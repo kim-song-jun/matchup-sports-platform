@@ -1478,6 +1478,18 @@ export class GamesService {
           // 대회 픽스처(`TOURNAMENT_FIXTURE`)에는 팀매치가 없으므로 `teamMatchId` 가 null 이라
           // 자연히 건너뛴다 — 즉 이 줄은 리그에만 작용한다.
           if (updated.teamMatchId !== null) {
+            // **취소된 대진은 여기서 막는다(결함 #29 C-1).** 대진 취소 경로
+            // (`cancelFixture`/`regenerateFixtures`/`removeTeam`)는 **게임을 건드리지 않아서**
+            // LIVE 이던 게임이 그대로 남고, 콘솔의 "경기 종료" 가 눌린다. 그대로 두면
+            // 완료 처리가 `cancelled` 를 `completed` 로 바꾸고, 24시간 뒤 자동 승인 잡의
+            // `revision.teamMatchStatus === 'cancelled'` 가드가 **이미 바뀐 값을 읽어** 통과해
+            // **취소된 경기가 공식 결과가 된다**(그 가드의 주석이 정확히 이 시나리오다).
+            // 순위표의 `status === 'cancelled'` 필터도 같은 이유로 뚫린다.
+            //
+            // **완료 처리의 `where` 를 좁히는 것으론 부족하다** — 그러면 상태만 안 바뀌고
+            // 결과 리비전은 그대로 생겨 자동 승인 레인에 들어간다. 그래서 리비전을 만들기
+            // **전에** 제출 경로(`submitResultRevision`)와 **같은 계약**을 건다.
+            await this.assertTeamMatchMatched(tx, updated.teamMatchId);
             await this.completeTeamMatchAtResultBoundary(
               tx,
               updated.teamMatchId,

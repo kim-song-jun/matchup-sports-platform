@@ -27,6 +27,7 @@ const ids = {
   leagueMatch: '96000000-0000-4000-8000-000000000040',
   friendlyMatch: '96000000-0000-4000-8000-000000000041',
   draftMatch: '96000000-0000-4000-8000-000000000042',
+  cancelledMatch: '96000000-0000-4000-8000-000000000043',
 } as const;
 
 const prisma = new PrismaService();
@@ -45,17 +46,23 @@ const sourceContext = (actor: GameActorScope, commandId: string, payload: unknow
   payloadHash: canonicalGameCommandPayloadHash(payload),
 });
 
+/**
+ * 실패를 잡아 돌려준다. **성공하면 그 사실을 값으로 돌려준다** — `beforeAll` 에서 던지면
+ * 스위트 전체가 red 가 되어 "무엇이 깨졌는지" 가 뭉개진다(실제로 C-1 을 재현할 때 그랬다).
+ */
 const captureFailure = async (run: () => Promise<unknown>): Promise<unknown> => {
   try {
     await run();
+    return { __unexpectedSuccess: true };
   } catch (error) {
     return error;
   }
-  throw new Error('호출이 실패했어야 하는데 성공했다');
 };
 
 const httpBody = (error: unknown): { code?: string; status: number } => {
-  if (!(error instanceof HttpException)) throw error;
+  if (!(error instanceof HttpException)) {
+    throw new Error(`HttpException 이 아니다: ${JSON.stringify(error)}`);
+  }
   const body = error.getResponse();
   const code = typeof body === 'object' && body !== null ? (body as { code?: string }).code : undefined;
   return { code, status: error.getStatus() };
@@ -66,9 +73,11 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
   let leagueGameId: string;
   let friendlyGameId: string;
   let draftGameId: string;
+  let cancelledGameId: string;
   let leagueEnded: Awaited<ReturnType<typeof service.executeCommand>> | undefined;
   let draftEnded: Awaited<ReturnType<typeof service.executeCommand>> | undefined;
   let friendlyEndError: unknown;
+  let cancelledEndError: unknown;
 
   const createGame = async (teamMatchId: string, commandId: string): Promise<string> => {
     const input: GameSourceCreationInput = {
@@ -163,6 +172,9 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     await prisma.v1TeamMatch.create({
       data: { ...common, id: ids.draftMatch, title: '#31 초안이 있는 리그 대진', leagueId: league.id },
     });
+    await prisma.v1TeamMatch.create({
+      data: { ...common, id: ids.cancelledMatch, title: '#29 C-1 취소될 리그 대진', leagueId: league.id },
+    });
 
     // **일정 행을 실제로 만든다.** 없으면 "SCHEDULED 0건" 단언이 빈 집합에서 참이 되어
     // cascade 가 도는지 아닌지를 전혀 구분하지 못한다(공허한 테스트).
@@ -187,6 +199,7 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     leagueGameId = await createGame(ids.leagueMatch, 'console-end-src-league');
     friendlyGameId = await createGame(ids.friendlyMatch, 'console-end-src-friendly');
     draftGameId = await createGame(ids.draftMatch, 'console-end-src-draft');
+    cancelledGameId = await createGame(ids.cancelledMatch, 'console-end-src-cancelled');
     // **초안을 미리 심는다(#31).** 호스트 팀장이 `createResultRevision` 으로 만들 수 있는
     // 상태다 — 그 경로엔 게임 상태 게이트가 없다. 예전 코드는 `revision: 1` 리터럴이라
     // 이 상태에서 `end` 가 P2002 로 죽고, 그게 409 "reload and retry" 로 번역됐다.
@@ -218,6 +231,16 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
 
     await run(friendlyGameId, 'start', 'console-end-friendly-start');
     friendlyEndError = await captureFailure(() => run(friendlyGameId, 'end', 'console-end-friendly-end'));
+
+    // **C-1 재현: 진행 중에 대진이 취소된 상황.** 우천 중단·팀 이탈로 운영자가 대진을
+    // 취소하는 경로(`cancelFixture`/`regenerateFixtures`/`removeTeam`)는 **게임을 건드리지
+    // 않는다** — LIVE 이던 게임은 LIVE 로 남는다. 그래서 콘솔의 "경기 종료" 가 그대로 눌린다.
+    await run(cancelledGameId, 'start', 'console-end-cancelled-start');
+    await prisma.v1TeamMatch.update({
+      where: { id: ids.cancelledMatch },
+      data: { status: 'cancelled', cancelledAt: new Date() },
+    });
+    cancelledEndError = await captureFailure(() => run(cancelledGameId, 'end', 'console-end-cancelled-end'));
   });
 
   afterAll(async () => {
@@ -285,6 +308,27 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
       { revision: 1, state: 'DRAFT' },
       { revision: 2, state: 'SUBMITTED' },
     ]);
+  });
+
+  it('취소된 리그 대진은 콘솔로 끝낼 수 없다 — 되살아나면 24시간 뒤 자동 확정된다 (C-1)', () => {
+    // 이걸 열어 두면 **취소된 경기가 공식 결과가 된다.** 사슬이 이렇다:
+    //   대진 취소는 게임을 안 끝낸다(LIVE 유지) → 콘솔 `end` 통과 → 완료 처리가
+    //   `cancelled` 를 `completed` 로 바꾼다 → 24시간 뒤 자동 승인 잡의
+    //   `revision.teamMatchStatus === 'cancelled'` 가드가 **이미 바뀐 값을 읽어** 통과 →
+    //   OFFICIAL. 그 가드의 자기 주석이 정확히 이 시나리오를 적고 있다.
+    //   순위표의 `status === 'cancelled'` 필터도 같은 이유로 뚫린다.
+    // 즉 **가드를 지운 게 아니라 가드가 보는 값을 바꿔서** 같은 결과를 만든다.
+    expect(httpBody(cancelledEndError)).toEqual({ status: 409, code: 'TEAM_MATCH_NOT_MATCHED' });
+  });
+
+  it('취소된 대진은 상태도 결과도 그대로다 — 되살아나지 않는다 (C-1)', async () => {
+    const cancelled = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: ids.cancelledMatch } });
+    expect(cancelled.status).toBe('cancelled');
+    expect(cancelled.completedAt).toBeNull();
+    // 리비전 자체가 안 생겨야 한다 — `where` 를 `status: matched` 로 좁히는 것만으로는
+    // 완료 처리만 막히고 **리비전은 그대로 생긴다**(그러면 자동 승인 레인에 그대로 들어간다).
+    const revisions = await prisma.v1GameResultRevision.count({ where: { gameId: cancelledGameId } });
+    expect(revisions).toBe(0);
   });
 
   it('친선 팀매치는 여전히 콘솔로 끝낼 수 없다 (409) — 이 가드가 지키던 것', () => {

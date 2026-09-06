@@ -128,6 +128,26 @@ import type {
 } from './dto/game-participant-identity.dto';
 import { findTournamentOnSurface, ALL_COMPETITION_KINDS } from '../tournaments/tournament-surface-lookup';
 
+/**
+ * 플랫폼 운영자의 **권한 주체 문자열**.
+ *
+ * takeover 토큰은 이 문자열에 묶인다(`GameTakeoverService.grant`) — 어드민 권한이 바뀌면
+ * `updatedAt` 이 움직여 옛 토큰이 자연히 무효가 되도록 설계된 값이다. 그래서 **세 자리가
+ * 글자 그대로 같아야** 한다: 형식이 갈리면 같은 사람의 토큰이 경로에 따라 다른 주체로
+ * 발급돼, 무효화가 한쪽에서만 듣는다.
+ *
+ * 실제로 갈려 있었다. TOURNAMENT_FIXTURE 경로는 이 문자열을 채웠는데 **TEAM_MATCH 경로의
+ * 운영자 분기만 주체 없이 반환**해서, `requestTakeover` 의
+ * `if (actor.authorizationSubject === undefined) throw forbidden()` 에 걸렸다 —
+ * 리그 대진의 게임이 `sourceType = TEAM_MATCH` 라, **플랫폼 운영자가 리그 경기를 콘솔에서
+ * 시작조차 못 했다**(2026-09-05 alpha 실측: 콘솔은 다 그려지는데 "경기 시작" 이
+ * `STAFF_SCOPE_DENIED`). 그래서 인라인 템플릿을 지우고 이 함수로 모은다.
+ */
+function platformOpsAuthorizationSubject(userId: string, adminUpdatedAt: Date): string {
+  return `platform_ops:${userId}@${adminUpdatedAt.getTime()}`;
+}
+
+
 type Transaction = Prisma.TransactionClient;
 type CommandResult = object;
 // Exhaustive list of every `v1_outbox_events.type` value this service ever
@@ -5665,7 +5685,7 @@ export class GamesService {
             teamId: membership.teamId,
           };
         }
-        const authorizationSubject = `platform_ops:${userId}@${eligibleAdmin.updatedAt.getTime()}`;
+        const authorizationSubject = platformOpsAuthorizationSubject(userId, eligibleAdmin.updatedAt);
         if (
           expectedAuthorizationSubject !== undefined &&
           expectedAuthorizationSubject !== authorizationSubject
@@ -5700,7 +5720,7 @@ export class GamesService {
         if (!decision.allowed) {
           throw this.forbidden();
         }
-        const authorizationSubject = `platform_ops:${userId}@${eligibleAdmin.updatedAt.getTime()}`;
+        const authorizationSubject = platformOpsAuthorizationSubject(userId, eligibleAdmin.updatedAt);
         if (
           expectedAuthorizationSubject !== undefined &&
           expectedAuthorizationSubject !== authorizationSubject
@@ -5809,7 +5829,14 @@ export class GamesService {
       admin.adminRole !== 'support' &&
       admin.user.accountStatus === 'active'
     ) {
-      return { actorType: 'USER', actorUserId: userId, role: 'platform_ops' };
+      // **주체를 반드시 함께 준다.** 없으면 `requestTakeover` 가 무조건 403 이라
+      // 운영자가 이 경로의 경기를 콘솔에서 시작조차 못 한다(리그 대진이 여기로 온다).
+      return {
+        actorType: 'USER',
+        actorUserId: userId,
+        role: 'platform_ops',
+        authorizationSubject: platformOpsAuthorizationSubject(userId, admin.updatedAt),
+      };
     }
     const match = game.teamMatch;
     if (match === null) {

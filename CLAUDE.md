@@ -533,6 +533,9 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - **`landing-rhythm`** — 랜딩·소개·온보딩·캠페인·빈 상태 카피처럼 *사용자가 훑어 읽는 화면*의
   레이아웃·카피 기준(큰 타이틀 · 키워드→타이틀→본문→그래픽 모듈 반복 · 여백 · 강조 섹션 하나).
   DESIGN.md 가 우선하고, 앱 셸 안 리스트/디테일/폼/유틸리티 페이지에는 쓰지 않는다.
+- **`browse-density`** — 목록·피드·그리드·필터·검색 결과처럼 *사용자가 고르는 화면*의 밀도 기준
+  (390 에서 화면당 4장 이상 · 미디어 크기는 결정 기여도에 비례 · 필터가 결과를 가리지 않기).
+  `landing-rhythm` 의 반대편이다 — 이해시키는 화면인지 비교시키는 화면인지 먼저 가른다.
 - **`agy-3d-graphic`** — 화면에 들어가는 3D 그래픽을 `agy`(alias `ag`) CLI 로 만들 때의 절차.
   메시지→상징 오브젝트→style lock 프롬프트→`scripts/postprocess.py` 검증·webp·매니페스트→
   `EmptyState illustration` 배치. 이 절차 밖에서 만든 이미지는 `public/illustrations/` 에 넣지 않는다.

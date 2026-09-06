@@ -509,10 +509,19 @@ export const gameSchemaSourceManifest = {
   // 바이트를 결속하기 때문에 걸리는 것이지 game operations 계약이 바뀐 게 아니다. 바인딩된
   // 20260729000100_v1_game_operations 는 건드리지 않았으므로 migration 해시는 불변이다.
   //
+  // 2026-09-07 재핀(Apple 로그인): `enum V1AuthProvider` 에 값 `apple` **한 줄**이 늘었다.
+  // 스키마 전체 대비 diff 가 그 한 줄뿐임을 확인했다 —
+  // `diff <(git show origin/dev:apps/v1_api/prisma/schema.prisma) apps/v1_api/prisma/schema.prisma`
+  // 가 `45a46 > apple` 만 낸다. Postgres enum 에 값을 더하는 것이라 기존 행·컬럼은 그대로다.
+  // 뒷받침 마이그레이션: 20260904150000_v1_auth_provider_apple (ADD VALUE IF NOT EXISTS).
+  //
+  // **game domain(V1Game*) 은 한 줄도 달라지지 않았다** — 이 guard 가 schema.prisma 전체
+  // 바이트를 결속하기 때문에 걸리는 것이지 game operations 계약이 바뀐 게 아니다. 바인딩된
+  // 20260729000100_v1_game_operations 는 건드리지 않았으므로 migration 해시는 불변이다.
+  //
   // 이 값은 **`origin/dev` 를 흡수한 뒤의** schema.prisma 로 재계산했다(게이트와 같은 방식 —
   // CRLF→LF 정규화 후 sha256). 흡수 전 해시를 그대로 쓰면 병합 결과와 달라 그대로 다시 깨진다.
-  // 뒷받침 마이그레이션: 20260904120000_v1_tournament_player_jersey_number.
-  schema: '6ac9a8b580718e20ac49f6850a442fadb0d019229815554ae456c5034ff3e702',
+  schema: '41cdf103464469263b69d7c60886078a6dce601e087bb8ca1ba3a407ad35759e',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

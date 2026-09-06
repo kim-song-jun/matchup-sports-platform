@@ -372,14 +372,14 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
   }
 
   /**
-   * 행 액션의 "취소" 버튼. **상태 필터 칩에도 같은 이름이 있어서** 이름만으로는 못 고른다 —
-   * 칩은 `aria-pressed` 를 갖고 행 액션은 안 갖는다.
+   * 행 액션의 "거부" 버튼. 모달·토스트와 같은 말을 쓴다 — 위쪽 상태 필터 칩의 "취소" 는
+   * **신청 상태 이름**이라 다른 뜻이고, 그래서 이름 충돌도 사라졌다.
    */
   function openCancelModal() {
-    const buttons = screen.getAllByRole('button', { name: '취소' });
-    const action = buttons.find((b) => !b.hasAttribute('aria-pressed'));
-    if (action === undefined) throw new Error('행 액션의 취소 버튼을 찾지 못했다');
-    return action;
+    // 모달이 열리면 그 안에도 "거부" 가 생긴다 — **열기 전에** 하나뿐일 때 잡는다.
+    const buttons = screen.getAllByRole('button', { name: '거부' });
+    if (buttons.length !== 1) throw new Error(`행 액션 "거부" 가 ${buttons.length}개다`);
+    return buttons[0];
   }
 
   it('리그: 사유가 비어 있으면 요청을 보내지 않고 이유를 말한다', () => {
@@ -388,7 +388,9 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
       <RegistrationsTab tournamentId="league-1" showToast={showToast} canWrite requireCancelReason />,
     );
     fireEvent.click(openCancelModal());
-    fireEvent.click(screen.getByRole('button', { name: '거부' }));
+    const submit = screen.getAllByRole('button', { name: '거부' }).at(-1);
+    if (submit === undefined) throw new Error('모달의 거부 버튼을 찾지 못했다');
+    fireEvent.click(submit);
 
     expect(cancelMutate).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent('리그 참가를 거부하려면 사유를 입력해 주세요.');
@@ -401,7 +403,9 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
     );
     fireEvent.click(openCancelModal());
     fireEvent.change(screen.getByLabelText('사유'), { target: { value: '정원 초과' } });
-    fireEvent.click(screen.getByRole('button', { name: '거부' }));
+    const submit = screen.getAllByRole('button', { name: '거부' }).at(-1);
+    if (submit === undefined) throw new Error('모달의 거부 버튼을 찾지 못했다');
+    fireEvent.click(submit);
 
     expect(cancelMutate).toHaveBeenCalledWith(
       { registrationId: 'reg-1', reason: '정원 초과' },
@@ -418,7 +422,9 @@ describe('RegistrationsTab — 거부 사유와 자동 확정 배지 (FE-4)', ()
     const { cancelMutate } = arrange();
     render(<RegistrationsTab tournamentId="tournament-1" showToast={showToast} canWrite />);
     fireEvent.click(openCancelModal());
-    fireEvent.click(screen.getByRole('button', { name: '거부' }));
+    const submit = screen.getAllByRole('button', { name: '거부' }).at(-1);
+    if (submit === undefined) throw new Error('모달의 거부 버튼을 찾지 못했다');
+    fireEvent.click(submit);
 
     // 빈 사유는 **키 자체를 빼고** 보낸다 — 빈 문자열을 보내면 팀이 남긴 취소 사유를
     // 덮어쓸 여지가 생긴다(서버는 `dto.reason ?? 기존값` 으로 보존한다).

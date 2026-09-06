@@ -872,7 +872,12 @@ export function RegistrationsTab({
                   onClick={() => void handleCancel(reg)}
                   disabled={cancelRegistration.isPending}
                   icon={<X size={13} />}
-                  label="취소"
+                  // 모달·토스트와 같은 말을 쓴다. 이 액션은 팀의 취소 요청을 받아 주는
+                  // 것만이 아니라 **운영자가 신청을 물리는 것**도 겸하고(그래서 리그는
+                  // 사유가 필수다), 위쪽 상태 필터 칩의 "취소" 는 **신청 상태 이름**이라
+                  // 다른 뜻이다. BE 경로는 `.../cancel` 그대로 둔다 — 저장하는 상태가
+                  // `cancelled` 라서, 거기까지 바꾸면 상태 이름과 어긋난다.
+                  label="거부"
                   tone="red"
                 />
               )}

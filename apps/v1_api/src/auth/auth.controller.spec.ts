@@ -1,6 +1,17 @@
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthController } from './auth.controller';
+import { AppleIdentityService } from './apple-identity.service';
+
+/**
+ * The controller only forwards to this service; what it actually does is covered by
+ * apple-identity-token.spec.ts and apple-nonce.spec.ts.
+ */
+const appleIdentityDouble = () => ({
+  issueNonce: jest.fn().mockReturnValue({ nonce: 'a1.value.9999999999.signature' }),
+  verifyIdentityToken: jest.fn(),
+  isConfigured: true,
+});
 import { AuthService } from './auth.service';
 
 describe('AuthController', () => {
@@ -25,6 +36,7 @@ describe('AuthController', () => {
           provide: PrismaService,
           useValue: {},
         },
+        { provide: AppleIdentityService, useValue: appleIdentityDouble() },
       ],
     }).compile();
 
@@ -58,6 +70,7 @@ describe('AuthController', () => {
       providers: [
         { provide: AuthService, useValue: authService },
         { provide: PrismaService, useValue: {} },
+        { provide: AppleIdentityService, useValue: appleIdentityDouble() },
       ],
     }).compile();
 
@@ -87,6 +100,7 @@ describe('AuthController', () => {
       providers: [
         { provide: AuthService, useValue: authService },
         { provide: PrismaService, useValue: {} },
+        { provide: AppleIdentityService, useValue: appleIdentityDouble() },
       ],
     }).compile();
 
@@ -120,6 +134,7 @@ describe('AuthController', () => {
       providers: [
         { provide: AuthService, useValue: authService },
         { provide: PrismaService, useValue: {} },
+        { provide: AppleIdentityService, useValue: appleIdentityDouble() },
       ],
     }).compile();
 
@@ -159,6 +174,7 @@ describe('AuthController', () => {
       providers: [
         { provide: AuthService, useValue: authService },
         { provide: PrismaService, useValue: {} },
+        { provide: AppleIdentityService, useValue: appleIdentityDouble() },
       ],
     }).compile();
 
@@ -191,6 +207,7 @@ describe('AuthController', () => {
       providers: [
         { provide: AuthService, useValue: authService },
         { provide: PrismaService, useValue: {} },
+        { provide: AppleIdentityService, useValue: appleIdentityDouble() },
       ],
     }).compile();
 
@@ -230,6 +247,7 @@ describe('AuthController', () => {
       providers: [
         { provide: AuthService, useValue: authService },
         { provide: PrismaService, useValue: {} },
+        { provide: AppleIdentityService, useValue: appleIdentityDouble() },
       ],
     }).compile();
 

@@ -209,7 +209,17 @@ class LiveWebHarnessCase: XCTestCase {
         XCTAssertTrue(focus(passwordField), "the password field never took keyboard focus")
         passwordField.typeText(password)
 
-        XCTAssertTrue(tapRow("로그인"), "no submit button on the sign-in form")
+        // Return, before reaching for the button. The shell now shortens the web view to sit
+        // above the keyboard, so on a tall device the submit button can be below the visible
+        // area entirely — `tapRow` then scrolls forever looking for something it cannot see.
+        // Enter submits the form outright on most attempts, and when it does not it at least
+        // puts the keyboard away and brings the button back into view.
+        passwordField.typeText("\n")
+        settle(2)
+
+        if !webView.links["마이"].exists {
+            XCTAssertTrue(tapRow("로그인"), "no submit button on the sign-in form")
+        }
         XCTAssertTrue(webView.links["마이"].waitForExistence(timeout: 90), "sign-in did not complete")
         attach("01-signed-in")
     }

@@ -23,5 +23,18 @@
 	<array>
 		<string>applinks:$(TEAMEET_APP_LINK_HOST)</string>
 	</array>
+	<!--
+	  Sign in with Apple. Required by App Store Review Guideline 4.8 because the app offers
+	  Kakao login: an app using a third-party social login must also offer a login that
+	  collects only name and email and lets the reader keep the address private.
+
+	  Without this entitlement the ASAuthorization sheet fails with error 1000 at runtime,
+	  and the capability has to be enabled on the App ID in the Apple Developer console for
+	  the provisioning profile to grant it.
+	-->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
 </dict>
 </plist>

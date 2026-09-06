@@ -85,6 +85,9 @@ services:
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
       FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      # Sign in with Apple 이 받아들일 audience(= 번들 id). 비밀이 아니라 앱 스토어에 찍히는
+      # 값이라 시크릿 동기화 없이 리터럴로 둔다. 비어 있으면 Apple 로그인만 조용히 꺼진다.
+      APPLE_SIGN_IN_AUDIENCES: ${APPLE_SIGN_IN_AUDIENCES:-kr.co.teameet}
       APNS_KEY_ID: ${APNS_KEY_ID:-}
       APNS_TEAM_ID: ${APNS_TEAM_ID:-}
       APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-}
@@ -136,6 +139,9 @@ services:
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
       FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      # Sign in with Apple 이 받아들일 audience(= 번들 id). 비밀이 아니라 앱 스토어에 찍히는
+      # 값이라 시크릿 동기화 없이 리터럴로 둔다. 비어 있으면 Apple 로그인만 조용히 꺼진다.
+      APPLE_SIGN_IN_AUDIENCES: ${APPLE_SIGN_IN_AUDIENCES:-kr.co.teameet}
       APNS_KEY_ID: ${APNS_KEY_ID:-}
       APNS_TEAM_ID: ${APNS_TEAM_ID:-}
       APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-}

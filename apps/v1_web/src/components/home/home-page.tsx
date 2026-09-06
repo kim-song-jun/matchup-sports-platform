@@ -971,7 +971,7 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
             className={`tm-match-card-media${match.imageUrl ? '' : ' tm-match-media-sport'}`}
             style={match.imageUrl ? { background: `${cssUrl(match.imageUrl)} center/cover` } : undefined}
           >
-            {match.imageUrl ? null : <SportIllustration sizes="112px" sport={match.sportLabel} />}
+            {match.imageUrl ? null : <SportIllustration sizes="132px" sport={match.sportLabel} />}
           </div>
           <div style={{ padding: 16 }}>
             <div className="tm-text-micro" style={{ color: 'var(--blue700)' }}>{match.sportLabel}</div>

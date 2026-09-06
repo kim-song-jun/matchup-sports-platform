@@ -2642,12 +2642,12 @@ label.tm-btn:focus-within {
 }
 
 /*
- * 사진이 없는 매치의 미디어 영역 — 목업 사진 대신 종목 그래픽(sportIllustration). 히어로는 흰 글씨
- * 오버레이를 그대로 쓰므로 바탕을 --blue700(흰 글씨 5.41:1 AA)으로 깔고 그래픽을 오른쪽에 둔다.
+ * 사진이 없는 매치 카드·홈 레일의 미디어 영역 — 목업 사진 대신 종목 그래픽(sportIllustration).
+ * 영상(pCc9GspeYfg) 03·07 을 따라 밝은 바탕 위 중앙에, 크게, 방해 요소 없이 둔다. 예전에는
+ * --blue700 진한 패널에 112px 아이콘을 얹고 그 위에 배지까지 겹쳤다. 상세·홈 히어로는 이제
+ * 이 클래스를 쓰지 않고 .tm-match-detail-hero-stack / .tm-home-featured-stack 으로 쌓는다.
  */
 .tm-match-media-sport {
-  /* 영상(pCc9GspeYfg) 03·07: 그래픽은 밝은 바탕 위 중앙에, 크게, 방해 요소 없이.
-     예전에는 --blue700 진한 패널에 112px 아이콘을 얹고 그 위에 배지까지 겹쳤다. */
   background: var(--grey50);
   display: flex;
   align-items: center;

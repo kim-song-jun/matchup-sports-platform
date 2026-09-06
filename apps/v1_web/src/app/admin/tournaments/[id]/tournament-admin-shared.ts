@@ -33,10 +33,19 @@ export function allowedNextStatuses(current: V1TournamentStatus): V1TournamentSt
   }
 }
 
+/**
+ * 어드민 목록의 시각 표기.
+ *
+ * **`timeZone` 을 고정한다.** 없으면 브라우저(=기기) 타임존으로 렌더돼, 해외에서 접속한
+ * 운영자와 한국 운영자가 **같은 신청을 다른 시각으로 본다.** 이 화면의 값은 전부 서버가
+ * KST 기준으로 다루는 것들이라(신청 시각·취소 요청 시각·명단 자동 확정 시각) 표기도
+ * KST 로 고정하는 것이 맞다 — `lib/date-utils.ts` 가 같은 이유로 KST 고정을 쓴다.
+ */
 export function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—';
   try {
     return new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul',
       year: 'numeric',
       month: 'numeric',
       day: 'numeric',

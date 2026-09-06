@@ -128,7 +128,11 @@ export default function LeagueRegistrationsClient({ leagueId }: { leagueId: stri
         </div>
       </div>
 
-      <RegistrationsTab tournamentId={leagueId} showToast={showToast} canWrite />
+      {/* `requireCancelReason` — 정규 리그는 거부 사유가 필수다(D9). 서버가
+          `LEAGUE_CANCEL_REASON_REQUIRED` 로 막는데 화면이 사유를 안 받아서, 그동안
+          **어드민이 리그 신청을 거부할 방법이 아예 없었다.** 대회 화면은 이 값을 안 넘겨
+          기존 계약(선택)이 그대로 유지된다. */}
+      <RegistrationsTab tournamentId={leagueId} showToast={showToast} canWrite requireCancelReason />
       <AdminToasts toasts={toasts} />
     </div>
   );

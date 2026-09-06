@@ -40,7 +40,10 @@ describe('buildSportChips', () => {
 describe('getStatus — 마감 판정', () => {
   const past = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-  const teamMatch = (overrides: Partial<V1TeamMatch>) => overrides as V1TeamMatch;
+  // getStatus 는 status/displayState/deadlineAt 세 필드만 읽는다 — 전체 V1TeamMatch 를
+  // 지어내면 무엇을 보는 함수인지 오히려 흐려진다.
+  const teamMatch = (overrides: { status: string; displayState?: string; deadlineAt: string | null }) =>
+    overrides as unknown as V1TeamMatch;
 
   it('displayState 가 없어도 신청 마감이 지났으면 closed 로 본다', () => {
     expect(getStatus(teamMatch({ status: 'recruiting', deadlineAt: past }))).toBe('closed');

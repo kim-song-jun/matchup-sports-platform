@@ -622,7 +622,27 @@ describe('MatchesService', () => {
       matchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: null }),
     );
 
-    await expect(service.reopen(host, 'match-1', {})).resolves.toMatchObject({ deadlineAt: null });
+    await service.reopen(host, 'match-1', {});
+
+    // 응답의 deadlineAt 은 mock 이 돌려준 값이라 아무것도 증명하지 못한다 —
+    // **무엇을 쓰라고 보냈는지**를 본다.
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'recruiting', deadlineAt: null } }),
+    );
+  });
+
+  it('reopen: 새 마감 시각을 주면 그 값으로 갱신한다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ status: 'closed', startAt: FUTURE, deadlineAt: PAST }),
+    );
+    prisma.v1Match.update.mockResolvedValue(matchRow({ status: 'recruiting' }));
+    const nextDeadline = new Date(FUTURE.getTime() - 60 * 60 * 1000);
+
+    await service.reopen(host, 'match-1', { deadlineAt: nextDeadline.toISOString() });
+
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'recruiting', deadlineAt: nextDeadline } }),
+    );
   });
 
   it('reopen: 아직 남은 마감 시각은 건드리지 않고, 이미 모집 중이면 409 ALREADY_PROCESSED', async () => {

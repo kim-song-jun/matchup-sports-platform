@@ -29,6 +29,9 @@ const { createMatchMutate, routerPush, uploadImagesMutateAsync, confirmMock, upd
       title: '수정 중인 매치',
       imageUrl: null,
       startsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      // 마감 시각은 '모집 마감/다시 열기' 토글이 읽는 값이라 fixture 에 자리를 만들어 둔다
+      // (테스트마다 과거/미래로 바꿔 넣는다).
+      deadlineAt: null as string | null,
       capacity: 10,
       manualPlaceName: '한강 풋살장',
     },

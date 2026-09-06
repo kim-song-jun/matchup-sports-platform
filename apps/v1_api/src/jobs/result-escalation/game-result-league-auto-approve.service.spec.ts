@@ -66,25 +66,36 @@ function fakeTx(opts: {
 }
 
 describe('GameResultLeagueAutoApproveService', () => {
-  it('SUBMITTED 상태의 리그 리비전을 OFFICIAL로 승인하고 결정/게임/아웃박스를 기록한다', async () => {
+  /**
+   * **옛 계약을 여기 박아 두고 있었다.** 이 테스트는 "리그 리비전을 24시간 뒤 OFFICIAL 로
+   * 승격한다" 를 고정하고 있었는데, 그건 정본 §4("결과 보내기 → **어드민 확인** 한 단계")가
+   * 없앤 단계다 — 자동 승인은 그 확인을 통째로 건너뛴다. **지우지 않고 새 계약으로 다시 적는다.**
+   */
+  it('리그 리비전을 자동 승인하지 않는다 — 어드민 확인을 건너뛰면 안 된다 (A-3)', async () => {
     const service = new GameResultLeagueAutoApproveService();
     const tx = fakeTx({ revisionRow: submittedLeagueRevision(), superseded: false, updateReturnsRevision: 3 });
 
     await expect(service.handler(claim('rev-1'), tx as never)).resolves.toBeUndefined();
 
-    const executed = tx.$executeRaw.mock.calls.map(sqlOf);
-    expect(executed).toHaveLength(3);
-    expect(executed[0]).toContain('INSERT INTO v1_game_result_decisions');
-    expect(executed[0]).toContain("'SYSTEM'");
-    expect(executed[0]).toContain("'approve'");
-    expect(executed[1]).toContain('UPDATE v1_games');
-    expect(executed[1]).toContain('current_official_revision_id');
-    expect(executed[2]).toContain('INSERT INTO v1_outbox_events');
-    expect(executed[2]).toContain("'GAME_RESULT_OFFICIAL'");
+    // **한 줄도 나가면 안 된다** — 결정 행도, 게임의 공식 리비전 포인터도, OFFICIAL 아웃박스도.
+    // 이 게이트가 막는 것은 **되돌리기 어려운 행위**다(어드민 확인 없이 공식 결과가 박힌다).
+    expect(tx.$executeRaw.mock.calls.map(sqlOf)).toHaveLength(0);
+  });
 
-    // 시스템 액터 값이 실제 v1_users id와 절대 겹치지 않는 고정 문자열이어야 한다
-    // (NULL을 도입하지 않고 유니크 제약을 지키는 방식 -- 상수 doc comment 참고).
-    expect(tx.$executeRaw.mock.calls[0]).toContain('system:league-result-auto-approve');
+  it('배포 전에 이미 예약된 잡이 발화해도 확정하지 않는다 (A-3 이중 방어)', async () => {
+    // 에스컬레이션 핸들러의 게이트는 **앞으로 예약이 안 생기게** 한다. 그런데 배포 시점에
+    // **이미 큐에 있던** 리그 예약은 그대로 발화한다 — 그때 확정되면 안 된다. 그래서 두
+    // 게이트가 필요하고, 둘은 서로 다른 것을 막는다.
+    const service = new GameResultLeagueAutoApproveService();
+    const tx = fakeTx({
+      revisionRow: submittedLeagueRevision({ revisionId: 'rev-queued-before-deploy' }),
+      superseded: false,
+      updateReturnsRevision: 3,
+    });
+
+    await service.handler(claim('rev-queued-before-deploy'), tx as never);
+
+    expect(tx.$executeRaw.mock.calls.map(sqlOf)).toHaveLength(0);
   });
 
   it('사람이 이미 승인/정정요청해 SUBMITTED 가 아니면 조용히 아무것도 하지 않는다(멱등)', async () => {

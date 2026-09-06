@@ -12,6 +12,7 @@ import {
   useV1LeagueMatchStandings,
   useV1MyTeams,
   useV1RecordConsent,
+  useV1MyRegistrations,
 } from '@/hooks/use-v1-api';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
@@ -502,6 +503,25 @@ function LeagueRegistrationCta({
   registrationOpen: boolean;
   registrationDeadlineAt: string | null;
 }) {
+  // **이미 신청한 사람에게 "참가 신청" 이라고 말하지 않는다.** 예전엔 조건 없이 `/apply`
+  // 로 보냈는데, 신청이 있으면 그 화면이 `/my` 로 되돌린다 — 팀장은 "신청" 을 눌렀는데
+  // 자기 신청 화면이 열려서 **눌린 건지 안 눌린 건지 알 수 없었다**(2026-09-05 alpha 실측).
+  // 대회 상세는 이미 같은 방식으로 갈라 두고 있어(`tournament-detail-client.tsx`) 그
+  // 판정 규칙을 그대로 쓴다 — 취소된 신청은 "없는 것" 으로 본다(다시 신청할 수 있다).
+  // **비로그인에게 401 을 쏘지 않는다.** 이 순위표는 공개 화면이라 로그인하지 않은 사람도
+  // 연다 — `registrationOpen` 만으로 켜면 그때마다 인증 요청이 나가 실패한다.
+  // 대회 상세와 같은 방식으로, 저장된 세션 힌트를 `useEffect` 로 읽은 뒤에만 켠다
+  // (SSR 과 첫 렌더가 어긋나지 않게 초기값은 false 다).
+  const [hasSessionHint, setHasSessionHint] = useState(false);
+  useEffect(() => {
+    setHasSessionHint(hasStoredV1Session());
+  }, []);
+  const myRegistrations = useV1MyRegistrations(leagueId, {
+    enabled: registrationOpen && hasSessionHint,
+  });
+  const activeRegistration =
+    (myRegistrations.data ?? []).find((registration) => registration.status !== 'cancelled') ?? null;
+
   if (!registrationOpen) return null;
   const deadlineLabel = formatTournamentDateTimeShort(registrationDeadlineAt);
   return (
@@ -511,11 +531,15 @@ function LeagueRegistrationCta({
         <span className="tm-text-caption text-[var(--text-muted)]">신청 마감 {deadlineLabel}</span>
       )}
       <Link
-        href={`/tournaments/${leagueId}/apply`}
-        className="tm-btn tm-btn-sm tm-btn-primary"
+        href={
+          activeRegistration === null
+            ? `/tournaments/${leagueId}/apply`
+            : `/tournaments/${leagueId}/my?reg=${activeRegistration.id}`
+        }
+        className={`tm-btn tm-btn-sm ${activeRegistration === null ? 'tm-btn-primary' : 'tm-btn-outline'}`}
         style={{ minHeight: 44 }}
       >
-        참가 신청
+        {activeRegistration === null ? '참가 신청' : '내 신청'}
       </Link>
     </div>
   );

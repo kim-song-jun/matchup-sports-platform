@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
   useV1ActivePopup,
@@ -11,6 +11,7 @@ import {
   useV1MyLeagues,
   useV1MyTeams,
   useV1RecordConsent,
+  useV1MyRegistrations,
 } from '@/hooks/use-v1-api';
 import { clearStoredV1Session, saveStoredV1Session } from '@/lib/session-storage';
 import { queryImageBySrc } from '@/test/next-image';
@@ -22,6 +23,7 @@ vi.mock('@/components/auth/pending-social-signup-gate', () => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1ActivePopup: vi.fn(),
+  useV1MyRegistrations: vi.fn(() => ({ data: [] })),
   useV1LeagueMatch: vi.fn(),
   useV1LeagueMatchStandings: vi.fn(),
   useV1LeagueMatchPlayerRecords: vi.fn(),
@@ -43,6 +45,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 }));
 
 const useV1ActivePopupMock = vi.mocked(useV1ActivePopup, { partial: true });
+const useV1MyRegistrationsMock = vi.mocked(useV1MyRegistrations);
 const useV1LeagueMatchMock = vi.mocked(useV1LeagueMatch, { partial: true });
 const useV1LeagueMatchStandingsMock = vi.mocked(useV1LeagueMatchStandings, { partial: true });
 const useV1LeagueMatchPlayerRecordsMock = vi.mocked(useV1LeagueMatchPlayerRecords, { partial: true });
@@ -1542,6 +1545,18 @@ describe('LeagueMatchStandingsClient', () => {
  * (2026-09-04 alpha 실측: 리그 화면 버튼 전수가 `["전체","예정만"]`).
  */
 describe('리그 참가 신청 입구', () => {
+  beforeEach(() => {
+    // 기본은 "신청 없음" — 케이스마다 필요할 때만 덮는다.
+    useV1MyRegistrationsMock.mockReturnValue({ data: [] } as never);
+    // **세션 힌트가 있어야 내 신청을 조회한다.** 이 순위표는 공개 화면이라 비로그인도
+    // 열고, 힌트 없이 켜면 401 이 나간다. 힌트를 안 세우면 이 화면의 실제 동작과 다르다.
+    clearStoredV1Session();
+  });
+
+  afterEach(() => {
+    clearStoredV1Session();
+  });
+
   function mockLeague(extra: Record<string, unknown>) {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
@@ -1568,6 +1583,80 @@ describe('리그 참가 신청 입구', () => {
     expect(container.querySelector('a[href="/tournaments/league-1/apply"]')).toBeInTheDocument();
   });
 
+  it('비로그인에게는 내 신청을 조회하지 않는다 — 공개 화면에서 401 을 쏘지 않는다', async () => {
+    // 이 순위표는 **공개 화면**이라 로그인하지 않은 사람도 연다. `registrationOpen` 만으로
+    // 켜면 그때마다 인증 요청이 나가 실패한다(Copilot 지적).
+    //
+    // 훅이 mock 이라 `enabled` 가 반환값을 바꾸지 않는다 — 그래서 **호출 계약을 직접
+    // 단언한다.** 화면 텍스트로만 보면 게이트를 지워도 통과해서(변이 red 0 으로 확인)
+    // 아무것도 검증하지 못한다.
+    clearStoredV1Session();
+    mockLeague({ registrationOpen: true, registrationDeadlineAt: '2026-09-20T14:59:00.000Z' });
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+    await waitFor(() => expect(screen.getByText('모집 중')).toBeInTheDocument());
+
+    expect(useV1MyRegistrationsMock).toHaveBeenCalledWith(
+      'league-1',
+      expect.objectContaining({ enabled: false }),
+    );
+  });
+
+  it('로그인 힌트가 있으면 조회한다 — 게이트가 항상 닫혀 있으면 아무도 "내 신청" 을 못 본다', async () => {
+    saveStoredV1Session({ userId: 'captain' });
+    mockLeague({ registrationOpen: true, registrationDeadlineAt: '2026-09-20T14:59:00.000Z' });
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+    await waitFor(() => expect(screen.getByText('모집 중')).toBeInTheDocument());
+
+    await waitFor(() =>
+      expect(useV1MyRegistrationsMock).toHaveBeenCalledWith(
+        'league-1',
+        expect.objectContaining({ enabled: true }),
+      ),
+    );
+  });
+
+  it('이미 신청한 팀장에게는 "내 신청" 으로 보낸다 — 결함 #22-a', async () => {
+    saveStoredV1Session({ userId: 'captain' });
+    // 예전엔 조건 없이 `/apply` 로 보냈다. 신청이 있으면 그 화면이 `/my` 로 되돌리므로,
+    // 팀장은 "참가 신청" 을 눌렀는데 자기 신청 화면이 열려 **눌린 건지 안 눌린 건지
+    // 알 수 없었다**(2026-09-05 alpha 실측).
+    useV1MyRegistrationsMock.mockReturnValue({
+      data: [{ id: 'reg-9', status: 'confirmed' }],
+    } as never);
+    mockLeague({ registrationOpen: true, registrationDeadlineAt: '2026-09-20T14:59:00.000Z' });
+    const { container } = render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+    await waitFor(() => expect(screen.getByText('내 신청')).toBeInTheDocument());
+    expect(container.querySelector('a[href="/tournaments/league-1/my?reg=reg-9"]')).toBeInTheDocument();
+    expect(container.querySelector('a[href="/tournaments/league-1/apply"]')).not.toBeInTheDocument();
+  });
+
+  it('취소한 신청은 없는 것으로 본다 — 다시 신청할 수 있어야 한다', async () => {
+    saveStoredV1Session({ userId: 'captain' });
+    useV1MyRegistrationsMock.mockReturnValue({
+      data: [{ id: 'reg-old', status: 'cancelled' }],
+    } as never);
+    mockLeague({ registrationOpen: true, registrationDeadlineAt: '2026-09-20T14:59:00.000Z' });
+    const { container } = render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+    await waitFor(() => expect(screen.getByText('참가 신청')).toBeInTheDocument());
+    expect(container.querySelector('a[href="/tournaments/league-1/apply"]')).toBeInTheDocument();
+  });
+
   it('신청을 안 받으면 입구를 아예 그리지 않는다 — 회색 버튼도 죽은 안내도 남기지 않는다', async () => {
     mockLeague({ registrationOpen: false, registrationDeadlineAt: '2020-01-01T00:00:00.000Z' });
     const { container } = render(
@@ -1580,7 +1669,10 @@ describe('리그 참가 신청 입구', () => {
     expect(container.querySelector('a[href="/tournaments/league-1/apply"]')).not.toBeInTheDocument();
   });
 
-  it('마감이 없어도 신청 버튼은 보인다 — null 은 "안 받는다" 가 아니라 "기한이 없다" 다', async () => {
+  it('받는 중이면 마감이 비어 있어도 입구는 그린다 — 받는지는 registrationOpen 이 답한다', async () => {
+    // 제목을 고쳤다. 예전엔 "null 은 기한이 없다" 로 적혀 있었는데, 2026-09-04 사용자
+    // 확정으로 **마감을 안 정하면 그 리그는 신청을 안 받는다**(정본 §6). 이 케이스가
+    // 검증하는 것은 그 계약이 아니라 "판정은 서버가 하고 화면은 그 값을 따른다" 는 것이다.
     mockLeague({ registrationOpen: true, registrationDeadlineAt: null });
     const { container } = render(
       <Providers>

@@ -19,6 +19,12 @@ type SqlClient = {
 /**
  * 주어진 신청들의 자동 확정 시각. **자동 확정되지 않은 신청은 맵에 아예 들어오지 않는다** —
  * `null` 을 넣어 두면 "자동 확정됐는데 시각을 모른다" 와 구분되지 않는다.
+ *
+ * **캐스팅은 `::text[]` 다.** `v1_tournament_registrations.id` 의 실제 컬럼 타입이
+ * `text` 이기 때문이다(값은 UUID 모양이지만 타입은 아니다). `::uuid[]` 로 쓰면
+ * Postgres 가 `operator does not exist: text = uuid` 로 **쿼리 전체를 500** 으로 만든다 —
+ * 2026-09-06 alpha 에서 어드민 리그 신청 목록이 통째로 죽었다. 유닛 스펙은 `$queryRaw` 를
+ * mock 으로 두고 반환값만 봐서 이 SQL 이 실제로 도는지 아무도 확인하지 않았다.
  */
 export async function readRosterAutoConfirmedAt(
   client: SqlClient,
@@ -30,7 +36,7 @@ export async function readRosterAutoConfirmedAt(
   const rows = await client.$queryRaw<Array<{ id: string; roster_auto_confirmed_at: Date | null }>>`
     SELECT id, roster_auto_confirmed_at
     FROM "v1_tournament_registrations"
-    WHERE id = ANY(${registrationIds}::uuid[])
+    WHERE id = ANY(${registrationIds}::text[])
       AND roster_auto_confirmed_at IS NOT NULL
   `;
   for (const row of rows) {

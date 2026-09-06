@@ -2619,6 +2619,109 @@ label.tm-btn:focus-within {
   min-width: 0;
 }
 
+/*
+ * 매치 목록의 기본 행 — 좌측 64px 썸네일 + 비교 축.
+ * 배너 카드(146px 미디어 / 286px 카드)는 390 폭에서 2.95장밖에 안 보였다. 목록은 고르는
+ * 화면이라 개수가 먼저다(browse-density 스킬 기준 1·2). 배너는 상단 이벤트 레일로 옮겼다.
+ */
+.tm-match-row {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--card-surface);
+  border: 1px solid var(--grey150);
+  border-radius: var(--radius-container);
+  text-decoration: none;
+  color: inherit;
+}
+
+.tm-match-row-thumb {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-control);
+  background-position: center;
+  background-size: cover;
+  overflow: hidden;
+}
+
+/* 썸네일 안의 종목 그래픽 — 목록 기본 크기(132px)를 이 자리 크기로 덮는다. */
+.tm-match-row-thumb .tm-match-sport-illustration {
+  width: 52px;
+  height: 52px;
+}
+
+.tm-match-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.tm-match-row-meta {
+  color: var(--text-caption);
+}
+
+.tm-match-row-title {
+  margin-top: 2px;
+  color: var(--text-strong);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
+.tm-match-row-when {
+  margin-top: 4px;
+}
+
+.tm-match-row-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tm-match-row-act {
+  flex: none;
+  color: var(--blue500);
+  font-weight: 600;
+}
+
+/* ── 상단 이벤트 레일 ── */
+.tm-match-rail-section {
+  margin-top: 16px;
+}
+
+.tm-match-rail-heading {
+  color: var(--text-strong);
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+/*
+ * 가로 스크롤. 카드 폭을 뷰포트보다 좁게 잡아 "옆에 더 있다"가 보이게 한다.
+ * 목록 본문은 세로 행이라, 이 레일이 유일한 가로 스크롤 영역이다.
+ */
+.tm-match-rail-h {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+
+.tm-match-rail-h > * {
+  flex: 0 0 276px;
+  scroll-snap-align: start;
+}
+
+@media (min-width: 1024px) {
+  .tm-match-rail-h > * {
+    flex: 0 0 320px;
+  }
+}
+
 .tm-match-card-stack {
   display: flex;
   flex-direction: column;

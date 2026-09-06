@@ -71,8 +71,19 @@ TEAMEET_SHOT_EMAIL=<계정> TEAMEET_SHOT_PASSWORD=<비밀번호> \
   scripts/ios/capture-store-screenshots.sh
 ```
 
-- 알파채널이 있으면 App Store Connect 가 업로드를 거부한다 — 스크립트가 마지막에 평탄화한다.
+카피는 별도 단계다. 원본을 그대로 두고 앞 3장에만 얹는다:
+
+```bash
+node scripts/ios/compose-store-captions.mjs <위 스크립트가 만든 디렉터리>
+# → <디렉터리>/captioned/01-home.png … 03-tournaments.png
+```
+
+카피 문구는 그 스크립트의 `CAPTIONS` 표 하나에만 있다. **화면에 실제로 보이는 것만 적는다** —
+앱에서 찾을 수 없는 주장은 2.3(정확한 메타데이터) 반려 사유다.
+
+- 알파채널이 있으면 App Store Connect 가 업로드를 거부한다 — 두 스크립트 모두 마지막에 평탄화한다.
 - 승격 **후** 프로덕션 빌드로 다시 찍는다. 스크린샷은 리뷰어가 설치할 앱과 같아야 한다.
+  지금 alpha 로 찍은 것은 하네스 검증용이며, 대회명이 테스트 데이터(`ttt`)라 그대로 못 쓴다.
 
 ## 6. Apple Developer / App Store Connect — 사용자 작업
 

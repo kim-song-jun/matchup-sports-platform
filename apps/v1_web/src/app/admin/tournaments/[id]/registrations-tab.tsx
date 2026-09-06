@@ -21,6 +21,7 @@ import {
   formatPhoneNumber,
   formatRegistrationPaymentSubtitle,
   submitBtnCls,
+  textareaCls,
 } from './tournament-detail-shared';
 
 
@@ -918,7 +919,7 @@ export function RegistrationsTab({
                 ? '왜 거부하는지 적어 주세요. 팀에게 남는 기록이에요.'
                 : '필요하면 적어 주세요.'
             }
-            className="rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 py-2 text-sm text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className={textareaCls}
           />
           {cancelError !== null ? (
             <p role="alert" className="text-xs text-[var(--red600,#dc2626)]">

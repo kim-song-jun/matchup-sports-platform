@@ -6,6 +6,7 @@ import {
 import type { LeagueFixtureListItem } from '../league-matches/league-fixture-list-source';
 import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
+import type { PublicRosterPlayer } from './public-roster';
 
 /**
  * 어워드 수상자 표시 이름 -- 저장된 `recipientName`(명단 실명 스냅샷, `tournament-reviews.service.ts`의
@@ -98,6 +99,17 @@ function presentOfficialResult(
   };
 }
 
+/**
+ * **공개 참가팀 목록에 그려지는 등록 상태.** 조회에 실린 상태(`TOURNAMENT_DETAIL_INCLUDE` 는
+ * 결제 진행 중 3개까지 포함한다)와 **다르다** — 화면에 안 나오는 등록의 명단까지 읽지 않도록
+ * 호출부가 이 술어로 좁힌다. 두 곳이 각자 배열을 적으면 조용히 갈리므로 여기 하나만 둔다.
+ */
+const PUBLICLY_LISTED_REGISTRATION_STATUSES = ['confirmed', 'waitlisted'] as const;
+
+export function isPubliclyListedRegistration(status: string): boolean {
+  return (PUBLICLY_LISTED_REGISTRATION_STATUSES as readonly string[]).includes(status);
+}
+
 export function presentTournamentDetail(
   row: TournamentDetailRow,
   now: Date = new Date(),
@@ -113,6 +125,16 @@ export function presentTournamentDetail(
    * 된다 — 타입도 값도 정상으로 보인다. 그래서 별도 필드로 낸다.
    */
   leagueFixtures: LeagueFixtureListItem[] = [],
+  /**
+   * 공개 명단(키: 등록 id). **호출부가 배치로 한 번에 읽어 넘긴다** — `leagueFixtures` 와
+   * 같은 규약이고, presenter 는 조회하지 않는다.
+   *
+   * **명단을 감출 때는 호출부가 아예 안 읽고 빈 맵을 넘긴다.** 그래서 이 자리에 기본값
+   * `new Map()` 이 있는 것이 곧 "명단 없음" 이다 — 예전처럼 `registration.players` 를
+   * 읽으면 include 가 조인을 하고 있어야만 맞는 값이 되어, 조인을 빼는 순간 조용히
+   * 빈 배열이 된다.
+   */
+  rosterByRegistrationId: ReadonlyMap<string, PublicRosterPlayer[]> = new Map(),
 ) {
   // Task 109 Track 6: bracketPublishedAt이 null이면 대진표(조/픽스처)를 관리자가 아직
   // 일괄 공개하지 않은 상태 — 공개 조회에서는 groups/fixtures를 빈 배열로 감춘다.
@@ -214,7 +236,7 @@ export function presentTournamentDetail(
     participantTeams: hideIdentity
       ? []
       : row.registrations
-            .filter((registration) => ['confirmed', 'waitlisted'].includes(registration.status))
+            .filter((registration) => isPubliclyListedRegistration(registration.status))
             .sort((a, b) => {
               const aRank = a.status === 'confirmed' ? 0 : 1;
               const bRank = b.status === 'confirmed' ? 0 : 1;
@@ -228,6 +250,17 @@ export function presentTournamentDetail(
               teamRegionName: registration.team.region?.name ?? null,
               status: registration.status,
               confirmedAt: registration.confirmedAt?.toISOString() ?? null,
+              // **팀 식별정보와 같은 게이트를 탄다** — `hideIdentity` 가 참이면 이 분기
+              // 자체가 안 돈다. 명단만 따로 게이트를 두면 "팀명은 가렸는데 선수는 보인다"
+              // 같은 어긋남이 생긴다(이 파일이 통일한 그 정책).
+              //
+              // **팀의 `membersVisible` 은 보지 않는다**(2026-09-06 사용자 확정) —
+              // 대회 명단은 팀의 멤버 목록이 아니라 **이 대회에 누가 나오는지**라는
+              // 대회의 사실이다.
+              // **`registration.players` 를 읽지 않는다.** include 에서 빠졌으므로 그 자리를
+              // 그대로 두면 `?? []` 가 삼켜 **명단이 조용히 빈 배열**이 된다 — tsc·lint 둘 다
+              // 못 잡고, row 를 인라인으로 만드는 유닛 스펙도 그대로 통과한다.
+              players: rosterByRegistrationId.get(registration.id) ?? [],
             })),
     pendingPaymentCount: row.registrations.filter((registration) =>
       ['awaiting_payment', 'payment_checking', 'paid'].includes(registration.status),

@@ -146,6 +146,17 @@ export type MatchCreateViewModel = {
     onNext: () => void;
     onSubmit: () => void;
     onCancel?: () => void;
+    /**
+     * 모집 마감 / 다시 열기 토글 (호스트 전용, 수정 화면 하단).
+     * 취소(onCancel)와 달리 **되돌릴 수 있는** 동작이라 danger 가 아니라 neutral 로 두고
+     * 취소 버튼 위에 놓는다 — 마감하려다 취소를 누르는 사고를 막는다.
+     */
+    recruitingToggle?: {
+      label: string;
+      hint: string;
+      pending?: boolean;
+      onClick: () => void;
+    };
     uploadImage?: (file: File) => Promise<string>;
     submitLabel?: string;
     submitting?: boolean;

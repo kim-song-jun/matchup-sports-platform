@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
@@ -182,8 +185,38 @@ function ParticipantTeamList({
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       {teams.map((team) => (
+        <ParticipantTeamRow key={team.registrationId} team={team} label={label} badgeClass={badgeClass} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * 참가팀 한 줄 + **공개 명단 펼치기**(사용자 A안, 2026-09-06).
+ *
+ * 정본 §3 이 "명단 공개는 등번호·이름(닉네임)" 으로 확정했고, 그걸 묻는 사람이 가는 자리가
+ * 여기(참가팀)다. 새 페이지를 만들지 않고 이 카드 안에서 펼친다.
+ *
+ * **토글은 링크 안에 넣지 않는다.** 팀 이름 줄은 이미 팀 상세로 가는 `<Link>` 라, 그 안에
+ * 버튼을 두면 인터랙티브 요소가 중첩돼 키보드·스크린리더에서 무엇이 눌리는지 갈린다.
+ * 링크 **옆**에 별도 버튼을 둔다.
+ */
+function ParticipantTeamRow({
+  team,
+  label,
+  badgeClass,
+}: {
+  team: V1TournamentParticipantTeam;
+  label: string;
+  badgeClass: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const rosterId = `roster-${team.registrationId}`;
+
+  return (
+    <div style={{ display: 'grid', gap: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 8 }}>
         <Link
-          key={team.registrationId}
           href={`/teams/${team.teamId}`}
           className="tm-list-row-interactive tm-pressable"
           style={{
@@ -217,7 +250,61 @@ function ParticipantTeamList({
             {label}
           </span>
         </Link>
-      ))}
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-expanded={open}
+          aria-controls={rosterId}
+          // **접근성 이름에 팀명을 넣는다.** 보이는 글자는 "명단" 이라 짧아도 되지만,
+          // 스크린리더 사용자는 버튼 목록을 훑기 때문에 팀마다 이름이 같으면 **어느 팀의
+          // 명단인지 구분할 수 없다**(Copilot 지적).
+          aria-label={`${team.teamName} 명단 ${open ? '접기' : '펼치기'}`}
+          className="tm-text-caption tm-pressable"
+          style={{
+            minHeight: 44, minWidth: 44, padding: '0 10px',
+            border: '1px solid var(--border)', borderRadius: 'var(--radius-control)',
+            background: 'var(--card-surface)', color: 'var(--text-muted)', whiteSpace: 'nowrap',
+          }}
+        >
+          {open ? '명단 접기' : '명단'}
+        </button>
+      </div>
+      {open ? (
+        <div
+          id={rosterId}
+          style={{
+            padding: '8px 12px',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-control)',
+            background: 'var(--grey50)',
+          }}
+        >
+          {team.players.length === 0 ? (
+            <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+              아직 명단을 등록하지 않았어요.
+            </div>
+          ) : (
+            <ul style={{ display: 'grid', gap: 4, margin: 0, padding: 0, listStyle: 'none' }}>
+              {team.players.map((player) => (
+                <li
+                  key={player.id}
+                  style={{ display: 'grid', gridTemplateColumns: '32px 1fr', alignItems: 'baseline', gap: 8 }}
+                >
+                  {/* 등번호가 없는 선수는 `—` — 0 으로 채우면 아무도 안 단 번호가 전원 0번이 된다. */}
+                  <span className="tm-text-caption tab-num" style={{ color: 'var(--text-caption)' }}>
+                    {player.jerseyNumber ?? '—'}
+                  </span>
+                  {/* 닉네임을 못 찾으면(탈퇴·프로필 삭제) 자리표시자다. **실명으로 떨어뜨리지
+                      않는다** — 정본 §3 은 공개 명단을 등번호·닉네임으로 못 박았다. */}
+                  <span className="tm-text-caption" style={{ color: 'var(--text-strong)' }}>
+                    {player.nickname ?? '(탈퇴한 선수)'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

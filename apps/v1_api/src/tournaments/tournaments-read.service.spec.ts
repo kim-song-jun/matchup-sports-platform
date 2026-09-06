@@ -172,6 +172,8 @@ describe('TournamentsReadService', () => {
       findFirst: jest.Mock;
       count: jest.Mock;
     };
+    /** 공개 명단 등번호는 raw 로 읽는다(생성 클라이언트에 컬럼이 없다). */
+    $queryRaw: jest.Mock;
     // 참가팀 식별 정보 통일 정책(fix/v1-publish)의 운영자·스태프 우회는
     // TournamentStaffAccessService(실제 구현)를 그대로 배선하므로, 그게 의존하는
     // v1AdminUser/v1TournamentStaffAssignment도 이 같은 fake PrismaService 위에
@@ -198,6 +200,9 @@ describe('TournamentsReadService', () => {
         findFirst: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
       },
+      // 기본은 "아무도 번호를 안 달았다" — 행 배열을 준다. `undefined` 로 두면 결과를
+      // 순회하는 코드가 mock 에서만 터진다.
+      $queryRaw: jest.fn().mockResolvedValue([]),
       v1AdminUser: {
         findUnique: jest.fn().mockResolvedValue(null),
       },
@@ -746,6 +751,13 @@ describe('TournamentsReadService', () => {
   });
 
   it('get: returns public participant teams and filters to active registration statuses (status=closed, post-recruiting)', async () => {
+    // **명단은 raw 한 번으로 읽는다.** 빈 배열을 돌려주면 아래 `players` 단언이 전부
+    // "빈 명단이 맞다" 가 되어 아무것도 증명하지 않는다 — 등번호를 **단 선수와 안 단 선수**를
+    // 섞어 돌려준다(안 단 선수가 사라지지 않는지가 이 픽스처의 핵심이다).
+    prisma.$queryRaw.mockResolvedValue([
+      { id: 'player-1', registration_id: 'reg-confirmed', jersey_number: 7, nickname: '길동이' },
+      { id: 'player-2', registration_id: 'reg-confirmed', jersey_number: null, nickname: null },
+    ]);
     const row = fullTournamentRow({
       status: 'closed',
       registrations: [
@@ -766,6 +778,13 @@ describe('TournamentsReadService', () => {
           confirmedAt: null,
           team: { id: 'team-waitlisted', name: '대기 FC', profile: null, region: null },
         },
+        {
+          // 조회에는 실리지만 **화면에는 안 그려지는** 상태 — 이 등록의 명단은 읽지 않아야 한다.
+          id: 'reg-awaiting-payment',
+          status: 'awaiting_payment',
+          confirmedAt: null,
+          team: { id: 'team-awaiting', name: '입금대기 FC', profile: null, region: null },
+        },
       ],
     });
     prisma.v1Tournament.findFirst.mockResolvedValue(row);
@@ -781,6 +800,12 @@ describe('TournamentsReadService', () => {
         teamRegionName: '서울 강남구',
         status: 'confirmed',
         confirmedAt: '2026-06-20T00:00:00.000Z',
+        // 공개 명단 — 등번호를 안 단 선수도 **남는다**. 조회에 `jersey_number IS NOT NULL`
+        // 을 걸면 `player-2` 가 통째로 사라지는데, 그건 화면에서 선수가 없어지는 결함이다.
+        players: [
+          { id: 'player-1', jerseyNumber: 7, nickname: '길동이' },
+          { id: 'player-2', jerseyNumber: null, nickname: null },
+        ],
       },
       {
         registrationId: 'reg-waitlisted',
@@ -790,8 +815,20 @@ describe('TournamentsReadService', () => {
         teamRegionName: null,
         status: 'waitlisted',
         confirmedAt: null,
+        // 이 등록에는 명단 행이 없다 — 맵에 키가 없으면 빈 배열이다.
+        players: [],
       },
     ]);
+
+    // **공개면 명단 조회가 정확히 한 번.** 팀마다 물으면 N+1 이고, 두 번이면 등번호를
+    // 따로 읽던 옛 구조로 되돌아간 것이다.
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    // **화면에 그려지는 등록만 넘긴다.** 조회에는 결제 진행 중 상태까지 실리지만 presenter 는
+    // `confirmed`/`waitlisted` 두 개만 그린다 — 안 그리는 등록의 명단을 읽으면 이 변경이
+    // 없앤 "읽고 버린다" 가 규모만 작아진 채 남는다.
+    const rosterArgs = JSON.stringify(prisma.$queryRaw.mock.calls[0]);
+    expect(rosterArgs).toContain('reg-confirmed');
+    expect(rosterArgs).not.toContain('reg-awaiting-payment');
 
     const callArgs = prisma.v1Tournament.findFirst.mock.calls[0][0];
     // Merged registration lifecycle: 결제 진행(awaiting_payment/payment_checking/paid) 팀도 공개 참가팀에 포함.
@@ -839,6 +876,10 @@ describe('TournamentsReadService', () => {
     expect(result.participantTeams).toEqual([]);
     // 모집 중에도 확정 인원수는 그대로 노출 — "그냥 다 숨겨버리는" 구현이면 이 값도 0이 되어 잡힌다.
     expect(result.confirmedCount).toBe(4);
+    // **숨김이면 명단을 아예 안 읽는다.** 예전엔 기본 조회의 include 가 무조건 명단 행과
+    // 닉네임 조인을 읽고 presenter 가 통째로 버렸다 — 안 쓰는 PII 인접 필드를 응답 경로에
+    // 싣지 않는다는 원칙은 "읽지도 않는다" 까지 가는 것이 일관된다.
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
   });
 
   it.each(['closed', 'in_progress', 'completed'] as const)(

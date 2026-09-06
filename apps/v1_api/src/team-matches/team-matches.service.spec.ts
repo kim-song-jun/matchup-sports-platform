@@ -560,14 +560,25 @@ describe('TeamMatchesService', () => {
     }
   });
 
-  it('list: 기본 조회는 최신 생성순이며 시작·신청 마감이 지난 모집 행을 제외한다', async () => {
+  it('list: 기본 조회는 최신 생성순이며 경기 전 마감 행도 신청마감 상태로 노출한다', async () => {
     prisma.v1TeamMatch.findMany.mockResolvedValue([]);
 
     await service.list(null, {});
 
     const args = prisma.v1TeamMatch.findMany.mock.calls[0][0];
     expect(args.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+    expect(args.where.status).toEqual({ in: ['recruiting', 'closed', 'matched'] });
     expect(args.where.startAt).toEqual({ gte: expect.any(Date) });
+    expect(args.where.AND).toBeUndefined();
+  });
+
+  it('list: 추천순은 신청 마감이 지나지 않은 모집 행만 조회한다', async () => {
+    prisma.v1TeamMatch.findMany.mockResolvedValue([]);
+
+    await service.list(null, { sort: 'recommended' });
+
+    const args = prisma.v1TeamMatch.findMany.mock.calls[0][0];
+    expect(args.where.status).toEqual({ in: ['recruiting'] });
     expect(args.where.AND).toEqual(expect.arrayContaining([
       { OR: [{ deadlineAt: null }, { deadlineAt: { gte: expect.any(Date) } }] },
     ]));

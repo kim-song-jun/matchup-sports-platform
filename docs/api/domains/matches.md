@@ -5,12 +5,13 @@
 | Method | Path | Auth | 설명 |
 |---|---|---|---|
 | GET | `/matches` | No | 목록 조회 |
-| GET | `/matches/recommended` | Yes | 추천 매치 |
+| GET | `/home/recommendations` | No | 신청 가능한 추천 매치 |
 | POST | `/matches` | Yes | 생성 |
 | GET | `/matches/:id` | No | 상세 |
 | PATCH | `/matches/:id` | Yes | 수정 |
 | POST | `/matches/:id/cancel` | Yes | 취소 (host) |
 | POST | `/matches/:id/close` | Yes | 모집 마감 (host) |
+| POST | `/matches/:id/reopen` | Yes | 모집 재개 (host) |
 | POST | `/matches/:id/join` | Yes | 참가 |
 | DELETE | `/matches/:id/leave` | Yes | 탈퇴 |
 | POST | `/matches/:id/teams` | Yes | 팀 자동 배정 (host) |
@@ -35,7 +36,8 @@
 
 - Response: `{ items, pageInfo }`
 - 기본 목록은 `createdAt DESC, id DESC` 최신 생성순이다. `deadline`/`starts_at`은 경기 시작 임박순이며 `recommended`는 현재 시작 임박순으로 처리한다.
-- `status`를 생략한 모집 목록은 raw `recruiting` 중 경기 시작 전이고, 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다. 상세의 `displayState`도 같은 시작·마감 기준을 사용한다.
+- `status`를 생략한 일반 목록은 경기 시작 전인 raw `recruiting`과 `closed`를 포함한다. 신청 마감이 지났거나 raw `closed`인 항목도 경기 시작 전까지 `displayState=closed`(신청마감)로 노출하고, 경기 시작 시각 이후에는 목록에서 제외한다.
+- `sort=recommended` 목록과 `GET /home/recommendations`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다.
 - Each list item includes `host.userId`, `host.displayName`, `host.profileImageUrl`, and `host.trustState`.
   `host.displayName` resolves the creator profile nickname first, then the profile display name, then the semantic `호스트` fallback.
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
@@ -106,11 +108,27 @@
 - 시간 창: 시작 30분 전 ~ 종료 30분 후
 - venue 좌표가 있으면 200m 이내만 허용
 
+## POST /matches/:id/close · /matches/:id/reopen (host)
+
+팀매치 `close`/`reopen` 과 같은 계약이다. **취소와 다르다** — 매치와 확정 참가자는 그대로 두고
+"새 신청을 더 받는 것"만 닫으므로 되돌릴 수 있다.
+
+- `close` (body `{ reason? }`): `recruiting` + 시작 전에만. `status='closed'` 로 바꾸고 대기 중
+  (`requested`)이던 신청서를 `expired` 로 정리한 뒤 그 신청자에게 `match_closed` 알림을 보낸다.
+  이미 `closed` 면 `409 ALREADY_PROCESSED`.
+- `reopen` (body `{ reason?, deadlineAt? }`): 시작 전에만. **닫힌 두 갈래를 모두 되돌린다** —
+  호스트가 닫은 `status='closed'` 와, 마감 시각이 지나 `displayState` 만 `closed` 인 `recruiting`
+  (화면에는 둘 다 "신청 마감"으로 보인다). 지난 마감 시각은 지운다(= 경기 시작 전까지 받는다) —
+  남겨두면 `getDisplayState` 가 곧바로 다시 `closed` 를 돌려줘 눌러도 아무 변화가 없다.
+  `deadlineAt` 을 주면 그 값으로 갱신하며 지금 이후 · 시작 이전이어야 한다(`400 VALIDATION_FAILED`).
+  이미 모집 중이면 `409 ALREADY_PROCESSED`, 시작 시각이 지났으면 `409 STATE_CONFLICT`.
+
 ## Idempotency / Duplicate Behavior
 
 - `join`: 이미 참가면 실패
 - `arrive`: 이미 도착 인증이면 실패
 - `cancel`/`complete`: 이미 종료 상태면 실패
+- `close`: 이미 마감이면 `409 ALREADY_PROCESSED` / `reopen`: 이미 모집 중이면 `409 ALREADY_PROCESSED`
 
 ## Task 6 Game source boundary
 

@@ -1,6 +1,25 @@
 import { HomeService } from './home.service';
 
 describe('HomeService', () => {
+  it('추천 매치는 경기 전이면서 신청 마감이 지나지 않은 모집 행만 조회한다', async () => {
+    const prisma = {
+      v1Match: { findMany: jest.fn().mockResolvedValue([]) },
+      v1Notice: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const popupsService = { findActive: jest.fn().mockResolvedValue(null) };
+    const service = new HomeService(prisma as never, popupsService as never);
+
+    await service.getRecommendations(null, {});
+
+    expect(prisma.v1Match.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        status: 'recruiting',
+        startAt: { gte: expect.any(Date) },
+        OR: [{ deadlineAt: null }, { deadlineAt: { gte: expect.any(Date) } }],
+      }),
+    }));
+  });
+
   it('returns the active popup separately from recent notices', async () => {
     const publishedAt = new Date('2026-07-09T00:00:00.000Z');
     const prisma = {

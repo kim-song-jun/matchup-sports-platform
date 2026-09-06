@@ -89,6 +89,8 @@ const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: WIDTH, height: HEIGHT } });
 
 const COLOR_TYPES = { 0: 'grey', 2: 'rgb', 3: 'palette', 4: 'grey+alpha', 6: 'rgba' };
+/** The two portrait sizes App Store Connect accepts for a 6.9" display. */
+const ACCEPTED_SIZES = new Set(['1290x2796', '1320x2868']);
 
 let captioned = 0;
 const rejected = [];
@@ -109,14 +111,17 @@ for (const name of shots) {
   const height = header.readUInt32BE(4);
   const colorType = header.readUInt8(9);
   console.log(`${name}  ${width} ${height}  ${COLOR_TYPES[colorType] ?? colorType}`);
-  if (colorType === 4 || colorType === 6) rejected.push(name);
+  if (colorType === 4 || colorType === 6) rejected.push(`${name} (alpha channel)`);
+  if (!ACCEPTED_SIZES.has(`${width}x${height}`)) {
+    rejected.push(`${name} (${width}x${height} is not a 6.9" size)`);
+  }
   captioned += 1;
 }
 
 await browser.close();
 
 if (rejected.length > 0) {
-  console.error(`\nThese carry an alpha channel and App Store Connect will refuse them: ${rejected.join(', ')}`);
+  console.error(`\nApp Store Connect will refuse these:\n  ${rejected.join('\n  ')}`);
   process.exit(1);
 }
 console.log(`\n${captioned} captioned in ${outputDirectory}`);

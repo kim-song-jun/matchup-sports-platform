@@ -30,6 +30,21 @@ const RESPONSE_TIMEOUT_MS = 120_000;
 /** The action name in the shared bridge contract; also what the shell lists in `supports`. */
 const APPLE_ACTION = 'sign-in-with-apple';
 
+/**
+ * Why the bridge could not answer — for logs, never for the reader.
+ *
+ * `message` is deliberately left empty. `extractErrorMessage` returns `err.message` when
+ * there is one, so an English internal string here would land verbatim in the Korean login
+ * screen's alert; empty lets the caller's own wording win. The reason stays on the object,
+ * so nothing is lost to whoever is debugging.
+ */
+export class NativeAppleSignInError extends Error {
+  constructor(readonly reason: 'bridge-unavailable' | 'timeout') {
+    super();
+    this.name = 'NativeAppleSignInError';
+  }
+}
+
 export function isNativeAppleSignInAvailable(): boolean {
   if (typeof window === 'undefined') return false;
   const bridge = window.TeameetNative;
@@ -41,7 +56,7 @@ export function requestNativeAppleSignIn(nonce: string): Promise<NativeAppleSign
   return new Promise((resolve, reject) => {
     const bridge = typeof window === 'undefined' ? undefined : window.TeameetNative;
     if (!bridge) {
-      reject(new Error('Teameet native bridge is unavailable.'));
+      reject(new NativeAppleSignInError('bridge-unavailable'));
       return;
     }
 
@@ -64,7 +79,7 @@ export function requestNativeAppleSignIn(nonce: string): Promise<NativeAppleSign
     window.addEventListener(RESULT_EVENT, handleResult as EventListener);
     timeoutId = setTimeout(() => {
       cleanup();
-      reject(new Error('Teameet native Apple sign-in timed out.'));
+      reject(new NativeAppleSignInError('timeout'));
     }, RESPONSE_TIMEOUT_MS);
 
     try {

@@ -81,8 +81,11 @@ import json, os, shutil, struct, sys
 output = sys.argv[1]
 manifest = os.path.join(output, 'attachments', 'manifest.json')
 if not os.path.exists(manifest):
+    # xcodebuild can report success while the export step produced nothing — a renamed test,
+    # a changed bundle. Reporting success here too would hand the operator an empty directory
+    # and let a submission pipeline carry on with no screenshots.
     print('no attachments were produced — see capture.log', file=sys.stderr)
-    raise SystemExit(0)
+    raise SystemExit(1)
 
 saved = []
 for test in json.load(open(manifest)):
@@ -98,8 +101,16 @@ for test in json.load(open(manifest)):
         saved.append(target)
 
 # Width, height and colour type all live in the PNG's first chunk, so reading 26 bytes
-# answers both questions without shelling out to anything.
+# answers every question below without shelling out to anything.
 COLOR_TYPES = {0: 'grey', 2: 'rgb', 3: 'palette', 4: 'grey+alpha', 6: 'rgba'}
+# The two portrait sizes App Store Connect accepts for a 6.9" display. Anything else is
+# refused on upload, so a simulator that is not the one this script picks must not pass
+# quietly as a set of unusable images.
+ACCEPTED_SIZES = {(1290, 2796), (1320, 2868)}
+
+if not saved:
+    print('the run produced no store screenshots — see capture.log', file=sys.stderr)
+    raise SystemExit(1)
 
 rejected = []
 for path in sorted(set(saved)):
@@ -107,11 +118,12 @@ for path in sorted(set(saved)):
         width, height, _depth, color = struct.unpack('>IIBB', handle.read(26)[16:26])
     print(f'{os.path.basename(path)}  {width} {height}  {COLOR_TYPES.get(color, color)}')
     if color in (4, 6):
-        rejected.append(os.path.basename(path))
+        rejected.append(f'{os.path.basename(path)} (alpha channel)')
+    if (width, height) not in ACCEPTED_SIZES:
+        rejected.append(f'{os.path.basename(path)} ({width}x{height} is not a 6.9" size)')
 
 if rejected:
-    print(f'\nThese carry an alpha channel and App Store Connect will refuse them: '
-          f'{", ".join(rejected)}', file=sys.stderr)
+    print('\nApp Store Connect will refuse these:\n  ' + '\n  '.join(rejected), file=sys.stderr)
     raise SystemExit(1)
 
 print(f'\n{len(set(saved))} screenshots in {output}')

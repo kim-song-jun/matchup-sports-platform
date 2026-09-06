@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isNativeAppleSignInAvailable, requestNativeAppleSignIn } from './native-apple';
+import { extractErrorMessage } from './error-message';
+import { NativeAppleSignInError, isNativeAppleSignInAvailable, requestNativeAppleSignIn } from './native-apple';
 
 afterEach(() => {
   delete window.TeameetNative;
@@ -55,6 +56,17 @@ describe('native Apple sign-in bridge', () => {
   });
 
   it('fails explicitly when there is no bridge at all', async () => {
-    await expect(requestNativeAppleSignIn('nonce')).rejects.toThrow('unavailable');
+    await expect(requestNativeAppleSignIn('nonce')).rejects.toMatchObject({
+      name: 'NativeAppleSignInError',
+      reason: 'bridge-unavailable',
+    });
+  });
+
+  // `extractErrorMessage` prefers `err.message`, so anything written there is what the reader
+  // sees. These errors carry their reason as a field and leave the message empty, so the
+  // login screen's own Korean wording wins.
+  it('keeps its internal reason out of the message the reader would be shown', () => {
+    const shown = extractErrorMessage(new NativeAppleSignInError('timeout'), '다시 시도해 주세요.');
+    expect(shown).toBe('다시 시도해 주세요.');
   });
 });

@@ -102,14 +102,9 @@ describe('Game core contract', () => {
         }),
       ).not.toThrow();
     }
-    expect(() =>
-      assertGameLifecycleTransition({
-        sourceType: V1GameSourceType.TEAM_MATCH,
-        trigger: 'TOURNAMENT_COMMAND',
-        from: V1GameState.SCHEDULED,
-        to: V1GameState.LIVE,
-      }),
-    ).toThrow(expect.objectContaining({ code: 'INVALID_STATE_TRANSITION' }));
+    // 콘솔 진행(`TOURNAMENT_COMMAND`)이 `TEAM_MATCH` 에서 무엇을 할 수 있는지는 이 테스트가
+    // 아니라 **아래 전용 describe(#25)** 가 한 벌로 맡는다 — 여기서 또 단언하면 같은 계약이
+    // 두 곳에 갈려 적히고, 나중에 한쪽만 고쳐져 서로 어긋난다.
   });
 
   it('permits a TEAM_RESULT_SUBMISSION resubmit from ENDED (the correction loop) but never from CANCELLED', () => {
@@ -427,5 +422,82 @@ describe('Game core contract', () => {
         records: [{ recordId: 'record-1' }],
       }),
     );
+  });
+});
+
+/**
+ * **리그 경기를 콘솔로 진행한다 (결함 #25, 2026-09-06 alpha 실측).**
+ *
+ * 리그 대진의 게임은 `TEAM_MATCH` 소스로 만들어지는데(`league-fixture-creation.ts`),
+ * `TOURNAMENT_COMMAND` 트리거가 `TOURNAMENT_FIXTURE` 에만 열려 있어서 **콘솔에서 경기를
+ * 시작조차 못 했다** — `TEAM_MATCH/TOURNAMENT_COMMAND cannot transition SCHEDULED to LIVE`.
+ * 인가(#23)를 고친 직후 그 뒤에서 드러난 두 번째 벽이다.
+ *
+ * 정본이 이미 정한 사안이다: "리그도 대회와 **같은 경기 운영 콘솔**을 쓴다(Task 165)" 이고,
+ * §6 결정 이력이 대가까지 적어 뒀다 — **"잃는 것: 콘솔이 팀 매치 출처를 알아야 한다"**.
+ */
+describe('assertGameLifecycleTransition — 팀 매치 출처의 콘솔 진행 (#25)', () => {
+  it('리그 대진(TEAM_MATCH)도 콘솔로 SCHEDULED → LIVE 할 수 있다', () => {
+    expect(() =>
+      assertGameLifecycleTransition({
+        sourceType: V1GameSourceType.TEAM_MATCH,
+        trigger: 'TOURNAMENT_COMMAND',
+        from: V1GameState.SCHEDULED,
+        to: V1GameState.LIVE,
+      }),
+    ).not.toThrow();
+  });
+
+  it('전이 표는 대회와 **같은 것을 쓴다** — 표를 갈라 두면 두 벌이 어긋난다', () => {
+    // LIVE→ENDED 는 허용, SCHEDULED→ENDED 는 불허 — 대회와 같은 규칙이다.
+    expect(() =>
+      assertGameLifecycleTransition({
+        sourceType: V1GameSourceType.TEAM_MATCH,
+        trigger: 'TOURNAMENT_COMMAND',
+        from: V1GameState.LIVE,
+        to: V1GameState.ENDED,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertGameLifecycleTransition({
+        sourceType: V1GameSourceType.TEAM_MATCH,
+        trigger: 'TOURNAMENT_COMMAND',
+        from: V1GameState.SCHEDULED,
+        to: V1GameState.ENDED,
+      }),
+    ).toThrow(GameContractError);
+  });
+
+  it('친선 팀매치는 그대로다 — 결과 제출로 ENDED 만 (회귀 방지)', () => {
+    // **이 케이스가 이 변경의 안전판이다.** 친선은 콘솔을 안 쓰고 `TEAM_RESULT_SUBMISSION`
+    // 으로만 끝내는데, 그 경로가 여전히 같은 규칙인지 고정한다.
+    expect(() =>
+      assertGameLifecycleTransition({
+        sourceType: V1GameSourceType.TEAM_MATCH,
+        trigger: 'TEAM_RESULT_SUBMISSION',
+        from: V1GameState.SCHEDULED,
+        to: V1GameState.ENDED,
+      }),
+    ).not.toThrow();
+    // 결과 제출로는 LIVE 로 못 간다 — 친선에 콘솔 진행을 열어 준 것이 아니다.
+    expect(() =>
+      assertGameLifecycleTransition({
+        sourceType: V1GameSourceType.TEAM_MATCH,
+        trigger: 'TEAM_RESULT_SUBMISSION',
+        from: V1GameState.SCHEDULED,
+        to: V1GameState.LIVE,
+      }),
+    ).toThrow(GameContractError);
+  });
+
+  it('대회 경기(TOURNAMENT_FIXTURE)는 그대로다 (회귀 방지)', () => {
+    expect(() =>
+      assertGameLifecycleTransition({
+        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+        trigger: 'TOURNAMENT_COMMAND',
+        from: V1GameState.SCHEDULED,
+        to: V1GameState.LIVE,
+      }),
+    ).not.toThrow();
   });
 });

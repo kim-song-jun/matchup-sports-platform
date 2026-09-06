@@ -194,8 +194,8 @@ function toHomeRecommendation(match: V1HomeRecommendation): HomeMatchCard {
     venue: match.regionName ?? base.venue,
     date: formatDate(match.startsAt),
     time: formatTime(match.startsAt),
-    currentParticipants: match.participantCount ?? base.currentParticipants,
-    maxParticipants: match.capacity ?? base.maxParticipants,
+    currentParticipants: match.participantCount ?? null,
+    maxParticipants: match.capacity ?? null,
     actionLabel: '승인제 신청',
   };
 }
@@ -226,8 +226,10 @@ function emptyMatchCard(): HomeMatchCard {
     venue: '',
     date: '',
     time: '',
-    currentParticipants: 0,
-    maxParticipants: 1,
+    // 인원은 "모름"으로 둔다 — 예전의 0/1 은 실제 1/6명 매치를 홈에서 "0/1명 · 마감 임박"
+    // 으로 보이게 했다(2026-09-07 프로덕션 제보).
+    currentParticipants: null,
+    maxParticipants: null,
     actionLabel: '',
     imageUrl: '/mock/generated/team-huddle.webp',
   };

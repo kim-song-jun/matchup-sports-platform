@@ -6,8 +6,8 @@ export type HomeMatchCard = {
   venue: string;
   date: string;
   time: string;
-  currentParticipants: number;
-  maxParticipants: number;
+  currentParticipants: number | null;
+  maxParticipants: number | null;
   actionLabel: string;
   imageUrl: string;
   reason?: string;

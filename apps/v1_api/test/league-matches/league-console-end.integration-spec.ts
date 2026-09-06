@@ -46,22 +46,27 @@ const sourceContext = (actor: GameActorScope, commandId: string, payload: unknow
   payloadHash: canonicalGameCommandPayloadHash(payload),
 });
 
+type Outcome<T> = { ok: true; value: T } | { ok: false; error: unknown };
+
 /**
- * 실패를 잡아 돌려준다. **성공하면 그 사실을 값으로 돌려준다** — `beforeAll` 에서 던지면
- * 스위트 전체가 red 가 되어 "무엇이 깨졌는지" 가 뭉개진다(실제로 C-1 을 재현할 때 그랬다).
+ * **성공이든 실패든 값으로 돌려준다.** `beforeAll` 에서 던지면 Jest 가 그 describe 의 모든
+ * `it` 을 실패로 보고해서 **"무엇이 깨졌는지" 가 통째로 뭉개진다** — 실제로 겪었다: 리비전
+ * 번호를 되돌리는 변이가 `beforeAll` 에서 터져 10건 전부 red 가 됐고, 그 숫자로는 어느
+ * 계약이 깨졌는지 알 수 없었다. 전이를 여기서 잡아 두면 각 `it` 이 자기 계약만 검사한다.
  */
-const captureFailure = async (run: () => Promise<unknown>): Promise<unknown> => {
+const capture = async <T>(run: () => Promise<T>): Promise<Outcome<T>> => {
   try {
-    await run();
-    return { __unexpectedSuccess: true };
+    return { ok: true, value: await run() };
   } catch (error) {
-    return error;
+    return { ok: false, error };
   }
 };
 
-const httpBody = (error: unknown): { code?: string; status: number } => {
+const httpBody = (outcome: Outcome<unknown>): { code?: string; status: number } => {
+  if (outcome.ok) throw new Error('실패했어야 하는데 성공했다');
+  const error = outcome.error;
   if (!(error instanceof HttpException)) {
-    throw new Error(`HttpException 이 아니다: ${JSON.stringify(error)}`);
+    throw new Error(`HttpException 이 아니다: ${String(error)}`);
   }
   const body = error.getResponse();
   const code = typeof body === 'object' && body !== null ? (body as { code?: string }).code : undefined;
@@ -74,10 +79,11 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
   let friendlyGameId: string;
   let draftGameId: string;
   let cancelledGameId: string;
-  let leagueEnded: Awaited<ReturnType<typeof service.executeCommand>> | undefined;
-  let draftEnded: Awaited<ReturnType<typeof service.executeCommand>> | undefined;
-  let friendlyEndError: unknown;
-  let cancelledEndError: unknown;
+  type EndOutcome = Outcome<Awaited<ReturnType<typeof service.executeCommand>>>;
+  let leagueEnd: EndOutcome;
+  let draftEnd: EndOutcome;
+  let friendlyEnd: EndOutcome;
+  let cancelledEnd: EndOutcome;
 
   const createGame = async (teamMatchId: string, commandId: string): Promise<string> => {
     const input: GameSourceCreationInput = {
@@ -224,13 +230,13 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
    */
   beforeAll(async () => {
     await run(leagueGameId, 'start', 'console-end-league-start');
-    leagueEnded = await run(leagueGameId, 'end', 'console-end-league-end');
+    leagueEnd = await capture(() => run(leagueGameId, 'end', 'console-end-league-end'));
 
     await run(draftGameId, 'start', 'console-end-draft-start');
-    draftEnded = await run(draftGameId, 'end', 'console-end-draft-end');
+    draftEnd = await capture(() => run(draftGameId, 'end', 'console-end-draft-end'));
 
     await run(friendlyGameId, 'start', 'console-end-friendly-start');
-    friendlyEndError = await captureFailure(() => run(friendlyGameId, 'end', 'console-end-friendly-end'));
+    friendlyEnd = await capture(() => run(friendlyGameId, 'end', 'console-end-friendly-end'));
 
     // **C-1 재현: 진행 중에 대진이 취소된 상황.** 우천 중단·팀 이탈로 운영자가 대진을
     // 취소하는 경로(`cancelFixture`/`regenerateFixtures`/`removeTeam`)는 **게임을 건드리지
@@ -240,7 +246,7 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
       where: { id: ids.cancelledMatch },
       data: { status: 'cancelled', cancelledAt: new Date() },
     });
-    cancelledEndError = await captureFailure(() => run(cancelledGameId, 'end', 'console-end-cancelled-end'));
+    cancelledEnd = await capture(() => run(cancelledGameId, 'end', 'console-end-cancelled-end'));
   });
 
   afterAll(async () => {
@@ -248,7 +254,7 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
   });
 
   it('리그 대진은 콘솔에서 시작하고 끝낼 수 있다', () => {
-    expect(leagueEnded?.state).toBe(V1GameState.ENDED);
+    expect(leagueEnd.ok && leagueEnd.value.state).toBe(V1GameState.ENDED);
   });
 
   it('리그의 종료는 결과를 **잠정(SUBMITTED)** 으로 남긴다 — 어드민 확인 단계가 살아 있어야 한다', async () => {
@@ -296,7 +302,7 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     // 예전엔 `revision: 1` 리터럴이라 `@@unique([gameId, revision])` 에 걸려 P2002 가 났고,
     // 그 P2002 는 경합 코드로 번역돼 **"reload and retry"** 라는 거짓 안내가 나갔다 —
     // 재시도해도 영원히 같은 답이다(원인이 경합이 아니다).
-    expect(draftEnded?.state).toBe(V1GameState.ENDED);
+    expect(draftEnd.ok && draftEnd.value.state).toBe(V1GameState.ENDED);
 
     const revisions = await prisma.v1GameResultRevision.findMany({
       where: { gameId: draftGameId },
@@ -318,7 +324,7 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     //   OFFICIAL. 그 가드의 자기 주석이 정확히 이 시나리오를 적고 있다.
     //   순위표의 `status === 'cancelled'` 필터도 같은 이유로 뚫린다.
     // 즉 **가드를 지운 게 아니라 가드가 보는 값을 바꿔서** 같은 결과를 만든다.
-    expect(httpBody(cancelledEndError)).toEqual({ status: 409, code: 'TEAM_MATCH_NOT_MATCHED' });
+    expect(httpBody(cancelledEnd)).toEqual({ status: 409, code: 'TEAM_MATCH_NOT_MATCHED' });
   });
 
   it('취소된 대진은 상태도 결과도 그대로다 — 되살아나지 않는다 (C-1)', async () => {
@@ -332,7 +338,7 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
   });
 
   it('친선 팀매치는 여전히 콘솔로 끝낼 수 없다 (409) — 이 가드가 지키던 것', () => {
-    expect(httpBody(friendlyEndError)).toEqual({ status: 409, code: 'TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN' });
+    expect(httpBody(friendlyEnd)).toEqual({ status: 409, code: 'TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN' });
   });
 
   it('친선은 종료 시도 뒤에도 완료되지 않는다 — 완료 부수효과가 새지 않았다', async () => {

@@ -28,46 +28,18 @@ import type {
 } from '@/types/api';
 
 /**
- * 서버 `ROSTER_MUTABLE_TOURNAMENT_STATUSES`(apps/v1_api/.../roster-cleanup.ts)와 동일 집합.
- * 감사 finding #1(2026-08): 이 화면이 대회 status를 전혀 보지 않아, 완료·취소된 대회에서도
- * '수정 가능' 배지·버튼이 그대로 떠 있다가 서버 409(TOURNAMENT_ROSTER_NOT_MUTABLE)로 실패했다.
- * 두 목록이 갈리지 않도록, 서버 값이 바뀌면 이 상수도 함께 고친다.
+ * 명단 편집 가능 판정은 `@/lib/roster-editability` 에 있다 — 내 신청 카드도 같은 규칙을
+ * 쓰는데, 이 파일에서 직접 가져가면 **판정 함수 두 개 때문에 이 큰 화면이 통째로 다른
+ * 번들에 딸려 온다**(Copilot 리뷰). 기존 소비처를 위해 이름만 다시 내보낸다.
  */
-const ROSTER_MUTABLE_TOURNAMENT_STATUSES = new Set(['open', 'closed', 'in_progress']);
+import {
+  getRosterDeadlineState,
+  isTournamentRosterMutable,
+  type RosterDeadlineState,
+} from '@/lib/roster-editability';
 
-/** tournament가 아직 로딩 중이면(undefined) 막지 않는다 — 기존 낙관적 렌더링과 동일. */
-export function isTournamentRosterMutable(status: string | null | undefined): boolean {
-  if (!status) return true;
-  return ROSTER_MUTABLE_TOURNAMENT_STATUSES.has(status);
-}
-
-/* ── Roster deadline helper ── */
-
-export type RosterDeadlineState = {
-  /** 명단 제출 마감이 지나 예외 없이는 편집이 막힌 상태 */
-  blocked: boolean;
-  /** 마감은 지났지만 어드민이 예외를 허용해 편집 가능한 상태 */
-  overridden: boolean;
-};
-
-/**
- * 명단 제출 마감 상태를 판정한다.
- * - 마감일이 없으면 항상 편집 가능.
- * - 마감일이 지났고 어드민 예외(override)가 없으면 편집 차단.
- * - 마감일이 지났어도 어드민 예외가 있으면 편집 가능(overridden=true로 안내만 표시).
- */
-export function getRosterDeadlineState(
-  rosterDeadlineAt: string | null | undefined,
-  overrideAt: string | null | undefined,
-  now: Date = new Date(),
-): RosterDeadlineState {
-  if (!rosterDeadlineAt) return { blocked: false, overridden: false };
-  const deadline = new Date(rosterDeadlineAt);
-  if (Number.isNaN(deadline.getTime())) return { blocked: false, overridden: false };
-  const isPast = now.getTime() > deadline.getTime();
-  if (!isPast) return { blocked: false, overridden: false };
-  return overrideAt ? { blocked: false, overridden: true } : { blocked: true, overridden: false };
-}
+// 이 파일에서 가져다 쓰던 소비처(테스트 포함)가 그대로 돌아가게 이름만 다시 내보낸다.
+export { getRosterDeadlineState, isTournamentRosterMutable, type RosterDeadlineState };
 
 /* ── Helpers ── */
 

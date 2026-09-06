@@ -38,10 +38,7 @@ import type {
   V1TournamentPaymentMethod,
   V1MyTeam,
 } from '@/types/api';
-import {
-  getRosterDeadlineState,
-  isTournamentRosterMutable,
-} from '../registrations/[registrationId]/roster/tournament-roster-client';
+import { getRosterDeadlineState, isTournamentRosterMutable } from '@/lib/roster-editability';
 
 function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTeam[] {
   if (!data) return [];
@@ -401,7 +398,11 @@ function RegistrationPass({
           <div style={{ minWidth: 0 }}>
             <div className="tm-text-caption" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>선수 명단</div>
             <div className="tm-text-micro" style={{ color: 'var(--text-body)', marginTop: 1 }}>
-              {isRosterLocked
+              {/* **라벨과 같은 조건을 쓴다.** 예전엔 이 텍스트만 `isRosterLocked` 를 봐서,
+                  마감이 지났거나 대회가 끝난 상태에서 aria-label 은 "확인하기" 인데 화면
+                  글자는 "등록 완료" 로 남았다 — 한 줄 안에서 두 말이 갈렸다(Copilot 지적).
+                  "마감" 은 이제 **못 고치는 상태 전부**를 뜻한다(잠금·제출 마감·대회 종료). */}
+              {!rosterEditable
                 ? belowMinimum
                   ? `${rosterCount}명 / 최소 ${minPlayers}명 · 마감`
                   : `${rosterCount}명 · 마감`

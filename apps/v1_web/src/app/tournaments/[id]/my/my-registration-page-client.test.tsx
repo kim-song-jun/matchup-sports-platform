@@ -309,6 +309,10 @@ describe('MyRegistrationPageClient — 명단 수정 가능 배지', () => {
 
     expect(container.textContent).toContain('제출 마감');
     expect(container.textContent).not.toContain('수정 가능');
+    // **한 줄 안에서 두 말이 갈리지 않게** 표시 텍스트도 같은 조건을 쓴다 — 예전엔 이
+    // 문구만 잠금 여부를 봐서, 마감이 지났는데 "등록 완료" 라고 적혀 있었다(Copilot 지적).
+    expect(container.textContent).toContain('· 마감');
+    expect(container.textContent).not.toContain('등록 완료');
     // **배지만 고치면 반쪽이다.** 편집 링크가 남아 있으면 눌러 들어가서 서버 409 를 만난다 —
     // 배지가 "못 고친다" 고 말하는데 버튼은 열려 있는 상태가 그 자체로 결함이다.
     expect(screen.queryByRole('link', { name: '선수 명단 수정하기' })).not.toBeInTheDocument();

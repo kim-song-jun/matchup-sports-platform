@@ -25,6 +25,7 @@ import type { V1PublicLeagueListItem } from '@/types/league-match';
 import { TournamentHeroCard } from './tournament-hero-card';
 import { FeaturedSlotSkeleton } from './featured-slot-skeleton';
 import type { HomeChatRoom, HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
+import { homeCapacity } from './home-capacity';
 
 export function HomePageView({ model }: { model: HomeViewModel }) {
   const dash = model.signedOut || model.network;
@@ -672,6 +673,7 @@ function FeaturedMatchCard({
   signedOut: boolean;
   onRetry?: () => void;
 }) {
+  const capacity = homeCapacity(match.currentParticipants, match.maxParticipants);
   const card = (
     <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
       {/* 사진이 없으면 목업 사진을 깔지 않고 종목 그래픽을 그린다 — 예전엔 모든 추천 카드가
@@ -712,13 +714,15 @@ function FeaturedMatchCard({
                 <span style={{ color: 'var(--text-strong)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                   {match.date} {match.time}
                 </span>
-                <span style={{ fontVariantNumeric: 'tabular-nums', display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
-                  <span style={{ fontWeight: 700, color: 'var(--text-strong)' }}>{match.currentParticipants}/{match.maxParticipants}</span>
-                  <span className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>명</span>
-                </span>
-                {Math.max(match.maxParticipants - match.currentParticipants, 0) <= 3 && match.currentParticipants < match.maxParticipants
-                  ? <span className="tm-badge tm-badge-orange">마감 임박</span>
-                  : null}
+                {capacity ? (
+                  <>
+                    <span style={{ fontVariantNumeric: 'tabular-nums', display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
+                      <span style={{ fontWeight: 700, color: 'var(--text-strong)' }}>{capacity.current}/{capacity.max}</span>
+                      <span className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>명</span>
+                    </span>
+                    {capacity.almostFull ? <span className="tm-badge tm-badge-orange">마감 임박</span> : null}
+                  </>
+                ) : null}
               </div>
             </div>
             <span
@@ -965,7 +969,10 @@ function SidebarLeaguesWidget({ items, loading }: { items: V1PublicLeagueListIte
 function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
   return (
     <div className="tm-match-rail">
-      {matches.map((match) => (
+      {matches.map((match) => {
+        const capacity = homeCapacity(match.currentParticipants, match.maxParticipants);
+
+        return (
         <Link key={match.id} className="tm-pressable tm-match-card" href={`/matches/${match.id}`}>
           <div
             className={`tm-match-card-media${match.imageUrl ? '' : ' tm-match-media-sport'}`}
@@ -983,21 +990,25 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
               {/* [P1 숫자:단위 2:1 + tabular-nums] 인원수 조판: 숫자 font-weight 700, 단위는
                   굵기(600)로만 recede — [R-T2] 단위가 9px(하한 3px 미달)였던 것을
                   ambient tm-text-micro(12px, globals.css)와 맞춰 12로 올림. */}
-              {Math.max(match.maxParticipants - match.currentParticipants, 0) <= 3 && match.currentParticipants < match.maxParticipants ? (
+              {capacity?.almostFull ? (
                 <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2, fontVariantNumeric: 'tabular-nums' }}>
                   <span className="tm-text-micro" style={{ color: 'var(--orange700)', fontWeight: 700 }}>
-                    {match.currentParticipants}/{match.maxParticipants}
+                    {capacity.current}/{capacity.max}
                   </span>
                   <span style={{ fontSize: 12, color: 'var(--orange700)', fontWeight: 600 }}>명</span>
                   <span className="tm-badge tm-badge-orange" style={{ marginLeft: 2 }}>마감 임박</span>
                 </span>
-              ) : (
+              ) : capacity ? (
                 <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1, fontVariantNumeric: 'tabular-nums' }}>
                   <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
-                    {match.currentParticipants}/{match.maxParticipants}
+                    {capacity.current}/{capacity.max}
                   </span>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>명</span>
                 </span>
+              ) : (
+                /* 인원을 모르면 숫자를 지어내지 않는다. 액션 라벨이 오른쪽 끝에 그대로 남도록
+                   빈 자리만 유지한다(footer 가 space-between 이라 자리가 없으면 라벨이 왼쪽으로 붙는다). */
+                <span aria-hidden="true" />
               )}
               <span className="tm-text-label tab-num" style={{ color: 'var(--text-strong)' }}>
                 {match.actionLabel}
@@ -1005,7 +1016,8 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
             </div>
           </div>
         </Link>
-      ))}
+        );
+      })}
     </div>
   );
 }

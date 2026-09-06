@@ -6384,6 +6384,22 @@ export class GamesService {
     await cascadeCompleteTeamMatchSchedulesInTx(tx, teamMatchId);
   }
 
+  /**
+   * 이 게임의 **다음 결과 리비전 번호**.
+   *
+   * `tournament-result-review.service.ts` 의 `nextRevisionNumber` 와 **같은 모양**이다 —
+   * 그쪽은 private 이라 가져다 쓸 수 없어 형태를 맞춘다. 둘이 갈리면 같은 게임에 두 규칙이
+   * 생기므로, 한쪽을 바꾸면 다른 쪽도 함께 본다.
+   */
+  private async nextGameRevisionNumber(tx: Transaction, gameId: string): Promise<number> {
+    const latest = await tx.v1GameResultRevision.findFirst({
+      where: { gameId },
+      orderBy: { revision: 'desc' },
+      select: { revision: true },
+    });
+    return (latest?.revision ?? 0) + 1;
+  }
+
   private async deriveTournamentRevision(
     tx: Transaction,
     game: LockedGame,
@@ -6462,7 +6478,22 @@ export class GamesService {
     const revision = await tx.v1GameResultRevision.create({
       data: {
         gameId: game.id,
-        revision: 1,
+        // **번호를 계산한다(결함 #31).** 예전엔 `1` 리터럴이었는데 스키마에
+        // `@@unique([gameId, revision])` 가 있어서, **이미 리비전이 하나라도 있으면
+        // `end` 가 P2002 로 죽는다.** 그런데 그 P2002 는
+        // `command-concurrency-error.ts` 의 경합 코드 목록에 걸려 409
+        // `COMMAND_CONCURRENCY_CONFLICT` "reload and retry" 로 번역된다 — **재시도해도
+        // 영원히 같은 답이 나오는 거짓 안내**다(원인이 경합이 아니다).
+        //
+        // 리그 대진은 호스트 팀장이 `createResultRevision` 으로 DRAFT 를 만들 수 있어
+        // 실제로 그 상태가 된다(그 경로엔 게임 상태 게이트가 없다).
+        //
+        // **대회 레인은 값이 안 바뀐다** — `end` 시점에 대회 픽스처의 리비전은 구조적으로
+        // 0건이다: `createResultRevision` 이 `TOURNAMENT_FIXTURE` 를 409
+        // `TOURNAMENT_RESULT_DERIVED_ONLY` 로 거부하고, 복구 레인은 기존 리비전이 0건일
+        // 때만 돌며, `end` 재호출은 전이 표(`TOURNAMENT_GAME_TRANSITIONS[ENDED]` = 빈 배열)가
+        // 막는다. 즉 이 함수는 대회에서 **항상 1** 을 돌려준다.
+        revision: await this.nextGameRevisionNumber(tx, game.id),
         // 몰수·중단이면 그 사실과 사유가 결과 리비전에 함께 박힌다 — 점수만 남기면
         // 정상 종료와 구분되지 않아 "왜 그 점수인지"를 나중에 설명할 수 없다.
         outcomeReason: outcome.outcomeReason,
@@ -6667,8 +6698,8 @@ export class GamesService {
    * `assistParticipantId` on an already-persisted GOAL event in place, but
    * nothing previously re-derived the game's result revision from that
    * change. `deriveTournamentRevision` only ever runs ONCE per game, at
-   * `end`/recovery time (its `revision: 1` literal above assumes exactly
-   * one call) -- every assist attach/detach AFTER that moment left the
+   * `end`/recovery time (it used to hard-code `revision: 1`, which assumed
+   * exactly one call; the number is computed now -- see #31) -- every assist attach/detach AFTER that moment left the
    * already-created revision's `V1GameResultParticipant` rows frozen at
    * whatever they were when the revision was derived, while the event
    * stream (and the "경기 세부 기록" event list the operate console renders

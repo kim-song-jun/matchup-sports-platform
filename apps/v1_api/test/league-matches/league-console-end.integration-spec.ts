@@ -26,6 +26,7 @@ const ids = {
   league: '96000000-0000-4000-8000-000000000030',
   leagueMatch: '96000000-0000-4000-8000-000000000040',
   friendlyMatch: '96000000-0000-4000-8000-000000000041',
+  draftMatch: '96000000-0000-4000-8000-000000000042',
 } as const;
 
 const prisma = new PrismaService();
@@ -64,6 +65,7 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
   let configId: string;
   let leagueGameId: string;
   let friendlyGameId: string;
+  let draftGameId: string;
 
   const createGame = async (teamMatchId: string, commandId: string): Promise<string> => {
     const input: GameSourceCreationInput = {
@@ -151,6 +153,9 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
       // `leagueId` 를 **주지 않는다** — 이것이 친선이다.
       data: { ...common, id: ids.friendlyMatch, title: '#29 친선 팀매치' },
     });
+    await prisma.v1TeamMatch.create({
+      data: { ...common, id: ids.draftMatch, title: '#31 초안이 있는 리그 대진', leagueId: league.id },
+    });
 
     // **일정 행을 실제로 만든다.** 없으면 "SCHEDULED 0건" 단언이 빈 집합에서 참이 되어
     // cascade 가 도는지 아닌지를 전혀 구분하지 못한다(공허한 테스트).
@@ -174,6 +179,21 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
 
     leagueGameId = await createGame(ids.leagueMatch, 'console-end-src-league');
     friendlyGameId = await createGame(ids.friendlyMatch, 'console-end-src-friendly');
+    draftGameId = await createGame(ids.draftMatch, 'console-end-src-draft');
+    // **초안을 미리 심는다(#31).** 호스트 팀장이 `createResultRevision` 으로 만들 수 있는
+    // 상태다 — 그 경로엔 게임 상태 게이트가 없다. 예전 코드는 `revision: 1` 리터럴이라
+    // 이 상태에서 `end` 가 P2002 로 죽고, 그게 409 "reload and retry" 로 번역됐다.
+    await prisma.v1GameResultRevision.create({
+      data: {
+        gameId: draftGameId,
+        revision: 1,
+        state: 'DRAFT',
+        score: { homeScore: 0, awayScore: 0 },
+        eventsHash: 'draft-seed',
+        createdByActorType: 'USER',
+        createdByUserId: ids.admin,
+      },
+    });
   });
 
   afterAll(async () => {
@@ -228,6 +248,26 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     // 빈 집합에서 참이 되지 않도록 **개수부터** 확인한다.
     expect(leagueSchedules).toHaveLength(2);
     expect(leagueSchedules.every((row) => row.state === 'COMPLETED')).toBe(true);
+  });
+
+  it('초안이 남아 있어도 콘솔 종료가 된다 — 다음 번호로 붙인다 (#31)', async () => {
+    // 예전엔 `revision: 1` 리터럴이라 `@@unique([gameId, revision])` 에 걸려 P2002 가 났고,
+    // 그 P2002 는 경합 코드로 번역돼 **"reload and retry"** 라는 거짓 안내가 나갔다 —
+    // 재시도해도 영원히 같은 답이다(원인이 경합이 아니다).
+    await run(draftGameId, 'start', 'console-end-draft-start');
+    const ended = await run(draftGameId, 'end', 'console-end-draft-end');
+    expect(ended.state).toBe(V1GameState.ENDED);
+
+    const revisions = await prisma.v1GameResultRevision.findMany({
+      where: { gameId: draftGameId },
+      orderBy: { revision: 'asc' },
+      select: { revision: true, state: true },
+    });
+    // 초안은 **그대로 남는다**(지우는 경로가 없다) — 그 위에 다음 번호로 붙는다.
+    expect(revisions).toEqual([
+      { revision: 1, state: 'DRAFT' },
+      { revision: 2, state: 'SUBMITTED' },
+    ]);
   });
 
   it('친선 팀매치는 여전히 콘솔로 끝낼 수 없다 (409) — 이 가드가 지키던 것', async () => {

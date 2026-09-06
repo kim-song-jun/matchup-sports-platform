@@ -10,7 +10,6 @@ import { AppleIdentityService } from './apple-identity.service';
 const appleIdentityDouble = () => ({
   issueNonce: jest.fn().mockReturnValue({ nonce: 'a1.value.9999999999.signature' }),
   verifyIdentityToken: jest.fn(),
-  isConfigured: true,
 });
 import { AuthService } from './auth.service';
 

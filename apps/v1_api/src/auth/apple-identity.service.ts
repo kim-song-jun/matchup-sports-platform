@@ -85,14 +85,6 @@ export class AppleIdentityService {
     return isUsableAppleNonceSecret(secret) ? secret : null;
   }
 
-  /**
-   * Both halves have to be present. Audiences without a secret would mint nonces nobody can
-   * trust; a secret without audiences would accept a token minted for any app.
-   */
-  get isConfigured(): boolean {
-    return this.audiences.length > 0 && this.secret !== null;
-  }
-
   private requireConfigured(): string {
     const secret = this.secret;
     if (this.audiences.length === 0 || secret === null) {

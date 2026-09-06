@@ -162,7 +162,7 @@ describe('AuthService', () => {
 
     // Apple's half of the sign-in is verified by its own spec; here the service only needs a
     // stand-in that yields claims, so the account logic can be asserted on its own.
-    const appleIdentity = { verifyIdentityToken: jest.fn(), issueNonce: jest.fn(), isConfigured: true };
+    const appleIdentity = { verifyIdentityToken: jest.fn(), issueNonce: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

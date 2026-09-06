@@ -20,7 +20,7 @@ describe('AuthService.appleSignIn', () => {
 
   let service: AuthService;
   let prisma: ReturnType<typeof buildPrismaMock>;
-  const appleIdentity = { verifyIdentityToken: jest.fn(), issueNonce: jest.fn(), isConfigured: true };
+  const appleIdentity = { verifyIdentityToken: jest.fn(), issueNonce: jest.fn() };
 
   function buildPrismaMock() {
     return {
@@ -42,7 +42,6 @@ describe('AuthService.appleSignIn', () => {
   beforeEach(async () => {
     prisma = buildPrismaMock();
     jest.clearAllMocks();
-    appleIdentity.isConfigured = true;
     (prisma.$transaction as jest.Mock).mockImplementation((arg: unknown) =>
       typeof arg === 'function'
         ? (arg as (tx: typeof prisma) => Promise<unknown>)(prisma)

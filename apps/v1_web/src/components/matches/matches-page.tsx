@@ -303,10 +303,17 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
       </div>
 
       <article className="tm-match-detail tm-content-enter">
-        <div className={`tm-match-detail-hero${match.image ? '' : ' tm-match-media-sport tm-match-detail-hero-sport'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
-          {match.image ? null : <SportIllustration sport={match.sport} sizes="(min-width: 1024px) 160px, 136px" className="tm-match-detail-hero-illustration" />}
+        {/* 사진이 없으면 그래픽을 위, 카피를 아래로 쌓는다(영상 pCc9GspeYfg 02 의 4칸 모듈).
+            예전에는 사진 히어로와 같은 면에 그래픽을 우하단 구석으로 얹어 아이콘 버튼·오버레이
+            텍스트와 자리를 다퉜다 — alpha 에서 실제로 겹쳐 한 번 옮긴 자리다. */}
+        <div className={`tm-match-detail-hero${match.image ? '' : ' tm-match-detail-hero-stack'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
+          {match.image ? null : (
+            <div className="tm-match-hero-graphic">
+              <SportIllustration sport={match.sport} sizes="(min-width: 1024px) 208px, 176px" />
+            </div>
+          )}
           <div className="tm-match-detail-overlay">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div className="tm-match-hero-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               {/* Mobile back button — hidden on desktop (desktop back is in the page head above) */}
               <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button tm-hide-desktop" href="/matches" aria-label="뒤로가기">
                 <ChevronLeftIcon size={22} strokeWidth={2.2} />
@@ -332,8 +339,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 <span className={`tm-badge ${matchStatusBadgeClass(mode, match.status)}`}>{matchStatusBadgeLabel(mode, match.status)}</span>
               </div>
               <h2 className="tm-match-detail-title">{match.title}</h2>
-              <div className="tm-text-caption" style={{ color: 'var(--overlay-white-76)', marginTop: 8 }}>{match.host} 호스트 · {match.deadline}</div>
-              {heroMessage ? <div className="tm-text-caption" role="status" style={{ color: 'var(--overlay-white-86)', marginTop: 8 }}>{heroMessage}</div> : null}
+              <div className="tm-text-caption tm-match-detail-meta" style={{ marginTop: 8 }}>{match.host} 호스트 · {match.deadline}</div>
+              {heroMessage ? <div className="tm-text-caption tm-match-detail-heromsg" role="status" style={{ marginTop: 8 }}>{heroMessage}</div> : null}
             </div>
           </div>
         </div>
@@ -676,7 +683,7 @@ function MatchCardItem({ match }: { match: MatchCardModel }) {
   return (
     <Link className="tm-match-list-card tm-card-interactive tm-pressable" href={`/matches/${match.id}`}>
       <div className={`tm-match-list-media${match.image ? '' : ' tm-match-media-sport'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
-        {match.image ? null : <SportIllustration sport={match.sport} sizes="112px" />}
+        {match.image ? null : <SportIllustration sport={match.sport} sizes="132px" />}
         <span className="tm-badge tm-badge-blue">{match.sport}</span>
         {/* [P1 숫자:단위 2:1 + tabular-nums] 현재/최대 인원 — 숫자(body-lg weight600) : 단위(caption) 2:1 */}
         <span className="tm-match-count-badge" style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>

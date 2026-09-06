@@ -632,27 +632,9 @@ describe('presentTournamentDetail — 공개 명단', () => {
           status: 'confirmed',
           confirmedAt: new Date('2026-06-02T00:00:00Z'),
           team: { id: 'team-1', name: 'A팀', profile: null, region: null },
-          players: [
-            {
-              id: 'player-1',
-              userId: 'user-1',
-              // 실제 행에는 이 값들도 있지만 **공개 응답에 실리면 안 된다.**
-              realName: '홍길동',
-              birthDateSnapshot: '1995-03-15',
-              genderSnapshot: 'male',
-              eligibilityStatus: 'pro',
-              user: { profile: { nickname: '길동이', displayName: '홍길동(실명)' } },
-            },
-            {
-              id: 'player-2',
-              userId: 'user-2',
-              realName: '김철수',
-              // **닉네임은 없고 `displayName` 만 있는 사용자.** 예전엔 여기서 `displayName`
-              // 으로 폴백했는데, 그 자리에는 가입 경로에 따라 **실명이 그대로 담길 수
-              // 있다** — 폴백 하나로 실명이 공개로 새 나간다(Copilot 지적).
-              user: { profile: { nickname: null, displayName: '김철수(실명)' } },
-            },
-          ],
+          // **`players` 를 여기 두지 않는다.** 기본 조회의 include 에서 뺐기 때문이다 —
+          // row 에 남겨 두면 presenter 가 그걸 읽는지 명단 맵을 읽는지 구분되지 않아,
+          // 소비처를 안 고쳐도 통과하는 vacuous 스펙이 된다.
         },
       ],
       groups: [],
@@ -667,13 +649,31 @@ describe('presentTournamentDetail — 공개 명단', () => {
     } as unknown as Parameters<typeof presentTournamentDetail>[0];
   }
 
+  /**
+   * 호출부(`tournaments-read.service.ts`)가 넘기는 **명단 맵**. 실명·생년월일 같은 값은
+   * 애초에 이 자리에 담기지 않는다 — `readPublicRostersForRegistrations` 가 `nickname` 만
+   * SELECT 하기 때문이다. 그래서 이 스펙의 PII 훑기는 **"presenter 가 다른 자리에서
+   * 끌어오지 않는가"** 를 보는 것이 된다.
+   */
+  const rosterMap = (jerseyOfPlayer1: number | null = 7) =>
+    new Map([
+      [
+        'reg-1',
+        [
+          { id: 'player-1', jerseyNumber: jerseyOfPlayer1, nickname: '길동이' },
+          // 번호를 안 단 선수 — 명단에서 사라지면 안 된다.
+          { id: 'player-2', jerseyNumber: null, nickname: null },
+        ],
+      ],
+    ]);
+
   it('등번호와 닉네임만 내보낸다 — 실명·생년월일·성별·자격판정은 응답에 없다', () => {
     const result = presentTournamentDetail(
       rowWithRoster(),
       new Date('2026-06-10T00:00:00Z'),
       false,
       [],
-      new Map([['player-1', 7]]),
+      rosterMap(),
     );
 
     const players = result.participantTeams[0]?.players;
@@ -701,7 +701,7 @@ describe('presentTournamentDetail — 공개 명단', () => {
       new Date('2026-06-10T00:00:00Z'),
       false,
       [],
-      new Map(),
+      rosterMap(),
     );
 
     // 화면이 이 `null` 을 보고 "(탈퇴한 선수)" 자리표시자를 그린다. 여기서 실명으로
@@ -715,7 +715,7 @@ describe('presentTournamentDetail — 공개 명단', () => {
       new Date('2026-06-10T00:00:00Z'),
       false,
       [],
-      new Map([['player-1', 7]]),
+      rosterMap(),
     );
 
     // 팀 자체가 안 나오므로 명단도 함께 사라진다. 명단만 따로 게이트를 두면
@@ -730,9 +730,48 @@ describe('presentTournamentDetail — 공개 명단', () => {
       new Date('2026-06-10T00:00:00Z'),
       true,
       [],
-      new Map([['player-1', 7]]),
+      rosterMap(),
     );
 
     expect(result.participantTeams[0]?.players[0]?.nickname).toBe('길동이');
+  });
+
+  it('명단은 **넘겨받은 맵**에서 온다 — row 에서 읽으면 include 를 빼는 순간 조용히 빈다', () => {
+    // 이 스펙의 핵심 방어다. presenter 가 `registration.players` 를 읽던 시절에는
+    // include 에서 조인을 빼도 `?? []` 가 삼켜 **명단이 빈 배열**이 되는데 tsc·lint 가
+    // 못 잡았다. 맵을 비우면 명단도 비고, 맵에 넣으면 그대로 나오는지를 양쪽으로 본다.
+    const withRoster = presentTournamentDetail(
+      rowWithRoster(),
+      new Date('2026-06-10T00:00:00Z'),
+      false,
+      [],
+      rosterMap(),
+    );
+    expect(withRoster.participantTeams[0]?.players).toHaveLength(2);
+
+    const withoutRoster = presentTournamentDetail(
+      rowWithRoster(),
+      new Date('2026-06-10T00:00:00Z'),
+      false,
+      [],
+      new Map(),
+    );
+    expect(withoutRoster.participantTeams[0]?.players).toEqual([]);
+  });
+
+  it('등번호를 안 단 선수도 명단에 남는다 — 거르면 통째로 사라진다', () => {
+    // 조회 쪽에서 `jersey_number IS NOT NULL` 을 걸면 이 선수가 사라진다. presenter 는
+    // 맵을 그대로 내보내야 하고, 번호 없음은 `null` 로 표현된다(0 이 아니다).
+    const result = presentTournamentDetail(
+      rowWithRoster(),
+      new Date('2026-06-10T00:00:00Z'),
+      false,
+      [],
+      rosterMap(null),
+    );
+    expect(result.participantTeams[0]?.players).toEqual([
+      { id: 'player-1', jerseyNumber: null, nickname: '길동이' },
+      { id: 'player-2', jerseyNumber: null, nickname: null },
+    ]);
   });
 });

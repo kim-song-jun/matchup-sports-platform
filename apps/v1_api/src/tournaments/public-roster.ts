@@ -50,3 +50,65 @@ export function toPublicRoster(
     nickname: row.user?.profile?.nickname ?? null,
   }));
 }
+
+type RosterSqlClient = {
+  $queryRaw: <T = unknown>(query: TemplateStringsArray, ...values: unknown[]) => Promise<T>;
+};
+
+type RosterSqlRow = {
+  id: string;
+  registration_id: string;
+  jersey_number: number | null;
+  nickname: string | null;
+};
+
+/**
+ * **공개 명단을 등록 단위로 한 번에 읽는다.**
+ *
+ * 왜 raw 인가: 등번호(`jersey_number`)가 **생성된 Prisma 클라이언트에 없다**(모노레포 공유
+ * 산출물이라 이 저장소에서 재생성하지 않는다). 명단 행과 등번호가 **같은 테이블**
+ * (`v1_tournament_players`)에 있으므로 한 쿼리로 끝난다.
+ *
+ * 왜 조건부인가: 예전엔 `TOURNAMENT_DETAIL_INCLUDE` 가 **무조건** `players` 를 조인해서,
+ * 명단을 감추는 상태(모집 중 · 비스태프)에서도 명단 행과 **닉네임 조인까지 읽고** presenter 가
+ * 통째로 버렸다. 안 쓰는 PII 인접 필드를 응답 경로에 싣지 않는다는 이 파일의 원칙은
+ * **읽지도 않는다**까지 가는 것이 일관된다(Copilot 지적). 그래서 호출자가 `hideIdentity` 일
+ * 때 아예 부르지 않는다 — 숨김이면 쿼리 1개(기본 조회), 공개면 2개로 **예전과 같다.**
+ *
+ * **`jersey_number IS NOT NULL` 을 걸지 않는다.** 등번호는 **선택**이고, 거르면 번호를 아직
+ * 안 받은 선수가 **명단에서 통째로 사라진다.** 번호가 없으면 `null` 로 내려가 화면이 `—` 를
+ * 그린다. (등번호 전용 배치 리더는 이 조건을 갖고 있었는데, 그 함수는 등번호 맵만 만들었으므로
+ * 맞았다 — 명단까지 합치면서 그대로 가져오면 결함이 된다.)
+ *
+ * 캐스팅이 `::text[]` 인 이유는 `registration_id` 의 실제 컬럼 타입이 `text` 이기 때문이다 —
+ * `@default(uuid())` 는 값 생성 방식이지 타입이 아니다. `::uuid[]` 로 쓰면
+ * `operator does not exist: text = uuid` 로 쿼리 전체가 죽는다(2026-09-06 alpha 실사고).
+ */
+export async function readPublicRostersForRegistrations(
+  client: RosterSqlClient,
+  registrationIds: readonly string[],
+): Promise<Map<string, PublicRosterPlayer[]>> {
+  const byRegistrationId = new Map<string, PublicRosterPlayer[]>();
+  if (registrationIds.length === 0) return byRegistrationId;
+  const rows = await client.$queryRaw<RosterSqlRow[]>`
+    SELECT p.id, p.registration_id, p.jersey_number, prof.nickname
+    FROM "v1_tournament_players" p
+    LEFT JOIN "v1_user_profiles" prof ON prof.user_id = p.user_id
+    WHERE p.registration_id = ANY(${[...registrationIds]}::text[])
+      AND p.removed_at IS NULL
+    ORDER BY p.id ASC
+  `;
+  for (const row of rows) {
+    const bucket = byRegistrationId.get(row.registration_id) ?? [];
+    bucket.push({
+      id: row.id,
+      jerseyNumber: row.jersey_number,
+      // **`displayName` 으로 폴백하지 않는다** — `toPublicRoster` 와 같은 규칙이다. 여기서
+      // raw 로 옮겼다고 `real_name`·`display_name` 을 SELECT 하고 싶어지면, 그게 정확히
+      // 정본 §3 이 막은 자리다(실명이 공개로 새 나간다).
+      nickname: row.nickname,
+    });
+    byRegistrationId.set(row.registration_id, bucket);
+  }
+  return byRegistrationId;
+}

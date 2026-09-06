@@ -33,35 +33,6 @@ export async function readJerseyNumbers(
 }
 
 /**
- * **여러 등록의 등번호를 한 번에** 읽는다. 키는 player id.
- *
- * 공개 대회 상세는 참가팀이 여럿이라, 팀마다 `readJerseyNumbers` 를 부르면 **팀 수만큼
- * 쿼리가 나간다(N+1)**. 등록 id 목록을 받아 한 번만 묻는다.
- *
- * 캐스팅이 `::text[]` 인 이유는 `v1_tournament_players.registration_id` 의 실제 컬럼 타입이
- * `text` 이기 때문이다 — `@default(uuid())` 는 값 생성 방식이지 타입이 아니다. `::uuid[]` 로
- * 쓰면 `operator does not exist: text = uuid` 로 **쿼리 전체가 죽는다**(2026-09-06 alpha 실사고).
- */
-export async function readJerseyNumbersForRegistrations(
-  client: SqlClient,
-  registrationIds: readonly string[],
-): Promise<Map<string, number>> {
-  const byPlayerId = new Map<string, number>();
-  if (registrationIds.length === 0) return byPlayerId;
-  const rows = await client.$queryRaw<Array<{ id: string; jersey_number: number | null }>>`
-    SELECT id, jersey_number
-    FROM "v1_tournament_players"
-    WHERE registration_id = ANY(${[...registrationIds]}::text[])
-      AND removed_at IS NULL
-      AND jersey_number IS NOT NULL
-  `;
-  for (const row of rows) {
-    if (row.jersey_number !== null) byPlayerId.set(row.id, row.jersey_number);
-  }
-  return byPlayerId;
-}
-
-/**
  * 같은 팀 명단에 그 번호를 이미 단 사람이 있으면 409.
  *
  * **스코프는 등록(팀) 단위다** — 같은 대회의 다른 팀이 같은 번호를 쓰는 것은 정상이다.

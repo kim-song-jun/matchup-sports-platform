@@ -28,7 +28,7 @@ import {
   calculateLeagueStandingsWithTieBreakInfo,
 } from '../league-matches/league-standings';
 import { LEAGUE_TIE_BREAK_ORDER } from '../league-matches/league-tie-break';
-import { readJerseyNumbersForRegistrations } from './tournament-player-jersey';
+import { readPublicRostersForRegistrations, type PublicRosterPlayer } from './public-roster';
 
 /** `V1CompetitionConfigVersion.tieBreak`(Json)에 담긴 승리 승점 기본값 — 프리셋 전부가 3이다. */
 const DEFAULT_WIN_POINTS = 3;
@@ -186,17 +186,21 @@ export class TournamentsReadService {
         ? await this.leagueCompetitionFixtures(tournamentId)
         : [];
 
-    // 공개 명단의 등번호 — **참가팀 전부를 한 번에** 읽는다. 팀마다 물으면 팀 수만큼
-    // 쿼리가 나간다(N+1). 명단을 감추는 상태면 아예 묻지 않는다.
+    // 공개 명단 — **참가팀 전부를 한 번에** 읽는다(팀마다 물으면 N+1). 명단과 등번호가 같은
+    // 테이블이라 **한 쿼리**로 끝난다.
+    //
+    // **감추는 상태면 아예 묻지 않는다.** 예전엔 기본 조회의 include 가 무조건 명단 행과
+    // 닉네임 조인을 읽고 presenter 가 통째로 버렸다 — 숨김 상태에서 안 쓰는 PII 인접 필드를
+    // 응답 경로에 싣는 것이라 include 에서 뺐다. 쿼리 수는 그대로다: 숨김 1개, 공개 2개.
     const hideIdentity = shouldHideParticipantIdentity(row.status, staffBypass);
-    const jerseyByPlayerId = hideIdentity
-      ? new Map<string, number>()
-      : await readJerseyNumbersForRegistrations(
+    const rosterByRegistrationId = hideIdentity
+      ? new Map<string, PublicRosterPlayer[]>()
+      : await readPublicRostersForRegistrations(
           this.prisma,
           row.registrations.map((registration) => registration.id),
         );
 
-    return presentTournamentDetail(row, new Date(), staffBypass, leagueFixtures, jerseyByPlayerId);
+    return presentTournamentDetail(row, new Date(), staffBypass, leagueFixtures, rosterByRegistrationId);
   }
 
   /**

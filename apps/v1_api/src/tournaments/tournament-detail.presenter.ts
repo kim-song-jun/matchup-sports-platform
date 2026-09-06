@@ -6,7 +6,7 @@ import {
 import type { LeagueFixtureListItem } from '../league-matches/league-fixture-list-source';
 import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
-import { toPublicRoster } from './public-roster';
+import type { PublicRosterPlayer } from './public-roster';
 
 /**
  * 어워드 수상자 표시 이름 -- 저장된 `recipientName`(명단 실명 스냅샷, `tournament-reviews.service.ts`의
@@ -115,11 +115,15 @@ export function presentTournamentDetail(
    */
   leagueFixtures: LeagueFixtureListItem[] = [],
   /**
-   * 공개 명단의 등번호(키: player id). **호출부가 배치로 한 번에 읽어 넘긴다** —
-   * `leagueFixtures` 와 같은 규약이고, presenter 는 조회하지 않는다.
-   * 생성 Prisma 클라이언트에 컬럼이 없어 raw 로만 읽을 수 있는 값이기도 하다.
+   * 공개 명단(키: 등록 id). **호출부가 배치로 한 번에 읽어 넘긴다** — `leagueFixtures` 와
+   * 같은 규약이고, presenter 는 조회하지 않는다.
+   *
+   * **명단을 감출 때는 호출부가 아예 안 읽고 빈 맵을 넘긴다.** 그래서 이 자리에 기본값
+   * `new Map()` 이 있는 것이 곧 "명단 없음" 이다 — 예전처럼 `registration.players` 를
+   * 읽으면 include 가 조인을 하고 있어야만 맞는 값이 되어, 조인을 빼는 순간 조용히
+   * 빈 배열이 된다.
    */
-  jerseyByPlayerId: ReadonlyMap<string, number> = new Map(),
+  rosterByRegistrationId: ReadonlyMap<string, PublicRosterPlayer[]> = new Map(),
 ) {
   // Task 109 Track 6: bracketPublishedAt이 null이면 대진표(조/픽스처)를 관리자가 아직
   // 일괄 공개하지 않은 상태 — 공개 조회에서는 groups/fixtures를 빈 배열로 감춘다.
@@ -242,7 +246,10 @@ export function presentTournamentDetail(
               // **팀의 `membersVisible` 은 보지 않는다**(2026-09-06 사용자 확정) —
               // 대회 명단은 팀의 멤버 목록이 아니라 **이 대회에 누가 나오는지**라는
               // 대회의 사실이다.
-              players: toPublicRoster(registration.players ?? [], jerseyByPlayerId),
+              // **`registration.players` 를 읽지 않는다.** include 에서 빠졌으므로 그 자리를
+              // 그대로 두면 `?? []` 가 삼켜 **명단이 조용히 빈 배열**이 된다 — tsc·lint 둘 다
+              // 못 잡고, row 를 인라인으로 만드는 유닛 스펙도 그대로 통과한다.
+              players: rosterByRegistrationId.get(registration.id) ?? [],
             })),
     pendingPaymentCount: row.registrations.filter((registration) =>
       ['awaiting_payment', 'payment_checking', 'paid'].includes(registration.status),

@@ -1295,12 +1295,42 @@ export class GamesService {
       },
       async (tx, game, context) => {
         // T3(기록 UX) 추가: 팀매치도 피리어드를 시작/전환해야 이벤트 시각이 찍힌다(T1-0).
-        // 끝맺음만 검증된 결과 제출 경로를 거쳐야 하므로 `end`만 계속 막는다.
+        //
+        // **이 가드가 지키는 것은 친선 팀매치다.** 친선은 양 팀이 결과를 제출하고 상대가
+        // 승인하는 검증된 경로(`submitResultRevision` → `decideResultRevision`)로만 끝나야
+        // 한다 — 여기서 `end` 를 허용하면 그 검증을 통째로 우회한다. **통째로 열지 마라.**
+        //
+        // **리그 대진은 예외다(결함 #29, 2026-09-06 alpha 실측).** 리그 대진의 게임도
+        // `TEAM_MATCH` 소스로 만들어지는데(`league-fixture-creation.ts`), 정본이 "리그도
+        // 대회와 **같은 경기 운영 콘솔**을 쓴다(Task 165)" 로 확정했고 사용자가 "**결과
+        // 보내기 = 경기 종료**, 별도 제출 단계를 만들지 않는다" 로 확정했다. 즉 리그에서는
+        // **콘솔의 `end` 가 곧 결과 보내기**다. 그런데 이 가드가 통째로 막고 있어서, 콘솔로
+        // 시작·득점·피리어드까지 전부 진행한 경기를 **끝낼 수 없었다** — alpha 에서 1:0
+        // 상태로 `정규 시간 종료` 에 갇혔다(409 `TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN`).
+        //
+        // 판별은 `V1TeamMatch.leagueId` 다 — **이 저장소가 이미 쓰는 관용구**이고
+        // (`team-record-category.ts` 의 `leagueId !== null ? 'league' : 'friendly'` 등)
+        // 리그 대진만 값을 갖는다. 조회는 `end` 한 커맨드에서만 일어난다.
+        //
+        // 하류는 이미 열려 있다: `end` 가 만드는 리비전은 `SUBMITTED` 이고(즉시 공식이
+        // 아니다), 어드민 확정(`tournament-result-review.service.ts` 의 `withResultCommand`)
+        // 은 Task 165 BE-1 이 `resolveGameSource` 로 바꿔 대회·리그를 함께 받는다.
         if (game.sourceType === V1GameSourceType.TEAM_MATCH && command === 'end') {
-          throw new ConflictException({
-            code: 'TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN',
-            message: 'Team matches end only through validated result submission',
-          });
+          const teamMatch =
+            game.teamMatchId === null
+              ? null
+              : await tx.v1TeamMatch.findUnique({
+                  where: { id: game.teamMatchId },
+                  select: { leagueId: true },
+                });
+          // 팀매치 행을 못 찾는 경우도 막는 쪽으로 둔다 — 리그 대진임을 **확인했을 때만**
+          // 연다(모르면 친선으로 취급하는 것이 안전한 기본값이다).
+          if (teamMatch === null || teamMatch.leagueId === null) {
+            throw new ConflictException({
+              code: 'TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN',
+              message: 'Team matches end only through validated result submission',
+            });
+          }
         }
         assertClockNotDrifted(dto.occurredAt);
         this.requireTakeover(game.id, game.sourceType, context);

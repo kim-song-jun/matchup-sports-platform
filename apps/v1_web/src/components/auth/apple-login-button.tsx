@@ -35,8 +35,15 @@ export function AppleLoginButton({ className, style }: { className?: string; sty
     try {
       const { nonce } = await v1Post<{ nonce: string }>('/auth/apple/nonce');
       const result = await requestNativeAppleSignIn(nonce);
-      // 취소는 실패가 아니다 — 시트를 닫은 사람에게 오류를 띄우지 않는다.
-      if (!result.ok || !result.identityToken) return;
+      if (!result.ok || !result.identityToken) {
+        // 취소만 무음이다. 셸은 시트를 닫았을 때만 error 없이 ok:false 로 답하고,
+        // 진짜 실패에는 이유를 실어 보낸다 — 그 둘을 같이 삼키면 App ID 에 capability 가
+        // 없어 시트가 오류 1000 으로 죽는 상황이 "눌러도 아무 일도 없는 버튼" 이 된다.
+        if (result.ok || result.error) {
+          setError('Apple 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.');
+        }
+        return;
+      }
 
       const session = await v1Post<V1AuthSessionResponse>('/auth/apple', {
         identityToken: result.identityToken,

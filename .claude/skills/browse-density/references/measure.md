@@ -4,6 +4,10 @@
 
 alpha 배포본에서 `ego-browser` 로 잰다. 로컬 next 서버는 띄우지 않는다.
 
+아래 예시는 **매치 목록 전용 선택자**(`.tm-match-list-card`)를 쓴다. 다른 목록에 옮길 때는
+그 화면의 카드 선택자로 바꾼다 — 팀은 `.tm-team-card`, 대회는 `.tm-card`, 매치 행은
+`.tm-match-row` 다. 선택자를 안 바꾸면 `cards[0]` 이 `undefined` 라 그대로 터진다.
+
 ```js
 await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
 await gotoAndWait('https://alpha.teameet.co.kr/matches', { timeout: 40, settle: 2 })

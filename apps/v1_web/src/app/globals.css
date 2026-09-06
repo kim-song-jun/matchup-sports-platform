@@ -2692,6 +2692,60 @@ label.tm-btn:focus-within {
   font-weight: 600;
 }
 
+/* 제목 앞에 마감 배지를 붙이는 줄 — 배지와 제목이 같은 baseline 에 놓이게 한다. */
+.tm-match-row-headline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tm-match-row-headline > .tm-match-row-title,
+.tm-match-row-headline > .tm-text-body-lg {
+  min-width: 0;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   신청을 더 받지 않는 카드 (개인 매치 · 팀매치 공용)
+
+   목록에는 마감된 매치도 경기 시작 전까지 남는다 — 남기기만 하고 똑같이 그리면
+   "모집 중"과 구분이 안 된다(2026-09-07 제보). 그래서 지면을 한 톤 눌러 비활성으로
+   읽히게 하고, 사진·그래픽만 흐리게 한다.
+
+   **카드 전체에 opacity 를 걸지 않는 이유**: --text-caption(=grey600)은 흰 카드에서
+   이미 4.54:1 로 AA 하한에 붙어 있다. 카드에 opacity:.6 을 주면 그 값이 약 2.9:1 로
+   떨어져 WCAG 1.4.3 위반이 된다(마감 카드도 정보는 그대로 읽혀야 한다 — 비활성
+   컨트롤이 아니라 여전히 열어볼 수 있는 링크다). 흐림은 텍스트가 아닌 미디어에만
+   주고, 텍스트는 색 토큰으로 눌러 대비를 지킨다.
+   ──────────────────────────────────────────────────────────────────────────── */
+.tm-card-closed {
+  background: var(--grey50);
+}
+
+.tm-card-closed .tm-match-row-thumb,
+.tm-card-closed .tm-match-list-media,
+.tm-card-closed .tm-team-match-vs {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+}
+
+/* 제목만 한 단계 눌러 "지난 것"으로 읽히게 한다 — grey600 은 흰 배경 4.54:1,
+   grey50 배경 4.39:1 로 큰 글씨(17px/600 = WCAG large text 기준 3:1)를 넉넉히 넘는다. */
+.tm-card-closed .tm-match-row-title,
+.tm-card-closed .tm-match-list-card-body .tm-text-body-lg {
+  color: var(--text-muted);
+}
+
+/* 파란 '참가 신청' 은 마감 카드에서 거짓말이 된다 — 회색으로 내린다. */
+.tm-card-closed .tm-match-row-act,
+.tm-card-closed .tm-match-list-footer .tm-text-label {
+  color: var(--text-muted);
+}
+
+.tm-card-closed-badge {
+  flex: none;
+}
+
 /* ── 상단 이벤트 레일 ── */
 .tm-match-rail-section {
   margin-top: 16px;

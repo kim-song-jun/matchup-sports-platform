@@ -5,11 +5,13 @@ import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useRouter } from 'next/navigation';
 import {
   useV1CancelMatch,
+  useV1CloseMatch,
   useV1CreateMatch,
   useV1MasterRegions,
   useV1MasterSports,
   useV1MatchEdit,
   useV1MyRecentVenues,
+  useV1ReopenMatch,
   useV1UpdateMatch,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
@@ -207,6 +209,8 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const regions = useV1MasterRegions();
   const updateMatch = useV1UpdateMatch(matchId);
   const cancelMatch = useV1CancelMatch(matchId);
+  const closeMatch = useV1CloseMatch(matchId);
+  const reopenMatch = useV1ReopenMatch(matchId);
   const uploadImages = useV1UploadImages();
   const [draft, setDraft] = useState<MatchDraft>(() => buildDefaultDraft());
   const [selectedSportId, setSelectedSportId] = useState('');
@@ -239,6 +243,21 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const editMissingFields = editAttempted ? getMatchMissingFields(editCtx) : [];
   const editFieldErrors = toFieldErrorMap(editMissingFields);
 
+  // 모집 마감 / 다시 열기 — 서버 close()/reopen() 이 받아주는 상태와 정확히 같은 조건으로
+  // 버튼을 고른다. 마감은 두 갈래(호스트가 닫은 status='closed' · 마감 시각 경과)라
+  // 둘 다 "다시 열기"로 모은다 — 화면에는 똑같이 "신청 마감"으로 보이기 때문이다.
+  const editStatus = editQuery.data?.status ?? null;
+  const editDeadlineAt = editQuery.data?.form.deadlineAt ?? null;
+  const deadlinePassed = Boolean(editDeadlineAt && new Date(editDeadlineAt).getTime() < Date.now());
+  const recruitingToggleKind = !editQuery.data || editQuery.data.editable === false
+    ? null
+    : editStatus === 'closed' || (editStatus === 'recruiting' && deadlinePassed)
+      ? 'reopen'
+      : editStatus === 'recruiting'
+        ? 'close'
+        : null;
+  const togglePending = closeMatch.isPending || reopenMatch.isPending;
+
   const model = buildCreateModel({
     step: 'edit',
     matchId,
@@ -251,6 +270,44 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     lockedReason: editQuery.data?.editable === false ? lockedReasonLabel(editQuery.data.lockedReason ?? '') : null,
     submitting: updateMatch.isPending || cancelMatch.isPending || editQuery.isLoading,
     fieldErrors: editFieldErrors,
+    recruitingToggle: recruitingToggleKind
+      ? {
+          label: recruitingToggleKind === 'close' ? '모집 마감' : '모집 다시 열기',
+          hint: recruitingToggleKind === 'close'
+            ? '매치는 그대로 두고 새 신청만 받지 않아요. 언제든 다시 열 수 있어요.'
+            : deadlinePassed
+              ? '신청 마감 시각을 지우고 경기 시작 전까지 다시 받아요.'
+              : '다시 신청을 받아요.',
+          pending: togglePending,
+          onClick: async () => {
+            if (togglePending || updateMatch.isPending || cancelMatch.isPending) return;
+            setError(null);
+            if (recruitingToggleKind === 'close') {
+              const ok = await confirm({
+                title: '모집을 마감할까요?',
+                message: '새 신청을 받지 않고, 대기 중인 신청은 종료돼요. 확정된 참가자는 그대로예요 — 나중에 다시 열 수 있어요.',
+                confirmLabel: '모집 마감',
+              });
+              if (!ok) return;
+              closeMatch.mutate(
+                { reason: 'host_closed_from_v1_web' },
+                {
+                  onSuccess: () => router.push(`/matches/${matchId}`),
+                  onError: (err) => setError(err instanceof Error ? err.message : '모집을 마감하지 못했어요. 다시 시도해 주세요.'),
+                },
+              );
+              return;
+            }
+            reopenMatch.mutate(
+              { reason: 'host_reopened_from_v1_web' },
+              {
+                onSuccess: () => router.push(`/matches/${matchId}`),
+                onError: (err) => setError(err instanceof Error ? err.message : '모집을 다시 열지 못했어요. 다시 시도해 주세요.'),
+              },
+            );
+          },
+        }
+      : undefined,
     onSelectSport: (sportName) => {
       const sport = sportOptions.find((item) => item.name === sportName);
       if (sport) setSelectedSportId(sport.id);
@@ -341,6 +398,7 @@ function buildCreateModel({
   onNext,
   onSubmit,
   onCancel,
+  recruitingToggle,
   uploadImage,
   submitLabel,
   fieldErrors,
@@ -365,6 +423,7 @@ function buildCreateModel({
   onNext: () => void;
   onSubmit: () => void;
   onCancel?: () => void;
+  recruitingToggle?: NonNullable<MatchCreateViewModel['form']>['recruitingToggle'];
   uploadImage?: (file: File) => Promise<string>;
   submitLabel?: string;
   /** #1·#2: 스텝별 즉시 검증(create)과 결측 필드 안내(create/edit)가 공유하는 필드 → 문구 맵. */
@@ -397,6 +456,7 @@ function buildCreateModel({
       onNext,
       onSubmit,
       onCancel,
+      recruitingToggle,
       uploadImage,
       submitLabel,
       submitting,

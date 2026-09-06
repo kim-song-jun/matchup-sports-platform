@@ -133,7 +133,16 @@ export function buildTeamMatchHref(params: URLSearchParams, overrides: Record<st
 }
 
 export function getStatus(match: V1TeamMatch): V1TeamMatchApiStatus {
-  return (match.displayState as V1TeamMatchApiStatus | undefined) ?? (match.status as V1TeamMatchApiStatus);
+  const base = (match.displayState as V1TeamMatchApiStatus | undefined) ?? (match.status as V1TeamMatchApiStatus);
+  // 개인 매치 카드모델(matches.card-model.ts getStatus)과 같은 마감 폴백.
+  // 서버가 이미 displayState 로 같은 판정을 내려주지만, 그 필드를 싣지 않는 응답이
+  // 섞여도(실제로 GET /me/team-matches 가 그랬다) 카드가 마감된 팀매치를 '모집 중'으로
+  // 그리지 않게 한다 — 목록과 상세가 서로 다른 상태를 말하던 결함의 프론트 쪽 방어선.
+  if (base === 'recruiting') {
+    const deadline = match.deadlineAt ? new Date(match.deadlineAt) : null;
+    if (deadline && !Number.isNaN(deadline.getTime()) && deadline.getTime() < Date.now()) return 'closed';
+  }
+  return base;
 }
 
 export function getViewerState(match: V1TeamMatch): V1TeamMatchViewerState {

@@ -76,6 +76,33 @@ describe('TeamMatchListPageView — 더 보기 (20건 컷오프 페이지네이�
   });
 });
 
+/**
+ * 마감된 팀매치도 경기 시작 전까지 목록에 남는다(team-matches.service.ts list()) —
+ * 모집 중 카드와 구분되지 않으면 "밖에서는 모집중, 안에서는 신청 마감"(2026-09-07 제보)이
+ * 그대로 재현된다.
+ */
+describe('TeamMatchListPageView — 신청 마감 카드 구분', () => {
+  function modelWithSingleCard(status: 'open' | 'closed') {
+    const base = getTeamMatchListViewModel();
+    return { ...base, matches: [{ ...base.matches[0], status }] };
+  }
+
+  it('마감된 카드는 "신청 마감" 배지 + 흐림 처리로 구분한다', () => {
+    const { container } = renderPage(<TeamMatchListPageView model={modelWithSingleCard('closed')} />);
+
+    expect(screen.getAllByText('신청 마감').length).toBeGreaterThan(0);
+    expect(container.querySelector('.tm-team-match-card.tm-card-closed')).not.toBeNull();
+  });
+
+  it('모집 중 카드는 "모집 중" 그대로이고 흐림 처리도 없다', () => {
+    const { container } = renderPage(<TeamMatchListPageView model={modelWithSingleCard('open')} />);
+
+    expect(screen.getAllByText('모집 중').length).toBeGreaterThan(0);
+    expect(screen.queryByText('신청 마감')).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-card-closed')).toBeNull();
+  });
+});
+
 describe('team match full edit', () => {
   it('shows immutable team context and every mutable field, including the cover image', () => {
     const model = getTeamMatchCreateViewModel('edit');

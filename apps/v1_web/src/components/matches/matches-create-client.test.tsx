@@ -7,13 +7,15 @@ import { draftFromMatchEdit, MatchCreatePageClient, MatchEditPageClient } from '
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
-const { createMatchMutate, routerPush, uploadImagesMutateAsync, confirmMock, updateMatchMutate, cancelMatchMutate, matchEditData } = vi.hoisted(() => ({
+const { createMatchMutate, routerPush, uploadImagesMutateAsync, confirmMock, updateMatchMutate, cancelMatchMutate, closeMatchMutate, reopenMatchMutate, matchEditData } = vi.hoisted(() => ({
   createMatchMutate: vi.fn(),
   routerPush: vi.fn(),
   uploadImagesMutateAsync: vi.fn(),
   confirmMock: vi.fn(),
   updateMatchMutate: vi.fn(),
   cancelMatchMutate: vi.fn(),
+  closeMatchMutate: vi.fn(),
+  reopenMatchMutate: vi.fn(),
   // useEffect(..., [editQuery.data])가 참조로 비교하므로, 매 렌더마다 새 객체를 돌려주면
   // 훅이 재실행 → setDraft → 리렌더 → 훅 재실행의 무한 루프에 빠진다. 안정적인 참조 하나를
   // 모듈 스코프에 고정해 실제 React Query의 캐시된 참조 안정성을 흉내낸다.
@@ -27,6 +29,9 @@ const { createMatchMutate, routerPush, uploadImagesMutateAsync, confirmMock, upd
       title: '수정 중인 매치',
       imageUrl: null,
       startsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      // 마감 시각은 '모집 마감/다시 열기' 토글이 읽는 값이라 fixture 에 자리를 만들어 둔다
+      // (테스트마다 과거/미래로 바꿔 넣는다).
+      deadlineAt: null as string | null,
       capacity: 10,
       manualPlaceName: '한강 풋살장',
     },
@@ -72,6 +77,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   }),
   useV1UpdateMatch: () => ({ mutate: updateMatchMutate, isPending: false }),
   useV1CancelMatch: () => ({ mutate: cancelMatchMutate, isPending: false }),
+  useV1CloseMatch: () => ({ mutate: closeMatchMutate, isPending: false }),
+  useV1ReopenMatch: () => ({ mutate: reopenMatchMutate, isPending: false }),
 }));
 
 vi.mock('./matches-page', () => ({
@@ -107,6 +114,11 @@ vi.mock('./matches-page', () => ({
         {form.onCancel ? (
           <button type="button" onClick={form.onCancel}>
             매치 취소
+          </button>
+        ) : null}
+        {form.recruitingToggle ? (
+          <button type="button" onClick={form.recruitingToggle.onClick}>
+            {form.recruitingToggle.label}
           </button>
         ) : null}
       </div>
@@ -305,5 +317,76 @@ describe('MatchEditPageClient — cancel confirmation', () => {
         expect.any(Object),
       );
     });
+  });
+});
+
+/**
+ * 모집 마감 / 다시 열기 (2026-09-07 제보 대응).
+ *
+ * 마감은 두 갈래다 — 호스트가 닫은 status='closed' 와, 마감 시각만 지난 recruiting.
+ * 화면에는 둘 다 "신청 마감"으로 보이므로 **두 경우 모두 '모집 다시 열기'** 가 떠야 한다.
+ * 한쪽만 처리하면 사용자는 되돌릴 수 없는 매치를 만나게 된다.
+ */
+describe('MatchEditPageClient — 모집 마감 / 다시 열기', () => {
+  const originalStatus = matchEditData.status;
+  const originalDeadline = matchEditData.form.deadlineAt;
+
+  afterEach(() => {
+    cleanup();
+    matchEditData.status = originalStatus;
+    matchEditData.form.deadlineAt = originalDeadline;
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('모집 중이면 마감 버튼이 뜨고, 확인 후에만 close API를 호출한다', async () => {
+    confirmMock.mockResolvedValue(true);
+    render(<MatchEditPageClient matchId="match-edit-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '모집 마감' }));
+
+    await waitFor(() => {
+      expect(closeMatchMutate).toHaveBeenCalledWith(
+        { reason: 'host_closed_from_v1_web' },
+        expect.any(Object),
+      );
+    });
+    expect(reopenMatchMutate).not.toHaveBeenCalled();
+  });
+
+  it('마감을 확인 모달에서 되돌리면 close API를 호출하지 않는다', async () => {
+    confirmMock.mockResolvedValue(false);
+    render(<MatchEditPageClient matchId="match-edit-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '모집 마감' }));
+
+    await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+    expect(closeMatchMutate).not.toHaveBeenCalled();
+  });
+
+  it('호스트가 닫은 매치에는 다시 열기 버튼이 뜨고 확인 없이 바로 연다', async () => {
+    matchEditData.status = 'closed';
+    render(<MatchEditPageClient matchId="match-edit-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '모집 다시 열기' }));
+
+    await waitFor(() => {
+      expect(reopenMatchMutate).toHaveBeenCalledWith(
+        { reason: 'host_reopened_from_v1_web' },
+        expect.any(Object),
+      );
+    });
+    expect(closeMatchMutate).not.toHaveBeenCalled();
+  });
+
+  it('마감 시각만 지난 recruiting 매치도 다시 열기로 보여준다', async () => {
+    matchEditData.status = 'recruiting';
+    matchEditData.form.deadlineAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    render(<MatchEditPageClient matchId="match-edit-1" />);
+
+    expect(await screen.findByRole('button', { name: '모집 다시 열기' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: '모집 마감' })).toBeNull();
   });
 });

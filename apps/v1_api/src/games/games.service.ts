@@ -1469,6 +1469,22 @@ export class GamesService {
               data: { state: V1GamePeriodState.ENDED, endedAt: now, ...(resolved ?? {}) },
             });
           }
+          // **리그 대진은 여기가 결과 경계다(결함 #29).** 콘솔의 `end` 가 곧 결과 보내기이므로
+          // 친선의 결과 제출과 **같은 부수효과**를 태운다 — 안 그러면 `V1TeamMatch` 가
+          // `matched` 로 남아 `reviews.service.ts` 의 `isCompleted` 가 409
+          // `SOURCE_NOT_COMPLETED` 를 던지고 **상호평가에 영구히 못 들어간다**(평가 마감
+          // 창의 기준시각도 `completedAt` 이다). 양 팀 캘린더 일정도 SCHEDULED 로 남는다.
+          //
+          // 대회 픽스처(`TOURNAMENT_FIXTURE`)에는 팀매치가 없으므로 `teamMatchId` 가 null 이라
+          // 자연히 건너뛴다 — 즉 이 줄은 리그에만 작용한다.
+          if (updated.teamMatchId !== null) {
+            await this.completeTeamMatchAtResultBoundary(
+              tx,
+              updated.teamMatchId,
+              context.actor.actorType === 'USER' ? context.actor.actorUserId : null,
+              'league_console_game_ended',
+            );
+          }
           return this.deriveTournamentRevision(
             tx,
             updated,
@@ -3865,32 +3881,12 @@ export class GamesService {
           // the TeamMatch already completed and skips the update); the log write
           // below is gated on `.count === 1` for the same reason, so a
           // no-op resubmit never writes a fromStatus==toStatus log row.
-          const completion = await tx.v1TeamMatch.updateMany({
-            where: { id: game.teamMatchId, status: { not: V1TeamMatchStatus.completed } },
-            data: { status: V1TeamMatchStatus.completed, completedAt: new Date() },
-          });
-          if (completion.count === 1) {
-            // assertTeamMatchMatched (above) already established that the TeamMatch's
-            // status is `matched` or `completed`; the guard on the updateMany above
-            // means a real transition only happens when it was `matched`, so
-            // `matched` is the only possible fromStatus here.
-            await tx.v1StatusChangeLog.create({
-              data: {
-                targetType: 'team_match',
-                targetId: game.teamMatchId,
-                fromStatus: V1TeamMatchStatus.matched,
-                toStatus: V1TeamMatchStatus.completed,
-                actorType: 'user',
-                actorUserId: user.id,
-                reason: 'team_match_result_submitted',
-              },
-            });
-            // 매치 ↔ 팀일정 연동(레인 schedule): 결과 제출이 팀 매치의 실질적 종료 시점이라는
-            // 바로 위 근거를 그대로 이어받아, 같은 트랜잭션 안에서 연결된 SCHEDULED 팀일정도
-            // COMPLETED로 cascade한다. `completion.count === 1` 가드 덕분에 이 블록도 재제출/
-            // 정정 루프에서 이미 완료 처리된 것을 다시 건드리지 않는다(자연히 idempotent).
-            await cascadeCompleteTeamMatchSchedulesInTx(tx, game.teamMatchId);
-          }
+          await this.completeTeamMatchAtResultBoundary(
+            tx,
+            game.teamMatchId,
+            user.id,
+            'team_match_result_submitted',
+          );
         }
         await this.writeOutbox(
           tx,
@@ -6331,6 +6327,61 @@ export class GamesService {
       missingScorer,
       ...(dto.mvpParticipantId === undefined ? {} : { mvpParticipantId: dto.mvpParticipantId }),
     };
+  }
+
+  /**
+   * **경기의 결과 경계에서 `V1TeamMatch` 를 완료로 넘긴다.**
+   *
+   * 이 셋은 **함께 일어나야 한다** — 하나라도 빠지면 화면이 조용히 어긋난다:
+   *   ① `status = completed` + `completedAt`
+   *   ② `V1StatusChangeLog` 감사 행
+   *   ③ 양 팀 캘린더의 SCHEDULED 팀일정 완료(cascade)
+   *
+   * **왜 공용인가(결함 #29):** 예전엔 이 블록이 `submitResultRevision` 안에만 있었다.
+   * 그런데 리그 대진은 **콘솔의 `end` 가 결과 경계**다(정본 Task 165). 그 경로에 이 부수효과가
+   * 없으면 `V1TeamMatch.status` 가 `matched` 로 남고, `reviews.service.ts` 의 `isCompleted`
+   * 가 **409 `SOURCE_NOT_COMPLETED`** 를 던져 **상호평가에 영구히 못 들어간다**. 평가 마감
+   * 창의 기준시각도 `completedAt` 이라 그 값이 없으면 계산 자체가 성립하지 않는다. 양 팀
+   * 캘린더에도 끝난 경기가 SCHEDULED 로 남는다.
+   *
+   * **복사하지 말고 이 함수를 불러라.** 두 입구가 각자 적으면 한쪽만 고쳐져 갈라진다.
+   *
+   * 멱등이다 — `status: { not: completed }` 가드 덕분에 재제출·정정 루프에서 두 번째부터는
+   * 아무것도 하지 않는다(감사 행도 `count === 1` 일 때만 쓴다).
+   *
+   * `fromStatus` 는 **읽어서 적는다.** 예전 코드는 `matched` 를 상수로 적었는데, 그건 바로
+   * 위에서 `assertTeamMatchMatched` 를 부르는 제출 경로에서만 참이다 — 콘솔 `end` 는 그
+   * 단언을 지나지 않으므로 상수로 두면 감사 로그가 사실과 달라질 수 있다.
+   */
+  private async completeTeamMatchAtResultBoundary(
+    tx: Transaction,
+    teamMatchId: string,
+    /** 사람이 아닌 액터(시스템 레인)면 `null` — 스키마가 nullable 이다. */
+    actorUserId: string | null,
+    reason: string,
+  ): Promise<void> {
+    const before = await tx.v1TeamMatch.findUnique({
+      where: { id: teamMatchId },
+      select: { status: true },
+    });
+    if (before === null) return;
+    const completion = await tx.v1TeamMatch.updateMany({
+      where: { id: teamMatchId, status: { not: V1TeamMatchStatus.completed } },
+      data: { status: V1TeamMatchStatus.completed, completedAt: new Date() },
+    });
+    if (completion.count !== 1) return;
+    await tx.v1StatusChangeLog.create({
+      data: {
+        targetType: 'team_match',
+        targetId: teamMatchId,
+        fromStatus: before.status,
+        toStatus: V1TeamMatchStatus.completed,
+        actorType: 'user',
+        actorUserId,
+        reason,
+      },
+    });
+    await cascadeCompleteTeamMatchSchedulesInTx(tx, teamMatchId);
   }
 
   private async deriveTournamentRevision(

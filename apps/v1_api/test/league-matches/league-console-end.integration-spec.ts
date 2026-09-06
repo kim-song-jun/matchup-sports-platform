@@ -139,6 +139,10 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
       startAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
       approvedApplicantTeamId: ids.awayTeam,
       competitionConfigVersionId: configId,
+      // 프로덕션의 리그 대진은 `matched` 로 만들어진다. 모델 기본값은 `recruiting` 이라
+      // 명시하지 않으면 **감사 로그의 fromStatus 가 현실과 달라진다** — 실제로 이 스펙을
+      // 쓰는 동안 그 차이가 드러났고, 헬퍼가 상수 대신 **읽은 값**을 적는 이유이기도 하다.
+      status: 'matched' as const,
     };
     await prisma.v1TeamMatch.create({
       data: { ...common, id: ids.leagueMatch, title: '#29 리그 대진', leagueId: league.id },
@@ -147,6 +151,26 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
       // `leagueId` 를 **주지 않는다** — 이것이 친선이다.
       data: { ...common, id: ids.friendlyMatch, title: '#29 친선 팀매치' },
     });
+
+    // **일정 행을 실제로 만든다.** 없으면 "SCHEDULED 0건" 단언이 빈 집합에서 참이 되어
+    // cascade 가 도는지 아닌지를 전혀 구분하지 못한다(공허한 테스트).
+    for (const [teamId, teamMatchId, title] of [
+      [ids.homeTeam, ids.leagueMatch, '#29 리그 홈 일정'],
+      [ids.awayTeam, ids.leagueMatch, '#29 리그 원정 일정'],
+      [ids.homeTeam, ids.friendlyMatch, '#29 친선 홈 일정'],
+    ] as const) {
+      await prisma.v1TeamSchedule.create({
+        data: {
+          teamId,
+          teamMatchId,
+          title,
+          type: 'MATCH',
+          startAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
+          endAt: new Date(Date.now() + 4 * 60 * 60 * 1000),
+          timezone: 'Asia/Seoul',
+        },
+      });
+    }
 
     leagueGameId = await createGame(ids.leagueMatch, 'console-end-src-league');
     friendlyGameId = await createGame(ids.friendlyMatch, 'console-end-src-friendly');
@@ -175,10 +199,55 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     expect(game.currentOfficialRevisionId).toBeNull();
   });
 
+  it('리그 종료는 팀매치를 **완료**로 넘긴다 — 이게 없으면 상호평가에 영원히 못 들어간다', async () => {
+    // `reviews.service.ts` 의 리뷰 진입 게이트는 `isCompleted(teamMatch)`
+    // (= `status === 'completed' || Boolean(completedAt)`, 1418행) 를 통과하지 못하면
+    // **409 `SOURCE_NOT_COMPLETED`** 를 던진다(648행). 그리고 평가 마감 창의 **기준시각이
+    // `completedAt`** 이라(655행) 그 값이 없으면 창 계산 자체가 성립하지 않는다.
+    // 그래서 둘 다 본다 — `status` 만 보면 `completedAt` 누락을 놓친다.
+    const teamMatch = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: ids.leagueMatch } });
+    expect(teamMatch.status).toBe('completed');
+    expect(teamMatch.completedAt).not.toBeNull();
+  });
+
+  it('완료 전이는 감사 로그를 남기고, 양 팀 캘린더 일정도 함께 닫는다', async () => {
+    // 셋은 **함께** 일어나야 한다. 상태만 바뀌고 로그·캘린더가 빠지면 화면이 조용히 어긋난다.
+    const log = await prisma.v1StatusChangeLog.findFirst({
+      where: { targetType: 'team_match', targetId: ids.leagueMatch, toStatus: 'completed' },
+    });
+    expect(log).not.toBeNull();
+    // `fromStatus` 는 상수가 아니라 **읽은 값**이어야 한다 — 콘솔 `end` 는 제출 경로의
+    // `assertTeamMatchMatched` 를 지나지 않으므로 `matched` 를 상수로 적으면 사실과 달라질 수 있다.
+    expect(log?.fromStatus).toBe('matched');
+
+    // 필드는 `status` 가 아니라 `state` 다(`V1ScheduleState`).
+    const leagueSchedules = await prisma.v1TeamSchedule.findMany({
+      where: { teamMatchId: ids.leagueMatch },
+      select: { state: true },
+    });
+    // 빈 집합에서 참이 되지 않도록 **개수부터** 확인한다.
+    expect(leagueSchedules).toHaveLength(2);
+    expect(leagueSchedules.every((row) => row.state === 'COMPLETED')).toBe(true);
+  });
+
   it('친선 팀매치는 여전히 콘솔로 끝낼 수 없다 (409) — 이 가드가 지키던 것', async () => {
     await run(friendlyGameId, 'start', 'console-end-friendly-start');
     const error = await captureFailure(() => run(friendlyGameId, 'end', 'console-end-friendly-end'));
     expect(httpBody(error)).toEqual({ status: 409, code: 'TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN' });
+  });
+
+  it('친선은 종료 시도 뒤에도 완료되지 않는다 — 완료 부수효과가 새지 않았다', async () => {
+    // **순서가 중요하다.** 바로 위 테스트가 친선 `end` 를 실제로 시도한 뒤에 본다 —
+    // 시도 전에 보면 "아직 안 끝냈으니 당연히 미완료" 라 아무것도 증명하지 못한다.
+    const friendly = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: ids.friendlyMatch } });
+    expect(friendly.status).not.toBe('completed');
+    expect(friendly.completedAt).toBeNull();
+    const friendlySchedules = await prisma.v1TeamSchedule.findMany({
+      where: { teamMatchId: ids.friendlyMatch },
+      select: { state: true },
+    });
+    expect(friendlySchedules).toHaveLength(1);
+    expect(friendlySchedules[0]?.state).toBe('SCHEDULED');
   });
 
   it('친선도 **시작**은 된다 — 가드는 `end` 에만 걸린다', async () => {

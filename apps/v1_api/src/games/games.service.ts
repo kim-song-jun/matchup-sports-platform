@@ -6388,7 +6388,12 @@ export class GamesService {
         targetId: teamMatchId,
         fromStatus: before.status,
         toStatus: V1TeamMatchStatus.completed,
-        actorType: 'user',
+        // **액터에서 파생시킨다.** 시그니처가 `actorUserId: string | null` 을 받으면서
+        // 본문이 `'user'` 를 상수로 쓰면 **없는 경우를 받아들이는 척**하는 것이고, 나중에
+        // 시스템 레인에서 이 헬퍼를 부르면 "user 인데 userId 가 없는" 거짓 감사 행이 조용히
+        // 쌓인다. 지금은 두 입구가 다 USER 라 `null` 분기에 **도달하지 않으므로 동작은
+        // 하나도 안 바뀐다** — 시그니처와 본문을 일치시키는 것이 목적이다.
+        actorType: actorUserId === null ? 'system' : 'user',
         actorUserId,
         reason,
       },

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Post } from '@/lib/api-client';
 import { randomUuid } from '@/lib/uuid';
+import type { GameActorRole as FullGameActorRole } from '@/types/game-operations';
 import type {
   V1GameResultCards,
   V1GameResultGoalEventInput,
@@ -52,11 +53,19 @@ export type TournamentStaffActorRole =
   | 'field_operator'
   | 'support_readonly';
 
-/** `GamesService.getGame()`'s `actorRole` also covers team-match actors; a
- * tournament-fixture game (the only kind this lane ever reads) only ever
- * resolves to one of `TournamentStaffActorRole` -- see
- * `GamesService.resolveActor()`'s `TOURNAMENT_FIXTURE` branch. */
-export type GameActorRole = TournamentStaffActorRole;
+/**
+ * **이 레인은 더 이상 대회 픽스처만 읽지 않는다.**
+ *
+ * 예전 주석은 "tournament-fixture game (the only kind this lane ever reads)" 라고 적고
+ * 그래서 `TournamentStaffActorRole` 로 좁혀도 안전하다고 했다. **정본이 "리그도 같은 콘솔"
+ * 로 확정하면서 그 전제가 깨졌다** — 이제 리그 대진(팀매치 소스)도 이 화면을 지나고, 그때
+ * `actorRole` 은 `team_owner`·`team_manager`·`opponent_manager` 가 될 수 있다.
+ *
+ * 좁은 타입을 그대로 두면 **라벨 맵에 없는 키가 들어와** 화면에 `undefined` 가 찍힌다
+ * (2026-09-06 alpha 실측: "종료 · undefined"). 넓혀 두면 `Record<GameActorRole, string>`
+ * 이 **누락을 tsc 가 잡는다.**
+ */
+export type GameActorRole = FullGameActorRole;
 
 export type GameResultRevisionState = V1GameResultRevisionState;
 

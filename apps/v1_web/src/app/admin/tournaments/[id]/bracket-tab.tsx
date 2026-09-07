@@ -493,7 +493,9 @@ export function BracketTab({
     const ok = await confirmModal({
       title: isBracketPublished ? '대진표 공개 취소' : '공개 예약 취소',
       message: isBracketPublished
-        ? '대진표를 다시 비공개로 되돌려요. 공개 페이지에는 "대진표 준비 중" 안내만 노출돼요. 이미 대진표를 본 참가자의 기억까지 되돌릴 수는 없어요.'
+        // 공개 화면의 실제 문구는 대회 상태마다 다르다 — 여기서 특정 문자열을 따옴표로
+        // 못박으면 그쪽이 바뀔 때 이 안내가 조용히 거짓이 된다.
+        ? '대진표를 다시 비공개로 되돌려요. 공개 페이지에서는 대진표가 보이지 않고 준비 중 안내만 남아요. 이미 대진표를 본 참가자의 기억까지 되돌릴 수는 없어요.'
         : '예약된 공개를 취소해요. 대진표는 계속 비공개로 남아요.',
       confirmLabel: isBracketPublished ? '비공개로 되돌리기' : '예약 취소',
       tone: 'danger',
@@ -523,7 +525,7 @@ export function BracketTab({
                   `${formatDate(bracketPublishedAt ?? bracketPublishScheduledAt ?? null)}에 공개됨 — 참가팀·방문자가 조/일정/대진표를 볼 수 있어요.`
                 : hasPendingSchedule
                 ? `${formatDate(bracketPublishScheduledAt ?? null)}에 자동 공개돼요. 그 전까지는 계속 수정할 수 있어요.`
-                : '아직 비공개예요. 공개 전까지 공개 페이지에는 "대진표 준비 중" 안내만 노출돼요.'}
+                : '아직 비공개예요. 공개 전까지는 공개 페이지에서 대진표가 보이지 않아요.'}
             </p>
             {!isBracketPublished && publishBlockedReason && (
               <p className="text-xs text-[var(--orange700)] mt-1">{publishBlockedReason}</p>

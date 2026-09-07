@@ -35,8 +35,14 @@
  * with both its own chat rows below (20px) and sibling section titles (20px).
  * Zeroing it here (unconditionally, not just at the desktop breakpoint) makes the
  * title rely solely on the block's own margin, matching every other home section.
+ *
+ * .tm-home-featured-block is the same case (`margin: 0 20px 28px` above) and joined
+ * this override on 2026-09-07 when "오늘의 추천" moved from an inline
+ * `<div class="tm-text-label">`(13px) to the shared SectionTitle(17px) — without it
+ * the new title would have doubled to 40px exactly as "최근 채팅" once did.
  */
-.tm-home-chat-block .tm-section-title {
+.tm-home-chat-block .tm-section-title,
+.tm-home-featured-block .tm-section-title {
   padding-left: 0;
   padding-right: 0;
 }

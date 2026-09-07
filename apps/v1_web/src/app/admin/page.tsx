@@ -119,7 +119,7 @@ function InboxSection() {
 
   return (
     <section aria-label="할 일" className="tm-content-enter mb-6">
-      <h2 className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)] mb-3">할 일</h2>
+      <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)] mb-3">할 일</h2>
       {isPending ? (
         <AdminKpiGridSkeleton count={4} />
       ) : isError ? (
@@ -235,7 +235,7 @@ export default function AdminOverviewPage() {
       {/* ── Warning section ───────────────────────────────────────────── */}
       {!isPending && !isError && (
         <section aria-label="주의 필요 항목" className="mb-6">
-          <h2 className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)] mb-3">주의 필요</h2>
+          <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)] mb-3">주의 필요</h2>
           {/* 운영 실패 지표(웹 푸시·SMS) 로딩 실패는 카드를 조용히 숨기는 대신 명시적으로
               알린다 — 숨기면 "조치 필요 없음"(초록)이 실패를 가리는 무신호 상태가 된다.
               이 '실패 시 무신호 금지' 계약은 이후 대시보드 개편(M6 WS 전환)에서도 유지해야 한다. */}
@@ -318,7 +318,7 @@ export default function AdminOverviewPage() {
 
       {/* ── Primary KPIs (현황) ──────────────────────────────────────── */}
       {!isPending && !isError && (
-        <h2 className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-body)] mb-3">현황</h2>
+        <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)] mb-3">현황</h2>
       )}
       {isPending ? (
         <AdminKpiGridSkeleton count={4} />
@@ -371,7 +371,7 @@ export default function AdminOverviewPage() {
       {!isPending && !isError && (
         <section aria-label="최근 운영 활동" className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)]">
           <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-            <h2 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">최근 운영 활동</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">최근 운영 활동</h2>
             <Link
               href="/admin/monitoring?tab=audit"
               className="flex items-center gap-0.5 text-[length:var(--font-size-label)] text-blue-500 font-medium hover:text-[var(--blue700)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded min-h-[44px] px-1"

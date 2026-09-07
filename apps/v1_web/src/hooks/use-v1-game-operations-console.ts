@@ -628,13 +628,20 @@ export function useV1GameOperationsConsole(
         },
       );
     };
-    const onGameError = (error: { code: string; clientEventId?: string }) => {
+    // **큐가 실제로 가장 많이 만나는 실패가 이 경로다**(`game.event.append`/`retry`).
+    // `reason` 을 여기서 안 받으면 재시도 판정이 값을 못 받아, 타입은 통과하고 화면만
+    // 안 되는 상태가 된다 — 구독·takeover 에만 싣는 것은 **배선이 반쪽**이다.
+    const onGameError = (error: { code: string; clientEventId?: string; reason?: string }) => {
       if (cancelled) return;
       if (error.clientEventId) {
         dispatchQueue({
           type: 'FAIL',
           clientEventId: error.clientEventId,
-          error: { code: error.code, message: gameOperationsErrorMessage(error.code) },
+          error: {
+            code: error.code,
+            message: gameOperationsErrorMessage(error.code),
+            ...(typeof error.reason === 'string' ? { reason: error.reason } : {}),
+          },
         });
       } else {
         setBannerMessage(gameOperationsErrorMessage(error.code));
@@ -852,7 +859,14 @@ export function useV1GameOperationsConsole(
           error: { code: 'SEND_TIMEOUT', message: gameOperationsErrorMessage('SEND_TIMEOUT') },
         });
       }, SEND_ACK_TIMEOUT_MS);
-      const ackHandler = (result: { status: string; sequence?: number; version?: number; code?: string }) => {
+      // `reason` 은 같은 코드의 서로 다른 원인을 가른다(서버가 additive 로 함께 보낸다).
+      const ackHandler = (result: {
+        status: string;
+        sequence?: number;
+        version?: number;
+        code?: string;
+        reason?: string;
+      }) => {
         clearTimeout(ackTimeoutId);
         if (result.status === 'ack' && result.sequence !== undefined && result.version !== undefined) {
           dispatchQueue({
@@ -876,7 +890,12 @@ export function useV1GameOperationsConsole(
           dispatchQueue({
             type: 'FAIL',
             clientEventId: item.clientEventId,
-            error: { code: result.code ?? 'INTERNAL_ERROR', message: gameOperationsErrorMessage(result.code ?? 'INTERNAL_ERROR') },
+            error: {
+              code: result.code ?? 'INTERNAL_ERROR',
+              message: gameOperationsErrorMessage(result.code ?? 'INTERNAL_ERROR'),
+              // 서버가 같은 코드의 원인을 구분해 보낸다 — 재시도 가능 여부가 여기서 갈린다.
+              ...(typeof result.reason === 'string' ? { reason: result.reason } : {}),
+            },
           });
         }
       };
@@ -1251,6 +1270,24 @@ const NON_RETRYABLE_GAME_OPERATIONS_ERROR_CODES = new Set<string>([
   'IDEMPOTENCY_PAYLOAD_CONFLICT',
 ]);
 
-export function isRetryableGameOperationsErrorCode(code: string): boolean {
+/**
+ * **같은 코드라도 원인이 다르면 답이 다르다.**
+ *
+ * `STAFF_SCOPE_DENIED` 는 구조적으로 다른 원인 넷에 함께 쓰인다. 그중 **인가 주체 버전
+ * 불일치**(`AUTHORIZATION_SUBJECT_STALE`)는 **재접속하면 풀린다** — 권한이 없어진 것이
+ * 아니다. 그런데 코드만 보고 non-retryable 로 묶으면 **재시도 버튼이 숨어** 운영자가
+ * 할 수 있는 유일한 행동을 못 한다(그리고 문구는 버전 불일치 쪽 설명이라 **진짜 권한
+ * 거부에는 틀린 안내**가 나간다).
+ *
+ * 서버가 ack 에 `reason` 을 함께 보내므로(코드는 그대로 — 계약을 안 깬다) 그 값으로 가른다.
+ */
+const RETRYABLE_STAFF_DENIAL_REASONS = new Set<string>(['AUTHORIZATION_SUBJECT_STALE']);
+
+export function isRetryableGameOperationsErrorCode(code: string, reason?: string | null): boolean {
+  // **예외는 `STAFF_SCOPE_DENIED` 안에서만 연다.** 이 reason 집합은 그 코드의 원인 구분이라,
+  // 다른 코드에 같은 값이 실려 오면(오배선·미래 변경) 엉뚱한 코드가 재시도 가능으로 분류된다.
+  if (code === 'STAFF_SCOPE_DENIED' && reason != null && RETRYABLE_STAFF_DENIAL_REASONS.has(reason)) {
+    return true;
+  }
   return !NON_RETRYABLE_GAME_OPERATIONS_ERROR_CODES.has(code);
 }

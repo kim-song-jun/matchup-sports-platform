@@ -1558,6 +1558,19 @@ button:disabled {
   color: var(--text);
 }
 
+/* 카드/리스트 항목의 제목. tm-text-label(13px)에서 갈라 나온 클래스다.
+   2026-09-07 alpha 실측: 홈에서 tm-text-label 하나가 인사말·섹션 제목·카드 제목·
+   리스트 항목명·메타 라벨·날짜 6개 역할을 겸했고, 그 결과 카드 제목(13px)이 바로
+   아래 메타 행(tm-text-micro 12px)과 1px 차이였다. DESIGN.md §2.1 은 인접 위계
+   사이에 최소 2px 차이를 요구한다 — 15px 으로 올려 메타와 3px, 섹션 제목(17px)과
+   2px 을 확보한다. 새 토큰은 만들지 않고 기존 --font-size-body(15px)를 쓴다. */
+.tm-text-card-title {
+  font-size: var(--font-size-body);
+  line-height: 20px; /* [P1 4pt snap] 15 × 1.33 */
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
 .tm-text-caption {
   font-size: var(--font-size-caption);
   line-height: 16px; /* [P1 4pt snap] 18→16 (4의 배수, ×1.33 — caption은 짧은 보조 텍스트라 압축해도 가독 OK) */
@@ -2191,11 +2204,14 @@ label.tm-btn:focus-within {
   height: 100%;
   display: flex;
   flex-direction: column;
-  /* hairline shadow — 사이드 추천 매치 카드(.tm-match-card)가 이미 동일 목적으로 쓰는
-     shadow-2 를 히어로 카드에도 적용해, 이미지 비중이 커진 만큼 media+content 를 한
-     덩어리로 묶어 '붕 떠' 보이지 않게 한다. border만 있던 이전보다 카드가 배경 위에
-     자연스럽게 자리 잡은 느낌을 준다(과한 확산 없는 절제된 값 그대로 재사용). */
-  box-shadow: var(--shadow-dropdown);
+  /* hairline shadow — media+content 를 한 덩어리로 묶어 '붕 떠' 보이지 않게 한다.
+     2026-09-07 정정: 주석은 계속 "hairline" 이라고 적혀 있었지만 실제로 걸려 있던 값은
+     --shadow-dropdown(0 8px 24px) 이었다. 그건 tokens.css 가 "dropdown / overlay —
+     검색 드롭다운, 툴팁, 하단 스크림" 용으로 정의한 elevation-2 이고, hairline 토큰
+     (--shadow-card, 0 1px 2px)보다 blur 가 12배다. alpha 390 실측에서 홈만 그림자 6개,
+     다른 5개 화면은 0개였다 — 홈이 유일한 이탈자였다. DESIGN.md §4.1 "기본 카드에는
+     none 또는 hairline-level shadow만 허용 / 큰 blur radius 금지" 에 맞춘다. */
+  box-shadow: var(--shadow-card);
 }
 
 .tm-featured-content {
@@ -2427,8 +2443,9 @@ label.tm-btn:focus-within {
   padding: 0;
   text-align: left;
   color: inherit;
-  /* hairline shadow 로 이미지+내용을 한 카드로 묶어 '붕 떠' 보이지 않게 */
-  box-shadow: var(--shadow-dropdown);
+  /* hairline shadow 로 이미지+내용을 한 카드로 묶어 '붕 떠' 보이지 않게.
+     .tm-featured-card 와 같은 이유로 --shadow-dropdown → --shadow-card (DESIGN.md §4.1). */
+  box-shadow: var(--shadow-card);
 }
 
 .tm-match-card-media {
@@ -2830,6 +2847,26 @@ label.tm-btn:focus-within {
   margin: 0 0 8px;
 }
 
+/* 인접 매치 레일 (디자인 검수 W-3, B안) — 결과가 1~2건일 때만 목록 아래에 붙는다.
+   검색 결과와 성격이 다르므로 위쪽 구분선으로 확실히 가른다. DESIGN.md §15 는 섹션
+   구분 수단을 여백·배경색·구분선 중 "하나만" 쓰라고 하므로, 여기서는 구분선 하나만
+   쓰고 배경색은 바꾸지 않는다. */
+.tm-match-nearby-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+/* 제목과 부제는 한 덩어리라 안쪽을 좁힌다(8 → 4). 레일과의 바깥 간격은 12로 벌린다. */
+.tm-match-nearby-section .tm-match-rail-heading {
+  margin-bottom: 4px;
+}
+
+.tm-match-nearby-sub {
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+
 /*
  * 가로 스크롤. 카드 폭을 뷰포트보다 좁게 잡아 "옆에 더 있다"가 보이게 한다.
  * 목록 본문은 세로 행이라, 이 레일이 유일한 가로 스크롤 영역이다.
@@ -2961,9 +2998,15 @@ label.tm-btn:focus-within {
   background: none;
 }
 
+/*
+ * 그래픽을 담는 자리. 면(배경)을 깔지 않는다.
+ * --grey50 을 깔아 봤는데 페이지 배경과 대비가 라이트 1.05 · 다크 1.09 라 눈에 안 보이면서
+ * 패딩만 232px 를 먹었다(alpha 실측 2026-09-06). 면이 필요한 이유 셋 — 그룹핑 · 레이어 분리 ·
+ * 글씨 대비 — 이 자리엔 셋 다 없다. 그래픽은 히어로 맨 위라 위에 구분할 것이 없고,
+ * 실루엣도 스스로 선다(자산 10장 전부 순백 픽셀 0%, 경계 밝기 128~176).
+ */
 .tm-match-hero-graphic {
-  background: var(--grey50);
-  padding: 28px 16px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3015,7 +3058,7 @@ label.tm-btn:focus-within {
 
 @media (min-width: 1024px) {
   .tm-match-hero-graphic {
-    padding: 36px 16px;
+    padding: 16px;
   }
 
   .tm-match-hero-graphic .tm-match-sport-illustration {
@@ -3086,7 +3129,10 @@ label.tm-btn:focus-within {
   font-size: 0;
   line-height: 1;
   font-weight: 500;
-  box-shadow: 0 12px 26px rgba(49, 130, 246, 0.32);
+  /* 컬러 글로우(파랑 32%) → 중립 elevation. FAB 은 실제로 떠 있는 surface 라 stronger
+     shadow 자체는 DESIGN.md §4.1 이 허용하지만, "glow성 shadow 금지" 는 별개 조항이다.
+     alpha 실측에서 이 값의 알파(0.32)가 앱 전체 어떤 그림자보다 6배 진했다. */
+  box-shadow: var(--shadow-modal);
   z-index: var(--z-floating);
 }
 
@@ -4002,11 +4048,14 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin-top: 16px;
 }
 
+/* 카드 표면은 .tm-card 와 같은 토큰을 쓴다. --bg 는 페이지 배경이라 다크에서
+   카드 채움이 페이지와 똑같아지고(둘 다 #121317, 대비 1.00) 테두리만 남는다
+   — alpha 실측 2026-09-06. --card-surface 는 다크에서 #1c1e24 로 한 단 올라간다. */
 .tm-team-card {
   display: block;
-  border: 1px solid var(--grey100);
+  border: 1px solid var(--card-border);
   border-radius: var(--radius-container);
-  background: var(--bg);
+  background: var(--card-surface);
   color: inherit;
   text-decoration: none;
   padding: 16px;
@@ -4052,16 +4101,15 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   color: var(--text-caption);
 }
 
+/*
+ * 팀 소개 한 줄. 면도 테두리도 없다.
+ * --grey50 + --grey100 테두리를 두르고 있었는데 카드와 대비가 라이트 1.05 · 다크 1.09 라
+ * 보이지 않으면서 49px 를 고정으로 먹었다("이게" 두 글자에도 49px). 게다가 그 틴트 위에서
+ * --text-caption 이 4.42:1 로 AA 미달이었다 — 카드 표면으로 올리면 4.62:1 로 통과한다.
+ * DESIGN.md 15절 "여백·배경색·구분선 중 하나만" 에 맞춰 여백만 남긴다.
+ */
 .tm-team-intro-box {
-  margin-top: 16px;
-  border: 1px solid var(--grey100);
-  border-radius: var(--radius-field);
-  background: var(--grey50);
-  padding: 12px;
-}
-
-.tm-team-card:active .tm-team-intro-box {
-  background: var(--bg);
+  margin-top: 12px;
 }
 
 .tm-team-detail-hero-card {
@@ -5163,7 +5211,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   color: var(--text-strong);
   font-size: 16px;
   line-height: 1.35;
-  font-weight: 850;
+  /* 850 → 700: 스케일 밖 값이고 700·800 과 육안 구분이 되지 않는다 (DESIGN.md §6 token-first) */
+  font-weight: 700;
 }
 
 .v1-button {
@@ -7331,9 +7380,14 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   overflow: hidden;
 }
 
+/* 섹션 제목의 정본. 공유 프리미티브 SectionTitle(.tm-text-body-lg = 17px/700)과 같은 값을
+   쓴다 — 2026-09-07 alpha 실측에서 같은 역할이 15px/850(여기) · 13px/600(홈 인라인) ·
+   17px/700(프리미티브) 세 값으로 갈려 있었다. 15px 은 본문(14~15px)과 1px 차이라
+   DESIGN.md §2.1 "각 단계 사이에 최소 2px 이상의 크기 차이" 를 만족하지 못했다.
+   850 은 어느 스케일에도 없는 값이고 700·800 과 육안 구분이 되지 않아 함께 폐기한다. */
 .tm-hub-section-title {
-  font-size: 15px;
-  font-weight: 850;
+  font-size: var(--font-size-body-lg);
+  font-weight: 700;
   color: var(--text-strong);
   margin: 0 0 12px;
 }
@@ -7356,7 +7410,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 .tm-retention-card-title {
   font-size: 16px;
-  font-weight: 850;
+  /* 850 → 700 (위 .v1-item-title 과 같은 이유) */
+  font-weight: 700;
   color: var(--text-strong);
   margin: 0;
 }

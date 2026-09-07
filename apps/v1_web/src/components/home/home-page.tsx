@@ -168,10 +168,10 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
             className="tm-home-featured-block"
             aria-busy={tournaments.isPending || model.statsLoading || undefined}
           >
-            <div style={{ marginBottom: 12 }}>
-              <div className="tm-text-label">오늘의 추천</div>
-              <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 2 }}>지금 눈여겨볼 매치·대회</div>
-            </div>
+            {/* 같은 화면의 "추천 매치"·"최근 채팅" 과 같은 역할인데 인라인 tm-text-label(13px)
+                이라 4px 작았다(2026-09-07 alpha 실측: 홈의 섹션 제목 역할 요소 28개 중 26개가
+                13px). 공유 SectionTitle 로 옮겨 17px/700 로 통일한다 — DESIGN.md §2.1. */}
+            <SectionTitle title="오늘의 추천" sub="지금 눈여겨볼 매치·대회" />
             <div className="tm-home-featured-carousel">
               {/* 추천 매치 슬롯도 **자리를 먼저 잡는다**. 이 카드는 /api/v1/home 응답으로 나타나는데
                   캐러셀의 0번 자리라, 늦게 끼어들면 이미 자리 잡은 대회 슬롯을 통째로 오른쪽으로
@@ -824,10 +824,7 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
                   <TrophyIcon size={16} strokeWidth={2} />
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    className="tm-text-label line-clamp-1"
-                    style={{ color: 'var(--text-strong)' }}
-                  >
+                  <div className="tm-text-card-title line-clamp-1">
                     {t.title}
                   </div>
                   <div
@@ -937,10 +934,7 @@ function SidebarLeaguesWidget({ items, loading }: { items: V1PublicLeagueListIte
                   <TrophyIcon size={16} strokeWidth={2} />
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    className="tm-text-label line-clamp-1"
-                    style={{ color: 'var(--text-strong)' }}
-                  >
+                  <div className="tm-text-card-title line-clamp-1">
                     {l.title}
                   </div>
                   <div
@@ -982,7 +976,9 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
           </div>
           <div style={{ padding: 16 }}>
             <div className="tm-text-micro" style={{ color: 'var(--blue700)' }}>{match.sportLabel}</div>
-            <div className="tm-text-label line-clamp-2" style={{ color: 'var(--text-strong)', marginTop: 4, minHeight: 36 }}>
+            {/* minHeight 36 → 40: 2줄 예약 높이라 line-height(18→20)와 함께 올린다.
+                줄이지 않으면 제목 2줄일 때 카드 높이가 다시 흔들린다. */}
+            <div className="tm-text-card-title line-clamp-2" style={{ marginTop: 4, minHeight: 40 }}>
               {match.title}
             </div>
             <div className="tm-match-card-footer">

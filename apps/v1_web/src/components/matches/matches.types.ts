@@ -58,6 +58,12 @@ export type MatchListViewModel = {
     urgent: number;
   };
   matches: MatchCardModel[];
+  /** 결과가 1~2건뿐인 "희소" 상태에서 목록 아래를 채우는 인접 매치 (디자인 검수 W-3, B안).
+   * 0건은 EmptyState 가 받지만 1건은 그 경로를 타지 않아 카드 한 장 아래로 화면 끝까지
+   * 비어 있었다(390 실측: 약 500px). 조건 밖이지만 지금 모집 중인 매치를 채워
+   * DESIGN.md §15("한 화면에 3-5개 카드")에 근접시킨다.
+   * 비었으면 아무것도 그리지 않는다 — 빈 레일을 남기지 않는다. */
+  nearbyMatches?: MatchCardModel[];
   /** team-matches.types.ts의 #5와 같은 목적 — true일 때 EmptyState 대신 PageSkeleton 렌더.
    * 로딩 중(items === undefined)에 matches: []를 EmptyState로 그대로 그리면 "조건에 맞는
    * 매치가 없어요"가 실제로는 아직 응답을 못 받은 상태에서도 뜬다. */

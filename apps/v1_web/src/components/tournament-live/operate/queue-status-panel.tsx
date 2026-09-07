@@ -94,7 +94,7 @@ export function QueueStatusPanel({ items, onRetry }: QueueStatusPanelProps) {
               확실한 버튼을 살려 두면 운영자가 실패 루프에 갇힌다. 그 대신 위의
               `item.lastError.message` 문구가 무엇을 해야 하는지(새로고침/관리자 문의
               등) 직접 안내한다. */}
-          {item.status === 'failed' && (item.lastError === null || isRetryableGameOperationsErrorCode(item.lastError.code)) ? (
+          {item.status === 'failed' && (item.lastError === null || isRetryableGameOperationsErrorCode(item.lastError.code, item.lastError.reason)) ? (
             <Button size="sm" variant="outline" onClick={() => onRetry(item.clientEventId)}>
               다시 시도
             </Button>

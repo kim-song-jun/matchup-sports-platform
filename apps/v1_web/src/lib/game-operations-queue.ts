@@ -84,7 +84,12 @@ export interface QueuedGameEvent {
   readonly status: QueuedEventStatus;
   readonly queuedAt: string;
   readonly attempts: number;
-  readonly lastError: { readonly code: string; readonly message: string } | null;
+  /**
+   * `reason` 은 **같은 코드의 서로 다른 원인**을 구분한다 — 특히 `STAFF_SCOPE_DENIED` 는
+   * 세션 미확립 · 인가 주체 버전 불일치 · 정책 거부에 함께 쓰이는데, 그중 버전 불일치는
+   * **재접속하면 풀린다**. 그 구분이 없으면 재시도 버튼이 잘못 숨는다.
+   */
+  readonly lastError: { readonly code: string; readonly message: string; readonly reason?: string } | null;
   readonly ackedSequence: number | null;
   readonly ackedVersion: number | null;
 }
@@ -108,7 +113,7 @@ export type GameOperationsQueueAction =
   | {
       readonly type: 'FAIL';
       readonly clientEventId: string;
-      readonly error: { readonly code: string; readonly message: string };
+      readonly error: { readonly code: string; readonly message: string; readonly reason?: string };
     }
   | {
       readonly type: 'RETRY';

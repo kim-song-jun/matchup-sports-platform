@@ -91,10 +91,10 @@ description: Use when a Teameet screen needs an illustration or 3D graphic — l
 
 | 자리 | 크기 | 정의 |
 |---|---|---|
-| 목록 행 썸네일 | 76px | `globals.css:2757` |
-| 홈 추천 스택 | 112px (≥1024 128px) | `globals.css:3077` |
-| 기본 슬롯 | 132px | `globals.css:3031` |
-| **매치 상세 히어로** | **176px (≥1024 208px)** | `globals.css:3136`·`3185` — 사진 없는 매치의 히어로. `matches-page.tsx:319` 가 `sizes="(min-width: 1024px) 208px, 176px"` 로 그대로 요청한다 |
+| 목록 행 썸네일 | 76px | `apps/v1_web/src/app/globals.css:2757` |
+| 홈 추천 스택 | 112px (≥1024 128px) | `apps/v1_web/src/app/globals.css:3077` |
+| 기본 슬롯 | 132px | `apps/v1_web/src/app/globals.css:3031` |
+| **매치 상세 히어로** | **176px (≥1024 208px)** | `apps/v1_web/src/app/globals.css:3136`·`3185` — 사진 없는 매치의 히어로. `apps/v1_web/src/components/matches/matches-page.tsx:319` 가 `sizes="(min-width: 1024px) 208px, 176px"` 로 그대로 요청한다 |
 
 즉 `sport-*` 는 이 스킬이 "삼각을 만들라"고 정한 크기(176px 이상)로 **실제로 그려진다.**
 다만 같은 파일이 76px 썸네일로도 쓰이므로, 삼각으로 다시 만들면 작은 자리에서 뭉갠다 —
@@ -120,11 +120,11 @@ description: Use when a Teameet screen needs an illustration or 3D graphic — l
 2. **`auth-notice` · `journey-done` 은 "큰 자리"가 아니다.** 둘 다 160px(≤360px 136px)로
    그려진다 — 이 스킬이 정한 삼각 기준선 176px 아래다. 그래서 둘로 끝내는 게 맞다.
 
-교훈: **자산을 다시 만들기 전에 그 자산이 실제로 몇 px 로 그려지는지 CSS 에서 확인한다.**
-"큰 자리 전용"은 파일 이름이나 용도 이름으로 정할 수 없다 — `.tm-auth-illustration` 과
-`.tm-empty-illustration` 의 `width` 를 읽어야 알 수 있다. **그리고 클래스 하나의 `width` 로
+교훈: **자산을 다시 만들기 전에 그 자산이 실제로 몇 px 로 그려지는지 CSS 에서 확인한다(이 저장소엔 `globals.css` 가 둘이다 — 배포되는 것은 `apps/v1_web/src/app/globals.css` 이고 `apps/web/` 쪽은 배포되지 않는다. 인용할 때 경로를 붙인다).**
+"큰 자리 전용"은 파일 이름이나 용도 이름으로 정할 수 없다 — `apps/v1_web/src/app/globals.css` 의
+`.tm-auth-illustration` · `.tm-empty-illustration` 의 `width` 를 읽어야 알 수 있다. **그리고 클래스 하나의 `width` 로
 끝나지 않는다** — 같은 클래스를 감싸는 파생 선택자가 크기를 덮어쓴다. `git grep -n
-'<클래스명>' globals.css` 로 **전부** 훑어 가장 큰 값을 기준으로 판정한다.
+'<클래스명>' apps/v1_web/src/app/globals.css` 로 **전부** 훑어 가장 큰 값을 기준으로 판정한다.
 
 측정 한계: 알파 채널 덩어리 수는 **겹친 오브젝트를 하나로 센다** — `landing-hero` 를
 2개로 잘못 센 원인이 이것이다. 개수는 육안으로 세고, 자동 측정은 면적비(깊이)에만 쓴다.

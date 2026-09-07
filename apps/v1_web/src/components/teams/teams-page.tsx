@@ -1326,6 +1326,8 @@ function TeamCoverImageField({
           caption line-height 16 + margin 12 + badge row 24 = 210px. 이전 132px는 실제보다
           약 60% 낮아 사진 상하가 실제보다 덜 잘려 보이는 미리보기-실사용 불일치가 있었다. */}
       <div
+        // 사진이 없을 때 지면에 색이 깔린다 — 그 위 안내 문구를 함께 올린다(.tm-on-tint).
+        className="tm-on-tint"
         style={{
           marginTop: 12,
           minHeight: 210,

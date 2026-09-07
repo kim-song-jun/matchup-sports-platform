@@ -452,6 +452,7 @@ describe('틴트 지면 위 보조 텍스트 대비 — grey600 은 흰 배경�
     '.tm-auth-profile-preview',
     '.tm-auth-segmented',
     '.tm-my-profile-head',
+    '.tm-create-selected',
   ])('%s 는 보조 텍스트 토큰을 grey700 으로 올린다', (selector) => {
     expect(rulesDeclaring('--text-caption', 'var\\(--grey700\\)')).toContain(selector);
     expect(rulesDeclaring('--text-muted', 'var\\(--grey700\\)')).toContain(selector);
@@ -576,6 +577,8 @@ describe('인라인으로 지면 색을 까는 곳의 보조 텍스트 (.tm-on-t
     // 이 파일은 blue50/red50 을 조건부로 까는 Card 가 셋이다. 하나만 붙이면 나머지
     // 둘은 그대로 미달로 남는다 — red50 은 4.02:1 로 blue50(4.11)보다 더 낮다.
     ['src/components/my/my-api-clients.tsx', 'Card', /var\(--blue50\)/, 3],
+    ['src/components/teams/teams-page.tsx', 'div', /center\/cover.*var\(--grey50\)/, 1],
+    ['src/app/tournaments/[id]/awards/awards-page-client.tsx', 'Card', /background: 'var\(--grey50\)', textAlign/, 2],
   ])('%s 의 틴트 %s 태그 %d개 전부에 표시 클래스가 붙어 있다', (file, tag, tint, count) => {
     const source = readFileSync(resolve(process.cwd(), file), 'utf8');
     const tinted = openingTagsWithTint(source, tag as string, tint as RegExp);

@@ -3657,6 +3657,10 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 .tm-create-selected {
   border-color: var(--blue500);
   background: var(--blue50);
+  /* 선택되면 지면에 색이 깔린다 — 그 위 "선택됨" 캡션이 4.11:1 로 AA 미달이었다
+     (alpha 실측). 배경을 주는 이 규칙 안에서 함께 올린다. */
+  --text-caption: var(--grey700);
+  --text-muted: var(--grey700);
 }
 
 .tm-create-field {

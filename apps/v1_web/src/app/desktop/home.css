@@ -91,7 +91,10 @@
   min-width: 0;
 }
 
-.tm-home-chat-title-line > .tm-text-label {
+/* 2026-09-07: 채팅 행 제목이 tm-text-label(13px) -> tm-text-card-title(15px) 로 바뀌면서
+   셀렉터도 함께 옮긴다. 클래스명에 걸린 규칙이라 안 옮기면 min-width:0 이 풀려
+   line-clamp 대신 제목이 flex 항목을 밀어내며 넘친다. */
+.tm-home-chat-title-line > .tm-text-card-title {
   min-width: 0;
 }
 

@@ -403,7 +403,9 @@ function HomeChatRoomRow({ room }: { room: HomeChatRoom }) {
       </div>
       <div className="tm-home-chat-copy">
         <div className="tm-home-chat-title-line">
-          <span className="tm-text-label line-clamp-1">{room.title}</span>
+          {/* 행 제목이 바로 아래 마지막 메시지(tm-text-caption 12px)와 1px 차이였다 —
+              홈 레일 카드 제목과 같은 역할이므로 같은 클래스를 쓴다(DESIGN.md §2.1). */}
+          <span className="tm-text-card-title line-clamp-1">{room.title}</span>
           <span className="tm-badge tm-badge-grey tm-badge-sm">{room.typeLabel}</span>
         </div>
         <div className={`tm-text-caption line-clamp-1 ${room.unreadCount > 0 ? 'tm-home-chat-last-unread' : ''}`}>

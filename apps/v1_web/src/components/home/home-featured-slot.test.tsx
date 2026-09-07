@@ -245,3 +245,44 @@ describe('추천 카드 미디어 밴드', () => {
     expect(container.querySelector('.tm-match-sport-illustration')).toBeNull();
   });
 });
+
+/**
+ * 카드 CTA 위계 (2026-09-07 alpha 실측 · 사용자 확정).
+ *
+ * 홈 한 페이지에 solid 파란 버튼이 **5개**였다 —
+ * `경기 후기 211건 쓰기` / `승인제 신청` / `참가 신청하기` ×3.
+ * 추천 매치·추천 대회가 여러 장이라 카드마다 solid 를 두면 primary 가 겹겹이 쌓인다.
+ *
+ * 그래서 **카드 CTA 는 secondary(outline)** 로 두고, solid 는 화면 최상위 행동
+ * (알림 받기·인증하기 같은 nudge) 에만 남긴다. 카드 전체가 이미 상세로 가는 링크라
+ * 이 버튼은 행동의 반복이기도 하다.
+ */
+describe('추천 카드 CTA 위계', () => {
+  function renderFeatured(imageUrl: string | null) {
+    homeMock.mockReturnValue({
+      data: { ...HOME_DATA, recommendedMatches: [{ ...MATCH_WITHOUT_PHOTO, imageUrl }] },
+      isError: false,
+      refetch: vi.fn(),
+    });
+    return renderHome();
+  }
+
+  it('추천 카드의 CTA 는 solid primary 가 아니라 outline 이다', () => {
+    const { container } = renderFeatured(null);
+
+    const ctas = [...container.querySelectorAll('.tm-featured-cta')];
+    expect(ctas.length).toBeGreaterThan(0);
+    ctas.forEach((cta) => {
+      expect(cta.classList.contains('tm-btn-outline')).toBe(true);
+      expect(cta.classList.contains('tm-btn-primary')).toBe(false);
+    });
+  });
+
+  it('사진이 있는 카드도 같은 규칙을 쓴다', () => {
+    const { container } = renderFeatured('/uploads/real.webp');
+
+    const ctas = [...container.querySelectorAll('.tm-featured-cta')];
+    expect(ctas.length).toBeGreaterThan(0);
+    ctas.forEach((cta) => expect(cta.classList.contains('tm-btn-primary')).toBe(false));
+  });
+});

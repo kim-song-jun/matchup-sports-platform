@@ -208,9 +208,9 @@ describe('BracketGroupCard — 결선 조 배정 안내', () => {
           groupId: 'semi-1',
           registrationId: 'r1',
           teamName: '강남FC',
-          seed: null,
+          sortOrder: 0,
           createdAt: '2026-08-01T00:00:00.000Z',
-        } as V1AdminBracketGroup['groupTeams'][number],
+        },
       ],
     });
 

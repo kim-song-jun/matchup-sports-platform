@@ -38,12 +38,23 @@ const config: Config = {
       // 고치는 것은 별도 작업이다. **새 스펙을 여기 넣지 마라** — 여기는 "고쳐야 할 빚" 목록이지
       // "안 돌려도 되는 것" 목록이 아니다.
       testPathIgnorePatterns: [
-        // ── team-matches 2개: **상속했던 "7건" 이 측정으로 확인됐다** (2026-09-01 KST CI). ──
-        //   team-match-lineup        5건 실패
-        //   team-match-game-adapter  2건 실패        합계 7 — 옛 주석의 수와 일치한다
-        // Idempotency-Key 필수화 · LOCKED 상태 리네이밍 이후 bit-rot(Task 14/Task 6 영역).
-        // **맞는 걸 확인한 것과 맞다고 믿은 것은 다르다** — 이제 이 수는 측정본이다.
-        '<rootDir>/test/team-matches/team-match-lineup\\.integration-spec\\.ts$',
+        // ── team-matches: `team-match-lineup` 은 **되살렸다**(2026-09-07). ──
+        // 실측한 실패 6건의 정체는 셋이었다:
+        //   ① Idempotency-Key 필수화 이후 `undefined` 를 넘기던 호출 4건 — 키를 채웠다.
+        //   ② 폐기된 계약을 단언하던 3건(최소 인원·골키퍼 필수·인원 상한) — 정본 §3 으로
+        //      사라진 규칙이라 `src` 에 throw 지점이 0곳이다. 상한 쪽은 지우지 않고
+        //      **반대 방향**(상한을 넘어도 저장된다)으로 다시 써서 새 계약을 못박았다.
+        //      **중복 등번호·중복 userId 검사는 폐기되지 않았으므로 그대로 남겼다.**
+        //   ③ `LOCKED` 단언 1건 — 폐기도 결함도 아니었다. `requestChange` 는 lazyLock 의
+        //      UPDATE 뒤 409 를 던지는데 그 전체가 한 `serializable` 트랜잭션이라 UPDATE 도
+        //      함께 롤백된다. 이제 **정상 반환하는 읽기 경로**를 먼저 태워 락이 실제로
+        //      영속되는 것을 잰다.
+        //   (재생 테스트 1건은 앞선 테스트가 남긴 SUBMITTED 상태 때문이었다 — 전용
+        //    팀매치 픽스처로 갈랐다.)
+        //
+        // `team-match-game-adapter` 는 **아직 켜지 않는다**: 그 스펙이
+        // `TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN` 을 무조건 기대하는데 리그 예외가 들어와
+        // 그 게이트가 좁아졌다(#1054). 보고된 2건보다 늘었을 수 있어 별건으로 다룬다.
         '<rootDir>/test/team-matches/team-match-game-adapter\\.integration-spec\\.ts$',
         //
         // ── 여기 남은 하나는 **상속한 숫자가 아니라 측정값**이다(2026-09-01 KST CI). ──

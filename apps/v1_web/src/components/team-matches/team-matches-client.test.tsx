@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { V1TeamMatch, V1TeamMatchViewerState } from '@/types/api';
 import type { TeamMatchDetailViewModel, TeamMatchModel } from './team-matches.types';
-import { TeamMatchDetailPageClient, toTeamMatch } from './team-matches-client';
+import { TeamMatchDetailPageClient, sortTeamMatchesByAvailability, toTeamMatch } from './team-matches-client';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
@@ -55,6 +55,28 @@ vi.mock('./team-matches-page', () => ({
   TeamMatchListPageView: () => null,
   TeamMatchStatePageView: () => null,
 }));
+
+describe('sortTeamMatchesByAvailability', () => {
+  it('keeps API order within each group and moves application-open team matches first without mutation', () => {
+    const item = (id: string, status: string) => ({
+      id,
+      teamMatchId: id,
+      title: id,
+      startsAt: '2099-01-01T10:00:00.000Z',
+      status,
+      displayState: status,
+    }) as unknown as V1TeamMatch;
+    const input = [item('closed-1', 'closed'), item('open-1', 'open'), item('matched-1', 'matched'), item('open-2', 'open')];
+
+    expect(sortTeamMatchesByAvailability(input).map((match) => match.id)).toEqual([
+      'open-1',
+      'open-2',
+      'closed-1',
+      'matched-1',
+    ]);
+    expect(input.map((match) => match.id)).toEqual(['closed-1', 'open-1', 'matched-1', 'open-2']);
+  });
+});
 
 describe('TeamMatchDetailPageClient — GA events', () => {
   beforeEach(() => {

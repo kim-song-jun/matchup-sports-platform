@@ -391,7 +391,16 @@ checkLiteralBaseline({
   label: '틴트 지면에 tm-on-tint 누락',
   baselinePath: 'scripts/tint-marker-baseline.json',
   count: (txt) => {
-    const TINT = /background(?:Color)?:\s*(?:'|"|`)?var\(--(?:tint-(?:blue|grey|green|orange|red)|blue50|grey50|grey100|red50|surface-soft)\)/;
+    // 지면으로 쓰이는 옅은 토큰을 전부 담는다. `--*50` 은 **여섯 색 모두** grey600 에서
+    // 미달이다(alpha 값 기준 계산): red 4.02 · blue 4.11 · teal 4.15 · green 4.16 ·
+    // orange 4.21 · yellow 4.32 · grey 4.42. 처음엔 blue/grey/red 만 넣었다가
+    // /tournaments/:id/my 의 orange50 안내가 스윕에서 나와 나머지를 채웠다.
+    const TOKEN =
+      /var\(--(?:tint-(?:blue|grey|green|orange|red)|(?:blue|green|orange|red|yellow|teal|grey)50|grey100|surface-soft)\)/;
+    // 배경 선언과 토큰이 **같은 태그 안에 함께** 있으면 센다. `background: var(--x)` 만
+    // 보면 조건부 배경을 놓친다 — 이 저장소는 `background: blocked ? 'var(--orange50)' :
+    // 'var(--grey50)'` 같은 삼항을 자주 쓰고, 실제로 그런 곳이 10군데 더 있었다.
+    const BG = /background(?:Color)?:/;
     // **className 값 안에서** 단어 경계로 찾는다. 단순 문자열 포함으로 보면 태그 안
     // 주석이나 data-* 속성에 이름만 스쳐도 "붙어 있다"고 오인한다 — 이 저장소는 실제로
     // 태그 안에 `// … (globals.css .tm-on-tint)` 같은 주석을 달고 있어 그대로 뚫린다.
@@ -399,7 +408,7 @@ checkLiteralBaseline({
     const MARKED = /className=(?:"[^"]*\btm-on-tint\b|'[^']*\btm-on-tint\b|\{[^}]*\btm-on-tint\b)/;
     // 여는 태그 단위로 본다 — 배경과 className 이 같은 태그 안에 있어야 처방이 닿는다.
     const tags = txt.match(/<[A-Za-z][A-Za-z0-9]*\b[^>]*?>/gs) || [];
-    return tags.filter((tag) => TINT.test(tag) && !MARKED.test(tag)).length;
+    return tags.filter((tag) => BG.test(tag) && TOKEN.test(tag) && !MARKED.test(tag)).length;
   },
   hint: '인라인으로 지면 색을 깔면 같은 태그에 className="tm-on-tint" 를 함께 붙일 것 (globals.css .tm-on-tint)',
 });

@@ -34,7 +34,10 @@ export default function GlobalError({
     if (!chunkError) return;
     if (!claimChunkReloadAttempt()) return;
     requestReleaseReload();
-  }, [chunkError]);
+    // 에러가 **바뀌면** 다시 판정한다(다른 청크로 재발 등). 객체 대신 message/digest 로
+    // 거는 이유는 identity 만 흔들리는 리렌더에 끌려 들어가지 않기 위해서다 — 재리로드를
+    // 실제로 막는 것은 표식이고, 이 deps 는 "새 에러면 다시 본다" 만 담당한다.
+  }, [chunkError, error.message, error.digest]);
 
   return (
     <html lang="ko">

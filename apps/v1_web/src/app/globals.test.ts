@@ -324,11 +324,19 @@ describe('home featured graphic size (cascade)', () => {
   it('sizes the graphic to fit inside the 2:1 media band on both breakpoints', () => {
     // 밴드 높이는 카드 폭의 절반이다(alpha 데스크톱 실측 304px 폭 → 152px). 그래픽이 그보다
     // 크면 밴드가 밀려 커진다 — 그래서 128px 이하로 묶는다.
-    const block = globalsCss.slice(globalsCss.indexOf(homeRule));
+    //
+    // width 만 보면 안 된다. 밴드를 실제로 밀어 올리는 건 height 이고, 이 그래픽은 정사각형이라
+    // 둘 중 하나만 커져도 회귀가 된다(#1090 Copilot).
+    const homeAt = globalsCss.indexOf(homeRule);
+    expect(homeAt).toBeGreaterThan(-1);
+    const block = globalsCss.slice(homeAt, homeAt + 400);
     // `min-width: 1024px`(미디어 쿼리)가 잡히지 않도록 선언 줄만 본다.
-    const sizes = [...block.slice(0, 400).matchAll(/\n\s*width:\s*(\d+)px/g)].map((m) => Number(m[1]));
+    const decls = [...block.matchAll(/\n\s*(width|height):\s*(\d+)px/g)].map((m) => ({ prop: m[1], px: Number(m[2]) }));
 
-    expect(sizes.length).toBeGreaterThanOrEqual(2);
-    sizes.slice(0, 2).forEach((value) => expect(value).toBeLessThanOrEqual(128));
+    // 기본(112px) + ≥1024(128px) 두 블록 × width/height = 4개.
+    expect(decls).toHaveLength(4);
+    expect(decls.filter((d) => d.prop === 'width')).toHaveLength(2);
+    expect(decls.filter((d) => d.prop === 'height')).toHaveLength(2);
+    decls.forEach(({ px }) => expect(px).toBeLessThanOrEqual(128));
   });
 });

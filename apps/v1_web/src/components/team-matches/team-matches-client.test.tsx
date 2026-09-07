@@ -683,7 +683,7 @@ describe('TeamMatchDetailPageClient — 신청 마감된 매치는 로그인/팀
     expect(screen.queryByRole('button', { name: '상대팀 신청' })).not.toBeInTheDocument();
   });
 
-  it('신청 마감(closed)에서 소속 팀이 없는 뷰어도 팀만들기 리다이렉트를 받지 않는다', () => {
+  it('원시 status가 recruiting이어도 displayState가 closed면 무팀 뷰어를 팀 만들기로 보내지 않는다', () => {
     useV1TeamMatchMock.mockReturnValue({
       data: {
         id: 'team-match-closed-1',
@@ -692,7 +692,9 @@ describe('TeamMatchDetailPageClient — 신청 마감된 매치는 로그인/팀
         sportName: '풋살',
         placeName: '경기장',
         startsAt: '2026-08-01T10:00:00.000Z',
-        status: 'closed',
+        // 운영 회귀 데이터와 같은 조합: 레코드는 recruiting으로 남아 있지만 deadlineAt이 지나
+        // 서버가 계산한 실제 신청 상태는 closed다. CTA도 반드시 displayState를 따라야 한다.
+        status: 'recruiting',
         displayState: 'closed',
         viewer: { state: 'none', manageableHostTeam: false },
         hostTeam: { teamId: 'team-host', name: '알파팀' },
@@ -707,6 +709,7 @@ describe('TeamMatchDetailPageClient — 신청 마감된 매치는 로그인/팀
 
     expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 불가');
     expect(screen.queryByRole('button', { name: '상대팀 신청' })).not.toBeInTheDocument();
+    expect(routerPush).not.toHaveBeenCalledWith('/teams/new');
   });
 });
 

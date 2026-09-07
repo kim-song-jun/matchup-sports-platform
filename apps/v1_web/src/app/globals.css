@@ -4002,11 +4002,14 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin-top: 16px;
 }
 
+/* 카드 표면은 .tm-card 와 같은 토큰을 쓴다. --bg 는 페이지 배경이라 다크에서
+   카드 채움이 페이지와 똑같아지고(둘 다 #121317, 대비 1.00) 테두리만 남는다
+   — alpha 실측 2026-09-06. --card-surface 는 다크에서 #1c1e24 로 한 단 올라간다. */
 .tm-team-card {
   display: block;
-  border: 1px solid var(--grey100);
+  border: 1px solid var(--card-border);
   border-radius: var(--radius-container);
-  background: var(--bg);
+  background: var(--card-surface);
   color: inherit;
   text-decoration: none;
   padding: 16px;

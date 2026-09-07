@@ -34,11 +34,7 @@ import type {
 } from '../common/audit/operation-audit.contract';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  evaluateSuspension,
-  suspensionRulesEnabled,
-  type PlayedGameCards,
-} from '../tournaments/discipline/card-suspension';
+import { assertNoSuspendedParticipants } from '../tournaments/discipline/suspension-verdicts';
 import { cascadeCompleteTeamMatchSchedulesInTx } from '../team-schedules/team-schedules.service';
 import {
   parseLineupCatalog,
@@ -126,7 +122,6 @@ import type {
   RevokeIdentityLinkDto,
   RevokeParticipantConsentDto,
 } from './dto/game-participant-identity.dto';
-import { findTournamentOnSurface, ALL_COMPETITION_KINDS } from '../tournaments/tournament-surface-lookup';
 
 /**
  * 플랫폼 운영자의 **권한 주체 문자열**.
@@ -5476,14 +5471,11 @@ export class GamesService {
   }
 
   /**
-   * 이 라인업의 **선발** 중 출전정지 선수가 있으면 400 `DISCIPLINE_SUSPENDED` 로 막는다.
+   * 대회 픽스처 축의 어댑터. 정지 판정 자체는 축을 모르는 공유 함수가 하고
+   * (`tournaments/discipline/suspension-verdicts.ts`), 여기서는 **이 축의 경기 순서**만
+   * 만들어 넘긴다. 리그 축(`TeamMatchLineupService`)이 같은 함수를 다른 정렬로 부른다.
    *
-   * 후보(started=false)는 막지 않는다 — 정지 선수를 벤치에 앉히는 것 자체는 규정
-   * 위반이 아니고, 실제로 뛰는 순간은 교체 이벤트라 그때 별도로 다룰 문제다.
-   * (지금은 교체까지 막지 않는다 — 그건 이 변경의 범위를 넘고, 라인업 제출을 막는
-   * 것만으로 회고가 지적한 "퇴장 선수가 다음 경기에 그대로 선발 출전"은 닫힌다.)
-   *
-   * 대회 픽스처가 아니거나 규정이 꺼진 대회면 조회 없이 즉시 통과한다.
+   * 대회 픽스처가 아니거나 픽스처가 없으면 조회 없이 즉시 통과한다.
    */
   private async assertNoSuspendedStarters(
     tx: Transaction,
@@ -5500,68 +5492,10 @@ export class GamesService {
     });
     if (fixture === null) return;
 
-    const verdicts = await this.suspensionVerdicts(tx, fixture.tournamentId, fixture.id);
-    if (verdicts.size === 0) return; // 규정 미적용이거나 누적 카드가 아직 없다.
-
-    const starters = await tx.v1GameParticipant.findMany({
-      where: { lineupId, started: true },
-      select: { userId: true, displayNameSnapshot: true },
-    });
-    const blocked = starters
-      .map((starter) => {
-        const verdict = starter.userId === null ? undefined : verdicts.get(starter.userId);
-        return verdict?.suspended === true
-          ? { name: starter.displayNameSnapshot, reason: verdict.reason }
-          : null;
-      })
-      .filter((entry): entry is { name: string; reason: string | null } => entry !== null);
-    if (blocked.length === 0) return;
-
-    throw new BadRequestException({
-      code: 'DISCIPLINE_SUSPENDED',
-      message: `${blocked.map((entry) => entry.name).join(', ')} 선수는 출전정지 상태예요. 선발에서 빼고 다시 제출해 주세요.`,
-      details: { blocked },
-    });
-  }
-
-  /**
-   * 이 대회에서 카드가 누적된 선수들의 `fixtureId` 경기 정지 여부. 규칙 자체는
-   * `card-suspension.ts`(순수 함수, DB 없이 전수 테스트)에 있고 여기서는 조회만 한다.
-   *
-   * **별도 주입 서비스로 빼지 않은 이유**: `GamesService` 생성자에 인자를 하나 더하면
-   * 이 클래스를 직접 `new` 하는 통합 스펙 41곳이 전부 깨진다(CI 실측 — 그 스펙들의
-   * 타입은 로컬 `tsc -p tsconfig.json` 대상 밖이라 로컬에서는 보이지도 않는다).
-   * 게다가 여기서 `tx` 를 쓰면 제출과 **같은 트랜잭션**에서 읽어 더 정확하다.
-   *
-   * **판정 단위는 사용자(userId)다.** 참가자 행은 경기마다 새로 생기므로 그것으로는
-   * 대회 전체 누적을 셀 수 없고, 이름 문자열로 묶으면 동명이인이 서로의 카드를
-   * 뒤집어쓴다. 계정 미연결 참가자는 대상에서 빠진다.
-   */
-  private async suspensionVerdicts(tx: Transaction, tournamentId: string, fixtureId: string) {
-    // **행이 없으면 규정이 조용히 꺼진다**(아래 `?? null` → `suspensionRulesEnabled` false).
-    // 그래서 리그를 허용한다 — 좁혀 두면 read-swap 이 리그 경기를 여기로 보내는 순간
-    // **리그 징계 규정이 에러 없이 사라진다**(경고 누적·퇴장 정지가 통째로 안 돈다).
-    //
-    // **지금은 동작이 바뀌지 않는다.** 거울 행은 `V1TournamentFixture` 를 갖지 않는다 —
-    // 그 행을 만드는 세 곳(`tournament-bracket.service` · `league-fixture-generator` ·
-    // mock-seed)이 전부 `TOURNAMENT_KINDS` 게이트 뒤에 있다. 이 함수는 `fixture.tournamentId`
-    // 로 불리므로 리그가 도달할 경로 자체가 없다.
-    // (docs/ops/read-swap-preflight.md §1-1)
-    const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
-      where: { id: tournamentId },
-      select: { yellowAccumulationLimit: true, redCardSuspensionMatches: true },
-    });
-    const rules = {
-      yellowAccumulationLimit: tournament?.yellowAccumulationLimit ?? null,
-      redCardSuspensionMatches: tournament?.redCardSuspensionMatches ?? null,
-    };
-    // 규정이 꺼져 있으면 **조회조차 하지 않는다** — 대다수 대회가 그렇다.
-    if (!suspensionRulesEnabled(rules)) return new Map<string, ReturnType<typeof evaluateSuspension>>();
-
     // 일정 순서 = "정지는 다음 경기부터"라는 규칙의 기준틀. scheduledAt 이 없는 픽스처는
     // 라운드·번호로 이어 정렬한다 — 순서를 못 정하면 판정 자체가 불가능하다.
     const fixtures = await tx.v1TournamentFixture.findMany({
-      where: { tournamentId },
+      where: { tournamentId: fixture.tournamentId },
       // `nulls: 'last'` 를 **명시한다.** Postgres 의 ASC 기본값이 이미 NULLS LAST 라
       // 동작은 같지만(Copilot 은 "기본이 nulls first"라고 봤는데 그건 DESC 얘기다),
       // 이 순서가 정지 판정의 기준축이라 기본값에 기대지 않고 의도를 코드에 박는다 —
@@ -5571,81 +5505,15 @@ export class GamesService {
         { round: 'asc' },
         { fixtureNumber: 'asc' },
       ],
-      select: {
-        id: true,
-        game: {
-          select: {
-            currentOfficialRevisionId: true,
-            // 공식 확정 전 결과도 봐야 한다 — 아래 폴백 주석 참고.
-            resultRevisions: {
-              where: { state: 'SUBMITTED' },
-              orderBy: { revision: 'desc' },
-              take: 1,
-              select: { id: true },
-            },
-          },
-        },
-      },
+      select: { id: true, game: { select: { id: true } } },
     });
-    const orderByFixtureId = new Map(fixtures.map((fixture, index) => [fixture.id, index + 1]));
-    const upcomingGameOrder = orderByFixtureId.get(fixtureId);
-    if (upcomingGameOrder === undefined) return new Map<string, ReturnType<typeof evaluateSuspension>>();
 
-    /**
-     * 픽스처마다 **딱 한 개**의 리비전만 센다 — 여러 개를 세면 정정 이력이 카드로 중복
-     * 집계돼 멀쩡한 선수가 정지된다.
-     *
-     * 고르는 순서: **공식 확정본 우선, 없으면 최신 제출본(SUBMITTED)**.
-     *
-     * 공식본만 보면 안 되는 이유(2026-08-24 alpha 실측으로 발견): 경기를 `end` 하면
-     * 결과 리비전은 `SUBMITTED` 로 남고 `currentOfficialRevisionId` 는 **null 이다** —
-     * 공식 확정은 운영진이 결과 검토를 거쳐 따로 눌러야 하는 별도 단계다. 당일 대회는
-     * 다음 경기가 그 검토보다 먼저 시작되는 게 보통이라, 공식본만 세면 **정작 필요한
-     * 순간에 가드가 조용히 안 걸린다**(실측: 레드카드 받은 선수가 다음 경기 라인업에
-     * 그대로 제출돼 201 로 통과했다).
-     *
-     * DRAFT·VOID 는 세지 않는다 — 초안은 아직 아무도 제출하지 않은 값이고 VOID 는
-     * 무효화된 값이다. 제출된 결과는 "심판이 기록을 확정해 올린 것"이라 정지 판정의
-     * 근거로 충분하다. 나중에 정정되면 공식본이 그 자리를 대신한다.
-     */
-    const revisionToOrder = new Map<string, number>();
-    for (const fixture of fixtures) {
-      const order = orderByFixtureId.get(fixture.id);
-      if (order === undefined) continue;
-      const revisionId =
-        fixture.game?.currentOfficialRevisionId ?? fixture.game?.resultRevisions?.[0]?.id ?? null;
-      if (revisionId !== null) revisionToOrder.set(revisionId, order);
-    }
-    if (revisionToOrder.size === 0) return new Map<string, ReturnType<typeof evaluateSuspension>>();
-
-    const resultParticipants = await tx.v1GameResultParticipant.findMany({
-      where: { resultRevisionId: { in: [...revisionToOrder.keys()] } },
-      select: { resultRevisionId: true, participantId: true, cards: true },
+    await assertNoSuspendedParticipants(tx, {
+      competitionId: fixture.tournamentId,
+      orderedGames: fixtures.map((row) => ({ key: row.id, gameId: row.game?.id ?? null })),
+      upcomingKey: fixture.id,
+      lineupId,
     });
-    if (resultParticipants.length === 0) return new Map<string, ReturnType<typeof evaluateSuspension>>();
-
-    const participants = await tx.v1GameParticipant.findMany({
-      where: { id: { in: resultParticipants.map((row) => row.participantId) } },
-      select: { id: true, userId: true },
-    });
-    const userByParticipantId = new Map(participants.map((row) => [row.id, row.userId]));
-
-    const playedByUserId = new Map<string, PlayedGameCards[]>();
-    for (const row of resultParticipants) {
-      const userId = userByParticipantId.get(row.participantId) ?? null;
-      if (userId === null) continue;
-      const gameOrder = revisionToOrder.get(row.resultRevisionId);
-      if (gameOrder === undefined) continue;
-      const bucket = playedByUserId.get(userId) ?? [];
-      bucket.push({ gameOrder, cards: readResultCards(row.cards) });
-      playedByUserId.set(userId, bucket);
-    }
-
-    const verdicts = new Map<string, ReturnType<typeof evaluateSuspension>>();
-    for (const [userId, played] of playedByUserId) {
-      verdicts.set(userId, evaluateSuspension({ rules, played, upcomingGameOrder }));
-    }
-    return verdicts;
   }
 
   private async resolveActor(
@@ -7663,22 +7531,3 @@ export class GamesService {
   }
 }
 
-/**
- * `V1GameResultParticipant.cards`(Json)에서 카드 수를 읽는다. 저장 모양은
- * `{ yellow: number, red: number }` 뿐이다(`parseFairPlayCards` 주석 참고 — 경고 누적
- * 퇴장과 직접 퇴장을 구분하는 필드가 데이터 모델에 없다). 모양이 다르면 0으로 본다 —
- * 판정을 못 하는 것이 잘못 막는 것보다 낫다.
- */
-function readResultCards(value: unknown): { yellow: number; red: number } {
-  if (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    typeof (value as { yellow?: unknown }).yellow === 'number' &&
-    typeof (value as { red?: unknown }).red === 'number'
-  ) {
-    const record = value as { yellow: number; red: number };
-    return { yellow: record.yellow, red: record.red };
-  }
-  return { yellow: 0, red: 0 };
-}

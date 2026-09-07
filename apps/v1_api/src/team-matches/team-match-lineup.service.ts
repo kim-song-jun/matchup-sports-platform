@@ -14,6 +14,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { parseLineupCatalog, parseLineupConfigForResponse } from '../tournaments/competition-config/competition-config.parse';
 import { findRejectedLineupPosition, rejectedLineupPositionMessage } from '../games/core/lineup-position';
 import {
+  leagueFixtureListOrder,
+  leagueFixtureListWhere,
+} from '../league-matches/league-fixture-list-source';
+import { assertNoSuspendedParticipants } from '../tournaments/discipline/suspension-verdicts';
+import {
   ChangeRequestTeamMatchLineupDto,
   SaveTeamMatchLineupDto,
   SubmitTeamMatchLineupDto,
@@ -70,12 +75,24 @@ interface TeamMatchLineupContext {
   opponentTeamId: string | null;
   role: 'team_owner' | 'team_manager';
   /**
-   * 이 팀 매치가 정규 리그의 대진인가(`V1TeamMatch.leagueId !== null`). 이 저장소가
-   * 이미 쓰는 리그/친선 판별자와 같은 값이다(`team-record-category.ts`).
+   * 정규 리그의 대진이면 그 리그(`V1Tournament(kind='regular_league')`)의 id, 친선이면
+   * `null`. 이 저장소가 이미 쓰는 리그/친선 판별자와 같은 값이다
+   * (`team-record-category.ts`).
    *
-   * 참석 응답 게이트를 여기서 가른다 — 근거는 `resolveEntry` 의 그 자리 주석.
+   * **불리언이 아니라 id 를 싣는다** — 참석 응답 게이트는 "리그인가" 만 물으면 되지만
+   * 출전정지 집계는 **그 리그의 id 로** 규정을 읽고 경기 목록을 만든다. 두 필드를 나란히
+   * 두면 같은 사실의 출처가 둘이 되므로, 값을 하나만 두고 불리언은 쓰는 자리에서 파생시킨다.
+   * (같은 `select` 라 추가 쿼리는 없다.)
    */
-  isLeagueFixture: boolean;
+  leagueId: string | null;
+}
+
+/**
+ * 참석 응답 게이트를 가르는 판정 — 근거는 `resolveEntry` 의 그 자리 주석.
+ * `leagueId` 하나에서 파생시켜 두 사실이 어긋날 수 없게 한다.
+ */
+function isLeagueFixture(context: TeamMatchLineupContext): boolean {
+  return context.leagueId !== null;
 }
 
 @Injectable()
@@ -303,6 +320,29 @@ export class TeamMatchLineupService {
               details: { expectedVersion: dto.expectedVersion, currentVersion: lineup.revision },
             });
           }
+          // **출전정지 가드는 제출에만 건다** — 대회도 같다(`GamesService.submitLineup`).
+          // 초안(`saveLineup`)에서 막으면 명단을 짜는 도중에 계속 튕겨 작성 자체가 안 된다.
+          //
+          // 리그가 아니면(친선) `leagueId` 가 null 이라 호출조차 하지 않는다. 리그여도
+          // 규정(`yellowAccumulationLimit`·`redCardSuspensionMatches`)이 꺼져 있으면 공유
+          // 함수가 조회 없이 통과시킨다 — **옵트인**이다.
+          if (context.leagueId !== null) {
+            const fixtures = await tx.v1TeamMatch.findMany({
+              // 리그 대진 목록의 정본 조건·정렬을 그대로 쓴다. 정지 판정의 기준틀이
+              // "몇 번째 경기인가" 라서, 목록 화면과 다른 순서로 세면 사람이 보는 순서와
+              // 규정이 어긋난다.
+              where: leagueFixtureListWhere(context.leagueId),
+              orderBy: leagueFixtureListOrder(),
+              select: { id: true, game: { select: { id: true } } },
+            });
+            await assertNoSuspendedParticipants(tx, {
+              competitionId: context.leagueId,
+              orderedGames: fixtures.map((row) => ({ key: row.id, gameId: row.game?.id ?? null })),
+              upcomingKey: context.teamMatchId,
+              lineupId: lineup.id,
+            });
+          }
+
           const submitted = await tx.v1GameLineup.update({
             where: { id: lineup.id },
             data: {
@@ -748,7 +788,7 @@ export class TeamMatchLineupService {
         opponentSideId: awaySide.id,
         opponentTeamId: teamMatch.approvedApplicantTeamId,
         role,
-        isLeagueFixture: teamMatch.leagueId !== null,
+        leagueId: teamMatch.leagueId,
       };
     }
     return {
@@ -761,7 +801,7 @@ export class TeamMatchLineupService {
       opponentSideId: hostSide.id,
       opponentTeamId: teamMatch.hostTeamId,
       role,
-      isLeagueFixture: teamMatch.leagueId !== null,
+      leagueId: teamMatch.leagueId,
     };
   }
 
@@ -792,7 +832,7 @@ export class TeamMatchLineupService {
     // 저장 시점 규칙(resolveEntry)과 **같은 조건**을 화면에 미리 알려주는 것이 이 함수의
     // 존재 이유다 -- 리그 예외도 같이 따라와야 한다. 안 따라오면 화면은 전원을 "참석 안 함"
     // 으로 흐려 놓는데 저장은 통과하는, 더 나쁜 어긋남이 된다.
-    const schedule = context.isLeagueFixture
+    const schedule = isLeagueFixture(context)
       ? null
       : await tx.v1TeamSchedule.findFirst({
           where: { teamMatchId: context.teamMatchId, teamId: context.ownTeamId },
@@ -1018,7 +1058,7 @@ export class TeamMatchLineupService {
     //
     // 친선 쪽은 그대로 둔다 -- 거기서는 팀이 직접 일정을 만들고 참석을 받으므로 이
     // 게이트가 실제 의미를 갖는다.
-    if (!context.isLeagueFixture) {
+    if (!isLeagueFixture(context)) {
       const schedule = await tx.v1TeamSchedule.findFirst({
         where: { teamMatchId: context.teamMatchId, teamId: context.ownTeamId },
         select: { id: true },

@@ -147,6 +147,10 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
   // nothing to do with the behavior under test.
   let safeNow: Date;
 
+  // overdueFixture 의 열린 에스컬레이션 기한. `RESULT_REVIEW_OVERDUE` 는 **기한이 지났을 때만**
+  // 나야 하므로, 이 값을 기준으로 `now` 를 앞뒤로 놓아 두 방향을 다 잰다.
+  let overdueEscalationDueAt: Date;
+
   beforeAll(async () => {
     if (!process.env.DATABASE_URL) {
       throw new Error('DATABASE_URL is required for the Task 18 operations board spec');
@@ -319,7 +323,7 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
       where: { id: overdueGame.id },
       data: { currentOfficialRevisionId: revision.id },
     });
-    await prisma.v1ResultEscalation.create({
+    const overdueEscalation = await prisma.v1ResultEscalation.create({
       data: {
         resultRevisionId: revision.id,
         kind: 'ESCALATION',
@@ -327,6 +331,7 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
         status: V1EscalationStatus.PENDING,
       },
     });
+    overdueEscalationDueAt = overdueEscalation.dueAt;
 
     // liveGame has no lineups at all -> both sides default to "missing" -> LINEUP_NOT_SUBMITTED.
     void liveGame;
@@ -619,9 +624,13 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
 
     // overdueFixture: no field assigned, scheduledAt 3h in the past (well past the 60m lock
     // window) with no lineups, an official revision with missingScorer=true, and an open
-    // ESCALATION -> every stable code fires, plus both time-relative codes.
+    // ESCALATION -> every stable code fires, plus the two deadline-driven time-relative codes.
+    //
+    // `RESULT_REVIEW_OVERDUE` 는 여기에 **없어야 한다**: `safeNow` 는 이 에스컬레이션의
+    // `due_at` 보다 앞이다. 예전엔 "열린 행이 있는가" 만 봐서 기한과 무관하게 항상 떴다.
     const overdue = byFixture.get(ids.overdueFixture);
-    expect(overdue?.warnings.sort()).toEqual(['MISSING_SCORER', 'NO_FIELD_ASSIGNED', 'RESULT_REVIEW_OVERDUE'].sort());
+    expect(overdue?.warnings.sort()).toEqual(['MISSING_SCORER', 'NO_FIELD_ASSIGNED'].sort());
+    expect(safeNow.getTime()).toBeLessThan(overdueEscalationDueAt.getTime());
     expect(byFixtureLive.get(ids.overdueFixture)?.warnings.sort()).toEqual(
       ['LINEUP_NOT_SUBMITTED', 'NO_STAFF_ASSIGNED'].sort(),
     );
@@ -630,6 +639,7 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
     for (const item of full.items) {
       expect(item.warnings).not.toContain('NO_STAFF_ASSIGNED');
       expect(item.warnings).not.toContain('LINEUP_NOT_SUBMITTED');
+      expect(item.warnings).not.toContain('RESULT_REVIEW_OVERDUE');
     }
 
     const missingScorerOnly = await board.list(
@@ -656,6 +666,14 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
     );
     expectHttpError(lineupFilterAttempt, 400, 'OPERATIONS_BOARD_WARNING_FILTER_NOT_STABLE');
 
+    // `RESULT_REVIEW_OVERDUE` 도 시계 의존이 됐으니 **필터 값으로 받아서는 안 된다**. 받아
+    // 주면 같은 DB 를 기한 앞뒤로 조회했을 때 `items` 멤버십이 달라져, 안정 스냅샷 보장이
+    // 다시 깨진다 — 이 코드가 stable 이던 시절엔 정상 필터였으므로 그 자리를 못 박는다.
+    const overdueFilterAttempt = await captureFailure(() =>
+      board.list(ids.detailTournament, { limit: 50, warning: 'RESULT_REVIEW_OVERDUE' }, safeNow),
+    );
+    expectHttpError(overdueFilterAttempt, 400, 'OPERATIONS_BOARD_WARNING_FILTER_NOT_STABLE');
+
     // A client that wants a live-warning-aware view must fetch the (always time-independent) full
     // page and filter client-side using the separate `liveWarnings` array -- prove that path still
     // works: the fixtures carrying NO_STAFF_ASSIGNED in the unfiltered `full` response above are
@@ -668,6 +686,47 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
     for (const item of full.items) {
       expect(item.warnings).not.toContain('NO_STAFF_ASSIGNED');
     }
+  });
+
+  /**
+   * #34 의 실제 결함: 판정에 **시간 비교가 아예 없었다** — "열린 에스컬레이션 행이 있는가" 만
+   * 봤다. 그 행은 결과 제출 즉시 `PENDING` 으로 만들어지고(`due_at` 은 미래) `PENDING →
+   * ACKNOWLEDGED` 전이가 없어 확정·승계 때 `CLOSED` 로만 간다. 그래서 **제출되는 순간**
+   * "검토 기한 초과" 가 참이 됐다(alpha 실측: 종료 수 초 뒤, 예정일이 **미래**인 경기에도 표시).
+   *
+   * 한 방향만 재면 옛 구현도 통과한다("열린 행이 있으면 항상 참"은 기한 이후 케이스를 그대로
+   * 만족한다). 그래서 **기한 앞·경계·뒤** 세 시점을 같은 DB 로 잰다 — 두 조회 사이에 쓰기는
+   * 하나도 없다.
+   */
+  it('RESULT_REVIEW_OVERDUE 는 기한이 지난 뒤에만 나온다 (기한 전 없음 / 기한 정각·이후 있음, 같은 DB)', async () => {
+    const board = new TournamentOperationsBoardService(prisma);
+    const dueMs = overdueEscalationDueAt.getTime();
+    const beforeDue = new Date(dueMs - 60 * 1000);
+    const atDue = new Date(dueMs);
+    const afterDue = new Date(dueMs + 60 * 1000);
+
+    const liveWarningsOf = (
+      page: { readonly liveWarnings: readonly { readonly fixtureId: string; readonly warnings: readonly string[] }[] },
+      fixtureId: string,
+    ): readonly string[] => page.liveWarnings.find((entry) => entry.fixtureId === fixtureId)?.warnings ?? [];
+
+    const before = await board.list(ids.detailTournament, { limit: 50 }, beforeDue);
+    const at = await board.list(ids.detailTournament, { limit: 50 }, atDue);
+    const after = await board.list(ids.detailTournament, { limit: 50 }, afterDue);
+
+    // 기한 이전: 열린 ESCALATION 행은 그대로 있는데도 나오면 안 된다. 옛 구현이 red 가 되는
+    // 자리가 정확히 여기다.
+    expect(liveWarningsOf(before, ids.overdueFixture)).not.toContain('RESULT_REVIEW_OVERDUE');
+    // 경계는 포함이다(`due_at <= now`) -- 기한 정각이면 이미 지난 것으로 센다.
+    expect(liveWarningsOf(at, ids.overdueFixture)).toContain('RESULT_REVIEW_OVERDUE');
+    expect(liveWarningsOf(after, ids.overdueFixture)).toContain('RESULT_REVIEW_OVERDUE');
+
+    // 그런데도 안정 본문은 세 시점에서 동일해야 한다 -- 이 코드가 stable 이었다면 `items` 가
+    // 시계에 따라 달라져 `stableRevision`/워터마크가 기대는 성질이 깨진다. 이 값을
+    // `liveWarnings` 로 옮긴 이유 자체를 못 박는다.
+    expect(after.items).toEqual(before.items);
+    expect(hashBody(stableBodyOf(after))).toBe(hashBody(stableBodyOf(before)));
+    expect(hashBody(stableBodyOf(at))).toBe(hashBody(stableBodyOf(before)));
   });
 
   it('proves the stable body {items, nextCursor, watermark} is a pure function of persisted state, invariant under `now` alone, while liveWarnings may legitimately differ across a clock boundary', async () => {
@@ -2014,7 +2073,7 @@ describe('Task 18 operations board incremental updates keyed by fixture/revision
 //
 // (fixtureId, version, revisionId) alone cannot identify every stable-body change: version/
 // revisionId are V1Game fields, so a fixture-only mutation (field (re)assignment, a field
-// rename, an escalation transition that doesn't flip RESULT_REVIEW_OVERDUE's boolean) can change
+// rename, an escalation transition that changes no stable warning at all) can change
 // the response without moving either -- and a fixture with no game at all always has
 // version:null, revisionId:null regardless of its own mutations. This block seeds exactly the
 // four failure paths the reviewer named and asserts the CONCRETE stableRevision/watermark values
@@ -2148,7 +2207,14 @@ describe('Task 18 operations board items[].stableRevision incremental key (revie
     expect(noGame0.fieldId).toBeNull();
     expect(typeof noGame0.stableRevision).toBe('string');
     expect(noGame0.stableRevision.length).toBeGreaterThan(0);
-    expect(withGame0.warnings).toContain('RESULT_REVIEW_OVERDUE');
+    // `RESULT_REVIEW_OVERDUE` 는 시계 의존이라 stable 쪽엔 절대 없다. 대신 여기서
+    // **열린·기한 지난 에스컬레이션이 실제로 있다**는 것을 `liveWarnings` 로 확인해 둔다 --
+    // 이게 없으면 아래 "에스컬레이션 전이" 실패 경로가 빈 전제 위에서 통과할 수 있다.
+    expect(withGame0.warnings).not.toContain('RESULT_REVIEW_OVERDUE');
+    const liveWithGame0 = snapshot0.liveWarnings.find(
+      (entry) => entry.fixtureId === stableRevIds.fixtureWithGame,
+    );
+    expect(liveWithGame0?.warnings).toContain('RESULT_REVIEW_OVERDUE');
 
     // ── Failure path 1: fixture-only field (re)assignment ────────────────────────────────────
     // No game exists for this fixture at all, so version/revisionId cannot move -- yet the
@@ -2185,18 +2251,24 @@ describe('Task 18 operations board items[].stableRevision incremental key (revie
     expect(snapshot2.watermark).not.toBe(snapshot1.watermark);
 
     // ── Failure path 3: escalation transition with no version/revisionId move ────────────────
-    // PENDING -> ACKNOWLEDGED is still "open" (RESULT_REVIEW_OVERDUE stays true either way), and
-    // neither this fixture's game.version nor its currentOfficialRevisionId are touched -- but
-    // the escalation's OWN version/updatedAt (which stableRevision hashes into the max across all
-    // escalations for the game) move, and stableRevision must move with them even though the
-    // stable warnings BOOLEAN and (version, revisionId) do not.
+    // PENDING -> ACKNOWLEDGED is still "open" (the row still counts toward the earliest open
+    // due_at either way), and neither this fixture's game.version nor its
+    // currentOfficialRevisionId are touched -- but the escalation's OWN version/updatedAt (which
+    // stableRevision hashes into the max across all escalations for the game) move, and
+    // stableRevision must move with them even though the stable WARNING SET and
+    // (version, revisionId) do not.
     await stableRevPrisma.v1ResultEscalation.update({
       where: { id: escalationId },
       data: { status: V1EscalationStatus.ACKNOWLEDGED, version: { increment: 1 } },
     });
     const snapshot3 = await board.list(stableRevIds.tournament, { limit: 50 });
     const withGame3 = snapshot3.items.find((item) => item.fixtureId === stableRevIds.fixtureWithGame)!;
-    expect(withGame3.warnings).toContain('RESULT_REVIEW_OVERDUE'); // boolean UNCHANGED
+    expect(withGame3.warnings).toEqual(withGame0.warnings); // stable warning set UNCHANGED
+    // 전이 후에도 열린 행이라 시계 의존 경고는 그대로 -- 즉 stableRevision 이 움직인 이유는
+    // 경고 변화가 아니라 에스컬레이션 자신의 version/updatedAt 뿐이다.
+    expect(
+      snapshot3.liveWarnings.find((entry) => entry.fixtureId === stableRevIds.fixtureWithGame)?.warnings,
+    ).toContain('RESULT_REVIEW_OVERDUE');
     expect(withGame3.version).toBe(withGame0.version); // V1Game.version UNCHANGED
     expect(withGame3.revisionId).toBe(withGame0.revisionId); // currentOfficialRevisionId UNCHANGED
     expect(withGame3.stableRevision).not.toBe(withGame0.stableRevision); // yet the key MOVES
@@ -2545,9 +2617,17 @@ describe('Task 18 operations board query-count/perf proof at realistic scale (re
       perfPrisma,
     ).list(perfIds.tournament, { limit: 100 });
     const beforeItem = before.items.find((item) => item.gameId === perfGameIds[0])!;
-    // The baseline escalation (seeded in beforeAll) is still PENDING -- amid 8 extra RESOLVED
-    // historical rows, the overdue boolean must still correctly reflect it.
-    expect(beforeItem.warnings).toContain('RESULT_REVIEW_OVERDUE');
+    const liveWarningsFor = (
+      page: { readonly liveWarnings: readonly { readonly fixtureId: string; readonly warnings: readonly string[] }[] },
+      fixtureId: string,
+    ): readonly string[] => page.liveWarnings.find((entry) => entry.fixtureId === fixtureId)?.warnings ?? [];
+    // The baseline escalation (seeded in beforeAll) is still PENDING and past due -- amid 8 extra
+    // RESOLVED historical rows, the aggregate's `MIN(due_at) FILTER (open)` must still surface it.
+    // (RESOLVED rows are filtered out; if the FILTER regressed to "all rows", their own due_at
+    // would still be past so this alone wouldn't catch it -- the FILTER's direction is pinned by
+    // the detail-board spec's before/after-due pair instead.)
+    expect(liveWarningsFor(before, beforeItem.fixtureId)).toContain('RESULT_REVIEW_OVERDUE');
+    expect(beforeItem.warnings).not.toContain('RESULT_REVIEW_OVERDUE');
 
     // Bump an OLD, already-RESOLVED escalation's own version -- this does not touch the boolean
     // (still overdue either way) or V1Game at all, so ONLY the GROUP BY's MAX(version) moving can
@@ -2561,7 +2641,7 @@ describe('Task 18 operations board query-count/perf proof at realistic scale (re
       perfPrisma,
     ).list(perfIds.tournament, { limit: 100 });
     const afterItem = after.items.find((item) => item.gameId === perfGameIds[0])!;
-    expect(afterItem.warnings).toContain('RESULT_REVIEW_OVERDUE');
+    expect(liveWarningsFor(after, afterItem.fixtureId)).toContain('RESULT_REVIEW_OVERDUE');
     expect(afterItem.stableRevision).not.toBe(beforeItem.stableRevision);
   });
 
@@ -2797,7 +2877,13 @@ describe('Task 18 operations board single-consistent-snapshot barrier (review fi
     // two INDEPENDENT (non-transactional) queries, the escalation read would run under its own
     // fresh snapshot AFTER the barrier committed and would observe RESOLVED, flipping this
     // assertion to fail.
-    expect(item.warnings).toContain('RESULT_REVIEW_OVERDUE');
+    //
+    // 이 코드는 시계 의존이라 `liveWarnings` 에 실린다 -- 이 경기의 `due_at` 은 seed 시각이라
+    // 이 시점엔 이미 지났다.
+    expect(
+      page.liveWarnings.find((entry) => entry.fixtureId === tearingIds.fixture)?.warnings,
+    ).toContain('RESULT_REVIEW_OVERDUE');
+    expect(item.warnings).not.toContain('RESULT_REVIEW_OVERDUE');
   });
 });
 

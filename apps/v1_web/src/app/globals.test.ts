@@ -627,8 +627,11 @@ describe('파랑 히어로 지면 — 다크에서 그라디언트 끝이 밝아
   const contrastWithWhite = (hex: string) => 1.05 / (luminance(hex) + 0.05);
 
   // 첫 ':root.dark' 는 33행 주석 안에 있다 — 실제 규칙(줄 첫머리 + 여는 중괄호)을 앵커로 쓴다.
+  // 끝도 닫는 중괄호로 막는다. 파일 끝까지 자르면 **다른 규칙**의 선언이 대신 잡혀,
+  // :root.dark 에서 선언이 사라져도 테스트가 통과한다.
   const darkStart = globalsCss.search(/^:root\.dark\s*\{/m);
-  const darkBlock = globalsCss.slice(darkStart);
+  const darkEndIdx = globalsCss.indexOf('\n}', darkStart);
+  const darkBlock = globalsCss.slice(darkStart, darkEndIdx);
   const darkEnd = darkBlock.match(/--brand-hero-gradient-end:\s*(#[0-9a-fA-F]{6})/)?.[1];
 
   it('다크의 지면 끝 값이 흰색 대비 4.5:1 을 넘는다', () => {

@@ -1118,7 +1118,7 @@ export function TournamentDetailView({
       {!isCompleted ? (
         <section aria-label="참가 전 꼭 확인해 주세요" className="tm-show-desktop">
           <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>참가 전 꼭 확인해 주세요</div>
-          <Card pad={0} style={{ background: 'var(--grey50)', overflow: 'hidden' }}>
+          <Card pad={0} className="tm-on-tint" style={{ background: 'var(--grey50)', overflow: 'hidden' }}>
             {([
               { label: '신청 확정', text: '운영진 확인 + 참가비 입금 완료 후 확정됩니다.' },
               { label: '환불 불가', text: '단순 변심·일정 착오·팀 사정으로 인한 취소는 원칙적으로 불가합니다.' },
@@ -1568,7 +1568,7 @@ function TournamentPreParticipationNotice() {
           <div id="tournament-precheck-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
             참가 전 꼭 확인해 주세요
           </div>
-          <Card pad={0} style={{ background: 'var(--grey50)', overflow: 'hidden' }}>
+          <Card pad={0} className="tm-on-tint" style={{ background: 'var(--grey50)', overflow: 'hidden' }}>
             {PRE_PARTICIPATION_CHECK_ITEMS.map((item, idx, arr) => (
               <div
                 key={item.label}

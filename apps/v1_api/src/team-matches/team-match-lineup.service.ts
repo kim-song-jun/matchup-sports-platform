@@ -14,6 +14,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { parseLineupCatalog, parseLineupConfigForResponse } from '../tournaments/competition-config/competition-config.parse';
 import { findRejectedLineupPosition, rejectedLineupPositionMessage } from '../games/core/lineup-position';
 import {
+  leagueFixtureListOrder,
+  leagueFixtureListWhere,
+} from '../league-matches/league-fixture-list-source';
+import { assertNoSuspendedParticipants } from '../tournaments/discipline/suspension-verdicts';
+import {
   ChangeRequestTeamMatchLineupDto,
   SaveTeamMatchLineupDto,
   SubmitTeamMatchLineupDto,
@@ -69,6 +74,12 @@ interface TeamMatchLineupContext {
   opponentSideId: string;
   opponentTeamId: string | null;
   role: 'team_owner' | 'team_manager';
+  /**
+   * 정규 리그의 대진이면 그 리그(`V1Tournament(kind='regular_league')`)의 id, 친선이면
+   * `null`. 이 저장소가 이미 쓰는 리그/친선 판별자와 같은 값이다
+   * (`team-record-category.ts`).
+   */
+  leagueId: string | null;
 }
 
 @Injectable()
@@ -296,6 +307,29 @@ export class TeamMatchLineupService {
               details: { expectedVersion: dto.expectedVersion, currentVersion: lineup.revision },
             });
           }
+          // **출전정지 가드는 제출에만 건다** — 대회도 같다(`GamesService.submitLineup`).
+          // 초안(`saveLineup`)에서 막으면 명단을 짜는 도중에 계속 튕겨 작성 자체가 안 된다.
+          //
+          // 리그가 아니면(친선) `leagueId` 가 null 이라 호출조차 하지 않는다. 리그여도
+          // 규정(`yellowAccumulationLimit`·`redCardSuspensionMatches`)이 꺼져 있으면 공유
+          // 함수가 조회 없이 통과시킨다 — **옵트인**이다.
+          if (context.leagueId !== null) {
+            const fixtures = await tx.v1TeamMatch.findMany({
+              // 리그 대진 목록의 정본 조건·정렬을 그대로 쓴다. 정지 판정의 기준틀이
+              // "몇 번째 경기인가" 라서, 목록 화면과 다른 순서로 세면 사람이 보는 순서와
+              // 규정이 어긋난다.
+              where: leagueFixtureListWhere(context.leagueId),
+              orderBy: leagueFixtureListOrder(),
+              select: { id: true, game: { select: { id: true } } },
+            });
+            await assertNoSuspendedParticipants(tx, {
+              competitionId: context.leagueId,
+              orderedGames: fixtures.map((row) => ({ key: row.id, gameId: row.game?.id ?? null })),
+              upcomingKey: context.teamMatchId,
+              lineupId: lineup.id,
+            });
+          }
+
           const submitted = await tx.v1GameLineup.update({
             where: { id: lineup.id },
             data: {
@@ -689,6 +723,7 @@ export class TeamMatchLineupService {
         hostTeamId: true,
         approvedApplicantTeamId: true,
         startAt: true,
+        leagueId: true,
       },
     });
     if (teamMatch === null) {
@@ -740,6 +775,7 @@ export class TeamMatchLineupService {
         opponentSideId: awaySide.id,
         opponentTeamId: teamMatch.approvedApplicantTeamId,
         role,
+        leagueId: teamMatch.leagueId,
       };
     }
     return {
@@ -752,6 +788,7 @@ export class TeamMatchLineupService {
       opponentSideId: hostSide.id,
       opponentTeamId: teamMatch.hostTeamId,
       role,
+      leagueId: teamMatch.leagueId,
     };
   }
 

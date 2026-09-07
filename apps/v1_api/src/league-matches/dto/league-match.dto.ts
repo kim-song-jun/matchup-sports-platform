@@ -255,3 +255,27 @@ export class CreateManualLeagueFixtureDto {
   @MaxLength(100)
   title?: string;
 }
+
+/**
+ * 리그 징계(출전정지) 규정 수정. **옵트인이다** — 두 값이 모두 비어 있으면 이 리그에는
+ * 규정이 적용되지 않는다(기본값을 두지 않은 것이 안전장치다: 값이 있으면 이미 진행 중인
+ * 리그에 소급 적용된다. schema.prisma 의 같은 필드 주석 참고).
+ *
+ * 대회(`admin-tournament.dto.ts`)와 **같은 범위·같은 문구**를 쓴다 — 두 축에서 다른 값을
+ * 허용하면 같은 규정이 대회냐 리그냐에 따라 달라진다.
+ */
+export class UpdateLeagueDisciplineDto {
+  /** 경고 누적 출전정지 — 옐로 몇 장이 쌓이면 다음 1경기 출전이 막히는가. */
+  @IsOptional()
+  @IsInt({ message: '경고 누적 기준은 정수여야 해요.' })
+  @Min(1, { message: '경고 누적 기준은 1장 이상이어야 해요.' })
+  @Max(20, { message: '경고 누적 기준이 20장을 넘으면 사실상 규정이 없는 것과 같아요.' })
+  yellowAccumulationLimit?: number | null;
+
+  /** 레드카드(퇴장) 1장당 출전정지 경기 수. 생략·null = 퇴장 정지 미적용. */
+  @IsOptional()
+  @IsInt({ message: '퇴장 정지 경기 수는 정수여야 해요.' })
+  @Min(1, { message: '퇴장 정지 경기 수는 1경기 이상이어야 해요.' })
+  @Max(20, { message: '퇴장 정지 경기 수는 20경기를 넘을 수 없어요.' })
+  redCardSuspensionMatches?: number | null;
+}

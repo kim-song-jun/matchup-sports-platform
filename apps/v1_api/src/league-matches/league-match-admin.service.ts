@@ -46,6 +46,7 @@ import {
   RegenerateLeagueFixturesDto,
   OpenLeagueRegistrationDto,
   RevertLeagueCompletionDto,
+  UpdateLeagueDisciplineDto,
   UpdateLeagueFixtureDto,
 } from './dto/league-match.dto';
 import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
@@ -373,6 +374,10 @@ export class LeagueMatchAdminService {
       // 그룹 B 감사 결함 1: 참가팀 추가 화면이 "이 리그 종목과 같은 팀만" 검색을 좁히려면
       // 종목ID가 필요하다 — 지금까지는 대진 표에서 쓸 일이 없어 응답에 없었다.
       sportId: league.sportId,
+      // 징계 규정 현재 값. null = 미적용(옵트인) — 화면이 "설정 안 함" 과 "0" 을 구분해야
+      // 하므로 0 으로 뭉개지 않고 그대로 내린다.
+      yellowAccumulationLimit: league.yellowAccumulationLimit,
+      redCardSuspensionMatches: league.redCardSuspensionMatches,
       teamIds,
       recentVenues,
       fixtures: fixtures.map((fixture) => {
@@ -1369,6 +1374,71 @@ export class LeagueMatchAdminService {
     };
   }
 
+  /**
+   * 리그 징계(출전정지) 규정을 켜고 끈다. **옵트인이고, 경기가 시작되면 잠긴다.**
+   *
+   * 왜 잠그는가: 규정은 **이미 치른 경기의 카드까지 소급해서** 센다
+   * (`readSuspensionVerdicts` 는 리그 전체 경기를 순서대로 훑는다). 리그가 굴러가는
+   * 도중에 값을 바꾸면 어제까지 멀쩡히 뛴 선수가 오늘 갑자기 정지되거나, 반대로 정지
+   * 중이던 선수가 풀린다 — 참가팀이 납득할 수 없는 변경이라 시작 전에만 허용한다.
+   *
+   * 취소된 경기는 잠금 사유가 아니다 — 치르지 않았으므로 카드가 없고, 소급의 대상도
+   * 아니다. `LIVE`·`PAUSED`·`ENDED` 만 "시작했다"로 센다.
+   */
+  async updateDiscipline(user: V1AuthUser, leagueId: string, dto: UpdateLeagueDisciplineDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: { id: true, yellowAccumulationLimit: true, redCardSuspensionMatches: true },
+    });
+    if (league === null) {
+      throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '리그를 찾을 수 없어요.' });
+    }
+
+    const startedGames = await this.prisma.v1Game.count({
+      where: {
+        teamMatch: { leagueId, deletedAt: null },
+        state: { in: ['LIVE', 'PAUSED', 'ENDED'] },
+      },
+    });
+    if (startedGames > 0) {
+      throw new ConflictException({
+        code: 'LEAGUE_DISCIPLINE_LOCKED',
+        message: '이미 시작한 경기가 있어 출전정지 규정을 바꿀 수 없어요. 규정은 리그 첫 경기 전에만 정할 수 있어요.',
+      });
+    }
+
+    // `undefined`(필드 미전송)와 `null`(규정 끄기)을 **구분한다** — 한쪽 값만 바꾸려는
+    // 요청이 다른 쪽을 조용히 지우면 안 된다.
+    const data: { yellowAccumulationLimit?: number | null; redCardSuspensionMatches?: number | null } = {};
+    if (dto.yellowAccumulationLimit !== undefined) data.yellowAccumulationLimit = dto.yellowAccumulationLimit;
+    if (dto.redCardSuspensionMatches !== undefined) data.redCardSuspensionMatches = dto.redCardSuspensionMatches;
+
+    if (Object.keys(data).length > 0) {
+      // `updateMany` + `kind` 가드인 이유는 이 파일의 다른 dual-write 와 같다 — `update` 는
+      // `where` 에 unique 필드만 받아 `kind` 를 못 걸어서, 같은 id 의 **진짜 대회**가 있으면
+      // 덮어쓴다.
+      await this.prisma.v1Tournament.updateMany({
+        where: { id: leagueId, kind: 'regular_league', deletedAt: null },
+        data,
+      });
+      await this.adminContext.logAdminAction(admin, {
+        action: 'league_match.update_discipline',
+        targetType: 'league_match',
+        targetId: leagueId,
+        reason: null,
+        fromStatus: undefined,
+        toStatus: undefined,
+      });
+    }
+
+    return {
+      leagueId,
+      yellowAccumulationLimit: data.yellowAccumulationLimit ?? league.yellowAccumulationLimit,
+      redCardSuspensionMatches: data.redCardSuspensionMatches ?? league.redCardSuspensionMatches,
+    };
+  }
+
   async revertCompletion(user: V1AuthUser, leagueId: string, dto: RevertLeagueCompletionDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
     const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
@@ -1458,6 +1528,10 @@ export class LeagueMatchAdminService {
         registrationDeadlineAt: true,
         sportId: true,
         regionId: true,
+        // 징계(출전정지) 규정 — 어드민 화면이 **현재 값**을 보여줘야 옵트인 여부를 알 수
+        // 있다. 둘 다 null 이면 이 리그에는 규정이 적용되지 않는다.
+        yellowAccumulationLimit: true,
+        redCardSuspensionMatches: true,
         // 거울이 `startsOn` 을 여기 담는다(leagueMirrorCreateData).
         scheduledAt: true,
         registrations: {

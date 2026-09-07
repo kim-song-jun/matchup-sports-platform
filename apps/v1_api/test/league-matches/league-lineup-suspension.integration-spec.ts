@@ -1,0 +1,346 @@
+import { HttpException } from '@nestjs/common';
+import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
+import { AdminContextService } from '../../src/common/admin-context.service';
+import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
+import { GameTakeoverService } from '../../src/games/game-takeover.service';
+import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/games.service';
+import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
+import { LeagueMatchAdminService } from '../../src/league-matches/league-match-admin.service';
+import type { NotificationsService } from '../../src/notifications/notifications.service';
+import { PrismaService } from '../../src/prisma/prisma.service';
+import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup.service';
+
+/**
+ * 정규 리그에도 출전정지 규정이 걸린다 — **옵트인이고, 리그 축으로 판정한다.**
+ *
+ * ## 왜 리그에는 안 걸렸나 (원인이 둘이다)
+ *
+ * 1. 가드가 대회 라우트(`GamesService.submitLineup`)에만 있었는데 **그 라우트는 리그에서
+ *    409 다**(`TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN`). 리그의 실제 입구는
+ *    `TeamMatchLineupService.submitLineup` 이고 거기엔 정지 검사가 한 줄도 없었다.
+ * 2. 그보다 근본적으로, 판정이 `V1TournamentFixture` 행에서 카드를 누적하는데 **정규
+ *    리그엔 그 행이 0건**이다(리그 경기는 `V1TeamMatch`). 집계 소스 자체가 없었다.
+ *
+ * ## 이 스펙이 재는 것
+ *
+ * - 규정을 켠 리그: 앞 경기에서 레드카드를 받은 선수를 다음 경기 명단으로 제출하면 막힌다.
+ * - 규정을 끈 리그: **똑같은 상황에서 그대로 통과한다**(옵트인 전제). 이 대조가 없으면
+ *   "리그는 무조건 막는다" 와 구분되지 않는다.
+ * - 규정 수정은 첫 경기가 시작되면 잠긴다(소급 적용 방지).
+ *
+ * ## 결과 리비전은 SUBMITTED 다 — 공식 확정본이 아니다
+ *
+ * 리그 결과는 어드민이 확인을 누를 때까지 `SUBMITTED` 로 머문다. 공식본만 세는 구현이면
+ * 리그 정지는 사실상 한 번도 안 걸린다 — 그래서 픽스처를 일부러 `SUBMITTED` 로만 만든다.
+ *
+ * 팀 일정(`V1TeamSchedule`)은 만들지 않는다 — 참석 응답 게이트는 이 스펙이 재는 계약이
+ * 아니고, 일정이 없으면 그 게이트는 애초에 건너뛴다.
+ */
+
+const ids = {
+  hostOwner: '6b000000-0000-4000-8000-000000000001',
+  suspended: '6b000000-0000-4000-8000-000000000002',
+  clean: '6b000000-0000-4000-8000-000000000003',
+  awayOwner: '6b000000-0000-4000-8000-000000000004',
+  adminUser: '6b000000-0000-4000-8000-000000000005',
+  admin: '6b000000-0000-4000-8000-000000000006',
+  sport: '6b000000-0000-4000-8000-000000000010',
+  region: '6b000000-0000-4000-8000-000000000011',
+  hostTeam: '6b000000-0000-4000-8000-000000000020',
+  awayTeam: '6b000000-0000-4000-8000-000000000021',
+  // 규정 ON 리그
+  strictLeague: '6b000000-0000-4000-8000-000000000030',
+  strictPast: '6b000000-0000-4000-8000-000000000031',
+  strictNext: '6b000000-0000-4000-8000-000000000032',
+  // 규정 OFF 리그 (같은 상황, 같은 사람)
+  openLeague: '6b000000-0000-4000-8000-000000000040',
+  openPast: '6b000000-0000-4000-8000-000000000041',
+  openNext: '6b000000-0000-4000-8000-000000000042',
+} as const;
+
+const prisma = new PrismaService();
+const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const lineups = new TeamMatchLineupService(prisma, new OperationAuditWriterService());
+
+function makeAdminService() {
+  return new LeagueMatchAdminService(
+    prisma,
+    new AdminContextService(prisma),
+    {} as GamesService,
+    { emitToManyDeferred: jest.fn() } as unknown as NotificationsService,
+  );
+}
+
+const authUser = (id: string) => ({
+  id,
+  email: `${id}@example.test`,
+  accountStatus: 'active' as const,
+  onboardingStatus: 'completed' as const,
+});
+
+async function captureFailure(operation: () => Promise<unknown>) {
+  try {
+    await operation();
+  } catch (error) {
+    return error;
+  }
+  throw new Error('Expected operation to fail');
+}
+
+function expectHttpCode(error: unknown, status: number, code: string) {
+  expect(error).toBeInstanceOf(HttpException);
+  const exception = error as HttpException;
+  expect(exception.getStatus()).toBe(status);
+  expect(exception.getResponse()).toEqual(expect.objectContaining({ code }));
+}
+
+describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 판정된다', () => {
+  let configId: string;
+
+  beforeAll(async () => {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is required for the league suspension spec');
+    }
+    await prisma.$connect();
+    const config = await prisma.v1CompetitionConfigVersion.findFirst({
+      where: { name: 'futsal-v1', status: 'ACTIVE' },
+      orderBy: { version: 'desc' },
+    });
+    if (config === null) throw new Error('futsal-v1 preset is required');
+    configId = config.id;
+
+    await prisma.v1User.createMany({
+      data: [ids.hostOwner, ids.suspended, ids.clean, ids.awayOwner, ids.adminUser].map((id, index) => ({
+        id,
+        email: `league-suspension-${index}@example.test`,
+        accountStatus: 'active' as const,
+        onboardingStatus: 'completed' as const,
+      })),
+    });
+    await prisma.v1AdminUser.create({
+      data: { id: ids.admin, userId: ids.adminUser, adminRole: 'owner', status: 'active' },
+    });
+    await prisma.v1Sport.create({ data: { id: ids.sport, code: 'futsal', name: '리그 정지 풋살' } });
+    await prisma.v1Region.create({
+      data: { id: ids.region, code: 'LEAGUE_SUSPENSION_REGION', name: '리그 정지 지역', level: 1 },
+    });
+    await prisma.v1Team.createMany({
+      data: [
+        { id: ids.hostTeam, ownerUserId: ids.hostOwner, sportId: ids.sport, regionId: ids.region, name: '정지 홈팀' },
+        { id: ids.awayTeam, ownerUserId: ids.awayOwner, sportId: ids.sport, regionId: ids.region, name: '정지 원정팀' },
+      ],
+    });
+    await prisma.v1TeamMembership.createMany({
+      data: [
+        { teamId: ids.hostTeam, userId: ids.hostOwner, role: 'owner', status: 'active' },
+        { teamId: ids.hostTeam, userId: ids.suspended, role: 'member', status: 'active' },
+        { teamId: ids.hostTeam, userId: ids.clean, role: 'member', status: 'active' },
+        { teamId: ids.awayTeam, userId: ids.awayOwner, role: 'owner', status: 'active' },
+      ],
+    });
+
+    await seedLeague({
+      leagueId: ids.strictLeague,
+      title: '규정 켠 리그',
+      // 옵트인: 레드카드 1장 = 다음 1경기 정지.
+      redCardSuspensionMatches: 1,
+      pastMatchId: ids.strictPast,
+      nextMatchId: ids.strictNext,
+    });
+    await seedLeague({
+      leagueId: ids.openLeague,
+      title: '규정 끈 리그',
+      redCardSuspensionMatches: null,
+      pastMatchId: ids.openPast,
+      nextMatchId: ids.openNext,
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  async function seedLeague(input: {
+    leagueId: string;
+    title: string;
+    redCardSuspensionMatches: number | null;
+    pastMatchId: string;
+    nextMatchId: string;
+  }) {
+    await prisma.v1Tournament.create({
+      data: {
+        id: input.leagueId,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: input.title,
+        kind: 'regular_league',
+        competitionConfigVersionId: configId,
+        // 거울은 `startsOn` 을 여기 담는다(leagueMirrorCreateData) — 어드민 상세가
+        // 이 값이 비면 LEAGUE_MIRROR_MISSING 으로 막는다.
+        scheduledAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        redCardSuspensionMatches: input.redCardSuspensionMatches,
+      },
+    });
+
+    // 지난 경기는 과거, 다음 경기는 미래 — 정지 판정의 기준틀이 경기 순서이므로
+    // `leagueFixtureListOrder()`(startAt → id)가 실제로 이 순서를 내야 한다.
+    const pastStartAt = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    const nextStartAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    await prisma.v1TeamMatch.createMany({
+      data: [input.pastMatchId, input.nextMatchId].map((id, index) => ({
+        id,
+        hostTeamId: ids.hostTeam,
+        createdByUserId: ids.hostOwner,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: index === 0 ? '지난 경기' : '다음 경기',
+        placeName: '풋살장',
+        startAt: index === 0 ? pastStartAt : nextStartAt,
+        approvedApplicantTeamId: ids.awayTeam,
+        competitionConfigVersionId: configId,
+        leagueId: input.leagueId,
+      })),
+    });
+
+    for (const teamMatchId of [input.pastMatchId, input.nextMatchId]) {
+      const creation: GameSourceCreationInput = {
+        sourceType: V1GameSourceType.TEAM_MATCH,
+        sourceId: teamMatchId,
+        competitionConfigVersionId: configId,
+        sides: [
+          { sideKey: V1GameSideKey.HOME, teamId: ids.hostTeam, displayNameSnapshot: '정지 홈팀' },
+          { sideKey: V1GameSideKey.AWAY, teamId: ids.awayTeam, displayNameSnapshot: '정지 원정팀' },
+        ],
+        participants: [],
+      };
+      const context: GameCommandContext = {
+        actor: { actorType: 'USER', actorUserId: ids.hostOwner, role: 'team_owner' },
+        expectedVersion: 0,
+        durableCommandId: `league-suspension-${teamMatchId}`,
+        payloadHash: canonicalGameCommandPayloadHash(creation),
+      };
+      await prisma.$transaction((tx) => games.createFromSourceInTransaction(tx, creation, context));
+    }
+
+    await seedRedCardResult(input.pastMatchId);
+  }
+
+  /** 지난 경기에 "레드카드 1장" 제출본을 심는다 — **공식 확정본이 아니라 SUBMITTED 다.** */
+  async function seedRedCardResult(teamMatchId: string) {
+    const game = await prisma.v1Game.findUniqueOrThrow({
+      where: { teamMatchId },
+      select: { id: true, sides: { select: { id: true, sideKey: true } }, lineups: { select: { id: true, sideId: true } } },
+    });
+    const homeSide = game.sides.find((side) => side.sideKey === V1GameSideKey.HOME)!;
+    const homeLineup = game.lineups.find((lineup) => lineup.sideId === homeSide.id)!;
+
+    const participant = await prisma.v1GameParticipant.create({
+      data: {
+        gameId: game.id,
+        sideId: homeSide.id,
+        lineupId: homeLineup.id,
+        userId: ids.suspended,
+        displayNameSnapshot: '퇴장 선수',
+        started: true,
+      },
+    });
+    // **DRAFT 로 만들고 참가자를 넣은 뒤 제출로 올린다.** DB 불변식 트리거가
+    // "result participants require a draft revision" 으로 막는다 — 프로덕션도 같은 순서다.
+    const revision = await prisma.v1GameResultRevision.create({
+      data: {
+        gameId: game.id,
+        revision: 1,
+        state: 'DRAFT',
+        score: { home: 0, away: 1 },
+        eventsHash: `league-suspension-${teamMatchId}`,
+        createdByActorType: 'SYSTEM',
+        createdBySystemActor: 'LEAGUE_SUSPENSION_TEST_SEED',
+      },
+    });
+    await prisma.v1GameResultParticipant.create({
+      data: {
+        resultRevisionId: revision.id,
+        participantId: participant.id,
+        sideId: homeSide.id,
+        started: true,
+        cards: { yellow: 0, red: 1 },
+      },
+    });
+    await prisma.v1GameResultRevision.update({
+      where: { id: revision.id },
+      data: { state: 'SUBMITTED', submittedAt: new Date() },
+    });
+  }
+
+  async function saveNextLineup(teamMatchId: string, idempotencyKey: string) {
+    const view = await lineups.getLineup(authUser(ids.hostOwner), teamMatchId);
+    return lineups.saveLineup(authUser(ids.hostOwner), teamMatchId, idempotencyKey, {
+      expectedVersion: view.version,
+      starters: [
+        { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
+        { userId: ids.clean, jerseyNumber: 2 },
+        { userId: ids.suspended, jerseyNumber: 3 },
+      ],
+      bench: [],
+    });
+  }
+
+  it('규정을 켠 리그: 앞 경기 레드카드 선수를 다음 경기 명단으로 제출하면 400 DISCIPLINE_SUSPENDED 로 막힌다', async () => {
+    const saved = await saveNextLineup(ids.strictNext, 'league-suspension-strict-save');
+
+    const rejected = await captureFailure(() =>
+      lineups.submitLineup(authUser(ids.hostOwner), ids.strictNext, 'league-suspension-strict-submit', {
+        expectedVersion: saved.revision,
+      }),
+    );
+    expectHttpCode(rejected, 400, 'DISCIPLINE_SUSPENDED');
+    // 누구 때문인지 화면이 말해 줘야 한다 — 이름 없이 막으면 팀장은 고칠 수가 없다.
+    expect((rejected as HttpException).getResponse()).toEqual(
+      expect.objectContaining({ details: { blocked: [expect.objectContaining({ name: expect.any(String) })] } }),
+    );
+
+    // 막힌 제출이 상태를 바꾸면 안 된다 — 초안 그대로여야 다시 고쳐 낼 수 있다.
+    const after = await lineups.getLineup(authUser(ids.hostOwner), ids.strictNext);
+    expect(after.state).toBe('DRAFT');
+  });
+
+  it('규정을 끈 리그: 똑같은 상황에서 그대로 제출된다 (옵트인)', async () => {
+    const saved = await saveNextLineup(ids.openNext, 'league-suspension-open-save');
+
+    const submitted = await lineups.submitLineup(
+      authUser(ids.hostOwner),
+      ids.openNext,
+      'league-suspension-open-submit',
+      { expectedVersion: saved.revision },
+    );
+    expect(submitted.state).toBe('SUBMITTED');
+  });
+
+  it('규정 수정은 첫 경기가 시작되면 잠긴다 — 시작 전에는 저장되고 상세에 그대로 보인다', async () => {
+    const admin = makeAdminService();
+
+    // 아직 아무 경기도 시작하지 않았다(생성 직후 게임은 SCHEDULED).
+    const updated = await admin.updateDiscipline(authUser(ids.adminUser), ids.openLeague, {
+      yellowAccumulationLimit: 3,
+    });
+    expect(updated.yellowAccumulationLimit).toBe(3);
+    // 한쪽만 보냈으므로 다른 쪽은 건드리지 않는다.
+    expect(updated.redCardSuspensionMatches).toBeNull();
+
+    const detail = await admin.detail(authUser(ids.adminUser), ids.openLeague);
+    expect(detail.yellowAccumulationLimit).toBe(3);
+
+    // 경기 하나가 끝난 상태로 만들면 잠긴다 — 규정은 이미 치른 경기의 카드까지 소급해서
+    // 세기 때문에, 진행 중에 바꾸면 어제까지 뛴 선수가 오늘 갑자기 정지된다.
+    await prisma.v1Game.update({ where: { teamMatchId: ids.openPast }, data: { state: 'ENDED' } });
+
+    const locked = await captureFailure(() =>
+      admin.updateDiscipline(authUser(ids.adminUser), ids.openLeague, { yellowAccumulationLimit: 5 }),
+    );
+    expectHttpCode(locked, 409, 'LEAGUE_DISCIPLINE_LOCKED');
+
+    // 잠금은 값을 되돌리지 않는다 — 앞서 저장한 3 이 그대로 남아야 한다.
+    const stillThree = await admin.detail(authUser(ids.adminUser), ids.openLeague);
+    expect(stillThree.yellowAccumulationLimit).toBe(3);
+  });
+});

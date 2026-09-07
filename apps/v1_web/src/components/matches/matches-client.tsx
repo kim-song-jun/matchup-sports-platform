@@ -32,6 +32,7 @@ import {
   getStatus,
   getViewerState,
   statusToCardStatus,
+  sortMatchesByAvailability,
   toMatchCard,
 } from './matches.card-model';
 
@@ -115,12 +116,13 @@ export function MatchListPageClient() {
     : cursor
       ? [...accumulated, ...pageItems.filter((item) => !accumulated.some((prev) => (prev.matchId ?? prev.id) === (item.matchId ?? item.id)))]
       : pageItems;
-  const visibleItems = filterMatchesByLevels(items, selectedLevels);
+  const orderedItems = items ? sortMatchesByAvailability(items) : undefined;
+  const visibleItems = filterMatchesByLevels(orderedItems, selectedLevels);
   const countItems = filterMatchesByLevels((countFilters ? countMatches.data?.items ?? allMatches.data?.items : allMatches.data?.items) ?? items, selectedLevels);
   const hasNext = query.data?.pageInfo?.hasNext ?? false;
   const handleLoadMore = () => {
     if (!query.data?.pageInfo?.nextCursor || query.isFetching) return;
-    setAccumulated(items ?? []);
+    setAccumulated(orderedItems ?? []);
     setCursor(query.data.pageInfo.nextCursor);
   };
   const searchModel: NonNullable<MatchListViewModel['search']> = {

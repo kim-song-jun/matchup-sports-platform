@@ -2,7 +2,7 @@
  * `matches.card-model.test.ts` 와 같은 계약 — 누르면 실제로 필터가 걸리는 링크만 만든다.
  */
 import { describe, expect, it } from 'vitest';
-import { buildSportChips, getStatus } from './team-matches.card-model';
+import { buildSportChips, getStatus, sortTeamMatchesByAvailability } from './team-matches.card-model';
 import { getTeamMatchListViewModel } from './team-matches.view-model';
 import type { V1Sport, V1TeamMatch } from '@/types/api';
 
@@ -60,5 +60,24 @@ describe('getStatus — 마감 판정', () => {
   it('서버 displayState 가 더 구체적이면 그 값을 그대로 쓴다', () => {
     expect(getStatus(teamMatch({ status: 'recruiting', displayState: 'expired', deadlineAt: past }))).toBe('expired');
     expect(getStatus(teamMatch({ status: 'recruiting', displayState: 'matched', deadlineAt: future }))).toBe('matched');
+  });
+});
+
+describe('sortTeamMatchesByAvailability', () => {
+  it('신청 가능한 팀 매치를 먼저 두고 각 상태 그룹의 서버 순서는 유지한다', () => {
+    const items = [
+      { id: 'matched-new', status: 'matched' },
+      { id: 'open-new', status: 'recruiting' },
+      { id: 'deadline-closed', status: 'recruiting', deadlineAt: new Date(Date.now() - 60_000).toISOString() },
+      { id: 'open-old', status: 'recruiting' },
+    ] as unknown as V1TeamMatch[];
+
+    expect(sortTeamMatchesByAvailability(items).map((item) => item.id)).toEqual([
+      'open-new',
+      'open-old',
+      'matched-new',
+      'deadline-closed',
+    ]);
+    expect(items.map((item) => item.id)).toEqual(['matched-new', 'open-new', 'deadline-closed', 'open-old']);
   });
 });

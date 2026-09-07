@@ -8,6 +8,7 @@ import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { useTournamentEndedFixtures, type TournamentOperationsBoardItem } from '@/hooks/use-tournament-result-review';
+import { buildLeagueFixtureTitles, resolveFixtureLabel } from '@/components/tournament-result-review/fixture-label';
 import { FixturePickerList } from '@/components/tournament-result-review/fixture-picker-list';
 import { GameResultReviewPanel } from '@/components/tournament-result-review/game-result-review-panel';
 import { describeResultReviewError } from '@/components/tournament-result-review/result-review-copy';
@@ -46,6 +47,15 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
     }
     return map;
   }, [tournament.data?.fixtures]);
+
+  /* **리그 대진은 `fixtures` 가 아니라 `leagueFixtures` 로 온다.** 리그 거울에는
+     `V1TournamentFixture` 가 0건이라 위 맵은 리그에서 항상 비고, 그래서 목록이 팀 이름도
+     주차도 없이 `"null번 경기"` 로 보였다(2026-09-06 alpha 실측). 제목은 생성 시 이미
+     "N주차 M경기" 로 붙어 있으니 그걸 읽는다. */
+  const leagueTitlesByFixtureId = useMemo(
+    () => buildLeagueFixtureTitles(tournament.data?.leagueFixtures),
+    [tournament.data?.leagueFixtures],
+  );
 
   const needsReview = useMemo(
     () =>
@@ -116,6 +126,7 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
             <FixturePickerList
               items={needsReview}
               teamNamesByFixtureId={teamNamesByFixtureId}
+              leagueTitlesByFixtureId={leagueTitlesByFixtureId}
               selectedFixtureId={selectedFixtureId}
               onSelect={(item) => {
                 setSelectedFixtureId(item.fixtureId);
@@ -139,7 +150,13 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
                   className="tm-text-body-lg"
                   style={{ marginBottom: 12, outline: 'none' }}
                 >
-                  {selectedItem.round} · {selectedItem.fixtureNumber}경기
+                  {
+                    resolveFixtureLabel(
+                      selectedItem,
+                      teamNamesByFixtureId.get(selectedItem.fixtureId),
+                      leagueTitlesByFixtureId,
+                    ).title
+                  }
                 </h2>
                 <GameResultReviewPanel
                   key={selectedItem.gameId}

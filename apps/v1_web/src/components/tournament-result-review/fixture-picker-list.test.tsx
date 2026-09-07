@@ -64,6 +64,42 @@ describe('FixturePickerList', () => {
     expect(screen.getByText('1번 경기')).toBeInTheDocument();
   });
 
+  it('리그 대진은 제목으로 식별된다 — `round`/`fixtureNumber` 가 없어 "null번 경기" 가 찍히던 자리 (#32)', () => {
+    // 리그 대진에는 주차·번호 컬럼이 **없다**(`V1TeamMatch` 에 그 컬럼이 없어 서버가 null 을
+    // 내린다). 예전엔 그 null 이 템플릿 리터럴에 그대로 들어가 `"null번 경기"` 가 찍혔고,
+    // 부제는 구분자만 남은 `" · 번 경기"` 였다. 제목은 생성 시 이미 "N주차 M경기" 다.
+    render(
+      <FixturePickerList
+        items={[makeItem({ round: null as unknown as string, fixtureNumber: null as unknown as number })]}
+        leagueTitlesByFixtureId={new Map([['f-1', '2주차 1경기']])}
+        selectedFixtureId={null}
+        onSelect={vi.fn()}
+        emptyTitle="없어요"
+        emptySub="없어요"
+      />,
+    );
+
+    expect(screen.getByText('2주차 1경기')).toBeInTheDocument();
+    // **"null" 이 화면 어디에도 없어야 한다** — 이게 이 테스트의 핵심이다.
+    expect(document.body.textContent).not.toContain('null');
+    // 구분자만 남은 부제도 없어야 한다.
+    expect(screen.queryByText(/·\s*번 경기/)).not.toBeInTheDocument();
+  });
+
+  it('리그인데 제목도 못 받으면 "경기" 로 둔다 — 없는 번호를 지어내지 않는다', () => {
+    render(
+      <FixturePickerList
+        items={[makeItem({ round: null as unknown as string, fixtureNumber: null as unknown as number })]}
+        selectedFixtureId={null}
+        onSelect={vi.fn()}
+        emptyTitle="없어요"
+        emptySub="없어요"
+      />,
+    );
+
+    expect(document.body.textContent).not.toContain('null');
+  });
+
   it('MISSING_SCORER 를 운영 보드와 같은 뜻(득점자 미기재)으로 표시한다', () => {
     // 예전에는 운영 보드가 '기록자 없음'이라 불러서, 운영자가 존재하지 않는
     // '기록자' 역할을 배정하려 헤매고 정작 득점자 누락은 방치됐다.

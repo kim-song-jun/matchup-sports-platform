@@ -38,7 +38,10 @@ export function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCard
     current: capacity.current,
     capacity: capacity.capacity,
     level: match.levelLabel ?? '레벨 미설정',
-    gender: match.genderRule ?? '성별 미설정',
+    // 팀매치 카드 모델과 같은 이유로 빈 문자열을 쓴다 — 문자열로 채우면 소비처의
+    // "값이 있을 때만 그린다" 가드가 무력해진다. 라벨 있는 자리(`InfoRow`)는 빈 값을
+    // '미정' 으로 그린다.
+    gender: match.genderRule ?? '',
     host: match.host?.displayName ?? '호스트',
     image: match.imageUrl ?? null,
     status,

@@ -56,8 +56,14 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     cost: costs.cost,
     opponentCost: costs.opponentCost,
     league: match.league ?? null,
+    opponentTeam: match.approvedOpponentTeam?.name ?? null,
     uniform: match.uniformColor || '',
-    gender: match.genderRule ?? '성별 미설정',
+    // **빈 값을 문자열로 채우지 않는다.** `'성별 미설정'` 을 넣으면 카드의
+    // `match.gender ? … : null` 가드가 **절대 안 걸려**, 성별을 안 정한 매치(리그 대진이
+    // 기본이다)에도 회색 배지가 항상 뜬다. 같은 파일이 매너·승·비용에서는 이미 "모르면
+    // null" 을 지키는데 성별만 어긋나 있었다.
+    // 상세는 `InfoRow` 가 빈 값을 '미정' 으로 그리므로 라벨 있는 자리에서는 뜻이 살아난다.
+    gender: match.genderRule ?? '',
     // 매너 평점·승수는 이제 API 가 실제로 내려준다(hostTeam.mannerScore / hostTeam.wins —
     // team-matches.service.ts 의 computeRevealedTeamTrustBatch · loadOfficialWinCounts).
     // `...fallback` 스프레드에 맡겨두면 매치마다 다른 실제 팀인데도 항상 같은 목업

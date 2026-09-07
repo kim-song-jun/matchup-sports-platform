@@ -1113,10 +1113,18 @@ export type V1TeamMatch = V1Match & {
     wins?: number;
     ownerUserId?: string;
   };
+  /**
+   * 확정된 상대팀. **목록과 상세가 같은 필드를 쓰되 `applicationId` 는 상세에만 있다** —
+   * 목록 카드는 "누구와 붙는지" 만 필요하고, 신청서 id 를 얻으려면 목록이 항목마다 승인된
+   * 신청서를 찾아야 해서 값이 없다.
+   *
+   * 이 값이 있다는 것 자체가 "상대가 확정됐다" 는 뜻이다(`approvedApplicantTeamId` 는
+   * 신청 승인 또는 리그 대진 편성 때만 설정된다).
+   */
   approvedOpponentTeam?: {
     teamId: string;
     name: string;
-    applicationId: string;
+    applicationId?: string;
   } | null;
   viewerState?: V1TeamMatchViewerState;
   viewer?: {

@@ -9,6 +9,7 @@ import {
   type TournamentStandingsRow,
 } from '@/components/tournaments/tournament-standings-table';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { matchOutcomeReasonLabel, toDisplayableOutcomeReason } from '@/lib/match-outcome';
 import type { V1MyTournamentFixtures } from '@/hooks/use-v1-api';
 import type { GameLineupState } from '@/types/game-operations';
@@ -333,6 +334,7 @@ function ScheduleRow({
   entry,
   myFixture,
   showGroupLabel = true,
+  isRegularLeague,
 }: {
   tournamentId: string;
   entry: PublicScheduleEntry;
@@ -340,12 +342,17 @@ function ScheduleRow({
   myFixture?: MyFixtureRowInfo;
   /** 그룹 제목("A조")이 바로 위에 있으면 카드 안에서 같은 말을 되풀이하지 않는다. */
   showGroupLabel?: boolean;
+  /** 정규 리그 시즌인가 — 경기 상세 라우트를 가른다(`fixtureDetailHref`). */
+  isRegularLeague: boolean;
 }) {
   const dateLabel = formatTournamentDateTimeShort(entry.scheduledAt);
   const venue = venueLabel(entry);
   const row = (
     <Link
-      href={`/tournaments/${tournamentId}/matches/${entry.fixtureId}`}
+      // **리그는 라우트가 다르다.** 이 화면은 대회와 리그가 같은 일정 응답을 쓰는데,
+      // 리그 행의 `fixtureId` 에는 팀 매치 id 가 들어 있어 대회 패턴으로 링크하면
+      // 경기 카드 전부가 404 로 떨어진다(근거는 `fixtureDetailHref`).
+      href={fixtureDetailHref({ isRegularLeague, competitionId: tournamentId, fixtureId: entry.fixtureId })}
       // 구분선을 인라인이 아니라 클래스로 그린다 — 인라인 style 은 미디어쿼리가 이길 수
       // 없어서, 데스크톱에서 목록을 2열로 펼 때 격자선을 다시 그릴 방법이 없어진다.
       // 내 팀 경기는 바깥 컨테이너가 테두리를 그린다(액센트 바와 한 겹으로 맞추기 위해).
@@ -594,11 +601,13 @@ function ScheduleGroupBlock({
   group,
   showGroupHeading,
   myFixtureById,
+  isRegularLeague,
 }: {
   tournamentId: string;
   group: { key: string; label: string; entries: PublicScheduleEntry[] };
   showGroupHeading: boolean;
   myFixtureById: Map<string, MyFixtureRowInfo>;
+  isRegularLeague: boolean;
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -617,6 +626,7 @@ function ScheduleGroupBlock({
             entry={entry}
             myFixture={myFixtureById.get(entry.fixtureId)}
             showGroupLabel={!showGroupHeading}
+            isRegularLeague={isRegularLeague}
           />
         ))}
       </div>
@@ -644,6 +654,7 @@ function ScheduleSections({
   activeFilter,
   onSelectFilter,
   phaseLabels,
+  isRegularLeague,
 }: {
   tournamentId: string;
   entries: readonly PublicScheduleEntry[];
@@ -652,6 +663,8 @@ function ScheduleSections({
   activeFilter: string;
   onSelectFilter: (key: string) => void;
   phaseLabels: SchedulePhaseLabels;
+  /** 정규 리그 시즌인가 — 경기 상세 라우트를 가른다(`fixtureDetailHref`). */
+  isRegularLeague: boolean;
 }) {
   const phases = groupScheduleEntries(entries, phaseLabels);
 
@@ -707,6 +720,7 @@ function ScheduleSections({
                 // 그룹 제목이 단계 제목과 같은 말이면(4강 안의 "4강") 한 번만 적는다.
                 showGroupHeading={group.label !== phase.label || phase.groups.length > 1}
                 myFixtureById={myFixtureById}
+                isRegularLeague={isRegularLeague}
               />
             ))}
           </section>
@@ -868,6 +882,7 @@ export function ScheduleContent({
             activeFilter={activeFilter}
             onSelectFilter={setFilter}
             phaseLabels={phaseLabels}
+            isRegularLeague={isRegularLeague}
           />
         )}
         {hasNextPage ? (
@@ -906,6 +921,7 @@ export function ScheduleContent({
                   group={group}
                   showGroupHeading
                   myFixtureById={myFixtureById}
+                  isRegularLeague={isRegularLeague}
                 />
               ))}
             </div>

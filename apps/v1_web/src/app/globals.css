@@ -2947,15 +2947,42 @@ label.tm-btn:focus-within {
 }
 
 /*
- * 홈 추천 히어로(.tm-featured-media)의 사진 없음 변형 — 매치 상세 히어로와 같은 처방이다.
- * 오버레이가 유일한 흐름 자식이라 flex 면 내용 폭으로 줄어 그라디언트가 전폭을 못 덮는다.
+ * 홈 추천 히어로(.tm-featured-media)의 사진 없음 변형 — 그래픽 위, 카피 아래.
+ *
+ * 밴드 비율(2:1)은 사진 변형과 같게 유지한다. aspect-ratio 를 풀면 밴드가 내용만큼
+ * 커져 같은 그리드 행의 사진 카드가 텍스트만 위에 뜬 채 아래가 비어 보인다
+ * (alpha 실측 2026-09-07: 그래픽 308px vs 사진 152px).
+ *
+ * 바탕은 목록 카드의 사진 없음 변형(.tm-match-media-sport)과 같은 --grey50 을 쓴다 —
+ * 카드면과 같은 흰색이면 2:1 빈 밴드가 미디어 영역으로 안 읽힌다.
  */
-/* 홈 추천 히어로의 사진 없음 변형 — 매치 상세와 같은 처방으로 그래픽 위, 카피 아래. */
 .tm-home-featured-stack {
-  aspect-ratio: auto;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   position: relative;
-  background: none;
+  background: var(--grey50);
+}
+
+.tm-home-featured-stack .tm-match-hero-graphic {
+  padding: 0;
+}
+
+.tm-home-featured-stack .tm-match-sport-illustration {
+  width: 112px;
+  height: 112px;
+}
+
+@media (min-width: 1024px) {
+  .tm-home-featured-stack .tm-match-sport-illustration {
+    width: 128px;
+    height: 128px;
+  }
+}
+
+/* 밴드 아래로 내려온 카피. 사진 변형의 오버레이와 같은 좌우 여백을 쓴다. */
+.tm-featured-stack-copy {
+  padding: 12px 16px 0;
 }
 
 .tm-featured-eyebrow,
@@ -2963,27 +2990,15 @@ label.tm-btn:focus-within {
   color: var(--static-white);
 }
 
-.tm-featured-overlay-stack {
-  position: static;
-  background: none;
-  padding: 16px 16px 4px;
-}
-
-/* 오버레이만 static 으로 바꾸면 안쪽 .tm-featured-text 가 absolute 로 남아 카드 하단에
-   붙는다 — 그래픽과 겹치고 흰 글씨가 밝은 바탕 위에 놓인다(실측 확인, #1045 Copilot). */
-.tm-featured-overlay-stack .tm-featured-text {
-  position: static;
-  color: inherit;
-}
-
-.tm-featured-overlay-stack .tm-featured-eyebrow {
-  color: var(--blue500);
+.tm-featured-stack-copy .tm-featured-eyebrow {
+  color: var(--blue700);
   font-weight: 700;
 }
 
-.tm-featured-overlay-stack .tm-featured-headline {
+.tm-featured-stack-copy .tm-featured-headline {
   color: var(--text-strong);
 }
+
 
 /*
  * 사진이 없는 매치 상세 히어로 — 그래픽 위, 카피 아래로 쌓는다.

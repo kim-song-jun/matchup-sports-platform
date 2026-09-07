@@ -69,10 +69,12 @@ describe('buildTeamSportChips', () => {
  */
 describe('toTeam — 소개문', () => {
   const base = getTeamListViewModel().teams[0];
-  const api = (over: Record<string, unknown>) => ({
+  // `as never` 로 캐스팅하면 타입 검사가 통째로 꺼져 `toTeam` 이 실제로 읽는 필드가 빠져도
+  // 컴파일러가 못 잡는다(#1105 Copilot). 같은 파일 위쪽과 같은 `Partial<T>` → `T` 패턴을 쓴다.
+  const api = (over: Partial<V1Team>): V1Team => ({
     id: 't1', name: '팀', sport: { id: 's', name: '풋살' }, region: { id: 'r', name: '서울 전체' },
     memberCount: 4, ...over,
-  }) as never;
+  } as unknown as V1Team);
 
   it('서버가 소개를 안 주면 빈 문자열이다 — 지역·종목으로 문장을 만들지 않는다', () => {
     const intro = toTeam(api({}), base).intro;

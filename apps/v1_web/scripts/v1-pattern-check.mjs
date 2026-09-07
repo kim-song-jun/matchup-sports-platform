@@ -391,7 +391,7 @@ checkLiteralBaseline({
   label: '틴트 지면에 tm-on-tint 누락',
   baselinePath: 'scripts/tint-marker-baseline.json',
   count: (txt) => {
-    // 지면으로 쓰이는 옅은 토큰을 전부 담는다. `--*50` 은 **여섯 색 모두** grey600 에서
+    // 지면으로 쓰이는 옅은 토큰을 전부 담는다. `--*50` 은 **일곱 색 모두** grey600 에서
     // 미달이다(alpha 값 기준 계산): red 4.02 · blue 4.11 · teal 4.15 · green 4.16 ·
     // orange 4.21 · yellow 4.32 · grey 4.42. 처음엔 blue/grey/red 만 넣었다가
     // /tournaments/:id/my 의 orange50 안내가 스윕에서 나와 나머지를 채웠다.

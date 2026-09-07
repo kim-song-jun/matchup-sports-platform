@@ -145,6 +145,14 @@ export function getStatus(match: V1TeamMatch): V1TeamMatchApiStatus {
   return base;
 }
 
+/** 개인 매치와 같은 공개 목록 계약: 신청 가능 우선, 마감 하단, 그룹 내부 서버 순서 유지. */
+export function sortTeamMatchesByAvailability(items: V1TeamMatch[]): V1TeamMatch[] {
+  return items
+    .map((item, index) => ({ item, index, rank: statusToCardStatus(getStatus(item)) === 'open' ? 0 : 1 }))
+    .sort((left, right) => left.rank - right.rank || left.index - right.index)
+    .map(({ item }) => item);
+}
+
 export function getViewerState(match: V1TeamMatch): V1TeamMatchViewerState {
   return match.viewer?.state ?? match.viewerState ?? 'none';
 }

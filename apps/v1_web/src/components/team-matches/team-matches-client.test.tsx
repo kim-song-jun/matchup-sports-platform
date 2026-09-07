@@ -84,6 +84,7 @@ vi.mock('./team-matches-page', () => ({
   ),
   TeamMatchListPageView: ({ model }: { model: TeamMatchListViewModel }) => (
     <div>
+      <span data-testid={'team-match-order'}>{model.matches.map((match) => match.title).join('|')}</span>
       <span data-testid="team-match-count">{model.matches.length}</span>
       {model.hasNext && model.onLoadMore ? <button onClick={model.onLoadMore}>더 보기</button> : null}
     </div>
@@ -856,7 +857,7 @@ describe('TeamMatchDetailPageClient — 신청 중인 뷰어의 히어로 CTA는
 // 20건 컷오프 페이지네이션 결함 회귀 방지(2026-08-27 감사) — matches-client.test.tsx의
 // 동일 계열 테스트와 짝을 이룬다.
 describe('TeamMatchListPageClient — 커서 페이지네이션 누적', () => {
-  function page(items: Array<{ id: string; title: string }>, nextCursor: string | null) {
+  function page(items: Array<{ id: string; title: string; status?: 'recruiting' | 'closed' }>, nextCursor: string | null) {
     return {
       data: {
         items: items.map((item) => ({
@@ -865,7 +866,7 @@ describe('TeamMatchListPageClient — 커서 페이지네이션 누적', () => {
           title: item.title,
           sportName: '풋살',
           startsAt: '2026-09-01T10:00:00.000Z',
-          status: 'recruiting' as const,
+          status: item.status ?? 'recruiting',
         })),
         nextCursor,
         pageInfo: { nextCursor, hasNext: nextCursor !== null },
@@ -883,7 +884,7 @@ describe('TeamMatchListPageClient — 커서 페이지네이션 누적', () => {
         return { data: undefined, isError: false, isFetching: false, isLoading: false };
       }
       if (!filters?.cursor) {
-        return page([{ id: 'tm1', title: '팀매치 1' }], 'cursor-page-2');
+        return page([{ id: 'tm1', title: '팀매치 1', status: 'closed' }], 'cursor-page-2');
       }
       return page([{ id: 'tm2', title: '팀매치 2' }], null);
     });
@@ -896,6 +897,7 @@ describe('TeamMatchListPageClient — 커서 페이지네이션 누적', () => {
     fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
 
     expect(screen.getByTestId('team-match-count')).toHaveTextContent('2');
+    expect(screen.getByTestId('team-match-order')).toHaveTextContent('팀매치 2|팀매치 1');
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });
 });

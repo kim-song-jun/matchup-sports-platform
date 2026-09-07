@@ -124,6 +124,18 @@ export function getStatus(match: V1Match): V1MatchApiStatus {
   return base;
 }
 
+/**
+ * 서버가 정한 정렬(최신순/마감임박순)은 각 상태 그룹 안에서 그대로 유지하면서,
+ * 현재 신청 가능한 카드만 신청 마감 카드보다 먼저 보이게 안정적으로 분리한다.
+ * 새 배열을 반환해 React Query 캐시의 원본 응답은 변경하지 않는다.
+ */
+export function sortMatchesByAvailability(items: V1Match[]): V1Match[] {
+  return items
+    .map((item, index) => ({ item, index, rank: statusToCardStatus(getStatus(item)) === 'open' ? 0 : 1 }))
+    .sort((left, right) => left.rank - right.rank || left.index - right.index)
+    .map(({ item }) => item);
+}
+
 export function getViewerState(match: V1Match, preflight?: Exclude<V1ViewerState, 'guest'>): V1ViewerState {
   return preflight ?? match.viewer?.state ?? match.viewerState ?? 'none';
 }

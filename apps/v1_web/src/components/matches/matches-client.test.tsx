@@ -57,6 +57,7 @@ vi.mock('./matches-page', () => ({
   ),
   MatchListPageView: ({ model }: { model: MatchListViewModel }) => (
     <div>
+      <span data-testid={'match-order'}>{model.matches.map((match) => match.title).join('|')}</span>
       <span data-testid="match-count">{model.matches.length}</span>
       {model.hasNext && model.onLoadMore ? <button onClick={model.onLoadMore}>더 보기</button> : null}
     </div>
@@ -229,7 +230,7 @@ describe('MatchDetailPageClient — 후기 진입점', () => {
 // 20건 컷오프 페이지네이션 결함 회귀 방지(2026-08-27 감사) — 서버 커서 응답의 두 번째
 // 페이지가 "더 보기" 클릭 후 첫 페이지에 이어 붙는지, 중복 없이 누적되는지 확인한다.
 describe('MatchListPageClient — 커서 페이지네이션 누적', () => {
-  function page(items: Array<{ id: string; title: string }>, nextCursor: string | null) {
+  function page(items: Array<{ id: string; title: string; status?: 'open' | 'closed' }>, nextCursor: string | null) {
     return {
       data: {
         items: items.map((item) => ({
@@ -238,7 +239,7 @@ describe('MatchListPageClient — 커서 페이지네이션 누적', () => {
           title: item.title,
           sportName: '풋살',
           startsAt: '2026-09-01T10:00:00.000Z',
-          status: 'open' as const,
+          status: item.status ?? 'open',
         })),
         nextCursor,
         pageInfo: { nextCursor, hasNext: nextCursor !== null },
@@ -258,7 +259,7 @@ describe('MatchListPageClient — 커서 페이지네이션 누적', () => {
         return { data: undefined, isError: false, isFetching: false, isLoading: false };
       }
       if (!filters?.cursor) {
-        return page([{ id: 'm1', title: '매치 1' }], 'cursor-page-2');
+        return page([{ id: 'm1', title: '매치 1', status: 'closed' }], 'cursor-page-2');
       }
       return page([{ id: 'm2', title: '매치 2' }], null);
     });
@@ -275,6 +276,7 @@ describe('MatchListPageClient — 커서 페이지네이션 누적', () => {
     // cursor state 갱신 → 재렌더 → useV1Matches가 cursor-page-2로 다시 호출되어 2페이지를
     // 받고, 누적 로직이 1페이지 위에 이어 붙인다.
     expect(screen.getByTestId('match-count')).toHaveTextContent('2');
+    expect(screen.getByTestId('match-order')).toHaveTextContent('매치 2|매치 1');
     // 마지막 페이지(nextCursor: null)라 "더 보기"가 사라진다.
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });

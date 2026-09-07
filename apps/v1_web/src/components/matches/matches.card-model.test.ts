@@ -3,7 +3,7 @@
  * 서버 프리렌더가 마스터 종목 없이도 이 함수를 호출하므로 두 경로를 모두 고정한다.
  */
 import { describe, expect, it } from 'vitest';
-import { buildSportSummary } from './matches.card-model';
+import { buildSportSummary, sortMatchesByAvailability } from './matches.card-model';
 import { getMatchListViewModel } from './matches.view-model';
 import type { V1Match, V1Sport } from '@/types/api';
 
@@ -41,5 +41,24 @@ describe('buildSportSummary', () => {
 
     expect(chips.find((c) => c.label === '풋살')?.href).toBeDefined();
     expect(chips.find((c) => c.label === '축구')?.href).toBeUndefined();
+  });
+});
+
+describe('sortMatchesByAvailability', () => {
+  it('신청 가능한 매치를 먼저 두고 각 상태 그룹의 서버 순서는 유지한다', () => {
+    const items = [
+      { id: 'closed-new', status: 'closed' },
+      { id: 'open-new', status: 'recruiting' },
+      { id: 'full', status: 'recruiting', displayState: 'full' },
+      { id: 'open-old', status: 'recruiting' },
+    ] as unknown as V1Match[];
+
+    expect(sortMatchesByAvailability(items).map((item) => item.id)).toEqual([
+      'open-new',
+      'open-old',
+      'closed-new',
+      'full',
+    ]);
+    expect(items.map((item) => item.id)).toEqual(['closed-new', 'open-new', 'full', 'open-old']);
   });
 });

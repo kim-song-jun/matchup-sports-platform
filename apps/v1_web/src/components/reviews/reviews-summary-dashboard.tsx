@@ -22,11 +22,22 @@ export function ReviewsSummaryDashboard({
   onPeriodChange,
   loading,
   title,
+  countUnit = '리뷰',
 }: {
   summary: V1ReviewReceivedSummaryResponse | undefined;
   period: string | null;
   onPeriodChange: (period: string | null) => void;
   loading: boolean;
+  /**
+   * **개수의 단위.** 이 카드는 개인 요약과 팀 요약을 **같은 컴포넌트**로 그리는데,
+   * `ratingCount` 가 두 경우에 **다른 것을 센다**:
+   *   · 개인 — 받은 리뷰 수
+   *   · 팀   — **리뷰어 팀별 평균 1개씩**(팀 단위 평균이 의도된 설계다)
+   * 그래서 팀 요약에서 한 팀이 리뷰 3건을 남기면 **"1개 리뷰" 옆에 태그 33%** 가 나란히
+   * 서서 서로를 부정하는 것처럼 보였다(태그 비율의 분모는 원시 리뷰 수다).
+   * **계산은 그대로 두고 단위를 사실대로 부른다.**
+   */
+  countUnit?: string;
   /** 이 요약이 무엇의 집계인지 — 페이지가 따로 라벨을 달지 않도록 여기서 받는다. */
   title: string;
 }) {
@@ -52,7 +63,7 @@ export function ReviewsSummaryDashboard({
           <div className="tm-text-label" style={{ fontWeight: 600 }}>{title}</div>
           <div className="tm-text-caption" style={{ marginTop: 2, color: 'var(--text-muted)' }}>
             평균 <span className="tab-num" style={{ fontWeight: 700, color: 'var(--text-body)' }}>{overallAvg ?? '-'}</span>
-            점 · <span className="tab-num">{totalCount}</span>개 리뷰
+            점 · <span className="tab-num">{totalCount}</span>개 {countUnit}
           </div>
         </div>
         {availableMonths.length > 0 ? (

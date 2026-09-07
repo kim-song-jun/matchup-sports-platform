@@ -2933,7 +2933,13 @@ label.tm-btn:focus-within {
 .tm-list-row,
 .tm-auth-profile-preview,
 .tm-auth-segmented,
-.tm-my-profile-head {
+.tm-my-profile-head,
+/* 아래 넷은 --grey100 을 지면으로 깔면서 같은 규칙에서 --text-muted 를 글자색으로
+   쓴다 — 위 표의 4.19:1 자리다. 선례는 .tm-list-row-interactive:hover(1897행). */
+.tm-bk2-pill,
+.tm-standings-rank,
+.tm-review-card-avatar,
+.tm-chat-system-message span {
   --text-caption: var(--grey700);
   --text-muted: var(--grey700);
 }

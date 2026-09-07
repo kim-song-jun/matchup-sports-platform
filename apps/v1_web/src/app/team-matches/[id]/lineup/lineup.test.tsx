@@ -450,6 +450,49 @@ describe('TeamMatchLineupPageClient', () => {
     hoisted.refetchLineup.mockResolvedValue({ data: baseLineup() });
   });
 
+  /**
+   * **화면이 자기모순이던 자리다.**
+   *
+   * 리그 대진에는 참석 응답 게이트가 걸리지 않는다 — 대진을 운영자가 일괄 생성하면서 팀
+   * 일정이 함께 깔리지만 그 일정의 참석을 묻는 입구가 없어, 게이트를 걸면 아무도 명단에
+   * 못 든다. 서버는 그래서 리그에서 `eligibleMembers` 를 전원 통과시키는데, 안내 문구만
+   * 친선 규칙을 그대로 말하고 있었다 — *"참석으로 확정된 팀원만 추가할 수 있어요"* 라고
+   * 적어 놓고 바로 아래에 **응답한 적 없는 팀원 전원**을 나열했다(alpha 실측).
+   */
+  it('리그 대진에서는 참석 안내 문구가 리그 규칙으로 바뀐다', () => {
+    hoisted.useV1TeamMatchMock.mockReturnValue({
+      data: { ...baseTeamMatch(), league: { leagueId: 'league-1', title: '테스트 리그' } },
+      isLoading: false,
+      isError: false,
+    });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup(),
+      isLoading: false,
+      isError: false,
+      refetch: hoisted.refetchLineup,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(
+      screen.getByText('리그 경기는 참석 응답과 상관없이 팀원을 명단에 넣을 수 있어요. 실제로 뛸 선수만 골라 주세요.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/참석으로 확정된 팀원만/)).not.toBeInTheDocument();
+  });
+
+  it('친선 매치에서는 참석 안내 문구가 그대로다 — 게이트가 살아 있는 쪽이다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup(),
+      isLoading: false,
+      isError: false,
+      refetch: hoisted.refetchLineup,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(screen.getByText(/참석으로 확정된 팀원만/)).toBeInTheDocument();
+  });
+
   it('owner/manager: lets a manager add a waiting roster member to the appearance roster', async () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup(),

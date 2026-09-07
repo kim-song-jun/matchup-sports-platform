@@ -30,8 +30,18 @@ import { resolve } from 'node:path';
 /**
  * 지금 제외된 스펙 수. **줄이는 방향은 자유롭게, 늘리는 방향은 이 숫자를 고쳐야 한다.**
  * 늘릴 때는 왜 지금 고칠 수 없는지를 `jest.config.ts` 의 해당 항목 옆에 적는다.
+ *
+ * **3 → 2 (2026-09-07)**: `team-match-lineup.integration-spec.ts` 를 되살려 목록에서 뺐다.
+ * 실패 6건의 정체는 Idempotency-Key 필수화(4) · 정본 §3 이 폐기한 계약(인원·골키퍼, 3) ·
+ * `requestChange` 의 거부가 같은 트랜잭션이라 `LOCKED` UPDATE 도 롤백된다는 오해(1)였다.
+ *
+ * **남은 둘이 왜 남았는가** — 다음 사람이 여기서 바로 알도록 적는다:
+ * - `team-match-game-adapter`: `TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN` 을 **무조건** 기대하는데
+ *   리그 예외로 그 게이트가 좁아졌다. 보고된 2건보다 늘었을 수 있어 재측정이 먼저다.
+ * - `task7-platform-ops-boundary`: 스펙 작성 후 붙은 FK 로 무효화됐다. 되살리려면 픽스처에
+ *   **대회 2개를 새로 만들어야** 한다 — 낡은 기대값 갱신과 규모가 다르다.
  */
-const PINNED_IGNORE_COUNT = 3;
+const PINNED_IGNORE_COUNT = 2;
 
 /** `jest.config.ts` 가 `<rootDir>` 접두사와 정규식 이스케이프를 쓰므로 실제 경로로 되돌린다. */
 function toRepoPath(pattern: string): string {

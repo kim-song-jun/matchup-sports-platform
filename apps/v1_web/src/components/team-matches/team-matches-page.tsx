@@ -819,11 +819,24 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   const league = match.league;
   // '마감'만으로는 무엇이 마감인지 안 드러난다 — 목록에 마감된 매치가 함께 놓이면서
   // '모집 중'과 대비되는 문구가 필요해졌다(2026-09-07 제보: "신청마감인거랑 신청가능이랑 차이가 보여야지").
-  const statusLabel = match.status === 'mine' ? '내 매치' : match.status === 'pending' ? '승인 대기' : match.status === 'approved' ? '승인 완료' : match.status === 'closed' ? '신청 마감' : '모집 중';
-  const statusClass = match.status === 'mine' ? 'tm-badge-blue' : match.status === 'pending' ? 'tm-badge-orange' : match.status === 'approved' ? 'tm-badge-green' : match.status === 'closed' ? 'tm-badge-grey' : 'tm-badge-blue';
+  // 배지는 두 가지 서로 다른 사실을 말한다 — **나와의 관계**와 **매치 상태**.
+  // 예전엔 한 배지에 눌러 담아서, 호스트가 보는 매치는 마감·취소·종료여도 '내 매치'로만
+  // 보이고 마감 표시가 아예 없었다(statusToCardStatus 가 viewerState 를 먼저 본다).
+  // 관계가 있으면 관계 배지를, 마감이면 마감 배지를 각각 붙인다 — 둘 다인 경우 둘 다 붙는다.
+  const relation = match.status === 'mine'
+    ? { label: '내 매치', className: 'tm-badge-blue' }
+    : match.status === 'pending'
+      ? { label: '승인 대기', className: 'tm-badge-orange' }
+      : match.status === 'approved'
+        ? { label: '승인 완료', className: 'tm-badge-green' }
+        : null;
   // 마감된 팀매치도 경기 시작 전까지 목록에 남는다(team-matches.service.ts list()) —
   // 배지만으로는 스크롤 중에 안 걸리므로 카드 지면·사진도 함께 눌러 한눈에 갈리게 한다.
-  const isClosed = match.status === 'closed';
+  // 판정은 관계가 아니라 API status 로 한다(match.closed) — 호스트도 같은 규칙으로 본다.
+  const isClosed = match.closed;
+  // 관계도 없고 마감도 아니면 "상대가 아직 없다"를 쓴다 — 목록 응답에 상대팀이 없어
+  // 화면 어디에도 없던 정보다. 상대 "팀 이름"은 응답에 없으므로 만들어내지 않는다.
+  const openLabel = !relation && !isClosed ? '상대 모집 중' : null;
   return (
     <Link className={`tm-match-row tm-card-interactive tm-pressable${isClosed ? ' tm-card-closed' : ''}`} href={`/team-matches/${match.id}`}>
       {/* 예전엔 카드 위쪽 124px(카드의 44%)이 파란 VS 밴드였다. 그 밴드의 "상대팀" 칸에는
@@ -839,21 +852,36 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
       <div className="tm-match-row-main">
         {/* 팀이 이 목록의 신원이다 — 제목보다 먼저 읽히도록 맨 위 줄에 둔다.
             매너·승수는 모르면(공개 후기 0건) 아예 안 쓴다. 0 으로 채우면 잘하는 팀이 최악으로 보인다. */}
-        <div className="tm-text-caption tm-match-row-meta">
-          <strong style={{ fontWeight: 600, color: 'var(--text-strong)' }}>{match.hostTeam}</strong>
-          {match.manner !== null && match.wins !== null ? (
-            <> · 매너 <span className="tab-num">{match.manner}</span> · 승 <span className="tab-num">{match.wins}</span></>
+        {/* 상태 배지는 제목 줄이 아니라 이 신원 줄에 둔다. 팀매치는 개인 매치와 달리 거의 모든
+            카드에 배지가 붙어(모집 중·신청 마감·승인 완료…), 제목 줄에 인라인으로 두면 매 카드에서
+            제목이 그만큼 잘린다 — 데스크톱 실측(2026-09-07)에서 본문 191px 중 제목이 111px 였다. */}
+        <div className="tm-text-caption tm-match-row-meta tm-team-match-row-id">
+          {relation ? (
+            <span className={`tm-badge ${relation.className}`}>
+              <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
+              {relation.label}
+            </span>
           ) : null}
+          {isClosed ? (
+            <span className="tm-badge tm-badge-grey tm-card-closed-badge">
+              <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
+              신청 마감
+            </span>
+          ) : null}
+          {openLabel ? (
+            <span className="tm-badge tm-badge-blue">
+              <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
+              {openLabel}
+            </span>
+          ) : null}
+          <span className="tm-team-match-row-host">
+            <strong style={{ fontWeight: 600, color: 'var(--text-strong)' }}>{match.hostTeam}</strong>
+            {match.manner !== null && match.wins !== null ? (
+              <> · 매너 <span className="tab-num">{match.manner}</span> · 승 <span className="tab-num">{match.wins}</span></>
+            ) : null}
+          </span>
         </div>
         <div className="tm-match-row-headline">
-          {/* 배지는 항상 정확히 하나다. 모집 중일 때는 상태(모집 중)가 아니라 **상대가 아직 없다**는
-              사실을 쓴다 — 목록에서 실제로 궁금한 값이고, 지금은 화면 어디에도 없던 정보다.
-              그 외 상태는 확정된 사실(내 매치·승인 대기·승인 완료·신청 마감)을 그대로 쓴다.
-              상대 "팀 이름"은 목록 응답에 없으므로 만들어내지 않는다(V1TeamMatch 참고). */}
-          <span className={`tm-badge ${match.status === 'open' ? 'tm-badge-blue' : statusClass}${isClosed ? ' tm-card-closed-badge' : ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
-            {match.status === 'open' ? '상대 모집 중' : statusLabel}
-          </span>
           <div className="tm-text-body-lg tm-match-row-title">{match.title}</div>
         </div>
         <div className="tm-text-caption tm-match-row-when">

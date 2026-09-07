@@ -2,9 +2,9 @@
  * `matches.card-model.test.ts` 와 같은 계약 — 누르면 실제로 필터가 걸리는 링크만 만든다.
  */
 import { describe, expect, it } from 'vitest';
-import { buildSportChips, getStatus, sortTeamMatchesByAvailability } from './team-matches.card-model';
+import { buildSportChips, getStatus, sortTeamMatchesByAvailability, statusToCardStatus, toTeamMatch } from './team-matches.card-model';
 import { getTeamMatchListViewModel } from './team-matches.view-model';
-import type { V1Sport, V1TeamMatch } from '@/types/api';
+import type { V1Sport, V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 
 const base = getTeamMatchListViewModel();
 const futsal = { id: 'uuid-futsal', name: '풋살', levels: [] } as unknown as V1Sport;
@@ -79,5 +79,55 @@ describe('sortTeamMatchesByAvailability', () => {
       'deadline-closed',
     ]);
     expect(items.map((item) => item.id)).toEqual(['matched-new', 'open-new', 'deadline-closed', 'open-old']);
+  });
+});
+
+/**
+ * `closed` 는 **보는 사람과 무관하게** API status 만으로 정해진다.
+ *
+ * `statusToCardStatus()` 는 viewerState 를 먼저 보므로 호스트에게는 항상 'mine' 을 준다 —
+ * 그 한 필드에 마감 여부까지 기대면, 매치를 만든 사람만 자기 매치가 마감된 걸 목록에서
+ * 알 수 없다(2026-09-07 확인). 그래서 두 값이 서로 독립인지 여기서 못박는다.
+ */
+describe('toTeamMatch — 마감 여부는 관계와 독립이다', () => {
+  const apiClosedStates = ['matched', 'closed', 'cancelled', 'completed', 'expired'] as const;
+
+  function card(status: V1TeamMatchApiStatus, viewerState: V1TeamMatchViewerState) {
+    return toTeamMatch({ id: 'tm1', title: 't', displayState: status, viewerState } as unknown as V1TeamMatch, base.matches[0]);
+  }
+
+  it('호스트가 봐도 마감된 매치는 closed=true 다 — status 는 그대로 mine', () => {
+    apiClosedStates.forEach((apiStatus) => {
+      const model = card(apiStatus, 'host_team');
+      expect(model.status).toBe('mine');
+      expect(model.closed).toBe(true);
+    });
+  });
+
+  // 열린 상태의 API 값은 'recruiting' 이다 — 'open' 은 카드 모델 쪽 값이라
+  // 여기에 쓰면 서버가 보내지 않는 입력을 검증하게 된다.
+  it('호스트의 열린 매치는 closed=false 다', () => {
+    const model = card('recruiting', 'host_team');
+    expect(model.status).toBe('mine');
+    expect(model.closed).toBe(false);
+  });
+
+  it('신청자·승인자가 봐도 마감 여부는 같은 값이다', () => {
+    (['requested', 'approved'] as const).forEach((viewerState) => {
+      expect(card('closed', viewerState).closed).toBe(true);
+      expect(card('recruiting', viewerState).closed).toBe(false);
+    });
+  });
+
+  it('관계가 없으면 status 와 closed 가 함께 마감을 가리킨다', () => {
+    const model = card('closed', 'none');
+    expect(model.status).toBe('closed');
+    expect(model.closed).toBe(true);
+  });
+
+  it('정렬은 viewerState 를 안 쓰므로 이 변경에 영향받지 않는다', () => {
+    // sortTeamMatchesByAvailability 는 statusToCardStatus(getStatus(item)) 를 인자 하나로 부른다.
+    expect(statusToCardStatus('closed')).toBe('closed');
+    expect(statusToCardStatus('recruiting')).toBe('open');
   });
 });

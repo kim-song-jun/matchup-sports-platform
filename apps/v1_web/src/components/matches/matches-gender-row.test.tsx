@@ -30,12 +30,18 @@ function detail(gender: string) {
   return { ...base, match: { ...base.match, gender } };
 }
 
-function genderRowText(container: HTMLElement): string {
-  const label = [...container.querySelectorAll('.tm-info-row')].find((row) =>
-    (row.textContent ?? '').includes('성별 조건'),
+/**
+ * 값 슬롯만 읽는다. 행 전체를 이어붙여 정확 일치를 요구하면 라벨·구분자 마크업이
+ * 바뀌는 정상 변경에도 깨진다. 여기서 지켜야 할 계약은 "값 슬롯이 비지 않는다" 하나다.
+ */
+function genderRowValue(container: HTMLElement): string {
+  const row = [...container.querySelectorAll('.tm-info-row')].find((candidate) =>
+    (candidate.textContent ?? '').includes('성별 조건'),
   );
-  expect(label).toBeDefined();
-  return (label!.textContent ?? '').replace(/\s+/g, ' ').trim();
+  expect(row).toBeDefined();
+  const value = row!.querySelector('.tm-text-body');
+  expect(value).not.toBeNull();
+  return (value!.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
 describe('개인 매치 상세 — 성별 조건 행', () => {
@@ -43,13 +49,13 @@ describe('개인 매치 상세 — 성별 조건 행', () => {
     const { container } = render(<MatchDetailPageView model={detail('')} />);
 
     // 라벨만 남고 값이 사라지면 사용자는 화면이 깨진 것으로 읽는다.
-    expect(genderRowText(container)).toBe('성별 조건미정');
+    expect(genderRowValue(container)).toBe('미정');
   });
 
   it('정한 값이 있으면 그대로 보여준다', () => {
     const { container } = render(<MatchDetailPageView model={detail('성별 무관')} />);
 
-    expect(genderRowText(container)).toBe('성별 조건성별 무관');
+    expect(genderRowValue(container)).toBe('성별 무관');
     expect(screen.queryByText('미정')).not.toBeInTheDocument();
   });
 });

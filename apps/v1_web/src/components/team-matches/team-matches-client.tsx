@@ -284,6 +284,7 @@ export function TeamMatchDetailPageClient({ teamMatchId }: { teamMatchId: string
         lineupHref: ownTeamId ? `/team-matches/${teamMatchId}/lineup` : undefined,
         onApply: getApplyAction({
           viewerState,
+          status: getStatus(query.data),
           selectedTeamId: selectedEligibility?.teamId,
           applicationId: selectedEligibility?.applicationId,
           eligible: selectedEligibility?.eligible,
@@ -674,6 +675,7 @@ async function shareTeamMatch(match: V1TeamMatch) {
 
 function getApplyAction({
   viewerState,
+  status,
   selectedTeamId,
   applicationId,
   eligible,
@@ -685,6 +687,7 @@ function getApplyAction({
   redirectTo,
 }: {
   viewerState: V1TeamMatchViewerState;
+  status: V1TeamMatchApiStatus;
   selectedTeamId?: string;
   applicationId?: string | null;
   eligible?: boolean;
@@ -695,7 +698,14 @@ function getApplyAction({
   reasonCode?: string;
   redirectTo: (href: string) => void;
 }): (() => Promise<unknown>) | undefined {
-  if ((viewerState === 'requested' || reasonCode === 'ALREADY_REQUESTED') && applicationId) return withdraw;
+  // 기존 신청 철회는 신규 신청 가능 여부와 별개다. 철회 대상을 찾지 못해도 다른 팀의
+  // 신규 신청이나 팀 생성 유도로 흘려보내지 않는다.
+  if (viewerState === 'requested' || reasonCode === 'ALREADY_REQUESTED') {
+    return applicationId ? withdraw : undefined;
+  }
+  // 서버의 displayState는 deadlineAt까지 반영한 유효 상태다. raw status가 recruiting으로
+  // 남아 있어도 displayState가 closed면 로그인·팀 생성·신규 신청을 모두 막는다.
+  if (status !== 'recruiting') return undefined;
   if (eligible && selectedTeamId) return () => apply(selectedTeamId);
   // 비인증: 로그인 페이지로 이동하되, 보던 팀매치 상세로 복귀하도록 redirect 전파 (Copilot)
   if (isGuest) return async () => { redirectTo(getLoginPathForRedirect(getCurrentRedirectPath())); };

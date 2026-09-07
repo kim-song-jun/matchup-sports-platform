@@ -92,7 +92,8 @@ describe('TeamMatchDetailPageClient — GA events', () => {
         placeName: '서울 풋살장',
         startsAt: '2026-08-01T10:00:00.000Z',
         capacityText: '1/2',
-        status: 'open',
+        // API 팀매치 상태의 신청 가능 값은 UI 카드 상태인 open이 아니라 recruiting이다.
+        status: 'recruiting',
         viewerState: 'none',
         hostTeam: { teamId: 'team-host', name: '호스트 팀' },
       },
@@ -162,6 +163,47 @@ describe('TeamMatchDetailPageClient — GA events', () => {
     expect(screen.getByTestId('team-match-status-label')).toHaveTextContent('상대팀 확정');
     expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 불가');
     expect(screen.queryByText('승인 완료')).not.toBeInTheDocument();
+  });
+});
+
+describe('TeamMatchDetailPageClient — effective application state', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1TeamMatchEligibilityMock.mockReturnValue({
+      data: {
+        teamMatchId: 'team-match-deadline-closed',
+        requiresApproval: true,
+        requiresPayment: false,
+        teams: [],
+      },
+      isSuccess: true,
+    });
+  });
+
+  it('does not redirect a teamless viewer when raw status is recruiting but displayState is closed', () => {
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-deadline-closed',
+        teamMatchId: 'team-match-deadline-closed',
+        title: '신청 마감된 팀매치',
+        sportName: '풋살',
+        placeName: '경기장',
+        startsAt: '2026-09-09T09:00:00.000Z',
+        deadlineAt: '2026-09-01T12:00:00.000Z',
+        status: 'recruiting',
+        displayState: 'closed',
+        viewer: { state: 'none', manageableHostTeam: false },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+        approvedOpponentTeam: null,
+      },
+      isError: false,
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId={'team-match-deadline-closed'} />);
+
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 불가');
+    expect(screen.queryByRole('button', { name: '상대팀 신청' })).not.toBeInTheDocument();
+    expect(routerPush).not.toHaveBeenCalledWith('/teams/new');
   });
 });
 

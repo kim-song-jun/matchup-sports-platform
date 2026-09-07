@@ -973,12 +973,23 @@ button:disabled {
  * 30% 라 규격에서 벗어난다. 47px 은 44px 터치 타깃과 HIG 최소 높이(30pt) 를 모두 넘는다.
  *
  * gap 은 0 이다 — 마크 아트워크가 자체 상하좌우 여백을 갖고 있어(HIG 가 그렇게 만들었다)
- * 버튼이 여백을 또 주면 사과가 글자에서 멀어진다. */
+ * 버튼이 여백을 또 주면 사과가 글자에서 멀어진다.
+ *
+ * 치수 세 줄만 `.tm-btn.tm-auth-apple` 로 두 클래스를 겹쳐 적는다. 한 클래스로 적으면
+ * .tm-btn-lg(이 파일 뒤쪽, 50px/15px/gap 8px)와 특이도가 같아 뒤에 선언된 쪽이 이긴다 —
+ * 값은 파일에 있는데 화면에는 30% 가 그대로 나왔다. 선언 위치를 뒤로 옮겨도 되지만
+ * 그러면 다음에 누가 규칙을 옮길 때 조용히 되돌아간다. 특이도로 이기면 순서와 무관하다. */
 .tm-auth-apple {
   background: var(--static-black);
   color: var(--static-white);
+}
+
+.tm-btn.tm-auth-apple {
   min-height: 47px;
   font-size: var(--font-size-subhead);
+  /* 20px 글자의 기본 line-height 가 상자를 48px 로 밀어 비율이 41.7% 가 된다. 높이를
+   * 마크(47px)와 min-height 가 정하도록 1 로 눕힌다 — 한 줄짜리 라벨이라 잘릴 일이 없다. */
+  line-height: 1;
   gap: 0;
 }
 

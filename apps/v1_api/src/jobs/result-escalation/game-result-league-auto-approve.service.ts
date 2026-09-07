@@ -46,6 +46,22 @@ type SubmittedRevisionRow = {
 export class GameResultLeagueAutoApproveService {
   readonly handler: GameOperationHandler = async (claim, tx) => {
     const revision = await this.lockRevision(tx, this.revisionId(claim.payload));
+    // **리그 결과는 자동 승인하지 않는다(A-3, 2026-09-06 사용자 확정).**
+    //
+    // 정본 §4 가 리그 결과를 "결과 보내기 → **어드민 확인** 한 단계" 로 못 박았다. 24시간
+    // 자동 승인은 그 어드민 확인을 **통째로 건너뛴다** — 이 레인이 하던 일이 정확히 그것이다.
+    //
+    // **에스컬레이션 핸들러의 게이트와 중복이 아니다. 둘은 서로 다른 것을 막는다:**
+    //   · 에스컬레이션 게이트 — 앞으로 **예약이 생기지 않게** 한다(재촉·상대팀 알림·SLA 큐 포함).
+    //   · 여기 게이트 — **이미 잡힌 예약이 발화해도 확정하지 않게** 한다.
+    // 앞의 것만 있으면, 배포 **전에** 이미 예약된 리그 경기는 24시간 뒤 그대로 공식화된다
+    // (배포 시점에 alpha 에 실제로 그런 행이 있었다). 그리고 그 행위는 **되돌리기 어렵다** —
+    // 어드민 확인 없이 공식 결과가 박힌다. 그래서 이 자리에는 이중 방어가 맞다.
+    // **하나를 중복으로 보고 지우지 마라.**
+    //
+    // 기존 행을 지우는 방식은 택하지 않았다 — alpha 데이터 변경은 사용자 승인 사항이고,
+    // 이 게이트가 있으면 **정리하지 않아도 안전**하다.
+    if (revision.leagueId !== null) return;
     if (revision.state !== 'SUBMITTED' || revision.leagueId === null) return;
     // 대진이 취소됐으면 그대로 no-op -- 형제 잡(league-result-entry-reminder.service.ts:61)과
     // 운영자 결과입력 경로(league-match-result-entry.service.ts:138-142)가 이미 갖고 있는

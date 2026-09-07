@@ -6,6 +6,8 @@ import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/g
 import type { GameActorScope, GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axis.fixture';
+import { GameResultSubmittedEscalationService } from '../../src/jobs/result-escalation/game-result-submitted-escalation.service';
+import type { GameOperationClaim } from '../../src/jobs/v1-game-operations-worker.service';
 
 /**
  * **리그 대진은 콘솔의 `end` 로 끝난다. 친선 팀매치는 여전히 못 끝낸다(결함 #29).**
@@ -28,10 +30,29 @@ const ids = {
   friendlyMatch: '96000000-0000-4000-8000-000000000041',
   draftMatch: '96000000-0000-4000-8000-000000000042',
   cancelledMatch: '96000000-0000-4000-8000-000000000043',
+  // 대조군: **대회 픽스처**. 같은 `deriveTournamentRevision` 을 지나지만 억제되면 안 된다.
+  tournamentFixture: '96000000-0000-4000-8000-000000000050',
 } as const;
 
 const prisma = new PrismaService();
 const service = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
+const escalation = new GameResultSubmittedEscalationService();
+
+/** 워커가 이 이벤트를 집었을 때와 같은 모양의 claim. */
+const escalationClaim = (revisionId: string, gameId: string): GameOperationClaim => ({
+  id: `outbox-${revisionId}`,
+  businessKey: `result-review:${revisionId}:GAME_RESULT_SUBMITTED`,
+  aggregateType: 'GAME',
+  aggregateId: gameId,
+  revisionId,
+  type: 'GAME_RESULT_SUBMITTED',
+  payload: { revisionId },
+  attempts: 0,
+  retryGeneration: 0,
+  version: 0,
+  leaseOwner: 'qa-owner',
+  leaseUntil: new Date(),
+});
 const authUser = (id: string) => ({
   id,
   email: `${id}@console-end.example.test`,
@@ -79,6 +100,8 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
   let friendlyGameId: string;
   let draftGameId: string;
   let cancelledGameId: string;
+  let fixtureGameId: string;
+  let fixtureEnd: EndOutcome;
   type EndOutcome = Outcome<Awaited<ReturnType<typeof service.executeCommand>>>;
   let leagueEnd: EndOutcome;
   let draftEnd: EndOutcome;
@@ -104,6 +127,46 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
       ),
     );
     return created.gameId;
+  };
+
+  const createFixtureGame = async (): Promise<string> => {
+    const input: GameSourceCreationInput = {
+      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceId: ids.tournamentFixture,
+      competitionConfigVersionId: configId,
+      sides: [
+        { sideKey: V1GameSideKey.HOME, teamId: ids.homeTeam, displayNameSnapshot: '대조군 홈' },
+        { sideKey: V1GameSideKey.AWAY, teamId: ids.awayTeam, displayNameSnapshot: '대조군 원정' },
+      ],
+      participants: [],
+    };
+    const created = await prisma.$transaction((tx) =>
+      service.createFromSourceInTransaction(
+        tx,
+        input,
+        sourceContext({ actorType: 'USER', actorUserId: ids.admin, role: 'platform_ops' }, 'console-end-src-fixture', input),
+      ),
+    );
+    return created.gameId;
+  };
+
+  /**
+   * 대회 픽스처 커맨드는 **실제 takeover 토큰**이 필요하다(팀매치는 그 요구가 early-return
+   * 이라 아무 문자열이나 통과한다 — 그 차이 자체가 계약이다).
+   */
+  const runFixture = async (command: 'start' | 'end', commandId: string) => {
+    const { takeoverToken } = await service.requestTakeover(authUser(ids.admin), fixtureGameId, {
+      clientInstanceId: 'console-end-fixture-client',
+      lastSequence: 0,
+    });
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: fixtureGameId } });
+    return service.executeCommand(authUser(ids.admin), fixtureGameId, command, commandId, {
+      expectedVersion: game.version,
+      clientCommandId: commandId,
+      takeoverToken,
+      occurredAt: new Date().toISOString(),
+      payload: {},
+    });
   };
 
   const run = async (gameId: string, command: 'start' | 'end', commandId: string) => {
@@ -206,6 +269,18 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     friendlyGameId = await createGame(ids.friendlyMatch, 'console-end-src-friendly');
     draftGameId = await createGame(ids.draftMatch, 'console-end-src-draft');
     cancelledGameId = await createGame(ids.cancelledMatch, 'console-end-src-cancelled');
+
+    // 대조군 — 리그 거울(`league.id`)이 곧 `V1Tournament` 이므로 그 아래 픽스처를 만든다.
+    await prisma.v1TournamentFixture.create({
+      data: {
+        id: ids.tournamentFixture,
+        tournamentId: league.id,
+        round: 'group',
+        fixtureNumber: 1,
+        competitionConfigVersionId: configId,
+      },
+    });
+    fixtureGameId = await createFixtureGame();
     // **초안을 미리 심는다(#31).** 호스트 팀장이 `createResultRevision` 으로 만들 수 있는
     // 상태다 — 그 경로엔 게임 상태 게이트가 없다. 예전 코드는 `revision: 1` 리터럴이라
     // 이 상태에서 `end` 가 P2002 로 죽고, 그게 409 "reload and retry" 로 번역됐다.
@@ -247,6 +322,9 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
       data: { status: 'cancelled', cancelledAt: new Date() },
     });
     cancelledEnd = await capture(() => run(cancelledGameId, 'end', 'console-end-cancelled-end'));
+
+    await runFixture('start', 'console-end-fixture-start');
+    fixtureEnd = await capture(() => runFixture('end', 'console-end-fixture-end'));
   });
 
   afterAll(async () => {
@@ -335,6 +413,47 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     // 완료 처리만 막히고 **리비전은 그대로 생긴다**(그러면 자동 승인 레인에 그대로 들어간다).
     const revisions = await prisma.v1GameResultRevision.count({ where: { gameId: cancelledGameId } });
     expect(revisions).toBe(0);
+  });
+
+  it('리그 콘솔 결과를 에스컬레이션 핸들러에 태우면 아무것도 안 만든다 (A-3)', async () => {
+    // **이벤트는 그대로 발행된다** — 억제는 생산자가 아니라 **핸들러**에서 한다. 생산자는
+    // 넷(콘솔 end · 팀 제출 · 어드민 정정 재제출 · 어시스트 동기화)이라 각각 막으면 하나가
+    // 조용히 빠지고, 실제로 어드민 정정 재제출은 리그에서 정상 도달 가능한 동선이다.
+    //
+    // 그래서 여기서는 **실제로 만들어진 이벤트를 핸들러에 태워** 아무 행도 안 생기는지 본다.
+    const revisionId = (
+      await prisma.v1GameResultRevision.findFirstOrThrow({
+        where: { gameId: leagueGameId },
+        orderBy: { revision: 'desc' },
+        select: { id: true },
+      })
+    ).id;
+    const before = await prisma.v1OutboxEvent.count({ where: { aggregateId: leagueGameId } });
+    await prisma.$transaction((tx) => escalation.handler(escalationClaim(revisionId, leagueGameId), tx));
+    const after = await prisma.v1OutboxEvent.count({ where: { aggregateId: leagueGameId } });
+    // 예약 아웃박스(24h 자동승인 · 12h 재촉)가 **하나도 안 늘어야** 한다.
+    expect(after).toBe(before);
+    const queued = await prisma.$queryRaw<Array<{ n: bigint }>>`
+      SELECT COUNT(*)::bigint AS n FROM v1_result_escalations WHERE result_revision_id = ${revisionId}
+    `;
+    expect(Number(queued[0]?.n ?? 0)).toBe(0);
+  });
+
+  it('대회 픽스처는 같은 핸들러에서 그대로 만든다 (A-3 대조군)', async () => {
+    // 억제가 너무 넓으면 **대회 운영이 조용히 멈춘다** — 화면에 안 보이는 종류라 아무도 모른다.
+    expect(fixtureEnd.ok && fixtureEnd.value.state).toBe(V1GameState.ENDED);
+    const revisionId = (
+      await prisma.v1GameResultRevision.findFirstOrThrow({
+        where: { gameId: fixtureGameId },
+        orderBy: { revision: 'desc' },
+        select: { id: true },
+      })
+    ).id;
+    await prisma.$transaction((tx) => escalation.handler(escalationClaim(revisionId, fixtureGameId), tx));
+    const queued = await prisma.$queryRaw<Array<{ n: bigint }>>`
+      SELECT COUNT(*)::bigint AS n FROM v1_result_escalations WHERE result_revision_id = ${revisionId}
+    `;
+    expect(Number(queued[0]?.n ?? 0)).toBeGreaterThan(0);
   });
 
   it('친선 팀매치는 여전히 콘솔로 끝낼 수 없다 (409) — 이 가드가 지키던 것', () => {

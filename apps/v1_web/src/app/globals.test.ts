@@ -503,10 +503,32 @@ describe('데스크톱(≥1024) 틴트 지면 위 보조 텍스트', () => {
   });
 
   it('데스크톱 채팅 스레드 창은 보조 텍스트 토큰을 올린다', () => {
-    const rule = chatCss.match(/^\.tm-chat-desktop-thread-pane\s*\{([^}]*)\}/m)?.[1];
+    // 이 셀렉터는 파일에 두 번 나온다 — 세 창 공용 레이아웃 규칙의 마지막 줄과,
+    // 이 창 전용 토큰 규칙. 줄 시작(^)으로 찾으면 앞의 것이 잡히므로 규칙 단위로
+    // 쪼개서 **셀렉터가 이것 하나뿐인** 규칙을 고른다.
+    const stripped = chatCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    const own = [...stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(
+      ([, sel]) => sel.trim() === '.tm-chat-desktop-thread-pane',
+    );
 
-    expect(rule, '.tm-chat-desktop-thread-pane 규칙을 찾지 못했다').toBeDefined();
-    expect(rule).toMatch(/--text-caption:\s*var\(--grey700\)/);
-    expect(rule).toMatch(/--text-muted:\s*var\(--grey700\)/);
+    expect(own, '.tm-chat-desktop-thread-pane 단독 규칙을 찾지 못했다').toBeDefined();
+    expect(own![2]).toMatch(/--text-caption:\s*var\(--grey700\)/);
+    expect(own![2]).toMatch(/--text-muted:\s*var\(--grey700\)/);
+  });
+
+  // 이 검사는 실제 사고에서 나왔다(#1110 Copilot). 토큰 override 를 넣으면서
+  // `.tm-chat-mobile-pane, .tm-chat-desktop-workspace, .tm-chat-desktop-thread-pane`
+  // 라는 **세 셀렉터 목록의 마지막 줄 앞에** 새 규칙을 끼워 넣는 바람에, 앞의 두
+  // 셀렉터가 `display: contents` 를 잃고 대신 토큰 override 를 받았다. 모바일 채팅
+  // 레이아웃이 깨지는 회귀인데 tsc·기존 테스트 어느 것도 잡지 못했다.
+  it('세 창의 display: contents 목록이 쪼개지지 않았다', () => {
+    const rule = chatCss.match(
+      /\.tm-chat-mobile-pane,\s*\.tm-chat-desktop-workspace,\s*\.tm-chat-desktop-thread-pane\s*\{([^}]*)\}/,
+    )?.[1];
+
+    expect(rule, '세 셀렉터가 한 규칙에 함께 있지 않다 — 목록이 쪼개졌을 수 있다').toBeDefined();
+    expect(rule).toMatch(/display:\s*contents/);
+    // 그 규칙에 토큰을 얹으면 모바일 창까지 바뀐다 — 지면이 grey50 인 것은 스레드 창뿐이다.
+    expect(rule).not.toMatch(/--text-caption|--text-muted/);
   });
 });

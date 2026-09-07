@@ -71,9 +71,8 @@ export function resolveOwnTeamId(
 /** 편집기 안에서 다루는 한 명분 엔트리. `userId`가 없으면 비연동 게스트(D-03) —
  * 개인 기록에는 반영되지 않고 팀 집계에만 잡히는 스냅샷이다. */
 export type LineupEntryDraft = {
-  /** React key + 중복 배치 판정용 안정적 로컬 식별자. userId와는 별개다 — 저장된 라인업을
-   * GET으로 다시 불러오면 서버가 userId를 되돌려주지 않기 때문에(참가자 스냅샷은
-   * displayName만 보관, Task 14 계약) 재수화된 엔트리는 key만 있고 userId는 null이다. */
+  /** React key + 중복 배치 판정용 안정적 로컬 식별자. userId와는 별개다 — 게스트 엔트리는
+   * 애초에 userId가 없고, 같은 사람을 두 번 배치했는지 같은 판정은 로컬 키로 한다. */
   key: string;
   userId: string | null;
   displayName: string;
@@ -142,10 +141,13 @@ export function createEmptyLineupEditorState(baseRevision: number): LineupEditor
 }
 
 /** GET 응답으로부터 편집기 상태를 새로 만든다 — 페이지 최초 진입, 그리고 버전 충돌 시
- * "새로고침" 액션(applyVersionConflictReload) 둘 다 이 함수를 거친다. 서버가 돌려주는
- * starters/bench는 displayName 스냅샷뿐이라 userId는 전부 null로 재수화된다(위 LineupEntryDraft
- * 주석 참고) — 그래서 그대로 재저장하면 링크가 사라지는 게 아니라, 애초에 저장 시점에
- * 링크 여부를 다시 선택해야 하는 게 이 계약의 정직한 동작이다.
+ * "새로고침" 액션(applyVersionConflictReload) 둘 다 이 함수를 거친다.
+ *
+ * **`userId`를 그대로 이어받는다.** 서버는 예전부터 참가자의 `userId`를 실어 보냈는데
+ * (`team-match-lineup.service.ts`의 라인업 조회 매퍼) 응답 타입에 그 칸이 없어 화면이
+ * 쓰지 못했다 — 그래서 다시 불러오면 연동 선수가 전부 이름뿐인 게스트로 재수화됐고,
+ * 그대로 저장하면 **연결이 조용히 끊겼다**. 연결이 끊기면 개인 기록·상호평가·징계
+ * 추적이 그 사람을 못 찾는다.
  */
 export function hydrateLineupEditorState(lineup: V1TeamMatchLineup): LineupEditorState {
   // 서버는 아직 `starters`/`bench` 로 내려준다(응답 계약은 이 태스크가 바꾸지 않는다) —
@@ -156,6 +158,7 @@ export function hydrateLineupEditorState(lineup: V1TeamMatchLineup): LineupEdito
     participants: [
       ...lineup.starters.map((starter) =>
         makeEntry({
+          userId: starter.userId,
           displayName: starter.displayName,
           jerseyNumber: starter.jerseyNumber,
           goalkeeper: starter.goalkeeper,
@@ -177,19 +180,13 @@ export function hydrateLineupEditorState(lineup: V1TeamMatchLineup): LineupEdito
 
 /** 엔트리 하나가 이 로스터 멤버를 가리키는지 판정한다.
  *
- * - `entry.userId`가 있으면(이번 세션에서 방금 추가한 엔트리) userId를 그대로 비교한다 —
- *   가장 정확한 신호.
- * - `entry.userId`가 null이면(서버에서 막 재수화된 엔트리 — GET은 displayName 스냅샷만
- *   돌려주고 userId를 절대 echo하지 않는다, Task 14 계약) 유일하게 남은 신호인 displayName
- *   완전 일치로 대체한다. 이게 없으면 페이지를 새로 열 때마다(또는 409 "새로고침" 후)
- *   이미 배치된 팀원이 다시 "추가 가능"으로 보여서 같은 사람이 두 번 배치될 수 있었다
- *   (Task 15 blocker-1) — DB에 userId를 저장하려면 `V1GameParticipant`에 컬럼을 추가하는
- *   마이그레이션이 필요한데 이번 변경 범위에서는 마이그레이션을 추가할 수 없어(hard
- *   constraint) 프론트가 이미 갖고 있는 로스터 정보로 정체성을 최대한 복구하는 쪽을 택했다.
- *   한계: 같은 팀 로스터 안에 표시 이름이 완전히 같은 서로 다른 두 사람이 있으면(또는
- *   재수화 시점 이후 별명을 바꾼 경우) 이 휴리스틱은 둘을 구분하지 못하고 보수적으로
- *   "이미 배치됨"으로 묶는다 — 실제로 다른 사람을 추가하지 못하게 막는 오탐이 생길 수
- *   있지만, 이 코드가 고치는 결함(같은 사람이 중복 등록되는 것)보다는 안전한 방향이다.
+ * - `entry.userId`가 있으면 userId를 그대로 비교한다 — 가장 정확한 신호이고, **재수화된
+ *   엔트리도 이제 여기 해당한다**(hydrateLineupEditorState가 서버의 userId를 이어받는다).
+ * - `entry.userId`가 null인 것은 **실제 비연동 게스트**뿐이다. 게스트는 플랫폼 계정이
+ *   없어 이름이 정체성의 전부라, 유일하게 남은 신호인 displayName 완전 일치로 대체한다.
+ *   한계: 팀원과 이름이 완전히 같은 게스트를 넣어 두면 그 팀원이 "이미 배치됨"으로
+ *   묶여 다시 추가되지 않는다 — 같은 사람이 두 번 등록되는 것(Task 15 blocker-1)보다는
+ *   안전한 방향이라 그대로 둔다.
  */
 function matchesRosterMember(entry: LineupEntryDraft, member: RosterOption): boolean {
   if (entry.userId !== null) return entry.userId === member.userId;

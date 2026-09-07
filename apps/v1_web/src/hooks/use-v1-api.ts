@@ -1747,43 +1747,6 @@ export function useV1SaveTeamMatchLineup(teamMatchId: string) {
   });
 }
 
-// ── 대회 경기(tournament fixture) 라인업 — 참가팀 자기 서비스 ──
-// team-match와 달리 범용 games 라우트(/games/:gameId/lineups/*)를 그대로 쓴다 —
-// resolveActor의 TOURNAMENT_FIXTURE 팀 액터 분기(games.service.ts)가 참가팀
-// owner/manager만 자기 사이드에 read/write 하도록 이미 인가를 강제한다.
-
-export type V1FixtureLineupAccess = {
-  gameId: string;
-  mySideId: string | null;
-  isStaff: boolean;
-  /**
-   * F61/F62 fix: `isStaff`는 SUPPORT_READONLY(조회 전용)와 실제 저장 권한이 있는
-   * 스태프(field_operator/tournament_director/platform_ops)를 구분하지 못했다 — 그
-   * 결과 조회 전용 스태프도 매니저와 동일한 편집기를 받았다가 저장 시점에야 서버
-   * 403으로 걸러졌다. 서버가 실제 lineup_mutate 인가 판정을 그대로 내려준다
-   * (mySideId가 있는 팀 매니저/오너도 true).
-   */
-  canMutateLineup: boolean;
-  scheduledAt: string | null;
-  homeSideId: string | null;
-  homeTeamName: string | null;
-  homeRegistrationId: string | null;
-  /** 팀 스코프 자산(이전 라인업 히스토리·프리셋)을 부를 때 쓴다. */
-  homeTeamId: string | null;
-  awaySideId: string | null;
-  awayTeamName: string | null;
-  awayRegistrationId: string | null;
-  awayTeamId: string | null;
-};
-
-export function useV1FixtureLineupAccess(tournamentId: string, fixtureId: string, options?: { enabled?: boolean }) {
-  return useQuery({
-    queryKey: v1Keys.fixtureLineupAccess(tournamentId, fixtureId),
-    queryFn: () => v1Get<V1FixtureLineupAccess>(`/tournaments/${tournamentId}/fixtures/${fixtureId}/lineup-access`),
-    enabled: Boolean(tournamentId) && Boolean(fixtureId) && (options?.enabled ?? true),
-    retry: false,
-  });
-}
 
 /**
  * "이 기록은 제 것입니다" 화면용 미연결 참가자 목록 (Task 154 P0-5).

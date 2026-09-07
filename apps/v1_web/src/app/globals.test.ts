@@ -583,3 +583,21 @@ describe('인라인으로 지면 색을 까는 곳의 보조 텍스트 (.tm-on-t
     for (const tag of tinted) expect(tag).toContain('tm-on-tint');
   });
 });
+
+describe('데스크톱 검색 화면의 틴트 지면', () => {
+  // 모바일에서는 지면이 흰색이라 문제가 없고, 데스크톱에서만 --grey50 이 깔린다.
+  // 그래서 처방도 배경을 주는 그 미디어 쿼리 안 규칙에 둔다(alpha 1440 실측 4.42:1).
+  const searchCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/search.css'), 'utf8');
+
+  it.each([
+    ['.tm-search-panel-col', /\.tm-search-panel-col\s*\{([^}]*background:\s*var\(--grey50\)[^}]*)\}/],
+    ['.tm-search-results-col .tm-empty-state', /\.tm-search-results-col \.tm-empty-state\s*\{([^}]*)\}/],
+  ])('%s 는 배경을 까는 규칙 안에서 토큰을 올린다', (_name, pattern) => {
+    const rule = searchCss.match(pattern)?.[1];
+
+    expect(rule, '배경을 까는 규칙을 찾지 못했다').toBeDefined();
+    expect(rule).toMatch(/background:\s*var\(--grey50\)/);
+    expect(rule).toMatch(/--text-caption:\s*var\(--grey700\)/);
+    expect(rule).toMatch(/--text-muted:\s*var\(--grey700\)/);
+  });
+});

@@ -259,6 +259,24 @@ describe('Task 8 game-operations realtime protocol', () => {
         reason: 'SESSION_NOT_AUTHENTICATED',
       }),
     );
+
+    // 재시도 경로도 같은 계약이다 — 큐는 거부당한 항목을 이쪽으로 다시 밀어 넣는다.
+    const retryResult = await task8Gateway(gateway).retryGameEvent(client, {
+      gameId: GAME_ID,
+      rebasedExpectedVersion: 4,
+      clientEventId: 'event-denied',
+      takeoverToken: 'nonempty-takeover-token',
+      payloadHash: 'sha256:stable-payload',
+      event: { type: 'SCORE', period: 1, clockMs: 12_000, occurredAt: '2026-08-01T10:00:00.000Z', payload: {} },
+    });
+
+    expect(retryResult).toEqual(
+      expect.objectContaining({
+        status: 'error',
+        code: 'STAFF_SCOPE_DENIED',
+        reason: 'SESSION_NOT_AUTHENTICATED',
+      }),
+    );
   });
 
   /**

@@ -236,6 +236,12 @@ type GameProtocolResult =
       readonly code: string;
       readonly clientEventId?: string;
       readonly expectedVersion?: number;
+      /**
+       * 거부 원인. 큐가 재시도할지(재접속하면 풀린다) 포기할지(권한이 없다)를
+       * 가르는 값이라, 구독·takeover ack 에만 실으면 정작 큐가 가장 자주 만나는
+       * 이 경로에서 값을 못 받는다.
+       */
+      readonly reason?: StaffDenialReason;
       /** `VALIDATION_ERROR`에서만 채워진다. */
       readonly validation?: FieldValidationFailure;
     };
@@ -524,6 +530,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         client,
         {
           code: 'STAFF_SCOPE_DENIED',
+          reason: 'SESSION_NOT_AUTHENTICATED',
           clientEventId: input.clientEventId,
           expectedVersion: input.expectedVersion,
         },
@@ -566,6 +573,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         client,
         {
           code: 'STAFF_SCOPE_DENIED',
+          reason: 'SESSION_NOT_AUTHENTICATED',
           clientEventId: input.clientEventId,
           expectedVersion: input.rebasedExpectedVersion,
         },

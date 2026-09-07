@@ -392,9 +392,14 @@ checkLiteralBaseline({
   baselinePath: 'scripts/tint-marker-baseline.json',
   count: (txt) => {
     const TINT = /background(?:Color)?:\s*(?:'|"|`)?var\(--(?:tint-(?:blue|grey|green|orange|red)|blue50|grey50|grey100|red50|surface-soft)\)/;
+    // **className 값 안에서** 단어 경계로 찾는다. 단순 문자열 포함으로 보면 태그 안
+    // 주석이나 data-* 속성에 이름만 스쳐도 "붙어 있다"고 오인한다 — 이 저장소는 실제로
+    // 태그 안에 `// … (globals.css .tm-on-tint)` 같은 주석을 달고 있어 그대로 뚫린다.
+    // globals.test.ts 의 검사와 같은 방식이다.
+    const MARKED = /className=(?:"[^"]*\btm-on-tint\b|'[^']*\btm-on-tint\b|\{[^}]*\btm-on-tint\b)/;
     // 여는 태그 단위로 본다 — 배경과 className 이 같은 태그 안에 있어야 처방이 닿는다.
     const tags = txt.match(/<[A-Za-z][A-Za-z0-9]*\b[^>]*?>/gs) || [];
-    return tags.filter((tag) => TINT.test(tag) && !tag.includes('tm-on-tint')).length;
+    return tags.filter((tag) => TINT.test(tag) && !MARKED.test(tag)).length;
   },
   hint: '인라인으로 지면 색을 깔면 같은 태그에 className="tm-on-tint" 를 함께 붙일 것 (globals.css .tm-on-tint)',
 });

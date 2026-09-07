@@ -6,12 +6,12 @@ import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-u
 import type { SponsorForm } from './tournament-sponsors-admin-model';
 
 const inputCls = [
-  'h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[13px] text-[var(--text-strong)]',
+  'h-[44px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-label)] text-[var(--text-strong)]',
   'outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:ring-2',
   'focus:ring-blue-100 disabled:bg-[var(--surface-soft)] disabled:text-gray-400',
 ].join(' ');
 const textareaCls = [
-  'min-h-[88px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-3 text-[13px] text-[var(--text-strong)]',
+  'min-h-[88px] rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-3 text-[length:var(--font-size-label)] text-[var(--text-strong)]',
   'outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-blue-500 focus:ring-2',
   'focus:ring-blue-100 disabled:bg-[var(--surface-soft)] disabled:text-gray-400',
 ].join(' ');
@@ -21,12 +21,12 @@ const textareaCls = [
 // 덮어써 마지막 것만 남는다(Copilot) — 필요한 프로퍼티를 한 유틸에 전부 나열한다.
 const primaryBtnCls = [
   'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-blue-500 px-4',
-  'text-[13px] font-semibold text-white transition-[color,background-color,border-color,transform] hover:bg-blue-600 active:scale-[0.98]',
+  'text-[length:var(--font-size-label)] font-semibold text-white transition-[color,background-color,border-color,transform] hover:bg-blue-600 active:scale-[0.98]',
   'disabled:cursor-not-allowed disabled:opacity-50',
 ].join(' ');
 const secondaryBtnCls = [
   'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-[var(--border)]',
-  'bg-[var(--card-surface)] px-4 text-[13px] font-semibold text-[var(--text-body)] transition-[color,background-color,border-color,transform] hover:bg-[var(--surface-soft)]',
+  'bg-[var(--card-surface)] px-4 text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)] transition-[color,background-color,border-color,transform] hover:bg-[var(--surface-soft)]',
   'active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
 ].join(' ');
 
@@ -55,7 +55,7 @@ export function TournamentSponsorForm({
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] px-5 py-5">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-[15px] font-bold text-[var(--text-strong)]">
+          <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">
             {mode === 'update' ? '협찬 정보 수정' : '협찬 정보 추가'}
           </h3>
           <p className="mt-1 text-xs text-[var(--text-muted)]">
@@ -210,7 +210,7 @@ export function TournamentSponsorForm({
           />
         </Field>
 
-        <label className="inline-flex items-center gap-2 text-[13px] font-medium text-[var(--text-body)]">
+        <label className="inline-flex items-center gap-2 text-[length:var(--font-size-label)] font-medium text-[var(--text-body)]">
           <input
             type="checkbox"
             checked={form.isActive}
@@ -247,7 +247,7 @@ function Field({
   readonly children: ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-2 text-[13px] text-[var(--text-strong)]">
+    <label className="flex flex-col gap-2 text-[length:var(--font-size-label)] text-[var(--text-strong)]">
       <span>
         {label}
         {required ? (

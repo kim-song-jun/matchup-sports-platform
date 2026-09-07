@@ -83,7 +83,7 @@ export default function AdminMatchDetailPage() {
                   <Users size={16} aria-hidden="true" />
                   매치
                 </div>
-                <h2 className="mt-2 break-words text-[22px] font-bold text-[var(--text-strong)]">{match.title}</h2>
+                <h2 className="mt-2 break-words text-[length:var(--font-size-subhead)] font-bold text-[var(--text-strong)]">{match.title}</h2>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">{match.sportName} · {match.placeName}</p>
               </div>
               <AdminStatusPill status={match.status} />
@@ -102,7 +102,7 @@ export default function AdminMatchDetailPage() {
           </article>
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="매치 소개">
-            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">소개</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">소개</h2>
             {match.description?.trim() ? (
               <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--text-body)]">
                 {match.description}
@@ -117,7 +117,7 @@ export default function AdminMatchDetailPage() {
 
         <aside className="flex flex-col gap-4" aria-label="매치 운영 요약">
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">운영 요약</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">운영 요약</h2>
             <dl className="mt-4 grid gap-3">
               <AdminSummaryItem icon={<Users size={16} />} label="참가 인원" value={`${match.participantCount}/${match.maxParticipants}명`} />
               <AdminSummaryItem icon={<UserRound size={16} />} label="신청" value={`${match.applicationCount}건`} />
@@ -128,7 +128,7 @@ export default function AdminMatchDetailPage() {
           </section>
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">호스트</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">호스트</h2>
             <dl className="mt-4 grid gap-3">
               <AdminSummaryItem icon={<UserRound size={16} />} label="이름" value={match.hostName} />
             </dl>

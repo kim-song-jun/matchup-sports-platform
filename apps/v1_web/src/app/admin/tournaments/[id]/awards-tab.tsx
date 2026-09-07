@@ -140,8 +140,8 @@ export function AwardsTab({
     <div className="tm-content-enter p-4">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-[15px] font-bold text-[var(--text-strong)]">개인 어워드</h3>
-          <p className="text-[12px] text-[var(--text-muted)] mt-0.5">MVP, 득점왕 등 개인 수상자를 입력하세요. 사용자 페이지(시상·리뷰)에 표시돼요.</p>
+          <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">개인 어워드</h3>
+          <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-0.5">MVP, 득점왕 등 개인 수상자를 입력하세요. 사용자 페이지(시상·리뷰)에 표시돼요.</p>
         </div>
         {canWrite && (
           <button type="button" onClick={addRow} className="inline-flex items-center text-xs text-[var(--blue700)] font-semibold px-3 min-h-[36px] rounded-lg border border-[var(--tint-blue-border)] hover:bg-[var(--blue50)]">+ 항목 추가</button>
@@ -161,8 +161,8 @@ export function AwardsTab({
       <div className="flex flex-col gap-3">
         {loaded && rows.length === 0 && (
           <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-5 text-center">
-            <p className="text-[13px] font-semibold text-[var(--text-strong)]">등록된 개인 어워드가 없어요.</p>
-            <p className="mt-1 text-[12px] text-[var(--text-muted)]">
+            <p className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)]">등록된 개인 어워드가 없어요.</p>
+            <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
               {canWrite ? '필요한 어워드만 항목 추가로 등록해 주세요.' : '아직 등록된 시상 내역이 없어요.'}
             </p>
           </div>
@@ -188,7 +188,7 @@ export function AwardsTab({
             type="button"
             onClick={handleSave}
             disabled={setAwards.isPending}
-            className="w-full h-[44px] inline-flex items-center justify-center bg-blue-600 text-white font-semibold rounded-xl text-[13px] disabled:opacity-50 hover:bg-blue-700 transition-colors"
+            className="w-full h-[44px] inline-flex items-center justify-center bg-blue-600 text-white font-semibold rounded-xl text-[length:var(--font-size-label)] disabled:opacity-50 hover:bg-blue-700 transition-colors"
           >
             {setAwards.isPending ? '저장 중...' : '어워드 저장'}
           </button>
@@ -214,7 +214,7 @@ function AwardRowReadOnly({ row }: { readonly row: AwardForm }) {
           <TournamentAwardIcon iconKey={row.iconKey} />
         </span>
         <div className="min-w-0">
-          <p className="text-[13px] font-bold text-[var(--text-strong)] truncate">{row.awardLabel}</p>
+          <p className="text-[length:var(--font-size-label)] font-bold text-[var(--text-strong)] truncate">{row.awardLabel}</p>
           <p className="mt-0.5 text-xs text-[var(--text-muted)] truncate">
             {row.recipientName}
             {row.teamName ? ` · ${row.teamName}` : ''}
@@ -273,7 +273,7 @@ function AwardRow({
           value={row.awardLabel}
           onChange={(e) => update(idx, 'awardLabel', e.target.value)}
           placeholder="어워드명 (예: MVP)"
-          className="flex-1 text-[13px] font-semibold border-0 bg-[var(--surface-soft)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="flex-1 text-[length:var(--font-size-label)] font-semibold border-0 bg-[var(--surface-soft)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
         {/* 파괴적 동작이므로 손가락으로 정확히 누를 수 있어야 한다 — 히트 영역 44px. */}
         <button type="button" onClick={() => removeRow(idx)} className="text-[var(--text-muted)] hover:text-red-500 inline-flex items-center justify-center min-h-11 min-w-11 shrink-0" aria-label="항목 삭제"><X size={16} /></button>
@@ -288,7 +288,7 @@ function AwardRow({
             id={`award-icon-${idx}`}
             value={row.iconKey}
             onChange={(event) => update(idx, 'iconKey', event.target.value)}
-            className="h-11 flex-1 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[13px] text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="h-11 flex-1 rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-label)] text-[var(--text-strong)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
           >
             {TOURNAMENT_AWARD_ICON_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>

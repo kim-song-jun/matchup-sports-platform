@@ -88,8 +88,8 @@ export function ReviewsTab({
   return (
     <div className="tm-content-enter p-4">
       <div className="mb-4">
-        <h3 className="text-[15px] font-bold text-[var(--text-strong)]">리뷰 관리</h3>
-        <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
+        <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">리뷰 관리</h3>
+        <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-0.5">
           부적절한 리뷰를 숨기거나 다시 공개할 수 있어요. 숨긴 리뷰는 사용자 화면에서 보이지 않아요.
         </p>
       </div>
@@ -118,12 +118,12 @@ export function ReviewsTab({
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="작성자, 팀명, 후기 내용으로 검색"
-            className="w-full h-[44px] pl-9 pr-3 text-[13px] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
+            className="w-full h-[44px] pl-9 pr-3 text-[length:var(--font-size-label)] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors"
           />
         </div>
         <button
           type="submit"
-          className="h-[44px] px-4 inline-flex items-center justify-center bg-[var(--surface-soft)] text-[var(--text-body)] text-[13px] font-semibold rounded-xl hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          className="h-[44px] px-4 inline-flex items-center justify-center bg-[var(--surface-soft)] text-[var(--text-body)] text-[length:var(--font-size-label)] font-semibold rounded-xl hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
         >
           검색
         </button>
@@ -165,7 +165,7 @@ export function ReviewsTab({
         </div>
       ) : (
         <>
-          <p className="text-[12px] text-[var(--text-muted)] mb-2">총 {total}개</p>
+          <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mb-2">총 {total}개</p>
           <div className="flex flex-col gap-3" style={{ opacity: isFetching ? 0.6 : 1 }}>
             {reviews.map((review) => (
               <ReviewModerationCard
@@ -202,11 +202,11 @@ export function ReviewsTab({
         pending={hideReview.isPending}
       >
         <div className="flex flex-col gap-3">
-          <p className="text-[13px] text-[var(--text-muted)]">
+          <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">
             이 리뷰를 사용자에게 숨길까요? 숨긴 리뷰는 관리자만 볼 수 있어요.
           </p>
           <div className="flex flex-col gap-2">
-            <label htmlFor="hide-reason" className="text-[13px] text-[var(--text-strong)]">숨김 사유 (선택)</label>
+            <label htmlFor="hide-reason" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">숨김 사유 (선택)</label>
             <textarea
               id="hide-reason"
               value={hideReason}
@@ -224,7 +224,7 @@ export function ReviewsTab({
               type="button"
               onClick={closeHideModal}
               disabled={hideReview.isPending}
-              className="flex-1 h-[44px] rounded-xl text-[13px] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               취소
             </button>
@@ -232,7 +232,7 @@ export function ReviewsTab({
               type="button"
               onClick={handleHideConfirm}
               disabled={hideReview.isPending}
-              className="flex-1 h-[44px] rounded-xl text-[13px] font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               {hideReview.isPending ? '처리 중...' : '숨기기'}
             </button>
@@ -283,16 +283,16 @@ function ReviewModerationCard({
         ) : (
           <div
             aria-hidden="true"
-            className="w-9 h-9 rounded-full bg-[var(--grey300)] text-[var(--text-muted)] text-[13px] font-semibold flex items-center justify-center shrink-0"
+            className="w-9 h-9 rounded-full bg-[var(--grey300)] text-[var(--text-muted)] text-[length:var(--font-size-label)] font-semibold flex items-center justify-center shrink-0"
           >
             {letter}
           </div>
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-[13px] font-semibold text-[var(--text-strong)] truncate">{review.authorNickname}</p>
+            <p className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] truncate">{review.authorNickname}</p>
             {review.teamName && (
-              <span className="text-[12px] text-[var(--text-muted)] truncate">· {review.teamName}</span>
+              <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] truncate">· {review.teamName}</span>
             )}
             {isHidden && (
               <span className="inline-flex items-center h-5 px-2 rounded-full bg-[var(--card-surface)] border border-[var(--border)] text-[var(--text-muted)] text-[length:var(--font-size-caption)] font-semibold">
@@ -317,7 +317,7 @@ function ReviewModerationCard({
       </div>
 
       {review.comment && (
-        <p className="text-[13px] text-[var(--text-body)] mt-3 leading-relaxed whitespace-pre-wrap break-words">
+        <p className="text-[length:var(--font-size-label)] text-[var(--text-body)] mt-3 leading-relaxed whitespace-pre-wrap break-words">
           {review.comment}
         </p>
       )}
@@ -346,7 +346,7 @@ function ReviewModerationCard({
       )}
 
       {isHidden && review.hiddenReason && (
-        <p className="text-[12px] text-[var(--text-muted)] mt-3 bg-[var(--card-surface)] border border-[var(--border)] rounded-lg px-3 py-2">
+        <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-3 bg-[var(--card-surface)] border border-[var(--border)] rounded-lg px-3 py-2">
           숨김 사유: {review.hiddenReason}
         </p>
       )}
@@ -358,7 +358,7 @@ function ReviewModerationCard({
               type="button"
               onClick={onUnhide}
               disabled={unhidePending}
-              className="w-full h-[44px] rounded-xl text-[13px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="w-full h-[44px] rounded-xl text-[length:var(--font-size-label)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               {unhidePending ? '처리 중...' : '공개로 전환'}
             </button>
@@ -366,7 +366,7 @@ function ReviewModerationCard({
             <button
               type="button"
               onClick={onHide}
-              className="w-full h-[44px] rounded-xl text-[13px] font-semibold text-[var(--red700)] bg-[var(--red50)] hover:bg-[var(--red100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="w-full h-[44px] rounded-xl text-[length:var(--font-size-label)] font-semibold text-[var(--red700)] bg-[var(--red50)] hover:bg-[var(--red100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               숨기기
             </button>

@@ -1248,7 +1248,7 @@ function RemoveTeamConfirmModal({
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <h2
             id="remove-team-confirm-title"
-            className="text-[16px] font-bold text-[var(--text-strong)] flex items-center gap-2"
+            className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)] flex items-center gap-2"
           >
             <AlertTriangle size={17} className="text-[var(--orange700)]" aria-hidden="true" />
             {teamName}을(를) 제외할까요?
@@ -1266,7 +1266,7 @@ function RemoveTeamConfirmModal({
         <div className="px-5 py-5 flex flex-col gap-4">
           <p
             id="remove-team-confirm-desc"
-            className="text-[13px] leading-relaxed rounded-xl border px-4 py-3 text-[var(--orange700)] bg-[var(--tint-orange)] border-[var(--tint-orange-border)]"
+            className="text-[length:var(--font-size-label)] leading-relaxed rounded-xl border px-4 py-3 text-[var(--orange700)] bg-[var(--tint-orange)] border-[var(--tint-orange-border)]"
           >
             {fixtureCount > 0
               ? `리그 로스터에서 이 팀을 빼요. 이 팀이 낀 예정 대진 ${fixtureCount}경기도 함께 취소돼요. 되돌리려면 팀을 다시 추가하고 대진을 재생성해야 해요.`

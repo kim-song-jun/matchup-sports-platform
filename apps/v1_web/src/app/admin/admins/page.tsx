@@ -167,7 +167,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-          <h2 id="grant-modal-title" className="text-[16px] font-bold text-[var(--text-strong)]">
+          <h2 id="grant-modal-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">
             운영자 추가
           </h2>
           <button

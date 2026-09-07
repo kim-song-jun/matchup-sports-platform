@@ -160,7 +160,7 @@ export default function AdminUserDetailPage() {
                   <UserRound size={16} aria-hidden="true" />
                   회원
                 </div>
-                <h2 className="mt-2 break-words text-[22px] font-bold text-[var(--text-strong)]">{userTitle(user)}</h2>
+                <h2 className="mt-2 break-words text-[length:var(--font-size-subhead)] font-bold text-[var(--text-strong)]">{userTitle(user)}</h2>
                 <p className="mt-1 break-all text-sm text-[var(--text-muted)]">{user.email ?? '이메일 없음'}</p>
               </div>
               <AdminStatusPill status={user.accountStatus} />
@@ -195,7 +195,7 @@ export default function AdminUserDetailPage() {
           {user.withdrawalRequest ? (
             <section className="rounded-2xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] p-5" aria-label="탈퇴 요청 메시지">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-[17px] font-bold text-[var(--text-strong)]">탈퇴 요청 메시지</h2>
+                <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">탈퇴 요청 메시지</h2>
                 <time className="text-xs font-semibold text-[var(--orange700)]">
                   {formatAdminDateTime(user.withdrawalRequest.requestedAt)}
                 </time>
@@ -248,7 +248,7 @@ export default function AdminUserDetailPage() {
 
         <aside className="flex flex-col gap-4" aria-label="회원 운영 정보">
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">활동 요약</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">활동 요약</h2>
             <dl className="mt-4 grid gap-3">
               <AdminSummaryItem icon={<Calendar size={16} />} label="개설 매치" value={user.hostedMatchCount} />
               <AdminSummaryItem icon={<Users size={16} />} label="생성/소유 팀" value={user.ownedTeamCount} />
@@ -261,7 +261,7 @@ export default function AdminUserDetailPage() {
           </section>
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">삭제 처리</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">삭제 처리</h2>
             <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
               삭제하면 계정 상태가 삭제로 바뀌고 이메일, 전화번호, 카카오 같은 로그인 식별자가 재가입 가능하도록 마스킹돼요. 처리 사유는 감사 로그에 남아요.
             </p>
@@ -297,7 +297,7 @@ export default function AdminUserDetailPage() {
             aria-modal="true"
             aria-labelledby="delete-user-title"
           >
-            <h2 id="delete-user-title" className="text-[18px] font-bold text-[var(--text-strong)]">회원 삭제</h2>
+            <h2 id="delete-user-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">회원 삭제</h2>
             <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
               {userTitle(user)} 회원을 삭제 처리합니다. 되돌리려면 별도 상태 변경과 계정 확인이 필요해요.
             </p>
@@ -364,7 +364,7 @@ function RelatedList({
 }) {
   return (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5">
-      <h2 className="text-[17px] font-bold text-[var(--text-strong)]">{title}</h2>
+      <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">{title}</h2>
       {items.length > 0 ? (
         <ol className="mt-4 flex flex-col gap-2">
           {items.map((item) => (

@@ -168,14 +168,14 @@ function RankingTable({
   return (
     <section className="rounded-xl border border-[var(--border)] bg-[var(--card-surface)] overflow-hidden">
       <div className="px-4 py-4 border-b border-[var(--border)]">
-        <h3 className="text-[15px] font-bold text-[var(--text-strong)]">{title}</h3>
+        <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">{title}</h3>
         <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">{description}</p>
       </div>
       {rows.length === 0 ? (
         <div className="p-4"><AdminEmpty title="아직 집계할 기록이 없어요." /></div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[360px] text-[13px]">
+          <table className="w-full min-w-[360px] text-[length:var(--font-size-label)]">
             <thead className="bg-[var(--surface-soft)] text-xs text-[var(--text-muted)]">
               <tr>
                 <th scope="col" className="w-14 px-4 py-3 text-center font-semibold">순위</th>
@@ -224,7 +224,7 @@ export function TournamentStatisticsTab({ tournamentId }: { tournamentId: string
   return (
     <div className="tm-content-enter p-4">
       <div className="mb-4">
-        <h2 className="text-[15px] font-bold text-[var(--text-strong)]">대회 통계</h2>
+        <h2 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">대회 통계</h2>
         <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
           결과가 확정된 {stats.completedFixtures.toLocaleString('ko-KR')}경기를 기준으로 자동 집계해요.
           {stats.excludedFixtures > 0 && (

@@ -628,13 +628,20 @@ export function useV1GameOperationsConsole(
         },
       );
     };
-    const onGameError = (error: { code: string; clientEventId?: string }) => {
+    // **큐가 실제로 가장 많이 만나는 실패가 이 경로다**(`game.event.append`/`retry`).
+    // `reason` 을 여기서 안 받으면 재시도 판정이 값을 못 받아, 타입은 통과하고 화면만
+    // 안 되는 상태가 된다 — 구독·takeover 에만 싣는 것은 **배선이 반쪽**이다.
+    const onGameError = (error: { code: string; clientEventId?: string; reason?: string }) => {
       if (cancelled) return;
       if (error.clientEventId) {
         dispatchQueue({
           type: 'FAIL',
           clientEventId: error.clientEventId,
-          error: { code: error.code, message: gameOperationsErrorMessage(error.code) },
+          error: {
+            code: error.code,
+            message: gameOperationsErrorMessage(error.code),
+            ...(typeof error.reason === 'string' ? { reason: error.reason } : {}),
+          },
         });
       } else {
         setBannerMessage(gameOperationsErrorMessage(error.code));

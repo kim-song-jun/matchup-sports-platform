@@ -235,6 +235,33 @@ describe('Task 8 game-operations realtime protocol', () => {
   });
 
   /**
+   * **큐가 실제로 가장 많이 만나는 실패가 이 경로다.**
+   *
+   * 원인(`reason`)을 구독·takeover ack 에만 실으면, 웹의 재시도 판정이 **이 경로에서
+   * 값을 못 받는다** — 타입은 통과하고 화면만 안 된다. 그 자리를 못 박는다.
+   */
+  it('game.event.append 가 거부될 때도 원인을 함께 보낸다 (부분 배선 방지)', async () => {
+    const client = socket({ data: {} as SocketAdapter['data'] });
+
+    const result = await task8Gateway(gateway).appendGameEvent(client, {
+      gameId: GAME_ID,
+      expectedVersion: 4,
+      clientEventId: 'event-denied',
+      takeoverToken: 'nonempty-takeover-token',
+      payloadHash: 'sha256:stable-payload',
+      event: { type: 'SCORE', period: 1, clockMs: 12_000, occurredAt: '2026-08-01T10:00:00.000Z', payload: {} },
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'error',
+        code: 'STAFF_SCOPE_DENIED',
+        reason: 'SESSION_NOT_AUTHENTICATED',
+      }),
+    );
+  });
+
+  /**
    * Root-cause regression (2026-08 ops-console realtime scoreboard bug): the
    * broadcast used to carry the raw, un-persisted request `event` verbatim
    * -- which never has `id`/`reversesEventId` (the client can't know them

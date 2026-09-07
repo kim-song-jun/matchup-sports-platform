@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
@@ -758,6 +760,17 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
 
     expect(screen.queryByText('활동 일정 미정')).not.toBeInTheDocument();
     expect(container.querySelector('.tm-team-card-activity')).toBeNull();
+  });
+
+  it('FAB 가림 보호는 활동 줄이 없는 카드에도 걸린다 — 마지막 자식 기준이다', () => {
+    // 활동 줄에만 걸면 그 줄이 없는 카드는 마지막 줄(소개)이 FAB 에 가려진다(#1095 Copilot).
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const block = css.match(/@media \(max-width: 767px\) \{\s*\.tm-team-list \.tm-team-card > :last-child \{[^}]*\}/);
+
+    expect(block).not.toBeNull();
+    expect(block![0]).toContain('padding-right: 64px');
+    // 예전처럼 활동 줄만 겨냥하는 규칙이 남아 있으면 의도가 반쯤만 지켜진다.
+    expect(css).not.toContain('.tm-team-list .tm-team-card-activity {');
   });
 
   it('활동 일정이 있으면 그대로 한 줄로 쓴다', () => {

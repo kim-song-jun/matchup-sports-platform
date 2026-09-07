@@ -4218,15 +4218,22 @@ export type V1TournamentStaffRole = 'PLATFORM_OPS' | 'TOURNAMENT_DIRECTOR' | 'FI
  * `now` 에도 의존하는 값(별도 `liveWarnings`)이 분리돼 있다. 백엔드 doc:
  * apps/v1_api/src/tournament-operations/board/dto/list-operations-query.dto.ts
  */
-export type V1TournamentStableWarningCode = 'NO_FIELD_ASSIGNED' | 'MISSING_SCORER' | 'RESULT_REVIEW_OVERDUE';
-export type V1TournamentTimeRelativeWarningCode = 'NO_STAFF_ASSIGNED' | 'LINEUP_NOT_SUBMITTED';
+export type V1TournamentStableWarningCode = 'NO_FIELD_ASSIGNED' | 'MISSING_SCORER';
+/**
+ * `RESULT_REVIEW_OVERDUE` 가 여기로 옮겨졌다(2026-09-06) — 판정이 `due_at <= now()` 라
+ * **정의상 시계 의존**이기 때문이다. 예전엔 stable 쪽에서 "열린 에스컬레이션 행이 있는가" 만
+ * 봐서 **결과 제출 즉시 참**이 됐다(alpha 실측: 종료 수 초 뒤에도 "검토 기한 초과").
+ */
+export type V1TournamentTimeRelativeWarningCode =
+  | 'NO_STAFF_ASSIGNED'
+  | 'LINEUP_NOT_SUBMITTED'
+  | 'RESULT_REVIEW_OVERDUE';
 export type V1TournamentOperationsWarningCode = V1TournamentStableWarningCode | V1TournamentTimeRelativeWarningCode;
 
 /** `?warning=` 필터는 안정(시간 무관) 코드만 받는다 — 서버가 시간 의존 코드는 400으로 거부한다. */
 export const V1_STABLE_WARNING_CODES: readonly V1TournamentStableWarningCode[] = [
   'NO_FIELD_ASSIGNED',
   'MISSING_SCORER',
-  'RESULT_REVIEW_OVERDUE',
 ];
 
 /** GET /tournament-ops/tournaments/:tournamentId/operations 응답의 items[] 항목. */

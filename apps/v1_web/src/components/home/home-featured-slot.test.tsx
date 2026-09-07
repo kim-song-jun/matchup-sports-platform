@@ -245,3 +245,56 @@ describe('추천 카드 미디어 밴드', () => {
     expect(container.querySelector('.tm-match-sport-illustration')).toBeNull();
   });
 });
+
+/**
+ * 카드 CTA 위계 (2026-09-07 alpha 실측 · 사용자 확정).
+ *
+ * 홈 한 페이지에 solid 파란 버튼이 **5개**였다 —
+ * `경기 후기 211건 쓰기` / `승인제 신청` / `참가 신청하기` ×3.
+ * 추천 매치·추천 대회가 여러 장이라 카드마다 solid 를 두면 primary 가 겹겹이 쌓인다.
+ *
+ * 그래서 **카드 CTA 는 secondary(outline)** 로 두고, solid 는 화면 최상위 행동
+ * (알림 받기·인증하기 같은 nudge) 에만 남긴다. 카드 전체가 이미 상세로 가는 링크라
+ * 이 버튼은 행동의 반복이기도 하다.
+ */
+describe('추천 카드 CTA 위계', () => {
+  function renderFeatured(imageUrl: string | null) {
+    // 대회 슬롯을 **명시적으로** 접힌 상태로 둔다. 이걸 빼면 이 describe 는 앞선
+    // '섹션 자체가 사라지는 경로' 가 남긴 mockReturnValue 에 얹혀 통과한다 —
+    // 그 describe 에는 afterEach 초기화가 없어 값이 끝까지 끌려온다. 앞 블록을
+    // 손대는 순간 여기가 무너지는데, 그때 뜨는 실패는 CTA 회귀가 아니라
+    // 스켈레톤(.tm-featured-cta.tm-skeleton) 이 섞여 든 것이다(실측 확인).
+    tournamentsMock.mockReturnValue({
+      data: [],
+      isPending: false,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    homeMock.mockReturnValue({
+      data: { ...HOME_DATA, recommendedMatches: [{ ...MATCH_WITHOUT_PHOTO, imageUrl }] },
+      isError: false,
+      refetch: vi.fn(),
+    });
+    return renderHome();
+  }
+
+  it('추천 카드의 CTA 는 solid primary 가 아니라 outline 이다', () => {
+    const { container } = renderFeatured(null);
+
+    const ctas = [...container.querySelectorAll('.tm-featured-cta:not(.tm-skeleton)')];
+    expect(ctas.length).toBeGreaterThan(0);
+    ctas.forEach((cta) => {
+      expect(cta.classList.contains('tm-btn-outline')).toBe(true);
+      expect(cta.classList.contains('tm-btn-primary')).toBe(false);
+    });
+  });
+
+  it('사진이 있는 카드도 같은 규칙을 쓴다', () => {
+    const { container } = renderFeatured('/uploads/real.webp');
+
+    const ctas = [...container.querySelectorAll('.tm-featured-cta:not(.tm-skeleton)')];
+    expect(ctas.length).toBeGreaterThan(0);
+    ctas.forEach((cta) => expect(cta.classList.contains('tm-btn-primary')).toBe(false));
+  });
+});

@@ -97,7 +97,9 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
                   ) : null}
                 </div>
                 <span
-                  className="tm-btn tm-btn-primary tm-btn-sm tm-featured-cta"
+                  // 카드 CTA 는 secondary(outline) — 추천 대회가 여러 장이라 solid 면
+                  // 한 화면에 primary 가 겹겹이 쌓인다(home-page.tsx 의 같은 자리 참고).
+                  className="tm-btn tm-btn-outline tm-btn-sm tm-featured-cta"
                   aria-hidden="true"
                 >
                   참가 신청하기

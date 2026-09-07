@@ -741,8 +741,13 @@ function FeaturedMatchCard({
                 ) : null}
               </div>
             </div>
+            {/* 카드 CTA 는 secondary(outline) 다. 홈은 추천 매치·추천 대회 카드가 여러 장
+                이어서, 카드마다 solid 파란 버튼을 두면 한 화면에 primary 가 5개까지 생긴다
+                (alpha 실측 2026-09-07). solid 는 화면 최상위 행동(알림 받기·인증하기 같은
+                nudge) 하나에만 남긴다 — DESIGN.md 의 시각 절제·위계 기준.
+                카드 전체가 이미 상세로 가는 링크라 이 버튼은 행동의 반복이기도 하다. */}
             <span
-              className="tm-btn tm-btn-primary tm-btn-sm tm-featured-cta"
+              className="tm-btn tm-btn-outline tm-btn-sm tm-featured-cta"
               aria-hidden="true"
             >
               {match.actionLabel ?? '신청하기'}

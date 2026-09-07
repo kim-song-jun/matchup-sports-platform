@@ -964,14 +964,55 @@ button:disabled {
 
 /* Apple 로그인 버튼. Apple 의 표시 지침대로 밝은 배경에는 검정, 어두운 배경에는 흰색을 쓴다 —
    토큰이 아니라 고정색인 이유는 이 색이 우리 테마가 아니라 Apple 의 규정이기 때문이다. */
+/* Sign in with Apple 버튼 — 치수는 취향이 아니라 HIG 가 정한 값이다.
+ *
+ *   "the title's font size would be 43% of the button's height — in other words, the
+ *    button's height would be 233% of the title's font size, rounded to the nearest integer"
+ *
+ * --font-size-subhead(20px) x 2.33 = 46.6 → 47px. tm-btn-lg 의 50px/15px 를 그대로 쓰면
+ * 30% 라 규격에서 벗어난다. 47px 은 44px 터치 타깃과 HIG 최소 높이(30pt) 를 모두 넘는다.
+ *
+ * gap 은 0 이다 — 마크 아트워크가 자체 상하좌우 여백을 갖고 있어(HIG 가 그렇게 만들었다)
+ * 버튼이 여백을 또 주면 사과가 글자에서 멀어진다.
+ *
+ * 치수 세 줄만 `.tm-btn.tm-auth-apple` 로 두 클래스를 겹쳐 적는다. 한 클래스로 적으면
+ * .tm-btn-lg(이 파일 뒤쪽, 50px/15px/gap 8px)와 특이도가 같아 뒤에 선언된 쪽이 이긴다 —
+ * 값은 파일에 있는데 화면에는 30% 가 그대로 나왔다. 선언 위치를 뒤로 옮겨도 되지만
+ * 그러면 다음에 누가 규칙을 옮길 때 조용히 되돌아간다. 특이도로 이기면 순서와 무관하다. */
 .tm-auth-apple {
   background: var(--static-black);
   color: var(--static-white);
 }
 
+.tm-btn.tm-auth-apple {
+  min-height: 47px;
+  font-size: var(--font-size-subhead);
+  /* 20px 글자의 기본 line-height 가 상자를 48px 로 밀어 비율이 41.7% 가 된다. 높이를
+   * 마크(47px)와 min-height 가 정하도록 1 로 눕힌다 — 한 줄짜리 라벨이라 잘릴 일이 없다. */
+  line-height: 1;
+  gap: 0;
+}
+
 :root.dark .tm-auth-apple {
   background: var(--static-white);
   color: var(--static-black);
+}
+
+/* 마크는 Apple 이 내려준 이미지 그대로다(출처·규격은 public/apple/README.md).
+ * 아트워크는 버튼 배경과 같은 색의 사각 바탕을 포함하므로, 배경이 같은 쪽을 쓰면 바탕이
+ * 버튼에 묻히고 사과만 남는다. 높이는 버튼 높이와 같아야 정렬이 맞는다. */
+.tm-auth-apple-mark {
+  width: 47px;
+  height: 47px;
+  flex: 0 0 auto;
+  background-image: url('/apple/sign-in-mark-on-black.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+:root.dark .tm-auth-apple-mark {
+  background-image: url('/apple/sign-in-mark-on-white.png');
 }
 
 .tm-auth-apple:disabled {

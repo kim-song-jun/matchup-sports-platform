@@ -214,7 +214,7 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
           <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[var(--border)] shrink-0">
             <h2
               id="error-log-detail-title"
-              className="text-[16px] font-bold text-[var(--text-strong)] truncate"
+              className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)] truncate"
             >
               {detail ? detail.message : '에러 상세'}
             </h2>
@@ -258,7 +258,7 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
                   title="메타"
                   onCopy={() => void copyToClipboard(metaMarkdown(detail), '메타 정보를')}
                 >
-                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[13px]">
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[length:var(--font-size-label)]">
                     <MetaRow label="최초 발생" value={formatAdminDateTime(detail.firstSeenAt)} />
                     <MetaRow label="최종 발생" value={formatAdminDateTime(detail.lastSeenAt)} />
                     <MetaRow label="발생 횟수" value={detail.occurrenceCount.toLocaleString('ko-KR')} />
@@ -281,13 +281,13 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
                   title="Request"
                   onCopy={() => void copyToClipboard(requestMarkdown(detail), 'Request를')}
                 >
-                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[13px] mb-3">
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[length:var(--font-size-label)] mb-3">
                     <MetaRow label="method" value={detail.method ?? '—'} mono />
                     <MetaRow label="route" value={detail.route ?? '—'} mono />
                   </dl>
-                  <p className="text-[12px] font-semibold text-[var(--text-muted)] mb-1">headers</p>
+                  <p className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)] mb-1">headers</p>
                   <CodeBlock content={safeJsonStringify(detail.requestHeaders)} />
-                  <p className="text-[12px] font-semibold text-[var(--text-muted)] mb-1 mt-3">body</p>
+                  <p className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)] mb-1 mt-3">body</p>
                   <CodeBlock content={safeJsonStringify(detail.requestBody)} />
                 </Section>
 
@@ -296,11 +296,11 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
                   title="Response"
                   onCopy={() => void copyToClipboard(responseMarkdown(detail), 'Response를')}
                 >
-                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[13px] mb-3">
+                  <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[length:var(--font-size-label)] mb-3">
                     <MetaRow label="statusCode" value={String(detail.statusCode ?? '—')} mono />
                     <MetaRow label="errorCode" value={detail.errorCode ?? '—'} mono />
                   </dl>
-                  <p className="text-[12px] font-semibold text-[var(--text-muted)] mb-1">body</p>
+                  <p className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)] mb-1">body</p>
                   <CodeBlock content={safeJsonStringify(detail.responseBody)} />
                 </Section>
 
@@ -334,12 +334,12 @@ function Section({
   return (
     <section aria-label={title}>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-[13px] font-bold text-[var(--text-body)]">{title}</h3>
+        <h3 className="text-[length:var(--font-size-label)] font-bold text-[var(--text-body)]">{title}</h3>
         <button
           type="button"
           onClick={onCopy}
           aria-label={`${title} 복사`}
-          className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-md text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--blue700)] hover:bg-[var(--blue50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          className="inline-flex items-center gap-1 min-h-[36px] px-3 rounded-md text-[length:var(--font-size-caption)] font-medium text-[var(--text-muted)] hover:text-[var(--blue700)] hover:bg-[var(--blue50)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
         >
           <Copy size={12} aria-hidden="true" />
           복사
@@ -357,7 +357,7 @@ function MetaRow({ label, value, mono }: { label: string; value: string; mono?: 
       <dd
         className={[
           'text-[var(--text-body)] break-all min-w-0',
-          mono ? 'font-mono text-[12px]' : '',
+          mono ? 'font-mono text-[length:var(--font-size-caption)]' : '',
         ].join(' ')}
       >
         {value}
@@ -368,7 +368,7 @@ function MetaRow({ label, value, mono }: { label: string; value: string; mono?: 
 
 function CodeBlock({ content }: { content: string }) {
   return (
-    <pre className="overflow-x-auto max-h-[280px] overflow-y-auto rounded-xl bg-[var(--grey100)] border border-[var(--border)] p-3 text-[12px] font-mono text-[var(--text-body)] whitespace-pre">
+    <pre className="overflow-x-auto max-h-[280px] overflow-y-auto rounded-xl bg-[var(--grey100)] border border-[var(--border)] p-3 text-[length:var(--font-size-caption)] font-mono text-[var(--text-body)] whitespace-pre">
       {content}
     </pre>
   );

@@ -61,7 +61,7 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
         className={`bg-[var(--card-surface)] rounded-2xl shadow-[var(--shadow-modal)] w-full max-w-[440px] overflow-hidden tm-modal-panel${closing ? ' is-closing' : ''}`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-          <h2 id="push-broadcast-confirm-title" className="text-[16px] font-bold text-[var(--text-strong)] flex items-center gap-2">
+          <h2 id="push-broadcast-confirm-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)] flex items-center gap-2">
             <AlertTriangle size={17} className="text-[var(--orange500)]" aria-hidden="true" />
             전체 발송 확인
           </h2>
@@ -77,12 +77,12 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
         </div>
 
         <div className="px-5 py-5 flex flex-col gap-3">
-          <p id="push-broadcast-confirm-desc" className="text-[14px] text-[var(--text-body)] leading-relaxed">
+          <p id="push-broadcast-confirm-desc" className="text-[length:var(--font-size-body-sm)] text-[var(--text-body)] leading-relaxed">
             현재 웹 푸시를 구독 중인 <strong>모든 회원</strong>에게 아래 알림을 발송해요. 이 작업은 되돌릴 수 없어요.
           </p>
           <div className="bg-[var(--surface-soft)] border border-[var(--border)] rounded-xl px-4 py-3">
             <p className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)] mb-0.5">제목</p>
-            <p className="text-[14px] font-semibold text-[var(--text-strong)] break-words">{title}</p>
+            <p className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)] break-words">{title}</p>
           </div>
         </div>
 
@@ -91,7 +91,7 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
             type="button"
             onClick={() => !pending && onClose()}
             disabled={pending}
-            className="flex-1 h-[48px] rounded-xl text-[15px] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            className="flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
           >
             취소
           </button>
@@ -100,7 +100,7 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
             type="button"
             onClick={onConfirm}
             disabled={pending}
-            className="flex-1 h-[48px] rounded-xl text-[15px] font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            className="flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold bg-red-500 text-white hover:bg-red-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
           >
             {pending ? '발송 중…' : '전체 발송'}
           </button>
@@ -120,8 +120,8 @@ function ResultStat({ label, value, tone }: { label: string; value: number; tone
         : 'text-[var(--text-muted)] bg-[var(--surface-soft)]';
   return (
     <div className={`flex flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-4 ${toneClass}`}>
-      <span className="text-[20px] font-bold tabular-nums">{value}</span>
-      <span className="text-[12px] font-medium">{label}</span>
+      <span className="text-[length:var(--font-size-subhead)] font-bold tabular-nums">{value}</span>
+      <span className="text-[length:var(--font-size-caption)] font-medium">{label}</span>
     </div>
   );
 }
@@ -166,7 +166,7 @@ function PushDeliveryNote({
     <div className="flex flex-col gap-2">
       {[web, native].map((line) =>
         line ? (
-          <p key={line.label} className={`rounded-xl border px-3 py-3 text-[13px] leading-relaxed ${line.tone}`}>
+          <p key={line.label} className={`rounded-xl border px-3 py-3 text-[length:var(--font-size-label)] leading-relaxed ${line.tone}`}>
             <span className="font-semibold">{line.label} </span>
             {line.message}
           </p>

@@ -48,7 +48,7 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
   return (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="상대팀 신청">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[17px] font-bold text-[var(--text-strong)]">상대팀 신청</h2>
+        <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">상대팀 신청</h2>
         <span className="text-sm font-semibold tabular-nums text-[var(--text-muted)]">
           {/* 서버가 최근 50건만 내려준다 — 총계만 적으면 목록이 전부인 것처럼 읽힌다. */}
           {truncated ? `${teamMatch.applications.length} / ${teamMatch.applicationCount}건` : `${teamMatch.applicationCount}건`}
@@ -136,7 +136,7 @@ export default function AdminTeamMatchDetailPage() {
                   <Trophy size={16} aria-hidden="true" />
                   팀매치
                 </div>
-                <h2 className="mt-2 break-words text-[22px] font-bold text-[var(--text-strong)]">{teamMatch.title}</h2>
+                <h2 className="mt-2 break-words text-[length:var(--font-size-subhead)] font-bold text-[var(--text-strong)]">{teamMatch.title}</h2>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">{teamMatch.sportName} · {teamMatch.hostTeamName}</p>
               </div>
               <AdminStatusPill status={teamMatch.status} />
@@ -170,7 +170,7 @@ export default function AdminTeamMatchDetailPage() {
           </article>
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="경기 조건">
-            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">경기 조건</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">경기 조건</h2>
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">
               <AdminDetailRow label="경기 형식" value={teamMatch.matchFormat} />
               <AdminDetailRow label="형식 메모" value={teamMatch.formatNote} />
@@ -182,7 +182,7 @@ export default function AdminTeamMatchDetailPage() {
           </section>
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="팀매치 소개">
-            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">소개</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">소개</h2>
             {teamMatch.description?.trim() ? (
               <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--text-body)]">
                 {teamMatch.description}
@@ -199,7 +199,7 @@ export default function AdminTeamMatchDetailPage() {
 
         <aside className="flex flex-col gap-4" aria-label="팀매치 운영 요약">
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">운영 요약</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">운영 요약</h2>
             <dl className="mt-4 grid gap-3">
               <AdminSummaryItem icon={<Users size={16} />} label="상대팀 신청" value={`${teamMatch.applicationCount}건`} />
               <AdminSummaryItem icon={<Trophy size={16} />} label="확정 상대팀" value={teamMatch.approvedApplicantTeamName ?? '미확정'} />
@@ -211,7 +211,7 @@ export default function AdminTeamMatchDetailPage() {
           </section>
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">주최 팀</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">주최 팀</h2>
             <dl className="mt-4 grid gap-3">
               <AdminSummaryItem icon={<Users size={16} />} label="이름" value={teamMatch.hostTeamName} />
             </dl>

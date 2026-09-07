@@ -99,7 +99,7 @@ export function GateConfirmModal({
         className={`bg-[var(--card-surface)] rounded-2xl shadow-[var(--shadow-modal)] w-full max-w-[440px] overflow-hidden tm-modal-panel${closing ? ' is-closing' : ''}`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-          <h2 id="gate-confirm-title" className="text-[16px] font-bold text-[var(--text-strong)] flex items-center gap-2">
+          <h2 id="gate-confirm-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)] flex items-center gap-2">
             {tone === 'amber' && <AlertTriangle size={17} className="text-[var(--orange700)]" aria-hidden="true" />}
             {title}
           </h2>
@@ -125,7 +125,7 @@ export function GateConfirmModal({
             <p
               id="gate-confirm-desc"
               className={[
-                'text-[13px] leading-relaxed rounded-xl border px-4 py-3',
+                'text-[length:var(--font-size-label)] leading-relaxed rounded-xl border px-4 py-3',
                 tone === 'amber' ? 'text-[var(--orange700)] bg-[var(--tint-orange)] border-[var(--tint-orange-border)]' : 'text-[var(--blue700)] bg-[var(--blue50)] border-[var(--tint-blue-border)]',
               ].join(' ')}
             >
@@ -133,7 +133,7 @@ export function GateConfirmModal({
             </p>
 
             <div className="flex flex-col gap-2">
-              <label htmlFor="gate-confirm-reason" className="text-[13px] font-semibold text-[var(--text-body)]">
+              <label htmlFor="gate-confirm-reason" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
               </label>
@@ -147,7 +147,7 @@ export function GateConfirmModal({
                 disabled={pending}
                 placeholder="이 작업이 왜 필요한지 남겨 주세요. 감사 로그에 그대로 기록돼요."
                 className={[
-                  'px-3 py-3 text-[13px] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
+                  'px-3 py-3 text-[length:var(--font-size-label)] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
                   'placeholder:text-[var(--text-muted)]',
                   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
                   'transition-colors disabled:opacity-50',
@@ -161,7 +161,7 @@ export function GateConfirmModal({
 
             {typedChallenge && (
               <div className="flex flex-col gap-2">
-                <label htmlFor="gate-confirm-typed" className="text-[13px] font-semibold text-[var(--text-body)]">
+                <label htmlFor="gate-confirm-typed" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                   확인을 위해 <span className="text-[var(--orange700)]">&ldquo;{typedChallenge}&rdquo;</span>
                   {objectParticle(typedChallenge)} 그대로 입력해 주세요{' '}
                   <span className="text-[var(--red700)]" aria-hidden="true">*</span>
@@ -176,7 +176,7 @@ export function GateConfirmModal({
                   autoComplete="off"
                   placeholder={typedChallenge}
                   className={[
-                    'h-[44px] px-3 text-[13px] bg-[var(--card-surface)] border rounded-xl text-[var(--text-strong)]',
+                    'h-[44px] px-3 text-[length:var(--font-size-label)] bg-[var(--card-surface)] border rounded-xl text-[var(--text-strong)]',
                     'placeholder:text-[var(--text-caption)]',
                     'focus:outline-none focus:ring-2 focus:ring-[var(--orange500)]/20',
                     'transition-colors disabled:opacity-50',
@@ -194,7 +194,7 @@ export function GateConfirmModal({
               type="button"
               onClick={() => !pending && onClose()}
               disabled={pending}
-              className="flex-1 h-[48px] rounded-xl text-[13px] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="flex-1 h-[48px] rounded-xl text-[length:var(--font-size-label)] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -202,7 +202,7 @@ export function GateConfirmModal({
               type="submit"
               disabled={!canSubmit}
               className={[
-                'flex-1 h-[48px] rounded-xl text-[13px] font-semibold transition-colors',
+                'flex-1 h-[48px] rounded-xl text-[length:var(--font-size-label)] font-semibold transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 canSubmit
                   ? tone === 'amber'

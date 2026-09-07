@@ -280,3 +280,63 @@ describe('카드 광택 스윕(tmCardSweep)은 left 가 아니라 transform 을 
     expect(rule).toMatch(/transform:\s*translateX\([^)]*\)\s*rotate\(18deg\)/);
   });
 });
+
+describe('home featured media band', () => {
+  // 사진 없는 변형이 aspect-ratio 를 풀면 밴드가 내용만큼 자라, 같은 그리드 행의 사진
+  // 카드가 텍스트만 위에 뜬 채 아래가 비어 보인다(alpha 실측 2026-09-07: 308 vs 152px).
+  // 마크업 계약(카피는 밴드 밖)은 home-featured-slot.test.tsx 가 지키고, 여기서는
+  // 그 마크업이 전제하는 **밴드 높이 고정**만 지킨다.
+  it('keeps the photo-less variant on the same fixed aspect ratio as the photo variant', () => {
+    const rule = globalsCss.match(/\.tm-home-featured-stack\s*\{([^}]*)\}/)?.[1];
+
+    expect(rule).toBeDefined();
+    expect(rule).not.toMatch(/aspect-ratio/);
+    expect(rule).not.toMatch(/height/);
+  });
+});
+
+describe('home featured graphic size (cascade)', () => {
+  // 이 선택자 쌍은 **같은 속성(width/height)** 을 겨루고, 일반 규칙이 파일 뒤쪽에 있다.
+  // 특이도가 같으면 뒤가 이기므로, 홈 전용 규칙은 반드시 더 좁아야 한다.
+  // (alpha 실측 2026-09-07: 이 조건이 깨져 그래픽이 208px 로 그려졌고, aspect-ratio 2/1 밴드가
+  //  내용에 밀려 208px 까지 자라 같은 행의 사진 카드 밴드 152px 과 다시 벌어졌다.)
+  const countClasses = (selector: string) => selector.split('.').length - 1;
+
+  const homeRule = '.tm-home-featured-stack .tm-match-hero-graphic .tm-match-sport-illustration';
+  const genericRule = '.tm-match-hero-graphic .tm-match-sport-illustration';
+
+  it('declares the home-only illustration size, and the generic hero rule still exists', () => {
+    expect(globalsCss).toContain(homeRule);
+    expect(globalsCss).toContain(genericRule);
+  });
+
+  it('wins the cascade against the later generic rule by specificity, not by order', () => {
+    const homeAt = globalsCss.indexOf(homeRule);
+    // -1 을 그대로 쓰면 아래 비교가 전부 통과한다 — 규칙이 사라진 변이를 놓친다.
+    expect(homeAt).toBeGreaterThan(-1);
+    // 일반 규칙은 홈 규칙 **뒤에** 있는 것을 찾는다 — 앞쪽 매치는 홈 선택자 자신의 꼬리다.
+    const genericAt = globalsCss.indexOf(`\n${genericRule}`, homeAt);
+
+    expect(genericAt).toBeGreaterThan(homeAt);
+    expect(countClasses(homeRule)).toBeGreaterThan(countClasses(genericRule));
+  });
+
+  it('sizes the graphic to fit inside the 2:1 media band on both breakpoints', () => {
+    // 밴드 높이는 카드 폭의 절반이다(alpha 데스크톱 실측 304px 폭 → 152px). 그래픽이 그보다
+    // 크면 밴드가 밀려 커진다 — 그래서 128px 이하로 묶는다.
+    //
+    // width 만 보면 안 된다. 밴드를 실제로 밀어 올리는 건 height 이고, 이 그래픽은 정사각형이라
+    // 둘 중 하나만 커져도 회귀가 된다(#1090 Copilot).
+    const homeAt = globalsCss.indexOf(homeRule);
+    expect(homeAt).toBeGreaterThan(-1);
+    const block = globalsCss.slice(homeAt, homeAt + 400);
+    // `min-width: 1024px`(미디어 쿼리)가 잡히지 않도록 선언 줄만 본다.
+    const decls = [...block.matchAll(/\n\s*(width|height):\s*(\d+)px/g)].map((m) => ({ prop: m[1], px: Number(m[2]) }));
+
+    // 기본(112px) + ≥1024(128px) 두 블록 × width/height = 4개.
+    expect(decls).toHaveLength(4);
+    expect(decls.filter((d) => d.prop === 'width')).toHaveLength(2);
+    expect(decls.filter((d) => d.prop === 'height')).toHaveLength(2);
+    decls.forEach(({ px }) => expect(px).toBeLessThanOrEqual(128));
+  });
+});

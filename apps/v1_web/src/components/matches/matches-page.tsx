@@ -99,7 +99,10 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
       <div className={`tm-match-list${!model.isLoading && model.matches.length === 0 ? ' tm-list-empty' : ''}`}>
         <SportSelector sports={model.sports} />
         <div className="tm-match-summary-row">
-          <div className="tm-text-label">{model.summary.label}</div>
+          {/* 이 화면의 유일한 헤딩이다 — 데스크톱 전용 헤더(.tm-match-desktop-header)가
+              모바일에서 display:none 이라 그 안의 h1 이 접근성 트리에서 빠진다.
+              줄을 더하지 않고 요약 행 안에서 제목 역할을 한다(2026-09-07 사용자 확정). */}
+          <h2 className="tm-list-scope-heading">{model.summary.label}</h2>
           {/* summary.urgent = status==='open'(모집중) 매치 수 — '마감'은 의미 반대였음(WS11 Rank6) */}
           {/* #21 + [P1 tabular-nums]: '모집 중 N' 숫자 weight700 + tabular-nums */}
           <div className="tm-text-caption tab-num">{model.summary.count}개 · 오늘 {model.summary.today} · 모집 중 <strong style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{model.summary.urgent}</strong></div>

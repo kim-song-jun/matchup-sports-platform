@@ -149,7 +149,7 @@ function ChecklistCard({ checks, basePath }: { checks: TournamentOverviewCheck[]
             className="flex items-center gap-3 px-5 py-3 border-b border-[var(--border)] last:border-b-0"
           >
             <div className="flex-1 min-w-0">
-              <p className="text-[13.5px] font-medium text-[var(--text-strong)]">{check.label}</p>
+              <p className="text-[length:var(--font-size-label)] font-medium text-[var(--text-strong)]">{check.label}</p>
               <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{check.hint}</p>
             </div>
             {check.section && (

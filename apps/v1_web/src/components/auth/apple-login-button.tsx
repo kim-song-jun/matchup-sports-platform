@@ -70,6 +70,10 @@ export function AppleLoginButton({ className, style }: { className?: string; sty
         disabled={busy}
         aria-label="Apple로 계속하기"
       >
+        {/* HIG 는 로고와 글자를 함께 놓는 형태를 요구한다. 아트워크는 Apple 이 내려준
+            것을 그대로 쓰고(출처는 public/apple/README.md), 읽어줄 내용이 없으므로
+            스크린리더에서는 숨긴다 — 버튼 이름은 아래 글자가 이미 말해 준다. */}
+        <span className="tm-auth-apple-mark" aria-hidden="true" />
         {busy ? '연결 중이에요…' : 'Apple로 계속하기'}
       </button>
       {error ? (

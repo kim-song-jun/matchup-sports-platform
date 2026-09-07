@@ -258,6 +258,38 @@ describe('ScheduleContent — 득점 기록 전·후반 구분', () => {
     expect(screen.queryByRole('group', { name: '기타 기록' })).not.toBeInTheDocument();
   });
 
+  /**
+   * **리그 일정·대진표의 경기 카드가 죽은 링크였다.**
+   *
+   * 이 화면은 대회와 정규 리그가 **같은 일정 응답**을 쓴다 — 서버가 리그 대진을 대회
+   * 일정 행으로 변환해 내려주기 때문에(`toLeagueScheduleRow`) `fixtureId` 에는 **팀 매치
+   * id** 가 들어 있다. 그런데 링크는 분기 없이 대회 패턴으로 만들어져서,
+   * `/tournaments/<리그id>/matches/<팀매치id>` 가 **두 겹으로 404** 였다(그 조회가
+   * `TOURNAMENT_KINDS` 로 리그를 배제하고, 통과해도 리그 거울엔 `V1TournamentFixture` 가
+   * 0행이다).
+   *
+   * 헬퍼 유닛 테스트만으로는 부족하다 — **배선되지 않으면 헬퍼는 green 인데 화면은 그대로
+   * 404 다.** 그래서 실제 렌더에서 href 를 잰다. 대회 쪽도 같은 자리에서 함께 잰다.
+   */
+  it('정규 리그의 경기 카드는 리그 경기 상세로, 대회는 대회 경기 상세로 링크한다', () => {
+    const data = { ...makeData(), items: [fixtureEntry({ fixtureId: 'team-match-9' })] };
+
+    const league = render(
+      <ScheduleContent tournamentId="league-1" data={data} isRegularLeague />,
+    );
+    expect(screen.getByRole('link', { name: /홈팀/ })).toHaveAttribute(
+      'href',
+      '/league-matches/league-1/fixtures/team-match-9',
+    );
+    league.unmount();
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+    expect(screen.getByRole('link', { name: /홈팀/ })).toHaveAttribute(
+      'href',
+      '/tournaments/tour-1/matches/team-match-9',
+    );
+  });
+
   it('득점이 없으면 득점 영역과 구분선을 모두 표시하지 않는다', () => {
     render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry()] }} />);
 

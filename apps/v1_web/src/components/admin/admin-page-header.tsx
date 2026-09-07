@@ -20,9 +20,9 @@ export function AdminPageHeader({ eyebrow, title, description, action }: AdminPa
             {eyebrow}
           </p>
         )}
-        <h1 className="text-[22px] md:text-[24px] font-bold text-[var(--text-strong)]">{title}</h1>
+        <h1 className="text-[length:var(--font-size-subhead)] md:text-[length:var(--font-size-heading)] font-bold text-[var(--text-strong)]">{title}</h1>
         {description && (
-          <p className="text-[13px] md:text-[14px] text-[var(--text-muted)] mt-1">{description}</p>
+          <p className="text-[length:var(--font-size-label)] md:text-[length:var(--font-size-body-sm)] text-[var(--text-muted)] mt-1">{description}</p>
         )}
       </div>
       {action && <div className="flex-shrink-0">{action}</div>}

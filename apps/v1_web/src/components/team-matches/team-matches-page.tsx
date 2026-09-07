@@ -14,6 +14,7 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { cssUrl } from '@/lib/assets';
+import { formatAmountNumber } from '@/lib/date-utils';
 // 사진 없는 팀매치의 종목 그래픽 — 매치·홈과 같은 공용 컴포넌트를 쓴다(웨이브8에서
 // 세 곳의 복사본을 하나로 모았다). 같은 종목이면 어느 화면에서든 같은 그래픽이 나온다.
 import { SportIllustration } from '@/components/v1-ui/sport-illustration';
@@ -58,7 +59,8 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
         <div className="tm-sport-chip-row">{model.sports.map((sport) => sport.href ? <Link key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} href={sport.href} aria-current={sport.active ? 'page' : undefined}>{sport.label} <span className="tab-num">{sport.count}</span></Link> : <button key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} type="button" aria-pressed={sport.active}>{sport.label} <span className="tab-num">{sport.count}</span></button>)}</div>
         {/* P1: 통계 숫자 tabular-nums + weight 차등 (2:1 원칙) */}
         <div className="tm-match-summary-row">
-          <div className="tm-text-label">{buildTeamMatchSummaryLabel()}</div>
+          {/* matches-page.tsx 와 같은 이유 — 이 화면도 모바일 헤딩이 0개였다. */}
+          <h2 className="tm-list-scope-heading">{buildTeamMatchSummaryLabel()}</h2>
           <div className="tm-text-caption tab-num">
             <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.count}</span>개 · 오늘 {model.summary.today} · 모집 중 <strong style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{model.summary.urgent}</strong>
           </div>
@@ -447,7 +449,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                       ) : (
                         <span className="tab-num" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
                           <span style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 700, color: 'var(--text-strong)', fontVariantNumeric: 'tabular-nums' }}>
-                            {match.opponentCost.toLocaleString('ko-KR')}
+                            {formatAmountNumber(match.opponentCost)}
                           </span>
                           <span style={{ fontSize: 'var(--font-size-body)', fontWeight: 500, color: 'var(--text-muted)' }}>원</span>
                         </span>
@@ -464,7 +466,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                     <div className="tm-text-caption">총비용</div>
                     <div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
                       <span className="tab-num" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
-                        <span className="tm-text-label" style={{ fontVariantNumeric: 'tabular-nums' }}>{match.cost.toLocaleString('ko-KR')}</span>
+                        <span className="tm-text-label" style={{ fontVariantNumeric: 'tabular-nums' }}>{formatAmountNumber(match.cost)}</span>
                         <span className="tm-text-caption" style={{ fontWeight: 500, color: 'var(--text-muted)' }}>원</span>
                       </span>
                     </div>
@@ -654,7 +656,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
             <div className="tm-team-match-cta-meta">
               <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : '신청 상태'}</span>
               {/* 비용을 모르면(costNote 미기재) 금액 대신 '비용 미정' — 0원으로 단정하지 않는다. */}
-              <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${match.opponentCost.toLocaleString('ko-KR')}원` : '비용 미정')}</span>
+              <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${formatAmountNumber(match.opponentCost)}원` : '비용 미정')}</span>
             </div>
             <div className="tm-team-match-cta-actions">
               {ctaButtons}
@@ -668,7 +670,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
           <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : '신청 상태'}</span>
           {/* 비용을 모르면(costNote 미기재) 금액 대신 '비용 미정' — 0원으로 단정하지 않는다. */}
-          <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${match.opponentCost.toLocaleString('ko-KR')}원` : '비용 미정')}</span>
+          <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${formatAmountNumber(match.opponentCost)}원` : '비용 미정')}</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: showChat ? '120px 1fr' : '1fr', gap: 8 }}>
           {ctaButtons}
@@ -817,82 +819,103 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   const league = match.league;
   // '마감'만으로는 무엇이 마감인지 안 드러난다 — 목록에 마감된 매치가 함께 놓이면서
   // '모집 중'과 대비되는 문구가 필요해졌다(2026-09-07 제보: "신청마감인거랑 신청가능이랑 차이가 보여야지").
-  const statusLabel = match.status === 'mine' ? '내 매치' : match.status === 'pending' ? '승인 대기' : match.status === 'approved' ? '승인 완료' : match.status === 'closed' ? '신청 마감' : '모집 중';
-  const statusClass = match.status === 'mine' ? 'tm-badge-blue' : match.status === 'pending' ? 'tm-badge-orange' : match.status === 'approved' ? 'tm-badge-green' : match.status === 'closed' ? 'tm-badge-grey' : 'tm-badge-blue';
+  // 배지는 두 가지 서로 다른 사실을 말한다 — **나와의 관계**와 **매치 상태**.
+  // 예전엔 한 배지에 눌러 담아서, 호스트가 보는 매치는 마감·취소·종료여도 '내 매치'로만
+  // 보이고 마감 표시가 아예 없었다(statusToCardStatus 가 viewerState 를 먼저 본다).
+  // 관계가 있으면 관계 배지를, 마감이면 마감 배지를 각각 붙인다 — 둘 다인 경우 둘 다 붙는다.
+  const relation = match.status === 'mine'
+    ? { label: '내 매치', className: 'tm-badge-blue' }
+    : match.status === 'pending'
+      ? { label: '승인 대기', className: 'tm-badge-orange' }
+      : match.status === 'approved'
+        ? { label: '승인 완료', className: 'tm-badge-green' }
+        : null;
   // 마감된 팀매치도 경기 시작 전까지 목록에 남는다(team-matches.service.ts list()) —
   // 배지만으로는 스크롤 중에 안 걸리므로 카드 지면·사진도 함께 눌러 한눈에 갈리게 한다.
-  const isClosed = match.status === 'closed';
+  // 판정은 관계가 아니라 API status 로 한다(match.closed) — 호스트도 같은 규칙으로 본다.
+  const isClosed = match.closed;
+  // 관계도 없고 마감도 아니면 "상대가 아직 없다"를 쓴다 — 목록 응답에 상대팀이 없어
+  // 화면 어디에도 없던 정보다. 상대 "팀 이름"은 응답에 없으므로 만들어내지 않는다.
+  const openLabel = !relation && !isClosed ? '상대 모집 중' : null;
   return (
-    <Link className={`tm-team-match-card tm-pressable${isClosed ? ' tm-card-closed' : ''}`} href={`/team-matches/${match.id}`}>
-      <div className={`tm-team-match-vs${match.imageUrl ? '' : ' tm-team-match-vs-sport'}`} style={match.imageUrl ? { backgroundImage: teamMatchBackgroundImage(match.imageUrl) } : undefined}>
-        {match.imageUrl ? null : <SportIllustration sport={match.sport} sizes="88px" className="tm-team-match-vs-illustration" />}
-        <div>
-          <div className="tm-text-caption">홈팀</div>
-          <div className="tm-text-subhead">{match.hostTeam}</div>
-        </div>
-        <span aria-hidden="true">vs</span>
-        <div style={{ textAlign: 'right' }}>
-          <div className="tm-text-caption">상대팀</div>
-          {/* P0/P1: 상태를 색상+아이콘+텍스트 병행 (WCAG 1.4.1) */}
-          <div className={`tm-badge ${statusClass}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
-            {statusLabel}
-          </div>
-        </div>
+    <Link className={`tm-match-row tm-card-interactive tm-pressable${isClosed ? ' tm-card-closed' : ''}`} href={`/team-matches/${match.id}`}>
+      {/* 예전엔 카드 위쪽 124px(카드의 44%)이 파란 VS 밴드였다. 그 밴드의 "상대팀" 칸에는
+          담을 값이 없다 — 목록 API 응답에 상대팀이 없고, 팀매치는 대부분 상대가 아직 정해지지
+          않은 모집 글이라 그 자리를 상태 배지가 차지하고 있었다. 결과적으로 시각 무게가 가장 큰
+          영역이 정보를 가장 적게 담았다(alpha 실측 2026-09-07: 390에서 카드 280px·한 화면 2.75장,
+          같은 토글의 개인 탭은 131px·5.88장).
+          그래서 개인 탭과 같은 행 카드(.tm-match-row)로 통일한다 — 새 카드 체계를 만들지 않고
+          이미 배포된 규칙을 그대로 쓴다. */}
+      <div className={`tm-match-row-thumb${match.imageUrl ? '' : ' tm-match-media-sport'}`} style={match.imageUrl ? { backgroundImage: teamMatchBackgroundImage(match.imageUrl) } : undefined}>
+        {match.imageUrl ? null : <SportIllustration sport={match.sport} sizes="76px" />}
       </div>
-      <div style={{ padding: 16 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <span className="tm-badge tm-badge-blue">{match.sport}</span>
-          {/* 값이 비면 내용 없는 회색 알약만 남는다(리그 대진은 등급·경기방식 미입력이 기본) — 숨긴다. */}
-          {match.grade ? <span className="tm-badge tm-badge-grey">{match.grade}등급</span> : null}
-          {match.format ? <span className="tm-badge tm-badge-grey">{match.format}</span> : null}
-          {match.gender ? <span className="tm-badge tm-badge-grey">{match.gender}</span> : null}
-          {/* 리그전 배지: 상태(모집중/마감)가 아니라 카테고리라 중립 grey 를 쓴다.
-              컬러만으로 뜻을 전달하지 않도록 "리그전" 텍스트를 함께 싣는다(DESIGN.md 규칙).
-              카드 전체가 이미 상세로 가는 Link라 <a>를 중첩하면 브라우저 파서가 바깥
-              <a>를 조기에 닫아 하이드레이션 불일치·레이아웃 붕괴를 낸다(HTML5 어댑션
-              에이전시 규칙 — <a> 안에 새 <a>가 열리면 바깥 태그가 강제로 닫힌다).
-              대신 button + stopPropagation/preventDefault로 안전하게 리그 홈으로
-              이동시킨다. "클릭 가능함"은 컬러가 아니라 화살표 아이콘+밑줄로 전달한다. */}
-          {league ? (
-            <button
-              type="button"
-              className="tm-badge tm-badge-grey tm-league-badge-link"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                router.push(`/league-matches/${league.leagueId}`);
-              }}
-              aria-label={`${league.title} 리그 상세로 이동`}
-            >
-              정규 리그
-              <ChevronRightIcon size={12} strokeWidth={2.5} aria-hidden="true" />
-            </button>
+      <div className="tm-match-row-main">
+        {/* 팀이 이 목록의 신원이다 — 제목보다 먼저 읽히도록 맨 위 줄에 둔다.
+            매너·승수는 모르면(공개 후기 0건) 아예 안 쓴다. 0 으로 채우면 잘하는 팀이 최악으로 보인다. */}
+        {/* 상태 배지는 제목 줄이 아니라 이 신원 줄에 둔다. 팀매치는 개인 매치와 달리 거의 모든
+            카드에 배지가 붙어(모집 중·신청 마감·승인 완료…), 제목 줄에 인라인으로 두면 매 카드에서
+            제목이 그만큼 잘린다 — 데스크톱 실측(2026-09-07)에서 본문 191px 중 제목이 111px 였다. */}
+        <div className="tm-text-caption tm-match-row-meta tm-team-match-row-id">
+          {relation ? (
+            <span className={`tm-badge ${relation.className}`}>
+              <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
+              {relation.label}
+            </span>
           ) : null}
-          {/* 비용을 모를 때(null)는 배지를 붙이지 않는다 — 0 과 null 을 같이 다루면
-              costNote 를 안 적은 매치가 전부 '무료초청'으로 둔갑한다. */}
-          {match.opponentCost === 0 ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}
+          {isClosed ? (
+            <span className="tm-badge tm-badge-grey tm-card-closed-badge">
+              <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
+              신청 마감
+            </span>
+          ) : null}
+          {openLabel ? (
+            <span className="tm-badge tm-badge-blue">
+              <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
+              {openLabel}
+            </span>
+          ) : null}
+          <span className="tm-team-match-row-host">
+            <strong style={{ fontWeight: 600, color: 'var(--text-strong)' }}>{match.hostTeam}</strong>
+            {match.manner !== null && match.wins !== null ? (
+              <> · 매너 <span className="tab-num">{match.manner}</span> · 승 <span className="tab-num">{match.wins}</span></>
+            ) : null}
+          </span>
         </div>
-        <div className="tm-text-body-lg" style={{ marginTop: 12 }}>{match.title}</div>
-        <div className="tm-text-caption" style={{ marginTop: 4 }}>{match.date} {match.time} · {match.venue}</div>
-        <div className="tm-match-list-footer">
-          {/* 매너·승수를 모르면(공개된 팀 후기 0건 등) 줄을 비운다 — 0 으로 채우면 잘하는 팀이 최악으로 보인다.
-              푸터의 좌우 배치를 유지하려고 빈 span 을 자리표시자로 남긴다. */}
-          {match.manner !== null && match.wins !== null ? (
-            <span className="tm-text-caption">매너 <span style={{ fontVariantNumeric: 'tabular-nums' }}>{match.manner}</span> · 승 <span style={{ fontVariantNumeric: 'tabular-nums' }}>{match.wins}</span></span>
-          ) : (
-            <span />
-          )}
-          {/* P1: 숫자는 body-lg(17px/700), 단위 "원"은 caption(12px) — 2:1 비율 */}
-          {/* 비용을 모르면(costNote 미기재) 금액 자리를 '비용 미정'으로 둔다 — 0 으로 채워
-              '무료'라고 하면 없는 사실을 만들어낸다. */}
+        <div className="tm-match-row-headline">
+          <div className="tm-text-body-lg tm-match-row-title">{match.title}</div>
+        </div>
+        <div className="tm-text-caption tm-match-row-when">
+          <strong style={{ fontWeight: 600 }}>{match.date} {match.time}</strong>
+          {' · '}{match.venue}
+        </div>
+        <div className="tm-match-row-foot">
+          <span className="tm-text-caption tm-team-match-row-cond">
+            {[match.sport, match.grade ? `${match.grade}등급` : '', match.format, match.gender].filter(Boolean).join(' · ')}
+            {league ? (
+              <button
+                type="button"
+                className="tm-badge tm-badge-grey tm-league-badge-link"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  router.push(`/league-matches/${league.leagueId}`);
+                }}
+                aria-label={`${league.title} 리그 상세로 이동`}
+              >
+                정규 리그
+                <ChevronRightIcon size={12} strokeWidth={2.5} aria-hidden="true" />
+              </button>
+            ) : null}
+          </span>
+          {/* 비용을 모르면(costNote 미기재) '비용 미정'으로 둔다 — 0 으로 채워 '무료'라고 하면
+              없는 사실을 만들어낸다. */}
           {match.opponentCost === null ? (
-            <span className="tm-text-caption">비용 미정</span>
+            <span className="tm-text-caption tm-match-row-cost">비용 미정</span>
           ) : match.opponentCost === 0 ? (
-            <span className="tm-text-body-lg tab-num" style={{ color: 'var(--blue700)' }}>무료</span>
+            <span className="tm-text-label tm-match-row-act">무료초청</span>
           ) : (
-            <span className="tab-num" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
-              <span style={{ fontSize: 'var(--font-size-body-lg)', fontWeight: 700, color: 'var(--blue700)', fontVariantNumeric: 'tabular-nums' }}>{match.opponentCost.toLocaleString('ko-KR')}</span>
+            <span className="tab-num tm-match-row-cost" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
+              <span style={{ fontSize: 'var(--font-size-body-lg)', fontWeight: 700, color: 'var(--blue700)', fontVariantNumeric: 'tabular-nums' }}>{formatAmountNumber(match.opponentCost)}</span>
               <span style={{ fontSize: 'var(--font-size-body-sm)', fontWeight: 500, color: 'var(--blue700)' }}>원</span>
             </span>
           )}
@@ -1168,7 +1191,7 @@ function ConfirmStep({ model }: { model: TeamMatchCreateViewModel }) {
   // 종료 시간은 선택 입력이라 비어 있을 수 있다 — 상세 화면(:349 InfoRow label="장소")과
   // 동일하게 분기해야 확인 화면에 하이픈만 매달려 남는 것을 막는다.
   const timeRangeText = d.endTime ? `${d.date} ${d.startTime}-${d.endTime}` : `${d.date} ${d.startTime}`;
-  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-team-create-preview" style={{ backgroundImage: cssUrl(d.imageUrl) }}><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{model.selectedTeam} vs 상대팀</div></div><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{d.gender}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format}${styleText ? ` · ${styleText}` : ''}`} sub={`${d.uniform} · ${d.gender}`} /><InfoRow label="비용" value={`총 ${d.cost.toLocaleString('ko-KR')}원 · 상대팀 ${d.opponentCost.toLocaleString('ko-KR')}원`} /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={d.venue} sub={d.address} /></Card></div>;
+  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-team-create-preview" style={{ backgroundImage: cssUrl(d.imageUrl) }}><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{model.selectedTeam} vs 상대팀</div></div><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{d.gender}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format}${styleText ? ` · ${styleText}` : ''}`} sub={`${d.uniform} · ${d.gender}`} /><InfoRow label="비용" value={`총 ${formatAmountNumber(d.cost)}원 · 상대팀 ${formatAmountNumber(d.opponentCost)}원`} /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={d.venue} sub={d.address} /></Card></div>;
 }
 
 // TeamMatchComplete(웨이브4 이전): /team-matches/new/complete 전용 화면이었다. 실제 제출

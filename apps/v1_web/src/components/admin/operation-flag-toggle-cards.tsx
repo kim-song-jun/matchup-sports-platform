@@ -82,11 +82,11 @@ function ToggleCard({ toggle, gateEnabled, showToast }: ToggleCardProps) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-[16px] font-bold text-[var(--text-strong)]">{toggle.label}</h3>
+            <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">{toggle.label}</h3>
             {!flagQuery.isPending && !flagQuery.isError && (
               <span
                 className={[
-                  'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold shrink-0',
+                  'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[length:var(--font-size-micro)] font-semibold shrink-0',
                   isOn ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
                 ].join(' ')}
               >
@@ -95,14 +95,14 @@ function ToggleCard({ toggle, gateEnabled, showToast }: ToggleCardProps) {
               </span>
             )}
           </div>
-          <p className="text-[13px] text-[var(--text-muted)] mt-2 leading-relaxed">
+          <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)] mt-2 leading-relaxed">
             {isOn ? toggle.onEffect : toggle.offEffect}
           </p>
-          <p className="text-[11px] text-[var(--text-muted)] mt-2 font-mono">{toggle.techNote}</p>
+          <p className="text-[length:var(--font-size-micro)] text-[var(--text-muted)] mt-2 font-mono">{toggle.techNote}</p>
         </div>
 
         {flagQuery.isError ? (
-          <span className="shrink-0 text-[12px] text-[var(--red700)]">불러오지 못함</span>
+          <span className="shrink-0 text-[length:var(--font-size-caption)] text-[var(--red700)]">불러오지 못함</span>
         ) : (
           <button
             type="button"
@@ -110,7 +110,7 @@ function ToggleCard({ toggle, gateEnabled, showToast }: ToggleCardProps) {
             disabled={disabled}
             aria-label={`${toggle.label} ${ctaLabel}`}
             className={[
-              'shrink-0 inline-flex items-center justify-center min-h-[44px] px-4 rounded-xl text-[13px] font-semibold transition-colors',
+              'shrink-0 inline-flex items-center justify-center min-h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold transition-colors',
               'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40 disabled:cursor-not-allowed',
               isOn ? 'bg-[var(--surface-soft)] text-[var(--text-body)] hover:bg-[var(--grey300)]' : 'bg-blue-500 text-white hover:bg-blue-600',
             ].join(' ')}
@@ -121,7 +121,7 @@ function ToggleCard({ toggle, gateEnabled, showToast }: ToggleCardProps) {
       </div>
 
       {flag && (
-        <dl className="grid grid-cols-3 gap-2 pt-3 mt-3 border-t border-[var(--border)] text-[12px]">
+        <dl className="grid grid-cols-3 gap-2 pt-3 mt-3 border-t border-[var(--border)] text-[length:var(--font-size-caption)]">
           <div>
             <dt className="text-[var(--text-muted)]">버전</dt>
             <dd className="text-[var(--text-body)] font-medium tabular-nums">v{flag.version}</dd>
@@ -171,7 +171,7 @@ export function OperationFlagToggleCards({ gateEnabled, showToast }: OperationFl
   return (
     <div className="flex flex-col gap-3">
       {!gateEnabled && (
-        <p className="text-[13px] text-[var(--text-muted)]">간소 전환 모드가 꺼져 있어 토글을 실행할 수 없어요.</p>
+        <p className="text-[length:var(--font-size-label)] text-[var(--text-muted)]">간소 전환 모드가 꺼져 있어 토글을 실행할 수 없어요.</p>
       )}
       {TOGGLES.map((toggle) => (
         <ToggleCard key={toggle.key} toggle={toggle} gateEnabled={gateEnabled} showToast={showToast} />

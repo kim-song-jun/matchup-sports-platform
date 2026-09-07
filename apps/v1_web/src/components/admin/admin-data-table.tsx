@@ -164,7 +164,7 @@ export function AdminDataTable<T>({
     // 여기 <table> 자체에 같이 걸면 w-max로 콘텐츠 폭까지 자라야 할 테이블이
     // 그 cap에 눌려 overflow-x-auto 스크롤 대신 다시 컬럼 압축이 재발한다.
     const tableClassName = compact
-      ? 'w-max min-w-full text-[13px] text-[var(--text-body)]'
+      ? 'w-max min-w-full text-[length:var(--font-size-label)] text-[var(--text-body)]'
       : 'w-max min-w-full text-sm text-[var(--text-body)]';
 
     return (
@@ -177,7 +177,7 @@ export function AdminDataTable<T>({
                 scope="col"
                 className={[
                   cellPad,
-                  'font-semibold text-[var(--text-muted)] text-[12px] tracking-wide whitespace-nowrap select-none',
+                  'font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)] tracking-wide whitespace-nowrap select-none',
                   alignClass(col.align),
                   col.width ?? '',
                   col.className ?? '',
@@ -191,7 +191,7 @@ export function AdminDataTable<T>({
                 scope="col"
                 className={[
                   cellPad,
-                  'font-semibold text-[var(--text-muted)] text-[12px] tracking-wide text-right whitespace-nowrap',
+                  'font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)] tracking-wide text-right whitespace-nowrap',
                   stickyActions ? 'sticky right-0 z-20 bg-[var(--card-surface)] border-l border-[var(--border)]' : '',
                 ].filter(Boolean).join(' ')}
               >
@@ -331,7 +331,7 @@ export function AdminDataTable<T>({
             >
               <dl className="flex flex-col gap-2">
                 {columns.map((col) => (
-                  <div key={col.key} className="flex items-start gap-2 text-[13px]">
+                  <div key={col.key} className="flex items-start gap-2 text-[length:var(--font-size-label)]">
                     <dt className="shrink-0 text-[var(--text-muted)] w-[90px] font-medium">{col.header}</dt>
                     {/* min-w-0: flex item 의 기본 min-width 는 auto 라, 셀 내용이 길면 dd 가
                         줄어들지 못하고 뷰포트를 밀어낸다(390px 화면에서 dd 가 410px 로 버텨

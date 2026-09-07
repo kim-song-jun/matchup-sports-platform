@@ -45,7 +45,7 @@ describe('사진 없는 팀매치', () => {
   it('목록 카드는 사진 대신 종목 그래픽을 그린다', () => {
     const model = { ...base, matches: [{ ...toTeamMatch(apiTeamMatch, base.matches[0]) }], isLoading: false };
     const { container } = renderPage(<TeamMatchListPageView model={model} />);
-    expect(container.querySelector('.tm-team-match-vs-sport')).not.toBeNull();
+    expect(container.querySelector('.tm-match-row-thumb.tm-match-media-sport')).not.toBeNull();
     expect(queryImageBySrc(container, `/illustrations/${sportIllustration('풋살')}-640.webp`)).not.toBeNull();
   });
 });

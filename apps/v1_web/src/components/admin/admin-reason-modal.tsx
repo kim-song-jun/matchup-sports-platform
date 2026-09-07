@@ -83,7 +83,7 @@ export function AdminReasonModal({
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <h2
             id="admin-reason-modal-title"
-            className="text-[16px] font-bold text-[var(--text-strong)]"
+            className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]"
           >
             {title}
           </h2>
@@ -105,7 +105,7 @@ export function AdminReasonModal({
             <div className="flex flex-col gap-2">
               <label
                 htmlFor="admin-reason-status"
-                className="text-[13px] font-semibold text-[var(--text-body)]"
+                className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]"
               >
                 변경할 상태
               </label>
@@ -133,7 +133,7 @@ export function AdminReasonModal({
             <div className="flex flex-col gap-2">
               <label
                 htmlFor="admin-reason-text"
-                className="text-[13px] font-semibold text-[var(--text-body)]"
+                className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]"
               >
                 사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
@@ -170,7 +170,7 @@ export function AdminReasonModal({
 
             {/* Required hint */}
             {trimmedReason.length === 0 && reason.length > 0 && (
-              <p className="text-[12px] text-[var(--red700)]" role="alert">
+              <p className="text-[length:var(--font-size-caption)] text-[var(--red700)]" role="alert">
                 공백만 입력하면 제출할 수 없어요.
               </p>
             )}
@@ -182,7 +182,7 @@ export function AdminReasonModal({
               type="button"
               onClick={() => !pending && onClose()}
               disabled={pending}
-              className="flex-1 h-[48px] rounded-xl text-[15px] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -190,7 +190,7 @@ export function AdminReasonModal({
               type="submit"
               disabled={!canSubmit}
               className={[
-                'flex-1 h-[48px] rounded-xl text-[15px] font-semibold transition-colors',
+                'flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 canSubmit
                   ? 'bg-blue-500 text-white hover:bg-blue-600'

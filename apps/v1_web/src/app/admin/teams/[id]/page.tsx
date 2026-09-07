@@ -33,7 +33,7 @@ function RecentTeamMatches({ team }: { team: V1AdminTeamDetail }) {
 
   return (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="최근 주최 팀매치">
-      <h2 className="text-[17px] font-bold text-[var(--text-strong)]">최근 주최 팀매치</h2>
+      <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">최근 주최 팀매치</h2>
       {matches.length > 0 ? (
         <ol className="mt-4 flex flex-col gap-2">
           {matches.map((match) => (
@@ -67,7 +67,7 @@ function TeamMembers({ team }: { team: V1AdminTeamDetail }) {
   return (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="팀원 목록">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[17px] font-bold text-[var(--text-strong)]">팀원</h2>
+        <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">팀원</h2>
         <span className="text-sm font-semibold tabular-nums text-[var(--text-muted)]">{team.members.length}명</span>
       </div>
       {team.members.length > 0 ? (
@@ -150,7 +150,7 @@ export default function AdminTeamDetailPage() {
                   <Users size={16} aria-hidden="true" />
                   팀
                 </div>
-                <h2 className="mt-2 break-words text-[22px] font-bold text-[var(--text-strong)]">{team.name}</h2>
+                <h2 className="mt-2 break-words text-[length:var(--font-size-subhead)] font-bold text-[var(--text-strong)]">{team.name}</h2>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">{team.sportName}</p>
               </div>
               <AdminStatusPill status={team.status} />
@@ -175,7 +175,7 @@ export default function AdminTeamDetailPage() {
 
         <aside className="flex flex-col gap-4" aria-label="팀 운영 요약">
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">운영 요약</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">운영 요약</h2>
             <dl className="mt-4 grid gap-3">
               <AdminSummaryItem icon={<Users size={16} />} label="전체 멤버" value={team.memberCount} />
               <AdminSummaryItem icon={<Shield size={16} />} label="매니저" value={team.managerCount} />
@@ -186,7 +186,7 @@ export default function AdminTeamDetailPage() {
           </section>
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-            <h2 className="text-[17px] font-bold text-[var(--text-strong)]">신뢰 정보</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">신뢰 정보</h2>
             {trust ? (
               <dl className="mt-4 grid gap-3">
                 <AdminSummaryItem icon={<Shield size={16} />} label="상태" value={trust.trustState} />

@@ -60,7 +60,7 @@ export function TournamentCampaignStatusDialog({
         </div>
         <form onSubmit={submit} noValidate>
           <div className="grid gap-2 px-5 py-5">
-            <label htmlFor="campaign-status-reason" className="text-[13px] font-semibold text-[var(--text-body)]">사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span></label>
+            <label htmlFor="campaign-status-reason" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span></label>
             <textarea
               id="campaign-status-reason"
               ref={initialFocusRef}

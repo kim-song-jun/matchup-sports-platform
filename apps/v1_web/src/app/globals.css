@@ -2899,6 +2899,35 @@ label.tm-btn:focus-within {
   --text-muted: var(--grey700);
 }
 
+/* ── 틴트 지면 위의 보조 텍스트 ────────────────────────────────────────────────
+   바로 위 .tm-card-closed 가 쓴 방법을, 같은 조건인 다른 지면으로 넓힌다.
+   --grey600(#6b7684)은 **흰 배경에서만** AA 를 넘고, 지면에 조금이라도 색이
+   깔리면 아래로 떨어진다(alpha 배포본 실측):
+
+     흰 카드 (#ffffff)      4.62:1   통과
+     --grey50  (#f9fafb)    4.42:1   미달
+     --grey100 (#f2f4f6)    4.19:1   미달
+     --blue50  (#e8f3ff)    4.11:1   미달
+
+   --grey700(#4e5968)으로 올리면 같은 순서로 7.11 / 6.81 / 6.45 / 6.33 이 된다.
+   토큰을 전역으로 바꾸지 않는 이유는 흰 카드 위 캡션까지 진해져 본문과의 위계가
+   좁아지기 때문이다 — 지면에 색이 깔린 곳에서만 올린다.
+
+   다크에서는 --grey700 과 --text-caption 이 같은 값(#9aa4b2)이라 이 블록이
+   아무것도 바꾸지 않는다(실측 확인). 세그먼트 탭의 활성 항목은 --text-strong 을
+   따로 쓰므로 영향받지 않는다(활성 항목은 흰 thumb 위에 있다).
+   ────────────────────────────────────────────────────────────────────────── */
+.tm-badge-grey,
+.tm-segmented-tabs,
+.tm-quick-grid,
+.tm-match-summary-row,
+.tm-team-summary-bar,
+.tm-weather-strip,
+.tm-player-card-progress {
+  --text-caption: var(--grey700);
+  --text-muted: var(--grey700);
+}
+
 /* 글자가 얹히지 않는 썸네일은 그대로 눌러도 된다. */
 .tm-card-closed .tm-match-row-thumb {
   opacity: 0.45;

@@ -561,26 +561,28 @@ describe('인라인으로 지면 색을 까는 곳의 보조 텍스트 (.tm-on-t
   });
 
   // 클래스만 있고 아무 데도 안 붙으면 아무것도 고쳐지지 않는다 — alpha 에서 실제로
-  // 미달이 확인된 두 곳에 붙어 있는지 본다.
+  // 미달이 확인된 곳에 붙어 있는지 본다.
+  //
+  // **파일 어딘가에 있는지가 아니라 그 요소에 붙었는지를 본다**(#1114 Copilot).
+  // `className="tm-on-tint"` 문자열만 찾으면 두 방향으로 틀린다: 클래스를 하나만 더
+  // 붙여도(`"tm-on-tint tm-x"`) 가짜 red 가 나고, 엉뚱한 요소에 붙어 있어도 통과한다.
+  // 틴트를 까는 **여는 태그 범위**를 잡아 그 안에 클래스가 있는지 확인한다.
+  const openingTagsWithTint = (source: string, tag: string, tint: RegExp) =>
+    (source.match(new RegExp('<' + tag + '[^>]*>', 'g')) ?? []).filter((one) => tint.test(one));
+
   it.each([
-    ['src/components/tournaments/pending-review-card.tsx', "background: 'var(--tint-blue)'"],
-    ['src/app/tournaments/page.tsx', "background: 'var(--blue50)'"],
-    ['src/components/my/my-api-clients.tsx', "'var(--blue50)'"],
-  ])('%s 의 틴트 지면에 표시 클래스가 붙어 있다', (file, tint) => {
-    const source = readFileSync(resolve(process.cwd(), file), 'utf8');
-
-    expect(source, file + ' 에서 틴트 배경을 찾지 못했다').toContain(tint);
-    expect(source).toMatch(/className="tm-on-tint"/);
-  });
-
-  it('my-api-clients 의 틴트 카드 3개 모두에 붙어 있다', () => {
+    ['src/components/tournaments/pending-review-card.tsx', 'Card', /var\(--tint-blue\)/, 1],
+    ['src/app/tournaments/page.tsx', 'Link', /var\(--blue50\)/, 1],
     // 이 파일은 blue50/red50 을 조건부로 까는 Card 가 셋이다. 하나만 붙이면 나머지
     // 둘은 그대로 미달로 남는다 — red50 은 4.02:1 로 blue50(4.11)보다 더 낮다.
-    const source = readFileSync(resolve(process.cwd(), 'src/components/my/my-api-clients.tsx'), 'utf8');
-    const tinted = source.match(/<Card[^>]*var\(--blue50\)/g) ?? [];
+    ['src/components/my/my-api-clients.tsx', 'Card', /var\(--blue50\)/, 3],
+  ])('%s 의 틴트 %s 태그 %d개 전부에 표시 클래스가 붙어 있다', (file, tag, tint, count) => {
+    const source = readFileSync(resolve(process.cwd(), file), 'utf8');
+    const tinted = openingTagsWithTint(source, tag as string, tint as RegExp);
 
-    expect(tinted.length).toBe(3);
-    for (const tag of tinted) expect(tag).toContain('tm-on-tint');
+    expect(tinted.length, file + ' 의 틴트 태그 수가 달라졌다').toBe(count);
+    // 클래스 목록 안에 있으면 된다 — 다른 클래스와 함께 써도 통과해야 한다.
+    for (const one of tinted) expect(one).toMatch(/className="[^"]*\btm-on-tint\b/);
   });
 });
 

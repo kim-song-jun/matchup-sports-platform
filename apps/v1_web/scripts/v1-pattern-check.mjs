@@ -407,8 +407,39 @@ checkLiteralBaseline({
     // globals.test.ts 의 검사와 같은 방식이다.
     const MARKED = /className=(?:"[^"]*\btm-on-tint\b|'[^']*\btm-on-tint\b|\{[^}]*\btm-on-tint\b)/;
     // 여는 태그 단위로 본다 — 배경과 className 이 같은 태그 안에 있어야 처방이 닿는다.
-    const tags = txt.match(/<[A-Za-z][A-Za-z0-9]*\b[^>]*?>/gs) || [];
-    return tags.filter((tag) => BG.test(tag) && TOKEN.test(tag) && !MARKED.test(tag)).length;
+    // 여는 태그를 정규식 `[^>]*?>` 로 끊으면 **`onClick={() => …}` 의 `>` 에서 조기
+    // 종료**된다. 그러면 그 뒤에 오는 `style={{ background: … }}` 를 못 봐서 누락을
+    // 세지 못한다(실측 6곳). 따옴표·중괄호 깊이를 세며 depth 0 의 `>` 만 태그 끝으로
+    // 본다 — 이 파일의 radius 검사가 값을 읽을 때 쓰는 방식과 같다.
+    const openingTags = (src) => {
+      const found = [];
+      const START = /<[A-Za-z][A-Za-z0-9]*\b/g;
+      let m;
+      while ((m = START.exec(src)) !== null) {
+        let depth = 0;
+        let quote = '';
+        let j = START.lastIndex;
+        for (; j < src.length; j++) {
+          const c = src[j];
+          if (quote) {
+            if (c === '\\') { j += 1; continue; }
+            if (c === quote) quote = '';
+          } else if (c === '"' || c === "'" || c === '`') {
+            quote = c;
+          } else if (c === '{') {
+            depth += 1;
+          } else if (c === '}') {
+            depth -= 1;
+          } else if (c === '>' && depth === 0) {
+            found.push(src.slice(m.index, j + 1));
+            break;
+          }
+        }
+        START.lastIndex = j + 1;
+      }
+      return found;
+    };
+    return openingTags(txt).filter((tag) => BG.test(tag) && TOKEN.test(tag) && !MARKED.test(tag)).length;
   },
   hint: '인라인으로 지면 색을 깔면 같은 태그에 className="tm-on-tint" 를 함께 붙일 것 (globals.css .tm-on-tint)',
 });

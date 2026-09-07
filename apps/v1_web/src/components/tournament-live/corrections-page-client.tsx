@@ -8,6 +8,7 @@ import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { useTournamentEndedFixtures, type TournamentOperationsBoardItem } from '@/hooks/use-tournament-result-review';
+import { buildLeagueFixtureTitles, resolveFixtureLabel } from '@/components/tournament-result-review/fixture-label';
 import { FixturePickerList } from '@/components/tournament-result-review/fixture-picker-list';
 import { GameResultCorrectionPanel } from '@/components/tournament-result-review/game-result-correction-panel';
 import { describeResultReviewError } from '@/components/tournament-result-review/result-review-copy';
@@ -44,6 +45,11 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
     }
     return map;
   }, [tournament.data?.fixtures]);
+
+  const leagueTitlesByFixtureId = useMemo(
+    () => buildLeagueFixtureTitles(tournament.data?.leagueFixtures),
+    [tournament.data?.leagueFixtures],
+  );
 
   const hasOfficialResult = useMemo(
     () =>
@@ -103,6 +109,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
             <FixturePickerList
               items={hasOfficialResult}
               teamNamesByFixtureId={teamNamesByFixtureId}
+              leagueTitlesByFixtureId={leagueTitlesByFixtureId}
               selectedFixtureId={selectedFixtureId}
               onSelect={(item) => {
                 setSelectedFixtureId(item.fixtureId);
@@ -122,7 +129,16 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
                   className="tm-text-body-lg"
                   style={{ marginBottom: 12, outline: 'none' }}
                 >
-                  {selectedItem.round} · {selectedItem.fixtureNumber}경기
+                  {
+                    /* 리그 대진은 `round`·`fixtureNumber` 가 둘 다 null 이라, 그대로 두면
+                       구분자만 남은 `" · 경기"` 가 된다. 리그 어드민 대진표가 확정 단계 행을
+                       이 화면으로 딥링크하므로 실제로 도달한다. */
+                    resolveFixtureLabel(
+                      selectedItem,
+                      teamNamesByFixtureId.get(selectedItem.fixtureId),
+                      leagueTitlesByFixtureId,
+                    ).title
+                  }
                 </h2>
                 <GameResultCorrectionPanel
                   key={selectedItem.gameId}

@@ -4225,8 +4225,17 @@ export const V1_STABLE_WARNING_CODES: readonly V1TournamentStableWarningCode[] =
 export type V1TournamentOperationsBoardItem = {
   fixtureId: string;
   tournamentId: string;
-  round: string;
-  fixtureNumber: number;
+  /**
+   * **리그 행에서는 `null` 이다.** 주차·번호는 대회 축(`V1TournamentFixture`)의 컬럼이고
+   * `V1TeamMatch` 에는 **존재하지 않는다** — 서버가 리그 행에 명시적으로 `null` 을 넣는다.
+   *
+   * 예전엔 여기를 non-null 로 선언해서 **타입이 거짓말을 했다**: 모든 소비처가 널 체크를
+   * 요구받지 않으니 템플릿 리터럴에 그대로 넣어도 타입상 정상이었고, 화면에 `"null번 경기"`
+   * 가 찍혔다. tsc·테스트·CI 는 전부 green 이었다. 정직하게 적어야 컴파일러가 소비처를
+   * 스스로 열거한다(바로 아래 `gameId`·`fieldName`·`scheduledAt` 은 원래 그렇게 돼 있다).
+   */
+  round: string | null;
+  fixtureNumber: number | null;
   gameId: string | null;
   gameState: V1GameState | null;
   fieldId: string | null;

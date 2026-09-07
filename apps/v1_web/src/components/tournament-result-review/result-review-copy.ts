@@ -81,11 +81,23 @@ export const REVISION_STATE_BADGE_TONE: Record<GameResultRevisionState, 'blue' |
   VOID: 'red',
 };
 
+/**
+ * **팀 역할까지 덮는다.** 이 화면은 이제 리그 대진(팀매치 소스)도 지나고, 그때 액터는
+ * 팀 쪽 역할로 해석된다. 예전엔 대회 스태프 4개만 있어서 팀 역할이 오면
+ * `ACTOR_ROLE_LABELS[role]` 이 `undefined` 가 되고, 그걸 템플릿 리터럴에 넣던 자리가
+ * 화면에 **"종료 · undefined"** 를 찍었다(2026-09-06 alpha 실측).
+ *
+ * `Record<GameActorRole, string>` 이라 **역할이 늘면 tsc 가 여기 누락을 잡는다** — 그게
+ * 이 타입을 넓게 유지하는 이유다.
+ */
 export const ACTOR_ROLE_LABELS: Record<GameActorRole, string> = {
   platform_ops: '플랫폼 운영자',
   tournament_director: '대회 감독관',
   field_operator: '현장 진행요원',
   support_readonly: '고객지원(읽기 전용)',
+  team_owner: '팀장',
+  team_manager: '팀 매니저',
+  opponent_manager: '상대팀 매니저',
 };
 
 /** tournament_director/platform_ops only -- field_operator/support_readonly

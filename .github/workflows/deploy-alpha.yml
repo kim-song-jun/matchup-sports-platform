@@ -227,6 +227,29 @@ jobs:
           bash scripts/release/sync-alpha-apns-env.sh \
             || echo "::warning::APNs env sync did not complete; the host's APNs env may be unchanged from before"
 
+      # 문자 인증은 alpha 에서 곁다리가 아니다 — 가입 3단계 중 2단계라, 값이 없으면 신규 가입이
+      # 통째로 막힌다(503 SMS_NOT_CONFIGURED). 그래도 배포를 세우지는 않는다: 코드를 못 보내는
+      # alpha 는 그래도 도는 alpha 이고, 멈춘 배포는 아니다 — APNs 스텝이 같은 이유로 그렇게
+      # 정해졌고 한 번은 그것 때문에 릴리스가 막혔다.
+      - name: Sync SMS runtime env
+        env:
+          INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
+          AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
+          SECRET_SMS_PROVIDER: ${{ secrets.SMS_PROVIDER }}
+          SECRET_SOLAPI_API_KEY: ${{ secrets.SOLAPI_API_KEY }}
+          SECRET_SOLAPI_API_SECRET: ${{ secrets.SOLAPI_API_SECRET }}
+          SECRET_SOLAPI_SENDER_NUMBER: ${{ secrets.SOLAPI_SENDER_NUMBER }}
+          SECRET_GABIA_SMS_ID: ${{ secrets.GABIA_SMS_ID }}
+          SECRET_GABIA_API_KEY: ${{ secrets.GABIA_API_KEY }}
+          SECRET_GABIA_SENDER_NUMBER: ${{ secrets.GABIA_SENDER_NUMBER }}
+        run: |
+          if [ -z "${SECRET_SMS_PROVIDER:-}" ]; then
+            echo "::warning::SMS_PROVIDER is not set, so the host's SMS env was not updated"
+            exit 0
+          fi
+          bash scripts/release/sync-alpha-sms-env.sh \
+            || echo "::warning::SMS env sync did not complete; the host's SMS env may be unchanged from before"
+
       - name: Deploy through AWS Systems Manager
         timeout-minutes: 25
         env:

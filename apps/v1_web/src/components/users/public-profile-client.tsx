@@ -171,6 +171,9 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
 
       {/* 매너 점수 */}
       <div
+        // 지면에 색을 까므로 그 위 보조 텍스트를 함께 올린다(globals.css .tm-on-tint).
+        // --surface-soft 위에서 grey600 이 4.19:1 이었다(alpha 실측, "아직 없음").
+        className="tm-on-tint"
         style={{
           display: 'flex',
           alignItems: 'center',

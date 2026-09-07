@@ -38,6 +38,7 @@ export const TOURNAMENTS_EXTRA_ROUTES: RouteChromeEntry[] = [
       bottomNav: false,
       backHref: (p) => `/tournaments/${p.id}`,
       desktopHead: true,
+      titleAsHeading: true,
     },
   },
   {

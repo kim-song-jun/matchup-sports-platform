@@ -30,6 +30,7 @@ export const MATCHES_ROUTES: RouteChromeEntry[] = [
       activeTab: 'matches',
       bottomNav: false,
       backHref: (p) => `/matches/${p.id}`,
+      titleAsHeading: true,
     },
   },
   // 매치 수정 — matches-page.tsx:486(MatchCreatePageView, edit=true 분기).

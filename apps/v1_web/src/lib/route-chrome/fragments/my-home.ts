@@ -33,7 +33,7 @@ export const MY_HOME_ROUTES: RouteChromeEntry[] = [
   { pattern: '/my', chrome: { title: '마이페이지', activeTab: 'my', centerTitle: true } },
   { pattern: '/my/matches/joined', chrome: { title: '내 매치', activeTab: 'my', bottomNav: false, backHref: '/my' } },
   { pattern: '/my/matches/created', chrome: { title: '내 매치', activeTab: 'my', bottomNav: false, backHref: '/my' } },
-  { pattern: '/my/teams', chrome: { title: '내 팀', activeTab: 'my', bottomNav: false, backHref: '/my' } },
+  { pattern: '/my/teams', chrome: { title: '내 팀', activeTab: 'my', bottomNav: false, backHref: '/my', titleAsHeading: true } },
   { pattern: '/my/invitations', chrome: { title: '받은 초대', activeTab: 'my', bottomNav: false, backHref: '/my' } },
   { pattern: '/my/join-applications', chrome: { title: '보낸 가입 신청', activeTab: 'my', bottomNav: false, backHref: '/my' } },
   { pattern: '/my/settings', chrome: { title: '설정', activeTab: 'my', bottomNav: false, backHref: '/my' } },

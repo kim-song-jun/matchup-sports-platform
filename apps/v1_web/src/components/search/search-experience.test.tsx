@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SearchExperience } from './search-experience';
 
@@ -149,5 +149,15 @@ describe('SearchExperience GA events', () => {
     await waitFor(() =>
       expect(analytics.trackEvent).toHaveBeenCalledWith('search', { queryLength: 6, resultCount: 1, domain: 'league' }),
     );
+  });
+});
+
+// 2026-09-07 alpha 실측: 이 화면엔 헤딩이 하나도 없어 스크린리더의 헤딩 이동으로 잡히지
+// 않았다. 검색창이 주인공이라 보이는 제목을 넣으면 입력이 밀리므로 sr-only 로 준다 —
+// 지우면 다시 헤딩 0개가 되므로 여기에 박제한다.
+describe('SearchExperience 접근성', () => {
+  it('화면에 보이지 않아도 페이지 제목 heading 을 제공한다', () => {
+    render(<SearchExperience state="results" />);
+    expect(screen.getByRole('heading', { name: '검색', level: 1 })).toBeInTheDocument();
   });
 });

@@ -156,6 +156,10 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
 
   return (
     <div className="tm-search-frame tm-content-enter" style={{ width: 'min(100%, var(--v1-app-chrome-frame-width))', height: '100%', minHeight: 0, margin: '0 auto', background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+      {/* 이 화면엔 헤딩이 하나도 없어 스크린리더의 헤딩 이동으로 잡히지 않았다(2026-09-07 실측).
+          검색은 입력창이 곧 주인공이라 보이는 제목을 넣으면 입력이 아래로 밀린다 —
+          /tournaments 와 같이 sr-only 로 준다(세로 비용 0). */}
+      <h1 className="sr-only">검색</h1>
       <form className="tm-search-form-bar" onSubmit={submit} style={{ minHeight: 'var(--v1-shell-topbar-height)', padding: '8px 12px 8px 8px', borderBottom: '1px solid var(--grey100)', display: 'flex', alignItems: 'center', gap: 1, background: 'var(--bg)', flexShrink: 0 }}>
         <button type="button" aria-label="뒤로가기" onClick={goBack} className="tm-search-back-btn tm-hide-desktop tm-tap-44" style={{ width: 30, minWidth: 30, height: 40, border: 0, background: 'transparent', borderRadius: 'var(--radius-control)', display: 'grid', placeItems: 'center', color: 'var(--text-strong)', padding: 0 }}>
           <ChevronLeft size={20} />

@@ -339,7 +339,13 @@ export class TeamMatchesService {
           title: teamMatch.title,
           sportName: teamMatch.sport.name,
           startsAt: teamMatch.startAt,
+          deadlineAt: teamMatch.deadlineAt,
           status: this.getApiStatus(teamMatch),
+          // list()/detail() 과 같은 필드를 싣는다 — 여기만 status 만 내려보내던 탓에
+          // "내 팀매치" 목록은 신청 마감이 지난 팀매치를 계속 '모집 중'으로 그렸고,
+          // 같은 매치를 열어본 상세는 displayState='closed' 라 '신청 마감'이었다
+          // (2026-09-07 제보: "밖에서는 모집중으로 뜨고 안에서는 신청 마감").
+          displayState: this.getDisplayState(teamMatch),
           relation,
           teamId,
           teamName: teamIds.includes(teamMatch.hostTeamId) ? teamMatch.hostTeam.name : application?.applicantTeam.name,

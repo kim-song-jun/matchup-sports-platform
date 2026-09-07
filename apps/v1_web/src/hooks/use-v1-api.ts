@@ -704,6 +704,37 @@ export function useV1CancelMatch(matchId: string) {
   });
 }
 
+/**
+ * 개인 매치 모집 마감 — 팀매치 useV1CloseTeamMatch 와 같은 계약(POST :id/close).
+ * 취소와 달리 되돌릴 수 있다(useV1ReopenMatch). 대기 중이던 신청서는 서버에서
+ * expired 로 정리되므로 신청 목록 캐시도 함께 비운다.
+ */
+export function useV1CloseMatch(matchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { reason?: string | null }) =>
+      v1Post<{ matchId: string; status: string; expiredApplications: number; detailRoute: string }>(`/matches/${matchId}/close`, body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.match(matchId), 'applications'] });
+    },
+  });
+}
+
+/** 개인 매치 모집 재개 — 호스트가 닫은 것과 마감 시각이 지난 것 둘 다 되돌린다. */
+export function useV1ReopenMatch(matchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body?: { reason?: string | null; deadlineAt?: string | null }) =>
+      v1Post<{ matchId: string; status: string; deadlineAt: string | null; detailRoute: string }>(`/matches/${matchId}/reopen`, body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
+    },
+  });
+}
+
 export function useV1MatchApplications(matchId: string, filters?: ListFilters, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: [...v1Keys.match(matchId), 'applications', filters ?? {}] as const,

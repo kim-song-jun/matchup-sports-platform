@@ -160,3 +160,43 @@ describe('MatchCreatePageView — 매치 수정 전체 필드', () => {
     expect(screen.getByLabelText('최대 인원 선택')).toContainHTML('<option value="100">100명</option>');
   });
 });
+
+/**
+ * 목록에는 이제 마감된 매치도 경기 시작 전까지 남는다(matches.service.ts list()) —
+ * 남기기만 하고 모집 중 카드와 똑같이 그리면 "밖에서는 모집중, 안에서는 신청 마감"이라는
+ * 원래 제보(2026-09-07)가 그대로 재현된다. 배지와 지면 처리가 실제로 붙는지 본다.
+ */
+describe('MatchListPageView — 신청 마감 카드 구분', () => {
+  // 기본 목업 목록에는 status 가 서로 다른 카드가 섞여 있어(open/pending/approved/full/mine)
+  // "배지가 하나도 없다" 류 단언이 다른 카드 때문에 흔들린다 — 카드 하나짜리 모델로 좁힌다.
+  function modelWithSingleCard(overrides: Partial<ReturnType<typeof getMatchListViewModel>['matches'][number]>) {
+    const base = getMatchListViewModel();
+    return { ...base, matches: [{ ...base.matches[0], ...overrides }] };
+  }
+
+  it('마감 시각이 지난 카드에 회색 "신청 마감" 배지를 붙이고 카드를 눌러 표시한다', () => {
+    const { container } = render(
+      <MatchListPageView model={modelWithSingleCard({ status: 'full', current: 2, capacity: 6 })} />,
+    );
+
+    expect(screen.getAllByText('신청 마감').length).toBeGreaterThan(0);
+    expect(container.querySelector('.tm-match-list-card.tm-card-closed')).not.toBeNull();
+  });
+
+  it('정원이 찬 카드는 "모집 완료"로 구분한다 (자리가 날 수 있는 것과 기한이 끝난 것은 다르다)', () => {
+    render(<MatchListPageView model={modelWithSingleCard({ status: 'full', current: 6, capacity: 6 })} />);
+
+    expect(screen.getAllByText('모집 완료').length).toBeGreaterThan(0);
+    expect(screen.queryByText('신청 마감')).not.toBeInTheDocument();
+  });
+
+  it('아직 신청할 수 있는 카드에는 마감 배지도 지면 처리도 붙지 않는다', () => {
+    const { container } = render(
+      <MatchListPageView model={modelWithSingleCard({ status: 'open', current: 2, capacity: 6 })} />,
+    );
+
+    expect(screen.queryByText('신청 마감')).not.toBeInTheDocument();
+    expect(screen.queryByText('모집 완료')).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-card-closed')).toBeNull();
+  });
+});

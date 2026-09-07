@@ -2753,6 +2753,21 @@ label.tm-btn:focus-within {
   font-weight: 600;
 }
 
+/* 팀매치 행의 조건 줄 — 종목·등급·경기방식 텍스트 옆에 리그 배지(button)가 인라인으로 붙는다.
+   배지는 baseline 정렬이라 그냥 두면 텍스트보다 아래로 처진다. */
+.tm-team-match-row-cond {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+/* 비용은 오른쪽 끝에서 줄어들면 안 된다 — 금액이 잘리면 판단 자체가 불가능해진다. */
+.tm-match-row-cost {
+  flex: none;
+}
+
 /* 제목 앞에 마감 배지를 붙이는 줄 — 배지와 제목이 같은 baseline 에 놓이게 한다. */
 .tm-match-row-headline {
   display: flex;
@@ -2786,11 +2801,7 @@ label.tm-btn:focus-within {
    grey700 으로 올려 6.7:1 을 확보한다. 다크에서는 --grey700 이 --text-caption 과 같은
    값(#9aa4b2)이라 이 재정의가 아무것도 바꾸지 않는다.
    ──────────────────────────────────────────────────────────────────────────── */
-/* .tm-team-match-card 는 이 파일에서 **아래쪽**에 선언돼 있어(3500번대) 같은 특이도
-   (0,1,0)로는 뒤 규칙이 이긴다 — alpha 실측에서 팀매치 마감 카드만 지면이 흰색으로
-   남아 있었다. 클래스를 겹쳐 특이도를 한 단계 올려 선언 순서에 기대지 않게 한다. */
-.tm-card-closed,
-.tm-team-match-card.tm-card-closed {
+.tm-card-closed {
   background: var(--card-surface-muted);
   --text-caption: var(--grey700);
   --text-muted: var(--grey700);
@@ -2808,14 +2819,12 @@ label.tm-btn:focus-within {
    3.25:1 → **1.61:1** 로 무너졌다. 정작 마감을 알리는 신호가 제일 안 읽히게 된 셈이다.
    여기서는 채도만 뺀다 — grayscale 은 상대 휘도를 보존해 대비가 그대로다.
    (개인 매치 카드의 미디어에도 종목·인원 배지가 얹혀 있어 같은 처리를 한다.) */
-.tm-card-closed .tm-match-list-media,
-.tm-card-closed .tm-team-match-vs {
+.tm-card-closed .tm-match-list-media {
   filter: grayscale(0.6);
 }
 
 /* 글자가 없는 종목 그래픽만 따로 눌러 "흐림"을 남긴다. */
-.tm-card-closed .tm-match-list-media .tm-match-sport-illustration,
-.tm-card-closed .tm-team-match-vs-illustration {
+.tm-card-closed .tm-match-list-media .tm-match-sport-illustration {
   opacity: 0.5;
 }
 
@@ -3737,43 +3746,6 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   gap: 12px;
 }
 
-.tm-team-match-card {
-  display: block;
-  overflow: hidden;
-  border: 1px solid var(--grey100);
-  border-radius: var(--radius-container);
-  background: var(--bg);
-  color: inherit;
-  text-decoration: none;
-}
-
-.tm-team-match-vs {
-  min-height: 124px;
-  padding: 16px;
-  background: var(--grey900);
-  color: var(--static-white);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-}
-
-.tm-team-match-vs .tm-text-caption,
-.tm-team-match-vs .tm-text-subhead {
-  color: var(--static-white);
-}
-
-.tm-team-match-vs .tm-text-caption {
-  opacity: .72;
-}
-
-.tm-team-match-vs > span {
-  color: rgba(255,255,255,.72);
-  font-size: 13px;
-  font-weight: 800;
-  text-align: center;
-}
-
 .tm-team-vs-hero {
   min-height: 224px;
   padding: 12px 16px 20px;
@@ -3798,8 +3770,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
  * 막는다. z-index 를 음수로 둬 흰 텍스트(비-포지션 콘텐츠)가 항상 그 위에 그려지게 한다 —
  * CSS 페인트 순서상 음수 z-index 자식은 비-포지션 콘텐츠보다 아래에 그려진다(CSS2.1 Appendix E).
  */
-.tm-team-vs-hero-sport,
-.tm-team-match-vs-sport {
+.tm-team-vs-hero-sport {
   background: var(--blue700);
   /* 아래 :root.dark 오버라이드와 짝이다 — 이 배경 위 글씨는 흰색 고정이다. */
   position: relative;
@@ -3817,16 +3788,6 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   bottom: 16px;
   width: 120px;
   height: 120px;
-  pointer-events: none;
-}
-
-.tm-team-match-vs-illustration {
-  position: absolute;
-  z-index: -1;
-  right: 12px;
-  bottom: 12px;
-  width: 88px;
-  height: 88px;
   pointer-events: none;
 }
 
@@ -3848,8 +3809,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
  * 다크에서 "밝은 파랑 + 흰 글씨"(2.42:1)가 되어 거의 안 읽힌다(alpha 실측 2026-09-06).
  * .tm-team-create-preview · .tm-team-detail-hero-card · .tm-chat-avatar 와 같은 처방으로
  * 다크에서 배경을 고정 어두운 파랑으로 되돌린다 — 흰 글씨 대비 5.41:1. */
-:root.dark .tm-team-vs-hero-sport,
-:root.dark .tm-team-match-vs-sport {
+:root.dark .tm-team-vs-hero-sport {
   /* --static-blue 는 테마가 뒤집혀도 값이 고정되는 파랑이다(#1b64da) — 이 용도로 정의돼 있다. */
   background: var(--static-blue);
 }
@@ -5119,8 +5079,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
     grid-template-columns: 1fr !important;
   }
 
-  .tm-team-vs-row,
-  .tm-team-match-vs {
+  .tm-team-vs-row {
     grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr);
     gap: 8px;
   }

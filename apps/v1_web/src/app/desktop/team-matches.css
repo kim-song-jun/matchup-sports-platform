@@ -76,16 +76,8 @@
      Redefining them here caused cross-domain bleed — matches.css values win
      the cascade and apply to both pages identically, so no override is needed. */
 
-  /* Team-match card: let the VS panel breathe at larger size */
-  .tm-team-match-card {
-    height: 100%;
-  }
-
-  .tm-team-match-vs {
-    min-height: 148px;
-    padding: 20px;
-    font-size: 1.05em;
-  }
+  /* 팀매치 목록 카드는 개인 탭과 같은 .tm-match-row 를 쓴다 — 데스크톱 그리드도
+     matches.css 의 .tm-match-card-stack 이 공통으로 맡으므로 여기서 따로 덮지 않는다. */
 
   /* Desktop page-head: use the shared .tm-desktop-page-head + .tm-desktop-back
      primitives from _shell.css. The JSX uses tm-desktop-page-head/tm-desktop-back

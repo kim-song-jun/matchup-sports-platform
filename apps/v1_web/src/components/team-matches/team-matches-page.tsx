@@ -14,6 +14,7 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { cssUrl } from '@/lib/assets';
+import { formatAmountNumber } from '@/lib/date-utils';
 // 사진 없는 팀매치의 종목 그래픽 — 매치·홈과 같은 공용 컴포넌트를 쓴다(웨이브8에서
 // 세 곳의 복사본을 하나로 모았다). 같은 종목이면 어느 화면에서든 같은 그래픽이 나온다.
 import { SportIllustration } from '@/components/v1-ui/sport-illustration';
@@ -447,7 +448,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                       ) : (
                         <span className="tab-num" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
                           <span style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 700, color: 'var(--text-strong)', fontVariantNumeric: 'tabular-nums' }}>
-                            {match.opponentCost.toLocaleString('ko-KR')}
+                            {formatAmountNumber(match.opponentCost)}
                           </span>
                           <span style={{ fontSize: 'var(--font-size-body)', fontWeight: 500, color: 'var(--text-muted)' }}>원</span>
                         </span>
@@ -654,7 +655,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
             <div className="tm-team-match-cta-meta">
               <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : '신청 상태'}</span>
               {/* 비용을 모르면(costNote 미기재) 금액 대신 '비용 미정' — 0원으로 단정하지 않는다. */}
-              <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${match.opponentCost.toLocaleString('ko-KR')}원` : '비용 미정')}</span>
+              <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${formatAmountNumber(match.opponentCost)}원` : '비용 미정')}</span>
             </div>
             <div className="tm-team-match-cta-actions">
               {ctaButtons}
@@ -668,7 +669,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
           <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : '신청 상태'}</span>
           {/* 비용을 모르면(costNote 미기재) 금액 대신 '비용 미정' — 0원으로 단정하지 않는다. */}
-          <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${match.opponentCost.toLocaleString('ko-KR')}원` : '비용 미정')}</span>
+          <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${formatAmountNumber(match.opponentCost)}원` : '비용 미정')}</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: showChat ? '120px 1fr' : '1fr', gap: 8 }}>
           {ctaButtons}
@@ -885,7 +886,7 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
             <span className="tm-text-label tm-match-row-act">무료초청</span>
           ) : (
             <span className="tab-num tm-match-row-cost" style={{ display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
-              <span style={{ fontSize: 'var(--font-size-body-lg)', fontWeight: 700, color: 'var(--blue700)', fontVariantNumeric: 'tabular-nums' }}>{match.opponentCost.toLocaleString('ko-KR')}</span>
+              <span style={{ fontSize: 'var(--font-size-body-lg)', fontWeight: 700, color: 'var(--blue700)', fontVariantNumeric: 'tabular-nums' }}>{formatAmountNumber(match.opponentCost)}</span>
               <span style={{ fontSize: 'var(--font-size-body-sm)', fontWeight: 500, color: 'var(--blue700)' }}>원</span>
             </span>
           )}

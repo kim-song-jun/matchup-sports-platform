@@ -1507,6 +1507,14 @@ export type V1TeamMatchLineupStarter = {
   // 이 값을 실어 보낸다). team-match-result.types.ts의 toResultRosterRows()가
   // participantId로 그대로 사용하므로 지우면 귀속이 undefined가 된다.
   id: string;
+  /**
+   * 저장된 사람 연결(`V1GameParticipant.userId`). 서버는 예전부터 이 값을 실어 보냈는데
+   * 이 타입에만 없어서 **화면이 쓸 수 없었다** — 라인업을 다시 불러오면 연동 선수가
+   * 전부 이름뿐인 게스트로 재수화되고, 그대로 저장하면 연결이 사라졌다.
+   *
+   * `null` 은 실제 비연동 게스트다(플랫폼 계정이 없어 이름이 정체성의 전부).
+   */
+  userId: string | null;
   displayName: string;
   jerseyNumber: number | null;
   position: string | null;

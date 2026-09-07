@@ -55,11 +55,21 @@ describe('lineup.view-model', () => {
     expect(state).toEqual({ participants: [], baseRevision: 3, formation: null, dirty: false });
   });
 
-  it('hydrates from a server lineup without leaking a userId (server never echoes it back)', () => {
+  /**
+   * 재수화가 **사람 연결(`userId`)을 이어받는다.**
+   *
+   * 이 테스트는 예전에 정반대를 못박고 있었다("server never echoes it back") — 그런데
+   * 서버는 예전부터 `userId` 를 실어 보냈고, 응답 **타입**에만 그 칸이 없었다. 그래서
+   * 화면이 값을 못 읽고 연동 선수를 전부 게스트로 재수화했고, 그대로 저장하면 연결이
+   * 조용히 끊겨 개인 기록·상호평가·징계 추적이 그 사람을 못 찾았다.
+   *
+   * `null` 은 이제 **실제 게스트**만을 뜻한다 — 두 경우를 한 배열에서 함께 잰다.
+   */
+  it('hydrates a server lineup carrying each participant\'s userId, and keeps null only for a real guest', () => {
     const state = hydrateLineupEditorState(
       serverLineup({
         starters: [
-          { id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null },
+          { id: 'participant-1', userId: 'user-hong', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null },
         ],
         bench: [{ id: 'participant-bench-1', displayName: '게스트', jerseyNumber: null }],
       }),
@@ -68,9 +78,65 @@ describe('lineup.view-model', () => {
     expect(state.dirty).toBe(false);
     // 명단은 하나다 — 서버가 아직 두 배열로 내려줘도 화면은 한 줄로 합쳐 읽는다(정본 §3).
     expect(state.participants).toEqual([
-      expect.objectContaining({ userId: null, displayName: '홍길동', jerseyNumber: 1, goalkeeper: true }),
+      expect.objectContaining({ userId: 'user-hong', displayName: '홍길동', jerseyNumber: 1, goalkeeper: true }),
       expect.objectContaining({ userId: null, displayName: '게스트' }),
     ]);
+  });
+
+  /**
+   * **결함이 실제로 터지던 자리는 여기다.** 재수화만 고쳐도 저장 payload 가 `userId` 를
+   * 안 실으면 아무것도 안 바뀐다 — 다시 열어 저장할 때마다 연동 선수가 게스트로
+   * 내려앉는다. 불러오기 → 저장 payload 를 한 번에 잰다.
+   */
+  it('재수화한 라인업을 그대로 저장하면 payload 가 사람 연결을 그대로 실어 보낸다', () => {
+    const state = hydrateLineupEditorState(
+      serverLineup({
+        revision: 4,
+        starters: [
+          { id: 'p-1', userId: 'user-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null },
+          { id: 'p-2', userId: 'user-2', displayName: '김철수', jerseyNumber: 4, position: null, goalkeeper: false, positionX: null, positionY: null },
+          { id: 'p-3', userId: null, displayName: '용병 게스트', jerseyNumber: 9, position: null, goalkeeper: false, positionX: null, positionY: null },
+        ],
+        bench: [],
+      }),
+    );
+
+    const payload = buildSavePayload(state);
+    expect(payload.expectedVersion).toBe(4);
+    expect(payload.participants).toEqual([
+      expect.objectContaining({ userId: 'user-1', displayName: '홍길동' }),
+      expect.objectContaining({ userId: 'user-2', displayName: '김철수' }),
+      // 게스트는 계정이 없으므로 `userId` 키 자체가 실리지 않는다(서버 DTO 계약).
+      { displayName: '용병 게스트', jerseyNumber: 9 },
+    ]);
+  });
+
+  /**
+   * `revision === 1` 은 경기 생성 때 자동으로 깔린 **미편집 스냅샷**이다 — 참가자는 대진
+   * 생성 시점의 팀 전체 활성 멤버이고, 일부러 `userId` 를 붙이지 않는다(한 경기도 안 뛴
+   * 팀원에게 신원 연결을 만들면 개인 기록·상호평가가 거짓이 된다).
+   *
+   * 이걸 편집기 시작 상태로 쓰면 팀장은 자기가 짜지 않은 명단을 보고, 그대로 저장하는
+   * 순간 **팀 전원이 이름뿐인 게스트로 박제된다.** alpha 실측에서 제출된 리그 라인업
+   * 참가자가 전원 `userId` 없이 저장돼 있던 마지막 고리가 여기다.
+   *
+   * 같은 참가자 목록을 `revision: 2` 로 주면 그대로 불러온다 — 규칙이 **내용이 아니라
+   * 리비전**이라는 것을 함께 잰다(내용으로 판정하면 진짜 게스트 명단까지 지워진다).
+   */
+  it('자동으로 깔린 미편집 스냅샷(revision 1)은 불러오지 않는다 — 팀이 저장한 리비전은 그대로 불러온다', () => {
+    const autoRoster = [
+      { id: 'auto-1', userId: null, displayName: '팀원A', jerseyNumber: null, position: null, goalkeeper: false, positionX: null, positionY: null },
+      { id: 'auto-2', userId: null, displayName: '팀원B', jerseyNumber: null, position: null, goalkeeper: false, positionX: null, positionY: null },
+    ];
+
+    const auto = hydrateLineupEditorState(serverLineup({ revision: 1, version: 1, starters: autoRoster, bench: [] }));
+    expect(auto.participants).toEqual([]);
+    // CAS 토큰은 그대로여야 한다 — 저장할 때 서버가 기대하는 값이 1 이다.
+    expect(auto.baseRevision).toBe(1);
+    expect(auto.dirty).toBe(false);
+
+    const saved = hydrateLineupEditorState(serverLineup({ revision: 2, version: 2, starters: autoRoster, bench: [] }));
+    expect(saved.participants.map((entry) => entry.displayName)).toEqual(['팀원A', '팀원B']);
   });
 
   it('이 변경 전에 후보로 저장된 사람도 명단에 남는다 — bench 를 안 읽으면 조용히 사라진다', () => {
@@ -184,8 +250,8 @@ describe('lineup.view-model', () => {
       serverLineup({
         formation: '1-2-1',
         starters: [
-          { id: 'p-1', displayName: '홍길동', jerseyNumber: 1, position: 'GK', goalkeeper: true, positionX: 50, positionY: 6 },
-          { id: 'p-2', displayName: '김철수', jerseyNumber: 4, position: 'FIXO', goalkeeper: false, positionX: 33, positionY: 43 },
+          { id: 'p-1', userId: null, displayName: '홍길동', jerseyNumber: 1, position: 'GK', goalkeeper: true, positionX: 50, positionY: 6 },
+          { id: 'p-2', userId: null, displayName: '김철수', jerseyNumber: 4, position: 'FIXO', goalkeeper: false, positionX: 33, positionY: 43 },
         ],
       }),
     );
@@ -272,12 +338,13 @@ describe('lineup.view-model', () => {
         revision: 3,
         version: 3,
         starters: [
-          { id: 'participant-2', displayName: rosterMember.displayName, jerseyNumber: 7, position: null, goalkeeper: true, positionX: null, positionY: null },
+          { id: 'participant-2', userId: rosterMember.userId, displayName: rosterMember.displayName, jerseyNumber: 7, position: null, goalkeeper: true, positionX: null, positionY: null },
         ],
       }),
     );
-    // Sanity: the rehydrated entry really did lose its userId (server contract).
-    expect(state.participants[0].userId).toBeNull();
+    // Sanity: 재수화된 엔트리는 이제 **사람 연결을 갖고 있다** — 중복 판정이 이름
+    // 휴리스틱이 아니라 userId 로 이뤄진다는 뜻이다.
+    expect(state.participants[0].userId).toBe(rosterMember.userId);
 
     expect(isRosterMemberPlaced(state, rosterMember)).toBe(true);
     expect(deriveLineupCounts(state, [rosterMember, rosterMember2]).waitingCount).toBe(1);
@@ -479,7 +546,7 @@ describe('TeamMatchLineupPageClient', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({
         revision: 0,
-        starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
+        starters: [{ id: 'participant-1', userId: null, displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
       }),
       isLoading: false,
       isError: false,
@@ -649,7 +716,7 @@ describe('TeamMatchLineupPageClient', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({
         revision: 3,
-        starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
+        starters: [{ id: 'participant-1', userId: null, displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
       }),
       isLoading: false,
       isError: false,
@@ -688,7 +755,7 @@ describe('TeamMatchLineupPageClient', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({
         revision: 3,
-        starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
+        starters: [{ id: 'participant-1', userId: null, displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
       }),
       isLoading: false,
       isError: false,
@@ -735,7 +802,7 @@ describe('TeamMatchLineupPageClient', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({
         revision: 0,
-        starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 9, position: null, goalkeeper: true, positionX: null, positionY: null }],
+        starters: [{ id: 'participant-1', userId: null, displayName: '홍길동', jerseyNumber: 9, position: null, goalkeeper: true, positionX: null, positionY: null }],
       }),
       isLoading: false,
       isError: false,

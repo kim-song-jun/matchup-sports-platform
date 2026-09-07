@@ -2961,9 +2961,15 @@ label.tm-btn:focus-within {
   background: none;
 }
 
+/*
+ * 그래픽을 담는 자리. 면(배경)을 깔지 않는다.
+ * --grey50 을 깔아 봤는데 페이지 배경과 대비가 라이트 1.05 · 다크 1.09 라 눈에 안 보이면서
+ * 패딩만 232px 를 먹었다(alpha 실측 2026-09-06). 면이 필요한 이유 셋 — 그룹핑 · 레이어 분리 ·
+ * 글씨 대비 — 이 자리엔 셋 다 없다. 그래픽은 히어로 맨 위라 위에 구분할 것이 없고,
+ * 실루엣도 스스로 선다(자산 10장 전부 순백 픽셀 0%, 경계 밝기 128~176).
+ */
 .tm-match-hero-graphic {
-  background: var(--grey50);
-  padding: 28px 16px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3015,7 +3021,7 @@ label.tm-btn:focus-within {
 
 @media (min-width: 1024px) {
   .tm-match-hero-graphic {
-    padding: 36px 16px;
+    padding: 16px;
   }
 
   .tm-match-hero-graphic .tm-match-sport-illustration {
@@ -4055,12 +4061,15 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   color: var(--text-caption);
 }
 
+/*
+ * 팀 소개 한 줄. 면도 테두리도 없다.
+ * --grey50 + --grey100 테두리를 두르고 있었는데 카드와 대비가 라이트 1.05 · 다크 1.09 라
+ * 보이지 않으면서 49px 를 고정으로 먹었다("이게" 두 글자에도 49px). 게다가 그 틴트 위에서
+ * --text-caption 이 4.42:1 로 AA 미달이었다 — 카드 표면으로 올리면 4.62:1 로 통과한다.
+ * DESIGN.md 15절 "여백·배경색·구분선 중 하나만" 에 맞춰 여백만 남긴다.
+ */
 .tm-team-intro-box {
-  margin-top: 16px;
-  border: 1px solid var(--grey100);
-  border-radius: var(--radius-field);
-  background: var(--grey50);
-  padding: 12px;
+  margin-top: 12px;
 }
 
 .tm-team-card:active .tm-team-intro-box {

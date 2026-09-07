@@ -521,6 +521,19 @@ describe('데스크톱(≥1024) 틴트 지면 위 보조 텍스트', () => {
   // 라는 **세 셀렉터 목록의 마지막 줄 앞에** 새 규칙을 끼워 넣는 바람에, 앞의 두
   // 셀렉터가 `display: contents` 를 잃고 대신 토큰 override 를 받았다. 모바일 채팅
   // 레이아웃이 깨지는 회귀인데 tsc·기존 테스트 어느 것도 잡지 못했다.
+  it('대회 프로모 단계는 배경을 까는 그 규칙 안에서 토큰을 올린다', () => {
+    const tournamentsCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/tournaments.css'), 'utf8');
+    // 이 배경은 미디어 쿼리 안에서만 깔린다 — 밖에서는 지면이 흰색이라 올릴 필요가 없다.
+    // 그래서 "배경을 주는 규칙"과 "토큰을 올리는 규칙"이 같아야 조건이 어긋나지 않는다.
+    const rule = [...tournamentsCss.matchAll(/\.tm-tournament-promo-step\s*\{([^}]*)\}/g)]
+      .map(([, body]) => body)
+      .find((body) => /background:\s*var\(--grey50\)/.test(body));
+
+    expect(rule, '--grey50 배경을 주는 .tm-tournament-promo-step 규칙을 찾지 못했다').toBeDefined();
+    expect(rule).toMatch(/--text-caption:\s*var\(--grey700\)/);
+    expect(rule).toMatch(/--text-muted:\s*var\(--grey700\)/);
+  });
+
   it('세 창의 display: contents 목록이 쪼개지지 않았다', () => {
     const rule = chatCss.match(
       /\.tm-chat-mobile-pane,\s*\.tm-chat-desktop-workspace,\s*\.tm-chat-desktop-thread-pane\s*\{([^}]*)\}/,

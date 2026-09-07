@@ -473,6 +473,12 @@
     background: var(--grey50);
     border-radius: var(--radius-hero);
     padding: 24px;
+    /* 지면을 --grey50 으로 깔았으니 그 위 보조 텍스트도 함께 올린다 —
+       grey600 은 여기서 4.42:1 로 AA 미달이다(alpha 1440 실측, promo-step-sub).
+       배경을 주는 이 규칙 안에 두어야 조건이 어긋나지 않는다: 이 배경은 이
+       미디어 쿼리 안에서만 깔리고, 밖에서는 지면이 흰색이라 올릴 필요가 없다. */
+    --text-caption: var(--grey700);
+    --text-muted: var(--grey700);
   }
 
   .tm-tournament-promo-step-icon {

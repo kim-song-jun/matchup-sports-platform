@@ -70,6 +70,16 @@ export class GameLineupParticipantDto {
    * 무시된다.
    *
    * 프론트가 전부 갱신되고 alpha 에서 미전송이 확인되면 이 필드를 지운다.
+   *
+   * **지금 지우면 안 된다** — `main.ts` 의 `ValidationPipe` 가 `forbidNonWhitelisted: true`
+   * 라, 모르는 속성을 조용히 떼는 게 아니라 **400 을 던진다.** 즉 이 필드를 없애는 순간
+   * `started` 를 보내는 옛 클라이언트(번들된 web 자산을 든 Capacitor 설치본 포함)는
+   * 라인업 저장이 통째로 막힌다. **죽은 코드가 아니라 의도적 하위호환 창이다.**
+   *
+   * 삭제 조건 ②("alpha 미전송")는 코드로 못 닫는다 — 그래서 서비스가 이 값이 실제로
+   * 실려 오면 경고 로그를 남긴다. **그 로그가 일정 기간 0건이면 그때 지운다.**
+   *
+   * @deprecated 저장 경로에서 무시된다. 하위호환 창이 닫히면 삭제.
    */
   @IsOptional()
   @IsBoolean()

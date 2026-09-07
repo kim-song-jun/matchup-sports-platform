@@ -91,3 +91,66 @@ describe('RevisionTimeline — 중첩(regulation) 스코어 리비전도 실제 
     expect(screen.getByText('이전 기록 없음 → 2:1')).toBeInTheDocument();
   });
 });
+
+/**
+ * **배지와 시각이 어긋나던 자리.**
+ *
+ * 예전엔 상태와 무관하게 `submittedAt` 만 썼다 — "공식 확정" 배지 옆에 **제출 시각**이 뜨고
+ * **확정 시각은 화면 어디에도 없었다**(`officialAt` 참조가 이 파일에 0건). 운영자가
+ * "언제 확정됐나" 를 이 화면에서 답할 수 없었다.
+ *
+ * 이 테스트는 **문구가 아니라 어느 값을 읽는가**를 본다 — 두 시각을 뚜렷이 다른 달로 준다.
+ */
+describe('RevisionTimeline — 배지가 말하는 시각을 보여준다', () => {
+  it('공식 확정 리비전은 확정 시각을 보여준다 (제출 시각이 아니다)', () => {
+    render(
+      <RevisionTimeline
+        revisions={[
+          revision({
+            id: 'rev-official',
+            state: 'OFFICIAL',
+            submittedAt: '2026-03-03T03:03:00.000Z',
+            officialAt: '2026-09-09T09:09:00.000Z',
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText(/2026\.\s*9\.\s*9|2026-09-09|9월 9일/)).toBeInTheDocument();
+    expect(screen.queryByText(/2026\.\s*3\.\s*3|2026-03-03|3월 3일/)).not.toBeInTheDocument();
+  });
+
+  it('제출 상태면 제출 시각을 보여준다 (회귀)', () => {
+    render(
+      <RevisionTimeline
+        revisions={[
+          revision({
+            id: 'rev-submitted',
+            state: 'SUBMITTED',
+            submittedAt: '2026-03-03T03:03:00.000Z',
+            officialAt: null,
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText(/2026\.\s*3\.\s*3|2026-03-03|3월 3일/)).toBeInTheDocument();
+  });
+
+  it('옛 데이터라 확정 시각이 비면 제출 시각으로 물러난다 — 빈 칸을 남기지 않는다', () => {
+    render(
+      <RevisionTimeline
+        revisions={[
+          revision({
+            id: 'rev-legacy',
+            state: 'OFFICIAL',
+            submittedAt: '2026-03-03T03:03:00.000Z',
+            officialAt: null,
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText(/2026\.\s*3\.\s*3|2026-03-03|3월 3일/)).toBeInTheDocument();
+  });
+});

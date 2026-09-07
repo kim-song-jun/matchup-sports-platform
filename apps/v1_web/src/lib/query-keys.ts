@@ -51,8 +51,6 @@ export const v1Keys = {
   gameOperationsLineup: (gameId: string) => [...v1Keys.game(gameId), 'operations-lineup'] as const,
   fixtureLineupAccess: (tournamentId: string, fixtureId: string) =>
     [...v1Keys.all, 'tournaments', tournamentId, 'fixtures', fixtureId, 'lineup-access'] as const,
-  fixtureLineupRoster: (tournamentId: string, fixtureId: string, sideId: string) =>
-    [...v1Keys.all, 'tournaments', tournamentId, 'fixtures', fixtureId, 'lineup-roster', sideId] as const,
   myTournamentFixtures: (tournamentId: string) =>
     [...v1Keys.all, 'tournaments', tournamentId, 'my-fixtures'] as const,
   teamLineupHistory: (teamId: string) => [...v1Keys.team(teamId), 'lineup-history'] as const,

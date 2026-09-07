@@ -68,6 +68,25 @@ describe('gameOperationsErrorMessage — 미매핑 코드', () => {
 });
 
 describe('isRetryableGameOperationsErrorCode — 문구와의 정합성', () => {
+  it('버전 불일치는 재시도 가능이다 — 재접속하면 풀리는 원인이라 버튼을 숨기면 안 된다', () => {
+    // `STAFF_SCOPE_DENIED` 하나에 구조적으로 다른 원인이 겹쳐 있다. 코드만 보면
+    // **재접속하면 풀리는 것**과 **진짜 권한 거부**가 구분되지 않아, 운영자가 할 수 있는
+    // 유일한 행동(다시 시도)이 막혔다.
+    expect(isRetryableGameOperationsErrorCode('STAFF_SCOPE_DENIED', 'AUTHORIZATION_SUBJECT_STALE')).toBe(true);
+  });
+
+  it('다른 코드에 같은 reason 이 실려도 재시도 가능이 되지 않는다 — 예외는 그 코드 안에서만', () => {
+    // 이 reason 집합은 `STAFF_SCOPE_DENIED` 의 원인 구분이다. 코드를 안 보면 오배선 하나로
+    // 엉뚱한 실패가 재시도 가능으로 분류된다.
+    expect(isRetryableGameOperationsErrorCode('TERMINAL_GAME_IMMUTABLE', 'AUTHORIZATION_SUBJECT_STALE')).toBe(false);
+  });
+
+  it('진짜 권한 거부는 그대로 재시도 불가다 (회귀)', () => {
+    expect(isRetryableGameOperationsErrorCode('STAFF_SCOPE_DENIED', 'ASSIGNMENT_REQUIRED')).toBe(false);
+    // reason 이 없던 옛 호출도 그대로 동작해야 한다.
+    expect(isRetryableGameOperationsErrorCode('STAFF_SCOPE_DENIED')).toBe(false);
+  });
+
   it('비재시도 코드 목록과 실제 판정이 일치한다', () => {
     for (const code of NON_RETRYABLE_CODES) {
       expect(isRetryableGameOperationsErrorCode(code)).toBe(false);

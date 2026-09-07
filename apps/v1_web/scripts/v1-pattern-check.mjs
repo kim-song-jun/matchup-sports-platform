@@ -405,7 +405,9 @@ checkLiteralBaseline({
     // 주석이나 data-* 속성에 이름만 스쳐도 "붙어 있다"고 오인한다 — 이 저장소는 실제로
     // 태그 안에 `// … (globals.css .tm-on-tint)` 같은 주석을 달고 있어 그대로 뚫린다.
     // globals.test.ts 의 검사와 같은 방식이다.
-    const MARKED = /className=(?:"[^"]*\btm-on-tint\b|'[^']*\btm-on-tint\b|\{[^}]*\btm-on-tint\b)/;
+    // \b 는 하이픈을 경계로 보므로 tm-on-tint-header · x-tm-on-tint 같은 다른 클래스가 통과한다.
+    const CLASS_EDGE = String.raw`(?<![\w-])tm-on-tint(?![\w-])`;
+    const MARKED = new RegExp(`className=(?:"[^"]*|'[^']*|\\{[^}]*)${CLASS_EDGE}`);
     // 여는 태그 단위로 본다 — 배경과 className 이 같은 태그 안에 있어야 처방이 닿는다.
     // 여는 태그를 정규식 `[^>]*?>` 로 끊으면 **`onClick={() => …}` 의 `>` 에서 조기
     // 종료**된다. 그러면 그 뒤에 오는 `style={{ background: … }}` 를 못 봐서 누락을

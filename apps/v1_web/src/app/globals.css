@@ -7881,10 +7881,15 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   color: var(--text-strong);
 }
 
-/* auth 전용 40px 변형 — .tm-auth-segment 의 기존 결정(치수를 새로 만든 게 아니라
-   그대로 이식한 것)이다. */
+/* 글자만 한 단계 작은 변형. 라벨이 길어 두 칸에 안 들어갈 때 쓴다
+   (현재 유일한 소비처: 라인업 불러오기 시트의 "최근 경기 (N) / 저장한 프리셋 (N)").
+
+   높이는 기본값 44px 그대로 둔다. 원래 이 변형은 40px 이었고 주석도 "auth 전용
+   이식"이라 적혀 있었는데, auth 는 이제 desktop/auth.css 의 .tm-auth-segment 를
+   쓰므로 그 근거가 남아 있지 않았다. 남은 것은 조작부 하나가 기준(44px)보다
+   4px 낮다는 사실뿐이고, 같은 이유로 .tm-btn-sm 은 이미 40→44 로 올려 둔 상태다
+   (바로 아래 "WS11 a11y 터치 타깃" 주석). 그 결정을 여기에도 맞춘다. */
 .tm-segmented-tabs-sm .tm-segmented-tab {
-  min-height: 40px;
   font-size: 13px;
 }
 

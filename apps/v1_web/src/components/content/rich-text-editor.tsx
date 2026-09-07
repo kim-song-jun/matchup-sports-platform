@@ -23,7 +23,7 @@ import {
   Underline,
   Undo2,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { resolveRichContent } from '@/lib/rich-content';
 import { publicAssetPath } from '@/lib/assets';
 import type { V1AdminContentAsset, V1RichContentDocument } from '@/types/api';
@@ -60,6 +60,10 @@ export function RichTextEditor({
   disabled = false,
   label = '본문',
 }: RichTextEditorProps) {
+  // 편집 영역(contenteditable)에 접근 가능한 이름을 주기 위한 id.
+  // 툴바 버튼은 전부 aria-label 을 갖고 있었는데 정작 글을 쓰는 칸만 이름이 없어,
+  // 스크린리더에서 "편집 텍스트"로만 읽혔다(2026-09-07 alpha 접근성 트리 실측).
+  const labelId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef(onUploadImage);
   const [uploading, setUploading] = useState(false);
@@ -119,6 +123,10 @@ export function RichTextEditor({
       }),
     ],
     content: value,
+    // TipTap 은 contenteditable 을 직접 만들므로 JSX 로 속성을 못 붙인다 — 여기로 넘긴다.
+    // role 을 함께 적는 이유: attributes 는 병합이 아니라 **대체**라, aria-labelledby 만
+    // 넘기면 TipTap 이 기본으로 주던 role="textbox" 가 사라진다(테스트가 잡았다).
+    editorProps: { attributes: { role: 'textbox', 'aria-labelledby': labelId } },
     onUpdate: ({ editor: instance }) => onChange(instance.getJSON() as V1RichContentDocument),
   });
 
@@ -169,9 +177,9 @@ export function RichTextEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">{label}</span>
+      <span id={labelId} className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">{label}</span>
       <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card-surface)] focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20">
-        <div className="flex flex-wrap gap-1 border-b border-[var(--border)] bg-[var(--surface-soft)] p-2" role="toolbar" aria-label="본문 서식">
+        <div className="flex flex-wrap gap-1 border-b border-[var(--border)] bg-[var(--surface-soft)] p-2" role="toolbar" aria-label={`${label} 서식`}>
           <ToolbarButton label="실행 취소" onClick={() => editor?.chain().focus().undo().run()} disabled={disabled || !editor?.can().undo()}><Undo2 /></ToolbarButton>
           <ToolbarButton label="다시 실행" onClick={() => editor?.chain().focus().redo().run()} disabled={disabled || !editor?.can().redo()}><Redo2 /></ToolbarButton>
           <ToolbarDivider />

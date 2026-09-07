@@ -6,8 +6,12 @@ export type HomeMatchCard = {
   venue: string;
   date: string;
   time: string;
-  currentParticipants: number;
-  maxParticipants: number;
+  /**
+   * 인원을 **모르는 상태**는 null 이다(0명과 다르다). 서버가 참가 인원·정원을 주지 않으면
+   * 숫자를 지어내지 않고, 화면이 인원 줄과 "마감 임박" 배지를 그리지 않는다 — `homeCapacity()`.
+   */
+  currentParticipants: number | null;
+  maxParticipants: number | null;
   actionLabel: string;
   imageUrl: string;
   reason?: string;

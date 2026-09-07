@@ -49,12 +49,17 @@ export class HomeService {
           disabledReason: null,
         },
       ],
+      // 참가 인원·정원은 홈 카드가 "1/6명"으로 그리는 값이라 목록 항목에도 반드시 실어 보낸다.
+      // 예전에는 featuredMatch 에만 실어 보내, 프론트가 값을 지어내 모든 추천 카드가
+      // "0/1명 · 마감 임박"으로 보였다(2026-09-07 프로덕션 제보).
       recommendations: recommendations.map((item) => ({
         matchId: item.matchId,
         title: item.title,
         sportName: item.sportName,
         regionName: item.regionName,
         startsAt: item.startsAt,
+        participantCount: item.participantCount,
+        capacity: item.capacity,
       })),
       popup,
       notices,

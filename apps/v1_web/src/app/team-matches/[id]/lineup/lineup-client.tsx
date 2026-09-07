@@ -117,6 +117,15 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   // 쓴다(아래 sportName 필터). 코트 배치·포메이션 선택은 Task 163 에서 전술보드로 옮겨
   // 이 화면에서 사라졌다 — 그래서 종목별 코트 allowlist 도 여기 남지 않는다.
   const formationSupportedSportName = teamMatchQuery.data?.sport?.name ?? null;
+  /**
+   * 정규 리그의 대진인가. **참석 응답 게이트가 리그에는 걸리지 않으므로** 안내 문구가
+   * 달라야 한다 — 서버가 리그에서는 `eligibleMembers` 를 전원 `attending: true` 로 내려준다
+   * (`team-match-lineup.service.ts` 의 그 자리 주석: 리그 대진에는 참석을 묻는 입구가 없어
+   * 게이트를 걸면 아무도 명단에 못 든다).
+   *
+   * 새 조회를 붙이지 않는다 — 이 화면이 이미 부르는 팀매치 상세가 `league` 를 싣고 있다.
+   */
+  const isLeagueFixture = teamMatchQuery.data?.league != null;
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
   const saveMutation = useV1SaveTeamMatchLineup(teamMatchId);
@@ -810,9 +819,17 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             {/* eligibleMembers(:94)가 서버 저장 검증과 동일한 조건(팀 일정에 '참석'으로
                 응답)을 이미 담아 내려주므로, 여기서도 그 조건으로 걸러서 보여준다 — 이
                 일정에 딸린 참석 조건은 "불참을 명시적으로 누른 사람"만이 아니라 무응답·
-                대기(WAITLISTED)까지 전부 포함한다(팀 일정이 없는 매치는 전원 통과). */}
+                대기(WAITLISTED)까지 전부 포함한다(팀 일정이 없는 매치는 전원 통과).
+
+                **리그 대진에는 그 조건이 없다.** 대진을 운영자가 일괄 생성하면서 팀 일정이
+                함께 깔리지만 그 일정의 참석을 묻는 입구가 없어, 게이트를 걸면 아무도 명단에
+                못 든다 — 서버가 그래서 리그에서는 전원 통과시킨다. 문구가 그대로면 화면이
+                자기모순이 된다: "참석으로 확정된 팀원만" 이라고 적어 놓고 바로 아래에
+                **응답한 적 없는 팀원 전원**을 나열한다(alpha 실측). */}
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '4px 0 8px' }}>
-              참석으로 확정된 팀원만 추가할 수 있어요. 아직 확정되지 않은 팀원은 참석 응답 후 다시 보여드려요.
+              {isLeagueFixture
+                ? '리그 경기는 참석 응답과 상관없이 팀원을 명단에 넣을 수 있어요. 실제로 뛸 선수만 골라 주세요.'
+                : '참석으로 확정된 팀원만 추가할 수 있어요. 아직 확정되지 않은 팀원은 참석 응답 후 다시 보여드려요.'}
             </p>
             {rosterQuery.isLoading ? (
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>

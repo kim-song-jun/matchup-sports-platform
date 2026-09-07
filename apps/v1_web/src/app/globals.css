@@ -2756,15 +2756,31 @@ label.tm-btn:focus-within {
   --text-muted: var(--grey700);
 }
 
-.tm-card-closed .tm-match-row-thumb,
-.tm-card-closed .tm-match-list-media,
-.tm-card-closed .tm-team-match-vs {
+/* 글자가 얹히지 않는 썸네일은 그대로 눌러도 된다. */
+.tm-card-closed .tm-match-row-thumb {
   opacity: 0.45;
   filter: grayscale(0.4);
 }
 
-/* 제목만 한 단계 눌러 "지난 것"으로 읽히게 한다 — grey600 은 흰 배경 4.54:1,
-   grey50 배경 4.39:1 로 큰 글씨(17px/600 = WCAG large text 기준 3:1)를 넉넉히 넘는다. */
+/* 반면 **미디어 위에 글자가 얹힌 자리**에는 opacity 를 걸면 안 된다. opacity 는 자식까지
+   한 덩어리로 지면과 합성하므로 그 위의 상태 배지·팀 이름까지 함께 옅어진다 — alpha
+   화면에서 잰 값으로 '신청 마감' 배지가 6.45:1 → **1.99:1**, 히어로의 팀 이름이
+   3.25:1 → **1.61:1** 로 무너졌다. 정작 마감을 알리는 신호가 제일 안 읽히게 된 셈이다.
+   여기서는 채도만 뺀다 — grayscale 은 상대 휘도를 보존해 대비가 그대로다.
+   (개인 매치 카드의 미디어에도 종목·인원 배지가 얹혀 있어 같은 처리를 한다.) */
+.tm-card-closed .tm-match-list-media,
+.tm-card-closed .tm-team-match-vs {
+  filter: grayscale(0.6);
+}
+
+/* 글자가 없는 종목 그래픽만 따로 눌러 "흐림"을 남긴다. */
+.tm-card-closed .tm-match-list-media .tm-match-sport-illustration,
+.tm-card-closed .tm-team-match-vs-illustration {
+  opacity: 0.5;
+}
+
+/* 제목만 한 단계 눌러 "지난 것"으로 읽히게 한다 — 이 카드 안에서 --text-muted 는
+   grey700 이라 grey50 지면 위에서 6.81:1(alpha 실측)로 AA 를 넘는다. */
 .tm-card-closed .tm-match-row-title,
 .tm-card-closed .tm-match-list-card-body .tm-text-body-lg {
   color: var(--text-muted);

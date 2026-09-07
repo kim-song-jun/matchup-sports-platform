@@ -364,6 +364,40 @@ checkLiteralBaseline({
     (txt.match(/\btext-(?:xs|sm|base|lg|xl|[2-9]xl)\b/g) || []).length,
   hint: 'text-[Npx] · fontSize:N · text-sm 류 Tailwind 기본 이름 대신 .tm-text-* 나 var(--font-size-*) 를 쓸 것',
 });
+/* ── 8) 틴트 지면에 보조 텍스트 처방이 빠진 곳 ─────────────────────
+ * `--text-caption`(=grey600)은 **흰 배경에서만** AA 를 넘는다(4.62:1). 지면에 색이
+ * 조금이라도 깔리면 아래로 떨어진다 — alpha 실측으로 다섯 틴트 토큰 전부 미달이다:
+ *
+ *   tint-grey 4.09 · tint-red 4.16 · tint-blue 4.21 · tint-green 4.25 · tint-orange 4.27
+ *   (grey700 이면 각각 6.31 / 6.42 / 6.49 / 6.55 / 6.57)
+ *
+ * CSS 에 셀렉터가 있는 지면은 globals.css 의 "틴트 지면 위의 보조 텍스트" 목록이
+ * 처리한다. 문제는 **인라인 style 로 까는 곳**이다 — 겨냥할 셀렉터가 없어 목록에
+ * 넣을 수 없고, 그래서 `.tm-on-tint` 표시 클래스를 함께 붙이기로 했다.
+ *
+ * 그 규약이 사람의 기억에만 의존하고 있었다. 실제로 스윕을 돌 때마다 새 지면이
+ * 계속 나왔다(#1104 7곳 → #1108 1 → #1110 3 → #1114 12 → #1116 2 → #1117 1).
+ * 여기서 세어 **새로 늘지 못하게** 막는다. 기존 84곳은 baseline 으로 인정한다 —
+ * 색이 깔렸다고 다 문제가 아니라 그 위에 캡션 텍스트가 있을 때만 미달이므로,
+ * 일괄 치환은 효과 없는 선언만 늘린다.
+ *
+ * **이 게이트가 못 잡는 것**: 배경이 변수를 거치는 경우다. matches-page.tsx 의
+ * StateCard 는 `const tint = tone === 'green' ? … : …` 로 세 토큰 중 하나를 고른 뒤
+ * `background: tint` 로 쓴다 — 태그 안에 `var(--tint-*)` 리터럴이 없어 여기 안 걸린다.
+ * 그런 곳은 실화면 대비 측정으로만 나온다(StateCard 도 이 게이트가 아니라 alpha
+ * 스윕에서 나왔다, #1117). 이 게이트는 **가장 흔한 형태를 막는 것**이지 전수 보장이 아니다.
+ * ────────────────────────────────────────────────────────────────── */
+checkLiteralBaseline({
+  label: '틴트 지면에 tm-on-tint 누락',
+  baselinePath: 'scripts/tint-marker-baseline.json',
+  count: (txt) => {
+    const TINT = /background(?:Color)?:\s*(?:'|"|`)?var\(--(?:tint-(?:blue|grey|green|orange|red)|blue50|grey50|grey100|red50|surface-soft)\)/;
+    // 여는 태그 단위로 본다 — 배경과 className 이 같은 태그 안에 있어야 처방이 닿는다.
+    const tags = txt.match(/<[A-Za-z][A-Za-z0-9]*\b[^>]*?>/gs) || [];
+    return tags.filter((tag) => TINT.test(tag) && !tag.includes('tm-on-tint')).length;
+  },
+  hint: '인라인으로 지면 색을 깔면 같은 태그에 className="tm-on-tint" 를 함께 붙일 것 (globals.css .tm-on-tint)',
+});
 checkLiteralBaseline({
   label: 'radius 리터럴(TSX)',
   baselinePath: 'scripts/radius-baseline.json',

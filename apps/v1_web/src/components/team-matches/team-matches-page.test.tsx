@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -315,16 +315,25 @@ describe('리그전 배지', () => {
     const model = getTeamMatchListViewModel();
     model.matches = [{ ...model.matches[0], league: { leagueId: 'lg-1', title: '가을 리그' } }];
 
-    renderPage(<TeamMatchListPageView model={model} />);
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
 
-    const badge = leagueBadge();
-    expect(badge).toBeInTheDocument();
-    const sportBadge = screen.getAllByText(model.matches[0].sport)[0];
-    expect(sportBadge).toBeInTheDocument();
-    expect(badge!.parentElement).not.toBe(sportBadge.parentElement);
+    // **카드 안으로 좁혀서 찾는다.** 화면 위쪽 필터에도 같은 종목 이름의 칩이 있어,
+    // `screen.getAllByText(sport)[0]` 로 잡으면 **카드 배지가 아니라 필터 칩**이 걸린다 —
+    // 그러면 두 단언이 "필터 칩의 부모" 와 비교하게 되어 리그 링크가 카드 안 어디에 있든
+    // 통과한다(실제로 그렇게 미끄러졌다). 인덱스로 고치면 필터 UI 가 바뀔 때 또 미끄러지니
+    // **범위**로 고른다.
+    const card = container.querySelector('.tm-team-match-card') as HTMLElement | null;
+    expect(card).not.toBeNull();
+    const scoped = within(card!);
+
+    const badge = scoped.getByRole('button', { name: /리그 상세로 이동/ });
+    const sportBadge = scoped.getByText(model.matches[0].sport);
+    expect(sportBadge).toHaveClass('tm-badge-blue');
+
+    expect(badge.parentElement).not.toBe(sportBadge.parentElement);
     // 종목 배지가 있는 줄이 리그 링크를 품고 있지 않다는 것까지 확인한다 —
     // 부모만 비교하면 한 겹 더 감싸는 것으로 통과해 버린다.
-    expect(sportBadge.parentElement!.contains(badge!)).toBe(false);
+    expect(sportBadge.parentElement!.contains(badge)).toBe(false);
   });
 
   /**

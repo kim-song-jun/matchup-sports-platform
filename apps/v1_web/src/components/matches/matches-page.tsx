@@ -362,7 +362,12 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             {/* [P1 숫자:단위 2:1 + tabular-nums] 인원 — 숫자(subhead/heading 크기) + 단위(body) 2:1 비율 */}
             <CapacityRow current={match.current} capacity={match.capacity} />
             <InfoRow label="레벨" value={match.level} />
-            <InfoRow label="성별 조건" value={match.gender} />
+            {/* **빈 값을 그대로 넘기면 값 슬롯이 통째로 빈다.** 공유 `InfoRow`
+                (`@/components/v1-ui/primitives`)는 `{value}` 를 그대로 그린다 — 팀매치
+                화면의 로컬 InfoRow 와 달리 빈 값 처리가 없다(같은 파일 아래 `isMissing`
+                헬퍼가 있는데 쓰지 않는다). 라벨이 있는 자리에서는 "모른다" 를 말로 해야
+                한다. */}
+            <InfoRow label="성별 조건" value={match.gender || '미정'} />
             {mode === 'pending' ? (
               <>
                 <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." />
@@ -436,7 +441,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           {/* [P1 숫자:단위 2:1 + tabular-nums] 인원 (모바일) */}
           <CapacityRow current={match.current} capacity={match.capacity} />
           <InfoRow label="레벨" value={match.level} />
-          <InfoRow label="성별 조건" value={match.gender} />
+          {/* 위 상세와 같은 이유 — 공유 InfoRow 는 빈 값을 그대로 그린다. */}
+          <InfoRow label="성별 조건" value={match.gender || '미정'} />
           {mode === 'pending' ? (
             <>
               <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." />

@@ -3,7 +3,7 @@
  * 서버 프리렌더가 이 함수를 마스터 종목 없이도 호출하므로 두 경로를 모두 고정한다.
  */
 import { describe, expect, it } from 'vitest';
-import { buildTeamSportChips } from './teams.card-model';
+import { buildTeamSportChips, toTeam } from './teams.card-model';
 import { getTeamListViewModel } from './teams.view-model';
 import type { V1Sport, V1Team } from '@/types/api';
 
@@ -56,5 +56,34 @@ describe('buildTeamSportChips', () => {
 
     expect(chips).toHaveLength(1);
     expect(chips[0].count).toBe(0);
+  });
+});
+
+/**
+ * 소개문 폴백 (2026-09-07 · 사용자 확정).
+ *
+ * 예전엔 `introductionPreview` 가 없으면 `{지역}에서 활동하는 {종목} 팀이에요.` 를 만들어
+ * 넣었다. 그 문장은 카드 바로 윗줄(`풋살 · 서울 전체 · 4/24명`)과 **같은 말**이라 정보가
+ * 되지 않으면서 ~35px 를 먹었다 — alpha 실측에서 50팀 중 **25팀**이 그 문장을 보여줬다.
+ * 모르는 것을 문장으로 만들지 않는다.
+ */
+describe('toTeam — 소개문', () => {
+  const base = getTeamListViewModel().teams[0];
+  // `as never` 로 캐스팅하면 타입 검사가 통째로 꺼져 `toTeam` 이 실제로 읽는 필드가 빠져도
+  // 컴파일러가 못 잡는다(#1105 Copilot). 같은 파일 위쪽과 같은 `Partial<T>` → `T` 패턴을 쓴다.
+  const api = (over: Partial<V1Team>): V1Team => ({
+    id: 't1', name: '팀', sport: { id: 's', name: '풋살' }, region: { id: 'r', name: '서울 전체' },
+    memberCount: 4, ...over,
+  } as unknown as V1Team);
+
+  it('서버가 소개를 안 주면 빈 문자열이다 — 지역·종목으로 문장을 만들지 않는다', () => {
+    const intro = toTeam(api({}), base).intro;
+
+    expect(intro).toBe('');
+    expect(intro).not.toMatch(/에서 활동하는/);
+  });
+
+  it('서버가 준 소개는 그대로 쓴다', () => {
+    expect(toTeam(api({ introductionPreview: '매주 토요일에 모여요' }), base).intro).toBe('매주 토요일에 모여요');
   });
 });

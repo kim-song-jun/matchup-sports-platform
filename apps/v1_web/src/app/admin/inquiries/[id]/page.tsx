@@ -181,7 +181,7 @@ function ReportedTeamSection({
   return (
     <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4" aria-label="신고 대상 팀">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[16px] font-bold text-[var(--text-strong)]">신고 대상 팀</h2>
+        <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">신고 대상 팀</h2>
         {reportedTeam ? <AdminStatusPill status={reportedTeam.status} /> : null}
       </div>
 
@@ -439,8 +439,8 @@ export default function AdminInquiryDetailPage() {
           <article className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="break-words text-[20px] font-bold text-[var(--text-strong)]">{inquiry.title}</h2>
-                <div className="mt-3 flex flex-wrap gap-2 text-[13px] text-[var(--text-muted)]">
+                <h2 className="break-words text-[length:var(--font-size-subhead)] font-bold text-[var(--text-strong)]">{inquiry.title}</h2>
+                <div className="mt-3 flex flex-wrap gap-2 text-[length:var(--font-size-label)] text-[var(--text-muted)]">
                   <span className="inline-flex items-center gap-2">
                     <Tag size={14} aria-hidden="true" />
                     {CATEGORY_LABEL[inquiry.category]}
@@ -475,7 +475,7 @@ export default function AdminInquiryDetailPage() {
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="답변 내역">
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-[17px] font-bold text-[var(--text-strong)]">답변</h2>
+              <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">답변</h2>
               <span className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
                 <MessageSquareText size={15} aria-hidden="true" />
                 {inquiry.replies.length}
@@ -569,7 +569,7 @@ export default function AdminInquiryDetailPage() {
           ) : null}
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-            <h2 className="text-[16px] font-bold text-[var(--text-strong)]">답변 작성</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">답변 작성</h2>
             <form className="mt-3 flex flex-col gap-3" onSubmit={handleReplySubmit}>
               <textarea
                 value={replyBody}
@@ -597,7 +597,7 @@ export default function AdminInquiryDetailPage() {
           </section>
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-            <h2 className="text-[16px] font-bold text-[var(--text-strong)]">상태 변경</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">상태 변경</h2>
             <form className="mt-3 flex flex-col gap-3" onSubmit={handleStatusSubmit}>
               <select
                 value={status}

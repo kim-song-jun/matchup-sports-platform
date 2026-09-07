@@ -199,7 +199,7 @@ export function RosterModal({
                 onChange={(e) => handleEligibilityChange(p.id, e.target.value)}
                 disabled={!canWrite || updateEligibility.isPending}
                 aria-label={`${p.realName} 자격 상태`}
-                className="h-[44px] px-3 text-[13px] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
+                className="h-[44px] px-3 text-[length:var(--font-size-label)] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
               >
                 {(Object.entries(ELIGIBILITY_LABEL) as [string, string][]).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
@@ -210,7 +210,7 @@ export function RosterModal({
                 onClick={() => handleRemovePlayer(p.id, p.realName)}
                 disabled={!canWrite || removePlayer.isPending}
                 aria-label={`${p.realName} 선수를 명단에서 제외`}
-                className="h-[44px] shrink-0 rounded-xl border border-[var(--border)] px-3 text-[13px] font-semibold text-[var(--red700)] transition-colors hover:bg-[var(--red50)] focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-red-950/30"
+                className="h-[44px] shrink-0 rounded-xl border border-[var(--border)] px-3 text-[length:var(--font-size-label)] font-semibold text-[var(--red700)] transition-colors hover:bg-[var(--red50)] focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-red-950/30"
               >
                 제외
               </button>
@@ -220,7 +220,7 @@ export function RosterModal({
       )}
       {canWrite ? (
         <div className="mt-4 rounded-xl border border-[var(--border)] p-3 dark:border-gray-700">
-          <p className="text-[13px] font-semibold text-[var(--text-strong)] dark:text-white">선수 추가</p>
+          <p className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)] dark:text-white">선수 추가</p>
           <p className="mt-0.5 text-xs text-[var(--text-muted)]">
             팀의 활성 멤버만 추가할 수 있어요. 명단 잠금과 제출 마감은 운영자 권한으로 넘어갑니다.
           </p>
@@ -237,7 +237,7 @@ export function RosterModal({
                   setAddError(null);
                 }}
                 disabled={eligible.isPending || members.length === 0}
-                className="h-[44px] w-full rounded-xl border border-[var(--border)] bg-white px-3 text-[13px] text-[var(--text-strong)] transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                className="h-[44px] w-full rounded-xl border border-[var(--border)] bg-white px-3 text-[length:var(--font-size-label)] text-[var(--text-strong)] transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
               >
                 <option value="">
                   {/* 조회 실패를 "멤버 없음" 으로 말하지 않는다 — 목록이 비어 있는 이유가
@@ -274,7 +274,7 @@ export function RosterModal({
                 eligible.isError ||
                 !canAddSelectedMember
               }
-              className="h-[44px] shrink-0 rounded-xl bg-blue-500 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="h-[44px] shrink-0 rounded-xl bg-blue-500 px-4 text-[length:var(--font-size-label)] font-semibold text-white transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               {addPlayer.isPending ? '추가 중…' : '추가'}
             </button>
@@ -294,7 +294,7 @@ export function RosterModal({
       <button
         type="button"
         onClick={onClose}
-        className="mt-4 w-full h-[44px] rounded-xl text-[13px] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+        className="mt-4 w-full h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
       >
         닫기
       </button>
@@ -614,7 +614,7 @@ export function RegistrationsTab({
     <>
       {/* 전량 로더의 안전 상한(1,000건)에 걸린 경우 — 조용한 잘림 금지, 정직하게 알린다 */}
       {data?.truncated && (
-        <p className="mb-3 rounded-xl bg-[var(--tint-orange)] px-4 py-3 text-[13px] font-medium text-[var(--orange700)]">
+        <p className="mb-3 rounded-xl bg-[var(--tint-orange)] px-4 py-3 text-[length:var(--font-size-label)] font-medium text-[var(--orange700)]">
           신청이 1,000건을 넘어 일부만 불러왔어요. 아래 목록과 카운트가 전체보다 적을 수 있어요.
         </p>
       )}
@@ -630,7 +630,7 @@ export function RegistrationsTab({
               onClick={() => setStatusFilter(opt.value)}
               aria-pressed={active}
               className={[
-                'inline-flex items-center gap-2 px-3 min-h-[44px] rounded-full text-[13px] font-medium transition-colors',
+                'inline-flex items-center gap-2 px-3 min-h-[44px] rounded-full text-[length:var(--font-size-label)] font-medium transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 active
                   ? 'bg-blue-500 text-white'
@@ -658,7 +658,7 @@ export function RegistrationsTab({
 
       {/* P1-2: 처리 대기 주의 배너 */}
       {pendingReviewCount > 0 && (
-        <div className="mb-3 flex items-center gap-2 rounded-xl bg-[var(--tint-orange)] border border-[var(--tint-orange-border)] px-4 py-3 text-[13px] text-[var(--orange700)]">
+        <div className="mb-3 flex items-center gap-2 rounded-xl bg-[var(--tint-orange)] border border-[var(--tint-orange-border)] px-4 py-3 text-[length:var(--font-size-label)] text-[var(--orange700)]">
           <AlertCircle size={14} aria-hidden="true" className="shrink-0" />
           <span>처리 대기 중인 신청이 {pendingReviewCount}건 있어요.</span>
         </div>
@@ -667,7 +667,7 @@ export function RegistrationsTab({
       {/* P2-7: 일괄 처리 바 */}
       {selectedIds.size > 0 && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--blue50)] border border-blue-100 px-4 py-3">
-          <span className="text-[13px] text-[var(--blue700)]">{selectedIds.size}건 선택됨</span>
+          <span className="text-[length:var(--font-size-label)] text-[var(--blue700)]">{selectedIds.size}건 선택됨</span>
           <button
             type="button"
             onClick={() => void handleBatchConfirmPayment()}

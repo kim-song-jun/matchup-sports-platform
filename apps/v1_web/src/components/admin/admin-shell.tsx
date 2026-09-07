@@ -381,7 +381,7 @@ function Drawer({
         <div className="flex items-center justify-between px-4 h-[52px] border-b border-[var(--border)] shrink-0">
           <div className="flex items-center gap-2">
             <LayoutDashboard size={17} className="text-blue-500" aria-hidden="true" />
-            <span className="text-[15px] font-bold text-[var(--text-strong)]">Teameet 운영</span>
+            <span className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">Teameet 운영</span>
             {/* [알파 감사 C] ops shell 역할 배지 — 알파 실측 지적(10px → 12px). */}
             {adminRoleLabel && (
               <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-2 py-0.5">
@@ -451,12 +451,12 @@ function Drawer({
         {/* Footer */}
         <div className="px-4 py-4 border-t border-[var(--border)] shrink-0">
           {adminName && (
-            <p className="text-[12px] text-[var(--text-muted)] mb-2 truncate">{adminName}</p>
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mb-2 truncate">{adminName}</p>
           )}
           <Link
             href="/home"
             onClick={onClose}
-            className="flex items-center gap-2 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-strong)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="flex items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-strong)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             서비스로 돌아가기
@@ -510,7 +510,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
         <div className="px-5 py-4 border-b border-[var(--border)] flex items-center gap-2 min-h-[64px]">
           <LayoutDashboard size={18} className="text-blue-500 shrink-0" aria-hidden="true" />
           <div className="flex flex-col min-w-0">
-            <span className="text-[15px] font-bold text-[var(--text-strong)] leading-tight">Teameet 운영</span>
+            <span className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)] leading-tight">Teameet 운영</span>
             {/* [알파 감사 C] ops shell 역할 배지 — 알파 실측 지적(10px → 12px). */}
             {adminRoleLabel && (
               <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-2 py-0.5 w-fit mt-0.5">
@@ -526,7 +526,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
             type="button"
             onClick={() => setPaletteOpen(true)}
             aria-label="전역 검색 열기 (Cmd+K)"
-            className="flex w-full items-center gap-2 min-h-[40px] rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 text-[13px] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--text-body)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="flex w-full items-center gap-2 min-h-[40px] rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--text-body)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <Search size={14} aria-hidden="true" />
             <span className="flex-1 text-left">회원·팀·매치 검색</span>
@@ -558,11 +558,11 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
         {/* Footer identity + back link */}
         <div className="px-4 py-4 border-t border-[var(--border)] shrink-0">
           {adminName && (
-            <p className="text-[12px] text-[var(--text-muted)] mb-2 truncate">{adminName}</p>
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mb-2 truncate">{adminName}</p>
           )}
           <Link
             href="/home"
-            className="flex items-center gap-2 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="flex items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             서비스로 돌아가기
@@ -598,7 +598,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
           >
             <Menu size={20} aria-hidden="true" />
           </button>
-          <span className="flex-1 text-center text-[15px] font-bold text-[var(--text-strong)]">
+          <span className="flex-1 text-center text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">
             {sectionLabel}
           </span>
           {/* Right slot: 전역 검색 (제목 중앙 정렬 유지 — 좌측 햄버거와 같은 44px) */}

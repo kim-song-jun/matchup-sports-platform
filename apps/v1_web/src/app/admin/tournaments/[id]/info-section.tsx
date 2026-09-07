@@ -462,7 +462,7 @@ export function TournamentInfoSection() {
           요약표가 각각 그렸고, '대회 정보 수정' 버튼도 두 곳에 있었다. */}
       <div className="tm-content-enter bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-[13px] font-bold text-[var(--text-strong)]">대회 정보</span>
+          <span className="text-[length:var(--font-size-label)] font-bold text-[var(--text-strong)]">대회 정보</span>
           {canWrite && (
             <button
               type="button"
@@ -511,7 +511,7 @@ export function TournamentInfoSection() {
           ].map(({ label, value }) => (
             <div key={label}>
               <dt className="text-xs text-[var(--text-muted)] font-medium mb-0.5">{label}</dt>
-              <dd className="text-[13px] text-[var(--text-strong)]">{value}</dd>
+              <dd className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">{value}</dd>
             </div>
           ))}
         </dl>
@@ -522,13 +522,13 @@ export function TournamentInfoSection() {
             {tournament.rulesText && (
               <div>
                 <p className="text-xs text-[var(--text-muted)] font-medium mb-0.5">대회 규정</p>
-                <p className="text-[13px] text-[var(--text-strong)] whitespace-pre-wrap leading-relaxed">{tournament.rulesText}</p>
+                <p className="text-[length:var(--font-size-label)] text-[var(--text-strong)] whitespace-pre-wrap leading-relaxed">{tournament.rulesText}</p>
               </div>
             )}
             {tournament.refundPolicyText && (
               <div>
                 <p className="text-xs text-[var(--text-muted)] font-medium mb-0.5">환불 정책</p>
-                <p className="text-[13px] text-[var(--text-strong)] whitespace-pre-wrap leading-relaxed">{tournament.refundPolicyText}</p>
+                <p className="text-[length:var(--font-size-label)] text-[var(--text-strong)] whitespace-pre-wrap leading-relaxed">{tournament.refundPolicyText}</p>
               </div>
             )}
           </div>
@@ -543,7 +543,7 @@ export function TournamentInfoSection() {
 
       <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6">
         <div className="flex items-center justify-between gap-3 mb-3">
-          <span className="text-[13px] font-bold text-[var(--text-strong)]">홍보 카드</span>
+          <span className="text-[length:var(--font-size-label)] font-bold text-[var(--text-strong)]">홍보 카드</span>
           {canWrite && (
             <button
               type="button"
@@ -588,12 +588,12 @@ export function TournamentInfoSection() {
           ].map((promo) => (
             <div key={promo.key} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-[13px] font-semibold text-[var(--text-strong)]">{promo.title}</p>
+                <p className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)]">{promo.title}</p>
                 <span className={`rounded-full px-3 py-1 text-[length:var(--font-size-caption)] font-semibold ${promo.enabled ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--card-surface)] text-[var(--text-muted)] border border-[var(--border)]'}`}>
                   {promo.enabled ? '노출' : '숨김'}
                 </span>
               </div>
-              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[13px]">
+              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[length:var(--font-size-label)]">
                 <div>
                   <dt className="text-xs text-[var(--text-muted)]">우선순위</dt>
                   <dd className="text-[var(--text-strong)]">{promo.priority}</dd>
@@ -645,7 +645,7 @@ export function TournamentInfoSection() {
       >
         <form onSubmit={handleEditSubmit} noValidate className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-1">
           <div className="flex flex-col gap-2">
-            <label htmlFor="edit-sport-id" className="text-[13px] text-[var(--text-strong)]">종목</label>
+            <label htmlFor="edit-sport-id" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">종목</label>
             <select
               id="edit-sport-id"
               value={editSportId}
@@ -661,7 +661,7 @@ export function TournamentInfoSection() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <label htmlFor="edit-title" className="text-[13px] text-[var(--text-strong)]">
+            <label htmlFor="edit-title" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
               대회명 <span className="text-red-500" aria-hidden="true">*</span>
             </label>
             <input
@@ -709,7 +709,7 @@ export function TournamentInfoSection() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <label htmlFor="edit-venue" className="text-[13px] text-[var(--text-strong)]">장소</label>
+            <label htmlFor="edit-venue" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">장소</label>
             <input
               id="edit-venue"
               type="text"
@@ -722,7 +722,7 @@ export function TournamentInfoSection() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <label htmlFor="edit-parking-info" className="text-[13px] text-[var(--text-strong)]">주차 안내</label>
+            <label htmlFor="edit-parking-info" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">주차 안내</label>
             <textarea
               id="edit-parking-info"
               value={editParkingInfo}
@@ -733,14 +733,14 @@ export function TournamentInfoSection() {
               placeholder="예: 건물 지하 주차장 2시간 무료, 만차 시 인근 공영주차장을 이용해 주세요."
               className={inputCls}
             />
-            <span className="text-[12px] text-[var(--text-muted)]">
+            <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
               대회 상세의 현장 안내에서 장소 아래에 표시돼요. 비우면 안내 문구를 숨겨요.
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
-              <label htmlFor="edit-entry-fee" className="text-[13px] text-[var(--text-strong)]">참가비 (원)</label>
+              <label htmlFor="edit-entry-fee" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">참가비 (원)</label>
               <input
                 id="edit-entry-fee"
                 type="text"
@@ -752,7 +752,7 @@ export function TournamentInfoSection() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <label htmlFor="edit-team-count" className="text-[13px] text-[var(--text-strong)]">팀 수</label>
+              <label htmlFor="edit-team-count" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">팀 수</label>
               <input
                 id="edit-team-count"
                 type="number"
@@ -765,7 +765,7 @@ export function TournamentInfoSection() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <label htmlFor="edit-min-players" className="text-[13px] text-[var(--text-strong)]">최소 선수 (등록 명단)</label>
+              <label htmlFor="edit-min-players" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">최소 선수 (등록 명단)</label>
               <input
                 id="edit-min-players"
                 type="number"
@@ -778,7 +778,7 @@ export function TournamentInfoSection() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <label htmlFor="edit-max-players" className="text-[13px] text-[var(--text-strong)]">최대 선수 (등록 명단)</label>
+              <label htmlFor="edit-max-players" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">최대 선수 (등록 명단)</label>
               <input
                 id="edit-max-players"
                 type="number"
@@ -793,32 +793,32 @@ export function TournamentInfoSection() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <span className="text-[13px] text-[var(--text-strong)]">출전 인원</span>
-            <p className="text-[12px] text-[var(--text-muted)]">
+            <span className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">출전 인원</span>
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
               경기장에 실제로 서는 라인업 인원(골키퍼 포함)이에요. 위 등록 명단 인원과는 달라요.
             </p>
             {tournament.status === 'in_progress' || tournament.status === 'completed' ? (
-              <p className="text-[12px] text-[var(--orange700)]">
+              <p className="text-[length:var(--font-size-caption)] text-[var(--orange700)]">
                 대회가 시작된 이후에는 출전 인원을 바꿀 수 없어요.
                 {tournament.lineupMaxPlayers !== null ? ` 현재 ${tournament.lineupMaxPlayers}명이에요.` : ''}
                 {' '}
                 {LINEUP_LOCK_ESCAPE_HINT}
               </p>
             ) : editSportId && editSportId !== tournament.sportId ? (
-              <p className="text-[12px] text-[var(--text-muted)]">
+              <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                 종목을 바꾸는 중에는 출전 인원을 함께 바꿀 수 없어요. 종목을 먼저 저장한 뒤 다시 편집해 주세요.
               </p>
             ) : lineupSizeOptionsPending ? (
-              <p className="text-[12px] text-[var(--text-muted)]">선택지를 불러오는 중이에요…</p>
+              <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">선택지를 불러오는 중이에요…</p>
             ) : lineupSizeOptionsFailed || !lineupSizeOptions ? (
               // 조회 실패를 "미지원 종목"과 같은 문구로 뭉뚱그리면 실제 오류가 숨겨진다
               // (Copilot 리뷰 지적). 현재 pin된 값은 아래 안내로 그대로 보여준다.
-              <p className="text-[12px] text-[var(--red700)]">
+              <p className="text-[length:var(--font-size-caption)] text-[var(--red700)]">
                 출전 인원 선택지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
                 {tournament.lineupMaxPlayers !== null ? ` 현재 설정은 ${tournament.lineupMaxPlayers}명이에요.` : ''}
               </p>
             ) : !lineupSizeOptions.supported ? (
-              <p className="text-[12px] text-[var(--text-muted)]">이 종목은 아직 출전 인원을 선택할 수 없어요.</p>
+              <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">이 종목은 아직 출전 인원을 선택할 수 없어요.</p>
             ) : (
               <div className="flex flex-wrap gap-2" role="group" aria-label="출전 인원 선택">
                 {lineupSizeOptions.options.map((option) => {
@@ -847,12 +847,12 @@ export function TournamentInfoSection() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <span className="text-[13px] text-[var(--text-strong)]">교체 방식</span>
-            <p className="text-[12px] text-[var(--text-muted)]">
+            <span className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">교체 방식</span>
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
               경기 중 후보 선수를 주전과 몇 번까지 바꿀 수 있는지예요. 무제한(롤링)은 이미 나갔던 선수도 다시 투입할 수 있어요.
             </p>
             {tournament.status === 'in_progress' || tournament.status === 'completed' ? (
-              <p className="text-[12px] text-[var(--orange700)]">
+              <p className="text-[length:var(--font-size-caption)] text-[var(--orange700)]">
                 대회가 시작된 이후에는 교체 방식을 바꿀 수 없어요.
                 {tournament.substitutionMode !== null
                   ? ` 현재 ${substitutionPolicyLabel(tournament.substitutionMode, tournament.maxSubstitutions)}이에요.`
@@ -861,20 +861,20 @@ export function TournamentInfoSection() {
                 {LINEUP_LOCK_ESCAPE_HINT}
               </p>
             ) : editSportId && editSportId !== tournament.sportId ? (
-              <p className="text-[12px] text-[var(--text-muted)]">
+              <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                 종목을 바꾸는 중에는 교체 방식을 함께 바꿀 수 없어요. 종목을 먼저 저장한 뒤 다시 편집해 주세요.
               </p>
             ) : lineupSizeOptionsPending ? (
-              <p className="text-[12px] text-[var(--text-muted)]">선택지를 불러오는 중이에요…</p>
+              <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">선택지를 불러오는 중이에요…</p>
             ) : lineupSizeOptionsFailed || !lineupSizeOptions ? (
-              <p className="text-[12px] text-[var(--red700)]">
+              <p className="text-[length:var(--font-size-caption)] text-[var(--red700)]">
                 교체 방식 선택지를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
                 {tournament.substitutionMode !== null
                   ? ` 현재 설정은 ${substitutionPolicyLabel(tournament.substitutionMode, tournament.maxSubstitutions)}이에요.`
                   : ''}
               </p>
             ) : !lineupSizeOptions.supported ? (
-              <p className="text-[12px] text-[var(--text-muted)]">이 종목은 아직 교체 방식을 선택할 수 없어요.</p>
+              <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">이 종목은 아직 교체 방식을 선택할 수 없어요.</p>
             ) : (
               <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap gap-2" role="group" aria-label="교체 방식 선택">
@@ -902,7 +902,7 @@ export function TournamentInfoSection() {
                 </div>
                 {(editSubstitutionMode || tournament.substitutionMode) === 'limited' ? (
                   <div className="flex flex-col gap-2">
-                    <label htmlFor="edit-max-substitutions" className="text-[13px] text-[var(--text-strong)]">
+                    <label htmlFor="edit-max-substitutions" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
                       허용 교체 횟수
                     </label>
                     <input
@@ -927,7 +927,7 @@ export function TournamentInfoSection() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <label htmlFor="edit-gender-category" className="text-[13px] text-[var(--text-strong)]">
+            <label htmlFor="edit-gender-category" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
               성별 카테고리
             </label>
             <select
@@ -979,11 +979,11 @@ export function TournamentInfoSection() {
             </div>
           ) : null}
 
-          <p className="text-[12px] text-[var(--text-muted)] -mb-2">상금·시상 정보는 &quot;대회 정보&quot; 탭에서 수정할 수 있어요.</p>
+          <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] -mb-2">상금·시상 정보는 &quot;대회 정보&quot; 탭에서 수정할 수 있어요.</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="flex flex-col gap-2">
-              <label htmlFor="edit-bank-name" className="text-[13px] text-[var(--text-strong)]">은행명</label>
+              <label htmlFor="edit-bank-name" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">은행명</label>
               <input
                 id="edit-bank-name"
                 type="text"
@@ -995,7 +995,7 @@ export function TournamentInfoSection() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <label htmlFor="edit-bank-account" className="text-[13px] text-[var(--text-strong)]">계좌번호</label>
+              <label htmlFor="edit-bank-account" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">계좌번호</label>
               <input
                 id="edit-bank-account"
                 type="text"
@@ -1007,7 +1007,7 @@ export function TournamentInfoSection() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <label htmlFor="edit-bank-holder" className="text-[13px] text-[var(--text-strong)]">예금주</label>
+              <label htmlFor="edit-bank-holder" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">예금주</label>
               <input
                 id="edit-bank-holder"
                 type="text"
@@ -1021,7 +1021,7 @@ export function TournamentInfoSection() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <label htmlFor="edit-rules-text" className="text-[13px] text-[var(--text-strong)]">대회 규정</label>
+            <label htmlFor="edit-rules-text" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">대회 규정</label>
             <textarea
               id="edit-rules-text"
               value={editRulesText}
@@ -1029,7 +1029,7 @@ export function TournamentInfoSection() {
               disabled={updateTournament.isPending}
               rows={16}
               placeholder="대회 규정을 입력해 주세요. 참가 자격, 경기 방식, 경기 진행, 순위 결정 기준 등 긴 문서도 그대로 붙여넣을 수 있어요."
-              className={`${textareaCls} text-[12px] leading-relaxed`}
+              className={`${textareaCls} text-[length:var(--font-size-caption)] leading-relaxed`}
             />
           </div>
 
@@ -1037,7 +1037,7 @@ export function TournamentInfoSection() {
               소급 적용되는 것을 막으려고 기본값을 두지 않았다. */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-2">
-              <label htmlFor="edit-yellow-limit" className="text-[13px] text-[var(--text-strong)]">
+              <label htmlFor="edit-yellow-limit" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
                 경고 누적 출전정지 (장)
               </label>
               <input
@@ -1054,7 +1054,7 @@ export function TournamentInfoSection() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <label htmlFor="edit-red-suspension" className="text-[13px] text-[var(--text-strong)]">
+              <label htmlFor="edit-red-suspension" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
                 퇴장 시 출전정지 (경기)
               </label>
               <input
@@ -1073,7 +1073,7 @@ export function TournamentInfoSection() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <label htmlFor="edit-refund-policy" className="text-[13px] text-[var(--text-strong)]">환불 정책</label>
+            <label htmlFor="edit-refund-policy" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">환불 정책</label>
             <textarea
               id="edit-refund-policy"
               value={editRefundPolicyText}
@@ -1081,7 +1081,7 @@ export function TournamentInfoSection() {
               disabled={updateTournament.isPending}
               rows={12}
               placeholder="환불 정책을 입력해 주세요. 신청·입금 안내, 환불 기준, 예외 사항 등 긴 문서도 그대로 붙여넣을 수 있어요."
-              className={`${textareaCls} text-[12px] leading-relaxed`}
+              className={`${textareaCls} text-[length:var(--font-size-caption)] leading-relaxed`}
             />
           </div>
 
@@ -1090,7 +1090,7 @@ export function TournamentInfoSection() {
               type="button"
               onClick={() => setEditOpen(false)}
               disabled={updateTournament.isPending}
-              className="flex-1 h-[44px] rounded-xl text-[13px] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -1202,7 +1202,7 @@ export function TournamentInfoSection() {
           />
 
           <div className="flex gap-2 pt-1 sticky bottom-0 bg-[var(--card-surface)] pb-1">
-            <button type="button" onClick={() => setPromoOpen(false)} disabled={updateTournament.isPending || promoUploadingSlot !== null} className="flex-1 h-[44px] rounded-xl text-[13px] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50">
+            <button type="button" onClick={() => setPromoOpen(false)} disabled={updateTournament.isPending || promoUploadingSlot !== null} className="flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50">
               취소
             </button>
             <button type="submit" disabled={updateTournament.isPending || promoUploadingSlot !== null} className={'flex-1 ' + submitBtnCls}>
@@ -1238,7 +1238,7 @@ function GenderQuotaInput({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <label htmlFor={id} className="text-[13px] text-[var(--text-strong)]">
+      <label htmlFor={id} className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
         {label}
       </label>
       <input
@@ -1367,7 +1367,7 @@ function PrizeCard({
     });
   };
 
-  const inputBoxCls = 'w-full text-[13px] border border-[var(--border)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-[var(--surface-soft)]';
+  const inputBoxCls = 'w-full text-[length:var(--font-size-label)] border border-[var(--border)] rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-[var(--surface-soft)]';
 
   return (
     <section
@@ -1375,7 +1375,7 @@ function PrizeCard({
       className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6 flex flex-col gap-3"
     >
       <div>
-        <p className="text-[13px] font-bold text-[var(--text-strong)] m-0">상금·시상 정보</p>
+        <p className="text-[length:var(--font-size-label)] font-bold text-[var(--text-strong)] m-0">상금·시상 정보</p>
         <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)] mt-0.5 mb-0">공개 페이지 &quot;시상·리뷰&quot;의 상금 카드에 그대로 표시돼요.</p>
       </div>
       <PrizeBreakdownEditor
@@ -1387,7 +1387,7 @@ function PrizeCard({
       />
 
       <div className="flex flex-col gap-2">
-        <label htmlFor="info-prize-summary" className="text-[12px] text-[var(--text-body)]">상품 및 상금</label>
+        <label htmlFor="info-prize-summary" className="text-[length:var(--font-size-caption)] text-[var(--text-body)]">상품 및 상금</label>
         <textarea
           id="info-prize-summary"
           value={prizeSummary}
@@ -1406,7 +1406,7 @@ function PrizeCard({
             type="button"
             onClick={handleSave}
             disabled={updateTournament.isPending}
-            className="inline-flex items-center justify-center text-[13px] font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 h-[44px] rounded-xl"
+            className="inline-flex items-center justify-center text-[length:var(--font-size-label)] font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-4 h-[44px] rounded-xl"
           >
             {updateTournament.isPending ? '저장 중…' : '상금 정보 저장'}
           </button>

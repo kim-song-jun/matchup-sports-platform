@@ -159,7 +159,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             onChange={(e) => setInput(e.target.value)}
             placeholder="회원 닉네임·이메일, 팀명, 매치명 검색"
             aria-label="회원·팀·매치 전역 검색"
-            className="flex-1 min-h-[52px] bg-transparent text-[15px] text-[var(--text-strong)] placeholder:text-[var(--text-muted)] outline-none"
+            className="flex-1 min-h-[52px] bg-transparent text-[length:var(--font-size-body)] text-[var(--text-strong)] placeholder:text-[var(--text-muted)] outline-none"
             role="combobox"
             aria-expanded={items.length > 0}
             aria-controls="command-palette-results"
@@ -173,17 +173,17 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         {/* 결과 */}
         <div className="max-h-[50vh] overflow-y-auto overscroll-contain">
           {query.length === 0 && (
-            <p className="px-4 py-8 text-center text-[13px] text-[var(--text-muted)]">
+            <p className="px-4 py-8 text-center text-[length:var(--font-size-label)] text-[var(--text-muted)]">
               검색어를 입력하면 회원·팀·매치를 한 번에 찾아요.
             </p>
           )}
           {isFetching && query.length > 0 && (
-            <p className="px-4 py-8 text-center text-[13px] text-[var(--text-muted)]" role="status">
+            <p className="px-4 py-8 text-center text-[length:var(--font-size-label)] text-[var(--text-muted)]" role="status">
               검색 중…
             </p>
           )}
           {showEmpty && (
-            <p className="px-4 py-8 text-center text-[13px] text-[var(--text-muted)]" role="status">
+            <p className="px-4 py-8 text-center text-[length:var(--font-size-label)] text-[var(--text-muted)]" role="status">
               &ldquo;{query}&rdquo;에 맞는 결과가 없어요.
             </p>
           )}
@@ -218,7 +218,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                       ].join(' ')}
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13.5px] font-medium text-[var(--text-strong)]">
+                        <span className="block truncate text-[length:var(--font-size-label)] font-medium text-[var(--text-strong)]">
                           {item.label}
                         </span>
                         {item.sublabel && (

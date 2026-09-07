@@ -58,7 +58,7 @@ export function BracketGroupQuickAdd({ existingGroups, createGroup, showToast, o
 
   return (
     <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-5">
-      <h3 className="text-[15px] font-bold text-[var(--text-strong)] mb-1">조 추가</h3>
+      <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)] mb-1">조 추가</h3>
       <p className="text-xs text-[var(--text-muted)] mb-4">
         탭 한 번으로 조를 만들어요. 이름은 나중에 수정 아이콘으로 바꿀 수 있어요.
       </p>
@@ -69,7 +69,7 @@ export function BracketGroupQuickAdd({ existingGroups, createGroup, showToast, o
             type="button"
             onClick={() => submitTemplate(phase)}
             disabled={createGroup.isPending}
-            className="inline-flex items-center justify-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-[var(--blue700)] bg-[var(--blue50)] border border-[var(--tint-blue-border)] hover:bg-[var(--blue100)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="inline-flex items-center justify-center h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] border border-[var(--tint-blue-border)] hover:bg-[var(--blue100)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <Plus size={14} aria-hidden="true" />
             {label}
@@ -91,7 +91,7 @@ export function BracketGroupQuickAdd({ existingGroups, createGroup, showToast, o
           className="mt-3 pt-4 border-t border-[var(--border)] flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end"
         >
           <div className="flex flex-col gap-1">
-            <label htmlFor="group-name" className="text-[13px] text-[var(--text-strong)]">
+            <label htmlFor="group-name" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
               조 이름
             </label>
             <input
@@ -106,7 +106,7 @@ export function BracketGroupQuickAdd({ existingGroups, createGroup, showToast, o
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="group-phase" className="text-[13px] text-[var(--text-strong)]">
+            <label htmlFor="group-phase" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
               단계
             </label>
             <select
@@ -123,7 +123,7 @@ export function BracketGroupQuickAdd({ existingGroups, createGroup, showToast, o
             </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="group-advance" className="text-[13px] text-[var(--text-strong)]">
+            <label htmlFor="group-advance" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
               진출 팀 수 <span className="text-xs text-[var(--text-muted)]">(선택)</span>
             </label>
             <input

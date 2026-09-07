@@ -26,7 +26,8 @@ import type { V1Sport, V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState
 // page-view component tree.
 
 export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamMatchModel {
-  const status = statusToCardStatus(getStatus(match), getViewerState(match));
+  const apiStatus = getStatus(match);
+  const status = statusToCardStatus(apiStatus, getViewerState(match));
   const costs = parseCosts(match.costNote);
   const hasStructuredConditions = Boolean(match.matchFormat) || (match.matchStyle?.length ?? 0) > 0 || Boolean(match.uniformColor);
   const legacyNote = !hasStructuredConditions ? match.rulesText ?? '' : '';
@@ -66,6 +67,7 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     manner: match.hostTeam?.mannerScore ?? null,
     wins: match.hostTeam?.wins ?? null,
     status,
+    closed: isClosedApiStatus(apiStatus),
   };
 }
 
@@ -157,11 +159,20 @@ export function getViewerState(match: V1TeamMatch): V1TeamMatchViewerState {
   return match.viewer?.state ?? match.viewerState ?? 'none';
 }
 
+/**
+ * 매치가 더는 신청을 받지 않는 상태인지 — **보는 사람과 무관하게** API status 만 본다.
+ * `statusToCardStatus` 는 viewerState 를 먼저 보므로 호스트에게는 항상 'mine' 을 돌려준다.
+ * 그 때문에 호스트는 자기 매치가 마감돼도 목록에서 마감 표시를 못 봤다(2026-09-07).
+ */
+export function isClosedApiStatus(status: V1TeamMatchApiStatus): boolean {
+  return status === 'matched' || status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired';
+}
+
 export function statusToCardStatus(status: V1TeamMatchApiStatus, viewerState: V1TeamMatchViewerState = 'none'): TeamMatchModel['status'] {
   if (viewerState === 'host_team') return 'mine';
   if (viewerState === 'requested') return 'pending';
   if (viewerState === 'approved') return 'approved';
-  if (status === 'matched' || status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired') return 'closed';
+  if (isClosedApiStatus(status)) return 'closed';
   return 'open';
 }
 

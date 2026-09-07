@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TeamMatchCreatePageView, TeamMatchDetailPageView, TeamMatchListPageView } from './team-matches-page';
 import { getTeamMatchCreateViewModel, getTeamMatchDetailViewModel, getTeamMatchListViewModel } from './team-matches.view-model';
+import type { TeamMatchModel } from './team-matches.types';
 
 // routerPush를 vi.hoisted로 모듈 스코프에 고정 — useRouter()가 매 렌더 새 vi.fn()을
 // 반환하면 클릭 핸들러가 실제로 호출한 push를 테스트에서 단언할 방법이 없다.
@@ -84,7 +85,8 @@ describe('TeamMatchListPageView — 더 보기 (20건 컷오프 페이지네이�
 describe('TeamMatchListPageView — 신청 마감 카드 구분', () => {
   function modelWithSingleCard(status: 'open' | 'closed') {
     const base = getTeamMatchListViewModel();
-    return { ...base, matches: [{ ...base.matches[0], status }] };
+    // `closed` 는 API status 만으로 정해지는 별도 필드다 — status 만 바꾸면 실제 응답과 어긋난다.
+    return { ...base, matches: [{ ...base.matches[0], status, closed: status === 'closed' }] };
   }
 
   it('마감된 카드는 "신청 마감" 배지 + 흐림 처리로 구분한다', () => {
@@ -153,7 +155,7 @@ describe('TeamMatchListPageView — 행 카드 (개인 탭과 같은 카드)', (
     expect(labels).not.toContain('홈팀');
   });
 
-  it('상태 배지는 카드마다 정확히 하나이고, 제목 줄이 아니라 신원 줄에 있다', () => {
+  it('상태 배지는 제목 줄이 아니라 신원 줄에 있다', () => {
     // 제목 줄에 인라인으로 두면 배지 폭만큼 제목이 잘린다 — 데스크톱 실측에서 본문 191px 중
     // 제목이 111px 였다. 팀매치는 거의 모든 카드에 배지가 붙어 매 카드가 그 대가를 치른다.
     const base = getTeamMatchListViewModel();
@@ -164,9 +166,52 @@ describe('TeamMatchListPageView — 행 카드 (개인 탭과 같은 카드)', (
     const cards = [...container.querySelectorAll('.tm-match-row')];
     expect(cards).toHaveLength(statuses.length);
     cards.forEach((card) => {
-      expect(card.querySelectorAll('.tm-team-match-row-id > .tm-badge')).toHaveLength(1);
+      expect(card.querySelectorAll('.tm-team-match-row-id > .tm-badge').length).toBeGreaterThanOrEqual(1);
       expect(card.querySelectorAll('.tm-match-row-headline .tm-badge')).toHaveLength(0);
     });
+  });
+});
+
+/**
+ * 호스트가 보는 자기 매치의 마감 표시 (2026-09-07, 사용자 확정: "'내 매치' + 마감 둘 다").
+ *
+ * `statusToCardStatus()` 는 viewerState 를 API status 보다 먼저 본다 —
+ * `if (viewerState === 'host_team') return 'mine'` 에서 끝나므로, 호스트에게는 그 매치가
+ * matched/closed/cancelled/completed/expired 여도 카드 status 가 항상 `'mine'` 이었다.
+ * 결과적으로 **매치를 만든 사람만 자기 매치가 마감된 줄 목록에서 알 수 없었다.**
+ *
+ * 그래서 모델에 `closed`(API status 만으로 판정) 를 따로 두고, 배지도 "나와의 관계"와
+ * "매치 상태" 두 가지로 나눈다. 둘 다 해당하면 둘 다 붙는다.
+ */
+describe('TeamMatchListPageView — 호스트도 자기 매치의 마감을 본다', () => {
+  function listWith(overrides: Partial<TeamMatchModel>) {
+    const base = getTeamMatchListViewModel();
+    return { ...base, matches: [{ ...base.matches[0], ...overrides }] };
+  }
+
+  it("호스트의 마감된 매치는 '내 매치'와 '신청 마감'을 함께 보여준다", () => {
+    const { container } = renderPage(<TeamMatchListPageView model={listWith({ status: 'mine', closed: true })} />);
+
+    expect(screen.getByText('내 매치')).toBeInTheDocument();
+    expect(screen.getByText('신청 마감')).toBeInTheDocument();
+    // 지면·썸네일도 함께 눌러야 스크롤 중에 걸린다 — 배지만으로는 놓친다.
+    expect(container.querySelector('.tm-match-row.tm-card-closed')).not.toBeNull();
+  });
+
+  it('호스트의 아직 열린 매치는 마감 표시를 하지 않는다', () => {
+    const { container } = renderPage(<TeamMatchListPageView model={listWith({ status: 'mine', closed: false })} />);
+
+    expect(screen.getByText('내 매치')).toBeInTheDocument();
+    expect(screen.queryByText('신청 마감')).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-card-closed')).toBeNull();
+  });
+
+  it("관계가 없고 마감도 아닌 매치에만 '상대 모집 중'을 쓴다 — 관계 배지와 겹치지 않는다", () => {
+    const mine = renderPage(<TeamMatchListPageView model={listWith({ status: 'mine', closed: false })} />);
+    expect(mine.queryByText('상대 모집 중')).not.toBeInTheDocument();
+
+    const open = renderPage(<TeamMatchListPageView model={listWith({ status: 'open', closed: false })} />);
+    expect(open.getByText('상대 모집 중')).toBeInTheDocument();
   });
 });
 

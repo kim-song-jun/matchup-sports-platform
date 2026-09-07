@@ -51,7 +51,7 @@ export function TournamentCampaignStatusDialog({
       <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="campaign-status-dialog-title" className="w-full max-w-[440px] overflow-hidden rounded-2xl bg-[var(--card-surface)] shadow-[var(--shadow-modal)]">
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
           <div>
-            <h2 id="campaign-status-dialog-title" className="text-base font-bold text-[var(--text-strong)]">캠페인 상태 변경</h2>
+            <h2 id="campaign-status-dialog-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">캠페인 상태 변경</h2>
             <p className="mt-1 text-xs text-[var(--text-muted)]">{targetLabel} 상태로 변경해요.</p>
           </div>
           <button type="button" aria-label="모달 닫기" disabled={pending} onClick={onClose} className="flex h-[44px] w-[44px] items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-body)] disabled:opacity-40">

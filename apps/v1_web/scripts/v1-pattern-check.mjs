@@ -352,8 +352,17 @@ checkLiteralBaseline({
   baselinePath: 'scripts/font-size-baseline.json',
   // 소수도 잡는다 — text-[13.5px] 같은 값이 baseline 밖에서 조용히 통과하고
   // 있었다(실측 3곳). px 리터럴은 정수만 쓰인다는 보장이 없다.
-  count: (txt) => (txt.match(/\btext-\[(\d+(?:\.\d+)?)px\]|fontSize:\s*(\d+(?:\.\d+)?)\b/g) || []).length,
-  hint: 'text-[Npx] · fontSize:N 대신 .tm-text-* 나 var(--font-size-*) 를 쓸 것',
+  //
+  // Tailwind 기본 이름 클래스(text-xs·text-sm·text-base·text-lg·text-xl·text-Nxl)도 센다.
+  // 이 검사의 머리말이 `text-xs` 를 네 가지 표기 중 하나로 지목해 놓고 정작 세지 않았다 —
+  // 719곳(92파일)이 그 구멍으로 들어와 있었다. 단순한 표기 문제가 아니다: 이 이름들은
+  // **사다리에 없는 크기를 들여온다.** text-base=16px, text-lg=18px 인데 타입 스케일은
+  // 15(body) 다음이 17(body-lg), 그 다음이 20(subhead)이라 16·18 단계가 아예 없다.
+  // 실제로 어드민 모달 제목 하나가 text-base 로 16px 이 되어 형제 모달(17px)과 어긋나 있었다.
+  count: (txt) =>
+    (txt.match(/\btext-\[(\d+(?:\.\d+)?)px\]|fontSize:\s*(\d+(?:\.\d+)?)\b/g) || []).length +
+    (txt.match(/\btext-(?:xs|sm|base|lg|xl|[2-9]xl)\b/g) || []).length,
+  hint: 'text-[Npx] · fontSize:N · text-sm 류 Tailwind 기본 이름 대신 .tm-text-* 나 var(--font-size-*) 를 쓸 것',
 });
 checkLiteralBaseline({
   label: 'radius 리터럴(TSX)',

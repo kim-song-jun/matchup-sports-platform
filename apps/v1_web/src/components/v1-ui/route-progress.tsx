@@ -1,18 +1,23 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useNavigationIntent } from './use-navigation-intent';
 
 /**
  * 전역 상단 네비게이션 진행 바.
  * - 내부 링크 클릭 / 뒤로·앞으로(popstate) 를 캡처해 즉시 "시작"
- * - 라우트(pathname) 가 바뀌면 "완료"(100% 채운 뒤 사라짐)
+ * - 라우트(pathname + query) 가 바뀌면 "완료"(100% 채운 뒤 사라짐)
  * - dev 컴파일·데이터 페칭 동안 화면이 멈춘 듯 보이는 체감을 줄여 준다.
  * 의존성 추가 없이 App Router(usePathname) + 클릭 가로채기로만 동작.
  */
 export function RouteProgressBar() {
+  return <Suspense fallback={null}><RouteProgressContent /></Suspense>;
+}
+
+function RouteProgressContent() {
   const pathname = usePathname();
+  const search = useSearchParams().toString();
   const [progress, setProgress] = useState<{ active: boolean; width: number }>({ active: false, width: 0 });
 
   const activeRef = useRef(false);
@@ -74,7 +79,7 @@ export function RouteProgressBar() {
     }
     finish();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, [pathname, search]);
 
   if (!progress.active) return null;
 

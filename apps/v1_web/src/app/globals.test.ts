@@ -453,6 +453,11 @@ describe('틴트 지면 위 보조 텍스트 대비 — grey600 은 흰 배경�
     '.tm-auth-segmented',
     '.tm-my-profile-head',
     '.tm-create-selected',
+    // --grey100 지면(4.19:1) — 같은 규칙에서 배경과 글자색을 함께 정하는 넷
+    '.tm-bk2-pill',
+    '.tm-standings-rank',
+    '.tm-review-card-avatar',
+    '.tm-chat-system-message span',
   ])('%s 는 보조 텍스트 토큰을 grey700 으로 올린다', (selector) => {
     expect(rulesDeclaring('--text-caption', 'var\\(--grey700\\)')).toContain(selector);
     expect(rulesDeclaring('--text-muted', 'var\\(--grey700\\)')).toContain(selector);

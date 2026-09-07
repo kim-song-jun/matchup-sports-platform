@@ -427,6 +427,19 @@ describe('틴트 지면 위 보조 텍스트 대비 — grey600 은 흰 배경�
     return selectors;
   };
 
+  // hover 로 지면이 한 단계 눌리는 자리도 같이 본다. 이 클래스는 .tm-list-row 없이
+  // 흰 지면에도 쓰여서(league awards) 평상시엔 올리지 않고 hover 일 때만 올린다 —
+  // 그래서 위 it.each 목록이 아니라 별도로 확인한다.
+  it('.tm-list-row-interactive 는 hover 일 때만 보조 텍스트 토큰을 올린다', () => {
+    const hover = globalsCss.match(/\.tm-list-row-interactive:hover\s*\{([^}]*)\}/)?.[1];
+
+    expect(hover, '.tm-list-row-interactive:hover 규칙을 찾지 못했다').toBeDefined();
+    expect(hover).toMatch(/--text-caption:\s*var\(--grey700\)/);
+    expect(hover).toMatch(/--text-muted:\s*var\(--grey700\)/);
+    // 평상시 규칙에는 올리지 않는다 — 흰 지면에서는 grey600 이 이미 기준을 넘는다.
+    expect(rulesDeclaring('--text-caption', 'var\\(--grey700\\)')).not.toContain('.tm-list-row-interactive');
+  });
+
   it.each([
     '.tm-badge-grey',
     '.tm-segmented-tabs',
@@ -435,6 +448,7 @@ describe('틴트 지면 위 보조 텍스트 대비 — grey600 은 흰 배경�
     '.tm-team-summary-bar',
     '.tm-weather-strip',
     '.tm-player-card-progress',
+    '.tm-list-row',
   ])('%s 는 보조 텍스트 토큰을 grey700 으로 올린다', (selector) => {
     expect(rulesDeclaring('--text-caption', 'var\\(--grey700\\)')).toContain(selector);
     expect(rulesDeclaring('--text-muted', 'var\\(--grey700\\)')).toContain(selector);

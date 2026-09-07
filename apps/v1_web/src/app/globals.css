@@ -1890,6 +1890,12 @@ label.tm-btn:focus-within {
   .tm-list-row-interactive:hover {
     background: var(--grey100); /* list-row-bg(grey50) → grey100 한 단계 진하게 */
     cursor: pointer;
+    /* 지면을 한 단계 눌렀으면 그 위 보조 텍스트도 함께 올린다 — grey600 은 grey100
+       위에서 4.19:1 이다. hover 일 때만 거는 이유는 이 클래스가 .tm-list-row 없이
+       흰 지면에도 쓰이기 때문이다(league-awards-page-client). 거기서는 grey600 이
+       4.62:1 로 이미 기준을 넘고, 굳이 올리면 본문과의 위계만 좁아진다. */
+    --text-caption: var(--grey700);
+    --text-muted: var(--grey700);
   }
 }
 
@@ -2923,7 +2929,8 @@ label.tm-btn:focus-within {
 .tm-match-summary-row,
 .tm-team-summary-bar,
 .tm-weather-strip,
-.tm-player-card-progress {
+.tm-player-card-progress,
+.tm-list-row {
   --text-caption: var(--grey700);
   --text-muted: var(--grey700);
 }

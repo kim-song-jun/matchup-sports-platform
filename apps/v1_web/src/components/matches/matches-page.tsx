@@ -316,7 +316,9 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
         <div className={`tm-match-detail-hero${match.image ? '' : ' tm-match-detail-hero-stack'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
           {match.image ? null : (
             <div className="tm-match-hero-graphic">
-              <SportIllustration sport={match.sport} sizes="(min-width: 1024px) 208px, 176px" />
+              {/* 이 자리는 176px(≥1024 208px)이라 agy-3d-graphic 기준의 "큰 자리"다 —
+                  오브젝트 셋(삼각 구도) 판을 쓴다. 목록 썸네일(76px)은 둘짜리 기본 판을 쓴다. */}
+              <SportIllustration sport={match.sport} sizes="(min-width: 1024px) 208px, 176px" variant="hero" />
             </div>
           )}
           <div className="tm-match-detail-overlay">

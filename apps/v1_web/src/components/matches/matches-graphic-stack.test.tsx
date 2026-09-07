@@ -31,6 +31,15 @@ describe('사진 없는 매치 상세 히어로', () => {
     expect(graphic!.querySelector('img')).not.toBeNull();
   });
 
+  it('이 자리는 176px 이상이라 오브젝트 셋짜리 hero 판을 쓴다', () => {
+    // 목록 썸네일(76px)용 둘짜리 판을 여기 쓰면 176/208px 를 오브젝트 둘로 채워 허전하다
+    // (agy-3d-graphic 스킬의 삼각 구도 기준). 자리별 파일 분리는 사용자 확정(2026-09-07 B안).
+    const { container } = render(<MatchDetailPageView model={detail(null)} />);
+
+    expect(queryImageBySrc(container, '/illustrations/sport-futsal-hero-640.webp')).not.toBeNull();
+    expect(queryImageBySrc(container, '/illustrations/sport-futsal-640.webp')).toBeNull();
+  });
+
   it('카피는 인라인 흰 글씨가 아니라 클래스로 색을 받는다 — 밝은 바탕에서 되돌릴 수 있어야 한다', () => {
     const { container } = render(<MatchDetailPageView model={detail(null)} />);
 

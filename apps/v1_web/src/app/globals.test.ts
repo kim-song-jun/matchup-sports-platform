@@ -294,3 +294,41 @@ describe('home featured media band', () => {
     expect(rule).not.toMatch(/height/);
   });
 });
+
+describe('home featured graphic size (cascade)', () => {
+  // 이 선택자 쌍은 **같은 속성(width/height)** 을 겨루고, 일반 규칙이 파일 뒤쪽에 있다.
+  // 특이도가 같으면 뒤가 이기므로, 홈 전용 규칙은 반드시 더 좁아야 한다.
+  // (alpha 실측 2026-09-07: 이 조건이 깨져 그래픽이 208px 로 그려졌고, aspect-ratio 2/1 밴드가
+  //  내용에 밀려 208px 까지 자라 같은 행의 사진 카드 밴드 152px 과 다시 벌어졌다.)
+  const countClasses = (selector: string) => selector.split('.').length - 1;
+
+  const homeRule = '.tm-home-featured-stack .tm-match-hero-graphic .tm-match-sport-illustration';
+  const genericRule = '.tm-match-hero-graphic .tm-match-sport-illustration';
+
+  it('declares the home-only illustration size, and the generic hero rule still exists', () => {
+    expect(globalsCss).toContain(homeRule);
+    expect(globalsCss).toContain(genericRule);
+  });
+
+  it('wins the cascade against the later generic rule by specificity, not by order', () => {
+    const homeAt = globalsCss.indexOf(homeRule);
+    // -1 을 그대로 쓰면 아래 비교가 전부 통과한다 — 규칙이 사라진 변이를 놓친다.
+    expect(homeAt).toBeGreaterThan(-1);
+    // 일반 규칙은 홈 규칙 **뒤에** 있는 것을 찾는다 — 앞쪽 매치는 홈 선택자 자신의 꼬리다.
+    const genericAt = globalsCss.indexOf(`\n${genericRule}`, homeAt);
+
+    expect(genericAt).toBeGreaterThan(homeAt);
+    expect(countClasses(homeRule)).toBeGreaterThan(countClasses(genericRule));
+  });
+
+  it('sizes the graphic to fit inside the 2:1 media band on both breakpoints', () => {
+    // 밴드 높이는 카드 폭의 절반이다(alpha 데스크톱 실측 304px 폭 → 152px). 그래픽이 그보다
+    // 크면 밴드가 밀려 커진다 — 그래서 128px 이하로 묶는다.
+    const block = globalsCss.slice(globalsCss.indexOf(homeRule));
+    // `min-width: 1024px`(미디어 쿼리)가 잡히지 않도록 선언 줄만 본다.
+    const sizes = [...block.slice(0, 400).matchAll(/\n\s*width:\s*(\d+)px/g)].map((m) => Number(m[1]));
+
+    expect(sizes.length).toBeGreaterThanOrEqual(2);
+    sizes.slice(0, 2).forEach((value) => expect(value).toBeLessThanOrEqual(128));
+  });
+});

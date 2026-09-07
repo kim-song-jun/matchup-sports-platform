@@ -440,3 +440,36 @@ describe('틴트 지면 위 보조 텍스트 대비 — grey600 은 흰 배경�
     expect(rulesDeclaring('--text-muted', 'var\\(--grey700\\)')).toContain(selector);
   });
 });
+
+describe('대진표 예정 단계 라벨 대비 (2026-09-07 사용자 확정 B안)', () => {
+  // 예정 단계 이름이 grey400 이라 흰 배경에서 2.01:1 이었다(alpha 실측) — 기준의 절반이다.
+  // grey500 으로 한 단계만 올려도 3.04 라 미달이어서 grey700 까지 올렸다.
+  // 원 안 숫자(.tm-hub-stage-dot)는 라벨과 중복이라 grey400 으로 두기로 했다
+  // (docs/design/a11y-decisions.md 5번) — 그 결정이 살아 있는지도 함께 못 박는다.
+  const hex = (name: string) =>
+    globalsCss.match(new RegExp('--' + name + ':\\s*(#[0-9a-fA-F]{6})'))?.[1] ?? null;
+  const lum = (h: string) =>
+    [1, 3, 5]
+      .map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+      .reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const ratio = (a: string, b: string) => {
+    const [l1, l2] = [lum(a), lum(b)];
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  };
+  const colorOf = (selector: string) =>
+    globalsCss.match(new RegExp('\\' + selector + '\\s*\\{[^}]*?color:\\s*var\\((--[a-z0-9-]+)\\)', 's'))?.[1] ?? null;
+
+  it('예정 단계 이름은 흰 배경에서 AA 를 넘는다', () => {
+    const token = colorOf('.tm-hub-stage-label');
+
+    expect(token, '.tm-hub-stage-label 의 color 토큰을 찾지 못했다').toBeTruthy();
+    const value = hex(token!.slice(2));
+    expect(value, token + ' 값을 찾지 못했다').toBeTruthy();
+    expect(ratio(value!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('원 안 숫자는 grey400 그대로다 — 라벨과 중복이라 예외로 등재했다', () => {
+    expect(colorOf('.tm-hub-stage-dot')).toBe('--grey400');
+  });
+});

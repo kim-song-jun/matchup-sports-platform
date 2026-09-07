@@ -160,7 +160,9 @@ describe('TeamMatchListPageView — 행 카드 (개인 탭과 같은 카드)', (
     // 제목이 111px 였다. 팀매치는 거의 모든 카드에 배지가 붙어 매 카드가 그 대가를 치른다.
     const base = getTeamMatchListViewModel();
     const statuses = ['open', 'pending', 'approved', 'closed', 'mine'] as const;
-    const model = { ...base, matches: statuses.map((status, index) => ({ ...base.matches[0], id: `tm-${index}`, status })) };
+    // `closed` 를 안 맞추면 status: 'closed' 인데 closed: false 인, 서버가 만들 수 없는
+    // 조합으로 검증하게 된다 — 마감 배지·openLabel 회귀를 그대로 놓친다.
+    const model = { ...base, matches: statuses.map((status, index) => ({ ...base.matches[0], id: `tm-${index}`, status, closed: status === 'closed' })) };
     const { container } = renderPage(<TeamMatchListPageView model={model} />);
 
     const cards = [...container.querySelectorAll('.tm-match-row')];

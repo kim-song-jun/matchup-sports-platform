@@ -112,7 +112,7 @@ export function AssistPickerSheet({ open, event, scorerName, teamName, whenLabel
       >
         <div className="mb-1 flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h2 id="assist-picker-title" className="text-base font-bold text-[var(--text-strong)]">
+            <h2 id="assist-picker-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">
               {scorerName}의 골, 어시스트한 선수는?
             </h2>
             {teamName || whenLabel ? (

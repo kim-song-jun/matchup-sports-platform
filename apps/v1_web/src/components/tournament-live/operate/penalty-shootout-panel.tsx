@@ -156,7 +156,7 @@ export function PenaltyShootoutPanel({
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
           <div className="min-w-0">
-            <h2 id="penalty-shootout-title" className="text-base font-bold text-[var(--text-strong)]">
+            <h2 id="penalty-shootout-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">
               승부차기
             </h2>
             {regulationScoreBySideId && sides.length === 2 ? (

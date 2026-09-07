@@ -407,13 +407,36 @@ describe('틴트 지면 위 보조 텍스트 대비 — grey600 은 흰 배경�
     }
   });
 
-  it('틴트 지면 6곳이 보조 텍스트 토큰을 grey700 으로 올린다', () => {
-    const block = globalsCss.match(
-      /\.tm-badge-grey,\s*\.tm-segmented-tabs,\s*\.tm-quick-grid,\s*\.tm-match-summary-row,\s*\.tm-team-summary-bar,\s*\.tm-weather-strip\s*\{([^}]*)\}/,
-    )?.[1];
+  // 셀렉터가 **어느 규칙에** 어떤 순서로 적혀 있는지는 계약이 아니다 — 각 지면이
+  // 두 토큰을 올린다는 것만 본다. 목록 순서·줄바꿈·포매터 변경으로 깨지지 않게
+  // 규칙 단위로 파싱해서 확인한다(#1104 Copilot).
+  const rulesDeclaring = (prop: string, value: string) => {
+    const selectors = new Set<string>();
+    // 주석을 먼저 걷어낸다 — 규칙 앞 주석이 첫 셀렉터에 붙어 와 매칭을 깨뜨린다.
+    const stripped = globalsCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const [, selText, body] of stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!new RegExp(prop + ':\\s*' + value).test(body)) continue;
+      // `@media (...) { .foo,\n .bar` 처럼 at-rule 접두가 붙어 올 수 있다. 접두는
+      // 마지막 `{` 뒤를 취해 걷어내되, **여러 줄 셀렉터 목록은 보존**해야 한다
+      // (마지막 줄만 취하면 앞의 셀렉터를 통째로 잃는다 — 실제로 한 번 그랬다).
+      for (const part of selText.split(',')) {
+        const one = part.slice(part.lastIndexOf('{') + 1).trim();
+        if (one) selectors.add(one);
+      }
+    }
+    return selectors;
+  };
 
-    expect(block, '틴트 지면 목록 규칙을 찾지 못했다').toBeDefined();
-    expect(block).toMatch(/--text-caption:\s*var\(--grey700\)/);
-    expect(block).toMatch(/--text-muted:\s*var\(--grey700\)/);
+  it.each([
+    '.tm-badge-grey',
+    '.tm-segmented-tabs',
+    '.tm-quick-grid',
+    '.tm-match-summary-row',
+    '.tm-team-summary-bar',
+    '.tm-weather-strip',
+    '.tm-player-card-progress',
+  ])('%s 는 보조 텍스트 토큰을 grey700 으로 올린다', (selector) => {
+    expect(rulesDeclaring('--text-caption', 'var\\(--grey700\\)')).toContain(selector);
+    expect(rulesDeclaring('--text-muted', 'var\\(--grey700\\)')).toContain(selector);
   });
 });

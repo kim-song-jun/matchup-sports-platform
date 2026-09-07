@@ -2922,7 +2922,8 @@ label.tm-btn:focus-within {
 .tm-quick-grid,
 .tm-match-summary-row,
 .tm-team-summary-bar,
-.tm-weather-strip {
+.tm-weather-strip,
+.tm-player-card-progress {
   --text-caption: var(--grey700);
   --text-muted: var(--grey700);
 }

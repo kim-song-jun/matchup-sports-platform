@@ -1432,10 +1432,20 @@ export class LeagueMatchAdminService {
       });
     }
 
+    // **`??` 로 폴백하면 안 된다.** 요청에서 `undefined`(미전송)와 `null`(규정 끄기)을
+    // 갈라 놓고 응답에서 합치면, 클라이언트가 규정을 끄려고 `null` 을 보내도 **응답은
+    // 기존 값**으로 돌아온다 — 화면이 응답을 정본으로 쓰면 껐는데 안 꺼진 것으로 보인다.
+    // 보낸 키는 보낸 값 그대로, 안 보낸 키만 기존 값을 돌려준다.
     return {
       leagueId,
-      yellowAccumulationLimit: data.yellowAccumulationLimit ?? league.yellowAccumulationLimit,
-      redCardSuspensionMatches: data.redCardSuspensionMatches ?? league.redCardSuspensionMatches,
+      yellowAccumulationLimit:
+        dto.yellowAccumulationLimit !== undefined
+          ? (dto.yellowAccumulationLimit ?? null)
+          : league.yellowAccumulationLimit,
+      redCardSuspensionMatches:
+        dto.redCardSuspensionMatches !== undefined
+          ? (dto.redCardSuspensionMatches ?? null)
+          : league.redCardSuspensionMatches,
     };
   }
 

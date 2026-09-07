@@ -438,6 +438,18 @@ describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 �
     const detail = await admin.detail(authUser(ids.adminUser), ids.openLeague);
     expect(detail.yellowAccumulationLimit).toBe(3);
 
+    // **끄는 동작을 잰다.** `null` 이 "이 리그에는 규정을 적용하지 않는다" 의 시그널인데,
+    // 응답이 `??` 로 폴백하면 **끄려고 null 을 보내도 기존 값이 돌아온다** — 화면이 응답을
+    // 정본으로 쓰면 껐는데 안 꺼진 것으로 보인다. 응답과 저장본 둘 다 확인한다.
+    const cleared = await admin.updateDiscipline(authUser(ids.adminUser), ids.openLeague, {
+      yellowAccumulationLimit: null,
+    });
+    expect(cleared.yellowAccumulationLimit).toBeNull();
+    expect((await admin.detail(authUser(ids.adminUser), ids.openLeague)).yellowAccumulationLimit).toBeNull();
+
+    // 다시 켜 둔다 — 아래 잠금 단언이 "값이 남아 있다" 를 재기 때문이다.
+    await admin.updateDiscipline(authUser(ids.adminUser), ids.openLeague, { yellowAccumulationLimit: 3 });
+
     // 경기 하나가 끝난 상태로 만들면 잠긴다 — 규정은 이미 치른 경기의 카드까지 소급해서
     // 세기 때문에, 진행 중에 바꾸면 어제까지 뛴 선수가 오늘 갑자기 정지된다.
     await prisma.v1Game.update({ where: { teamMatchId: ids.openPast }, data: { state: 'ENDED' } });

@@ -367,3 +367,53 @@ describe('세그먼트 탭 조작부 높이 — 기준 44px 밑으로 내려가�
     expect(rule).toMatch(/font-size:/);
   });
 });
+
+describe('틴트 지면 위 보조 텍스트 대비 — grey600 은 흰 배경에서만 AA 를 넘는다', () => {
+  // alpha 배포본 실측에서 나왔다. --grey600 은 흰 카드(4.62:1)에서만 AA 를 넘고,
+  // 지면에 색이 조금이라도 깔리면 4.11~4.42 로 떨어진다. .tm-card-closed 가 이미
+  // 같은 이유로 grey700 을 쓰고 있어, 그 방법을 같은 조건의 지면으로 넓혔다.
+  const hex = (s: string) => {
+    const m = globalsCss.match(new RegExp('--' + s + ':\\s*(#[0-9a-fA-F]{6})'));
+    return m ? m[1] : null;
+  };
+  const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const lum = (c: number[]) =>
+    c
+      .map((v) => v / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+      .reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const ratio = (a: string, b: string) => {
+    const [l1, l2] = [lum(rgb(a)), lum(rgb(b))];
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  };
+
+  it('문제가 실재한다 — grey600 은 grey50·grey100·blue50 위에서 AA 미달이다', () => {
+    const g600 = hex('grey600');
+    expect(g600).toBeTruthy();
+    for (const surface of ['grey50', 'grey100', 'blue50']) {
+      const bg = hex(surface);
+      expect(bg, surface + ' 토큰을 찾지 못했다').toBeTruthy();
+      expect(ratio(g600!, bg!), surface + ' 위 grey600').toBeLessThan(4.5);
+    }
+    // 흰 배경에서는 넘는다 — 그래서 전역 교체가 아니라 지면별 처방이어야 한다.
+    expect(ratio(g600!, '#ffffff')).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('grey700 은 세 지면 모두 AA 를 넘는다', () => {
+    const g700 = hex('grey700');
+    expect(g700).toBeTruthy();
+    for (const surface of ['grey50', 'grey100', 'blue50']) {
+      expect(ratio(g700!, hex(surface)!), surface + ' 위 grey700').toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it('틴트 지면 6곳이 보조 텍스트 토큰을 grey700 으로 올린다', () => {
+    const block = globalsCss.match(
+      /\.tm-badge-grey,\s*\.tm-segmented-tabs,\s*\.tm-quick-grid,\s*\.tm-match-summary-row,\s*\.tm-team-summary-bar,\s*\.tm-weather-strip\s*\{([^}]*)\}/,
+    )?.[1];
+
+    expect(block, '틴트 지면 목록 규칙을 찾지 못했다').toBeDefined();
+    expect(block).toMatch(/--text-caption:\s*var\(--grey700\)/);
+    expect(block).toMatch(/--text-muted:\s*var\(--grey700\)/);
+  });
+});

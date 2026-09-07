@@ -118,7 +118,15 @@ export class HomeService {
         where: {
           userId: user.id,
           status: { in: ['active', 'completed'] },
-          match: { startAt: { gte: monthStart } },
+          // 참가자 row 의 상태만 보면 안 된다 — 매치 자체의 상태도 함께 건다.
+          // matches.service.ts 의 cancel() 은 참가자 row 를 `role: 'participant'` 인 것만
+          // cancelled 로 바꾸므로 **호스트 자신의 row(role: 'host')는 active 로 남는다.**
+          // 그래서 자기가 만들었다 취소한 매치가 "이번 달 활동"에 계속 잡혔다
+          // (2026-09-07 alpha 실측: 매치 3건 생성 → 전량 취소했는데 8 → 11 로 오른 값이
+          // 취소 후에도 11 그대로. 정확히 +3 일치).
+          // profile.service.ts 의 같은 계열 count 4곳은 이미 match.status·deletedAt 을
+          // 함께 걸고 있었다 — 이 한 곳만 빠져 있었다.
+          match: { startAt: { gte: monthStart }, status: { not: 'cancelled' }, deletedAt: null },
         },
       }),
       this.prisma.v1UserReputationSummary.findUnique({

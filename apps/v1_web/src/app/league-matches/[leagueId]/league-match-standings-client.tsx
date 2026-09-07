@@ -743,7 +743,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           {/* 이슈 4 — 아직 한 경기도 안 치른 리그는 표 자체가 "참가 팀"으로 바뀌므로
               제목도 그에 맞춰 바꾼다("순위표"라는 제목 아래 순위 아닌 목록이 뜨면
               혼란스럽다). */}
-          <h2 className="text-lg font-semibold text-[var(--text-strong)]">
+          <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">
             {preparingNoGames ? '참가 팀' : '순위표'}
           </h2>
           {series.state === 'completed' && <span className="tm-badge tm-badge-sm tm-badge-green">최종 순위</span>}
@@ -920,7 +920,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
 
       <section className="mt-8" id="league-schedule">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-[var(--text-strong)]">경기 일정</h2>
+          <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">경기 일정</h2>
           {/* 이슈 3 — 대진은 항상 오래된 순으로 오므로 시즌 중반 리그는 "다음 경기"가
               이미 끝난 경기 여러 개 아래 묻힌다. 정렬 자체를 뒤집는 대신(과거 기록을
               찾으러 온 사람에게는 오름차순이 자연스럽다) "예정만 보기" 필터를 둬서
@@ -1008,7 +1008,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-2 text-lg font-semibold text-[var(--text-strong)]">득점 순위</h2>
+        <h2 className="mb-2 text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">득점 순위</h2>
         {recordsQuery.isError ? (
           <ErrorState
             message={extractErrorMessage(recordsQuery.error, '기록을 불러오지 못했어요.')}
@@ -1037,7 +1037,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-2 text-lg font-semibold text-[var(--text-strong)]">도움 순위</h2>
+        <h2 className="mb-2 text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">도움 순위</h2>
         {recordsQuery.isError ? (
           <ErrorState
             message={extractErrorMessage(recordsQuery.error, '기록을 불러오지 못했어요.')}

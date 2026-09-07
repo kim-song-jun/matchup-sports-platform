@@ -109,7 +109,7 @@ function SectionLink({
           : undefined
       }
       className={[
-        'inline-flex shrink-0 items-center justify-between gap-2 min-h-[44px] px-3 rounded-lg text-[13px] transition-colors',
+        'inline-flex shrink-0 items-center justify-between gap-2 min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] transition-colors',
         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
         active
           ? 'bg-[var(--blue50)] text-[var(--blue700)] font-bold'
@@ -220,7 +220,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
       <div className="mb-4">
         <Link
           href="/admin/tournaments"
-          className="inline-flex items-center gap-1 min-h-[44px] text-[13px] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+          className="inline-flex items-center gap-1 min-h-[44px] text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
         >
           <ChevronLeft size={14} aria-hidden="true" />
           대회 목록으로
@@ -255,7 +255,7 @@ export function TournamentAdminShell({ id, children }: { id: string; children: R
                 onClick={() => handleStatusChange(s)}
                 disabled={changeStatus.isPending}
                 className={[
-                  'inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold',
+                  'inline-flex items-center h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold',
                   'transition-colors disabled:opacity-50',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap',
                   isDestructive

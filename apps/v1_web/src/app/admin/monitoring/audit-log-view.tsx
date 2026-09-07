@@ -140,7 +140,7 @@ function LogDetailModal({
         className="flex max-h-[85vh] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl bg-[var(--card-surface)] shadow-[0_8px_32px_rgba(20,28,45,0.14)]"
       >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
-          <h2 id="audit-log-detail-title" className="truncate text-[16px] font-bold text-[var(--text-strong)]">
+          <h2 id="audit-log-detail-title" className="truncate text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">
             {title}
           </h2>
           <button

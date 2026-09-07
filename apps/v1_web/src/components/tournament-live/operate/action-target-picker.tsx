@@ -212,7 +212,7 @@ export function ActionTargetPicker({
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
           <div>
-            <h2 id="action-target-picker-title" className="text-base font-bold text-[var(--text-strong)]">
+            <h2 id="action-target-picker-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">
               {titleText}
             </h2>
             {isSubstitution && substitutionOut !== null ? (

@@ -517,7 +517,7 @@ export function BracketTab({
       <div className="tm-content-enter bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-4 mb-6 flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="text-[15px] font-bold text-[var(--text-strong)] mb-1">대진표 전체 공개</h3>
+            <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)] mb-1">대진표 전체 공개</h3>
             <p className="text-xs text-[var(--text-muted)]">
               {isBracketPublished
                 ? // 예약 시각이 지나 공개된 경우 bracketPublishedAt 은 null 이고 예약 시각이
@@ -538,7 +538,7 @@ export function BracketTab({
                 onClick={handlePublishBracket}
                 disabled={publishBracket.isPending || !!publishBlockedReason}
                 title={publishBlockedReason ?? undefined}
-                className="inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
+                className="inline-flex items-center h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
               >
                 지금 전체 공개
               </button>
@@ -548,7 +548,7 @@ export function BracketTab({
                 type="button"
                 onClick={handleUnpublishBracket}
                 disabled={unpublishBracket.isPending}
-                className="inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-[var(--red700)] border border-[var(--tint-red-border)] bg-[var(--card-surface)] hover:bg-[var(--red50)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-500 focus-visible:outline-offset-2 whitespace-nowrap"
+                className="inline-flex items-center h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-[var(--red700)] border border-[var(--tint-red-border)] bg-[var(--card-surface)] hover:bg-[var(--red50)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-red-500 focus-visible:outline-offset-2 whitespace-nowrap"
               >
                 {isBracketPublished ? '공개 취소' : '예약 취소'}
               </button>
@@ -569,7 +569,7 @@ export function BracketTab({
                 value={publishScheduleInput}
                 onChange={(e) => setPublishScheduleInput(e.target.value)}
                 disabled={!!publishBlockedReason}
-                className="h-[44px] px-3 rounded-xl border border-[var(--border)] text-[13px] text-[var(--text-strong)] disabled:bg-[var(--surface-soft)] disabled:text-[var(--text-muted)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="h-[44px] px-3 rounded-xl border border-[var(--border)] text-[length:var(--font-size-label)] text-[var(--text-strong)] disabled:bg-[var(--surface-soft)] disabled:text-[var(--text-muted)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               />
             </div>
             <button
@@ -577,7 +577,7 @@ export function BracketTab({
               onClick={handleSchedulePublish}
               disabled={publishBracket.isPending || !publishScheduleInput || !!publishBlockedReason}
               title={publishBlockedReason ?? undefined}
-              className="inline-flex items-center h-[44px] px-4 rounded-xl text-[13px] font-semibold text-[var(--blue700)] border border-[var(--tint-blue-border)] bg-[var(--card-surface)] hover:bg-[var(--blue50)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
+              className="inline-flex items-center h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-[var(--blue700)] border border-[var(--tint-blue-border)] bg-[var(--card-surface)] hover:bg-[var(--blue50)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 whitespace-nowrap"
             >
               {hasPendingSchedule ? '예약 변경' : '이 시각에 공개 예약'}
             </button>
@@ -592,7 +592,7 @@ export function BracketTab({
 
       {/* ── 조 롤업 헤더 + 원클릭 조 추가 ─────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap px-1">
-        <p className="text-[13px] font-semibold text-[var(--text-body)]">
+        <p className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
           총 {groups.length}개 조 · {readyGroupCount}개 준비 완료
         </p>
         {groups.length > 0 && (
@@ -649,7 +649,7 @@ export function BracketTab({
       {/* ── 픽스처 목록: 모든 조 합산 전체보기 (조 카드와 별개, 전폭 섹션) ── */}
       {fixtures.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h3 className="text-[15px] font-bold text-[var(--text-strong)]">경기 일정 전체보기</h3>
+          <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)]">경기 일정 전체보기</h3>
           {/* #6b: scrollOnMobile so wide fixture rows scroll horizontally on narrow screens.
               tableMaxWidth="max-w-none" — 조 카드 목록과 별개인 전폭 섹션이라
               기본 900px 캡을 걸 이유가 없고, 오히려 좁은 데스크톱(~1024px)에서
@@ -788,7 +788,7 @@ export function BracketTab({
       >
         <form onSubmit={handleUpdateFixture} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <label htmlFor="edit-fx-scheduled" className="text-[13px] text-[var(--text-strong)]">경기 일시</label>
+            <label htmlFor="edit-fx-scheduled" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">경기 일시</label>
             <input
               id="edit-fx-scheduled"
               type="datetime-local"
@@ -799,7 +799,7 @@ export function BracketTab({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="edit-fx-venue" className="text-[13px] text-[var(--text-strong)]">장소</label>
+            <label htmlFor="edit-fx-venue" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">장소</label>
             <input
               id="edit-fx-venue"
               type="text"
@@ -813,7 +813,7 @@ export function BracketTab({
           </div>
           <div className="flex gap-3">
             <div className="flex flex-col gap-1 flex-1">
-              <label htmlFor="edit-fx-home" className="text-[13px] text-[var(--text-strong)]">홈 팀</label>
+              <label htmlFor="edit-fx-home" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">홈 팀</label>
               <EntityPicker
                 id="edit-fx-home"
                 value={editFixtureTeamItems.find((it) => it.id === editFxHomeRegId) ?? null}
@@ -825,7 +825,7 @@ export function BracketTab({
               />
             </div>
             <div className="flex flex-col gap-1 flex-1">
-              <label htmlFor="edit-fx-away" className="text-[13px] text-[var(--text-strong)]">어웨이 팀</label>
+              <label htmlFor="edit-fx-away" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">어웨이 팀</label>
               <EntityPicker
                 id="edit-fx-away"
                 value={editFixtureTeamItems.find((it) => it.id === editFxAwayRegId) ?? null}
@@ -845,7 +845,7 @@ export function BracketTab({
               type="button"
               onClick={() => setEditFixture(null)}
               disabled={updateFixture.isPending}
-              className="flex-1 h-[44px] rounded-xl text-[13px] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -865,7 +865,7 @@ export function BracketTab({
       >
         <form onSubmit={handleUpdateGroup} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <label htmlFor="edit-group-name" className="text-[13px] text-[var(--text-strong)]">조 이름</label>
+            <label htmlFor="edit-group-name" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">조 이름</label>
             <input
               id="edit-group-name"
               type="text"
@@ -877,7 +877,7 @@ export function BracketTab({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor="edit-group-advance" className="text-[13px] text-[var(--text-strong)]">진출 팀 수 (선택)</label>
+            <label htmlFor="edit-group-advance" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">진출 팀 수 (선택)</label>
             <input
               id="edit-group-advance"
               type="text"
@@ -894,7 +894,7 @@ export function BracketTab({
               type="button"
               onClick={() => setEditGroup(null)}
               disabled={updateGroup.isPending}
-              className="flex-1 h-[44px] rounded-xl text-[13px] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -914,7 +914,7 @@ export function BracketTab({
       >
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <label htmlFor="league-fixtures-legs" className="text-[13px] text-[var(--text-strong)]">회전 수</label>
+            <label htmlFor="league-fixtures-legs" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">회전 수</label>
             <select
               id="league-fixtures-legs"
               value={legsPickerValue}
@@ -934,7 +934,7 @@ export function BracketTab({
               type="button"
               onClick={() => setLegsPickerGroupId(null)}
               disabled={isGeneratingLeague}
-              className="flex-1 h-[44px] rounded-xl text-[13px] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>

@@ -158,7 +158,7 @@ export function AnnouncementsTab({
       )}
       {canWrite && (
       <div className="bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] px-5 py-5">
-        <h3 className="text-[15px] font-bold text-[var(--text-strong)] mb-4">공지 작성</h3>
+        <h3 className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)] mb-4">공지 작성</h3>
         {editingAnnouncement && (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[var(--blue50)] px-3 py-2 text-xs text-[var(--blue700)]">
             <span className="font-medium">선택한 공지를 수정 중이에요.</span>
@@ -174,7 +174,7 @@ export function AnnouncementsTab({
         )}
         <form onSubmit={handleSave} noValidate className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <label htmlFor="ann-title" className="text-[13px] text-[var(--text-strong)]">
+            <label htmlFor="ann-title" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
               제목 <span className="text-red-500" aria-hidden="true">*</span>
               <span className="sr-only">(필수)</span>
             </label>
@@ -193,7 +193,7 @@ export function AnnouncementsTab({
           </div>
 
           <div className="flex flex-col gap-2">
-            <label htmlFor="ann-body" className="text-[13px] text-[var(--text-strong)]">
+            <label htmlFor="ann-body" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
               내용 <span className="text-red-500" aria-hidden="true">*</span>
               <span className="sr-only">(필수)</span>
             </label>
@@ -212,7 +212,7 @@ export function AnnouncementsTab({
 
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex flex-col gap-2 flex-1">
-              <label htmlFor="ann-category" className="text-[13px] text-[var(--text-strong)]">
+              <label htmlFor="ann-category" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
                 분류
               </label>
               <select
@@ -232,7 +232,7 @@ export function AnnouncementsTab({
             </div>
 
             <div className="flex flex-col gap-2 flex-1">
-              <label htmlFor="ann-audience" className="text-[13px] text-[var(--text-strong)]">
+              <label htmlFor="ann-audience" className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">
                 대상
               </label>
               <select
@@ -249,7 +249,7 @@ export function AnnouncementsTab({
               </select>
             </div>
 
-            <label className="flex items-center gap-2 text-[13px] text-[var(--text-strong)] cursor-pointer min-h-[44px] self-end sm:pb-0.5">
+            <label className="flex items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-strong)] cursor-pointer min-h-[44px] self-end sm:pb-0.5">
               <input
                 type="checkbox"
                 checked={annPublish}

@@ -83,7 +83,7 @@ function TournamentBreakdownCard({
             key={row.tournamentId}
             className="flex items-center gap-3 px-5 py-3 border-b border-[var(--border)] last:border-b-0"
           >
-            <span className="flex-1 min-w-0 truncate text-[13.5px] text-[var(--text-strong)]">
+            <span className="flex-1 min-w-0 truncate text-[length:var(--font-size-label)] text-[var(--text-strong)]">
               {row.title || '(제목 없음)'}
             </span>
             <span className="shrink-0 rounded-full bg-[var(--tint-red)] px-2 py-0.5 text-[length:var(--font-size-caption)] font-bold tabular-nums text-[var(--red700)]">

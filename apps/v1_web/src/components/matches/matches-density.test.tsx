@@ -3,6 +3,8 @@
  * 사진이 있는 매치만 상단 가로 레일로 올린다. 배너를 목록에 그대로 두면 미디어가
  * 카드의 절반(146/286px)을 써서 390 폭에서 2.95장밖에 안 보였다(browse-density 스킬).
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { getMatchListViewModel } from './matches.view-model';
@@ -81,5 +83,42 @@ describe('참가 현황 게이지 (DESIGN.md 11절)', () => {
 
     expect(container.querySelector('.tm-match-row-gauge')).toBeNull();
     expect(container.querySelector('.tm-match-row-foot')!.textContent).toContain('3/0명');
+  });
+});
+
+/**
+ * 데스크톱 열 수 (2026-09-07 alpha 실측).
+ *
+ * 행 카드는 96px 썸네일이 폭을 먼저 가져가므로, 열을 늘리면 본문이 그만큼 좁아져 제목이
+ * 한 줄에서 잘린다. 실측값:
+ *   768  2-up → 카드 272px / 본문 **130px**
+ *   1440 3-up → 카드 333px / 본문 **191px** (제목에 남는 폭 111px)
+ *   1024 2-up → 카드 480px / 본문 338px  ← 이 정도가 필요하다
+ *
+ * 그래서 `.tm-match-card-stack` 은 어느 폭에서도 3-up 이 되면 안 되고, 768~1023 은 1-up 이다.
+ * (배너 카드 시절엔 3-up 이 맞았다 — 그때는 썸네일이 카드 위에 얹혀 본문이 카드 전폭이었다.)
+ */
+describe('데스크톱 열 수 — 행 카드가 눌리지 않는 폭', () => {
+  const css = readFileSync(resolve(process.cwd(), 'src/app/desktop/matches.css'), 'utf8');
+  const stackRules = [...css.matchAll(/\.tm-match-card-stack\s*\{([^}]*)\}/g)].map((m) => m[1]);
+
+  it('선언이 실제로 잡힌다 — 파일 구조가 바뀌면 아래 단언이 조용히 통과하지 않도록', () => {
+    expect(stackRules.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('어느 브레이크포인트에서도 3-up 이 되지 않는다', () => {
+    stackRules.forEach((rule) => {
+      const cols = rule.match(/grid-template-columns:\s*repeat\((\d+)/)?.[1];
+      if (cols) expect(Number(cols)).toBeLessThanOrEqual(2);
+    });
+  });
+
+  it('768~1023 구간은 한 줄에 한 장이다', () => {
+    const block = css.match(/@media \(min-width: 768px\) and \(max-width: 1023px\) \{[\s\S]*?\n\}/)?.[0];
+
+    expect(block).toBeDefined();
+    expect(block).toContain('.tm-match-card-stack');
+    expect(block).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\)/);
+    expect(block).not.toMatch(/repeat\(2/);
   });
 });

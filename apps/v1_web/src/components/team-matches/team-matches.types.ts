@@ -40,7 +40,14 @@ export type TeamMatchModel = {
   gender: string;
   manner: number | null;
   wins: number | null;
+  /**
+   * 나와의 관계('내 매치'·'승인 대기'…)와 매치 상태가 한 필드에 눌려 있다 —
+   * `statusToCardStatus` 가 viewerState 를 먼저 보기 때문에, 호스트가 보는 매치는
+   * 마감·취소·종료여도 항상 'mine' 이다. 그래서 매치 상태는 별도 필드로 둔다.
+   */
   status: 'open' | 'pending' | 'approved' | 'closed' | 'mine';
+  /** API status 만으로 판정한 "더는 신청받지 않는다" — 관계와 무관하다. */
+  closed: boolean;
 };
 
 export type TeamMatchListViewModel = {

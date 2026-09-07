@@ -46,7 +46,7 @@ function KpiCardInner({
   return (
     <div className={`${TONE_WRAPPER[tone]} rounded-2xl border p-4 md:p-5 min-h-[80px] flex flex-col justify-between`}>
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[12px] md:text-[13px] text-[var(--text-muted)] leading-tight">{label}</p>
+        <p className="text-[length:var(--font-size-caption)] md:text-[length:var(--font-size-label)] text-[var(--text-muted)] leading-tight">{label}</p>
         {icon && (
           <span className={`flex-shrink-0 ${TONE_ICON[tone]}`} aria-hidden="true">
             {icon}

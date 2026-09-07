@@ -808,7 +808,9 @@ export function ProfileEditPageClient() {
           ) : null}
         </div>
 
-        <Card pad={16} style={{ marginTop: 16, background: fieldErrors.form ? 'var(--red50)' : 'var(--blue50)' }}>
+        {/* 지면에 색을 까므로 그 위 보조 텍스트를 함께 올린다(globals.css .tm-on-tint).
+            blue50 에서 4.11:1, red50 에서 4.02:1 로 둘 다 기준 아래였다. */}
+        <Card pad={16} className="tm-on-tint" style={{ marginTop: 16, background: fieldErrors.form ? 'var(--red50)' : 'var(--blue50)' }}>
           <div className="tm-text-label">{fieldErrors.form ?? '프로필 정보만 저장돼요.'}</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>종목·난이도·활동 지역은 '운동 정보'에서 따로 관리할 수 있어요.</div>
         </Card>
@@ -1043,7 +1045,7 @@ export function SportsSettingsPageClient() {
           />
         </Card>
 
-        <Card pad={16} style={{ marginTop: 16, background: message?.includes('실패') || message?.includes('선택해') ? 'var(--red50)' : 'var(--blue50)' }}>
+        <Card pad={16} className="tm-on-tint" style={{ marginTop: 16, background: message?.includes('실패') || message?.includes('선택해') ? 'var(--red50)' : 'var(--blue50)' }}>
           <div className="tm-text-label">{message ?? '운동 정보만 별도로 저장돼요.'}</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>저장하면 종목 태그와 추천 기준에 바로 반영돼요.</div>
         </Card>
@@ -1342,7 +1344,7 @@ export function LocationSettingsPageClient() {
             </select>
           </label>
 
-          <Card pad={16} style={{ background: status === 'denied' || status === 'unsupported' || status === 'unmatched' ? 'var(--red50)' : 'var(--blue50)' }}>
+          <Card pad={16} className="tm-on-tint" style={{ background: status === 'denied' || status === 'unsupported' || status === 'unmatched' ? 'var(--red50)' : 'var(--blue50)' }}>
             <div className="tm-text-label">{matchedLabel ?? '지역을 선택해 주세요'}</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>{message}</div>
           </Card>

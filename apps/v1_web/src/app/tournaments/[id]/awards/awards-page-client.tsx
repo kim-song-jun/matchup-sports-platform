@@ -317,7 +317,7 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
     return (
       <section style={{ marginBottom: 20 }}>
         <h3 className="tm-hub-section-title">개인 어워드</h3>
-        <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
+        <Card pad={20} className="tm-on-tint" style={{ background: 'var(--grey50)', textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true">
             <Star size={28} fill="var(--orange500)" stroke="var(--orange500)" strokeWidth={1.4} />
           </div>
@@ -765,7 +765,7 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
         </div>
 
         {reviews.length === 0 ? (
-          <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
+          <Card pad={20} className="tm-on-tint" style={{ background: 'var(--grey50)', textAlign: 'center' }}>
             {/* 왜 후기를 쓸 수 없는지(또는 어떻게 쓰는지)를 상태별로 안내한다.
                 실제 권한은 참가 확정 팀의 owner(팀장) + manager(운영진)다
                 — tournaments/tournament-reviews.service.ts eligibleTeamWhere 참조.

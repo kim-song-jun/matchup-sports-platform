@@ -76,6 +76,8 @@ function TournamentEventHubEntry() {
     <div className="tm-tournament-event-hub-entry">
       <Link
         href="/events"
+        // 지면에 색을 까므로 그 위 보조 텍스트를 함께 올린다(globals.css .tm-on-tint).
+        className="tm-on-tint"
         style={{
           display: 'flex',
           alignItems: 'center',

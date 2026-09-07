@@ -449,6 +449,10 @@ describe('틴트 지면 위 보조 텍스트 대비 — grey600 은 흰 배경�
     '.tm-weather-strip',
     '.tm-player-card-progress',
     '.tm-list-row',
+    '.tm-auth-profile-preview',
+    '.tm-auth-segmented',
+    '.tm-my-profile-head',
+    '.tm-create-selected',
   ])('%s 는 보조 텍스트 토큰을 grey700 으로 올린다', (selector) => {
     expect(rulesDeclaring('--text-caption', 'var\\(--grey700\\)')).toContain(selector);
     expect(rulesDeclaring('--text-muted', 'var\\(--grey700\\)')).toContain(selector);
@@ -543,5 +547,62 @@ describe('데스크톱(≥1024) 틴트 지면 위 보조 텍스트', () => {
     expect(rule).toMatch(/display:\s*contents/);
     // 그 규칙에 토큰을 얹으면 모바일 창까지 바뀐다 — 지면이 grey50 인 것은 스레드 창뿐이다.
     expect(rule).not.toMatch(/--text-caption|--text-muted/);
+  });
+});
+
+describe('인라인으로 지면 색을 까는 곳의 보조 텍스트 (.tm-on-tint)', () => {
+  // 위 목록은 CSS 셀렉터가 있는 지면만 담는다. 지면 색을 인라인 style 로 까는 곳은
+  // 겨냥할 셀렉터가 없어 목록에 못 넣으므로 이 표시 클래스를 함께 붙인다.
+  it('표시 클래스가 보조 텍스트 토큰을 올린다', () => {
+    const rule = globalsCss.match(/\.tm-on-tint\s*\{([^}]*)\}/)?.[1];
+
+    expect(rule, '.tm-on-tint 규칙을 찾지 못했다').toBeDefined();
+    expect(rule).toMatch(/--text-caption:\s*var\(--grey700\)/);
+    expect(rule).toMatch(/--text-muted:\s*var\(--grey700\)/);
+  });
+
+  // 클래스만 있고 아무 데도 안 붙으면 아무것도 고쳐지지 않는다 — alpha 에서 실제로
+  // 미달이 확인된 곳에 붙어 있는지 본다.
+  //
+  // **파일 어딘가에 있는지가 아니라 그 요소에 붙었는지를 본다**(#1114 Copilot).
+  // `className="tm-on-tint"` 문자열만 찾으면 두 방향으로 틀린다: 클래스를 하나만 더
+  // 붙여도(`"tm-on-tint tm-x"`) 가짜 red 가 나고, 엉뚱한 요소에 붙어 있어도 통과한다.
+  // 틴트를 까는 **여는 태그 범위**를 잡아 그 안에 클래스가 있는지 확인한다.
+  const openingTagsWithTint = (source: string, tag: string, tint: RegExp) =>
+    (source.match(new RegExp('<' + tag + '[^>]*>', 'g')) ?? []).filter((one) => tint.test(one));
+
+  it.each([
+    ['src/components/tournaments/pending-review-card.tsx', 'Card', /var\(--tint-blue\)/, 1],
+    ['src/app/tournaments/page.tsx', 'Link', /var\(--blue50\)/, 1],
+    // 이 파일은 blue50/red50 을 조건부로 까는 Card 가 셋이다. 하나만 붙이면 나머지
+    // 둘은 그대로 미달로 남는다 — red50 은 4.02:1 로 blue50(4.11)보다 더 낮다.
+    ['src/components/my/my-api-clients.tsx', 'Card', /var\(--blue50\)/, 3],
+    ['src/components/teams/teams-page.tsx', 'div', /center\/cover.*var\(--grey50\)/, 1],
+    ['src/app/tournaments/[id]/awards/awards-page-client.tsx', 'Card', /background: 'var\(--grey50\)', textAlign/, 2],
+  ])('%s 의 틴트 %s 태그 %d개 전부에 표시 클래스가 붙어 있다', (file, tag, tint, count) => {
+    const source = readFileSync(resolve(process.cwd(), file), 'utf8');
+    const tinted = openingTagsWithTint(source, tag as string, tint as RegExp);
+
+    expect(tinted.length, file + ' 의 틴트 태그 수가 달라졌다').toBe(count);
+    // 클래스 목록 안에 있으면 된다 — 다른 클래스와 함께 써도 통과해야 한다.
+    for (const one of tinted) expect(one).toMatch(/className="[^"]*\btm-on-tint\b/);
+  });
+});
+
+describe('데스크톱 검색 화면의 틴트 지면', () => {
+  // 모바일에서는 지면이 흰색이라 문제가 없고, 데스크톱에서만 --grey50 이 깔린다.
+  // 그래서 처방도 배경을 주는 그 미디어 쿼리 안 규칙에 둔다(alpha 1440 실측 4.42:1).
+  const searchCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/search.css'), 'utf8');
+
+  it.each([
+    ['.tm-search-panel-col', /\.tm-search-panel-col\s*\{([^}]*background:\s*var\(--grey50\)[^}]*)\}/],
+    ['.tm-search-results-col .tm-empty-state', /\.tm-search-results-col \.tm-empty-state\s*\{([^}]*)\}/],
+  ])('%s 는 배경을 까는 규칙 안에서 토큰을 올린다', (_name, pattern) => {
+    const rule = searchCss.match(pattern)?.[1];
+
+    expect(rule, '배경을 까는 규칙을 찾지 못했다').toBeDefined();
+    expect(rule).toMatch(/background:\s*var\(--grey50\)/);
+    expect(rule).toMatch(/--text-caption:\s*var\(--grey700\)/);
+    expect(rule).toMatch(/--text-muted:\s*var\(--grey700\)/);
   });
 });

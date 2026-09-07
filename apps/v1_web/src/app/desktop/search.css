@@ -129,6 +129,11 @@
     border: 1px solid var(--grey150);
     border-radius: var(--radius-container);
     padding: 20px;
+    /* 지면을 --grey50 으로 깔았으니 그 위 보조 텍스트도 함께 올린다 —
+       grey600 은 여기서 4.42:1 로 AA 미달이다(alpha 1440 실측, "최근 검색어가 없어요.").
+       배경을 주는 이 규칙 안에 둔다: 이 배경은 이 미디어 쿼리 안에서만 깔린다. */
+    --text-caption: var(--grey700);
+    --text-muted: var(--grey700);
   }
 
   .tm-search-panel-col::-webkit-scrollbar {
@@ -209,6 +214,9 @@
     padding: 40px 24px;
     background: var(--grey50);
     margin-top: 12px;
+    /* 위와 같은 이유 — 데스크톱에서만 지면에 색이 깔리므로 처방도 여기 둔다. */
+    --text-caption: var(--grey700);
+    --text-muted: var(--grey700);
   }
 }
 

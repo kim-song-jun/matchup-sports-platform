@@ -4072,10 +4072,6 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin-top: 12px;
 }
 
-.tm-team-card:active .tm-team-intro-box {
-  background: var(--bg);
-}
-
 .tm-team-detail-hero-card {
   background: var(--grey900);
   color: var(--static-white);

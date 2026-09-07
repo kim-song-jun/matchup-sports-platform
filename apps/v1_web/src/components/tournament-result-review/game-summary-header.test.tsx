@@ -46,6 +46,9 @@ describe('GameSummaryHeader 역할 라벨', () => {
       />,
     );
 
+    // **긍정 앵커** — 이게 없으면 렌더가 조용히 비어도 통과한다("body 에 그 문자열이
+    // 없다" 만 재는 셈이다).
+    expect(screen.getByText(/종료/)).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('undefined');
   });
 });

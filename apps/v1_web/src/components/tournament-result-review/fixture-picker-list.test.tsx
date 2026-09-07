@@ -97,6 +97,8 @@ describe('FixturePickerList', () => {
       />,
     );
 
+    // **이름이 주장하는 것을 단언한다** — "'경기' 로 둔다" 는 계약이 실제로 지켜지는지.
+    expect(screen.getByText('경기')).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('null');
   });
 

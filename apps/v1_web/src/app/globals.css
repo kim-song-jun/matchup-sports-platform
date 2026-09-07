@@ -2847,6 +2847,26 @@ label.tm-btn:focus-within {
   margin: 0 0 8px;
 }
 
+/* 인접 매치 레일 (디자인 검수 W-3, B안) — 결과가 1~2건일 때만 목록 아래에 붙는다.
+   검색 결과와 성격이 다르므로 위쪽 구분선으로 확실히 가른다. DESIGN.md §15 는 섹션
+   구분 수단을 여백·배경색·구분선 중 "하나만" 쓰라고 하므로, 여기서는 구분선 하나만
+   쓰고 배경색은 바꾸지 않는다. */
+.tm-match-nearby-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+/* 제목과 부제는 한 덩어리라 안쪽을 좁힌다(8 → 4). 레일과의 바깥 간격은 12로 벌린다. */
+.tm-match-nearby-section .tm-match-rail-heading {
+  margin-bottom: 4px;
+}
+
+.tm-match-nearby-sub {
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+
 /*
  * 가로 스크롤. 카드 폭을 뷰포트보다 좁게 잡아 "옆에 더 있다"가 보이게 한다.
  * 목록 본문은 세로 행이라, 이 레일이 유일한 가로 스크롤 영역이다.

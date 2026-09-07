@@ -37,6 +37,13 @@ import {
 } from './matches.card-model';
 
 
+/** 이 개수 이하로 결과가 남으면 "희소" 로 보고 인접 매치 레일을 붙인다(디자인 검수 W-3).
+ *  3 이상은 DESIGN.md §15 의 "한 화면에 3-5개 카드" 를 이미 만족하므로 채울 이유가 없다. */
+const SPARSE_RESULT_MAX = 2;
+/** 인접 레일에 넣는 최대 카드 수. 가로 스크롤이라 더 넣어도 되지만, 검색 결과보다
+ *  추천이 커 보이면 주객이 바뀐다. */
+const NEARBY_RAIL_MAX = 4;
+
 export function MatchListPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -120,6 +127,22 @@ export function MatchListPageClient() {
   const visibleItems = filterMatchesByLevels(orderedItems, selectedLevels);
   const countItems = filterMatchesByLevels((countFilters ? countMatches.data?.items ?? allMatches.data?.items : allMatches.data?.items) ?? items, selectedLevels);
   const hasNext = query.data?.pageInfo?.hasNext ?? false;
+  // 희소 결과(1~2건) 아래를 채우는 인접 매치 — 디자인 검수 W-3, B안.
+  // 새 요청을 만들지 않는다: allMatches 는 필터가 걸려 있든 아니든 이미 돌고 있고
+  // (countItems 가 같은 데이터를 쓴다) 그 무필터 목록에서 지금 보여준 것만 빼면 된다.
+  // 필터가 없을 때는 allMatches 가 곧 결과라 차집합이 비고, 레일은 그리지 않는다 —
+  // "다른 매치가 정말 없다" 는 뜻이므로 그게 맞는 동작이다.
+  const shownIds = new Set((visibleItems ?? []).map((item) => item.matchId ?? item.id));
+  const nearbyItems =
+    visibleItems && visibleItems.length > 0 && visibleItems.length <= SPARSE_RESULT_MAX
+      ? sortMatchesByAvailability(
+          (allMatches.data?.items ?? []).filter(
+            (item) =>
+              !shownIds.has(item.matchId ?? item.id) &&
+              statusToCardStatus(getStatus(item)) === 'open',
+          ),
+        ).slice(0, NEARBY_RAIL_MAX)
+      : [];
   const handleLoadMore = () => {
     if (!query.data?.pageInfo?.nextCursor || query.isFetching) return;
     setAccumulated(orderedItems ?? []);
@@ -150,6 +173,7 @@ export function MatchListPageClient() {
         filterHref: buildMatchHref(searchParams, { filter: '1' }),
         filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
         matches: visibleItems.map((item, index) => toMatchCard(item, base.matches[index] ?? base.matches[0])),
+        nearbyMatches: nearbyItems.map((item, index) => toMatchCard(item, base.matches[index] ?? base.matches[0])),
         sports: buildSportSummary(searchParams, countItems, base, selectedSportId, sports.data),
         summary: {
           ...base.summary,

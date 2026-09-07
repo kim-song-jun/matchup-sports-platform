@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { MatchDetailViewModel, MatchListViewModel } from './matches.types';
 import { MatchDetailPageClient, MatchListPageClient } from './matches-client';
@@ -13,6 +13,7 @@ const {
   useV1MatchMock,
   useV1MatchApplicationEligibilityMock,
   useV1MatchesMock,
+  searchParamsRef,
 } = vi.hoisted(() => ({
   applyMatchMutateAsync: vi.fn(),
   withdrawMatchMutateAsync: vi.fn(),
@@ -20,11 +21,14 @@ const {
   useV1MatchMock: vi.fn(),
   useV1MatchApplicationEligibilityMock: vi.fn(),
   useV1MatchesMock: vi.fn(),
+  // 필터가 걸린 목록을 재현하려면 검색 파라미터를 테스트마다 갈아끼워야 한다.
+  // 기본값은 빈 파라미터라 기존 테스트 동작은 그대로다.
+  searchParamsRef: { current: new URLSearchParams() },
 }));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParamsRef.current,
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -59,6 +63,8 @@ vi.mock('./matches-page', () => ({
     <div>
       <span data-testid={'match-order'}>{model.matches.map((match) => match.title).join('|')}</span>
       <span data-testid="match-count">{model.matches.length}</span>
+      <span data-testid="nearby-order">{(model.nearbyMatches ?? []).map((match) => match.title).join('|')}</span>
+      <span data-testid="nearby-count">{(model.nearbyMatches ?? []).length}</span>
       {model.hasNext && model.onLoadMore ? <button onClick={model.onLoadMore}>더 보기</button> : null}
     </div>
   ),
@@ -279,6 +285,107 @@ describe('MatchListPageClient — 커서 페이지네이션 누적', () => {
     expect(screen.getByTestId('match-order')).toHaveTextContent('매치 2|매치 1');
     // 마지막 페이지(nextCursor: null)라 "더 보기"가 사라진다.
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
+  });
+});
+
+// 디자인 검수 W-3 (B안). 0건은 EmptyState 가 받지만 1건은 그 경로를 타지 않아, 카드 한 장
+// 아래로 화면 끝까지 비어 있었다(alpha 390 실측 약 500px). 새 요청 없이 이미 도는 무필터
+// 목록(allMatches)의 차집합으로 그 아래를 채운다.
+describe('MatchListPageClient — 희소 결과 인접 매치 레일', () => {
+  function item(id: string, title: string, status: 'open' | 'closed' = 'open') {
+    return { id, matchId: id, title, sportName: '풋살', startsAt: '2026-09-01T10:00:00.000Z', status };
+  }
+  function ok(items: ReturnType<typeof item>[]) {
+    return {
+      data: { items, nextCursor: null, pageInfo: { nextCursor: null, hasNext: false } },
+      isError: false,
+      isFetching: false,
+      isLoading: false,
+    };
+  }
+  // 종목 필터가 걸린 상태를 만든다 — 그래야 결과(filteredMatches)와 무필터 풀(allMatches)이
+  // 서로 다른 데이터가 되어 차집합이 의미를 갖는다.
+  function mockLists(filtered: ReturnType<typeof item>[], pool: ReturnType<typeof item>[]) {
+    useV1MatchesMock.mockImplementation((filters?: { sportId?: string }, options?: { enabled?: boolean }) => {
+      if (options && options.enabled === false) {
+        return { data: undefined, isError: false, isFetching: false, isLoading: false };
+      }
+      if (filters?.sportId) return ok(filtered);
+      return ok(pool);
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParamsRef.current = new URLSearchParams('sportId=sport-futsal');
+  });
+
+  afterEach(() => {
+    searchParamsRef.current = new URLSearchParams();
+  });
+
+  it('결과가 1건이면 무필터 풀의 나머지로 채우되 이미 보여준 매치는 빼고 최대 4장까지만 넣는다', () => {
+    mockLists(
+      [item('m1', '풋살 A')],
+      [
+        item('m1', '풋살 A'),
+        item('m2', '농구 B'),
+        item('m3', '러닝 C'),
+        item('m4', '수영 D'),
+        item('m5', '테니스 E'),
+        item('m6', '배드민턴 F'),
+      ],
+    );
+
+    render(<MatchListPageClient />);
+
+    expect(screen.getByTestId('match-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('nearby-count')).toHaveTextContent('4');
+    expect(screen.getByTestId('nearby-order')).not.toHaveTextContent('풋살 A');
+  });
+
+  it('결과가 2건이어도 붙는다 — 희소 상한은 2다', () => {
+    mockLists(
+      [item('m1', '풋살 A'), item('m2', '농구 B')],
+      [item('m1', '풋살 A'), item('m2', '농구 B'), item('m3', '러닝 C')],
+    );
+
+    render(<MatchListPageClient />);
+
+    expect(screen.getByTestId('nearby-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('nearby-order')).toHaveTextContent('러닝 C');
+  });
+
+  it('결과가 3건이면 DESIGN.md §15 밀도를 이미 만족하므로 레일을 붙이지 않는다', () => {
+    mockLists(
+      [item('m1', '풋살 A'), item('m2', '농구 B'), item('m3', '러닝 C')],
+      [item('m1', '풋살 A'), item('m2', '농구 B'), item('m3', '러닝 C'), item('m4', '수영 D')],
+    );
+
+    render(<MatchListPageClient />);
+
+    expect(screen.getByTestId('match-count')).toHaveTextContent('3');
+    expect(screen.getByTestId('nearby-count')).toHaveTextContent('0');
+  });
+
+  it('마감된 매치는 인접 레일에 넣지 않는다 — 지금 신청할 수 있는 것만 권한다', () => {
+    mockLists(
+      [item('m1', '풋살 A')],
+      [item('m1', '풋살 A'), item('m2', '마감 B', 'closed'), item('m3', '열린 C')],
+    );
+
+    render(<MatchListPageClient />);
+
+    expect(screen.getByTestId('nearby-order')).toHaveTextContent('열린 C');
+    expect(screen.getByTestId('nearby-order')).not.toHaveTextContent('마감 B');
+  });
+
+  it('풀에 다른 매치가 없으면 빈 레일을 남기지 않는다', () => {
+    mockLists([item('m1', '풋살 A')], [item('m1', '풋살 A')]);
+
+    render(<MatchListPageClient />);
+
+    expect(screen.getByTestId('nearby-count')).toHaveTextContent('0');
   });
 });
 

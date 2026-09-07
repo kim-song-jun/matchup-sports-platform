@@ -218,7 +218,11 @@ describe('대회 축 출전정지 — 라인업 제출이 DISCIPLINE_SUSPENDED �
         participants: [],
       };
       const context: GameCommandContext = {
-        actor: { actorType: 'USER', actorUserId: ids.hostOwner, role: 'platform_ops' },
+        // **시드 액터를 시나리오와 같은 사람으로 둔다.** `actorUserId` 는 팀장인데 `role` 만
+        // `platform_ops` 로 두면 두 의미가 섞이고, 나중에 role 기반 가드가 붙었을 때 시드
+        // 경로가 **비현실적으로 통과**한다 — 픽스처가 실제와 다른 모양이라 테스트가 거짓으로
+        // 통과하는 그 부류다(Copilot 지적).
+        actor: { actorType: 'USER', actorUserId: ids.hostOwner, role: 'team_owner' },
         expectedVersion: 0,
         durableCommandId: `tournament-suspension-${fixtureId}`,
         payloadHash: canonicalGameCommandPayloadHash(creation),

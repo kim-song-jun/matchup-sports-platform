@@ -54,3 +54,32 @@ describe('상단 이벤트 레일', () => {
     expect(container.querySelector('.tm-match-rail-section')).toBeNull();
   });
 });
+
+describe('참가 현황 게이지 (DESIGN.md 11절)', () => {
+  it('참가율을 바 너비로 그리고, 정확한 값은 텍스트가 계속 말한다', () => {
+    const matches = [{ ...base.matches[0], id: 'm0', image: null, current: 3, capacity: 10 }];
+    const { container } = render(<MatchListPageView model={{ ...base, matches, isLoading: false }} />);
+
+    const gauge = container.querySelector('.tm-match-row-gauge') as HTMLElement;
+    expect(gauge).not.toBeNull();
+    expect(gauge.style.getPropertyValue('--tm-fill')).toBe('30%');
+    // 바는 장식이고 값은 텍스트가 지킨다 — 스크린리더가 같은 값을 두 번 읽지 않게.
+    expect(gauge.getAttribute('aria-hidden')).toBe('true');
+    expect(container.querySelector('.tm-match-row-foot')!.textContent).toContain('3/10명');
+  });
+
+  it('정원을 넘겨도 100% 를 넘지 않는다', () => {
+    const matches = [{ ...base.matches[0], id: 'm0', image: null, current: 12, capacity: 10 }];
+    const { container } = render(<MatchListPageView model={{ ...base, matches, isLoading: false }} />);
+
+    expect((container.querySelector('.tm-match-row-gauge') as HTMLElement).style.getPropertyValue('--tm-fill')).toBe('100%');
+  });
+
+  it('정원이 없으면 바를 그리지 않는다 — 분모가 없으면 채움을 정할 수 없다', () => {
+    const matches = [{ ...base.matches[0], id: 'm0', image: null, current: 3, capacity: 0 }];
+    const { container } = render(<MatchListPageView model={{ ...base, matches, isLoading: false }} />);
+
+    expect(container.querySelector('.tm-match-row-gauge')).toBeNull();
+    expect(container.querySelector('.tm-match-row-foot')!.textContent).toContain('3/0명');
+  });
+});

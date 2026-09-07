@@ -2696,6 +2696,29 @@ label.tm-btn:focus-within {
   margin-top: 4px;
 }
 
+/*
+ * 참가 현황 게이지 — DESIGN.md 11절 "숫자를 크게 쓰지 않고 시각적 밀도로 전달".
+ * 11절의 '오버레이 배지'는 사진 위 처방이라 행 카드엔 안 맞고, 같은 절이 제시한
+ * 프로그레스 바를 쓴다. 정확한 값은 아래 텍스트가 계속 말하므로 바는 aria-hidden 이다.
+ * 높이 3px + 위 여백 8px 로 카드 높이에 거의 영향이 없다.
+ */
+.tm-match-row-gauge {
+  height: 3px;
+  margin-top: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--grey150);
+  overflow: hidden;
+}
+
+.tm-match-row-gauge::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: var(--tm-fill, 0%);
+  border-radius: inherit;
+  background: var(--blue500);
+}
+
 .tm-match-row-foot {
   display: flex;
   justify-content: space-between;
@@ -3766,7 +3789,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
  * 다크에서 배경을 고정 어두운 파랑으로 되돌린다 — 흰 글씨 대비 5.41:1. */
 :root.dark .tm-team-vs-hero-sport,
 :root.dark .tm-team-match-vs-sport {
-  background: #1b64da;
+  /* --static-blue 는 테마가 뒤집혀도 값이 고정되는 파랑이다(#1b64da) — 이 용도로 정의돼 있다. */
+  background: var(--static-blue);
 }
 
 :root.dark .tm-team-create-preview {

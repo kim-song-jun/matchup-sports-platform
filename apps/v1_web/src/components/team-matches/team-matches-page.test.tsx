@@ -301,6 +301,56 @@ describe('리그전 배지', () => {
     expect(badge).toHaveTextContent('정규 리그');
   });
 
+  /**
+   * **리그 링크는 배지 줄 안에 있으면 안 된다.**
+   *
+   * 이 요소만 44px 터치 타깃을 가져야 하는데(누를 수 있는 유일한 칩이다) 형제 배지는
+   * 26px 이다. 한 줄에 섞으면 69% 큰 요소 하나가 줄 높이를 혼자 끌어올려 나머지 배지가
+   * 그 안에서 떠 보인다 — 화살표·밑줄이 아니라 **높이**가 원인이었다.
+   *
+   * 높이는 jsdom 이 계산하지 않으므로(레이아웃 없음) **구조**를 잰다: 리그 링크가
+   * 종목 배지와 **같은 부모 안에 있으면 안 된다.**
+   */
+  it('리그 링크는 배지 줄 밖에 있다 — 종목 배지와 부모를 공유하지 않는다', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = [{ ...model.matches[0], league: { leagueId: 'lg-1', title: '가을 리그' } }];
+
+    renderPage(<TeamMatchListPageView model={model} />);
+
+    const badge = leagueBadge();
+    expect(badge).toBeInTheDocument();
+    const sportBadge = screen.getAllByText(model.matches[0].sport)[0];
+    expect(sportBadge).toBeInTheDocument();
+    expect(badge!.parentElement).not.toBe(sportBadge.parentElement);
+    // 종목 배지가 있는 줄이 리그 링크를 품고 있지 않다는 것까지 확인한다 —
+    // 부모만 비교하면 한 겹 더 감싸는 것으로 통과해 버린다.
+    expect(sportBadge.parentElement!.contains(badge!)).toBe(false);
+  });
+
+  /**
+   * **`성별 미설정` 배지가 리그 카드에 항상 떴다.**
+   *
+   * 카드 모델이 빈 값을 `'성별 미설정'` 문자열로 채워서, 화면의 `match.gender ? … : null`
+   * 가드가 **절대 안 걸렸다.** 리그 대진은 성별 조건을 안 정하는 게 기본이라 모든 리그
+   * 카드에 회색 배지가 하나씩 붙었다. 같은 파일이 매너·승·비용에서는 "모르면 null" 을
+   * 지키는데 성별만 어긋나 있었다.
+   *
+   * 두 방향을 함께 잰다 — 값이 있으면 그려야 하고, 없으면 배지 자체가 없어야 한다.
+   */
+  it('성별 조건이 없으면 배지를 그리지 않고, 있으면 그린다', () => {
+    const withGender = getTeamMatchListViewModel();
+    withGender.matches = [{ ...withGender.matches[0], gender: '성별 무관' }];
+    const first = renderPage(<TeamMatchListPageView model={withGender} />);
+    expect(screen.getByText('성별 무관')).toBeInTheDocument();
+    first.unmount();
+
+    const withoutGender = getTeamMatchListViewModel();
+    withoutGender.matches = [{ ...withoutGender.matches[0], gender: '' }];
+    renderPage(<TeamMatchListPageView model={withoutGender} />);
+    expect(screen.queryByText('성별 미설정')).not.toBeInTheDocument();
+    expect(screen.queryByText('성별 무관')).not.toBeInTheDocument();
+  });
+
   it('리그 소속이 아니면 목록 카드에 리그전 배지가 없다', () => {
     const model = getTeamMatchListViewModel();
     model.matches = [{ ...model.matches[0], league: null }];

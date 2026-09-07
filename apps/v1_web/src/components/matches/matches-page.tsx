@@ -339,7 +339,9 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                   {match.sport}
                 </span>
                 <span className="tm-badge tm-badge-grey">{match.level}</span>
-                <span className="tm-badge tm-badge-grey">{match.gender}</span>
+                {/* 성별을 안 정한 매치에는 배지를 붙이지 않는다 — 카드 모델이 빈 값을
+                    문자열로 채우지 않게 바뀌면서 이 가드가 비로소 의미를 갖는다. */}
+                {match.gender ? <span className="tm-badge tm-badge-grey">{match.gender}</span> : null}
                 <span className={`tm-badge ${matchStatusBadgeClass(mode, match.status)}`}>{matchStatusBadgeLabel(mode, match.status)}</span>
               </div>
               <h2 className="tm-match-detail-title">{match.title}</h2>
@@ -725,7 +727,8 @@ function MatchRowItem({ match }: { match: MatchCardModel }) {
         {match.image ? null : <SportIllustration sport={match.sport} sizes="76px" />}
       </div>
       <div className="tm-match-row-main">
-        <div className="tm-text-caption tm-match-row-meta">{match.sport} · {match.level} · {match.gender}</div>
+        {/* 빈 값을 그대로 이으면 "풋살 · 3-5 · " 처럼 구분점만 남는다 — 있는 것만 잇는다. */}
+        <div className="tm-text-caption tm-match-row-meta">{[match.sport, match.level, match.gender].filter(Boolean).join(' · ')}</div>
         <div className="tm-match-row-headline">
           {closedLabel ? <span className="tm-badge tm-badge-grey tm-card-closed-badge">{closedLabel}</span> : null}
           <div className="tm-text-body-lg tm-match-row-title">{match.title}</div>
@@ -819,7 +822,7 @@ function MatchCardItem({ match }: { match: MatchCardModel }) {
         {/* [격상1] 종목 배지 제거 — 미디어 상단 badge에 이미 표시됨(중복).
             [격상2] 마감 orange 배지 제거 — footer actionLabel로 통합.
             레벨·성별은 pill 배지 → caption 인라인 텍스트로 강등(메타 배지 동등경쟁 해소). */}
-        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 2 }}>{match.level} · {match.gender}</div>
+        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 2 }}>{[match.level, match.gender].filter(Boolean).join(' · ')}</div>
         <div className="tm-match-row-headline" style={{ marginTop: 8 }}>
           {closedLabel ? <span className="tm-badge tm-badge-grey tm-card-closed-badge">{closedLabel}</span> : null}
           <div className="tm-text-body-lg">{match.title}</div>

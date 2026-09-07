@@ -298,15 +298,19 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
           {match.hostTeamTrustState && trustStateLabel(match.hostTeamTrustState) ? (
             <span className="tm-badge tm-badge-blue">{trustStateLabel(match.hostTeamTrustState)}</span>
           ) : null}
-          {/* 리그 상세 페이지는 앱 안에 진입점이 전혀 없었다(직접 URL 만) -- 이 링크가
-              사실상 첫 통로다. 배지 자체를 링크로 만들어 리그명을 함께 보여준다.
-              hostTeamCard 전체가 이미 팀 상세로 가는 Link라 배지를 또 <a>로 두면 <a>가
-              중첩돼 브라우저가 바깥 <a>를 조기에 닫아버린다(오케스트레이터 지적,
-              2026-08-20) -- TeamMatchCard(R3, 목록 카드 리그전 배지)와 동일하게
-              button + preventDefault/stopPropagation + router.push로 바꿨고,
-              같은 .tm-league-badge-link 클래스를 재사용해 화살표 아이콘+밑줄로
-              "클릭 가능함"을 컬러 외 신호로도 전달한다. */}
-          {league ? (
+        </div>
+        {/* 리그 링크는 **배지 줄 밖에 둔다.** 이 요소만 44px 터치 타깃을 가져야 하는데
+            (누를 수 있는 유일한 칩이다) 형제 배지는 26px 이라, 한 줄에 섞으면 69% 큰
+            요소 하나가 줄 전체의 높이를 끌어올려 나머지 배지가 그 안에서 떠 보인다.
+            줄을 나누면 배지 줄이 26px 로 균질해지고 이 링크는 자기 줄에서 44px 를 자연스럽게
+            갖는다. (히트 영역만 ::after 로 넓히는 우회는 이미 기각됐다 — 넓힌 영역이
+            위아래 배지 줄을 덮어 그 자리 탭이 팀이 아니라 리그로 샌다. globals.css 주석 참조.)
+
+            리그 상세는 앱 안에 다른 진입점이 없어(직접 URL 만) 이 링크가 사실상 첫 통로다.
+            카드 전체가 팀 상세로 가는 Link 라 <a> 를 중첩하면 브라우저가 바깥 <a> 를 조기에
+            닫으므로 button + preventDefault/stopPropagation 을 유지한다. */}
+        {league ? (
+          <div style={{ marginTop: 8 }}>
             <button
               type="button"
               className="tm-badge tm-badge-grey tm-league-badge-link"
@@ -319,14 +323,12 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
             >
               {/* F7: 리그명이 길면 배지가 카드 밖으로 밀려 나가 화면이 가로로 스크롤됐다
                   (390px 실측: 카드 밖 152px, 뷰포트 밖 37px). 리그명만 말줄임하고
-                  화살표는 항상 보이게 텍스트를 별도 span 으로 감싼다 — 팀 상세의
-                  "내 리그" 목록이 이미 쓰는 처리와 같은 방식이다.
-                  목록 카드 쪽 배지(아래)는 리그명 없이 '정규 리그'만 실어서 넘치지 않는다. */}
+                  화살표는 항상 보이게 텍스트를 별도 span 으로 감싼다. */}
               <span className="tm-league-badge-text">정규 리그 · {league.title}</span>
               <ChevronRightIcon size={12} strokeWidth={2.5} aria-hidden="true" />
             </button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
       {/* 팀 보기는 보조 CTA — apply가 단일 primary; 파란 fill 중복 방지(R-K5) */}
       <span className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flexShrink: 0 }}>팀 보기</span>
@@ -847,14 +849,15 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
           {match.grade ? <span className="tm-badge tm-badge-grey">{match.grade}등급</span> : null}
           {match.format ? <span className="tm-badge tm-badge-grey">{match.format}</span> : null}
           {match.gender ? <span className="tm-badge tm-badge-grey">{match.gender}</span> : null}
-          {/* 리그전 배지: 상태(모집중/마감)가 아니라 카테고리라 중립 grey 를 쓴다.
-              컬러만으로 뜻을 전달하지 않도록 "리그전" 텍스트를 함께 싣는다(DESIGN.md 규칙).
-              카드 전체가 이미 상세로 가는 Link라 <a>를 중첩하면 브라우저 파서가 바깥
-              <a>를 조기에 닫아 하이드레이션 불일치·레이아웃 붕괴를 낸다(HTML5 어댑션
-              에이전시 규칙 — <a> 안에 새 <a>가 열리면 바깥 태그가 강제로 닫힌다).
-              대신 button + stopPropagation/preventDefault로 안전하게 리그 홈으로
-              이동시킨다. "클릭 가능함"은 컬러가 아니라 화살표 아이콘+밑줄로 전달한다. */}
-          {league ? (
+          {/* 비용을 모를 때(null)는 배지를 붙이지 않는다 — 0 과 null 을 같이 다루면
+              costNote 를 안 적은 매치가 전부 '무료초청'으로 둔갑한다. */}
+          {match.opponentCost === 0 ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}
+        </div>
+        {/* 리그 링크는 **배지 줄 밖에 둔다** — 근거는 호스트 팀 카드의 같은 자리 주석과 같다.
+            이 요소만 44px 이고 형제 배지는 26px 이라, 한 줄에 섞으면 줄 높이를 혼자 끌어올린다.
+            카드 전체가 상세로 가는 Link 라 <a> 중첩을 피해 button 을 유지한다. */}
+        {league ? (
+          <div style={{ marginTop: 8 }}>
             <button
               type="button"
               className="tm-badge tm-badge-grey tm-league-badge-link"
@@ -868,11 +871,8 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
               정규 리그
               <ChevronRightIcon size={12} strokeWidth={2.5} aria-hidden="true" />
             </button>
-          ) : null}
-          {/* 비용을 모를 때(null)는 배지를 붙이지 않는다 — 0 과 null 을 같이 다루면
-              costNote 를 안 적은 매치가 전부 '무료초청'으로 둔갑한다. */}
-          {match.opponentCost === 0 ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}
-        </div>
+          </div>
+        ) : null}
         <div className="tm-text-body-lg" style={{ marginTop: 12 }}>{match.title}</div>
         <div className="tm-text-caption" style={{ marginTop: 4 }}>{match.date} {match.time} · {match.venue}</div>
         <div className="tm-match-list-footer">

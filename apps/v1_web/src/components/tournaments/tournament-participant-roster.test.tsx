@@ -57,8 +57,12 @@ describe('참가팀 카드 — 공개 명단 펼치기', () => {
 
     const toggle = screen.getByRole('button', { name: 'A팀 명단 펼치기' });
     expect(toggle).toHaveClass('tm-btn', 'tm-btn-sm', 'tm-btn-ghost');
+    // shorthand 와 롱핸드를 **둘 다** 잰다 — 되돌리기는 shorthand 로 오지만 새로 쓰는
+    // 사람은 `backgroundColor` 를 쓸 수 있고, 그러면 shorthand 만 재는 단언은 통과한다.
     expect(toggle.style.background).toBe('');
+    expect(toggle.style.backgroundColor).toBe('');
     expect(toggle.style.border).toBe('');
+    expect(toggle.style.borderColor).toBe('');
   });
 
   it('처음엔 접혀 있고, 누르면 등번호와 닉네임이 보인다', () => {

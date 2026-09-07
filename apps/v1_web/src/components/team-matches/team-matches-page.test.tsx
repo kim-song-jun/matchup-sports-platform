@@ -386,6 +386,48 @@ describe('리그전 배지', () => {
     expect(screen.queryByText('신청 마감')).not.toBeInTheDocument();
   });
 
+  /**
+   * **친선은 이름 아래에 상태가 남아야 한다.**
+   *
+   * 상대가 확정된 친선 매치에서 상태 줄까지 없애면 목록에서 **모집 중과 마감을 가리는
+   * 신호가 사라진다**(2026-09-07 제보로 최근 강화한 자리다). 리그와 친선을 한 자리에서
+   * 대조해, 리그에는 안 그리고 친선에는 그린다는 것을 함께 잰다.
+   */
+  it('상대가 확정된 친선은 이름 아래에 상태를 남기고, 리그는 남기지 않는다', () => {
+    const friendly = getTeamMatchListViewModel();
+    friendly.matches = [{ ...friendly.matches[0], opponentTeam: '상대 FC', league: null, status: 'closed' }];
+    const first = renderPage(<TeamMatchListPageView model={friendly} />);
+    expect(screen.getByText('상대 FC')).toBeInTheDocument();
+    expect(screen.getByText('신청 마감')).toBeInTheDocument();
+    first.unmount();
+
+    const league = getTeamMatchListViewModel();
+    league.matches = [{ ...league.matches[0], opponentTeam: '상대 FC', league: { leagueId: 'lg-1', title: '가을 리그' }, status: 'closed' }];
+    renderPage(<TeamMatchListPageView model={league} />);
+    expect(screen.getByText('상대 FC')).toBeInTheDocument();
+    expect(screen.queryByText('신청 마감')).not.toBeInTheDocument();
+  });
+
+  /**
+   * **리그 대진 카드를 흐리게 만들지 않는다.**
+   *
+   * 리그의 `closed` 는 "모집이 끝났다" 가 아니라 "상대가 정해져 있다" 는 뜻인데, 그 상태가
+   * 원정팀 팀장·선수 전원에게 붙어 **자기 팀 경기가 마감·흐림으로** 보였다. 흐림은 클래스
+   * 하나(`tm-card-closed`)로 걸리므로 그 클래스의 유무를 잰다 — 친선은 그대로 걸려야 한다.
+   */
+  it('리그 대진 카드에는 마감 흐림을 걸지 않는다 — 친선은 그대로', () => {
+    const league = getTeamMatchListViewModel();
+    league.matches = [{ ...league.matches[0], league: { leagueId: 'lg-1', title: '가을 리그' }, status: 'closed' }];
+    const first = renderPage(<TeamMatchListPageView model={league} />);
+    expect(first.container.querySelector('.tm-team-match-card')).not.toHaveClass('tm-card-closed');
+    first.unmount();
+
+    const friendly = getTeamMatchListViewModel();
+    friendly.matches = [{ ...friendly.matches[0], league: null, status: 'closed' }];
+    const second = renderPage(<TeamMatchListPageView model={friendly} />);
+    expect(second.container.querySelector('.tm-team-match-card')).toHaveClass('tm-card-closed');
+  });
+
   it('상대가 아직 없으면 그 자리에 상태를 그린다 — 그때는 그게 알아야 할 값이다', () => {
     const model = getTeamMatchListViewModel();
     model.matches = [{ ...model.matches[0], opponentTeam: null, league: null, status: 'open' }];

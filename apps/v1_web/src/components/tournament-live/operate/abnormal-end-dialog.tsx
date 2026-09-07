@@ -84,7 +84,7 @@ export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = fals
         aria-labelledby={titleId}
         className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-5 shadow-xl"
       >
-        <h2 id={titleId} className="text-base font-bold">
+        <h2 id={titleId} className="text-[length:var(--font-size-body-lg)] font-bold">
           몰수·중단으로 종료
         </h2>
         <p className="mt-2 text-sm text-[var(--text-muted)]">

@@ -545,3 +545,27 @@ describe('데스크톱(≥1024) 틴트 지면 위 보조 텍스트', () => {
     expect(rule).not.toMatch(/--text-caption|--text-muted/);
   });
 });
+
+describe('인라인으로 지면 색을 까는 곳의 보조 텍스트 (.tm-on-tint)', () => {
+  // 위 목록은 CSS 셀렉터가 있는 지면만 담는다. 지면 색을 인라인 style 로 까는 곳은
+  // 겨냥할 셀렉터가 없어 목록에 못 넣으므로 이 표시 클래스를 함께 붙인다.
+  it('표시 클래스가 보조 텍스트 토큰을 올린다', () => {
+    const rule = globalsCss.match(/\.tm-on-tint\s*\{([^}]*)\}/)?.[1];
+
+    expect(rule, '.tm-on-tint 규칙을 찾지 못했다').toBeDefined();
+    expect(rule).toMatch(/--text-caption:\s*var\(--grey700\)/);
+    expect(rule).toMatch(/--text-muted:\s*var\(--grey700\)/);
+  });
+
+  // 클래스만 있고 아무 데도 안 붙으면 아무것도 고쳐지지 않는다 — alpha 에서 실제로
+  // 미달이 확인된 두 곳에 붙어 있는지 본다.
+  it.each([
+    ['src/components/tournaments/pending-review-card.tsx', "background: 'var(--tint-blue)'"],
+    ['src/app/tournaments/page.tsx', "background: 'var(--blue50)'"],
+  ])('%s 의 틴트 지면에 표시 클래스가 붙어 있다', (file, tint) => {
+    const source = readFileSync(resolve(process.cwd(), file), 'utf8');
+
+    expect(source, file + ' 에서 틴트 배경을 찾지 못했다').toContain(tint);
+    expect(source).toMatch(/className="tm-on-tint"/);
+  });
+});

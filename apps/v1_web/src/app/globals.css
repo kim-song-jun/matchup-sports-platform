@@ -2935,6 +2935,19 @@ label.tm-btn:focus-within {
   --text-muted: var(--grey700);
 }
 
+/* 위 목록은 CSS 에서 겨냥할 클래스가 있는 지면만 담는다. 지면 색을 **인라인 style 로**
+   까는 곳(실측 36파일 85건)은 겨냥할 셀렉터가 없어 목록에 넣을 수 없다 — 그런 곳엔
+   이 표시 클래스를 함께 붙인다. 배경은 각자 정하고, 이 클래스는 그 위 보조 텍스트를
+   읽히는 값으로 올리는 몫만 진다.
+
+   85곳 전부에 붙이지는 않는다. 지면에 색이 깔렸다고 다 문제가 아니라, **그 위에
+   --text-caption/--text-muted 를 쓰는 글자가 있을 때만** 기준 아래로 내려간다
+   (alpha 실측으로 확인된 곳에만 붙였다). */
+.tm-on-tint {
+  --text-caption: var(--grey700);
+  --text-muted: var(--grey700);
+}
+
 /* 글자가 얹히지 않는 썸네일은 그대로 눌러도 된다. */
 .tm-card-closed .tm-match-row-thumb {
   opacity: 0.45;

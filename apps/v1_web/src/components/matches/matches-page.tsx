@@ -733,6 +733,14 @@ function MatchRowItem({ match }: { match: MatchCardModel }) {
           <strong style={{ fontWeight: 600 }}>{match.date} {match.time}</strong>
           {' · '}{match.venue}
         </div>
+        {/* DESIGN.md 11절: 참가 현황은 "숫자를 크게 쓰지 않고 시각적 밀도로 전달" — 오버레이 배지
+            아니면 프로그레스 바다. 행 카드엔 오버레이가 없으니 바를 쓴다. 숫자도 남겨 스크린리더와
+            정확한 값을 지킨다(바는 aria-hidden). */}
+        <div
+          aria-hidden="true"
+          className="tm-match-row-gauge"
+          style={{ ['--tm-fill' as string]: `${Math.min(100, Math.round((match.current / Math.max(1, match.capacity)) * 100))}%` }}
+        />
         <div className="tm-match-row-foot">
           {/* [P1 숫자:단위 2:1 + tabular-nums] 배너에 있던 인원 배지를 텍스트로 내렸다 —
               미디어 위에 겹치면 그래픽도 숫자도 안 읽힌다. */}

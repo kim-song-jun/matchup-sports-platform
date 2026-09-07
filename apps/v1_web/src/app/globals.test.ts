@@ -340,3 +340,30 @@ describe('home featured graphic size (cascade)', () => {
     decls.forEach(({ px }) => expect(px).toBeLessThanOrEqual(128));
   });
 });
+
+describe('세그먼트 탭 조작부 높이 — 기준 44px 밑으로 내려가지 않는다', () => {
+  // 이 저장소의 조작부 기준은 44×44 이고, 같은 이유로 .tm-btn-sm 은 이미 40→44 로
+  // 올려 둔 상태다("WS11 a11y 터치 타깃"). 세그먼트 탭의 sm 변형만 40px 로 남아
+  // 있었는데, 유닛 테스트도 tsc 도 이런 건 못 잡는다 — 화면은 멀쩡히 그려지고
+  // 손가락만 빗나간다. 그래서 CSS 계약으로 못 박는다.
+  it('기본 탭이 44px 이상이다', () => {
+    const rule = globalsCss.match(/\.tm-segmented-tab\s*\{([^}]*)\}/)?.[1];
+
+    expect(rule).toBeDefined();
+    const min = Number(rule!.match(/min-height:\s*(\d+)px/)?.[1]);
+    expect(min).toBeGreaterThanOrEqual(44);
+  });
+
+  it('sm 변형은 높이를 낮추지 않는다 — 글자 크기만 줄인다', () => {
+    const rule = globalsCss.match(/\.tm-segmented-tabs-sm \.tm-segmented-tab\s*\{([^}]*)\}/)?.[1];
+
+    expect(rule).toBeDefined();
+    // 높이 계열 속성을 아예 쓰지 않아야 기본값 44px 를 그대로 물려받는다.
+    // max-height 까지 막는 이유는 회귀가 아니라 dead code 다 — 브라우저 실측상
+    // min-height 가 max-height 를 이기므로(min-height:44 + max-height:40 → 44px)
+    // 여기 max-height 를 적어도 높이는 안 줄어든다. 즉 아무 효과 없는 선언이
+    // 남게 되고, 다음 사람은 그게 먹히는 줄 안다.
+    expect(rule).not.toMatch(/(?:min-|max-)?height:/);
+    expect(rule).toMatch(/font-size:/);
+  });
+});

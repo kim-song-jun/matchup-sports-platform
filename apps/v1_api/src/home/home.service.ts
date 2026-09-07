@@ -137,6 +137,9 @@ export class HomeService {
     const limit = Math.min(Math.max(input.limit ?? 5, 1), 20);
     const where: Prisma.V1MatchWhereInput = {
       status: 'recruiting',
+      // 홈 추천/대표 매치는 일반 탐색과 달리 지금 신청 가능한 모집 글만 노출한다.
+      startAt: { gte: new Date() },
+      OR: [{ deadlineAt: null }, { deadlineAt: { gte: new Date() } }],
       deletedAt: null,
       ...(input.sportId ? { sportId: input.sportId } : {}),
       ...(input.regionId ? { regionId: input.regionId } : {}),

@@ -74,4 +74,12 @@ describe('참가 현황 게이지 (DESIGN.md 11절)', () => {
 
     expect((container.querySelector('.tm-match-row-gauge') as HTMLElement).style.getPropertyValue('--tm-fill')).toBe('100%');
   });
+
+  it('정원이 없으면 바를 그리지 않는다 — 분모가 없으면 채움을 정할 수 없다', () => {
+    const matches = [{ ...base.matches[0], id: 'm0', image: null, current: 3, capacity: 0 }];
+    const { container } = render(<MatchListPageView model={{ ...base, matches, isLoading: false }} />);
+
+    expect(container.querySelector('.tm-match-row-gauge')).toBeNull();
+    expect(container.querySelector('.tm-match-row-foot')!.textContent).toContain('3/0명');
+  });
 });

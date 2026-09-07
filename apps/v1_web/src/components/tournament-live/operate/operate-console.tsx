@@ -1210,7 +1210,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             화면이 사라져 갈 곳도 없다. 남긴 이유는 **운영자가 상황을 알아야** 하기
             때문이다: 명단이 왜 비어 보이는지, 어느 팀이 아직 안 냈는지. 차단이 아니라
             경고다. */}
-        {gameState === 'SCHEDULED' && sidesMissingLineup.length > 0 && (
+        {/* 대회 축(TOURNAMENT_FIXTURE)은 제외한다 — 거기엔 라인업 제출 단계가 없어
+            자동 생성된 초안이 영영 SUBMITTED 가 되지 않는다. 명단 검인에 선수가 다 차 있는데
+            "아직 제출하지 않았어요" 가 뜨던 자리다(alpha 실측). */}
+        {gameDetail.data?.sourceType === 'TEAM_MATCH' &&
+          gameState === 'SCHEDULED' &&
+          sidesMissingLineup.length > 0 && (
           <Banner tone="warning">
             {sidesMissingLineup.map((side) => side.displayNameSnapshot).join(', ')} 팀이 아직 선발 명단을
             제출하지 않았어요. 이대로도 경기를 시작할 수 있어요.

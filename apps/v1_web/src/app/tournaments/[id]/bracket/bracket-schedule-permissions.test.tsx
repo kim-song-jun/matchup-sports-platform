@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BracketScheduleTab } from './bracket-page-client';
 
@@ -81,12 +81,18 @@ describe('BracketScheduleTab — 내 팀 경기와 라인업 권한', () => {
     });
   });
 
-  it('bracket 일정 탭에서 내 팀 경기를 강조한다', () => {
-    render(<BracketScheduleTab tournamentId="tour-1" />);
+  it('bracket 일정 탭에서 내 팀 경기를 강조하되, 대회엔 라인업 상태를 붙이지 않는다', () => {
+    const { container } = render(<BracketScheduleTab tournamentId="tour-1" />);
 
     // [P1-d] 라인업 링크 단언은 뺐다(경기별 라인업 화면 제거). **강조 계약은 남긴다** --
     // 이 탭에서 내 팀 경기가 눈에 띄어야 한다는 것은 링크와 별개의 계약이다.
-    expect(screen.getByText('라인업 미작성')).toBeInTheDocument();
+    // 강조는 행 카드가 `tm-schedule-card-mine` 을 다는 것으로 확인한다 — 이 픽스처의
+    // 팀 이름이 하필 '우리 팀'이라 문구로 찾으면 뱃지인지 팀 이름인지 갈리지 않는다.
+    const myCard = container.querySelector('.tm-schedule-card-mine');
+    expect(myCard).not.toBeNull();
     expect(screen.queryByRole('link', { name: '라인업 짜기' })).not.toBeInTheDocument();
+    // 대회 축엔 라인업 제출 단계가 없다 — 여기 뱃지가 뜨면 팀장에게 할 수 없는 일을
+    // 안 했다고 말하는 것이고, 끝난 경기 위에도 남았다(alpha 실측).
+    expect(within(myCard as HTMLElement).queryByText('라인업 미작성')).not.toBeInTheDocument();
   });
 });

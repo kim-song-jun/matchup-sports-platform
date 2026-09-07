@@ -329,10 +329,10 @@ describe('ScheduleContent — 우리 팀 경기 강조', () => {
     ],
   };
 
-  it('내 팀 경기 행에 "우리 팀" 표시와 라인업 상태가 붙는다', () => {
+  it('내 팀 경기 행에 "우리 팀" 표시와 라인업 상태가 붙는다 (리그)', () => {
     const data = { ...makeData(), items: [fixtureEntry()] };
 
-    render(<ScheduleContent tournamentId="tour-1" data={data} myFixtures={myFixtures} />);
+    render(<ScheduleContent tournamentId="lg-1" data={data} myFixtures={myFixtures} isRegularLeague />);
 
     expect(screen.getByText('우리 팀')).toBeInTheDocument();
     // 색만으로 상태를 전달하지 않는다 — 문구가 함께 있어야 한다.
@@ -341,6 +341,22 @@ describe('ScheduleContent — 우리 팀 경기 강조', () => {
     // 표시 계약은 그대로 남긴다** — 링크가 사라졌다고 함께 지우면 "우리 팀 경기가
     // 눈에 띄어야 한다"는 별개의 계약까지 커버리지가 없어진다.
     expect(screen.queryByRole('link', { name: '라인업 짜기' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 대회 축엔 라인업 제출 단계가 없다 — 대진 생성 때 등록 명단이 참가자로 복사된다.
+   * 그런데도 이 뱃지가 떠서 팀장에게 **할 수 없는 일을 안 했다고** 말했고, 이미 끝난
+   * 경기 위에도 그대로 남았다(alpha 실측). "우리 팀" 강조는 대회에서도 그대로 둔다.
+   */
+  it('대회 경기에는 라인업 상태 뱃지를 붙이지 않는다', () => {
+    const data = { ...makeData(), items: [fixtureEntry()] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} myFixtures={myFixtures} />);
+
+    expect(screen.getByText('우리 팀')).toBeInTheDocument();
+    expect(screen.queryByText('라인업 미작성')).not.toBeInTheDocument();
+    expect(screen.queryByText('라인업 제출 완료')).not.toBeInTheDocument();
+    expect(screen.queryByText('라인업 작성 중')).not.toBeInTheDocument();
   });
 
   /**
@@ -522,6 +538,30 @@ describe('ScheduleContent — 시간 미정 경기', () => {
     render(<ScheduleContent tournamentId="tour-1" data={data} />);
 
     expect(screen.getAllByText('A조')).toHaveLength(1);
+  });
+
+  /**
+   * `items` 는 서버가 `scheduledAt: { not: null }` 로 거른 것이라, 전부 시간 미정이면
+   * `items` 가 0이 된다. 예전엔 그것만 보고 "아직 확정된 일정이 없어요" 를 그렸고,
+   * **바로 아래에 실제 경기 2건**이 있었다(alpha 실측). 두 문장 각각은 참인데 나란히
+   * 놓여 모순으로 읽히고, 사용자는 위에서 읽기를 멈춘다.
+   */
+  it('시간 미정 경기가 있으면 "일정이 없어요" 로 말하지 않는다', () => {
+    const data = makeData({
+      unscheduled: [fixtureEntry({ fixtureId: 'u-1', scheduledAt: null })],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.queryByText('아직 확정된 일정이 없어요')).not.toBeInTheDocument();
+    expect(screen.getByText('아직 경기 시간이 정해지지 않았어요')).toBeInTheDocument();
+    expect(screen.getByText('시간 미정 경기')).toBeInTheDocument();
+  });
+
+  it('일정이 잡힌 경기도 미정 경기도 없으면 그때는 일정이 없다고 말한다', () => {
+    render(<ScheduleContent tournamentId="tour-1" data={makeData()} />);
+
+    expect(screen.getByText('아직 확정된 일정이 없어요')).toBeInTheDocument();
   });
 
   it('조가 다르면 각각 제목이 선다', () => {

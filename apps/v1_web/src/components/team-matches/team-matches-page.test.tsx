@@ -30,7 +30,7 @@ describe('team match images', () => {
     model.matches = [{ ...model.matches[0], imageUrl: 'https://cdn.example.com/team-match.webp' }];
 
     const { container } = renderPage(<TeamMatchListPageView model={model} />);
-    const media = container.querySelector<HTMLElement>('.tm-team-match-vs');
+    const media = container.querySelector<HTMLElement>('.tm-match-row-thumb');
 
     expect(media?.style.backgroundImage).toContain('https://cdn.example.com/team-match.webp');
     expect(media?.style.backgroundImage).toContain('/mock/generated/team-huddle.webp');
@@ -91,15 +91,79 @@ describe('TeamMatchListPageView — 신청 마감 카드 구분', () => {
     const { container } = renderPage(<TeamMatchListPageView model={modelWithSingleCard('closed')} />);
 
     expect(screen.getAllByText('신청 마감').length).toBeGreaterThan(0);
-    expect(container.querySelector('.tm-team-match-card.tm-card-closed')).not.toBeNull();
+    expect(container.querySelector('.tm-match-row.tm-card-closed')).not.toBeNull();
   });
 
-  it('모집 중 카드는 "모집 중" 그대로이고 흐림 처리도 없다', () => {
+  // 행 카드 전환(2026-09-07) 후 목록의 열린 카드는 "모집 중"이 아니라 **"상대 모집 중"**을
+  // 쓴다 — 목록 응답에 상대팀이 없어 그 자리가 늘 비어 있던 것을, 배지 한 칸으로 답한다.
+  it('열린 카드는 "상대 모집 중" 배지를 쓰고 흐림 처리도 없다', () => {
     const { container } = renderPage(<TeamMatchListPageView model={modelWithSingleCard('open')} />);
 
-    expect(screen.getAllByText('모집 중').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('상대 모집 중').length).toBeGreaterThan(0);
     expect(screen.queryByText('신청 마감')).not.toBeInTheDocument();
     expect(container.querySelector('.tm-card-closed')).toBeNull();
+  });
+});
+
+/**
+ * 행 카드 전환 (2026-09-07).
+ *
+ * 예전 카드는 위쪽 124px(카드의 44%)이 파란 VS 밴드였는데, 그 밴드의 "상대팀" 칸에 담을 값이
+ * 없었다 — 목록 API 응답에 상대팀이 없다. 그래서 그 자리를 상태 배지가 차지했고, 시각 무게가
+ * 가장 큰 영역이 정보를 가장 적게 담았다(alpha 실측: 390에서 카드 280px·한 화면 2.75장,
+ * 같은 토글의 개인 탭은 131px·5.88장).
+ *
+ * 여기서 지키는 것은 세 가지다 — ① 개인 탭과 같은 행 카드를 쓴다 ② 팀 이름이 사라지지 않는다
+ * ③ 없는 상대팀 이름을 만들어내지 않는다.
+ */
+describe('TeamMatchListPageView — 행 카드 (개인 탭과 같은 카드)', () => {
+  function listWithOneCard() {
+    const base = getTeamMatchListViewModel();
+    return { ...base, matches: [base.matches[0]] };
+  }
+
+  it('개인 탭과 같은 .tm-match-row 를 쓰고, VS 밴드는 더 그리지 않는다', () => {
+    const { container } = renderPage(<TeamMatchListPageView model={listWithOneCard()} />);
+
+    expect(container.querySelector('.tm-match-row')).not.toBeNull();
+    expect(container.querySelector('.tm-match-row-thumb')).not.toBeNull();
+    // 밴드가 남아 있으면 카드 높이가 다시 2배가 된다.
+    expect(container.querySelector('.tm-team-match-vs')).toBeNull();
+  });
+
+  it('VS 밴드가 담던 팀 이름은 행 카드로 옮겨 와 그대로 남는다', () => {
+    const model = listWithOneCard();
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+
+    const meta = container.querySelector('.tm-match-row-meta');
+    expect(meta?.textContent).toContain(model.matches[0].hostTeam);
+  });
+
+  it('상대팀 이름을 만들어내지 않는다 — 카드에 "상대팀" 자리를 남기지 않는다', () => {
+    // 목록 응답(V1TeamMatch)에는 상대팀이 없다. 예전 VS 밴드는 그 라벨만 띄워 두고
+    // 값 자리에 상태 배지를 넣었다 — 있지도 않은 값을 위해 카드의 절반을 쓴 셈이다.
+    const { container } = renderPage(<TeamMatchListPageView model={listWithOneCard()} />);
+    const card = container.querySelector('.tm-match-row');
+    expect(card).not.toBeNull();
+
+    // 제목 안의 "…vs 상대팀 구합니다" 같은 문장은 호스트가 쓴 값이라 그대로 둔다.
+    // 여기서 없어야 하는 것은 **라벨 자체를 그리는 요소** — 예전 밴드의 '홈팀'/'상대팀' 칸이다.
+    const labels = [...card!.querySelectorAll('*')].map((el) => el.textContent?.trim());
+    expect(labels).not.toContain('상대팀');
+    expect(labels).not.toContain('홈팀');
+  });
+
+  it('상태 배지는 카드마다 정확히 하나다 — 같은 사실을 두 번 말하지 않는다', () => {
+    const base = getTeamMatchListViewModel();
+    const statuses = ['open', 'pending', 'approved', 'closed', 'mine'] as const;
+    const model = { ...base, matches: statuses.map((status, index) => ({ ...base.matches[0], id: `tm-${index}`, status })) };
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+
+    const cards = [...container.querySelectorAll('.tm-match-row')];
+    expect(cards).toHaveLength(statuses.length);
+    cards.forEach((card) => {
+      expect(card.querySelectorAll('.tm-match-row-headline .tm-badge')).toHaveLength(1);
+    });
   });
 });
 

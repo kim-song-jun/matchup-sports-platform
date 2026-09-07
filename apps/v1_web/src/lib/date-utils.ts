@@ -240,9 +240,21 @@ export function formatMonthDay(dateStr: string | null | undefined): string | nul
   return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
+/**
+ * 금액의 **숫자 부분만** ko-KR 천 단위로 끊는다. 예) 140000 → '140,000'
+ *
+ * DESIGN.md 는 금액을 "숫자 17px/700 + 단위 14px/500"(2:1)로 나눠 그리게 한다 —
+ * 완성 문자열('140,000원')을 받으면 그 두 조각을 다시 만들 수 없다. 그래서 단위를
+ * 붙이지 않은 이 함수를 두고, 완성 문자열이 필요한 자리는 formatEntryFee 를 쓴다.
+ * 둘 다 여기서만 정의한다(로컬 포맷터 금지).
+ */
+export function formatAmountNumber(amount: number): string {
+  return amount.toLocaleString('ko-KR');
+}
+
 export function formatEntryFee(fee: number): string {
   if (fee === 0) return '무료';
-  return `${fee.toLocaleString('ko-KR')}원`;
+  return `${formatAmountNumber(fee)}원`;
 }
 
 /**

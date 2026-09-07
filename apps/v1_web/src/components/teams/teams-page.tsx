@@ -93,11 +93,13 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
         <div className="tm-sport-chip-row" role="group" aria-label="종목 필터">{model.chips.map((chip) => chip.href ? <Link key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} href={chip.href} aria-current={chip.active ? 'page' : undefined}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</Link> : <button key={chip.label} className={`tm-chip ${chip.active ? 'tm-chip-active' : ''}`} type="button" aria-pressed={chip.active}>{chip.label}{typeof chip.count === 'number' ? <span className="tab-num"> {chip.count}</span> : null}</button>)}</div>
         {/* 모바일 진입점 위계: summary-bar 텍스트를 tm-text-heading으로 승격해 페이지 진입점을 명확히 함.
             desktop에는 이미 .tm-team-desktop-header가 제목을 담당하므로 모바일에서만 노출. */}
-        <h2 className="tm-text-heading tm-hide-desktop tm-team-mobile-heading">{model.summary.scope}</h2>
+        {/* 2026-09-07: 별도 줄에 있던 모바일 전용 h2(tm-text-heading 24px)를 요약 바 안으로
+            흡수했다. /matches·/team-matches 와 같은 처리로 모아 목록 화면의 제목이 한 가지가
+            되고, 세로 44px 를 돌려받는다(사용자 확정 — 보이는 제목을 주되 줄은 더하지 않는다).
+            hide/show-desktop 으로 같은 값을 두 번 그리던 중복도 함께 사라진다. */}
         <div className="tm-team-summary-bar">
-          <div className="tm-text-caption tab-num tm-hide-desktop"><TeamSummaryText summary={model.summary} /></div>
-          <div className="tm-text-label tm-show-desktop">{model.summary.scope}</div>
-          <div className="tm-text-caption tab-num tm-show-desktop"><TeamSummaryText summary={model.summary} /></div>
+          <h2 className="tm-list-scope-heading">{model.summary.scope}</h2>
+          <div className="tm-text-caption tab-num"><TeamSummaryText summary={model.summary} /></div>
         </div>
         {model.listLoading ? (
           <TeamListSkeleton />

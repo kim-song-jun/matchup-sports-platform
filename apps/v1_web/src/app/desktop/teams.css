@@ -5,14 +5,9 @@
  * Mobile (<768) is NEVER modified here.
  * ============================================================ */
 
-/* ─── 모바일 진입점 위계 — summary-bar를 heading으로 승격 ─────────────────────
- * .tm-team-mobile-heading: tm-hide-desktop을 통해 모바일(<1024)에서만 렌더.
- * desktop에서는 .tm-team-desktop-header-title이 동일 역할을 담당.
- */
-.tm-team-mobile-heading {
-  margin: 0 0 4px;
-  padding: 12px 0 0;
-}
+/* .tm-team-mobile-heading 은 2026-09-07 에 제거했다 — 별도 줄에 있던 모바일 전용 제목을
+ * 요약 바 안(.tm-list-scope-heading)으로 흡수해 /matches·/team-matches 와 같은 처리로
+ * 모았기 때문이다. 소비처가 사라진 규칙이라 함께 지운다. */
 
 /* ─── 카드 footer '팀 보기' ghost 링크 스타일 보강 ──────────────────────────
  * tm-btn-ghost는 globals.css에서 배경 없는 텍스트 링크로 정의됨.

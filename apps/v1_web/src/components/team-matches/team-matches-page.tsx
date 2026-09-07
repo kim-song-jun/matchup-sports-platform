@@ -58,7 +58,8 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
         <div className="tm-sport-chip-row">{model.sports.map((sport) => sport.href ? <Link key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} href={sport.href} aria-current={sport.active ? 'page' : undefined}>{sport.label} <span className="tab-num">{sport.count}</span></Link> : <button key={sport.label} className={`tm-chip ${sport.active ? 'tm-chip-active' : ''}`} type="button" aria-pressed={sport.active}>{sport.label} <span className="tab-num">{sport.count}</span></button>)}</div>
         {/* P1: 통계 숫자 tabular-nums + weight 차등 (2:1 원칙) */}
         <div className="tm-match-summary-row">
-          <div className="tm-text-label">{buildTeamMatchSummaryLabel()}</div>
+          {/* matches-page.tsx 와 같은 이유 — 이 화면도 모바일 헤딩이 0개였다. */}
+          <h2 className="tm-list-scope-heading">{buildTeamMatchSummaryLabel()}</h2>
           <div className="tm-text-caption tab-num">
             <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{model.summary.count}</span>개 · 오늘 {model.summary.today} · 모집 중 <strong style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{model.summary.urgent}</strong>
           </div>

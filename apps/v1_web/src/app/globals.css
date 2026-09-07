@@ -2644,6 +2644,33 @@ label.tm-btn:focus-within {
   padding: 0 12px;
 }
 
+/* 목록 화면의 스코프 제목 — 요약 행 **안에서** 페이지 제목 역할을 한다(줄을 더하지 않는다).
+ *
+ * 2026-09-07 alpha 390 실측으로 목록 4개 화면의 제목 처리가 3갈래였다:
+ *   /matches · /team-matches  헤딩 0개 — 데스크톱 전용 헤더가 display:none 이라 그 안의
+ *                             h1 이 접근성 트리에서 통째로 빠진다(스크린리더 헤딩 이동 불가)
+ *   /tournaments              sr-only h1 — 들리지만 보이지 않는다
+ *   /teams                    보이는 h2 24/700 을 별도 줄에 — 유일하게 제목이 있었다
+ *
+ * 사용자 확정: **보이는 제목을 주되 줄은 더하지 않는다.** 요약 행이 이미 min-height 44px 로
+ * 자리를 차지하고 있으므로 그 안의 스코프 텍스트를 제목으로 승격한다. /teams 의 별도 24px
+ * 줄도 여기로 흡수해 네 화면을 같은 처리로 모았다 — 목록은 사용자가 "고르는" 화면이라
+ * 세로 픽셀이 비싸다(browse-density: 390 에서 4장 이상).
+ *
+ * 데스크톱에서도 같은 값을 쓴다. 이전 13px(tm-text-label)은 스코프 라벨로 너무 조용했고,
+ * 데스크톱 헤더 제목(24)과 2단계 차이라 사다리가 자연스럽다. */
+.tm-list-scope-heading {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--font-size-body-lg);
+  line-height: 24px;
+  font-weight: 700;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* [다크 전용] 다크에서 페이지 배경(--bg #121317)과 grey50(#1a1c22)의 명도차가 라이트보다
    훨씬 덜 읽히므로, 다크에서만 grey150(#20222a)으로 한 단계 더 진하게 둔다.
    라이트는 main과 동일한 grey50. .tm-team-summary-bar 동일 구조. */

@@ -850,9 +850,19 @@ export class TournamentOperationsBoardService {
         -- 가장 이른 기한만 돌려준다. 지났는지 판정은 호출부가 now 와 비교한다 --
         -- 그래야 이 쿼리가 시계를 읽지 않고, 응답의 stable 부분도 깨끗하게 남는다.
         -- (SQL 템플릿 안에서는 백틱을 쓰지 않는다 -- 템플릿 리터럴이 끊긴다.)
+        -- **kind 를 반드시 가른다.** 비-리그 결과는 제출 시 REMINDER(24h)와
+        -- ESCALATION(48h) **두 행**이 함께 생긴다(game-result-submitted-escalation).
+        -- 가르지 않으면 MIN 이 REMINDER 를 집어 검토 기한 초과가 **24시간 일찍** 켜진다 --
+        -- 지금 고치는 결함("기한을 안 보고 켠다")과 같은 부류다.
+        -- 기한을 정의하는 것은 ESCALATION 이다: 플랫폼 ops 의 기한 판정도 같은 기준을 쓴다
+        -- (ResultEscalationAccessService.platformRows 의 kind = 'ESCALATION').
+        -- (SQL 템플릿 안에서는 백틱을 쓰지 않는다 -- 템플릿 리터럴이 끊긴다.)
         MIN(e.due_at) FILTER (
-          WHERE e.status = 'PENDING'::"V1EscalationStatus"
-             OR e.status = 'ACKNOWLEDGED'::"V1EscalationStatus"
+          WHERE e.kind = 'ESCALATION'::"V1EscalationKind"
+            AND (
+              e.status = 'PENDING'::"V1EscalationStatus"
+              OR e.status = 'ACKNOWLEDGED'::"V1EscalationStatus"
+            )
         ) AS "overdueAt",
         MAX(e.version) AS "maxVersion",
         MAX(e.updated_at) AS "maxUpdatedAt"

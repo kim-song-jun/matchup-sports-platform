@@ -332,6 +332,18 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
       },
     });
     overdueEscalationDueAt = overdueEscalation.dueAt;
+    // **비-리그 결과는 제출 시 두 행이 함께 생긴다** — `REMINDER`(24h) 와
+    // `ESCALATION`(48h). 검토 기한을 정의하는 것은 `ESCALATION` 쪽이므로(플랫폼 ops 의
+    // 기한 판정과 같은 기준), 이미 지난 REMINDER 가 있어도 경고가 켜지면 안 된다.
+    // 이 행이 없으면 "가장 이른 열린 기한" 구현이 kind 를 안 갈라도 통과한다.
+    await prisma.v1ResultEscalation.create({
+      data: {
+        resultRevisionId: revision.id,
+        kind: 'REMINDER',
+        dueAt: new Date(overdueEscalation.dueAt.getTime() - 24 * 60 * 60 * 1000),
+        status: V1EscalationStatus.PENDING,
+      },
+    });
 
     // liveGame has no lineups at all -> both sides default to "missing" -> LINEUP_NOT_SUBMITTED.
     void liveGame;
@@ -716,6 +728,10 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
 
     // 기한 이전: 열린 ESCALATION 행은 그대로 있는데도 나오면 안 된다. 옛 구현이 red 가 되는
     // 자리가 정확히 여기다.
+    //
+    // **같은 리비전에 24시간 앞선 `REMINDER` 가 열려 있다.** 그래서 이 단언은 두 가지를
+    // 동시에 잠근다 — 기한을 안 보는 구현(항상 켜짐)과, kind 를 안 가르는 구현(REMINDER
+    // 기한을 집어 24시간 일찍 켜짐). 뒤쪽은 플랫폼 ops 의 기한 판정과도 어긋난다.
     expect(liveWarningsOf(before, ids.overdueFixture)).not.toContain('RESULT_REVIEW_OVERDUE');
     // 경계는 포함이다(`due_at <= now`) -- 기한 정각이면 이미 지난 것으로 센다.
     expect(liveWarningsOf(at, ids.overdueFixture)).toContain('RESULT_REVIEW_OVERDUE');

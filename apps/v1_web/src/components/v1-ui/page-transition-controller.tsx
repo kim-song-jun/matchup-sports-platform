@@ -23,21 +23,27 @@ const MAX_PENDING_MS = 150;
  */
 export function PageTransitionController() {
   const pathname = usePathname();
-  const resolveRef = useRef<(() => void) | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRef = useRef<{
+    resolve?: () => void;
+    timeout?: ReturnType<typeof setTimeout>;
+    transition?: ViewTransition;
+  } | null>(null);
   const firstRender = useRef(true);
 
-  const settlePending = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    resolveRef.current?.();
-    resolveRef.current = null;
+  const settlePending = (skip = false) => {
+    const pending = pendingRef.current;
+    pendingRef.current = null;
+    if (!pending) return;
+    if (pending.timeout) clearTimeout(pending.timeout);
+    // 새 화면이 없는 timeout에는 old → old 애니메이션을 재생하지 않는다.
+    if (skip) pending.transition?.skipTransition();
+    pending.resolve?.();
   };
 
   const beginTransition = (kind: NavigationIntentKind) => {
     if (typeof document === 'undefined') return;
+    // 연타 시 이전 snapshot과 callback을 먼저 해제한다.
+    settlePending(true);
     // 같은 pathname 안에서 검색 파라미터만 바뀌는 이동(필터 시트·칩·페이지네이션)은
     // template.tsx 가 리마운트되지 않는다 — VT 를 걸면 resolve 신호가 영영 안 와 MAX_PENDING_MS
     // 동안 old 스냅샷이 정지 화면으로 남는다(Copilot 2차). kind 만 심고 전환은 걸지 않는다.
@@ -50,21 +56,29 @@ export function PageTransitionController() {
       document.documentElement.dataset.navKind = kind;
       return;
     }
-    // 직전 전환이 아직 pending이면(연타 네비게이션) 먼저 정리 — 고아 프로미스가 남으면
-    // 다음 startViewTransition() 호출이 브라우저에 따라 무시되거나 대기열에 쌓인다.
-    settlePending();
-
     document.documentElement.dataset.navKind = kind;
-    document.startViewTransition(
+    const pending: NonNullable<typeof pendingRef.current> = {};
+    pendingRef.current = pending;
+    pending.transition = document.startViewTransition(
       () =>
         new Promise<void>((resolve) => {
-          resolveRef.current = resolve;
-          timeoutRef.current = setTimeout(settlePending, MAX_PENDING_MS);
+          // 콜백이 실행되기 전에 다음 이동이나 unmount가 발생할 수 있다.
+          if (pendingRef.current !== pending) {
+            pending.transition?.skipTransition();
+            resolve();
+            return;
+          }
+          pending.resolve = resolve;
+          pending.timeout = setTimeout(() => settlePending(true), MAX_PENDING_MS);
         })
     );
+    // skipTransition()은 ready를 reject할 수 있지만 navigation 실패는 아니다.
+    void pending.transition.ready.catch(() => undefined);
   };
 
   useNavigationIntent({ onIntent: beginTransition });
+
+  useEffect(() => () => settlePending(true), []);
 
   // template.tsx가 새로 마운트되면(=pathname 변경이 커밋됨) pending VT를 즉시 resolve.
   useEffect(() => {

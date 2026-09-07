@@ -566,7 +566,7 @@ export class TournamentOperationsBoardService {
       const revisionId = row.game?.currentOfficialRevisionId ?? null;
       const escalationSummary =
         (row.game !== null ? escalationSummaryMap.get(row.game.id) : undefined) ?? {
-          overdue: false,
+          overdueAtMs: null,
           maxVersion: 0,
           maxUpdatedAtMs: 0,
         };
@@ -581,9 +581,6 @@ export class TournamentOperationsBoardService {
       if (row.game?.currentOfficialRevision?.missingScorer === true) {
         warnings.push('MISSING_SCORER');
       }
-      if (escalationSummary.overdue) {
-        warnings.push('RESULT_REVIEW_OVERDUE');
-      }
 
       // Time-relative: additionally a function of `now` -- deliberately kept OUT of `warnings`
       // above and surfaced only via the separate `liveWarnings` array below.
@@ -591,6 +588,13 @@ export class TournamentOperationsBoardService {
       // 같은 이유로 리그에서는 스태프 커버리지 경고도 내지 않는다 — 두 판정 경로(필드 배정 ·
       // 대진 스코프) 모두 리그 행을 **구조적으로** 맞출 수 없다. `LINEUP_NOT_SUBMITTED` 는
       // 게임 축이라 두 종류에 똑같이 걸리므로 그대로 둔다.
+      // **기한이 실제로 지났을 때만** 낸다. 예전엔 stable 쪽에서 "열린 에스컬레이션 행이
+      // 있는가" 만 봐서, 그 행이 제출 즉시 만들어지는 탓에 **제출되는 순간 참**이 됐다
+      // (alpha 실측: 종료 수 초 뒤, 예정일이 미래인 경기에도 "검토 기한 초과").
+      // 시계를 읽으므로 stable 일 수 없다 — `liveWarnings` 가 정확히 그 용도다.
+      if (escalationSummary.overdueAtMs !== null && escalationSummary.overdueAtMs <= now.getTime()) {
+        liveWarnings.push('RESULT_REVIEW_OVERDUE');
+      }
       if (!row.isLeague && !this.isStaffCovered(row.id, row.fieldId, staffCoverageResult)) {
         liveWarnings.push('NO_STAFF_ASSIGNED');
       }
@@ -835,18 +839,21 @@ export class TournamentOperationsBoardService {
   private async escalationSummaryByGameId(
     tx: Tx,
     gameIds: readonly string[],
-  ): Promise<Map<string, { overdue: boolean; maxVersion: number; maxUpdatedAtMs: number }>> {
-    const summary = new Map<string, { overdue: boolean; maxVersion: number; maxUpdatedAtMs: number }>();
+  ): Promise<Map<string, { overdueAtMs: number | null; maxVersion: number; maxUpdatedAtMs: number }>> {
+    const summary = new Map<string, { overdueAtMs: number | null; maxVersion: number; maxUpdatedAtMs: number }>();
     if (gameIds.length === 0) return summary;
     const rows = await tx.$queryRaw<
-      { gameId: string; overdue: boolean; maxVersion: number; maxUpdatedAt: Date }[]
+      { gameId: string; overdueAt: Date | null; maxVersion: number; maxUpdatedAt: Date }[]
     >`
       SELECT
         r.game_id AS "gameId",
-        bool_or(
-          e.status = 'PENDING'::"V1EscalationStatus"
-          OR e.status = 'ACKNOWLEDGED'::"V1EscalationStatus"
-        ) AS overdue,
+        -- 가장 이른 기한만 돌려준다. 지났는지 판정은 호출부가 now 와 비교한다 --
+        -- 그래야 이 쿼리가 시계를 읽지 않고, 응답의 stable 부분도 깨끗하게 남는다.
+        -- (SQL 템플릿 안에서는 백틱을 쓰지 않는다 -- 템플릿 리터럴이 끊긴다.)
+        MIN(e.due_at) FILTER (
+          WHERE e.status = 'PENDING'::"V1EscalationStatus"
+             OR e.status = 'ACKNOWLEDGED'::"V1EscalationStatus"
+        ) AS "overdueAt",
         MAX(e.version) AS "maxVersion",
         MAX(e.updated_at) AS "maxUpdatedAt"
       FROM v1_result_escalations e
@@ -856,7 +863,7 @@ export class TournamentOperationsBoardService {
     `;
     for (const row of rows) {
       summary.set(row.gameId, {
-        overdue: row.overdue,
+        overdueAtMs: row.overdueAt === null ? null : row.overdueAt.getTime(),
         maxVersion: row.maxVersion,
         maxUpdatedAtMs: row.maxUpdatedAt.getTime(),
       });

@@ -373,7 +373,12 @@ describe('RealtimeGateway', () => {
 
       await expect(
         task8Gateway().subscribeToGame(socket, { gameId: GAME_SCOPE.gameId, afterSequence: 0 }),
-      ).resolves.toEqual({ status: 'denied', code: 'STAFF_SCOPE_DENIED' });
+      ).resolves.toEqual({
+        status: 'denied',
+        code: 'STAFF_SCOPE_DENIED',
+        // **재접속하면 풀리는 원인** — 진짜 권한 거부와 구분돼야 화면이 재시도를 열 수 있다.
+        reason: 'AUTHORIZATION_SUBJECT_STALE',
+      });
 
       expect(gamesService.listEvents).not.toHaveBeenCalled();
       expect(socket.join).not.toHaveBeenCalledWith(`game:${GAME_SCOPE.gameId}`);

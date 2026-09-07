@@ -359,8 +359,8 @@ let v1TeamMatchLineupFixture: V1TeamMatchLineup = {
   formation: '2-2',
   publicLineupAt: null,
   starters: [
-    { id: 'participant-1', displayName: '김도윤', jerseyNumber: 7, position: 'FW', goalkeeper: false, positionX: 30, positionY: 60 },
-    { id: 'participant-2', displayName: '박서준', jerseyNumber: 1, position: 'GK', goalkeeper: true, positionX: 50, positionY: 6 },
+    { id: 'participant-1', userId: 'user-1', displayName: '김도윤', jerseyNumber: 7, position: 'FW', goalkeeper: false, positionX: 30, positionY: 60 },
+    { id: 'participant-2', userId: 'user-2', displayName: '박서준', jerseyNumber: 1, position: 'GK', goalkeeper: true, positionX: 50, positionY: 6 },
   ],
   bench: [{ id: 'participant-3', displayName: '이하늘', jerseyNumber: 11 }],
 };
@@ -1226,7 +1226,14 @@ export const v1MswHandlers = [
         ? body.participants
         : [...(body.starters ?? []), ...(body.bench ?? [])]
       ).map((participant, index) => ({
-        id: participant.userId ?? `guest-participant-${index + 1}`,
+        // **`id` 는 `V1GameParticipant.id` 이고 `userId` 와 별개다.** 예전 mock 은 여기에
+        // `userId` 를 그대로 넣어, `participantId` 를 `userId` 로 잘못 다루는 코드가
+        // 있어도 테스트가 통과했다(결과 입력 폼의 골·카드 귀속이 그 값을 쓴다).
+        // 두 값이 절대 같지 않도록 접두어를 붙여 갈라 둔다.
+        id: `participant-${index + 1}`,
+        // 서버와 같다: 저장 요청이 실어 보낸 사람 연결을 응답이 그대로 되돌려준다.
+        // 게스트는 계정이 없으므로 null.
+        userId: participant.userId ?? null,
         displayName: participant.displayName ?? '이름 미확인',
         jerseyNumber: participant.jerseyNumber ?? null,
         position: participant.position ?? null,

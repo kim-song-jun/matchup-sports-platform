@@ -1,4 +1,5 @@
 import { ForbiddenException, HttpException, Inject } from '@nestjs/common';
+import type { TournamentStaffRuntimeDenialReason } from '../tournaments/staff/tournament-staff-access.service';
 import { createHash } from 'node:crypto';
 import {
   ConnectedSocket,
@@ -130,7 +131,43 @@ type GameSubscriptionResult =
       readonly snapshot: GameSnapshot;
     }
   | { readonly status: 'unsubscribed'; readonly room: string }
-  | { readonly status: 'denied'; readonly code: 'STAFF_SCOPE_DENIED' | 'VALIDATION_ERROR' };
+  | {
+      readonly status: 'denied';
+      readonly code: 'STAFF_SCOPE_DENIED' | 'VALIDATION_ERROR';
+      readonly reason?: StaffDenialReason;
+    };
+
+/**
+ * **`STAFF_SCOPE_DENIED` 하나에 구조적으로 다른 원인이 겹쳐 있었다.**
+ *
+ * 같은 코드가 ① 세션 미확립 ② 인가 주체 버전 불일치 ③ 정책 거부(배정 없음·범위 밖 …)
+ * ④ 대상 없음(존재를 감추려 일부러 같은 코드로 낸다) 에 모두 쓰인다. 그래서 화면이
+ * **재접속하면 풀리는 것**과 **진짜 권한 거부**를 구분하지 못했다 — 버전 불일치인데
+ * "다시 시도" 버튼이 숨고, 문구는 버전 불일치 쪽 설명이라 진짜 거부에는 틀린 안내가 나갔다.
+ *
+ * **코드를 새로 만들지 않는다.** 소비처 둘이 코드로 분기하고 있어서(재시도 가능 목록 ·
+ * 사용자 문구 매핑) 새 코드를 내면 **모르는 코드**로 떨어져 재시도 가능으로 오분류되고
+ * 문구가 빠진다. 그래서 **`reason` 을 더한다(additive)** — 계약은 그대로다.
+ *
+ * REST 는 이미 원인을 구분해 보낸다(`details.reason`). ack 만 못 보내고 있었다.
+ */
+type StaffDenialReason =
+  | TournamentStaffRuntimeDenialReason
+  /** 인가 주체 버전이 어긋났다 — **재접속하면 풀린다.** 권한이 없어진 것이 아니다. */
+  | 'AUTHORIZATION_SUBJECT_STALE'
+  /** 소켓에 확립된 세션이 없다(또는 신원이 어긋났다). 재로그인·재연결이 답이다. */
+  | 'SESSION_NOT_AUTHENTICATED';
+
+/** 정책이 `ForbiddenException` 에 실어 보낸 원인. 형태가 다르면 `undefined` 로 둔다. */
+function staffDenialReasonOf(error: unknown): TournamentStaffRuntimeDenialReason | undefined {
+  if (!(error instanceof ForbiddenException)) return undefined;
+  const response = error.getResponse();
+  if (!isRecord(response)) return undefined;
+  const details = response.details;
+  if (!isRecord(details)) return undefined;
+  const reason = details.reason;
+  return typeof reason === 'string' ? (reason as TournamentStaffRuntimeDenialReason) : undefined;
+}
 
 type GameEventCommandPayload = {
   readonly gameId: string;
@@ -162,6 +199,7 @@ type GameTakeoverResult =
   | ({ readonly status: 'granted' } & GameTakeoverGrantResult)
   | {
       readonly status: 'denied';
+      readonly reason?: StaffDenialReason;
       readonly code:
         | 'STAFF_SCOPE_DENIED'
         | 'TAKEOVER_TOKEN_EXPIRED'
@@ -198,6 +236,12 @@ type GameProtocolResult =
       readonly code: string;
       readonly clientEventId?: string;
       readonly expectedVersion?: number;
+      /**
+       * 거부 원인. 큐가 재시도할지(재접속하면 풀린다) 포기할지(권한이 없다)를
+       * 가르는 값이라, 구독·takeover ack 에만 실으면 정작 큐가 가장 자주 만나는
+       * 이 경로에서 값을 못 받는다.
+       */
+      readonly reason?: StaffDenialReason;
       /** `VALIDATION_ERROR`에서만 채워진다. */
       readonly validation?: FieldValidationFailure;
     };
@@ -354,7 +398,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     const userId = client.data.userId;
     const authUser = client.data.authUser;
     if (userId === undefined || authUser === undefined || authUser.id !== userId) {
-      return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+      return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'SESSION_NOT_AUTHENTICATED' };
     }
 
     const game = await this.prisma.v1Game.findUnique({
@@ -370,6 +414,8 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       },
     });
     if (game === null) {
+      // **여기는 `reason` 을 일부러 비운다** — 대상이 없다는 사실 자체를 감추려고
+      // 권한 거부와 같은 코드로 낸다. 원인을 붙이면 그 감춤이 무의미해진다.
       return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
     }
 
@@ -389,7 +435,8 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
           principal.assignmentVersion !== null &&
           client.data.authorizationSubjectVersion !== principal.assignmentVersion
         ) {
-          return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+          // **재접속하면 풀린다** — 권한이 없어진 것이 아니다.
+          return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'AUTHORIZATION_SUBJECT_STALE' };
         }
       }
       const backfill = await this.gamesService.listEvents(authUser, input.gameId, input.afterSequence);
@@ -417,7 +464,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       };
     } catch (error) {
       if (error instanceof ForbiddenException) {
-        return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+        return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: staffDenialReasonOf(error) };
       }
       throw error;
     }
@@ -483,6 +530,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         client,
         {
           code: 'STAFF_SCOPE_DENIED',
+          reason: 'SESSION_NOT_AUTHENTICATED',
           clientEventId: input.clientEventId,
           expectedVersion: input.expectedVersion,
         },
@@ -525,6 +573,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         client,
         {
           code: 'STAFF_SCOPE_DENIED',
+          reason: 'SESSION_NOT_AUTHENTICATED',
           clientEventId: input.clientEventId,
           expectedVersion: input.rebasedExpectedVersion,
         },
@@ -567,13 +616,13 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     }
     const authUser = authenticatedSocketUser(client);
     if (authUser === null) {
-      return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+      return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'SESSION_NOT_AUTHENTICATED' };
     }
     // Mirrors game.subscribe's staleness gate: a connection whose cached
     // authorization-subject version no longer matches the version it is
     // presenting must re-establish its session rather than take over a game.
     if (client.data.authorizationSubjectVersion !== input.authorizationSubjectVersion) {
-      return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+      return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'AUTHORIZATION_SUBJECT_STALE' };
     }
     try {
       const grant = await this.gamesService.requestTakeover(authUser, input.gameId, {
@@ -584,7 +633,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       return { status: 'granted', ...grant };
     } catch (error) {
       if (error instanceof ForbiddenException) {
-        return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+        return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: staffDenialReasonOf(error) };
       }
       throw error;
     }
@@ -601,7 +650,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     }
     const authUser = authenticatedSocketUser(client);
     if (authUser === null) {
-      return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+      return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'SESSION_NOT_AUTHENTICATED' };
     }
     try {
       const grant = await this.gamesService.renewTakeover(authUser, input.gameId, {
@@ -614,7 +663,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       if (error instanceof ForbiddenException) {
         const response = error.getResponse();
         if (isRecord(response) && response.code === 'PERMISSION_DENIED') {
-          return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+          return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: staffDenialReasonOf(error) };
         }
         // `GamesService.renewTakeover` always throws `TAKEOVER_TOKEN_EXPIRED`
         // here regardless of WHY the underlying `GameTakeoverService.renew`
@@ -648,7 +697,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     }
     const userId = client.data.userId;
     if (userId === undefined) {
-      return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+      return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'SESSION_NOT_AUTHENTICATED' };
     }
 
     const room = gameRoom(input.gameId);

@@ -960,6 +960,28 @@ export class GamesService {
 
   /** 푸시 발송 실패 기록용. 이 클래스에는 주입 로거가 없어 지역 인스턴스를 쓴다. */
   private readonly pushLogger = new Logger(`${GamesService.name}:push`);
+  /**
+   * **`started` 삭제 조건을 측정하는 로거(#33).**
+   *
+   * 그 필드는 저장 경로에서 **무시되지만** DTO 에서 지우면 안 된다 — `ValidationPipe` 가
+   * `forbidNonWhitelisted: true` 라 모르는 속성을 조용히 떼는 게 아니라 **400 을 던진다.**
+   * 즉 지우는 순간 아직 그 값을 보내는 옛 클라이언트(번들 web 자산을 든 설치본 포함)의
+   * 라인업/결과 저장이 통째로 막힌다.
+   *
+   * DTO 주석이 삭제 조건을 "프론트 갱신 + alpha 미전송 확인" 으로 적어 뒀는데 **두 번째는
+   * 코드로 못 닫는다.** 그래서 실제로 실려 오면 여기서 남긴다 — 이 로그가 일정 기간
+   * 0건이면 그때가 지울 때다. **동작은 하나도 바뀌지 않는다(값은 여전히 무시된다).**
+   */
+  private readonly legacyFieldLogger = new Logger(`${GamesService.name}:legacy-field`);
+
+  /** 무시되는 `started` 가 실제로 실려 왔는지만 센다. 값 자체는 쓰지 않는다. */
+  private countLegacyStarted(where: string, participants: ReadonlyArray<{ started?: boolean }>): void {
+    const sent = participants.filter((participant) => participant.started !== undefined).length;
+    if (sent === 0) return;
+    this.legacyFieldLogger.warn(
+      `${where}: 'started' 가 ${sent}건 실려 왔다 — 이 값은 무시된다. #33 삭제 조건 측정용.`,
+    );
+  }
 
   async createFromSourceInTransaction(
     tx: Prisma.TransactionClient,
@@ -2601,6 +2623,7 @@ export class GamesService {
     headerIdempotencyKey: string | undefined,
     dto: SaveGameLineupDto,
   ) {
+    this.countLegacyStarted('saveLineup', dto.participants ?? []);
     return this.withCommand(
       {
         gameId,

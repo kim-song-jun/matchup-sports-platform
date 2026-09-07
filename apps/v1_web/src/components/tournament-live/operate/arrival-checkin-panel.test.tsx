@@ -8,12 +8,12 @@ import type { GameLineup, GameLineupParticipant, GameSide } from '@/types/game-o
 // 대한 확인이 어려움". 스태프는 제출된 명단을 들고 육안·구두로만 확인했고 결과가
 // 어디에도 남지 않았다.
 //
-// 이 패널이 지켜야 하는 계약의 핵심은 **축이 둘**이라는 것이다 —
-//   started  = 팀이 제출한 계획(선발/후보)
-//   arrivedAt = 현장에서 확인한 사실(도착/미확인)
-// 회고가 지목한 사람은 "선발로 제출됐는데 안 온 사람"이라, 둘을 한 축으로 합치면
-// 그 상태가 화면에서 사라진다. 아래 테스트는 그 조합이 실제로 구분돼 보이는지와
-// 토글이 올바른 방향(현재 상태의 반대)으로 나가는지를 본다.
+// 이 패널의 계약은 **축이 하나**다 — `arrivedAt` = 현장에서 확인한 사실(도착/미확인).
+//
+// 예전엔 `started`(선발/후보)를 두 번째 축으로 그렸다. **정본 §3 이 "명단 = 출전자,
+// 선후발 없음" 으로 확정하면서 그 축이 사라졌고**, 지금은 `started` 가 전원 true 라 그
+// 배지는 모두에게 "선발" 을 찍는 정보 없는 라벨이었다(2026-09-06 alpha 실측).
+// 회고가 지목한 사람("명단에 있는데 안 온 사람")은 남은 한 축으로 그대로 표현된다.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function side(id: string, name: string): GameSide {
@@ -69,24 +69,29 @@ function lineup(participants: GameLineupParticipant[], overrides: Partial<GameLi
 const SIDES = [side('side-home', '홈팀')];
 
 describe('ArrivalCheckinPanel — 명단 검인', () => {
-  it('선발/후보와 도착/미확인을 서로 다른 축으로 함께 보여준다 (선발인데 안 온 사람이 드러나야 한다)', () => {
+  it('도착/미확인만 보여준다 — 선발/후보 축은 정본에서 사라졌다', () => {
     render(
       <ArrivalCheckinPanel
         sides={SIDES}
         lineups={[
           lineup([
             participant({ id: 'p-1', displayNameSnapshot: '홍길동', started: true, arrivedAt: null }),
-            participant({ id: 'p-2', displayNameSnapshot: '김후보', started: false, arrivedAt: '2026-08-23T01:00:00.000Z' }),
+            participant({ id: 'p-2', displayNameSnapshot: '김철수', started: false, arrivedAt: '2026-08-23T01:00:00.000Z' }),
           ]),
         ]}
         onToggleArrival={vi.fn()}
       />,
     );
 
-    // 회고가 지목한 사람: 선발로 제출됐는데 아직 안 온 사람. 두 축이 한 줄에 함께 보여야 한다.
-    expect(screen.getByText('선발 · 미확인')).toBeInTheDocument();
-    // 반대 조합(후보인데 도착)도 구분돼야 한다 — 한 축으로 합쳤다면 둘 중 하나는 표현 불가다.
-    expect(screen.getByText('후보 · 도착')).toBeInTheDocument();
+    // 회고가 지목한 사람("명단에 있는데 안 온 사람")은 이 한 축으로 그대로 드러난다.
+    expect(screen.getByText('미확인')).toBeInTheDocument();
+    expect(screen.getByText('도착')).toBeInTheDocument();
+    // **"선발"·"후보" 는 화면 어디에도 없어야 한다** — `started` 가 전원 true 라
+    // 그 라벨은 정보를 주지 않으면서 정본이 없앤 축을 되살린다.
+    // 픽스처 이름에 그 단어가 들어가면 이 단언이 이름에 걸린다 — 그래서 이름을
+    // 축과 무관하게 지었다('김철수' → '김철수').
+    expect(document.body.textContent).not.toContain('선발');
+    expect(document.body.textContent).not.toContain('후보');
   });
 
   it('진행 상황을 숫자로 집계해 보여준다', () => {
@@ -96,7 +101,7 @@ describe('ArrivalCheckinPanel — 명단 검인', () => {
         lineups={[
           lineup([
             participant({ id: 'p-1', displayNameSnapshot: '홍길동', arrivedAt: '2026-08-23T01:00:00.000Z' }),
-            participant({ id: 'p-2', displayNameSnapshot: '김후보' }),
+            participant({ id: 'p-2', displayNameSnapshot: '김철수' }),
             participant({ id: 'p-3', displayNameSnapshot: '박선수' }),
           ]),
         ]}
@@ -115,7 +120,7 @@ describe('ArrivalCheckinPanel — 명단 검인', () => {
         lineups={[
           lineup([
             participant({ id: 'p-1', displayNameSnapshot: '홍길동', arrivedAt: null }),
-            participant({ id: 'p-2', displayNameSnapshot: '김후보', arrivedAt: '2026-08-23T01:00:00.000Z' }),
+            participant({ id: 'p-2', displayNameSnapshot: '김철수', arrivedAt: '2026-08-23T01:00:00.000Z' }),
           ]),
         ]}
         onToggleArrival={onToggleArrival}
@@ -125,7 +130,7 @@ describe('ArrivalCheckinPanel — 명단 검인', () => {
     fireEvent.click(screen.getByRole('switch', { name: /홍길동/ }));
     expect(onToggleArrival).toHaveBeenLastCalledWith({ participantId: 'p-1', arrived: true });
 
-    fireEvent.click(screen.getByRole('switch', { name: /김후보/ }));
+    fireEvent.click(screen.getByRole('switch', { name: /김철수/ }));
     expect(onToggleArrival).toHaveBeenLastCalledWith({ participantId: 'p-2', arrived: false });
   });
 
@@ -164,7 +169,7 @@ describe('ArrivalCheckinPanel — 명단 검인', () => {
   it('제출된 명단이 없으면 검인 대상이 없다고 알린다', () => {
     render(<ArrivalCheckinPanel sides={SIDES} lineups={[]} onToggleArrival={vi.fn()} />);
 
-    expect(screen.getByText('제출된 선발 명단이 없어 검인할 대상이 없어요.')).toBeInTheDocument();
+    expect(screen.getByText('제출된 명단이 없어 검인할 대상이 없어요.')).toBeInTheDocument();
   });
 
   /**
@@ -214,7 +219,7 @@ describe('ArrivalCheckinPanel — 명단 검인', () => {
         lineups={[
           lineup([
             participant({ id: 'p-1', displayNameSnapshot: '홍길동' }),
-            participant({ id: 'p-2', displayNameSnapshot: '김후보' }),
+            participant({ id: 'p-2', displayNameSnapshot: '김철수' }),
           ]),
         ]}
         onToggleArrival={vi.fn()}
@@ -223,6 +228,6 @@ describe('ArrivalCheckinPanel — 명단 검인', () => {
     );
 
     expect(screen.getByRole('switch', { name: /홍길동/ })).toBeDisabled();
-    expect(screen.getByRole('switch', { name: /김후보/ })).not.toBeDisabled();
+    expect(screen.getByRole('switch', { name: /김철수/ })).not.toBeDisabled();
   });
 });

@@ -84,7 +84,10 @@ export function LineupTodoCard({ enabled = true }: { enabled?: boolean }) {
                       잘라내거나 고정 라벨로 바꾸지 않는다. 주차는 서버가 킥오프 시각에서
                       매번 파생하므로(재일정돼도 다른 리그 화면과 어긋나지 않는다) 여기서
                       다시 계산하지도 않는다. */}
-                  <span className="tm-text-label" style={{ fontWeight: 700 }}>
+                  {/* 행 제목이 바로 아래 메타(tm-text-caption 12px)와 1px 차이였다 —
+                      크기로 위계를 내지 못해 굵기(700)로 때우던 자리라, 홈 카드 제목과
+                      같은 tm-text-card-title(15px/600)로 옮긴다(DESIGN.md §2.1). */}
+                  <span className="tm-text-card-title">
                     {todo.title}
                   </span>
                   <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>

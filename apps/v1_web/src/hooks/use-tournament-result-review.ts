@@ -145,10 +145,8 @@ export type TournamentGameDetail = {
   isKnockoutFixture: boolean;
 };
 
-export type TournamentOperationsBoardWarning =
-  | 'NO_FIELD_ASSIGNED'
-  | 'MISSING_SCORER'
-  | 'RESULT_REVIEW_OVERDUE';
+/** 안정 스냅샷에 실리는 경고. `RESULT_REVIEW_OVERDUE` 는 시계 의존이라 `liveWarnings` 로 온다. */
+export type TournamentOperationsBoardWarning = 'NO_FIELD_ASSIGNED' | 'MISSING_SCORER';
 
 export type TournamentOperationsBoardItem = {
   fixtureId: string;

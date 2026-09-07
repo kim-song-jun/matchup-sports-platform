@@ -57,13 +57,24 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
     [tournament.data?.leagueFixtures],
   );
 
+  /* `RESULT_REVIEW_OVERDUE` 는 **`liveWarnings` 로 온다** — 판정이 `due_at <= now()` 라
+     시계 의존이고, 안정 스냅샷에 넣으면 그 스냅샷이 시계에 물든다. 예전엔 stable 쪽에서
+     "열린 에스컬레이션 행이 있는가" 만 봐서 **결과 제출 즉시 참**이 됐다. */
+  const overdueFixtureIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const live of boardQuery.data?.liveWarnings ?? []) {
+      if (live.warnings.includes('RESULT_REVIEW_OVERDUE')) ids.add(live.fixtureId);
+    }
+    return ids;
+  }, [boardQuery.data]);
+
   const needsReview = useMemo(
     () =>
       (boardQuery.data?.items ?? []).filter(
         (item): item is TournamentOperationsBoardItem & { gameId: string } =>
-          item.gameId !== null && (item.revisionId === null || item.warnings.includes('RESULT_REVIEW_OVERDUE')),
+          item.gameId !== null && (item.revisionId === null || overdueFixtureIds.has(item.fixtureId)),
       ),
-    [boardQuery.data],
+    [boardQuery.data, overdueFixtureIds],
   );
 
   const selectedItem = needsReview.find((item) => item.fixtureId === selectedFixtureId) ?? null;

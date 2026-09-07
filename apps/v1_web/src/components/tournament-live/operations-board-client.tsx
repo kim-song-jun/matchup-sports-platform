@@ -45,10 +45,11 @@ const GAME_STATE_FILTER_LABELS: Record<V1GameState, string> = {
 
 // 필터 라벨과 배지 라벨이 다르면 "필터를 걸었는데 다른 이름의 행만 나온다"로 읽힌다 —
 // 배지와 같은 출처(WARNING_LABELS)를 쓴다.
+// `RESULT_REVIEW_OVERDUE` 는 여기 없다 — 시계 의존으로 옮겨져 서버가 `?warning=` 필터로는
+// 받지 않는다(400). 배지로는 계속 보인다.
 const WARNING_FILTER_LABELS: Record<V1TournamentStableWarningCode, string> = {
   NO_FIELD_ASSIGNED: WARNING_LABELS.NO_FIELD_ASSIGNED,
   MISSING_SCORER: WARNING_LABELS.MISSING_SCORER,
-  RESULT_REVIEW_OVERDUE: WARNING_LABELS.RESULT_REVIEW_OVERDUE,
 };
 
 function readFilter<T extends string>(value: string | null, allowed: readonly T[]): T | undefined {

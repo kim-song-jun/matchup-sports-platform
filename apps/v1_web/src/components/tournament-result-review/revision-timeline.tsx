@@ -21,6 +21,17 @@ function scoreText(score: GameResultRevision['score']): string {
  * and diff" for the read side of that requirement (the write side is
  * `ResultEditModal`'s own diff summary).
  */
+/**
+ * 그 리비전의 **배지에 해당하는 시각**.
+ *
+ * `OFFICIAL` 이면 확정 시각(`officialAt`), 그 밖에는 제출 시각, 제출 전이면 생성 시각.
+ * 값이 비면 한 단계씩 물러난다 — 옛 데이터에 `officialAt` 이 없을 수 있다.
+ */
+function timestampFor(revision: GameResultRevision): string {
+  if (revision.state === 'OFFICIAL' && revision.officialAt !== null) return revision.officialAt;
+  return revision.submittedAt ?? revision.createdAt;
+}
+
 export function RevisionTimeline({ revisions }: { revisions: readonly GameResultRevision[] }) {
   const byId = new Map(revisions.map((revision) => [revision.id, revision]));
 
@@ -46,9 +57,11 @@ export function RevisionTimeline({ revisions }: { revisions: readonly GameResult
                   이력의 날짜가 알파 실측에서 지적됐다. 한 단계 위 캡션
                   토큰으로 교체. */}
               <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
-                {revision.submittedAt
-                  ? formatAdminDateTime(revision.submittedAt)
-                  : formatAdminDateTime(revision.createdAt)}
+                {/* **배지가 말하는 시각을 보여준다.** 예전엔 상태와 무관하게 `submittedAt`
+                    만 썼다 — 그래서 "공식 확정" 배지 옆에 **제출 시각**이 뜨고 정작
+                    **확정 시각은 화면 어디에도 없었다**(`officialAt` 참조가 이 파일에 0건).
+                    운영자가 "언제 확정됐나" 를 이 화면에서 답할 수 없었다. */}
+                {formatAdminDateTime(timestampFor(revision))}
               </span>
             </div>
             <p className="tab-num" style={{ fontSize: 20, fontWeight: 700, marginTop: 8, color: 'var(--text-strong)' }}>

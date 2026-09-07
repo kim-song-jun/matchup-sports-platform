@@ -87,6 +87,8 @@ export function ReviewsPageView({
                   onPeriodChange={onTeamPeriodChange}
                   loading={teamSummaryLoading}
                   title="내 팀이 받은 리뷰 요약"
+                  // 팀 요약의 개수는 **리뷰 수가 아니라 리뷰를 남긴 팀 수**다(팀 단위 평균).
+                  countUnit="팀"
                 />
               ) : null}
             </div>

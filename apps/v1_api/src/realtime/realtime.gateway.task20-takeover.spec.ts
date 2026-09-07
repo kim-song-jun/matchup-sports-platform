@@ -125,7 +125,12 @@ describe('Task 20 game-operations takeover realtime protocol', () => {
       lastSequence: 0,
     });
 
-    expect(result).toEqual({ status: 'denied', code: 'STAFF_SCOPE_DENIED' });
+    // **원인이 구분돼야 한다** — 버전 불일치는 재접속하면 풀린다(권한 상실이 아니다).
+    expect(result).toEqual({
+      status: 'denied',
+      code: 'STAFF_SCOPE_DENIED',
+      reason: 'AUTHORIZATION_SUBJECT_STALE',
+    });
     expect(gamesService.requestTakeover).not.toHaveBeenCalled();
   });
 
@@ -148,7 +153,11 @@ describe('Task 20 game-operations takeover realtime protocol', () => {
       lastSequence: 0,
     });
 
-    expect(result).toEqual({ status: 'denied', code: 'STAFF_SCOPE_DENIED' });
+    expect(result).toEqual({
+      status: 'denied',
+      code: 'STAFF_SCOPE_DENIED',
+      reason: 'SESSION_NOT_AUTHENTICATED',
+    });
     expect(gamesService.requestTakeover).not.toHaveBeenCalled();
   });
 

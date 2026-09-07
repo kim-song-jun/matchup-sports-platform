@@ -56,6 +56,14 @@ const ids = {
   openLeague: '6b000000-0000-4000-8000-000000000040',
   openPast: '6b000000-0000-4000-8000-000000000041',
   openNext: '6b000000-0000-4000-8000-000000000042',
+  // 카드가 **나중 경기**에 있는 리그 — 정렬만 뒤집혀도 갈리는 자리다.
+  futureCardLeague: '6b000000-0000-4000-8000-000000000050',
+  futureCardEarly: '6b000000-0000-4000-8000-000000000051',
+  futureCardLate: '6b000000-0000-4000-8000-000000000052',
+  // 카드가 **공식 확정본**에 있는 리그 — SUBMITTED 폴백과 무관하게 걸려야 한다.
+  officialLeague: '6b000000-0000-4000-8000-000000000060',
+  officialPast: '6b000000-0000-4000-8000-000000000061',
+  officialNext: '6b000000-0000-4000-8000-000000000062',
 } as const;
 
 const prisma = new PrismaService();
@@ -154,6 +162,25 @@ describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 �
       pastMatchId: ids.openPast,
       nextMatchId: ids.openNext,
     });
+    await seedLeague({
+      leagueId: ids.officialLeague,
+      title: '공식본 리그',
+      redCardSuspensionMatches: 1,
+      pastMatchId: ids.officialPast,
+      nextMatchId: ids.officialNext,
+      officializeCardedResult: true,
+    });
+    await seedLeague({
+      leagueId: ids.futureCardLeague,
+      title: '나중 경기에 카드가 있는 리그',
+      redCardSuspensionMatches: 1,
+      // **두 경기 모두 미래다.** 카드는 나중 경기에 있고, 제출하는 것은 앞선 경기다 --
+      // 순서를 제대로 세면 그 카드는 "아직 치르지 않은 경기" 라 판정에 쓰이지 않는다.
+      pastMatchId: ids.futureCardEarly,
+      nextMatchId: ids.futureCardLate,
+      bothFuture: true,
+      cardOnSecondFixture: true,
+    });
   });
 
   afterAll(async () => {
@@ -166,6 +193,12 @@ describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 �
     redCardSuspensionMatches: number | null;
     pastMatchId: string;
     nextMatchId: string;
+    /** 두 경기를 모두 미래로 둔다 — 앞선 경기를 실제로 제출할 수 있어야 할 때. */
+    bothFuture?: boolean;
+    /** 카드를 첫 경기가 아니라 **둘째 경기**에 심는다. */
+    cardOnSecondFixture?: boolean;
+    /** 카드가 실린 리비전을 공식 확정본으로 올린다(SUBMITTED 폴백과 분리해서 재려고). */
+    officializeCardedResult?: boolean;
   }) {
     await prisma.v1Tournament.create({
       data: {
@@ -184,8 +217,10 @@ describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 �
 
     // 지난 경기는 과거, 다음 경기는 미래 — 정지 판정의 기준틀이 경기 순서이므로
     // `leagueFixtureListOrder()`(startAt → id)가 실제로 이 순서를 내야 한다.
-    const pastStartAt = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-    const nextStartAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const pastStartAt = input.bothFuture === true
+      ? new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
+      : new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    const nextStartAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
     await prisma.v1TeamMatch.createMany({
       data: [input.pastMatchId, input.nextMatchId].map((id, index) => ({
         id,
@@ -222,11 +257,14 @@ describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 �
       await prisma.$transaction((tx) => games.createFromSourceInTransaction(tx, creation, context));
     }
 
-    await seedRedCardResult(input.pastMatchId);
+    await seedRedCardResult(
+      input.cardOnSecondFixture === true ? input.nextMatchId : input.pastMatchId,
+      input.officializeCardedResult === true,
+    );
   }
 
   /** 지난 경기에 "레드카드 1장" 제출본을 심는다 — **공식 확정본이 아니라 SUBMITTED 다.** */
-  async function seedRedCardResult(teamMatchId: string) {
+  async function seedRedCardResult(teamMatchId: string, officialize: boolean) {
     const game = await prisma.v1Game.findUniqueOrThrow({
       where: { teamMatchId },
       select: { id: true, sides: { select: { id: true, sideKey: true } }, lineups: { select: { id: true, sideId: true } } },
@@ -270,6 +308,16 @@ describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 �
       where: { id: revision.id },
       data: { state: 'SUBMITTED', submittedAt: new Date() },
     });
+    if (officialize) {
+      await prisma.v1GameResultRevision.update({
+        where: { id: revision.id },
+        data: { state: 'OFFICIAL', officialAt: new Date() },
+      });
+      await prisma.v1Game.update({
+        where: { id: game.id },
+        data: { currentOfficialRevisionId: revision.id },
+      });
+    }
   }
 
   async function saveNextLineup(teamMatchId: string, idempotencyKey: string) {
@@ -314,6 +362,66 @@ describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 �
       { expectedVersion: saved.revision },
     );
     expect(submitted.state).toBe('SUBMITTED');
+  });
+
+  /**
+   * **아직 치르지 않은 경기의 카드는 세지 않는다.**
+   *
+   * 결과 정정 때문에 나중 경기의 카드가 먼저 들어오는 경우가 실제로 있다. 정지 판정의
+   * 기준틀은 "몇 번째 경기인가" 이므로, 리그 축 정렬(`leagueFixtureListOrder()` --
+   * `startAt` → `id`)이 흐트러지면 미래의 카드가 과거로 둔갑해 **아무 잘못 없는 선수가
+   * 막힌다.**
+   *
+   * 이 케이스가 따로 있는 이유: 다른 케이스들은 "가드가 안 돌았다"·"폴백이 없다"·"정렬이
+   * 뒤집혔다" 가 **전부 같은 테스트 하나**만 red 로 만들어 원인을 못 가른다. 여기는
+   * **정렬이 뒤집힐 때만** red 가 되므로 신호가 갈린다.
+   */
+  it('나중 경기의 카드는 앞선 경기 제출을 막지 않는다 (리그 축 정렬)', async () => {
+    const view = await lineups.getLineup(authUser(ids.hostOwner), ids.futureCardEarly);
+    const saved = await lineups.saveLineup(authUser(ids.hostOwner), ids.futureCardEarly, 'league-suspension-order-save', {
+      expectedVersion: view.version,
+      starters: [
+        { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
+        { userId: ids.clean, jerseyNumber: 2 },
+        { userId: ids.suspended, jerseyNumber: 3 },
+      ],
+      bench: [],
+    });
+
+    const submitted = await lineups.submitLineup(
+      authUser(ids.hostOwner),
+      ids.futureCardEarly,
+      'league-suspension-order-submit',
+      { expectedVersion: saved.revision },
+    );
+    expect(submitted.state).toBe('SUBMITTED');
+  });
+
+  /**
+   * 카드가 **공식 확정본**에 있어도 걸린다.
+   *
+   * 이 케이스는 `SUBMITTED` 폴백과 **독립적**이다 — 폴백을 지워도 공식본은 그대로 세므로
+   * 여기는 green 으로 남는다. 그래서 "가드가 안 돌았다"(둘 다 red)와 "폴백이 없다"(제출본
+   * 케이스만 red)를 가르는 두 번째 신호가 된다.
+   */
+  it('공식 확정본의 카드도 다음 경기 제출을 막는다', async () => {
+    const view = await lineups.getLineup(authUser(ids.hostOwner), ids.officialNext);
+    const saved = await lineups.saveLineup(authUser(ids.hostOwner), ids.officialNext, 'league-suspension-official-save', {
+      expectedVersion: view.version,
+      starters: [
+        { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
+        { userId: ids.clean, jerseyNumber: 2 },
+        { userId: ids.suspended, jerseyNumber: 3 },
+      ],
+      bench: [],
+    });
+
+    const rejected = await captureFailure(() =>
+      lineups.submitLineup(authUser(ids.hostOwner), ids.officialNext, 'league-suspension-official-submit', {
+        expectedVersion: saved.revision,
+      }),
+    );
+    expectHttpCode(rejected, 400, 'DISCIPLINE_SUSPENDED');
   });
 
   it('규정 수정은 첫 경기가 시작되면 잠긴다 — 시작 전에는 저장되고 상세에 그대로 보인다', async () => {

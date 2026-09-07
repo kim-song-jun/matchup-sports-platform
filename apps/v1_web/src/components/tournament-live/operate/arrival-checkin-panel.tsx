@@ -18,12 +18,13 @@ import { latestLineupForDisplay } from './lineup-grid';
  * 오조작이 생긴다. 검인은 킥오프 전 한 번, 이벤트 기록은 경기 내내 — 시점도 목적도
  * 달라 화면을 나눈다.
  *
- * 표시 축이 둘이라는 점이 이 화면의 핵심이다.
- *   - `started` = 팀이 **제출한 계획**(선발/후보)
- *   - `arrivedAt` = 현장에서 **확인한 사실**(도착/미확인)
- * 회고가 지목한 사람은 정확히 "선발로 제출됐는데 안 온 사람"이라, 둘을 한 축으로
- * 합치면 그 상태를 표현할 수 없다. 그래서 선발 여부는 배지로 두고 체크인은 별도
- * 토글로 그린다.
+ * **선발/후보 축은 없다(정본 §3).** 예전엔 `started` 를 "팀이 제출한 계획(선발/후보)" 으로
+ * 읽어 배지로 그렸는데, 정본이 **"명단 = 출전자, 선후발 없음"** 으로 확정하면서 그 축이
+ * 사라졌다. 지금은 명단에 오른 사람이 곧 출전자이고 `started` 는 **전원 true** 라, 그 배지는
+ * 모두에게 "선발" 을 찍는 **정보 없는 라벨**이었다(2026-09-06 alpha 실측).
+ *
+ * 남는 축은 하나다 — `arrivedAt` = 현장에서 **확인한 사실**(도착/미확인). 회고가 지목한
+ * 사람은 "명단에 있는데 안 온 사람" 이고, 그건 이 축 하나로 표현된다.
  */
 
 export interface ArrivalCheckinPanelProps {
@@ -58,7 +59,7 @@ export function ArrivalCheckinPanel({
     return (
       <div className="px-4">
         <p className="text-sm text-[var(--text-muted)]">
-          제출된 선발 명단이 없어 검인할 대상이 없어요.
+          제출된 명단이 없어 검인할 대상이 없어요.
         </p>
       </div>
     );
@@ -114,8 +115,6 @@ function ArrivalRow({
 }) {
   const checked = participant.arrivedAt !== null;
   const jersey = jerseyText(participant.jerseyNumber);
-  // 선발/후보는 회고가 지목한 "선발인데 안 온 사람"을 눈에 띄게 하려고 함께 보여준다.
-  const roleLabel = participant.started ? '선발' : '후보';
   return (
     <li>
       <button
@@ -124,7 +123,7 @@ function ArrivalRow({
         aria-checked={checked}
         // 컬러만으로 상태를 전달하지 않는다(프로젝트 접근성 규칙) — aria-label 에 상태를
         // 말로 담고, 화면에도 체크 표시와 "도착"/"미확인" 텍스트를 함께 둔다.
-        aria-label={`${participant.displayNameSnapshot} ${roleLabel} — ${checked ? '도착 확인됨, 누르면 취소' : '아직 미확인, 누르면 도착 확인'}`}
+        aria-label={`${participant.displayNameSnapshot} — ${checked ? '도착 확인됨, 누르면 취소' : '아직 미확인, 누르면 도착 확인'}`}
         disabled={disabled}
         onClick={onToggle}
         className={[
@@ -152,7 +151,7 @@ function ArrivalRow({
             {participant.displayNameSnapshot}
           </span>
           <span className="block text-xs text-[var(--text-muted)]">
-            {roleLabel} · {checked ? '도착' : '미확인'}
+            {checked ? '도착' : '미확인'}
           </span>
         </span>
       </button>

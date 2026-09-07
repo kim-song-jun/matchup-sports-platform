@@ -1979,40 +1979,6 @@ export function useV1LeagueRequestIdentityLink(leagueId: string, teamMatchId: st
 }
 
 /** 라인업 편집기가 쓰는 참가 등록 명단 — 대회 경기 라인업 선수의 유일한 출처. */
-export type V1FixtureLineupRoster = {
-  sideId: string;
-  registrationId: string;
-  players: Array<{
-    tournamentPlayerId: string;
-    userId: string;
-    name: string;
-    /** 팀이 지정한 고정 등번호(V1TeamMembership.jerseyNumber). 미지정이면 null. */
-    teamJerseyNumber: number | null;
-  }>;
-};
-
-export function useV1FixtureLineupRoster(
-  tournamentId: string,
-  fixtureId: string,
-  sideId: string | null,
-) {
-  return useQuery({
-    queryKey: v1Keys.fixtureLineupRoster(tournamentId, fixtureId, sideId ?? ''),
-    queryFn: () =>
-      v1Get<V1FixtureLineupRoster>(
-        `/tournaments/${tournamentId}/fixtures/${fixtureId}/lineup-roster?sideId=${encodeURIComponent(sideId ?? '')}`,
-      ),
-    enabled: Boolean(tournamentId) && Boolean(fixtureId) && Boolean(sideId),
-    retry: false,
-    // 편집 세션 동안 명단을 고정한다. 전역 기본값은 refetchOnWindowFocus: true(providers.tsx)인데,
-    // 라인업 화면은 이 명단으로 **한 번만** 상태를 수화하고 이후 그 상태를 편집한다 — 창을 잠깐
-    // 벗어난 사이 명단이 갱신되면 화면(로스터 기준으로 그린다)과 저장 대상(수화된 상태) 이 갈라져,
-    // 목록에서 사라진 선수가 저장 페이로드에는 그대로 실린다(등록 명단이 SSOT라는 이 화면의 전제가
-    // 조용히 깨진다). 명단을 고쳤다면 화면을 다시 여는 것이 맞다(Copilot 리뷰 지적).
-    refetchOnWindowFocus: false,
-  });
-}
-
 /** 불러오기 시트가 쓰는 한 명분 엔트리 — 히스토리와 프리셋이 같은 모양을 쓴다. */
 export type V1LineupSourceEntry = {
   userId: string | null;

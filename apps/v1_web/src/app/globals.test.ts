@@ -449,6 +449,9 @@ describe('틴트 지면 위 보조 텍스트 대비 — grey600 은 흰 배경�
     '.tm-weather-strip',
     '.tm-player-card-progress',
     '.tm-list-row',
+    '.tm-auth-profile-preview',
+    '.tm-auth-segmented',
+    '.tm-my-profile-head',
   ])('%s 는 보조 텍스트 토큰을 grey700 으로 올린다', (selector) => {
     expect(rulesDeclaring('--text-caption', 'var\\(--grey700\\)')).toContain(selector);
     expect(rulesDeclaring('--text-muted', 'var\\(--grey700\\)')).toContain(selector);
@@ -562,10 +565,21 @@ describe('인라인으로 지면 색을 까는 곳의 보조 텍스트 (.tm-on-t
   it.each([
     ['src/components/tournaments/pending-review-card.tsx', "background: 'var(--tint-blue)'"],
     ['src/app/tournaments/page.tsx', "background: 'var(--blue50)'"],
+    ['src/components/my/my-api-clients.tsx', "'var(--blue50)'"],
   ])('%s 의 틴트 지면에 표시 클래스가 붙어 있다', (file, tint) => {
     const source = readFileSync(resolve(process.cwd(), file), 'utf8');
 
     expect(source, file + ' 에서 틴트 배경을 찾지 못했다').toContain(tint);
     expect(source).toMatch(/className="tm-on-tint"/);
+  });
+
+  it('my-api-clients 의 틴트 카드 3개 모두에 붙어 있다', () => {
+    // 이 파일은 blue50/red50 을 조건부로 까는 Card 가 셋이다. 하나만 붙이면 나머지
+    // 둘은 그대로 미달로 남는다 — red50 은 4.02:1 로 blue50(4.11)보다 더 낮다.
+    const source = readFileSync(resolve(process.cwd(), 'src/components/my/my-api-clients.tsx'), 'utf8');
+    const tinted = source.match(/<Card[^>]*var\(--blue50\)/g) ?? [];
+
+    expect(tinted.length).toBe(3);
+    for (const tag of tinted) expect(tag).toContain('tm-on-tint');
   });
 });

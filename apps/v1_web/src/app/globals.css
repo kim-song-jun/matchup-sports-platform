@@ -2930,7 +2930,10 @@ label.tm-btn:focus-within {
 .tm-team-summary-bar,
 .tm-weather-strip,
 .tm-player-card-progress,
-.tm-list-row {
+.tm-list-row,
+.tm-auth-profile-preview,
+.tm-auth-segmented,
+.tm-my-profile-head {
   --text-caption: var(--grey700);
   --text-muted: var(--grey700);
 }

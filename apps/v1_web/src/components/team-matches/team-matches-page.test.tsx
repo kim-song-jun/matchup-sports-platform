@@ -40,6 +40,24 @@ describe('team match images', () => {
   });
 });
 
+describe('team match application CTA state', () => {
+  it('renders 신청 불가 as a disabled neutral control when there is no action', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.mode = 'default';
+    model.applyLabel = '신청 불가';
+    model.onApply = undefined;
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const buttons = screen.getAllByRole('button', { name: '신청 불가' });
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const button of buttons) {
+      expect(button).toBeDisabled();
+      expect(button).toHaveClass('tm-btn-neutral', 'tm-btn-disabled');
+    }
+  });
+});
+
 describe('team match full edit', () => {
   it('shows immutable team context and every mutable field, including the cover image', () => {
     const model = getTeamMatchCreateViewModel('edit');

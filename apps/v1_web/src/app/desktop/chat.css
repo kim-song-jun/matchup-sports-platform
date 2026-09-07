@@ -284,6 +284,16 @@
 /* Desktop master-detail workspace. Mobile keeps the existing single-pane flow. */
 .tm-chat-mobile-pane,
 .tm-chat-desktop-workspace,
+
+/* 이 창은 지면이 --grey50 이라 그 위 --text-caption(grey600)이 4.42:1 로 AA 미달이다
+   (alpha 데스크톱 1440 실측 — 빈 상태 안내 문구). globals.css 의 "틴트 지면 위의
+   보조 텍스트" 목록과 같은 처방이고, 여기 텍스트는 tm-text-caption 을 쓰므로
+   토큰 재정의가 그대로 닿는다. */
+.tm-chat-desktop-thread-pane {
+  --text-caption: var(--grey700);
+  --text-muted: var(--grey700);
+}
+
 .tm-chat-desktop-thread-pane {
   display: contents;
 }

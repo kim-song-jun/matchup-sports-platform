@@ -487,3 +487,26 @@ describe('대진표 예정 단계 라벨 대비 (2026-09-07 사용자 확정 B�
     expect(colorOf('.tm-hub-stage-dot')).toBe('--grey400');
   });
 });
+
+describe('데스크톱(≥1024) 틴트 지면 위 보조 텍스트', () => {
+  // 데스크톱은 모바일과 다른 CSS 파일을 쓴다 — 390 만 재던 스윕에서 빠져 있었고,
+  // 1440 으로 재니 모든 페이지에 깔리는 푸터에서 나왔다(alpha 실측).
+  const shellCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/_shell.css'), 'utf8');
+  const chatCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/chat.css'), 'utf8');
+
+  it('푸터 링크는 grey50 지면 위에서 AA 를 넘는 색을 쓴다', () => {
+    const rule = shellCss.match(/\.tm-desktop-footer-links a\s*\{([^}]*)\}/)?.[1];
+
+    expect(rule, '.tm-desktop-footer-links a 규칙을 찾지 못했다').toBeDefined();
+    // grey600 은 grey50(#f9fafb) 위에서 4.42:1 이라 미달이다. grey700 이 6.81:1.
+    expect(rule).toMatch(/color:\s*var\(--grey700\)/);
+  });
+
+  it('데스크톱 채팅 스레드 창은 보조 텍스트 토큰을 올린다', () => {
+    const rule = chatCss.match(/^\.tm-chat-desktop-thread-pane\s*\{([^}]*)\}/m)?.[1];
+
+    expect(rule, '.tm-chat-desktop-thread-pane 규칙을 찾지 못했다').toBeDefined();
+    expect(rule).toMatch(/--text-caption:\s*var\(--grey700\)/);
+    expect(rule).toMatch(/--text-muted:\s*var\(--grey700\)/);
+  });
+});

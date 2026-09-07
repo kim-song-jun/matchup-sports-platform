@@ -476,7 +476,11 @@
     align-items: center;
     min-height: 44px; /* WCAG 터치 타깃 — 시각 밀도는 gap으로 유지 */
     font-size: 13px;
-    color: var(--grey600);
+    /* 푸터 지면이 --grey50 이라 grey600 은 4.42:1 로 AA 미달이다(alpha 실측).
+       globals.css 의 "틴트 지면 위의 보조 텍스트" 처방과 같은 이유·같은 값이다.
+       여기서는 시맨틱 토큰이 아니라 grey 스케일을 직접 쓰고 있어 토큰 재정의가
+       닿지 않으므로 값을 직접 올린다. */
+    color: var(--grey700);
     text-decoration: none;
     transition: color 0.12s;
   }

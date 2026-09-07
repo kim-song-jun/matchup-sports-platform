@@ -883,7 +883,7 @@ export function ScheduleContent({
           data.unscheduled.length === 0 ? (
             <EmptyState title="아직 확정된 일정이 없어요" sub="경기 시간이 정해지면 여기에 표시돼요." />
           ) : (
-            <EmptyState title="아직 경기 시간이 정해지지 않았어요" sub="아래에서 예정된 경기를 확인할 수 있어요." />
+            <EmptyState title="아직 경기 시간이 정해지지 않았어요" sub="아래 '시간 미정 경기'에서 대진을 확인할 수 있어요." />
           )
         ) : (
           <ScheduleSections

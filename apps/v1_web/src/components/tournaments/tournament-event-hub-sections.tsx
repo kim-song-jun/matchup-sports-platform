@@ -150,7 +150,7 @@ export function TournamentParticipantSection({
           ) : null}
         </Card>
       ) : (
-        <Card pad={16} style={{ background: 'var(--grey50)', marginTop: 4 }}>
+        <Card pad={16} className="tm-on-tint" style={{ background: 'var(--grey50)', marginTop: 4 }}>
           <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
             참가팀 공개 전
           </div>

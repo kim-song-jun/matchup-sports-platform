@@ -150,6 +150,22 @@ export function createEmptyLineupEditorState(baseRevision: number): LineupEditor
  * 추적이 그 사람을 못 찾는다.
  */
 export function hydrateLineupEditorState(lineup: V1TeamMatchLineup): LineupEditorState {
+  // **`revision === 1` 은 팀이 작성한 명단이 아니다.** 경기가 만들어질 때 자동으로 깔리는
+  // 미편집 행이고, 그 참가자는 대진 생성 시점의 **팀 전체 활성 멤버 스냅샷**이다
+  // (league-fixture-creation.ts · team-matches.service.ts 의 approved-away 스냅샷). 그
+  // 스냅샷에는 일부러 `userId` 를 붙이지 않는다 — 한 경기도 안 뛴 팀원에게 신원 연결을
+  // 만들면 개인 기록·상호평가가 전부 거짓이 되기 때문이다(그 파일의 근거 주석 참조).
+  //
+  // 그것을 편집기의 시작 상태로 삼으면 팀장은 **자기가 짜지 않은 명단**을 보고, 그대로
+  // 저장하는 순간 팀 전원이 이름뿐인 게스트로 박제된다. 그래서 빈 명단에서 시작해
+  // `eligibleMembers`(진짜 `userId` 를 지닌 목록)에서 골라 넣게 한다.
+  //
+  // `revision === 1` 을 "저장한 적 없음" 으로 읽는 것은 이 저장소가 이미 쓰는 판정이다
+  // (games.service.ts 의 팀별 라인업 작성 현황 `lineupState`) — 같은 뜻에 두 정의를
+  // 만들지 않으려고 그 규칙을 그대로 쓴다. CAS 토큰(`baseRevision`)은 그대로 1 이다.
+  if (lineup.revision === 1) {
+    return createEmptyLineupEditorState(lineup.revision);
+  }
   // 서버는 아직 `starters`/`bench` 로 내려준다(응답 계약은 이 태스크가 바꾸지 않는다) —
   // #978 이후 **둘 다 같은 출전자 명단**이고 `bench` 는 항상 비어 있다. 그래도 두 배열을
   // 다 읽어 합치는 이유는, 이 변경 이전에 저장된 라인업에 후보로 남은 사람이 있으면

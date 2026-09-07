@@ -111,6 +111,34 @@ describe('lineup.view-model', () => {
     ]);
   });
 
+  /**
+   * `revision === 1` 은 경기 생성 때 자동으로 깔린 **미편집 스냅샷**이다 — 참가자는 대진
+   * 생성 시점의 팀 전체 활성 멤버이고, 일부러 `userId` 를 붙이지 않는다(한 경기도 안 뛴
+   * 팀원에게 신원 연결을 만들면 개인 기록·상호평가가 거짓이 된다).
+   *
+   * 이걸 편집기 시작 상태로 쓰면 팀장은 자기가 짜지 않은 명단을 보고, 그대로 저장하는
+   * 순간 **팀 전원이 이름뿐인 게스트로 박제된다.** alpha 실측에서 제출된 리그 라인업
+   * 참가자가 전원 `userId` 없이 저장돼 있던 마지막 고리가 여기다.
+   *
+   * 같은 참가자 목록을 `revision: 2` 로 주면 그대로 불러온다 — 규칙이 **내용이 아니라
+   * 리비전**이라는 것을 함께 잰다(내용으로 판정하면 진짜 게스트 명단까지 지워진다).
+   */
+  it('자동으로 깔린 미편집 스냅샷(revision 1)은 불러오지 않는다 — 팀이 저장한 리비전은 그대로 불러온다', () => {
+    const autoRoster = [
+      { id: 'auto-1', userId: null, displayName: '팀원A', jerseyNumber: null, position: null, goalkeeper: false, positionX: null, positionY: null },
+      { id: 'auto-2', userId: null, displayName: '팀원B', jerseyNumber: null, position: null, goalkeeper: false, positionX: null, positionY: null },
+    ];
+
+    const auto = hydrateLineupEditorState(serverLineup({ revision: 1, version: 1, starters: autoRoster, bench: [] }));
+    expect(auto.participants).toEqual([]);
+    // CAS 토큰은 그대로여야 한다 — 저장할 때 서버가 기대하는 값이 1 이다.
+    expect(auto.baseRevision).toBe(1);
+    expect(auto.dirty).toBe(false);
+
+    const saved = hydrateLineupEditorState(serverLineup({ revision: 2, version: 2, starters: autoRoster, bench: [] }));
+    expect(saved.participants.map((entry) => entry.displayName)).toEqual(['팀원A', '팀원B']);
+  });
+
   it('이 변경 전에 후보로 저장된 사람도 명단에 남는다 — bench 를 안 읽으면 조용히 사라진다', () => {
     // 서버 응답 계약은 이 태스크가 바꾸지 않았다. 옛 저장본에는 `bench` 에만 있는 사람이
     // 실제로 존재하므로, `starters` 만 읽으면 그 사람이 화면에서 사라진 채 저장돼 삭제된다.

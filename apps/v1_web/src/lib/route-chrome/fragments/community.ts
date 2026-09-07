@@ -14,7 +14,7 @@ import type { RouteChromeEntry } from '../types';
 export const COMMUNITY_ROUTES: RouteChromeEntry[] = [
   {
     pattern: '/chat',
-    chrome: { title: '채팅', activeTab: 'my', bottomNav: false, backHref: '/home', showNotifications: false },
+    chrome: { title: '채팅', activeTab: 'my', bottomNav: false, backHref: '/home', showNotifications: false, titleAsHeading: true },
   },
   {
     pattern: '/chat/:id',
@@ -22,6 +22,6 @@ export const COMMUNITY_ROUTES: RouteChromeEntry[] = [
   },
   {
     pattern: '/notifications',
-    chrome: { title: '알림', activeTab: 'my', bottomNav: false, backHref: '/home', showNotifications: false },
+    chrome: { title: '알림', activeTab: 'my', bottomNav: false, backHref: '/home', showNotifications: false, titleAsHeading: true },
   },
 ];

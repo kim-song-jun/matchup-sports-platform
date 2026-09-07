@@ -145,3 +145,26 @@ describe('ROUTE_CHROME_TABLE — 골든 샘플(전 세그먼트 통합, U39)', (
     expect(new Set(patterns).size).toBe(patterns.length);
   });
 });
+
+// 2026-09-07 alpha 실측: 상단바 제목은 titleAsHeading 이 참일 때만 <h1> 로 그려지고
+// (shell.tsx:142-146) 기본값은 false 라 <div> 가 된다. 그래서 아래 화면들은 모바일에서
+// **접근성 트리에 헤딩이 하나도 없었다** — 스크린리더의 헤딩 이동(H 키)으로 잡히는 게 없다.
+// 이 플래그가 빠지면 그 상태로 되돌아가므로 테이블에 박제한다.
+describe('titleAsHeading — 상단바 제목이 페이지 헤딩이어야 하는 라우트', () => {
+  const MUST_BE_HEADING = [
+    '/chat',
+    '/notifications',
+    '/my/teams',
+    '/tournaments/abc/my',
+    '/matches/abc/applications',
+  ];
+
+  for (const pathname of MUST_BE_HEADING) {
+    it(`${pathname} 의 상단바 제목은 heading 으로 렌더된다`, () => {
+      const resolved = resolveRouteChrome(pathname);
+      expect(resolved).not.toBeNull();
+      expect(resolved?.chrome.title).toBeTruthy();
+      expect(resolved?.chrome.titleAsHeading).toBe(true);
+    });
+  }
+});

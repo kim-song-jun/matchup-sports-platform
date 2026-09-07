@@ -280,3 +280,17 @@ describe('카드 광택 스윕(tmCardSweep)은 left 가 아니라 transform 을 
     expect(rule).toMatch(/transform:\s*translateX\([^)]*\)\s*rotate\(18deg\)/);
   });
 });
+
+describe('home featured media band', () => {
+  // 사진 없는 변형이 aspect-ratio 를 풀면 밴드가 내용만큼 자라, 같은 그리드 행의 사진
+  // 카드가 텍스트만 위에 뜬 채 아래가 비어 보인다(alpha 실측 2026-09-07: 308 vs 152px).
+  // 마크업 계약(카피는 밴드 밖)은 home-featured-slot.test.tsx 가 지키고, 여기서는
+  // 그 마크업이 전제하는 **밴드 높이 고정**만 지킨다.
+  it('keeps the photo-less variant on the same fixed aspect ratio as the photo variant', () => {
+    const rule = globalsCss.match(/\.tm-home-featured-stack\s*\{([^}]*)\}/)?.[1];
+
+    expect(rule).toBeDefined();
+    expect(rule).not.toMatch(/aspect-ratio/);
+    expect(rule).not.toMatch(/height/);
+  });
+});

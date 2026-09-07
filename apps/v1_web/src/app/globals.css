@@ -4247,15 +4247,17 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding: 0 12px;
 }
 
-/* 카드 마지막 줄이 플로팅 FAB 아래로 들어간다 — 예전 액션 행에 주던 여백을 그대로 물려준다. */
+/* 카드 마지막 줄이 플로팅 FAB 아래로 들어간다 — 예전 액션 행에 주던 여백을 물려준다.
+   활동 줄은 값이 있을 때만 그려지므로 그 클래스에 걸면 없는 카드가 무방비가 된다
+   (#1095 Copilot). 무엇이 마지막이든 보호되도록 카드의 마지막 자식에 건다. */
 @media (max-width: 767px) {
-  .tm-team-list .tm-team-card-activity {
+  .tm-team-list .tm-team-card > :last-child {
     padding-right: 64px;
   }
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
-  .tm-team-list .tm-team-card-stack > .tm-team-card:nth-child(even) .tm-team-card-activity {
+  .tm-team-list .tm-team-card-stack > .tm-team-card:nth-child(even) > :last-child {
     padding-right: 64px;
   }
 }

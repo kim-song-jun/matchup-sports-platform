@@ -1277,6 +1277,10 @@ const NON_RETRYABLE_GAME_OPERATIONS_ERROR_CODES = new Set<string>([
 const RETRYABLE_STAFF_DENIAL_REASONS = new Set<string>(['AUTHORIZATION_SUBJECT_STALE']);
 
 export function isRetryableGameOperationsErrorCode(code: string, reason?: string | null): boolean {
-  if (reason != null && RETRYABLE_STAFF_DENIAL_REASONS.has(reason)) return true;
+  // **예외는 `STAFF_SCOPE_DENIED` 안에서만 연다.** 이 reason 집합은 그 코드의 원인 구분이라,
+  // 다른 코드에 같은 값이 실려 오면(오배선·미래 변경) 엉뚱한 코드가 재시도 가능으로 분류된다.
+  if (code === 'STAFF_SCOPE_DENIED' && reason != null && RETRYABLE_STAFF_DENIAL_REASONS.has(reason)) {
+    return true;
+  }
   return !NON_RETRYABLE_GAME_OPERATIONS_ERROR_CODES.has(code);
 }

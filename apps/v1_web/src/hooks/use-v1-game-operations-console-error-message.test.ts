@@ -75,6 +75,12 @@ describe('isRetryableGameOperationsErrorCode — 문구와의 정합성', () => 
     expect(isRetryableGameOperationsErrorCode('STAFF_SCOPE_DENIED', 'AUTHORIZATION_SUBJECT_STALE')).toBe(true);
   });
 
+  it('다른 코드에 같은 reason 이 실려도 재시도 가능이 되지 않는다 — 예외는 그 코드 안에서만', () => {
+    // 이 reason 집합은 `STAFF_SCOPE_DENIED` 의 원인 구분이다. 코드를 안 보면 오배선 하나로
+    // 엉뚱한 실패가 재시도 가능으로 분류된다.
+    expect(isRetryableGameOperationsErrorCode('TERMINAL_GAME_IMMUTABLE', 'AUTHORIZATION_SUBJECT_STALE')).toBe(false);
+  });
+
   it('진짜 권한 거부는 그대로 재시도 불가다 (회귀)', () => {
     expect(isRetryableGameOperationsErrorCode('STAFF_SCOPE_DENIED', 'ASSIGNMENT_REQUIRED')).toBe(false);
     // reason 이 없던 옛 호출도 그대로 동작해야 한다.

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
@@ -279,7 +279,7 @@ function TeamMyLeaguesSection({
           onCta={onRetry}
         />
       ) : (
-        <div style={{ display: 'grid', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
           {items.map((league) => (
             <Link
               key={league.leagueId}
@@ -451,6 +451,24 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const memberCapacity = formatMemberCapacity(team);
   const capacity = formatCapacity(team);
   const [heroMessage, setHeroMessage] = useState('');
+  const mobileBodyRef = useRef<HTMLElement>(null);
+  const mobileCtaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const body = mobileBodyRef.current;
+    const cta = mobileCtaRef.current;
+    if (!body || !cta) return;
+
+    // 문구 줄바꿈과 Android safe area까지 포함한 실제 CTA 높이를 비워 둔다.
+    const syncBottomSpace = () => {
+      body.style.paddingBottom = `${cta.getBoundingClientRect().height + 16}px`;
+    };
+    syncBottomSpace();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(syncBottomSpace);
+    observer.observe(cta, { box: 'border-box' });
+    return () => observer.disconnect();
+  }, []);
 
   /**
    * 팀 후기 요약. **공개 엔드포인트**(`GET /teams/:id/reviews`)라 내 팀이든 남의 팀이든
@@ -702,7 +720,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
       </div>
 
       {/* Mobile layout (unchanged) */}
-      <article className="tm-team-detail-body tm-hide-desktop tm-content-enter">
+      <article ref={mobileBodyRef} className="tm-team-detail-body tm-hide-desktop tm-content-enter">
         <Card pad={20} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
           <button
             className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
@@ -816,7 +834,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           ) : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
         </Card>
       </article>
-      <div className="tm-fixed-cta tm-hide-desktop">
+      <div ref={mobileCtaRef} className="tm-fixed-cta tm-hide-desktop">
         {/* 승인 대기 중에는 본문의 안내 카드가 상태를 이미 설명하므로 같은 말을 반복하지 않는다. */}
         {mode === 'pending' ? null : (
           <div className="tm-text-caption" style={{ marginBottom: 8 }}>

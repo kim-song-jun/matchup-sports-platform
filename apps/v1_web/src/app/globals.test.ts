@@ -581,6 +581,9 @@ describe('인라인으로 지면 색을 까는 곳의 보조 텍스트 (.tm-on-t
     ['src/app/tournaments/[id]/awards/awards-page-client.tsx', 'Card', /background: 'var\(--grey50\)', textAlign/, 2],
     ['src/components/users/public-profile-client.tsx', 'div', /var\(--surface-soft\)/, 1],
     ['src/app/tournaments/[id]/reviews/reviews-page-client.tsx', 'Card', /background: 'var\(--grey50\)', textAlign/, 1],
+    // StateCard 는 tone 에 따라 --tint-grey/green/orange 셋을 깐다 — 배경이 변수라
+    // 태그에서 잡히는 것은 `background: tint` 다. 한 곳이 셋을 다 만든다.
+    ['src/components/matches/matches-page.tsx', 'Card', /background: tint/, 1],
   ])('%s 의 틴트 %s 태그 %d개 전부에 표시 클래스가 붙어 있다', (file, tag, tint, count) => {
     const source = readFileSync(resolve(process.cwd(), file), 'utf8');
     const tinted = openingTagsWithTint(source, tag as string, tint as RegExp);

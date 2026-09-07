@@ -71,7 +71,8 @@ export function MatchListPageClient() {
 
   const base = getMatchListViewModel();
   const items = query.data?.items;
-  const visibleItems = filterMatchesByLevels(items, selectedLevels);
+  const orderedItems = items ? sortMatchesByAvailability(items) : undefined;
+  const visibleItems = filterMatchesByLevels(orderedItems, selectedLevels);
   const countItems = filterMatchesByLevels((countFilters ? countMatches.data?.items ?? allMatches.data?.items : allMatches.data?.items) ?? items, selectedLevels);
   const searchModel: NonNullable<MatchListViewModel['search']> = {
     value: searchValue,
@@ -378,6 +379,16 @@ function toGenderRuleFilter(value: string | null): '' | '성별 무관' | '남' 
 function filterMatchesByLevels(matches: V1Match[] | undefined, levels: NonNullable<MatchListViewModel['filterSheet']>['levels']) {
   if (!matches || levels.length === 0) return matches ?? [];
   return matches.filter((match) => levelRangeMatches(levels, match.minLevel?.code, match.maxLevel?.code, match.levelLabel));
+}
+
+export function sortMatchesByAvailability(matches: V1Match[]): V1Match[] {
+  return matches
+    .map((match, index) => ({ match, index }))
+    .sort((left, right) => {
+      const rank = (match: V1Match) => statusToCardStatus(getStatus(match)) === 'open' ? 0 : 1;
+      return rank(left.match) - rank(right.match) || left.index - right.index;
+    })
+    .map(({ match }) => match);
 }
 
 function countMatchFilters(

@@ -44,6 +44,12 @@ Status: complete
 - [x] 두 상세 히어로 우측에는 공유만 남는다.
 - [x] 팀 상세의 `sample` 신뢰 상태는 사용자에게 노출하지 않는다.
 
+## 2026-09-07 Application Availability Ordering Hotfix
+
+- [x] Personal and team match lists show application-open matches before application-closed matches.
+- [x] The API-provided order remains stable inside both availability groups.
+- [x] Sorting returns a new array and does not mutate query data.
+
 ## 2026-09-04 Match Visibility Hotfix
 
 - [x] 개인 매치는 신청 마감 또는 raw `closed` 상태여도 경기 시작 전까지 일반 목록에 신청마감으로 노출한다.

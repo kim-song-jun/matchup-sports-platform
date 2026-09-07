@@ -91,7 +91,8 @@ export function TeamMatchListPageClient() {
 
   const base = getTeamMatchListViewModel();
   const items = query.data?.items;
-  const visibleItems = filterTeamMatchesByLevels(items, selectedLevels);
+  const orderedItems = items ? sortTeamMatchesByAvailability(items) : undefined;
+  const visibleItems = filterTeamMatchesByLevels(orderedItems, selectedLevels);
   const countItems = filterTeamMatchesByLevels((countFilters ? countQuery.data?.items ?? allQuery.data?.items : allQuery.data?.items) ?? items, selectedLevels);
   const searchModel: NonNullable<TeamMatchListViewModel['search']> = {
     value: searchValue,
@@ -454,6 +455,16 @@ function toGenderRuleFilter(value: string | null): '' | '성별 무관' | '남' 
 function filterTeamMatchesByLevels(matches: V1TeamMatch[] | undefined, levels: NonNullable<TeamMatchListViewModel['filterSheet']>['levels']) {
   if (!matches || levels.length === 0) return matches ?? [];
   return matches.filter((match) => levelRangeMatches(levels, match.minLevel?.code, match.maxLevel?.code, match.levelLabel));
+}
+
+export function sortTeamMatchesByAvailability(matches: V1TeamMatch[]): V1TeamMatch[] {
+  return matches
+    .map((match, index) => ({ match, index }))
+    .sort((left, right) => {
+      const rank = (match: V1TeamMatch) => statusToCardStatus(getStatus(match)) === 'open' ? 0 : 1;
+      return rank(left.match) - rank(right.match) || left.index - right.index;
+    })
+    .map(({ match }) => match);
 }
 
 function countTeamMatchFilters(

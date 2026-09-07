@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
+import type { V1Match } from '@/types/api';
 import type { MatchDetailViewModel } from './matches.types';
-import { MatchDetailPageClient } from './matches-client';
+import { MatchDetailPageClient, sortMatchesByAvailability } from './matches-client';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
@@ -55,6 +56,28 @@ const baseMatch = {
   capacityText: '3/10',
   status: 'open' as const,
 };
+
+describe('sortMatchesByAvailability', () => {
+  it('keeps API order within each group and moves application-open matches first without mutation', () => {
+    const item = (id: string, status: string) => ({
+      id,
+      matchId: id,
+      title: id,
+      startsAt: '2099-01-01T10:00:00.000Z',
+      status,
+      displayState: status,
+    }) as unknown as V1Match;
+    const input = [item('closed-1', 'closed'), item('open-1', 'open'), item('full-1', 'full'), item('open-2', 'open')];
+
+    expect(sortMatchesByAvailability(input).map((match) => match.id)).toEqual([
+      'open-1',
+      'open-2',
+      'closed-1',
+      'full-1',
+    ]);
+    expect(input.map((match) => match.id)).toEqual(['closed-1', 'open-1', 'full-1', 'open-2']);
+  });
+});
 
 describe('MatchDetailPageClient — GA events', () => {
   beforeEach(() => {

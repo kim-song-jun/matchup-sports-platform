@@ -1736,7 +1736,19 @@ function TeamCard({ team }: { team: TeamModel }) {
           {leaderLine ? (
             <div className="tm-text-caption line-clamp-1" style={{ marginTop: 4, color: 'var(--text-muted)' }}>{leaderLine}</div>
           ) : null}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>{dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+            {dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}
+            {/* '가입 신청 가능' 은 목록에서 정보가 되지 않는다 — alpha 실측(2026-09-07)에서
+                50팀 중 50팀이 같은 값이었고, 머리말에도 "50팀 · 가입 가능 50" 이 이미 있다.
+                그 한 줄을 위해 구분선 + 49px 를 쓰고 있었다. 예외(가입 닫힘·정원 마감)만 알린다.
+                예전 자리는 aria-hidden 이라 스크린리더에는 아예 안 읽혔다 — 배지로 옮기며 읽히게 된다. */}
+            {team.status !== 'open' ? (
+              <span className="tm-badge tm-badge-grey tm-team-card-status-badge">
+                <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
+                {team.statusLabel}
+              </span>
+            ) : null}
+          </div>
         </div>
       </div>
       {/* 실제 팀 소개가 있을 때만 intro-box를 렌더한다. */}
@@ -1745,14 +1757,11 @@ function TeamCard({ team }: { team: TeamModel }) {
           <div className="tm-text-body line-clamp-3" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>{team.intro}</div>
         </div>
       ) : null}
-      <div className="tm-team-card-action-row" aria-hidden="true">
-        <span className="tm-text-caption line-clamp-1" style={{ color: 'var(--text-muted)', minWidth: 0 }}>
-          {activity || '활동 일정 미정'}
-        </span>
-        <span className={`tm-team-card-action-status ${team.status === 'closed' ? 'tm-team-card-action-status-muted' : ''}`}>
-          {team.statusLabel}
-        </span>
-      </div>
+      {/* 활동 일정도 **있을 때만** 쓴다. 없을 때 '활동 일정 미정' 으로 채우면 '가입 신청 가능'
+          과 같은 종류의 빈 줄이 된다 — 모르는 것을 문장으로 만들지 않는다. */}
+      {activity ? (
+        <div className="tm-text-caption tm-team-card-activity line-clamp-1">{activity}</div>
+      ) : null}
     </Link>
   );
 }

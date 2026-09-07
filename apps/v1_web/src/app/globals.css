@@ -4143,34 +4143,19 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   outline-offset: 2px;
 }
 
-.tm-team-card-action-row {
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--grey100);
-  display: flex;
+/* 예전엔 카드 맨 아래에 구분선 + 액션 행(활동 일정 / 가입 상태)이 있었다. 그 행의 상태
+   문구가 목록 50팀 중 50팀에서 같은 값('가입 신청 가능')이라, 49px 를 정보량 0 에 쓰고
+   있었다(alpha 실측 2026-09-07). 상태는 예외일 때만 배지로 알리고, 활동 일정은 이 줄로
+   내렸다 — 구분선도 함께 없앤다(DESIGN.md §15: 여백·배경색·구분선 중 하나만). */
+.tm-team-card-activity {
+  margin-top: 8px;
+  color: var(--text-muted);
+}
+
+.tm-team-card-status-badge {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.tm-team-card-action-row .tm-text-caption {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-/* --blue500 은 흰 카드 위 3.71:1 로 AA 미달이다. a11y-decisions.md 는 그 값을
-   .tm-btn-primary(솔리드 배경 흰 글씨)에만 예외로 등재해 뒀지 파란 글씨용이 아니다.
-   카드 위 파란 글씨는 --blue700 을 쓴다(라이트 5.41:1 / 다크 6.88:1). */
-.tm-team-card-action-status {
-  flex: 0 0 auto;
-  white-space: nowrap;
-  color: var(--blue700);
-}
-
-.tm-team-card-action-status-muted {
-  color: var(--text-caption);
+  gap: 4px;
 }
 
 /*
@@ -4262,14 +4247,17 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding: 0 12px;
 }
 
+/* 카드 마지막 줄이 플로팅 FAB 아래로 들어간다 — 예전 액션 행에 주던 여백을 물려준다.
+   활동 줄은 값이 있을 때만 그려지므로 그 클래스에 걸면 없는 카드가 무방비가 된다
+   (#1095 Copilot). 무엇이 마지막이든 보호되도록 카드의 마지막 자식에 건다. */
 @media (max-width: 767px) {
-  .tm-team-list .tm-team-card-action-row {
+  .tm-team-list .tm-team-card > :last-child {
     padding-right: 64px;
   }
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
-  .tm-team-list .tm-team-card-stack > .tm-team-card:nth-child(even) .tm-team-card-action-row {
+  .tm-team-list .tm-team-card-stack > .tm-team-card:nth-child(even) > :last-child {
     padding-right: 64px;
   }
 }

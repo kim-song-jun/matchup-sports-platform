@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
@@ -153,7 +155,9 @@ describe('TeamListPageView', () => {
     render(<TeamListPageView model={model} />);
 
     expect(screen.getByText('라이브 팀')).toBeInTheDocument();
-    expect(screen.getByText('가입 신청 가능')).toBeInTheDocument();
+    // 가입 가능은 목록에서 50/50 이 같은 값이라(alpha 실측 2026-09-07) 더는 쓰지 않는다 —
+    // 예외(가입 닫힘·정원 마감)만 배지로 알린다. 아래 별도 describe 에서 그 계약을 지킨다.
+    expect(screen.queryByText('가입 신청 가능')).not.toBeInTheDocument();
     expect(screen.getByText('레벨 미설정')).toBeInTheDocument();
     expect(screen.getByText('짧은 소개')).toBeInTheDocument();
     expect(screen.getByText('팀장 김도윤 · 감독 박서준')).toBeInTheDocument();
@@ -704,5 +708,74 @@ describe('TeamDetailPageView — 내 리그 섹션', () => {
     fireEvent.click(retryButtons[0]);
 
     expect(onRetryMyLeagues).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * 팀 카드 밀도 (2026-09-07 alpha 실측 · 사용자 A안 확정).
+ *
+ * 카드 217px 중 맨 아래 49px(구분선 + 액션 행)이 '활동 일정'과 '가입 상태'를 담고 있었는데,
+ * 상태 문구는 **50팀 중 50팀이 같은 값**('가입 신청 가능')이었다. 머리말에도
+ * "50팀 · 가입 가능 50" 이 이미 있어, 그 49px 은 정보량 0 이었다.
+ *
+ * 그래서 ① 가입 가능은 안 쓰고 예외만 배지로 알리고 ② 활동 일정은 있을 때만 한 줄로 쓴다.
+ * 예전 액션 행은 `aria-hidden="true"` 라 스크린리더에는 아예 안 읽혔다 — 배지로 옮기며
+ * 읽히게 되는 것도 함께 지킨다.
+ */
+describe('TeamListPageView — 팀 카드 밀도', () => {
+  function listWith(overrides: Partial<TeamListViewModel['teams'][number]>) {
+    const base = getTeamListViewModel();
+    return {
+      ...base,
+      summary: { ...base.summary, total: 1, recruiting: 1 },
+      teams: [{ ...base.teams[0], ...overrides }],
+    } as TeamListViewModel;
+  }
+
+  it('구분선이 있던 액션 행 자체를 그리지 않는다', () => {
+    const { container } = render(<TeamListPageView model={listWith({ status: 'open', statusLabel: '가입 신청 가능' })} />);
+
+    expect(container.querySelector('.tm-team-card-action-row')).toBeNull();
+    expect(container.querySelector('.tm-team-card-action-status')).toBeNull();
+  });
+
+  it("가입 가능한 팀에는 상태 배지를 붙이지 않는다 — 목록에서 전부 같은 값이다", () => {
+    render(<TeamListPageView model={listWith({ status: 'open', statusLabel: '가입 신청 가능' })} />);
+
+    expect(screen.queryByText('가입 신청 가능')).not.toBeInTheDocument();
+  });
+
+  it('가입이 막힌 팀에만 상태 배지를 붙이고, 스크린리더에도 읽힌다', () => {
+    const { container } = render(<TeamListPageView model={listWith({ status: 'closed', statusLabel: '가입 닫힘' })} />);
+
+    const badge = container.querySelector('.tm-team-card-status-badge');
+    expect(badge).not.toBeNull();
+    expect(badge!.textContent).toContain('가입 닫힘');
+    // 예전 액션 행은 aria-hidden 이라 안 읽혔다. 배지에는 그 속성이 없어야 한다.
+    expect(badge!.closest('[aria-hidden="true"]')).toBeNull();
+  });
+
+  it("활동 일정이 없으면 '활동 일정 미정' 으로 채우지 않고 줄 자체를 뺀다", () => {
+    const { container } = render(<TeamListPageView model={listWith({ next: '' })} />);
+
+    expect(screen.queryByText('활동 일정 미정')).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-team-card-activity')).toBeNull();
+  });
+
+  it('FAB 가림 보호는 활동 줄이 없는 카드에도 걸린다 — 마지막 자식 기준이다', () => {
+    // 활동 줄에만 걸면 그 줄이 없는 카드는 마지막 줄(소개)이 FAB 에 가려진다(#1095 Copilot).
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const block = css.match(/@media \(max-width: 767px\) \{\s*\.tm-team-list \.tm-team-card > :last-child \{[^}]*\}/);
+
+    expect(block).not.toBeNull();
+    expect(block![0]).toContain('padding-right: 64px');
+    // 예전처럼 활동 줄만 겨냥하는 규칙이 남아 있으면 의도가 반쯤만 지켜진다.
+    expect(css).not.toContain('.tm-team-list .tm-team-card-activity {');
+  });
+
+  it('활동 일정이 있으면 그대로 한 줄로 쓴다', () => {
+    const { container } = render(<TeamListPageView model={listWith({ next: '매일 · 저녁 · 실력 중심' })} />);
+
+    expect(container.querySelector('.tm-team-card-activity')?.textContent).toBe('매일 · 저녁 · 실력 중심');
   });
 });

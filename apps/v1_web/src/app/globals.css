@@ -2821,6 +2821,29 @@ label.tm-btn:focus-within {
   font-weight: 600;
 }
 
+/* 팀매치 행의 신원 줄 — 상태 배지 + 팀 이름 + 매너·승. 배지는 폭이 고정이고, 이름이 길면
+   이름 쪽이 줄어든다(배지가 줄면 '신청 마…' 이 된다). */
+.tm-team-match-row-id {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tm-team-match-row-id .tm-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tm-team-match-row-host {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* 팀매치 행의 조건 줄 — 종목·등급·경기방식 텍스트 옆에 리그 배지(button)가 인라인으로 붙는다.
    배지는 baseline 정렬이라 그냥 두면 텍스트보다 아래로 처진다. */
 .tm-team-match-row-cond {

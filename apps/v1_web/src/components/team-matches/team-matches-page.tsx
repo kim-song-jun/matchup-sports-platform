@@ -839,21 +839,22 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
       <div className="tm-match-row-main">
         {/* 팀이 이 목록의 신원이다 — 제목보다 먼저 읽히도록 맨 위 줄에 둔다.
             매너·승수는 모르면(공개 후기 0건) 아예 안 쓴다. 0 으로 채우면 잘하는 팀이 최악으로 보인다. */}
-        <div className="tm-text-caption tm-match-row-meta">
-          <strong style={{ fontWeight: 600, color: 'var(--text-strong)' }}>{match.hostTeam}</strong>
-          {match.manner !== null && match.wins !== null ? (
-            <> · 매너 <span className="tab-num">{match.manner}</span> · 승 <span className="tab-num">{match.wins}</span></>
-          ) : null}
-        </div>
-        <div className="tm-match-row-headline">
-          {/* 배지는 항상 정확히 하나다. 모집 중일 때는 상태(모집 중)가 아니라 **상대가 아직 없다**는
-              사실을 쓴다 — 목록에서 실제로 궁금한 값이고, 지금은 화면 어디에도 없던 정보다.
-              그 외 상태는 확정된 사실(내 매치·승인 대기·승인 완료·신청 마감)을 그대로 쓴다.
-              상대 "팀 이름"은 목록 응답에 없으므로 만들어내지 않는다(V1TeamMatch 참고). */}
-          <span className={`tm-badge ${match.status === 'open' ? 'tm-badge-blue' : statusClass}${isClosed ? ' tm-card-closed-badge' : ''}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+        {/* 상태 배지는 제목 줄이 아니라 이 신원 줄에 둔다. 팀매치는 개인 매치와 달리 거의 모든
+            카드에 배지가 붙어(모집 중·신청 마감·승인 완료…), 제목 줄에 인라인으로 두면 매 카드에서
+            제목이 그만큼 잘린다 — 데스크톱 실측(2026-09-07)에서 본문 191px 중 제목이 111px 였다. */}
+        <div className="tm-text-caption tm-match-row-meta tm-team-match-row-id">
+          <span className={`tm-badge ${match.status === 'open' ? 'tm-badge-blue' : statusClass}${isClosed ? ' tm-card-closed-badge' : ''}`}>
             <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
             {match.status === 'open' ? '상대 모집 중' : statusLabel}
           </span>
+          <span className="tm-team-match-row-host">
+            <strong style={{ fontWeight: 600, color: 'var(--text-strong)' }}>{match.hostTeam}</strong>
+            {match.manner !== null && match.wins !== null ? (
+              <> · 매너 <span className="tab-num">{match.manner}</span> · 승 <span className="tab-num">{match.wins}</span></>
+            ) : null}
+          </span>
+        </div>
+        <div className="tm-match-row-headline">
           <div className="tm-text-body-lg tm-match-row-title">{match.title}</div>
         </div>
         <div className="tm-text-caption tm-match-row-when">

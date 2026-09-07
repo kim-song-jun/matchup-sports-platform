@@ -153,7 +153,9 @@ describe('TeamMatchListPageView — 행 카드 (개인 탭과 같은 카드)', (
     expect(labels).not.toContain('홈팀');
   });
 
-  it('상태 배지는 카드마다 정확히 하나다 — 같은 사실을 두 번 말하지 않는다', () => {
+  it('상태 배지는 카드마다 정확히 하나이고, 제목 줄이 아니라 신원 줄에 있다', () => {
+    // 제목 줄에 인라인으로 두면 배지 폭만큼 제목이 잘린다 — 데스크톱 실측에서 본문 191px 중
+    // 제목이 111px 였다. 팀매치는 거의 모든 카드에 배지가 붙어 매 카드가 그 대가를 치른다.
     const base = getTeamMatchListViewModel();
     const statuses = ['open', 'pending', 'approved', 'closed', 'mine'] as const;
     const model = { ...base, matches: statuses.map((status, index) => ({ ...base.matches[0], id: `tm-${index}`, status })) };
@@ -162,7 +164,8 @@ describe('TeamMatchListPageView — 행 카드 (개인 탭과 같은 카드)', (
     const cards = [...container.querySelectorAll('.tm-match-row')];
     expect(cards).toHaveLength(statuses.length);
     cards.forEach((card) => {
-      expect(card.querySelectorAll('.tm-match-row-headline .tm-badge')).toHaveLength(1);
+      expect(card.querySelectorAll('.tm-team-match-row-id > .tm-badge')).toHaveLength(1);
+      expect(card.querySelectorAll('.tm-match-row-headline .tm-badge')).toHaveLength(0);
     });
   });
 });

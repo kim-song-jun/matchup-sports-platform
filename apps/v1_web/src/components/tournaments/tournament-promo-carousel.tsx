@@ -162,7 +162,7 @@ export function TournamentPromoCarousel({
                   style={{
                     background: imageUrl
                       ? `${cssUrl(imageUrl)} center/cover`
-                      : 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
+                      : 'var(--brand-hero-gradient)',
                   }}
                 >
                   {imageUrl ? <span className="tm-tournament-promo-card-scrim" aria-hidden="true" /> : null}

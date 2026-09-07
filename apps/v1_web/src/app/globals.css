@@ -42,6 +42,10 @@
   --blue500: #3182f6;
   --blue600: #2272eb;
   --blue700: #1b64da; /* blue600보다 진한 강조색 — active 상태(.tm-review-tag-chip 등) */
+  /* 파랑 지면(히어로·프로모 카드·풋살 아이콘 배지)의 어두운 쪽 끝. --blue600 을 직접
+     쓰면 다크에서 뒤집힌다 — 다크의 --blue600 은 글자용으로 밝힌 값이다. */
+  --brand-hero-gradient-end: var(--blue600);
+  --brand-hero-gradient: linear-gradient(135deg, var(--blue500) 0%, var(--brand-hero-gradient-end) 100%);
   --green50: #e3f8ef;
   --green500: #03b26c;
   --green600: #039e60; /* green500과 동일한 명도차(blue500→600, orange500→600 평균)로 파생 — 종목 아이콘 그라디언트용 */
@@ -403,6 +407,10 @@
    * blue500(#3182f6, 4.49:1) 과 blue700(#6ba8ff, 6.88:1) 사이를 유지하면서
    * AA 를 넘는 값으로 잡았다 — #5a9cf8 은 5.99:1. */
   --blue600: #5a9cf8;
+  /* 위 --blue600 은 **글자색** 문제를 풀려고 밝힌 값이다. 같은 토큰이 지면으로도 쓰여
+     그 위 흰 글씨·아이콘이 2.78:1 까지 떨어졌다(alpha 실측). 지면은 라이트와 같은
+     방향(어두워지는 쪽)을 지킨다 — #1b64da 위 흰색 5.41:1. */
+  --brand-hero-gradient-end: #1b64da;
   --orange700: var(--orange500);
   /* --yellow700(light #a66c00)도 동일 이유로 다크에서 --yellow500 재사용 — 다크
      yellow50 틴트(rgba(255,195,66,0.16)) 위 yellow500은 이미 7.2:1로 충분히 통과. */

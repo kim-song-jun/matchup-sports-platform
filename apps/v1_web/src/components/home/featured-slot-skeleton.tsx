@@ -27,7 +27,7 @@ export function FeaturedSlotSkeleton({ eyebrow, title }: { eyebrow: string; titl
       <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
         <div
           className="tm-featured-media"
-          style={{ background: 'linear-gradient(135deg, var(--blue500), var(--blue600))' }}
+          style={{ background: 'var(--brand-hero-gradient)' }}
         >
           <div className="tm-featured-overlay" />
           <div className="tm-featured-text">

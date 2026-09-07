@@ -758,7 +758,7 @@ export function TournamentDetailView({
           width: 56,
           height: 56,
           borderRadius: 'var(--radius-container)',
-          background: 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
+          background: 'var(--brand-hero-gradient)',
           display: 'grid',
           placeItems: 'center',
           color: 'var(--static-white)',

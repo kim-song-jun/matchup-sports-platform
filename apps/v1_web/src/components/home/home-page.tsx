@@ -680,17 +680,20 @@ function FeaturedMatchCard({
     <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
       {/* 사진이 없으면 목업 사진을 깔지 않고 종목 그래픽을 그린다 — 예전엔 모든 추천 카드가
           같은 스톡 사진 한 장이라 서로 다른 실제 매치가 구분되지 않았다(웨이브 8). */}
+      {/* 미디어 밴드는 사진이 있든 없든 같은 비율(2:1)이다. 그래픽 카드만 밴드가 커지면
+          같은 그리드 행의 사진 카드가 텍스트만 위에 뜬 채 아래가 비어 보인다
+          (alpha 실측 2026-09-07: 그래픽 308px vs 사진 152px). */}
       <div
         className={`tm-featured-media${!network && !match.imageUrl ? ' tm-home-featured-stack' : ''}`}
         style={network ? { background: 'var(--grey100)' } : match.imageUrl ? { background: `${cssUrl(match.imageUrl)} center/cover` } : undefined}
       >
         {!network && !match.imageUrl ? (
           <div className="tm-match-hero-graphic">
-            <SportIllustration sizes="(min-width: 1024px) 208px, 176px" sport={match.sportLabel} />
+            <SportIllustration sizes="(min-width: 1024px) 128px, 112px" sport={match.sportLabel} />
           </div>
         ) : null}
-        {!network ? (
-          <div className={`tm-featured-overlay${!match.imageUrl ? ' tm-featured-overlay-stack' : ''}`}>
+        {!network && match.imageUrl ? (
+          <div className="tm-featured-overlay">
             <div className="tm-featured-text">
               <div className="tm-text-micro tm-featured-eyebrow">
                 {signedOut ? '랜덤 추천 매치' : match.reason ?? '관심 종목 기반 추천'}
@@ -702,6 +705,17 @@ function FeaturedMatchCard({
           </div>
         ) : null}
       </div>
+      {/* 사진이 없으면 흰 글씨 오버레이를 쓸 수 없어 카피를 밴드 아래로 내린다. */}
+      {!network && !match.imageUrl ? (
+        <div className="tm-featured-stack-copy">
+          <div className="tm-text-micro tm-featured-eyebrow">
+            {signedOut ? '랜덤 추천 매치' : match.reason ?? '관심 종목 기반 추천'}
+          </div>
+          <div className="tm-text-subhead tm-featured-headline" style={{ marginTop: 4 }}>
+            {match.title}
+          </div>
+        </div>
+      ) : null}
       <div className={network ? 'tm-featured-content' : 'tm-featured-content tm-featured-content-with-cta'}>
         {network ? (
           <ErrorState title="목록을 불러오지 못했어요" message="잠시 후 다시 시도해 주세요." onRetry={onRetry} retryLabel="다시 불러오기" />

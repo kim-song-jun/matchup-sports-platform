@@ -193,3 +193,55 @@ describe('섹션 자체가 사라지는 경로 — 로컬 캐시 복원 + 홈 �
     expect(container.querySelector('.tm-featured-skeleton')).toBeInTheDocument();
   });
 });
+
+// ─── 추천 카드 미디어 밴드 (2026-09-07) ───────────────────────────────────────
+//
+// alpha 데스크톱 1440 실측에서 같은 행의 두 추천 카드가 미디어 밴드 308px vs 152px 로
+// 벌어져 있었다. 사진 없는 카드의 카피를 밴드 **안**에 두는 바람에 밴드가 내용만큼
+// 자란 것이다(사진 카드는 흰 글씨 오버레이라 밴드가 안 자란다).
+//
+// 그래서 계약은 하나다 — **사진이 없으면 카피는 밴드 밖에 있다.** 밴드는 비율만
+// 차지하고 그래픽만 담는다. 누군가 카피를 다시 밴드 안으로 넣으면 여기서 잡힌다.
+
+const MATCH_WITHOUT_PHOTO = {
+  id: 'match-1',
+  title: '토요일 저녁 풋살',
+  sportName: '풋살',
+  placeName: '성수 풋살장',
+  startsAt: '2026-09-12T10:00:00.000Z',
+  capacityText: '4/10',
+};
+
+function renderWithFeatured(imageUrl: string | null) {
+  homeMock.mockReturnValue({
+    data: { ...HOME_DATA, recommendedMatches: [{ ...MATCH_WITHOUT_PHOTO, imageUrl }] },
+    isError: false,
+    refetch: vi.fn(),
+  });
+  return renderHome();
+}
+
+describe('추천 카드 미디어 밴드', () => {
+  it('사진이 없으면 카피가 밴드 밖에 있다 — 밴드에는 그래픽만 남는다', () => {
+    const { container } = renderWithFeatured(null);
+
+    const media = container.querySelector('.tm-featured-media');
+    const copy = container.querySelector('.tm-featured-stack-copy');
+    expect(media).not.toBeNull();
+    expect(copy).not.toBeNull();
+
+    // 핵심 단언. 밴드가 카피를 품으면 내용만큼 자라 같은 행의 사진 카드와 높이가 벌어진다.
+    expect(media?.contains(copy)).toBe(false);
+    expect(media?.querySelector('.tm-match-sport-illustration')).not.toBeNull();
+    expect(copy?.querySelector('.tm-featured-headline')?.textContent).toBe('토요일 저녁 풋살');
+  });
+
+  it('사진이 있으면 카피는 밴드 안 오버레이에 남는다 — 밴드 밖 카피를 만들지 않는다', () => {
+    const { container } = renderWithFeatured('/uploads/real.webp');
+
+    const media = container.querySelector('.tm-featured-media');
+    expect(media?.querySelector('.tm-featured-overlay .tm-featured-headline')).not.toBeNull();
+    expect(container.querySelector('.tm-featured-stack-copy')).toBeNull();
+    expect(container.querySelector('.tm-match-sport-illustration')).toBeNull();
+  });
+});

@@ -52,7 +52,13 @@ export function TournamentCampaignStatusDialog({
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
           <div>
             <h2 id="campaign-status-dialog-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">캠페인 상태 변경</h2>
-            <p className="mt-1 text-xs text-[var(--text-muted)]">{targetLabel} 상태로 변경해요.</p>
+            {/* Tailwind 12px 클래스 + --text-muted 를 tm-text-caption 하나로 — 12px/16px/400 이
+                그대로고 color 도 같다(--text-muted 와 --text-caption 은 라이트·다크·고대비
+                세 곳 전부 같은 값을 가리킨다. 언젠가 갈리면 이 줄은 caption 을 따라간다 —
+                다이얼로그 제목 아래 보조 문구라 그 편이 의미에도 맞다).
+                주석에 클래스 이름을 그대로 적지 않는 이유: 글자 크기 게이트가 소스 문자열을
+                세기 때문에 인용만으로 카운트가 늘어난다(실제로 한 번 늘었다). */}
+            <p className="mt-1 tm-text-caption">{targetLabel} 상태로 변경해요.</p>
           </div>
           <button type="button" aria-label="모달 닫기" disabled={pending} onClick={onClose} className="flex h-[44px] w-[44px] items-center justify-center rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-soft)] hover:text-[var(--text-body)] disabled:opacity-40">
             <X size={18} aria-hidden="true" />

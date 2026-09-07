@@ -259,6 +259,18 @@ describe('추천 카드 미디어 밴드', () => {
  */
 describe('추천 카드 CTA 위계', () => {
   function renderFeatured(imageUrl: string | null) {
+    // 대회 슬롯을 **명시적으로** 접힌 상태로 둔다. 이걸 빼면 이 describe 는 앞선
+    // '섹션 자체가 사라지는 경로' 가 남긴 mockReturnValue 에 얹혀 통과한다 —
+    // 그 describe 에는 afterEach 초기화가 없어 값이 끝까지 끌려온다. 앞 블록을
+    // 손대는 순간 여기가 무너지는데, 그때 뜨는 실패는 CTA 회귀가 아니라
+    // 스켈레톤(.tm-featured-cta.tm-skeleton) 이 섞여 든 것이다(실측 확인).
+    tournamentsMock.mockReturnValue({
+      data: [],
+      isPending: false,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
     homeMock.mockReturnValue({
       data: { ...HOME_DATA, recommendedMatches: [{ ...MATCH_WITHOUT_PHOTO, imageUrl }] },
       isError: false,
@@ -270,7 +282,7 @@ describe('추천 카드 CTA 위계', () => {
   it('추천 카드의 CTA 는 solid primary 가 아니라 outline 이다', () => {
     const { container } = renderFeatured(null);
 
-    const ctas = [...container.querySelectorAll('.tm-featured-cta')];
+    const ctas = [...container.querySelectorAll('.tm-featured-cta:not(.tm-skeleton)')];
     expect(ctas.length).toBeGreaterThan(0);
     ctas.forEach((cta) => {
       expect(cta.classList.contains('tm-btn-outline')).toBe(true);
@@ -281,7 +293,7 @@ describe('추천 카드 CTA 위계', () => {
   it('사진이 있는 카드도 같은 규칙을 쓴다', () => {
     const { container } = renderFeatured('/uploads/real.webp');
 
-    const ctas = [...container.querySelectorAll('.tm-featured-cta')];
+    const ctas = [...container.querySelectorAll('.tm-featured-cta:not(.tm-skeleton)')];
     expect(ctas.length).toBeGreaterThan(0);
     ctas.forEach((cta) => expect(cta.classList.contains('tm-btn-primary')).toBe(false));
   });

@@ -456,6 +456,27 @@ describe('리그전 배지', () => {
     expect(screen.getByText('비용 미정')).toBeInTheDocument();
   });
 
+  /**
+   * **호스트 팀 카드에도 같은 링크가 있다** — 소비처가 둘인데 한쪽만 테스트가 있으면
+   * 다른 쪽은 조용히 되돌아갈 수 있다. 여기서도 배지 줄 밖에 있는지를 구조로 잰다.
+   * (그 카드는 데스크톱/모바일 두 컬럼에 같은 노드를 그리므로 첫 번째로 좁힌다.)
+   */
+  it('호스트 팀 카드의 리그 링크도 배지 줄 밖에 있다', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.match = { ...model.match, league: { leagueId: 'lg-1', title: '가을 리그' } };
+
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const card = container.querySelector('.tm-host-team-card') as HTMLElement | null;
+    expect(card).not.toBeNull();
+    const scoped = within(card!);
+
+    const badge = scoped.getByRole('button', { name: /리그 상세로 이동/ });
+    const sportBadge = scoped.getByText(model.match.sport);
+    expect(sportBadge).toHaveClass('tm-badge-blue');
+    expect(sportBadge.parentElement!.contains(badge)).toBe(false);
+  });
+
   it('리그 소속이 아니면 목록 카드에 리그전 배지가 없다', () => {
     const model = getTeamMatchListViewModel();
     model.matches = [{ ...model.matches[0], league: null }];

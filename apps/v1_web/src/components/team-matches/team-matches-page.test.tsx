@@ -351,6 +351,60 @@ describe('리그전 배지', () => {
     expect(screen.queryByText('성별 무관')).not.toBeInTheDocument();
   });
 
+  /**
+   * **카드가 "누구와 붙는지" 를 보여주지 않던 결함.**
+   *
+   * 상대팀 이름이 있어야 할 자리에 신청 상태 배지(`승인 완료`·`신청 마감`)가 들어가 있었다.
+   * 리그 대진은 상대가 항상 확정돼 있어 **그 자리가 늘 상태 배지**였다. 상세는 같은
+   * 사용자 보고로 2026-08-25 에 고쳤는데(`teamMatchOpponentLabel`) 목록 카드만 남았다.
+   *
+   * 세 가지를 함께 잰다 — 이름이 나온다 · 상태 문구가 그 자리를 차지하지 않는다 ·
+   * 리그 대진에는 신청 상태 자체를 안 그린다(신청 개념이 없다).
+   */
+  it('상대가 확정되면 카드가 상태 대신 상대팀 이름을 보여준다', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = [{
+      ...model.matches[0],
+      opponentTeam: '상대 FC',
+      league: { leagueId: 'lg-1', title: '가을 리그' },
+      status: 'closed',
+    }];
+
+    renderPage(<TeamMatchListPageView model={model} />);
+
+    expect(screen.getByText('상대 FC')).toBeInTheDocument();
+    // 리그 대진에는 신청 개념이 없다 — 모집 어휘를 그리지 않는다.
+    expect(screen.queryByText('신청 마감')).not.toBeInTheDocument();
+  });
+
+  it('상대가 아직 없으면 그 자리에 상태를 그린다 — 그때는 그게 알아야 할 값이다', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = [{ ...model.matches[0], opponentTeam: null, league: null, status: 'open' }];
+
+    renderPage(<TeamMatchListPageView model={model} />);
+
+    expect(screen.getByText('모집 중')).toBeInTheDocument();
+  });
+
+  /**
+   * 리그 경기에는 **상대팀 부담금이라는 개념이 없다** — `비용 미정` 이 영원히 미정으로
+   * 남아 운영자가 안 채운 것처럼 읽힌다. 자리를 비우지는 않는다(푸터 좌우 배치가
+   * 무너지고, '무료' 로 둔갑시키지 않으려던 원래 의도도 사라진다).
+   */
+  it('리그 대진의 비용 자리는 리그 문맥으로 바뀐다 — 친선은 그대로 비용 미정', () => {
+    const league = getTeamMatchListViewModel();
+    league.matches = [{ ...league.matches[0], opponentCost: null, league: { leagueId: 'lg-1', title: '가을 리그' } }];
+    const first = renderPage(<TeamMatchListPageView model={league} />);
+    expect(screen.getByText('리그 경기')).toBeInTheDocument();
+    expect(screen.queryByText('비용 미정')).not.toBeInTheDocument();
+    first.unmount();
+
+    const friendly = getTeamMatchListViewModel();
+    friendly.matches = [{ ...friendly.matches[0], opponentCost: null, league: null }];
+    renderPage(<TeamMatchListPageView model={friendly} />);
+    expect(screen.getByText('비용 미정')).toBeInTheDocument();
+  });
+
   it('리그 소속이 아니면 목록 카드에 리그전 배지가 없다', () => {
     const model = getTeamMatchListViewModel();
     model.matches = [{ ...model.matches[0], league: null }];

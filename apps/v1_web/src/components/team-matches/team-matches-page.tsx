@@ -823,7 +823,12 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   const statusClass = match.status === 'mine' ? 'tm-badge-blue' : match.status === 'pending' ? 'tm-badge-orange' : match.status === 'approved' ? 'tm-badge-green' : match.status === 'closed' ? 'tm-badge-grey' : 'tm-badge-blue';
   // 마감된 팀매치도 경기 시작 전까지 목록에 남는다(team-matches.service.ts list()) —
   // 배지만으로는 스크롤 중에 안 걸리므로 카드 지면·사진도 함께 눌러 한눈에 갈리게 한다.
-  const isClosed = match.status === 'closed';
+  //
+  // **리그 대진은 여기서 제외한다.** 리그엔 신청 개념이 없어 `closed` 가 "모집이 끝났다"
+  // 가 아니라 그냥 "상대가 정해져 있다" 는 뜻인데, 그 상태가 원정팀 팀장·선수에게도
+  // 그대로 붙어 **자기 팀 경기가 마감·흐림으로** 보였다(리뷰어 실측).
+  const isLeagueFixture = league != null;
+  const isClosed = match.status === 'closed' && !isLeagueFixture;
   return (
     <Link className={`tm-team-match-card tm-pressable${isClosed ? ' tm-card-closed' : ''}`} href={`/team-matches/${match.id}`}>
       <div className={`tm-team-match-vs${match.imageUrl ? '' : ' tm-team-match-vs-sport'}`} style={match.imageUrl ? { backgroundImage: teamMatchBackgroundImage(match.imageUrl) } : undefined}>
@@ -835,11 +840,28 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
         <span aria-hidden="true">vs</span>
         <div style={{ textAlign: 'right' }}>
           <div className="tm-text-caption">상대팀</div>
-          {/* P0/P1: 상태를 색상+아이콘+텍스트 병행 (WCAG 1.4.1) */}
-          <div className={`tm-badge ${statusClass}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-            <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
-            {statusLabel}
-          </div>
+          {/* **팀 이름 자리에는 팀 이름을 쓴다.** 여기에 신청 상태('승인 완료'·'신청 마감')를
+              넣으면 **정작 누구와 붙는지가 화면에서 사라진다** — 상세가 2026-08-25 에 같은
+              사용자 보고로 고친 결함인데(`teamMatchOpponentLabel` 주석) 목록 카드만 남아
+              있었다. 리그 대진은 상대가 항상 확정돼 있어 그 자리가 늘 상태 배지였다.
+
+              상대가 아직 없으면(모집 중·검토 중) 이름이 없으니 그때는 상태를 그린다 —
+              그게 그 카드에서 실제로 알아야 할 값이다. */}
+          {match.opponentTeam ? (
+            <div className="tm-text-subhead">{match.opponentTeam}</div>
+          ) : (
+            /* P0/P1: 상태를 색상+아이콘+텍스트 병행 (WCAG 1.4.1) */
+            <div className={`tm-badge ${statusClass}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+              <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
+              {statusLabel}
+            </div>
+          )}
+          {/* 상대가 확정된 **친선** 매치는 이름 아래에 상태를 작게 남긴다 — 목록에서
+              모집 중과 마감을 가리는 신호가 사라지면 안 된다(2026-09-07 제보).
+              리그 대진에는 신청 개념 자체가 없어 이 줄을 그리지 않는다. */}
+          {match.opponentTeam && !isLeagueFixture ? (
+            <div className="tm-text-micro" style={{ marginTop: 2, color: 'var(--text-caption)' }}>{statusLabel}</div>
+          ) : null}
         </div>
       </div>
       <div style={{ padding: 16 }}>
@@ -885,8 +907,16 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
           )}
           {/* P1: 숫자는 body-lg(17px/700), 단위 "원"은 caption(12px) — 2:1 비율 */}
           {/* 비용을 모르면(costNote 미기재) 금액 자리를 '비용 미정'으로 둔다 — 0 으로 채워
-              '무료'라고 하면 없는 사실을 만들어낸다. */}
-          {match.opponentCost === null ? (
+              '무료'라고 하면 없는 사실을 만들어낸다.
+
+              **리그 대진은 그 자리를 리그 문맥으로 바꾼다.** 리그 경기에는 상대팀 부담금이라는
+              개념이 없어 '비용 미정' 이 영원히 미정으로 남는다 — 채워질 수 없는 값을 계속
+              "미정" 이라 말하면 운영자가 안 채운 것처럼 읽힌다. 지우지는 않는다(자리가 비면
+              푸터의 좌우 배치가 무너지고, 무엇보다 '무료' 로 둔갑시키지 않으려는 원래 의도가
+              사라진다). */}
+          {isLeagueFixture && match.opponentCost === null ? (
+            <span className="tm-text-caption">리그 경기</span>
+          ) : match.opponentCost === null ? (
             <span className="tm-text-caption">비용 미정</span>
           ) : match.opponentCost === 0 ? (
             <span className="tm-text-body-lg tab-num" style={{ color: 'var(--blue700)' }}>무료</span>

@@ -390,7 +390,7 @@ describe('toTeamMatch — legacy/unmigrated condition fields never show mock dat
     sport: '축구', hostTeam: 'FC 발빠른놈들', venue: '상암 월드컵 A구장', region: '서울 마포',
     date: '5월 11일 일', time: '09:00', endTime: '11:00',
     format: '11:11', grade: 'A', style: '친선', cost: 280000, opponentCost: 140000, uniform: '빨강',
-    gender: '성별 무관', manner: 4.8, wins: 23, status: 'open',
+    gender: '성별 무관', manner: 4.8, wins: 23, opponentTeam: null, status: 'open',
   };
 
   function realMatch(overrides: Partial<V1TeamMatch>): V1TeamMatch {

@@ -55,6 +55,7 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     cost: costs.cost,
     opponentCost: costs.opponentCost,
     league: match.league ?? null,
+    opponentTeam: match.approvedOpponentTeam?.name ?? null,
     uniform: match.uniformColor || '',
     // **빈 값을 문자열로 채우지 않는다.** `'성별 미설정'` 을 넣으면 카드의
     // `match.gender ? … : null` 가드가 **절대 안 걸려**, 성별을 안 정한 매치(리그 대진이

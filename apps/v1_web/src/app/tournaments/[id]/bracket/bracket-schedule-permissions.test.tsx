@@ -7,6 +7,15 @@ const myFixturesMock = vi.fn();
 
 vi.mock('@/components/public-game-records/use-public-game-records', () => ({
   usePublicTournamentSchedule: (...args: unknown[]) => scheduleMock(...args),
+  // 선수 기록 섹션이 `/schedule` 에서 이 탭으로 옮겨왔다. 이 스펙의 관심사는 아니라
+  // 빈 상태로 둔다(`emptyBehavior="hide"` 라 아무것도 그리지 않는다).
+  usePublicTournamentPlayerRecords: () => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({

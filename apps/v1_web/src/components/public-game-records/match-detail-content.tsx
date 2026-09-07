@@ -43,6 +43,26 @@ function sideLabel(side: PublicMatchDetail['home']): string {
   return side?.teamName ?? '미정';
 }
 
+/**
+ * 스코어보드의 팀 이름. **선수 이름은 프로필로 눌리는데 팀 이름은 아무 데도 못 갔다** —
+ * 관전자가 이 경기에서 팀으로 가는 유일한 자리인데 막혀 있었다(alpha 실측).
+ *
+ * 모집 마감 전에는 서버가 신원을 가려 `teamId` 가 없다. 그때는 `ProfileLink` 와 같은
+ * 규칙으로 평문이 된다 — 없는 팀 페이지로 보내지 않는다.
+ */
+function SideName({ side }: { side: PublicMatchDetail['home'] }) {
+  const label = sideLabel(side);
+  if (!side?.teamId) return <>{label}</>;
+  return (
+    <Link
+      href={`/teams/${encodeURIComponent(side.teamId)}`}
+      style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}
+    >
+      {label}
+    </Link>
+  );
+}
+
 /** `void`/`corrected` states need a visible badge so a stale-looking score is never mistaken for the live truth. */
 function ResultStateBadge({ state }: { state: PublicMatchDetail['resultState'] }) {
   if (state === 'pending' || state === 'official') return null;
@@ -311,7 +331,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
         <Card pad={16}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ flex: 1, textAlign: 'right', fontSize: 16, fontWeight: 700, color: 'var(--text-strong)' }}>
-              {sideLabel(data.home)}
+              <SideName side={data.home} />
             </span>
             <span
               className="tab-num"
@@ -329,7 +349,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
               {formatScoreline(data.score, data.scoreStatus)}
             </span>
             <span style={{ flex: 1, textAlign: 'left', fontSize: 16, fontWeight: 700, color: 'var(--text-strong)' }}>
-              {sideLabel(data.away)}
+              <SideName side={data.away} />
             </span>
           </div>
           {/* 스코어 아래 보조 표기 — 승부차기가 없으면 렌더 없음. */}

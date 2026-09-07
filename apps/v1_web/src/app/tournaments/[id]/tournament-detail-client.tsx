@@ -1672,7 +1672,7 @@ function StandingsMovedNotice({ tournamentId }: { tournamentId: string }) {
     <section aria-label="순위표 안내" style={{ marginTop: 24 }}>
       <Link
         href={`/tournaments/${tournamentId}/bracket`}
-        className="tm-pressable"
+        className="tm-pressable tm-on-tint"
         style={{
           display: 'flex',
           alignItems: 'center',

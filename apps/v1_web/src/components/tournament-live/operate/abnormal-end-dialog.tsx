@@ -84,7 +84,11 @@ export function AbnormalEndDialog({ open, onCancel, onConfirm, submitting = fals
         aria-labelledby={titleId}
         className="w-full max-w-md rounded-2xl bg-[var(--surface)] p-5 shadow-xl"
       >
-        <h2 id={titleId} className="text-[length:var(--font-size-body-lg)] font-bold">
+        {/* text-strong 을 명시한다 — 지금은 body 상속색(--foreground)과 값이 같아 화면은
+            달라지지 않지만(라이트 둘 다 --grey900, 다크 둘 다 #f2f4f6), 형제 다이얼로그 셋
+            (assist/penalty/action-target)이 전부 명시하고 있어 이 하나만 상속에 기대면
+            두 토큰이 갈라지는 날 여기만 조용히 드리프트한다. */}
+        <h2 id={titleId} className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">
           몰수·중단으로 종료
         </h2>
         <p className="mt-2 text-sm text-[var(--text-muted)]">

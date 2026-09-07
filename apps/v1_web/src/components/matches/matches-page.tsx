@@ -115,6 +115,7 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
             <div className="tm-match-card-stack">
               {model.matches.map((match) => <MatchRowItem key={match.id} match={match} />)}
             </div>
+            <MatchNearbyRail matches={model.nearbyMatches ?? []} />
           </>
         ) : (
           /* EmptyState must be a sibling of .tm-match-card-stack, not nested inside it —
@@ -768,9 +769,34 @@ function MatchFeatureRail({ matches }: { matches: MatchCardModel[] }) {
   if (matches.length === 0) return null;
   return (
     <section className="tm-match-rail-section" aria-labelledby="match-rail-heading">
-      <h2 className="tm-text-label tm-match-rail-heading" id="match-rail-heading">눈에 띄는 매치</h2>
+      {/* 2026-09-07: tm-text-label(13px) → tm-text-body-lg(17px). 섹션 제목인데 그 아래
+          카드 제목과 같은 크기라 위계가 서지 않았다 — DESIGN.md §2.1 의 섹션 제목 값. */}
+      <h2 className="tm-text-body-lg tm-match-rail-heading" id="match-rail-heading">눈에 띄는 매치</h2>
       <div className="tm-match-rail-h">
         {matches.map((match) => <MatchCardItem key={`rail-${match.id}`} match={match} />)}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * 인접 매치 레일 — 결과가 1~2건뿐일 때만 목록 아래에 붙는다(디자인 검수 W-3, B안).
+ *
+ * 0건은 EmptyState 가 받지만 1건은 그 경로를 타지 않아, 카드 한 장 아래로 화면 끝까지
+ * 비어 있었다(alpha 390 실측: 약 500px). 검색 결과와 섞이지 않도록 위쪽 구분선 + 자체
+ * 섹션 제목 + "검색 조건 밖" 이라는 문구로 성격을 명시한다 — 이게 B안이 안고 가는
+ * 트레이드오프(결과와 추천이 한 스크롤에 있다)를 줄이는 유일한 장치다.
+ *
+ * 채울 게 없으면 아무것도 그리지 않는다. 빈 레일이나 자리표시를 남기지 않는다.
+ */
+function MatchNearbyRail({ matches }: { matches: MatchCardModel[] }) {
+  if (matches.length === 0) return null;
+  return (
+    <section className="tm-match-nearby-section" aria-labelledby="match-nearby-heading">
+      <h2 className="tm-text-body-lg tm-match-rail-heading" id="match-nearby-heading">이런 매치는 어때요?</h2>
+      <p className="tm-text-caption tm-match-nearby-sub">검색 조건 밖이지만 지금 모집 중인 매치예요</p>
+      <div className="tm-match-rail-h">
+        {matches.map((match) => <MatchCardItem key={`nearby-${match.id}`} match={match} />)}
       </div>
     </section>
   );

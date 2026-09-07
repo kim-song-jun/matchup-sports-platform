@@ -6,7 +6,7 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
-import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, ErrorState, KPIStat, ListItem, SectionTitle } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
@@ -1773,9 +1773,11 @@ function dedupeTags(tags: string[]) {
   return Array.from(new Set(tags.filter(Boolean)));
 }
 
-function SectionTitle({ title, sub }: { title: string; sub: string }) {
-  return <div className="tm-section-title"><div className="tm-text-body-lg">{title}</div><div className="tm-text-caption" style={{ marginTop: 3 }}>{sub}</div></div>;
-}
+/* SectionTitle 로컬 복제본은 2026-09-07 에 제거하고 @/components/v1-ui/primitives 의 공유
+   컴포넌트를 쓴다. 복제본은 title 과 sub 를 .tm-section-title(display:flex;
+   justify-content: space-between)의 형제로 직접 넣어 둘이 좌우로 갈라졌고, 공유
+   컴포넌트는 둘을 한 래퍼에 담아 세로로 쌓는다. 값(17px/700)은 원래 같았지만 다음
+   변경 때 갈라질 자리였다 — DESIGN.md §7 "컴포넌트 재사용". */
 
 function formatTeamSports(items: string[]) {
   return items.length ? items.join(' · ') : '종목 미정';

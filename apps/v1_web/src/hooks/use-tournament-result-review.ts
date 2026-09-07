@@ -153,8 +153,14 @@ export type TournamentOperationsBoardWarning =
 export type TournamentOperationsBoardItem = {
   fixtureId: string;
   tournamentId: string;
-  round: string;
-  fixtureNumber: number;
+  /**
+   * **리그 행에서는 `null` 이다.** 주차·번호는 대회 축의 컬럼이고 `V1TeamMatch` 에는
+   * **존재하지 않는다** — 서버가 리그 행에 명시적으로 `null` 을 넣는다. 여기를 non-null 로
+   * 두면 **타입이 거짓말을 하고**, 모든 소비처가 널 체크를 요구받지 않아 템플릿 리터럴에
+   * 그대로 들어가 화면에 `"null번 경기"` 가 찍힌다(tsc·테스트·CI 는 전부 green 이었다).
+   */
+  round: string | null;
+  fixtureNumber: number | null;
   gameId: string | null;
   gameState: string | null;
   fieldId: string | null;

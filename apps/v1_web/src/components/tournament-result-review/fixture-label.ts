@@ -38,8 +38,8 @@ export function resolveFixtureLabel(
   teamNames: { home: string; away: string } | undefined,
   leagueTitles: ReadonlyMap<string, string>,
 ): FixtureLabel {
-  const round = item.round as string | null;
-  const fixtureNumber = item.fixtureNumber as number | null;
+  // 캐스팅이 필요 없다 — 타입이 이제 사실대로 `| null` 이다(리그 행에서 서버가 null 을 준다).
+  const { round, fixtureNumber } = item;
   const hasTournamentAxis = round !== null && fixtureNumber !== null;
   const leagueTitle = leagueTitles.get(item.fixtureId) ?? null;
 

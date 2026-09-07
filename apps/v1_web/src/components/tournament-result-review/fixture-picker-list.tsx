@@ -1,14 +1,14 @@
 'use client';
 
 import { resolveFixtureLabel } from './fixture-label';
-
-const EMPTY_TITLES: ReadonlyMap<string, string> = new Map();
 import type { TournamentOperationsBoardItem } from '@/hooks/use-tournament-result-review';
 import { EmptyState } from '@/components/v1-ui/primitives';
 import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/game-result-score';
 // 라벨은 운영 보드 배지와 같은 출처를 쓴다 — 같은 경고 코드가 화면마다 다른 뜻으로
 // 번역되던 문제(MISSING_SCORER: '기록자 없음' vs '득점자 미기재')를 막는다.
 import { WARNING_LABELS } from '@/components/tournament-ops/badges';
+
+const EMPTY_TITLES: ReadonlyMap<string, string> = new Map();
 
 function scoreLabel(item: TournamentOperationsBoardItem): string | null {
   // `.home` 을 직접 읽으면 백필된 경기(중첩 `{regulation:{…}}` 형태)가

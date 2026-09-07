@@ -70,7 +70,7 @@ describe('FixturePickerList', () => {
     // 부제는 구분자만 남은 `" · 번 경기"` 였다. 제목은 생성 시 이미 "N주차 M경기" 다.
     render(
       <FixturePickerList
-        items={[makeItem({ round: null as unknown as string, fixtureNumber: null as unknown as number })]}
+        items={[makeItem({ round: null, fixtureNumber: null })]}
         leagueTitlesByFixtureId={new Map([['f-1', '2주차 1경기']])}
         selectedFixtureId={null}
         onSelect={vi.fn()}
@@ -89,7 +89,7 @@ describe('FixturePickerList', () => {
   it('리그인데 제목도 못 받으면 "경기" 로 둔다 — 없는 번호를 지어내지 않는다', () => {
     render(
       <FixturePickerList
-        items={[makeItem({ round: null as unknown as string, fixtureNumber: null as unknown as number })]}
+        items={[makeItem({ round: null, fixtureNumber: null })]}
         selectedFixtureId={null}
         onSelect={vi.fn()}
         emptyTitle="없어요"

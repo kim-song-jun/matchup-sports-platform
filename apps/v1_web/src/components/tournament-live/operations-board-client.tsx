@@ -13,6 +13,7 @@ import {
   useV1TournamentOperationsBoard,
   useV1Tournament,
 } from '@/hooks/use-v1-api';
+import { buildLeagueFixtureTitles } from '@/components/tournament-result-review/fixture-label';
 import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
@@ -160,8 +161,15 @@ function FixtureFieldCell({
   );
 }
 
-/** 표·카드·라벨이 같은 문구를 쓰도록 컴포넌트 밖으로 뺀 경기 이름(팀명은 호출부가 채운다). */
-function rowLabelFor(item: V1TournamentOperationsBoardItem): string {
+/**
+ * 표·카드·라벨이 같은 문구를 쓰도록 컴포넌트 밖으로 뺀 경기 이름(팀명은 호출부가 채운다).
+ *
+ * **리그 행은 `round`·`fixtureNumber` 가 둘 다 `null` 이다** — 그대로 템플릿 리터럴에 넣으면
+ * `"null null번"` 이 된다(타입이 non-null 이라 tsc 도 못 잡던 자리다). 값이 없으면 대진
+ * 제목으로 대체하고, 그것도 없으면 아무것도 만들어 내지 않는다.
+ */
+function rowLabelFor(item: V1TournamentOperationsBoardItem, leagueTitle?: string): string {
+  if (item.round === null || item.fixtureNumber === null) return leagueTitle ?? '경기';
   return `${item.round} ${item.fixtureNumber}번`;
 }
 
@@ -222,6 +230,14 @@ export function OperationsBoardClient({ tournamentId }: Props) {
     }
     return map;
   }, [tournament.data?.fixtures]);
+
+  /* 리그 대진은 `fixtures` 가 아니라 `leagueFixtures` 로 온다 — 리그 거울엔
+     `V1TournamentFixture` 가 0건이라 위 맵은 리그에서 항상 빈다. 제목은 생성 시 이미
+     "N주차 M경기" 로 붙어 있으니 그걸 읽는다. */
+  const leagueTitlesByFixtureId = useMemo(
+    () => buildLeagueFixtureTitles(tournament.data?.leagueFixtures),
+    [tournament.data?.leagueFixtures],
+  );
 
   /* 소비자용 순위·브래킷 화면(/tournaments/:id/bracket)은 이미 이 스테퍼로 대회
    * 진행 단계를 보여준다. 운영 보드에는 같은 정보가 표에 흩어져 있어서 스태프가
@@ -286,8 +302,9 @@ export function OperationsBoardClient({ tournamentId }: Props) {
 
   function rowLabel(item: V1TournamentOperationsBoardItem): string {
     const names = teamNamesByFixtureId.get(item.fixtureId);
-    if (!names) return `${item.fixtureNumber}번 경기`;
-    return `${names.home} vs ${names.away}`;
+    if (names) return `${names.home} vs ${names.away}`;
+    // 리그 행은 팀명 맵이 비고(`fixtures` 가 아니라 `leagueFixtures` 로 온다) 번호도 없다.
+    return rowLabelFor(item, leagueTitlesByFixtureId.get(item.fixtureId));
   }
 
   /* 예전에는 NO_FIELD_ASSIGNED·NO_STAFF_ASSIGNED 를 여기서 통째로 걸러냈다 — 경기장 배정
@@ -447,7 +464,9 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                       <td className="px-4 py-3 align-middle">
                         <p className="font-medium text-[var(--text-strong)]">{rowLabel(item)}</p>
                         {/* 모바일 카드와 같은 표기 — "4강 4경기"는 "4강의 4번째 경기"로 오독된다. */}
-                        <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{item.round} · {item.fixtureNumber}번 경기</p>
+                        {item.round !== null && item.fixtureNumber !== null ? (
+                          <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">{item.round} · {item.fixtureNumber}번 경기</p>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 align-middle tabular-nums">
                         {item.scheduledAt ? formatAdminDateTime(item.scheduledAt) : '미정'}
@@ -503,7 +522,9 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                     <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                       {/* "4강 4경기"는 "4강의 4번째 경기"로 오독된다 — fixtureNumber 는
                           대회 전체 연번이므로 '번 경기'로 번호임을 드러낸다. */}
-                      {item.round} · {item.fixtureNumber}번 경기 ·{' '}
+                      {item.round !== null && item.fixtureNumber !== null
+                        ? `${item.round} · ${item.fixtureNumber}번 경기 · `
+                        : ''}
                       {item.scheduledAt ? formatAdminDateTime(item.scheduledAt) : '일정 미정'}
                     </p>
                     {/* 배정 권한이 있으면 여기서 바로 바꾼다 — 권한이 없으면 배정된 필드만 읽기로

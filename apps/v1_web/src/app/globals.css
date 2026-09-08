@@ -3380,10 +3380,15 @@ label.tm-btn:focus-within {
 
 .tm-match-detail-title {
   margin: 4px 0 0;
+  /* 히어로 지면(사진·그라디언트) 위라 흰 글씨는 그대로 둔다. */
   color: var(--static-white);
-  font-size: 24px;
+  /* 이 h2 는 데스크톱 페이지 헤드의 h1(.tm-text-heading)과 **같은 match.title 문자열**을
+     보여준다(matches-page.tsx:309 vs :352). 그런데 크기는 같고 굵기만 700 vs 800 으로
+     갈려 있었다 — 한 화면에서 같은 제목이 두 무게로 보인다(alpha 실측 2026-09-08).
+     DESIGN.md 의 페이지 제목 값(24px/700)에 맞춘다. */
+  font-size: var(--font-size-heading);
   line-height: 32px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .tm-match-detail-body {

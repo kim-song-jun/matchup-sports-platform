@@ -177,6 +177,26 @@ for (const { file, name, floor } of RESTORE_FUNCTIONS) {
 }
 
 /**
+ * **라벨이 겹치면 로그가 어느 단계인지 말하지 못한다** — 이 PR 의 목적이 그것뿐이라
+ * 중복은 곧 목적 상실이다.
+ *
+ * 이 검사는 **라벨이 검사 대상과 맞는지는 못 본다**(그건 사람이 읽어야 한다 — 실제로
+ * 리뷰가 `legacy_images_known` 이 api 하나만 검사하는 것을 잡았다). 여기서 막는 것은
+ * "두 단계가 같은 이름을 낸다" 는 기계적으로 판정 가능한 쪽뿐이다.
+ */
+test('(b-1) 복구 단계 라벨이 서로 겹치지 않는다', () => {
+  const labels = RESTORE_FUNCTIONS.flatMap(({ file, name }) =>
+    joinContinuations(functionBody(readFileSync(file, 'utf8'), name))
+      .split('\n')
+      .map((line) => /alpha_restore_step\s+([A-Za-z0-9_]+)/.exec(line)?.[1])
+      .filter((label) => label !== undefined),
+  );
+  const duplicated = labels.filter((label, i) => labels.indexOf(label) !== i);
+  assert.deepEqual(duplicated, [], `같은 이름을 내는 단계가 있다: ${duplicated.join(', ')}`);
+  assert.ok(labels.length >= 29, `라벨 ${labels.length} 개 — 단계 수와 어긋난다`);
+});
+
+/**
  * 래퍼가 없으면 (b) 는 의미가 없다. 이름을 바꾸거나 지우면 여기서 먼저 걸린다.
  */
 test('(b-0) alpha_restore_step 이 공유 스크립트에 정의돼 있다', () => {

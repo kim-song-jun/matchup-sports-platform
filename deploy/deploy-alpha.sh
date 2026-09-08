@@ -146,7 +146,7 @@ container_image_state() {
 }
 
 restore_legacy_runtime() {
-  alpha_restore_step legacy_images_known test -n "${legacy_api_image}" || return 1
+  alpha_restore_step legacy_api_image_known test -n "${legacy_api_image}" || return 1
   alpha_restore_step legacy_web_image_known test -n "${legacy_web_image}" || return 1
   alpha_restore_step legacy_source restore_legacy_alpha_source || return 1
   ALPHA_API_IMAGE="${legacy_api_image}"

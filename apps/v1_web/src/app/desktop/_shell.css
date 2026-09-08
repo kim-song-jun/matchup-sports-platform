@@ -198,6 +198,12 @@
 
   /* Brand / logo */
   .tm-desktop-nav-brand {
+    /* 형제 .tm-desktop-nav-avatar 는 36px 박스로 히트박스를 확보해 뒀는데 이 브랜드
+       링크만 빠져 100×27px 로 렌더됐다(alpha 실측 2026-09-08, 데스크톱 5화면).
+       inline-flex + min-height 로 세로만 늘린다 — 글자 크기·위치는 그대로다. */
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
     font-size: 18px;
     font-weight: 800;
     color: var(--blue500);
@@ -287,7 +293,12 @@
   }
 
   .tm-desktop-nav-tab[aria-current="page"] {
-    color: var(--blue500);
+    /* [대비] --blue500 은 흰 배경에서 3.71:1 로 텍스트 기준(4.5:1) 미달이다(alpha 실측
+       2026-09-08, 데스크톱 5화면 전부). 15px bold 도 WCAG large-text 완화 기준
+       (14pt bold = 18.66px)에 못 미쳐 4.5:1 이 그대로 적용된다.
+       모바일 하단탭(.tm-bottom-tab[data-active="true"] span, globals.css)이 **같은 결함을
+       같은 값으로 이미 고쳤다** — 그 처방을 그대로 따른다(--blue700 ≈ 5.41:1). */
+    color: var(--blue700);
     font-weight: 700;
   }
 
@@ -458,7 +469,10 @@
 
   .tm-desktop-footer-tagline {
     font-size: 12.5px;
-    color: var(--grey500);
+    /* 푸터 지면(--grey50) 위에서 --grey500 은 2.91:1 이다(alpha 실측). 바로 아래
+       .tm-desktop-footer-links a 가 같은 지면에서 같은 이유로 이미 --grey700 을 쓰는데
+       형제인 이 줄만 빠져 있었다 — 같은 값으로 맞춘다. */
+    color: var(--grey700);
     white-space: nowrap;
   }
 
@@ -498,7 +512,9 @@
   .tm-desktop-footer-copy {
     margin: 0; /* <p> 기본 마진(1em 0)이 flex align-items:center 행에서 불필요한 여백을 만듦 */
     font-size: 12px;
-    color: var(--grey400);
+    /* --grey400 은 푸터 지면(--grey50) 위에서 1.92:1 — 이번 감사에서 가장 낮은 값이었다
+       (alpha 실측). 형제 footer-links·tagline 과 같은 --grey700 으로 맞춘다. */
+    color: var(--grey700);
     white-space: nowrap;
   }
 

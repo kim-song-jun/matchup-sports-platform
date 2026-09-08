@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const globalsCss = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+const desktopShellCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/_shell.css'), 'utf8');
 const tournamentsCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/tournaments.css'), 'utf8');
 
 describe('mobile floating action button layout', () => {
@@ -681,6 +682,60 @@ describe('파랑 히어로 지면 — 다크에서 그라디언트 끝이 밝아
 
     expect(accent).not.toMatch(/gradientTo:\s*'var\(--blue600\)'/);
     expect((accent.match(/gradientTo:\s*'var\(--brand-hero-gradient-end\)'/g) ?? []).length).toBe(2);
+  });
+});
+
+/**
+ * 데스크톱 셸의 대비·히트박스 (2026-09-08 alpha 실측).
+ *
+ * 이 파일은 **데스크톱에서만** 적용되는데 유닛 테스트는 jsdom 이라 미디어 쿼리도 레이아웃도
+ * 계산하지 않는다 — 그래서 여기서 깨져도 3000개 넘는 테스트가 전부 green 이었다.
+ * 실제로 alpha 데스크톱 5화면 **전부**에서 아래 4개가 기준 미달이었고, 모바일에는 0건이었다.
+ *
+ * 특히 이 파일 안에서 **형제 요소는 이미 고쳐져 있었다** — `footer-links a` 는 같은 지면
+ * (--grey50)에서 grey700 으로 올리며 그 이유를 주석으로 남겼고, `nav-avatar` 는 36px 박스로
+ * 히트박스를 확보했다. 옆줄만 빠진 것이라, 값을 문자열로 고정해 다음에 또 빠지지 않게 한다.
+ */
+describe('desktop shell — contrast and hit targets', () => {
+  const rule = (selector: string) => {
+    // 선택자의 공백은 \s+ 로 느슨하게 — 포매터가 줄바꿈이나 여러 칸으로 바꿔도 안 깨진다.
+    const escaped = selector
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\s+/g, '\\s+');
+    const body = desktopShellCss.match(new RegExp(escaped + '\\s*\\{([^}]*)\\}'))?.[1];
+    // 주석을 걷어낸다 — 안 걷으면 주석에 적은 `color: var(--grey500)` 같은 문구가
+    // `.not.toMatch(/color:.../)` 에 걸려 오탐이 난다(#1143 Copilot).
+    return body?.replace(/\/\*[\s\S]*?\*\//g, '');
+  };
+
+  it('활성 GNB 탭은 --blue500 이 아니라 --blue700 을 쓴다 (3.71 → 5.41)', () => {
+    const r = rule('.tm-desktop-nav-tab[aria-current="page"]');
+    expect(r).toBeDefined();
+    expect(r).toMatch(/color:\s*var\(--blue700\)/);
+    expect(r).not.toMatch(/color:\s*var\(--blue500\)/);
+  });
+
+  it('푸터 보조 텍스트 둘 다 형제 링크와 같은 --grey700 을 쓴다', () => {
+    for (const sel of ['.tm-desktop-footer-tagline', '.tm-desktop-footer-copy']) {
+      const r = rule(sel);
+      expect(r, sel).toBeDefined();
+      expect(r, sel).toMatch(/color:\s*var\(--grey700\)/);
+      // 실측에서 각각 2.91 · 1.92 였던 값들.
+      expect(r, sel).not.toMatch(/color:\s*var\(--grey(400|500|600)\)/);
+    }
+  });
+
+  it('브랜드 링크가 44px 히트박스를 갖는다 — 형제 avatar 와 같은 기준', () => {
+    const r = rule('.tm-desktop-nav-brand');
+    expect(r).toBeDefined();
+    expect(r).toMatch(/min-height:\s*44px/);
+    // min-height 만 있고 display 가 inline 이면 세로가 안 늘어난다.
+    expect(r).toMatch(/display:\s*inline-flex/);
+  });
+
+  it('이미 고쳐져 있던 형제들은 그대로다 — 이 PR 이 되돌리지 않았는지', () => {
+    expect(rule('.tm-desktop-footer-links a')).toMatch(/color:\s*var\(--grey700\)/);
+    expect(rule('.tm-desktop-footer-links a')).toMatch(/min-height:\s*44px/);
   });
 });
 

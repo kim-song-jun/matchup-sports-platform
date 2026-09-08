@@ -149,8 +149,13 @@ describe('페이지 제목 — 공유 토큰', () => {
         ?.replace(/\/\*[\s\S]*?\*\//g, '');
 
       expect(rule, name).toBeDefined();
+      // 계약은 "크기·굵기·색·자간은 tm-text-heading 이 준다" 이므로 넷 다 막는다.
+      // font-size/weight 만 막으면 `font:` shorthand 로 같은 것이 돌아올 수 있다(#1145 Copilot).
       expect(rule, name).not.toMatch(/font-size:/);
       expect(rule, name).not.toMatch(/font-weight:/);
+      expect(rule, name).not.toMatch(/(^|[;{\s])font:/);
+      expect(rule, name).not.toMatch(/color:/);
+      expect(rule, name).not.toMatch(/letter-spacing:/);
     });
   });
 

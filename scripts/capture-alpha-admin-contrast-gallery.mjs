@@ -21,7 +21,30 @@ const OUT = process.env.OUT_DIR ?? 'output/playwright/visual-audit/admin-contras
  * `[["home","/home"],["teams","/teams"]]` 형태. 같은 계산기를 쓰기 위한 것이지,
  * 이 스크립트를 범용 크롤러로 만들려는 것은 아니다(로그인·읽기 전용 전제는 그대로).
  */
-const PAGES = process.env.PAGES_JSON ? JSON.parse(process.env.PAGES_JSON) : [
+/**
+ * `name` 은 **파일 이름이 되고** `path` 는 **URL 이 된다.** 환경변수로 들어오므로
+ * 오타 하나로 OUT 디렉터리 밖에 쓰거나(`../x`) 다른 호스트를 때릴 수 있다.
+ * 조용히 고치지 않고 **거부한다** — 이름이 바뀌어 저장되면 어느 화면을 찍은 건지
+ * 알 수 없게 되고, 그게 파일이 엉뚱한 데 쓰이는 것보다 나중에 더 비싸다.
+ */
+function checkPages(pages) {
+  for (const entry of pages) {
+    const [name, path] = entry;
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,59}$/.test(String(name))) {
+      throw new Error(`PAGES_JSON name 이 파일 이름으로 안전하지 않습니다: ${JSON.stringify(name)}`);
+    }
+    // `(?!\/)` 가 없으면 `//evil.com` 이 통과한다 — 프로토콜 상대 URL 이라 **다른 호스트**로 간다.
+    // 내 첫 정규식이 실제로 그걸 통과시켰고, 양방향 테스트에서만 드러났다.
+    // `..` 는 호스트를 못 벗어나지만(브라우저가 정규화한다) **찍은 화면이 지정한 경로와
+    // 달라진다** — 결과 파일 이름은 그대로라 나중에 어느 화면인지 알 수 없다.
+    if (!/^\/(?!\/)[A-Za-z0-9\-._~/?=&%]*$/.test(String(path)) || String(path).split('/').includes('..')) {
+      throw new Error(`PAGES_JSON path 는 '/' 로 시작하는 같은 호스트 경로여야 합니다: ${JSON.stringify(path)}`);
+    }
+  }
+  return pages;
+}
+
+const PAGES = process.env.PAGES_JSON ? checkPages(JSON.parse(process.env.PAGES_JSON)) : [
   ['dashboard', '/admin'],
   ['tournaments', '/admin/tournaments'],
   ['users', '/admin/users'],

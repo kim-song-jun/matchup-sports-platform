@@ -405,6 +405,26 @@ describe('TeamsService', () => {
       expect(summary).not.toContain('주 1회 · ');
     });
 
+    it('한 글자 요일은 메모에 우연히 걸려도 지우지 않는다 — 금 vs 금액 협의', async () => {
+      // 한글은 단어 경계가 없어 '금액' 안의 '금' 을 가릴 수 없다. 중복은 보기 나쁠 뿐이지만
+      // 삭제는 정보를 잃으므로, 한 글자 라벨은 아예 제외 대상에서 뺀다(#1123 Copilot).
+      const summary = await summaryOf({
+        activityDays: ['fri'],
+        activityNote: '금액 협의',
+      });
+
+      expect(summary).toBe('금 · 금액 협의');
+    });
+
+    it('두 글자 이상이면 예전대로 중복을 뺀다 — 길이 가드가 기능을 죽이지 않는다', async () => {
+      const summary = await summaryOf({
+        activityDays: ['wed', 'sun'],
+        activityNote: '매주 수·일 저녁',
+      });
+
+      expect(summary).toBe('매주 수·일 저녁');
+    });
+
     it('메모가 없으면 구조화된 값만으로 예전과 같이 만든다', async () => {
       const summary = await summaryOf({
         activityDays: ['wed', 'sun'],

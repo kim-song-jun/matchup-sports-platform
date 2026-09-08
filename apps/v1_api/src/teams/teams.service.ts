@@ -2310,11 +2310,20 @@ function formatTeamActivitySummary(profile: ActivityProfileLike) {
   return null;
 }
 
-/** 메모가 이 라벨을 이미 말하고 있는가. 공백 차이는 무시한다('수·일 저녁' vs '수·일 · 저녁'). */
+/**
+ * 메모가 이 라벨을 이미 말하고 있는가. 공백 차이는 무시한다('수·일 저녁' vs '수·일 · 저녁').
+ *
+ * **한 글자 라벨은 절대 제외하지 않는다.** 요일은 하루만 고르면 '금' 처럼 한 글자가 되는데,
+ * `금액 협의` 같은 메모에 우연히 걸려 **진짜 요일 정보가 사라진다**(#1123 Copilot).
+ * 한글은 단어 경계가 없어 정규식으로도 이 우연을 가르기 어려우므로, 그럴 땐 중복을
+ * 그대로 두는 쪽을 택한다 — 중복은 보기 나쁠 뿐이지만 삭제는 정보를 잃는다.
+ */
 function noteRepeats(note: string | null, label: string) {
   if (!note) return false;
   const squash = (value: string) => value.replace(/\s+/g, '');
-  return squash(note).includes(squash(label));
+  const needle = squash(label);
+  if (needle.length < 2) return false;
+  return squash(note).includes(needle);
 }
 
 function formatActivityDays(days: string[]) {

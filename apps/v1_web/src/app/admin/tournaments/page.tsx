@@ -196,7 +196,7 @@ export default function AdminTournamentsPage() {
                 aria-label={`${row.title} 상세 보기`}
                 className={[
                   'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg',
-                  'text-[length:var(--font-size-label)] font-medium text-[var(--text-muted)] bg-[var(--surface-soft)]',
+                  'tm-on-tint text-[length:var(--font-size-label)] font-medium text-[var(--text-muted)] bg-[var(--surface-soft)]',
                   'hover:bg-[var(--grey300)] transition-colors whitespace-nowrap',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 ].join(' ')}

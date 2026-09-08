@@ -32,8 +32,9 @@ const TONE_ICON: Record<NonNullable<AdminKpiCardProps['tone']>, string> = {
 const TONE_WRAPPER: Record<NonNullable<AdminKpiCardProps['tone']>, string> = {
   neutral: 'bg-[var(--card-surface)] border-[var(--border)]',
   positive: 'bg-[var(--card-surface)] border-[var(--border)]',
-  warning: 'bg-[var(--tint-orange)] border-[var(--tint-orange-border)]',
-  danger: 'bg-[var(--red50)] border-red-100',
+  // tm-on-tint: 틴트 지면 위 muted 캡션을 grey700 으로(grey600 은 tint-orange 4.27 · red50 4.02 로 AA 미달)
+  warning: 'tm-on-tint bg-[var(--tint-orange)] border-[var(--tint-orange-border)]',
+  danger: 'tm-on-tint bg-[var(--red50)] border-red-100',
 };
 
 function KpiCardInner({

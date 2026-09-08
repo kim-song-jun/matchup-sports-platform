@@ -526,7 +526,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
             type="button"
             onClick={() => setPaletteOpen(true)}
             aria-label="전역 검색 열기 (Cmd+K)"
-            className="flex w-full items-center gap-2 min-h-[40px] rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--text-body)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="tm-on-tint flex w-full items-center gap-2 min-h-[40px] rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--text-body)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <Search size={14} aria-hidden="true" />
             <span className="flex-1 text-left">회원·팀·매치 검색</span>

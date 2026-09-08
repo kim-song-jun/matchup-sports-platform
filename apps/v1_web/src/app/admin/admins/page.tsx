@@ -65,7 +65,7 @@ function AdminRoleBadge({ role }: { role: 'owner' | 'ops' | 'support' }) {
   }
   // support
   return (
-    <span className="inline-flex items-center gap-1 bg-[var(--surface-soft)] text-[var(--text-muted)] text-[length:var(--font-size-micro)] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+    <span className="tm-on-tint inline-flex items-center gap-1 bg-[var(--surface-soft)] text-[var(--text-muted)] text-[length:var(--font-size-micro)] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
       <ShieldMinus size={11} aria-hidden="true" />
       지원
     </span>
@@ -257,7 +257,7 @@ function GrantModal({ open, onClose, onGrantSuccess }: GrantModalProps) {
               type="button"
               onClick={() => !grantMutation.isPending && onClose()}
               disabled={grantMutation.isPending}
-              className="flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="tm-on-tint flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -522,7 +522,7 @@ export default function AdminAdminsPage() {
                       onClick={() => setActionModal({ row, action: 'changeRole' })}
                       className={[
                         'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
-                        'text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors whitespace-nowrap',
+                        'tm-on-tint text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors whitespace-nowrap',
                         'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                       ].join(' ')}
                       aria-label={`${row.nickname ?? '운영자'} 역할 변경`}

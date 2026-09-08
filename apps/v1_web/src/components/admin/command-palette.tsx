@@ -165,7 +165,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             aria-controls="command-palette-results"
             aria-activedescendant={items[activeIndex] ? `palette-item-${activeIndex}` : undefined}
           />
-          <kbd className="hidden sm:inline-flex items-center rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-0.5 text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
+          <kbd className="tm-on-tint hidden sm:inline-flex items-center rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-0.5 text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
             ESC
           </kbd>
         </div>
@@ -214,7 +214,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                       onMouseEnter={() => setActiveIndex(index)}
                       className={[
                         'flex w-full items-center gap-3 px-4 min-h-[44px] text-left transition-colors',
-                        index === activeIndex ? 'bg-[var(--blue50)]' : 'hover:bg-[var(--surface-soft)]',
+                        index === activeIndex ? 'tm-on-tint bg-[var(--blue50)]' : 'hover:bg-[var(--surface-soft)]',
                       ].join(' ')}
                     >
                       <span className="min-w-0 flex-1">

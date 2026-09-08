@@ -92,7 +92,7 @@ export function PromoCardFields({
   };
 
   return (
-    <section className="rounded-2xl border border-[var(--border)] bg-[var(--grey50)] p-4">
+    <section className="tm-on-tint rounded-2xl border border-[var(--border)] bg-[var(--grey50)] p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-bold text-[var(--text-strong)]">

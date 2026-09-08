@@ -154,7 +154,7 @@ export function TournamentCampaignTab({
               ))}
             </div>
           ) : (
-            <span className="rounded-full bg-[var(--surface-soft)] px-3 py-1 text-xs font-medium text-[var(--text-muted)]">읽기 전용</span>
+            <span className="tm-on-tint rounded-full bg-[var(--surface-soft)] px-3 py-1 text-xs font-medium text-[var(--text-muted)]">읽기 전용</span>
           )}
         </div>
       </section>

@@ -176,7 +176,7 @@ export function ErrorLogsClient() {
       render: (row) => (
         <span
           className={[
-            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[length:var(--font-size-caption)] font-semibold tabular-nums whitespace-nowrap',
+            'tm-on-tint inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[length:var(--font-size-caption)] font-semibold tabular-nums whitespace-nowrap',
             statusTone(row.statusCode),
           ].join(' ')}
         >

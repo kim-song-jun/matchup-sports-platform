@@ -60,7 +60,7 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
       {teamMatch.applications.length > 0 ? (
         <ol className="mt-4 flex flex-col gap-2">
           {teamMatch.applications.map((application) => (
-            <li key={application.applicationId} className="rounded-xl bg-[var(--surface-soft)] px-4 py-3">
+            <li key={application.applicationId} className="tm-on-tint rounded-xl bg-[var(--surface-soft)] px-4 py-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <Link
@@ -82,7 +82,7 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
           ))}
         </ol>
       ) : (
-        <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
+        <div className="tm-on-tint mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
           아직 신청한 팀이 없어요.
         </div>
       )}
@@ -188,7 +188,7 @@ export default function AdminTeamMatchDetailPage() {
                 {teamMatch.description}
               </p>
             ) : (
-              <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
+              <div className="tm-on-tint mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
                 주최 팀이 입력한 소개가 없어요.
               </div>
             )}

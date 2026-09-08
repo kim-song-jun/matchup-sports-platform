@@ -39,7 +39,7 @@ export function AwardRecommendationChips({
   ].filter((group) => group.rows.length > 0);
   if (isError) {
     return (
-      <div className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2">
+      <div className="tm-on-tint mb-3 flex items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2">
         <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
           추천 근거(득점·도움 순위)를 불러오지 못했어요 — 기록이 없는 게 아니라 조회에 실패한 상태예요.
         </p>
@@ -58,7 +58,7 @@ export function AwardRecommendationChips({
   if (groups.length === 0) return null;
 
   return (
-    <div className="mb-3 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3">
+    <div className="tm-on-tint mb-3 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3">
       <p className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)] mb-2">
         추천 근거 — 공식 결과 집계 기준, 탭하면 항목이 미리 채워져요
       </p>

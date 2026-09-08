@@ -186,7 +186,7 @@ function ReportedTeamSection({
       </div>
 
       {!reportedTeam ? (
-        <p className="mt-3 rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--text-muted)]">
+        <p className="tm-on-tint mt-3 rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-sm text-[var(--text-muted)]">
           신고 대상 팀을 알 수 없어요
         </p>
       ) : (
@@ -202,7 +202,7 @@ function ReportedTeamSection({
                   이 팀은 정지된 상태예요.
                 </p>
               ) : suspendConfirming ? (
-                <div role="group" aria-label="정지 확인" className="flex flex-col gap-2 rounded-xl bg-[var(--surface-soft)] p-3">
+                <div role="group" aria-label="정지 확인" className="tm-on-tint flex flex-col gap-2 rounded-xl bg-[var(--surface-soft)] p-3">
                   <p className="text-xs text-[var(--text-muted)]">
                     정지하면 이 팀은 채팅·일정·컨택을 모두 할 수 없어요.
                   </p>
@@ -247,7 +247,7 @@ function ReportedTeamSection({
                   {blockResult === 'already' ? '이미 차단된 팀이에요.' : '신고한 팀을 대신 차단했어요.'}
                 </p>
               ) : blockConfirming ? (
-                <div role="group" aria-label="차단 확인" className="flex flex-col gap-2 rounded-xl bg-[var(--surface-soft)] p-3">
+                <div role="group" aria-label="차단 확인" className="tm-on-tint flex flex-col gap-2 rounded-xl bg-[var(--surface-soft)] p-3">
                   <p className="text-xs text-[var(--text-muted)]">
                     신고한 팀 명의로 이 팀을 차단해요. 신고한 팀은 더 이상 이 팀에게 컨택을 받지 않아요.
                   </p>
@@ -487,7 +487,7 @@ export default function AdminInquiryDetailPage() {
                 {inquiry.replies.map((reply) => {
                   const isEditing = editingReplyId === reply.replyId;
                   return (
-                    <li key={reply.replyId} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
+                    <li key={reply.replyId} className="tm-on-tint rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-sm font-semibold text-[var(--text-strong)]">
                           {reply.adminName ?? '운영팀'}
@@ -550,7 +550,7 @@ export default function AdminInquiryDetailPage() {
                 })}
               </ol>
             ) : (
-              <div className="rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
+              <div className="tm-on-tint rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
                 등록된 답변이 없어요.
               </div>
             )}
@@ -581,7 +581,7 @@ export default function AdminInquiryDetailPage() {
                 placeholder="답변 내용"
               />
               {!canWrite ? (
-                <p className="rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-xs text-[var(--text-muted)]">
+                <p className="tm-on-tint rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-xs text-[var(--text-muted)]">
                   지원 권한은 조회만 가능해요.
                 </p>
               ) : null}

@@ -37,7 +37,7 @@ function RecentTeamMatches({ team }: { team: V1AdminTeamDetail }) {
       {matches.length > 0 ? (
         <ol className="mt-4 flex flex-col gap-2">
           {matches.map((match) => (
-            <li key={match.teamMatchId} className="rounded-xl bg-[var(--surface-soft)] px-4 py-3">
+            <li key={match.teamMatchId} className="tm-on-tint rounded-xl bg-[var(--surface-soft)] px-4 py-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="break-words text-sm font-semibold text-[var(--text-strong)]">{match.title}</p>
@@ -49,7 +49,7 @@ function RecentTeamMatches({ team }: { team: V1AdminTeamDetail }) {
           ))}
         </ol>
       ) : (
-        <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
+        <div className="tm-on-tint mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
           최근 주최한 팀매치가 없어요.
         </div>
       )}
@@ -73,7 +73,7 @@ function TeamMembers({ team }: { team: V1AdminTeamDetail }) {
       {team.members.length > 0 ? (
         <ol className="mt-4 grid gap-3 sm:grid-cols-2">
           {team.members.map((member) => (
-            <li key={member.membershipId} className="min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
+            <li key={member.membershipId} className="tm-on-tint min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <Link href={`/admin/users/${member.userId}`} className="break-words text-sm font-bold text-[var(--text-strong)] hover:text-[var(--blue700)]">
@@ -94,7 +94,7 @@ function TeamMembers({ team }: { team: V1AdminTeamDetail }) {
           ))}
         </ol>
       ) : (
-        <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">활성 팀원이 없어요.</div>
+        <div className="tm-on-tint mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">활성 팀원이 없어요.</div>
       )}
     </section>
   );
@@ -195,7 +195,7 @@ export default function AdminTeamDetailPage() {
                 <AdminSummaryItem icon={<Calendar size={16} />} label="계산일" value={formatAdminDateTime(trust.calculatedAt)} />
               </dl>
             ) : (
-              <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
+              <div className="tm-on-tint mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
                 아직 산정된 팀 신뢰 정보가 없어요.
               </div>
             )}

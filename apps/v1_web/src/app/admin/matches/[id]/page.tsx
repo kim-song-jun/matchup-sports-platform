@@ -108,7 +108,7 @@ export default function AdminMatchDetailPage() {
                 {match.description}
               </p>
             ) : (
-              <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
+              <div className="tm-on-tint mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
                 호스트가 입력한 소개가 없어요.
               </div>
             )}

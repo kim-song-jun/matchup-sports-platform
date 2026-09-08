@@ -530,7 +530,8 @@
 .tm-tourn-flow-format {
   font-size: var(--font-size-label);
   font-weight: 700;
-  color: var(--blue500);
+  /* 13px/700 은 큰 글씨 완화 대상이 아니다 — blue500 은 흰 지면 3.71:1 로 미달(alpha 실측). */
+  color: var(--blue700);
   margin-bottom: 16px;
 }
 
@@ -565,7 +566,8 @@
   height: 28px;
   border-radius: var(--radius-circle);
   background: var(--blue50);
-  color: var(--blue500);
+  /* blue50 지면 위 blue500 은 3.31:1 — 흰 지면(3.71)보다 더 나쁘다. blue700 은 4.82:1. */
+  color: var(--blue700);
   font-size: var(--font-size-label);
   font-weight: 700;
   display: grid;

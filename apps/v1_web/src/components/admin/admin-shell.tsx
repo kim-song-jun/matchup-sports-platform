@@ -207,7 +207,11 @@ function NavBadge({ count }: { count: number }) {
   return (
     <span
       aria-hidden="true"
-      className="ml-auto inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-blue-500 px-2 text-[length:var(--font-size-caption)] font-semibold leading-none text-white tabular-nums"
+      /* 배지는 버튼이 아니라 정보 표시라 a11y-decisions.md 1번(solid-fill 버튼 흰 글씨
+         현행 유지)의 적용 대상이 아니다. blue-500 위 흰 글씨는 3.71:1.
+         --blue700 은 다크에서 #6ba8ff(밝은 파랑)로 뒤집혀 흰 글씨가 2.42:1 이 되므로
+         쓸 수 없다 — 테마와 무관하게 고정인 --static-blue(#1b64da)로 5.41:1 을 얻는다. */
+      className="ml-auto inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-[var(--static-blue)] px-2 text-[length:var(--font-size-caption)] font-semibold leading-none text-white tabular-nums"
     >
       {count > 99 ? '99+' : count}
     </span>

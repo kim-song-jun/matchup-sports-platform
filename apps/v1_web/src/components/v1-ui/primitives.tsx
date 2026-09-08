@@ -536,7 +536,9 @@ type InfoRowProps = {
  * 공백만 있는 값도 빈 값으로 본다 — 서버가 `' '` 를 주면 `''` 만 보는 판정은 반만 막는다.
  */
 export function InfoRow({ label, value, valueColor, isLast, sub, badge }: InfoRowProps) {
-  const filled = value.trim().length > 0;
+  // 판정한 값과 그리는 값을 **같게** 둔다 — `trim()` 으로 판정하고 원본을 그리면
+  // 서버가 `"  값  "` 을 줬을 때 화면에 공백이 그대로 남는다.
+  const trimmed = value.trim();
   return (
     <div
       className="tm-info-row"
@@ -552,7 +554,7 @@ export function InfoRow({ label, value, valueColor, isLast, sub, badge }: InfoRo
           className="tm-text-body"
           style={{ fontWeight: 600, color: valueColor ?? 'var(--text-strong)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}
         >
-          {filled ? value : '미정'}
+          {trimmed.length > 0 ? trimmed : '미정'}
           {/* #2: 희소성/마감 인라인 배지 */}
           {badge}
         </div>

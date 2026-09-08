@@ -39,8 +39,27 @@ describe('InfoRow — 빈 값', () => {
     expect(valueOf(container)).toBe('미정');
   });
 
-  it('호출부가 폴백을 정했으면 그 값이 그대로 쓰인다', () => {
-    const { container } = render(<InfoRow label="예금주" value={'' || '—'} />);
-    expect(valueOf(container)).toBe('—');
+  /**
+   * 앞뒤 공백은 **판정과 렌더가 같은 값을 봐야** 한다 — `trim()` 으로 "값이 있다"고 판정하고
+   * 원본을 그리면 화면에 공백이 남아 정렬이 흔들린다.
+   */
+  it('앞뒤 공백은 다듬어서 그린다', () => {
+    const { container } = render(<InfoRow label="장소" value="  안양천 풋살장  " />);
+    expect(valueOf(container)).toBe('안양천 풋살장');
+    // `textContent` 를 직접 봐서 실제로 공백이 안 들어갔는지 확인한다(위 헬퍼는 trim 한다).
+    const value = container.querySelector('.tm-info-row .tm-text-body');
+    expect(value?.textContent).toBe('안양천 풋살장');
+  });
+
+  /**
+   * 폴백은 **값 슬롯만** 대체한다 — 값이 없다고 그 행의 다른 정보까지 사라지면 안 된다.
+   */
+  it('빈 값이어도 sub 와 badge 는 그대로 그린다', () => {
+    const { container } = render(
+      <InfoRow label="장소" value="" sub="주소는 확정 후 안내해요" badge={<span>마감 임박</span>} />,
+    );
+    expect(valueOf(container)).toContain('미정');
+    expect(within(container).getByText('주소는 확정 후 안내해요')).toBeInTheDocument();
+    expect(within(container).getByText('마감 임박')).toBeInTheDocument();
   });
 });

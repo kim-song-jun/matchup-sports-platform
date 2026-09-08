@@ -82,7 +82,7 @@ export function IntegrationsView() {
               href="https://developers.kakao.com/console/app"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-500 font-semibold hover:underline"
+              className="text-[var(--blue700)] font-semibold hover:underline"
             >
               Kakao Developers
             </a>

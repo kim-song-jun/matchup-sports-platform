@@ -4857,8 +4857,10 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 .tm-notification-count {
-  /* 17px/700 은 큰 글씨 완화(≥18.66px + bold)에 1.66px 모자라 4.5:1 기준을 받는다 —
-     blue500 은 흰 지면 3.71:1 이라 미달(alpha 실측). */
+  /* 크기는 소비처가 정한다 — 데스크톱은 h1.tm-text-heading(24px) 안이라 큰 글씨
+     완화(3:1)를 받지만, 모바일 상단 타이틀은 17px/700 이라 완화 문턱(≥18.66px +
+     bold)에 1.66px 모자라 4.5:1 을 받는다. **가장 작은 소비처 기준**으로 잡는다:
+     blue500 은 흰 지면 3.71:1 이라 그 자리에서 미달이다(alpha 실측). */
   color: var(--blue700);
 }
 

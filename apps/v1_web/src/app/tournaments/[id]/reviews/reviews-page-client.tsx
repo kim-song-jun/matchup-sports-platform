@@ -228,7 +228,7 @@ export function TournamentReviewsPageClient({ tournamentId }: { tournamentId: st
               onRetry={() => void refetch()}
             />
           ) : reviews.length === 0 ? (
-            <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
+            <Card pad={20} className="tm-on-tint" style={{ background: 'var(--grey50)', textAlign: 'center' }}>
               <EmptyState
                 illustration={{ name: 'chat-empty' }}
                 title={search ? '검색 결과가 없어요' : '아직 등록된 후기가 없어요'}

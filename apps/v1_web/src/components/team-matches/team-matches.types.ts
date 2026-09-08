@@ -28,6 +28,14 @@ export type TeamMatchModel = {
   opponentCost: number | null;
   /** 값이 있으면 리그전 경기다. */
   league?: { leagueId: string; title: string } | null;
+  /**
+   * 확정된 상대팀 이름. 없으면 아직 상대가 안 정해진 것이다.
+   *
+   * 이 값이 없던 동안 카드는 **상대팀 이름 자리에 신청 상태**('승인 완료'·'신청 마감')를
+   * 그렸다 — 상세에서 2026-08-25 에 고친 결함인데(`teamMatchOpponentLabel` 주석) 목록만
+   * 남아 있었다. 리그 대진은 상대가 항상 확정돼 있어 그 자리가 늘 상태 배지였다.
+   */
+  opponentTeam: string | null;
   uniform: string;
   gender: string;
   manner: number | null;

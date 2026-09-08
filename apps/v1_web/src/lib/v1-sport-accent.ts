@@ -27,7 +27,7 @@ export interface SportAccent {
   /**
    * 아이콘 배지 그라디언트의 어두운 쪽 stop(항상 `dot`보다 한 단계 진한 색).
    * `linear-gradient(135deg, dot 0%, gradientTo 100%)` 형태로 사용 — 대회 상세
-   * 헤더의 트로피 배지(`linear-gradient(135deg, var(--blue500), var(--blue600))`)와
+   * 헤더의 트로피 배지(`var(--brand-hero-gradient)`)와
    * 동일한 시각 언어를 카드형 종목 아이콘에도 적용하기 위함(TournamentCard).
    */
   gradientTo: string;
@@ -48,7 +48,7 @@ const SPORT_ACCENT_MAP: Record<string, SportAccent> = {
     dot: 'var(--blue500)',
     badgeBg: 'var(--blue50)',
     badgeText: 'var(--blue700)',
-    gradientTo: 'var(--blue600)',
+    gradientTo: 'var(--brand-hero-gradient-end)',
   },
   running: {
     label: '러닝',
@@ -98,7 +98,7 @@ const SPORT_ACCENT_MAP: Record<string, SportAccent> = {
     dot: 'var(--blue500)',
     badgeBg: 'var(--blue50)',
     badgeText: 'var(--blue700)',
-    gradientTo: 'var(--blue600)',
+    gradientTo: 'var(--brand-hero-gradient-end)',
   },
   cycling: {
     label: '사이클',

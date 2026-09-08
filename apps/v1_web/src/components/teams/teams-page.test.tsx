@@ -773,6 +773,21 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     expect(css).not.toContain('.tm-team-list .tm-team-card-activity {');
   });
 
+  it('소개가 없으면 소개 상자를 그리지 않는다 — 지역·종목을 문장으로 되풀이하지 않는다', () => {
+    // 예전 폴백 `{지역}에서 활동하는 {종목} 팀이에요.` 는 바로 윗줄(`풋살 · 서울 전체 · 4/24명`)
+    // 과 같은 말이라 정보가 되지 않았다. alpha 50팀 중 25팀이 그 문장을 보여주고 있었다.
+    const { container } = render(<TeamListPageView model={listWith({ intro: '' })} />);
+
+    expect(container.querySelector('.tm-team-intro-box')).toBeNull();
+    expect(screen.queryByText(/에서 활동하는 .+ 팀이에요\./)).not.toBeInTheDocument();
+  });
+
+  it('소개가 있으면 그대로 쓴다', () => {
+    const { container } = render(<TeamListPageView model={listWith({ intro: '매주 토요일에 모여요' })} />);
+
+    expect(container.querySelector('.tm-team-intro-box')?.textContent).toContain('매주 토요일에 모여요');
+  });
+
   it('활동 일정이 있으면 그대로 한 줄로 쓴다', () => {
     const { container } = render(<TeamListPageView model={listWith({ next: '매일 · 저녁 · 실력 중심' })} />);
 

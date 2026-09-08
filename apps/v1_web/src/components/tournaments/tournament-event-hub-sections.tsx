@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { ChevronRight } from 'lucide-react';
 import { Card } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import type { V1TournamentParticipantTeam, V1TournamentStatus } from '@/types/api';
@@ -149,7 +150,7 @@ export function TournamentParticipantSection({
           ) : null}
         </Card>
       ) : (
-        <Card pad={16} style={{ background: 'var(--grey50)', marginTop: 4 }}>
+        <Card pad={16} className="tm-on-tint" style={{ background: 'var(--grey50)', marginTop: 4 }}>
           <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
             참가팀 공개 전
           </div>
@@ -259,14 +260,33 @@ function ParticipantTeamRow({
           // 스크린리더 사용자는 버튼 목록을 훑기 때문에 팀마다 이름이 같으면 **어느 팀의
           // 명단인지 구분할 수 없다**(Copilot 지적).
           aria-label={`${team.teamName} 명단 ${open ? '접기' : '펼치기'}`}
-          className="tm-text-caption tm-pressable"
+          // **같은 페이지의 펼치기 토글과 같은 모양을 쓴다**(`tournament-detail-client.tsx` 의
+          // 소개 글 "전체 보기"): ghost 버튼 + 회전하는 ChevronRight.
+          //
+          // 예전엔 인라인 스타일로 `--card-surface` 배경에 테두리를 둘렀는데, 그 색이
+          // **카드 배경과 같아** 눌리는 것이 아니라 빈 상자로 보였다. 바로 옆의 `참가 확정`
+          // 은 채워진 칩이라, 정작 누를 수 있는 쪽이 덜 눌러 보이는 **어포던스 역전**이었다.
+          // `.tm-btn-sm` 이 이미 `min-height: 44px` 를 갖고 있어(globals.css) 터치 타깃을
+          // 인라인으로 다시 적을 필요도 없다 — 새 CSS 없이 있는 패턴만 재사용한다.
+          className="tm-btn tm-btn-sm tm-btn-ghost"
           style={{
-            minHeight: 44, minWidth: 44, padding: '0 10px',
-            border: '1px solid var(--border)', borderRadius: 'var(--radius-control)',
-            background: 'var(--card-surface)', color: 'var(--text-muted)', whiteSpace: 'nowrap',
+            fontSize: 'var(--font-size-caption)',
+            fontWeight: 500,
+            color: 'var(--text-muted)',
+            whiteSpace: 'nowrap',
           }}
         >
           {open ? '명단 접기' : '명단'}
+          <ChevronRight
+            size={12}
+            strokeWidth={2.2}
+            aria-hidden="true"
+            style={{
+              marginLeft: 2,
+              transform: open ? 'rotate(-90deg)' : 'rotate(90deg)',
+              transition: 'transform 0.16s ease',
+            }}
+          />
         </button>
       </div>
       {open ? (

@@ -381,7 +381,11 @@ function ScheduleRow({
           >
             우리 팀
           </span>
-          <LineupStatusBadge lineupState={myFixture.lineupState} />
+          {/* 라인업 제출은 리그·팀매치 축의 단계다(`/team-matches/:id/lineup`). 대회 축은
+              대진 생성 때 등록 명단을 참가자로 복사하므로 제출할 화면 자체가 없다 —
+              거기서 "라인업 미작성"은 팀장에게 **할 수 없는 일을 안 했다고** 말하는 것이고,
+              이미 끝난 경기 위에도 그대로 떴다(alpha 실측). */}
+          {isRegularLeague ? <LineupStatusBadge lineupState={myFixture.lineupState} /> : null}
         </div>
       ) : null}
       {/* 카드 머리줄 — 왼쪽에 "어디서"(조·장소), 오른쪽에 "언제"(날짜·상태).
@@ -871,8 +875,16 @@ export function ScheduleContent({
         <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
           경기 일정
         </h3>
+        {/* `items` 는 서버가 `scheduledAt: { not: null }` 로 거른 것이고, 시간 미정 경기는
+            바로 아래 "시간 미정 경기" 섹션이 그린다. 그래서 전부 시간 미정이면 두 문장이
+            나란히 놓여 모순으로 읽혔다 — "아직 확정된 일정이 없어요" 바로 밑에 경기 2건
+            (alpha 실측). 정말 아무 경기도 없을 때만 빈 상태를 그린다. */}
         {data.items.length === 0 ? (
-          <EmptyState title="아직 확정된 일정이 없어요" sub="경기 시간이 정해지면 여기에 표시돼요." />
+          data.unscheduled.length === 0 ? (
+            <EmptyState title="아직 확정된 일정이 없어요" sub="경기 시간이 정해지면 여기에 표시돼요." />
+          ) : (
+            <EmptyState title="아직 경기 시간이 정해지지 않았어요" sub="아래 '시간 미정 경기'에서 대진을 확인할 수 있어요." />
+          )
         ) : (
           <ScheduleSections
             tournamentId={tournamentId}

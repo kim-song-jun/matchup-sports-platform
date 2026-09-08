@@ -614,7 +614,10 @@ const HOME_AWAY_SIDES = [
 
 // UX 감사 item 2 — 라인업 없이 경기 시작 가능 → 복구 불가능한 막다른 길.
 describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
-  function setup(lineups: Array<{ sideId: string; state: string; revision: number }>) {
+  function setup(
+    lineups: Array<{ sideId: string; state: string; revision: number }>,
+    sourceType: 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE' = 'TEAM_MATCH',
+  ) {
     mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
     mocks.useV1FixtureLineup.mockReturnValue({
       data: { gameId: 'game-1', lineups: lineups.map((l) => ({ ...l, participants: [] })) },
@@ -625,7 +628,7 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
     });
     mocks.useV1Game.mockReturnValue({
       data: {
-        id: 'game-1', state: 'SCHEDULED', version: 1, lastSequence: 0,
+        id: 'game-1', state: 'SCHEDULED', version: 1, lastSequence: 0, sourceType,
         periods: [{ id: 'period-1', gameId: 'game-1', number: 1, state: 'SCHEDULED', startedAt: null, endedAt: null, pausedTotalMs: 0, pausedAt: null }],
         sides: HOME_AWAY_SIDES,
         lineups: [],
@@ -652,6 +655,19 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
     expect(screen.getByText(/성수 풋살 클럽.*아직 선발 명단을 제출하지 않았어요/)).toBeInTheDocument();
     // [P1-d/웨이브8] 제출 링크 단언은 뺐다 — 링크를 그릴 수 있는 코드가 남아 있지 않아
     // 무조건 통과하는 단언이었다. 경고 문구 단언(위)이 이 계약의 실제 보호막이다.
+  });
+
+  /**
+   * 대회 축엔 라인업 제출 단계가 없다 — 대진 생성 때 등록 명단이 참가자로 복사되고,
+   * 자동 생성된 초안은 영영 SUBMITTED 가 되지 않는다. 그래서 명단 검인에 선수가 다 차
+   * 있는데도 이 경고가 떴다(alpha 실측). 운영자가 할 수 있는 일이 없는 경고다.
+   */
+  it('대회 경기에서는 미제출 경고를 띄우지 않는다', () => {
+    setup([{ sideId: 'side-home', state: 'SUBMITTED', revision: 1 }], 'TOURNAMENT_FIXTURE');
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
+    expect(screen.queryByText(/아직 선발 명단을 제출하지 않았어요/)).not.toBeInTheDocument();
   });
 
   it('양 팀 모두 라인업을 제출하면 "경기 시작"이 활성화되고 배너가 없다', () => {

@@ -300,15 +300,19 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
           {match.hostTeamTrustState && trustStateLabel(match.hostTeamTrustState) ? (
             <span className="tm-badge tm-badge-blue">{trustStateLabel(match.hostTeamTrustState)}</span>
           ) : null}
-          {/* 리그 상세 페이지는 앱 안에 진입점이 전혀 없었다(직접 URL 만) -- 이 링크가
-              사실상 첫 통로다. 배지 자체를 링크로 만들어 리그명을 함께 보여준다.
-              hostTeamCard 전체가 이미 팀 상세로 가는 Link라 배지를 또 <a>로 두면 <a>가
-              중첩돼 브라우저가 바깥 <a>를 조기에 닫아버린다(오케스트레이터 지적,
-              2026-08-20) -- TeamMatchCard(R3, 목록 카드 리그전 배지)와 동일하게
-              button + preventDefault/stopPropagation + router.push로 바꿨고,
-              같은 .tm-league-badge-link 클래스를 재사용해 화살표 아이콘+밑줄로
-              "클릭 가능함"을 컬러 외 신호로도 전달한다. */}
-          {league ? (
+        </div>
+        {/* 리그 링크는 **배지 줄 밖에 둔다.** 이 요소만 44px 터치 타깃을 가져야 하는데
+            (누를 수 있는 유일한 칩이다) 형제 배지는 26px 이라, 한 줄에 섞으면 69% 큰
+            요소 하나가 줄 전체의 높이를 끌어올려 나머지 배지가 그 안에서 떠 보인다.
+            줄을 나누면 배지 줄이 26px 로 균질해지고 이 링크는 자기 줄에서 44px 를 자연스럽게
+            갖는다. (히트 영역만 ::after 로 넓히는 우회는 이미 기각됐다 — 넓힌 영역이
+            위아래 배지 줄을 덮어 그 자리 탭이 팀이 아니라 리그로 샌다. globals.css 주석 참조.)
+
+            리그 상세는 앱 안에 다른 진입점이 없어(직접 URL 만) 이 링크가 사실상 첫 통로다.
+            카드 전체가 팀 상세로 가는 Link 라 <a> 를 중첩하면 브라우저가 바깥 <a> 를 조기에
+            닫으므로 button + preventDefault/stopPropagation 을 유지한다. */}
+        {league ? (
+          <div style={{ marginTop: 8 }}>
             <button
               type="button"
               className="tm-badge tm-badge-grey tm-league-badge-link"
@@ -321,14 +325,12 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
             >
               {/* F7: 리그명이 길면 배지가 카드 밖으로 밀려 나가 화면이 가로로 스크롤됐다
                   (390px 실측: 카드 밖 152px, 뷰포트 밖 37px). 리그명만 말줄임하고
-                  화살표는 항상 보이게 텍스트를 별도 span 으로 감싼다 — 팀 상세의
-                  "내 리그" 목록이 이미 쓰는 처리와 같은 방식이다.
-                  목록 카드 쪽 배지(아래)는 리그명 없이 '정규 리그'만 실어서 넘치지 않는다. */}
+                  화살표는 항상 보이게 텍스트를 별도 span 으로 감싼다. */}
               <span className="tm-league-badge-text">정규 리그 · {league.title}</span>
               <ChevronRightIcon size={12} strokeWidth={2.5} aria-hidden="true" />
             </button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
       {/* 팀 보기는 보조 CTA — apply가 단일 primary; 파란 fill 중복 방지(R-K5) */}
       <span className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flexShrink: 0 }}>팀 보기</span>
@@ -833,7 +835,12 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   // 마감된 팀매치도 경기 시작 전까지 목록에 남는다(team-matches.service.ts list()) —
   // 배지만으로는 스크롤 중에 안 걸리므로 카드 지면·사진도 함께 눌러 한눈에 갈리게 한다.
   // 판정은 관계가 아니라 API status 로 한다(match.closed) — 호스트도 같은 규칙으로 본다.
-  const isClosed = match.closed;
+  //
+  // **리그 대진은 제외한다.** 리그엔 신청 개념이 없어 `closed` 가 "모집이 끝났다" 가 아니라
+  // 그냥 "상대가 정해져 있다" 는 뜻인데, 그 상태가 원정팀 팀장·선수 전원에게 붙어
+  // **자기 팀 경기가 마감·흐림으로** 보였다.
+  const isLeagueFixture = league != null;
+  const isClosed = match.closed && !isLeagueFixture;
   // 관계도 없고 마감도 아니면 "상대가 아직 없다"를 쓴다 — 목록 응답에 상대팀이 없어
   // 화면 어디에도 없던 정보다. 상대 "팀 이름"은 응답에 없으므로 만들어내지 않는다.
   const openLabel = !relation && !isClosed ? '상대 모집 중' : null;
@@ -875,7 +882,12 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
             </span>
           ) : null}
           <span className="tm-team-match-row-host">
-            <strong style={{ fontWeight: 600, color: 'var(--text-strong)' }}>{match.hostTeam}</strong>
+            {/* **누구와 붙는지**. 목록 응답에 상대팀이 없어 화면 어디에도 없던 정보다
+                (`toListItem` 이 `approvedOpponentTeam` 을 싣게 되면서 생겼다 — 추가 쿼리 없음).
+                상대가 아직 없으면 붙이지 않는다 — 없는 사실을 만들지 않는다. */}
+            <strong style={{ fontWeight: 600, color: 'var(--text-strong)' }}>
+              {match.opponentTeam ? `${match.hostTeam} vs ${match.opponentTeam}` : match.hostTeam}
+            </strong>
             {match.manner !== null && match.wins !== null ? (
               <> · 매너 <span className="tab-num">{match.manner}</span> · 승 <span className="tab-num">{match.wins}</span></>
             ) : null}
@@ -908,8 +920,15 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
             ) : null}
           </span>
           {/* 비용을 모르면(costNote 미기재) '비용 미정'으로 둔다 — 0 으로 채워 '무료'라고 하면
-              없는 사실을 만들어낸다. */}
-          {match.opponentCost === null ? (
+              없는 사실을 만들어낸다.
+
+              **리그 대진은 그 자리를 리그 문맥으로 바꾼다.** 리그 경기에는 상대팀 부담금이라는
+              개념이 없어 '비용 미정' 이 영원히 미정으로 남는다 — 채워질 수 없는 값을 계속
+              "미정" 이라 말하면 운영자가 안 채운 것처럼 읽힌다. 지우지는 않는다(자리가 비면
+              푸터의 좌우 배치가 무너지고, '무료' 로 둔갑시키지 않으려던 원래 의도도 사라진다). */}
+          {isLeagueFixture && match.opponentCost === null ? (
+            <span className="tm-text-caption tm-match-row-cost">리그 경기</span>
+          ) : match.opponentCost === null ? (
             <span className="tm-text-caption tm-match-row-cost">비용 미정</span>
           ) : match.opponentCost === 0 ? (
             <span className="tm-text-label tm-match-row-act">무료초청</span>

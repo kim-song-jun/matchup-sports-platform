@@ -33,7 +33,11 @@ export function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
     genderRule,
     ownerName: team.owner?.displayName,
     managerName: team.manager?.displayName ?? null,
-    intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀이에요.`,
+    // 소개가 없으면 **빈 값으로 둔다.** 예전엔 `{지역}에서 활동하는 {종목} 팀이에요.` 를
+    // 만들어 넣었는데, 바로 윗줄(`풋살 · 서울 전체 · 4/24명`)과 같은 말이라 정보가 되지
+    // 않으면서 카드에서 ~35px 를 먹었다 — alpha 실측(2026-09-07) 50팀 중 **25팀**이 그
+    // 문장을 보여주고 있었다. 카드는 `hasIntro` 로 이미 빈 값을 감춘다.
+    intro: team.introductionPreview ?? '',
     next: team.activitySummary ?? team.activityAreaText ?? '',
   };
 }

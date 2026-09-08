@@ -316,7 +316,9 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
         <div className={`tm-match-detail-hero${match.image ? '' : ' tm-match-detail-hero-stack'}`} style={match.image ? { backgroundImage: cssUrl(match.image) } : undefined}>
           {match.image ? null : (
             <div className="tm-match-hero-graphic">
-              <SportIllustration sport={match.sport} sizes="(min-width: 1024px) 208px, 176px" />
+              {/* 이 자리는 176px(≥1024 208px)이라 agy-3d-graphic 기준의 "큰 자리"다 —
+                  오브젝트 셋(삼각 구도) 판을 쓴다. 목록 썸네일(76px)은 둘짜리 기본 판을 쓴다. */}
+              <SportIllustration sport={match.sport} sizes="(min-width: 1024px) 208px, 176px" variant="hero" />
             </div>
           )}
           <div className="tm-match-detail-overlay">
@@ -342,7 +344,9 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                   {match.sport}
                 </span>
                 <span className="tm-badge tm-badge-grey">{match.level}</span>
-                <span className="tm-badge tm-badge-grey">{match.gender}</span>
+                {/* 성별을 안 정한 매치에는 배지를 붙이지 않는다 — 카드 모델이 빈 값을
+                    문자열로 채우지 않게 바뀌면서 이 가드가 비로소 의미를 갖는다. */}
+                {match.gender ? <span className="tm-badge tm-badge-grey">{match.gender}</span> : null}
                 <span className={`tm-badge ${matchStatusBadgeClass(mode, match.status)}`}>{matchStatusBadgeLabel(mode, match.status)}</span>
               </div>
               <h2 className="tm-match-detail-title">{match.title}</h2>
@@ -363,7 +367,12 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             {/* [P1 숫자:단위 2:1 + tabular-nums] 인원 — 숫자(subhead/heading 크기) + 단위(body) 2:1 비율 */}
             <CapacityRow current={match.current} capacity={match.capacity} />
             <InfoRow label="레벨" value={match.level} />
-            <InfoRow label="성별 조건" value={match.gender} />
+            {/* **빈 값을 그대로 넘기면 값 슬롯이 통째로 빈다.** 공유 `InfoRow`
+                (`@/components/v1-ui/primitives`)는 `{value}` 를 그대로 그린다 — 팀매치
+                화면의 로컬 InfoRow 와 달리 빈 값 처리가 없다(같은 파일 아래 `isMissing`
+                헬퍼가 있는데 쓰지 않는다). 라벨이 있는 자리에서는 "모른다" 를 말로 해야
+                한다. */}
+            <InfoRow label="성별 조건" value={match.gender || '미정'} />
             {mode === 'pending' ? (
               <>
                 <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." />
@@ -437,7 +446,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           {/* [P1 숫자:단위 2:1 + tabular-nums] 인원 (모바일) */}
           <CapacityRow current={match.current} capacity={match.capacity} />
           <InfoRow label="레벨" value={match.level} />
-          <InfoRow label="성별 조건" value={match.gender} />
+          {/* 위 상세와 같은 이유 — 공유 InfoRow 는 빈 값을 그대로 그린다. */}
+          <InfoRow label="성별 조건" value={match.gender || '미정'} />
           {mode === 'pending' ? (
             <>
               <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." />
@@ -728,7 +738,8 @@ function MatchRowItem({ match }: { match: MatchCardModel }) {
         {match.image ? null : <SportIllustration sport={match.sport} sizes="76px" />}
       </div>
       <div className="tm-match-row-main">
-        <div className="tm-text-caption tm-match-row-meta">{match.sport} · {match.level} · {match.gender}</div>
+        {/* 빈 값을 그대로 이으면 "풋살 · 3-5 · " 처럼 구분점만 남는다 — 있는 것만 잇는다. */}
+        <div className="tm-text-caption tm-match-row-meta">{[match.sport, match.level, match.gender].filter(Boolean).join(' · ')}</div>
         <div className="tm-match-row-headline">
           {closedLabel ? <span className="tm-badge tm-badge-grey tm-card-closed-badge">{closedLabel}</span> : null}
           <div className="tm-text-body-lg tm-match-row-title">{match.title}</div>
@@ -822,7 +833,7 @@ function MatchCardItem({ match }: { match: MatchCardModel }) {
         {/* [격상1] 종목 배지 제거 — 미디어 상단 badge에 이미 표시됨(중복).
             [격상2] 마감 orange 배지 제거 — footer actionLabel로 통합.
             레벨·성별은 pill 배지 → caption 인라인 텍스트로 강등(메타 배지 동등경쟁 해소). */}
-        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 2 }}>{match.level} · {match.gender}</div>
+        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 2 }}>{[match.level, match.gender].filter(Boolean).join(' · ')}</div>
         <div className="tm-match-row-headline" style={{ marginTop: 8 }}>
           {closedLabel ? <span className="tm-badge tm-badge-grey tm-card-closed-badge">{closedLabel}</span> : null}
           <div className="tm-text-body-lg">{match.title}</div>
@@ -883,7 +894,10 @@ function StateCard({ tone, title, body }: { tone: 'orange' | 'green' | 'grey'; t
   const tint = tone === 'green' ? 'var(--tint-green)' : tone === 'grey' ? 'var(--tint-grey)' : 'var(--tint-orange)';
   const accent = tone === 'green' ? 'var(--green700)' : tone === 'grey' ? 'var(--text-muted)' : 'var(--orange700)';
   return (
-    <Card pad={16} style={{ marginTop: 16, background: tint }}>
+    // 세 톤 다 지면에 색을 깐다(--tint-grey/green/orange). 그 위 본문이
+    // --text-caption(grey600)이라 tint-grey 에서 4.09:1 로 AA 미달이었다(alpha 실측).
+    // 톤이 하나가 아니라 셋이므로 컴포넌트 한 곳에 붙여 함께 닫는다.
+    <Card pad={16} className="tm-on-tint" style={{ marginTop: 16, background: tint }}>
       {/* [P0/P1 아이콘+컬러] 아이콘을 타이틀과 함께 표시해 색상만으로 상태를 구분하지 않음 (WCAG 1.4.1) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <StatusIcon tone={tone} />

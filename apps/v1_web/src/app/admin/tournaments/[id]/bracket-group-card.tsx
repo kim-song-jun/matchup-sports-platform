@@ -288,7 +288,10 @@ export function BracketGroupCard({
     { key: 'goalsAgainst', header: '실점', align: 'center', width: 'w-[60px]', render: (s) => <span className="tabular-nums">{s.goalsAgainst}</span> },
     { key: 'points', header: '승점', align: 'right', width: 'w-[64px]', render: (s) => <span className="tabular-nums font-semibold text-[var(--text-strong)]">{s.points}</span> },
   ];
-  const knockoutEmpty = isKnockout && standings.length === 0;
+  // 결선 조는 순위를 계산하지 않는다 — 순위만 보면 팀을 배정한 뒤에도 계속 0이라
+  // "아직 배정된 팀이 없어요" 가 남았다(alpha 실측: 2팀 배정 후에도 잔존). 이 문장이
+  // 말하는 것은 배정이므로 배정을 본다.
+  const knockoutEmpty = isKnockout && standings.length === 0 && group.groupTeams.length === 0;
   const bodyId = `bracket-group-${group.id}-body`;
 
   return (

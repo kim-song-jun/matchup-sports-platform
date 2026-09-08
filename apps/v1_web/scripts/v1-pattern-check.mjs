@@ -364,6 +364,87 @@ checkLiteralBaseline({
     (txt.match(/\btext-(?:xs|sm|base|lg|xl|[2-9]xl)\b/g) || []).length,
   hint: 'text-[Npx] · fontSize:N · text-sm 류 Tailwind 기본 이름 대신 .tm-text-* 나 var(--font-size-*) 를 쓸 것',
 });
+/* ── 8) 틴트 지면에 보조 텍스트 처방이 빠진 곳 ─────────────────────
+ * `--text-caption`(=grey600)은 **흰 배경에서만** AA 를 넘는다(4.62:1). 지면에 색이
+ * 조금이라도 깔리면 아래로 떨어진다 — alpha 실측으로 다섯 틴트 토큰 전부 미달이다:
+ *
+ *   tint-grey 4.09 · tint-red 4.16 · tint-blue 4.21 · tint-green 4.25 · tint-orange 4.27
+ *   (grey700 이면 각각 6.31 / 6.42 / 6.49 / 6.55 / 6.57)
+ *
+ * CSS 에 셀렉터가 있는 지면은 globals.css 의 "틴트 지면 위의 보조 텍스트" 목록이
+ * 처리한다. 문제는 **인라인 style 로 까는 곳**이다 — 겨냥할 셀렉터가 없어 목록에
+ * 넣을 수 없고, 그래서 `.tm-on-tint` 표시 클래스를 함께 붙이기로 했다.
+ *
+ * 그 규약이 사람의 기억에만 의존하고 있었다. 실제로 스윕을 돌 때마다 새 지면이
+ * 계속 나왔다(#1104 7곳 → #1108 1 → #1110 3 → #1114 12 → #1116 2 → #1117 1).
+ * 여기서 세어 **새로 늘지 못하게** 막는다. 기존 84곳은 baseline 으로 인정한다 —
+ * 색이 깔렸다고 다 문제가 아니라 그 위에 캡션 텍스트가 있을 때만 미달이므로,
+ * 일괄 치환은 효과 없는 선언만 늘린다.
+ *
+ * **이 게이트가 못 잡는 것**: 배경이 변수를 거치는 경우다. matches-page.tsx 의
+ * StateCard 는 `const tint = tone === 'green' ? … : …` 로 세 토큰 중 하나를 고른 뒤
+ * `background: tint` 로 쓴다 — 태그 안에 `var(--tint-*)` 리터럴이 없어 여기 안 걸린다.
+ * 그런 곳은 실화면 대비 측정으로만 나온다(StateCard 도 이 게이트가 아니라 alpha
+ * 스윕에서 나왔다, #1117). 이 게이트는 **가장 흔한 형태를 막는 것**이지 전수 보장이 아니다.
+ * ────────────────────────────────────────────────────────────────── */
+checkLiteralBaseline({
+  label: '틴트 지면에 tm-on-tint 누락',
+  baselinePath: 'scripts/tint-marker-baseline.json',
+  count: (txt) => {
+    // 지면으로 쓰이는 옅은 토큰을 전부 담는다. `--*50` 은 **일곱 색 모두** grey600 에서
+    // 미달이다(alpha 값 기준 계산): red 4.02 · blue 4.11 · teal 4.15 · green 4.16 ·
+    // orange 4.21 · yellow 4.32 · grey 4.42. 처음엔 blue/grey/red 만 넣었다가
+    // /tournaments/:id/my 의 orange50 안내가 스윕에서 나와 나머지를 채웠다.
+    const TOKEN =
+      /var\(--(?:tint-(?:blue|grey|green|orange|red)|(?:blue|green|orange|red|yellow|teal|grey)50|grey100|surface-soft)\)/;
+    // 배경 선언과 토큰이 **같은 태그 안에 함께** 있으면 센다. `background: var(--x)` 만
+    // 보면 조건부 배경을 놓친다 — 이 저장소는 `background: blocked ? 'var(--orange50)' :
+    // 'var(--grey50)'` 같은 삼항을 자주 쓰고, 실제로 그런 곳이 10군데 더 있었다.
+    const BG = /background(?:Color)?:/;
+    // **className 값 안에서** 단어 경계로 찾는다. 단순 문자열 포함으로 보면 태그 안
+    // 주석이나 data-* 속성에 이름만 스쳐도 "붙어 있다"고 오인한다 — 이 저장소는 실제로
+    // 태그 안에 `// … (globals.css .tm-on-tint)` 같은 주석을 달고 있어 그대로 뚫린다.
+    // globals.test.ts 의 검사와 같은 방식이다.
+    // \b 는 하이픈을 경계로 보므로 tm-on-tint-header · x-tm-on-tint 같은 다른 클래스가 통과한다.
+    const CLASS_EDGE = String.raw`(?<![\w-])tm-on-tint(?![\w-])`;
+    const MARKED = new RegExp(`className=(?:"[^"]*|'[^']*|\\{[^}]*)${CLASS_EDGE}`);
+    // 여는 태그 단위로 본다 — 배경과 className 이 같은 태그 안에 있어야 처방이 닿는다.
+    // 여는 태그를 정규식 `[^>]*?>` 로 끊으면 **`onClick={() => …}` 의 `>` 에서 조기
+    // 종료**된다. 그러면 그 뒤에 오는 `style={{ background: … }}` 를 못 봐서 누락을
+    // 세지 못한다(실측 6곳). 따옴표·중괄호 깊이를 세며 depth 0 의 `>` 만 태그 끝으로
+    // 본다 — 이 파일의 radius 검사가 값을 읽을 때 쓰는 방식과 같다.
+    const openingTags = (src) => {
+      const found = [];
+      const START = /<[A-Za-z][A-Za-z0-9]*\b/g;
+      let m;
+      while ((m = START.exec(src)) !== null) {
+        let depth = 0;
+        let quote = '';
+        let j = START.lastIndex;
+        for (; j < src.length; j++) {
+          const c = src[j];
+          if (quote) {
+            if (c === '\\') { j += 1; continue; }
+            if (c === quote) quote = '';
+          } else if (c === '"' || c === "'" || c === '`') {
+            quote = c;
+          } else if (c === '{') {
+            depth += 1;
+          } else if (c === '}') {
+            depth -= 1;
+          } else if (c === '>' && depth === 0) {
+            found.push(src.slice(m.index, j + 1));
+            break;
+          }
+        }
+        START.lastIndex = j + 1;
+      }
+      return found;
+    };
+    return openingTags(txt).filter((tag) => BG.test(tag) && TOKEN.test(tag) && !MARKED.test(tag)).length;
+  },
+  hint: '인라인으로 지면 색을 깔면 같은 태그에 className="tm-on-tint" 를 함께 붙일 것 (globals.css .tm-on-tint)',
+});
 checkLiteralBaseline({
   label: 'radius 리터럴(TSX)',
   baselinePath: 'scripts/radius-baseline.json',

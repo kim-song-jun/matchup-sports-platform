@@ -1407,6 +1407,15 @@ export class TeamMatchesService {
         wins,
       },
       costNote: teamMatch.costNote,
+      // **누구와 붙는지**. 목록 카드가 이 값이 없어서 상대팀 이름 자리에 신청 상태
+      // ('승인 완료'·'신청 마감')를 그렸다 — 상세에서 2026-08-25 에 이미 고친 결함인데
+      // (`teamMatchOpponentLabel` 주석) 목록만 남아 있었다. `teamMatchInclude` 가
+      // `approvedApplicantTeam` 을 이미 싣고 있어 **추가 쿼리는 없다.**
+      // 이 필드가 채워졌다는 것 자체가 "상대가 확정됐다" 는 뜻이다 —
+      // `approvedApplicantTeamId` 는 신청 승인(또는 리그 대진 편성) 때만 설정된다.
+      approvedOpponentTeam: teamMatch.approvedApplicantTeam
+        ? { teamId: teamMatch.approvedApplicantTeam.id, name: teamMatch.approvedApplicantTeam.name }
+        : null,
       league: teamMatch.league ? { leagueId: teamMatch.league.id, title: teamMatch.league.title } : null,
       levelLabel: formatLevelRange(teamMatch.minSportLevel, teamMatch.maxSportLevel, teamMatch.formatNote),
       minLevel: teamMatch.minSportLevel ? { code: teamMatch.minSportLevel.code, name: teamMatch.minSportLevel.name } : null,

@@ -758,7 +758,7 @@ export function TournamentDetailView({
           width: 56,
           height: 56,
           borderRadius: 'var(--radius-container)',
-          background: 'linear-gradient(135deg, var(--blue500) 0%, var(--blue600) 100%)',
+          background: 'var(--brand-hero-gradient)',
           display: 'grid',
           placeItems: 'center',
           color: 'var(--static-white)',
@@ -1672,7 +1672,7 @@ function StandingsMovedNotice({ tournamentId }: { tournamentId: string }) {
     <section aria-label="순위표 안내" style={{ marginTop: 24 }}>
       <Link
         href={`/tournaments/${tournamentId}/bracket`}
-        className="tm-pressable"
+        className="tm-pressable tm-on-tint"
         style={{
           display: 'flex',
           alignItems: 'center',

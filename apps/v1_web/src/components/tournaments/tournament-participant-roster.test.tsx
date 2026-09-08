@@ -41,6 +41,30 @@ function renderSection(teams: V1TournamentParticipantTeam[]) {
 }
 
 describe('참가팀 카드 — 공개 명단 펼치기', () => {
+  /**
+   * **어포던스 역전을 막는다.**
+   *
+   * 이 토글은 인라인 스타일로 `--card-surface` 배경에 테두리를 둘렀는데, 그 색이 **카드
+   * 배경과 같아** 눌리는 것이 아니라 빈 상자로 보였다. 바로 옆의 `참가 확정` 은 채워진
+   * 칩이라, 정작 누를 수 있는 쪽이 덜 눌러 보였다.
+   *
+   * 지금은 같은 페이지의 "전체 보기" 토글과 **같은 공유 패턴**(ghost 버튼)을 쓴다.
+   * 인라인 배경이 다시 붙으면 같은 역전이 돌아오므로 그 부재까지 함께 잰다 — 클래스만
+   * 재면 인라인이 그 위를 덮어써도 통과한다.
+   */
+  it('명단 토글은 공유 ghost 버튼 패턴을 쓴다 — 카드색 인라인 배경을 다시 두지 않는다', () => {
+    renderSection([team()]);
+
+    const toggle = screen.getByRole('button', { name: 'A팀 명단 펼치기' });
+    expect(toggle).toHaveClass('tm-btn', 'tm-btn-sm', 'tm-btn-ghost');
+    // shorthand 와 롱핸드를 **둘 다** 잰다 — 되돌리기는 shorthand 로 오지만 새로 쓰는
+    // 사람은 `backgroundColor` 를 쓸 수 있고, 그러면 shorthand 만 재는 단언은 통과한다.
+    expect(toggle.style.background).toBe('');
+    expect(toggle.style.backgroundColor).toBe('');
+    expect(toggle.style.border).toBe('');
+    expect(toggle.style.borderColor).toBe('');
+  });
+
   it('처음엔 접혀 있고, 누르면 등번호와 닉네임이 보인다', () => {
     renderSection([team()]);
 

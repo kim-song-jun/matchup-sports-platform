@@ -391,7 +391,7 @@ describe('toTeamMatch — legacy/unmigrated condition fields never show mock dat
     date: '5월 11일 일', time: '09:00', endTime: '11:00',
     format: '11:11', grade: 'A', style: '친선', cost: 280000, opponentCost: 140000, uniform: '빨강',
     closed: false,
-    gender: '성별 무관', manner: 4.8, wins: 23, status: 'open',
+    gender: '성별 무관', manner: 4.8, wins: 23, opponentTeam: null, status: 'open',
   };
 
   function realMatch(overrides: Partial<V1TeamMatch>): V1TeamMatch {
@@ -406,6 +406,34 @@ describe('toTeamMatch — legacy/unmigrated condition fields never show mock dat
       ...overrides,
     };
   }
+
+  /**
+   * **버그의 뿌리는 이 모델에 있었다.** `gender: match.genderRule ?? '성별 미설정'` 이
+   * 빈 값을 문자열로 채워서, 화면의 `match.gender ? … : null` 가드가 **절대 안 걸렸다.**
+   * 리그 대진은 성별 조건을 안 정하는 게 기본이라 모든 리그 카드에 배지가 하나씩 붙었다.
+   *
+   * 화면 테스트에서 `gender: ''` 를 직접 넣으면 이 모델을 **우회**해서, 여기 `??` 를
+   * 되돌려도 red 가 안 난다. 그래서 모델을 지나는 자리에서 잰다.
+   *
+   * 같은 파일이 매너·승·비용에서는 이미 "모르면 null" 을 지킨다 — 성별만 어긋나 있었다.
+   */
+  it('성별 조건이 없으면 빈 값으로 둔다 — 문자열로 채우면 화면 가드가 무력해진다', () => {
+    expect(toTeamMatch(realMatch({ genderRule: null }), mockFallback).gender).toBe('');
+    expect(toTeamMatch(realMatch({}), mockFallback).gender).toBe('');
+    // 값이 있으면 그대로 흐른다.
+    expect(toTeamMatch(realMatch({ genderRule: '성별 무관' }), mockFallback).gender).toBe('성별 무관');
+  });
+
+  /**
+   * 상대팀 이름도 같은 경로로 흐른다 — 목록 카드가 "누구와 붙는지" 를 보여주려면
+   * 이 모델이 서버 값을 실어 날라야 한다.
+   */
+  it('확정된 상대팀 이름을 카드 모델에 싣는다', () => {
+    expect(
+      toTeamMatch(realMatch({ approvedOpponentTeam: { teamId: 't-2', name: '상대 FC' } }), mockFallback).opponentTeam,
+    ).toBe('상대 FC');
+    expect(toTeamMatch(realMatch({}), mockFallback).opponentTeam).toBeNull();
+  });
 
   it('shows real matchFormat/matchStyle/uniformColor when structured columns are populated (post-backfill)', () => {
     const model = toTeamMatch(

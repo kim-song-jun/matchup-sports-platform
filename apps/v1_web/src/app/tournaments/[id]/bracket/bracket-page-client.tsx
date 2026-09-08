@@ -350,7 +350,7 @@ export function BracketScheduleTab({
     usePublicTournamentSchedule(tournamentId);
   // `/schedule`의 권한 기능도 통합 허브인 `/bracket`에서 동일하게 제공한다. 공개 일정
   // 조회와 분리된 인증 전용 요청이라 비로그인·비참가자는 빈 상태로 끝나고, 참가팀
-  // owner/manager에게만 자기 팀 경기 강조와 라인업 바로가기가 열린다.
+  // owner/manager에게만 자기 팀 경기 강조가 열린다.
   const myFixtures = useV1MyTournamentFixtures(tournamentId);
   // 리그는 조회조차 하지 않는다 — 위 섹션 주석 참조.
   const playerRecords = usePublicTournamentPlayerRecords(tournamentId, { enabled: !isRegularLeague });

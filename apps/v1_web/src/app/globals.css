@@ -42,6 +42,10 @@
   --blue500: #3182f6;
   --blue600: #2272eb;
   --blue700: #1b64da; /* blue600보다 진한 강조색 — active 상태(.tm-review-tag-chip 등) */
+  /* 파랑 지면(히어로·프로모 카드·풋살 아이콘 배지)의 어두운 쪽 끝. --blue600 을 직접
+     쓰면 다크에서 뒤집힌다 — 다크의 --blue600 은 글자용으로 밝힌 값이다. */
+  --brand-hero-gradient-end: var(--blue600);
+  --brand-hero-gradient: linear-gradient(135deg, var(--blue500) 0%, var(--brand-hero-gradient-end) 100%);
   --green50: #e3f8ef;
   --green500: #03b26c;
   --green600: #039e60; /* green500과 동일한 명도차(blue500→600, orange500→600 평균)로 파생 — 종목 아이콘 그라디언트용 */
@@ -403,6 +407,10 @@
    * blue500(#3182f6, 4.49:1) 과 blue700(#6ba8ff, 6.88:1) 사이를 유지하면서
    * AA 를 넘는 값으로 잡았다 — #5a9cf8 은 5.99:1. */
   --blue600: #5a9cf8;
+  /* 위 --blue600 은 **글자색** 문제를 풀려고 밝힌 값이다. 같은 토큰이 지면으로도 쓰여
+     그 위 흰 글씨·아이콘이 2.78:1 까지 떨어졌다(alpha 실측). 지면은 라이트와 같은
+     방향(어두워지는 쪽)을 지킨다 — #1b64da 위 흰색 5.41:1. */
+  --brand-hero-gradient-end: #1b64da;
   --orange700: var(--orange500);
   /* --yellow700(light #a66c00)도 동일 이유로 다크에서 --yellow500 재사용 — 다크
      yellow50 틴트(rgba(255,195,66,0.16)) 위 yellow500은 이미 7.2:1로 충분히 통과. */
@@ -2930,7 +2938,29 @@ label.tm-btn:focus-within {
 .tm-team-summary-bar,
 .tm-weather-strip,
 .tm-player-card-progress,
-.tm-list-row {
+.tm-list-row,
+.tm-auth-profile-preview,
+.tm-auth-segmented,
+.tm-my-profile-head,
+/* 아래 넷은 --grey100 을 지면으로 깔면서 같은 규칙에서 --text-muted 를 글자색으로
+   쓴다 — 위 표의 4.19:1 자리다. 선례는 .tm-list-row-interactive:hover(1897행). */
+.tm-bk2-pill,
+.tm-standings-rank,
+.tm-review-card-avatar,
+.tm-chat-system-message span {
+  --text-caption: var(--grey700);
+  --text-muted: var(--grey700);
+}
+
+/* 위 목록은 CSS 에서 겨냥할 클래스가 있는 지면만 담는다. 지면 색을 **인라인 style 로**
+   까는 곳(실측 36파일 85건)은 겨냥할 셀렉터가 없어 목록에 넣을 수 없다 — 그런 곳엔
+   이 표시 클래스를 함께 붙인다. 배경은 각자 정하고, 이 클래스는 그 위 보조 텍스트를
+   읽히는 값으로 올리는 몫만 진다.
+
+   85곳 전부에 붙이지는 않는다. 지면에 색이 깔렸다고 다 문제가 아니라, **그 위에
+   --text-caption/--text-muted 를 쓰는 글자가 있을 때만** 기준 아래로 내려간다
+   (alpha 실측으로 확인된 곳에만 붙였다). */
+.tm-on-tint {
   --text-caption: var(--grey700);
   --text-muted: var(--grey700);
 }
@@ -3641,6 +3671,10 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 .tm-create-selected {
   border-color: var(--blue500);
   background: var(--blue50);
+  /* 선택되면 지면에 색이 깔린다 — 그 위 "선택됨" 캡션이 4.11:1 로 AA 미달이었다
+     (alpha 실측). 배경을 주는 이 규칙 안에서 함께 올린다. */
+  --text-caption: var(--grey700);
+  --text-muted: var(--grey700);
 }
 
 .tm-create-field {

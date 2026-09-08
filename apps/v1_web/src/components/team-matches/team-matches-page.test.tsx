@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -413,6 +413,128 @@ describe('리그전 배지', () => {
     const badge = leagueBadge();
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveTextContent('정규 리그');
+  });
+
+  /**
+   * **카드가 "누구와 붙는지" 를 안 보여줬다.**
+   *
+   * 목록 응답에 상대팀이 없어 화면 어디에도 없던 정보다 — 그래서 행 카드는 신원 줄에
+   * 홈팀만 적었다. `toListItem` 이 `approvedOpponentTeam` 을 싣게 되면서(추가 쿼리 없음)
+   * 이제 "A vs B" 를 말할 수 있다. 상대가 아직 없으면 **붙이지 않는다** — 없는 사실을
+   * 만들지 않는다.
+   */
+  it('상대가 확정되면 신원 줄이 홈팀 vs 상대팀을 말한다', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = [{ ...model.matches[0], hostTeam: '홈 FC', opponentTeam: '상대 FC' }];
+
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+
+    const host = container.querySelector('.tm-team-match-row-host');
+    expect(host).not.toBeNull();
+    expect(host!.textContent).toContain('홈 FC vs 상대 FC');
+  });
+
+  it('상대가 아직 없으면 홈팀만 적는다 — 없는 상대를 만들지 않는다', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = [{ ...model.matches[0], hostTeam: '홈 FC', opponentTeam: null }];
+
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+
+    const host = container.querySelector('.tm-team-match-row-host');
+    expect(host!.textContent).toContain('홈 FC');
+    expect(host!.textContent).not.toContain('vs');
+  });
+
+  /**
+   * **리그 대진 카드를 흐리게 만들지 않는다.**
+   *
+   * 리그의 `closed` 는 "모집이 끝났다" 가 아니라 "상대가 정해져 있다" 는 뜻인데, 그 상태가
+   * 원정팀 팀장·선수 전원에게 붙어 **자기 팀 경기가 마감·흐림으로** 보였다. 흐림은 클래스
+   * 하나로 걸리므로 그 유무를 리그/친선 두 방향으로 잰다.
+   */
+  it('리그 대진 카드에는 마감 흐림을 걸지 않는다 — 친선은 그대로', () => {
+    const league = getTeamMatchListViewModel();
+    league.matches = [{ ...league.matches[0], closed: true, league: { leagueId: 'lg-1', title: '가을 리그' } }];
+    const first = renderPage(<TeamMatchListPageView model={league} />);
+    expect(first.container.querySelector('.tm-match-row')).not.toHaveClass('tm-card-closed');
+    expect(screen.queryByText('신청 마감')).not.toBeInTheDocument();
+    first.unmount();
+
+    const friendly = getTeamMatchListViewModel();
+    friendly.matches = [{ ...friendly.matches[0], closed: true, league: null }];
+    const second = renderPage(<TeamMatchListPageView model={friendly} />);
+    expect(second.container.querySelector('.tm-match-row')).toHaveClass('tm-card-closed');
+    expect(screen.getByText('신청 마감')).toBeInTheDocument();
+  });
+
+  /**
+   * **`성별 미설정` 이 리그 카드에 항상 떴다.**
+   *
+   * 카드 모델이 빈 값을 문자열로 채워서, 조건 줄의 `filter(Boolean)` 가 **절대 안 걸렸다.**
+   * 리그 대진은 성별 조건을 안 정하는 게 기본이라 모든 리그 카드에 그 말이 붙었다.
+   * 두 방향을 함께 잰다 — 값이 있으면 조건 줄에 들어가고, 없으면 구분점째로 사라진다.
+   */
+  it('성별 조건이 없으면 조건 줄에서 빠지고, 있으면 들어간다', () => {
+    const withGender = getTeamMatchListViewModel();
+    withGender.matches = [{ ...withGender.matches[0], sport: '풋살', grade: '', format: '', gender: '성별 무관' }];
+    const first = renderPage(<TeamMatchListPageView model={withGender} />);
+    expect(first.container.querySelector('.tm-team-match-row-cond')!.textContent).toContain('풋살 · 성별 무관');
+    first.unmount();
+
+    const withoutGender = getTeamMatchListViewModel();
+    withoutGender.matches = [{ ...withoutGender.matches[0], sport: '풋살', grade: '', format: '', gender: '' }];
+    const second = renderPage(<TeamMatchListPageView model={withoutGender} />);
+    const cond = second.container.querySelector('.tm-team-match-row-cond')!.textContent ?? '';
+    expect(cond).toContain('풋살');
+    expect(cond).not.toContain('성별 미설정');
+    // 빈 값을 그대로 이으면 "풋살 · " 처럼 구분점만 남는다.
+    expect(cond.trim().startsWith('풋살')).toBe(true);
+    expect(cond.trim()).not.toMatch(/·\s*$/);
+  });
+
+  /**
+   * 리그 경기에는 **상대팀 부담금이라는 개념이 없다** — `비용 미정` 이 영원히 미정으로
+   * 남아 운영자가 안 채운 것처럼 읽힌다. 자리를 비우지는 않는다(푸터 좌우 배치가 무너지고,
+   * '무료' 로 둔갑시키지 않으려던 원래 의도도 사라진다).
+   */
+  it('리그 대진의 비용 자리는 리그 문맥으로 바뀐다 — 친선은 그대로 비용 미정', () => {
+    const league = getTeamMatchListViewModel();
+    league.matches = [{ ...league.matches[0], opponentCost: null, league: { leagueId: 'lg-1', title: '가을 리그' } }];
+    const first = renderPage(<TeamMatchListPageView model={league} />);
+    expect(screen.getByText('리그 경기')).toBeInTheDocument();
+    expect(screen.queryByText('비용 미정')).not.toBeInTheDocument();
+    first.unmount();
+
+    const friendly = getTeamMatchListViewModel();
+    friendly.matches = [{ ...friendly.matches[0], opponentCost: null, league: null }];
+    renderPage(<TeamMatchListPageView model={friendly} />);
+    expect(screen.getByText('비용 미정')).toBeInTheDocument();
+  });
+
+  /**
+   * **호스트 팀 카드의 리그 링크는 배지 줄 밖에 있어야 한다.**
+   *
+   * 이 요소만 44px 터치 타깃을 가져야 하는데(누를 수 있는 유일한 칩이다) 형제 배지는
+   * 26px 이다 — 한 줄에 섞으면 69% 큰 요소 하나가 줄 높이를 혼자 끌어올린다. 높이는
+   * jsdom 이 계산하지 않으므로(레이아웃 없음) **구조**를 잰다.
+   *
+   * (목록 카드는 행 카드로 다시 그려지면서 배지 줄 자체가 없어졌다 — 그래서 이 계약이
+   * 남아 있는 곳은 호스트 팀 카드뿐이다.)
+   */
+  it('호스트 팀 카드의 리그 링크도 배지 줄 밖에 있다', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.match = { ...model.match, league: { leagueId: 'lg-1', title: '가을 리그' } };
+
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const card = container.querySelector('.tm-host-team-card') as HTMLElement | null;
+    expect(card).not.toBeNull();
+    const scoped = within(card!);
+
+    const badge = scoped.getByRole('button', { name: /리그 상세로 이동/ });
+    const sportBadge = scoped.getByText(model.match.sport);
+    expect(sportBadge).toHaveClass('tm-badge-blue');
+    expect(sportBadge.parentElement!.contains(badge)).toBe(false);
   });
 
   it('리그 소속이 아니면 목록 카드에 리그전 배지가 없다', () => {

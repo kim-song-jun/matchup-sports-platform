@@ -34,6 +34,27 @@ describe('사진 없는 매치', () => {
     expect(sportIllustration(undefined)).toBe('landing-hero');
   });
 
+  /**
+   * 176px 이상으로 그려지는 자리는 오브젝트 셋(삼각 구도)을 요구하고, 76px 썸네일은 둘을
+   * 요구한다(agy-3d-graphic 스킬). 한 파일로 둘 다 만족시킬 수 없어 자리별로 파일을 나눈다.
+   */
+  it('hero 자리는 오브젝트 셋짜리 전용 판을 고른다', () => {
+    expect(sportIllustration('축구', 'hero')).toBe('sport-soccer-hero');
+    expect(sportIllustration('풋살', 'hero')).toBe('sport-futsal-hero');
+    expect(sportIllustration('러닝', 'hero')).toBe('sport-running-hero');
+    expect(sportIllustration('수영', 'hero')).toBe('sport-swimming-hero');
+  });
+
+  it('landing-hero 는 이미 오브젝트 셋이라 hero 판을 따로 두지 않는다', () => {
+    // -hero 를 붙이면 없는 파일을 가리켜 404 가 된다.
+    expect(sportIllustration('배드민턴', 'hero')).toBe('landing-hero');
+    expect(sportIllustration(undefined, 'hero')).toBe('landing-hero');
+  });
+
+  it('variant 를 안 주면 카드 판이다 — 목록 썸네일이 hero 판으로 바뀌지 않는다', () => {
+    expect(sportIllustration('풋살')).toBe(sportIllustration('풋살', 'card'));
+  });
+
   it('목록 카드는 사진 대신 종목 그래픽을 그린다', () => {
     const model = { ...base, matches: [{ ...toMatchCard(apiMatch, base.matches[0]) }], isLoading: false };
     const { container } = render(<MatchListPageView model={model} />);

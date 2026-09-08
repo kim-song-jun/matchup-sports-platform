@@ -1280,6 +1280,9 @@ function TeamRegistrationHub({
 
       {capacity ? (
         <div
+          // 두 분기 다 지면에 색을 깐다 — orange50 에서 4.21:1, grey50 에서 4.42:1 로
+          // 그 위 보조 텍스트가 AA 미달이었다(alpha 실측).
+          className="tm-on-tint"
           style={{
             marginTop: 12,
             padding: '12px 12px',

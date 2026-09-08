@@ -152,3 +152,69 @@ describe('BracketGroupCard — 팀 일괄 배정', () => {
     expect(screen.getByPlaceholderText('팀 검색')).toBeInTheDocument();
   });
 });
+
+/**
+ * 결선 조는 순위를 계산하지 않는다. 그래서 "아직 배정된 팀이 없어요" 를 순위 개수로
+ * 판정하면 **팀을 배정한 뒤에도 계속 남는다** — alpha 실측에서 2팀을 배정했는데도
+ * 위쪽 칩에는 두 팀이 보이고 아래에는 여전히 배정이 없다고 적혀 있었다.
+ * 이 문장이 말하는 것은 배정이므로 배정을 봐야 한다.
+ */
+describe('BracketGroupCard — 결선 조 배정 안내', () => {
+  const semiGroup: V1AdminBracketGroup = {
+    id: 'semi-1',
+    tournamentId: 't-1',
+    name: '4강',
+    phase: 'semi',
+    sortOrder: 1,
+    advanceCount: null,
+    createdAt: '2026-08-01T00:00:00.000Z',
+    updatedAt: '2026-08-01T00:00:00.000Z',
+    groupTeams: [],
+  };
+
+  function renderCard(group: V1AdminBracketGroup) {
+    return render(
+      <BracketGroupCard
+        group={group}
+        allGroups={[group]}
+        allStandings={[]}
+        fixtures={[]}
+        confirmedTeamItems={[]}
+        assignGroupTeam={noopMutation() as never}
+        createFixture={noopMutation()}
+        isAutoGenerating={false}
+        onAutoGenerate={vi.fn()}
+        onEditGroup={vi.fn()}
+        onDeleteGroup={vi.fn()}
+        onRemoveGroupTeam={vi.fn()}
+        autoFocus={false}
+        showToast={vi.fn()}
+      />,
+    );
+  }
+
+  it('배정이 정말 없으면 안내한다', () => {
+    renderCard(semiGroup);
+
+    expect(screen.getByText('아직 배정된 팀이 없어요')).toBeInTheDocument();
+  });
+
+  it('팀을 배정했으면 순위가 없어도 그 안내를 거둔다', () => {
+    renderCard({
+      ...semiGroup,
+      groupTeams: [
+        {
+          id: 'gt-1',
+          groupId: 'semi-1',
+          registrationId: 'r1',
+          teamName: '강남FC',
+          sortOrder: 0,
+          createdAt: '2026-08-01T00:00:00.000Z',
+        },
+      ],
+    });
+
+    expect(screen.queryByText('아직 배정된 팀이 없어요')).not.toBeInTheDocument();
+    expect(screen.getByText('강남FC')).toBeInTheDocument();
+  });
+});

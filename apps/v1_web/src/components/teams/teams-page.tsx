@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
@@ -160,7 +160,7 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
       <div className="tm-team-list">
         <EmptyState title={model.title} sub={model.description} />
         {model.state === 'error' ? (
-          <Card pad={16} className="tm-team-state-error-card" style={{ marginTop: 20, background: 'var(--grey50)' }}>
+          <Card pad={16} className="tm-team-state-error-card tm-on-tint" style={{ marginTop: 20, background: 'var(--grey50)' }}>
             <div className="tm-text-label">목록에서 다시 확인해 주세요</div>
             <div className="tm-text-caption" style={{ marginTop: 8, lineHeight: 1.55 }}>
               새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 보세요.
@@ -228,7 +228,7 @@ function TeamOpenMatchesSection({
           ))}
         </div>
       ) : (
-        <Card pad={16} style={{ background: 'var(--grey50)' }}>
+        <Card pad={16} className="tm-on-tint" style={{ background: 'var(--grey50)' }}>
           <div className="tm-text-label">아직 열어둔 매치가 없어요</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>이 팀이 새 경기를 모집하면 여기서 확인할 수 있어요.</div>
         </Card>
@@ -279,7 +279,7 @@ function TeamMyLeaguesSection({
           onCta={onRetry}
         />
       ) : (
-        <div style={{ display: 'grid', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
           {items.map((league) => (
             <Link
               key={league.leagueId}
@@ -451,6 +451,24 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
   const memberCapacity = formatMemberCapacity(team);
   const capacity = formatCapacity(team);
   const [heroMessage, setHeroMessage] = useState('');
+  const mobileBodyRef = useRef<HTMLElement>(null);
+  const mobileCtaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const body = mobileBodyRef.current;
+    const cta = mobileCtaRef.current;
+    if (!body || !cta) return;
+
+    // 문구 줄바꿈과 Android safe area까지 포함한 실제 CTA 높이를 비워 둔다.
+    const syncBottomSpace = () => {
+      body.style.paddingBottom = `${cta.getBoundingClientRect().height + 16}px`;
+    };
+    syncBottomSpace();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(syncBottomSpace);
+    observer.observe(cta, { box: 'border-box' });
+    return () => observer.disconnect();
+  }, []);
 
   /**
    * 팀 후기 요약. **공개 엔드포인트**(`GET /teams/:id/reviews`)라 내 팀이든 남의 팀이든
@@ -702,7 +720,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
       </div>
 
       {/* Mobile layout (unchanged) */}
-      <article className="tm-team-detail-body tm-hide-desktop tm-content-enter">
+      <article ref={mobileBodyRef} className="tm-team-detail-body tm-hide-desktop tm-content-enter">
         <Card pad={20} className="tm-team-detail-hero-card" style={teamHeroStyle(team)}>
           <button
             className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button"
@@ -816,7 +834,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           ) : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
         </Card>
       </article>
-      <div className="tm-fixed-cta tm-hide-desktop">
+      <div ref={mobileCtaRef} className="tm-fixed-cta tm-hide-desktop">
         {/* 승인 대기 중에는 본문의 안내 카드가 상태를 이미 설명하므로 같은 말을 반복하지 않는다. */}
         {mode === 'pending' ? null : (
           <div className="tm-text-caption" style={{ marginBottom: 8 }}>
@@ -1326,6 +1344,8 @@ function TeamCoverImageField({
           caption line-height 16 + margin 12 + badge row 24 = 210px. 이전 132px는 실제보다
           약 60% 낮아 사진 상하가 실제보다 덜 잘려 보이는 미리보기-실사용 불일치가 있었다. */}
       <div
+        // 사진이 없을 때 지면에 색이 깔린다 — 그 위 안내 문구를 함께 올린다(.tm-on-tint).
+        className="tm-on-tint"
         style={{
           marginTop: 12,
           minHeight: 210,

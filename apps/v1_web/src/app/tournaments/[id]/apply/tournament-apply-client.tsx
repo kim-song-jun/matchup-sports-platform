@@ -1392,7 +1392,9 @@ function PaymentGuideStep({
         <Card pad={0} style={{ marginTop: 8 }}>
           {paymentInstructions ? (
             <div style={{ padding: '0 16px' }}>
-              <InfoRow label="은행" value={paymentInstructions.bankName} />
+              {/* 이 블록의 어휘는 '—' 다(입금자명·참가 팀과 같은 말). 공유 InfoRow 의
+                  기본 폴백('미정')이 닿으면 바로 아래 행과 말이 갈린다. */}
+              <InfoRow label="은행" value={paymentInstructions.bankName || '—'} />
               {/* Account number row with copy button */}
               <div
                 className="tm-info-row"
@@ -1419,7 +1421,7 @@ function PaymentGuideStep({
                   </button>
                 </div>
               </div>
-              <InfoRow label="예금주" value={paymentInstructions.bankHolder} />
+              <InfoRow label="예금주" value={paymentInstructions.bankHolder || '—'} />
               <InfoRow label="입금액" value={formatEntryFee(tournament.entryFee)} />
               <InfoRow
                 label="입금자명"

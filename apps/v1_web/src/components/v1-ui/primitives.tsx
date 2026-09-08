@@ -518,7 +518,25 @@ type InfoRowProps = {
   badge?: React.ReactNode;
 };
 
+/**
+ * **라벨이 있는 자리에서 "모른다"는 말로 해야 한다.**
+ *
+ * 예전엔 `{value}` 를 그대로 그려서, 값이 빈 문자열이면 **라벨만 남고 값 칸이 통째로
+ * 비었다** — 사용자는 그걸 "정보가 없다"가 아니라 **화면이 깨졌다**로 읽는다. 실제로
+ * 개인 매치 상세의 "성별 조건" 이 그렇게 비어 나갔다.
+ *
+ * 소비처 24곳을 전수로 봤을 때 **값 없음이 정상 상태인 자리는 하나도 없었다** — 없어도
+ * 되는 값들은 이미 소스에서 자기 어휘로 채워져 있고(`'지역 미정'`·`'레벨 미설정'`),
+ * 남는 자리는 없으면 **사용자가 행동할 수 없는** 값이다(장소·은행·예금주). 그래서
+ * 폴백이 덮어쓸 "의도된 빈칸"이 없다.
+ *
+ * 어휘는 `'미정'` — `team-matches-page` 의 로컬 `InfoRow` 가 이미 쓰는 말이라 새로 만들지
+ * 않는다. **다른 어휘를 쓰는 화면은 호출부에서 폴백을 명시한다**(대회 신청 화면은 `'—'`).
+ *
+ * 공백만 있는 값도 빈 값으로 본다 — 서버가 `' '` 를 주면 `''` 만 보는 판정은 반만 막는다.
+ */
 export function InfoRow({ label, value, valueColor, isLast, sub, badge }: InfoRowProps) {
+  const filled = value.trim().length > 0;
   return (
     <div
       className="tm-info-row"
@@ -534,7 +552,7 @@ export function InfoRow({ label, value, valueColor, isLast, sub, badge }: InfoRo
           className="tm-text-body"
           style={{ fontWeight: 600, color: valueColor ?? 'var(--text-strong)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}
         >
-          {value}
+          {filled ? value : '미정'}
           {/* #2: 희소성/마감 인라인 배지 */}
           {badge}
         </div>

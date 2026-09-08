@@ -76,6 +76,7 @@ function LeagueHub() {
           <Link
             href={activeTab === 'series' ? '/admin/league-series/new' : '/admin/league-matches/new'}
             className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white"
+            style={{ color: 'var(--static-white)' }}
           >
             <Plus size={16} aria-hidden="true" />
             {activeTab === 'series' ? '리그 체계 만들기' : '리그 만들기'}

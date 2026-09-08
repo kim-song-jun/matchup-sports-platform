@@ -33,6 +33,7 @@ function AccessDenied() {
         <Link
           href="/home"
           className="mt-2 inline-flex items-center justify-center h-[44px] px-6 bg-blue-500 hover:bg-blue-600 text-white text-[length:var(--font-size-body-sm)] font-semibold rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          style={{ color: 'var(--static-white)' }}
         >
           서비스로 돌아가기
         </Link>
@@ -63,6 +64,7 @@ function AdminErrorScreen({ onRetry }: { onRetry: () => void }) {
           type="button"
           onClick={onRetry}
           className="mt-2 inline-flex items-center justify-center h-[44px] px-6 bg-blue-500 hover:bg-blue-600 text-white text-[length:var(--font-size-body-sm)] font-semibold rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+          style={{ color: 'var(--static-white)' }}
         >
           다시 시도
         </button>

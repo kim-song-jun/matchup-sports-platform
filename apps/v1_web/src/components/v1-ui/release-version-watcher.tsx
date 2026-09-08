@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { getV1ApiBaseUrl } from '@/lib/api-client';
+import { clearChunkReloadMark, requestReleaseReload } from '@/lib/release-reload';
 import { BrandMark } from './brand-logo';
 
 const CHECK_INTERVAL_MS = 3 * 60 * 1000;
-const RELOAD_DELAY_MS = 1500;
 const RELEASE_HEADER = 'x-teameet-release';
 
 /**
@@ -22,6 +22,9 @@ export function ReleaseVersionWatcher() {
 
   useEffect(() => {
     let cancelled = false;
+    // 이 컴포넌트가 떴다 = 화면이 정상으로 그려졌다. 청크 복구 표식을 지워 다음 배포 때
+    // 자동 복구가 다시 한 번 열리게 한다.
+    clearChunkReloadMark();
 
     const checkVersion = async () => {
       if (reloadingRef.current) return;
@@ -43,10 +46,8 @@ export function ReleaseVersionWatcher() {
       if (release !== baselineRef.current) {
         reloadingRef.current = true;
         setUpdating(true);
-        // SW가 살아있으면 정적 자산 캐시를 즉시 무효화한다 — 컨트롤러가 없으면(SW 미등록·
-        // 아직 activate 전) 옵셔널 체이닝으로 조용히 스킵되고 reload()는 그대로 실행된다.
-        navigator.serviceWorker?.controller?.postMessage({ type: 'TEAMEET_RELEASE_CHANGED' });
-        window.setTimeout(() => window.location.reload(), RELOAD_DELAY_MS);
+        // 리로드는 global-error 의 청크 복구와 같은 경로를 쓴다(SW 정적 캐시 무효화 포함).
+        requestReleaseReload();
       }
     };
 

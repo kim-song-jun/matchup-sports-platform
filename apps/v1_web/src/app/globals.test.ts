@@ -592,6 +592,10 @@ describe('인라인으로 지면 색을 까는 곳의 보조 텍스트 (.tm-on-t
     // 이 파일엔 grey50 카드가 둘이다(에러 상태 · 매치 없음). 둘 다 그 위가 캡션이다.
     ['src/components/teams/teams-page.tsx', 'Card', /background: 'var\(--grey50\)' \}\}/, 2],
     ['src/components/tournaments/tournament-event-hub-sections.tsx', 'Card', /var\(--grey50\)/, 1],
+    // 이 파일의 grey50 Card 넷 — 참가 전 유의사항(모바일·데스크톱 두 벌) · 환불 정책 원문 ·
+    // 대진표 준비 중. 표시 클래스를 고르는 조건에 넣으면 순환이 되므로 지면만으로 고른다.
+    // 속성 순서·줄바꿈에 기대지 않도록 토큰 하나만 본다(Prettier 재포맷에 깨지지 않게).
+    ['src/app/tournaments/[id]/tournament-detail-client.tsx', 'Card', /var\(--grey50\)/, 4],
   ])('%s 의 틴트 %s 태그 %d개 전부에 표시 클래스가 붙어 있다', (file, tag, tint, count) => {
     const source = readFileSync(resolve(process.cwd(), file), 'utf8');
     const tinted = openingTagsWithTint(source, tag as string, tint as RegExp);

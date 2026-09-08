@@ -134,33 +134,47 @@ restore_on_failure() {
 }
 trap 'restore_on_failure' ERR
 
+# 파이프라인은 `alpha_restore_step` 의 인자로 넘길 수 없어 이름 있는 함수로 뺀다 —
+# 그래야 실패했을 때 "무엇이" 실패했는지 남는다.
+legacy_local_health_ok() {
+  curl -fsS --connect-timeout 3 --max-time 10 \
+    http://127.0.0.1:8121/api/v1/health | jq -e '.data.checks.db == true' >/dev/null
+}
+
+container_image_state() {
+  docker inspect --format '{{.Config.Image}} {{.State.Running}}' "$1"
+}
+
 restore_legacy_runtime() {
-  [[ -n "${legacy_api_image}" && -n "${legacy_web_image}" ]] || return 1
-  restore_legacy_alpha_source || return 1
+  alpha_restore_step legacy_api_image_known test -n "${legacy_api_image}" || return 1
+  alpha_restore_step legacy_web_image_known test -n "${legacy_web_image}" || return 1
+  alpha_restore_step legacy_source restore_legacy_alpha_source || return 1
   ALPHA_API_IMAGE="${legacy_api_image}"
   ALPHA_WEB_IMAGE="${legacy_web_image}"
   ALPHA_RELEASE_VERSION="${legacy_release_version}"
   ALPHA_RELEASE_SHA="${legacy_release_sha}"
   export ALPHA_API_IMAGE ALPHA_WEB_IMAGE ALPHA_RELEASE_VERSION ALPHA_RELEASE_SHA
-  "${compose[@]}" up -d --force-recreate --no-deps \
+  alpha_restore_step legacy_compose_up_app "${compose[@]}" up -d --force-recreate --no-deps \
     v1_api v1_web v1_game_operations_worker || return 1
-  "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
+  alpha_restore_step legacy_compose_up_nginx "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
   local restored_api_container
   local restored_web_container
-  restored_api_container="$("${compose[@]}" ps -q v1_api)" || return 1
-  restored_web_container="$("${compose[@]}" ps -q v1_web)" || return 1
-  [[ -n "${restored_api_container}" && -n "${restored_web_container}" ]] || return 1
-  [[ "$(docker inspect --format '{{.Config.Image}} {{.State.Running}}' "${restored_api_container}")" == "${legacy_api_image} true" ]] || return 1
-  [[ "$(docker inspect --format '{{.Config.Image}} {{.State.Running}}' "${restored_web_container}")" == "${legacy_web_image} true" ]] || return 1
-  curl -fsS --connect-timeout 3 --max-time 10 \
-    http://127.0.0.1:8121/api/v1/health | jq -e '.data.checks.db == true' >/dev/null || return 1
+  restored_api_container="$(alpha_restore_step legacy_ps_api "${compose[@]}" ps -q v1_api)" || return 1
+  restored_web_container="$(alpha_restore_step legacy_ps_web "${compose[@]}" ps -q v1_web)" || return 1
+  alpha_restore_step legacy_api_container_present test -n "${restored_api_container}" || return 1
+  alpha_restore_step legacy_web_container_present test -n "${restored_web_container}" || return 1
+  alpha_restore_step legacy_api_image_running \
+    test "$(container_image_state "${restored_api_container}")" = "${legacy_api_image} true" || return 1
+  alpha_restore_step legacy_web_image_running \
+    test "$(container_image_state "${restored_web_container}")" = "${legacy_web_image} true" || return 1
+  alpha_restore_step legacy_local_health legacy_local_health_ok || return 1
   local restored_headers restored_release restored_sha
-  restored_headers="$(curl -fsSI --connect-timeout 3 --max-time 10 \
-    https://alpha.teameet.co.kr/landing)" || return 1
+  restored_headers="$(alpha_restore_step legacy_public_headers \
+    curl -fsSI --connect-timeout 3 --max-time 10 https://alpha.teameet.co.kr/landing)" || return 1
   restored_release="$(awk -F': ' 'tolower($1) == "x-teameet-release" { gsub("\r", "", $2); print $2 }' <<< "${restored_headers}")"
   restored_sha="$(awk -F': ' 'tolower($1) == "x-teameet-commit" { gsub("\r", "", $2); print $2 }' <<< "${restored_headers}")"
-  [[ "${restored_release}" == "${legacy_release_version}" ]] || return 1
-  [[ "${restored_sha}" == "${legacy_release_sha}" ]] || return 1
+  alpha_restore_step legacy_release_matches test "${restored_release}" = "${legacy_release_version}" || return 1
+  alpha_restore_step legacy_sha_matches test "${restored_sha}" = "${legacy_release_sha}" || return 1
 }
 
 if ! command -v rsync >/dev/null 2>&1; then
@@ -202,7 +216,11 @@ fi
 # 여기서 배포를 막기로 판단한 이유: 이 preflight 시점은 이미 activate_alpha_release_source
 # 로 소스가 전환된 뒤(runtime_mutated=true)라 ERR 트랩(restore_active_release /
 # restore_legacy_runtime)이 정상 동작해 안전하게 되감아진다 — 즉 막아도 롤백 경로 자체가
-# 막히지 않는다. 반대로 여기서 통과시키면 디스크가 이미 위험 수준인 채로 이미지 pull ·
+# 막히지 않는다.
+#
+# ⚠️ **이 판단은 복구 경로가 실제로 동작한다는 전제 위에 서 있다.** 2026-09-08 에 그 전제가
+# 네 번 거짓이었다(복구가 매번 실패했고 어느 단계인지도 몰랐다 — 그래서
+# `alpha_restore_step` 을 넣었다). **복구 경로를 건드리면 이 가드도 함께 재검토하라.** 반대로 여기서 통과시키면 디스크가 이미 위험 수준인 채로 이미지 pull ·
 # postgres 볼륨 쓰기까지 진행하다 더 나쁜 지점에서 실패할 수 있고, 그 실패 지점이 하필
 # 복구용 재-pull 도 실패시켰던 바로 그 사고 패턴이다(디스크 부족은 복구 시도 자체를
 # 무력화한다는 게 이 사고의 핵심 교훈). 긴급 배포를 막을 위험은 있지만, 그 대가는

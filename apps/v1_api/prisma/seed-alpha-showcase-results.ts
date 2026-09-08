@@ -8,6 +8,7 @@ import {
 
 import { assertAlphaSeedAllowed } from './seed-alpha-tournament-qa';
 import { repairExistingShowcaseOfficialResult } from './showcase-official-result-repair';
+import { participantDisplayName } from '../src/tournaments/participant-display-name';
 
 const LOCAL_SHOWCASE_DATABASE = 'teameet_alpha';
 const LOCAL_SHOWCASE_HOST = 'v1_postgres';
@@ -98,13 +99,19 @@ async function seedFixtureResult(
       teamId: string;
       appliedByUserId: string;
       team: { name: string };
-      players: readonly { userId: string; realName: string }[];
+      players: readonly {
+        userId: string;
+        user: { profile: { nickname: string | null; displayName: string | null } | null } | null;
+      }[];
     } | null;
     awayRegistration: {
       teamId: string;
       appliedByUserId: string;
       team: { name: string };
-      players: readonly { userId: string; realName: string }[];
+      players: readonly {
+        userId: string;
+        user: { profile: { nickname: string | null; displayName: string | null } | null } | null;
+      }[];
     } | null;
     game: {
       id: string;
@@ -152,7 +159,7 @@ async function seedFixtureResult(
             sideId: side.id,
             lineupId: lineup.id,
             userId: player.userId,
-            displayNameSnapshot: player.realName,
+            displayNameSnapshot: participantDisplayName(player),
             jerseyNumber: 7 + playerIndex,
             started: true,
           },
@@ -210,14 +217,14 @@ async function seedFixtureResult(
     gameId: game.id,
     sideId: homeSide.id,
     userId: homeUserId,
-    displayNameSnapshot: homePlayer.realName,
+    displayNameSnapshot: participantDisplayName(homePlayer),
     jerseyNumber: 7,
   });
   awayParticipant ??= await ensureShowcaseRepresentativeParticipant(tx, {
     gameId: game.id,
     sideId: awaySide.id,
     userId: awayUserId,
-    displayNameSnapshot: awayPlayer.realName,
+    displayNameSnapshot: participantDisplayName(awayPlayer),
     jerseyNumber: 7,
   });
 
@@ -418,7 +425,12 @@ async function main() {
             players: {
               where: { removedAt: null },
               orderBy: { addedAt: 'asc' },
-              select: { userId: true, realName: true },
+              // 이름은 닉네임이 먼저다(`participantDisplayName`). **실명은 아예 안 가져온다** —
+              // 표시에 쓰지 않는 값이라 프로세스에 들여올 이유가 없다.
+              select: {
+                userId: true,
+                user: { select: { profile: { select: { nickname: true, displayName: true } } } },
+              },
             },
           },
         },
@@ -430,7 +442,12 @@ async function main() {
             players: {
               where: { removedAt: null },
               orderBy: { addedAt: 'asc' },
-              select: { userId: true, realName: true },
+              // 이름은 닉네임이 먼저다(`participantDisplayName`). **실명은 아예 안 가져온다** —
+              // 표시에 쓰지 않는 값이라 프로세스에 들여올 이유가 없다.
+              select: {
+                userId: true,
+                user: { select: { profile: { select: { nickname: true, displayName: true } } } },
+              },
             },
           },
         },

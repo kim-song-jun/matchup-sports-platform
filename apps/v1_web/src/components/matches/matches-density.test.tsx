@@ -151,11 +151,13 @@ describe('페이지 제목 — 공유 토큰', () => {
       expect(rule, name).toBeDefined();
       // 계약은 "크기·굵기·색·자간은 tm-text-heading 이 준다" 이므로 넷 다 막는다.
       // font-size/weight 만 막으면 `font:` shorthand 로 같은 것이 돌아올 수 있다(#1145 Copilot).
-      expect(rule, name).not.toMatch(/font-size:/);
-      expect(rule, name).not.toMatch(/font-weight:/);
-      expect(rule, name).not.toMatch(/(^|[;{\s])font:/);
-      expect(rule, name).not.toMatch(/color:/);
-      expect(rule, name).not.toMatch(/letter-spacing:/);
+      // 속성명과 콜론 사이 공백은 유효한 CSS 다(`font-size : 26px`) — \s* 로 허용하지 않으면
+      // 그 형태로 회귀가 들어와도 못 잡는다(#1145 Copilot).
+      expect(rule, name).not.toMatch(/font-size\s*:/);
+      expect(rule, name).not.toMatch(/font-weight\s*:/);
+      expect(rule, name).not.toMatch(/(^|[;{\s])font\s*:/);
+      expect(rule, name).not.toMatch(/color\s*:/);
+      expect(rule, name).not.toMatch(/letter-spacing\s*:/);
     });
   });
 

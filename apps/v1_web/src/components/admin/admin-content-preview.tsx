@@ -88,12 +88,17 @@ function DeviceButton({
   label: string;
   children: React.ReactNode;
 }) {
+  // 활성 알약은 트랙(--surface-soft)보다 **밝아야** 한다 — shadow-sm 이 말하는 "떠 있는"
+  // 상태를 지면 톤도 같이 말해야 하고, --grey300 은 라이트에서 트랙보다 어두워 그 신호를
+  // 뒤집었다(blue700 대비도 3.70:1 로 미달). 밝은 쪽 토큰이 테마마다 달라 쌍으로 준다:
+  // 라이트 --surface(#fff, 5.41:1) · 다크 --grey300(#333a45, 4.73:1). 디자인 시스템의
+  // .tm-segmented-thumb 도 같은 이유로 surface/grey150 쌍을 쓴다(globals.css).
   return (
     <button
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold transition-colors [&_svg]:h-4 [&_svg]:w-4 ${active ? 'bg-[var(--grey300)] text-[var(--blue700)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-strong)]'}`}
+      className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold transition-colors [&_svg]:h-4 [&_svg]:w-4 ${active ? 'bg-[var(--surface)] dark:bg-[var(--grey300)] text-[var(--blue700)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-strong)]'}`}
     >
       {children}{label}
     </button>

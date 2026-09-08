@@ -122,3 +122,49 @@ describe('데스크톱 열 수 — 행 카드가 눌리지 않는 폭', () => {
     expect(block).not.toMatch(/repeat\(2/);
   });
 });
+
+/**
+ * 페이지 제목 토큰 정합 (2026-09-08 alpha 실측 · ultracode 감사).
+ *
+ * DESIGN.md 는 페이지 제목을 `--font-size-heading` / `.tm-text-heading`(24px/700)으로 규정한다.
+ * 그런데 matches·team-matches·teams 세 화면은 각자 desktop CSS 에 **26px/800 을 복붙**해
+ * 두고 있었다(실측 px=26/weight=800, 세 파일 각 1건). 8단계 스케일(11/12/13/14/15/17/20/24)에
+ * 26 은 없다. 형제 화면 tournaments 는 같은 역할에 공유 셸의 `tm-text-heading` 을 그대로 써서
+ * 24/700 을 얻고 있었다 — 세 화면만 빠진 것이다.
+ *
+ * 이 계약은 **jsdom 이 미디어 쿼리를 계산하지 않아** 렌더 테스트로는 못 잡는다.
+ */
+describe('페이지 제목 — 공유 토큰', () => {
+  const files = [
+    ['matches', 'src/app/desktop/matches.css', '.tm-match-desktop-header-title'],
+    ['team-matches', 'src/app/desktop/team-matches.css', '.tm-team-match-desktop-header-title'],
+    ['teams', 'src/app/desktop/teams.css', '.tm-team-desktop-header-title'],
+  ];
+
+  it('세 화면 모두 desktop CSS 에서 크기·굵기를 직접 정하지 않는다', () => {
+    files.forEach(([name, path, selector]) => {
+      const css = readFileSync(resolve(process.cwd(), path), 'utf8');
+      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const rule = css.match(new RegExp(escaped + '\\s*\\{([^}]*)\\}'))?.[1]
+        ?.replace(/\/\*[\s\S]*?\*\//g, '');
+
+      expect(rule, name).toBeDefined();
+      expect(rule, name).not.toMatch(/font-size:/);
+      expect(rule, name).not.toMatch(/font-weight:/);
+    });
+  });
+
+  it('세 h1 이 공유 클래스를 실제로 달고 있다 — CSS 만 지우면 크기가 사라진다', () => {
+    [
+      'src/components/matches/matches-page.tsx',
+      'src/components/team-matches/team-matches-page.tsx',
+      'src/components/teams/teams-page.tsx',
+    ].forEach((path) => {
+      const tsx = readFileSync(resolve(process.cwd(), path), 'utf8');
+      const h1 = tsx.match(/<h1 className="([^"]*desktop-header-title[^"]*)"/)?.[1];
+
+      expect(h1, path).toBeDefined();
+      expect(h1, path).toContain('tm-text-heading');
+    });
+  });
+});

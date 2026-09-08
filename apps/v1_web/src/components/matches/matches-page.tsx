@@ -87,7 +87,7 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
     <>
       {/* Desktop-only page header with inline "매치 만들기" CTA */}
       <div className="tm-match-desktop-header tm-show-desktop">
-        <h1 className="tm-match-desktop-header-title">매치</h1>
+        <h1 className="tm-text-heading tm-match-desktop-header-title">매치</h1>
         <Link className="tm-match-desktop-create-btn" href="/matches/new/sport" aria-label="새 매치 만들기">
           <PlusIcon size={18} strokeWidth={2.5} aria-hidden="true" />
           매치 만들기

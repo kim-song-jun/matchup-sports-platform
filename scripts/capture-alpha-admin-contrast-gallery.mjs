@@ -115,6 +115,12 @@ const READ = `(() => {
   /** a11y-decisions.md 1번 — solid-fill 버튼 위 흰 글씨(4색). */
   const SOLID_FILL = new Set(['49,130,246', '240,68,82', '3,178,108', '254,152,0']);
   const isWhite = (c) => c[0] > 250 && c[1] > 250 && c[2] > 250;
+  /**
+   * WCAG 2.1 SC 1.4.3 자체 예외 — *"로고 또는 브랜드명의 일부인 텍스트에는 대비 요구가 없다."*
+   * 워드마크를 세면 홈·팀·마이·채팅 모든 화면에서 같은 두 건이 영원히 올라와, 진짜 결함이 묻힌다.
+   * 클래스로 고르는 이유: 텍스트로 고르면 "teameet" 이 들어간 **본문**까지 함께 빠진다.
+   */
+  const LOGOTYPE = '.tm-desktop-nav-brand, .tm-desktop-footer-wordmark';
 
   const out = { checked: 0, skipped: 0, exempt: 0, fails: [] };
   for (const el of document.querySelectorAll('body *')) {
@@ -130,6 +136,7 @@ const READ = `(() => {
     const cs = getComputedStyle(el);
     if (cs.visibility === 'hidden' || cs.opacity === '0') continue;
     if (el.closest('[disabled],[aria-disabled="true"]')) { out.exempt += 1; continue }
+    if (el.closest(LOGOTYPE)) { out.exempt += 1; continue }
     const bg = ground(el);
     if (!bg) { out.skipped += 1; continue }
     const fg = over(rgba(cs.color), bg);

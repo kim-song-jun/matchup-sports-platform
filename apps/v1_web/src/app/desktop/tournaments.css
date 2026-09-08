@@ -343,6 +343,10 @@
 .tm-tournament-promo-section-title {
   /* 페이지 내 형제 섹션("대회 목록" = tm-text-body-lg 17px)과 동일 스케일로 통일 */
   font-size: var(--font-size-body-lg);
+  /* 크기·굵기만 맞추고 line-height 를 빼 두면 'normal'(≈26px)이 상속돼 형제와 2px
+     어긋난다 — 주석은 "동일 스케일로 통일"이라 말하는데 실제 출력이 달랐다
+     (alpha 실측 2026-09-08: lh=26 vs tm-text-body-lg 의 28). 같은 값을 명시한다. */
+  line-height: 28px;
   font-weight: 700;
   color: var(--text-strong);
   /* 제목 아래 여백: 이전엔 0이라 h2 line-box의 half-leading(약 4px)만 남아

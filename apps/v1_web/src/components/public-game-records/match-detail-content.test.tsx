@@ -271,3 +271,44 @@ describe('MatchDetailContent — 선수 이름 프로필 링크', () => {
     expect(screen.getByRole('link', { name: '김도윤' })).toHaveAttribute('href', '/users/u-1');
   });
 });
+
+/**
+ * **선수 이름은 프로필로 눌리는데 팀 이름은 아무 데도 못 갔다**(alpha 실측). 관전자가
+ * 이 경기에서 팀으로 갈 수 있는 자리가 여기뿐인데 막혀 있었다.
+ */
+describe('MatchDetailContent — 팀 이름 진입점', () => {
+  it('팀 이름을 누르면 팀 페이지로 간다', () => {
+    render(<MatchDetailContent data={makeDetail()} />);
+
+    expect(screen.getByRole('link', { name: '홈팀' })).toHaveAttribute('href', '/teams/team-home');
+    expect(screen.getByRole('link', { name: '원정팀' })).toHaveAttribute('href', '/teams/team-away');
+  });
+
+  /**
+   * `teamId` 와 `teamName` 은 **각각** nullable 이다. id 는 있고 이름만 가려진 조합에서
+   * `teamId` 만 보고 링크를 만들면 **'미정' 이라는 글자가 팀 페이지로 링크된다.**
+   */
+  it('이름이 가려졌으면 id 가 있어도 링크로 만들지 않는다', () => {
+    const data = makeDetail({
+      home: { registrationId: 'reg-home', teamId: 'team-home', teamName: null },
+      away: { registrationId: 'reg-away', teamId: 'team-away', teamName: null },
+    });
+
+    render(<MatchDetailContent data={data} />);
+
+    expect(screen.queryByRole('link', { name: '미정' })).not.toBeInTheDocument();
+  });
+
+  it('신원이 가려진 동안에는 링크로 만들지 않는다', () => {
+    const data = makeDetail({
+      home: { registrationId: 'reg-home', teamId: null, teamName: null },
+      away: { registrationId: 'reg-away', teamId: null, teamName: null },
+    });
+
+    render(<MatchDetailContent data={data} />);
+
+    // 없는 팀 페이지로 보내지 않는다 — 이름 자체가 아직 공개 전이다.
+    expect(screen.queryByRole('link', { name: '미정' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('미정').length).toBeGreaterThan(0);
+  });
+});

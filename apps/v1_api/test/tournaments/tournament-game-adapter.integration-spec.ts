@@ -59,6 +59,10 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
         email: authUser.email,
         accountStatus: 'active',
         onboardingStatus: 'completed',
+        // 참가자 이름은 **닉네임이 먼저다**(`participantDisplayName`). 프로필이 없으면
+        // 그 규칙이 폴백으로 떨어져 이 스펙이 무엇을 재는지 흐려진다 — 여기서 재려는 건
+        // "대진 생성이 등록 명단의 그 사람을 참가자로 잇는가" 이고, 이름은 그 증거다.
+        profile: { create: { nickname: '어댑터닉' } },
       },
     });
     await prisma.v1AdminUser.create({
@@ -219,9 +223,11 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
         displayNameSnapshot: 'Task 6 Home',
       }),
     ]));
+    // **실명이 아니라 닉네임이다.** 두 명단 행이 같은 계정을 가리키므로 둘 다 같은 닉네임이
+    // 된다 — 실명(`Away Player`/`Home Player`)이 여기 나오면 규칙이 안 걸린 것이다.
     expect(fixture.game?.participants.map((participant) => participant.displayNameSnapshot)).toEqual([
-      'Away Player',
-      'Home Player',
+      '어댑터닉',
+      '어댑터닉',
     ]);
     expect(
       await prisma.v1TournamentFixture.count({

@@ -93,6 +93,9 @@ describe('fixture-game-backfill — repairs the "public schedule always empty" b
         email: 'fixture-game-backfill@example.test',
         accountStatus: 'active',
         onboardingStatus: 'completed',
+        // 백필도 참가자 이름 규칙(`participantDisplayName`)을 따른다 — 닉네임이 먼저다.
+        // 프로필이 없으면 폴백으로 떨어져 이 스펙이 규칙을 지나는지 알 수 없다.
+        profile: { create: { nickname: '백필닉' } },
       },
     });
     await prisma.v1Sport.create({
@@ -331,10 +334,9 @@ describe('fixture-game-backfill — repairs the "public schedule always empty" b
     expect(game.sides.map((side) => side.sideKey)).toEqual(['HOME', 'AWAY']);
     expect(game.sides.map((side) => side.displayNameSnapshot).sort()).toEqual(['Scheduled Away', 'Scheduled Home']);
     expect(game.lineups).toHaveLength(2);
-    expect(game.participants.map((p) => p.displayNameSnapshot)).toEqual([
-      'Scheduled Away Player',
-      'Scheduled Home Player',
-    ]);
+    // **실명이 아니라 닉네임이다.** 두 명단 행이 같은 계정을 가리키므로 둘 다 같은 값이다 —
+    // 실명(`Scheduled … Player`)이 여기 나오면 백필이 규칙을 안 거친 것이다.
+    expect(game.participants.map((p) => p.displayNameSnapshot)).toEqual(['백필닉', '백필닉']);
     expect(game.periods).toHaveLength(2);
     expect(game.periods.every((period) => period.state === 'SCHEDULED')).toBe(true);
     expect(game.visibilityPolicy?.mode).toBe('LIVE');

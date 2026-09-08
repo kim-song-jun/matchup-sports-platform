@@ -15,6 +15,12 @@
  * 에서 `dist/src/…js` 를 참조하므로 둘 다 이미지 안에 있다.
  *
  * 앱 코드를 import 하지 않는 시드는 ts-node 로 돌려도 된다 — 이 체커가 건드리지 않는다.
+ *
+ * `@/` 별칭은 **더 나쁘다.** `tsconfig.json` 에 `"@/*": ["src/*"]` 가 선언돼 있지만 런타임
+ * 매퍼(`tsconfig-paths`·`module-alias`)가 **어디에도 등록돼 있지 않고**, `src/` 자신도 그 별칭을
+ * 한 번도 쓰지 않는다(실측 0건). tsc 는 import 지정자를 다시 쓰지 않으므로 컴파일본도
+ * `require("@/...")` 를 그대로 뿜는다 — **ts-node 든 컴파일본이든 양쪽 다 죽는다.** 그래서
+ * `@/` 는 실행 방식과 무관하게 금지한다. 지금 prisma/ 에는 0건이라 잠복 상태다.
  */
 import { readFileSync, readdirSync } from 'node:fs';
 
@@ -25,10 +31,24 @@ const RUNTIME_DOCKERFILE = 'deploy/Dockerfile.v1-api';
 /** 런타임 이미지가 싣지 않는 워크스페이스 디렉터리를 가리키는 상대 import. */
 const CROSSES_INTO_SRC = /from\s+['"]\.\.\/src\//;
 
+/** `@/` 별칭. 런타임 매퍼가 없어 어떤 실행 방식으로도 해석되지 않는다. */
+const USES_PATH_ALIAS = /from\s+['"]@\//;
+
 export function findOffenders({ deployScript, seeds }) {
   const offenders = [];
 
   for (const { name, source } of seeds) {
+    // `@/` 는 실행 방식과 무관하게 깨진다 — 배포에 등록됐는지도 따지지 않는다.
+    if (USES_PATH_ALIAS.test(source)) {
+      offenders.push({
+        seed: name,
+        reason:
+          '`@/` 별칭을 쓴다 — 런타임 매퍼가 등록돼 있지 않아 ts-node 도 컴파일본도 해석하지 못한다. ' +
+          '상대 경로로 바꾸세요',
+      });
+      continue;
+    }
+
     if (!CROSSES_INTO_SRC.test(source)) continue;
 
     const base = name.replace(/\.ts$/, '');
@@ -40,12 +60,14 @@ export function findOffenders({ deployScript, seeds }) {
     if (tsNodeInvocation.test(deployScript)) {
       offenders.push({
         seed: name,
-        reason: 'ts-node 로 .ts 를 직접 돌린다 — 런타임 이미지에 `src` 가 없어 import 가 깨진다',
+        reason:
+          '`../src/` 를 import 하는데 ts-node 로 .ts 를 직접 돌린다 — 런타임 이미지에 `src` 가 없다. ' +
+          `\`node dist/prisma/${base}.js\` 로 바꾸세요`,
       });
     } else if (!compiledInvocation.test(deployScript)) {
       offenders.push({
         seed: name,
-        reason: `배포 스크립트에서 \`node dist/prisma/${base}.js\` 로 실행되지 않는다`,
+        reason: `\`../src/\` 를 import 하는데 배포에서 \`node dist/prisma/${base}.js\` 로 실행되지 않는다`,
       });
     }
   }
@@ -76,10 +98,7 @@ function main() {
   if (offenders.length > 0) {
     console.error('[alpha-seed-runtime] failed');
     for (const { seed, reason } of offenders) {
-      console.error(
-        `- \`prisma/${seed}\` 는 \`../src/\` 를 import 하는데 ${reason}. ` +
-          `\`node dist/prisma/${seed.replace(/\.ts$/, '')}.js\` 로 바꾸세요.`,
-      );
+      console.error(`- \`prisma/${seed}\`: ${reason}.`);
     }
     process.exit(1);
   }

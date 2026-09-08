@@ -52,6 +52,31 @@ test('배포에서 아예 안 돌리는 시드는 대상이 아니다', () => {
   assert.deepEqual(offenders, []);
 });
 
+const ALIAS_SEED = `
+import { PrismaClient } from '@prisma/client';
+import { participantDisplayName } from '@/tournaments/participant-display-name';
+`;
+
+test('@/ 별칭은 컴파일본으로 돌려도 잡는다 — 런타임 매퍼가 없다', () => {
+  const offenders = findOffenders({
+    deployScript: "v1_api sh -c 'cd /app/apps/v1_api && node dist/prisma/seed-z.js'",
+    seeds: [{ name: 'seed-z.ts', source: ALIAS_SEED }],
+  });
+
+  assert.equal(offenders.length, 1, '컴파일본으로 돌려도 @/ 는 해석되지 않는다');
+  assert.match(offenders[0].reason, /@\//);
+});
+
+test('@/ 별칭은 배포에서 안 돌리는 시드여도 잡는다', () => {
+  // 상대 경로 규칙과 달리 실행 방식과 무관하므로 배포 등록 여부를 따지지 않는다.
+  const offenders = findOffenders({
+    deployScript: "아무 관련 없는 내용",
+    seeds: [{ name: 'seed-local.ts', source: ALIAS_SEED }],
+  });
+
+  assert.equal(offenders.length, 1);
+});
+
 test('실제 저장소 상태가 규칙을 지킨다', () => {
   const deployScript = readFileSync('deploy/deploy-alpha.sh', 'utf8');
   const seeds = readdirSync('apps/v1_api/prisma')

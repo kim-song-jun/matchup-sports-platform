@@ -275,7 +275,7 @@ export function UserRecordsContent({
             <EmptyState
               illustration={{ name: 'journey-done' }}
               title="공개된 경기 기록이 없어요"
-              sub="이 선수가 경기 기록 공개를 켜면 이곳에 표시돼요. 대회 결과가 확정되기 전이거나 팀 라인업에 연결되지 않은 경기는 표시되지 않아요."
+              sub="이 선수가 경기 기록 공개를 켜면 이곳에 표시돼요. 대회 결과가 확정되기 전이거나 대회 등록 명단에 연결되지 않은 경기는 표시되지 않아요."
             />
           )
         ) : (

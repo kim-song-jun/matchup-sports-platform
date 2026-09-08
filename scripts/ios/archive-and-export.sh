@@ -101,6 +101,7 @@ echo "[archive] built ${IPA#"$OUTPUT/"} ($(du -h "$IPA" | cut -f1))"
 REQUIRED_ENTITLEMENTS=(
   "aps-environment"                             # APNs. Without it the device never gets a token.
   "com.apple.developer.associated-domains"      # Universal links, incl. the Kakao sign-in return.
+  "com.apple.developer.applesignin"             # Sign in with Apple. Guideline 4.8 rides on it.
 )
 GATE_DIR="$(mktemp -d)"
 trap 'rm -rf "$GATE_DIR"' EXIT
@@ -119,7 +120,9 @@ if (( ${#MISSING[@]} > 0 )); then
   echo "[archive] nothing. Usual cause: the archive was produced without signing." >&2
   exit 1
 fi
-echo "[archive] entitlements present: ${REQUIRED_ENTITLEMENTS[*]}"
+# «required» — not «all». The line lists what was checked, and reading it as a full dump of the
+# app's entitlements is an easy mistake to make when a key is missing from the array.
+echo "[archive] required entitlements present: ${REQUIRED_ENTITLEMENTS[*]}"
 
 if [[ "$UPLOAD" != true ]]; then
   echo

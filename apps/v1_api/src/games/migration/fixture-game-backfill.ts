@@ -207,13 +207,12 @@ async function collectCandidates(client: MigrationReadClient): Promise<Candidate
     select: {
       id: true,
       team: { select: { id: true, name: true } },
-      // 프로필까지 싣는다 — 참가자 이름은 닉네임이 먼저다(`participantDisplayName`).
-      // 예전엔 둘만 실어서 닉네임을 쓸 수가 없었고 실명이 그대로 박혔다.
+      // 참가자 이름은 닉네임이 먼저다(`participantDisplayName`). 예전엔 프로필을 안 실어서
+      // **그 함수를 쓸 수가 없었다.** 실명은 아예 안 가져온다 — 표시에 쓰지 않는 값이다.
       players: {
         where: { removedAt: null },
         select: {
           userId: true,
-          realName: true,
           user: { select: { profile: { select: { nickname: true, displayName: true } } } },
         },
         orderBy: { id: 'asc' },

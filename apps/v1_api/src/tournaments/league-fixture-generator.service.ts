@@ -560,11 +560,11 @@ export class LeagueFixtureGeneratorService {
               // 동명이인을 구분할 수 없어 라인업 화면이 등록 명단과 참가자를 잇지 못한다.
               //
               // 프로필까지 싣는 이유: 참가자 이름은 닉네임이 먼저다(`participantDisplayName`).
-              // 예전엔 여기 셋만 실어서 **닉네임을 쓰고 싶어도 쓸 수가 없었다.**
+              // 예전엔 프로필이 없어 **그 함수를 쓸 수가 없었다.** 실명은 아예 안 가져온다 —
+              // 표시에 쓰지 않는 값이라 프로세스에 들여올 이유가 없다.
               select: {
                 id: true,
                 userId: true,
-                realName: true,
                 user: { select: { profile: { select: { nickname: true, displayName: true } } } },
               },
               orderBy: { id: 'asc' },

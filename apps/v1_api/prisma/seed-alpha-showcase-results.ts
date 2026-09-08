@@ -101,7 +101,6 @@ async function seedFixtureResult(
       team: { name: string };
       players: readonly {
         userId: string;
-        realName: string;
         user: { profile: { nickname: string | null; displayName: string | null } | null } | null;
       }[];
     } | null;
@@ -111,7 +110,6 @@ async function seedFixtureResult(
       team: { name: string };
       players: readonly {
         userId: string;
-        realName: string;
         user: { profile: { nickname: string | null; displayName: string | null } | null } | null;
       }[];
     } | null;
@@ -427,11 +425,10 @@ async function main() {
             players: {
               where: { removedAt: null },
               orderBy: { addedAt: 'asc' },
-              // 이름은 닉네임이 먼저다(`participantDisplayName`) — 프로필을 안 실으면
-              // 그 함수를 쓸 수가 없고 조용히 실명으로 떨어진다.
+              // 이름은 닉네임이 먼저다(`participantDisplayName`). **실명은 아예 안 가져온다** —
+              // 표시에 쓰지 않는 값이라 프로세스에 들여올 이유가 없다.
               select: {
                 userId: true,
-                realName: true,
                 user: { select: { profile: { select: { nickname: true, displayName: true } } } },
               },
             },
@@ -445,11 +442,10 @@ async function main() {
             players: {
               where: { removedAt: null },
               orderBy: { addedAt: 'asc' },
-              // 이름은 닉네임이 먼저다(`participantDisplayName`) — 프로필을 안 실으면
-              // 그 함수를 쓸 수가 없고 조용히 실명으로 떨어진다.
+              // 이름은 닉네임이 먼저다(`participantDisplayName`). **실명은 아예 안 가져온다** —
+              // 표시에 쓰지 않는 값이라 프로세스에 들여올 이유가 없다.
               select: {
                 userId: true,
-                realName: true,
                 user: { select: { profile: { select: { nickname: true, displayName: true } } } },
               },
             },

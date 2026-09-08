@@ -64,6 +64,15 @@ const ids = {
   officialLeague: '6b000000-0000-4000-8000-000000000060',
   officialPast: '6b000000-0000-4000-8000-000000000061',
   officialNext: '6b000000-0000-4000-8000-000000000062',
+  // 경고 누적 — 앞 두 경기에 경고 1장씩. 한도만 다른 두 리그를 같은 데이터로 둔다.
+  yellowHitLeague: '6b000000-0000-4000-8000-000000000070',
+  yellowHitFirst: '6b000000-0000-4000-8000-000000000071',
+  yellowHitSecond: '6b000000-0000-4000-8000-000000000072',
+  yellowHitNext: '6b000000-0000-4000-8000-000000000073',
+  yellowUnderLeague: '6b000000-0000-4000-8000-000000000080',
+  yellowUnderFirst: '6b000000-0000-4000-8000-000000000081',
+  yellowUnderSecond: '6b000000-0000-4000-8000-000000000082',
+  yellowUnderNext: '6b000000-0000-4000-8000-000000000083',
 } as const;
 
 const prisma = new PrismaService();
@@ -180,6 +189,21 @@ describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 �
       nextMatchId: ids.futureCardLate,
       bothFuture: true,
       cardOnSecondFixture: true,
+    });
+    await seedYellowLeague({
+      leagueId: ids.yellowHitLeague,
+      title: '경고 2장이면 정지인 리그',
+      yellowAccumulationLimit: 2,
+      pastMatchIds: [ids.yellowHitFirst, ids.yellowHitSecond],
+      nextMatchId: ids.yellowHitNext,
+    });
+    await seedYellowLeague({
+      leagueId: ids.yellowUnderLeague,
+      title: '경고 3장이면 정지인 리그',
+      // **데이터는 위와 똑같고 한도만 다르다** — 갈리는 것이 누적 수인지 확인한다.
+      yellowAccumulationLimit: 3,
+      pastMatchIds: [ids.yellowUnderFirst, ids.yellowUnderSecond],
+      nextMatchId: ids.yellowUnderNext,
     });
   });
 
@@ -320,6 +344,123 @@ describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 �
     }
   }
 
+  /**
+   * 경고 누적 리그: **앞 두 경기에 경고 1장씩** + 다음 경기 하나. 레드카드 쪽
+   * `seedLeague` 와 달리 경기가 셋이어야 한다 — 누적은 **여러 경기에 걸쳐** 세는 값이라
+   * 두 경기짜리 하네스로는 "한 경기 안에서 2장" 과 구분되지 않는다.
+   */
+  async function seedYellowLeague(input: {
+    leagueId: string;
+    title: string;
+    yellowAccumulationLimit: number;
+    pastMatchIds: readonly [string, string];
+    nextMatchId: string;
+  }) {
+    await prisma.v1Tournament.create({
+      data: {
+        id: input.leagueId,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: input.title,
+        kind: 'regular_league',
+        competitionConfigVersionId: configId,
+        scheduledAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        yellowAccumulationLimit: input.yellowAccumulationLimit,
+      },
+    });
+
+    const startAts = [
+      new Date(Date.now() - 6 * 24 * 60 * 60 * 1000),
+      new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+    ];
+    const matchIds = [...input.pastMatchIds, input.nextMatchId];
+    await prisma.v1TeamMatch.createMany({
+      data: matchIds.map((id, index) => ({
+        id,
+        hostTeamId: ids.hostTeam,
+        createdByUserId: ids.hostOwner,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: index === 2 ? '다음 경기' : `지난 경기 ${index + 1}`,
+        placeName: '풋살장',
+        startAt: startAts[index],
+        approvedApplicantTeamId: ids.awayTeam,
+        competitionConfigVersionId: configId,
+        leagueId: input.leagueId,
+      })),
+    });
+
+    for (const teamMatchId of matchIds) {
+      const creation: GameSourceCreationInput = {
+        sourceType: V1GameSourceType.TEAM_MATCH,
+        sourceId: teamMatchId,
+        competitionConfigVersionId: configId,
+        sides: [
+          { sideKey: V1GameSideKey.HOME, teamId: ids.hostTeam, displayNameSnapshot: '정지 홈팀' },
+          { sideKey: V1GameSideKey.AWAY, teamId: ids.awayTeam, displayNameSnapshot: '정지 원정팀' },
+        ],
+        participants: [],
+      };
+      const context: GameCommandContext = {
+        actor: { actorType: 'USER', actorUserId: ids.hostOwner, role: 'team_owner' },
+        expectedVersion: 0,
+        durableCommandId: `league-yellow-${teamMatchId}`,
+        payloadHash: canonicalGameCommandPayloadHash(creation),
+      };
+      await prisma.$transaction((tx) => games.createFromSourceInTransaction(tx, creation, context));
+    }
+
+    for (const teamMatchId of input.pastMatchIds) {
+      await seedYellowCardResult(teamMatchId);
+    }
+  }
+
+  /** 한 경기에 "경고 1장" 제출본을 심는다 — 레드는 0이라 레드 규정과 섞이지 않는다. */
+  async function seedYellowCardResult(teamMatchId: string) {
+    const game = await prisma.v1Game.findUniqueOrThrow({
+      where: { teamMatchId },
+      select: { id: true, sides: { select: { id: true, sideKey: true } }, lineups: { select: { id: true, sideId: true } } },
+    });
+    const homeSide = game.sides.find((side) => side.sideKey === V1GameSideKey.HOME)!;
+    const homeLineup = game.lineups.find((lineup) => lineup.sideId === homeSide.id)!;
+
+    const participant = await prisma.v1GameParticipant.create({
+      data: {
+        gameId: game.id,
+        sideId: homeSide.id,
+        lineupId: homeLineup.id,
+        userId: ids.suspended,
+        displayNameSnapshot: '경고 선수',
+        started: true,
+      },
+    });
+    const revision = await prisma.v1GameResultRevision.create({
+      data: {
+        gameId: game.id,
+        revision: 1,
+        state: 'DRAFT',
+        score: { home: 0, away: 0 },
+        eventsHash: `league-yellow-${teamMatchId}`,
+        createdByActorType: 'SYSTEM',
+        createdBySystemActor: 'LEAGUE_SUSPENSION_TEST_SEED',
+      },
+    });
+    await prisma.v1GameResultParticipant.create({
+      data: {
+        resultRevisionId: revision.id,
+        participantId: participant.id,
+        sideId: homeSide.id,
+        started: true,
+        cards: { yellow: 1, red: 0 },
+      },
+    });
+    await prisma.v1GameResultRevision.update({
+      where: { id: revision.id },
+      data: { state: 'SUBMITTED', submittedAt: new Date() },
+    });
+  }
+
   async function saveNextLineup(teamMatchId: string, idempotencyKey: string) {
     const view = await lineups.getLineup(authUser(ids.hostOwner), teamMatchId);
     return lineups.saveLineup(authUser(ids.hostOwner), teamMatchId, idempotencyKey, {
@@ -422,6 +563,43 @@ describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 �
       }),
     );
     expectHttpCode(rejected, 400, 'DISCIPLINE_SUSPENDED');
+  });
+
+  /**
+   * **경고 누적은 여러 경기에 걸쳐 세는 값이다.** 레드카드는 한 경기의 한 장으로 끝나지만
+   * 이쪽은 앞선 경기들을 합산해야 하고, 그 합산이 **DB 를 거쳐** 맞는지는 여기서만 잰다
+   * (순수 함수 스펙은 자기가 만든 배열을 셀 뿐이다).
+   *
+   * 아래 두 케이스는 **데이터가 완전히 같고 한도만 다르다** — 그래야 갈리는 것이 누적
+   * 수라는 게 증명된다. 하나만 두면 "경고가 하나라도 있으면 막는다" 와 구분되지 않는다.
+   */
+  it('한도 2인 리그: 앞 두 경기 경고 1장씩이면 다음 경기 제출이 막힌다', async () => {
+    const saved = await saveNextLineup(ids.yellowHitNext, 'league-yellow-hit-save');
+
+    const rejected = await captureFailure(() =>
+      lineups.submitLineup(authUser(ids.hostOwner), ids.yellowHitNext, 'league-yellow-hit-submit', {
+        expectedVersion: saved.revision,
+      }),
+    );
+    expectHttpCode(rejected, 400, 'DISCIPLINE_SUSPENDED');
+    expect((rejected as HttpException).getResponse()).toEqual(
+      expect.objectContaining({ details: { blocked: [expect.objectContaining({ name: expect.any(String) })] } }),
+    );
+
+    const after = await lineups.getLineup(authUser(ids.hostOwner), ids.yellowHitNext);
+    expect(after.state).toBe('DRAFT');
+  });
+
+  it('한도 3인 리그: 같은 경고 2장으로는 막히지 않는다', async () => {
+    const saved = await saveNextLineup(ids.yellowUnderNext, 'league-yellow-under-save');
+
+    const submitted = await lineups.submitLineup(
+      authUser(ids.hostOwner),
+      ids.yellowUnderNext,
+      'league-yellow-under-submit',
+      { expectedVersion: saved.revision },
+    );
+    expect(submitted.state).toBe('SUBMITTED');
   });
 
   it('규정 수정은 첫 경기가 시작되면 잠긴다 — 시작 전에는 저장되고 상세에 그대로 보인다', async () => {

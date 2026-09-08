@@ -284,6 +284,21 @@ describe('MatchDetailContent — 팀 이름 진입점', () => {
     expect(screen.getByRole('link', { name: '원정팀' })).toHaveAttribute('href', '/teams/team-away');
   });
 
+  /**
+   * `teamId` 와 `teamName` 은 **각각** nullable 이다. id 는 있고 이름만 가려진 조합에서
+   * `teamId` 만 보고 링크를 만들면 **'미정' 이라는 글자가 팀 페이지로 링크된다.**
+   */
+  it('이름이 가려졌으면 id 가 있어도 링크로 만들지 않는다', () => {
+    const data = makeDetail({
+      home: { registrationId: 'reg-home', teamId: 'team-home', teamName: null },
+      away: { registrationId: 'reg-away', teamId: 'team-away', teamName: null },
+    });
+
+    render(<MatchDetailContent data={data} />);
+
+    expect(screen.queryByRole('link', { name: '미정' })).not.toBeInTheDocument();
+  });
+
   it('신원이 가려진 동안에는 링크로 만들지 않는다', () => {
     const data = makeDetail({
       home: { registrationId: 'reg-home', teamId: null, teamName: null },

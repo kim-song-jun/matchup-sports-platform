@@ -52,7 +52,9 @@ function sideLabel(side: PublicMatchDetail['home']): string {
  */
 function SideName({ side }: { side: PublicMatchDetail['home'] }) {
   const label = sideLabel(side);
-  if (!side?.teamId) return <>{label}</>;
+  // `teamId` 만 보면 **`'미정'` 이라는 글자가 팀 페이지로 링크된다** — 두 필드가 각각
+  // nullable 이라 id 는 있고 이름만 가려진 조합이 나올 수 있다. 이름이 없으면 링크도 없다.
+  if (!side?.teamId || !side.teamName) return <>{label}</>;
   return (
     <Link
       href={`/teams/${encodeURIComponent(side.teamId)}`}

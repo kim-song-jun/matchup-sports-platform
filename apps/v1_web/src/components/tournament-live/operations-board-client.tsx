@@ -496,9 +496,13 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                         </div>
                       </td>
                       <td className="px-4 py-3 align-middle">
+                        {/* `<a>` 는 globals.css 의 언레이어드 `a { color: inherit }` 때문에 Tailwind
+                            색 유틸리티가 안 먹는다(레이어 밖 규칙이 레이어 안 유틸리티를 이긴다).
+                            의도색을 인라인으로 되살린다 — 아래 카드 뷰의 같은 링크도 마찬가지다. */}
                         <Link
                           href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
                           className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                          style={{ color: 'var(--blue700)' }}
                         >
                           운영 콘솔
                         </Link>
@@ -558,6 +562,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                 <Link
                   href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
                   className="mt-2 inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  style={{ color: 'var(--blue700)' }}
                 >
                   운영 콘솔로 이동
                 </Link>

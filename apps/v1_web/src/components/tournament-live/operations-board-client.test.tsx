@@ -215,6 +215,26 @@ describe('OperationsBoardClient', () => {
     });
   });
 
+  /**
+   * **`<a>` 에서는 Tailwind 색 유틸리티가 죽는다.** `globals.css` 의 `a { color: inherit }` 가
+   * `@layer` 밖이라 레이어 안의 유틸리티를 명시도와 무관하게 이긴다 — `text-[var(--blue700)]`
+   * 가 붙어 있어도 실제로는 상속색이 나온다(alpha 실측: `rgb(78,89,104)`, 의도는 `#1b64da`).
+   * 대비 검사에는 안 걸린다 — 연한 파란 배경 위 회색이라 대비는 오히려 더 높다. 깨진 건
+   * **"링크로 읽히는가"** 다.
+   *
+   * 그래서 **클래스가 붙었는지로는 계약을 못 잡는다**(지금도 붙어 있다). 인라인 `style` 로
+   * 되살린 값이 실제로 실려 있는지를 본다.
+   */
+  it('운영 콘솔 링크는 파란 글씨를 인라인으로 되살린다 — 클래스만으로는 안 먹는다', () => {
+    render(<OperationsBoardClient tournamentId="t-1" />);
+
+    const links = screen.getAllByRole('link', { name: /운영 콘솔/ });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(link.getAttribute('style') ?? '').toContain('var(--blue700)');
+    }
+  });
+
   it('offers every stable warning code in the filter', () => {
     render(<OperationsBoardClient tournamentId="t-1" />);
 

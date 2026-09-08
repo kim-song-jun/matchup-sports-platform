@@ -18,20 +18,32 @@
 set -Eeuo pipefail
 : "${INSTANCE_ID:?INSTANCE_ID is required}"
 : "${AWS_REGION:?AWS_REGION is required}"
-: "${SECRET_SMS_PROVIDER:?SECRET_SMS_PROVIDER is required}"
+# Not `:?` — an unset value is not an error here either. The server reads it as solapi, so
+# this script has to do the same rather than refuse and leave solapi's trio unwritten.
 
 [[ "${INSTANCE_ID}" =~ ^i-[0-9a-f]{17}$ ]]
 [[ "${AWS_REGION}" =~ ^[a-z]{2}-[a-z]+-[0-9]$ ]]
 
-provider="${SECRET_SMS_PROVIDER}"
-case "${provider}" in
-  solapi) required_names=(SOLAPI_API_KEY SOLAPI_API_SECRET SOLAPI_SENDER_NUMBER) ;;
-  gabia)  required_names=(GABIA_SMS_ID GABIA_API_KEY GABIA_SENDER_NUMBER) ;;
-  *)
-    echo "::warning::SMS_PROVIDER is '${provider}', which is neither solapi nor gabia; the host's SMS env was left unchanged"
-    exit 0
-    ;;
-esac
+# The server picks the sender with
+#   (process.env.SMS_PROVIDER ?? 'solapi').trim().toLowerCase() === 'gabia' ? gabia : solapi
+# so this has to resolve the SAME string the SAME way. Two ways to get it wrong, both of
+# which end in a host that stays on 503 while the server is happily using a sender whose
+# credentials were never written:
+#   - comparing untrimmed: `gabia ` selects Gabia on the server and misses here
+#   - treating an unrecognised value as an error: the server does not error, it falls back to
+#     solapi — so refusing to write leaves solapi's trio missing
+# Hence: normalise like the server, and mirror its fallback instead of rejecting.
+provider="${SECRET_SMS_PROVIDER-}"
+provider="${provider#"${provider%%[![:space:]]*}"}"
+provider="${provider%"${provider##*[![:space:]]}"}"
+provider="$(printf '%s' "${provider}" | tr '[:upper:]' '[:lower:]')"
+[ -n "${provider}" ] || provider=solapi
+
+if [ "${provider}" = gabia ]; then
+  required_names=(GABIA_SMS_ID GABIA_API_KEY GABIA_SENDER_NUMBER)
+else
+  required_names=(SOLAPI_API_KEY SOLAPI_API_SECRET SOLAPI_SENDER_NUMBER)
+fi
 
 # Only the ACTIVE provider's trio has to be complete. The other one is copied when present so
 # a provider switch is a one-line change rather than another secret hunt, but its absence is

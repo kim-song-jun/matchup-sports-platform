@@ -255,6 +255,37 @@ describe('GameResultReviewPanel — 확정 결과 헤더의 승부차기 표기'
 
     expect(screen.getByText('승부차기 2:0, 선축 원정')).toBeInTheDocument();
   });
+
+  /**
+   * 확정한 뒤 운영자가 가장 먼저 하는 일이 "관전자에게 어떻게 보이나" 확인인데, 이
+   * 화면에는 공개 화면으로 가는 링크가 하나도 없었다(alpha 실측). 확정 직후 그대로
+   * 머무는 자리라 여기 둔다 — 새 화면을 만들지 않는다.
+   */
+  it('확정된 결과에는 공개 화면으로 가는 링크가 붙는다', () => {
+    render(
+      <GameResultReviewPanel
+        gameId={GAME_ID}
+        publicHref="/tournaments/t-1/matches/f-1"
+        correctionsHref="/x/records/corrections"
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: '공개 화면에서 보기' })).toHaveAttribute(
+      'href',
+      '/tournaments/t-1/matches/f-1',
+    );
+    // 정정 링크는 그대로 남는다 — 둘은 서로 다른 일이다.
+    expect(screen.getByRole('link', { name: '정정 화면으로 이동' })).toBeInTheDocument();
+  });
+
+  it('publicHref 가 없으면 공개 화면 링크를 렌더하지 않는다', () => {
+    render(<GameResultReviewPanel gameId={GAME_ID} correctionsHref="/x/records/corrections" />);
+
+    // **긍정 앵커 먼저.** 부정 단언만 두면 패널이 통째로 안 그려져도 통과한다 —
+    // 정정 링크가 실제로 있다는 것이 "이 화면이 렌더됐다"의 증거다.
+    expect(screen.getByRole('link', { name: '정정 화면으로 이동' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '공개 화면에서 보기' })).not.toBeInTheDocument();
+  });
 });
 
 describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드를 따른다', () => {

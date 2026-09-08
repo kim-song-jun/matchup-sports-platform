@@ -20,7 +20,8 @@ import {
   partitionTournamentSections,
   isGroupStageComplete,
 } from '@/app/tournaments/[id]/tournament-detail-client';
-import { usePublicTournamentSchedule } from '@/components/public-game-records/use-public-game-records';
+import { usePublicTournamentPlayerRecords, usePublicTournamentSchedule } from '@/components/public-game-records/use-public-game-records';
+import { TournamentPlayerRecordsSections } from '@/components/public-game-records/player-records-sections';
 // ⚠️ 이 파일에도 동명 지역 함수가 있다(대회 상세 `V1TournamentStanding` 용). 별칭으로 갈라
 // 둔다 — 같은 이름 두 개가 서로 다른 입력을 받으면 다음 사람이 아무거나 집는다.
 import {
@@ -351,6 +352,8 @@ export function BracketScheduleTab({
   // 조회와 분리된 인증 전용 요청이라 비로그인·비참가자는 빈 상태로 끝나고, 참가팀
   // owner/manager에게만 자기 팀 경기 강조가 열린다.
   const myFixtures = useV1MyTournamentFixtures(tournamentId);
+  // 리그는 조회조차 하지 않는다 — 위 섹션 주석 참조.
+  const playerRecords = usePublicTournamentPlayerRecords(tournamentId, { enabled: !isRegularLeague });
 
   if (isLoading) {
     return (
@@ -374,18 +377,37 @@ export function BracketScheduleTab({
   const combined = { ...firstPage, items: data.pages.flatMap((page) => page.items) };
 
   return (
-    <ScheduleContent
-      tournamentId={tournamentId}
-      isRegularLeague={isRegularLeague}
-      data={combined}
-      hasNextPage={hasNextPage}
-      isFetchingNextPage={isFetchingNextPage}
-      onLoadMore={() => void fetchNextPage()}
-      myFixtures={myFixtures.data}
-      /* 순위표는 옆 탭("순위 · 대진표")이 이미 그린다 — 여기서 또 그리면 탭만 바꿔도
-         같은 표가 두 번 나온다(오너 지적: "중복되는 정보도 많고"). */
-      showStandings={false}
-    />
+    <>
+      <ScheduleContent
+        tournamentId={tournamentId}
+        isRegularLeague={isRegularLeague}
+        data={combined}
+        hasNextPage={hasNextPage}
+        isFetchingNextPage={isFetchingNextPage}
+        onLoadMore={() => void fetchNextPage()}
+        myFixtures={myFixtures.data}
+        /* 순위표는 옆 탭("순위 · 대진표")이 이미 그린다 — 여기서 또 그리면 탭만 바꿔도
+           같은 표가 두 번 나온다(오너 지적: "중복되는 정보도 많고"). */
+        showStandings={false}
+      />
+      {/* 개인 득점·도움 랭킹. `/schedule` 이 여기로 접히면서 함께 옮겼다 — 같은 섹션이
+          `/awards` 에도 있지만 그 입구는 "대회 종료 후 공개"라, 이게 없으면 **진행 중에는
+          선수 기록을 볼 화면이 없어진다.**
+          리그에서는 그리지 않는다: 리그 참가자는 `userId` 로 이어져 있지 않아 사람 단위
+          집계 자체가 불가능하고, 빈 표는 "아직 기록이 없다"로 잘못 읽힌다. */}
+      {isRegularLeague ? null : (
+        <TournamentPlayerRecordsSections
+          goals={playerRecords.data?.goals}
+          assists={playerRecords.data?.assists}
+          isLoading={playerRecords.isLoading}
+          isError={playerRecords.isError}
+          errorMessage={extractErrorMessage(playerRecords.error, '기록을 불러오지 못했어요.')}
+          onRetry={() => void playerRecords.refetch()}
+          emptyBehavior="hide"
+          containerStyle={{ padding: '0 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}
+        />
+      )}
+    </>
   );
 }
 

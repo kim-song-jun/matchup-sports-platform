@@ -30,6 +30,9 @@ vi.mock('next/navigation', () => ({
   notFound: vi.fn(() => {
     throw new Error('NEXT_NOT_FOUND');
   }),
+  permanentRedirect: vi.fn((to: string) => {
+    throw new Error(`NEXT_REDIRECT:${to}`);
+  }),
 }));
 
 vi.mock('@/lib/seo', async (importOriginal) => {
@@ -40,9 +43,6 @@ vi.mock('@/lib/seo', async (importOriginal) => {
   };
 });
 
-vi.mock('./tournaments/[id]/schedule/schedule-page-client', () => ({
-  SchedulePageClient: () => null,
-}));
 vi.mock('./tournaments/[id]/matches/[fixtureId]/match-page-client', () => ({
   MatchPageClient: () => null,
 }));
@@ -1118,11 +1118,14 @@ describe('MatchDetailContent — 진행 중 경기의 라이브 스코어/경과
  */
 
 describe('공개 서브라우트의 404 게이트', () => {
-  it('대회 일정: tournament를 찾을 수 없으면 진짜 404', async () => {
-    vi.mocked(fetchPublicV1).mockResolvedValue(null);
+  // 대회 일정은 `/bracket` 으로 접혔다 — 404 게이트는 그 다음 홉이 진다.
+  it('대회 일정: bracket 으로 리다이렉트한다', async () => {
     await expect(
-      TournamentSchedulePage({ params: Promise.resolve({ id: MISSING_ID }) }),
-    ).rejects.toThrow('NEXT_NOT_FOUND');
+      TournamentSchedulePage({
+        params: Promise.resolve({ id: MISSING_ID }),
+        searchParams: Promise.resolve({}),
+      }),
+    ).rejects.toThrow(`NEXT_REDIRECT:/tournaments/${MISSING_ID}/bracket`);
   });
 
   it('경기 상세: hidden 픽스처와 존재하지 않는 픽스처가 동일한 404로 처리된다', async () => {

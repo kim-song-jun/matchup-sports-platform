@@ -1,4 +1,7 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -250,4 +253,58 @@ test('실사고 그대로 재현하면 잡힌다 — 이 규칙이 그 배포 �
   });
 
   assert.equal(offenders.length, 1, '실패했던 그 호출 형태를 잡지 못한다');
+});
+
+/**
+ * 위 테스트들은 순수 함수만 본다. `main()` 이 `process.exit(1)` 을 멈춰도 전부 통과하고
+ * **CI 는 녹색인데 게이트는 아무것도 막지 않는다.** 그래서 CLI 를 실제로 띄워 종료코드를 센다.
+ * (병렬 세션이 배포 복구 스파이크에서 정확히 이 실패 모드를 만났다 — 단계 이름은 찍히는데
+ * 종료코드가 전파되지 않아 로그만 보면 정상으로 보였다.)
+ */
+function fixtureRepo(files) {
+  const root = mkdtempSync(join(tmpdir(), 'seed-runtime-'));
+  for (const [rel, body] of Object.entries(files)) {
+    const path = join(root, rel);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, body);
+  }
+  return root;
+}
+
+const CHECKER = resolve('scripts/qa/check-alpha-seed-runtime.mjs');
+const DOCKERFILE_WITHOUT_SRC = 'COPY --from=builder /app/apps/v1_api/dist ./apps/v1_api/dist\n';
+const TSCONFIG = '{ "include": ["src/**/*", "prisma/**/*"] }';
+const SEED_WITH_APP_IMPORT = "import { x } from '../src/tournaments/x';\n";
+
+test('CLI 가 위반을 만나면 종료코드 1 로 끝난다', () => {
+  const root = fixtureRepo({
+    'deploy/deploy-alpha.sh': "ts-node prisma/seed-bad.ts\n",
+    'deploy/Dockerfile.v1-api': DOCKERFILE_WITHOUT_SRC,
+    'apps/v1_api/tsconfig.json': TSCONFIG,
+    'apps/v1_api/prisma/seed-bad.ts': SEED_WITH_APP_IMPORT,
+  });
+
+  const run = spawnSync(process.execPath, [CHECKER], { cwd: root, encoding: 'utf8' });
+
+  assert.equal(run.status, 1, `종료코드가 전파되지 않는다: ${run.stdout}${run.stderr}`);
+  assert.match(run.stderr, /seed-bad/);
+});
+
+test('CLI 가 깨끗한 저장소에서는 종료코드 0 으로 끝난다', () => {
+  const root = fixtureRepo({
+    'deploy/deploy-alpha.sh': "node dist/prisma/seed-ok.js\n",
+    'deploy/Dockerfile.v1-api': DOCKERFILE_WITHOUT_SRC,
+    'apps/v1_api/tsconfig.json': TSCONFIG,
+    'apps/v1_api/prisma/seed-ok.ts': SEED_WITH_APP_IMPORT,
+  });
+
+  const run = spawnSync(process.execPath, [CHECKER], { cwd: root, encoding: 'utf8' });
+
+  assert.equal(run.status, 0, `${run.stdout}${run.stderr}`);
+});
+
+test('CLI 가 실제 저장소에서 종료코드 0 으로 끝난다', () => {
+  const run = spawnSync(process.execPath, [CHECKER], { encoding: 'utf8' });
+
+  assert.equal(run.status, 0, `${run.stdout}${run.stderr}`);
 });

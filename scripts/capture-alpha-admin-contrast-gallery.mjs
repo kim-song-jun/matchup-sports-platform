@@ -155,6 +155,14 @@ const READ = `(() => {
   return out;
 })()`;
 
+/**
+ * 테마. 다크는 **`localStorage` 를 첫 페인트 전에 심어서** 만든다 —
+ * `document.documentElement.classList.add('dark')` 로 켜면 `ThemeProvider` 의 effect 가
+ * 다음 렌더에서 되돌리고, 같은 evaluate 안에서 토글하고 바로 읽으면 스타일 재계산 전이라
+ * **라이트 값이 그대로 나온다**(다른 세션이 실제로 그 함정에 빠졌다).
+ */
+const THEME = process.env.THEME === 'dark' ? 'dark' : 'light';
+
 const token = await login();
 mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch();
@@ -164,13 +172,19 @@ const only = process.env.WIDTH_KEYS?.split(',').map((x) => x.trim()).filter(Bool
 for (const { key, width, height } of WIDTHS.filter((w) => !only || only.includes(w.key))) {
   const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2 });
   await ctx.addCookies([{ name: 'teameet_v1_session', value: token, domain: 'alpha.teameet.co.kr', path: '/', secure: true }]);
+  if (THEME === 'dark') {
+    // 키 이름은 src/lib/theme.ts 의 THEME_STORAGE_KEY 와 같아야 한다.
+    await ctx.addInitScript(() => { try { localStorage.setItem('tm-theme', 'dark') } catch {} });
+  }
   const page = await ctx.newPage();
   for (const [name, path] of PAGES) {
     await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await page.waitForTimeout(2500);
     const body = await page.evaluate('document.body.innerText.length');
     if (body < 200) { console.log(`  ⚠️ ${key}/${name}: 본문 ${body}자 — 측정 무효(권한/로딩)`); continue; }
-    await page.screenshot({ path: `${OUT}/${name}-${key}.png`, fullPage: false });
+    const isDark = await page.evaluate("document.documentElement.classList.contains('dark')");
+    if (THEME === 'dark' && !isDark) { console.log(`  ⚠️ ${key}/${name}: 다크 적용 실패 — 측정 무효`); continue; }
+    await page.screenshot({ path: `${OUT}/${name}-${key}${THEME === 'dark' ? '-dark' : ''}.png`, fullPage: false });
     const r = await page.evaluate(READ);
     totalFails += r.fails.length;
     const head = r.fails.slice(0, 4).map((f) => `${f.v}:1 "${f.t}" ${f.size}px/${f.weight} ${f.fg} on ${f.bg}`).join(' | ');
@@ -181,4 +195,4 @@ for (const { key, width, height } of WIDTHS.filter((w) => !only || only.includes
   await ctx.close();
 }
 await browser.close();
-console.log(`\n=== 3폭 × ${PAGES.length}화면 · 대비 미달 총 ${totalFails}건 · ${OUT} ===`);
+console.log(`\n=== ${THEME} · 3폭 × ${PAGES.length}화면 · 대비 미달 총 ${totalFails}건 · ${OUT} ===`);

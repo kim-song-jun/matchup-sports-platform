@@ -598,7 +598,7 @@ describe('인라인으로 지면 색을 까는 곳의 보조 텍스트 (.tm-on-t
     ['src/app/tournaments/[id]/tournament-detail-client.tsx', 'Card', /var\(--grey50\)/, 4],
     // 팀 매치 만들기 — 확인 카드 둘(grey50) · 권한 카드(grey50↔orange50) · 상태 카드(green↔orange 틴트).
     // 삼항으로 지면을 고르는 것까지 포함해 이 파일의 틴트 Card 는 넷이고 전부 표시가 붙어야 한다.
-    ['src/components/team-matches/team-matches-page.tsx', 'Card', /background: (?:'var\(--grey50\)'|blocked \?|tone ===)/, 4],
+    ['src/components/team-matches/team-matches-page.tsx', 'Card', /var\(--(?:grey50|orange50|tint-green|tint-orange)\)/, 4],
   ])('%s 의 틴트 %s 태그 %d개 전부에 표시 클래스가 붙어 있다', (file, tag, tint, count) => {
     const source = readFileSync(resolve(process.cwd(), file), 'utf8');
     const tinted = openingTagsWithTint(source, tag as string, tint as RegExp);

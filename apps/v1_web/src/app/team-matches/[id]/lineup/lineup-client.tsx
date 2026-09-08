@@ -27,6 +27,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatMonthDay, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import Link from 'next/link';
+import { josa } from '@/lib/korean';
 import { randomUuid } from '@/lib/uuid';
 import type { LineupEditorState, LineupEntryDraft, RosterOption } from './lineup.view-model';
 import {
@@ -753,7 +754,13 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                       onClick={() =>
                         setState((prev) => (prev ? setGoalkeeper(prev, entry.key) : prev))
                       }
-                      aria-label={`${entry.displayName}${entry.goalkeeper ? ', 골키퍼로 지정됨' : '을 골키퍼로 지정'}`}
+                      // 조사는 이름의 받침에 따라 갈린다 — 고정하면 "김철수을" 이 그대로
+                      // 스크린리더로 읽힌다. 화면엔 글자가 없으니 이 라벨이 유일한 안내다.
+                      aria-label={
+                        entry.goalkeeper
+                          ? `${entry.displayName}, 골키퍼로 지정됨`
+                          : `${josa(entry.displayName, ['을', '를'])} 골키퍼로 지정`
+                      }
                       style={{
                         flexShrink: 0,
                         minWidth: 44,

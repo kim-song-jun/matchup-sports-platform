@@ -484,11 +484,15 @@ describe('TeamMatchLineupPageClient', () => {
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
     const designated = screen.getByRole('button', { name: '홍길동, 골키퍼로 지정됨' });
-    const notDesignated = screen.getByRole('button', { name: '김철수을 골키퍼로 지정' });
+    // 조사는 받침을 따른다 — '김철수' 는 받침이 없으니 '를' 이다(`josa`).
+    const notDesignated = screen.getByRole('button', { name: '김철수를 골키퍼로 지정' });
 
     expect(designated).toHaveTextContent('GK');
     // 여기가 계약이다 — 미지정 행에 글자가 있으면 그게 "이 선수는 GK" 로 읽힌다.
-    expect(notDesignated.textContent).toBe('');
+    // `toHaveTextContent('')` 는 쓰지 않는다: **포함 검사**라 빈 문자열이 무엇에나 매치돼
+    // 단언이 무력해진다. `toBeEmptyDOMElement()` 는 자식 노드가 없어야 통과하므로
+    // 공백 문자에도 걸리지 않으면서 계약을 그대로 지킨다.
+    expect(notDesignated).toBeEmptyDOMElement();
     // 그래도 누를 수 있어야 한다(빈 컨트롤이지 사라진 컨트롤이 아니다).
     expect(notDesignated).toBeEnabled();
   });

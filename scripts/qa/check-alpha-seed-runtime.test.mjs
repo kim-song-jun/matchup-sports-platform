@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { findOffenders, findPremiseBreak } from './check-alpha-seed-runtime.mjs';
+import { findOffenders, findPremiseBreak, stripComments } from './check-alpha-seed-runtime.mjs';
 
 const CROSSING_SEED = `
 import { PrismaClient } from '@prisma/client';
@@ -117,6 +117,58 @@ test('실제 저장소가 그 전제를 만족한다', () => {
   const buildTsconfig = existsSync(buildPath) ? readFileSync(buildPath, 'utf8') : null;
 
   assert.equal(findPremiseBreak({ tsconfig, buildTsconfig }), null);
+});
+
+test('side-effect import · require · 동적 import 도 잡는다 — from 절만 보면 fail-open', () => {
+  const forms = [
+    "import '../src/x';",
+    "const x = require('../src/x');",
+    "await import('../src/x');",
+  ];
+
+  for (const body of forms) {
+    const offenders = findOffenders({
+      deployScript: "ts-node prisma/seed-f.ts",
+      seeds: [{ name: 'seed-f.ts', source: body }],
+    });
+    assert.equal(offenders.length, 1, `놓쳤다: ${body}`);
+  }
+});
+
+test('경고 주석은 위반이 아니다 — 실제 시드 둘이 그 경고를 달고 있다', () => {
+  const warned = `
+// **여기서 \`../src/...\` 를 import 하면 안 된다.** 이미지에 없다.
+/* 블록 주석에서도 '../src/foo' 를 언급할 수 있다 */
+import { PrismaClient } from '@prisma/client';
+`;
+
+  const offenders = findOffenders({
+    deployScript: "ts-node prisma/seed-w.ts",
+    seeds: [{ name: 'seed-w.ts', source: warned }],
+  });
+
+  assert.deepEqual(offenders, [], '경고 주석을 위반으로 잡으면 안 된다');
+});
+
+test('주석 제거가 문자열 안의 // 를 건드리지 않는다', () => {
+  const kept = stripComments(`const url = 'https://example.com/a'; // 이건 주석`);
+
+  assert.match(kept, /https:\/\/example\.com\/a/);
+  assert.doesNotMatch(kept, /이건 주석/);
+});
+
+test('주석 뒤에 진짜 import 가 있으면 여전히 잡는다', () => {
+  const mixed = `
+// 여기서 '../src/x' 를 쓰면 안 된다
+import { y } from '../src/y';
+`;
+
+  const offenders = findOffenders({
+    deployScript: "ts-node prisma/seed-m.ts",
+    seeds: [{ name: 'seed-m.ts', source: mixed }],
+  });
+
+  assert.equal(offenders.length, 1, '주석 제거가 실제 위반까지 지우면 안 된다');
 });
 
 test('실제 저장소 상태가 규칙을 지킨다', () => {

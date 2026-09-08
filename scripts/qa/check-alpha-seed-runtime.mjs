@@ -30,16 +30,56 @@ const RUNTIME_DOCKERFILE = 'deploy/Dockerfile.v1-api';
 const API_TSCONFIG = 'apps/v1_api/tsconfig.json';
 const API_BUILD_TSCONFIG = 'apps/v1_api/tsconfig.build.json';
 
-/** 런타임 이미지가 싣지 않는 워크스페이스 디렉터리를 가리키는 상대 import. */
-const CROSSES_INTO_SRC = /from\s+['"]\.\.\/src\//;
+/**
+ * 모듈 지정자는 **문자열 리터럴 자체**로 본다. `from '…'` 만 보면
+ * side-effect import(`import '../src/x'`) · `require('../src/x')` · 동적 `import('../src/x')`
+ * 를 전부 놓쳐 **fail-open** 된다(실측: 세 형태 다 통과했다).
+ */
+const moduleSpecifier = (prefix) => new RegExp(`['"\`]${prefix}`);
+
+/**
+ * 주석을 걷어낸다. 이 저장소의 시드들은 **"여기서 `../src/` 를 import 하면 안 된다"** 는
+ * 경고를 주석으로 달고 있어(seed-alpha-league-qa · seed-alpha-tournament-qa), 그대로 두면
+ * 그 경고문 자체를 위반으로 잡는다. 문자열 리터럴 안의 `//`(URL 등)는 건드리지 않는다.
+ */
+export function stripComments(source) {
+  let out = '';
+  let quote = '';
+  for (let i = 0; i < source.length; i += 1) {
+    const c = source[i];
+    const next = source[i + 1];
+    if (quote) {
+      out += c;
+      if (c === '\\') { out += next ?? ''; i += 1; continue; }
+      if (c === quote) quote = '';
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') { quote = c; out += c; continue; }
+    if (c === '/' && next === '/') { while (i < source.length && source[i] !== '\n') i += 1; out += '\n'; continue; }
+    if (c === '/' && next === '*') {
+      i += 2;
+      while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) i += 1;
+      i += 1;
+      out += ' ';
+      continue;
+    }
+    out += c;
+  }
+  return out;
+}
+
+/** 런타임 이미지가 싣지 않는 워크스페이스 디렉터리를 가리키는 상대 지정자. */
+const CROSSES_INTO_SRC = moduleSpecifier('\\.\\./src/');
 
 /** `@/` 별칭. 런타임 매퍼가 없어 어떤 실행 방식으로도 해석되지 않는다. */
-const USES_PATH_ALIAS = /from\s+['"]@\//;
+const USES_PATH_ALIAS = moduleSpecifier('@/');
 
 export function findOffenders({ deployScript, seeds }) {
   const offenders = [];
 
-  for (const { name, source } of seeds) {
+  for (const { name, source: raw } of seeds) {
+    const source = stripComments(raw);
+
     // `@/` 는 실행 방식과 무관하게 깨진다 — 배포에 등록됐는지도 따지지 않는다.
     if (USES_PATH_ALIAS.test(source)) {
       offenders.push({

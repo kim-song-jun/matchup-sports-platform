@@ -140,7 +140,10 @@ async function main() {
   // 7 ── 로그인. 가입이 준 쿠키가 아니라 **새로 받은** 쿠키로 확인해야 로그인 경로를 잰 것이다.
   cookie = null;
   const login = await call('/auth/login', { method: 'POST', body: { email: account.email, password: account.password } });
-  record('로그인', login.status === 200 && login.gotSession, `${login.status}${login.gotSession ? ', 세션 쿠키 받음' : ', 세션 쿠키 없음'}`);
+  // 2xx 면 통과. 이 라우트에는 @HttpCode 가 없어서 NestJS 기본값대로 POST 가 201 을 낸다 —
+  // 200 을 요구하면 «로그인이 되는가» 가 아니라 «NestJS 기본 상태코드가 무엇인가» 를 재게 된다.
+  record('로그인', login.status >= 200 && login.status < 300 && login.gotSession,
+    `${login.status}${login.gotSession ? ', 세션 쿠키 받음' : ', 세션 쿠키 없음'}`);
 
   // 8 ── 같은 사람인지
   const me = await call('/auth/me', { useCookie: true });

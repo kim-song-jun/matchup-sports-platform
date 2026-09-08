@@ -13,6 +13,31 @@ services:
       # 구분할 수 없어서(둘 다 production) 전용 플래그를 쓴다 — 프로덕션 compose 에는 없으므로
       # 그쪽에서는 라우트가 404 이고 버튼도 렌더되지 않는다.
       V1_ENABLE_MOCK_SEED: "true"
+      # 인증번호는 alpha 에서 발송하지 않고 응답에 실어 보낸다.
+      #
+      # 그동안 alpha 는 발송 수단이 없어 issueChallenge 가 503 을 내고 있었고, 문자 인증은 가입
+      # 3단계 중 2단계라 **신규 가입이 통째로 막혀** 있었다. 실제 발송을 붙이는 선택지도 있었지만
+      # (프로덕션과 같은 경로를 검증할 수 있다) 테스트 한 번마다 실제 문자와 비용이 나가고 E2E 를
+      # 자동화할 수 없어, alpha 는 우회를 쓰기로 했다 — 대신 실발송 경로는 프로덕션에서 처음
+      # 검증하게 된다는 것이 이 선택의 대가다.
+      #
+      # 값을 빈 문자열로 **명시하는 것이 핵심**이다. dispatcher 는
+      #   devEcho && !sms.enabled && !email.enabled
+      # 일 때만 코드를 응답에 싣는다. 즉 발송 수단이 하나라도 살아 있으면 플래그가 켜져 있어도
+      # 노출되지 않는다(설정 실수로 실제 메일·문자를 보내면서 코드까지 흘리는 것을 막는 안전장치).
+      # 그 안전장치는 여기서는 반대로 작동한다 — 호스트 .env 에 자격증명이 한 번이라도 써지면
+      # 우회가 조용히 꺼진다. 그래서 base compose 의 ${VAR:-} 를 오버레이에서 빈 값으로 눌러,
+      # 호스트 상태와 무관하게 alpha 는 항상 우회로 동작하게 한다.
+      V1_VERIFICATION_DEV_ECHO: "true"
+      SMS_PROVIDER: ""
+      GABIA_SMS_ID: ""
+      GABIA_API_KEY: ""
+      GABIA_SENDER_NUMBER: ""
+      SOLAPI_API_KEY: ""
+      SOLAPI_API_SECRET: ""
+      SOLAPI_SENDER_NUMBER: ""
+      SES_REGION: ""
+      EMAIL_FROM: ""
 
   # 워커는 전용 이미지를 빌드하지 않고 API 이미지를 그대로 재사용한다
   # (alpha-release-common.sh 의 assert_running_release_digests 가

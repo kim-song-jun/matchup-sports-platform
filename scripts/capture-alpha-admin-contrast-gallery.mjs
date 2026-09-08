@@ -15,7 +15,7 @@ import { chromium } from 'playwright';
 
 const BASE = 'https://alpha.teameet.co.kr';
 const API = `${BASE}/api/v1`;
-const OUT = process.env.OUT_DIR ?? 'output/admin-contrast';
+const OUT = process.env.OUT_DIR ?? 'output/playwright/visual-audit/admin-contrast';
 const PAGES = [
   ['dashboard', '/admin'],
   ['tournaments', '/admin/tournaments'],
@@ -48,14 +48,10 @@ async function login() {
 }
 
 /**
- * 보이는 텍스트 노드의 실제 색과 **뒤에 실제로 깔린 지면**을 읽어 대비를 센다.
- * 지면은 조상을 거슬러 올라가며 처음 만나는 불투명 배경을 쓴다 — 요소 자신의
- * `backgroundColor` 가 `rgba(0,0,0,0)` 인 경우가 대부분이기 때문이다.
- */
-/**
  * 보이는 텍스트의 실제 색과 **뒤에 실제로 깔린 지면**을 읽어 대비를 센다.
  *
- * 이 계산기는 **네 번 틀린 뒤에 이 모양이 됐다.** 각 장치가 막는 오판을 적어 둔다.
+ * 이 계산기는 **세 번 다시 재고 나서** 이 모양이 됐다(미달 930 → 197 → 45).
+ * 장치는 넷이고, 각 장치가 막는 오판을 적어 둔다.
  *
  * 1. **canvas 로 색을 정규화한다.** Tailwind v4 는 `lab()`·`oklab()`·`color()` 를 그대로
  *    내보내고, 그 문자열의 숫자를 0~255 로 읽으면 지면이 `rgb(0.98, 0.002, 0.02)` 라는
@@ -117,8 +113,12 @@ const READ = `(() => {
 
   const out = { checked: 0, skipped: 0, exempt: 0, fails: [] };
   for (const el of document.querySelectorAll('body *')) {
-    if (el.children.length) continue;
-    const text = (el.textContent || '').trim();
+    // leaf 만 보면 \`<button><svg/>라벨</button>\` 처럼 **자식 요소와 직접 텍스트가 함께
+    // 있는** 요소를 통째로 놓친다(아이콘 버튼이 전부 이 모양이다). 요소의 **직접 텍스트
+    // 노드만** 모으면 자식이 있어도 재고, 자식 요소의 글자를 두 번 세지도 않는다.
+    let text = '';
+    for (const node of el.childNodes) if (node.nodeType === 3) text += node.textContent;
+    text = text.trim();
     if (!text) continue;
     const r = el.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) continue;

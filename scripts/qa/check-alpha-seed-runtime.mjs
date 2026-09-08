@@ -22,11 +22,13 @@
  * `require("@/...")` 를 그대로 뿜는다 — **ts-node 든 컴파일본이든 양쪽 다 죽는다.** 그래서
  * `@/` 는 실행 방식과 무관하게 금지한다. 지금 prisma/ 에는 0건이라 잠복 상태다.
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 
 const DEPLOY_SCRIPT = 'deploy/deploy-alpha.sh';
 const SEED_DIR = 'apps/v1_api/prisma';
 const RUNTIME_DOCKERFILE = 'deploy/Dockerfile.v1-api';
+const API_TSCONFIG = 'apps/v1_api/tsconfig.json';
+const API_BUILD_TSCONFIG = 'apps/v1_api/tsconfig.build.json';
 
 /** 런타임 이미지가 싣지 않는 워크스페이스 디렉터리를 가리키는 상대 import. */
 const CROSSES_INTO_SRC = /from\s+['"]\.\.\/src\//;
@@ -55,7 +57,9 @@ export function findOffenders({ deployScript, seeds }) {
     const tsNodeInvocation = new RegExp(`ts-node\\s+prisma/${escapeRegExp(base)}\\.ts`);
     const compiledInvocation = new RegExp(`node\\s+dist/prisma/${escapeRegExp(base)}\\.js`);
 
-    if (!deployScript.includes(base)) continue; // 배포에서 안 돌리는 시드는 대상이 아니다
+    // 배포에서 안 돌리는 시드는 대상이 아니다. 이름 부분일치로 보면 `prisma/seed.ts`(base='seed')가
+    // 스크립트 어디의 "seed" 에나 걸려 **항상 돈다**고 오판한다 — 실제 호출 형태로만 센다.
+    if (!tsNodeInvocation.test(deployScript) && !compiledInvocation.test(deployScript)) continue;
 
     if (tsNodeInvocation.test(deployScript)) {
       offenders.push({
@@ -79,6 +83,26 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * 이 규칙 전체가 **`dist/prisma/` 가 만들어진다**는 전제 위에 서 있다. 그 전제는 암묵적이다:
+ * `nest build` 의 기본 tsConfig 는 `tsconfig.build.json` 인데 이 저장소엔 그 파일이 **없어서**
+ * `tsconfig.json` 으로 폴백하고, 그 `include` 에 `prisma/**\/*` 가 있어서 나온다.
+ * 누가 `tsconfig.build.json` 을 추가하거나 `include` 를 좁히면 `dist/prisma/` 가 통째로
+ * 사라져 배포가 또 죽는데, 호출 형태만 보는 검사는 **녹색인 채로** 지나간다.
+ */
+export function findPremiseBreak({ tsconfig, buildTsconfig }) {
+  const includesPrisma = (raw) => /"include"\s*:\s*\[[^\]]*prisma\//.test(raw);
+
+  if (buildTsconfig !== null) {
+    return includesPrisma(buildTsconfig)
+      ? null
+      : '`tsconfig.build.json` 이 생겼는데 `include` 에 `prisma/**/*` 가 없다 — `dist/prisma/` 가 만들어지지 않는다';
+  }
+  return includesPrisma(tsconfig)
+    ? null
+    : '`apps/v1_api/tsconfig.json` 의 `include` 에 `prisma/**/*` 가 없다 — `dist/prisma/` 가 만들어지지 않는다';
+}
+
 function main() {
   const deployScript = readFileSync(DEPLOY_SCRIPT, 'utf8');
   const dockerfile = readFileSync(RUNTIME_DOCKERFILE, 'utf8');
@@ -92,6 +116,16 @@ function main() {
   const seeds = readdirSync(SEED_DIR)
     .filter((name) => name.endsWith('.ts'))
     .map((name) => ({ name, source: readFileSync(`${SEED_DIR}/${name}`, 'utf8') }));
+
+  const premiseBreak = findPremiseBreak({
+    tsconfig: readFileSync(API_TSCONFIG, 'utf8'),
+    buildTsconfig: existsSync(API_BUILD_TSCONFIG) ? readFileSync(API_BUILD_TSCONFIG, 'utf8') : null,
+  });
+  if (premiseBreak) {
+    console.error('[alpha-seed-runtime] failed');
+    console.error(`- ${premiseBreak}. 컴파일본 실행이 성립하지 않는다.`);
+    process.exit(1);
+  }
 
   const offenders = findOffenders({ deployScript, seeds });
 

@@ -1,8 +1,8 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { findOffenders } from './check-alpha-seed-runtime.mjs';
+import { findOffenders, findPremiseBreak } from './check-alpha-seed-runtime.mjs';
 
 const CROSSING_SEED = `
 import { PrismaClient } from '@prisma/client';
@@ -75,6 +75,48 @@ test('@/ 별칭은 배포에서 안 돌리는 시드여도 잡는다', () => {
   });
 
   assert.equal(offenders.length, 1);
+});
+
+test('이름이 다른 시드의 부분 문자열이어도 대상으로 오판하지 않는다', () => {
+  // `prisma/seed.ts` → base='seed' 는 스크립트의 어떤 "seed" 에나 부분일치한다.
+  // 실제 호출 형태로만 세지 않으면 "배포에서 돈다"고 잘못 판정해 만족 불가능한 요구를 낸다.
+  const offenders = findOffenders({
+    deployScript: "node dist/prisma/seed-alpha-showcase-results.js",
+    seeds: [{ name: 'seed.ts', source: CROSSING_SEED }],
+  });
+
+  assert.deepEqual(offenders, [], "seed-alpha-showcase-results 의 'seed' 에 부분일치하면 안 된다");
+});
+
+test('tsconfig 의 include 가 prisma 를 잃으면 잡는다 — dist/prisma 가 안 생긴다', () => {
+  const broken = findPremiseBreak({
+    tsconfig: '{ "include": ["src/**/*"] }',
+    buildTsconfig: null,
+  });
+
+  assert.ok(broken, 'include 에서 prisma 가 빠졌는데 통과시켰다');
+  assert.match(broken, /prisma/);
+});
+
+test('tsconfig.build.json 이 생기면 그쪽 include 를 본다', () => {
+  // nest build 는 tsconfig.build.json 이 있으면 그걸 쓴다 — 폴백 전제가 깨진다.
+  assert.ok(
+    findPremiseBreak({ tsconfig: '{ "include": ["src/**/*", "prisma/**/*"] }', buildTsconfig: '{ "include": ["src/**/*"] }' }),
+    'build 설정이 prisma 를 빼면 잡아야 한다',
+  );
+  assert.equal(
+    findPremiseBreak({ tsconfig: '{ "include": ["src/**/*"] }', buildTsconfig: '{ "include": ["src/**/*", "prisma/**/*"] }' }),
+    null,
+    'build 설정이 prisma 를 담으면 통과해야 한다',
+  );
+});
+
+test('실제 저장소가 그 전제를 만족한다', () => {
+  const tsconfig = readFileSync('apps/v1_api/tsconfig.json', 'utf8');
+  const buildPath = 'apps/v1_api/tsconfig.build.json';
+  const buildTsconfig = existsSync(buildPath) ? readFileSync(buildPath, 'utf8') : null;
+
+  assert.equal(findPremiseBreak({ tsconfig, buildTsconfig }), null);
 });
 
 test('실제 저장소 상태가 규칙을 지킨다', () => {

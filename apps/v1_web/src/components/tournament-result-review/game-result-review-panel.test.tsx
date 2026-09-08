@@ -278,9 +278,12 @@ describe('GameResultReviewPanel — 확정 결과 헤더의 승부차기 표기'
     expect(screen.getByRole('link', { name: '정정 화면으로 이동' })).toBeInTheDocument();
   });
 
-  it('링크를 못 만든 경우엔 그 자리를 비운다', () => {
+  it('publicHref 가 없으면 공개 화면 링크를 렌더하지 않는다', () => {
     render(<GameResultReviewPanel gameId={GAME_ID} correctionsHref="/x/records/corrections" />);
 
+    // **긍정 앵커 먼저.** 부정 단언만 두면 패널이 통째로 안 그려져도 통과한다 —
+    // 정정 링크가 실제로 있다는 것이 "이 화면이 렌더됐다"의 증거다.
+    expect(screen.getByRole('link', { name: '정정 화면으로 이동' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '공개 화면에서 보기' })).not.toBeInTheDocument();
   });
 });

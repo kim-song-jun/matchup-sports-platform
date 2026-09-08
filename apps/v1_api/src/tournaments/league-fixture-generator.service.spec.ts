@@ -305,7 +305,13 @@ describe('LeagueFixtureGeneratorService.generate', () => {
 
   let service: LeagueFixtureGeneratorService;
 
-  /** 조에 배정된 registrationId 들을 전부 confirmed 로 돌려주는 기본 응답. */
+  /**
+   * 조에 배정된 registrationId 들을 전부 confirmed 로 돌려주는 기본 응답.
+   *
+   * **프로필을 함께 싣는다.** 참가자 이름은 닉네임이 먼저이고(`participantDisplayName`),
+   * 조회가 프로필을 안 실으면 규칙이 폴백으로 떨어져 이 스펙이 무엇을 재는지 흐려진다 —
+   * 여기서 재려는 건 "리그 대진 생성이 등록 명단을 참가자로 잇는가" 이고, 이름이 그 증거다.
+   */
   function confirmedRegistrations({ where }: { where: { id: { in: string[] } } }) {
     return Promise.resolve(
       where.id.in.map((registrationId) => ({
@@ -313,7 +319,31 @@ describe('LeagueFixtureGeneratorService.generate', () => {
         status: 'confirmed',
         team: { id: `team-${registrationId}`, name: `${registrationId} 팀` },
         players: [
-          { id: `player-${registrationId}`, userId: `user-${registrationId}`, realName: `${registrationId} 선수` },
+          {
+            id: `player-${registrationId}`,
+            userId: `user-${registrationId}`,
+            realName: `${registrationId} 선수`,
+            user: { profile: { nickname: `${registrationId} 닉`, displayName: null } },
+          },
+        ],
+      })),
+    );
+  }
+
+  /** 프로필이 없는 명단 행 — 폴백이 실제로 `'팀원'` 인지 같은 스펙이 잠근다. */
+  function confirmedRegistrationsWithoutProfile({ where }: { where: { id: { in: string[] } } }) {
+    return Promise.resolve(
+      where.id.in.map((registrationId) => ({
+        id: registrationId,
+        status: 'confirmed',
+        team: { id: `team-${registrationId}`, name: `${registrationId} 팀` },
+        players: [
+          {
+            id: `player-${registrationId}`,
+            userId: `user-${registrationId}`,
+            realName: `${registrationId} 선수`,
+            user: { profile: null },
+          },
         ],
       })),
     );
@@ -502,15 +532,36 @@ describe('LeagueFixtureGeneratorService.generate', () => {
         sourceParticipantId: `player-${home}`,
         userId: `user-${home}`,
         sideKey: 'HOME',
-        displayNameSnapshot: `${home} 선수`,
+        // **실명이 아니라 닉네임이다.** 실명(`… 선수`)이 나오면 규칙이 안 걸린 것이다.
+        displayNameSnapshot: `${home} 닉`,
       },
       {
         sourceParticipantId: `player-${away}`,
         userId: `user-${away}`,
         sideKey: 'AWAY',
-        displayNameSnapshot: `${away} 선수`,
+        displayNameSnapshot: `${away} 닉`,
       },
     ]);
+  });
+
+  /**
+   * **폴백은 실명이 아니라 `'팀원'` 이다.** 프로필 행이 없을 때만 닿는 자리인데, 그때
+   * 실명으로 떨어지면 이 경로가 **사용자가 고르지 않은 쪽 이름**을 스냅샷에 남긴다.
+   * 위 케이스와 짝이라 갈리는 것이 "프로필 유무" 하나로 좁혀진다.
+   */
+  it('C1-b: 프로필이 없는 명단 행은 팀원으로 스냅샷된다 — 실명이 아니다', async () => {
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2']));
+    prisma.v1TournamentRegistration.findMany.mockImplementation(confirmedRegistrationsWithoutProfile);
+
+    await service.generate(user, 't1', dto());
+
+    const row = createdFixtureRows()[0];
+    const home = row.homeRegistrationId as string;
+    const away = row.awayRegistrationId as string;
+    const names = gameCreations()[0].input.participants.map((participant) => participant.displayNameSnapshot);
+    expect(names).toEqual(['팀원', '팀원']);
+    expect(names).not.toContain(`${home} 선수`);
+    expect(names).not.toContain(`${away} 선수`);
   });
 
   // C1: 규칙 버전이 없으면 게임을 만들 수 없다 — 그런데도 fixture 만 만들어 두면 그게 바로

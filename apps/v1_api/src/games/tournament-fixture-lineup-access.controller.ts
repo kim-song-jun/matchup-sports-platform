@@ -18,9 +18,9 @@ import { GamesService } from './games.service';
  *
  * 뒤의 둘은 **화면이 `my-fixtures` 로 옮겨간 것이지 기능이 죽은 게 아니다**(경위:
  * `apps/v1_api/CHANGELOG.md` — 경기마다 `lineup-access` 를 따로 부르지 않으려고
- * `my-fixtures` 를 추가했다). 지금 유일한 소비자는 alpha 운영 스크립트이고, 시드의 라인업
- * 진입 검증과 카드 정지 검증이 이 라우트들의 200 응답에 의존한다 — **지우면 그 스크립트가
- * 멈춘다.**
+ * `my-fixtures` 를 추가했다). **`lineup-access` 와 `lineup-roster` 두 라우트의** 유일한
+ * 소비자가 alpha 운영 스크립트이고(위의 다른 두 라우트는 화면이 쓴다), 시드의 라인업 진입
+ * 검증과 카드 정지 검증이 그 둘의 200 응답에 의존한다 — **지우면 그 스크립트가 멈춘다.**
  *
  * ⚠️ 웹 grep 으로 소비처를 셀 때 `apps/v1_web/.next/` 를 제외해야 한다(빌드 산출물이 결과를
  * 오염시킨다). 그리고 이 저장소의 네이티브 셸(`v1_android`·`v1_ios`)은 WebView 래퍼라

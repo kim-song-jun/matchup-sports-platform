@@ -94,7 +94,7 @@
   - 로컬 개발/E2E/bootstrap 전용
   - 사용자-facing production flow에 절대 포함하지 않는다.
 
-## POST /auth/kakao, /auth/naver, /auth/apple
+## POST /auth/kakao, /auth/naver
 
 - Body
 
@@ -105,9 +105,47 @@
 
 CAUTION:
 
-- `apple`은 현재 service에서 미구현 경로로 `401` 에러 가능
 - `kakao/naver`는 env 미구성 시 mock profile로 fallback 가능
 - 프론트는 provider별 성공/실패 copy를 분리하되, 최종 payload 저장 shape는 동일하게 처리한다.
+
+## POST /auth/apple/nonce, POST /auth/apple
+
+애플은 OAuth code 흐름이 아니다. 애플이 자기 웹 흐름을 임베디드 브라우저에서 막기 때문에,
+네이티브 셸이 시트를 띄우고 **identity token** 을 돌려주는 경로만 쓴다. 그래서 body 도
+`code` 가 아니다.
+
+- `POST /auth/apple/nonce` — body 없음. `{ nonce }` 를 돌려준다(서명된 단발 값, 5분).
+  앱은 이 값을 **SHA-256 해서** 애플 요청에 싣는다. 애플이 받은 문자열을 그대로 되돌려주므로
+  서버는 같은 해시로 대조한다 — 원문을 실으면 서버가 해시와 평문을 비교하게 되어 전부 거절된다.
+
+- `POST /auth/apple`
+
+| 필드 | 타입 | 필수 | 비고 |
+|---|---|---|---|
+| `identityToken` | string | Yes | 애플이 준 JWT. 최소 20자 |
+| `nonce` | string | Yes | 위에서 받은 **원문** nonce |
+| `fullName` | string | No | 애플은 **최초 1회만** 준다. 그때 안 보내면 영영 못 받는다 |
+
+실패:
+
+| 상태 | 코드 | 뜻 |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | body 형식 |
+| 401 | `APPLE_SIGN_IN_FAILED` | 토큰·nonce 검증 실패(서명·발급자·audience·만료·nonce 불일치) |
+| 403 | `PERMISSION_DENIED` | 계정 상태가 로그인 불가 |
+| 409 | `SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL` | 아래 참조 |
+| 503 | `APPLE_SIGN_IN_NOT_CONFIGURED` | `APPLE_SIGN_IN_AUDIENCES` 미설정, 또는 `V1_SESSION_SECRET` 이 32자 미만 |
+
+### 409 SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL (kakao·apple 공통)
+
+같은 이메일을 쓰는 계정이 이미 있는데 **우리가 그 이메일을 인증한 적이 없을 때** 난다.
+제공자의 `email_verified` 는 제공자 쪽 소유만 증명하고, 우리 계정 이메일은 소유 증명 없이
+바꿀 수 있어서(바꾸면 `emailVerifiedAt` 이 null 이 된다) 그것만 믿으면 남의 계정을 흡수하게
+된다 — account pre-hijacking.
+
+**사용자 대응**: 기존 방법(이메일·비밀번호 또는 다른 소셜)으로 로그인해 **이메일 인증을 마친 뒤**
+다시 시도한다. 프론트는 이 코드에 «인증을 마쳐 달라» 는 안내를 붙이고, 로그인 화면으로
+되돌리지 말 것 — 같은 자리에서 다시 눌러도 같은 409 가 난다.
 
 ## POST /auth/refresh
 

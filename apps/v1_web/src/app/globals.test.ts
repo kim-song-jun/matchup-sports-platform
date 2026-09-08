@@ -697,8 +697,14 @@ describe('파랑 히어로 지면 — 다크에서 그라디언트 끝이 밝아
  */
 describe('desktop shell — contrast and hit targets', () => {
   const rule = (selector: string) => {
-    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return desktopShellCss.match(new RegExp(escaped + '\\s*\\{([^}]*)\\}'))?.[1];
+    // 선택자의 공백은 \s+ 로 느슨하게 — 포매터가 줄바꿈이나 여러 칸으로 바꿔도 안 깨진다.
+    const escaped = selector
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\s+/g, '\\s+');
+    const body = desktopShellCss.match(new RegExp(escaped + '\\s*\\{([^}]*)\\}'))?.[1];
+    // 주석을 걷어낸다 — 안 걷으면 주석에 적은 `color: var(--grey500)` 같은 문구가
+    // `.not.toMatch(/color:.../)` 에 걸려 오탐이 난다(#1143 Copilot).
+    return body?.replace(/\/\*[\s\S]*?\*\//g, '');
   };
 
   it('활성 GNB 탭은 --blue500 이 아니라 --blue700 을 쓴다 (3.71 → 5.41)', () => {

@@ -172,6 +172,13 @@ jobs:
       - name: Compose service parity guard tests
         run: node --test scripts/qa/check-compose-service-parity.test.mjs
 
+      # alpha 배포 시드가 이미지에 없는 파일을 참조하면 배포가 죽는다(2026-09-08 실사고).
+      - name: Alpha seed runtime contracts
+        run: pnpm qa:alpha-seed-runtime
+
+      - name: Alpha seed runtime guard tests
+        run: node --test scripts/qa/check-alpha-seed-runtime.test.mjs
+
       # 이 스위트는 존재만 하고 CI 에서 한 번도 실행되지 않았다 — 그래서
       # "changeset 을 전부 소비하면 alpha 배포가 깨진다"는 계약 위반이 계속 살아 있었다.
       # 디렉터리 인자(`node --test scripts/release/`)는 Node 버전에 따라 모듈 해석으로

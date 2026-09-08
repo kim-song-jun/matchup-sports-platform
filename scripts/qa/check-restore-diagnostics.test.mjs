@@ -79,23 +79,57 @@ test('(a-5) 성공한 단계의 stdout 은 그대로 통과한다', () => {
  * 래퍼와 별개로, **함수가 실패를 반환하는지** 자체가 고장나 있었다. 호출부에 `|| return 1` 이
  * 있어도 불려간 함수가 0 을 돌려주면 아무 일도 일어나지 않는다 — 아래 둘이 그랬다.
  */
-test('(c-1) extract_active_manifest 는 .active 가 없으면 실패를 반환한다', () => {
-  const r = runStep(
-    `d="$(mktemp -d)"; echo '{}' > "$d/state.json"; ALPHA_RELEASE_STATE_FILE="$d/state.json" ` +
-      `extract_active_manifest "$d/out.json"`,
+/**
+ * **호출부와 같은 모양으로 불러야 한다.** 이 함수들을 그냥 실행하면 `set -e` 가 먼저
+ * 죽여서 **버그를 되돌려도 테스트가 통과한다**(실제로 그렇게 썼다가 변이가 GREEN 이었다).
+ * 프로덕션은 `f || return 1` 문맥에서 부르는데 그 자리에서는 `set -e` 가 꺼진다 —
+ * 그래서 "0 을 반환한다" 는 버그가 비로소 드러난다. 아래는 그 문맥을 그대로 재현한다.
+ */
+function callsInGuardContext(setup, call) {
+  return runStep(
+    `${setup}\nprobe() { ${call} || return 1; echo REACHED; }\nprobe || true`,
   );
-  assert.notEqual(r.code, 0, '끝의 chmod 가 jq 실패를 삼켰다 — 호출부의 `|| return 1` 이 무력화된다');
+}
+
+test('(c-1) extract_active_manifest 는 .active 가 없으면 실패를 반환한다', () => {
+  const r = callsInGuardContext(
+    `d="$(mktemp -d)"; echo '{}' > "$d/state.json"; ALPHA_RELEASE_STATE_FILE="$d/state.json"`,
+    `extract_active_manifest "$d/out.json"`,
+  );
+  assert.doesNotMatch(
+    r.stdout,
+    /REACHED/,
+    '끝의 chmod 가 jq 실패를 삼켰다 — 호출부의 `|| return 1` 이 무력화된다',
+  );
 });
 
-test('(c-2) load_alpha_release_manifest 는 앞쪽 필드가 없으면 실패를 반환한다', () => {
-  // 마지막 대입(.images.web.uri)만 성공하는 매니페스트. 예전 코드는 여기서 0 을 돌려주고
-  // ALPHA_API_IMAGE 가 빈 문자열인 채 `docker pull ""` 로 넘어갔다.
-  const r = runStep(
-    `d="$(mktemp -d)"; echo '{"images":{"web":{"uri":"repo@sha256:x"}}}' > "$d/m.json"; ` +
+/**
+ * 네 필드를 **하나씩** 빼서 각각 확인한다. 하나만 빠진 매니페스트를 안 쓰면 다른 줄이 대신
+ * 걸려서 통과해 버린다 — 실제로 `.release.version` 의 가드만 지운 변이가 GREEN 이었다.
+ */
+const MANIFEST_FIELDS = [
+  { name: 'release.version', omit: (m) => delete m.release.version },
+  { name: 'release.sha', omit: (m) => delete m.release.sha },
+  { name: 'images.api.uri', omit: (m) => delete m.images.api.uri },
+  { name: 'images.web.uri', omit: (m) => delete m.images.web.uri },
+];
+
+for (const field of MANIFEST_FIELDS) {
+  test(`(c-2) load_alpha_release_manifest 는 ${field.name} 이 없으면 실패를 반환한다`, () => {
+    // 예전 코드는 **마지막 대입만** 반환값이 되어, 앞쪽이 실패해도 0 이 나갔다. 그러면
+    // ALPHA_API_IMAGE 가 빈 문자열인 채 `pull_release_images` 가 `docker pull ""` 를 부른다.
+    const manifest = {
+      release: { version: 'v', sha: 's' },
+      images: { api: { uri: 'repo@sha256:a' }, web: { uri: 'repo@sha256:b' } },
+    };
+    field.omit(manifest);
+    const r = callsInGuardContext(
+      `d="$(mktemp -d)"; printf '%s' '${JSON.stringify(manifest)}' > "$d/m.json"`,
       `load_alpha_release_manifest "$d/m.json"`,
-  );
-  assert.notEqual(r.code, 0, '마지막 대입만 반환값이 됐다 — 앞의 실패가 사라진다');
-});
+    );
+    assert.doesNotMatch(r.stdout, /REACHED/, `${field.name} 의 실패가 사라졌다`);
+  });
+}
 
 /** 이어붙인 줄(`\\` 로 끊긴 명령)을 한 줄로 합친다 — 안 합치면 `|| return 1` 이 있는 줄만 보고 앞을 놓친다. */
 function joinContinuations(source) {

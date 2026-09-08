@@ -180,8 +180,17 @@ for (const { key, width, height } of WIDTHS.filter((w) => !only || only.includes
   for (const [name, path] of PAGES) {
     await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await page.waitForTimeout(2500);
-    const body = await page.evaluate('document.body.innerText.length');
-    if (body < 200) { console.log(`  ⚠️ ${key}/${name}: 본문 ${body}자 — 측정 무효(권한/로딩)`); continue; }
+    // 길이로 거르지 않는다. 검색·채팅의 빈 상태는 정상 화면인데도 200자가 안 되고,
+    // 그걸 "측정 무효" 로 버리면 **재야 할 화면을 조용히 안 재게 된다**(실제로 3화면을
+    // 그렇게 버렸다). 무효는 **화면 자체가 다른 것**일 때만이다.
+    const body = await page.evaluate(
+      "({ len: document.body.innerText.length, text: document.body.innerText })",
+    );
+    const wrongScreen = ['페이지를 찾을 수 없어요', '운영자 권한이 필요해요', '로그인이 필요해요'].find((m) =>
+      body.text.includes(m),
+    );
+    if (wrongScreen) { console.log(`  ⚠️ ${key}/${name}: "${wrongScreen}" — 다른 화면이라 측정 무효`); continue; }
+    if (body.len < 60) { console.log(`  ⚠️ ${key}/${name}: 본문 ${body.len}자 — 렌더 전으로 보임, 측정 무효`); continue; }
     const isDark = await page.evaluate("document.documentElement.classList.contains('dark')");
     if (THEME === 'dark' && !isDark) { console.log(`  ⚠️ ${key}/${name}: 다크 적용 실패 — 측정 무효`); continue; }
     await page.screenshot({ path: `${OUT}/${name}-${key}${THEME === 'dark' ? '-dark' : ''}.png`, fullPage: false });

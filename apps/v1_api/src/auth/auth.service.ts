@@ -395,7 +395,8 @@ export class AuthService {
       : null;
 
     if (existingUser) {
-      assertLinkableByEmail(existingUser);
+      // 계정 상태를 먼저 본다. 정지된 계정에 «이메일 인증을 마치라» 고 안내하면, 인증을 마쳐도
+      // 로그인은 안 되는 곳으로 사람을 보내게 된다. 이메일 게이트는 붙일 수 있는 계정에만 뜻이 있다.
       if (existingUser.accountStatus !== 'active') {
         this.assertNotWithdrawalPending(existingUser.accountStatus);
         throw new ForbiddenException({
@@ -403,6 +404,7 @@ export class AuthService {
           message: 'This account cannot sign in',
         });
       }
+      assertLinkableByEmail(existingUser);
 
       await this.prisma.$transaction([
         this.prisma.v1AuthIdentity.create({
@@ -565,7 +567,8 @@ export class AuthService {
       : null;
 
     if (existingUser) {
-      assertLinkableByEmail(existingUser);
+      // 계정 상태를 먼저 본다. 정지된 계정에 «이메일 인증을 마치라» 고 안내하면, 인증을 마쳐도
+      // 로그인은 안 되는 곳으로 사람을 보내게 된다. 이메일 게이트는 붙일 수 있는 계정에만 뜻이 있다.
       if (existingUser.accountStatus !== 'active') {
         this.assertNotWithdrawalPending(existingUser.accountStatus);
         throw new ForbiddenException({
@@ -573,6 +576,7 @@ export class AuthService {
           message: 'This account cannot sign in',
         });
       }
+      assertLinkableByEmail(existingUser);
 
       await this.prisma.$transaction([
         this.prisma.v1AuthIdentity.create({

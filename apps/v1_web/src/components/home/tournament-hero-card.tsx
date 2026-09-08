@@ -51,7 +51,7 @@ export function TournamentHeroCard({ items, loading = false }: { items: V1Tourna
             <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
               <div
                 className="tm-featured-media"
-                style={{ background: imageUrl ? `${cssUrl(imageUrl)} center/cover` : 'linear-gradient(135deg, var(--blue500), var(--blue600))' }}
+                style={{ background: imageUrl ? `${cssUrl(imageUrl)} center/cover` : 'var(--brand-hero-gradient)' }}
               >
                 {/* 은은한 트로피 워터마크 (장식) — 세로 중앙·우측 살짝 블리드(상단 잘림 방지) */}
                 {!imageUrl ? (

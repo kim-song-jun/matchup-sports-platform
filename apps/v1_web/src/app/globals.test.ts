@@ -619,3 +619,59 @@ describe('데스크톱 검색 화면의 틴트 지면', () => {
     expect(rule).toMatch(/--text-muted:\s*var\(--grey700\)/);
   });
 });
+
+describe('파랑 히어로 지면 — 다크에서 그라디언트 끝이 밝아지지 않는다', () => {
+  // 다크 팔레트는 --blue600 을 글자용으로 밝혔다(#2272eb → #5a9cf8). 같은 토큰이
+  // 히어로 그라디언트와 풋살 아이콘 배지의 **지면**으로도 쓰여 그 위 흰 글씨·아이콘이
+  // 2.78:1 까지 떨어졌다(alpha 실측). 지면은 별도 토큰으로 떼어 어두운 쪽을 지킨다.
+  const luminance = (hex: string) =>
+    [1, 3, 5]
+      .map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+      .reduce((sum, v, i) => sum + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const contrastWithWhite = (hex: string) => 1.05 / (luminance(hex) + 0.05);
+
+  // 첫 ':root.dark' 는 33행 주석 안에 있다 — 실제 규칙(줄 첫머리 + 여는 중괄호)을 앵커로 쓴다.
+  // 끝도 닫는 중괄호로 막는다. 파일 끝까지 자르면 **다른 규칙**의 선언이 대신 잡혀,
+  // :root.dark 에서 선언이 사라져도 테스트가 통과한다.
+  const darkStart = globalsCss.search(/^:root\.dark\s*\{/m);
+  const darkEndIdx = globalsCss.indexOf('\n}', darkStart);
+  const darkBlock = globalsCss.slice(darkStart, darkEndIdx);
+  const darkEnd = darkBlock.match(/--brand-hero-gradient-end:\s*(#[0-9a-fA-F]{6})/)?.[1];
+
+  it('다크의 지면 끝 값이 흰색 대비 4.5:1 을 넘는다', () => {
+    expect(darkEnd, ':root.dark 에 --brand-hero-gradient-end 가 없다').toBeDefined();
+    expect(contrastWithWhite(darkEnd as string)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('다크에서 지면 끝이 --blue600 을 그대로 쓰지 않는다', () => {
+    // 그대로 쓰면 다크 재정의(#5a9cf8)를 물려받아 2.78:1 로 돌아간다.
+    expect(darkBlock).not.toMatch(/--brand-hero-gradient-end:\s*var\(--blue600\)/);
+  });
+
+  it('그라디언트는 지면 끝 토큰으로 조립된다', () => {
+    expect(globalsCss).toMatch(
+      /--brand-hero-gradient:\s*linear-gradient\(135deg,\s*var\(--blue500\)\s*0%,\s*var\(--brand-hero-gradient-end\)\s*100%\)/,
+    );
+  });
+
+  it.each([
+    'src/components/tournaments/tournament-promo-carousel.tsx',
+    'src/components/home/tournament-hero-card.tsx',
+    'src/components/home/featured-slot-skeleton.tsx',
+    'src/components/admin/promo-card-preview.tsx',
+    'src/app/tournaments/[id]/tournament-detail-client.tsx',
+  ])('%s 는 그라디언트를 직접 쓰지 않고 토큰을 쓴다', (file) => {
+    const source = readFileSync(resolve(process.cwd(), file), 'utf8');
+
+    expect(source).toContain('var(--brand-hero-gradient)');
+    expect(source).not.toMatch(/var\(--blue500\)(?:\s*0%)?,\s*var\(--blue600\)/);
+  });
+
+  it('풋살 계열 종목 배지도 지면 끝 토큰을 쓴다', () => {
+    const accent = readFileSync(resolve(process.cwd(), 'src/lib/v1-sport-accent.ts'), 'utf8');
+
+    expect(accent).not.toMatch(/gradientTo:\s*'var\(--blue600\)'/);
+    expect((accent.match(/gradientTo:\s*'var\(--brand-hero-gradient-end\)'/g) ?? []).length).toBe(2);
+  });
+});

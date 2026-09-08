@@ -5,6 +5,29 @@ import type { V1AuthUser } from '../auth/v1-auth-user';
 import { GamesService } from './games.service';
 
 /**
+ * **라우트가 넷이다** — 파일 이름이 그중 하나(`lineup-access`)를 가리켜서, 그 하나의 웹
+ * 소비가 사라지면 컨트롤러 전체가 쓰이지 않는 것처럼 읽힌다. 실제로 그렇게 오해한 적이
+ * 있다. 넷의 소비처는 이렇다:
+ *
+ * ```
+ * claimable-participants  화면이 쓴다 — "이 기록은 제 것입니다"(use-v1-api.ts)
+ * my-fixtures             화면이 쓴다 — 대진표·일정 탭의 내 팀 경기 강조
+ * lineup-access           웹 소비 없음 · scripts/seed_alpha_lineup_ops_tournaments.mjs 가 부른다
+ * lineup-roster           웹 소비 없음 · scripts/verify-alpha-card-suspension.mjs 가 부른다
+ * ```
+ *
+ * 뒤의 둘은 **화면이 `my-fixtures` 로 옮겨간 것이지 기능이 죽은 게 아니다**(경위:
+ * `apps/v1_api/CHANGELOG.md` — 경기마다 `lineup-access` 를 따로 부르지 않으려고
+ * `my-fixtures` 를 추가했다). 지금 유일한 소비자는 alpha 운영 스크립트이고, 시드의 라인업
+ * 진입 검증과 카드 정지 검증이 이 라우트들의 200 응답에 의존한다 — **지우면 그 스크립트가
+ * 멈춘다.**
+ *
+ * ⚠️ 웹 grep 으로 소비처를 셀 때 `apps/v1_web/.next/` 를 제외해야 한다(빌드 산출물이 결과를
+ * 오염시킨다). 그리고 이 저장소의 네이티브 셸(`v1_android`·`v1_ios`)은 WebView 래퍼라
+ * 대부분의 API 를 직접 부르지 않지만 **완전히 안 부르는 것은 아니다** — 실측상 직접 호출은
+ * `notifications/push-devices` 두 라우트뿐이고, 그쪽은 웹 grep 이 0이어도 이미 설치된 앱이
+ * 조용히 깨진다.
+ *
  * 참가팀이 자기 대회 경기의 gameId·자기 sideId를 알아내는 전용 진입점.
  * `/tournaments/:id/matches/:fixtureId`(공개 기록)는 visibilityPolicy에 걸려
  * 있어 팀이 사전에 라인업을 준비하는 용도로 쓸 수 없다 — 그 정책과 완전히

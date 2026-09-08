@@ -7,7 +7,6 @@ import { ErrorState } from '@/components/v1-ui/primitives';
 import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { useV1Tournament } from '@/hooks/use-v1-api';
-import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { useTournamentEndedFixtures, type TournamentOperationsBoardItem } from '@/hooks/use-tournament-result-review';
 import { buildLeagueFixtureTitles, resolveFixtureLabel } from '@/components/tournament-result-review/fixture-label';
 import { FixturePickerList } from '@/components/tournament-result-review/fixture-picker-list';
@@ -81,21 +80,6 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
   const selectedItem = needsReview.find((item) => item.fixtureId === selectedFixtureId) ?? null;
   const liveBase = resolveTournamentLiveBase(usePathname(), tournamentId);
   const correctionsHref = `${liveBase}/records/corrections`;
-  /* 확정한 결과를 관전자 화면에서 바로 확인할 수 있게 한다. 리그와 대회는 경기 상세
-     라우트가 달라서 `fixtureDetailHref` 를 거친다 — 대회 패턴으로 리그를 링크하면 404 다.
-
-     ⚠️ **`kind` 가 오기 전에는 만들지 않는다.** 패널은 보드 쿼리(`boardQuery`)로 뜨는데
-     `kind` 는 다른 쿼리(`tournament`)에서 온다. 보드가 먼저 성공하면 `tournament.data` 가
-     아직 undefined 라 `=== 'regular_league'` 가 false 로 떨어지고, **정규 리그가 대회
-     라우트로 링크돼 404** 다. 헬퍼를 쓰는 것만으로는 안전하지 않다 — 입력이 준비돼야 한다. */
-  const publicHref =
-    selectedItem !== null && tournament.data
-      ? fixtureDetailHref({
-          isRegularLeague: tournament.data.kind === 'regular_league',
-          competitionId: tournamentId,
-          fixtureId: selectedItem.fixtureId,
-        })
-      : undefined;
 
   // T6-1: 딥링크로 들어왔는데 목록이 로드된 뒤에도 해당 fixture가 없으면(아직
   // 종료 전이거나 이미 처리됨) 조용히 미선택 상태로 두지 않고 안내한다.
@@ -190,7 +174,6 @@ export function ResultReviewPageClient({ tournamentId }: { tournamentId: string 
                   gameId={selectedItem.gameId}
                   tournamentId={tournamentId}
                   correctionsHref={correctionsHref}
-                  publicHref={publicHref}
                 />
               </div>
             ) : null}

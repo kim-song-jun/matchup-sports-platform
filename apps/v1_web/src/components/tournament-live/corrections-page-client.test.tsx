@@ -128,3 +128,65 @@ describe('CorrectionsPageClient fixtureId 딥링크 (T6-2)', () => {
     expect(screen.getByTestId('panel')).toHaveTextContent('panel:game-2');
   });
 });
+
+
+/**
+ * **공개 화면 링크가 여기 사는 이유.**
+ *
+ * 원래 결과 검토 화면에 뒀는데 거기서는 도달할 수 없었다 — 확정 한 번에 `revisions`
+ * 무효화(링크를 띄운다)와 `board` 무효화(그 패널을 걷어낸다)가 **같은 콜백에서** 나가,
+ * 링크의 수명이 두 refetch 사이 간격이었다. 이 화면은 `revisionId !== null` 만 모으므로
+ * **확정된 항목이 목록에서 사라지지 않는다.**
+ */
+describe('CorrectionsPageClient — 공개 화면 링크', () => {
+  beforeEach(() => {
+    window.localStorage.setItem('teameet.v1.userId', 'user-1');
+    mocks.useV1AuthMe.mockReturnValue({
+      data: { user: { id: 'user-1' } },
+      isPending: false,
+      isSuccess: true,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+    mocks.useTournamentEndedFixtures.mockReturnValue({
+      isPending: false, isSuccess: true, isError: false, data: { items: ITEMS }, refetch: vi.fn(),
+    });
+    mocks.useSearchParams.mockReturnValue(new URLSearchParams('fixtureId=fx-1'));
+  });
+
+  it('대회는 대회 경기 라우트로 링크한다', () => {
+    mocks.useV1Tournament.mockReturnValue({ data: { title: '가을 대회', kind: 'tournament', fixtures: [] } });
+    render(<CorrectionsPageClient tournamentId="t-1" />);
+
+    // 긍정 앵커 — 패널이 실제로 그려졌다는 증거를 먼저 둔다.
+    expect(screen.getByTestId('panel')).toHaveTextContent('panel:game-1');
+    expect(screen.getByRole('link', { name: '공개 화면에서 보기' })).toHaveAttribute(
+      'href',
+      '/tournaments/t-1/matches/fx-1',
+    );
+  });
+
+  it('정규 리그는 리그 경기 라우트로 링크한다', () => {
+    mocks.useV1Tournament.mockReturnValue({ data: { title: '가을 리그', kind: 'regular_league', fixtures: [] } });
+    render(<CorrectionsPageClient tournamentId="t-1" />);
+
+    expect(screen.getByRole('link', { name: '공개 화면에서 보기' })).toHaveAttribute(
+      'href',
+      '/league-matches/t-1/fixtures/fx-1',
+    );
+  });
+
+  /**
+   * 목록은 보드 쿼리로 뜨고 `kind` 는 다른 쿼리에서 온다 — 보드가 먼저 성공하면
+   * `tournament.data` 가 undefined 라 정규 리그가 대회 라우트로 링크돼 404 다.
+   * 헬퍼를 쓰는 것만으로는 안전하지 않고 **입력이 준비돼야** 한다.
+   */
+  it('kind 가 아직 안 왔으면 링크를 만들지 않는다', () => {
+    mocks.useV1Tournament.mockReturnValue({ data: undefined });
+    render(<CorrectionsPageClient tournamentId="t-1" />);
+
+    expect(screen.getByTestId('panel')).toHaveTextContent('panel:game-1');
+    expect(screen.queryByRole('link', { name: '공개 화면에서 보기' })).not.toBeInTheDocument();
+  });
+});

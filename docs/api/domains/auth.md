@@ -17,7 +17,6 @@
 | POST | `/auth/login` | No | 이메일 로그인 |
 | POST | `/auth/dev-login` | No | 개발용 로그인 |
 | POST | `/auth/kakao` | No | 카카오 로그인 |
-| POST | `/auth/naver` | No | 네이버 로그인 |
 | POST | `/auth/apple` | No | 애플 로그인 |
 | POST | `/auth/refresh` | No | 토큰 재발급 |
 | GET | `/auth/me` | Yes | 현재 사용자 조회 |
@@ -25,7 +24,7 @@
 
 ## 공통 성공 응답 shape
 
-인증 성공 계열 endpoint(`register`, `login`, `dev-login`, `kakao`, `naver`, 일부 provider fallback 경로)는 `data` 안에 아래 shape를 반환한다.
+인증 성공 계열 endpoint(`register`, `login`, `dev-login`, `kakao`, `apple`)는 `data` 안에 아래 shape를 반환한다.
 
 ```json
 {
@@ -94,7 +93,7 @@
   - 로컬 개발/E2E/bootstrap 전용
   - 사용자-facing production flow에 절대 포함하지 않는다.
 
-## POST /auth/kakao, /auth/naver
+## POST /auth/kakao
 
 - Body
 
@@ -105,8 +104,13 @@
 
 CAUTION:
 
-- `kakao/naver`는 env 미구성 시 mock profile로 fallback 가능
+- `kakao`는 env 미구성 시 mock profile로 fallback 가능
 - 프론트는 provider별 성공/실패 copy를 분리하되, 최종 payload 저장 shape는 동일하게 처리한다.
+
+> **네이버는 엔드포인트가 없다.** `V1AuthProvider` enum 에 `naver` 값이 남아 있어 있는 것처럼
+> 보이지만 라우트도 서비스 코드도 없다(컨트롤러는 kakao·apple 둘뿐). 로그인 화면의 네이버
+> 버튼이 «준비 중» 으로 비활성인 것도 그래서다. 이 문서는 오랫동안 `/auth/naver` 를 있는
+> 것처럼 적고 있었다 — 그대로 붙이면 404 다.
 
 ## POST /auth/apple/nonce, POST /auth/apple
 

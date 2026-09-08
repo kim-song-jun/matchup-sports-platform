@@ -82,8 +82,11 @@ load_alpha_release_manifest() {
   export ALPHA_RELEASE_SHA
   export ALPHA_API_IMAGE
   export ALPHA_WEB_IMAGE
-  ALPHA_RELEASE_VERSION="$(jq -er '.release.version' "${manifest_file}")"
-  ALPHA_RELEASE_SHA="$(jq -er '.release.sha' "${manifest_file}")"
-  ALPHA_API_IMAGE="$(jq -er '.images.api.uri' "${manifest_file}")"
-  ALPHA_WEB_IMAGE="$(jq -er '.images.web.uri' "${manifest_file}")"
+  # 줄마다 `|| return 1` 이 필요하다 — 함수 반환값은 **마지막 대입**의 것이라, 앞의 셋이
+  # 실패해도 마지막 하나만 성공하면 0 이 나갔다. 그러면 `ALPHA_API_IMAGE` 가 빈 문자열인
+  # 채로 `pull_release_images` 가 `docker pull ""` 를 시도한다.
+  ALPHA_RELEASE_VERSION="$(jq -er '.release.version' "${manifest_file}")" || return 1
+  ALPHA_RELEASE_SHA="$(jq -er '.release.sha' "${manifest_file}")" || return 1
+  ALPHA_API_IMAGE="$(jq -er '.images.api.uri' "${manifest_file}")" || return 1
+  ALPHA_WEB_IMAGE="$(jq -er '.images.web.uri' "${manifest_file}")" || return 1
 }

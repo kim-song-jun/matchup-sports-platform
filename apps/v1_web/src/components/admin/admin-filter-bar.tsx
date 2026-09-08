@@ -107,7 +107,11 @@ export function AdminFilterBar({
                       <span
                         className={[
                           'ml-2 min-w-[1.25rem] text-center font-semibold tabular-nums',
-                          active ? 'text-white/90' : 'text-[var(--text-muted)]',
+                          // 활성 칩의 흰 글씨는 a11y-decisions.md 1번(solid-fill 버튼, 3.71:1)이
+                          // 현행 유지하기로 한 자리다. 여기에 /90 을 더 걸면 3.32:1 로 **그
+                          // 결정보다 나빠진다** — 결정은 3.71 기준으로 내려졌다. 옆 라벨과 같은
+                          // 흰색으로 두고, 위계는 이미 font-semibold(라벨은 medium)가 만든다.
+                          active ? 'text-white' : 'text-[var(--text-muted)]',
                         ].join(' ')}
                         aria-hidden="true"
                       >

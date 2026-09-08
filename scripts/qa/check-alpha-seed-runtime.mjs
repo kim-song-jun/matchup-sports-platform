@@ -29,6 +29,7 @@ const SEED_DIR = 'apps/v1_api/prisma';
 const RUNTIME_DOCKERFILE = 'deploy/Dockerfile.v1-api';
 const API_TSCONFIG = 'apps/v1_api/tsconfig.json';
 const API_BUILD_TSCONFIG = 'apps/v1_api/tsconfig.build.json';
+const DEPLOY_SCRIPTS = ['deploy/deploy-alpha.sh', 'deploy/deploy-prod.sh'];
 
 /**
  * 모듈 지정자는 **문자열 리터럴 자체**로 본다. `from '…'` 만 보면
@@ -143,6 +144,41 @@ export function findPremiseBreak({ tsconfig, buildTsconfig }) {
     : '`apps/v1_api/tsconfig.json` 의 `include` 에 `prisma/**/*` 가 없다 — `dist/prisma/` 가 만들어지지 않는다';
 }
 
+/**
+ * 규칙을 대칭으로 만든다. 지금까지는 "소스가 `../src/` 를 넘으면 컴파일본으로 불러라"
+ * 한 방향만 봤다. 반대 방향 — **배포가 `node dist/<rel>.js` 로 부르는 것은 빌드가 실제로
+ * 그 자리에 만드는 파일이어야 한다** — 이 비어 있었다. 오타 하나면 체커는 녹색인 채로
+ * 배포가 죽는다.
+ *
+ * `include` 글롭까지 확인한다 — 소스가 있어도 빌드 대상이 아니면 dist 에 안 생긴다.
+ */
+export function findMissingEntrypoints({ deployScripts, sourceExists, includeGlobs }) {
+  const missing = [];
+  const seen = new Set();
+
+  for (const script of deployScripts) {
+    for (const match of script.matchAll(/node\s+dist\/([A-Za-z0-9._/-]+)\.js/g)) {
+      const rel = match[1];
+      if (seen.has(rel)) continue;
+      seen.add(rel);
+
+      if (!sourceExists(`${rel}.ts`)) {
+        missing.push({ entrypoint: `dist/${rel}.js`, reason: `\`${rel}.ts\` 가 없다` });
+        continue;
+      }
+      const topDir = rel.split('/')[0];
+      if (!includeGlobs.some((glob) => glob.startsWith(`${topDir}/`))) {
+        missing.push({
+          entrypoint: `dist/${rel}.js`,
+          reason: `\`${rel}.ts\` 가 tsconfig 의 include 에 잡히지 않는다 — dist 에 생기지 않는다`,
+        });
+      }
+    }
+  }
+
+  return missing;
+}
+
 function main() {
   const deployScript = readFileSync(DEPLOY_SCRIPT, 'utf8');
   const dockerfile = readFileSync(RUNTIME_DOCKERFILE, 'utf8');
@@ -164,6 +200,22 @@ function main() {
   if (premiseBreak) {
     console.error('[alpha-seed-runtime] failed');
     console.error(`- ${premiseBreak}. 컴파일본 실행이 성립하지 않는다.`);
+    process.exit(1);
+  }
+
+  const includeGlobs = JSON.parse(
+    readFileSync(API_TSCONFIG, 'utf8').match(/"include"\s*:\s*(\[[^\]]*\])/)?.[1] ?? '[]',
+  );
+  const missing = findMissingEntrypoints({
+    deployScripts: DEPLOY_SCRIPTS.filter(existsSync).map((path) => readFileSync(path, 'utf8')),
+    sourceExists: (rel) => existsSync(`apps/v1_api/${rel}`),
+    includeGlobs,
+  });
+  if (missing.length > 0) {
+    console.error('[alpha-seed-runtime] failed');
+    for (const { entrypoint, reason } of missing) {
+      console.error(`- 배포가 \`${entrypoint}\` 를 부르는데 ${reason}.`);
+    }
     process.exit(1);
   }
 

@@ -2,7 +2,12 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { findOffenders, findPremiseBreak, stripComments } from './check-alpha-seed-runtime.mjs';
+import {
+  findMissingEntrypoints,
+  findOffenders,
+  findPremiseBreak,
+  stripComments,
+} from './check-alpha-seed-runtime.mjs';
 
 const CROSSING_SEED = `
 import { PrismaClient } from '@prisma/client';
@@ -169,6 +174,59 @@ import { y } from '../src/y';
   });
 
   assert.equal(offenders.length, 1, '주석 제거가 실제 위반까지 지우면 안 된다');
+});
+
+const INCLUDE = ['src/**/*', 'prisma/**/*'];
+
+test('배포가 부르는 dist 진입점의 소스가 없으면 잡는다', () => {
+  const missing = findMissingEntrypoints({
+    deployScripts: ['node dist/prisma/seed-typo.js'],
+    sourceExists: () => false,
+    includeGlobs: INCLUDE,
+  });
+
+  assert.equal(missing.length, 1);
+  assert.match(missing[0].reason, /없다/);
+});
+
+test('소스는 있지만 include 밖이면 잡는다 — dist 에 안 생긴다', () => {
+  const missing = findMissingEntrypoints({
+    deployScripts: ['node dist/prisma/seed-x.js'],
+    sourceExists: () => true,
+    includeGlobs: ['src/**/*'],
+  });
+
+  assert.equal(missing.length, 1);
+  assert.match(missing[0].reason, /include/);
+});
+
+test('소스가 있고 include 안이면 통과한다', () => {
+  assert.deepEqual(
+    findMissingEntrypoints({
+      deployScripts: ['node dist/prisma/seed-x.js', 'node dist/src/a/b.cli.js'],
+      sourceExists: () => true,
+      includeGlobs: INCLUDE,
+    }),
+    [],
+  );
+});
+
+test('실제 배포 스크립트의 진입점 전부가 소스를 갖는다', () => {
+  const scripts = ['deploy/deploy-alpha.sh', 'deploy/deploy-prod.sh']
+    .filter((path) => existsSync(path))
+    .map((path) => readFileSync(path, 'utf8'));
+  const includeGlobs = JSON.parse(
+    readFileSync('apps/v1_api/tsconfig.json', 'utf8').match(/"include"\s*:\s*(\[[^\]]*\])/)[1],
+  );
+
+  assert.deepEqual(
+    findMissingEntrypoints({
+      deployScripts: scripts,
+      sourceExists: (rel) => existsSync(`apps/v1_api/${rel}`),
+      includeGlobs,
+    }),
+    [],
+  );
 });
 
 test('실제 저장소 상태가 규칙을 지킨다', () => {

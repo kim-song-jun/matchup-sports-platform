@@ -40,6 +40,7 @@ describe('global-error — 청크 로드 실패 복구', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
     vi.useRealTimers();
     window.sessionStorage.clear();
@@ -77,6 +78,36 @@ describe('global-error — 청크 로드 실패 복구', () => {
     await flush();
 
     expect(reloadMock).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * **이 PR 에서 가장 중요한 단언.** 프라이빗 모드·스토리지 차단 브라우저는 `sessionStorage`
+   * **접근 자체가 던진다.** 그때 "표식 없음"으로 넘기면 매 마운트마다 자동 리로드가 참이
+   * 되어 **1.5초 간격 무한 리로드**가 되고, 사용자는 버튼을 누를 기회조차 잃는다 —
+   * 지금(수동 새로고침)보다 나쁘다. 저장소를 못 쓰면 자동 복구를 포기한다.
+   */
+  it('sessionStorage 를 못 읽으면 자동 리로드하지 않고 버튼을 남긴다', async () => {
+    // jsdom 의 Storage 는 프록시라 인스턴스에 spy 를 걸어도 안 먹는다 — 프로토타입에 건다.
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('The operation is insecure.', 'SecurityError');
+    });
+
+    render(<GlobalError error={chunkError()} reset={vi.fn()} />);
+    await flush();
+
+    expect(reloadMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '새로고침' })).toBeInTheDocument();
+  });
+
+  it('표식을 쓸 수 없으면 리로드하지 않는다 — 다음 번을 막을 수단이 없다', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('QuotaExceededError', 'QuotaExceededError');
+    });
+
+    render(<GlobalError error={chunkError()} reset={vi.fn()} />);
+    await flush();
+
+    expect(reloadMock).not.toHaveBeenCalled();
   });
 
   it('청크가 아닌 렌더 에러는 리로드하지 않는다 — 무한 루프 방지', async () => {

@@ -43,16 +43,18 @@ export function requestReleaseReload(): void {
  * 자동 리로드를 해도 되는지 묻고, 된다면 표식을 남긴다. 표식이 최근이면 `false` —
  * 그때는 리로드하지 말고 에러 화면을 그대로 보여 사용자가 직접 고를 수 있게 한다.
  *
- * sessionStorage 는 프라이빗 모드·차단 설정에서 접근 자체가 던진다. 읽기 실패는
- * "표식 없음"으로, 쓰기 실패는 무시로 처리한다 — 저장이 안 되는 브라우저에서 자동 복구를
- * 통째로 포기하는 쪽이 더 나쁘다.
+ * **저장소를 못 쓰면 자동 복구를 포기한다(fail-closed).** sessionStorage 는 프라이빗
+ * 모드·스토리지 차단에서 **접근 자체가 던진다.** 그때 "표식 없음"으로 넘기면 매 마운트마다
+ * 참이 되어 **1.5초 간격 무한 리로드**가 되고, 사용자가 버튼을 누를 기회조차 사라진다 —
+ * 지금(수동 새로고침)보다 나쁘다. 읽기든 쓰기든 던지면 `false` 로 돌려 **에러 화면과
+ * 버튼을 남긴다.** 표식을 못 남긴 채 리로드하는 것도 같은 이유로 하지 않는다.
  */
 export function claimChunkReloadAttempt(now: number = Date.now()): boolean {
-  let previous: string | null = null;
+  let previous: string | null;
   try {
     previous = window.sessionStorage.getItem(CHUNK_RELOAD_MARK);
   } catch {
-    previous = null;
+    return false;
   }
   if (previous !== null) {
     const at = Number(previous);
@@ -61,7 +63,7 @@ export function claimChunkReloadAttempt(now: number = Date.now()): boolean {
   try {
     window.sessionStorage.setItem(CHUNK_RELOAD_MARK, String(now));
   } catch {
-    // 저장이 안 되면 루프 방지가 약해지지만, 리로드 자체는 시도한다.
+    return false;
   }
   return true;
 }

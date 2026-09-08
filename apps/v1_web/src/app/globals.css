@@ -2480,8 +2480,10 @@ label.tm-btn:focus-within {
 .tm-section-action {
   border: 0;
   background: transparent;
-  /* #15: blue500으로 격상해 '더보기' 진입점 링크로 인식되도록 */
-  color: var(--blue500);
+  /* #15: 파랑으로 격상해 '더보기' 진입점 링크로 인식되도록. blue500 은 13px/600 에서
+     흰 지면 3.71:1 로 AA 미달이라(alpha 실측) blue700(5.41:1)로 올렸다 —
+     링크로 읽히는 성질은 그대로다. */
+  color: var(--blue700);
   font-size: 13px;
   font-weight: 600;
   padding: 0 4px;
@@ -4855,7 +4857,9 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 .tm-notification-count {
-  color: var(--blue500);
+  /* 17px/700 은 큰 글씨 완화(≥18.66px + bold)에 1.66px 모자라 4.5:1 기준을 받는다 —
+     blue500 은 흰 지면 3.71:1 이라 미달(alpha 실측). */
+  color: var(--blue700);
 }
 
 .tm-notification-count-muted {

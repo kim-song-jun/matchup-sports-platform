@@ -1101,7 +1101,7 @@ export function TournamentDetailView({
       {!isCompleted && tournament.refundPolicyText ? (
         <section aria-labelledby="refund-heading">
           <div id="refund-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>환불 정책</div>
-          <Card pad={16} style={{ background: 'var(--grey50)' }}>
+          <Card pad={16} className="tm-on-tint" style={{ background: 'var(--grey50)' }}>
             <CollapsiblePolicyText
               id="refund-content"
               text={tournament.refundPolicyText}
@@ -2010,7 +2010,7 @@ function FixturesPlaceholder() {
   return (
     <section aria-labelledby="fixtures-placeholder-heading" style={{ marginTop: 24 }}>
       <div className="tm-text-body-lg" style={{ marginBottom: 8 }}>일정 · 대진</div>
-      <Card pad={16} style={{ marginTop: 4, background: 'var(--grey50)' }}>
+      <Card pad={16} className="tm-on-tint" style={{ marginTop: 4, background: 'var(--grey50)' }}>
         <div id="fixtures-placeholder-heading" className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
           대진표 준비 중
         </div>

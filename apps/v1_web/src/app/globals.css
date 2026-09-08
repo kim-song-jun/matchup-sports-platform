@@ -6529,7 +6529,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 .tm-hub-stage-label-done  { color: var(--blue500); font-weight: 700; }
 /* 크기는 base(12px)와 같게 두고 색·굵기로만 현재 단계를 구분한다. */
-.tm-hub-stage-label-active { color: var(--blue500); font-weight: 800; }
+/* 12px/800 은 완화 문턱(≥18.66px)에 한참 못 미친다 — blue500 흰 지면 3.71:1 미달. */
+.tm-hub-stage-label-active { color: var(--blue700); font-weight: 800; }
 
 /* 서브레이블 (날짜/시각) */
 .tm-hub-stage-sublabel {
@@ -6784,7 +6785,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding: 8px 12px;
   border-radius: var(--radius-pill);
   background: var(--blue50);
-  color: var(--blue500);
+  /* blue50 지면 위 blue500 은 3.31:1 — 12px/700 이라 완화 대상도 아니다. blue700 은 4.82:1. */
+  color: var(--blue700);
   font-size: 12px;
   font-weight: 700;
 }

@@ -1690,6 +1690,10 @@ button:disabled {
   height: 44px;
   padding: 0;
   position: relative;
+  /* 이 클래스는 정의상 44x44 **고정**이다. 그런데 flex 컨테이너 안에서는 flex-shrink 기본값
+     (1)이 width 를 이겨 눌린다 — alpha 실측(2026-09-08) 홈 날씨 카드의 새로고침 버튼이
+     세 폭 모두에서 44 미만으로 찌그러져 있었다. 고정을 실제로 고정으로 만든다. */
+  flex-shrink: 0;
 }
 
 /* 시각 크기는 그대로 두고 **터치 영역만** 44px 로 넓힌다.
@@ -3380,10 +3384,15 @@ label.tm-btn:focus-within {
 
 .tm-match-detail-title {
   margin: 4px 0 0;
+  /* 히어로 지면(사진·그라디언트) 위라 흰 글씨는 그대로 둔다. */
   color: var(--static-white);
-  font-size: 24px;
+  /* 이 h2 는 데스크톱 페이지 헤드의 h1(.tm-text-heading)과 **같은 match.title 문자열**을
+     보여준다(matches-page.tsx:309 vs :352). 그런데 크기는 같고 굵기만 700 vs 800 으로
+     갈려 있었다 — 한 화면에서 같은 제목이 두 무게로 보인다(alpha 실측 2026-09-08).
+     DESIGN.md 의 페이지 제목 값(24px/700)에 맞춘다. */
+  font-size: var(--font-size-heading);
   line-height: 32px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .tm-match-detail-body {

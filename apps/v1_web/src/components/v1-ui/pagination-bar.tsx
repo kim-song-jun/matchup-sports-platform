@@ -38,9 +38,20 @@ export function PaginationBar({
 
   // 44×44: 프로젝트 터치 타겟 최솟값. 40px 로 두면 목록 19곳의 페이지네이션이 전부
   // 기준 미달이 된다(실측: 이전/다음 44×40, 숫자 40×40).
+  // 크기·굵기는 Tailwind 유틸이 아니라 인라인으로 준다.
+  // globals.css 의 `button, input, ... { font: inherit }` 리셋이 **레이어 밖(unlayered)** 이라
+  // CSS Cascade Layers 규칙상 Tailwind 의 `@layer utilities` 안 유틸리티를 항상 이긴다 —
+  // `text-[length:var(--font-size-label)] font-medium` 이 무효화돼 브라우저 기본 16px/400 으로
+  // 렌더되고 있었다(alpha 실측 2026-09-08: 대회 목록 데스크톱 페이지네이션 16/400/24).
+  // 인라인 style 은 그 리셋보다 우선하므로 여기서만 확실히 이긴다.
+  //
+  // 리셋 자체를 `@layer base` 로 옮기는 근본 수정은 **일부러 하지 않았다** — 저장소의
+  // `tm-btn-*` 커스텀 버튼들이 지금 정상 렌더되는 것도 그 unlayered 우선순위 덕이라,
+  // 전수 영향 조사 없이 옮기면 다른 버튼이 깨진다.
+  const btnFont = { fontSize: 'var(--font-size-label)', fontWeight: 500 };
   const btn = [
     'inline-flex items-center justify-center min-w-[44px] min-h-[44px] px-2 rounded-lg',
-    'text-[length:var(--font-size-label)] font-medium transition-colors',
+    'transition-colors',
     'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
     'disabled:cursor-not-allowed disabled:opacity-40',
   ].join(' ');
@@ -58,6 +69,7 @@ export function PaginationBar({
           onClick={() => onPageChange(page - 1)}
           disabled={page <= 1 || loading}
           className={[btn, 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)]'].join(' ')}
+          style={btnFont}
           aria-label="이전 페이지"
         >
           이전
@@ -88,6 +100,7 @@ export function PaginationBar({
                   ? 'bg-blue-500 text-white'
                   : 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)]',
               ].join(' ')}
+              style={btnFont}
             >
               {item}
             </button>
@@ -99,6 +112,7 @@ export function PaginationBar({
           onClick={() => onPageChange(page + 1)}
           disabled={page >= totalPages || loading}
           className={[btn, 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)]'].join(' ')}
+          style={btnFont}
           aria-label="다음 페이지"
         >
           다음

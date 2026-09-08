@@ -1001,8 +1001,9 @@ function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
           팀은 있으나 권한이 없는 경우에만 권한 카드를 표시한다. */}
       {!model.isLoadingTeams && hasTeams ? (() => {
         const blocked = !hasCreatableTeams;
+        // 두 갈래 다 지면에 색이 깔린다 — grey50 4.42:1 · orange50 4.21:1 (기준 4.5).
         return (
-          <Card pad={16} style={{ marginTop: 16, background: blocked ? 'var(--orange50)' : 'var(--grey50)' }}>
+          <Card pad={16} className="tm-on-tint" style={{ marginTop: 16, background: blocked ? 'var(--orange50)' : 'var(--grey50)' }}>
             <div className="tm-text-label" style={blocked ? { color: 'var(--orange700)' } : undefined}>권한 기준</div>
             <div className="tm-text-caption" style={{ marginTop: 8 }}>
               {blocked
@@ -1045,7 +1046,7 @@ function InfoStep({ model, edit }: { model: TeamMatchCreateViewModel; edit: bool
 
 function ImmutableMatchContext({ team, sport }: { team: string; sport: string }) {
   return (
-    <Card pad={16} style={{ marginTop: 16, background: 'var(--grey50)' }}>
+    <Card pad={16} className="tm-on-tint" style={{ marginTop: 16, background: 'var(--grey50)' }}>
       <div className="tm-create-two-col">
         <div><div className="tm-text-caption">호스트 팀</div><div className="tm-text-body-lg" style={{ marginTop: 4 }}>{team}</div></div>
         <div><div className="tm-text-caption">종목</div><div className="tm-text-body-lg" style={{ marginTop: 4 }}>{sport}</div></div>
@@ -1086,7 +1087,7 @@ function matchFormatOptionsForSport(sportNameOrId: string): readonly string[] {
 }
 
 function ConditionStep({ model }: { model: TeamMatchCreateViewModel }) {
-  return <div><h1 className="tm-text-heading">경기조건</h1><p className="tm-text-body" style={{ marginTop: 8 }}>상대팀이 신청 전에 확인할 등급, 방식, 비용 조건을 입력해 주세요.</p><ConditionFields model={model} /><Card pad={16} style={{ marginTop: 16, background: 'var(--grey50)' }}><div className="tm-text-label">무료초청 표시</div><div className="tm-text-caption" style={{ marginTop: 4 }}>상대팀 부담금이 0원이면 목록과 상세에 '무료초청' 배지가 표시돼요.</div></Card></div>;
+  return <div><h1 className="tm-text-heading">경기조건</h1><p className="tm-text-body" style={{ marginTop: 8 }}>상대팀이 신청 전에 확인할 등급, 방식, 비용 조건을 입력해 주세요.</p><ConditionFields model={model} /><Card pad={16} className="tm-on-tint" style={{ marginTop: 16, background: 'var(--grey50)' }}><div className="tm-text-label">무료초청 표시</div><div className="tm-text-caption" style={{ marginTop: 4 }}>상대팀 부담금이 0원이면 목록과 상세에 '무료초청' 배지가 표시돼요.</div></Card></div>;
 }
 
 function ConditionFields({ model }: { model: TeamMatchCreateViewModel }) {
@@ -1238,7 +1239,7 @@ function InfoRow({ label, value, sub }: { label: string; value: string; sub?: st
 
 function StateCard({ tone, title, body }: { tone: 'orange' | 'green'; title: string; body: string }) {
   /* 배경색은 디자인 토큰 사용 — raw rgba 금지(v1-coding-patterns §2) */
-  return <Card pad={16} style={{ marginTop: 16, background: tone === 'green' ? 'var(--tint-green)' : 'var(--tint-orange)' }}><div className="tm-text-label" style={{ color: tone === 'green' ? 'var(--green700)' : 'var(--orange700)' }}>{title}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{body}</div></Card>;
+  return <Card pad={16} className="tm-on-tint" style={{ marginTop: 16, background: tone === 'green' ? 'var(--tint-green)' : 'var(--tint-orange)' }}><div className="tm-text-label" style={{ color: tone === 'green' ? 'var(--green700)' : 'var(--orange700)' }}>{title}</div><div className="tm-text-caption" style={{ marginTop: 4 }}>{body}</div></Card>;
 }
 
 function ImageUploadField({ image, onChange, onUpload }: { image: string; onChange?: (value: string) => void; onUpload?: (file: File) => Promise<string> }) {

@@ -13,6 +13,11 @@ import { join } from 'node:path';
  * ```
  * 둘 다 필요하다 — 타입만으로는 "프로필을 싣고도 realName 을 쓰는" 코드를 못 막고,
  * 이 테스트만으로는 "함수를 부르지만 프로필이 안 실린" 조용한 폴백을 못 막는다.
+ *
+ * **이 스캔을 실제보다 강하게 믿지 마라.** 정규식은 `displayNameSnapshot:` 뒤의 **점 접근**만
+ * 본다 — `const rn = player.realName; … displayNameSnapshot: rn` 처럼 **지역 변수를 경유하면
+ * 통과한다.** 함수를 쓰는 경로의 1차 게이트는 **타입**이고(시그니처에 `realName` 이 아예
+ * 없다), 이 스캔은 **함수를 아예 안 쓰는 새 경로**를 잡는 백스톱이다.
  */
 /**
  * `src/` 와 `prisma/` 를 **둘 다** 본다 — 위반 세 곳 중 하나가 `prisma/seed-alpha-showcase-results.ts`

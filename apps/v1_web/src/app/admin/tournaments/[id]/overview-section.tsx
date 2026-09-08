@@ -156,7 +156,7 @@ function ChecklistCard({ checks, basePath }: { checks: TournamentOverviewCheck[]
               <Link
                 href={`${basePath}/${check.section}`}
                 aria-label={`${check.label} — ${SECTION_LABEL[check.section]}에서 고치기`}
-                className="shrink-0 inline-flex items-center gap-0.5 min-h-[44px] px-2 text-[length:var(--font-size-label)] font-medium text-blue-500 hover:text-[var(--blue700)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+                className="shrink-0 inline-flex items-center gap-0.5 min-h-[44px] px-2 text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] hover:underline transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
               >
                 {SECTION_LABEL[check.section]}
                 <ArrowRight size={13} aria-hidden="true" />

@@ -111,7 +111,11 @@ GATE_APP="$(find "$GATE_DIR/Payload" -maxdepth 1 -name "*.app" | head -1)"
 GATE_PLIST="$(codesign -d --entitlements :- "$GATE_APP" 2>/dev/null || true)"
 MISSING=()
 for key in "${REQUIRED_ENTITLEMENTS[@]}"; do
-  grep -q "<key>$key</key>" <<<"$GATE_PLIST" || MISSING+=("$key")
+  # -F: the keys contain dots, and an unescaped dot in a regex matches any character. The
+  # realistic failure is not a false pass — no plist holds `comXappleXdeveloperXapplesignin` —
+  # but a gate whose correctness rests on «no plausible string matches» is a gate that has to
+  # be re-argued every time a key is added. Fixed-string matching costs two characters.
+  grep -qF "<key>$key</key>" <<<"$GATE_PLIST" || MISSING+=("$key")
 done
 if (( ${#MISSING[@]} > 0 )); then
   echo "[archive] The built app is missing entitlements it needs:" >&2

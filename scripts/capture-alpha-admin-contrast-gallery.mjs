@@ -16,7 +16,12 @@ import { chromium } from 'playwright';
 const BASE = 'https://alpha.teameet.co.kr';
 const API = `${BASE}/api/v1`;
 const OUT = process.env.OUT_DIR ?? 'output/playwright/visual-audit/admin-contrast';
-const PAGES = [
+/**
+ * 기본은 어드민 9화면. `PAGES_JSON` 으로 다른 표면을 넣을 수 있다 —
+ * `[["home","/home"],["teams","/teams"]]` 형태. 같은 계산기를 쓰기 위한 것이지,
+ * 이 스크립트를 범용 크롤러로 만들려는 것은 아니다(로그인·읽기 전용 전제는 그대로).
+ */
+const PAGES = process.env.PAGES_JSON ? JSON.parse(process.env.PAGES_JSON) : [
   ['dashboard', '/admin'],
   ['tournaments', '/admin/tournaments'],
   ['users', '/admin/users'],

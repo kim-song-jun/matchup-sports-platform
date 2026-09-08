@@ -155,8 +155,15 @@ describe('CorrectionsPageClient — 공개 화면 링크', () => {
     mocks.useSearchParams.mockReturnValue(new URLSearchParams('fixtureId=fx-1'));
   });
 
+  /**
+   * ⚠️ `kind` 는 **`'regular_tournament' | 'regular_league'`** 다(`V1CompetitionKind`).
+   * `'tournament'` 는 서버가 보내지 않는 값인데, 구현이 `=== 'regular_league'` 로만
+   * 비교해서 **아무 문자열이나 통과한다** — 그 목은 "대회 축"이 아니라 "리그가 아니다"만
+   * 재게 된다. `vi.fn().mockReturnValue()` 는 느슨하게 타입돼 tsc 도 안 잡는다.
+   * **목은 타입 검사의 사각지대**라 실제 합집합 값을 손으로 맞춰야 한다.
+   */
   it('대회는 대회 경기 라우트로 링크한다', () => {
-    mocks.useV1Tournament.mockReturnValue({ data: { title: '가을 대회', kind: 'tournament', fixtures: [] } });
+    mocks.useV1Tournament.mockReturnValue({ data: { title: '가을 대회', kind: 'regular_tournament', fixtures: [] } });
     render(<CorrectionsPageClient tournamentId="t-1" />);
 
     // 긍정 앵커 — 패널이 실제로 그려졌다는 증거를 먼저 둔다.

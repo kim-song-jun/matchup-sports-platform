@@ -30,6 +30,34 @@ const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
 // 타입이 맞지 않고, 그 자리에서 select 전체의 추론이 무너져 관계 필드까지 사라진다.
 const SOCIAL_AUTH_PROVIDERS: V1AuthProvider[] = [V1AuthProvider.kakao, V1AuthProvider.apple];
 
+/**
+ * 소셜 로그인이 이메일만 보고 기존 계정을 흡수할 때 우리 쪽 이메일 인증까지 요구한다.
+ *
+ * 제공자가 "이 이메일은 확인된 것" 이라고 말해도, 그 말은 **제공자 쪽 소유**만 증명한다.
+ * 우리 계정의 이메일은 `PATCH /me/profile` 로 소유 증명 없이 바꿀 수 있고(휴대폰은
+ * phoneProofToken 으로 막혀 있지만 이메일은 열려 있다) 바뀌는 순간 `emailVerifiedAt` 은
+ * null 이 된다. 그래서 우리가 검증한 적 없는 이메일을 신뢰하면 이런 순서가 성립한다:
+ *
+ *   1. 공격자가 자기 계정 이메일을 피해자의 Apple ID 주소로 바꿔 둔다
+ *   2. 피해자가 **처음으로** Apple 로그인을 한다
+ *   3. 그 계정이 이메일로 매칭돼 공격자 계정에 피해자의 Apple identity 가 붙는다
+ *   4. 피해자는 공격자의 계정으로 들어가고, 공격자는 계속 그 계정에 들어갈 수 있다
+ *
+ * 흔히 account pre-hijacking 이라 부르는 모양이다. 막는 방법은 **우리가 인증한 이메일일
+ * 때만** 흡수하는 것 하나뿐이다.
+ *
+ * 매칭 실패로 떨어뜨리지 않고 명시적으로 끊는 이유: `V1User.email` 은 unique 라, 그냥
+ * 못 찾은 척하면 아래 create 가 P2002 로 터져 500 이 된다. 사용자에게는 무엇을 해야
+ * 하는지 말해 주는 편이 낫다.
+ */
+function assertLinkableByEmail(user: { emailVerifiedAt: Date | null }): void {
+  if (user.emailVerifiedAt) return;
+  throw new ConflictException({
+    code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
+    message: '이 이메일을 쓰는 계정이 이미 있는데 이메일 인증이 끝나지 않았어요. 기존 방법으로 로그인해 이메일 인증을 마친 뒤 다시 시도해 주세요.',
+  });
+}
+
 type KakaoProfile = {
   providerUserKey: string;
   email: string | null;
@@ -361,11 +389,13 @@ export class AuthService {
             id: true,
             email: true,
             accountStatus: true,
+            emailVerifiedAt: true,
           },
         })
       : null;
 
     if (existingUser) {
+      assertLinkableByEmail(existingUser);
       if (existingUser.accountStatus !== 'active') {
         this.assertNotWithdrawalPending(existingUser.accountStatus);
         throw new ForbiddenException({
@@ -530,11 +560,12 @@ export class AuthService {
     const existingUser = email
       ? await this.prisma.v1User.findUnique({
           where: { email },
-          select: { id: true, email: true, accountStatus: true },
+          select: { id: true, email: true, accountStatus: true, emailVerifiedAt: true },
         })
       : null;
 
     if (existingUser) {
+      assertLinkableByEmail(existingUser);
       if (existingUser.accountStatus !== 'active') {
         this.assertNotWithdrawalPending(existingUser.accountStatus);
         throw new ForbiddenException({

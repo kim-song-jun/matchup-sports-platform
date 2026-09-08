@@ -126,10 +126,12 @@ describe('AuthService.appleSignIn', () => {
     expect(prisma.v1User.create.mock.calls[0][0].data.email).toBe('zzz@privaterelay.appleid.com');
   });
 
-  it('links to an existing account when Apple vouches for the same address', async () => {
+  it('links to an existing account when Apple vouches for it AND we verified that address ourselves', async () => {
     appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
     prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
-    prisma.v1User.findUnique.mockResolvedValue({ id: 'user-9', email: 'someone@example.com', accountStatus: 'active' });
+    prisma.v1User.findUnique.mockResolvedValue({
+      id: 'user-9', email: 'someone@example.com', accountStatus: 'active', emailVerifiedAt: new Date('2026-01-01'),
+    });
 
     await signIn();
 
@@ -137,6 +139,29 @@ describe('AuthService.appleSignIn', () => {
     expect(prisma.v1AuthIdentity.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ userId: 'user-9', provider: V1AuthProvider.apple }) }),
     );
+    expect(prisma.v1User.create).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Account pre-hijacking. Apple's `email_verified` proves the address is theirs, not that the
+   * account holding it here is. `PATCH /me/profile` takes an email with no ownership proof and
+   * sets emailVerifiedAt to null, so an attacker can park a victim's Apple address on their own
+   * account and wait. Without this gate the victim's FIRST Apple sign-in lands in that account.
+   */
+  it('refuses to link when we never verified that address ourselves', async () => {
+    appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'victim@example.com' }));
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+    prisma.v1User.findUnique.mockResolvedValue({
+      id: 'attacker-1', email: 'victim@example.com', accountStatus: 'active', emailVerifiedAt: null,
+    });
+
+    await expect(signIn()).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL' }),
+    });
+
+    // Neither outcome may happen: no identity attached to the squatting account, and no second
+    // account either — V1User.email is unique, so a silent fall-through would be a 500.
+    expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
     expect(prisma.v1User.create).not.toHaveBeenCalled();
   });
 

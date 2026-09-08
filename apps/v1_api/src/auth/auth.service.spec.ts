@@ -844,6 +844,60 @@ describe('AuthService', () => {
       process.env = { ...originalEnv };
     });
 
+    /**
+     * 카카오는 Apple 보다 한 단계 더 헐겁다 — `is_email_verified` 조차 보지 않고
+     * `kakao_account.email` 을 그대로 받는다(auth.service.ts 의 fetchKakaoProfile). 그래서
+     * 우리 쪽 emailVerifiedAt 이 유일한 방어선이다.
+     *
+     * 막으려는 순서: 공격자가 자기 계정 이메일을 피해자 주소로 바꿔 두고(그 순간
+     * emailVerifiedAt 은 null 이 된다) 피해자의 첫 카카오 로그인을 기다린다.
+     */
+    it('우리가 인증하지 않은 이메일로는 기존 계정에 붙이지 않는다 → 409', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'kakao-access-token' }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: 777, kakao_account: { email: 'victim@example.com' } }),
+        }) as unknown as typeof fetch;
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.findUnique.mockResolvedValue({
+        id: 'attacker-1', email: 'victim@example.com', accountStatus: 'active', emailVerifiedAt: null,
+      });
+
+      await expect(service.kakaoLogin({ code: 'auth-code' })).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL' },
+      });
+
+      // 붙이지도, 새로 만들지도 않아야 한다. email 은 unique 라 조용히 흘려보내면 P2002 → 500 이다.
+      expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+      expect(prisma.v1User.create).not.toHaveBeenCalled();
+    });
+
+    it('우리가 인증한 이메일이면 기존 계정에 붙인다', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'kakao-access-token' }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: 778, kakao_account: { email: 'owner@example.com' } }),
+        }) as unknown as typeof fetch;
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.findUnique
+        .mockResolvedValueOnce({
+          id: 'user-owner', email: 'owner@example.com', accountStatus: 'active', emailVerifiedAt: NOW,
+        })
+        .mockResolvedValue(pendingSocialUserRow({ onboardingStatus: 'completed' }));
+
+      await service.kakaoLogin({ code: 'auth-code' });
+
+      expect(prisma.v1AuthIdentity.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ userId: 'user-owner', provider: V1AuthProvider.kakao }) }),
+      );
+      expect(prisma.v1User.create).not.toHaveBeenCalled();
+    });
+
     it('만료된(>24h) 소셜 가입 계정으로 재로그인 → 삭제하지 않고 온보딩을 리셋한 뒤 세션을 반환한다', async () => {
       const expiredTime = new Date(Date.now() - 25 * 60 * 60 * 1000); // 25시간 전
       prisma.v1AuthIdentity.findUnique.mockResolvedValue({

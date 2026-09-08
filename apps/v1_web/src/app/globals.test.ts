@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const globalsCss = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
 const desktopShellCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/_shell.css'), 'utf8');
+const tournamentsCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/tournaments.css'), 'utf8');
 
 describe('mobile floating action button layout', () => {
   it('keeps the FAB above both the bottom navigation and the native safe inset', () => {
@@ -735,5 +736,57 @@ describe('desktop shell — contrast and hit targets', () => {
   it('이미 고쳐져 있던 형제들은 그대로다 — 이 PR 이 되돌리지 않았는지', () => {
     expect(rule('.tm-desktop-footer-links a')).toMatch(/color:\s*var\(--grey700\)/);
     expect(rule('.tm-desktop-footer-links a')).toMatch(/min-height:\s*44px/);
+  });
+});
+
+/**
+ * 아이콘 버튼 히트박스 (2026-09-08 alpha 실측).
+ *
+ * 둘 다 "크기를 정해 뒀는데 실제로는 그 크기가 아니었던" 경우다 — 선언을 읽는 것만으로는
+ * 안 걸리고 렌더된 박스를 재야 보인다.
+ */
+describe('icon button hit targets', () => {
+  // 규칙 본문에서 주석을 걷어낸다. 안 걷으면 **주석에 적은 클래스 이름**이 단언에 걸린다
+  // (이 저장소는 주석이 식별자를 그대로 인용하는 편이라 실제로 한 번 걸렸다).
+  const body = (css: string, selector: string) => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const m = css.match(new RegExp('^' + escaped + '\\s*\\{([^}]*)\\}', 'm'));
+    return m ? m[1].replace(/\/\*[\s\S]*?\*\//g, '') : undefined;
+  };
+
+  it('.tm-btn-icon 은 flex 컨테이너에서 눌리지 않는다', () => {
+    // width:44px 를 써 뒀어도 flex-shrink 기본값(1)이 그것을 이긴다 —
+    // 홈 날씨 카드의 새로고침 버튼이 세 폭 모두에서 44 미만이었다.
+    const rule = body(globalsCss, '.tm-btn-icon');
+
+    expect(rule).toBeDefined();
+    expect(rule).toMatch(/width:\s*44px/);
+    expect(rule).toMatch(/flex-shrink:\s*0/);
+  });
+
+  it('대회 프로모 점 버튼은 WCAG 2.5.8 의 24px 를 채우고 서로 겹치지 않는다', () => {
+    const btn = body(tournamentsCss, '.tm-tournament-promo-dot-button');
+    const row = body(tournamentsCss, '.tm-tournament-promo-dots');
+
+    expect(btn).toBeDefined();
+    expect(row).toBeDefined();
+
+    const size = Number(btn?.match(/width:\s*(\d+)px/)?.[1]);
+    const gap = Number(row?.match(/gap:\s*(\d+)(?:px)?/)?.[1]);
+    expect(size).toBeGreaterThanOrEqual(24);
+    expect(btn).toMatch(/height:\s*24px/);
+
+    // 중심 간격 = 버튼 폭 + gap. 24 이상이어야 2.5.8 간격 요건을 만족한다.
+    expect(size + gap).toBeGreaterThanOrEqual(24);
+
+    // 44px 히트박스를 쓰면 이 줄에서는 서로 겹친다 — 그래서 .tm-tap-44 를 쓰지 않았다.
+    expect(btn).not.toMatch(/tm-tap-44/);
+  });
+
+  it('보이는 점 자체는 그대로다 — 히트박스만 넓혔다', () => {
+    const dot = body(tournamentsCss, '.tm-tournament-promo-dot');
+
+    expect(dot).toBeDefined();
+    expect(dot).toMatch(/width:\s*5px/);
   });
 });

@@ -343,6 +343,10 @@
 .tm-tournament-promo-section-title {
   /* 페이지 내 형제 섹션("대회 목록" = tm-text-body-lg 17px)과 동일 스케일로 통일 */
   font-size: var(--font-size-body-lg);
+  /* 크기·굵기만 맞추고 line-height 를 빼 두면 'normal'(≈26px)이 상속돼 형제와 2px
+     어긋난다 — 주석은 "동일 스케일로 통일"이라 말하는데 실제 출력이 달랐다
+     (alpha 실측 2026-09-08: lh=26 vs tm-text-body-lg 의 28). 같은 값을 명시한다. */
+  line-height: 28px;
   font-weight: 700;
   color: var(--text-strong);
   /* 제목 아래 여백: 이전엔 0이라 h2 line-box의 half-leading(약 4px)만 남아
@@ -700,7 +704,9 @@
   z-index: 3;
   display: flex;
   align-items: center;
-  gap: 1px;
+  /* gap 0 — 버튼 자체가 24px 라 중심 간격이 24px 로 확보된다. gap 을 주면 보이는 점
+     사이가 벌어져 캐러셀 인디케이터로 안 읽힌다. */
+  gap: 0;
   transform: translateX(-50%);
   padding: 1px 4px;
   border-radius: var(--radius-pill);
@@ -708,8 +714,14 @@
 }
 
 .tm-tournament-promo-dot-button {
-  width: 20px;
-  height: 20px;
+  /* WCAG 2.5.8(Target Size Minimum, AA)의 24x24 를 채운다. 실측(alpha 2026-09-08)에서
+     세 폭 모두 20x20 이었다.
+     44px(.tm-tap-44)를 쓰지 않는 이유: 점이 여러 개 나란히 놓이는 자리라 44px 히트박스는
+     **서로 겹친다** — 옆 점이 눌리는 게 작은 것보다 나쁘다. 24px 는 버튼 폭 자체로
+     중심 간격 24px 를 만들어 2.5.8 의 간격 예외까지 동시에 만족한다.
+     보이는 점(.tm-tournament-promo-dot 5px)은 그대로다 — 히트박스만 넓힌다. */
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
   padding: 0;

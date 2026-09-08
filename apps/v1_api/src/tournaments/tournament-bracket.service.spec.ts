@@ -732,7 +732,14 @@ describe('TournamentBracketService', () => {
     expect(sent[0].displayNameSnapshot).not.toBe('홍길동');
   });
 
-  it('닉네임이 없으면 실명으로 폴백한다 — 이름 없는 참가자를 만들지 않는다', async () => {
+  /**
+   * **폴백은 실명이 아니라 `'팀원'` 이다.** 예전엔 실명으로 떨어뜨리며 "이름 없는 참가자보다
+   * 낫다"고 정당화했는데, 스키마상 이 폴백의 실제 발동 조건은 **프로필 행 부재** 하나뿐이고
+   * (`V1TournamentPlayer.userId` non-null · `V1UserProfile.nickname` non-null),
+   * **읽는 쪽 게이팅도 정확히 그 조건에서 스냅샷을 그대로 반환한다** — 두 폴백이 같은
+   * 구멍으로 함께 뚫려 방어가 되지 않았다. 팀 매치 쪽이 이미 `'팀원'` 이고 그쪽이 맞다.
+   */
+  it('닉네임이 없으면 팀원으로 폴백한다 — 실명을 스냅샷에 남기지 않는다', async () => {
     arrangeFixtureWithRoster({ homeNickname: null });
 
     await service.createFixture(ownerUser, 'tournament-1', {
@@ -743,7 +750,8 @@ describe('TournamentBracketService', () => {
       awayRegistrationId: 'reg-away',
     } as never);
 
-    expect(participantsSent()[0].displayNameSnapshot).toBe('홍길동');
+    expect(participantsSent()[0].displayNameSnapshot).toBe('팀원');
+    expect(participantsSent()[0].displayNameSnapshot).not.toBe('홍길동');
   });
 
   it('createFixture: missing source pin rejects before fixture persistence', async () => {

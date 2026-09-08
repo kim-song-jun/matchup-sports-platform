@@ -17,7 +17,13 @@ import { join } from 'node:path';
  * 둘 다 필요하다 — 타입만으로는 "프로필을 싣고도 realName 을 쓰는" 코드를 못 막고,
  * 이 테스트만으로는 "함수를 부르지만 프로필이 안 실린" 조용한 폴백을 못 막는다.
  */
-const SRC_ROOT = join(__dirname, '..');
+/**
+ * `src/` 와 `prisma/` 를 **둘 다** 본다 — 위반 세 곳 중 하나가 `prisma/seed-alpha-showcase-results.ts`
+ * 였고, `deploy-alpha.sh` 가 배포마다 그 시드를 돌린다. `src/` 만 훑었으면 그 파일은
+ * 이 게이트 밖에 남는다.
+ */
+const APP_ROOT = join(__dirname, '..', '..');
+const SCAN_ROOTS = [join(APP_ROOT, 'src'), join(APP_ROOT, 'prisma')];
 
 function collectTsFiles(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -42,11 +48,11 @@ function stripComments(source: string): string {
 describe('참가자 이름의 출처', () => {
   it('displayNameSnapshot 에 realName 을 직접 싣는 코드가 없다', () => {
     const offenders: string[] = [];
-    for (const file of collectTsFiles(SRC_ROOT)) {
+    for (const file of SCAN_ROOTS.flatMap((root) => collectTsFiles(root))) {
       const code = stripComments(readFileSync(file, 'utf8'));
       // `displayNameSnapshot: <무엇이든>.realName` — 변수 이름은 경로마다 다르다.
       if (/displayNameSnapshot:\s*[A-Za-z_$][\w$]*(?:\?\.|\.)[\w$.?]*realName\b/.test(code)) {
-        offenders.push(file.slice(SRC_ROOT.length + 1));
+        offenders.push(file.slice(APP_ROOT.length + 1));
       }
     }
 

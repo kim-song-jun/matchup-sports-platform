@@ -2277,19 +2277,44 @@ const ACTIVITY_TYPE_LABELS: Record<string, string> = {
   competitive: '실력 중심',
 };
 
+/**
+ * 팀 카드 한 줄 요약 — 구조화된 활동 값(요일·시간대·빈도·유형) + 팀이 직접 쓴 메모.
+ *
+ * 메모가 구조화된 값을 다시 말하는 경우가 흔하다. alpha 실측(2026-09-07) 결과 활동 줄
+ * 7개 중 4개가 그랬다:
+ *
+ *   요일 '수·일' + 시간대 '저녁' + 메모 '매주 수·일 저녁 · 서울 송파구'
+ *   → "수·일 · 저녁 · 매주 수·일 저녁 · 서울 송파구"
+ *
+ * 같은 정보를 두 번 말하면서 카드 한 줄을 통째로 더 먹는다. 그래서 **메모가 이미 담고 있는
+ * 구조화된 조각은 빼고** 메모 쪽을 남긴다 — 메모가 더 구체적이기 때문이다(위 예에서 '매주',
+ * '서울 송파구'는 구조화된 값에 없다).
+ *
+ * 임의 문자열의 모양을 짐작하지 않는다는 점이 중요하다 — 비교 대상은 **우리가 만든 라벨**이고,
+ * 그것이 메모 안에 그대로 들어 있는지만 본다.
+ */
 function formatTeamActivitySummary(profile: ActivityProfileLike) {
   if (!profile) return null;
 
-  const parts = [
+  const note = profile.activityNote?.trim() || null;
+  const structured = [
     formatActivityDays(profile.activityDays ?? []),
     formatActivityTimeSlots(profile.activityTimeSlots ?? []),
     profile.activityFrequency ? ACTIVITY_FREQUENCY_LABELS[profile.activityFrequency] : null,
     formatActivityTypes(profile.activityTypes ?? []),
-    profile.activityNote?.trim() || null,
   ].filter(Boolean) as string[];
+
+  const parts = [...structured.filter((part) => !noteRepeats(note, part)), ...(note ? [note] : [])];
 
   if (parts.length > 0) return parts.join(' · ');
   return null;
+}
+
+/** 메모가 이 라벨을 이미 말하고 있는가. 공백 차이는 무시한다('수·일 저녁' vs '수·일 · 저녁'). */
+function noteRepeats(note: string | null, label: string) {
+  if (!note) return false;
+  const squash = (value: string) => value.replace(/\s+/g, '');
+  return squash(note).includes(squash(label));
 }
 
 function formatActivityDays(days: string[]) {

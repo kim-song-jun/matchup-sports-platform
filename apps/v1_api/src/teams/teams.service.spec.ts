@@ -341,6 +341,76 @@ describe('TeamsService', () => {
     });
   });
 
+  describe('list — 활동 요약', () => {
+    /**
+     * 구조화된 값(요일·시간대)과 팀이 직접 쓴 메모가 같은 말을 하면 카드 한 줄이 통째로
+     * 중복이 된다 — alpha 실측(2026-09-07) 활동 줄 7개 중 4개가 그랬다:
+     *   "수·일 · 저녁 · 매주 수·일 저녁 · 서울 송파구"
+     * 메모가 더 구체적이므로(매주·지역) 메모를 남기고 중복된 구조화 조각을 뺀다.
+     */
+    function rowWithProfile(profile: Record<string, unknown>) {
+      return {
+        ...teamRow(),
+        name: '활동팀',
+        sport: { id: 'sport-1', name: 'Futsal' },
+        region: null,
+        profile,
+        memberships: [],
+        joinApplications: [],
+        trustScore: null,
+        ownerUser: { id: owner.id, profile: { nickname: 'owner-nick', displayName: '오너', profileImageUrl: null } },
+      };
+    }
+
+    async function summaryOf(profile: Record<string, unknown>) {
+      prisma.v1Team.findMany.mockResolvedValueOnce([rowWithProfile(profile)]);
+      const result = await service.list(null, {});
+      return result.items[0].activitySummary;
+    }
+
+    it('메모가 요일·시간대를 이미 말하면 그 조각을 빼고 메모만 남긴다', async () => {
+      const summary = await summaryOf({
+        activityDays: ['wed', 'sun'],
+        activityTimeSlots: ['evening'],
+        activityNote: '매주 수·일 저녁 · 서울 송파구',
+      });
+
+      expect(summary).toBe('매주 수·일 저녁 · 서울 송파구');
+      // 예전 동작. 이 문자열이 다시 나오면 중복이 되살아난 것이다.
+      expect(summary).not.toBe('수·일 · 저녁 · 매주 수·일 저녁 · 서울 송파구');
+    });
+
+    it('메모에 없는 조각은 그대로 남긴다 — 중복만 빼지 정보를 버리지 않는다', async () => {
+      const summary = await summaryOf({
+        activityDays: ['wed', 'sun'],
+        activityTimeSlots: ['evening'],
+        activityFrequency: 'weekly_1',
+        activityNote: '우천시 취소',
+      });
+
+      expect(summary).toContain('우천시 취소');
+      expect(summary).toContain('수·일');
+      expect(summary).toContain('저녁');
+    });
+
+    it('메모가 없으면 구조화된 값만으로 예전과 같이 만든다', async () => {
+      const summary = await summaryOf({
+        activityDays: ['wed', 'sun'],
+        activityTimeSlots: ['evening'],
+      });
+
+      expect(summary).toBe('수·일 · 저녁');
+    });
+
+    it('메모만 있으면 메모만 쓴다', async () => {
+      expect(await summaryOf({ activityNote: '제로투' })).toBe('제로투');
+    });
+
+    it('활동 정보가 아무것도 없으면 null 이다 — 빈 줄을 만들지 않는다', async () => {
+      expect(await summaryOf({})).toBeNull();
+    });
+  });
+
   describe('list', () => {
     it('includes owner and active manager in each list item', async () => {
       prisma.v1Team.findMany.mockResolvedValueOnce([

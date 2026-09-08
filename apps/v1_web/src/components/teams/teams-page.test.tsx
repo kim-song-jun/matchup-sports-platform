@@ -773,6 +773,41 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     expect(css).not.toContain('.tm-team-list .tm-team-card-activity {');
   });
 
+  /**
+   * 레벨 태그는 서버 자유 텍스트라 길이가 보장되지 않는다. alpha 실측(2026-09-07):
+   * `중급 · 빌드업과 패스 플레이 중심`(170px)이 태그 행 232px 안에서 형제(`성별 무관` 62px
+   * + gap 8)를 둘째 줄로 밀어내 카드가 32px 커졌다(50팀 중 4팀). 폭 상한으로 칩 한 줄을 지킨다.
+   */
+  it('긴 태그도 잘릴 뿐 DOM 에는 전문이 남는다 — 스크린리더는 다 읽는다', () => {
+    const long = '중급 · 빌드업과 패스 플레이 중심';
+    const { container } = render(<TeamListPageView model={listWith({ tags: [long], genderRule: '성별 무관' })} />);
+
+    const tag = [...container.querySelectorAll('.tm-team-tag-text')].find((el) => el.textContent === long);
+    expect(tag).toBeDefined();
+    // 잘림은 CSS 가 하지 텍스트를 지우지 않는다 — 지우면 접근성이 함께 깎인다.
+    expect(tag!.textContent).toBe(long);
+    expect(tag!.closest('.tm-team-tag')).not.toBeNull();
+  });
+
+  it('태그마다 폭 상한 훅이 붙는다 — 레벨만이 아니라 전부 서버 문자열이다', () => {
+    const { container } = render(<TeamListPageView model={listWith({ tags: ['입문-고수'], genderRule: '성별 무관' })} />);
+
+    const tags = [...container.querySelectorAll('.tm-team-tag')];
+    expect(tags).toHaveLength(2);
+    tags.forEach((t) => expect(t.querySelector('.tm-team-tag-text')).not.toBeNull());
+  });
+
+  it('상한은 형제 배지 자리를 남긴다 — 62% 이하여야 한 줄이 유지된다', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const rule = css.match(/\.tm-team-tag\s*\{([^}]*)\}/)?.[1];
+
+    expect(rule).toBeDefined();
+    const pct = Number(rule!.match(/max-width:\s*(\d+)%/)?.[1]);
+    // 232px 행에서 형제(~73px = 31%) + gap(8px = 3%) 자리를 남기려면 66% 아래여야 한다.
+    expect(pct).toBeGreaterThan(0);
+    expect(pct).toBeLessThanOrEqual(66);
+  });
+
   it('소개가 없으면 소개 상자를 그리지 않는다 — 지역·종목을 문장으로 되풀이하지 않는다', () => {
     // 예전 폴백 `{지역}에서 활동하는 {종목} 팀이에요.` 는 바로 윗줄(`풋살 · 서울 전체 · 4/24명`)
     // 과 같은 말이라 정보가 되지 않았다. alpha 50팀 중 25팀이 그 문장을 보여주고 있었다.

@@ -4222,6 +4222,21 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   color: var(--text-muted);
 }
 
+/* 팀 카드 조건 태그 — 레벨은 서버 자유 텍스트라 길이가 보장되지 않는다.
+   태그 행 폭 232px(390 실측) 안에서 형제 배지(`성별 미설정` 최대 ~73px = 31%)와 gap(8px = 3%)
+   자리를 남기도록 62% 로 묶는다. 상한은 넘칠 때만 걸리므로 짧은 태그는 그대로다. */
+.tm-team-tag {
+  max-width: 62%;
+  min-width: 0;
+}
+
+.tm-team-tag-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tm-team-card-status-badge {
   display: inline-flex;
   align-items: center;

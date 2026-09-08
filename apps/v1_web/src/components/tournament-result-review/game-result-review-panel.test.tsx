@@ -257,34 +257,21 @@ describe('GameResultReviewPanel — 확정 결과 헤더의 승부차기 표기'
   });
 
   /**
-   * 확정한 뒤 운영자가 가장 먼저 하는 일이 "관전자에게 어떻게 보이나" 확인인데, 이
-   * 화면에는 공개 화면으로 가는 링크가 하나도 없었다(alpha 실측). 확정 직후 그대로
-   * 머무는 자리라 여기 둔다 — 새 화면을 만들지 않는다.
+   * **공개 화면 링크는 이 화면의 것이 아니다.** 한 번 여기 뒀다가 도달 불가로 걷어냈다 —
+   * 확정 한 번에 `revisions`(링크를 띄운다)와 `board`(이 패널을 걷어낸다) 무효화가 같은
+   * 콜백에서 나가, 링크의 수명이 두 refetch 사이 간격이었다.
+   *
+   * **이 자리에 "링크가 없다"는 단언은 두지 않는다.** 기능을 옮기면서 그 부재를 단언하는
+   * 테스트를 남기면 영영 녹색인 줄이 되고, 어디서 그 기능을 재는지도 흐려진다 —
+   * 실제 계약은 옮겨간 화면(`corrections-page-client.test.tsx`)이 **긍정으로** 잠근다.
    */
-  it('확정된 결과에는 공개 화면으로 가는 링크가 붙는다', () => {
-    render(
-      <GameResultReviewPanel
-        gameId={GAME_ID}
-        publicHref="/tournaments/t-1/matches/f-1"
-        correctionsHref="/x/records/corrections"
-      />,
-    );
-
-    expect(screen.getByRole('link', { name: '공개 화면에서 보기' })).toHaveAttribute(
-      'href',
-      '/tournaments/t-1/matches/f-1',
-    );
-    // 정정 링크는 그대로 남는다 — 둘은 서로 다른 일이다.
-    expect(screen.getByRole('link', { name: '정정 화면으로 이동' })).toBeInTheDocument();
-  });
-
-  it('publicHref 가 없으면 공개 화면 링크를 렌더하지 않는다', () => {
+  it('정정 화면으로 가는 링크는 확정된 결과에 그대로 있다', () => {
     render(<GameResultReviewPanel gameId={GAME_ID} correctionsHref="/x/records/corrections" />);
 
-    // **긍정 앵커 먼저.** 부정 단언만 두면 패널이 통째로 안 그려져도 통과한다 —
-    // 정정 링크가 실제로 있다는 것이 "이 화면이 렌더됐다"의 증거다.
-    expect(screen.getByRole('link', { name: '정정 화면으로 이동' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: '공개 화면에서 보기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '정정 화면으로 이동' })).toHaveAttribute(
+      'href',
+      '/x/records/corrections',
+    );
   });
 });
 

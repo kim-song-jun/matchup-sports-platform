@@ -252,6 +252,19 @@ type GameProtocolResult =
 const isProduction = process.env.NODE_ENV === 'production';
 const frontendOrigin = isProduction ? requireProductionFrontendOrigin(process.env.FRONTEND_URL) : null;
 
+/**
+ * `pingInterval`/`pingTimeout` 을 지정하지 않아 engine.io 기본값(25s/20s)을 쓴다. 그래서
+ * 끊김 **감지**가 최대 25초 늦고, 거기에 클라이언트 재연결(기본 1~5초 + 지터)이 붙어
+ * 재연결까지 26~32초로 관측된다(2026-09-08 alpha).
+ *
+ * **재연결이 느린 게 아니라 끊긴 걸 늦게 아는 것이다** — 클라이언트에는 `reconnection*`
+ * 옵션이 없어 재시도 간격이 최대 5초이므로(저장소 전체 grep 0건, `v1-socket.ts`·
+ * `v1-game-operations-socket.ts`), 백오프만으로는 그 시간이 나오지 않는다.
+ *
+ * 값을 줄이면 감지는 빨라지지만 모든 연결의 하트비트 트래픽이 늘고, `pingTimeout` 을 함께
+ * 조정하지 않으면 느린 네트워크의 멀쩡한 연결을 끊는다. 조정은 그 트레이드오프를 함께
+ * 정할 때 한다 — 관측 당시 큐가 이벤트를 보관했다 배수해 **유실은 0** 이었다.
+ */
 @WebSocketGateway({
   namespace: '/game-operations',
   cors: { origin: frontendOrigin ?? true, credentials: true },

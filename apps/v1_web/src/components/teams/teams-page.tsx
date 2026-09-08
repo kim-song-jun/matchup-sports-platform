@@ -81,7 +81,7 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
     <>
       {/* Desktop-only page header with inline create CTA */}
       <div className="tm-team-desktop-header tm-show-desktop">
-        <h1 className="tm-team-desktop-header-title">팀</h1>
+        <h1 className="tm-text-heading tm-team-desktop-header-title">팀</h1>
         <Link className="tm-team-desktop-create-btn" href="/teams/new">
           <PlusIcon size={18} strokeWidth={2.5} aria-hidden="true" />
           팀 만들기

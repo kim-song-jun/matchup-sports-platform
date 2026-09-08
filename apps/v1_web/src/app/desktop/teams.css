@@ -77,10 +77,11 @@
   }
 
   .tm-team-desktop-header-title {
-    font-size: 26px;
-    font-weight: 800;
-    color: var(--grey900);
-    letter-spacing: -0.5px;
+    /* 크기·굵기·색은 공유 .tm-text-heading 이 준다(DESIGN.md: 페이지 제목 24px/700).
+       예전엔 이 자리에 26px/800 이 세 파일에 각각 복붙돼 있었다 — 8단계 스케일
+       (11/12/13/14/15/17/20/24)에 26 은 없고, 형제 화면 tournaments 는 같은 역할에
+       공유 셸의 tm-text-heading 을 그대로 써서 24/700 을 얻고 있었다.
+       여기는 레이아웃(마진)만 남긴다. */
     margin: 0;
   }
 

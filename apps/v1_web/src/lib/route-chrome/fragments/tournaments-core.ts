@@ -29,18 +29,6 @@ export const TOURNAMENTS_CORE_ROUTES: RouteChromeEntry[] = [
     },
   },
   {
-    // success 분기가 useShellOverride({ title: `${제목} 경기 일정` })로 덮어씀
-    // (schedule-page-client.tsx). desktopHead는 3분기 모두 동일(true)이라 override 불필요.
-    // tournaments/[id]/schedule/not-found.tsx도 이 패턴을 재사용한다.
-    pattern: '/tournaments/:id/schedule',
-    chrome: {
-      title: '경기 일정',
-      activeTab: 'tournaments',
-      backHref: (p) => `/tournaments/${p.id}`,
-      desktopHead: true,
-    },
-  },
-  {
     // bracket-page-client.tsx는 로딩/에러/성공 3분기 전부 동일 정적 props라 override가
     // 필요 없다. tournaments/[id]/bracket/not-found.tsx도 이 패턴을 재사용한다.
     pattern: '/tournaments/:id/bracket',

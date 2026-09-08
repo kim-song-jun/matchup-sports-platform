@@ -47,10 +47,17 @@ export function GameResultReviewPanel({
   gameId,
   tournamentId,
   correctionsHref,
+  publicHref,
 }: {
   gameId: string;
   tournamentId?: string;
   correctionsHref?: string;
+  /**
+   * 확정한 결과가 관전자에게 어떻게 보이는지 — 공개 경기 상세. 확정 직후 이 화면에
+   * 그대로 머무는 자리라서 여기 둔다(별도 화면을 만들지 않는다). 축에 따라 라우트가
+   * 달라 호출부가 `fixtureDetailHref` 로 만들어 넘긴다.
+   */
+  publicHref?: string;
 }) {
   const gameQuery = useTournamentGame(gameId);
   const revisionsQuery = useGameResultRevisions(gameId);
@@ -278,10 +285,21 @@ export function GameResultReviewPanel({
           }
         />
       ) : null}
-      {latest && latest.state === 'OFFICIAL' && correctionsHref ? (
-        <Link href={correctionsHref} className="tm-section-action">
-          정정 화면으로 이동
-        </Link>
+      {latest && latest.state === 'OFFICIAL' && (correctionsHref || publicHref) ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {correctionsHref ? (
+            <Link href={correctionsHref} className="tm-section-action">
+              정정 화면으로 이동
+            </Link>
+          ) : null}
+          {/* 확정한 뒤 운영자가 가장 먼저 하는 일이 "관전자에게 어떻게 보이나" 확인인데,
+              이 화면에는 공개 화면으로 가는 링크가 하나도 없었다(alpha 실측). */}
+          {publicHref ? (
+            <Link href={publicHref} className="tm-section-action">
+              공개 화면에서 보기
+            </Link>
+          ) : null}
+        </div>
       ) : null}
 
       {latest && latest.state === 'VOID' ? (

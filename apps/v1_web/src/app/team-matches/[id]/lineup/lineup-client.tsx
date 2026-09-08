@@ -738,7 +738,14 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         똑같아 보여 "전원 골키퍼로 표시된다"는 알파 실측 지적을 받았다 — 같은
                         화면 계열인 대회 fixture 라인업(lineup-client.tsx, 2026-08-11)에서 이미
                         적용한 "미지정=점선 아웃라인, 지정=orange700 채움"을 그대로 옮겨 두
-                        화면이 같은 의미를 같은 형태로 전달하게 한다. */}
+                        화면이 같은 의미를 같은 형태로 전달하게 한다.
+
+                        **글자는 지정된 행에만 넣는다**(2026-09-08 사용자 확정). 항상 "GK" 를
+                        띄우니 이번엔 반대로 **글자가 값으로 읽혀** QA 가 두 라운드 연속
+                        "전원이 GK" 로 보고했다. 라벨을 지우면 못 찾고, 항상 띄우면 값으로
+                        읽힌다 — 미지정을 **빈 컨트롤**로 두면 둘 다 피한다. 열 헤더('GK')가
+                        이 열이 무엇인지 말하고, 각 버튼의 aria-label 이 스크린리더에 같은
+                        문맥을 준다. 피치 배치 화면도 지정된 선수에게만 GK 를 붙인다. */}
                     <button
                       type="button"
                       aria-pressed={entry.goalkeeper}
@@ -760,7 +767,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         cursor: editable ? 'pointer' : 'default',
                       }}
                     >
-                      GK
+                      {entry.goalkeeper ? 'GK' : ''}
                     </button>
                     <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>
                       {entry.displayName}

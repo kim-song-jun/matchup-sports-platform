@@ -393,6 +393,18 @@ describe('TeamsService', () => {
       expect(summary).toContain('저녁');
     });
 
+    it('띄어쓰기가 달라도 같은 말로 본다 — 주 1회 vs 매주1회', async () => {
+      // 이 케이스가 없으면 noteRepeats 의 공백 무시(squash)가 테스트로 보호되지 않는다.
+      // 변이(squash 제거)로 확인했다: 이 테스트가 있어야 red 가 난다.
+      const summary = await summaryOf({
+        activityFrequency: 'weekly_1',
+        activityNote: '매주1회 실내구장',
+      });
+
+      expect(summary).toBe('매주1회 실내구장');
+      expect(summary).not.toContain('주 1회 · ');
+    });
+
     it('메모가 없으면 구조화된 값만으로 예전과 같이 만든다', async () => {
       const summary = await summaryOf({
         activityDays: ['wed', 'sun'],

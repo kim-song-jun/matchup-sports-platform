@@ -27,7 +27,39 @@ describe('ReviewsSummaryDashboard', () => {
     render(<ReviewsSummaryDashboard summary={summary} period={null} onPeriodChange={vi.fn()} loading={false} title="내가 받은 리뷰 요약" />);
 
     expect(screen.getByText(/평균/)).toBeInTheDocument();
-    expect(screen.getByText(/개 리뷰/)).toBeInTheDocument();
+    // 단위가 헤더와 종목 행 **양쪽**에 붙는다 — 예전엔 헤더에만 있었다.
+    expect(screen.getAllByText(/개 리뷰/).length).toBeGreaterThan(0);
+  });
+
+  /**
+   * **팀 요약에서 이 숫자는 리뷰 수가 아니라 리뷰를 남긴 팀 수다**(팀 단위 평균이 의도된
+   * 설계). 헤더에는 단위가 붙어 있었는데 **종목별 행만 "3개" 로 끝나** 리뷰 3건으로
+   * 읽혔고, 바로 아래 태그 비율(분모는 원시 리뷰 수)과 나란히 서면 서로를 부정하는 것처럼
+   * 보였다. 단위를 양쪽에 같게 붙이고, 무엇을 세는지는 카드 아래 한 줄이 말한다.
+   */
+  it('종목별 행에도 헤더와 같은 단위를 붙인다', () => {
+    render(
+      <ReviewsSummaryDashboard
+        summary={summary}
+        period={null}
+        onPeriodChange={vi.fn()}
+        loading={false}
+        title="내 팀이 받은 리뷰 요약"
+        countUnit="팀"
+        countNote="숫자는 리뷰를 남긴 팀 수예요. 아래 태그 비율은 리뷰 하나하나를 세요."
+      />,
+    );
+
+    // 헤더와 종목 행 두 자리 — 단위가 빠진 자리가 없어야 한다.
+    expect(screen.getAllByText(/개 팀/)).toHaveLength(2);
+    expect(screen.getByText('숫자는 리뷰를 남긴 팀 수예요. 아래 태그 비율은 리뷰 하나하나를 세요.')).toBeInTheDocument();
+  });
+
+  it('개인 요약도 무엇을 세는지 한 줄로 말한다', () => {
+    render(<ReviewsSummaryDashboard summary={summary} period={null} onPeriodChange={vi.fn()} loading={false} title="내가 받은 리뷰 요약" />);
+
+    expect(screen.getAllByText(/개 리뷰/)).toHaveLength(2);
+    expect(screen.getByText('숫자는 받은 리뷰 수예요.')).toBeInTheDocument();
   });
 
   it('월 드롭다운 선택 시 onPeriodChange를 선택한 값으로 호출한다', () => {

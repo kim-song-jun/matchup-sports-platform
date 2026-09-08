@@ -16,6 +16,22 @@ import type { V1ReviewReceivedSummaryResponse } from '@/types/api';
  * 집계가 0건이면 아무것도 렌더하지 않는다 — 걸 대상이 없는데 기간 필터만 덩그러니 남는
  * 빈 상태가 화면 맨 위에 있었다.
  */
+/**
+ * **개수의 단위와 그 설명은 짝이다 — 둘 다이거나 둘 다 아니거나.**
+ *
+ * 이 카드는 개인 요약과 팀 요약을 **같은 컴포넌트**로 그리는데 `ratingCount` 가 두 경우에
+ * **다른 것을 센다**: 개인은 받은 리뷰 수, 팀은 **리뷰어 팀별 평균 1개씩**(팀 단위 평균이
+ * 의도된 설계다). 그래서 단위(`countUnit`)와 "무엇을 세는지"(`countNote`)를 함께 받는데,
+ * 하나만 넘길 수 있게 두면 `"3개 팀"` 옆에 `"숫자는 받은 리뷰 수예요."` 라는 **자기모순
+ * 조합**이 만들어진다. 이 컴포넌트가 고치는 게 정확히 그 종류의 불일치라, 같은 불일치를
+ * 다시 만들 수 있는 채로 두지 않는다 — 규약을 주석으로만 적으면 지켜지지 않는다.
+ *
+ * 기본값(개인 요약)은 **둘 다 생략했을 때만** 쓰인다. 계산은 어느 쪽도 건드리지 않는다.
+ */
+type CountLabels =
+  | { countUnit?: undefined; countNote?: undefined }
+  | { countUnit: string; countNote: string };
+
 export function ReviewsSummaryDashboard({
   summary,
   period,
@@ -23,24 +39,15 @@ export function ReviewsSummaryDashboard({
   loading,
   title,
   countUnit = '리뷰',
+  countNote = '숫자는 받은 리뷰 수예요.',
 }: {
   summary: V1ReviewReceivedSummaryResponse | undefined;
   period: string | null;
   onPeriodChange: (period: string | null) => void;
   loading: boolean;
-  /**
-   * **개수의 단위.** 이 카드는 개인 요약과 팀 요약을 **같은 컴포넌트**로 그리는데,
-   * `ratingCount` 가 두 경우에 **다른 것을 센다**:
-   *   · 개인 — 받은 리뷰 수
-   *   · 팀   — **리뷰어 팀별 평균 1개씩**(팀 단위 평균이 의도된 설계다)
-   * 그래서 팀 요약에서 한 팀이 리뷰 3건을 남기면 **"1개 리뷰" 옆에 태그 33%** 가 나란히
-   * 서서 서로를 부정하는 것처럼 보였다(태그 비율의 분모는 원시 리뷰 수다).
-   * **계산은 그대로 두고 단위를 사실대로 부른다.**
-   */
-  countUnit?: string;
   /** 이 요약이 무엇의 집계인지 — 페이지가 따로 라벨을 달지 않도록 여기서 받는다. */
   title: string;
-}) {
+} & CountLabels) {
   const bySport = summary?.bySport ?? [];
   const availableMonths = summary?.availableMonths ?? [];
 
@@ -93,7 +100,9 @@ export function ReviewsSummaryDashboard({
                 <span className="tm-badge" style={{ background: accent.badgeBg, color: accent.badgeText }}>{accent.label}</span>
                 <div className="tm-text-caption">
                   <span className="tab-num" style={{ fontWeight: 700, color: 'var(--text-body)' }}>{sport.ratingAvg ?? '-'}</span>
-                  점 · <span className="tab-num">{sport.ratingCount}</span>개
+                  {/* 헤더와 **같은 단위**를 붙인다. 예전엔 여기만 단위가 빠져 "3개" 로 끝났고,
+                      팀 요약에서 그건 리뷰 3건으로 읽혔다(실제로는 리뷰를 남긴 팀 3곳). */}
+                  점 · <span className="tab-num">{sport.ratingCount}</span>개 {countUnit}
                 </div>
               </div>
               {topTags.length > 0 ? (
@@ -109,6 +118,12 @@ export function ReviewsSummaryDashboard({
             </div>
           );
         })}
+      </div>
+
+      {/* 카드 아래 한 줄 — 그 숫자가 무엇을 세는지. 같은 화면의 다른 카드들이 쓰는
+          `tm-text-caption` + muted 패턴을 그대로 쓴다(새로 만들지 않는다). */}
+      <div className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-muted)' }}>
+        {countNote}
       </div>
     </Card>
   );

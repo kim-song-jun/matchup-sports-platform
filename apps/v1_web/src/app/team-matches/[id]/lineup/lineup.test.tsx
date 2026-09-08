@@ -459,6 +459,44 @@ describe('TeamMatchLineupPageClient', () => {
    * 친선 규칙을 그대로 말하고 있었다 — *"참석으로 확정된 팀원만 추가할 수 있어요"* 라고
    * 적어 놓고 바로 아래에 **응답한 적 없는 팀원 전원**을 나열했다(alpha 실측).
    */
+  /**
+   * **라벨을 지우면 못 찾고, 항상 띄우면 값으로 읽힌다.**
+   *
+   * 처음엔 선택됐을 때만 "GK" 가 보이는 네이티브 라디오였는데 "뭘 누르는 버튼인지 모르겠다"
+   * 는 지적을 받아 **항상** GK 를 띄우게 바꿨다. 그랬더니 이번엔 QA 가 두 라운드 연속
+   * **"전원이 GK 로 보인다"** 고 보고했다 — 글자가 상태가 아니라 값으로 읽힌 것이다.
+   * 미지정을 **빈 컨트롤**로 두면 둘 다 피한다. 이 열이 무엇인지는 열 헤더가 말하고,
+   * 스크린리더는 각 버튼의 aria-label 에서 같은 문맥을 얻는다(2026-09-08 사용자 확정).
+   */
+  it('GK 글자는 지정된 행에만 있다 — 미지정 행은 빈 컨트롤이다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({
+        starters: [
+          { id: 'p-1', userId: null, displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null },
+          { id: 'p-2', userId: null, displayName: '김철수', jerseyNumber: 2, position: null, goalkeeper: false, positionX: null, positionY: null },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: hoisted.refetchLineup,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    const designated = screen.getByRole('button', { name: '홍길동, 골키퍼로 지정됨' });
+    // 조사는 받침을 따른다 — '김철수' 는 받침이 없으니 '를' 이다(`josa`).
+    const notDesignated = screen.getByRole('button', { name: '김철수를 골키퍼로 지정' });
+
+    expect(designated).toHaveTextContent('GK');
+    // 여기가 계약이다 — 미지정 행에 글자가 있으면 그게 "이 선수는 GK" 로 읽힌다.
+    // `toHaveTextContent('')` 는 쓰지 않는다: **포함 검사**라 빈 문자열이 무엇에나 매치돼
+    // 단언이 무력해진다. `toBeEmptyDOMElement()` 는 자식 노드가 없어야 통과하므로
+    // 공백 문자에도 걸리지 않으면서 계약을 그대로 지킨다.
+    expect(notDesignated).toBeEmptyDOMElement();
+    // 그래도 누를 수 있어야 한다(빈 컨트롤이지 사라진 컨트롤이 아니다).
+    expect(notDesignated).toBeEnabled();
+  });
+
   it('리그 대진에서는 참석 안내 문구가 리그 규칙으로 바뀐다', () => {
     hoisted.useV1TeamMatchMock.mockReturnValue({
       data: { ...baseTeamMatch(), league: { leagueId: 'league-1', title: '테스트 리그' } },

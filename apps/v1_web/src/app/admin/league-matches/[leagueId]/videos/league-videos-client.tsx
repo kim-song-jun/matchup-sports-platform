@@ -86,7 +86,7 @@ function LeagueFixtureVideoCard({
       ) : (
         <ul className="flex flex-col gap-2" role="list">
           {fixture.videos.map((video, index) => (
-            <li key={video.id} className="flex items-center gap-2 rounded-xl bg-[var(--surface-soft)] px-3 py-2">
+            <li key={video.id} className="tm-on-tint flex items-center gap-2 rounded-xl bg-[var(--surface-soft)] px-3 py-2">
               <span className="text-[var(--text-muted)] shrink-0" aria-hidden="true">
                 {video.source === 'upload' ? <Clapperboard size={16} /> : <ExternalLink size={16} />}
               </span>

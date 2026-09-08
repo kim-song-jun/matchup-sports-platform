@@ -54,7 +54,7 @@ export function AdminContentPreview({ payload }: { payload: AdminContentPreviewP
           <h2 id="content-preview-title" className="text-base font-bold text-[var(--text-strong)]">실제 화면 미리보기</h2>
           <p className="mt-1 text-xs text-[var(--text-muted)]">저장 전 내용을 실제 사용자 컴포넌트와 viewport로 확인합니다.</p>
         </div>
-        <div className="inline-flex rounded-xl bg-[var(--surface-soft)] p-1" aria-label="미리보기 화면 크기">
+        <div className="tm-on-tint inline-flex rounded-xl bg-[var(--surface-soft)] p-1" aria-label="미리보기 화면 크기">
           <DeviceButton active={device === 'desktop'} onClick={() => setDevice('desktop')} label="웹"><Monitor /></DeviceButton>
           <DeviceButton active={device === 'mobile'} onClick={() => setDevice('mobile')} label="모바일"><Smartphone /></DeviceButton>
         </div>

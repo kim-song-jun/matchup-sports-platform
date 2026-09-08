@@ -793,7 +793,7 @@ export default function LeagueMatchFixturesClient({ leagueId }: { leagueId: stri
         <div className="flex flex-col gap-3">
           {/* R13: 대진 재생성 — 기존 대진을 전부 취소하고 같은 팀 로스터로 새로 만드는
               파괴적 조작이라, 위 생성 폼과 시각 구분되게 amber 톤 카드에 담는다. */}
-          <div className="rounded-2xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] p-4">
+          <div className="tm-on-tint rounded-2xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] p-4">
             <p className="mb-2 text-sm font-semibold text-[var(--orange700)]">대진 재생성</p>
             <p className="mb-3 text-xs text-[var(--text-muted)]">
               팀 구성이 바뀌었거나 주차·요일을 다시 정해야 하면, 아래 설정으로 기존 대진을 전부
@@ -1337,7 +1337,7 @@ function FixturePreviewPanel({
   // 매치데이별 타임라인(B안)로 렌더한다. 레거시 응답(필드 없음)은 기존 테이블 유지.
   const isTimingPreview = result.fixtures.some((fixture) => fixture.matchday !== undefined && fixture.endAt != null);
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+    <div className="tm-on-tint rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
       <p className="mb-1 text-sm font-semibold text-[var(--text-strong)]">
         미리보기 — {result.matchdayCount ?? result.rounds}주 · {result.fixtureCount}경기 · 기본 장소 &quot;{result.placeName}&quot;
       </p>
@@ -1529,7 +1529,7 @@ function formatMinutesLabel(totalMinutes: number) {
 // B안: 하루 운영 계산 카드 — 현재 폼 값이 만들 하루치 스케줄을 입력 즉시 요약한다.
 function DailyPlanCard({ plan }: { plan: DailyPlan }) {
   return (
-    <div className="rounded-2xl border border-[var(--tint-blue-border)] bg-[var(--tint-blue)] p-4">
+    <div className="tm-on-tint rounded-2xl border border-[var(--tint-blue-border)] bg-[var(--tint-blue)] p-4">
       <p className="mb-2 text-sm font-semibold text-[var(--text-strong)]">하루 운영 계산</p>
       <dl className="flex flex-wrap gap-x-6 gap-y-2">
         <div>

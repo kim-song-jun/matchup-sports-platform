@@ -160,7 +160,7 @@ export function AwardsTab({
 
       <div className="flex flex-col gap-3">
         {loaded && rows.length === 0 && (
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-5 text-center">
+          <div className="tm-on-tint rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-5 text-center">
             <p className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)]">등록된 개인 어워드가 없어요.</p>
             <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
               {canWrite ? '필요한 어워드만 항목 추가로 등록해 주세요.' : '아직 등록된 시상 내역이 없어요.'}
@@ -194,7 +194,7 @@ export function AwardsTab({
           </button>
         ) : (
           <p
-            className="rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-xs text-[var(--text-muted)]"
+            className="tm-on-tint rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-xs text-[var(--text-muted)]"
             role="status"
           >
             조회 전용 권한으로 접속했어요. 시상 내역을 수정하려면 운영 권한이 필요해요.

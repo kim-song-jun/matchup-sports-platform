@@ -600,7 +600,7 @@ export function BracketTab({
             type="button"
             onClick={handleRecalculate}
             disabled={recalculate.isPending}
-            className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="tm-on-tint inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <RefreshCw size={13} aria-hidden="true" />
             순위 재계산
@@ -730,7 +730,7 @@ export function BracketTab({
                       setEditFxAwayRegId(f.awayRegistrationId ?? '');
                     }}
                     aria-label={`${f.round} ${f.fixtureNumber}번 경기 수정`}
-                    className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                    className="tm-on-tint inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-medium whitespace-nowrap text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
                   >
                     <Pencil size={12} aria-hidden="true" /> 수정
                   </button>
@@ -845,7 +845,7 @@ export function BracketTab({
               type="button"
               onClick={() => setEditFixture(null)}
               disabled={updateFixture.isPending}
-              className="flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="tm-on-tint flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -894,7 +894,7 @@ export function BracketTab({
               type="button"
               onClick={() => setEditGroup(null)}
               disabled={updateGroup.isPending}
-              className="flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="tm-on-tint flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -934,7 +934,7 @@ export function BracketTab({
               type="button"
               onClick={() => setLegsPickerGroupId(null)}
               disabled={isGeneratingLeague}
-              className="flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="tm-on-tint flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>

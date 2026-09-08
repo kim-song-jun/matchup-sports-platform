@@ -87,7 +87,7 @@ function ToggleCard({ toggle, gateEnabled, showToast }: ToggleCardProps) {
               <span
                 className={[
                   'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[length:var(--font-size-micro)] font-semibold shrink-0',
-                  isOn ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
+                  isOn ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'tm-on-tint bg-[var(--surface-soft)] text-[var(--text-muted)]',
                 ].join(' ')}
               >
                 {isOn ? <ToggleRight size={12} aria-hidden="true" /> : <ToggleLeft size={12} aria-hidden="true" />}

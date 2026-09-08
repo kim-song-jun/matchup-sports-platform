@@ -23,7 +23,8 @@ const TONE_CLASSES: Record<Tone, string> = {
   red: 'bg-[var(--red50)] text-[var(--red700)]',
   // --surface-soft 배경만으로는 흰색 카드/행(--card-surface)과 대비가 거의 없어(~1.10:1)
   // border-strong 테두리를 더해 컨테이너와 무관하게 경계가 보이도록 함 (기존 P1 패턴 재사용)
-  gray: 'bg-[var(--surface-soft)] text-[var(--text-muted)] border border-[var(--border-strong)]',
+  // tm-on-tint: grey600-on-grey100 은 4.19:1 로 AA 미달 — 이 톤에서만 캡션색을 grey700 으로 올린다
+  gray: 'tm-on-tint bg-[var(--surface-soft)] text-[var(--text-muted)] border border-[var(--border-strong)]',
 };
 
 // ── Status meta map ───────────────────────────────────────────────────────

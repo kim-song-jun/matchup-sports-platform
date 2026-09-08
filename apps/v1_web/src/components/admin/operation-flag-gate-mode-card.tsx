@@ -53,7 +53,7 @@ export function GateModeCard({ gateStatus, isPending, isError, showToast }: Gate
             {!isPending && !isError && (
               <span
                 className={[
-                  'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[length:var(--font-size-caption)] font-semibold',
+                  'tm-on-tint inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[length:var(--font-size-caption)] font-semibold',
                   enabled ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
                 ].join(' ')}
               >

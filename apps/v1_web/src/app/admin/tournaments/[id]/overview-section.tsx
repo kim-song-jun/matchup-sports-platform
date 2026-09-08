@@ -54,7 +54,7 @@ export function TournamentOverviewSection() {
         className={[
           'rounded-2xl border p-4 md:p-5 flex flex-col gap-2',
           milestone.overdue
-            ? 'bg-[var(--tint-orange)] border-[var(--tint-orange-border)]'
+            ? 'bg-[var(--tint-orange)] border-[var(--tint-orange-border)] tm-on-tint'
             : 'bg-[var(--card-surface)] border-[var(--border)]',
         ].join(' ')}
       >

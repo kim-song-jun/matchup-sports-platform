@@ -185,7 +185,7 @@ export default function AdminUserDetailPage() {
               <AdminDetailRow label="관리자 권한" value={user.adminRole ?? '없음'} />
             </dl>
             {user.bio ? (
-              <div className="mt-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
+              <div className="tm-on-tint mt-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
                 <p className="text-xs font-semibold text-[var(--text-muted)]">소개</p>
                 <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--text-strong)]">{user.bio}</p>
               </div>
@@ -368,14 +368,14 @@ function RelatedList({
       {items.length > 0 ? (
         <ol className="mt-4 flex flex-col gap-2">
           {items.map((item) => (
-            <li key={item.id} className="rounded-xl bg-[var(--surface-soft)] px-4 py-3">
+            <li key={item.id} className="tm-on-tint rounded-xl bg-[var(--surface-soft)] px-4 py-3">
               <p className="break-words text-sm font-semibold text-[var(--text-strong)]">{item.title}</p>
               <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">{item.meta}</p>
             </li>
           ))}
         </ol>
       ) : (
-        <div className="mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
+        <div className="tm-on-tint mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
           {empty}
         </div>
       )}

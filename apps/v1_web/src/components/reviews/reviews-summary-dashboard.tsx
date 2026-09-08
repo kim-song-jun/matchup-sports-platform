@@ -23,6 +23,7 @@ export function ReviewsSummaryDashboard({
   loading,
   title,
   countUnit = '리뷰',
+  countNote = '숫자는 받은 리뷰 수예요.',
 }: {
   summary: V1ReviewReceivedSummaryResponse | undefined;
   period: string | null;
@@ -38,6 +39,13 @@ export function ReviewsSummaryDashboard({
    * **계산은 그대로 두고 단위를 사실대로 부른다.**
    */
   countUnit?: string;
+  /**
+   * **그 숫자가 무엇을 세는지** 한 줄로 말한다. 단위만으로는 부족했다 — 팀 요약에서
+   * "1개 팀" 옆에 "33%" 태그가 나란히 서면 서로를 부정하는 것처럼 보이는데, 둘의 분모가
+   * 다르기 때문이다(개수는 팀 단위, 태그 비율은 원시 리뷰 수). 문장으로 갈라 준다.
+   * `countUnit` 과 짝이라 호출부가 함께 넘긴다.
+   */
+  countNote?: string;
   /** 이 요약이 무엇의 집계인지 — 페이지가 따로 라벨을 달지 않도록 여기서 받는다. */
   title: string;
 }) {
@@ -93,7 +101,9 @@ export function ReviewsSummaryDashboard({
                 <span className="tm-badge" style={{ background: accent.badgeBg, color: accent.badgeText }}>{accent.label}</span>
                 <div className="tm-text-caption">
                   <span className="tab-num" style={{ fontWeight: 700, color: 'var(--text-body)' }}>{sport.ratingAvg ?? '-'}</span>
-                  점 · <span className="tab-num">{sport.ratingCount}</span>개
+                  {/* 헤더와 **같은 단위**를 붙인다. 예전엔 여기만 단위가 빠져 "3개" 로 끝났고,
+                      팀 요약에서 그건 리뷰 3건으로 읽혔다(실제로는 리뷰를 남긴 팀 3곳). */}
+                  점 · <span className="tab-num">{sport.ratingCount}</span>개 {countUnit}
                 </div>
               </div>
               {topTags.length > 0 ? (
@@ -109,6 +119,12 @@ export function ReviewsSummaryDashboard({
             </div>
           );
         })}
+      </div>
+
+      {/* 카드 아래 한 줄 — 그 숫자가 무엇을 세는지. 같은 화면의 다른 카드들이 쓰는
+          `tm-text-caption` + muted 패턴을 그대로 쓴다(새로 만들지 않는다). */}
+      <div className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-muted)' }}>
+        {countNote}
       </div>
     </Card>
   );

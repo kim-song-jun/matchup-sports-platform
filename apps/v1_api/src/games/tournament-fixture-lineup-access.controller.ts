@@ -24,9 +24,14 @@ import { GamesService } from './games.service';
  *
  * ⚠️ 웹 grep 으로 소비처를 셀 때 `apps/v1_web/.next/` 를 제외해야 한다(빌드 산출물이 결과를
  * 오염시킨다). 그리고 이 저장소의 네이티브 셸(`v1_android`·`v1_ios`)은 WebView 래퍼라
- * 대부분의 API 를 직접 부르지 않지만 **완전히 안 부르는 것은 아니다** — 실측상 직접 호출은
- * `notifications/push-devices` 두 라우트뿐이고, 그쪽은 웹 grep 이 0이어도 이미 설치된 앱이
- * 조용히 깨진다.
+ * 대부분의 API 를 직접 부르지 않지만 **완전히 안 부르는 것은 아니다** — 직접 호출은
+ * `notifications/push-devices` 두 라우트뿐이고(`apps/v1_android/.../PushRegistrationClient.java` ·
+ * `apps/v1_ios/Teameet/Push/PushDeviceClient.swift`), 그쪽은 웹 grep 이 0이어도 이미 설치된
+ * 앱이 조용히 깨진다. 재확인:
+ *
+ * ```
+ * grep -rhoE '"/api/v1/[^"]*"' apps/v1_android/app/src/main apps/v1_ios/Teameet
+ * ```
  *
  * 참가팀이 자기 대회 경기의 gameId·자기 sideId를 알아내는 전용 진입점.
  * `/tournaments/:id/matches/:fixtureId`(공개 기록)는 visibilityPolicy에 걸려

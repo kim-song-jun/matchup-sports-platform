@@ -560,8 +560,7 @@ export class LeagueFixtureGeneratorService {
               // 동명이인을 구분할 수 없어 라인업 화면이 등록 명단과 참가자를 잇지 못한다.
               //
               // 프로필까지 싣는 이유: 참가자 이름은 닉네임이 먼저다(`participantDisplayName`).
-              // 예전엔 여기 셋만 실어서 **닉네임을 쓰고 싶어도 쓸 수가 없었고**, 그 결과
-              // 실명이 공개 기록에 그대로 박혔다(2026-09-08 alpha 실측).
+              // 예전엔 여기 셋만 실어서 **닉네임을 쓰고 싶어도 쓸 수가 없었다.**
               select: {
                 id: true,
                 userId: true,

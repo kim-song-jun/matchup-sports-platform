@@ -2,12 +2,9 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * **네 번째 경로를 막는 테스트.**
- *
- * 참가자 이름 규칙(`participantDisplayName`)이 한 곳에만 있었을 때, 나머지 두 경로가
- * `player.realName` 을 그대로 박아 **신원이 연결된 참가자의 실명이 공개 경기 기록에
- * 그대로 떴다**(2026-09-08 alpha 실측). 두 곳을 고쳐도 **다섯 번째 경로가 생기면 같은 일이
- * 난다** — 개별 호출부 테스트로는 아직 없는 경로를 막을 수 없다.
+ * **아직 없는 경로를 막는 테스트.** 개별 호출부 테스트는 이미 있는 코드만 잠근다 —
+ * 참가자 이름 규칙(`participantDisplayName`)이 한 곳에만 있었을 때 나머지 세 경로가
+ * `realName` 을 그대로 박았고, 셋을 고쳐도 새 경로가 생기면 같은 일이 난다.
  *
  * ## 이 테스트가 잡는 것과, 타입이 잡는 것
  * ```

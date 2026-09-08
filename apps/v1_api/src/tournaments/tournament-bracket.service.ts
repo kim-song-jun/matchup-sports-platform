@@ -58,23 +58,8 @@ import {
 } from './tournament-group-standings';
 import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { participantDisplayName } from './participant-display-name';
 import { readJerseyNumbers } from './tournament-player-jersey';
-
-/**
- * 경기 참가자에 실을 이름. **닉네임이 먼저다** — 정본 §3 이 "명단은 등번호 + 이름(닉네임)"
- * 이고 명단 공개도 등번호·이름이다. 예전엔 `realName` 을 그대로 실어서, 자격 가드에만 쓰라고
- * 받은 실명이 경기 기록·관전 화면까지 흘렀다.
- *
- * 프로필이 없거나 닉네임이 비어 있으면 실명으로 폴백한다 — 이름 없는 참가자를 만드는 것보다
- * 낫고, 명단에 오르려면 실명이 이미 필수다.
- */
-function participantDisplayName(player: {
-  realName: string;
-  user?: { profile?: { nickname?: string | null; displayName?: string | null } | null } | null;
-}): string {
-  return player.user?.profile?.nickname ?? player.user?.profile?.displayName ?? player.realName;
-}
-
 
 @Injectable()
 export class TournamentBracketService {

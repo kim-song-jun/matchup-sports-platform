@@ -22,12 +22,41 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 IOS_DIR="$REPO_ROOT/apps/v1_ios"
 SCHEME="${TEAMEET_ARCHIVE_SCHEME:-TeameetAlpha}"
-CONFIGURATION="${TEAMEET_ARCHIVE_CONFIGURATION:-Alpha Release}"
+
+# Configuration and profile follow the SCHEME. They used to default to the alpha pair no
+# matter which scheme was named, and `-configuration` overrides whatever the scheme would have
+# chosen — so the documented production command
+#
+#   TEAMEET_ARCHIVE_SCHEME=TeameetProduction scripts/ios/archive-and-export.sh --upload
+#
+# built, signed, exported and **uploaded** an alpha app: bundle kr.co.teameet.alpha, pointing
+# at alpha.teameet.co.kr, with aps-environment=development. Every gate passed, because every
+# gate was looking at a correctly built alpha build. The only symptom was the build landing
+# under the wrong app in App Store Connect, one irreversible upload later.
+case "$SCHEME" in
+  TeameetAlpha)      SCHEME_CONFIGURATION="Alpha Release";      SCHEME_PROFILE="Teameet Alpha App Store" ;;
+  TeameetProduction) SCHEME_CONFIGURATION="Production Release"; SCHEME_PROFILE="Teameet Production App Store" ;;
+  *)
+    echo "[archive] Unknown scheme '$SCHEME'. Expected TeameetAlpha or TeameetProduction." >&2
+    echo "[archive] A scheme this script does not know cannot be given a configuration or a" >&2
+    echo "[archive] profile, and guessing produces a signed build for the wrong app." >&2
+    exit 1
+    ;;
+esac
+
+CONFIGURATION="${TEAMEET_ARCHIVE_CONFIGURATION:-$SCHEME_CONFIGURATION}"
 OUTPUT="${TEAMEET_ARCHIVE_OUTPUT:-${TMPDIR:-/tmp}/teameet-ios-archive}"
 UPLOAD=false
 TEAM_ID="${TEAMEET_TEAM_ID:-U9J95Q6XD3}"
 SIGNING_IDENTITY="${TEAMEET_SIGNING_IDENTITY:-Apple Distribution}"
-PROFILE_NAME="${TEAMEET_PROFILE_NAME:-Teameet Alpha App Store}"
+PROFILE_NAME="${TEAMEET_PROFILE_NAME:-$SCHEME_PROFILE}"
+
+# The overrides stay, but they now have to be deliberate. Silently pairing a production scheme
+# with an alpha profile is the exact failure above; saying so out loud costs one line.
+if [[ "$CONFIGURATION" != "$SCHEME_CONFIGURATION" || "$PROFILE_NAME" != "$SCHEME_PROFILE" ]]; then
+  echo "[archive] scheme $SCHEME normally uses '$SCHEME_CONFIGURATION' / '$SCHEME_PROFILE'."
+  echo "[archive] Overridden to '$CONFIGURATION' / '$PROFILE_NAME' — make sure that is intended."
+fi
 [[ "${1:-}" == "--upload" ]] && UPLOAD=true
 
 # --- build number ------------------------------------------------------------------------

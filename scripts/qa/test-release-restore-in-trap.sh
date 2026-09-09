@@ -158,7 +158,7 @@ run_restore_case prod
 # 같은 결함이 다시 들어오지 않게 정적으로도 막는다: trap 핸들러에서 도달할 수 있는 배포
 # 스크립트 안에서는 인자 없는 `return` 을 쓰지 않는다(성공이면 `return 0`, 조건의 결과를
 # 돌려주려면 `|| return 1` 뒤에 `return 0`).
-bare_returns="$(grep -nE '^[[:space:]]*return[[:space:]]*$' \
+bare_returns="$(grep -nE '^[[:space:]]*return[[:space:]]*(;|#.*)?$' \
   "${ROOT_DIR}"/deploy/alpha-*.sh "${ROOT_DIR}"/deploy/prod-*.sh \
   "${ROOT_DIR}"/deploy/deploy-alpha.sh "${ROOT_DIR}"/deploy/deploy-prod.sh || true)"
 [[ -z "${bare_returns}" ]] ||

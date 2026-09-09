@@ -22,6 +22,13 @@ readonly SHA_CANDIDATE=2222222222222222222222222222222222222222
 readonly DIGEST_A="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 readonly DIGEST_B="sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
+# bash 5.3 부터는 trap 안의 인자 없는 return 이 정상 값을 돌려준다(5.2 까지 재현). 그 bash 에서는
+# 아래 행동 검증이 결함을 되돌려도 통과하므로, 재현 여부를 먼저 재서 정적 가드만 유효함을 알린다.
+bug_reproduces="$(bash -c 'set -E; f() { [[ x == x ]]; return; }; trap "if f; then echo no; else echo yes; fi; exit 0" ERR; false')"
+if [[ "${bug_reproduces}" != "yes" ]]; then
+  echo "test-release-restore-in-trap: bash ${BASH_VERSION} 은 trap 안 bare return 결함을 재현하지 않는다 — 행동 검증은 무효, 정적 가드만 유효" >&2
+fi
+
 failures=0
 fail() {
   echo "FAIL: $*" >&2
@@ -155,12 +162,11 @@ EOF
 run_restore_case alpha
 run_restore_case prod
 
-# 같은 결함이 다시 들어오지 않게 정적으로도 막는다: trap 핸들러에서 도달할 수 있는 배포
-# 스크립트 안에서는 인자 없는 `return` 을 쓰지 않는다(성공이면 `return 0`, 조건의 결과를
+# 같은 결함이 다시 들어오지 않게 정적으로도 막는다: ERR trap 을 거는 배포 스크립트와 그것들이
+# source 하는 *-common.sh 안에서는 인자 없는 `return` 을 쓰지 않는다(성공이면 `return 0`, 조건의 결과를
 # 돌려주려면 `|| return 1` 뒤에 `return 0`).
-bare_returns="$(grep -nE '^[[:space:]]*return[[:space:]]*(;|#.*)?$' \
-  "${ROOT_DIR}"/deploy/alpha-*.sh "${ROOT_DIR}"/deploy/prod-*.sh \
-  "${ROOT_DIR}"/deploy/deploy-alpha.sh "${ROOT_DIR}"/deploy/deploy-prod.sh || true)"
+guarded_files="$(grep -lE 'trap [^#]*ERR' "${ROOT_DIR}"/deploy/*.sh; ls "${ROOT_DIR}"/deploy/*-common.sh)"
+bare_returns="$(grep -nE '^[[:space:]]*return[[:space:]]*(;|#.*)?$' ${guarded_files} || true)"
 [[ -z "${bare_returns}" ]] ||
   fail "인자 없는 return 이 배포 스크립트에 남아 있다 (trap 핸들러 안에서는 trap 을 일으킨 종료코드를 돌려준다):"$'\n'"${bare_returns}"
 

@@ -2850,20 +2850,20 @@ label.tm-btn:focus-within {
 }
 
 /* 팀매치 행의 조건 줄 — 종목·등급·경기방식 텍스트, 리그 대진이면 그 뒤에 리그명.
-   리그명만 줄어들고(말줄임) 종목 쪽은 고정한다 — 종목이 잘리면 무슨 경기인지 못 읽는다. */
+   조건 텍스트는 예전처럼 줄바꿈으로 전부 보여 주고(390 에서 "풋살 · A등급 · 5:5 · 성별 무관"
+   은 한 줄에 안 들어간다), 리그명만 한 줄로 말줄임한다 — 종목·조건이 잘리면 무슨 경기인지
+   못 읽지만 리그명은 카드 탭 뒤 상세에서 다시 보인다. */
 .tm-team-match-row-cond {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   min-width: 0;
 }
 
-.tm-team-match-row-cond-text {
-  flex: none;
-}
-
 .tm-team-match-row-cond-league {
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

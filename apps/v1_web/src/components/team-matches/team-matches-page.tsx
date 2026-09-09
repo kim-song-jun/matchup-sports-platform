@@ -887,13 +887,13 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
         </div>
         <div className="tm-match-row-foot">
           <span className="tm-text-caption tm-team-match-row-cond">
-            <span className="tm-team-match-row-cond-text">
+            <span>
               {[match.sport, match.grade ? `${match.grade}등급` : '', match.format, match.gender].filter(Boolean).join(' · ')}
             </span>
             {/* 어느 리그인지는 이 줄이 말한다 — 배지엔 종류만, 제목은 여기서 말줄임된다. */}
             {league ? (
               <>
-                <span className="tm-team-match-row-cond-text" aria-hidden="true">·</span>
+                <span aria-hidden="true">·</span>
                 <span className="tm-team-match-row-cond-league">{league.title}</span>
               </>
             ) : null}

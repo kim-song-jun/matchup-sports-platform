@@ -49,6 +49,8 @@ Android registration environment is server-owned rather than accepted from the c
 
 `targetType` values are `match`, `team`, `team_match`, `chat`, `notice`, `system`, `tournament`, `inquiry`. Admin replies to a 1:1 inquiry emit `inquiry_answered` (targetType `inquiry`, deep link `/my/inquiries/:inquiryId`) to the member who asked; guest inquiries have no account and are answered through their contact details instead. That event is gated by `importantEnabled`, not `activityEnabled`.
 
+`chatEnabled=false` suppresses chat notification-center rows, `notification:new` badge events, and push delivery. It does not suppress the live `chat:message` event while the user is in the room.
+
 ## Primary Tables
 
 - `v1_chat_rooms`

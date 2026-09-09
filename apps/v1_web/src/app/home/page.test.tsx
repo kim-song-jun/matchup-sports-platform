@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { HomePageView } from '@/components/home/home-page';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getHomeViewModel } from '@/components/home/home.view-model';
@@ -128,60 +128,13 @@ describe('HomePage', () => {
     expect(error).toHaveTextContent('다시 불러오기');
   });
 
-  describe('push notification nudge banner', () => {
-    it('does not render the nudge when the model has no pushNudge', () => {
-      const model = getHomeViewModel();
+  it('does not render a second push opt-in action on home', () => {
+    render(
+      <Providers>
+        <HomePageView model={getHomeViewModel()} />
+      </Providers>,
+    );
 
-      render(
-        <Providers>
-          <HomePageView model={model} />
-        </Providers>,
-      );
-
-      expect(screen.queryByText('알림을 받아보세요')).not.toBeInTheDocument();
-    });
-
-    it('renders a dismissible nudge and wires the subscribe/dismiss actions through', () => {
-      const onSubscribe = vi.fn();
-      const onDismiss = vi.fn();
-      const model = {
-        ...getHomeViewModel(),
-        // Task 154 P2-1: 배너는 조건이 맞아도 정책이 이번 방문에 뽑아야 렌더된다.
-        // 이 테스트의 관심사는 "뽑혔을 때 제대로 그려지고 동작이 연결되는가" 이므로
-        // 푸시가 뽑힌 상태를 명시한다.
-        bannerDecision: { showPhoneVerify: false, nudge: 'push' as const, deferred: [] },
-        pushNudge: { subscribing: false, onSubscribe, onDismiss },
-      };
-
-      render(
-        <Providers>
-          <HomePageView model={model} />
-        </Providers>,
-      );
-
-      expect(screen.getByText('알림을 받아보세요')).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: '알림 받기' }));
-      expect(onSubscribe).toHaveBeenCalledTimes(1);
-
-      fireEvent.click(screen.getByLabelText('알림 받기 안내 닫기'));
-      expect(onDismiss).toHaveBeenCalledTimes(1);
-    });
-
-    it('disables the subscribe button and shows a pending label while subscribing', () => {
-      const model = {
-        ...getHomeViewModel(),
-        bannerDecision: { showPhoneVerify: false, nudge: 'push' as const, deferred: [] },
-        pushNudge: { subscribing: true, onSubscribe: vi.fn(), onDismiss: vi.fn() },
-      };
-
-      render(
-        <Providers>
-          <HomePageView model={model} />
-        </Providers>,
-      );
-
-      const subscribeButton = screen.getByRole('button', { name: '확인 중' });
-      expect(subscribeButton).toBeDisabled();
-    });
+    expect(screen.queryByRole('button', { name: '알림 받기' })).not.toBeInTheDocument();
   });
 });

@@ -212,18 +212,6 @@ export class ChatService {
         },
         select: { userId: true },
       });
-      if (recipients.length > 0) {
-        await tx.v1Notification.createMany({
-          data: recipients.map((participant) => ({
-            recipientUserId: participant.userId,
-            targetType: 'chat',
-            targetId: room.id,
-            title: getRoomTitle(room),
-            body: content.slice(0, 120),
-            deepLink: `/chat/${room.id}`,
-          })),
-        });
-      }
       return { message: created, recipientUserIds: recipients.map((participant) => participant.userId) };
     });
 
@@ -235,35 +223,51 @@ export class ChatService {
       sentAt: message.sentAt,
       senderUserId: user.id,
     };
-    // 메시지/알림은 이미 위 트랜잭션에서 커밋됐다 — 이 선호도 조회가 실패해도
-    // 이미 성공한 전송을 500으로 되돌리면 안 되므로, 실패 시 웹 푸시만 스킵하고
-    // 요청은 계속 성공으로 처리한다.
-    let pushEnabledRecipientIds: Set<string>;
+    // 메시지는 이미 위 트랜잭션에서 커밋됐다. 선호도 조회나 알림 부가 작업 실패가
+    // 성공한 채팅 전송을 500으로 되돌리면 안 되므로 알림만 건너뛴다.
+    let notificationEnabledRecipientIds: Set<string>;
     try {
-      pushEnabledRecipientIds = await this.chatPushEnabledRecipientIds(recipientUserIds);
+      notificationEnabledRecipientIds = await this.chatNotificationEnabledRecipientIds(recipientUserIds);
     } catch (err) {
       this.logger.warn(
         { roomId: room.id, err },
-        '채팅 웹 푸시 선호도 조회 실패 — 이 메시지는 웹 푸시 없이 처리됩니다',
+        '채팅 알림 선호도 조회 실패 — 이 메시지는 알림함과 푸시 없이 처리됩니다',
       );
-      pushEnabledRecipientIds = new Set();
+      notificationEnabledRecipientIds = new Set();
     }
     const roomTitle = getRoomTitle(room);
+    if (notificationEnabledRecipientIds.size > 0) {
+      try {
+        await this.prisma.v1Notification.createMany({
+          data: [...notificationEnabledRecipientIds].map((recipientUserId) => ({
+            recipientUserId,
+            targetType: 'chat',
+            targetId: room.id,
+            title: roomTitle,
+            body: content.slice(0, 120),
+            deepLink: `/chat/${room.id}`,
+          })),
+        });
+      } catch (err) {
+        this.logger.warn({ roomId: room.id, err }, '채팅 알림함 저장 실패');
+      }
+    }
     // Fire-and-forget, matching NotificationsService's emitNotificationFireAndForget:
-    // the message + notifications already committed above, so a realtime-emit or
-    // web-push failure must never surface as an error response for a request that
-    // already succeeded.
+    // the message and any notification rows are settled above, so realtime or push
+    // delivery failures must never surface as an error for a successful send.
     for (const recipientUserId of recipientUserIds) {
       try {
         this.realtimeGateway.emitToUser(recipientUserId, 'chat:message', chatMessagePayload);
-        this.realtimeGateway.emitToUser(recipientUserId, 'notification:new', {
-          targetType: 'chat',
-          targetId: room.id,
-        });
+        if (notificationEnabledRecipientIds.has(recipientUserId)) {
+          this.realtimeGateway.emitToUser(recipientUserId, 'notification:new', {
+            targetType: 'chat',
+            targetId: room.id,
+          });
+        }
       } catch (err) {
         this.logger.warn({ recipientUserId, roomId: room.id, err }, '실시간 채팅 알림 전송 실패');
       }
-      if (!pushEnabledRecipientIds.has(recipientUserId)) continue;
+      if (!notificationEnabledRecipientIds.has(recipientUserId)) continue;
       void this.webPushService
         .sendToUser(recipientUserId, {
           title: roomTitle,
@@ -279,11 +283,11 @@ export class ChatService {
   }
 
   /**
-   * Recipients with chatEnabled=false in V1NotificationPreference are excluded from
-   * web push (no preference row → default enabled, matching NotificationsService's
-   * createNotificationWithPrefCheck convention).
+   * Recipients with chatEnabled=false are excluded from both the notification inbox
+   * and push. The chat message realtime event still reaches them while the room is open.
+   * No preference row means enabled, matching NotificationsService.
    */
-  private async chatPushEnabledRecipientIds(recipientUserIds: string[]): Promise<Set<string>> {
+  private async chatNotificationEnabledRecipientIds(recipientUserIds: string[]): Promise<Set<string>> {
     if (recipientUserIds.length === 0) return new Set();
     const preferences = await this.prisma.v1NotificationPreference.findMany({
       where: { userId: { in: recipientUserIds } },

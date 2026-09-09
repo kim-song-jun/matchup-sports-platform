@@ -719,6 +719,9 @@ export class ProfileService {
       if (dto.notifications) {
         const notificationInput = dto.notifications;
         const individualNotifications = {
+          ...(notificationInput.activityEnabled === undefined
+            ? {}
+            : { activityEnabled: notificationInput.activityEnabled }),
           ...(notificationInput.matchEnabled === undefined ? {} : { matchEnabled: notificationInput.matchEnabled }),
           ...(notificationInput.teamEnabled === undefined ? {} : { teamEnabled: notificationInput.teamEnabled }),
           ...(notificationInput.teamMatchEnabled === undefined
@@ -737,7 +740,7 @@ export class ProfileService {
           },
           create: {
             userId: user.id,
-            activityEnabled: true,
+            activityEnabled: notificationInput.activityEnabled ?? true,
             matchEnabled: notificationInput.matchEnabled ?? true,
             teamEnabled: notificationInput.teamEnabled ?? true,
             teamMatchEnabled: notificationInput.teamMatchEnabled ?? true,
@@ -1469,6 +1472,7 @@ function toSettingsNotifications(preferences: {
   marketingEnabled: boolean;
 }) {
   return {
+    activityEnabled: preferences.activityEnabled,
     matchEnabled: preferences.matchEnabled ?? preferences.activityEnabled,
     teamEnabled: preferences.teamEnabled ?? preferences.activityEnabled,
     teamMatchEnabled: preferences.teamMatchEnabled ?? preferences.activityEnabled,

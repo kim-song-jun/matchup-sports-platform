@@ -14,7 +14,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
 
 export interface V1PushRegistration {
   subscribe: () => Promise<boolean>;
-  unsubscribe: () => Promise<void>;
+  unsubscribe: () => Promise<boolean>;
   permission: NotificationPermission | 'unsupported';
   isSubscribed: boolean;
   /**
@@ -153,29 +153,29 @@ export function useV1PushRegistration(): V1PushRegistration {
     }
   }, [browserSupported, nativeSupported]);
 
-  const unsubscribe = useCallback(async () => {
+  const unsubscribe = useCallback(async (): Promise<boolean> => {
     if (nativeSupported) {
       setIsPending(true);
       try {
         const result = await requestNativePush('revoke-push-device');
         setPermission(result.permission);
         setIsSubscribed(result.subscribed);
-        if (result.subscribed) {
+        if (result.subscribed || result.errorCode === 'revocation-failed') {
           throw new Error('Native push device revocation was not confirmed by the server.');
         }
-        return;
+        return true;
       } catch (err) {
         reportClientError({
           message: extractErrorMessage(err, '앱 알림 해제에 실패했어요.'),
           level: 'warn',
           context: { flow: 'native-push-unsubscribe' },
         });
-        return;
+        return false;
       } finally {
         setIsPending(false);
       }
     }
-    if (!browserSupported) return;
+    if (!browserSupported) return false;
 
     setIsPending(true);
     try {
@@ -190,7 +190,7 @@ export function useV1PushRegistration(): V1PushRegistration {
       const subscription = registration ? await registration.pushManager.getSubscription() : null;
       if (!subscription) {
         setIsSubscribed(false);
-        return;
+        return true;
       }
 
       try {
@@ -206,12 +206,14 @@ export function useV1PushRegistration(): V1PushRegistration {
 
       await subscription.unsubscribe();
       setIsSubscribed(false);
+      return true;
     } catch (err) {
       reportClientError({
         message: extractErrorMessage(err, '푸시 알림 구독 해지에 실패했어요.'),
         level: 'warn',
         context: { flow: 'push-unsubscribe' },
       });
+      return false;
     } finally {
       setIsPending(false);
     }

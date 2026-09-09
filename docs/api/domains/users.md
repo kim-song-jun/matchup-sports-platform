@@ -63,7 +63,8 @@
 ### `GET/PATCH /me/settings`
 
 - 조회 응답은 `account`, `profile`, `notifications`를 반환한다.
-- `UpdateSettingsDto.notifications`의 선택 boolean 필드: `matchEnabled`, `teamEnabled`, `teamMatchEnabled`, `chatEnabled`, `noticeEnabled`, `marketingEnabled`.
+- `UpdateSettingsDto.notifications`의 선택 boolean 필드: `activityEnabled`, `matchEnabled`, `teamEnabled`, `teamMatchEnabled`, `chatEnabled`, `noticeEnabled`, `marketingEnabled`.
+- 사용자 화면의 경기·대회 스위치는 `matchEnabled`, `teamMatchEnabled`, `activityEnabled`를 함께 갱신한다.
 - 수정 응답은 `{ profile, notifications, updatedAt }`이다.
 
 ### `PATCH /me/regions`

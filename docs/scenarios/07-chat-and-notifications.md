@@ -85,3 +85,4 @@
 - 2026-04-08: 알림 센터는 explicit in-app navigation, socket connect-time backfill, focus/visibility backfill을 같이 둬서 hidden tab recovery까지 보장하도록 정리했다.
 - 2026-04-08: `global-setup`의 `teams` seed drift는 여전히 best-effort warning으로 남지만, notification suite 자체는 더 이상 그 이슈에 막히지 않는다.
 - 2026-04-11: `/settings/notifications`의 category persistence는 이 파일의 verified 범위가 아니다. 현재 페이지는 persistence unsupported 상태로 보고, server sync는 task 39에서 다룬다.
+- 2026-09-09: Task 169에서 `chatEnabled=false`가 푸시뿐 아니라 알림함 row와 `notification:new` 배지 이벤트도 억제하도록 계약을 통일했다. 열린 채팅방의 `chat:message` 실시간 전달은 유지하며 API 단위 테스트로 검증했다.

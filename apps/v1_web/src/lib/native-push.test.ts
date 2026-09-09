@@ -46,4 +46,19 @@ describe('native push bridge', () => {
     await vi.advanceTimersByTimeAsync(104_999);
     expect(outcome).toBe('rejected');
   });
+
+  it('also waits for the user to return from Android notification settings', async () => {
+    vi.useFakeTimers();
+    window.TeameetNative = { postMessage: vi.fn() };
+    let outcome = 'pending';
+    void requestNativePush('open-notification-settings').then(
+      () => { outcome = 'resolved'; },
+      () => { outcome = 'rejected'; },
+    );
+
+    await vi.advanceTimersByTimeAsync(15_001);
+    expect(outcome).toBe('pending');
+    await vi.advanceTimersByTimeAsync(104_999);
+    expect(outcome).toBe('rejected');
+  });
 });

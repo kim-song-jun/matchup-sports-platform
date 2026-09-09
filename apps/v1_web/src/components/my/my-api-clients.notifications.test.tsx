@@ -55,6 +55,7 @@ describe('NotificationSettingsPageClient push toggle', () => {
     hooks.settings.mockReturnValue({
       data: {
         notifications: {
+          activityEnabled: true,
           matchEnabled: true,
           teamEnabled: true,
           teamMatchEnabled: true,
@@ -143,7 +144,7 @@ describe('NotificationSettingsPageClient push toggle', () => {
     expect(unsubscribe).toHaveBeenCalled();
   });
 
-  it('disables the toggle when browser permission is denied and not currently subscribed', async () => {
+  it('disables the single device control when browser permission is denied', async () => {
     const subscribe = vi.fn();
     vi.mocked(useV1PushRegistration).mockReturnValue({
       subscribe,
@@ -183,11 +184,47 @@ describe('NotificationSettingsPageClient push toggle', () => {
     const user = userEvent.setup();
     renderWithClient(<NotificationSettingsPageClient />);
 
-    await user.click(screen.getByRole('button', { name: '기기 알림 설정 열기' }));
+    expect(screen.queryByRole('switch', { name: '푸시 알림 받기' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '휴대폰 알림 켜기' }));
 
     expect(messages).toEqual([
       expect.objectContaining({ type: 'open-notification-settings' }),
     ]);
+    expect(screen.queryByRole('button', { name: '기기 알림 설정 열기' })).not.toBeInTheDocument();
+  });
+
+  it('알림 종류는 네 개만 보여주고 경기·대회 변경을 세 저장 필드에 함께 반영한다', async () => {
+    const mutate = vi.fn();
+    hooks.updateSettings.mockReturnValue({ mutate, isPending: false });
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+      permission: 'default',
+      isSubscribed: false,
+      isPending: false,
+    });
+    const user = userEvent.setup();
+    renderWithClient(<NotificationSettingsPageClient />);
+
+    expect(screen.getAllByRole('switch')).toHaveLength(5);
+    expect(screen.getByRole('switch', { name: '경기·대회' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: '팀 활동' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: '채팅' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: '서비스 공지' })).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: '마케팅 소식' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('switch', { name: '경기·대회' }));
+
+    expect(mutate).toHaveBeenCalledWith(
+      {
+        notifications: {
+          matchEnabled: false,
+          teamMatchEnabled: false,
+          activityEnabled: false,
+        },
+      },
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
   });
 
   it('설정 조회가 성공 화면 이후 실패해도 Hook 순서 오류 없이 전용 오류 상태를 보여준다', () => {

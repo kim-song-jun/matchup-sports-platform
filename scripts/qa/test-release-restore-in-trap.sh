@@ -166,7 +166,13 @@ run_restore_case prod
 # source 하는 *-common.sh 안에서는 인자 없는 `return` 을 쓰지 않는다(성공이면 `return 0`, 조건의 결과를
 # 돌려주려면 `|| return 1` 뒤에 `return 0`).
 guarded_files="$(grep -lE 'trap [^#]*ERR' "${ROOT_DIR}"/deploy/*.sh; ls "${ROOT_DIR}"/deploy/*-common.sh)"
-bare_returns="$(grep -nE '^[[:space:]]*return[[:space:]]*(;|#.*)?$' ${guarded_files} || true)"
+# 가드가 조용히 비지 않게: 대상 파일이 있어야 하고, grep 은 1(매치 없음)만 정상이며 2(파일 오류)는 실패다.
+grep -qx "${ROOT_DIR}/deploy/deploy-alpha.sh" <<< "${guarded_files}" ||
+  fail "정적 가드 대상 목록에 deploy-alpha.sh 가 없다 — 목록 도출이 깨졌다"
+grep_rc=0
+bare_returns="$(grep -nE '^[[:space:]]*return[[:space:]]*(;|#.*)?$' ${guarded_files})" || grep_rc=$?
+(( grep_rc == 0 || grep_rc == 1 )) ||
+  fail "정적 가드 grep 이 rc=${grep_rc} 로 실패했다 (파일 누락/오류) — 검사가 수행되지 않았다"
 [[ -z "${bare_returns}" ]] ||
   fail "인자 없는 return 이 배포 스크립트에 남아 있다 (trap 핸들러 안에서는 trap 을 일으킨 종료코드를 돌려준다):"$'\n'"${bare_returns}"
 

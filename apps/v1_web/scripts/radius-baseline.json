@@ -13,7 +13,7 @@
   "src/app/tournaments/tournament-card.tsx": 1,
   "src/app/users/[id]/card/opengraph-image.tsx": 1,
   "src/components/auth/terms-client.tsx": 1,
-  "src/components/home/home-page.tsx": 5,
+  "src/components/home/home-page.tsx": 4,
   "src/components/home/tournament-hero-card.tsx": 0,
   "src/components/lineup/pitch-formation-editor.tsx": 3,
   "src/components/my/my-page.tsx": 1,

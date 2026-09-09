@@ -194,6 +194,13 @@ jobs:
       - name: Alpha release-state contract tests
         run: bash scripts/qa/test-alpha-release-state.sh
 
+      # 배포 실패를 되돌리는 restore_active_release() 는 ERR trap 안에서 돈다. bash 는 trap 안의
+      # 인자 없는 `return` 에 trap 을 일으킨 종료코드를 돌려주므로, 정상 흐름에서 멀쩡한 함수가
+      # 복구에서만 조용히 실패한다(2026-09-08 alpha 복구 5회 연속 실패의 원인). alpha·prod 둘 다
+      # 실제 trap 문맥에서 복구를 끝까지 돌려 본다.
+      - name: Release restore-in-trap contract tests
+        run: bash scripts/qa/test-release-restore-in-trap.sh
+
       # alpha 는 로컬 이미지 GC 가 없어 dangling 이미지가 배포마다 쌓였고, 실제로 EC2
       # 디스크가 28G/30G 까지 차서 배포와 롤백이 함께 "no space left on device" 로 실패했다
       # (2026-08). 이 테스트는 그 재발 방지 로직(prune_stale_alpha_images)이 정확히 어떤

@@ -93,7 +93,7 @@ archive_failed_candidate() {
   local failed_path
 
   if [[ ! -f "${ALPHA_CANDIDATE_MANIFEST}" ]]; then
-    return
+    return 0
   fi
   failed_sha="$(jq -r '.release.sha // "unknown"' "${ALPHA_CANDIDATE_MANIFEST}")"
   failed_path="${ALPHA_FAILED_RELEASE_DIR}/${failed_sha}-$(date -u +%Y%m%dT%H%M%SZ).json"
@@ -166,7 +166,7 @@ check_alpha_health_contract() {
 wait_for_alpha_health_contract() {
   for attempt in $(seq 1 36); do
     if check_alpha_health_contract; then
-      return
+      return 0
     fi
     if [[ "${attempt}" -eq 36 ]]; then
       echo "[alpha-release] Health contract failed" >&2
@@ -197,7 +197,7 @@ wait_for_alpha_worker_healthy() {
     if [[ -n "${worker_container}" ]]; then
       worker_health="$(docker inspect --format '{{.State.Health.Status}}' "${worker_container}" 2>/dev/null || true)"
       if [[ "${worker_health}" == "healthy" ]]; then
-        return
+        return 0
       fi
     fi
     if [[ "${attempt}" -eq 36 ]]; then

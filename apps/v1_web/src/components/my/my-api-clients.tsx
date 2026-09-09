@@ -80,6 +80,7 @@ import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinAp
 import { myHomeModel, settingsModel } from './my.view-model';
 import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
 import { isNativePushAvailable, requestNativePush } from '@/lib/native-push';
+import { WithdrawalErrorCard } from './withdrawal-error-card';
 
 type ProfileEditErrors = Partial<Record<'realName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
 type DuplicateCheckState = {
@@ -2190,7 +2191,6 @@ export function WithdrawalPageClient() {
   const [infoOpen, setInfoOpen] = useState(false);
   // #4: 비가역 작업이므로 confirm 모달로 이중 확인한다.
   const { confirm, ConfirmModal } = useConfirm();
-
   const handleWithdraw = () => {
     confirm({
       title: '탈퇴 요청',
@@ -2269,13 +2269,7 @@ export function WithdrawalPageClient() {
             <span className="tm-text-label">탈퇴 사유</span>
             <textarea className="tm-input tm-create-input-multiline" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="선택 입력" />
           </label>
-          {withdrawal.isError ? (
-            <Card pad={16} className="tm-auth-soft-card-error">
-              <div className="tm-text-label">
-                {extractErrorMessage(withdrawal.error, '탈퇴 요청에 실패했어요')}
-              </div>
-            </Card>
-          ) : null}
+          {withdrawal.isError ? <WithdrawalErrorCard error={withdrawal.error} /> : null}
         </div>
       </div>
       <div className="tm-fixed-cta tm-my-withdrawal-cta">

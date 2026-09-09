@@ -176,8 +176,10 @@ class LiveWebHarnessCase: XCTestCase {
         // but goes nowhere — the home screen stays put and the walk then scrolls it looking
         // for an option that only exists on the sign-in screen. Measured twice on first
         // launch; the same walk went through on the very next launch.
-        var reachedSignIn = false
-        for attempt in 1...3 {
+        // The shell restores the last route, so a launch after signing out lands on the
+        // sign-in options directly — the landing screen and its 로그인하기 never appear.
+        var reachedSignIn = linkExists("이메일로 로그인", timeout: 5)
+        for attempt in 1...3 where !reachedSignIn {
             XCTAssertTrue(tapRow("로그인하기"), "no sign-in entry point on the landing screen")
             if linkExists("이메일로 로그인", timeout: 20) { reachedSignIn = true; break }
             attach("sign-in-entry-attempt-\(attempt)")

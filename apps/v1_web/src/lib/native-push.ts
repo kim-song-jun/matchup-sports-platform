@@ -10,6 +10,7 @@ export interface NativePushResult {
   requestId: string;
   permission: NotificationPermission;
   subscribed: boolean;
+  errorCode?: 'registration-failed' | 'revocation-failed';
 }
 
 const RESULT_EVENT = 'teameet:native-push-result';
@@ -46,7 +47,7 @@ export function requestNativePush(action: NativePushAction): Promise<NativePushR
     timeoutId = setTimeout(() => {
       cleanup();
       reject(new Error('Teameet native push request timed out.'));
-    }, action === 'request-notification-permission'
+    }, action === 'request-notification-permission' || action === 'open-notification-settings'
       ? PERMISSION_RESPONSE_TIMEOUT_MS
       : RESPONSE_TIMEOUT_MS);
 

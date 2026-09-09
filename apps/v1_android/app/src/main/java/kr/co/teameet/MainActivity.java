@@ -51,6 +51,7 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 import org.json.JSONObject;
 
 public final class MainActivity extends AppCompatActivity {
@@ -65,6 +66,7 @@ public final class MainActivity extends AppCompatActivity {
     private GeolocationPermissions.Callback pendingLocationCallback;
     private String pendingLocationOrigin;
     private String pendingPushRequestId;
+    private String pendingPushSettingsRequestId;
     private int bottomSystemInsetCssPixels;
     private int keyboardInsetCssPixels;
     private boolean keyboardVisible;
@@ -82,7 +84,8 @@ public final class MainActivity extends AppCompatActivity {
                 pendingPushRequestId = null;
                 if (!granted) {
                     InstallationIdentity.markOptedIn(this, false);
-                    revokePushAndDeleteToken(() -> reportPushResult(requestId, false));
+                    revokePushAndDeleteToken(revoked -> reportPushResult(
+                        requestId, false, revoked ? null : "revocation-failed"));
                     return;
                 }
                 registerPushAndReport(requestId);
@@ -258,7 +261,7 @@ public final class MainActivity extends AppCompatActivity {
                     if (canRegisterPush()) {
                         PushRegistrationClient.register(MainActivity.this);
                     } else if (InstallationIdentity.isRegistered(MainActivity.this)) {
-                        revokePushAndDeleteToken(() -> {});
+                        revokePushAndDeleteToken(ignored -> {});
                     }
                 }
             }
@@ -547,7 +550,8 @@ public final class MainActivity extends AppCompatActivity {
                 case "open-notification-settings" -> openNotificationSettings(requestId);
                 case "revoke-push-device" -> {
                     InstallationIdentity.markOptedIn(this, false);
-                    revokePushAndDeleteToken(() -> reportPushResult(requestId, false));
+                    revokePushAndDeleteToken(revoked -> reportPushResult(
+                        requestId, false, revoked ? null : "revocation-failed"));
                 }
                 default -> reportPushResult(requestId, false);
             }
@@ -572,24 +576,30 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void openNotificationSettings(String requestId) {
+        InstallationIdentity.markOptedIn(this, true);
+        pendingPushSettingsRequestId = requestId;
+        boolean launched = false;
         try {
             Intent settingsIntent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                 .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
             startActivity(settingsIntent);
+            launched = true;
         } catch (Exception primaryFailure) {
             try {
                 startActivity(new Intent(
                     Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                     Uri.parse("package:" + getPackageName())
                 ));
+                launched = true;
             } catch (Exception ignored) {
-                // The Web UI keeps the manual settings instructions visible.
+                // The Web UI will keep the manual settings instructions visible.
             }
         }
-        reportPushResult(
-            requestId,
-            canRegisterPush() && InstallationIdentity.isRegistered(this)
-        );
+        if (!launched) {
+            pendingPushSettingsRequestId = null;
+            InstallationIdentity.markOptedIn(this, false);
+            reportPushResult(requestId, false);
+        }
     }
 
     private boolean hasNotificationPermission() {
@@ -603,9 +613,20 @@ public final class MainActivity extends AppCompatActivity {
     @Override protected void onResume() {
         super.onResume();
         if (rootView != null) applySystemBarAppearance();
+        String settingsRequestId = pendingPushSettingsRequestId;
+        if (settingsRequestId != null) {
+            pendingPushSettingsRequestId = null;
+            if (PushPermission.isGranted(this)) {
+                registerPushAndReport(settingsRequestId);
+            } else {
+                InstallationIdentity.markOptedIn(this, false);
+                reportPushResult(settingsRequestId, false);
+            }
+            return;
+        }
         if (!PushPermission.isGranted(this)) InstallationIdentity.markOptedIn(this, false);
         if (!canRegisterPush() && InstallationIdentity.isRegistered(this)) {
-            revokePushAndDeleteToken(() -> {});
+            revokePushAndDeleteToken(ignored -> {});
         }
     }
 
@@ -623,29 +644,34 @@ public final class MainActivity extends AppCompatActivity {
             .addOnFailureListener(ignored -> reportPushResult(requestId, false));
     }
 
-    private void revokePushAndDeleteToken(Runnable completion) {
+    private void revokePushAndDeleteToken(Consumer<Boolean> completion) {
         boolean firebaseReady = FirebaseBootstrap.initialize(this);
         FirebaseMessaging messaging = firebaseReady ? FirebaseMessaging.getInstance() : null;
         if (messaging != null) messaging.setAutoInitEnabled(false);
         InstallationIdentity.clearToken(this);
         InstallationIdentity.markRegistered(this, false);
-        PushRegistrationClient.revoke(this, ignored -> {
+        PushRegistrationClient.revoke(this, revoked -> {
             if (messaging == null) {
-                completion.run();
+                completion.accept(revoked);
                 return;
             }
             messaging.deleteToken().addOnCompleteListener(task -> {
-                completion.run();
+                completion.accept(revoked);
             });
         });
     }
 
     private void reportPushResult(String requestId, boolean subscribed) {
+        reportPushResult(requestId, subscribed, null);
+    }
+
+    private void reportPushResult(String requestId, boolean subscribed, String errorCode) {
         try {
             JSONObject detail = new JSONObject()
                 .put("requestId", requestId == null ? "" : requestId)
                 .put("permission", notificationPermissionState())
                 .put("subscribed", subscribed);
+            if (errorCode != null) detail.put("errorCode", errorCode);
             String script = "window.dispatchEvent(new CustomEvent('teameet:native-push-result',{detail:"
                 + detail + "}))";
             webView.evaluateJavascript(script, null);

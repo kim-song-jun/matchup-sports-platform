@@ -402,17 +402,83 @@ describe('경기방식 프리셋 — 축구/풋살 외 종목은 축구 포맷�
 });
 
 describe('리그전 배지', () => {
-  const leagueBadge = () => screen.queryByRole('button', { name: /리그 상세로 이동/ });
+  /**
+   * 리그 배지는 **정적 칩**이다(2026-09-09 B안 사용자 확정). 예전엔 카드(<a>) 안에 리그 상세로
+   * 가는 button 을 중첩했고, 44px 터치 타깃 때문에 12px 조건 줄 안에서 혼자 튀었다.
+   * 지금은 카드 탭 하나만 인터랙티브이고, 리그 순위표는 카드가 가는 리그 경기 상세가 안내한다.
+   */
+  const leagueBadges = () => screen.queryAllByText('정규 리그');
 
-  it('리그 소속이면 목록 카드에 리그전 배지가 보인다', () => {
+  it('리그 소속이면 목록 카드의 신원 줄에 정적 "정규 리그" 배지가 보이고 조건 줄에 리그명이 붙는다', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = [{ ...model.matches[0], sport: '풋살', grade: '', format: '', gender: '', league: { leagueId: 'lg-1', title: '가을 리그' } }];
+
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+
+    const badge = container.querySelector('.tm-team-match-row-id .tm-badge-grey');
+    expect(badge).not.toBeNull();
+    expect(badge!.textContent).toBe('정규 리그');
+    expect(container.querySelector('.tm-team-match-row-cond')!.textContent).toBe('풋살·가을 리그');
+    expect(container.querySelector('.tm-team-match-row-cond-league')!.textContent).toBe('가을 리그');
+  });
+
+  it('리그 소속이 아니면 목록 카드에 리그 배지도 리그명도 없다', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = [{ ...model.matches[0], league: null }];
+
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+
+    expect(leagueBadges()).toHaveLength(0);
+    expect(container.querySelector('.tm-team-match-row-cond-league')).toBeNull();
+  });
+
+  it('목록 카드 안에는 카드 링크 말고 누를 것이 없다 — 리그 배지는 button 도 <a> 도 아니다', () => {
     const model = getTeamMatchListViewModel();
     model.matches = [{ ...model.matches[0], league: { leagueId: 'lg-1', title: '가을 리그' } }];
 
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+
+    const card = container.querySelector('a[href="/team-matches/team-match-1"]');
+    expect(card).not.toBeNull();
+    expect(card!.querySelectorAll('a, button')).toHaveLength(0);
+    expect(container.querySelector('a[href="/league-matches/lg-1"]')).toBeNull();
+    expect(screen.queryByRole('button', { name: /리그 상세로 이동/ })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 리그 대진은 편성 시 어드민 명의의 '승인된 신청서'가 함께 만들어져(league-fixture-creation.ts)
+   * 편성한 어드민에게 viewerState 'approved' 가 온다. 신청 개념이 없는 리그에서 '승인 완료' 는
+   * "내 팀이 승인됐다" 가 아니고, 관계가 없는 뷰어에게 붙던 '상대 모집 중' 도 거짓이다
+   * (상대는 이미 정해져 있다). 호스트 팀 관리자의 '내 매치' 만 남긴다.
+   */
+  it("리그 대진에는 '승인 완료'·'상대 모집 중' 이 붙지 않고, 호스트의 '내 매치' 만 남는다", () => {
+    const league = { leagueId: 'lg-1', title: '가을 리그' };
+    const model = getTeamMatchListViewModel();
+    model.matches = [
+      { ...model.matches[0], id: 'tm-approved', status: 'approved', league },
+      { ...model.matches[0], id: 'tm-open', status: 'open', league },
+      { ...model.matches[0], id: 'tm-mine', status: 'mine', league },
+    ];
+
     renderPage(<TeamMatchListPageView model={model} />);
 
-    const badge = leagueBadge();
-    expect(badge).toBeInTheDocument();
-    expect(badge).toHaveTextContent('정규 리그');
+    expect(screen.queryByText('승인 완료')).not.toBeInTheDocument();
+    expect(screen.queryByText('상대 모집 중')).not.toBeInTheDocument();
+    expect(screen.getAllByText('내 매치')).toHaveLength(1);
+    expect(leagueBadges()).toHaveLength(3);
+  });
+
+  it("친선 매치는 그대로 '승인 완료'·'상대 모집 중' 을 쓴다 — 리그 예외가 친선으로 새지 않는다", () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = [
+      { ...model.matches[0], id: 'tm-approved', status: 'approved', league: null },
+      { ...model.matches[0], id: 'tm-open', status: 'open', league: null },
+    ];
+
+    renderPage(<TeamMatchListPageView model={model} />);
+
+    expect(screen.getByText('승인 완료')).toBeInTheDocument();
+    expect(screen.getByText('상대 모집 중')).toBeInTheDocument();
   });
 
   /**
@@ -497,11 +563,12 @@ describe('리그전 배지', () => {
    * 남아 운영자가 안 채운 것처럼 읽힌다. 자리를 비우지는 않는다(푸터 좌우 배치가 무너지고,
    * '무료' 로 둔갑시키지 않으려던 원래 의도도 사라진다).
    */
-  it('리그 대진의 비용 자리는 리그 문맥으로 바뀐다 — 친선은 그대로 비용 미정', () => {
+  it('리그 대진의 비용 자리는 행동 라벨(경기 보기)로 바뀐다 — 친선은 그대로 비용 미정', () => {
     const league = getTeamMatchListViewModel();
     league.matches = [{ ...league.matches[0], opponentCost: null, league: { leagueId: 'lg-1', title: '가을 리그' } }];
     const first = renderPage(<TeamMatchListPageView model={league} />);
-    expect(screen.getByText('리그 경기')).toBeInTheDocument();
+    expect(screen.getByText('경기 보기')).toHaveClass('tm-match-row-act');
+    expect(screen.queryByText('리그 경기')).not.toBeInTheDocument();
     expect(screen.queryByText('비용 미정')).not.toBeInTheDocument();
     first.unmount();
 
@@ -511,80 +578,25 @@ describe('리그전 배지', () => {
     expect(screen.getByText('비용 미정')).toBeInTheDocument();
   });
 
-  /**
-   * **호스트 팀 카드의 리그 링크는 배지 줄 밖에 있어야 한다.**
-   *
-   * 이 요소만 44px 터치 타깃을 가져야 하는데(누를 수 있는 유일한 칩이다) 형제 배지는
-   * 26px 이다 — 한 줄에 섞으면 69% 큰 요소 하나가 줄 높이를 혼자 끌어올린다. 높이는
-   * jsdom 이 계산하지 않으므로(레이아웃 없음) **구조**를 잰다.
-   *
-   * (목록 카드는 행 카드로 다시 그려지면서 배지 줄 자체가 없어졌다 — 그래서 이 계약이
-   * 남아 있는 곳은 호스트 팀 카드뿐이다.)
-   */
-  it('호스트 팀 카드의 리그 링크도 배지 줄 밖에 있다', () => {
+  it('상세의 호스트 팀 카드는 리그명이 든 정적 배지를 배지 줄 안에 형제와 같은 크기로 둔다', () => {
     const model = getTeamMatchDetailViewModel();
     model.match = { ...model.match, league: { leagueId: 'lg-1', title: '가을 리그' } };
 
     const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
 
-    const card = container.querySelector('.tm-host-team-card') as HTMLElement | null;
-    expect(card).not.toBeNull();
-    const scoped = within(card!);
-
-    const badge = scoped.getByRole('button', { name: /리그 상세로 이동/ });
-    const sportBadge = scoped.getByText(model.match.sport);
-    expect(sportBadge).toHaveClass('tm-badge-blue');
-    expect(sportBadge.parentElement!.contains(badge)).toBe(false);
-  });
-
-  it('리그 소속이 아니면 목록 카드에 리그전 배지가 없다', () => {
-    const model = getTeamMatchListViewModel();
-    model.matches = [{ ...model.matches[0], league: null }];
-
-    renderPage(<TeamMatchListPageView model={model} />);
-
-    expect(leagueBadge()).not.toBeInTheDocument();
-  });
-
-  // R3(2026-08-20): 목록 카드는 카드 전체가 이미 상세로 가는 <a>다. 배지를 또 <a>로
-  // 만들면 <a> 안에 <a>가 중첩돼 브라우저가 바깥 태그를 조기에 닫아버린다 -- 그래서
-  // button + preventDefault/stopPropagation로 구현했다. 이 두 테스트가 그 계약을 지킨다.
-  it('목록 카드의 리그전 배지는 중첩 <a> 없이 button으로 렌더된다', () => {
-    const model = getTeamMatchListViewModel();
-    model.matches = [{ ...model.matches[0], league: { leagueId: 'lg-1', title: '가을 리그' } }];
-
-    const { container } = renderPage(<TeamMatchListPageView model={model} />);
-
-    // 카드 자체의 href는 여전히 팀매치 상세를 가리킨다 -- 카드 링크는 유지.
-    expect(container.querySelector('a[href="/team-matches/team-match-1"]')).not.toBeNull();
-    // 리그 배지는 <a>가 아니어야 한다 -- 중첩 <a>면 이 셀렉터가 걸린다.
-    expect(container.querySelector('a[href="/league-matches/lg-1"]')).toBeNull();
-    expect(screen.getByRole('button', { name: '가을 리그 리그 상세로 이동' })).toBeInTheDocument();
-  });
-
-  it('목록 카드의 리그전 배지를 클릭하면 카드 자체 이동 없이 리그 상세로만 한 번 이동한다', () => {
-    const model = getTeamMatchListViewModel();
-    model.matches = [{ ...model.matches[0], league: { leagueId: 'lg-1', title: '가을 리그' } }];
-
-    renderPage(<TeamMatchListPageView model={model} />);
-    fireEvent.click(screen.getByRole('button', { name: '가을 리그 리그 상세로 이동' }));
-
-    // stopPropagation이 실패해 카드 링크까지 같이 눌렸다면 team-matches 경로로도
-    // push가 호출되거나 push가 두 번 호출된다 -- 정확히 리그 경로 한 번만 확인한다.
-    expect(routerPush).toHaveBeenCalledTimes(1);
-    expect(routerPush).toHaveBeenCalledWith('/league-matches/lg-1');
-  });
-
-  it('상세에서는 리그명과 함께 리그 배지를 보여준다', () => {
-    const model = getTeamMatchDetailViewModel();
-    model.match.league = { leagueId: 'lg-1', title: '가을 리그' };
-
-    renderPage(<TeamMatchDetailPageView model={model} />);
-
     // hostTeamCard가 모바일·데스크톱 레이아웃 두 곳에 동시 마운트되므로 배지도 2개.
-    const badges = screen.getAllByRole('button', { name: '가을 리그 리그 상세로 이동' });
-    expect(badges).toHaveLength(2);
-    badges.forEach((badge) => expect(badge).toHaveTextContent('가을 리그'));
+    const texts = screen.getAllByText('정규 리그 · 가을 리그');
+    expect(texts).toHaveLength(2);
+    texts.forEach((text) => {
+      const badge = text.closest('.tm-badge') as HTMLElement | null;
+      expect(badge).not.toBeNull();
+      expect(badge!.tagName).toBe('SPAN');
+      // 종목 배지와 같은 부모(배지 줄)에 있어야 26px 균질 줄이 된다.
+      const sportBadge = within(badge!.parentElement as HTMLElement).getByText(model.match.sport);
+      expect(sportBadge.parentElement).toBe(badge!.parentElement);
+    });
+    expect(container.querySelector('a[href^="/league-matches/"]')).toBeNull();
+    expect(container.querySelectorAll('.tm-host-team-card button')).toHaveLength(0);
   });
 
   it('리그 소속이 아니면 상세에 리그 배지가 없다', () => {
@@ -594,37 +606,7 @@ describe('리그전 배지', () => {
     const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
 
     expect(container.querySelector('a[href^="/league-matches/"]')).toBeNull();
-    expect(screen.queryByRole('button', { name: /리그 상세로 이동/ })).not.toBeInTheDocument();
-  });
-
-  // R3 후속(2026-08-20, 오케스트레이터 지적): hostTeamCard 전체가 이미 팀 상세로 가는
-  // Link인데 그 안의 리그 배지도 Link였다 -- 실제 중첩 <a>. 목록 카드(TeamMatchCard)와
-  // 동일한 button 패턴으로 고쳤고, 이 두 테스트가 그 계약을 지킨다.
-  it('상세 카드의 리그 배지는 중첩 <a> 없이 button으로 렌더되고, 카드 자체 href는 팀 경로로 유지된다', () => {
-    const model = getTeamMatchDetailViewModel();
-    model.match.league = { leagueId: 'lg-1', title: '가을 리그' };
-
-    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
-
-    // hostTeamCard 자체 링크는 여전히 팀 상세를 가리킨다(fixture에 hostTeamHref가 없어 기본값 /teams).
-    expect(container.querySelector('a[href="/teams"]')).not.toBeNull();
-    // 리그 배지는 <a>가 아니어야 한다 -- 중첩 <a>면 이 셀렉터가 걸린다.
-    expect(container.querySelector('a[href="/league-matches/lg-1"]')).toBeNull();
-    expect(screen.getAllByRole('button', { name: '가을 리그 리그 상세로 이동' })).toHaveLength(2);
-  });
-
-  it('상세 카드의 리그 배지를 클릭하면 카드 자체 이동 없이 리그 상세로만 한 번 이동한다', () => {
-    const model = getTeamMatchDetailViewModel();
-    model.match.league = { leagueId: 'lg-1', title: '가을 리그' };
-
-    renderPage(<TeamMatchDetailPageView model={model} />);
-    const [badge] = screen.getAllByRole('button', { name: '가을 리그 리그 상세로 이동' });
-    fireEvent.click(badge);
-
-    // stopPropagation이 실패해 hostTeamCard 링크까지 같이 눌렸다면 팀 경로로도 push가
-    // 호출되거나 push가 두 번 호출된다 -- 정확히 리그 경로 한 번만 확인한다.
-    expect(routerPush).toHaveBeenCalledTimes(1);
-    expect(routerPush).toHaveBeenCalledWith('/league-matches/lg-1');
+    expect(screen.queryByText(/정규 리그/)).not.toBeInTheDocument();
   });
 });
 

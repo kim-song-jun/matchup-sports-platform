@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
+import { ChevronLeftIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
@@ -209,7 +209,6 @@ export function TeamMatchDetailPageSkeleton() {
 }
 
 export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewModel }) {
-  const router = useRouter();
   const { match, mode } = model;
   const league = match.league;
   /* 매치 관리 카드의 "화면당 primary 1개" 규칙(DESIGN.md §14) — 라인업 → 경기 결과 → 후기
@@ -300,37 +299,15 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
           {match.hostTeamTrustState && trustStateLabel(match.hostTeamTrustState) ? (
             <span className="tm-badge tm-badge-blue">{trustStateLabel(match.hostTeamTrustState)}</span>
           ) : null}
-        </div>
-        {/* 리그 링크는 **배지 줄 밖에 둔다.** 이 요소만 44px 터치 타깃을 가져야 하는데
-            (누를 수 있는 유일한 칩이다) 형제 배지는 26px 이라, 한 줄에 섞으면 69% 큰
-            요소 하나가 줄 전체의 높이를 끌어올려 나머지 배지가 그 안에서 떠 보인다.
-            줄을 나누면 배지 줄이 26px 로 균질해지고 이 링크는 자기 줄에서 44px 를 자연스럽게
-            갖는다. (히트 영역만 ::after 로 넓히는 우회는 이미 기각됐다 — 넓힌 영역이
-            위아래 배지 줄을 덮어 그 자리 탭이 팀이 아니라 리그로 샌다. globals.css 주석 참조.)
-
-            리그 상세는 앱 안에 다른 진입점이 없어(직접 URL 만) 이 링크가 사실상 첫 통로다.
-            카드 전체가 팀 상세로 가는 Link 라 <a> 를 중첩하면 브라우저가 바깥 <a> 를 조기에
-            닫으므로 button + preventDefault/stopPropagation 을 유지한다. */}
-        {league ? (
-          <div style={{ marginTop: 8 }}>
-            <button
-              type="button"
-              className="tm-badge tm-badge-grey tm-league-badge-link"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                router.push(`/league-matches/${league.leagueId}`);
-              }}
-              aria-label={`${league.title} 리그 상세로 이동`}
-            >
-              {/* F7: 리그명이 길면 배지가 카드 밖으로 밀려 나가 화면이 가로로 스크롤됐다
-                  (390px 실측: 카드 밖 152px, 뷰포트 밖 37px). 리그명만 말줄임하고
-                  화살표는 항상 보이게 텍스트를 별도 span 으로 감싼다. */}
+          {/* 리그 배지는 정보만 말한다(링크 아님) — 카드 전체가 팀 상세 Link 라 안에 누를 것을
+              두면 인터랙티브 중첩이 된다. 리그 순위표는 리그 경기 상세가 안내한다.
+              리그명은 nowrap 배지가 카드 밖으로 밀리지 않게 .tm-league-badge-text 에서 말줄임한다. */}
+          {league ? (
+            <span className="tm-badge tm-badge-grey tm-league-badge">
               <span className="tm-league-badge-text">정규 리그 · {league.title}</span>
-              <ChevronRightIcon size={12} strokeWidth={2.5} aria-hidden="true" />
-            </button>
-          </div>
-        ) : null}
+            </span>
+          ) : null}
+        </div>
       </div>
       {/* 팀 보기는 보조 CTA — apply가 단일 primary; 파란 fill 중복 방지(R-K5) */}
       <span className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flexShrink: 0 }}>팀 보기</span>
@@ -817,8 +794,13 @@ function TeamMatchFilterSheet({ model }: { model: TeamMatchListViewModel }) {
 function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   /* #20: 상대팀 부담금은 핵심 결정요소 — tm-text-body-lg(17px/700)+blue로 격상.
    *      P1: 숫자:단위 2:1 비율 + tabular-nums. 매너·승 통계는 caption 유지. */
-  const router = useRouter();
   const league = match.league;
+  // 리그 대진은 편성될 때 어드민 명의의 '승인된 신청서'가 함께 만들어진다
+  // (league-fixture-creation.ts). 그래서 viewerState 'approved' 는 "내 팀이 승인됐다" 가 아니라
+  // "내가 편성했다" 이고, 신청 개념이 없는 리그에서 '승인 완료'·'상대 모집 중' 은 둘 다 거짓이다.
+  // 리그 카드의 관계 배지는 호스트 팀 관리자('내 매치')만 남긴다 — 원정팀 관계는 목록 응답에
+  // 팀 id 가 없어 판정할 수 없다(없는 사실을 만들지 않는다).
+  const isLeagueFixture = league != null;
   // '마감'만으로는 무엇이 마감인지 안 드러난다 — 목록에 마감된 매치가 함께 놓이면서
   // '모집 중'과 대비되는 문구가 필요해졌다(2026-09-07 제보: "신청마감인거랑 신청가능이랑 차이가 보여야지").
   // 배지는 두 가지 서로 다른 사실을 말한다 — **나와의 관계**와 **매치 상태**.
@@ -827,11 +809,13 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   // 관계가 있으면 관계 배지를, 마감이면 마감 배지를 각각 붙인다 — 둘 다인 경우 둘 다 붙는다.
   const relation = match.status === 'mine'
     ? { label: '내 매치', className: 'tm-badge-blue' }
-    : match.status === 'pending'
-      ? { label: '승인 대기', className: 'tm-badge-orange' }
-      : match.status === 'approved'
-        ? { label: '승인 완료', className: 'tm-badge-green' }
-        : null;
+    : isLeagueFixture
+      ? null
+      : match.status === 'pending'
+        ? { label: '승인 대기', className: 'tm-badge-orange' }
+        : match.status === 'approved'
+          ? { label: '승인 완료', className: 'tm-badge-green' }
+          : null;
   // 마감된 팀매치도 경기 시작 전까지 목록에 남는다(team-matches.service.ts list()) —
   // 배지만으로는 스크롤 중에 안 걸리므로 카드 지면·사진도 함께 눌러 한눈에 갈리게 한다.
   // 판정은 관계가 아니라 API status 로 한다(match.closed) — 호스트도 같은 규칙으로 본다.
@@ -839,11 +823,10 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   // **리그 대진은 제외한다.** 리그엔 신청 개념이 없어 `closed` 가 "모집이 끝났다" 가 아니라
   // 그냥 "상대가 정해져 있다" 는 뜻인데, 그 상태가 원정팀 팀장·선수 전원에게 붙어
   // **자기 팀 경기가 마감·흐림으로** 보였다.
-  const isLeagueFixture = league != null;
   const isClosed = match.closed && !isLeagueFixture;
   // 관계도 없고 마감도 아니면 "상대가 아직 없다"를 쓴다 — 목록 응답에 상대팀이 없어
   // 화면 어디에도 없던 정보다. 상대 "팀 이름"은 응답에 없으므로 만들어내지 않는다.
-  const openLabel = !relation && !isClosed ? '상대 모집 중' : null;
+  const openLabel = !relation && !isClosed && !isLeagueFixture ? '상대 모집 중' : null;
   return (
     <Link className={`tm-match-row tm-card-interactive tm-pressable${isClosed ? ' tm-card-closed' : ''}`} href={`/team-matches/${match.id}`}>
       {/* 예전엔 카드 위쪽 124px(카드의 44%)이 파란 VS 밴드였다. 그 밴드의 "상대팀" 칸에는
@@ -881,6 +864,8 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
               {openLabel}
             </span>
           ) : null}
+          {/* 리그 배지는 형제 배지와 같은 정적 칩이다(링크 아님). 리그명은 조건 줄에 적는다. */}
+          {league ? <span className="tm-badge tm-badge-grey">정규 리그</span> : null}
           <span className="tm-team-match-row-host">
             {/* **누구와 붙는지**. 목록 응답에 상대팀이 없어 화면 어디에도 없던 정보다
                 (`toListItem` 이 `approvedOpponentTeam` 을 싣게 되면서 생겼다 — 추가 쿼리 없음).
@@ -902,32 +887,27 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
         </div>
         <div className="tm-match-row-foot">
           <span className="tm-text-caption tm-team-match-row-cond">
-            {[match.sport, match.grade ? `${match.grade}등급` : '', match.format, match.gender].filter(Boolean).join(' · ')}
+            <span className="tm-team-match-row-cond-text">
+              {[match.sport, match.grade ? `${match.grade}등급` : '', match.format, match.gender].filter(Boolean).join(' · ')}
+            </span>
+            {/* 어느 리그인지는 이 줄이 말한다 — 배지엔 종류만, 제목은 여기서 말줄임된다. */}
             {league ? (
-              <button
-                type="button"
-                className="tm-badge tm-badge-grey tm-league-badge-link"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  router.push(`/league-matches/${league.leagueId}`);
-                }}
-                aria-label={`${league.title} 리그 상세로 이동`}
-              >
-                정규 리그
-                <ChevronRightIcon size={12} strokeWidth={2.5} aria-hidden="true" />
-              </button>
+              <>
+                <span className="tm-team-match-row-cond-text" aria-hidden="true">·</span>
+                <span className="tm-team-match-row-cond-league">{league.title}</span>
+              </>
             ) : null}
           </span>
           {/* 비용을 모르면(costNote 미기재) '비용 미정'으로 둔다 — 0 으로 채워 '무료'라고 하면
               없는 사실을 만들어낸다.
 
-              **리그 대진은 그 자리를 리그 문맥으로 바꾼다.** 리그 경기에는 상대팀 부담금이라는
+              **리그 대진은 그 자리를 행동 라벨로 바꾼다.** 리그 경기에는 상대팀 부담금이라는
               개념이 없어 '비용 미정' 이 영원히 미정으로 남는다 — 채워질 수 없는 값을 계속
-              "미정" 이라 말하면 운영자가 안 채운 것처럼 읽힌다. 지우지는 않는다(자리가 비면
-              푸터의 좌우 배치가 무너지고, '무료' 로 둔갑시키지 않으려던 원래 의도도 사라진다). */}
+              "미정" 이라 말하면 운영자가 안 채운 것처럼 읽힌다. 자리를 비우지도 않는다(푸터의
+              좌우 배치가 무너진다). 카드 탭이 리그 경기 상세로 가므로 그것을 그대로 적는다
+              (개인 매치 행 카드의 actionLabel 자리와 같은 클래스). */}
           {isLeagueFixture && match.opponentCost === null ? (
-            <span className="tm-text-caption tm-match-row-cost">리그 경기</span>
+            <span className="tm-text-label tm-match-row-act">경기 보기</span>
           ) : match.opponentCost === null ? (
             <span className="tm-text-caption tm-match-row-cost">비용 미정</span>
           ) : match.opponentCost === 0 ? (

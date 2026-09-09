@@ -54,7 +54,10 @@ export function LogoutButton({ variant = 'default' }: LogoutButtonProps) {
         // 훅 자체는 내부에서 모든 에러를 삼키고 항상 resolve 하지만(use-v1-push-registration
         // 참조), 여기서도 .catch 로 한 번 더 막아둔다 — 그렇지 않으면 훅 계약이 나중에 바뀌어
         // reject 하게 될 경우 로그아웃 리다이렉트 자체가 조용히 멈춰버린다.
-        const pushCleanup = pushRegistration.unsubscribe().catch(() => undefined);
+        // 'sign-out' 이라 앱 셸은 서버 등록만 지우고 사용자의 앱 내 알림 옵트인은 남긴다 —
+        // 다음에 이 기기로 로그인하는 계정이 다시 묻지 않고 등록되게. 설정 스위치의 해제와
+        // 같은 액션이지만 뜻이 다르다.
+        const pushCleanup = pushRegistration.unsubscribe({ reason: 'sign-out' }).catch(() => undefined);
         logout.mutate(undefined, { onSettled: () => void pushCleanup.finally(clearAndRedirect) });
       }}
       size={isGhost ? 'md' : 'lg'}

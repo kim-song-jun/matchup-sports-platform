@@ -82,6 +82,17 @@ struct PushDeviceClient {
         }
     }
 
+    /// The value of the API's session cookie for the configured origin, or nil when nobody
+    /// is signed in. Used only to fingerprint a registration; it is never sent anywhere else.
+    func sessionCookieValue() async -> String? {
+        guard let host = AllowedNavigation.parse(config.webOrigin)?.host else { return nil }
+        let cookies = await cookieStore.allCookies()
+        return cookies.first {
+            $0.name == PushCookieScope.sessionCookieName
+                && PushCookieScope.matches(domain: $0.domain, host: host)
+        }?.value
+    }
+
     /// Builds a `Cookie` header from the web view's store, keeping only cookies that belong
     /// to the configured origin's host.
     private func sessionCookieHeader() async -> String? {

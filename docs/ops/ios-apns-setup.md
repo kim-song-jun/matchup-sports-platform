@@ -129,6 +129,15 @@
    `[alpha-apns-env] sync completed`가 있어야 한다(alpha는 2026-09-02 04:59 UTC 배포부터).
 3. 앱에서 옵트인을 했는가 — 설명 화면에서 "알림 받기" 또는 마이 → 알림 설정 스위치.
    OS 권한만으로는 등록되지 않는다(`PushCoordinator.hasOptedIn`).
+4. **로그아웃한 적이 있는가.** 0.1.4 (7) 이전 빌드는 로그아웃의 등록 해제를 설정 스위치의
+   해제와 똑같이 처리해 **앱 내 옵트인까지 껐다.** 설명 화면은 한 번만 뜨므로 재로그인 뒤
+   아무도 다시 묻지 않고, 그 계정에는 푸시가 한 건도 가지 않는다(2026-09-09 alpha 실측 —
+   `DELETE push-devices` 직후 로그인한 계정의 알림 row 만 쌓이고 기기 row 는 폐기 상태).
+   0.1.4 (8) 부터 웹이 로그아웃 해제에 `reason: "sign-out"` 을 붙이고 셸은 서버 row 만 지운다
+   — 다음 인증된 페이지 로드에서 새 계정으로 다시 등록된다. 재현·검증:
+   `scripts/ios/verify-push-relogin.sh`. **Android 셸(`MainActivity.java` 의
+   `revoke-push-device`)은 아직 같은 방식이라 같은 증상이 남아 있다** — `reason` 필드를 읽어
+   `markOptedIn(false)` 를 건너뛰면 된다(웹은 이미 보낸다).
 
 
 ## alpha 런타임 주입 (2026-08-31 추가 — 이게 없으면 푸시가 조용히 죽는다)

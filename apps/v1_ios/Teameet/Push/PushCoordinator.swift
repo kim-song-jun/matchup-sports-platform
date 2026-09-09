@@ -29,6 +29,8 @@ final class PushCoordinator {
     /// because granting the system permission again must not silently re-enable push the
     /// reader turned off in the app.
     private var optedIn: Bool
+    /// What the server has been told. Stops `register()` from posting on every navigation.
+    private var ledger = PushRegistrationLedger()
 
     private let optedInKey = "kr.co.teameet.push.optedIn"
     private let defaults: UserDefaults
@@ -122,12 +124,19 @@ final class PushCoordinator {
         }
     }
 
-    /// The web's `revoke-push-device`.
-    func revoke() async {
-        setOptedIn(false)
+    /// The web's `revoke-push-device`, and the foreground reconciliation.
+    ///
+    /// A sign-out drops only the server row. The opt-in and the APNs token stay, so the next
+    /// authenticated page load registers this device for whoever signed in — the reader is
+    /// not asked again, because they never said no.
+    func revoke(reason: PushRevocation = .userTurnedOff) async {
+        if !reason.keepsOptIn {
+            setOptedIn(false)
+            UIApplication.shared.unregisterForRemoteNotifications()
+            deviceToken = nil
+        }
         isRegistered = false
-        UIApplication.shared.unregisterForRemoteNotifications()
-        deviceToken = nil
+        ledger.clear()
         guard let installationId = InstallationIdentity.current() else { return }
         _ = await client.revoke(installationId: installationId)
     }
@@ -158,7 +167,12 @@ final class PushCoordinator {
         guard optedIn,
               await currentPermission() == .granted,
               let token = deviceToken,
-              let installationId = InstallationIdentity.current() else { return false }
+              let installationId = InstallationIdentity.current(),
+              let session = await client.sessionCookieValue() else { return false }
+
+        // Same token, same account, already stored: nothing to tell the server.
+        let fingerprint = PushRegistrationLedger.fingerprint(token: token, session: session)
+        if isRegistered, !ledger.needsRegistration(for: fingerprint) { return true }
 
         let registration = PushDeviceRegistration(
             installationId: installationId,
@@ -168,6 +182,11 @@ final class PushCoordinator {
 
         let outcome = await client.register(registration)
         isRegistered = outcome == .registered
+        if isRegistered {
+            ledger.recordRegistered(fingerprint)
+        } else {
+            ledger.clear()
+        }
         return isRegistered
     }
 
@@ -176,7 +195,7 @@ final class PushCoordinator {
     func reconcileWithSystemPermission() async {
         guard await currentPermission() != .granted else { return }
         guard optedIn || isRegistered else { return }
-        await revoke()
+        await revoke(reason: .userTurnedOff)
     }
 
     private func setOptedIn(_ value: Bool) {

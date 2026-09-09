@@ -159,10 +159,19 @@ final class WebShellViewController: UIViewController {
         NotificationCenter.default.addObserver(
             self, selector: #selector(appWillResignActive),
             name: UIApplication.willResignActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(appWillEnterForeground),
+            name: UIApplication.willEnterForegroundNotification, object: nil)
     }
 
     @objc private func appWillResignActive() {
         persistSession()
+    }
+
+    /// The reader may have switched notifications off in Settings while the app was away.
+    /// Counterpart of Android's `onResume` reconciliation.
+    @objc private func appWillEnterForeground() {
+        Task { await push?.reconcileWithSystemPermission() }
     }
 
     private func installWebView() {
@@ -563,7 +572,7 @@ extension WebShellViewController: WKScriptMessageHandler {
         case .openNotificationSettings:
             openNotificationSettings()
         case .revokePushDevice:
-            await push.revoke()
+            await push.revoke(reason: PushRevocation(bridgeReason: request.reason))
         case .signInWithApple:
             // Handled above, before this switch. Listed so a new action added to `Action`
             // cannot be forgotten here — the compiler refuses an inexhaustive switch.

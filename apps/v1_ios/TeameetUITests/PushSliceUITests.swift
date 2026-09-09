@@ -335,4 +335,70 @@ final class PushSliceUITests: LiveWebHarnessCase {
             terminatedBanner,
             "no server-sent notification reached this device while the app was terminated")
     }
+
+    /// Signing out and back in must leave the device registered, with nothing asked.
+    ///
+    /// Measured on TestFlight 0.1.4 (7): the logout button revoked the registration *and*
+    /// the in-app opt-in, the explainer had already been spent, and the account that signed
+    /// in next received nothing until someone found the settings switch. The web now marks
+    /// the logout revocation and the shell keeps the opt-in, so the next authenticated page
+    /// load re-registers on its own. The settings row is where that outcome is visible; the
+    /// banner at the end is the server proving it can still reach the device.
+    ///
+    /// Run: scripts/ios/verify-push-relogin.sh
+    func testFSigningOutAndBackInKeepsTheDeviceRegistered() throws {
+        let title = try environmentValue("TEAMEET_UITEST_BANNER_TITLE")
+        try signIn()
+
+        let explainer = app.otherElements["알림 받기 안내"]
+        XCTAssertTrue(explainer.waitForExistence(timeout: 60), "the explainer never appeared")
+        app.buttons["push-prompt-accept"].tap()
+        let alert = springboard.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 30), "the system permission prompt never appeared")
+        let allow = allowLabels.map { alert.buttons[$0] }.first { $0.exists }
+        XCTAssertNotNil(allow, "no allow button in the prompt")
+        allow?.tap()
+
+        openNotificationSettings()
+        var deadline = Date().addingTimeInterval(90)
+        while Date() < deadline, !isPushRowOn { settle(2) }
+        attach("16-registered-before-sign-out")
+        XCTAssertTrue(isPushRowOn, "the device did not register with the origin")
+
+        // The logout button sits at the bottom of 마이. The settings screen has no tab bar,
+        // so the way there is the header's home link first.
+        XCTAssertTrue(tapRow("홈"), "the header's home link is missing")
+        XCTAssertTrue(tapTab("마이"), "no 마이 tab")
+        XCTAssertTrue(tapRow("로그아웃"), "no logout button on 마이")
+        XCTAssertTrue(
+            webView.links["로그인하기"].waitForExistence(timeout: 60)
+                || webView.links.matching(NSPredicate(format: "label BEGINSWITH %@", "이메일로 로그인")).firstMatch.waitForExistence(timeout: 5),
+            "signing out did not return to the signed-out screen")
+        attach("17-signed-out")
+
+        // Same account, because the assertion is about this device, not about who is on it:
+        // the server row was dropped on sign-out and has to come back without any tap on the
+        // settings switch or any answer to any dialog.
+        try signIn()
+        XCTAssertFalse(
+            dismissNotificationExplainerIfPresent(timeout: 10),
+            "the explainer came back — the opt-in was lost on sign-out")
+
+        openNotificationSettings()
+        deadline = Date().addingTimeInterval(90)
+        while Date() < deadline, !isPushRowOn { settle(2) }
+        attach("18-registered-after-sign-in")
+        XCTAssertTrue(
+            isPushRowOn,
+            "the device did not re-register after signing back in — the sign-out revocation "
+                + "dropped the opt-in, or the next authenticated page load did not register")
+
+        if let ready = ProcessInfo.processInfo.environment["TEAMEET_UITEST_READY_FILE"], !ready.isEmpty {
+            FileManager.default.createFile(atPath: ready, contents: Data())
+        }
+        XCUIDevice.shared.press(.home)
+        let banner = waitForNotificationBanner(containing: title, timeout: 240)
+        attach(banner == nil ? "19-no-banner" : "19-banner-after-relogin")
+        XCTAssertNotNil(banner, "no server-sent notification reached the re-registered device")
+    }
 }

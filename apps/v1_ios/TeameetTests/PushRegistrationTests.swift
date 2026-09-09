@@ -201,3 +201,80 @@ final class PushCookieScopeTests: XCTestCase {
         XCTAssertFalse(PushCookieScope.matches(domain: host, host: ""))
     }
 }
+
+/// Why a revocation was asked for decides what survives it.
+///
+/// The case that mattered: signing out used to be treated as an opt-out, so a reader who
+/// signed back in was never registered again and received nothing.
+final class PushRevocationTests: XCTestCase {
+
+    func testSignOutIsRecognisedFromTheBridgeReason() {
+        XCTAssertEqual(PushRevocation(bridgeReason: "sign-out"), .signedOut)
+    }
+
+    /// Every older web build sends no reason at all, and the settings switch still does.
+    func testAnythingElseIsAnOptOut() {
+        XCTAssertEqual(PushRevocation(bridgeReason: nil), .userTurnedOff)
+        XCTAssertEqual(PushRevocation(bridgeReason: ""), .userTurnedOff)
+        XCTAssertEqual(PushRevocation(bridgeReason: "SIGN-OUT"), .userTurnedOff)
+        XCTAssertEqual(PushRevocation(bridgeReason: "user"), .userTurnedOff)
+    }
+
+    func testOnlyASignOutKeepsTheOptIn() {
+        XCTAssertTrue(PushRevocation.signedOut.keepsOptIn)
+        XCTAssertFalse(PushRevocation.userTurnedOff.keepsOptIn)
+    }
+}
+
+/// The ledger is what keeps a registration per navigation from becoming a request per
+/// navigation — the endpoint allows ten a minute.
+final class PushRegistrationLedgerTests: XCTestCase {
+
+    private let token = Data(repeating: 0xab, count: 32)
+
+    func testAFreshLedgerNeedsRegistration() {
+        let ledger = PushRegistrationLedger()
+        XCTAssertTrue(ledger.needsRegistration(for: "anything"))
+    }
+
+    func testTheSamePairIsNotRegisteredTwice() {
+        var ledger = PushRegistrationLedger()
+        let fingerprint = PushRegistrationLedger.fingerprint(token: token, session: "s1")
+        ledger.recordRegistered(fingerprint)
+        XCTAssertFalse(ledger.needsRegistration(for: fingerprint))
+    }
+
+    /// A new session is a new account. That is the one change the server must hear about.
+    func testADifferentSessionNeedsRegistration() {
+        var ledger = PushRegistrationLedger()
+        ledger.recordRegistered(PushRegistrationLedger.fingerprint(token: token, session: "s1"))
+        XCTAssertTrue(ledger.needsRegistration(
+            for: PushRegistrationLedger.fingerprint(token: token, session: "s2")))
+    }
+
+    func testADifferentTokenNeedsRegistration() {
+        var ledger = PushRegistrationLedger()
+        ledger.recordRegistered(PushRegistrationLedger.fingerprint(token: token, session: "s1"))
+        XCTAssertTrue(ledger.needsRegistration(
+            for: PushRegistrationLedger.fingerprint(token: Data(repeating: 0xcd, count: 32), session: "s1")))
+    }
+
+    func testClearingForgetsTheRegistration() {
+        var ledger = PushRegistrationLedger()
+        let fingerprint = PushRegistrationLedger.fingerprint(token: token, session: "s1")
+        ledger.recordRegistered(fingerprint)
+        ledger.clear()
+        XCTAssertTrue(ledger.needsRegistration(for: fingerprint))
+    }
+
+    /// The fingerprint must not be the cookie itself, and the two inputs must not be
+    /// confusable by concatenation.
+    func testFingerprintIsAHashThatSeparatesItsInputs() {
+        let fingerprint = PushRegistrationLedger.fingerprint(token: token, session: "s1")
+        XCTAssertEqual(fingerprint.count, 64)
+        XCTAssertFalse(fingerprint.contains("s1"))
+        XCTAssertNotEqual(
+            PushRegistrationLedger.fingerprint(token: Data("ab".utf8), session: "cd"),
+            PushRegistrationLedger.fingerprint(token: Data("abc".utf8), session: "d"))
+    }
+}

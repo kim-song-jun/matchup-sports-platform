@@ -891,9 +891,13 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
               {[match.sport, match.grade ? `${match.grade}등급` : '', match.format, match.gender].filter(Boolean).join(' · ')}
             </span>
             {/* 어느 리그인지는 이 줄이 말한다 — 배지엔 종류만, 제목은 여기서 말줄임된다. */}
+            {/* flex 컨테이너라 공백 텍스트 노드는 그리지 않지만 스크린리더는 읽는다 —
+                없으면 "풋살가을 리그" 로 붙여 읽는다. */}
             {league ? (
               <>
+                {' '}
                 <span aria-hidden="true">·</span>
+                {' '}
                 <span className="tm-team-match-row-cond-league">{league.title}</span>
               </>
             ) : null}

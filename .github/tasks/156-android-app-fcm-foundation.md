@@ -623,3 +623,13 @@ report, upgrade preservation, and the remaining OEM/foldable/multi-window matrix
   `output/playwright/visual-audit/task156-play-policy-followup/`.
 - External gates remain: Play Console declarations, production URL probes after deployment, signed Play
   distribution, pre-launch report, and the physical OEM/device notification and WebView matrix.
+
+## Account-deletion rejection-risk follow-up (2026-09-08)
+
+- Re-probed production: `/my/settings/withdrawal` and the privacy policy return 200, while the required
+  unauthenticated `/account-deletion` resource still returns 404 because the dev route is not on main.
+- Kept active-match, team-authority, and active-admin integrity gates, but the in-app withdrawal screen now
+  maps each server code to an actionable Korean explanation and always links to the public deletion-request
+  alternative instead of leaving a blocked user at a dead end.
+- Public deletion copy continues to distinguish immediate account lock/push revocation, operator final PII
+  cleanup, and narrowly retained completed-match/payment/dispute/security records.

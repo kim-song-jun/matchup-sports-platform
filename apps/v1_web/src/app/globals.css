@@ -2861,8 +2861,13 @@ label.tm-btn:focus-within {
   min-width: 0;
 }
 
+/* 리그명은 첫 줄의 남는 폭을 차지해 말줄임한다(flex-basis 0). 남는 폭이 48px 도 안 되면
+   다음 줄로 내려간다 — 390 alpha 실측: 보통 조건("풋살")은 한 줄, "풋살 · A등급 · 5:5 ·
+   성별 무관" 같은 극단 조합만 두 줄. flex-basis auto 였을 땐 리그명이 항상 둘째 줄로 내려가
+   줄 머리에 구분점만 남았다. */
 .tm-team-match-row-cond-league {
-  min-width: 0;
+  flex: 1 1 0;
+  min-width: 48px;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;

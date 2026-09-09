@@ -417,9 +417,9 @@ describe('리그전 배지', () => {
 
     const badge = container.querySelector('.tm-team-match-row-id .tm-badge-grey');
     expect(badge).not.toBeNull();
-    expect(badge!.textContent).toBe('정규 리그');
-    expect(container.querySelector('.tm-team-match-row-cond')!.textContent).toBe('풋살 · 가을 리그');
-    expect(container.querySelector('.tm-team-match-row-cond-league')!.textContent).toBe(' · 가을 리그');
+    expect(badge).toHaveTextContent('정규 리그');
+    expect(container.querySelector('.tm-team-match-row-cond')).toHaveTextContent('풋살 · 가을 리그');
+    expect(container.querySelector('.tm-team-match-row-cond-league')).toHaveTextContent('가을 리그');
   });
 
   it('리그 소속이 아니면 목록 카드에 리그 배지도 리그명도 없다', () => {

@@ -215,9 +215,13 @@ class LiveWebHarnessCase: XCTestCase {
         // Enter submits the form outright on most attempts, and when it does not it at least
         // puts the keyboard away and brings the button back into view.
         passwordField.typeText("\n")
-        settle(2)
 
-        if !webView.links["마이"].exists {
+        // Enter usually submits, and the sign-in then takes a few seconds during which the
+        // form — and its button — is already gone. Looking for the button after a fixed two
+        // seconds raced that: measured once as "no submit button" on a run whose recording
+        // shows the signed-in skeleton loading. Wait for the sign-in first; tap only if it
+        // never comes.
+        if !webView.links["마이"].waitForExistence(timeout: 20) {
             XCTAssertTrue(tapRow("로그인"), "no submit button on the sign-in form")
         }
         XCTAssertTrue(webView.links["마이"].waitForExistence(timeout: 90), "sign-in did not complete")

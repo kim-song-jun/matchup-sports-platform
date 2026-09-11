@@ -4,31 +4,10 @@ import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { V1TournamentDetail } from '@/types/api';
-import type { V1LeaguePlayerRecordRow } from '@/types/league-match';
 import { AwardsPageClient, ReviewFormModal } from './awards-page-client';
 
 const awardsApiMocks = vi.hoisted(() => ({
   useV1Tournament: vi.fn(),
-  useV1LeagueMatchPlayerRecords: vi.fn((_leagueId: string) => ({
-    data: {
-      leagueId: 'tournament-1',
-      goals: [] as V1LeaguePlayerRecordRow[],
-      assists: [] as V1LeaguePlayerRecordRow[],
-    },
-    isLoading: false,
-    isPending: false,
-    isError: false,
-    error: null,
-    refetch: vi.fn(),
-  })),
-  usePublicTournamentPlayerRecords: vi.fn((_tournamentId: string, _options?: { enabled?: boolean }) => ({
-    data: { goals: [], assists: [] },
-    isLoading: false,
-    isPending: false,
-    isError: false,
-    error: null,
-    refetch: vi.fn(),
-  })),
 }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
@@ -36,10 +15,19 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   ...awardsApiMocks,
 }));
 
+// 정규 리그 시즌 게이트(tournament.kind !== 'regular_league') 검증용 — 기본 구현을
+// 팩토리에 둬서 이 훅을 신경 쓰지 않는 다른 describe 블록의 clearAllMocks()에 안전하다.
+const playerRecordsApiMocks = vi.hoisted(() => ({
+  usePublicTournamentPlayerRecords: vi.fn(() => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+  })),
+}));
+
 vi.mock('@/components/public-game-records/use-public-game-records', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/components/public-game-records/use-public-game-records')>()),
-  usePublicTournamentPlayerRecords: (tournamentId: string, options?: { enabled?: boolean }) =>
-    awardsApiMocks.usePublicTournamentPlayerRecords(tournamentId, options),
+  ...playerRecordsApiMocks,
 }));
 
 vi.mock('@/lib/analytics', () => ({
@@ -145,26 +133,6 @@ describe('AwardsPageClient GA events', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    awardsApiMocks.usePublicTournamentPlayerRecords.mockReturnValue({
-      data: { goals: [], assists: [] },
-      isLoading: false,
-      isPending: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    });
-    awardsApiMocks.useV1LeagueMatchPlayerRecords.mockReturnValue({
-      data: {
-        leagueId: 'tournament-1',
-        goals: [] as V1LeaguePlayerRecordRow[],
-        assists: [] as V1LeaguePlayerRecordRow[],
-      },
-      isLoading: false,
-      isPending: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    });
     awardsApiMocks.useV1Tournament.mockReturnValue({
       data: makeCompletedTournament(),
       isLoading: false,
@@ -202,48 +170,6 @@ describe('AwardsPageClient GA events', () => {
 
     expect(trackEvent).toHaveBeenCalledWith('tournament_share', { channel: 'clipboard' });
     expect(writeTextMock).toHaveBeenCalled();
-  });
-});
-
-describe('AwardsPageClient — regular league player records endpoint', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    awardsApiMocks.usePublicTournamentPlayerRecords.mockReturnValue({
-      data: { goals: [], assists: [] },
-      isLoading: false,
-      isPending: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    });
-    awardsApiMocks.useV1Tournament.mockReturnValue({
-      data: makeCompletedTournament({ kind: 'regular_league' }),
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    });
-    awardsApiMocks.useV1LeagueMatchPlayerRecords.mockReturnValue({
-      data: {
-        leagueId: 'tournament-1',
-        goals: [{ userId: 'user-1', nickname: '리그 득점자', goals: 3, assists: 0 }],
-        assists: [{ userId: 'user-2', nickname: '리그 도움자', goals: 0, assists: 2 }],
-      },
-      isLoading: false,
-      isPending: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    });
-  });
-
-  it('uses the league player-records query and does not enable the tournament query', () => {
-    render(<AwardsPageClient tournamentId="tournament-1" />);
-
-    expect(awardsApiMocks.useV1LeagueMatchPlayerRecords).toHaveBeenCalledWith('tournament-1');
-    expect(awardsApiMocks.usePublicTournamentPlayerRecords).toHaveBeenCalledWith('tournament-1', { enabled: false });
-    expect(screen.getByText('리그 득점자')).toBeInTheDocument();
-    expect(screen.getByText('리그 도움자')).toBeInTheDocument();
   });
 });
 
@@ -323,5 +249,43 @@ describe('ReviewFormModal — 모달 a11y(useModalA11y) 배선', () => {
     const backdrop = screen.getByRole('dialog', { name: '리뷰 작성' }).parentElement as HTMLElement;
     fireEvent.click(backdrop);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+// alpha 실측: 정규 리그 시즌 대회(kind: regular_league)의 "시상·리뷰" 화면에서 개인
+// 기록 조회가 항상 404 TOURNAMENT_MATCH_NOT_FOUND 였다 — 리그 거울 행엔 대회 축 게임이
+// 없어 이 API는 의도적으로 리그를 막는다(test/tournaments/tournament-surface-kind.
+// integration-spec.ts). 화면이 애초에 리그에서는 이 API를 호출하지 않아야 한다.
+describe('AwardsPageClient — 정규 리그 시즌은 개인 기록(player-records) 조회를 시도하지 않는다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('kind=regular_league면 usePublicTournamentPlayerRecords를 호출하지 않는다', () => {
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({ kind: 'regular_league' }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    expect(playerRecordsApiMocks.usePublicTournamentPlayerRecords).not.toHaveBeenCalled();
+  });
+
+  it('kind=regular_tournament면 usePublicTournamentPlayerRecords를 호출한다', () => {
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({ kind: 'regular_tournament' }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    expect(playerRecordsApiMocks.usePublicTournamentPlayerRecords).toHaveBeenCalledWith('tournament-1');
   });
 });

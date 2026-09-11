@@ -12,7 +12,6 @@ import {
   useV1MyTournamentReview,
   useV1SubmitTournamentReview,
   useV1UploadImages,
-  useV1LeagueMatchPlayerRecords,
 } from '@/hooks/use-v1-api';
 import { usePublicTournamentPlayerRecords } from '@/components/public-game-records/use-public-game-records';
 import { TournamentPlayerRecordsSections } from '@/components/public-game-records/player-records-sections';
@@ -296,20 +295,12 @@ function PrizeSection({
  * 데이터를 함께 보여주는 패턴의 대회판이며, 어워드(수상자)가 "왜 그 사람인지"를
  * 옆에서 뒷받침한다. 기록이 없으면 EmptyState(emptyBehavior=empty-state).
  */
-function PlayerRecordsSection({ tournamentId, isRegularLeague }: { tournamentId: string; isRegularLeague: boolean }) {
-  const tournamentRecords = usePublicTournamentPlayerRecords(tournamentId, { enabled: !isRegularLeague });
-  const leagueRecords = useV1LeagueMatchPlayerRecords(isRegularLeague ? tournamentId : '');
-  const records = isRegularLeague ? leagueRecords : tournamentRecords;
-  const goals = isRegularLeague
-    ? (leagueRecords.data?.goals ?? []).map((row) => ({ ...row, profileHref: `/users/${row.userId}` }))
-    : tournamentRecords.data?.goals;
-  const assists = isRegularLeague
-    ? (leagueRecords.data?.assists ?? []).map((row) => ({ ...row, profileHref: `/users/${row.userId}` }))
-    : tournamentRecords.data?.assists;
+function PlayerRecordsSection({ tournamentId }: { tournamentId: string }) {
+  const records = usePublicTournamentPlayerRecords(tournamentId);
   return (
     <TournamentPlayerRecordsSections
-      goals={goals}
-      assists={assists}
+      goals={records.data?.goals}
+      assists={records.data?.assists}
       isLoading={records.isLoading}
       isError={records.isError}
       errorMessage={extractErrorMessage(records.error, '기록을 불러오지 못했어요.')}
@@ -929,8 +920,9 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
             {/* 개인 어워드 */}
             <IndividualAwardsSection tournament={tournament} />
 
-            {/* 개인 기록 랭킹 (STATS-1) */}
-            <PlayerRecordsSection tournamentId={tournament.id} isRegularLeague={tournament.kind === 'regular_league'} />
+            {/* 개인 기록 랭킹 (STATS-1) — 정규 리그 시즌 거울 행은 대회 축 게임이 없어
+                이 API가 항상 404다(tournament-surface-kind.integration-spec.ts 계약). */}
+            {tournament.kind !== 'regular_league' && <PlayerRecordsSection tournamentId={tournament.id} />}
 
             {/* 참가팀 후기 */}
             <ReviewsSection tournament={tournament} />
@@ -942,7 +934,7 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
         /* 상금 정보가 없는 대회는 2열 그리드 대신 전체 폭 단일 컬럼으로 — 빈 좌측 트랙이 생기지 않도록 */
         <div className="tm-tourn-hero-full" style={{ padding: '0 20px' }}>
           <IndividualAwardsSection tournament={tournament} />
-          <PlayerRecordsSection tournamentId={tournament.id} isRegularLeague={tournament.kind === 'regular_league'} />
+          {tournament.kind !== 'regular_league' && <PlayerRecordsSection tournamentId={tournament.id} />}
             <ReviewsSection tournament={tournament} />
         </div>
       )}

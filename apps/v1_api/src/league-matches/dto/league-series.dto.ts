@@ -4,6 +4,7 @@ import {
   IsDateString,
   IsIn,
   IsInt,
+  IsNotEmpty,
   IsNumber,
   IsObject,
   IsOptional,
@@ -70,7 +71,11 @@ export class CreateLeagueSeriesDto {
   @IsUUID()
   sportId!: string;
 
-  @IsUUID()
+  // Master regions use stable slugs (for example `region-busan-jung`) as IDs.
+  // The service still enforces active level-2 membership.
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
   regionId!: string;
 
   /** 1~3. 팀이 모이지 않는 종목·지역은 1로 두고 단일 티어로 운영한다. */

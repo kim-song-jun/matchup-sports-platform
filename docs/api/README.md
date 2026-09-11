@@ -15,6 +15,7 @@ This directory is the single indexed contract tree for `apps/v1_api` and `apps/v
 - [Teams](./domains/teams.md)
 - [Team matches](./domains/team-matches.md)
 - [Tournaments](./domains/tournaments.md)
+- [League matches](./domains/league-matches.md)
 - [Games](./domains/games.md)
 - [Team schedules](./domains/team-schedules.md)
 - [Tournament operations](./domains/tournament-operations.md)

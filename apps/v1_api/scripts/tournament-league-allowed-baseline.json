@@ -13,8 +13,8 @@
     "why": "결과 확정 알림 — 행이 없으면 대회명이 `?? '대회'` 로 폴백된다. 기능이 아니라 라벨이 어긋나는 급이지만 조용히 틀리는 것은 같다(read-swap-preflight.md §1-3)."
   },
   "src/games/public-records/public-tournament-records.service.ts": {
-    "allowed": 1,
-    "why": "공개 일정 조회(getSchedule) — 리그를 대회 표면에 올린 뒤 **이 API 만 리그에서 404** 라, `/tournaments/:id/schedule` 과 `/tournaments/:id/bracket` 이 둘 다 \"경기 정보를 찾을 수 없어요\" 만 그렸다(두 화면이 같은 `ScheduleContent` + `usePublicTournamentSchedule` 을 쓴다 — 그래서 이 한 곳이 두 화면을 동시에 죽였고, 동시에 살린다). 좁혀 두면 리그 상세의 주 CTA(\"진행 중인 리그 보기\")가 에러 화면으로 간다. 거울 행에는 대회 축 대진이 없으므로 `leagueSchedule` 이 리그 축에서 같은 응답 모양을 만든다 — `tournaments-read.service.ts` 의 `leagueOverallStandings` 와 같은 갈래다. **대회의 대진표 미공개 게이트는 그대로 유지된다**(`public-league-schedule.spec.ts` 의 대조군이 그것을 고정한다 — 게이트를 없앤 것이 아니라 리그에 해당 없음으로 갈랐다)."
+    "allowed": 2,
+    "why": "공개 일정 조회(getSchedule) — 리그를 대회 표면에 올린 뒤 **이 API 만 리그에서 404** 라, `/tournaments/:id/schedule` 과 `/tournaments/:id/bracket` 이 둘 다 \"경기 정보를 찾을 수 없어요\" 만 그렸다(두 화면이 같은 `ScheduleContent` + `usePublicTournamentSchedule` 을 쓴다 — 그래서 이 한 곳이 두 화면을 동시에 죽였고, 동시에 살린다). 좁혀 두면 리그 상세의 주 CTA(\"진행 중인 리그 보기\")가 에러 화면으로 간다. 거울 행에는 대회 축 대진이 없으므로 `leagueSchedule` 이 리그 축에서 같은 응답 모양을 만든다 — `tournaments-read.service.ts` 의 `leagueOverallStandings` 와 같은 갈래다. **대회의 대진표 미공개 게이트는 그대로 유지된다**(`public-league-schedule.spec.ts` 의 대조군이 그것을 고정한다 — 게이트를 없앤 것이 아니라 리그에 해당 없음으로 갈랐다). (2026-09-11: 개인 기록 조회(getPlayerRecords)도 같은 이유로 추가 — alpha 실측, 리그 대회의 \"시상·리뷰\" 화면 진입 시 이 API 만 404 `TOURNAMENT_MATCH_NOT_FOUND` 를 내 에러 카드가 떴다. 이쪽은 getSchedule 과 달리 리그 축 브리지를 새로 만들지 않는다 — 거울 행엔 대회 축 게임(`V1Game.tournamentFixture`)이 하나도 없어 조회가 자연히 빈 배열로 떨어지고, 그 경로는 이미 \"아직 기록이 없어요\" empty state 계약을 갖고 있어 좁은 게이트만 걷어내면 충분하다.)"
   },
   "src/tournaments/tournaments-read.service.ts": {
     "allowed": 2,

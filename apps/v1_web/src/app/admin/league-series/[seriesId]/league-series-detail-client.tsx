@@ -11,7 +11,7 @@ import {
   useV1PreviewLeaguePromotions,
   useV1SeedLeagueSeason,
 } from '@/hooks/use-v1-api';
-import { extractErrorMessage } from '@/lib/error-message';
+import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import type { V1CommitPromotionEntry, V1PromotionPreviewResponse, V1SeedSeasonPayload } from '@/types/league-series';
 
 export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: string }) {
@@ -43,17 +43,24 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
   const handlePreview = (seasonNo: number) => {
     previewPromotions.mutate(seasonNo, {
       onSuccess: (result) => {
+        if (result.alreadyDecided) {
+          setPreview(null);
+          void refetch();
+          showToast('이미 승강이 확정된 시즌이에요.', 'error');
+          return;
+        }
         setPreview(result);
         setPreviewNonce((n) => n + 1);
-        // 이미 확정된 시즌은 다시 확정할 수 없다 — commit 이 409 로 막히므로 미리 알린다.
-        if (result.alreadyDecided) showToast('이미 승강이 확정된 시즌이에요.', 'error');
       },
       onError: (error) => showToast(extractErrorMessage(error, '승강 후보를 계산하지 못했어요.'), 'error'),
     });
   };
 
   const handleCommit = (entries: V1CommitPromotionEntry[]) => {
-    if (preview === null) return;
+    if (preview === null || series?.seasons.some((season) => season.seasonNo === preview.seasonNo + 1)) {
+      setPreview(null);
+      return;
+    }
     commitPromotions.mutate(
       // preview 를 만든 규칙의 지문을 함께 보낸다 — 그 사이 어드민이 규칙을 바꿨다면
       // 서버가 409 PROMOTION_RULE_CHANGED 로 막고 다시 계산하게 한다.
@@ -67,7 +74,15 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
             'success',
           );
         },
-        onError: (error) => showToast(extractErrorMessage(error, '승강을 확정하지 못했어요.'), 'error'),
+        onError: (error) => {
+          if (extractErrorCode(error) === 'PROMOTION_ALREADY_DECIDED') {
+            setPreview(null);
+            void refetch();
+            showToast('이미 승강이 확정된 시즌이에요.', 'error');
+            return;
+          }
+          showToast(extractErrorMessage(error, '승강을 확정하지 못했어요.'), 'error');
+        },
       },
     );
   };
@@ -94,6 +109,10 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
   }
 
   const rule = series.promotionRule;
+  const canRenderPreview =
+    preview !== null &&
+    !preview.alreadyDecided &&
+    !series.seasons.some((season) => season.seasonNo === preview.seasonNo + 1);
   const ruleSummary =
     series.tierCount === 1
       ? '티어가 하나라 승강이 없어요.'
@@ -167,7 +186,7 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
 
               {decided ? (
                 <p className="mt-2 text-xs text-[var(--text-muted)]">
-                  다음 시즌 리그가 이미 만들어졌어요. 아래 {season.seasonNo + 1}시즌 카드에서 결과를 볼 수 있어요.
+                  다음 시즌 리그가 이미 만들어졌어요. {season.seasonNo + 1}시즌 카드에서 결과를 볼 수 있어요.
                 </p>
               ) : (
                 !season.allCompleted && (
@@ -181,7 +200,7 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
                 {season.tiers.map((tier) => (
                   <li
                     key={tier.leagueId}
-                    className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3"
+                    className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="rounded-md bg-blue-100 px-2 py-0.5 text-2xs font-bold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
@@ -191,7 +210,7 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
                     </div>
                     <Link
                       href={`/admin/league-matches/${tier.leagueId}`}
-                      className="mt-2 block truncate text-sm font-semibold text-[var(--blue700)]"
+                      className="mt-2 block min-h-[44px] truncate py-3 text-sm font-semibold text-[var(--blue700)]"
                     >
                       {tier.title}
                     </Link>
@@ -205,7 +224,7 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
         </div>
       )}
 
-      {preview !== null && (
+      {canRenderPreview && preview !== null && (
         <div className="mt-6">
           <h2 className="mb-3 text-base font-bold text-[var(--text-strong)]">
             {preview.seasonNo}시즌 승강 확정

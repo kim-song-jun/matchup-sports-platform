@@ -275,12 +275,7 @@ export class PublicTournamentRecordsService {
    * 참가자 스탯 행 자체가 없어 자연히 집계되지 않는다.
    */
   async getPlayerRecords(tournamentId: string) {
-    // 정규 리그 시즌 거울 행(`kind: 'regular_league'`)은 대회 축 대진(`V1TournamentFixture`)이
-    // 하나도 없다 -- getSchedule과 같은 이유(524번째 줄 주석 참고)로 `TOURNAMENT_KINDS`만
-    // 쓰면 리그를 404로 막는다. 아래 조회가 리그 축 게임을 찾지 못해 자연히
-    // `{ goals: [], assists: [] }`로 떨어지므로(228번째 줄 EmptyState 계약), 별도 리그
-    // 축 브리지 없이 게이트만 getSchedule과 맞춘다.
-    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId },
       select: { id: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
     });

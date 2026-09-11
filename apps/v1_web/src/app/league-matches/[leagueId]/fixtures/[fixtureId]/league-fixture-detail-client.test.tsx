@@ -273,6 +273,26 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.queryByTestId('league-claim-section')).not.toBeInTheDocument();
   });
 
+  it.each(['approved', 'host_team'] as const)('legacy viewer state(%s)만 있고 현재 참가 권한 플래그가 없으면 claim을 보여주지 않는다', (state) => {
+    mockLeague();
+    mockViewer(state);
+    mockRecord('present');
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+    // 공개 기록은 유지하지만, 서버가 403으로 거부할 claim affordance는 숨긴다.
+    expect(screen.getByText('경기 기록')).toBeInTheDocument();
+    expect(screen.queryByTestId('league-claim-section')).not.toBeInTheDocument();
+  });
+
+  it('양 팀 manager 권한 플래그가 있으면 legacy state와 무관하게 claim을 보여준다', () => {
+    mockLeague();
+    mockViewer('none', { manageableOpponentTeam: true });
+    mockRecord('present');
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+    expect(screen.getByTestId('league-claim-section')).toBeInTheDocument();
+  });
+
   it('참가자 권한을 다시 잃으면 재렌더링에서 내 기록 연결 진입점을 제거한다', () => {
     mockLeague();
     mockRecord('present');

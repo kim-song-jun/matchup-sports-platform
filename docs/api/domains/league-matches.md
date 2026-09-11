@@ -19,6 +19,15 @@ LEAGUE_REGION_INVALID`. This domain check remains separate from DTO shape
 validation so persisted master identifiers are accepted without allowing
 arbitrary regions.
 
+## Create a league series
+
+`POST /api/v1/admin/league-series` accepts `title`, UUID `sportId`, a
+non-empty master `regionId` string (maximum 100 characters), and `tierCount`
+from 1 through 3. Region slugs such as `region-busan-jung` are valid; UUID
+strings remain valid at the DTO boundary for compatibility. The service still
+requires the region to be active and level 2, and returns `422
+LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
+
 ## Read and manage fixtures
 
 - `GET /api/v1/league-matches/me` lists leagues for the authenticated user's

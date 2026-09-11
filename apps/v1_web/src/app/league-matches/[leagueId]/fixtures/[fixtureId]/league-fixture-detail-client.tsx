@@ -196,7 +196,9 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
     teamMatchQuery.data !== undefined &&
     !teamMatchQuery.isPending &&
     !teamMatchQuery.isError &&
-    isParticipant;
+    (viewer?.manageableHostTeam === true ||
+      viewer?.manageableOpponentTeam === true ||
+      viewer?.participantMember === true);
   // 서버 assertCanUseTeamMatchChat(chat.service.ts)과 정확히 같은 기준으로 바꾼다 — 양 팀
   // owner/manager. 예전엔 host_team/approved(=신청서를 낸 사람 한 명)만 봐서, 리그 대진의
   // 신청서를 운영자가 대신 내는 원정팀 owner/manager는 canChat이 영원히 false였다(alpha

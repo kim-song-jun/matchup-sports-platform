@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
@@ -55,7 +55,11 @@ function render(ui: ReactElement) {
     },
   });
 
-  return rtlRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  return rtlRender(ui, {
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    ),
+  });
 }
 
 // useV1LeagueMatches 는 팀 상세가 항상 호출한다("내 리그" 섹션). describe 마다 채우면
@@ -244,6 +248,61 @@ describe('TeamMembersPageClient GA events', () => {
         expect.objectContaining({ onSuccess: expect.any(Function) }),
       );
       expect(trackEvent).toHaveBeenCalledWith('team_application_reject', { teamId: 'team-1' });
+    });
+  });
+
+  it('removes stale review controls when the live viewer role changes to member', async () => {
+    const ownerDetail = {
+      name: '성수 풋살 크루',
+      canViewMembers: true,
+      viewer: { role: 'owner', membershipId: 'membership-owner' },
+    };
+    const memberDetail = {
+      name: '성수 풋살 크루',
+      canViewMembers: true,
+      viewer: { role: 'member', membershipId: 'membership-owner' },
+    };
+    teamApiMocks.useV1TeamDetail
+      .mockReset()
+      .mockReturnValue({ data: ownerDetail, isError: false });
+    teamApiMocks.useV1TeamMembers.mockReturnValue({
+      data: {
+        items: [{
+          membershipId: 'membership-owner',
+          userId: 'user-owner',
+          displayName: '김도윤',
+          role: 'member',
+          status: 'active',
+          joinedAt: '2026-01-01T00:00:00.000Z',
+          canChangeRole: false,
+          canRemove: false,
+        }],
+        summary: { ownerCount: 0, managerCount: 0, memberCount: 1 },
+        viewerRole: 'member',
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isError: false,
+    });
+
+    const rendered = render(<TeamMembersPageClient teamId="team-1" />);
+    fireEvent.click(await screen.findByRole('button', { name: /^가입 신청/ }));
+    expect(screen.getByText('이서준')).toBeInTheDocument();
+
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: memberDetail, isError: false });
+    rendered.rerender(<TeamMembersPageClient teamId="team-1" />);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /^가입 신청/ })).toBeNull();
+      expect(screen.queryByText('이서준')).toBeNull();
+      expect(screen.queryByText('권한 규칙')).toBeNull();
+      expect(screen.queryByRole('button', { name: '관리' })).toBeNull();
+      expect(screen.getByRole('heading', { name: '성수 풋살 크루 · 멤버 목록' })).toBeInTheDocument();
+      expect(teamApiMocks.useV1TeamJoinApplications).toHaveBeenLastCalledWith(
+        'team-1',
+        { status: 'requested', limit: 50 },
+        { enabled: false },
+      );
+      expect(teamApiMocks.useV1TeamInvitations).toHaveBeenLastCalledWith('team-1', { enabled: false });
     });
   });
 });

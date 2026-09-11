@@ -360,6 +360,7 @@ describe('TeamMembersPageView — 보낸 초대 목록', () => {
     const fallback = getTeamMembersViewModel();
     return {
       ...fallback,
+      viewerRole: 'owner',
       activeTab: 'invitations',
       invitations: {
         form: {
@@ -478,6 +479,40 @@ describe('TeamFormPageView', () => {
 });
 
 describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
+  it('일반 멤버는 관리자 문구·가입 신청 탭·비활성 관리 버튼 없이 본인 탈퇴만 본다', () => {
+    const base = getTeamMembersViewModel();
+    const model: TeamMembersViewModel = {
+      ...base,
+      viewerRole: 'member',
+      activeTab: 'requests',
+      tabs: [
+        { key: 'members', label: '멤버', count: 2, onSelect: vi.fn() },
+        { key: 'requests', label: '가입 신청', count: 4, onSelect: vi.fn() },
+        { key: 'invitations', label: '초대', count: 2, onSelect: vi.fn() },
+      ],
+      members: [
+        { name: '김도윤', role: '팀장', meta: '가입 2024.03', actions: [] },
+        {
+          name: '이하나',
+          role: '멤버',
+          meta: '가입 2024.05',
+          actions: [],
+          selfLeave: { disabled: false, pending: false, onSelect: vi.fn() },
+        },
+      ],
+    };
+
+    render(<TeamMembersPageView model={model} />);
+
+    expect(screen.getByRole('heading', { level: 1, name: '성수 러너스 FC · 멤버 목록' })).toBeInTheDocument();
+    expect(screen.queryByText('권한 규칙')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^가입 신청/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^초대/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '관리' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '멤버 탭 선택' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '팀 나가기' })).toBeEnabled();
+  });
+
   it('본인 행에만 "팀 나가기" 버튼이 보이고 클릭 시 onSelect가 호출된다', () => {
     const onSelect = vi.fn();
     const base = getTeamMembersViewModel();

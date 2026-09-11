@@ -1766,6 +1766,8 @@ export type V1ClaimableParticipants = {
   participants: {
     participantId: string;
     sideId: string;
+    sideKey: 'HOME' | 'AWAY';
+    sideLabel: string;
     displayName: string;
     jerseyNumber: number | null;
   }[];

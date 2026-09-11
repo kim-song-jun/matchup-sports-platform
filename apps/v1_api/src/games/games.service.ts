@@ -3235,6 +3235,17 @@ export class GamesService {
     if (participants.length === 0) {
       return { gameId, version: game.version, participants: [] };
     }
+    const sides = await this.prisma.v1GameSide.findMany({
+      where: { gameId, id: { in: [...new Set(participants.map((participant) => participant.sideId))] } },
+      select: { id: true, sideKey: true, displayNameSnapshot: true },
+    });
+    const sideById = new Map(sides.map((side) => [side.id, side]));
+    if (participants.some((participant) => !sideById.has(participant.sideId))) {
+      throw new ConflictException({
+        code: 'GAME_SIDE_CONTEXT_MISSING',
+        message: '참가자의 팀 정보가 없어 기록 연결 명단을 표시할 수 없어요.',
+      });
+    }
     // 이미 연결된 참가자는 뺀다 -- 남의 연결을 빼앗는 경로를 애초에 안 만든다.
     // (설령 목록에 넣어도 requestIdentityLink 가 409 로 막지만, 고를 수 있게 보여주는
     //  것 자체가 "가능하다"는 신호가 된다.)
@@ -3251,6 +3262,8 @@ export class GamesService {
         .map((participant) => ({
           participantId: participant.id,
           sideId: participant.sideId,
+          sideKey: sideById.get(participant.sideId)!.sideKey,
+          sideLabel: sideById.get(participant.sideId)!.displayNameSnapshot,
           displayName: participant.displayNameSnapshot,
           jerseyNumber: participant.jerseyNumber,
         })),

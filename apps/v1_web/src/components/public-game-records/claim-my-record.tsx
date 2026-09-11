@@ -192,12 +192,42 @@ function ClaimMyRecordView({
                     key={participant.participantId}
                     type="button"
                     className={`tm-btn tm-btn-md ${selected === participant.participantId ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
-                    style={{ minHeight: 44, justifyContent: 'flex-start' }}
+                    style={{
+                      minHeight: 44,
+                      width: '100%',
+                      minWidth: 0,
+                      justifyContent: 'flex-start',
+                      alignItems: 'flex-start',
+                      textAlign: 'left',
+                      whiteSpace: 'normal',
+                      overflowWrap: 'anywhere',
+                      ...(selected === participant.participantId ? { background: 'var(--static-blue)' } : {}),
+                    }}
                     aria-pressed={selected === participant.participantId}
                     onClick={() => setSelected(participant.participantId)}
                   >
-                    {participant.jerseyNumber !== null ? `${participant.jerseyNumber}. ` : ''}
-                    {participant.displayName}
+                    <span
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 2,
+                        width: '100%',
+                        minWidth: 0,
+                      }}
+                    >
+                      <span
+                        className="tm-text-caption"
+                        style={{
+                          color: selected === participant.participantId ? 'inherit' : 'var(--text-muted)',
+                        }}
+                      >
+                        {participant.sideLabel} · {participant.sideKey === 'HOME' ? '홈' : '원정'}
+                      </span>
+                      <span>
+                        {participant.jerseyNumber !== null ? `${participant.jerseyNumber}. ` : ''}
+                        {participant.displayName}
+                      </span>
+                    </span>
                   </button>
                 ))
               )}
@@ -213,7 +243,7 @@ function ClaimMyRecordView({
               <button
                 type="button"
                 className={`tm-btn tm-btn-md ${loaded && !hasCandidates ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
-                style={{ flex: 1, minHeight: 44 }}
+                style={{ flex: 1, minHeight: 44, ...(loaded && !hasCandidates ? { background: 'var(--static-blue)' } : {}) }}
                 onClick={() => onOpenChange(false)}
               >
                 {loaded && !hasCandidates ? '닫기' : '취소'}
@@ -222,7 +252,7 @@ function ClaimMyRecordView({
               <button
                 type="button"
                 className="tm-btn tm-btn-md tm-btn-primary"
-                style={{ flex: 1, minHeight: 44 }}
+                style={{ flex: 1, minHeight: 44, ...(selected !== null && !request.isPending && claimable.data !== undefined ? { background: 'var(--static-blue)' } : {}) }}
                 disabled={selected === null || request.isPending || claimable.data === undefined}
                 onClick={() => {
                   if (selected === null || claimable.data === undefined) return;

@@ -32,6 +32,7 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
     memberships?: unknown[];
     lineups?: unknown[];
     participants?: unknown[];
+    sides?: unknown[];
     linked?: unknown[];
   }) {
     const prisma = {
@@ -56,6 +57,9 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       },
       v1GameParticipant: {
         findMany: jest.fn().mockResolvedValue(overrides.participants ?? []),
+      },
+      v1GameSide: {
+        findMany: jest.fn().mockResolvedValue(overrides.sides ?? [{ id: 's-1', sideKey: 'HOME', displayNameSnapshot: '블루팀' }]),
       },
       v1ParticipantIdentityLinkCurrent: {
         findMany: jest.fn().mockResolvedValue(overrides.linked ?? []),
@@ -130,7 +134,7 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       // requestIdentityLink 의 expectedVersion 으로 그대로 되돌아가는 값이다.
       version: 4,
       participants: [
-        { participantId: 'p-1', sideId: 's-1', displayName: '김민준', jerseyNumber: 7 },
+        { participantId: 'p-1', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '김민준', jerseyNumber: 7 },
       ],
     });
   });
@@ -162,8 +166,52 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       // 폐기된 revision 1의 'p-stale'은 나오지 않는다 — 골랐다면 공식 결과가 절대
       // 매칭되지 않는 participantId였다.
       participants: [
-        { participantId: 'p-current', sideId: 's-1', displayName: '김민준', jerseyNumber: 7 },
+        { participantId: 'p-current', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '김민준', jerseyNumber: 7 },
       ],
+    });
+  });
+
+  it('동명이인 참가자는 canonical sideKey와 팀 snapshot label을 함께 반환한다', async () => {
+    const { service, prisma } = makeService({
+      teamMatch: { game: { id: 'game-1', version: 7 } },
+      memberships: [{ teamId: 'team-host', role: 'member' }],
+      lineups: [
+        { id: 'lineup-home', sideId: 's-home', revision: 1, state: 'SUBMITTED', invalidatedAt: null },
+        { id: 'lineup-away', sideId: 's-away', revision: 1, state: 'SUBMITTED', invalidatedAt: null },
+      ],
+      participants: [
+        { id: 'p-home', sideId: 's-home', lineupId: 'lineup-home', displayNameSnapshot: 'E2E 선수01', jerseyNumber: null },
+        { id: 'p-away', sideId: 's-away', lineupId: 'lineup-away', displayNameSnapshot: 'E2E 선수01', jerseyNumber: null },
+      ],
+      sides: [
+        { id: 's-home', sideKey: 'HOME', displayNameSnapshot: '블루팀' },
+        { id: 's-away', sideKey: 'AWAY', displayNameSnapshot: '레드팀' },
+      ],
+    });
+
+    await expect(service.listLeagueClaimableParticipants(user, 'league-1', 'tm-1')).resolves.toMatchObject({
+      participants: [
+        expect.objectContaining({ participantId: 'p-home', sideKey: 'HOME', sideLabel: '블루팀' }),
+        expect.objectContaining({ participantId: 'p-away', sideKey: 'AWAY', sideLabel: '레드팀' }),
+      ],
+    });
+    expect(prisma.v1GameSide.findMany).toHaveBeenCalledWith({
+      where: { gameId: 'game-1', id: { in: ['s-home', 's-away'] } },
+      select: { id: true, sideKey: true, displayNameSnapshot: true },
+    });
+  });
+
+  it('참가자 side가 없으면 조용히 라벨을 추측하지 않고 무결성 충돌을 반환한다', async () => {
+    const { service } = makeService({
+      teamMatch: { game: { id: 'game-1', version: 7 } },
+      memberships: [{ teamId: 'team-host', role: 'member' }],
+      lineups: [{ id: 'lineup-1', sideId: 's-missing', revision: 1, state: 'SUBMITTED', invalidatedAt: null }],
+      participants: [{ id: 'p-missing', sideId: 's-missing', lineupId: 'lineup-1', displayNameSnapshot: 'E2E 선수01', jerseyNumber: null }],
+      sides: [],
+    });
+
+    await expect(service.listLeagueClaimableParticipants(user, 'league-1', 'tm-1')).rejects.toMatchObject({
+      response: { code: 'GAME_SIDE_CONTEXT_MISSING' },
     });
   });
 });

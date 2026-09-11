@@ -72,14 +72,14 @@ export function TournamentPlayerRecordsSections({
   }
 
   return wrap(
-    <>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 20 }}>
       {goalRows.length > 0 ? (
         <RecordList title="득점 순위" rows={goalRows} ranks={goalRanks} unit="골" value={(row) => row.goals} />
       ) : null}
       {assistRows.length > 0 ? (
         <RecordList title="도움 순위" rows={assistRows} ranks={assistRanks} unit="도움" value={(row) => row.assists} />
       ) : null}
-    </>,
+    </div>,
   );
 }
 
@@ -103,23 +103,30 @@ function RecordList({
         {rows.map((row, index) => (
           <li
             key={row.userId}
-            style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: 'var(--text-strong)' }}
+            style={{ display: 'flex', fontSize: 14, color: 'var(--text-strong)' }}
           >
-            <span>
-              {ranks[index]}.{' '}
-              {/* 랭킹 행은 정의상 전원 동의+계정 연결 — 서버가 내려준 profileHref로
-                  공개 프로필에 연결한다(#707/#714 관례: 밑줄 = 링크, 색만으로 구분 금지). */}
-              {/* 닉네임 null 행은 링크 텍스트가 전부 '선수'가 된다 — 스크린리더가
-                  같은 이름의 링크를 구분할 수 있게 순위·기록을 aria-label에 싣는다. */}
-              <Link
-                href={row.profileHref}
-                aria-label={`${title} ${ranks[index]}위 ${row.nickname ?? '선수'} ${value(row)}${unit} — 공개 프로필 보기`}
-                style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}
-              >
-                {row.nickname ?? '선수'}
-              </Link>
-            </span>
-            <span>{value(row)}{unit}</span>
+            <Link
+              href={row.profileHref}
+              aria-label={`${title} ${ranks[index]}위 ${row.nickname ?? '선수'} ${value(row)}${unit} — 공개 프로필 보기`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                minHeight: 44,
+                gap: 12,
+                padding: '8px 0',
+                color: 'inherit',
+                textDecoration: 'underline',
+                textUnderlineOffset: 2,
+                textAlign: 'left',
+              }}
+            >
+              <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+                {ranks[index]}. {row.nickname ?? '선수'}
+              </span>
+              <span style={{ flexShrink: 0 }}>{value(row)}{unit}</span>
+            </Link>
           </li>
         ))}
       </ol>

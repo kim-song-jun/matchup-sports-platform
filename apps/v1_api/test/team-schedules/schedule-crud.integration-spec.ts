@@ -40,6 +40,13 @@ function expectHttpCode(error: unknown, status: number, code: string) {
   expect(exception.getResponse()).toEqual(expect.objectContaining({ code }));
 }
 
+const fixtureEpoch = Date.now();
+function futureAt(days: number, hour: number, minute = 0): string {
+  const date = new Date(fixtureEpoch + days * 24 * 60 * 60 * 1_000);
+  date.setUTCHours(hour, minute, 0, 0);
+  return date.toISOString();
+}
+
 describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService', () => {
   let service: TeamSchedulesService;
   let moduleRef: TestingModule | undefined;
@@ -94,8 +101,8 @@ describe('Task 12 schedule CRUD/cancel/reminders lane — TeamSchedulesService',
   const baseDto = () => ({
     title: 'Task 12 CRUD fixture',
     type: 'TRAINING' as const,
-    startAt: '2026-09-10T10:00:00.000Z',
-    endAt: '2026-09-10T12:00:00.000Z',
+    startAt: futureAt(30, 10),
+    endAt: futureAt(30, 12),
     timezone: 'Asia/Seoul',
   });
 

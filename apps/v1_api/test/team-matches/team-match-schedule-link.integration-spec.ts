@@ -39,14 +39,21 @@ const authUser = (id: string) => ({
   onboardingStatus: 'completed' as const,
 });
 
+const fixtureEpoch = Date.now();
+function futureAt(days: number, hour: number, minute = 0): string {
+  const date = new Date(fixtureEpoch + days * 24 * 60 * 60 * 1_000);
+  date.setUTCHours(hour, minute, 0, 0);
+  return date.toISOString();
+}
+
 function baseDto(overrides: Partial<MutateTeamMatchDto> = {}): MutateTeamMatchDto {
   return {
     hostTeamId: ids.hostTeam,
     sportId: ids.sport,
     regionId: ids.region,
     title: 'Schedule-link fixture match',
-    startsAt: '2026-09-10T10:00:00.000Z',
-    endsAt: '2026-09-10T12:00:00.000Z',
+    startsAt: futureAt(30, 10),
+    endsAt: futureAt(30, 12),
     manualPlaceName: 'Schedule-link ground',
     ...overrides,
   };
@@ -122,8 +129,8 @@ describe('레인 schedule — 매치 ↔ 팀일정 연동 (TeamMatch 생명주�
     expect(schedule.type).toBe('MATCH');
     expect(schedule.state).toBe('SCHEDULED');
     expect(schedule.title).toBe('Create-flow match');
-    expect(schedule.startAt.toISOString()).toBe('2026-09-10T10:00:00.000Z');
-    expect(schedule.endAt.toISOString()).toBe('2026-09-10T12:00:00.000Z');
+    expect(schedule.startAt.toISOString()).toBe(futureAt(30, 10));
+    expect(schedule.endAt.toISOString()).toBe(futureAt(30, 12));
 
     const detail = await teamSchedules.detail(authUser(ids.hostUser), ids.hostTeam, schedule.id);
     expect(detail.matchConfirmed).toBe(false);
@@ -195,8 +202,8 @@ describe('레인 schedule — 매치 ↔ 팀일정 연동 (TeamMatch 생명주�
     const updateDto: UpdateTeamMatchDto = {
       ...baseDto({
         title: 'Update-flow match, after',
-        startsAt: '2026-09-11T09:00:00.000Z',
-        endsAt: '2026-09-11T10:30:00.000Z',
+        startsAt: futureAt(31, 9),
+        endsAt: futureAt(31, 10, 30),
       }),
       version: detail.version,
     };
@@ -206,8 +213,8 @@ describe('레인 schedule — 매치 ↔ 팀일정 연동 (TeamMatch 생명주�
       where: { teamId: ids.hostTeam, teamMatchId: created.teamMatchId },
     });
     expect(schedule.title).toBe('Update-flow match, after');
-    expect(schedule.startAt.toISOString()).toBe('2026-09-11T09:00:00.000Z');
-    expect(schedule.endAt.toISOString()).toBe('2026-09-11T10:30:00.000Z');
+    expect(schedule.startAt.toISOString()).toBe(futureAt(31, 9));
+    expect(schedule.endAt.toISOString()).toBe(futureAt(31, 10, 30));
     expect(schedule.version).toBe(1);
   });
 

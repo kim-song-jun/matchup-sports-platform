@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { createPortal } from 'react-dom';
 import { Star, ImagePlus, X, Trophy, Medal } from 'lucide-react';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
@@ -395,7 +396,7 @@ function StarRating({ value, onChange }: { value: number; onChange?: (v: number)
       {[1, 2, 3, 4, 5].map((n) => (
         <button
           key={n} type="button"
-          style={{ display: 'inline-flex', background: 'none', border: 'none', padding: '2px', cursor: onChange ? 'pointer' : 'default', lineHeight: 1 }}
+          style={{ display: 'inline-flex', width: 44, height: 44, alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', padding: 0, cursor: onChange ? 'pointer' : 'default', lineHeight: 1 }}
           onClick={() => onChange?.(n)}
           aria-label={`${n}점`}
         >
@@ -502,7 +503,9 @@ export function ReviewFormModal({
     );
   };
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal((
     <div style={{
       position: 'fixed', inset: 0, zIndex: 'var(--z-top)',
       background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
@@ -515,12 +518,13 @@ export function ReviewFormModal({
         style={{
           width: '100%', maxWidth: 480, background: 'var(--background)',
           borderRadius: 'var(--radius-container) var(--radius-container) 0 0', padding: '24px 20px',
-          paddingBottom: 'max(24px, var(--v1-shell-safe-bottom))',
+          maxHeight: 'calc(100dvh - var(--v1-shell-safe-bottom))', overflowY: 'auto',
+          paddingBottom: 'max(24px, calc(16px + var(--v1-shell-safe-bottom)))',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 className="tm-text-body-lg" style={{ margin: 0 }}>대회 후기 작성</h3>
-          <button type="button" onClick={onClose} style={{ display: 'inline-flex', background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-muted)' }} aria-label="닫기"><X size={20} /></button>
+          <button type="button" onClick={onClose} disabled={isPending} style={{ display: 'inline-flex', width: 44, height: 44, alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'none', border: 'none', padding: 0, cursor: isPending ? 'default' : 'pointer', color: 'var(--text-muted)', opacity: isPending ? 0.55 : 1 }} aria-label="닫기"><X size={20} /></button>
         </div>
 
         <div style={{ marginBottom: 16, textAlign: 'center' }}>
@@ -657,7 +661,7 @@ export function ReviewFormModal({
         </button>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 /* ── 후기 카드 (임베드 목록 · 전체보기 페이지 공용) ── */

@@ -451,12 +451,24 @@ function ReviewTargetCard({
 
 function StarRating({ compact, disabled, onChange, rating }: { compact?: boolean; disabled?: boolean; onChange: (rating: number) => void; rating: number }) {
   return (
-    <div className="tm-review-stars" data-compact={compact ? 'true' : undefined} aria-label={`${rating}점`}>
+    <div className="tm-review-stars" style={{ gap: compact ? 0 : 16, padding: compact ? 0 : 8, flexShrink: 0 }} data-compact={compact ? 'true' : undefined} aria-label={`${rating}점`}>
       {[1, 2, 3, 4, 5].map((value) => (
         <button
           key={value}
           aria-label={`${value}점`}
           className="tm-review-star"
+          style={{
+            width: 44,
+            height: 44,
+            minWidth: 44,
+            minHeight: 44,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+            boxSizing: 'border-box',
+            lineHeight: 1,
+          }}
           data-active={value <= rating}
           disabled={disabled}
           onClick={() => onChange(value)}

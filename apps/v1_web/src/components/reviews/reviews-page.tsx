@@ -318,7 +318,14 @@ function ReviewTargetSections({
 
   return (
     <>
-      {teamTargets.length > 0 ? <div className="tm-review-target-stack">{teamTargets.map(renderCard)}</div> : null}
+      {teamTargets.length > 0 ? (
+        <div
+          className="tm-review-target-stack"
+          style={{ gridTemplateColumns: teamTargets.length === 1 ? 'minmax(0, 1fr)' : undefined }}
+        >
+          {teamTargets.map(renderCard)}
+        </div>
+      ) : null}
 
       {playerTargets.length > 0 ? (
         <details className="tm-review-player-details" open={playersOpen} style={{ marginTop: teamTargets.length > 0 ? 16 : 0 }}>
@@ -328,7 +335,12 @@ function ReviewTargetSections({
           <div className="tm-text-caption" style={{ margin: '8px 0 12px' }}>
             남기고 싶은 선수만 골라 주세요. 비워 두면 팀 후기만 전송돼요.
           </div>
-          <div className="tm-review-target-stack">{playerTargets.map(renderCard)}</div>
+          <div
+            className="tm-review-target-stack"
+            style={{ gridTemplateColumns: playerTargets.length === 1 ? 'minmax(0, 1fr)' : undefined }}
+          >
+            {playerTargets.map(renderCard)}
+          </div>
         </details>
       ) : null}
     </>
@@ -389,12 +401,16 @@ function ReviewTargetCard({
   const active = !locked && draft.tagCodes.length > 0;
 
   return (
-    <Card className={active ? 'tm-review-target-card tm-review-target-active' : 'tm-review-target-card'} pad={16}>
+    <Card
+      className={active ? 'tm-review-target-card tm-review-target-active' : 'tm-review-target-card'}
+      pad={16}
+      style={{ width: '100%', minWidth: 0 }}
+    >
       <div className="tm-review-target-head">
         <Avatar imageUrl={target.imageUrl} initials={target.initials} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="tm-review-card-head">
-            <div style={{ minWidth: 0 }}>
+          <div className="tm-review-card-head" style={{ flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
               <div className="tm-text-body-lg">{target.name}</div>
               <div className="tm-text-caption" style={{ marginTop: 2 }}>{target.subtitle || targetTypeLabel(target.targetType)}</div>
               {target.reviewerTeamLabel ? (
@@ -405,45 +421,45 @@ function ReviewTargetCard({
               {target.statusLabel === '대기' && active ? '작성 중' : target.statusLabel}
             </span>
           </div>
-          {target.lockReasonLabel ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{target.lockReasonLabel}</div> : null}
-          <StarRating disabled={locked} rating={draft.rating} onChange={onUpdateRating} />
-          {/* 4항목 채점 -- 사람 대상에만. 이 값이 상대 선수 카드의 실력·매너·시간약속을
-              만들고, 후기 3개로 능력치가·10개로 카드 모양이 열린다(Task 155 해금의 원천).
-              기본값은 종합 별점과 같아 세부를 안 만져도 제출 마찰이 늘지 않는다. */}
-          {target.targetType === 'user' && draft.metricScores ? (
-            <div className="tm-review-metric-rows">
-              {REVIEW_METRIC_FIELDS.map((field) => (
-                <div key={field.key} className="tm-review-metric-row">
-                  <span className="tm-review-metric-label">{field.label}</span>
-                  <StarRating
-                    compact
-                    disabled={locked}
-                    rating={draft.metricScores?.[field.key] ?? draft.rating}
-                    onChange={(score) => onUpdateMetricScore(field.key, score)}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : null}
-          <div className="tm-review-chip-row">
-            {REVIEW_TAG_OPTIONS.map((tag) => {
-              const selected = draft.tagCodes.includes(tag.code);
-              return (
-                <button
-                  key={tag.code}
-                  aria-pressed={selected}
-                  className="tm-review-tag-chip"
-                  data-active={selected}
-                  disabled={locked}
-                  onClick={() => onToggleTag(tag.code)}
-                  type="button"
-                >
-                  {tag.label}
-                </button>
-              );
-            })}
-          </div>
         </div>
+      </div>
+      {target.lockReasonLabel ? <div className="tm-text-caption" style={{ marginTop: 8, overflowWrap: 'anywhere' }}>{target.lockReasonLabel}</div> : null}
+      <StarRating disabled={locked} rating={draft.rating} onChange={onUpdateRating} />
+      {/* 4항목 채점 -- 사람 대상에만. 이 값이 상대 선수 카드의 실력·매너·시간약속을
+          만들고, 후기 3개로 능력치가·10개로 카드 모양이 열린다(Task 155 해금의 원천).
+          기본값은 종합 별점과 같아 세부를 안 만져도 제출 마찰이 늘지 않는다. */}
+      {target.targetType === 'user' && draft.metricScores ? (
+        <div className="tm-review-metric-rows">
+          {REVIEW_METRIC_FIELDS.map((field) => (
+            <div key={field.key} className="tm-review-metric-row" style={{ flexWrap: 'wrap' }}>
+              <span className="tm-review-metric-label">{field.label}</span>
+              <StarRating
+                compact
+                disabled={locked}
+                rating={draft.metricScores?.[field.key] ?? draft.rating}
+                onChange={(score) => onUpdateMetricScore(field.key, score)}
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <div className="tm-review-chip-row">
+        {REVIEW_TAG_OPTIONS.map((tag) => {
+          const selected = draft.tagCodes.includes(tag.code);
+          return (
+            <button
+              key={tag.code}
+              aria-pressed={selected}
+              className="tm-review-tag-chip"
+              data-active={selected}
+              disabled={locked}
+              onClick={() => onToggleTag(tag.code)}
+              type="button"
+            >
+              {tag.label}
+            </button>
+          );
+        })}
       </div>
     </Card>
   );
@@ -451,7 +467,20 @@ function ReviewTargetCard({
 
 function StarRating({ compact, disabled, onChange, rating }: { compact?: boolean; disabled?: boolean; onChange: (rating: number) => void; rating: number }) {
   return (
-    <div className="tm-review-stars" style={{ gap: compact ? 0 : 16, padding: compact ? 0 : 8, flexShrink: 0 }} data-compact={compact ? 'true' : undefined} aria-label={`${rating}점`}>
+    <div
+      className="tm-review-stars"
+      style={{
+        width: '100%',
+        minWidth: compact ? 220 : 0,
+        maxWidth: compact ? 220 : 284,
+        flex: compact ? '1 1 220px' : '0 1 284px',
+        justifyContent: 'space-between',
+        gap: 0,
+        padding: 0,
+      }}
+      data-compact={compact ? 'true' : undefined}
+      aria-label={`${rating}점`}
+    >
       {[1, 2, 3, 4, 5].map((value) => (
         <button
           key={value}

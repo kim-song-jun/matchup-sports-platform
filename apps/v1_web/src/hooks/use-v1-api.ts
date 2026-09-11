@@ -1159,7 +1159,14 @@ export function useV1LeaveTeam(teamId: string) {
   return useMutation({
     mutationFn: (body?: { reason?: string | null }) =>
       v1Post<V1TeamMembershipMutationResult>(`/teams/${teamId}/leave`, body ?? {}),
-    onSuccess: () => {
+    onSuccess: async () => {
+      // Leaving changes viewer-scoped team-match and league permissions. Reset
+      // these caches before the mutation settles so SPA back navigation cannot
+      // restore a stale participant viewer from the previous membership.
+      await Promise.all([
+        queryClient.resetQueries({ queryKey: v1Keys.teamMatchesAll() }),
+        queryClient.resetQueries({ queryKey: v1Keys.myLeagues() }),
+      ]);
       queryClient.invalidateQueries({ queryKey: v1Keys.team(teamId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.team(teamId), 'members'] });
       queryClient.invalidateQueries({ queryKey: v1Keys.teams() });

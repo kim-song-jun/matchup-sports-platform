@@ -245,7 +245,7 @@ describe('LeagueFixtureDetailClient', () => {
   // 경기에도 모두 있어야 한다. 기록 API 가 응답하면 대회와 같은 본문을 임베드한다.
   it('기록이 있으면 대회 경기 상세와 같은 본문(주차 헤더·경기 기록 섹션)과 리그 순위·전적 카드가 뜬다', () => {
     mockLeague();
-    mockViewer('none');
+    mockViewer('none', { participantMember: true });
     mockRecord('present');
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
@@ -261,6 +261,44 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.getByTestId('league-claim-section')).toHaveTextContent('lg-1/fx-1');
     // 기록 연결 승인함도 기록의 gameId 로 함께 실린다.
     expect(screen.getByTestId('attest-section')).toHaveTextContent('game-1');
+  });
+
+  it('기록이 있어도 비참가자에게는 API가 거부할 내 기록 연결 진입점을 보여주지 않는다', () => {
+    mockLeague();
+    mockViewer('none');
+    mockRecord('present');
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+    expect(screen.getByText('경기 기록')).toBeInTheDocument();
+    expect(screen.queryByTestId('league-claim-section')).not.toBeInTheDocument();
+  });
+
+  it('참가자 권한을 다시 잃으면 재렌더링에서 내 기록 연결 진입점을 제거한다', () => {
+    mockLeague();
+    mockRecord('present');
+    let viewer = { participantMember: true };
+    useV1TeamMatchMock.mockImplementation(() => ({ data: { id: 'fx-1', viewer } }) as never);
+    useV1ResolveChatRoomMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+
+    const view = render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+    expect(screen.getByTestId('league-claim-section')).toBeInTheDocument();
+
+    viewer = { participantMember: false };
+    view.rerender(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+    expect(screen.queryByTestId('league-claim-section')).not.toBeInTheDocument();
+  });
+
+  it('참가자 범위를 확인할 수 없을 때는 내 기록 연결 진입점을 보류한다', () => {
+    mockLeague();
+    mockRecord('present');
+    useV1TeamMatchMock.mockReturnValue({ data: undefined, isPending: true, isError: false } as never);
+    useV1ResolveChatRoomMock.mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    const view = render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+    expect(screen.queryByTestId('league-claim-section')).not.toBeInTheDocument();
+
+    useV1TeamMatchMock.mockReturnValue({ data: undefined, isPending: false, isError: true } as never);
+    view.rerender(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+    expect(screen.queryByTestId('league-claim-section')).not.toBeInTheDocument();
   });
 
   it('기록에 경기 영상이 있으면 대회와 동일한 경기 영상 섹션이 뜬다', () => {

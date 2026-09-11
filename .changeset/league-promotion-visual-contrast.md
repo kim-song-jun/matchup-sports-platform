@@ -2,4 +2,4 @@
 "v1_web": patch
 ---
 
-Improve league promotion approval contrast in light and dark themes and restore subtle league card and row borders using defined design tokens.
+Keep league promotion approval in sync with confirmed seasons, recover from already-decided conflicts, and preserve proposals after temporary failures. Improve light/dark contrast, defined surface tokens, and season-link touch targets.

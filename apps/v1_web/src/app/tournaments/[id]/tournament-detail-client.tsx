@@ -346,6 +346,11 @@ function ApplyCTAButtons({
   blockReason: TournamentRegistrationBlockReason | null;
   myRegistration: V1TournamentRegistration | null;
 }) {
+  const primaryButtonClass = `tm-btn tm-btn-lg tm-btn-primary tm-btn-block${
+    tournament.kind === 'regular_league'
+      ? ' [--button-fill-primary:var(--static-blue)] [--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]'
+      : ''
+  }`;
   const hasActiveRegistration =
     myRegistration !== null && myRegistration.status !== 'cancelled';
 
@@ -353,7 +358,7 @@ function ApplyCTAButtons({
     return (
       <Link
         href={`/tournaments/${tournament.id}/my`}
-        className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+        className={primaryButtonClass}
         style={{ fontSize: 'var(--font-size-body-lg)' }}
         aria-label="내 신청 내역 보기"
       >
@@ -374,7 +379,7 @@ function ApplyCTAButtons({
     return (
       <button
         type="button"
-        className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+        className={primaryButtonClass}
         style={{ fontSize: 'var(--font-size-body-lg)' }}
         disabled
         aria-disabled="true"
@@ -388,7 +393,7 @@ function ApplyCTAButtons({
   return (
     <Link
       href={`/tournaments/${tournament.id}/my`}
-      className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+      className={primaryButtonClass}
       style={{ fontSize: 'var(--font-size-body-lg)' }}
       aria-label={applyAriaLabel}
     >

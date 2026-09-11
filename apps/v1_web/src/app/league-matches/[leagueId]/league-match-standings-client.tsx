@@ -1011,8 +1011,8 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
 
       {records !== undefined && !recordsQuery.isError && records.goals.length === 0 && records.assists.length === 0 ? (
         <section className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-          <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">득점·도움 순위</h2>
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
+          <h2 className="tm-text-body-lg">득점·도움 순위</h2>
+          <p className="mt-2 text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">
             {records.hiddenByEligibility
               ? '기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'
               : '확정된 경기 결과가 쌓이면 득점·도움 순위가 나타나요.'}

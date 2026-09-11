@@ -341,18 +341,21 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     moreLinks.forEach((link) => expect(link).toHaveAttribute('href', '/teams/team-1/members'));
   });
 
-  it('총원이 미리보기 인원 이하면 더보기 CTA가 없다', () => {
+  it('작은 팀의 멤버에게도 전체 멤버 목록 진입점이 있다', () => {
     teamApiMocks.useV1TeamDetail.mockReturnValue({
       data: baseTeamDetail({
         memberCount: 6,
         membersPreview: Array.from({ length: 6 }, (_, i) => member(i)),
+        viewer: { role: 'member', membershipId: 'mem-0', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null },
       }),
       isError: false,
     });
 
     render(<TeamDetailPageClient teamId="team-1" />);
 
-    expect(screen.queryByText(/더보기/)).not.toBeInTheDocument();
+    const memberListLinks = screen.getAllByRole('link', { name: '멤버 목록 보기' });
+    expect(memberListLinks.length).toBeGreaterThanOrEqual(2); // 데스크톱·모바일 레이아웃 둘 다 렌더
+    memberListLinks.forEach((link) => expect(link).toHaveAttribute('href', '/teams/team-1/members'));
   });
 
   it('미리보기 멤버를 누르면 해당 멤버의 공개 프로필(/users/{userId})로 이동한다', () => {

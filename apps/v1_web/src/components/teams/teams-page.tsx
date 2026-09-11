@@ -357,22 +357,21 @@ function TeamOperationsSection({
 }
 
 /**
- * 미리보기(최대 8명) 뒤에 남은 멤버가 있을 때만 노출되는 보조 CTA.
- * 기존 `/teams/{teamId}/members` 전체 목록으로 보낸다 — 새 라우트를 만들지 않는다.
+ * 팀 멤버가 접근할 수 있는 전체 목록으로 보낸다. 미리보기 뒤에 남은 멤버가 있으면
+ * 기존 수량 라벨을 유지하고, 전원을 미리 보여주는 작은 팀에도 명시적인 진입점을 둔다.
  * 화면의 주요 CTA(가입/채팅 버튼)와 겹치지 않도록 tm-list-row 안의 텍스트 링크로만 표현한다.
  */
 function TeamMembersMoreLink({ teamId, count }: { teamId: string; count: number }) {
-  if (count <= 0) return null;
   return (
     <Link
       href={`/teams/${teamId}/members`}
       className="tm-list-row tm-pressable"
-      style={{ justifyContent: 'center', gap: 4, textDecoration: 'none' }}
+      style={{ justifyContent: 'center', gap: 4, minHeight: 44, textDecoration: 'none' }}
     >
-      <span className="tm-text-label" style={{ color: 'var(--blue500)', fontWeight: 600 }}>
-        + {count}명 더보기
+      <span className="tm-text-label" style={{ color: 'var(--blue700)', fontWeight: 600 }}>
+        {count > 0 ? `+ ${count}명 더보기` : '멤버 목록 보기'}
       </span>
-      <ChevronRightIcon size={16} stroke="var(--blue500)" strokeWidth={2} aria-hidden="true" />
+      <ChevronRightIcon size={16} stroke="var(--blue700)" strokeWidth={2} aria-hidden="true" />
     </Link>
   );
 }

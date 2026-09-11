@@ -119,11 +119,12 @@ function RecordList({
                 color: 'inherit',
                 textDecoration: 'underline',
                 textUnderlineOffset: 2,
-                textAlign: 'left',
-              }}
+              textAlign: 'left',
+            }}
             >
               <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
-                {ranks[index]}. {row.nickname ?? '선수'}
+                <span>{ranks[index]}. </span>
+                <span>{row.nickname ?? '선수'}</span>
               </span>
               <span style={{ flexShrink: 0 }}>{value(row)}{unit}</span>
             </Link>

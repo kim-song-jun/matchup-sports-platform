@@ -1,4 +1,4 @@
-# Task 157 — iOS App + APNs/FCM Foundation
+# Task 157 — iOS App + Direct APNs Foundation
 
 Status: ACTIVE
 Base branch: `dev` (PR #821이 2026-08-29에 머지되어 `dev`로 재타깃 완료)
@@ -6,10 +6,26 @@ Working branch: `feat/ios-webview-shell`
 Target: `both` (`apps/v1_ios`, `apps/v1_api`, `apps/v1_android` 1줄, deploy/docs)
 Mode: CODE
 
+## Canonical Push Architecture Override (2026-09-11)
+
+This section is the current contract and supersedes the earlier 2026-08-29 planning text below that
+proposed Firebase Messaging for iOS. The older entries remain only as decision history.
+
+- iOS registers the APNs device token and `apnsEnvironment`; it contains no Firebase SDK and the
+  Teameet API sends directly to APNs over HTTP/2.
+- Android retains `firebase-messaging` only for the OS transport and registration token. The Teameet
+  API owns delivery and calls FCM HTTP v1 directly; the server no longer uses `firebase-admin`.
+- `WebPushService` remains the common dispatcher and isolates browser Web Push, Android FCM, and iOS
+  APNs failures from one another.
+- Android sign-out revokes the authenticated server row but preserves local opt-in and the FCM token,
+  so the next authenticated page can re-register it. Explicit opt-out or permission withdrawal still
+  revokes the server row and deletes the local token.
+- Promotion from `dev` to `main` is explicitly deferred and remains out of scope for this follow-up.
+
 ## Objective
 
 Task 156이 Android에 만든 것과 같은 모델로 Teameet v1 웹을 iOS 네이티브 WebView 셸로 제공하고,
-APNs 위에서 FCM을 재사용해 iOS 네이티브 알림을 추가한다. 웹은 번들하지 않고 배포된 원격 origin을
+Teameet API가 APNs HTTP/2를 직접 호출하는 iOS 네이티브 알림을 추가한다. 웹은 번들하지 않고 배포된 원격 origin을
 그대로 로드한다. 첫 vertical slice는 로그인한 사용자가 Alpha iOS 앱에서 `inquiry_answered` 알림을
 받고, 알림을 눌러 정확한 문의 화면으로 이동하는 것이다.
 

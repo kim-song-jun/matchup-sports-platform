@@ -40,7 +40,7 @@ not presented as test-ready. On `dev` pushes and manual dispatches, missing valu
 When present, the Gradle gate checks formats, sender/app ID consistency, the Alpha project name,
 and separation from any supplied production project ID.
 
-## v1 API credentials
+## v1 API direct FCM HTTP v1 credentials
 
 The API requires all three values together:
 
@@ -49,6 +49,8 @@ The API requires all three values together:
 - `FIREBASE_PRIVATE_KEY`
 
 Store the private key as one line with literal `\n` separators. The API converts those separators back to newlines in memory. If all three values are absent, only FCM is disabled. Partial credentials or an invalid `V1_PUSH_ENVIRONMENT` fail startup.
+
+The API does not use `firebase-admin`. It signs a service-account JWT, exchanges it for a short-lived OAuth access token with the `firebase.messaging` scope, caches that token with an early refresh margin, and calls the FCM HTTP v1 `messages:send` endpoint directly. The Teameet API remains the source of notification content, routing, environment isolation, device selection, retries, and delivery-state updates; FCM is only the final Android transport.
 
 When the Alpha host loads `deploy/.env` with `source`, wrap the one-line private-key value in single
 quotes. An unquoted PEM assignment contains spaces in `BEGIN PRIVATE KEY` and makes the shell interpret
@@ -69,8 +71,9 @@ testing; Play signing/AAB release is a later release gate.
 
 `V1PushDevice` keeps delivery metadata without exposing the registration token: `lastSuccessAt`,
 `failureCount`, `lastFailureAt`, and `revokedAt`. A successful FCM response updates
-`lastSuccessAt`. Invalid/unregistered tokens are revoked; transient and batch-level failures are
-counted and later batches continue. FCM multicast is split into at most 500 tokens per request.
+`lastSuccessAt`. `UNREGISTERED` and `SENDER_ID_MISMATCH` tokens are revoked; transient failures are
+counted and later requests continue. FCM HTTP v1 sends one message per token, capped at 50 concurrent
+requests so a large device set cannot create an unbounded burst.
 
 When investigating delivery, select only the metadata above plus environment/platform/user and
 installation IDs. Never print or export the `token` column. Confirm in this order:
@@ -81,9 +84,11 @@ installation IDs. Never print or export the `token` column. Confirm in this orde
 4. Browser Web Push still succeeds independently if FCM is degraded.
 
 Native FCM auto-init stays disabled until the user has both OS permission and explicit in-app opt-in.
-Permission denial, opt-out, and logout revoke the server installation and delete the local FCM token;
-token refresh callbacks are ignored without active consent. This minimizes token retention and closes the
-window where a locally opted-out installation could continue displaying foreground messages.
+Permission denial or explicit opt-out revokes the server installation and deletes the local FCM token;
+token refresh callbacks are ignored without active consent. Logout revokes only the signed-in user's
+server registration while retaining local opt-in and the transport token. After the next login, the app
+re-registers that installation for the new authenticated user. This prevents cross-account delivery
+without forcing the user to repeat consent or wait for a newly issued token.
 
 ## Store release gates
 

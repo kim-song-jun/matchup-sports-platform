@@ -549,9 +549,16 @@ public final class MainActivity extends AppCompatActivity {
                 case "request-notification-permission" -> requestPushPermission(requestId);
                 case "open-notification-settings" -> openNotificationSettings(requestId);
                 case "revoke-push-device" -> {
-                    InstallationIdentity.markOptedIn(this, false);
-                    revokePushAndDeleteToken(revoked -> reportPushResult(
-                        requestId, false, revoked ? null : "revocation-failed"));
+                    boolean keepOptIn = PushRevocationPolicy.keepsOptIn(
+                        request.optString("reason", ""));
+                    if (keepOptIn) {
+                        PushRegistrationClient.revoke(this, revoked -> reportPushResult(
+                            requestId, false, revoked ? null : "revocation-failed"));
+                    } else {
+                        InstallationIdentity.markOptedIn(this, false);
+                        revokePushAndDeleteToken(revoked -> reportPushResult(
+                            requestId, false, revoked ? null : "revocation-failed"));
+                    }
                 }
                 default -> reportPushResult(requestId, false);
             }

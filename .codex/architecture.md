@@ -34,7 +34,9 @@ Frontend work must start by checking:
 - Canonical Android app: `apps/v1_android`
 - Architecture: dedicated native WebView shell over the deployed v1 Web origin, with native FCM, permission, and deep-link handling
 - Alpha and production must use distinct application IDs, Firebase projects, and API origins.
-- Firebase Admin credentials never belong in the Android artifact; only public Firebase app identifiers are build inputs.
+- Teameet API owns Android notification delivery and calls FCM HTTP v1 directly with a short-lived OAuth token; `firebase-admin` is not used.
+- FCM remains only the Android OS transport and client token source. Service-account credentials never belong in the Android artifact; only public Firebase app identifiers are build inputs.
+- iOS delivery is separate: Teameet API calls APNs directly over HTTP/2 and the iOS app contains no Firebase SDK.
 
 ## Shared Rule
 

@@ -1817,7 +1817,10 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   }
 
   // Only allow apply when tournament is open
-  if (tournament.status !== 'open') {
+  const applicationSurfaceOpen = tournament.kind === 'regular_league'
+    ? tournament.status !== 'completed' && tournament.status !== 'cancelled'
+    : tournament.status === 'open';
+  if (!applicationSurfaceOpen) {
     return (
               <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner

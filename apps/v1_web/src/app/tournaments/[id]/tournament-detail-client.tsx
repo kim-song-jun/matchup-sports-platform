@@ -404,7 +404,9 @@ function ApplyCTA({
   tournament: V1TournamentDetail;
   myRegistration: V1TournamentRegistration | null;
 }) {
-  const isOpen = tournament.status === 'open';
+  const isOpen = tournament.kind === 'regular_league'
+    ? tournament.status !== 'completed' && tournament.status !== 'cancelled'
+    : tournament.status === 'open';
 
   if (!isOpen) return null;
 
@@ -585,7 +587,9 @@ export function TournamentDetailView({
 }) {
   const status = getTournamentStatusConfig(tournament.status);
   const sportAccent = getSportAccent(tournament.sport.code);
-  const isOpen = tournament.status === 'open';
+  const isOpen = tournament.kind === 'regular_league'
+    ? tournament.status !== 'completed' && tournament.status !== 'cancelled'
+    : tournament.status === 'open';
   const isCompleted = tournament.status === 'completed';
   const pendingPaymentCount = getPendingPaymentCount(tournament);
   const reservedTeamCount = getReservedTeamCount(tournament);

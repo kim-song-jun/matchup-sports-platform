@@ -92,6 +92,19 @@ describe('resolveTournamentRegistrationBlock', () => {
       resolveTournamentRegistrationBlock(tournament({ registrationDeadlineAt: null }), NOW),
     ).toBeNull();
   });
+  it.each(['draft', 'open', 'in_progress'])('keeps a regular league open by future deadline while status is %s', (status) => {
+    expect(resolveTournamentRegistrationBlock(tournament({ kind: 'regular_league', status, teamCount: 0, confirmedCount: 99, pendingPaymentCount: 99 }), NOW)).toBeNull();
+  });
+
+  it.each(['completed', 'cancelled'])('blocks a terminal regular league even with a future deadline: %s', (status) => {
+    expect(resolveTournamentRegistrationBlock(tournament({ kind: 'regular_league', status, registrationDeadlineAt: '2026-08-10T14:59:00.000Z' }), NOW)).toBe('not_open');
+  });
+
+  it('blocks a regular league with no deadline or an expired deadline', () => {
+    expect(resolveTournamentRegistrationBlock(tournament({ kind: 'regular_league', status: 'draft', registrationDeadlineAt: null }), NOW)).toBe('not_open');
+    expect(resolveTournamentRegistrationBlock(tournament({ kind: 'regular_league', status: 'in_progress', registrationDeadlineAt: '2026-07-01T00:00:00.000Z' }), NOW)).toBe('deadline_passed');
+  });
+
 });
 
 describe('copy helpers', () => {

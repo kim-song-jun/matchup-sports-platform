@@ -931,6 +931,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                 type="button"
                 onClick={() => setShowUpcomingOnly(false)}
                 aria-pressed={!showUpcomingOnly}
+                style={!showUpcomingOnly ? { background: 'var(--static-blue)' } : undefined}
                 className={`tm-chip${!showUpcomingOnly ? ' tm-chip-active' : ''}`}
               >
                 전체
@@ -939,6 +940,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                 type="button"
                 onClick={() => setShowUpcomingOnly(true)}
                 aria-pressed={showUpcomingOnly}
+                style={showUpcomingOnly ? { background: 'var(--static-blue)' } : undefined}
                 className={`tm-chip${showUpcomingOnly ? ' tm-chip-active' : ''}`}
               >
                 예정만
@@ -1007,63 +1009,79 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
         )}
       </section>
 
-      <section className="mt-8">
-        <h2 className="mb-2 text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">득점 순위</h2>
-        {recordsQuery.isError ? (
-          <ErrorState
-            message={extractErrorMessage(recordsQuery.error, '기록을 불러오지 못했어요.')}
-            onRetry={() => void recordsQuery.refetch()}
-          />
-        ) : records === undefined ? (
-          <div className="tm-skeleton" style={{ height: 80, borderRadius: 'var(--radius-control)' }} />
-        ) : records.goals.length === 0 ? (
-          <EmptyState
-            title="아직 기록이 없어요"
-            sub={leagueRecordEmptySub('goals', records.hiddenByEligibility)}
-            illustration={{ name: 'journey-done' }}
-            cta="경기 일정 보기"
-            ctaHref="#league-schedule"
-          />
-        ) : (
-          <ol className="space-y-1">
-            {records.goals.map((row, index) => (
-              <li key={row.userId} className="flex justify-between text-sm text-[var(--text-strong)]">
-                <span>{goalRanks[index]}. {row.nickname ?? '선수'}</span>
-                <span>{row.goals}골</span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+      {records !== undefined && !recordsQuery.isError && records.goals.length === 0 && records.assists.length === 0 ? (
+        <section className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
+          <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">득점·도움 순위</h2>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">
+            {records.hiddenByEligibility
+              ? '기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'
+              : '확정된 경기 결과가 쌓이면 득점·도움 순위가 나타나요.'}
+          </p>
+          <a href="#league-schedule" className="mt-3 inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)]">
+            경기 일정 보기
+          </a>
+        </section>
+      ) : (
+        <>
+          <section className="mt-8">
+            <h2 className="mb-2 text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">득점 순위</h2>
+            {recordsQuery.isError ? (
+              <ErrorState
+                message={extractErrorMessage(recordsQuery.error, '기록을 불러오지 못했어요.')}
+                onRetry={() => void recordsQuery.refetch()}
+              />
+            ) : records === undefined ? (
+              <div className="tm-skeleton" style={{ height: 80, borderRadius: 'var(--radius-control)' }} />
+            ) : records.goals.length === 0 ? (
+              <EmptyState
+                title="아직 기록이 없어요"
+                sub={leagueRecordEmptySub('goals', records.hiddenByEligibility)}
+                illustration={{ name: 'journey-done' }}
+                cta="경기 일정 보기"
+                ctaHref="#league-schedule"
+              />
+            ) : (
+              <ol className="space-y-1">
+                {records.goals.map((row, index) => (
+                  <li key={row.userId} className="flex justify-between text-sm text-[var(--text-strong)]">
+                    <span>{goalRanks[index]}. {row.nickname ?? '선수'}</span>
+                    <span>{row.goals}골</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
 
-      <section className="mt-8">
-        <h2 className="mb-2 text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">도움 순위</h2>
-        {recordsQuery.isError ? (
-          <ErrorState
-            message={extractErrorMessage(recordsQuery.error, '기록을 불러오지 못했어요.')}
-            onRetry={() => void recordsQuery.refetch()}
-          />
-        ) : records === undefined ? (
-          <div className="tm-skeleton" style={{ height: 80, borderRadius: 'var(--radius-control)' }} />
-        ) : records.assists.length === 0 ? (
-          <EmptyState
-            title="아직 기록이 없어요"
-            sub={leagueRecordEmptySub('assists', records.hiddenByEligibility)}
-            illustration={{ name: 'journey-done' }}
-            cta="경기 일정 보기"
-            ctaHref="#league-schedule"
-          />
-        ) : (
-          <ol className="space-y-1">
-            {records.assists.map((row, index) => (
-              <li key={row.userId} className="flex justify-between text-sm text-[var(--text-strong)]">
-                <span>{assistRanks[index]}. {row.nickname ?? '선수'}</span>
-                <span>{row.assists}도움</span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+          <section className="mt-8">
+            <h2 className="mb-2 text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">도움 순위</h2>
+            {recordsQuery.isError ? (
+              <ErrorState
+                message={extractErrorMessage(recordsQuery.error, '기록을 불러오지 못했어요.')}
+                onRetry={() => void recordsQuery.refetch()}
+              />
+            ) : records === undefined ? (
+              <div className="tm-skeleton" style={{ height: 80, borderRadius: 'var(--radius-control)' }} />
+            ) : records.assists.length === 0 ? (
+              <EmptyState
+                title="아직 기록이 없어요"
+                sub={leagueRecordEmptySub('assists', records.hiddenByEligibility)}
+                illustration={{ name: 'journey-done' }}
+                cta="경기 일정 보기"
+                ctaHref="#league-schedule"
+              />
+            ) : (
+              <ol className="space-y-1">
+                {records.assists.map((row, index) => (
+                  <li key={row.userId} className="flex justify-between text-sm text-[var(--text-strong)]">
+                    <span>{assistRanks[index]}. {row.nickname ?? '선수'}</span>
+                    <span>{row.assists}도움</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        </>
+      )}
 
       {/* 득점·도움 두 빈 상태가 같은 이유(공개 자격)를 말하고 hiddenByEligibility 플래그도
           하나뿐이라, 배너는 절마다 반복하지 않고 두 순위 바로 아래에 한 번만 놓는다.

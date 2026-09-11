@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { V1TournamentDetail } from '@/types/api';
@@ -158,5 +158,29 @@ describe('TournamentDetailPageClient GA events', () => {
     render(<TournamentDetailPageClient tournamentId="tournament-1" />);
 
     expect(trackEvent).not.toHaveBeenCalled();
+  });
+
+  it('keeps the application entry for an in-progress regular league with a future deadline', async () => {
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({
+        status: 'in_progress',
+        kind: 'regular_league',
+        registrationDeadlineAt: '2099-08-10T14:59:00.000Z',
+        confirmedCount: 8,
+        teamCount: 8,
+      }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    const desktopRail = screen.getByRole('complementary', { name: '참가 신청' });
+    expect(within(desktopRail).getByRole('link', { name: '참가 신청하기' })).toHaveAttribute(
+      'href', '/tournaments/tournament-1/my',
+    );
   });
 });

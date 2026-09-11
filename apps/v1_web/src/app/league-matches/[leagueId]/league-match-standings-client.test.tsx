@@ -1124,7 +1124,7 @@ describe('LeagueMatchStandingsClient', () => {
 
   // 기록이 입력됐지만 신원 연동·동의가 없어 집계에서 빠진 경우, "결과가 쌓이면
   // 나타나요"는 거짓 안내가 된다 — hiddenByEligibility 가 문구를 갈라야 한다.
-  it('hiddenByEligibility 면 빈 상태 문구가 동의 안내로 바뀐다', async () => {
+  it('hiddenByEligibility 면 득점·도움 빈 상태를 하나의 동의 안내로 합친다', async () => {
     useV1LeagueMatchMock.mockReturnValue({
       data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
     } as never);
@@ -1137,12 +1137,37 @@ describe('LeagueMatchStandingsClient', () => {
 
     render(<LeagueMatchStandingsClient leagueId="league-1" />);
 
-    expect(
-      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
-    ).toBeInTheDocument();
-    expect(
-      await screen.findByText('도움 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '득점·도움 순위' })).toBeInTheDocument();
+    expect(await screen.findByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.')).toBeInTheDocument();
+    expect(screen.queryByText('도움 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.')).not.toBeInTheDocument();
+    const recordsSection = screen.getByRole('heading', { name: '득점·도움 순위' }).closest('section');
+    expect(recordsSection).not.toBeNull();
+    expect(within(recordsSection as HTMLElement).getByRole('link', { name: '경기 일정 보기' })).toHaveAttribute(
+      'href',
+      '#league-schedule',
+    );
+  });
+
+  it('한쪽 기록만 비면 populated 순위와 다른 쪽 빈 상태를 각각 유지한다', async () => {
+    mockLeague({
+      goals: [
+        { userId: 'u1', nickname: '선수 하나', goals: 2 },
+        { userId: 'u2', nickname: '선수 둘', goals: 1 },
+      ],
+      assists: [],
+      hiddenByEligibility: false,
+    });
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    const goalsSection = screen.getByRole('heading', { name: '득점 순위' }).closest('section');
+    expect(goalsSection).not.toBeNull();
+    expect(within(goalsSection as HTMLElement).getByText(/1\.\s*선수 하나/)).toBeInTheDocument();
+    expect(within(goalsSection as HTMLElement).getByText(/2\.\s*선수 둘/)).toBeInTheDocument();
+    const assistsSection = screen.getByRole('heading', { name: '도움 순위' }).closest('section');
+    expect(assistsSection).not.toBeNull();
+    expect(within(assistsSection as HTMLElement).getByText('아직 기록이 없어요')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '득점·도움 순위' })).not.toBeInTheDocument();
   });
 
   /* ── F8: 빈 상태에서 신원 연동으로 가는 길 ────────────────────────────────
@@ -1279,7 +1304,7 @@ describe('LeagueMatchStandingsClient', () => {
 
     // 화면 자체는 그려졌다(빈 상태 문구 존재) — 배너만 없다.
     expect(
-      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+      await screen.findByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'),
     ).toBeInTheDocument();
     expect(screen.queryByText('이 리그에서 뛰었는데 내 기록이 없나요?')).not.toBeInTheDocument();
   });
@@ -1292,7 +1317,7 @@ describe('LeagueMatchStandingsClient', () => {
     render(<LeagueMatchStandingsClient leagueId="league-1" />);
 
     expect(
-      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+      await screen.findByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'),
     ).toBeInTheDocument();
     expect(screen.queryByText('이 리그에서 뛰었는데 내 기록이 없나요?')).not.toBeInTheDocument();
   });
@@ -1308,7 +1333,7 @@ describe('LeagueMatchStandingsClient', () => {
 
     render(<LeagueMatchStandingsClient leagueId="league-1" />);
 
-    expect(await screen.findByText('확정된 경기 결과가 쌓이면 득점 순위가 나타나요.')).toBeInTheDocument();
+    expect(await screen.findByText('확정된 경기 결과가 쌓이면 득점·도움 순위가 나타나요.')).toBeInTheDocument();
     expect(screen.queryByText('이 리그에서 뛰었는데 내 기록이 없나요?')).not.toBeInTheDocument();
     expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
   });
@@ -1389,7 +1414,7 @@ describe('LeagueMatchStandingsClient', () => {
     render(<LeagueMatchStandingsClient leagueId="league-1" />);
 
     expect(
-      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+      await screen.findByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'),
     ).toBeInTheDocument();
     expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
   });
@@ -1406,7 +1431,7 @@ describe('LeagueMatchStandingsClient', () => {
     render(<LeagueMatchStandingsClient leagueId="league-1" />);
 
     expect(
-      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+      await screen.findByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'),
     ).toBeInTheDocument();
     expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
   });
@@ -1424,7 +1449,7 @@ describe('LeagueMatchStandingsClient', () => {
     render(<LeagueMatchStandingsClient leagueId="league-1" />);
 
     expect(
-      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+      await screen.findByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'),
     ).toBeInTheDocument();
     expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
   });
@@ -1440,7 +1465,7 @@ describe('LeagueMatchStandingsClient', () => {
 
     render(<LeagueMatchStandingsClient leagueId="league-1" />);
 
-    expect(await screen.findByText('확정된 경기 결과가 쌓이면 득점 순위가 나타나요.')).toBeInTheDocument();
+    expect(await screen.findByText('확정된 경기 결과가 쌓이면 득점·도움 순위가 나타나요.')).toBeInTheDocument();
     expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
   });
 
@@ -1458,7 +1483,7 @@ describe('LeagueMatchStandingsClient', () => {
     render(<LeagueMatchStandingsClient leagueId="league-1" />);
 
     expect(
-      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+      await screen.findByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'),
     ).toBeInTheDocument();
     expect(screen.queryByText('이 리그에서 뛰었는데 내 기록이 없나요?')).not.toBeInTheDocument();
   });
@@ -1473,7 +1498,7 @@ describe('LeagueMatchStandingsClient', () => {
     render(<LeagueMatchStandingsClient leagueId="league-1" />);
 
     expect(
-      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+      await screen.findByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'),
     ).toBeInTheDocument();
     expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
   });
@@ -1489,7 +1514,7 @@ describe('LeagueMatchStandingsClient', () => {
     render(<LeagueMatchStandingsClient leagueId="league-1" />);
 
     expect(
-      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+      await screen.findByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'),
     ).toBeInTheDocument();
     expect(screen.queryByText('이 리그에서 뛰었는데 내 기록이 없나요?')).not.toBeInTheDocument();
     expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
@@ -1515,7 +1540,7 @@ describe('LeagueMatchStandingsClient', () => {
     render(<LeagueMatchStandingsClient leagueId="league-1" />);
 
     expect(
-      await screen.findByText('득점 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.'),
+      await screen.findByText('기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'),
     ).toBeInTheDocument();
     expect(screen.queryByText(CONSENT_CARD_TITLE)).not.toBeInTheDocument();
   });

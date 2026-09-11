@@ -181,7 +181,7 @@ export default function LeagueSeriesDetailClient({ seriesId }: { seriesId: strin
                 {season.tiers.map((tier) => (
                   <li
                     key={tier.leagueId}
-                    className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3"
+                    className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="rounded-md bg-blue-100 px-2 py-0.5 text-2xs font-bold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">

@@ -142,7 +142,7 @@ export function PromotionCommitPanel({ preview, submitting, onCommit }: Promotio
           {tier.entries.length === 0 ? (
             <p className="mt-3 text-xs text-[var(--text-muted)]">참가 팀이 없어요.</p>
           ) : (
-            <ul className="mt-3 divide-y divide-[var(--border-subtle)]">
+            <ul className="mt-3 divide-y divide-[var(--border)]">
               {tier.entries.map((entry) => {
                 const kind = kindOf(entry.teamId, entry.computedKind);
                 const meta = KIND_META[kind];
@@ -256,7 +256,7 @@ export function PromotionCommitPanel({ preview, submitting, onCommit }: Promotio
           type="button"
           onClick={handleCommit}
           disabled={submitting || entries.length === 0 || impossible.length > 0 || undersizedTiers.length > 0}
-          className="inline-flex min-h-[44px] items-center rounded-xl bg-blue-500 px-5 text-sm font-semibold text-white disabled:opacity-50"
+          className="inline-flex min-h-[44px] items-center rounded-xl bg-[var(--static-blue)] px-5 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
         >
           {submitting ? '확정하는 중…' : '승강 최종 승인'}
         </button>

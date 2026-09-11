@@ -13,6 +13,21 @@ ALPHA_LEGACY_STATE_FILE="${ALPHA_LEGACY_STATE_FILE:-${ALPHA_HOME_DIR}/.teameet-a
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/alpha-source-common.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/alpha-manifest-common.sh"
 
+# 복구 경로의 한 단계를 감싼다. 실패하면 **어느 단계인지** 를 남기고 종료코드를 그대로 돌려준다.
+# 복구는 배포가 이미 실패한 뒤에 도는 안전망이라, 여기서 조용히 죽으면 운영자가 받는 신호는
+# `CRITICAL` 한 줄뿐이다(2026-09-08 실사고: 네 번 실패했고 어느 단계인지 아무도 모른다).
+#
+# `if ! "$@"; then local rc=$?` 로 쓰지 마라 — 그 자리의 `$?` 는 `!` 의 결과라 명령이
+# 실패했을 때 0 이 되고, 단계 이름만 찍힌 채 **실패가 사라진다.**
+alpha_restore_step() {
+  local label="$1"
+  shift
+  local rc=0
+  "$@" || rc=$?
+  (( rc == 0 )) || echo "[alpha-deploy] restore step failed: ${label} (rc=${rc})" >&2
+  return "${rc}"
+}
+
 write_candidate_manifest() {
   local manifest_file="$1"
   local candidate_tmp
@@ -51,13 +66,15 @@ promote_candidate_manifest() {
 
 extract_active_manifest() {
   local output_file="$1"
-  jq -e '.active' "${ALPHA_RELEASE_STATE_FILE}" > "${output_file}"
+  # 함수 반환값은 **마지막 명령**의 것이다. `|| return 1` 이 없으면 `jq` 가 실패해도
+  # `chmod` 가 성공해 0 이 나가고, 호출부의 `|| return 1` 이 통째로 무력화된다.
+  jq -e '.active' "${ALPHA_RELEASE_STATE_FILE}" > "${output_file}" || return 1
   chmod 600 "${output_file}"
 }
 
 extract_previous_manifest() {
   local output_file="$1"
-  jq -e '.previous | select(. != null)' "${ALPHA_RELEASE_STATE_FILE}" > "${output_file}"
+  jq -e '.previous | select(. != null)' "${ALPHA_RELEASE_STATE_FILE}" > "${output_file}" || return 1
   chmod 600 "${output_file}"
 }
 
@@ -76,7 +93,7 @@ archive_failed_candidate() {
   local failed_path
 
   if [[ ! -f "${ALPHA_CANDIDATE_MANIFEST}" ]]; then
-    return
+    return 0
   fi
   failed_sha="$(jq -r '.release.sha // "unknown"' "${ALPHA_CANDIDATE_MANIFEST}")"
   failed_path="${ALPHA_FAILED_RELEASE_DIR}/${failed_sha}-$(date -u +%Y%m%dT%H%M%SZ).json"
@@ -149,7 +166,7 @@ check_alpha_health_contract() {
 wait_for_alpha_health_contract() {
   for attempt in $(seq 1 36); do
     if check_alpha_health_contract; then
-      return
+      return 0
     fi
     if [[ "${attempt}" -eq 36 ]]; then
       echo "[alpha-release] Health contract failed" >&2
@@ -180,7 +197,7 @@ wait_for_alpha_worker_healthy() {
     if [[ -n "${worker_container}" ]]; then
       worker_health="$(docker inspect --format '{{.State.Health.Status}}' "${worker_container}" 2>/dev/null || true)"
       if [[ "${worker_health}" == "healthy" ]]; then
-        return
+        return 0
       fi
     fi
     if [[ "${attempt}" -eq 36 ]]; then
@@ -192,26 +209,30 @@ wait_for_alpha_worker_healthy() {
   done
 }
 
+# 후보 배포가 실패했을 때 되돌리는 경로. **디스크 preflight(`deploy-alpha.sh`)의 "막아도
+# 안전하다" 판단이 이 함수가 동작한다는 전제 위에 서 있다** — 여기를 바꾸면 그 가드도 함께 본다.
 restore_active_release() {
   local active_tmp
   local active_sha
   local active_checksum
 
-  active_tmp="$(mktemp "${ALPHA_RELEASE_STATE_DIR}/active.XXXXXX")"
-  extract_active_manifest "${active_tmp}" || return 1
-  active_checksum="$(jq -er '.activeManifestSha256' "${ALPHA_RELEASE_STATE_FILE}")" || return 1
-  validate_stored_alpha_manifest "${active_tmp}" "${ALPHA_ECR_REGISTRY}" "${active_checksum}" || return 1
-  active_sha="$(jq -er '.release.sha' "${active_tmp}")" || return 1
-  activate_alpha_release_source "${active_sha}" || return 1
-  load_alpha_release_manifest "${active_tmp}" || return 1
-  pull_release_images || return 1
-  write_release_metadata "${active_tmp}" || return 1
-  "${compose[@]}" up -d --force-recreate --no-deps \
+  active_tmp="$(alpha_restore_step mktemp mktemp "${ALPHA_RELEASE_STATE_DIR}/active.XXXXXX")" || return 1
+  alpha_restore_step extract_active_manifest extract_active_manifest "${active_tmp}" || return 1
+  active_checksum="$(alpha_restore_step read_active_checksum \
+    jq -er '.activeManifestSha256' "${ALPHA_RELEASE_STATE_FILE}")" || return 1
+  alpha_restore_step validate_stored_manifest \
+    validate_stored_alpha_manifest "${active_tmp}" "${ALPHA_ECR_REGISTRY}" "${active_checksum}" || return 1
+  active_sha="$(alpha_restore_step read_active_sha jq -er '.release.sha' "${active_tmp}")" || return 1
+  alpha_restore_step activate_source activate_alpha_release_source "${active_sha}" || return 1
+  alpha_restore_step load_manifest load_alpha_release_manifest "${active_tmp}" || return 1
+  alpha_restore_step pull_images pull_release_images || return 1
+  alpha_restore_step write_metadata write_release_metadata "${active_tmp}" || return 1
+  alpha_restore_step compose_up_app "${compose[@]}" up -d --force-recreate --no-deps \
     v1_api v1_web v1_game_operations_worker || return 1
-  "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
-  wait_for_alpha_health_contract || return 1
-  assert_running_release_digests || return 1
-  rm -f "${active_tmp}" || return 1
+  alpha_restore_step compose_up_nginx "${compose[@]}" up -d --force-recreate --no-deps nginx || return 1
+  alpha_restore_step health_contract wait_for_alpha_health_contract || return 1
+  alpha_restore_step assert_digests assert_running_release_digests || return 1
+  alpha_restore_step cleanup_tmp rm -f "${active_tmp}" || return 1
 }
 
 # 배포마다 이전 릴리스의 dangling(태그 없는) 이미지가 로컬에 쌓인다 — alpha 는 ECR 에서

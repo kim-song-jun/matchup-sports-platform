@@ -447,33 +447,43 @@ describe('ChatService', () => {
     prisma.v1ChatRoom.update.mockResolvedValue({});
     prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: 'user-2' }, { userId: 'user-3' }]);
     prisma.v1Notification.createMany.mockResolvedValue({ count: 2 });
-    // The message/notifications are already committed above by the time this runs —
-    // a rejection here must not turn an already-successful send into a 500.
+    // The message is already committed by the time this runs — a rejection here
+    // must not turn an already-successful send into a 500.
     prisma.v1NotificationPreference.findMany.mockRejectedValueOnce(new Error('db unavailable'));
 
     await expect(service.sendMessage(userA, 'room-1', { content: 'ping' })).resolves.toMatchObject({
       messageId: 'msg-pref-lookup-fail',
     });
+    expect(prisma.v1Notification.createMany).not.toHaveBeenCalled();
     expect(webPushService.sendToUser).not.toHaveBeenCalled();
   });
 
-  it('sendMessage: skips WebPushService.sendToUser for recipients with chatEnabled=false', async () => {
+  it('sendMessage: chatEnabled=false 수신자는 채팅 메시지만 받고 알림함·배지·푸시는 받지 않는다', async () => {
     const sentAt = new Date('2026-06-21T10:00:00Z');
     const createdMessage = { id: 'msg-muted-pref', chatRoomId: 'room-1', senderUserId: userA.id, body: 'quiet', status: 'sent', sentAt };
     prisma.v1ChatRoom.findFirst.mockResolvedValue(roomWithTwoRecipients());
     prisma.v1ChatMessage.create.mockResolvedValue(createdMessage);
     prisma.v1ChatRoom.update.mockResolvedValue({});
     prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: 'user-2' }, { userId: 'user-3' }]);
-    prisma.v1Notification.createMany.mockResolvedValue({ count: 2 });
-    // user-2 disabled chat push; user-3 has no preference row (default enabled)
+    prisma.v1Notification.createMany.mockResolvedValue({ count: 1 });
+    // user-2 disabled chat notifications; user-3 has no preference row (default enabled)
     prisma.v1NotificationPreference.findMany.mockResolvedValue([{ userId: 'user-2', chatEnabled: false }]);
 
     await service.sendMessage(userA, 'room-1', { content: 'quiet' });
 
     expect(webPushService.sendToUser).not.toHaveBeenCalledWith('user-2', expect.anything());
     expect(webPushService.sendToUser).toHaveBeenCalledWith('user-3', expect.anything());
-    // Realtime in-app notification must still fire for the pref-disabled recipient (push-only gate)
     expect(realtimeGateway.emitToUser).toHaveBeenCalledWith('user-2', 'chat:message', expect.anything());
+    expect(realtimeGateway.emitToUser).not.toHaveBeenCalledWith('user-2', 'notification:new', expect.anything());
+    expect(prisma.v1Notification.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          recipientUserId: 'user-3',
+          targetType: 'chat',
+          targetId: 'room-1',
+        }),
+      ],
+    });
   });
 
   it('resolve(match): 첫 호출 시 created=true, 두 번째 호출 시 created=false (멱등성)', async () => {

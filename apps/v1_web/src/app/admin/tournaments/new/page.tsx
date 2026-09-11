@@ -501,7 +501,7 @@ function WizardStepper({
                         ? 'bg-blue-500 text-white'
                         : done
                           ? 'bg-[var(--blue50)] text-[var(--blue700)]'
-                          : 'bg-[var(--grey150)] text-[var(--text-caption)]',
+                          : 'tm-on-tint bg-[var(--grey150)] text-[var(--text-caption)]',
                     ].join(' ')}
                   >
                     {done ? <Check size={14} /> : locked ? <Lock size={12} /> : index + 1}
@@ -595,7 +595,7 @@ function BasicStep({
               className={[
                 'cursor-pointer rounded-xl border p-3 transition-colors',
                 state.format === value
-                  ? 'border-blue-500 bg-[var(--blue50)]'
+                  ? 'tm-on-tint border-blue-500 bg-[var(--blue50)]'
                   : 'border-[var(--border)] hover:border-[var(--border-strong)]',
               ].join(' ')}
             >
@@ -984,7 +984,7 @@ function ParticipationStep({
       ) : null}
 
       {state.genderCategory === 'mixed' ? (
-        <section className="rounded-2xl border border-[var(--border)] bg-[var(--grey50)] p-4">
+        <section className="tm-on-tint rounded-2xl border border-[var(--border)] bg-[var(--grey50)] p-4">
           <h3 className="text-sm font-bold text-[var(--text-strong)]">혼성 명단 쿼터</h3>
           <p className="mt-1 text-xs leading-5 text-[var(--text-caption)]">
             선수 추가는 막지 않고, 운영자가 명단을 확정할 때 이 조건을 검사해요.
@@ -1038,7 +1038,7 @@ function ParticipationStep({
           ) : null}
         </section>
       ) : (
-        <div className="rounded-xl bg-[var(--grey50)] p-4 text-sm text-[var(--text-caption)]">
+        <div className="tm-on-tint rounded-xl bg-[var(--grey50)] p-4 text-sm text-[var(--text-caption)]">
           {state.genderCategory === 'male' ? '남성부' : '여성부'}는 별도 쿼터 없이 카테고리만
           표시해요.
         </div>
@@ -1325,7 +1325,7 @@ function ConfirmStep({
   return (
     <div className="grid gap-5">
       <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--grey50)] p-4 sm:p-5">
-        <p className="mb-3 text-xs font-bold text-[var(--text-caption)]">참가자에게 이렇게 보여요</p>
+        <p className="tm-on-tint mb-3 text-xs font-bold text-[var(--text-caption)]">참가자에게 이렇게 보여요</p>
         <div className="mx-auto max-w-sm">
           <TournamentCard item={previewItem} interactive={false} />
         </div>

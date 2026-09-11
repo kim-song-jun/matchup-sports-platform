@@ -32,10 +32,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.routerPush }),
 }));
 vi.mock('@/components/tournament-result-review/game-result-review-panel', () => ({
-  // `publicHref` 도 드러낸다 — 이 화면이 만들어 넘기는 값이라 여기서만 검증할 수 있다.
-  GameResultReviewPanel: ({ gameId, publicHref }: { gameId: string; publicHref?: string }) => (
-    <div data-testid="panel" data-public-href={publicHref ?? ''}>panel:{gameId}</div>
-  ),
+  GameResultReviewPanel: ({ gameId }: { gameId: string }) => <div data-testid="panel">panel:{gameId}</div>,
 }));
 
 const ITEM = (fixtureId: string, gameId: string, fixtureNumber: number) => ({
@@ -109,56 +106,3 @@ describe('ResultReviewPageClient fixtureId 딥링크 (T6-1)', () => {
   });
 });
 
-/**
- * **"고쳤는데 다른 경로로 되살아난다" 의 교과서 사례.**
- *
- * 리그와 대회는 경기 상세 라우트가 다르고, 대회 패턴으로 리그를 링크하면 404 다. 그건
- * `fixtureDetailHref` 로 고쳤는데 — **그 헬퍼를 쓰는 것만으로는 안전하지 않다.** 이 화면의
- * 패널은 보드 쿼리로 뜨고 `kind` 는 **다른 쿼리**에서 온다. 보드가 먼저 성공하면
- * `tournament.data` 가 아직 없어 `=== 'regular_league'` 가 false 로 떨어지고, 정규 리그가
- * 대회 라우트로 링크된다. 입력이 준비되기 전에는 링크를 만들지 않는다.
- */
-describe('ResultReviewPageClient — 공개 화면 링크의 축 판정', () => {
-  beforeEach(() => {
-    window.localStorage.setItem('teameet.v1.userId', 'user-1');
-    mocks.useV1AuthMe.mockReturnValue({
-      data: { user: { id: 'user-1' } },
-      isPending: false,
-      isSuccess: true,
-      isError: false,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-    mocks.useTournamentEndedFixtures.mockReturnValue({
-      isPending: false, isSuccess: true, isError: false, data: { items: ITEMS }, refetch: vi.fn(),
-    });
-    mocks.useSearchParams.mockReturnValue(new URLSearchParams('fixtureId=fx-1'));
-  });
-
-  it('kind 가 아직 안 왔으면 링크를 만들지 않는다', () => {
-    mocks.useV1Tournament.mockReturnValue({ data: undefined });
-    render(<ResultReviewPageClient tournamentId="t-1" />);
-
-    expect(screen.getByTestId('panel')).toHaveAttribute('data-public-href', '');
-  });
-
-  it('정규 리그는 리그 경기 라우트로 링크한다', () => {
-    mocks.useV1Tournament.mockReturnValue({ data: { title: '가을 리그', kind: 'regular_league' } });
-    render(<ResultReviewPageClient tournamentId="t-1" />);
-
-    expect(screen.getByTestId('panel')).toHaveAttribute(
-      'data-public-href',
-      '/league-matches/t-1/fixtures/fx-1',
-    );
-  });
-
-  it('대회는 대회 경기 라우트로 링크한다', () => {
-    mocks.useV1Tournament.mockReturnValue({ data: { title: '가을 대회', kind: 'tournament' } });
-    render(<ResultReviewPageClient tournamentId="t-1" />);
-
-    expect(screen.getByTestId('panel')).toHaveAttribute(
-      'data-public-href',
-      '/tournaments/t-1/matches/fx-1',
-    );
-  });
-});

@@ -297,7 +297,7 @@ export function ActionButton({
       ? 'text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)]'
       : tone === 'red'
       ? 'text-[var(--red700)] bg-[var(--red50)] hover:bg-[var(--red100)]'
-      : 'text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)]';
+      : 'tm-on-tint text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)]';
 
   return (
     <button

@@ -62,7 +62,7 @@ REMOTE
 
 parameters="$(jq -nc --arg script "${remote_script}" '{commands:[$script]}')"
 command_id="$(aws ssm send-command --region "${AWS_REGION}" --instance-ids "${INSTANCE_ID}" \
-  --document-name AWS-RunShellScript --comment 'Teameet alpha Firebase Admin env sync' \
+  --document-name AWS-RunShellScript --comment 'Teameet alpha FCM service-account env sync' \
   --parameters "${parameters}" --query 'Command.CommandId' --output text)"
 aws ssm wait command-executed --region "${AWS_REGION}" --command-id "${command_id}" --instance-id "${INSTANCE_ID}" || true
 status="$(aws ssm get-command-invocation --region "${AWS_REGION}" --command-id "${command_id}" \

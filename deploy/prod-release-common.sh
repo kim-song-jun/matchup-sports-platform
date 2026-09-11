@@ -145,7 +145,7 @@ archive_failed_candidate() {
   local failed_path
 
   if [[ ! -f "${PROD_CANDIDATE_MANIFEST}" ]]; then
-    return
+    return 0
   fi
   failed_sha="$(jq -r '.release.sha // "unknown"' "${PROD_CANDIDATE_MANIFEST}")"
   failed_path="${PROD_FAILED_RELEASE_DIR}/${failed_sha}-$(date -u +%Y%m%dT%H%M%SZ).json"
@@ -232,7 +232,7 @@ check_prod_health_contract() {
 wait_for_prod_health_contract() {
   for attempt in $(seq 1 36); do
     if check_prod_health_contract; then
-      return
+      return 0
     fi
     if [[ "${attempt}" -eq 36 ]]; then
       echo "[prod-release] Health contract failed" >&2

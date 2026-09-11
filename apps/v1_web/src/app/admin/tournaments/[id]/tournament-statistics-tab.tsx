@@ -176,7 +176,7 @@ function RankingTable({
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[360px] text-[length:var(--font-size-label)]">
-            <thead className="bg-[var(--surface-soft)] text-xs text-[var(--text-muted)]">
+            <thead className="tm-on-tint bg-[var(--surface-soft)] text-xs text-[var(--text-muted)]">
               <tr>
                 <th scope="col" className="w-14 px-4 py-3 text-center font-semibold">순위</th>
                 <th scope="col" className="px-3 py-3 text-left font-semibold">이름</th>

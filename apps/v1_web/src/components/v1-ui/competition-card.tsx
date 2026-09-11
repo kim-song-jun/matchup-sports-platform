@@ -189,11 +189,15 @@ export function CompetitionCardHeader({
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, justifyContent: 'space-between' }}>
           <div
             className="tm-text-body-lg"
+            /* lineHeight 를 여기서 주지 않는다. tm-text-body-lg 의 28px 은
+               "[P1 4pt snap] 26→28 (4의 배수, ×1.65 — 한국어 +0.1 여유 포함)" 으로
+               의도해 맞춘 값인데, 인라인 1.35 가 특이도로 이겨 23px(17×1.35)로 덮고
+               있었다(alpha 실측 2026-09-08). 카드만 다르게 가야 한다면 전용 클래스로
+               정식 등록할 일이지 인라인으로 우회할 일이 아니다. */
             style={{
               color: 'var(--text-strong)',
               flex: 1,
               minWidth: 0,
-              lineHeight: 1.35,
               overflowWrap: 'break-word',
               wordBreak: 'keep-all',
             }}

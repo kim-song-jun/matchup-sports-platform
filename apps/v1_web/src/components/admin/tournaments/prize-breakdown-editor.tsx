@@ -137,7 +137,7 @@ export function PrizeBreakdownEditor({
         </div>
       </div>
 
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--grey50)] p-4">
+      <div className="tm-on-tint rounded-xl border border-[var(--border)] bg-[var(--grey50)] p-4">
         <p className="text-xs font-semibold text-[var(--text-caption)]">공개 페이지 미리보기</p>
         <div className="mt-2 grid gap-2">
           {rows.some((row) => row.label.trim() && row.value.trim()) ? (

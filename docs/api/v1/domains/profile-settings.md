@@ -60,7 +60,8 @@ The profile edit route renders a loading skeleton while `GET /me/profile` is pen
 Application, invitation, chat, review, inquiry, profile update, and existing-entity management endpoints do not use this gate.
 `UpdateSettingsDto`:
 
-- `notifications?: { matchEnabled?, teamEnabled?, teamMatchEnabled?, chatEnabled?, noticeEnabled?, marketingEnabled? }`
+- `notifications?: { activityEnabled?, matchEnabled?, teamEnabled?, teamMatchEnabled?, chatEnabled?, noticeEnabled?, marketingEnabled? }`
+- The user-facing notification settings group `matchEnabled`, `teamMatchEnabled`, and `activityEnabled` as 경기·대회. `activityEnabled` gates tournament events.
 
 `GET /me/activity-summary` response:
 

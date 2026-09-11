@@ -130,3 +130,7 @@ node scripts/ios/compose-store-captions.mjs <위 스크립트가 만든 디렉�
    # → kr.co.teameet
    ```
 4. 스크린샷 촬영 → 메타데이터 입력 → 심사 제출.
+
+## Archive target safety
+
+`scripts/ios/archive-and-export.sh` binds each scheme to its matching configuration, provisioning profile, and bundle identifier. Configuration/profile overrides that do not match the scheme are rejected before `xcodebuild`; the exported bundle identifier is checked again before upload.

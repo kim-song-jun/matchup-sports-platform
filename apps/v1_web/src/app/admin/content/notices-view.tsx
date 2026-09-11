@@ -408,7 +408,7 @@ export function NoticesView() {
             />
 
             {!canWrite ? (
-              <p className="rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+              <p className="tm-on-tint rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                 지원 역할은 공지를 조회할 수 있지만 작성할 수 없어요.
               </p>
             ) : null}

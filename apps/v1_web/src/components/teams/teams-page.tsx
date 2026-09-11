@@ -81,7 +81,7 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
     <>
       {/* Desktop-only page header with inline create CTA */}
       <div className="tm-team-desktop-header tm-show-desktop">
-        <h1 className="tm-team-desktop-header-title">팀</h1>
+        <h1 className="tm-text-heading tm-team-desktop-header-title">팀</h1>
         <Link className="tm-team-desktop-create-btn" href="/teams/new">
           <PlusIcon size={18} strokeWidth={2.5} aria-hidden="true" />
           팀 만들기
@@ -1757,7 +1757,15 @@ function TeamCard({ team }: { team: TeamModel }) {
             <div className="tm-text-caption line-clamp-1" style={{ marginTop: 4, color: 'var(--text-muted)' }}>{leaderLine}</div>
           ) : null}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-            {dedupeTags([...team.tags, team.genderRule]).map((tag) => <span key={tag} className="tm-badge tm-badge-grey">{tag}</span>)}
+            {/* 레벨 태그는 서버가 자유 텍스트로 준다 — alpha 에는 `중급 · 빌드업과 패스 플레이 중심`
+                (17자, 170px)처럼 문장이 들어온 팀이 4곳 있다. 태그 행이 232px 이라 그 배지 하나가
+                형제(`성별 무관` 62px + gap 8)를 둘째 줄로 밀어낸다. 폭에 상한을 걸어 칩 한 줄을
+                지킨다 — 잘린 뒤도 DOM 에는 남아 스크린리더는 전문을 읽는다. */}
+            {dedupeTags([...team.tags, team.genderRule]).map((tag) => (
+              <span key={tag} className="tm-badge tm-badge-grey tm-team-tag">
+                <span className="tm-team-tag-text">{tag}</span>
+              </span>
+            ))}
             {/* '가입 신청 가능' 은 목록에서 정보가 되지 않는다 — alpha 실측(2026-09-07)에서
                 50팀 중 50팀이 같은 값이었고, 머리말에도 "50팀 · 가입 가능 50" 이 이미 있다.
                 그 한 줄을 위해 구분선 + 49px 를 쓰고 있었다. 예외(가입 닫힘·정원 마감)만 알린다.

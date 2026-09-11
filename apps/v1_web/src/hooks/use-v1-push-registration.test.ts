@@ -143,6 +143,63 @@ describe('useV1PushRegistration', () => {
     expect(result.current.isSubscribed).toBe(false);
   });
 
+  it('forwards the sign-out reason to the shell so it keeps the reader\'s opt-in', async () => {
+    const messages: Array<Record<string, unknown>> = [];
+    window.TeameetNative = {
+      postMessage: vi.fn((message) => {
+        const request = JSON.parse(message) as { requestId: string; type: string };
+        messages.push(request);
+        window.dispatchEvent(new CustomEvent('teameet:native-push-result', {
+          detail: { requestId: request.requestId, permission: 'granted', subscribed: false },
+        }));
+      }),
+    };
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+    await waitFor(() => expect(messages.length).toBe(1));
+
+    await act(async () => {
+      await result.current.unsubscribe({ reason: 'sign-out' });
+    });
+    await act(async () => {
+      await result.current.unsubscribe();
+    });
+
+    const revocations = messages.filter((message) => message.type === 'revoke-push-device');
+    expect(revocations).toHaveLength(2);
+    expect(revocations[0]).toMatchObject({ reason: 'sign-out' });
+    expect(revocations[1]).not.toHaveProperty('reason');
+  });
+
+  it('does not report a native revoke as successful when the server did not confirm it', async () => {
+    window.TeameetNative = {
+      postMessage: vi.fn((message) => {
+        const request = JSON.parse(message) as { requestId: string; type: string };
+        window.dispatchEvent(new CustomEvent('teameet:native-push-result', {
+          detail: {
+            requestId: request.requestId,
+            permission: 'granted',
+            subscribed: request.type !== 'revoke-push-device',
+            ...(request.type === 'revoke-push-device' ? { errorCode: 'revocation-failed' } : {}),
+          },
+        }));
+      }),
+    };
+    const { useV1PushRegistration } = await import('./use-v1-push-registration');
+    const { result } = renderHook(() => useV1PushRegistration());
+    await waitFor(() => expect(result.current.isSubscribed).toBe(true));
+
+    let revoked = true;
+    await act(async () => {
+      revoked = await result.current.unsubscribe();
+    });
+
+    expect(revoked).toBe(false);
+    expect(reportClientError).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ flow: 'native-push-unsubscribe' }) }),
+    );
+  });
+
   it('subscribes: requests permission, registers the SW, and posts the subscription', async () => {
     const { useV1PushRegistration } = await import('./use-v1-push-registration');
     const { result } = renderHook(() => useV1PushRegistration());

@@ -211,7 +211,10 @@
 }
 
 .deadline {
-  color: var(--blue600);
+  /* 라이트 --blue600(#2272eb)은 흰 지면에서 4.49:1 — 기준에 0.01 모자란다(alpha 실측).
+     다크는 이미 같은 이유로 #5a9cf8 로 올라가 있다(globals.css 주석). 토큰 자체는
+     지면으로도 쓰여 못 건드리므로 여기서 blue700(5.41:1)을 쓴다. */
+  color: var(--blue700);
 }
 
 .detailCta {
@@ -219,7 +222,7 @@
   align-items: center;
   gap: 4px;
   flex: 0 0 auto;
-  color: var(--blue600);
+  color: var(--blue700); /* .deadline 과 같은 이유 — 12px/700 에서 blue600 은 4.49:1 */
   font-size: var(--font-size-caption);
   font-weight: 700;
 }

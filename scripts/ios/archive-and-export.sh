@@ -34,8 +34,8 @@ SCHEME="${TEAMEET_ARCHIVE_SCHEME:-TeameetAlpha}"
 # gate was looking at a correctly built alpha build. The only symptom was the build landing
 # under the wrong app in App Store Connect, one irreversible upload later.
 case "$SCHEME" in
-  TeameetAlpha)      SCHEME_CONFIGURATION="Alpha Release";      SCHEME_PROFILE="Teameet Alpha App Store" ;;
-  TeameetProduction) SCHEME_CONFIGURATION="Production Release"; SCHEME_PROFILE="Teameet Production App Store" ;;
+  TeameetAlpha)      SCHEME_CONFIGURATION="Alpha Release";      SCHEME_PROFILE="Teameet Alpha App Store";      EXPECTED_BUNDLE_ID="kr.co.teameet.alpha" ;;
+  TeameetProduction) SCHEME_CONFIGURATION="Production Release"; SCHEME_PROFILE="Teameet Production App Store"; EXPECTED_BUNDLE_ID="kr.co.teameet" ;;
   *)
     echo "[archive] Unknown scheme '$SCHEME'. Expected TeameetAlpha or TeameetProduction." >&2
     echo "[archive] A scheme this script does not know cannot be given a configuration or a" >&2
@@ -51,11 +51,13 @@ TEAM_ID="${TEAMEET_TEAM_ID:-U9J95Q6XD3}"
 SIGNING_IDENTITY="${TEAMEET_SIGNING_IDENTITY:-Apple Distribution}"
 PROFILE_NAME="${TEAMEET_PROFILE_NAME:-$SCHEME_PROFILE}"
 
-# The overrides stay, but they now have to be deliberate. Silently pairing a production scheme
-# with an alpha profile is the exact failure above; saying so out loud costs one line.
+# Configuration and profile identify the signed app just as strongly as the scheme. They are
+# intentionally immutable per scheme: accepting an override can produce a correctly signed,
+# correctly entitled binary for the wrong App Store record.
 if [[ "$CONFIGURATION" != "$SCHEME_CONFIGURATION" || "$PROFILE_NAME" != "$SCHEME_PROFILE" ]]; then
-  echo "[archive] scheme $SCHEME normally uses '$SCHEME_CONFIGURATION' / '$SCHEME_PROFILE'."
-  echo "[archive] Overridden to '$CONFIGURATION' / '$PROFILE_NAME' — make sure that is intended."
+  echo "[archive] configuration/profile do not match scheme $SCHEME." >&2
+  echo "[archive] expected '$SCHEME_CONFIGURATION' / '$SCHEME_PROFILE'; got '$CONFIGURATION' / '$PROFILE_NAME'." >&2
+  exit 1
 fi
 [[ "${1:-}" == "--upload" ]] && UPLOAD=true
 
@@ -130,16 +132,29 @@ echo "[archive] built ${IPA#"$OUTPUT/"} ($(du -h "$IPA" | cut -f1))"
 REQUIRED_ENTITLEMENTS=(
   "aps-environment"                             # APNs. Without it the device never gets a token.
   "com.apple.developer.associated-domains"      # Universal links, incl. the Kakao sign-in return.
+  "com.apple.developer.applesignin"             # Sign in with Apple. Guideline 4.8 rides on it.
 )
 GATE_DIR="$(mktemp -d)"
 trap 'rm -rf "$GATE_DIR"' EXIT
 unzip -q "$IPA" -d "$GATE_DIR"
 GATE_APP="$(find "$GATE_DIR/Payload" -maxdepth 1 -name "*.app" | head -1)"
 [[ -n "$GATE_APP" ]] || { echo "[archive] no .app inside the .ipa" >&2; exit 1; }
+# Validate the exported product identity before any upload decision. Entitlements alone do not
+# prove that a production build was exported from the production target.
+BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$GATE_APP/Info.plist" 2>/dev/null || true)"
+if [[ "$BUNDLE_ID" != "$EXPECTED_BUNDLE_ID" ]]; then
+  echo "[archive] exported bundle id '$BUNDLE_ID' does not match scheme $SCHEME ('$EXPECTED_BUNDLE_ID')." >&2
+  exit 1
+fi
+echo "[archive] exported bundle id: $BUNDLE_ID"
 GATE_PLIST="$(codesign -d --entitlements :- "$GATE_APP" 2>/dev/null || true)"
 MISSING=()
 for key in "${REQUIRED_ENTITLEMENTS[@]}"; do
-  grep -q "<key>$key</key>" <<<"$GATE_PLIST" || MISSING+=("$key")
+  # -F: the keys contain dots, and an unescaped dot in a regex matches any character. The
+  # realistic failure is not a false pass — no plist holds `comXappleXdeveloperXapplesignin` —
+  # but a gate whose correctness rests on «no plausible string matches» is a gate that has to
+  # be re-argued every time a key is added. Fixed-string matching costs two characters.
+  grep -qF "<key>$key</key>" <<<"$GATE_PLIST" || MISSING+=("$key")
 done
 if (( ${#MISSING[@]} > 0 )); then
   echo "[archive] The built app is missing entitlements it needs:" >&2
@@ -148,7 +163,9 @@ if (( ${#MISSING[@]} > 0 )); then
   echo "[archive] nothing. Usual cause: the archive was produced without signing." >&2
   exit 1
 fi
-echo "[archive] entitlements present: ${REQUIRED_ENTITLEMENTS[*]}"
+# «required» — not «all». The line lists what was checked, and reading it as a full dump of the
+# app's entitlements is an easy mistake to make when a key is missing from the array.
+echo "[archive] required entitlements present: ${REQUIRED_ENTITLEMENTS[*]}"
 
 if [[ "$UPLOAD" != true ]]; then
   echo

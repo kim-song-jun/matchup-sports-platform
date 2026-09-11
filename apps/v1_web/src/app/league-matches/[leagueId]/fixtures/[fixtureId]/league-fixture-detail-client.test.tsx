@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { useV1LeagueMatch, useV1LeagueMatchStandings, useV1ResolveChatRoom, useV1TeamMatch } from '@/hooks/use-v1-api';
 import { usePublicLeagueFixtureRecord } from '@/components/public-game-records/use-public-game-records';
 import { V1ApiError } from '@/lib/api-client';
@@ -142,6 +142,21 @@ function mockViewer(state: 'none' | 'approved' | 'host_team', extra: Record<stri
 }
 
 describe('LeagueFixtureDetailClient', () => {
+  // 픽스처가 **고정 날짜**다 — fx-1 은 2026-09-08T10:00Z 이고 "예정"으로 보여야 한다.
+  // 시계를 얼리지 않으면 그 시각이 지나는 순간 두 테스트가 깨지고, 실제로 2026-09-08 에
+  // 그렇게 됐다(CI red → alpha 배포 차단). 실패 시점이 픽스처를 쓴 날과 멀어서 원인이
+  // 안 보였다 — 09:46 UTC 배포는 통과하고 10:05 배포만 실패했다.
+  //
+  // Date 만 얼린다 — setTimeout 까지 얼리면 Testing Library 의 waitFor 가 진행하지 못한다
+  // (league-match-standings-client.test.tsx 의 같은 처방).
+  beforeAll(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-05T00:00:00.000Z')); // 1주차(9/1) 뒤 · 2주차(9/8) 앞
+  });
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   it('예정 경기: 양팀 실명·순위·전적과 "예정"을 보여주고, 리그명은 리그 상세로 링크한다', () => {
     mockLeague();
     mockViewer('none');

@@ -14,11 +14,15 @@ interface AdminKpiCardProps {
   ariaLabel?: string;
 }
 
+/* 값은 24~30px 라 큰 글씨 완화(3:1)를 받지만, green-500 은 흰 지면에서 2.22:1 로
+   그것조차 못 넘는다(--green700 은 5.40:1). blue-500 3.71 · red-500 3.81 은 완화
+   기준을 넘지만 label·sub 와 같은 카드 안에서 혼자 약해 보여 --blue700/--red700 로
+   함께 맞춘다. */
 const TONE_VALUE: Record<NonNullable<AdminKpiCardProps['tone']>, string> = {
-  neutral: 'text-blue-500',
-  positive: 'text-green-500',
+  neutral: 'text-[var(--blue700)]',
+  positive: 'text-[var(--green700)]',
   warning: 'text-[var(--orange700)]',
-  danger: 'text-red-500',
+  danger: 'text-[var(--red700)]',
 };
 
 const TONE_ICON: Record<NonNullable<AdminKpiCardProps['tone']>, string> = {
@@ -32,8 +36,9 @@ const TONE_ICON: Record<NonNullable<AdminKpiCardProps['tone']>, string> = {
 const TONE_WRAPPER: Record<NonNullable<AdminKpiCardProps['tone']>, string> = {
   neutral: 'bg-[var(--card-surface)] border-[var(--border)]',
   positive: 'bg-[var(--card-surface)] border-[var(--border)]',
-  warning: 'bg-[var(--tint-orange)] border-[var(--tint-orange-border)]',
-  danger: 'bg-[var(--red50)] border-red-100',
+  // tm-on-tint: 틴트 지면 위 muted 캡션을 grey700 으로(grey600 은 tint-orange 4.27 · red50 4.02 로 AA 미달)
+  warning: 'tm-on-tint bg-[var(--tint-orange)] border-[var(--tint-orange-border)]',
+  danger: 'tm-on-tint bg-[var(--red50)] border-red-100',
 };
 
 function KpiCardInner({

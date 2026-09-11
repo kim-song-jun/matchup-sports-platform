@@ -145,7 +145,7 @@ export function MockSeedPanel() {
           type="button"
           onClick={submit}
           disabled={createMock.isPending || teamCountTooHigh}
-          className="inline-flex items-center gap-2 h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-60 transition-colors focus-visible:outline-2 focus-visible:outline-amber-500 focus-visible:outline-offset-2"
+          className="inline-flex items-center gap-2 h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-white bg-amber-700 hover:bg-amber-800 disabled:opacity-60 transition-colors focus-visible:outline-2 focus-visible:outline-amber-500 focus-visible:outline-offset-2"
         >
           {createMock.isPending ? '만드는 중…' : '목업 대회 만들기'}
         </button>

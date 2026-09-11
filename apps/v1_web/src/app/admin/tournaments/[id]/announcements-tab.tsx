@@ -150,7 +150,7 @@ export function AnnouncementsTab({
       {/* ── 공지 작성 폼 ─────────────────────────────────────────────── */}
       {!canWrite && (
         <p
-          className="rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-xs text-[var(--text-muted)]"
+          className="tm-on-tint rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-xs text-[var(--text-muted)]"
           role="status"
         >
           조회 전용 권한으로 접속했어요. 공지를 작성하거나 변경하려면 운영 권한이 필요해요.

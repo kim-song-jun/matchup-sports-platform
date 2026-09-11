@@ -470,7 +470,7 @@ function PopupDetail({
         </div>
         <AdminStatusPill status={popup.status} label={STATUS_LABEL[popup.status]} />
       </div>
-      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-xl bg-[var(--surface-soft)] p-3 text-sm">
+      <dl className="tm-on-tint mt-4 grid grid-cols-2 gap-3 rounded-xl bg-[var(--surface-soft)] p-3 text-sm">
         <div><dt className="text-xs text-[var(--text-muted)]">게시일</dt><dd className="mt-1 text-[var(--text-body)]">{formatDateTime(popup.publishedAt)}</dd></div>
         <div><dt className="text-xs text-[var(--text-muted)]">수정일</dt><dd className="mt-1 text-[var(--text-body)]">{formatDateTime(popup.updatedAt)}</dd></div>
         <div className="col-span-2"><dt className="text-xs text-[var(--text-muted)]">노출 기간</dt><dd className="mt-1 text-[var(--text-body)]">{formatDisplayWindow(popup.displayStartAt, popup.displayEndAt)}</dd></div>
@@ -621,7 +621,7 @@ function PopupForm({
           onUploadImage={onUploadImage}
           disabled={!canWrite || saving}
         />
-        <p className="rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-xs leading-5 text-[var(--text-muted)]">각 화면에서는 공개 상태이고 노출 기간 안에 있는 팝업 중 가장 최근 항목 하나를 보여줘요. 내부 링크는 /로 시작하고 외부 링크는 https://만 사용할 수 있어요.</p>
+        <p className="tm-on-tint rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-xs leading-5 text-[var(--text-muted)]">각 화면에서는 공개 상태이고 노출 기간 안에 있는 팝업 중 가장 최근 항목 하나를 보여줘요. 내부 링크는 /로 시작하고 외부 링크는 https://만 사용할 수 있어요.</p>
         <button type="submit" disabled={!canWrite || saving} className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2">{saving ? '저장 중...' : mode === 'create' ? '팝업 생성' : '수정 저장'}</button>
       </form>
     </div>

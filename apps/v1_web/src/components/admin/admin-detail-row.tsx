@@ -17,7 +17,7 @@ export function AdminDetailRow({
 }) {
   const isEmpty = value === null || value === undefined || value === '';
   return (
-    <div className="min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
+    <div className="tm-on-tint min-w-0 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
       <dt className="text-xs font-semibold text-[var(--text-muted)]">{label}</dt>
       <dd className="mt-1 break-words text-sm font-semibold text-[var(--text-strong)]">
         {isEmpty ? '-' : value}
@@ -42,7 +42,7 @@ export function AdminSummaryItem({
 }) {
   const isEmpty = value === null || value === undefined || value === '';
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
+    <div className="tm-on-tint flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-soft)] px-4 py-3">
       <dt className="flex min-w-0 items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
         <span className="shrink-0 text-[var(--text-muted)]" aria-hidden="true">{icon}</span>
         <span className="truncate">{label}</span>

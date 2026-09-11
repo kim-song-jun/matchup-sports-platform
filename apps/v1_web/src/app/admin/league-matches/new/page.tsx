@@ -121,7 +121,7 @@ export default function AdminLeagueMatchNewPage() {
       {/* 그룹 B 감사 결함 4: 이 폼은 항상 단발 리그만 만든다 — 1부·2부처럼 승격·강등이
           있는 리그 체계는 이 폼이 아니라 리그 체계(시즌 시딩) 경로로만 생긴다. 두 화면이
           서로를 언급하지 않아 "1부 리그를 만들자"며 여기 온 운영자는 방법이 없었다. */}
-      <div className="mb-5 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3 text-sm text-[var(--text-muted)]">
+      <div className="tm-on-tint mb-5 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3 text-sm text-[var(--text-muted)]">
         1부·2부처럼 승격·강등이 있는 리그 체계를 만들려면{' '}
         <Link href="/admin/league-series/new" className="font-medium text-[var(--blue700)] underline underline-offset-2">
           리그 체계 만들기
@@ -206,7 +206,7 @@ export default function AdminLeagueMatchNewPage() {
           </ul>
         </div>
 
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] p-3 text-sm text-[var(--text-muted)]">
+        <div className="tm-on-tint rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] p-3 text-sm text-[var(--text-muted)]">
           순위 규칙: 승점 → 골득실 → 다득점 → 승자승 (고정값 — 리그별 변경 미지원)
         </div>
 

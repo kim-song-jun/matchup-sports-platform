@@ -92,7 +92,7 @@ function TournamentBreakdownCard({
             <Link
               href={hrefFor(row.tournamentId)}
               aria-label={`${row.title || '(제목 없음)'} ${linkLabel}`}
-              className="shrink-0 inline-flex items-center gap-0.5 min-h-[44px] px-2 text-[length:var(--font-size-label)] font-medium text-blue-500 hover:text-[var(--blue700)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+              className="shrink-0 inline-flex items-center gap-0.5 min-h-[44px] px-2 text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] hover:underline transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
             >
               {linkLabel}
               <ArrowRight size={13} aria-hidden="true" />
@@ -374,7 +374,7 @@ export default function AdminOverviewPage() {
             <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">최근 운영 활동</h2>
             <Link
               href="/admin/monitoring?tab=audit"
-              className="flex items-center gap-0.5 text-[length:var(--font-size-label)] text-blue-500 font-medium hover:text-[var(--blue700)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded min-h-[44px] px-1"
+              className="flex items-center gap-0.5 text-[length:var(--font-size-label)] text-[var(--blue700)] font-medium hover:underline transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded min-h-[44px] px-1"
             >
               전체 보기
               <ArrowRight size={13} aria-hidden="true" />

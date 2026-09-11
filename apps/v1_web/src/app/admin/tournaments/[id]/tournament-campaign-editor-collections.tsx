@@ -50,7 +50,7 @@ export function TournamentCampaignEditorCollections({
         ])}
       >
         {form.highlights.map((item, index) => (
-          <div key={`highlight-${index}`} className="rounded-xl bg-[var(--surface-soft)] p-4">
+          <div key={`highlight-${index}`} className="tm-on-tint rounded-xl bg-[var(--surface-soft)] p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="text-xs font-semibold text-[var(--text-muted)]">참가할 이유 {index + 1}</p>
               <RemoveButton
@@ -98,7 +98,7 @@ export function TournamentCampaignEditorCollections({
         onAdd={() => onFaqChange([...form.faq, { question: '', answer: '' }])}
       >
         {form.faq.map((item, index) => (
-          <div key={`faq-${index}`} className="rounded-xl bg-[var(--surface-soft)] p-4">
+          <div key={`faq-${index}`} className="tm-on-tint rounded-xl bg-[var(--surface-soft)] p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <p className="text-xs font-semibold text-[var(--text-muted)]">FAQ {index + 1}</p>
               <RemoveButton

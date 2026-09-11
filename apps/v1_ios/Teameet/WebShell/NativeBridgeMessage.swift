@@ -46,6 +46,10 @@ enum NativeBridge {
         /// app: a nonce the app could choose is a nonce an attacker could choose, and then a
         /// captured identity token replays into a fresh sign-in.
         var nonce: String?
+        /// Only `revoke-push-device` carries one. `"sign-out"` marks the logout button's
+        /// revocation, which keeps the reader's opt-in — see `PushRevocation`. Absent on
+        /// every older web build, which is read as an opt-out, the behaviour it had.
+        var reason: String?
     }
 
     /// Parses a message from the page.
@@ -64,7 +68,11 @@ enum NativeBridge {
         // `request.optString("requestId", "")`. The web ignores such an event, so the reply
         // is harmless, and the shell still performs the action the page asked for.
         let requestId = payload["requestId"] as? String ?? ""
-        return Message(action: action, requestId: requestId, nonce: payload["nonce"] as? String)
+        return Message(
+            action: action,
+            requestId: requestId,
+            nonce: payload["nonce"] as? String,
+            reason: payload["reason"] as? String)
     }
 
     /// Builds the JavaScript that hands a result back to the page.

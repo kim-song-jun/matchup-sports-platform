@@ -2,7 +2,7 @@
  * 홈 상단 배너 표시 정책 (Task 154 P2-1, 사용자 선택 A안).
  *
  * ## 왜 필요한가
- * 배너 4종이 각자 독립 조건으로 뜬다. 조건이 겹치면 넷이 한꺼번에 쌓여 인사말·통계·
+ * 여러 배너가 각자 독립 조건으로 뜬다. 조건이 겹치면 한꺼번에 쌓여 인사말·통계·
  * 추천이 전부 접힘 아래로 밀린다(alpha 실화면에서 2개가 연달아 뜨는 것을 확인했고,
  * 미인증 사용자면 넷까지 간다).
  *
@@ -19,10 +19,9 @@
  * "왜 신청이 안 되지" 상태로 이탈하는 경우가 생긴다.
  *
  * ## 우선순위 근거 (2026-08-24 프로덕션 실측)
- * `recordConsent` 를 `pendingReviews`·`push` 앞에 둔다:
+ * `recordConsent` 를 `pendingReviews` 앞에 둔다:
  *   - 신원 연결 1,384건 중 **131명 / 383경기가 동의만 켜면 즉시 공개**되는데 동의한
  *     사람이 0명이다. 노출 기회도 계정당 **총 2회**뿐이라 한 번 밀리면 회수가 어렵다.
- *   - `push` 는 로그인마다 다시 뜨므로 가장 뒤에 둬도 손해가 가장 적다.
  *   - `pendingReviews` 는 0건이 되면 스스로 사라지므로 영구 점유 위험이 없다.
  *
  * ## 어드민 설정화 여지
@@ -32,7 +31,7 @@
  */
 
 /** 유도 배너 식별자. 배열 순서가 곧 우선순위다(앞이 우선). */
-export const NUDGE_PRIORITY = ['recordConsent', 'pendingReviews', 'push'] as const;
+export const NUDGE_PRIORITY = ['recordConsent', 'pendingReviews'] as const;
 
 export type HomeNudgeKey = (typeof NUDGE_PRIORITY)[number];
 
@@ -41,7 +40,6 @@ export interface HomeBannerAvailability {
   readonly phoneVerify: boolean;
   readonly recordConsent: boolean;
   readonly pendingReviews: boolean;
-  readonly push: boolean;
 }
 
 export interface HomeBannerDecision {

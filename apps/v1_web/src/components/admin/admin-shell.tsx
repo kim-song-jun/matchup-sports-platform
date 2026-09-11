@@ -207,7 +207,11 @@ function NavBadge({ count }: { count: number }) {
   return (
     <span
       aria-hidden="true"
-      className="ml-auto inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-blue-500 px-2 text-[length:var(--font-size-caption)] font-semibold leading-none text-white tabular-nums"
+      /* 배지는 버튼이 아니라 정보 표시라 a11y-decisions.md 1번(solid-fill 버튼 흰 글씨
+         현행 유지)의 적용 대상이 아니다. blue-500 위 흰 글씨는 3.71:1.
+         --blue700 은 다크에서 #6ba8ff(밝은 파랑)로 뒤집혀 흰 글씨가 2.42:1 이 되므로
+         쓸 수 없다 — 테마와 무관하게 고정인 --static-blue(#1b64da)로 5.41:1 을 얻는다. */
+      className="ml-auto inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-[var(--static-blue)] px-2 text-[length:var(--font-size-caption)] font-semibold leading-none text-white tabular-nums"
     >
       {count > 99 ? '99+' : count}
     </span>
@@ -526,7 +530,7 @@ export function AdminShell({ children, adminName, adminRoleLabel, canManageAdmin
             type="button"
             onClick={() => setPaletteOpen(true)}
             aria-label="전역 검색 열기 (Cmd+K)"
-            className="flex w-full items-center gap-2 min-h-[40px] rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--text-body)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            className="tm-on-tint flex w-full items-center gap-2 min-h-[40px] rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] px-3 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:border-blue-300 hover:text-[var(--text-body)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
           >
             <Search size={14} aria-hidden="true" />
             <span className="flex-1 text-left">회원·팀·매치 검색</span>

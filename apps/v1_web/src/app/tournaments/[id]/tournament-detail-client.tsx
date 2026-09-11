@@ -1159,6 +1159,20 @@ export function TournamentDetailView({
 
   /* ── Desktop right-rail CTA card ── */
   const railCTA = isOpen ? (
+    isLeagueMirror ? (
+      <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="리그 참가 신청">
+        <div className="tm-text-label" style={{ color: 'var(--text-strong)', marginBottom: 2 }}>
+          {hasActiveRegistration ? '내 리그 신청' : '리그 참가 신청'}
+        </div>
+        {tournament.registrationDeadlineAt ? (
+          <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 12 }}>
+            신청 마감 {formatTournamentDateLong(tournament.registrationDeadlineAt)}
+          </div>
+        ) : null}
+        <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} />
+      </aside>
+    ) : (
+
     <aside
       className="tm-tournament-rail tm-show-desktop"
       role="complementary"
@@ -1222,6 +1236,7 @@ export function TournamentDetailView({
         </div>
       </div>
     </aside>
+    )
   ) : tournament.status === 'in_progress' ? (
     <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="대회 진행 상태">
       {/* Live CTA */}

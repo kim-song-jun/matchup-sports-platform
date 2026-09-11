@@ -160,7 +160,7 @@ describe('TournamentDetailPageClient GA events', () => {
     expect(trackEvent).not.toHaveBeenCalled();
   });
 
-  it('keeps the application entry for an in-progress regular league with a future deadline', async () => {
+  it('keeps the shared application contract in a regular-league rail without tournament capacity facts', async () => {
     tournamentApiMocks.useV1Tournament.mockReturnValue({
       data: makeTournament({
         status: 'in_progress',
@@ -178,9 +178,12 @@ describe('TournamentDetailPageClient GA events', () => {
     render(<TournamentDetailPageClient tournamentId="tournament-1" />);
 
     await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
-    const desktopRail = screen.getByRole('complementary', { name: '참가 신청' });
-    expect(within(desktopRail).getByRole('link', { name: '참가 신청하기' })).toHaveAttribute(
+    const rail = screen.getByRole('complementary', { name: '리그 참가 신청' });
+    expect(within(rail).getByRole('link', { name: '참가 신청하기' })).toHaveAttribute(
       'href', '/tournaments/tournament-1/my',
     );
+    expect(within(rail).queryByText('정원')).not.toBeInTheDocument();
+    expect(within(rail).queryByText('참가비')).not.toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: '참가 신청' })).not.toBeInTheDocument();
   });
 });

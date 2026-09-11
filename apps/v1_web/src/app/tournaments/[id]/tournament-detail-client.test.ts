@@ -1134,24 +1134,34 @@ describe('TournamentDetailView — 정규 리그 거울 행', () => {
   });
 
   /**
-   * 위 대조군이 "레일 것을 잡아서" vacuous 였던 사고의 나머지 절반.
-   *
-   * 레일(`railCTA`)에도 정원 진행바가 있는데 **거기엔 게이트를 안 걸었다.** 리그가 도달할 수
-   * 없기 때문이다 — 거울의 status 는 `STATUS_BY_LEAGUE_STATE`(draft/in_progress/completed)
-   * 로만 만들어져 **`open` 이 나올 수 없고**, 레일은 `status === 'open'` 일 때만 그려진다.
-   * `open` 을 넣을 수 있는 유일한 경로인 어드민 `changeStatus` 는 진입 조회가
-   * `TOURNAMENT_KINDS` 라 거울에 닿지 않는다.
-   *
-   * 그 전제를 여기서 못박는다. 안 박으면 다음 사람은 "왜 레일만 안 막았지?" 를 다시
-   * 판단해야 하고, 전제가 깨져도 아무것도 red 가 되지 않는다.
+   * 정규 리그에도 공통 참가 신청 rail은 있지만, 토너먼트 전용 capacity/fee rail과는
+   * 분리한다. 이 회귀는 리그 rail이 사라지는지보다, 거울의 기본 teamCount/entryFee가
+   * 신청 정원·참가비처럼 잘못 표시되지 않는지를 확인한다.
    */
-  it('리그 상세에는 참가 신청 레일이 아예 없다 — 레일 정원 블록을 게이팅하지 않은 근거', async () => {
+  it('리그 상세에는 토너먼트 참가 신청 레일이 없다', async () => {
     vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
     const { container } = render(
       createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }),
     );
     await screen.findByText('통합 순위');
     expect(container.querySelector('[aria-label="참가 신청"]')).toBeNull();
+  });
+
+  it('미래 마감 정규 리그에는 정원·참가비 없는 공통 참가 신청 레일이 있다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    render(
+      createElement(TournamentDetailView, {
+        tournament: makeMirror({ registrationDeadlineAt: '2099-08-10T14:59:00.000Z' }),
+        myRegistration: null,
+      }),
+    );
+    await screen.findByText('통합 순위');
+    const rail = screen.getByRole('complementary', { name: '리그 참가 신청' });
+    expect(within(rail).getByRole('link', { name: '참가 신청하기' })).toHaveAttribute(
+      'href', '/tournaments/league-1/my',
+    );
+    expect(within(rail).queryByText('정원')).toBeNull();
+    expect(within(rail).queryByText('참가비')).toBeNull();
   });
 
   it('조가 없어도 통합 순위 섹션을 그린다 — 조 개수로 게이팅하면 리그는 영영 안 뜬다', async () => {

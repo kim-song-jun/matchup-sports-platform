@@ -1510,7 +1510,9 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
           teams={visibleTeams}
           hasAnyTeam={teams.length > 0}
           registrations={registrations}
-          capacity={resolveTournamentCapacity(tournament)}
+          // 정규 리그는 백엔드가 팀 수 정원을 적용하지 않는다. teamCount는
+          // 통합 거울의 기본값일 수 있으므로 신청 허브에서 capacity를 만들지 않는다.
+          capacity={tournament.kind === 'regular_league' ? null : resolveTournamentCapacity(tournament)}
           blockReason={resolveTournamentRegistrationBlock(tournament)}
         />
       );

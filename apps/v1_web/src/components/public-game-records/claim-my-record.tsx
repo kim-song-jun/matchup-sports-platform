@@ -218,7 +218,7 @@ function ClaimMyRecordView({
                       <span
                         className="tm-text-caption"
                         style={{
-                          color: selected === participant.participantId ? 'inherit' : 'var(--text-muted)',
+                          color: selected === participant.participantId ? 'inherit' : 'var(--grey700)',
                         }}
                       >
                         {participant.sideLabel} · {participant.sideKey === 'HOME' ? '홈' : '원정'}

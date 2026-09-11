@@ -9,7 +9,12 @@ export class CreateLeagueMatchDto {
   @IsUUID()
   sportId!: string;
 
-  @IsUUID()
+  // Master regions use stable slugs (for example `region-busan-jung`) as IDs.
+  // The service still enforces active level-2 membership and returns
+  // LEAGUE_REGION_INVALID for unknown or non-district values.
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
   regionId!: string;
 
   @IsDateString()

@@ -209,6 +209,18 @@ describe('MyRegistrationPageClient — 셸 backHref override', () => {
     }
   });
 
+  it('정규 리그 신청 허브에는 거울 teamCount 정원 요약을 표시하지 않는다', () => {
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ kind: 'regular_league', status: 'in_progress', registrationDeadlineAt: '2099-08-10T14:59:00.000Z', teamCount: 8, confirmedCount: 2, pendingPaymentCount: 1 }),
+      isLoading: false,
+    });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({ data: [], isLoading: false, isError: false, error: null });
+    const { container } = render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+    expect(container.textContent).toContain('팀별 대회 신청');
+    expect(container.textContent).not.toContain('정원');
+    expect(container.textContent).not.toContain('더 신청할 수 있어요');
+  });
+
   it('참가비가 있는 대회의 목록 카드에는 결제 수단·상태가 그대로 나온다 (위 부재 단언이 공허하지 않음을 증명)', () => {
     // 부재 단언만 있으면 "카드가 아예 안 그려져도" 통과한다. 같은 렌더 경로에서 유료일 때는
     // 그 문자열들이 **실제로 나타나는지**를 함께 못 박는다.

@@ -346,6 +346,11 @@ function ApplyCTAButtons({
   blockReason: TournamentRegistrationBlockReason | null;
   myRegistration: V1TournamentRegistration | null;
 }) {
+  const primaryButtonClass = `tm-btn tm-btn-lg tm-btn-primary tm-btn-block${
+    tournament.kind === 'regular_league'
+      ? ' [--button-fill-primary:var(--static-blue)] [--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]'
+      : ''
+  }`;
   const hasActiveRegistration =
     myRegistration !== null && myRegistration.status !== 'cancelled';
 
@@ -353,7 +358,7 @@ function ApplyCTAButtons({
     return (
       <Link
         href={`/tournaments/${tournament.id}/my`}
-        className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+        className={primaryButtonClass}
         style={{ fontSize: 'var(--font-size-body-lg)' }}
         aria-label="내 신청 내역 보기"
       >
@@ -374,7 +379,7 @@ function ApplyCTAButtons({
     return (
       <button
         type="button"
-        className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+        className={primaryButtonClass}
         style={{ fontSize: 'var(--font-size-body-lg)' }}
         disabled
         aria-disabled="true"
@@ -388,7 +393,7 @@ function ApplyCTAButtons({
   return (
     <Link
       href={`/tournaments/${tournament.id}/my`}
-      className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+      className={primaryButtonClass}
       style={{ fontSize: 'var(--font-size-body-lg)' }}
       aria-label={applyAriaLabel}
     >
@@ -404,7 +409,9 @@ function ApplyCTA({
   tournament: V1TournamentDetail;
   myRegistration: V1TournamentRegistration | null;
 }) {
-  const isOpen = tournament.status === 'open';
+  const isOpen = tournament.kind === 'regular_league'
+    ? tournament.status !== 'completed' && tournament.status !== 'cancelled'
+    : tournament.status === 'open';
 
   if (!isOpen) return null;
 
@@ -585,7 +592,9 @@ export function TournamentDetailView({
 }) {
   const status = getTournamentStatusConfig(tournament.status);
   const sportAccent = getSportAccent(tournament.sport.code);
-  const isOpen = tournament.status === 'open';
+  const isOpen = tournament.kind === 'regular_league'
+    ? tournament.status !== 'completed' && tournament.status !== 'cancelled'
+    : tournament.status === 'open';
   const isCompleted = tournament.status === 'completed';
   const pendingPaymentCount = getPendingPaymentCount(tournament);
   const reservedTeamCount = getReservedTeamCount(tournament);
@@ -1155,6 +1164,20 @@ export function TournamentDetailView({
 
   /* ── Desktop right-rail CTA card ── */
   const railCTA = isOpen ? (
+    isLeagueMirror ? (
+      <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="리그 참가 신청">
+        <div className="tm-text-label" style={{ color: 'var(--text-strong)', marginBottom: 2 }}>
+          {hasActiveRegistration ? '내 리그 신청' : '리그 참가 신청'}
+        </div>
+        {tournament.registrationDeadlineAt ? (
+          <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginBottom: 12 }}>
+            신청 마감 {formatTournamentDateLong(tournament.registrationDeadlineAt)}
+          </div>
+        ) : null}
+        <ApplyCTAButtons tournament={tournament} blockReason={registrationBlock} myRegistration={myRegistration} />
+      </aside>
+    ) : (
+
     <aside
       className="tm-tournament-rail tm-show-desktop"
       role="complementary"
@@ -1218,6 +1241,7 @@ export function TournamentDetailView({
         </div>
       </div>
     </aside>
+    )
   ) : tournament.status === 'in_progress' ? (
     <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="대회 진행 상태">
       {/* Live CTA */}

@@ -4008,8 +4008,18 @@ function invalidateRosterViews(
           queryClient.invalidateQueries({
             queryKey: v1Keys.myTournamentRegistration(tournamentId),
           }),
+          queryClient.invalidateQueries({
+            queryKey: v1Keys.myTournamentRegistrations(tournamentId),
+          }),
         ]
-      : []),
+      : [
+          queryClient.invalidateQueries({
+            predicate: (query) => {
+              const key = query.queryKey;
+              return key[0] === 'v1' && key[1] === 'tournaments' && key[3] === 'my-registrations';
+            },
+          }),
+        ]),
   ]);
 }
 

@@ -235,6 +235,7 @@ type AdminListSummary = {
 - Tiptap's default textAlign=null attribute is accepted at the API boundary and omitted from canonical stored JSON. Explicit alignment remains restricted to left, center, or right.
 - Tiptap Image's default title/width/height=null attributes are likewise omitted before validation and persistence. Non-null dimensions and arbitrary image attributes are not accepted.
 - Empty Tiptap paragraph/heading nodes may omit content and are canonicalized to content=[]. Default Link presentation attrs are stripped; custom target/rel/class/title attrs are not part of the stored contract.
+- Tiptap may retain supported text-formatting marks on hardBreak nodes to continue formatting after a soft line break. These marks are accepted and validated with the same allowlist as text-node marks; unknown or unsafe marks remain rejected.
 - Only managed /uploads URLs may be used for content images. External URLs, base64 images, raw HTML, unsafe links, and unknown nodes or attributes are rejected.
 - Saving a notice or popup claims referenced temporary assets. Removing an unreferenced image deletes its managed asset record and stored file.
 - The Web editor deletes its current session's unused temporary assets after save and all session temporary assets on explicit cancel or editor switch.

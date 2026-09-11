@@ -5794,35 +5794,33 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 .tm-review-star {
-  /* a11y: 시각 크기 28px 유지 + ::before 투명 히트영역으로 터치 타깃 44px 확보 */
-  position: relative;
-  width: 28px;
-  height: 28px;
+  /* a11y: 별 모양과 버튼 자체가 같은 44px 터치 타깃을 제공한다. */
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-sizing: border-box;
   border: 0;
   background: transparent;
-  color: var(--grey200);
+  color: var(--grey600);
   cursor: pointer;
   font-size: 24px;
-  line-height: 28px;
+  line-height: 1;
   padding: 0;
 }
 
-.tm-review-star::before {
-  content: '';
-  position: absolute;
-  inset: -8px; /* (44 - 28) / 2 = 8px 확장 → 터치 타깃 44×44 */
-}
-
 .tm-review-star[data-active="true"] {
-  /* 읽기 전용 별(`RatingStar`, awards-page-client.tsx)이 `--orange500` 이라, 후기 흐름
-     안에서 같은 별점이 화면마다 다른 색으로 보였다(오너 결정: 둘 다 주황으로 통일).
-     입력 가능하다는 신호는 색이 아니라 커서·호버·터치 타깃(::before 44px)이 맡는다. */
-  color: var(--orange500);
+  /* 선택 상태는 orange700 텍스트 토큰으로 충분한 대비를 확보한다.
+     입력 가능하다는 신호는 색이 아니라 커서·호버·44px 버튼이 맡는다. */
+  color: var(--orange700);
 }
 
 .tm-review-star:disabled {
   cursor: default;
-  opacity: .75;
 }
 
 .tm-review-chip-row {
@@ -8828,7 +8826,7 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 .tm-review-metric-label {
   width: 56px; flex: none; font-size: 12px; font-weight: 600; color: var(--text-muted);
 }
-.tm-review-stars[data-compact='true'] button { font-size: 15px; min-width: 28px; min-height: 32px; }
+.tm-review-stars[data-compact='true'] button { font-size: 15px; }
 
 /* ── 카드 안 사진 추가 슬롯 (사용자 선택 A안, 2026-08-26) ──
    사진이 없는 본인 카드에서 렌더 자리를 그대로 버튼으로 바꾼다. 업로드는 이미

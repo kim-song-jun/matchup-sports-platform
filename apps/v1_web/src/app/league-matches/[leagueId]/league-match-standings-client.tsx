@@ -1017,7 +1017,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
               ? '기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'
               : '확정된 경기 결과가 쌓이면 득점·도움 순위가 나타나요.'}
           </p>
-          <a href="#league-schedule" className="mt-3 inline-flex min-h-[44px] items-center rounded-lg px-3 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)]">
+          <a href="#league-schedule" className="mt-3 inline-flex min-h-[44px] items-center rounded-lg px-3 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)]">
             경기 일정 보기
           </a>
         </section>

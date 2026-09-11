@@ -845,13 +845,72 @@ describe('AuthService', () => {
     });
 
     /**
-     * 카카오는 Apple 보다 한 단계 더 헐겁다 — `is_email_verified` 조차 보지 않고
-     * `kakao_account.email` 을 그대로 받는다(auth.service.ts 의 fetchKakaoProfile). 그래서
-     * 우리 쪽 emailVerifiedAt 이 유일한 방어선이다.
-     *
-     * 막으려는 순서: 공격자가 자기 계정 이메일을 피해자 주소로 바꿔 두고(그 순간
-     * emailVerifiedAt 은 null 이 된다) 피해자의 첫 카카오 로그인을 기다린다.
+     * Kakao 이메일은 주소 문자열만으로 신뢰하지 않는다. `is_email_valid`와
+     * `is_email_verified`가 모두 true인 실제 profile 응답만 계정 연결 키가 된다.
      */
+    it.each([undefined, false])('is_email_verified=%s이면 기존 계정에 자동 연결하지 않는다', async (verified) => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'kakao-access-token' }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            id: 779,
+            kakao_account: {
+              email: 'victim@example.com',
+              is_email_valid: true,
+              ...(verified === undefined ? {} : { is_email_verified: verified }),
+            },
+          }),
+        }) as unknown as typeof fetch;
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.findUnique.mockResolvedValue({
+        id: 'victim-local', email: 'victim@example.com', accountStatus: 'active', emailVerifiedAt: NOW,
+      });
+
+      await expect(service.kakaoLogin({ code: 'auth-code' })).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL' },
+      });
+      expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+      expect(prisma.v1User.create).not.toHaveBeenCalled();
+    });
+
+    it('unverified Kakao email is not persisted on a new social identity', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'kakao-access-token' }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            id: 781,
+            kakao_account: { email: 'unverified@example.com', is_email_valid: true, is_email_verified: false },
+          }),
+        }) as unknown as typeof fetch;
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValue(completedUserRow({
+          id: 'new-social-user',
+          email: null,
+          onboardingStatus: 'social_terms_required',
+          onboardingProgress: { currentStep: 'terms', draftJson: {} },
+          authIdentities: [{ id: 'new-social-identity', provider: V1AuthProvider.kakao, passwordHash: null }],
+        }));
+      prisma.v1User.create.mockResolvedValue({ id: 'new-social-user', email: null });
+
+      await service.kakaoLogin({ code: 'auth-code' });
+
+      expect(prisma.v1User.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          email: null,
+          authIdentities: {
+            create: expect.objectContaining({ email: null }),
+          },
+        }),
+      }));
+    });
+
     it('우리가 인증하지 않은 이메일로는 기존 계정에 붙이지 않는다 → 409', async () => {
       global.fetch = jest
         .fn()
@@ -881,14 +940,24 @@ describe('AuthService', () => {
         .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'kakao-access-token' }) })
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({ id: 778, kakao_account: { email: 'owner@example.com' } }),
+          json: async () => ({
+            id: 778,
+            kakao_account: {
+              email: 'owner@example.com',
+              is_email_valid: true,
+              is_email_verified: true,
+            },
+          }),
         }) as unknown as typeof fetch;
       prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
       prisma.v1User.findUnique
         .mockResolvedValueOnce({
           id: 'user-owner', email: 'owner@example.com', accountStatus: 'active', emailVerifiedAt: NOW,
         })
-        .mockResolvedValue(pendingSocialUserRow({ onboardingStatus: 'completed' }));
+        .mockResolvedValueOnce({
+          id: 'user-owner', email: 'owner@example.com', accountStatus: 'active', emailVerifiedAt: NOW,
+        })
+        .mockResolvedValue(completedUserRow({ id: 'user-owner', email: 'owner@example.com' }));
 
       await service.kakaoLogin({ code: 'auth-code' });
 
@@ -896,6 +965,62 @@ describe('AuthService', () => {
         expect.objectContaining({ data: expect.objectContaining({ userId: 'user-owner', provider: V1AuthProvider.kakao }) }),
       );
       expect(prisma.v1User.create).not.toHaveBeenCalled();
+    });
+
+    it('후보 계정이 transaction 재조회 시 이메일을 바꾸면 Kakao identity를 만들지 않는다', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'kakao-access-token' }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            id: 782,
+            kakao_account: { email: 'owner@example.com', is_email_valid: true, is_email_verified: true },
+          }),
+        }) as unknown as typeof fetch;
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.findUnique
+        .mockResolvedValueOnce({
+          id: 'candidate-user', email: 'owner@example.com', accountStatus: 'active', emailVerifiedAt: NOW,
+        })
+        .mockResolvedValueOnce({
+          id: 'candidate-user', email: 'changed@example.com', accountStatus: 'active', emailVerifiedAt: NOW,
+        });
+
+      await expect(service.kakaoLogin({ code: 'auth-code' })).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL' },
+      });
+      expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+    });
+
+    it('이미 연결된 Kakao identity는 provider 이메일 플래그가 없어도 ID로 로그인한다', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'kakao-access-token' }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: 780, kakao_account: { email: 'changed@example.com' } }),
+        }) as unknown as typeof fetch;
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue({
+        id: 'linked-kakao-identity',
+        status: 'active',
+        user: {
+          id: 'linked-user', email: 'old@example.com', accountStatus: 'active',
+          onboardingStatus: 'completed', createdAt: NOW, updatedAt: NOW,
+        },
+      });
+      prisma.v1User.findUnique.mockResolvedValue(completedUserRow({
+        id: 'linked-user', email: 'old@example.com',
+      }));
+
+      await service.kakaoLogin({ code: 'auth-code' });
+
+      expect(prisma.v1AuthIdentity.update).toHaveBeenCalledWith(expect.objectContaining({
+        where: { id: 'linked-kakao-identity' },
+        data: { lastLoginAt: expect.any(Date) },
+      }));
+      expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
     });
 
     it('만료된(>24h) 소셜 가입 계정으로 재로그인 → 삭제하지 않고 온보딩을 리셋한 뒤 세션을 반환한다', async () => {
@@ -934,7 +1059,7 @@ describe('AuthService', () => {
       });
       expect(prisma.v1AuthIdentity.update).toHaveBeenCalledWith({
         where: { id: 'identity-1' },
-        data: { email: null, lastLoginAt: expect.any(Date) },
+        data: { lastLoginAt: expect.any(Date) },
       });
       expect(result.session.userId).toBe('user-1');
     });

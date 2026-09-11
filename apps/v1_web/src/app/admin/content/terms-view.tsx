@@ -407,7 +407,7 @@ export function TermsView() {
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {policy.placements.map((placement) => (
-                      <span key={placement.placementId} className="rounded-full bg-[var(--surface-soft)] px-2 py-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+                      <span key={placement.placementId} className="tm-on-tint rounded-full bg-[var(--surface-soft)] px-2 py-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                         {contextLabel[placement.context]} · {requirementLabel[placement.requirement]}
                       </span>
                     ))}
@@ -474,7 +474,7 @@ export function TermsView() {
                       {requirementsForContext(placement.context).map((value) => <option key={value} value={value}>{requirementLabel[value]}</option>)}
                     </select>
                     <input className={fieldClass} type="number" min={0} max={1000} value={placement.displayOrder} onChange={(event) => setPlacement(index, { displayOrder: Number(event.target.value) })} disabled={!canWrite} aria-label="노출 순서" />
-                    <label className="flex min-h-[44px] items-center gap-2 px-1 text-xs text-[var(--text-muted)]">
+                    <label className="tm-on-tint flex min-h-[44px] items-center gap-2 px-1 text-xs text-[var(--text-muted)]">
                       <input type="checkbox" checked={placement.isActive} onChange={(event) => setPlacement(index, { isActive: event.target.checked })} disabled={!canWrite} />
                       노출
                     </label>
@@ -580,7 +580,7 @@ export function TermsView() {
                   화면 높이가 4,851px(모바일 8.7화면)까지 늘어났고, 정작 편집 폼이 위쪽 20%로
                   밀려 스크롤을 되감아야 했다(2026-08-17 로컬 실측). */}
               <div className="rounded-2xl bg-[var(--surface-soft)] p-4">
-                <p className="mb-3 text-xs font-bold text-[var(--text-muted)]">
+                <p className="tm-on-tint mb-3 text-xs font-bold text-[var(--text-muted)]">
                   실제 본문 미리보기
                   <span className="ml-2 font-medium text-[var(--text-muted)]">{form.version || '버전 미입력'}</span>
                 </p>

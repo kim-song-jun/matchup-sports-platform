@@ -459,7 +459,7 @@ ELO 자동화                                   ██████████�
 | OAuth 소셜 로그인 | 카카오/네이버/애플 실제 연동 | OAuth 2.0, PKCE | 4주 |
 | 토스페이먼츠 결제 | 결제 + 웹훅 + 환불 처리 | PG API, 웹훅 서버 | 6주 |
 | 이미지 업로드 | AWS S3 + CloudFront CDN | Presigned URL, CDN | 3주 |
-| FCM 푸시 알림 | Firebase Admin SDK 연동 | FCM, 알림 스케줄러 | 4주 |
+| Android 푸시 알림 | Teameet API의 FCM HTTP v1 직접 연동 | FCM, OAuth service account, 알림 스케줄러 | 4주 |
 | Socket.IO 완성 | 채팅 실시간 통신 완성 | WebSocket, 메시지 큐 | 4주 |
 | GPS 위치 API | Geolocation + 반경 검증 | HTML5 Geolocation | 2주 |
 | EC2 + Docker 배포 | 프로덕션 환경 구축 | Docker, Nginx, SSL | 3주 |

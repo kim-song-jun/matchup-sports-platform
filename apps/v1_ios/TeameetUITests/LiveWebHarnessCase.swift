@@ -176,8 +176,10 @@ class LiveWebHarnessCase: XCTestCase {
         // but goes nowhere — the home screen stays put and the walk then scrolls it looking
         // for an option that only exists on the sign-in screen. Measured twice on first
         // launch; the same walk went through on the very next launch.
-        var reachedSignIn = false
-        for attempt in 1...3 {
+        // The shell restores the last route, so a launch after signing out lands on the
+        // sign-in options directly — the landing screen and its 로그인하기 never appear.
+        var reachedSignIn = linkExists("이메일로 로그인", timeout: 5)
+        for attempt in 1...3 where !reachedSignIn {
             XCTAssertTrue(tapRow("로그인하기"), "no sign-in entry point on the landing screen")
             if linkExists("이메일로 로그인", timeout: 20) { reachedSignIn = true; break }
             attach("sign-in-entry-attempt-\(attempt)")
@@ -215,9 +217,13 @@ class LiveWebHarnessCase: XCTestCase {
         // Enter submits the form outright on most attempts, and when it does not it at least
         // puts the keyboard away and brings the button back into view.
         passwordField.typeText("\n")
-        settle(2)
 
-        if !webView.links["마이"].exists {
+        // Enter usually submits, and the sign-in then takes a few seconds during which the
+        // form — and its button — is already gone. Looking for the button after a fixed two
+        // seconds raced that: measured once as "no submit button" on a run whose recording
+        // shows the signed-in skeleton loading. Wait for the sign-in first; tap only if it
+        // never comes.
+        if !webView.links["마이"].waitForExistence(timeout: 20) {
             XCTAssertTrue(tapRow("로그인"), "no submit button on the sign-in form")
         }
         XCTAssertTrue(webView.links["마이"].waitForExistence(timeout: 90), "sign-in did not complete")

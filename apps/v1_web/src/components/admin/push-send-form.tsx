@@ -23,7 +23,7 @@ function segmentButtonClass(active: boolean) {
     'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
     active
       ? 'bg-blue-500 text-white'
-      : 'bg-[var(--surface-soft)] text-[var(--text-muted)] hover:bg-[var(--grey300)]',
+      : 'tm-on-tint bg-[var(--surface-soft)] text-[var(--text-muted)] hover:bg-[var(--grey300)]',
   ].join(' ');
 }
 
@@ -80,7 +80,7 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
           <p id="push-broadcast-confirm-desc" className="text-[length:var(--font-size-body-sm)] text-[var(--text-body)] leading-relaxed">
             현재 웹 푸시를 구독 중인 <strong>모든 회원</strong>에게 아래 알림을 발송해요. 이 작업은 되돌릴 수 없어요.
           </p>
-          <div className="bg-[var(--surface-soft)] border border-[var(--border)] rounded-xl px-4 py-3">
+          <div className="tm-on-tint bg-[var(--surface-soft)] border border-[var(--border)] rounded-xl px-4 py-3">
             <p className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)] mb-0.5">제목</p>
             <p className="text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-strong)] break-words">{title}</p>
           </div>
@@ -91,7 +91,7 @@ function BroadcastConfirmModal({ open, pending, title, onConfirm, onClose }: Bro
             type="button"
             onClick={() => !pending && onClose()}
             disabled={pending}
-            className="flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+            className="tm-on-tint flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
           >
             취소
           </button>
@@ -117,7 +117,7 @@ function ResultStat({ label, value, tone }: { label: string; value: number; tone
       ? 'text-[var(--blue700)] bg-[var(--blue50)]'
       : tone === 'danger'
         ? 'text-[var(--red700)] bg-[var(--red50)]'
-        : 'text-[var(--text-muted)] bg-[var(--surface-soft)]';
+        : 'tm-on-tint text-[var(--text-muted)] bg-[var(--surface-soft)]';
   return (
     <div className={`flex flex-col items-center justify-center gap-0.5 rounded-xl px-3 py-4 ${toneClass}`}>
       <span className="text-[length:var(--font-size-subhead)] font-bold tabular-nums">{value}</span>

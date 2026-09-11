@@ -193,7 +193,7 @@ jobs:
           SECRET_SLACK_INQUIRY_WEBHOOK_URL: ${{ secrets.SLACK_INQUIRY_WEBHOOK_URL }}
         run: bash scripts/release/sync-alpha-inquiry-slack-env.sh
 
-      - name: Sync Firebase Admin runtime env
+      - name: Sync FCM service-account runtime env
         env:
           INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
           AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}

@@ -18,6 +18,7 @@
 | POST | `/auth/dev-login` | No | 개발용 로그인 |
 | POST | `/auth/kakao` | No | 카카오 로그인 |
 | POST | `/auth/apple` | No | 애플 로그인 |
+| POST | `/auth/apple/nonce` | No | 애플 nonce 발급 |
 | POST | `/auth/refresh` | No | 토큰 재발급 |
 | GET | `/auth/me` | Yes | 현재 사용자 조회 |
 | DELETE | `/auth/withdraw` | Yes | 탈퇴 |
@@ -142,10 +143,11 @@ CAUTION:
 
 ### 409 SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL (kakao·apple 공통)
 
-같은 이메일을 쓰는 계정이 이미 있는데 **우리가 그 이메일을 인증한 적이 없을 때** 난다.
-제공자의 `email_verified` 는 제공자 쪽 소유만 증명하고, 우리 계정 이메일은 소유 증명 없이
-바꿀 수 있어서(바꾸면 `emailVerifiedAt` 이 null 이 된다) 그것만 믿으면 남의 계정을 흡수하게
-된다 — account pre-hijacking.
+같은 이메일을 쓰는 계정이 이미 있는데 우리 계정의 이메일 인증이 끝나지 않았거나,
+Kakao 응답의 `is_email_valid`와 `is_email_verified`가 모두 true가 아닐 때 난다.
+제공자 이메일 플래그와 우리 계정의 `emailVerifiedAt`을 함께 확인하지 않으면 남의 계정을
+흡수하게 된다 — account pre-hijacking. 이미 연결된 provider identity의 ID 로그인은 이
+연결 게이트를 다시 거치지 않는다.
 
 **사용자 대응**: 기존 방법(이메일·비밀번호 또는 다른 소셜)으로 로그인해 **이메일 인증을 마친 뒤**
 다시 시도한다. 프론트는 이 코드에 «인증을 마쳐 달라» 는 안내를 붙이고, 로그인 화면으로

@@ -458,7 +458,7 @@ export function AuditLogView() {
       <div
         role="tablist"
         aria-label="감사 로그 종류"
-        className="flex items-center gap-1 mb-4 bg-[var(--surface-soft)] p-1 rounded-xl w-fit"
+        className="tm-on-tint flex items-center gap-1 mb-4 bg-[var(--surface-soft)] p-1 rounded-xl w-fit"
       >
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;

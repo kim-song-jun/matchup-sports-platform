@@ -5,7 +5,6 @@ import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { LineupTodoCard } from '@/components/lineup/lineup-todo-card';
 import {
-  BellIcon,
   ChatIcon,
   ChevronRightIcon,
   MatchIcon,
@@ -99,9 +98,6 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
             {model.phoneVerifyNudge ? <PhoneVerifyBanner phoneVerifyNudge={model.phoneVerifyNudge} /> : null}
             {model.bannerDecision.nudge === 'recordConsent' && model.recordConsentNudge ? (
               <RecordConsentNudgeBanner recordConsentNudge={model.recordConsentNudge} />
-            ) : null}
-            {model.bannerDecision.nudge === 'push' && model.pushNudge ? (
-              <PushNudgeBanner pushNudge={model.pushNudge} />
             ) : null}
           {/* 남은 후기 유도 — 홈에는 대회 후기 전용 바텀시트 모달만 있어서 경기 후기는
               마이 메뉴 서브텍스트 한 줄 말고 알릴 길이 없었다. 마이페이지와 같은 컴포넌트를
@@ -513,56 +509,6 @@ function RecordConsentNudgeBanner({
           {recordConsentNudge.saving ? '적용 중' : '공개하기'}
         </button>
       </div>
-    </Card>
-  );
-}
-
-function PushNudgeBanner({ pushNudge }: { pushNudge: NonNullable<HomeViewModel['pushNudge']> }) {
-  return (
-    // 390px 에서 아이콘(36) + 문구 + CTA + 닫기(44) 를 한 줄에 넣으면 gap·패딩까지 합쳐
-    // 220px 넘게 먹어 문구가 들어갈 자리가 거의 남지 않는다. 정보 줄과 CTA 를 분리해
-    // 같은 자리에 뜨는 "남은 후기" 배너와 같은 리듬으로 맞춘다.
-    <Card pad={16} style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <span
-        aria-hidden="true"
-        style={{
-          flexShrink: 0,
-          width: 36,
-          height: 36,
-          borderRadius: 10,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'var(--blue-soft)',
-          color: 'var(--blue700)',
-        }}
-      >
-        <BellIcon size={18} strokeWidth={2} />
-      </span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="tm-text-label">알림을 받아보세요</div>
-          <div className="tm-text-caption" style={{ marginTop: 2 }}>매칭, 채팅, 경기 결과 소식을 놓치지 않아요.</div>
-        </div>
-        <button
-          type="button"
-          aria-label="알림 받기 안내 닫기"
-          className="tm-pressable"
-          style={{ flexShrink: 0, padding: 8, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={pushNudge.onDismiss}
-        >
-          <X size={18} aria-hidden="true" />
-        </button>
-      </div>
-      <button
-        type="button"
-        className="tm-btn tm-btn-sm tm-btn-primary tm-btn-block"
-        style={{ marginTop: 12, minHeight: 44 }}
-        disabled={pushNudge.subscribing}
-        onClick={pushNudge.onSubscribe}
-      >
-        {pushNudge.subscribing ? '확인 중' : '알림 받기'}
-      </button>
     </Card>
   );
 }

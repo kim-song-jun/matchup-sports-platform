@@ -111,6 +111,8 @@ describe('LogoutButton session cleanup', () => {
     // Then
     await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/login'));
     expect(hooks.pushUnsubscribe).toHaveBeenCalledTimes(1);
+    // 앱 셸은 이 표시로 서버 등록만 지우고 옵트인은 남긴다 — 없으면 재로그인 뒤 푸시가 죽는다.
+    expect(hooks.pushUnsubscribe).toHaveBeenCalledWith({ reason: 'sign-out' });
   });
 
   it('여전히 리다이렉트한다 — 푸시 구독 해지가 실패해도 로그아웃 자체는 막히지 않는다', async () => {

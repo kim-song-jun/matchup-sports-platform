@@ -96,7 +96,7 @@ export function ReviewsTab({
 
       {!canWrite && (
         <p
-          className="mb-4 rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-xs text-[var(--text-muted)]"
+          className="tm-on-tint mb-4 rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-xs text-[var(--text-muted)]"
           role="status"
         >
           조회 전용 권한으로 접속했어요. 리뷰를 숨기거나 다시 공개하려면 운영 권한이 필요해요.
@@ -224,7 +224,7 @@ export function ReviewsTab({
               type="button"
               onClick={closeHideModal}
               disabled={hideReview.isPending}
-              className="flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="tm-on-tint flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               취소
             </button>
@@ -266,7 +266,7 @@ function ReviewModerationCard({
     <div
       className={[
         'rounded-xl border p-4',
-        isHidden ? 'bg-[var(--surface-soft)] border-[var(--border)]' : 'bg-[var(--card-surface)] border-[var(--border)]',
+        isHidden ? 'tm-on-tint bg-[var(--surface-soft)] border-[var(--border)]' : 'bg-[var(--card-surface)] border-[var(--border)]',
       ].join(' ')}
     >
       <div className="flex items-start gap-3">
@@ -283,7 +283,7 @@ function ReviewModerationCard({
         ) : (
           <div
             aria-hidden="true"
-            className="w-9 h-9 rounded-full bg-[var(--grey300)] text-[var(--text-muted)] text-[length:var(--font-size-label)] font-semibold flex items-center justify-center shrink-0"
+            className="tm-on-tint w-9 h-9 rounded-full bg-[var(--grey300)] text-[var(--text-muted)] text-[length:var(--font-size-label)] font-semibold flex items-center justify-center shrink-0"
           >
             {letter}
           </div>

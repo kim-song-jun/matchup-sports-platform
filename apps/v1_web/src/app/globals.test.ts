@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const globalsCss = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+const desktopShellCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/_shell.css'), 'utf8');
+const tournamentsCss = readFileSync(resolve(process.cwd(), 'src/app/desktop/tournaments.css'), 'utf8');
 
 describe('mobile floating action button layout', () => {
   it('keeps the FAB above both the bottom navigation and the native safe inset', () => {
@@ -596,6 +598,9 @@ describe('인라인으로 지면 색을 까는 곳의 보조 텍스트 (.tm-on-t
     // 대진표 준비 중. 표시 클래스를 고르는 조건에 넣으면 순환이 되므로 지면만으로 고른다.
     // 속성 순서·줄바꿈에 기대지 않도록 토큰 하나만 본다(Prettier 재포맷에 깨지지 않게).
     ['src/app/tournaments/[id]/tournament-detail-client.tsx', 'Card', /var\(--grey50\)/, 4],
+    // 팀 매치 만들기 — 확인 카드 둘(grey50) · 권한 카드(grey50↔orange50) · 상태 카드(green↔orange 틴트).
+    // 삼항으로 지면을 고르는 것까지 포함해 이 파일의 틴트 Card 는 넷이고 전부 표시가 붙어야 한다.
+    ['src/components/team-matches/team-matches-page.tsx', 'Card', /var\(--(?:grey50|orange50|tint-green|tint-orange)\)/, 4],
   ])('%s 의 틴트 %s 태그 %d개 전부에 표시 클래스가 붙어 있다', (file, tag, tint, count) => {
     const source = readFileSync(resolve(process.cwd(), file), 'utf8');
     const tinted = openingTagsWithTint(source, tag as string, tint as RegExp);
@@ -677,5 +682,111 @@ describe('파랑 히어로 지면 — 다크에서 그라디언트 끝이 밝아
 
     expect(accent).not.toMatch(/gradientTo:\s*'var\(--blue600\)'/);
     expect((accent.match(/gradientTo:\s*'var\(--brand-hero-gradient-end\)'/g) ?? []).length).toBe(2);
+  });
+});
+
+/**
+ * 데스크톱 셸의 대비·히트박스 (2026-09-08 alpha 실측).
+ *
+ * 이 파일은 **데스크톱에서만** 적용되는데 유닛 테스트는 jsdom 이라 미디어 쿼리도 레이아웃도
+ * 계산하지 않는다 — 그래서 여기서 깨져도 3000개 넘는 테스트가 전부 green 이었다.
+ * 실제로 alpha 데스크톱 5화면 **전부**에서 아래 4개가 기준 미달이었고, 모바일에는 0건이었다.
+ *
+ * 특히 이 파일 안에서 **형제 요소는 이미 고쳐져 있었다** — `footer-links a` 는 같은 지면
+ * (--grey50)에서 grey700 으로 올리며 그 이유를 주석으로 남겼고, `nav-avatar` 는 36px 박스로
+ * 히트박스를 확보했다. 옆줄만 빠진 것이라, 값을 문자열로 고정해 다음에 또 빠지지 않게 한다.
+ */
+describe('desktop shell — contrast and hit targets', () => {
+  const rule = (selector: string) => {
+    // 선택자의 공백은 \s+ 로 느슨하게 — 포매터가 줄바꿈이나 여러 칸으로 바꿔도 안 깨진다.
+    const escaped = selector
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\s+/g, '\\s+');
+    const body = desktopShellCss.match(new RegExp(escaped + '\\s*\\{([^}]*)\\}'))?.[1];
+    // 주석을 걷어낸다 — 안 걷으면 주석에 적은 `color: var(--grey500)` 같은 문구가
+    // `.not.toMatch(/color:.../)` 에 걸려 오탐이 난다(#1143 Copilot).
+    return body?.replace(/\/\*[\s\S]*?\*\//g, '');
+  };
+
+  it('활성 GNB 탭은 --blue500 이 아니라 --blue700 을 쓴다 (3.71 → 5.41)', () => {
+    const r = rule('.tm-desktop-nav-tab[aria-current="page"]');
+    expect(r).toBeDefined();
+    expect(r).toMatch(/color:\s*var\(--blue700\)/);
+    expect(r).not.toMatch(/color:\s*var\(--blue500\)/);
+  });
+
+  it('푸터 보조 텍스트 둘 다 형제 링크와 같은 --grey700 을 쓴다', () => {
+    for (const sel of ['.tm-desktop-footer-tagline', '.tm-desktop-footer-copy']) {
+      const r = rule(sel);
+      expect(r, sel).toBeDefined();
+      expect(r, sel).toMatch(/color:\s*var\(--grey700\)/);
+      // 실측에서 각각 2.91 · 1.92 였던 값들.
+      expect(r, sel).not.toMatch(/color:\s*var\(--grey(400|500|600)\)/);
+    }
+  });
+
+  it('브랜드 링크가 44px 히트박스를 갖는다 — 형제 avatar 와 같은 기준', () => {
+    const r = rule('.tm-desktop-nav-brand');
+    expect(r).toBeDefined();
+    expect(r).toMatch(/min-height:\s*44px/);
+    // min-height 만 있고 display 가 inline 이면 세로가 안 늘어난다.
+    expect(r).toMatch(/display:\s*inline-flex/);
+  });
+
+  it('이미 고쳐져 있던 형제들은 그대로다 — 이 PR 이 되돌리지 않았는지', () => {
+    expect(rule('.tm-desktop-footer-links a')).toMatch(/color:\s*var\(--grey700\)/);
+    expect(rule('.tm-desktop-footer-links a')).toMatch(/min-height:\s*44px/);
+  });
+});
+
+/**
+ * 아이콘 버튼 히트박스 (2026-09-08 alpha 실측).
+ *
+ * 둘 다 "크기를 정해 뒀는데 실제로는 그 크기가 아니었던" 경우다 — 선언을 읽는 것만으로는
+ * 안 걸리고 렌더된 박스를 재야 보인다.
+ */
+describe('icon button hit targets', () => {
+  // 규칙 본문에서 주석을 걷어낸다. 안 걷으면 **주석에 적은 클래스 이름**이 단언에 걸린다
+  // (이 저장소는 주석이 식별자를 그대로 인용하는 편이라 실제로 한 번 걸렸다).
+  const body = (css: string, selector: string) => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const m = css.match(new RegExp('^' + escaped + '\\s*\\{([^}]*)\\}', 'm'));
+    return m ? m[1].replace(/\/\*[\s\S]*?\*\//g, '') : undefined;
+  };
+
+  it('.tm-btn-icon 은 flex 컨테이너에서 눌리지 않는다', () => {
+    // width:44px 를 써 뒀어도 flex-shrink 기본값(1)이 그것을 이긴다 —
+    // 홈 날씨 카드의 새로고침 버튼이 세 폭 모두에서 44 미만이었다.
+    const rule = body(globalsCss, '.tm-btn-icon');
+
+    expect(rule).toBeDefined();
+    expect(rule).toMatch(/width:\s*44px/);
+    expect(rule).toMatch(/flex-shrink:\s*0/);
+  });
+
+  it('대회 프로모 점 버튼은 WCAG 2.5.8 의 24px 를 채우고 서로 겹치지 않는다', () => {
+    const btn = body(tournamentsCss, '.tm-tournament-promo-dot-button');
+    const row = body(tournamentsCss, '.tm-tournament-promo-dots');
+
+    expect(btn).toBeDefined();
+    expect(row).toBeDefined();
+
+    const size = Number(btn?.match(/width:\s*(\d+)px/)?.[1]);
+    const gap = Number(row?.match(/gap:\s*(\d+)(?:px)?/)?.[1]);
+    expect(size).toBeGreaterThanOrEqual(24);
+    expect(btn).toMatch(/height:\s*24px/);
+
+    // 중심 간격 = 버튼 폭 + gap. 24 이상이어야 2.5.8 간격 요건을 만족한다.
+    expect(size + gap).toBeGreaterThanOrEqual(24);
+
+    // 44px 히트박스를 쓰면 이 줄에서는 서로 겹친다 — 그래서 .tm-tap-44 를 쓰지 않았다.
+    expect(btn).not.toMatch(/tm-tap-44/);
+  });
+
+  it('보이는 점 자체는 그대로다 — 히트박스만 넓혔다', () => {
+    const dot = body(tournamentsCss, '.tm-tournament-promo-dot');
+
+    expect(dot).toBeDefined();
+    expect(dot).toMatch(/width:\s*5px/);
   });
 });

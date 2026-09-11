@@ -1,6 +1,7 @@
 import { Prisma, PrismaClient, V1GameSideKey, V1GameSourceType, V1VisibilityMode } from '@prisma/client';
 import { GameContractError } from '../core';
 import { computePeriodCount, jsonObject } from '../games.service';
+import { participantDisplayName } from '../../tournaments/participant-display-name';
 
 /**
  * Operational backfill for the "public tournament schedule is always empty"
@@ -206,7 +207,16 @@ async function collectCandidates(client: MigrationReadClient): Promise<Candidate
     select: {
       id: true,
       team: { select: { id: true, name: true } },
-      players: { where: { removedAt: null }, select: { userId: true, realName: true }, orderBy: { id: 'asc' } },
+      // 참가자 이름은 닉네임이 먼저다(`participantDisplayName`). 예전엔 프로필을 안 실어서
+      // **그 함수를 쓸 수가 없었다.** 실명은 아예 안 가져온다 — 표시에 쓰지 않는 값이다.
+      players: {
+        where: { removedAt: null },
+        select: {
+          userId: true,
+          user: { select: { profile: { select: { nickname: true, displayName: true } } } },
+        },
+        orderBy: { id: 'asc' },
+      },
     },
   });
   const registrationById = new Map(registrations.map((registration) => [registration.id, registration]));
@@ -256,12 +266,12 @@ async function collectCandidates(client: MigrationReadClient): Promise<Candidate
         ...(home?.players ?? []).map((player) => ({
           sideKey: V1GameSideKey.HOME,
           userId: player.userId,
-          displayNameSnapshot: player.realName,
+          displayNameSnapshot: participantDisplayName(player),
         })),
         ...(away?.players ?? []).map((player) => ({
           sideKey: V1GameSideKey.AWAY,
           userId: player.userId,
-          displayNameSnapshot: player.realName,
+          displayNameSnapshot: participantDisplayName(player),
         })),
       ],
     });

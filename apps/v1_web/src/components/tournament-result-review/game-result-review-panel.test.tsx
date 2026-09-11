@@ -255,6 +255,24 @@ describe('GameResultReviewPanel — 확정 결과 헤더의 승부차기 표기'
 
     expect(screen.getByText('승부차기 2:0, 선축 원정')).toBeInTheDocument();
   });
+
+  /**
+   * **공개 화면 링크는 이 화면의 것이 아니다.** 한 번 여기 뒀다가 도달 불가로 걷어냈다 —
+   * 확정 한 번에 `revisions`(링크를 띄운다)와 `board`(이 패널을 걷어낸다) 무효화가 같은
+   * 콜백에서 나가, 링크의 수명이 두 refetch 사이 간격이었다.
+   *
+   * **이 자리에 "링크가 없다"는 단언은 두지 않는다.** 기능을 옮기면서 그 부재를 단언하는
+   * 테스트를 남기면 영영 녹색인 줄이 되고, 어디서 그 기능을 재는지도 흐려진다 —
+   * 실제 계약은 옮겨간 화면(`corrections-page-client.test.tsx`)이 **긍정으로** 잠근다.
+   */
+  it('정정 화면으로 가는 링크는 확정된 결과에 그대로 있다', () => {
+    render(<GameResultReviewPanel gameId={GAME_ID} correctionsHref="/x/records/corrections" />);
+
+    expect(screen.getByRole('link', { name: '정정 화면으로 이동' })).toHaveAttribute(
+      'href',
+      '/x/records/corrections',
+    );
+  });
 });
 
 describe('GameResultReviewPanel — 재제출 폼도 결선 승부차기 가드를 따른다', () => {

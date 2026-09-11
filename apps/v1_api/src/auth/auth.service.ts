@@ -61,6 +61,8 @@ function assertLinkableByEmail(user: { emailVerifiedAt: Date | null }): void {
 type KakaoProfile = {
   providerUserKey: string;
   email: string | null;
+  emailValid: boolean;
+  emailVerified: boolean;
   profileImageUrl: string | null;
   /** 콘솔 동의항목이 승인된 앱에서만 값이 온다. 미승인이면 null. */
   signupPrefill: KakaoSignupPrefill | null;
@@ -348,7 +350,10 @@ export class AuthService {
         await this.prisma.$transaction([
           this.prisma.v1AuthIdentity.update({
             where: { id: existingIdentity.id },
-            data: { email: profile.email, lastLoginAt: now },
+            // An already-linked provider ID remains a valid login even when
+            // Kakao omits email consent. Preserve the stored identity email;
+            // never overwrite it with an untrusted provider payload.
+            data: { lastLoginAt: now },
           }),
           this.prisma.v1User.update({
             where: { id: existingIdentity.user.id },
@@ -366,10 +371,9 @@ export class AuthService {
         await this.prisma.$transaction([
           this.prisma.v1AuthIdentity.update({
             where: { id: existingIdentity.id },
-            data: {
-              email: profile.email,
-              lastLoginAt: now,
-            },
+            // The provider user key is the established identity. Keep its
+            // stored email stable when a later profile response is unverified.
+            data: { lastLoginAt: now },
           }),
           this.prisma.v1User.update({
             where: { id: existingIdentity.user.id },
@@ -381,10 +385,16 @@ export class AuthService {
       }
     }
 
-    const email = profile.email ? normalizeEmail(profile.email) : null;
-    const existingUser = email
+    const providerEmail = profile.email ? normalizeEmail(profile.email) : null;
+    const providerEmailVerified =
+      providerEmail !== null && profile.emailValid === true && profile.emailVerified === true;
+    // Kakao email is a linking key only when both provider assertions are
+    // strict true. If email consent is absent, keep social signup available
+    // without persisting an untrusted address.
+    const email = providerEmailVerified ? providerEmail : null;
+    const existingUser = providerEmail
       ? await this.prisma.v1User.findUnique({
-          where: { email },
+          where: { email: providerEmail },
           select: {
             id: true,
             email: true,
@@ -395,35 +405,20 @@ export class AuthService {
       : null;
 
     if (existingUser) {
-      // 계정 상태를 먼저 본다. 정지된 계정에 «이메일 인증을 마치라» 고 안내하면, 인증을 마쳐도
-      // 로그인은 안 되는 곳으로 사람을 보내게 된다. 이메일 게이트는 붙일 수 있는 계정에만 뜻이 있다.
-      if (existingUser.accountStatus !== 'active') {
-        this.assertNotWithdrawalPending(existingUser.accountStatus);
-        throw new ForbiddenException({
-          code: 'PERMISSION_DENIED',
-          message: 'This account cannot sign in',
+      if (!providerEmailVerified || providerEmail === null) {
+        throw new ConflictException({
+          code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
+          message: '카카오에서 이메일 소유 확인이 되지 않아 기존 계정과 연결할 수 없어요. 카카오 이메일 인증 후 다시 시도해 주세요.',
         });
       }
-      assertLinkableByEmail(existingUser);
-
-      await this.prisma.$transaction([
-        this.prisma.v1AuthIdentity.create({
-          data: {
-            userId: existingUser.id,
-            provider: V1AuthProvider.kakao,
-            providerUserKey: profile.providerUserKey,
-            email,
-            status: 'active',
-            lastLoginAt: now,
-          },
-        }),
-        this.prisma.v1User.update({
-          where: { id: existingUser.id },
-          data: { lastLoginAt: now },
-        }),
-      ]);
-
-      return this.sessionResponse(existingUser.id, existingUser.email, { social: true });
+      const linked = await this.linkExistingSocialIdentity({
+        provider: V1AuthProvider.kakao,
+        providerUserKey: profile.providerUserKey,
+        email: providerEmail,
+        existingUserId: existingUser.id,
+        now,
+      });
+      return this.sessionResponse(linked.id, linked.email, { social: true });
     }
 
     const user = await this.prisma.v1User.create({
@@ -529,7 +524,8 @@ export class AuthService {
         await this.prisma.$transaction([
           this.prisma.v1AuthIdentity.update({
             where: { id: existingIdentity.id },
-            data: { email, lastLoginAt: now },
+            // Preserve the stored identity email for an already-linked Apple subject.
+            data: { lastLoginAt: now },
           }),
           this.prisma.v1User.update({
             where: { id: existingIdentity.user.id },
@@ -548,7 +544,7 @@ export class AuthService {
       await this.prisma.$transaction([
         this.prisma.v1AuthIdentity.update({
           where: { id: existingIdentity.id },
-          data: { email, lastLoginAt: now },
+          data: { lastLoginAt: now },
         }),
         this.prisma.v1User.update({
           where: { id: existingIdentity.user.id },
@@ -566,36 +562,15 @@ export class AuthService {
         })
       : null;
 
-    if (existingUser) {
-      // 계정 상태를 먼저 본다. 정지된 계정에 «이메일 인증을 마치라» 고 안내하면, 인증을 마쳐도
-      // 로그인은 안 되는 곳으로 사람을 보내게 된다. 이메일 게이트는 붙일 수 있는 계정에만 뜻이 있다.
-      if (existingUser.accountStatus !== 'active') {
-        this.assertNotWithdrawalPending(existingUser.accountStatus);
-        throw new ForbiddenException({
-          code: 'PERMISSION_DENIED',
-          message: 'This account cannot sign in',
-        });
-      }
-      assertLinkableByEmail(existingUser);
-
-      await this.prisma.$transaction([
-        this.prisma.v1AuthIdentity.create({
-          data: {
-            userId: existingUser.id,
-            provider: V1AuthProvider.apple,
-            providerUserKey: claims.subject,
-            email,
-            status: 'active',
-            lastLoginAt: now,
-          },
-        }),
-        this.prisma.v1User.update({
-          where: { id: existingUser.id },
-          data: { lastLoginAt: now },
-        }),
-      ]);
-
-      return this.sessionResponse(existingUser.id, existingUser.email, { social: true });
+    if (existingUser && email !== null) {
+      const linked = await this.linkExistingSocialIdentity({
+        provider: V1AuthProvider.apple,
+        providerUserKey: claims.subject,
+        email,
+        existingUserId: existingUser.id,
+        now,
+      });
+      return this.sessionResponse(linked.id, linked.email, { social: true });
     }
 
     const displayName = dto.fullName?.trim();
@@ -635,6 +610,67 @@ export class AuthService {
     });
 
     return this.sessionResponse(user.id, user.email, { social: true });
+  }
+
+  /**
+   * Re-reads and conditionally locks the candidate in the same transaction as
+   * the provider identity insert. Profile email changes also lock this user
+   * row, so a changed email or cleared verification makes the guarded update
+   * affect zero rows and no identity is created.
+   */
+  private async linkExistingSocialIdentity(input: {
+    provider: V1AuthProvider;
+    providerUserKey: string;
+    email: string;
+    existingUserId: string;
+    now: Date;
+  }): Promise<{ id: string; email: string }> {
+    return this.prisma.$transaction(async (tx) => {
+      const candidate = await tx.v1User.findUnique({
+        where: { id: input.existingUserId },
+        select: { id: true, email: true, accountStatus: true, emailVerifiedAt: true },
+      });
+
+      if (!candidate || candidate.email !== input.email) {
+        throw new ConflictException({
+          code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
+          message: '이메일 계정 정보가 바뀌어 소셜 계정을 연결할 수 없어요. 다시 시도해 주세요.',
+        });
+      }
+      if (candidate.accountStatus !== 'active') {
+        this.assertNotWithdrawalPending(candidate.accountStatus);
+        throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'This account cannot sign in' });
+      }
+      assertLinkableByEmail(candidate);
+
+      const claimed = await tx.v1User.updateMany({
+        where: {
+          id: candidate.id,
+          email: input.email,
+          accountStatus: 'active',
+          emailVerifiedAt: { not: null },
+        },
+        data: { lastLoginAt: input.now },
+      });
+      if (claimed.count !== 1) {
+        throw new ConflictException({
+          code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
+          message: '이메일 계정 정보가 바뀌어 소셜 계정을 연결할 수 없어요. 다시 시도해 주세요.',
+        });
+      }
+
+      await tx.v1AuthIdentity.create({
+        data: {
+          userId: candidate.id,
+          provider: input.provider,
+          providerUserKey: input.providerUserKey,
+          email: input.email,
+          status: 'active',
+          lastLoginAt: input.now,
+        },
+      });
+      return { id: candidate.id, email: candidate.email };
+    });
   }
 
   async completeSocialTerms(userId: string, dto: SocialTermsDto) {
@@ -1113,6 +1149,8 @@ export class AuthService {
       id?: number | string;
       kakao_account?: {
         email?: string;
+        is_email_valid?: boolean;
+        is_email_verified?: boolean;
         // 이름/전화번호/성별은 카카오 콘솔 동의항목이 승인된 앱에만 내려온다(미승인 시 필드 자체가 없음).
         // 따라서 전부 optional 로 두고, 없으면 프리필을 포기한다.
         name?: string;
@@ -1140,6 +1178,8 @@ export class AuthService {
     return {
       providerUserKey: String(userData.id),
       email: userData.kakao_account?.email ?? null,
+      emailValid: userData.kakao_account?.is_email_valid === true,
+      emailVerified: userData.kakao_account?.is_email_verified === true,
       profileImageUrl:
         userData.kakao_account?.profile?.profile_image_url ??
         userData.properties?.profile_image ??

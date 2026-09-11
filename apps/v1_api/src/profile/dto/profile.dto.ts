@@ -72,6 +72,10 @@ export class UpdateProfileDto {
 class SettingsNotificationsDto {
   @IsOptional()
   @IsBoolean()
+  activityEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
   matchEnabled?: boolean;
 
   @IsOptional()

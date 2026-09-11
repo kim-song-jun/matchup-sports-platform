@@ -1,5 +1,10 @@
 import type { Config } from 'jest';
 
+// 워커가 이 프로세스의 env 를 물려받으므로 여기서 한 번 고정하면 전 스위트에 적용된다.
+// 이유는 `apps/v1_web/vitest.config.mts` 의 같은 핀과 같다 — CI(UTC)와 로컬(KST)이
+// 자정 경계에서 갈리는 것을 없앤다.
+process.env.TZ = 'UTC';
+
 const base: Partial<Config> = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   transform: { '^.+\\.(t|j)s$': 'ts-jest' },

@@ -6,6 +6,28 @@ Working branch: `feat/android-fcm-foundation`
 Target: `both` (`apps/v1_api`, `apps/v1_web`, Android native surface, deploy/docs)
 Mode: CODE
 
+## Server-owned delivery follow-up (2026-09-11)
+
+- [x] Remove the API's `firebase-admin` dependency.
+- [x] Sign service-account JWTs and exchange/cache short-lived Google OAuth tokens in the Teameet API.
+- [x] Send Android notifications through the FCM HTTP v1 `messages:send` endpoint with bounded concurrency.
+- [x] Preserve permanent/transient device failure handling without logging registration or OAuth tokens.
+- [x] On Android sign-out, revoke the server row but preserve local opt-in/token for re-registration after login.
+- [x] Keep token deletion for explicit opt-out and notification-permission withdrawal.
+- [ ] Run the required physical-device foreground/background/terminated/deep-link matrix with an Alpha APK.
+
+This follow-up changes ownership, not Android's OS transport: reliable background and terminated delivery
+still requires FCM on Android. Notification content, routing, environment selection, fan-out, OAuth,
+failure classification, and device state are all owned by the Teameet API.
+
+Validation evidence (2026-09-11):
+
+- v1 API notification unit suites: 4 suites, 44 tests passed.
+- v1 API `tsc --noEmit`: passed.
+- Android `PushRevocationPolicyTest`: 2 JUnit tests passed using JDK 17 and the repository's cached test dependencies.
+- `PushRevocationPolicy.java` production source compiled with JDK 17.
+- Local Gradle/ADB/device runtime was unavailable, so the physical-device checkbox above remains open rather than being reported as complete.
+
 ## Objective
 
 기존 Teameet v1 웹 경험을 Android 앱으로 제공하고, 기존 Web Push를 보존하면서 Android 네이티브 FCM 알림을 추가한다. 첫 vertical slice는 로그인한 사용자가 Alpha Android 앱에서 `inquiry_answered` 알림을 받고, 알림을 눌러 정확한 문의 화면으로 이동하는 것이다.
@@ -17,7 +39,7 @@ Mode: CODE
 - `apps/v1_web/next.config.ts`는 production에서 `output: 'standalone'`을 사용한다.
 - 브라우저 푸시는 `V1PushSubscription` + `WebPushService` + VAPID로 이미 동작한다.
 - 알림 본문과 목적지는 `V1Notification`의 `title`, `body`, `deepLink`와 `NotificationsService`가 보유한다.
-- Android FCM registration token 모델과 Firebase Admin 발송 서비스는 v1에 없다.
+- Android FCM registration token 모델과 서버 발송 서비스는 당시 v1에 없었다. 현재는 API가 FCM HTTP v1을 직접 호출한다.
 - legacy `apps/web`의 Capacitor/FCM 코드는 V1 Scope Override에 따라 구현 근거로 사용하지 않는다.
 - `.github/tasks/next-session-plan-72-onward.md`의 “Android Chrome WebView에서 Web Push API 재사용” 서술은 v1 runtime evidence가 없으므로 이 task가 supersede한다.
 
@@ -63,7 +85,7 @@ Phase 0 exit decision:
 
 ### Phase 2 — Delivery fan-out
 
-- Firebase Admin SDK 기반 `FcmPushService`를 Web Push와 별도 adapter로 추가한다.
+- Teameet API가 FCM HTTP v1을 직접 호출하는 `FcmPushService`를 Web Push와 별도 adapter로 둔다. `firebase-admin`은 사용하지 않는다.
 - `V1Notification`의 기존 title/body/deepLink를 Android payload의 source of truth로 사용한다.
 - Web Push와 FCM을 함께 fan-out하되 한 채널 실패가 알림 row 생성을 성공처럼 위장하거나 다른 채널을 취소하지 않게 한다.
 - invalid/unregistered token은 비활성화하고 transient failure는 추적 가능한 실패로 기록한다.
@@ -83,7 +105,7 @@ Phase 0 exit decision:
 ### Phase 4 — Environment and release
 
 - Firebase Alpha와 production 프로젝트를 분리한다.
-- Firebase Admin credential은 앱/Git에 포함하지 않고 기존 secret delivery 경로로 주입한다.
+- FCM service-account credential은 앱/Git에 포함하지 않고 기존 secret delivery 경로로 API에만 주입한다.
 - Alpha application artifact를 Play internal testing 또는 controlled device install로 배포한다.
 - app version/versionCode, signing, AAB build, rollback 절차를 문서화한다.
 - `dev` merge는 Alpha만 배포하며 `main` 승격은 사용자가 수행한다.
@@ -111,7 +133,7 @@ Required responsibilities:
 - FCM token 평문 로그
 - Alpha/production 공용 Firebase project 또는 공용 application ID
 - Firebase service account JSON 커밋
-- 앱 안에 Firebase Admin credential 포함
+- 앱 안에 FCM service-account credential 포함
 
 최종 model/field 이름은 Phase 1 RED test와 migration 설계에서 확정한다.
 
@@ -353,7 +375,7 @@ Firebase Alpha identity:
 - The four `ANDROID_ALPHA_FIREBASE_*` values are repository variables. An initial mistaken copy in
   Repository Secrets made workflow run `33188600314` fail closed with all four inputs missing; the
   variables were moved to the correct scope and the duplicate secrets were deleted.
-- Alpha Firebase Admin credentials were installed in the operator-managed EC2 `deploy/.env` without
+- Alpha FCM service-account credentials were installed in the operator-managed EC2 `deploy/.env` without
   printing their values. Project/email/key-shape checks passed, the file mode was corrected from `777`
   to `600`, and downloaded Admin/client JSON copies plus the temporary SSM SecureString were deleted.
 - The Admin service account has one user-managed key. Two downloaded files were duplicate copies, not
@@ -623,3 +645,13 @@ report, upgrade preservation, and the remaining OEM/foldable/multi-window matrix
   `output/playwright/visual-audit/task156-play-policy-followup/`.
 - External gates remain: Play Console declarations, production URL probes after deployment, signed Play
   distribution, pre-launch report, and the physical OEM/device notification and WebView matrix.
+
+## Account-deletion rejection-risk follow-up (2026-09-08)
+
+- Re-probed production: `/my/settings/withdrawal` and the privacy policy return 200, while the required
+  unauthenticated `/account-deletion` resource still returns 404 because the dev route is not on main.
+- Kept active-match, team-authority, and active-admin integrity gates, but the in-app withdrawal screen now
+  maps each server code to an actionable Korean explanation and always links to the public deletion-request
+  alternative instead of leaving a blocked user at a dead end.
+- Public deletion copy continues to distinguish immediate account lock/push revocation, operator final PII
+  cleanup, and narrowly retained completed-match/payment/dispute/security records.

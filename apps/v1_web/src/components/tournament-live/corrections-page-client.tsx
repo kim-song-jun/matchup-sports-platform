@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { RequireAuth } from '@/components/auth/require-auth';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
+import { fixtureDetailHref } from '@/lib/fixture-detail-route';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { useTournamentEndedFixtures, type TournamentOperationsBoardItem } from '@/hooks/use-tournament-result-review';
@@ -61,6 +63,25 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
   );
 
   const selectedItem = hasOfficialResult.find((item) => item.fixtureId === selectedFixtureId) ?? null;
+
+  /**
+   * **확정된 결과를 관전자 화면에서 확인하는 자리.** 원래 결과 검토 화면에 뒀는데 거기서는
+   * 도달할 수 없었다 — 확정 한 번에 "링크를 띄우는 무효화"(revisions)와 "패널을 걷어내는
+   * 무효화"(board)가 같은 콜백에서 나가, 링크의 수명이 두 refetch 사이 간격이었다.
+   * 이 화면은 `revisionId !== null` 만 모으므로 **확정된 항목이 사라지지 않는다.**
+   *
+   * ⚠️ `kind` 가 오기 전에는 만들지 않는다. 목록은 보드 쿼리로 뜨고 `kind` 는 다른
+   * 쿼리에서 온다 — 보드가 먼저 성공하면 `tournament.data` 가 undefined 라 정규 리그가
+   * 대회 라우트로 링크돼 404 다(결과 검토 화면에서 실제로 났던 경합).
+   */
+  const publicHref =
+    selectedItem !== null && tournament.data
+      ? fixtureDetailHref({
+          isRegularLeague: tournament.data.kind === 'regular_league',
+          competitionId: tournamentId,
+          fixtureId: selectedItem.fixtureId,
+        })
+      : undefined;
 
   // T6-2: 딥링크로 들어왔는데 목록이 로드된 뒤에도 해당 fixture가 없으면(아직 공식
   // 결과가 확정되지 않은 경우) 조용히 미선택 상태로 두지 않고 안내한다.
@@ -140,6 +161,11 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
                     ).title
                   }
                 </h2>
+                {publicHref ? (
+                  <Link href={publicHref} className="tm-section-action" style={{ marginBottom: 12 }}>
+                    공개 화면에서 보기
+                  </Link>
+                ) : null}
                 <GameResultCorrectionPanel
                   key={selectedItem.gameId}
                   gameId={selectedItem.gameId}

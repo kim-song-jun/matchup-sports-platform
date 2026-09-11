@@ -341,6 +341,108 @@ describe('TeamsService', () => {
     });
   });
 
+  describe('list — 활동 요약', () => {
+    /**
+     * 구조화된 값(요일·시간대)과 팀이 직접 쓴 메모가 같은 말을 하면 카드 한 줄이 통째로
+     * 중복이 된다 — alpha 실측(2026-09-07) 활동 줄 7개 중 4개가 그랬다:
+     *   "수·일 · 저녁 · 매주 수·일 저녁 · 서울 송파구"
+     * 메모가 더 구체적이므로(매주·지역) 메모를 남기고 중복된 구조화 조각을 뺀다.
+     */
+    function rowWithProfile(profile: Record<string, unknown>) {
+      return {
+        ...teamRow(),
+        name: '활동팀',
+        sport: { id: 'sport-1', name: 'Futsal' },
+        region: null,
+        profile,
+        memberships: [],
+        joinApplications: [],
+        trustScore: null,
+        ownerUser: { id: owner.id, profile: { nickname: 'owner-nick', displayName: '오너', profileImageUrl: null } },
+      };
+    }
+
+    async function summaryOf(profile: Record<string, unknown>) {
+      prisma.v1Team.findMany.mockResolvedValueOnce([rowWithProfile(profile)]);
+      const result = await service.list(null, {});
+      return result.items[0].activitySummary;
+    }
+
+    it('메모가 요일·시간대를 이미 말하면 그 조각을 빼고 메모만 남긴다', async () => {
+      const summary = await summaryOf({
+        activityDays: ['wed', 'sun'],
+        activityTimeSlots: ['evening'],
+        activityNote: '매주 수·일 저녁 · 서울 송파구',
+      });
+
+      expect(summary).toBe('매주 수·일 저녁 · 서울 송파구');
+      // 예전 동작. 이 문자열이 다시 나오면 중복이 되살아난 것이다.
+      expect(summary).not.toBe('수·일 · 저녁 · 매주 수·일 저녁 · 서울 송파구');
+    });
+
+    it('메모에 없는 조각은 그대로 남긴다 — 중복만 빼지 정보를 버리지 않는다', async () => {
+      const summary = await summaryOf({
+        activityDays: ['wed', 'sun'],
+        activityTimeSlots: ['evening'],
+        activityFrequency: 'weekly_1',
+        activityNote: '우천시 취소',
+      });
+
+      expect(summary).toContain('우천시 취소');
+      expect(summary).toContain('수·일');
+      expect(summary).toContain('저녁');
+    });
+
+    it('띄어쓰기가 달라도 같은 말로 본다 — 주 1회 vs 매주1회', async () => {
+      // 이 케이스가 없으면 noteRepeats 의 공백 무시(squash)가 테스트로 보호되지 않는다.
+      // 변이(squash 제거)로 확인했다: 이 테스트가 있어야 red 가 난다.
+      const summary = await summaryOf({
+        activityFrequency: 'weekly_1',
+        activityNote: '매주1회 실내구장',
+      });
+
+      expect(summary).toBe('매주1회 실내구장');
+      expect(summary).not.toContain('주 1회 · ');
+    });
+
+    it('한 글자 요일은 메모에 우연히 걸려도 지우지 않는다 — 금 vs 금액 협의', async () => {
+      // 한글은 단어 경계가 없어 '금액' 안의 '금' 을 가릴 수 없다. 중복은 보기 나쁠 뿐이지만
+      // 삭제는 정보를 잃으므로, 한 글자 라벨은 아예 제외 대상에서 뺀다(#1123 Copilot).
+      const summary = await summaryOf({
+        activityDays: ['fri'],
+        activityNote: '금액 협의',
+      });
+
+      expect(summary).toBe('금 · 금액 협의');
+    });
+
+    it('두 글자 이상이면 예전대로 중복을 뺀다 — 길이 가드가 기능을 죽이지 않는다', async () => {
+      const summary = await summaryOf({
+        activityDays: ['wed', 'sun'],
+        activityNote: '매주 수·일 저녁',
+      });
+
+      expect(summary).toBe('매주 수·일 저녁');
+    });
+
+    it('메모가 없으면 구조화된 값만으로 예전과 같이 만든다', async () => {
+      const summary = await summaryOf({
+        activityDays: ['wed', 'sun'],
+        activityTimeSlots: ['evening'],
+      });
+
+      expect(summary).toBe('수·일 · 저녁');
+    });
+
+    it('메모만 있으면 메모만 쓴다', async () => {
+      expect(await summaryOf({ activityNote: '제로투' })).toBe('제로투');
+    });
+
+    it('활동 정보가 아무것도 없으면 null 이다 — 빈 줄을 만들지 않는다', async () => {
+      expect(await summaryOf({})).toBeNull();
+    });
+  });
+
   describe('list', () => {
     it('includes owner and active manager in each list item', async () => {
       prisma.v1Team.findMany.mockResolvedValueOnce([

@@ -15,8 +15,10 @@ export function AdminPageHeader({ eyebrow, title, description, action }: AdminPa
           390px alpha 실측: 리그 상세의 긴 리그 이름 칸이 110px 로 눌려 네 줄로 쪼개졌다.
           제목이 짧고 action 이 좁은 화면들은 합이 한 줄에 들어가므로 지금 배치 그대로다. */}
       <div className="min-w-[220px] flex-1">
+        {/* eyebrow 는 12px 라 큰 글씨 완화(3:1)를 못 받는다 — --blue500 은 흰 지면에서
+            3.71:1 로 AA 미달이고 --blue700 이 5.41:1 이다(alpha 실측 2026-09-08). */}
         {eyebrow && (
-          <p className="text-[length:var(--font-size-caption)] font-semibold text-blue-500 tracking-normal mb-1">
+          <p className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] tracking-normal mb-1">
             {eyebrow}
           </p>
         )}

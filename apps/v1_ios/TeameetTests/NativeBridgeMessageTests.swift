@@ -49,6 +49,15 @@ final class NativeBridgeMessageTests: XCTestCase {
         XCTAssertNil(message(#"{"type":"sign-in-with-apple","requestId":"r1"}"#)?.nonce)
     }
 
+    /// The logout button marks its revocation so the shell keeps the reader's opt-in; the
+    /// settings switch sends none. Both go through the same action.
+    func testCarriesTheRevocationReasonThrough() {
+        let signOut = message(#"{"type":"revoke-push-device","requestId":"r1","reason":"sign-out"}"#)
+        XCTAssertEqual(signOut?.action, .revokePushDevice)
+        XCTAssertEqual(signOut?.reason, "sign-out")
+        XCTAssertNil(message(#"{"type":"revoke-push-device","requestId":"r1"}"#)?.reason)
+    }
+
     // MARK: - Apple reply
 
     func testAppleReplyCarriesTheTokenAndTheRequestId() {

@@ -87,7 +87,7 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
     <>
       {/* Desktop-only page header with inline "매치 만들기" CTA */}
       <div className="tm-match-desktop-header tm-show-desktop">
-        <h1 className="tm-match-desktop-header-title">매치</h1>
+        <h1 className="tm-text-heading tm-match-desktop-header-title">매치</h1>
         <Link className="tm-match-desktop-create-btn" href="/matches/new/sport" aria-label="새 매치 만들기">
           <PlusIcon size={18} strokeWidth={2.5} aria-hidden="true" />
           매치 만들기
@@ -372,7 +372,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 화면의 로컬 InfoRow 와 달리 빈 값 처리가 없다(같은 파일 아래 `isMissing`
                 헬퍼가 있는데 쓰지 않는다). 라벨이 있는 자리에서는 "모른다" 를 말로 해야
                 한다. */}
-            <InfoRow label="성별 조건" value={match.gender || '미정'} />
+            <InfoRow label="성별 조건" value={match.gender} />
             {mode === 'pending' ? (
               <>
                 <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." />
@@ -447,7 +447,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           <CapacityRow current={match.current} capacity={match.capacity} />
           <InfoRow label="레벨" value={match.level} />
           {/* 위 상세와 같은 이유 — 공유 InfoRow 는 빈 값을 그대로 그린다. */}
-          <InfoRow label="성별 조건" value={match.gender || '미정'} />
+          <InfoRow label="성별 조건" value={match.gender} />
           {mode === 'pending' ? (
             <>
               <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." />

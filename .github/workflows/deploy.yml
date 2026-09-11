@@ -172,6 +172,18 @@ jobs:
       - name: Compose service parity guard tests
         run: node --test scripts/qa/check-compose-service-parity.test.mjs
 
+      # alpha 배포 시드가 이미지에 없는 파일을 참조하면 배포가 죽는다(2026-09-08 실사고).
+      - name: Alpha seed runtime contracts
+        run: pnpm qa:alpha-seed-runtime
+
+      - name: Alpha seed runtime guard tests
+        run: node --test scripts/qa/check-alpha-seed-runtime.test.mjs
+
+      # 배포 실패 시 되돌리는 경로가 **어느 단계에서 막혔는지** 말하는지 본다(2026-09-08 실사고:
+      # 네 번 실패했는데 로그엔 "restore failed" 한 줄뿐이라 원인을 못 좁혔다).
+      - name: Alpha restore diagnostics contracts
+        run: node --test scripts/qa/check-restore-diagnostics.test.mjs
+
       # 이 스위트는 존재만 하고 CI 에서 한 번도 실행되지 않았다 — 그래서
       # "changeset 을 전부 소비하면 alpha 배포가 깨진다"는 계약 위반이 계속 살아 있었다.
       # 디렉터리 인자(`node --test scripts/release/`)는 Node 버전에 따라 모듈 해석으로
@@ -181,6 +193,13 @@ jobs:
 
       - name: Alpha release-state contract tests
         run: bash scripts/qa/test-alpha-release-state.sh
+
+      # 배포 실패를 되돌리는 restore_active_release() 는 ERR trap 안에서 돈다. bash 는 trap 안의
+      # 인자 없는 `return` 에 trap 을 일으킨 종료코드를 돌려주므로, 정상 흐름에서 멀쩡한 함수가
+      # 복구에서만 조용히 실패한다(2026-09-08 alpha 복구 5회 연속 실패의 원인). alpha·prod 둘 다
+      # 실제 trap 문맥에서 복구를 끝까지 돌려 본다.
+      - name: Release restore-in-trap contract tests
+        run: bash scripts/qa/test-release-restore-in-trap.sh
 
       # alpha 는 로컬 이미지 GC 가 없어 dangling 이미지가 배포마다 쌓였고, 실제로 EC2
       # 디스크가 28G/30G 까지 차서 배포와 롤백이 함께 "no space left on device" 로 실패했다

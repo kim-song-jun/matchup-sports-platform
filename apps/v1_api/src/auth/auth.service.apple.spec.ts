@@ -42,6 +42,7 @@ describe('AuthService.appleSignIn', () => {
   beforeEach(async () => {
     prisma = buildPrismaMock();
     jest.clearAllMocks();
+    prisma.v1User.updateMany.mockResolvedValue({ count: 1 });
     (prisma.$transaction as jest.Mock).mockImplementation((arg: unknown) =>
       typeof arg === 'function'
         ? (arg as (tx: typeof prisma) => Promise<unknown>)(prisma)
@@ -140,6 +141,37 @@ describe('AuthService.appleSignIn', () => {
       expect.objectContaining({ data: expect.objectContaining({ userId: 'user-9', provider: V1AuthProvider.apple }) }),
     );
     expect(prisma.v1User.create).not.toHaveBeenCalled();
+  });
+
+  it('does not create an Apple identity when the candidate changes before the transaction re-read', async () => {
+    appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce({
+        id: 'user-9', email: 'someone@example.com', accountStatus: 'active', emailVerifiedAt: new Date('2026-01-01'),
+      })
+      .mockResolvedValueOnce({
+        id: 'user-9', email: 'changed@example.com', accountStatus: 'active', emailVerifiedAt: new Date('2026-01-01'),
+      });
+
+    await expect(signIn()).rejects.toMatchObject({
+      response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL' },
+    });
+    expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+  });
+
+  it('does not create an Apple identity when the guarded candidate claim affects zero rows', async () => {
+    appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+    prisma.v1User.findUnique.mockResolvedValue({
+      id: 'user-9', email: 'someone@example.com', accountStatus: 'active', emailVerifiedAt: new Date('2026-01-01'),
+    });
+    prisma.v1User.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(signIn()).rejects.toMatchObject({
+      response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL' },
+    });
+    expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
   });
 
   /**

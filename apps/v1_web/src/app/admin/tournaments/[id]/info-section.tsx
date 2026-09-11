@@ -467,7 +467,7 @@ export function TournamentInfoSection() {
             <button
               type="button"
               onClick={openEdit}
-              className="inline-flex items-center gap-2 h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="tm-on-tint inline-flex items-center gap-2 h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               <Pencil size={13} aria-hidden="true" />
               대회 정보 수정
@@ -548,7 +548,7 @@ export function TournamentInfoSection() {
             <button
               type="button"
               onClick={openPromoEdit}
-              className="inline-flex items-center gap-2 h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              className="tm-on-tint inline-flex items-center gap-2 h-[44px] px-3 rounded-lg text-xs font-medium text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
               <Pencil size={13} aria-hidden="true" />
               홍보 카드 수정
@@ -586,7 +586,7 @@ export function TournamentInfoSection() {
               prizeText: tournament.promoListPrizeText,
             },
           ].map((promo) => (
-            <div key={promo.key} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
+            <div key={promo.key} className="tm-on-tint rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-strong)]">{promo.title}</p>
                 <span className={`rounded-full px-3 py-1 text-[length:var(--font-size-caption)] font-semibold ${promo.enabled ? 'bg-[var(--blue50)] text-[var(--blue700)]' : 'bg-[var(--card-surface)] text-[var(--text-muted)] border border-[var(--border)]'}`}>
@@ -1090,7 +1090,7 @@ export function TournamentInfoSection() {
               type="button"
               onClick={() => setEditOpen(false)}
               disabled={updateTournament.isPending}
-              className="flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="tm-on-tint flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -1202,7 +1202,7 @@ export function TournamentInfoSection() {
           />
 
           <div className="flex gap-2 pt-1 sticky bottom-0 bg-[var(--card-surface)] pb-1">
-            <button type="button" onClick={() => setPromoOpen(false)} disabled={updateTournament.isPending || promoUploadingSlot !== null} className="flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50">
+            <button type="button" onClick={() => setPromoOpen(false)} disabled={updateTournament.isPending || promoUploadingSlot !== null} className="tm-on-tint flex-1 h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50">
               취소
             </button>
             <button type="submit" disabled={updateTournament.isPending || promoUploadingSlot !== null} className={'flex-1 ' + submitBtnCls}>

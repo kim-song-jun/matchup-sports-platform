@@ -3,7 +3,7 @@ import { v1Delete, v1Get, v1Post } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { reportClientError } from '@/lib/client-error-reporter';
 import { trackEvent } from '@/lib/analytics';
-import { isNativePushAvailable, requestNativePush } from '@/lib/native-push';
+import { isNativePushAvailable, requestNativePush, type NativePushRevokeReason } from '@/lib/native-push';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -12,9 +12,14 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
 }
 
+export interface UnsubscribeOptions {
+  /** `'sign-out'` from the logout button — the app shell keeps the reader's opt-in. */
+  reason?: NativePushRevokeReason;
+}
+
 export interface V1PushRegistration {
   subscribe: () => Promise<boolean>;
-  unsubscribe: () => Promise<void>;
+  unsubscribe: (options?: UnsubscribeOptions) => Promise<boolean>;
   permission: NotificationPermission | 'unsupported';
   isSubscribed: boolean;
   /**
@@ -153,29 +158,29 @@ export function useV1PushRegistration(): V1PushRegistration {
     }
   }, [browserSupported, nativeSupported]);
 
-  const unsubscribe = useCallback(async () => {
+  const unsubscribe = useCallback(async (options: UnsubscribeOptions = {}): Promise<boolean> => {
     if (nativeSupported) {
       setIsPending(true);
       try {
-        const result = await requestNativePush('revoke-push-device');
+        const result = await requestNativePush('revoke-push-device', { reason: options.reason });
         setPermission(result.permission);
         setIsSubscribed(result.subscribed);
-        if (result.subscribed) {
+        if (result.subscribed || result.errorCode === 'revocation-failed') {
           throw new Error('Native push device revocation was not confirmed by the server.');
         }
-        return;
+        return true;
       } catch (err) {
         reportClientError({
           message: extractErrorMessage(err, '앱 알림 해제에 실패했어요.'),
           level: 'warn',
           context: { flow: 'native-push-unsubscribe' },
         });
-        return;
+        return false;
       } finally {
         setIsPending(false);
       }
     }
-    if (!browserSupported) return;
+    if (!browserSupported) return false;
 
     setIsPending(true);
     try {
@@ -190,7 +195,7 @@ export function useV1PushRegistration(): V1PushRegistration {
       const subscription = registration ? await registration.pushManager.getSubscription() : null;
       if (!subscription) {
         setIsSubscribed(false);
-        return;
+        return true;
       }
 
       try {
@@ -206,12 +211,14 @@ export function useV1PushRegistration(): V1PushRegistration {
 
       await subscription.unsubscribe();
       setIsSubscribed(false);
+      return true;
     } catch (err) {
       reportClientError({
         message: extractErrorMessage(err, '푸시 알림 구독 해지에 실패했어요.'),
         level: 'warn',
         context: { flow: 'push-unsubscribe' },
       });
+      return false;
     } finally {
       setIsPending(false);
     }

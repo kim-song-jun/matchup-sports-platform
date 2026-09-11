@@ -92,6 +92,8 @@ export default function AdminTournamentsPage() {
             <Link
               href="/admin/tournaments/new"
               className="inline-flex items-center gap-2 h-[44px] px-4 rounded-xl text-[length:var(--font-size-label)] font-semibold text-white bg-blue-500 hover:bg-blue-600 transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              // 앵커에서는 Tailwind 글자색이 죽는다 — anchor-text-color.test.ts 참조
+              style={{ color: 'var(--static-white)' }}
               aria-label="새 대회 만들기"
             >
               <Plus size={16} aria-hidden="true" />
@@ -196,7 +198,7 @@ export default function AdminTournamentsPage() {
                 aria-label={`${row.title} 상세 보기`}
                 className={[
                   'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg',
-                  'text-[length:var(--font-size-label)] font-medium text-[var(--text-muted)] bg-[var(--surface-soft)]',
+                  'tm-on-tint text-[length:var(--font-size-label)] font-medium text-[var(--text-muted)] bg-[var(--surface-soft)]',
                   'hover:bg-[var(--grey300)] transition-colors whitespace-nowrap',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 ].join(' ')}

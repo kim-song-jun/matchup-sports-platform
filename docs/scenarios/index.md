@@ -326,6 +326,15 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 - Evidence: policy source gate PASS; backend 48/48, public-page 1/1, API/Web typechecks PASS; Android
   JVM/AAB build PASS; AAB 16 KB alignment PASS; headed public-route QA 3/3 with zero runtime errors.
 
+## 2026-09-09 — Android notification control unification
+
+- Status: Task 169 implementation and targeted validation PASS; physical-device permission/FCM delivery remains external.
+- Kept onboarding opt-in, removed the home duplicate prompt, and reduced settings to one adaptive device control plus four server-backed categories.
+- Android notification-settings return continues FCM registration without a second tap; failed server revocation is surfaced as an error.
+- `chatEnabled` now gates notification-center rows, badge events, and push while preserving live room messages.
+- Evidence: Web 84/84, API 55/55, both typechecks PASS, Android alpha unit/Java compile PASS, headed UI 4 states with no overflow or scoped runtime/API errors.
+- Screenshots: `output/playwright/visual-audit/task169-notification-settings/`.
+
 1. `index.md`에서 현재 우선순위와 열린 논점을 확인한다.
 2. 해당 기능 문서로 이동해 체크박스를 직접 갱신한다.
 3. 이슈가 생기면 개별 문서에도 적고, 최종 판단/논의는 `Discussion`에 요약한다.

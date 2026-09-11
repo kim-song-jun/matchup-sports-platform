@@ -278,6 +278,10 @@ export function GameResultReviewPanel({
           }
         />
       ) : null}
+      {/* **공개 화면 링크는 여기 두지 않는다.** 한 번 뒀다가 도달 불가로 걷어냈다 — 확정
+          한 번에 `revisions`(링크를 띄운다)와 `board`(이 패널을 걷어낸다) 무효화가 같은
+          콜백에서 나가, 링크의 수명이 두 refetch 사이 간격이었다. 확정된 결과가 사라지지
+          않는 정정 화면(`corrections-page-client.tsx`)으로 옮겼다. */}
       {latest && latest.state === 'OFFICIAL' && correctionsHref ? (
         <Link href={correctionsHref} className="tm-section-action">
           정정 화면으로 이동

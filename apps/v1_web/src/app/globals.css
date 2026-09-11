@@ -468,9 +468,17 @@ body:has(.tm-app-frame) {
   overflow: hidden;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+/* 레이어 안에 둔다. 레이어 밖이면 이 규칙이 @layer utilities 의 색 유틸리티를
+   **항상** 이겨서, 앵커에 적어 둔 text-[var(--blue700)] 같은 색이 전부 죽는다
+   (2026-09-08 실측: 기본 상태 51곳 + hover/focus/dark 만 죽는 19곳 — 어드민
+   사이드바 14개가 활성·비활성 구분 없이 같은 색으로 나오던 원인). 이 문서의 레이어 우선순위는 utilities > base 이고,
+   레이어 밖 .tm-* 는 레이어 안 어느 것보다도 우선하므로 색을 거는 tm-* 클래스
+   362개는 이 이동에 영향받지 않는다. */
+@layer base {
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 }
 
 button,
@@ -1690,6 +1698,10 @@ button:disabled {
   height: 44px;
   padding: 0;
   position: relative;
+  /* 이 클래스는 정의상 44x44 **고정**이다. 그런데 flex 컨테이너 안에서는 flex-shrink 기본값
+     (1)이 width 를 이겨 눌린다 — alpha 실측(2026-09-08) 홈 날씨 카드의 새로고침 버튼이
+     세 폭 모두에서 44 미만으로 찌그러져 있었다. 고정을 실제로 고정으로 만든다. */
+  flex-shrink: 0;
 }
 
 /* 시각 크기는 그대로 두고 **터치 영역만** 44px 로 넓힌다.
@@ -1965,28 +1977,9 @@ label.tm-btn:focus-within {
   background: var(--grey150);
 }
 
-/* 리그전 배지 링크화(R3, team-matches-page.tsx TeamMatchCard) — 팀매치 목록 카드는
- * 카드 전체가 이미 상세로 가는 Link라 리그 배지는 <a>가 아니라 button으로 구현했다.
- * .tm-badge UA 기본 button 스타일(폰트·테두리)을 리셋하고, "클릭 가능함"을 컬러가
- * 아니라 밑줄 + 화살표 아이콘으로 전달한다(색맹 대응, DESIGN.md 컬러 전용 전달 금지). */
-.tm-league-badge-link {
-  font: inherit;
-  gap: 3px;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-  /* a11y 터치 타깃 (26->44). 이 배지는 원래 비인터랙티브 span 이라 배지 높이 그대로
-     26px 였는데, 카드 전체를 감싼 Link 안에서 중첩 앵커를 피하려고 button 으로 바꾸면서
-     "누를 수 있는 26px 표면"이 생겼다 — alpha 라이브 측정에서 390/768/1440 전부 26px
-     로 확인됐다. 히트 영역만 ::after 로 넓히는 방법도 있지만, 배지가 카드 Link 안에
-     있어 넓힌 영역이 위아래 형제 배지 줄을 덮으면 그 자리 탭이 팀이 아니라 리그로
-     새는 부작용이 생긴다. 그래서 이 저장소의 다른 a11y 상향 선례와 동일하게 요소
-     자체를 44px 로 올린다. */
-  min-height: 44px;
-  /* F7: 리그명이 길면 배지가 부모 카드 밖으로 밀려 나가 페이지가 가로로 스크롤됐다
-     (390px alpha 실측: 카드 밖 152px, main.tm-scroll-area scrollWidth 427 vs client 390).
-     .tm-badge 가 nowrap 이라 flex 안에서 줄지 않는 것이 원인 — 최대 폭을 부모로 묶고
-     리그명만 .tm-league-badge-text 에서 말줄임한다(화살표는 항상 보인다). */
+/* 리그 배지는 정적 칩이다(링크 아님). .tm-badge 가 nowrap 이라 리그명이 길면 카드 밖으로
+   밀려 페이지가 가로로 스크롤되므로(390 실측 전례) 최대 폭을 부모로 묶고 텍스트만 말줄임한다. */
+.tm-league-badge {
   max-width: 100%;
   min-width: 0;
 }
@@ -1996,11 +1989,6 @@ label.tm-btn:focus-within {
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
-}
-
-.tm-league-badge-link:focus-visible {
-  outline: 2px solid var(--blue500);
-  outline-offset: 2px;
 }
 
 .tm-badge-orange {
@@ -2468,8 +2456,10 @@ label.tm-btn:focus-within {
 .tm-section-action {
   border: 0;
   background: transparent;
-  /* #15: blue500으로 격상해 '더보기' 진입점 링크로 인식되도록 */
-  color: var(--blue500);
+  /* #15: 파랑으로 격상해 '더보기' 진입점 링크로 인식되도록. blue500 은 13px/600 에서
+     흰 지면 3.71:1 로 AA 미달이라(alpha 실측) blue700(5.41:1)로 올렸다 —
+     링크로 읽히는 성질은 그대로다. */
+  color: var(--blue700);
   font-size: 13px;
   font-weight: 600;
   padding: 0 4px;
@@ -2859,14 +2849,29 @@ label.tm-btn:focus-within {
   white-space: nowrap;
 }
 
-/* 팀매치 행의 조건 줄 — 종목·등급·경기방식 텍스트 옆에 리그 배지(button)가 인라인으로 붙는다.
-   배지는 baseline 정렬이라 그냥 두면 텍스트보다 아래로 처진다. */
+/* 팀매치 행의 조건 줄 — 종목·등급·경기방식 텍스트, 리그 대진이면 그 뒤에 리그명.
+   조건 텍스트는 예전처럼 줄바꿈으로 전부 보여 주고(390 에서 "풋살 · A등급 · 5:5 · 성별 무관"
+   은 한 줄에 안 들어간다), 리그명만 한 줄로 말줄임한다 — 종목·조건이 잘리면 무슨 경기인지
+   못 읽지만 리그명은 카드 탭 뒤 상세에서 다시 보인다. */
 .tm-team-match-row-cond {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* 리그명은 첫 줄의 남는 폭을 차지해 말줄임한다(flex-basis 0). 남는 폭이 48px 도 안 되면
+   다음 줄로 내려간다 — 390 alpha 실측: 보통 조건("풋살")은 한 줄, "풋살 · A등급 · 5:5 ·
+   성별 무관" 같은 극단 조합만 두 줄. flex-basis auto 였을 땐 리그명이 항상 둘째 줄로 내려가
+   줄 머리에 구분점만 남았다. */
+.tm-team-match-row-cond-league {
+  flex: 1 1 0;
+  min-width: 48px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 비용은 오른쪽 끝에서 줄어들면 안 된다 — 금액이 잘리면 판단 자체가 불가능해진다. */
@@ -2922,6 +2927,7 @@ label.tm-btn:focus-within {
      --grey50  (#f9fafb)    4.42:1   미달
      --grey100 (#f2f4f6)    4.19:1   미달
      --blue50  (#e8f3ff)    4.11:1   미달
+     --grey300 (#d1d6db)    3.15:1   미달 — 어드민 아바타 폴백에서 나왔다. 지면 중 가장 나쁘다.
 
    --grey700(#4e5968)으로 올리면 같은 순서로 7.11 / 6.81 / 6.45 / 6.33 이 된다.
    토큰을 전역으로 바꾸지 않는 이유는 흰 카드 위 캡션까지 진해져 본문과의 위계가
@@ -3379,10 +3385,15 @@ label.tm-btn:focus-within {
 
 .tm-match-detail-title {
   margin: 4px 0 0;
+  /* 히어로 지면(사진·그라디언트) 위라 흰 글씨는 그대로 둔다. */
   color: var(--static-white);
-  font-size: 24px;
+  /* 이 h2 는 데스크톱 페이지 헤드의 h1(.tm-text-heading)과 **같은 match.title 문자열**을
+     보여준다(matches-page.tsx:309 vs :352). 그런데 크기는 같고 굵기만 700 vs 800 으로
+     갈려 있었다 — 한 화면에서 같은 제목이 두 무게로 보인다(alpha 실측 2026-09-08).
+     DESIGN.md 의 페이지 제목 값(24px/700)에 맞춘다. */
+  font-size: var(--font-size-heading);
   line-height: 32px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .tm-match-detail-body {
@@ -4222,6 +4233,21 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   color: var(--text-muted);
 }
 
+/* 팀 카드 조건 태그 — 레벨은 서버 자유 텍스트라 길이가 보장되지 않는다.
+   태그 행 폭 232px(390 실측) 안에서 형제 배지(`성별 미설정` 최대 ~73px = 31%)와 gap(8px = 3%)
+   자리를 남기도록 62% 로 묶는다. 상한은 넘칠 때만 걸리므로 짧은 태그는 그대로다. */
+.tm-team-tag {
+  max-width: 62%;
+  min-width: 0;
+}
+
+.tm-team-tag-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tm-team-card-status-badge {
   display: inline-flex;
   align-items: center;
@@ -4822,7 +4848,11 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 .tm-notification-count {
-  color: var(--blue500);
+  /* 크기는 소비처가 정한다 — 데스크톱은 h1.tm-text-heading(24px) 안이라 큰 글씨
+     완화(3:1)를 받지만, 모바일 상단 타이틀은 17px/700 이라 완화 문턱(≥18.66px +
+     bold)에 1.66px 모자라 4.5:1 을 받는다. **가장 작은 소비처 기준**으로 잡는다:
+     blue500 은 흰 지면 3.71:1 이라 그 자리에서 미달이다(alpha 실측). */
+  color: var(--blue700);
 }
 
 .tm-notification-count-muted {
@@ -6490,7 +6520,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 .tm-hub-stage-label-done  { color: var(--blue500); font-weight: 700; }
 /* 크기는 base(12px)와 같게 두고 색·굵기로만 현재 단계를 구분한다. */
-.tm-hub-stage-label-active { color: var(--blue500); font-weight: 800; }
+/* 12px/800 은 완화 문턱(≥18.66px)에 한참 못 미친다 — blue500 흰 지면 3.71:1 미달. */
+.tm-hub-stage-label-active { color: var(--blue700); font-weight: 800; }
 
 /* 서브레이블 (날짜/시각) */
 .tm-hub-stage-sublabel {
@@ -6745,7 +6776,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding: 8px 12px;
   border-radius: var(--radius-pill);
   background: var(--blue50);
-  color: var(--blue500);
+  /* blue50 지면 위 blue500 은 3.31:1 — 12px/700 이라 완화 대상도 아니다. blue700 은 4.82:1. */
+  color: var(--blue700);
   font-size: 12px;
   font-weight: 700;
 }

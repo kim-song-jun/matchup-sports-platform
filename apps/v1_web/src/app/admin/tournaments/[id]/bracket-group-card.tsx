@@ -370,7 +370,7 @@ export function BracketGroupCard({
               </div>
             )}
             {knockoutEmpty ? (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--surface-soft)] border border-dashed border-[var(--border)]">
+              <div className="tm-on-tint flex items-center gap-2 px-3 py-2 rounded-xl bg-[var(--surface-soft)] border border-dashed border-[var(--border)]">
                 <span className="text-xs text-[var(--text-muted)]">아직 배정된 팀이 없어요</span>
               </div>
             ) : standings.length > 0 || group.groupTeams.length > 0 ? (

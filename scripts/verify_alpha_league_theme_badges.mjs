@@ -1,14 +1,12 @@
 /**
- * alpha 리그 화면 보강 검증 2건.
- *   (A) 수동 다크 모드(localStorage 'tm-theme' = dark)에서 리그 화면이 제대로 나오는지
- *   (B) 44px 리그전 배지가 같은 flex 줄의 24px 배지 높이를 늘리는지 (align-items 미지정)
+ * alpha 리그 화면 — 수동 다크 모드(localStorage 'tm-theme' = dark)에서 리그 목록·상세가
+ * 제대로 나오는지 computed 색으로 확인한다. (예전의 "44px 리그 배지 줄 높이" 측정은 배지가
+ * 정적 칩이 되면서 대상이 사라져 제거했다.)
  *
- * 이 스크립트는 로그인하지 않는다 — 리그·팀매치 상세는 비인증으로 열리는 공개 경로다.
- * 필요한 건 대상 id 뿐이다.
+ * 이 스크립트는 로그인하지 않는다 — 리그 목록·상세는 비인증으로 열리는 공개 경로다.
  *
  * 사용법:
- *   LEAGUE_IDS='{"tier":"<리그 id>","fixture":"<팀매치 id>"}' \
- *     node scripts/verify_alpha_league_theme_badges.mjs <outDir>
+ *   LEAGUE_IDS='{"tier":"<리그 id>"}' node scripts/verify_alpha_league_theme_badges.mjs <outDir>
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -17,9 +15,9 @@ const BASE = process.env.CAPTURE_BASE_URL ?? 'https://alpha.teameet.co.kr';
 const OUT = process.argv[2] ?? '.capture/league-theme-badges';
 const L = JSON.parse(process.env.LEAGUE_IDS ?? '{}');
 // id 가 없으면 /league-matches/undefined 를 열어 "화면이 이상하다" 는 엉뚱한 결론이 난다.
-for (const key of ['tier', 'fixture']) {
+for (const key of ['tier']) {
   if (!L[key]) {
-    console.error(`LEAGUE_IDS 에 "${key}" 가 필요해요. 예: LEAGUE_IDS='{"tier":"<리그 id>","fixture":"<팀매치 id>"}'`);
+    console.error(`LEAGUE_IDS 에 "${key}" 가 필요해요. 예: LEAGUE_IDS='{"tier":"<리그 id>"}'`);
     process.exit(1);
   }
 }
@@ -76,65 +74,11 @@ async function themePass(theme, width) {
   await ctx.close();
 }
 
-/** (B) 리그전 배지가 있는 줄의 형제 배지 높이를 잰다. */
-async function badgePass(width) {
-  const ctx = await browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: 2, locale: 'ko-KR' });
-  const page = await ctx.newPage();
-  await page.goto(`${BASE}/team-matches/${L.fixture}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(3500);
-  const diag = await page.evaluate(() => {
-    // 데스크톱/모바일 레이아웃이 같은 카드를 두 번 렌더할 수 있다 — 실제로 보이는 인스턴스만 잰다.
-    const links = [...document.querySelectorAll('.tm-league-badge-link')];
-    const link = links.find((el) => el.getBoundingClientRect().height > 0) ?? links[0];
-    if (!link) return { found: false };
-    const row = link.parentElement;
-    const rowCs = getComputedStyle(row);
-    const siblings = [...row.children].map((el) => {
-      const r = el.getBoundingClientRect();
-      const cs = getComputedStyle(el);
-      return {
-        text: (el.textContent || '').trim().slice(0, 22),
-        cls: el.className.toString().split(' ').filter((c) => c.startsWith('tm-')).join('.'),
-        h: Math.round(r.height * 10) / 10,
-        top: Math.round(r.top * 10) / 10,
-        minH: cs.minHeight,
-        alignSelf: cs.alignSelf,
-      };
-    });
-    return {
-      found: true,
-      rowDisplay: rowCs.display,
-      rowAlignItems: rowCs.alignItems,
-      rowFlexWrap: rowCs.flexWrap,
-      siblings,
-    };
-  });
-  // 배지 줄만 잘라 저장 — 요소가 화면 밖이면 스킵한다(데스크톱은 우측 컬럼이라 보이지 않을 수 있다).
-  try {
-    const box = await page.locator('.tm-league-badge-link').first().boundingBox({ timeout: 3000 });
-    if (box) {
-      await page.screenshot({
-        path: `${OUT}/badges-${width}-crop.png`,
-        clip: { x: Math.max(0, box.x - 20), y: Math.max(0, box.y - 90), width: Math.min(width - 1, 420), height: 190 },
-      });
-    }
-  } catch {
-    // 크롭 실패는 측정과 무관 — 계산값은 위에서 이미 확보했다.
-  }
-  await page.screenshot({ path: `${OUT}/badges-${width}.png`, fullPage: true });
-  report[`badges/${width}`] = diag;
-  console.log(`\n[badges ${width}] found=${diag.found} row: display=${diag.rowDisplay} align-items=${diag.rowAlignItems} wrap=${diag.rowFlexWrap}`);
-  (diag.siblings ?? []).forEach((s) => console.log(`   ${s.h}px (min ${s.minH}, self ${s.alignSelf}) top=${s.top} .${s.cls} "${s.text}"`));
-  await ctx.close();
-}
-
 // 중간에 던져도 chromium 이 남지 않게 finally 로 닫는다 — 실패할수록 여러 번 돌리게 되고,
 // 그때마다 브라우저가 쌓이면 호스트가 먼저 죽는다.
 try {
   await themePass('dark', 390);
   await themePass('light', 390);
-  await badgePass(390);
-  await badgePass(1440);
 } finally {
   await browser.close();
   // 부분 결과라도 남긴다 — 어디까지 됐는지가 다음 실행의 단서다.

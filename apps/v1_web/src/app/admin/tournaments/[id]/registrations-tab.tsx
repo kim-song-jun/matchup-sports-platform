@@ -294,7 +294,7 @@ export function RosterModal({
       <button
         type="button"
         onClick={onClose}
-        className="mt-4 w-full h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+        className="tm-on-tint mt-4 w-full h-[44px] rounded-xl text-[length:var(--font-size-label)] text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
       >
         닫기
       </button>
@@ -645,7 +645,7 @@ export function RegistrationsTab({
                     // active 상태의 카운트 배지는 파란 칩(bg-blue-500, 테마 불변) 위에 얹히는
                     // 반투명 흰 원이라 --static-white 를 써야 한다 — --card-surface 는 다크에서
                     // 거의 검정이라 파란 칩 위에서 탁하게 죽는 회귀가 있었다(전수검수 발견).
-                    active ? 'bg-[var(--static-white)]/25 text-white' : 'bg-[var(--surface-soft)] text-[var(--text-muted)]',
+                    active ? 'bg-[var(--static-white)]/25 text-white' : 'tm-on-tint bg-[var(--surface-soft)] text-[var(--text-muted)]',
                   ].join(' ')}
                 >
                   {count}

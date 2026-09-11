@@ -149,6 +149,20 @@ describe('ProfileService settings theme preference', () => {
     expect(result.theme).toBe('system');
   });
 
+  it('persists activityEnabled so the grouped 경기·대회 setting controls tournament notifications', async () => {
+    const prisma = buildPrisma();
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    await service.updateSettings(user, { notifications: { activityEnabled: false } });
+
+    expect(prisma.v1NotificationPreference.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ activityEnabled: false }),
+        create: expect.objectContaining({ activityEnabled: false }),
+      }),
+    );
+  });
+
   // Copilot 리뷰 지적: ThemeProvider가 앱 루트에서 GET /me/settings를 상시 호출하게
   // 되면서, settings()가 upsert(update:{})로 알림설정을 읽으면 요청마다 불필요한
   // UPDATE(@updatedAt 갱신 포함)가 발생한다 — GET은 순수 읽기여야 한다.

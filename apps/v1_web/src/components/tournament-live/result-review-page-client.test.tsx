@@ -105,3 +105,4 @@ describe('ResultReviewPageClient fixtureId 딥링크 (T6-1)', () => {
     expect(screen.getByTestId('panel')).toHaveTextContent('panel:game-3');
   });
 });
+

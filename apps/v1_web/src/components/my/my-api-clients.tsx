@@ -80,6 +80,7 @@ import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinAp
 import { myHomeModel, settingsModel } from './my.view-model';
 import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
 import { isNativePushAvailable, requestNativePush } from '@/lib/native-push';
+import { WithdrawalErrorCard } from './withdrawal-error-card';
 
 type ProfileEditErrors = Partial<Record<'realName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
 type DuplicateCheckState = {
@@ -1365,6 +1366,7 @@ export function NotificationSettingsPageClient() {
   const pushRegistration = useV1PushRegistration();
   const [toggleError, setToggleError] = useState(false);
   const [pushError, setPushError] = useState<string | null>(null);
+  const [recoveredNativeSubscription, setRecoveredNativeSubscription] = useState<boolean | null>(null);
   const nativePushAvailable = isNativePushAvailable();
 
   // loading/error 상태에선 테이블 기본값(desktopHead:true)을 쓰고, success 분기만 자기
@@ -1395,12 +1397,17 @@ export function NotificationSettingsPageClient() {
   }
 
   const notifications = settings.data?.notifications;
-  const pushBlocked = pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed;
+  const deviceSubscribed = recoveredNativeSubscription ?? pushRegistration.isSubscribed;
+  const pushBlocked = pushRegistration.permission === 'denied' && !deviceSubscribed;
 
   const togglePush = async () => {
     setPushError(null);
-    if (pushRegistration.isSubscribed) {
-      await pushRegistration.unsubscribe();
+    setRecoveredNativeSubscription(null);
+    if (deviceSubscribed) {
+      const unsubscribed = await pushRegistration.unsubscribe();
+      if (!unsubscribed) {
+        setPushError('푸시 알림 해제를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
+      }
       return;
     }
     const subscribed = await pushRegistration.subscribe();
@@ -1418,25 +1425,36 @@ export function NotificationSettingsPageClient() {
   const openNativeNotificationSettings = async () => {
     setPushError(null);
     try {
-      await requestNativePush('open-notification-settings');
+      const result = await requestNativePush('open-notification-settings');
+      setRecoveredNativeSubscription(result.subscribed);
+      if (!result.subscribed) {
+        setPushError('휴대폰 설정에서 Teameet 알림을 허용한 뒤 다시 시도해 주세요.');
+      }
     } catch {
       setPushError('기기 알림 설정을 열지 못했어요. 휴대폰 설정에서 Teameet 알림을 직접 허용해 주세요.');
     }
   };
   const items = [
-    { key: 'matchEnabled', label: '매치 승인 알림', sub: '참가 승인, 거절, 대기 상태가 바뀔 때' },
-    { key: 'teamEnabled', label: '팀 가입 신청', sub: '내가 운영하는 팀에 신청이 들어올 때' },
-    { key: 'teamMatchEnabled', label: '팀매치 알림', sub: '팀매치 신청, 승인, 매칭 상태가 바뀔 때' },
-    { key: 'chatEnabled', label: '채팅 메시지', sub: '참여 중인 매치와 팀 채팅 새 메시지' },
-    { key: 'noticeEnabled', label: '공지 알림', sub: '서비스 운영 공지와 필수 안내' },
-    { key: 'marketingEnabled', label: '마케팅 소식', sub: '새 기능과 이벤트 안내' },
+    {
+      key: 'games',
+      keys: ['matchEnabled', 'teamMatchEnabled', 'activityEnabled'],
+      label: '경기·대회',
+      sub: '개인 경기, 팀매치, 대회 일정과 결과',
+    },
+    { key: 'teams', keys: ['teamEnabled'], label: '팀 활동', sub: '가입 신청과 팀 운영 소식' },
+    { key: 'chat', keys: ['chatEnabled'], label: '채팅', sub: '참여 중인 경기와 팀의 새 메시지' },
+    { key: 'notices', keys: ['noticeEnabled'], label: '서비스 공지', sub: '서비스 운영 공지와 필수 안내' },
   ] as const;
 
-  const toggle = (key: keyof V1Settings['notifications']) => {
+  const toggle = (keys: readonly (keyof V1Settings['notifications'])[]) => {
     if (!notifications) return;
+    const enabled = keys.every((key) => notifications[key]);
+    const nextNotifications = Object.fromEntries(keys.map((key) => [key, !enabled])) as Partial<
+      V1Settings['notifications']
+    >;
     setToggleError(false);
     update.mutate(
-      { notifications: { [key]: !notifications[key] } },
+      { notifications: nextNotifications },
       {
         onError: () => {
           setToggleError(true);
@@ -1463,24 +1481,25 @@ export function NotificationSettingsPageClient() {
                 // 활성화·서버 저장까지 수 초가 걸려서, 그동안 토글이 그대로면 눌리지
                 // 않은 줄 알고 다시 누르게 된다. 다만 '켜짐'이라고 단정하지는 않고
                 // 라벨로 진행 중임을 밝힌다 — 실패하면 되돌아간다.
-                const showAsOn = pushRegistration.isSubscribed || pushRegistration.isPending;
+                const recovering = blocked && nativePushAvailable;
+                const showAsOn = deviceSubscribed || pushRegistration.isPending;
                 return (
                   <button
                     className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
-                    onClick={() => void togglePush()}
+                    onClick={() => void (recovering ? openNativeNotificationSettings() : togglePush())}
                     type="button"
-                    role="switch"
-                    aria-checked={pushRegistration.isSubscribed}
+                    role={recovering ? undefined : 'switch'}
+                    aria-checked={recovering ? undefined : deviceSubscribed}
                     aria-busy={pushRegistration.isPending}
-                    aria-label="푸시 알림 받기"
-                    disabled={blocked || pushRegistration.isPending}
+                    aria-label={recovering ? '휴대폰 알림 켜기' : '푸시 알림 받기'}
+                    disabled={(blocked && !nativePushAvailable) || pushRegistration.isPending}
                     style={{
                       width: '100%',
                       background: 'none',
                       border: 'none',
                       textAlign: 'left',
-                      cursor: blocked ? 'not-allowed' : pushRegistration.isPending ? 'progress' : 'pointer',
-                      opacity: blocked ? 0.5 : 1,
+                      cursor: blocked && !nativePushAvailable ? 'not-allowed' : pushRegistration.isPending ? 'progress' : 'pointer',
+                      opacity: blocked && !nativePushAvailable ? 0.5 : 1,
                     }}
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -1492,9 +1511,11 @@ export function NotificationSettingsPageClient() {
                           ? pushRegistration.isSubscribed
                             ? '끄는 중이에요…'
                             : '켜는 중이에요… 알림 권한을 물어보면 허용해 주세요'
-                          : blocked
-                            ? '기기 또는 브라우저 설정에서 알림을 허용해 주세요'
-                            : pushRegistration.isSubscribed
+                          : recovering
+                            ? '눌러서 휴대폰 설정을 열고 Teameet 알림을 허용해 주세요'
+                            : blocked
+                              ? '브라우저 설정에서 알림을 허용해 주세요'
+                            : deviceSubscribed
                               ? '지금 이 기기에서 받고 있어요. 다른 기기에서는 따로 켜야 해요'
                               : '켜면 앱을 닫아도 새 소식을 받을 수 있어요'}
                       </div>
@@ -1504,29 +1525,13 @@ export function NotificationSettingsPageClient() {
                       style={{ minWidth: 24, textAlign: 'right', color: showAsOn ? 'var(--blue700)' : 'var(--text-caption)' }}
                       aria-hidden="true"
                     >
-                      {pushRegistration.isPending ? '···' : pushRegistration.isSubscribed ? 'ON' : 'OFF'}
+                      {pushRegistration.isPending ? '···' : deviceSubscribed ? 'ON' : 'OFF'}
                     </span>
                     <span className={`tm-toggle ${showAsOn ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
                   </button>
                 );
               })()}
             </div>
-          ) : null}
-          {pushBlocked && nativePushAvailable ? (
-            <Card pad={16} style={{ marginBottom: 8 }}>
-              <div className="tm-text-label">휴대폰 알림이 꺼져 있어요</div>
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>
-                기기 설정에서 Teameet 알림을 허용한 뒤 돌아와 푸시 알림을 다시 켜 주세요.
-              </div>
-              <button
-                className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-                style={{ marginTop: 12 }}
-                type="button"
-                onClick={() => void openNativeNotificationSettings()}
-              >
-                기기 알림 설정 열기
-              </button>
-            </Card>
           ) : null}
           {pushError ? (
             <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
@@ -1539,7 +1544,7 @@ export function NotificationSettingsPageClient() {
             <div className="tm-text-caption" style={{ marginTop: 4 }}>
               {/* 위 푸시 토글과의 관계를 명시한다 — 예전에는 두 영역이 무관해 보여서,
                   푸시를 켜지 않은 사용자가 왜 폰으로 알림이 안 오는지 알 수 없었다. */}
-              {pushRegistration.isSubscribed
+              {deviceSubscribed
                 ? '여기서 끈 종류는 알림함과 푸시 알림 모두에서 빠져요.'
                 : '지금은 앱 안 알림함에서만 볼 수 있어요. 위에서 푸시 알림을 켜면 같은 종류를 폰으로도 받아요.'}
             </div>
@@ -1550,15 +1555,15 @@ export function NotificationSettingsPageClient() {
               <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
             </Card>
           ) : null}
-          {/* 6개 개별 카드 → 단일 Card 내 .tm-my-menu-row 행 — 시각 단위 절감, 마이홈 메뉴 패턴 일치 */}
+          {/* 저장 필드를 사용자가 이해하는 4개 발송 축으로 묶는다. */}
           <div className="tm-card" style={{ padding: 0 }}>
             {items.map((setting) => {
-              const enabled = Boolean(notifications?.[setting.key]);
+              const enabled = Boolean(notifications && setting.keys.every((key) => notifications[key]));
               return (
                 <button
                   key={setting.key}
                   className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
-                  onClick={() => toggle(setting.key)}
+                  onClick={() => toggle(setting.keys)}
                   type="button"
                   disabled={!notifications || update.isPending}
                   role="switch"
@@ -1737,22 +1742,6 @@ export function RecordConsentSettingsPageClient() {
  * 자체는 여전히 유효하지만, 신청 화면의 선택 동의 체크박스가 이 화면 밖에서 이 값을 켜는
  * 두 번째 진입점이 됐다 -- 이 화면은 "언제든 끌 수 있는" 유일한 진입점 역할은 그대로 유지.
  *
- * 기존 사용자 안내 배너 (범위 밖, 계획만) -- 조사 결과: 이 저장소에는 이미 "한 번 노출되는
- * 조건부 넛지 카드" 패턴이 있다. `components/home/home-client.tsx`의 `pushNudge`/
- * `phoneVerifyNudge`가 예시 -- 서버/클라이언트 조건(권한 미허용, 미인증)으로 표시 여부를
- * 계산하고, `PushNudgeBanner`/`PhoneVerifyBanner`(`components/home/home-page.tsx`)로
- * 렌더링하며, `lib/session-storage.ts`의 `V1_PUSH_NUDGE_DISMISSED_KEY` 같은
- * sessionStorage 키로 닫기 상태를 기록한다. 범용 배너 프리미티브는
- * `components/v1-ui/primitives.tsx`의 `AlertBanner`(tone: error|info|warning).
- * 이 토글을 위한 안내라면: (a) 홈 화면에 `TournamentRealNameNudgeBanner`를 추가해
- * `V1UserProfile.tournamentRealNameVisible === false`이고 아직 안내를 본 적 없는
- * 사용자에게만 노출 -- 단 `pushNudge`처럼 세션마다 리셋되는 sessionStorage는 "한 번만"
- * 요구사항에 안 맞으므로(로그인마다 다시 뜸) 영구 dismiss는 서버 플래그(예:
- * `V1UserProfile`에 `tournamentRealNameNudgeDismissedAt` 컬럼 추가, 스키마 변경 필요) 또는
- * localStorage(기기 단위라 완벽하진 않지만 스키마 변경 없이 가능)로 가야 한다. (b) 배너
- * CTA는 이 페이지(`/my/settings/tournament-real-name`)로 링크. 실제 구현은 이번 작업
- * 범위 밖 -- 스키마 변경(서버 dismiss 플래그가 필요하다면) 여부를 먼저 사용자에게 확인하고
- * 착수해야 한다.
  */
 export function TournamentRealNameVisibilitySettingsPageClient() {
   const visibility = useV1TournamentRealNameVisibility();
@@ -2190,7 +2179,6 @@ export function WithdrawalPageClient() {
   const [infoOpen, setInfoOpen] = useState(false);
   // #4: 비가역 작업이므로 confirm 모달로 이중 확인한다.
   const { confirm, ConfirmModal } = useConfirm();
-
   const handleWithdraw = () => {
     confirm({
       title: '탈퇴 요청',
@@ -2269,13 +2257,7 @@ export function WithdrawalPageClient() {
             <span className="tm-text-label">탈퇴 사유</span>
             <textarea className="tm-input tm-create-input-multiline" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="선택 입력" />
           </label>
-          {withdrawal.isError ? (
-            <Card pad={16} className="tm-auth-soft-card-error">
-              <div className="tm-text-label">
-                {extractErrorMessage(withdrawal.error, '탈퇴 요청에 실패했어요')}
-              </div>
-            </Card>
-          ) : null}
+          {withdrawal.isError ? <WithdrawalErrorCard error={withdrawal.error} /> : null}
         </div>
       </div>
       <div className="tm-fixed-cta tm-my-withdrawal-cta">

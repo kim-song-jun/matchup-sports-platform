@@ -9,10 +9,8 @@ import {
   useV1RecordConsent,
   useV1UpdateRecordConsent,
 } from '@/hooks/use-v1-api';
-import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
-import { dismissPushNudge, shouldShowPushNudge } from '@/lib/session-storage';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import type { V1ResolveLocationResponse } from '@/types/api';
 import { HomePageView } from './home-page';
@@ -46,38 +44,6 @@ export function HomePageClient() {
     refreshing: weatherRefreshing,
     refresh: refreshWeather,
   } = useCurrentLocationWeather();
-  const pushRegistration = useV1PushRegistration();
-  const [pushNudgeSubscribing, setPushNudgeSubscribing] = useState(false);
-  const [pushNudgeDismissed, setPushNudgeDismissed] = useState(true);
-  useEffect(() => {
-    setPushNudgeDismissed(!shouldShowPushNudge());
-  }, []);
-  const showPushNudge =
-    isAuthenticated &&
-    onboardingCompleted &&
-    !pushNudgeDismissed &&
-    pushRegistration.permission === 'default' &&
-    !pushRegistration.isSubscribed;
-  const pushNudge = showPushNudge
-    ? {
-        subscribing: pushNudgeSubscribing,
-        onSubscribe: () => {
-          setPushNudgeSubscribing(true);
-          void pushRegistration.subscribe().then((subscribed) => {
-            if (subscribed) {
-              dismissPushNudge();
-              setPushNudgeDismissed(true);
-            }
-          }).finally(() => {
-            setPushNudgeSubscribing(false);
-          });
-        },
-        onDismiss: () => {
-          dismissPushNudge();
-          setPushNudgeDismissed(true);
-        },
-      }
-    : undefined;
   // ─── 경기 기록 공개 동의 넛지 (Task 154 P0-3) ────────────────────────────────
   //
   // 노출 조건이 까다로운 이유: 켜도 아무것도 안 보이는 사람에게 조르면 켜고 나서
@@ -146,7 +112,6 @@ export function HomePageClient() {
     phoneVerify: phoneVerifyNudge !== undefined,
     recordConsent: recordConsentNudge !== undefined,
     pendingReviews: pendingReviews.total > 0,
-    push: pushNudge !== undefined,
   });
 
   const chatStatus: HomeViewModel['chatStatus'] = !isAuthenticated ? 'ready' : chatRooms.isPending ? 'loading' : chatRooms.isError ? 'error' : 'ready';
@@ -189,7 +154,6 @@ export function HomePageClient() {
                 weatherPermission,
                 weatherRefreshing,
                 refreshWeather,
-                pushNudge,
                 recordConsentNudge,
                 bannerDecision,
                 phoneVerifyNudge,

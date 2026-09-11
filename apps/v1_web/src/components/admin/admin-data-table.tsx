@@ -228,7 +228,8 @@ export function AdminDataTable<T>({
                   onRowClick
                     ? 'cursor-pointer hover:bg-[var(--surface-soft)]/60 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2'
                     : '',
-                  tone ? ROW_TONE_TR[tone] : '',
+                  // 틴트 지면(#feebec/orange tint) 위 grey600 캡션은 4.0~4.3:1 — grey700으로 올린다.
+                  tone ? 'tm-on-tint ' + ROW_TONE_TR[tone] : '',
                 ].filter(Boolean).join(' ')}
               >
                 {columns.map((col, colIdx) => (
@@ -325,7 +326,7 @@ export function AdminDataTable<T>({
                 onRowClick
                   ? 'cursor-pointer transition-colors hover:bg-[var(--surface-soft)]/60 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2'
                   : '',
-                tone ? ROW_TONE_TR[tone] : '',
+                tone ? 'tm-on-tint ' + ROW_TONE_TR[tone] : '',
                 tone ? ROW_TONE_ACCENT[tone] : '',
               ].filter(Boolean).join(' ')}
             >

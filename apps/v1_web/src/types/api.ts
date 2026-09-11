@@ -2099,6 +2099,7 @@ export type V1Settings = {
   };
   theme: 'light' | 'dark' | 'system';
   notifications: {
+    activityEnabled: boolean;
     matchEnabled: boolean;
     teamEnabled: boolean;
     teamMatchEnabled: boolean;

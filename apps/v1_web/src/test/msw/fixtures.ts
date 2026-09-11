@@ -816,6 +816,7 @@ export const v1SettingsFixture: V1Settings = {
   },
   theme: 'light',
   notifications: {
+    activityEnabled: true,
     matchEnabled: true,
     teamEnabled: true,
     teamMatchEnabled: true,

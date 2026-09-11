@@ -201,6 +201,48 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
     });
   });
 
+  it('연결된 무효 side 참가자는 검증 대상에서 먼저 제외한다', async () => {
+    const { service, prisma } = makeService({
+      teamMatch: { game: { id: 'game-1', version: 8 } },
+      memberships: [{ teamId: 'team-host', role: 'member' }],
+      lineups: [{ id: 'lineup-1', sideId: 's-home', revision: 1, state: 'SUBMITTED', invalidatedAt: null }],
+      participants: [
+        { id: 'p-valid', sideId: 's-home', lineupId: 'lineup-1', displayNameSnapshot: '유효 선수', jerseyNumber: null },
+        { id: 'p-linked-missing-side', sideId: 's-missing-linked', lineupId: 'lineup-1', displayNameSnapshot: '연결됨', jerseyNumber: null },
+      ],
+      sides: [{ id: 's-home', sideKey: 'HOME', displayNameSnapshot: '블루팀' }],
+      linked: [{ participantId: 'p-linked-missing-side' }],
+    });
+
+    await expect(service.listLeagueClaimableParticipants(user, 'league-1', 'tm-1')).resolves.toMatchObject({
+      participants: [expect.objectContaining({ participantId: 'p-valid' })],
+    });
+    expect(prisma.v1GameSide.findMany).toHaveBeenCalledWith({
+      where: { gameId: 'game-1', id: { in: ['s-home'] } },
+      select: { id: true, sideKey: true, displayNameSnapshot: true },
+    });
+  });
+
+  it('모든 후보가 연결되면 side 조회 없이 빈 목록을 반환한다', async () => {
+    const { service, prisma } = makeService({
+      teamMatch: { game: { id: 'game-1', version: 9 } },
+      memberships: [{ teamId: 'team-host', role: 'member' }],
+      lineups: [{ id: 'lineup-1', sideId: 's-missing', revision: 1, state: 'SUBMITTED', invalidatedAt: null }],
+      participants: [
+        { id: 'p-linked', sideId: 's-missing-linked', lineupId: 'lineup-1', displayNameSnapshot: '연결됨', jerseyNumber: null },
+      ],
+      linked: [{ participantId: 'p-linked' }],
+      sides: [],
+    });
+
+    await expect(service.listLeagueClaimableParticipants(user, 'league-1', 'tm-1')).resolves.toEqual({
+      gameId: 'game-1',
+      version: 9,
+      participants: [],
+    });
+    expect(prisma.v1GameSide.findMany).not.toHaveBeenCalled();
+  });
+
   it('참가자 side가 없으면 조용히 라벨을 추측하지 않고 무결성 충돌을 반환한다', async () => {
     const { service } = makeService({
       teamMatch: { game: { id: 'game-1', version: 7 } },

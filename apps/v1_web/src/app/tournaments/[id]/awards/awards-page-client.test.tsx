@@ -4,15 +4,42 @@ import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { V1TournamentDetail } from '@/types/api';
+import type { V1LeaguePlayerRecordRow } from '@/types/league-match';
 import { AwardsPageClient, ReviewFormModal } from './awards-page-client';
 
 const awardsApiMocks = vi.hoisted(() => ({
   useV1Tournament: vi.fn(),
+  useV1LeagueMatchPlayerRecords: vi.fn((_leagueId: string) => ({
+    data: {
+      leagueId: 'tournament-1',
+      goals: [] as V1LeaguePlayerRecordRow[],
+      assists: [] as V1LeaguePlayerRecordRow[],
+    },
+    isLoading: false,
+    isPending: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+  usePublicTournamentPlayerRecords: vi.fn((_tournamentId: string, _options?: { enabled?: boolean }) => ({
+    data: { goals: [], assists: [] },
+    isLoading: false,
+    isPending: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
 }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/hooks/use-v1-api')>()),
   ...awardsApiMocks,
+}));
+
+vi.mock('@/components/public-game-records/use-public-game-records', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/public-game-records/use-public-game-records')>()),
+  usePublicTournamentPlayerRecords: (tournamentId: string, options?: { enabled?: boolean }) =>
+    awardsApiMocks.usePublicTournamentPlayerRecords(tournamentId, options),
 }));
 
 vi.mock('@/lib/analytics', () => ({
@@ -118,6 +145,26 @@ describe('AwardsPageClient GA events', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    awardsApiMocks.usePublicTournamentPlayerRecords.mockReturnValue({
+      data: { goals: [], assists: [] },
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    awardsApiMocks.useV1LeagueMatchPlayerRecords.mockReturnValue({
+      data: {
+        leagueId: 'tournament-1',
+        goals: [] as V1LeaguePlayerRecordRow[],
+        assists: [] as V1LeaguePlayerRecordRow[],
+      },
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
     awardsApiMocks.useV1Tournament.mockReturnValue({
       data: makeCompletedTournament(),
       isLoading: false,
@@ -155,6 +202,48 @@ describe('AwardsPageClient GA events', () => {
 
     expect(trackEvent).toHaveBeenCalledWith('tournament_share', { channel: 'clipboard' });
     expect(writeTextMock).toHaveBeenCalled();
+  });
+});
+
+describe('AwardsPageClient — regular league player records endpoint', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    awardsApiMocks.usePublicTournamentPlayerRecords.mockReturnValue({
+      data: { goals: [], assists: [] },
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({ kind: 'regular_league' }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    awardsApiMocks.useV1LeagueMatchPlayerRecords.mockReturnValue({
+      data: {
+        leagueId: 'tournament-1',
+        goals: [{ userId: 'user-1', nickname: '리그 득점자', goals: 3, assists: 0 }],
+        assists: [{ userId: 'user-2', nickname: '리그 도움자', goals: 0, assists: 2 }],
+      },
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('uses the league player-records query and does not enable the tournament query', () => {
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    expect(awardsApiMocks.useV1LeagueMatchPlayerRecords).toHaveBeenCalledWith('tournament-1');
+    expect(awardsApiMocks.usePublicTournamentPlayerRecords).toHaveBeenCalledWith('tournament-1', { enabled: false });
+    expect(screen.getByText('리그 득점자')).toBeInTheDocument();
+    expect(screen.getByText('리그 도움자')).toBeInTheDocument();
   });
 });
 

@@ -42,6 +42,7 @@ describe('AuthService.appleSignIn', () => {
   beforeEach(async () => {
     prisma = buildPrismaMock();
     jest.clearAllMocks();
+    prisma.v1User.updateMany.mockResolvedValue({ count: 1 });
     (prisma.$transaction as jest.Mock).mockImplementation((arg: unknown) =>
       typeof arg === 'function'
         ? (arg as (tx: typeof prisma) => Promise<unknown>)(prisma)
@@ -126,10 +127,12 @@ describe('AuthService.appleSignIn', () => {
     expect(prisma.v1User.create.mock.calls[0][0].data.email).toBe('zzz@privaterelay.appleid.com');
   });
 
-  it('links to an existing account when Apple vouches for the same address', async () => {
+  it('links to an existing account when Apple vouches for it AND we verified that address ourselves', async () => {
     appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
     prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
-    prisma.v1User.findUnique.mockResolvedValue({ id: 'user-9', email: 'someone@example.com', accountStatus: 'active' });
+    prisma.v1User.findUnique.mockResolvedValue({
+      id: 'user-9', email: 'someone@example.com', accountStatus: 'active', emailVerifiedAt: new Date('2026-01-01'),
+    });
 
     await signIn();
 
@@ -137,6 +140,60 @@ describe('AuthService.appleSignIn', () => {
     expect(prisma.v1AuthIdentity.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ userId: 'user-9', provider: V1AuthProvider.apple }) }),
     );
+    expect(prisma.v1User.create).not.toHaveBeenCalled();
+  });
+
+  it('does not create an Apple identity when the candidate changes before the transaction re-read', async () => {
+    appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+    prisma.v1User.findUnique
+      .mockResolvedValueOnce({
+        id: 'user-9', email: 'someone@example.com', accountStatus: 'active', emailVerifiedAt: new Date('2026-01-01'),
+      })
+      .mockResolvedValueOnce({
+        id: 'user-9', email: 'changed@example.com', accountStatus: 'active', emailVerifiedAt: new Date('2026-01-01'),
+      });
+
+    await expect(signIn()).rejects.toMatchObject({
+      response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL' },
+    });
+    expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+  });
+
+  it('does not create an Apple identity when the guarded candidate claim affects zero rows', async () => {
+    appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'Someone@Example.com' }));
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+    prisma.v1User.findUnique.mockResolvedValue({
+      id: 'user-9', email: 'someone@example.com', accountStatus: 'active', emailVerifiedAt: new Date('2026-01-01'),
+    });
+    prisma.v1User.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(signIn()).rejects.toMatchObject({
+      response: { code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL' },
+    });
+    expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Account pre-hijacking. Apple's `email_verified` proves the address is theirs, not that the
+   * account holding it here is. `PATCH /me/profile` takes an email with no ownership proof and
+   * sets emailVerifiedAt to null, so an attacker can park a victim's Apple address on their own
+   * account and wait. Without this gate the victim's FIRST Apple sign-in lands in that account.
+   */
+  it('refuses to link when we never verified that address ourselves', async () => {
+    appleIdentity.verifyIdentityToken.mockResolvedValue(claims({ email: 'victim@example.com' }));
+    prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+    prisma.v1User.findUnique.mockResolvedValue({
+      id: 'attacker-1', email: 'victim@example.com', accountStatus: 'active', emailVerifiedAt: null,
+    });
+
+    await expect(signIn()).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL' }),
+    });
+
+    // Neither outcome may happen: no identity attached to the squatting account, and no second
+    // account either — V1User.email is unique, so a silent fall-through would be a 500.
+    expect(prisma.v1AuthIdentity.create).not.toHaveBeenCalled();
     expect(prisma.v1User.create).not.toHaveBeenCalled();
   });
 

@@ -18,6 +18,27 @@ describe('UpdateProfileDto', () => {
     await expect(validate(dto)).resolves.toHaveLength(0);
   });
 
+  /**
+   * 이 검증이 사라지면 남의 주소를 계정에 심어 두는 비용이 0 이 된다. 근본 차단은 소셜 링크
+   * 쪽 게이트(auth.service.ts 의 assertLinkableByEmail)이지만, 형식조차 안 보면 그 게이트가
+   * 막아야 할 시도 자체가 늘어난다.
+   */
+  it('rejects an email that is not an address', async () => {
+    for (const email of ['not-an-email', 'a@', '@example.com', 'a b@example.com']) {
+      const dto = plainToInstance(UpdateProfileDto, { nickname: '러너01', gender: 'female', email });
+      const errors = await validate(dto);
+      expect(errors.some((error) => error.property === 'email')).toBe(true);
+    }
+  });
+
+  it('still accepts a real address, and null to clear it', async () => {
+    for (const email of ['runner@example.com', null]) {
+      const dto = plainToInstance(UpdateProfileDto, { nickname: '러너01', gender: 'female', email });
+      const errors = await validate(dto);
+      expect(errors.some((error) => error.property === 'email')).toBe(false);
+    }
+  });
+
   it('rejects a missing gender', async () => {
     const dto = plainToInstance(UpdateProfileDto, { nickname: '러너01' });
     const errors = await validate(dto);

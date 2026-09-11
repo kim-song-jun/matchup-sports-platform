@@ -17,15 +17,15 @@
 | POST | `/auth/login` | No | 이메일 로그인 |
 | POST | `/auth/dev-login` | No | 개발용 로그인 |
 | POST | `/auth/kakao` | No | 카카오 로그인 |
-| POST | `/auth/naver` | No | 네이버 로그인 |
 | POST | `/auth/apple` | No | 애플 로그인 |
+| POST | `/auth/apple/nonce` | No | 애플 nonce 발급 |
 | POST | `/auth/refresh` | No | 토큰 재발급 |
 | GET | `/auth/me` | Yes | 현재 사용자 조회 |
 | DELETE | `/auth/withdraw` | Yes | 탈퇴 |
 
 ## 공통 성공 응답 shape
 
-인증 성공 계열 endpoint(`register`, `login`, `dev-login`, `kakao`, `naver`, 일부 provider fallback 경로)는 `data` 안에 아래 shape를 반환한다.
+인증 성공 계열 endpoint(`register`, `login`, `dev-login`, `kakao`, `apple`)는 `data` 안에 아래 shape를 반환한다.
 
 ```json
 {
@@ -94,7 +94,7 @@
   - 로컬 개발/E2E/bootstrap 전용
   - 사용자-facing production flow에 절대 포함하지 않는다.
 
-## POST /auth/kakao, /auth/naver, /auth/apple
+## POST /auth/kakao
 
 - Body
 
@@ -105,9 +105,53 @@
 
 CAUTION:
 
-- `apple`은 현재 service에서 미구현 경로로 `401` 에러 가능
-- `kakao/naver`는 env 미구성 시 mock profile로 fallback 가능
+- `kakao`는 env 미구성 시 mock profile로 fallback 가능
 - 프론트는 provider별 성공/실패 copy를 분리하되, 최종 payload 저장 shape는 동일하게 처리한다.
+
+> **네이버는 엔드포인트가 없다.** `V1AuthProvider` enum 에 `naver` 값이 남아 있어 있는 것처럼
+> 보이지만 라우트도 서비스 코드도 없다(컨트롤러는 kakao·apple 둘뿐). 로그인 화면의 네이버
+> 버튼이 «준비 중» 으로 비활성인 것도 그래서다. 이 문서는 오랫동안 `/auth/naver` 를 있는
+> 것처럼 적고 있었다 — 그대로 붙이면 404 다.
+
+## POST /auth/apple/nonce, POST /auth/apple
+
+애플은 OAuth code 흐름이 아니다. 애플이 자기 웹 흐름을 임베디드 브라우저에서 막기 때문에,
+네이티브 셸이 시트를 띄우고 **identity token** 을 돌려주는 경로만 쓴다. 그래서 body 도
+`code` 가 아니다.
+
+- `POST /auth/apple/nonce` — body 없음. `{ nonce }` 를 돌려준다(서명된 단발 값, 5분).
+  앱은 이 값을 **SHA-256 해서** 애플 요청에 싣는다. 애플이 받은 문자열을 그대로 되돌려주므로
+  서버는 같은 해시로 대조한다 — 원문을 실으면 서버가 해시와 평문을 비교하게 되어 전부 거절된다.
+
+- `POST /auth/apple`
+
+| 필드 | 타입 | 필수 | 비고 |
+|---|---|---|---|
+| `identityToken` | string | Yes | 애플이 준 JWT. 최소 20자 |
+| `nonce` | string | Yes | 위에서 받은 **원문** nonce |
+| `fullName` | string | No | 애플은 **최초 1회만** 준다. 그때 안 보내면 영영 못 받는다 |
+
+실패:
+
+| 상태 | 코드 | 뜻 |
+|---|---|---|
+| 400 | `VALIDATION_ERROR` | body 형식 |
+| 401 | `APPLE_SIGN_IN_FAILED` | 토큰·nonce 검증 실패(서명·발급자·audience·만료·nonce 불일치) |
+| 403 | `PERMISSION_DENIED` | 계정 상태가 로그인 불가 |
+| 409 | `SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL` | 아래 참조 |
+| 503 | `APPLE_SIGN_IN_NOT_CONFIGURED` | `APPLE_SIGN_IN_AUDIENCES` 미설정, 또는 `V1_SESSION_SECRET` 이 32자 미만 |
+
+### 409 SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL (kakao·apple 공통)
+
+같은 이메일을 쓰는 계정이 이미 있는데 우리 계정의 이메일 인증이 끝나지 않았거나,
+Kakao 응답의 `is_email_valid`와 `is_email_verified`가 모두 true가 아닐 때 난다.
+제공자 이메일 플래그와 우리 계정의 `emailVerifiedAt`을 함께 확인하지 않으면 남의 계정을
+흡수하게 된다 — account pre-hijacking. 이미 연결된 provider identity의 ID 로그인은 이
+연결 게이트를 다시 거치지 않는다.
+
+**사용자 대응**: 기존 방법(이메일·비밀번호 또는 다른 소셜)으로 로그인해 **이메일 인증을 마친 뒤**
+다시 시도한다. 프론트는 이 코드에 «인증을 마쳐 달라» 는 안내를 붙이고, 로그인 화면으로
+되돌리지 말 것 — 같은 자리에서 다시 눌러도 같은 409 가 난다.
 
 ## POST /auth/refresh
 

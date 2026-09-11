@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateProfileDto {
@@ -19,8 +19,11 @@ export class UpdateProfileDto {
   nickname!: string;
 
   @IsOptional()
-  @IsString()
-  @MinLength(3)
+  // @IsEmail 이 없어서 임의의 문자열이 그대로 들어갔다. 근본 방어는 소셜 링크 쪽 게이트지만
+  // (auth.service.ts 의 assertLinkableByEmail), 주소 모양조차 검사하지 않으면 남의 주소를
+  // 심어 두는 비용이 0 이다. 소유 증명은 여전히 없고 — 바꾸면 emailVerifiedAt 이 null 이 되어
+  // 그 계정은 소셜 흡수 대상에서 빠진다.
+  @IsEmail()
   @MaxLength(320)
   email?: string | null;
 

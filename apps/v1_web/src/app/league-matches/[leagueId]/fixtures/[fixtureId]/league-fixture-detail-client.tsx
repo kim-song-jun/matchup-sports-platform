@@ -187,6 +187,16 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
     viewer?.manageableHostTeam === true ||
     viewer?.manageableOpponentTeam === true ||
     viewer?.participantMember === true;
+  // Claiming a record is an authenticated participant action.  Keep the
+  // affordance hidden while the viewer scope is loading or unavailable so a
+  // stale/outsider view cannot open a modal that the API will reject with 403.
+  const canClaimMyRecord =
+    recordQuery.data?.gameId !== null &&
+    recordQuery.data?.gameId !== undefined &&
+    teamMatchQuery.data !== undefined &&
+    !teamMatchQuery.isPending &&
+    !teamMatchQuery.isError &&
+    isParticipant;
   // 서버 assertCanUseTeamMatchChat(chat.service.ts)과 정확히 같은 기준으로 바꾼다 — 양 팀
   // owner/manager. 예전엔 host_team/approved(=신청서를 낸 사람 한 명)만 봐서, 리그 대진의
   // 신청서를 운영자가 대신 내는 원정팀 owner/manager는 canChat이 영원히 false였다(alpha
@@ -234,7 +244,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
           {/* 대회 경기 상세와 같은 "내 기록 연결" 배너 (claim 의 리그 판). 기록 본문이
               뜨는 경우에만 싣는다 — 게임 미공개(404 폴백) 대진은 연결할 기록 자체가
               화면에 없어 배너가 맥락을 잃는다. 조회는 모달을 연 뒤에만 나간다. */}
-          <LeagueClaimMyRecordSection leagueId={leagueId} teamMatchId={fixtureId} />
+          {canClaimMyRecord ? <LeagueClaimMyRecordSection leagueId={leagueId} teamMatchId={fixtureId} /> : null}
           {/* 리그 고유 문맥 — 대회 본문에는 없는 순위·전적. 팀 상세로 가는 통로이기도 하다. */}
           {(recordLine(homeRow) || recordLine(awayRow)) && (
             <Card pad={16}>

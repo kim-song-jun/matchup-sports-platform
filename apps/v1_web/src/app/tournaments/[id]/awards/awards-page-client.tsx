@@ -920,8 +920,9 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
             {/* 개인 어워드 */}
             <IndividualAwardsSection tournament={tournament} />
 
-            {/* 개인 기록 랭킹 (STATS-1) */}
-            <PlayerRecordsSection tournamentId={tournament.id} />
+            {/* 개인 기록 랭킹 (STATS-1) — 정규 리그 시즌 거울 행은 대회 축 게임이 없어
+                이 API가 항상 404다(tournament-surface-kind.integration-spec.ts 계약). */}
+            {tournament.kind !== 'regular_league' && <PlayerRecordsSection tournamentId={tournament.id} />}
 
             {/* 참가팀 후기 */}
             <ReviewsSection tournament={tournament} />
@@ -933,7 +934,7 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
         /* 상금 정보가 없는 대회는 2열 그리드 대신 전체 폭 단일 컬럼으로 — 빈 좌측 트랙이 생기지 않도록 */
         <div className="tm-tourn-hero-full" style={{ padding: '0 20px' }}>
           <IndividualAwardsSection tournament={tournament} />
-          <PlayerRecordsSection tournamentId={tournament.id} />
+          {tournament.kind !== 'regular_league' && <PlayerRecordsSection tournamentId={tournament.id} />}
             <ReviewsSection tournament={tournament} />
         </div>
       )}

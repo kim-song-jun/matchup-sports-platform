@@ -104,7 +104,12 @@ function validateNode(
     state.textParts.push(node.text);
     return;
   }
-  if (node.marks || node.text !== undefined) throw invalidContent(`${node.type} 노드 구조가 올바르지 않아요.`);
+  if (node.type === 'hardBreak') {
+    if (node.text !== undefined) throw invalidContent(`${node.type} 노드 구조가 올바르지 않아요.`);
+    validateMarks(node.marks);
+  } else if (node.marks || node.text !== undefined) {
+    throw invalidContent(`${node.type} 노드 구조가 올바르지 않아요.`);
+  }
 
   if (node.type === 'hardBreak') {
     if (node.content) throw invalidContent('줄바꿈 노드에는 하위 내용을 둘 수 없어요.');

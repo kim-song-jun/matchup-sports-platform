@@ -147,6 +147,39 @@ describe('rich content contract', () => {
     ]);
   });
 
+  it('accepts marks retained by Tiptap on a hard break', () => {
+    const result = normalizeRichContent({
+      type: 'doc',
+      content: [{
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: 'Bold line', marks: [{ type: 'bold' }] },
+          { type: 'hardBreak', marks: [{ type: 'bold' }] },
+          { type: 'text', text: 'Next line', marks: [{ type: 'bold' }] },
+        ],
+      }],
+    });
+
+    expect(result.plainText).toBe('Bold line\nNext line');
+    expect(result.document.content[0].content?.[1]).toEqual({
+      type: 'hardBreak',
+      marks: [{ type: 'bold' }],
+    });
+  });
+
+  it('still rejects unsupported marks retained on a hard break', () => {
+    expect(() => normalizeRichContent({
+      type: 'doc',
+      content: [{
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: 'Visible content' },
+          { type: 'hardBreak', marks: [{ type: 'code' }] },
+        ],
+      }],
+    })).toThrow(BadRequestException);
+  });
+
   it.each([
     { type: 'doc', content: [null] },
     { type: 'doc', content: [{ type: 'paragraph', content: null }] },

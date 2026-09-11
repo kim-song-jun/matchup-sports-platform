@@ -224,7 +224,7 @@ export function LeagueManualFixtureModal({
         <button
           type="button"
           onClick={() => void submit()}
-          className="tm-btn tm-btn-md tm-btn-primary flex-1"
+          className="tm-btn tm-btn-md tm-btn-primary flex-1 [--button-fill-primary:var(--static-blue)] [--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]"
           style={{ minHeight: 44 }}
           disabled={isSubmitting}
         >

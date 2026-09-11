@@ -30,7 +30,7 @@ shell around our own web application, and the shell provides functionality the w
 - Remote push notifications over APNs (match approvals, game start, team chat), including
   when the app is backgrounded or terminated.
 - Sign in with Apple, presented natively with ASAuthorizationController.
-- Universal Links, so a shared match or tournament link opens the app rather than Safari.
+- Native handling of sign-in redirects through Universal Links.
 - Session restoration across app launches, native keyboard handling and safe-area layout.
 
 The app can be browsed without an account ("로그인 없이 시작하기" on the first screen), so a
@@ -90,10 +90,14 @@ node scripts/ios/compose-store-captions.mjs <위 스크립트가 만든 디렉�
 
 ## 6. Apple Developer / App Store Connect — 사용자 작업
 
-1. **App ID `kr.co.teameet`**: Push Notifications 와 **Sign In with Apple** capability 를 켠다.
+1. ~~**App ID `kr.co.teameet`**: Push Notifications 와 **Sign In with Apple** capability 를 켠다.~~
+   **완료(2026-09-08)** — `APPLE_ID_AUTH` 를 `PRIMARY_APP_CONSENT` 로 켜고 배포 프로파일
+   `Teameet Production App Store` 를 발급했다. 실측: `com.apple.developer.applesignin =
+   ['Default']`, `aps-environment = production`. 아래 원문은 다시 해야 할 때를 위해 남긴다.
    Sign In with Apple 이 꺼져 있으면 프로비저닝 프로파일이 `com.apple.developer.applesignin`
    엔타이틀먼트를 주지 않고, 앱에서 시트가 오류 1000 으로 실패한다.
-2. **배포 프로파일** 재발급(엔타이틀먼트가 늘었으므로): `scripts/ios/asc-profile.mjs`.
+2. ~~**배포 프로파일** 재발급(엔타이틀먼트가 늘었으므로): `scripts/ios/asc-profile.mjs`.~~
+   **완료(2026-09-08)** — 위 1번과 함께.
 3. **App Store Connect 앱 레코드** 생성 — 현재 "팀밋 알파" 하나뿐이다.
 4. 연령 등급·가격·판매 지역·카테고리, 개인정보 URL(`https://teameet.co.kr/terms?document=privacy`).
 5. **App Privacy(영양성분표)**: 수집 항목은 이메일·이름·휴대폰·위치(활동 지역)·사용자 콘텐츠
@@ -105,6 +109,28 @@ node scripts/ios/compose-store-captions.mjs <위 스크립트가 만든 디렉�
 2. **사용자**가 `dev → main` 승격 → 프로덕션 배포 승인 → 배포 확인.
    - 마이그레이션이 한 번에 여러 개 적용된다. 배포 후 `/api/v1/health` 와 주요 화면을 확인한다.
    - `APPLE_SIGN_IN_AUDIENCES` 는 compose 에 리터럴로 있으므로 별도 시크릿 등록이 없다.
-3. 프로덕션 빌드 아카이브·업로드(`scripts/ios/archive-and-export.sh --upload`,
-   `TEAMEET_ARCHIVE_SCHEME=TeameetProduction`).
+3. 프로덕션 빌드 아카이브·업로드:
+
+   ```bash
+   TEAMEET_ARCHIVE_SCHEME=TeameetProduction scripts/ios/archive-and-export.sh --upload
+   ```
+
+   스킴만 주면 된다 — 설정(`Production Release`)과 프로파일(`Teameet Production App Store`)은
+   스크립트가 스킴에서 파생한다. 예전에는 둘 다 alpha 값으로 고정돼 있어서 이 명령이
+   **alpha 앱을 만들어 업로드했다**(번들 `kr.co.teameet.alpha`, alpha 오리진,
+   `aps-environment=development`). 모든 게이트가 통과했다 — 올바르게 만들어진 alpha 빌드를
+   보고 있었으니까. 증상은 빌드가 App Store Connect 의 엉뚱한 앱 아래에 얹히는 것뿐이었고,
+   그때는 이미 되돌릴 수 없는 업로드가 끝난 뒤다.
+
+   확인하고 싶으면 빌드 전에:
+
+   ```bash
+   xcodebuild -project apps/v1_ios/Teameet.xcodeproj -scheme TeameetProduction \
+     -configuration "Production Release" -showBuildSettings | grep PRODUCT_BUNDLE_IDENTIFIER
+   # → kr.co.teameet
+   ```
 4. 스크린샷 촬영 → 메타데이터 입력 → 심사 제출.
+
+## Archive target safety
+
+`scripts/ios/archive-and-export.sh` binds each scheme to its matching configuration, provisioning profile, and bundle identifier. Configuration/profile overrides that do not match the scheme are rejected before `xcodebuild`; the exported bundle identifier is checked again before upload.

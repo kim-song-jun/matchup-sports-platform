@@ -22,12 +22,43 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 IOS_DIR="$REPO_ROOT/apps/v1_ios"
 SCHEME="${TEAMEET_ARCHIVE_SCHEME:-TeameetAlpha}"
-CONFIGURATION="${TEAMEET_ARCHIVE_CONFIGURATION:-Alpha Release}"
+
+# Configuration and profile follow the SCHEME. They used to default to the alpha pair no
+# matter which scheme was named, and `-configuration` overrides whatever the scheme would have
+# chosen — so the documented production command
+#
+#   TEAMEET_ARCHIVE_SCHEME=TeameetProduction scripts/ios/archive-and-export.sh --upload
+#
+# built, signed, exported and **uploaded** an alpha app: bundle kr.co.teameet.alpha, pointing
+# at alpha.teameet.co.kr, with aps-environment=development. Every gate passed, because every
+# gate was looking at a correctly built alpha build. The only symptom was the build landing
+# under the wrong app in App Store Connect, one irreversible upload later.
+case "$SCHEME" in
+  TeameetAlpha)      SCHEME_CONFIGURATION="Alpha Release";      SCHEME_PROFILE="Teameet Alpha App Store";      EXPECTED_BUNDLE_ID="kr.co.teameet.alpha" ;;
+  TeameetProduction) SCHEME_CONFIGURATION="Production Release"; SCHEME_PROFILE="Teameet Production App Store"; EXPECTED_BUNDLE_ID="kr.co.teameet" ;;
+  *)
+    echo "[archive] Unknown scheme '$SCHEME'. Expected TeameetAlpha or TeameetProduction." >&2
+    echo "[archive] A scheme this script does not know cannot be given a configuration or a" >&2
+    echo "[archive] profile, and guessing produces a signed build for the wrong app." >&2
+    exit 1
+    ;;
+esac
+
+CONFIGURATION="${TEAMEET_ARCHIVE_CONFIGURATION:-$SCHEME_CONFIGURATION}"
 OUTPUT="${TEAMEET_ARCHIVE_OUTPUT:-${TMPDIR:-/tmp}/teameet-ios-archive}"
 UPLOAD=false
 TEAM_ID="${TEAMEET_TEAM_ID:-U9J95Q6XD3}"
 SIGNING_IDENTITY="${TEAMEET_SIGNING_IDENTITY:-Apple Distribution}"
-PROFILE_NAME="${TEAMEET_PROFILE_NAME:-Teameet Alpha App Store}"
+PROFILE_NAME="${TEAMEET_PROFILE_NAME:-$SCHEME_PROFILE}"
+
+# Configuration and profile identify the signed app just as strongly as the scheme. They are
+# intentionally immutable per scheme: accepting an override can produce a correctly signed,
+# correctly entitled binary for the wrong App Store record.
+if [[ "$CONFIGURATION" != "$SCHEME_CONFIGURATION" || "$PROFILE_NAME" != "$SCHEME_PROFILE" ]]; then
+  echo "[archive] configuration/profile do not match scheme $SCHEME." >&2
+  echo "[archive] expected '$SCHEME_CONFIGURATION' / '$SCHEME_PROFILE'; got '$CONFIGURATION' / '$PROFILE_NAME'." >&2
+  exit 1
+fi
 [[ "${1:-}" == "--upload" ]] && UPLOAD=true
 
 # --- build number ------------------------------------------------------------------------
@@ -108,6 +139,14 @@ trap 'rm -rf "$GATE_DIR"' EXIT
 unzip -q "$IPA" -d "$GATE_DIR"
 GATE_APP="$(find "$GATE_DIR/Payload" -maxdepth 1 -name "*.app" | head -1)"
 [[ -n "$GATE_APP" ]] || { echo "[archive] no .app inside the .ipa" >&2; exit 1; }
+# Validate the exported product identity before any upload decision. Entitlements alone do not
+# prove that a production build was exported from the production target.
+BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$GATE_APP/Info.plist" 2>/dev/null || true)"
+if [[ "$BUNDLE_ID" != "$EXPECTED_BUNDLE_ID" ]]; then
+  echo "[archive] exported bundle id '$BUNDLE_ID' does not match scheme $SCHEME ('$EXPECTED_BUNDLE_ID')." >&2
+  exit 1
+fi
+echo "[archive] exported bundle id: $BUNDLE_ID"
 GATE_PLIST="$(codesign -d --entitlements :- "$GATE_APP" 2>/dev/null || true)"
 MISSING=()
 for key in "${REQUIRED_ENTITLEMENTS[@]}"; do

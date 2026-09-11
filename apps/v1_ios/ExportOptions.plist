@@ -28,10 +28,18 @@
 	<key>signingCertificate</key>
 	<string>Apple Distribution</string>
 
+	<!--
+	  Both bundles are listed. Export only reads the entry for the bundle it is exporting, so
+	  carrying both is free — and the alternative was worse: with only the alpha entry here,
+	  a correctly configured production archive still failed at export, which made the
+	  production path unreachable no matter what the runbook said.
+	-->
 	<key>provisioningProfiles</key>
 	<dict>
 		<key>kr.co.teameet.alpha</key>
 		<string>Teameet Alpha App Store</string>
+		<key>kr.co.teameet</key>
+		<string>Teameet Production App Store</string>
 	</dict>
 
 	<!-- Symbols let App Store Connect symbolicate crash reports from testers. -->

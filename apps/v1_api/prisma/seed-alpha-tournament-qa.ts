@@ -1,6 +1,7 @@
 import {
   Prisma,
   PrismaClient,
+  V1CompetitionKind,
   V1GameState,
   V1TeamMatchStatus,
   V1TournamentRegistrationStatus,
@@ -9,7 +10,7 @@ import {
 // 같은 `prisma/` 폴더 안의 모듈이라 프로덕션 이미지에도 함께 복사된다 — 아래 경고가 금지하는
 // 건 이 이미지에 없는 `../src/...` import 다.
 import { seedAlphaQaSquads } from './seed-alpha-qa-squads';
-import { deterministicCanonicalMatchId, ensureCanonicalOfficialResult, ensureCanonicalTournamentMatch } from './canonical-tournament-seed';
+import { deterministicCanonicalMatchId, ensureCanonicalOfficialResult, ensureCanonicalTournamentMatch, findTournamentOnSurfaceOrThrow } from './canonical-tournament-seed';
 
 // canonical 풋살 competition config 의 id.
 //
@@ -556,7 +557,7 @@ export async function createCompetitionData(
   competitionConfigVersionId: string,
   sportId?: string,
 ) {
-  const resolvedSportId = sportId ?? (await tx.v1Tournament.findUnique({ where: { id: scenario.id }, select: { sportId: true } }))?.sportId;
+  const resolvedSportId = sportId ?? (await findTournamentOnSurfaceOrThrow(tx, [V1CompetitionKind.regular_tournament], scenario.id)).sportId;
   if (!resolvedSportId) throw new Error(`Tournament ${scenario.id} has no sport for canonical seed matches.`);
   const group = await tx.v1TournamentGroup.upsert({
     where: { tournamentId_name: { tournamentId: scenario.id, name: 'A조' } },

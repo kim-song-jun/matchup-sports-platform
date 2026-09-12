@@ -362,7 +362,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
               style={{
                 margin: '8px auto 0',
                 maxWidth: '28rem',
-                fontSize: 14,
+                fontSize: 'var(--font-size-body-sm)',
                 color: 'var(--text-caption)',
                 textAlign: 'center',
                 wordBreak: 'keep-all',

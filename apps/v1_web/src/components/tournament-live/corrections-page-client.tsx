@@ -126,12 +126,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
         {boardQuery.isSuccess ? (
           <>
           <ResultReviewGridStyles />
-          <style>{`
-            @media (max-width: 1023px) {
-              .tm-corrections-result-review-grid { grid-template-columns: minmax(0, 1fr); }
-            }
-          `}</style>
-          <div className="tm-result-review-grid tm-corrections-result-review-grid">
+          <div className="tm-result-review-grid tm-result-review-grid--corrections">
             <FixturePickerList
               items={hasOfficialResult}
               teamNamesByFixtureId={teamNamesByFixtureId}

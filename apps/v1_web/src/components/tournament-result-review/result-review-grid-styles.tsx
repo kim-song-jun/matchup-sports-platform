@@ -17,6 +17,10 @@ const GRID_STYLES = `
 @media (min-width: 768px) {
   .tm-result-review-grid { grid-template-columns: minmax(240px, 320px) 1fr; align-items: start; }
 }
+.tm-result-review-grid--corrections { grid-template-columns: 1fr; }
+@media (min-width: 1024px) {
+  .tm-result-review-grid--corrections { grid-template-columns: minmax(240px, 320px) 1fr; }
+}
 `;
 
 export function ResultReviewGridStyles() {

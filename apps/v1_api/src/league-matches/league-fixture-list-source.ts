@@ -26,7 +26,7 @@ import { resolveIsForfeit } from './league-forfeit-result';
 export type LeagueFixtureListRow = {
   id: string;
   title: string;
-  hostTeamId: string;
+  hostTeamId: string | null;
   approvedApplicantTeamId: string | null;
   startAt: Date;
   placeName: string;
@@ -84,7 +84,7 @@ export function toLeagueFixtureList(
       title: fixture.title,
       homeTeamId: fixture.hostTeamId,
       awayTeamId: fixture.approvedApplicantTeamId,
-      homeAssigned: true,
+      homeAssigned: fixture.hostTeamId !== null,
       awayAssigned: fixture.approvedApplicantTeamId !== null,
       startAt: fixture.startAt,
       placeName: fixture.placeName,

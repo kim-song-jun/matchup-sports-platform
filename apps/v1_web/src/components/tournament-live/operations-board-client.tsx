@@ -431,7 +431,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
               <button
                 type="button"
                 onClick={() => setExpandedGameId(null)}
-                className="min-h-11 px-3 rounded-lg border border-[var(--border)] text-sm text-[var(--text-body)] hover:bg-[var(--card-surface)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="min-h-11 px-3 rounded-lg border border-[var(--border)] text-[length:var(--font-size-body-sm)] text-[var(--text-body)] hover:bg-[var(--card-surface)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 {resultCloseLabel}
               </button>

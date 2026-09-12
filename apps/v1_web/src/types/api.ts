@@ -4342,7 +4342,20 @@ export type V1MyTournamentStaffAssignment = {
 };
 
 /** GET /me/tournament-staff 응답의 items[] 항목 — 대회 단위로 묶은 "내 담당 대회". */
-export type V1MyTournamentStaffFixture = { fixtureId: string; gameId: string; tournamentId: string; title: string; scheduledAt: string | null; status: string; gameState: V1GameState | null; round: string; fixtureNumber: number; legNumber: number; fieldId: string | null; fieldName: string | null; };
+export type V1MyTournamentStaffFixture = {
+  fixtureId: string;
+  gameId: string;
+  tournamentId: string;
+  title: string;
+  scheduledAt: string | null;
+  status: string;
+  gameState: V1GameState | null;
+  round: string;
+  fixtureNumber: number;
+  legNumber: number;
+  fieldId: string | null;
+  fieldName: string | null;
+};
 
 export type V1MyTournamentStaffGroup = {
   tournamentId: string;

@@ -70,7 +70,7 @@ function ScheduleResultBadge({ entry }: { entry: PublicScheduleEntry }) {
         fontWeight: 700,
         color: tone,
         background: bg,
-        borderRadius: 6,
+        borderRadius: 'var(--radius-chip)',
         padding: '2px 8px',
       }}
     >
@@ -323,7 +323,7 @@ function LineupStatusBadge({ lineupState }: { lineupState: GameLineupState | nul
         ? { label: '라인업 작성 중', color: 'var(--orange700)', background: 'var(--orange50)' }
         : { label: '라인업 제출 완료', color: 'var(--blue700)', background: 'var(--blue50)' };
   return (
-    <span style={{ fontSize: 12, fontWeight: 700, color, background, borderRadius: 6, padding: '2px 8px' }}>
+    <span style={{ fontSize: 12, fontWeight: 700, color, background, borderRadius: 'var(--radius-chip)', padding: '2px 8px' }}>
       {label}
     </span>
   );
@@ -366,7 +366,7 @@ function ScheduleRow({
     >
       {myFixture ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-          <span
+          <span className="tm-on-tint"
             style={{
               fontSize: 12,
               fontWeight: 800,
@@ -375,7 +375,7 @@ function ScheduleRow({
               // 왼쪽 액센트 바 둘뿐이다 — 배지가 파랗게 떠야 "우리 팀"이 눈에 걸린다.
               // 예전처럼 카드 표면색(흰색)으로 두면 중립 배경 위에서 배지 윤곽이 사라진다.
               background: 'var(--blue50)',
-              borderRadius: 6,
+              borderRadius: 'var(--radius-chip)',
               padding: '2px 8px',
             }}
           >
@@ -845,7 +845,7 @@ export function ScheduleContent({
         <div
           style={{
             padding: '12px 16px',
-            borderRadius: 10,
+            borderRadius: 'var(--radius-container)',
             background: 'var(--grey50)',
             fontSize: 12,
             color: 'var(--text-caption)',
@@ -890,7 +890,7 @@ export function ScheduleContent({
                 gap: 4,
                 padding: '12px 14px',
                 border: '1px solid var(--border)',
-                borderRadius: 10,
+                borderRadius: 'var(--radius-container)',
                 background: 'var(--grey50)',
               }}
             >

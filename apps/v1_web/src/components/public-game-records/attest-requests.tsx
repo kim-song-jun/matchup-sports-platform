@@ -134,8 +134,8 @@ export function AttestRequestsSection({ gameId }: { gameId: string | null | unde
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 type="button"
-                className="tm-btn tm-btn-md tm-btn-primary"
-                style={{ flex: 1, minHeight: 44, background: 'var(--static-blue)' }}
+                className="tm-btn tm-btn-md tm-btn-primary [--button-fill-primary:var(--static-blue)] [--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]"
+                style={{ flex: 1, minHeight: 44 }}
                 disabled={attest.isPending}
                 aria-label={`${request.participantDisplayName} 연결 승인`}
                 onClick={() => decide(request, 'approve')}

@@ -1,5 +1,24 @@
 import { createHash } from 'node:crypto';
-import { Prisma, V1GameOfficialFactSourceType, V1GameSourceType, V1IdentityActorType, V1TeamMatchStatus, V1VisibilityMode } from '@prisma/client';
+import { Prisma, V1CompetitionKind, V1GameOfficialFactSourceType, V1GameSourceType, V1IdentityActorType, V1TeamMatchStatus, V1VisibilityMode } from '@prisma/client';
+
+/**
+ * Seed-side equivalent of the runtime tournament-surface lookup. Prisma seed
+ * runs in the production image without `src/`, so this small helper keeps the
+ * same required kind gate in the image-owned seed module.
+ */
+export async function findTournamentOnSurfaceOrThrow(
+  tx: Prisma.TransactionClient,
+  kinds: readonly V1CompetitionKind[],
+  tournamentId: string,
+): Promise<{ sportId: string | null }> {
+  const [row] = await tx.v1Tournament.findMany({
+    where: { id: tournamentId, kind: { in: [...kinds] } },
+    select: { sportId: true },
+    take: 1,
+  });
+  if (!row) throw new Error(`Tournament ${tournamentId} is outside the requested competition surface.`);
+  return row;
+}
 
 export type CanonicalTournamentSeedMatch = {
   readonly tournamentId: string;

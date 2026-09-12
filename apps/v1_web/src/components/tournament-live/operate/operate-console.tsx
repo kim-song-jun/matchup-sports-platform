@@ -1436,9 +1436,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         {ops.bannerMessage && <Banner tone="danger">{ops.bannerMessage}</Banner>}
         {commandError && <Banner tone="danger">{commandError}</Banner>}
         {pendingCommandRetry && (
-          <div className="flex flex-col items-stretch gap-2 rounded-lg bg-[var(--red50)] px-3 py-2 text-sm leading-relaxed text-[var(--red700)] sm:flex-row sm:items-center sm:gap-3">
+          <div className="flex flex-col items-stretch gap-2 rounded-lg bg-[var(--red50)] px-3 py-2 text-[length:var(--font-size-body-sm)] leading-relaxed text-[var(--red700)] sm:flex-row sm:items-center sm:gap-3">
             <span className="min-w-0 flex-1 break-keep">{pendingCommandRetry.label} 요청의 서버 응답을 받지 못했어요. 같은 요청을 다시 보낼 수 있어요.</span>
-            <Button type="button" size="sm" variant="outline" className="min-h-[44px] shrink-0 self-start text-sm sm:self-auto" disabled={commandPending || !canOperate} onClick={retryPendingCommand}>
+            <Button type="button" size="sm" variant="outline" className="min-h-[44px] shrink-0 self-start text-[length:var(--font-size-body-sm)] sm:self-auto" disabled={commandPending || !canOperate} onClick={retryPendingCommand}>
               같은 요청 재시도
             </Button>
           </div>

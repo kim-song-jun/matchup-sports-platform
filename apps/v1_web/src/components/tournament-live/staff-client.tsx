@@ -328,7 +328,7 @@ export function StaffClient({ tournamentId }: Props) {
                 setGrantError(null);
                 setGrantOpen(true);
               }}
-              className="flex items-center gap-2 h-[44px] px-4 rounded-xl bg-[var(--button-fill-primary)] hover:bg-[var(--button-fill-primary-hover)] text-[var(--button-text-primary)] text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 shrink-0"
+              className="flex items-center gap-2 h-[44px] px-4 rounded-xl bg-[var(--button-fill-primary)] hover:bg-[var(--button-fill-primary-hover)] text-[var(--button-text-primary)] text-[length:var(--font-size-body-sm)] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 shrink-0"
             >
               <UserPlus size={16} aria-hidden="true" />
               스태프 배정

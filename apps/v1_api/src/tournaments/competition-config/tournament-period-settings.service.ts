@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, V1CompetitionKind } from '@prisma/client';
 import { V1AuthUser } from '../../auth/v1-auth-user';
 import { AdminContextService } from '../../common/admin-context.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -127,8 +127,11 @@ export class TournamentPeriodSettingsService {
       if (updated.count !== 1) {
         throw new ConflictException({ code: 'TOURNAMENT_VERSION_CONFLICT', message: '대회 설정이 다른 요청에서 변경됐어요. 다시 확인해 주세요.' });
       }
-      const committed = await tx.v1Tournament.findUnique({
-        where: { id: row.id },
+      const committedKinds = row.kind === V1CompetitionKind.regular_league
+        ? [V1CompetitionKind.regular_league]
+        : [V1CompetitionKind.regular_tournament];
+      const committed = await findTournamentOnSurface(tx, committedKinds, {
+        where: { id: row.id, deletedAt: null },
         select: { updatedAt: true },
       });
       await this.adminContext.logAdminAction(admin, {

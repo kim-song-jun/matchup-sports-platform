@@ -40,6 +40,7 @@ describe('toLeagueFixtureList', () => {
     expect(item.homeScore).toBeNull();
     expect(item.awayScore).toBeNull();
     expect(item.isForfeit).toBe(false);
+    expect(item).toMatchObject({ homeTeamId: 'team-a', homeAssigned: true, awayTeamId: 'team-b', awayAssigned: true });
   });
 
   it('게임 자체가 없는 대진도 같은 모양으로 나온다', () => {
@@ -84,6 +85,11 @@ describe('toLeagueFixtureList', () => {
     const [item] = toLeagueFixtureList([row({ approvedApplicantTeamId: null })], new Map());
     expect(item.awayTeamId).toBeNull();
     expect(item.teamMatchId).toBe('tm-1');
+  });
+
+  it('홈팀이 아직 배정되지 않은 대진은 홈 identity를 가리고 assignment를 false로 둔다', () => {
+    const [item] = toLeagueFixtureList([row({ hostTeamId: null })], new Map());
+    expect(item).toMatchObject({ homeTeamId: null, homeAssigned: false, awayTeamId: 'team-b', awayAssigned: true });
   });
 
   it('취소·무효 대진도 목록에는 남는다', () => {

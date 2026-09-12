@@ -128,6 +128,16 @@ function createFakeTx(initialFixtureFieldId: string | null) {
       })),
     },
     v1TeamMatch: {
+      findUnique: jest.fn(async () => ({
+        id: fixture.id,
+        tournamentId: fixture.tournamentId,
+        leagueId: null,
+        fieldId: fixture.fieldId,
+        deletedAt: null,
+        tournament: { kind: 'regular_tournament' },
+        tournamentDetails: { tournamentId: fixture.tournamentId, teamMatchId: fixture.id },
+        game: { id: 'canonical-game', sourceType: 'TEAM_MATCH' },
+      })),
       updateMany: jest.fn(async ({ where, data }: { where: { fieldId: string | null }; data: { fieldId: string | null } }) => {
         if (where.fieldId !== fixture.fieldId) {
           return { count: 0 };
@@ -218,34 +228,29 @@ describe('TournamentOperationsFieldsService', () => {
     }
   });
 
-  // Finding #8 -- lost update: two operators who both observed fieldId=null
-  // must not both succeed. The CAS predicate losing (count !== 1) must
-  // surface as a conflict, not a silently accepted overwrite.
-  // **이 자리도 되돌리기 창을 닫는다.** 필드 운영은 `V1OperationAudit` 를 쓰고, 그 관계는
-  // 백필 행을 `onDelete: Restrict` 로 참조한다 — 리그 행에 감사 로그가 하나라도 붙으면
-  // 백필 88행을 **더 이상 지울 수 없다**(docs/ops/read-swap-preflight.md).
-  // 그래서 404 만이 아니라 **필드 행·감사 로그가 만들어지지 않는 것**까지 단언한다.
-  it('리그 id 에는 필드를 만들 수 없다 — 필드 행도 감사 로그도 남지 않는다', async () => {
+  // Public league operations use the same field surface as tournament operations.
+  it('리그 id 에도 필드를 만들 수 있다 — 모든 competition kind 가 같은 운영 필드 surface 를 쓴다', async () => {
     const assertAccess = jest.fn().mockResolvedValue(platformOpsPrincipal());
     const { service, moduleRef, prisma, tx } = await buildHarness({ assertAccess, fixtureFieldId: null });
     prisma.v1Tournament.findFirst.mockImplementation(
       kindAwareFindFirst({ id: tournamentId, kind: 'regular_league' }),
     );
 
-    await expect(
-      service.create(
-        actorUserId,
-        tournamentId,
-        { scopeKey: 'A', name: 'A구장', sortOrder: 1 },
-        audit('req-league'),
-      ),
-    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+    await expect(service.create(
+      actorUserId,
+      tournamentId,
+      { scopeKey: 'A', name: 'A구장', sortOrder: 1 },
+      audit('req-league'),
+    )).resolves.toMatchObject({ tournamentId, scopeKey: 'A', name: 'A구장' });
 
-    expect(tx.v1TournamentField.create).not.toHaveBeenCalled();
-    expect(tx.v1OperationAudit.create).not.toHaveBeenCalled();
+    expect(tx.v1TournamentField.create).toHaveBeenCalledTimes(1);
+    expect(tx.v1OperationAudit.create).toHaveBeenCalledTimes(1);
     await moduleRef.close();
   });
 
+  // Finding #8 -- lost update: two operators who both observed fieldId=null
+  // must not both succeed. The CAS predicate losing (count !== 1) must
+  // surface as a conflict, not a silently accepted overwrite or audit event.
   it('assignFixtureField returns 409 when the CAS predicate no longer matches (lost-update race)', async () => {
     const assertAccess = jest.fn().mockResolvedValue(platformOpsPrincipal());
     const { service, moduleRef, tx } = await buildHarness({ assertAccess, fixtureFieldId: null });
@@ -259,6 +264,7 @@ describe('TournamentOperationsFieldsService', () => {
       await expect(promise).rejects.toMatchObject({
         response: { code: 'FIXTURE_FIELD_ASSIGNMENT_CONFLICT' },
       });
+      expect(tx.v1OperationAudit.create).not.toHaveBeenCalled();
     } finally {
       await moduleRef.close();
     }

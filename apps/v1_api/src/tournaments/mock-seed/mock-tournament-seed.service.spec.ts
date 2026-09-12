@@ -91,7 +91,13 @@ function makeWorld(teamCount = 4) {
         const rows = where.id
           ? playerRecords.filter((player) => where.id!.in.includes(player.id as string))
           : playerRecords.filter((player) => player.registrationId === where.registrationId);
-        return rows.map((player) => ({ id: player.id, registrationId: player.registrationId, userId: player.userId, realName: player.realName, removedAt: null }));
+        return rows.map((player) => ({
+          id: player.id,
+          registrationId: player.registrationId,
+          userId: player.userId,
+          removedAt: null,
+          user: { profile: { nickname: `별명-${String(player.userId)}`, displayName: `표시-${String(player.userId)}` } },
+        }));
       }),
     },
     v1TournamentGroup: { create: jest.fn(async () => ({ id: 'group-1' })), findFirst: jest.fn(async () => ({ id: 'group-1' })) },
@@ -136,7 +142,7 @@ function makeWorld(teamCount = 4) {
     logAdminAction: jest.fn(),
   };
   const gamesService = {
-    createFromSourceInTransaction: jest.fn(async (_tx: unknown, input: { sourceId: string }, context: { actor: Record<string, unknown> }) => {
+    createFromSourceInTransaction: jest.fn(async (_tx: unknown, input: { sourceId: string; participants: Array<{ userId: string; displayNameSnapshot: string }> }, context: { actor: Record<string, unknown> }) => {
       actorContexts.push(context.actor);
       const game = { gameId: `game-${games.length + 1}`, sourceType: 'TEAM_MATCH', sourceId: input.sourceId, competitionConfigVersionId: 'config-1', state: 'SCHEDULED', version: 0 };
       games.push({ gameId: game.gameId, version: 0, lastSequence: 0 });
@@ -234,6 +240,21 @@ describe('MockTournamentSeedService', () => {
       (field) => !scalarFields.has(field),
     );
     expect(unknownFields).toEqual([]);
+  });
+
+  it('실제 목업 시드 경기 생성 경로는 실명과 다른 프로필 닉네임을 참가자 스냅샷에 쓴다', async () => {
+    const { service, gamesService, players } = makeWorld();
+    await service.createTournament(user, { format: 'league', teamCount: 4 });
+
+    const source = gamesService.createFromSourceInTransaction.mock.calls[0]?.[1] as unknown as {
+      participants: Array<{ userId: string; displayNameSnapshot: string }>;
+    };
+    expect(source.participants.length).toBeGreaterThan(0);
+    const participant = source.participants[0]!;
+    const realName = players.find((player) => player.userId === participant.userId)?.realName;
+    expect(realName).toBeDefined();
+    expect(participant.displayNameSnapshot).toBe(`별명-${participant.userId}`);
+    expect(participant.displayNameSnapshot).not.toBe(realName);
   });
 
   // alpha 에는 ACTIVE config 가 5개 있고 종목마다 라인업 하한이 다르다(풋살 3명 · 축구 7명).

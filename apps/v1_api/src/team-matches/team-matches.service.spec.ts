@@ -229,7 +229,11 @@ describe('TeamMatchesService', () => {
     });
     expect(prisma.v1TeamMatch.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { hostTeamId: 'team-host', deletedAt: null },
+        where: {
+          hostTeamId: 'team-host',
+          deletedAt: null,
+          OR: [{ tournamentId: null }, { leagueId: { not: null } }],
+        },
         orderBy: { createdAt: 'desc' },
         take: 30,
       }),

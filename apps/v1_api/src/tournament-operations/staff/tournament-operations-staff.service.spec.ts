@@ -183,6 +183,19 @@ type FakeAssignmentRow = {
   fixtureScopes: { teamMatchId: string }[];
 };
 
+type FakeTeamMatchRow = {
+  id: string;
+  tournamentId: string | null;
+  title: string;
+  startAt: Date | null;
+  status: string;
+  fieldId: string | null;
+  field: { name: string | null } | null;
+  deletedAt: Date | null;
+  game: { id: string; state: string; sourceType: string } | null;
+  tournamentDetails: { tournamentId: string; round: string; fixtureNumber: number; legNumber: number } | null;
+};
+
 /**
  * findMany()가 실제로 `where`를 평가하도록 흉내낸 fake -- 단순히
  * `toHaveBeenCalledWith`로 인자만 확인하면 서비스 코드에서 필터 조건 자체가 빠져도
@@ -193,6 +206,7 @@ type FakeAssignmentRow = {
 function buildMyAssignmentsHarness(
   rows: FakeAssignmentRow[],
   admin: { adminRole: 'owner' | 'ops' | 'support'; status: 'active'; revokedAt: Date | null; user: { accountStatus: 'active' | 'suspended' } } | null = null,
+  teamMatchRows: FakeTeamMatchRow[] = [],
 ) {
   const findMany = jest.fn(async ({ where }: { where: Record<string, unknown> }) => {
     const now = new Date();
@@ -227,6 +241,23 @@ function buildMyAssignmentsHarness(
   const prisma = {
     v1AdminUser: { findUnique: jest.fn().mockResolvedValue(admin) },
     v1TournamentStaffAssignment: { findMany, count: jest.fn() },
+    v1TeamMatch: {
+      findMany: jest.fn(async ({ where }: { where: { tournamentId: string; deletedAt: null; tournamentDetails: { isNot: null }; game: { is: { sourceType: string } }; OR?: Array<{ id?: { in: string[] }; fieldId?: { in: string[] } }> } }) => {
+        const scopedIds = new Set(
+          (where.OR ?? []).flatMap((clause) => clause.id?.in ?? []),
+        );
+        const scopedFieldIds = new Set(
+          (where.OR ?? []).flatMap((clause) => clause.fieldId?.in ?? []),
+        );
+        return teamMatchRows.filter((row) =>
+          row.tournamentId === where.tournamentId
+          && row.deletedAt === null
+          && row.tournamentDetails !== null
+          && row.game?.sourceType === where.game.is.sourceType
+          && (scopedIds.has(row.id) || (row.fieldId !== null && scopedFieldIds.has(row.fieldId))),
+        );
+      }),
+    },
   };
 
   return {
@@ -289,6 +320,42 @@ describe('TournamentOperationsStaffService.myAssignments', () => {
     // 이 값이 빠지면 필드 담당자는 자기 경기 콘솔로 갈 수 없다 — 대회 전역 리소스를 읽을
     // 권한이 없어 셸 진입이 구조적으로 막히므로 이 응답이 담당 경기를 아는 유일한 출처다.
     expect(result.items[0]?.assignments[0]?.fixtureIds).toEqual(['fx-1', 'fx-2']);
+  });
+
+  it('canonical team-match predicates exclude a foreign, unassigned, deleted, or non-game fixture', async () => {
+    const scopedFixtureId = 'fx-scoped';
+    const fieldScopedId = 'field-scoped';
+    const foreignTournamentId = '00000000-0000-4000-8000-000000000099';
+    const baseFixture = {
+      tournamentId,
+      title: '담당 경기',
+      startAt: new Date('2026-08-03T10:00:00.000Z'),
+      status: 'matched',
+      fieldId: fieldScopedId,
+      field: { name: 'A구장' },
+      deletedAt: null,
+      game: { id: 'game-1', state: 'SCHEDULED', sourceType: 'TEAM_MATCH' },
+      tournamentDetails: { tournamentId, round: 'group', fixtureNumber: 1, legNumber: 1 },
+    };
+    const { service } = buildMyAssignmentsHarness(
+      [
+        assignmentRow({ id: 'fixture-scope', fieldId: null, fixtureScopes: [{ teamMatchId: scopedFixtureId }] }),
+        assignmentRow({ id: 'field-scope', fieldId: fieldScopedId, fixtureScopes: [] }),
+      ],
+      null,
+      [
+        { ...baseFixture, id: scopedFixtureId },
+        { ...baseFixture, id: 'fx-field', fieldId: fieldScopedId },
+        { ...baseFixture, id: 'fx-foreign', tournamentId: foreignTournamentId, tournamentDetails: { ...baseFixture.tournamentDetails, tournamentId: foreignTournamentId } },
+        { ...baseFixture, id: 'fx-unassigned', fieldId: 'field-other' },
+        { ...baseFixture, id: 'fx-deleted', deletedAt: new Date('2026-08-01T00:00:00.000Z') },
+        { ...baseFixture, id: 'fx-no-game', game: null },
+      ],
+    );
+
+    const result = await service.myAssignments(targetUserId);
+
+    expect(result.items[0]?.fixtures.map((fixture) => fixture.fixtureId)).toEqual(['fx-field', scopedFixtureId]);
   });
 
   it('유효한 배정이 있는 사용자에게 그 대회가 반환된다', async () => {

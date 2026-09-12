@@ -31,8 +31,8 @@ describe('buildLeagueGoalEventSnapshot', () => {
     const snapshot = buildLeagueGoalEventSnapshot([{ participantId: 'p-h1', sideId: 'side-home', goals: 2 }]);
     const parsed = parseTournamentFixtureRevisionGoals(JSON.parse(JSON.stringify(snapshot)));
     expect(parsed).toEqual([
-      { id: 'p-h1:1', sideId: 'side-home', participantId: 'p-h1', minute: null, period: null, ownGoal: false },
-      { id: 'p-h1:2', sideId: 'side-home', participantId: 'p-h1', minute: null, period: null, ownGoal: false },
+      { id: 'p-h1:1', sideId: 'side-home', participantId: 'p-h1', playerNameSnapshot: null, minute: null, period: null, ownGoal: false },
+      { id: 'p-h1:2', sideId: 'side-home', participantId: 'p-h1', playerNameSnapshot: null, minute: null, period: null, ownGoal: false },
     ]);
   });
 

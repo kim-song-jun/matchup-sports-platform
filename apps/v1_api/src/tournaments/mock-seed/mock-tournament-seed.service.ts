@@ -10,6 +10,7 @@ import { createTournamentMatchInTx } from '../tournament-match-creation';
 import { TournamentResultReviewService } from '../../tournament-operations/results/tournament-result-review.service';
 import { isMockSeedEnabled } from './mock-seed.config';
 import { CreateMockTournamentDto, type MockSeedStatus } from './mock-tournament-seed.dto';
+import { participantDisplayName } from '../participant-display-name';
 
 /**
  * 시드 계정 전용 도메인. 목업 대회에는 이 도메인만으로 이뤄진 팀만 넣는다 —
@@ -155,7 +156,11 @@ export class MockTournamentSeedService {
         });
         const players = await tx.v1TournamentPlayer.findMany({
           where: { registrationId: registration.id, removedAt: null },
-          select: { id: true, userId: true, realName: true },
+          select: {
+            id: true,
+            userId: true,
+            user: { select: { profile: { select: { nickname: true, displayName: true } } } },
+          },
           orderBy: { createdAt: 'asc' },
         });
         registrations.push({
@@ -168,7 +173,7 @@ export class MockTournamentSeedService {
             .map((player) => ({
               sourceParticipantId: player.id,
               userId: player.userId,
-              displayNameSnapshot: player.realName,
+              displayNameSnapshot: participantDisplayName(player),
               sideKey: V1GameSideKey.HOME,
             })),
         });

@@ -19,6 +19,8 @@ const GAME_ID = 'league-game-1';
 type FakeTeamMatchRow = {
   id: string;
   leagueId: string;
+  hostTeamId: string;
+  approvedApplicantTeamId: string | null;
   deletedAt: Date | null;
   startAt: Date;
   placeName: string;
@@ -59,6 +61,8 @@ function makeFixtureRow(overrides: Partial<FakeTeamMatchRow> = {}): FakeTeamMatc
   return {
     id: TEAM_MATCH_ID,
     leagueId: LEAGUE_ID,
+    hostTeamId: 'team-home',
+    approvedApplicantTeamId: 'team-away',
     deletedAt: null,
     startAt: new Date('2026-09-12T10:00:00.000Z'),
     placeName: '검증장',

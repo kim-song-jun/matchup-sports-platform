@@ -5,7 +5,7 @@ import { CircleHelp, Tag, X } from 'lucide-react';
 import { TextField } from '@/components/v1-ui/primitives';
 import { useV1CreateInquiry } from '@/hooks/use-v1-api';
 import { V1ApiError } from '@/lib/api-client';
-import type { V1AuthMe } from '@/types/api';
+import type { V1AuthMe, V1InquiryRelatedType } from '@/types/api';
 import styles from './tournament-inquiry-modal.module.css';
 import {
   findTournamentInquiryTopic,
@@ -16,9 +16,20 @@ import { useTournamentInquiryDialog } from './use-tournament-inquiry-dialog';
 import { TournamentInquiryContext } from './tournament-inquiry-context';
 
 type InquiryFormErrors = Partial<Record<'title' | 'body' | 'form', string>>;
+
+const MATCH_RESULT_TOPIC = {
+  value: 'result',
+  label: '경기 결과 정정',
+  description: '점수, 득점·카드 등 경기 기록 확인 및 정정',
+  titlePrefix: '[경기 결과 정정]',
+  apiCategory: 'match',
+} as const;
 type TournamentInquiryModalProps = {
   readonly tournamentId: string;
   readonly tournamentTitle: string;
+  readonly relatedType?: V1InquiryRelatedType;
+  readonly relatedId?: string;
+  readonly targetLabel?: '대회' | '경기';
   readonly authUser: V1AuthMe | null;
   readonly isSessionChecking: boolean;
   readonly hasSessionError: boolean;
@@ -30,6 +41,9 @@ type TournamentInquiryModalProps = {
 export function TournamentInquiryModal({
   tournamentId,
   tournamentTitle,
+  relatedType = 'tournament',
+  relatedId = tournamentId,
+  targetLabel = '대회',
   authUser,
   isSessionChecking,
   hasSessionError,
@@ -39,13 +53,17 @@ export function TournamentInquiryModal({
 }: TournamentInquiryModalProps) {
   const createInquiry = useV1CreateInquiry();
   const isSessionBlocked = isSessionChecking || hasSessionError || authUser === null;
-  const [topic, setTopic] = useState<TournamentInquiryTopic>('participation');
+  const isMatchInquiry = relatedType === 'team_match';
+  const [topic, setTopic] = useState<string>(isMatchInquiry ? MATCH_RESULT_TOPIC.value : 'participation');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [errors, setErrors] = useState<InquiryFormErrors>({});
   const dialogRef = useTournamentInquiryDialog(onClose);
   const submitBusyRef = useRef(false);
-  const selectedTopic = findTournamentInquiryTopic(topic) ?? TOURNAMENT_INQUIRY_TOPICS[0];
+  const selectedTopic = isMatchInquiry
+    ? MATCH_RESULT_TOPIC
+    : findTournamentInquiryTopic(topic) ?? TOURNAMENT_INQUIRY_TOPICS[0];
+  const topicOptions = isMatchInquiry ? [MATCH_RESULT_TOPIC] : TOURNAMENT_INQUIRY_TOPICS;
   const maximumTitleLength = 80 - selectedTopic.titlePrefix.length - 1;
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -71,8 +89,8 @@ export function TournamentInquiryModal({
         category: selectedTopic.apiCategory,
         title: `${selectedTopic.titlePrefix} ${trimmedTitle}`,
         body: trimmedBody,
-        relatedType: 'tournament',
-        relatedId: tournamentId,
+        relatedType,
+        relatedId,
       },
       {
         onSuccess: onSubmitted,
@@ -107,7 +125,7 @@ export function TournamentInquiryModal({
                 <CircleHelp size={22} strokeWidth={2.1} />
               </span>
               <div>
-                <h2 id="tournament-inquiry-title" className={styles.title}>대회 문의하기</h2>
+                <h2 id="tournament-inquiry-title" className={styles.title}>{targetLabel} 문의하기</h2>
                 <p id="tournament-inquiry-description" className={styles.description}>
                   문의 대상과 답변 계정을 확인한 뒤 내용을 남겨 주세요.
                 </p>
@@ -138,11 +156,15 @@ export function TournamentInquiryModal({
                   className={`tm-input ${styles.select}`}
                   value={topic}
                   onChange={(event) => {
+                    if (isMatchInquiry) {
+                      setTopic(MATCH_RESULT_TOPIC.value);
+                      return;
+                    }
                     const nextTopic = findTournamentInquiryTopic(event.target.value);
                     if (nextTopic) setTopic(nextTopic.value);
                   }}
                 >
-                  {TOURNAMENT_INQUIRY_TOPICS.map((option) => (
+                  {topicOptions.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>

@@ -215,6 +215,7 @@ describe('Task 24 public tournament schedule/match and team/player record projec
         regionId: ids.region,
         title: 'Task 24 Cup',
         kind: 'regular_tournament',
+        status: 'in_progress',
         format: 'league',
         bracketPublishedAt: new Date(),
       },
@@ -494,6 +495,24 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     expectHttpCode(hidden, 404, 'TOURNAMENT_MATCH_NOT_FOUND');
     const nonexistent = await captureFailure(() => tournamentRecords.getMatch(ids.tournament, 'nonexistent-fixture', undefined));
     expectHttpCode(nonexistent, 404, 'TOURNAMENT_MATCH_NOT_FOUND');
+  });
+
+  it('draft and soft-deleted tournaments are indistinguishable from a nonexistent direct match URL', async () => {
+    try {
+      await prisma.v1Tournament.update({ where: { id: ids.tournament }, data: { status: 'draft' } });
+      const draft = await captureFailure(() => tournamentRecords.getMatch(ids.tournament, ids.fixtureMain, undefined));
+      expectHttpCode(draft, 404, 'TOURNAMENT_MATCH_NOT_FOUND');
+
+      await prisma.v1Tournament.update({ where: { id: ids.tournament }, data: { status: 'in_progress' } });
+      await prisma.v1Tournament.update({ where: { id: ids.tournament }, data: { deletedAt: new Date() } });
+      const deleted = await captureFailure(() => tournamentRecords.getMatch(ids.tournament, ids.fixtureMain, undefined));
+      expectHttpCode(deleted, 404, 'TOURNAMENT_MATCH_NOT_FOUND');
+    } finally {
+      await prisma.v1Tournament.update({
+        where: { id: ids.tournament },
+        data: { status: 'in_progress', deletedAt: null },
+      });
+    }
   });
 
   it('status_only: schedule/match expose lifecycle and the official record but never the numeric score, lineup, or events', async () => {

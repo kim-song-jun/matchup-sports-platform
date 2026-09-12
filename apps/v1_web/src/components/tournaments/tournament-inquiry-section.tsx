@@ -6,6 +6,7 @@ import { Instagram, Mail, MessageCircleQuestion } from 'lucide-react';
 import { useV1AuthMe } from '@/hooks/use-v1-api';
 import { isUnauthenticatedError } from '@/lib/api-client';
 import { getCurrentRedirectPath, getLoginPathForRedirect } from '@/lib/session-storage';
+import type { V1InquiryRelatedType } from '@/types/api';
 import { TournamentInquiryModal } from './tournament-inquiry-modal';
 import styles from './tournament-inquiry-section.module.css';
 
@@ -18,11 +19,17 @@ const TOURNAMENT_CONTACT = {
 type TournamentInquirySectionProps = {
   readonly tournamentId: string;
   readonly tournamentTitle: string;
+  readonly relatedType?: V1InquiryRelatedType;
+  readonly relatedId?: string;
+  readonly targetLabel?: '대회' | '경기';
 };
 
 export function TournamentInquirySection({
   tournamentId,
   tournamentTitle,
+  relatedType = 'tournament',
+  relatedId = tournamentId,
+  targetLabel = '대회',
 }: TournamentInquirySectionProps) {
   const router = useRouter();
   const authMe = useV1AuthMe({ retry: false });
@@ -38,7 +45,7 @@ export function TournamentInquirySection({
   }, [toast]);
 
   return (
-    <section aria-label="대회 문의" className={styles.section}>
+    <section aria-label={`${targetLabel} 문의`} className={styles.section}>
       <button
         type="button"
         onClick={() => {
@@ -55,9 +62,9 @@ export function TournamentInquirySection({
         <MessageCircleQuestion size={18} aria-hidden="true" />
         {authMe.isPending || authMe.isFetching ? '로그인 확인 중...' : isGuest ? '로그인 후 문의하기' : '문의하기'}
       </button>
-      <p className={styles.memberNotice}>대회 문의는 회원가입 후 로그인한 사용자만 접수할 수 있어요.</p>
+      <p className={styles.memberNotice}>{targetLabel} 문의는 회원가입 후 로그인한 사용자만 접수할 수 있어요.</p>
 
-      <div className={styles.contactList} aria-label="대회 문의 연락처">
+      <div className={styles.contactList} aria-label={`${targetLabel} 문의 연락처`}>
         <a href={TOURNAMENT_CONTACT.instagramUrl} target="_blank" rel="noreferrer" className={styles.contactItem}>
           <Instagram size={18} aria-hidden="true" />
           <span>인스타그램</span>
@@ -74,6 +81,9 @@ export function TournamentInquirySection({
         <TournamentInquiryModal
           tournamentId={tournamentId}
           tournamentTitle={tournamentTitle}
+          relatedType={relatedType}
+          relatedId={relatedId}
+          targetLabel={targetLabel}
           authUser={authMe.data ?? null}
           isSessionChecking={authMe.isPending || authMe.isFetching}
           hasSessionError={hasSessionError}

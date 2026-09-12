@@ -377,16 +377,21 @@ function ApplyCTAButtons({
       tournament.entryFee === 0,
     );
     return (
-      <button
-        type="button"
-        className={primaryButtonClass}
-        style={{ fontSize: 'var(--font-size-body-lg)' }}
-        disabled
-        aria-disabled="true"
-        aria-label={description}
-      >
-        {getApplyBlockButtonLabel(blockReason)}
-      </button>
+      <div style={{ display: 'grid', gap: 8 }}>
+        <button
+          type="button"
+          className={primaryButtonClass}
+          style={{ fontSize: 'var(--font-size-body-lg)' }}
+          disabled
+          aria-disabled="true"
+          aria-label={description}
+        >
+          {getApplyBlockButtonLabel(blockReason)}
+        </button>
+        <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-muted)', lineHeight: 1.5, textAlign: 'center' }}>
+          {description}
+        </p>
+      </div>
     );
   }
 

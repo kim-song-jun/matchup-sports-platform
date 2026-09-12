@@ -1060,7 +1060,11 @@ export class PublicTournamentRecordsService {
 
   async getMatch(tournamentId: string, fixtureId: string, user: V1AuthUser | undefined) {
     const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
-      where: { id: tournamentId },
+      where: {
+        id: tournamentId,
+        deletedAt: null,
+        AND: [PUBLIC_COMPETITION_STATUS_WHERE],
+      },
       select: { id: true, title: true, status: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
     });
     if (

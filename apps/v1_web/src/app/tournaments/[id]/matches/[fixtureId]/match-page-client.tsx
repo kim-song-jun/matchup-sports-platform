@@ -6,6 +6,7 @@ import { usePublicMatch } from '@/components/public-game-records/use-public-game
 import { MatchDetailContent } from '@/components/public-game-records/match-detail-content';
 import { AttestRequestsSection } from '@/components/public-game-records/attest-requests';
 import { ClaimMyRecordSection } from '@/components/public-game-records/claim-my-record';
+import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
 
 function MatchSkeleton() {
   return (
@@ -48,6 +49,13 @@ export function MatchPageClient({ tournamentId, fixtureId }: { tournamentId: str
             사라졌다(경기별 라인업 화면 제거) -- 이제는 경기 기록 바로 아래이고,
             "명단을 보고 내가 없네를 깨달은 직후"라는 자리 자체는 그대로다. */}
         <ClaimMyRecordSection tournamentId={tournamentId} fixtureId={fixtureId} />
+        <TournamentInquirySection
+          tournamentId={tournamentId}
+          tournamentTitle={data.tournamentTitle}
+          relatedType="team_match"
+          relatedId={fixtureId}
+          targetLabel="경기"
+        />
       </div>
     </>
   );

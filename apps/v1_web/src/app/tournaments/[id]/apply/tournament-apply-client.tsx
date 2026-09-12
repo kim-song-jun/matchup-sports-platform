@@ -245,7 +245,7 @@ function DesktopRailSummary({
       {step === 'team' && (
         <button
           type="button"
-          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))] tm-btn-block"
           disabled={!selectedTeamId || !hasManagerTeam || isCreating}
           onClick={onNext}
           aria-label="다음 단계: 동의 및 결제 수단 선택"
@@ -257,7 +257,7 @@ function DesktopRailSummary({
       {step === 'agreements' && (
         <button
           type="button"
-          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))] tm-btn-block"
           disabled={!canSubmit || isSubmitting}
           onClick={onSubmitFromRail}
           aria-label="신청 제출하기"
@@ -269,7 +269,7 @@ function DesktopRailSummary({
       {step === 'payment' && tournament && (
         <Link
           href={`/tournaments/${tournament.id}/my`}
-          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))] tm-btn-block"
         >
           내 신청 확인하기
         </Link>
@@ -477,7 +477,7 @@ function TeamSelectStep({
           </Link>
           <button
             type="button"
-            className="tm-btn tm-btn-lg tm-btn-primary"
+            className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]"
             disabled={!selectedTeamId || !hasManagerTeam || isCreating}
             onClick={onNext}
             aria-label="다음 단계: 동의 및 결제수단 선택"
@@ -1114,7 +1114,7 @@ function AgreementsStep({
           </button>
           <button
             type="button"
-            className="tm-btn tm-btn-lg tm-btn-primary"
+            className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]"
             disabled={!canSubmit || isSubmitting}
             onClick={onSubmit}
             aria-label="신청 제출하기"
@@ -1276,7 +1276,7 @@ function TournamentSubmitConfirmDialog({
           </button>
           <button
             type="button"
-            className="tm-btn tm-btn-lg tm-btn-primary"
+            className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]"
             disabled={isSubmitting}
             onClick={onConfirm}
           >
@@ -1487,7 +1487,7 @@ function PaymentGuideStep({
       <div className="tm-fixed-cta tm-hide-desktop">
         <Link
           href={`/tournaments/${tournament.id}/my`}
-          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))] tm-btn-block"
         >
           내 신청 확인하기
         </Link>

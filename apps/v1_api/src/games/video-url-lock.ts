@@ -7,7 +7,8 @@ export const VIDEO_UPLOAD_CLEANUP_TYPE = 'VIDEO_UPLOAD_CLEANUP';
 
 /** All video writers use the same transaction-scoped lock namespace. */
 export async function lockVideoUrl(tx: Prisma.TransactionClient, url: string): Promise<void> {
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${url}))`;
+  const scope = `video-url:${url}`;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope}, 0))`;
 }
 
 /**

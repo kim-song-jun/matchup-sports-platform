@@ -20,6 +20,7 @@ import {
   formatCurrency,
   inputCls,
   isoToDatetimeLocalValue,
+  submitBtnBaseCls,
   submitBtnCls,
   substitutionPolicyLabel,
   textareaCls,
@@ -1097,7 +1098,7 @@ export function TournamentInfoSection() {
             <button
               type="submit"
               disabled={!editTitle.trim() || updateTournament.isPending}
-              className={'flex-1 ' + submitBtnCls + ' [background:var(--static-blue)] hover:[background:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]' }
+              className={'flex-1 ' + submitBtnBaseCls + ' [background:var(--static-blue)] hover:[background:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]'}
             >
               {updateTournament.isPending ? '저장 중…' : '저장'}
             </button>

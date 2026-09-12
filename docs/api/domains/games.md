@@ -1,5 +1,15 @@
 # Game aggregate contract
 
+
+## Task 168 Phase 3 contract addendum (candidate)
+
+- Canonical game creation and reads use `TEAM_MATCH` games bound to `V1TeamMatch`; `fixtureId` remains a stable route and response alias where the public contract already exposes it. Legacy-only bindings fail closed and are not reclassified as friendly matches.
+- Result corrections create a superseding draft and officialization moves the current official pointer atomically; public records select the current official revision, while match time remains the persisted TeamMatch time. Period and event details come from canonical Game rows.
+- Tournament and friendly video surfaces persist `V1TeamMatchVideo`; the removed fixture-video Prisma model is not a runtime fallback.
+- These clauses describe the candidate contract only. They do not claim the 11-migration retirement has reached dev or Alpha, and they do not authorize a production DROP.
+
+- Stage A promotes the canonical runtime contract while the five legacy fixture tables remain physically present and are excluded from the generated runtime client. Physical removal belongs to the later, separately gated Stage B release.
+
 ## Current Task 6 runtime surface
 
 `GamesModule` is assembled once at the `AppModule` root and exports `GamesService` for the

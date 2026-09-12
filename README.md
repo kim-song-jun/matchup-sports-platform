@@ -1,5 +1,12 @@
 # Teameet
 
+
+### Task 168 database cleanup and retirement note (candidate)
+
+The v1 demo cleanup command operates on canonical TeamMatch/Game graphs, requires backup and count review, and aborts when protected official, lineage, identity, consent, or audit history is connected. The Phase 3 retirement migration still requires an explicit maintenance-window decision and committed-tree/dev/Alpha verification.
+
+The selected Alpha rollout first promotes and verifies a canonical intermediate runtime while the five legacy fixture tables remain physically present. A separately reviewed final-DROP release follows that checkpoint; neither release is claimed deployed by this note.
+
 > 생활체육 동호인을 위한 멀티스포츠 소셜 매칭 플랫폼
 
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)

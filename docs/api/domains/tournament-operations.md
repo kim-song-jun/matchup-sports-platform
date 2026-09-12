@@ -1,5 +1,13 @@
 # Tournament operations contract
 
+
+## Task 168 Phase 3 canonical operations addendum (candidate)
+
+- Staff scope and operations-board authorization resolve canonical `teamMatchId` storage while preserving fixture-named route parameters and `fixtureId` response aliases. No legacy fixture-table fallback is permitted.
+- Correction, officialize, and void commands use the current Game revision pointer, idempotency key, expected-version CAS, and transaction-bound audit/outbox behavior. Period and lineup reads remain bound to the same canonical Game/TeamMatch aggregate.
+- Video registration uses `V1TeamMatchVideo`; the retired fixture-video model is absent from the post-DROP runtime.
+- This candidate records API behavior only; migration, maintenance-window selection, dev promotion, and Alpha verification remain pending.
+
 The authoritative field, fixture-lineup, competition-config, operations-board, job-requeue, and operation-flag method/field/actor rows are frozen in the [REST and idempotency registry](../global-contract.md#frozen-rest-and-idempotency-contract).
 
 Staff scope and actor permissions are defined by [Tournament operations authorization](./tournament-operations-auth.md). Review escalation is a durable result boundary defined by [Tournament operations escalations](./tournament-operations-escalations.md), never an ephemeral admin task queue.

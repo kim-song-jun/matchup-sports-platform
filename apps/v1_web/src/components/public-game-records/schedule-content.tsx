@@ -845,7 +845,7 @@ export function ScheduleContent({
         <div
           style={{
             padding: '12px 16px',
-            borderRadius: 'var(--radius-container)',
+            borderRadius: 'var(--radius-control)',
             background: 'var(--grey50)',
             fontSize: 12,
             color: 'var(--text-caption)',
@@ -890,7 +890,7 @@ export function ScheduleContent({
                 gap: 4,
                 padding: '12px 14px',
                 border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-container)',
+                borderRadius: 'var(--radius-control)',
                 background: 'var(--grey50)',
               }}
             >

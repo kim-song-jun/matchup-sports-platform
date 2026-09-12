@@ -204,8 +204,9 @@ describe('TournamentDetailView — 신청 차단 사유 표시', () => {
     render(<TournamentDetailView tournament={tournament} myRegistration={null} />);
 
     const reason = '신청이 마감돼서 새로 신청할 수 없어요.';
-    expect(screen.getAllByRole('button', { name: reason })).toHaveLength(2);
-    expect(screen.getAllByText(reason)).toHaveLength(2);
+    const button = screen.getByRole('button', { name: reason });
+    expect(button).toBeDisabled();
+    expect(screen.getByText(reason)).toBeVisible();
   });
 });
 

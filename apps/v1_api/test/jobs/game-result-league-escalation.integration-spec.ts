@@ -50,6 +50,7 @@ async function seedLeagueSubmittedRevision(submittedAt: Date, opts: { asLeague: 
       status: 'matched',
       approvedApplicantTeamId: awayTeam.id,
       leagueId,
+      tournamentId: leagueId,
     },
   });
   const game = await prisma.v1Game.create({

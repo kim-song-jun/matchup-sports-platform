@@ -154,7 +154,10 @@ describe('POST /admin/league-matches + fixtures', () => {
     expect(fixtures.every((f) => f.placeName === '상암 풋살파크')).toBe(true);
     // Task 164 BE-2: 서버는 요일을 모른다 — 운영자가 고른 **날짜 목록**을 오름차순으로 쓴다.
     // 18:00 KST = 09:00 UTC.
-    expect(fixtures.map((f) => f.startAt.toISOString())).toEqual(
+    expect(fixtures.map((f) => {
+      if (f.startAt === null) throw new Error('fixture timing test requires persisted startAt');
+      return f.startAt.toISOString();
+    })).toEqual(
       futureDates.map((date) => `${date}T09:00:00.000Z`),
     );
   });
@@ -260,6 +263,7 @@ describe('POST /admin/league-matches + fixtures', () => {
       where: { id: fixturesRes.body.data.teamMatchIds[0] },
     });
     expect(fixture.placeName).toBe('장소 미정');
+    if (fixture.startAt === null) throw new Error('fixture timing test requires persisted startAt');
     expect(fixture.startAt.toISOString()).toBe('2026-09-01T03:00:00.000Z');
   });
 

@@ -132,7 +132,10 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
       where: { id: { in: res.body.data.teamMatchIds } },
       orderBy: { startAt: 'asc' },
     });
-    expect(fixtures.map((f) => f.startAt.toISOString())).toEqual(expectedStartAts);
+    expect(fixtures.map((f) => {
+      if (f.startAt === null) throw new Error('fixture timing test requires persisted startAt');
+      return f.startAt.toISOString();
+    })).toEqual(expectedStartAts);
     expect(fixtures[0].endAt?.toISOString()).toBe(`${futureDates[0]}T13:15:00.000Z`);
     expect(fixtures[5].endAt?.toISOString()).toBe(`${futureDates[0]}T14:55:00.000Z`); // 마지막 경기 23:55 KST 종료
     expect(fixtures.map((f) => f.title)).toEqual(
@@ -168,7 +171,10 @@ describe('리그 대진 timing(경기 시간·휴식·팀당 하루 경기 수)'
 
     const fixtures = await prisma.v1TeamMatch.findMany({ where: { leagueId } });
     expect(fixtures).toHaveLength(2); // 4팀 1라운드 = 2경기
-    expect(new Set(fixtures.map((f) => f.startAt.toISOString())).size).toBe(1);
+    expect(new Set(fixtures.map((f) => {
+      if (f.startAt === null) throw new Error('fixture timing test requires persisted startAt');
+      return f.startAt.toISOString();
+    })).size).toBe(1);
     expect(fixtures.every((f) => f.endAt === null)).toBe(true);
     expect(fixtures.every((f) => f.title === '레거시 리그 1주차')).toBe(true);
   });

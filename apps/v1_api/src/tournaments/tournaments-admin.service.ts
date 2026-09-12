@@ -173,7 +173,7 @@ export class TournamentsAdminService {
     if (!row) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
-    const canonicalMatchIds = await this.prisma.v1TournamentMatchDetails.groupBy({
+    const fixtureCount = await this.prisma.v1TournamentMatchDetails.count({
       where: {
         tournamentId,
         teamMatch: {
@@ -182,9 +182,7 @@ export class TournamentsAdminService {
           game: { sourceType: V1GameSourceType.TEAM_MATCH },
         },
       },
-      by: ['teamMatchId'],
     });
-    const fixtureCount = canonicalMatchIds.length;
     // row.sport는 스키마상 항상 존재해야 하는 필수 relation(V1Tournament.sportId가
     // required)이지만, 옵셔널 체이닝으로 방어해 둔다 — 이 relation을 모르는(추가 전부터
     // 있던) 다른 테스트의 얕은 목이 undefined를 줘도 loadLineupInfo가 "종목 정보 없음"으로

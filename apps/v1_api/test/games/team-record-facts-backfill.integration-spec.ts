@@ -275,7 +275,7 @@ describe('runTeamRecordFactsBackfill real-database contract', () => {
         events_hash, official_at, recorded_at
       ) VALUES (
         ${randomUUID()}, ${ids.alreadyHasFactRevision}, ${ids.alreadyHasFactGame}, 1,
-        'TEAM_MATCH'::"V1GameSourceType", NULL, ${ids.hostTeam}, ${ids.opponentTeam}, 2, 2,
+        'TEAM_MATCH'::"V1GameOfficialFactSourceType", NULL, ${ids.hostTeam}, ${ids.opponentTeam}, 2, 2,
         ${JSON.stringify({ home: 2, away: 2 })}::jsonb, ${`${prefix}:already-hash`},
         ${new Date('2026-08-03T00:05:00.000Z')}, CURRENT_TIMESTAMP
       )

@@ -67,6 +67,29 @@ finalize_committed_cutover(){ local report_sha migration_hashes resume_fields=''
 {"schemaVersion":1,"kind":"transition","status":"COMPLETED","stage":"stageAIntermediate","releaseSha":"$RELEASE_SHA","apiImage":"$API_IMAGE","toolImage":"$TOOL_IMAGE","databaseIdentity":"$DB_ID","schemaSha256":"$TASK_SCHEMA_SHA","migrationHashes":$migration_hashes,"quiesceReceipt":"$quiesce","quiesceReceiptSha256":"$(sha "$quiesce")","backupReceipt":"$backup","backupReceiptSha256":"$(sha "$backup")","backupPath":"$backup_file","backupSha256":"$(sha "$backup_file")","cutoverReport":"$report","cutoverReportSha256":"$report_sha"$resume_fields,"completedAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
 EOF
 receipt "$transition" transition "$API_IMAGE"; [[ "$(sha "$quiesce")" == "$(jq -er '.quiesceReceiptSha256' "$transition")" && "$(sha "$backup")" == "$(jq -er '.backupReceiptSha256' "$transition")" && "$(sha "$backup_file")" == "$(jq -er '.backupSha256' "$transition")" && "$(sha "$report")" == "$(jq -er '.cutoverReportSha256' "$transition")" ]] || fail 'transition evidence binding failed'; }
+readonly RECORDS_PROFILE_REPAIR_MIGRATION="20260819090000_v1_records_profile_integration_repair"
+readonly PLAYED_AT_MIGRATION="20260821120000_v1_team_record_facts_played_at"
+recovery_pending=()
+validate_reviewed_migration_failure(){ local migration="$1" label="$2" required_log_one="$3" required_log_two="$4" required_sqlstate="$5" migration_table_exists failed_count failure_logs
+  migration_table_exists="$(dbq "SELECT to_regclass('public.\"_prisma_migrations\"') IS NOT NULL")"
+  if [[ "$migration_table_exists" == f ]]; then return 0; fi
+  [[ "$migration_table_exists" == t ]] || fail 'could not verify the Prisma migration table'
+  failed_count="$(dbq "SELECT COUNT(*) FROM \"_prisma_migrations\" WHERE migration_name = '$migration' AND finished_at IS NULL AND rolled_back_at IS NULL")"
+  [[ "$failed_count" =~ ^[0-9]+$ ]] || fail "could not verify the reviewed $label failure state"
+  if [[ "$failed_count" == 0 ]]; then return 0; fi
+  [[ "$failed_count" == 1 ]] || fail "refusing to auto-recover $failed_count unresolved $migration attempts"
+  failure_logs="$(dbq "SELECT COALESCE(logs, '') FROM \"_prisma_migrations\" WHERE migration_name = '$migration' AND finished_at IS NULL AND rolled_back_at IS NULL")"
+  [[ "$failure_logs" == *"$required_log_one"* && "$failure_logs" == *"$required_log_two"* && "$failure_logs" == *"$required_sqlstate"* ]] || fail "refusing to auto-recover an unrecognized $migration failure"
+  recovery_pending+=("$migration")
+}
+validate_known_records_profile_migration_failure(){ validate_reviewed_migration_failure "$RECORDS_PROFILE_REPAIR_MIGRATION" nullable-goalkeeper 'null value in column "goalkeeper"' v1_game_result_participants 23502; }
+validate_known_played_at_migration_failure(){ validate_reviewed_migration_failure "$PLAYED_AT_MIGRATION" played-at-append-only 'team record facts are append-only' v1_block_team_record_fact_mutation 55000; }
+apply_validated_migration_recoveries(){ local migration
+  for migration in "${recovery_pending[@]}"; do
+    echo "[task168-stage-a] Marking the reviewed $migration failure rolled back inside the sealed Stage A boundary"
+    "${compose[@]}" run --rm --no-deps -T v1_api sh -c "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back $migration"
+  done
+}
 initial_rows="$(ledger_rows)"
 if [[ -z "$initial_rows" ]]; then initial_state=fresh
 elif ledger_matches "$initial_rows" "${M1[@]}"; then initial_state=precutover
@@ -88,6 +111,9 @@ write "$backup" <<EOF
 {"schemaVersion":1,"kind":"backup","status":"COMPLETED","stage":"stageAIntermediate","releaseSha":"$RELEASE_SHA","apiImage":"$API_IMAGE","databaseIdentity":"$DB_ID","backupPath":"$backup_file","backupSha256":"$backup_sha","backupBytes":$backup_bytes,"completedAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
 EOF
 receipt "$quiesce" quiesce "$API_IMAGE"; receipt "$backup" backup "$API_IMAGE"
+validate_known_records_profile_migration_failure
+validate_known_played_at_migration_failure
+apply_validated_migration_recoveries
 run_migrations pre; rows="$(ledger_rows)"; assert_exact_ledger "$rows" "${M1[@]}" "$M10"
 if with_compose_api_database_url; then
   jq -e '.status=="COMPLETED" and .result.verification.remainingLegacyGameLinks==0 and .result.verification.remainingLegacyStaffScopes==0 and .result.verification.remainingLegacyAuditScopes==0' "$report" >/dev/null || fail 'archived cutover did not produce zero-legacy completed report'

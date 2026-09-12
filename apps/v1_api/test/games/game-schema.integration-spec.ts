@@ -214,14 +214,14 @@ describe('v1 game operations schema', () => {
         (id, source_type, state, version, last_sequence, competition_config_version_id, created_at, updated_at)
       VALUES
         (${gameSchemaFixture.gameId}, 'TEAM_MATCH', 'SCHEDULED', 0, 0, ${gameSchemaFixture.configId}, ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
-    `), '23514', 'v1_games_canonical_source_guard_ck');
+    `), '23514', 'v1_games_source_expand_ck');
 
     expectRawFailure(await captureRawFailure(() => prisma.$executeRaw`
       INSERT INTO v1_games
         (id, source_type, team_match_id, state, version, last_sequence, competition_config_version_id, created_at, updated_at)
         VALUES
         (${gameSchemaFixture.secondGameId}, 'FRIENDLY_MATCH', ${gameSchemaFixture.teamMatchId}, 'SCHEDULED', 0, 0, ${gameSchemaFixture.configId}, ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
-    `), '23514', 'v1_games_canonical_source_guard_ck');
+    `), '23514', 'v1_games_source_expand_ck');
   });
 
   it('keeps the canonical TeamMatch binding nullable and unique for soft-deleted source records', async () => {

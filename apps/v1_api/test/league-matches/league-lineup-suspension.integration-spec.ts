@@ -258,6 +258,7 @@ describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 �
         approvedApplicantTeamId: ids.awayTeam,
         competitionConfigVersionId: configId,
         leagueId: input.leagueId,
+        tournamentId: input.leagueId,
       })),
     });
 
@@ -388,6 +389,7 @@ describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 �
         approvedApplicantTeamId: ids.awayTeam,
         competitionConfigVersionId: configId,
         leagueId: input.leagueId,
+        tournamentId: input.leagueId,
       })),
     });
 

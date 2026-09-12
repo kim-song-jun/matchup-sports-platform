@@ -435,6 +435,7 @@ describe('Task 14 team-match lineup builder', () => {
       where: { gameId: submitted.gameId },
     });
     const teamMatch = await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: ids.futureMatch } });
+    if (teamMatch.startAt === null) throw new Error('lineup visibility test requires persisted startAt');
     expect(policy.lineupAt?.getTime()).toBe(teamMatch.startAt.getTime() - 60 * 60 * 1000);
 
     const editAfterSubmit = await captureFailure(() =>

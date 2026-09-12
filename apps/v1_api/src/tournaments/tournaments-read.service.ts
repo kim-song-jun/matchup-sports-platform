@@ -501,7 +501,7 @@ export class TournamentsReadService {
         // 숨기고 confirmed registrationId를 opaque row key로만 싣는다.
         teamId: hideIdentity ? null : row.teamId,
         teamName: hideIdentity ? null : teamNameById.get(row.teamId) ?? '',
-        registrationId: hideIdentity ? registrationIdByTeamId.get(row.teamId) ?? null : undefined,
+        ...(hideIdentity ? { registrationId: registrationIdByTeamId.get(row.teamId) ?? null } : {}),
         position: row.position,
         points: row.points,
         wins: row.wins,

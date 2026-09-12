@@ -396,7 +396,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
   const sectionLabel = navItems.find((item) => isActive(item))?.label ?? '대회 운영';
 
   return (
-    <div className="min-h-screen bg-[var(--surface-soft)] flex">
+    <div className="min-h-screen bg-[var(--surface-soft)] flex [--tournament-ops-mobile-header-offset:52px] lg:[--tournament-ops-mobile-header-offset:0px]">
       {/* ── Desktop sidebar (lg+) ─────────────────────────────────────── */}
       <aside
         className="hidden lg:flex w-[240px] min-h-screen bg-[var(--card-surface)] border-r border-[var(--border)] flex-col fixed top-0 left-0 h-screen overflow-y-auto z-30 shrink-0"
@@ -474,7 +474,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
 
       {/* ── Right column ─────────────────────────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0 lg:pl-[240px]">
-        <header className="lg:hidden sticky top-0 z-20 bg-[var(--card-surface)] border-b border-[var(--border)] h-[52px] flex items-center px-2">
+        <header className="lg:hidden sticky top-0 z-20 bg-[var(--card-surface)] border-b border-[var(--border)] h-[var(--tournament-ops-mobile-header-offset)] flex items-center px-2">
           <button
             ref={hamburgerRef}
             onClick={openDrawer}

@@ -1094,7 +1094,17 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
             officialAt: now,
             game: {
               currentOfficialRevisionId: `${gameId}-revision`,
-              tournamentFixture: { tournamentId },
+              sourceType: 'TEAM_MATCH',
+              teamMatch: {
+                id: `${gameId}-team-match`,
+                leagueId: null,
+                tournamentId,
+                tournament: { kind: 'regular_tournament' },
+                tournamentDetails: {
+                  teamMatchId: `${gameId}-team-match`,
+                  tournamentId,
+                },
+              },
             },
           },
         };

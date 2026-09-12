@@ -73,7 +73,7 @@ elif ledger_matches "$initial_rows" "${M1[@]}"; then initial_state=precutover
 elif ledger_matches "$initial_rows" "${M1[@]}" "$M10"; then initial_state=committed_resume
 elif ledger_matches "$initial_rows" "${M1[@]}" "$M8" "$M9" "$M10"; then initial_state=complete
 else fail 'Task168 ledger is unsupported or incomplete'; fi
-if [[ "$initial_state" == complete ]]; then assert_existing_transition; exit 0; fi
+if [[ "$initial_state" == complete ]]; then assert_existing_transition; assert_actual_cutover_seals; exit 0; fi
 if [[ "$initial_state" == committed_resume ]]; then
   assert_legacy_physical_schema; assert_actual_cutover_seals; assert_committed_report; bind_resume_evidence; finalize_committed_cutover; exit 0
 fi

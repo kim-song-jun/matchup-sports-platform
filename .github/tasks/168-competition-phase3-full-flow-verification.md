@@ -1,6 +1,9 @@
 # Task 168 — 모든 경기의 팀 매치 통일과 실제 사용자 E2E
 
-## 최신 판정 — 42/42 실행 증거 확보, 본체 배포 미완
+## 최신 판정 — dev 머지 완료, 새 Alpha 배포·42개 검증 미완
+
+- **2026-09-13 01:03KST dev 머지 완료:** #1178을exacthead `a91c7926eccfc8d673848492b637fd3d330fcffb`로고정하고base=dev/CI전체PASS/새Copilot지적0을확인한뒤merge commit방식으로머지했다. dev커밋 `0d76e6b2d077e505eb746173154f9d2df5128af4`, mergedAt `2026-09-12T16:03:16Z`. PR CI `34703711282` PASS, Copilot `5187039802`는137/340부분검토의일반적이관위험알림이며새구체적지적0이다. 위험검증은이전실제DB리허설·복구반례·Sol증거를근거로삼았다. DTO최종실행독립보고서 `region-dto-runtime-independent-review-20260913.json` SHA `8eeff5041a966513611f40a4a1930955671539a6961abc001d21a72737956d64`는6/6·1093파일·잔여0을확인했다. 머지후dev CI `34704065354`, Alpha배포 `34704065353`은진행중이며새Alpha **0/42**다.
+- **로컬 동기화 보호 / 외부 인증·검토 상태:** `git fetch origin dev`는성공했지만`git merge --ff-only origin/dev`는tracked/untracked공유변경충돌로exit1이었다. HEADdd4d와indexSHA `f146be28c21387cc47f617ab930696f0a4993d489f4adb662072ff02ac3ce3a6`가전후동일하며강제복원·stash·switch는하지않았다. `pr1178-dev-sync-20260913/` 참조. 머지후GitHub관리형보안run `34704068457`은agent세션생성중`Model claude-opus-5 is not available`로실패했으며보안발견이나보안PASS로해석하지않는다. 로컬AWS세션은만료됐고Ego실제재인증은로그인자격증명을요구했다. 사용자가터미널`aws login`을완료하도록요청했으며GitHubOIDC배포는별도로진행한다. Ego업데이트알림을필수승인게이트로오해한초기중단은정정하고업그레이드없이재시도했다. Ego276/277및소유aws-login PID80417/80914를정리했고비밀번호는수집하지않았다. 통합영수증 `pr1178-merge-release-20260913.json`.
 
 - **30c CI 전체 PASS 및 마지막 입력 계약 보완:** CI `34702837858`에서 Gates·Web431파일3566건/빌드·API269파일3520건/통합96파일672PASS3SKIP/빌드·Task9실제HTTP10건이모두통과했다. Copilot최종리뷰 `5186995083`의regionId빈문자열지적은Sol이낮은심각도의실제DTO누락으로인정했다. 기존서비스는400 VALIDATION_FAILED로거절해권한우회·DB변경은없으나UUID→문자열전환때빈값거절을놓쳤다. Luna후보는IsString을유지하고IsNotEmpty/정상지역slug및빈문자열회귀/API계약한문장을추가했다. Sol소스검토 `region-dto-independent-review-20260913.json` SHA `433102e4922d848fcac3b4bab75ed00ea15e3ac7a362330c6864f924b4c286ea` PASS후root의exact30c격리1093파일에서DTO테스트 **6/6**,source불일치0,PID74576/부모67823잔여0/archive삭제를확인했다. `region-dto-runtime-20260913/` 근거. nonempty잘못된/비활성지역의서비스400·권한·version계약은그대로다. 공유문서의별도CRLF/이전본문WIP는덮어쓰지않고검토한후보만privateindex에반영한다. 새headCI→dev머지→Alpha42개는계속미완이다. 로컬AWS세션만료는확인했으며GitHubOIDC배포와구분하고호스트증거수집때해결한다.
 

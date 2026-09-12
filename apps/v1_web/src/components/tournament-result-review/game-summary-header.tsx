@@ -68,7 +68,7 @@ export function GameSummaryHeader({
       className="tm-card"
       style={{
         position: 'sticky',
-        top: 0,
+        top: 'var(--tournament-ops-mobile-header-offset, 0px)',
         zIndex: 5,
         padding: 16,
         display: 'flex',

@@ -57,7 +57,13 @@ run_restore_case() {
   ln -s "${sources}/${SHA_CANDIDATE}" "${home}/teameet"
 
   local source_json='{"bucket":"b","key":("releases/" + $sha + ".tar.gz"),"sha256":$srcsha,"versionId":"v1"}'
+  local database_json='{migrationPolicy:"task168-stageAIntermediate",rollbackMode:"canonical-intermediate-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:null,rollbackCompatibleWith:null,task168:{stage:"stageAIntermediate",schemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f",runtimeClientSchemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f",cutoverArchiveSha256:"694a17ba8ed3d062b68908d4fd4ca3085be28afbe2c9661dd7a1cfae2c6e799b",cutoverManifestSha256:"aa1753551026795af1af70352e54bfed31759fda826fe7a0244f43603ac8bb26",migrations:[range(0;10)|{name:("2026091200000"+tostring+"_v1_fixture"),sha256:"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}],rollbackTarget:null}}'
+  local cutover_tool_json=',cutoverTool: { repository: ($registry + "/" + $prefix + "-api"), digest: $digest, uri: ($registry + "/" + $prefix + "-api@" + $digest) }'
   [[ "${env}" == "prod" ]] && source_json='{"transfer":"ssh-rsync","sha256":$srcsha}'
+  if [[ "${env}" == "prod" ]]; then
+    database_json='{migrationPolicy:"expand-contract",rollbackMode:"application-images-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:null,rollbackCompatibleWith:null}'
+    cutover_tool_json=''
+  fi
   jq -n --arg sha "${SHA_ACTIVE}" --arg environment "${environment}" --arg registry "${REGISTRY}" \
     --arg prefix "${repo_prefix}" --arg digest "${DIGEST_A}" \
     --arg srcsha "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" \
@@ -66,13 +72,12 @@ run_restore_case() {
       environment: \$environment,
       release: { sha: \$sha, version: (\"1.0.0-\" + \$environment + \".20260908.g\" + \$sha[0:12]), createdAt: \"2026-09-08T17:16:55+09:00\" },
       source: ${source_json},
-      database: { migrationPolicy: \"expand-contract\", rollbackMode: \"application-images-only\",
-                  compatibilityCheck: \"expand-contract-sql-v1\", migrationValidatedFrom: null, rollbackCompatibleWith: null },
+      database: ${database_json},
       images: {
         api: { repository: (\$registry + \"/\" + \$prefix + \"-api\"), digest: \$digest,
                uri: (\$registry + \"/\" + \$prefix + \"-api@\" + \$digest) },
         web: { repository: (\$registry + \"/\" + \$prefix + \"-web\"), digest: \$digest,
-               uri: (\$registry + \"/\" + \$prefix + \"-web@\" + \$digest) }
+               uri: (\$registry + \"/\" + \$prefix + \"-web@\" + \$digest) }${cutover_tool_json}
       }
     }" > "${manifest}"
   local checksum

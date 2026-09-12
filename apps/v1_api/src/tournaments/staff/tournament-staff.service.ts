@@ -19,7 +19,7 @@ import {
   TournamentStaffAccessService,
   type TournamentStaffPrincipal,
 } from './tournament-staff-access.service';
-import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournament-surface-lookup';
+import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-surface-lookup';
 
 export const TOURNAMENT_STAFF_MANAGEMENT_CLOCK = Symbol('TOURNAMENT_STAFF_MANAGEMENT_CLOCK');
 export type TournamentStaffManagementClock = () => Date;
@@ -88,11 +88,20 @@ type StaffAssignmentSnapshot = {
   readonly version: number;
   readonly expiresAt: Date | null;
   readonly revokedAt: Date | null;
-  readonly fixtureScopes: readonly { readonly fixtureId: string }[];
+  readonly fixtureScopes: readonly {
+    readonly teamMatchId: string | null;
+  }[];
   readonly user?: { readonly profile: { readonly nickname: string | null } | null } | null;
 };
 
 const STABLE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function scopeIdentifier(scope: { readonly teamMatchId: string | null }): string {
+  const id = scope.teamMatchId;
+  if (id === null) throw new Error('STAFF_SCOPE_SOURCE_MISSING');
+  return id;
+}
+
 const ASSIGNMENT_SELECT = {
   id: true,
   tournamentId: true,
@@ -102,12 +111,15 @@ const ASSIGNMENT_SELECT = {
   version: true,
   expiresAt: true,
   revokedAt: true,
-  fixtureScopes: { select: { fixtureId: true }, orderBy: { fixtureId: 'asc' as const } },
+  fixtureScopes: {
+    select: { teamMatchId: true },
+    orderBy: [{ teamMatchId: 'asc' }],
+  },
   // 운영 화면이 담당자를 userId 앞 8자로만 보여주고 있었다 — 스태프 표에서 누가 누구인지
   // 알 수 없다는 뜻이다. 공개 신원으로 쓸 수 있는 값은 닉네임뿐이므로(D-03/D-11) 그것만
   // 함께 싣는다. 프로필이 없는 계정도 있으므로 optional 이다.
   user: { select: { profile: { select: { nickname: true } } } },
-} as const;
+} satisfies Prisma.V1TournamentStaffAssignmentSelect;
 
 @Injectable()
 export class TournamentStaffService {
@@ -211,7 +223,8 @@ export class TournamentStaffService {
           await tx.v1TournamentStaffFixtureScope.createMany({
             data: normalized.fixtureIds.map((fixtureId) => ({
               assignmentId: created.id,
-              fixtureId,
+              tournamentId: normalized.tournamentId,
+              teamMatchId: fixtureId,
             })),
           });
         }
@@ -301,7 +314,7 @@ export class TournamentStaffService {
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
 
-    this.realtimeGateway.evictUserFromScopedGameRooms({
+    await this.realtimeGateway.evictUserFromScopedGameRooms({
       userId: result.userId,
       tournamentId: result.tournamentId,
       assignmentVersion: result.version,
@@ -429,7 +442,7 @@ export class TournamentStaffService {
     targetUserId: string,
   ): Promise<void> {
     const [tournament, target] = await Promise.all([
-      findTournamentOnSurface(tx, TOURNAMENT_KINDS, { where: { id: tournamentId }, select: { id: true } }),
+      findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, { where: { id: tournamentId }, select: { id: true } }),
       tx.v1User.findUnique({
         where: { id: targetUserId },
         select: { id: true, accountStatus: true },
@@ -471,11 +484,31 @@ export class TournamentStaffService {
       }
     }
     if (fixtureIds.length > 0) {
-      const fixtures = await tx.v1TournamentFixture.findMany({
-        where: { tournamentId, id: { in: [...fixtureIds] } },
+      const teamMatches = await tx.v1TeamMatch.findMany({
+        where: {
+          tournamentId,
+          id: { in: [...fixtureIds] },
+          deletedAt: null,
+          OR: [
+            {
+              leagueId: null,
+              tournamentDetails: { is: { tournamentId } },
+              tournament: {
+                is: { OR: [{ kind: 'regular_tournament' }, { kind: null }] },
+              },
+            },
+            // Regular-league TeamMatches share the unified tournament id but
+            // intentionally have no bracket Details row.
+            {
+              leagueId: tournamentId,
+              tournamentDetails: { is: null },
+              tournament: { is: { kind: 'regular_league' } },
+            },
+          ],
+        },
         select: { id: true },
       });
-      if (fixtures.length !== fixtureIds.length) {
+      if (teamMatches.length !== fixtureIds.length) {
         this.deny('CROSS_TOURNAMENT_FIXTURE_SCOPE');
       }
     }
@@ -569,7 +602,7 @@ export class TournamentStaffService {
       userId: assignment.userId,
       role: assignment.role,
       fieldId: assignment.fieldId,
-      fixtureIds: assignment.fixtureScopes.map((scope) => scope.fixtureId),
+      fixtureIds: assignment.fixtureScopes.map(scopeIdentifier),
       version: assignment.version,
       expiresAt: assignment.expiresAt?.toISOString() ?? null,
       revokedAt: assignment.revokedAt?.toISOString() ?? null,
@@ -583,7 +616,7 @@ export class TournamentStaffService {
       userId: assignment.userId,
       role: assignment.role,
       fieldId: assignment.fieldId,
-      fixtureIds: assignment.fixtureScopes.map((scope) => scope.fixtureId),
+      fixtureIds: assignment.fixtureScopes.map(scopeIdentifier),
       version: assignment.version,
       expiresAt: assignment.expiresAt,
       revokedAt: assignment.revokedAt,

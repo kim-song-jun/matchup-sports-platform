@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Logger } from '@nestjs/common';
 import { Prisma, V1IdentityActorType, V1IdentityLinkAction } from '@prisma/client';
 import { notificationCopyFor } from '../../notifications/notifications.service';
+import { IdentityNotificationScopeError } from '../../games/identity-attest-notification';
 import type { WebPushService } from '../../notifications/web-push.service';
 import type { GameOperationClaim, GameOperationHandler } from '../v1-game-operations-worker.service';
 
@@ -42,6 +43,80 @@ export async function scheduleIdentityLinkExpiry(
 
 type ExpiryPayload = { gameId: string; participantId: string; requestId: string };
 
+type ExpiryNotificationScope =
+  | { readonly kind: 'tournament'; readonly tournamentId: string; readonly fixtureId: string }
+  | { readonly kind: 'team_match'; readonly teamMatchId: string };
+
+/**
+ * Keep expiry notifications on the same source boundary as identity-attest-notification.ts:
+ * a TEAM_MATCH becomes a tournament match only when its Details row binds the same IDs.
+ */
+function resolveExpiryNotificationScope(game: {
+  readonly sourceType: string;
+  readonly teamMatchId: string | null;
+  readonly teamMatch: {
+    readonly tournamentId: string | null;
+    readonly leagueId: string | null;
+    readonly tournament: { readonly kind: string | null } | null;
+    readonly tournamentDetails: { readonly teamMatchId: string; readonly tournamentId: string } | null;
+} | null;
+}): ExpiryNotificationScope | null {
+  if (game.sourceType !== 'TEAM_MATCH' || game.teamMatchId === null || game.teamMatch === null) return null;
+  const competitionKind = game.teamMatch.tournament?.kind ?? null;
+  const isRegularLeague =
+    game.teamMatch.leagueId !== null &&
+    game.teamMatch.tournamentId === game.teamMatch.leagueId &&
+    competitionKind === 'regular_league';
+  if (isRegularLeague && game.teamMatch.tournamentDetails === null) {
+    return { kind: 'team_match', teamMatchId: game.teamMatchId };
+  }
+  if (game.teamMatch.tournamentId === null && game.teamMatch.leagueId === null && game.teamMatch.tournamentDetails === null) {
+    return { kind: 'team_match', teamMatchId: game.teamMatchId };
+  }
+  if (
+    game.teamMatch.leagueId !== null &&
+    game.teamMatch.tournamentId === game.teamMatch.leagueId &&
+    competitionKind === 'regular_league' &&
+    game.teamMatch.tournamentDetails === null
+  ) {
+    return { kind: 'team_match', teamMatchId: game.teamMatchId };
+  }
+  if (
+    game.teamMatch.tournament === null ||
+    game.teamMatch.tournament === undefined ||
+    game.teamMatch.leagueId !== null ||
+    game.teamMatch.tournamentId === null ||
+    (competitionKind !== null && competitionKind !== 'regular_tournament')
+  ) return null;
+  const details = game.teamMatch.tournamentDetails;
+  if (details === null || details.teamMatchId !== game.teamMatchId || details.tournamentId !== game.teamMatch.tournamentId) return null;
+  return { kind: 'tournament', tournamentId: game.teamMatch.tournamentId, fixtureId: game.teamMatchId };
+}
+
+async function assertExpiryNotificationScope(
+  tx: Prisma.TransactionClient,
+  gameId: string,
+): Promise<void> {
+  const game = await tx.v1Game.findUnique({
+    where: { id: gameId },
+    select: {
+      sourceType: true,
+      teamMatchId: true,
+      teamMatch: {
+        select: {
+          tournamentId: true,
+          leagueId: true,
+          tournament: { select: { kind: true } },
+          tournamentDetails: { select: { teamMatchId: true, tournamentId: true } },
+        },
+      },
+    },
+  });
+  if (game === null || resolveExpiryNotificationScope(game) === null) {
+    throw new IdentityNotificationScopeError();
+  }
+}
+
 export class IdentityLinkExpiryService {
   private readonly logger = new Logger(IdentityLinkExpiryService.name);
 
@@ -50,13 +125,34 @@ export class IdentityLinkExpiryService {
   readonly handler: GameOperationHandler = async (claim, tx) => {
     const { gameId, participantId, requestId } = this.payload(claim.payload);
 
+    const participant = await tx.v1GameParticipant.findUnique({
+      where: { id: participantId },
+      select: { id: true, gameId: true },
+    });
+    if (participant === null || participant.gameId !== gameId) {
+      throw new Error('IDENTITY_LINK_EXPIRY_PARTICIPANT_GAME_MISMATCH');
+    }
+
     const events = await tx.v1ParticipantIdentityLinkEvent.findMany({
       where: { participantId, requestId },
       orderBy: { eventVersion: 'asc' },
     });
     const requested = events.find((event) => event.action === V1IdentityLinkAction.REQUESTED);
-    // 요청 자체가 없으면(데이터 정리 등) 할 일이 없다.
-    if (requested === undefined) return;
+    // A scheduled expiry without its REQUESTED event is malformed queue data.
+    // Retry/fail the transaction rather than silently acknowledging it.
+    if (requested === undefined) {
+      throw new Error('IDENTITY_LINK_EXPIRY_REQUEST_MISSING');
+    }
+    if (
+      requested.participantId !== participantId ||
+      requested.requestId !== requestId ||
+      typeof requested.userId !== 'string' ||
+      requested.userId.trim().length === 0 ||
+      typeof requested.linkId !== 'string' ||
+      requested.linkId.trim().length === 0
+    ) {
+      throw new Error('IDENTITY_LINK_EXPIRY_REQUEST_MISMATCH');
+    }
     const terminal = events.find(
       (event) =>
         event.action === V1IdentityLinkAction.ATTESTED ||
@@ -71,6 +167,11 @@ export class IdentityLinkExpiryService {
     // 매번 "아직 아님"으로 종료돼 만료가 영영 기록되지 않는다(Copilot 리뷰).
     const [{ now }] = await tx.$queryRaw<Array<{ now: Date }>>`SELECT CURRENT_TIMESTAMP AS now`;
     if (now.getTime() - requested.effectiveAt.getTime() < IDENTITY_LINK_REQUEST_TTL_MS) return;
+
+    // Validate the canonical scope before writing EXPIRED/version. A malformed
+    // source must abort the worker transaction so it can be repaired/retried;
+    // otherwise the request would be closed with no notification path.
+    await assertExpiryNotificationScope(tx, gameId);
 
     const last = await tx.v1ParticipantIdentityLinkEvent.findFirst({
       where: { participantId },
@@ -113,7 +214,14 @@ export class IdentityLinkExpiryService {
       select: {
         sourceType: true,
         teamMatchId: true,
-        tournamentFixture: { select: { id: true, tournamentId: true } },
+        teamMatch: {
+          select: {
+            tournamentId: true,
+            leagueId: true,
+            tournament: { select: { kind: true } },
+            tournamentDetails: { select: { teamMatchId: true, tournamentId: true } },
+          },
+        },
       },
     });
     if (game === null) return;
@@ -122,14 +230,11 @@ export class IdentityLinkExpiryService {
       select: { displayNameSnapshot: true },
     });
 
-    const isTournament = game.sourceType === 'TOURNAMENT_FIXTURE';
+    const scope = resolveExpiryNotificationScope(game);
+    if (scope === null) return;
+    const isTournament = scope.kind === 'tournament';
     const targetType = isTournament ? ('tournament' as const) : ('team_match' as const);
-    const targetId = isTournament
-      ? game.tournamentFixture
-        ? `${game.tournamentFixture.tournamentId}:${game.tournamentFixture.id}`
-        : null
-      : game.teamMatchId;
-    if (targetId === null) return;
+    const targetId = isTournament ? `${scope.tournamentId}:${scope.fixtureId}` : scope.teamMatchId;
 
     const preference = await tx.v1NotificationPreference.findUnique({
       where: { userId: input.requesterUserId },

@@ -111,6 +111,7 @@ export class TeamMatchesService {
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
       where: {
         deletedAt: null,
+        OR: [{ tournamentId: null }, { leagueId: { not: null } }],
         hostTeam: { status: 'active', deletedAt: null },
         ...(status === 'expired'
           ? { startAt: { lt: now } }
@@ -144,7 +145,10 @@ export class TeamMatchesService {
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     });
 
-    const pageItems = teamMatches.slice(0, limit);
+    const pageItems = teamMatches.slice(0, limit).map((teamMatch) => {
+      assertTeamMatchPublicInvariant(teamMatch);
+      return teamMatch;
+    });
     const hasNext = teamMatches.length > limit;
 
     // 캐시(V1TeamTrustScore)는 72시간 경과만으로는 안 갱신될 수 있으므로 이 페이지에 등장하는
@@ -253,7 +257,14 @@ export class TeamMatchesService {
   async recentVenues(user: V1AuthUser, teamId: string) {
     await this.assertCanManageTeam(user.id, teamId);
     const rows = await this.prisma.v1TeamMatch.findMany({
-      where: { hostTeamId: teamId, deletedAt: null },
+      where: {
+        hostTeamId: teamId,
+        deletedAt: null,
+        // This picker belongs to friendly/regular-league team matches. A
+        // canonical tournament match has its field/place managed by tournament
+        // operations and must not leak into the generic team-match form.
+        OR: [{ tournamentId: null }, { leagueId: { not: null } }],
+      },
       orderBy: { createdAt: 'desc' },
       take: 30,
       select: { placeName: true, placeAddress: true },
@@ -264,6 +275,7 @@ export class TeamMatchesService {
     const seen = new Set<string>();
     const items: { placeName: string; addressText: string | null }[] = [];
     for (const row of rows) {
+      if (row.placeName === null) continue;
       const placeName = row.placeName.trim();
       if (!placeName || seen.has(placeName)) continue;
       seen.add(placeName);
@@ -339,6 +351,7 @@ export class TeamMatchesService {
     const teamMatches = await this.prisma.v1TeamMatch.findMany({
       where: {
         deletedAt: null,
+        AND: [{ OR: [{ tournamentId: null }, { leagueId: { not: null } }] }],
         // 'expired'는 계산 상태(getApiStatus)라 DB status 로 존재하지 않는다 — list()와
         // 동일하게 startAt 과거 조건으로 매핑한다.
         ...(matchStatusFilter
@@ -386,7 +399,11 @@ export class TeamMatchesService {
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     });
 
-    const pageItems = teamMatches.slice(0, limit);
+    const pageItems = teamMatches.slice(0, limit).map((teamMatch) => {
+      assertTeamMatchHasHostAndStart(teamMatch);
+      assertTeamMatchHasHostRelation(teamMatch);
+      return teamMatch;
+    });
     const hasNext = teamMatches.length > limit;
 
     return {
@@ -469,6 +486,7 @@ export class TeamMatchesService {
         const existingTeamMatch = await tx.v1TeamMatch.findUniqueOrThrow({
           where: { id: existingCommand.resourceId },
         });
+        assertTeamMatchHasHostAndStart(existingTeamMatch);
         const actorRole = await this.resolveTeamGameActorRole(
           tx,
           existingTeamMatch.hostTeamId,
@@ -1083,6 +1101,7 @@ export class TeamMatchesService {
     }
     if (
       application.teamMatch.status !== 'recruiting' ||
+      application.teamMatch.startAt === null ||
       application.teamMatch.startAt < new Date() ||
       (application.teamMatch.deadlineAt && application.teamMatch.deadlineAt < new Date())
     ) {
@@ -1098,6 +1117,7 @@ export class TeamMatchesService {
       if (
         !currentTeamMatch ||
         currentTeamMatch.status !== 'recruiting' ||
+        currentTeamMatch.startAt === null ||
         currentTeamMatch.startAt < new Date() ||
         (currentTeamMatch.deadlineAt && currentTeamMatch.deadlineAt < new Date()) ||
         currentTeamMatch.approvedApplicantTeamId
@@ -1436,10 +1456,16 @@ export class TeamMatchesService {
     options: { includeTrust?: boolean } = {},
   ) {
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({
-      where: { id: teamMatchId, deletedAt: null, hostTeam: { status: 'active', deletedAt: null } },
+      where: {
+        id: teamMatchId,
+        deletedAt: null,
+        OR: [{ tournamentId: null }, { leagueId: { not: null } }],
+        hostTeam: { status: 'active', deletedAt: null },
+      },
       include: this.teamMatchInclude(user),
     });
     if (!teamMatch) throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
+    assertTeamMatchPublicInvariant(teamMatch);
 
     // hostTeam 신뢰점수는 detail() 응답에만 노출된다. applicationEligibility()/createApplication()은
     // hostTeam.trustScore를 전혀 참조하지 않으므로 불필요한 live 재계산(추가 쿼리)을 건너뛴다.
@@ -1545,14 +1571,20 @@ export class TeamMatchesService {
 
   private async getManageableTeamMatch(user: V1AuthUser, teamMatchId: string) {
     const teamMatch = await this.prisma.v1TeamMatch.findFirst({
-      where: { id: teamMatchId, deletedAt: null },
+      where: {
+        id: teamMatchId,
+        deletedAt: null,
+        OR: [{ tournamentId: null }, { leagueId: { not: null } }],
+      },
       include: {
         minSportLevel: { select: { code: true } },
         maxSportLevel: { select: { code: true } },
-        hostTeam: { select: { sportId: true } },
+        hostTeam: { select: { id: true, sportId: true } },
       },
     });
     if (!teamMatch) throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
+    assertTeamMatchHasHostAndStart(teamMatch);
+    assertTeamMatchHasHostRelation(teamMatch);
     await this.assertCanManageTeam(user.id, teamMatch.hostTeamId);
     return teamMatch;
   }
@@ -1561,7 +1593,10 @@ export class TeamMatchesService {
     const application = await this.prisma.v1TeamMatchApplication.findFirst({
       where: {
         id: applicationId,
-        teamMatch: { deletedAt: null },
+        teamMatch: {
+          deletedAt: null,
+          OR: [{ tournamentId: null }, { leagueId: { not: null } }],
+        },
       },
       include: { teamMatch: true },
     });
@@ -1573,7 +1608,10 @@ export class TeamMatchesService {
       });
     }
 
-    return application;
+    const teamMatch = application.teamMatch;
+    assertTeamMatchHasHostAndStart(teamMatch);
+
+    return { ...application, teamMatch };
   }
 
   private async getUserManageableTeams(userId: string, teamId?: string) {
@@ -1892,7 +1930,7 @@ export class TeamMatchesService {
   }
 
   private getApiStatus(teamMatch: V1TeamMatch) {
-    if (teamMatch.status === 'recruiting' && teamMatch.startAt < new Date()) return 'expired';
+    if (teamMatch.status === 'recruiting' && teamMatch.startAt !== null && teamMatch.startAt < new Date()) return 'expired';
     return teamMatch.status;
   }
 
@@ -1900,6 +1938,61 @@ export class TeamMatchesService {
     const status = this.getApiStatus(teamMatch);
     if (status === 'recruiting' && teamMatch.deadlineAt && teamMatch.deadlineAt < new Date()) return 'closed';
     return status;
+  }
+}
+
+type TeamMatchOperationalFields = {
+  hostTeamId: string | null;
+  startAt: Date | null;
+};
+
+type TeamMatchPublicFields = TeamMatchOperationalFields & {
+  hostTeam: { id: string } | null;
+  region: { id: string; name: string } | null;
+};
+
+type TeamMatchHostFields = {
+  hostTeam: { id: string } | null;
+};
+
+function assertTeamMatchHasHostAndStart<T extends TeamMatchOperationalFields>(
+  teamMatch: T,
+): asserts teamMatch is T & { hostTeamId: string; startAt: Date } {
+  if (teamMatch.hostTeamId === null || teamMatch.startAt === null) {
+    throw new ConflictException({
+      code: 'TEAM_MATCH_OPERATIONAL_DATA_INVALID',
+      message: '팀 매치의 호스트 팀 또는 경기 시작 시간이 없습니다.',
+    });
+  }
+}
+
+function assertTeamMatchHasHostRelation<T extends TeamMatchHostFields>(
+  teamMatch: T,
+): asserts teamMatch is T & { hostTeam: NonNullable<T['hostTeam']> } {
+  if (teamMatch.hostTeam === null) {
+    throw new ConflictException({
+      code: 'TEAM_MATCH_OPERATIONAL_DATA_INVALID',
+      message: '팀 매치의 호스트 팀 관계가 없습니다.',
+    });
+  }
+}
+
+function assertTeamMatchPublicInvariant<T extends TeamMatchPublicFields>(
+  teamMatch: T,
+): asserts teamMatch is T & { hostTeamId: string; startAt: Date; hostTeam: NonNullable<T['hostTeam']>; region: NonNullable<T['region']> } {
+  assertTeamMatchHasHostAndStart(teamMatch);
+  assertTeamMatchHasHostRelation(teamMatch);
+  if (teamMatch.hostTeam.id !== teamMatch.hostTeamId) {
+    throw new ConflictException({
+      code: 'TEAM_MATCH_OPERATIONAL_DATA_INVALID',
+      message: '팀 매치의 호스트 팀 정보가 일치하지 않습니다.',
+    });
+  }
+  if (teamMatch.region === null) {
+    throw new ConflictException({
+      code: 'TEAM_MATCH_OPERATIONAL_DATA_INVALID',
+      message: '팀 매치의 지역 정보가 없습니다.',
+    });
   }
 }
 
@@ -1993,6 +2086,7 @@ function getEligibilityReason(
   if (teamMatch.status === 'matched') return 'MATCHED_ALREADY';
   if (
     teamMatch.status !== 'recruiting' ||
+    teamMatch.startAt === null ||
     teamMatch.startAt < new Date() ||
     (teamMatch.deadlineAt && teamMatch.deadlineAt < new Date())
   ) return 'NOT_RECRUITING';

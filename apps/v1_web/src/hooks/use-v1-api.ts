@@ -1950,6 +1950,34 @@ export function useV1LeagueRequestIdentityLink(leagueId: string, teamMatchId: st
   });
 }
 
+/** 팀매치 상세의 "내 기록 연결" 목록 — 대회·리그와 같은 게임 경로를 쓰되
+ * 참가팀 멤버십은 팀매치 API가 판정한다. */
+export function useV1TeamMatchClaimableParticipants(
+  teamMatchId: string,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: ['v1', 'team-match-claimable-participants', teamMatchId] as const,
+    queryFn: () =>
+      v1Get<V1ClaimableParticipants>(`/team-matches/${teamMatchId}/claimable-participants`),
+    enabled: Boolean(teamMatchId) && (options?.enabled ?? true),
+    retry: false,
+  });
+}
+
+/** 팀매치 기록 연결 신청 — 성공하면 같은 상세의 후보 목록을 다시 읽는다. */
+export function useV1TeamMatchRequestIdentityLink(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: postIdentityLinkRequest,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['v1', 'team-match-claimable-participants', teamMatchId],
+      });
+    },
+  });
+}
+
 /** 라인업 편집기가 쓰는 참가 등록 명단 — 대회 경기 라인업 선수의 유일한 출처. */
 /** 불러오기 시트가 쓰는 한 명분 엔트리 — 히스토리와 프리셋이 같은 모양을 쓴다. */
 export type V1LineupSourceEntry = {

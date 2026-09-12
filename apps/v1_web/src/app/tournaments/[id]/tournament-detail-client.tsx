@@ -377,16 +377,21 @@ function ApplyCTAButtons({
       tournament.entryFee === 0,
     );
     return (
-      <button
-        type="button"
-        className={primaryButtonClass}
-        style={{ fontSize: 'var(--font-size-body-lg)' }}
-        disabled
-        aria-disabled="true"
-        aria-label={description}
-      >
-        {getApplyBlockButtonLabel(blockReason)}
-      </button>
+      <div style={{ display: 'grid', gap: 8 }}>
+        <button
+          type="button"
+          className={primaryButtonClass}
+          style={{ fontSize: 'var(--font-size-body-lg)' }}
+          disabled
+          aria-disabled="true"
+          aria-label={description}
+        >
+          {getApplyBlockButtonLabel(blockReason)}
+        </button>
+        <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-muted)', lineHeight: 1.5, textAlign: 'center' }}>
+          {description}
+        </p>
+      </div>
     );
   }
 
@@ -649,7 +654,7 @@ export function TournamentDetailView({
     myRegistration !== null && myRegistration.status !== 'cancelled';
   // Mobile: extra bottom padding so fixed CTA doesn't occlude last content row.
   // Desktop: fixed CTA is hidden via .tm-hide-desktop; sticky right panel takes over.
-  const bottomPad = isOpen ? 96 : 48;
+  const detailArticleClassName = `tm-tournament-detail-article${isOpen ? ' tm-tournament-detail-article--fixed-cta' : ''}`;
 
   /* ── 신청자 본인 대상 targeted 공지(confirmed_only/waitlist/all_registered) ──
      공개 상세 프로젝션(`tournament.announcements`)은 audience='public'만 담는다(의도된
@@ -1365,7 +1370,7 @@ export function TournamentDetailView({
   ) : null;
 
   return (
-    <article style={{ paddingBottom: bottomPad }}>
+    <article className={detailArticleClassName}>
       {/* ── Desktop back navigation (hidden on mobile via .tm-show-desktop) ── */}
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link

@@ -95,7 +95,7 @@ export class TournamentAwardItemDto {
 }
 
 export class SetTournamentAwardsDto {
-  /** 어워드 배열. awardType 중복 시 upsert 처리. */
+  /** 어워드 배열. 같은 대회 안에서 awardType은 한 번만 보낼 수 있다. */
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => TournamentAwardItemDto)
@@ -566,9 +566,21 @@ export class TournamentReviewsService {
     // 검증과 저장이 같은 값을 쓰도록 선(先)정규화 — 공백 섞인 입력이 그대로 저장되는 것을 방지.
     const submittedAwards = dto.awards.map((a) => ({
       ...a,
+      awardType: a.awardType.trim(),
       recipientName: a.recipientName.trim(),
       teamName: a.teamName?.trim() || null,
     }));
+    const duplicateAwardTypes = [...new Set(
+      submittedAwards
+        .map((award) => award.awardType.trim())
+        .filter((awardType, index, awardTypes) => awardTypes.indexOf(awardType) !== index),
+    )];
+    if (duplicateAwardTypes.length > 0) {
+      throw new BadRequestException({
+        code: 'DUPLICATE_AWARD_TYPE',
+        message: '같은 종류의 어워드가 중복되어 있어요. 중복 항목을 제거한 뒤 다시 저장해 주세요.',
+      });
+    }
 
     // 로스터 전용 강제 — 이름만 비교하면 동명이인을 잘못 연결할 수 있으므로 계정 ID,
     // 이름 스냅샷, 팀을 같은 confirmed 등록 행에서 교차 검증한다.

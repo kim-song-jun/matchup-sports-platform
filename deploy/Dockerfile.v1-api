@@ -18,8 +18,30 @@ RUN --mount=type=cache,id=teameet-pnpm-store,target=/root/.local/share/pnpm/stor
 COPY apps/v1_api/ apps/v1_api/
 
 WORKDIR /app/apps/v1_api
-RUN npx prisma generate
+RUN npx prisma generate \
+  && test "$(sha256sum prisma/schema.prisma | awk '{print $1}')" = 91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f \
+  && printf '{"schemaVersion":1,"stage":"stageAIntermediate","schemaSha256":"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f","generatedClient":true}\n' > .task168-runtime-client-attestation.json
 RUN npx nest build
+
+# This image is an executable view of the immutable v6 tar. No retired source
+# is copied into the application tree: Docker verifies and extracts the pinned
+# archive, installs its locked dependencies, and generates its archived client.
+FROM base AS task168-cutover-tool
+WORKDIR /opt/task168
+RUN npm install -g pnpm@9.15.4
+COPY deploy/task168-pre-retirement-v6.tar.gz ./release.tar.gz
+RUN test "$(sha256sum release.tar.gz | awk '{print $1}')" = 694a17ba8ed3d062b68908d4fd4ca3085be28afbe2c9661dd7a1cfae2c6e799b \
+  && mkdir release \
+  && tar -xzf release.tar.gz -C release \
+  && test "$(sha256sum release/MANIFEST.json | awk '{print $1}')" = aa1753551026795af1af70352e54bfed31759fda826fe7a0244f43603ac8bb26 \
+  && cd release && sha256sum -c SHA256SUMS
+WORKDIR /opt/task168/release/bundle
+RUN pnpm --filter v1_api... install --frozen-lockfile --ignore-scripts \
+  && cd apps/v1_api \
+  && pnpm exec prisma generate --schema prisma/schema.prisma \
+  && printf '{"schemaVersion":1,"archiveSha256":"694a17ba8ed3d062b68908d4fd4ca3085be28afbe2c9661dd7a1cfae2c6e799b","manifestSha256":"aa1753551026795af1af70352e54bfed31759fda826fe7a0244f43603ac8bb26","generatedClient":true}\n' > /opt/task168/tool-attestation.json
+WORKDIR /opt/task168/release/bundle/apps/v1_api
+ENTRYPOINT ["node", "-r", "ts-node/register/transpile-only", "src/games/migration/tournament-team-match-cutover-cli.ts"]
 
 FROM base AS runtime
 WORKDIR /app
@@ -40,6 +62,7 @@ COPY --from=builder /app/apps/v1_api/dist ./apps/v1_api/dist
 COPY --from=builder /app/apps/v1_api/prisma ./apps/v1_api/prisma
 COPY --from=builder /app/apps/v1_api/package.json ./apps/v1_api/package.json
 COPY --from=builder /app/apps/v1_api/tsconfig.json ./apps/v1_api/tsconfig.json
+COPY --from=builder /app/apps/v1_api/.task168-runtime-client-attestation.json ./apps/v1_api/
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 

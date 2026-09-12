@@ -172,7 +172,7 @@ export function buildDailyMessages(
   const groups = new Map<string, LineupTodo[]>();
   for (const todo of todos) {
     const scope =
-      todo.source === 'TOURNAMENT_FIXTURE' && todo.tournamentId !== null
+      todo.competitionKind === 'TOURNAMENT' && todo.tournamentId !== null
         ? `tournament:${todo.tournamentId}`
         : `game:${todo.gameId}`;
     const key = `${scope}|${todo.teamId}`;
@@ -185,7 +185,7 @@ export function buildDailyMessages(
   for (const [key, group] of groups) {
     const [scope] = key.split('|');
     const first = group[0];
-    const isTournament = first.source === 'TOURNAMENT_FIXTURE';
+    const isTournament = first.competitionKind === 'TOURNAMENT';
     // 가장 이른 경기를 대표로 삼는다 — 링크는 지금 당장 손볼 경기로 꽂혀야 한다.
     const soonest = group.reduce((earliest, candidate) =>
       (candidate.scheduledAt?.getTime() ?? Infinity) < (earliest.scheduledAt?.getTime() ?? Infinity)

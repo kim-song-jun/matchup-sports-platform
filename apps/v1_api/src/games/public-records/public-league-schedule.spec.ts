@@ -1,6 +1,7 @@
 import type { PrismaService } from '../../prisma/prisma.service';
 import { TournamentStaffAccessService } from '../../tournaments/staff/tournament-staff-access.service';
 import { PublicTournamentRecordsService } from './public-tournament-records.service';
+import { PUBLIC_COMPETITION_STATUS_WHERE } from '../../tournaments/tournaments-read.query';
 
 /**
  * `getSchedule` 의 **정규 리그 갈래** — `/tournaments/:id/schedule`.
@@ -21,6 +22,7 @@ import { PublicTournamentRecordsService } from './public-tournament-records.serv
  */
 
 const LEAGUE_ID = 'c1000000-0000-4000-8000-000000000001';
+let firstTournamentWhere: unknown;
 
 function makeGame(id: string, score: { home: number; away: number } | null) {
   return {
@@ -51,6 +53,7 @@ function makeTeamMatches() {
   return [
     {
       id: 'tm-1',
+      leagueId: LEAGUE_ID,
       startAt: new Date('2026-09-05T10:00:00.000Z'),
       placeName: '성수 풋살장',
       status: 'completed',
@@ -63,6 +66,7 @@ function makeTeamMatches() {
     },
     {
       id: 'tm-2',
+      leagueId: LEAGUE_ID,
       startAt: new Date('2026-09-12T10:00:00.000Z'),
       placeName: '왕십리 구장',
       status: 'matched',
@@ -83,24 +87,28 @@ function buildService(options: {
   bracketPublishedAt?: Date | null;
 } = {}) {
   const teamMatches = options.teamMatches ?? makeTeamMatches();
+  firstTournamentWhere = undefined;
   const fakePrisma = {
     // BE-5: 일정 조회와 순위표 로스터가 **같은 테이블**을 읽는다(로스터 = confirmed 등록,
     // `tieBreakJson` 은 상수화되어 더는 읽지 않는다 — `league-tie-break.ts`). 두 소비처가
     // 서로 다른 필드를 select 하므로 합집합을 돌려준다.
     v1Tournament: {
-      findFirst: async () => ({
-        id: LEAGUE_ID,
-        title: '가을 정규 리그',
-        kind: options.kind ?? 'regular_league',
-        status: 'in_progress',
-        bracketPublishedAt: options.bracketPublishedAt ?? null,
-        bracketPublishScheduledAt: null,
-        tier: options.tier === undefined ? 1 : options.tier,
-        registrations: [
-          { teamId: 'team-a', team: { name: '성수 FC', profile: { logoUrl: 'https://example.test/a.png' } } },
-          { teamId: 'team-b', team: { name: '왕십리 유나이티드', profile: null } },
-        ],
-      }),
+      findFirst: async (args: { where?: unknown }) => {
+        if (firstTournamentWhere === undefined) firstTournamentWhere = args.where;
+        return {
+          id: LEAGUE_ID,
+          title: '가을 정규 리그',
+          kind: options.kind ?? 'regular_league',
+          status: 'in_progress',
+          bracketPublishedAt: options.bracketPublishedAt ?? null,
+          bracketPublishScheduledAt: null,
+          tier: options.tier === undefined ? 1 : options.tier,
+          registrations: [
+            { teamId: 'team-a', team: { name: '성수 FC', profile: { logoUrl: 'https://example.test/a.png' } } },
+            { teamId: 'team-b', team: { name: '왕십리 유나이티드', profile: null } },
+          ],
+        };
+      },
     },
     v1TeamMatch: { findMany: async () => teamMatches },
     v1GameOfficialFact: {
@@ -114,6 +122,19 @@ function buildService(options: {
 }
 
 describe('getSchedule — 정규 리그 갈래', () => {
+  it('public status와 삭제 경계를 surface query에 함께 전달한다', async () => {
+    await buildService().getSchedule(LEAGUE_ID, {});
+    expect(firstTournamentWhere).toEqual(expect.objectContaining({
+      AND: expect.arrayContaining([
+        expect.objectContaining({
+          AND: [PUBLIC_COMPETITION_STATUS_WHERE],
+          id: LEAGUE_ID,
+          deletedAt: null,
+        }),
+      ]),
+    }));
+  });
+
   it('리그도 일정을 돌려준다 — 이 갈래가 없으면 404 라 /schedule 과 /bracket 이 함께 죽는다', async () => {
     const result = await buildService().getSchedule(LEAGUE_ID, {});
     expect(result.items).toHaveLength(2);
@@ -206,7 +227,8 @@ describe('getSchedule — 정규 리그 갈래', () => {
       const row = result.standings.find((entry) => entry.teamId === 'team-a');
       expect(row).toBeDefined();
       expect(row?.teamName).toBe('성수 FC');
-      expect(row).not.toHaveProperty('registrationId');
+      const serialized = JSON.parse(JSON.stringify(row)) as Record<string, unknown>;
+      expect(serialized).not.toHaveProperty('registrationId');
     });
 
     it('확정된 경기만 순위에 센다 — 2:1 승리가 승점 3 으로 잡힌다', async () => {

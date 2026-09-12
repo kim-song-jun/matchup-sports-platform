@@ -1,5 +1,6 @@
 import {
   Prisma,
+  V1GameOfficialFactSourceType,
   V1GameSourceType,
   V1IdentityActorType,
 } from '@prisma/client';
@@ -50,6 +51,19 @@ export async function repairExistingShowcaseOfficialResult(
       outcomeReason: true,
       outcomeNote: true,
       officialAt: true,
+      game: { select: { sourceType: true, teamMatchId: true } },
+      officialFact: {
+        select: {
+          revision: true,
+          gameId: true,
+          sourceType: true,
+          tournamentId: true,
+          homeTeamId: true,
+          awayTeamId: true,
+          eventsHash: true,
+          officialAt: true,
+        },
+      },
       resultParticipants: {
         select: {
           participantId: true,
@@ -68,8 +82,19 @@ export async function repairExistingShowcaseOfficialResult(
   if (
     !current
     || current.gameId !== input.gameId
+    || current.game.sourceType !== V1GameSourceType.TEAM_MATCH
+    || current.game.teamMatchId !== input.fixtureId
     || current.state !== 'OFFICIAL'
     || current.officialAt === null
+    || !current.officialFact
+    || current.officialFact.revision !== current.revision
+    || current.officialFact.gameId !== input.gameId
+    || current.officialFact.sourceType !== V1GameOfficialFactSourceType.TEAM_MATCH
+    || current.officialFact.tournamentId !== input.tournamentId
+    || current.officialFact.homeTeamId !== input.homeTeamId
+    || current.officialFact.awayTeamId !== input.awayTeamId
+    || current.officialFact.eventsHash !== current.eventsHash
+    || current.officialFact.officialAt.getTime() !== current.officialAt.getTime()
   ) {
     throw new Error('Showcase fixture ' + input.fixtureId + ' has an invalid current official revision.');
   }
@@ -87,6 +112,13 @@ export async function repairExistingShowcaseOfficialResult(
     { participantId: input.homeParticipantId, userId: input.homeUserId },
     { participantId: input.awayParticipantId, userId: input.awayUserId },
   ]) {
+    const existingIdentity = await tx.v1ParticipantIdentityLinkCurrent.findUnique({
+      where: { participantId: identity.participantId },
+      select: { userId: true },
+    });
+    if (existingIdentity && existingIdentity.userId !== identity.userId) {
+      throw new Error(`Showcase fixture ${input.fixtureId} has participant ${identity.participantId} linked to a different user.`);
+    }
     await tx.v1ParticipantIdentityLinkCurrent.upsert({
       where: { participantId: identity.participantId },
       update: {},
@@ -154,7 +186,9 @@ export async function repairExistingShowcaseOfficialResult(
       revisionId: revision.id,
       gameId: input.gameId,
       revision: revisionNumber,
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      // New repairs are emitted from the canonical TeamMatch source. Existing
+      // historical facts are immutable and are never rewritten by this path.
+      sourceType: V1GameOfficialFactSourceType.TEAM_MATCH,
       tournamentId: input.tournamentId,
       homeTeamId: input.homeTeamId,
       awayTeamId: input.awayTeamId,

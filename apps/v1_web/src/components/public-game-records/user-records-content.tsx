@@ -6,7 +6,7 @@ import { Card, EmptyState, KPIStat } from '@/components/v1-ui/primitives';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
 import { userRecordResultLabel } from './format';
-import { resultChipStyle, resultStripeStyle } from './result-emphasis';
+import { resultChipStyle } from './result-emphasis';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { RECORD_TYPE_TABS, recordEmptyCopy, type RecordTypeFilter } from './record-category-tabs';
 import type { PublicUserRecordItem, PublicUserRecordsResponse } from './types';
@@ -37,7 +37,12 @@ function OwnerVisibilityBanner() {
         <Link
           href="/my/settings/record-consent"
           className="tm-btn tm-btn-md tm-btn-primary"
-          style={{ marginTop: 8, alignSelf: 'flex-start' }}
+          style={{
+            marginTop: 8,
+            alignSelf: 'flex-start',
+            background: 'var(--static-blue)',
+            color: 'var(--static-white)',
+          }}
         >
           경기 기록 공개 설정하기
         </Link>
@@ -60,14 +65,25 @@ function competitionLabel(item: PublicUserRecordItem): string | null {
   return item.tournamentTitle ?? item.leagueTitle ?? null;
 }
 
+function userRecordHref(item: PublicUserRecordItem): string | null {
+  if (item.leagueId && item.teamMatchId) {
+    return `/league-matches/${item.leagueId}/fixtures/${item.teamMatchId}`;
+  }
+  if (item.tournamentId && item.teamMatchId) {
+    return `/tournaments/${item.tournamentId}/matches/${item.teamMatchId}`;
+  }
+  if (item.teamMatchId) return `/team-matches/${item.teamMatchId}`;
+  if (item.tournamentId) return `/tournaments/${item.tournamentId}`;
+  return null;
+}
+
 function UserRecordRow({ item }: { item: PublicUserRecordItem }) {
   const competition = competitionLabel(item);
   return (
     <div
       style={{
-        padding: '12px 16px 12px 12px',
+        padding: '12px 16px',
         borderTop: '1px solid var(--grey100)',
-        ...resultStripeStyle(item.result),
       }}
     >
       {/* [R-T2] 고정폭 없는 텍스트/배지 — 아래 span 모두 12로 상향.
@@ -280,11 +296,12 @@ export function UserRecordsContent({
           )
         ) : (
           <Card pad={0}>
-            {data.items.map((item) =>
-              item.tournamentId ? (
+            {data.items.map((item) => {
+              const href = userRecordHref(item);
+              return href ? (
                 <Link
                   key={item.id}
-                  href={`/tournaments/${item.tournamentId}`}
+                  href={href}
                   style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}
                 >
                   <UserRecordRow item={item} />
@@ -293,8 +310,8 @@ export function UserRecordsContent({
                 <div key={item.id}>
                   <UserRecordRow item={item} />
                 </div>
-              ),
-            )}
+              );
+            })}
           </Card>
         )}
         {hasNextPage ? (

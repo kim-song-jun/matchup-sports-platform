@@ -1,4 +1,4 @@
-import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OperateConsole } from './operate-console';
 import type { GameEventRecord } from '@/types/game-operations';
@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
     isPending: false,
     isError: false,
   })),
+  useTournamentOpsRole: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -43,6 +44,9 @@ vi.mock('@/hooks/use-v1-game-operations-console', () => ({
   useV1GameOperationsConsole: () => mocks.useV1GameOperationsConsole(),
   gameOperationsErrorMessage: (code: string) => `오류(${code})`,
   isRetryableGameOperationsErrorCode: () => true,
+}));
+vi.mock('@/components/tournament-ops/role-context', () => ({
+  useTournamentOpsRole: () => mocks.useTournamentOpsRole(),
 }));
 // action-target-picker.tsx가 그대로 import하는 './lineup-grid'와 같은 상대
 // 경로라 여기서 목을 걸면 (모달이 열렸을 때) 그 안에서 렌더되는 실제
@@ -65,6 +69,7 @@ vi.mock('./lineup-grid', async (importOriginal) => ({
   LineupGrid: ({
     onSelectPlayer,
     restrictSideId,
+    filterParticipantIds,
   }: {
     onSelectPlayer: (input: {
       sideId: string;
@@ -75,18 +80,25 @@ vi.mock('./lineup-grid', async (importOriginal) => ({
       };
     }) => void;
     restrictSideId?: string;
+    filterParticipantIds?: ReadonlySet<string>;
   }) => {
-    const participant = restrictSideId
-      ? {
-          id: 'p-2', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1',
-          displayNameSnapshot: '이민호', jerseyNumber: 7, position: null,
-          createdAt: '', updatedAt: '',
-        }
-      : {
-          id: 'p-1', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1',
-          displayNameSnapshot: '정우진', jerseyNumber: 10, position: null,
-          createdAt: '', updatedAt: '',
-        };
+    const participantId = restrictSideId
+      ? filterParticipantIds?.has('p-1')
+        ? 'p-1'
+        : filterParticipantIds?.has('p-2')
+          ? 'p-2'
+          : 'p-3'
+      : filterParticipantIds?.has('p-2')
+        ? 'p-2'
+        : 'p-1';
+    const participant = {
+      id: participantId,
+      gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1',
+      displayNameSnapshot: participantId === 'p-1' ? '정우진' : participantId === 'p-2' ? '이민호' : '박서준',
+      jerseyNumber: participantId === 'p-1' ? 10 : participantId === 'p-2' ? 7 : 3,
+      position: null,
+      createdAt: '', updatedAt: '',
+    };
     return (
       <div data-testid="lineup-grid">
         <button type="button" onClick={() => onSelectPlayer({ sideId: 'side-home', participant })}>
@@ -108,6 +120,7 @@ vi.mock('./lineup-grid', async (importOriginal) => ({
 // 구현 자체는 건드리지 않는다).
 beforeEach(() => {
   mocks.postV1GameCommand.mockClear();
+  mocks.useTournamentOpsRole.mockReturnValue('TOURNAMENT_DIRECTOR');
 });
 
 const SIDE_ID = 'side-home';
@@ -155,7 +168,7 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
   beforeEach(() => {
     mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
     mocks.useV1FixtureLineup.mockReturnValue({
-      data: { gameId: 'game-1', lineups: [{ sideId: SIDE_ID, participants: [
+      data: { gameId: 'game-1', lineups: [{ sideId: SIDE_ID, invalidatedAt: null, participants: [
         { id: 'p-1', gameId: 'game-1', sideId: SIDE_ID, lineupId: 'l-1',
           displayNameSnapshot: '정우진', jerseyNumber: 10, position: null,
           createdAt: '', updatedAt: '' },
@@ -185,6 +198,28 @@ describe('OperateConsole — 기록된 이벤트 / 전송 상태 분리', () => 
     const list = screen.getByRole('list', { name: '기록된 이벤트 목록' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(1);
     expect(list).toHaveTextContent('정우진');
+  });
+
+  it('FIELD_OPERATOR가 takeover를 보유하면 기록 수정 액션을 노출한다', () => {
+    mocks.useTournamentOpsRole.mockReturnValue('FIELD_OPERATOR');
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({
+        takeover: { status: 'held', token: 'tok', expiresAtMs: Date.now() + 60000, assignmentVersion: 0 },
+        liveEvents: [{ ...goal(1), assistParticipantId: null }],
+      }),
+    );
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getByRole('button', { name: /어시스트/ })).toBeInTheDocument();
+  });
+
+  it('SUPPORT_READONLY에서는 기록 수정 액션을 노출하지 않는다', () => {
+    mocks.useTournamentOpsRole.mockReturnValue('SUPPORT_READONLY');
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    expect(screen.getByRole('list', { name: '기록된 이벤트 목록' })).toHaveTextContent('정우진');
+    expect(screen.queryByRole('button', { name: /어시스트/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: '수정·취소' })).toBeNull();
   });
 
   // 큐가 비어 있으면 "전송 상태" 절은 아예 나오지 않아야 한다 — 평상시 화면에 빈 패널이
@@ -251,6 +286,7 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
           // 둔다(없으면 SCHEDULED 테스트에서 "경기를 시작해 주세요." 대신
           // "라인업을 제출해야" 배너가 대신 뜬다).
           state: 'SUBMITTED',
+          invalidatedAt: null,
           revision: 1,
           participants: [{
             id: 'p-1', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1',
@@ -287,10 +323,16 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
           pausedAt: null,
           ...period,
         })),
-        sides: [{
-          id: 'side-home', gameId: 'game-1', sideKey: 'HOME', teamId: null,
-          displayNameSnapshot: '강남 풋살 클럽', createdAt: '', updatedAt: '',
-        }],
+        sides: [
+          {
+            id: 'side-home', gameId: 'game-1', sideKey: 'HOME', teamId: 'team-home',
+            displayNameSnapshot: '강남 풋살 클럽', createdAt: '', updatedAt: '',
+          },
+          {
+            id: 'side-away', gameId: 'game-1', sideKey: 'AWAY', teamId: 'team-away',
+            displayNameSnapshot: '성수 풋살 클럽', createdAt: '', updatedAt: '',
+          },
+        ],
         lineups: [],
       },
       isLoading: false,
@@ -316,6 +358,29 @@ describe('OperateConsole — 피리어드 생명주기 (T1-0)', () => {
 
     fireEvent.click(goalButton);
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('모든 피리어드가 끝났으면 마지막 완료 피리어드의 팀 파울을 보여준다', () => {
+    gameWithPeriods('LIVE', [
+      { number: 1, state: 'ENDED', startedAt: '2026-08-07T00:00:00.000Z', endedAt: '2026-08-07T00:20:00.000Z' },
+      { number: 2, state: 'ENDED', startedAt: '2026-08-07T00:20:00.000Z', endedAt: '2026-08-07T00:40:00.000Z' },
+    ]);
+    mocks.useV1GameOperationsConsole.mockReturnValue(
+      consoleState({
+        liveEvents: [{
+          id: 'foul-period-2', gameId: 'game-1', sequence: 1, clientEventId: 'foul-client-1',
+          payloadHash: 'foul-hash', type: 'FOUL', sideId: 'side-away', participantId: null,
+          assistParticipantId: null, period: 2, clockMs: 30_000,
+          occurredAt: '2026-08-07T00:30:00.000Z', receivedAt: '2026-08-07T00:30:00.000Z',
+          actorUserId: 'actor-1', reversesEventId: null, payload: {},
+        } as GameEventRecord],
+      }),
+    );
+
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    const foulGroup = screen.getByRole('group', { name: '2피리어드 팀 파울' });
+    expect(foulGroup).toHaveTextContent('파울 1');
   });
 
   it('1피리어드가 진행 중이고 다음 피리어드가 있으면 "전반 종료" 버튼을 보여주고 액션을 허용한다', async () => {
@@ -536,10 +601,12 @@ describe('OperateConsole — 선수 교체', () => {
         lineups: [{
           sideId: 'side-home',
           state: 'SUBMITTED',
+          invalidatedAt: null,
           revision: 1,
           participants: [
             { id: 'p-1', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1', displayNameSnapshot: '정우진', jerseyNumber: 10, position: null, positionX: null, positionY: null, started: true, createdAt: '', updatedAt: '' },
             { id: 'p-2', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1', displayNameSnapshot: '이민호', jerseyNumber: 7, position: null, positionX: null, positionY: null, started: false, createdAt: '', updatedAt: '' },
+            { id: 'p-3', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1', displayNameSnapshot: '박서준', jerseyNumber: 3, position: null, positionX: null, positionY: null, started: false, createdAt: '', updatedAt: '' },
           ],
         }],
       },
@@ -550,14 +617,38 @@ describe('OperateConsole — 선수 교체', () => {
     });
   });
 
-  function gameWithSubstitutionPolicy(substitutionPolicy: { mode: 'limited' | 'rolling'; maxSubstitutions: number | null }) {
+  function gameWithSubstitutionPolicy(
+    substitutionPolicy: { mode: 'limited' | 'rolling'; maxSubstitutions: number | null },
+    liveEvents: GameEventRecord[] = [],
+  ) {
     mocks.useV1Game.mockReturnValue({
       data: { id: 'game-1', state: 'LIVE', version: 2, lastSequence: 1, periods: [LIVE_PERIOD], sides: SUB_SIDES, lineups: [], substitutionPolicy },
       isLoading: false,
       isError: false,
       refetch: vi.fn(),
     });
-    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'LIVE' }, liveEvents: [] }));
+    mocks.useV1GameOperationsConsole.mockReturnValue(consoleState({ gameSnapshot: { version: 2, state: 'LIVE' }, liveEvents }));
+  }
+
+  function substitutionEvent(id: string, sequence: number, inParticipantId: string, outParticipantId: string): GameEventRecord {
+    return {
+      id,
+      gameId: 'game-1',
+      sequence,
+      clientEventId: `client-${id}`,
+      payloadHash: `hash-${id}`,
+      type: 'SUBSTITUTION',
+      sideId: 'side-home',
+      participantId: inParticipantId,
+      assistParticipantId: null,
+      period: 1,
+      clockMs: sequence * 1000,
+      occurredAt: '2026-08-07T00:00:00.000Z',
+      receivedAt: '2026-08-07T00:00:00.000Z',
+      actorUserId: 'user-1',
+      reversesEventId: null,
+      payload: { outParticipantId },
+    };
   }
 
   it('"교체" 액션 버튼이 있고, 2단계(나갈 선수 → 들어올 선수)를 거쳐 SUBSTITUTION 이벤트를 제출한다', async () => {
@@ -605,6 +696,26 @@ describe('OperateConsole — 선수 교체', () => {
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
     expect(screen.getByRole('button', { name: /^교체$/ })).toBeInTheDocument();
   });
+
+  it('제한 교체에서 이미 나간 선수는 incoming 후보에서 빠지고, reversal된 교체는 다시 허용된다', async () => {
+    gameWithSubstitutionPolicy(
+      { mode: 'limited', maxSubstitutions: 5 },
+      [substitutionEvent('sub-1', 1, 'p-2', 'p-1')],
+    );
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^교체/ }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'select-player' }));
+
+    const confirmDialog = await screen.findByRole('dialog');
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '교체 기록' }));
+    await waitFor(() =>
+      expect(mocks.useV1GameOperationsConsole().submitEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ participantId: 'p-3', payload: { outParticipantId: 'p-2' } }),
+      ),
+    );
+  });
 });
 
 const HOME_AWAY_SIDES = [
@@ -615,7 +726,7 @@ const HOME_AWAY_SIDES = [
 // UX 감사 item 2 — 라인업 없이 경기 시작 가능 → 복구 불가능한 막다른 길.
 describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
   function setup(
-    lineups: Array<{ sideId: string; state: string; revision: number }>,
+    lineups: Array<{ sideId: string; state: string; revision: number; invalidatedAt: string | null }>,
     sourceType: 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE' = 'TEAM_MATCH',
   ) {
     mocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
@@ -630,7 +741,10 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
       data: {
         id: 'game-1', state: 'SCHEDULED', version: 1, lastSequence: 0, sourceType,
         periods: [{ id: 'period-1', gameId: 'game-1', number: 1, state: 'SCHEDULED', startedAt: null, endedAt: null, pausedTotalMs: 0, pausedAt: null }],
-        sides: HOME_AWAY_SIDES,
+        sides: HOME_AWAY_SIDES.map((side) => ({
+          ...side,
+          teamId: side.sideKey === 'HOME' ? 'team-home' : 'team-away',
+        })),
         lineups: [],
       },
       isLoading: false,
@@ -648,11 +762,11 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
    * "왜 명단이 비어 있지"를 운영자가 현장에서 알 수 없다.
    */
   it('한쪽 팀만 라인업을 제출했어도 "경기 시작"은 활성이고, 미제출 경고는 그대로 뜬다', () => {
-    setup([{ sideId: 'side-home', state: 'SUBMITTED', revision: 1 }]);
+    setup([{ sideId: 'side-home', state: 'SUBMITTED', revision: 1, invalidatedAt: null }]);
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
-    expect(screen.getByText(/성수 풋살 클럽.*아직 선발 명단을 제출하지 않았어요/)).toBeInTheDocument();
+    expect(screen.getByText(/성수 풋살 클럽.*아직 출전 명단을 제출하지 않았어요/)).toBeInTheDocument();
     // [P1-d/웨이브8] 제출 링크 단언은 뺐다 — 링크를 그릴 수 있는 코드가 남아 있지 않아
     // 무조건 통과하는 단언이었다. 경고 문구 단언(위)이 이 계약의 실제 보호막이다.
   });
@@ -663,22 +777,22 @@ describe('OperateConsole — 라인업 게이트 (UX 감사 item 2)', () => {
    * 있는데도 이 경고가 떴다(alpha 실측). 운영자가 할 수 있는 일이 없는 경고다.
    */
   it('대회 경기에서는 미제출 경고를 띄우지 않는다', () => {
-    setup([{ sideId: 'side-home', state: 'SUBMITTED', revision: 1 }], 'TOURNAMENT_FIXTURE');
+    setup([{ sideId: 'side-home', state: 'SUBMITTED', revision: 1, invalidatedAt: null }], 'TOURNAMENT_FIXTURE');
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
     expect(screen.getByRole('button', { name: '경기 시작' })).toBeEnabled();
-    expect(screen.queryByText(/아직 선발 명단을 제출하지 않았어요/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/아직 출전 명단을 제출하지 않았어요/)).not.toBeInTheDocument();
   });
 
   it('양 팀 모두 라인업을 제출하면 "경기 시작"이 활성화되고 배너가 없다', () => {
     setup([
-      { sideId: 'side-home', state: 'SUBMITTED', revision: 1 },
-      { sideId: 'side-away', state: 'LOCKED', revision: 1 },
+      { sideId: 'side-home', state: 'SUBMITTED', revision: 1, invalidatedAt: null },
+      { sideId: 'side-away', state: 'LOCKED', revision: 1, invalidatedAt: null },
     ]);
     render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
 
     expect(screen.getByRole('button', { name: '경기 시작' })).not.toBeDisabled();
-    expect(screen.queryByText(/선발 명단을 제출해야/)).toBeNull();
+    expect(screen.queryByText(/출전 명단을 제출해야/)).toBeNull();
   });
 });
 
@@ -747,6 +861,85 @@ describe('OperateConsole — 경기 종료 확인 (UX 감사 item 3)', () => {
       }),
     );
   });
+
+  it('응답이 끊기면 같은 종료 요청을 같은 idempotency body로 재시도하고 다른 기록은 막는다', async () => {
+    mocks.postV1GameCommand
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce({ gameId: 'game-1', state: 'ENDED', version: 3 });
+
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '경기 종료' }));
+
+    const retry = await screen.findByRole('button', { name: '같은 요청 재시도' });
+    const firstRequest = mocks.postV1GameCommand.mock.calls[0]?.[2];
+    expect(firstRequest).toEqual(expect.objectContaining({
+      expectedVersion: 2,
+      clientCommandId: expect.any(String),
+      takeoverToken: 'tok',
+      occurredAt: expect.any(String),
+    }));
+    expect(screen.getByRole('button', { name: '경기 종료' })).toBeDisabled();
+
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(2));
+    expect(mocks.postV1GameCommand.mock.calls[1]?.[2]).toEqual(firstRequest);
+    await waitFor(() => expect(screen.queryByRole('button', { name: '같은 요청 재시도' })).toBeNull());
+    expect(mocks.useV1GameOperationsConsole().applyCommandResult).toHaveBeenCalledWith({
+      gameId: 'game-1',
+      state: 'ENDED',
+      version: 3,
+    });
+  });
+
+  it('종료 POST가 성공한 뒤 상세 재조회가 실패해도 이미 저장된 명령을 재시도하지 않는다', async () => {
+    const refetch = vi.fn().mockRejectedValue(new Error('refresh unavailable'));
+    mocks.useV1Game.mockReturnValue({ ...mocks.useV1Game(), refetch });
+    mocks.postV1GameCommand.mockResolvedValue({ gameId: 'game-1', state: 'ENDED', version: 3 });
+
+    render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '경기 종료' }));
+
+    await waitFor(() => expect(refetch).toHaveBeenCalled());
+    await screen.findByText('명령은 저장됐지만 최신 상태를 불러오지 못했어요. 화면을 새로고침해 주세요.');
+    expect(screen.queryByRole('button', { name: '같은 요청 재시도' })).toBeNull();
+    expect(screen.getByText('명령은 저장됐지만 최신 상태를 불러오지 못했어요. 화면을 새로고침해 주세요.')).toBeInTheDocument();
+  });
+
+  it('진행 중인 종료 요청이 다른 경기로 전환된 뒤 도착해도 새 경기 상태를 오염시키지 않는다', async () => {
+    let resolvePost: ((value: { gameId: string; state: 'ENDED'; version: number }) => void) | undefined;
+    mocks.postV1GameCommand.mockReturnValueOnce(new Promise((resolve) => { resolvePost = resolve; }));
+
+    const view = render(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '경기 종료' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: '경기 종료' }));
+    await waitFor(() => expect(mocks.postV1GameCommand).toHaveBeenCalledTimes(1));
+
+    const nextFixtureLineup = mocks.useV1FixtureLineup();
+    const nextGame = mocks.useV1Game();
+    mocks.useV1FixtureLineup.mockReturnValue({
+      ...nextFixtureLineup,
+      data: { ...nextFixtureLineup.data, gameId: 'game-2' },
+    });
+    mocks.useV1Game.mockReturnValue({
+      ...nextGame,
+      data: { ...nextGame.data, id: 'game-2' },
+    });
+    view.rerender(<OperateConsole tournamentId="t-1" fixtureId="f-1" />);
+
+    await act(async () => {
+      resolvePost?.({ gameId: 'game-1', state: 'ENDED', version: 3 });
+    });
+    expect(mocks.useV1GameOperationsConsole().applyCommandResult).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: '같은 요청 재시도' })).toBeNull();
+  });
 });
 
 // alpha "452′" 사고(2026-08) — 운영자가 경기 종료를 누르지 않으면 클럭이
@@ -762,6 +955,7 @@ describe('OperateConsole — 이상 클럭 확인 게이트 (alpha 452′ 사고
         lineups: [{
           sideId: 'side-home',
           state: 'SUBMITTED',
+          invalidatedAt: null,
           revision: 1,
           participants: [
             { id: 'p-1', gameId: 'game-1', sideId: 'side-home', lineupId: 'l-1', displayNameSnapshot: '정우진', jerseyNumber: 10, position: null, positionX: null, positionY: null, started: true, createdAt: '', updatedAt: '' },

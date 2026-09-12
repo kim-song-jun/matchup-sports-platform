@@ -45,6 +45,7 @@ function myScheduleItem(overrides: Partial<V1MyScheduleItem> = {}): V1MySchedule
     state: 'SCHEDULED',
     version: 0,
     teamMatchId: null,
+    linkedMatch: null,
     matchConfirmed: null,
     goingCount: 5,
     waitlistedCount: 0,

@@ -24,6 +24,7 @@ export function hasUnsettledQueueItems(items: readonly QueuedGameEvent[]): boole
 export interface QueueStatusPanelProps {
   readonly items: readonly QueuedGameEvent[];
   readonly onRetry: (clientEventId: string) => void;
+  readonly disabled?: boolean;
 }
 
 const STATUS_LABEL: Record<QueuedEventStatus, string> = {
@@ -53,7 +54,7 @@ function eventLabel(item: QueuedGameEvent): string {
   return item.event.type;
 }
 
-export function QueueStatusPanel({ items, onRetry }: QueueStatusPanelProps) {
+export function QueueStatusPanel({ items, onRetry, disabled = false }: QueueStatusPanelProps) {
   const unsettled = items.filter((item) => item.status !== 'acked');
   if (unsettled.length === 0) {
     return (
@@ -95,7 +96,7 @@ export function QueueStatusPanel({ items, onRetry }: QueueStatusPanelProps) {
               `item.lastError.message` 문구가 무엇을 해야 하는지(새로고침/관리자 문의
               등) 직접 안내한다. */}
           {item.status === 'failed' && (item.lastError === null || isRetryableGameOperationsErrorCode(item.lastError.code, item.lastError.reason)) ? (
-            <Button size="sm" variant="outline" onClick={() => onRetry(item.clientEventId)}>
+            <Button size="sm" variant="outline" disabled={disabled} onClick={() => onRetry(item.clientEventId)}>
               다시 시도
             </Button>
           ) : null}

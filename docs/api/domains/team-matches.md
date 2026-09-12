@@ -1,5 +1,12 @@
 # Domain Contract - Team Matches
 
+
+## Task 168 Phase 3 canonical source addendum (candidate)
+
+- A TeamMatch owns the canonical Game identity for tournament, regular-league, and friendly flows. Existing fixture-shaped URLs and `fixtureId` response fields continue to carry the same TeamMatch UUID for compatibility.
+- Result correction and public record projections follow the Game current official revision; a correction does not change the TeamMatch start time or create a second appearance.
+- This is a contract candidate pending the selected API overlay review; it does not claim Alpha migration completion.
+
 ## Endpoint Matrix
 
 | Method | Path | Auth | Description |
@@ -55,6 +62,7 @@ Required:
 - `hostTeamId`
 - `sportId`
 - `regionId`
+  - Required non-empty string; accepts stable catalog slugs such as `region-seoul-jongno`.
 - `title`
 - `startsAt`
 - `manualPlaceName`

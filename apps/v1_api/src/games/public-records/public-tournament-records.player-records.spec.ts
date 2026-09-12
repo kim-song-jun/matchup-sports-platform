@@ -12,6 +12,7 @@ import { PublicTournamentRecordsService } from './public-tournament-records.serv
 function buildPrisma(options: {
   bracketPublishedAt?: Date | null;
   games?: Array<{ currentOfficialRevisionId: string | null; visibilityPolicy?: { mode: string } | null }>;
+  invalidTeamMatches?: Array<{ id: string; gameSourceType: string | null; detailsTournamentId: string | null }>;
   participantRows?: Array<{
     participantId: string;
     goals: number;
@@ -31,7 +32,16 @@ function buildPrisma(options: {
         bracketPublishScheduledAt: null,
       }),
     },
-    v1Game: { findMany: jest.fn().mockResolvedValue(options.games ?? []) },
+    v1Game: {
+      findMany: jest.fn().mockResolvedValue(options.games ?? []),
+    },
+    v1TeamMatch: {
+      findMany: jest.fn().mockResolvedValue((options.invalidTeamMatches ?? []).map((row) => ({
+        id: row.id,
+        game: row.gameSourceType === null ? null : { sourceType: row.gameSourceType },
+        tournamentDetails: row.detailsTournamentId === null ? null : { tournamentId: row.detailsTournamentId },
+      }))),
+    },
     v1GameOperationFlag: { findUnique: jest.fn().mockResolvedValue({ value: 'on' }) },
     v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(options.participantRows ?? []) },
     v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue(options.identityLinks ?? []) },
@@ -118,6 +128,39 @@ describe('PublicTournamentRecordsService.getPlayerRecords', () => {
     const result = await new PublicTournamentRecordsService(prisma, access).getPlayerRecords('tour-1');
     expect(result).toEqual({ tournamentId: 'tour-1', goals: [], assists: [] });
     expect((prisma as unknown as { v1Game: { findMany: jest.Mock } }).v1Game.findMany).not.toHaveBeenCalled();
+  });
+
+  it('queries only owned canonical TeamMatch games for published records', async () => {
+    const prisma = buildPrisma({ games: [] });
+    await new PublicTournamentRecordsService(prisma, access).getPlayerRecords('tour-1');
+    const gameQueries = (prisma as unknown as { v1Game: { findMany: jest.Mock } }).v1Game.findMany.mock.calls;
+    expect(gameQueries).toHaveLength(1);
+    expect(gameQueries[0][0].where).toMatchObject({
+      sourceType: 'TEAM_MATCH',
+      teamMatch: {
+        tournamentId: 'tour-1',
+        leagueId: null,
+        deletedAt: null,
+        tournamentDetails: { is: { tournamentId: 'tour-1' } },
+      },
+    });
+  });
+
+  it('fails closed when a canonical TeamMatch has missing or mismatched Details', async () => {
+    const prisma = buildPrisma({
+      invalidTeamMatches: [
+        { id: 'team-match-missing-details', gameSourceType: 'TEAM_MATCH', detailsTournamentId: null },
+        { id: 'team-match-missing-game', gameSourceType: null, detailsTournamentId: 'tour-1' },
+        { id: 'team-match-wrong-details', gameSourceType: 'TEAM_MATCH', detailsTournamentId: 'other-tour' },
+        { id: 'team-match-wrong-source', gameSourceType: 'TOURNAMENT_FIXTURE', detailsTournamentId: 'tour-1' },
+      ],
+    });
+    await expect(new PublicTournamentRecordsService(prisma, access).getPlayerRecords('tour-1')).rejects.toMatchObject({
+      response: {
+        code: 'TOURNAMENT_MATCH_GAME_MISSING',
+        details: { teamMatchIds: ['team-match-missing-details', 'team-match-missing-game', 'team-match-wrong-details', 'team-match-wrong-source'] },
+      },
+    });
   });
 
   it('shows a withdrawn user as their displayName instead of the deleted_* internal nickname', async () => {

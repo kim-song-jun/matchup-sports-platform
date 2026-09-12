@@ -12,6 +12,8 @@ const ids = {
   hostTeam: '66000000-0000-4000-8000-000000000020',
   awayTeam: '66000000-0000-4000-8000-000000000021',
   tournament: '66000000-0000-4000-8000-000000000030',
+  hostRegistration: '66000000-0000-4000-8000-000000000050',
+  awayRegistration: '66000000-0000-4000-8000-000000000051',
   fixture: '66000000-0000-4000-8000-000000000031',
   assignment: '66000000-0000-4000-8000-000000000040',
 } as const;
@@ -45,12 +47,19 @@ describe('deriveTournamentRevision — assist/foul aggregation (T1-4)', () => {
       ],
     });
     await prisma.v1Tournament.create({ data: { id: ids.tournament, sportId: ids.sport, title: 'Task Record Tournament', competitionConfigVersionId: config.id } });
-    await prisma.v1TournamentFixture.create({ data: { id: ids.fixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, competitionConfigVersionId: config.id } });
+    await prisma.v1TournamentRegistration.createMany({
+      data: [
+        { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.operator, status: 'confirmed' },
+        { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.awayTeam, appliedByUserId: ids.operator, status: 'confirmed' },
+      ],
+    });
+    await prisma.v1TeamMatch.create({ data: { id: ids.fixture, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.awayTeam, startAt: new Date(Date.now() - 60_000), title: 'Canonical assist match', status: 'matched', competitionConfigVersionId: config.id } });
+    await prisma.v1TournamentMatchDetails.create({ data: { teamMatchId: ids.fixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, legNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.awayRegistration } });
     await prisma.v1TournamentStaffAssignment.create({ data: { id: ids.assignment, tournamentId: ids.tournament, userId: ids.operator, role: 'TOURNAMENT_DIRECTOR', grantedByUserId: ids.operator } });
     await prisma.v1GameOperationFlag.upsert({ where: { key: 'PUBLIC_LIVE' }, create: { key: 'PUBLIC_LIVE', value: 'off', ownerActor: 'platform_ops' }, update: {} });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: config.id,
       sides: [

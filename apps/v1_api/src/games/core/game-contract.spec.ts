@@ -39,7 +39,7 @@ describe('Game core contract', () => {
     ]);
   });
 
-  it('decides every tournament lifecycle pair and allows only the frozen transitions', () => {
+  it('decides every canonical tournament lifecycle pair and allows only the frozen transitions', () => {
     const allowed = new Set([
       'SCHEDULED>LIVE',
       'SCHEDULED>CANCELLED',
@@ -59,7 +59,7 @@ describe('Game core contract', () => {
         if (allowed.has(key)) {
           expect(() =>
             assertGameLifecycleTransition({
-              sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+              sourceType: V1GameSourceType.TEAM_MATCH,
               trigger: 'TOURNAMENT_COMMAND',
               from,
               to,
@@ -69,7 +69,7 @@ describe('Game core contract', () => {
         } else {
           expect(() =>
             assertGameLifecycleTransition({
-              sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+              sourceType: V1GameSourceType.TEAM_MATCH,
               trigger: 'TOURNAMENT_COMMAND',
               from,
               to,
@@ -141,7 +141,7 @@ describe('Game core contract', () => {
       for (const to of lifecycleStates) {
         expect(() =>
           assertGameLifecycleTransition({
-            sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+            sourceType: V1GameSourceType.TEAM_MATCH,
             trigger: 'TOURNAMENT_COMMAND',
             from,
             to,
@@ -151,7 +151,7 @@ describe('Game core contract', () => {
     }
     expect(() =>
       assertGameLifecycleTransition({
-        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+        sourceType: V1GameSourceType.TEAM_MATCH,
         trigger: 'TOURNAMENT_COMMAND',
         from: 'UNKNOWN',
         to: V1GameState.LIVE,
@@ -429,9 +429,8 @@ describe('Game core contract', () => {
  * **리그 경기를 콘솔로 진행한다 (결함 #25, 2026-09-06 alpha 실측).**
  *
  * 리그 대진의 게임은 `TEAM_MATCH` 소스로 만들어지는데(`league-fixture-creation.ts`),
- * `TOURNAMENT_COMMAND` 트리거가 `TOURNAMENT_FIXTURE` 에만 열려 있어서 **콘솔에서 경기를
- * 시작조차 못 했다** — `TEAM_MATCH/TOURNAMENT_COMMAND cannot transition SCHEDULED to LIVE`.
- * 인가(#23)를 고친 직후 그 뒤에서 드러난 두 번째 벽이다.
+ * `TOURNAMENT_COMMAND` 트리거는 canonical `TEAM_MATCH`에 열려 있어 **리그 경기도
+ * 대회와 같은 콘솔에서 진행할 수 있다**.
  *
  * 정본이 이미 정한 사안이다: "리그도 대회와 **같은 경기 운영 콘솔**을 쓴다(Task 165)" 이고,
  * §6 결정 이력이 대가까지 적어 뒀다 — **"잃는 것: 콘솔이 팀 매치 출처를 알아야 한다"**.
@@ -490,7 +489,7 @@ describe('assertGameLifecycleTransition — 팀 매치 출처의 콘솔 진행 (
     ).toThrow(GameContractError);
   });
 
-  it('대회 경기(TOURNAMENT_FIXTURE)는 그대로다 (회귀 방지)', () => {
+  it('historical TOURNAMENT_FIXTURE source is rejected by operational lifecycle commands', () => {
     expect(() =>
       assertGameLifecycleTransition({
         sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
@@ -498,6 +497,6 @@ describe('assertGameLifecycleTransition — 팀 매치 출처의 콘솔 진행 (
         from: V1GameState.SCHEDULED,
         to: V1GameState.LIVE,
       }),
-    ).not.toThrow();
+    ).toThrow(expect.objectContaining({ code: 'INVALID_GAME_SOURCE' }));
   });
 });

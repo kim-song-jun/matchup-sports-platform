@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { V1GameLineupState } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 // 주차 규칙은 공용 모듈이 소유한다. 아래 private 메서드는 "DB 에서 형제 경기일을 모으는" 부분만
@@ -24,13 +24,15 @@ export type TeamGameLineupState = LineupTodoState | 'DONE';
 export type TeamUpcomingGame = Omit<LineupTodo, 'state'> & { lineupState: TeamGameLineupState };
 
 export type LineupTodo = {
-  source: 'TOURNAMENT_FIXTURE' | 'TEAM_MATCH';
+  source: 'TEAM_MATCH';
+  /** TEAM_MATCH also carries regular-league rows, so tournamentId alone is not a discriminator. */
+  competitionKind: 'TOURNAMENT' | 'LEAGUE' | 'FRIENDLY';
   teamId: string;
   teamName: string;
   gameId: string;
   /**
    * 이 경기가 속한 **대회 또는 리그**. 대회 경기면 대회 id/제목, 리그 대진이면 리그
-   * id/제목이 들어간다 — 어느 쪽인지는 `source` 로 갈린다.
+   * id/제목이 들어간다 — 어느 쪽인지는 `competitionKind`로 구분한다.
    *
    * 리그 값을 대회 이름의 자리에 싣는 것은 이 레포의 기존 관례다
    * (public-tournament-records.service.ts `getLeagueFixtureRecord` — 같은 화면·같은 소비자가
@@ -38,9 +40,8 @@ export type LineupTodo = {
    * 워커·홈 카드)마다 "둘 중 채워진 쪽"을 고르는 분기가 늘어난다.
    *
    * 주의: 알림 워커는 이 값을 **대회 단위 묶음의 열쇠**로도 쓴다
-   * (lineup-reminder.service.ts `buildDailyMessages`). 그쪽은 `source === 'TOURNAMENT_FIXTURE'`
-   * 를 함께 보고 있으므로 리그 대진은 지금도 경기 단위로 묶인다 — 그 가드를 지우면
-   * 리그 대진이 리그 단위로 묶여버리니 함께 고쳐야 한다.
+   * (lineup-reminder.service.ts `buildDailyMessages`). `competitionKind === 'TOURNAMENT'`
+   * 조건으로 canonical 대회까지 함께 묶고, 리그 대진은 경기 단위를 유지한다.
    */
   tournamentId: string | null;
   tournamentTitle: string | null;
@@ -122,11 +123,7 @@ export class LineupTodoService {
     teamIds: string[] | null,
     now: Date,
   ): Promise<TeamUpcomingGame[]> {
-    const [fixtures, teamMatches] = await Promise.all([
-      this.loadTournamentFixtures(teamIds, now),
-      this.loadTeamMatches(teamIds, now),
-    ]);
-    const candidates = [...fixtures, ...teamMatches];
+    const candidates = await this.loadTeamMatches(teamIds, now);
     if (candidates.length === 0) return [];
 
     const states = await this.loadLineupStates(candidates.map((candidate) => ({
@@ -153,73 +150,14 @@ export class LineupTodoService {
     return items;
   }
 
-  private async loadTournamentFixtures(teamIds: string[] | null, now: Date) {
-    const fixtures = await this.prisma.v1TournamentFixture.findMany({
-      where: {
-        status: 'scheduled',
-        scheduledAt: { gte: now },
-        game: { isNot: null },
-        OR: [
-          { homeRegistration: this.registrationFilter(teamIds) },
-          { awayRegistration: this.registrationFilter(teamIds) },
-        ],
-      },
-      select: {
-        id: true,
-        round: true,
-        scheduledAt: true,
-        tournamentId: true,
-        tournament: { select: { title: true } },
-        game: { select: { id: true } },
-        homeRegistration: { select: { teamId: true, team: { select: { name: true } } } },
-        awayRegistration: { select: { teamId: true, team: { select: { name: true } } } },
-      },
-      orderBy: { scheduledAt: 'asc' },
-      take: 500,
-    });
-
-    const rows: Array<Omit<LineupTodo, 'state'>> = [];
-    for (const fixture of fixtures) {
-      if (fixture.game === null) continue;
-      for (const side of ['home', 'away'] as const) {
-        const mine = side === 'home' ? fixture.homeRegistration : fixture.awayRegistration;
-        const opponent = side === 'home' ? fixture.awayRegistration : fixture.homeRegistration;
-        if (mine?.teamId == null) continue;
-        if (teamIds !== null && !teamIds.includes(mine.teamId)) continue;
-        rows.push({
-          source: 'TOURNAMENT_FIXTURE',
-          teamId: mine.teamId,
-          teamName: mine.team.name,
-          gameId: fixture.game.id,
-          tournamentId: fixture.tournamentId,
-          tournamentTitle: fixture.tournament.title,
-          // round는 자유 문자열 표시 라벨이라 그대로 이어 붙이기만 한다.
-          title: [fixture.tournament.title, fixture.round].filter(Boolean).join(' · '),
-          opponentName: opponent?.team.name ?? null,
-          scheduledAt: fixture.scheduledAt,
-          deepLink: `/tournaments/${fixture.tournamentId}/matches/${fixture.id}/lineup`,
-        });
-      }
-    }
-    return rows;
-  }
-
-  /** 참가가 확정된 등록만 본다 — 신청서를 넣기만 한 팀에게 라인업을 재촉할 수는 없다. */
-  private registrationFilter(teamIds: string[] | null) {
-    return {
-      is: {
-        status: 'confirmed' as const,
-        ...(teamIds !== null ? { teamId: { in: teamIds } } : {}),
-      },
-    };
-  }
-
   private async loadTeamMatches(teamIds: string[] | null, now: Date) {
     const matches = await this.prisma.v1TeamMatch.findMany({
       where: {
         // 상대가 정해진 매치만 — 아직 모집 중이면 라인업을 짤 대상이 없다.
         status: 'matched',
         startAt: { gte: now },
+        hostTeamId: { not: null },
+        approvedApplicantTeamId: { not: null },
         game: { isNot: null },
         ...(teamIds !== null
           ? { OR: [{ hostTeamId: { in: teamIds } }, { approvedApplicantTeamId: { in: teamIds } }] }
@@ -235,6 +173,9 @@ export class LineupTodoService {
         approvedApplicantTeamId: true,
         approvedApplicantTeam: { select: { name: true } },
         leagueId: true,
+        tournamentId: true,
+        tournament: { select: { title: true } },
+        tournamentDetails: { select: { round: true } },
         // 리그 제목은 관계로 가져온다 — Prisma 가 대진 목록에 딸린 리그를 id IN (...) 한 번으로
         // 모아 오므로 대진 수(최대 500)만큼 쿼리가 늘지 않는다.
         league: { select: { title: true } },
@@ -244,17 +185,38 @@ export class LineupTodoService {
       take: 500,
     });
 
-    const weekNumberByTeamMatchId = await this.resolveLeagueWeekNumbers(matches);
+    // Prisma keeps these columns nullable because tournament TBD slots share the
+    // TeamMatch table. A slot without a scheduled time has no lineup action yet;
+    // retain only scheduled rows for this actionable surface and narrow the type
+    // before deriving league weeks.
+    const scheduledMatches = matches.flatMap((match) =>
+      match.startAt === null ? [] : [{ ...match, startAt: match.startAt }],
+    );
+    const weekNumberByTeamMatchId = await this.resolveLeagueWeekNumbers(scheduledMatches);
 
     const rows: Array<Omit<LineupTodo, 'state'>> = [];
-    for (const match of matches) {
+    for (const match of scheduledMatches) {
       if (match.game === null) continue;
+      // League creators temporarily carry both IDs for the shared TeamMatch row.
+      // `leagueId` is the authoritative discriminator for those rows; checking
+      // tournamentId first silently drops every such league todo as incomplete.
+      const isLeagueMatch = match.leagueId !== null && match.leagueId !== undefined;
+      const isTournamentMatch = !isLeagueMatch && match.tournamentId !== null && match.tournamentId !== undefined;
+      // A canonical tournament row must have its bracket metadata and title. Do not
+      // silently render it as a friendly match when an expand-phase row is incomplete.
+      if (isTournamentMatch && (match.tournament === null || match.tournamentDetails === null)) {
+        throw new ConflictException({
+          code: 'TOURNAMENT_MATCH_METADATA_INCOMPLETE',
+          message: '대회 경기의 라운드 정보가 아직 준비되지 않았어요.',
+        });
+      }
+      if (match.hostTeamId === null || match.approvedApplicantTeamId === null) continue;
       const sides = [
-        { teamId: match.hostTeamId, teamName: match.hostTeam.name, opponentName: match.approvedApplicantTeam?.name ?? null },
+        { teamId: match.hostTeamId, teamName: match.hostTeam?.name ?? null, opponentName: match.approvedApplicantTeam?.name ?? null },
         {
           teamId: match.approvedApplicantTeamId,
           teamName: match.approvedApplicantTeam?.name ?? null,
-          opponentName: match.hostTeam.name,
+          opponentName: match.hostTeam?.name ?? null,
         },
       ];
       // 리그 대진의 라벨은 "<리그명> N주차"로 **여기서 조립한다**. 저장된
@@ -270,19 +232,23 @@ export class LineupTodoService {
       // 친선 팀매치(leagueId 없음)는 사용자가 붙인 제목이 리그 맥락이 아니라 모집 문구라
       // 예전처럼 '팀 매치'로 둔다.
       const leagueTitle = match.league?.title ?? null;
+      const tournamentTitle = match.tournament?.title ?? null;
+      const competitionKind = isTournamentMatch ? 'TOURNAMENT' as const : leagueTitle === null ? 'FRIENDLY' as const : 'LEAGUE' as const;
       const weekNumber = weekNumberByTeamMatchId.get(match.id);
-      const title =
-        leagueTitle === null || weekNumber === undefined ? '팀 매치' : `${leagueTitle} ${weekNumber}주차`;
+      const title = isTournamentMatch
+        ? [tournamentTitle, match.tournamentDetails!.round].filter(Boolean).join(' · ')
+        : leagueTitle === null || weekNumber === undefined ? '팀 매치' : `${leagueTitle} ${weekNumber}주차`;
       for (const side of sides) {
         if (side.teamId === null || side.teamName === null) continue;
         if (teamIds !== null && !teamIds.includes(side.teamId)) continue;
         rows.push({
           source: 'TEAM_MATCH',
+          competitionKind,
           teamId: side.teamId,
           teamName: side.teamName,
           gameId: match.game.id,
-          tournamentId: match.leagueId,
-          tournamentTitle: leagueTitle,
+          tournamentId: isTournamentMatch ? match.tournamentId! : match.leagueId,
+          tournamentTitle: isTournamentMatch ? tournamentTitle : leagueTitle,
           title,
           opponentName: side.opponentName,
           scheduledAt: match.startAt,
@@ -323,6 +289,9 @@ export class LineupTodoService {
     const startAtsByLeagueId = new Map<string, Date[]>();
     for (const sibling of siblings) {
       if (sibling.leagueId === null) continue;
+      if (sibling.startAt === null) {
+        throw new Error('League TeamMatch is missing startAt');
+      }
       const bucket = startAtsByLeagueId.get(sibling.leagueId);
       if (bucket === undefined) startAtsByLeagueId.set(sibling.leagueId, [sibling.startAt]);
       else bucket.push(sibling.startAt);
@@ -353,7 +322,7 @@ export class LineupTodoService {
       // 팀이 늘어날수록 스캔 비용이 함께 자란다(Copilot 리뷰 지적). 정렬이 사이드별
       // revision 내림차순이므로 남는 행은 인메모리로 고르던 것과 같다.
       this.prisma.v1GameLineup.findMany({
-        where: { gameId: { in: gameIds } },
+        where: { gameId: { in: gameIds }, invalidatedAt: null },
         orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
         distinct: ['sideId'],
         select: { sideId: true, state: true },

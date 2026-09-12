@@ -149,6 +149,7 @@ describe('ProfileService settings theme preference', () => {
     expect(result.theme).toBe('system');
   });
 
+
   it('persists activityEnabled so the grouped 경기·대회 setting controls tournament notifications', async () => {
     const prisma = buildPrisma();
     const service = new ProfileService(prisma as unknown as PrismaService);
@@ -467,9 +468,15 @@ describe('ProfileService tournament appearance aggregation', () => {
     currentOfficialRevisionId: string | null;
     officialAt: Date | null;
     tournamentId?: string | null;
+    canonicalTournamentId?: string | null;
+    canonicalLeagueId?: string | null;
+    canonicalKind?: 'regular_tournament' | 'regular_league' | null;
+    legacy?: boolean;
   }) {
-    // sourceType 은 select 에 없다 — where 가 이미 TOURNAMENT_FIXTURE 로 좁히므로
-    // 서비스가 그 필드를 읽지 않는다(위 TEAM_MATCH 테스트가 where 쪽을 검증한다).
+    const sourceType = config.legacy === true ? 'TOURNAMENT_FIXTURE' : 'TEAM_MATCH';
+    const canonicalTournamentId = config.canonicalTournamentId === undefined
+      ? `${config.gameId}-tournament`
+      : config.canonicalTournamentId;
     const tournamentId = config.tournamentId === undefined ? `${config.gameId}-tournament` : config.tournamentId;
     return {
       resultRevision: {
@@ -478,7 +485,24 @@ describe('ProfileService tournament appearance aggregation', () => {
         officialAt: config.officialAt,
         game: {
           currentOfficialRevisionId: config.currentOfficialRevisionId,
-          tournamentFixture: tournamentId === null ? null : { tournamentId },
+          sourceType,
+          teamMatch: config.legacy === true
+            ? undefined
+            : {
+                id: `${config.gameId}-team-match`,
+                leagueId: config.canonicalLeagueId ?? null,
+                tournamentId: canonicalTournamentId,
+                tournament: canonicalTournamentId === null
+                  ? null
+                  : { kind: config.canonicalKind ?? 'regular_tournament' },
+                tournamentDetails: canonicalTournamentId === null
+                  ? null
+                  : {
+                      teamMatchId: `${config.gameId}-team-match`,
+                      tournamentId: canonicalTournamentId,
+                    },
+              },
+          tournamentFixture: config.legacy === true && tournamentId !== null ? { tournamentId } : undefined,
         },
       },
     };
@@ -518,7 +542,7 @@ describe('ProfileService tournament appearance aggregation', () => {
       const rows = [
         // 현재 공식 리비전 + 이번 달 → total, monthly 모두 카운트
         gameResultRow({
-          gameId: 'game-1',
+        gameId: 'game-1',
           revisionId: 'revision-1-current',
           currentOfficialRevisionId: 'revision-1-current',
           officialAt: new Date('2026-08-10T00:00:00Z'),
@@ -543,6 +567,15 @@ describe('ProfileService tournament appearance aggregation', () => {
           revisionId: 'revision-4-current',
           currentOfficialRevisionId: 'revision-4-current',
           officialAt: new Date('2026-07-20T00:00:00Z'),
+        }),
+        // legacy fixture rows are still present in the transitional database, but must not
+        // re-enter the canonical profile activity aggregate.
+        gameResultRow({
+          gameId: 'game-legacy-fixture',
+          revisionId: 'revision-legacy-current',
+          currentOfficialRevisionId: 'revision-legacy-current',
+          officialAt: new Date('2026-08-12T00:00:00Z'),
+          legacy: true,
         }),
       ];
       const prisma = {
@@ -572,7 +605,7 @@ describe('ProfileService tournament appearance aggregation', () => {
           participantId: { in: ['participant-1'] },
           resultRevision: {
             officialAt: { not: null },
-            game: { sourceType: { in: ['TOURNAMENT_FIXTURE', 'TEAM_MATCH'] } },
+            game: { sourceType: 'TEAM_MATCH' },
           },
         },
         select: {
@@ -584,7 +617,16 @@ describe('ProfileService tournament appearance aggregation', () => {
               game: {
                 select: {
                   currentOfficialRevisionId: true,
-                  tournamentFixture: { select: { tournamentId: true } },
+                  sourceType: true,
+                  teamMatch: {
+                    select: {
+                      id: true,
+                      leagueId: true,
+                      tournamentId: true,
+                      tournament: { select: { kind: true } },
+                      tournamentDetails: { select: { teamMatchId: true, tournamentId: true } },
+                    },
+                  },
                 },
               },
             },
@@ -634,7 +676,7 @@ describe('ProfileService tournament appearance aggregation', () => {
           where: expect.objectContaining({
             resultRevision: {
               officialAt: { not: null },
-              game: { sourceType: { in: ['TOURNAMENT_FIXTURE', 'TEAM_MATCH'] } },
+              game: { sourceType: 'TEAM_MATCH' },
             },
           }),
         }),
@@ -707,6 +749,27 @@ describe('ProfileService tournament appearance aggregation', () => {
           revisionId: 'revision-1-current',
           currentOfficialRevisionId: 'revision-1-current',
           officialAt: new Date('2026-08-10T00:00:00Z'),
+          tournamentId: null,
+          canonicalTournamentId: 'canonical-tournament-1',
+        }),
+        gameResultRow({
+          gameId: 'game-malformed-league-details',
+          revisionId: 'revision-malformed-league-details',
+          currentOfficialRevisionId: 'revision-malformed-league-details',
+          officialAt: new Date('2026-08-10T00:00:00Z'),
+          tournamentId: null,
+          canonicalTournamentId: 'canonical-tournament-1',
+          canonicalLeagueId: 'canonical-tournament-1',
+          canonicalKind: 'regular_league',
+        }),
+        gameResultRow({
+          gameId: 'game-friendly-team-match',
+          revisionId: 'revision-friendly-current',
+          currentOfficialRevisionId: 'revision-friendly-current',
+          officialAt: new Date('2026-08-11T00:00:00Z'),
+          tournamentId: null,
+          canonicalTournamentId: null,
+          canonicalKind: null,
         }),
       ];
       const prisma = {
@@ -744,8 +807,10 @@ describe('ProfileService tournament appearance aggregation', () => {
 
       // 동의가 REVOKED 인데도 출전 **횟수**는 그대로다 -- 이 집계는 게이트 대상이 아니다
       // (사용자 결정: 총계 숫자 하나는 개별 경기 상세와 노출 수준이 다르다).
-      expect(result.activitySummary.totals.matchCount).toBe(1);
-      expect(result.activitySummary.monthly.matchCount).toBe(1);
+      expect(result.activitySummary.totals.matchCount).toBe(3);
+      expect(result.activitySummary.monthly.matchCount).toBe(3);
+      expect(result.activitySummary.totals.tournamentCount).toBe(1);
+      expect(result.activitySummary.monthly.tournamentCount).toBe(1);
       // 반대로 경기별 상세(최근 활동)는 같은 REVOKED 에 막혀야 한다 -- 두 노출 수준이
       // 실제로 분리돼 있음을 여기서 함께 고정한다.
       expect(result.recentActivity).toBeNull();
@@ -1029,7 +1094,17 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
             officialAt: now,
             game: {
               currentOfficialRevisionId: `${gameId}-revision`,
-              tournamentFixture: { tournamentId },
+              sourceType: 'TEAM_MATCH',
+              teamMatch: {
+                id: `${gameId}-team-match`,
+                leagueId: null,
+                tournamentId,
+                tournament: { kind: 'regular_tournament' },
+                tournamentDetails: {
+                  teamMatchId: `${gameId}-team-match`,
+                  tournamentId,
+                },
+              },
             },
           },
         };

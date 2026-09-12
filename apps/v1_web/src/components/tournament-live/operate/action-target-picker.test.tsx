@@ -43,6 +43,7 @@ function lineup(side: GameSide, participantId: string, name: string): GameLineup
     formation: null,
     createdAt: '',
     updatedAt: '',
+    invalidatedAt: null,
     participants: [
       {
         id: participantId,
@@ -237,6 +238,7 @@ function subLineup(
     formation: null,
     createdAt: '',
     updatedAt: '',
+    invalidatedAt: null,
     participants: participants.map((p) => ({
       id: p.id,
       gameId: 'g-1',

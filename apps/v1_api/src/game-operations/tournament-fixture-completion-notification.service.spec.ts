@@ -11,10 +11,13 @@ function revisionFixture(overrides: Partial<OfficialRevisionRow> = {}): Official
     playedAt: new Date('2026-08-01T00:00:00Z'),
     officialAt: new Date('2026-08-01T00:00:00Z'),
     reason: null,
-    sourceType: 'TOURNAMENT_FIXTURE',
+    sourceType: 'TEAM_MATCH',
     currentOfficialRevisionId: 'revision-1',
     tournamentId: 'tour-1',
-    tournamentFixtureId: 'fixture-1',
+    teamMatchId: 'fixture-1',
+    tournamentTeamMatchId: 'fixture-1',
+    leagueId: null,
+    teamMatchTournamentId: 'tour-1',
     homeTeamId: 'team-home',
     awayTeamId: 'team-away',
     visibility: 'LIVE',
@@ -56,7 +59,7 @@ function fakeTx(options: {
 }
 
 describe('TournamentFixtureCompletionNotificationService', () => {
-  it('is a no-op for team-match games (sourceType !== TOURNAMENT_FIXTURE)', async () => {
+  it('does not deliver tournament notifications for retired source types', async () => {
     const { tx, createMany } = fakeTx({
       memberships: [{ userId: 'user-1' }],
       preferences: [],
@@ -66,7 +69,7 @@ describe('TournamentFixtureCompletionNotificationService', () => {
     // 가드가 제거돼도 다음 가드가 대신 통과시켜 테스트가 무력화된다(Copilot 지적).
     await new TournamentFixtureCompletionNotificationService().project(
       tx,
-      revisionFixture({ sourceType: 'TEAM_MATCH' }),
+      revisionFixture({ sourceType: 'TOURNAMENT_FIXTURE' }),
     );
     expect(createMany).not.toHaveBeenCalled();
   });
@@ -97,6 +100,20 @@ describe('TournamentFixtureCompletionNotificationService', () => {
       deepLink: '/tournaments/tour-1/matches/fixture-1',
       businessKey: 'tournament-fixture-completed:fixture-1:captain-home',
     });
+  });
+
+  it('notifies a canonical tournament TeamMatch through the same tournament lane and key', async () => {
+    const { tx, createMany } = fakeTx({
+      memberships: [{ userId: 'captain-home' }],
+      preferences: [],
+      alreadyDelivered: [],
+    });
+    await new TournamentFixtureCompletionNotificationService().project(
+      tx,
+      revisionFixture({ teamMatchId: 'tm-1', tournamentTeamMatchId: 'tm-1' }),
+    );
+    const row = createMany.mock.calls[0][0].data[0];
+    expect(row).toMatchObject({ targetType: 'tournament', targetId: 'tour-1', deepLink: '/tournaments/tour-1/matches/tm-1', businessKey: 'tournament-fixture-completed:tm-1:captain-home' });
   });
 
   it('renders the penalty shoot-out score when the official score carries one', async () => {

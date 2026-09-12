@@ -20,8 +20,7 @@ import type { CSSProperties } from 'react';
  *   #6b7684)은 흰 카드 위에서 4.55:1로 간신히 AA였는데, 칩 배경(#f2f4f6)을 깔면 4.19:1로
  *   떨어져 미달한다 — alpha 라이브에서 computed 값으로 실측한 회귀다. body(#4e5968)는 같은
  *   배경에서 6.45:1, 다크(#d1d6db on #24262d)에서도 넉넉히 통과한다.
- * - 색만으로 정보를 전달하지 않는다(WCAG 1.4.1) — 칩 안의 '승/무/패' 글자가 항상 함께 렌더되고,
- *   좌측 띠는 그 글자를 보조하는 스캔 힌트일 뿐 단독으로 의미를 지지 않는다.
+ * - 색만으로 정보를 전달하지 않는다(WCAG 1.4.1) — 칩 안의 '승/무/패' 글자가 항상 함께 렌더된다.
  */
 const CHIP_TONE: Record<string, { color: string; background: string }> = {
   WON: { color: 'var(--blue700)', background: 'var(--blue50)' },
@@ -31,12 +30,6 @@ const CHIP_TONE: Record<string, { color: string; background: string }> = {
 
 /** 결과를 특정할 수 없는 행(개인 전적의 `result: null` — 스코어 사이드 매칭 실패) 용 중립 톤. */
 const NEUTRAL_TONE = { color: 'var(--text-body)', background: 'var(--surface-soft)' };
-
-const STRIPE_COLOR: Record<string, string> = {
-  WON: 'var(--blue500)',
-  DRAWN: 'var(--grey300)',
-  LOST: 'var(--red500)',
-};
 
 /** 결과 라벨('승'/'무'/'패'/'-')을 감싸는 칩 스타일. */
 export function resultChipStyle(result: string | null): CSSProperties {
@@ -50,13 +43,4 @@ export function resultChipStyle(result: string | null): CSSProperties {
     padding: '2px 8px',
     flexShrink: 0,
   };
-}
-
-/**
- * 기록 행 좌측의 결과 색 띠. 4px 띠가 들어간 만큼 좌측 패딩에서 4px을 돌려줘야 기존 16px
- * 콘텐츠 정렬이 유지되므로, 호출부는 `paddingLeft: 12`와 함께 쓴다.
- */
-export function resultStripeStyle(result: string | null): CSSProperties {
-  const color = (result ? STRIPE_COLOR[result] : undefined) ?? 'transparent';
-  return { borderLeft: `4px solid ${color}` };
 }

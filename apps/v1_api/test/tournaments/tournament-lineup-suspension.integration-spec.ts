@@ -180,26 +180,48 @@ describe('대회 축 출전정지 — 라인업 제출이 DISCIPLINE_SUSPENDED �
       ],
     });
     // 일정 순서가 정지 판정의 기준틀이다 — 앞 경기가 먼저 와야 그 카드가 "이미 치른
-    // 경기" 로 잡힌다.
-    await prisma.v1TournamentFixture.createMany({
+    // 경기" 로 잡힌다. 대회 경기는 canonical TeamMatch + Details가 정본이다.
+    await prisma.v1TeamMatch.createMany({
       data: [
         {
           id: input.pastFixtureId,
           tournamentId: input.tournamentId,
-          round: 'group',
-          fixtureNumber: 1,
+          sportId: ids.sport,
+          regionId: ids.region,
+          title: `${input.title} 지난 경기`,
+          hostTeamId: ids.hostTeam,
+          approvedApplicantTeamId: ids.awayTeam,
+          startAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
           competitionConfigVersionId: configId,
-          scheduledAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-          homeRegistrationId: input.hostRegistrationId,
-          awayRegistrationId: input.awayRegistrationId,
         },
         {
           id: input.nextFixtureId,
           tournamentId: input.tournamentId,
+          sportId: ids.sport,
+          regionId: ids.region,
+          title: `${input.title} 다음 경기`,
+          hostTeamId: ids.hostTeam,
+          approvedApplicantTeamId: ids.awayTeam,
+          startAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+          competitionConfigVersionId: configId,
+        },
+      ],
+    });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: [
+        {
+          teamMatchId: input.pastFixtureId,
+          tournamentId: input.tournamentId,
+          round: 'group',
+          fixtureNumber: 1,
+          homeRegistrationId: input.hostRegistrationId,
+          awayRegistrationId: input.awayRegistrationId,
+        },
+        {
+          teamMatchId: input.nextFixtureId,
+          tournamentId: input.tournamentId,
           round: 'group',
           fixtureNumber: 2,
-          competitionConfigVersionId: configId,
-          scheduledAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
           homeRegistrationId: input.hostRegistrationId,
           awayRegistrationId: input.awayRegistrationId,
         },
@@ -208,7 +230,7 @@ describe('대회 축 출전정지 — 라인업 제출이 DISCIPLINE_SUSPENDED �
 
     for (const fixtureId of [input.pastFixtureId, input.nextFixtureId]) {
       const creation: GameSourceCreationInput = {
-        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+        sourceType: V1GameSourceType.TEAM_MATCH,
         sourceId: fixtureId,
         competitionConfigVersionId: configId,
         sides: [
@@ -290,7 +312,7 @@ describe('대회 축 출전정지 — 라인업 제출이 DISCIPLINE_SUSPENDED �
 
   async function loadGame(fixtureId: string) {
     const game = await prisma.v1Game.findFirstOrThrow({
-      where: { tournamentFixtureId: fixtureId },
+      where: { teamMatchId: fixtureId },
       select: {
         id: true,
         sides: { select: { id: true, sideKey: true } },

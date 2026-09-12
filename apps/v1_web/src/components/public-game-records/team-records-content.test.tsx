@@ -114,4 +114,24 @@ describe('TeamRecordsContent — 행 캡션의 대회·리그 이름', () => {
 
     expect(screen.getByText(/· 여름 챔피언십/)).toBeInTheDocument();
   });
+
+  it('canonical tournament 경기는 경기 상세로, legacy tournament fixture는 대회 상세로 이동한다', () => {
+    render(
+      <TeamRecordsContent
+        data={makeTeamRecords([
+          makeItem({ gameId: 'game-canonical', teamMatchId: 'team-match-1' }),
+          makeItem({
+            gameId: 'game-legacy',
+            teamMatchId: null,
+            opponentTeamName: '인천 FC',
+          }),
+        ])}
+      />,
+    );
+
+    expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+      '/tournaments/tournament-1/matches/team-match-1',
+      '/tournaments/tournament-1',
+    ]);
+  });
 });

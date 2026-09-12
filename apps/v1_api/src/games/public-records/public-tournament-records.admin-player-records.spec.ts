@@ -10,6 +10,7 @@ import { PublicTournamentRecordsService } from './public-tournament-records.serv
 function buildPrisma(options: {
   tournamentExists?: boolean;
   games?: Array<{ currentOfficialRevisionId: string | null }>;
+  invalidTeamMatches?: Array<{ id: string; gameSourceType: string | null; detailsTournamentId: string | null }>;
   participantRows?: Array<{
     participantId: string;
     goals: number;
@@ -23,7 +24,16 @@ function buildPrisma(options: {
   const consentFindMany = jest.fn().mockResolvedValue([]);
   const prisma = {
     v1Tournament: { findFirst: jest.fn().mockResolvedValue(options.tournamentExists === false ? null : { id: 'tour-1' }) },
-    v1Game: { findMany: jest.fn().mockResolvedValue(options.games ?? []) },
+    v1Game: {
+      findMany: jest.fn().mockResolvedValue(options.games ?? []),
+    },
+    v1TeamMatch: {
+      findMany: jest.fn().mockResolvedValue((options.invalidTeamMatches ?? []).map((row) => ({
+        id: row.id,
+        game: row.gameSourceType === null ? null : { sourceType: row.gameSourceType },
+        tournamentDetails: row.detailsTournamentId === null ? null : { tournamentId: row.detailsTournamentId },
+      }))),
+    },
     v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(options.participantRows ?? []) },
     v1GameParticipant: { findMany: jest.fn().mockResolvedValue(options.participants ?? []) },
     v1GameSide: { findMany: jest.fn().mockResolvedValue(options.sides ?? []) },
@@ -44,6 +54,41 @@ describe('PublicTournamentRecordsService.getPlayerRecordsForAdmin', () => {
     await expect(
       new PublicTournamentRecordsService(prisma, access).getPlayerRecordsForAdmin('nope'),
     ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+  });
+
+  it('queries only canonical TeamMatch games for administrator records', async () => {
+    const { prisma } = buildPrisma({ games: [] });
+    await new PublicTournamentRecordsService(prisma, access).getPlayerRecordsForAdmin('tour-1');
+    const gameQueries = (prisma as unknown as { v1Game: { findMany: jest.Mock } }).v1Game.findMany;
+    expect(gameQueries.mock.calls).toHaveLength(1);
+    expect(gameQueries.mock.calls[0][0].where).toMatchObject({
+      sourceType: 'TEAM_MATCH',
+      teamMatch: {
+        tournamentId: 'tour-1',
+        leagueId: null,
+        deletedAt: null,
+        tournamentDetails: { is: { tournamentId: 'tour-1' } },
+      },
+    });
+  });
+
+  it('fails closed when a canonical TeamMatch has missing or mismatched Details', async () => {
+    const { prisma } = buildPrisma({
+      invalidTeamMatches: [
+        { id: 'team-match-missing-details', gameSourceType: 'TEAM_MATCH', detailsTournamentId: null },
+        { id: 'team-match-missing-game', gameSourceType: null, detailsTournamentId: 'tour-1' },
+        { id: 'team-match-wrong-details', gameSourceType: 'TEAM_MATCH', detailsTournamentId: 'other-tour' },
+        { id: 'team-match-wrong-source', gameSourceType: 'TOURNAMENT_FIXTURE', detailsTournamentId: 'tour-1' },
+      ],
+    });
+    await expect(
+      new PublicTournamentRecordsService(prisma, access).getPlayerRecordsForAdmin('tour-1'),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'TOURNAMENT_MATCH_GAME_MISSING',
+        details: { teamMatchIds: ['team-match-missing-details', 'team-match-missing-game', 'team-match-wrong-details', 'team-match-wrong-source'] },
+      },
+    });
   });
 
   it('aggregates without consent gating and never touches the consent tables', async () => {

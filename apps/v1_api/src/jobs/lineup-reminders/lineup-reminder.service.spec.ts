@@ -1,4 +1,4 @@
-import { LineupReminderService } from './lineup-reminder.service';
+import { buildDailyMessages, LineupReminderService } from './lineup-reminder.service';
 import type { LineupTodo } from '../../team-lineups/lineup-todo.service';
 
 /**
@@ -29,6 +29,7 @@ describe('LineupReminderService', () => {
   function fakeTodo(overrides: Partial<LineupTodo> = {}): LineupTodo {
     return {
       source: 'TEAM_MATCH',
+      competitionKind: 'FRIENDLY',
       teamId: 'team-1',
       teamName: '테스트 팀',
       gameId: 'game-1',
@@ -44,6 +45,27 @@ describe('LineupReminderService', () => {
       ...overrides,
     };
   }
+
+  it('groups canonical tournament games by tournament while keeping league games separate', () => {
+    const messages = buildDailyMessages([
+      fakeTodo({ competitionKind: 'TOURNAMENT', tournamentId: 'cup', tournamentTitle: '대회', gameId: 'canonical', deepLink: '/team-matches/canonical/lineup' }),
+      fakeTodo({ competitionKind: 'TOURNAMENT', tournamentId: 'cup', tournamentTitle: '대회', gameId: 'canonical-2', scheduledAt: new Date('2026-08-30T00:00:00Z') }),
+      fakeTodo({ competitionKind: 'LEAGUE', tournamentId: 'league', tournamentTitle: '리그', gameId: 'league-1' }),
+      fakeTodo({ competitionKind: 'LEAGUE', tournamentId: 'league', tournamentTitle: '리그', gameId: 'league-2' }),
+    ], '2026-08-27');
+
+    expect(messages).toHaveLength(3);
+    expect(messages[0]).toMatchObject({
+      title: '대회 라인업을 확인해 주세요',
+      deepLink: '/team-matches/canonical/lineup',
+      keyPrefix: 'lineup-daily:tournament:cup:team-1:2026-08-27',
+    });
+    expect(messages[0].body).toContain('2경기');
+    expect(messages.slice(1).map((message) => message.keyPrefix)).toEqual([
+      'lineup-daily:game:league-1:team-1:2026-08-27',
+      'lineup-daily:game:league-2:team-1:2026-08-27',
+    ]);
+  });
 
   function fakeClaim(overrides: { id?: string; afterCommit?: Array<() => void | Promise<void>> } = {}) {
     return {

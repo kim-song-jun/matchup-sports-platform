@@ -28,8 +28,18 @@ describe('identity attest (승인함)', () => {
           findUnique: jest.fn().mockResolvedValue({
             version: 7,
             sourceType: 'TEAM_MATCH',
-            teamMatch: { hostTeamId: 'team-host', approvedApplicantTeamId: 'team-away' },
-            tournamentFixture: null,
+            teamMatch: {
+              id: 'tm-1',
+              deletedAt: null,
+              hostTeamId: 'team-host',
+              approvedApplicantTeamId: 'team-away',
+              tournamentId: null,
+              leagueId: null,
+              fieldId: null,
+              tournament: null,
+              league: null,
+              tournamentDetails: null,
+            },
           }),
         },
         v1AdminUser: { findUnique: jest.fn().mockResolvedValue(null) },
@@ -116,8 +126,16 @@ describe('identity attest (승인함)', () => {
       memberships: unknown[];
       preferences?: unknown[];
     }) {
+      const sourceGame = overrides.game as { sourceType?: string; teamMatch?: unknown };
+      const game =
+        sourceGame?.sourceType === 'TEAM_MATCH' && sourceGame.teamMatch === undefined
+          ? {
+              ...sourceGame,
+              teamMatch: { tournamentId: null, leagueId: null, tournamentDetails: null },
+            }
+          : overrides.game;
       return {
-        v1Game: { findUnique: jest.fn().mockResolvedValue(overrides.game) },
+        v1Game: { findUnique: jest.fn().mockResolvedValue(game) },
         v1GameParticipant: {
           findFirst: jest.fn().mockResolvedValue({ displayNameSnapshot: '김민준', sideId: 's-h' }),
         },
@@ -138,7 +156,7 @@ describe('identity attest (승인함)', () => {
 
     it('팀매치(리그): 사이드 팀 리더에게 신청자 제외·businessKey 멱등으로 남기고 /team-matches 로 보낸다', async () => {
       const tx = makeTx({
-        game: { sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1', tournamentFixture: null },
+        game: { sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1' },
         memberships: [{ userId: 'leader-1' }, { userId: 'requester' }],
       });
 
@@ -168,7 +186,7 @@ describe('identity attest (승인함)', () => {
 
     it('새로 배달된 수신자만 커밋 뒤 푸시 대상으로 돌려준다(재시도 시 중복 푸시 없음)', async () => {
       const tx = makeTx({
-        game: { sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1', tournamentFixture: null },
+        game: { sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1' },
         memberships: [{ userId: 'leader-1' }, { userId: 'leader-2' }],
       });
       // leader-1 은 이미 같은 요청으로 알림을 받은 상태(커맨드 재시도).
@@ -193,7 +211,7 @@ describe('identity attest (승인함)', () => {
 
     it('선호도(teamMatchEnabled=false)로 꺼진 수신자에게는 남기지 않는다', async () => {
       const tx = makeTx({
-        game: { sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1', tournamentFixture: null },
+        game: { sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1' },
         memberships: [{ userId: 'leader-1' }],
         preferences: [{ userId: 'leader-1', teamMatchEnabled: false, activityEnabled: true }],
       });
@@ -208,16 +226,21 @@ describe('identity attest (승인함)', () => {
       expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
     });
 
-    it('대회: 두 등록팀 리더에게 복합 targetId 로 경기 상세 딥링크를 남긴다', async () => {
+    it('canonical 대회 TeamMatch: 두 등록팀 리더에게 복합 targetId 로 경기 상세 딥링크를 남긴다', async () => {
       const tx = makeTx({
         game: {
-          sourceType: 'TOURNAMENT_FIXTURE',
-          teamMatchId: null,
-          tournamentFixture: {
-            id: 'fx-1',
+          sourceType: 'TEAM_MATCH',
+          teamMatchId: 'tm-tournament-legacy-test',
+          teamMatch: {
             tournamentId: 't-1',
-            homeRegistration: { teamId: 'team-h' },
-            awayRegistration: { teamId: 'team-a' },
+            leagueId: null,
+            tournament: { kind: 'regular_tournament' },
+            tournamentDetails: {
+              teamMatchId: 'tm-tournament-legacy-test',
+              tournamentId: 't-1',
+              homeRegistration: { teamId: 'team-h' },
+              awayRegistration: { teamId: 'team-a' },
+            },
           },
         },
         memberships: [{ userId: 'leader-h' }, { userId: 'leader-a' }],
@@ -234,11 +257,81 @@ describe('identity attest (승인함)', () => {
         data: expect.arrayContaining([
           expect.objectContaining({
             targetType: 'tournament',
-            targetId: 't-1:fx-1',
-            deepLink: '/tournaments/t-1/matches/fx-1',
+            targetId: 't-1:tm-tournament-legacy-test',
+            deepLink: '/tournaments/t-1/matches/tm-tournament-legacy-test',
             businessKey: 'identity-attest:req-9:leader-h',
           }),
         ]),
+        skipDuplicates: true,
+      });
+    });
+
+    it('canonical TEAM_MATCH 대회: Details의 양 등록팀 리더에게 activity 알림을 보낸다', async () => {
+      const tx = makeTx({
+        game: {
+          sourceType: 'TEAM_MATCH',
+          teamMatchId: 'tm-tournament',
+          teamMatch: {
+            tournamentId: 't-1',
+            leagueId: null,
+            tournament: { kind: null },
+            tournamentDetails: {
+              teamMatchId: 'tm-tournament',
+              tournamentId: 't-1',
+              homeRegistration: { teamId: 'team-h' },
+              awayRegistration: { teamId: 'team-a' },
+            },
+          },
+        },
+        memberships: [{ userId: 'leader-h' }, { userId: 'leader-a' }],
+        preferences: [{ userId: 'leader-h', activityEnabled: true, teamMatchEnabled: false }],
+      });
+
+      await writeIdentityAttestRequestNotifications(tx as never, {
+        gameId: 'game-1',
+        participantId: 'p-1',
+        requestId: 'req-canonical-tournament',
+        requesterUserId: 'requester',
+      });
+
+      expect(tx.v1Notification.createMany).toHaveBeenCalledWith({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            recipientUserId: 'leader-h',
+            targetType: 'tournament',
+            targetId: 't-1:tm-tournament',
+            deepLink: '/tournaments/t-1/matches/tm-tournament',
+          }),
+        ]),
+        skipDuplicates: true,
+      });
+    });
+
+    it('league TEAM_MATCH가 tournamentId와 leagueId를 함께 가져도 league 알림으로 남긴다', async () => {
+      const tx = makeTx({
+        game: {
+          sourceType: 'TEAM_MATCH',
+          teamMatchId: 'tm-league',
+          teamMatch: {
+            tournamentId: 'league-1',
+            leagueId: 'league-1',
+            league: { kind: 'regular_league' },
+            tournament: null,
+            tournamentDetails: null,
+          },
+        },
+        memberships: [{ userId: 'leader-1' }],
+      });
+
+      await writeIdentityAttestRequestNotifications(tx as never, {
+        gameId: 'game-1',
+        participantId: 'p-1',
+        requestId: 'req-league',
+        requesterUserId: 'requester',
+      });
+
+      expect(tx.v1Notification.createMany).toHaveBeenCalledWith({
+        data: [expect.objectContaining({ targetType: 'team_match', targetId: 'tm-league' })],
         skipDuplicates: true,
       });
     });

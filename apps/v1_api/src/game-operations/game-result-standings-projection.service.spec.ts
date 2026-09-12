@@ -1,209 +1,132 @@
-/**
- * game-result-standings-projection.service.spec.ts
- *
- * Contract tests for the automatic per-result group-standings trigger:
- *   - team-match games (no tournamentFixtureId) never touch tournament tables
- *   - a fixture with no groupId is skipped
- *   - knockout-phase groups (phase !== 'group') are skipped, matching
- *     TournamentBracketService.recalculateStandings()'s own filter
- *   - a soft-deleted tournament / missing competition config is skipped
- *   - a real group-phase group with a completed OFFICIAL fixture gets its
- *     V1TournamentStanding rows recomputed via the real
- *     calculateCompetitionStandings() (not a mocked calculation)
- *
- * 관찰 가능한 동작(tx 호출 여부/인자)만 검증한다. Mock 자체를 검증하지 않는다.
- */
 import { GameResultStandingsProjectionService } from './game-result-standings-projection.service';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
 import { FOOTBALL_V1_CONFIG } from '../tournaments/competition-config/competition-config';
 
+const canonicalIds = {
+  tournament: 'tournament-1', group: 'group-1', match: 'match-1', game: 'game-1',
+  revision: 'revision-1', homeRegistration: 'reg-1', awayRegistration: 'reg-2',
+} as const;
+
 function revisionRow(overrides: Partial<OfficialRevisionRow> = {}): OfficialRevisionRow {
   return {
-    revisionId: 'revision-1',
-    gameId: 'game-1',
-    revision: 1,
-    score: { home: 2, away: 1 },
-    sourceHash: 'hash-1',
-    playedAt: new Date('2026-06-14T00:00:00Z'),
-    officialAt: new Date('2026-06-14T00:00:00Z'),
-    reason: null,
-    sourceType: 'TOURNAMENT_FIXTURE',
-    currentOfficialRevisionId: 'revision-1',
-    tournamentId: 'tournament-1',
-    tournamentFixtureId: 'fixture-1',
-    homeTeamId: 'team-home',
-    awayTeamId: 'team-away',
-    visibility: 'LIVE' as const,
+    revisionId: canonicalIds.revision, gameId: canonicalIds.game, revision: 1,
+    score: { home: 2, away: 1 }, sourceHash: 'hash-1',
+    playedAt: new Date('2026-06-14T00:00:00Z'), officialAt: new Date('2026-06-14T00:00:00Z'),
+    reason: null, sourceType: 'TEAM_MATCH', currentOfficialRevisionId: canonicalIds.revision,
+    tournamentId: canonicalIds.tournament, teamMatchId: canonicalIds.match,
+    tournamentTeamMatchId: canonicalIds.match, teamMatchTournamentId: canonicalIds.tournament,
+    leagueId: null, homeTeamId: 'team-home', awayTeamId: 'team-away', visibility: 'LIVE' as const,
     ...overrides,
+  };
+}
+
+function canonicalGame(overrides: Record<string, unknown> = {}) {
+  return {
+    id: canonicalIds.game, sourceType: 'TEAM_MATCH',
+    currentOfficialRevision: { state: 'OFFICIAL', score: { home: 2, away: 1 }, resultParticipants: [] },
+    sides: [{ id: 'home-side', sideKey: 'HOME' }, { id: 'away-side', sideKey: 'AWAY' }], ...overrides,
+  };
+}
+
+function canonicalDetail(overrides: Record<string, unknown> = {}) {
+  return {
+    groupId: canonicalIds.group, tournamentId: canonicalIds.tournament,
+    homeRegistrationId: canonicalIds.homeRegistration, awayRegistrationId: canonicalIds.awayRegistration,
+    teamMatch: {
+      id: canonicalIds.match, deletedAt: null, tournamentId: canonicalIds.tournament,
+      leagueId: null, status: 'completed', game: canonicalGame(),
+    }, ...overrides,
+  };
+}
+
+function groupBase(overrides: Record<string, unknown> = {}) {
+  return {
+    id: canonicalIds.group, phase: 'group',
+    groupTeams: [{ registrationId: canonicalIds.homeRegistration }, { registrationId: canonicalIds.awayRegistration }],
+    tournament: {
+      id: canonicalIds.tournament, deletedAt: null, competitionConfigVersionId: 'config-version-1',
+      competitionConfig: FOOTBALL_V1_CONFIG,
+    }, ...overrides,
   };
 }
 
 function makeTx() {
   return {
-    v1TournamentFixture: { findUnique: jest.fn() },
-    // findMany feeds the invariant-required overall (통합) recalculation —
-    // defaults to empty since most tests below never reach that call
-    // (they return before it via one of the early skip paths).
+    v1TournamentMatchDetails: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentGroup: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
     v1TournamentStanding: { upsert: jest.fn().mockResolvedValue({}) },
     v1TournamentOverallStanding: {
-      upsert: jest.fn().mockResolvedValue({}),
-      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      upsert: jest.fn().mockResolvedValue({}), deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
 }
 
-function groupRow(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 'group-1',
-    phase: 'group',
-    groupTeams: [{ registrationId: 'reg-1' }, { registrationId: 'reg-2' }],
-    fixtures: [
-      {
-        homeRegistrationId: 'reg-1',
-        awayRegistrationId: 'reg-2',
-        game: {
-          currentOfficialRevision: { state: 'OFFICIAL', score: { home: 2, away: 1 } },
-        },
-      },
-    ],
-    tournament: {
-      id: 'tournament-1',
-      deletedAt: null,
-      competitionConfigVersionId: 'config-version-1',
-      competitionConfig: FOOTBALL_V1_CONFIG,
-    },
-    ...overrides,
-  };
+function configureCanonicalGroup(tx: ReturnType<typeof makeTx>, detail = canonicalDetail()) {
+  tx.v1TournamentMatchDetails.findUnique.mockResolvedValue(detail);
+  tx.v1TournamentGroup.findUnique.mockResolvedValue(groupBase());
+  tx.v1TournamentGroup.findMany.mockResolvedValue([groupBase()]);
+  tx.v1TournamentMatchDetails.findMany.mockResolvedValue([detail]);
 }
 
 describe('GameResultStandingsProjectionService', () => {
   const service = new GameResultStandingsProjectionService();
 
-  it('team-match game (tournamentFixtureId === null) → no tournament tables touched', async () => {
-    const tx = makeTx();
-    await service.project(tx, revisionRow({ tournamentFixtureId: null }));
-
-    expect(tx.v1TournamentFixture.findUnique).not.toHaveBeenCalled();
-    expect(tx.v1TournamentGroup.findUnique).not.toHaveBeenCalled();
-    expect(tx.v1TournamentStanding.upsert).not.toHaveBeenCalled();
-  });
-
-  it('fixture has no groupId → group is never looked up, no standings upserted', async () => {
-    const tx = makeTx();
-    tx.v1TournamentFixture.findUnique.mockResolvedValue({ groupId: null });
-
+  it('projects canonical tournament TeamMatch results to group and overall standings', async () => {
+    const tx = makeTx(); configureCanonicalGroup(tx);
     await service.project(tx, revisionRow());
-
-    expect(tx.v1TournamentFixture.findUnique).toHaveBeenCalledWith({
-      where: { id: 'fixture-1' },
-      select: { groupId: true },
-    });
-    expect(tx.v1TournamentGroup.findUnique).not.toHaveBeenCalled();
-    expect(tx.v1TournamentStanding.upsert).not.toHaveBeenCalled();
-  });
-
-  it('fixture row missing entirely (defensive) → no standings upserted', async () => {
-    const tx = makeTx();
-    tx.v1TournamentFixture.findUnique.mockResolvedValue(null);
-
-    await service.project(tx, revisionRow());
-
-    expect(tx.v1TournamentGroup.findUnique).not.toHaveBeenCalled();
-    expect(tx.v1TournamentStanding.upsert).not.toHaveBeenCalled();
-  });
-
-  it('knockout-phase group (phase !== "group") → skipped, no standings upserted', async () => {
-    const tx = makeTx();
-    tx.v1TournamentFixture.findUnique.mockResolvedValue({ groupId: 'group-1' });
-    tx.v1TournamentGroup.findUnique.mockResolvedValue(groupRow({ phase: 'semi' }));
-
-    await service.project(tx, revisionRow());
-
-    expect(tx.v1TournamentStanding.upsert).not.toHaveBeenCalled();
-  });
-
-  it('soft-deleted tournament → skipped, no standings upserted', async () => {
-    const tx = makeTx();
-    tx.v1TournamentFixture.findUnique.mockResolvedValue({ groupId: 'group-1' });
-    tx.v1TournamentGroup.findUnique.mockResolvedValue(
-      groupRow({ tournament: { id: 'tournament-1', deletedAt: new Date(), competitionConfigVersionId: 'config-version-1', competitionConfig: FOOTBALL_V1_CONFIG } }),
-    );
-
-    await service.project(tx, revisionRow());
-
-    expect(tx.v1TournamentStanding.upsert).not.toHaveBeenCalled();
-  });
-
-  it('tournament without an active competition config → skipped, no standings upserted', async () => {
-    const tx = makeTx();
-    tx.v1TournamentFixture.findUnique.mockResolvedValue({ groupId: 'group-1' });
-    tx.v1TournamentGroup.findUnique.mockResolvedValue(
-      groupRow({ tournament: { id: 'tournament-1', deletedAt: null, competitionConfigVersionId: null, competitionConfig: null } }),
-    );
-
-    await service.project(tx, revisionRow());
-
-    expect(tx.v1TournamentStanding.upsert).not.toHaveBeenCalled();
-  });
-
-  it('group-phase group + completed OFFICIAL fixture → real calculateCompetitionStandings() result is upserted for both teams', async () => {
-    const tx = makeTx();
-    tx.v1TournamentFixture.findUnique.mockResolvedValue({ groupId: 'group-1' });
-    tx.v1TournamentGroup.findUnique.mockResolvedValue(groupRow());
-    // 불변식(§7.1)이 재조회하는 "대회 전체 group-phase 조 목록" — 이 트리거는
-    // 영향받은 조 하나만 갖고 있으므로 통합 재계산을 위해 다시 조회한다.
-    tx.v1TournamentGroup.findMany.mockResolvedValue([groupRow()]);
-
-    await service.project(tx, revisionRow());
-
-    const calls = (tx.v1TournamentStanding.upsert as jest.Mock).mock.calls;
-    expect(calls).toHaveLength(2);
-    const winner = calls.find((c) => c[0].create.registrationId === 'reg-1')?.[0].create;
-    const loser = calls.find((c) => c[0].create.registrationId === 'reg-2')?.[0].create;
-    expect(winner).toMatchObject({ groupId: 'group-1', points: 3, wins: 1, losses: 0, position: 1 });
-    expect(loser).toMatchObject({ groupId: 'group-1', points: 0, wins: 0, losses: 1, position: 2 });
-
-    // 불변식(§7.1): recalculateAndUpsertGroupStandings가 호출되는 경로는 같은 tx에서
-    // recalculateAndUpsertOverallStandings도 호출해야 한다 — 조별 화면과 통합 화면이
-    // 어긋나지 않도록.
-    expect(tx.v1TournamentGroup.findMany).toHaveBeenCalledWith({
-      where: { tournamentId: 'tournament-1', phase: 'group' },
-      select: expect.any(Object),
-    });
-    const overallCalls = (tx.v1TournamentOverallStanding.upsert as jest.Mock).mock.calls;
-    expect(overallCalls).toHaveLength(2);
-    const overallWinner = overallCalls.find((c) => c[0].create.registrationId === 'reg-1')?.[0].create;
-    expect(overallWinner).toMatchObject({ tournamentId: 'tournament-1', points: 3, wins: 1, position: 1 });
-  });
-
-  it('nested {regulation} backfill score shape → still recomputed correctly', async () => {
-    const tx = makeTx();
-    tx.v1TournamentFixture.findUnique.mockResolvedValue({ groupId: 'group-1' });
-    const nestedGroup = groupRow({
-      fixtures: [
-        {
-          homeRegistrationId: 'reg-1',
-          awayRegistrationId: 'reg-2',
-          game: {
-            currentOfficialRevision: {
-              state: 'OFFICIAL',
-              score: { regulation: { home: 1, away: 1 }, penalty: null, goals: [], incomplete: false },
-            },
-          },
-        },
-      ],
-    });
-    tx.v1TournamentGroup.findUnique.mockResolvedValue(nestedGroup);
-    tx.v1TournamentGroup.findMany.mockResolvedValue([nestedGroup]);
-
-    await service.project(tx, revisionRow());
-
-    const calls = (tx.v1TournamentStanding.upsert as jest.Mock).mock.calls;
-    for (const call of calls) {
-      expect(call[0].create.points).toBe(1);
-      expect(call[0].create.draws).toBe(1);
+    for (const table of [tx.v1TournamentStanding, tx.v1TournamentOverallStanding]) {
+      const rows = (table.upsert as jest.Mock).mock.calls.map(([input]) => input.create);
+      expect(rows).toHaveLength(2);
+      expect(rows.find((row) => row.registrationId === canonicalIds.homeRegistration)).toMatchObject({ points: 3, wins: 1, position: 1 });
+      expect(rows.find((row) => row.registrationId === canonicalIds.awayRegistration)).toMatchObject({ points: 0, losses: 1, position: 2 });
     }
+  });
+
+  it('ignores legacy-only revisions without querying legacy fixtures', async () => {
+    const tx = makeTx();
+    await service.project(tx, revisionRow({ sourceType: 'TOURNAMENT_FIXTURE', teamMatchId: null, tournamentTeamMatchId: null, teamMatchTournamentId: null }));
+    expect(tx.v1TournamentMatchDetails.findUnique).not.toHaveBeenCalled();
+    expect(tx.v1TournamentGroup.findMany).not.toHaveBeenCalled();
+    expect(tx.v1TournamentStanding.upsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects a canonical revision whose Details or TeamMatch cannot be resolved', async () => {
+    const tx = makeTx(); tx.v1TournamentMatchDetails.findUnique.mockResolvedValue(null);
+    await expect(service.project(tx, revisionRow())).rejects.toMatchObject({ response: { code: 'CANONICAL_MATCH_REQUIRED' } });
+    expect(tx.v1TournamentStanding.upsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects cross-tournament canonical ownership instead of projecting zeroes', async () => {
+    const tx = makeTx();
+    const base = canonicalDetail();
+    configureCanonicalGroup(tx, canonicalDetail({ tournamentId: 'other-tournament', teamMatch: { ...base.teamMatch, tournamentId: 'other-tournament' } }));
+    await expect(service.project(tx, revisionRow())).rejects.toMatchObject({ response: { code: 'CANONICAL_MATCH_REQUIRED' } });
+    expect(tx.v1TournamentStanding.upsert).not.toHaveBeenCalled();
+  });
+
+  it('skips a valid canonical knockout match without group standings', async () => {
+    const tx = makeTx(); tx.v1TournamentMatchDetails.findUnique.mockResolvedValue(canonicalDetail({ groupId: null }));
+    await service.project(tx, revisionRow());
+    expect(tx.v1TournamentGroup.findMany).not.toHaveBeenCalled();
+    expect(tx.v1TournamentStanding.upsert).not.toHaveBeenCalled();
+  });
+
+  it('skips a canonical match attached to a non-group phase even when groupId is present', async () => {
+    const tx = makeTx();
+    tx.v1TournamentMatchDetails.findUnique.mockResolvedValue(canonicalDetail());
+    tx.v1TournamentGroup.findUnique.mockResolvedValue(groupBase({ phase: 'semi' }));
+
+    await service.project(tx, revisionRow());
+
+    expect(tx.v1TournamentGroup.findMany).not.toHaveBeenCalled();
+    expect(tx.v1TournamentStanding.upsert).not.toHaveBeenCalled();
+  });
+
+  it('keeps VOID current revisions from contributing points while preserving both rows', async () => {
+    const tx = makeTx(); const base = canonicalDetail();
+    const detail = canonicalDetail({ teamMatch: { ...base.teamMatch, game: canonicalGame({ currentOfficialRevision: { state: 'VOID', score: { home: 2, away: 1 }, resultParticipants: [] } }) } });
+    configureCanonicalGroup(tx, detail); await service.project(tx, revisionRow());
+    const rows = (tx.v1TournamentStanding.upsert as jest.Mock).mock.calls.map(([input]) => input.create);
+    expect(rows).toHaveLength(2); expect(rows.every((row) => row.points === 0 && row.wins === 0 && row.losses === 0)).toBe(true);
   });
 });

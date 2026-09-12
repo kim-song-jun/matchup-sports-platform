@@ -107,7 +107,7 @@ async function buildTournamentGame(fixtureId: string): Promise<string> {
     orderBy: { version: 'desc' },
   });
   const input: GameSourceCreationInput = {
-    sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+    sourceType: V1GameSourceType.TEAM_MATCH,
     sourceId: fixtureId,
     competitionConfigVersionId: config.id,
     sides: [
@@ -195,6 +195,7 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
   let correctionRevisionId: string;
   let correctionOfficialId: string;
   let voidRevisionId: string;
+  let conflictTargetGameId: string;
 
   beforeAll(async () => {
     if (!process.env.DATABASE_URL) {
@@ -212,7 +213,7 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
     await prisma.v1AdminUser.create({
       data: { userId: ids.platformOps, adminRole: 'ops', status: 'active' },
     });
-    await prisma.v1Sport.upsert({
+    const sport = await prisma.v1Sport.upsert({
       where: { code: 'football' },
       create: { id: ids.sport, code: 'football', name: 'Task 22 Football' },
       update: {},
@@ -222,35 +223,26 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
     });
     await prisma.v1Team.createMany({
       data: [
-        { id: ids.hostTeam, ownerUserId: ids.platformOps, sportId: ids.sport, regionId: ids.region, name: 'Task 22 Host' },
-        { id: ids.opponentTeam, ownerUserId: ids.platformOps, sportId: ids.sport, regionId: ids.region, name: 'Task 22 Opponent' },
+        { id: ids.hostTeam, ownerUserId: ids.platformOps, sportId: sport.id, regionId: ids.region, name: 'Task 22 Host' },
+        { id: ids.opponentTeam, ownerUserId: ids.platformOps, sportId: sport.id, regionId: ids.region, name: 'Task 22 Opponent' },
       ],
     });
+    const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({ where: { name: 'football-v1', status: 'ACTIVE' }, orderBy: { version: 'desc' } });
     await prisma.v1Tournament.createMany({
       data: [
-        { id: ids.tournament, sportId: ids.sport, title: 'Task 22 tournament' },
-        { id: ids.otherTournament, sportId: ids.sport, title: 'Task 22 other tournament' },
+        { id: ids.tournament, sportId: sport.id, title: 'Task 22 tournament', competitionConfigVersionId: config.id },
+        { id: ids.otherTournament, sportId: sport.id, title: 'Task 22 other tournament', competitionConfigVersionId: config.id },
       ],
     });
-    const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({
-      where: { name: 'football-v1', status: 'ACTIVE' },
-      orderBy: { version: 'desc' },
-    });
-    await prisma.v1TournamentFixture.createMany({
+    await prisma.v1TeamMatch.createMany({
       data: [
-        { id: ids.sourceFixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, competitionConfigVersionId: config.id },
-        { id: ids.targetFixture, tournamentId: ids.tournament, round: 'semi', fixtureNumber: 1, competitionConfigVersionId: config.id },
-        { id: ids.conflictSourceFixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, competitionConfigVersionId: config.id },
-        {
-          id: ids.conflictTargetFixture,
-          tournamentId: ids.tournament,
-          round: 'semi',
-          fixtureNumber: 2,
-          competitionConfigVersionId: config.id,
-          status: 'in_progress',
-        },
-        { id: ids.directorGateFixtureA, tournamentId: ids.tournament, round: 'group', fixtureNumber: 3, competitionConfigVersionId: config.id },
-        { id: ids.directorGateFixtureB, tournamentId: ids.tournament, round: 'group', fixtureNumber: 4, competitionConfigVersionId: config.id },
+        { id: ids.sourceFixture, tournamentId: ids.tournament, sportId: sport.id, regionId: ids.region, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, title: 'Task 22 source match', placeName: 'Task 22 field 1', status: 'matched', startAt: new Date('2035-01-01T01:00:00.000Z'), competitionConfigVersionId: config.id },
+        { id: ids.targetFixture, tournamentId: ids.tournament, sportId: sport.id, regionId: ids.region, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, title: 'Task 22 target match', placeName: 'Task 22 field 2', status: 'matched', startAt: new Date('2035-01-01T02:00:00.000Z'), competitionConfigVersionId: config.id },
+        { id: ids.conflictSourceFixture, tournamentId: ids.tournament, sportId: sport.id, regionId: ids.region, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, title: 'Task 22 conflict source', placeName: 'Task 22 field 3', status: 'matched', startAt: new Date('2035-01-01T03:00:00.000Z'), competitionConfigVersionId: config.id },
+        // TeamMatch has no legacy `in_progress` status; the conflict case uses its canonical Game state.
+        { id: ids.conflictTargetFixture, tournamentId: ids.tournament, sportId: sport.id, regionId: ids.region, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, title: 'Task 22 conflict target', placeName: 'Task 22 field 4', status: 'matched', startAt: new Date('2035-01-01T04:00:00.000Z'), competitionConfigVersionId: config.id },
+        { id: ids.directorGateFixtureA, tournamentId: ids.tournament, sportId: sport.id, regionId: ids.region, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, title: 'Task 22 director gate A', placeName: 'Task 22 field 5', status: 'matched', startAt: new Date('2035-01-01T05:00:00.000Z'), competitionConfigVersionId: config.id },
+        { id: ids.directorGateFixtureB, tournamentId: ids.tournament, sportId: sport.id, regionId: ids.region, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, title: 'Task 22 director gate B', placeName: 'Task 22 field 6', status: 'matched', startAt: new Date('2035-01-01T06:00:00.000Z'), competitionConfigVersionId: config.id },
       ],
     });
     await prisma.v1TournamentRegistration.createMany({
@@ -259,29 +251,27 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
         { id: ids.opponentRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
       ],
     });
-    await prisma.v1TournamentFixture.update({
-      where: { id: ids.sourceFixture },
-      data: { homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration },
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: [ids.sourceFixture, ids.targetFixture, ids.conflictSourceFixture, ids.conflictTargetFixture, ids.directorGateFixtureA, ids.directorGateFixtureB].map((teamMatchId, index) => ({
+        teamMatchId, tournamentId: ids.tournament, round: new Set<string>([ids.sourceFixture, ids.conflictSourceFixture, ids.directorGateFixtureA, ids.directorGateFixtureB]).has(teamMatchId) ? 'group' : 'semi', fixtureNumber: index + 1,
+        homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration,
+      })),
     });
-    await prisma.v1TournamentFixture.update({
-      where: { id: ids.conflictSourceFixture },
-      data: { homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration },
-    });
-    await prisma.v1TournamentFixtureAdvancementEdge.create({
+    await prisma.v1TournamentMatchAdvancementEdge.create({
       data: {
         tournamentId: ids.tournament,
-        sourceFixtureId: ids.sourceFixture,
+        sourceTeamMatchId: ids.sourceFixture,
         sourceOutcome: 'WINNER',
-        targetFixtureId: ids.targetFixture,
+        targetTeamMatchId: ids.targetFixture,
         targetSide: 'HOME',
       },
     });
-    await prisma.v1TournamentFixtureAdvancementEdge.create({
+    await prisma.v1TournamentMatchAdvancementEdge.create({
       data: {
         tournamentId: ids.tournament,
-        sourceFixtureId: ids.conflictSourceFixture,
+        sourceTeamMatchId: ids.conflictSourceFixture,
         sourceOutcome: 'WINNER',
-        targetFixtureId: ids.conflictTargetFixture,
+        targetTeamMatchId: ids.conflictTargetFixture,
         targetSide: 'HOME',
       },
     });
@@ -309,6 +299,12 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
       update: { value: 'off' },
     });
 
+    // Every tournament advancement target must already have its canonical Game and sides before
+    // the source can be officialized.  The projection path resolves the target Game while
+    // applying the winner; leaving it as Details-only makes the first officialization fail with
+    // NEXT_FIXTURE_CONFLICT before any review assertion runs.
+    await buildTournamentGame(ids.targetFixture);
+    conflictTargetGameId = await buildTournamentGame(ids.conflictTargetFixture);
     gameId = await buildTournamentGame(ids.sourceFixture);
     const ended = await endWithOneHomeGoal(gameId);
     homeSideId = ended.homeSideId;
@@ -465,7 +461,7 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
     expect(game.currentOfficialRevisionId).toBe(officialRevisionId);
 
     await drainOutbox();
-    const target = await prisma.v1TournamentFixture.findUniqueOrThrow({ where: { id: ids.targetFixture } });
+    const target = await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: ids.targetFixture } });
     expect(target.homeRegistrationId).toBe(ids.hostRegistration);
 
     const duplicate = await captureFailure(() =>
@@ -598,7 +594,7 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
       SELECT is_current AS "isCurrent" FROM v1_game_official_result_cache WHERE game_id = ${gameId}
     `;
     expect(cache.every((row) => row.isCurrent === false)).toBe(true);
-    const target = await prisma.v1TournamentFixture.findUniqueOrThrow({ where: { id: ids.targetFixture } });
+    const target = await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: ids.targetFixture } });
     expect(target.homeRegistrationId).toBeNull();
   });
 
@@ -617,6 +613,8 @@ describe('Task 22 tournament result review, officialize, correction, and void', 
         projectionPreviewHash: previewHash(submitted),
       },
     );
+    await prisma.v1Game.update({ where: { id: conflictTargetGameId }, data: { state: 'LIVE' } });
+    expect((await prisma.v1Game.findUniqueOrThrow({ where: { id: conflictTargetGameId }, select: { state: true } })).state).toBe('LIVE');
     const before = await revisionCount(conflictGameId);
     const blocked = await captureFailure(() =>
       resultReview.voidResultRevision(authUser(ids.platformOps), conflictGameId, officialized.revisionId, 'task22-conflict-void', {

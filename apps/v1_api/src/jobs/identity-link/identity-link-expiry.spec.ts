@@ -20,7 +20,11 @@ describe('IdentityLinkExpiryService', () => {
     payload: { gameId: 'game-1', participantId: 'p-1', requestId: 'req-1' },
   } as never;
 
-  function makeTx(overrides: { events: unknown[]; existingNotification?: unknown }) {
+  function makeTx(overrides: {
+    events: unknown[];
+    existingNotification?: unknown;
+    teamMatch?: unknown;
+  }) {
     return {
       v1ParticipantIdentityLinkEvent: {
         findMany: jest.fn().mockResolvedValue(overrides.events),
@@ -32,10 +36,16 @@ describe('IdentityLinkExpiryService', () => {
         findUnique: jest.fn().mockResolvedValue({
           sourceType: 'TEAM_MATCH',
           teamMatchId: 'tm-1',
-          tournamentFixture: null,
+          teamMatch: overrides.teamMatch ?? {
+            tournamentId: null,
+            leagueId: null,
+            tournament: null,
+            tournamentDetails: null,
+          },
         }),
       },
       v1GameParticipant: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'p-1', gameId: 'game-1' }),
         findFirst: jest.fn().mockResolvedValue({ displayNameSnapshot: '김민준' }),
       },
       v1NotificationPreference: { findUnique: jest.fn().mockResolvedValue(null) },
@@ -51,6 +61,7 @@ describe('IdentityLinkExpiryService', () => {
 
   const requestedEvent = {
     action: 'REQUESTED',
+    participantId: 'p-1',
     requestId: 'req-1',
     linkId: 'link-1',
     userId: 'requester',
@@ -107,6 +118,17 @@ describe('IdentityLinkExpiryService', () => {
     expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
   });
 
+  it('REQUESTED 원장이 없는 만료 잡은 조용히 성공 처리하지 않는다', async () => {
+    const tx = makeTx({ events: [] });
+
+    await expect(new IdentityLinkExpiryService().handler(claim, tx as never)).rejects.toThrow(
+      'IDENTITY_LINK_EXPIRY_REQUEST_MISSING',
+    );
+    expect(tx.v1ParticipantIdentityLinkEvent.create).not.toHaveBeenCalled();
+    expect(tx.v1Game.update).not.toHaveBeenCalled();
+    expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
+  });
+
   it('아직 24시간이 지나지 않았으면 쓰지 않는다(잡이 일찍 깬 경우)', async () => {
     const tx = makeTx({ events: [{ ...requestedEvent, effectiveAt: new Date() }] });
 
@@ -143,6 +165,49 @@ describe('IdentityLinkExpiryService', () => {
     expect(push.sendToUser).not.toHaveBeenCalled();
   });
 
+  it('canonical tournament TeamMatch uses tournament preference and match deep link', async () => {
+    const tx = makeTx({
+      events: [requestedEvent],
+      teamMatch: {
+        tournamentId: 'tournament-1',
+        leagueId: null,
+        tournament: { kind: 'regular_tournament' },
+        tournamentDetails: { teamMatchId: 'tm-1', tournamentId: 'tournament-1' },
+      },
+    });
+    tx.v1NotificationPreference.findUnique.mockResolvedValue({
+      teamMatchEnabled: false,
+      activityEnabled: true,
+    });
+
+    await new IdentityLinkExpiryService().handler(claim, tx as never);
+
+    const [{ data }] = tx.v1Notification.createMany.mock.calls[0] as [
+      { data: Array<{ deepLink: string | null }> },
+    ];
+    expect(data[0]).toMatchObject({ deepLink: '/tournaments/tournament-1/matches/tm-1' });
+  });
+
+  it('fails closed when a regular-league TeamMatch has malformed tournament Details', async () => {
+    const tx = makeTx({
+      events: [requestedEvent],
+      teamMatch: {
+        tournamentId: 'league-1',
+        leagueId: 'league-1',
+        tournament: { kind: 'regular_league' },
+        tournamentDetails: { teamMatchId: 'tm-1', tournamentId: 'league-1' },
+      },
+    });
+
+    await expect(new IdentityLinkExpiryService().handler(claim, tx as never)).rejects.toMatchObject({
+      code: 'IDENTITY_NOTIFICATION_SCOPE_INVALID',
+    });
+
+    expect(tx.v1ParticipantIdentityLinkEvent.create).not.toHaveBeenCalled();
+    expect(tx.v1Game.update).not.toHaveBeenCalled();
+    expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
+  });
+
   it('신청자가 이 알림 축을 꺼 뒀으면 통보하지 않는다', async () => {
     const tx = makeTx({ events: [requestedEvent] });
     tx.v1NotificationPreference.findUnique.mockResolvedValue({
@@ -154,6 +219,31 @@ describe('IdentityLinkExpiryService', () => {
 
     // 만료 자체는 기록하되 통보만 건너뛴다 — 원장 정합성은 선호도와 무관하다.
     expect(tx.v1ParticipantIdentityLinkEvent.create).toHaveBeenCalled();
+    expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
+  });
+
+  it('fails closed before mutation when the participant belongs to another game', async () => {
+    const tx = makeTx({ events: [requestedEvent] });
+    tx.v1GameParticipant.findUnique.mockResolvedValue({ id: 'p-1', gameId: 'other-game' });
+
+    await expect(new IdentityLinkExpiryService().handler(claim, tx as never)).rejects.toThrow(
+      'IDENTITY_LINK_EXPIRY_PARTICIPANT_GAME_MISMATCH',
+    );
+    expect(tx.v1ParticipantIdentityLinkEvent.create).not.toHaveBeenCalled();
+    expect(tx.v1Game.update).not.toHaveBeenCalled();
+    expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
+  });
+
+  it('fails closed before mutation when the requested event does not match the claimed request', async () => {
+    const tx = makeTx({
+      events: [{ ...requestedEvent, requestId: 'other-request' }],
+    });
+
+    await expect(new IdentityLinkExpiryService().handler(claim, tx as never)).rejects.toThrow(
+      'IDENTITY_LINK_EXPIRY_REQUEST_MISMATCH',
+    );
+    expect(tx.v1ParticipantIdentityLinkEvent.create).not.toHaveBeenCalled();
+    expect(tx.v1Game.update).not.toHaveBeenCalled();
     expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
   });
 

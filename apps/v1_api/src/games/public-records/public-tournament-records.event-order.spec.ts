@@ -98,74 +98,77 @@ function buildFakePrisma(events: readonly FakeEvent[]): PrismaService {
         return [];
       },
     },
-    v1TournamentFixture: {
-      async findFirst(args: { select: Record<string, unknown> }) {
-        if (!('game' in args.select)) return null;
+    v1TournamentMatchDetails: {
+      async findFirst() {
         return {
-          id: FIXTURE_ID,
+          teamMatchId: FIXTURE_ID,
           tournamentId: TOURNAMENT_ID,
           round: '결승',
           fixtureNumber: 1,
           legNumber: 1,
           groupId: null,
-          scheduledAt: new Date('2026-08-10T04:00:00.000Z'),
-          venue: null,
-          status: 'in_progress',
           homeRegistrationId: 'reg-home',
           awayRegistrationId: 'reg-away',
           homeRegistration: { team: { id: 'team-home', name: '홈팀' } },
           awayRegistration: { team: { id: 'team-away', name: '원정팀' } },
           group: null,
-          fieldId: null,
-          field: null,
-          videos: [],
-          game: {
-            id: GAME_ID,
-            state: 'LIVE',
-            visibilityPolicy: { mode: 'LIVE', lineupAt: null },
-            sides: [
-              { id: 'side-home', sideKey: 'HOME' },
-              { id: 'side-away', sideKey: 'AWAY' },
-            ],
-            lineups: [{ id: 'lineup-home-1', sideId: 'side-home', revision: 1 }],
-            participants: [HOME_SCORER],
-            currentOfficialRevision: null,
-            periods: [],
-          },
-        };
-      },
-      async findMany(args: { where: { scheduledAt?: unknown } }) {
-        const wantsScheduled = args.where.scheduledAt !== null;
-        if (!wantsScheduled) return [];
-        return [
-          {
-            id: FIXTURE_ID,
-            round: '결승',
-            fixtureNumber: 1,
-            legNumber: 1,
-            groupId: null,
-            scheduledAt: new Date('2026-08-10T04:00:00.000Z'),
-            venue: null,
-            status: 'in_progress',
-            homeRegistrationId: 'reg-home',
-            awayRegistrationId: 'reg-away',
-            homeRegistration: { team: { id: 'team-home', name: '홈팀' } },
-            awayRegistration: { team: { id: 'team-away', name: '원정팀' } },
-            group: null,
+          teamMatch: {
+            startAt: new Date('2026-08-10T04:00:00.000Z'),
+            placeName: null,
+            status: 'matched',
+            fieldId: null,
             field: null,
             videos: [],
             game: {
               id: GAME_ID,
               state: 'LIVE',
               visibilityPolicy: { mode: 'LIVE', lineupAt: null },
-              currentOfficialRevision: null,
               sides: [
                 { id: 'side-home', sideKey: 'HOME' },
                 { id: 'side-away', sideKey: 'AWAY' },
               ],
-              lineups: [{ id: 'lineup-home-1', sideId: 'side-home', revision: 1 }],
-              periods: [],
+              lineups: [{ id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'LOCKED', invalidatedAt: null }],
               participants: [HOME_SCORER],
+              currentOfficialRevision: null,
+              periods: [],
+            },
+          },
+        };
+      },
+      async findMany() {
+        return [
+          {
+            teamMatchId: FIXTURE_ID,
+            tournamentId: TOURNAMENT_ID,
+            round: '결승',
+            fixtureNumber: 1,
+            legNumber: 1,
+            groupId: null,
+            homeRegistrationId: 'reg-home',
+            awayRegistrationId: 'reg-away',
+            homeRegistration: { team: { id: 'team-home', name: '홈팀' } },
+            awayRegistration: { team: { id: 'team-away', name: '원정팀' } },
+            group: null,
+            teamMatch: {
+              startAt: new Date('2026-08-10T04:00:00.000Z'),
+              placeName: null,
+              status: 'matched',
+              fieldId: null,
+              field: null,
+              videos: [],
+              game: {
+                id: GAME_ID,
+                state: 'LIVE',
+                visibilityPolicy: { mode: 'LIVE', lineupAt: null },
+                currentOfficialRevision: null,
+                sides: [
+                  { id: 'side-home', sideKey: 'HOME' },
+                  { id: 'side-away', sideKey: 'AWAY' },
+                ],
+                lineups: [{ id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'LOCKED', invalidatedAt: null }],
+                periods: [],
+                participants: [HOME_SCORER],
+              },
             },
           },
         ];

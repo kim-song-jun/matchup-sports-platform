@@ -1,27 +1,36 @@
-import { appearedUserIdsBySide, type AppearanceGamePrismaLike } from './tournament-fixture-appearance';
+import { appearedUserIdsBySide, appearedUserIdsBySideBatch, type AppearanceGamePrismaLike } from './tournament-fixture-appearance';
 
 function fixtureWith(
-  game: { id: string; currentOfficialRevision: { id: string; state: string } | null } | null,
+  game: { id: string; sourceType?: string; currentOfficialRevision: { id: string; state: string } | null } | null,
 ) {
-  return { game };
+  return {
+    id: 'tm-1',
+    tournamentId: 't-1',
+    leagueId: null,
+    tournamentDetails: { teamMatchId: 'tm-1', tournamentId: 't-1' },
+    game: game ? { sourceType: 'TEAM_MATCH', ...game } : null,
+  };
 }
 
 describe('appearedUserIdsBySide', () => {
   it('OFFICIAL 리비전이 있으면 홈/원정 실출전 userId 집합을 반환한다', async () => {
     const prisma = {
       v1GameResultParticipant: {
-        findMany: jest.fn().mockResolvedValue([{ participantId: 'p1' }, { participantId: 'p2' }]),
+        findMany: jest.fn().mockResolvedValue([
+          { participantId: 'p1', resultRevisionId: 'rev1', resultRevision: { gameId: 'g1' } },
+          { participantId: 'p2', resultRevisionId: 'rev1', resultRevision: { gameId: 'g1' } },
+        ]),
       },
       v1GameParticipant: {
         findMany: jest.fn().mockResolvedValue([
-          { id: 'p1', userId: 'u1', sideId: 's-home' },
-          { id: 'p2', userId: 'u2', sideId: 's-away' },
+          { id: 'p1', gameId: 'g1', userId: 'u1', sideId: 's-home' },
+          { id: 'p2', gameId: 'g1', userId: 'u2', sideId: 's-away' },
         ]),
       },
       v1GameSide: {
         findMany: jest.fn().mockResolvedValue([
-          { id: 's-home', sideKey: 'HOME' },
-          { id: 's-away', sideKey: 'AWAY' },
+          { id: 's-home', gameId: 'g1', sideKey: 'HOME' },
+          { id: 's-away', gameId: 'g1', sideKey: 'AWAY' },
         ]),
       },
     } as unknown as AppearanceGamePrismaLike;
@@ -32,15 +41,23 @@ describe('appearedUserIdsBySide', () => {
     );
 
     expect(result).toEqual({ home: new Set(['u1']), away: new Set(['u2']) });
+    expect(prisma.v1GameResultParticipant.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { resultRevisionId: { in: ['rev1'] } } }),
+    );
+    expect(prisma.v1GameSide.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: { in: ['s-home', 's-away'] } } }),
+    );
   });
 
   it('userId가 null인 참가자(게스트 라인업)는 집합에서 제외한다', async () => {
     const prisma = {
-      v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue([{ participantId: 'p1' }]) },
-      v1GameParticipant: {
-        findMany: jest.fn().mockResolvedValue([{ id: 'p1', userId: null, sideId: 's-home' }]),
+      v1GameResultParticipant: {
+        findMany: jest.fn().mockResolvedValue([{ participantId: 'p1', resultRevisionId: 'rev1', resultRevision: { gameId: 'g1' } }]),
       },
-      v1GameSide: { findMany: jest.fn().mockResolvedValue([{ id: 's-home', sideKey: 'HOME' }]) },
+      v1GameParticipant: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'p1', gameId: 'g1', userId: null, sideId: 's-home' }]),
+      },
+      v1GameSide: { findMany: jest.fn().mockResolvedValue([{ id: 's-home', gameId: 'g1', sideKey: 'HOME' }]) },
     } as unknown as AppearanceGamePrismaLike;
 
     const result = await appearedUserIdsBySide(
@@ -96,11 +113,13 @@ describe('appearedUserIdsBySide', () => {
   it('결과 참가자만 세고 라인업 전체를 세지 않는다 — 미출전 선수는 빠진다', async () => {
     const prisma = {
       // 라인업에는 p1,p2 가 있지만 공식 결과에는 p1 만 있다.
-      v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue([{ participantId: 'p1' }]) },
-      v1GameParticipant: {
-        findMany: jest.fn().mockResolvedValue([{ id: 'p1', userId: 'u1', sideId: 's-home' }]),
+      v1GameResultParticipant: {
+        findMany: jest.fn().mockResolvedValue([{ participantId: 'p1', resultRevisionId: 'rev1', resultRevision: { gameId: 'g1' } }]),
       },
-      v1GameSide: { findMany: jest.fn().mockResolvedValue([{ id: 's-home', sideKey: 'HOME' }]) },
+      v1GameParticipant: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'p1', gameId: 'g1', userId: 'u1', sideId: 's-home' }]),
+      },
+      v1GameSide: { findMany: jest.fn().mockResolvedValue([{ id: 's-home', gameId: 'g1', sideKey: 'HOME' }]) },
     } as unknown as AppearanceGamePrismaLike;
 
     const result = await appearedUserIdsBySide(
@@ -113,5 +132,46 @@ describe('appearedUserIdsBySide', () => {
     expect(prisma.v1GameParticipant.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: { in: ['p1'] } } }),
     );
+  });
+
+  it('여러 fixture를 세 번의 batch query로 계산하고 foreign game 행을 버린다', async () => {
+    const secondFixture = {
+      ...fixtureWith({ id: 'g2', currentOfficialRevision: { id: 'rev2', state: 'OFFICIAL' } }),
+      id: 'tm-2',
+      tournamentDetails: { teamMatchId: 'tm-2', tournamentId: 't-1' },
+    };
+    const prisma = {
+      v1GameResultParticipant: {
+        findMany: jest.fn().mockResolvedValue([
+          { participantId: 'p1', resultRevisionId: 'rev1', resultRevision: { gameId: 'g1' } },
+          { participantId: 'foreign-p3', resultRevisionId: 'rev2', resultRevision: { gameId: 'g2' } },
+          { participantId: 'p2', resultRevisionId: 'rev2', resultRevision: { gameId: 'g2' } },
+        ]),
+      },
+      v1GameParticipant: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'p1', gameId: 'g1', userId: 'u1', sideId: 's1-home' },
+          { id: 'foreign-p3', gameId: 'g1', userId: 'foreign', sideId: 's1-home' },
+          { id: 'p2', gameId: 'g2', userId: 'u2', sideId: 's2-home' },
+        ]),
+      },
+      v1GameSide: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 's1-home', gameId: 'g1', sideKey: 'HOME' },
+          { id: 's2-home', gameId: 'g2', sideKey: 'HOME' },
+        ]),
+      },
+    } as unknown as AppearanceGamePrismaLike;
+
+    const result = await appearedUserIdsBySideBatch(
+      prisma,
+      [fixtureWith({ id: 'g1', currentOfficialRevision: { id: 'rev1', state: 'OFFICIAL' } }), secondFixture],
+    );
+
+    expect(result.get('tm-1')).toEqual({ home: new Set(['u1']), away: new Set() });
+    expect(result.get('tm-2')).toEqual({ home: new Set(['u2']), away: new Set() });
+    expect(prisma.v1GameResultParticipant.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.v1GameParticipant.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.v1GameSide.findMany).toHaveBeenCalledTimes(1);
   });
 });

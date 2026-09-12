@@ -3364,6 +3364,26 @@ label.tm-btn:focus-within {
   padding-bottom: 124px;
 }
 
+/* Tournament detail owns a mobile/tablet fixed CTA. Its terminal content must clear the
+   complete CTA surface, including the deadline explanation and native safe-area inset. Keep
+   the existing desktop article clearance where the fixed CTA is hidden. */
+.tm-tournament-detail-article {
+  padding-bottom: 48px;
+}
+
+@media (min-width: 1024px) {
+  .tm-tournament-detail-article--fixed-cta {
+    padding-bottom: 96px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .tm-tournament-detail-article--fixed-cta {
+    padding-bottom: calc(128px + var(--v1-shell-safe-bottom));
+  }
+}
+
+
 .tm-match-detail-hero {
   height: 220px;
   background-position: center;

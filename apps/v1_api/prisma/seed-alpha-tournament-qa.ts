@@ -1,13 +1,16 @@
 import {
   Prisma,
   PrismaClient,
-  V1TournamentFixtureStatus,
+  V1CompetitionKind,
+  V1GameState,
+  V1TeamMatchStatus,
   V1TournamentRegistrationStatus,
   V1TournamentStatus,
 } from '@prisma/client';
 // 같은 `prisma/` 폴더 안의 모듈이라 프로덕션 이미지에도 함께 복사된다 — 아래 경고가 금지하는
 // 건 이 이미지에 없는 `../src/...` import 다.
 import { seedAlphaQaSquads } from './seed-alpha-qa-squads';
+import { deterministicCanonicalMatchId, ensureCanonicalOfficialResult, ensureCanonicalTournamentMatch, findTournamentOnSurfaceOrThrow } from './canonical-tournament-seed';
 
 // canonical 풋살 competition config 의 id.
 //
@@ -495,8 +498,10 @@ async function createRegistrations(
 ) {
   const registrations = [];
   for (const item of teams) {
-    const registration = await tx.v1TournamentRegistration.create({
-      data: {
+    const registration = await tx.v1TournamentRegistration.upsert({
+      where: { tournamentId_teamId: { tournamentId, teamId: item.team.id } },
+      update: {},
+      create: {
         tournamentId,
         teamId: item.team.id,
         appliedByUserId: item.user.id,
@@ -510,8 +515,13 @@ async function createRegistrations(
         rosterLockedAt: status === V1TournamentRegistrationStatus.confirmed ? new Date() : null,
       },
     });
-    await tx.v1TournamentPlayer.create({
-      data: {
+    await tx.v1TournamentPlayer.upsert({
+      where: { registrationId_userId: { registrationId: registration.id, userId: item.user.id } },
+      update: {
+        realName: item.persona.realName,
+        genderSnapshot: item.persona.gender,
+      },
+      create: {
         registrationId: registration.id,
         userId: item.user.id,
         realName: item.persona.realName,
@@ -521,8 +531,10 @@ async function createRegistrations(
       },
     });
     if (status === V1TournamentRegistrationStatus.confirmed && entryFee > 0) {
-      await tx.v1TournamentPayment.create({
-        data: {
+      await tx.v1TournamentPayment.upsert({
+        where: { registrationId: registration.id },
+        update: {},
+        create: {
           registrationId: registration.id,
           method: 'bank_transfer',
           provider: 'alpha_qa',
@@ -543,89 +555,93 @@ export async function createCompetitionData(
   registrations: Awaited<ReturnType<typeof createRegistrations>>,
   scheduledAt: Date,
   competitionConfigVersionId: string,
+  sportId?: string,
 ) {
-  // 그룹은 자연키 (tournamentId, name) 로 upsert — 절대 삭제하지 않는다. 픽스처가 groupId 로
-  // 참조하는 스켈레톤이므로 삭제-재생성 대신 upsert 로 같은 행을 유지한다(id 안정).
+  const resolvedSportId = sportId ?? (await findTournamentOnSurfaceOrThrow(tx, [V1CompetitionKind.regular_tournament], scenario.id)).sportId;
+  if (!resolvedSportId) throw new Error(`Tournament ${scenario.id} has no sport for canonical seed matches.`);
   const group = await tx.v1TournamentGroup.upsert({
     where: { tournamentId_name: { tournamentId: scenario.id, name: 'A조' } },
-    create: {
-      tournamentId: scenario.id,
-      name: 'A조',
-      phase: 'group',
-      sortOrder: 0,
-      advanceCount: 2,
-    },
+    create: { tournamentId: scenario.id, name: 'A조', phase: 'group', sortOrder: 0, advanceCount: 2 },
     update: { phase: 'group', sortOrder: 0, advanceCount: 2 },
   });
   for (let index = 0; index < registrations.length; index += 1) {
-    await tx.v1TournamentGroupTeam.create({
-      data: { groupId: group.id, registrationId: registrations[index].id, sortOrder: index },
+    await tx.v1TournamentGroupTeam.upsert({
+      where: { groupId_registrationId: { groupId: group.id, registrationId: registrations[index].id } },
+      update: { sortOrder: index },
+      create: { groupId: group.id, registrationId: registrations[index].id, sortOrder: index },
     });
   }
-  // 순위(V1TournamentStanding)는 여기서 만들지 않는다 — 실제 경기 결과 기반 계산은 배포
-  // 파이프라인에서 fixture-game-backfill 직후 tournament-standings-recalculation.cli.js가
-  // recalculateAndUpsertGroupStandings()(tournament-group-standings.ts)를 재사용해 수행한다.
-  // 과거엔 여기서 배열 인덱스만으로 승점/승무패/득실을 하드코딩해 실제 픽스처 결과와 모순되는
-  // 값(예: 2:0 승리팀이 패배로 표시)이 나갔다.
-
-  const fixtureStatuses =
-    scenario.status === V1TournamentStatus.completed
-      ? [V1TournamentFixtureStatus.completed, V1TournamentFixtureStatus.completed, V1TournamentFixtureStatus.completed]
-      : scenario.status === V1TournamentStatus.in_progress
-        ? [V1TournamentFixtureStatus.completed, V1TournamentFixtureStatus.in_progress, V1TournamentFixtureStatus.scheduled]
-        : [V1TournamentFixtureStatus.scheduled, V1TournamentFixtureStatus.scheduled, V1TournamentFixtureStatus.scheduled];
-  const pairings = [[0, 1], [2, 3], [0, 2]] as const;
-  const fixtures = [];
-  for (let index = 0; index < pairings.length; index += 1) {
-    const [homeIndex, awayIndex] = pairings[index];
-    // 픽스처는 자연키 (tournamentId, round, fixtureNumber, legNumber=1) 로 upsert — 절대 삭제하지
-    // 않는다(V1Game·operation_audit 가 Restrict 로 못박는 스켈레톤). 같은 행을 유지해 id 가 안정적이고
-    // 붙어 있는 V1Game 은 건드리지 않는다. 등록 참조는 매 배포 새 registration id 로 update 로 갱신.
-    // `status` 는 **create 에만** 넣는다. 시드는 픽스처의 초기 상태만 정하고, 그 뒤의 상태는
-    // 실제 운영이 정한다 — officialize 가 결과 확정과 같은 트랜잭션에서
-    // `fixture.status = completed` 로 올린다(tournament-result-review.service.ts).
-    // 이걸 update 에 넣으면 배포할 때마다 라이브 운영 결과가 시드 값으로 되돌아가고,
-    // 순위 재계산은 `status: 'completed'` 픽스처만 읽으므로(tournament-bracket.service.ts)
-    // 그 경기가 순위에서 통째로 사라진다.
-    // 2026-08-11 알파 실측: 2경기가 ENDED + OFFICIAL 2:0 인데 픽스처만 in_progress 로
-    // 되돌아가 있었고, 2:0 으로 이긴 팀이 순위표에 0승 0-0 으로 표시됐다.
-    const groupFixtureData = {
-      groupId: group.id,
+  const rosterFor = async (registrationId: string) => tx.v1TournamentPlayer.findMany({
+    where: { registrationId, removedAt: null },
+    orderBy: { addedAt: 'asc' },
+    select: { userId: true, realName: true, jerseyNumber: true },
+  });
+  const players = new Map<string, Awaited<ReturnType<typeof rosterFor>>>();
+  for (const registration of registrations) players.set(registration.id, await rosterFor(registration.id));
+  const teamIds = [...new Set(registrations.map((registration) => registration.teamId))];
+  const teams = await tx.v1Team.findMany({
+    where: { id: { in: teamIds } },
+    select: { id: true, name: true },
+  });
+  const teamNames = new Map(teams.map((team) => [team.id, team.name]));
+  if (teamNames.size !== teamIds.length || teamIds.some((teamId) => !teamNames.has(teamId))) {
+    throw new Error(`Tournament ${scenario.id} has a registration with a missing team.`);
+  }
+  const statusFor = (status: V1TournamentStatus): V1TeamMatchStatus => {
+    if (status === V1TournamentStatus.cancelled) return V1TeamMatchStatus.cancelled;
+    if (status === V1TournamentStatus.completed) return V1TeamMatchStatus.completed;
+    return V1TeamMatchStatus.matched;
+  };
+  const rows: Array<{ id: string; round: string }> = [];
+  const ensure = async (round: string, fixtureNumber: number, homeIndex: number, awayIndex: number, homeScore: number, awayScore: number) => {
+    const home = registrations[homeIndex];
+    const away = registrations[awayIndex];
+    const homeRoster = players.get(home.id) ?? [];
+    const awayRoster = players.get(away.id) ?? [];
+    const match = await ensureCanonicalTournamentMatch(tx, {
+      tournamentId: scenario.id,
+      sportId: resolvedSportId,
       competitionConfigVersionId,
-      homeRegistrationId: registrations[homeIndex].id,
-      awayRegistrationId: registrations[awayIndex].id,
-      scheduledAt: new Date(scheduledAt.getTime() + index * 90 * 60 * 1000),
-      venue: `서울 송파 풋살파크 ${index + 1}구장`,
-    };
-    const fixture = await tx.v1TournamentFixture.upsert({
-      where: {
-        tournamentId_round_fixtureNumber_legNumber: {
-          tournamentId: scenario.id, round: 'group', fixtureNumber: index + 1, legNumber: 1,
-        },
-      },
-      create: {
-        tournamentId: scenario.id, round: 'group', fixtureNumber: index + 1,
-        ...groupFixtureData, status: fixtureStatuses[index],
-      },
-      update: groupFixtureData,
+      title: `${scenario.title} · ${round} ${fixtureNumber}`,
+      startAt: new Date(scheduledAt.getTime() + rows.length * 90 * 60 * 1000),
+      placeName: `서울 송파 풋살파크 ${round === 'group' ? `${fixtureNumber}구장` : '결선구장'}`,
+      status: statusFor(scenario.status),
+      homeTeamId: home.teamId,
+      awayTeamId: away.teamId,
+      homeTeamName: teamNames.get(home.teamId)!,
+      awayTeamName: teamNames.get(away.teamId)!,
+      hostTeamId: home.teamId,
+      groupId: round === 'group' ? group.id : null,
+      round,
+      fixtureNumber,
+      homeRegistrationId: home.id,
+      awayRegistrationId: away.id,
+      matchId: deterministicCanonicalMatchId(`${scenario.id}:${round}:${fixtureNumber}:1`),
+      homePlayers: homeRoster.map((player) => ({ userId: player.userId, displayName: player.realName, jerseyNumber: player.jerseyNumber ?? 0 })),
+      awayPlayers: awayRoster.map((player) => ({ userId: player.userId, displayName: player.realName, jerseyNumber: player.jerseyNumber ?? 0 })),
     });
-    if (fixtureStatuses[index] === V1TournamentFixtureStatus.completed) {
-      // 결과는 fixtureId(@unique) 로 upsert — 삭제하지 않는다. V1TournamentFixtureGoal 이
-      // fixtureResult 를 Cascade 로 참조하므로 삭제-재생성 대신 upsert 로 같은 결과 행을 유지한다.
-      // 스코어는 status 와 같은 이유로 **create 에만** 쓴다: 운영자가 결과를 정정했는데
-      // 다음 배포가 시드 스코어로 되돌리면 레거시 폴백 경로가 틀린 값을 읽는다.
-      await tx.v1TournamentFixtureResult.upsert({
-        where: { fixtureId: fixture.id },
-        create: {
-          fixtureId: fixture.id,
-          homeScore: index === 0 ? 3 : 2,
-          awayScore: index === 0 ? 1 : 2,
-          note: 'ALPHA QA 경기 결과',
-        },
-        update: {},
+    if (scenario.status === V1TournamentStatus.in_progress && round === 'group' && fixtureNumber === 2 && match.isPristineGame) {
+      await tx.v1Game.update({ where: { id: match.gameId }, data: { state: V1GameState.LIVE } });
+    }
+    if (scenario.status === V1TournamentStatus.completed) {
+      await ensureCanonicalOfficialResult(tx, {
+        gameId: match.gameId,
+        tournamentId: scenario.id,
+        homeTeamId: home.teamId,
+        awayTeamId: away.teamId,
+        homeScore,
+        awayScore,
+        playedAt: new Date(scheduledAt.getTime() + rows.length * 90 * 60 * 1000),
+        recordedAt: new Date(scheduledAt.getTime() + rows.length * 90 * 60 * 1000 + 90 * 60 * 1000),
+        sourceHash: `alpha-qa-${scenario.id}-${round}-${fixtureNumber}`,
       });
     }
-    fixtures.push(fixture);
+    rows.push({ id: match.id, round });
+  };
+  const pairings = [[0, 1], [2, 3], [0, 2]] as const;
+  for (let index = 0; index < pairings.length; index += 1) {
+    const [homeIndex, awayIndex] = pairings[index];
+    await ensure('group', index + 1, homeIndex, awayIndex, index === 0 ? 3 : 2, index === 0 ? 1 : 2);
   }
   if (scenario.status === V1TournamentStatus.completed) {
     const knockoutPlans = [
@@ -634,42 +650,9 @@ export async function createCompetitionData(
       { round: 'final', fixtureNumber: 1, homeIndex: 0, awayIndex: 1, homeScore: 4, awayScore: 2 },
       { round: 'third_place', fixtureNumber: 1, homeIndex: 2, awayIndex: 3, homeScore: 2, awayScore: 1 },
     ] as const;
-    for (let index = 0; index < knockoutPlans.length; index += 1) {
-      const plan = knockoutPlans[index];
-      // 조별 픽스처와 같은 이유로 status·스코어는 create 에만 쓴다(위 주석 참조).
-      const knockoutFixtureData = {
-        competitionConfigVersionId,
-        homeRegistrationId: registrations[plan.homeIndex].id,
-        awayRegistrationId: registrations[plan.awayIndex].id,
-        scheduledAt: new Date(scheduledAt.getTime() + (pairings.length + index) * 90 * 60 * 1000),
-        venue: '서울 송파 풋살파크 결선구장',
-      };
-      const fixture = await tx.v1TournamentFixture.upsert({
-        where: {
-          tournamentId_round_fixtureNumber_legNumber: {
-            tournamentId: scenario.id, round: plan.round, fixtureNumber: plan.fixtureNumber, legNumber: 1,
-          },
-        },
-        create: {
-          tournamentId: scenario.id, round: plan.round, fixtureNumber: plan.fixtureNumber,
-          ...knockoutFixtureData, status: V1TournamentFixtureStatus.completed,
-        },
-        update: knockoutFixtureData,
-      });
-      await tx.v1TournamentFixtureResult.upsert({
-        where: { fixtureId: fixture.id },
-        create: {
-          fixtureId: fixture.id,
-          homeScore: plan.homeScore,
-          awayScore: plan.awayScore,
-          note: 'ALPHA QA 결선 결과',
-        },
-        update: {},
-      });
-      fixtures.push(fixture);
-    }
+    for (const plan of knockoutPlans) await ensure(plan.round, plan.fixtureNumber, plan.homeIndex, plan.awayIndex, plan.homeScore, plan.awayScore);
   }
-  return fixtures;
+  return rows;
 }
 
 export async function createScenario(
@@ -692,7 +675,7 @@ export async function createScenario(
     scenario.status === V1TournamentStatus.completed
     ? new Date(now.getTime() - 24 * 60 * 60 * 1000)
     : scenarioDate(now, scenario.startsInDays - 7, 14);
-  // 이 시나리오가 소유한 leaf 행(등록·명단·순위·픽스처 결과/영상·시상·후기·스폰서·공지·캠페인)을
+  // 이 시나리오가 소유한 leaf 행(순위·시상·후기·스폰서·공지·캠페인)을
   // 먼저 정리한다. 대회·그룹·픽스처·V1Game 은 절대 지우지 않고 upsert/보존하므로 append-only
   // (operation_audit)·V1Game Restrict FK 가 걸릴 일이 없다 — leaf 는 그 append-only 참조 대상이
   // 아니라서 안전하게 삭제-재생성한다. 이게 delete→upsert 전환의 핵심: 데드락이 구조적으로 사라진다.
@@ -759,10 +742,18 @@ export async function createScenario(
     refundPolicyText: marketing.refundPolicyText,
     createdByAdminUserId: adminUserId,
   } satisfies Omit<Prisma.V1TournamentUncheckedCreateInput, 'id'>;
+  const {
+    scheduledAt: _seedScheduledAt,
+    scheduledEndAt: _seedScheduledEndAt,
+    registrationDeadlineAt: _seedRegistrationDeadlineAt,
+    rosterDeadlineAt: _seedRosterDeadlineAt,
+    bracketPublishedAt: _seedBracketPublishedAt,
+    ...stableTournamentUpdate
+  } = tournamentData;
   await tx.v1Tournament.upsert({
     where: { id: scenario.id },
     create: { id: scenario.id, ...tournamentData },
-    update: tournamentData,
+    update: stableTournamentUpdate,
   });
   if (scenario.hasCampaign) {
     await tx.v1TournamentCampaign.create({
@@ -817,16 +808,18 @@ export async function createScenario(
     registrations,
     scheduledAt,
     competitionConfigVersionId,
+    sportId,
   );
   if (scenario.status !== V1TournamentStatus.completed) return;
   const finalFixture = fixtures.find((fixture) => fixture.round === 'final');
   if (!finalFixture) throw new Error('Completed alpha tournament requires a final fixture.');
 
-  await tx.v1TournamentFixtureVideo.createMany({
+  await tx.v1TeamMatchVideo.createMany({
     data: [
-      { fixtureId: finalFixture.id, title: '결승 하이라이트', url: HIGHLIGHT_VIDEO_URL, sortOrder: 0 },
-      { fixtureId: finalFixture.id, title: '우승 세리머니', url: HIGHLIGHT_VIDEO_URL, sortOrder: 1 },
+      { id: deterministicCanonicalMatchId(`${finalFixture.id}:seed-video:highlight`), teamMatchId: finalFixture.id, title: '결승 하이라이트', url: HIGHLIGHT_VIDEO_URL, sortOrder: 0 },
+      { id: deterministicCanonicalMatchId(`${finalFixture.id}:seed-video:celebration`), teamMatchId: finalFixture.id, title: '우승 세리머니', url: HIGHLIGHT_VIDEO_URL, sortOrder: 1 },
     ],
+    skipDuplicates: true,
   });
   await tx.v1TournamentAward.createMany({
     data: [
@@ -864,25 +857,13 @@ export async function createScenario(
 // Part 2(delete→upsert 근본 해소): **대회·그룹·픽스처·V1Game 은 절대 삭제하지 않고 upsert/보존**한다.
 // 그러면 append-only·Restrict 참조 대상이 사라지지 않으므로 데드락이 구조적으로 없어진다. 아래 함수는
 // 그 대신 **시나리오가 소유한 leaf 행만** tournament scope 로 지운다 — leaf 는 어떤 append-only 트리거·
-// Restrict FK 의 대상도 아니라서(schema 실측) 항상 안전하게 삭제-재생성된다. 게임은 시드가 만들지도,
-// 지우지도 않는다(fixture-game-backfill 같은 ops 소유). 그래서 teardownGamesForTournaments·
+// Restrict FK 의 대상도 아니라서(schema 실측) 항상 안전하게 삭제-재생성된다. 게임은 시드가 만들지만,
+// 이미 운영 중인 게임은 건드리지 않는다. 그래서 teardownGamesForTournaments·
 // nonDraftRevision·orphanTeamRecordFact·SAVEPOINT 우회가 통째로 불필요해졌다.
 async function clearScenarioLeaves(
   tx: Prisma.TransactionClient,
   tournamentId: string,
 ): Promise<void> {
-  const fixtures = await tx.v1TournamentFixture.findMany({
-    where: { tournamentId },
-    select: { id: true },
-  });
-  const fixtureIds = fixtures.map((fixture) => fixture.id);
-  if (fixtureIds.length > 0) {
-    // 영상은 leaf(참조받는 것 없음)라 삭제-재생성한다. 결과(V1TournamentFixtureResult)는 여기서
-    // 지우지 않는다 — V1TournamentFixtureGoal 이 Cascade 로 참조하므로 createCompetitionData 에서
-    // fixtureId(@unique) upsert 로 유지한다.
-    await tx.v1TournamentFixtureVideo.deleteMany({ where: { fixtureId: { in: fixtureIds } } });
-  }
-
   const groups = await tx.v1TournamentGroup.findMany({
     where: { tournamentId },
     select: { id: true },
@@ -892,11 +873,6 @@ async function clearScenarioLeaves(
     await tx.v1TournamentStanding.deleteMany({ where: { groupId: { in: groupIds } } });
     await tx.v1TournamentGroupTeam.deleteMany({ where: { groupId: { in: groupIds } } });
   }
-
-  // 등록 삭제는 player·payment(및 남은 standing/groupTeam)를 Cascade 로 함께 지운다. 픽스처의
-  // home/awayRegistrationId 는 SetNull 로 비워지고, 곧 새 등록 id 로 다시 upsert 되며 재연결된다.
-  // 등록·명단·순위는 어떤 append-only 참조 대상도 아니라 안전하다.
-  await tx.v1TournamentRegistration.deleteMany({ where: { tournamentId } });
 
   await tx.v1TournamentAward.deleteMany({ where: { tournamentId } });
   await tx.v1TournamentReview.deleteMany({ where: { tournamentId } });
@@ -919,11 +895,9 @@ async function main() {
 
     // 시드가 만드는 대회·픽스처에 canonical 풋살 config 를 직접 박는다.
     //
-    // 왜: `fixture-game-backfill` 은 `competitionConfigVersionId` 가 없는 픽스처를
-    // `CONFIG_MISSING` 으로 격리한다. 예전에는 `competition-config-backfill` CLI 가 나중에
-    // 그 값을 채워줬지만, 그 CLI 는 canonical config 행이 코드 상수와 다르면
-    // `COMPETITION_CONFIG_SEED_DRIFT` 로 하드 실패한다 — 그래서 드리프트가 있는 동안
-    // 배포마다 공개 대회 일정이 통째로 비어 있었다(2026-08-09 alpha 실측: 일정 0건).
+    // canonical game creation requires an explicit competition config. Previously a later
+    // backfill filled this value and could quarantine the schedule on seed drift; creating
+    // it here makes the seed's dependency explicit and fail closed.
     // 값을 아는 쪽(시드)이 만들 때 바로 넣으면 그 의존 자체가 사라진다.
     const competitionConfig = await prisma.v1CompetitionConfigVersion.findUnique({
       where: { id: ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID },

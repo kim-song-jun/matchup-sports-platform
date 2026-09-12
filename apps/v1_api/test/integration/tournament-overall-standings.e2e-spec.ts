@@ -5,10 +5,6 @@ import { recalculateAndUpsertGroupStandings } from '../../src/tournaments/tourna
 import { recalculateAndUpsertOverallStandings } from '../../src/tournaments/tournament-overall-standings';
 
 /**
- * ⚠️ 이 환경(worktree)에는 Teameet v1 PostgreSQL이 떠 있지 않아 로컬에서는
- * 실행하지 않는다 — CI의 "V1 migration replay + drift gate"가 DB를 갖춘
- * 환경에서 실제로 검증한다. (Task 5 Step 6, 계획 문서 887-899행 참조)
- *
  * `TournamentBracketService.recalculateStandings()`의 핵심 불변식을 실제
  * Postgres 트랜잭션으로 고정한다: `recalculateAndUpsertGroupStandings`가
  * 호출되는 모든 경로에서 `recalculateAndUpsertOverallStandings`도 같은
@@ -69,6 +65,11 @@ describe('recalculateAndUpsertOverallStandings + recalculateAndUpsertGroupStandi
     await prisma.v1Sport.create({
       data: { id: ids.soccerSportId, code: 'soccer', name: '축구', sortOrder: 1 },
     });
+    await runCompetitionConfigContractPhaseBackfill(prisma);
+    const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({
+      where: { sportCode: 'football', name: 'football-v1', status: 'ACTIVE' },
+      orderBy: { version: 'desc' },
+    });
     await prisma.v1Team.createMany({
       data: ids.teamIds.map((id, index) => ({
         id,
@@ -80,7 +81,13 @@ describe('recalculateAndUpsertOverallStandings + recalculateAndUpsertGroupStandi
     });
 
     await prisma.v1Tournament.create({
-      data: { id: ids.tournamentId, sportId: ids.soccerSportId, title: 'Overall standings tournament', status: 'in_progress' },
+      data: {
+        id: ids.tournamentId,
+        sportId: ids.soccerSportId,
+        title: 'Overall standings tournament',
+        status: 'in_progress',
+        competitionConfigVersionId: config.id,
+      },
     });
     await prisma.v1TournamentGroup.create({
       data: { id: ids.groupA, tournamentId: ids.tournamentId, name: 'A조', phase: 'group' },
@@ -118,38 +125,53 @@ describe('recalculateAndUpsertOverallStandings + recalculateAndUpsertGroupStandi
       });
     }
 
-    await prisma.v1TournamentFixture.create({
-      data: {
-        id: ids.fixtureA,
-        tournamentId: ids.tournamentId,
-        groupId: ids.groupA,
-        round: 'group_a',
-        fixtureNumber: 1,
-        homeRegistrationId: ids.registrationIdsA[0],
-        awayRegistrationId: ids.registrationIdsA[1],
-        status: 'completed',
-        result: { create: { homeScore: 3, awayScore: 1, recordedByAdminUserId: ids.adminId } },
-      },
-    });
-    await prisma.v1TournamentFixture.create({
-      data: {
-        id: ids.fixtureB,
-        tournamentId: ids.tournamentId,
-        groupId: ids.groupB,
-        round: 'group_b',
-        fixtureNumber: 1,
-        homeRegistrationId: ids.registrationIdsB[0],
-        awayRegistrationId: ids.registrationIdsB[1],
-        status: 'completed',
-        result: { create: { homeScore: 2, awayScore: 2, recordedByAdminUserId: ids.adminId } },
-      },
-    });
-
-    // Pins competitionConfigVersionId + an active competitionConfig on the
-    // tournament, mirroring what production's contract-phase backfill does —
-    // same helper the Task 11 fixture and the sibling
-    // tournament-standings-recalculation integration test rely on.
-    await runCompetitionConfigContractPhaseBackfill(prisma);
+    for (const fixture of [
+      { id: ids.fixtureA, groupId: ids.groupA, round: 'group_a', homeScore: 3, awayScore: 1, homeRegistrationId: ids.registrationIdsA[0], awayRegistrationId: ids.registrationIdsA[1] },
+      { id: ids.fixtureB, groupId: ids.groupB, round: 'group_b', homeScore: 2, awayScore: 2, homeRegistrationId: ids.registrationIdsB[0], awayRegistrationId: ids.registrationIdsB[1] },
+    ]) {
+      const match = await prisma.v1TeamMatch.create({
+        data: {
+          id: fixture.id,
+          tournamentId: ids.tournamentId,
+          hostTeamId: ids.teamIds[fixture.homeRegistrationId === ids.registrationIdsA[0] ? 0 : 2],
+          approvedApplicantTeamId: ids.teamIds[fixture.homeRegistrationId === ids.registrationIdsA[0] ? 1 : 3],
+          createdByUserId: ids.adminUserId,
+          sportId: ids.soccerSportId,
+          regionId: ids.regionId,
+          title: `Overall standings ${fixture.round}`,
+          status: 'completed',
+          completedAt: new Date(),
+          competitionConfigVersionId: config.id,
+        },
+      });
+      await prisma.v1TournamentMatchDetails.create({
+        data: {
+          teamMatchId: match.id,
+          tournamentId: ids.tournamentId,
+          groupId: fixture.groupId,
+          round: fixture.round,
+          fixtureNumber: 1,
+          homeRegistrationId: fixture.homeRegistrationId,
+          awayRegistrationId: fixture.awayRegistrationId,
+        },
+      });
+      const game = await prisma.v1Game.create({
+        data: { sourceType: 'TEAM_MATCH', teamMatchId: match.id, competitionConfigVersionId: config.id, state: 'ENDED' },
+      });
+      const revision = await prisma.v1GameResultRevision.create({
+        data: {
+          gameId: game.id,
+          revision: 1,
+          state: 'OFFICIAL',
+          score: { home: fixture.homeScore, away: fixture.awayScore },
+          eventsHash: `overall-standings-${fixture.id}`,
+          createdByActorType: 'SYSTEM',
+          createdBySystemActor: 'TEST_FIXTURE',
+          officialAt: new Date(),
+        },
+      });
+      await prisma.v1Game.update({ where: { id: game.id }, data: { currentOfficialRevisionId: revision.id } });
+    }
   });
 
   afterAll(async () => {
@@ -157,21 +179,28 @@ describe('recalculateAndUpsertOverallStandings + recalculateAndUpsertGroupStandi
   });
 
   async function loadGroupsForStandings() {
-    return prisma.v1TournamentGroup.findMany({
+    const groups = await prisma.v1TournamentGroup.findMany({
       where: { tournamentId: ids.tournamentId, phase: 'group' },
       include: {
         groupTeams: { orderBy: { registrationId: 'asc' } },
-        fixtures: {
-          where: { status: 'completed' },
+        tournamentMatchDetails: {
+          where: { teamMatch: { status: 'completed', deletedAt: null } },
           include: {
-            game: { select: { currentOfficialRevision: { select: { state: true, score: true } } } },
-            result: {
-              select: { homeScore: true, awayScore: true, hasPenalty: true, homePenaltyScore: true, awayPenaltyScore: true },
+            teamMatch: {
+              include: { game: { select: { currentOfficialRevision: { select: { state: true, score: true } } } } },
             },
           },
         },
       },
     });
+    return groups.map((group) => ({
+      ...group,
+      fixtures: group.tournamentMatchDetails.map((details) => ({
+        homeRegistrationId: details.homeRegistrationId,
+        awayRegistrationId: details.awayRegistrationId,
+        game: details.teamMatch.game,
+      })),
+    }));
   }
 
   it('조별 승점 합계와 통합 승점 합계가 같은 트랜잭션 갱신 후 일치한다', async () => {

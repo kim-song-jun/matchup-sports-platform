@@ -62,6 +62,7 @@ function lineup(participants: GameLineupParticipant[], overrides: Partial<GameLi
     createdAt: '2026-08-23T00:00:00.000Z',
     updatedAt: '2026-08-23T00:00:00.000Z',
     participants,
+    invalidatedAt: null,
     ...overrides,
   };
 }
@@ -200,7 +201,7 @@ describe('ArrivalCheckinPanel — 명단 검인', () => {
               participant({ id: 'p-auto-1', displayNameSnapshot: '자동등록1' }),
               participant({ id: 'p-auto-2', displayNameSnapshot: '자동등록2' }),
             ],
-            { id: 'lineup-draft', revision: 1, state: 'DRAFT', submittedAt: null },
+            { id: 'lineup-draft', revision: 1, state: 'DRAFT', submittedAt: null, invalidatedAt: null },
           ),
         ]}
         onToggleArrival={vi.fn()}

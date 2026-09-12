@@ -21,7 +21,10 @@ export class TournamentsReadController {
   }
 
   @Get(':tournamentId/standings/overall')
-  getOverallStandings(@Param('tournamentId') tournamentId: string) {
-    return this.tournamentsReadService.getOverallStandings(tournamentId);
+  getOverallStandings(
+    @Param('tournamentId') tournamentId: string,
+    @CurrentUser() user: V1AuthUser | undefined,
+  ) {
+    return this.tournamentsReadService.getOverallStandings(tournamentId, user);
   }
 }

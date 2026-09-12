@@ -8,7 +8,6 @@ import {
 import { fairPlayPointsOf, parseFairPlayCards } from './league-fair-play';
 import {
   resolveTournamentFixtureOfficialScore,
-  type TournamentFixtureOfficialScore,
 } from './tournament-fixture-official-result';
 
 /**
@@ -21,15 +20,7 @@ import {
  * score}` — the R3 §4-3 new-path source of truth for a fixture's result
  * (see `tournament-fixture-official-result.ts`).
  *
- * `result` is the R3 §4-3~§4-4 한시적 legacy fallback input
- * (`V1TournamentFixtureResult`'s score columns only — standings never need
- * goals/note). It is optional: `recalculateStandings()` fetches it and
- * therefore gets the fallback, while `GameResultStandingsProjectionService`
- * does not fetch it (that automatic trigger only ever fires off a fresh
- * new-path OFFICIAL revision, and in production the other fixtures in the
- * same group have already been through the GAME_BACKFILL migration too —
- * see `tournament-fixture-official-result.ts`'s file-level doc comment).
- * Removed together with the rest of the fallback in R3 §4-4단계.
+ * Results are read exclusively from the canonical Game revision.
  */
 export type StandingsSourceGroup = {
   id: string;
@@ -50,18 +41,14 @@ export type StandingsSourceGroup = {
       /** F5: participant.sideId → home/away 매핑에 필요 (V1GameSideKey: 'HOME' | 'AWAY'). */
       sides?: readonly { id: string; sideKey: string }[];
     } | null;
-    result?: TournamentFixtureOfficialScore | null;
   }[];
 };
 
 /**
  * 그룹(들)의 완료 픽스처에서 팀(registrationId)별 페어플레이 벌점 합계를 뽑는다.
  *
- * **레거시 폴백 픽스처는 카드 데이터가 없다.** `V1TournamentFixtureResult`(R3
- * §4-3~§4-4단계 레거시 폴백, `resolveTournamentFixtureOfficialScore` 참고)에는 애초에
- * 참가자 카드 컬럼이 없으므로, `game.currentOfficialRevision`이 없거나
- * `state !== 'OFFICIAL'`인 픽스처는 그냥 건너뛴다(0점 기여) — 조용히 계산 불가로
- * 남는 것이지 회귀가 아니다. `sides`/`resultParticipants`를 옵셔널로 둔 것도 같은
+ * `game.currentOfficialRevision`이 없거나 `state !== 'OFFICIAL'`인 픽스처는 그냥 건너뛴다.
+ * `sides`/`resultParticipants`를 옵셔널로 둔 것도 같은
  * 이유: 이 필드들을 select하지 않은 호출부(예: 카드 무관한 기존 조회)가 있어도
  * 타입이 깨지지 않게 하기 위함이며, 실제로는 F5를 연결한 3개 호출부
  * (tournament-bracket.service.ts / tournament-standings-recalculation.ts /
@@ -101,7 +88,7 @@ export function fairPlayByRegistrationFromGroups(
 export function standingsFixturesFromGroup(group: StandingsSourceGroup): StandingFixture[] {
   return group.fixtures.flatMap((fixture) => {
     if (!fixture.homeRegistrationId || !fixture.awayRegistrationId) return [];
-    const score = resolveTournamentFixtureOfficialScore(fixture.game, fixture.result);
+    const score = resolveTournamentFixtureOfficialScore(fixture.game);
     if (!score) return [];
     return [
       {

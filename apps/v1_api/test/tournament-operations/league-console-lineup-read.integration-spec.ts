@@ -122,6 +122,7 @@ describe('콘솔의 라인업 읽기 — 리그 경기', () => {
         sportId: ids.sport,
         regionId: ids.region,
         leagueId: ids.league,
+        tournamentId: ids.league,
         createdByUserId: ids.adminUser,
         hostTeamId: ids.teamA,
         approvedApplicantTeamId: ids.teamB,
@@ -131,6 +132,7 @@ describe('콘솔의 라인업 읽기 — 리그 경기', () => {
       },
     });
     teamMatchId = teamMatch.id;
+    expect(await prisma.v1TournamentMatchDetails.findUnique({ where: { teamMatchId }, select: { teamMatchId: true } })).toBeNull();
 
     // 게임과 사이드는 리그 대진 생성이 만드는 것과 같은 모양으로 둔다.
     const game = await prisma.v1Game.create({
@@ -218,9 +220,18 @@ describe('콘솔의 라인업 읽기 — 리그 경기', () => {
     ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_FIXTURE_GAME_NOT_FOUND' } });
   });
 
-  it('대진 행은 있는데 게임이 없으면 404 다 — 팀매치를 뒤지지 않는다', async () => {
-    // 리그 fallback 은 **대진 행이 없을 때만** 돈다. 대진이 있는데 게임만 없는 것은
-    // 대회 경기의 정상적인 "아직 게임 없음" 이지 리그일 가능성이 아니다(Copilot 리뷰).
+  it('정규 리그 canonical TeamMatch가 삭제되면 콘솔 라인업 조회를 닫는다', async () => {
+    await prisma.v1TeamMatch.update({ where: { id: teamMatchId }, data: { deletedAt: new Date() } });
+    try {
+      await expect(
+        consoleLineup.listLineups(adminActor, ids.league, teamMatchId),
+      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_FIXTURE_GAME_NOT_FOUND' } });
+    } finally {
+      await prisma.v1TeamMatch.update({ where: { id: teamMatchId }, data: { deletedAt: null } });
+    }
+  });
+
+  it('canonical 대진 Details는 있는데 게임이 없으면 404다', async () => {
     const fixtureOnlyTournament = await prisma.v1Tournament.create({
       data: {
         kind: 'regular_tournament',
@@ -230,20 +241,31 @@ describe('콘솔의 라인업 읽기 — 리그 경기', () => {
         status: 'in_progress',
       },
     });
-    const fixture = await prisma.v1TournamentFixture.create({
-      data: { tournamentId: fixtureOnlyTournament.id, round: 'R1', fixtureNumber: 1 },
+    const teamMatch = await prisma.v1TeamMatch.create({
+      data: {
+        tournamentId: fixtureOnlyTournament.id,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: 'Canonical TBD fixture without game',
+        status: 'matched',
+      },
     });
-    const spy = jest.spyOn(prisma.v1TeamMatch, 'findFirst');
     try {
+      await prisma.v1TournamentMatchDetails.create({
+        data: {
+          teamMatchId: teamMatch.id,
+          tournamentId: fixtureOnlyTournament.id,
+          round: 'R1',
+          fixtureNumber: 1,
+          legNumber: 1,
+        },
+      });
       await expect(
-        consoleLineup.listLineups(adminActor, fixtureOnlyTournament.id, fixture.id),
+        consoleLineup.listLineups(adminActor, fixtureOnlyTournament.id, teamMatch.id),
       ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_FIXTURE_GAME_NOT_FOUND' } });
-      // 404 만 보면 fallback 이 돌고 못 찾아 404 인 경우와 구분되지 않는다 — 조회 자체가
-      // 없었다는 것까지 본다.
-      expect(spy).not.toHaveBeenCalled();
     } finally {
-      spy.mockRestore();
-      await prisma.v1TournamentFixture.deleteMany({ where: { tournamentId: fixtureOnlyTournament.id } });
+      await prisma.v1TournamentMatchDetails.deleteMany({ where: { tournamentId: fixtureOnlyTournament.id } });
+      await prisma.v1TeamMatch.deleteMany({ where: { id: teamMatch.id } });
       await prisma.v1Tournament.deleteMany({ where: { id: fixtureOnlyTournament.id } });
     }
   });

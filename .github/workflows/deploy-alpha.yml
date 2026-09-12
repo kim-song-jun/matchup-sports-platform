@@ -32,6 +32,10 @@ jobs:
           [[ "${RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]]
           echo "sha=${RELEASE_SHA}" >> "${GITHUB_OUTPUT}"
 
+      - name: Lock one-shot Task 168 Stage A release
+        id: task168
+        run: echo "stage=stageAIntermediate" >> "${GITHUB_OUTPUT}"
+
       - name: Wait for matching CI success
         timeout-minutes: 35
         env:
@@ -117,15 +121,24 @@ jobs:
         run: |
           set -Eeuo pipefail
           imageTag="sha-${RELEASE_SHA}"
+          toolTag="task168-${RELEASE_SHA}"
           api_exists=false
           web_exists=false
+          tool_exists=false
           aws ecr describe-images --repository-name "${API_REPOSITORY}" \
             --image-ids "imageTag=${imageTag}" >/dev/null 2>&1 && api_exists=true
           aws ecr describe-images --repository-name "${WEB_REPOSITORY}" \
             --image-ids "imageTag=${imageTag}" >/dev/null 2>&1 && web_exists=true
+          aws ecr describe-images --repository-name "${API_REPOSITORY}" \
+            --image-ids "imageTag=${toolTag}" >/dev/null 2>&1 && tool_exists=true
           echo "imageTag=${imageTag}" >> "${GITHUB_OUTPUT}"
+          echo "toolTag=${toolTag}" >> "${GITHUB_OUTPUT}"
           echo "api_exists=${api_exists}" >> "${GITHUB_OUTPUT}"
           echo "web_exists=${web_exists}" >> "${GITHUB_OUTPUT}"
+          echo "tool_exists=${tool_exists}" >> "${GITHUB_OUTPUT}"
+
+      - name: Bind one-shot Task 168 manifest inputs
+        run: bash scripts/release/prepare-task168-stage-manifest-inputs.sh
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -140,6 +153,20 @@ jobs:
           tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.API_REPOSITORY }}:${{ steps.images.outputs.imageTag }}
           cache-from: type=gha,scope=alpha-v1-api
           cache-to: type=gha,mode=max,scope=alpha-v1-api
+          provenance: false
+          sbom: false
+
+      - name: Build and push immutable Task 168 cutover tool
+        if: steps.images.outputs.tool_exists != 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          file: deploy/Dockerfile.v1-api
+          target: task168-cutover-tool
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.API_REPOSITORY }}:${{ steps.images.outputs.toolTag }}
+          cache-from: type=gha,scope=alpha-v1-task168-cutover
+          cache-to: type=gha,mode=max,scope=alpha-v1-task168-cutover
           provenance: false
           sbom: false
 
@@ -182,6 +209,7 @@ jobs:
           SOURCE_VERSION_ID: ${{ steps.source.outputs.sourceVersionId }}
           SOURCE_SHA256: ${{ steps.source.outputs.sourceSha256 }}
           IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
+          TOOL_IMAGE_TAG: ${{ steps.images.outputs.toolTag }}
           PREVIOUS_SHA: ${{ steps.rollback-base.outputs.previousSha }}
           MIGRATION_BASE_SHA: ${{ steps.rollback-base.outputs.migrationBaseSha }}
         run: bash scripts/release/create-alpha-release-manifest.sh

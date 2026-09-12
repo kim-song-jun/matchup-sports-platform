@@ -32,6 +32,7 @@ function platformOpsPrincipal(): TournamentStaffPrincipal {
     authorizationSubject: `platform_ops:${actorUserId}@0`,
     assignmentId: null,
     assignmentVersion: null,
+    expiresAt: null,
   };
 }
 
@@ -117,8 +118,26 @@ function createFakeTx(initialFixtureFieldId: string | null) {
       })),
       updateMany: jest.fn(async () => ({ count: 0 })),
     },
-    v1TournamentFixture: {
-      findUnique: jest.fn(async () => ({ id: fixture.id, tournamentId: fixture.tournamentId, fieldId: fixture.fieldId })),
+    $queryRaw: jest.fn(async (query: { sql: string } | TemplateStringsArray) => ('sql' in query ? query.sql : query.join(' ')).includes('FROM v1_team_matches')
+      ? [{ fieldId: fixture.fieldId, deletedAt: null }]
+      : [{ id: 'canonical-game' }]),
+    v1TournamentMatchDetails: {
+      findUnique: jest.fn(async () => ({
+        tournamentId: fixture.tournamentId,
+        teamMatch: { id: fixture.id, fieldId: fixture.fieldId, deletedAt: null, game: { id: 'canonical-game', sourceType: 'TEAM_MATCH' } },
+      })),
+    },
+    v1TeamMatch: {
+      findUnique: jest.fn(async () => ({
+        id: fixture.id,
+        tournamentId: fixture.tournamentId,
+        leagueId: null,
+        fieldId: fixture.fieldId,
+        deletedAt: null,
+        tournament: { kind: 'regular_tournament' },
+        tournamentDetails: { tournamentId: fixture.tournamentId, teamMatchId: fixture.id },
+        game: { id: 'canonical-game', sourceType: 'TEAM_MATCH' },
+      })),
       updateMany: jest.fn(async ({ where, data }: { where: { fieldId: string | null }; data: { fieldId: string | null } }) => {
         if (where.fieldId !== fixture.fieldId) {
           return { count: 0 };
@@ -163,7 +182,7 @@ describe('TournamentOperationsFieldsService', () => {
   //
   // A prior version of this test mocked `assertAccess` with
   // `mockRejectedValue` (always rejects) and asserted only that the promise
-  // rejected and that `tx.v1TournamentFixture.updateMany`/`findUnique` were
+  // rejected and that canonical TeamMatch/Details persistence methods were
   // never called. That passes identically whether the recheck runs BEFORE
   // `this.prisma.$transaction(...)` is even called (the pre-fix arrangement)
   // or, as shipped, AFTER `$transaction` has already opened: either way, an
@@ -202,47 +221,42 @@ describe('TournamentOperationsFieldsService', () => {
       expect(order).toEqual(['transaction-opened', 'access-recheck']);
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(assertAccess).toHaveBeenCalledTimes(1);
-      expect(tx.v1TournamentFixture.updateMany).not.toHaveBeenCalled();
-      expect(tx.v1TournamentFixture.findUnique).not.toHaveBeenCalled();
+      expect(tx.v1TeamMatch.updateMany).not.toHaveBeenCalled();
+      expect(tx.v1TournamentMatchDetails.findUnique).not.toHaveBeenCalled();
     } finally {
       await moduleRef.close();
     }
   });
 
-  // Finding #8 -- lost update: two operators who both observed fieldId=null
-  // must not both succeed. The CAS predicate losing (count !== 1) must
-  // surface as a conflict, not a silently accepted overwrite.
-  // **이 자리도 되돌리기 창을 닫는다.** 필드 운영은 `V1OperationAudit` 를 쓰고, 그 관계는
-  // 백필 행을 `onDelete: Restrict` 로 참조한다 — 리그 행에 감사 로그가 하나라도 붙으면
-  // 백필 88행을 **더 이상 지울 수 없다**(docs/ops/read-swap-preflight.md).
-  // 그래서 404 만이 아니라 **필드 행·감사 로그가 만들어지지 않는 것**까지 단언한다.
-  it('리그 id 에는 필드를 만들 수 없다 — 필드 행도 감사 로그도 남지 않는다', async () => {
+  // Public league operations use the same field surface as tournament operations.
+  it('리그 id 에도 필드를 만들 수 있다 — 모든 competition kind 가 같은 운영 필드 surface 를 쓴다', async () => {
     const assertAccess = jest.fn().mockResolvedValue(platformOpsPrincipal());
     const { service, moduleRef, prisma, tx } = await buildHarness({ assertAccess, fixtureFieldId: null });
     prisma.v1Tournament.findFirst.mockImplementation(
       kindAwareFindFirst({ id: tournamentId, kind: 'regular_league' }),
     );
 
-    await expect(
-      service.create(
-        actorUserId,
-        tournamentId,
-        { scopeKey: 'A', name: 'A구장', sortOrder: 1 },
-        audit('req-league'),
-      ),
-    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+    await expect(service.create(
+      actorUserId,
+      tournamentId,
+      { scopeKey: 'A', name: 'A구장', sortOrder: 1 },
+      audit('req-league'),
+    )).resolves.toMatchObject({ tournamentId, scopeKey: 'A', name: 'A구장' });
 
-    expect(tx.v1TournamentField.create).not.toHaveBeenCalled();
-    expect(tx.v1OperationAudit.create).not.toHaveBeenCalled();
+    expect(tx.v1TournamentField.create).toHaveBeenCalledTimes(1);
+    expect(tx.v1OperationAudit.create).toHaveBeenCalledTimes(1);
     await moduleRef.close();
   });
 
+  // Finding #8 -- lost update: two operators who both observed fieldId=null
+  // must not both succeed. The CAS predicate losing (count !== 1) must
+  // surface as a conflict, not a silently accepted overwrite or audit event.
   it('assignFixtureField returns 409 when the CAS predicate no longer matches (lost-update race)', async () => {
     const assertAccess = jest.fn().mockResolvedValue(platformOpsPrincipal());
     const { service, moduleRef, tx } = await buildHarness({ assertAccess, fixtureFieldId: null });
     // Force the CAS to lose regardless of the observed value, simulating a
     // concurrent winner that already moved the row.
-    tx.v1TournamentFixture.updateMany.mockResolvedValueOnce({ count: 0 });
+    tx.v1TeamMatch.updateMany.mockResolvedValueOnce({ count: 0 });
 
     try {
       const promise = service.assignFixtureField(actorUserId, tournamentId, fixtureId, { fieldId }, audit('req-2'));
@@ -250,6 +264,7 @@ describe('TournamentOperationsFieldsService', () => {
       await expect(promise).rejects.toMatchObject({
         response: { code: 'FIXTURE_FIELD_ASSIGNMENT_CONFLICT' },
       });
+      expect(tx.v1OperationAudit.create).not.toHaveBeenCalled();
     } finally {
       await moduleRef.close();
     }

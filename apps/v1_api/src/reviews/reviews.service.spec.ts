@@ -161,6 +161,7 @@ describe('ReviewsService', () => {
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
         v1PostEventReview: {
           create: createMock,
+          findFirst: jest.fn().mockResolvedValue(null),
           findMany: jest.fn().mockResolvedValue([]),
         },
         // 4항목 채점 집계(Task 155 후속)가 tx 에서 함께 읽는다 -- 스키마-mock 드리프트 방지.
@@ -456,6 +457,9 @@ describe('ReviewsService', () => {
       status: 'submitted',
       submittedAt,
     });
+    const teamMembershipFindMany = jest.fn().mockResolvedValue([
+      { userId: user.id, teamId: hostTeamId, role: 'manager', status: 'active', team: { name: '홈팀' } },
+    ]);
     const prisma = {
       v1TeamMatch: {
         findUnique: jest.fn().mockResolvedValue({
@@ -472,9 +476,7 @@ describe('ReviewsService', () => {
         }),
       },
       v1TeamMembership: {
-        findMany: jest.fn().mockResolvedValue([
-          { teamId: hostTeamId, role: 'manager', team: { name: '홈팀' } },
-        ]),
+        findMany: teamMembershipFindMany,
       },
       v1PostEventReview: {
         // 겸직(양 팀 멤버) 지원 이후 teamMatchSource 는 대상별 기존 후기를 한 번에 조회한다.
@@ -488,11 +490,27 @@ describe('ReviewsService', () => {
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
         v1PostEventReview: {
           create: createMock,
+          findFirst: jest.fn().mockResolvedValue(null),
           findMany: jest.fn().mockResolvedValue([]),
         },
         v1TeamMatch: {
           count: jest.fn().mockResolvedValue(1),
+          findUnique: jest.fn().mockResolvedValue({
+            id: teamSourceId,
+            title: '성수 풋살파크 팀 매치',
+            status: 'completed',
+            completedAt: teamMatchCompletedAt,
+            startAt: teamMatchCompletedAt,
+            sportId: 'sport-futsal',
+            hostTeamId,
+            approvedApplicantTeamId: awayTeamId,
+            hostTeam: { id: hostTeamId, name: '홈팀', profile: { logoUrl: null } },
+            approvedApplicantTeam: { id: awayTeamId, name: '원정팀', profile: { logoUrl: null } },
+          }),
         },
+        v1TeamMembership: { findMany: teamMembershipFindMany },
+        v1Game: { findUnique: jest.fn().mockResolvedValue(null) },
+        $queryRaw: jest.fn().mockResolvedValue([]),
         v1TeamTrustScore: {
           upsert: jest.fn().mockResolvedValue({}),
         },
@@ -1692,14 +1710,15 @@ function teamMatchWorld(
   const lineupRows: FakeRow[] = hasAwayLineup
     ? staleAwayRosterUserIds.length
       ? [
-          { id: staleLineupId, gameId: gameRow.id, sideId: awaySideId, revision: 1 },
-          { id: latestLineupId, gameId: gameRow.id, sideId: awaySideId, revision: 2 },
+          { id: staleLineupId, gameId: gameRow.id, sideId: awaySideId, revision: 1, invalidatedAt: null },
+          { id: latestLineupId, gameId: gameRow.id, sideId: awaySideId, revision: 2, invalidatedAt: null },
         ]
-      : [{ id: latestLineupId, gameId: gameRow.id, sideId: awaySideId, revision: 1 }]
+      : [{ id: latestLineupId, gameId: gameRow.id, sideId: awaySideId, revision: 1, invalidatedAt: null }]
     : [];
   const gameParticipantRows: FakeRow[] = [
     // 옛 revision에만 남은, 최종 명단에서 빠진 선수 — 최신 revision으로 스코프하면 제외돼야 한다.
     ...staleAwayRosterUserIds.map((userId) => ({
+      id: `participant-${userId}`,
       gameId: gameRow.id,
       sideId: awaySideId,
       lineupId: staleLineupId,
@@ -1707,6 +1726,7 @@ function teamMatchWorld(
       displayNameSnapshot: `선수-${userId}`,
     })),
     ...awayRosterUserIds.map((userId) => ({
+      id: `participant-${userId}`,
       gameId: gameRow.id,
       sideId: awaySideId,
       lineupId: latestLineupId,
@@ -1745,50 +1765,73 @@ function teamMatchWorld(
     return row;
   });
   const reviewFindMany = jest.fn(async ({ where }: { where: FakeRow }) => reviewRows.filter((row) => matchesWhere(row, where)));
+  const reviewFindFirst = jest.fn(async ({ where }: { where: FakeRow }) => reviewRows.find((row) => matchesWhere(row, where)) ?? null);
   const teamTrustUpsert = jest.fn().mockResolvedValue({});
   const userReputationUpsert = jest.fn().mockResolvedValue({});
+  const teamMatchFindUnique = jest.fn().mockResolvedValue(teamMatchRow);
+  const teamMembershipFindMany = jest.fn(async ({ where }: { where: FakeRow }) => membershipRows.filter((row) => matchesWhere(row, where)));
+  const gameFindUnique = jest.fn().mockResolvedValue(hasAwayLineup ? gameRow : null);
+  const gameLineupFindMany = jest.fn(async ({ where }: { where: FakeRow }) =>
+    lineupRows
+      .filter((row) => matchesWhere(row, where))
+      .sort((a, b) => (b.revision as number) - (a.revision as number)),
+  );
+  const gameParticipantFindMany = jest.fn(async ({ where }: { where: FakeRow }) => gameParticipantRows.filter((row) => matchesWhere(row, where)));
+  const userFindMany = jest.fn().mockResolvedValue(
+    [...awayRosterUserIds, ...staleAwayRosterUserIds].map((userId) => ({
+      id: userId,
+      profile: { nickname: `선수-${userId}`, profileImageUrl: null },
+    })),
+  );
+  const currentLinkFindMany = jest.fn().mockResolvedValue(
+    gameParticipantRows.map((row) => ({ participantId: row.id, userId: row.userId })),
+  );
+  const eventLinkFindMany = jest.fn().mockResolvedValue([]);
 
   const prisma = {
     v1TeamMatch: {
-      findUnique: jest.fn().mockResolvedValue(teamMatchRow),
+      findUnique: teamMatchFindUnique,
       findMany: jest.fn().mockResolvedValue([teamMatchRow]),
     },
     v1TeamMembership: {
-      findMany: jest.fn(async ({ where }: { where: FakeRow }) => membershipRows.filter((row) => matchesWhere(row, where))),
+      findMany: teamMembershipFindMany,
     },
     v1PostEventReview: {
-      findFirst: jest.fn(async ({ where }: { where: FakeRow }) => reviewRows.find((row) => matchesWhere(row, where)) ?? null),
+      findFirst: reviewFindFirst,
       findMany: reviewFindMany,
     },
     // awayRosterUserIds/staleAwayRosterUserIds 가 둘 다 비면 라인업 없는 팀 매치 — 상대 선수 대상
     // 0명이라 팀 후기 경로만 남는다.
     v1Game: {
-      findUnique: jest.fn().mockResolvedValue(hasAwayLineup ? gameRow : null),
+      findUnique: gameFindUnique,
       findMany: jest.fn().mockResolvedValue(hasAwayLineup ? [{ ...gameRow, teamMatchId: teamSourceId }] : []),
     },
     // where 절을 실제로 해석한다 — mock이 인자를 무시하고 고정 배열을 돌려주면 "최신 revision
     // lineupId로 좁히는지"를 잡을 수 없다(finding: gameId/sideId만으로 조회해 옛 revision까지 샌 회귀).
     v1GameLineup: {
-      findMany: jest.fn(async ({ where }: { where: FakeRow }) =>
-        lineupRows
-          .filter((row) => matchesWhere(row, where))
-          .sort((a, b) => (b.revision as number) - (a.revision as number)),
-      ),
+      findMany: gameLineupFindMany,
     },
     v1GameParticipant: {
-      findMany: jest.fn(async ({ where }: { where: FakeRow }) => gameParticipantRows.filter((row) => matchesWhere(row, where))),
+      findMany: gameParticipantFindMany,
     },
     v1User: {
-      findMany: jest.fn().mockResolvedValue(
-        [...awayRosterUserIds, ...staleAwayRosterUserIds].map((userId) => ({
-          id: userId,
-          profile: { nickname: `선수-${userId}`, profileImageUrl: null },
-        })),
-      ),
+      findMany: userFindMany,
     },
+    v1ParticipantIdentityLinkCurrent: {
+      findMany: currentLinkFindMany,
+    },
+    v1ParticipantIdentityLinkEvent: { findMany: eventLinkFindMany },
     $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
-      v1PostEventReview: { create: createMock, findMany: reviewFindMany },
-      v1TeamMatch: { count: jest.fn().mockResolvedValue(1) },
+      v1PostEventReview: { create: createMock, findFirst: reviewFindFirst, findMany: reviewFindMany },
+      v1TeamMatch: { count: jest.fn().mockResolvedValue(1), findUnique: teamMatchFindUnique },
+      v1TeamMembership: { findMany: teamMembershipFindMany },
+      v1Game: { findUnique: gameFindUnique },
+      v1GameLineup: { findMany: gameLineupFindMany },
+      v1GameParticipant: { findMany: gameParticipantFindMany },
+      v1User: { findMany: userFindMany },
+      v1ParticipantIdentityLinkCurrent: { findMany: currentLinkFindMany },
+      v1ParticipantIdentityLinkEvent: { findMany: eventLinkFindMany },
+      $queryRaw: jest.fn().mockResolvedValue([]),
       v1TeamTrustScore: { upsert: teamTrustUpsert },
       // 선수 후기 경로는 팀 신뢰점수가 아니라 개인 평판을 갱신한다.
       v1PostEventReviewMetricScore: { findMany: jest.fn().mockResolvedValue([]) },
@@ -1842,22 +1885,25 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
   });
 
   function makeDualPrisma(createMock = jest.fn()) {
+    const completedTeamMatch = {
+      id: teamSourceId,
+      title: '홈팀 vs 원정팀',
+      status: 'completed',
+      completedAt: teamMatchCompletedAt,
+      startAt: teamMatchCompletedAt,
+      sportId: 'sport-futsal',
+      hostTeamId,
+      approvedApplicantTeamId: awayTeamId,
+      hostTeam: { id: hostTeamId, name: '홈팀', profile: { logoUrl: null } },
+      approvedApplicantTeam: { id: awayTeamId, name: '원정팀', profile: { logoUrl: null } },
+    };
+    const teamMatchFindUnique = jest.fn().mockResolvedValue(completedTeamMatch);
+    const membershipFindMany = jest.fn().mockResolvedValue(bothTeamMemberships);
     return {
       v1TeamMatch: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: teamSourceId,
-          title: '홈팀 vs 원정팀',
-          status: 'completed',
-          completedAt: teamMatchCompletedAt,
-          startAt: teamMatchCompletedAt,
-          sportId: 'sport-futsal',
-          hostTeamId,
-          approvedApplicantTeamId: awayTeamId,
-          hostTeam: { id: hostTeamId, name: '홈팀', profile: { logoUrl: null } },
-          approvedApplicantTeam: { id: awayTeamId, name: '원정팀', profile: { logoUrl: null } },
-        }),
+        findUnique: teamMatchFindUnique,
       },
-      v1TeamMembership: { findMany: jest.fn().mockResolvedValue(bothTeamMemberships) },
+      v1TeamMembership: { findMany: membershipFindMany },
       v1PostEventReview: {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
@@ -1867,8 +1913,11 @@ describe('ReviewsService — 양 팀 겸직 후기', () => {
       v1GameParticipant: { findMany: jest.fn().mockResolvedValue([]) },
       v1User: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback({
-        v1PostEventReview: { create: createMock, findMany: jest.fn().mockResolvedValue([]) },
-        v1TeamMatch: { count: jest.fn().mockResolvedValue(1) },
+        v1PostEventReview: { create: createMock, findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
+        v1TeamMatch: { count: jest.fn().mockResolvedValue(1), findUnique: teamMatchFindUnique },
+        v1TeamMembership: { findMany: membershipFindMany },
+        v1Game: { findUnique: jest.fn().mockResolvedValue(null) },
+        $queryRaw: jest.fn().mockResolvedValue([]),
         v1TeamTrustScore: { upsert: jest.fn().mockResolvedValue({}) },
       })),
     };

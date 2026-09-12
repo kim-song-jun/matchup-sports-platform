@@ -4,13 +4,31 @@ import Link from 'next/link';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
-import { PublicFixtureStateBadge, staffRoleLabel } from '@/components/tournament-ops/badges';
-import { usePublicTournamentSchedule } from '@/components/public-game-records/use-public-game-records';
+import { GameStateBadge, PublicFixtureStateBadge, staffRoleLabel } from '@/components/tournament-ops/badges';
 import { useV1MyTournamentStaffAssignments } from '@/hooks/use-v1-api';
 import { findMyTournamentGroup } from '@/hooks/use-v1-my-staff-assignments';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
-import type { PublicScheduleEntry } from '@/components/public-game-records/types';
-import type { V1MyTournamentStaffAssignment } from '@/types/api';
+import type { V1GameState, V1MyTournamentStaffAssignment, V1MyTournamentStaffFixture } from '@/types/api';
+
+const STAFF_GAME_STATE_BY_STATUS: Readonly<Record<string, V1GameState>> = {
+  scheduled: 'SCHEDULED',
+  SCHEDULED: 'SCHEDULED',
+  in_progress: 'LIVE',
+  live: 'LIVE',
+  LIVE: 'LIVE',
+  paused: 'PAUSED',
+  PAUSED: 'PAUSED',
+  completed: 'ENDED',
+  ended: 'ENDED',
+  ENDED: 'ENDED',
+  cancelled: 'CANCELLED',
+  CANCELLED: 'CANCELLED',
+};
+
+function StaffFixtureStateBadge({ status }: { status: string }) {
+  const gameState = STAFF_GAME_STATE_BY_STATUS[status];
+  return gameState === undefined ? <PublicFixtureStateBadge status={status} /> : <GameStateBadge state={gameState} />;
+}
 
 /**
  * "담당 경기" — 필드 담당자(FIELD_OPERATOR)가 자기 경기 콘솔로 들어가는 유일한 경로.
@@ -22,13 +40,12 @@ import type { V1MyTournamentStaffAssignment } from '@/types/api';
  * (`.../fixtures/:fixtureId/operate`)은 URL 에 경기가 있어 통과한다. 그래서 "어느 경기로
  * 갈지" 고르는 단계가 사이에 필요하다.
  *
- * 데이터: 담당 범위는 `GET /me/tournament-staff`(본인 스코프라 필드 담당자도 읽을 수 있다),
- * 경기의 상세(팀·시각·상태)는 공개 일정(`GET /tournaments/:id/schedule`)에서 가져온다.
- * 둘 다 이 사용자가 이미 읽을 수 있는 것이라 새 권한 표면이 생기지 않는다.
+ * 데이터: 담당 범위와 경기 요약은 `GET /me/tournament-staff` 한 응답에서 받는다.
+ * 서버가 현재 사용자의 활성 스태프 스코프와 canonical TeamMatch를 함께 교차검증하므로,
+ * 공개 대진표가 아직 게시되지 않은 대회도 담당 경기 콘솔로 들어갈 수 있다.
  */
 export function MyStaffFixturesPageClient({ tournamentId }: { tournamentId: string }) {
   const assignmentsQuery = useV1MyTournamentStaffAssignments();
-  const scheduleQuery = usePublicTournamentSchedule(tournamentId);
 
   const group = findMyTournamentGroup(assignmentsQuery.data, tournamentId);
   const title = group?.tournamentTitle ?? '담당 경기';
@@ -36,14 +53,10 @@ export function MyStaffFixturesPageClient({ tournamentId }: { tournamentId: stri
   // 찾으면 여기서 실제 대회명으로 덮어쓴다(fragments/my-secondary.ts 참조).
   useShellOverride({ title });
 
-  const entries = (scheduleQuery.data?.pages ?? []).flatMap((page) => [
-    ...page.items,
-    ...page.unscheduled,
-  ]);
-  const mine = group === null ? [] : selectMyFixtures(entries, group.assignments);
+  const mine = group === null ? [] : selectMyFixtures(group.fixtures, group.assignments);
 
-  const isLoading = assignmentsQuery.isLoading || scheduleQuery.isLoading;
-  const isError = assignmentsQuery.isError || scheduleQuery.isError;
+  const isLoading = assignmentsQuery.isLoading;
+  const isError = assignmentsQuery.isError;
 
   if (isError) {
     return (
@@ -52,7 +65,6 @@ export function MyStaffFixturesPageClient({ tournamentId }: { tournamentId: stri
           message="담당 경기를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
           onRetry={() => {
             void assignmentsQuery.refetch();
-            void scheduleQuery.refetch();
           }}
         />
       </Shell>
@@ -122,9 +134,9 @@ function Shell({ children }: { children: React.ReactNode }) {
  * 필드 레코드의 진짜 기본키라 동명이인 문제가 없다.
  */
 export function selectMyFixtures(
-  entries: readonly PublicScheduleEntry[],
+  fixtures: readonly V1MyTournamentStaffFixture[],
   assignments: readonly V1MyTournamentStaffAssignment[],
-): PublicScheduleEntry[] {
+): V1MyTournamentStaffFixture[] {
   const fieldOperators = assignments.filter((a) => a.role === 'FIELD_OPERATOR');
   if (fieldOperators.length === 0) return [];
 
@@ -135,10 +147,10 @@ export function selectMyFixtures(
       .map((a) => a.fieldId as string),
   );
 
-  return entries.filter(
-    (entry) =>
-      scopedFixtureIds.has(entry.fixtureId) ||
-      (entry.fieldId !== null && scopedFieldIds.has(entry.fieldId)),
+  return fixtures.filter(
+    (fixture) =>
+      scopedFixtureIds.has(fixture.fixtureId) ||
+      (fixture.fieldId !== null && scopedFieldIds.has(fixture.fieldId)),
   );
 }
 
@@ -153,10 +165,8 @@ function StaffFixtureRow({
   fixture,
 }: {
   tournamentId: string;
-  fixture: PublicScheduleEntry;
+  fixture: V1MyTournamentStaffFixture;
 }) {
-  const home = fixture.home?.teamName ?? '팀 미정';
-  const away = fixture.away?.teamName ?? '팀 미정';
   const when = formatTournamentDateTimeShort(fixture.scheduledAt);
   const meta = [`${fixture.round} · ${fixture.fixtureNumber}번 경기`, when === '' ? '일정 미정' : when]
     .filter(Boolean)
@@ -165,17 +175,17 @@ function StaffFixtureRow({
     <Link
       className="tm-list-row tm-pressable"
       href={`/tournament-ops/tournaments/${tournamentId}/fixtures/${fixture.fixtureId}/operate`}
-      aria-label={`${home} 대 ${away}, 경기 운영 콘솔 열기`}
+      aria-label={`${fixture.title}, 경기 운영 콘솔 열기`}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-text-body" style={{ color: 'var(--text-strong)' }}>
-          {home} vs {away}
+          {fixture.title}
         </div>
         <div className="tm-text-caption" style={{ marginTop: 4 }}>
           {meta}
         </div>
       </div>
-      <PublicFixtureStateBadge status={fixture.status} />
+      <StaffFixtureStateBadge status={fixture.gameState ?? fixture.status} />
       <ChevronRightIcon size={18} stroke="var(--text-caption)" strokeWidth={2} />
     </Link>
   );

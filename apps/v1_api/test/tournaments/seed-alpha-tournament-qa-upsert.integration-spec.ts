@@ -10,24 +10,21 @@ import { runCompetitionConfigContractPhaseBackfill } from '../../src/tournaments
 
 /**
  * Part 2 (delete→upsert 근본 해소): the alpha QA seed no longer deletes the fixed
- * scenario tournaments/fixtures before recreating them. `createScenario` now upserts
- * the tournament (by id) + group + fixtures (by natural key) — never deleting them —
- * and delete-recreates only the leaf rows (registrations, standings, results, videos,
- * awards, reviews, sponsor, announcement, campaign), none of which any append-only
- * trigger or Restrict FK references.
+ * scenario tournaments/matches before recreating them. `createScenario` now upserts
+ * the tournament (by id) + group + canonical match details (by natural key) — never
+ * deleting them — and preserves registrations, games, results, and append-only history.
  *
  * That structurally removes the 2026-08-09 deploy deadlock: an append-only
- * `v1_operation_audits` row (or a V1Game) that pins a tournament/fixture used to make
+ * `v1_operation_audits` row (or a V1Game) that pins a tournament/TeamMatch used to make
  * the old delete-based reset fail with P2003 and skip that tournament, leaving it stale
  * every deploy. This suite proves, against a real Postgres database, that:
  *   1. re-seeding the same scenario twice is idempotent — no duplicate tournament /
- *      group / fixture / registration rows,
- *   2. an append-only operation_audit row referencing the tournament + fixture does NOT
+ *      group / match / registration rows,
+ *   2. an append-only operation_audit row referencing the tournament + TeamMatch does NOT
  *      block the reseed (upsert never deletes them) and both the audit row and the
  *      tournament survive untouched (same row, not delete+recreate),
- *   3. a V1Game attached to a fixture survives the reseed with a stable fixture id —
- *      the exact Restrict FK (`v1_games_tournament_fixture_id_fkey`) that broke the old
- *      delete path.
+ *   3. a canonical V1Game attached to a TeamMatch survives the reseed with stable
+ *      state, revision, and TeamMatch identity.
  */
 
 const id = (suffix: string) => `6a000000-0000-4000-8000-${suffix}`;
@@ -36,7 +33,8 @@ const ids = {
   sport: id('000000000001'),
   region: id('000000000002'),
   tournament: id('000000000010'),
-  pinnedGame: id('000000000020'),
+  operatorVideo: id('000000000030'),
+  identityRevokeRequest: id('000000000040'),
 } as const;
 
 const personas: readonly PersonaSeed[] = [
@@ -74,7 +72,7 @@ const EXPECTED_REGISTRATIONS = 4;
 const prisma = new PrismaService();
 let configId: string;
 
-async function seedScenarioOnce(): Promise<void> {
+async function seedScenarioOnce(seedNow = new Date()): Promise<void> {
   await prisma.$transaction(async (tx) => {
     const teams = await ensureTeamRoster(
       tx,
@@ -87,7 +85,7 @@ async function seedScenarioOnce(): Promise<void> {
     );
     // adminUserId=null is a supported path (main() passes admin?.id ?? null), so this
     // suite needs no V1AdminUser fixture.
-    await createScenario(tx, scenario, ids.sport, teams, null, new Date(), configId);
+    await createScenario(tx, scenario, ids.sport, teams, null, seedNow, configId);
   });
 }
 
@@ -95,10 +93,51 @@ async function countScenarioRows() {
   const [tournaments, groups, fixtures, registrations] = await Promise.all([
     prisma.v1Tournament.count({ where: { id: ids.tournament } }),
     prisma.v1TournamentGroup.count({ where: { tournamentId: ids.tournament } }),
-    prisma.v1TournamentFixture.count({ where: { tournamentId: ids.tournament } }),
+    prisma.v1TournamentMatchDetails.count({ where: { tournamentId: ids.tournament } }),
     prisma.v1TournamentRegistration.count({ where: { tournamentId: ids.tournament } }),
   ]);
   return { tournaments, groups, fixtures, registrations };
+}
+
+async function snapshotOperationalRows() {
+  const [tournament, matches, registrations] = await Promise.all([
+    prisma.v1Tournament.findUniqueOrThrow({
+      where: { id: ids.tournament },
+      select: { id: true, scheduledAt: true, scheduledEndAt: true, registrationDeadlineAt: true },
+    }),
+    prisma.v1TournamentMatchDetails.findMany({
+      where: { tournamentId: ids.tournament },
+      orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }],
+      select: {
+        teamMatchId: true,
+        teamMatch: {
+          select: {
+            startAt: true,
+            status: true,
+            videos: { orderBy: { id: 'asc' }, select: { id: true, title: true, url: true, sortOrder: true } },
+            game: {
+              select: {
+                id: true,
+                state: true,
+                version: true,
+                currentOfficialRevisionId: true,
+                sides: { orderBy: { sideKey: 'asc' }, select: { id: true, sideKey: true, teamId: true, displayNameSnapshot: true } },
+                participants: { orderBy: { id: 'asc' }, select: { id: true, sideId: true, lineupId: true, userId: true, displayNameSnapshot: true, jerseyNumber: true } },
+                events: { orderBy: { id: 'asc' }, select: { id: true, clientEventId: true, sequence: true } },
+                resultRevisions: { orderBy: { revision: 'asc' }, select: { id: true, revision: true, state: true, eventsHash: true } },
+              },
+            },
+          },
+        },
+      },
+    }),
+    prisma.v1TournamentRegistration.findMany({
+      where: { tournamentId: ids.tournament },
+      orderBy: { teamId: 'asc' },
+      select: { id: true, teamId: true, players: { select: { id: true, userId: true } }, payment: { select: { id: true } } },
+    }),
+  ]);
+  return { tournament, matches, registrations };
 }
 
 describe('alpha QA seed — Part 2 delete→upsert idempotency & append-only survival', () => {
@@ -117,8 +156,41 @@ describe('alpha QA seed — Part 2 delete→upsert idempotency & append-only sur
   });
 
   it('re-seeding the same scenario twice is idempotent — no duplicate tournament / group / fixture / registration rows', async () => {
-    await seedScenarioOnce();
+    await seedScenarioOnce(new Date('2026-08-01T09:00:00.000Z'));
     const afterFirst = await countScenarioRows();
+    const initialSnapshot = await snapshotOperationalRows();
+    const operatorTeamMatchId = initialSnapshot.matches[0]?.teamMatchId;
+    if (!operatorTeamMatchId) throw new Error('Expected a canonical TeamMatch for operator-video preservation.');
+    await prisma.v1TeamMatchVideo.create({
+      data: { id: ids.operatorVideo, teamMatchId: operatorTeamMatchId, title: 'Operator upload', url: 'https://example.test/operator.mp4', sortOrder: 99 },
+    });
+    const operatorMatch = await prisma.v1TournamentMatchDetails.findUniqueOrThrow({
+      where: { teamMatchId: operatorTeamMatchId },
+      select: { teamMatchId: true, teamMatch: { select: { game: { select: { id: true, sides: { select: { id: true } }, participants: { select: { id: true } } } } } } },
+    });
+    const operatorGame = operatorMatch.teamMatch.game;
+    const operatorSide = operatorGame?.sides[0];
+    const operatorParticipant = operatorGame?.participants[0];
+    if (!operatorGame || !operatorSide || !operatorParticipant) throw new Error('Expected canonical Game snapshots for preservation.');
+    await prisma.v1GameSide.update({ where: { id: operatorSide.id }, data: { displayNameSnapshot: 'Operator renamed side' } });
+    await prisma.v1GameParticipant.update({ where: { id: operatorParticipant.id }, data: { jerseyNumber: 99 } });
+    const currentIdentity = await prisma.v1ParticipantIdentityLinkCurrent.findUnique({ where: { participantId: operatorParticipant.id } });
+    if (!currentIdentity) throw new Error('Expected a current identity before revocation preservation check.');
+    await prisma.v1ParticipantIdentityLinkCurrent.delete({ where: { participantId: operatorParticipant.id } });
+    await prisma.v1ParticipantIdentityLinkEvent.create({
+      data: {
+        participantId: operatorParticipant.id,
+        linkId: currentIdentity.linkId,
+        eventVersion: currentIdentity.version + 1,
+        requestId: ids.identityRevokeRequest,
+        action: 'REVOKED',
+        userId: currentIdentity.userId,
+        actorType: 'SYSTEM',
+        systemActor: 'p2-upsert-test',
+        reason: 'operator preservation regression',
+      },
+    });
+    const operationalBefore = await snapshotOperationalRows();
     expect(afterFirst).toEqual({
       tournaments: 1,
       groups: 1,
@@ -126,17 +198,20 @@ describe('alpha QA seed — Part 2 delete→upsert idempotency & append-only sur
       registrations: EXPECTED_REGISTRATIONS,
     });
 
-    await seedScenarioOnce();
+    await seedScenarioOnce(new Date('2026-09-01T09:00:00.000Z'));
     const afterSecond = await countScenarioRows();
-    // The second run upserts the skeleton and delete-recreates the leaves, so the
-    // counts are identical — nothing duplicated.
+    const operationalAfter = await snapshotOperationalRows();
+    // The second run preserves canonical rows and registration identities.
     expect(afterSecond).toEqual(afterFirst);
+    expect(operationalAfter).toEqual(operationalBefore);
+    expect(await prisma.v1ParticipantIdentityLinkCurrent.findUnique({ where: { participantId: operatorParticipant.id } })).toBeNull();
+    expect(await prisma.v1ParticipantIdentityLinkEvent.findFirst({ where: { participantId: operatorParticipant.id, action: 'REVOKED' } })).not.toBeNull();
   });
 
-  it('re-seeds through an append-only operation_audit that pins the tournament + fixture (the 2026-08-09 deadlock) — never deletes them, audit survives', async () => {
-    const fixture = await prisma.v1TournamentFixture.findFirstOrThrow({
+  it('re-seeds through an append-only operation_audit that pins the tournament + TeamMatch — never deletes them, audit survives', async () => {
+    const fixture = await prisma.v1TournamentMatchDetails.findFirstOrThrow({
       where: { tournamentId: ids.tournament },
-      select: { id: true },
+      select: { teamMatchId: true },
     });
     // INSERT is always allowed (the append-only trigger only blocks DELETE/UPDATE), so
     // this reproduces the exact undeletable state that broke the delete-based reset.
@@ -149,7 +224,7 @@ describe('alpha QA seed — Part 2 delete→upsert idempotency & append-only sur
         resourceId: 'p2-upsert-audit-resource',
         requestId: 'p2-upsert-audit-request',
         tournamentId: ids.tournament,
-        fixtureId: fixture.id,
+        teamMatchId: fixture.teamMatchId,
       },
     });
     const before = await prisma.v1Tournament.findUniqueOrThrow({ where: { id: ids.tournament }, select: { id: true, createdAt: true } });
@@ -173,33 +248,25 @@ describe('alpha QA seed — Part 2 delete→upsert idempotency & append-only sur
     });
   });
 
-  it('re-seeds without deleting a V1Game attached to a fixture (the Restrict FK that broke the delete path) and keeps the fixture id stable', async () => {
-    const fixture = await prisma.v1TournamentFixture.findFirstOrThrow({
+  it('re-seeds without changing an official canonical Game or TeamMatch identity', async () => {
+    const fixture = await prisma.v1TournamentMatchDetails.findFirstOrThrow({
       where: { tournamentId: ids.tournament, round: 'group', fixtureNumber: 1 },
-      select: { id: true },
+      select: { teamMatchId: true },
     });
-    await prisma.v1Game.create({
-      data: {
-        id: ids.pinnedGame,
-        sourceType: 'TOURNAMENT_FIXTURE',
-        tournamentFixtureId: fixture.id,
-        competitionConfigVersionId: configId,
-        state: 'SCHEDULED',
-      },
+    const before = await prisma.v1Game.findUniqueOrThrow({
+      where: { teamMatchId: fixture.teamMatchId },
+      select: { id: true, state: true, currentOfficialRevisionId: true, version: true },
     });
 
     await expect(seedScenarioOnce()).resolves.not.toThrow();
 
-    const game = await prisma.v1Game.findUnique({ where: { id: ids.pinnedGame }, select: { id: true, tournamentFixtureId: true } });
-    expect(game).not.toBeNull();
-    const fixtureAfter = await prisma.v1TournamentFixture.findFirstOrThrow({
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: before.id }, select: { id: true, state: true, currentOfficialRevisionId: true, version: true } });
+    const fixtureAfter = await prisma.v1TournamentMatchDetails.findFirstOrThrow({
       where: { tournamentId: ids.tournament, round: 'group', fixtureNumber: 1 },
-      select: { id: true },
+      select: { teamMatchId: true },
     });
-    // Fixture is upserted by its natural key, not recreated, so its id — and the Game's
-    // FK to it — stays valid across the reseed.
-    expect(fixtureAfter.id).toBe(fixture.id);
-    expect(game?.tournamentFixtureId).toBe(fixture.id);
+    expect(fixtureAfter.teamMatchId).toBe(fixture.teamMatchId);
+    expect(game).toEqual(before);
   });
 });
 

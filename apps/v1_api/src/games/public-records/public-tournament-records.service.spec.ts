@@ -104,7 +104,11 @@ function buildFakePrisma(options: {
     supersedesId: string | null;
     officialAt: Date;
     score: unknown;
+    reason?: string | null;
+    goalEvents?: unknown;
   } | null;
+  visibilityMode?: string;
+  revisions?: Array<{ revision: number; state: string; officialAt: Date | null; reason: string | null; supersedesId: string | null }>;
   /**
    * `resolvePeriodBreak` 배선 검증용(하프타임/정규 시간 종료) -- 기본값 `[]`이라
    * 기존 테스트는 그대로 LIVE 클록 없는 경로를 탄다(회귀 없음).
@@ -123,7 +127,7 @@ function buildFakePrisma(options: {
    * 경기에서 라이브 전용 필드가 새는지 확인할 수 있다.
    */
   gameState?: string;
-  lineups?: readonly { id: string; sideId: string; revision: number; state?: string }[];
+  lineups?: readonly { id: string; sideId: string; revision: number; state?: string; invalidatedAt?: Date | null }[];
   participants?: readonly FakeParticipant[];
   /**
    * 2026-08-18 대회 실명 표시 정책 -- `loadParticipantNameProfiles`가 in 조회하는
@@ -131,6 +135,8 @@ function buildFakePrisma(options: {
    * 스냅샷으로 폴백하는 기존 테스트를 그대로 둔다.
    */
   nameProfiles?: FakeNameProfile[];
+  /** Simulate a legacy-only fixture with no canonical Details row. */
+  canonical?: boolean;
 }): PrismaService {
   const database = {
     v1Tournament: {
@@ -144,47 +150,49 @@ function buildFakePrisma(options: {
         };
       },
     },
-    v1TournamentFixture: {
-      // getMatch 의 본 조회(select 에 game 포함)와 findNextMatch 의 다음 경기
-      // 조회(select 에 game 미포함)가 같은 모델을 두 번 다른 select 로 호출한다 --
-      // select 형태로 어느 호출인지 구분한다.
-      async findFirst(args: { select: Record<string, unknown> }) {
-        if (!('game' in args.select)) return null; // 다음 경기 없음 -- 이 스펙의 관심사가 아니다.
+    v1TournamentMatchDetails: {
+      async findFirst() {
+        if (options.canonical === false) return null;
         return {
-          id: FIXTURE_ID,
+          teamMatchId: FIXTURE_ID,
           tournamentId: TOURNAMENT_ID,
           round: '결승',
           fixtureNumber: 1,
           legNumber: 1,
           groupId: null,
-          scheduledAt: options.scheduledAt,
-          venue: null,
-          status: 'in_progress',
           homeRegistrationId: 'reg-home',
           awayRegistrationId: 'reg-away',
           homeRegistration: { team: { id: 'team-home', name: '홈팀' } },
           awayRegistration: { team: { id: 'team-away', name: '원정팀' } },
           group: null,
-          fieldId: options.fieldId ?? null,
-          field: null,
-          videos: [],
-          game: {
-            id: GAME_ID,
-            state: options.gameState ?? 'LIVE',
-            visibilityPolicy: { mode: 'LIVE', lineupAt: null },
-            sides: [
-              { id: 'side-home', sideKey: 'HOME' },
-              { id: 'side-away', sideKey: 'AWAY' },
-            ],
-            lineups: options.lineups ?? [
-              { id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' },
-              { id: 'lineup-away-1', sideId: 'side-away', revision: 1, state: 'SUBMITTED' },
-            ],
-            participants: options.participants ?? [ELIGIBLE_PARTICIPANT, INELIGIBLE_PARTICIPANT],
-            currentOfficialRevision: options.officialRevision ?? null,
-            periods: options.periods ?? [],
+          teamMatch: {
+            startAt: options.scheduledAt,
+            placeName: null,
+            status: 'matched',
+            fieldId: options.fieldId ?? null,
+            field: null,
+            videos: [],
+            game: {
+              id: GAME_ID,
+              state: options.gameState ?? 'LIVE',
+              visibilityPolicy: { mode: options.visibilityMode ?? 'LIVE', lineupAt: null },
+              sides: [
+                { id: 'side-home', sideKey: 'HOME' },
+                { id: 'side-away', sideKey: 'AWAY' },
+              ],
+              lineups: options.lineups ?? [
+                { id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED', invalidatedAt: null },
+                { id: 'lineup-away-1', sideId: 'side-away', revision: 1, state: 'SUBMITTED', invalidatedAt: null },
+              ],
+              participants: options.participants ?? [ELIGIBLE_PARTICIPANT, INELIGIBLE_PARTICIPANT],
+              currentOfficialRevision: options.officialRevision ?? null,
+              periods: options.periods ?? [],
+            },
           },
         };
+      },
+      async findMany() {
+        return [];
       },
     },
     v1GameOperationFlag: {
@@ -232,7 +240,7 @@ function buildFakePrisma(options: {
     },
     v1GameResultRevision: {
       async findMany() {
-        return [];
+        return options.revisions ?? [];
       },
     },
   };
@@ -300,10 +308,10 @@ describe('PublicTournamentRecordsService.getMatch -- event participant identity 
       scheduledAt: new Date(Date.now() - 60_000),
       consentLinks: [], consentSnapshots: [], events: [],
       lineups: [
-        { id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' },
-        { id: 'lineup-away-1', sideId: 'side-away', revision: 1, state: 'SUBMITTED' },
-        { id: 'lineup-home-2', sideId: 'side-home', revision: 2, state: 'SUBMITTED' },
-        { id: 'lineup-away-3', sideId: 'side-away', revision: 3, state: 'SUBMITTED' },
+        { id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED', invalidatedAt: null },
+        { id: 'lineup-away-1', sideId: 'side-away', revision: 1, state: 'SUBMITTED', invalidatedAt: null },
+        { id: 'lineup-home-2', sideId: 'side-home', revision: 2, state: 'SUBMITTED', invalidatedAt: null },
+        { id: 'lineup-away-3', sideId: 'side-away', revision: 3, state: 'SUBMITTED', invalidatedAt: null },
       ],
       participants: [oldHome, latestHome, oldAway, latestAway],
     });
@@ -325,12 +333,12 @@ describe('PublicTournamentRecordsService.getMatch -- event participant identity 
       scheduledAt: new Date(Date.now() - 60_000),
       consentLinks: [], consentSnapshots: [], events: [],
       lineups: [
-        { id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' },
+        { id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED', invalidatedAt: null },
         // revision 2가 revision 1보다 크지만 DRAFT다 -- 팀이 제출 후 라인업을 다시
         // 편집만 하고 제출은 누르지 않은 상태. "가장 큰 revision"만 보면 이 DRAFT가
         // 공개 라인업을 덮어써 버린다 -- 그게 이 테스트가 막는 결함이다.
-        { id: 'lineup-home-2', sideId: 'side-home', revision: 2, state: 'DRAFT' },
-        { id: 'lineup-away-1', sideId: 'side-away', revision: 1, state: 'SUBMITTED' },
+        { id: 'lineup-home-2', sideId: 'side-home', revision: 2, state: 'DRAFT', invalidatedAt: null },
+        { id: 'lineup-away-1', sideId: 'side-away', revision: 1, state: 'SUBMITTED', invalidatedAt: null },
       ],
       participants: [submittedHome, draftHome, away],
     });
@@ -353,8 +361,8 @@ describe('PublicTournamentRecordsService.getMatch -- event participant identity 
       lineups: [
         // 대진 생성 시 자동으로 깔리는 revision 1 DRAFT -- 홈팀은 아직 제출을
         // 마치지 않았다. 이 사이드에는 SUBMITTED/LOCKED가 하나도 없다.
-        { id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'DRAFT' },
-        { id: 'lineup-away-1', sideId: 'side-away', revision: 1, state: 'SUBMITTED' },
+        { id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'DRAFT', invalidatedAt: null },
+        { id: 'lineup-away-1', sideId: 'side-away', revision: 1, state: 'SUBMITTED', invalidatedAt: null },
       ],
       participants: [draftHome, submittedAway],
     });
@@ -400,6 +408,45 @@ describe('PublicTournamentRecordsService.getMatch -- event participant identity 
         jerseyNumber: 7,
       }),
     ]);
+  });
+
+  it('공식 revision의 게스트 snapshot은 공개하되 등록 참가자의 snapshot은 무시한다', async () => {
+    const registered = {
+      ...ELIGIBLE_PARTICIPANT,
+      id: 'registered-goal-participant',
+      userId: 'user-1',
+      displayNameSnapshot: '등록 선수 스냅샷',
+      jerseyNumber: 9,
+    };
+    const guest = {
+      ...INELIGIBLE_PARTICIPANT,
+      id: 'guest-goal-participant',
+      userId: null,
+      displayNameSnapshot: '라인업 이름이 아닌 값',
+      jerseyNumber: 11,
+    };
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date(Date.now() - 60_000),
+      consentLinks: [{ participantId: registered.id, linkId: 'link-registered', userId: 'user-1' }],
+      consentSnapshots: [{ linkId: 'link-registered', state: 'GRANTED', effectiveAt: new Date('2026-01-01T00:00:00.000Z') }],
+      userConsents: [{ userId: 'user-1', state: 'GRANTED' }],
+      nameProfiles: [{ userId: 'user-1', realName: '실명', displayName: '레거시 실명', nickname: '등록닉네임', tournamentRealNameVisible: false, deletedAt: null }],
+      participants: [registered, guest],
+      events: [],
+      officialRevision: {
+        state: 'OFFICIAL', supersedesId: null, officialAt: new Date(), score: { home: 1, away: 1 },
+        goalEvents: [
+          { id: 'registered-goal', sideId: 'side-home', participantId: registered.id, playerNameSnapshot: '악의적 등록 snapshot', minute: 4, period: 1, ownGoal: false },
+          { id: 'guest-goal', sideId: 'side-away', participantId: null, playerNameSnapshot: '게스트 득점자', minute: 8, period: 1, ownGoal: false },
+        ],
+      },
+    });
+    const result = await new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS).getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ participantId: registered.id, participantName: '등록닉네임', jerseyNumber: 9, profileHref: '/users/user-1' }),
+      expect.objectContaining({ participantId: null, participantName: '게스트 득점자', jerseyNumber: null, profileHref: null }),
+    ]));
   });
 
   it('정책 변경(2026-08-13): 동의 없이 미연동/게스트 참가자라도 대회 참가자면 관전자에게 이름이 보인다', async () => {
@@ -466,6 +513,23 @@ describe('PublicTournamentRecordsService.getMatch -- event participant identity 
     expect(result.events).toEqual([
       expect.objectContaining({ participantName: '김철수', jerseyNumber: 7 }),
     ]);
+  });
+});
+
+describe('PublicTournamentRecordsService canonical source boundary', () => {
+  it('returns 404 for a legacy-only fixture without a canonical Details row', async () => {
+    const prisma = buildFakePrisma({
+      scheduledAt: new Date('2030-01-01T09:00:00.000Z'),
+      consentLinks: [],
+      consentSnapshots: [],
+      events: [],
+      canonical: false,
+    });
+    const service = new PublicTournamentRecordsService(prisma, NO_ASSIGNMENTS_ACCESS);
+
+    await expect(service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined)).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_MATCH_NOT_FOUND' },
+    });
   });
 });
 
@@ -743,6 +807,61 @@ describe('PublicTournamentRecordsService.getMatch -- 참가팀 공개 정책 통
  * 도 양쪽을 다 읽는다), 두 형태를 각각 못박는다. 한쪽만 테스트하면 나머지 형태로
  * 저장된 경기에서 승부차기가 사라져도 전부 초록이다.
  */
+describe('PublicTournamentRecordsService.getMatch -- status-only history privacy', () => {
+  const revision = {
+    revision: 2,
+    state: 'OFFICIAL',
+    officialAt: new Date('2026-08-10T06:00:00.000Z'),
+    reason: '운영자 내부 정정 사유',
+    supersedesId: 'revision-1',
+  };
+
+  it('status_only는 history reason을 null로 만들고 revision metadata는 유지한다', async () => {
+    const service = new PublicTournamentRecordsService(
+      buildFakePrisma({
+        scheduledAt: new Date('2026-08-10T04:00:00.000Z'),
+        consentLinks: [],
+        consentSnapshots: [],
+        events: [],
+        visibilityMode: 'STATUS_ONLY',
+        officialRevision: { ...revision, score: { home: 1, away: 0 } },
+        revisions: [revision],
+      }),
+      NO_ASSIGNMENTS_ACCESS,
+    );
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.visibilityMode).toBe('status_only');
+    expect(result.history).toEqual([{
+      revision: 2,
+      state: 'OFFICIAL',
+      officialAt: '2026-08-10T06:00:00.000Z',
+      reason: null,
+      isCorrection: true,
+    }]);
+  });
+
+  it('live 공개는 authorized history reason을 유지한다', async () => {
+    const service = new PublicTournamentRecordsService(
+      buildFakePrisma({
+        scheduledAt: new Date('2026-08-10T04:00:00.000Z'),
+        consentLinks: [],
+        consentSnapshots: [],
+        events: [],
+        visibilityMode: 'LIVE',
+        officialRevision: { ...revision, score: { home: 1, away: 0 } },
+        revisions: [revision],
+      }),
+      NO_ASSIGNMENTS_ACCESS,
+    );
+
+    const result = await service.getMatch(TOURNAMENT_ID, FIXTURE_ID, undefined);
+
+    expect(result.history[0]?.reason).toBe('운영자 내부 정정 사유');
+  });
+});
+
 describe('PublicTournamentRecordsService.getMatch -- 승부차기 표면화', () => {
   const OFFICIAL_AT = new Date('2026-08-10T06:00:00.000Z');
 
@@ -1054,7 +1173,7 @@ describe('PublicTournamentRecordsService.getMatch -- 선수 프로필 링크(pro
   const base = {
     scheduledAt: new Date(Date.now() - 60_000),
     events: [],
-    lineups: [{ id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED' }],
+    lineups: [{ id: 'lineup-home-1', sideId: 'side-home', revision: 1, state: 'SUBMITTED', invalidatedAt: null }],
     participants: [LINKED],
   };
 

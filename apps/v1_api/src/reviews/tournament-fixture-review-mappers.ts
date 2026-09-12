@@ -1,5 +1,4 @@
 import { Prisma } from '@prisma/client';
-import { resolveTournamentFixtureOfficialTimestamp } from '../tournaments/tournament-fixture-official-result';
 // 신뢰 등급 경계는 team-trust-aggregation.ts의 단일 정의를 쓴다 — 예전엔 여기에도 사본이 있었고,
 // 그런 복제가 "DB 저장값과 화면 재계산값이 갈라지는" 사고의 원인이었다(reviews.service.ts 하단 주석 참고).
 import { trustStateForReviewCount } from './team-trust-aggregation';
@@ -17,9 +16,15 @@ export const REVIEW_TAGS = {
 } as const;
 
 export type TournamentFixtureReviewTagCode = keyof typeof REVIEW_TAGS;
-export type TournamentFixture = Prisma.V1TournamentFixtureGetPayload<{
+export type TournamentFixture = Prisma.V1TeamMatchGetPayload<{
   select: ReturnType<typeof tournamentFixtureSelect>;
 }>;
+export type CanonicalTournamentFixture = TournamentFixture & {
+  tournamentId: string;
+  leagueId: null;
+  tournament: NonNullable<TournamentFixture['tournament']>;
+  tournamentDetails: NonNullable<TournamentFixture['tournamentDetails']>;
+};
 export type ReviewWithIncludes = Prisma.V1PostEventReviewGetPayload<{
   include: ReturnType<typeof reviewInclude>;
 }>;
@@ -28,33 +33,33 @@ export type ExistingReviewWithIncludes = ReviewWithIncludes & { __alreadySubmitt
 export function tournamentFixtureSelect() {
   return {
     id: true,
-    tournamentId: true,
-    round: true,
-    fixtureNumber: true,
+    title: true,
     status: true,
-    scheduledAt: true,
+    completedAt: true,
+    startAt: true,
+    sportId: true,
+    tournamentId: true,
+    leagueId: true,
     updatedAt: true,
-    // R3 §4-3단계: 신규 경로(V1Game.currentOfficialRevision.officialAt)를 우선 읽는다 --
-    // officialResultTimestamp() 참고. state까지 함께 골라서 VOID로 넘어간 리비전을
-    // "결과 있음"으로 오판하지 않는다.
-    // 실출전 게이트(스펙 §5.1)가 V1GameResultParticipant 를 조회하려면 game.id 와
-    // currentOfficialRevision.id 가 필요하다 -- 확장 전에는 두 필드가 골라지지 않아
-    // appearedUserIdsBySide() 가 항상 null 폴백으로 떨어졌다.
+    // Canonical eligibility uses only the current official revision; VOID is not eligible.
     game: {
       select: {
         id: true,
+        sourceType: true,
         currentOfficialRevision: { select: { id: true, state: true, officialAt: true } },
       },
     },
-    // R3 §4-3단계 한시적 레거시 폴백 입력 — officialResultTimestamp()가 새 경로에 OFFICIAL
-    // 리비전이 없을 때만(game 백필 전) 레거시 recordedAt으로 대체한다. §4-4단계에서 제거.
-    result: { select: { recordedAt: true } },
-    // sportId: 개인 후기 행의 sportId 스냅샷 — 종목별 받은 후기 집계(ReviewsService.receivedSummary)가
-    // sportId 없는 행을 레거시로 취급해 통째로 빼기 때문에, 대회 개인 후기도 종목을 실어야 집계에 잡힌다.
     tournament: { select: { title: true, sportId: true } },
-    // registration id: 상대팀 등록 로스터(V1TournamentPlayer)를 조회하는 키. 개인 후기 대상 명단의 근거다.
-    homeRegistration: { select: { id: true, teamId: true, team: { select: teamSelect() } } },
-    awayRegistration: { select: { id: true, teamId: true, team: { select: teamSelect() } } },
+    tournamentDetails: {
+      select: {
+        tournamentId: true,
+        teamMatchId: true,
+        round: true,
+        fixtureNumber: true,
+        homeRegistration: { select: { id: true, teamId: true, team: { select: teamSelect() } } },
+        awayRegistration: { select: { id: true, teamId: true, team: { select: teamSelect() } } },
+      },
+    },
   } as const;
 }
 
@@ -68,20 +73,24 @@ export function rosterPlayerSelect() {
 
 export type RosterPlayer = Prisma.V1TournamentPlayerGetPayload<{ select: ReturnType<typeof rosterPlayerSelect> }>;
 
-/**
- * 신규 경로(`V1Game.currentOfficialRevision.officialAt`) 우선, 새 경로에 OFFICIAL
- * 리비전이 없을 때만(game 백필 전 등) 레거시 `fixture.result?.recordedAt`으로 폴백한다
- * (R3 §4-3~§4-4단계 사이 한시적 — resolveTournamentFixtureOfficialTimestamp() 참고).
- * `currentOfficialRevisionId`는 VOID 이후 VOID 리비전을 가리키도록 옮겨가므로
- * (tournament-result-review.service.ts voidResult) 존재 여부가 아니라
- * `state === 'OFFICIAL'`을 확인해야 레거시의 "결과가 있다"와 동등해진다. 백필된 픽스처는
- * officialAt에 레거시 recordedAt이 그대로 들어있어(game-result-backfill.ts) 이 값이
- * 정확히 같다. 이 타임스탬프는 `reviewContext()`의 리뷰 게이트("결과가 확정된 경기만
- * 리뷰 가능")로도 그대로 쓰이므로, 폴백이 빠지면 레거시 결과만 있는(game 백필 전) 완료
- * 경기가 리뷰를 못 받게 된다.
- */
+/** Canonical review eligibility is driven only by the current OFFICIAL revision. */
 export function officialResultTimestamp(fixture: TournamentFixture): Date | null {
-  return resolveTournamentFixtureOfficialTimestamp(fixture.game, fixture.result?.recordedAt);
+  const revision = fixture.game?.currentOfficialRevision;
+  return revision?.state === 'OFFICIAL' ? revision.officialAt : null;
+}
+
+/** Canonical tournament review source guard. Legacy fixture rows are intentionally not accepted. */
+export function isCanonicalTournamentFixture(fixture: TournamentFixture): fixture is CanonicalTournamentFixture {
+  const details = fixture.tournamentDetails;
+  return Boolean(
+    fixture.tournamentId &&
+      fixture.leagueId === null &&
+      fixture.tournament &&
+      fixture.game?.sourceType === 'TEAM_MATCH' &&
+      details &&
+      details.teamMatchId === fixture.id &&
+      details.tournamentId === fixture.tournamentId,
+  );
 }
 
 export function reviewInclude() {
@@ -94,16 +103,17 @@ export function reviewInclude() {
   };
 }
 
-export function fixtureTeams(fixture: TournamentFixture) {
-  if (!fixture.homeRegistration || !fixture.awayRegistration) return null;
+export function fixtureTeams(fixture: CanonicalTournamentFixture) {
+  if (!fixture.tournamentDetails.homeRegistration || !fixture.tournamentDetails.awayRegistration) return null;
   return {
-    home: teamInfo(fixture.homeRegistration),
-    away: teamInfo(fixture.awayRegistration),
+    home: teamInfo(fixture.tournamentDetails.homeRegistration),
+    away: teamInfo(fixture.tournamentDetails.awayRegistration),
   };
 }
 
-export function fixtureTitle(fixture: TournamentFixture) {
-  return `${fixture.tournament.title} · ${fixture.round} ${fixture.fixtureNumber}경기`;
+export function fixtureTitle(fixture: CanonicalTournamentFixture) {
+  const details = fixture.tournamentDetails;
+  return `${fixture.tournament.title} · ${details?.round ?? '대회'} ${details?.fixtureNumber ?? ''}경기`;
 }
 
 export function sourceSummary(sourceId: string, title: string, completedAt: Date | null) {
@@ -211,7 +221,7 @@ function teamSelect() {
   return { id: true, name: true, profile: { select: { logoUrl: true } } } as const;
 }
 
-function teamInfo(registration: NonNullable<TournamentFixture['homeRegistration']>) {
+function teamInfo(registration: NonNullable<NonNullable<TournamentFixture['tournamentDetails']>['homeRegistration']>) {
   return {
     // 로스터(V1TournamentPlayer)는 팀이 아니라 "이 대회의 등록"에 달려 있으므로, 개인 후기 대상 명단을
     // 뽑으려면 teamId가 아니라 registrationId가 필요하다.

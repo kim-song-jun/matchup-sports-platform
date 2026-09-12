@@ -538,7 +538,7 @@ export class ProfileService {
           officialAt: { not: null },
           // 공개 개인 기록과 같은 공식 게임 모집단. 팀매치를 빼면 개인 기록에는 3경기가
           // 보이는데 마이페이지 활동은 0회가 되어 같은 사용자의 두 화면이 모순된다.
-          game: { sourceType: { in: ['TOURNAMENT_FIXTURE', 'TEAM_MATCH'] } },
+          game: { sourceType: 'TEAM_MATCH' },
         },
       },
       select: {
@@ -550,9 +550,16 @@ export class ProfileService {
             game: {
               select: {
                 currentOfficialRevisionId: true,
-                // "몇 개 대회에 나갔나"를 세려면 경기 → 픽스처 → 대회 한 단계가 더 필요하다.
-                // 컬럼 하나(tournamentId)만 더 실을 뿐 행 수는 그대로다.
-                tournamentFixture: { select: { tournamentId: true } },
+                sourceType: true,
+                teamMatch: {
+                  select: {
+                    id: true,
+                    leagueId: true,
+                    tournamentId: true,
+                    tournament: { select: { kind: true } },
+                    tournamentDetails: { select: { teamMatchId: true, tournamentId: true } },
+                  },
+                },
               },
             },
           },
@@ -569,6 +576,7 @@ export class ProfileService {
       // sourceType과 officialAt은 위 where가 이미 걸렀다 -- 여기서는
       // where 로 표현할 수 없는 "현재 공식 리비전인가"(컬럼 대 컬럼 비교)만 본다.
       // officialAt 은 스키마상 nullable 이라 아래 비교를 위해 타입만 좁힌다.
+      if (revision.game.sourceType !== 'TEAM_MATCH') continue;
       const isCurrent = revision.game.currentOfficialRevisionId === revision.id;
       if (!isCurrent || revision.officialAt === null) continue;
 
@@ -576,10 +584,19 @@ export class ProfileService {
       totalGameIds.add(revision.gameId);
       if (isThisMonth) monthlyGameIds.add(revision.gameId);
 
-      const tournamentId = revision.game.tournamentFixture?.tournamentId ?? null;
-      if (tournamentId !== null) {
-        totalTournamentIds.add(tournamentId);
-        if (isThisMonth) monthlyTournamentIds.add(tournamentId);
+      const canonicalTeamMatch = revision.game.teamMatch;
+      const canonicalTournamentId = revision.game.sourceType === 'TEAM_MATCH'
+        && canonicalTeamMatch !== null
+        && canonicalTeamMatch.leagueId === null
+        && (canonicalTeamMatch.tournament?.kind === null || canonicalTeamMatch.tournament?.kind === 'regular_tournament')
+        && canonicalTeamMatch.tournamentDetails !== null
+        && canonicalTeamMatch.tournamentDetails.teamMatchId === canonicalTeamMatch.id
+        && canonicalTeamMatch.tournamentDetails.tournamentId === canonicalTeamMatch.tournamentId
+        ? canonicalTeamMatch.tournamentDetails.tournamentId
+        : null;
+      if (canonicalTournamentId !== null) {
+        totalTournamentIds.add(canonicalTournamentId);
+        if (isThisMonth) monthlyTournamentIds.add(canonicalTournamentId);
       }
     }
 

@@ -2,8 +2,8 @@ export const gameSchemaFixture = {
   gameId: '00000000-0000-4000-8000-000000000901',
   secondGameId: '00000000-0000-4000-8000-000000000902',
   teamMatchId: '00000000-0000-4000-8000-000000000911',
-  tournamentFixtureId: '00000000-0000-4000-8000-000000000912',
-  secondTournamentFixtureId: '00000000-0000-4000-8000-0000000009e1',
+  secondTeamMatchId: '00000000-0000-4000-8000-000000000912',
+  thirdTeamMatchId: '00000000-0000-4000-8000-0000000009e1',
   sportId: '00000000-0000-4000-8000-000000000913',
   regionId: '00000000-0000-4000-8000-000000000914',
   teamId: '00000000-0000-4000-8000-000000000915',
@@ -410,8 +410,7 @@ export const gameSchemaSourceManifest = {
   //   `V1TeamTacticsBoard`/`V1TeamTacticsBoardEntry` 신규, `V1LeagueSeries`·`V1Team` 에
   //   역참조 배열 한 줄씩.
   // - game domain 을 건드리나: **컬럼·제약은 건드리지 않는다.** 두 곳만 닿는다 —
-  //   `V1GameSourceType` 에 값 2개 추가(COMPETITION_FIXTURE·FRIENDLY_MATCH, 구 값
-  //   TEAM_MATCH·TOURNAMENT_FIXTURE 는 그대로 남는다. 개명이 아니라 추가다), 그리고
+  //   `V1GameSourceType` 에 값 2개 추가(COMPETITION_FIXTURE·FRIENDLY_MATCH), 그리고
   //   `V1Game`/`V1GameSide` 에 전술보드 역참조 필드 한 줄씩(테이블 형태 변화 없음).
   //   이 릴리스에는 새 enum 값을 읽거나 쓰는 코드가 없다 — 소스 승격은 R3 다.
   // - additive 인가: 그렇다. 새 컬럼은 전부 nullable(kind/entrySource 는 DEFAULT 로 기존
@@ -521,7 +520,10 @@ export const gameSchemaSourceManifest = {
   //
   // 이 값은 **`origin/dev` 를 흡수한 뒤의** schema.prisma 로 재계산했다(게이트와 같은 방식 —
   // CRLF→LF 정규화 후 sha256). 흡수 전 해시를 그대로 쓰면 병합 결과와 달라 그대로 다시 깨진다.
-  schema: '41cdf103464469263b69d7c60886078a6dce601e087bb8ca1ba3a407ad35759e',
+  // Task168 Stage A r5 retains the legacy physical contract for the compatible
+  // intermediate release while hiding retired Prisma surfaces with @ignore.
+  // schema.stage-a.prisma is the identical assertion copy; the migration is immutable.
+  schema: '91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 
@@ -571,7 +573,6 @@ export function gameData(overrides: Record<string, unknown> = {}) {
     id: gameSchemaFixture.gameId,
     sourceType: 'TEAM_MATCH' as const,
     teamMatchId: gameSchemaFixture.teamMatchId,
-    tournamentFixtureId: null,
     state: 'SCHEDULED' as const,
     version: 0,
     lastSequence: 0,

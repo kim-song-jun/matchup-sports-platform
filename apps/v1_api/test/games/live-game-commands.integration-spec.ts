@@ -22,6 +22,8 @@ const ids = {
   fixtureLive: '92000000-0000-4000-8000-000000000040',
   fixtureEnd: '92000000-0000-4000-8000-000000000041',
   fixtureRecovery: '92000000-0000-4000-8000-000000000042',
+  hostRegistration: '92000000-0000-4000-8000-000000000043',
+  opponentRegistration: '92000000-0000-4000-8000-000000000044',
 } as const;
 
 const prisma = new PrismaService();
@@ -78,7 +80,7 @@ describe('Task 20 live tournament commands, event validation, atomic result subm
     homeParticipantId: string;
   }> {
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: fixtureId,
       competitionConfigVersionId: configId,
       sides: [
@@ -150,19 +152,21 @@ describe('Task 20 live tournament commands, event validation, atomic result subm
     // (migration 20260729000200) maps only soccer/football/futsal and otherwise raises
     // COMPETITION_CONFIG_SPORT_UNSUPPORTED, which fires the moment a Tournament or TeamMatch is
     // created against this sport. Sibling game suites use the same shared code with a per-suite name.
-    await prisma.v1Sport.create({
-      data: { id: ids.sport, code: 'football', name: 'Task 20 Football' },
+    const sport = await prisma.v1Sport.upsert({
+      where: { code: 'football' },
+      create: { id: ids.sport, code: 'football', name: 'Task 20 Football' },
+      update: {},
     });
     await prisma.v1Region.create({
       data: { id: ids.region, code: 'TASK20_REGION', name: 'Task 20 Region', level: 1 },
     });
     await prisma.v1Team.createMany({
       data: [
-        { id: ids.hostTeam, ownerUserId: ids.director, sportId: ids.sport, regionId: ids.region, name: 'Task 20 Host' },
+        { id: ids.hostTeam, ownerUserId: ids.director, sportId: sport.id, regionId: ids.region, name: 'Task 20 Host' },
         {
           id: ids.opponentTeam,
           ownerUserId: ids.director,
-          sportId: ids.sport,
+          sportId: sport.id,
           regionId: ids.region,
           name: 'Task 20 Opponent',
         },
@@ -171,18 +175,41 @@ describe('Task 20 live tournament commands, event validation, atomic result subm
     await prisma.v1Tournament.create({
       data: {
         id: ids.tournament,
-        sportId: ids.sport,
+        sportId: sport.id,
         title: 'Task 20 tournament',
         competitionConfigVersionId: configId,
       },
     });
-    await prisma.v1TournamentFixture.createMany({
+    await prisma.v1TournamentRegistration.createMany({
+      data: [
+        { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.director, status: 'confirmed' },
+        { id: ids.opponentRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.director, status: 'confirmed' },
+      ],
+    });
+    await prisma.v1TeamMatch.createMany({
       data: [ids.fixtureLive, ids.fixtureEnd, ids.fixtureRecovery].map((id, index) => ({
         id,
         tournamentId: ids.tournament,
+        sportId: sport.id,
+        regionId: ids.region,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+        createdByUserId: ids.director,
+        title: `Task 20 canonical match ${index + 1}`,
+        placeName: `Task 20 field ${index + 1}`,
+        status: 'matched' as const,
+        startAt: new Date(`2030-01-01T1${index}:00:00.000Z`),
+        competitionConfigVersionId: configId,
+      })),
+    });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: [ids.fixtureLive, ids.fixtureEnd, ids.fixtureRecovery].map((id, index) => ({
+        teamMatchId: id,
+        tournamentId: ids.tournament,
         round: 'group',
         fixtureNumber: index + 1,
-        competitionConfigVersionId: configId,
+        homeRegistrationId: ids.hostRegistration,
+        awayRegistrationId: ids.opponentRegistration,
       })),
     });
     await prisma.v1TournamentStaffAssignment.create({
@@ -205,9 +232,10 @@ describe('Task 20 live tournament commands, event validation, atomic result subm
       });
       fieldOperatorAssignmentId = assignment.id;
       await tx.v1TournamentStaffFixtureScope.createMany({
-        data: [ids.fixtureLive, ids.fixtureEnd, ids.fixtureRecovery].map((fixtureId) => ({
+        data: [ids.fixtureLive, ids.fixtureEnd, ids.fixtureRecovery].map((teamMatchId) => ({
           assignmentId: assignment.id,
-          fixtureId,
+          tournamentId: ids.tournament,
+          teamMatchId,
         })),
       });
     });
@@ -711,16 +739,18 @@ describe('TEAM_MATCH sourced games allow lifecycle commands other than end, host
         onboardingStatus: 'completed',
       })),
     });
-    await prisma.v1Sport.create({
-      data: { id: tmIds.sport, code: 'futsal', name: 'T3 TEAM_MATCH Command Futsal' },
+    const sport = await prisma.v1Sport.upsert({
+      where: { code: 'futsal' },
+      create: { id: tmIds.sport, code: 'futsal', name: 'T3 TEAM_MATCH Command Futsal' },
+      update: {},
     });
     await prisma.v1Region.create({
       data: { id: tmIds.region, code: 'T3_TM_COMMAND_REGION', name: 'T3 TEAM_MATCH Command Region', level: 1 },
     });
     await prisma.v1Team.createMany({
       data: [
-        { id: tmIds.hostTeam, ownerUserId: tmIds.hostUser, sportId: tmIds.sport, regionId: tmIds.region, name: 'T3 TM Command Host' },
-        { id: tmIds.opponentTeam, ownerUserId: tmIds.opponentUser, sportId: tmIds.sport, regionId: tmIds.region, name: 'T3 TM Command Opponent' },
+        { id: tmIds.hostTeam, ownerUserId: tmIds.hostUser, sportId: sport.id, regionId: tmIds.region, name: 'T3 TM Command Host' },
+        { id: tmIds.opponentTeam, ownerUserId: tmIds.opponentUser, sportId: sport.id, regionId: tmIds.region, name: 'T3 TM Command Opponent' },
       ],
     });
     await prisma.v1TeamMembership.createMany({
@@ -734,7 +764,7 @@ describe('TEAM_MATCH sourced games allow lifecycle commands other than end, host
         id: tmIds.teamMatch,
         hostTeamId: tmIds.hostTeam,
         createdByUserId: tmIds.hostUser,
-        sportId: tmIds.sport,
+        sportId: sport.id,
         regionId: tmIds.region,
         title: 'T3 TEAM_MATCH command gate match',
         placeName: 'T3 futsal court',

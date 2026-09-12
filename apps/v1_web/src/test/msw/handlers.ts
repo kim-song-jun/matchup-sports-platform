@@ -220,6 +220,7 @@ let v1ScheduleFixture = {
   state: 'SCHEDULED' as 'SCHEDULED' | 'CANCELLED' | 'COMPLETED',
   version: 1,
   teamMatchId: null as string | null,
+  linkedMatch: null as { teamMatchId: string; tournamentId: string | null; leagueId: string | null } | null,
   matchConfirmed: null as boolean | null,
   cancelReason: null as string | null,
   cancelledAt: null as string | null,
@@ -278,6 +279,7 @@ function scheduleSummary() {
     state: v1ScheduleFixture.state,
     version: v1ScheduleFixture.version,
     teamMatchId: v1ScheduleFixture.teamMatchId,
+    linkedMatch: v1ScheduleFixture.linkedMatch,
     matchConfirmed: v1ScheduleFixture.matchConfirmed,
     goingCount: v1ScheduleAttendanceCounts.going,
     waitlistedCount: v1ScheduleAttendanceCounts.waitlisted,
@@ -341,7 +343,7 @@ let v1GameFixture = {
     { id: 'side-away-1', gameId: 'game-1', sideKey: 'AWAY' as const, teamId: 'team-2', displayNameSnapshot: '마포 FC' },
   ],
   periods: [] as unknown[],
-  lineups: [] as { id: string; gameId: string; sideId: string; revision: number; state: string; version: number; submittedAt: string | null; supersedesId: string | null }[],
+  lineups: [] as { id: string; gameId: string; sideId: string; revision: number; state: string; version: number; submittedAt: string | null; supersedesId: string | null; invalidatedAt: string | null }[],
   actorRole: 'team_owner',
 };
 
@@ -380,6 +382,7 @@ let v1TournamentOperationsBoardItems: V1TournamentOperationsBoardItem[] = [
     awayRegistrationId: 'registration-2',
     scheduledAt: '2026-05-25T09:00:00.000Z',
     currentScore: null,
+    currentRevisionState: null,
     warnings: [],
     version: 1,
     revisionId: null,

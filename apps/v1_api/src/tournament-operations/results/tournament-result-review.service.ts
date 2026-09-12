@@ -14,7 +14,6 @@ import {
   V1GameOutcomeReason,
   V1GameResultRevisionState,
   V1GameSourceType,
-  V1TournamentFixtureStatus,
 } from '@prisma/client';
 import {
   OperationAuditWriterService,
@@ -35,7 +34,17 @@ import {
   requiresDecisiveResult,
   type StoredPenalties,
 } from '../../games/core/knockout-penalties';
-import { readKnockoutFixtureFacts } from '../../tournaments/knockout-fixture';
+import { completeTeamMatchAtResultBoundary } from '../../games/team-match-result-boundary';
+import {
+  projectCanonicalAdvancement,
+  reprojectCanonicalAdvancement,
+  reverseCanonicalAdvancement,
+  assertCanonicalDownstreamScheduled,
+} from '../../game-operations/tournament-team-match-advancement';
+import type { OfficialRevisionRow, OfficialRevisionRowRaw } from '../../game-operations/game-result-official-projection.types';
+import { normalizeOfficialRevisionRow } from '../../game-operations/official-revision-row.normalizer';
+import { officialRevisionRowSelect } from '../../game-operations/official-revision-row.query';
+import { parseOfficialScore } from '../../game-operations/parse-official-score';
 import {
   assertGameCommandContext,
   assertRevisionSupersession,
@@ -71,7 +80,7 @@ type Transaction = Prisma.TransactionClient;
 type LockedTournamentGame = {
   id: string;
   sourceType: V1GameSourceType;
-  tournamentFixtureId: string | null;
+  teamMatchId: string | null;
   state: string;
   version: number;
   currentOfficialRevisionId: string | null;
@@ -486,6 +495,8 @@ export class TournamentResultReviewService {
             });
           }
         }
+        const previousOfficialRevisionId =
+          flow === 'CORRECTION' ? game.currentOfficialRevisionId : null;
         const officialized = await tx.v1GameResultRevision.update({
           where: { id: revision.id },
           data: { state: V1GameResultRevisionState.OFFICIAL, officialAt: new Date() },
@@ -495,21 +506,41 @@ export class TournamentResultReviewService {
           data: { version: { increment: 1 }, currentOfficialRevisionId: revision.id },
         });
         // `GameResultBracketProjectionService.project` gates advancement on
-        // the source fixture's own `status` being 'completed' -- that
-        // column defaults to 'scheduled' and, per
-        // docs/api/domains/tournament-operations.md, no other writer ever
-        // advances it once the Game model became authoritative. Officialize
-        // is this fixture's authoritative "result decided" moment, so the
-        // fixture is marked completed in the *same* transaction as the
-        // official pointer swap: the async bracket projection (dispatched
-        // via the outbox event below) then always observes a consistent,
-        // already-committed 'completed' status with no eventual-consistency
-        // gap. Idempotent on repeat officialize (e.g. a later correction).
-        if (game.tournamentFixtureId !== null) {
-          await tx.v1TournamentFixture.update({
-            where: { id: game.tournamentFixtureId },
-            data: { status: V1TournamentFixtureStatus.completed },
-          });
+        if (game.teamMatchId !== null) {
+          await completeTeamMatchAtResultBoundary(tx, game.teamMatchId, user.id, 'result_officialized');
+          const canonicalRevision = await this.loadOfficialRevisionRow(tx, officialized.id);
+          if (canonicalRevision !== null && canonicalRevision.tournamentTeamMatchId !== null) {
+            if (previousOfficialRevisionId !== null) {
+              const previousRevision = await this.loadOfficialRevisionRow(tx, previousOfficialRevisionId);
+              if (previousRevision !== null && previousRevision.tournamentTeamMatchId !== null) {
+                const previousState = await tx.v1GameResultRevision.findUnique({
+                  where: { id: previousOfficialRevisionId },
+                  select: { state: true },
+                });
+                if (previousState?.state === V1GameResultRevisionState.VOID) {
+                  await projectCanonicalAdvancement(
+                    tx,
+                    canonicalRevision,
+                    parseOfficialScore(canonicalRevision.score),
+                  );
+                } else {
+                  await reprojectCanonicalAdvancement(
+                    tx,
+                    canonicalRevision,
+                    parseOfficialScore(canonicalRevision.score),
+                    previousRevision,
+                    parseOfficialScore(previousRevision.score),
+                  );
+                }
+              }
+            } else {
+              await projectCanonicalAdvancement(
+                tx,
+                canonicalRevision,
+                parseOfficialScore(canonicalRevision.score),
+              );
+            }
+          }
         }
         await this.writeOutbox(
           tx,
@@ -577,8 +608,20 @@ export class TournamentResultReviewService {
             message: 'Only the current official revision can be voided',
           });
         }
-        if (game.tournamentFixtureId !== null) {
-          await this.assertNoLockedDownstreamFixture(tx, game.tournamentFixtureId);
+        const canonicalRevision = game.teamMatchId !== null
+          ? await this.loadOfficialRevisionRow(tx, revision.id)
+          : null;
+        if (canonicalRevision !== null && canonicalRevision.tournamentTeamMatchId !== null) {
+          await this.assertNoLockedDownstreamTeamMatch(tx, game.teamMatchId!);
+        }
+        if (game.teamMatchId !== null) {
+          if (canonicalRevision !== null && canonicalRevision.tournamentTeamMatchId !== null) {
+            await reverseCanonicalAdvancement(
+              tx,
+              canonicalRevision,
+              parseOfficialScore(revision.score),
+            );
+          }
         }
         const voidRevision = await tx.v1GameResultRevision.create({
           data: {
@@ -811,8 +854,6 @@ export class TournamentResultReviewService {
             select: {
               id: true,
               sourceType: true,
-              tournamentFixtureId: true,
-              // 리그 경기는 팀 매치 기반이라 대회 id 를 여기서 찾는다(resolve-game-source.ts).
               teamMatchId: true,
               state: true,
               version: true,
@@ -824,12 +865,14 @@ export class TournamentResultReviewService {
             throw this.notFound();
           }
           // **이 한 줄이 콘솔의 유일한 출처 경계다.** 다섯 개 공개 명령이 전부 이
-          // `withResultCommand` 를 지난다 — 예전엔 여기서 `sourceType !== TOURNAMENT_FIXTURE`
-          // 를 404 로 튕겨서 리그 경기가 콘솔에 아예 들어오지 못했고, 그래서 리그가 전용
-          // 결과 입력 모달을 따로 갖고 있어야 했다(정본 §4 가 "같은 콘솔" 로 확정).
+          // Every live review command uses the canonical TeamMatch resolver;
+          // regular-league TeamMatch games remain on this shared console path.
           const source = await resolveGameSource(tx, game);
           if (source === null) {
             throw this.notFound();
+          }
+          if (game.sourceType !== V1GameSourceType.TEAM_MATCH || game.teamMatchId === null) {
+            throw this.notFound('GAME_NOT_FOUND');
           }
           const principal = await this.staffAccess.assertAccess(
             {
@@ -838,14 +881,15 @@ export class TournamentResultReviewService {
               // 대회와 **같은 함수**를 지난다. 리그 거울엔 스태프 배정이 보통 없지만,
               // 플랫폼 관리자와 대회 운영자는 배정 없이도 통과하는 것이 원래 규칙이라
               // 그대로 성립한다 — 배정 없는 일반 사용자는 여전히 403 이다.
-              // ⚠️ 리그 경기는 `fixtureId` **키 자체를 뺀다.** `undefined` 를 담아 보내면
+              // ⚠️ 미정인 `fixtureId`/`fieldId`는 **키 자체를 뺀다.** `undefined` 를 담아 보내면
               // 정책 파서가 `hasOwn` 으로 "있다" 고 보고 값이 stable id 가 아니라며
               // 리소스 전체를 무효로 만든다 → 플랫폼 관리자까지 STAFF_SCOPE_DENIED
               // (실측: 이 한 줄 때문에 리그 경기가 권한에서 막혔다).
-              resource:
-                source.fixtureId === null
-                  ? { tournamentId: source.tournamentId }
-                  : { tournamentId: source.tournamentId, fixtureId: source.fixtureId },
+              resource: {
+                tournamentId: source.tournamentId,
+                ...(source.fixtureId === null ? {} : { fixtureId: source.fixtureId }),
+                ...(source.fieldId === null ? {} : { fieldId: source.fieldId }),
+              },
             },
             tx,
           );
@@ -855,13 +899,14 @@ export class TournamentResultReviewService {
             role: principal.role,
             tournamentId: source.tournamentId,
             ...(source.fixtureId === null ? {} : { fixtureId: source.fixtureId }),
+            ...(source.fieldId === null ? {} : { fieldId: source.fieldId }),
             authorizationSubject: principal.authorizationSubject,
           };
           const payloadHash = canonicalGameCommandPayloadHash(input.payload);
           const context = this.assertCommandContext({
             actor,
             expectedVersion: input.expectedVersion,
-            currentVersion: game.version,
+            currentVersion: input.expectedVersion,
             headerIdempotencyKey: input.headerIdempotencyKey ?? '',
             bodyClientCommandId: input.bodyCommandId,
             payloadHash,
@@ -895,7 +940,7 @@ export class TournamentResultReviewService {
                   directorOfficializeFlag,
                 },
                 tournamentId: source.tournamentId,
-                fixtureId: source.fixtureId,
+                teamMatchId: game.teamMatchId,
               };
               throw new ForbiddenException({
                 code: 'DIRECTOR_OFFICIALIZE_DISABLED',
@@ -927,6 +972,14 @@ export class TournamentResultReviewService {
           if (decision.kind === 'REPLAY') {
             return { ...decision.responseBody, replayed: true };
           }
+          this.assertCommandContext({
+            actor,
+            expectedVersion: input.expectedVersion,
+            currentVersion: game.version,
+            headerIdempotencyKey: input.headerIdempotencyKey ?? '',
+            bodyClientCommandId: input.bodyCommandId,
+            payloadHash,
+          });
           const response = await mutate(tx, game, context);
           await tx.v1IdempotencyRecord.create({
             data: {
@@ -959,7 +1012,7 @@ export class TournamentResultReviewService {
               ...(directorOfficializeFlag === null ? {} : { directorOfficializeFlag }),
             },
             tournamentId: source.tournamentId,
-            fixtureId: source.fixtureId,
+            teamMatchId: game.teamMatchId,
           });
           return { ...response, replayed: false };
         },
@@ -971,6 +1024,9 @@ export class TournamentResultReviewService {
         // so this write uses `this.prisma` directly (a fresh statement, not
         // `tx`) and is the *only* place the denial audit is ever persisted.
         await this.auditWriter.create(this.prisma, deniedAuditInput);
+      }
+      if (error instanceof Error && error.message.startsWith('BRACKET_')) {
+        throw new ConflictException({ code: 'NEXT_FIXTURE_CONFLICT', message: '다음 경기의 상태 또는 팀 배정을 확인해 주세요.' });
       }
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -1068,6 +1124,19 @@ export class TournamentResultReviewService {
    * the same command transaction instead of the async projection worker,
    * because reject/request_supplement/void never emit GAME_RESULT_OFFICIAL.
    */
+  private async loadOfficialRevisionRow(
+    tx: Transaction,
+    revisionId: string,
+  ): Promise<OfficialRevisionRow | null> {
+    const rows = await tx.$queryRaw<Array<Omit<OfficialRevisionRowRaw, 'officialAt'> & { officialAt: Date | null }>>`
+      ${officialRevisionRowSelect()}
+      WHERE revision.id = ${revisionId}
+    `;
+    const row = rows[0];
+    if (row === undefined || row.officialAt === null) return null;
+    return normalizeOfficialRevisionRow({ ...row, officialAt: row.officialAt });
+  }
+
   private async closeReviewSla(tx: Transaction, revisionId: string, reason: string): Promise<void> {
     await tx.$executeRaw`
       UPDATE v1_result_escalations
@@ -1093,33 +1162,20 @@ export class TournamentResultReviewService {
   }
 
   /**
-   * Blocks voiding the current official revision of a tournament fixture
-   * whose bracket advancement already reached a downstream fixture that is
-   * no longer 'scheduled' -- un-advancing a team that is already
-   * live/finished downstream is not safe. Locks every candidate target row
-   * so a concurrent advancement cannot race past this check.
+   * Canonical tournament TeamMatches use Details and TeamMatch advancement
+   * edges. Locking the target TeamMatch, Details, and game in stable id order
+   * makes confirm/correction/void fail synchronously if the next match has
+   * already started or completed; league-only TeamMatches have no Details and
+   * therefore have no downstream bracket to gate.
    */
-  private async assertNoLockedDownstreamFixture(tx: Transaction, sourceFixtureId: string): Promise<void> {
-    const edges = await tx.v1TournamentFixtureAdvancementEdge.findMany({
-      where: { sourceFixtureId },
-      select: { targetFixtureId: true },
-    });
-    if (edges.length === 0) {
-      return;
-    }
-    const targetIds = [...new Set(edges.map((edge) => edge.targetFixtureId))].sort();
-    const targets = await tx.$queryRaw<Array<{ id: string; status: string }>>`
-      SELECT id, status::text AS status
-      FROM v1_tournament_fixtures
-      WHERE id IN (${Prisma.join(targetIds)})
-      ORDER BY id ASC
-      FOR UPDATE
-    `;
-    if (targets.some((target) => target.status !== 'scheduled')) {
-      throw new ConflictException({
-        code: 'NEXT_FIXTURE_CONFLICT',
-        message: 'A downstream bracket fixture already advanced past scheduled',
-      });
+  private async assertNoLockedDownstreamTeamMatch(tx: Transaction, sourceTeamMatchId: string): Promise<void> {
+    try {
+      await assertCanonicalDownstreamScheduled(tx, sourceTeamMatchId);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('BRACKET_')) {
+        throw new ConflictException({ code: 'NEXT_FIXTURE_CONFLICT', message: '다음 경기의 상태 또는 팀 배정을 확인해 주세요.' });
+      }
+      throw error;
     }
   }
 
@@ -1180,7 +1236,10 @@ export class TournamentResultReviewService {
     if (!needsKnockoutFixtureFacts(regulation, submitted)) {
       return regulation;
     }
-    const facts = await readKnockoutFixtureFacts(tx, game.tournamentFixtureId);
+    if (game.teamMatchId === null) {
+      throw this.notFound('GAME_NOT_FOUND');
+    }
+    const facts = await this.readTeamMatchKnockoutFacts(tx, game.teamMatchId);
     if (submitted !== undefined) {
       // 클라이언트가 킥 수·우회 표식을 빠뜨렸으면 **base 에서 메운다.** 정정 폼에는
       // 승부차기 입력란이 아예 없어(2026-08-18 실측: 폼 필드 186개 중 0개) 폼이 보내는
@@ -1240,6 +1299,25 @@ export class TournamentResultReviewService {
     // 해결 불가한 무승부로 거부된다(`assertBracketResolvable`의 동점 분기).
     assertBracketResolvable({ ...regulation, penalties: carried }, facts);
     return assertPenaltiesNotAllowed(regulation, carried, facts);
+  }
+
+  /** Canonical tournament bracket facts live on Details, not the legacy fixture. */
+  private async readTeamMatchKnockoutFacts(
+    tx: Transaction,
+    teamMatchId: string,
+  ): Promise<{ isKnockoutFixture: boolean; hasAdvancementEdges: boolean }> {
+    const details = await tx.v1TournamentMatchDetails.findUnique({
+      where: { teamMatchId },
+      select: {
+        group: { select: { phase: true } },
+        _count: { select: { advancementSources: true } },
+      },
+    });
+    return {
+      isKnockoutFixture:
+        details?.group !== null && details?.group !== undefined && details.group.phase !== 'group',
+      hasAdvancementEdges: (details?._count.advancementSources ?? 0) > 0,
+    };
   }
 
   private async assertStoredPenaltiesPersistable(
@@ -1501,9 +1579,8 @@ export class TournamentResultReviewService {
 
   /**
    * Reads the same inputs `GamesService.resultInvariantInput` reads for a
-   * team match, but keyed on the TOURNAMENT scorer policy column
-   * (`tournamentScorerPolicy`) instead of `teamMatchScorerPolicy`, since
-   * every game this lane ever touches is `TOURNAMENT_FIXTURE`-sourced.
+   * canonical TeamMatch, but keyed on the tournament scorer policy column
+   * (`tournamentScorerPolicy`) instead of `teamMatchScorerPolicy`.
    */
   private async resultInvariantInput(
     tx: Transaction,
@@ -1554,11 +1631,8 @@ export class TournamentResultReviewService {
       ...(participant.minutesPlayed === undefined ? {} : { minutesPlayed: participant.minutesPlayed }),
     }));
     return {
-      // Task 17이 GameResultInvariantInput에 sourceType을 필수로 추가했다
-      // (TEAM_MATCH는 자체 보고라 이벤트-스코어 교차검증에서 면제,
-      // TOURNAMENT_FIXTURE는 엄격 검증 유지 — game-invariants.ts 참조).
-      // 이 레인은 위 docblock대로 항상 TOURNAMENT_FIXTURE지만, 하드코딩 대신
-      // 잠근 게임의 실제 값을 넘겨 704행의 sourceType 가드와 단일 출처를 유지한다.
+      // The invariant layer uses the locked canonical source type directly;
+      // no legacy fixture source is admitted by withResultCommand.
       sourceType: game.sourceType,
       score: dto.score,
       sides: sides.map((side) => ({ id: side.id, sideKey: side.sideKey })),

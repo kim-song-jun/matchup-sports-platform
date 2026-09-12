@@ -94,7 +94,7 @@ describe('[P1-c] 라인업 미제출 상태에서도 대회 경기를 시작할 
       ],
     });
     await prisma.v1Tournament.create({
-      data: { id: ids.tournament, sportId: ids.sport, title: 'P1c tournament' },
+      data: { id: ids.tournament, sportId: ids.sport, title: 'P1c tournament', competitionConfigVersionId: config.id },
     });
     await prisma.v1TournamentRegistration.createMany({
       data: [
@@ -114,13 +114,26 @@ describe('[P1-c] 라인업 미제출 상태에서도 대회 경기를 시작할 
         },
       ],
     });
-    await prisma.v1TournamentFixture.create({
+    await prisma.v1TeamMatch.create({
       data: {
         id: ids.fixture,
         tournamentId: ids.tournament,
+        sportId: ids.sport,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.awayTeam,
+        title: 'P1c start match',
+        status: 'matched',
+        startAt: new Date(Date.now() - 60_000),
+        competitionConfigVersionId: config.id,
+      },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: ids.fixture,
+        tournamentId: ids.tournament,
         round: 'group',
         fixtureNumber: 1,
-        competitionConfigVersionId: config.id,
+        legNumber: 1,
         homeRegistrationId: ids.hostRegistration,
         awayRegistrationId: ids.awayRegistration,
       },
@@ -129,7 +142,7 @@ describe('[P1-c] 라인업 미제출 상태에서도 대회 경기를 시작할 
     // 경기 생성 시 참가자를 함께 넣는다 — 실제 대회 경로가 등록 명단을 이렇게 싣는다
     // (tournament-bracket.service.ts). **라인업 저장·제출은 일부러 하지 않는다.**
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: config.id,
       sides: [

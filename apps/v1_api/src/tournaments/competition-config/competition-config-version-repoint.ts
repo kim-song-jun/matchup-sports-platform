@@ -1,5 +1,7 @@
 import { AdminContextService } from '../../common/admin-context.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+import { computePeriodCount } from '../../games/games.service';
 import { V1AuthUser } from '../../auth/v1-auth-user';
 import {
   CompetitionConfig,
@@ -12,7 +14,7 @@ import {
   FUTSAL_COMPETITION_CONFIG_ID,
 } from './competition-config-backfill';
 import { CompetitionConfigRegistry } from './competition-config-registry';
-import { TournamentCompetitionConfig } from './tournament-competition-config';
+import { mutableTeamMatchRepointWhere, TournamentCompetitionConfig } from './tournament-competition-config';
 import { FOOTBALL_V1_CONFIG, FUTSAL_V1_CONFIG } from './competition-config.presets';
 import { findTournamentOnSurface, ALL_COMPETITION_KINDS } from '../tournament-surface-lookup';
 
@@ -187,9 +189,7 @@ async function findRepointTargets(
       where: { competitionConfigVersionId: { in: staleVersionIds }, deletedAt: null },
       select: { id: true },
     }),
-    prisma.v1TeamMatch.count({
-      where: { competitionConfigVersionId: { in: staleVersionIds }, status: { not: 'completed' } },
-    }),
+    prisma.v1TeamMatch.count({ where: mutableTeamMatchRepointWhere(staleVersionIds) }),
   ]);
   return { staleVersionIds, tournamentIds: tournaments.map((t) => t.id), teamMatchCandidateCount };
 }
@@ -350,6 +350,7 @@ async function processSeed(
   // re-fetch below. Counted rather than silently dropped so a run that repoints
   // fewer rows than it planned says why.
   let skippedDeletedTournaments = 0;
+  let teamMatchesRepointedByTournamentChange = 0;
   for (const tournamentId of tournamentIds) {
     // Re-fetch immediately before mutating to minimize the optimistic-lock
     // race window between the read above and this call — change() itself
@@ -377,23 +378,93 @@ async function processSeed(
       competitionConfigVersionId: targetVersionId,
       expectedVersion: fresh.updatedAt.toISOString(),
     };
-    const preview = await tournamentCompetitionConfig.change(actor, tournamentId, request);
+    const preview = await tournamentCompetitionConfig.changeForInternalRepoint(actor, tournamentId, request);
+    let appliedChange = preview;
     if (preview.confirmationRequired) {
-      await tournamentCompetitionConfig.change(actor, tournamentId, {
+      appliedChange = await tournamentCompetitionConfig.changeForInternalRepoint(actor, tournamentId, {
         ...request,
         confirmRecalculation: true,
         previewHash: preview.previewHash,
       });
     }
+    teamMatchesRepointedByTournamentChange += appliedChange.teamMatchesRepointed;
     tournamentsRepointed += 1;
   }
 
+  // Tournament and regular-league-owned matches were repointed through their
+  // locked CAS calls above. This transaction is deliberately standalone-only;
+  // it cannot become a broad stale-pin cleanup path.
   const teamMatchesRepointed = await prisma.$transaction(async (tx) => {
+    const mutableWhere = mutableTeamMatchRepointWhere(staleVersionIds);
+    const existingMutableConditions = Array.isArray(mutableWhere.AND)
+      ? mutableWhere.AND
+      : mutableWhere.AND
+        ? [mutableWhere.AND]
+        : [];
+    const standaloneWhere: Prisma.V1TeamMatchWhereInput = {
+      ...mutableWhere,
+      AND: [
+        ...existingMutableConditions,
+        { tournamentId: null, leagueId: null, tournamentDetails: { is: null } },
+      ],
+    };
+    // Standalone rows do not pass through TournamentCompetitionConfig.change.
+    // Lock Game first and TeamMatch second, then re-read the same safe
+    // predicate in this transaction before changing either pin.
+    await tx.$queryRaw`SELECT g.id
+      FROM v1_games g
+      JOIN v1_team_matches tm ON tm.id = g.team_match_id
+      WHERE tm.tournament_id IS NULL AND tm.league_id IS NULL
+        AND NOT EXISTS (SELECT 1 FROM v1_tournament_match_details d WHERE d.team_match_id = tm.id)
+        AND g.source_type = 'TEAM_MATCH' AND g.state = 'SCHEDULED'
+        AND NOT EXISTS (SELECT 1 FROM v1_game_lineups l WHERE l.game_id = g.id)
+        AND NOT EXISTS (SELECT 1 FROM v1_game_events e WHERE e.game_id = g.id)
+        AND NOT EXISTS (SELECT 1 FROM v1_game_result_revisions r WHERE r.game_id = g.id)
+      ORDER BY g.id FOR UPDATE OF g`;
+    await tx.$queryRaw`SELECT tm.id
+      FROM v1_team_matches tm
+      WHERE tm.tournament_id IS NULL AND tm.league_id IS NULL
+        AND NOT EXISTS (SELECT 1 FROM v1_tournament_match_details d WHERE d.team_match_id = tm.id)
+      ORDER BY tm.id FOR UPDATE OF tm`;
+    const standaloneRows = await tx.v1TeamMatch.findMany({
+      where: standaloneWhere,
+      select: {
+        id: true,
+        game: { select: { id: true, periods: { select: { id: true, number: true }, orderBy: { number: 'asc' } } } },
+      },
+    });
     const updated = await tx.v1TeamMatch.updateMany({
-      where: { competitionConfigVersionId: { in: staleVersionIds }, status: { not: 'completed' } },
+      where: { id: { in: standaloneRows.map((row) => row.id) } },
       data: { competitionConfigVersionId: targetVersionId },
     });
-    if (published || tournamentsRepointed > 0 || updated.count > 0) {
+    const standaloneGameIds = standaloneRows.flatMap((row) => row.game ? [row.game.id] : []);
+    if (standaloneGameIds.length > 0) {
+      await tx.v1Game.updateMany({
+        where: { id: { in: standaloneGameIds }, competitionConfigVersionId: { in: staleVersionIds } },
+        data: { competitionConfigVersionId: targetVersionId },
+      });
+      const targetConfig = await tx.v1CompetitionConfigVersion.findUniqueOrThrow({
+        where: { id: targetVersionId },
+        select: { periods: true },
+      });
+      const desiredPeriodCount = computePeriodCount(targetConfig.periods);
+      for (const row of standaloneRows) {
+        if (!row.game) continue;
+        const periods = row.game.periods;
+        if (periods.length < desiredPeriodCount) {
+          const existingNumbers = new Set(periods.map((period) => period.number));
+          await tx.v1GamePeriod.createMany({
+            data: Array.from({ length: desiredPeriodCount }, (_, index) => index + 1)
+              .filter((number) => !existingNumbers.has(number))
+              .map((number) => ({ gameId: row.game!.id, number })),
+          });
+        } else if (periods.length > desiredPeriodCount) {
+          await tx.v1GamePeriod.deleteMany({ where: { gameId: row.game.id, number: { gt: desiredPeriodCount } } });
+        }
+      }
+    }
+    const totalTeamMatchesRepointed = teamMatchesRepointedByTournamentChange + updated.count;
+    if (published || tournamentsRepointed > 0 || totalTeamMatchesRepointed > 0) {
       await adminContext.logAdminAction(
         admin,
         {
@@ -406,13 +477,13 @@ async function processSeed(
             newVersion: targetVersion,
             published,
             tournamentsRepointed,
-            teamMatchesRepointed: updated.count,
+            teamMatchesRepointed: totalTeamMatchesRepointed,
           },
         },
         tx,
       );
     }
-    return updated.count;
+    return totalTeamMatchesRepointed;
   });
 
   return {

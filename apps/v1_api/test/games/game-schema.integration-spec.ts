@@ -69,15 +69,16 @@ async function insertConfig(id: string) {
   `;
 }
 
-async function insertGame(id: string, sourceType: 'TEAM_MATCH' | 'TOURNAMENT_FIXTURE', configId = gameSchemaFixture.configId) {
-  const sourceColumns = sourceType === 'TEAM_MATCH'
-    ? { teamMatchId: gameSchemaFixture.teamMatchId, tournamentFixtureId: null }
-    : { teamMatchId: null, tournamentFixtureId: gameSchemaFixture.tournamentFixtureId };
+async function insertGame(
+  id: string,
+  configId: string = gameSchemaFixture.configId,
+  teamMatchId: string = gameSchemaFixture.teamMatchId,
+) {
   await prisma.$executeRaw`
     INSERT INTO v1_games
-      (id, source_type, team_match_id, tournament_fixture_id, state, version, last_sequence, competition_config_version_id, created_at, updated_at)
+      (id, source_type, team_match_id, state, version, last_sequence, competition_config_version_id, created_at, updated_at)
     VALUES
-      (${id}, ${sourceType}::"V1GameSourceType", ${sourceColumns.teamMatchId}, ${sourceColumns.tournamentFixtureId}, 'SCHEDULED', 0, 0, ${configId}, ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
+      (${id}, 'TEAM_MATCH'::"V1GameSourceType", ${teamMatchId}, 'SCHEDULED', 0, 0, ${configId}, ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
   `;
 }
 
@@ -108,13 +109,6 @@ describe('v1 game operations schema', () => {
       ON CONFLICT (id) DO NOTHING
     `;
     await prisma.$executeRaw`
-      INSERT INTO v1_team_matches
-        (id, host_team_id, created_by_user_id, sport_id, region_id, title, place_name, start_at, created_at, updated_at)
-      VALUES
-        (${gameSchemaFixture.teamMatchId}, ${gameSchemaFixture.teamId}, ${gameSchemaFixture.userId}, ${gameSchemaFixture.sportId}, ${gameSchemaFixture.regionId}, 'Game schema match', 'Game schema venue', ${gameSchemaFixture.now}, ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
-      ON CONFLICT (id) DO NOTHING
-    `;
-    await prisma.$executeRaw`
       INSERT INTO v1_tournaments (id, sport_id, title, created_at, updated_at)
       VALUES (${gameSchemaFixture.tournamentId}, ${gameSchemaFixture.sportId}, 'Game schema tournament', ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
       ON CONFLICT (id) DO NOTHING
@@ -125,16 +119,22 @@ describe('v1 game operations schema', () => {
       ON CONFLICT (id) DO NOTHING
     `;
     await prisma.$executeRaw`
-      INSERT INTO v1_tournament_fixtures
-        (id, tournament_id, round, fixture_number, created_at, updated_at)
-      VALUES (${gameSchemaFixture.tournamentFixtureId}, ${gameSchemaFixture.tournamentId}, 'group', 1, ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
+      INSERT INTO v1_team_matches
+        (id, host_team_id, created_by_user_id, sport_id, region_id, tournament_id, title, place_name, start_at, created_at, updated_at)
+      VALUES
+        (${gameSchemaFixture.teamMatchId}, ${gameSchemaFixture.teamId}, ${gameSchemaFixture.userId}, ${gameSchemaFixture.sportId}, ${gameSchemaFixture.regionId}, ${gameSchemaFixture.tournamentId}, 'Game schema match', 'Game schema venue', ${gameSchemaFixture.now}, ${gameSchemaFixture.now}, ${gameSchemaFixture.now}),
+        (${gameSchemaFixture.secondTeamMatchId}, ${gameSchemaFixture.teamId}, ${gameSchemaFixture.userId}, ${gameSchemaFixture.sportId}, ${gameSchemaFixture.regionId}, ${gameSchemaFixture.tournamentId}, 'Game schema second match', 'Game schema venue', ${gameSchemaFixture.now}, ${gameSchemaFixture.now}, ${gameSchemaFixture.now}),
+        (${gameSchemaFixture.thirdTeamMatchId}, ${gameSchemaFixture.teamId}, ${gameSchemaFixture.userId}, ${gameSchemaFixture.sportId}, ${gameSchemaFixture.regionId}, ${gameSchemaFixture.secondTournamentId}, 'Game schema third match', 'Game schema venue', ${gameSchemaFixture.now}, ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
       ON CONFLICT (id) DO NOTHING
     `;
     await prisma.$executeRaw`
-      INSERT INTO v1_tournament_fixtures
-        (id, tournament_id, round, fixture_number, created_at, updated_at)
-      VALUES (${gameSchemaFixture.secondTournamentFixtureId}, ${gameSchemaFixture.secondTournamentId}, 'group', 1, ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
-      ON CONFLICT (id) DO NOTHING
+      INSERT INTO v1_tournament_match_details
+        (team_match_id, tournament_id, round, fixture_number, created_at, updated_at)
+      VALUES
+        (${gameSchemaFixture.teamMatchId}, ${gameSchemaFixture.tournamentId}, 'group', 1, ${gameSchemaFixture.now}, ${gameSchemaFixture.now}),
+        (${gameSchemaFixture.secondTeamMatchId}, ${gameSchemaFixture.tournamentId}, 'group', 2, ${gameSchemaFixture.now}, ${gameSchemaFixture.now}),
+        (${gameSchemaFixture.thirdTeamMatchId}, ${gameSchemaFixture.secondTournamentId}, 'group', 1, ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
+      ON CONFLICT (team_match_id) DO NOTHING
     `;
     await insertConfig(gameSchemaFixture.configId);
     await insertConfig(gameSchemaFixture.secondConfigId);
@@ -179,6 +179,7 @@ describe('v1 game operations schema', () => {
       'v1_game_operation_flags',
       'v1_game_cutover_epochs',
       'v1_operation_audits',
+      'v1_tournament_match_details',
     ];
     expect(required.filter((name) => !names.has(name))).toEqual([]);
 
@@ -187,42 +188,44 @@ describe('v1 game operations schema', () => {
       FROM information_schema.table_constraints
       WHERE constraint_schema = 'public'
         AND constraint_name IN (
-          'v1_games_source_exactly_one_ck',
+          'v1_games_canonical_source_guard_ck',
           'v1_games_current_revision_fk',
           'v1_result_revisions_supersedes_fk',
           'v1_staff_field_fk',
-          'v1_staff_scope_fixture_fk'
+          'v1_staff_scope_team_match_fk',
+          'v1_tournament_match_details_team_match_fk'
         )
     `;
     expect(new Set(constraints.map((row) => row.constraint_name))).toEqual(
       new Set([
-        'v1_games_source_exactly_one_ck',
+        'v1_games_canonical_source_guard_ck',
         'v1_games_current_revision_fk',
         'v1_result_revisions_supersedes_fk',
         'v1_staff_field_fk',
-        'v1_staff_scope_fixture_fk',
+        'v1_staff_scope_team_match_fk',
+        'v1_tournament_match_details_team_match_fk',
       ]),
     );
   });
 
-  it('rejects a game with zero or two source adapters at the database boundary', async () => {
+  it('rejects a game without its canonical TeamMatch source at the database boundary', async () => {
     expectRawFailure(await captureRawFailure(() => prisma.$executeRaw`
       INSERT INTO v1_games
         (id, source_type, state, version, last_sequence, competition_config_version_id, created_at, updated_at)
       VALUES
         (${gameSchemaFixture.gameId}, 'TEAM_MATCH', 'SCHEDULED', 0, 0, ${gameSchemaFixture.configId}, ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
-    `), '23514', 'v1_games_source_exactly_one_ck');
+    `), '23514', 'v1_games_source_expand_ck');
 
     expectRawFailure(await captureRawFailure(() => prisma.$executeRaw`
       INSERT INTO v1_games
-        (id, source_type, team_match_id, tournament_fixture_id, state, version, last_sequence, competition_config_version_id, created_at, updated_at)
+        (id, source_type, team_match_id, state, version, last_sequence, competition_config_version_id, created_at, updated_at)
         VALUES
-        (${gameSchemaFixture.secondGameId}, 'TEAM_MATCH', ${gameSchemaFixture.teamMatchId}, ${gameSchemaFixture.tournamentFixtureId}, 'SCHEDULED', 0, 0, ${gameSchemaFixture.configId}, ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
-    `), '23514', 'v1_games_source_exactly_one_ck');
+        (${gameSchemaFixture.secondGameId}, 'FRIENDLY_MATCH', ${gameSchemaFixture.teamMatchId}, 'SCHEDULED', 0, 0, ${gameSchemaFixture.configId}, ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
+    `), '23514', 'v1_games_source_expand_ck');
   });
 
-  it('keeps game source adapters nullable and unique for soft-deleted source records', async () => {
-    await insertGame(gameSchemaFixture.gameId, 'TEAM_MATCH');
+  it('keeps the canonical TeamMatch binding nullable and unique for soft-deleted source records', async () => {
+    await insertGame(gameSchemaFixture.gameId);
     await prisma.$executeRaw`UPDATE v1_team_matches SET deleted_at = ${gameSchemaFixture.now} WHERE id = ${gameSchemaFixture.teamMatchId}`;
     const survivingGame = await prisma.$queryRaw<Array<{ id: string }>>`SELECT id FROM v1_games WHERE id = ${gameSchemaFixture.gameId}`;
     expect(survivingGame).toEqual([{ id: gameSchemaFixture.gameId }]);
@@ -233,10 +236,10 @@ describe('v1 game operations schema', () => {
       FROM information_schema.columns
       WHERE table_schema = 'public'
         AND table_name = 'v1_games'
-        AND column_name IN ('team_match_id', 'tournament_fixture_id')
+      AND column_name = 'team_match_id'
       ORDER BY column_name
     `;
-    expect(sourceAdapterColumns).toHaveLength(2);
+    expect(sourceAdapterColumns).toHaveLength(1);
     expect(sourceAdapterColumns.every((column) => column.is_nullable === 'YES')).toBe(true);
 
     const sourceConfigPins = await prisma.$queryRaw<Array<{ table_name: string; column_name: string; is_nullable: string }>>`
@@ -244,7 +247,7 @@ describe('v1 game operations schema', () => {
       FROM information_schema.columns
       WHERE table_schema = 'public'
         AND column_name = 'competition_config_version_id'
-        AND table_name IN ('v1_team_matches', 'v1_tournament_fixtures')
+        AND table_name = 'v1_team_matches'
       ORDER BY table_name
     `;
     // Nullable, not 'NO', until the deferred contract-phase migration adds
@@ -256,7 +259,6 @@ describe('v1 game operations schema', () => {
     // tables' pinned copies.
     expect(sourceConfigPins).toEqual([
       { table_name: 'v1_team_matches', column_name: 'competition_config_version_id', is_nullable: 'YES' },
-      { table_name: 'v1_tournament_fixtures', column_name: 'competition_config_version_id', is_nullable: 'YES' },
     ]);
 
     const uniqueIndexes = await prisma.$queryRaw<Array<{ indexname: string }>>`
@@ -265,7 +267,7 @@ describe('v1 game operations schema', () => {
       WHERE schemaname = 'public'
         AND tablename IN ('v1_games', 'v1_game_events', 'v1_outbox_events')
         AND indexname IN (
-          'v1_games_team_match_id_key', 'v1_games_tournament_fixture_id_key',
+          'v1_games_team_match_id_key',
           'v1_game_events_game_client_event_key', 'v1_game_events_reverses_event_id_key',
           'v1_outbox_events_business_key_key'
         )
@@ -273,7 +275,6 @@ describe('v1 game operations schema', () => {
     expect(new Set(uniqueIndexes.map((index) => index.indexname))).toEqual(
       new Set([
         'v1_games_team_match_id_key',
-        'v1_games_tournament_fixture_id_key',
         'v1_game_events_game_client_event_key',
         'v1_game_events_reverses_event_id_key',
         'v1_outbox_events_business_key_key',
@@ -282,8 +283,8 @@ describe('v1 game operations schema', () => {
   });
 
   it('rejects duplicate event identity, sequence, and self or cross-game reversal', async () => {
-    await insertGame(gameSchemaFixture.gameId, 'TEAM_MATCH');
-    await insertGame(gameSchemaFixture.secondGameId, 'TOURNAMENT_FIXTURE');
+    await insertGame(gameSchemaFixture.gameId);
+    await insertGame(gameSchemaFixture.secondGameId, gameSchemaFixture.secondConfigId, gameSchemaFixture.secondTeamMatchId);
     const eventId = '00000000-0000-4000-8000-0000000009c1';
     await prisma.$executeRaw`
       INSERT INTO v1_game_events
@@ -315,8 +316,8 @@ describe('v1 game operations schema', () => {
   });
 
   it('rejects cross-game revision pointers and freezes submitted and terminal revisions', async () => {
-    await insertGame(gameSchemaFixture.gameId, 'TEAM_MATCH');
-    await insertGame(gameSchemaFixture.secondGameId, 'TOURNAMENT_FIXTURE');
+    await insertGame(gameSchemaFixture.gameId);
+    await insertGame(gameSchemaFixture.secondGameId, gameSchemaFixture.secondConfigId, gameSchemaFixture.secondTeamMatchId);
     await prisma.$executeRaw`
       INSERT INTO v1_game_result_revisions
         (id, game_id, revision, state, score, events_hash, created_by_actor_type, created_by_user_id, created_at, updated_at)
@@ -367,15 +368,15 @@ describe('v1 game operations schema', () => {
         VALUES (${assignmentId}, ${gameSchemaFixture.tournamentId}, ${gameSchemaFixture.userId}, 'FIELD_OPERATOR', ${gameSchemaFixture.userId}, ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
       `;
       await tx.$executeRaw`
-        INSERT INTO v1_tournament_staff_fixture_scopes (id, assignment_id, fixture_id, created_at)
-        VALUES ('00000000-0000-4000-8000-0000000009ca', ${assignmentId}, ${gameSchemaFixture.tournamentFixtureId}, ${gameSchemaFixture.now})
+        INSERT INTO v1_tournament_staff_fixture_scopes (id, assignment_id, tournament_id, team_match_id, created_at)
+        VALUES ('00000000-0000-4000-8000-0000000009ca', ${assignmentId}, ${gameSchemaFixture.tournamentId}, ${gameSchemaFixture.secondTeamMatchId}, ${gameSchemaFixture.now})
       `;
     });
     expectRawFailure(await captureRawFailure(() => prisma.$executeRaw`
       UPDATE v1_tournament_staff_fixture_scopes
-      SET fixture_id = ${gameSchemaFixture.secondTournamentFixtureId}
+      SET team_match_id = ${gameSchemaFixture.thirdTeamMatchId}
       WHERE assignment_id = ${assignmentId}
-    `), '23514', 'staff fixture scope must stay within tournament');
+    `), '23503', 'v1_staff_scope_team_match_fk');
     expectRawFailure(await captureRawFailure(() => prisma.$executeRaw`
       DELETE FROM v1_tournament_staff_fixture_scopes WHERE assignment_id = ${assignmentId}
     `), '23514', 'field operator requires a field or fixture scope');

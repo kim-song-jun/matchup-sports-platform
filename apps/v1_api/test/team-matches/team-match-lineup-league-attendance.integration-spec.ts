@@ -167,6 +167,7 @@ describe('리그 대진 라인업 — 참석 응답 게이트 예외', () => {
           approvedApplicantTeamId: ids.opponentTeam,
           competitionConfigVersionId: configId,
           leagueId: ids.league,
+          tournamentId: ids.league,
         },
         {
           // 대조군 — 같은 팀·같은 시각·같은 참석 상태인데 `leagueId` 만 없다. 이 행이

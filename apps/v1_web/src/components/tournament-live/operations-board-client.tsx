@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
@@ -14,6 +15,10 @@ import {
   useV1Tournament,
 } from '@/hooks/use-v1-api';
 import { buildLeagueFixtureTitles } from '@/components/tournament-result-review/fixture-label';
+import { GameResultCorrectionPanel } from '@/components/tournament-result-review/game-result-correction-panel';
+import { GameResultReviewPanel } from '@/components/tournament-result-review/game-result-review-panel';
+import { useGameResultRevisions } from '@/hooks/use-tournament-result-review';
+import { ErrorState } from '@/components/v1-ui/primitives';
 import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
@@ -34,6 +39,43 @@ import type {
   V1TournamentStaffRole,
 } from '@/types/api';
 import { V1_GAME_STATES, V1_STABLE_WARNING_CODES } from '@/types/api';
+import { DESKTOP_LIST_MEDIA_QUERY, useMediaQuery } from '@/hooks/use-media-query';
+
+function ExpandedResultPanel({
+  gameId,
+  tournamentId,
+  onSaved,
+}: {
+  gameId: string;
+  tournamentId: string;
+  onSaved: () => void;
+}) {
+  const revisions = useGameResultRevisions(gameId);
+  const [mode, setMode] = useState<'review' | 'correction' | null>(null);
+  const latest = revisions.data?.[0];
+  const handleSaved = useCallback(() => {
+    void revisions.refetch().then((result) => {
+      if (result.isSuccess && result.data) {
+        setMode(result.data[0]?.state === 'SUBMITTED' ? 'review' : 'correction');
+      }
+      onSaved();
+    });
+  }, [onSaved, revisions.refetch]);
+  useEffect(() => {
+    if (mode !== null || revisions.isPending || revisions.isError) return;
+    setMode(latest?.state === 'SUBMITTED' ? 'review' : 'correction');
+  }, [latest?.state, mode, revisions.isError, revisions.isPending]);
+  if (revisions.isPending) return <AdminListSkeleton rows={4} />;
+  if (revisions.isError) {
+    return <ErrorState message={extractErrorMessage(revisions.error, '결과 정보를 불러오지 못했어요.')} onRetry={() => void revisions.refetch()} />;
+  }
+  if (mode === null) return <AdminListSkeleton rows={4} />;
+  return mode === 'review' ? (
+    <GameResultReviewPanel gameId={gameId} tournamentId={tournamentId} inline onSaved={handleSaved} />
+  ) : (
+    <GameResultCorrectionPanel gameId={gameId} tournamentId={tournamentId} inline autoOpen onSaved={handleSaved} />
+  );
+}
 
 const GAME_STATE_FILTER_LABELS: Record<V1GameState, string> = {
   SCHEDULED: '예정',
@@ -76,6 +118,12 @@ function FixtureResultCell({
   item: V1TournamentOperationsBoardItem;
   align?: 'left' | 'right';
 }) {
+  if (item.currentRevisionState === 'VOID') {
+    return <span className="text-[length:var(--font-size-caption)] font-medium text-[var(--red700)]">결과 무효</span>;
+  }
+  if (item.currentRevisionState !== null && item.currentRevisionState !== 'OFFICIAL') {
+    return <span className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">결과 대기</span>;
+  }
   const score = readGameResultScore(item.currentScore);
   if (score === null) {
     return <span className="text-[length:var(--font-size-caption)] text-gray-300 dark:text-gray-600">—</span>;
@@ -92,6 +140,14 @@ function FixtureResultCell({
       ) : null}
     </div>
   );
+}
+
+function canOpenResultCorrection(item: V1TournamentOperationsBoardItem): boolean {
+  if (item.gameId === null) return false;
+  if (item.revisionId !== null) return true;
+  // Standard result submission transitions the game to ENDED before review; the official
+  // pointer remains null until approval, so ENDED is the real pending-submission signal.
+  return item.gameState === 'ENDED' || item.currentRevisionState === 'SUBMITTED';
 }
 
 /**
@@ -204,6 +260,13 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const [olderCursor, setOlderCursor] = useState<string | null | undefined>(undefined);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const [expandedGameId, setExpandedGameId] = useState<string | null>(null);
+  const isDesktop = useMediaQuery(DESKTOP_LIST_MEDIA_QUERY);
+  const [editorHost] = useState<HTMLDivElement | null>(() =>
+    typeof document === 'undefined' ? null : document.createElement('div'),
+  );
+  const desktopEditorSlots = useRef<Record<string, HTMLDivElement | null>>({});
+  const mobileEditorSlots = useRef<Record<string, HTMLDivElement | null>>({});
 
   const filters = useMemo(
     () => ({ status, fieldId, warning, limit: 50 }),
@@ -215,6 +278,12 @@ export function OperationsBoardClient({ tournamentId }: Props) {
   const tournament = useV1Tournament(tournamentId);
 
   const role = useTournamentOpsRole();
+  const resultActionLabel = role === 'SUPPORT_READONLY' ? '결과 보기' : '결과 정정';
+  const resultPanelLabel = role === 'SUPPORT_READONLY' ? '결과 보기' : '결과 편집';
+  const resultCloseLabel = role === 'SUPPORT_READONLY' ? '결과 보기 닫기' : '정정 닫기';
+  const resultUnavailableTitle = role === 'SUPPORT_READONLY'
+    ? '제출되거나 확정된 결과가 없어 결과를 볼 수 없어요.'
+    : '제출되거나 확정된 결과가 없어 정정할 수 없어요.';
   const canAssignField = FIELD_ASSIGN_ROLES.includes(role);
   const allFields = useMemo(() => fields.data?.items ?? [], [fields.data]);
 
@@ -317,6 +386,61 @@ export function OperationsBoardClient({ tournamentId }: Props) {
     const live = liveWarningsByFixtureId.get(item.fixtureId) ?? [];
     return [...item.warnings, ...live];
   }
+
+  function toggleCorrection(item: V1TournamentOperationsBoardItem) {
+    if (item.gameId === null) return;
+    setExpandedGameId((current) => (current === item.gameId ? null : item.gameId));
+  }
+
+  function expandedCorrection(item: V1TournamentOperationsBoardItem) {
+    if (item.gameId === null || expandedGameId !== item.gameId) return null;
+    return (
+      <ExpandedResultPanel
+        key={item.gameId}
+        gameId={item.gameId}
+        tournamentId={tournamentId}
+        onSaved={() => void board.refetch()}
+      />
+    );
+  }
+
+  useLayoutEffect(() => {
+    if (!editorHost) return;
+    if (expandedGameId === null) {
+      editorHost.remove();
+      return;
+    }
+    const slot = (isDesktop ? desktopEditorSlots : mobileEditorSlots).current[expandedGameId];
+    if (!slot) {
+      editorHost.remove();
+      return;
+    }
+    if (editorHost.parentElement !== slot) slot.appendChild(editorHost);
+  }, [editorHost, expandedGameId, isDesktop, items]);
+
+  const expandedItem = expandedGameId === null ? null : items.find((item) => item.gameId === expandedGameId) ?? null;
+  const expandedEditor =
+    editorHost && expandedItem
+      ? createPortal(
+          <section aria-label={`${rowLabel(expandedItem)} ${resultPanelLabel}`} className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4 md:p-5">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div>
+                <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">선택한 경기</p>
+                <h2 className="font-semibold text-[var(--text-strong)]">{rowLabel(expandedItem)}</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpandedGameId(null)}
+                className="min-h-11 px-3 rounded-lg border border-[var(--border)] text-[length:var(--font-size-body-sm)] text-[var(--text-body)] hover:bg-[var(--card-surface)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                {resultCloseLabel}
+              </button>
+            </div>
+            {expandedCorrection(expandedItem)}
+          </section>,
+          editorHost,
+        )
+      : null;
 
   return (
     <div className="tm-content-enter flex flex-col gap-5">
@@ -432,8 +556,17 @@ export function OperationsBoardClient({ tournamentId }: Props) {
         <>
           {/* ── 데스크톱 표 (lg+) ────────────────────────────────────── */}
           <div className="hidden lg:block bg-[var(--card-surface)] rounded-2xl border border-[var(--border)] overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-max min-w-full text-sm text-[var(--text-body)]">
+            <div className="overflow-x-hidden">
+              <table className="w-full table-fixed text-sm text-[var(--text-body)]">
+                <colgroup>
+                  <col className="w-[17%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[19%]" />
+                </colgroup>
                 <thead className="sticky top-0 bg-[var(--surface-soft)] border-b border-[var(--border)]">
                   <tr>
                     <th scope="col" className="px-4 py-3 text-left font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)]">
@@ -461,7 +594,8 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
                   {items.map((item) => (
-                    <tr key={item.fixtureId}>
+                    <Fragment key={item.fixtureId}>
+                    <tr>
                       <td className="px-4 py-3 align-middle">
                         <p className="font-medium text-[var(--text-strong)]">{rowLabel(item)}</p>
                         {/* 모바일 카드와 같은 표기 — "4강 4경기"는 "4강의 4번째 경기"로 오독된다. */}
@@ -496,14 +630,34 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                         </div>
                       </td>
                       <td className="px-4 py-3 align-middle">
-                        <Link
-                          href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
-                          className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-                        >
-                          운영 콘솔
-                        </Link>
+                        <div className="flex flex-wrap gap-2">
+                          <Link
+                            href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
+                            className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                          >
+                            운영 콘솔
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => toggleCorrection(item)}
+                            aria-expanded={expandedGameId === item.gameId}
+                            disabled={!canOpenResultCorrection(item)}
+                            title={!canOpenResultCorrection(item) && item.gameId !== null ? resultUnavailableTitle : undefined}
+                            className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--text-body)] border border-[var(--border)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                          >
+                            {resultActionLabel}
+                          </button>
+                        </div>
                       </td>
                     </tr>
+                    {expandedGameId === item.gameId && item.gameId !== null ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 pb-4">
+                          <div ref={(node) => { desktopEditorSlots.current[item.gameId!] = node; }} />
+                        </td>
+                      </tr>
+                    ) : null}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -519,7 +673,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-medium text-[var(--text-strong)] truncate">{rowLabel(item)}</p>
+                    <p className="font-medium text-[var(--text-strong)] min-w-0 whitespace-normal break-words">{rowLabel(item)}</p>
                     <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
                       {/* "4강 4경기"는 "4강의 4번째 경기"로 오독된다 — fixtureNumber 는
                           대회 전체 연번이므로 '번 경기'로 번호임을 드러낸다. */}
@@ -555,12 +709,27 @@ export function OperationsBoardClient({ tournamentId }: Props) {
                     ))}
                   </div>
                 )}
-                <Link
-                  href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
-                  className="mt-2 inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-                >
-                  운영 콘솔로 이동
-                </Link>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Link
+                    href={`${liveBase}/fixtures/${encodeURIComponent(item.fixtureId)}/operate`}
+                    className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--blue100)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  >
+                    운영 콘솔로 이동
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => toggleCorrection(item)}
+                    aria-expanded={expandedGameId === item.gameId}
+                    disabled={!canOpenResultCorrection(item)}
+                    title={!canOpenResultCorrection(item) && item.gameId !== null ? resultUnavailableTitle : undefined}
+                    className="inline-flex items-center min-h-11 px-3 rounded-lg text-[length:var(--font-size-caption)] font-medium whitespace-nowrap text-[var(--text-body)] border border-[var(--border)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                  >
+                    {resultActionLabel}
+                  </button>
+                </div>
+                {expandedGameId === item.gameId && item.gameId !== null ? (
+                  <div ref={(node) => { mobileEditorSlots.current[item.gameId!] = node; }} />
+                ) : null}
               </li>
             ))}
           </ul>
@@ -584,6 +753,7 @@ export function OperationsBoardClient({ tournamentId }: Props) {
           )}
         </>
       )}
+      {expandedEditor}
     </div>
   );
 }

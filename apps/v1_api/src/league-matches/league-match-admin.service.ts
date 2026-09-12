@@ -113,6 +113,20 @@ function weeklyMatchdayStartAts(leagueStartsOn: Date, totalRounds: number, timin
   return Array.from({ length: matchdayCount }, (_, index) => resolveFixtureStartAt(leagueStartsOn, index + 1));
 }
 
+function requireLeagueHostTeamId(hostTeamId: string | null, message: string): string {
+  if (hostTeamId === null) {
+    throw new ConflictException({ code: 'LEAGUE_FIXTURE_INCOMPLETE', message });
+  }
+  return hostTeamId;
+}
+
+function requireLeagueStartAt(startAt: Date | null, message: string): Date {
+  if (startAt === null) {
+    throw new ConflictException({ code: 'LEAGUE_FIXTURE_INCOMPLETE', message });
+  }
+  return startAt;
+}
+
 // 총 라운드(주차 수 × 팀당 하루 경기 수) 상한. timing 없던 시절의 사실상 상한(weeksCount
 // Max 52)의 2배 — 대형 리그의 트랜잭션(팀 수 × 라운드 수만큼 팀매치·게임·참가자 행 생성,
 // timeout 120초)이 감당 가능한 범위로 묶는다. 52주 × 2경기까지는 허용, 그 이상은 422.
@@ -737,7 +751,7 @@ export class LeagueMatchAdminService {
         cancelledFixtures.push({
           id: fixture.id,
           title: fixture.title,
-          hostTeamId: fixture.hostTeamId,
+          hostTeamId: requireLeagueHostTeamId(fixture.hostTeamId, '홈 팀이 없는 리그 대진은 취소 알림을 만들 수 없어요.'),
           approvedApplicantTeamId: fixture.approvedApplicantTeamId,
         });
         cancelled += 1;
@@ -912,7 +926,7 @@ export class LeagueMatchAdminService {
         {
           id: teamMatch.id,
           title: teamMatch.title,
-          hostTeamId: teamMatch.hostTeamId,
+          hostTeamId: requireLeagueHostTeamId(teamMatch.hostTeamId, '홈 팀이 없는 리그 대진은 취소 알림을 만들 수 없어요.'),
           approvedApplicantTeamId: teamMatch.approvedApplicantTeamId,
         },
       ],
@@ -995,7 +1009,7 @@ export class LeagueMatchAdminService {
         cancelledFixtures.push({
           id: fixture.id,
           title: fixture.title,
-          hostTeamId: fixture.hostTeamId,
+          hostTeamId: requireLeagueHostTeamId(fixture.hostTeamId, '홈 팀이 없는 리그 대진은 취소 알림을 만들 수 없어요.'),
           approvedApplicantTeamId: fixture.approvedApplicantTeamId,
         });
         cancelledCount += 1;
@@ -1187,7 +1201,10 @@ export class LeagueMatchAdminService {
     });
     const targetId = 'manual-fixture-being-created';
     const week = resolveLeagueWeekNumbers(
-      new Map([[leagueId, [...siblings.map((row) => row.startAt), startAt]]]),
+      new Map([[leagueId, [
+        ...siblings.map((row) => requireLeagueStartAt(row.startAt, '리그 대진의 시작 시각이 없어 주차를 계산할 수 없어요.')),
+        startAt,
+      ]]]),
       [{ id: targetId, leagueId, startAt }],
     ).get(targetId);
     return leagueFixtureTitle({ leagueTitle, round: week ?? 1 });
@@ -1204,7 +1221,9 @@ export class LeagueMatchAdminService {
     // duration(endAt-startAt, generateFixtures가 resolveFixtureTimeSlots로 채운 값)을 새
     // startAt에 그대로 적용해 유지한다. timing 없이 만들어져 endAt이 애초에 없는(null)
     // 대진은 계속 없음으로 둔다 — duration 자체가 정의되지 않으므로 임의로 만들어내지 않는다.
-    const durationMs = teamMatch.endAt !== null ? teamMatch.endAt.getTime() - teamMatch.startAt.getTime() : null;
+    const durationMs = teamMatch.endAt !== null && teamMatch.startAt !== null
+      ? teamMatch.endAt.getTime() - teamMatch.startAt.getTime()
+      : null;
     const nextStartAt = dto.startsAt === undefined ? undefined : new Date(dto.startsAt);
     const nextEndAt = nextStartAt !== undefined && durationMs !== null ? new Date(nextStartAt.getTime() + durationMs) : undefined;
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -1220,16 +1239,17 @@ export class LeagueMatchAdminService {
           ...(dto.placeAddress === undefined ? {} : { placeAddress: dto.placeAddress }),
         },
       });
+      const persistedStartAt = requireLeagueStartAt(result.startAt, '리그 대진의 시작 시각이 없어 수정할 수 없어요.');
       // 사용자 확정: 시작 시각이 바뀌면 결과 미입력 리마인더도 새 시각을 따라간다 —
       // 새 세대(startAt)로 다시 스케줄할 뿐 옛 행은 건드리지 않는다(발화 시점에
       // expectedStartAt 불일치로 스스로 no-op — league-result-entry-reminder.service.ts 참고).
       if (dto.startsAt !== undefined) {
-        await scheduleLeagueResultEntryReminder(tx, { teamMatchId, startAt: result.startAt });
+        await scheduleLeagueResultEntryReminder(tx, { teamMatchId, startAt: persistedStartAt });
         // 그룹 B 감사 결함 5 후속: createFixturesInTx가 이제 양 팀 스케줄을 만들어 두므로,
         // 여기서 시작 시각만 바꾸고 스케줄을 그대로 두면 캘린더 시각이 대진 시각과 어긋난다
         // (team-matches.service.ts:593의 동일 패턴). syncTeamMatchScheduleInTx는 teamMatchId
         // 기준으로 SCHEDULED 상태인 스케줄을 전부(호스트+원정 최대 2건) 갱신한다.
-        await syncTeamMatchScheduleInTx(tx, teamMatchId, teamMatch.title, result.startAt, result.endAt);
+        await syncTeamMatchScheduleInTx(tx, teamMatchId, teamMatch.title, persistedStartAt, result.endAt);
       }
       await this.adminContext.logAdminAction(
         admin,
@@ -1238,7 +1258,7 @@ export class LeagueMatchAdminService {
           targetType: 'team_match',
           targetId: teamMatchId,
           afterJson: {
-            startAt: result.startAt.toISOString(),
+            startAt: persistedStartAt.toISOString(),
             endAt: result.endAt !== null ? result.endAt.toISOString() : null,
             placeName: result.placeName,
           },

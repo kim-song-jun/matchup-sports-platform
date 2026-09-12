@@ -8,7 +8,7 @@ import {
 
 export interface CreateOperationAuditInput extends CreateOperationAuditEnvelopeInput {
   tournamentId?: string | null;
-  fixtureId?: string | null;
+  teamMatchId?: string | null;
   fieldId?: string | null;
 }
 
@@ -28,11 +28,11 @@ export class OperationAuditWriterService {
   ): Promise<{ readonly id: string }> {
     const envelope = createOperationAuditEnvelope(input);
     const tournamentId = optionalStableId(input.tournamentId, 'tournamentId');
-    const fixtureId = optionalStableId(input.fixtureId, 'fixtureId');
+    const teamMatchId = optionalStableId(input.teamMatchId, 'teamMatchId');
     const fieldId = optionalStableId(input.fieldId, 'fieldId');
 
-    if (tournamentId === null && (fixtureId !== null || fieldId !== null)) {
-      throw new TypeError('tournamentId is required when fixtureId or fieldId is present');
+    if (tournamentId === null && (teamMatchId !== null || fieldId !== null)) {
+      throw new TypeError('tournamentId is required when teamMatchId or fieldId is present');
     }
 
     assertSnapshotContainsNoSensitiveFields(envelope.before, 'before');
@@ -53,7 +53,7 @@ export class OperationAuditWriterService {
         after: toFrozenPrismaJson(envelope.after),
         reason: envelope.reason,
         tournamentId,
-        fixtureId,
+        teamMatchId,
         fieldId,
         createdAt: new Date(envelope.occurredAt),
       },

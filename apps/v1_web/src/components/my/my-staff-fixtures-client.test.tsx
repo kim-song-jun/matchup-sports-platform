@@ -4,7 +4,7 @@ import { render as rtlRender, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MyStaffFixturesPageClient, selectMyFixtures } from './my-staff-fixtures-client';
 import type { PublicScheduleEntry } from '@/components/public-game-records/types';
-import type { V1MyTournamentStaffAssignment } from '@/types/api';
+import type { V1MyTournamentStaffAssignment, V1MyTournamentStaffFixture } from '@/types/api';
 
 /**
  * 필드 담당자가 자기 경기 콘솔에 도달하는 유일한 경로의 회귀 테스트.
@@ -16,17 +16,11 @@ import type { V1MyTournamentStaffAssignment } from '@/types/api';
 
 const apiMocks = vi.hoisted(() => ({
   useV1MyTournamentStaffAssignments: vi.fn(),
-  usePublicTournamentSchedule: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/hooks/use-v1-api')>()),
   useV1MyTournamentStaffAssignments: apiMocks.useV1MyTournamentStaffAssignments,
-}));
-
-vi.mock('@/components/public-game-records/use-public-game-records', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/components/public-game-records/use-public-game-records')>()),
-  usePublicTournamentSchedule: apiMocks.usePublicTournamentSchedule,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -89,18 +83,36 @@ function assignment(
   } as V1MyTournamentStaffAssignment;
 }
 
+function fixtureFromEntry(item: PublicScheduleEntry): V1MyTournamentStaffFixture {
+  return {
+    fixtureId: item.fixtureId,
+    gameId: 'game-1',
+    tournamentId: 't-1',
+    title: `${item.home?.teamName ?? '팀 미정'} vs ${item.away?.teamName ?? '팀 미정'}`,
+    scheduledAt: item.scheduledAt,
+    status: item.status,
+    gameState: null,
+    round: item.round,
+    fixtureNumber: item.fixtureNumber,
+    legNumber: item.legNumber,
+    fieldId: item.fieldId,
+    fieldName: item.fieldName,
+  };
+}
+
 function mockData(assignments: V1MyTournamentStaffAssignment[], entries: PublicScheduleEntry[]) {
   apiMocks.useV1MyTournamentStaffAssignments.mockReturnValue({
     data: {
       items: [
-        { tournamentId: 't-1', tournamentTitle: '성수 5인제 컵', tournamentStatus: 'in_progress', assignments },
+        {
+          tournamentId: 't-1',
+          tournamentTitle: '성수 5인제 컵',
+          tournamentStatus: 'in_progress',
+          assignments,
+          fixtures: entries.map(fixtureFromEntry),
+        },
       ],
     },
-    isLoading: false,
-    isError: false,
-  });
-  apiMocks.usePublicTournamentSchedule.mockReturnValue({
-    data: { pages: [{ items: entries, unscheduled: [] }] },
     isLoading: false,
     isError: false,
   });
@@ -109,7 +121,7 @@ function mockData(assignments: V1MyTournamentStaffAssignment[], entries: PublicS
 describe('selectMyFixtures', () => {
   it('경기 스코프가 있으면 그 경기만 고른다', () => {
     const entries = [entry({ fixtureId: 'fx-1' }), entry({ fixtureId: 'fx-2' })];
-    const picked = selectMyFixtures(entries, [assignment({ fixtureIds: ['fx-2'] })]);
+    const picked = selectMyFixtures(entries.map(fixtureFromEntry), [assignment({ fixtureIds: ['fx-2'] })]);
     expect(picked.map((f) => f.fixtureId)).toEqual(['fx-2']);
   });
 
@@ -118,7 +130,7 @@ describe('selectMyFixtures', () => {
       entry({ fixtureId: 'fx-1', fieldId: 'f-1', fieldName: 'A구장' }),
       entry({ fixtureId: 'fx-2', fieldId: 'f-2', fieldName: 'B구장' }),
     ];
-    const picked = selectMyFixtures(entries, [assignment({ fieldId: 'f-1', fieldName: 'A구장' })]);
+    const picked = selectMyFixtures(entries.map(fixtureFromEntry), [assignment({ fieldId: 'f-1', fieldName: 'A구장' })]);
     expect(picked.map((f) => f.fixtureId)).toEqual(['fx-1']);
   });
 
@@ -132,19 +144,19 @@ describe('selectMyFixtures', () => {
       entry({ fixtureId: 'fx-1', fieldId: 'f-1', fieldName: 'A구장' }),
       entry({ fixtureId: 'fx-2', fieldId: 'f-2', fieldName: 'A구장' }), // 동명이인 필드
     ];
-    const picked = selectMyFixtures(entries, [assignment({ fieldId: 'f-1', fieldName: 'A구장' })]);
+    const picked = selectMyFixtures(entries.map(fixtureFromEntry), [assignment({ fieldId: 'f-1', fieldName: 'A구장' })]);
     expect(picked.map((f) => f.fixtureId)).toEqual(['fx-1']);
   });
 
   it('필드가 붙지 않은 경기는 필드 단위 배정으로 잡히지 않는다', () => {
     // alpha 실데이터가 정확히 이 상태다 — 경기에 필드가 하나도 배정돼 있지 않다.
     const entries = [entry({ fixtureId: 'fx-1', fieldId: null, fieldName: null })];
-    expect(selectMyFixtures(entries, [assignment({ fieldId: 'f-1', fieldName: 'A구장' })])).toEqual([]);
+    expect(selectMyFixtures(entries.map(fixtureFromEntry), [assignment({ fieldId: 'f-1', fieldName: 'A구장' })])).toEqual([]);
   });
 
   it('필드 담당자 배정이 없으면 아무것도 고르지 않는다', () => {
     const entries = [entry({ fixtureId: 'fx-1' })];
-    expect(selectMyFixtures(entries, [assignment({ role: 'TOURNAMENT_DIRECTOR' })])).toEqual([]);
+    expect(selectMyFixtures(entries.map(fixtureFromEntry), [assignment({ role: 'TOURNAMENT_DIRECTOR' })])).toEqual([]);
   });
 });
 
@@ -160,7 +172,7 @@ describe('MyStaffFixturesPageClient', () => {
 
     render(<MyStaffFixturesPageClient tournamentId="t-1" />);
 
-    const link = screen.getByRole('link', { name: /성수 FC 대 망원 FC, 경기 운영 콘솔 열기/ });
+    const link = screen.getByRole('link', { name: /성수 FC vs 망원 FC, 경기 운영 콘솔 열기/ });
     expect(link).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/fixtures/fx-1/operate');
     expect(screen.queryByText(/남의 팀/)).toBeNull();
   });
@@ -168,6 +180,9 @@ describe('MyStaffFixturesPageClient', () => {
   it.each([
     ['scheduled', '예정'],
     ['in_progress', '진행 중'],
+    ['LIVE', '진행 중'],
+    ['PAUSED', '일시중지'],
+    ['paused', '일시중지'],
     ['completed', '종료'],
     ['cancelled', '취소됨'],
     ['unexpected', '상태 확인 필요'],
@@ -196,12 +211,6 @@ describe('MyStaffFixturesPageClient', () => {
       isLoading: false,
       isError: false,
     });
-    apiMocks.usePublicTournamentSchedule.mockReturnValue({
-      data: { pages: [{ items: [], unscheduled: [] }] },
-      isLoading: false,
-      isError: false,
-    });
-
     render(<MyStaffFixturesPageClient tournamentId="t-1" />);
 
     expect(screen.getByText('이 대회의 담당 배정이 없어요')).toBeInTheDocument();

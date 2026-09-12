@@ -128,25 +128,6 @@ describe('fairPlayByRegistrationFromGroups (F5: 페어플레이 실제 연결)',
     expect(totals.get('reg-home')).toBe(7);
   });
 
-  it('레거시 폴백 픽스처(OFFICIAL 리비전 없음)는 카드 데이터가 없어 건너뛴다', () => {
-    const group: StandingsSourceGroup = {
-      id: 'group-1',
-      groupTeams: [{ registrationId: 'reg-home' }, { registrationId: 'reg-away' }],
-      fixtures: [
-        {
-          homeRegistrationId: 'reg-home',
-          awayRegistrationId: 'reg-away',
-          game: null,
-          result: { homeScore: 2, awayScore: 1, hasPenalty: false, homePenaltyScore: null, awayPenaltyScore: null },
-        },
-      ],
-    };
-
-    const totals = fairPlayByRegistrationFromGroups([group]);
-
-    expect(totals.size).toBe(0);
-  });
-
   it('여러 조를 넘겨도 조별 합계가 registrationId 기준으로 올바르게 합쳐진다', () => {
     const groupA = officialGroup({
       resultParticipants: [{ sideId: 'side-home', cards: { yellow: 1, red: 0 } }],

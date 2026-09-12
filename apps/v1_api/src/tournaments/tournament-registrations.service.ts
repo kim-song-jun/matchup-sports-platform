@@ -465,7 +465,9 @@ export class TournamentRegistrationsService {
       result.updated.appliedByUserId,
       'tournament_registration_submitted',
       tournamentId,
-      `"${result.tournament.title}" 대회 입금 안내를 확인해 주세요.`,
+      result.tournament.entryFee > 0
+        ? `"${result.tournament.title}" 대회 입금 안내를 확인해 주세요.`
+        : `"${result.tournament.title}" 대회 신청이 접수됐어요. 명단을 등록해 주세요.`,
     );
 
     // Task 154 P0-4 / 사용자 결정 ⑤ (2026-08-23): 기록 공개 동의를 **명단에 오른 선수

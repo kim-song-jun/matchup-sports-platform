@@ -47,10 +47,14 @@ export function GameResultReviewPanel({
   gameId,
   tournamentId,
   correctionsHref,
+  inline = false,
+  onSaved,
 }: {
   gameId: string;
   tournamentId?: string;
   correctionsHref?: string;
+  inline?: boolean;
+  onSaved?: () => void;
 }) {
   const gameQuery = useTournamentGame(gameId);
   const revisionsQuery = useGameResultRevisions(gameId);
@@ -68,6 +72,7 @@ export function GameResultReviewPanel({
   const { confirm, ConfirmModal: officializeConfirmModal } = useConfirm();
 
   const [resubmitTarget, setResubmitTarget] = useState<GameResultRevision | null>(null);
+  const [resubmitExpectedVersion, setResubmitExpectedVersion] = useState<number | null>(null);
   const [directorGateStatus, setDirectorGateStatus] = useState<DirectorGateStatus>('unknown');
 
   if (gameQuery.isPending || revisionsQuery.isPending) {
@@ -159,7 +164,7 @@ export function GameResultReviewPanel({
         mvpParticipantId: freshRevision.mvpParticipantId,
       },
       {
-        onSuccess: () => setDirectorGateStatus('enabled'),
+        onSuccess: () => { setDirectorGateStatus('enabled'); onSaved?.(); },
         onError: (error) => {
           if (isDirectorOfficializeDisabledError(error)) setDirectorGateStatus('disabled');
         },
@@ -247,7 +252,14 @@ export function GameResultReviewPanel({
             ) : null}
             {/* 재제출 모달을 그대로 재사용한다(신규 컴포넌트 없음) — 저장하면 새 SUBMITTED
                 리비전이 서고 이 카드가 다시 떠서 "확인" 을 누르게 된다. */}
-            <Button variant="outline" size="md" onClick={() => setResubmitTarget(latest)}>
+            <Button
+              variant="outline"
+              size="md"
+              onClick={() => {
+                setResubmitTarget(latest);
+                setResubmitExpectedVersion(game.version);
+              }}
+            >
               고치고 확인
             </Button>
           </div>
@@ -317,23 +329,27 @@ export function GameResultReviewPanel({
           }}
           sides={game.sides}
           lineups={lineupsQuery.data ?? []}
+          periods={game.periods}
           // 재제출도 정정과 **같은** 서버 승부차기 가드(`applyPenalties`)를 통과한다 --
           // 그래서 같은 값을 내려준다: 폼이 기존 승부차기 점수를 이어서 보낼지 판정하고,
           // 못 보내는 상태를 저장 전에 알린다(`game-result-correction-panel.tsx` 주석 참고).
           isKnockoutFixture={game.isKnockoutFixture}
+          presentation={inline ? 'inline' : 'modal'}
           submitting={supersedeAndSubmit.isPending}
           errorMessage={
             supersedeAndSubmit.isError ? describeResultReviewError(supersedeAndSubmit.error) : null
           }
           onCancel={() => {
             setResubmitTarget(null);
+            setResubmitExpectedVersion(null);
             supersedeAndSubmit.reset();
           }}
           onConfirm={(input: ResultEditSubmitInput) => {
+            if (resubmitExpectedVersion === null) return;
             supersedeAndSubmit.mutate(
               {
                 revisionId: resubmitTarget.id,
-                expectedVersion: game.version,
+                expectedVersion: resubmitExpectedVersion,
                 score: input.score,
                 goalEvents: input.goalEvents,
                 actualParticipants: input.actualParticipants,
@@ -341,7 +357,13 @@ export function GameResultReviewPanel({
                 mvpParticipantId: input.mvpParticipantId,
                 reason: input.reason,
               },
-              { onSuccess: () => setResubmitTarget(null) },
+              {
+                onSuccess: () => {
+                  setResubmitTarget(null);
+                  setResubmitExpectedVersion(null);
+                  onSaved?.();
+                },
+              },
             );
           }}
         />

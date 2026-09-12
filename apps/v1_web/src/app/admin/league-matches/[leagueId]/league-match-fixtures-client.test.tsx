@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
   useV1ActivePopup,
@@ -1228,6 +1228,13 @@ describe('LeagueMatchFixturesClient — 대진 timing 설정', () => {
  * 그대로 나가지 않으면 운영자가 지운 주가 되살아난다(사용자 A안의 요지).
  */
 describe('대진 날짜 — 달력에서 고른 값이 그대로 나간다', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-04T01:00:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   it('날짜만 고르고 시각이 비면 요청을 보내지 않는다 — 빈 time 은 서버가 형식으로 거부한다', async () => {
     // 요일 경로는 `time` 이 비면 `dates` 가 빈 배열이 돼 자연히 빠졌는데, 달력 경로는
     // `dates` 가 채워져 있어 **빈 `time` 이 그대로 나갔다.**

@@ -15,12 +15,15 @@ import { TriggerReminderDto } from './dto/reminder.dto';
 import { CancelScheduleDto } from './dto/cancel-schedule.dto';
 import { CompleteScheduleDto } from './dto/complete-schedule.dto';
 import { CreateScheduleDto, ScheduleListQueryDto, UpdateScheduleDto } from './dto/team-schedule.dto';
+import { MATCH_SCHEDULE_DEFAULT_DURATION_MS } from './team-match-schedule';
+export { createTeamMatchScheduleInTx } from './team-match-schedule';
 
 const RESOURCE_TYPE = 'V1_TEAM_SCHEDULE';
 const IDEMPOTENCY_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
-const MATCH_SCHEDULE_DEFAULT_DURATION_MS = 2 * 60 * 60 * 1_000;
 
 type Tx = Prisma.TransactionClient;
+type LinkedMatch = { teamMatchId: string; tournamentId: string | null; leagueId: string | null };
+type MatchProjection = { linkedMatch: LinkedMatch; confirmed: boolean };
 
 /**
  * 매치 ↔ 팀일정 연동(레인 schedule). TeamMatchesService(create/approveApplication/cancel/update)와
@@ -39,30 +42,6 @@ type Tx = Prisma.TransactionClient;
  * (팀매치는 endAt이 optional) startAt+2시간을 기본값으로 쓴다(mock 4건 전부 정확히 2시간 창을
  * 쓰는 게 근거, team-matches.view-model.ts).
  */
-export async function createTeamMatchScheduleInTx(
-  tx: Tx,
-  teamId: string,
-  teamMatchId: string,
-  title: string,
-  startAt: Date,
-  endAt: Date | null,
-): Promise<void> {
-  const resolvedEndAt = endAt ?? new Date(startAt.getTime() + MATCH_SCHEDULE_DEFAULT_DURATION_MS);
-  await tx.v1TeamSchedule.create({
-    data: {
-      teamId,
-      teamMatchId,
-      title,
-      type: V1ScheduleType.MATCH,
-      startAt,
-      endAt: resolvedEndAt,
-      timezone: 'Asia/Seoul',
-      visibility: V1ScheduleVisibility.TEAM,
-      state: V1ScheduleState.SCHEDULED,
-      version: 0,
-    },
-  });
-}
 
 /**
  * TeamMatch 수정(recruiting 단계에서만 허용)이 호스트 스케줄의 title/startAt/endAt을 같은
@@ -200,11 +179,11 @@ export class TeamSchedulesService {
     });
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
-    const matchConfirmedByTeamMatchId = await this.loadMatchConfirmationMap(pageItems);
+    const matchProjectionByTeamMatchId = await this.loadMatchConfirmationMap(pageItems);
     const activeMemberUserIds = await this.activeMemberUserIds(teamId);
 
     return {
-      items: pageItems.map((row) => this.toSummary(row, matchConfirmedByTeamMatchId, activeMemberUserIds)),
+      items: pageItems.map((row) => this.toSummary(row, matchProjectionByTeamMatchId, activeMemberUserIds)),
       nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
     };
   }
@@ -282,10 +261,10 @@ export class TeamSchedulesService {
     // visibility check (above) is not sufficient — a PUBLIC schedule can still carry a MEMBERS
     // recruitment, so the child's own visibility must be re-checked here independently.
     const canSeeRecruitment = recruitment !== null && (isMember || recruitment.visibility === 'PUBLIC');
-    const matchConfirmedByTeamMatchId = await this.loadMatchConfirmationMap([schedule]);
+    const matchProjectionByTeamMatchId = await this.loadMatchConfirmationMap([schedule]);
 
     return {
-      ...this.toSummary(schedule, matchConfirmedByTeamMatchId, activeMemberUserIds),
+      ...this.toSummary(schedule, matchProjectionByTeamMatchId, activeMemberUserIds),
       cancelReason: schedule.cancelReason,
       cancelledAt: schedule.state === V1ScheduleState.CANCELLED ? schedule.updatedAt : null,
       guestRecruitment:
@@ -358,7 +337,7 @@ export class TeamSchedulesService {
     });
     const pageItems = rows.slice(0, limit);
     const hasNext = rows.length > limit;
-    const matchConfirmedByTeamMatchId = await this.loadMatchConfirmationMap(pageItems);
+    const matchProjectionByTeamMatchId = await this.loadMatchConfirmationMap(pageItems);
 
     // 정원 산정 일원화: /me/schedule은 여러 팀에 걸쳐 있으므로 팀별 active 멤버십 집합을
     // 한 번에 모아 두고(N+1 방지), 각 스케줄이 속한 팀의 집합으로 goingCount를 걸러낸다.
@@ -379,7 +358,7 @@ export class TeamSchedulesService {
         const info = infoByTeam.get(row.teamId);
         const mine = row.attendance.find((a) => a.userId === user.id) ?? null;
         return {
-          ...this.toSummary(row, matchConfirmedByTeamMatchId, activeMemberUserIdsByTeam.get(row.teamId) ?? new Set()),
+          ...this.toSummary(row, matchProjectionByTeamMatchId, activeMemberUserIdsByTeam.get(row.teamId) ?? new Set()),
           teamId: row.teamId,
           teamName: info?.teamName ?? null,
           myRole: info?.role ?? null,
@@ -925,7 +904,7 @@ export class TeamSchedulesService {
       teamMatchId: string | null;
       attendance?: Array<{ status: string; userId: string }>;
     },
-    matchConfirmedByTeamMatchId: Map<string, boolean> = new Map(),
+    matchProjectionByTeamMatchId: Map<string, MatchProjection> = new Map(),
     // 정원 산정 일원화 (M-F-team-schedule-attendance-orphan-cleanup fix): 팀을 나가거나
     // 추방된 멤버의 GOING/WAITLISTED 행은 v1_schedule_attendance에서 지워지지 않는다(이탈
     // 경로가 teams.service.ts·profile.service.ts·admin.service.ts 4곳으로 흩어져 있어 각
@@ -949,13 +928,17 @@ export class TeamSchedulesService {
       state: row.state,
       version: row.version,
       teamMatchId: row.teamMatchId,
+      linkedMatch:
+        row.type === V1ScheduleType.MATCH && row.teamMatchId
+          ? matchProjectionByTeamMatchId.get(row.teamMatchId)?.linkedMatch ?? null
+          : null,
       // 매치 ↔ 팀일정 연동(레인 schedule): "가확정(상대팀 모집 중) vs 확정(상대팀 확정)"은 순수
       // 파생값이다 — V1ScheduleState는 건드리지 않고, type===MATCH일 때만 연결된 TeamMatch의
       // approvedApplicantTeamId 유무로 매 조회 시점마다 새로 계산한다(levelLabel이 FK에서 파생
       // 계산되는 것과 같은 원칙). MATCH가 아닌 스케줄은 이 개념 자체가 없으므로 항상 null.
       matchConfirmed:
         row.type === V1ScheduleType.MATCH && row.teamMatchId
-          ? matchConfirmedByTeamMatchId.get(row.teamMatchId) ?? null
+          ? matchProjectionByTeamMatchId.get(row.teamMatchId)?.confirmed ?? null
           : null,
       goingCount: attendance.filter((a) => a.status === 'GOING').length,
       waitlistedCount: attendance.filter((a) => a.status === 'WAITLISTED').length,
@@ -1005,7 +988,7 @@ export class TeamSchedulesService {
    */
   private async loadMatchConfirmationMap(
     rows: Array<{ type: string; teamMatchId: string | null }>,
-  ): Promise<Map<string, boolean>> {
+  ): Promise<Map<string, MatchProjection>> {
     const teamMatchIds = [
       ...new Set(
         rows
@@ -1015,10 +998,46 @@ export class TeamSchedulesService {
     ];
     if (teamMatchIds.length === 0) return new Map();
     const matches = await this.prisma.v1TeamMatch.findMany({
-      where: { id: { in: teamMatchIds } },
-      select: { id: true, approvedApplicantTeamId: true },
+      where: { id: { in: teamMatchIds }, deletedAt: null },
+      select: {
+        id: true,
+        tournamentId: true,
+        leagueId: true,
+        approvedApplicantTeamId: true,
+        tournamentDetails: { select: { tournamentId: true } },
+        tournament: { select: { kind: true, deletedAt: true } },
+        league: { select: { kind: true, deletedAt: true } },
+        game: { select: { sourceType: true, teamMatchId: true } },
+      },
     });
-    return new Map(matches.map((match) => [match.id, match.approvedApplicantTeamId !== null]));
+    const projection = new Map<string, MatchProjection>();
+    for (const match of matches) {
+      if (match.game?.sourceType !== 'TEAM_MATCH' || match.game.teamMatchId !== match.id) continue;
+      const friendlyValid = match.tournamentId === null && match.leagueId === null && match.tournamentDetails === null;
+      const tournamentValid =
+        match.tournamentId !== null &&
+        match.leagueId === null &&
+        match.tournament?.deletedAt === null &&
+        (match.tournament.kind === null || match.tournament.kind === 'regular_tournament') &&
+        match.tournamentDetails?.tournamentId === match.tournamentId;
+      const leagueValid =
+        match.leagueId !== null &&
+        match.tournamentId === match.leagueId &&
+        match.league?.deletedAt === null &&
+        match.league.kind === 'regular_league' &&
+        match.tournamentDetails === null;
+      if (!friendlyValid && !tournamentValid && !leagueValid) continue;
+      const linkedMatch = {
+        teamMatchId: match.id,
+        tournamentId: match.tournamentId,
+        leagueId: match.leagueId,
+      };
+      projection.set(match.id, {
+        linkedMatch,
+        confirmed: match.approvedApplicantTeamId !== null,
+      });
+    }
+    return projection;
   }
 
   private async isActiveMember(teamId: string, userId: string): Promise<boolean> {

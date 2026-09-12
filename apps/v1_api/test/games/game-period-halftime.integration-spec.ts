@@ -28,6 +28,8 @@ const ids = {
   fixture: '66000000-0000-4000-8000-000000000040',
   fixtureHalftimeEnd: '66000000-0000-4000-8000-000000000041',
   fixtureFinalPeriodEnd: '66000000-0000-4000-8000-000000000042',
+  homeRegistration: '66000000-0000-4000-8000-000000000050',
+  awayRegistration: '66000000-0000-4000-8000-000000000051',
 } as const;
 
 const prisma = new PrismaService();
@@ -114,14 +116,36 @@ describe('이슈 #375 — end-period/start-period/revert-period drive an observa
     await prisma.v1Tournament.create({
       data: { id: ids.tournament, sportId: ids.sport, title: 'Issue 375 tournament', competitionConfigVersionId: configId },
     });
-    await prisma.v1TournamentFixture.create({
-      data: {
-        id: ids.fixture,
+    await prisma.v1TournamentRegistration.createMany({
+      data: [
+        { id: ids.homeRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.director, status: 'confirmed' },
+        { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.director, status: 'confirmed' },
+      ],
+    });
+    await prisma.v1TeamMatch.createMany({
+      data: [ids.fixture, ids.fixtureHalftimeEnd, ids.fixtureFinalPeriodEnd].map((id, index) => ({
+        id,
+        tournamentId: ids.tournament,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+        createdByUserId: ids.director,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: `Issue 375 canonical match ${index + 1}`,
+        status: 'matched' as const,
+        startAt: new Date(`2026-09-${12 + index}T00:00:00.000Z`),
+        competitionConfigVersionId: configId,
+      })),
+    });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: [ids.fixture, ids.fixtureHalftimeEnd, ids.fixtureFinalPeriodEnd].map((teamMatchId, index) => ({
+        teamMatchId,
         tournamentId: ids.tournament,
         round: 'group',
-        fixtureNumber: 1,
-        competitionConfigVersionId: configId,
-      },
+        fixtureNumber: index + 1,
+        homeRegistrationId: ids.homeRegistration,
+        awayRegistrationId: ids.awayRegistration,
+      })),
     });
     await prisma.v1TournamentStaffAssignment.create({
       data: {
@@ -133,7 +157,7 @@ describe('이슈 #375 — end-period/start-period/revert-period drive an observa
     });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: configId,
       sides: [
@@ -366,18 +390,10 @@ describe('이슈 #375 — 경기 종료가 하프타임 도중에도 다음 피�
     }
     configId = config.id;
 
-    await prisma.v1TournamentFixture.create({
-      data: {
-        id: ids.fixtureHalftimeEnd,
-        tournamentId: ids.tournament,
-        round: 'group',
-        fixtureNumber: 2,
-        competitionConfigVersionId: configId,
-      },
-    });
+    await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: ids.fixtureHalftimeEnd } });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixtureHalftimeEnd,
       competitionConfigVersionId: configId,
       sides: [
@@ -465,18 +481,10 @@ describe('정규 시간 종료 — 마지막 피리어드도 end-period로 닫�
       orderBy: { version: 'desc' },
     });
 
-    await prisma.v1TournamentFixture.create({
-      data: {
-        id: ids.fixtureFinalPeriodEnd,
-        tournamentId: ids.tournament,
-        round: 'group',
-        fixtureNumber: 3,
-        competitionConfigVersionId: config.id,
-      },
-    });
+    await prisma.v1TeamMatch.findUniqueOrThrow({ where: { id: ids.fixtureFinalPeriodEnd } });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixtureFinalPeriodEnd,
       competitionConfigVersionId: config.id,
       sides: [

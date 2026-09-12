@@ -173,7 +173,7 @@ const BOARD_GAME_SELECT = {
   version: true,
   updatedAt: true,
   currentOfficialRevisionId: true,
-  currentOfficialRevision: { select: { id: true, score: true, missingScorer: true } },
+  currentOfficialRevision: { select: { id: true, state: true, score: true, missingScorer: true } },
 } as const;
 
 /**
@@ -204,7 +204,7 @@ type BoardRow = {
  *
  * ## Warning codes (sensible default, Decision #3 -- not defined by the plan or
  * docs/api/global-contract.md)
- * - `NO_FIELD_ASSIGNED`      -- `V1TournamentFixture.fieldId` is null. (stable)
+ * - `NO_FIELD_ASSIGNED`      -- tournament `V1TeamMatch.fieldId` is null. (stable)
  * - `NO_STAFF_ASSIGNED`      -- no live `FIELD_OPERATOR` assignment scopes this fixture's field
  *                               or fixture id directly (`tournament_director`/`support_readonly`
  *                               assignments are tournament-wide by policy and never carry a
@@ -241,18 +241,19 @@ type BoardRow = {
  * must compare `{items, nextCursor, watermark}` only and may ignore `liveWarnings`.
  *
  * Stable body field -> persisted source:
- * - `items[].fixtureId`            <- `V1TournamentFixture.id`
- * - `items[].tournamentId`         <- `V1TournamentFixture.tournamentId`
- * - `items[].round`                <- `V1TournamentFixture.round`
- * - `items[].fixtureNumber`        <- `V1TournamentFixture.fixtureNumber`
- * - `items[].gameId`               <- `V1Game.id` (via the fixture's `game` relation, nullable)
+ * - `items[].fixtureId`            <- canonical `V1TeamMatch.id`
+ * - `items[].tournamentId`         <- `V1TeamMatch.tournamentId`
+ * - `items[].round`                <- `V1TournamentMatchDetails.round`
+ * - `items[].fixtureNumber`        <- `V1TournamentMatchDetails.fixtureNumber`
+ * - `items[].gameId`               <- `V1Game.id` (via the TeamMatch `game` relation, nullable)
  * - `items[].gameState`            <- `V1Game.state`
- * - `items[].fieldId`              <- `V1TournamentFixture.fieldId`
- * - `items[].fieldName`            <- `V1TournamentField.name` (via `fixture.field`)
- * - `items[].homeRegistrationId`   <- `V1TournamentFixture.homeRegistrationId`
- * - `items[].awayRegistrationId`   <- `V1TournamentFixture.awayRegistrationId`
- * - `items[].scheduledAt`          <- `V1TournamentFixture.scheduledAt`
- * - `items[].currentScore`         <- `V1GameResultRevision.score` (via `game.currentOfficialRevision`)
+ * - `items[].fieldId`              <- `V1TeamMatch.fieldId`
+ * - `items[].fieldName`            <- `V1TournamentField.name` (via `teamMatch.field`)
+ * - `items[].homeRegistrationId`   <- `V1TournamentMatchDetails.homeRegistrationId`
+ * - `items[].awayRegistrationId`   <- `V1TournamentMatchDetails.awayRegistrationId`
+ * - `items[].scheduledAt`          <- `V1TeamMatch.startAt`
+ * - `items[].currentScore`         <- `V1GameResultRevision.score` only when the pointed revision is `OFFICIAL`
+ * - `items[].currentRevisionState` <- `V1GameResultRevision.state` (so `VOID` is not shown as a valid score)
  * - `items[].warnings`             <- `STABLE_WARNING_CODES` only, each computed from persisted
  *                                     columns alone (`NO_FIELD_ASSIGNED` <- `fieldId`,
  *                                     `MISSING_SCORER` <- `currentOfficialRevision.missingScorer`,
@@ -269,7 +270,7 @@ type BoardRow = {
  * `liveWarnings[].fixtureId` correlates back to `items[].fixtureId` (not new information);
  * `liveWarnings[].warnings` holds `TIME_RELATIVE_WARNING_CODES` only, each a function of
  * persisted state AND `now` (`NO_STAFF_ASSIGNED` <- `V1TournamentStaffAssignment.expiresAt` vs
- * `now`; `LINEUP_NOT_SUBMITTED` <- `V1TournamentFixture.scheduledAt - 60m` vs `now`, plus the
+ * `now`; `LINEUP_NOT_SUBMITTED` <- `V1TeamMatch.startAt - 60m` vs `now`, plus the
  * latest `V1GameLineup.state` per side).
  *
  * ## Incremental key: `items[].stableRevision` + hashed `watermark` (P0 fix, review finding #5)
@@ -281,7 +282,7 @@ type BoardRow = {
  * indistinguishable from any other game-less fixture regardless of its own mutations.
  *
  * Each item now carries `stableRevision` -- a `sha256` hex digest over EVERY persisted input that
- * can change that item's stable fields: `V1TournamentFixture.updatedAt`, `V1TournamentField.version`
+ * can change that item's stable fields: `V1TeamMatch.updatedAt`, `V1TournamentField.version`
  * (nullable), `V1Game.version`+`updatedAt` (nullable), `V1Game.currentOfficialRevisionId`
  * (nullable), the CANONICALIZED `V1GameResultRevision.score`+`missingScorer` of that current
  * official revision (nullable; Task 18 review P0-5 -- `currentOfficialRevisionId` alone is a proxy
@@ -433,12 +434,6 @@ export class TournamentOperationsBoardService {
     // Narrowed by the guard above (throws otherwise): safe to treat as stable-only from here on.
     const warningFilter: StableWarningCode | undefined = rawWarning;
 
-    const where: Prisma.V1TournamentFixtureWhereInput = {
-      tournamentId,
-      ...(query.fieldId ? { fieldId: query.fieldId } : {}),
-      ...(query.status ? { game: { is: { state: query.status } } } : {}),
-    };
-
     // Review finding #6: every persisted read that feeds the stable body runs inside one
     // RepeatableRead transaction so the response reflects a single database instant.
     const snapshot = await this.prisma.$transaction(
@@ -487,7 +482,7 @@ export class TournamentOperationsBoardService {
           ? []
           : isLeague
             ? await this.leagueBoardRows(tx, tournamentId, query, cursorPayload, limit)
-            : await this.fixtureBoardRows(tx, where, cursorPayload, limit);
+            : await this.tournamentBoardRows(tx, tournamentId, query, cursorPayload, limit);
 
         const hasNext = rawRows.length > limit;
         const pageRows = hasNext ? rawRows.slice(0, limit) : rawRows;
@@ -528,10 +523,8 @@ export class TournamentOperationsBoardService {
           await Promise.all([
             this.latestLineupStateBySide(tx, gameIds),
             this.escalationSummaryByGameId(tx, gameIds),
-            // 리그 페이지에서는 **커버리지를 계산할 수 없다** — 팀매치엔 `fieldId` 컬럼이
-            // 없고, `V1TournamentStaffFixtureScope.fixtureId` 는 FK 가 `V1TournamentFixture`
-            // 라 팀매치 id 가 거기 있을 수 없다(실측). 결과가 반드시 빈 집합인 쿼리라
-            // 아예 날리지 않는다.
+            // 리그 페이지에는 운영 필드가 없으므로 스태프 필드 커버리지를 계산하지 않는다.
+            // 결과가 반드시 빈 집합인 쿼리라 아예 날린다.
             isLeague
               ? Promise.resolve({ fieldIds: new Set<string>(), fixtureIds: new Set<string>() })
               : this.staffCoverage(tx, tournamentId, now, pageFieldIds, pageFixtureIds),
@@ -564,6 +557,8 @@ export class TournamentOperationsBoardService {
       const gameVersion = row.game?.version ?? null;
       const gameUpdatedAtMs = row.game?.updatedAt.getTime() ?? null;
       const revisionId = row.game?.currentOfficialRevisionId ?? null;
+      const currentRevision = row.game?.currentOfficialRevision ?? null;
+      const hasOfficialRevision = currentRevision?.state === 'OFFICIAL';
       const escalationSummary =
         (row.game !== null ? escalationSummaryMap.get(row.game.id) : undefined) ?? {
           overdueAtMs: null,
@@ -578,7 +573,7 @@ export class TournamentOperationsBoardService {
       // 항상 켜지는데, 운영자가 **영원히 해제할 수 없는 경고**는 신호가 아니라 소음이다 —
       // 모든 행에 붙어 진짜 경고(MISSING_SCORER·RESULT_REVIEW_OVERDUE)를 덮는다.
       if (!row.isLeague && row.fieldId === null) warnings.push('NO_FIELD_ASSIGNED');
-      if (row.game?.currentOfficialRevision?.missingScorer === true) {
+      if (hasOfficialRevision && currentRevision?.missingScorer === true) {
         warnings.push('MISSING_SCORER');
       }
 
@@ -616,8 +611,8 @@ export class TournamentOperationsBoardService {
       // silently breaking the incremental-diff contract this section documents. Hash the actual
       // (canonicalized, so jsonb key-order alone can never move this hash) `score`/`missingScorer`
       // values directly instead of only their revision-identity proxy.
-      const currentScoreForHash = canonicalizeForHash(row.game?.currentOfficialRevision?.score ?? null);
-      const missingScorerForHash = row.game?.currentOfficialRevision?.missingScorer ?? null;
+      const currentScoreForHash = canonicalizeForHash(hasOfficialRevision ? currentRevision?.score ?? null : null);
+      const missingScorerForHash = hasOfficialRevision ? currentRevision?.missingScorer ?? null : null;
       const stableRevision = createHash('sha256')
         .update(
           JSON.stringify([
@@ -626,6 +621,7 @@ export class TournamentOperationsBoardService {
             gameVersion,
             gameUpdatedAtMs,
             revisionId,
+            row.game?.currentOfficialRevision?.state ?? null,
             currentScoreForHash,
             missingScorerForHash,
             escalationSummary.maxVersion,
@@ -647,7 +643,11 @@ export class TournamentOperationsBoardService {
           homeRegistrationId: row.homeRegistrationId,
           awayRegistrationId: row.awayRegistrationId,
           scheduledAt: row.scheduledAt,
-          currentScore: row.game?.currentOfficialRevision?.score ?? null,
+          currentScore:
+            row.game?.currentOfficialRevision?.state === 'OFFICIAL'
+              ? row.game.currentOfficialRevision.score
+              : null,
+          currentRevisionState: row.game?.currentOfficialRevision?.state ?? null,
           warnings,
           version: gameVersion,
           revisionId,
@@ -780,7 +780,7 @@ export class TournamentOperationsBoardService {
       // ON-style query (one round-trip, still `v1GameLineup.findMany`), so this stays within
       // the fixed six-query board.list() budget while no longer scaling with revision count.
       tx.v1GameLineup.findMany({
-        where: { gameId: { in: [...gameIds] } },
+        where: { gameId: { in: [...gameIds] }, invalidatedAt: null },
         orderBy: [{ gameId: 'asc' }, { sideId: 'asc' }, { revision: 'desc' }],
         distinct: ['gameId', 'sideId'],
         select: { gameId: true, sideId: true, state: true },
@@ -917,7 +917,15 @@ export class TournamentOperationsBoardService {
             OR: [
               ...(pageFieldIds.length > 0 ? [{ fieldId: { in: [...pageFieldIds] } }] : []),
               ...(pageFixtureIds.length > 0
-                ? [{ fixtureScopes: { some: { fixtureId: { in: [...pageFixtureIds] } } } }]
+                ? [
+                    {
+                      fixtureScopes: {
+                        some: {
+                          teamMatchId: { in: [...pageFixtureIds] },
+                        },
+                      },
+                    },
+                  ]
                 : []),
             ],
           },
@@ -926,8 +934,13 @@ export class TournamentOperationsBoardService {
       select: {
         fieldId: true,
         fixtureScopes: {
-          where: pageFixtureIds.length > 0 ? { fixtureId: { in: [...pageFixtureIds] } } : undefined,
-          select: { fixtureId: true },
+          where:
+            pageFixtureIds.length > 0
+              ? {
+                  teamMatchId: { in: [...pageFixtureIds] },
+                }
+              : undefined,
+          select: { teamMatchId: true },
         },
       },
     });
@@ -935,50 +948,95 @@ export class TournamentOperationsBoardService {
       if (assignment.fieldId !== null && pageFieldIds.includes(assignment.fieldId)) {
         fieldIds.add(assignment.fieldId);
       }
-      for (const scope of assignment.fixtureScopes) fixtureIds.add(scope.fixtureId);
+      for (const scope of assignment.fixtureScopes) {
+        const scopeId = scope.teamMatchId;
+        if (scopeId !== null) fixtureIds.add(scopeId);
+      }
     }
     return { fieldIds, fixtureIds };
   }
 
   /**
-   * 대회 축 한 페이지. 지금까지의 동작 그대로다 — 정렬·커서 튜플 `(round, fixtureNumber, id)`.
+   * 대회 축 한 페이지. 대진 메타데이터는 `V1TournamentMatchDetails`가, 경기·필드·일정은
+   * `V1TeamMatch`가 정본이다. 예전 `V1TournamentFixture` mirror를 읽으면 creator가 만든
+   * canonical 행이 운영 콘솔에서 사라지고, 같은 경기의 두 행이 서로 다른 상태를 보이므로
+   * 이 경로에서는 mirror를 조회하지 않는다.
    */
-  private async fixtureBoardRows(
+  private async tournamentBoardRows(
     tx: Tx,
-    where: Prisma.V1TournamentFixtureWhereInput,
+    tournamentId: string,
+    query: ListTournamentOperationsQueryDto,
     cursor: OperationsBoardCursorPayload | null | undefined,
     limit: number,
   ): Promise<BoardRow[]> {
-    const cursorPredicate: Prisma.V1TournamentFixtureWhereInput | undefined =
+    const cursorPredicate: Prisma.V1TeamMatchWhereInput | undefined =
       cursor != null && cursor.kind === 'fixture'
         ? {
             OR: [
-              { round: { gt: cursor.round } },
-              { round: cursor.round, fixtureNumber: { gt: cursor.fixtureNumber } },
-              { round: cursor.round, fixtureNumber: cursor.fixtureNumber, id: { gt: cursor.id } },
+              { tournamentDetails: { is: { round: { gt: cursor.round } } } },
+              {
+                tournamentDetails: {
+                  is: { round: cursor.round, fixtureNumber: { gt: cursor.fixtureNumber } },
+                },
+              },
+              {
+                tournamentDetails: {
+                  is: { round: cursor.round, fixtureNumber: cursor.fixtureNumber },
+                },
+                id: { gt: cursor.id },
+              },
             ],
           }
         : undefined;
 
-    const rows = await tx.v1TournamentFixture.findMany({
-      where: cursorPredicate === undefined ? where : { ...where, ...cursorPredicate },
-      orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }, { id: 'asc' }],
+    const base: Prisma.V1TeamMatchWhereInput = {
+      tournamentId,
+      deletedAt: null,
+      tournamentDetails: { isNot: null },
+      ...(query.fieldId ? { fieldId: query.fieldId } : {}),
+      ...(query.status ? { game: { is: { state: query.status } } } : {}),
+    };
+    const rows = await tx.v1TeamMatch.findMany({
+      where: cursorPredicate === undefined ? base : { ...base, ...cursorPredicate },
+      orderBy: [
+        { tournamentDetails: { round: 'asc' } },
+        { tournamentDetails: { fixtureNumber: 'asc' } },
+        { id: 'asc' },
+      ],
       take: limit + 1,
       select: {
         id: true,
         tournamentId: true,
-        round: true,
-        fixtureNumber: true,
         fieldId: true,
-        field: { select: { name: true, version: true } },
-        homeRegistrationId: true,
-        awayRegistrationId: true,
-        scheduledAt: true,
+        startAt: true,
         updatedAt: true,
+        field: { select: { name: true, version: true } },
+        tournamentDetails: {
+          select: {
+            round: true,
+            fixtureNumber: true,
+            homeRegistrationId: true,
+            awayRegistrationId: true,
+          },
+        },
         game: { select: BOARD_GAME_SELECT },
       },
     });
-    return rows.map((row) => ({ ...row, isLeague: false }));
+
+    return rows.map((row) => ({
+      id: row.id,
+      tournamentId: row.tournamentId ?? tournamentId,
+      round: row.tournamentDetails?.round ?? null,
+      fixtureNumber: row.tournamentDetails?.fixtureNumber ?? null,
+      fieldId: row.fieldId,
+      field: row.field,
+      homeRegistrationId: row.tournamentDetails?.homeRegistrationId ?? null,
+      awayRegistrationId: row.tournamentDetails?.awayRegistrationId ?? null,
+      scheduledAt: row.startAt,
+      updatedAt: row.updatedAt,
+      game: row.game,
+      isLeague: false,
+    }));
   }
 
   /**
@@ -1047,7 +1105,7 @@ export class TournamentOperationsBoardService {
             : [row.hostTeamId, row.approvedApplicantTeamId],
         ),
       ),
-    ];
+    ].filter((teamId): teamId is string => teamId !== null);
     const registrations =
       teamIds.length === 0
         ? []
@@ -1074,7 +1132,10 @@ export class TournamentOperationsBoardService {
       fixtureNumber: null,
       fieldId: null,
       field: null,
-      homeRegistrationId: registrationByTeamId.get(row.hostTeamId) ?? null,
+      // A legacy league row can have no host team while it is still recruiting. Keep that
+      // unresolved side null; never pass null through registration lookup as if it were a team.
+      homeRegistrationId:
+        row.hostTeamId === null ? null : registrationByTeamId.get(row.hostTeamId) ?? null,
       awayRegistrationId:
         row.approvedApplicantTeamId === null
           ? null

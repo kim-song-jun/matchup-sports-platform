@@ -6,7 +6,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { Prisma, V1ConsentState, V1GameLineupState, type V1GameLineup } from '@prisma/client';
+import { Prisma, V1ConsentState, V1GameLineupState, type V1GameLineup, type V1TeamMatchStatus } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { canonicalGameCommandPayloadHash, createRosterAssertedIdentityLink } from '../games/games.service';
@@ -68,6 +68,7 @@ interface TeamMatchLineupContext {
   gameId: string;
   gameCompetitionConfigVersionId: string;
   teamMatchId: string;
+  status: V1TeamMatchStatus;
   startAt: Date;
   ownSideId: string;
   ownTeamId: string;
@@ -93,6 +94,14 @@ interface TeamMatchLineupContext {
  */
 function isLeagueFixture(context: TeamMatchLineupContext): boolean {
   return context.leagueId !== null;
+}
+
+function assertLineupMutationAllowed(context: TeamMatchLineupContext): void {
+  if (context.status !== 'completed' && context.status !== 'cancelled' && context.status !== 'archived') return;
+  throw new ConflictException({
+    code: 'LINEUP_MATCH_TERMINAL',
+    message: '종료되거나 취소된 경기의 라인업은 수정할 수 없어요.',
+  });
 }
 
 @Injectable()
@@ -149,6 +158,7 @@ export class TeamMatchLineupService {
           payload: dto,
         },
         async () => {
+          assertLineupMutationAllowed(context);
           if (Date.now() >= context.startAt.getTime()) {
             throw new ConflictException({
               code: 'LINEUP_DEADLINE_PASSED',
@@ -290,6 +300,7 @@ export class TeamMatchLineupService {
           payload: dto,
         },
         async () => {
+          assertLineupMutationAllowed(context);
           if (Date.now() >= context.startAt.getTime()) {
             throw new ConflictException({
               code: 'LINEUP_DEADLINE_PASSED',
@@ -389,6 +400,7 @@ export class TeamMatchLineupService {
           payload: dto,
         },
         async () => {
+          assertLineupMutationAllowed(context);
           const target = await this.lazyLock(
             tx,
             await this.latestLineup(tx, context.gameId, context.opponentSideId),
@@ -735,6 +747,7 @@ export class TeamMatchLineupService {
         id: true,
         hostTeamId: true,
         approvedApplicantTeamId: true,
+        status: true,
         startAt: true,
         leagueId: true,
       },
@@ -743,6 +756,16 @@ export class TeamMatchLineupService {
       throw new NotFoundException({
         code: 'TEAM_MATCH_NOT_FOUND',
         message: '팀 매칭을 찾을 수 없어요.',
+      });
+    }
+    if (
+      teamMatch.hostTeamId === null ||
+      teamMatch.approvedApplicantTeamId === null ||
+      teamMatch.startAt === null
+    ) {
+      throw new ConflictException({
+        code: 'TEAM_MATCH_OPERATIONAL_DATA_INVALID',
+        message: '팀 매치의 양 팀 또는 경기 시작 시간이 없습니다.',
       });
     }
     const game = await tx.v1Game.findUnique({
@@ -782,6 +805,7 @@ export class TeamMatchLineupService {
         gameId: game.id,
         gameCompetitionConfigVersionId: game.competitionConfigVersionId,
         teamMatchId,
+        status: teamMatch.status,
         startAt: teamMatch.startAt,
         ownSideId: hostSide.id,
         ownTeamId: teamMatch.hostTeamId,
@@ -795,6 +819,7 @@ export class TeamMatchLineupService {
       gameId: game.id,
       gameCompetitionConfigVersionId: game.competitionConfigVersionId,
       teamMatchId,
+      status: teamMatch.status,
       startAt: teamMatch.startAt,
       ownSideId: awaySide.id,
       ownTeamId: membership.teamId,
@@ -857,7 +882,7 @@ export class TeamMatchLineupService {
 
   private async latestLineup(tx: Transaction, gameId: string, sideId: string) {
     return tx.v1GameLineup.findFirst({
-      where: { gameId, sideId },
+      where: { gameId, sideId, invalidatedAt: null },
       orderBy: { revision: 'desc' },
     });
   }
@@ -1102,6 +1127,7 @@ export class TeamMatchLineupService {
       state: V1GameLineupState;
       version: number;
       formation: string | null;
+      invalidatedAt: Date | null;
     } | null,
     publicLineupAt: Date | null,
   ) {
@@ -1141,6 +1167,7 @@ export class TeamMatchLineupService {
       state: lineup?.state ?? V1GameLineupState.DRAFT,
       version: lineup?.revision ?? 0,
       formation: lineup?.formation ?? null,
+      invalidatedAt: lineup?.invalidatedAt?.toISOString() ?? null,
       publicLineupAt: publicLineupAt?.toISOString() ?? null,
       participants: roster,
       // 옛 두 칸 — 같은 명단을 프론트가 아직 읽는 모양으로 한 번 더 담는다.

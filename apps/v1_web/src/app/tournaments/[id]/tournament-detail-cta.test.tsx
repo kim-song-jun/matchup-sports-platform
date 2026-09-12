@@ -193,6 +193,23 @@ describe('TournamentDetailView — 통합 CTA가 실제 화면에 상태별로 �
   });
 });
 
+describe('TournamentDetailView — 신청 차단 사유 표시', () => {
+  it('신청 마감 사유를 disabled CTA의 접근성 이름과 화면 텍스트로 함께 보여준다', () => {
+    const tournament = makeTournament({
+      id: 't-deadline',
+      status: 'open',
+      format: 'knockout',
+      registrationDeadlineAt: '2020-01-01T00:00:00.000Z',
+    });
+    render(<TournamentDetailView tournament={tournament} myRegistration={null} />);
+
+    const reason = '신청이 마감돼서 새로 신청할 수 없어요.';
+    const button = screen.getByRole('button', { name: reason });
+    expect(button).toBeDisabled();
+    expect(screen.getByText(reason)).toBeVisible();
+  });
+});
+
 describe('TournamentDetailView — 중복 "전체 경기 일정 보기" 링크가 없다', () => {
   it.each<V1TournamentStatus>(['open', 'closed', 'in_progress', 'completed'])(
     '%s 상태에서도 옛 상태-무관 일정 링크 문구가 더 이상 렌더되지 않는다',

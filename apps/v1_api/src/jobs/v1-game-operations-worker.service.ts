@@ -7,6 +7,7 @@ import {
 import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
+import { TOURNAMENT_CUTOVER_SHARED_LOCK } from '../common/tournament-cutover-lock';
 import { GameResultOfficialProjectionService } from '../game-operations/game-result-official-projection.service';
 import { GameResultVoidProjectionService } from '../game-operations/game-result-void-projection.service';
 import { GameResultSubmittedEscalationService } from './result-escalation/game-result-submitted-escalation.service';
@@ -21,6 +22,8 @@ import {
 } from './identity-link/identity-link-expiry.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebPushService } from '../notifications/web-push.service';
+import { VideoUploadCleanupService } from './video-upload-cleanup.service';
+import { VIDEO_UPLOAD_CLEANUP_TYPE } from '../games/video-url-lock';
 
 export const GAME_OPERATION_RETRY_DELAYS_MS = [1_000, 5_000, 30_000, 120_000, 600_000] as const;
 export const GAME_OPERATION_LEASE_MS = 30_000;
@@ -92,6 +95,7 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     // 계속 동작해야 한다. 실제 워커(v1-game-operations-worker.module.ts)에서는
     // WorkerNotificationsModule이 내보내는 WebPushService가 DI로 자동 주입된다.
     @Optional() private readonly webPush?: WebPushService,
+    @Optional() private readonly videoUploadCleanup?: VideoUploadCleanupService,
   ) {
     this.transactionTimeoutMs = transactionTimeoutMs ?? GAME_OPERATION_TRANSACTION_TIMEOUT_MS;
     if (this.transactionTimeoutMs <= 0 || this.transactionTimeoutMs >= GAME_OPERATION_SHUTDOWN_MS) {
@@ -140,6 +144,9 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     // `revision.state !== 'SUBMITTED'` 를 가드하므로 잘못된 알림은 나가지 않고 escalation
     // 행의 status 만 PENDING 으로 남는다(의도적으로 이 태스크 범위 밖).
     this.registerDurableAuditHandler('GAME_RESULT_CHANGE_REQUESTED');
+    if (this.videoUploadCleanup) {
+      this.registerHandler(VIDEO_UPLOAD_CLEANUP_TYPE, this.videoUploadCleanup.handler);
+    }
   }
 
   /** Read-only registration introspection for tests — no DB access. */
@@ -237,6 +244,11 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     if (!this.acceptingClaims || this.handlers.size === 0) return null;
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const maintenanceLock = await tx.$queryRaw<Array<{ acquired: boolean }>>(TOURNAMENT_CUTOVER_SHARED_LOCK);
+      if (maintenanceLock[0]?.acquired !== true) {
+        return { recovered: 0, row: null };
+      }
+
       const recovered = await tx.$executeRaw`
         WITH expired AS (
           SELECT id, version

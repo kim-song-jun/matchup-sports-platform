@@ -40,7 +40,8 @@ function ProfileLink({ href, children }: { href: string | null; children: React.
 }
 
 function sideLabel(side: PublicMatchDetail['home']): string {
-  return side?.teamName ?? '미정';
+  if (side?.teamName) return side.teamName;
+  return side?.registrationId ? '참가팀 비공개' : '미정';
 }
 
 /**
@@ -288,7 +289,7 @@ function EventsSection({
   );
 }
 
-function HistorySection({ history }: { history: PublicMatchDetail['history'] }) {
+function HistorySection({ history, isStatusOnly }: { history: PublicMatchDetail['history']; isStatusOnly: boolean }) {
   if (history.length === 0) return null;
   return (
     <section>
@@ -308,7 +309,7 @@ function HistorySection({ history }: { history: PublicMatchDetail['history'] }) 
                 {revision.officialAt ? formatTournamentDateTimeLong(revision.officialAt) : ''}
               </span>
             </div>
-            {revision.reason ? (
+            {revision.reason && !isStatusOnly ? (
               <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-caption)' }}>{revision.reason}</p>
             ) : null}
           </div>
@@ -356,6 +357,20 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
           </div>
           {/* 스코어 아래 보조 표기 — 승부차기가 없으면 렌더 없음. */}
           <PenaltyScoreline score={data.score} scoreStatus={data.scoreStatus} fontSize="var(--font-size-caption)" />
+          {data.visibilityMode === 'official_only' && data.resultState === 'pending' ? (
+            <p
+              style={{
+                margin: '8px auto 0',
+                maxWidth: '28rem',
+                fontSize: 'var(--font-size-body-sm)',
+                color: 'var(--text-caption)',
+                textAlign: 'center',
+                wordBreak: 'keep-all',
+              }}
+            >
+              공식 결과가 확정되면 점수와 기록이 공개돼요.
+            </p>
+          ) : null}
           {/* 몰수·중단 표기는 스코어 바로 아래에 둔다 — 점수를 읽은 다음 눈이 가는 자리이자,
               "이 점수가 정상 경기 결과가 아니다"를 점수와 떼어놓지 않는 유일한 위치다. */}
           <MatchOutcomeNotice outcome={data.outcome} />
@@ -385,8 +400,18 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
             </p>
           ) : null}
           {isStatusOnly ? (
-            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-caption)', textAlign: 'center' }}>
-              이 경기는 진행 상태와 확정 기록만 공개돼요.
+            <p
+              style={{
+                margin: '8px auto 0',
+                maxWidth: '28rem',
+                fontSize: 12,
+                color: 'var(--text-caption)',
+                textAlign: 'center',
+                wordBreak: 'keep-all',
+                textWrap: 'balance',
+              }}
+            >
+              이 경기는 진행 상태만 공개돼요. 점수와 선수 기록은 공개되지 않아요.
             </p>
           ) : null}
         </Card>
@@ -434,7 +459,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
         </section>
       ) : null}
 
-      <HistorySection history={data.history} />
+      <HistorySection history={data.history} isStatusOnly={isStatusOnly} />
 
       {data.nextMatch ? (
         <Link

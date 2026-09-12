@@ -1,15 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-
-// 백필은 별도 모듈의 검증 대상이라 여기서는 호출 여부만 본다.
-jest.mock('../../games/migration/fixture-game-backfill', () => ({
-  runFixtureGameBackfill: jest.fn(async () => ({
-    counts: { gamesCreated: 6, periodsBackfilled: 0, visibilityPoliciesBackfilled: 0, quarantined: 0 },
-    quarantine: [],
-  })),
-}));
 import { MockTournamentSeedService, readLineupMinPlayers } from './mock-tournament-seed.service';
+import type { V1AuthUser } from '../../auth/v1-auth-user';
 
 /**
  * schema.prisma 원문에서 모델별 필드 맵을 만든다.
@@ -57,7 +50,7 @@ function unknownSelectFields(
   return problems;
 }
 
-const user = { id: 'admin-1', email: 'a@teameet.v1', accountStatus: 'active', onboardingStatus: 'completed' } as never;
+const user: V1AuthUser = { id: 'admin-1', email: 'a@teameet.v1', accountStatus: 'active', onboardingStatus: 'completed' };
 
 function makeWorld(teamCount = 4) {
   const teams = Array.from({ length: teamCount }, (_, i) => ({
@@ -69,22 +62,78 @@ function makeWorld(teamCount = 4) {
       { userId: `member-${i}-2`, role: 'member', user: { email: `m${i}b@teameet.test`, profile: { nickname: `선수${i}B` } } },
     ],
   }));
-  const fixtures: Array<Record<string, unknown>> = [];
   const results: Array<Record<string, unknown>> = [];
   const players: Array<Record<string, unknown>> = [];
+  const playerRecords: Array<Record<string, unknown>> = [];
+  const teamMatches: Array<Record<string, unknown>> = [];
+  const games: Array<{ gameId: string; version: number; lastSequence: number }> = [];
+  const events: Array<{ gameId: string; sideId: string }> = [];
+  const operationHeaders: Array<{ operation: string; headerIdempotencyKey: unknown; bodyIdempotencyKey: unknown }> = [];
+  const actorContexts: Array<Record<string, unknown>> = [];
+  const registrationTeams = new Map<string, string>();
   const tx = {
     v1Tournament: { create: jest.fn(async ({ data }: never) => ({ ...(data as object), id: 'tour-1' })) },
-    v1TournamentRegistration: { create: jest.fn(async ({ data }: never) => ({ ...(data as object), id: `reg-${Math.random()}` })) },
-    v1TournamentPlayer: { createMany: jest.fn(async ({ data }: { data: unknown[] }) => { players.push(...(data as never[])); return { count: data.length }; }) },
-    v1TournamentGroup: { create: jest.fn(async () => ({ id: 'group-1' })) },
+    v1TournamentRegistration: {
+      create: jest.fn(async ({ data }: never) => {
+        const id = `reg-${registrationTeams.size + 1}`;
+        registrationTeams.set(id, (data as { teamId: string }).teamId);
+        return { ...(data as object), id };
+      }),
+      findMany: jest.fn(async ({ where }: { where: { id: { in: string[] } } }) => where.id.in.map((id) => ({ id, teamId: registrationTeams.get(id) ?? '' }))),
+    },
+    v1TournamentPlayer: {
+      createMany: jest.fn(async ({ data }: { data: unknown[] }) => {
+        players.push(...(data as never[]));
+        playerRecords.push(...(data as Array<Record<string, unknown>>).map((row, index) => ({ ...row, id: `player-${playerRecords.length + index + 1}`, removedAt: null })));
+        return { count: data.length };
+      }),
+      findMany: jest.fn(async ({ where }: { where: { registrationId?: string; id?: { in: string[] } } }) => {
+        const rows = where.id
+          ? playerRecords.filter((player) => where.id!.in.includes(player.id as string))
+          : playerRecords.filter((player) => player.registrationId === where.registrationId);
+        return rows.map((player) => ({
+          id: player.id,
+          registrationId: player.registrationId,
+          userId: player.userId,
+          removedAt: null,
+          user: { profile: { nickname: `별명-${String(player.userId)}`, displayName: `표시-${String(player.userId)}` } },
+        }));
+      }),
+    },
+    v1TournamentGroup: { create: jest.fn(async () => ({ id: 'group-1' })), findFirst: jest.fn(async () => ({ id: 'group-1' })) },
     v1TournamentGroupTeam: { createMany: jest.fn(async () => ({ count: 0 })) },
-    v1TournamentFixture: { create: jest.fn(async ({ data }: never) => { fixtures.push(data as never); return { ...(data as object), id: `fx-${fixtures.length}` }; }) },
-    v1TournamentFixtureResult: { create: jest.fn(async ({ data }: never) => { results.push(data as never); return data; }) },
+    v1TeamMatch: {
+      create: jest.fn(async ({ data }: never) => { teamMatches.push(data as never); return { id: (data as { id: string }).id }; }),
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
+    v1TournamentMatchDetails: { create: jest.fn(async ({ data }: never) => data) },
+    v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn() },
+    v1TeamSchedule: { count: jest.fn().mockResolvedValue(0), create: jest.fn() },
+    $executeRaw: jest.fn(),
   };
   const prisma = {
     v1Sport: { findFirst: jest.fn().mockResolvedValue({ id: 'sport-futsal', code: 'futsal' }) },
     v1CompetitionConfigVersion: { findFirst: jest.fn().mockResolvedValue({ id: 'config-1', lineup: { minPlayers: 3, maxPlayers: 11 } }) },
-    v1Game: { findMany: jest.fn().mockResolvedValue([]) },
+    v1Game: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn(async ({ where }: { where: { id: string } }) => {
+        const game = games.find((row) => row.gameId === where.id);
+        return game === undefined
+          ? null
+          : {
+              ...game,
+              sides: [{ id: `side-home-${where.id}`, sideKey: 'HOME' }, { id: `side-away-${where.id}`, sideKey: 'AWAY' }],
+              participants: [
+                { id: `participant-home-${where.id}`, sideId: `side-home-${where.id}` },
+                { id: `participant-away-${where.id}`, sideId: `side-away-${where.id}` },
+              ],
+            };
+      }),
+      resultRevisions: { findUnique: jest.fn() },
+    },
+    v1GameResultRevision: {
+      findUnique: jest.fn(async ({ where }: { where: { id: string } }) => ({ id: where.id, score: { home: 0, away: 0 }, goalEvents: [], eventsHash: 'events-hash', mvpParticipantId: null })),
+    },
     v1Team: { findMany: jest.fn().mockResolvedValue(teams) },
     $transaction: jest.fn(async (cb: (t: unknown) => Promise<unknown>) => cb(tx)),
   };
@@ -92,8 +141,44 @@ function makeWorld(teamCount = 4) {
     getMutationAdmin: jest.fn().mockResolvedValue({ id: 'admin-row', role: 'ops' }),
     logAdminAction: jest.fn(),
   };
-  const service = new MockTournamentSeedService(prisma as never, adminContext as never);
-  return { service, prisma, tx, fixtures, results, players, adminContext };
+  const gamesService = {
+    createFromSourceInTransaction: jest.fn(async (_tx: unknown, input: { sourceId: string; participants: Array<{ userId: string; displayNameSnapshot: string }> }, context: { actor: Record<string, unknown> }) => {
+      actorContexts.push(context.actor);
+      const game = { gameId: `game-${games.length + 1}`, sourceType: 'TEAM_MATCH', sourceId: input.sourceId, competitionConfigVersionId: 'config-1', state: 'SCHEDULED', version: 0 };
+      games.push({ gameId: game.gameId, version: 0, lastSequence: 0 });
+      return game;
+    }),
+    requestTakeover: jest.fn(async (_user: unknown, gameId: string) => ({ gameId, takeoverToken: 'takeover-token', version: 4, lastSequence: 9, expiresAt: new Date().toISOString() })),
+    executeCommand: jest.fn(async (_user: unknown, gameId: string, command: string, headerIdempotencyKey: unknown, dto: { clientCommandId: unknown }) => {
+      operationHeaders.push({ operation: command, headerIdempotencyKey, bodyIdempotencyKey: dto.clientCommandId });
+      return command === 'start'
+        ? { gameId, state: 'LIVE', version: 1, durableCommandId: String(dto.clientCommandId), replayed: false }
+        : { gameId, state: 'ENDED', version: 2, durableCommandId: String(dto.clientCommandId), replayed: false, revisionId: `revision-${gameId}`, revision: 1, revisionState: 'SUBMITTED' };
+    }),
+    appendEvent: jest.fn(async (_user: unknown, gameId: string, headerIdempotencyKey: unknown, dto: { expectedVersion: number; sideId?: string; clientEventId: unknown }) => {
+      operationHeaders.push({ operation: 'event', headerIdempotencyKey, bodyIdempotencyKey: dto.clientEventId });
+      events.push({ gameId, sideId: dto.sideId ?? '' });
+      return {
+        gameId,
+        state: 'LIVE',
+        version: dto.expectedVersion + 1,
+        durableCommandId: 'event',
+        replayed: false,
+        clientEventId: 'event',
+        sequence: dto.expectedVersion,
+        event: {},
+      };
+    }),
+  };
+  const resultReview = {
+    officializeResultRevision: jest.fn(async (_user: unknown, gameId: string, _revisionId: string, headerIdempotencyKey: unknown, dto: { clientCommandId: unknown }) => {
+      operationHeaders.push({ operation: 'officialize', headerIdempotencyKey, bodyIdempotencyKey: dto.clientCommandId });
+      results.push({ gameId });
+      return { gameId };
+    }),
+  };
+  const service = new MockTournamentSeedService(prisma as never, adminContext as never, gamesService as never, resultReview as never);
+  return { service, prisma, tx, results, players, teamMatches, games, events, operationHeaders, actorContexts, adminContext, gamesService, resultReview };
 }
 
 describe('MockTournamentSeedService', () => {
@@ -155,6 +240,21 @@ describe('MockTournamentSeedService', () => {
       (field) => !scalarFields.has(field),
     );
     expect(unknownFields).toEqual([]);
+  });
+
+  it('실제 목업 시드 경기 생성 경로는 실명과 다른 프로필 닉네임을 참가자 스냅샷에 쓴다', async () => {
+    const { service, gamesService, players } = makeWorld();
+    await service.createTournament(user, { format: 'league', teamCount: 4 });
+
+    const source = gamesService.createFromSourceInTransaction.mock.calls[0]?.[1] as unknown as {
+      participants: Array<{ userId: string; displayNameSnapshot: string }>;
+    };
+    expect(source.participants.length).toBeGreaterThan(0);
+    const participant = source.participants[0]!;
+    const realName = players.find((player) => player.userId === participant.userId)?.realName;
+    expect(realName).toBeDefined();
+    expect(participant.displayNameSnapshot).toBe(`별명-${participant.userId}`);
+    expect(participant.displayNameSnapshot).not.toBe(realName);
   });
 
   // alpha 에는 ACTIVE config 가 5개 있고 종목마다 라인업 하한이 다르다(풋살 3명 · 축구 7명).
@@ -255,17 +355,16 @@ describe('MockTournamentSeedService', () => {
     expect(prisma.v1Team.findMany).not.toHaveBeenCalled();
   });
 
-  // 픽스처만 있으면 운영 콘솔이 "경기 미생성"으로 뜬다(alpha 실측). V1Game 은 백필이 만들고,
-  // 그 백필은 competitionConfigVersionId 가 없는 픽스처를 CONFIG_MISSING 으로 격리한다.
-  it('픽스처에 competitionConfigVersionId 를 박고 게임 백필을 돌린다', async () => {
-    const { runFixtureGameBackfill } = jest.requireMock('../../games/migration/fixture-game-backfill');
-    const { service, fixtures } = makeWorld(4);
+  it('canonical TeamMatch와 TEAM_MATCH Game을 같은 config pin으로 만든다', async () => {
+    const { service, teamMatches, games, gamesService, actorContexts } = makeWorld(4);
 
     const result = await service.createTournament(user, { format: 'league', teamCount: 4 });
 
-    expect(fixtures.length).toBeGreaterThan(0);
-    expect(fixtures.every((fixture) => fixture.competitionConfigVersionId === 'config-1')).toBe(true);
-    expect(runFixtureGameBackfill).toHaveBeenCalledWith(expect.anything(), { mode: 'apply' });
+    expect(teamMatches).toHaveLength(6);
+    expect(games).toHaveLength(6);
+    expect(gamesService.createFromSourceInTransaction).toHaveBeenCalledTimes(6);
+    expect(actorContexts).toHaveLength(6);
+    expect(actorContexts.every((actor) => actor.actorType === 'USER' && actor.actorUserId === user.id && actor.role === 'platform_ops' && actor.tournamentId === 'tour-1')).toBe(true);
     expect(result.gamesCreated).toBe(6);
   });
 
@@ -335,7 +434,7 @@ describe('MockTournamentSeedService', () => {
 
     await service.createTournament(user, { format: 'league', teamCount: 4 });
 
-    expect(tx.v1TournamentFixture.create).toHaveBeenCalled();
+    expect(tx.v1TeamMatch.create).toHaveBeenCalled();
     expect(tx).not.toHaveProperty('v1GameLineup');
   });
 
@@ -349,12 +448,12 @@ describe('MockTournamentSeedService', () => {
   });
 
   it('리그는 라운드로빈으로 전 팀이 맞붙는다 (4팀 → 6경기)', async () => {
-    const { service, fixtures } = makeWorld(4);
+    const { service, teamMatches } = makeWorld(4);
 
     const result = await service.createTournament(user, { format: 'league', teamCount: 4 });
 
     expect(result.fixtureCount).toBe(6);
-    expect(fixtures).toHaveLength(6);
+    expect(teamMatches).toHaveLength(6);
   });
 
   it('토너먼트는 단판 대진으로 짝을 짓는다 (4팀 → 2경기)', async () => {
@@ -363,6 +462,33 @@ describe('MockTournamentSeedService', () => {
     const result = await service.createTournament(user, { format: 'knockout', teamCount: 4 });
 
     expect(result.fixtureCount).toBe(2);
+  });
+
+  it('8팀 knockout 결과는 canonical 이벤트 기준 regulation 동점을 만들지 않는다', async () => {
+    const { service, events, gamesService, operationHeaders } = makeWorld(8);
+
+    await service.createTournament(user, { format: 'knockout', teamCount: 8, reviewReady: true });
+
+    const eventsByGame = new Map<string, Map<string, number>>();
+    for (const event of events) {
+      const bySide = eventsByGame.get(event.gameId) ?? new Map<string, number>();
+      bySide.set(event.sideId, (bySide.get(event.sideId) ?? 0) + 1);
+      eventsByGame.set(event.gameId, bySide);
+    }
+    expect(gamesService.requestTakeover).toHaveBeenCalledTimes(4);
+    expect(operationHeaders).not.toHaveLength(0);
+    expect(operationHeaders.every(({ headerIdempotencyKey, bodyIdempotencyKey }) =>
+      typeof headerIdempotencyKey === 'string' &&
+      headerIdempotencyKey.length > 0 &&
+      headerIdempotencyKey === bodyIdempotencyKey,
+    )).toBe(true);
+    expect(eventsByGame.size).toBe(4);
+    for (const [gameId, bySide] of eventsByGame.entries()) {
+      expect(new Set([
+        bySide.get(`side-home-${gameId}`) ?? 0,
+        bySide.get(`side-away-${gameId}`) ?? 0,
+      ]).size).toBeGreaterThan(1);
+    }
   });
 
   it('조별리그+토너먼트는 조별 라운드로빈에 4강을 더한다 (4팀 → 6+2)', async () => {
@@ -375,12 +501,11 @@ describe('MockTournamentSeedService', () => {
 
   // 후기 대상은 "공식 결과가 있는 완료 경기"에서만 열린다 — 결과 없이 종료시키면 쓸 게 없다.
   it('후기 작성 가능으로 만들면 경기 결과까지 채운다', async () => {
-    const { service, results, fixtures } = makeWorld(4);
+    const { service, results, teamMatches } = makeWorld(4);
 
     await service.createTournament(user, { format: 'league', teamCount: 4, reviewReady: true });
 
-    expect(results).toHaveLength(fixtures.length);
-    expect(fixtures.every((f) => f.status === 'completed')).toBe(true);
+    expect(results).toHaveLength(teamMatches.length);
   });
 
   it('명단을 채울 팀이 부족하면 반쪽 대회를 만들지 않고 실패한다', async () => {

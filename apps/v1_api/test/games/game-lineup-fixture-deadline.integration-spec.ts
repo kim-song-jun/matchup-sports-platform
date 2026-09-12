@@ -7,7 +7,7 @@ import type { GameCommandContext, GameSourceCreationInput } from '../../src/game
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 /**
- * Issue #378 — `GamesService.saveLineup`'s tournament-fixture route
+ * Issue #378 — `GamesService.saveLineup`'s tournament match route
  * (`PUT /games/:gameId/lineups/:sideId`) had no deadline gate at all: a
  * caller could overwrite a fixture's lineup (DRAFT or SUBMITTED) after
  * kickoff, even though the frontend hid the save UI once the lineup was
@@ -24,6 +24,8 @@ const ids = {
   hostTeam: '6b000000-0000-4000-8000-000000000120',
   opponentTeam: '6b000000-0000-4000-8000-000000000121',
   tournament: '6b000000-0000-4000-8000-000000000130',
+  hostRegistration: '6b000000-0000-4000-8000-000000000150',
+  awayRegistration: '6b000000-0000-4000-8000-000000000151',
   fixture: '6b000000-0000-4000-8000-000000000140',
 } as const;
 
@@ -71,7 +73,7 @@ function starters(count: number) {
   }));
 }
 
-describe('GamesService.saveLineup rejects tournament-fixture saves once the game has started (#378)', () => {
+describe('GamesService.saveLineup rejects tournament-match saves once the game has started (#378)', () => {
   let minPlayers: number;
   let gameId: string;
   let hostSideId: string;
@@ -120,18 +122,39 @@ describe('GamesService.saveLineup rejects tournament-fixture saves once the game
         competitionConfigVersionId: config.id,
       },
     });
-    await prisma.v1TournamentFixture.create({
+    await prisma.v1TournamentRegistration.createMany({
+      data: [
+        { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.platformOpsUser, status: 'confirmed' },
+        { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.platformOpsUser, status: 'confirmed' },
+      ],
+    });
+    await prisma.v1TeamMatch.create({
       data: {
         id: ids.fixture,
         tournamentId: ids.tournament,
+        sportId: ids.sport,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+        title: 'Lineup deadline match',
+        status: 'matched',
+        startAt: new Date(Date.now() - 60_000),
+        competitionConfigVersionId: config.id,
+      },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: ids.fixture,
+        tournamentId: ids.tournament,
         round: 'group',
         fixtureNumber: 1,
-        competitionConfigVersionId: config.id,
+        legNumber: 1,
+        homeRegistrationId: ids.hostRegistration,
+        awayRegistrationId: ids.awayRegistration,
       },
     });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: config.id,
       sides: [

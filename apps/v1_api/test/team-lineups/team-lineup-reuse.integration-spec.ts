@@ -27,6 +27,9 @@ const ids = {
   futsalGame: '71000000-0000-4000-8000-000000000061',
   futsalSideA: '71000000-0000-4000-8000-000000000062',
   futsalConfig: '71000000-0000-4000-8000-000000000063',
+  invalidatedOnlyTeamMatch: '71000000-0000-4000-8000-000000000070',
+  invalidatedOnlyGame: '71000000-0000-4000-8000-000000000071',
+  invalidatedOnlySideA: '71000000-0000-4000-8000-000000000072',
 } as const;
 
 const prisma = new PrismaService();
@@ -167,23 +170,38 @@ describe('팀 스코프 라인업 재사용 (히스토리 · 프리셋 · 고정
       ],
     });
 
-    // 우리 팀은 revision 1 → 2로 두 번 저장했다. 히스토리는 최신 하나만 보여야 한다.
-    for (const [revision, jersey] of [[1, 7], [2, 9]] as const) {
-      const lineup = await prisma.v1GameLineup.create({
-        data: { gameId: ids.game, sideId: ids.sideA, revision, formation: '2-2' },
-      });
-      await prisma.v1GameParticipant.create({
-        data: {
-          gameId: ids.game,
-          sideId: ids.sideA,
-          lineupId: lineup.id,
-          userId: ids.ownerA,
-          displayNameSnapshot: '팀장A',
-          jerseyNumber: jersey,
-          started: true,
-        },
-      });
-    }
+    // 대진 팀 교체를 재현한다. 이전 revision 2는 무효화됐지만 revision 번호가 더 높고,
+    // 교체 전 선수 스냅샷도 남아 있다. 현재 팀의 active revision 3만 히스토리에 보여야 한다.
+    const firstLineup = await prisma.v1GameLineup.create({
+      data: { gameId: ids.game, sideId: ids.sideA, revision: 1, formation: '2-2' },
+    });
+    await prisma.v1GameParticipant.create({
+      data: {
+        gameId: ids.game, sideId: ids.sideA, lineupId: firstLineup.id, userId: ids.ownerA,
+        displayNameSnapshot: '팀장A', jerseyNumber: 7, started: true,
+      },
+    });
+    const invalidatedLineup = await prisma.v1GameLineup.create({
+      data: {
+        gameId: ids.game, sideId: ids.sideA, revision: 2, formation: '3-3',
+        invalidatedAt: new Date('2026-08-09T00:00:00.000Z'), invalidationReason: 'SIDE_TEAM_CHANGED',
+      },
+    });
+    await prisma.v1GameParticipant.create({
+      data: {
+        gameId: ids.game, sideId: ids.sideA, lineupId: invalidatedLineup.id, userId: ids.ownerB,
+        displayNameSnapshot: '교체전선수', jerseyNumber: 9, started: true,
+      },
+    });
+    const currentLineup = await prisma.v1GameLineup.create({
+      data: { gameId: ids.game, sideId: ids.sideA, revision: 3, formation: '2-2' },
+    });
+    await prisma.v1GameParticipant.create({
+      data: {
+        gameId: ids.game, sideId: ids.sideA, lineupId: currentLineup.id, userId: ids.ownerA,
+        displayNameSnapshot: '교체후선수', jerseyNumber: 11, started: true,
+      },
+    });
     const opponentLineup = await prisma.v1GameLineup.create({
       data: { gameId: ids.game, sideId: ids.sideB, revision: 1 },
     });
@@ -309,14 +327,39 @@ describe('팀 스코프 라인업 재사용 (히스토리 · 프리셋 · 고정
         },
       ],
     });
+
+    // 무효화된 라인업만 남은 별도 경기. 이 경기는 히스토리에서 완전히 사라져야 한다.
+    await prisma.v1TeamMatch.create({
+      data: {
+        id: ids.invalidatedOnlyTeamMatch, hostTeamId: ids.teamA, approvedApplicantTeamId: ids.teamB,
+        sportId: ids.sport, regionId: ids.region, status: 'matched', title: '무효화 전용 경기',
+        placeName: '검증 풋살장 3', startAt: new Date('2026-08-12T10:00:00.000Z'),
+        createdByUserId: ids.ownerA, competitionConfigVersionId: configId,
+      },
+    });
+    await prisma.v1Game.create({
+      data: { id: ids.invalidatedOnlyGame, sourceType: V1GameSourceType.TEAM_MATCH, teamMatchId: ids.invalidatedOnlyTeamMatch, competitionConfigVersionId: configId },
+    });
+    await prisma.v1GameSide.create({
+      data: { id: ids.invalidatedOnlySideA, gameId: ids.invalidatedOnlyGame, sideKey: V1GameSideKey.HOME, teamId: ids.teamA, displayNameSnapshot: '우리팀' },
+    });
+    const invalidatedOnlyLineup = await prisma.v1GameLineup.create({
+      data: { gameId: ids.invalidatedOnlyGame, sideId: ids.invalidatedOnlySideA, revision: 1, invalidatedAt: new Date(), invalidationReason: 'SIDE_TEAM_CHANGED' },
+    });
+    await prisma.v1GameParticipant.create({
+      data: {
+        gameId: ids.invalidatedOnlyGame, sideId: ids.invalidatedOnlySideA, lineupId: invalidatedOnlyLineup.id,
+        userId: ids.ownerB, displayNameSnapshot: '무효화된교체전선수', jerseyNumber: 99, started: true,
+      },
+    });
   });
 
   afterAll(async () => {
-    await prisma.v1GameParticipant.deleteMany({ where: { gameId: { in: [ids.game, ids.futsalGame] } } });
-    await prisma.v1GameLineup.deleteMany({ where: { gameId: { in: [ids.game, ids.futsalGame] } } });
-    await prisma.v1GameSide.deleteMany({ where: { gameId: { in: [ids.game, ids.futsalGame] } } });
-    await prisma.v1Game.deleteMany({ where: { id: { in: [ids.game, ids.futsalGame] } } });
-    await prisma.v1TeamMatch.deleteMany({ where: { id: { in: [ids.teamMatch, ids.futsalTeamMatch] } } });
+    await prisma.v1GameParticipant.deleteMany({ where: { gameId: { in: [ids.game, ids.futsalGame, ids.invalidatedOnlyGame] } } });
+    await prisma.v1GameLineup.deleteMany({ where: { gameId: { in: [ids.game, ids.futsalGame, ids.invalidatedOnlyGame] } } });
+    await prisma.v1GameSide.deleteMany({ where: { gameId: { in: [ids.game, ids.futsalGame, ids.invalidatedOnlyGame] } } });
+    await prisma.v1Game.deleteMany({ where: { id: { in: [ids.game, ids.futsalGame, ids.invalidatedOnlyGame] } } });
+    await prisma.v1TeamMatch.deleteMany({ where: { id: { in: [ids.teamMatch, ids.futsalTeamMatch, ids.invalidatedOnlyTeamMatch] } } });
     await prisma.v1TeamLineupPreset.deleteMany({ where: { teamId: { in: [ids.teamA, ids.teamB] } } });
     await prisma.v1TeamMembership.deleteMany({ where: { teamId: { in: [ids.teamA, ids.teamB] } } });
     await prisma.v1Team.deleteMany({ where: { id: { in: [ids.teamA, ids.teamB] } } });
@@ -343,8 +386,17 @@ describe('팀 스코프 라인업 재사용 (히스토리 · 프리셋 · 고정
 
       const forThisGame = result.items.filter((item) => item.gameId === ids.game);
       expect(forThisGame).toHaveLength(1);
-      // 최신 revision(등번호 9)이어야 한다 — 옛 revision(7)이 아니라.
-      expect(forThisGame[0].participants[0].jerseyNumber).toBe(9);
+      // revision 2는 번호가 더 높아도 대진 교체로 무효화됐으므로 revision 3만 선택된다.
+      expect(forThisGame[0].participants[0].jerseyNumber).toBe(11);
+      expect(forThisGame[0].participants.map((participant) => participant.displayName)).not.toContain('교체전선수');
+    });
+
+    it('무효화된 라인업만 남은 경기는 히스토리에서 제외한다', async () => {
+      const result = await history.list(authUser(ids.ownerA), ids.teamA, 20);
+
+      expect(result.items.map((item) => item.gameId)).not.toContain(ids.invalidatedOnlyGame);
+      const names = result.items.flatMap((item) => item.participants.map((participant) => participant.displayName));
+      expect(names).not.toContain('무효화된교체전선수');
     });
 
     it('상대팀 매니저는 우리 팀 히스토리를 볼 수 없다', async () => {

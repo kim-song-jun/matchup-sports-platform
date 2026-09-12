@@ -369,7 +369,7 @@ export interface PublicTeamRecordItem {
   readonly teamMatchId: string | null;
   readonly tournamentId: string | null;
   readonly tournamentTitle: string | null;
-  /** 팀매치를 거친 경기에서만 채워진다 (`tournamentId`가 있는 경기는 항상 null). */
+  /** 운영 TeamMatch 식별자. canonical tournament 경기에서는 tournamentId와 함께 채워진다. */
   readonly leagueId: string | null;
   readonly leagueTitle: string | null;
   readonly type: TeamRecordCategory;
@@ -436,6 +436,8 @@ export interface PublicTeamRecordsResponse {
 export interface PublicUserRecordItem {
   readonly id: string;
   readonly gameId: string;
+  /** 검증된 canonical 경기의 안정적인 TeamMatch ID. category별 상세 route에 사용한다. */
+  readonly teamMatchId: string | null;
   /**
    * F6 -- 개인 전적 한 건의 정본 분류. 팀 전적(`PublicTeamRecordItem.type`)과 **같은
    * 값 집합·같은 판정 함수**(`team-record-category.ts`)를 쓴다 -- 같은 경기를 두 화면이

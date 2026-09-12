@@ -70,7 +70,7 @@ function ScheduleResultBadge({ entry }: { entry: PublicScheduleEntry }) {
         fontWeight: 700,
         color: tone,
         background: bg,
-        borderRadius: 6,
+        borderRadius: 'var(--radius-chip)',
         padding: '2px 8px',
       }}
     >
@@ -323,7 +323,7 @@ function LineupStatusBadge({ lineupState }: { lineupState: GameLineupState | nul
         ? { label: '라인업 작성 중', color: 'var(--orange700)', background: 'var(--orange50)' }
         : { label: '라인업 제출 완료', color: 'var(--blue700)', background: 'var(--blue50)' };
   return (
-    <span style={{ fontSize: 12, fontWeight: 700, color, background, borderRadius: 6, padding: '2px 8px' }}>
+    <span style={{ fontSize: 12, fontWeight: 700, color, background, borderRadius: 'var(--radius-chip)', padding: '2px 8px' }}>
       {label}
     </span>
   );
@@ -366,7 +366,7 @@ function ScheduleRow({
     >
       {myFixture ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-          <span
+          <span className="tm-on-tint"
             style={{
               fontSize: 12,
               fontWeight: 800,
@@ -375,7 +375,7 @@ function ScheduleRow({
               // 왼쪽 액센트 바 둘뿐이다 — 배지가 파랗게 떠야 "우리 팀"이 눈에 걸린다.
               // 예전처럼 카드 표면색(흰색)으로 두면 중립 배경 위에서 배지 윤곽이 사라진다.
               background: 'var(--blue50)',
-              borderRadius: 6,
+              borderRadius: 'var(--radius-chip)',
               padding: '2px 8px',
             }}
           >
@@ -480,7 +480,7 @@ function ScheduleRow({
 
   if (myFixture === undefined) return row;
 
-  // 내 팀 경기는 왼쪽 액센트 바 + 옅은 배경으로 목록에서 즉시 떠오르게 하고, 라인업으로
+  // 내 팀 경기는 배지 + 옅은 배경으로 목록에서 즉시 떠오르게 하고, 라인업으로
   // 가는 길을 행 안에 둔다 — 예전에는 경기 상세로 한 번 더 들어가야 라인업 진입점을 만날
   // 수 있었고, 그마저 경기가 공개된 뒤에만 나타났다. 라인업 링크는 행 링크(경기 상세)와
   // 형제로 둔다: 링크 안에 링크를 넣으면 유효하지 않은 마크업이 되고 클릭 대상도 모호해진다.
@@ -488,12 +488,11 @@ function ScheduleRow({
     <div
       className="tm-schedule-card tm-schedule-card-mine"
       style={{
-        borderLeft: '3px solid var(--blue500)',
         // 예전에는 행 전체를 `--blue50`(#e8f3ff)로 칠했다 — 내 팀 경기가 연달아 있으면
         // 목록의 절반이 통째로 파랗게 덮여, 강조가 아니라 배경 자체가 바뀐 것처럼 보였다
-        // (오너 지적: "하이라이트 색상도 그렇고"). 파랑은 왼쪽 액센트 바와 "우리 팀"
-        // 배지에만 남기고 면(面)은 중립 톤으로 되돌린다 — 이 저장소의 절제 원칙대로
-        // 강조는 넓은 색면이 아니라 좁은 액센트로 준다.
+        // (오너 지적: "하이라이트 색상도 그렇고"). 파랑은 "우리 팀" 배지에만 남기고
+        // 면(面)은 중립 톤으로 되돌린다 — 이 저장소의 절제 원칙대로
+        // 강조는 넓은 색면 대신 배지와 텍스트 계층으로 준다.
         //
         // `--grey50`이 아니라 `--grey100`인 이유: 스코어 칸이 `--grey50` pill이라,
         // 행 배경까지 `--grey50`으로 두면 **두 색이 정확히 같아져 스코어 pill이 배경에
@@ -846,7 +845,7 @@ export function ScheduleContent({
         <div
           style={{
             padding: '12px 16px',
-            borderRadius: 10,
+            borderRadius: 'var(--radius-control)',
             background: 'var(--grey50)',
             fontSize: 12,
             color: 'var(--text-caption)',
@@ -883,7 +882,25 @@ export function ScheduleContent({
           data.unscheduled.length === 0 ? (
             <EmptyState title="아직 확정된 일정이 없어요" sub="경기 시간이 정해지면 여기에 표시돼요." />
           ) : (
-            <EmptyState title="아직 경기 시간이 정해지지 않았어요" sub="아래 '시간 미정 경기'에서 대진을 확인할 수 있어요." />
+            <div
+              role="status"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+                padding: '12px 14px',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-control)',
+                background: 'var(--grey50)',
+              }}
+            >
+              <strong className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
+                아직 경기 시간이 정해지지 않았어요
+              </strong>
+              <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+                아래 '시간 미정 경기'에서 대진을 확인할 수 있어요.
+              </span>
+            </div>
           )
         ) : (
           <ScheduleSections

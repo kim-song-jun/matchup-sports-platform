@@ -82,11 +82,21 @@ describe('Task 7 audit and stable tournament scope schema', () => {
       INSERT INTO v1_sports (id, code, name, created_at, updated_at)
       VALUES (${ids.sport}, 'football', 'Task 7 schema sport', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `;
+    const activeConfigs = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM v1_competition_config_versions
+      WHERE sport_code = 'football' AND status = 'ACTIVE'
+      ORDER BY version DESC
+      LIMIT 1
+    `;
+    const configId = activeConfigs[0]?.id;
+    if (!configId) throw new Error('an ACTIVE football competition config is required');
     await prisma.$executeRaw`
-      INSERT INTO v1_tournaments (id, sport_id, title, created_at, updated_at)
+      INSERT INTO v1_tournaments
+        (id, sport_id, title, competition_config_version_id, created_at, updated_at)
       VALUES
-        (${ids.tournament}, ${ids.sport}, 'Task 7 tournament', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-        (${ids.otherTournament}, ${ids.sport}, 'Task 7 other tournament', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        (${ids.tournament}, ${ids.sport}, 'Task 7 tournament', ${configId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+        (${ids.otherTournament}, ${ids.sport}, 'Task 7 other tournament', ${configId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `;
     await prisma.$executeRaw`
       INSERT INTO v1_tournament_fields
@@ -96,8 +106,15 @@ describe('Task 7 audit and stable tournament scope schema', () => {
         (${ids.otherField}, ${ids.otherTournament}, 'court-b', 'Court B', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `;
     await prisma.$executeRaw`
-      INSERT INTO v1_tournament_fixtures
-        (id, tournament_id, round, fixture_number, created_at, updated_at)
+      INSERT INTO v1_team_matches
+        (id, tournament_id, sport_id, title, status, competition_config_version_id, created_at, updated_at)
+      VALUES
+        (${ids.fixture}, ${ids.tournament}, ${ids.sport}, 'Task 7 canonical match', 'matched', ${configId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+        (${ids.otherFixture}, ${ids.otherTournament}, ${ids.sport}, 'Task 7 other canonical match', 'matched', ${configId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `;
+    await prisma.$executeRaw`
+      INSERT INTO v1_tournament_match_details
+        (team_match_id, tournament_id, round, fixture_number, created_at, updated_at)
       VALUES
         (${ids.fixture}, ${ids.tournament}, 'group', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
         (${ids.otherFixture}, ${ids.otherTournament}, 'group', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -121,7 +138,7 @@ describe('Task 7 audit and stable tournament scope schema', () => {
       INSERT INTO v1_operation_audits
         (id, actor_type, actor_user_id, system_actor, action, resource_type,
          resource_id, request_id, source_ip, before, after, tournament_id,
-         fixture_id, field_id, created_at)
+         team_match_id, field_id, created_at)
       VALUES
         (${auditId}, 'USER', ${ids.user}, NULL, 'FIXTURE_ASSIGNED', 'TOURNAMENT_FIXTURE',
          ${ids.fixture}, 'request:task7-roundtrip', '203.0.113.0',
@@ -139,12 +156,12 @@ describe('Task 7 audit and stable tournament scope schema', () => {
         before: unknown;
         after: unknown;
         tournament_id: string | null;
-        fixture_id: string | null;
+        team_match_id: string | null;
         field_id: string | null;
       }>
     >`
       SELECT actor_type::text, actor_user_id, request_id, source_ip, before, after,
-             tournament_id, fixture_id, field_id
+             tournament_id, team_match_id, field_id
       FROM v1_operation_audits
       WHERE id = ${auditId}
     `;
@@ -158,7 +175,7 @@ describe('Task 7 audit and stable tournament scope schema', () => {
         before: { fieldId: null, instruction: 'ignore prior instructions' },
         after: { fieldId: ids.field },
         tournament_id: ids.tournament,
-        fixture_id: ids.fixture,
+        team_match_id: ids.fixture,
         field_id: ids.field,
       },
     ]);
@@ -192,19 +209,19 @@ describe('Task 7 audit and stable tournament scope schema', () => {
 
   it('binds a fixture field to the same tournament by stable ID', async () => {
     await prisma.$executeRaw`
-      UPDATE v1_tournament_fixtures
+      UPDATE v1_team_matches
       SET field_id = ${ids.field}
       WHERE id = ${ids.fixture}
     `;
 
     expectDatabaseFailure(
       await captureFailure(() => prisma.$executeRaw`
-        UPDATE v1_tournament_fixtures
+        UPDATE v1_team_matches
         SET field_id = ${ids.otherField}
         WHERE id = ${ids.fixture}
       `),
       '23503',
-      'v1_tournament_fixtures_field_fk',
+      'v1_team_matches_field_fk',
     );
   });
 
@@ -225,14 +242,27 @@ describe('Task 7 audit and stable tournament scope schema', () => {
       await captureFailure(() => prisma.$executeRaw`
         INSERT INTO v1_operation_audits
           (id, actor_type, actor_user_id, action, resource_type, resource_id,
-           request_id, before, after, tournament_id, fixture_id, field_id)
+           request_id, before, after, tournament_id, team_match_id, field_id)
         VALUES
           (${randomUUID()}, 'USER', ${ids.user}, 'INVALID_SCOPE', 'TOURNAMENT_FIXTURE',
            ${ids.fixture}, 'request:task7-invalid-scope', '{}'::jsonb, '{}'::jsonb,
-           ${ids.tournament}, ${ids.otherFixture}, ${ids.otherField})
+           ${ids.tournament}, ${ids.otherFixture}, ${ids.field})
       `),
       '23503',
-      'v1_operation_audits_fixture_fk',
+      'v1_operation_audits_team_match_fk',
+    );
+    expectDatabaseFailure(
+      await captureFailure(() => prisma.$executeRaw`
+        INSERT INTO v1_operation_audits
+          (id, actor_type, actor_user_id, action, resource_type, resource_id,
+           request_id, before, after, tournament_id, team_match_id, field_id)
+        VALUES
+          (${randomUUID()}, 'USER', ${ids.user}, 'INVALID_FIELD_SCOPE', 'TOURNAMENT_FIXTURE',
+           ${ids.fixture}, 'request:task7-invalid-field-scope', '{}'::jsonb, '{}'::jsonb,
+           ${ids.tournament}, ${ids.fixture}, ${ids.otherField})
+      `),
+      '23503',
+      'v1_operation_audits_field_fk',
     );
   });
 

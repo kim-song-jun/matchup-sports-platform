@@ -36,7 +36,7 @@ vi.mock('@/components/tournament-result-review/game-result-correction-panel', ()
 const ITEM = (fixtureId: string, gameId: string, fixtureNumber: number, revisionId: string | null) => ({
   fixtureId, tournamentId: 't-1', round: '조별 A', fixtureNumber, gameId, gameState: 'ENDED',
   fieldId: null, fieldName: null, homeRegistrationId: null, awayRegistrationId: null,
-  scheduledAt: null, currentScore: null, warnings: [], version: 1, revisionId, stableRevision: 'x',
+  scheduledAt: null, currentScore: null, currentRevisionState: null, warnings: [], version: 1, revisionId, stableRevision: 'x',
 });
 // fx-1은 공식 결과가 있고(revisionId 존재), fx-2는 아직 없다 — hasOfficialResult 필터를 실제로 태운다.
 const ITEMS = [ITEM('fx-1', 'game-1', 1, 'rev-1'), ITEM('fx-2', 'game-2', 2, null)];

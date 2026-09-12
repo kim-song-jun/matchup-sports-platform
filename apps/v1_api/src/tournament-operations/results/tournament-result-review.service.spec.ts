@@ -40,6 +40,7 @@ const ids = {
   game: '7c1d0000-0000-4000-8000-000000000010',
   fixture: '7c1d0000-0000-4000-8000-000000000011',
   tournament: '7c1d0000-0000-4000-8000-000000000012',
+  field: '7c1d0000-0000-4000-8000-000000000013',
   homeSide: '7c1d0000-0000-4000-8000-000000000020',
   awaySide: '7c1d0000-0000-4000-8000-000000000021',
   homePlayer: '7c1d0000-0000-4000-8000-000000000030',
@@ -74,6 +75,8 @@ type CreatedRevision = {
 type CreatedParticipant = { participantId: string; sideId: string; goals: number };
 
 type HarnessOptions = {
+  /** 경기장 미정이면 권한 리소스에 fieldId 키 자체를 보내지 않는다. */
+  readonly fieldId?: string | null;
   /** 'group' = 조별리그, 'semi' = 결선. 승부차기 가드의 단일 판정 기준. */
   readonly phase?: 'group' | 'semi';
   /** 다음 라운드로 가는 진출 엣지가 있는가. */
@@ -107,12 +110,17 @@ type HarnessOptions = {
    * 하므로, 1-1 무승부 재제출을 검증하려면 이벤트도 1-1이어야 한다.
    */
   readonly awayGoalEvent?: boolean;
+  /** Use the canonical TEAM_MATCH source and Details bracket metadata. */
+  readonly canonical?: boolean;
+  /** Use the regular-league TEAM_MATCH shape (no Details bracket row). */
+  readonly canonicalLeague?: boolean;
 };
 
 type Harness = {
   readonly service: TournamentResultReviewService;
   readonly createdRevisions: CreatedRevision[];
   readonly createdParticipants: CreatedParticipant[];
+  readonly staffAccessInputs: Array<{ resource: Record<string, string> }>;
   readonly correct: (changes: Record<string, unknown>) => Promise<unknown>;
   /** 재제출 레인. 정정과 같은 가드를 통과해야 한다. */
   readonly supersede: (body: Record<string, unknown>) => Promise<unknown>;
@@ -144,9 +152,15 @@ function createHarness(options: HarnessOptions = {}): Harness {
   const phase = options.phase ?? 'group';
   const hasAdvancementEdge = options.hasAdvancementEdge ?? false;
   const goalHasScorer = options.goalHasScorer ?? true;
+  // Result-review resolves canonical TEAM_MATCH games only. The explicit
+  // non-canonical source case below exercises the typed rejection, while the
+  // default fixture matches the production contract.
+  const canonical = options.canonical ?? true;
+  const canonicalLeague = options.canonicalLeague ?? false;
 
   const createdRevisions: CreatedRevision[] = [];
   const createdParticipants: CreatedParticipant[] = [];
+  const staffAccessInputs: Array<{ resource: Record<string, string> }> = [];
 
   const advancementEdges = hasAdvancementEdge
     ? [{ id: ids.edge, sourceFixtureId: ids.fixture, targetFixtureId: ids.edge, sourceOutcome: 'WINNER' }]
@@ -155,13 +169,6 @@ function createHarness(options: HarnessOptions = {}): Harness {
   // `readKnockoutFixtureFacts`는 phase와 진출 엣지 수를 **한 번의 findUnique**로
   // 읽는다(잠금 보유 시간 때문에 왕복을 늘리지 않는다). 그래서 이 더블은 같은
   // 행에 `_count.advancementSources`를 함께 실어야 한다.
-  const fixtureRow = {
-    id: ids.fixture,
-    tournamentId: ids.tournament,
-    group: { phase },
-    _count: { advancementSources: advancementEdges.length },
-  };
-
   const baseRevisionRow = {
     id: ids.baseRevision,
     gameId: ids.game,
@@ -184,8 +191,14 @@ function createHarness(options: HarnessOptions = {}): Harness {
     v1Game: {
       findUnique: async () => ({
         id: ids.game,
-        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
-        tournamentFixtureId: ids.fixture,
+        // Historical corrupt rows can still be read from an archive, but the
+        // retired Prisma enum member is intentionally absent from the runtime
+        // client. Keep this negative case as a raw source value without
+        // reintroducing the removed enum dependency.
+        sourceType: canonical
+          ? V1GameSourceType.TEAM_MATCH
+          : ('TOURNAMENT_FIXTURE' as unknown as V1GameSourceType),
+        teamMatchId: canonical ? ids.fixture : null,
         state: 'ENDED',
         version: GAME_VERSION,
         currentOfficialRevisionId: ids.baseRevision,
@@ -193,12 +206,24 @@ function createHarness(options: HarnessOptions = {}): Harness {
       }),
       update: async () => ({ state: 'ENDED', version: GAME_VERSION + 1 }),
     },
-    v1TournamentFixture: {
-      findUnique: async () => fixtureRow,
-      findFirst: async () => fixtureRow,
+    v1TeamMatch: {
+      findUnique: async () => canonical
+        ? {
+            id: ids.fixture,
+            tournamentId: ids.tournament,
+            leagueId: canonicalLeague ? ids.tournament : null,
+            fieldId: options.fieldId === undefined ? ids.field : options.fieldId,
+            tournament: { kind: canonicalLeague ? 'regular_league' : 'regular_tournament' },
+            tournamentDetails: canonicalLeague
+              ? null
+              : { teamMatchId: ids.fixture, tournamentId: ids.tournament },
+          }
+        : null,
     },
-    v1TournamentFixtureAdvancementEdge: {
-      findMany: async () => advancementEdges,
+    v1TournamentMatchDetails: {
+      findUnique: async () => canonical && !canonicalLeague
+        ? { group: { phase }, _count: { advancementSources: advancementEdges.length } }
+        : null,
     },
     v1IdempotencyRecord: {
       findUnique: async () => null,
@@ -300,12 +325,15 @@ function createHarness(options: HarnessOptions = {}): Harness {
   } as unknown as PrismaService;
 
   const staffAccess = {
-    assertAccess: async () => ({
-      role: 'platform_ops' as const,
-      authorizationSubject: `platform_ops:${ids.user}@1`,
-      assignmentId: null,
-      assignmentVersion: null,
-    }),
+    assertAccess: async (input: { resource: Record<string, string> }) => {
+      staffAccessInputs.push(input);
+      return {
+        role: 'platform_ops' as const,
+        authorizationSubject: `platform_ops:${ids.user}@1`,
+        assignmentId: null,
+        assignmentVersion: null,
+      };
+    },
   } as unknown as TournamentStaffAccessService;
 
   const auditWriter = { create: async () => ({}) } as unknown as OperationAuditWriterService;
@@ -354,7 +382,7 @@ function createHarness(options: HarnessOptions = {}): Harness {
     } as never);
   };
 
-  return { service, createdRevisions, createdParticipants, correct, supersede, voidRevision };
+  return { service, createdRevisions, createdParticipants, staffAccessInputs, correct, supersede, voidRevision };
 }
 
 async function captureFailure(operation: () => Promise<unknown>): Promise<unknown> {
@@ -393,6 +421,30 @@ describe('createResultCorrection — 정상 정정(하네스 건전성 증거)',
     ]);
   });
 
+  it('결과 명령 권한 검사에 픽스처의 실제 필드 범위를 전달한다', async () => {
+    const harness = createHarness();
+
+    await harness.correct({});
+
+    expect(harness.staffAccessInputs[0]?.resource).toEqual({
+      tournamentId: ids.tournament,
+      fixtureId: ids.fixture,
+      fieldId: ids.field,
+    });
+  });
+
+  it('경기장이 미정이면 엄격한 권한 파서에 fieldId 키를 보내지 않는다', async () => {
+    const harness = createHarness({ fieldId: null });
+
+    await harness.correct({});
+
+    expect(harness.staffAccessInputs[0]?.resource).toEqual({
+      tournamentId: ids.tournament,
+      fixtureId: ids.fixture,
+    });
+    expect(harness.staffAccessInputs[0]?.resource).not.toHaveProperty('fieldId');
+  });
+
   it('중복 participantId는 이미 거부된다(기존 가드가 실제로 도달한다는 증거)', async () => {
     const harness = createHarness();
 
@@ -402,6 +454,19 @@ describe('createResultCorrection — 정상 정정(하네스 건전성 증거)',
 
     expectHttp(error, 422, 'PARTICIPANT_INVALID');
     expect(harness.createdRevisions).toHaveLength(0);
+  });
+});
+
+describe('canonical source boundary', () => {
+  it('rejects a legacy tournament-fixture Game before authorization or mutation', async () => {
+    const harness = createHarness({ canonical: false });
+
+    const rejected = await captureFailure(() => harness.correct({}));
+
+    expectHttp(rejected, 404, 'GAME_NOT_FOUND');
+    expect(harness.staffAccessInputs).toHaveLength(0);
+    expect(harness.createdRevisions).toHaveLength(0);
+    expect(harness.createdParticipants).toHaveLength(0);
   });
 });
 
@@ -825,6 +890,41 @@ describe('2-C: 결선 경기 정정은 브래킷을 해결할 수 있어야 한�
 
     expectHttp(error, 409, 'TOURNAMENT_PENALTY_NOT_ALLOWED');
     expect(harness.createdRevisions).toHaveLength(0);
+  });
+
+  it('canonical TEAM_MATCH 결선도 Details의 phase/진출 엣지로 무승부 승부차기를 요구한다', async () => {
+    const harness = createHarness({ canonical: true, phase: 'semi', hasAdvancementEdge: true });
+
+    const error = await captureFailure(() => harness.correct({ score: { home: 1, away: 1 } }));
+
+    expectHttp(error, 409, 'TOURNAMENT_PENALTY_REQUIRED');
+    expect(harness.createdRevisions).toHaveLength(0);
+  });
+
+  it('canonical regular-league TEAM_MATCH에는 승부차기를 허용하지 않는다', async () => {
+    const harness = createHarness({ canonical: true, canonicalLeague: true });
+
+    const error = await captureFailure(() =>
+      harness.correct({ score: { home: 1, away: 1, penalties: { home: 5, away: 4 } } }),
+    );
+
+    expectHttp(error, 409, 'TOURNAMENT_PENALTY_NOT_ALLOWED');
+    expect(harness.createdRevisions).toHaveLength(0);
+  });
+
+  it('canonical TEAM_MATCH 결선은 유효한 승부차기 정정을 저장한다', async () => {
+    const harness = createHarness({ canonical: true, phase: 'semi', hasAdvancementEdge: true });
+
+    await harness.correct({
+      score: { home: 1, away: 1, penalties: { home: 5, away: 4, takenHome: 5, takenAway: 5 } },
+    });
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].score).toEqual({
+      home: 1,
+      away: 1,
+      penalties: { home: 5, away: 4, takenHome: 5, takenAway: 5 },
+    });
   });
 });
 

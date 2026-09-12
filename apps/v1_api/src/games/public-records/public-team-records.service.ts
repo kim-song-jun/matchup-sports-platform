@@ -213,8 +213,8 @@ export class PublicTeamRecordsService {
       const isStatusOnly = rowVisibilityMode(row) === 'status_only';
       return {
         gameId: row.gameId,
-        // exactly-one-source: a game is either tournament-sourced (tournamentId set) or
-        // team-match-sourced (teamMatchId set), never both -- see V1Game's CHECK constraint.
+        // A canonical tournament game may expose both tournamentId and teamMatchId:
+        // tournamentId is the competition axis and teamMatchId is the operational identity.
         teamMatchId,
         tournamentId: row.tournamentId,
         tournamentTitle: row.tournamentId === null ? null : (tournamentTitleById.get(row.tournamentId) ?? null),
@@ -528,8 +528,10 @@ export class PublicTeamRecordsService {
               side: (eventSideKey !== null && eventSideKey === ownSideKey
                 ? 'own'
                 : 'opponent') as 'own' | 'opponent',
-              participantName: eligible
-                ? resolveParticipantDisplayName(participant, nameProfileByUserId)
+            participantName: eligible
+                ? event.participantId === null
+                  ? (event.playerNameSnapshot ?? '선수 정보 없음')
+                  : resolveParticipantDisplayName(participant, nameProfileByUserId)
                 : null,
               jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
               profileHref: eligible ? resolveParticipantProfileHref(participant?.userId ?? null, consent) : null,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   useCreateResultCorrection,
   useGameResultRevisions,
@@ -28,6 +28,11 @@ import {
 import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 
 type DirectorGateStatus = 'unknown' | 'enabled' | 'disabled';
+type CorrectionSnapshot = {
+  expectedVersion: number;
+  baseRevisionId: string;
+  eventsHash: string;
+};
 
 /**
  * GameResultCorrectionPanel -- the records/corrections screen's per-game
@@ -58,9 +63,15 @@ type DirectorGateStatus = 'unknown' | 'enabled' | 'disabled';
 export function GameResultCorrectionPanel({
   gameId,
   tournamentId,
+  inline = false,
+  autoOpen = false,
+  onSaved,
 }: {
   gameId: string;
   tournamentId?: string;
+  inline?: boolean;
+  autoOpen?: boolean;
+  onSaved?: () => void;
 }) {
   const gameQuery = useTournamentGame(gameId);
   const revisionsQuery = useGameResultRevisions(gameId);
@@ -73,9 +84,55 @@ export function GameResultCorrectionPanel({
   const voidRevision = useVoidResultRevision(gameId, tournamentId);
   const { confirm, ConfirmModal: officializeConfirmModal } = useConfirm();
 
-  const [correctionFormOpen, setCorrectionFormOpen] = useState(false);
+  const [correctionFormOpen, setCorrectionFormOpen] = useState(autoOpen);
+  const [correctionSnapshot, setCorrectionSnapshot] = useState<CorrectionSnapshot | null>(null);
   const [voidRequested, setVoidRequested] = useState(false);
   const [directorGateStatus, setDirectorGateStatus] = useState<DirectorGateStatus>('unknown');
+  const startCorrectionButtonRef = useRef<HTMLButtonElement>(null);
+  const confirmCorrectionButtonRef = useRef<HTMLButtonElement>(null);
+  const inlinePanelTitleRef = useRef<HTMLHeadingElement>(null);
+  const restoreInlineFocusRef = useRef(false);
+  const inlineFocusTargetRef = useRef<'start' | 'confirm' | 'title'>('start');
+  const [inlineFocusRestoreNonce, setInlineFocusRestoreNonce] = useState(0);
+
+  useEffect(() => {
+    if (!inline || correctionFormOpen || !restoreInlineFocusRef.current) return;
+    restoreInlineFocusRef.current = false;
+    const frame = window.requestAnimationFrame(() => {
+      const target = inlineFocusTargetRef.current === 'title'
+        ? inlinePanelTitleRef.current
+        : inlineFocusTargetRef.current === 'confirm'
+          ? confirmCorrectionButtonRef.current ?? inlinePanelTitleRef.current
+          : startCorrectionButtonRef.current ?? inlinePanelTitleRef.current;
+      target?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [correctionFormOpen, inline, inlineFocusRestoreNonce]);
+
+  useEffect(() => {
+    if (!correctionFormOpen || correctionSnapshot !== null) return;
+    const game = gameQuery.data;
+    const revisions = revisionsQuery.data;
+    if (!game || revisions === undefined) return;
+    const currentPointerRevision =
+      revisions.find((revision) => revision.id === game.currentOfficialRevisionId) ?? null;
+    const currentOfficial =
+      currentPointerRevision && currentPointerRevision.state === 'OFFICIAL' ? currentPointerRevision : null;
+    const isVoided = currentPointerRevision?.state === 'VOID';
+    const draftBase = currentOfficial ?? (isVoided ? currentPointerRevision : null);
+    const editPrefill =
+      currentOfficial ??
+      (isVoided && currentPointerRevision
+        ? revisions.find((revision) => revision.id === currentPointerRevision.supersedesId) ??
+          currentPointerRevision
+        : null);
+    if (!draftBase || !editPrefill) return;
+    setCorrectionSnapshot({
+      expectedVersion: game.version,
+      baseRevisionId: draftBase.id,
+      eventsHash: editPrefill.eventsHash,
+    });
+  }, [correctionFormOpen, correctionSnapshot, gameQuery.data, revisionsQuery.data]);
 
   if (gameQuery.isPending || revisionsQuery.isPending) {
     // 텍스트 한 줄이면 로드가 끝나는 순간 레이아웃이 통째로 튀어나온다 — 같은 화면의
@@ -175,7 +232,17 @@ export function GameResultCorrectionPanel({
         mvpParticipantId: pendingCorrection.mvpParticipantId,
       },
       {
-        onSuccess: () => setDirectorGateStatus('enabled'),
+        onSuccess: () => {
+          if (inline) {
+            // Confirmation refreshes the revision list and removes the pending CTA. Bump a
+            // separate focus effect key so that refresh cannot leave focus on document.body.
+            restoreInlineFocusRef.current = true;
+            inlineFocusTargetRef.current = 'title';
+            setInlineFocusRestoreNonce((value) => value + 1);
+          }
+          setDirectorGateStatus('enabled');
+          onSaved?.();
+        },
         onError: (error) => {
           if (isDirectorOfficializeDisabledError(error)) setDirectorGateStatus('disabled');
         },
@@ -183,8 +250,82 @@ export function GameResultCorrectionPanel({
     );
   }
 
+  const renderCorrectionEditor = () => {
+    if (!correctionFormOpen || !draftBase || !editPrefill) return null;
+    return (
+      <ResultEditModal
+        open
+        title={entryCopy.modalTitle}
+        message={entryCopy.modalMessage}
+        confirmLabel={entryCopy.modalConfirmLabel}
+        reasonLabel={entryCopy.reasonLabel}
+        base={{
+          score: editPrefill.score,
+          goalEvents: deriveEditableGoalEvents(editPrefill.goalEvents, eventsQuery.data?.events ?? []),
+          participants: editPrefill.resultParticipants,
+          mvpParticipantId: editPrefill.mvpParticipantId,
+        }}
+        sides={game.sides}
+        lineups={lineupsQuery.data ?? []}
+        periods={game.periods}
+        isKnockoutFixture={game.isKnockoutFixture}
+        presentation={inline ? 'inline' : 'modal'}
+        submitting={createCorrection.isPending}
+        errorMessage={createCorrection.isError ? describeResultReviewError(createCorrection.error) : null}
+        onCancel={() => {
+          setCorrectionFormOpen(false);
+          setCorrectionSnapshot(null);
+          createCorrection.reset();
+        }}
+        onConfirm={(input: ResultEditSubmitInput) => {
+          if (correctionSnapshot === null) return;
+          createCorrection.mutate(
+            {
+              expectedVersion: correctionSnapshot.expectedVersion,
+              baseRevisionId: correctionSnapshot.baseRevisionId,
+              reason: input.reason,
+              changes: {
+                score: input.score,
+                goalEvents: input.goalEvents,
+                actualParticipants: input.actualParticipants,
+                eventsHash: correctionSnapshot.eventsHash,
+                mvpParticipantId: input.mvpParticipantId,
+              },
+            },
+            { onSuccess: () => {
+                if (inline) {
+                  // The parent refreshes the revisions immediately after this callback. The
+                  // pending CTA can therefore mount, receive focus, and unmount in the same
+                  // update. Focus the persistent panel title so the successful submission
+                  // retains a stable, meaningful target across that refresh.
+                  restoreInlineFocusRef.current = true;
+                  inlineFocusTargetRef.current = 'title';
+                }
+                setCorrectionFormOpen(false);
+                setCorrectionSnapshot(null);
+                onSaved?.();
+              } },
+          );
+        }}
+      />
+    );
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div
+      className="[--button-fill-primary:var(--static-blue)] [--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]"
+      style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
+    >
+      {inline ? (
+        <h2
+          ref={inlinePanelTitleRef}
+          tabIndex={-1}
+          className="sr-only"
+          style={{ outline: 'none' }}
+        >
+          경기 결과 정정
+        </h2>
+      ) : null}
       <GameSummaryHeader game={game} currentRevision={currentPointerRevision} />
 
       {readOnly ? (
@@ -202,7 +343,9 @@ export function GameResultCorrectionPanel({
         />
       ) : null}
 
-      {draftBase && !readOnly ? (
+      {inline && correctionFormOpen ? renderCorrectionEditor() : null}
+
+      {(!inline || !correctionFormOpen) && draftBase && !readOnly ? (
         <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {pendingCorrection ? (
             <>
@@ -214,7 +357,14 @@ export function GameResultCorrectionPanel({
               </p>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {showGatedCta ? (
-                  <Button variant="primary" size="md" loading={officialize.isPending} onClick={() => void handleOfficializeCorrection()}>
+                  <Button
+                    ref={confirmCorrectionButtonRef}
+                    variant="primary"
+                    size="md"
+                    className="self-start"
+                    loading={officialize.isPending}
+                    onClick={() => void handleOfficializeCorrection()}
+                  >
                     {entryCopy.confirmCta}
                   </Button>
                 ) : null}
@@ -223,7 +373,25 @@ export function GameResultCorrectionPanel({
           ) : (
             <>
               <p className="tm-text-label" style={{ fontWeight: 600 }}>{entryCopy.cardTitle}</p>
-              <Button variant="primary" size="md" onClick={() => setCorrectionFormOpen(true)}>
+              <Button
+                ref={startCorrectionButtonRef}
+                variant="primary"
+                size="md"
+                className="self-start"
+                onClick={() => {
+                  if (draftBase === null || editPrefill === null) return;
+                  if (inline) {
+                    restoreInlineFocusRef.current = true;
+                    inlineFocusTargetRef.current = 'start';
+                  }
+                  setCorrectionSnapshot({
+                    expectedVersion: game.version,
+                    baseRevisionId: draftBase.id,
+                    eventsHash: editPrefill.eventsHash,
+                  });
+                  setCorrectionFormOpen(true);
+                }}
+              >
                 {entryCopy.startCta}
               </Button>
             </>
@@ -242,7 +410,7 @@ export function GameResultCorrectionPanel({
         </div>
       ) : null}
 
-      {currentOfficial && !readOnly ? (
+      {(!inline || !correctionFormOpen) && currentOfficial && !readOnly ? (
         <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <p className="tm-text-label" style={{ fontWeight: 600, color: 'var(--red700)' }}>
             공식 결과 무효화
@@ -251,7 +419,13 @@ export function GameResultCorrectionPanel({
             무효화하면 이 경기의 공식 점수·기록이 모두 취소되고, 다음 라운드 진행에도 영향을 줄 수 있어요.
           </p>
           {showGatedCta ? (
-            <Button variant="danger" size="md" onClick={() => setVoidRequested(true)}>
+            <Button
+              variant="outline"
+              size="md"
+              className="self-start"
+              style={{ color: 'var(--red700)' }}
+              onClick={() => setVoidRequested(true)}
+            >
               무효화
             </Button>
           ) : null}
@@ -265,55 +439,7 @@ export function GameResultCorrectionPanel({
 
       {officializeConfirmModal}
 
-      {correctionFormOpen && draftBase && editPrefill ? (
-        <ResultEditModal
-          open
-          title={entryCopy.modalTitle}
-          message={entryCopy.modalMessage}
-          confirmLabel={entryCopy.modalConfirmLabel}
-          reasonLabel={entryCopy.reasonLabel}
-          base={{
-            score: editPrefill.score,
-            goalEvents: deriveEditableGoalEvents(
-              editPrefill.goalEvents,
-              eventsQuery.data?.events ?? [],
-            ),
-            participants: editPrefill.resultParticipants,
-            mvpParticipantId: editPrefill.mvpParticipantId,
-          }}
-          sides={game.sides}
-          lineups={lineupsQuery.data ?? []}
-          // 서버 `applyPenalties` 는 승부차기를 **결선 픽스처 + 정규시간 무승부**에서만
-          // 받는다. 폼은 이 값으로 (a) 기존 승부차기 점수를 이어서 보낼지 판정하고
-          // (b) 무승부인데 승부차기가 없거나 반대로 승부차기가 남아 못 보내는 상태를
-          // 저장 전에 알린다. 내려주지 않으면 결선 경기의 승부차기 결과가 조용히
-          // 사라지므로 이 prop 은 필수(기본값 없음)다.
-          isKnockoutFixture={game.isKnockoutFixture}
-          submitting={createCorrection.isPending}
-          errorMessage={createCorrection.isError ? describeResultReviewError(createCorrection.error) : null}
-          onCancel={() => {
-            setCorrectionFormOpen(false);
-            createCorrection.reset();
-          }}
-          onConfirm={(input: ResultEditSubmitInput) => {
-            createCorrection.mutate(
-              {
-                expectedVersion: game.version,
-                baseRevisionId: draftBase.id,
-                reason: input.reason,
-                changes: {
-                  score: input.score,
-                  goalEvents: input.goalEvents,
-                  actualParticipants: input.actualParticipants,
-                  eventsHash: editPrefill.eventsHash,
-                  mvpParticipantId: input.mvpParticipantId,
-                },
-              },
-              { onSuccess: () => setCorrectionFormOpen(false) },
-            );
-          }}
-        />
-      ) : null}
+      {!inline && correctionFormOpen ? renderCorrectionEditor() : null}
 
       <ReasonModal
         open={voidRequested}
@@ -336,6 +462,7 @@ export function GameResultCorrectionPanel({
               onSuccess: () => {
                 setVoidRequested(false);
                 setDirectorGateStatus('enabled');
+                onSaved?.();
               },
               onError: (error) => {
                 if (isDirectorOfficializeDisabledError(error)) setDirectorGateStatus('disabled');

@@ -1,5 +1,14 @@
 # Public records and consent contract
 
+
+## Task 168 Phase 3 canonical records addendum (candidate)
+
+- Public, team, and personal records select the current official revision of the canonical TeamMatch-backed Game. A correction changes the score and revision history without moving the persisted match instant.
+- Periods, events, participant identity, consent masking, visibility mode, and pagination continue to use the existing public-records gates; legacy-only games are omitted or fail closed according to the route contract.
+- This candidate is not evidence of dev/Alpha deployment or schema retirement.
+
+- Public tournament schedule and direct match detail first require a non-deleted tournament in a public competition status. Direct match detail returns 404 `TOURNAMENT_MATCH_NOT_FOUND` for draft, cancelled, or soft-deleted tournaments, as it does for an unknown fixture. Optional authentication and fixture-scoped staff identity do not bypass this tournament-surface gate.
+
 <!-- API_CONTRACT_SECTION_BEGIN:Public visibility output matrix -->
 ### Public visibility output matrix
 | Mode | Bracket/status | Lineup | Score | Events | Records |

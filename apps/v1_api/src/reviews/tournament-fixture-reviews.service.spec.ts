@@ -40,7 +40,7 @@ function reviewPolicyStub(windowHours = 168) {
 describe('TournamentFixtureReviewsService', () => {
   it('returns the opponent team target for a completed tournament fixture', async () => {
     const prisma = {
-      v1TournamentFixture: {
+      v1TeamMatch: {
         findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 7 })),
       },
       v1TeamMembership: {
@@ -78,10 +78,42 @@ describe('TournamentFixtureReviewsService', () => {
     });
   });
 
+  it('fails closed when the TeamMatch has no matching tournament Details row', async () => {
+    const prisma = {
+      v1TeamMatch: {
+        findUnique: jest.fn().mockResolvedValue({ ...fixture({ id: fixtureId, fixtureNumber: 7 }), tournamentDetails: null }),
+      },
+    };
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
+
+    await expect(service.source(user, fixtureId)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'TOURNAMENT_MATCH_METADATA_INCOMPLETE' }),
+    });
+  });
+
+  it('rejects a legacy Game even when tournament Details and an official result exist', async () => {
+    const canonical = fixture({ id: fixtureId, fixtureNumber: 7 });
+    const prisma = {
+      v1TeamMatch: {
+        findUnique: jest.fn().mockResolvedValue({
+          ...canonical,
+          game: { ...canonical.game, sourceType: 'TOURNAMENT_FIXTURE' },
+        }),
+      },
+      v1TeamMembership: { findMany: jest.fn() },
+    };
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
+
+    await expect(service.source(user, fixtureId)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'TOURNAMENT_MATCH_METADATA_INCOMPLETE' }),
+    });
+    expect(prisma.v1TeamMembership.findMany).not.toHaveBeenCalled();
+  });
+
   // 개인 후기 대상 명단(사용자 확정): 대회 로스터(V1TournamentPlayer) 기준 · 상대팀만.
   it('개인 후기 대상은 상대팀 로스터뿐이다 — 같은 팀 동료와 제외된 선수는 나오지 않는다', async () => {
     const prisma = {
-      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
+      v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       v1TeamMembership: membershipStore([membership({ userId: user.id, teamId: reviewerTeamId, role: 'owner' })]),
       v1TournamentPlayer: playerStore([
         player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
@@ -118,7 +150,7 @@ describe('TournamentFixtureReviewsService', () => {
 
   it('상대팀 로스터에 없는 사람에게는 개인 후기를 쓸 수 없다', async () => {
     const prisma = {
-      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
+      v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       v1TeamMembership: membershipStore([membership({ userId: user.id, teamId: reviewerTeamId, role: 'owner' })]),
       v1TournamentPlayer: playerStore([
         player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
@@ -140,7 +172,7 @@ describe('TournamentFixtureReviewsService', () => {
   it('개인 후기는 대회 스코프(sourceGroupId) + 종목 + 작성자 팀을 함께 기록한다', async () => {
     const createMock = jest.fn().mockResolvedValue(playerReviewRow({ id: 'review-player', reviewerUserId: user.id, targetUserId: opponentPlayerId, rating: 5 }));
     const prisma = {
-      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
+      v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       v1TeamMembership: membershipStore([membership({ userId: user.id, teamId: reviewerTeamId, role: 'owner' })]),
       v1TournamentPlayer: playerStore([player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' })]),
       v1PostEventReview: reviewStore([]),
@@ -172,7 +204,7 @@ describe('TournamentFixtureReviewsService', () => {
     const transactionMock = jest.fn();
     const prisma = {
       // 예선(fixtureId)에서 이미 썼고, 이번엔 결승(secondFixtureId)에서 같은 선수를 다시 평가하려는 상황.
-      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: secondFixtureId, fixtureNumber: 2 })) },
+      v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(fixture({ id: secondFixtureId, fixtureNumber: 2 })) },
       v1TeamMembership: membershipStore([membership({ userId: user.id, teamId: reviewerTeamId, role: 'owner' })]),
       v1TournamentPlayer: playerStore([player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' })]),
       v1PostEventReview: reviewStore([
@@ -194,7 +226,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1TeamMembership: {
         findMany: jest.fn().mockResolvedValue([{ teamId: reviewerTeamId, role: 'owner' }]),
       },
-      v1TournamentFixture: {
+      v1TeamMatch: {
         findMany: jest.fn().mockResolvedValue([
           fixture({ id: fixtureId, fixtureNumber: 1 }),
           fixture({ id: secondFixtureId, fixtureNumber: 2 }),
@@ -204,6 +236,7 @@ describe('TournamentFixtureReviewsService', () => {
       v1PostEventReview: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
@@ -220,14 +253,14 @@ describe('TournamentFixtureReviewsService', () => {
   it('공식 결과가 없는 completed fixture는 pending 목록에서 제외한다', async () => {
     const fixtureWithoutOfficialResult = {
       ...fixture({ id: fixtureId, fixtureNumber: 1 }),
-      game: { currentOfficialRevision: null },
+      game: { id: 'game-1', sourceType: 'TEAM_MATCH', currentOfficialRevision: null },
       result: null,
     };
     const prisma = {
       v1TeamMembership: {
         findMany: jest.fn().mockResolvedValue([{ teamId: reviewerTeamId, role: 'owner' }]),
       },
-      v1TournamentFixture: {
+      v1TeamMatch: {
         findMany: jest.fn().mockResolvedValue([fixtureWithoutOfficialResult]),
       },
       v1TournamentPlayer: { findMany: jest.fn() },
@@ -243,7 +276,7 @@ describe('TournamentFixtureReviewsService', () => {
   it('pending 대상 수는 상대 팀 1 + 상대팀 로스터 인원이다', async () => {
     const prisma = {
       v1TeamMembership: membershipStore([membership({ userId: user.id, teamId: reviewerTeamId, role: 'owner' })]),
-      v1TournamentFixture: { findMany: jest.fn().mockResolvedValue([fixture({ id: fixtureId, fixtureNumber: 1 })]) },
+      v1TeamMatch: { findMany: jest.fn().mockResolvedValue([fixture({ id: fixtureId, fixtureNumber: 1 })]) },
       v1TournamentPlayer: playerStore([
         player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
         player({ registrationId: targetRegistrationId, userId: secondOpponentPlayerId, nickname: '러너스 7번' }),
@@ -253,11 +286,30 @@ describe('TournamentFixtureReviewsService', () => {
       v1PostEventReview: reviewStore([
         playerReviewRow({ id: 'review-mine', reviewerUserId: user.id, targetUserId: opponentPlayerId, rating: 4 }),
       ]),
+      ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
     await expect(service.pending(user, 20)).resolves.toMatchObject([
       { sourceId: fixtureId, targetCount: 3, reviewedCount: 1, remainingCount: 2, state: 'ready' },
+    ]);
+  });
+
+  it('pending 대상 수는 공식 결과의 실제 출전 상대 선수로 좁힌다', async () => {
+    const prisma = {
+      v1TeamMembership: membershipStore([membership({ userId: user.id, teamId: reviewerTeamId, role: 'owner' })]),
+      v1TeamMatch: { findMany: jest.fn().mockResolvedValue([fixture({ id: fixtureId, fixtureNumber: 1 })]) },
+      v1TournamentPlayer: playerStore([
+        player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
+        player({ registrationId: targetRegistrationId, userId: secondOpponentPlayerId, nickname: '러너스 7번' }),
+      ]),
+      v1PostEventReview: reviewStore([]),
+      ...appearanceStore([user.id], [opponentPlayerId]),
+    };
+    const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
+
+    await expect(service.pending(user, 20)).resolves.toMatchObject([
+      { sourceId: fixtureId, targetCount: 2, reviewedCount: 0, remainingCount: 2, state: 'ready' },
     ]);
   });
 
@@ -277,7 +329,7 @@ describe('TournamentFixtureReviewsService', () => {
       submittedAt: recordedAt,
     };
     const prisma = {
-      v1TournamentFixture: {
+      v1TeamMatch: {
         findUnique: jest.fn().mockResolvedValue(fixture({ id: secondFixtureId, fixtureNumber: 2 })),
       },
       v1TeamMembership: {
@@ -315,10 +367,10 @@ describe('TournamentFixtureReviewsService', () => {
   // 결과를 "리뷰 가능"으로 오판한다.
   it('무효화(VOID)된 결과는 완료로 취급하지 않고 SOURCE_NOT_COMPLETED로 막는다', async () => {
     const prisma = {
-      v1TournamentFixture: {
+      v1TeamMatch: {
         findUnique: jest.fn().mockResolvedValue({
           ...fixture({ id: fixtureId, fixtureNumber: 1 }),
-          game: { currentOfficialRevision: { state: 'VOID', officialAt: null } },
+          game: { id: 'game-1', sourceType: 'TEAM_MATCH', currentOfficialRevision: { state: 'VOID', officialAt: null } },
         }),
       },
       v1TeamMembership: { findMany: jest.fn() },
@@ -356,7 +408,7 @@ describe('TournamentFixtureReviewsService', () => {
       submittedAt: recordedAt,
     });
     const prisma = {
-      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
+      v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       // role 필터가 살아 있으면(role: { in: ['owner','manager'] }) 이 행이 걸러져
       // NOT_TEAM_MEMBER 403으로 떨어진다 — 그게 이 테스트가 잡으려는 회귀다.
       v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'member' })]),
@@ -376,7 +428,7 @@ describe('TournamentFixtureReviewsService', () => {
   // 순서는 화면이 "팀 평가가 기본, 선수는 선택"으로 그리는 근거다.
   it('source(): 일반 멤버에게도 상대 팀과 상대 선수가 모두 반환된다', async () => {
     const prisma = {
-      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
+      v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'member' })]),
       v1TournamentPlayer: playerStore([
         player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
@@ -400,7 +452,7 @@ describe('TournamentFixtureReviewsService', () => {
       playerReviewRow({ id: 'review-member-player', reviewerUserId: teammate.id, targetUserId: opponentPlayerId, rating: 4 }),
     );
     const prisma = {
-      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
+      v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'member' })]),
       v1TournamentPlayer: playerStore([
         player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
@@ -422,7 +474,7 @@ describe('TournamentFixtureReviewsService', () => {
   it('같은 팀의 다른 운영진이 이미 썼어도 내 후기는 새로 생성된다', async () => {
     const createMock = jest.fn().mockResolvedValue(reviewRow({ id: 'review-second', reviewerUserId: teammate.id, rating: 2 }));
     const prisma = {
-      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
+      v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'manager' })]),
       v1TournamentPlayer: playerStore([]),
       // 팀장(user)이 같은 대회·같은 상대팀에 이미 후기를 남긴 상태.
@@ -456,7 +508,7 @@ describe('TournamentFixtureReviewsService', () => {
   // 못 찾고 409로 시끄럽게 실패해야 한다 — 팀장의 후기를 내 것인 양 돌려주면 안 된다.
   it('P2002 폴백은 내 후기만 찾는다 — 없으면 DUPLICATE_REVIEW_RETRY로 실패한다', async () => {
     const prisma = {
-      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
+      v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'manager' })]),
       v1TournamentPlayer: playerStore([]),
       v1PostEventReview: reviewStore([reviewRow({ id: 'review-captain', reviewerUserId: user.id, rating: 5 })]),
@@ -473,7 +525,7 @@ describe('TournamentFixtureReviewsService', () => {
   it('같은 사람이 같은 상대팀에 다시 제출하면 기존 후기를 그대로 돌려준다', async () => {
     const transactionMock = jest.fn();
     const prisma = {
-      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
+      v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       v1TeamMembership: membershipStore([membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'manager' })]),
       v1TournamentPlayer: playerStore([]),
       v1PostEventReview: reviewStore([reviewRow({ id: 'review-mine', reviewerUserId: teammate.id, rating: 3 })]),
@@ -494,13 +546,14 @@ describe('TournamentFixtureReviewsService', () => {
         membership({ userId: user.id, teamId: reviewerTeamId, role: 'owner' }),
         membership({ userId: teammate.id, teamId: reviewerTeamId, role: 'member' }),
       ]),
-      v1TournamentFixture: {
+      v1TeamMatch: {
         findMany: jest.fn().mockResolvedValue([fixture({ id: fixtureId, fixtureNumber: 1 })]),
       },
       v1TournamentPlayer: playerStore([
         player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
       ]),
       v1PostEventReview: reviewStore([reviewRow({ id: 'review-captain', reviewerUserId: user.id, rating: 5 })]),
+      ...appearanceStore(),
     };
     const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
@@ -517,14 +570,14 @@ describe('TournamentFixtureReviewsService', () => {
     await expect(service.pending(user, 20, tournamentId)).resolves.toMatchObject([
       { sourceId: fixtureId, targetCount: 2, reviewedCount: 1, remainingCount: 1 },
     ]);
-    expect(prisma.v1TournamentFixture.findMany).toHaveBeenCalledWith(expect.objectContaining({
+    expect(prisma.v1TeamMatch.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ tournamentId }),
     }));
   });
 
   it('참가팀 소속이 아니면 NOT_TEAM_MEMBER로 막는다', async () => {
     const prisma = {
-      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
+      v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       // 참가하지 않은 제3팀의 멤버 — teamId 필터에서 걸러져야 한다.
       v1TeamMembership: membershipStore([membership({ userId: outsider.id, teamId: otherTeamId, role: 'owner' })]),
       v1TournamentPlayer: playerStore([]),
@@ -541,7 +594,7 @@ describe('TournamentFixtureReviewsService', () => {
   // 실출전 게이트(Task 3, §5.4): roster(대상 명단) 자체를 실출전 userId로 좁힌다.
   it('로스터에는 있지만 실출전이 아닌 선수는 대상 목록에서 빠진다', async () => {
     const prisma = {
-      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
+      v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       v1TeamMembership: membershipStore([membership({ userId: user.id, teamId: reviewerTeamId, role: 'owner' })]),
       v1TournamentPlayer: playerStore([
         player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
@@ -582,7 +635,7 @@ describe('TournamentFixtureReviewsService', () => {
 
   it('작성자 본인이 자기 사이드의 실출전 명단에 없으면 NOT_ACTUAL_PARTICIPANT(403)를 던진다', async () => {
     const prisma = {
-      v1TournamentFixture: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
+      v1TeamMatch: { findUnique: jest.fn().mockResolvedValue(fixture({ id: fixtureId, fixtureNumber: 1 })) },
       v1TeamMembership: membershipStore([membership({ userId: user.id, teamId: reviewerTeamId, role: 'owner' })]),
       v1TournamentPlayer: playerStore([
         player({ registrationId: targetRegistrationId, userId: opponentPlayerId, nickname: '러너스 10번' }),
@@ -605,16 +658,12 @@ describe('TournamentFixtureReviewsService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('appearedUserIdsBySide가 null이면(Game 백필 전) 등록 로스터 전체를 대상으로 유지한다', async () => {
+  it('Game이 없는 canonical TeamMatch는 legacy roster fallback 없이 fail closed 한다', async () => {
     const prisma = {
-      v1TournamentFixture: {
+      v1TeamMatch: {
         findUnique: jest.fn().mockResolvedValue({
           ...fixture({ id: fixtureId, fixtureNumber: 1 }),
-          // Game 미연결(백필 전) — officialResultTimestamp()는 레거시 result.recordedAt으로
-          // 폴백하므로 완료 게이트는 그대로 통과하지만, appearedUserIdsBySide()는 null을
-          // 반환해야 한다(§5.2 폴백 조건: game이 없음).
           game: null,
-          result: { recordedAt },
         }),
       },
       v1TeamMembership: membershipStore([membership({ userId: user.id, teamId: reviewerTeamId, role: 'owner' })]),
@@ -623,29 +672,22 @@ describe('TournamentFixtureReviewsService', () => {
         player({ registrationId: targetRegistrationId, userId: secondOpponentPlayerId, nickname: '러너스 7번' }),
       ]),
       v1PostEventReview: reviewStore([]),
-      // v1GameResultParticipant/v1GameParticipant/v1GameSide는 일부러 넣지 않는다 —
-      // appearedUserIdsBySide()가 game이 null이면 그 델리게이트들을 아예 호출하지 않고
-      // 첫 줄에서 null을 반환해야 하고, 이 테스트가 바로 그 계약을 검증한다.
     };
     const service = new TournamentFixtureReviewsService(prisma as never, reviewPolicyStub());
 
-    const result = await service.source(user, fixtureId);
-
-    // appeared가 null(폴백)이면 필터링하지 않는다 — 등록 로스터 두 명 모두 그대로 남는다.
-    expect(result.targets.map((target) => target.targetUserId ?? target.targetTeamId)).toEqual([
-      targetTeamId,
-      opponentPlayerId,
-      secondOpponentPlayerId,
-    ]);
+    await expect(service.source(user, fixtureId)).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_MATCH_METADATA_INCOMPLETE' },
+    });
   });
 
   // 평가창(Task 4, §6). 기간은 어드민 설정에서 오고, 저장하지 않고 매 조회 시점에 계산한다.
   it('공식 결과 확정 후 설정된 기간이 지나면 REVIEW_WINDOW_CLOSED(410)로 막는다', async () => {
     const prisma = {
-      v1TournamentFixture: {
+      v1TeamMatch: {
         findUnique: jest.fn().mockResolvedValue({
           ...fixture({ id: fixtureId, fixtureNumber: 1 }),
           game: {
+            sourceType: 'TEAM_MATCH',
             id: 'game-1',
             currentOfficialRevision: {
               id: 'revision-1',
@@ -674,10 +716,11 @@ describe('TournamentFixtureReviewsService', () => {
   // 이 한 쌍이 "기간이 하드코딩이 아니라 설정에서 온다"는 것을 실제로 증명한다.
   it('같은 경기라도 설정 기간이 더 길면(기본 168시간) 아직 막지 않는다', async () => {
     const prisma = {
-      v1TournamentFixture: {
+      v1TeamMatch: {
         findUnique: jest.fn().mockResolvedValue({
           ...fixture({ id: fixtureId, fixtureNumber: 1 }),
           game: {
+            sourceType: 'TEAM_MATCH',
             id: 'game-1',
             currentOfficialRevision: {
               id: 'revision-1',
@@ -757,15 +800,19 @@ function appearanceStore(
   ];
   return {
     v1GameResultParticipant: {
-      findMany: jest.fn(async () => participants.map((participant) => ({ participantId: participant.id }))),
+      findMany: jest.fn(async () => participants.map((participant) => ({
+        participantId: participant.id,
+        resultRevisionId: 'revision-1',
+        resultRevision: { gameId: 'game-1' },
+      }))),
     },
     v1GameParticipant: {
-      findMany: jest.fn(async () => participants),
+      findMany: jest.fn(async () => participants.map((participant) => ({ ...participant, gameId: 'game-1' }))),
     },
     v1GameSide: {
       findMany: jest.fn(async () => [
-        { id: 'home-side', sideKey: 'HOME' },
-        { id: 'away-side', sideKey: 'AWAY' },
+        { id: 'home-side', gameId: 'game-1', sideKey: 'HOME' },
+        { id: 'away-side', gameId: 'game-1', sideKey: 'AWAY' },
       ]),
     },
   };
@@ -844,8 +891,7 @@ function playerReviewRow(input: {
 function trustTx(createMock: jest.Mock) {
   return {
     v1PostEventReview: { create: createMock, groupBy: jest.fn().mockResolvedValue([]) },
-    v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
-    v1TournamentFixture: { count: jest.fn().mockResolvedValue(1) },
+    v1TeamMatch: { count: jest.fn().mockResolvedValue(1) },
     v1TeamTrustScore: { upsert: jest.fn().mockResolvedValue({}) },
   };
 }
@@ -861,23 +907,30 @@ function reputationTx(createMock: jest.Mock) {
 function fixture(input: { readonly id: string; readonly fixtureNumber: number }) {
   return {
     id: input.id,
+    title: 'TeamMeet Cup match',
     tournamentId,
+    leagueId: null,
     tournament: { title: 'TeamMeet Cup', sportId },
-    round: '예선',
-    fixtureNumber: input.fixtureNumber,
     status: 'completed',
-    scheduledAt: recordedAt,
+    completedAt: recordedAt,
+    startAt: recordedAt,
     updatedAt: recordedAt,
-    game: { id: 'game-1', currentOfficialRevision: { id: 'revision-1', state: 'OFFICIAL', officialAt: recordedAt } },
-    homeRegistration: {
-      id: reviewerRegistrationId,
-      teamId: reviewerTeamId,
-      team: { id: reviewerTeamId, name: '성수 FC', profile: { logoUrl: null } },
-    },
-    awayRegistration: {
-      id: targetRegistrationId,
-      teamId: targetTeamId,
-      team: { id: targetTeamId, name: '마포 러너스', profile: { logoUrl: null } },
+    game: { id: 'game-1', sourceType: 'TEAM_MATCH', currentOfficialRevision: { id: 'revision-1', state: 'OFFICIAL', officialAt: recordedAt } },
+    tournamentDetails: {
+      teamMatchId: input.id,
+      tournamentId,
+      round: '예선',
+      fixtureNumber: input.fixtureNumber,
+      homeRegistration: {
+        id: reviewerRegistrationId,
+        teamId: reviewerTeamId,
+        team: { id: reviewerTeamId, name: '성수 FC', profile: { logoUrl: null } },
+      },
+      awayRegistration: {
+        id: targetRegistrationId,
+        teamId: targetTeamId,
+        team: { id: targetTeamId, name: '마포 러너스', profile: { logoUrl: null } },
+      },
     },
   };
 }

@@ -222,6 +222,7 @@ describe('LeagueResultEntryReminderService — 리그 결과 미입력 24시간 
       const updated = await leagueAdmin.updateFixture(actor, ctx.leagueId, ctx.teamMatchId, {
         startsAt: newStartAt.toISOString(),
       } as UpdateLeagueFixtureDto);
+      if (updated.startAt === null) throw new Error('reminder reschedule test requires persisted startAt');
       expect(updated.startAt.toISOString()).toBe(newStartAt.toISOString());
 
       const outboxRows = await prisma.$queryRaw<Array<{ businessKey: string; availableAt: Date }>>`

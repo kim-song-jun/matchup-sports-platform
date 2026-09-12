@@ -4,11 +4,12 @@ import type { WebPushService } from '../notifications/web-push.service';
 import { GameResultBracketProjectionService } from './game-result-bracket-projection.service';
 import { GameResultEscalationTerminalService } from './game-result-escalation-terminal.service';
 import { GameResultOfficialFactsService } from './game-result-official-facts.service';
-import type { OfficialRevisionRow } from './game-result-official-projection.types';
+import type { OfficialRevisionRow, OfficialRevisionRowRaw } from './game-result-official-projection.types';
 import { GameResultProjectionWatermarkService } from './game-result-projection-watermark.service';
 import { GameResultPublicCacheService } from './game-result-public-cache.service';
 import { GameResultStandingsProjectionService } from './game-result-standings-projection.service';
 import { officialRevisionRowSelect } from './official-revision-row.query';
+import { normalizeOfficialRevisionRow } from './official-revision-row.normalizer';
 import { parseOfficialScore } from './parse-official-score';
 import { TeamMatchCompletionNotificationService } from './team-match-completion-notification.service';
 import { TournamentFixtureCompletionNotificationService } from './tournament-fixture-completion-notification.service';
@@ -18,7 +19,7 @@ import { TournamentFixtureCompletionNotificationService } from './tournament-fix
 // 영향이 없다.
 import { LeagueCompletionProjectionService } from '../league-matches/league-completion-projection.service';
 
-type LockedOfficialRevisionRow = Omit<OfficialRevisionRow, 'officialAt'> & {
+type LockedOfficialRevisionRow = Omit<OfficialRevisionRowRaw, 'officialAt'> & {
   state: string;
   officialAt: Date | null;
 };
@@ -108,7 +109,7 @@ export class GameResultOfficialProjectionService {
     if (revision === undefined || revision.state !== 'OFFICIAL' || revision.officialAt === null) {
       throw new Error(`GAME_RESULT_OFFICIAL revision ${revisionId} is not OFFICIAL`);
     }
-    return { ...revision, officialAt: revision.officialAt };
+    return normalizeOfficialRevisionRow({ ...revision, officialAt: revision.officialAt });
   }
 
   private async writeAggregateWatermarks(

@@ -184,20 +184,30 @@ describe('대회 표면은 정규 리그 시즌을 보여주지 않는다 (real 
     // (`findFirstOrThrow({status:'ACTIVE'})` 로 기존 행에 기대면 여기서 터진다, 실측).
     await seedCompetitionConfigVersions(prisma as unknown as PrismaClient);
     const competitionConfig = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({
-      where: { status: 'ACTIVE' },
+      where: { name: 'futsal-v1', status: 'ACTIVE' },
       orderBy: { version: 'desc' },
     });
     for (const [fixtureId, tournamentId] of [
       [ids.tournamentFixture, ids.tournament],
       [ids.leagueFixture, ids.league],
     ] as ReadonlyArray<readonly [string, string]>) {
-      await prisma.v1TournamentFixture.create({
-        data: { id: fixtureId, tournamentId, round: 'group', fixtureNumber: 1 },
+      await prisma.v1TeamMatch.create({
+        data: {
+          id: fixtureId,
+          tournamentId,
+          sportId: ids.sportId,
+          title: `Surface kind canonical match ${fixtureId}`,
+          status: 'matched',
+          competitionConfigVersionId: competitionConfig.id,
+        },
+      });
+      await prisma.v1TournamentMatchDetails.create({
+        data: { teamMatchId: fixtureId, tournamentId, round: 'group', fixtureNumber: 1 },
       });
       const game = await prisma.v1Game.create({
         data: {
-          sourceType: 'TOURNAMENT_FIXTURE',
-          tournamentFixtureId: fixtureId,
+          sourceType: 'TEAM_MATCH',
+          teamMatchId: fixtureId,
           competitionConfigVersionId: competitionConfig.id,
         },
         select: { id: true },

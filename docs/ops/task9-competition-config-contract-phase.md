@@ -1,5 +1,11 @@
 # Task 9 competition-config — deferred contract-phase migration
 
+
+## Task 168 interaction note (candidate)
+
+- Competition-config backfill remains an explicit post-migrate CLI contract and must be reviewed with the 11-migration replay.
+- The historical goal/fixture backfill runner is pre-retirement evidence only; it is not restored as an active deploy consumer. Empty-database zero-candidate output cannot prove historical preservation.
+
 ## Why this document exists
 
 PR `fix/v1-expand-contract-split` rewrote 4 of the 10 Task 9 migrations

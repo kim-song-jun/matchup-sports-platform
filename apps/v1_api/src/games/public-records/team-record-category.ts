@@ -11,12 +11,9 @@
  * - `tournamentId` 가 없고 `leagueId` 가 있으면 `league`.
  * - 둘 다 없으면 `friendly`(단발 팀 매치).
  *
- * 스키마상 `V1TeamRecordFact`는 `tournamentId`/`teamMatchId` 중 정확히 하나만
- * 채워진다(`exactly-one-source`, `public-team-records.service.ts` 참조) -- 즉 실제
- * 데이터에서 tournamentId 와 leagueId 가 동시에 채워지는 행은 없다. 그래도 판정
- * 우선순위를 tournamentId 우선으로 고정해 두는 것은, 이 함수가 "두 값이 항상
- * 상호배타적"이라는 스키마 불변식에 몰래 기대지 않고 그 자체로 방어적이게 하기
- * 위함이다.
+ * canonical tournament fact는 `tournamentId`와 운영 식별자인 `teamMatchId`를
+ * 동시에 가질 수 있다. `leagueId`는 정규 리그 팀매치 축에만 해당한다. 판정
+ * 우선순위를 tournamentId 우선으로 고정해 전환기 데이터에서도 대회 분류를 보존한다.
  */
 export type TeamRecordCategory = 'league' | 'tournament' | 'friendly';
 

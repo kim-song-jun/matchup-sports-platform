@@ -154,7 +154,7 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
       ],
     });
     await prisma.v1Tournament.create({
-      data: { id: ids.tournament, sportId: ids.sport, title: 'Roster link tournament' },
+      data: { id: ids.tournament, sportId: ids.sport, title: 'Roster link tournament', competitionConfigVersionId: config.id },
     });
     await prisma.v1TournamentRegistration.createMany({
       data: [
@@ -162,15 +162,28 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
         { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.awayTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
       ],
     });
-    await prisma.v1TournamentFixture.create({
+    await prisma.v1TeamMatch.create({
       data: {
         id: ids.fixture,
         tournamentId: ids.tournament,
+        sportId: ids.sport,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.awayTeam,
+        title: 'Roster link match',
+        status: 'matched',
+        startAt: new Date(Date.now() - 60_000),
+        competitionConfigVersionId: config.id,
+      },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: ids.fixture,
+        tournamentId: ids.tournament,
         round: 'group',
         fixtureNumber: 1,
-        competitionConfigVersionId: config.id,
+        legNumber: 1,
         // team_manager 액터 경로(self 케이스)가 resolveActor에서 자기 팀
-        // 라인업 권한을 얻으려면 이 fixture의 homeRegistration이 hostTeam을
+        // 라인업 권한을 얻으려면 이 Details row가 hostTeam registration을
         // 가리켜야 한다.
         homeRegistrationId: ids.hostRegistration,
         awayRegistrationId: ids.awayRegistration,
@@ -178,7 +191,7 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
     });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: config.id,
       sides: [

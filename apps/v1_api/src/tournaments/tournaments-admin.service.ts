@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, V1Tournament } from '@prisma/client';
+import { Prisma, V1GameSourceType, V1Tournament } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -166,13 +166,23 @@ export class TournamentsAdminService {
     const row = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       include: {
-        _count: { select: { registrations: true, fixtures: true, announcements: true } },
+        _count: { select: { registrations: true, announcements: true } },
         sport: { select: { code: true } },
       },
     });
     if (!row) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
+    const fixtureCount = await this.prisma.v1TournamentMatchDetails.count({
+      where: {
+        tournamentId,
+        teamMatch: {
+          deletedAt: null,
+          tournamentId,
+          game: { sourceType: V1GameSourceType.TEAM_MATCH },
+        },
+      },
+    });
     // row.sport는 스키마상 항상 존재해야 하는 필수 relation(V1Tournament.sportId가
     // required)이지만, 옵셔널 체이닝으로 방어해 둔다 — 이 relation을 모르는(추가 전부터
     // 있던) 다른 테스트의 얕은 목이 undefined를 줘도 loadLineupInfo가 "종목 정보 없음"으로
@@ -183,7 +193,7 @@ export class TournamentsAdminService {
       row._count.registrations,
       {
         registrations: row._count.registrations,
-        fixtures: row._count.fixtures,
+        fixtures: fixtureCount,
         announcements: row._count.announcements,
       },
       lineup,

@@ -30,7 +30,7 @@ make_manifest() {
 
   jq -Sn \
     --arg sha "${sha}" --arg version "${version}" --arg registry "${REGISTRY}" --arg digest "${digest}" \
-    '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version,createdAt:"2026-07-19T00:00:00Z"},source:{bucket:"alpha-bucket",key:("releases/"+$sha+".tar.gz"),versionId:"version-1",sha256:"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},database:{migrationPolicy:"expand-contract",rollbackMode:"application-images-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:null,rollbackCompatibleWith:null},images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$digest,uri:($registry+"/teameet-alpha-v1-api@"+$digest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$digest,uri:($registry+"/teameet-alpha-v1-web@"+$digest)}}}' \
+    '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version,createdAt:"2026-07-19T00:00:00Z"},source:{bucket:"alpha-bucket",key:("releases/"+$sha+".tar.gz"),versionId:"version-1",sha256:"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},database:{migrationPolicy:"task168-stageAIntermediate",rollbackMode:"canonical-intermediate-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:null,rollbackCompatibleWith:null,task168:{stage:"stageAIntermediate",schemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f",runtimeClientSchemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f",cutoverArchiveSha256:"694a17ba8ed3d062b68908d4fd4ca3085be28afbe2c9661dd7a1cfae2c6e799b",cutoverManifestSha256:"aa1753551026795af1af70352e54bfed31759fda826fe7a0244f43603ac8bb26",migrations:[range(0;10)|{name:("2026091200000"+tostring+"_v1_fixture"),sha256:"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}],rollbackTarget:null}},images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$digest,uri:($registry+"/teameet-alpha-v1-api@"+$digest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$digest,uri:($registry+"/teameet-alpha-v1-web@"+$digest)},cutoverTool:{repository:($registry+"/teameet-alpha-v1-api"),digest:$digest,uri:($registry+"/teameet-alpha-v1-api@"+$digest)}}}' \
     > "${output}"
 }
 
@@ -97,6 +97,14 @@ tampered_checksum="$(sha256sum "${tampered}" | awk '{print $1}')"
 if validate_alpha_release_manifest "${tampered}" "${SHA_A}" \
   "0.1.0-alpha.20260719.g111111111111" "${tampered_checksum}" "${REGISTRY}"; then
   echo "Malformed API digest was accepted" >&2
+  exit 1
+fi
+
+jq '.database.task168.stage = "wrong-stage"' "${manifest_a}" > "${tampered}"
+tampered_checksum="$(sha256sum "${tampered}" | awk '{print $1}')"
+if validate_alpha_release_manifest "${tampered}" "${SHA_A}" \
+  "0.1.0-alpha.20260719.g111111111111" "${tampered_checksum}" "${REGISTRY}"; then
+  echo "Incorrect Task 168 release stage was accepted" >&2
   exit 1
 fi
 

@@ -52,6 +52,11 @@ previous_checksum="$(jq -er '.previousManifestSha256' "${ALPHA_RELEASE_STATE_FIL
 validate_stored_alpha_manifest "${active_tmp}" "${ALPHA_ECR_REGISTRY}" "${active_checksum}"
 validate_stored_alpha_manifest "${PREVIOUS_MANIFEST}" "${ALPHA_ECR_REGISTRY}" "${previous_checksum}"
 
+if [[ "$(jq -r '.database.task168.stage // "none"' "${active_tmp}")" == stageAIntermediate ]]; then
+  echo "[alpha-rollback] Stage A has sealed the canonical intermediate; restoring a pre-cutover runtime is forbidden" >&2
+  exit 1
+fi
+
 previous_sha="$(jq -er '.release.sha' "${PREVIOUS_MANIFEST}")"
 if [[ "$(jq -r '.database.rollbackCompatibleWith // ""' "${active_tmp}")" != "${previous_sha}" ]]; then
   echo "[alpha-rollback] Active manifest is not proven compatible with the previous release" >&2

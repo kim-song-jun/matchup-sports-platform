@@ -26,6 +26,9 @@ const ids = {
   homeTeam: '96000000-0000-4000-8000-000000000020',
   awayTeam: '96000000-0000-4000-8000-000000000021',
   league: '96000000-0000-4000-8000-000000000030',
+  tournament: '96000000-0000-4000-8000-000000000031',
+  tournamentHomeRegistration: '96000000-0000-4000-8000-000000000032',
+  tournamentAwayRegistration: '96000000-0000-4000-8000-000000000033',
   leagueMatch: '96000000-0000-4000-8000-000000000040',
   friendlyMatch: '96000000-0000-4000-8000-000000000041',
   draftMatch: '96000000-0000-4000-8000-000000000042',
@@ -96,6 +99,7 @@ const httpBody = (outcome: Outcome<unknown>): { code?: string; status: number } 
 
 describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
   let configId: string;
+  let sportId: string;
   let leagueGameId: string;
   let friendlyGameId: string;
   let draftGameId: string;
@@ -131,7 +135,7 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
 
   const createFixtureGame = async (): Promise<string> => {
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.tournamentFixture,
       competitionConfigVersionId: configId,
       sides: [
@@ -150,31 +154,16 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     return created.gameId;
   };
 
-  /**
-   * 대회 픽스처 커맨드는 **실제 takeover 토큰**이 필요하다(팀매치는 그 요구가 early-return
-   * 이라 아무 문자열이나 통과한다 — 그 차이 자체가 계약이다).
-   */
-  const runFixture = async (command: 'start' | 'end', commandId: string) => {
-    const { takeoverToken } = await service.requestTakeover(authUser(ids.admin), fixtureGameId, {
-      clientInstanceId: 'console-end-fixture-client',
-      lastSequence: 0,
-    });
-    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: fixtureGameId } });
-    return service.executeCommand(authUser(ids.admin), fixtureGameId, command, commandId, {
-      expectedVersion: game.version,
-      clientCommandId: commandId,
-      takeoverToken,
-      occurredAt: new Date().toISOString(),
-      payload: {},
-    });
-  };
-
   const run = async (gameId: string, command: 'start' | 'end', commandId: string) => {
     const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
+    const { takeoverToken } = await service.requestTakeover(authUser(ids.admin), gameId, {
+      clientInstanceId: `console-end-${gameId}`,
+      lastSequence: game.lastSequence,
+    });
     return service.executeCommand(authUser(ids.admin), gameId, command, commandId, {
       expectedVersion: game.version,
       clientCommandId: commandId,
-      takeoverToken: 'league-console-end-token',
+      takeoverToken,
       occurredAt: new Date().toISOString(),
       payload: {},
     });
@@ -198,29 +187,67 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     const admin = await prisma.v1AdminUser.create({
       data: { userId: ids.admin, adminRole: 'ops', status: 'active' },
     });
-    await prisma.v1Sport.create({ data: { id: ids.sport, code: 'futsal', name: '#29 Futsal' } });
+    const sport = await prisma.v1Sport.upsert({
+      where: { code: 'futsal' },
+      create: { id: ids.sport, code: 'futsal', name: '#29 Futsal' },
+      update: {},
+    });
+    sportId = sport.id;
     await prisma.v1Region.create({ data: { id: ids.region, code: 'CONSOLE_END_REGION', name: '#29 Region', level: 1 } });
     await prisma.v1Team.createMany({
       data: [
-        { id: ids.homeTeam, ownerUserId: ids.admin, sportId: ids.sport, regionId: ids.region, name: '#29 홈팀' },
-        { id: ids.awayTeam, ownerUserId: ids.admin, sportId: ids.sport, regionId: ids.region, name: '#29 원정팀' },
+        { id: ids.homeTeam, ownerUserId: ids.admin, sportId, regionId: ids.region, name: '#29 홈팀' },
+        { id: ids.awayTeam, ownerUserId: ids.admin, sportId, regionId: ids.region, name: '#29 원정팀' },
       ],
     });
     const league = await seedLeagueOnTournamentAxis(prisma, {
       id: ids.league,
       title: '#29 콘솔 종료 리그',
-      sportId: ids.sport,
+      sportId,
       sportCode: 'futsal',
       regionId: ids.region,
       // **유저 id 가 아니라 어드민 행 id 다** — `v1_tournaments_created_by_admin_user_id_fkey`.
       createdByAdminUserId: admin.id,
       state: 'active',
     });
+    // The comparison case is a real regular tournament. A `regular_league`
+    // row deliberately rejects tournament Details, even though both surfaces
+    // share the integrated V1Tournament table.
+    await prisma.v1Tournament.create({
+      data: {
+        id: ids.tournament,
+        sportId,
+        regionId: ids.region,
+        title: '#29 canonical tournament',
+        status: 'in_progress',
+        kind: 'regular_tournament',
+        format: 'league',
+        competitionConfigVersionId: configId,
+      },
+    });
+    await prisma.v1TournamentRegistration.createMany({
+      data: [
+        {
+          id: ids.tournamentHomeRegistration,
+          tournamentId: ids.tournament,
+          teamId: ids.homeTeam,
+          appliedByUserId: ids.admin,
+          status: 'confirmed',
+        },
+        {
+          id: ids.tournamentAwayRegistration,
+          tournamentId: ids.tournament,
+          teamId: ids.awayTeam,
+          appliedByUserId: ids.admin,
+          status: 'confirmed',
+        },
+      ],
+    });
 
     const common = {
       hostTeamId: ids.homeTeam,
       createdByUserId: ids.admin,
-      sportId: ids.sport,
+      sportId,
       regionId: ids.region,
       placeName: '#29 구장',
       startAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
@@ -232,17 +259,17 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
       status: 'matched' as const,
     };
     await prisma.v1TeamMatch.create({
-      data: { ...common, id: ids.leagueMatch, title: '#29 리그 대진', leagueId: league.id },
+      data: { ...common, id: ids.leagueMatch, title: '#29 리그 대진', tournamentId: league.id, leagueId: league.id },
     });
     await prisma.v1TeamMatch.create({
       // `leagueId` 를 **주지 않는다** — 이것이 친선이다.
       data: { ...common, id: ids.friendlyMatch, title: '#29 친선 팀매치' },
     });
     await prisma.v1TeamMatch.create({
-      data: { ...common, id: ids.draftMatch, title: '#31 초안이 있는 리그 대진', leagueId: league.id },
+      data: { ...common, id: ids.draftMatch, title: '#31 초안이 있는 리그 대진', tournamentId: league.id, leagueId: league.id },
     });
     await prisma.v1TeamMatch.create({
-      data: { ...common, id: ids.cancelledMatch, title: '#29 C-1 취소될 리그 대진', leagueId: league.id },
+      data: { ...common, id: ids.cancelledMatch, title: '#29 C-1 취소될 리그 대진', tournamentId: league.id, leagueId: league.id },
     });
 
     // **일정 행을 실제로 만든다.** 없으면 "SCHEDULED 0건" 단언이 빈 집합에서 참이 되어
@@ -270,14 +297,30 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     draftGameId = await createGame(ids.draftMatch, 'console-end-src-draft');
     cancelledGameId = await createGame(ids.cancelledMatch, 'console-end-src-cancelled');
 
-    // 대조군 — 리그 거울(`league.id`)이 곧 `V1Tournament` 이므로 그 아래 픽스처를 만든다.
-    await prisma.v1TournamentFixture.create({
+    // 대조군 — 별도 regular tournament 아래의 canonical tournament TeamMatch다.
+    // Details가 있어야 source resolver가 tournament-owned match로 판별한다.
+    await prisma.v1TeamMatch.create({
       data: {
         id: ids.tournamentFixture,
-        tournamentId: league.id,
+        tournamentId: ids.tournament,
+        hostTeamId: ids.homeTeam,
+        approvedApplicantTeamId: ids.awayTeam,
+        createdByUserId: ids.admin,
+        sportId: sport.id,
+        regionId: ids.region,
+        title: '#29 canonical tournament match',
+        status: 'matched',
+        competitionConfigVersionId: configId,
+      },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: ids.tournamentFixture,
+        tournamentId: ids.tournament,
         round: 'group',
         fixtureNumber: 1,
-        competitionConfigVersionId: configId,
+        homeRegistrationId: ids.tournamentHomeRegistration,
+        awayRegistrationId: ids.tournamentAwayRegistration,
       },
     });
     fixtureGameId = await createFixtureGame();
@@ -323,8 +366,8 @@ describe('#29 콘솔 종료 — 리그 대진만 열린다', () => {
     });
     cancelledEnd = await capture(() => run(cancelledGameId, 'end', 'console-end-cancelled-end'));
 
-    await runFixture('start', 'console-end-fixture-start');
-    fixtureEnd = await capture(() => runFixture('end', 'console-end-fixture-end'));
+    await run(fixtureGameId, 'start', 'console-end-fixture-start');
+    fixtureEnd = await capture(() => run(fixtureGameId, 'end', 'console-end-fixture-end'));
   });
 
   afterAll(async () => {

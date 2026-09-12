@@ -4,14 +4,14 @@ import type { WebPushService } from '../notifications/web-push.service';
 import type { GameOperationClaim } from '../jobs/v1-game-operations-worker.service';
 import type { OfficialRevisionRow } from './game-result-official-projection.types';
 import { parseOfficialScore } from './parse-official-score';
-import { findTournamentOnSurface, ALL_COMPETITION_KINDS } from '../tournaments/tournament-surface-lookup';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from '../tournaments/tournament-surface-lookup';
 
 /**
  * 1차 대회 회고 REACH-4: 대회 알림은 등록·대기·취소·결제·공지·후기요청·수상까지
  * 실제로 발송되고, '경기 임박'도 lineup-reminder 워커가 커버하는데 — 정작
  * **"경기 결과가 확정됐어요"만 비어 있었다.** `TeamMatchCompletionNotificationService`
- * (리그 감사 R1)가 팀매치 쪽 같은 구멍을 메우면서 헤더에 "TOURNAMENT_FIXTURE에는
- * 완전히 no-op"이라고 스스로 문서화해 둔 그 갭이 이것이다. 참가팀 운영진은 확정
+ * (리그 감사 R1)가 일반 팀매치를 담당하고, 이 서비스는 Details가 있는 대회 TeamMatch를
+ * 담당한다. 참가팀 운영진은 확정
  * 여부를 앱을 스스로 열어 확인하는 것 외엔 알 방법이 없었다.
  *
  * 설계는 그 sibling 을 그대로 따른다(다른 점만 기록):
@@ -41,8 +41,12 @@ export class TournamentFixtureCompletionNotificationService {
     revision: OfficialRevisionRow,
     claim?: GameOperationClaim,
   ): Promise<void> {
-    if (revision.sourceType !== 'TOURNAMENT_FIXTURE') return;
-    if (revision.tournamentId === null || revision.tournamentFixtureId === null) return;
+    if (revision.sourceType !== 'TEAM_MATCH' || revision.tournamentTeamMatchId === null) return;
+    const tournamentId = revision.tournamentId;
+    const fixtureId = revision.tournamentTeamMatchId;
+    if (tournamentId === null || revision.teamMatchTournamentId !== tournamentId || revision.teamMatchId !== fixtureId || revision.leagueId !== null) {
+      throw new Error('Tournament completion notification requires matching canonical Details ownership');
+    }
 
     const teamIds = [revision.homeTeamId, revision.awayTeamId].filter(
       (id): id is string => id !== null,
@@ -69,16 +73,15 @@ export class TournamentFixtureCompletionNotificationService {
     if (enabledRecipients.length === 0) return;
 
     const [tournament, teams] = await Promise.all([
-      // 좁혀 두면 리그 경기의 알림에서 대회명이 `'대회'` 로 폴백된다(아래 `?? '대회'`).
-      // 기능이 아니라 **라벨**이 어긋나는 급이지만 조용히 틀리는 것은 같다.
-      // 지금은 동작이 안 바뀐다 — 거울 행은 `V1TournamentFixture` 가 없다.
-      // (docs/ops/read-swap-preflight.md §1-3)
-      findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
-        where: { id: revision.tournamentId },
+      findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
+        where: { id: tournamentId },
         select: { title: true },
       }),
       tx.v1Team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true } }),
     ]);
+    if (tournament === null) {
+      throw new Error('Tournament completion notification requires a tournament-kind competition');
+    }
     const teamNameById = new Map(teams.map((team) => [team.id, team.name]));
     const homeName = (revision.homeTeamId !== null ? teamNameById.get(revision.homeTeamId) : undefined) ?? '홈팀';
     const awayName = (revision.awayTeamId !== null ? teamNameById.get(revision.awayTeamId) : undefined) ?? '원정팀';
@@ -89,12 +92,10 @@ export class TournamentFixtureCompletionNotificationService {
         : `${score.home}:${score.away} (승부차기 ${score.penalties.home}:${score.penalties.away})`;
 
     const title = '대회 경기 결과가 확정됐어요';
-    // `?? '대회'` 는 조용한 폴백이다 — 위 조회를 `ALL_COMPETITION_KINDS` 로 넓혔으므로
-    // 리그가 도달해도 제 이름이 나간다. 폴백 자체는 남긴다(행이 정말 없을 수 있다).
-    const body = `${tournament?.title ?? '대회'} — ${homeName} ${scoreline} ${awayName} 결과가 공식 확정됐어요.`;
-    const deepLink = `/tournaments/${revision.tournamentId}/matches/${revision.tournamentFixtureId}`;
+    const body = `${tournament.title} — ${homeName} ${scoreline} ${awayName} 결과가 공식 확정됐어요.`;
+    const deepLink = `/tournaments/${tournamentId}/matches/${fixtureId}`;
     const businessKeyFor = (userId: string) =>
-      `tournament-fixture-completed:${revision.tournamentFixtureId}:${userId}`;
+      `tournament-fixture-completed:${fixtureId}:${userId}`;
 
     const alreadyDelivered = await tx.v1Notification.findMany({
       where: { businessKey: { in: enabledRecipients.map(businessKeyFor) } },
@@ -106,7 +107,7 @@ export class TournamentFixtureCompletionNotificationService {
       data: enabledRecipients.map((userId) => ({
         recipientUserId: userId,
         targetType: 'tournament' as const,
-        targetId: revision.tournamentId!,
+        targetId: tournamentId,
         title,
         body,
         deepLink,
@@ -127,7 +128,7 @@ export class TournamentFixtureCompletionNotificationService {
             // 조용히 삼키면 sendToUser 내부 실패(조회·전송)를 추적할 수 없다
             // (이 저장소의 silent-catch 안티패턴 규칙). warn 한 줄은 남긴다.
             this.logger.warn(
-              `web push failed for tournament fixture completion (fixture=${revision.tournamentFixtureId}): ${String(error)}`,
+              `web push failed for tournament fixture completion (fixture=${fixtureId}): ${String(error)}`,
             );
           });
       // 커밋 확정 뒤에만 보낸다(위 클래스 docblock 참조). claim이 없거나

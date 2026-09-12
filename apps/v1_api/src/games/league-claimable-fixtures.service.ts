@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { resolveLeagueWeekNumbers } from '../league-matches/league-week-number';
 import { PrismaService } from '../prisma/prisma.service';
@@ -119,9 +119,19 @@ export class LeagueClaimableFixturesService {
       select: { id: true, startAt: true, game: { select: { id: true } } },
       orderBy: { startAt: 'asc' },
     });
+    const validFixtures = fixtures.map((fixture) => {
+      const startAt = fixture.startAt;
+      if (startAt === null) {
+        throw new ConflictException({
+          code: 'LEAGUE_FIXTURE_INCOMPLETE',
+          message: '리그 대진의 시작 시각이 없어 기록 연결 대상을 표시할 수 없어요.',
+        });
+      }
+      return { ...fixture, startAt };
+    });
 
     const gameIdByFixtureId = new Map<string, string>();
-    for (const fixture of fixtures) {
+    for (const fixture of validFixtures) {
       // where 의 `game: { is: ... }` 가 이미 게임 없는 대진을 걸렀지만, Prisma 는 관계
       // 필터를 select 타입에 반영하지 않아 `game` 이 여전히 nullable 이다 — 타입 좁히기.
       if (fixture.game !== null) {
@@ -182,14 +192,23 @@ export class LeagueClaimableFixturesService {
       }),
     ]);
     const league = leagueRow === null ? null : { title: leagueRow.title, teamMatches: siblingFixtures };
+    const siblingStartAts = (league?.teamMatches ?? []).map((sibling) => {
+      if (sibling.startAt === null) {
+        throw new ConflictException({
+          code: 'LEAGUE_FIXTURE_INCOMPLETE',
+          message: '리그 대진의 시작 시각이 없어 주차를 계산할 수 없어요.',
+        });
+      }
+      return sibling.startAt;
+    });
     const weekNumbers = resolveLeagueWeekNumbers(
-      new Map([[leagueId, (league?.teamMatches ?? []).map((sibling) => sibling.startAt)]]),
-      fixtures.map((fixture) => ({ id: fixture.id, leagueId, startAt: fixture.startAt })),
+      new Map([[leagueId, siblingStartAts]]),
+      validFixtures.map((fixture) => ({ id: fixture.id, leagueId, startAt: fixture.startAt })),
     );
 
     return {
       leagueId,
-      fixtures: fixtures.flatMap((fixture) => {
+      fixtures: validFixtures.flatMap((fixture) => {
         const gameId = gameIdByFixtureId.get(fixture.id);
         if (gameId === undefined || gamesAlreadyLinkedToMe.has(gameId)) return [];
         const claimableCount = claimableCountByGameId.get(gameId) ?? 0;

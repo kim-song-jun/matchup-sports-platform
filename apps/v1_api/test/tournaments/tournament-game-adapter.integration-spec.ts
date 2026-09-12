@@ -195,9 +195,10 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
       bracket.createFixture(authUser, ids.tournament, request),
       bracket.createFixture(authUser, ids.tournament, request),
     ]);
-    const fixture = await prisma.v1TournamentFixture.findUniqueOrThrow({
+    const fixture = await prisma.v1TeamMatch.findUniqueOrThrow({
       where: { id: first.id },
       include: {
+        tournamentDetails: true,
         game: {
           include: {
             sides: { orderBy: { sideKey: 'asc' } },
@@ -230,8 +231,8 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
       '어댑터닉',
     ]);
     expect(
-      await prisma.v1TournamentFixture.count({
-        where: { tournamentId: ids.tournament, round: 'group_a', fixtureNumber: 41 },
+      await prisma.v1TeamMatch.count({
+        where: { tournamentId: ids.tournament, tournamentDetails: { is: { round: 'group_a', fixtureNumber: 41 } } },
       }),
     ).toBe(1);
 
@@ -256,7 +257,7 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
       // 팀 미정으로 생성 — 결선 대진을 미리 깔아두는 실제 운영 흐름이다
     });
 
-    const before = await prisma.v1TournamentFixture.findUniqueOrThrow({
+    const before = await prisma.v1TeamMatch.findUniqueOrThrow({
       where: { id: created.id },
       include: { game: { include: { sides: { orderBy: { sideKey: 'asc' } } } } },
     });
@@ -267,7 +268,7 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
       awayRegistrationId: ids.awayRegistration,
     });
 
-    const after = await prisma.v1TournamentFixture.findUniqueOrThrow({
+    const after = await prisma.v1TeamMatch.findUniqueOrThrow({
       where: { id: created.id },
       include: { game: { include: { sides: { orderBy: { sideKey: 'asc' } } } } },
     });
@@ -294,16 +295,16 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
     expect((failure as ConflictException).getStatus()).toBe(409);
     expect(failure).toMatchObject({ response: { code: 'COMPETITION_CONFIG_REQUIRED' } });
     expect(
-      await prisma.v1TournamentFixture.count({
-        where: { tournamentId: ids.invalidTournament, fixtureNumber: 42 },
+      await prisma.v1TeamMatch.count({
+        where: { tournamentId: ids.invalidTournament, tournamentDetails: { is: { fixtureNumber: 42 } } },
       }),
     ).toBe(0);
-    expect(await prisma.v1Game.count({ where: { tournamentFixture: { tournamentId: ids.invalidTournament } } })).toBe(0);
+    expect(await prisma.v1Game.count({ where: { teamMatch: { tournamentId: ids.invalidTournament } } })).toBe(0);
   });
 
   it('rejects generic result create/delete without legacy rows, revisions, or events', async () => {
-    const fixture = await prisma.v1TournamentFixture.findFirstOrThrow({
-      where: { tournamentId: ids.tournament, round: 'group_a', fixtureNumber: 41 },
+    const fixture = await prisma.v1TeamMatch.findFirstOrThrow({
+      where: { tournamentId: ids.tournament, tournamentDetails: { is: { round: 'group_a', fixtureNumber: 41 } } },
       include: { game: true },
     });
     const createFailure = await captureFailure(() =>
@@ -319,7 +320,6 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
     expect(deleteFailure).toBeInstanceOf(ConflictException);
     expect((deleteFailure as ConflictException).getStatus()).toBe(409);
     expect(deleteFailure).toMatchObject({ response: { code: 'TOURNAMENT_RESULT_DERIVED_ONLY' } });
-    expect(await prisma.v1TournamentFixtureResult.count({ where: { fixtureId: fixture.id } })).toBe(0);
     expect(await prisma.v1GameResultRevision.count({ where: { gameId: fixture.game!.id } })).toBe(0);
     expect(await prisma.v1GameEvent.count({ where: { gameId: fixture.game!.id } })).toBe(0);
     console.log(

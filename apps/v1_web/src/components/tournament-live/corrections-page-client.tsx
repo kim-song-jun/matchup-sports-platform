@@ -32,7 +32,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
   const deepLinkFixtureId = searchParams.get('fixtureId');
   const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(() => deepLinkFixtureId);
   const [deepLinkNotFound, setDeepLinkNotFound] = useState(false);
-  const panelHeadingRef = useRef<HTMLHeadingElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   /* 보드 API 응답에는 팀 이름이 없어서 목록이 "group · 1경기"로만 보였다 —
      어느 경기를 정정하는지 알 수 없다. 운영 보드와 같은 소스에서 이름을 채운다. */
@@ -82,6 +82,13 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
           fixtureId: selectedItem.fixtureId,
         })
       : undefined;
+  const selectedFixtureTitle = selectedItem
+    ? resolveFixtureLabel(
+        selectedItem,
+        teamNamesByFixtureId.get(selectedItem.fixtureId),
+        leagueTitlesByFixtureId,
+      ).title
+    : null;
 
   // T6-2: 딥링크로 들어왔는데 목록이 로드된 뒤에도 해당 fixture가 없으면(아직 공식
   // 결과가 확정되지 않은 경우) 조용히 미선택 상태로 두지 않고 안내한다.
@@ -94,7 +101,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
     if (!boardQuery.isSuccess || !deepLinkFixtureId) return;
     if (selectedItem) {
       setDeepLinkNotFound(false);
-      setTimeout(() => panelHeadingRef.current?.focus(), 0);
+      setTimeout(() => panelRef.current?.focus(), 0);
       return;
     }
     setDeepLinkNotFound(true);
@@ -126,7 +133,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
         {boardQuery.isSuccess ? (
           <>
           <ResultReviewGridStyles />
-          <div className="tm-result-review-grid">
+          <div className="tm-result-review-grid tm-result-review-grid--corrections">
             <FixturePickerList
               items={hasOfficialResult}
               teamNamesByFixtureId={teamNamesByFixtureId}
@@ -134,7 +141,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
               selectedFixtureId={selectedFixtureId}
               onSelect={(item) => {
                 setSelectedFixtureId(item.fixtureId);
-                setTimeout(() => panelHeadingRef.current?.focus(), 0);
+                setTimeout(() => panelRef.current?.focus(), 0);
               }}
               emptyTitle="정정할 결과가 없어요"
               emptySub="정정은 공식 확정된 결과가 있어야 할 수 있어요. 아직 확정한 경기가 없다면 결과 검토에서 먼저 확정해 주세요."
@@ -143,26 +150,18 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
             />
 
             {selectedItem && selectedItem.gameId ? (
-              <div>
-                <h2
-                  ref={panelHeadingRef}
-                  tabIndex={-1}
-                  className="tm-text-body-lg"
-                  style={{ marginBottom: 12, outline: 'none' }}
-                >
-                  {
-                    /* 리그 대진은 `round`·`fixtureNumber` 가 둘 다 null 이라, 그대로 두면
-                       구분자만 남은 `" · 경기"` 가 된다. 리그 어드민 대진표가 확정 단계 행을
-                       이 화면으로 딥링크하므로 실제로 도달한다. */
-                    resolveFixtureLabel(
-                      selectedItem,
-                      teamNamesByFixtureId.get(selectedItem.fixtureId),
-                      leagueTitlesByFixtureId,
-                    ).title
-                  }
-                </h2>
+              <div
+                ref={panelRef}
+                tabIndex={-1}
+                aria-label={`${selectedFixtureTitle} 결과 정정 패널`}
+                className="rounded-md outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--static-blue)]"
+              >
                 {publicHref ? (
-                  <Link href={publicHref} className="tm-section-action" style={{ marginBottom: 12 }}>
+                  <Link
+                    href={publicHref}
+                    className="tm-section-action inline-flex min-h-[44px] items-center"
+                    style={{ marginBottom: 12 }}
+                  >
                     공개 화면에서 보기
                   </Link>
                 ) : null}
@@ -170,6 +169,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
                   key={selectedItem.gameId}
                   gameId={selectedItem.gameId}
                   tournamentId={tournamentId}
+                  inline
                 />
               </div>
             ) : null}

@@ -1,4 +1,4 @@
-import { ForbiddenException, HttpException, Inject } from '@nestjs/common';
+import { ForbiddenException, HttpException, Inject, type OnModuleDestroy } from '@nestjs/common';
 import type { TournamentStaffRuntimeDenialReason } from '../tournaments/staff/tournament-staff-access.service';
 import { createHash } from 'node:crypto';
 import {
@@ -14,6 +14,7 @@ import {
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import type { Server, Socket } from 'socket.io';
 import { plainToInstance } from 'class-transformer';
+import type { V1CompetitionKind } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { currentRuntimeConfiguration, resolveV1RequestIdentity } from '../auth/v1-session';
@@ -38,31 +39,44 @@ type V1Socket = Socket & {
 };
 
 /**
- * 하트비트(15초)마다 재검증하면 구독 게임 수 × 동시 소켓 수만큼 DB 조회가 반복된다
- * (게임당 fixture 조회 1 + assertAccess 내부 조회 2). 만료된 스태프를 쫓아내는 데
- * 15초 해상도가 필요한 것은 아니므로 소켓당 재검증을 60초로 묶는다 — 하트비트가
- * 만드는 DB 부하가 1/4로 줄어든다.
- *
- * **"최대 60초"는 클라이언트가 계속 핑을 보낼 때만 성립한다.** 핑을 멈춘(또는 멈추게
- * 만든) 소켓은 이 재검증에 닿지 않아 만료 뒤에도 방송을 계속 받는다 — 이 저장소에는
- * cron 인프라가 없어 서버가 스스로 도는 스윕을 붙일 수 없다는 것이 그 이유이고,
- * 여기 적힌 보증은 그만큼만 유효하다. 다만 **쓰기는 별개로 안전하다**: 커맨드는
- * 매번 games.service 의 resolveActor 가 현재 DB 상태로 권한을 다시 판정하므로,
- * 만료된 스태프가 핑을 멈춘 채 이벤트를 기록할 수는 없다. 즉 남는 위험은
- * "이미 열려 있던 콘솔이 라이브 데이터를 계속 본다" 하나다.
+ * Explicit expiresAt deadlines use server timers. This slower heartbeat pass is
+ * retained as insurance for out-of-band assignment changes that do not publish a
+ * revoke event; it is not the expiry enforcement clock.
  */
 const STAFF_REVALIDATION_INTERVAL_MS = 60_000;
+const MAX_STAFF_LEASE_TIMER_MS = 2_147_000_000;
 
 type GameFixtureScope = {
   readonly tournamentId: string;
   readonly fixtureId: string;
+  readonly teamMatchId?: string;
   readonly fieldId: string | null;
+  readonly invalid?: boolean;
 };
 
 type GameBackfill = {
+  readonly version: number;
+  readonly state: string;
   readonly events: readonly unknown[];
   readonly lastSequence: number;
   readonly gap?: { readonly expectedSequence: number; readonly availableFrom: number } | null;
+};
+
+type StaffLease = {
+  readonly generation: number;
+  readonly userId: string;
+  readonly gameId: string;
+  readonly scope: GameFixtureScope;
+  expiresAt: Date | null;
+  state: 'PENDING' | 'ACTIVE' | 'SUSPENDED';
+  timer: NodeJS.Timeout | undefined;
+};
+
+type StaffLeaseAttempt = {
+  readonly generation: number;
+  readonly userId: string;
+  readonly gameId: string;
+  readonly scope: GameFixtureScope;
 };
 
 type RetryGameEventInput = {
@@ -82,6 +96,7 @@ type GameTakeoverGrantResult = {
 };
 
 type GameRealtimeOperations = {
+  assertReadAccess(user: V1AuthUser, gameId: string): Promise<void>;
   listEvents(user: V1AuthUser, gameId: string, afterSequence: number): Promise<GameBackfill>;
   appendEvent(
     user: V1AuthUser,
@@ -273,7 +288,7 @@ const frontendOrigin = isProduction ? requireProductionFrontendOrigin(process.en
   namespace: '/game-operations',
   cors: { origin: frontendOrigin ?? true, credentials: true },
 })
-export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy {
   @WebSocketServer()
   server!: Server;
 
@@ -291,6 +306,16 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     string,
     Map<string, Map<string, Set<string>>>
   >();
+  /** The last authorized lease. A new authorization attempt never shortens this lease. */
+  private readonly staffLeases = new Map<string, Map<string, StaffLease>>();
+  /** Authorization awaits live here until they atomically promote to `staffLeases`. */
+  private readonly pendingStaffLeaseAttempts = new Map<string, Map<string, StaffLeaseAttempt>>();
+  private readonly staffLeaseGenerations = new Map<string, Map<string, number>>();
+  private readonly roomTransitions = new Map<string, Promise<void>>();
+  /** Generation that currently owns the physical socket.io room membership. */
+  private readonly staffRoomOwners = new Map<string, number>();
+  private readonly socketClients = new Map<string, V1Socket>();
+  private shuttingDown = false;
 
   afterInit(server: Server): void {
     // Hand the games lane a way to reach this namespace's rooms without
@@ -332,6 +357,11 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         throw new Error('SOCKET_AUTH_STATE_INVALID');
       }
       await client.join(`user:${userId}`);
+      if (this.shuttingDown || client.connected === false) {
+        await client.leave(`user:${userId}`);
+        return;
+      }
+      this.socketClients.set(client.id, client);
       this.logger.debug(
         { socketId: client.id, userId },
         'Socket joined user room',
@@ -394,6 +424,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   }
 
   handleDisconnect(client: V1Socket): void {
+    this.socketClients.delete(client.id);
     const userId = client.data.userId;
     const authUser = client.data.authUser;
     if (userId === undefined || authUser === undefined || authUser.id !== userId) {
@@ -425,8 +456,16 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         state: true,
         version: true,
         lastSequence: true,
-        tournamentFixture: {
-          select: { id: true, tournamentId: true, fieldId: true },
+        teamMatch: {
+          select: {
+            id: true,
+            tournamentId: true,
+            leagueId: true,
+            fieldId: true,
+            tournament: { select: { kind: true } },
+            league: { select: { kind: true } },
+            tournamentDetails: { select: { teamMatchId: true, tournamentId: true } },
+          },
         },
       },
     });
@@ -436,16 +475,28 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
     }
 
-    const fixture = game.tournamentFixture;
+    const scope = gameRealtimeScope(game);
+    let leaseGeneration: number | undefined;
+    let leasePromoted = false;
     try {
-      if (fixture !== null) {
+      if (scope?.invalid === true) {
+        return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+      }
+      if (scope !== null) {
+        // Reserve an attempt before the authorization await so revoke/disconnect can
+        // invalidate it. The previously authorized lease and its deadline stay intact
+        // until this attempt has a concrete principal and can be promoted atomically.
+        leaseGeneration = this.reserveStaffLeaseAttempt(client, input.gameId, userId, scope);
+        if (leaseGeneration === undefined) {
+          return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'SESSION_NOT_AUTHENTICATED' };
+        }
         const principal = await this.tournamentStaffAccess.assertAccess({
           userId,
           action: 'read',
           resource: {
-            tournamentId: fixture.tournamentId,
-            fixtureId: fixture.id,
-            ...(fixture.fieldId === null ? {} : { fieldId: fixture.fieldId }),
+            tournamentId: scope.tournamentId,
+            fixtureId: scope.fixtureId,
+            ...(scope.fieldId === null ? {} : { fieldId: scope.fieldId }),
           },
         });
         if (
@@ -453,19 +504,68 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
           client.data.authorizationSubjectVersion !== principal.assignmentVersion
         ) {
           // **재접속하면 풀린다** — 권한이 없어진 것이 아니다.
+          await this.denyCurrentStaffAttempt(client, userId, input.gameId, leaseGeneration);
           return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'AUTHORIZATION_SUBJECT_STALE' };
         }
+        if (principal.expiresAt !== null && principal.expiresAt.getTime() <= Date.now()) {
+          await this.denyCurrentStaffAttempt(client, userId, input.gameId, leaseGeneration);
+          return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_EXPIRED' };
+        }
+        if (
+          !this.promoteStaffLeaseAttempt(
+            client,
+            input.gameId,
+            leaseGeneration,
+            principal.expiresAt ?? null,
+          )
+        ) {
+          return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' };
+        }
+        leasePromoted = true;
+      }
+      const room = gameRoom(input.gameId);
+      if (scope === null) {
+        leaseGeneration = this.reserveRoomGeneration(client, input.gameId);
+        if (leaseGeneration === undefined) {
+          return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'SESSION_NOT_AUTHENTICATED' };
+        }
+        await this.gamesService.assertReadAccess(authUser, input.gameId);
+        if (!(await this.joinUnscopedGameRoom(client, input.gameId, leaseGeneration))) {
+          return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
+        }
+      } else if (!(await this.joinAuthorizedGameRoom(client, input.gameId, leaseGeneration!))) {
+        const cancelled = this.cancelAuthorizedLeaseIfGeneration(client.id, input.gameId, leaseGeneration!);
+        if (cancelled) await this.leaveAuthorizedGameRoom(client, input.gameId, leaseGeneration!);
+        return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' };
       }
       const backfill = await this.gamesService.listEvents(authUser, input.gameId, input.afterSequence);
-      const room = gameRoom(input.gameId);
-      await client.join(room);
-      if (fixture !== null) {
-        this.recordGameSubscription(userId, fixture.tournamentId, input.gameId, client.id);
+      if (scope !== null) {
+        if (!this.activateStaffLease(client.id, input.gameId, leaseGeneration!)) {
+          const cancelled = this.cancelAuthorizedLeaseIfGeneration(client.id, input.gameId, leaseGeneration!);
+          if (cancelled || this.staffRoomOwners.get(this.roomTransitionKey(client.id, input.gameId)) === leaseGeneration) {
+            await this.leaveAuthorizedGameRoom(client, input.gameId, leaseGeneration!);
+          }
+          return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: 'ASSIGNMENT_REQUIRED' };
+        }
+        this.recordGameSubscription(userId, scope.tournamentId, input.gameId, client.id);
+      } else if (
+        leaseGeneration === undefined ||
+        !this.isRoomGenerationCurrent(client.id, input.gameId, leaseGeneration) ||
+        this.staffRoomOwners.get(this.roomTransitionKey(client.id, input.gameId)) !== leaseGeneration
+      ) {
+        if (leaseGeneration !== undefined) {
+          if (this.invalidateRoomGenerationIfCurrent(client.id, input.gameId, leaseGeneration)) {
+            await this.forceLeaveGameRoom(client, input.gameId);
+          } else {
+            await this.leaveAuthorizedGameRoom(client, input.gameId, leaseGeneration);
+          }
+        }
+        return { status: 'denied', code: 'STAFF_SCOPE_DENIED' };
       }
       const snapshot = {
         gameId: input.gameId,
-        version: game.version,
-        state: game.state,
+        version: backfill.version,
+        state: backfill.state,
         lastSequence: backfill.lastSequence,
         events: backfill.events,
       };
@@ -480,8 +580,64 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
         snapshot,
       };
     } catch (error) {
+      let cleanupFailed = false;
+      if (scope !== null) {
+        if (leaseGeneration !== undefined) {
+          const ownedAttempt = this.clearStaffLeaseAttempt(client.id, input.gameId, leaseGeneration);
+          const cancelled = leasePromoted
+            ? this.cancelAuthorizedLeaseIfGeneration(client.id, input.gameId, leaseGeneration)
+            : false;
+          if (cancelled) {
+            try {
+              await this.leaveAuthorizedGameRoom(client, input.gameId, leaseGeneration);
+            } catch (leaveError) {
+              this.logger.error(
+                { socketId: client.id, gameId: input.gameId, err: leaveError },
+                'Failed to leave failed game subscription',
+              );
+              client.disconnect(true);
+              cleanupFailed = true;
+            }
+          } else if (ownedAttempt) {
+            this.invalidateStaffAuthorization(client.id, input.gameId);
+            this.removeGameSubscription(userId, input.gameId, client.id);
+            try {
+              await this.forceLeaveGameRoom(client, input.gameId);
+            } catch (leaveError) {
+              this.logger.error(
+                { socketId: client.id, gameId: input.gameId, err: leaveError },
+                'Failed to leave denied game subscription',
+              );
+              this.emitProtocolError(client, { code: 'INTERNAL_ERROR' }, { gameId: input.gameId });
+              client.disconnect(true);
+              cleanupFailed = true;
+            }
+          }
+        }
+      } else {
+        if (leaseGeneration !== undefined) {
+          try {
+            if (this.invalidateRoomGenerationIfCurrent(client.id, input.gameId, leaseGeneration)) {
+              await this.forceLeaveGameRoom(client, input.gameId);
+            } else {
+              await this.leaveAuthorizedGameRoom(client, input.gameId, leaseGeneration);
+            }
+          } catch (leaveError) {
+            this.logger.error(
+              { socketId: client.id, gameId: input.gameId, err: leaveError },
+              'Failed to leave failed game subscription',
+            );
+            client.disconnect(true);
+            cleanupFailed = true;
+          }
+        }
+      }
       if (error instanceof ForbiddenException) {
         return { status: 'denied', code: 'STAFF_SCOPE_DENIED', reason: staffDenialReasonOf(error) };
+      }
+      if (!cleanupFailed) {
+        this.logger.error({ socketId: client.id, gameId: input.gameId, err: error }, 'Failed to subscribe to game room');
+        this.emitProtocolError(client, { code: 'INTERNAL_ERROR' }, { gameId: input.gameId });
       }
       throw error;
     }
@@ -718,38 +874,609 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     }
 
     const room = gameRoom(input.gameId);
-    await client.leave(room);
+    this.invalidateStaffAuthorization(client.id, input.gameId);
     this.removeGameSubscription(userId, input.gameId, client.id);
+    await this.forceLeaveGameRoom(client, input.gameId);
     return { status: 'unsubscribed', room };
   }
 
-  evictUserFromScopedGameRooms(input: {
+  async evictUserFromScopedGameRooms(input: {
     readonly userId: string;
     readonly tournamentId: string;
     readonly assignmentVersion: number;
-  }): void {
+  }): Promise<void> {
     const tournaments = this.gameSubscriptions.get(input.userId);
     const games = tournaments?.get(input.tournamentId);
-    if (games === undefined) {
-      return;
-    }
-
-    const userSockets = this.server.in(`user:${input.userId}`);
-    for (const gameId of games.keys()) {
-      const room = gameRoom(gameId);
-      const socketIds = games.get(gameId) ?? new Set<string>();
-      for (const socketId of socketIds) {
-        this.server.to(socketId).emit('game.permission.revoked', {
-          gameId,
-          assignmentVersion: input.assignmentVersion,
-        });
+    const gamesToEvict = new Map<string, Set<string>>();
+    for (const [gameId, socketIds] of games ?? []) gamesToEvict.set(gameId, new Set(socketIds));
+    // A pending authorization attempt may not have reached gameSubscriptions yet.
+    // Include it so revoke invalidates the attempt before any asynchronous leave.
+    for (const [socketId, attempts] of this.pendingStaffLeaseAttempts) {
+      for (const [gameId, attempt] of attempts) {
+        if (attempt.userId !== input.userId || attempt.scope.tournamentId !== input.tournamentId) continue;
+        const socketIds = gamesToEvict.get(gameId) ?? new Set<string>();
+        socketIds.add(socketId);
+        gamesToEvict.set(gameId, socketIds);
       }
-      userSockets.socketsLeave(room);
+    }
+    for (const [socketId, leases] of this.staffLeases) {
+      for (const [gameId, lease] of leases) {
+        if (lease.userId !== input.userId || lease.scope.tournamentId !== input.tournamentId) continue;
+        const socketIds = gamesToEvict.get(gameId) ?? new Set<string>();
+        socketIds.add(socketId);
+        gamesToEvict.set(gameId, socketIds);
+      }
+    }
+    if (gamesToEvict.size === 0) return;
+
+    const pendingLeaves: Promise<void>[] = [];
+    for (const [gameId, socketIds] of gamesToEvict) {
+      for (const socketId of socketIds) {
+        this.invalidateStaffAuthorization(socketId, gameId);
+        const leave = this.forceLeaveSocketGame(socketId, gameId, () => {
+          this.server.to(socketId).emit('game.permission.revoked', {
+            gameId,
+            assignmentVersion: input.assignmentVersion,
+          });
+        });
+        pendingLeaves.push(leave.catch((error: unknown) => {
+            this.logger.error({ socketId, gameId, err: error }, 'Failed to evict revoked staff socket');
+            this.socketClients.get(socketId)?.disconnect(true);
+          }));
+      }
     }
     tournaments?.delete(input.tournamentId);
     if (tournaments?.size === 0) {
       this.gameSubscriptions.delete(input.userId);
     }
+    await Promise.all(pendingLeaves);
+  }
+
+  private reserveStaffLeaseAttempt(
+    client: V1Socket,
+    gameId: string,
+    userId: string,
+    scope: GameFixtureScope,
+  ): number | undefined {
+    const generation = this.reserveRoomGeneration(client, gameId);
+    if (generation === undefined) return undefined;
+    const attempts = this.pendingStaffLeaseAttempts.get(client.id) ?? new Map<string, StaffLeaseAttempt>();
+    attempts.set(gameId, { generation, userId, gameId, scope });
+    this.pendingStaffLeaseAttempts.set(client.id, attempts);
+    return generation;
+  }
+
+  private reserveRoomGeneration(client: V1Socket, gameId: string): number | undefined {
+    if (!this.isSocketLive(client)) return undefined;
+    const generations = this.staffLeaseGenerations.get(client.id) ?? new Map<string, number>();
+    const generation = (generations.get(gameId) ?? 0) + 1;
+    generations.set(gameId, generation);
+    this.staffLeaseGenerations.set(client.id, generations);
+    return generation;
+  }
+
+  private isSocketLive(client: V1Socket): boolean {
+    return (
+      !this.shuttingDown &&
+      client.connected !== false &&
+      this.socketClients.get(client.id) === client
+    );
+  }
+
+  private isRoomGenerationCurrent(clientId: string, gameId: string, generation: number): boolean {
+    return this.staffLeaseGenerations.get(clientId)?.get(gameId) === generation;
+  }
+
+  private invalidateRoomGenerationIfCurrent(clientId: string, gameId: string, generation: number): boolean {
+    if (!this.isRoomGenerationCurrent(clientId, gameId, generation)) return false;
+    this.invalidateStaffAuthorization(clientId, gameId);
+    return true;
+  }
+
+  private clearStaffLeaseAttempt(clientId: string, gameId: string, generation: number): boolean {
+    const attempts = this.pendingStaffLeaseAttempts.get(clientId);
+    if (attempts?.get(gameId)?.generation !== generation) return false;
+    attempts.delete(gameId);
+    if (attempts.size === 0) this.pendingStaffLeaseAttempts.delete(clientId);
+    return true;
+  }
+
+  private replaceStaffLeaseAttemptScope(
+    clientId: string,
+    gameId: string,
+    generation: number,
+    scope: GameFixtureScope,
+  ): boolean {
+    const attempts = this.pendingStaffLeaseAttempts.get(clientId);
+    const attempt = attempts?.get(gameId);
+    if (attempt?.generation !== generation) return false;
+    attempts!.set(gameId, { ...attempt, scope });
+    return true;
+  }
+
+  private promoteStaffLeaseAttempt(
+    client: V1Socket,
+    gameId: string,
+    generation: number,
+    expiresAt: Date | null,
+  ): boolean {
+    if (!this.isSocketLive(client)) return false;
+    const attempts = this.pendingStaffLeaseAttempts.get(client.id);
+    const attempt = attempts?.get(gameId);
+    if (attempt?.generation !== generation) return false;
+    if (expiresAt !== null && expiresAt.getTime() <= Date.now()) {
+      this.clearStaffLeaseAttempt(client.id, gameId, generation);
+      return false;
+    }
+
+    const leases = this.staffLeases.get(client.id) ?? new Map<string, StaffLease>();
+    const previous = leases.get(gameId);
+    if (previous?.timer !== undefined) clearTimeout(previous.timer);
+    const lease: StaffLease = {
+      generation,
+      userId: attempt.userId,
+      gameId,
+      scope: attempt.scope,
+      expiresAt,
+      state: 'PENDING',
+      timer: undefined,
+    };
+    leases.set(gameId, lease);
+    this.staffLeases.set(client.id, leases);
+    this.clearStaffLeaseAttempt(client.id, gameId, generation);
+    if (previous !== undefined) {
+      this.removeGameSubscription(previous.userId, gameId, client.id);
+    }
+
+    const roomKey = this.roomTransitionKey(client.id, gameId);
+    if (previous !== undefined && this.staffRoomOwners.get(roomKey) === previous.generation) {
+      this.staffRoomOwners.set(roomKey, generation);
+    }
+    if (expiresAt !== null) this.scheduleStaffLease(client, lease);
+    return true;
+  }
+
+  private scheduleStaffLease(client: V1Socket, lease: StaffLease): void {
+    if (lease.expiresAt === null) return;
+    const remaining = lease.expiresAt.getTime() - Date.now();
+    const delay = Math.max(0, Math.min(remaining, MAX_STAFF_LEASE_TIMER_MS));
+    lease.timer = setTimeout(() => {
+      if (lease.expiresAt !== null && lease.expiresAt.getTime() - Date.now() > 0) {
+        this.scheduleStaffLease(client, lease);
+        return;
+      }
+      void this.expireStaffLease(client, lease);
+    }, delay);
+    lease.timer.unref?.();
+  }
+
+  private isAuthorizedLeaseOwner(clientId: string, gameId: string, generation: number): boolean {
+    return this.staffLeases.get(clientId)?.get(gameId)?.generation === generation;
+  }
+
+  private isAuthorizedLeaseAdmissible(clientId: string, gameId: string, generation: number): boolean {
+    const lease = this.staffLeases.get(clientId)?.get(gameId);
+    return (
+      lease?.generation === generation &&
+      lease.state !== 'SUSPENDED' &&
+      (lease.expiresAt === null || lease.expiresAt.getTime() > Date.now())
+    );
+  }
+
+  private activateStaffLease(clientId: string, gameId: string, generation: number): boolean {
+    if (!this.isAuthorizedLeaseAdmissible(clientId, gameId, generation)) return false;
+    if (this.staffRoomOwners.get(this.roomTransitionKey(clientId, gameId)) !== generation) return false;
+    this.staffLeases.get(clientId)!.get(gameId)!.state = 'ACTIVE';
+    return true;
+  }
+
+  private roomTransitionKey(socketId: string, gameId: string): string {
+    return `${socketId}:${gameId}`;
+  }
+
+  private async transitionGameRoom(
+    socketId: string,
+    gameId: string,
+    operation: () => Promise<void>,
+  ): Promise<void> {
+    const key = this.roomTransitionKey(socketId, gameId);
+    const previous = this.roomTransitions.get(key) ?? Promise.resolve();
+    const current = previous.catch(() => undefined).then(operation);
+    this.roomTransitions.set(key, current);
+    try {
+      await current;
+    } finally {
+      if (this.roomTransitions.get(key) === current) this.roomTransitions.delete(key);
+    }
+  }
+
+  private async joinAuthorizedGameRoom(client: V1Socket, gameId: string, generation: number): Promise<boolean> {
+    let admitted = false;
+    await this.transitionGameRoom(client.id, gameId, async () => {
+      if (!this.isSocketLive(client) || !this.isAuthorizedLeaseAdmissible(client.id, gameId, generation)) return;
+      const key = this.roomTransitionKey(client.id, gameId);
+      const previousOwner = this.staffRoomOwners.get(key);
+      this.staffRoomOwners.set(key, generation);
+      try {
+        await client.join(gameRoom(gameId));
+      } catch (error) {
+        if (this.staffRoomOwners.get(key) === generation) {
+          if (previousOwner === undefined) {
+            try {
+              await client.leave(gameRoom(gameId));
+              this.staffRoomOwners.delete(key);
+            } catch (leaveError) {
+              this.logger.error(
+                { socketId: client.id, gameId, err: leaveError },
+                'Failed to roll back rejected staff room join',
+              );
+              client.disconnect(true);
+              this.staffRoomOwners.delete(key);
+              throw leaveError;
+            }
+          } else {
+            this.staffRoomOwners.set(key, previousOwner);
+          }
+        }
+        throw error;
+      }
+      if (!this.isSocketLive(client) || !this.isAuthorizedLeaseAdmissible(client.id, gameId, generation)) {
+        if (this.staffRoomOwners.get(key) === generation) {
+          await client.leave(gameRoom(gameId));
+          this.staffRoomOwners.delete(key);
+        }
+        return;
+      }
+      admitted = true;
+    });
+    return admitted;
+  }
+
+  private async joinUnscopedGameRoom(client: V1Socket, gameId: string, generation: number): Promise<boolean> {
+    let admitted = false;
+    await this.transitionGameRoom(client.id, gameId, async () => {
+      if (!this.isSocketLive(client) || !this.isRoomGenerationCurrent(client.id, gameId, generation)) return;
+      const key = this.roomTransitionKey(client.id, gameId);
+      const previousOwner = this.staffRoomOwners.get(key);
+      this.staffRoomOwners.set(key, generation);
+      try {
+        await client.join(gameRoom(gameId));
+      } catch (error) {
+        if (this.staffRoomOwners.get(key) === generation) {
+          if (previousOwner === undefined) {
+            try {
+              await client.leave(gameRoom(gameId));
+              this.staffRoomOwners.delete(key);
+            } catch (leaveError) {
+              this.logger.error(
+                { socketId: client.id, gameId, err: leaveError },
+                'Failed to roll back rejected game room join',
+              );
+              client.disconnect(true);
+              this.staffRoomOwners.delete(key);
+              throw leaveError;
+            }
+          } else {
+            this.staffRoomOwners.set(key, previousOwner);
+          }
+        }
+        throw error;
+      }
+      if (!this.isSocketLive(client) || !this.isRoomGenerationCurrent(client.id, gameId, generation)) {
+        if (this.staffRoomOwners.get(key) === generation) {
+          await client.leave(gameRoom(gameId));
+          this.staffRoomOwners.delete(key);
+        }
+        return;
+      }
+      admitted = true;
+    });
+    return admitted;
+  }
+
+  private async leaveAuthorizedGameRoom(client: V1Socket, gameId: string, generation: number): Promise<void> {
+    const key = this.roomTransitionKey(client.id, gameId);
+    await this.transitionGameRoom(client.id, gameId, async () => {
+      if (this.staffRoomOwners.get(key) !== generation) return;
+      await client.leave(gameRoom(gameId));
+      if (this.staffRoomOwners.get(key) === generation) this.staffRoomOwners.delete(key);
+    });
+  }
+
+  private async forceLeaveGameRoom(client: V1Socket, gameId: string, afterLeave?: () => void): Promise<void> {
+    const key = this.roomTransitionKey(client.id, gameId);
+    await this.transitionGameRoom(client.id, gameId, async () => {
+      await client.leave(gameRoom(gameId));
+      this.staffRoomOwners.delete(key);
+      afterLeave?.();
+    });
+  }
+
+  private async forceLeaveSocketGame(socketId: string, gameId: string, afterLeave?: () => void): Promise<void> {
+    const client = this.socketClients.get(socketId);
+    if (client !== undefined) {
+      await this.forceLeaveGameRoom(client, gameId, afterLeave);
+      return;
+    }
+    const key = this.roomTransitionKey(socketId, gameId);
+    await this.transitionGameRoom(socketId, gameId, async () => {
+      this.server.in(socketId).socketsLeave(gameRoom(gameId));
+      this.staffRoomOwners.delete(key);
+      afterLeave?.();
+    });
+  }
+
+  private refreshAuthorizedLeaseExpiry(
+    client: V1Socket,
+    gameId: string,
+    generation: number,
+    expiresAt: Date | null,
+  ): boolean {
+    if (!this.isAuthorizedLeaseAdmissible(client.id, gameId, generation)) return false;
+    if (expiresAt !== null && expiresAt.getTime() <= Date.now()) return false;
+    const lease = this.staffLeases.get(client.id)!.get(gameId)!;
+    if (lease.timer !== undefined) clearTimeout(lease.timer);
+    lease.expiresAt = expiresAt;
+    if (expiresAt !== null) this.scheduleStaffLease(client, lease);
+    return true;
+  }
+
+  private cancelAuthorizedLeaseIfGeneration(clientId: string, gameId: string, generation: number): boolean {
+    const leases = this.staffLeases.get(clientId);
+    const lease = leases?.get(gameId);
+    if (lease?.generation !== generation) return false;
+    if (lease.timer !== undefined) clearTimeout(lease.timer);
+    leases?.delete(gameId);
+    if (leases?.size === 0) this.staffLeases.delete(clientId);
+    this.removeGameSubscription(lease.userId, gameId, clientId);
+    return true;
+  }
+
+  private invalidateStaffAuthorization(clientId: string, gameId: string): StaffLease | undefined {
+    const generations = this.staffLeaseGenerations.get(clientId) ?? new Map<string, number>();
+    generations.set(gameId, (generations.get(gameId) ?? 0) + 1);
+    this.staffLeaseGenerations.set(clientId, generations);
+
+    const attempts = this.pendingStaffLeaseAttempts.get(clientId);
+    attempts?.delete(gameId);
+    if (attempts?.size === 0) this.pendingStaffLeaseAttempts.delete(clientId);
+
+    const leases = this.staffLeases.get(clientId);
+    const lease = leases?.get(gameId);
+    if (lease?.timer !== undefined) clearTimeout(lease.timer);
+    if (lease !== undefined) lease.state = 'SUSPENDED';
+    leases?.delete(gameId);
+    if (leases?.size === 0) this.staffLeases.delete(clientId);
+    return lease;
+  }
+
+  private invalidateAuthorizedLeaseIfGeneration(clientId: string, gameId: string, generation: number): StaffLease | undefined {
+    if (!this.isAuthorizedLeaseOwner(clientId, gameId, generation)) return undefined;
+    return this.invalidateStaffAuthorization(clientId, gameId);
+  }
+
+  private async expireStaffLease(client: V1Socket, scheduledLease: StaffLease): Promise<void> {
+    const lease = this.staffLeases.get(client.id)?.get(scheduledLease.gameId);
+    if (lease?.generation !== scheduledLease.generation || lease.expiresAt === null) return;
+    if (lease.expiresAt.getTime() > Date.now()) {
+      this.scheduleStaffLease(client, lease);
+      return;
+    }
+
+    const expiredLease = this.invalidateAuthorizedLeaseIfGeneration(client.id, lease.gameId, lease.generation);
+    if (expiredLease === undefined) return;
+    const rejoinGeneration = this.reserveStaffLeaseAttempt(
+      client,
+      expiredLease.gameId,
+      expiredLease.userId,
+      expiredLease.scope,
+    );
+    if (rejoinGeneration === undefined) return;
+    this.removeGameSubscription(expiredLease.userId, expiredLease.gameId, client.id);
+    try {
+      await this.forceLeaveGameRoom(client, expiredLease.gameId);
+    } catch (error) {
+      this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration);
+      this.logger.error(
+        { socketId: client.id, gameId: expiredLease.gameId, err: error },
+        'Failed to leave expired staff room',
+      );
+      this.emitProtocolError(client, { code: 'INTERNAL_ERROR' }, { gameId: expiredLease.gameId });
+      client.disconnect(true);
+      return;
+    }
+
+    if (
+      this.pendingStaffLeaseAttempts.get(client.id)?.get(expiredLease.gameId)?.generation !== rejoinGeneration
+    ) {
+      return;
+    }
+
+    let promoted = false;
+    try {
+      const game = await this.loadGameForStaffLease(expiredLease.gameId);
+      if (game === null) {
+        if (this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration)) {
+          client.emit('game.permission.revoked', { gameId: expiredLease.gameId, assignmentVersion: null });
+        }
+        return;
+      }
+      const scope = gameRealtimeScope(game);
+      if (
+        scope === null ||
+        scope.invalid === true ||
+        !this.replaceStaffLeaseAttemptScope(client.id, expiredLease.gameId, rejoinGeneration, scope)
+      ) {
+        if (this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration)) {
+          client.emit('game.permission.revoked', { gameId: expiredLease.gameId, assignmentVersion: null });
+        }
+        return;
+      }
+      const principal = await this.tournamentStaffAccess.assertAccess({
+        userId: expiredLease.userId,
+        action: 'read',
+        resource: {
+          tournamentId: scope.tournamentId,
+          fixtureId: scope.fixtureId,
+          ...(scope.fieldId === null ? {} : { fieldId: scope.fieldId }),
+        },
+      });
+      if (!this.matchesAuthorizationVersion(client, principal.assignmentVersion)) {
+        if (this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration)) {
+          client.emit('game.permission.revoked', {
+            gameId: expiredLease.gameId,
+            assignmentVersion: principal.assignmentVersion,
+          });
+        }
+        return;
+      }
+      if (principal.expiresAt !== null && principal.expiresAt.getTime() <= Date.now()) {
+        if (this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration)) {
+          client.emit('game.permission.revoked', {
+            gameId: expiredLease.gameId,
+            assignmentVersion: principal.assignmentVersion,
+          });
+        }
+        return;
+      }
+      if (
+        !this.promoteStaffLeaseAttempt(
+          client,
+          expiredLease.gameId,
+          rejoinGeneration,
+          principal.expiresAt ?? null,
+        )
+      ) {
+        return;
+      }
+      promoted = true;
+      if (!(await this.joinAuthorizedGameRoom(client, expiredLease.gameId, rejoinGeneration))) return;
+      const backfill = await this.gamesService.listEvents(client.data.authUser!, expiredLease.gameId, 0);
+      if (!this.activateStaffLease(client.id, expiredLease.gameId, rejoinGeneration)) {
+        const cancelled = this.cancelAuthorizedLeaseIfGeneration(client.id, expiredLease.gameId, rejoinGeneration);
+        if (cancelled) await this.leaveAuthorizedGameRoom(client, expiredLease.gameId, rejoinGeneration);
+        return;
+      }
+      this.recordGameSubscription(expiredLease.userId, scope.tournamentId, expiredLease.gameId, client.id);
+      client.emit('game.snapshot', {
+        gameId: expiredLease.gameId,
+        version: backfill.version,
+        state: backfill.state,
+        lastSequence: backfill.lastSequence,
+        events: backfill.events,
+      });
+      if (backfill.gap !== undefined && backfill.gap !== null) client.emit('game.gap', backfill.gap);
+    } catch (error) {
+      const ownedAttempt = this.clearStaffLeaseAttempt(client.id, expiredLease.gameId, rejoinGeneration);
+      const cancelled = promoted
+        ? this.cancelAuthorizedLeaseIfGeneration(client.id, expiredLease.gameId, rejoinGeneration)
+        : false;
+      if (cancelled) {
+        try {
+          await this.leaveAuthorizedGameRoom(client, expiredLease.gameId, rejoinGeneration);
+        } catch (leaveError) {
+          this.logger.error(
+            { socketId: client.id, gameId: expiredLease.gameId, err: leaveError },
+            'Failed to leave failed staff rejoin room',
+          );
+          client.disconnect(true);
+        }
+      }
+      if (!ownedAttempt && !cancelled) return;
+      if (error instanceof ForbiddenException) {
+        client.emit('game.permission.revoked', { gameId: expiredLease.gameId, assignmentVersion: null });
+        return;
+      }
+      this.logger.error(
+        { socketId: client.id, gameId: expiredLease.gameId, err: error },
+        'Failed to revalidate expired staff lease',
+      );
+      this.emitProtocolError(client, { code: 'INTERNAL_ERROR' }, { gameId: expiredLease.gameId });
+      client.disconnect(true);
+    }
+  }
+
+  private async revokeAuthorizedLease(
+    client: V1Socket,
+    userId: string,
+    gameId: string,
+    generation: number,
+    afterLeave?: () => void,
+  ): Promise<'stale' | 'left' | 'leave_failed'> {
+    const invalidated = this.invalidateAuthorizedLeaseIfGeneration(client.id, gameId, generation);
+    if (invalidated === undefined) return 'stale';
+    this.removeGameSubscription(userId, gameId, client.id);
+    try {
+      await this.forceLeaveGameRoom(client, gameId, afterLeave);
+      return 'left';
+    } catch (error) {
+      this.logger.error({ socketId: client.id, gameId, err: error }, 'Failed to leave revoked staff room');
+      this.emitProtocolError(client, { code: 'INTERNAL_ERROR' }, { gameId });
+      client.disconnect(true);
+      return 'leave_failed';
+    }
+  }
+
+  private async denyCurrentStaffAttempt(
+    client: V1Socket,
+    userId: string,
+    gameId: string,
+    generation: number,
+  ): Promise<boolean> {
+    if (!this.clearStaffLeaseAttempt(client.id, gameId, generation)) return false;
+    this.invalidateStaffAuthorization(client.id, gameId);
+    this.removeGameSubscription(userId, gameId, client.id);
+    try {
+      await this.forceLeaveGameRoom(client, gameId);
+    } catch (error) {
+      this.logger.error({ socketId: client.id, gameId, err: error }, 'Failed to leave denied staff room');
+      this.emitProtocolError(client, { code: 'INTERNAL_ERROR' }, { gameId });
+      client.disconnect(true);
+    }
+    return true;
+  }
+
+  private sameStaffScope(left: GameFixtureScope, right: GameFixtureScope): boolean {
+    return (
+      left.tournamentId === right.tournamentId &&
+      left.fixtureId === right.fixtureId &&
+      left.teamMatchId === right.teamMatchId &&
+      left.fieldId === right.fieldId &&
+      left.invalid === right.invalid
+    );
+  }
+
+  private matchesAuthorizationVersion(client: V1Socket, assignmentVersion: number | null): boolean {
+    return assignmentVersion === null || client.data.authorizationSubjectVersion === assignmentVersion;
+  }
+
+  private async loadGameForStaffLease(gameId: string): Promise<{
+    readonly id: string;
+    readonly state: string;
+    readonly version: number;
+    readonly lastSequence: number;
+    readonly teamMatch: GameRealtimeScopeRecord['teamMatch'];
+  } | null> {
+    return this.prisma.v1Game.findUnique({
+      where: { id: gameId },
+      select: {
+        id: true,
+        state: true,
+        version: true,
+        lastSequence: true,
+        teamMatch: {
+          select: {
+            id: true,
+            tournamentId: true,
+            leagueId: true,
+            fieldId: true,
+            tournament: { select: { kind: true } },
+            league: { select: { kind: true } },
+            tournamentDetails: { select: { teamMatchId: true, tournamentId: true } },
+          },
+        },
+      },
+    });
   }
 
   /**
@@ -790,18 +1517,22 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     client.data.lastStaffRevalidationAt = now;
 
     // 게임마다 findUnique 를 돌리면 구독 수만큼 왕복이 늘어난다(N+1).
-    // 한 번의 findMany 로 픽스처 스코프를 모두 읽어 온다.
+    // 한 번의 findMany 로 canonical/legacy tournament scope를 모두 읽어 온다.
     const scopes = await this.loadGameFixtureScopes(subscribedGameIds);
 
     for (const gameId of subscribedGameIds) {
+      const leaseAtStart = this.staffLeases.get(client.id)?.get(gameId);
+      if (leaseAtStart === undefined || leaseAtStart.state !== 'ACTIVE') continue;
+      const leaseGeneration = leaseAtStart.generation;
       const scope = scopes.get(gameId) ?? null;
-      if (scope === null) {
-        // 픽스처가 없는 게임(team-match 등)은 애초에 스태프 스코프 검사 없이
-        // 구독됐다 — game.subscribe 의 `if (fixture !== null)` 분기와 동일 기준.
+      if (scope === null || scope.invalid === true || !this.sameStaffScope(leaseAtStart.scope, scope)) {
+        await this.revokeAuthorizedLease(client, userId, gameId, leaseGeneration, () => {
+          client.emit('game.permission.revoked', { gameId, assignmentVersion: null });
+        });
         continue;
       }
       try {
-        await this.tournamentStaffAccess.assertAccess({
+        const principal = await this.tournamentStaffAccess.assertAccess({
           userId,
           action: 'read',
           resource: {
@@ -810,13 +1541,33 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
             ...(scope.fieldId === null ? {} : { fieldId: scope.fieldId }),
           },
         });
+        if (!this.isAuthorizedLeaseAdmissible(client.id, gameId, leaseGeneration)) continue;
+        if (!this.matchesAuthorizationVersion(client, principal.assignmentVersion)) {
+          await this.revokeAuthorizedLease(client, userId, gameId, leaseGeneration, () => {
+            client.emit('game.permission.revoked', { gameId, assignmentVersion: principal.assignmentVersion });
+          });
+          continue;
+        }
+        if (principal.expiresAt !== null && principal.expiresAt.getTime() <= Date.now()) {
+          await this.revokeAuthorizedLease(client, userId, gameId, leaseGeneration, () => {
+            client.emit('game.permission.revoked', { gameId, assignmentVersion: principal.assignmentVersion });
+          });
+          continue;
+        }
+        if (leaseAtStart.expiresAt?.getTime() !== (principal.expiresAt?.getTime() ?? null)) {
+          this.refreshAuthorizedLeaseExpiry(client, gameId, leaseGeneration, principal.expiresAt ?? null);
+        }
       } catch (error) {
         if (!(error instanceof ForbiddenException)) {
-          throw error;
+          await this.revokeAuthorizedLease(client, userId, gameId, leaseGeneration, () => {
+            this.logger.error({ socketId: client.id, gameId, err: error }, 'Failed to revalidate staff subscription');
+            this.emitProtocolError(client, { code: 'INTERNAL_ERROR' }, { gameId });
+          });
+          continue;
         }
-        await client.leave(gameRoom(gameId));
-        this.removeGameSubscription(userId, gameId, client.id);
-        client.emit('game.permission.revoked', { gameId, assignmentVersion: null });
+        await this.revokeAuthorizedLease(client, userId, gameId, leaseGeneration, () => {
+          client.emit('game.permission.revoked', { gameId, assignmentVersion: null });
+        });
       }
     }
   }
@@ -828,40 +1579,28 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       where: { id: { in: [...gameIds] } },
       select: {
         id: true,
-        tournamentFixture: { select: { id: true, tournamentId: true, fieldId: true } },
+        teamMatch: {
+          select: {
+            id: true,
+            tournamentId: true,
+            leagueId: true,
+            fieldId: true,
+            tournament: { select: { kind: true } },
+            league: { select: { kind: true } },
+            tournamentDetails: { select: { teamMatchId: true, tournamentId: true } },
+          },
+        },
       },
     });
     const scopes = new Map<string, GameFixtureScope>();
     for (const game of games) {
-      const fixture = game.tournamentFixture;
-      if (fixture === null) {
+      const scope = gameRealtimeScope(game);
+      if (scope === null) {
         continue;
       }
-      scopes.set(game.id, {
-        tournamentId: fixture.tournamentId,
-        fixtureId: fixture.id,
-        fieldId: fixture.fieldId,
-      });
+      scopes.set(game.id, scope);
     }
     return scopes;
-  }
-
-  private async loadGameFixtureScope(gameId: string): Promise<{
-    readonly tournamentId: string;
-    readonly fixtureId: string;
-    readonly fieldId: string | null;
-  } | null> {
-    const game = await this.prisma.v1Game.findUnique({
-      where: { id: gameId },
-      select: {
-        tournamentFixture: { select: { id: true, tournamentId: true, fieldId: true } },
-      },
-    });
-    const fixture = game?.tournamentFixture ?? null;
-    if (fixture === null) {
-      return null;
-    }
-    return { tournamentId: fixture.tournamentId, fixtureId: fixture.id, fieldId: fixture.fieldId };
   }
 
   emitToUser(userId: string, event: string, payload: unknown): void {
@@ -878,6 +1617,22 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
    */
   forceDisconnectUser(userId: string): void {
     this.server.in(`user:${userId}`).disconnectSockets(true);
+  }
+
+  onModuleDestroy(): void {
+    this.shuttingDown = true;
+    for (const leases of this.staffLeases.values()) {
+      for (const lease of leases.values()) {
+        if (lease.timer !== undefined) clearTimeout(lease.timer);
+      }
+    }
+    this.staffLeases.clear();
+    this.pendingStaffLeaseAttempts.clear();
+    this.staffLeaseGenerations.clear();
+    this.staffRoomOwners.clear();
+    this.socketClients.clear();
+    this.gameSubscriptions.clear();
+    this.roomTransitions.clear();
   }
 
   private acknowledgeGameEvent(
@@ -999,24 +1754,36 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
 
   private removeSocketSubscriptions(userId: string, socketId: string): void {
     const tournaments = this.gameSubscriptions.get(userId);
-    if (tournaments === undefined) {
-      return;
-    }
-    for (const games of tournaments.values()) {
-      for (const [gameId, sockets] of games) {
-        sockets.delete(socketId);
-        if (sockets.size === 0) {
-          games.delete(gameId);
+    if (tournaments !== undefined) {
+      for (const games of tournaments.values()) {
+        for (const [gameId, sockets] of games) {
+          sockets.delete(socketId);
+          if (sockets.size === 0) {
+            games.delete(gameId);
+          }
         }
       }
-    }
-    for (const [tournamentId, games] of tournaments) {
-      if (games.size === 0) {
-        tournaments.delete(tournamentId);
+      for (const [tournamentId, games] of tournaments) {
+        if (games.size === 0) {
+          tournaments.delete(tournamentId);
+        }
+      }
+      if (tournaments.size === 0) {
+        this.gameSubscriptions.delete(userId);
       }
     }
-    if (tournaments.size === 0) {
-      this.gameSubscriptions.delete(userId);
+
+    const leases = this.staffLeases.get(socketId);
+    if (leases !== undefined) {
+      for (const lease of leases.values()) {
+        if (lease.timer !== undefined) clearTimeout(lease.timer);
+      }
+    }
+    this.staffLeases.delete(socketId);
+    this.pendingStaffLeaseAttempts.delete(socketId);
+    this.staffLeaseGenerations.delete(socketId);
+    for (const key of this.staffRoomOwners.keys()) {
+      if (key.startsWith(`${socketId}:`)) this.staffRoomOwners.delete(key);
     }
   }
 }
@@ -1027,6 +1794,73 @@ function toSingleValue(value: string | string[] | undefined): string | undefined
 
 function gameRoom(gameId: string): string {
   return `game:${gameId}`;
+}
+
+type GameRealtimeScopeRecord = {
+  readonly teamMatch: {
+    readonly id: string;
+    readonly tournamentId: string | null;
+    readonly leagueId: string | null;
+    readonly fieldId: string | null;
+    readonly tournament: { readonly kind: V1CompetitionKind | null } | null;
+    readonly league: { readonly kind: V1CompetitionKind | null } | null;
+    readonly tournamentDetails: { readonly teamMatchId: string; readonly tournamentId: string } | null;
+  } | null;
+};
+
+function gameRealtimeScope(game: GameRealtimeScopeRecord): GameFixtureScope | null {
+  const teamMatch = game.teamMatch;
+  const competitionId = teamMatch?.tournamentId ?? teamMatch?.leagueId ?? null;
+  const isRegularLeague =
+    teamMatch?.tournament?.kind === 'regular_league' || teamMatch?.league?.kind === 'regular_league';
+  if (
+    teamMatch !== null &&
+    teamMatch !== undefined &&
+    teamMatch.tournamentId !== null &&
+    teamMatch.leagueId !== null &&
+    teamMatch.tournamentId !== teamMatch.leagueId
+  ) {
+    return {
+      tournamentId: teamMatch.tournamentId,
+      fixtureId: teamMatch.id,
+      teamMatchId: teamMatch.id,
+      fieldId: teamMatch.fieldId,
+      invalid: true,
+    };
+  }
+  if (teamMatch?.tournamentDetails !== null && teamMatch?.tournamentDetails !== undefined) {
+    const details = teamMatch.tournamentDetails;
+    if (
+      competitionId === null ||
+      isRegularLeague ||
+      details.teamMatchId !== teamMatch.id ||
+      details.tournamentId !== competitionId
+    ) {
+      return {
+        tournamentId: details.tournamentId,
+        fixtureId: teamMatch.id,
+        teamMatchId: teamMatch.id,
+        fieldId: teamMatch.fieldId,
+        invalid: true,
+      };
+    }
+    return {
+      tournamentId: competitionId,
+      fixtureId: teamMatch.id,
+      teamMatchId: teamMatch.id,
+      fieldId: teamMatch.fieldId,
+    };
+  }
+
+  if (teamMatch !== null && teamMatch !== undefined && competitionId !== null && isRegularLeague) {
+    return { tournamentId: competitionId, fixtureId: teamMatch.id, teamMatchId: teamMatch.id, fieldId: teamMatch.fieldId };
+  }
+
+  if (teamMatch !== null && teamMatch !== undefined && competitionId !== null) {
+    return { tournamentId: competitionId, fixtureId: teamMatch.id, teamMatchId: teamMatch.id, fieldId: teamMatch.fieldId, invalid: true };
+  }
+
+  return null;
 }
 
 function parseGameSubscription(payload: unknown): GameSubscriptionPayload | null {

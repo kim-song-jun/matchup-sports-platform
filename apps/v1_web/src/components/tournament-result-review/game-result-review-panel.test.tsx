@@ -88,6 +88,7 @@ function gameDetail(overrides: Partial<TournamentGameDetail> = {}): TournamentGa
     lastSequence: 3,
     competitionConfigVersionId: 'config-1',
     currentOfficialRevisionId: null,
+    periods: [{ number: 1 }, { number: 2 }],
     sides: [
       { id: 'side-home', gameId: GAME_ID, sideKey: 'HOME' as const, teamId: null, displayNameSnapshot: '홈' },
       { id: 'side-away', gameId: GAME_ID, sideKey: 'AWAY' as const, teamId: null, displayNameSnapshot: '원정' },

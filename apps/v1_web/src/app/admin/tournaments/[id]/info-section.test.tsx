@@ -23,6 +23,23 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1LineupSizeOptions: () => ({ data: [], isPending: false, isError: false }),
 }));
 
+vi.mock('@/hooks/use-tournament-period-settings', () => ({
+  useTournamentPeriodSettings: () => ({
+    data: {
+      tournamentId: 'tournament-1',
+      competitionConfigVersionId: 'config-1',
+      expectedVersion: 'version-1',
+      periods: [{ code: 'FIRST_HALF', label: '전반', durationMinutes: 45, extraTime: false }],
+      legacyPeriodCount: null,
+      requiresDurationInput: false,
+    },
+    isPending: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  useUpdateTournamentPeriodSettings: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+}));
+
 const tournament = {
   id: 'tournament-1',
   sportId: 'sport-1',

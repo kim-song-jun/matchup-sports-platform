@@ -14,11 +14,13 @@ import { ClaimMyRecordSection, LeagueClaimMyRecordSection } from './claim-my-rec
  */
 const claimableMock = vi.fn();
 const leagueClaimableMock = vi.fn();
+const requestMutateMock = vi.fn();
+const leagueRequestMutateMock = vi.fn();
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1ClaimableParticipants: (...args: unknown[]) => claimableMock(...args),
-  useV1RequestIdentityLink: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1RequestIdentityLink: () => ({ mutate: requestMutateMock, isPending: false }),
   useV1LeagueClaimableParticipants: (...args: unknown[]) => leagueClaimableMock(...args),
-  useV1LeagueRequestIdentityLink: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1LeagueRequestIdentityLink: () => ({ mutate: leagueRequestMutateMock, isPending: false }),
 }));
 vi.mock('@/components/v1-ui/primitives', () => ({
   Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -59,7 +61,7 @@ describe('ClaimMyRecordSection 빈 상태', () => {
       data: {
         gameId: 'g-1',
         version: 3,
-        participants: [{ participantId: 'p-1', sideId: 's-1', displayName: '홍길동', jerseyNumber: 7 }],
+        participants: [{ participantId: 'p-1', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '홍길동', jerseyNumber: 7 }],
       },
       isLoading: false,
       isError: false,
@@ -89,7 +91,7 @@ describe('LeagueClaimMyRecordSection', () => {
       data: {
         gameId: 'g-1',
         version: 3,
-        participants: [{ participantId: 'p-1', sideId: 's-1', displayName: '홍길동', jerseyNumber: 7 }],
+        participants: [{ participantId: 'p-1', sideId: 's-1', sideKey: 'HOME', sideLabel: '블루팀', displayName: '홍길동', jerseyNumber: 7 }],
       },
       isLoading: false,
       isError: false,
@@ -106,5 +108,35 @@ describe('LeagueClaimMyRecordSection', () => {
     expect(screen.getByRole('button', { name: /홍길동/ })).toBeInTheDocument();
     // 대회 훅으로 새지 않는다.
     expect(claimableMock).not.toHaveBeenCalled();
+  });
+
+  it('같은 이름·등번호 없음도 팀/사이드 라벨로 구분하고 선택한 participantId를 보낸다', () => {
+    leagueClaimableMock.mockReturnValue({
+      data: {
+        gameId: 'g-1',
+        version: 3,
+        participants: [
+          { participantId: 'p-home', sideId: 's-home', sideKey: 'HOME', sideLabel: '블루팀', displayName: 'E2E 선수01', jerseyNumber: null },
+          { participantId: 'p-away', sideId: 's-away', sideKey: 'AWAY', sideLabel: '레드팀', displayName: 'E2E 선수01', jerseyNumber: null },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+    leagueRequestMutateMock.mockClear();
+    render(<LeagueClaimMyRecordSection leagueId="lg-1" teamMatchId="tm-1" />);
+    fireEvent.click(screen.getByRole('button', { name: '명단에서 나 찾기' }));
+
+    const candidates = screen.getAllByRole('button', { name: /E2E 선수01/ });
+    expect(candidates).toHaveLength(2);
+    expect(candidates[0]).toHaveAccessibleName(/블루팀.*홈.*E2E 선수01/);
+    expect(candidates[1]).toHaveAccessibleName(/레드팀.*원정.*E2E 선수01/);
+    fireEvent.click(candidates[1]);
+    fireEvent.click(screen.getByRole('button', { name: '이 선수가 저예요' }));
+    expect(leagueRequestMutateMock).toHaveBeenCalledWith(
+      { gameId: 'g-1', participantId: 'p-away', expectedVersion: 3 },
+      expect.anything(),
+    );
   });
 });

@@ -34,6 +34,11 @@ raw roster identity fields.
 | `POST` | `/api/v1/games/:gameId/result-revisions/:revisionId/submit` | authenticated **host** team owner/manager only (Task 16) | `SubmitGameResultRevisionDto`; team-match only. Same `409 TEAM_MATCH_NOT_MATCHED` precondition as the draft route above. It atomically validates/submits the revision and moves `SCHEDULED`, `LIVE`, or `PAUSED` to `ENDED`; the same transaction also completes the linked `V1TeamMatch` (`status=completed`, `completedAt`) — idempotently, via a `status != completed` guard so a correction-loop resubmit is a no-op — and, on the first real transition only, writes a matching `V1StatusChangeLog` row (`team_match`, `matched → completed`) so review eligibility keeps working and the status history stays complete now that the old `POST /api/v1/team-matches/:teamMatchId/complete` shortcut is removed (Task 16 — that route bypassed all result validation and opponent approval and never was part of this frozen contract). |
 | `POST` | `/api/v1/games/:gameId/result-revisions/:revisionId/decision` | authenticated opposing team result decider | `DecideGameResultRevisionDto`; `approve` or `change_request` for a team-match revision. |
 
+Claimable participant responses include the persisted `sideKey` (`HOME` or `AWAY`) and a
+non-null `sideLabel` snapshot for each row. Clients must render that context as returned and
+must not infer a participant's side from list ordering; a missing side context is an integrity
+error rather than a display fallback.
+
 ### Penalty-shootout conclusion rule
 
 Tournament shootouts use a three-kick opening series. With `earlyStop: true` (the default),

@@ -15,6 +15,7 @@ import { cssUrl } from '@/lib/assets';
 import { useV1PublicTeamReviewSummary } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { isTeamLogoPreset, TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
+import { isTeamOperatorRole } from '@/lib/team-role';
 import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
 import type {
   TeamDetailViewModel,
@@ -1440,6 +1441,8 @@ function TeamFormPreview({
 }
 
 export function TeamMembersPageView({ model, backHref = '/teams' }: { model: TeamMembersViewModel; backHref?: string }) {
+  const canManageMembers = isTeamOperatorRole(model.viewerRole);
+  const visibleTabs = model.tabs.filter((tab) => tab.key === 'members' || canManageMembers);
   return (
     <>
       {/* Desktop back header */}
@@ -1447,28 +1450,32 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
         <Link className="tm-desktop-back" href={backHref} aria-label="팀으로 돌아가기">
           <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
         </Link>
-        <h1 className="tm-text-heading">{model.teamName} · 멤버 관리</h1>
+        <h1 className="tm-text-heading">{model.teamName} · {canManageMembers ? '멤버 관리' : '멤버 목록'}</h1>
       </div>
       <div className="tm-team-list tm-team-members-list tm-content-enter">
         <h2 className="tm-text-heading tm-hide-desktop">{model.teamName}</h2>
-        <div className="tm-team-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+        <div className="tm-team-stat-grid" style={{ gridTemplateColumns: canManageMembers ? '1fr 1fr 1fr' : '1fr 1fr' }}>
           <Card pad={12}><KPIStat label="전체" value={model.summary.total} unit="명" /></Card>
           <Card pad={12}><KPIStat label="관리자" value={model.summary.managers} unit="명" /></Card>
-          <Card pad={12}><KPIStat label="검토" value={model.summary.pending} unit="명" /></Card>
+          {canManageMembers ? <Card pad={12}><KPIStat label="검토" value={model.summary.pending} unit="명" /></Card> : null}
         </div>
-        <Card pad={16} style={{ background: 'var(--grey50)', marginTop: 16 }}>
-          <div className="tm-text-label">권한 규칙</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>멤버를 운영진으로 지정할 수 있고, 팀장 위임은 운영진에게만 할 수 있어요. 모든 변경은 확인 창을 거쳐 적용돼요.</div>
-        </Card>
-        <div className="tm-team-form-chip-row" role="group" aria-label="멤버 탭 선택" style={{ marginTop: 16 }}>
-          {model.tabs.map((tab) => (
-            <button key={tab.key} className={`tm-chip ${model.activeTab === tab.key ? 'tm-chip-active' : ''}`} type="button" aria-pressed={model.activeTab === tab.key} onClick={tab.onSelect}>
-              {tab.label} <span className="tab-num">{tab.count}</span>
-            </button>
-          ))}
-        </div>
-        {model.activeTab === 'members' ? (
-          <MemberSection title="팀 멤버" sub="팀에 속한 멤버의 역할과 권한을 관리해요." desktopGrid>
+        {canManageMembers ? (
+          <Card pad={16} style={{ background: 'var(--grey50)', marginTop: 16 }}>
+            <div className="tm-text-label">권한 규칙</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>멤버를 운영진으로 지정할 수 있고, 팀장 위임은 운영진에게만 할 수 있어요. 모든 변경은 확인 창을 거쳐 적용돼요.</div>
+          </Card>
+        ) : null}
+        {visibleTabs.length > 1 ? (
+          <div className="tm-team-form-chip-row" role="group" aria-label="멤버 탭 선택" style={{ marginTop: 16 }}>
+            {visibleTabs.map((tab) => (
+              <button key={tab.key} className={`tm-chip ${model.activeTab === tab.key ? 'tm-chip-active' : ''}`} type="button" aria-pressed={model.activeTab === tab.key} onClick={tab.onSelect}>
+                {tab.label} <span className="tab-num">{tab.count}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {!canManageMembers || model.activeTab === 'members' ? (
+          <MemberSection title={canManageMembers ? '팀 멤버' : '멤버 목록'} sub={canManageMembers ? '팀에 속한 멤버의 역할과 권한을 관리해요.' : '팀에 속한 멤버를 확인할 수 있어요.'} desktopGrid>
             {model.members.map((member, index) => <MemberCard key={index} title={member.name} sub={member.meta} role={member.role} profileHref={member.profileHref} actions={member.actions} actionPending={member.actionPending} selfLeave={member.selfLeave} />)}
           </MemberSection>
         ) : model.activeTab === 'requests' ? (
@@ -1959,14 +1966,17 @@ function MemberCard({
   selfLeave?: { disabled: boolean; disabledReason?: string; pending?: boolean; error?: string | null; onSelect: () => void };
 }) {
   const [open, setOpen] = useState(false);
-  const disabled = actionPending || actions.length === 0;
+  const hasActions = actions.length > 0;
+  const disabled = actionPending || !hasActions;
 
   return (
     <Card pad={16}>
       <ListItem title={title} sub={sub} trailing={role} href={profileHref} chev={Boolean(profileHref)} />
-      <button className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block" style={{ marginTop: 12 }} type="button" disabled={disabled} onClick={() => setOpen((current) => !current)}>
-        관리
-      </button>
+      {hasActions ? (
+        <button className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block" style={{ marginTop: 12 }} type="button" disabled={disabled} onClick={() => setOpen((current) => !current)}>
+          관리
+        </button>
+      ) : null}
       {open && !disabled ? (
         <div className="tm-member-actions" style={{ gridTemplateColumns: '1fr', marginTop: 12 }}>
           {actions.map((action) => (

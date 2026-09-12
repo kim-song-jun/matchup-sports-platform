@@ -435,7 +435,9 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
 
   const tabs: TeamMembersViewModel['tabs'] = [
     { key: 'members', label: '멤버', count: members.data?.summary.memberCount ?? memberItems.length, onSelect: () => setActiveTab('members') },
-    { key: 'requests', label: '가입 신청', count: requestItems.length, onSelect: () => setActiveTab('requests') },
+    ...(canReviewApplications
+      ? [{ key: 'requests' as const, label: '가입 신청', count: requestItems.length, onSelect: () => setActiveTab('requests') }]
+      : []),
     ...(canManageInvitations
       ? [{ key: 'invitations' as const, label: '초대', count: invitationItems.length, onSelect: () => setActiveTab('invitations') }]
       : []),
@@ -445,6 +447,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
     ...fallback,
     activeTab,
     tabs,
+    viewerRole: viewerRole ?? null,
     // 팀 정보가 아직 안 왔을 때 목업 팀('성수 러너스 FC')·목업 인원(운영진 2명)을 보여주지
     // 않는다 — 다른 팀의 이름과 숫자를 이 팀의 것처럼 읽게 만든다.
     teamName: team.data?.name ?? '',

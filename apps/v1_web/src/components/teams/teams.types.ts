@@ -166,6 +166,8 @@ export type TeamFormViewModel = {
 
 export type TeamMembersViewModel = {
   teamName: string;
+  /** Live viewer role from the team detail response; absent only in the loading fallback. */
+  viewerRole?: string | null;
   activeTab: 'members' | 'requests' | 'invitations';
   tabs: Array<{ key: 'members' | 'requests' | 'invitations'; label: string; count: number; onSelect: () => void }>;
   summary: { total: number; managers: number; pending: number };

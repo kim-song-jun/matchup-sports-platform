@@ -3243,14 +3243,33 @@ export class GamesService {
       select: { participantId: true },
     });
     const linkedIds = new Set(linked.map((row) => row.participantId));
+    const eligibleParticipants = participants.filter((participant) => !linkedIds.has(participant.id));
+    if (eligibleParticipants.length === 0) {
+      return { gameId, version: game.version, participants: [] };
+    }
+    const sides = await this.prisma.v1GameSide.findMany({
+      where: {
+        gameId,
+        id: { in: [...new Set(eligibleParticipants.map((participant) => participant.sideId))] },
+      },
+      select: { id: true, sideKey: true, displayNameSnapshot: true },
+    });
+    const sideById = new Map(sides.map((side) => [side.id, side]));
+    if (eligibleParticipants.some((participant) => !sideById.has(participant.sideId))) {
+      throw new ConflictException({
+        code: 'GAME_SIDE_CONTEXT_MISSING',
+        message: '참가자의 팀 정보가 없어 기록 연결 명단을 표시할 수 없어요.',
+      });
+    }
     return {
       gameId,
       version: game.version,
-      participants: participants
-        .filter((participant) => !linkedIds.has(participant.id))
+      participants: eligibleParticipants
         .map((participant) => ({
           participantId: participant.id,
           sideId: participant.sideId,
+          sideKey: sideById.get(participant.sideId)!.sideKey,
+          sideLabel: sideById.get(participant.sideId)!.displayNameSnapshot,
           displayName: participant.displayNameSnapshot,
           jerseyNumber: participant.jerseyNumber,
         })),

@@ -20,6 +20,7 @@ import {
   formatCurrency,
   inputCls,
   isoToDatetimeLocalValue,
+  submitBtnBaseCls,
   submitBtnCls,
   substitutionPolicyLabel,
   textareaCls,
@@ -834,7 +835,7 @@ export function TournamentInfoSection() {
                       aria-pressed={selected}
                       className={`inline-flex min-h-[44px] items-center rounded-xl border px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
                         selected
-                          ? 'border-blue-500 bg-blue-500 text-white'
+                          ? 'border-blue-500 bg-[var(--static-blue)] text-white'
                           : 'border-[var(--border)] bg-white text-[var(--text-strong)] hover:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white'
                       }`}
                     >
@@ -891,7 +892,7 @@ export function TournamentInfoSection() {
                         aria-pressed={selected}
                         className={`inline-flex min-h-[44px] items-center rounded-xl border px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-50 ${
                           selected
-                            ? 'border-blue-500 bg-blue-500 text-white'
+                            ? 'border-blue-500 bg-[var(--static-blue)] text-white'
                             : 'border-[var(--border)] bg-white text-[var(--text-strong)] hover:border-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white'
                         }`}
                       >
@@ -1097,7 +1098,7 @@ export function TournamentInfoSection() {
             <button
               type="submit"
               disabled={!editTitle.trim() || updateTournament.isPending}
-              className={'flex-1 ' + submitBtnCls}
+              className={'flex-1 ' + submitBtnBaseCls + ' [background:var(--static-blue)] hover:[background:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]'}
             >
               {updateTournament.isPending ? '저장 중…' : '저장'}
             </button>

@@ -155,13 +155,19 @@ export function formatGenderQuotaError(details: unknown) {
 
 // ── Shared input styles ───────────────────────────────────────────────────
 
-/** h-[44px] unified submit button (f12) */
-export const submitBtnCls = [
+/** Non-background portion of the unified h-[44px] submit button. */
+export const submitBtnBaseCls = [
   'inline-flex items-center justify-center gap-2 h-[44px] px-4 rounded-xl',
   'whitespace-nowrap',
-  'text-[length:var(--font-size-label)] text-white bg-blue-500 hover:bg-blue-600',
+  'text-[length:var(--font-size-label)] text-white',
   'transition-colors disabled:opacity-50',
   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+].join(' ');
+
+/** h-[44px] unified submit button (f12) */
+export const submitBtnCls = [
+  submitBtnBaseCls,
+  'bg-blue-500 hover:bg-blue-600',
 ].join(' ');
 
 export const inputCls = [

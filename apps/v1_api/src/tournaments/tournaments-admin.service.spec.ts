@@ -1178,6 +1178,7 @@ describe('TournamentsAdminService', () => {
       previewHash: 'hash-6-new',
       impact: { fixtureCount: 0, completedFixtureCount: 0, standingCount: 0, requiresRecalculation: false },
       confirmationRequired: false,
+      teamMatchesRepointed: 0,
     });
 
     try {
@@ -1215,6 +1216,7 @@ describe('TournamentsAdminService', () => {
       previewHash: 'hash-6-new',
       impact: { fixtureCount: 4, completedFixtureCount: 2, standingCount: 2, requiresRecalculation: true },
       confirmationRequired: true,
+      teamMatchesRepointed: 0,
     });
 
     try {
@@ -1367,6 +1369,7 @@ describe('TournamentsAdminService', () => {
       previewHash: 'hash-new',
       impact: { fixtureCount: 0, completedFixtureCount: 0, standingCount: 0, requiresRecalculation: false },
       confirmationRequired: false,
+      teamMatchesRepointed: 0,
     });
 
     try {

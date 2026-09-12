@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { GamesService } from '../../games/games.service';
@@ -9,39 +9,26 @@ import {
 } from '../../tournaments/staff/tournament-staff-access.service';
 import type { TournamentStaffAction } from '../../tournaments/staff/tournament-staff-policy';
 
-type FixtureGameLookup = {
+type CanonicalGameLookup = {
+  readonly tournamentId: string;
+  readonly teamMatchId: string;
   readonly fieldId: string | null;
-  readonly game: { readonly id: string } | null;
+  readonly game: { readonly id: string; readonly sourceType: string } | null;
 };
 
 /**
- * Thin fixtureId -> gameId adapter over GamesService's already-shipped lineup
+ * Thin canonical teamMatchId -> gameId adapter over GamesService's already-shipped lineup
  * capture/submit methods (listLineups/saveLineup/submitLineup).
  *
  * GamesService.resolveActor() still performs the authoritative, full
- * role-scoped authorization for TOURNAMENT_FIXTURE-sourced games (the same
+ * role-scoped authorization for TEAM_MATCH-sourced games (the same
  * decideTournamentStaffAccess pure decision function that backs Task 7's
  * TournamentStaffAccessService -- see apps/v1_api/src/games/games.service.ts
  * resolveActor()), so this adapter does not re-implement that decision logic.
  *
- * Task 18 review P1-4: it previously ran that check TOO LATE. `resolveGameId()`
- * queried fixture/game existence FIRST and threw 404 immediately for a
- * nonexistent fixture/game -- before GamesService ever got a chance to
- * authorize the caller. An unauthenticated-for-this-tournament caller could
- * therefore fingerprint which fixture/game ids exist by comparing "404
- * immediately" (does not exist) against "403 from GamesService" (exists, but
- * I'm not allowed to see it) -- an existence oracle a denied caller should
- * never get. `authorizeAndResolveGameId()` fixes the order: it loads the
- * fixture row's `fieldId` (needed so a FIELD_OPERATOR scoped by *field*, not
- * by explicit fixtureId, is still correctly authorized for `read` -- see
- * tournament-staff-policy.ts's `fieldOrCourtId` scope check) and its linked
- * game id in ONE query, calls `TournamentStaffAccessService.assertAccess()`
- * with that resource FIRST, and only after that call succeeds does it decide
- * "not found" from the SAME already-fetched row. A caller who is not
- * authorized for this tournamentId/fixtureId/fieldId combination gets the
- * identical 403 STAFF_SCOPE_DENIED whether or not the fixture/game actually
- * exists; 404 TOURNAMENT_FIXTURE_GAME_NOT_FOUND is only ever reachable by a
- * caller who has already been authorized for that scope.
+ * Authorization runs before existence-sensitive errors. A canonical Details
+ * row from another tournament never contributes its field to the requested
+ * resource, so denied callers cannot use this route as an existence oracle.
  */
 @Injectable()
 export class TournamentFixtureLineupService {
@@ -57,56 +44,68 @@ export class TournamentFixtureLineupService {
     fixtureId: string,
     action: TournamentStaffAction,
   ): Promise<string> {
-    const fixture: FixtureGameLookup | null = await this.prisma.v1TournamentFixture.findUnique({
-      where: { tournamentId_id: { tournamentId, id: fixtureId } },
-      select: { fieldId: true, game: { select: { id: true } } },
+    const canonicalRow = await this.prisma.v1TeamMatch.findUnique({
+      where: { id: fixtureId },
+      select: {
+        tournamentId: true,
+        leagueId: true,
+        deletedAt: true,
+        fieldId: true,
+        tournament: { select: { kind: true } },
+        tournamentDetails: { select: { teamMatchId: true, tournamentId: true } },
+        game: { select: { id: true, sourceType: true } },
+      },
     });
+    const isCanonicalTournament = canonicalRow !== null
+      && canonicalRow.deletedAt === null
+      && canonicalRow.tournamentId === tournamentId
+      && canonicalRow.leagueId === null
+      && canonicalRow.tournamentDetails !== null
+      && canonicalRow.tournamentDetails.tournamentId === tournamentId
+      && canonicalRow.tournamentDetails.teamMatchId === fixtureId
+      && (canonicalRow.tournament?.kind === 'regular_tournament' || canonicalRow.tournament?.kind === null);
+    const isRegularLeague = canonicalRow !== null
+      && canonicalRow.deletedAt === null
+      && canonicalRow.tournamentId === tournamentId
+      && canonicalRow.leagueId === tournamentId
+      && canonicalRow.tournament?.kind === 'regular_league'
+      && canonicalRow.tournamentDetails === null;
+    const canonical: CanonicalGameLookup | null = canonicalRow === null || (!isCanonicalTournament && !isRegularLeague)
+      ? null
+      : {
+          tournamentId,
+          teamMatchId: fixtureId,
+          fieldId: canonicalRow.fieldId,
+          game: canonicalRow.game,
+        };
 
-    // Authorize FIRST, from whatever this lookup actually returned (a
-    // nonexistent fixture yields `fieldId: undefined` here, same as an
-    // existing-but-unassigned-field fixture would for scope purposes) --
-    // never branch on existence before this call.
+    // Authorize before existence-sensitive errors. A row owned by another
+    // tournament must not contribute its field to the requested scope.
     const resource: TournamentStaffResource =
-      fixture?.fieldId != null
-        ? { tournamentId, fixtureId, fieldId: fixture.fieldId }
+      canonical?.tournamentId === tournamentId && canonical.fieldId !== null
+        ? { tournamentId, fixtureId: canonical.teamMatchId, fieldId: canonical.fieldId }
         : { tournamentId, fixtureId };
     await this.access.assertAccess({ userId, action, resource });
 
-    if (fixture !== null) {
-      // 대진 행이 **있다** — 이건 대회 경기다. 게임이 아직 없으면 그건 리그일 가능성이
-      // 아니라 그냥 없는 것이므로, 팀매치를 뒤지지 않고 여기서 끝낸다(Copilot 리뷰 지적:
-      // 아래 fallback 이 `game === null` 인 대회 대진에도 돌아 불필요한 조회를 했다).
-      if (fixture.game !== null) return fixture.game.id;
+    if (canonical === null || canonical.tournamentId !== tournamentId) {
       throw new NotFoundException({
         code: 'TOURNAMENT_FIXTURE_GAME_NOT_FOUND',
         message: '경기 정보를 찾을 수 없어요.',
       });
     }
-
-    // ## 정규 리그 거울이면 경기는 `V1TeamMatch` 다 (Task 165 BE-4)
-    // 정본 §4 가 "리그도 대회와 같은 콘솔" 로 확정했는데, 위 조회는 `V1TournamentFixture`
-    // 만 본다 — 리그 경기의 id 는 **팀매치 id** 라 그 행이 없어 콘솔이 통째로 404 였다.
-    //
-    // **`resolveGameSource` 를 쓰지 않는다** — 그 함수는 *게임 → 출처* 방향이고
-    // (`game.teamMatchId` 로 리그를 찾는다), 여기는 그 반대인 *출처 → 게임* 이다.
-    // 방향이 달라 재사용이 성립하지 않는다.
-    //
-    // **인가 뒤에 조회한다.** 위 `assertAccess` 가 이미 끝났으므로 존재 여부로 분기해도
-    // 권한 판정이 그것에 영향받지 않는다(이 함수 맨 위 주석의 불변식). 리그 거울에는
-    // 대진 스코프가 없어 `{ tournamentId, fixtureId }` 리소스로 걸리는데, 그건 대회
-    // 스태프·플랫폼 관리자만 통과하는 것과 같은 규칙이다(#982 의 결과 경계와 동일).
-    const leagueTeamMatch = await this.prisma.v1TeamMatch.findFirst({
-      where: { id: fixtureId, leagueId: tournamentId, deletedAt: null },
-      select: { game: { select: { id: true } } },
-    });
-    if (leagueTeamMatch?.game != null) {
-      return leagueTeamMatch.game.id;
+    if (canonical.game === null) {
+      throw new NotFoundException({
+        code: 'TOURNAMENT_FIXTURE_GAME_NOT_FOUND',
+        message: '경기 정보를 찾을 수 없어요.',
+      });
     }
-
-    throw new NotFoundException({
-      code: 'TOURNAMENT_FIXTURE_GAME_NOT_FOUND',
-      message: '경기 정보를 찾을 수 없어요.',
-    });
+    if (canonical.game.sourceType !== 'TEAM_MATCH') {
+      throw new ConflictException({
+        code: 'TOURNAMENT_MATCH_SOURCE_INVALID',
+        message: '대회 경기 출처가 올바르지 않아요.',
+      });
+    }
+    return canonical.game.id;
   }
 
   /**

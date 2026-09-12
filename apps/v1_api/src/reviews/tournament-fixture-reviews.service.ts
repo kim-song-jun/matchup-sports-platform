@@ -4,10 +4,11 @@ import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { formatReviewWindow, reviewWindowClosed } from './review-deadline';
 import { ReviewPolicySettingsService } from './review-policy-settings.service';
-import { appearedUserIdsBySide } from './tournament-fixture-appearance';
+import { appearedUserIdsBySide, appearedUserIdsBySideBatch } from './tournament-fixture-appearance';
 import {
   fixtureTeams,
   fixtureTitle,
+  isCanonicalTournamentFixture,
   isExistingReviewResult,
   isUniqueConstraintError,
   markExistingReviewResult,
@@ -24,7 +25,7 @@ import {
   tournamentFixtureSelect,
   type ReviewWithIncludes,
   type RosterPlayer,
-  type TournamentFixture,
+  type CanonicalTournamentFixture,
   type TournamentFixtureReviewTagCode,
 } from './tournament-fixture-review-mappers';
 import { recalculateTournamentUserReputation } from './tournament-fixture-review-reputation';
@@ -45,21 +46,21 @@ export class TournamentFixtureReviewsService {
     if (!teamIds.length) return [];
     const roleByTeamId = new Map(memberships.map((membership) => [membership.teamId, membership.role]));
 
-    const fixtures = (await this.prisma.v1TournamentFixture.findMany({
+    const fixtures = (await this.prisma.v1TeamMatch.findMany({
       where: {
         ...(tournamentId ? { tournamentId } : {}),
+        leagueId: null,
         status: 'completed',
-        homeRegistrationId: { not: null },
-        awayRegistrationId: { not: null },
+        tournamentDetails: { isNot: null },
         OR: [
-          { homeRegistration: { is: { teamId: { in: teamIds } } } },
-          { awayRegistration: { is: { teamId: { in: teamIds } } } },
+          { tournamentDetails: { is: { homeRegistration: { is: { teamId: { in: teamIds } } } } } },
+          { tournamentDetails: { is: { awayRegistration: { is: { teamId: { in: teamIds } } } } } },
         ],
       },
-      orderBy: [{ updatedAt: 'desc' }, { fixtureNumber: 'desc' }],
+      orderBy: [{ updatedAt: 'desc' }],
       take: limit * 4,
       select: tournamentFixtureSelect(),
-    })).filter((fixture) => officialResultTimestamp(fixture) !== null);
+    })).filter(isCanonicalTournamentFixture).filter((fixture) => officialResultTimestamp(fixture) !== null);
     const reviewed = await this.existingReviews(fixtures.map((fixture) => fixture.tournamentId), user.id);
     const seenKeys = new Set<string>();
 
@@ -95,15 +96,28 @@ export class TournamentFixtureReviewsService {
     // 로스터는 중복 제거가 끝난 뒤에만 조회한다 — 위 findMany가 limit*4개를 읽어오므로
     // 매핑 전에 조회하면 실제로 보여줄 것보다 몇 배 많은 등록의 선수 행을 끌어온다.
     const rosters = await this.rostersByRegistration(entries.map((entry) => entry.targetTeam.registrationId));
+    const appearanceByFixtureId = await appearedUserIdsBySideBatch(
+      this.prisma,
+      [...new Map(entries.map((entry) => [entry.fixture.id, entry.fixture] as const)).values()],
+    );
 
     return entries
       .map((entry) => {
         const rosterUserIds = (rosters.get(entry.targetTeam.registrationId) ?? []).filter((userId) => userId !== user.id);
+        const appearance = appearanceByFixtureId.get(entry.fixture.id);
+        const isHomeReviewer = entry.reviewerTeamId === fixtureTeams(entry.fixture)!.home.teamId;
+        const appearedTargetUserIds = appearance
+          ? (isHomeReviewer ? appearance.away : appearance.home)
+          : null;
+        const eligibleRosterUserIds = appearedTargetUserIds
+          ? rosterUserIds.filter((userId) => appearedTargetUserIds.has(userId))
+          : rosterUserIds;
         const reviewedUserIds = reviewed.users.get(entry.fixture.tournamentId) ?? new Set<string>();
-        const reviewedPlayerCount = rosterUserIds.filter((userId) => reviewedUserIds.has(userId)).length;
-        // 대상 = 상대 팀 1 + 상대팀 등록 로스터 인원. 로스터가 비어 있으면(등록 전/전원 삭제) 팀 후기만 남는다.
+        const reviewedPlayerCount = eligibleRosterUserIds.filter((userId) => reviewedUserIds.has(userId)).length;
+        // 대상 = 상대 팀 1 + 공식 결과상 실제 출전한 상대팀 로스터 인원. 판정 근거가
+        // 없으면 등록 로스터 전체를 유지하고, 공식 결과가 비어 있으면 팀 후기만 남긴다.
         const canReviewTeam = canReviewOpponentTeam(entry.reviewerRole);
-        const targetCount = (canReviewTeam ? 1 : 0) + rosterUserIds.length;
+        const targetCount = (canReviewTeam ? 1 : 0) + eligibleRosterUserIds.length;
         const reviewedCount = (canReviewTeam && entry.teamReviewed ? 1 : 0) + reviewedPlayerCount;
         return {
           sourceType: TOURNAMENT_FIXTURE_SOURCE_TYPE,
@@ -162,16 +176,16 @@ export class TournamentFixtureReviewsService {
 
   async sourceSummaries(sourceIds: string[]) {
     if (!sourceIds.length) return new Map<string, ReturnType<typeof sourceSummary>>();
-    const fixtures = await this.prisma.v1TournamentFixture.findMany({
-      where: { id: { in: sourceIds } },
+    const fixtures = await this.prisma.v1TeamMatch.findMany({
+      where: { id: { in: sourceIds }, leagueId: null, tournamentDetails: { isNot: null } },
       select: tournamentFixtureSelect(),
     });
-    return new Map(fixtures.map((fixture) => [
+    return new Map(fixtures.filter(isCanonicalTournamentFixture).map((fixture) => [
       `${TOURNAMENT_FIXTURE_SOURCE_TYPE}:${fixture.id}`,
       sourceSummary(
         fixture.id,
         fixtureTitle(fixture),
-        officialResultTimestamp(fixture) ?? fixture.scheduledAt ?? fixture.updatedAt,
+        officialResultTimestamp(fixture) ?? fixture.startAt ?? fixture.updatedAt,
       ),
     ] as const));
   }
@@ -284,11 +298,14 @@ export class TournamentFixtureReviewsService {
    * (각 팀 입장에서 상대팀 + 상대팀 로스터를 평가).
    */
   private async reviewContexts(userId: string, sourceId: string): Promise<ReviewContext[]> {
-    const fixture = await this.prisma.v1TournamentFixture.findUnique({
+    const fixture = await this.prisma.v1TeamMatch.findUnique({
       where: { id: sourceId },
       select: tournamentFixtureSelect(),
     });
     if (!fixture) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
+    if (!isCanonicalTournamentFixture(fixture)) {
+      throw conflict('TOURNAMENT_MATCH_METADATA_INCOMPLETE', 'Canonical tournament match metadata is incomplete');
+    }
     if (fixture.status !== 'completed' || !officialResultTimestamp(fixture)) {
       throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
     }
@@ -484,7 +501,7 @@ export type TournamentFixtureReviewSubmitInput = {
 };
 
 type ReviewContext = {
-  readonly fixture: TournamentFixture;
+  readonly fixture: CanonicalTournamentFixture;
   readonly reviewerTeam: { teamId: string; name: string; role: V1TeamMembershipRole };
   readonly targetTeam: { registrationId: string; teamId: string; name: string; imageUrl: string | null };
   readonly existing: ReviewWithIncludes | null;

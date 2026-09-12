@@ -38,7 +38,7 @@ vi.mock('@/components/tournament-result-review/game-result-review-panel', () => 
 const ITEM = (fixtureId: string, gameId: string, fixtureNumber: number) => ({
   fixtureId, tournamentId: 't-1', round: '조별 A', fixtureNumber, gameId, gameState: 'ENDED',
   fieldId: null, fieldName: null, homeRegistrationId: null, awayRegistrationId: null,
-  scheduledAt: null, currentScore: null, warnings: [], version: 1, revisionId: null, stableRevision: 'x',
+  scheduledAt: null, currentScore: null, currentRevisionState: null, warnings: [], version: 1, revisionId: null, stableRevision: 'x',
 });
 const ITEMS = [ITEM('fx-1', 'game-1', 1), ITEM('fx-2', 'game-2', 2)];
 
@@ -105,4 +105,3 @@ describe('ResultReviewPageClient fixtureId 딥링크 (T6-1)', () => {
     expect(screen.getByTestId('panel')).toHaveTextContent('panel:game-3');
   });
 });
-

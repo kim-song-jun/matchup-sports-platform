@@ -33,6 +33,7 @@ function schedule(overrides: Partial<V1TeamScheduleSummary> = {}): V1TeamSchedul
     state: 'SCHEDULED',
     version: 0,
     teamMatchId: null,
+    linkedMatch: null,
     matchConfirmed: null,
     goingCount: 5,
     waitlistedCount: 0,

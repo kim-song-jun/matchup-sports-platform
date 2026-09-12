@@ -1,6 +1,7 @@
 import {
   Prisma,
   PrismaClient,
+  V1GameOfficialFactSourceType,
   V1GameSourceType,
   V1IdentityActorType,
   V1VisibilityMode,
@@ -39,6 +40,13 @@ function resultFor(goalsFor: number, goalsAgainst: number) {
   if (goalsFor > goalsAgainst) return 'WON';
   if (goalsFor < goalsAgainst) return 'LOST';
   return 'DRAWN';
+}
+
+function readOfficialScore(value: Prisma.JsonValue): { homeScore: number; awayScore: number } | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const home = value.home;
+  const away = value.away;
+  return typeof home === 'number' && typeof away === 'number' ? { homeScore: home, awayScore: away } : null;
 }
 
 export async function ensureShowcaseRepresentativeParticipant(
@@ -128,8 +136,8 @@ async function seedFixtureResult(
   if (!game) {
     const createdGame = await tx.v1Game.create({
       data: {
-        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
-        tournamentFixtureId: fixture.id,
+        sourceType: V1GameSourceType.TEAM_MATCH,
+        teamMatchId: fixture.id,
         competitionConfigVersionId: fixture.competitionConfigVersionId,
       },
     });
@@ -355,7 +363,7 @@ async function seedFixtureResult(
       revisionId: revision.id,
       gameId: game.id,
       revision: 1,
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameOfficialFactSourceType.TEAM_MATCH,
       tournamentId: fixture.tournamentId,
       homeTeamId: fixture.homeRegistration.teamId,
       awayTeamId: fixture.awayRegistration.teamId,
@@ -404,19 +412,30 @@ async function main() {
   assertShowcaseResultSeedAllowed(process.env);
   const prisma = new PrismaClient();
   try {
-    const fixtures = await prisma.v1TournamentFixture.findMany({
+    const canonicalRows = await prisma.v1TournamentMatchDetails.findMany({
       where: {
         tournamentId: SHOWCASE_TOURNAMENT_ID,
-        status: 'completed',
-        result: { isNot: null },
+        teamMatch: { status: 'completed', deletedAt: null, game: { isNot: null } },
       },
-      orderBy: [{ scheduledAt: 'asc' }, { fixtureNumber: 'asc' }],
+      orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }],
       select: {
-        id: true,
+        teamMatchId: true,
         tournamentId: true,
-        scheduledAt: true,
-        competitionConfigVersionId: true,
-        result: { select: { homeScore: true, awayScore: true, recordedAt: true } },
+        teamMatch: {
+          select: {
+            startAt: true,
+            competitionConfigVersionId: true,
+            game: {
+              select: {
+                id: true,
+                currentOfficialRevisionId: true,
+                currentOfficialRevision: { select: { score: true, officialAt: true } },
+                sides: { select: { id: true, sideKey: true, teamId: true } },
+                participants: { select: { id: true, sideId: true, userId: true } },
+              },
+            },
+          },
+        },
         homeRegistration: {
           select: {
             teamId: true,
@@ -451,15 +470,25 @@ async function main() {
             },
           },
         },
-        game: {
-          select: {
-            id: true,
-            currentOfficialRevisionId: true,
-            sides: { select: { id: true, sideKey: true, teamId: true } },
-            participants: { select: { id: true, sideId: true, userId: true } },
-          },
-        },
       },
+    });
+    const fixtures = canonicalRows.map((row) => {
+      const score = row.teamMatch.game?.currentOfficialRevision
+        ? readOfficialScore(row.teamMatch.game.currentOfficialRevision.score)
+        : null;
+      if (!row.teamMatch.game || !row.teamMatch.game.currentOfficialRevision || !score || !row.teamMatch.startAt || !row.teamMatch.competitionConfigVersionId) {
+        throw new Error(`Canonical showcase match ${row.teamMatchId} is missing an official result.`);
+      }
+      return {
+        id: row.teamMatchId,
+        tournamentId: row.tournamentId,
+        scheduledAt: row.teamMatch.startAt,
+        competitionConfigVersionId: row.teamMatch.competitionConfigVersionId,
+        result: { ...score, recordedAt: row.teamMatch.game.currentOfficialRevision.officialAt ?? row.teamMatch.startAt },
+        homeRegistration: row.homeRegistration,
+        awayRegistration: row.awayRegistration,
+        game: row.teamMatch.game,
+      };
     });
     if (fixtures.length !== 7) {
       throw new Error(`Expected 7 completed showcase fixtures, found ${fixtures.length}.`);

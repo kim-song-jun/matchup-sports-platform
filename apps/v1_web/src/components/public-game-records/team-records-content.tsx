@@ -18,7 +18,7 @@ import {
   presentParticipantName,
   teamRecordResultLabel,
 } from './format';
-import { resultChipStyle, resultStripeStyle } from './result-emphasis';
+import { resultChipStyle } from './result-emphasis';
 import type {
   PublicTeamRecordEvent,
   PublicTeamRecordItem,
@@ -38,17 +38,21 @@ import type {
  * 전에는 대회명만 붙어서 '전체' 탭의 리그 경기와 친선 팀매치가 둘 다 날짜 한 줄로 끝나
  * 서로 구분되지 않았다. 리그가 아닌 친선 팀매치는 예전 그대로 아무것도 붙지 않는다(회귀 금지).
  *
- * 서버 계약상 `tournamentId`가 있는 경기는 `leagueId`가 항상 null이지만(V1Game의
- * exactly-one-source CHECK), 우선순위는 백엔드 판정 함수(`classifyTeamRecordCategory`)와
+ * canonical tournament 경기에는 `tournamentId`와 운영 `teamMatchId`가 함께 있을 수
+ * 있고, `leagueId`는 정규 리그 축에만 해당한다. 우선순위는 백엔드 판정 함수와
  * 같은 순서로 고정해 둔다.
  */
 function competitionLabel(item: PublicTeamRecordItem): string | null {
   return item.tournamentTitle ?? item.leagueTitle ?? null;
 }
 
-/** 대회 소스면 대회 상세로, 팀매치 소스면 팀매치 상세로 — exactly-one-source라 항상 둘 중
- * 하나만 있다(V1Game의 CHECK 제약, public-team-records.service.ts 주석 참고). */
+/** 대회 축이면 대회 상세로, 팀매치 축이면 팀매치 상세로 이동한다. canonical tournament
+ * 행은 두 식별자를 모두 가지므로 실제 경기 상세 route를 사용하고, legacy fixture는
+ * tournament 상세를 유지한다. */
 function recordHref(item: PublicTeamRecordItem): string | null {
+  if (item.tournamentId && item.teamMatchId) {
+    return `/tournaments/${item.tournamentId}/matches/${item.teamMatchId}`;
+  }
   if (item.tournamentId) return `/tournaments/${item.tournamentId}`;
   if (item.teamMatchId) return `/team-matches/${item.teamMatchId}`;
   return null;
@@ -198,9 +202,8 @@ function TeamRecordRow({
   return (
     <div
       style={{
-        padding: '16px 16px 16px 12px',
+        padding: 16,
         borderTop: '1px solid var(--grey100)',
-        ...resultStripeStyle(item.result),
       }}
     >
       <div

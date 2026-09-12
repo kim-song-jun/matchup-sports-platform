@@ -92,6 +92,11 @@ export async function createLeagueFixture(
       status: 'matched',
       approvedApplicantTeamId: away.id,
       competitionConfigVersionId: input.competitionConfigId,
+      // A league match is also an official tournament-scoped TeamMatch. Keep
+      // the canonical ownership column populated at creation time so audit
+      // rows can use the composite (tournamentId, teamMatchId) scope without
+      // mutating historical rows from the audit writer.
+      tournamentId: input.leagueId,
       leagueId: input.leagueId,
     },
   });

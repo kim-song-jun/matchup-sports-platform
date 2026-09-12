@@ -5,7 +5,7 @@ type ChatEntitlementRoom = {
   teamId: string | null;
   teamMatchId: string | null;
   teamMatch: {
-    hostTeamId: string;
+    hostTeamId: string | null;
     approvedApplicantTeamId: string | null;
   } | null;
   teamContactId: string | null;
@@ -47,6 +47,7 @@ export function currentChatEntitlementWhere(userId: string): Prisma.V1ChatRoomWh
             // 취소된 뒤"는 이전과 동일하게 막힌다.
             status: { in: ['matched', 'completed'] },
             deletedAt: null,
+            hostTeamId: { not: null },
             approvedApplicantTeamId: { not: null },
             OR: [
               {

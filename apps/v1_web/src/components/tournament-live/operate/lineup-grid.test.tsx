@@ -59,6 +59,7 @@ function lineup(participants: GameLineupParticipant[]): GameLineup {
     version: 0,
     submittedAt: '2026-08-23T00:00:00.000Z',
     supersedesId: null,
+    invalidatedAt: null,
     formation: null,
     createdAt: '2026-08-23T00:00:00.000Z',
     updatedAt: '2026-08-23T00:00:00.000Z',
@@ -75,6 +76,13 @@ const SQUAD = [
 ];
 
 describe('matchesPlayerQuery', () => {
+  it('excludes invalidated submitted participants from both display and operable selection', () => {
+    const old = { ...lineup(SQUAD), invalidatedAt: '2026-09-08T00:00:00Z' };
+    const draft: GameLineup = { ...lineup([]), id: 'new-draft', revision: 3, state: 'DRAFT' };
+    expect(latestOperableLineup([old, draft], 'side-home')).toBeNull();
+    expect(latestLineupForDisplay([old, draft], 'side-home')?.participants).toEqual([]);
+    expect(latestLineupForDisplay([old], 'side-home')).toBeNull();
+  });
   it('빈 검색어는 전원을 통과시킨다', () => {
     expect(matchesPlayerQuery(SQUAD[0], '')).toBe(true);
     expect(matchesPlayerQuery(SQUAD[0], '   ')).toBe(true);

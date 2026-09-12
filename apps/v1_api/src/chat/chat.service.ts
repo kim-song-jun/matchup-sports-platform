@@ -438,7 +438,7 @@ export class ChatService {
       where: { id: teamMatchId, status: { in: ['matched', 'completed'] }, deletedAt: null },
       select: { hostTeamId: true, approvedApplicantTeamId: true },
     });
-    if (!teamMatch?.approvedApplicantTeamId) throw stateConflict('Team match chat is available after matching');
+    if (!teamMatch?.hostTeamId || !teamMatch.approvedApplicantTeamId) throw stateConflict('Team match chat is available after both teams are assigned');
     const membership = await this.prisma.v1TeamMembership.findFirst({
       where: {
         userId,

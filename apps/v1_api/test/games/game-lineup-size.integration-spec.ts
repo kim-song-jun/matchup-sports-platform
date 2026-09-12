@@ -30,6 +30,8 @@ const ids = {
   hostTeam: '6b000000-0000-4000-8000-000000000020',
   opponentTeam: '6b000000-0000-4000-8000-000000000021',
   tournament: '6b000000-0000-4000-8000-000000000030',
+  hostRegistration: '6b000000-0000-4000-8000-000000000050',
+  awayRegistration: '6b000000-0000-4000-8000-000000000051',
   fixture: '6b000000-0000-4000-8000-000000000040',
 } as const;
 
@@ -92,7 +94,7 @@ describe('GamesService.saveLineup 은 인원·골키퍼를 검증하지 않는�
         onboardingStatus: 'completed',
       },
     });
-    // platform_ops (non-support admin) can act on any tournament-fixture
+    // platform_ops (non-support admin) can act on any tournament match
     // lineup without a per-tournament staff assignment row
     // (GamesService.resolveActor's `eligibleAdmin` branch) — keeps this
     // fixture minimal, matching the "guest-only, no membership rows" spirit
@@ -118,18 +120,39 @@ describe('GamesService.saveLineup 은 인원·골키퍼를 검증하지 않는�
         competitionConfigVersionId: config.id,
       },
     });
-    await prisma.v1TournamentFixture.create({
+    await prisma.v1TournamentRegistration.createMany({
+      data: [
+        { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.platformOpsUser, status: 'confirmed' },
+        { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.platformOpsUser, status: 'confirmed' },
+      ],
+    });
+    await prisma.v1TeamMatch.create({
       data: {
         id: ids.fixture,
         tournamentId: ids.tournament,
+        sportId: ids.sport,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+        title: 'Lineup size match',
+        status: 'matched',
+        startAt: new Date(Date.now() - 60_000),
+        competitionConfigVersionId: config.id,
+      },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: ids.fixture,
+        tournamentId: ids.tournament,
         round: 'group',
         fixtureNumber: 1,
-        competitionConfigVersionId: config.id,
+        legNumber: 1,
+        homeRegistrationId: ids.hostRegistration,
+        awayRegistrationId: ids.awayRegistration,
       },
     });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: config.id,
       sides: [

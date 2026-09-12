@@ -126,7 +126,12 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
         {boardQuery.isSuccess ? (
           <>
           <ResultReviewGridStyles />
-          <div className="tm-result-review-grid">
+          <style>{`
+            @media (max-width: 1023px) {
+              .tm-corrections-result-review-grid { grid-template-columns: minmax(0, 1fr); }
+            }
+          `}</style>
+          <div className="tm-result-review-grid tm-corrections-result-review-grid">
             <FixturePickerList
               items={hasOfficialResult}
               teamNamesByFixtureId={teamNamesByFixtureId}
@@ -147,8 +152,8 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
                 <h2
                   ref={panelHeadingRef}
                   tabIndex={-1}
-                  className="tm-text-body-lg"
-                  style={{ marginBottom: 12, outline: 'none' }}
+                  className="sr-only"
+                  style={{ outline: 'none' }}
                 >
                   {
                     /* 리그 대진은 `round`·`fixtureNumber` 가 둘 다 null 이라, 그대로 두면
@@ -162,7 +167,11 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
                   }
                 </h2>
                 {publicHref ? (
-                  <Link href={publicHref} className="tm-section-action" style={{ marginBottom: 12 }}>
+                  <Link
+                    href={publicHref}
+                    className="tm-section-action inline-flex min-h-[44px] items-center"
+                    style={{ marginBottom: 12 }}
+                  >
                     공개 화면에서 보기
                   </Link>
                 ) : null}
@@ -170,6 +179,7 @@ export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }
                   key={selectedItem.gameId}
                   gameId={selectedItem.gameId}
                   tournamentId={tournamentId}
+                  inline
                 />
               </div>
             ) : null}

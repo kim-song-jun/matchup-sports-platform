@@ -27,6 +27,8 @@ const ids = {
   hostTeam: '86000000-0000-4000-8000-000000000020',
   opponentTeam: '86000000-0000-4000-8000-000000000021',
   tournament: '86000000-0000-4000-8000-000000000030',
+  hostRegistration: '86000000-0000-4000-8000-000000000031',
+  opponentRegistration: '86000000-0000-4000-8000-000000000032',
   denialFixture: '86000000-0000-4000-8000-000000000040',
   successFixture: '86000000-0000-4000-8000-000000000041',
   directorAssignment: '86000000-0000-4000-8000-000000000060',
@@ -83,7 +85,7 @@ async function buildTournamentGame(fixtureId: string): Promise<string> {
     orderBy: { version: 'desc' },
   });
   const input: GameSourceCreationInput = {
-    sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+    sourceType: V1GameSourceType.TEAM_MATCH,
     sourceId: fixtureId,
     competitionConfigVersionId: config.id,
     sides: [
@@ -186,7 +188,7 @@ describe('Task 22 G-3: DIRECTOR_OFFICIALIZE denial audit + flag snapshot', () =>
     await prisma.v1AdminUser.create({
       data: { userId: ids.platformOps, adminRole: 'ops', status: 'active' },
     });
-    await prisma.v1Sport.upsert({
+    const sport = await prisma.v1Sport.upsert({
       where: { code: 'football' },
       create: { id: ids.sport, code: 'football', name: 'Task 22 G-3 Football' },
       update: {},
@@ -196,21 +198,33 @@ describe('Task 22 G-3: DIRECTOR_OFFICIALIZE denial audit + flag snapshot', () =>
     });
     await prisma.v1Team.createMany({
       data: [
-        { id: ids.hostTeam, ownerUserId: ids.platformOps, sportId: ids.sport, regionId: ids.region, name: 'Task 22 G-3 Host' },
-        { id: ids.opponentTeam, ownerUserId: ids.platformOps, sportId: ids.sport, regionId: ids.region, name: 'Task 22 G-3 Opponent' },
+        { id: ids.hostTeam, ownerUserId: ids.platformOps, sportId: sport.id, regionId: ids.region, name: 'Task 22 G-3 Host' },
+        { id: ids.opponentTeam, ownerUserId: ids.platformOps, sportId: sport.id, regionId: ids.region, name: 'Task 22 G-3 Opponent' },
       ],
     });
     await prisma.v1Tournament.create({
-      data: { id: ids.tournament, sportId: ids.sport, title: 'Task 22 G-3 tournament' },
+      data: { id: ids.tournament, sportId: sport.id, title: 'Task 22 G-3 tournament' },
+    });
+    await prisma.v1TournamentRegistration.createMany({
+      data: [
+        { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
+        { id: ids.opponentRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
+      ],
     });
     const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({
       where: { name: 'football-v1', status: 'ACTIVE' },
       orderBy: { version: 'desc' },
     });
-    await prisma.v1TournamentFixture.createMany({
+    await prisma.v1TeamMatch.createMany({
       data: [
-        { id: ids.denialFixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, competitionConfigVersionId: config.id },
-        { id: ids.successFixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, competitionConfigVersionId: config.id },
+        { id: ids.denialFixture, tournamentId: ids.tournament, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, sportId: sport.id, title: 'Task 22 G-3 denial match', status: 'matched', competitionConfigVersionId: config.id },
+        { id: ids.successFixture, tournamentId: ids.tournament, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, sportId: sport.id, title: 'Task 22 G-3 success match', status: 'matched', competitionConfigVersionId: config.id },
+      ],
+    });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: [
+        { teamMatchId: ids.denialFixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration },
+        { teamMatchId: ids.successFixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration },
       ],
     });
     await prisma.v1TournamentStaffAssignment.create({
@@ -268,7 +282,7 @@ describe('Task 22 G-3: DIRECTOR_OFFICIALIZE denial audit + flag snapshot', () =>
     expect(audit.actorType).toBe('USER');
     expect(audit.actorUserId).toBe(ids.director);
     expect(audit.tournamentId).toBe(ids.tournament);
-    expect(audit.fixtureId).toBe(ids.denialFixture);
+    expect(audit.teamMatchId).toBe(ids.denialFixture);
     expect(audit.after).toMatchObject({
       denied: true,
       code: 'DIRECTOR_OFFICIALIZE_DISABLED',
@@ -305,7 +319,7 @@ describe('Task 22 G-3: DIRECTOR_OFFICIALIZE denial audit + flag snapshot', () =>
     expect(audit.actorType).toBe('USER');
     expect(audit.actorUserId).toBe(ids.director);
     expect(audit.tournamentId).toBe(ids.tournament);
-    expect(audit.fixtureId).toBe(ids.successFixture);
+    expect(audit.teamMatchId).toBe(ids.successFixture);
     expect(audit.after).toMatchObject({
       revisionId: voided.revisionId,
       revisionState: 'VOID',
@@ -341,6 +355,8 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     hostTeam: '86000000-0000-4000-8000-000000000103',
     opponentTeam: '86000000-0000-4000-8000-000000000104',
     tournament: '86000000-0000-4000-8000-000000000105',
+    hostRegistration: '86000000-0000-4000-8000-000000000106',
+    opponentRegistration: '86000000-0000-4000-8000-000000000107',
     fixtureQ02: '86000000-0000-4000-8000-000000000110',
     fixtureQ04: '86000000-0000-4000-8000-000000000111',
     fixtureQ08: '86000000-0000-4000-8000-000000000113',
@@ -365,7 +381,7 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
       orderBy: { version: 'desc' },
     });
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: fixtureId,
       competitionConfigVersionId: config.id,
       sides: [
@@ -473,20 +489,25 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     await prisma.v1Tournament.create({
       data: { id: ids.tournament, sportId: sport.id, title: 'Task 22 T-B tournament' },
     });
+    await prisma.v1TournamentRegistration.createMany({
+      data: [
+        { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
+        { id: ids.opponentRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
+      ],
+    });
     const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({
       where: { name: 'football-v1', status: 'ACTIVE' },
       orderBy: { version: 'desc' },
     });
-    await prisma.v1TournamentFixture.createMany({
-      data: [
-        { id: ids.fixtureQ02, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, competitionConfigVersionId: config.id },
-        { id: ids.fixtureQ04, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, competitionConfigVersionId: config.id },
-        { id: ids.fixtureQ08, tournamentId: ids.tournament, round: 'group', fixtureNumber: 4, competitionConfigVersionId: config.id },
-        { id: ids.fixtureQ10, tournamentId: ids.tournament, round: 'group', fixtureNumber: 3, competitionConfigVersionId: config.id },
-        { id: ids.fixtureQ11A, tournamentId: ids.tournament, round: 'group', fixtureNumber: 5, competitionConfigVersionId: config.id },
-        { id: ids.fixtureQ11B, tournamentId: ids.tournament, round: 'group', fixtureNumber: 6, competitionConfigVersionId: config.id },
-        { id: ids.fixtureQ13, tournamentId: ids.tournament, round: 'group', fixtureNumber: 7, competitionConfigVersionId: config.id },
-      ],
+    const canonicalFixtures = [
+      [ids.fixtureQ02, 1], [ids.fixtureQ04, 2], [ids.fixtureQ08, 4], [ids.fixtureQ10, 3],
+      [ids.fixtureQ11A, 5], [ids.fixtureQ11B, 6], [ids.fixtureQ13, 7],
+    ] as const;
+    await prisma.v1TeamMatch.createMany({
+      data: canonicalFixtures.map(([id]) => ({ id, tournamentId: ids.tournament, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, sportId: sport.id, title: `Task 22 T-B match ${id}`, status: 'matched' as const, competitionConfigVersionId: config.id })),
+    });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: canonicalFixtures.map(([teamMatchId, fixtureNumber]) => ({ teamMatchId, tournamentId: ids.tournament, round: 'group', fixtureNumber, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration })),
     });
     await prisma.v1GameOperationFlag.upsert({
       where: { key: 'DIRECTOR_OFFICIALIZE' },

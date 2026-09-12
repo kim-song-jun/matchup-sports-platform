@@ -285,30 +285,82 @@ describe('MatchDetailContent — 팀 이름 진입점', () => {
   });
 
   /**
-   * `teamId` 와 `teamName` 은 **각각** nullable 이다. id 는 있고 이름만 가려진 조합에서
-   * `teamId` 만 보고 링크를 만들면 **'미정' 이라는 글자가 팀 페이지로 링크된다.**
+   * `registrationId` 가 있으면 참가팀은 존재하지만 이름만 가려진 상태다. 이 경우 실제
+   * TBD인 `side: null`과 같은 '미정'으로 표시하면 공개 상태를 오해하게 만든다.
    */
-  it('이름이 가려졌으면 id 가 있어도 링크로 만들지 않는다', () => {
+  it.each([null, 'team-id'])('이름이 가려졌으면 팀 ID %s와 무관하게 참가팀 비공개로 표시한다', (teamId) => {
     const data = makeDetail({
-      home: { registrationId: 'reg-home', teamId: 'team-home', teamName: null },
-      away: { registrationId: 'reg-away', teamId: 'team-away', teamName: null },
+      home: { registrationId: 'reg-home', teamId, teamName: null },
+      away: { registrationId: 'reg-away', teamId, teamName: null },
     });
 
     render(<MatchDetailContent data={data} />);
 
-    expect(screen.queryByRole('link', { name: '미정' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('참가팀 비공개')).toHaveLength(2);
+    expect(screen.queryByRole('link', { name: '참가팀 비공개' })).not.toBeInTheDocument();
   });
 
-  it('신원이 가려진 동안에는 링크로 만들지 않는다', () => {
+  it('실제 TBD side는 미정으로 표시하고 링크로 만들지 않는다', () => {
     const data = makeDetail({
-      home: { registrationId: 'reg-home', teamId: null, teamName: null },
-      away: { registrationId: 'reg-away', teamId: null, teamName: null },
+      home: null,
+      away: null,
     });
 
     render(<MatchDetailContent data={data} />);
 
-    // 없는 팀 페이지로 보내지 않는다 — 이름 자체가 아직 공개 전이다.
+    // 아직 배정되지 않은 팀에 링크를 만들지 않는다.
     expect(screen.queryByRole('link', { name: '미정' })).not.toBeInTheDocument();
     expect(screen.getAllByText('미정').length).toBeGreaterThan(0);
+  });
+});
+
+describe('MatchDetailContent — status-only 이력 privacy', () => {
+  it('status-only에서는 공개 결과 변경 사유를 렌더링하지 않는다', () => {
+    render(<MatchDetailContent data={makeDetail({
+      visibilityMode: 'status_only',
+      history: [{
+        revision: 2,
+        state: 'OFFICIAL',
+        officialAt: '2026-09-05T11:00:00.000Z',
+        reason: '운영자 내부 정정 사유',
+        isCorrection: true,
+      }],
+    })} />);
+
+    expect(screen.getByText('결과 변경 이력')).toBeInTheDocument();
+    expect(screen.queryByText('운영자 내부 정정 사유')).not.toBeInTheDocument();
+  });
+});
+
+describe('MatchDetailContent — official-only pending result guidance', () => {
+  it('공식 결과 확정 전에는 점수와 기록 공개 정책을 안내한다', () => {
+    render(<MatchDetailContent data={makeDetail({
+      visibilityMode: 'official_only',
+      resultState: 'pending',
+      scoreStatus: 'pending',
+    })} />);
+
+    expect(screen.getByText('공식 결과가 확정되면 점수와 기록이 공개돼요.')).toBeInTheDocument();
+  });
+
+  it('실시간 공개 정책의 pending 결과에는 확정 안내를 붙이지 않는다', () => {
+    render(<MatchDetailContent data={makeDetail({
+      visibilityMode: 'live',
+      resultState: 'pending',
+      scoreStatus: 'pending',
+      status: 'live',
+    })} />);
+
+    expect(screen.queryByText('공식 결과가 확정되면 점수와 기록이 공개돼요.')).not.toBeInTheDocument();
+  });
+
+  it('이미 공식 결과인 official-only 경기에는 pending 안내를 붙이지 않는다', () => {
+    render(<MatchDetailContent data={makeDetail({
+      visibilityMode: 'official_only',
+      resultState: 'official',
+      scoreStatus: 'official',
+    })} />);
+
+    expect(screen.queryByText('공식 결과가 확정되면 점수와 기록이 공개돼요.')).not.toBeInTheDocument();
   });
 });

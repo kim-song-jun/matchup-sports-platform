@@ -202,104 +202,116 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
       data: { id: ids.field, tournamentId: ids.detailTournament, scopeKey: 'main-court', name: 'Main court' },
     });
 
-    // 100 plain fixtures (no game) so the deterministic-pagination test exercises the exact
-    // scale the plan calls out ("100-fixture board snapshot").
-    const paginationFixtures: Prisma.V1TournamentFixtureCreateManyInput[] = Array.from(
+    // 100 canonical tournament matches (no game) so the deterministic-pagination test exercises
+    // the exact scale the plan calls out ("100-fixture board snapshot").
+    type CanonicalMatchSeed = Prisma.V1TeamMatchCreateManyInput & { id: string };
+    const paginationMatches: CanonicalMatchSeed[] = Array.from(
       { length: PAGINATION_FIXTURE_COUNT },
       (_, index) => ({
         id: randomUUID(),
+        sportId,
+        title: `Task 18 pagination match ${index + 1}`,
+        status: 'matched',
         tournamentId: ids.paginationTournament,
-        round: 'group',
-        fixtureNumber: index + 1,
         competitionConfigVersionId: configId,
       }),
     );
-    await prisma.v1TournamentFixture.createMany({ data: paginationFixtures });
+    await prisma.v1TeamMatch.createMany({ data: paginationMatches });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: paginationMatches.map((match, index) => ({
+        teamMatchId: match.id,
+        tournamentId: ids.paginationTournament,
+        round: 'group',
+        fixtureNumber: index + 1,
+      })),
+    });
 
     boundaryBase = Date.now();
     safeNow = new Date(boundaryBase - 1_000);
     // deadline (scheduledAt - 60m) lands exactly on boundaryBase.
     const boundaryScheduledAt = new Date(boundaryBase + 60 * 60 * 1000);
 
-    // Detail fixtures for status/warning coverage.
-    await prisma.v1TournamentFixture.createMany({
-      data: [
-        {
-          id: ids.liveFixture,
-          tournamentId: ids.detailTournament,
-          round: 'group',
-          fixtureNumber: 1,
-          fieldId: ids.field,
-          competitionConfigVersionId: configId,
-        },
-        {
-          id: ids.clearFixture,
-          tournamentId: ids.detailTournament,
-          round: 'group',
-          fixtureNumber: 2,
-          competitionConfigVersionId: configId,
-        },
-        {
-          id: ids.overdueFixture,
-          tournamentId: ids.detailTournament,
-          round: 'group',
-          fixtureNumber: 3,
-          scheduledAt: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3h ago -> well past the 60m lock window
-          competitionConfigVersionId: configId,
-        },
-        {
-          // No fieldId on purpose: its NO_STAFF_ASSIGNED coverage comes only from the
-          // fixture-scoped boundaryStaffAssignment below, never from ids.field's permanent
-          // (expiresAt: null) coverage, so the boundary test isn't accidentally masked.
-          id: ids.boundaryFixture,
-          tournamentId: ids.detailTournament,
-          round: 'group',
-          fixtureNumber: 4,
-          scheduledAt: boundaryScheduledAt,
-          competitionConfigVersionId: configId,
-        },
-        // Regression pair for the Copilot C1 finding (latestLineupStateBySide() previously keyed
-        // its map by the V1GameLineup.sideId UUID while isLineupOverdue() looked up the literal
-        // 'HOME'/'AWAY' V1GameSideKey strings -- the lookup could never hit, so LINEUP_NOT_SUBMITTED
-        // fired unconditionally past the deadline regardless of whether lineups were submitted).
-        // Both fixtures share the same 3h-in-the-past scheduledAt (well past the 60m lock window)
-        // so the ONLY variable between them is whether a lineup was actually submitted. Both are
-        // assigned ids.field (permanent, expiresAt:null staff coverage from ids.staffAssignment) so
-        // NO_FIELD_ASSIGNED/NO_STAFF_ASSIGNED never fire here and don't disturb the exact-match
-        // `?warning=NO_STAFF_ASSIGNED` assertion below, which is scoped to clearFixture/overdueFixture.
-        {
-          id: ids.lineupSubmittedFixture,
-          tournamentId: ids.detailTournament,
-          round: 'group',
-          fixtureNumber: 5,
-          fieldId: ids.field,
-          scheduledAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
-          competitionConfigVersionId: configId,
-        },
-        {
-          id: ids.lineupMissingFixture,
-          tournamentId: ids.detailTournament,
-          round: 'group',
-          fixtureNumber: 6,
-          fieldId: ids.field,
-          scheduledAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
-          competitionConfigVersionId: configId,
-        },
-      ],
+    // Detail canonical matches for status/warning coverage.
+    const detailMatches: CanonicalMatchSeed[] = [
+      {
+        id: ids.liveFixture,
+        sportId,
+        title: 'Task 18 live match',
+        status: 'matched',
+        tournamentId: ids.detailTournament,
+        fieldId: ids.field,
+        competitionConfigVersionId: configId,
+      },
+      {
+        id: ids.clearFixture,
+        sportId,
+        title: 'Task 18 clear match',
+        status: 'matched',
+        tournamentId: ids.detailTournament,
+        competitionConfigVersionId: configId,
+      },
+      {
+        id: ids.overdueFixture,
+        sportId,
+        title: 'Task 18 overdue match',
+        status: 'matched',
+        tournamentId: ids.detailTournament,
+        startAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+        competitionConfigVersionId: configId,
+      },
+      {
+        // No fieldId on purpose: its NO_STAFF_ASSIGNED coverage comes only from the
+        // fixture-scoped boundaryStaffAssignment below.
+        id: ids.boundaryFixture,
+        sportId,
+        title: 'Task 18 boundary match',
+        status: 'matched',
+        tournamentId: ids.detailTournament,
+        startAt: boundaryScheduledAt,
+        competitionConfigVersionId: configId,
+      },
+      {
+        id: ids.lineupSubmittedFixture,
+        sportId,
+        title: 'Task 18 submitted lineup match',
+        status: 'matched',
+        tournamentId: ids.detailTournament,
+        fieldId: ids.field,
+        startAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+        competitionConfigVersionId: configId,
+      },
+      {
+        id: ids.lineupMissingFixture,
+        sportId,
+        title: 'Task 18 missing lineup match',
+        status: 'matched',
+        tournamentId: ids.detailTournament,
+        fieldId: ids.field,
+        startAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+        competitionConfigVersionId: configId,
+      },
+    ];
+    await prisma.v1TeamMatch.createMany({ data: detailMatches });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: detailMatches.map((match, index) => ({
+        teamMatchId: match.id,
+        tournamentId: ids.detailTournament,
+        round: 'group',
+        fixtureNumber: index + 1,
+      })),
     });
-
     const liveGame = await prisma.v1Game.create({
       data: {
-        sourceType: 'TOURNAMENT_FIXTURE',
-        tournamentFixtureId: ids.liveFixture,
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: ids.liveFixture,
         state: 'LIVE',
         competitionConfigVersionId: configId,
       },
     });
     const overdueGame = await prisma.v1Game.create({
       data: {
-        sourceType: 'TOURNAMENT_FIXTURE',
-        tournamentFixtureId: ids.overdueFixture,
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: ids.overdueFixture,
         state: 'ENDED',
         competitionConfigVersionId: configId,
       },
@@ -354,8 +366,8 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
     // resolve to a HOME/AWAY hit and so always reported the warning as if lineups were missing).
     const lineupSubmittedGame = await prisma.v1Game.create({
       data: {
-        sourceType: 'TOURNAMENT_FIXTURE',
-        tournamentFixtureId: ids.lineupSubmittedFixture,
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: ids.lineupSubmittedFixture,
         state: 'SCHEDULED',
         competitionConfigVersionId: configId,
       },
@@ -377,8 +389,8 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
     // LINEUP_NOT_SUBMITTED must still be PRESENT (the "missing lineup" direction).
     await prisma.v1Game.create({
       data: {
-        sourceType: 'TOURNAMENT_FIXTURE',
-        tournamentFixtureId: ids.lineupMissingFixture,
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: ids.lineupMissingFixture,
         state: 'SCHEDULED',
         competitionConfigVersionId: configId,
       },
@@ -388,8 +400,8 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
     // deadline (boundaryBase), independent of any DB write.
     await prisma.v1Game.create({
       data: {
-        sourceType: 'TOURNAMENT_FIXTURE',
-        tournamentFixtureId: ids.boundaryFixture,
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: ids.boundaryFixture,
         state: 'SCHEDULED',
         competitionConfigVersionId: configId,
       },
@@ -422,7 +434,11 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
         },
       });
       await tx.v1TournamentStaffFixtureScope.create({
-        data: { assignmentId: boundaryAssignment.id, fixtureId: ids.boundaryFixture },
+        data: {
+          assignmentId: boundaryAssignment.id,
+          tournamentId: ids.detailTournament,
+          teamMatchId: ids.boundaryFixture,
+        },
       });
     });
   });
@@ -597,7 +613,7 @@ describe('Task 18 tournament operations board snapshot/filter', () => {
 
     // Delete the exact anchor row page1.nextCursor was minted from.
     const anchorFixtureId = page1.items[page1.items.length - 1].fixtureId;
-    await prisma.v1TournamentFixture.delete({ where: { id: anchorFixtureId } });
+    await prisma.v1TeamMatch.delete({ where: { id: anchorFixtureId } });
 
     const page2 = await board.list(ids.paginationTournament, {
       cursor: page1.nextCursor as string,
@@ -1087,12 +1103,28 @@ describe('Task 18 tournament field/court CRUD and fixture assignment', () => {
         competitionConfigVersionId: config.id,
       },
     });
-    await fieldsPrisma.v1TournamentFixture.create({
+    await fieldsPrisma.v1TeamMatch.create({
       data: {
         id: fieldIds.fixture,
+        sportId,
+        title: 'Task 18 fields fixture',
+        tournamentId: fieldIds.tournament,
+        competitionConfigVersionId: config.id,
+      },
+    });
+    await fieldsPrisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: fieldIds.fixture,
         tournamentId: fieldIds.tournament,
         round: 'group',
         fixtureNumber: 1,
+      },
+    });
+    await fieldsPrisma.v1Game.create({
+      data: {
+        sourceType: V1GameSourceType.TEAM_MATCH,
+        teamMatchId: fieldIds.fixture,
+        state: 'SCHEDULED',
         competitionConfigVersionId: config.id,
       },
     });
@@ -1114,7 +1146,11 @@ describe('Task 18 tournament field/court CRUD and fixture assignment', () => {
         },
       });
       await tx.v1TournamentStaffFixtureScope.create({
-        data: { assignmentId: assignment.id, fixtureId: fieldIds.fixture },
+        data: {
+          assignmentId: assignment.id,
+          tournamentId: fieldIds.tournament,
+          teamMatchId: fieldIds.fixture,
+        },
       });
     });
 
@@ -1194,7 +1230,7 @@ describe('Task 18 tournament field/court CRUD and fixture assignment', () => {
     expectHttpError(stale, 409, 'STALE_FIELD_VERSION');
   });
 
-  it('assigns and reassigns a fixture to a field, PERSISTING the change to V1TournamentFixture.fieldId (not just the returned object), without duplicating field rows, then clears it -- and a replayed Idempotency-Key does not re-apply the mutation or duplicate the audit trail (regression for review finding #15: the prior version of this test only checked the constructed return value and a field-row count, which an implementation that merely echoed dto.fieldId/null without writing V1TournamentFixture would also have satisfied)', async () => {
+  it('assigns and reassigns a fixture to a field, PERSISTING the change to the canonical TeamMatch.fieldId (not just the returned object), without duplicating field rows, then clears it -- and a replayed Idempotency-Key does not re-apply the mutation or duplicate the audit trail (regression for review finding #15: the prior version of this test only checked the constructed return value and a field-row count, which an implementation that merely echoed dto.fieldId/null without writing the TeamMatch would also have satisfied)', async () => {
     const courtB = await fieldsService.create(
       fieldIds.platformOps,
       fieldIds.tournament,
@@ -1207,7 +1243,7 @@ describe('Task 18 tournament field/court CRUD and fixture assignment', () => {
     const beforeCount = (await fieldsService.list(fieldIds.platformOps, fieldIds.tournament)).items.length;
 
     async function persistedFieldId(): Promise<string | null> {
-      const row = await fieldsPrisma.v1TournamentFixture.findUniqueOrThrow({
+      const row = await fieldsPrisma.v1TeamMatch.findUniqueOrThrow({
         where: { id: fieldIds.fixture },
         select: { fieldId: true },
       });
@@ -1485,18 +1521,44 @@ describe('Task 18 tournament field/court CRUD and fixture assignment', () => {
     try {
       const wiringFixtureId = randomUUID();
       const wiringFieldId = randomUUID();
-      await fieldsPrisma.v1TournamentFixture.create({
+      await fieldsPrisma.v1TeamMatch.create({
         data: {
           id: wiringFixtureId,
+          sportId: (
+            await fieldsPrisma.v1Tournament.findUniqueOrThrow({
+              where: { id: fieldIds.tournament },
+              select: { sportId: true },
+            })
+          ).sportId,
+          title: 'Task 18 wiring match',
           tournamentId: fieldIds.tournament,
-          round: 'group',
-          fixtureNumber: 9001,
           competitionConfigVersionId: (
             await fieldsPrisma.v1Tournament.findUniqueOrThrow({
               where: { id: fieldIds.tournament },
               select: { competitionConfigVersionId: true },
             })
           ).competitionConfigVersionId,
+        },
+      });
+      await fieldsPrisma.v1TournamentMatchDetails.create({
+        data: {
+          teamMatchId: wiringFixtureId,
+          tournamentId: fieldIds.tournament,
+          round: 'group',
+          fixtureNumber: 9001,
+        },
+      });
+      await fieldsPrisma.v1Game.create({
+        data: {
+          sourceType: V1GameSourceType.TEAM_MATCH,
+          teamMatchId: wiringFixtureId,
+          state: 'SCHEDULED',
+          competitionConfigVersionId: (
+            await fieldsPrisma.v1Tournament.findUniqueOrThrow({
+              where: { id: fieldIds.tournament },
+              select: { competitionConfigVersionId: true },
+            })
+          ).competitionConfigVersionId!,
         },
       });
       await fieldsPrisma.v1TournamentField.create({
@@ -1599,29 +1661,37 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
         competitionConfigVersionId: config.id,
       },
     });
-    await lineupPrisma.v1TournamentFixture.createMany({
+    await lineupPrisma.v1TeamMatch.createMany({
       data: [
         {
           id: lineupIds.fixture,
+          sportId,
+          title: 'Task 18 lineup match',
           tournamentId: lineupIds.tournament,
-          round: 'group',
-          fixtureNumber: 1,
+          status: 'matched',
           competitionConfigVersionId: config.id,
         },
         {
           id: lineupIds.fixtureNoGame,
+          sportId,
+          title: 'Task 18 lineup match without game',
           tournamentId: lineupIds.tournament,
-          round: 'group',
-          fixtureNumber: 2,
+          status: 'matched',
           competitionConfigVersionId: config.id,
         },
+      ],
+    });
+    await lineupPrisma.v1TournamentMatchDetails.createMany({
+      data: [
+        { teamMatchId: lineupIds.fixture, tournamentId: lineupIds.tournament, round: 'group', fixtureNumber: 1 },
+        { teamMatchId: lineupIds.fixtureNoGame, tournamentId: lineupIds.tournament, round: 'group', fixtureNumber: 2 },
       ],
     });
 
     const game = await lineupPrisma.v1Game.create({
       data: {
-        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
-        tournamentFixtureId: lineupIds.fixture,
+        sourceType: V1GameSourceType.TEAM_MATCH,
+        teamMatchId: lineupIds.fixture,
         state: 'SCHEDULED',
         competitionConfigVersionId: config.id,
       },
@@ -1654,7 +1724,11 @@ describe('Task 18 tournament fixture lineup capture and submit', () => {
         },
       });
       await tx.v1TournamentStaffFixtureScope.create({
-        data: { assignmentId: assignment.id, fixtureId: lineupIds.fixture },
+        data: {
+          assignmentId: assignment.id,
+          tournamentId: lineupIds.tournament,
+          teamMatchId: lineupIds.fixture,
+        },
       });
     });
 
@@ -1988,28 +2062,46 @@ describe('Task 18 operations board incremental updates keyed by fixture/revision
         competitionConfigVersionId: config.id,
       },
     });
-    await incrementalPrisma.v1TournamentFixture.createMany({
+    await incrementalPrisma.v1TeamMatch.createMany({
       data: [
         {
           id: incrementalIds.fixtureA,
+          sportId,
+          title: 'Task 18 canonical incremental match A',
+          status: 'matched',
           tournamentId: incrementalIds.tournament,
-          round: 'group',
-          fixtureNumber: 1,
           competitionConfigVersionId: config.id,
         },
         {
           id: incrementalIds.fixtureB,
+          sportId,
+          title: 'Task 18 canonical incremental match B',
+          status: 'matched',
+          tournamentId: incrementalIds.tournament,
+          competitionConfigVersionId: config.id,
+        },
+      ],
+    });
+    await incrementalPrisma.v1TournamentMatchDetails.createMany({
+      data: [
+        {
+          teamMatchId: incrementalIds.fixtureA,
+          tournamentId: incrementalIds.tournament,
+          round: 'group',
+          fixtureNumber: 1,
+        },
+        {
+          teamMatchId: incrementalIds.fixtureB,
           tournamentId: incrementalIds.tournament,
           round: 'group',
           fixtureNumber: 2,
-          competitionConfigVersionId: config.id,
         },
       ],
     });
     const gameA = await incrementalPrisma.v1Game.create({
       data: {
-        sourceType: 'TOURNAMENT_FIXTURE',
-        tournamentFixtureId: incrementalIds.fixtureA,
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: incrementalIds.fixtureA,
         state: 'LIVE',
         competitionConfigVersionId: config.id,
       },
@@ -2017,8 +2109,8 @@ describe('Task 18 operations board incremental updates keyed by fixture/revision
     gameAId = gameA.id;
     await incrementalPrisma.v1Game.create({
       data: {
-        sourceType: 'TOURNAMENT_FIXTURE',
-        tournamentFixtureId: incrementalIds.fixtureB,
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: incrementalIds.fixtureB,
         state: 'LIVE',
         competitionConfigVersionId: config.id,
       },
@@ -2077,8 +2169,39 @@ describe('Task 18 operations board incremental updates keyed by fixture/revision
     expect(changedFixtureIds).toEqual([incrementalIds.fixtureA]);
     expect(afterByFixture.get(incrementalIds.fixtureA)?.version).toBe(1);
     expect(afterByFixture.get(incrementalIds.fixtureA)?.revisionId).toBe(revision.id);
+    expect(afterByFixture.get(incrementalIds.fixtureA)?.currentRevisionState).toBe('OFFICIAL');
+    expect(afterByFixture.get(incrementalIds.fixtureA)?.currentScore).toEqual({ home: 1, away: 0 });
     expect(afterByFixture.get(incrementalIds.fixtureB)?.version).toBe(0);
     expect(afterByFixture.get(incrementalIds.fixtureB)?.revisionId).toBeNull();
+
+    // A VOID revision keeps its historical score JSON for audit/re-entry, but it is no longer
+    // an official score. The board must expose the pointer state and suppress that retained JSON.
+    const voidRevision = await incrementalPrisma.v1GameResultRevision.create({
+      data: {
+        gameId: gameAId,
+        revision: 2,
+        state: 'VOID',
+        score: { home: 1, away: 0 },
+        eventsHash: 'task18-incremental-void-events-hash',
+        missingScorer: true,
+        createdByActorType: 'SYSTEM',
+        createdBySystemActor: 'TASK18_INCREMENTAL_TEST',
+        supersedesId: revision.id,
+      },
+    });
+    await incrementalPrisma.v1Game.update({
+      where: { id: gameAId },
+      data: { version: { increment: 1 }, currentOfficialRevisionId: voidRevision.id },
+    });
+
+    const voided = await board.list(incrementalIds.tournament, { limit: 50 });
+    const voidedItem = voided.items.find((item) => item.fixtureId === incrementalIds.fixtureA);
+    expect(voidedItem?.revisionId).toBe(voidRevision.id);
+    expect(voidedItem?.currentRevisionState).toBe('VOID');
+    expect(voidedItem?.currentScore).toBeNull();
+    expect(voidedItem?.warnings).not.toContain('MISSING_SCORER');
+    expect(voidedItem?.stableRevision).not.toBe(afterByFixture.get(incrementalIds.fixtureA)?.stableRevision);
+    expect(voided.watermark).not.toBe(after.watermark);
   });
 });
 
@@ -2147,29 +2270,35 @@ describe('Task 18 operations board items[].stableRevision incremental key (revie
         name: 'Rev Court',
       },
     });
-    await stableRevPrisma.v1TournamentFixture.createMany({
+    await stableRevPrisma.v1TeamMatch.createMany({
       data: [
         {
           id: stableRevIds.fixtureNoGame,
+          sportId,
+          title: 'Task 18 stable revision no-game match',
           tournamentId: stableRevIds.tournament,
-          round: 'group',
-          fixtureNumber: 1,
           competitionConfigVersionId: config.id,
         },
         {
           id: stableRevIds.fixtureWithGame,
+          sportId,
+          title: 'Task 18 stable revision match',
           tournamentId: stableRevIds.tournament,
-          round: 'group',
-          fixtureNumber: 2,
           competitionConfigVersionId: config.id,
         },
+      ],
+    });
+    await stableRevPrisma.v1TournamentMatchDetails.createMany({
+      data: [
+        { teamMatchId: stableRevIds.fixtureNoGame, tournamentId: stableRevIds.tournament, round: 'group', fixtureNumber: 1 },
+        { teamMatchId: stableRevIds.fixtureWithGame, tournamentId: stableRevIds.tournament, round: 'group', fixtureNumber: 2 },
       ],
     });
 
     const game = await stableRevPrisma.v1Game.create({
       data: {
-        sourceType: 'TOURNAMENT_FIXTURE',
-        tournamentFixtureId: stableRevIds.fixtureWithGame,
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: stableRevIds.fixtureWithGame,
         state: 'ENDED',
         competitionConfigVersionId: config.id,
       },
@@ -2236,7 +2365,7 @@ describe('Task 18 operations board items[].stableRevision incremental key (revie
     // No game exists for this fixture at all, so version/revisionId cannot move -- yet the
     // response DOES change (fieldId/fieldName). stableRevision must move with it, and the
     // concrete value must differ, not merely remain "some string".
-    await stableRevPrisma.v1TournamentFixture.update({
+    await stableRevPrisma.v1TeamMatch.update({
       where: { id: stableRevIds.fixtureNoGame },
       data: { fieldId: stableRevIds.fieldA },
     });
@@ -2405,20 +2534,28 @@ describe('Task 18 operations board query-count/perf proof at realistic scale (re
     perfHomeSideIds = perfGameIds.map(() => randomUUID());
     perfAwaySideIds = perfGameIds.map(() => randomUUID());
 
-    await perfPrisma.v1TournamentFixture.createMany({
+    await perfPrisma.v1TeamMatch.createMany({
       data: perfFixtureIds.map((id, index) => ({
         id,
+        sportId,
+        title: `Task 18 perf match ${index + 1}`,
+        tournamentId: perfIds.tournament,
+        competitionConfigVersionId: config.id,
+      })),
+    });
+    await perfPrisma.v1TournamentMatchDetails.createMany({
+      data: perfFixtureIds.map((id, index) => ({
+        teamMatchId: id,
         tournamentId: perfIds.tournament,
         round: 'group',
         fixtureNumber: index + 1,
-        competitionConfigVersionId: config.id,
       })),
     });
     await perfPrisma.v1Game.createMany({
       data: perfGameIds.map((id, index) => ({
         id,
-        sourceType: 'TOURNAMENT_FIXTURE',
-        tournamentFixtureId: perfFixtureIds[index],
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: perfFixtureIds[index],
         state: 'LIVE',
         competitionConfigVersionId: config.id,
       })),
@@ -2543,7 +2680,7 @@ describe('Task 18 operations board query-count/perf proof at realistic scale (re
     expect([...queryLog].sort()).toEqual(
       [
         'V1Tournament.findFirst',
-        'V1TournamentFixture.findMany',
+        'V1TeamMatch.findMany',
         'V1GameLineup.findMany',
         'V1GameSide.findMany',
         'V1TournamentStaffAssignment.findMany',
@@ -2699,13 +2836,26 @@ describe('Task 18 operations board query-count/perf proof at realistic scale (re
     });
     // Sorts after every one of the 100 page fixtures (round/fixtureNumber-wise) so it is never
     // itself part of the `limit: 100` page this test queries below.
-    await perfPrisma.v1TournamentFixture.create({
+    await perfPrisma.v1TeamMatch.create({
       data: {
         id: outOfPageFixtureId,
+        sportId: (
+          await perfPrisma.v1Tournament.findUniqueOrThrow({
+            where: { id: perfIds.tournament },
+            select: { sportId: true },
+          })
+        ).sportId,
+        title: 'Task 18 out-of-page match',
+        tournamentId: perfIds.tournament,
+        competitionConfigVersionId: config.id,
+      },
+    });
+    await perfPrisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: outOfPageFixtureId,
         tournamentId: perfIds.tournament,
         round: 'zzz-out-of-page',
         fixtureNumber: 1,
-        competitionConfigVersionId: config.id,
       },
     });
     await perfPrisma.v1TournamentStaffAssignment.create({
@@ -2794,19 +2944,27 @@ describe('Task 18 operations board single-consistent-snapshot barrier (review fi
         competitionConfigVersionId: config.id,
       },
     });
-    await tearingPrisma.v1TournamentFixture.create({
+    await tearingPrisma.v1TeamMatch.create({
       data: {
         id: tearingIds.fixture,
+        sportId,
+        title: 'Task 18 tearing-barrier match',
+        tournamentId: tearingIds.tournament,
+        competitionConfigVersionId: config.id,
+      },
+    });
+    await tearingPrisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: tearingIds.fixture,
         tournamentId: tearingIds.tournament,
         round: 'group',
         fixtureNumber: 1,
-        competitionConfigVersionId: config.id,
       },
     });
     const game = await tearingPrisma.v1Game.create({
       data: {
-        sourceType: 'TOURNAMENT_FIXTURE',
-        tournamentFixtureId: tearingIds.fixture,
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: tearingIds.fixture,
         state: 'ENDED',
         competitionConfigVersionId: config.id,
       },
@@ -2850,11 +3008,10 @@ describe('Task 18 operations board single-consistent-snapshot barrier (review fi
         $allModels: {
           async $allOperations({ model, operation, args, query }) {
             const result = await query(args);
-            // Prisma's $allOperations reports `model` with the PascalCase model name from the
-            // schema ('V1TournamentFixture'), not the camelCase client property. Comparing against
-            // the camelCase form never matched, so the barrier below silently never fired and the
-            // tearing assertion passed vacuously.
-            if (model === 'V1TournamentFixture' && operation === 'findMany') {
+            // Prisma's $allOperations reports the PascalCase schema model name. The board page
+            // now reads canonical TeamMatch rows, so the barrier must attach to that actual
+            // delegate; retaining the retired fixture model would make this assertion vacuous.
+            if (model === 'V1TeamMatch' && operation === 'findMany') {
               // Barrier: commit a concurrent mutation on a SEPARATE connection right here --
               // strictly AFTER list()'s fixture-page read has already executed but BEFORE its
               // escalation read runs. If both reads genuinely share one RepeatableRead snapshot,
@@ -2987,13 +3144,38 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
     });
 
     // V1AuthGuard also fail-closed-enforces managed-terms reconsent on every route; accept
-    // whatever the seeded environment currently requires so these actors aren't blocked by an
-    // unrelated gate this block isn't testing.
+    // a real published required signup document so these actors aren't blocked by an unrelated
+    // gate this block isn't testing. The isolated integration template may contain no terms rows.
+    const termsPolicy = await httpPrisma.v1ManagedTermsPolicy.create({
+      data: { code: `task18-http-${httpIds.tournamentA}`, name: 'Task 18 HTTP required terms' },
+    });
+    const termsDocument = await httpPrisma.v1ManagedTermsDocument.create({
+      data: {
+        policyId: termsPolicy.id,
+        version: '1',
+        title: 'Task 18 HTTP required terms',
+        content: 'Task 18 integration-only required terms.',
+        contentHash: `task18-http-hash-${httpIds.tournamentA}`,
+        status: 'published',
+        publishedAt: new Date(),
+        effectiveAt: new Date(),
+      },
+    });
+    await httpPrisma.v1ManagedTermsPlacement.create({
+      data: {
+        policyId: termsPolicy.id,
+        context: 'signup',
+        requirement: 'required',
+        displayOrder: 0,
+        isActive: true,
+      },
+    });
     const termsService = app.get(ManagedTermsRuntimeService);
     const currentTerms = await termsService.currentSignupTerms();
     const requiredDocumentIds = currentTerms.items
       .filter((item) => item.requirement === 'required')
       .map((item) => item.documentId);
+    expect(requiredDocumentIds).toContain(termsDocument.id);
     await Promise.all(
       userIds.map((userId) => termsService.acceptSignupTerms(userId, requiredDocumentIds)),
     );
@@ -3017,13 +3199,21 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
     await httpPrisma.v1TournamentField.create({
       data: { id: httpIds.fieldA, tournamentId: httpIds.tournamentA, scopeKey: 'main-court', name: 'Main court' },
     });
-    await httpPrisma.v1TournamentFixture.create({
+    await httpPrisma.v1TeamMatch.create({
       data: {
         id: httpIds.fixtureA,
+        sportId,
+        title: 'Task 18 HTTP match A',
+        tournamentId: httpIds.tournamentA,
+        competitionConfigVersionId: config.id,
+      },
+    });
+    await httpPrisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: httpIds.fixtureA,
         tournamentId: httpIds.tournamentA,
         round: 'group',
         fixtureNumber: 1,
-        competitionConfigVersionId: config.id,
       },
     });
 
@@ -3053,14 +3243,18 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
         },
       });
       await tx.v1TournamentStaffFixtureScope.create({
-        data: { assignmentId: assignment.id, fixtureId: httpIds.fixtureA },
+        data: {
+          assignmentId: assignment.id,
+          tournamentId: httpIds.tournamentA,
+          teamMatchId: httpIds.fixtureA,
+        },
       });
     });
 
     const game = await httpPrisma.v1Game.create({
       data: {
-        sourceType: 'TOURNAMENT_FIXTURE',
-        tournamentFixtureId: httpIds.fixtureA,
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: httpIds.fixtureA,
         state: 'SCHEDULED',
         competitionConfigVersionId: config.id,
       },
@@ -3161,6 +3355,7 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
       authorizationSubject: 'assignment:controller-wiring-fake@0',
       assignmentId: 'controller-wiring-fake-assignment',
       assignmentVersion: 0,
+      expiresAt: null,
     };
     const listSpy = jest
       .fn()
@@ -3206,6 +3401,7 @@ describe('Task 18 tournament operations HTTP contract (guards/validation/envelop
       authorizationSubject: `assignment:${assignment.id}@${assignment.version}`,
       assignmentId: assignment.id,
       assignmentVersion: assignment.version,
+      expiresAt: assignment.expiresAt,
     };
     const board = new TournamentOperationsBoardService(httpPrisma);
 

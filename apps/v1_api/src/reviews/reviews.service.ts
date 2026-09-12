@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   Prisma,
+  V1IdentityLinkAction,
   V1MatchParticipantStatus,
   V1PostEventReviewSourceType,
   V1PostEventReviewTargetType,
@@ -53,6 +54,12 @@ const PERSONAL_REPUTATION_SOURCES: V1PostEventReviewSourceType[] = ['match', 'te
 type SourceType = 'match' | 'team_match' | 'tournament_fixture';
 type TargetType = 'user' | 'team';
 type RevealScopeCandidate = { sourceType: V1PostEventReviewSourceType; sourceId: string; sourceGroupId: string | null };
+type TeamMatchRosterParticipant = {
+  id: string;
+  sideId: string;
+  userId: string | null;
+  displayNameSnapshot: string;
+};
 type PrismaTx = Omit<
   PrismaService,
   '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends' | 'onModuleInit' | 'onModuleDestroy'
@@ -491,6 +498,9 @@ export class ReviewsService {
               { approvedApplicantTeamId: { in: teamIds } },
             ],
           },
+          // Tournament-owned canonical matches are served by the dedicated
+          // tournament review service. Equal-owner league rows remain here.
+          { OR: [{ tournamentId: null }, { leagueId: { not: null } }] },
         ],
       },
       orderBy: [{ completedAt: 'desc' }, { startAt: 'desc' }],
@@ -516,16 +526,19 @@ export class ReviewsService {
     return teamMatches
       .flatMap((match) => {
         if (!match.approvedApplicantTeamId) return [];
+        assertTeamReviewTeams(match);
+        const completedAt = match.completedAt ?? match.startAt;
+        if (completedAt === null) throw conflict('TEAM_MATCH_NOT_READY', 'Completed team match has no review date');
         // 양 팀 모두의 멤버면 두 방향이 각각 별도의 후기 항목이 된다.
         return resolveReviewerTeamIds(teamIds, match.hostTeamId, match.approvedApplicantTeamId).map((reviewerTeamId) => {
           const isHost = reviewerTeamId === match.hostTeamId;
           const targetTeam = isHost ? match.approvedApplicantTeam : match.hostTeam;
-          const key = teamReviewKey(match.id, targetTeam?.id ?? '');
+          const key = teamReviewKey(match.id, targetTeam.id);
           const role = roleByTeamId.get(reviewerTeamId);
           // 팀 후기는 팀장·운영진만 — 목록의 남은 개수도 실제로 쓸 수 있는 대상만 세야
           // "1건 남음"을 눌렀는데 쓸 게 없는 화면이 나오지 않는다.
           const canReviewTeam = role ? canReviewOpponentTeam(role) : false;
-          const rosterUserIds = (rostersBySource.get(match.id)?.get(targetTeam?.id ?? '') ?? [])
+          const rosterUserIds = (rostersBySource.get(match.id)?.get(targetTeam.id) ?? [])
             .filter((userId) => userId !== user.id);
           const reviewedUserIds = reviewKeys.users.get(match.id) ?? new Set<string>();
           const teamReviewed = reviewKeys.teams.has(key);
@@ -537,16 +550,16 @@ export class ReviewsService {
             sourceType: 'team_match' as const,
             sourceId: match.id,
             title: match.title,
-            completedAt: toIso(match.completedAt ?? match.startAt),
+            completedAt: toIso(completedAt),
             // 목록 배지가 작성 화면과 어긋나지 않도록 실제 대표 대상 종류를 따른다.
             targetType: canReviewTeam ? ('team' as const) : ('user' as const),
             targetCount,
             reviewedCount,
             remainingCount: Math.max(targetCount - reviewedCount, 0),
-            reviewerTeam: { teamId: reviewerTeamId, name: isHost ? match.hostTeam.name : match.approvedApplicantTeam?.name ?? '' },
-            targetTeam: targetTeam ? { teamId: targetTeam.id, name: targetTeam.name } : null,
+            reviewerTeam: { teamId: reviewerTeamId, name: isHost ? match.hostTeam.name : match.approvedApplicantTeam.name },
+            targetTeam: { teamId: targetTeam.id, name: targetTeam.name },
             state: reviewedCount >= targetCount ? 'done' : 'ready',
-            completedAtSort: (match.completedAt ?? match.startAt).getTime(),
+            completedAtSort: completedAt.getTime(),
           };
         });
       })
@@ -625,8 +638,8 @@ export class ReviewsService {
    * 제출 경로가 역할을 다시 조회하지 않도록 하기 위한 것 — 같은 판정을 두 번 하면 그 사이에
    * 멤버십이 바뀌었을 때 화면과 저장 결과가 어긋난다.
    */
-  private async teamMatchSourceContext(user: V1AuthUser, sourceId: string) {
-    const teamMatch = await this.prisma.v1TeamMatch.findUnique({
+  private async teamMatchSourceContext(user: V1AuthUser, sourceId: string, db: PrismaService | PrismaTx = this.prisma) {
+    const teamMatch = await db.v1TeamMatch.findUnique({
       where: { id: sourceId },
       select: {
         id: true,
@@ -635,6 +648,10 @@ export class ReviewsService {
         completedAt: true,
         startAt: true,
         sportId: true,
+        tournamentId: true,
+        leagueId: true,
+        deletedAt: true,
+        tournamentDetails: { select: { teamMatchId: true, tournamentId: true } },
         hostTeamId: true,
         approvedApplicantTeamId: true,
         hostTeam: { select: teamSelect() },
@@ -645,30 +662,35 @@ export class ReviewsService {
       },
     });
     if (!teamMatch) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
+    if (teamMatch.deletedAt) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
+    if (teamMatch.tournamentId && teamMatch.leagueId === null) {
+      throw conflict('TOURNAMENT_REVIEW_SOURCE_REQUIRED', 'Tournament matches use the tournament review source');
+    }
     if (!isCompleted(teamMatch)) throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
     if (isResultVoided(teamMatch.game)) {
       throw conflict('SOURCE_RESULT_VOIDED', '결과가 무효 처리된 경기예요. 평가를 남길 수 없어요.');
     }
     // team_match 앵커는 completedAt(games.service.ts 결과 확정 시 채워짐, 스펙 §6.1) — 정정 승인 시
     // 앵커가 갱신되면 이 판정도 매 요청마다 다시 계산되므로 마감이 함께 연장된다(D-6, 저장 안 함).
+    const reviewAt = teamMatch.completedAt ?? teamMatch.startAt;
+    if (reviewAt === null) throw conflict('TEAM_MATCH_NOT_READY', 'Completed team match has no review date');
     const windowHours = await this.reviewPolicySettings.getWindowHours();
-    if (reviewWindowClosed(teamMatch.completedAt, new Date(), windowHours)) {
+    if (reviewWindowClosed(reviewAt, new Date(), windowHours)) {
       throw gone('REVIEW_WINDOW_CLOSED', `평가 가능 기간(${formatReviewWindow(windowHours)})이 지났어요.`);
     }
-    if (!teamMatch.approvedApplicantTeamId || !teamMatch.approvedApplicantTeam) {
-      throw conflict('TEAM_MATCH_NOT_READY', 'Team match does not have an approved opponent');
-    }
+    assertTeamReviewTeams(teamMatch);
+    const { hostTeam, approvedApplicantTeam } = teamMatch;
 
     // 양 팀 모두의 멤버면 두 방향 모두 대상이 된다 — 어느 팀 입장인지는 target 마다 실어 보낸다.
-    const reviewerTeams = await this.resolveReviewerTeams(user.id, teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId);
+    const reviewerTeams = await this.resolveReviewerTeams(user.id, teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId, db);
     const opponentOf = (reviewerTeamId: string) =>
-      reviewerTeamId === teamMatch.hostTeamId ? teamMatch.approvedApplicantTeam! : teamMatch.hostTeam;
+      reviewerTeamId === teamMatch.hostTeamId ? approvedApplicantTeam : hostTeam;
     const opponentTeamIds = reviewerTeams.map((team) => opponentOf(team.teamId).id);
-    const rosterByTeamId = await this.teamMatchOpponentRosters(teamMatch.id, opponentTeamIds);
+    const rosterByTeamId = await this.teamMatchOpponentRosters(teamMatch.id, opponentTeamIds, db);
     const rosterUserIds = [...rosterByTeamId.values()].flat().map((player) => player.userId);
 
     // 기존 후기 조회도 사람 기준 — 팀 기준으로 조회하면 같은 팀 다른 사람의 후기를 "내 후기"로 잘못 잠근다.
-    const existingReviews = await this.prisma.v1PostEventReview.findMany({
+    const existingReviews = await db.v1PostEventReview.findMany({
       where: {
         reviewerUserId: user.id,
         sourceType: 'team_match',
@@ -688,7 +710,7 @@ export class ReviewsService {
     );
 
     const payload = {
-      source: sourceSummary('team_match', teamMatch.id, teamMatch.title, teamMatch.completedAt ?? teamMatch.startAt),
+      source: sourceSummary('team_match', teamMatch.id, teamMatch.title, reviewAt),
       sportId: teamMatch.sportId,
       // 겸직이면 단일 값으로 좁힐 수 없으므로 null — 소비자는 target.reviewerTeam 을 봐야 한다.
       reviewerTeam: reviewerTeams.length === 1 ? reviewerTeams[0] : null,
@@ -742,10 +764,10 @@ export class ReviewsService {
    * 같은 규칙(revision desc, 상태 무관)을 그대로 따른다 — 두 곳이 서로 다른 "최신"의 정의를
    * 갖게 되는 걸 막기 위해 규칙을 일치시켰다.
    */
-  private async latestLineupIdsBySideId(sideIds: string[]): Promise<Map<string, string>> {
+  private async latestLineupIdsBySideId(sideIds: string[], db: PrismaService | PrismaTx = this.prisma): Promise<Map<string, string>> {
     if (!sideIds.length) return new Map();
-    const lineups = await this.prisma.v1GameLineup.findMany({
-      where: { sideId: { in: sideIds } },
+    const lineups = await db.v1GameLineup.findMany({
+      where: { sideId: { in: sideIds }, invalidatedAt: null },
       select: { id: true, sideId: true },
       orderBy: { revision: 'desc' },
     });
@@ -760,20 +782,28 @@ export class ReviewsService {
    * 팀 매치에서 "그 경기에 실제로 뛴 상대 선수" 명단.
    *
    * 근거는 제출된 라인업 하나뿐이다 — V1Game.teamMatchId 로 연결된 경기의, 상대 팀 사이드에 속한
-   * "최신 revision 라인업"에 딸린 V1GameParticipant 중 userId 가 채워진 행(연동 팀원)만 센다.
+   * "최신 revision 라인업"에 딸린 V1GameParticipant를 읽고, 현재 identity link로 실제 계정을
+   * 해석할 수 있는 행(연동 팀원)만 센다. TeamMatch의 참가자 userId 컬럼은 null이어도 정상이다.
    * gameId/sideId만으로 조회하면 지워지지 않는 옛 revision의 참가자까지 섞여 최종 명단에서
    * 빠진 선수가 계속 평가 대상으로 남는다(finding: 라인업을 rev1→rev2로 다시 저장해 선수를
    * 뺐는데도 rev1 참가자가 그대로 남아 리뷰를 받음) — 그래서 latestLineupIdsBySideId()로 먼저
-   * "지금 유효한" 라인업만 골라낸 뒤 그 lineupId로만 조회한다. 게스트(userId=null)는 플랫폼
-   * 계정이 없어 평가 대상이 될 수 없고, 라인업을 제출하지 않은 팀 매치는 명단 자체가 없으므로
-   * 선수 후기도 없다(팀 후기만 남는다). 팀 멤버십 전원으로 대체하지 않는 이유: 그 경기에 안 뛴
-   * 사람까지 평가 대상이 되어 "상대했던 팀원"이라는 전제가 깨진다.
+   * "지금 유효한" 라인업만 골라낸 뒤 그 lineupId로만 조회한다. 현재 identity link가 없는
+   * 실제 게스트는 플랫폼 계정이 없어 평가 대상이 될 수 없고, 라인업을 제출하지 않은 팀 매치는
+   * 명단 자체가 없으므로 선수 후기도 없다(팀 후기만 남는다). 팀 멤버십 전원으로 대체하지 않는 이유: 그 경기에 안 뛴
+   * 사람까지 평가 대상이 되어 "상대했던 팀원"이라는 전제가 깨진다. TeamMatch의
+   * `userId=null` 자체는 게스트라는 결론이 아니므로, 현재 identity link가 있으면 그
+   * 연결된 계정을 대상으로 포함한다. 과거 link event만 있고 current link가 없는 행은
+   * revoked/expired일 수 있어 제외한다.
    */
-  private async teamMatchOpponentRosters(teamMatchId: string, opponentTeamIds: string[]) {
+  private async teamMatchOpponentRosters(
+    teamMatchId: string,
+    opponentTeamIds: string[],
+    db: PrismaService | PrismaTx = this.prisma,
+  ) {
     const rosterByTeamId = new Map<string, Array<{ userId: string; name: string; imageUrl: string | null }>>();
     if (!opponentTeamIds.length) return rosterByTeamId;
 
-    const game = await this.prisma.v1Game.findUnique({
+    const game = await db.v1Game.findUnique({
       where: { teamMatchId },
       select: { id: true, sides: { select: { id: true, teamId: true } } },
     });
@@ -787,18 +817,19 @@ export class ReviewsService {
     const sideIds = [...sideIdsByTeamId.values()].flat();
     if (!sideIds.length) return rosterByTeamId;
 
-    const latestLineupIdBySideId = await this.latestLineupIdsBySideId(sideIds);
+    const latestLineupIdBySideId = await this.latestLineupIdsBySideId(sideIds, db);
     const latestLineupIds = [...latestLineupIdBySideId.values()];
     if (!latestLineupIds.length) return rosterByTeamId;
 
-    const participants = await this.prisma.v1GameParticipant.findMany({
-      where: { lineupId: { in: latestLineupIds }, userId: { not: null } },
-      select: { sideId: true, userId: true, displayNameSnapshot: true },
+    const participants = await db.v1GameParticipant.findMany({
+      where: { lineupId: { in: latestLineupIds } },
+      select: { id: true, sideId: true, userId: true, displayNameSnapshot: true },
     });
+    const resolvedParticipants = await this.resolveTeamMatchParticipantUsers(participants, db);
     // V1GameParticipant.userId 는 FK 가 아니라 nullable 컬럼이라(스키마 주석 참조) relation include 가
     // 불가능하다 — 프로필은 id 로 따로 모아 온다.
-    const profiles = await this.prisma.v1User.findMany({
-      where: { id: { in: [...new Set(participants.map((participant) => participant.userId!))] } },
+    const profiles = await db.v1User.findMany({
+      where: { id: { in: [...new Set(resolvedParticipants.map((participant) => participant.userId))] } },
       select: { id: true, profile: { select: { nickname: true, profileImageUrl: true } } },
     });
     const profileById = new Map(profiles.map((profile) => [profile.id, profile.profile]));
@@ -806,8 +837,8 @@ export class ReviewsService {
     for (const [teamId, teamSideIds] of sideIdsByTeamId) {
       const seen = new Set<string>();
       const roster: Array<{ userId: string; name: string; imageUrl: string | null }> = [];
-      for (const participant of participants) {
-        if (!participant.userId || !teamSideIds.includes(participant.sideId)) continue;
+      for (const participant of resolvedParticipants) {
+        if (!teamSideIds.includes(participant.sideId)) continue;
         // 최신 라인업으로 이미 좁혔지만, 한 사람이 같은 라인업에 중복 등록되는 입력 오류까지
         // 대비해 dedup은 유지한다.
         if (seen.has(participant.userId)) continue;
@@ -873,16 +904,25 @@ export class ReviewsService {
     if (existing) return { review: existing, alreadySubmitted: true };
 
     const review = await this.prisma.$transaction(async (tx) => {
+      await this.lockTeamMatchGame(tx, dto.sourceId);
+      const { payload: lockedSource } = await this.teamMatchSourceContext(user, dto.sourceId, tx);
+      const lockedTarget = lockedSource.targets.find((item) => item.targetType === 'user' && item.targetUserId === targetUserId);
+      if (!lockedTarget) throw forbidden('TARGET_NOT_REVIEWABLE', 'Target user is not reviewable for this source');
+      const lockedExisting = await tx.v1PostEventReview.findFirst({
+        where: { reviewerUserId: user.id, sourceType: 'team_match', sourceId: dto.sourceId, targetUserId },
+        include: reviewInclude(),
+      });
+      if (lockedExisting) return markExistingReviewResult(lockedExisting);
       const created = await tx.v1PostEventReview.create({
         data: {
           reviewerUserId: user.id,
-          reviewerTeamId: target.reviewerTeam.teamId,
+          reviewerTeamId: lockedTarget.reviewerTeam.teamId,
           sourceType: 'team_match',
           sourceId: dto.sourceId,
           targetType: 'user',
           targetUserId,
           rating: dto.rating,
-          sportId: source.sportId,
+          sportId: lockedSource.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
           ...metricScoreCreate(dto),
         },
@@ -931,18 +971,29 @@ export class ReviewsService {
     const existing = target.review;
     if (existing) return { review: existing, alreadySubmitted: true };
 
-    const reviewerTeamId = target.reviewerTeam.teamId;
     const review = await this.prisma.$transaction(async (tx) => {
+      // Team reviews preserve the historical completed-TeamMatch contract even
+      // when no Game/lineup exists. In that case the TeamMatch row itself is the
+      // serialization boundary; player reviews still require a canonical Game.
+      await this.lockTeamMatchGame(tx, dto.sourceId, false);
+      const { payload: lockedSource } = await this.teamMatchSourceContext(user, dto.sourceId, tx);
+      const lockedTarget = lockedSource.targets.find((item) => item.targetType === 'team' && item.targetTeamId === targetTeamId);
+      if (!lockedTarget) throw forbidden('TARGET_NOT_REVIEWABLE', 'Target team is not reviewable for this source');
+      const lockedExisting = await tx.v1PostEventReview.findFirst({
+        where: { reviewerUserId: user.id, sourceType: 'team_match', sourceId: dto.sourceId, targetTeamId },
+        include: reviewInclude(),
+      });
+      if (lockedExisting) return markExistingReviewResult(lockedExisting);
       const created = await tx.v1PostEventReview.create({
         data: {
           reviewerUserId: user.id,
-          reviewerTeamId,
+          reviewerTeamId: lockedTarget.reviewerTeam.teamId,
           sourceType: 'team_match',
           sourceId: dto.sourceId,
           targetType: 'team',
           targetTeamId,
           rating: dto.rating,
-          sportId: source.sportId,
+          sportId: lockedSource.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
         },
         include: reviewInclude(),
@@ -955,6 +1006,23 @@ export class ReviewsService {
     });
 
     return { review: this.toReviewDetail(review), alreadySubmitted: isExistingReviewResult(review) };
+  }
+
+  /**
+   * Identity links and lineups are changed under the Game row lock. Review submission
+   * must take the same lock before re-reading the source, otherwise a revoke or lineup
+   * replacement can race a permission check and leave a review for a stale identity.
+   */
+  private async lockTeamMatchGame(tx: PrismaTx, teamMatchId: string, requireGame = true) {
+    const game = await tx.v1Game.findUnique({ where: { teamMatchId }, select: { id: true } });
+    if (game) {
+      await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${game.id} FOR UPDATE`;
+      return;
+    }
+    if (requireGame) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
+    const teamMatch = await tx.v1TeamMatch.findUnique({ where: { id: teamMatchId }, select: { id: true } });
+    if (!teamMatch) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
+    await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id = ${teamMatch.id} FOR UPDATE`;
   }
 
   private async findExistingPersonalReview(reviewerUserId: string, sourceId: string, targetUserId: string) {
@@ -1018,8 +1086,9 @@ export class ReviewsService {
     userId: string,
     hostTeamId: string,
     approvedApplicantTeamId: string,
+    db: PrismaService | PrismaTx = this.prisma,
   ): Promise<Array<{ teamId: string; name: string; role: V1TeamMembershipRole }>> {
-    const memberships = await this.prisma.v1TeamMembership.findMany({
+    const memberships = await db.v1TeamMembership.findMany({
       where: {
         userId,
         status: 'active',
@@ -1100,10 +1169,11 @@ export class ReviewsService {
 
     const participants = latestLineupIds.length
       ? await this.prisma.v1GameParticipant.findMany({
-          where: { lineupId: { in: latestLineupIds }, userId: { not: null } },
-          select: { gameId: true, sideId: true, userId: true },
+          where: { lineupId: { in: latestLineupIds } },
+          select: { id: true, gameId: true, sideId: true, userId: true, displayNameSnapshot: true },
         })
       : [];
+    const resolvedParticipants = await this.resolveTeamMatchParticipantUsers(participants);
 
     for (const game of games) {
       if (!game.teamMatchId) continue;
@@ -1112,9 +1182,9 @@ export class ReviewsService {
         if (!side.teamId) continue;
         const userIds = [
           ...new Set(
-            participants
+            resolvedParticipants
               .filter((participant) => participant.gameId === game.id && participant.sideId === side.id)
-              .map((participant) => participant.userId!)
+              .map((participant) => participant.userId)
           ),
         ];
         byTeamId.set(side.teamId, [...(byTeamId.get(side.teamId) ?? []), ...userIds]);
@@ -1122,6 +1192,48 @@ export class ReviewsService {
       empty.set(game.teamMatchId, byTeamId);
     }
     return empty;
+  }
+
+  /**
+   * TeamMatch roster identity is authoritative in the current-link table. A
+   * participant row may legitimately keep `userId=null` after a REQUESTED →
+   * ATTESTED identity flow. Conversely, falling back to that snapshot when a
+   * current link disappeared could resurrect a REVOKED/EXPIRED identity.
+   *
+   * A persisted participant.userId is retained for rows whose history contains
+   * only a request/rejection/expiry. Those actions do not establish a terminal
+   * identity assignment. ATTESTED and REVOKED are terminal lifecycle actions:
+   * without a current link, either one suppresses the snapshot so a revoked
+   * identity can never be resurrected.
+   */
+  private async resolveTeamMatchParticipantUsers<T extends TeamMatchRosterParticipant>(
+    participants: readonly T[],
+    db: PrismaService | PrismaTx = this.prisma,
+  ): Promise<Array<Omit<T, 'userId'> & { userId: string }>> {
+    if (participants.length === 0) return [];
+    const participantIds = participants.map((participant) => participant.id);
+    const [currentLinks, identityEvents] = await Promise.all([
+      db.v1ParticipantIdentityLinkCurrent.findMany({
+        where: { participantId: { in: participantIds } },
+        select: { participantId: true, userId: true },
+      }),
+      db.v1ParticipantIdentityLinkEvent.findMany({
+        where: { participantId: { in: participantIds } },
+        select: { participantId: true, action: true },
+      }),
+    ]);
+    const currentUserByParticipantId = new Map(currentLinks.map((link) => [link.participantId, link.userId]));
+    const hasTerminalIdentityHistory = new Set(
+      identityEvents
+        .filter((event) => event.action === V1IdentityLinkAction.ATTESTED || event.action === V1IdentityLinkAction.REVOKED)
+        .map((event) => event.participantId),
+    );
+    return participants.flatMap((participant) => {
+      const linkedUserId = currentUserByParticipantId.get(participant.id);
+      if (linkedUserId !== undefined) return [{ ...participant, userId: linkedUserId }];
+      if (hasTerminalIdentityHistory.has(participant.id) || participant.userId === null) return [];
+      return [{ ...participant, userId: participant.userId }];
+    });
   }
 
   /**
@@ -1199,7 +1311,10 @@ export class ReviewsService {
       tx.v1TeamMatch.count({
         where: {
           OR: [{ hostTeamId: targetTeamId }, { approvedApplicantTeamId: targetTeamId }],
-          AND: [{ OR: [{ status: 'completed' }, { completedAt: { not: null } }] }],
+          AND: [
+            { OR: [{ status: 'completed' }, { completedAt: { not: null } }] },
+            { OR: [{ tournamentId: null }, { leagueId: { not: null } }] },
+          ],
         },
       }),
     ]);
@@ -1364,6 +1479,23 @@ type ReviewWithIncludes = Prisma.V1PostEventReviewGetPayload<{
   include: ReturnType<typeof reviewInclude>;
 }>;
 type ExistingReviewWithIncludes = ReviewWithIncludes & { __alreadySubmitted: true };
+
+function assertTeamReviewTeams<T extends {
+  hostTeamId: string | null;
+  approvedApplicantTeamId: string | null;
+  hostTeam: { id: string; name: string } | null;
+  approvedApplicantTeam: { id: string; name: string } | null;
+}>(match: T): asserts match is T & {
+  hostTeamId: string;
+  approvedApplicantTeamId: string;
+  hostTeam: NonNullable<T['hostTeam']>;
+  approvedApplicantTeam: NonNullable<T['approvedApplicantTeam']>;
+} {
+  if (!match.hostTeamId || !match.approvedApplicantTeamId || !match.hostTeam || !match.approvedApplicantTeam ||
+      match.hostTeam.id !== match.hostTeamId || match.approvedApplicantTeam.id !== match.approvedApplicantTeamId) {
+    throw conflict('TEAM_MATCH_NOT_READY', 'Team review requires both assigned teams');
+  }
+}
 
 function markExistingReviewResult(review: ReviewWithIncludes): ExistingReviewWithIncludes {
   return Object.assign(review, { __alreadySubmitted: true as const });

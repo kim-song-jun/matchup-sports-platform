@@ -15,7 +15,10 @@ function revisionFixture(overrides: Partial<OfficialRevisionRow> = {}): Official
     sourceType: 'TEAM_MATCH',
     currentOfficialRevisionId: 'revision-1',
     tournamentId: null,
-    tournamentFixtureId: null,
+    teamMatchId: 'tm-1',
+    tournamentTeamMatchId: null,
+    leagueId: null,
+    teamMatchTournamentId: null,
     homeTeamId: 'team-home',
     awayTeamId: 'team-away',
     visibility: 'PUBLIC' as never,
@@ -33,7 +36,7 @@ function fakeTx(options: {
     leagueId: string | null;
   } | null;
   memberships: Array<{ userId: string }>;
-  preferences: Array<{ userId: string; teamMatchEnabled: boolean }>;
+  preferences: Array<{ userId: string; teamMatchEnabled: boolean; activityEnabled?: boolean }>;
   alreadyDelivered: string[];
 }) {
   const createMany = jest.fn().mockResolvedValue({ count: 0 });
@@ -50,6 +53,9 @@ function fakeTx(options: {
     },
     v1NotificationPreference: {
       findMany: jest.fn().mockResolvedValue(options.preferences),
+    },
+    v1Tournament: {
+      findUnique: jest.fn().mockResolvedValue({ title: '테스트 대회' }),
     },
     v1Notification: {
       findMany: jest
@@ -148,6 +154,18 @@ describe('TeamMatchCompletionNotificationService', () => {
       'user-host-owner',
       expect.objectContaining({ title: '리그 경기 결과가 확정됐어요', url: '/team-matches/tm-league-1/result' }),
     );
+  });
+
+  it('canonical tournament TeamMatch is left to the tournament notification lane', async () => {
+    const { tx, createMany } = fakeTx({
+      teamMatch: { id: 'tm-tournament-1', title: '결승', hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', leagueId: null },
+      memberships: [{ userId: 'user-host-owner' }],
+      preferences: [{ userId: 'user-host-owner', teamMatchEnabled: false, activityEnabled: true }],
+      alreadyDelivered: [],
+    });
+    const service = new TeamMatchCompletionNotificationService();
+    await service.project(tx, revisionFixture({ gameId: 'game-1', tournamentTeamMatchId: 'tm-tournament-1', teamMatchTournamentId: 'tour-1', leagueId: null }));
+    expect(createMany).not.toHaveBeenCalled();
   });
 
   it('does not re-push to a recipient whose businessKey was already delivered (correction re-officialize)', async () => {

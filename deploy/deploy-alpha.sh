@@ -384,7 +384,7 @@ recover_known_played_at_migration_failure
   -e V1_ALPHA_QA_SEED=true \
   -e V1_ALPHA_QA_ORIGIN=https://alpha.teameet.co.kr \
   v1_api sh -c \
-  'cd /app/apps/v1_api && ./node_modules/.bin/ts-node prisma/seed-alpha-tournament-qa.ts'
+  'cd /app/apps/v1_api && node dist/prisma/seed-alpha-tournament-qa.js'
 # 리그 QA 시드. 토너먼트 시드와 같은 alpha 4중 가드를 공유하고 같은 sport/region/admin/
 # futsal-v1 config 선행조건을 쓰므로 반드시 토너먼트 시드 뒤에 둔다.
 #
@@ -405,27 +405,13 @@ fi
 # 이미 연결됐거나 동명이인 후보가 여러 명인 행은 건드리지 않는 멱등 CLI다.
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && node dist/src/tournaments/migration/tournament-award-recipient-backfill.cli.js'
-# QA 시드가 매 배포마다 대회를 리셋하므로, 공개 일정을 채우는 fixture-game 백필은 반드시
-# QA 시드 뒤에 돌아야 한다(앞에 두면 QA 시드가 만든 픽스처를 못 보고 무의미하다).
-#
-# competition-config 백필은 **의도적으로 여기 넣지 않는다.** 그 CLI 는 canonical config 행이
-# 현재 코드의 레지스트리 상수와 다르면 COMPETITION_CONFIG_SEED_DRIFT 로 하드 실패하는데,
-# 그 가드는 옳지만 이 자리에 두면 드리프트가 존재하는 동안 **모든 alpha 배포가 실패**한다.
-# 실제로 2026-08-09 alpha 가 그 상태였다 — #277 이 lineup.positions/formations 를 추가했고
-# DB 행은 이전 내용이라 CLI 가 거부했다(실측). 배포 파이프라인이 그런 운영 판단
-# ("새 버전 발행 후 repoint" vs "행 복원")을 대신 내릴 수는 없으므로, config 채우기는
-# QA 시드가 픽스처 생성 시점에 직접 하고(seed-alpha-tournament-qa.ts) 이 CLI 는 운영자가
-# 필요할 때 수동으로 돌린다.
-#
-# fixture-game 백필은 config 가 없는 픽스처를 **격리(quarantine)만 하고 실패하지 않으므로**
-# 배포를 깨뜨리지 않는다 — 그래서 이 자리에 두어도 안전하다.
-"${compose[@]}" run --rm --no-deps -T v1_api sh -c \
-  'cd /app/apps/v1_api && node dist/src/games/migration/fixture-game-backfill.cli.js'
+# Phase 3 시드는 설정과 canonical TeamMatch/Details/Game을 함께 만든다.
+# legacy fixture 이관은 schema retirement 전에 별도 검증된 release로 완료해야 한다.
+# 삭제된 fixture-game 백필을 배포 뒤에 다시 실행하지 않는다.
 # Project the seed-owned completed showcase results into official public records.
 # Production execution is allowed only by the alpha origin/flag/database guard.
 #
-# 이 시드만 컴파일본으로 돈다. 이웃 시드 둘과 달리 **앱 코드를 import 하기 때문**이다
-# (`prisma/seed-alpha-showcase-results.ts` → `../src/tournaments/participant-display-name`).
+# 대회/결과 시드는 canonical helper와 앱 코드를 import하므로 컴파일본으로 실행한다.
 # 런타임 이미지는 `dist`·`prisma` 만 싣고 `src` 는 싣지 않아(deploy/Dockerfile.v1-api),
 # ts-node 로 .ts 를 돌리면 그 import 가 MODULE_NOT_FOUND 로 죽는다 — 배포 실패 실사례.
 # 컴파일본은 `dist/prisma/…js` 에서 `dist/src/…js` 를 참조하므로 둘 다 이미지 안에 있다.
@@ -434,12 +420,8 @@ fi
   -e V1_ALPHA_QA_ORIGIN=https://alpha.teameet.co.kr \
   v1_api sh -c \
   'cd /app/apps/v1_api && node dist/prisma/seed-alpha-showcase-results.js'
-# QA 시드는 더 이상 V1TournamentStanding 행을 만들지 않는다(과거엔 배열 인덱스만으로
-# 승점/득실을 하드코딩해 실제 픽스처 결과와 모순되는 값이 나갔다). fixture-game-backfill
-# 뒤에서 돌아야 하는 이유는 순위 재계산이 그 백필이 만드는 V1Game.currentOfficialRevision
-# (새 경로)을 참조하기 때문 — backfill 전에 돌리면 아직 아무 결과도 없는 채로 계산된다.
-# config 가 없거나 유효하지 않은 대회는 격리(quarantine)만 하고 exit 0 을 유지하므로
-# (fixture-game-backfill 과 동일한 격리 패턴) 배포를 막지 않는다.
+# 공식 결과 시드 이후 canonical Game의 공식 revision으로 순위를 재계산한다.
+# 배열 순서로 순위를 만들어 실제 결과와 모순되는 데이터를 넣지 않는다.
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && node dist/src/tournaments/tournament-standings-recalculation.cli.js'
 

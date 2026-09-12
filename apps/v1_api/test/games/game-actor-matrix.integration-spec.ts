@@ -40,6 +40,10 @@ const ids = {
   fixture: '77000000-0000-4000-8000-000000000050',
   otherFixture: '77000000-0000-4000-8000-000000000051',
   crossTournamentFixture: '77000000-0000-4000-8000-000000000052',
+  hostRegistration: '77000000-0000-4000-8000-000000000053',
+  opponentRegistration: '77000000-0000-4000-8000-000000000054',
+  crossHostRegistration: '77000000-0000-4000-8000-000000000057',
+  crossOpponentRegistration: '77000000-0000-4000-8000-000000000058',
   field: '77000000-0000-4000-8000-000000000060',
   otherField: '77000000-0000-4000-8000-000000000061',
 } as const;
@@ -267,30 +271,26 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
         },
       ],
     });
-    await prisma.v1TournamentFixture.createMany({
+    await prisma.v1TournamentRegistration.createMany({
       data: [
-        {
-          id: ids.fixture,
-          tournamentId: ids.tournament,
-          round: 'group',
-          fixtureNumber: 1,
-          fieldId: ids.field,
-          competitionConfigVersionId: configId,
-        },
-        {
-          id: ids.otherFixture,
-          tournamentId: ids.tournament,
-          round: 'group',
-          fixtureNumber: 2,
-          competitionConfigVersionId: configId,
-        },
-        {
-          id: ids.crossTournamentFixture,
-          tournamentId: ids.otherTournament,
-          round: 'group',
-          fixtureNumber: 1,
-          competitionConfigVersionId: configId,
-        },
+        { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.teamOwner, status: 'confirmed' },
+        { id: ids.opponentRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.opponentOwner, status: 'confirmed' },
+        { id: ids.crossHostRegistration, tournamentId: ids.otherTournament, teamId: ids.hostTeam, appliedByUserId: ids.teamOwner, status: 'confirmed' },
+        { id: ids.crossOpponentRegistration, tournamentId: ids.otherTournament, teamId: ids.opponentTeam, appliedByUserId: ids.opponentOwner, status: 'confirmed' },
+      ],
+    });
+    await prisma.v1TeamMatch.createMany({
+      data: [
+        { id: ids.fixture, tournamentId: ids.tournament, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.teamOwner, sportId, regionId: ids.region, title: 'Task 7 canonical fixture 1', placeName: 'Main court', status: 'matched', startAt: new Date('2026-08-01T12:00:00.000Z'), fieldId: ids.field, competitionConfigVersionId: configId },
+        { id: ids.otherFixture, tournamentId: ids.tournament, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.teamOwner, sportId, regionId: ids.region, title: 'Task 7 canonical fixture 2', placeName: 'Task 7 ground 2', status: 'matched', startAt: new Date('2026-08-01T13:00:00.000Z'), competitionConfigVersionId: configId },
+        { id: ids.crossTournamentFixture, tournamentId: ids.otherTournament, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.teamOwner, sportId, regionId: ids.region, title: 'Task 7 canonical cross tournament', placeName: 'Task 7 ground 3', status: 'matched', startAt: new Date('2026-08-01T14:00:00.000Z'), competitionConfigVersionId: configId },
+      ],
+    });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: [
+        { teamMatchId: ids.fixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration },
+        { teamMatchId: ids.otherFixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration },
+        { teamMatchId: ids.crossTournamentFixture, tournamentId: ids.otherTournament, round: 'group', fixtureNumber: 1, homeRegistrationId: ids.crossHostRegistration, awayRegistrationId: ids.crossOpponentRegistration },
       ],
     });
 
@@ -355,14 +355,14 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
           fieldOperatorAssignmentId = created.id;
         }
         if (assignment.role === 'FIELD_OPERATOR') {
-          const fixtureId =
+          const teamMatchId =
             assignment.userId === ids.crossTournamentOperator
               ? ids.crossTournamentFixture
               : assignment.userId === ids.crossFixtureOperator
                 ? ids.otherFixture
                 : ids.fixture;
           await tx.v1TournamentStaffFixtureScope.create({
-            data: { assignmentId: created.id, fixtureId },
+            data: { assignmentId: created.id, tournamentId: assignment.tournamentId, teamMatchId },
           });
         }
       });
@@ -375,7 +375,7 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
     });
 
     const tournamentInput: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: configId,
       sides: [
@@ -649,7 +649,7 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
         before: true,
         after: true,
         tournamentId: true,
-        fixtureId: true,
+        teamMatchId: true,
         fieldId: true,
       },
     });
@@ -668,7 +668,7 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
           audit.before !== null &&
           audit.after !== null &&
           audit.tournamentId === ids.tournament &&
-          audit.fixtureId === ids.fixture &&
+          audit.teamMatchId === ids.fixture &&
           audit.fieldId === ids.field,
       ),
     ).toBe(true);
@@ -709,7 +709,7 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
         actorUserId: ids.fieldOperator,
         maskedSourceIp: null,
         tournamentId: ids.tournament,
-        fixtureId: ids.fixture,
+        teamMatchId: ids.fixture,
         fieldId: ids.field,
       }),
     );

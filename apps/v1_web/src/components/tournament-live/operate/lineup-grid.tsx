@@ -44,7 +44,7 @@ export interface LineupGridProps {
  * would silently drift from what this grid itself shows as empty. */
 export function latestOperableLineup(lineups: readonly GameLineup[], sideId: string): GameLineup | null {
   const candidates = lineups.filter(
-    (lineup) => lineup.sideId === sideId && (lineup.state === 'SUBMITTED' || lineup.state === 'LOCKED'),
+    (lineup) => lineup.sideId === sideId && lineup.invalidatedAt === null && (lineup.state === 'SUBMITTED' || lineup.state === 'LOCKED'),
   );
   if (candidates.length === 0) return null;
   return candidates.reduce((latest, current) => (current.revision > latest.revision ? current : latest));
@@ -79,7 +79,7 @@ export function latestOperableLineup(lineups: readonly GameLineup[], sideId: str
 export function latestLineupForDisplay(lineups: readonly GameLineup[], sideId: string): GameLineup | null {
   const operable = latestOperableLineup(lineups, sideId);
   if (operable !== null) return operable;
-  const candidates = lineups.filter((lineup) => lineup.sideId === sideId);
+  const candidates = lineups.filter((lineup) => lineup.sideId === sideId && lineup.invalidatedAt === null);
   if (candidates.length === 0) return null;
   return candidates.reduce((latest, current) => (current.revision > latest.revision ? current : latest));
 }
@@ -179,7 +179,7 @@ export function LineupGrid({
           />
         </div>
       ) : null}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className={['grid grid-cols-1 gap-4', visibleSides.length > 1 ? 'sm:grid-cols-2' : ''].join(' ')}>
         {visibleSides.map((side) => {
           const lineup = latestLineupForDisplay(lineups, side.id);
           const participants = (lineup?.participants ?? [])

@@ -5,6 +5,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { RecordLeagueForfeitDto } from './dto/league-match-forfeit.dto';
 import { resolveStoredForfeit } from './league-lifecycle-rules';
+import { FORFEIT_REASON_MARKER } from './league-forfeit-result';
+export { FORFEIT_REASON_MARKER, resolveIsForfeit } from './league-forfeit-result';
 
 /**
  * R11(C-6) 몰수패·부전승 결과 입력 경로.
@@ -65,7 +67,6 @@ import { resolveStoredForfeit } from './league-lifecycle-rules';
 
 // 공개 응답에서 몰수 여부를 판정하는 쪽(league-match-public.service.ts)도 같은 값을 봐야 한다.
 // 문자열을 복제하면 한쪽만 바뀌었을 때 조용히 어긋나므로 여기가 단일 출처다.
-export const FORFEIT_REASON_MARKER = '[LEAGUE_FORFEIT]';
 
 /**
  * 감사 L-E finding 4 수정 — 몰수 판정의 단일 출처 함수. "컬럼(outcomeReason) 우선,
@@ -73,9 +74,6 @@ export const FORFEIT_REASON_MARKER = '[LEAGUE_FORFEIT]';
  * (관전자 상세)와 `league-match-admin.service.ts`(운영자 정정 모달의 "현재 몰수예요"
  * 표시) 양쪽이 각자 인라인으로 다시 적으면 한쪽만 바뀌었을 때 조용히 어긋난다.
  */
-export function resolveIsForfeit(revision: { reason: string | null; outcomeReason: string }): boolean {
-  return revision.outcomeReason === 'FORFEIT' || (revision.reason?.includes(FORFEIT_REASON_MARKER) ?? false);
-}
 const WINNER_SCORE = 1;
 const LOSER_SCORE = 0;
 
@@ -175,10 +173,10 @@ export class LeagueMatchForfeitService {
     if (teamMatch === null) {
       throw new NotFoundException({ code: 'LEAGUE_NOT_FOUND', message: '이 리그의 대진이 아니에요.' });
     }
-    if (teamMatch.approvedApplicantTeamId === null || teamMatch.game === null) {
+    if (teamMatch.hostTeamId === null || teamMatch.approvedApplicantTeamId === null || teamMatch.game === null) {
       throw new ConflictException({
         code: 'LEAGUE_FIXTURE_NOT_MATCHED',
-        message: '상대팀이 확정되지 않은 대진은 몰수 처리할 수 없어요.',
+        message: '참가팀이 확정되지 않은 대진은 몰수 처리할 수 없어요.',
       });
     }
     if (teamMatch.status === 'cancelled') {

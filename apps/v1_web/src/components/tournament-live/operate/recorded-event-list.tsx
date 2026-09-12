@@ -76,6 +76,7 @@ export function RecordedEventList({
   onReverseEvent,
   onReverseSubstitution,
   resultOfficialized,
+  disabled = false,
 }: {
   readonly events: readonly GameEventRecord[];
   /** 이 목록이 실제로 읽는 건 `id`·`displayNameSnapshot` 둘뿐이라 구조적
@@ -91,6 +92,7 @@ export function RecordedEventList({
   readonly onReverseEvent?: (event: GameEventRecord) => void;
   /** @deprecated 새 호출부는 모든 수정 가능 이벤트를 받는 onReverseEvent를 사용한다. */
   readonly onReverseSubstitution?: (event: GameEventRecord) => void;
+  readonly disabled?: boolean;
   /**
    * F66 fix: 결과가 OFFICIAL로 확정된 뒤에는 서버도 reverseEvent를 409
    * RESULT_ALREADY_OFFICIAL로 거부한다(games.service.ts) — 이 플래그가 없으면 확정 후에도
@@ -133,11 +135,10 @@ export function RecordedEventList({
       ]),
     ),
   );
-  // reverseEvent로 이미 되돌려진 이벤트는 목록에서 흐리게 표시할 필요는 없다(서버가
-  // 새 CORRECTION 행만 추가할 뿐 원본을 지우지 않으므로) — 다만 되돌려진 GOAL에는
-  // "+ 어시스트"를 붙이지 않는다(더는 유효한 득점이 아니다).
+  // 원본 이벤트는 immutable history로 남긴다. 되돌려진 원본에는 명시적인 상태
+  // 라벨을 붙이고, 어시스트·추가 수정 액션만 막는다.
   const reversedIds = new Set(
-    events.filter((event) => event.reversesEventId !== null).map((event) => event.reversesEventId),
+    events.flatMap((event) => (typeof event.reversesEventId === 'string' ? [event.reversesEventId] : [])),
   );
 
   return (
@@ -145,6 +146,7 @@ export function RecordedEventList({
       {events.map((event) => {
         const canAttachAssist =
           onAttachAssist !== undefined &&
+          resultOfficialized !== true &&
           event.type === 'GOAL' &&
           event.assistParticipantId === null &&
           event.participantId !== null &&
@@ -156,23 +158,12 @@ export function RecordedEventList({
           (onReverseEvent !== undefined || event.type === 'SUBSTITUTION') &&
           ['GOAL', 'OWN_GOAL', 'CARD', 'FOUL', 'SUBSTITUTION'].includes(event.type) &&
           !reversedIds.has(event.id);
+        const isReversed = reversedIds.has(event.id);
         return (
           <li
             key={event.id}
-            className="flex items-stretch gap-2 rounded-lg border border-[var(--border)] py-2 pl-2 pr-3"
+            className="flex items-stretch gap-2 rounded-lg border border-[var(--border)] px-3 py-2"
           >
-            {/* 팀 레일 — 행 왼쪽 색 막대. 팀 이름은 오른쪽에 그대로 남아 있어
-                색만으로 정보를 전달하지 않는다(R-C3). */}
-            <span
-              aria-hidden="true"
-              className={`w-1 shrink-0 self-stretch rounded-full ${
-                {
-                  home: 'bg-[var(--blue500)]',
-                  away: 'bg-[var(--orange500)]',
-                  unknown: 'bg-[var(--border)]',
-                }[teamAccent(event.sideId)]
-              }`}
-            />
             <div className="@container flex min-w-0 flex-1 flex-col gap-2">
             {/* 좁은 폭에서는 위아래로 쌓는다. 한 줄로 두면 액션 묶음(어시스트·
                 되돌리기·팀명)이 shrink-0 이라 폭을 먼저 가져가고, 남은 자리에서
@@ -233,12 +224,13 @@ export function RecordedEventList({
                     모바일(292px)보다도 좁다는 레이아웃 쪽에 있다. */}
                 <p className="line-clamp-2 text-sm font-medium text-[var(--text-strong)]">
                   {eventTypeLabel(event)}
+                  {isReversed ? <span className="font-semibold text-[var(--text-muted)]"> · 취소된 기록</span> : null}
                   {event.type === 'SUBSTITUTION'
                     ? substitutionDetailSuffix(event, playerName)
                     : participantSuffix(event, playerName) + assistSuffix(event, playerName)}
                 </p>
               </div>
-              <div className="flex shrink-0 items-center justify-end gap-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-start gap-2 @md:justify-end">
                 {/* 44px 최소 터치 타깃(WCAG 2.5.5 유사 기준) — 이 콘솔의 실사용
                     맥락은 경기장에서 한 손으로 급하게 조작하는 것이라, 반복
                     눌리는 CTA가 44px 미만이면 오탭 위험이 커진다(Copilot 리뷰
@@ -252,9 +244,10 @@ export function RecordedEventList({
                 {canAttachAssist ? (
                   <button
                     type="button"
+                    disabled={disabled}
                     onClick={() => onAttachAssist(event)}
                     aria-label="이 골에 어시스트 추가"
-                    className="flex min-h-[44px] items-center gap-1 rounded-lg px-2 text-xs font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                    className="flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-2 text-xs font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
                   >
                     <Handshake size={12} aria-hidden="true" />
                     어시스트
@@ -263,8 +256,9 @@ export function RecordedEventList({
                 {canReverse ? (
                   <button
                     type="button"
+                    disabled={disabled}
                     onClick={() => reverseHandler?.(event)}
-                    className="flex min-h-[44px] items-center gap-1 rounded-lg border border-[var(--border)] px-2 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
+                      className="flex min-h-[44px] shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-[var(--border)] px-2 text-xs font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-soft)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500"
                   >
                     <Undo2 size={12} aria-hidden="true" />
                     {event.type === 'SUBSTITUTION' ? '되돌리기' : '수정·취소'}
@@ -274,7 +268,7 @@ export function RecordedEventList({
                     가장 약하게 표현돼 있었다(11px·regular·muted, 우측 끝 — 알파 390px
                     실측). 색을 더 쓰지 않고(R-C1) 굵기로만 대비를 올린다 — 색으로
                     팀을 구분하면 색만으로 의미를 전달하게 돼 R-C3 에 걸린다. */}
-                <span className="flex items-center gap-1 text-xs font-medium text-[var(--text-muted)]">
+                <span className="flex min-w-0 basis-full items-center gap-1 break-words text-xs font-medium text-[var(--text-muted)] @md:basis-auto">
                   {teamAccent(event.sideId) === 'unknown' ? null : (
                     <span
                       aria-hidden="true"

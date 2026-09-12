@@ -43,6 +43,11 @@ function buildPrismaMock(lineupRows: Array<{ sideId: string; state: string }> = 
       approvedApplicantTeamId: opponentTeamId,
       approvedApplicantTeam: { name: '망원 FC' },
       leagueId,
+      // Expand-phase league rows can carry both IDs while Details is absent;
+      // leagueId must win this classification.
+      tournamentId: leagueId,
+      tournament: null,
+      tournamentDetails: null,
       league: { title: '가을 정규 리그' },
       game: { id: 'game-league' },
     },
@@ -68,7 +73,6 @@ function buildPrismaMock(lineupRows: Array<{ sideId: string; state: string }> = 
 
   return {
     v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId }]) },
-    v1TournamentFixture: { findMany: jest.fn().mockResolvedValue([]) },
     v1TeamMatch: {
       // 할 일 조회와 주차 파생 조회를 인자로 갈라 준다 — 호출 순서에 기대지 않는다.
       findMany: jest.fn().mockImplementation((args: { where?: { status?: string } }) =>
@@ -114,6 +118,13 @@ describe('LineupTodoService — 리그 대진의 맥락', () => {
         state: 'MISSING',
       });
       expect(leagueTodo?.title).not.toContain('3주차');
+      expect(prisma.v1TeamMatch.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({
+          hostTeamId: { not: null },
+          approvedApplicantTeamId: { not: null },
+          startAt: { gte: expect.any(Date) },
+        }),
+      }));
     } finally {
       await moduleRef.close();
     }
@@ -134,6 +145,80 @@ describe('LineupTodoService — 리그 대진의 맥락', () => {
         // 모집 문구가 아니라 예전과 같은 고정 라벨이어야 한다.
         title: '팀 매치',
         opponentName: '연남 FC',
+      });
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('canonical tournament TEAM_MATCH는 대회 라운드와 generic lineup 링크를 유지한다', async () => {
+    const prisma = buildPrismaMock();
+    const tournamentId = 'tournament-1';
+    prisma.v1TeamMatch.findMany.mockImplementation((args: { where?: { status?: string } }) =>
+      Promise.resolve(args?.where?.status === 'matched'
+        ? [{
+            id: 'match-tournament',
+            startAt: RESCHEDULED_KICKOFF,
+            hostTeamId: teamId,
+            hostTeam: { name: '성수 FC' },
+            approvedApplicantTeamId: opponentTeamId,
+            approvedApplicantTeam: { name: '망원 FC' },
+            tournamentId,
+            tournament: { title: '가을 컵' },
+            tournamentDetails: { round: '준결승' },
+            leagueId: null,
+            league: null,
+            game: { id: 'game-tournament' },
+          }]
+        : []),
+    );
+    prisma.v1GameSide.findMany.mockResolvedValue([
+      { id: 'side-tournament-home', gameId: 'game-tournament', teamId },
+    ]);
+    const { service, moduleRef } = await buildService(prisma);
+
+    try {
+      const { items } = await service.listForUser({ id: userId } as never);
+      expect(items).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          source: 'TEAM_MATCH',
+          competitionKind: 'TOURNAMENT',
+          tournamentId,
+          tournamentTitle: '가을 컵',
+          title: '가을 컵 · 준결승',
+          deepLink: '/team-matches/match-tournament/lineup',
+        }),
+      ]));
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('canonical tournament metadata가 없으면 조용히 누락하지 않고 도메인 오류를 반환한다', async () => {
+    const prisma = buildPrismaMock();
+    prisma.v1TeamMatch.findMany.mockImplementation((args: { where?: { status?: string } }) =>
+      Promise.resolve(args?.where?.status === 'matched'
+        ? [{
+            id: 'match-incomplete-tournament',
+            startAt: RESCHEDULED_KICKOFF,
+            hostTeamId: teamId,
+            hostTeam: { name: '성수 FC' },
+            approvedApplicantTeamId: opponentTeamId,
+            approvedApplicantTeam: { name: '망원 FC' },
+            tournamentId: 'tournament-incomplete',
+            tournament: null,
+            tournamentDetails: null,
+            leagueId: null,
+            league: null,
+            game: { id: 'game-incomplete-tournament' },
+          }]
+        : []),
+    );
+    const { service, moduleRef } = await buildService(prisma);
+
+    try {
+      await expect(service.listForUser({ id: userId } as never)).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_MATCH_METADATA_INCOMPLETE' },
       });
     } finally {
       await moduleRef.close();
@@ -281,6 +366,9 @@ describe('LineupTodoService — 완료된 라인업 처리는 소비자마다 �
       const { items } = await service.listForUser({ id: userId } as never);
       expect(items.map((item) => item.gameId)).toEqual(['game-friendly']);
       expect(items.some((item) => item.gameId === 'game-league')).toBe(false);
+      expect(prisma.v1GameLineup.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({ invalidatedAt: null }),
+      }));
     } finally {
       await moduleRef.close();
     }

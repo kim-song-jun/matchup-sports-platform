@@ -1053,6 +1053,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         region: { select: { name: true } },
         createdByUser: { select: { id: true, profile: { select: { nickname: true } } } },
         league: { select: { id: true, title: true } },
+        tournament: { select: { id: true, title: true } },
         game: { select: { id: true } },
         applications: {
           orderBy: { createdAt: 'desc' },
@@ -1088,12 +1089,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       deadlineAt: row.deadlineAt ?? null,
       status: row.status,
       hostTeamId: row.hostTeamId,
-      hostTeamName: row.hostTeam.name,
+      hostTeamName: row.hostTeam?.name ?? null,
       approvedApplicantTeamId: row.approvedApplicantTeamId ?? null,
       approvedApplicantTeamName: row.approvedApplicantTeam?.name ?? null,
-      createdByUserId: row.createdByUser.id,
-      createdByName: row.createdByUser.profile?.nickname ?? null,
+      createdByUserId: row.createdByUser?.id ?? null,
+      createdByName: row.createdByUser?.profile?.nickname ?? null,
       league: row.league ? { leagueId: row.league.id, title: row.league.title } : null,
+      tournament: row.tournament ? { tournamentId: row.tournament.id, title: row.tournament.title } : null,
       // 게임이 붙어 있으면 현장 콘솔에서 다룰 수 있는 경기라는 뜻이다.
       hasGame: row.game !== null,
       matchFormat: row.matchFormat ?? null,
@@ -1198,7 +1200,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       'cancel_requested',
     ] as const;
 
-    const [regGroups, reviewGroups, pendingInquiries, tournamentsInProgress] = await Promise.all([
+    const [regGroups, rawReviewGroups, pendingInquiries, tournamentsInProgress] = await Promise.all([
       this.prisma.v1TournamentRegistration.groupBy({
         by: ['tournamentId'],
         where: {
@@ -1207,12 +1209,18 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         },
         _count: { _all: true },
       }),
-      this.prisma.v1TournamentFixture.groupBy({
+      this.prisma.v1TeamMatch.groupBy({
         by: ['tournamentId'],
         where: {
-          tournament: { deletedAt: null },
+          // Canonical tournament matches are owned by tournamentId and have
+          // no league mirror. Keep the public tournament surface gate so a
+          // regular-league row sharing the same id cannot leak into this inbox.
+          leagueId: null,
+          tournament: { ...TOURNAMENT_SURFACE_KIND, deletedAt: null },
+          tournamentDetails: { isNot: null },
           game: {
             is: {
+              sourceType: 'TEAM_MATCH',
               state: 'ENDED',
               OR: [
                 { currentOfficialRevisionId: null },
@@ -1235,6 +1243,9 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       // 대시보드 '진행 중 대회' KPI — 정규 리그 시즌은 세지 않는다(상수 주석 참고).
       this.prisma.v1Tournament.count({ where: { ...TOURNAMENT_SURFACE_KIND, status: 'in_progress', deletedAt: null } }),
     ]);
+    const reviewGroups = rawReviewGroups.filter(
+      (group): group is (typeof rawReviewGroups)[number] & { tournamentId: string } => group.tournamentId !== null,
+    );
 
     const tournamentIds = [
       ...new Set([
@@ -2359,6 +2370,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         sport: { select: { name: true } },
         // 리그전 표시(사용자 결정 3-C) -- 운영자도 목록에서 리그 경기를 바로 구분한다.
         league: { select: { id: true, title: true } },
+        tournament: { select: { id: true, title: true } },
       },
     }), this.prisma.v1TeamMatch.groupBy({
       by: ['status'],
@@ -2379,8 +2391,9 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         teamMatchId: row.id,
         title: row.title,
         hostTeamId: row.hostTeamId,
-        hostTeamName: row.hostTeam.name,
+        hostTeamName: row.hostTeam?.name ?? null,
         league: row.league ? { leagueId: row.league.id, title: row.league.title } : null,
+        tournament: row.tournament ? { tournamentId: row.tournament.id, title: row.tournament.title } : null,
         sportName: row.sport.name,
         startAt: row.startAt,
         status: row.status,

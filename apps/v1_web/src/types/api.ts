@@ -866,6 +866,7 @@ export type V1TeamScheduleSummary = {
   state: V1ScheduleState;
   version: number;
   teamMatchId: string | null;
+  linkedMatch: { teamMatchId: string; tournamentId: string | null; leagueId: string | null } | null;
   /**
    * 매치 ↔ 팀일정 연동: type이 'MATCH'일 때만 유효한 파생 필드 — TeamMatch.approvedApplicantTeamId
    * 유무로 매 조회 시점 계산된다(false=가확정/상대팀 모집 중, true=확정). MATCH가 아닌 스케줄은
@@ -1303,6 +1304,7 @@ export type V1GameLineupSummary = {
   version: number;
   submittedAt: string | null;
   supersedesId: string | null;
+  invalidatedAt: string | null;
 };
 
 export type V1Game = {
@@ -1381,6 +1383,8 @@ export type V1GameResultParticipantRow = {
   fouls: number;
   cards: V1GameResultCards;
   goalkeeper: boolean;
+  displayName?: string | null;
+  jerseyNumber?: number | null;
 };
 
 export type V1GameResultRevision = {
@@ -4272,6 +4276,7 @@ export type V1TournamentOperationsBoardItem = {
    *  반드시 `lib/game-result-score` 의 헬퍼를 쓴다(직접 `.home` 을 읽으면 백필된 경기가
    *  `undefined:undefined` 가 된다). 승부차기는 이 안의 `penalties`/`penalty` 에 있다. */
   currentScore: V1GameResultScore | null;
+  currentRevisionState: V1GameResultRevisionState | null;
   warnings: V1TournamentStableWarningCode[];
   version: number | null;
   revisionId: string | null;
@@ -4337,14 +4342,18 @@ export type V1MyTournamentStaffAssignment = {
 };
 
 /** GET /me/tournament-staff 응답의 items[] 항목 — 대회 단위로 묶은 "내 담당 대회". */
+export type V1MyTournamentStaffFixture = { fixtureId: string; gameId: string; tournamentId: string; title: string; scheduledAt: string | null; status: string; gameState: V1GameState | null; round: string; fixtureNumber: number; legNumber: number; fieldId: string | null; fieldName: string | null; };
+
 export type V1MyTournamentStaffGroup = {
   tournamentId: string;
   tournamentTitle: string;
   tournamentStatus: V1TournamentStatus;
   assignments: V1MyTournamentStaffAssignment[];
+  fixtures: V1MyTournamentStaffFixture[];
 };
 
 export type V1MyTournamentStaffResponse = {
+  platformRole: 'PLATFORM_OPS' | null;
   items: V1MyTournamentStaffGroup[];
 };
 

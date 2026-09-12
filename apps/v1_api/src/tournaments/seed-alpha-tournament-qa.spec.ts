@@ -85,17 +85,6 @@ describe('alpha tournament QA campaign content', () => {
     ).not.toThrow();
   });
 
-  it('runs the public-result projection after game backfill and before standings recalculation', () => {
-    const deployScript = readFileSync(resolve(__dirname, '../../../../deploy/deploy-alpha.sh'), 'utf8');
-    const backfillIndex = deployScript.indexOf('fixture-game-backfill.cli.js');
-    const resultSeedIndex = deployScript.indexOf('seed-alpha-showcase-results.ts');
-    const standingsIndex = deployScript.indexOf('tournament-standings-recalculation.cli.js');
-
-    expect(backfillIndex).toBeGreaterThan(-1);
-    expect(resultSeedIndex).toBeGreaterThan(backfillIndex);
-    expect(standingsIndex).toBeGreaterThan(resultSeedIndex);
-  });
-
   it('creates public-record consent for a QA persona without overwriting a later revocation', async () => {
     const upsert = jest.fn().mockResolvedValue({});
     await ensureAlphaQaRecordConsent(
@@ -132,104 +121,6 @@ describe('alpha tournament QA campaign content', () => {
 
     const persistedContent = JSON.parse(JSON.stringify(content)) as Prisma.JsonValue;
     expect(() => parseCampaignContentJson(persistedContent)).not.toThrow();
-  });
-
-  it('creates completed knockout rounds so final rankings and videos are reachable', async () => {
-    const rounds: string[] = [];
-    const fixtureConfigIds: Array<string | undefined> = [];
-    // Part 2: createCompetitionData 는 group·fixture·fixtureResult 를 자연키/유니크로 upsert 한다
-    // (삭제-재생성 대신 유지). round·config 는 upsert 의 `create` 절에서 읽는다.
-    const tx = {
-      v1TournamentGroup: { upsert: jest.fn().mockResolvedValue({ id: 'group-a' }) },
-      v1TournamentGroupTeam: { create: jest.fn().mockResolvedValue({}) },
-      v1TournamentFixture: {
-        upsert: jest.fn().mockImplementation(
-          ({ create }: { create: { round: string; competitionConfigVersionId?: string } }) => {
-          rounds.push(create.round);
-          fixtureConfigIds.push(create.competitionConfigVersionId);
-          return Promise.resolve({ id: `fixture-${rounds.length}`, round: create.round });
-          },
-        ),
-      },
-      v1TournamentFixtureResult: { upsert: jest.fn().mockResolvedValue({}) },
-    } as unknown as Parameters<typeof createCompetitionData>[0];
-    const registrations = Array.from({ length: 4 }, (_, index) => ({
-      id: `registration-${index + 1}`,
-    })) as unknown as Parameters<typeof createCompetitionData>[2];
-    const completedScenario = ALPHA_TOURNAMENT_SCENARIOS.find(
-      (scenario) => scenario.status === V1TournamentStatus.completed,
-    );
-    if (!completedScenario) throw new Error('Completed alpha tournament scenario is required.');
-
-    const fixtures = await createCompetitionData(
-      tx,
-      completedScenario,
-      registrations,
-      new Date('2026-07-04T01:00:00.000Z'),
-      ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID,
-    );
-
-    expect(rounds).toEqual(expect.arrayContaining(['semi', 'final', 'third_place']));
-    // 픽스처마다 config 가 박히지 않으면 fixture-game 백필이 CONFIG_MISSING 으로 격리해
-    // 공개 대회 일정이 통째로 비어버린다(2026-08-09 alpha 실측). 그 계약을 여기서 고정한다.
-    expect(fixtureConfigIds.length).toBeGreaterThan(0);
-    expect(fixtureConfigIds.every((value) => value === ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID)).toBe(true);
-    expect(fixtures.find((fixture) => fixture.round === 'final')).toBeDefined();
-  });
-
-  it('재배포가 라이브 운영이 만든 픽스처 상태·스코어를 덮지 않는다', async () => {
-    // 2026-08-11 알파 실측 회귀. 2경기는 게임이 ENDED 이고 OFFICIAL 결과(2:0)까지 있었는데
-    // 픽스처 status 만 in_progress 로 되돌아가 있었다. 원인은 이 시드가 upsert 의 `update` 절에
-    // status 를 실어 배포마다 덮어썼기 때문이고, 순위 재계산은 `status: 'completed'` 픽스처만
-    // 읽으므로(tournament-bracket.service.ts) 2:0 으로 이긴 팀이 순위표에 0승 0-0 으로 나왔다.
-    //
-    // status 는 officialize 가 결과 확정과 같은 트랜잭션에서 올리는 **운영의 산물**이다.
-    // 시드는 초기값만 정하고(create) 이후 상태를 건드리면 안 된다.
-    const fixtureUpserts: Array<{ create: Record<string, unknown>; update: Record<string, unknown> }> = [];
-    const resultUpserts: Array<{ create: Record<string, unknown>; update: Record<string, unknown> }> = [];
-    const tx = {
-      v1TournamentGroup: { upsert: jest.fn().mockResolvedValue({ id: 'group-a' }) },
-      v1TournamentGroupTeam: { create: jest.fn().mockResolvedValue({}) },
-      v1TournamentFixture: {
-        upsert: jest.fn().mockImplementation((args: (typeof fixtureUpserts)[number]) => {
-          fixtureUpserts.push(args);
-          return Promise.resolve({ id: `fixture-${fixtureUpserts.length}`, round: 'group' });
-        }),
-      },
-      v1TournamentFixtureResult: {
-        upsert: jest.fn().mockImplementation((args: (typeof resultUpserts)[number]) => {
-          resultUpserts.push(args);
-          return Promise.resolve({});
-        }),
-      },
-    } as unknown as Parameters<typeof createCompetitionData>[0];
-    const registrations = Array.from({ length: 4 }, (_, index) => ({
-      id: `registration-${index + 1}`,
-    })) as unknown as Parameters<typeof createCompetitionData>[2];
-    const inProgressScenario = ALPHA_TOURNAMENT_SCENARIOS.find(
-      (scenario) => scenario.status === V1TournamentStatus.in_progress,
-    );
-    if (!inProgressScenario) throw new Error('An in_progress alpha tournament scenario is required.');
-
-    await createCompetitionData(
-      tx,
-      inProgressScenario,
-      registrations,
-      new Date('2026-07-04T01:00:00.000Z'),
-      ALPHA_SEED_FUTSAL_COMPETITION_CONFIG_ID,
-    );
-
-    expect(fixtureUpserts.length).toBeGreaterThan(0);
-    // create 에는 초기 상태가 있어야 한다 — 새 환경에서 시나리오가 재현되지 않으면 시드가 무의미하다.
-    expect(fixtureUpserts.every((call) => 'status' in call.create)).toBe(true);
-    // update 에는 절대 없어야 한다.
-    expect(fixtureUpserts.filter((call) => 'status' in call.update)).toEqual([]);
-
-    expect(resultUpserts.length).toBeGreaterThan(0);
-    expect(resultUpserts.every((call) => 'homeScore' in call.create && 'awayScore' in call.create)).toBe(true);
-    expect(
-      resultUpserts.filter((call) => 'homeScore' in call.update || 'awayScore' in call.update),
-    ).toEqual([]);
   });
 
   it('시드의 canonical 풋살 config id 가 레지스트리 상수와 일치한다', () => {

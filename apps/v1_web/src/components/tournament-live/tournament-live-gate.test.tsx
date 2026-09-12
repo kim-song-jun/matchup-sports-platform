@@ -61,7 +61,7 @@ describe('TournamentLiveGate', () => {
     mocks.useV1Tournament.mockReturnValue({ data: { title: '가을 풋살 대회' } });
     mocks.useSearchParams.mockReturnValue(new URLSearchParams());
     mocks.usePathname.mockReturnValue('/tournament-ops/tournaments/t-1/operations');
-    mocks.useV1MyStaffAssignments.mockReturnValue({ isPending: false, isError: false, data: { items: [] } });
+    mocks.useV1MyStaffAssignments.mockReturnValue({ isPending: false, isError: false, data: { platformRole: null, items: [] } });
   });
 
   it('shows a loading screen while auth/staff queries are pending', () => {
@@ -97,7 +97,28 @@ describe('TournamentLiveGate', () => {
     expect(screen.getByText('보드 콘텐츠')).toBeInTheDocument();
   });
 
-  it('derives PLATFORM_OPS when the staff list succeeds but no assignment row matches me (admin bypass path)', () => {
+  it('uses the authoritative platform role from my assignments response', () => {
+    mocks.useV1MyStaffAssignments.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: {
+        platformRole: 'PLATFORM_OPS',
+        items: [{
+          tournamentId: 't-1',
+          tournamentTitle: '가을 풋살 대회',
+          tournamentStatus: 'open',
+          assignments: [{
+            id: 'support-1',
+            role: 'SUPPORT_READONLY',
+            fieldId: null,
+            fieldName: null,
+            version: 1,
+            expiresAt: null,
+            fixtureIds: [],
+          }],
+        }],
+      },
+    });
     mocks.useV1TournamentStaffAssignments.mockReturnValue({
       isPending: false,
       isError: false,
@@ -137,7 +158,12 @@ describe('TournamentLiveGate', () => {
     expect(screen.getByTestId('shell')).toHaveAttribute('data-role', 'TOURNAMENT_DIRECTOR');
   });
 
-  it('treats a revoked assignment row as inactive and falls back to PLATFORM_OPS derivation rather than crashing', () => {
+  it('does not infer platform access from a revoked staff row', () => {
+    mocks.useV1MyStaffAssignments.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { platformRole: null, items: [] },
+    });
     mocks.useV1TournamentStaffAssignments.mockReturnValue({
       isPending: false,
       isError: false,
@@ -159,7 +185,8 @@ describe('TournamentLiveGate', () => {
       </TournamentLiveGate>,
     );
 
-    expect(screen.getByTestId('shell')).toHaveAttribute('data-role', 'PLATFORM_OPS');
+    expect(screen.getByText('대회 운영자 권한이 필요해요')).toBeInTheDocument();
+    expect(screen.queryByTestId('shell')).not.toBeInTheDocument();
   });
 
   it('shows an access-denied screen (not a crash) when the caller is not staff for this tournament', () => {
@@ -299,6 +326,20 @@ describe('TournamentLiveGate 필드 담당자 딥링크', () => {
     );
   });
 
+  it('만료된 cached field assignment는 fixture coverage로 재사용하지 않고 전역 staff 조회도 하지 않는다', () => {
+    myAssignments([fieldOperatorAssignment({ expiresAt: '2020-01-01T00:00:00.000Z' })]);
+
+    render(
+      <TournamentLiveGate tournamentId="t-1">
+        <div>경기 콘솔</div>
+      </TournamentLiveGate>,
+    );
+
+    expect(screen.queryByText('경기 콘솔')).not.toBeInTheDocument();
+    expect(screen.getByText('담당 경기 범위 밖의 화면이에요')).toBeInTheDocument();
+    expect(mocks.useV1TournamentStaffAssignments).toHaveBeenLastCalledWith('t-1', { enabled: false });
+  });
+
   it('배정에 없는 경기는 딥링크로도 열리지 않는다', () => {
     scopeDeniedShell();
     myAssignments([fieldOperatorAssignment({ fixtureIds: ['fx-other'] })]);
@@ -310,7 +351,7 @@ describe('TournamentLiveGate 필드 담당자 딥링크', () => {
     );
 
     expect(screen.queryByText('경기 콘솔')).not.toBeInTheDocument();
-    expect(screen.getByText('담당 범위 밖의 화면이에요')).toBeInTheDocument();
+    expect(screen.getByText('담당 경기 범위 밖의 화면이에요')).toBeInTheDocument();
   });
 
   it('다른 대회의 같은 경기 id를 담당해도 이 대회 콘솔은 열리지 않는다', () => {
@@ -324,7 +365,7 @@ describe('TournamentLiveGate 필드 담당자 딥링크', () => {
     );
 
     expect(screen.queryByText('경기 콘솔')).not.toBeInTheDocument();
-    expect(screen.getByText('담당 범위 밖의 화면이에요')).toBeInTheDocument();
+    expect(screen.getByText('담당 경기 범위 밖의 화면이에요')).toBeInTheDocument();
   });
 
   it('배정이 아예 없으면(스태프가 아닌 사용자) 딥링크가 열리지 않는다', () => {
@@ -343,7 +384,8 @@ describe('TournamentLiveGate 필드 담당자 딥링크', () => {
     );
 
     expect(screen.queryByText('경기 콘솔')).not.toBeInTheDocument();
-    expect(screen.getByText('대회 운영자 권한이 필요해요')).toBeInTheDocument();
+    expect(screen.getByText('담당 경기 범위 밖의 화면이에요')).toBeInTheDocument();
+    expect(mocks.useV1TournamentStaffAssignments).toHaveBeenCalledWith('t-1', { enabled: false });
   });
 
   it('내 배정 조회가 끝나기 전에는 콘솔도 거부 화면도 보여주지 않는다', () => {
@@ -386,6 +428,27 @@ describe('TournamentLiveGate 필드 담당자 딥링크', () => {
       isError: false,
       data: { items: [{ userId: 'user-me', role: 'TOURNAMENT_DIRECTOR', revokedAt: null, expiresAt: null }] },
     });
+    mocks.useV1MyStaffAssignments.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: {
+        platformRole: null,
+        items: [{
+          tournamentId: 't-1',
+          tournamentTitle: '가을 풋살 대회',
+          tournamentStatus: 'open',
+          assignments: [{
+            id: 'director-1',
+            role: 'TOURNAMENT_DIRECTOR',
+            fieldId: null,
+            fieldName: null,
+            version: 1,
+            expiresAt: null,
+            fixtureIds: [],
+          }],
+        }],
+      },
+    });
 
     render(
       <TournamentLiveGate tournamentId="t-1">
@@ -395,8 +458,8 @@ describe('TournamentLiveGate 필드 담당자 딥링크', () => {
 
     expect(screen.getByTestId('shell')).toHaveAttribute('data-role', 'TOURNAMENT_DIRECTOR');
     expect(screen.getByText('경기 콘솔')).toBeInTheDocument();
-    // 셸로 들어가는 정상 경로에서는 내 배정 조회 자체가 비활성이다(추가 요청 없음).
-    expect(mocks.useV1MyStaffAssignments).toHaveBeenCalledWith({ enabled: false });
+    // 전역 역할과 platformRole을 구분하기 위해 자기 배정 조회는 모든 인증 경로에서 수행한다.
+    expect(mocks.useV1MyStaffAssignments).toHaveBeenCalledWith({ enabled: true });
   });
 });
 
@@ -406,6 +469,11 @@ describe('TournamentLiveGate 진입 출처 (T6-2)', () => {
       isPending: false,
       isError: false,
       data: { items: [{ userId: 'user-me', role: 'PLATFORM_OPS', revokedAt: null, expiresAt: null }] },
+    });
+    mocks.useV1MyStaffAssignments.mockReturnValue({
+      isPending: false,
+      isError: false,
+      data: { platformRole: 'PLATFORM_OPS', items: [] },
     });
     window.sessionStorage.clear();
   });

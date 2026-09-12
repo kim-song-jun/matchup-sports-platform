@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v1Get, v1Post } from '@/lib/api-client';
 import { randomUuid } from '@/lib/uuid';
-import type { GameActorRole as FullGameActorRole } from '@/types/game-operations';
+import type { GameActorRole as FullGameActorRole, GamePeriod } from '@/types/game-operations';
 import type {
   V1GameResultCards,
   V1GameResultGoalEventInput,
@@ -131,6 +131,8 @@ export type TournamentGameDetail = {
   competitionConfigVersionId: string;
   currentOfficialRevisionId: string | null;
   sides: TournamentGameSide[];
+  /** Pinned periods returned by GET /games/:gameId; result editing must use these numbers. */
+  periods: Pick<GamePeriod, 'number'>[];
   actorRole: GameActorRole;
   /**
    * `V1TournamentGroup.phase !== 'group'` -- 서버가 `GET /games/:gameId` 응답에

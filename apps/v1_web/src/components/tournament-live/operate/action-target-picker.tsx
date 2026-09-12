@@ -52,6 +52,10 @@ export interface ActionTargetPickerProps {
    * 선수만 보여준다 — 서버가 최종 검증을 하지만, 애초에 무효한 대상을
    * 보여주지 않는 게 오조작을 줄이는 첫 번째 방어선이다. */
   readonly onPitchParticipantIds?: ReadonlySet<string>;
+  /** LIMITED substitution only — participants already used as an active OUT
+   * target cannot re-enter. A reversed substitution is omitted by the parent,
+   * so its former OUT participant becomes eligible again. */
+  readonly substitutionOutParticipantIds?: ReadonlySet<string>;
   /** SUBSTITUTION 전용 — "남은 횟수" 표시용(요건: `substitutions === 'limited'`
    * 종목은 남은 교체 횟수를 UI에 보여준다). `null`이면 대회 config를 아직
    * 못 읽은 것이라 표시를 생략한다. */
@@ -87,6 +91,7 @@ export function ActionTargetPicker({
   lineups,
   allowTeamOnly,
   onPitchParticipantIds,
+  substitutionOutParticipantIds,
   substitutionPolicy,
   substitutionUsedBySideId,
   onCommit,
@@ -258,11 +263,12 @@ export function ActionTargetPicker({
                   restrictSideId={substitutionOut.sideId}
                   filterParticipantIds={
                     onPitchParticipantIds &&
-                    new Set(
-                      (lineups.find((lineup) => lineup.sideId === substitutionOut.sideId)?.participants ?? [])
-                        .filter((participant) => !onPitchParticipantIds.has(participant.id))
-                        .map((participant) => participant.id),
-                    )
+                      new Set(
+                        (lineups.find((lineup) => lineup.sideId === substitutionOut.sideId)?.participants ?? [])
+                          .filter((participant) => !onPitchParticipantIds.has(participant.id))
+                          .filter((participant) => !substitutionOutParticipantIds?.has(participant.id))
+                          .map((participant) => participant.id),
+                      )
                   }
                 />
                 <Button size="md" variant="outline" onClick={() => setSubstitutionOut(null)}>

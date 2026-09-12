@@ -59,6 +59,16 @@ describe('QueueStatusPanel — 재시도 버튼 게이팅', () => {
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
   });
 
+  it('보류 중인 경기 명령이 있으면 이벤트 재시도도 비활성화한다', () => {
+    const failed: QueuedGameEvent = {
+      ...queuedEvent(),
+      status: 'failed',
+      lastError: { code: 'VERSION_CONFLICT', message: '경기 상태가 변경되어 다시 시도해주세요.' },
+    };
+    render(<QueueStatusPanel items={[failed]} onRetry={vi.fn()} disabled />);
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeDisabled();
+  });
+
   it('재시도로 풀리지 않는 코드(STAFF_SCOPE_DENIED)에서는 "다시 시도" 버튼을 숨긴다', () => {
     const failed: QueuedGameEvent = {
       ...queuedEvent(),

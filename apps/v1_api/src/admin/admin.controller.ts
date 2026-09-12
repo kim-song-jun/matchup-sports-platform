@@ -135,7 +135,7 @@ export class AdminController {
   }
 
   @Get('action-logs')
-  actionLogs(@CurrentUser() user: V1AuthUser, @Query() query: AdminLogsQueryDto) {
+  actionLogs(@CurrentUser() user: V1AuthUser, @Query() query: AdminLogsQueryDto): ReturnType<AdminService['actionLogs']> {
     return this.adminService.actionLogs(user, query);
   }
 
@@ -152,7 +152,7 @@ export class AdminController {
   }
 
   @Get('users/:userId')
-  getUser(@CurrentUser() user: V1AuthUser, @Param('userId') userId: string) {
+  getUser(@CurrentUser() user: V1AuthUser, @Param('userId') userId: string): ReturnType<AdminService['getUser']> {
     return this.adminService.getUser(user, userId);
   }
 
@@ -192,17 +192,17 @@ export class AdminController {
   // ─── Popups ───────────────────────────────────────────────────────────────
 
   @Get('popups')
-  listPopups(@CurrentUser() user: V1AuthUser, @Query() query: AdminPopupListQueryDto) {
+  listPopups(@CurrentUser() user: V1AuthUser, @Query() query: AdminPopupListQueryDto): ReturnType<AdminService['listPopups']> {
     return this.adminService.listPopups(user, query);
   }
 
   @Get('popups/:popupId')
-  getPopup(@CurrentUser() user: V1AuthUser, @Param('popupId') popupId: string) {
+  getPopup(@CurrentUser() user: V1AuthUser, @Param('popupId') popupId: string): ReturnType<AdminService['getPopup']> {
     return this.adminService.getPopup(user, popupId);
   }
 
   @Post('popups')
-  createPopup(@CurrentUser() user: V1AuthUser, @Body() dto: CreateAdminPopupDto) {
+  createPopup(@CurrentUser() user: V1AuthUser, @Body() dto: CreateAdminPopupDto): ReturnType<AdminService['createPopup']> {
     return this.adminService.createPopup(user, dto);
   }
 
@@ -211,7 +211,7 @@ export class AdminController {
     @CurrentUser() user: V1AuthUser,
     @Param('popupId') popupId: string,
     @Body() dto: UpdateAdminPopupDto,
-  ) {
+  ): ReturnType<AdminService['updatePopup']> {
     return this.adminService.updatePopup(user, popupId, dto);
   }
 
@@ -222,17 +222,17 @@ export class AdminController {
   // ─── Notices ──────────────────────────────────────────────────────────────
 
   @Get('notices')
-  listNotices(@CurrentUser() user: V1AuthUser, @Query() query: AdminNoticeListQueryDto) {
+  listNotices(@CurrentUser() user: V1AuthUser, @Query() query: AdminNoticeListQueryDto): ReturnType<AdminService['listNotices']> {
     return this.adminService.listNotices(user, query);
   }
 
   @Get('notices/:noticeId')
-  getNotice(@CurrentUser() user: V1AuthUser, @Param('noticeId') noticeId: string) {
+  getNotice(@CurrentUser() user: V1AuthUser, @Param('noticeId') noticeId: string): ReturnType<AdminService['getNotice']> {
     return this.adminService.getNotice(user, noticeId);
   }
 
   @Post('notices')
-  createNotice(@CurrentUser() user: V1AuthUser, @Body() dto: CreateAdminNoticeDto) {
+  createNotice(@CurrentUser() user: V1AuthUser, @Body() dto: CreateAdminNoticeDto): ReturnType<AdminService['createNotice']> {
     return this.adminService.createNotice(user, dto);
   }
 
@@ -241,7 +241,7 @@ export class AdminController {
     @CurrentUser() user: V1AuthUser,
     @Param('noticeId') noticeId: string,
     @Body() dto: UpdateAdminNoticeDto,
-  ) {
+  ): ReturnType<AdminService['updateNotice']> {
     return this.adminService.updateNotice(user, noticeId, dto);
   }
 

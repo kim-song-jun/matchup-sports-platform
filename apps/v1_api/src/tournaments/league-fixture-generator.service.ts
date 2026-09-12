@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { Prisma, V1GameSideKey, V1GameSourceType } from '@prisma/client';
+import { Prisma, V1GameSideKey } from '@prisma/client';
 import { generateRoundRobin } from '../common/scheduling/round-robin';
 import { resolveFixtureStartAt, type FixtureScheduleTemplate } from '../league-matches/round-robin-schedule';
 import { AdminContextService } from '../common/admin-context.service';
@@ -7,51 +7,19 @@ import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.se
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { GenerateLeagueFixturesDto } from './dto/admin-league.dto';
-import { hasTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
 import { participantDisplayName } from './participant-display-name';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { createTournamentMatchInTx } from './tournament-match-creation';
+import { updateTournamentMatchInTx } from './tournament-match-update';
 
 /**
- * ## 교체(`replaceExisting`)는 진짜 삭제다 — 그리고 지울 수 있는 것만 지운다
- *
- * 되돌리기를 "취소 표식(status = cancelled)"으로 만들었던 앞선 시도는 폐기했다. 그 값은 이
- * 저장소가 한 번도 쓴 적이 없어 대진을 읽는 쪽이 아무도 걸러내지 않았고, 물러난 행이 그대로
- * 남아 **공개 리그 진행률·매직넘버·카드 출전정지 판정**을 오염시켰다
- * (`leagueProgressOf` 는 fixture 행 수를 total 로 세고, `games.service.ts` 의 경기 순서
- * 인덱스는 `V1TournamentFixture` 전체를 정렬해 만든다). 표식은 지울 수도 없어 그 오염은
- * 되돌릴 수 없었다. 그래서 이 파일은 **행을 남기지 않는다** — 지우거나, 거절한다.
- *
- * ## 무엇을 지울 수 있는가 — 스키마가 정한다
- *
- * `V1TournamentFixture` 를 참조하는 관계를 `prisma/schema.prisma` 에서 전수로 읽어 두 부류로
- * 나눴다.
- *
- * **(1) DB 가 삭제를 거부하는 관계 (`onDelete: Restrict`)** — 하나라도 있으면 삭제는
- * *물리적으로 불가능*하다.
- *  - `V1Game.tournamentFixtureId` (schema.prisma `onDelete: Restrict`)
- *  - `V1TournamentStaffFixtureScope.fixtureId` (`v1_staff_scope_fixture_fk`, RESTRICT)
- *  - `V1OperationAudit(tournamentId, fixtureId)` (`v1_operation_audits_fixture_fk`, RESTRICT)
- *
- * 이 중 감사 로그는 **우회로가 아예 없다.** 같은 마이그레이션
- * (`20260801040000_v1_task7_staff_audit_scope/migration.sql`)이
- * `CREATE TRIGGER v1_operation_audits_append_only BEFORE UPDATE OR DELETE ON v1_operation_audits`
- * 를 걸어 감사 행을 지우는 것도, `fixture_id` 를 NULL 로 떼어내는 것도 ERRCODE 55000 으로
- * 거부한다. 그리고 `GamesService.createFromSourceInTransaction` 은 게임을 만들 때 항상
- * `GAME_CREATED` 감사를 `fixtureId` 와 함께 남긴다 — 즉 **게임이 한 번이라도 붙은 대진은
- * 영구히 삭제 불가**다. 이건 이 생성기만의 사정이 아니라 수동 폼(`createFixture`)으로 만든
- * 대진도 똑같다.
- *
- * **(2) 삭제하면 함께 사라지는 관계 (`onDelete: Cascade` / `SetNull`)** — `result`(결과),
- * `videos`(영상), `advancementSources`/`advancementTargets`(진출 연결), `childFixtures`(다음
- * 라운드 부모 참조). 조 단위 일괄 교체는 한 번의 클릭으로 수십 개를 지우는데 운영자는 어느
- * 대진에 영상·진출 연결이 걸려 있는지 화면에서 볼 수 없다. 그래서 **일괄 경로에서는 이쪽도
- * 막는다**(단건 삭제 `TournamentBracketService.deleteFixture` 는 대진 하나를 지목해 확인까지
- * 받는 조작이라 기존 cascade 계약을 그대로 둔다).
- *
- * ⇒ 결과적으로 이 생성기가 지우는 것은 **아무것도 매달려 있지 않은 대진 행**뿐이다. 그런
- * 행의 DELETE 는 다른 테이블을 한 줄도 건드리지 않으므로 FK 정리 순서 자체가 존재하지 않는다.
- * 하나라도 매달려 있으면 `LEAGUE_FIXTURES_NOT_DELETABLE` 로 **어느 대진이 무엇 때문에**
- * 막혔는지 이름을 붙여 거절한다.
+ * League generation operates on the canonical TeamMatch/Details/Game unit.
+ * A replacement keeps the existing coordinate and reconciles its scheduled
+ * TeamMatch in place; it never deletes a legacy row or creates a second game.
+ * Attached results, audit/scope records, videos, and advancement edges remain
+ * protected by the existing blocker contract. Coordinate drift is rejected as
+ * `LEAGUE_FIXTURES_RECONCILIATION_REQUIRED` so an operator can review it
+ * explicitly instead of receiving a partial schedule.
  */
 
 /** 대진 행 삭제를 막는 사유. `Restrict` 계열과 `Cascade` 계열을 구분해 담는다. */
@@ -327,42 +295,102 @@ export function buildLeagueFixtureRows(input: {
  * 거절 메시지의 사유가 된다.
  */
 const existingFixtureSelect = {
-  id: true,
+  teamMatchId: true,
+  homeRegistrationId: true,
+  awayRegistrationId: true,
   round: true,
   fixtureNumber: true,
   legNumber: true,
-  game: { select: { id: true, currentOfficialRevision: { select: { state: true } } } },
-  result: { select: { id: true } },
-  _count: {
+  teamMatch: {
     select: {
-      operationAudits: true,
-      staffScopes: true,
-      videos: true,
-      childFixtures: true,
-      advancementSources: true,
-      advancementTargets: true,
+      hostTeamId: true,
+      approvedApplicantTeamId: true,
+      startAt: true,
+      competitionConfigVersionId: true,
+      game: {
+        select: {
+          id: true,
+          state: true,
+          sourceType: true,
+          teamMatchId: true,
+          competitionConfigVersionId: true,
+          sides: { select: { sideKey: true, teamId: true } },
+          currentOfficialRevision: { select: { state: true } },
+        },
+      },
+      _count: { select: { operationAudits: true, staffScopes: true, videos: true } },
     },
   },
-} satisfies Prisma.V1TournamentFixtureSelect;
+  _count: { select: { childTeamMatches: true, advancementSources: true, advancementTargets: true } },
+} satisfies Prisma.V1TournamentMatchDetailsSelect;
 
-type ExistingFixture = Prisma.V1TournamentFixtureGetPayload<{ select: typeof existingFixtureSelect }>;
+type ExistingFixture = Prisma.V1TournamentMatchDetailsGetPayload<{ select: typeof existingFixtureSelect }>;
+
+function sameInstant(left: Date | null, right: Date | null): boolean {
+  return (left?.getTime() ?? null) === (right?.getTime() ?? null);
+}
+
+function isExactCanonicalPlan(
+  fixtures: readonly ExistingFixture[],
+  rows: readonly LeagueFixtureRow[],
+  teamsByRegistrationId: ReadonlyMap<string, string>,
+): boolean {
+  if (fixtures.length !== rows.length) return false;
+  const current = [...fixtures].sort((a, b) => a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber);
+  const planned = [...rows].sort((a, b) => a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber);
+  return planned.every((row, index) => {
+    const fixture = current[index];
+    if (fixture === undefined || fixture.round !== row.round || fixture.fixtureNumber !== row.fixtureNumber || fixture.legNumber !== row.legNumber || fixture.homeRegistrationId !== row.homeRegistrationId || fixture.awayRegistrationId !== row.awayRegistrationId || !sameInstant(fixture.teamMatch.startAt, row.startAt)) return false;
+    const homeTeamId = row.homeRegistrationId === null ? null : teamsByRegistrationId.get(row.homeRegistrationId);
+    const awayTeamId = row.awayRegistrationId === null ? null : teamsByRegistrationId.get(row.awayRegistrationId);
+    const homeSide = fixture.teamMatch.game?.sides.find((side) => side.sideKey === 'HOME');
+    const awaySide = fixture.teamMatch.game?.sides.find((side) => side.sideKey === 'AWAY');
+    const pinnedConfigId = fixture.teamMatch.competitionConfigVersionId;
+    return pinnedConfigId !== null && fixture.teamMatch.hostTeamId === homeTeamId && fixture.teamMatch.approvedApplicantTeamId === awayTeamId && homeSide?.teamId === homeTeamId && awaySide?.teamId === awayTeamId && fixture.teamMatch.game?.sourceType === 'TEAM_MATCH' && fixture.teamMatch.game.teamMatchId === fixture.teamMatchId && fixture.teamMatch.game.competitionConfigVersionId === pinnedConfigId && fixture.teamMatch.game.currentOfficialRevision === null;
+  });
+}
+
+function reconciliationBlockers(fixtures: readonly ExistingFixture[]): ReturnType<typeof summarizeExistingFixtures>['blockedFixtures'] {
+  return summarizeExistingFixtures(fixtures).blockedFixtures
+    .map((fixture) => ({
+      ...fixture,
+      reasons: fixture.reasons.filter((reason) => reason === 'video' || reason === 'child_fixture' || reason === 'advancement_edge'),
+    }))
+    .filter((fixture) => fixture.reasons.length > 0);
+}
 
 function summarizeExistingFixtures(fixtures: readonly ExistingFixture[]) {
   const blockedFixtures: BlockedLeagueFixture[] = [];
   for (const fixture of fixtures) {
-    const reasons = bulkFixtureDeleteBlockers(fixture);
-    if (reasons.length === 0) continue;
-    blockedFixtures.push({
+    const normalized = {
+      id: fixture.teamMatchId,
       round: fixture.round,
       fixtureNumber: fixture.fixtureNumber,
       legNumber: fixture.legNumber,
+      game: fixture.teamMatch.game,
+      result: null,
+      _count: {
+        operationAudits: fixture.teamMatch._count.operationAudits,
+        staffScopes: fixture.teamMatch._count.staffScopes,
+        videos: fixture.teamMatch._count.videos,
+        childFixtures: fixture._count.childTeamMatches,
+        advancementSources: fixture._count.advancementSources,
+        advancementTargets: fixture._count.advancementTargets,
+      },
+    };
+    const reasons = bulkFixtureDeleteBlockers(normalized);
+    if (reasons.length === 0) continue;
+    blockedFixtures.push({
+      round: normalized.round,
+      fixtureNumber: normalized.fixtureNumber,
+      legNumber: normalized.legNumber,
       reasons,
     });
   }
   return {
     existingFixtureCount: fixtures.length,
     fixturesWithResultCount: fixtures.filter((fixture) =>
-      hasTournamentFixtureOfficialResult(fixture.game, fixture.result),
+      fixture.teamMatch.game?.currentOfficialRevision?.state === 'OFFICIAL',
     ).length,
     blockedFixtures,
   };
@@ -426,7 +454,7 @@ export class LeagueFixtureGeneratorService {
 
     const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId },
-      select: { id: true, format: true, minMatchesPerTeam: true },
+      select: { id: true, title: true, sportId: true, regionId: true, format: true, minMatchesPerTeam: true },
     });
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
@@ -440,24 +468,12 @@ export class LeagueFixtureGeneratorService {
       throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '해당 대회의 조를 찾을 수 없어요.' });
     }
 
-    // F1: DB 반환 순서는 정렬 순서를 보장하지 않는다. 라운드로빈 커널의 홈 균형
-    // tie-break(pickHome)가 입력 순서에 의존하므로, sortOrder(동률이면
-    // registrationId)로 명시 정렬해 대진 생성이 실행마다 흔들리지 않게 한다.
-    const sortedRegistrationIds = [...group.groupTeams]
-      .sort((a, b) => a.sortOrder - b.sortOrder || (a.registrationId < b.registrationId ? -1 : a.registrationId > b.registrationId ? 1 : 0))
-      .map((team) => team.registrationId);
-
     // F2: `game?.currentOfficialRevisionId != null` 만으로는 결과 확정 여부를 정확히
     // 판정할 수 없다(VOID 리비전에도 값이 있을 수 있고, 레거시 result-only 픽스처는
     // 놓친다). `hasTournamentFixtureOfficialResult`가 이 판정의 단일 기준이다.
     //
     // status 로 거르지 않는다 — 교체는 행을 남기지 않으므로 "죽은 대진" 상태가 존재하지
     // 않는다. 조에 있는 대진은 전부 진짜 일정이다.
-    const existingFixtures = await this.prisma.v1TournamentFixture.findMany({
-      where: { groupId: group.id },
-      select: existingFixtureSelect,
-    });
-
     const guardBase = {
       format: tournament.format,
       groupPhase: group.phase,
@@ -467,7 +483,12 @@ export class LeagueFixtureGeneratorService {
       replaceExisting: dto.replaceExisting ?? false,
     };
     // 사전 점검 — 트랜잭션을 열기 전에 409/422 를 돌려준다(교체 확인 모달의 입력이기도 하다).
-    assertLeagueGenerationAllowed({ ...guardBase, ...summarizeExistingFixtures(existingFixtures) });
+    assertLeagueGenerationAllowed({
+      ...guardBase,
+      existingFixtureCount: 0,
+      fixturesWithResultCount: 0,
+      blockedFixtures: [],
+    });
 
     const schedule = dto.schedule
       ? { startsOn: new Date(dto.schedule.startsOn), template: dto.schedule.template }
@@ -483,16 +504,29 @@ export class LeagueFixtureGeneratorService {
       guardBase.teamCount,
       dto.legs,
       async (tx) => {
-        // C1: 대회 경기는 **활성 경기 규칙 버전을 못 박은 V1Game 을 반드시 동반한다**
-        // (tournament-bracket.service.ts createFixture 와 같은 계약). 이 생성기는 fixture
-        // 행만 만들고 게임을 만들지 않아서, 만들어진 경기가 공개 일정 프로젝션에서
-        // `fixture.game?.visibilityPolicy?.mode ?? 'HIDDEN'` → hidden 으로 접혀 한 건도
-        // 안 보였고, 경기 상세는 404, 라인업은 TOURNAMENT_FIXTURE_GAME_NOT_FOUND 였다.
-        // 규칙 버전 조회를 트랜잭션 안에서 하는 이유는 createFixture 와 같다 — 이 트랜잭션이
-        // 쓰는 모든 fixture·game 이 **하나의 같은 버전**에 고정돼야 하기 때문이다.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`league-fixture-generation:${tournamentId}`}, 0))`;
+        const currentGroup = await tx.v1TournamentGroup.findFirst({
+          where: { id: dto.groupId, tournamentId },
+          include: { groupTeams: { select: { registrationId: true, sortOrder: true } } },
+        });
+        if (currentGroup === null) {
+          throw new NotFoundException({ code: 'GROUP_NOT_FOUND', message: '해당 대회를 찾을 수 없어요.' });
+        }
+        const currentRegistrationIds = [...currentGroup.groupTeams]
+          .sort((a, b) => a.sortOrder - b.sortOrder || (a.registrationId < b.registrationId ? -1 : a.registrationId > b.registrationId ? 1 : 0))
+          .map((team) => team.registrationId);
+        const currentGuardBase = { ...guardBase, groupPhase: currentGroup.phase, teamCount: currentGroup.groupTeams.length };
+        // C1: each canonical TeamMatch must carry a TEAM_MATCH Game pinned to
+        // the tournament's active competition config. Reading the pin inside
+        // this transaction keeps every created match on one immutable version.
         const pinnedTournament = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
           where: { id: tournamentId },
-          select: { competitionConfigVersionId: true },
+          select: {
+            competitionConfigVersionId: true,
+            title: true,
+            sportId: true,
+            regionId: true,
+          },
         });
         const competitionConfigVersionId = pinnedTournament?.competitionConfigVersionId;
         if (!competitionConfigVersionId) {
@@ -508,36 +542,25 @@ export class LeagueFixtureGeneratorService {
         // 트랜잭션 안에서 다시 판정한다. 사전 점검과 여기 사이에 다른 운영자가 경기를
         // 시작했거나 대진을 더 만들었을 수 있는데, 그 상태를 못 보고 지우면 방금 만들어진
         // 기록을 잃는다. 같은 순수 가드를 같은 셀렉트로 한 번 더 돌린다.
-        const currentFixtures = await tx.v1TournamentFixture.findMany({
-          where: { groupId: group.id },
+        const currentFixtures = await tx.v1TournamentMatchDetails.findMany({
+          where: { tournamentId, groupId: currentGroup.id },
           select: existingFixtureSelect,
         });
-        assertLeagueGenerationAllowed({ ...guardBase, ...summarizeExistingFixtures(currentFixtures) });
-
         let deletedCount = 0;
-        if (dto.replaceExisting && currentFixtures.length > 0) {
-          deletedCount = await this.deleteFixtures(tx, currentFixtures);
-          await this.adminContext.logAdminAction(
-            admin,
-            {
-              action: 'tournament.league.fixtures.delete',
-              targetType: 'tournament_group',
-              targetId: group.id,
-              beforeJson: { fixtureIds: currentFixtures.map((fixture) => fixture.id) },
-            },
-            tx,
-          );
-        }
 
-        const maxFixtureNumber = await tx.v1TournamentFixture.aggregate({
-          where: { tournamentId },
+        const maxFixtureNumber = await tx.v1TournamentMatchDetails.aggregate({
+          where: currentFixtures.length > 0
+            ? { tournamentId, groupId: { not: currentGroup.id } }
+            : { tournamentId },
           _max: { fixtureNumber: true },
         });
-        const fixtureNumberOffset = maxFixtureNumber._max.fixtureNumber ?? 0;
+        const fixtureNumberOffset = currentFixtures.length > 0
+          ? Math.min(...currentFixtures.map((fixture) => fixture.fixtureNumber)) - 1
+          : maxFixtureNumber._max.fixtureNumber ?? 0;
 
         const builtRows = buildLeagueFixtureRows({
-          groupId: group.id,
-          registrationIds: sortedRegistrationIds,
+          groupId: currentGroup.id,
+          registrationIds: currentRegistrationIds,
           legs: dto.legs,
           balanceHome: dto.balanceHome ?? true,
           schedule,
@@ -551,7 +574,7 @@ export class LeagueFixtureGeneratorService {
         // 없음" 으로만 나타나서, 어느 팀이 문제인지 이름조차 알려줄 수 없다. 조에 배정된
         // 신청을 전부 읽어 온 뒤 아래에서 상태를 판정한다.
         const registrations = await tx.v1TournamentRegistration.findMany({
-          where: { id: { in: sortedRegistrationIds }, tournamentId },
+          where: { id: { in: currentRegistrationIds }, tournamentId },
           include: {
             team: { select: { id: true, name: true } },
             players: {
@@ -582,7 +605,7 @@ export class LeagueFixtureGeneratorService {
         // **어느 팀인지 반드시 알려준다.** 8팀 조에서 "확정이 아닌 신청이 있어요" 만 받으면
         // 운영자는 신청 목록을 한 줄씩 대조해야 한다 — 어드민 대진표 화면에는 조 팀별 신청
         // 상태 표시가 없다. 팀명은 공개 정보라 details 에 실어도 PII 문제가 없다.
-        const unconfirmed = sortedRegistrationIds
+        const unconfirmed = currentRegistrationIds
           .map((registrationId) => ({ registrationId, registration: registrationById.get(registrationId) }))
           .filter(({ registration }) => registration === undefined || registration.status !== 'confirmed')
           .map(({ registrationId, registration }) => ({
@@ -621,37 +644,86 @@ export class LeagueFixtureGeneratorService {
           away: requireConfirmed(row.awayRegistrationId),
         }));
 
-        for (const { row, home, away } of pairedRows) {
-          const fixture = await tx.v1TournamentFixture.create({
-            data: {
-              tournamentId,
-              groupId: row.groupId,
-              round: row.round,
-              fixtureNumber: row.fixtureNumber,
-              legNumber: row.legNumber,
+        const currentSummary = summarizeExistingFixtures(currentFixtures);
+        const teamIdsByRegistrationId = new Map(
+          registrations.map((registration) => [registration.id, registration.team.id]),
+        );
+        if (currentFixtures.length > 0 && isExactCanonicalPlan(
+          currentFixtures,
+          pairedRows.map(({ row }) => row),
+          teamIdsByRegistrationId,
+        )) {
+          return { createdCount: 0, deleted: 0, rows: pairedRows.map(({ row }) => row), teamCount: currentGroup.groupTeams.length, oddTeamCount: currentGroup.groupTeams.length % 2 !== 0 };
+        }
+        assertLeagueGenerationAllowed({
+          ...currentGuardBase,
+          ...currentSummary,
+          blockedFixtures: dto.replaceExisting ? reconciliationBlockers(currentFixtures) : currentSummary.blockedFixtures,
+        });
+
+        if (dto.replaceExisting && currentFixtures.length > 0) {
+          const existingByCoordinate = new Map(
+            currentFixtures.map((fixture) => [`${fixture.round}:${fixture.fixtureNumber}:${fixture.legNumber}`, fixture]),
+          );
+          if (
+            currentFixtures.length !== pairedRows.length ||
+            pairedRows.some(({ row }) => !existingByCoordinate.has(`${row.round}:${row.fixtureNumber}:${row.legNumber}`))
+          ) {
+            throw new ConflictException({
+              code: 'LEAGUE_FIXTURES_RECONCILIATION_REQUIRED',
+              message: '기존 canonical 대진의 좌표를 보존할 수 없는 변경이라 교체할 수 없어요.',
+              details: { existingFixtureCount: currentFixtures.length, plannedFixtureCount: pairedRows.length },
+            });
+          }
+          if (currentFixtures.some((fixture) => fixture.teamMatch.game === null)) {
+            throw new ConflictException({
+              code: 'TOURNAMENT_MATCH_GAME_MISSING',
+              message: '대회 경기의 정본 게임을 찾을 수 없어요.',
+            });
+          }
+          if (currentFixtures.some((fixture) => fixture.teamMatch.game?.currentOfficialRevision?.state === 'VOID')) {
+            throw new ConflictException({
+              code: 'LEAGUE_FIXTURES_NOT_DELETABLE',
+              message: '무효화된 결과 기록이 있는 대진은 교체할 수 없어요.',
+            });
+          }
+          if (currentFixtures.some((fixture) => fixture.teamMatch.game?.state !== 'SCHEDULED')) {
+            throw new ConflictException({
+              code: 'LEAGUE_FIXTURES_LIVE',
+              message: '진행 중이거나 종료된 경기가 있어 대진을 바꿀 수 없어요.',
+            });
+          }
+          const reconciledRows: Array<Awaited<ReturnType<typeof updateTournamentMatchInTx>>> = [];
+          for (const { row } of pairedRows) {
+            const existing = existingByCoordinate.get(`${row.round}:${row.fixtureNumber}:${row.legNumber}`)!;
+            const updated = await updateTournamentMatchInTx(tx, {
+              teamMatchId: existing.teamMatchId,
+              scheduledAt: row.startAt,
               homeRegistrationId: row.homeRegistrationId,
               awayRegistrationId: row.awayRegistrationId,
-              scheduledAt: row.startAt,
-              competitionConfigVersionId,
+            });
+            reconciledRows.push(updated);
+          }
+          await this.adminContext.logAdminAction(
+            admin,
+            {
+              action: 'tournament.league.fixtures.reconcile',
+              targetType: 'tournament_group',
+              targetId: currentGroup.id,
+              afterJson: {
+                fixtureIds: reconciledRows.map((row) => row.id),
+                fixtureCount: reconciledRows.length,
+              },
             },
-          });
+            tx,
+          );
+          return { createdCount: 0, deleted: 0, rows: pairedRows.map(({ row }) => row), teamCount: currentGroup.groupTeams.length, oddTeamCount: currentGroup.groupTeams.length % 2 !== 0 };
+        }
 
-          // 커맨드 키·페이로드 해시는 createFixture 와 **같은 규약**을 쓴다. 얻는 것은
-          // 경로 간 멱등성이다 — 같은 대진 좌표(round/fixtureNumber/legNumber)를 수동 폼으로
-          // 다시 만들면 키와 payloadHash 가 둘 다 일치해 중복 생성 대신 REPLAY 로 처리된다
-          // (`canonicalGameCommandPayloadHash` 가 키를 정렬해 해싱하므로 아래 10개 필드가
-          // createFixture 의 `existingPayload` 와 그대로 대응한다).
-          //
-          // 이 루프 안에서 키가 뭉치는지 여부는 **중복 생성과 무관하다.** 멱등 조회의
-          // 복합 유니크는 `(actorUserId, action, resourceType, resourceId, idempotencyKey)`
-          // 이고 `resourceId` 는 방금 만든 fixture.id 라 건마다 다르며, 그 앞 단락 조회도
-          // `v1Game.findFirst({ tournamentFixtureId: sourceId })` 로 fixture 별로 스코프된다
-          // (games.service.ts createFromSourceInTransaction). 즉 키가 6건 모두 같아도 게임은
-          // 6개 생긴다 — "키가 뭉치면 REPLAY 로 삼켜진다" 는 이 코드에 존재하지 않는
-          // 메커니즘이다. 그래도 좌표별로 다른 키를 쓰는 이유는 위의 경로 간 멱등성과,
-          // 감사 로그(`V1OperationAudit.requestId`)에서 어느 대진의 커맨드인지 식별하기
-          // 위해서다.
-          const durableCommandId = `tournament-fixture:${tournamentId}:${row.round}:${row.fixtureNumber}:${row.legNumber}`;
+        for (const { row, home, away } of pairedRows) {
+          // The generator now creates the canonical TeamMatch/Details/Game unit. The
+          // durable key remains coordinate-based so retries cannot create a second row.
+          const durableCommandId = `tournament-match:${tournamentId}:${row.round}:${row.fixtureNumber}:${row.legNumber}`;
           const payloadHash = canonicalGameCommandPayloadHash({
             tournamentId,
             groupId: row.groupId,
@@ -665,64 +737,71 @@ export class LeagueFixtureGeneratorService {
             venue: null,
           });
 
-          await this.games.createFromSourceInTransaction(
-            tx,
-            {
-              sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
-              sourceId: fixture.id,
-              competitionConfigVersionId,
-              sides: [
-                { sideKey: V1GameSideKey.HOME, teamId: home.team.id, displayNameSnapshot: home.team.name },
-                { sideKey: V1GameSideKey.AWAY, teamId: away.team.id, displayNameSnapshot: away.team.name },
-              ],
-              participants: [
-                ...home.players.map((player) => ({
-                  sourceParticipantId: player.id,
-                  userId: player.userId,
-                  sideKey: V1GameSideKey.HOME,
-                  displayNameSnapshot: participantDisplayName(player),
-                })),
-                ...away.players.map((player) => ({
-                  sourceParticipantId: player.id,
-                  userId: player.userId,
-                  sideKey: V1GameSideKey.AWAY,
-                  displayNameSnapshot: participantDisplayName(player),
-                })),
-              ],
+          await createTournamentMatchInTx(tx, this.games, {
+            tournamentId,
+            groupId: row.groupId,
+            round: row.round,
+            fixtureNumber: row.fixtureNumber,
+            legNumber: row.legNumber,
+            parentTeamMatchId: null,
+            homeRegistrationId: row.homeRegistrationId,
+            awayRegistrationId: row.awayRegistrationId,
+            sportId: pinnedTournament.sportId,
+            regionId: pinnedTournament.regionId ?? null,
+            title: `${pinnedTournament.title} · ${row.round} ${row.fixtureNumber}`,
+            placeName: null,
+            startAt: row.startAt,
+            createdByUserId: user.id,
+            competitionConfigVersionId,
+            home: {
+              id: home.team.id,
+              name: home.team.name,
+              participants: home.players.map((player) => ({
+                sourceParticipantId: player.id,
+                userId: player.userId,
+                sideKey: V1GameSideKey.HOME,
+                displayNameSnapshot: participantDisplayName(player),
+              })),
             },
-            {
-              actor: {
-                actorType: 'USER',
-                actorUserId: user.id,
-                role: 'platform_ops',
-                tournamentId,
-                fixtureId: fixture.id,
-              },
-              expectedVersion: 0,
-              durableCommandId,
-              payloadHash,
+            away: {
+              id: away.team.id,
+              name: away.team.name,
+              participants: away.players.map((player) => ({
+                sourceParticipantId: player.id,
+                userId: player.userId,
+                sideKey: V1GameSideKey.AWAY,
+                displayNameSnapshot: participantDisplayName(player),
+              })),
             },
-          );
+            actor: {
+              actorType: 'USER',
+              actorUserId: user.id,
+              role: 'platform_ops',
+              tournamentId,
+            },
+            durableCommandId,
+            payloadHash,
+          });
         }
 
-        return { deleted: deletedCount, rows: builtRows };
+        return { createdCount: builtRows.length, deleted: deletedCount, rows: builtRows, teamCount: currentGroup.groupTeams.length, oddTeamCount: currentGroup.groupTeams.length % 2 !== 0 };
       },
     );
-    const { deleted, rows } = generated;
+    const { createdCount, deleted, rows, teamCount, oddTeamCount } = generated;
 
     const warnings: Array<{ code: string; message: string }> = [];
     if (!dto.schedule) {
       warnings.push({ code: 'SCHEDULE_NOT_SET', message: '경기 일시가 지정되지 않았어요.' });
     }
-    if (group.groupTeams.length % 2 !== 0) {
+    if (oddTeamCount) {
       warnings.push({ code: 'ODD_TEAM_COUNT_BYE', message: '팀 수가 홀수라 라운드마다 한 팀이 쉬어요.' });
     }
 
     return {
-      created: rows.length,
+      created: createdCount,
       /** 이 호출이 조에서 실제로 삭제한 기존 대진 수 — 행이 남지 않는다. */
       deleted,
-      perTeamMatches: matchesPerTeam(group.groupTeams.length, dto.legs),
+      perTeamMatches: matchesPerTeam(teamCount, dto.legs),
       rounds: rows.length === 0 ? 0 : new Set(rows.map((r) => r.round)).size,
       warnings,
     };
@@ -755,55 +834,4 @@ export class LeagueFixtureGeneratorService {
     }
   }
 
-  /**
-   * 기존 대진을 **실제로 지운다**. 여기 도달하는 대진은 `assertLeagueGenerationAllowed` 가
-   * 이미 "아무것도 매달려 있지 않다"고 판정한 것뿐이라, 이 DELETE 는 다른 테이블을 한 줄도
-   * 건드리지 않는다(파일 상단 주석 참고).
-   *
-   * `where` 에 그 전제를 **그대로 다시 적는 것이 CAS 다.** 재점검과 이 DELETE 사이에 다른
-   * 요청이 경기를 붙였다면 Postgres 가 최신 커밋본으로 이 조건을 다시 따져 그 행을 빼므로,
-   * 지운 행 수가 모자란 것으로 드러난다 — 그때는 전체를 롤백한다(같은 저장소의
-   * `tournament-operations-fields.service.ts` 가 쓰는 패턴).
-   */
-  private async deleteFixtures(
-    tx: Prisma.TransactionClient,
-    fixtures: readonly ExistingFixture[],
-  ): Promise<number> {
-    const fixtureIds = fixtures.map((fixture) => fixture.id);
-    if (fixtureIds.length === 0) return 0;
-
-    let deleted: { count: number };
-    try {
-      deleted = await tx.v1TournamentFixture.deleteMany({
-        where: {
-          id: { in: fixtureIds },
-          game: { is: null },
-          result: { is: null },
-          operationAudits: { none: {} },
-          staffScopes: { none: {} },
-          videos: { none: {} },
-          childFixtures: { none: {} },
-          advancementSources: { none: {} },
-          advancementTargets: { none: {} },
-        },
-      });
-    } catch (error) {
-      // 상대 트랜잭션이 아직 커밋 전이면 위 조건이 그 행을 걸러내지 못한다. Postgres 는
-      // FK 검사로 잡은 락 때문에 이 DELETE 를 대기시켰다가, 상대가 커밋하면 FK 위반으로
-      // 거부한다(P2003). 매핑하지 않으면 운영자가 원인 없는 500 을 본다.
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
-        throw this.fixturesChangedConflict();
-      }
-      throw error;
-    }
-    if (deleted.count !== fixtureIds.length) throw this.fixturesChangedConflict();
-    return deleted.count;
-  }
-
-  private fixturesChangedConflict(): ConflictException {
-    return new ConflictException({
-      code: 'LEAGUE_FIXTURES_CHANGED',
-      message: '다른 요청이 방금 이 조의 대진을 바꿨어요. 새로고침한 뒤 다시 시도해주세요.',
-    });
-  }
 }

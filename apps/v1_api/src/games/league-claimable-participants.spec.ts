@@ -42,14 +42,28 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       v1Game: {
         findUnique: jest.fn().mockResolvedValue({
           sourceType: 'TEAM_MATCH',
-          teamMatch: { hostTeamId: 'team-host', approvedApplicantTeamId: 'team-away' },
-          tournamentFixture: null,
+          teamMatch: {
+            id: 'tm-1',
+            deletedAt: null,
+            hostTeamId: 'team-host',
+            approvedApplicantTeamId: 'team-away',
+            tournamentId: 'league-1',
+            leagueId: 'league-1',
+            fieldId: null,
+            tournament: { kind: 'regular_league' },
+            league: { kind: 'regular_league' },
+            tournamentDetails: null,
+          },
         }),
       },
       v1AdminUser: {
         findUnique: jest.fn().mockResolvedValue(null),
       },
       v1TeamMembership: {
+        findFirst: jest.fn().mockImplementation(async () => {
+          const membership = overrides.memberships?.[0];
+          return membership ?? null;
+        }),
         findMany: jest.fn().mockResolvedValue(overrides.memberships ?? []),
       },
       v1GameLineup: {
@@ -63,6 +77,9 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       },
       v1ParticipantIdentityLinkCurrent: {
         findMany: jest.fn().mockResolvedValue(overrides.linked ?? []),
+      },
+      v1ParticipantIdentityLinkEvent: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
     };
     const service = new GamesService(
@@ -119,7 +136,7 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       memberships: [{ teamId: 'team-host', role: 'member' }],
       // state 는 selectLineupParticipantsWithDraftFallback 의 필수 입력 — 제출된 리비전만
       // "최신"을 다툰다(DRAFT 는 후보에서 빠진다).
-      lineups: [{ id: 'lineup-1', sideId: 's-1', revision: 1, state: 'SUBMITTED' }],
+      lineups: [{ id: 'lineup-1', sideId: 's-1', revision: 1, state: 'SUBMITTED', invalidatedAt: null }],
       participants: [
         { id: 'p-1', sideId: 's-1', lineupId: 'lineup-1', displayNameSnapshot: '김민준', jerseyNumber: 7 },
         { id: 'p-2', sideId: 's-1', lineupId: 'lineup-1', displayNameSnapshot: '이서준', jerseyNumber: null },
@@ -148,8 +165,8 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       teamMatch: { game: { id: 'game-1', version: 6 } },
       memberships: [{ teamId: 'team-host', role: 'member' }],
       lineups: [
-        { id: 'lineup-1', sideId: 's-1', revision: 1, state: 'SUBMITTED' },
-        { id: 'lineup-2', sideId: 's-1', revision: 2, state: 'SUBMITTED' },
+        { id: 'lineup-1', sideId: 's-1', revision: 1, state: 'SUBMITTED', invalidatedAt: null },
+        { id: 'lineup-2', sideId: 's-1', revision: 2, state: 'SUBMITTED', invalidatedAt: null },
       ],
       participants: [
         { id: 'p-stale', sideId: 's-1', lineupId: 'lineup-1', displayNameSnapshot: '김민준', jerseyNumber: 7 },
@@ -170,6 +187,7 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       ],
     });
   });
+
 
   it('동명이인 참가자는 canonical sideKey와 팀 snapshot label을 함께 반환한다', async () => {
     const { service, prisma } = makeService({
@@ -228,17 +246,13 @@ describe('GamesService.listLeagueClaimableParticipants', () => {
       teamMatch: { game: { id: 'game-1', version: 9 } },
       memberships: [{ teamId: 'team-host', role: 'member' }],
       lineups: [{ id: 'lineup-1', sideId: 's-missing', revision: 1, state: 'SUBMITTED', invalidatedAt: null }],
-      participants: [
-        { id: 'p-linked', sideId: 's-missing-linked', lineupId: 'lineup-1', displayNameSnapshot: '연결됨', jerseyNumber: null },
-      ],
+      participants: [{ id: 'p-linked', sideId: 's-missing-linked', lineupId: 'lineup-1', displayNameSnapshot: '연결됨', jerseyNumber: null }],
       linked: [{ participantId: 'p-linked' }],
       sides: [],
     });
 
     await expect(service.listLeagueClaimableParticipants(user, 'league-1', 'tm-1')).resolves.toEqual({
-      gameId: 'game-1',
-      version: 9,
-      participants: [],
+      gameId: 'game-1', version: 9, participants: [],
     });
     expect(prisma.v1GameSide.findMany).not.toHaveBeenCalled();
   });

@@ -99,7 +99,7 @@ describe('Task 154 대회 경기 신원 연결 자가신청 (참가팀 멤버)',
     await prisma.v1AdminUser.create({
       data: { userId: ids.platformOps, adminRole: 'ops', status: 'active' },
     });
-    await prisma.v1Sport.upsert({
+    const sport = await prisma.v1Sport.upsert({
       where: { code: 'football' },
       create: { id: ids.sport, code: 'football', name: 'Task 154 Self Claim Football' },
       update: {},
@@ -109,8 +109,8 @@ describe('Task 154 대회 경기 신원 연결 자가신청 (참가팀 멤버)',
     });
     await prisma.v1Team.createMany({
       data: [
-        { id: ids.hostTeam, ownerUserId: ids.platformOps, sportId: ids.sport, regionId: ids.region, name: 'Task 154 Self Claim Host' },
-        { id: ids.opponentTeam, ownerUserId: ids.platformOps, sportId: ids.sport, regionId: ids.region, name: 'Task 154 Self Claim Opponent' },
+        { id: ids.hostTeam, ownerUserId: ids.platformOps, sportId: sport.id, regionId: ids.region, name: 'Task 154 Self Claim Host' },
+        { id: ids.opponentTeam, ownerUserId: ids.platformOps, sportId: sport.id, regionId: ids.region, name: 'Task 154 Self Claim Opponent' },
       ],
     });
     // 자가신청 자격의 근거는 "등록팀의 활성 멤버"다. attestor 는 반대편 팀 멤버로 둬서
@@ -122,7 +122,7 @@ describe('Task 154 대회 경기 신원 연결 자가신청 (참가팀 멤버)',
       ],
     });
     await prisma.v1Tournament.create({
-      data: { id: ids.tournament, sportId: ids.sport, title: 'Task 154 self claim tournament', competitionConfigVersionId: configId },
+      data: { id: ids.tournament, sportId: sport.id, title: 'Task 154 self claim tournament', competitionConfigVersionId: configId },
     });
     await prisma.v1TournamentRegistration.createMany({
       data: [
@@ -130,21 +130,34 @@ describe('Task 154 대회 경기 신원 연결 자가신청 (참가팀 멤버)',
         { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
       ],
     });
-    await prisma.v1TournamentFixture.create({
+    await prisma.v1TeamMatch.create({
       data: {
         id: ids.fixture,
         tournamentId: ids.tournament,
+        sportId: sport.id,
+        regionId: ids.region,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+        createdByUserId: ids.platformOps,
+        title: 'Task 154 canonical self claim match',
+        status: 'matched',
+        startAt: new Date('2030-01-01T00:00:00.000Z'),
+        competitionConfigVersionId: configId,
+      },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: ids.fixture,
+        tournamentId: ids.tournament,
         round: 'group',
         fixtureNumber: 1,
-        competitionConfigVersionId: configId,
-        // 이 두 줄이 이 스펙의 전제다 -- 등록이 붙어 있어야 "참가팀 멤버" 판정이 가능하다.
         homeRegistrationId: ids.homeRegistration,
         awayRegistrationId: ids.awayRegistration,
       },
     });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: configId,
       sides: [

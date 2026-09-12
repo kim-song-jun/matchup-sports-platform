@@ -13,7 +13,10 @@ export class MutateTeamMatchDto {
   @IsUUID()
   sportId!: string;
 
-  @IsUUID()
+  // Master region IDs are stable slugs in the v1 catalog (for example
+  // `region-seoul-jongno`), unlike team/sport primary keys. Existence and
+  // active district validation remains authoritative in TeamMatchesService.
+  @IsString()
   regionId!: string;
 
   @IsString()

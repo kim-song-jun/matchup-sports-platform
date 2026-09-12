@@ -84,7 +84,7 @@ describe('Task 8 realtime authenticated pre-connect handshake', () => {
     v1User: { findFirst: jest.fn() },
     v1Game: { findUnique: jest.fn() },
   };
-  const gamesService = { listEvents: jest.fn() };
+  const gamesService = { assertReadAccess: jest.fn().mockResolvedValue(undefined), listEvents: jest.fn() };
   const staffAccess = { assertAccess: jest.fn() };
   const logger = { debug: jest.fn(), warn: jest.fn(), error: jest.fn() };
   const server = { use: jest.fn<void, [SocketMiddleware]>() };
@@ -101,9 +101,8 @@ describe('Task 8 realtime authenticated pre-connect handshake', () => {
       state: 'LIVE',
       version: 4,
       lastSequence: 0,
-      tournamentFixture: null,
     });
-    gamesService.listEvents.mockResolvedValue({ events: [], lastSequence: 0, gap: null });
+    gamesService.listEvents.mockResolvedValue({ events: [], lastSequence: 0, version: 4, state: 'LIVE', gap: null });
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -200,7 +199,7 @@ describe('Task 8 realtime authenticated pre-connect handshake', () => {
       expect(error).toBeUndefined();
       expect(client.data.userId).toBe(USER.id);
       expect(client.data.authUser).toEqual(USER);
-      subscribePromise = subscribeToGame(client, { gameId: GAME_ID, afterSequence: 0 });
+      subscribePromise = handleConnection(client).then(() => subscribeToGame(client, { gameId: GAME_ID, afterSequence: 0 }));
     });
 
     await invokeMiddleware(captureMiddleware(), client, next);

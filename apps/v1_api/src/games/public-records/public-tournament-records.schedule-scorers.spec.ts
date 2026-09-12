@@ -12,12 +12,10 @@ import { PublicTournamentRecordsService } from './public-tournament-records.serv
 const TOURNAMENT_ID = 'tournament-1';
 
 /**
- * Issue #377 -- `PublicTournamentRecordsService`'s constructor now also takes
- * a `TournamentStaffAccessService`, but only `getMatch` (not `getSchedule`,
- * which every test in this file exercises) ever calls it. A type-satisfying
- * stub that is never invoked is deliberate here, not a shortcut around real
- * coverage -- the staff-bypass scope tests live in
- * `public-tournament-records.service.spec.ts` next to `getMatch` itself.
+ * Most schedule tests use a type-only access stub because they exercise public
+ * presentation. The open-tournament staff-scope cases below use the real
+ * `TournamentStaffAccessService` policy so a scoped field operator cannot
+ * accidentally receive a tournament-wide identity bypass.
  */
 const UNUSED_ACCESS_SERVICE = {} as unknown as TournamentStaffAccessService;
 
@@ -35,7 +33,7 @@ type FakeFixture = {
   homeRegistration: { team: { id: string; name: string } };
   awayRegistration: { team: { id: string; name: string } };
   group: null;
-  field: null;
+  field: { id: string; name: string } | null;
   videos: never[];
   game: {
     id: string;
@@ -47,6 +45,7 @@ type FakeFixture = {
       /** 스키마상 nullable — 레거시/백필 OFFICIAL 리비전은 비어 있을 수 있다. */
       officialAt: Date | null;
       score: unknown;
+      goalEvents?: unknown;
       /** 프로덕션 select 가 항상 돌려주는 필드라 fake 도 필수로 둔다 — 생략을 허용하면
        *  `undefined !== 'NORMAL'` 이 참이 되어 정상 경기가 몰수로 오판된다. */
       outcomeReason: 'NORMAL' | 'FORFEIT' | 'ABANDONED';
@@ -56,6 +55,29 @@ type FakeFixture = {
     periods: never[];
     participants: { id: string; sideId: string; userId: string | null; displayNameSnapshot: string; jerseyNumber: number | null }[];
   } | null;
+};
+
+type FakeCanonicalScheduleRow = {
+  teamMatchId: string;
+  tournamentId: string;
+  groupId: null;
+  round: string;
+  fixtureNumber: number;
+  legNumber: number;
+  homeRegistrationId: string;
+  awayRegistrationId: string;
+  group: null;
+  homeRegistration: { team: { id: string; name: string } };
+  awayRegistration: { team: { id: string; name: string } };
+  teamMatch: {
+    startAt: Date;
+    placeName: null;
+    status: string;
+    fieldId: string | null;
+    field: { id: string; name: string } | null;
+    videos: { id: string }[];
+    game: FakeFixture['game'];
+  };
 };
 
 /** `loadParticipantNameProfiles`가 조회하는 V1UserProfile 투영 -- 스펙 전용 fake 타입. */
@@ -90,6 +112,7 @@ type FakeGoalEvent = {
 
 function buildFakePrisma(options: {
   fixtures: FakeFixture[];
+  canonicalRows?: FakeCanonicalScheduleRow[];
   consentLinks: { participantId: string; linkId: string; userId: string }[];
   consentSnapshots: { linkId: string; state: 'GRANTED' | 'REVOKED'; effectiveAt: Date }[];
   /**
@@ -133,12 +156,31 @@ function buildFakePrisma(options: {
         return [];
       },
     },
-    v1TournamentFixture: {
-      async findMany(args: { where: { scheduledAt?: unknown } }) {
-        // getSchedule은 scheduledAt이 있는 픽스처(paged)와 없는 픽스처(unscheduled)를
-        // 서로 다른 where 절로 두 번 조회한다 -- null 여부로 호출을 구분한다.
-        const wantsScheduled = args.where.scheduledAt !== null;
-        return wantsScheduled ? options.fixtures : [];
+    v1TournamentMatchDetails: {
+      async findMany() {
+        if (options.canonicalRows !== undefined) return options.canonicalRows;
+        return options.fixtures.map((fixture): FakeCanonicalScheduleRow => ({
+          teamMatchId: fixture.id,
+          tournamentId: options.tournamentId ?? TOURNAMENT_ID,
+          groupId: fixture.groupId,
+          round: fixture.round,
+          fixtureNumber: fixture.fixtureNumber,
+          legNumber: fixture.legNumber,
+          homeRegistrationId: fixture.homeRegistrationId,
+          awayRegistrationId: fixture.awayRegistrationId,
+          group: fixture.group,
+          homeRegistration: fixture.homeRegistration,
+          awayRegistration: fixture.awayRegistration,
+          teamMatch: {
+            startAt: fixture.scheduledAt,
+            placeName: fixture.venue,
+            status: fixture.status,
+            fieldId: fixture.field?.id ?? null,
+            field: fixture.field,
+            videos: fixture.videos,
+            game: fixture.game,
+          },
+        }));
       },
     },
     v1TournamentStanding: {
@@ -231,6 +273,63 @@ function makeFixture(overrides: Partial<FakeFixture>): FakeFixture {
 }
 
 describe('PublicTournamentRecordsService.getSchedule -- 일정 카드 득점자 요약', () => {
+  it('공식 revision 일정 요약은 게스트 snapshot만 이름으로 쓰고 등록 snapshot은 무시한다', async () => {
+    const registered = { ...ELIGIBLE, id: 'registered-schedule', userId: 'user-1', displayNameSnapshot: '등록 스냅샷', jerseyNumber: 8 };
+    const guest = { ...INELIGIBLE, id: 'guest-schedule', userId: null, displayNameSnapshot: '라인업 이름', jerseyNumber: 12 };
+    const fixture = makeFixture({
+      game: {
+        ...makeFixture({}).game!,
+        participants: [registered, guest],
+        currentOfficialRevision: {
+          state: 'OFFICIAL', supersedesId: null, officialAt: new Date(), score: { home: 1, away: 1 },
+          outcomeReason: 'NORMAL', outcomeNote: null,
+          goalEvents: [
+            { id: 'registered-schedule-goal', sideId: 'side-home', participantId: registered.id, playerNameSnapshot: '악의적 등록 snapshot', minute: 3, period: 1, ownGoal: false },
+            { id: 'guest-schedule-goal', sideId: 'side-away', participantId: null, playerNameSnapshot: '게스트 일정 득점자', minute: 7, period: 1, ownGoal: false },
+          ],
+        },
+      },
+    });
+    const canonicalFixture: FakeCanonicalScheduleRow = {
+      teamMatchId: fixture.id,
+      tournamentId: TOURNAMENT_ID,
+      groupId: null,
+      round: fixture.round,
+      fixtureNumber: fixture.fixtureNumber,
+      legNumber: fixture.legNumber,
+      homeRegistrationId: fixture.homeRegistrationId,
+      awayRegistrationId: fixture.awayRegistrationId,
+      group: null,
+      homeRegistration: fixture.homeRegistration,
+      awayRegistration: fixture.awayRegistration,
+      teamMatch: {
+        startAt: fixture.scheduledAt,
+        placeName: null,
+        status: 'scheduled',
+        fieldId: null,
+        field: null,
+        videos: [],
+        game: fixture.game!,
+      },
+    };
+    const prisma = buildFakePrisma({
+      fixtures: [fixture],
+      canonicalRows: [canonicalFixture],
+      consentLinks: [{ participantId: registered.id, linkId: 'link-schedule', userId: 'user-1' }],
+      consentSnapshots: [{ linkId: 'link-schedule', state: 'GRANTED', effectiveAt: new Date('2026-01-01T00:00:00.000Z') }],
+      userConsents: [{ userId: 'user-1', state: 'GRANTED' }],
+      nameProfiles: [{ userId: 'user-1', realName: '실명', displayName: '레거시', nickname: '등록닉네임', tournamentRealNameVisible: false, deletedAt: null }],
+      goalEvents: [],
+    });
+
+    const result = await new PublicTournamentRecordsService(prisma, UNUSED_ACCESS_SERVICE).getSchedule(TOURNAMENT_ID, {});
+
+    expect(result.items[0].scorers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ participantName: '등록닉네임', jerseyNumber: 8 }),
+      expect.objectContaining({ participantName: '게스트 일정 득점자', jerseyNumber: null }),
+    ]));
+  });
+
   it('정책 변경(2026-08-13): 동의 여부와 무관하게 대회 참가자는 모두 홈/원정과 이름/등번호가 실린다', async () => {
     const prisma = buildFakePrisma({
       fixtures: [makeFixture({})],
@@ -584,7 +683,11 @@ describe('PublicTournamentRecordsService.getSchedule -- 참가팀 공개 정책 
   const SCHEDULE_TOURNAMENT_UUID = 'c3000000-0000-4000-8000-000000000001';
 
   function buildFakeAccessService(
-    assignments: readonly { role: 'FIELD_OPERATOR' | 'TOURNAMENT_DIRECTOR' | 'SUPPORT_READONLY'; fieldId?: string | null }[],
+    assignments: readonly {
+      role: 'FIELD_OPERATOR' | 'TOURNAMENT_DIRECTOR' | 'SUPPORT_READONLY';
+      fieldId?: string | null;
+      fixtureIds?: readonly string[];
+    }[],
   ): TournamentStaffAccessService {
     const fakeAccessPrisma = {
       v1AdminUser: { async findUnique() { return null; } },
@@ -599,7 +702,7 @@ describe('PublicTournamentRecordsService.getSchedule -- 참가팀 공개 정책 
             createdAt: new Date('2026-01-01T00:00:00.000Z'),
             expiresAt: null,
             revokedAt: null,
-            fixtureScopes: [],
+            fixtureScopes: (assignment.fixtureIds ?? []).map((teamMatchId) => ({ teamMatchId })),
           }));
         },
       },
@@ -640,6 +743,63 @@ describe('PublicTournamentRecordsService.getSchedule -- 참가팀 공개 정책 
     const result = await service.getSchedule(SCHEDULE_TOURNAMENT_UUID, {}, staffUser);
 
     expect(result.items[0].home).toEqual({ registrationId: 'reg-home', teamId: 'team-home', teamName: '홈팀' });
+  });
+
+  it.each([
+    {
+      scope: 'field',
+      fieldId: 'field-a',
+      fixtureIds: [] as readonly string[],
+    },
+    {
+      scope: 'fixture',
+      fieldId: null,
+      fixtureIds: ['c3000000-0000-4000-8000-000000000002'] as readonly string[],
+    },
+  ])('필드 담당자는 모집 중에도 $scope 범위 경기만 팀명이 보이고 다른 경기는 가린다', async ({ fieldId, fixtureIds }) => {
+    const assigned = makeFixture({
+      id: 'c3000000-0000-4000-8000-000000000002',
+      field: { id: 'c3000000-0000-4000-8000-000000000010', name: 'A구장' },
+      homeRegistration: { team: { id: 'team-assigned-home', name: '담당 홈팀' } },
+      awayRegistration: { team: { id: 'team-assigned-away', name: '담당 원정팀' } },
+    });
+    const outside = makeFixture({
+      id: 'c3000000-0000-4000-8000-000000000003',
+      fixtureNumber: 2,
+      field: { id: 'c3000000-0000-4000-8000-000000000011', name: 'B구장' },
+      homeRegistration: { team: { id: 'team-outside-home', name: '다른 홈팀' } },
+      awayRegistration: { team: { id: 'team-outside-away', name: '다른 원정팀' } },
+    });
+    const prisma = buildFakePrisma({
+      fixtures: [assigned, outside],
+      consentLinks: [],
+      consentSnapshots: [],
+      goalEvents: [],
+      tournamentStatus: 'open',
+      tournamentId: SCHEDULE_TOURNAMENT_UUID,
+    });
+    const access = buildFakeAccessService([{
+      role: 'FIELD_OPERATOR',
+      fieldId: fieldId === 'field-a' ? 'c3000000-0000-4000-8000-000000000010' : null,
+      fixtureIds,
+    }]);
+    const service = new PublicTournamentRecordsService(prisma, access);
+    const staffUser = { id: 'field-staff-1', email: null, accountStatus: 'active' as const, onboardingStatus: 'signup_done' as const };
+
+    const result = await service.getSchedule(SCHEDULE_TOURNAMENT_UUID, {}, staffUser);
+
+    expect(result.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        fixtureId: assigned.id,
+        home: { registrationId: 'reg-home', teamId: 'team-assigned-home', teamName: '담당 홈팀' },
+        away: { registrationId: 'reg-away', teamId: 'team-assigned-away', teamName: '담당 원정팀' },
+      }),
+      expect.objectContaining({
+        fixtureId: outside.id,
+        home: { registrationId: 'reg-home', teamId: null, teamName: null },
+        away: { registrationId: 'reg-away', teamId: null, teamName: null },
+      }),
+    ]));
   });
 
   it('모집이 끝나면(closed) 관전자에게도 일정 카드의 팀명이 다시 공개된다', async () => {

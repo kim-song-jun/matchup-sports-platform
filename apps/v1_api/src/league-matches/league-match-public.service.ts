@@ -39,6 +39,31 @@ const PLAYER_RECORDS_LIMIT = 30;
 const LEAGUE_LIST_DEFAULT_LIMIT = 20;
 const LEAGUE_LIST_MAX_LIMIT = 50;
 
+function assertLeagueFixtureListInvariant(row: {
+  hostTeamId: string | null;
+  startAt: Date | null;
+  placeName: string | null;
+}): asserts row is typeof row & { hostTeamId: string; startAt: Date; placeName: string } {
+  if (row.hostTeamId === null || row.startAt === null || row.placeName === null) {
+    throw new InternalServerErrorException({
+      code: 'LEAGUE_FIXTURE_INCOMPLETE',
+      message: '리그 대진의 팀·일정·장소 정보가 없어 공개 일정에 표시할 수 없어요.',
+    });
+  }
+}
+
+function assertLeagueStandingsInvariant(row: {
+  hostTeamId: string | null;
+  startAt: Date | null;
+}): asserts row is typeof row & { hostTeamId: string; startAt: Date } {
+  if (row.hostTeamId === null || row.startAt === null) {
+    throw new InternalServerErrorException({
+      code: 'LEAGUE_FIXTURE_INCOMPLETE',
+      message: '리그 대진의 팀 또는 일정 정보가 없어 순위를 계산할 수 없어요.',
+    });
+  }
+}
+
 @Injectable()
 export class LeagueMatchPublicService {
   private readonly logger = new Logger(LeagueMatchPublicService.name);
@@ -492,7 +517,13 @@ export class LeagueMatchPublicService {
       // 미확정 대진의 점수를 null 로 두는 것, 몰수를 boolean 하나로만 내보내는 것(사유
       // 원문 비공개)은 `league-fixture-list-source.ts` 가 지킨다 — 대회 표면의 리그
       // 경로도 같은 함수를 쓴다.
-      fixtures: toLeagueFixtureList(fixtures, factByGameId),
+      fixtures: toLeagueFixtureList(
+        fixtures.map((fixture) => {
+          assertLeagueFixtureListInvariant(fixture);
+          return fixture;
+        }),
+        factByGameId,
+      ),
     };
   }
 
@@ -530,11 +561,15 @@ export class LeagueMatchPublicService {
     // 분류 규칙(취소·VOID·pending·confirmed)은 `league-standings-source.ts` 로 뽑았다 —
     // 통합 화면의 `getOverallStandings` 가 거울 행에서 **같은 계산**을 해야 하는데, 여기 두면
     // 두 벌이 되고 한쪽만 고쳐지는 날이 온다. 규칙의 근거(R8 · 감사 L-E)는 그 파일 주석에 있다.
+    const validTeamMatches = teamMatches.map((teamMatch) => {
+      assertLeagueStandingsInvariant(teamMatch);
+      return teamMatch;
+    });
     const {
       confirmed: confirmedFixtures,
       pending: pendingFixtures,
       cancelledCount: cancelledFixtureCount,
-    } = bucketLeagueFixtures(teamMatches, factByGameId);
+    } = bucketLeagueFixtures(validTeamMatches, factByGameId);
 
     const tieBreakOrder = LEAGUE_TIE_BREAK_ORDER;
     // calculateLeagueStandingsWithTieBreakInfo 는 calculateLeagueStandings 와 완전히 같은

@@ -87,6 +87,7 @@ function createFake() {
     registeredTeamIds: new Set(['team-a', 'team-b']),
   };
   let seq = 0;
+  let createdGameId: string | null = null;
   const next = (prefix: string) => {
     seq += 1;
     return `${prefix}-${seq}`;
@@ -197,11 +198,26 @@ function createFake() {
     },
     v1Game: {
       findFirst: track('v1Game.findFirst', async () => null),
-      // writeAudit 이 대회 픽스처 스코프를 읽는 조회. 리그 대진은 팀매치 소스라 null 이다.
-      findUnique: track('v1Game.findUnique', async () => ({ tournamentFixture: null })),
+      findUnique: track('v1Game.findUnique', async () =>
+        createdGameId === null
+          ? null
+          : {
+              sourceType: V1GameSourceType.TEAM_MATCH,
+              teamMatch: {
+                id: 'fixture-1',
+                deletedAt: null,
+                tournamentId: 'league-1',
+                leagueId: 'league-1',
+                fieldId: null,
+                tournament: { kind: 'regular_league' },
+                league: { kind: 'regular_league' },
+                tournamentDetails: null,
+              },
+            },
+      ),
       create: track('v1Game.create', async (args: { data: { sourceType: string; competitionConfigVersionId: string } }) => ({
-        id: 'game-1',
-        sourceType: args.data.sourceType,
+        id: (createdGameId = 'game-1'),
+        sourceType: V1GameSourceType.TEAM_MATCH,
         competitionConfigVersionId: args.data.competitionConfigVersionId,
         state: 'SCHEDULED',
         version: 0,
@@ -791,7 +807,7 @@ describe('GamesService.createFromSourceInTransaction — 대회 경로 회귀 �
     await games.createFromSourceInTransaction(
       tx as never,
       {
-        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+        sourceType: V1GameSourceType.TEAM_MATCH,
         sourceId: 'fixture-1',
         competitionConfigVersionId: 'config-1',
         sides: [

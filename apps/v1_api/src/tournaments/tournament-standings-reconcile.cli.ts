@@ -33,6 +33,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { validateCompetitionConfig } from './competition-config/competition-config';
 import { recalculateAndUpsertOverallStandings } from './tournament-overall-standings';
 import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { loadCanonicalStandingsSource } from './tournament-standings-source';
 
 export interface StandingTotals {
   registrationId: string;
@@ -144,24 +145,7 @@ async function main(): Promise<void> {
     if (!tournament.competitionConfigVersionId) {
       throw new Error(`Tournament has no active competition config version: ${tournamentId}`);
     }
-    const config = validateCompetitionConfig(tournament.competitionConfig);
-    const competitionConfigVersionId = tournament.competitionConfigVersionId;
-
-    const groups = await prisma.v1TournamentGroup.findMany({
-      where: { tournamentId, phase: 'group' },
-      include: {
-        groupTeams: { orderBy: { registrationId: 'asc' } },
-        fixtures: {
-          where: { status: 'completed' },
-          include: {
-            game: { select: { currentOfficialRevision: { select: { state: true, score: true } } } },
-            result: {
-              select: { homeScore: true, awayScore: true, hasPenalty: true, homePenaltyScore: true, awayPenaltyScore: true },
-            },
-          },
-        },
-      },
-    });
+    validateCompetitionConfig(tournament.competitionConfig);
 
     const groupStandings = await prisma.v1TournamentStanding.findMany({
       where: { group: { tournamentId, phase: 'group' } },
@@ -196,13 +180,15 @@ async function main(): Promise<void> {
       return;
     }
 
-    const now = new Date();
-    await prisma.$transaction(async (tx) => {
+    const now = await prisma.$transaction(async (tx) => {
+      const source = await loadCanonicalStandingsSource(tx, tournamentId);
+      if (source === null) throw new Error(`Tournament not found during reconciliation: ${tournamentId}`);
       await recalculateAndUpsertOverallStandings(
         tx,
-        { tournamentId, configVersionId: competitionConfigVersionId, config, groups },
-        now,
+        { tournamentId, configVersionId: source.configVersionId, config: source.config, groups: source.groups },
+        source.recalculatedAt,
       );
+      return source.recalculatedAt;
     });
     process.stdout.write(`통합 순위를 재계산해 저장했어요 (recalculatedAt=${now.toISOString()})\n`);
     process.exitCode = 0;

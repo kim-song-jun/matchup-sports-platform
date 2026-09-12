@@ -135,7 +135,7 @@ export function AttestRequestsSection({ gameId }: { gameId: string | null | unde
               <button
                 type="button"
                 className="tm-btn tm-btn-md tm-btn-primary"
-                style={{ flex: 1, minHeight: 44 }}
+                style={{ flex: 1, minHeight: 44, background: 'var(--static-blue)' }}
                 disabled={attest.isPending}
                 aria-label={`${request.participantDisplayName} 연결 승인`}
                 onClick={() => decide(request, 'approve')}

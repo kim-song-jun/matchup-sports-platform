@@ -14,10 +14,10 @@ describe('recalculateTournamentFixtureTeamTrust', () => {
       { reviewerTeamId: teamA, _avg: { rating: 2 }, _count: { _all: 3 } },
       { reviewerTeamId: teamB, _avg: { rating: 5 }, _count: { _all: 1 } },
     ]);
+    const teamMatchCountMock = jest.fn().mockResolvedValue(2);
     const tx = {
       v1PostEventReview: { groupBy: groupByMock },
-      v1TeamMatch: { count: jest.fn().mockResolvedValue(2) },
-      v1TournamentFixture: { count: jest.fn().mockResolvedValue(3) },
+      v1TeamMatch: { count: teamMatchCountMock },
       v1TeamTrustScore: { upsert: upsertMock },
     };
 
@@ -29,7 +29,25 @@ describe('recalculateTournamentFixtureTeamTrust', () => {
     // reviewCount는 후기 건수(4)가 아니라 평가에 참여한 팀 수(2)다.
     expect(upsertCall.update.tournamentReviewCount).toBe(2);
     expect(upsertCall.update.tournamentTrustState).toBe('estimated');
-    expect(upsertCall.update.tournamentMatchCount).toBe(5);
+    expect(upsertCall.update.tournamentMatchCount).toBe(2);
+    expect(teamMatchCountMock).toHaveBeenCalledWith({
+      where: {
+        tournamentId: { not: null },
+        leagueId: null,
+        status: 'completed',
+        tournamentDetails: { isNot: null },
+        game: {
+          is: {
+            sourceType: 'TEAM_MATCH',
+            currentOfficialRevision: { is: { state: 'OFFICIAL', officialAt: { not: null } } },
+          },
+        },
+        OR: [
+          { tournamentDetails: { is: { homeRegistration: { is: { teamId: targetTeamId } } } } },
+          { tournamentDetails: { is: { awayRegistration: { is: { teamId: targetTeamId } } } } },
+        ],
+      },
+    });
     expect(upsertCall.where).toEqual({ teamId: targetTeamId });
   });
 
@@ -40,7 +58,6 @@ describe('recalculateTournamentFixtureTeamTrust', () => {
     const tx = {
       v1PostEventReview: { groupBy: groupByMock },
       v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
-      v1TournamentFixture: { count: jest.fn().mockResolvedValue(0) },
       v1TeamTrustScore: { upsert: jest.fn().mockResolvedValue({}) },
     };
 
@@ -69,7 +86,6 @@ describe('recalculateTournamentFixtureTeamTrust', () => {
         ]),
       },
       v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
-      v1TournamentFixture: { count: jest.fn().mockResolvedValue(1) },
       v1TeamTrustScore: { upsert: upsertMock },
     };
 
@@ -86,7 +102,6 @@ describe('recalculateTournamentFixtureTeamTrust', () => {
     const tx = {
       v1PostEventReview: { groupBy: jest.fn().mockResolvedValue([]) },
       v1TeamMatch: { count: jest.fn().mockResolvedValue(0) },
-      v1TournamentFixture: { count: jest.fn().mockResolvedValue(0) },
       v1TeamTrustScore: { upsert: upsertMock },
     };
 

@@ -61,8 +61,8 @@ export class GameResultSubmittedEscalationService {
     // 판별자는 생성 시 정해져 변하지 않으므로 비동기 간극 문제가 없다. `lockRevision` 이
     // 이미 `team_match.league_id` 를 읽고 있어 **추가 조회도 새 컬럼도 필요 없다.**
     //
-    // 대회 픽스처는 `team_match` 조인이 비어 `leagueId` 가 null 이고, 친선 팀매치도
-    // `leagueId` 가 null 이라 **둘 다 그대로 이 레인을 탄다.**
+    // canonical 대회 TeamMatch는 `tournamentId`가 채워지고 `Details`가 같은 매치를
+    // 가리킨다. 친선 TeamMatch는 두 소유권이 모두 null이라 **둘 다 그대로 이 레인을 탄다.**
     if (revision.teamMatchId !== null && revision.leagueId !== null) return;
     if (await this.guardSuperseded(tx, revision.revisionId)) return;
     await this.createQueue(tx, revision);
@@ -107,13 +107,34 @@ export class GameResultSubmittedEscalationService {
       SELECT
         revision.id AS "revisionId", revision.game_id AS "gameId", revision.state::text AS state,
         revision.submitted_at AS "submittedAt", game.team_match_id AS "teamMatchId",
-        fixture.tournament_id AS "tournamentId", team_match.league_id AS "leagueId",
+        COALESCE(team_match.tournament_id, team_match.league_id) AS "tournamentId",
+        team_match.league_id AS "leagueId",
         team_match.host_team_id AS "hostTeamId"
       FROM v1_game_result_revisions revision
       INNER JOIN v1_games game ON game.id = revision.game_id
-      LEFT JOIN v1_tournament_fixtures fixture ON fixture.id = game.tournament_fixture_id
-      LEFT JOIN v1_team_matches team_match ON team_match.id = game.team_match_id
+      INNER JOIN v1_team_matches team_match ON team_match.id = game.team_match_id
+      LEFT JOIN v1_tournaments competition ON competition.id = team_match.tournament_id
+      LEFT JOIN v1_tournament_match_details details ON details.team_match_id = team_match.id
       WHERE revision.id = ${revisionId}
+        AND game.source_type = 'TEAM_MATCH'::"V1GameSourceType"
+        AND team_match.deleted_at IS NULL
+        AND (
+          (team_match.tournament_id IS NULL AND team_match.league_id IS NULL AND details.team_match_id IS NULL)
+          OR (
+            team_match.tournament_id IS NOT NULL
+            AND team_match.league_id IS NULL
+            AND competition.id IS NOT NULL
+            AND (competition.kind = 'regular_tournament' OR competition.kind IS NULL)
+            AND details.team_match_id = team_match.id
+            AND details.tournament_id = team_match.tournament_id
+          )
+          OR (
+            team_match.league_id IS NOT NULL
+            AND team_match.tournament_id = team_match.league_id
+            AND competition.kind = 'regular_league'
+            AND details.team_match_id IS NULL
+          )
+        )
       FOR UPDATE OF revision
     `;
     const revision = rows[0];
@@ -265,6 +286,24 @@ export class GameResultSubmittedEscalationService {
   }
 
   private async currentReviewer(tx: Prisma.TransactionClient, revision: SubmittedRevision): Promise<Recipient | null> {
+    // Canonical tournament matches are reviewed by tournament staff. The
+    // opponent-owner recipient is reserved for friendly and regular-league
+    // TeamMatches; regular-league mirrors have leagueId and no tournament
+    // Details, while tournament matches have Details and no leagueId.
+    if (revision.tournamentId !== null && revision.leagueId === null) {
+      const rows = await tx.$queryRaw<Array<{ userId: string }>>`
+        SELECT assignment.user_id AS "userId"
+        FROM v1_tournament_staff_assignments assignment
+        INNER JOIN v1_users reviewer ON reviewer.id = assignment.user_id
+        WHERE assignment.tournament_id = ${revision.tournamentId} AND assignment.role = 'TOURNAMENT_DIRECTOR'
+          AND assignment.revoked_at IS NULL AND assignment.created_at <= CURRENT_TIMESTAMP
+          AND (assignment.expires_at IS NULL OR assignment.expires_at > CURRENT_TIMESTAMP)
+          AND reviewer.account_status = 'active'
+        ORDER BY assignment.created_at ASC, assignment.id ASC LIMIT 1
+      `;
+      const reviewer = rows[0];
+      return reviewer === undefined ? null : { userId: reviewer.userId, targetType: 'tournament', targetId: revision.tournamentId };
+    }
     if (revision.teamMatchId !== null) {
       const rows = await tx.$queryRaw<Array<{ userId: string }>>`
         SELECT candidate.user_id AS "userId"
@@ -287,20 +326,6 @@ export class GameResultSubmittedEscalationService {
       `;
       const reviewer = rows[0];
       return reviewer === undefined ? null : { userId: reviewer.userId, targetType: 'team_match', targetId: revision.teamMatchId };
-    }
-    if (revision.tournamentId !== null) {
-      const rows = await tx.$queryRaw<Array<{ userId: string }>>`
-        SELECT assignment.user_id AS "userId"
-        FROM v1_tournament_staff_assignments assignment
-        INNER JOIN v1_users reviewer ON reviewer.id = assignment.user_id
-        WHERE assignment.tournament_id = ${revision.tournamentId} AND assignment.role = 'TOURNAMENT_DIRECTOR'
-          AND assignment.revoked_at IS NULL AND assignment.created_at <= CURRENT_TIMESTAMP
-          AND (assignment.expires_at IS NULL OR assignment.expires_at > CURRENT_TIMESTAMP)
-          AND reviewer.account_status = 'active'
-        ORDER BY assignment.created_at ASC, assignment.id ASC LIMIT 1
-      `;
-      const reviewer = rows[0];
-      return reviewer === undefined ? null : { userId: reviewer.userId, targetType: 'tournament', targetId: revision.tournamentId };
     }
     return null;
   }

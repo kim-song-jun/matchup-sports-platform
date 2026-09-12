@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, V1GameSourceType } from '@prisma/client';
 
 export const PUBLIC_TOURNAMENT_STATUS_FILTER: Prisma.V1TournamentWhereInput['status'] = {
   in: ['open', 'closed', 'in_progress', 'completed'],
@@ -81,7 +81,12 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
       },
     },
   },
-  fixtures: {
+  // Expand-phase canonical tournament matches. Details owns only bracket metadata;
+  // TeamMatch owns schedule/status/venue and its single Game owns live/results data.
+  // The presenter maps these rows into the stable fixture-shaped response. The
+  // TeamMatch UUID remains the public fixture id throughout the transition.
+  tournamentMatchDetails: {
+    where: { teamMatch: { deletedAt: null, game: { sourceType: V1GameSourceType.TEAM_MATCH } } },
     orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }],
     include: {
       homeRegistration: {
@@ -90,36 +95,31 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
       awayRegistration: {
         include: { team: { select: { id: true, name: true, profile: { select: { logoUrl: true } } } } },
       },
-      // R3 §4-3단계: 공개 상세의 fixtures[].result는 이제 아래 game.currentOfficialRevision
-      // 에서 조립한다(tournament-detail.presenter.ts). result/goals 조인은 §4-4단계까지는
-      // 의도적으로 남겨둔다 -- docs/ops/legacy-game-result-r3-removal-inventory.md §4.
-      result: { include: { goals: { orderBy: { createdAt: 'asc' } } } },
-      game: {
+      teamMatch: {
         select: {
-          // `V1Game.state` is what actually moves when a match kicks off. The
-          // `V1TournamentFixture.status` enum has four values
-          // (scheduled | in_progress | completed | cancelled), but only two are
-          // ever written: `scheduled` at creation (tournament-bracket.service.ts)
-          // and `completed` at officialize (tournament-result-review.service.ts).
-          // No writer advances it to `in_progress` or `cancelled`. The presenter
-          // derives `liveStatus` from this state so the public detail response can
-          // say a fixture is live at all.
-          state: true,
-          sides: { select: { id: true, sideKey: true } },
-          participants: { select: { id: true, sideId: true, displayNameSnapshot: true } },
-          currentOfficialRevision: {
-            select: { id: true, state: true, score: true, goalEvents: true, officialAt: true, createdAt: true, updatedAt: true },
+          startAt: true,
+          fieldId: true,
+          placeName: true,
+          status: true,
+          competitionConfigVersionId: true,
+          game: {
+            select: {
+              state: true,
+              visibilityPolicy: { select: { mode: true } },
+              sides: { select: { id: true, sideKey: true } },
+              participants: { select: { id: true, sideId: true, userId: true, displayNameSnapshot: true } },
+              currentOfficialRevision: {
+                select: { id: true, state: true, score: true, goalEvents: true, outcomeReason: true, outcomeNote: true, officialAt: true, createdAt: true, updatedAt: true, tournamentResultLineages: { select: { note: true } } },
+              },
+              events: {
+                where: { OR: [{ type: { in: ['GOAL', 'OWN_GOAL'] } }, { reversesEventId: { not: null } }] },
+                select: { id: true, type: true, sideId: true, participantId: true, clockMs: true, reversesEventId: true, payload: true },
+              },
+            },
           },
-          events: {
-            where: { OR: [{ type: { in: ['GOAL', 'OWN_GOAL'] } }, { reversesEventId: { not: null } }] },
-            // `payload`는 골 이벤트 백필의 `minuteKnown: false` 표식용 --
-            // tournament-bracket.service.ts의 같은 인라인 select와 정확히 일치해야 한다
-            // (tournament-fixture-official-result.ts 하단 주석 참고).
-            select: { id: true, type: true, sideId: true, participantId: true, clockMs: true, reversesEventId: true, payload: true },
-          },
+          videos: { orderBy: { sortOrder: 'asc' } },
         },
       },
-      videos: { orderBy: { sortOrder: 'asc' } },
     },
   },
   announcements: {

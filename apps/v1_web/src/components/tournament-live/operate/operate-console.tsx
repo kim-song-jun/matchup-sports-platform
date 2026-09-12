@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   WifiOff,
   Wifi,
@@ -34,6 +34,7 @@ import {
 } from '@/lib/game-operations-clock';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
+import { V1ApiError } from '@/lib/api-client';
 import { ActionTargetPicker, type EventCaptureCommitInput } from './action-target-picker';
 import { latestLineupForDisplay, latestOperableLineup } from './lineup-grid';
 import { ElapsedMatchClock } from './elapsed-match-clock';
@@ -45,6 +46,7 @@ import { ArrivalCheckinPanel } from './arrival-checkin-panel';
 import { RestTimer } from './rest-timer';
 import { PenaltyShootoutPanel } from './penalty-shootout-panel';
 import { useEventToast, EventToasts } from '@/components/game-operations/event-toast';
+import { useTournamentOpsRole } from '@/components/tournament-ops/role-context';
 import { findRecentGoalEvent } from '@/lib/find-recent-goal-event';
 import { findRecentSubstitutionEvent } from '@/lib/find-recent-substitution-event';
 import { deriveFoulCounts } from '@/lib/team-foul-counter';
@@ -69,6 +71,7 @@ import {
 import type {
   GameCardColor,
   GameCommandName,
+  GameCommandRequest,
   GameEventRecord,
   GameEventType,
   GameLineup,
@@ -163,6 +166,28 @@ interface PendingAction {
   readonly frozen: FrozenEventCapture;
 }
 
+interface PendingCommandRetry {
+  readonly gameId: string;
+  readonly userId: string | undefined;
+  readonly command: GameCommandName;
+  readonly body: GameCommandRequest;
+  readonly label: string;
+}
+
+function deriveLimitedSubstitutionOutParticipantIds(events: readonly GameEventRecord[]): ReadonlySet<string> {
+  const reversedIds = new Set(
+    events
+      .map((event) => event.reversesEventId)
+      .filter((id): id is string => id !== null && id !== undefined),
+  );
+  return new Set(
+    events
+      .filter((event) => event.type === 'SUBSTITUTION' && !reversedIds.has(event.id))
+      .map((event) => event.payload.outParticipantId)
+      .filter((id): id is string => typeof id === 'string'),
+  );
+}
+
 const ACTION_BUTTONS: ReadonlyArray<{
   readonly type: GameEventType;
   readonly label: string;
@@ -181,6 +206,8 @@ const ACTION_BUTTONS: ReadonlyArray<{
 ];
 
 export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps) {
+  const tournamentOpsRole = useTournamentOpsRole();
+  const takeoverEnabled = tournamentOpsRole !== 'SUPPORT_READONLY';
   const authMe = useV1AuthMe();
   const myUserId = authMe.data?.user.id;
 
@@ -198,11 +225,15 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     gameId,
     myUserId,
     initialLastSequence: gameDetail.data?.lastSequence ?? 0,
+    takeoverEnabled,
   });
+  const canOperate = takeoverEnabled && isTakeoverHeld(ops.takeover);
 
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [commandError, setCommandError] = useState<string | null>(null);
   const [commandPending, setCommandPending] = useState(false);
+  const [pendingCommandRetry, setPendingCommandRetry] = useState<PendingCommandRetry | null>(null);
+  const commandBlocked = commandPending || pendingCommandRetry !== null;
   // 몰수·중단 종료 다이얼로그. 사유 자유 텍스트를 받아야 해서 useConfirm(boolean)으로는 안 된다.
   const [abnormalEndOpen, setAbnormalEndOpen] = useState(false);
   // "재개/경기종료할 때 얼마나 걸렸는지" — 실측 사고에서 나온 요구. 명령 왕복
@@ -225,9 +256,19 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 재시도하지 않는다). ref로 "보내는 순간의" 최신 버전을 읽는다 —
   // 아래 handleRunCommandRef가 토스트 콜백에 쓰는 것과 같은 패턴이다.
   const gameVersionRef = useRef(gameVersion);
+  const commandScopeGenerationRef = useRef(0);
+  const commandAttemptRef = useRef(0);
   useEffect(() => {
     gameVersionRef.current = gameVersion;
   }, [gameVersion]);
+
+  useLayoutEffect(() => {
+    commandScopeGenerationRef.current += 1;
+    commandAttemptRef.current += 1;
+    setPendingCommandRetry(null);
+    setCommandError(null);
+    setCommandPending(false);
+  }, [gameId, myUserId]);
 
   // T1-0: a period only counts as "current" once the server has marked it
   // LIVE (via executeCommand's start/start-period). Falling back to "the
@@ -237,6 +278,20 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     const periods = gameDetail.data?.periods ?? [];
     return periods.find((period) => period.state === 'LIVE') ?? null;
   }, [gameDetail.data?.periods]);
+
+  // 풀이 진행 중인 LIVE 피리어드가 없으면 표시 기준은 미래 피리어드(1번 고정)가
+  // 아니라 마지막으로 완료된 피리어드다. HALFTIME에서는 다음 피리어드가 아직
+  // 시작되지 않았으므로 직전 ENDED 피리어드를 계속 보여주고, 모든 피리어드가
+  // ENDED인 정규시간 종료 상태에서도 마지막 피리어드의 이벤트를 유지한다.
+  const periodForDisplay = useMemo(() => {
+    const periods = gameDetail.data?.periods ?? [];
+    if (currentPeriod !== null) return currentPeriod;
+    const halftime = periods.find((period) => period.state === 'HALFTIME') ?? null;
+    const ended = periods
+      .filter((period) => period.state === 'ENDED' && (halftime === null || period.number < halftime.number))
+      .sort((left, right) => right.number - left.number)[0];
+    return ended ?? halftime ?? null;
+  }, [currentPeriod, gameDetail.data?.periods]);
 
   // 이슈 #375 — end-period가 다음 피리어드를 SCHEDULED가 아니라 HALFTIME으로
   // 옮긴다. currentPeriod와 배타적이다(한 번에 최대 하나만 참일 수 있다: 어떤
@@ -318,8 +373,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   }, [gameState, hasNextPeriod, halftimePeriod, regulationEnded]);
 
   const foulCounts = useMemo(
-    () => deriveFoulCounts(ops.liveEvents, currentPeriod?.number ?? 1),
-    [ops.liveEvents, currentPeriod?.number],
+    () => deriveFoulCounts(ops.liveEvents, periodForDisplay?.number ?? 1),
+    [ops.liveEvents, periodForDisplay?.number],
   );
 
   // 선수 교체: "지금 피치 위" 는 저장된 컬럼이 아니라 started + 확정 SUBSTITUTION
@@ -340,10 +395,16 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     }
     return bySide;
   }, [gameDetail.data?.sides, ops.liveEvents]);
+  const substitutionOutParticipantIds = useMemo(
+    () => gameDetail.data?.substitutionPolicy?.mode === 'limited'
+      ? deriveLimitedSubstitutionOutParticipantIds(ops.liveEvents)
+      : new Set<string>(),
+    [gameDetail.data?.substitutionPolicy?.mode, ops.liveEvents],
+  );
 
 
   // UX 감사 item 2 — 라인업 없이 경기를 시작하면 복구 불가능한 막다른 길이
-  // 된다(시작 후에는 LineupGrid가 "제출된 선발 명단이 없어요"만 보여줄 뿐
+  // 된다(시작 후에는 LineupGrid가 "제출된 출전 명단이 없어요"만 보여줄 뿐
   // 되돌릴 수단이 없었다).
   //
   // [P1-c 후속] **여기만 `latestOperableLineup`(제출본 전용)을 계속 쓴다.** 표시·검인은
@@ -540,6 +601,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
   const handleSelectAction = useCallback(
     (button: (typeof ACTION_BUTTONS)[number]) => {
+      if (commandBlocked) return;
       // T1-0: no LIVE period means there is no server-anchored start time to
       // freeze a capture against. This used to silently fall back to
       // Date.now(), which is exactly why every captured event read
@@ -565,7 +627,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         frozen,
       });
     },
-    [ops.clockOffsetMs, currentPeriod],
+    [commandBlocked, ops.clockOffsetMs, currentPeriod],
   );
 
   const { toasts, showToast, dismiss } = useEventToast();
@@ -585,6 +647,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
   const handleCommit = useCallback(
     async (input: EventCaptureCommitInput) => {
+      if (commandBlocked) return;
       // 확인 모달을 띄우기 전에 선택 화면부터 닫는다 — 모달 두 개가 겹쳐
       // 보이지 않게(ActionTargetPicker의 role="dialog" 위에 ConfirmModal의
       // role="dialog"가 또 뜨는 상태를 만들지 않는다). 확인 문구 자체에
@@ -615,7 +678,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         });
       }
     },
-    [ops, showToast, confirm, gameDetail.data?.sides, fixtureLineup.data?.lineups, clockWarningMinutes],
+    [commandBlocked, ops, showToast, confirm, gameDetail.data?.sides, fixtureLineup.data?.lineups, clockWarningMinutes],
   );
 
   // 이슈 #376 — 예전엔 ops.reverseEvent(되돌리기) + ops.submitEvent(재제출) 두 번
@@ -626,13 +689,15 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // assistParticipantId만 in-place로 채우므로 그 레이스 자체가 사라진다.
   const attachAssist = useCallback(
     async (event: GameEventRecord, assistParticipantId: string) => {
+      if (commandBlocked) return;
       await ops.assignAssist({ eventId: event.id, assistParticipantId });
     },
-    [ops],
+    [commandBlocked, ops],
   );
 
   const handleReverseEvent = useCallback(
     async (event: GameEventRecord) => {
+      if (commandBlocked) return;
       const label =
         event.type === 'GOAL'
           ? '골'
@@ -655,7 +720,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       if (!ok) return;
       await ops.reverseEvent({ eventId: event.id, reason: `${label} 기록 수정·취소` });
     },
-    [confirm, ops],
+    [commandBlocked, confirm, ops],
   );
 
   // Task 166 BE-3: 롤링 교체 종목은 교체를 기록하지 않는다(정본 §3) — 서버가 422
@@ -686,8 +751,13 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // (revert-period 토스트, confirmAndRunCommand, 몰수 종료)는 반환값을 그냥 무시하므로
   // 동작이 그대로다.
   const handleRunCommand = useCallback(
-    async (command: GameCommandName, payload: Record<string, unknown> = {}): Promise<boolean> => {
-      if (!gameId || !isTakeoverHeld(ops.takeover)) return false;
+    async (
+      command: GameCommandName,
+      payload: Record<string, unknown> = {},
+      replayBody?: GameCommandRequest,
+    ): Promise<boolean> => {
+      if (!gameId || !canOperate) return false;
+      if (pendingCommandRetry !== null && replayBody === undefined) return false;
       setCommandPending(true);
       setCommandError(null);
       setLastCommandFeedback(null);
@@ -698,14 +768,38 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       // 라벨이 뒤바뀐다.
       const label = commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null);
       const startedAtMs = performance.now();
+      const commandBody: GameCommandRequest = replayBody ?? {
+        expectedVersion: gameVersionRef.current,
+        clientCommandId: randomUuid(),
+        takeoverToken: ops.takeover.token,
+        occurredAt: new Date(Date.now() + ops.clockOffsetMs).toISOString(),
+        payload,
+      };
+      const attemptGeneration = commandScopeGenerationRef.current;
+      const attemptId = ++commandAttemptRef.current;
+      const ownsAttempt = () =>
+        commandScopeGenerationRef.current === attemptGeneration && commandAttemptRef.current === attemptId;
       try {
-        const result = await postV1GameCommand(gameId, command, {
-          expectedVersion: gameVersionRef.current,
-          clientCommandId: randomUuid(),
-          takeoverToken: ops.takeover.token,
-          occurredAt: new Date(Date.now() + ops.clockOffsetMs).toISOString(),
-          payload,
-        });
+        let result: Awaited<ReturnType<typeof postV1GameCommand>>;
+        try {
+          result = await postV1GameCommand(gameId, command, commandBody);
+        } catch (error) {
+          if (ownsAttempt()) {
+            const uncertain = !(error instanceof V1ApiError) || error.statusCode === 408 || error.statusCode >= 500;
+            setCommandError(
+              uncertain
+                ? null
+                : extractErrorMessage(error, '명령을 처리하지 못했어요. 다시 시도해주세요.'),
+            );
+            setPendingCommandRetry(
+              uncertain
+                ? { gameId, userId: myUserId, command, body: commandBody, label }
+                : null,
+            );
+          }
+          return false;
+        }
+        if (!ownsAttempt()) return false;
         // UX 감사 — 커맨드 성공은 소켓으로 브로드캐스트되지 않는다(REST
         // 전용, D-10). `gameState`는 `ops.gameSnapshot?.state`를
         // `gameDetail.data?.state`보다 우선하므로, 아래 refetch만으로는
@@ -713,7 +807,22 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         // 중지"로 보임, 새로고침해야 풀림) — REST 응답을 그 자리에서
         // gameSnapshot에 반영해야 헤더/버튼이 즉시 갱신된다.
         ops.applyCommandResult(result);
-        await gameDetail.refetch();
+        // The command is committed before the auxiliary refetch. Clear the
+        // retry now so a refetch failure cannot resend a committed command
+        // with a new version and create a false VERSION_CONFLICT.
+        setPendingCommandRetry(null);
+        if (command === 'end' && Object.prototype.hasOwnProperty.call(commandBody.payload, 'penalties')) {
+          setPenaltyKicks(null);
+          setFirstKickSideId(null);
+        }
+        try {
+          await gameDetail.refetch();
+        } catch {
+          if (ownsAttempt()) {
+            setCommandError('명령은 저장됐지만 최신 상태를 불러오지 못했어요. 화면을 새로고침해 주세요.');
+          }
+        }
+        if (!ownsAttempt()) return false;
         setLastCommandFeedback({ label, durationMs: Math.round(performance.now() - startedAtMs) });
         // 이슈 #375 — 기존 골/교체 되돌리기(findRecentGoalEvent /
         // ops.reverseEvent)와 같은 토스트 패턴을 따른다: end-period 직후
@@ -744,14 +853,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           });
         }
         return true;
-      } catch (error) {
-        setCommandError(extractErrorMessage(error, '명령을 처리하지 못했어요. 다시 시도해주세요.'));
-        return false;
       } finally {
-        setCommandPending(false);
+        if (ownsAttempt()) setCommandPending(false);
       }
     },
-    [gameId, ops, gameDetail, currentPeriod, halftimePeriod, hasNextPeriod, showToast],
+    [gameId, myUserId, canOperate, ops, gameDetail, currentPeriod, halftimePeriod, hasNextPeriod, pendingCommandRetry, showToast],
   );
 
   // start/pause/resume/end-period/start-period/end 버튼이 실제로 부르는 진입점 —
@@ -761,6 +867,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   // 이 함수 대신 `handleRunCommand`를 직접 부른다).
   const confirmAndRunCommand = useCallback(
     async (command: Exclude<GameCommandName, 'revert-period'>) => {
+      if (commandBlocked) return;
       const label = commandLabel(command, currentPeriod?.number ?? null, halftimePeriod?.number ?? null);
       const copy = commandConfirmCopy(command, label, {
         sides: gameDetail.data?.sides ?? [],
@@ -773,20 +880,21 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       if (!(await confirm(copy))) return;
       await handleRunCommand(command);
     },
-    [confirm, currentPeriod, halftimePeriod, hasNextPeriod, gameDetail.data?.sides, scoreBySideId, handleRunCommand],
+    [commandBlocked, confirm, currentPeriod, halftimePeriod, hasNextPeriod, gameDetail.data?.sides, scoreBySideId, handleRunCommand],
   );
 
   // 과제 2 — 승부차기 시작. 아직 서버에 아무것도 보내지 않는다(패널을 여는
   // 로컬 상태 전환뿐) — 그래도 사용자 결정("예외 없이 전부")에 따라 확인을
   // 거친다.
   const handleStartPenaltyShootout = useCallback(async () => {
+    if (commandBlocked) return;
     const copy = penaltyShootoutStartConfirmCopy(gameDetail.data?.sides ?? [], scoreBySideId);
     if (!(await confirm(copy))) return;
     setPenaltyKicks([]);
     // 선축은 매번 다시 고른다 — 직전 승부차기(취소했던 것)의 선택이 남아 있으면
     // 운영자가 동전을 던지지도 않고 그대로 진행하게 된다.
     setFirstKickSideId(null);
-  }, [confirm, gameDetail.data?.sides, scoreBySideId]);
+  }, [commandBlocked, confirm, gameDetail.data?.sides, scoreBySideId]);
 
   // 패널을 닫는다 — 취소는 사이드 이펙트가 없으므로(아직 아무것도 서버에
   // 보내지 않았다) 확인을 거치지 않는다. ActionTargetPicker의 onCancel과
@@ -796,14 +904,16 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   }, []);
 
   const handleRecordPenaltyKick = useCallback((sideId: string, result: PenaltyKickResult) => {
+    if (commandBlocked) return;
     setPenaltyKicks((current) => (current === null ? current : [...current, { sideId, result }]));
-  }, []);
+  }, [commandBlocked]);
 
   // 요구사항 3(과제 2) — 오조작 복구. 로컬 상태 되감기일 뿐이라 확인이 없다
   // (revert-period와 같은 이유 — 되돌리기 자체가 이미 교정 행동이다).
   const handleUndoPenaltyKick = useCallback(() => {
+    if (commandBlocked) return;
     setPenaltyKicks((current) => (current === null || current.length === 0 ? current : current.slice(0, -1)));
-  }, []);
+  }, [commandBlocked]);
 
   // 승부차기 종료 — 이 순간에야 `end` 커맨드가 실제로 나간다. `home`/`away`는
   // 배열 순서가 아니라 `sideKey`로 매핑한다(백엔드 `scoreFromEvents`/
@@ -892,6 +1002,20 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
     handleRunCommandRef.current = handleRunCommand;
   }, [handleRunCommand]);
 
+  const retryPendingCommand = useCallback(() => {
+    if (
+      pendingCommandRetry === null ||
+      pendingCommandRetry.gameId !== gameId ||
+      pendingCommandRetry.userId !== myUserId
+    ) return;
+    void handleRunCommandRef.current(
+      pendingCommandRetry.command,
+      pendingCommandRetry.body.payload,
+      pendingCommandRetry.body,
+    );
+  }, [gameId, myUserId, pendingCommandRetry]);
+
+
   if (fixtureLineup.isLoading || (gameId && gameDetail.isLoading)) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center text-sm text-[var(--text-muted)]">
@@ -922,6 +1046,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
   }
 
   const sides = gameDetail.data?.sides ?? [];
+  const homeTeamId = sides.find((side) => side.sideKey === 'HOME')?.teamId;
+  const awayTeamId = sides.find((side) => side.sideKey === 'AWAY')?.teamId;
+  const startBlockedByTeams = !homeTeamId || !awayTeamId || homeTeamId === awayTeamId;
   const lineups = fixtureLineup.data?.lineups ?? [];
 
   return (
@@ -938,10 +1065,23 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           배치해 데스크톱의 남는 세로 공간을 채운다. 두 컬럼 모두 내부에서
           기존과 같은 gap-4 세로 리듬을 유지해 모바일 스택 순서·간격은
           픽셀 단위로 그대로다. */}
-      <div className="flex flex-col gap-4">
+      {/* On mobile the first column must not become the sticky header's containing
+          block: it ends before the event column, which otherwise forces the header
+          back toward the viewport top at the end of the first column. The outer
+          console stack owns the full scroll flow; desktop keeps the two-column
+          wrapper for its existing grid layout. */}
+      <div className="contents lg:flex lg:flex-col lg:gap-4">
       {/* Sticky context header — tablet 768×1024 / desktop 1280+ keep this
           visible while scrolling the lineup/queue below. */}
-      <header className="sticky top-0 z-10 -mx-4 border-b border-[var(--border)] bg-white/95 px-4 py-3 backdrop-blur-sm dark:bg-gray-900/95">
+      {/* The ops shell keeps a 52px mobile/tablet header sticky at the viewport top.
+          Keep this game context header below it while scrolling; the shell header is
+          hidden on desktop, so the console can return to the viewport top at lg. */}
+      <header
+        className={[
+          'sticky z-10 border-b border-[var(--border)] bg-white/95 px-4 py-3 backdrop-blur-sm dark:bg-gray-900/95',
+          tournamentOpsRole === 'FIELD_OPERATOR' ? 'top-[52px]' : 'top-[52px] lg:top-0',
+        ].join(' ')}
+      >
         {/* T1-0: next-period(현재는 end-period) 버튼이 추가되며 LIVE 상태의
             버튼이 최대 3개(일시 중지/전반 종료/경기 종료)가 됐다. 기존 "한
             줄에 타이틀+뱃지+버튼" 레이아웃은 390px 모바일에서 버튼 3개가
@@ -979,7 +1119,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
               </span>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-1 sm:shrink-0">
+          <div className="flex w-full flex-col items-stretch gap-1 sm:w-auto sm:shrink-0 sm:items-end">
             {/* UX 감사 item 3 — "경기 종료"는 되돌릴 수 없는데 나머지 명령과
                 6px 간격으로 붙어 있어 오탭 위험이 컸다. 되돌릴 수 있는
                 명령들과 별도 그룹으로 묶고 구분선을 둬 시각적·물리적으로
@@ -992,7 +1132,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                 "일시 중지"다(피리어드 종료는 절반의 경기 시간에 한 번뿐,
                 일시 중지는 파울·부상 등으로 언제든 필요) — 나머지는 보조
                 (outline)로 후퇴시킨다. */}
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
               {availableCommands
                 .filter((command) => command !== 'end')
                 .map((command, index) => {
@@ -1002,9 +1142,11 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                       key={command}
                       size="sm"
                       variant={index === 0 ? 'primary' : 'outline'}
+                      className={index === 0 ? 'enabled:!bg-[var(--blue700)] enabled:!text-white enabled:hover:brightness-95' : undefined}
                       disabled={
-                        !isTakeoverHeld(ops.takeover) ||
-                        commandPending
+                        !canOperate ||
+                        commandBlocked ||
+                        (command === 'start' && startBlockedByTeams)
                         // [P1-c] 예전에는 라인업 미제출이면 시작 버튼을 비활성화했다.
                         // 그 근거는 "시작하면 기록할 참가자가 없어 막다른 길"이었는데,
                         // 이제 참가자는 대회 등록 명단에서 경기 생성 시점에 이미
@@ -1028,7 +1170,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                       availableCommands 가 ['end'] 하나뿐이라, 조건 없이 그리면 세로선이 첫 버튼
                       왼쪽에 홀로 매달린다. */}
                   {availableCommands.some((command) => command !== 'end') ? (
-                    <span aria-hidden="true" className="mx-0.5 h-6 w-px shrink-0 bg-[var(--border)]" />
+                    <span aria-hidden="true" className="mx-0.5 hidden h-6 w-px shrink-0 bg-[var(--border)] sm:block" />
                   ) : null}
                   {/* 과제 2 — 정규시간(+연장) 종료 시 동점인 대회 knockout
                       경기에서는 "경기 종료"를 바로 누르는 대신 승부차기
@@ -1042,7 +1184,8 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                       key="penalty-start"
                       size="sm"
                       variant="primary"
-                      disabled={!isTakeoverHeld(ops.takeover) || commandPending}
+                      className="enabled:!bg-[var(--blue700)] enabled:!text-white enabled:hover:brightness-95"
+                      disabled={!canOperate || commandBlocked}
                       onClick={() => void handleStartPenaltyShootout()}
                     >
                       <Target size={14} aria-hidden="true" />
@@ -1053,11 +1196,12 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                       key="end"
                       size="sm"
                       variant="danger"
+                      className="enabled:!bg-[var(--red700)] enabled:!text-white enabled:hover:brightness-95"
                       // 요구사항 4 — 결선 무승부인데 승부차기가 없으면 누를
                       // 수 없다. 숨기지 않고 비활성 + 아래 배너로 사유를
                       // 설명한다(이 화면의 반복 패턴 ①: 라인업 미제출 시
                       // "경기 시작"을 다루는 방식과 동일).
-                      disabled={!isTakeoverHeld(ops.takeover) || commandPending || endBlockedReason !== null}
+                      disabled={!canOperate || commandBlocked || endBlockedReason !== null}
                       loading={commandPending}
                       onClick={() => void confirmAndRunCommand('end')}
                     >
@@ -1076,7 +1220,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
                       key="abnormal-end"
                       size="sm"
                       variant="outline"
-                      disabled={!isTakeoverHeld(ops.takeover) || commandPending}
+                      disabled={!canOperate || commandBlocked}
                       onClick={() => setAbnormalEndOpen(true)}
                     >
                       몰수·중단으로 종료
@@ -1197,12 +1341,15 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
 
       {/* Banners — never silently swallowed; each condition is its own
           visible, dismissable-by-recovery state. */}
-      <div className="flex flex-col gap-2 px-4" aria-live="polite">
+      <div className="flex flex-col gap-2 px-4 empty:hidden" aria-live="polite">
+        {!takeoverEnabled && (
+          <Banner tone="info">지원 담당자는 이 경기의 기록을 조회할 수 있지만 수정할 수 없어요.</Banner>
+        )}
         {/* UX 감사 item 4 — takeover.status가 'none'/'requesting'인 동안(마운트 시
             자동 요청, 매번 콘솔을 열 때마다 거치는 구간) 명령 버튼과
             LineupGrid가 전부 비활성인데 이유를 알려주는 배너가 없었다(감사의
             반복 패턴 ①). */}
-        {(ops.takeover.status === 'none' || ops.takeover.status === 'requesting') && (
+        {takeoverEnabled && (ops.takeover.status === 'none' || ops.takeover.status === 'requesting') && (
           <Banner tone="info">경기 운영 권한을 가져오는 중이에요…</Banner>
         )}
         {/* [P1-d] 예전에는 "버튼이 비활성인 이유 + 제출하러 가는 링크"였다. 지금은 둘 다
@@ -1213,11 +1360,15 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         {/* 대회 축(TOURNAMENT_FIXTURE)은 제외한다 — 거기엔 라인업 제출 단계가 없어
             자동 생성된 초안이 영영 SUBMITTED 가 되지 않는다. 명단 검인에 선수가 다 차 있는데
             "아직 제출하지 않았어요" 가 뜨던 자리다(alpha 실측). */}
+        {gameState === 'SCHEDULED' && startBlockedByTeams && (
+          <Banner tone="warning">대진표에서 서로 다른 두 팀을 배정한 뒤 경기를 시작해 주세요.</Banner>
+        )}
         {gameDetail.data?.sourceType === 'TEAM_MATCH' &&
+          !startBlockedByTeams &&
           gameState === 'SCHEDULED' &&
           sidesMissingLineup.length > 0 && (
           <Banner tone="warning">
-            {sidesMissingLineup.map((side) => side.displayNameSnapshot).join(', ')} 팀이 아직 선발 명단을
+            {sidesMissingLineup.map((side) => side.displayNameSnapshot).join(', ')} 팀이 아직 출전 명단을
             제출하지 않았어요. 이대로도 경기를 시작할 수 있어요.
           </Banner>
         )}
@@ -1252,6 +1403,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         {currentPeriod === null &&
           halftimePeriod === null &&
           !regulationEnded &&
+          !startBlockedByTeams &&
           gameState !== 'ENDED' &&
           gameState !== 'CANCELLED' && (
             // [P1-c] 예전에는 라인업 미제출일 때 이 안내를 숨겼다(시작이 막혀 있었으므로).
@@ -1283,6 +1435,14 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         )}
         {ops.bannerMessage && <Banner tone="danger">{ops.bannerMessage}</Banner>}
         {commandError && <Banner tone="danger">{commandError}</Banner>}
+        {pendingCommandRetry && (
+          <div className="flex flex-col items-stretch gap-2 rounded-lg bg-[var(--red50)] px-3 py-2 text-sm leading-relaxed text-[var(--red700)] sm:flex-row sm:items-center sm:gap-3">
+            <span className="min-w-0 flex-1 break-keep">{pendingCommandRetry.label} 요청의 서버 응답을 받지 못했어요. 같은 요청을 다시 보낼 수 있어요.</span>
+            <Button type="button" size="sm" variant="outline" className="min-h-[44px] shrink-0 self-start text-sm sm:self-auto" disabled={commandPending || !canOperate} onClick={retryPendingCommand}>
+              같은 요청 재시도
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* 휴식 타이머(하프타임·부상 중단) — 경기가 SCHEDULED 이전(아직 시작 전)이나
@@ -1291,7 +1451,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           중에도 필요하다. */}
       {(gameState === 'LIVE' || gameState === 'PAUSED') && <RestTimer />}
 
-      <TeamFoulCounterBar sides={sides} counts={foulCounts} period={currentPeriod?.number ?? 1} />
+      <TeamFoulCounterBar sides={sides} counts={foulCounts} period={periodForDisplay?.number ?? 1} />
 
       {/* 액션 우선 리오더: 이 자리는 예전엔 탭 가능한 선수 그리드였다(선수 먼저 →
           액션). 지금은 액션이 먼저이므로, 그 다음 조작이 실제로 일어나는 자리가
@@ -1320,7 +1480,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
             size="lg"
             variant="outline"
             className="h-16 flex-col gap-1 lg:h-20"
-            disabled={!isTakeoverHeld(ops.takeover) || currentPeriod === null}
+            disabled={!canOperate || currentPeriod === null || commandBlocked}
             onClick={() => handleSelectAction(button)}
           >
             {button.type === 'GOAL' || button.type === 'OWN_GOAL' ? (
@@ -1355,7 +1515,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           부풀어 보인다. */}
       <AbnormalEndDialog
         open={abnormalEndOpen}
-        submitting={commandPending}
+        submitting={commandBlocked}
         onCancel={() => setAbnormalEndOpen(false)}
         onConfirm={({ reason, note }: { reason: AbnormalEndReason; note: string }) => {
           setAbnormalEndOpen(false);
@@ -1372,7 +1532,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
         <ArrivalCheckinPanel
           sides={sides}
           lineups={lineups}
-          disabled={!isTakeoverHeld(ops.takeover)}
+          disabled={!canOperate || commandBlocked}
           pendingParticipantId={setArrival.isPending ? setArrival.variables?.participantId ?? null : null}
           onToggleArrival={({ participantId, arrived }) => {
             setArrival.mutate(
@@ -1404,8 +1564,9 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           events={ops.liveEvents}
           sides={sides}
           lineups={lineups}
-          onAttachAssist={(event) => setAssistTarget({ event })}
-          onReverseEvent={(event) => void handleReverseEvent(event)}
+          onAttachAssist={canOperate ? (event) => setAssistTarget({ event }) : undefined}
+          onReverseEvent={canOperate ? (event) => void handleReverseEvent(event) : undefined}
+          disabled={commandBlocked}
           resultOfficialized={resultOfficialized}
         />
       </section>
@@ -1415,7 +1576,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
       {hasUnsettledQueueItems(ops.queue.items) && (
         <section className="px-4">
           <h3 className="mb-2 text-sm font-semibold text-[var(--text-strong)]">전송 대기·실패</h3>
-          <QueueStatusPanel items={ops.queue.items} onRetry={ops.retryFailedEvent} />
+          <QueueStatusPanel items={ops.queue.items} onRetry={ops.retryFailedEvent} disabled={commandBlocked} />
         </section>
       )}
       </div>
@@ -1431,6 +1592,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           lineups={lineups}
           allowTeamOnly={pendingAction.allowTeamOnly}
           onPitchParticipantIds={onPitchParticipantIds}
+          substitutionOutParticipantIds={substitutionOutParticipantIds}
           substitutionPolicy={gameDetail.data?.substitutionPolicy ?? null}
           substitutionUsedBySideId={substitutionUsedBySideId}
           onCommit={handleCommit}
@@ -1464,7 +1626,7 @@ export function OperateConsole({ tournamentId, fixtureId }: OperateConsoleProps)
           onCancel={handleCancelPenaltyShootout}
           regulationScoreBySideId={scoreBySideId}
           policy={penaltyPolicy}
-          finishing={commandPending}
+          finishing={commandBlocked}
         />
       ) : null}
       <EventToasts toasts={toasts} onDismiss={dismiss} />

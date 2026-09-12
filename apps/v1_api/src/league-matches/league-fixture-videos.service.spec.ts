@@ -9,8 +9,7 @@ import { LeagueFixtureVideosService } from './league-fixture-videos.service';
  * 대회 영상 서비스와 공유하는 규칙(URL 검증·상한·중복)은 스모크만 확인하고,
  * 이 스펙의 핵심은 **리그 고유 규칙**이다:
  *  - 주차 라벨(round='N주차')과 팀 실명이 목록 응답에 실린다
- *  - 업로드 파일 회수가 참조 카운트를 **두 테이블 모두**(리그·대회)에서 센다 —
- *    한쪽만 보면 다른 도메인에 등록된 같은 파일의 재생이 깨진다.
+ *  - 업로드 파일 회수가 canonical `V1TeamMatchVideo` URL 참조를 센다.
  */
 
 const USER = { id: 'admin-1' } as V1AuthUser;
@@ -20,11 +19,11 @@ const TEAM_MATCH_ID = 'c1000000-0000-4000-8000-000000000002';
 function buildService(options: {
   videos?: Array<{ id: string; url: string; sortOrder: number; title: string | null; createdAt: Date; teamMatchId: string }>;
   teamMatchUrlRefs?: number;
-  tournamentUrlRefs?: number;
   adminContext?: AdminContextService;
 }) {
   const removed: string[] = [];
   const created: Array<Record<string, unknown>> = [];
+  const executeRaw = jest.fn().mockResolvedValue(0);
   const videos = options.videos ?? [];
   const fakePrisma = {
     // BE-5: 리그 존재 확인이 통합 축으로 옮겨졌다.
@@ -46,12 +45,15 @@ function buildService(options: {
       delete: async () => videos[0],
       count: async () => options.teamMatchUrlRefs ?? 0,
     },
-    v1TournamentFixtureVideo: { count: async () => options.tournamentUrlRefs ?? 0 },
     v1UploadAsset: {
       findUnique: async () => ({ ownerUserId: USER.id, kind: 'video' }),
       deleteMany: async () => ({ count: 1 }),
     },
+    $queryRaw: jest.fn().mockResolvedValue([{ id: 'admin-row' }]),
+    $executeRaw: executeRaw,
   } as unknown as PrismaService;
+  (fakePrisma as unknown as { $transaction: (callback: (tx: typeof fakePrisma) => Promise<unknown>) => Promise<unknown> }).$transaction =
+    async (callback) => callback(fakePrisma);
   const adminContext =
     options.adminContext ??
     ({
@@ -66,7 +68,7 @@ function buildService(options: {
     },
   } as unknown as UploadsService;
   const service = new LeagueFixtureVideosService(fakePrisma, adminContext, uploads);
-  return { service, removed, created };
+  return { service, removed, created, executeRaw };
 }
 
 describe('LeagueFixtureVideosService', () => {
@@ -120,17 +122,26 @@ describe('LeagueFixtureVideosService', () => {
     ).rejects.toThrow(ConflictException);
   });
 
-  it('삭제: 업로드 파일이 두 테이블 어디에서도 참조되지 않을 때만 물리 회수한다', async () => {
+  it('삭제: canonical 경기 어디에서도 참조되지 않을 때만 물리 회수한다', async () => {
     const uploadVideo = { id: 'v-1', url: '/uploads/2026/08/a.mp4', sortOrder: 0, title: null, createdAt: new Date(), teamMatchId: TEAM_MATCH_ID };
-    const { service, removed } = buildService({ videos: [uploadVideo], teamMatchUrlRefs: 0, tournamentUrlRefs: 0 });
-    await service.deleteVideo(USER, LEAGUE_ID, TEAM_MATCH_ID, 'v-1');
-    expect(removed).toEqual(['/uploads/2026/08/a.mp4']);
-  });
-
-  it('삭제: 대회 경기 쪽에 같은 업로드 URL 참조가 남아 있으면 물리 파일을 지우지 않는다', async () => {
-    const uploadVideo = { id: 'v-1', url: '/uploads/2026/08/a.mp4', sortOrder: 0, title: null, createdAt: new Date(), teamMatchId: TEAM_MATCH_ID };
-    const { service, removed } = buildService({ videos: [uploadVideo], teamMatchUrlRefs: 0, tournamentUrlRefs: 1 });
+    const { service, removed, executeRaw } = buildService({ videos: [uploadVideo], teamMatchUrlRefs: 0 });
     await service.deleteVideo(USER, LEAGUE_ID, TEAM_MATCH_ID, 'v-1');
     expect(removed).toEqual([]);
+    // Physical unlink is deferred to VIDEO_UPLOAD_CLEANUP worker after the
+    // transaction; the lock and durable outbox insert both ran.
+    const calls = executeRaw.mock.calls;
+    expect(calls.filter((call) => String(call[0]).includes('pg_advisory_xact_lock'))).toHaveLength(2);
+    const cleanupCall = calls.find((call) => String(call[0]).includes('INSERT INTO v1_outbox_events'));
+    expect(cleanupCall).toBeDefined();
+    expect(cleanupCall).toContain('/uploads/2026/08/a.mp4');
+  });
+
+  it('삭제: 다른 canonical 경기에도 같은 업로드 URL 참조가 남아 있으면 물리 파일을 지우지 않는다', async () => {
+    const uploadVideo = { id: 'v-1', url: '/uploads/2026/08/a.mp4', sortOrder: 0, title: null, createdAt: new Date(), teamMatchId: TEAM_MATCH_ID };
+    const { service, removed, executeRaw } = buildService({ videos: [uploadVideo], teamMatchUrlRefs: 1 });
+    await service.deleteVideo(USER, LEAGUE_ID, TEAM_MATCH_ID, 'v-1');
+    expect(removed).toEqual([]);
+    expect(executeRaw.mock.calls.filter((call) => String(call[0]).includes('pg_advisory_xact_lock'))).toHaveLength(2);
+    expect(executeRaw.mock.calls.some((call) => String(call[0]).includes('INSERT INTO v1_outbox_events'))).toBe(false);
   });
 });

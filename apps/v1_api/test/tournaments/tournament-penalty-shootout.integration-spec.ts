@@ -120,7 +120,7 @@ async function buildTournamentGame(fixtureId: string): Promise<string> {
     orderBy: { version: 'desc' },
   });
   const input: GameSourceCreationInput = {
-    sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+    sourceType: V1GameSourceType.TEAM_MATCH,
     sourceId: fixtureId,
     competitionConfigVersionId: config.id,
     sides: [
@@ -221,7 +221,7 @@ async function endGame(
 ) {
   const key = `task-penalty-end-${gameId}-${attempt}`;
   const endToken = await grantTakeover(gameId, ids.platformOps, `end-${gameId}-${attempt}`);
-  // 'end' on a TOURNAMENT_FIXTURE game always derives+submits a result
+  // 'end' on a canonical tournament TeamMatch game always derives+submits a result
   // revision (GamesService.deriveTournamentRevision), so the union always
   // resolves to GameRevisionMutationResult here -- the generic
   // GameMutationResult branch only ever applies to start/pause/resume/
@@ -285,73 +285,73 @@ describe('Track B tournament penalty shootout', () => {
     await prisma.v1TournamentGroup.create({
       data: { id: ids.groupPhaseGroup, tournamentId: ids.tournament, name: 'A조', phase: 'group' },
     });
-    await prisma.v1TournamentFixture.createMany({
-      data: [
+    const matchDefinitions = [
         {
           id: ids.knockoutSourceFixture,
-          tournamentId: ids.tournament,
-          groupId: ids.semiGroup,
           round: '준결승',
           fixtureNumber: 1,
-          competitionConfigVersionId: config.id,
+          groupId: ids.semiGroup,
         },
         {
           id: ids.knockoutTargetFixture,
-          tournamentId: ids.tournament,
-          groupId: ids.semiGroup,
           round: '결승',
           fixtureNumber: 1,
-          competitionConfigVersionId: config.id,
+          groupId: ids.semiGroup,
         },
         {
           id: ids.decisiveKnockoutFixture,
-          tournamentId: ids.tournament,
-          groupId: ids.semiGroup,
           round: '준결승',
           fixtureNumber: 2,
-          competitionConfigVersionId: config.id,
+          groupId: ids.semiGroup,
         },
         {
           id: ids.groupPhaseFixture,
-          tournamentId: ids.tournament,
-          groupId: ids.groupPhaseGroup,
           round: '조별리그',
           fixtureNumber: 1,
-          competitionConfigVersionId: config.id,
+          groupId: ids.groupPhaseGroup,
         },
         {
           id: ids.drawKnockoutFixture,
-          tournamentId: ids.tournament,
-          groupId: ids.semiGroup,
           round: '준결승',
           fixtureNumber: 3,
-          competitionConfigVersionId: config.id,
+          groupId: ids.semiGroup,
         },
-      ],
-    });
+    ] as const;
     await prisma.v1TournamentRegistration.createMany({
       data: [
         { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
         { id: ids.opponentRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
       ],
     });
-    for (const fixtureId of [
-      ids.knockoutSourceFixture,
-      ids.decisiveKnockoutFixture,
-      ids.groupPhaseFixture,
-      ids.drawKnockoutFixture,
-    ]) {
-      await prisma.v1TournamentFixture.update({
-        where: { id: fixtureId },
-        data: { homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration },
-      });
-    }
-    await prisma.v1TournamentFixtureAdvancementEdge.create({
+    await prisma.v1TeamMatch.createMany({
+      data: matchDefinitions.map((match) => ({
+        id: match.id,
+        tournamentId: ids.tournament,
+        sportId: ids.sport,
+        title: `Penalty ${match.id}`,
+        status: 'matched' as const,
+        competitionConfigVersionId: config.id,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+      })),
+    });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: matchDefinitions.map((match) => ({
+        teamMatchId: match.id,
+        tournamentId: ids.tournament,
+        groupId: match.groupId,
+        round: match.round,
+        fixtureNumber: match.fixtureNumber,
+        homeRegistrationId: ids.hostRegistration,
+        awayRegistrationId: ids.opponentRegistration,
+      })),
+    });
+    await prisma.v1TournamentMatchAdvancementEdge.create({
       data: {
         tournamentId: ids.tournament,
-        sourceFixtureId: ids.knockoutSourceFixture,
+        sourceTeamMatchId: ids.knockoutSourceFixture,
         sourceOutcome: 'WINNER',
-        targetFixtureId: ids.knockoutTargetFixture,
+        targetTeamMatchId: ids.knockoutTargetFixture,
         targetSide: 'HOME',
       },
     });
@@ -360,6 +360,9 @@ describe('Track B tournament penalty shootout', () => {
       create: { key: 'DIRECTOR_OFFICIALIZE', value: 'off', ownerActor: 'platform_ops' },
       update: { value: 'off' },
     });
+    // Canonical advancement validates the target's scheduled TeamMatch Game
+    // and both sides before assigning a registration.
+    await buildTournamentGame(ids.knockoutTargetFixture);
   });
 
   afterAll(async () => {
@@ -398,7 +401,7 @@ describe('Track B tournament penalty shootout', () => {
     await drainOutbox();
 
     // 브래킷 진출 판정: 승부차기 승자(home, 5-4)가 다음 라운드 HOME 슬롯에 배정된다.
-    const target = await prisma.v1TournamentFixture.findUniqueOrThrow({ where: { id: ids.knockoutTargetFixture } });
+    const target = await prisma.v1TournamentMatchDetails.findUniqueOrThrow({ where: { teamMatchId: ids.knockoutTargetFixture } });
     expect(target.homeRegistrationId).toBe(ids.hostRegistration);
 
     // 공개 응답 필드: resolveTournamentFixtureOfficialResult()는 공개 상세

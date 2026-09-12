@@ -11,6 +11,7 @@ import { ResultEscalationMutationService } from '../game-operations/result-escal
 import { ResultEscalationService } from '../game-operations/result-escalation.service';
 import { ResultEscalationValidationInterceptor } from '../game-operations/result-escalation-validation.interceptor';
 import { PrismaModule } from '../prisma/prisma.module';
+import { UploadsService } from '../uploads/uploads.service';
 import { LineupTodoService } from '../team-lineups/lineup-todo.service';
 import { WorkerNotificationsModule } from './schedule-reminders/worker-notifications.module';
 import {
@@ -18,6 +19,7 @@ import {
   V1GameOperationsWorkerController,
 } from './v1-game-operations-worker.controller';
 import { V1GameOperationsWorkerService } from './v1-game-operations-worker.service';
+import { VideoUploadCleanupService } from './video-upload-cleanup.service';
 
 @Module({
   // LoggerModule.forRoot() is required here (mirrors app.module.ts) because
@@ -66,6 +68,9 @@ import { V1GameOperationsWorkerService } from './v1-game-operations-worker.servi
   ],
   providers: [
     V1GameOperationsWorkerService,
+    VideoUploadCleanupService,
+    // Cleanup needs storage operations, not the public upload HTTP controller.
+    UploadsService,
     // 라인업 리마인더 스캔이 쓰는 읽기 전용 서비스. 서비스만 가져오고 컨트롤러
     // (LineupTodosController)는 HTTP 앱에만 두므로, 위 주석이 경고하는 "같은 컨트롤러가
     // 두 모듈에 등록되는" 문제는 생기지 않는다.

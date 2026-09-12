@@ -70,6 +70,48 @@ function tournamentCard(overrides: Record<string, unknown> = {}) {
 }
 
 function fullTournamentRow(overrides: Record<string, unknown> = {}) {
+  const {
+    detailSeeds: rawDetailSeeds,
+    tournamentMatchDetails: suppliedDetails,
+    ...rowOverrides
+  } = overrides;
+  const detailSeeds = (rawDetailSeeds as Array<Record<string, unknown>> | undefined) ?? [];
+  const canonicalDetails = detailSeeds.map((fixture) => ({
+    tournamentId: 'tournament-1',
+    teamMatchId: fixture.id,
+    groupId: fixture.groupId ?? null,
+    round: fixture.round,
+    fixtureNumber: fixture.fixtureNumber,
+    legNumber: fixture.legNumber,
+    parentTeamMatchId: fixture.parentFixtureId ?? null,
+    homeRegistrationId: fixture.homeRegistrationId ?? null,
+    awayRegistrationId: fixture.awayRegistrationId ?? null,
+    homeRegistration: fixture.homeRegistration,
+    awayRegistration: fixture.awayRegistration,
+    createdAt: fixture.createdAt ?? new Date('2026-06-01T00:00:00.000Z'),
+    updatedAt: fixture.updatedAt ?? new Date('2026-06-01T00:00:00.000Z'),
+      teamMatch: {
+        deletedAt: null,
+        startAt: fixture.scheduledAt ?? null,
+      fieldId: fixture.fieldId ?? null,
+      placeName: fixture.venue ?? null,
+      status: fixture.status === 'completed' ? 'completed' : fixture.status === 'cancelled' ? 'cancelled' : 'scheduled',
+      competitionConfigVersionId: fixture.competitionConfigVersionId ?? 'config-1',
+        game: fixture.game === null
+          ? null
+          : {
+              sourceType: 'TEAM_MATCH',
+              visibilityPolicy: { mode: 'LIVE' },
+              state: 'SCHEDULED',
+              sides: [],
+              participants: [],
+              currentOfficialRevision: null,
+              events: [],
+              ...fixture.game,
+            },
+      videos: fixture.videos ?? [],
+    },
+  }));
   return {
     id: 'tournament-1',
     sportId: 'sport-1',
@@ -120,10 +162,10 @@ function fullTournamentRow(overrides: Record<string, unknown> = {}) {
     _count: { registrations: 4 },
     registrations: [{ status: 'awaiting_payment' }],
     groups: [],
-    fixtures: [],
     announcements: [],
     sponsors: [],
-    ...overrides,
+    ...rowOverrides,
+    tournamentMatchDetails: suppliedDetails ?? canonicalDetails,
   };
 }
 
@@ -188,7 +230,7 @@ describe('TournamentsReadService', () => {
     v1TournamentOverallStanding: {
       findMany: jest.Mock;
     };
-    v1TournamentFixture: {
+    v1TournamentMatchDetails: {
       findMany: jest.Mock;
     };
   };
@@ -212,7 +254,7 @@ describe('TournamentsReadService', () => {
       v1TournamentOverallStanding: {
         findMany: jest.fn().mockResolvedValue([]),
       },
-      v1TournamentFixture: {
+      v1TournamentMatchDetails: {
         findMany: jest.fn().mockResolvedValue([]),
       },
     };
@@ -606,7 +648,7 @@ describe('TournamentsReadService', () => {
           ],
         },
       ],
-      fixtures: [
+      detailSeeds: [
         {
           id: 'fixture-1',
           groupId: 'group-1',
@@ -642,6 +684,18 @@ describe('TournamentsReadService', () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(row);
 
     const result = await service.get('tournament-1');
+    const detailQuery = prisma.v1Tournament.findFirst.mock.calls.at(-1)?.[0];
+    expect(detailQuery.include).not.toHaveProperty('fixtures');
+    expect(detailQuery.include.tournamentMatchDetails.where).toEqual({
+      teamMatch: { deletedAt: null, game: { sourceType: 'TEAM_MATCH' } },
+    });
+    expect(detailQuery.include.tournamentMatchDetails.include.teamMatch.select).toMatchObject({
+      startAt: true,
+      fieldId: true,
+      placeName: true,
+      status: true,
+      competitionConfigVersionId: true,
+    });
 
     expect(result).toMatchObject({
       id: 'tournament-1',
@@ -666,6 +720,9 @@ describe('TournamentsReadService', () => {
       points: 9,
     });
     expect(result.fixtures[0]).toMatchObject({
+      id: 'fixture-1',
+      scheduledAt: '2026-07-01T10:00:00.000Z',
+      status: 'scheduled',
       homeTeamId: 'team-1',
       homeTeamName: 'FC 서울',
       homeTeamLogoUrl: '/uploads/teams/fc-seoul.png',
@@ -696,7 +753,7 @@ describe('TournamentsReadService', () => {
           standings: [],
         },
       ],
-      fixtures: [
+      detailSeeds: [
         {
           id: 'fixture-1',
           groupId: 'group-1',
@@ -740,7 +797,7 @@ describe('TournamentsReadService', () => {
           standings: [],
         },
       ],
-      fixtures: [],
+      detailSeeds: [],
     });
     prisma.v1Tournament.findFirst.mockResolvedValue(row);
 
@@ -967,7 +1024,7 @@ describe('TournamentsReadService', () => {
             ],
           },
         ],
-        fixtures: [
+        detailSeeds: [
           {
             id: 'fixture-1',
             groupId: 'group-1',
@@ -1160,17 +1217,18 @@ describe('TournamentsReadService', () => {
     });
   });
 
-  // R3 §4-3단계: 이 결과는 이제 레거시 V1TournamentFixtureResult가 아니라
+  // R3 §4-3단계: 이 결과는 이제 레거시 legacy result row가 아니라
   // V1Game.currentOfficialRevision(신규 경로)에서 조립된다 -- fixture.result는 더 이상
-  // 읽지 않는다. note는 신규 리비전에 대응 컬럼이 없어 항상 null이고(재현 불가 필드),
-  // playerId 없는 골의 playerName은 레거시가 남긴 자유 텍스트("대타 선수")를 보존하지
-  // 못하고 고정 플레이스홀더로 대체된다(참가자를 특정할 수 없을 때의 신규 경로 한계).
+  // 읽지 않는다. note도 현재 공식 리비전의 outcomeNote만 사용하며, 이전 레거시 결과의
+  // 메모를 정정 후 다시 노출하지 않는다. playerId 없는 골의 playerName은 레거시가 남긴
+  // 자유 텍스트("대타 선수")를 보존하지 못하고 고정 플레이스홀더로 대체된다(참가자를
+  // 특정할 수 없을 때의 신규 경로 한계).
   it('get: fixture with official result(신규 경로) is serialized correctly', async () => {
     // status='closed' — 위 "returns full detail" 테스트와 동일한 이유(팀명 비공개
     // 정책과 무관하게 result 조립 로직만 검증).
     const row = fullTournamentRow({
       status: 'closed',
-      fixtures: [
+      detailSeeds: [
         {
           id: 'fixture-2',
           groupId: null,
@@ -1214,6 +1272,7 @@ describe('TournamentsReadService', () => {
               id: 'revision-fixture-2',
               state: 'OFFICIAL',
               score: { regulation: { home: 3, away: 2 }, penalty: null, goals: [], incomplete: false },
+              tournamentResultLineages: [{ note: '현재 공식 메모' }],
               officialAt: new Date('2026-07-01T17:30:00Z'),
               createdAt: new Date('2026-07-01T17:30:00Z'),
               updatedAt: new Date('2026-07-01T17:30:00Z'),
@@ -1233,7 +1292,7 @@ describe('TournamentsReadService', () => {
         homeScore: 3,
         awayScore: 2,
         hasPenalty: false,
-        note: null,
+        note: '현재 공식 메모',
         recordedAt: '2026-07-01T17:30:00.000Z',
         goals: [
           { id: 'goal-1', team: 'home', playerId: 'player-1', playerName: '홍길동', minute: 45 },
@@ -1241,6 +1300,58 @@ describe('TournamentsReadService', () => {
         ],
       },
     });
+  });
+
+  it('get: VOID current revision suppresses result and never falls back to legacy result', async () => {
+    const row = fullTournamentRow({
+      status: 'closed',
+      detailSeeds: [
+        {
+          id: 'fixture-void',
+          groupId: null,
+          round: 'final',
+          fixtureNumber: 2,
+          legNumber: 1,
+          scheduledAt: new Date('2026-07-01T18:00:00Z'),
+          venue: '결승 구장',
+          status: 'completed',
+          homeRegistrationId: 'reg-1',
+          awayRegistrationId: 'reg-2',
+          homeRegistration: { team: { id: 'team-1', name: 'FC 서울' } },
+          awayRegistration: { team: { id: 'team-2', name: '부산 아이파크' } },
+          videos: [],
+          result: {
+            homeScore: 9,
+            awayScore: 0,
+            hasPenalty: false,
+            homePenaltyScore: null,
+            awayPenaltyScore: null,
+            note: 'legacy must not leak',
+            recordedAt: new Date('2026-07-01T18:30:00Z'),
+            goals: [],
+          },
+          game: {
+            state: 'ENDED',
+            sides: [],
+            participants: [],
+            events: [],
+            currentOfficialRevision: {
+              id: 'revision-void',
+              state: 'VOID',
+              score: { regulation: { home: 9, away: 0 }, penalty: null, goals: [], incomplete: false },
+              officialAt: new Date('2026-07-01T18:30:00Z'),
+              createdAt: new Date('2026-07-01T18:30:00Z'),
+              updatedAt: new Date('2026-07-01T18:30:00Z'),
+            },
+          },
+        },
+      ],
+    });
+    prisma.v1Tournament.findFirst.mockResolvedValue(row);
+
+    const result = await service.get('tournament-1');
+
+    expect(result.fixtures[0].result).toBeNull();
   });
 
   it('get: DateTime fields are serialized as ISO strings', async () => {
@@ -1264,6 +1375,7 @@ describe('TournamentsReadService', () => {
     beforeEach(() => {
       prisma.v1Tournament.findFirst.mockResolvedValue({
         id: tournamentId,
+        status: 'closed',
         competitionConfig: { tieBreak: { points: { win: 3, draw: 1, loss: 0 } } },
       });
       prisma.v1TournamentOverallStanding.findMany.mockResolvedValue([
@@ -1301,18 +1413,16 @@ describe('TournamentsReadService', () => {
           registration: { team: { name: 'FC 부산' } },
         },
       ]);
-      prisma.v1TournamentFixture.findMany.mockResolvedValue([
+      prisma.v1TournamentMatchDetails.findMany.mockResolvedValue([
         {
           homeRegistrationId: 'reg-1',
           awayRegistrationId: 'reg-2',
-          game: { currentOfficialRevision: { state: 'OFFICIAL' } },
-          result: null,
+          teamMatch: { game: { currentOfficialRevision: { state: 'OFFICIAL' } } },
         },
         {
           homeRegistrationId: 'reg-1',
           awayRegistrationId: 'reg-2',
-          game: null,
-          result: null,
+          teamMatch: { game: null },
         },
       ]);
     });
@@ -1329,9 +1439,28 @@ describe('TournamentsReadService', () => {
       });
       expect(result.standings[1]).toMatchObject({ registrationId: 'reg-2', teamName: 'FC 부산' });
       expect(result.progress).toEqual({ total: 2, played: 1, remaining: 1, percent: 50 });
+      expect(prisma.v1TournamentMatchDetails.findMany).toHaveBeenCalled();
       // 2위(reg-2) 최대 = 10 + 1(잔여) * 3(승점) = 13, 1위(reg-1) 현재 18 → 확정
       expect(result.magicNumber).toEqual({ registrationId: 'reg-1', value: 0, clinched: true });
       expect(result.recalculatedAt).toBe('2026-08-17T10:00:00.000Z');
+    });
+
+    it('모집 중 익명 조회는 순위 구조를 유지하면서 팀 식별자를 숨긴다', async () => {
+      prisma.v1Tournament.findFirst.mockResolvedValue({
+        id: tournamentId,
+        kind: 'regular_tournament',
+        status: 'open',
+        competitionConfig: { tieBreak: { points: { win: 3, draw: 1, loss: 0 } } },
+      });
+
+      const result = await service.getOverallStandings(tournamentId);
+
+      expect(result.standings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ registrationId: 'reg-1', teamName: null, points: 18 }),
+          expect.objectContaining({ registrationId: 'reg-2', teamName: null, points: 10 }),
+        ]),
+      );
     });
 
     it('대회를 찾을 수 없으면 404 TOURNAMENT_NOT_FOUND를 던진다', async () => {

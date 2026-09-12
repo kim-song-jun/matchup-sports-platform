@@ -83,7 +83,7 @@ export class GamesController {
 
   @Get(':gameId/visibility')
   @UseGuards(OptionalV1AuthGuard)
-  visibility(@Param('gameId') gameId: string) {
+  visibility(@Param('gameId') gameId: string): ReturnType<GamesService['getVisibility']> {
     return this.gamesService.getVisibility(gameId);
   }
 
@@ -122,7 +122,7 @@ export class GamesController {
     @CurrentUser() user: V1AuthUser,
     @Param('gameId') gameId: string,
     @Query() query: ListGameEventsQueryDto,
-  ) {
+  ): ReturnType<GamesService['listEvents']> {
     return this.gamesService.listEvents(user, gameId, query.validatedAfterSequence);
   }
 
@@ -232,7 +232,7 @@ export class GamesController {
 
   @Get(':gameId/result-revisions')
   @UseGuards(V1AuthGuard)
-  resultRevisions(@CurrentUser() user: V1AuthUser, @Param('gameId') gameId: string) {
+  resultRevisions(@CurrentUser() user: V1AuthUser, @Param('gameId') gameId: string): ReturnType<GamesService['listResultRevisions']> {
     return this.gamesService.listResultRevisions(user, gameId);
   }
 

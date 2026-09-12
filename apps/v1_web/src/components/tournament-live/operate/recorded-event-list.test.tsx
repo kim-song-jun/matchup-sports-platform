@@ -56,6 +56,7 @@ function lineup(sideId: string, participants: Array<{ id: string; name: string; 
       createdAt: '2026-08-04T00:00:00.000Z',
       updatedAt: '2026-08-04T00:00:00.000Z',
     })),
+    invalidatedAt: null,
   };
 }
 
@@ -109,17 +110,13 @@ describe('RecordedEventList', () => {
   });
 
   // 라인업 스냅샷에 없는 참가자를 이름으로 지어내면 운영자가 잘못된 득점자를 보게 된다.
-  /** 행의 두 색 신호를 각각 집어 온다 — 레일은 행 왼쪽 세로 막대(w-1),
-   *  팀 점은 팀 이름 앞 원(h-2 w-2). innerHTML 문자열 매칭으로 뭉뚱그리면
-   *  "unknown 이면 점을 아예 그리지 않는다"는 계약이 고정되지 않는다. */
+  /** 팀 이름 앞 점은 팀 귀속을 보조하는 시각 신호다. 색만으로 의미를 전달하지
+   *  않도록 팀명도 같은 행에 함께 둔다. */
   function teamSignals(row: Element) {
-    return {
-      rail: row.querySelector('span.w-1'),
-      dot: row.querySelector('span.h-2.w-2'),
-    };
+    return row.querySelector('span.h-2.w-2');
   }
 
-  it('홈/원정을 색으로 구분한다 — 왼쪽 레일과 팀명 앞 점이 같은 팀 색을 쓴다', () => {
+  it('홈/원정을 팀명 앞 점과 팀명으로 구분한다', () => {
     const { container } = render(
       <RecordedEventList
         events={[goal(1, HOME_SIDE_ID, 'p-jung', 6 * 60000), goal(2, AWAY_SIDE_ID, 'p-cho', 11 * 60000)]}
@@ -130,26 +127,57 @@ describe('RecordedEventList', () => {
     const rows = container.querySelectorAll('li');
     const home = teamSignals(rows[0]);
     const away = teamSignals(rows[1]);
-    expect(home.rail?.className).toContain('bg-[var(--blue500)]');
-    expect(home.dot?.className).toContain('bg-[var(--blue500)]');
-    expect(away.rail?.className).toContain('bg-[var(--orange500)]');
-    expect(away.dot?.className).toContain('bg-[var(--orange500)]');
+    expect(home?.className).toContain('bg-[var(--blue500)]');
+    expect(away?.className).toContain('bg-[var(--orange500)]');
   });
 
   /* 팀 색은 "이 이벤트가 어느 팀 것인가"를 말하는 신호다. sides 가 아직 로드되지
      않은 첫 렌더에서 홈을 알 수 없는데도 한쪽 색을 칠하면 없는 정보를 지어내는
      셈이고, 그때는 옆의 팀 이름조차 비어 있어 잘못된 색만 남는다. */
-  it('sides 를 아직 모르면 팀 색을 지어내지 않는다 — 레일은 중립, 팀 점은 아예 없다', () => {
+  it('sides 를 아직 모르면 팀 색을 지어내지 않는다 — 팀 점은 아예 없다', () => {
     const { container } = render(
       <RecordedEventList events={[goal(1, HOME_SIDE_ID, 'p-jung', 6 * 60000)]} sides={[]} lineups={[]} />,
     );
     const row = container.querySelector('li');
     expect(row).not.toBeNull();
-    const { rail, dot } = teamSignals(row as Element);
-    expect(rail?.className).toContain('bg-[var(--border)]');
-    expect(rail?.className).not.toContain('bg-[var(--blue500)]');
-    expect(rail?.className).not.toContain('bg-[var(--orange500)]');
-    expect(dot).toBeNull();
+    expect(teamSignals(row as Element)).toBeNull();
+  });
+
+  it('되돌린 원본은 보존하면서 취소 라벨을 보여주고 재수정하지 않는다', async () => {
+    const onReverseEvent = vi.fn();
+    const original = { ...goal(1, HOME_SIDE_ID, 'p-jung', 6 * 60000), type: 'FOUL' as const };
+    const correction = {
+      ...goal(2, HOME_SIDE_ID, null, 6 * 60000),
+      type: 'CORRECTION' as const,
+      reversesEventId: original.id,
+      payload: { reason: '오조작' },
+    };
+    const unrelatedUndefinedReference = {
+      ...goal(3, AWAY_SIDE_ID, 'p-cho', 7 * 60000),
+      reversesEventId: null,
+    };
+
+    render(
+      <RecordedEventList
+        events={[original, correction, unrelatedUndefinedReference]}
+        sides={SIDES}
+        lineups={LINEUPS}
+        onReverseEvent={onReverseEvent}
+      />,
+    );
+
+    const rows = within(screen.getByRole('list', { name: '기록된 이벤트 목록' })).getAllByRole('listitem');
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toHaveTextContent('파울');
+    expect(rows[0]).toHaveTextContent('취소된 기록');
+    expect(rows[1]).toHaveTextContent('정정');
+    expect(rows[1]).not.toHaveTextContent('취소된 기록');
+    expect(rows[2]).toHaveTextContent('골');
+    expect(rows[2]).not.toHaveTextContent('취소된 기록');
+    expect(within(rows[0]).queryByRole('button', { name: '수정·취소' })).toBeNull();
+    expect(within(rows[0]).queryByRole('button', { name: /어시스트/ })).toBeNull();
+    await userEvent.click(within(rows[2]).getByRole('button', { name: '수정·취소' }));
+    expect(onReverseEvent).toHaveBeenCalledWith(unrelatedUndefinedReference);
   });
 
   // 알 수 없는 participantId는 지어내지 않고, 명시적으로 참가자가 없는 골만 익명으로 표시한다.
@@ -243,6 +271,21 @@ describe('RecordedEventList', () => {
     const bareGoal = { ...goal(1, HOME_SIDE_ID, 'p-jung', 60000), assistParticipantId: null };
     render(<RecordedEventList events={[bareGoal]} sides={SIDES} lineups={LINEUPS} onAttachAssist={onAttachAssist} />);
     expect(screen.getByRole('button', { name: /어시스트/ })).toBeInTheDocument();
+  });
+
+  it('OFFICIAL 결과에서는 어시스트 수정 액션을 숨긴다', () => {
+    const onAttachAssist = vi.fn();
+    render(
+      <RecordedEventList
+        events={[{ ...goal(1, HOME_SIDE_ID, 'p-jung', 60000), assistParticipantId: null }]}
+        sides={SIDES}
+        lineups={LINEUPS}
+        onAttachAssist={onAttachAssist}
+        resultOfficialized
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /어시스트/ })).toBeNull();
   });
 
   it('이미 assistParticipantId가 있는 GOAL 이벤트에는 "+ 어시스트" 버튼이 없다', () => {

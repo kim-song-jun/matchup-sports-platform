@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   useTournamentOpsRole: vi.fn(),
   assignFixtureField: vi.fn(),
   clearFixtureField: vi.fn(),
+  useGameResultRevisions: vi.fn(),
   pathname: { value: '/tournament-ops/tournaments/t-1/operations' },
 }));
 
@@ -18,6 +19,20 @@ const mocks = vi.hoisted(() => ({
 // 테스트는 provider 트리를 세우는 대신 역할만 갈아끼운다 — staff-client.test.tsx 와 같은 방식.
 vi.mock('@/components/tournament-ops/role-context', () => ({
   useTournamentOpsRole: () => mocks.useTournamentOpsRole(),
+}));
+
+vi.mock('@/components/tournament-result-review/game-result-correction-panel', () => ({
+  GameResultCorrectionPanel: (props: { gameId: string }) => (
+    <div data-testid={`inline-correction-${props.gameId}`}>인라인 결과 정정</div>
+  ),
+}));
+
+vi.mock('@/hooks/use-tournament-result-review', () => ({
+  useGameResultRevisions: (...args: unknown[]) => mocks.useGameResultRevisions(...args),
+}));
+
+vi.mock('@/components/tournament-result-review/game-result-review-panel', () => ({
+  GameResultReviewPanel: (props: { onSaved: () => void }) => <button onClick={props.onSaved}>테스트 결과 확인</button>,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -75,6 +90,7 @@ const ITEM_A: V1TournamentOperationsBoardItem = {
   awayRegistrationId: 'reg-away',
   scheduledAt: '2026-08-10T05:00:00.000Z',
   currentScore: null,
+  currentRevisionState: 'SUBMITTED',
   warnings: ['MISSING_SCORER', 'NO_FIELD_ASSIGNED'],
   version: 3,
   revisionId: null,
@@ -92,6 +108,7 @@ const ENDED_PENALTY_ITEM: V1TournamentOperationsBoardItem = {
   gameState: 'ENDED',
   warnings: [],
   currentScore: { home: 0, away: 0, penalties: { home: 2, away: 0 } },
+  currentRevisionState: 'OFFICIAL',
   revisionId: 'rev-2',
   stableRevision: 'hash-b',
 };
@@ -110,6 +127,8 @@ describe('OperationsBoardClient', () => {
     mocks.routerReplace.mockReset();
     mocks.assignFixtureField.mockReset();
     mocks.clearFixtureField.mockReset();
+    mocks.useGameResultRevisions.mockReset();
+    mocks.useGameResultRevisions.mockReturnValue({ data: [], isPending: false, isError: false });
     mocks.useTournamentOpsRole.mockReturnValue('TOURNAMENT_DIRECTOR');
     mocks.pathname.value = '/tournament-ops/tournaments/t-1/operations';
     mocks.useV1TournamentOperationsBoard.mockReturnValue({
@@ -129,6 +148,47 @@ describe('OperationsBoardClient', () => {
     // MISSING_SCORER 는 "골에 득점자가 안 적힘"이지 기록 담당 스태프 부재가 아니다.
     // 결과 검토 화면과 같은 라벨을 쓴다.
     expect(screen.getAllByText('득점자 미기재').length).toBeGreaterThan(0);
+  });
+
+  it('expands the selected game row with its stable game id and closes it without changing the route', async () => {
+    const user = userEvent.setup();
+    render(<OperationsBoardClient tournamentId="t-1" />);
+
+    expect(screen.queryByTestId('inline-correction-game-1')).not.toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: '결과 정정' })[0]);
+
+    expect(screen.getAllByTestId('inline-correction-game-1')).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: '정정 닫기' })).toHaveLength(1);
+
+    await user.click(screen.getAllByRole('button', { name: '정정 닫기' })[0]);
+    expect(screen.queryByTestId('inline-correction-game-1')).not.toBeInTheDocument();
+    expect(mocks.routerReplace).not.toHaveBeenCalled();
+  });
+
+  it('switches from submitted review to correction after a successful authoritative refresh', async () => {
+    const user = userEvent.setup();
+    mocks.useGameResultRevisions.mockReturnValue({
+      data: [{ state: 'SUBMITTED' }], isPending: false, isError: false,
+      refetch: vi.fn().mockResolvedValue({ isSuccess: true, data: [{ state: 'OFFICIAL' }] }),
+    });
+    render(<OperationsBoardClient tournamentId="t-1" />);
+    await user.click(screen.getAllByRole('button', { name: '결과 정정' })[0]);
+    await user.click(await screen.findByRole('button', { name: '테스트 결과 확인' }));
+    expect(await screen.findByTestId('inline-correction-game-1')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '테스트 결과 확인' })).not.toBeInTheDocument();
+  });
+
+  it('does not switch the editor on a failed refresh containing stale cached data', async () => {
+    const user = userEvent.setup();
+    mocks.useGameResultRevisions.mockReturnValue({
+      data: [{ state: 'SUBMITTED' }], isPending: false, isError: false,
+      refetch: vi.fn().mockResolvedValue({ isSuccess: false, data: [{ state: 'OFFICIAL' }] }),
+    });
+    render(<OperationsBoardClient tournamentId="t-1" />);
+    await user.click(screen.getAllByRole('button', { name: '결과 정정' })[0]);
+    await user.click(await screen.findByRole('button', { name: '테스트 결과 확인' }));
+    expect(screen.getByRole('button', { name: '테스트 결과 확인' })).toBeInTheDocument();
+    expect(screen.queryByTestId('inline-correction-game-1')).not.toBeInTheDocument();
   });
 
   /* 이 두 테스트는 예전에 정반대를 못박고 있었다: 경기장 배정 UI 가 없어서 운영자가
@@ -212,6 +272,39 @@ describe('OperationsBoardClient', () => {
 
       expect(screen.queryByText('0:0')).not.toBeInTheDocument();
       expect(screen.queryByText(/승부차기/)).not.toBeInTheDocument();
+    });
+
+    it('does not render a VOID score as an official result', () => {
+      mocks.useV1TournamentOperationsBoard.mockReturnValue({
+        data: {
+          ...PAGE,
+          items: [{ ...ENDED_PENALTY_ITEM, currentScore: { home: 0, away: 1 }, currentRevisionState: 'VOID' }],
+          liveWarnings: [],
+        },
+        isPending: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+      });
+
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      expect(screen.getAllByText('결과 무효')).toHaveLength(2);
+      expect(screen.queryByText('0:1')).not.toBeInTheDocument();
+    });
+
+    it('does not offer correction for a paused game without a revision', () => {
+      mocks.useV1TournamentOperationsBoard.mockReturnValue({
+        data: { ...PAGE, items: [{ ...ITEM_A, gameState: 'PAUSED', currentRevisionState: null }], liveWarnings: [] },
+        isPending: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+      });
+
+      render(<OperationsBoardClient tournamentId="t-1" />);
+
+      expect(screen.getAllByRole('button', { name: '결과 정정' }).every((button) => (button as HTMLButtonElement).disabled)).toBe(true);
     });
   });
 

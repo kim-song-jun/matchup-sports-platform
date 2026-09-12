@@ -2,7 +2,7 @@
  * Task 21 — types for the live tournament operations console.
  *
  * These mirror the frozen REST/realtime contract in
- * `.omo/plans/teameet-team-tournament-operations-v1.md` ("Frozen REST and
+ * `.project-artifacts/plans/teameet-team-tournament-operations-v1.md` ("Frozen REST and
  * idempotency contract" / "Frozen realtime contract") and the shipped
  * `apps/v1_api/src/games/**` DTOs/service responses (Task 18/20). Kept as a
  * dedicated domain file (not folded into `types/api.ts`) because this is a
@@ -120,6 +120,7 @@ export interface GameLineup {
   formation: string | null;
   createdAt: string;
   updatedAt: string;
+  invalidatedAt: string | null;
   participants: GameLineupParticipant[];
 }
 

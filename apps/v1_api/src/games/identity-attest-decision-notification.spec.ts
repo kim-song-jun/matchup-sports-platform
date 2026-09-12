@@ -15,8 +15,16 @@ describe('writeIdentityAttestDecisionNotification', () => {
     preference?: unknown;
     existing?: unknown;
   }) {
+    const sourceGame = overrides.game as { sourceType?: string; teamMatch?: unknown };
+    const game =
+      sourceGame?.sourceType === 'TEAM_MATCH' && sourceGame.teamMatch === undefined
+        ? {
+            ...sourceGame,
+            teamMatch: { tournamentId: null, leagueId: null, tournamentDetails: null },
+          }
+        : overrides.game;
     return {
-      v1Game: { findUnique: jest.fn().mockResolvedValue(overrides.game) },
+      v1Game: { findUnique: jest.fn().mockResolvedValue(game) },
       v1GameParticipant: {
         findFirst: jest
           .fn()
@@ -34,7 +42,7 @@ describe('writeIdentityAttestDecisionNotification', () => {
 
   it('승인: 신청자에게 businessKey 멱등으로 알림을 남기고 커밋 뒤 푸시 plan 을 돌려준다', async () => {
     const tx = makeTx({
-      game: { sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1', tournamentFixture: null },
+      game: { sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1' },
     });
 
     const plan = await writeIdentityAttestDecisionNotification(tx as never, {
@@ -68,9 +76,14 @@ describe('writeIdentityAttestDecisionNotification', () => {
   it('거절: 사유가 있으면 본문에 담기고, 다시 신청할 수 있다는 안내를 포함한다', async () => {
     const tx = makeTx({
       game: {
-        sourceType: 'TOURNAMENT_FIXTURE',
-        teamMatchId: null,
-        tournamentFixture: { id: 'fx-1', tournamentId: 't-1' },
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: 'tm-reject-tournament',
+        teamMatch: {
+          tournamentId: 't-1',
+          leagueId: null,
+          tournament: { kind: 'regular_tournament' },
+          tournamentDetails: { teamMatchId: 'tm-reject-tournament', tournamentId: 't-1' },
+        },
       },
     });
 
@@ -86,12 +99,74 @@ describe('writeIdentityAttestDecisionNotification', () => {
     expect(plan?.title).toBe('기록 연결이 거절됐어요');
     expect(plan?.body).toContain('등번호가 달라요');
     expect(plan?.body).toContain('다시 신청할 수 있어요');
-    expect(plan?.url).toBe('/tournaments/t-1/matches/fx-1');
+    expect(plan?.url).toBe('/tournaments/t-1/matches/tm-reject-tournament');
+  });
+
+  it('canonical TEAM_MATCH 대회: activity preference와 tournament deep link를 사용한다', async () => {
+    const tx = makeTx({
+      game: {
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: 'tm-tournament',
+        teamMatch: {
+          tournamentId: 't-1',
+          leagueId: null,
+          tournament: { kind: null },
+          tournamentDetails: {
+            teamMatchId: 'tm-tournament',
+            tournamentId: 't-1',
+            homeRegistration: null,
+            awayRegistration: null,
+          },
+        },
+      },
+      preference: { activityEnabled: true, teamMatchEnabled: false },
+    });
+
+    const plan = await writeIdentityAttestDecisionNotification(tx as never, {
+      gameId: 'game-1',
+      participantId: 'p-1',
+      requestId: 'req-canonical-tournament',
+      requesterUserId: 'requester',
+      decision: 'approve',
+    });
+
+    expect(tx.v1Notification.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          targetType: 'tournament',
+          targetId: 't-1:tm-tournament',
+          deepLink: '/tournaments/t-1/matches/tm-tournament',
+        }),
+      ],
+      skipDuplicates: true,
+    });
+    expect(plan?.url).toBe('/tournaments/t-1/matches/tm-tournament');
+  });
+
+  it('canonical tournament Details가 없으면 team-match 알림으로 잘못 분류하지 않는다', async () => {
+    const tx = makeTx({
+      game: {
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: 'tm-corrupt',
+        teamMatch: { tournamentId: 't-1', leagueId: null, tournamentDetails: null },
+      },
+    });
+
+    await expect(
+      writeIdentityAttestDecisionNotification(tx as never, {
+        gameId: 'game-1',
+        participantId: 'p-1',
+        requestId: 'req-corrupt',
+        requesterUserId: 'requester',
+        decision: 'approve',
+      }),
+    ).rejects.toMatchObject({ code: 'IDENTITY_NOTIFICATION_SCOPE_INVALID' });
+    expect(tx.v1Notification.createMany).not.toHaveBeenCalled();
   });
 
   it('선호도(teamMatchEnabled=false)로 꺼둔 신청자에게는 남기지 않는다', async () => {
     const tx = makeTx({
-      game: { sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1', tournamentFixture: null },
+      game: { sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1' },
       preference: { activityEnabled: true, teamMatchEnabled: false },
     });
 
@@ -109,7 +184,7 @@ describe('writeIdentityAttestDecisionNotification', () => {
 
   it('이미 배달된 결정(재시도)이면 알림은 skipDuplicates 로 남기되 푸시 plan 은 null 이다', async () => {
     const tx = makeTx({
-      game: { sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1', tournamentFixture: null },
+      game: { sourceType: 'TEAM_MATCH', teamMatchId: 'tm-1' },
       existing: { id: 'notif-1' },
     });
 

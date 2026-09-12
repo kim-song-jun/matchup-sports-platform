@@ -10,7 +10,10 @@ import {
   FUTSAL_V1_CONFIG,
   validateCompetitionConfig,
 } from '../../src/tournaments/competition-config/competition-config';
-import { seedCompetitionConfigVersions } from '../../src/tournaments/competition-config/competition-config-backfill';
+import {
+  backfillCompetitionConfigVersionIds,
+  seedCompetitionConfigVersions,
+} from '../../src/tournaments/competition-config/competition-config-backfill';
 import {
   baselineStandingExpectation,
   competitionConfigFixture,
@@ -218,6 +221,28 @@ describe('Task 11 competition configuration', () => {
     );
   });
 
+  it('canonical config backfill does not read the retired fixture table', async () => {
+    const executeRaw = jest.spyOn(prisma, '$executeRaw');
+    const retiredProbeTable = 'v1_tournament_fixtures_task168_probe';
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "v1_tournament_fixtures" RENAME TO "${retiredProbeTable}"`,
+    );
+
+    try {
+      await backfillCompetitionConfigVersionIds(prisma);
+      const sql = executeRaw.mock.calls
+        .map(([query]) => Array.isArray(query) ? query.join(' ') : String(query))
+        .join('\n')
+        .toLowerCase();
+      expect(sql).not.toContain('v1_tournament_fixtures');
+    } finally {
+      executeRaw.mockRestore();
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE "${retiredProbeTable}" RENAME TO "v1_tournament_fixtures"`,
+      );
+    }
+  });
+
   // Skipped (the raw-create half only would need to change, but the whole
   // case shares one `it`): rejecting a raw v1TeamMatch.create() for an
   // unsupported sport is the v1_pin_sport_competition_config trigger's job,
@@ -278,7 +303,11 @@ describe('Task 11 competition configuration', () => {
   it('creates a new version and requires impact confirmation before config-driven recalculation', async () => {
     const result = await exerciseCompetitionConfigChange(prisma, bracketService, authUser);
     expect(result.createdVersion).toBe(2);
-    expect(result.preview).toMatchObject({
+    const preview = result.preview;
+    if (preview.confirmationRequired !== true || !('requestedCompetitionConfigVersionId' in preview)) {
+      throw new Error('Expected the config change preview to require recalculation confirmation.');
+    }
+    expect(preview).toMatchObject({
       changed: false,
       confirmationRequired: true,
       requestedCompetitionConfigVersionId: result.changed.currentCompetitionConfigVersionId,
@@ -288,7 +317,7 @@ describe('Task 11 competition configuration', () => {
     expect(result.changed).toMatchObject({
       changed: true,
       confirmationRequired: false,
-      currentCompetitionConfigVersionId: result.preview.requestedCompetitionConfigVersionId,
+      currentCompetitionConfigVersionId: preview.requestedCompetitionConfigVersionId,
     });
     expect(result.topPoints).toEqual([5, 5]);
   });

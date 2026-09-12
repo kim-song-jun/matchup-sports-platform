@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
+import { act, render, screen, waitFor, within, fireEvent } from '@testing-library/react';
+import { useState } from 'react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -113,6 +114,7 @@ function buildGame(actorRole: GameActorRole, overrides?: Partial<TournamentGameD
     competitionConfigVersionId: 'config-1',
     currentOfficialRevisionId: null,
     sides: SIDES,
+    periods: [{ number: 1 }, { number: 2 }],
     actorRole,
     // 서버가 `GET /games/:gameId` 응답에 항상 싣는 필드 -- 조별(비결선)이 기본값이고,
     // 결선 경기를 다루는 테스트만 `isKnockoutFixture: true` 로 덮어쓴다.
@@ -559,6 +561,39 @@ describe('correction -- create against the current official revision, always cap
     );
     const calledMessage = hookMocks.confirm.mock.calls[0][0].message as string;
     expect(calledMessage).not.toContain('undefined');
+  });
+
+  it('inline 정정 확정 후 pending CTA가 사라져도 패널 제목으로 focus를 복귀한다', async () => {
+    hookMocks.game.data = buildGame('platform_ops', { version: 2, currentOfficialRevisionId: 'rev-1' });
+    hookMocks.revisions.data = [
+      buildRevision({ id: 'rev-1', revision: 1, state: 'OFFICIAL' }),
+      buildRevision({ id: 'rev-2', revision: 2, state: 'DRAFT', supersedesId: 'rev-1', reason: '득점 누락 정정' }),
+    ];
+    function Harness() {
+      const [, rerender] = useState(0);
+      return (
+        <GameResultCorrectionPanel
+          gameId="game-1"
+          inline
+          onSaved={() => {
+            hookMocks.revisions.data = [buildRevision({ id: 'rev-2', revision: 2, state: 'OFFICIAL' })];
+            rerender((value) => value + 1);
+          }}
+        />
+      );
+    }
+
+    const user = userEvent.setup();
+    renderWithClient(<Harness />);
+    await user.click(screen.getByRole('button', { name: '정정 확정' }));
+    const officializeCall = hookMocks.officialize.mutate.mock.calls[0];
+    expect(officializeCall).toBeDefined();
+
+    await act(async () => {
+      officializeCall[1].onSuccess();
+    });
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: '경기 결과 정정' })).toHaveFocus());
   });
 });
 

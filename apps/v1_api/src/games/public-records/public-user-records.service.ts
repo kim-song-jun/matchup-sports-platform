@@ -14,11 +14,8 @@ import {
 
 interface EligibleResultRow {
   readonly participantResultId: string;
-  readonly resultRevisionId: string;
   readonly participantId: string;
   readonly gameId: string;
-  readonly sourceType: string;
-  readonly tournamentFixtureId: string | null;
   readonly teamMatchId: string | null;
   readonly sideId: string;
   readonly goals: number;
@@ -89,12 +86,19 @@ export class PublicUserRecordsService {
         : [];
     // Task 166 BE-4: 리그/대회/친선 분류를 **전체 행**에 대해 한 번 구한다 — 필터와
     // `summary.byType` 둘 다 페이지가 아니라 전체를 봐야 한다.
-    const { categoryByResultId, tournamentIdByFixtureId, leagueIdByTeamMatchId } =
+    const {
+      categoryByResultId,
+      invalidResultIds,
+      tournamentIdByTeamMatchId,
+      roundByTeamMatchId,
+      leagueIdByTeamMatchId,
+    } =
       await this.classifyRows(eligibleRows);
+    const validRows = eligibleRows.filter((row) => !invalidResultIds.has(row.participantResultId));
     const categoryOf = (row: EligibleResultRow): TeamRecordCategory =>
       categoryByResultId.get(row.participantResultId) ?? 'friendly';
     const typedRows =
-      query.type === undefined ? eligibleRows : eligibleRows.filter((row) => categoryOf(row) === query.type);
+      query.type === undefined ? validRows : validRows.filter((row) => categoryOf(row) === query.type);
 
     const cursor = decodeRecordCursor(query.cursor);
     const limit = query.limit ?? 20;
@@ -107,13 +111,13 @@ export class PublicUserRecordsService {
     const page = afterCursor.slice(0, limit);
     const hasMore = afterCursor.length > limit;
 
-    const detail = await this.hydrate(page, { tournamentIdByFixtureId, leagueIdByTeamMatchId });
+    const detail = await this.hydrate(page, { tournamentIdByTeamMatchId, roundByTeamMatchId, leagueIdByTeamMatchId });
 
     // 파울 누적치는 공개 응답에 싣지 않는다. 카드(경고/퇴장)는 경기 서사로서
     // 공개하지만, 일반 파울 개수는 선수 개인 프로필에 낙인으로 남을 뿐
     // 관전자에게 주는 정보가 없다. DB(`V1GameResultParticipant.fouls`)와
     // 운영 콘솔의 팀 파울 카운터는 그대로 유지된다.
-    const matchMvpCount = eligibleRows.filter((row) => row.isMvp).length;
+    const matchMvpCount = validRows.filter((row) => row.isMvp).length;
     // `summary` 는 **필터와 무관하게 전체 기준**이다(팀 전적과 같은 계약) — 화면이
     // 탭을 바꿀 때마다 KPI 를 다시 받지 않고 `byType[탭]` 을 읽는다.
     const totalsOf = (rows: readonly EligibleResultRow[]) => ({
@@ -125,14 +129,14 @@ export class PublicUserRecordsService {
       mvpCount: rows.filter((row) => row.isMvp).length,
     });
     const byType: Record<TeamRecordCategory, ReturnType<typeof totalsOf>> = {
-      league: totalsOf(eligibleRows.filter((row) => categoryOf(row) === 'league')),
-      tournament: totalsOf(eligibleRows.filter((row) => categoryOf(row) === 'tournament')),
-      friendly: totalsOf(eligibleRows.filter((row) => categoryOf(row) === 'friendly')),
+      league: totalsOf(validRows.filter((row) => categoryOf(row) === 'league')),
+      tournament: totalsOf(validRows.filter((row) => categoryOf(row) === 'tournament')),
+      friendly: totalsOf(validRows.filter((row) => categoryOf(row) === 'friendly')),
     };
     const summary = {
       // 전체 합계도 `totalsOf` 를 쓴다 — 같은 계산을 두 벌로 두면 한쪽만 고쳐져
       // `byType` 합과 전체가 어긋난다(Copilot 리뷰).
-      ...totalsOf(eligibleRows),
+      ...totalsOf(validRows),
       byType,
       matchMvpCount,
       // 구 Web 클라이언트 호환용 별칭. 신규 화면은 matchMvpCount를 사용한다.
@@ -221,10 +225,18 @@ export class PublicUserRecordsService {
     const eligibility = await loadParticipantConsentEligibility(this.prisma, participantIds);
 
     const resultRows = await this.prisma.v1GameResultParticipant.findMany({
-      where: { participantId: { in: participantIds } },
+      // Public personal records are canonical V1TeamMatch records only. Keep the
+      // source gate in SQL so legacy fixture rows cannot enter classification and
+      // accidentally be projected as friendly matches.
+      where: {
+        participantId: { in: participantIds },
+        resultRevision: {
+          officialAt: { not: null },
+          game: { sourceType: 'TEAM_MATCH' },
+        },
+      },
       select: {
         id: true,
-        resultRevisionId: true,
         participantId: true,
         sideId: true,
         started: true,
@@ -242,8 +254,6 @@ export class PublicUserRecordsService {
             score: true,
             game: {
               select: {
-                sourceType: true,
-                tournamentFixtureId: true,
                 // 리그 맥락은 게임에 직접 실려 있지 않다 -- 팀매치를 거쳐야만 얻어진다
                 // (game.teamMatchId -> V1TeamMatch.leagueId -> V1League.title). 팀 전적
                 // (`public-team-records.service.ts`)이 쓰는 것과 같은 사슬이다.
@@ -286,11 +296,8 @@ export class PublicUserRecordsService {
       const cards = parseCards(row.cards);
       eligible.push({
         participantResultId: row.id,
-        resultRevisionId: revision.id,
         participantId: row.participantId,
         gameId: revision.gameId,
-        sourceType: revision.game.sourceType,
-        tournamentFixtureId: revision.game.tournamentFixtureId,
         teamMatchId: revision.game.teamMatchId,
         sideId: row.sideId,
         goals: row.goals,
@@ -321,53 +328,95 @@ export class PublicUserRecordsService {
    */
   private async classifyRows(rows: readonly EligibleResultRow[]): Promise<{
     readonly categoryByResultId: ReadonlyMap<string, TeamRecordCategory>;
+    readonly invalidResultIds: ReadonlySet<string>;
     /** `hydrate` 가 **다시 조회하지 않도록** 그대로 넘긴다 — 같은 IN 조회를 두 번 내면
      *  N+1 방지 스펙이 잡는다(실제로 잡혔다). */
-    readonly tournamentIdByFixtureId: ReadonlyMap<string, string>;
+    readonly tournamentIdByTeamMatchId: ReadonlyMap<string, string>;
+    readonly roundByTeamMatchId: ReadonlyMap<string, string>;
     readonly leagueIdByTeamMatchId: ReadonlyMap<string, string | null>;
   }> {
     const byResultId = new Map<string, TeamRecordCategory>();
+    const invalidResultIds = new Set<string>();
     if (rows.length === 0) {
-      return { categoryByResultId: byResultId, tournamentIdByFixtureId: new Map(), leagueIdByTeamMatchId: new Map() };
+      return {
+        categoryByResultId: byResultId,
+        invalidResultIds,
+        tournamentIdByTeamMatchId: new Map(),
+        roundByTeamMatchId: new Map(),
+        leagueIdByTeamMatchId: new Map(),
+      };
     }
 
-    const fixtureIds = Array.from(
-      new Set(rows.map((row) => row.tournamentFixtureId).filter((id): id is string => id !== null)),
-    );
     const teamMatchIds = Array.from(
       new Set(rows.map((row) => row.teamMatchId).filter((id): id is string => id !== null)),
     );
-    const [fixtures, teamMatches] = await Promise.all([
-      fixtureIds.length === 0
-        ? []
-        : this.prisma.v1TournamentFixture.findMany({
-            where: { id: { in: fixtureIds } },
-            select: { id: true, tournamentId: true },
-          }),
+    const [teamMatches, tournamentDetails] = await Promise.all([
       teamMatchIds.length === 0
         ? []
         : this.prisma.v1TeamMatch.findMany({
             where: { id: { in: teamMatchIds } },
-            select: { id: true, leagueId: true },
+            select: {
+              id: true,
+              leagueId: true,
+              tournamentId: true,
+              deletedAt: true,
+              tournament: { select: { kind: true } },
+            },
+          }),
+      teamMatchIds.length === 0
+        ? []
+        : this.prisma.v1TournamentMatchDetails.findMany({
+            where: { teamMatchId: { in: teamMatchIds } },
+            select: { teamMatchId: true, tournamentId: true, round: true },
           }),
     ]);
-    const tournamentIdByFixtureId = new Map(fixtures.map((f) => [f.id, f.tournamentId]));
+    const tournamentIdByTeamMatchId = new Map(tournamentDetails.map((row) => [row.teamMatchId, row.tournamentId]));
+    const roundByTeamMatchId = new Map(tournamentDetails.map((row) => [row.teamMatchId, row.round]));
     const leagueIdByTeamMatchId = new Map(teamMatches.map((t) => [t.id, t.leagueId]));
+    const teamMatchById = new Map(teamMatches.map((teamMatch) => [teamMatch.id, teamMatch]));
 
     for (const row of rows) {
+      const canonicalTournamentId =
+        row.teamMatchId === null ? null : (tournamentIdByTeamMatchId.get(row.teamMatchId) ?? null);
+      const teamMatch = row.teamMatchId === null ? null : teamMatchById.get(row.teamMatchId) ?? null;
+      const hasCanonicalDetails = canonicalTournamentId !== null;
+      const isRegularLeague =
+        teamMatch?.deletedAt === null &&
+        teamMatch.leagueId !== null &&
+        teamMatch.tournamentId === teamMatch.leagueId &&
+        teamMatch.tournament?.kind === 'regular_league' &&
+        !hasCanonicalDetails;
+      const isCanonicalTournament =
+        teamMatch?.deletedAt === null &&
+        teamMatch.tournamentId !== null &&
+        teamMatch.leagueId === null &&
+        teamMatch.tournament?.kind !== 'regular_league' &&
+        hasCanonicalDetails &&
+        teamMatch.tournamentId === canonicalTournamentId;
+      const isFriendly =
+        teamMatch?.deletedAt === null &&
+        teamMatch.tournamentId === null &&
+        teamMatch.leagueId === null &&
+        !hasCanonicalDetails;
+      if (!isRegularLeague && !isCanonicalTournament && !isFriendly) {
+        invalidResultIds.add(row.participantResultId);
+      }
       byResultId.set(
         row.participantResultId,
         classifyTeamRecordCategory({
-          tournamentId:
-            row.tournamentFixtureId === null
-              ? null
-              : (tournamentIdByFixtureId.get(row.tournamentFixtureId) ?? null),
+          tournamentId: isCanonicalTournament ? canonicalTournamentId : null,
           leagueId:
-            row.teamMatchId === null ? null : (leagueIdByTeamMatchId.get(row.teamMatchId) ?? null),
+            isRegularLeague ? teamMatch?.leagueId ?? null : null,
         }),
       );
     }
-    return { categoryByResultId: byResultId, tournamentIdByFixtureId, leagueIdByTeamMatchId };
+    return {
+      categoryByResultId: byResultId,
+      invalidResultIds,
+      tournamentIdByTeamMatchId,
+      roundByTeamMatchId,
+      leagueIdByTeamMatchId,
+    };
   }
 
   private async hydrate(
@@ -375,38 +424,20 @@ export class PublicUserRecordsService {
     /** `classifyRows` 가 **이미 조회한** 맵. 여기서 다시 조회하면 같은 IN 쿼리가 두 번
      *  나가고 N+1 방지 스펙이 잡는다. `round` 만 이 화면 전용이라 따로 가져온다. */
     prefetched: {
-      readonly tournamentIdByFixtureId: ReadonlyMap<string, string>;
+      readonly tournamentIdByTeamMatchId: ReadonlyMap<string, string>;
+      readonly roundByTeamMatchId: ReadonlyMap<string, string>;
       readonly leagueIdByTeamMatchId: ReadonlyMap<string, string | null>;
     },
   ) {
     if (rows.length === 0) return [];
 
     const gameIds = Array.from(new Set(rows.map((row) => row.gameId)));
-    const fixtureIds = Array.from(
-      new Set(rows.map((row) => row.tournamentFixtureId).filter((id): id is string => id !== null)),
-    );
-
-    const [sides, fixtureRounds] = await Promise.all([
+    const [sides] = await Promise.all([
       this.prisma.v1GameSide.findMany({
         where: { gameId: { in: gameIds } },
         select: { id: true, gameId: true, sideKey: true, teamId: true, displayNameSnapshot: true },
       }),
-      fixtureIds.length === 0
-        ? []
-        : this.prisma.v1TournamentFixture.findMany({
-            where: { id: { in: fixtureIds } },
-            select: { id: true, round: true },
-          }),
     ]);
-    const fixtures = fixtureRounds.map((row) => ({
-      id: row.id,
-      round: row.round,
-      // **`''` 로 폴백하지 않는다.** 빈 문자열은 아래 `tournamentIds` 를 거쳐
-      // `findMany({ id: { in: [...] } })` 에 들어가고, uuid 컬럼이라 DB 가 캐스트 에러를
-      // 던진다(Copilot 리뷰). 대진 행이 있는데 tournamentId 를 못 찾는 건 "그 값을 모른다"
-      // 이므로 null 이 맞고, 아래 소비처가 이미 null 을 다룬다.
-      tournamentId: prefetched.tournamentIdByFixtureId.get(row.id) ?? null,
-    }));
 
     const sidesByGame = new Map<string, typeof sides>();
     for (const side of sides) {
@@ -414,14 +445,15 @@ export class PublicUserRecordsService {
       list.push(side);
       sidesByGame.set(side.gameId, list);
     }
-    const fixtureById = new Map(fixtures.map((fixture) => [fixture.id, fixture]));
     const leagueIdByTeamMatchId = prefetched.leagueIdByTeamMatchId;
 
     const teamIds = Array.from(
       new Set(sides.map((side) => side.teamId).filter((id): id is string => id !== null)),
     );
     const tournamentIds = Array.from(
-      new Set(fixtures.map((fixture) => fixture.tournamentId).filter((id): id is string => id !== null)),
+      new Set([
+        ...rows.map((row) => row.teamMatchId === null ? null : prefetched.tournamentIdByTeamMatchId.get(row.teamMatchId) ?? null).filter((id): id is string => id !== null),
+      ]),
     );
     const leagueIds = Array.from(
       new Set(Array.from(leagueIdByTeamMatchId.values()).filter((id): id is string => id !== null)),
@@ -448,9 +480,12 @@ export class PublicUserRecordsService {
       const gameSides = sidesByGame.get(row.gameId) ?? [];
       const ownSide = gameSides.find((side) => side.id === row.sideId) ?? null;
       const opponentSide = gameSides.find((side) => side.id !== row.sideId) ?? null;
-      const fixture = row.tournamentFixtureId === null ? null : (fixtureById.get(row.tournamentFixtureId) ?? null);
-      const tournamentId = fixture?.tournamentId ?? null;
+      const canonicalTournamentId =
+        row.teamMatchId === null ? null : (prefetched.tournamentIdByTeamMatchId.get(row.teamMatchId) ?? null);
+      const tournamentId = canonicalTournamentId;
       const leagueId = row.teamMatchId === null ? null : (leagueIdByTeamMatchId.get(row.teamMatchId) ?? null);
+      const round =
+        row.teamMatchId === null ? null : (prefetched.roundByTeamMatchId.get(row.teamMatchId) ?? null);
 
       let result: 'WON' | 'LOST' | 'DRAWN' | null = null;
       if (row.score !== null && ownSide !== null) {
@@ -471,19 +506,22 @@ export class PublicUserRecordsService {
       return {
         id: row.participantResultId,
         gameId: row.gameId,
+        // Every row reaching this projection is a validated canonical TEAM_MATCH.
+        // Keep its stable ID for tournament, league, and friendly detail routes;
+        // legacy fixture-only results are rejected during classification.
+        teamMatchId: row.teamMatchId,
         // `type` 이 화면이 읽는 정본 분류다 -- 팀 전적(`public-team-records.service.ts`)과
         // **같은 함수**(`classifyTeamRecordCategory`)를 그대로 호출해 두 화면이 같은
         // 경기를 다르게 부르지 않게 한다(리그 경기가 친선과 뭉뚱그려지던 F6 결함).
         type: classifyTeamRecordCategory({ tournamentId, leagueId }),
-        // 구 클라이언트 호환용 별칭 -- 게임의 *소스 타입* 이분법(대회 픽스처/팀매치)일
-        // 뿐이라 리그를 구분하지 못한다. 신규 화면은 위 `type` 을 쓴다(같은 파일의
-        // `mvpCount` -> `matchMvpCount` 별칭과 같은 이유·같은 방식).
-        matchType: row.sourceType === 'TOURNAMENT_FIXTURE' ? ('tournament' as const) : ('team_match' as const),
+        // 구 클라이언트의 대회/팀매치 별칭도 저장 소스 전환과 무관하게 대회 소속을 유지한다.
+        // 리그까지 구분하는 신규 화면은 위 `type`을 사용한다.
+        matchType: tournamentId !== null ? ('tournament' as const) : ('team_match' as const),
         tournamentId,
         tournamentTitle: tournamentId === null ? null : (tournamentTitleById.get(tournamentId) ?? null),
         leagueId,
         leagueTitle: leagueId === null ? null : (leagueTitleById.get(leagueId) ?? null),
-        round: fixture?.round ?? null,
+        round,
         teamId: ownSide?.teamId ?? null,
         teamName: ownSide ? (ownSide.teamId ? (teamNameById.get(ownSide.teamId) ?? null) : ownSide.displayNameSnapshot) : null,
         opponentTeamId: opponentSide?.teamId ?? null,
@@ -504,7 +542,7 @@ export class PublicUserRecordsService {
 }
 
 function rowCursorOf(row: EligibleResultRow): RecordCursor {
-  return { key: row.officialAt.toISOString(), id: row.resultRevisionId };
+  return { key: row.officialAt.toISOString(), id: row.participantResultId };
 }
 
 function parseCards(value: Prisma.JsonValue): { yellow: number; red: number } {

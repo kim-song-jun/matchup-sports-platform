@@ -53,6 +53,8 @@ import { TournamentResultReviewService } from '../tournament-operations/results/
 // above (also wired into this same unowned file, not into a todo-owned
 // one). No other file in this module is touched.
 import { PublicRecordsModule } from '../games/public-records/public-records.module';
+import { TournamentPeriodSettingsController } from './competition-config/tournament-period-settings.controller';
+import { TournamentPeriodSettingsService } from './competition-config/tournament-period-settings.service';
 
 /**
  * 대회(풋살 토너먼트) 도메인 모듈 — Wave 2-3.
@@ -87,6 +89,7 @@ import { PublicRecordsModule } from '../games/public-records/public-records.modu
     TournamentReviewsController,
     TournamentsReadController,
     TournamentResultReviewController,
+    TournamentPeriodSettingsController,
   ],
   providers: [
     MockTournamentSeedService,
@@ -110,6 +113,7 @@ import { PublicRecordsModule } from '../games/public-records/public-records.modu
     TournamentStaffGuard,
     TournamentStaffService,
     TournamentResultReviewService,
+    TournamentPeriodSettingsService,
   ],
 })
 export class TournamentsModule {}

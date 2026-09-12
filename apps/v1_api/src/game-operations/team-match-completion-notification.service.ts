@@ -74,6 +74,9 @@ export class TeamMatchCompletionNotificationService {
     const teamMatchId = game?.teamMatchId ?? null;
     const teamMatch = game?.teamMatch ?? null;
     if (teamMatchId === null || teamMatch === null) return;
+    // Tournament-owned TeamMatch notifications use the tournament lane below. Keeping this
+    // return here prevents the same canonical game from also receiving friendly/team copy.
+    if (revision.tournamentTeamMatchId !== null) return;
 
     const teamIds = [teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId].filter(
       (id): id is string => id !== null,
@@ -89,13 +92,10 @@ export class TeamMatchCompletionNotificationService {
 
     // 선호도 필터: NotificationsService.createNotificationWithPrefCheck와 동일하게
     // 선호도 행이 없으면 기본 활성으로 취급한다.
-    const preferences = await tx.v1NotificationPreference.findMany({
-      where: { userId: { in: recipients } },
-      select: { userId: true, teamMatchEnabled: true },
-    });
-    const teamMatchEnabledByUser = new Map(preferences.map((p) => [p.userId, p.teamMatchEnabled] as const));
-    const enabledRecipients = recipients.filter((userId) => teamMatchEnabledByUser.get(userId) !== false);
-    if (enabledRecipients.length === 0) return;
+    const preferences = await tx.v1NotificationPreference.findMany({ where: { userId: { in: recipients } }, select: { userId: true, teamMatchEnabled: true } });
+    const preferenceEnabledByUser = new Map(preferences.map((preference) => [preference.userId, preference.teamMatchEnabled] as const));
+    const filteredRecipients = recipients.filter((userId) => preferenceEnabledByUser.get(userId) !== false);
+    if (filteredRecipients.length === 0) return;
 
     const isLeagueFixture = teamMatch.leagueId !== null;
     // 제목·딥링크는 notifications.service.ts 의 단일 소스에서 읽는다 — 처음엔 여기 주석으로
@@ -120,13 +120,13 @@ export class TeamMatchCompletionNotificationService {
     const businessKeyFor = (userId: string) => `team-match-completed:${teamMatchId}:${userId}`;
 
     const alreadyDelivered = await tx.v1Notification.findMany({
-      where: { businessKey: { in: enabledRecipients.map(businessKeyFor) } },
+      where: { businessKey: { in: filteredRecipients.map(businessKeyFor) } },
       select: { businessKey: true },
     });
     const alreadyDeliveredKeys = new Set(alreadyDelivered.map((n) => n.businessKey));
 
     await tx.v1Notification.createMany({
-      data: enabledRecipients.map((userId) => ({
+      data: filteredRecipients.map((userId) => ({
         recipientUserId: userId,
         targetType: 'team_match' as const,
         targetId: teamMatchId,
@@ -138,7 +138,7 @@ export class TeamMatchCompletionNotificationService {
       skipDuplicates: true,
     });
 
-    const newlyDelivered = enabledRecipients.filter((userId) => !alreadyDeliveredKeys.has(businessKeyFor(userId)));
+    const newlyDelivered = filteredRecipients.filter((userId) => !alreadyDeliveredKeys.has(businessKeyFor(userId)));
     for (const userId of newlyDelivered) {
       const send = () =>
         void this.webPush

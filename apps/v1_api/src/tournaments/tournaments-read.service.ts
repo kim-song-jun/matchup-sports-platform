@@ -1,5 +1,5 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, V1CompetitionKind } from '@prisma/client';
+import { ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { Prisma, V1CompetitionKind, V1GameSourceType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import type { V1AuthUser } from '../auth/v1-auth-user';
@@ -37,6 +37,31 @@ import { readPublicRostersForRegistrations, type PublicRosterPlayer } from './pu
 /** `V1CompetitionConfigVersion.tieBreak`(Json)에 담긴 승리 승점 기본값 — 프리셋 전부가 3이다. */
 const DEFAULT_WIN_POINTS = 3;
 
+function assertLeagueFixtureListInvariant(row: {
+  hostTeamId: string | null;
+  startAt: Date | null;
+  placeName: string | null;
+}): asserts row is typeof row & { hostTeamId: string; startAt: Date; placeName: string } {
+  if (row.hostTeamId === null || row.startAt === null || row.placeName === null) {
+    throw new InternalServerErrorException({
+      code: 'LEAGUE_FIXTURE_INCOMPLETE',
+      message: '리그 대진의 팀·일정·장소 정보가 없어 공개 일정에 표시할 수 없어요.',
+    });
+  }
+}
+
+function assertLeagueStandingsInvariant(row: {
+  hostTeamId: string | null;
+  startAt: Date | null;
+}): asserts row is typeof row & { hostTeamId: string; startAt: Date } {
+  if (row.hostTeamId === null || row.startAt === null) {
+    throw new InternalServerErrorException({
+      code: 'LEAGUE_FIXTURE_INCOMPLETE',
+      message: '리그 대진의 팀 또는 일정 정보가 없어 순위를 계산할 수 없어요.',
+    });
+  }
+}
+
 /**
  * `getOverallStandings()` 조회 결과 행의 명시적 형태.
  *
@@ -67,8 +92,7 @@ type OverallStandingRow = {
 type OverallStandingsFixtureRow = {
   homeRegistrationId: string | null;
   awayRegistrationId: string | null;
-  game: { currentOfficialRevision: { state: string } | null } | null;
-  result: { id: string } | null;
+  teamMatch: { game: { currentOfficialRevision: { state: string } | null } | null } | null;
 };
 
 @Injectable()
@@ -181,7 +205,7 @@ export class TournamentsReadService {
     }
 
     const staffBypass = await this.resolveStaffBypass(user, tournamentId);
-    // 거울 행에는 `V1TournamentFixture` 가 하나도 없다 — 그 행을 만드는 코드가 전부
+    // 거울 행에는 tournament-match Details가 없다 — 그 행을 만드는 코드가 전부
     // `TOURNAMENT_KINDS` 게이트 뒤에 있다. 그래서 대회 축 대진으로는 **빈 일정**이 나오고,
     // 화면은 "대진표 준비 중" 을 띄운다(진행 중인 리그 시즌에 뜨면 틀린 말이다).
     // 리그 축에서 같은 목록을 만들어 별도 필드로 싣는다.
@@ -209,7 +233,13 @@ export class TournamentsReadService {
             .map((registration) => registration.id),
         );
 
-    return presentTournamentDetail(row, new Date(), staffBypass, leagueFixtures, rosterByRegistrationId);
+    return presentTournamentDetail(
+      row,
+      new Date(),
+      staffBypass,
+      leagueFixtures,
+      rosterByRegistrationId,
+    );
   }
 
   /**
@@ -243,7 +273,13 @@ export class TournamentsReadService {
             select: LEAGUE_FIXTURE_FACT_SELECT,
           });
 
-    return toLeagueFixtureList(fixtures, new Map(facts.map((fact) => [fact.gameId, fact])));
+    return toLeagueFixtureList(
+      fixtures.map((fixture) => {
+        assertLeagueFixtureListInvariant(fixture);
+        return fixture;
+      }),
+      new Map(facts.map((fact) => [fact.gameId, fact])),
+    );
   }
 
   /**
@@ -253,7 +289,7 @@ export class TournamentsReadService {
    * - 대회 전체 fixture로 진행률(`leagueProgressOf`)을 계산한다
    * - 팀별 잔여 경기 수를 세어 `magicNumberOf`에 넘긴다
    */
-  async getOverallStandings(tournamentId: string) {
+  async getOverallStandings(tournamentId: string, user?: V1AuthUser) {
     const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: {
         // 목록만 막으면 **id 를 아는 사람은 그대로 열 수 있다** — 대회 id 는 대진·순위
@@ -269,6 +305,7 @@ export class TournamentsReadService {
       select: {
         id: true,
         kind: true,
+        status: true,
         competitionConfig: { select: { tieBreak: true } },
       },
     });
@@ -280,11 +317,14 @@ export class TournamentsReadService {
       });
     }
 
+    const staffBypass = await this.resolveStaffBypass(user, tournamentId);
+    const hideIdentity = shouldHideParticipantIdentity(tournament.status, staffBypass);
+
     // 거울 행(정규 리그 시즌)은 조도 대진도 없어 **대회 축 계산으로는 빈 순위표**가 나온다.
     // 404 대신 빈 표를 주는 것이 더 나쁘다 — 에러가 아니라 "아직 순위가 없다" 로 읽힌다.
     // 그래서 종류로 갈라 리그 축에서 같은 모양을 만든다.
     if (tournament.kind === V1CompetitionKind.regular_league) {
-      return this.leagueOverallStandings(tournamentId);
+      return this.leagueOverallStandings(tournamentId, hideIdentity);
     }
 
     const [standingRows, fixtures]: [OverallStandingRow[], OverallStandingsFixtureRow[]] = await Promise.all([
@@ -295,26 +335,35 @@ export class TournamentsReadService {
           registration: { include: { team: { select: { name: true } } } },
         },
       }),
-      this.prisma.v1TournamentFixture.findMany({
-        where: { tournamentId },
+      this.prisma.v1TournamentMatchDetails.findMany({
+        where: { tournamentId, teamMatch: { deletedAt: null, game: { sourceType: V1GameSourceType.TEAM_MATCH } } },
         select: {
           homeRegistrationId: true,
           awayRegistrationId: true,
-          game: { select: { currentOfficialRevision: { select: { state: true } } } },
-          result: { select: { id: true } },
+          teamMatch: {
+            select: {
+              game: {
+                select: { currentOfficialRevision: { select: { state: true } } },
+              },
+            },
+          },
         },
       }),
     ]);
 
+    const canonicalFixtures = fixtures.filter(
+      (fixture): fixture is (typeof fixture & { teamMatch: NonNullable<typeof fixture.teamMatch> }) =>
+        fixture.teamMatch !== null,
+    );
     const progress = leagueProgressOf(
-      fixtures.map((fixture) => ({
-        hasResult: hasTournamentFixtureOfficialResult(fixture.game, fixture.result),
+      canonicalFixtures.map((fixture) => ({
+        hasResult: hasTournamentFixtureOfficialResult(fixture.teamMatch.game),
       })),
     );
 
     const remainingByRegistration = new Map<string, number>();
-    for (const fixture of fixtures) {
-      if (hasTournamentFixtureOfficialResult(fixture.game, fixture.result)) continue;
+    for (const fixture of canonicalFixtures) {
+      if (hasTournamentFixtureOfficialResult(fixture.teamMatch.game)) continue;
       for (const registrationId of [fixture.homeRegistrationId, fixture.awayRegistrationId]) {
         if (!registrationId) continue;
         remainingByRegistration.set(registrationId, (remainingByRegistration.get(registrationId) ?? 0) + 1);
@@ -323,7 +372,7 @@ export class TournamentsReadService {
 
     const standings = standingRows.map((row) => ({
       registrationId: row.registrationId,
-      teamName: row.registration.team.name,
+      teamName: hideIdentity ? null : row.registration.team.name,
       position: row.position,
       points: row.points,
       wins: row.wins,
@@ -360,7 +409,7 @@ export class TournamentsReadService {
    * 이 갚고, **문 PR(상세 조회 `get` 을 넓히는 것)보다 반드시 먼저 머지돼야 한다.**
    *
    * ## 왜 대회 축 계산을 못 쓰나
-   * 거울에는 조(`V1TournamentGroup`)도 대진(`V1TournamentFixture`)도 없다 — 그 행들을 만드는
+   * 거울에는 조(`V1TournamentGroup`)도 tournament-match Details도 없다 — 그 행들을 만드는
    * 세 곳이 전부 `TOURNAMENT_KINDS` 게이트 뒤라 거울은 도달하지 않는다. 그래서 기존 경로는
    * **빈 순위표**를 준다. 404 보다 나쁘다: 에러가 아니라 "아직 순위가 없다" 로 읽힌다.
    *
@@ -379,7 +428,7 @@ export class TournamentsReadService {
    * 취소·무효 대진은 분모에서도 빠진다 — 앞으로도 치러지지 않을 경기를 "남은 경기" 로 세면
    * 진행률이 영원히 100% 에 못 닿는다. 그 분류는 `bucketLeagueFixtures` 가 한다.
    */
-  private async leagueOverallStandings(leagueId: string) {
+  private async leagueOverallStandings(leagueId: string, hideIdentity: boolean) {
     const leagueRow = await findTournamentOnSurface(this.prisma, ['regular_league'], {
       where: { id: leagueId, deletedAt: null },
       select: {
@@ -388,7 +437,7 @@ export class TournamentsReadService {
         // 로스터 = confirmed 등록.
         registrations: {
           where: { status: 'confirmed' },
-          select: { teamId: true, team: { select: { name: true } } },
+          select: { id: true, teamId: true, team: { select: { name: true } } },
         },
       },
     });
@@ -429,8 +478,13 @@ export class TournamentsReadService {
           });
     const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
 
-    const buckets = bucketLeagueFixtures(teamMatches, factByGameId);
+    const validTeamMatches = teamMatches.map((teamMatch) => {
+      assertLeagueStandingsInvariant(teamMatch);
+      return teamMatch;
+    });
+    const buckets = bucketLeagueFixtures(validTeamMatches, factByGameId);
     const teamNameById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.name]));
+    const registrationIdByTeamId = new Map(league.teams.map((entry) => [entry.teamId, entry.id]));
     const tieBreakOrder = LEAGUE_TIE_BREAK_ORDER;
     const { standings: leagueStandings } = calculateLeagueStandingsWithTieBreakInfo({
       teamIds: league.teams.map((entry) => entry.teamId),
@@ -443,9 +497,11 @@ export class TournamentsReadService {
         // `registrationId` 는 **싣지 않는다.** 리그엔 참가 등록 개념이 없다 — teamId 를 그
         // 이름으로 담으면 값을 함께 실어도 **이름이 팀 id 를 담는 상태**가 그대로 남고,
         // 나중에 그 값으로 등록을 조회하는 코드가 생기는 순간 터진다.
-        // `fairPlayPoints` 와 같은 처리다: 값이 아니라 **부재**다.
-        teamId: row.teamId,
-        teamName: teamNameById.get(row.teamId) ?? '',
+        // 공개 league 행은 teamId를 identity로 쓴다. 모집 중 익명 행은 실제 teamId를
+        // 숨기고 confirmed registrationId를 opaque row key로만 싣는다.
+        teamId: hideIdentity ? null : row.teamId,
+        teamName: hideIdentity ? null : teamNameById.get(row.teamId) ?? '',
+        registrationId: hideIdentity ? registrationIdByTeamId.get(row.teamId) ?? null : undefined,
         position: row.position,
         points: row.points,
         wins: row.wins,

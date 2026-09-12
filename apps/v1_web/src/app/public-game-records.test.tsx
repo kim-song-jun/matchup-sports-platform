@@ -557,6 +557,7 @@ function makeUserRecords(overrides: Partial<PublicUserRecordsResponse> = {}): Pu
       {
         id: 'result-1',
         gameId: 'game-1',
+        teamMatchId: null,
         type: 'tournament',
         matchType: 'tournament',
         tournamentId: 'tournament-1',

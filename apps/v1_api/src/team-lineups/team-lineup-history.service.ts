@@ -25,6 +25,7 @@ export type TeamLineupHistoryItem = {
   lineupId: string;
   gameId: string;
   source: V1GameSourceType;
+  competitionKind: 'TOURNAMENT' | 'LEAGUE' | 'FRIENDLY';
   sourceLabel: string;
   opponentName: string | null;
   playedAt: Date | null;
@@ -36,7 +37,8 @@ export type TeamLineupHistoryItem = {
 };
 
 /**
- * 팀이 과거에 낸 라인업을 팀 스코프로 모아 돌려준다 — 대회 경기와 팀 매치를 가로지른다.
+ * 팀이 과거에 낸 canonical TeamMatch 라인업을 팀 스코프로 모아 돌려준다 — 대회 경기와
+ * 일반 팀 매치를 가로지른다.
  *
  * 교차 조회가 가능한 이유는 `V1GameSide.teamId`가 두 경로 모두에서 채워지기 때문이다.
  * 반대로 이 컬럼으로 좁히기 때문에 **상대팀 사이드는 결과에 들어올 수조차 없다** — 킥오프
@@ -65,7 +67,9 @@ export class TeamLineupHistoryService {
     // 사이드 수를 넘지 않는다 — 예전에는 전 revision을 받아 메모리에서 골라냈고, 그러면
     // 팀이 오래 활동할수록 전송량이 함께 자랐다(Copilot 리뷰 지적).
     const lineups = await this.prisma.v1GameLineup.findMany({
-      where: { sideId: { in: sides.map((side) => side.id) } },
+      // 대진 팀 교체가 남긴 이전 라인업은 같은 sideId를 재사용할 수 있다.
+      // 무효화된 행을 최신 revision 후보에 섞으면 새 팀에 옛 팀의 전술이 노출된다.
+      where: { sideId: { in: sides.map((side) => side.id) }, invalidatedAt: null },
       orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
       distinct: ['sideId'],
       select: { id: true, gameId: true, sideId: true, formation: true },
@@ -94,17 +98,21 @@ export class TeamLineupHistoryService {
         },
       }),
       this.prisma.v1Game.findMany({
-        where: { id: { in: [...new Set([...latestBySideId.values()].map((lineup) => lineup.gameId))] } },
+        where: {
+          id: { in: [...new Set([...latestBySideId.values()].map((lineup) => lineup.gameId))] },
+          sourceType: V1GameSourceType.TEAM_MATCH,
+        },
         select: {
           id: true,
           sourceType: true,
           competitionConfigVersionId: true,
-          teamMatch: { select: { startAt: true, sport: { select: { name: true } } } },
-          tournamentFixture: {
+          teamMatch: {
             select: {
-              round: true,
-              scheduledAt: true,
+              startAt: true,
+              sport: { select: { name: true } },
               tournament: { select: { title: true, sport: { select: { name: true } } } },
+              league: { select: { id: true } },
+              tournamentDetails: { select: { round: true } },
             },
           },
           sides: { select: { id: true, teamId: true, displayNameSnapshot: true } },
@@ -128,43 +136,44 @@ export class TeamLineupHistoryService {
     for (const lineup of latestBySideId.values()) {
       const game = gamesById.get(lineup.gameId);
       if (game === undefined) continue;
+      const teamMatch = game.teamMatch;
+      if (teamMatch === null) continue;
       const rows = participantsByLineupId.get(lineup.id) ?? [];
       // 참가자가 없는 라인업은 목록에 올리지 않는다 — 불러와도 얻을 게 없는 빈 초안이다.
       if (rows.length === 0) continue;
 
       const opponent = game.sides.find((side) => side.id !== lineup.sideId) ?? null;
-      const isTournament = game.sourceType === V1GameSourceType.TOURNAMENT_FIXTURE;
+      const isTournament = teamMatch.tournamentDetails !== null;
+      const competitionKind = isTournament ? 'TOURNAMENT' as const : teamMatch.league !== null ? 'LEAGUE' as const : 'FRIENDLY' as const;
       // **선발/후보는 소스와 무관하게 `started` 컬럼 하나**다(Task 163 BE-3). 예전엔 팀
       // 매치가 그 컬럼을 안 쓰고 position === 'BENCH' 센티널로 후보를 표시해서 여기에
       // 소스별 분기가 있었는데, 마이그레이션이 옛 행을 컬럼으로 옮기고 쓰기 경로도
       // 컬럼을 쓰도록 바꿨다.
       //
-      // **골키퍼는 여전히 갈린다** — 대회 경기는 종목 사전 코드(축구 'GK', 풋살
-      // 'GOLEIRO')로 저장하고, 팀 매치는 종목과 무관하게 항상 GOALKEEPER_MARKER('GK')
-      // 리터럴이다. 여기서 사전 코드만 비교하면 풋살 팀 매치의 골키퍼 지정이 통째로
-      // 사라진다.
+      // **골키퍼는 여전히 갈린다** — canonical 대회 경기는 종목 사전 코드(축구 'GK',
+      // 풋살 'GOLEIRO')로 저장하고, 일반 팀 매치는 종목과 무관하게 항상
+      // GOALKEEPER_MARKER('GK') 리터럴이다.
       const goalkeeperCode = isTournament
         ? goalkeeperCodeByConfigId.get(game.competitionConfigVersionId) ?? 'GK'
         : GOALKEEPER_MARKER;
-      const tournamentName = game.tournamentFixture?.tournament.title ?? null;
+      const tournamentName = teamMatch.tournament?.title ?? null;
       // round는 자유 문자열 표시 라벨이고 한글·영문이 섞여 저장돼 있다("8강", "Round 1").
       // 파싱하거나 순서를 추론하지 않고 그대로 이어 붙이기만 한다.
-      const round = game.tournamentFixture?.round ?? null;
+      const round = teamMatch.tournamentDetails?.round ?? null;
 
       items.push({
         lineupId: lineup.id,
         gameId: lineup.gameId,
         source: game.sourceType,
+        competitionKind,
         sourceLabel: isTournament
           ? [tournamentName, round].filter((part): part is string => Boolean(part)).join(' · ') || '대회 경기'
           : '팀 매치',
         opponentName: opponent?.displayNameSnapshot ?? null,
-        playedAt: isTournament ? game.tournamentFixture?.scheduledAt ?? null : game.teamMatch?.startAt ?? null,
-        // 종목은 두 경로 모두에서 알아낼 수 있다 — 목록에서 "지금 화면과 다른 종목"에
+        playedAt: teamMatch.startAt,
+      // 종목은 두 경로 모두에서 알아낼 수 있다 — 목록에서 "지금 화면과 다른 종목"에
         // 경고 배지를 붙이려면 팀 매치 쪽도 채워져 있어야 한다.
-        sportName: isTournament
-          ? game.tournamentFixture?.tournament.sport?.name ?? null
-          : game.teamMatch?.sport?.name ?? null,
+        sportName: teamMatch.tournament?.sport?.name ?? teamMatch.sport?.name ?? null,
         formation: lineup.formation,
         starterCount: rows.filter((row) => row.started).length,
         benchCount: rows.filter((row) => !row.started).length,

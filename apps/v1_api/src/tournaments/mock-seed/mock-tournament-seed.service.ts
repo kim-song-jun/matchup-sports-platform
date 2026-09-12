@@ -1,8 +1,13 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { V1GameEventType, V1GameSideKey } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AdminContextService } from '../../common/admin-context.service';
 import { V1AuthUser } from '../../auth/v1-auth-user';
-import { runFixtureGameBackfill } from '../../games/migration/fixture-game-backfill';
+import { canonicalGameCommandPayloadHash, GamesService } from '../../games/games.service';
+import type { GameCreationResult } from '../../games/games.types';
+import { createTournamentMatchInTx } from '../tournament-match-creation';
+import { TournamentResultReviewService } from '../../tournament-operations/results/tournament-result-review.service';
 import { isMockSeedEnabled } from './mock-seed.config';
 import { CreateMockTournamentDto, type MockSeedStatus } from './mock-tournament-seed.dto';
 
@@ -21,6 +26,14 @@ export function readLineupMinPlayers(lineup: unknown): number {
 
 type SeedAccount = { userId: string; email: string; nickname: string; role: string };
 type SeedTeam = { teamId: string; name: string; ownerUserId: string; memberUserIds: string[]; accounts: SeedAccount[] };
+type SeedRegistration = {
+  id: string;
+  teamId: string;
+  teamName: string;
+  sortOrder: number;
+  participants: Array<{ sourceParticipantId: string; userId: string; displayNameSnapshot: string; sideKey: V1GameSideKey }>;
+};
+type SeedFixture = { teamMatchId: string; game: GameCreationResult; homeScore: number; awayScore: number };
 
 /**
  * 검증용 목업 대회를 한 번에 만든다 — 대회 생성 → 팀 등록(확정) → 명단 채우기 → 조 편성 →
@@ -37,6 +50,8 @@ export class MockTournamentSeedService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
+    private readonly games: GamesService,
+    private readonly resultReview: TournamentResultReviewService,
   ) {}
 
   async createTournament(user: V1AuthUser, dto: CreateMockTournamentDto) {
@@ -58,9 +73,7 @@ export class MockTournamentSeedService {
     const sport = await this.pickSport();
     if (!sport) throw new BadRequestException({ code: 'NO_SPORT', message: '종목 데이터가 없어요.' });
 
-    // 픽스처에 competitionConfigVersionId 가 없으면 fixture-game-backfill 이 CONFIG_MISSING 으로
-    // 격리해 V1Game 이 만들어지지 않는다 — 운영 콘솔이 "경기 미생성"으로 뜨는 원인이다.
-    // 값을 아는 쪽(이 시드)이 만들 때 바로 박는다.
+    // canonical TeamMatch/Game 을 만들 때 config pin 을 바로 박는다.
     // 종목마다 config 가 따로 있고 라인업 하한도 다르다(alpha 실측: 풋살 3명 · 축구 7명).
     // 종목을 안 맞추고 최신 ACTIVE 를 집으면 대회 종목과 어긋난 규칙이 박힌다.
     const competitionConfig = await this.prisma.v1CompetitionConfigVersion.findFirst({
@@ -140,20 +153,46 @@ export class MockTournamentSeedService {
           })),
           skipDuplicates: true,
         });
-        registrations.push({ ...registration, sortOrder: index, teamName: team.name });
+        const players = await tx.v1TournamentPlayer.findMany({
+          where: { registrationId: registration.id, removedAt: null },
+          select: { id: true, userId: true, realName: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        registrations.push({
+          id: registration.id,
+          teamId: team.teamId,
+          sortOrder: index,
+          teamName: team.name,
+          participants: players
+            .filter((player): player is typeof player & { userId: string } => player.userId !== null)
+            .map((player) => ({
+              sourceParticipantId: player.id,
+              userId: player.userId,
+              displayNameSnapshot: player.realName,
+              sideKey: V1GameSideKey.HOME,
+            })),
+        });
       }
 
-      const fixtures = await this.buildFixtures(tx, tournament.id, format, registrations, withResults, now, competitionConfig.id);
-      return { tournament, registrationCount: registrations.length, fixtureCount: fixtures };
+      const fixtures = await this.buildFixtures(
+        tx,
+        tournament.id,
+        format,
+        registrations,
+        now,
+        competitionConfig.id,
+        sport.id,
+        user.id,
+      );
+      return { tournament, registrationCount: registrations.length, fixtures };
     }, { timeout: 30_000 });
-
-    // 픽스처만으로는 운영 콘솔을 열 수 없다 — V1Game 은 이 백필이 만든다(배포 때 한 번 도는 것과
-    // 같은 경로). 시드가 만든 대회는 그 배포 이후에 생기므로 여기서 직접 돌려야 한다.
-    const backfill = await runFixtureGameBackfill(this.prisma as never, { mode: 'apply' });
 
     const lineupsSubmitted = withLineups
       ? await this.submitLineups(created.tournament.id, minPlayers)
       : 0;
+    const gamesCreated = withResults
+      ? await this.materializeResults(user, created.fixtures)
+      : created.fixtures.length;
 
     await this.adminContext.logAdminAction(admin, {
       action: 'tournament.mock_seed',
@@ -168,11 +207,11 @@ export class MockTournamentSeedService {
       title,
       format,
       teamCount: created.registrationCount,
-      fixtureCount: created.fixtureCount,
+      fixtureCount: created.fixtures.length,
       status: created.tournament.status,
       reviewReady,
       route: `/tournaments/${created.tournament.id}`,
-      gamesCreated: backfill.counts.gamesCreated,
+      gamesCreated,
       lineupsSubmitted,
       // 로그인해서 확인하려면 어떤 계정이 이 대회에 들어가 있는지 알아야 한다.
       // 비밀번호는 응답에 담지 않는다 — 이 저장소는 public 이고 시드 계정은 공통 비밀번호를 쓴다.
@@ -246,7 +285,7 @@ export class MockTournamentSeedService {
    */
   private async submitLineups(tournamentId: string, minPlayers: number): Promise<number> {
     const games = await this.prisma.v1Game.findMany({
-      where: { tournamentFixture: { tournamentId } },
+      where: { teamMatch: { tournamentId, deletedAt: null } },
       select: {
         id: true,
         lineups: { where: { state: 'DRAFT' }, select: { id: true, sideId: true, version: true } },
@@ -272,6 +311,96 @@ export class MockTournamentSeedService {
       }
     }
     return submitted;
+  }
+
+  /**
+   * 완료 목업도 실제 운영 경로를 통과시킨다. 직접 revision/result 행을 심거나
+   * 별도 seed 결과 행을 직접 심으면 운영 콘솔에서 만든 경기와 상태·감사·
+   * idempotency 계약이 달라진다.
+   */
+  private async materializeResults(user: V1AuthUser, fixtures: readonly SeedFixture[]): Promise<number> {
+    for (const fixture of fixtures) {
+      const gameId = fixture.game.gameId;
+      const snapshot = await this.prisma.v1Game.findUnique({
+        where: { id: gameId },
+        select: {
+          version: true,
+          lastSequence: true,
+          sides: { select: { id: true, sideKey: true } },
+          participants: { select: { id: true, sideId: true }, orderBy: { createdAt: 'asc' } },
+        },
+      });
+      if (snapshot === null) throw new NotFoundException({ code: 'MOCK_GAME_NOT_FOUND', message: '목업 경기를 찾을 수 없어요.' });
+      const takeover = await this.games.requestTakeover(user, gameId, {
+        clientInstanceId: `mock-seed-${gameId}`,
+        lastSequence: snapshot.lastSequence,
+      });
+      let expectedVersion = takeover.version;
+      const startCommandId = randomUUID();
+      const started = await this.games.executeCommand(user, gameId, 'start', startCommandId, {
+        expectedVersion,
+        clientCommandId: startCommandId,
+        takeoverToken: takeover.takeoverToken,
+        occurredAt: new Date().toISOString(),
+        payload: {},
+      });
+      expectedVersion = started.version;
+      const homeSide = snapshot.sides.find((side) => side.sideKey === V1GameSideKey.HOME);
+      const awaySide = snapshot.sides.find((side) => side.sideKey === V1GameSideKey.AWAY);
+      if (homeSide === undefined || awaySide === undefined) {
+        throw new ConflictException({ code: 'MOCK_GAME_SIDES_MISSING', message: '목업 경기 팀 정보를 찾을 수 없어요.' });
+      }
+      for (const [sideId, score] of [[homeSide.id, fixture.homeScore], [awaySide.id, fixture.awayScore]] as const) {
+        const participant = snapshot.participants.find((row) => row.sideId === sideId);
+        if (score > 0 && participant === undefined) {
+          throw new ConflictException({ code: 'MOCK_GAME_PARTICIPANTS_MISSING', message: '목업 결과의 득점 선수를 찾을 수 없어요.' });
+        }
+        for (let goal = 0; goal < score; goal += 1) {
+          const eventId = randomUUID();
+          const appended = await this.games.appendEvent(user, gameId, eventId, {
+            expectedVersion,
+            clientEventId: eventId,
+            takeoverToken: takeover.takeoverToken,
+            type: V1GameEventType.GOAL,
+            sideId,
+            participantId: participant!.id,
+            period: 1,
+            clockMs: (goal + 1) * 60_000,
+            occurredAt: new Date().toISOString(),
+            payload: {},
+          });
+          expectedVersion = appended.version;
+        }
+      }
+      const endCommandId = randomUUID();
+      const ended = await this.games.executeCommand(user, gameId, 'end', endCommandId, {
+        expectedVersion,
+        clientCommandId: endCommandId,
+        takeoverToken: takeover.takeoverToken,
+        occurredAt: new Date().toISOString(),
+        payload: {},
+      });
+      if (!('revisionId' in ended) || ended.revisionId === undefined) {
+        throw new ConflictException({ code: 'MOCK_RESULT_NOT_CREATED', message: '목업 경기 결과를 만들지 못했어요.' });
+      }
+      const revision = await this.prisma.v1GameResultRevision.findUnique({
+        where: { id: ended.revisionId },
+        select: { score: true, goalEvents: true, eventsHash: true, mvpParticipantId: true },
+      });
+      if (revision === null) throw new NotFoundException({ code: 'MOCK_REVISION_NOT_FOUND', message: '목업 결과를 찾을 수 없어요.' });
+      const officializeCommandId = randomUUID();
+      await this.resultReview.officializeResultRevision(user, gameId, ended.revisionId, officializeCommandId, {
+        expectedVersion: ended.version,
+        clientCommandId: officializeCommandId,
+        projectionPreviewHash: canonicalGameCommandPayloadHash({
+          score: revision.score,
+          goalEvents: revision.goalEvents,
+          eventsHash: revision.eventsHash,
+          mvpParticipantId: revision.mvpParticipantId,
+        }),
+      });
+    }
+    return fixtures.length;
   }
 
   /** 대회 이름에 조건이 드러나야 목록에서 어떤 테스트용인지 바로 읽힌다. */
@@ -360,11 +489,12 @@ export class MockTournamentSeedService {
     tx: Parameters<Parameters<PrismaService['$transaction']>[0]>[0],
     tournamentId: string,
     format: string,
-    registrations: Array<{ id: string; sortOrder: number; teamName: string }>,
-    withResults: boolean,
+    registrations: SeedRegistration[],
     now: Date,
     competitionConfigVersionId: string,
-  ): Promise<number> {
+    sportId: string,
+    createdByUserId: string,
+  ): Promise<SeedFixture[]> {
     const pairs: Array<{ home: string; away: string; round: string; groupId: string | null }> = [];
 
     if (format === 'knockout') {
@@ -394,34 +524,60 @@ export class MockTournamentSeedService {
       }
     }
 
+    const fixtures: SeedFixture[] = [];
     for (const [index, pair] of pairs.entries()) {
-      const fixture = await tx.v1TournamentFixture.create({
-        data: {
-          tournamentId,
-          groupId: pair.groupId,
-          round: pair.round,
-          fixtureNumber: index + 1,
-          homeRegistrationId: pair.home,
-          awayRegistrationId: pair.away,
-          scheduledAt: now,
-          venue: '목업 테스트 경기장',
-          competitionConfigVersionId,
-          status: withResults ? 'completed' : 'scheduled',
-        },
-      });
-      if (withResults) {
-        // 후기 대상이 열리려면 공식 결과가 있어야 한다(officialResultTimestamp).
-        await tx.v1TournamentFixtureResult.create({
-          data: {
-            fixtureId: fixture.id,
-            homeScore: (index % 3) + 1,
-            awayScore: index % 2,
-            hasPenalty: false,
-            recordedAt: now,
-          },
-        });
+      const home = registrations.find((registration) => registration.id === pair.home);
+      const away = registrations.find((registration) => registration.id === pair.away);
+      if (home === undefined || away === undefined) {
+        throw new ConflictException({ code: 'MOCK_REGISTRATION_NOT_FOUND', message: '목업 대진 등록을 찾을 수 없어요.' });
       }
+      const homeParticipants = home.participants.map((participant) => ({ ...participant, sideKey: V1GameSideKey.HOME }));
+      const awayParticipants = away.participants.map((participant) => ({ ...participant, sideKey: V1GameSideKey.AWAY }));
+      const durableCommandId = randomUUID();
+      const payload = { tournamentId, groupId: pair.groupId, round: pair.round, fixtureNumber: index + 1, home: home.id, away: away.id };
+      const creation = await createTournamentMatchInTx(tx, this.games, {
+        id: randomUUID(),
+        tournamentId,
+        groupId: pair.groupId,
+        round: pair.round,
+        fixtureNumber: index + 1,
+        legNumber: 1,
+        parentTeamMatchId: null,
+        homeRegistrationId: home.id,
+        awayRegistrationId: away.id,
+        sportId,
+        regionId: null,
+        title: `${home.teamName} vs ${away.teamName}`,
+        placeName: '목업 테스트 경기장',
+        startAt: now,
+        endAt: now,
+        fieldId: null,
+        createdByUserId,
+        competitionConfigVersionId,
+        home: { id: home.teamId, name: home.teamName, participants: homeParticipants },
+        away: { id: away.teamId, name: away.teamName, participants: awayParticipants },
+        actor: {
+          actorType: 'USER',
+          actorUserId: createdByUserId,
+          role: 'platform_ops',
+          tournamentId,
+        },
+        durableCommandId,
+        payloadHash: canonicalGameCommandPayloadHash(payload),
+      });
+      const homeScore = (index % 3) + 1;
+      const regulationAwayScore = index % 2;
+      const isEliminationRound = pair.round === '8강' || pair.round === '4강';
+      const awayScore = isEliminationRound && homeScore === regulationAwayScore
+        ? regulationAwayScore + 1
+        : regulationAwayScore;
+      fixtures.push({
+        teamMatchId: creation.teamMatchId,
+        game: creation.game,
+        homeScore,
+        awayScore,
+      });
     }
-    return pairs.length;
+    return fixtures;
   }
 }

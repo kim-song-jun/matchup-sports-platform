@@ -180,7 +180,7 @@ type FakeAssignmentRow = {
   revokedAt: Date | null;
   createdAt: Date;
   tournament: { title: string; status: V1TournamentStatus };
-  fixtureScopes: { fixtureId: string }[];
+  fixtureScopes: { teamMatchId: string }[];
 };
 
 /**
@@ -190,7 +190,10 @@ type FakeAssignmentRow = {
  * `where.revokedAt`/`where.OR`를 행 단위로 실제 적용해서, 그 회귀가 나면 만료·해제된
  * 행이 결과에 섞여 들어와 테스트가 실패하게 만든다.
  */
-function buildMyAssignmentsHarness(rows: FakeAssignmentRow[]) {
+function buildMyAssignmentsHarness(
+  rows: FakeAssignmentRow[],
+  admin: { adminRole: 'owner' | 'ops' | 'support'; status: 'active'; revokedAt: Date | null; user: { accountStatus: 'active' | 'suspended' } } | null = null,
+) {
   const findMany = jest.fn(async ({ where }: { where: Record<string, unknown> }) => {
     const now = new Date();
     return rows.filter((row) => {
@@ -221,7 +224,10 @@ function buildMyAssignmentsHarness(rows: FakeAssignmentRow[]) {
     }));
   });
 
-  const prisma = { v1TournamentStaffAssignment: { findMany, count: jest.fn() } };
+  const prisma = {
+    v1AdminUser: { findUnique: jest.fn().mockResolvedValue(admin) },
+    v1TournamentStaffAssignment: { findMany, count: jest.fn() },
+  };
 
   return {
     prisma,
@@ -253,9 +259,29 @@ function assignmentRow(overrides: Partial<FakeAssignmentRow> = {}): FakeAssignme
 }
 
 describe('TournamentOperationsStaffService.myAssignments', () => {
+  it('reports an active owner/ops admin as platform_ops even when staff assignments are mixed', async () => {
+    const { service } = buildMyAssignmentsHarness(
+      [assignmentRow({ role: V1TournamentStaffRole.SUPPORT_READONLY })],
+      { adminRole: 'ops', status: 'active', revokedAt: null, user: { accountStatus: 'active' } },
+    );
+
+    await expect(service.myAssignments(targetUserId)).resolves.toMatchObject({ platformRole: 'PLATFORM_OPS' });
+  });
+
+  it('does not report support, revoked, or inactive admins as platform_ops', async () => {
+    for (const admin of [
+      { adminRole: 'support' as const, status: 'active' as const, revokedAt: null, user: { accountStatus: 'active' as const } },
+      { adminRole: 'ops' as const, status: 'active' as const, revokedAt: new Date('2026-08-01T00:00:00.000Z'), user: { accountStatus: 'active' as const } },
+      { adminRole: 'ops' as const, status: 'active' as const, revokedAt: null, user: { accountStatus: 'suspended' as const } },
+    ]) {
+      const { service } = buildMyAssignmentsHarness([], admin);
+      await expect(service.myAssignments(targetUserId)).resolves.toMatchObject({ platformRole: null });
+    }
+  });
+
   it('담당 경기 스코프를 fixtureIds 로 실어 보낸다 (필드 담당자 딥링크 진입 판정의 유일한 근거)', async () => {
     const { service } = buildMyAssignmentsHarness([
-      assignmentRow({ fixtureScopes: [{ fixtureId: 'fx-1' }, { fixtureId: 'fx-2' }] }),
+      assignmentRow({ fixtureScopes: [{ teamMatchId: 'fx-1' }, { teamMatchId: 'fx-2' }] }),
     ]);
 
     const result = await service.myAssignments(targetUserId);

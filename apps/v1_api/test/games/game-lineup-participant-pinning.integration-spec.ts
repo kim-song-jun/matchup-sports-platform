@@ -6,7 +6,7 @@ import type { GameCommandContext, GameSourceCreationInput } from '../../src/game
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 /**
- * [P1-b] 대회 경기(TOURNAMENT_FIXTURE)의 참가자 행이 라인업 저장에 **살아남는지** 검증한다.
+ * [P1-b] 대회 TeamMatch의 참가자 행이 라인업 저장에 **살아남는지** 검증한다.
  *
  * 예전에는 `saveLineup` 한 번에 새 라인업 리비전 + 새 `V1GameParticipant` 한 벌이 통째로
  * 생겼다. participant 행에는 그 행에만 매달린 것들이 있다:
@@ -182,7 +182,7 @@ describe('[P1-b] saveLineup pins tournament participants to the roster instead o
       ],
     });
     await prisma.v1Tournament.create({
-      data: { id: ids.tournament, sportId: ids.sport, title: 'P1b pin tournament' },
+      data: { id: ids.tournament, sportId: ids.sport, title: 'P1b pin tournament', competitionConfigVersionId: config.id },
     });
     await prisma.v1TournamentRegistration.createMany({
       data: [
@@ -202,20 +202,33 @@ describe('[P1-b] saveLineup pins tournament participants to the roster instead o
         },
       ],
     });
-    await prisma.v1TournamentFixture.create({
+    await prisma.v1TeamMatch.create({
       data: {
         id: ids.fixture,
         tournamentId: ids.tournament,
+        sportId: ids.sport,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.awayTeam,
+        title: 'P1b pin match',
+        status: 'matched',
+        startAt: new Date(Date.now() - 60_000),
+        competitionConfigVersionId: config.id,
+      },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: ids.fixture,
+        tournamentId: ids.tournament,
         round: 'group',
         fixtureNumber: 1,
-        competitionConfigVersionId: config.id,
+        legNumber: 1,
         homeRegistrationId: ids.hostRegistration,
         awayRegistrationId: ids.awayRegistration,
       },
     });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: config.id,
       sides: [

@@ -194,7 +194,7 @@ function TournamentFieldsSection({
             placeholder="예: A구장, 1번 코트"
             aria-invalid={isDuplicateName}
             aria-describedby={isDuplicateName ? 'tournament-field-name-duplicate' : undefined}
-            className="flex-1 h-[44px] px-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
+            className="h-[44px] min-h-[44px] flex-none sm:flex-1 sm:min-w-0 px-3 text-base sm:text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-colors disabled:opacity-50"
           />
           <button
             type="submit"
@@ -203,7 +203,7 @@ function TournamentFieldsSection({
               'h-[44px] px-4 rounded-xl text-sm font-semibold transition-colors shrink-0',
               'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
               canSubmit
-                ? 'bg-blue-500 text-white hover:bg-blue-600'
+                ? 'bg-[var(--button-fill-primary)] text-[var(--button-text-primary)] hover:bg-[var(--button-fill-primary-hover)]'
                 : 'bg-[var(--grey100)] text-[var(--text-caption)] cursor-not-allowed',
             ].join(' ')}
           >
@@ -328,7 +328,7 @@ export function StaffClient({ tournamentId }: Props) {
                 setGrantError(null);
                 setGrantOpen(true);
               }}
-              className="flex items-center gap-2 h-[44px] px-4 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 shrink-0"
+              className="flex items-center gap-2 h-[44px] px-4 rounded-xl bg-[var(--button-fill-primary)] hover:bg-[var(--button-fill-primary-hover)] text-[var(--button-text-primary)] text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 shrink-0"
             >
               <UserPlus size={16} aria-hidden="true" />
               스태프 배정

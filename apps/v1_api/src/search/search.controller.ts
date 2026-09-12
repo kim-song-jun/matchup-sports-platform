@@ -15,7 +15,7 @@ export class SearchController {
     @CurrentUser() user: V1AuthUser | undefined,
     @Headers('x-v1-search-session-id') sessionKey: string | undefined,
     @Query() query: RecentSearchesQueryDto,
-  ) {
+  ): ReturnType<SearchService['recent']> {
     return this.searchService.recent(user ?? null, sessionKey ?? null, query);
   }
 
@@ -24,7 +24,7 @@ export class SearchController {
     @CurrentUser() user: V1AuthUser | undefined,
     @Headers('x-v1-search-session-id') sessionKey: string | undefined,
     @Body() dto: RecordSearchDto,
-  ) {
+  ): ReturnType<SearchService['record']> {
     return this.searchService.record(user ?? null, sessionKey ?? null, dto);
   }
 }

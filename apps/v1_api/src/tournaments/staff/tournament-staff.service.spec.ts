@@ -19,6 +19,16 @@ const IDS = {
 const NOW = new Date('2026-08-01T05:00:00.000Z');
 const AUDIT = { requestId: 'request-task-7-001', sourceIp: '203.0.113.42' } as const;
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 function assignment(overrides: Record<string, unknown> = {}) {
   return {
     id: IDS.assignment,
@@ -32,7 +42,7 @@ function assignment(overrides: Record<string, unknown> = {}) {
     grantedByUserId: IDS.actor,
     createdAt: NOW,
     updatedAt: NOW,
-    fixtureScopes: [{ fixtureId: IDS.fixture }],
+    fixtureScopes: [{ teamMatchId: IDS.fixture }],
     ...overrides,
   };
 }
@@ -45,8 +55,8 @@ function setup() {
       findUnique: jest.fn().mockResolvedValue({ id: IDS.target, accountStatus: 'active' }),
     },
     v1TournamentField: { findUnique: jest.fn().mockResolvedValue({ id: IDS.field }) },
-    v1TournamentFixture: {
-      findMany: jest.fn().mockResolvedValue([{ id: IDS.fixture }]),
+    v1TeamMatch: {
+      findMany: jest.fn().mockResolvedValue([]),
     },
     v1TournamentStaffAssignment: {
       count: jest.fn().mockResolvedValue(0),
@@ -102,11 +112,7 @@ describe('TournamentStaffService', () => {
     expect(context.auditWriter.create).not.toHaveBeenCalled();
   });
 
-  // **되돌리기 창을 닫는 자리다.** `V1TournamentStaffAssignment` 는 백필 행을 `Restrict` 로
-  // 참조하는 세 관계 중 하나라, 리그 행에 스태프가 한 명이라도 붙으면 백필 88행을
-  // **더 이상 지울 수 없다**(docs/ops/read-swap-preflight.md).
-  // 그래서 404 만이 아니라 **배정 행이 만들어지지 않는 것**까지 단언한다.
-  it('리그 id 에는 스태프를 배정할 수 없다 — 배정 행이 만들어지지 않는다', async () => {
+  it('정규 리그에도 대회와 같은 스태프 관리 권한을 적용한다', async () => {
     const context = setup();
     context.access.assertAccess.mockResolvedValue({
       userId: IDS.actor,
@@ -134,9 +140,9 @@ describe('TournamentStaffService', () => {
         targetUserId: IDS.target,
         audit: AUDIT,
       }),
-    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+    ).resolves.toMatchObject({ id: IDS.directorAssignment, role: 'TOURNAMENT_DIRECTOR' });
 
-    expect(context.tx.v1TournamentStaffAssignment.create).not.toHaveBeenCalled();
+    expect(context.tx.v1TournamentStaffAssignment.create).toHaveBeenCalled();
   });
 
   it('persists the bootstrap operation timestamp as the first director assignment start time', async () => {
@@ -407,16 +413,36 @@ describe('TournamentStaffService', () => {
       order.push('commit');
       return result;
     });
-    context.realtime.evictUserFromScopedGameRooms.mockImplementation(() => order.push('scoped-eviction'));
+    const evictionEntered = deferred<void>();
+    const evictionCompleted = deferred<void>();
+    context.realtime.evictUserFromScopedGameRooms.mockImplementation(async () => {
+      evictionEntered.resolve();
+      await evictionCompleted.promise;
+      order.push('scoped-eviction');
+    });
     context.realtime.forceDisconnectUser.mockImplementation(() => order.push('disconnect'));
 
-    await context.service.revokeStaff({
+    let revokeSettled = false;
+    const revokePromise = context.service.revokeStaff({
       actorUserId: IDS.actor,
       tournamentId: IDS.tournament,
       assignmentId: IDS.assignment,
       expectedVersion: 0,
       audit: AUDIT,
     });
+    void revokePromise.then(
+      () => {
+        revokeSettled = true;
+      },
+      () => {
+        revokeSettled = true;
+      },
+    );
+    await evictionEntered.promise;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(revokeSettled).toBe(false);
+    evictionCompleted.resolve();
+    await revokePromise;
 
     try {
       expect(order).toEqual(['assignment', 'audit', 'commit', 'scoped-eviction']);
@@ -560,8 +586,6 @@ describe('TournamentStaffService', () => {
     context.tx.v1AdminUser.findUnique.mockResolvedValue({
       adminRole: 'ops', status: 'active', revokedAt: null, user: { accountStatus: 'active' },
     });
-    context.tx.v1TournamentFixture.findMany.mockResolvedValue([]);
-
     await expect(
       context.service.grantStaff({
         actorUserId: IDS.actor,
@@ -576,6 +600,51 @@ describe('TournamentStaffService', () => {
     expect(context.tx.v1TournamentStaffAssignment.create).not.toHaveBeenCalled();
     expect(context.auditWriter.create).not.toHaveBeenCalled();
     expect(context.realtime.forceDisconnectUser).not.toHaveBeenCalled();
+  });
+
+  it('accepts a regular-league TeamMatch scope without bracket Details', async () => {
+    const context = setup();
+    context.access.assertAccess.mockResolvedValue({
+      userId: IDS.actor,
+      role: 'platform_ops',
+      tournamentId: IDS.tournament,
+      assignmentId: null,
+      assignmentVersion: null,
+    });
+    context.tx.v1AdminUser.findUnique.mockResolvedValue({
+      adminRole: 'ops', status: 'active', revokedAt: null, user: { accountStatus: 'active' },
+    });
+    context.tx.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: IDS.tournament, kind: 'regular_league' }),
+    );
+    context.tx.v1TeamMatch.findMany.mockResolvedValue([{ id: IDS.fixture }]);
+    context.tx.v1TournamentStaffAssignment.create.mockResolvedValue(assignment({ fixtureScopes: [] }));
+    context.tx.v1TournamentStaffAssignment.findUnique.mockResolvedValue(assignment({ fixtureScopes: [] }));
+
+    await context.service.grantStaff({
+      actorUserId: IDS.actor,
+      tournamentId: IDS.tournament,
+      targetUserId: IDS.target,
+      role: 'FIELD_OPERATOR',
+      fixtureIds: [IDS.fixture],
+      audit: AUDIT,
+    });
+
+    expect(context.tx.v1TournamentStaffFixtureScope.createMany).toHaveBeenCalledWith({
+      data: [{ assignmentId: IDS.assignment, tournamentId: IDS.tournament, teamMatchId: IDS.fixture }],
+    });
+    expect(context.tx.v1TeamMatch.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tournamentId: IDS.tournament,
+          deletedAt: null,
+          OR: expect.arrayContaining([
+            expect.objectContaining({ leagueId: IDS.tournament, tournamentDetails: { is: null } }),
+          ]),
+        }),
+        select: { id: true },
+      }),
+    );
   });
 
   it('denies a director whose authority changed after access preflight with zero assignment, audit, and disconnect writes', async () => {

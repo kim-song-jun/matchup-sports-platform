@@ -5,7 +5,7 @@ export async function recalculateTournamentFixtureTeamTrust(
   tx: Prisma.TransactionClient,
   targetTeamId: string,
 ) {
-  const [reviewerTeamAverages, teamMatchCount, tournamentFixtureCount] = await Promise.all([
+  const [reviewerTeamAverages, tournamentMatchCount] = await Promise.all([
     // "팀 평균 1표": 참가팀 멤버 전원이 후기를 쓸 수 있으므로 원시 평균을 쓰면 인원이 많은
     // 팀의 목소리가 그만큼 커진다. reviewerTeamId로 묶어 팀별 평균을 먼저 낸 뒤(아래에서)
     // 그 평균들의 평균을 최종 점수로 쓴다.
@@ -23,18 +23,24 @@ export async function recalculateTournamentFixtureTeamTrust(
       },
       _avg: { rating: true },
     }),
+    // The tournament trust column counts canonical tournament matches only. The
+    // old fixture mirror is intentionally not consulted: during migration it
+    // shares the same UUID and would double-count the same completed game.
     tx.v1TeamMatch.count({
       where: {
-        OR: [{ hostTeamId: targetTeamId }, { approvedApplicantTeamId: targetTeamId }],
-        AND: [{ OR: [{ status: 'completed' }, { completedAt: { not: null } }] }],
-      },
-    }),
-    tx.v1TournamentFixture.count({
-      where: {
+        tournamentId: { not: null },
+        leagueId: null,
         status: 'completed',
+        tournamentDetails: { isNot: null },
+        game: {
+          is: {
+            sourceType: 'TEAM_MATCH',
+            currentOfficialRevision: { is: { state: 'OFFICIAL', officialAt: { not: null } } },
+          },
+        },
         OR: [
-          { homeRegistration: { is: { teamId: targetTeamId } } },
-          { awayRegistration: { is: { teamId: targetTeamId } } },
+          { tournamentDetails: { is: { homeRegistration: { is: { teamId: targetTeamId } } } } },
+          { tournamentDetails: { is: { awayRegistration: { is: { teamId: targetTeamId } } } } },
         ],
       },
     }),
@@ -47,7 +53,7 @@ export async function recalculateTournamentFixtureTeamTrust(
   const avgRating = reviewCount === 0
     ? null
     : teamAverages.reduce((sum, rating) => sum + rating, 0) / reviewCount;
-  const trustData = teamTrustData(reviewCount, avgRating, teamMatchCount + tournamentFixtureCount);
+  const trustData = teamTrustData(reviewCount, avgRating, tournamentMatchCount);
   await tx.v1TeamTrustScore.upsert({
     where: { teamId: targetTeamId },
     update: trustData,

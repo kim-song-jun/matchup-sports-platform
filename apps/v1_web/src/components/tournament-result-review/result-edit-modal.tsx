@@ -11,6 +11,7 @@ import type {
 } from '@/hooks/use-tournament-result-review';
 import type { GameLineup } from '@/types/game-operations';
 import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/game-result-score';
+import { periodLabel } from '@/components/tournament-live/operate/period-label';
 
 /**
  * `score` 는 서버가 돌려주는 스냅샷(`GameResultScore`, 두 형태의 union -- `base.score`가
@@ -49,6 +50,8 @@ export type ResultEditModalProps = {
     mvpParticipantId: string | null;
   };
   sides: readonly TournamentGameSide[];
+  /** Pinned period rows from GET /games/:gameId. New goals may only use these numbers. */
+  periods: readonly { number: number }[];
   /** `GET /games/:gameId/lineups`(`GamesService.listLineups()`)의 라인업 스냅샷 --
    * 실명 표시에 쓴다. 아직 로딩 중이거나 없으면 빈 배열을 넘기면 된다(폴백은
    * `participantLabel`이 알아서 처리한다). */
@@ -67,6 +70,7 @@ export type ResultEditModalProps = {
   errorMessage?: string | null;
   onConfirm: (input: ResultEditSubmitInput) => void;
   onCancel: () => void;
+  presentation?: 'modal' | 'inline';
 };
 
 type EditableParticipant = GameResultParticipantInput;
@@ -230,7 +234,7 @@ function StatNumberField({
 }: {
   id: string;
   label: string;
-  value: number;
+  value: number | null | undefined;
   onValueChange: (next: number) => void;
 }) {
   return (
@@ -244,8 +248,8 @@ function StatNumberField({
         min={0}
         inputMode="numeric"
         className="tm-input"
-        style={{ width: 56, minHeight: 44 }}
-        value={value}
+        style={{ width: 72, minWidth: 72, minHeight: 44 }}
+        value={value ?? ''}
         onChange={(event) => onValueChange(toStatValue(event.target.value))}
       />
     </div>
@@ -274,12 +278,14 @@ export function ResultEditModal({
   reasonLabel = '사유',
   base,
   sides,
+  periods,
   lineups,
   isKnockoutFixture = false,
   submitting = false,
   errorMessage,
   onConfirm,
   onCancel,
+  presentation = 'modal',
 }: ResultEditModalProps) {
   const idPrefix = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -325,7 +331,7 @@ export function ResultEditModal({
   const [reason, setReason] = useState('');
 
   useEffect(() => {
-    previousFocusRef.current = document.activeElement;
+    if (presentation === 'modal') previousFocusRef.current = document.activeElement;
     const id = setTimeout(() => {
       // Guard against clobbering focus the user (or the focus trap) has
       // already moved into the dialog by the time this fires -- e.g. typing
@@ -338,6 +344,7 @@ export function ResultEditModal({
     }, 60);
     return () => {
       clearTimeout(id);
+      if (presentation === 'inline') return;
       // Restore focus on unmount (WCAG 2.4.3) -- this component is always
       // conditionally rendered by its caller (see the state-initialization
       // comment above), so unmount IS the "closed" transition; there is no
@@ -351,16 +358,16 @@ export function ResultEditModal({
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || presentation === 'inline') return;
     const handler = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onCancel();
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [open, onCancel]);
+  }, [open, onCancel, presentation]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || presentation === 'inline') return;
     const dialog = dialogRef.current;
     if (!dialog) return;
     const FOCUSABLE =
@@ -383,14 +390,15 @@ export function ResultEditModal({
     };
     document.addEventListener('keydown', trap);
     return () => document.removeEventListener('keydown', trap);
-  }, [open]);
+  }, [open, presentation]);
 
   useEffect(() => {
+    if (presentation === 'inline') return;
     document.body.style.overflow = open ? 'hidden' : '';
     return () => {
       document.body.style.overflow = '';
     };
-  }, [open]);
+  }, [open, presentation]);
 
   const participantNameMap = useMemo(() => buildParticipantNameMap(lineups), [lineups]);
 
@@ -521,29 +529,30 @@ export function ResultEditModal({
 
   if (!open) return null;
 
+  const inline = presentation === 'inline';
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
-      style={{ background: 'rgba(25,31,40,0.45)' }}
-      onClick={(event) => {
+      className={inline ? 'w-full' : 'fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4'}
+      style={inline ? undefined : { background: 'rgba(25,31,40,0.45)' }}
+      onClick={inline ? undefined : (event) => {
         if (event.target === event.currentTarget) onCancel();
       }}
     >
       <div
         ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
+        role={inline ? 'region' : 'dialog'}
+        aria-modal={inline ? undefined : true}
         aria-labelledby={`${idPrefix}-title`}
         aria-describedby={`${idPrefix}-message`}
-        className="w-full max-w-[560px] rounded-2xl overflow-hidden"
+        className={inline ? 'w-full rounded-xl overflow-hidden border border-[var(--border)]' : 'w-full max-w-[560px] rounded-2xl overflow-hidden'}
         style={{
           background: 'var(--surface, #fff)',
-          boxShadow: '0 8px 32px rgba(20,28,45,0.14)',
-          maxHeight: '90vh',
+          boxShadow: inline ? undefined : '0 8px 32px rgba(20,28,45,0.14)',
+          maxHeight: inline ? undefined : '90vh',
           display: 'flex',
           flexDirection: 'column',
         }}
-        onClick={(event) => event.stopPropagation()}
+        onClick={inline ? undefined : (event) => event.stopPropagation()}
       >
         <div style={{ padding: '24px 24px 0', flexShrink: 0 }}>
           <p id={`${idPrefix}-title`} className="tm-text-body-lg" style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 8 }}>
@@ -662,7 +671,7 @@ export function ResultEditModal({
                       sideId: scoringSide.id,
                       anonymous: true,
                       minute: 0,
-                      period: 1,
+                      ...(periods[0] ? { period: periods[0].number } : {}),
                       ownGoal: false,
                     },
                   ]);
@@ -674,13 +683,16 @@ export function ResultEditModal({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {goalEvents.map((goal, index) => (
                 <div key={goal.id} className="tm-card" style={{ padding: 12 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(88px, 0.8fr) minmax(120px, 1.4fr) 76px 86px', gap: 8 }}>
-                    <select
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(88px,0.8fr)_minmax(120px,1.4fr)_76px_86px]">
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <label className="tm-text-caption" htmlFor={`${idPrefix}-goal-${index}-side`}>득점 팀</label>
+                      <select
+                      id={`${idPrefix}-goal-${index}-side`}
                       aria-label={`${index + 1}번째 득점 팀`}
-                      className="tm-input"
-                      value={goal.sideId}
-                      onChange={(event) =>
-                        replaceGoalEvents(goalEvents.map((item, itemIndex) =>
+                        className="tm-input"
+                        value={goal.sideId}
+                        onChange={(event) =>
+                          replaceGoalEvents(goalEvents.map((item, itemIndex) =>
                           itemIndex === index
                             ? {
                                 ...item,
@@ -689,17 +701,21 @@ export function ResultEditModal({
                                 anonymous: true,
                               }
                             : item,
-                        ))
-                      }
-                    >
-                      {sides.map((side) => <option key={side.id} value={side.id}>{sideLabel(sides, side.id)}</option>)}
-                    </select>
-                    <select
+                          ))
+                        }
+                      >
+                        {sides.map((side) => <option key={side.id} value={side.id}>{sideLabel(sides, side.id)}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <label className="tm-text-caption" htmlFor={`${idPrefix}-goal-${index}-participant`}>득점 선수</label>
+                      <select
+                      id={`${idPrefix}-goal-${index}-participant`}
                       aria-label={`${index + 1}번째 득점 선수`}
-                      className="tm-input"
-                      value={goal.participantId ?? ''}
-                      onChange={(event) =>
-                        replaceGoalEvents(goalEvents.map((item, itemIndex) =>
+                        className="tm-input"
+                        value={goal.participantId ?? ''}
+                        onChange={(event) =>
+                          replaceGoalEvents(goalEvents.map((item, itemIndex) =>
                           itemIndex === index
                             ? {
                                 ...item,
@@ -707,22 +723,26 @@ export function ResultEditModal({
                                 anonymous: event.target.value ? undefined : true,
                               }
                             : item,
-                        ))
-                      }
-                    >
-                      <option value="">익명</option>
+                          ))
+                        }
+                      >
+                        <option value="">익명</option>
                       {participants.filter((participant) => participantFitsGoal(goal, participant)).map((participant) => (
                         <option key={participant.participantId} value={participant.participantId}>
                           {participantLabel(sides, participantNameMap, participant.participantId, participant.sideId)}
                         </option>
                       ))}
-                    </select>
-                    <select
+                      </select>
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <label className="tm-text-caption" htmlFor={`${idPrefix}-goal-${index}-type`}>득점 유형</label>
+                      <select
+                      id={`${idPrefix}-goal-${index}-type`}
                       aria-label={`${index + 1}번째 득점 유형`}
-                      className="tm-input"
-                      value={goal.ownGoal ? 'OWN_GOAL' : 'GOAL'}
-                      onChange={(event) =>
-                        replaceGoalEvents(goalEvents.map((item, itemIndex) =>
+                        className="tm-input"
+                        value={goal.ownGoal ? 'OWN_GOAL' : 'GOAL'}
+                        onChange={(event) =>
+                          replaceGoalEvents(goalEvents.map((item, itemIndex) =>
                           itemIndex === index
                             ? {
                                 ...item,
@@ -731,24 +751,57 @@ export function ResultEditModal({
                                 anonymous: true,
                               }
                             : item,
-                        ))
-                      }
-                    >
-                      <option value="GOAL">골</option>
-                      <option value="OWN_GOAL">자책골</option>
-                    </select>
-                    <input
-                      aria-label={`${index + 1}번째 득점 분`}
-                      type="number"
-                      min={0}
-                      className="tm-input"
-                      value={goal.minute ?? 0}
-                      onChange={(event) =>
-                        replaceGoalEvents(goalEvents.map((item, itemIndex) =>
-                          itemIndex === index ? { ...item, minute: toStatValue(event.target.value) } : item,
-                        ))
-                      }
-                    />
+                          ))
+                        }
+                      >
+                        <option value="GOAL">골</option>
+                        <option value="OWN_GOAL">자책골</option>
+                      </select>
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <label className="tm-text-caption" htmlFor={`${idPrefix}-goal-${index}-minute`}>득점 시간(분)</label>
+                      <input
+                      id={`${idPrefix}-goal-${index}-minute`}
+                      aria-label={`${index + 1}번째 득점 시간(분)`}
+                        type="number"
+                        min={0}
+                        className="tm-input"
+                        value={goal.minute ?? 0}
+                        onChange={(event) =>
+                          replaceGoalEvents(goalEvents.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, minute: toStatValue(event.target.value) } : item,
+                          ))
+                        }
+                      />
+                    </div>
+                    <div className="col-span-2 flex min-w-0 flex-col gap-1 sm:col-span-1">
+                      <label className="tm-text-caption" htmlFor={`${idPrefix}-goal-${index}-period`}>피리어드</label>
+                      <select
+                        id={`${idPrefix}-goal-${index}-period`}
+                        aria-label={`${index + 1}번째 득점 피리어드`}
+                        className="tm-input"
+                        value={goal.period ?? ''}
+                        onChange={(event) =>
+                          replaceGoalEvents(goalEvents.map((item, itemIndex) =>
+                            itemIndex === index
+                              ? {
+                                  ...item,
+                                  ...(event.target.value
+                                    ? { period: Number(event.target.value) }
+                                    : { period: undefined }),
+                                }
+                              : item,
+                          ))
+                        }
+                      >
+                        <option value="">선택 안 함</option>
+                        {periods.map((period) => (
+                          <option key={period.number} value={period.number}>
+                            {periodLabel(period.number)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
                     <button type="button" className="tm-btn tm-btn-sm tm-btn-ghost" disabled={index === 0} onClick={() => {
@@ -761,7 +814,7 @@ export function ResultEditModal({
                       [next[index], next[index + 1]] = [next[index + 1], next[index]];
                       replaceGoalEvents(next);
                     }}>아래로</button>
-                    <button type="button" className="tm-btn tm-btn-sm tm-btn-danger" onClick={() => replaceGoalEvents(goalEvents.filter((_, itemIndex) => itemIndex !== index))}>
+                    <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" style={{ color: 'var(--red700)' }} onClick={() => replaceGoalEvents(goalEvents.filter((_, itemIndex) => itemIndex !== index))}>
                       삭제
                     </button>
                   </div>
@@ -803,6 +856,12 @@ export function ResultEditModal({
                     label="파울"
                     value={participant.fouls}
                     onValueChange={(fouls) => updateParticipant(index, { fouls })}
+                  />
+                  <StatNumberField
+                    id={`${idPrefix}-p${index}-minutes`}
+                    label="출전 시간(분)"
+                    value={participant.minutesPlayed}
+                    onValueChange={(minutesPlayed) => updateParticipant(index, { minutesPlayed })}
                   />
                   <StatNumberField
                     id={`${idPrefix}-p${index}-yellow`}

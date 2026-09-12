@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { createPortal } from 'react-dom';
 import { useState } from 'react';
 import { Card } from '@/components/v1-ui/primitives';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
@@ -10,6 +11,8 @@ import {
   useV1LeagueClaimableParticipants,
   useV1LeagueRequestIdentityLink,
   useV1RequestIdentityLink,
+  useV1TeamMatchClaimableParticipants,
+  useV1TeamMatchRequestIdentityLink,
 } from '@/hooks/use-v1-api';
 
 /**
@@ -63,6 +66,14 @@ export function LeagueClaimMyRecordSection({
   return <ClaimMyRecordView open={open} onOpenChange={setOpen} claimable={claimable} request={request} />;
 }
 
+/** 팀매치 상세용 — 후보 목록 API만 팀매치 스코프로 바꾸고 화면·신청 계약은 공유한다. */
+export function TeamMatchClaimMyRecordSection({ teamMatchId }: { teamMatchId: string }) {
+  const [open, setOpen] = useState(false);
+  const claimable = useV1TeamMatchClaimableParticipants(teamMatchId, { enabled: open });
+  const request = useV1TeamMatchRequestIdentityLink(teamMatchId);
+  return <ClaimMyRecordView open={open} onOpenChange={setOpen} claimable={claimable} request={request} />;
+}
+
 function ClaimMyRecordView({
   open,
   onOpenChange,
@@ -107,7 +118,7 @@ function ClaimMyRecordView({
 
   return (
     <>
-      <Card pad={16} style={{ marginTop: 12, borderStyle: 'dashed' }}>
+      <Card pad={16} style={{ marginTop: 12, borderStyle: 'solid' }}>
         <div className="tm-text-body-lg">이 경기에 뛰었는데 내 기록이 없나요?</div>
         <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
           명단에서 본인을 찾아 연결하면 내 활동 기록으로 가져올 수 있어요.
@@ -125,21 +136,22 @@ function ClaimMyRecordView({
         </button>
       </Card>
 
-      {open ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(25, 31, 40, 0.48)' }}
-          onClick={onBackdropClick}
-        >
-          <div
-            ref={dialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="claim-my-record-title"
-            tabIndex={-1}
-            className="w-full max-w-[420px] overflow-hidden rounded-2xl"
-            style={{ background: 'var(--surface, #fff)', boxShadow: 'var(--shadow-modal)', padding: 20 }}
-          >
+      {open && typeof document !== 'undefined'
+        ? createPortal((
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              style={{ background: 'rgba(25, 31, 40, 0.48)' }}
+              onClick={onBackdropClick}
+            >
+              <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="claim-my-record-title"
+                tabIndex={-1}
+                className="w-full max-w-[420px] overflow-hidden rounded-2xl"
+                style={{ background: 'var(--surface, #fff)', boxShadow: 'var(--shadow-modal)', padding: 20 }}
+              >
             {/*
               제목과 안내는 목록 상태를 따라간다. 고를 것이 없는 화면이 "골라 주세요"라고
               말하면 사용자는 자기가 뭘 잘못했는지 찾게 된다 -- 실제로 alpha 실화면에서
@@ -206,21 +218,8 @@ function ClaimMyRecordView({
                     aria-pressed={selected === participant.participantId}
                     onClick={() => setSelected(participant.participantId)}
                   >
-                    <span
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 2,
-                        width: '100%',
-                        minWidth: 0,
-                      }}
-                    >
-                      <span
-                        className="tm-text-caption"
-                        style={{
-                          color: selected === participant.participantId ? 'inherit' : 'var(--grey700)',
-                        }}
-                      >
+                    <span style={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span className="tm-text-caption" style={{ color: selected === participant.participantId ? 'inherit' : 'var(--grey700)' }}>
                         {participant.sideLabel} · {participant.sideKey === 'HOME' ? '홈' : '원정'}
                       </span>
                       <span>
@@ -280,9 +279,10 @@ function ClaimMyRecordView({
               </button>
               )}
             </div>
-          </div>
-        </div>
-      ) : null}
+              </div>
+            </div>
+          ), document.body)
+        : null}
     </>
   );
 }

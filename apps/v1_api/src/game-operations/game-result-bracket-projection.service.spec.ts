@@ -1,146 +1,89 @@
-/**
- * game-result-bracket-projection.service.spec.ts
- *
- * 승부차기 트랙 B: `GameResultBracketProjectionService.project()`의 승자 판정만 표적으로
- * 검증한다(`resolveWinnerSide`는 private이라 직접 부르지 않고, 실제 코드 경로인
- * `project()`를 통해 관찰 가능한 결과 -- 어느 쪽 registrationId가 다음 라운드 픽스처에
- * 배정되는지 -- 로만 검증한다).
- *
- * `$queryRaw`/`$executeRaw`는 태그드 템플릿이라 실제 SQL을 파싱할 필요가 없다 -- 이
- * 서비스가 호출하는 정확한 순서(lockEdges -> fixtures 조회 -> assertRegistrations ->
- * assignTarget)대로 `mockResolvedValueOnce`를 체이닝해 각 단계가 기대하는 행만 돌려준다.
- * 이 순서가 바뀌면 테스트 자체가 실패하므로(where 필터를 무시하는 가짜와 달리) 실제 서비스
- * 코드가 그 순서로 호출한다는 사실 자체를 이 테스트가 증명한다.
- */
 import { GameResultBracketProjectionService } from './game-result-bracket-projection.service';
 import type { OfficialRevisionRow, OfficialScore } from './game-result-official-projection.types';
 
-const SOURCE_FIXTURE = 'fixture-source';
-const TARGET_FIXTURE = 'fixture-target';
+const SOURCE = 'team-match-source';
+const TARGET = 'team-match-target';
 const TOURNAMENT = 'tournament-1';
 const HOME_REG = 'registration-home';
 const AWAY_REG = 'registration-away';
 
 function revisionRow(overrides: Partial<OfficialRevisionRow> = {}): OfficialRevisionRow {
   return {
-    revisionId: 'revision-1',
-    gameId: 'game-1',
-    revision: 1,
-    score: { home: 1, away: 1 },
-    sourceHash: 'hash-1',
-    playedAt: new Date('2026-07-31T09:00:00Z'),
-    officialAt: new Date('2026-08-01T00:00:00Z'),
-    reason: null,
-    sourceType: 'TOURNAMENT_FIXTURE',
-    currentOfficialRevisionId: 'revision-1',
-    tournamentId: TOURNAMENT,
-    tournamentFixtureId: SOURCE_FIXTURE,
-    homeTeamId: 'team-home',
-    awayTeamId: 'team-away',
-    visibility: 'LIVE' as const,
-    ...overrides,
+    revisionId: 'revision-1', gameId: 'game-source', revision: 1,
+    score: { home: 1, away: 1 }, sourceHash: 'hash-1', playedAt: new Date('2026-07-31T09:00:00Z'),
+    officialAt: new Date('2026-08-01T00:00:00Z'), reason: null, sourceType: 'TEAM_MATCH',
+    currentOfficialRevisionId: 'revision-1', tournamentId: TOURNAMENT,
+    teamMatchId: SOURCE, tournamentTeamMatchId: SOURCE, teamMatchTournamentId: TOURNAMENT,
+    leagueId: null, homeTeamId: 'team-home', awayTeamId: 'team-away', visibility: 'LIVE', ...overrides,
   };
 }
 
-/**
- * Builds a fake tx whose `$queryRaw` answers, in call order, exactly what
- * `project()` issues for a single-edge WINNER advancement out of a level
- * (1-1) source fixture: (1) the advancement edge, (2) the locked source +
- * target fixture rows, (3) the two CONFIRMED registrations. `$executeRaw`
- * answers the final `assignTarget` UPDATE with "1 row touched".
- */
 function makeTx() {
-  const queryRaw = jest
-    .fn()
-    .mockResolvedValueOnce([
-      {
-        tournamentId: TOURNAMENT,
-        sourceFixtureId: SOURCE_FIXTURE,
-        sourceOutcome: 'WINNER',
-        targetFixtureId: TARGET_FIXTURE,
-        targetSide: 'HOME',
-      },
-    ])
-    .mockResolvedValueOnce([
-      {
-        id: SOURCE_FIXTURE,
-        tournamentId: TOURNAMENT,
-        status: 'completed',
-        homeRegistrationId: HOME_REG,
-        awayRegistrationId: AWAY_REG,
-      },
-      {
-        id: TARGET_FIXTURE,
-        tournamentId: TOURNAMENT,
-        status: 'scheduled',
-        homeRegistrationId: null,
-        awayRegistrationId: null,
-      },
-    ])
-    .mockResolvedValueOnce([
-      { id: HOME_REG, tournamentId: TOURNAMENT, status: 'confirmed' },
-      { id: AWAY_REG, tournamentId: TOURNAMENT, status: 'confirmed' },
-    ]);
-  const executeRaw = jest.fn().mockResolvedValue(1);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return { $queryRaw: queryRaw, $executeRaw: executeRaw } as any;
+  const queryRaw = jest.fn()
+    // source lock: Game, Details, TeamMatch, sides
+    .mockResolvedValueOnce([{ id: 'game-source', teamMatchId: SOURCE, gameState: 'ENDED' }])
+    .mockResolvedValueOnce([{ teamMatchId: SOURCE, tournamentId: TOURNAMENT, homeRegistrationId: HOME_REG, awayRegistrationId: AWAY_REG }])
+    .mockResolvedValueOnce([{ teamMatchId: SOURCE, tournamentId: TOURNAMENT, status: 'completed', hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', title: 'Source', startAt: null, endAt: null }])
+    .mockResolvedValueOnce([{ id: 'home-side', gameId: 'game-source', sideKey: 'HOME', teamId: 'team-home', displayName: 'Home' }, { id: 'away-side', gameId: 'game-source', sideKey: 'AWAY', teamId: 'team-away', displayName: 'Away' }])
+    // advancement edges
+    .mockResolvedValueOnce([{ tournamentId: TOURNAMENT, sourceTeamMatchId: SOURCE, sourceOutcome: 'WINNER', targetTeamMatchId: TARGET, targetSide: 'HOME' }])
+    // source registrations
+    .mockResolvedValueOnce([{ id: HOME_REG, tournamentId: TOURNAMENT, status: 'confirmed', teamId: 'team-home', teamName: 'Home' }, { id: AWAY_REG, tournamentId: TOURNAMENT, status: 'confirmed', teamId: 'team-away', teamName: 'Away' }])
+    // target lock: Game, Details, TeamMatch, sides
+    .mockResolvedValueOnce([{ id: 'game-target', teamMatchId: TARGET, gameState: 'SCHEDULED' }])
+    .mockResolvedValueOnce([{ teamMatchId: TARGET, tournamentId: TOURNAMENT, homeRegistrationId: null, awayRegistrationId: null }])
+    .mockResolvedValueOnce([{ teamMatchId: TARGET, tournamentId: TOURNAMENT, status: 'matched', hostTeamId: null, approvedApplicantTeamId: null, title: 'Target', startAt: null, endAt: null }])
+    .mockResolvedValueOnce([{ id: 'target-home-side', gameId: 'game-target', sideKey: 'HOME', teamId: null, displayName: null }, { id: 'target-away-side', gameId: 'game-target', sideKey: 'AWAY', teamId: null, displayName: null }])
+    // target registration validation
+    .mockResolvedValueOnce([{ id: HOME_REG, tournamentId: TOURNAMENT, status: 'confirmed', teamId: 'team-home', teamName: 'Home' }, { id: AWAY_REG, tournamentId: TOURNAMENT, status: 'confirmed', teamId: 'team-away', teamName: 'Away' }]);
+  return {
+    $queryRaw: queryRaw,
+    v1TournamentMatchDetails: { update: jest.fn() },
+    v1TeamMatch: { update: jest.fn() },
+    v1GameLineup: {
+      findMany: jest.fn().mockResolvedValue([]),
+      updateMany: jest.fn(),
+      create: jest.fn(),
+    },
+    v1TeamTacticsBoard: { deleteMany: jest.fn() },
+    v1GameSide: { update: jest.fn() },
+    v1Game: { update: jest.fn() },
+  } as never;
 }
 
-describe('GameResultBracketProjectionService penalty-aware winner resolution', () => {
+describe('GameResultBracketProjectionService canonical TeamMatch projection', () => {
   const service = new GameResultBracketProjectionService();
 
-  it('정규시간이 무승부여도 승부차기 승자가 있으면 그 팀이 다음 라운드로 배정된다', async () => {
+  it('uses the canonical advancement path and applies a regulation winner', async () => {
     const tx = makeTx();
-    const score: OfficialScore = { home: 1, away: 1, penalties: { home: 5, away: 4 } };
-
-    await service.project(tx, revisionRow(), score);
-
-    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
-    const [strings, registrationId] = tx.$executeRaw.mock.calls[0];
-    expect(String(strings.join(''))).toContain('home_registration_id');
-    expect(registrationId).toBe(HOME_REG); // penalties.home(5) > penalties.away(4)
+    await service.project(tx, revisionRow(), { home: 2, away: 1 });
+    expect((tx as any).v1TournamentMatchDetails.update).toHaveBeenCalledWith(expect.objectContaining({ where: { teamMatchId: TARGET }, data: { homeRegistrationId: HOME_REG } }));
+    expect((tx as any).v1TeamMatch.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: TARGET }, data: { hostTeamId: 'team-home' } }));
   });
 
-  it('승부차기에서 원정팀이 이기면 원정팀 registrationId가 배정된다', async () => {
+  it.each<OfficialScore>([
+    { home: 1, away: 1 },
+    { home: 1, away: 1, penalties: { home: 4, away: 4 } },
+  ])('rejects an unresolved draw before assigning the target', async (score) => {
     const tx = makeTx();
-    const score: OfficialScore = { home: 1, away: 1, penalties: { home: 3, away: 5 } };
-
-    await service.project(tx, revisionRow(), score);
-
-    const [, registrationId] = tx.$executeRaw.mock.calls[0];
-    expect(registrationId).toBe(AWAY_REG);
+    await expect(service.project(tx, revisionRow(), score)).rejects.toThrow('BRACKET_RESULT_DRAW_UNSUPPORTED');
+    expect((tx as any).v1TournamentMatchDetails.update).not.toHaveBeenCalled();
   });
 
-  it('정규시간 무승부 + 승부차기 미기록 → 여전히 BRACKET_RESULT_DRAW_UNSUPPORTED(회귀 방지)', async () => {
+  it('uses the penalty winner for a tied canonical knockout match', async () => {
     const tx = makeTx();
-    const score: OfficialScore = { home: 1, away: 1 };
-
-    await expect(service.project(tx, revisionRow(), score)).rejects.toThrow(
-      'BRACKET_RESULT_DRAW_UNSUPPORTED',
-    );
-    expect(tx.$executeRaw).not.toHaveBeenCalled();
+    await service.project(tx, revisionRow(), { home: 1, away: 1, penalties: { home: 5, away: 4 } });
+    expect((tx as any).v1TournamentMatchDetails.update).toHaveBeenCalledWith(expect.objectContaining({ data: { homeRegistrationId: HOME_REG } }));
   });
 
-  it('승부차기 스코어 자체가 동점이면(입력 오류) 무승부로 취급해 거부한다', async () => {
+  it('fails closed for a noncanonical source', async () => {
     const tx = makeTx();
-    const score: OfficialScore = { home: 1, away: 1, penalties: { home: 4, away: 4 } };
-
-    await expect(service.project(tx, revisionRow(), score)).rejects.toThrow(
-      'BRACKET_RESULT_DRAW_UNSUPPORTED',
-    );
+    await expect(service.project(tx, revisionRow({ sourceType: 'TOURNAMENT_FIXTURE' }), { home: 2, away: 1 })).rejects.toThrow('BRACKET_CANONICAL_SOURCE_REQUIRED');
   });
 
-  it('정규시간에 이미 승부가 갈렸으면 penalties가 있어도 정규시간 승자를 그대로 쓴다', async () => {
+  it('does not project regular league TeamMatches without bracket Details', async () => {
     const tx = makeTx();
-    // Home won 2-1 in regulation; a stray penalties field (should never
-    // reach here in practice -- GamesService.applyPenalties rejects this at
-    // the `end` command -- but the projection itself must stay defensive)
-    // must not override the decisive regulation result.
-    const score: OfficialScore = { home: 2, away: 1, penalties: { home: 3, away: 5 } };
-
-    await service.project(tx, revisionRow(), score);
-
-    const [, registrationId] = tx.$executeRaw.mock.calls[0];
-    expect(registrationId).toBe(HOME_REG);
+    await service.project(tx, revisionRow({ tournamentTeamMatchId: null, tournamentId: null, teamMatchTournamentId: TOURNAMENT, leagueId: TOURNAMENT }), { home: 2, away: 1 });
+    expect((tx as any).$queryRaw).not.toHaveBeenCalled();
   });
 });

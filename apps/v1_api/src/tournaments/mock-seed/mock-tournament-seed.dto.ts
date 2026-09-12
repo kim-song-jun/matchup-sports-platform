@@ -40,8 +40,8 @@ export class CreateMockTournamentDto {
   reviewReady?: boolean;
 
   /**
-   * 라인업까지 제출된 상태로 만든다. 각 팀 명단에서 선발 최소 인원을 뽑아 1명을 골키퍼로
-   * 지정하고 나머지는 후보로 남긴다. 기본값 false — 라인업 제출 자체를 테스트하려면 비어 있어야 한다.
+   * 최소 인원을 충족한 각 팀 명단 전체를 출전자로 등록하고 1명을 골키퍼로 지정해
+   * 라인업을 제출한다. 기본값 false — 라인업 제출 자체를 테스트하려면 비어 있어야 한다.
    */
   @IsOptional()
   @IsBoolean()

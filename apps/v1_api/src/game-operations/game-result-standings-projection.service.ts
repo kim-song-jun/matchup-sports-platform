@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { ConflictException } from '@nestjs/common';
 import { validateCompetitionConfig } from '../tournaments/competition-config/competition-config';
 import {
   fairPlayByRegistrationFromGroups,
@@ -20,16 +21,15 @@ type GroupForStandingsRow = StandingsSourceGroup & {
 
 /**
  * Recalculates the affected group's `V1TournamentStanding` rows whenever a
- * tournament-fixture game result becomes the current OFFICIAL revision, so
+ * canonical tournament TeamMatch game result becomes the current OFFICIAL revision, so
  * group standings stay live instead of requiring an admin to hit
  * `POST admin/tournaments/:id/standings/recalculate` by hand after every
  * result (that route stays in place as an operator recovery tool — see
  * TournamentBracketService.recalculateStandings()).
  *
  * Skips (no-op, no throw) for anything that isn't a standings-bearing
- * group-phase fixture result:
- *  - team-match games (`revision.tournamentFixtureId === null`) — team
- *    matches have no tournament standings at all;
+ * group-phase canonical result:
+ *  - legacy-only, league, and friendly revisions without a canonical tournament TeamMatch;
  *  - a fixture with no `groupId` (e.g. a knockout slot never wired to a
  *    group row);
  *  - a group whose `phase !== 'group'` — semi/final/third_place fixtures
@@ -59,33 +59,38 @@ type GroupForStandingsRow = StandingsSourceGroup & {
  */
 export class GameResultStandingsProjectionService {
   async project(tx: Prisma.TransactionClient, revision: OfficialRevisionRow): Promise<void> {
-    if (revision.tournamentFixtureId === null) return;
+    // Friendly/league and legacy-only revisions have no tournament Details.
+    // Historical import creates a canonical TeamMatch before invoking this projector.
+    if (revision.tournamentTeamMatchId === null) return;
+    if (revision.sourceType !== 'TEAM_MATCH') {
+      throw new ConflictException({
+        code: 'CANONICAL_MATCH_REQUIRED',
+        message: 'Tournament standings require a TEAM_MATCH source.',
+      });
+    }
 
-    const fixture = await tx.v1TournamentFixture.findUnique({
-      where: { id: revision.tournamentFixtureId },
-      select: { groupId: true },
-    });
-    if (!fixture || fixture.groupId === null) return;
-
-    const group = await tx.v1TournamentGroup.findUnique({
-      where: { id: fixture.groupId },
+    const detail = await tx.v1TournamentMatchDetails.findUnique({
+      where: { teamMatchId: revision.tournamentTeamMatchId },
       select: {
-        id: true,
-        phase: true,
-        groupTeams: { select: { registrationId: true } },
-        fixtures: {
-          where: { status: 'completed' },
+        groupId: true,
+        tournamentId: true,
+        homeRegistrationId: true,
+        awayRegistrationId: true,
+        teamMatch: {
           select: {
-            homeRegistrationId: true,
-            awayRegistrationId: true,
+            id: true,
+            deletedAt: true,
+            tournamentId: true,
+            leagueId: true,
+            status: true,
             game: {
               select: {
+                id: true,
+                sourceType: true,
                 currentOfficialRevision: {
                   select: {
                     state: true,
                     score: true,
-                    // F5: 페어플레이 벌점 원천. tournament-group-standings.ts의
-                    // fairPlayByRegistrationFromGroups() 참고.
                     resultParticipants: { select: { sideId: true, cards: true } },
                   },
                 },
@@ -94,6 +99,39 @@ export class GameResultStandingsProjectionService {
             },
           },
         },
+      },
+    });
+    const match = detail?.teamMatch;
+    if (detail === null || match == null) {
+      throw new ConflictException({
+        code: 'CANONICAL_MATCH_REQUIRED',
+        message: 'The official revision is not bound to a valid canonical tournament match.',
+      });
+    }
+    if (
+      match.deletedAt !== null ||
+      match.id !== revision.tournamentTeamMatchId ||
+      match.tournamentId === null ||
+      match.tournamentId !== detail.tournamentId ||
+      match.tournamentId !== revision.teamMatchTournamentId ||
+      match.leagueId !== null ||
+      match.status !== 'completed' ||
+      match.game === null ||
+      match.game.id !== revision.gameId ||
+      match.game.sourceType !== 'TEAM_MATCH'
+    ) {
+      throw new ConflictException({
+        code: 'CANONICAL_MATCH_REQUIRED',
+        message: 'The official revision is not bound to a valid canonical tournament match.',
+      });
+    }
+    if (detail.groupId === null) return;
+
+    const targetGroup = await tx.v1TournamentGroup.findUnique({
+      where: { id: detail.groupId },
+      select: {
+        id: true,
+        phase: true,
         tournament: {
           select: {
             id: true,
@@ -103,12 +141,24 @@ export class GameResultStandingsProjectionService {
           },
         },
       },
-    }) as GroupForStandingsRow | null;
-    if (!group || group.phase !== 'group') return;
-
+    });
+    if (targetGroup === null || targetGroup.tournament?.id !== detail.tournamentId) {
+      throw new ConflictException({
+        code: 'CANONICAL_MATCH_REQUIRED',
+        message: 'The canonical tournament group could not be resolved.',
+      });
+    }
+    if (targetGroup.phase !== 'group') return;
+    const allGroups = await this.loadCanonicalGroups(tx, detail.tournamentId);
+    const group = allGroups.find((candidate) => candidate.id === detail.groupId);
+    if (group === undefined) {
+      throw new ConflictException({
+        code: 'CANONICAL_MATCH_REQUIRED',
+        message: 'The canonical tournament group could not be loaded.',
+      });
+    }
     const tournament = group.tournament;
     if (!tournament || tournament.deletedAt !== null || !tournament.competitionConfigVersionId) return;
-
     const config = validateCompetitionConfig(tournament.competitionConfig);
     const now = new Date();
     // F5: 이 그룹만으로 계산해도 값은 전체 조 기준과 동일하다 — 픽스처는 조별로
@@ -134,35 +184,6 @@ export class GameResultStandingsProjectionService {
     // only has the one affected group loaded above — so it re-fetches every
     // group-phase group of the tournament here, in the same transaction, to
     // feed the overall recalculation.
-    const allGroups = (await tx.v1TournamentGroup.findMany({
-      where: { tournamentId: tournament.id, phase: 'group' },
-      select: {
-        id: true,
-        groupTeams: { select: { registrationId: true } },
-        fixtures: {
-          where: { status: 'completed' },
-          select: {
-            homeRegistrationId: true,
-            awayRegistrationId: true,
-            game: {
-              select: {
-                currentOfficialRevision: {
-                  select: {
-                    state: true,
-                    score: true,
-                    // F5: 페어플레이 벌점 원천. tournament-group-standings.ts의
-                    // fairPlayByRegistrationFromGroups() 참고.
-                    resultParticipants: { select: { sideId: true, cards: true } },
-                  },
-                },
-                sides: { select: { id: true, sideKey: true } },
-              },
-            },
-          },
-        },
-      },
-    })) as StandingsSourceGroup[];
-
     await recalculateAndUpsertOverallStandings(
       tx,
       {
@@ -174,5 +195,92 @@ export class GameResultStandingsProjectionService {
       },
       now,
     );
+  }
+
+  private async loadCanonicalGroups(
+    tx: Prisma.TransactionClient,
+    tournamentId: string,
+  ): Promise<GroupForStandingsRow[]> {
+    const groups = await tx.v1TournamentGroup.findMany({
+      where: {
+        tournamentId,
+        phase: 'group',
+      },
+      select: {
+        id: true,
+        phase: true,
+        groupTeams: { select: { registrationId: true } },
+        tournament: {
+          select: {
+            id: true,
+            deletedAt: true,
+            competitionConfigVersionId: true,
+            competitionConfig: true,
+          },
+        },
+      },
+    });
+    const details = await tx.v1TournamentMatchDetails.findMany({
+      where: {
+        tournamentId,
+        teamMatch: { deletedAt: null },
+      },
+      select: {
+        groupId: true,
+        homeRegistrationId: true,
+        awayRegistrationId: true,
+        teamMatch: {
+          select: {
+            tournamentId: true,
+            leagueId: true,
+            status: true,
+            game: {
+              select: {
+                id: true,
+                sourceType: true,
+                currentOfficialRevision: {
+                  select: {
+                    state: true,
+                    score: true,
+                    resultParticipants: { select: { sideId: true, cards: true } },
+                  },
+                },
+                sides: { select: { id: true, sideKey: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    type CanonicalFixture = StandingsSourceGroup['fixtures'][number];
+    const fixturesByGroup = new Map<string, CanonicalFixture[]>();
+    for (const detail of details) {
+      const match = detail.teamMatch;
+      if (
+        match === null ||
+        match.tournamentId !== tournamentId ||
+        match.leagueId !== null ||
+        match.game === null ||
+        match.game.sourceType !== 'TEAM_MATCH'
+      ) {
+        throw new ConflictException({
+          code: 'CANONICAL_MATCH_REQUIRED',
+          message: 'A tournament group contains a non-canonical TeamMatch.',
+        });
+      }
+      if (match.status !== 'completed') continue;
+      if (detail.groupId === null) continue;
+      const fixtures = fixturesByGroup.get(detail.groupId) ?? [];
+      fixtures.push({
+        homeRegistrationId: detail.homeRegistrationId,
+        awayRegistrationId: detail.awayRegistrationId,
+        game: detail.teamMatch.game,
+      });
+      fixturesByGroup.set(detail.groupId, fixtures);
+    }
+    return groups.map((group) => ({
+      ...group,
+      fixtures: fixturesByGroup.get(group.id) ?? [],
+    })) as GroupForStandingsRow[];
   }
 }

@@ -22,9 +22,9 @@ import { notificationCopyFor } from '../notifications/notifications.service';
  * fire-and-forget 으로 한다. 발송이 실패해도 이미 커밋된 인앱 알림은 그대로 남는다.
  *
  * ## 수신자 = 승인 자격자(assertAttestorAuthority)와 정렬하되, 대회는 리더로 좁힌다
- * - TEAM_MATCH(리그 대진 포함): 참가자가 속한 사이드 팀의 owner/manager — 승인 자격
- *   그 자체다.
- * - TOURNAMENT_FIXTURE: 승인 자격은 두 등록팀의 활성 멤버 **전원**이지만, 전원 발송은
+ * - TEAM_MATCH 친선·리그: 참가자가 속한 사이드 팀의 owner/manager — 승인 자격 그 자체다.
+ * - canonical TEAM_MATCH 대회(Details + tournamentId 일치): 승인 자격은 두 등록팀의 활성
+ *   멤버 **전원**이지만, 전원 발송은
  *   소음이다(양 팀 수십 명). 알림은 두 등록팀의 owner/manager 에게만 보낸다 — 자격
  *   범위는 그대로 두고 도달 채널만 좁히는 것이라 새 인가 규칙이 아니다.
  * - 신청자 본인은 제외한다(스스로 승인할 수 없다 — 서비스 + DB 트리거).
@@ -36,6 +36,89 @@ export type IdentityAttestPushPlan = {
   body: string;
   url: string | null;
 };
+
+type IdentityNotificationScope =
+  | {
+      kind: 'tournament';
+      tournamentId: string;
+      fixtureId: string;
+      teamIds: string[];
+    }
+  | { kind: 'team_match'; teamMatchId: string };
+
+/** A malformed canonical game must abort its surrounding identity mutation. */
+export class IdentityNotificationScopeError extends Error {
+  readonly code = 'IDENTITY_NOTIFICATION_SCOPE_INVALID';
+
+  constructor() {
+    super('Canonical TeamMatch notification scope is invalid');
+    this.name = 'IdentityNotificationScopeError';
+  }
+}
+
+/**
+ * `TEAM_MATCH` is the canonical source for both regular leagues and tournaments.
+ * Details is the discriminator for tournament matches; tournamentId alone is not
+ * sufficient because the league creator keeps both competition columns populated
+ * during the expand window.
+ */
+function resolveIdentityNotificationScope(game: {
+  sourceType: string;
+  teamMatchId: string | null;
+  teamMatch?: {
+    tournamentId: string | null;
+    leagueId: string | null;
+    tournament?: { kind: string | null } | null;
+    league?: { kind: string | null } | null;
+    tournamentDetails: {
+      teamMatchId: string;
+      tournamentId: string;
+      homeRegistration: { teamId: string } | null;
+      awayRegistration: { teamId: string } | null;
+    } | null;
+  } | null;
+}): IdentityNotificationScope | null {
+  if (game.sourceType !== 'TEAM_MATCH' || game.teamMatchId === null) return null;
+
+  // Prisma returns null for a missing relation. Never infer a friendly/league
+  // scope from an absent relation: malformed ownership must fail closed.
+  if (game.teamMatch === null || game.teamMatch === undefined) return null;
+  if (game.teamMatch.tournamentId === null && game.teamMatch.leagueId === null && game.teamMatch.tournamentDetails === null) {
+    return { kind: 'team_match', teamMatchId: game.teamMatchId };
+  }
+  if (
+    game.teamMatch.leagueId !== null &&
+    game.teamMatch.tournamentId === game.teamMatch.leagueId &&
+    game.teamMatch.league?.kind === 'regular_league' &&
+    game.teamMatch.tournamentDetails === null
+  ) {
+    return { kind: 'team_match', teamMatchId: game.teamMatchId };
+  }
+
+  const details = game.teamMatch.tournamentDetails;
+  if (
+    game.teamMatch.tournament === null ||
+    game.teamMatch.tournament === undefined ||
+    game.teamMatch.tournamentId === null ||
+    game.teamMatch.leagueId !== null ||
+    (game.teamMatch.tournament?.kind !== undefined &&
+      game.teamMatch.tournament?.kind !== null &&
+      game.teamMatch.tournament.kind !== 'regular_tournament') ||
+    details === null ||
+    details.teamMatchId !== game.teamMatchId ||
+    details.tournamentId !== game.teamMatch.tournamentId
+  ) {
+    return null;
+  }
+  return {
+    kind: 'tournament',
+    tournamentId: game.teamMatch.tournamentId,
+    fixtureId: game.teamMatchId,
+    teamIds: [details.homeRegistration?.teamId, details.awayRegistration?.teamId].filter(
+      (teamId): teamId is string => typeof teamId === 'string',
+    ),
+  };
+}
 
 export async function writeIdentityAttestRequestNotifications(
   tx: Prisma.TransactionClient,
@@ -51,12 +134,20 @@ export async function writeIdentityAttestRequestNotifications(
     select: {
       sourceType: true,
       teamMatchId: true,
-      tournamentFixture: {
+      teamMatch: {
         select: {
-          id: true,
           tournamentId: true,
-          homeRegistration: { select: { teamId: true } },
-          awayRegistration: { select: { teamId: true } },
+          leagueId: true,
+          tournament: { select: { kind: true } },
+          league: { select: { kind: true } },
+          tournamentDetails: {
+            select: {
+              teamMatchId: true,
+              tournamentId: true,
+              homeRegistration: { select: { teamId: true } },
+              awayRegistration: { select: { teamId: true } },
+            },
+          },
         },
       },
     },
@@ -69,13 +160,12 @@ export async function writeIdentityAttestRequestNotifications(
   });
   if (participant === null) return null;
 
-  const isTournament = game.sourceType === 'TOURNAMENT_FIXTURE';
+  const scope = resolveIdentityNotificationScope(game);
+  if (scope === null) throw new IdentityNotificationScopeError();
+  const isTournament = scope.kind === 'tournament';
   let recipientTeamIds: string[];
   if (isTournament) {
-    recipientTeamIds = [
-      game.tournamentFixture?.homeRegistration?.teamId,
-      game.tournamentFixture?.awayRegistration?.teamId,
-    ].filter((teamId): teamId is string => typeof teamId === 'string');
+    recipientTeamIds = scope.teamIds;
   } else {
     const side = await tx.v1GameSide.findUnique({
       where: { id: participant.sideId },
@@ -118,12 +208,7 @@ export async function writeIdentityAttestRequestNotifications(
     ? ('tournament_identity_attest_requested' as const)
     : ('team_match_identity_attest_requested' as const);
   const targetType = isTournament ? ('tournament' as const) : ('team_match' as const);
-  const targetId = isTournament
-    ? game.tournamentFixture
-      ? `${game.tournamentFixture.tournamentId}:${game.tournamentFixture.id}`
-      : null
-    : game.teamMatchId;
-  if (targetId === null) return null;
+  const targetId = isTournament ? `${scope.tournamentId}:${scope.fixtureId}` : scope.teamMatchId;
 
   const copy = notificationCopyFor(type, targetType, targetId);
   const body = `"${participant.displayNameSnapshot}" 참가자의 기록 연결 요청이 도착했어요. 24시간 안에 확인해 주세요.`;
@@ -195,7 +280,22 @@ export async function writeIdentityAttestDecisionNotification(
     select: {
       sourceType: true,
       teamMatchId: true,
-      tournamentFixture: { select: { id: true, tournamentId: true } },
+      teamMatch: {
+        select: {
+          tournamentId: true,
+          leagueId: true,
+          tournament: { select: { kind: true } },
+          league: { select: { kind: true } },
+          tournamentDetails: {
+            select: {
+              teamMatchId: true,
+              tournamentId: true,
+              homeRegistration: { select: { teamId: true } },
+              awayRegistration: { select: { teamId: true } },
+            },
+          },
+        },
+      },
     },
   });
   if (game === null) return null;
@@ -205,14 +305,11 @@ export async function writeIdentityAttestDecisionNotification(
     select: { displayNameSnapshot: true },
   });
 
-  const isTournament = game.sourceType === 'TOURNAMENT_FIXTURE';
+  const scope = resolveIdentityNotificationScope(game);
+  if (scope === null) throw new IdentityNotificationScopeError();
+  const isTournament = scope.kind === 'tournament';
   const targetType = isTournament ? ('tournament' as const) : ('team_match' as const);
-  const targetId = isTournament
-    ? game.tournamentFixture
-      ? `${game.tournamentFixture.tournamentId}:${game.tournamentFixture.id}`
-      : null
-    : game.teamMatchId;
-  if (targetId === null) return null;
+  const targetId = isTournament ? `${scope.tournamentId}:${scope.fixtureId}` : scope.teamMatchId;
 
   // 선호도 필터 — 요청 알림과 동일하게 행이 없으면 기본 활성 취급.
   const preference = await tx.v1NotificationPreference.findUnique({

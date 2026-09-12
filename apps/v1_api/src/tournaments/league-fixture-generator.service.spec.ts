@@ -22,7 +22,7 @@ const NO_ATTACHMENTS = {
   advancementTargets: 0,
 };
 
-describe('fixture delete blockers', () => {
+describe('canonical match replacement blockers', () => {
   // 단건 삭제와 일괄 교체가 서로 다른 하한선을 쓰는 것이 의도된 설계다. 단건은 대진 하나를
   // 지목해 확인까지 받으므로 영상 cascade 계약을 유지하고, 일괄은 운영자가 어느 대진에
   // 영상·진출 연결이 걸렸는지 볼 수 없으므로 그것까지 막는다. 두 함수가 같아지면 한쪽이
@@ -289,16 +289,28 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     v1Tournament: { findFirst: jest.fn() },
     v1TournamentGroup: { findFirst: jest.fn() },
     v1TournamentRegistration: { findMany: jest.fn() },
-    v1TournamentFixture: {
+    v1TournamentPlayer: { findMany: jest.fn() },
+    v1IdempotencyRecord: { findFirst: jest.fn() },
+    v1TournamentMatchDetails: {
       findMany: jest.fn(),
-      deleteMany: jest.fn(),
-      updateMany: jest.fn(),
+      findFirst: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      update: jest.fn(),
       create: jest.fn(),
       aggregate: jest.fn(),
     },
-    v1Game: { updateMany: jest.fn() },
-    v1GameVisibilityPolicy: { updateMany: jest.fn() },
+    v1GameResultRevision: { findUnique: jest.fn() },
+    v1TeamMatch: {
+      create: jest.fn(),
+      update: jest.fn(),
+      findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+    },
+    v1TeamSchedule: { create: jest.fn(), updateMany: jest.fn(), count: jest.fn() },
+    v1GameSide: { update: jest.fn() },
     $transaction: jest.fn(),
+    $queryRaw: jest.fn(),
+    $executeRaw: jest.fn(),
   };
   const adminContext = { getMutationAdmin: jest.fn(), logAdminAction: jest.fn() };
   const games = { createFromSourceInTransaction: jest.fn() };
@@ -317,6 +329,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
       where.id.in.map((registrationId) => ({
         id: registrationId,
         status: 'confirmed',
+        teamId: `team-${registrationId}`,
         team: { id: `team-${registrationId}`, name: `${registrationId} 팀` },
         players: [
           {
@@ -336,6 +349,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
       where.id.in.map((registrationId) => ({
         id: registrationId,
         status: 'confirmed',
+        teamId: `team-${registrationId}`,
         team: { id: `team-${registrationId}`, name: `${registrationId} 팀` },
         players: [
           {
@@ -359,8 +373,8 @@ describe('LeagueFixtureGeneratorService.generate', () => {
   }
 
   /**
-   * 기존 대진 한 행. 서비스가 실제로 읽는 모양(`round`/`fixtureNumber`/`legNumber` + `game` +
-   * `result` + 관계별 `_count`) 그대로 만든다 — 모양이 어긋나면 "지울 수 있는가" 판정이
+   * 기존 canonical 대진 한 행. 서비스가 실제로 읽는 모양(`round`/`fixtureNumber`/`legNumber` + `teamMatch.game` +
+   * 관계별 `_count`) 그대로 만든다 — 모양이 어긋나면 "조정 가능한가" 판정이
    * 스펙에서만 통하는 거짓이 된다.
    */
   function existingFixture(
@@ -371,24 +385,62 @@ describe('LeagueFixtureGeneratorService.generate', () => {
       counts?: Partial<typeof NO_ATTACHMENTS>;
       round?: string;
       fixtureNumber?: number;
+      startAt?: Date | null;
     } = {},
   ) {
+    const homeRegistrationId = 'r1';
+    const awayRegistrationId = 'r2';
+    const homeTeamId = 'team-r1';
+    const awayTeamId = 'team-r2';
     return {
-      id,
+      teamMatchId: id,
+      homeRegistrationId,
+      awayRegistrationId,
       round: extra.round ?? 'league_r1',
       fixtureNumber: extra.fixtureNumber ?? 1,
       legNumber: 1,
-      game: game
-        ? { id: game.id, currentOfficialRevision: game.officialState ? { state: game.officialState } : null }
-        : null,
-      result: extra.result ?? null,
-      _count: { ...NO_ATTACHMENTS, ...extra.counts },
+      parentTeamMatchId: null,
+      groupId: 'group-a',
+      teamMatch: {
+        id,
+        hostTeamId: homeTeamId,
+        approvedApplicantTeamId: awayTeamId,
+        startAt: extra.startAt ?? null,
+        endAt: null,
+        placeName: null,
+        status: 'matched',
+        competitionConfigVersionId: 'ccv-1',
+        game: game
+          ? {
+              id: game.id,
+              state: 'SCHEDULED',
+              sourceType: 'TEAM_MATCH',
+              teamMatchId: id,
+              competitionConfigVersionId: 'ccv-1',
+              sides: [
+                { id: `${game.id}-home`, sideKey: 'HOME', teamId: homeTeamId },
+                { id: `${game.id}-away`, sideKey: 'AWAY', teamId: awayTeamId },
+              ],
+              currentOfficialRevision: game.officialState ? { state: game.officialState } : null,
+            }
+          : null,
+        _count: {
+          operationAudits: extra.counts?.operationAudits ?? 0,
+          staffScopes: extra.counts?.staffScopes ?? 0,
+          videos: extra.counts?.videos ?? 0,
+        },
+      },
+      _count: {
+        childTeamMatches: extra.counts?.childFixtures ?? 0,
+        advancementSources: extra.counts?.advancementSources ?? 0,
+        advancementTargets: extra.counts?.advancementTargets ?? 0,
+      },
     };
   }
 
   /** create 로 실제 저장된 fixture 행들(호출 순서대로). */
   function createdFixtureRows() {
-    return prisma.v1TournamentFixture.create.mock.calls.map((call) => call[0].data as Record<string, unknown>);
+    return prisma.v1TournamentMatchDetails.create.mock.calls.map((call) => call[0].data as Record<string, unknown>);
   }
 
   /** games.createFromSourceInTransaction 에 넘어간 (input, context) 쌍들. */
@@ -417,31 +469,51 @@ describe('LeagueFixtureGeneratorService.generate', () => {
       minMatchesPerTeam: null,
       competitionConfigVersionId: 'ccv-1',
     });
-    prisma.v1TournamentFixture.findMany.mockResolvedValue([]);
-    // 기본 목은 "요청한 만큼 전부 지워졌다" — 실제 DB 처럼 where 절의 관계 조건을 흉내내지는
-    // 못하므로, 경합(일부만 지워짐)은 그 테스트에서 count 를 직접 낮춰 만든다.
-    prisma.v1TournamentFixture.deleteMany.mockImplementation(({ where }: { where: { id: { in: string[] } } }) => {
-      writeLog.push('fixture.deleteMany');
-      return Promise.resolve({ count: where.id.in.length });
+    prisma.v1TournamentMatchDetails.findMany.mockResolvedValue([]);
+    prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockImplementation(({ where }: { where: { teamMatchId: string } }) =>
+      Promise.resolve(existingFixture(where.teamMatchId, { id: `game-${where.teamMatchId}` })),
+    );
+    prisma.v1TournamentMatchDetails.findFirst.mockResolvedValue({ teamMatchId: 'parent' });
+    prisma.v1IdempotencyRecord.findFirst.mockResolvedValue(null);
+    prisma.v1GameResultRevision.findUnique.mockResolvedValue(null);
+    prisma.$queryRaw.mockImplementation((strings: TemplateStringsArray, ...values: unknown[]) => {
+      const id = String(values[0] ?? '');
+      const query = strings.join(' ');
+      if (query.includes('FROM v1_games')) {
+        return Promise.resolve([{ id: `game-${id}`, state: 'SCHEDULED', sourceType: 'TEAM_MATCH', currentOfficialRevisionId: null }]);
+      }
+      if (query.includes('FROM v1_team_matches')) {
+        return Promise.resolve([{ id, deletedAt: null }]);
+      }
+      return Promise.resolve([]);
     });
-    prisma.v1TournamentFixture.updateMany.mockImplementation(({ data }: { data: Record<string, unknown> }) => {
-      writeLog.push(`fixture.updateMany:${String(data.status)}`);
-      return Promise.resolve({ count: 1 });
-    });
-    prisma.v1Game.updateMany.mockImplementation(({ data }: { data: Record<string, unknown> }) => {
-      writeLog.push(`game.updateMany:${String(data.state)}`);
-      return Promise.resolve({ count: 1 });
-    });
-    prisma.v1GameVisibilityPolicy.updateMany.mockImplementation(({ data }: { data: Record<string, unknown> }) => {
-      writeLog.push(`visibility.updateMany:${String(data.mode)}`);
-      return Promise.resolve({ count: 1 });
-    });
-    prisma.v1TournamentFixture.aggregate.mockResolvedValue({ _max: { fixtureNumber: null } });
-    prisma.v1TournamentFixture.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => {
+    prisma.v1TournamentMatchDetails.update.mockResolvedValue({});
+    prisma.v1TournamentMatchDetails.aggregate.mockResolvedValue({ _max: { fixtureNumber: null } });
+    prisma.v1TournamentMatchDetails.create.mockImplementation(({ data }: { data: Record<string, unknown> }) => {
       writeLog.push('fixture.create');
-      return Promise.resolve({ id: `fx-${data.round}-${data.fixtureNumber}-${data.legNumber}`, ...data });
+      return Promise.resolve({ teamMatchId: String(data.teamMatchId), ...data });
     });
+    prisma.v1TeamMatch.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: data.id, tournamentId: data.tournamentId, ...data }),
+    );
+    prisma.v1TeamMatch.update.mockImplementation(({ where, data }: { where: { id: string }; data: Record<string, unknown> }) =>
+      Promise.resolve({ id: where.id, tournamentId: 't1', title: 'updated', startAt: data.startAt ?? null, placeName: data.placeName ?? null, status: 'matched', createdAt: new Date(), updatedAt: new Date() }),
+    );
+    prisma.v1TeamMatch.findUnique.mockResolvedValue(null);
+    prisma.v1TeamMatch.findUniqueOrThrow.mockResolvedValue({ hostTeamId: 'team-r1', approvedApplicantTeamId: 'team-r2' });
+    prisma.v1TeamSchedule.create.mockResolvedValue({});
+    prisma.v1TeamSchedule.updateMany.mockResolvedValue({ count: 0 });
+    prisma.v1TeamSchedule.count = jest.fn().mockResolvedValue(0);
+    prisma.v1GameSide.update.mockResolvedValue({});
     prisma.v1TournamentRegistration.findMany.mockImplementation(confirmedRegistrations);
+    prisma.v1TournamentPlayer.findMany.mockImplementation(({ where }: { where: { id: { in: string[] } } }) =>
+      Promise.resolve(where.id.in.map((id) => ({
+        id,
+        registrationId: id.replace(/^player-/, ''),
+        userId: id.replace(/^player-/, 'user-'),
+        removedAt: null,
+      }))),
+    );
     games.createFromSourceInTransaction.mockResolvedValue({ gameId: 'game-1' });
     service = new LeagueFixtureGeneratorService(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -459,21 +531,19 @@ describe('LeagueFixtureGeneratorService.generate', () => {
 
   // C1: 생성기가 fixture 행만 만들고 게임을 만들지 않아, 만들어진 경기가 공개 일정
   // (presentScheduleEntry 가 game 없는 fixture 를 hidden 으로 접는다)·경기 상세(404)·
-  // 라인업(TOURNAMENT_FIXTURE_GAME_NOT_FOUND)에서 통째로 사라졌다.
+  // canonical TeamMatch/Game가 생성되지 않으면 공개 일정과 경기 상세가 끊긴다.
   it('C1: 만든 대진마다 그 fixture 를 가리키는 게임을 함께 만든다', async () => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2', 'r3', 'r4']));
 
     const result = await service.generate(user, 't1', dto());
 
     expect(result.created).toBe(6);
-    const fixtureIds = prisma.v1TournamentFixture.create.mock.calls.map(
-      (call) => `fx-${call[0].data.round}-${call[0].data.fixtureNumber}-${call[0].data.legNumber}`,
-    );
+    const fixtureIds = createdFixtureRows().map((row) => String(row.teamMatchId));
     expect(fixtureIds).toHaveLength(6);
     const creations = gameCreations();
     // 대진 하나당 게임 하나 — 개수가 아니라 "어느 fixture 를 가리키는가"까지 본다.
     expect(creations.map((creation) => creation.input.sourceId)).toEqual(fixtureIds);
-    expect(creations.map((creation) => creation.input.sourceType)).toEqual(Array(6).fill('TOURNAMENT_FIXTURE'));
+    expect(creations.map((creation) => creation.input.sourceType)).toEqual(Array(6).fill('TEAM_MATCH'));
     expect(creations.map((creation) => creation.input.competitionConfigVersionId)).toEqual(Array(6).fill('ccv-1'));
   });
 
@@ -484,9 +554,9 @@ describe('LeagueFixtureGeneratorService.generate', () => {
 
     await service.generate(user, 't1', dto());
 
-    const rows = createdFixtureRows();
-    expect(rows).toHaveLength(6);
-    expect(rows.map((row) => row.competitionConfigVersionId)).toEqual(Array(6).fill('ccv-1'));
+    const creations = gameCreations();
+    expect(creations).toHaveLength(6);
+    expect(creations.map((creation) => creation.input.competitionConfigVersionId)).toEqual(Array(6).fill('ccv-1'));
   });
 
   // D1: 커맨드 키는 "이 루프 안의 중복 생성" 을 막지 않는다(멱등 조회가 fixture.id 로
@@ -500,7 +570,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     const first = gameCreations().map((creation) => creation.context);
 
     games.createFromSourceInTransaction.mockClear();
-    prisma.v1TournamentFixture.create.mockClear();
+    prisma.v1TournamentMatchDetails.create.mockClear();
     await service.generate(user, 't1', dto());
     const second = gameCreations().map((creation) => creation.context);
 
@@ -574,7 +644,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
       competitionConfigVersionId: null,
     });
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2']));
-    prisma.v1TournamentFixture.findMany.mockResolvedValue([existingFixture('fx-old', null)]);
+    prisma.v1TournamentMatchDetails.findMany.mockResolvedValue([existingFixture('fx-old', null)]);
 
     await expect(
       service.generate(user, 't1', dto({ replaceExisting: true })),
@@ -584,132 +654,123 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     expect(games.createFromSourceInTransaction).not.toHaveBeenCalled();
   });
 
-  // ── D1: 교체는 행을 남기지 않는다 ──────────────────────────────────────────
-  // 앞선 시도는 되돌리기를 `status = cancelled` 표식으로 만들었다가, 그 행을 아무도 거르지
-  // 않아 공개 진행률·매직넘버·카드 출전정지 판정을 오염시켰다. 여기서 못박는 것은 ① 진짜로
-  // DELETE 한다 ② 취소 표식을 남기지 않는다 ③ 삭제가 생성보다 먼저다, 세 가지다.
-  it('D1: 교체는 기존 대진을 실제로 지우고 새 대진을 만든다', async () => {
+  // ── D1: 교체는 canonical TeamMatch를 좌표 그대로 조정한다 ────────────────
+  // 결과·감사·스태프 범위가 연결된 TeamMatch를 삭제하지 않고, 동일 좌표의
+  // SCHEDULED 경기만 updateTournamentMatchInTx로 조정한다.
+  it('D1: 교체는 canonical 대진을 삭제하지 않고 좌표를 보존해 조정한다', async () => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2']));
-    prisma.v1TournamentFixture.findMany.mockResolvedValue([
-      existingFixture('fx-old-1', null, { fixtureNumber: 1 }),
-      existingFixture('fx-old-2', null, { fixtureNumber: 2 }),
+    prisma.v1TournamentMatchDetails.findMany.mockResolvedValue([
+      existingFixture('fx-old-1', { id: 'game-fx-old-1' }, { fixtureNumber: 1, startAt: new Date('2026-09-01T20:00:00.000Z') }),
     ]);
 
     const result = await service.generate(user, 't1', dto({ replaceExisting: true }));
 
-    expect(prisma.v1TournamentFixture.deleteMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ id: { in: ['fx-old-1', 'fx-old-2'] } }) }),
+    expect(writeLog).toEqual([]);
+    expect(prisma.v1TournamentMatchDetails.create).not.toHaveBeenCalled();
+    expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'fx-old-1' } }));
+    expect(adminContext.logAdminAction).toHaveBeenCalledWith(
+      admin,
+      expect.objectContaining({ action: 'tournament.league.fixtures.reconcile' }),
+      expect.anything(),
     );
-    // 삭제 → 생성 순서. 먼저 만들면 unique(round, fixtureNumber, legNumber) 가 옛 번호와
-    // 부딪히고, 중간 상태에서 살아 있는 대진이 두 배가 된다.
-    expect(writeLog).toEqual(['fixture.deleteMany', 'fixture.create']);
-    expect(result.deleted).toBe(2);
-    expect(result.created).toBe(1);
-    expect(gameCreations()).toHaveLength(1);
+    expect(result.deleted).toBe(0);
+    expect(result.created).toBe(0);
   });
 
   // 취소 표식(tombstone)이 되살아나면 진행률·매직넘버·카드 정지가 다시 오염된다.
   it('D1: 교체는 대진이나 게임을 취소 상태로 바꾸지 않는다', async () => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2']));
-    prisma.v1TournamentFixture.findMany.mockResolvedValue([existingFixture('fx-old-1', null)]);
+    prisma.v1TournamentMatchDetails.findMany.mockResolvedValue([
+      existingFixture('fx-old-1', { id: 'game-fx-old-1' }, { startAt: new Date('2026-09-01T20:00:00.000Z') }),
+    ]);
 
     await service.generate(user, 't1', dto({ replaceExisting: true }));
 
-    expect(prisma.v1TournamentFixture.updateMany).not.toHaveBeenCalled();
-    expect(prisma.v1Game.updateMany).not.toHaveBeenCalled();
-    expect(prisma.v1GameVisibilityPolicy.updateMany).not.toHaveBeenCalled();
-    for (const call of prisma.v1TournamentFixture.create.mock.calls) {
+    expect(writeLog).toEqual([]);
+    for (const call of prisma.v1TournamentMatchDetails.create.mock.calls) {
       expect(call[0].data).not.toHaveProperty('status');
     }
   });
 
-  // 삭제하려는 전제("아무것도 매달려 있지 않다")를 DELETE 의 where 에 다시 적는 것이 CAS 다.
-  // 그 사이에 경기가 붙으면 지워진 행 수가 모자라고, 그때는 전부 롤백해야 한다 — 일부만
-  // 지우면 조에 옛 대진과 새 대진이 뒤섞인다.
-  it('D1: 재점검 직후 대진이 바뀌어 일부만 지워지면 아무것도 만들지 않고 거부한다', async () => {
+  it('D1: 기존 canonical 좌표와 계획이 다르면 삭제 대신 명시적으로 재조정이 필요하다고 거부한다', async () => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2']));
-    prisma.v1TournamentFixture.findMany.mockResolvedValue([
+    prisma.v1TournamentMatchDetails.findMany.mockResolvedValue([
       existingFixture('fx-old-1', null, { fixtureNumber: 1 }),
       existingFixture('fx-old-2', null, { fixtureNumber: 2 }),
     ]);
-    prisma.v1TournamentFixture.deleteMany.mockImplementation(() => {
-      writeLog.push('fixture.deleteMany');
-      return Promise.resolve({ count: 1 });
-    });
-
     await expect(
       service.generate(user, 't1', dto({ replaceExisting: true })),
-    ).rejects.toMatchObject({ response: { code: 'LEAGUE_FIXTURES_CHANGED' } });
+    ).rejects.toMatchObject({ response: { code: 'LEAGUE_FIXTURES_RECONCILIATION_REQUIRED' } });
 
-    expect(writeLog).toEqual(['fixture.deleteMany']);
+    expect(writeLog).toEqual([]);
     expect(games.createFromSourceInTransaction).not.toHaveBeenCalled();
   });
 
-  // 상대 트랜잭션이 아직 커밋 전이면 where 조건이 그 행을 걸러내지 못하고, Postgres 가
-  // FK 위반으로 DELETE 를 거부한다(P2003). 매핑하지 않으면 운영자가 원인 없는 500 을 본다.
-  it('D1: DELETE 가 FK 위반으로 거부되면 500 대신 도메인 오류로 번역한다', async () => {
+  it('D1: canonical 정본 Game이 사라진 대진은 도메인 오류로 반환한다', async () => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2']));
-    prisma.v1TournamentFixture.findMany.mockResolvedValue([existingFixture('fx-old-1', null)]);
-    prisma.v1TournamentFixture.deleteMany.mockImplementation(() =>
-      Promise.reject(
-        new Prisma.PrismaClientKnownRequestError('Foreign key constraint violated', {
-          code: 'P2003',
-          clientVersion: 'test',
-        }),
-      ),
-    );
-
+    prisma.v1TournamentMatchDetails.findMany.mockResolvedValue([
+      existingFixture('fx-old-1', { id: 'game-fx-old-1' }, { startAt: new Date('2026-09-01T20:00:00.000Z') }),
+    ]);
+    prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockResolvedValueOnce(existingFixture('fx-old-1', null));
     await expect(
       service.generate(user, 't1', dto({ replaceExisting: true })),
-    ).rejects.toMatchObject({ response: { code: 'LEAGUE_FIXTURES_CHANGED' } });
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_MATCH_GAME_MISSING' } });
   });
 
   it('D1: 삭제는 어드민 액션 로그로 남는다', async () => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2']));
-    prisma.v1TournamentFixture.findMany.mockResolvedValue([existingFixture('fx-old-1', null)]);
+    prisma.v1TournamentMatchDetails.findMany.mockResolvedValue([
+      existingFixture('fx-old-1', { id: 'game-fx-old-1' }, { startAt: new Date('2026-09-01T20:00:00.000Z') }),
+    ]);
 
     await service.generate(user, 't1', dto({ replaceExisting: true }));
 
     expect(adminContext.logAdminAction).toHaveBeenCalledWith(
       admin,
       expect.objectContaining({
-        action: 'tournament.league.fixtures.delete',
+        action: 'tournament.league.fixtures.reconcile',
         targetId: 'group-a',
-        beforeJson: { fixtureIds: ['fx-old-1'] },
+        afterJson: expect.objectContaining({ fixtureIds: ['fx-old-1'], fixtureCount: 1 }),
       }),
       expect.anything(),
     );
   });
 
   it.each([
-    ['게임이 붙은', { game: { id: 'g-1' }, counts: {} }],
-    ['운영 감사 기록이 남은', { game: null, counts: { operationAudits: 1 } }],
-    ['스태프가 배정된', { game: null, counts: { staffScopes: 1 } }],
-    ['영상이 붙은', { game: null, counts: { videos: 1 } }],
-    ['진출 연결이 걸린', { game: null, counts: { advancementSources: 1 } }],
-  ])('D1: %s 대진이 있으면 아무것도 지우지 않고 거부한다', async (_label, { game, counts }) => {
+    ['정본 Game이 붙은', { game: { id: 'g-1' }, counts: {}, rejects: false }],
+    ['운영 감사 기록이 남은', { game: { id: 'g-1' }, counts: { operationAudits: 1 }, rejects: false }],
+    ['스태프가 배정된', { game: { id: 'g-1' }, counts: { staffScopes: 1 }, rejects: false }],
+    ['영상이 붙은', { game: { id: 'g-1' }, counts: { videos: 1 }, rejects: true }],
+    ['진출 연결이 걸린', { game: { id: 'g-1' }, counts: { advancementSources: 1 }, rejects: true }],
+  ])('D1: %s canonical 연결의 교체 정책을 적용한다', async (_label, { game, counts, rejects }) => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2']));
-    prisma.v1TournamentFixture.findMany.mockResolvedValue([existingFixture('fx-1', game, { counts })]);
+    prisma.v1TournamentMatchDetails.findMany.mockResolvedValue([
+      existingFixture('fx-1', game, { counts, startAt: new Date('2026-09-01T20:00:00.000Z') }),
+    ]);
 
-    await expect(
-      service.generate(user, 't1', dto({ replaceExisting: true })),
-    ).rejects.toMatchObject({ response: { code: 'LEAGUE_FIXTURES_NOT_DELETABLE' } });
-
-    expect(writeLog).toEqual([]);
-    expect(games.createFromSourceInTransaction).not.toHaveBeenCalled();
+    if (rejects) {
+      await expect(
+        service.generate(user, 't1', dto({ replaceExisting: true })),
+      ).rejects.toMatchObject({ response: { code: 'LEAGUE_FIXTURES_NOT_DELETABLE' } });
+      expect(writeLog).toEqual([]);
+      expect(games.createFromSourceInTransaction).not.toHaveBeenCalled();
+    } else {
+      const result = await service.generate(user, 't1', dto({ replaceExisting: true }));
+      expect(result.created).toBe(0);
+      expect(result.deleted).toBe(0);
+      expect(games.createFromSourceInTransaction).not.toHaveBeenCalled();
+    }
   });
 
-  // 사전 점검과 트랜잭션 사이에 다른 운영자가 경기를 만들 수 있다. 트랜잭션 안에서 다시
-  // 읽지 않으면 방금 만들어진 기록을 지우려다 FK 위반으로 500 이 난다.
-  it('D1: 사전 점검 뒤 경기가 붙으면 트랜잭션 안에서 다시 잡아 아무것도 지우지 않는다', async () => {
+  it('D1: canonical Details에 Game이 없으면 쓰기 전에 정본 누락 오류를 반환한다', async () => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2']));
-    prisma.v1TournamentFixture.findMany
-      .mockResolvedValueOnce([existingFixture('fx-1', null)])
+    prisma.v1TournamentMatchDetails.findMany
+      .mockResolvedValueOnce([existingFixture('fx-1', null, { startAt: new Date('2026-09-01T20:00:00.000Z') })])
       .mockResolvedValueOnce([existingFixture('fx-1', { id: 'g-1' })]);
 
     await expect(
       service.generate(user, 't1', dto({ replaceExisting: true })),
-    ).rejects.toMatchObject({ response: { code: 'LEAGUE_FIXTURES_NOT_DELETABLE' } });
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_MATCH_GAME_MISSING' } });
 
     expect(writeLog).toEqual([]);
   });
@@ -774,7 +835,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
   it('C1: 조에 확정 상태가 아닌 신청이 있으면 아무 대진도 만들지 않는다', async () => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2']));
     prisma.v1TournamentRegistration.findMany.mockResolvedValue([
-      { id: 'r1', status: 'confirmed', team: { id: 'team-r1', name: 'r1 팀' }, players: [] },
+      { id: 'r1', status: 'confirmed', teamId: 'team-r1', team: { id: 'team-r1', name: 'r1 팀' }, players: [] },
     ]);
 
     await expect(service.generate(user, 't1', dto())).rejects.toMatchObject({
@@ -789,10 +850,10 @@ describe('LeagueFixtureGeneratorService.generate', () => {
   it('D1: 확정이 아닌 팀을 이름과 상태까지 지목한다', async () => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2', 'r3', 'r4']));
     prisma.v1TournamentRegistration.findMany.mockResolvedValue([
-      { id: 'r1', status: 'confirmed', team: { id: 'team-r1', name: '강남FC' }, players: [] },
-      { id: 'r2', status: 'cancelled', team: { id: 'team-r2', name: '서초유나이티드' }, players: [] },
-      { id: 'r3', status: 'confirmed', team: { id: 'team-r3', name: '송파스포츠' }, players: [] },
-      { id: 'r4', status: 'cancel_requested', team: { id: 'team-r4', name: '마포클럽' }, players: [] },
+      { id: 'r1', status: 'confirmed', teamId: 'team-r1', team: { id: 'team-r1', name: '강남FC' }, players: [] },
+      { id: 'r2', status: 'cancelled', teamId: 'team-r2', team: { id: 'team-r2', name: '서초유나이티드' }, players: [] },
+      { id: 'r3', status: 'confirmed', teamId: 'team-r3', team: { id: 'team-r3', name: '송파스포츠' }, players: [] },
+      { id: 'r4', status: 'cancel_requested', teamId: 'team-r4', team: { id: 'team-r4', name: '마포클럽' }, players: [] },
     ]);
 
     const error = await service
@@ -819,17 +880,17 @@ describe('LeagueFixtureGeneratorService.generate', () => {
   // F3: 조가 2개면 대진 생성이 실패한다 — fixtureNumber가 대회 전체에서 겹치지 않는지 증명.
   it('F3: 조 2개에 각각 대진을 생성해도 fixtureNumber가 겹치지 않는다', async () => {
     // A조: 2팀 → 1경기. 대회에 기존 fixture 없음(max=null).
-    prisma.v1TournamentGroup.findFirst.mockResolvedValueOnce(groupOf('group-a', ['r1', 'r2']));
-    prisma.v1TournamentFixture.aggregate.mockResolvedValueOnce({ _max: { fixtureNumber: null } });
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2']));
+    prisma.v1TournamentMatchDetails.aggregate.mockResolvedValueOnce({ _max: { fixtureNumber: null } });
 
     await service.generate(user, 't1', dto({ groupId: 'group-a' }));
     const groupARows = createdFixtureRows() as Array<{ round: string; fixtureNumber: number; legNumber: number }>;
     expect(groupARows.map((row) => row.fixtureNumber)).toEqual([1]);
 
     // B조: 3팀 → 3경기. B조 생성 시점엔 A조가 이미 fixtureNumber=1을 썼으므로 max=1.
-    prisma.v1TournamentFixture.create.mockClear();
-    prisma.v1TournamentGroup.findFirst.mockResolvedValueOnce(groupOf('group-b', ['r3', 'r4', 'r5']));
-    prisma.v1TournamentFixture.aggregate.mockResolvedValueOnce({ _max: { fixtureNumber: 1 } });
+    prisma.v1TournamentMatchDetails.create.mockClear();
+    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-b', ['r3', 'r4', 'r5']));
+    prisma.v1TournamentMatchDetails.aggregate.mockResolvedValueOnce({ _max: { fixtureNumber: 1 } });
 
     await service.generate(user, 't1', dto({ groupId: 'group-b' }));
     const groupBRows = createdFixtureRows() as Array<{ round: string; fixtureNumber: number; legNumber: number }>;
@@ -848,8 +909,8 @@ describe('LeagueFixtureGeneratorService.generate', () => {
   // "지울 수 없음"이어야 운영자가 결과 삭제를 시도하는 헛수고를 하지 않는다.
   it('F2: VOID 리비전만 있는 fixture는 "결과 확정"이 아니라 "지울 수 없음"으로 막힌다', async () => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2']));
-    prisma.v1TournamentFixture.findMany.mockResolvedValue([
-      existingFixture('fx-1', { id: 'g-1', officialState: 'VOID' }),
+    prisma.v1TournamentMatchDetails.findMany.mockResolvedValue([
+      existingFixture('fx-1', { id: 'g-1', officialState: 'VOID' }, { startAt: new Date('2026-09-01T20:00:00.000Z') }),
     ]);
 
     await expect(
@@ -859,32 +920,19 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     expect(writeLog).toEqual([]);
   });
 
-  // F2-2: game 연결이 없는 레거시 완료 경기(V1TournamentFixtureResult만 존재)를 놓치면
-  // replaceExisting=true일 때 결과가 있는 경기를 조용히 지우게 된다.
-  it('F2: 레거시 결과만 있고 game 연결이 없는 완료 경기가 있으면 재생성을 막는다', async () => {
+  // F2-2: canonical Details에 정본 Game이 없으면 부분 재생성을 하지 않는다.
+  it('F2: canonical Details에 정본 Game이 없으면 재생성을 막는다', async () => {
     prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2']));
-    prisma.v1TournamentFixture.findMany.mockResolvedValue([
-      existingFixture('fx-1', null, { result: { id: 'legacy-result-1' } }),
+    prisma.v1TournamentMatchDetails.findMany.mockResolvedValue([
+      existingFixture('fx-1', { id: 'game-fx-1' }, { startAt: new Date('2026-09-01T20:00:00.000Z') }),
     ]);
+    prisma.v1TournamentMatchDetails.findUniqueOrThrow.mockResolvedValueOnce(existingFixture('fx-1', null));
 
     await expect(
       service.generate(user, 't1', dto({ groupId: 'group-a', replaceExisting: true })),
-    ).rejects.toMatchObject({ response: { code: 'LEAGUE_FIXTURES_HAVE_RESULTS' } });
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_MATCH_GAME_MISSING' } });
     expect(writeLog).toEqual([]);
-  });
-
-  // C1 회귀: 이 결함으로 이미 만들어진 게임 없는 대진은, 고친 생성기로 다시 눌러
-  // "교체"하는 것이 유일한 복구 경로다 — 그 경로가 실제로 열려 있는지 못박는다.
-  it('C1: 게임 없는 옛 대진은 교체가 허용되고, 새로 만든 대진에는 게임이 붙는다', async () => {
-    prisma.v1TournamentGroup.findFirst.mockResolvedValue(groupOf('group-a', ['r1', 'r2']));
-    prisma.v1TournamentFixture.findMany.mockResolvedValue([existingFixture('fx-broken', null)]);
-
-    const result = await service.generate(user, 't1', dto({ replaceExisting: true }));
-
-    expect(result.deleted).toBe(1);
-    expect(writeLog).toEqual(['fixture.deleteMany', 'fixture.create']);
-    expect(gameCreations()).toHaveLength(1);
+    expect(writeLog).toEqual([]);
   });
 
   // F1: groupTeams 조회 순서(DB 반환 순서)가 달라도 sortOrder 기준 정렬로 결정적이어야 한다.
@@ -907,7 +955,7 @@ describe('LeagueFixtureGeneratorService.generate', () => {
     await service.generate(user, 't1', dto({ groupId: 'group-a', balanceHome: true }));
     const firstRows = createdFixtureRows();
 
-    prisma.v1TournamentFixture.create.mockClear();
+    prisma.v1TournamentMatchDetails.create.mockClear();
     prisma.v1TournamentGroup.findFirst.mockResolvedValueOnce({
       id: 'group-a',
       name: 'A조',

@@ -207,6 +207,8 @@ export interface SubmitEventInput {
 }
 
 export interface UseV1GameOperationsConsoleOptions {
+  /** Read-only staff may subscribe and receive live updates, but never acquire a write lease. */
+  readonly takeoverEnabled?: boolean;
   // T3 추가: 팀매치는 tournamentId/스태프 배정 개념이 없다 — null이면 아래
   // useMyTournamentStaffAssignmentVersion 쿼리가 스킵되고 버전은 항상 0으로
   // 고정된다(팀매치는 배정 handshake가 필요 없어 언제나 self-consistent하다).
@@ -291,7 +293,7 @@ export interface UseV1GameOperationsConsoleResult {
 export function useV1GameOperationsConsole(
   options: UseV1GameOperationsConsoleOptions,
 ): UseV1GameOperationsConsoleResult {
-  const { tournamentId, gameId, myUserId, initialLastSequence } = options;
+  const { tournamentId, gameId, myUserId, initialLastSequence, takeoverEnabled = true } = options;
   const queryClient = useQueryClient();
 
   const [connectionStatus, setConnectionStatus] = useState<GameOperationsConnectionStatus>('connecting');
@@ -302,6 +304,15 @@ export function useV1GameOperationsConsole(
   const [liveEvents, setLiveEvents] = useState<readonly GameEventRecord[]>([]);
   const [clockSamples, setClockSamples] = useState<readonly ClockPingPong[]>([]);
   const [bannerMessage, setBannerMessage] = useState<string | null>(null);
+  const takeoverEnabledRef = useRef(takeoverEnabled);
+  takeoverEnabledRef.current = takeoverEnabled;
+  // Renew ACKs can arrive after an API restart/reconnect has already issued a
+  // fresh grant. A late denial for the superseded token must not overwrite the
+  // newer held state and show a false TAKEOVER_SUPERSEDED banner.
+  const takeoverStatusRef = useRef(takeover.status);
+  const takeoverTokenRef = useRef<string | null>(null);
+  takeoverStatusRef.current = takeover.status;
+  takeoverTokenRef.current = takeover.status === 'held' ? takeover.token : null;
 
   const clockOffsetMs = useMemo(() => medianOffsetMs(clockSamples), [clockSamples]);
 
@@ -395,6 +406,7 @@ export function useV1GameOperationsConsole(
 
     type SubscribeAck = {
       status: string;
+      code?: string;
       snapshot?: { version: number; state: GameState; lastSequence: number; events: readonly GameEventRecord[] };
     };
 
@@ -510,6 +522,13 @@ export function useV1GameOperationsConsole(
           if (result.status === 'subscribed' && result.snapshot) {
             applySnapshot(result.snapshot);
           } else if (result.status === 'denied') {
+            if (result.code === 'STAFF_SCOPE_DENIED') {
+              // A resync denial is an authoritative loss of this game's read scope,
+              // just like the explicit permission-revoked event. Drop the held
+              // takeover so every write control is disabled, while leaving the
+              // durable queue untouched for a later explicit recovery.
+              dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
+            }
             setBannerMessage('운영 권한이 없어 이 경기를 조회할 수 없어요. 새로고침 후 다시 시도해주세요.');
           }
           if (resyncCoalesced) {
@@ -702,6 +721,7 @@ export function useV1GameOperationsConsole(
 
   // ── Takeover: request once, renew on a timer, expire on a timer ────────────
   const requestTakeover = useCallback(() => {
+    if (!takeoverEnabledRef.current) return;
     if (!gameId || (myAssignment.data === undefined && myAssignment.isLoading)) return;
     const socket = getV1GameOperationsSocket();
     clientInstanceIdRef.current = clientInstanceIdRef.current ?? randomUuid();
@@ -715,6 +735,10 @@ export function useV1GameOperationsConsole(
         lastSequence: sync.lastSequence,
       },
       (result: GameTakeoverAck) => {
+        if (!takeoverEnabledRef.current) {
+          dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
+          return;
+        }
         // 서버가 코드를 주지 않은 경우까지 STAFF_SCOPE_DENIED 로 뭉뚱그리면 안 된다.
         // 운영자가 실제 원인이 아니라 권한 요청이라는 엉뚱한 경로로 가기 때문이다.
         // 서버가 명시한 거부만 그 코드로 남기고, 나머지는 원인 미상으로 구분한다.
@@ -734,14 +758,20 @@ export function useV1GameOperationsConsole(
         });
       },
     );
-  }, [gameId, myAssignment.data, myAssignment.isLoading, sync.lastSequence]);
+  }, [gameId, myAssignment.data, myAssignment.isLoading, sync.lastSequence, takeoverEnabled]);
 
   useEffect(() => {
-    if (takeover.status === 'none') requestTakeover();
-  }, [takeover.status, requestTakeover]);
+    if (!takeoverEnabled && takeover.status !== 'none') {
+      dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
+    }
+  }, [takeoverEnabled, takeover.status]);
 
   useEffect(() => {
-    if (takeover.status !== 'held') return undefined;
+    if (takeoverEnabled && takeover.status === 'none') requestTakeover();
+  }, [takeover.status, requestTakeover, takeoverEnabled]);
+
+  useEffect(() => {
+    if (!takeoverEnabled || takeover.status !== 'held') return undefined;
     const interval = setInterval(() => {
       const socket = getV1GameOperationsSocket();
       if (!clientInstanceIdRef.current) return;
@@ -749,6 +779,16 @@ export function useV1GameOperationsConsole(
         'game.takeover.renew',
         { gameId, takeoverToken: takeover.token, clientInstanceId: clientInstanceIdRef.current },
         (result: GameTakeoverAck) => {
+          if (
+            takeoverStatusRef.current !== 'held' ||
+            takeoverTokenRef.current !== takeover.token
+          ) {
+            return;
+          }
+          if (!takeoverEnabledRef.current) {
+            dispatchTakeover({ type: 'REVOKED', assignmentVersion: -1 });
+            return;
+          }
           if (result.status !== 'granted') {
             dispatchTakeover({ type: 'DENIED', code: result.code ?? 'TAKEOVER_TOKEN_EXPIRED' });
             return;
@@ -768,7 +808,7 @@ export function useV1GameOperationsConsole(
     }, TAKEOVER_RENEW_INTERVAL_MS);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [takeover.status, gameId]);
+  }, [takeover.status, takeover.status === 'held' ? takeover.token : null, gameId, takeoverEnabled]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -802,15 +842,18 @@ export function useV1GameOperationsConsole(
   // 다시 정상적으로 요청·보유할 수 있지만, 자동으로 되찾으러 가지는 않는다).
   const deniedCode = takeover.status === 'denied' ? takeover.code : null;
   useEffect(() => {
-    if (takeover.status === 'expired' || (takeover.status === 'denied' && deniedCode === 'TAKEOVER_TOKEN_EXPIRED')) {
+    if (
+      takeoverEnabled &&
+      (takeover.status === 'expired' || (takeover.status === 'denied' && deniedCode === 'TAKEOVER_TOKEN_EXPIRED'))
+    ) {
       requestTakeover();
     }
-  }, [takeover.status, deniedCode, requestTakeover]);
+  }, [takeover.status, deniedCode, requestTakeover, takeoverEnabled]);
 
   // ── Event send / durable-queue flush ────────────────────────────────────────
   const sendQueuedItem = useCallback(
     (item: QueuedGameEvent) => {
-      if (!gameId || !isTakeoverHeld(takeover) || !canAppendWhileSyncing(sync)) return;
+      if (!takeoverEnabledRef.current || !gameId || !isTakeoverHeld(takeover) || !canAppendWhileSyncing(sync)) return;
       if (Date.now() >= takeover.expiresAtMs) return; // CHECK_EXPIRY's poll will flip status to 'expired' shortly; do not send meanwhile.
       const socket = getV1GameOperationsSocket();
       dispatchQueue({ type: 'MARK_SENDING', clientEventId: item.clientEventId });
@@ -936,6 +979,7 @@ export function useV1GameOperationsConsole(
   useEffect(() => {
     if (
       connectionStatus !== 'connected' ||
+      !takeoverEnabled ||
       !isTakeoverHeld(takeover) ||
       Date.now() >= takeover.expiresAtMs ||
       !canAppendWhileSyncing(sync)
@@ -944,11 +988,11 @@ export function useV1GameOperationsConsole(
     }
     const next = nextQueuedItem(queue);
     if (next) sendQueuedItem(next);
-  }, [connectionStatus, takeover, sync, queue, sendQueuedItem]);
+  }, [connectionStatus, takeoverEnabled, takeover, sync, queue, sendQueuedItem]);
 
   const submitEvent = useCallback(
     async (input: SubmitEventInput) => {
-      if (!gameSnapshot) return;
+      if (!takeoverEnabledRef.current || !gameSnapshot) return;
       // D-10 (frozen decision table): this is the ONLY thing that may ever
       // enter the durable offline queue. Asserting it here — even though
       // every current caller already only constructs an append_event —
@@ -967,6 +1011,7 @@ export function useV1GameOperationsConsole(
         occurredAt: input.occurredAt,
         payload: input.payload,
       });
+      if (!takeoverEnabledRef.current) return;
       const item: QueuedGameEvent = {
         clientEventId,
         gameId: gameId ?? '',
@@ -996,6 +1041,7 @@ export function useV1GameOperationsConsole(
 
   const retryFailedEvent = useCallback(
     async (clientEventId: string) => {
+      if (!takeoverEnabledRef.current) return;
       // alpha 실사고(2026-08) 구제: `medianOffsetMs()`를 고치기 전에 이미
       // 캡처된 항목은 `event.clockMs`가 소수(.5 등)일 수 있다 — 그대로
       // 재전송하면 서버 `parseGameEvent`(`Number.isSafeInteger` 요구)에
@@ -1019,6 +1065,7 @@ export function useV1GameOperationsConsole(
             occurredAt: repairedEvent.occurredAt,
             payload: repairedEvent.payload,
           });
+          if (!takeoverEnabledRef.current) return;
           dispatchQueue({
             type: 'RETRY',
             clientEventId,
@@ -1040,7 +1087,7 @@ export function useV1GameOperationsConsole(
   // 때만 호출 가능"을 문서화한다.
   const reverseEvent = useCallback(
     async (input: { eventId: string; reason: string }) => {
-      if (!gameId || !gameSnapshot || !isTakeoverHeld(takeover)) {
+      if (!takeoverEnabledRef.current || !gameId || !gameSnapshot || !isTakeoverHeld(takeover)) {
         throw new Error('경기 운영 권한이 없어 되돌릴 수 없어요.');
       }
       const clientEventId = randomUuid();
@@ -1076,7 +1123,7 @@ export function useV1GameOperationsConsole(
   // 새 version으로 갱신할 때까지 다른 커맨드가 끼어들 여지가 없다.
   const assignAssist = useCallback(
     async (input: { eventId: string; assistParticipantId: string | null }) => {
-      if (!gameId || !gameSnapshot || !isTakeoverHeld(takeover)) {
+      if (!takeoverEnabledRef.current || !gameId || !gameSnapshot || !isTakeoverHeld(takeover)) {
         throw new Error('경기 운영 권한이 없어 어시스트를 기록할 수 없어요.');
       }
       const clientEventId = randomUuid();

@@ -13,6 +13,7 @@ import { PrizeBreakdownEditor, createPrizeRowId, serializeTournamentPrizeRows, t
 import { PromoCardFields, type TournamentPromoCardValue } from '@/components/admin/tournaments/promo-card-fields';
 import { TournamentDatetimeField } from '@/components/admin/tournaments/tournament-datetime-field';
 import { useTournamentAdmin } from './tournament-admin-context';
+import { TournamentPeriodSettingsEditor } from '@/components/admin/tournament-period-settings-editor';
 import { TOURNAMENT_STATUS_LABEL, formatDate, formatDateRange } from './tournament-admin-shared';
 import {
   SimpleModal,
@@ -538,6 +539,8 @@ export function TournamentInfoSection() {
         )}
       </div>
 
+      <TournamentPeriodSettingsEditor tournamentId={id} canWrite={canWrite} showToast={showToast} />
+
       <CoverImageCard tournament={tournament} canWrite={canWrite} showToast={showToast} />
 
       <PrizeCard tournament={tournament} canWrite={canWrite} showToast={showToast} />
@@ -677,7 +680,7 @@ export function TournamentInfoSection() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <TournamentDatetimeField
               id="edit-scheduled-at"
               label="대회 시작"
@@ -850,7 +853,7 @@ export function TournamentInfoSection() {
           <div className="flex flex-col gap-2">
             <span className="text-[length:var(--font-size-label)] text-[var(--text-strong)]">교체 방식</span>
             <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
-              경기 중 후보 선수를 주전과 몇 번까지 바꿀 수 있는지예요. 무제한(롤링)은 이미 나갔던 선수도 다시 투입할 수 있어요.
+              교체 방식과 허용 횟수예요. 제한 방식은 교체를 기록하고 횟수를 세며, 롤링은 교체를 기록하지 않고 별도 횟수 제한 없이 운영해요.
             </p>
             {tournament.status === 'in_progress' || tournament.status === 'completed' ? (
               <p className="text-[length:var(--font-size-caption)] text-[var(--orange700)]">

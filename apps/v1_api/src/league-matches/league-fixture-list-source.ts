@@ -1,4 +1,4 @@
-import { resolveIsForfeit } from './league-match-forfeit.service';
+import { resolveIsForfeit } from './league-forfeit-result';
 
 /**
  * 리그 **일정 목록**을 만드는 한 곳.
@@ -51,8 +51,11 @@ export type LeagueFixtureFactRow = {
 export type LeagueFixtureListItem = {
   teamMatchId: string;
   title: string;
-  homeTeamId: string;
+  homeTeamId: string | null;
   awayTeamId: string | null;
+  /** Slot assignment remains observable while team identity is privacy-masked. */
+  homeAssigned: boolean;
+  awayAssigned: boolean;
   startAt: Date;
   placeName: string;
   status: string;
@@ -81,6 +84,8 @@ export function toLeagueFixtureList(
       title: fixture.title,
       homeTeamId: fixture.hostTeamId,
       awayTeamId: fixture.approvedApplicantTeamId,
+      homeAssigned: true,
+      awayAssigned: fixture.approvedApplicantTeamId !== null,
       startAt: fixture.startAt,
       placeName: fixture.placeName,
       status: fixture.status,

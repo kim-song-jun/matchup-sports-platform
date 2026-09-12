@@ -32,6 +32,7 @@ function platformOpsPrincipal(): TournamentStaffPrincipal {
     authorizationSubject: `platform_ops:${actorUserId}@0`,
     assignmentId: null,
     assignmentVersion: null,
+    expiresAt: null,
   };
 }
 
@@ -117,8 +118,16 @@ function createFakeTx(initialFixtureFieldId: string | null) {
       })),
       updateMany: jest.fn(async () => ({ count: 0 })),
     },
-    v1TournamentFixture: {
-      findUnique: jest.fn(async () => ({ id: fixture.id, tournamentId: fixture.tournamentId, fieldId: fixture.fieldId })),
+    $queryRaw: jest.fn(async (query: { sql: string } | TemplateStringsArray) => ('sql' in query ? query.sql : query.join(' ')).includes('FROM v1_team_matches')
+      ? [{ fieldId: fixture.fieldId, deletedAt: null }]
+      : [{ id: 'canonical-game' }]),
+    v1TournamentMatchDetails: {
+      findUnique: jest.fn(async () => ({
+        tournamentId: fixture.tournamentId,
+        teamMatch: { id: fixture.id, fieldId: fixture.fieldId, deletedAt: null, game: { id: 'canonical-game', sourceType: 'TEAM_MATCH' } },
+      })),
+    },
+    v1TeamMatch: {
       updateMany: jest.fn(async ({ where, data }: { where: { fieldId: string | null }; data: { fieldId: string | null } }) => {
         if (where.fieldId !== fixture.fieldId) {
           return { count: 0 };
@@ -163,7 +172,7 @@ describe('TournamentOperationsFieldsService', () => {
   //
   // A prior version of this test mocked `assertAccess` with
   // `mockRejectedValue` (always rejects) and asserted only that the promise
-  // rejected and that `tx.v1TournamentFixture.updateMany`/`findUnique` were
+  // rejected and that canonical TeamMatch/Details persistence methods were
   // never called. That passes identically whether the recheck runs BEFORE
   // `this.prisma.$transaction(...)` is even called (the pre-fix arrangement)
   // or, as shipped, AFTER `$transaction` has already opened: either way, an
@@ -202,8 +211,8 @@ describe('TournamentOperationsFieldsService', () => {
       expect(order).toEqual(['transaction-opened', 'access-recheck']);
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(assertAccess).toHaveBeenCalledTimes(1);
-      expect(tx.v1TournamentFixture.updateMany).not.toHaveBeenCalled();
-      expect(tx.v1TournamentFixture.findUnique).not.toHaveBeenCalled();
+      expect(tx.v1TeamMatch.updateMany).not.toHaveBeenCalled();
+      expect(tx.v1TournamentMatchDetails.findUnique).not.toHaveBeenCalled();
     } finally {
       await moduleRef.close();
     }
@@ -242,7 +251,7 @@ describe('TournamentOperationsFieldsService', () => {
     const { service, moduleRef, tx } = await buildHarness({ assertAccess, fixtureFieldId: null });
     // Force the CAS to lose regardless of the observed value, simulating a
     // concurrent winner that already moved the row.
-    tx.v1TournamentFixture.updateMany.mockResolvedValueOnce({ count: 0 });
+    tx.v1TeamMatch.updateMany.mockResolvedValueOnce({ count: 0 });
 
     try {
       const promise = service.assignFixtureField(actorUserId, tournamentId, fixtureId, { fieldId }, audit('req-2'));

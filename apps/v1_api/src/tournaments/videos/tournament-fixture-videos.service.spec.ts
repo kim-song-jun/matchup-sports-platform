@@ -47,11 +47,7 @@ function createHarness(options: {
   videos?: VideoRow[];
   uploadAssets?: { url: string; ownerUserId: string; kind: 'image' | 'video' }[];
   fixtureExists?: boolean;
-  /**
-   * 같은 업로드 URL 을 참조 중인 리그 대진(V1TeamMatchVideo) 행 수. 기본값 0 —
-   * releaseUploadedFile 이 두 테이블을 함께 세는 계약(코드 주석 :281-285)을 검증하려면
-   * 이 값을 1 이상으로 올려야 한다.
-   */
+  /** 다른 canonical 팀매치가 같은 업로드 URL을 참조하는 행 수. */
   teamMatchVideoRefCount?: number;
 }) {
   const assignments = options.assignments ?? [];
@@ -78,47 +74,40 @@ function createHarness(options: {
             createdAt: new Date('2026-01-01T00:00:00.000Z'),
             expiresAt: null,
             revokedAt: null,
-            fixtureScopes: assignment.fixtureIds.map((id) => ({ fixtureId: id })),
+            fixtureScopes: assignment.fixtureIds.map((id) => ({ fixtureId: id, teamMatchId: null })),
           })),
       ),
     },
     v1Tournament: { findFirst: jest.fn().mockResolvedValue({ id: tournamentId }) },
-    v1TournamentFixture: {
-      findUnique: jest.fn(async ({ where }: { where: { tournamentId_id: { id: string } } }) =>
+    v1TeamMatch: {
+      findFirst: jest.fn(async ({ where }: { where: { id: string } }) =>
         fixtureExists
-          ? { id: where.tournamentId_id.id, fieldId: options.fixtureFieldId ?? null }
+          ? { id: where.id, fieldId: options.fixtureFieldId ?? null }
           : null,
       ),
-      // 대회 단위 목록은 대회가 실재할 때만 여기까지 온다 — 기존 테스트는 전부 그 앞
-      // (403/404)에서 끝나 이 스텁이 없었다.
       findMany: jest.fn().mockResolvedValue([]),
     },
-    v1TournamentFixtureVideo: {
-      findMany: jest.fn(async ({ where }: { where: { fixtureId: string } }) =>
-        videos.filter((video) => video.fixtureId === where.fixtureId),
+    // 다른 canonical 팀매치가 같은 업로드 URL을 참조하면 파일을 지우지 않는다.
+    v1TeamMatchVideo: {
+      findMany: jest.fn(async ({ where }: { where: { teamMatchId: string } }) =>
+        videos
+          .filter((video) => video.fixtureId === where.teamMatchId)
+          .map(({ id, title, url, sortOrder, createdAt }) => ({ id, title, url, sortOrder, createdAt })),
       ),
-      findFirst: jest.fn(async ({ where }: { where: { id: string; fixtureId: string } }) =>
-        videos.find((video) => video.id === where.id && video.fixtureId === where.fixtureId) ?? null,
-      ),
-      count: jest.fn(async ({ where }: { where: { url: string } }) =>
-        videos.filter((video) => video.url === where.url).length,
-      ),
-      create: jest.fn(async ({ data }: { data: Omit<VideoRow, 'id' | 'createdAt'> }) => {
-        const row: VideoRow = { id: `video-${videos.length + 1}`, createdAt: new Date(), ...data };
+      findFirst: jest.fn(async ({ where }: { where: { id: string; teamMatchId: string } }) => {
+        const video = videos.find((candidate) => candidate.id === where.id && candidate.fixtureId === where.teamMatchId);
+        return video === undefined ? null : { id: video.id, title: video.title, url: video.url, sortOrder: video.sortOrder, createdAt: video.createdAt };
+      }),
+      create: jest.fn(async ({ data }: { data: { teamMatchId: string; title: string | null; url: string; sortOrder: number } }) => {
+        const row: VideoRow = { id: `video-${videos.length + 1}`, fixtureId: data.teamMatchId, createdAt: new Date(), ...data };
         videos.push(row);
-        return row;
+        return { id: row.id, title: row.title, url: row.url, sortOrder: row.sortOrder, createdAt: row.createdAt };
       }),
       delete: jest.fn(async ({ where }: { where: { id: string } }) => {
         const index = videos.findIndex((video) => video.id === where.id);
         const [removed] = videos.splice(index, 1);
-        return removed;
+        return removed === undefined ? null : { id: removed.id };
       }),
-    },
-    // 같은 업로드 URL 을 리그 대진 영상이 아직 참조 중이면 대회 영상 삭제가
-    // 파일까지 지워선 안 된다 — 서비스가 두 도메인의 참조 수를 함께 센다.
-    // 이 하네스는 리그 쪽 참조가 없는 상태(0건)를 기본으로 두되, teamMatchVideoRefCount
-    // 옵션으로 "리그 대진이 아직 참조 중"인 상태를 만들 수 있다.
-    v1TeamMatchVideo: {
       count: jest.fn(async () => teamMatchVideoRefCount),
     },
     v1UploadAsset: {
@@ -133,7 +122,14 @@ function createHarness(options: {
         return { count: before - uploadAssets.length };
       }),
     },
+    $executeRaw: jest.fn().mockResolvedValue(0),
+    $queryRaw: jest.fn().mockResolvedValue([]),
   };
+
+  const prismaWithTransaction = prisma as unknown as {
+    $transaction: (callback: (tx: typeof prisma) => Promise<unknown>) => Promise<unknown>;
+  };
+  prismaWithTransaction.$transaction = async (callback) => callback(prisma);
 
   const uploads = {
     storeFiles: jest.fn(),
@@ -265,7 +261,7 @@ describe('TournamentFixtureVideosService — 등록', () => {
     ).rejects.toMatchObject({
       response: { code: 'FIXTURE_VIDEO_URL_INVALID', details: { reason: 'SCHEME_NOT_ALLOWED' } },
     });
-    expect(prisma.v1TournamentFixtureVideo.create).not.toHaveBeenCalled();
+    expect(prisma.v1TeamMatchVideo.create).not.toHaveBeenCalled();
   });
 
   it('내가 올린 업로드 파일만 등록할 수 있다', async () => {
@@ -329,7 +325,9 @@ describe('TournamentFixtureVideosService — 등록', () => {
       harness.service.uploadAndCreateVideo(user('director'), tournamentId, fixtureId, [], undefined),
     ).rejects.toMatchObject({ response: { code: 'FIXTURE_VIDEO_LIMIT_EXCEEDED' } });
 
-    expect(harness.removedUrls).toEqual([url]);
+    // Cleanup is durable now: the transaction retires the asset and enqueues
+    // physical deletion for the worker; it does not unlink before commit.
+    expect(harness.removedUrls).toEqual([]);
     expect(harness.uploadAssets).toHaveLength(0);
   });
 
@@ -378,7 +376,7 @@ describe('TournamentFixtureVideosService — 삭제와 파일 회수', () => {
       harness.service.deleteVideo(user('director'), tournamentId, fixtureId, 'video-1'),
     ).resolves.toEqual({ deleted: true });
 
-    expect(harness.removedUrls).toEqual([uploadUrl]);
+    expect(harness.removedUrls).toEqual([]);
     expect(harness.uploadAssets).toHaveLength(0);
     expect(harness.videos).toHaveLength(0);
   });
@@ -388,6 +386,7 @@ describe('TournamentFixtureVideosService — 삭제와 파일 회수', () => {
       assignments: [director],
       videos: [videoRow(), videoRow({ id: 'video-2', fixtureId: otherFixtureId })],
       uploadAssets: [{ url: uploadUrl, ownerUserId: 'director', kind: 'video' }],
+      teamMatchVideoRefCount: 1,
     });
 
     await harness.service.deleteVideo(user('director'), tournamentId, fixtureId, 'video-1');
@@ -397,10 +396,7 @@ describe('TournamentFixtureVideosService — 삭제와 파일 회수', () => {
   });
 
   it('같은 업로드 URL을 리그 대진(V1TeamMatchVideo)이 아직 참조하면 파일을 남긴다', async () => {
-    // 대회 쪽(V1TournamentFixtureVideo) 참조는 이 영상 하나뿐이라 지우면 0건이 되지만,
-    // 같은 업로드 URL을 리그 대진 영상이 여전히 참조 중이다(teamMatchVideoRefCount: 1).
-    // releaseUploadedFile은 두 테이블의 참조 수를 합산해서 봐야 한다 — 대회 쪽만 보면
-    // 0건으로 오판해 리그 대진이 아직 쓰는 파일을 지워 그쪽 재생을 영구히 깨뜨린다.
+    // 현재 경기 행을 삭제해도 다른 canonical 팀매치 참조가 남아 있다.
     const harness = createHarness({
       assignments: [director],
       videos: [videoRow()],
@@ -437,19 +433,17 @@ describe('TournamentFixtureVideosService — 삭제와 파일 회수', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('파일 삭제가 실패해도 영상 삭제는 끝나고 업로드 원장은 남는다', async () => {
+  it('파일 cleanup은 worker가 맡으므로 영상 삭제와 원장 retirement가 먼저 끝난다', async () => {
     const harness = createHarness({
       assignments: [director],
       videos: [videoRow()],
       uploadAssets: [{ url: uploadUrl, ownerUserId: 'director', kind: 'video' }],
     });
-    harness.uploads.removeStoredUrl.mockRejectedValue(new Error('EACCES'));
-
     await expect(
       harness.service.deleteVideo(user('director'), tournamentId, fixtureId, 'video-1'),
     ).resolves.toEqual({ deleted: true });
-    // 원장이 남아 있어야 어떤 파일이 남았는지 나중에 추적할 수 있다.
-    expect(harness.uploadAssets).toHaveLength(1);
+    expect(harness.removedUrls).toEqual([]);
+    expect(harness.uploadAssets).toHaveLength(0);
   });
 });
 
@@ -504,6 +498,15 @@ describe('TournamentFixtureVideosService — 대회 단위 조회', () => {
     await expect(
       harness.service.listTournamentVideos(user('director'), tournamentId),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('canonical 영상이 남은 대회 전체 목록을 반환한다', async () => {
+    const harness = createHarness({
+      assignments: [
+        { userId: 'director', role: 'TOURNAMENT_DIRECTOR', fieldId: null, fixtureIds: [] },
+      ],
+    });
+    await expect(harness.service.listTournamentVideos(user('director'), tournamentId)).resolves.toBeDefined();
   });
 });
 

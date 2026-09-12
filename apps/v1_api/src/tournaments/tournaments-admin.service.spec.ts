@@ -99,7 +99,7 @@ describe('TournamentsAdminService', () => {
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
     v1CompetitionConfigVersion: { findFirst: jest.Mock; findUnique: jest.Mock };
-    v1TournamentFixture: { count: jest.Mock; updateMany: jest.Mock };
+    v1TournamentMatchDetails: { findMany: jest.Mock };
     v1TournamentStanding: { count: jest.Mock };
     // 대회 종료 시 후기 요청 알림 수신자(참가 확정 팀의 owner/manager) 조회용.
     v1TournamentRegistration: { findMany: jest.Mock };
@@ -125,7 +125,7 @@ describe('TournamentsAdminService', () => {
       // — 대부분의 기존 테스트는 lineupMaxPlayers를 전혀 안 보내거나 종목이 football/futsal이
       // 아니라 이 경로를 안 타므로 unconfigured mock(undefined 반환)으로 둬도 무해하다.
       v1CompetitionConfigVersion: { findFirst: jest.fn(), findUnique: jest.fn() },
-      v1TournamentFixture: { count: jest.fn(), updateMany: jest.fn() },
+      v1TournamentMatchDetails: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentRegistration: { findMany: jest.fn().mockResolvedValue([]) },
       v1TournamentStanding: { count: jest.fn() },
       $transaction: jest.fn(),
@@ -706,12 +706,28 @@ describe('TournamentsAdminService', () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue({
       ...tournamentRow(),
-      _count: { registrations: 7, fixtures: 11, announcements: 3 },
+      // The operation count comes from canonical TeamMatchDetails rows below;
+      // the tournament relation count is intentionally not used here.
+      _count: { registrations: 7, announcements: 3 },
     });
+    prisma.v1TournamentMatchDetails.findMany.mockResolvedValue(
+      Array.from({ length: 11 }, (_, index) => ({ teamMatchId: `team-match-${index}` })),
+    );
 
     const result = await service.get(ownerAuthUser, 'tournament-1');
 
     expect(result.operationCounts).toEqual({ registrations: 7, fixtures: 11, announcements: 3 });
+    expect(prisma.v1TournamentMatchDetails.findMany).toHaveBeenCalledWith({
+      where: {
+        tournamentId: 'tournament-1',
+        teamMatch: {
+          deletedAt: null,
+          tournamentId: 'tournament-1',
+          game: { sourceType: 'TEAM_MATCH' },
+        },
+      },
+      select: { teamMatchId: true },
+    });
   });
 
   // ─── update ──────────────────────────────────────────────────────────────────
@@ -1162,6 +1178,7 @@ describe('TournamentsAdminService', () => {
       previewHash: 'hash-6-new',
       impact: { fixtureCount: 0, completedFixtureCount: 0, standingCount: 0, requiresRecalculation: false },
       confirmationRequired: false,
+      teamMatchesRepointed: 0,
     });
 
     try {
@@ -1199,6 +1216,7 @@ describe('TournamentsAdminService', () => {
       previewHash: 'hash-6-new',
       impact: { fixtureCount: 4, completedFixtureCount: 2, standingCount: 2, requiresRecalculation: true },
       confirmationRequired: true,
+      teamMatchesRepointed: 0,
     });
 
     try {
@@ -1351,6 +1369,7 @@ describe('TournamentsAdminService', () => {
       previewHash: 'hash-new',
       impact: { fixtureCount: 0, completedFixtureCount: 0, standingCount: 0, requiresRecalculation: false },
       confirmationRequired: false,
+      teamMatchesRepointed: 0,
     });
 
     try {

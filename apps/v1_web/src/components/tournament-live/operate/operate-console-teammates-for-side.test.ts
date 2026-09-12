@@ -44,6 +44,7 @@ function lineup(participants: GameLineupParticipant[], overrides: Partial<GameLi
     formation: null,
     createdAt: '2026-08-23T00:00:00.000Z',
     updatedAt: '2026-08-23T00:00:00.000Z',
+    invalidatedAt: null,
     participants,
     ...overrides,
   };

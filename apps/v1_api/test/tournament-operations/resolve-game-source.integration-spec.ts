@@ -41,6 +41,7 @@ const ids = {
   league: '8b000000-0000-4000-8000-000000000030',
   leagueMatch: '8b000000-0000-4000-8000-000000000031',
   friendlyMatch: '8b000000-0000-4000-8000-000000000032',
+  malformedLeagueOnlyMatch: '8b000000-0000-4000-8000-000000000033',
 } as const;
 
 const prisma = new PrismaService();
@@ -151,7 +152,7 @@ describe('Task 165 BE-1 — 콘솔 결과 명령 경계가 리그 경기를 해�
           startAt,
           approvedApplicantTeamId: ids.awayTeam,
           competitionConfigVersionId: config.id,
-          ...(leagueId === null ? {} : { leagueId }),
+          ...(leagueId === null ? {} : { leagueId, tournamentId: leagueId }),
         },
       });
       const input: GameSourceCreationInput = {
@@ -182,24 +183,8 @@ describe('Task 165 BE-1 — 콘솔 결과 명령 경계가 리그 경기를 해�
   });
 
   afterAll(async () => {
-    const gameIds = (
-      await prisma.v1Game.findMany({
-        where: { teamMatchId: { in: [ids.leagueMatch, ids.friendlyMatch] } },
-        select: { id: true },
-      })
-    ).map((row) => row.id);
-    await prisma.v1GameParticipant.deleteMany({ where: { gameId: { in: gameIds } } });
-    await prisma.v1GameLineup.deleteMany({ where: { gameId: { in: gameIds } } });
-    await prisma.v1GameVisibilityPolicy.deleteMany({ where: { gameId: { in: gameIds } } });
-    await prisma.v1GameSide.deleteMany({ where: { gameId: { in: gameIds } } });
-    await prisma.v1Game.deleteMany({ where: { id: { in: gameIds } } });
-    await prisma.v1TeamMatch.deleteMany({ where: { id: { in: [ids.leagueMatch, ids.friendlyMatch] } } });
-    await prisma.v1Tournament.deleteMany({ where: { id: ids.league } });
-    await prisma.v1Team.deleteMany({ where: { id: { in: [ids.homeTeam, ids.awayTeam] } } });
-    await prisma.v1Region.deleteMany({ where: { id: ids.region } });
-    await prisma.v1Sport.deleteMany({ where: { id: ids.sport } });
-    await prisma.v1AdminUser.deleteMany({ where: { userId: ids.platformOps } });
-    await prisma.v1User.deleteMany({ where: { id: { in: [ids.platformOps, ids.stranger, ids.teamOwner] } } });
+    // GAME_CREATED audits are append-only and retain their canonical match FK.
+    // The configured isolated integration environment drops this suite's clone.
     await prisma.$disconnect();
   });
 
@@ -227,6 +212,78 @@ describe('Task 165 BE-1 — 콘솔 결과 명령 경계가 리그 경기를 해�
   it('친선 팀매치는 열리지 않는다 — 대회 운영 권한 체계 밖이다', async () => {
     expect(await probeBoundary(ids.platformOps, friendlyGameId)).toBe('GAME_NOT_FOUND');
   });
+
+  it('삭제된 리그 경기는 운영 콘솔에서 열리지 않고 감사 기록도 추가하지 않는다', async () => {
+    const before = await prisma.v1OperationAudit.count({ where: { resourceId: leagueGameId } });
+    await prisma.v1TeamMatch.update({ where: { id: ids.leagueMatch }, data: { deletedAt: new Date() } });
+    try {
+      expect(await probeBoundary(ids.platformOps, leagueGameId)).toBe('GAME_NOT_FOUND');
+      expect(await prisma.v1OperationAudit.count({ where: { resourceId: leagueGameId } })).toBe(before);
+    } finally {
+      await prisma.v1TeamMatch.update({ where: { id: ids.leagueMatch }, data: { deletedAt: null } });
+    }
+  });
+
+  it('league-only TeamMatch ownership is rejected before Game/audit/idempotency artifacts are committed', async () => {
+    await prisma.v1TeamMatch.create({
+      data: {
+        id: ids.malformedLeagueOnlyMatch,
+        hostTeamId: ids.homeTeam,
+        createdByUserId: ids.teamOwner,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: 'Task 165 malformed league-only match',
+        placeName: 'Task 165 court',
+        startAt: new Date(Date.now() + 3 * 60 * 60 * 1000),
+        approvedApplicantTeamId: ids.awayTeam,
+        competitionConfigVersionId: (await prisma.v1CompetitionConfigVersion.findFirstOrThrow({
+          where: { name: 'futsal-v1', status: 'ACTIVE' },
+          orderBy: { version: 'desc' },
+          select: { id: true },
+        })).id,
+        leagueId: ids.league,
+      },
+    });
+
+    const before = {
+      games: await prisma.v1Game.count({ where: { teamMatchId: ids.malformedLeagueOnlyMatch } }),
+      audits: await prisma.v1OperationAudit.count({ where: { resourceId: ids.malformedLeagueOnlyMatch } }),
+      idempotency: await prisma.v1IdempotencyRecord.count({ where: { action: 'source_create', resourceId: ids.malformedLeagueOnlyMatch } }),
+    };
+    const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({
+      where: { name: 'futsal-v1', status: 'ACTIVE' },
+      orderBy: { version: 'desc' },
+      select: { id: true },
+    });
+    const input: GameSourceCreationInput = {
+      sourceType: V1GameSourceType.TEAM_MATCH,
+      sourceId: ids.malformedLeagueOnlyMatch,
+      competitionConfigVersionId: config.id,
+      sides: [
+        { sideKey: V1GameSideKey.HOME, teamId: ids.homeTeam, displayNameSnapshot: 'Task 165 Home' },
+        { sideKey: V1GameSideKey.AWAY, teamId: ids.awayTeam, displayNameSnapshot: 'Task 165 Away' },
+      ],
+      participants: [],
+    };
+    const context: GameCommandContext = {
+      actor: { actorType: 'USER', actorUserId: ids.platformOps, role: 'platform_ops' },
+      expectedVersion: 0,
+      durableCommandId: `t165-source-${ids.malformedLeagueOnlyMatch}`,
+      payloadHash: canonicalGameCommandPayloadHash(input),
+    };
+    const beforeRequestAudits = await prisma.v1OperationAudit.count({ where: { requestId: context.durableCommandId } });
+
+    try {
+      expect(await codeOf(() => prisma.$transaction((tx) => games.createFromSourceInTransaction(tx, input, context))))
+        .toBe('GAME_AUDIT_SCOPE_INVALID');
+      await expect(prisma.v1Game.count({ where: { teamMatchId: ids.malformedLeagueOnlyMatch } })).resolves.toBe(before.games);
+      await expect(prisma.v1OperationAudit.count({ where: { resourceId: ids.malformedLeagueOnlyMatch } })).resolves.toBe(before.audits);
+      await expect(prisma.v1OperationAudit.count({ where: { requestId: context.durableCommandId } })).resolves.toBe(beforeRequestAudits);
+      await expect(prisma.v1IdempotencyRecord.count({ where: { action: 'source_create', resourceId: ids.malformedLeagueOnlyMatch } })).resolves.toBe(before.idempotency);
+    } finally {
+      await prisma.v1TeamMatch.delete({ where: { id: ids.malformedLeagueOnlyMatch } });
+    }
+  });
   /**
    * enum 에는 이미 `COMPETITION_FIXTURE`·`FRIENDLY_MATCH` 가 있고(R1 expand) 앞으로 더
    * 늘어난다. "대회 대진이 아니면 전부 팀매치" 로 두면 그 경기들이 **운영 규칙이 다른 채로**
@@ -250,7 +307,6 @@ describe('Task 165 BE-1 — 콘솔 결과 명령 경계가 리그 경기를 해�
       await expect(
         resolveGameSource(txThatMustNotBeUsed, {
           sourceType,
-          tournamentFixtureId: null,
           teamMatchId: ids.leagueMatch,
         }),
       ).resolves.toBeNull();

@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsDateString, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import {
   MATCH_FORMAT_MAX_LENGTH,
   MATCH_STYLE_ITEM_MAX_LENGTH,
@@ -17,6 +17,7 @@ export class MutateTeamMatchDto {
   // `region-seoul-jongno`), unlike team/sport primary keys. Existence and
   // active district validation remains authoritative in TeamMatchesService.
   @IsString()
+  @IsNotEmpty()
   regionId!: string;
 
   @IsString()

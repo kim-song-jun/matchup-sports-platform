@@ -2,6 +2,10 @@
 
 ## 최신 판정 — 42/42 실행 증거 확보, 본체 배포 미완
 
+- **30c CI 전체 PASS 및 마지막 입력 계약 보완:** CI `34702837858`에서 Gates·Web431파일3566건/빌드·API269파일3520건/통합96파일672PASS3SKIP/빌드·Task9실제HTTP10건이모두통과했다. Copilot최종리뷰 `5186995083`의regionId빈문자열지적은Sol이낮은심각도의실제DTO누락으로인정했다. 기존서비스는400 VALIDATION_FAILED로거절해권한우회·DB변경은없으나UUID→문자열전환때빈값거절을놓쳤다. Luna후보는IsString을유지하고IsNotEmpty/정상지역slug및빈문자열회귀/API계약한문장을추가했다. Sol소스검토 `region-dto-independent-review-20260913.json` SHA `433102e4922d848fcac3b4bab75ed00ea15e3ac7a362330c6864f924b4c286ea` PASS후root의exact30c격리1093파일에서DTO테스트 **6/6**,source불일치0,PID74576/부모67823잔여0/archive삭제를확인했다. `region-dto-runtime-20260913/` 근거. nonempty잘못된/비활성지역의서비스400·권한·version계약은그대로다. 공유문서의별도CRLF/이전본문WIP는덮어쓰지않고검토한후보만privateindex에반영한다. 새headCI→dev머지→Alpha42개는계속미완이다. 로컬AWS세션만료는확인했으며GitHubOIDC배포와구분하고호스트증거수집때해결한다.
+
+- **날짜 테스트 최종 독립 실행 판정 추가:** 기존소스단계검토fd5c이후실행및EOF1byte차이까지검토한보고서의갱신SHA는 `33e385a6a37b2d7254584d1be53c5133aa4eed41048e7c23ae5c023221225a46`이다. 43/43·1407파일불일치0·PID/archive회수와최종e02e파일이검증후보0ecc에서마지막LF하나만뺀것임을Sol이독립확인했다. 앞선fd5c은소스단계역사적해시이며현재보고서는이갱신본이다.
+
 - **커밋 전 공백 검사 보정:** 검증후보0ecc에는기존원문에없던EOF빈줄1개가있어private commit `19a6bfb1898819f4bf885b5dc9967fb04c3df112`의diff-check가거부했다. 이객체는어떤원격에도push하지않았고공유HEAD/index불변·privateindex삭제다. 마지막LF1byte만제거한최종파일SHA는 `e02e42416c1969ac987b27d9fedcdd483a1c6a5db9b5bea73a361b1c4cbccab8`이며검증후보의마지막LF를뺀나머지전체byte와같음을커밋helper가검사한다. 실행코드·단언변경이없으므로43개테스트를반복실행하지않고이차이를독립검토기록에명시한다.
 
 - **날짜 테스트 수리 검증 PASS:** Luna 후보 SHA `0ecc6a39a41d553958a2fb960c60c87575c80d5f02dd65269d109d5ab82a9d38`는4개테스트묶음에Date전용고정시계/복원과afterEach import만추가한다. 기존43개테스트·선택값·저장payload·요청없음단언및실제타이머를유지했다. Sol정적독립검토 `league-date-independent-review-20260913.json` SHA `fd5c436fad42f4ad4f8893754555248c13eecf35aa4159cbf7938bf0af95eb06` PASS후root가exact6fe의1407개파일을격리해후보1개만대체하고43/43통과·전후source불일치0을확인했다. `league-date-runtime-20260913/{receipt,vitest,source-manifest}.json` 근거. 소유PID50560/부모41912종료,group잔여0/archive삭제완료다. 실제로검증한후보와공유파일의끝줄공백차이를맞춰SHA전체일치시켰으며추가제품변경은없다. hostedTask9 artifact의commit은PRmerge-ref `cfcfc4579d333f91701458bffa0a617b904c0be6`이며부모dd4d+6fe,tree `cef9a9df7158daaa7c74e9fc0f1234c3be9f0930`가6fe와동일함을확인했다. 아직새원격CI·dev머지·Alpha검증은미완이다.

@@ -62,6 +62,7 @@ Required:
 - `hostTeamId`
 - `sportId`
 - `regionId`
+  - Required non-empty string; accepts stable catalog slugs such as `region-seoul-jongno`.
 - `title`
 - `startsAt`
 - `manualPlaceName`

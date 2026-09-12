@@ -56,4 +56,24 @@ describe('MutateTeamMatchDto matchStyle cap', () => {
 
     expect(errors.map((error) => error.property)).not.toContain('matchStyle');
   });
+
+  it('accepts the stable master region catalog id used by the v1 API', async () => {
+    const dto = plainToInstance(MutateTeamMatchDto, {
+      ...basePayload,
+      regionId: 'region-seoul-jongno',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors.map((error) => error.property)).not.toContain('regionId');
+  });
+
+  it('rejects an empty required region id at the DTO boundary', async () => {
+    const dto = plainToInstance(MutateTeamMatchDto, { ...basePayload, regionId: '' });
+
+    const errors = await validate(dto);
+    const regionIdError = errors.find((error) => error.property === 'regionId');
+
+    expect(regionIdError?.constraints).toHaveProperty('isNotEmpty');
+  });
 });

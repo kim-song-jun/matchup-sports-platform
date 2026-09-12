@@ -43,6 +43,7 @@ for required_path in \
   "${ALPHA_SOURCE_DIR}/deploy/deploy-alpha.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-release-common.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-manifest-common.sh" \
+  "${ALPHA_SOURCE_DIR}/deploy/task168-stage-a-migrate.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-source-common.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/rollback-alpha.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-sanitize.sql" \
@@ -71,6 +72,7 @@ if [[ -f "${ALPHA_RELEASE_STATE_FILE}" ]]; then
 fi
 runtime_mutated=false
 source_activated=false
+task168_irreversible=false
 legacy_api_image=''
 legacy_web_image=''
 legacy_release_version=''
@@ -119,7 +121,9 @@ restore_on_failure() {
   local status="$?"
   trap - ERR
   archive_failed_candidate
-  if [[ "${runtime_mutated}" == true && "${had_active}" == true ]]; then
+  if [[ "${task168_irreversible}" == true ]]; then
+    echo "[alpha-deploy] Task 168 Stage A began; old writers remain stopped for operator recovery" >&2
+  elif [[ "${runtime_mutated}" == true && "${had_active}" == true ]]; then
     echo "[alpha-deploy] Candidate failed; restoring active release" >&2
     if ! restore_active_release; then
       echo "[alpha-deploy] CRITICAL: active release restore failed" >&2
@@ -365,10 +369,11 @@ recover_known_played_at_migration_failure() {
     "cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate resolve --rolled-back ${PLAYED_AT_MIGRATION}"
 }
 
-recover_known_records_profile_migration_failure
-recover_known_played_at_migration_failure
-"${compose[@]}" run --rm --no-deps -T v1_api sh -c \
-  'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy'
+[[ "${ALPHA_TASK168_STAGE}" == stageAIntermediate ]] || { echo "[alpha-deploy] Refusing non-Stage-A manifest in this release" >&2; exit 1; }
+task168_irreversible=true
+bash "${ALPHA_SOURCE_DIR}/deploy/task168-stage-a-migrate.sh" \
+  --source-dir "${ALPHA_SOURCE_DIR}" --manifest "${ALPHA_MANIFEST_FILE}" \
+  --compose-prod "${COMPOSE_PROD}" --compose-alpha "${COMPOSE_ALPHA}" --env-file "${ENV_FILE}"
 # 게임 운영 플래그 불변 행 시드. 마이그레이션에 DML 을 넣을 수 없고(expand-contract 게이트)
 # GameOperationFlagsService.ensureDefaults() 는 platform_ops 가 플래그 API 를 호출할 때만
 # 돌기 때문에, 이걸 안 돌리면 갓 배포된 환경의 대회 운영 보드가 500 GAME_READ_FLAG_MISSING

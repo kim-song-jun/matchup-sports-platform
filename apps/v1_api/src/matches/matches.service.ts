@@ -19,7 +19,7 @@ import {
   WithdrawMatchApplicationDto,
 } from './dto/match-application.dto';
 import { MatchesQueryDto, MyMatchesQueryDto } from './dto/matches-query.dto';
-import { CancelMatchDto, MutateMatchDto, UpdateMatchDto } from './dto/mutate-match.dto';
+import { CancelMatchDto, CloseMatchDto, MutateMatchDto, ReopenMatchDto, UpdateMatchDto } from './dto/mutate-match.dto';
 
 type MatchWithRelations = V1Match & {
   sport: { id: string; name: string };
@@ -498,6 +498,143 @@ export class MatchesService {
       status: 'cancelled',
       cancelledApplications: result.applications.count,
       cancelledParticipants: result.participants.count,
+      detailRoute: `/matches/${match.id}`,
+    };
+  }
+
+  /**
+   * 호스트가 직접 모집을 닫는다 — 팀매치 close() 와 같은 계약이다.
+   *
+   * 취소(cancel)와 다르다: 매치는 그대로 열려 있고 확정된 참가자도 유지된다. 닫히는 건
+   * "새 신청을 더 받는 것"뿐이라 reopen() 으로 되돌릴 수 있다. 대기 중(requested)이던
+   * 신청서만 expired 로 정리하는 것도 팀매치와 같다 — 닫힌 매치에 답을 기다리는
+   * 신청서를 남겨두면 신청자 화면에 영원히 "승인 대기"가 뜬다.
+   */
+  async close(user: V1AuthUser, matchId: string, dto: CloseMatchDto) {
+    this.assertActiveAccount(user);
+    const match = await this.getHostMatch(user, matchId);
+
+    if (match.status === 'closed') {
+      throw new ConflictException({
+        code: 'ALREADY_PROCESSED',
+        message: 'Match is already closed',
+      });
+    }
+    if (match.status !== 'recruiting' || this.getApiStatus(match) === 'expired') {
+      throw stateConflict('Only active recruiting matches can be closed');
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.v1Match.update({
+        where: { id: match.id },
+        data: { status: 'closed' },
+      });
+
+      // updateMany 는 갱신된 행을 돌려주지 않는다 — 누구에게 알릴지는 갱신 "전"에 읽어야 한다.
+      const pending = await tx.v1MatchApplication.findMany({
+        where: { matchId: match.id, status: 'requested' },
+        select: { applicantUserId: true },
+      });
+      const applications = await tx.v1MatchApplication.updateMany({
+        where: { matchId: match.id, status: 'requested' },
+        data: {
+          status: 'expired',
+          reviewedByUserId: user.id,
+          reviewedAt: new Date(),
+        },
+      });
+
+      await tx.v1StatusChangeLog.create({
+        data: {
+          targetType: 'match',
+          targetId: match.id,
+          fromStatus: match.status,
+          toStatus: 'closed',
+          actorType: 'user',
+          actorUserId: user.id,
+          reason: dto.reason ?? 'match_closed',
+        },
+      });
+
+      return { applications, notifyUserIds: pending.map((row) => row.applicantUserId) };
+    });
+
+    void this.notifications.emitNotificationToMany(
+      result.notifyUserIds,
+      'match_closed',
+      match.id,
+      `"${match.title}" 매치 모집이 마감되어 대기 중인 신청이 종료됐어요.`,
+    );
+
+    return {
+      matchId: match.id,
+      status: 'closed',
+      expiredApplications: result.applications.count,
+      detailRoute: `/matches/${match.id}`,
+    };
+  }
+
+  /**
+   * 닫힌 모집을 다시 연다.
+   *
+   * 개인 매치의 "마감"은 두 갈래다 — ① 호스트가 close() 로 닫은 status='closed' ②
+   * deadlineAt 이 지나 displayState 만 'closed' 인 recruiting. **둘 다 되돌린다.**
+   * ②를 빼면 화면에는 똑같이 "신청 마감"으로 보이는데 다시 열기가 한쪽에서만 듣는다.
+   *
+   * 지난 마감 시각은 그대로 두면 안 된다 — status 를 recruiting 으로 돌려놔도
+   * getDisplayState 가 곧바로 다시 'closed' 를 돌려주기 때문에 눌러도 아무 변화가 없는
+   * 것처럼 보인다. 새 마감을 받았으면 그걸 쓰고, 없으면 마감을 지워 경기 시작 전까지
+   * 받는다(마감 없음 = 시작 전까지, create/update 와 같은 규약).
+   */
+  async reopen(user: V1AuthUser, matchId: string, dto: ReopenMatchDto) {
+    this.assertActiveAccount(user);
+    const match = await this.getHostMatch(user, matchId);
+
+    if (match.status !== 'closed' && match.status !== 'recruiting') {
+      throw stateConflict('Only closed matches can be reopened');
+    }
+    const now = new Date();
+    if (match.startAt < now) {
+      throw stateConflict('Expired matches cannot be reopened');
+    }
+
+    const deadlinePassed = Boolean(match.deadlineAt && match.deadlineAt < now);
+    if (match.status === 'recruiting' && !deadlinePassed) {
+      throw new ConflictException({
+        code: 'ALREADY_PROCESSED',
+        message: 'Match is already recruiting',
+      });
+    }
+
+    const deadlineAt = resolveReopenDeadline(
+      { deadlineAt: match.deadlineAt, startAt: match.startAt },
+      dto.deadlineAt,
+      now,
+    );
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const next = await tx.v1Match.update({
+        where: { id: match.id },
+        data: { status: 'recruiting', deadlineAt },
+      });
+      await tx.v1StatusChangeLog.create({
+        data: {
+          targetType: 'match',
+          targetId: match.id,
+          fromStatus: match.status,
+          toStatus: 'recruiting',
+          actorType: 'user',
+          actorUserId: user.id,
+          reason: dto.reason ?? 'match_reopened',
+        },
+      });
+      return next;
+    });
+
+    return {
+      matchId: updated.id,
+      status: updated.status,
+      deadlineAt: updated.deadlineAt,
       detailRoute: `/matches/${match.id}`,
     };
   }
@@ -1152,6 +1289,28 @@ function validationError(message: string, field: string) {
     message,
     details: { field },
   });
+}
+
+/**
+ * reopen() 이 저장할 신청 마감 시각을 정한다.
+ *  - 호출자가 새 마감을 줬으면 그 값을 쓴다(지금 이후 · 경기 시작 이전이어야 한다 — update() 의
+ *    validateMatchDates 와 같은 불변식).
+ *  - 안 줬는데 기존 마감이 이미 지났으면 지운다(null = 경기 시작 전까지 받는다).
+ *  - 안 줬고 기존 마감이 아직 남았으면 건드리지 않는다.
+ */
+function resolveReopenDeadline(
+  match: { deadlineAt: Date | null; startAt: Date },
+  requested: string | null | undefined,
+  now: Date,
+): Date | null {
+  if (requested == null) {
+    return match.deadlineAt && match.deadlineAt < now ? null : match.deadlineAt;
+  }
+  const parsed = new Date(requested);
+  if (Number.isNaN(parsed.getTime())) throw validationError('deadlineAt must be a valid date', 'deadlineAt');
+  if (parsed <= now) throw validationError('deadlineAt must be in the future', 'deadlineAt');
+  if (parsed >= match.startAt) throw validationError('deadlineAt must be before startsAt', 'deadlineAt');
+  return parsed;
 }
 
 function stateConflict(message: string, code = 'STATE_CONFLICT') {

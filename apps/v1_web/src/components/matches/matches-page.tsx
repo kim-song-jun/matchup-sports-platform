@@ -498,7 +498,22 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
             <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextCreateHref(model.step)}>{primaryLabel}</Link>
           )}
         </div>
-        {edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting} onClick={model.form.onCancel}>매치 취소</button> : null}
+        {/* 모집 마감 / 다시 열기 — 되돌릴 수 있는 동작이라 취소보다 위에 둔다. */}
+        {edit && model.form?.recruitingToggle ? (
+          <>
+            <button
+              className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+              type="button"
+              style={{ marginTop: 8 }}
+              disabled={model.form.submitting || model.form.recruitingToggle.pending}
+              onClick={model.form.recruitingToggle.onClick}
+            >
+              {model.form.recruitingToggle.label}
+            </button>
+            <p className="tm-text-caption" style={{ marginTop: 6, textAlign: 'center' }}>{model.form.recruitingToggle.hint}</p>
+          </>
+        ) : null}
+        {edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-danger tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting} onClick={model.form.onCancel}>매치 취소</button> : null}
       </div>
     </AppChrome>
   );
@@ -629,9 +644,23 @@ function SportSelector({ sports }: { sports: MatchListViewModel['sports'] }) {
   );
 }
 
+/**
+ * 신청을 더 받지 않는 카드에 붙일 배지 문구. 없으면 null(= 아직 신청할 수 있다).
+ *
+ * 목록에는 마감된 매치도 경기 시작 전까지 남는다(matches.service.ts list()) — 그래서
+ * "신청 가능"과 "신청 마감"이 한 목록에 섞인다. 카드가 둘을 구분해 보여주지 않으면
+ * 마감된 매치도 모집 중처럼 보인다(2026-09-07 제보). 정원이 찬 것과 기한이 지난 것은
+ * 사용자가 할 수 있는 일이 다르므로(전자는 자리가 날 수 있고 후자는 끝났다) 문구도 가른다.
+ */
+function closedBadgeLabel(match: MatchCardModel): string | null {
+  if (match.status !== 'full') return null;
+  return match.current >= match.capacity ? '모집 완료' : '신청 마감';
+}
+
 function MatchCardItem({ match }: { match: MatchCardModel }) {
+  const closedLabel = closedBadgeLabel(match);
   return (
-    <Link className="tm-match-list-card tm-pressable" href={`/matches/${match.id}`}>
+    <Link className={`tm-match-list-card tm-pressable${closedLabel ? ' tm-card-closed' : ''}`} href={`/matches/${match.id}`}>
       <div className="tm-match-list-media" style={{ backgroundImage: cssUrl(match.image) }}>
         <span className="tm-badge tm-badge-blue">{match.sport}</span>
         {/* [P1 숫자:단위 2:1 + tabular-nums] 현재/최대 인원 — 숫자(body-lg weight600) : 단위(caption) 2:1 */}
@@ -645,7 +674,10 @@ function MatchCardItem({ match }: { match: MatchCardModel }) {
             [격상2] 마감 orange 배지 제거 — footer actionLabel로 통합.
             레벨·성별은 pill 배지 → caption 인라인 텍스트로 강등(메타 배지 동등경쟁 해소). */}
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 2 }}>{match.level} · {match.gender}</div>
-        <div className="tm-text-body-lg" style={{ marginTop: 8 }}>{match.title}</div>
+        <div className="tm-match-card-headline" style={{ marginTop: 8 }}>
+          {closedLabel ? <span className="tm-badge tm-badge-grey tm-card-closed-badge">{closedLabel}</span> : null}
+          <div className="tm-text-body-lg">{match.title}</div>
+        </div>
         {/* [격상3] 시간만 weight 600으로 강조 — 행동 결정 핵심 정보 분리. 날짜·장소는 caption 유지. */}
         <div className="tm-text-caption" style={{ marginTop: 5 }}>
           <strong style={{ fontWeight: 600 }}>{match.date} {match.time}</strong>

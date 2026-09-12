@@ -520,10 +520,10 @@ export const gameSchemaSourceManifest = {
   //
   // 이 값은 **`origin/dev` 를 흡수한 뒤의** schema.prisma 로 재계산했다(게이트와 같은 방식 —
   // CRLF→LF 정규화 후 sha256). 흡수 전 해시를 그대로 쓰면 병합 결과와 달라 그대로 다시 깨진다.
-  // Re-pinned for Task168 canonical schema retirement: the committed schema now
-  // removes the five tournament-fixture models, legacy source columns, and retired
-  // fixture enums. The bound game-operations migration remains immutable.
-  schema: 'b74228bf4d94a6a9d5d5cc843098622d67f37f8f5ed9e9547432f7fa2f5a9ecd',
+  // Task168 Stage A r5 retains the legacy physical contract for the compatible
+  // intermediate release while hiding retired Prisma surfaces with @ignore.
+  // schema.stage-a.prisma is the identical assertion copy; the migration is immutable.
+  schema: '91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

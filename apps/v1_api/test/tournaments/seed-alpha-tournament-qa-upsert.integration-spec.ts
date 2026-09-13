@@ -208,6 +208,29 @@ describe('alpha QA seed — Part 2 delete→upsert idempotency & append-only sur
     expect(await prisma.v1ParticipantIdentityLinkEvent.findFirst({ where: { participantId: operatorParticipant.id, action: 'REVOKED' } })).not.toBeNull();
   });
 
+  it('preserves an anonymous historical participant snapshot when re-seeding an existing canonical game', async () => {
+    await seedScenarioOnce(new Date('2026-09-13T00:00:00.000Z'));
+    const fixture = await prisma.v1TournamentMatchDetails.findFirstOrThrow({
+      where: { tournamentId: ids.tournament, round: 'group', fixtureNumber: 1 },
+      select: { teamMatchId: true },
+    });
+    const game = await prisma.v1Game.findUniqueOrThrow({
+      where: { teamMatchId: fixture.teamMatchId },
+      select: { id: true, participants: { orderBy: { id: 'asc' }, take: 1, select: { id: true, gameId: true, sideId: true, lineupId: true, userId: true, displayNameSnapshot: true, jerseyNumber: true } } },
+    });
+    const participant = game.participants[0];
+    if (!participant) throw new Error('Expected a seeded participant for the historical snapshot regression.');
+    await prisma.v1GameParticipant.update({ where: { id: participant.id }, data: { userId: null } });
+    await prisma.v1ParticipantIdentityLinkCurrent.deleteMany({ where: { participantId: participant.id } });
+    const before = await prisma.v1GameParticipant.findUniqueOrThrow({ where: { id: participant.id }, select: { id: true, gameId: true, sideId: true, lineupId: true, userId: true, displayNameSnapshot: true, jerseyNumber: true } });
+
+    await expect(seedScenarioOnce(new Date('2026-09-13T01:00:00.000Z'))).resolves.not.toThrow();
+
+    const after = await prisma.v1GameParticipant.findUniqueOrThrow({ where: { id: participant.id }, select: { id: true, gameId: true, sideId: true, lineupId: true, userId: true, displayNameSnapshot: true, jerseyNumber: true } });
+    expect(after).toEqual(before);
+    expect(await prisma.v1ParticipantIdentityLinkCurrent.findUnique({ where: { participantId: participant.id } })).toBeNull();
+  });
+
   it('re-seeds through an append-only operation_audit that pins the tournament + TeamMatch — never deletes them, audit survives', async () => {
     const fixture = await prisma.v1TournamentMatchDetails.findFirstOrThrow({
       where: { tournamentId: ids.tournament },

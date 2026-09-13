@@ -11,21 +11,21 @@ must not render Kakao's login form with the reader's session attached. The redir
 `/callback/kakao` therefore also completes in Safari, and the session is created in the
 wrong browser. A universal link brings that last hop back into the app.
 
-## What is missing
+## Current association
 
-**The Apple Team ID.** The association file identifies the app as `<TEAMID>.<bundle id>`,
-and the Team ID only exists once the Apple Developer account is set up. Until then this
-directory holds no `apple-app-site-association` file and nginx answers 404 — the same
-answer it gives today, so nothing changes for anyone.
+The committed `apple-app-site-association` file contains both current App IDs:
 
-The Team ID is not a secret (it appears in App Store metadata), so the finished file is
-committed here rather than injected at deploy time. Nothing about it varies per host except
-the app id, which is why alpha and production each get their own entry.
+- alpha: `U9J95Q6XD3.kr.co.teameet.alpha`
+- production: `U9J95Q6XD3.kr.co.teameet`
+
+Both entries cover only `/callback/*`. If the production app moves to a new Apple
+organization, update only the production App ID after the new Team ID is confirmed;
+preserve the alpha entry.
 
 ## Filling it in
 
-Copy `apple-app-site-association.example.json` to `apple-app-site-association` — **no
-extension** — replace `TEAMID`, and commit it. Then check the deployed result:
+Edit `apple-app-site-association` in place when an App ID changes — **no extension** —
+and commit the confirmed value. Then check the deployed result:
 
 ```bash
 curl -fsS https://alpha.teameet.co.kr/.well-known/apple-app-site-association | python3 -m json.tool

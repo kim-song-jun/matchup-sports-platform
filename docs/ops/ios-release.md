@@ -86,8 +86,9 @@ plutil -p "<DerivedData>/Build/Intermediates.noindex/Teameet.build/Alpha Debug-i
 ## Universal Links
 
 `/callback/*` 링크가 Safari 대신 앱을 열게 하는 것이 목적이다(카카오 로그인 리다이렉트).
-서버 쪽 절차와 미완 사유는 [`../../deploy/aasa/README.md`](../../deploy/aasa/README.md)에 있다.
-**현재 Apple Team ID가 없어 association 파일을 만들 수 없고, 링크는 여전히 Safari로 열린다.**
+서버 쪽 절차와 설정은 [`../../deploy/aasa/README.md`](../../deploy/aasa/README.md)에 있다.
+현재 association 파일에는 alpha와 production App ID가 모두 등록돼 있다. alpha는
+`U9J95Q6XD3.kr.co.teameet.alpha`, production은 `U9J95Q6XD3.kr.co.teameet`이다.
 
 ## 롤백
 
@@ -215,7 +216,7 @@ APNs 프로바이더 토큰의 ES256 서명은 **서버(Node)** 에서 한다 �
 | `scripts/ios/asc-profile.mjs` | App Store 프로파일을 ASC API 로 생성·설치 (기기 등록 불필요) |
 | `scripts/ios/archive-and-export.sh` | archive → export → (`--upload` 일 때만) 업로드 |
 | 빌드 번호 강제 | `version.properties` 가 원천. 같은 버전·빌드 번호로 두 번 업로드하면 스크립트가 먼저 막는다 |
-| `DEVELOPMENT_TEAM` | project.yml 에 설정 |
+| `DEVELOPMENT_TEAM` | `project.yml` 기본값 `U9J95Q6XD3`; archive 시 `TEAMEET_TEAM_ID` 환경변수로 override 가능 |
 
 ### 자동 서명은 이 프로젝트에서 동작하지 않는다 (2026-08-31 실측)
 
@@ -337,15 +338,17 @@ GitHub Actions secrets 는 public 저장소에서도 값이 노출되지 않고 
 > 조직 계정을 직접 신청할 자격이 없고, **법인 대표자/서명권한자가 신청하거나 기존 조직
 > 계정에 팀원으로 초대**해야 한다
 > ([Program enrollment](https://developer.apple.com/help/account/membership/program-enrollment/)).
-> App Transfer 는 "App Store 정식 출시 이력"을 요구하는데 지금은 TestFlight 뿐이라 이전 자체가
-> 불가능하다 — alpha(`kr.co.teameet.alpha`, 개인 계정)는 그대로 두고 production(`kr.co.teameet`,
-> 아직 미등록)만 새 조직 계정에서 새로 만들면 충돌이 없다.
+> Apple의 App Transfer Criteria는 앱에 App Store에 출시된 버전이 하나 이상 있어야 한다고 명시한다.
+> 현재 TestFlight 전용 상태만으로 transfer 가능하다고 판단하지 않는다
+> ([App Transfer Criteria](https://developer.apple.com/help/app-store-connect/transfer-an-app/app-transfer-criteria)).
+> 조직 계정으로 전환할 때는 production(`kr.co.teameet`) App ID만 새 조직에서 갱신하고,
+> alpha(`kr.co.teameet.alpha`) App ID와 현재 alpha 설정은 유지한다.
 
 새 Team ID 를 받으면 실행할 것 — 코드는 대부분 이미 파라미터화돼 있어 재설정 부담이 작다:
 
 | 항목 | 위치 | 현재 상태 |
 |---|---|---|
-| iOS 서명 Team ID | `scripts/ios/archive-and-export.sh:28` | `TEAMEET_TEAM_ID` env var 로 이미 오버라이드 가능 |
-| APNs 서버 인증 | `scripts/ios/apns-send.mjs`, `.github/workflows/deploy.yml`(`APNS_TEAM_ID`) | 새 조직 계정의 새 `.p8` 키 발급 필요 — alpha(`deploy-alpha.yml`)는 시크릿이 분리돼 있어 안 건드림 |
+| iOS 서명 Team ID | `apps/v1_ios/project.yml`, `scripts/ios/archive-and-export.sh:28` | `project.yml` 기본값은 `U9J95Q6XD3`; archive 스크립트의 `TEAMEET_TEAM_ID` 환경변수로 override 가능 |
+| APNs 서버 인증 | `scripts/ios/apns-send.mjs`, `.github/workflows/deploy.yml`, `.github/workflows/deploy-alpha.yml` | 두 workflow가 `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_PRIVATE_KEY`라는 같은 secret 이름을 사용한다. production job은 `environment: production`이므로 새 조직 값을 production 환경 secrets에 넣고, alpha의 기존 값은 현재 저장소/조직 secret 범위에서 유지한다. 실제 적용값은 GitHub secret precedence와 workflow job scope를 확인한 뒤 기록한다. |
 | Sign in with Apple / associated domains | `apps/v1_ios/Teameet/Teameet.entitlements` | Team ID 하드코딩 없음(xcconfig 변수) — 새 App ID 에 capability 만 다시 켜면 됨 |
-| production AASA | `deploy/aasa/` | `teameet.co.kr` 용은 아직 존재하지 않음 — 새 Team ID 확정 후 신규 작성 |
+| production AASA | `deploy/aasa/apple-app-site-association` | alpha와 production App ID가 모두 등록돼 있다. 조직 이전 후 production App ID만 새 Team ID 값으로 갱신하고 alpha 항목은 보존한다. |

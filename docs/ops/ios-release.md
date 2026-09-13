@@ -329,3 +329,23 @@ GitHub Actions secrets 는 public 저장소에서도 값이 노출되지 않고 
 
 - production 번들(`kr.co.teameet`)도 앱 레코드를 만들지 여부. 알파만 먼저 올리는 편이 단순하다
 - 스크린샷·설명 등 App Store 메타데이터는 TestFlight 만 쓸 거면 최소한만 있으면 된다
+
+### 사업자(Organization) 계정 전환 체크리스트 — 계약직 경로 (2026-09-13)
+
+> 지금 TestFlight 는 개인 Apple Developer 계정이고, 그 앱이 속한 법인은 계약 개발자 본인
+> 소유가 아니다. Apple 은 이 경우를 "Contract developers" 항목으로 명시한다 — 계약 개발자는
+> 조직 계정을 직접 신청할 자격이 없고, **법인 대표자/서명권한자가 신청하거나 기존 조직
+> 계정에 팀원으로 초대**해야 한다
+> ([Program enrollment](https://developer.apple.com/help/account/membership/program-enrollment/)).
+> App Transfer 는 "App Store 정식 출시 이력"을 요구하는데 지금은 TestFlight 뿐이라 이전 자체가
+> 불가능하다 — alpha(`kr.co.teameet.alpha`, 개인 계정)는 그대로 두고 production(`kr.co.teameet`,
+> 아직 미등록)만 새 조직 계정에서 새로 만들면 충돌이 없다.
+
+새 Team ID 를 받으면 실행할 것 — 코드는 대부분 이미 파라미터화돼 있어 재설정 부담이 작다:
+
+| 항목 | 위치 | 현재 상태 |
+|---|---|---|
+| iOS 서명 Team ID | `scripts/ios/archive-and-export.sh:28` | `TEAMEET_TEAM_ID` env var 로 이미 오버라이드 가능 |
+| APNs 서버 인증 | `scripts/ios/apns-send.mjs`, `.github/workflows/deploy.yml`(`APNS_TEAM_ID`) | 새 조직 계정의 새 `.p8` 키 발급 필요 — alpha(`deploy-alpha.yml`)는 시크릿이 분리돼 있어 안 건드림 |
+| Sign in with Apple / associated domains | `apps/v1_ios/Teameet/Teameet.entitlements` | Team ID 하드코딩 없음(xcconfig 변수) — 새 App ID 에 capability 만 다시 켜면 됨 |
+| production AASA | `deploy/aasa/` | `teameet.co.kr` 용은 아직 존재하지 않음 — 새 Team ID 확정 후 신규 작성 |

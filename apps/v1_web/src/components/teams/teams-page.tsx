@@ -379,8 +379,8 @@ function TeamMembersMoreLink({ teamId, count }: { teamId: string; count: number 
 
 function TeamDetailMembersCard({ team }: { team: TeamDetailViewModel['team'] }) {
   return (
-    <Card pad={16} className="tm-team-detail-members-card">
-      <div className="tm-section-row" style={{ alignItems: 'flex-start', gap: 12, marginTop: 0 }}>
+    <section className="tm-team-detail-members-section">
+      <div className="tm-section-row tm-team-detail-members-head" style={{ alignItems: 'flex-start', gap: 12, marginTop: 0 }}>
         <div style={{ minWidth: 0, flex: '1 1 auto' }}>
           <div className="tm-text-body-lg">주요 멤버</div>
           {team.memberAccess.message ? <div className="tm-text-caption" style={{ marginTop: 4, lineHeight: 1.45 }}>{team.memberAccess.message}</div> : null}
@@ -388,7 +388,7 @@ function TeamDetailMembersCard({ team }: { team: TeamDetailViewModel['team'] }) 
         {team.memberAccess.enabled ? <span className="tm-badge tm-badge-blue">공개</span> : <span className="tm-badge tm-badge-grey" style={{ gap: 4 }}><Lock size={11} aria-hidden="true" />비공개</span>}
       </div>
       {team.memberAccess.canView ? (
-        <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+        <div style={{ display: 'grid', gap: 8 }}>
             {team.membersList.length ? (
             team.membersList.map((member) => {
               const content = <><TeamAvatar seed={member.userId} name={member.name} size="sm" /><div style={{ flex: 1, minWidth: 0 }}><div className="tm-text-body" style={{ color: 'var(--text-strong)', lineHeight: 1.35 }}>{member.name}</div><div className="tm-text-caption" style={{ marginTop: 2 }}>{member.role}</div></div>{member.profileHref ? <ChevronRightIcon size={18} stroke="var(--text-caption)" strokeWidth={2} /> : null}</>;
@@ -397,8 +397,8 @@ function TeamDetailMembersCard({ team }: { team: TeamDetailViewModel['team'] }) 
           ) : <div className="tm-text-caption" style={{ lineHeight: 1.55 }}>공개된 멤버가 아직 없어요.</div>}
           <TeamMembersMoreLink teamId={team.id} count={team.memberAccess.moreCount} />
         </div>
-      ) : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
-    </Card>
+      ) : <div className="tm-text-caption" style={{ lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
+    </section>
   );
 }
 

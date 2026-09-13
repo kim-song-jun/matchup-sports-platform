@@ -4,6 +4,22 @@
 
 ### 재개 커서 — 2026-09-13 AWS 재인증 이후
 
+- **815 AFTER 중간 판정 및 추가 수정:** Ego 실제 public team390/768/1440에서 hero scrim·한글 역할·프로필 링크·가로넘침0·하단CTA 여유33px를 확인했다. Event 실제 sport=futsal 요청/pressed/복귀 경로와 배지24px·12px700도 확인했다. Tournament sport의 inner label은 직접 DOM 재측정에서700이며, 오래된600/PR범위밖이라는 설명은 철회했다. 그러나 root가 AFTER 이미지를 확인해 기본정보 카드와 주요멤버 외곽 카드의 간격0 및 제목들여쓰기 불일치를 발견했다. 팀 상세 전체 PASS는 보류한다. 좁은 후속 후보는 외곽Card를section으로 바꾸고24px 섹션 간격·12px 제목간격을 준다. root가 미일치 closing tag를 고쳤고 candidate page d1524c70/CSS8fb44127를 검토한다. 이 UI 보완은 열려 있는 API1185에 함께 포함해 CI·배포를 진행할 예정이다. 비공개 멤버/팀생성 전체 상태 등은 계속 Ego 검수 중이다.
+
+- **UI Alpha 실제 배포 완료 / Ego AFTER 실행:** dev815522905의 CI34752286361 및 Alpha34752286382 SUCCESS. SSM `05a2db02-62ae-4d9c-8210-7eff17261dba` readback16/16 true(`alpha-81552290-readback-result-20260913-r1.json`)로 exact release·runtime·M1–M10·원본310 연결을 확인했다. Ego36에서 같은 공개/팀장/팀없는 계정과390/768/1440 AFTER를 시작했다. 멤버 비공개 검증은 실제 설정 UI가 있을 때만 원값을 기록해 일시 변경 후 정확히 복원한다. 아직 AFTER PASS는 아니다. API1185 exactdf3 CI34752403472 전체PASS·Copilot5190438763 7/7 새지적0이며 UI검수의 안정된 release 경계 뒤 머지한다. 선택적 TOCTOU 코멘트는 기존 요청 단위 공개상태 검사이며 새 무조건 노출 경로가 아니라는 Sol 검토를 기록했다.
+
+- **UI dev 머지 완료 / Alpha 배포 대기:** PR1184의 exact e4c725ff CI34751988427 API/Web/Gates SUCCESS, Copilot5190424707 19/19·새 코드지적0을 확인해 dev `815522905c4c4693854256cb18dfa5dee5f90df9`로 머지했다. matching CI34752286361/Alpha34752286382 진행 중이다. API PR1185는 b527 CI에서 API PASS를 확인했고 Copilot의 cross-league fixture가 missing과 같은 stub이라는 지적을 보완했다. 새 테스트28a2b23f는 잘못된 리그 소속의 실제 행이 권한 조건 누락 시 반환되므로 회귀를 잡으며 Sol delta PASS다. 공통 Task168 문서 충돌을 통합하고 최신 dev UI를 보존한 PR CI를 다시 수행한다. live UI after는 아직 실행하지 않았다.
+
+- **공통 문서 충돌 해결 / 별도 자동검사 한계:** PR1185 head `df3d728cc71c934073728fe4bef891dbce903b0c`는 b527과 dev815를 부모로 보존한 merge commit이다. dev 대비 API·문서·검사 baseline·Changeset·Task168 총7개 경로만 다르며 UI 변경 손실0, 로컬 HEAD/index 불변이다. CI34752403472 진행 중. 별도 GitHub Advanced Security34752289631은 코드 취약점 판정이 아니라 `Model "claude-opus-5" is not available`로 실행 실패했다. API/Web CI 및 PR Copilot와 분리하며 보안검사 PASS로 세지 않는다.
+
+- **현재 검증 커서:** PR1184 head `e4c725ff4423c9c164d90b016b144f654b37abb5`, CI34751988427; PR1185 head `b527200d7e2452c25a253e6d6b7ec1b803d3011b`, CI34751988300 실행 중이다. API의 첫 surface gate 실패는 baseline의 정당한 리그 허용 지점1→2 및 사유 등록으로 보완했다(서비스에 주석만 추가한 중간 후보는 채택하지 않음). Event 동기화는 Luna 반복 수정 후 Sol이 import/선언순서·retry/back 테스트를 직접 보완했고 root가 첫 enabled 요청 검증을 추가했다. Badge 실제16→24px, profile/member/spacing/empty-create가 같은 UI PR에 포함된다. docs1181 Alpha34751634909 SUCCESS, SSM bf9a50ef readback16/16 true·원본310 연결 보존(`alpha-15d619f4-readback-result-20260913-r1.json`). 최신 UI/API의 Alpha after는 여전히 미실행이다.
+
+- **최종 이관 후보의 병행 읽기 검토:** StageB manifest validator c7f9ebd0 및 creator cdb96e66는 source SHA 고정·호환필드null·저장된 manifest 재시도 시 stored image사용·StageA 유지에 대해 Sol bounded PASS. common StageB validator만으로 source 바이트가 검증되는 것은 아니며 호출자는 기존 별도 source-binding validator를 유지해야 한다. 최종 runner·workflow 통합과 실제 M11 실행은 미완이다.
+
+- **M11 후보 실행 금지 사유 확인:** runner ee6374의 EXIT trap은 성공(status0)·after_m11에서도 else로 구 writer를 재시작할 수 있어 Sol BLOCK이다. 실제 실행하지 않았다. 복원은 오직 before_m11 실패에만 허용하고 after_m11은 성공·실패 모두 정지를 유지하도록 Luna가 candidate만 수정한다. 복원 분기에도 exact container running 확인이 필요하다. 현재 Alpha는 M1–M10이며 기존 테이블은 유지된다.
+
+- **M11 runner 후보 수정 후 판정:** f2a97c2f는 before_m11 실패에만 exact writer를 복원하고 running=true를 확인한다. before/after×성공/실패4분기에서 after_m11 재시작0임을 Sol이 확인해 좁은 delta PASS했다. 실제 DB/서비스에서 실행하지 않았으며 StageB 호출 통합7지점이 남는다(`final-retirement-candidate-20260913/stageb-integration-map-20260913.json`). 이것은 최종 이관 완료를 뜻하지 않는다.
+
 - **dev PR 처리 및 공개 상세 수정 PR:** 문서 PR1181 exact headff9179의 CI/Copilot PASS 및 변경 경로2개를 확인하여 dev `15d619f4de7de171ff7db06897a02e6f3e844afc`로 머지했다. Alpha34751634909 진행 중이며 앱 소스 변경은 없다. 공개 리그 상세404는 PR1185 head `5260075a93ba111cd7d64e38a15671c5688fe236`, CI34751754167에서 검증 중이다. 서비스74a674a·실제 projection 테스트256b4520·API 문서2개·Changeset·이 문서만 포함하며 shared local dev HEAD/index는 보존했다. 서비스/테스트 Sol source PASS, Alpha after는 미검증이다. UI1184는 별도로 local URL draft 경계 수정 중이며 GitHub CI PASS를 UI 완료로 세지 않는다.
 
 - **실측 정정 및 팀장 baseline:** `public-2140/tournament-tag-outer-geometry-correction.json`은 풋살 inner label 대신 semantic outer를 재측정했다. 실제 풋살 배지는 높이16px·pill이며 상태/리그는24px다(plain text라는 이전 판정 철회). Luna의24px/12px700 보완은 Sol source PASS. `captain-2140/` 9개 frame으로 실제 팀장 계정의10개 팀 상세 영역·멤버목록/프로필 이동·하단CTA 비겹침을 확인했다. 비공개 멤버 fixture 미확보이며 공개 범위 검증 PASS는 아니다. 23개 내 리그가 핵심정보를 아래로 미는 기존 문제도 남는다. CI34751060318 API/Web/Gates 모두 PASS이나, 추가 Event URL 수정은 local draft/query 불일치로 Sol BLOCK되어 보완 중이다. 공개 경기404 후보 역시 기존 TOURNAMENT_MATCH_NOT_FOUND를 보존하고 실제 projection 테스트·문서를 보완하여 검토 중이다.

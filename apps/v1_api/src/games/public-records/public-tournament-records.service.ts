@@ -1059,18 +1059,35 @@ export class PublicTournamentRecordsService {
   }
 
   async getMatch(tournamentId: string, fixtureId: string, user: V1AuthUser | undefined) {
-    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: {
         id: tournamentId,
         deletedAt: null,
         AND: [PUBLIC_COMPETITION_STATUS_WHERE],
       },
-      select: { id: true, title: true, status: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
+      select: { id: true, title: true, kind: true, status: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
     });
-    if (
-      tournament === null ||
-      !isBracketPublished(tournament.bracketPublishedAt, tournament.bracketPublishScheduledAt)
-    ) {
+    if (tournament === null) {
+      throw new NotFoundException(NOT_FOUND);
+    }
+    // The schedule surface intentionally supports regular leagues through the
+    // league-shaped branch. The shared detail URL must use the same branch;
+    // restricting this lookup to TOURNAMENT_KINDS made every schedule link
+    // for a regular league fail closed before its fixture was queried.
+    if (tournament.kind === 'regular_league') {
+      try {
+        return await this.getLeagueFixtureRecord(tournamentId, fixtureId);
+      } catch (error) {
+        // Both competition families share this URL's public error contract.
+        // Normalize only the league projection's not-found result; operational
+        // failures must remain visible to the controller/error pipeline.
+        if (error instanceof NotFoundException) {
+          throw new NotFoundException(NOT_FOUND);
+        }
+        throw error;
+      }
+    }
+    if (!isBracketPublished(tournament.bracketPublishedAt, tournament.bracketPublishScheduledAt)) {
       throw new NotFoundException(NOT_FOUND);
     }
 

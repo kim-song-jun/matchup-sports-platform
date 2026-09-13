@@ -4302,6 +4302,16 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   padding: 20px 20px 128px;
 }
 
+/* Keep the basic-info card and member section as separate reading groups in both layouts.
+   The member heading aligns with other section headings; member rows retain their own list-row surfaces. */
+.tm-team-detail-members-section {
+  margin-top: 24px;
+}
+
+.tm-team-detail-members-head {
+  margin-bottom: 12px;
+}
+
 /* 가입 승인 대기 안내 — 토스트가 사라진 뒤에도 상태를 알려주는 상시 카드.
    배경은 팀매치·매치 안내 카드와 같은 --tint-orange 톤을 쓴다(주황 안내 카드 관례). */
 .tm-team-join-pending {

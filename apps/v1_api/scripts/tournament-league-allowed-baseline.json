@@ -13,8 +13,8 @@
     "why": "결과 확정 알림 — 행이 없으면 대회명이 `?? '대회'` 로 폴백된다. 기능이 아니라 라벨이 어긋나는 급이지만 조용히 틀리는 것은 같다(read-swap-preflight.md §1-3)."
   },
   "src/games/public-records/public-tournament-records.service.ts": {
-    "allowed": 1,
-    "why": "공개 일정 조회(getSchedule) — 리그를 대회 표면에 올린 뒤 **이 API 만 리그에서 404** 라, `/tournaments/:id/schedule` 과 `/tournaments/:id/bracket` 이 둘 다 \"경기 정보를 찾을 수 없어요\" 만 그렸다(두 화면이 같은 `ScheduleContent` + `usePublicTournamentSchedule` 을 쓴다 — 그래서 이 한 곳이 두 화면을 동시에 죽였고, 동시에 살린다). 좁혀 두면 리그 상세의 주 CTA(\"진행 중인 리그 보기\")가 에러 화면으로 간다. 거울 행에는 대회 축 대진이 없으므로 `leagueSchedule` 이 리그 축에서 같은 응답 모양을 만든다 — `tournaments-read.service.ts` 의 `leagueOverallStandings` 와 같은 갈래다. **대회의 대진표 미공개 게이트는 그대로 유지된다**(`public-league-schedule.spec.ts` 의 대조군이 그것을 고정한다 — 게이트를 없앤 것이 아니라 리그에 해당 없음으로 갈랐다)."
+    "allowed": 2,
+    "why": "공개 일정 조회(getSchedule)와 공개 상세 조회(getMatch) — 일정이 이미 정규 리그를 공개하고, 상세도 기존 리그 fixture projection을 통해 같은 `/tournaments/:id/matches/:fixtureId` 표면을 지원한다. 기존 1은 일정 호출만 계수했으므로 상세의 정당한 리그 허용 지점을 명시적으로 2로 올린다. 두 경로 모두 공개 대회 상태·삭제 게이트와 `TOURNAMENT_MATCH_NOT_FOUND` 오류 계약을 유지한다."
   },
   "src/tournaments/tournaments-read.service.ts": {
     "allowed": 2,

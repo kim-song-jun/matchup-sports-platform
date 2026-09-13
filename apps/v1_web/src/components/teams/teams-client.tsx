@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useV1ApproveTeamJoinApplication,
+  useV1AuthMe,
   useV1CancelTeamInvitation,
   useV1ChangeMembershipJersey,
   useV1ChangeTeamMembershipRole,
@@ -35,7 +36,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
-import { hasStoredV1Session } from '@/lib/session-storage';
+import { getLoginPathForRedirect, hasStoredV1Session } from '@/lib/session-storage';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
@@ -188,8 +189,17 @@ export function TeamListPageClient() {
  */
 export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V1TeamDetail | null }) {
   const router = useRouter();
+  const [hasSessionHint, setHasSessionHint] = useState(false);
+  useEffect(() => {
+    setHasSessionHint(hasStoredV1Session());
+  }, []);
+  // RequireAuth and login flows hydrate this cache when a valid session is already known.
+  // Reading it without enabling the query avoids a guest /auth/me probe while covering
+  // cookie-backed sessions whose local hint has not reached this component yet.
+  const authMe = useV1AuthMe({ enabled: false });
+  const authHydrated = Boolean(authMe.data?.user?.id);
   const query = useV1TeamDetail(teamId, { seed });
-  const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) });
+  const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) && (hasSessionHint || authHydrated) });
   const join = useV1CreateTeamJoinApplication(teamId);
   const withdraw = useV1WithdrawTeamJoinApplication(teamId, eligibility.data?.applicationId);
   const resolveChat = useV1ResolveChatRoom();
@@ -209,10 +219,6 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
   // useUnreadState와 동일하게 세션 힌트(hasStoredV1Session, 동기 localStorage 체크)가
   // 있을 때만 /me/teams 를 호출한다 — SSR에서는 localStorage를 못 읽으므로 useEffect로
   // 마운트 후 세팅한다. 힌트가 없으면(게스트) 쿼리 자체가 안 돌아 operatorTeamCount는 0.
-  const [hasSessionHint, setHasSessionHint] = useState(false);
-  useEffect(() => {
-    setHasSessionHint(hasStoredV1Session());
-  }, []);
   const myTeamsQuery = useV1MyTeams(undefined, { enabled: hasSessionHint });
   const operatorTeamCount = normalizeMyTeamsResponse(myTeamsQuery.data).filter((team) => isTeamOperatorRole(team.role)).length;
   // 운영 메뉴 "받은 컨택 N" 배지 — 이 팀의 운영진일 때만 조회한다(다른 사용자에겐 메뉴 자체가 없다).
@@ -306,6 +312,7 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
         trackEvent('team_apply_complete', { teamId });
         return result;
       }),
+      login: () => router.push(getLoginPathForRedirect(`/teams/${teamId}`)),
       withdraw: () => withdraw.mutateAsync({ reason: 'team_join_withdrawn_from_v1_web' }),
     }),
     // CTA는 상태에 따라 채팅·신청·취소 세 갈래라 안내 문구도 갈래마다 달라야 한다.
@@ -723,6 +730,7 @@ function toDetailMode(
 function teamDetailCtaLabel(team: V1TeamDetail, eligibility?: { message: string; joinState: string; eligible: boolean }) {
   if (isTeamMemberRole(team.viewer.role)) return '팀 채팅';
   if (resolveJoinState(team, eligibility) === 'requested') return '신청 취소';
+  if (team.viewer.disabledReason === 'LOGIN_REQUIRED') return '로그인 후 가입 신청';
   if (eligibility?.eligible) return '가입 신청';
   return eligibility?.message ?? '가입 불가';
 }
@@ -764,16 +772,19 @@ function teamDetailCtaAction({
   eligibility,
   chat,
   join,
+  login,
   withdraw,
 }: {
   team: V1TeamDetail;
   eligibility?: { eligible: boolean; joinState: string };
   chat: () => Promise<unknown>;
   join: () => Promise<unknown>;
+  login: () => void;
   withdraw: () => Promise<unknown>;
 }): (() => void | Promise<unknown>) | undefined {
   if (isTeamMemberRole(team.viewer.role)) return chat;
   if (resolveJoinState(team, eligibility) === 'requested') return withdraw;
+  if (team.viewer.disabledReason === 'LOGIN_REQUIRED') return login;
   if (eligibility?.eligible) return join;
   return undefined;
 }

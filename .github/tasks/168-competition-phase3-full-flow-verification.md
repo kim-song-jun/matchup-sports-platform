@@ -1,8 +1,22 @@
 # Task 168 — 모든 경기의 팀 매치 통일과 실제 사용자 E2E
 
-## 최신 판정 — Alpha 복구 완료, UI PR 검증 및 공개 경기 상세 오류 수정 중
+## 최신 판정 — Alpha 45104 UI 검수 완료 범위 확인, 가입 흐름 보완 및 최종 이관 준비 중
 
 ### 재개 커서 — 2026-09-13 AWS 재인증 이후
+
+- **게스트 가입 후속 source PASS / 팀 선택 실제 계약:** guest join candidate teams-client5105c2b/test3d14b16은 Sol PASS. 실제PageView는 login action이 있으면 활성화되며 기존redirect helper로팀복귀를보존한다. guesteligibility query미실행·실제CTA클릭/router 및eligible/denied/error 테스트 후보를GitHubCI로검증한다. Ego45104의팀장wizard는 저장된유효팀 또는첫생성가능팀을자동선택하므로UI에서eligible+unselected상태를만들수없었다. 이를실행실패로세거나storage를강제조작하지않는다. 기존A팀선택유지·경기생성0. 새final screenshot `after-45104/team-basic-members-frame-390.png`, `...-1440.png` 확보.
+
+- **실제 전체 ledger로 후보 게이트 수정:** 읽기전용 SSM `e5523adf-c607-4ec0-b5f3-e38c78972cb9` Success/0, `full-ledger-readonly-20260913/result-r2.json`의gzip+base64를 완전복원했다. 원시171행은167개 정상 적용+과거 명시적 rolled_back 시도4행이며 각4건은 후속 정상 적용 행을 갖는다. 최초r1은SSM24000byte출력제한으로 잘려 판단근거로 사용하지 않는다. 과거 resolved 시도를 현재 실패/중복적용으로 오판하지 않는다. 현재active applied167개의 source hash 일치 및 resolved역사4행을 별도바인딩해 보존하도록 Sol/Luna 게이트를 수정한다. DBledger삭제/resolve/rollback은 실행하지 않는다. Prisma 공식 hotfix 문서의 rolled-back 후 redeploy 계약과 실제Alpha이력을 함께 근거로 삼는다.
+
+- **45104 Ego 완료 범위:** desktop/tablet/mobile headings20/104/200 좌표정렬·24px gap·overflow0, 공개2경기200/UI, guest auth/me client-error0 확인. 팀장 기존자격증명1회성공, own controls/profilelinks 및 멤버비공개 owner/guest 동작PASS·원래true로복원확인. `after-45104/narrow-verdict.json`에근거. 별도잔여: publicteamguest join-eligibility401→가입불가deadend 확인, 원인은공개seed query.data만으로protectedqueryenabled. 이가입흐름을로그인안내로보완중. 무소속credential 및42전체는미완.
+
+- **45104 최종 UI Delta Alpha health 완료:** CI34755056998/Alpha34755056997 SUCCESS. SSM `062f172d-b525-4b36-a268-4f124c700240` Success/0, `alpha-45104d5d-readback-result-20260913-r1.json` release45104/migration72405a·16/16 true. Sol Ego36에서 새 `after-45104`에 heading/guesttelemetry 및 공개2경기 AFTER를 재검수한다. 관리자/무소속401을 팀장까지 일반화하지 않고 이전에 성공한 정확한 팀장 자격증명은1회 재시도 가능하다. 비공개 변경 검증 시 원값복원 필수. 아직 해당 AFTER PASS나42개 완료 주장은 하지 않는다.
+
+- **최종 이관 핵심 계약 강화 / 모델 승격:** Sol이 전체 migration bundle을 Prisma에 제공하면서 Task168의10개 ledger만 검사하는 결함을 발견했다. 실제 적용 전 전체 source history와 DB ledger의 이름·checksum·성공상태·중복/추가/누락을 대조해 M11만 유일한 미적용임을 증명해야 한다. 반복되는 고위험 계약 수정 때문에 Sol이 candidate creator/common/preparer/runner4개 구현을 담당하고 Luna는 isolated rehearsal producer를 담당한다. `fullMigrationHistory:[{name,sha256}]` 및 raw pre/post full ledger 증거를 공통 계약으로 고정한다. 이전 후보들의 bash-n/부분fixture PASS는 실행 준비 완료가 아니다. 실제Alpha/DB/M11 실행은 여전히 하지 않았다.
+
+- **PR1186 dev 머지 / 최종 UI Delta 배포 중:** exact headb5866bed의 CI34754706562 API/Web/Gates SUCCESS 및 Copilot 6/6·새지적0 승인권고를 확인하여 dev `45104d5d85f476d59e987fe7178960ce2bc86275`로 머지했다. matching CI34755056998/Alpha34755056997 실행 중이다. 새 readback은 migrationSHA72405a를 보존해45104d5d와 바인딩한다. Ego36은 새healthy 신호 후 desktopheading·guesttelemetry 재검수용으로 유지한다. 아직45104 AFTER PASS가 아니다.
+
+- **후속 PR1186 실행 중:** head `b5866bedeea10d33c6a147d188e9646dcafc209d`, base dev, 6개 명시 경로만 커밋. CI34754706562 및 자동 Copilot34754711340 진행 중. 수동 reviewer 로그인 `Copilot` 추가는 GitHub가 로그인명을 해석하지 못했지만 자동 Copilot 실행이 이미 생성되어 중복 요청하지 않는다. StageB runner는 Luna가 보고 뒤 수정했음을 확인했으며 실제 동결 SHA는 `353f4a0a54d64ea48d6a84a0c98d16058885b240fb40ade4431ce863e196cc7d`다. 이전a925 보고를 최종 후보 근거로 사용하지 않는다.
 
 - **b42 AFTER 잔여 두 건 후속 PR 준비:** Sol source PASS: CSS `c19702f6`의1024px 이상 desktop-main 직계 SectionTitle padding0으로 visible label을x200에 통일한다. API client `e51c8f2f`는 정확히 GET `/auth/me`+401+UNAUTHENTICATED만 client-error 수집에서 제외하고 원오류throw는 유지한다. 테스트 `2135af3e`는 실제v1Get 게스트 예외/다른route401 기록을 검증한다. GitHub CI 및 새Alpha AFTER 전에는 최종 완료로 세지 않는다.
 

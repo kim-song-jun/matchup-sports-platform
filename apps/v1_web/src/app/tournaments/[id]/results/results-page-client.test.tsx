@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ResultsPageContent } from './results-page-client';
 import type {
   V1LeagueOverallStandingsResponse,
@@ -250,5 +250,74 @@ describe('ResultsPageContent — 완료된 리그 방식 대회의 최종 순위
 
     await waitFor(() => expect(screen.getAllByText('B조 1위팀').length).toBeGreaterThan(0));
     expect(v1GetMock).toHaveBeenCalledWith(`/tournaments/${tournament.id}/standings/overall`);
+  });
+});
+
+/**
+ * 정규 리그 거울 행(kind==='regular_league') 회귀 테스트.
+ *
+ * 거울 행은 groups가 항상 []다 — 순위가 V1League 축에서 계산되고 대회 행에는 미러링되지
+ * 않기 때문이다(단일 시즌·다조 무관). 그래서 groups.length로 다조 여부를 판정하는 기존
+ * 가드로는 이 행이 절대 통합 순위 API(GET /standings/overall)로 가지 않고, 뒤이은
+ * groups[0].standings 읽기(buildSingleGroupLeagueRanking)도 groups가 비어 있어 항상 []가
+ * 나온다 — 시즌이 전부 끝나 GET .../standings/overall이 진짜 순위를 갖고 있어도
+ * "최종 순위가 아직 등록되지 않았어요"만 뜬다.
+ *
+ * alpha 실측(2026-09-13): 2팀·경기 1개짜리 완결 리그("(테스트) 9.11.2")에서 그대로
+ * 재현 — GET .../standings/overall은 200으로 정상 순위를 주는데 화면은 미등록 안내만
+ * 그렸다.
+ */
+describe('ResultsPageContent — 정규 리그 거울 행(kind=regular_league)의 최종 순위', () => {
+  // v1GetMock은 파일 전체가 공유하는 hoisted mock이라 이전 describe의 호출 기록이 남는다
+  // (이 파일에 다른 곳도 전역 clear가 없다) — 두 번째 테스트의 "호출 안 됨" 단언이 앞
+  // 테스트들의 누적 호출과 섞이지 않도록 이 블록에서만 매 테스트 전에 비운다.
+  beforeEach(() => {
+    v1GetMock.mockClear();
+  });
+
+  it('groups가 비어 있어도(단일 시즌) 통합 순위 API로 최종 순위를 그린다', async () => {
+    const overall: V1LeagueOverallStandingsResponse = {
+      standings: [
+        { teamId: 'team-1', teamName: '풋살크루', position: 1, points: 3, wins: 1, draws: 0, losses: 0, goalsFor: 3, goalsAgainst: 0 },
+        { teamId: 'team-2', teamName: 'Tttt', position: 2, points: 0, wins: 0, draws: 0, losses: 1, goalsFor: 0, goalsAgainst: 3 },
+      ],
+      progress: { total: 1, played: 1, remaining: 0, percent: 100 },
+      magicNumber: null,
+      recalculatedAt: null,
+    };
+    v1GetMock.mockResolvedValueOnce(overall);
+
+    const tournament = baseTournament({
+      format: 'group_knockout',
+      kind: 'regular_league',
+      groups: [],
+      fixtures: [],
+    });
+
+    render(<ResultsPageContent tournament={tournament} />);
+
+    await waitFor(() => expect(screen.getAllByText('풋살크루').length).toBeGreaterThan(0));
+    expect(screen.getByText('Tttt')).toBeInTheDocument();
+    expect(screen.queryByText('최종 순위가 아직 등록되지 않았어요.')).not.toBeInTheDocument();
+    expect(v1GetMock).toHaveBeenCalledWith(`/tournaments/${tournament.id}/standings/overall`);
+  });
+
+  it('다조(2개 이상) format=league 대회의 기존 동작은 그대로 유지한다(회귀 방지)', () => {
+    // kind가 대회(regular_tournament)이고 groups가 실제로 채워진 경우 — 거울 행 가드
+    // (isLeagueMirror)가 이 경로를 건드리지 않고, groups.length>1 판정이 그대로
+    // 통합 순위 API를 태워야 한다(228행 테스트와 동일 전제, 여기서는 회귀만 못박는다).
+    const tournament = baseTournament({
+      kind: 'regular_tournament',
+      groups: [
+        leagueGroup({ id: 'group-a', name: 'A조', standings: [standing({ registrationId: 'r-a1', teamName: 'A조 1위팀', position: 1 })] }),
+      ],
+    });
+
+    render(<ResultsPageContent tournament={tournament} />);
+
+    // 단일 조(groups.length===1)이므로 통합 순위 API를 타지 않고 groups[0].standings를
+    // 그대로 쓴다 — 184행 테스트와 같은 경로.
+    expect(v1GetMock).not.toHaveBeenCalled();
+    expect(screen.getAllByText('A조 1위팀').length).toBeGreaterThan(0);
   });
 });

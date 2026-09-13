@@ -964,13 +964,23 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
   // format 만 보면 정규 리그(거울 행 format='group_knockout')를 놓친다 — 두 질문을 다 한다.
   const isLeague = isLeagueCompetition(tournament);
   const isMultiGroupLeague = isLeague && tournament.groups.filter((g) => g.phase === 'group').length > 1;
-  // 다조 리그일 때만 통합 순위 API를 조회한다 — 훅 자체는 매 렌더 동일한 순서로
+  // 정규 리그 거울 행(kind==='regular_league')은 groups가 항상 []다 — 순위는
+  // V1League 축에서 계산되고 대회 행에는 절대 미러링되지 않는다(단일 시즌도 마찬가지).
+  // 그래서 groups.length>1(다조) 판정은 이 행에서 절대 참이 될 수 없고, 이어지는
+  // buildSingleGroupLeagueRanking도 groups.length===1을 요구해 역시 항상 []다 — 시즌이
+  // 전부 끝나도 "최종 순위가 아직 등록되지 않았어요"만 뜨는 결함(감사 evidence: alpha
+  // 실측, 완결 2팀 리그도 재현). 통합 순위 API(GET /standings/overall)는 이미 리그 축
+  // 응답도 반환하므로(V1LeagueOverallStandingRow의 teamId 변형), 조 개수와 무관하게
+  // 거울 행이면 그 API로 보낸다.
+  const isLeagueMirror = tournament.kind === 'regular_league';
+  const needsOverallStandings = isMultiGroupLeague || isLeagueMirror;
+  // 필요할 때만 통합 순위 API를 조회한다 — 훅 자체는 매 렌더 동일한 순서로
   // 호출해야 하므로(react hooks rule) enabled 플래그로 조건을 안쪽에 둔다.
-  const overallLeagueRows = useLeagueOverallFinalRanking(tournament.id, isCompleted && isMultiGroupLeague);
+  const overallLeagueRows = useLeagueOverallFinalRanking(tournament.id, isCompleted && needsOverallStandings);
   const knockoutRows = !isCompleted
     ? []
     : isLeague
-      ? (isMultiGroupLeague ? (overallLeagueRows ?? []) : buildSingleGroupLeagueRanking(tournament))
+      ? (needsOverallStandings ? (overallLeagueRows ?? []) : buildSingleGroupLeagueRanking(tournament))
       : buildKnockoutFinalRanking(tournament.fixtures);
   const championName = knockoutRows.find((r) => r.pos === 1)?.name ?? null;
 

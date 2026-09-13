@@ -9,8 +9,8 @@ while (($#)); do case "$1" in --source-dir) SOURCE_DIR=${2:?};shift 2;;--manifes
 sha(){ sha256sum "$1" | awk '{print $1}'; }
 fail(){ echo "[task168-stage-a] $*" >&2; exit 1; }
 readonly TASK_SCHEMA_SHA=91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f
-readonly ARCHIVE_SHA=694a17ba8ed3d062b68908d4fd4ca3085be28afbe2c9661dd7a1cfae2c6e799b
-readonly ARCHIVE_MANIFEST_SHA=aa1753551026795af1af70352e54bfed31759fda826fe7a0244f43603ac8bb26
+readonly ARCHIVE_SHA=829cbb214afc26c417947c864fd477647498003e06915ca20b4d2f8b44b80c4b
+readonly ARCHIVE_MANIFEST_SHA=b270be3c365ad780a2988ccf16f4850c15807ebc3eb9eb763f2bcdd0418f2f74
 readonly M1=(20260908130000_v1_team_match_tournament_expand 20260908150000_v1_operation_audit_team_match_expand 20260908160000_v1_official_fact_team_match_scope 20260908170000_v1_lineup_invalidation 20260908180000_v1_staff_scope_team_match 20260909000000_v1_tournament_result_lineage 20260909110000_v1_operation_audit_canonical_binding)
 readonly M8=20260910010000_v1_official_fact_source_history M9=20260910020000_v1_canonical_game_db_guards M10=20260910160000_v1_outbox_cutover_claim_gate M11=20260911090000_retire_tournament_fixture_tables
 [[ "$(jq -r '.database.task168.stage // empty' "$MANIFEST")" == stageAIntermediate ]] || fail 'manifest is not Stage A'
@@ -78,6 +78,8 @@ assert_committed_post_resume9(){
   jq -e '.status=="COMPLETED" or .status=="COMPLETED_WITH_GATE_RELEASE_ERROR"' "$report" >/dev/null || fail '9-row post-migration resume has unsupported report status';
   jq -e '.result.verification.remainingLegacyGameLinks==0 and .result.verification.remainingLegacyStaffScopes==0 and .result.verification.remainingLegacyAuditScopes==0' "$report" >/dev/null || fail '9-row post-migration report has legacy links';
   receipt "$quiesce" quiesce "$API_IMAGE"; receipt "$backup" backup "$API_IMAGE";
+  jq -e --arg release "$RELEASE_SHA" '.releaseSha==$release and (.services|sort)==["v1_api","v1_game_operations_worker"]' "$quiesce" >/dev/null || fail '9-row post-migration quiesce receipt is not bound to the selected release or writer set';
+  jq -e --arg release "$RELEASE_SHA" '.releaseSha==$release' "$backup" >/dev/null || fail '9-row post-migration backup receipt is not bound to the selected release';
   [[ -s "$backup_file" ]] || fail '9-row post-migration backup file is missing or empty';
   jq -e --arg path "$backup_file" --arg hash "$(sha "$backup_file")" '.backupPath==$path and .backupSha256==$hash and (.backupBytes|type=="number" and .>0)' "$backup" >/dev/null || fail '9-row post-migration backup is not bound';
   [[ "$(wc -c < "$backup_file" | tr -d ' ')" == "$(jq -er '.backupBytes' "$backup")" ]] || fail '9-row post-migration backup bytes are missing or changed';

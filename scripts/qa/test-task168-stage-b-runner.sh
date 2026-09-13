@@ -18,17 +18,14 @@ REPO_ROOT="$(cd "$HERE/../.." && pwd)"
 FIXTURES_DIR="$HERE/harness/task168-stage-b-fixtures"
 IMAGE_DIR="$HERE/harness/task168-stage-b-image"
 RUNNER="$REPO_ROOT/deploy/task168-stage-b-migrate.sh"
-# The M11 SQL + final schema fixtures live in the untracked, read-only
-# candidate output directory under the SHARED main worktree (git common dir's
-# parent), not necessarily this worktree — every worktree shares one such
-# directory. Override with CANDIDATE_M11_DIR/CANDIDATE_FINAL_SCHEMA if it
-# ever moves.
-SHARED_ROOT="$(dirname "$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir)")"
-CANDIDATE_M11_DIR="${CANDIDATE_M11_DIR:-$SHARED_ROOT/output/qa/task168/final-retirement-candidate-20260913/candidate/apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables}"
-# The wiring track (PR-A2) already committed the final schema to
-# deploy/task168-final-drop/schema.prisma on this branch; prefer that over
-# the untracked candidate copy so the harness tests the same bytes the real
-# wrapper/manifest reference.
+# round-3 blocking finding: the M11 SQL + final schema fixtures used to
+# default to an untracked, read-only output directory under the SHARED main
+# worktree (a path that only exists on the machine that produced it), so the
+# same committed bytes would fail to run this suite anywhere else. Both are
+# committed to this repo at the same sha256 (deploy/task168-final-drop/) --
+# default there. Override with CANDIDATE_M11_DIR/CANDIDATE_FINAL_SCHEMA only
+# for local one-off experiments against a different candidate.
+CANDIDATE_M11_DIR="${CANDIDATE_M11_DIR:-$REPO_ROOT/deploy/task168-final-drop/migrations/20260911090000_retire_tournament_fixture_tables}"
 CANDIDATE_FINAL_SCHEMA="${CANDIDATE_FINAL_SCHEMA:-$REPO_ROOT/deploy/task168-final-drop/schema.prisma}"
 [[ -f "$RUNNER" ]] || { echo "runner not found: $RUNNER" >&2; exit 1; }
 [[ -d "$CANDIDATE_M11_DIR" ]] || { echo "candidate M11 dir not found: $CANDIDATE_M11_DIR" >&2; exit 1; }
@@ -44,6 +41,7 @@ log(){ echo "[test-runner] $*"; }
 ok(){ PASS=$((PASS+1)); log "PASS: $1"; }
 bad(){ FAIL=$((FAIL+1)); FAILED_NAMES+=("$1"); log "FAIL: $1 -- $2"; }
 
+BASELINE_VOLUME_COUNT=""
 cleanup(){
   local status=$?
   log "cleaning up (run id: $RUN_ID)"
@@ -55,15 +53,36 @@ cleanup(){
   [[ -z "${FINAL_IMAGE_REF:-}" ]] || docker rmi -f "$FINAL_IMAGE_REF" >/dev/null 2>&1 || true
   docker rmi -f "t168harness-v1-api:$RUN_ID" >/dev/null 2>&1 || true
   rm -rf "$WORK_ROOT"
-  local remaining
-  remaining="$(docker ps -aq --filter "label=$LABEL" | wc -l | tr -d ' ')"
-  [[ "$remaining" == 0 ]] || log "WARNING: $remaining harness containers still present after cleanup"
+
+  # newDefect fix (harness item 7): assert zero leftover resources, not just
+  # log a warning on the container count. A labeled filter also cannot see
+  # an ANONYMOUS volume (postgres:16-alpine declares VOLUME in its own
+  # Dockerfile, so every v1_postgres container gets one unless `compose down
+  # -v` removed it) -- the only way to catch that class of leak is a
+  # before/after count of the entire docker volume namespace.
+  local remaining_containers remaining_networks remaining_volumes final_volume_count
+  remaining_containers="$(docker ps -aq --filter "label=$LABEL" | wc -l | tr -d ' ')"
+  remaining_networks="$(docker network ls -q --filter "label=$LABEL" | wc -l | tr -d ' ')"
+  remaining_volumes="$(docker volume ls -q --filter "label=$LABEL" | wc -l | tr -d ' ')"
+  final_volume_count="$(docker volume ls -q | wc -l | tr -d ' ')"
+  [[ "$remaining_containers" == 0 ]] && ok "harness leaves 0 labeled containers" || bad "harness labeled containers" "$remaining_containers remain"
+  [[ "$remaining_networks" == 0 ]] && ok "harness leaves 0 labeled networks" || bad "harness labeled networks" "$remaining_networks remain"
+  [[ "$remaining_volumes" == 0 ]] && ok "harness leaves 0 labeled volumes" || bad "harness labeled volumes" "$remaining_volumes remain"
+  if [[ -z "$BASELINE_VOLUME_COUNT" ]]; then
+    log "WARNING: no baseline docker volume count was established; skipping the anonymous-volume-leak assertion"
+  elif [[ "$final_volume_count" == "$BASELINE_VOLUME_COUNT" ]]; then
+    ok "docker volume count unchanged from baseline ($BASELINE_VOLUME_COUNT) -- no anonymous-volume leak"
+  else
+    bad "docker volume count vs baseline" "baseline=$BASELINE_VOLUME_COUNT final=$final_volume_count"
+  fi
+
   log "results: $PASS passed, $FAIL failed"
-  ((FAIL==0)) || log "failed: ${FAILED_NAMES[*]}"
+  if ((FAIL>0)); then log "failed: ${FAILED_NAMES[*]}"; status=1; fi
   exit $status
 }
 trap cleanup EXIT
-log "run id: $RUN_ID, work root: $WORK_ROOT"
+BASELINE_VOLUME_COUNT="$(docker volume ls -q | wc -l | tr -d ' ')" || true
+log "run id: $RUN_ID, work root: $WORK_ROOT, baseline docker volumes: $BASELINE_VOLUME_COUNT"
 
 # --- one-time: local registry + harness image, so the "final" image can be a
 # real @sha256-digest reference (docker image inspect resolves it, exactly
@@ -470,6 +489,49 @@ wait_for_backup_inflight(){
   return 1
 }
 
+# T1-6 (spec §5): sets up the ALPHA_HOME_DIR/ALPHA_LIVE_DIR scratch layout
+# the real wrapper (deploy/deploy-alpha-stage-b.sh) needs for
+# TASK168_STAGE=stageBRecover, then invokes that wrapper UNMODIFIED as a
+# black box (this delegation owns the runner, not the wrapper). Leaves
+# $recover_out (path to captured stdout+stderr) and $recover_rc (exit code)
+# for the caller to assert on.
+invoke_stage_b_recover(){
+  local work="$1" release="$2" env_final="$3"
+  local home_dir="$work/recover-home" live_dir="$work/recover-live"
+  install -d "$home_dir" "$live_dir/deploy"
+  cp "$FIXTURES_DIR/compose-prod.yml" "$live_dir/deploy/docker-compose.prod.yml"
+  cp "$FIXTURES_DIR/compose-alpha.yml" "$live_dir/deploy/docker-compose.alpha.yml"
+  cp "$env_final" "$live_dir/deploy/.env"
+  # stageBRecover's own entry precondition refuses to touch anything while a
+  # runner container is still labeled for this release ("not touching
+  # anything") -- by design. A SIGKILL only kills the host bash script, not
+  # the detached one-off migration-runner container it started, so remove
+  # it first: the same manual "confirm nothing is actually running, then
+  # clear the stale container" step a real operator takes before recovering
+  # (it is idle -- migrate already returned -- or already gone).
+  local stale; stale="$(docker ps -aq --filter "label=com.teameet.task168.stage-b=$release")"
+  [[ -z "$stale" ]] || docker rm -f $stale >/dev/null 2>&1 || true
+  # macOS has no flock(1) (verified: `which flock` -> not found on this
+  # host). The wrapper's own lock-contention semantics are wiring-track
+  # scope and already have an open, separately-flagged gap on this exact
+  # point (scripts/qa/test-task168-stage-b-wrapper.sh fakes flock to always
+  # exit 0 for the same reason). Do the same here -- a fake tool on PATH,
+  # never a test-only env hook in the operational script itself -- so this
+  # scenario reaches the catalog/backup-hash logic under test instead of
+  # failing at "command not found" on the very first flock call.
+  local fake_bin="$work/recover-bin"
+  install -d "$fake_bin"
+  printf '#!/bin/sh\nexit 0\n' > "$fake_bin/flock"
+  chmod +x "$fake_bin/flock"
+  recover_out="$work/recover-$RANDOM.out"
+  set +e
+  PATH="$fake_bin:$PATH" ALPHA_HOME_DIR="$home_dir" ALPHA_LIVE_DIR="$live_dir" ALPHA_RELEASE_STATE_DIR="$work/state" \
+    TASK168_STAGE=stageBRecover ALPHA_SHA="$release" \
+    bash "$REPO_ROOT/deploy/deploy-alpha-stage-b.sh" >"$recover_out" 2>&1
+  recover_rc=$?
+  set -e
+}
+
 # ---------------------------------------------------------------------------
 # (h) blocking finding #1 + #2: SIGTERM delivered while the runner is deep
 # inside a real, multi-second `pg_dump` (i.e. inside a command substitution,
@@ -539,8 +601,11 @@ run_scenario_h(){
 # leave a durable on-disk quiesce-intent receipt identifying the exact
 # stopped writers. Before this fix, nothing at all existed on disk in this
 # window (missedDefect: quiesce.json is only written *after* the backup
-# finishes) -- a wrapper-level recovery entrypoint (wiring track, out of
-# scope for this delegation) would have had no receipt to recover from.
+# finishes) -- a wrapper-level recovery entrypoint would have had no receipt
+# to recover from. spec T1-6: now also invokes the real wrapper
+# (deploy/deploy-alpha-stage-b.sh, TASK168_STAGE=stageBRecover) unmodified
+# against this exact state and asserts R-B restores the writer from the
+# quiesce-intent.json fallback (quiesce.json was never reached).
 run_scenario_i(){
   local name=i project="deploy" work="$WORK_ROOT/i" release predecessor
   mkdir -p "$work"
@@ -551,8 +616,9 @@ run_scenario_i(){
   seed_bulk_table "$project" "$env_pre" || { bad "$name" "bulk seed failed"; return; }
   build_fixtures "$work" "$release" "$predecessor"
   local env_final="$work/final.env"; write_env_file "$env_final" "$FINAL_IMAGE_REF"
-  local pre_api_id
+  local pre_api_id pre_worker_id
   pre_api_id="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" ps -a -q v1_api)"
+  pre_worker_id="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" ps -a -q v1_game_operations_worker)"
   local state_dir="$work/state/task168/$release" out_file="$work/i.out" pid
   install -d "$work/state"
   set +e
@@ -578,9 +644,25 @@ run_scenario_i(){
   local api_id
   api_id="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" ps -a -q v1_api)"
   if [[ "$api_id" == "$pre_api_id" && "$(docker inspect --format '{{.State.Running}}' "$api_id" 2>/dev/null)" == false && "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$api_id" 2>/dev/null)" == no ]]; then
-    ok "$name writer left stopped/restart=no (no trap runs on SIGKILL; recovery is the wrapper track's job, out of scope here)"
+    ok "$name writer left stopped/restart=no (no trap runs on SIGKILL)"
   else
     bad "$name writer state after SIGKILL" "id=$api_id running=$(docker inspect --format '{{.State.Running}}' "$api_id" 2>/dev/null) restart=$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$api_id" 2>/dev/null)"
+  fi
+
+  # spec T1-6: invoke the real, unmodified wrapper's stageBRecover against
+  # exactly this state (M11 never applied, only quiesce-intent.json exists).
+  invoke_stage_b_recover "$work" "$release" "$env_final"
+  sed 's/^/  [i-recover] /' "$recover_out"
+  if [[ "$recover_rc" == 0 ]] && grep -qi 'R-B:.*restored and running' "$recover_out"; then
+    ok "$name real stageBRecover R-B restores the pre-quiesce writer from the quiesce-intent.json fallback"
+  else
+    bad "$name stageBRecover R-B" "rc=$recover_rc out=$(cat "$recover_out")"
+  fi
+  if [[ "$(docker inspect --format '{{.State.Running}}' "$pre_api_id" 2>/dev/null)" == true && "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_api_id" 2>/dev/null)" == always \
+     && "$(docker inspect --format '{{.State.Running}}' "$pre_worker_id" 2>/dev/null)" == true && "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_worker_id" 2>/dev/null)" == always ]]; then
+    ok "$name stageBRecover R-B brought both writers back running with restart=always"
+  else
+    bad "$name writer state after stageBRecover R-B" "api running=$(docker inspect --format '{{.State.Running}}' "$pre_api_id" 2>/dev/null) restart=$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_api_id" 2>/dev/null); worker running=$(docker inspect --format '{{.State.Running}}' "$pre_worker_id" 2>/dev/null) restart=$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_worker_id" 2>/dev/null)"
   fi
   docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
 }
@@ -699,8 +781,8 @@ run_scenario_k(){
     bad "$name false diagnosis receipt despite committed M11" "$(cat "$receipt")"
   fi
   local marker="$state_dir/m11-entry-marker.json"
-  if jq -e '.status=="ENTERED" and (.quiesceReceiptSha256|length>0) and (.preM11BackupSha256|length>0)' "$marker" >/dev/null 2>&1; then
-    ok "$name m11-entry-marker.json is present for recovery"
+  if jq -e --arg release "$release" '.status=="ENTERED" and .releaseSha==$release and (.manifestSha256|length>0) and (.quiesceReceiptSha256|length>0) and (.preM11BackupSha256|length>0)' "$marker" >/dev/null 2>&1; then
+    ok "$name m11-entry-marker.json is present for recovery and bound to this release"
   else
     bad "$name m11-entry-marker.json" "$(cat "$marker" 2>/dev/null || echo MISSING)"
   fi
@@ -756,8 +838,8 @@ run_scenario_l(){
   [[ "$ledger_m11" == 1 ]] && ok "$name M11 is committed in the ledger despite the untrappable SIGKILL" || bad "$name M11 ledger state" "count=$ledger_m11"
   [[ ! -f "$state_dir/migration-stage.json" ]] && ok "$name no receipt written (no trap can run on SIGKILL) so a fresh diagnosis isn't falsely blocked" || bad "$name unexpected receipt after SIGKILL" "$(cat "$state_dir/migration-stage.json")"
   local marker="$state_dir/m11-entry-marker.json"
-  if jq -e '.status=="ENTERED" and (.quiesceReceiptSha256|length>0) and (.preM11BackupSha256|length>0) and (.runnerContainerId|length>0)' "$marker" >/dev/null 2>&1; then
-    ok "$name m11-entry-marker.json survives the SIGKILL for recovery to consult"
+  if jq -e --arg release "$release" '.status=="ENTERED" and .releaseSha==$release and (.manifestSha256|length>0) and (.quiesceReceiptSha256|length>0) and (.preM11BackupSha256|length>0) and (.runnerContainerId|length>0)' "$marker" >/dev/null 2>&1; then
+    ok "$name m11-entry-marker.json survives the SIGKILL for recovery to consult, bound to this release"
   else
     bad "$name m11-entry-marker.json after SIGKILL" "$(cat "$marker" 2>/dev/null || echo MISSING)"
   fi
@@ -779,12 +861,161 @@ run_scenario_l(){
   else
     bad "$name writer state after SIGKILL" "api=$pre_api_id running=$(docker inspect --format '{{.State.Running}}' "$pre_api_id" 2>/dev/null) restart=$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_api_id" 2>/dev/null); worker=$pre_worker_id running=$(docker inspect --format '{{.State.Running}}' "$pre_worker_id" 2>/dev/null) restart=$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_worker_id" 2>/dev/null)"
   fi
+
+  # spec T1-6: invoke the real, unmodified wrapper's stageBRecover against
+  # exactly this R-A-eligible state (M11 applied, no migration-stage.json).
+  invoke_stage_b_recover "$work" "$release" "$env_final"
+  sed 's/^/  [l-recover] /' "$recover_out"
+  if [[ "$recover_rc" == 0 ]] && jq -e '.status=="MIGRATION_COMMITTED_RECOVERED"' "$state_dir/migration-stage.json" >/dev/null 2>&1; then
+    ok "$name real stageBRecover R-A reconstructs MIGRATION_COMMITTED_RECOVERED"
+  else
+    bad "$name stageBRecover R-A" "rc=$recover_rc receipt=$(cat "$state_dir/migration-stage.json" 2>/dev/null || echo MISSING) out=$(cat "$recover_out")"
+  fi
+  if [[ "$(docker inspect --format '{{.State.Running}}' "$pre_api_id" 2>/dev/null)" == false && "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_api_id" 2>/dev/null)" == no \
+     && "$(docker inspect --format '{{.State.Running}}' "$pre_worker_id" 2>/dev/null)" == false && "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_worker_id" 2>/dev/null)" == no ]]; then
+    ok "$name writers remain stopped/restart=no after stageBRecover R-A"
+  else
+    bad "$name writer state after stageBRecover R-A" "api running=$(docker inspect --format '{{.State.Running}}' "$pre_api_id" 2>/dev/null) restart=$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_api_id" 2>/dev/null)"
+  fi
   docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
 }
 
-# Optional: T168_ONLY=a|b|c|d|e|f|g|h|i|j|k|l runs a single scenario (used
-# for fast mutation iteration during development; a plain run with no filter
-# runs all).
+# ---------------------------------------------------------------------------
+# (m) spec T1-6 negative recover scenario: reaches the same R-A-eligible
+# state as (l) (uncatchable SIGKILL right after M11 commits: ledger applied,
+# marker+quiesce present, no migration-stage.json), then injects a real
+# post-M11 catalog inconsistency -- one of M11's own retired tables
+# reappears -- BEFORE invoking the real, unmodified wrapper's stageBRecover.
+# The wrapper's own R-A catalog re-check (deploy-alpha-stage-b.sh,
+# "legacy tables are still present") must refuse and must not write
+# MIGRATION_COMMITTED_RECOVERED.
+run_scenario_m(){
+  local name=m project="deploy" work="$WORK_ROOT/m" release predecessor
+  mkdir -p "$work"
+  release="$(hex40)"; predecessor="$(hex40)"
+  local env_pre="$work/pre.env"
+  start_stack "$project" "$env_pre" || { bad "$name" "stack did not start"; return; }
+  seed_migrations "$project" without_m11 || { bad "$name" "seeding M1-M10 failed"; return; }
+  build_fixtures "$work" "$release" "$predecessor"
+  local env_final="$work/final.env"; write_env_file "$env_final" "$FINAL_IMAGE_REF"
+  local state_dir="$work/state/task168/$release" out_file="$work/m.out" pid
+  install -d "$work/state"
+  set +e
+  ALPHA_RELEASE_STATE_DIR="$work/state" "$RUNNER" --source-dir "$work/source" --manifest "$work/manifest.json" --compose-prod "$FIXTURES_DIR/compose-prod.yml" --compose-alpha "$FIXTURES_DIR/compose-alpha.yml" --env-file "$env_final" >"$out_file" 2>&1 &
+  pid=$!
+  if ! wait_for_m11_committed "$project" "$env_pre"; then
+    bad "$name" "M11 never committed within the timeout (harness timing, not the fix under test)"
+    kill -9 "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+    set -e
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+  if ! kill -0 "$pid" 2>/dev/null; then
+    bad "$name" "runner already exited before the signal could be sent (harness timing, not the fix under test)"
+    wait "$pid" 2>/dev/null
+    set -e
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+  kill -KILL "$pid"
+  wait "$pid" 2>/dev/null
+  set -e
+  if [[ ! -f "$state_dir/m11-entry-marker.json" || ! -f "$state_dir/quiesce.json" || -f "$state_dir/migration-stage.json" ]]; then
+    bad "$name" "did not reach the R-A-eligible state (harness timing, not the fix under test)"
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+
+  docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" exec -T v1_postgres \
+    psql -X -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -c 'CREATE TABLE v1_tournament_fixtures (id text)' >/dev/null
+
+  invoke_stage_b_recover "$work" "$release" "$env_final"
+  sed 's/^/  [m-recover] /' "$recover_out"
+  # Assert the SPECIFIC catalog-check message, not just "it failed somehow"
+  # -- any unrelated refusal earlier in the wrapper's R-A chain would also
+  # make a loose rc!=0-and-no-receipt check pass without this scenario
+  # having exercised the catalog re-check at all (a vacuous pass).
+  if [[ "$recover_rc" != 0 ]] && ! [[ -f "$state_dir/migration-stage.json" ]] && grep -qi 'legacy tables are still present' "$recover_out"; then
+    ok "$name real stageBRecover refuses when a retired table reappears post-commit (no false MIGRATION_COMMITTED_RECOVERED)"
+  else
+    bad "$name recover-with-catalog-break" "rc=$recover_rc receipt=$(cat "$state_dir/migration-stage.json" 2>/dev/null || echo NONE) out=$(cat "$recover_out")"
+  fi
+
+  docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" exec -T v1_postgres \
+    psql -X -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -c 'DROP TABLE v1_tournament_fixtures' >/dev/null
+  docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+}
+
+# ---------------------------------------------------------------------------
+# (n) round-3 blocking finding #1 (runner-side fix under test) + spec T1-6
+# negative recover scenario: corrupts the fresh pre-M11 backup file on disk
+# WHILE the runner is still running, timed to land right after M11 commits
+# but before the runner's own post-commit checks reach its backup-hash
+# re-check (:"pre-M11 backup changed during M11"). This is a genuine
+# non-signal fail() with M11 already committed -- exactly the shape the
+# fixed cleanup_pre_quiesce trap must still diagnose (status=1, not a
+# 129/130/143 deferred signal). The runner must exit nonzero AND write
+# MIGRATION_DIAGNOSIS_REQUIRED. The real, unmodified wrapper's stageBRecover
+# is then invoked against that exact (still-corrupted) backup and must also
+# refuse -- its own independent backup-hash re-check -- rather than write
+# MIGRATION_COMMITTED_RECOVERED.
+run_scenario_n(){
+  local name=n project="deploy" work="$WORK_ROOT/n" release predecessor
+  mkdir -p "$work"
+  release="$(hex40)"; predecessor="$(hex40)"
+  local env_pre="$work/pre.env"
+  start_stack "$project" "$env_pre" || { bad "$name" "stack did not start"; return; }
+  seed_migrations "$project" without_m11 || { bad "$name" "seeding M1-M10 failed"; return; }
+  build_fixtures "$work" "$release" "$predecessor"
+  local env_final="$work/final.env"; write_env_file "$env_final" "$FINAL_IMAGE_REF"
+  local state_dir="$work/state/task168/$release" out_file="$work/n.out" pid rc
+  install -d "$work/state"
+  set +e
+  ALPHA_RELEASE_STATE_DIR="$work/state" "$RUNNER" --source-dir "$work/source" --manifest "$work/manifest.json" --compose-prod "$FIXTURES_DIR/compose-prod.yml" --compose-alpha "$FIXTURES_DIR/compose-alpha.yml" --env-file "$env_final" >"$out_file" 2>&1 &
+  pid=$!
+  if ! wait_for_m11_committed "$project" "$env_pre"; then
+    bad "$name" "M11 never committed within the timeout (harness timing, not the fix under test)"
+    kill -9 "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+    set -e
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+  # No signal is sent -- let the runner keep running to its own post-commit
+  # checks, but corrupt the backup file it is about to re-hash right now.
+  printf 'corrupted-during-m11' >> "$state_dir/pre-m11-backup.sql"
+  wait "$pid"; rc=$?
+  set -e
+  sed 's/^/  [n] /' "$out_file"
+  [[ "$rc" != 0 ]] && ok "$name backup-changed-during-M11 fails the run (non-signal exit)" || bad "$name expected nonzero exit" "rc=$rc"
+  local receipt="$state_dir/migration-stage.json"
+  if jq -e '.status=="MIGRATION_DIAGNOSIS_REQUIRED" and (.failureReason|test("backup"))' "$receipt" >/dev/null 2>&1; then
+    ok "$name a real post-commit check failure still writes MIGRATION_DIAGNOSIS_REQUIRED (round-3 blocking finding #1 fix)"
+  else
+    bad "$name MIGRATION_DIAGNOSIS_REQUIRED after real post-commit failure" "$(cat "$receipt" 2>/dev/null || echo MISSING)"
+  fi
+  local ledger_m11
+  ledger_m11="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" exec -T v1_postgres psql -X -At -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name='20260911090000_retire_tournament_fixture_tables' AND finished_at IS NOT NULL AND rolled_back_at IS NULL" 2>/dev/null | tr -d '\r')"
+  [[ "$ledger_m11" == 1 ]] && ok "$name M11 is genuinely committed (this is a real post-commit failure, not a pre-commit RAISE)" || bad "$name M11 ledger state" "count=$ledger_m11"
+
+  # spec T1-6: the real, unmodified wrapper must independently refuse too
+  # (its own backup-hash re-check), not just supersede the runner's own
+  # correct diagnosis.
+  invoke_stage_b_recover "$work" "$release" "$env_final"
+  sed 's/^/  [n-recover] /' "$recover_out"
+  # As in (m): require the specific backup-hash message, not just "it
+  # failed somehow", so an unrelated earlier refusal in the wrapper's R-A
+  # chain cannot make this pass without exercising the backup-hash re-check.
+  if [[ "$recover_rc" != 0 ]] && ! jq -e '.status=="MIGRATION_COMMITTED_RECOVERED"' "$receipt" >/dev/null 2>&1 && grep -qi 'backup no longer matches' "$recover_out"; then
+    ok "$name real stageBRecover refuses when the pre-M11 backup no longer matches its recorded hash"
+  else
+    bad "$name recover-with-backup-corruption" "rc=$recover_rc receipt=$(cat "$receipt" 2>/dev/null || echo MISSING) out=$(cat "$recover_out")"
+  fi
+  docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+}
+
+# Optional: T168_ONLY=a|b|c|d|e|f|g|h|i|j|k|l|m|n runs a single scenario
+# (used for fast mutation iteration during development; a plain run with no
+# filter runs all).
 case "${T168_ONLY:-}" in
   a) run_scenario_a ;;
   b) run_scenario_b ;;
@@ -798,8 +1029,10 @@ case "${T168_ONLY:-}" in
   j) run_scenario_j ;;
   k) run_scenario_k ;;
   l) run_scenario_l ;;
-  "") run_scenario_a; run_scenario_b; run_scenario_c; run_scenario_d; run_scenario_e; run_scenario_f; run_scenario_g; run_scenario_h; run_scenario_i; run_scenario_j; run_scenario_k; run_scenario_l ;;
-  *) echo "unknown T168_ONLY=$T168_ONLY (expected a|b|c|d|e|f|g|h|i|j|k|l)" >&2; exit 64 ;;
+  m) run_scenario_m ;;
+  n) run_scenario_n ;;
+  "") run_scenario_a; run_scenario_b; run_scenario_c; run_scenario_d; run_scenario_e; run_scenario_f; run_scenario_g; run_scenario_h; run_scenario_i; run_scenario_j; run_scenario_k; run_scenario_l; run_scenario_m; run_scenario_n ;;
+  *) echo "unknown T168_ONLY=$T168_ONLY (expected a|b|c|d|e|f|g|h|i|j|k|l|m|n)" >&2; exit 64 ;;
 esac
 
 log "=== summary: $PASS passed, $FAIL failed ==="

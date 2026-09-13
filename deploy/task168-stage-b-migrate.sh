@@ -53,6 +53,37 @@ readonly ALL_MIGRATIONS=("${M1[@]}" "$M8" "$M9" "$M10" "$M11")
 # plain-sql-gzip vs custom). Every downstream reference reads this one
 # variable so U4 resolves to a one-line change.
 readonly BACKUP_FORMAT=custom
+# round-3 blocking finding #2: the constant above used to be receipt-only
+# decoration -- the actual dump (`pg_dump --format=custom`) and verify
+# (`pg_restore --list`) commands were hardcoded past it, so flipping U4 to
+# plain-sql-gzip would have produced a receipt claiming plain-sql-gzip while
+# the file on disk was still a custom dump, and the restore procedure
+# (spec §6.3-4) would pick the wrong tool. Fail before any writer is touched
+# if BACKUP_FORMAT is ever anything neither backup_dump/backup_verify below
+# knows how to handle.
+case "$BACKUP_FORMAT" in
+  custom|plain-sql-gzip) ;;
+  *) fail "unsupported BACKUP_FORMAT: $BACKUP_FORMAT" ;;
+esac
+# Both read the one BACKUP_FORMAT constant above; called with the compose
+# helper, DB_USER/DB_NAME (set once the target DB identity is verified) and a
+# destination/source path. `dump` writes the backup to $2; `verify` proves
+# the bytes at $1 are a well-formed backup of that format without applying
+# them (never actually restores).
+backup_dump(){
+  local dest="$1"
+  case "$BACKUP_FORMAT" in
+    custom) "${compose[@]}" exec -T v1_postgres sh -ceu 'pg_dump --format=custom --no-owner --no-acl -U "$1" -d "$2"' sh "$DB_USER" "$DB_NAME" > "$dest" ;;
+    plain-sql-gzip) "${compose[@]}" exec -T v1_postgres sh -ceu 'pg_dump --format=plain --no-owner --no-acl -U "$1" -d "$2" | gzip -c' sh "$DB_USER" "$DB_NAME" > "$dest" ;;
+  esac
+}
+backup_verify(){
+  local src="$1"
+  case "$BACKUP_FORMAT" in
+    custom) "${compose[@]}" exec -T v1_postgres sh -ceu 'pg_restore --list -U "$1" -d "$2" >/dev/null' sh "$DB_USER" "$DB_NAME" < "$src" ;;
+    plain-sql-gzip) gunzip -t "$src" ;;
+  esac
+}
 # Disk headroom coefficient is a single named constant (U4-adjacent decision
 # left to real-world measurement) so future tuning is also a one-line change.
 readonly BACKUP_DISK_HEADROOM_FACTOR=3
@@ -172,9 +203,23 @@ EXPECTED_DB_ID="$(jq -er '.database.task168.predecessor.databaseIdentity' "$MANI
 # service (and user/db pair) `dbq` used, before any writer is touched.
 V1_API_DATABASE_URL="$(jq -er '.services.v1_api.environment.DATABASE_URL // empty' <<<"$("${compose[@]}" config --format json)")" || fail 'v1_api DATABASE_URL is not resolvable from the rendered compose config'
 [[ "$V1_API_DATABASE_URL" =~ ^postgres(ql)?://([^:@/]+):[^@]*@([^:/]+):[0-9]+/([^?]+)(\?.*)?$ ]] || fail 'v1_api DATABASE_URL has an unexpected form'
-db_url_user="${BASH_REMATCH[2]}"; db_url_host="${BASH_REMATCH[3]}"; db_url_name="${BASH_REMATCH[4]}"
+db_url_user="${BASH_REMATCH[2]}"; db_url_host="${BASH_REMATCH[3]}"; db_url_name="${BASH_REMATCH[4]}"; db_url_query="${BASH_REMATCH[5]#\?}"
 [[ "$db_url_host" == v1_postgres ]] || fail 'v1_api DATABASE_URL host is not the verified v1_postgres service; refusing to migrate an unauthenticated database'
 [[ "$db_url_user" == "$DB_USER" && "$db_url_name" == "$DB_NAME" ]] || fail 'v1_api DATABASE_URL user/database differs from the verified v1_postgres identity'
+# nonBlocking finding (round-3 review): host/user/db alone still let a query
+# string retarget the connection -- Prisma honours `?schema=`, and libpq
+# honours `?options=...` (which can itself set `-csearch_path=...`). Either
+# would migrate against something other than the verified public schema of
+# the identity checked above, so reject both before any writer is touched.
+if [[ -n "$db_url_query" ]]; then
+  while IFS='=' read -r qk qv; do
+    [[ -n "$qk" ]] || continue
+    case "$qk" in
+      schema) [[ "$qv" == public ]] || fail 'v1_api DATABASE_URL targets a non-public schema; refusing to migrate an unauthenticated target' ;;
+      options) fail 'v1_api DATABASE_URL sets libpq options (can override search_path); refusing to migrate an unauthenticated target' ;;
+    esac
+  done < <(tr '&' '\n' <<<"$db_url_query")
+fi
 
 [[ -f "$PREDECESSOR_TRANSITION" && "$(sha "$PREDECESSOR_TRANSITION")" == "$PREDECESSOR_TRANSITION_SHA" ]] || fail 'predecessor transition receipt missing or changed'
 EXPECTED_PREDECESSOR_MIGRATIONS="$(jq -c '.database.task168.migrations[0:10] | map({name,sha256})' "$MANIFEST")" || fail 'manifest predecessor migration boundary is malformed'
@@ -434,8 +479,21 @@ cleanup_pre_quiesce(){
     # exactly as an untrappable SIGKILL in the same window already leaves
     # (m11-entry-marker.json + ledger are the recoverable trace; writing that
     # receipt is stageBRecover's job, out of scope here).
-    if m11_committed_in_ledger; then
-      echo '[task168-stage-b] M11 is already committed to the ledger; leaving no MIGRATION_DIAGNOSIS_REQUIRED receipt so recovery judges from the ledger and m11-entry-marker instead of a false diagnosis' >&2
+    # round-3 blocking finding #1: the previous version skipped the receipt
+    # whenever M11 was committed, full stop -- but `fail()` always exits 1,
+    # so every real post-commit check (:550 status drift, :553 full ledger,
+    # :555 lineage trigger, :557-558 CHECK defs, :561 audit constraint,
+    # :564-566 guard signatures, :567 enum types, :570 outbox, :575 backup
+    # hash) also lands here with M11 already committed and got silently
+    # swallowed -- a real verification failure with no diagnosis, which
+    # stageBRecover's R-A would then treat as recoverable and turn into a
+    # false MIGRATION_COMMITTED_RECOVERED. Only a genuine deferred signal
+    # (129/130/143 from the TERM/INT/HUP traps above, landing while bash was
+    # blocked inside the foreground migrate-deploy/migrate-status exec) is
+    # the "nothing actually failed, the exit code just arrived late" case;
+    # every other nonzero status past this point is our own explicit fail().
+    if [[ "$status" == 129 || "$status" == 130 || "$status" == 143 ]] && m11_committed_in_ledger; then
+      echo '[task168-stage-b] M11 is already committed to the ledger and this exit was a deferred signal that arrived while blocked inside the migrate/status exec; leaving no MIGRATION_DIAGNOSIS_REQUIRED receipt so recovery judges from the ledger and m11-entry-marker instead of a false diagnosis' >&2
     else
       write_diagnosis_receipt || true
       echo '[task168-stage-b] MIGRATION_DIAGNOSIS_REQUIRED: writers remain stopped after M11-phase failure' >&2
@@ -470,9 +528,9 @@ assert_disk_headroom
 install -d -m 700 "$state_dir"
 backup_tmp="$(mktemp "$state_dir/.task168-backup.XXXXXX")" || fail 'cannot create a backup temp file'
 chmod 600 "$backup_tmp"
-"${compose[@]}" exec -T v1_postgres sh -ceu 'pg_dump --format=custom --no-owner --no-acl -U "$1" -d "$2"' sh "$DB_USER" "$DB_NAME" > "$backup_tmp" || { rm -f "$backup_tmp"; fail 'fresh pre-M11 backup failed'; }
+backup_dump "$backup_tmp" || { rm -f "$backup_tmp"; fail 'fresh pre-M11 backup failed'; }
 backup_bytes="$(wc -c < "$backup_tmp" | tr -d ' ')"; backup_sha="$(sha "$backup_tmp")"; [[ "$backup_bytes" =~ ^[1-9][0-9]*$ && "$backup_sha" =~ ^[0-9a-f]{64}$ ]] || { rm -f "$backup_tmp"; fail 'fresh backup is empty or unauthenticated'; }
-"${compose[@]}" exec -T v1_postgres sh -ceu 'pg_restore --list -U "$1" -d "$2" >/dev/null' sh "$DB_USER" "$DB_NAME" < "$backup_tmp" || { rm -f "$backup_tmp"; fail 'fresh backup restore listing failed'; }
+backup_verify "$backup_tmp" || { rm -f "$backup_tmp"; fail 'fresh backup verification failed'; }
 mv -n "$backup_tmp" "$backup_file"
 if [[ -e "$backup_tmp" ]]; then rm -f "$backup_tmp"; fail 'pre-M11 backup path already exists; refusing to overwrite'; fi
 # manifest_sha/restart_policy_before_json were already computed before the
@@ -527,9 +585,14 @@ docker exec -u 0 "$runner" sh -ceu 'chown -R app:app /tmp/task168.staging && tes
 # runner container id) atomically, immediately before crossing into the
 # irreversible phase. Contract note: §4 does not yet list this file — flagged
 # in the final report as a suggested contract addition for the wiring track.
-m11_marker_json="$(jq -n --arg quiesceSha "$(sha "$quiesce")" --arg backupSha "$backup_sha" --arg runner "$runner" --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  '{schemaVersion:1,kind:"task168StageBM11EntryMarker",status:"ENTERED",quiesceReceiptSha256:$quiesceSha,preM11BackupSha256:$backupSha,runnerContainerId:$runner,enteredAt:$now}')" || fail 'cannot encode the M11 entry marker'
-printf '%s\n' "$m11_marker_json" | write_json "$m11_marker" '.schemaVersion==1 and .kind=="task168StageBM11EntryMarker" and .status=="ENTERED" and (.quiesceReceiptSha256|strings|test("^[0-9a-f]{64}$")) and (.preM11BackupSha256|strings|test("^[0-9a-f]{64}$")) and (.runnerContainerId|strings|length>0)'
+# PR-A2 review round 3 (runner-track item 4): the marker used to omit which
+# release/manifest entered M11 -- a wrapper-side stageBRecover reading only
+# ALPHA_SHA has no way to bind "this marker is THIS run's" without them, so
+# it could certify a days-old backup from a different release as the pre-M11
+# backup for whatever sha it happens to be invoked with.
+m11_marker_json="$(jq -n --arg releaseSha "$RELEASE_SHA" --arg manifestSha "$manifest_sha" --arg quiesceSha "$(sha "$quiesce")" --arg backupSha "$backup_sha" --arg runner "$runner" --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  '{schemaVersion:1,kind:"task168StageBM11EntryMarker",status:"ENTERED",releaseSha:$releaseSha,manifestSha256:$manifestSha,quiesceReceiptSha256:$quiesceSha,preM11BackupSha256:$backupSha,runnerContainerId:$runner,enteredAt:$now}')" || fail 'cannot encode the M11 entry marker'
+printf '%s\n' "$m11_marker_json" | write_json "$m11_marker" '.schemaVersion==1 and .kind=="task168StageBM11EntryMarker" and .status=="ENTERED" and (.releaseSha|strings|test("^[0-9a-f]{40}$")) and (.manifestSha256|strings|test("^[0-9a-f]{64}$")) and (.quiesceReceiptSha256|strings|test("^[0-9a-f]{64}$")) and (.preM11BackupSha256|strings|test("^[0-9a-f]{64}$")) and (.runnerContainerId|strings|length>0)'
 
 # blocking finding #3 (runner-side): the writers were confirmed stopped only
 # once, right after quiescence (line ~431) -- backup and preflight both take

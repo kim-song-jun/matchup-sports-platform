@@ -287,13 +287,18 @@ assert_disk_headroom(){
   (( tmp_free >= required_bytes )) || fail "insufficient disk space in TMPDIR for the migration staging copy (need >= ${required_bytes} bytes, have ${tmp_free})"
 }
 
-STATE_ROOT="${ALPHA_RELEASE_STATE_DIR:-/home/ec2-user/.teameet-alpha-releases}/task168"; state_dir="$STATE_ROOT/$RELEASE_SHA"; backup_file="$state_dir/pre-m11-backup.sql"; quiesce="$state_dir/quiesce.json"; receipt_file="$state_dir/migration-stage.json"; m11_marker="$state_dir/m11-entry-marker.json"
+STATE_ROOT="${ALPHA_RELEASE_STATE_DIR:-/home/ec2-user/.teameet-alpha-releases}/task168"; state_dir="$STATE_ROOT/$RELEASE_SHA"; backup_file="$state_dir/pre-m11-backup.sql"; quiesce_intent="$state_dir/quiesce-intent.json"; quiesce="$state_dir/quiesce.json"; receipt_file="$state_dir/migration-stage.json"; m11_marker="$state_dir/m11-entry-marker.json"
 [[ ! -e "$receipt_file" ]] || fail 'final retirement receipt already exists'
 # spec-backup-overwrite fix: a quiesce receipt already existing for this
 # release sha means a prior attempt got at least as far as stopping writers.
 # A fresh run must not silently re-quiesce and truncate that backup; recovery
 # of a partial attempt is a dedicated entrypoint's job, not this script's.
 [[ ! -e "$quiesce" ]] || fail 'a stage-b quiesce receipt already exists for this release; use the dedicated recovery entrypoint instead of a fresh run'
+# blocking finding #2: same reasoning for quiesce-intent.json (written below,
+# before any writer is stopped) -- its existence means a prior attempt at
+# least identified the writers to quiesce.
+[[ ! -e "$quiesce_intent" ]] || fail 'a stage-b quiesce-intent receipt already exists for this release; use the dedicated recovery entrypoint instead of a fresh run'
+manifest_sha="$(sha "$MANIFEST")"
 
 # newDefect fix (정지 전 preflight 거부): run the full pre-M11 preflight
 # (ledger/seal/legacy-link/disk-headroom) once *before* touching any writer.
@@ -318,8 +323,39 @@ pre_api_restart_policy="$(docker inspect --format '{{.HostConfig.RestartPolicy.N
 pre_worker_restart_policy="$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_worker_id")" || fail 'cannot read the pre-quiesce worker restart policy'
 [[ -n "$pre_api_restart_policy" ]] || pre_api_restart_policy=no
 [[ -n "$pre_worker_restart_policy" ]] || pre_worker_restart_policy=no
+restart_policy_before_json="$(jq -n --arg api "$pre_api_restart_policy" --arg worker "$pre_worker_restart_policy" '{api:$api,worker:$worker}')" || fail 'cannot encode the pre-quiesce restart policy snapshot'
+# blocking finding #2: the pre-quiesce container ids/images/restart policies
+# above exist only in shell memory until quiesce.json is written after the
+# backup finishes (the longest step, on a real DB). A kill in that window
+# (SIGKILL, or SIGTERM before the trap fix above can run) leaves writers
+# stopped with restart=no and nothing on disk identifying them -- a fresh
+# run refuses (quiesce.json/quiesce-intent.json guard above and after this
+# write), and a recovery entrypoint has no receipt to recover from. Record
+# the identity atomically, before any writer is touched, so that a kill
+# anywhere after this point leaves a recoverable trace even if quiesce.json
+# itself never gets written. Recovering FROM this file is the wrapper
+# track's job (deploy-alpha-stage-b.sh stageBRecover, out of scope here).
+quiesce_intent_json="$(jq -n \
+  --arg releaseSha "$RELEASE_SHA" --arg apiImage "$API_IMAGE" --arg predecessor "$PREDECESSOR_RELEASE" \
+  --arg dbId "$DB_ID" --arg manifestSha "$manifest_sha" \
+  --arg preApiId "$pre_api_id" --arg preWorkerId "$pre_worker_id" \
+  --arg preApiImage "$pre_api_image" --arg preWorkerImage "$pre_worker_image" \
+  --argjson restartBefore "$restart_policy_before_json" \
+  --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  '{schemaVersion:1,kind:"quiesceIntent",status:"INTENDED",stage:"stageBFinal",releaseSha:$releaseSha,apiImage:$apiImage,previousStageAReleaseSha:$predecessor,databaseIdentity:$dbId,manifestSha256:$manifestSha,services:["v1_api","v1_game_operations_worker"],preApiContainerId:$preApiId,preWorkerContainerId:$preWorkerId,preApiImage:$preApiImage,preWorkerImage:$preWorkerImage,restartPolicyBefore:$restartBefore,intendedAt:$now}'
+)" || fail 'cannot encode the quiesce-intent receipt'
+printf '%s\n' "$quiesce_intent_json" | write_json "$quiesce_intent" '
+  .schemaVersion==1 and .kind=="quiesceIntent" and .status=="INTENDED" and .stage=="stageBFinal"
+  and (.releaseSha|strings|test("^[0-9a-f]{40}$")) and (.apiImage|strings|length>0)
+  and (.databaseIdentity|strings|length>0) and (.manifestSha256|strings|test("^[0-9a-f]{64}$"))
+  and (.services|sort)==["v1_api","v1_game_operations_worker"]
+  and (.preApiContainerId|strings|length>0) and (.preWorkerContainerId|strings|length>0)
+  and (.preApiImage|strings|length>0) and (.preWorkerImage|strings|length>0)
+  and (.restartPolicyBefore.api|strings|length>0) and (.restartPolicyBefore.worker|strings|length>0)
+'
 phase=before_m11
 runner=''
+migration_completed=0
 cleanup(){ [[ -z "${migration_tmp:-}" ]] || rm -rf "$migration_tmp"; }
 restore_pre_quiesce_writers(){
   [[ "$phase" == before_m11 ]] || return 0
@@ -362,6 +398,18 @@ cleanup_pre_quiesce(){
   local status=$?
   [[ -z "${runner:-}" ]] || docker rm -f "$runner" >/dev/null 2>&1 || true
   cleanup
+  # blocking finding #1: a signal (SIGTERM from an SSM cancel/timeout or a
+  # GitHub Actions cancel) that arrives while bash is inside a command
+  # substitution (dbq/docker inspect, most of this script's runtime) can make
+  # `$?` read back as 0 in this trap even though the run never reached
+  # MIGRATION_COMMITTED -- verified experimentally on bash 5.3
+  # (`x="$(sleep 6)"` + SIGTERM -> EXIT trap sees status=0). Without this,
+  # both branches below are skipped and the script exits 0 with writers
+  # stopped and restart=no, and no diagnosis receipt. `migration_completed`
+  # is set to 1 only after the MIGRATION_COMMITTED receipt is durably
+  # written, so any exit without it is treated as a failure regardless of
+  # what `$?` claims.
+  if [[ "$status" == 0 && "${migration_completed:-0}" != 1 ]]; then status=1; fi
   if [[ "$status" != 0 && "$phase" == before_m11 ]]; then
     restore_pre_quiesce_writers || status=1
   elif [[ "$status" != 0 && "$phase" == after_m11 ]]; then
@@ -371,6 +419,14 @@ cleanup_pre_quiesce(){
   exit "$status"
 }
 trap cleanup_pre_quiesce EXIT
+# Same root cause as above: without an explicit handler, a signal caught
+# mid-command-substitution can lose its exit code by the time the EXIT trap
+# runs. These force `exit <128+signum>` so `cleanup_pre_quiesce` always sees
+# the real termination reason for the signals a cancel/timeout/manual kill
+# actually send.
+trap 'exit 143' TERM
+trap 'exit 130' INT
+trap 'exit 129' HUP
 "${compose[@]}" stop v1_api v1_game_operations_worker >/dev/null || fail 'API/worker quiescence failed'
 for service in v1_api v1_game_operations_worker; do [[ -z "$("${compose[@]}" ps --status running -q "$service")" ]] || fail "$service remains running after quiescence"; done
 # spec-D-6: `restart: always` (docker-compose.prod.yml v1_api/worker) means a
@@ -394,8 +450,9 @@ backup_bytes="$(wc -c < "$backup_tmp" | tr -d ' ')"; backup_sha="$(sha "$backup_
 "${compose[@]}" exec -T v1_postgres sh -ceu 'pg_restore --list -U "$1" -d "$2" >/dev/null' sh "$DB_USER" "$DB_NAME" < "$backup_tmp" || { rm -f "$backup_tmp"; fail 'fresh backup restore listing failed'; }
 mv -n "$backup_tmp" "$backup_file"
 if [[ -e "$backup_tmp" ]]; then rm -f "$backup_tmp"; fail 'pre-M11 backup path already exists; refusing to overwrite'; fi
-manifest_sha="$(sha "$MANIFEST")"
-restart_policy_before_json="$(jq -n --arg api "$pre_api_restart_policy" --arg worker "$pre_worker_restart_policy" '{api:$api,worker:$worker}')" || fail 'cannot encode the pre-quiesce restart policy snapshot'
+# manifest_sha/restart_policy_before_json were already computed before the
+# writers were touched (quiesce-intent.json, blocking finding #2) -- reused
+# here rather than recomputed so both receipts agree by construction.
 quiesce_json="$(jq -n \
   --arg releaseSha "$RELEASE_SHA" --arg apiImage "$API_IMAGE" --arg predecessor "$PREDECESSOR_RELEASE" \
   --arg dbId "$DB_ID" --arg manifestSha "$manifest_sha" --arg backupPath "$backup_file" \
@@ -448,6 +505,21 @@ docker exec -u 0 "$runner" sh -ceu 'chown -R app:app /tmp/task168.staging && tes
 m11_marker_json="$(jq -n --arg quiesceSha "$(sha "$quiesce")" --arg backupSha "$backup_sha" --arg runner "$runner" --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   '{schemaVersion:1,kind:"task168StageBM11EntryMarker",status:"ENTERED",quiesceReceiptSha256:$quiesceSha,preM11BackupSha256:$backupSha,runnerContainerId:$runner,enteredAt:$now}')" || fail 'cannot encode the M11 entry marker'
 printf '%s\n' "$m11_marker_json" | write_json "$m11_marker" '.schemaVersion==1 and .kind=="task168StageBM11EntryMarker" and .status=="ENTERED" and (.quiesceReceiptSha256|strings|test("^[0-9a-f]{64}$")) and (.preM11BackupSha256|strings|test("^[0-9a-f]{64}$")) and (.runnerContainerId|strings|length>0)'
+
+# blocking finding #3 (runner-side): the writers were confirmed stopped only
+# once, right after quiescence (line ~431) -- backup and preflight both take
+# real time on a real DB, during which an unlocked concurrent deploy (the
+# wrapper's deploy lock is the wiring track's job, out of scope here) could
+# recreate and restart them with the pre-M11 image before this irreversible
+# step. Re-confirm the exact quiesced container ids (not `compose ps -q
+# <service>`, which can also match the ephemeral migration-runner container
+# started above under the v1_api service) are still stopped with restart=no
+# immediately before running M11.
+for cid in "$pre_api_id" "$pre_worker_id"; do
+  docker inspect "$cid" >/dev/null 2>&1 || fail 'a quiesced writer container no longer exists; refusing to migrate'
+  [[ "$(docker inspect --format '{{.State.Running}}' "$cid")" == false ]] || fail 'a quiesced writer is running again; refusing to migrate against writers that may have been revived'
+  [[ "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$cid")" == no ]] || fail 'a quiesced writer restart policy changed since quiescence; refusing to migrate'
+done
 
 phase=after_m11
 docker exec -u app "$runner" sh -ceu 'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy --schema /tmp/task168/schema.prisma' || fail 'M11 migration failed; leave ledger for explicit diagnosis'; docker exec -u app "$runner" sh -ceu 'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate status --schema /tmp/task168/schema.prisma' || fail 'post-M11 Prisma migration status has drift'
@@ -502,3 +574,6 @@ printf '%s\n' "$receipt_json" | write_json "$receipt_file" '
   and (.quiesceReceiptSha256|strings|test("^[0-9a-f]{64}$")) and (.preM11BackupSha256|strings|test("^[0-9a-f]{64}$"))
   and .postVerification.retirementTriggers==0 and .postVerification.legacyTables==0
 '
+# Only after the MIGRATION_COMMITTED receipt is durably on disk does the EXIT
+# trap's status==0 mean an actual success (blocking finding #1).
+migration_completed=1

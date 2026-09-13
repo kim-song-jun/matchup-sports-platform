@@ -433,8 +433,209 @@ run_scenario_g(){
   fi
 }
 
-# Optional: T168_ONLY=a|b|c|d|e|f|g runs a single scenario (used for fast
-# mutation iteration during development; a plain run with no filter runs all).
+# Seeds a real, sizeable, catalog-irrelevant table so a real `pg_dump` of the
+# whole database takes multiple seconds -- the wall-clock margin scenarios
+# h/i/j need to catch the runner mid-backup without touching the runner
+# script itself (no test-only env hooks; see repo git-safety rules).
+seed_bulk_table(){
+  local project="$1" env_pre="$2" rows="${3:-300000}"
+  docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" exec -T v1_postgres psql -X -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -c \
+    "CREATE TABLE t168_harness_bulk (id serial primary key, data text); INSERT INTO t168_harness_bulk (data) SELECT repeat('x',800) FROM generate_series(1,${rows});" >/dev/null
+}
+
+# Polls for the runner's backup temp file to exceed a byte threshold -- the
+# real, external signal that `pg_dump` (deep inside a `$(...)`/pipeline, not
+# a foreground command) is actually in flight for this release.
+wait_for_backup_inflight(){
+  local state_dir="$1" min_bytes="${2:-1000000}" i f sz
+  for i in $(seq 1 400); do
+    f="$(ls "$state_dir"/.task168-backup.* 2>/dev/null | head -1)"
+    if [[ -n "$f" ]]; then
+      sz="$(wc -c < "$f" 2>/dev/null | tr -d ' ')"
+      [[ -n "$sz" && "$sz" -gt "$min_bytes" ]] && return 0
+    fi
+    sleep 0.05
+  done
+  return 1
+}
+
+# ---------------------------------------------------------------------------
+# (h) blocking finding #1 + #2: SIGTERM delivered while the runner is deep
+# inside a real, multi-second `pg_dump` (i.e. inside a command substitution,
+# not a foreground command -- the exact shape independently verified to lose
+# `$?` in bash's EXIT trap) during the before_m11 phase must still: (1) exit
+# 143, (2) have already durably written quiesce-intent.json (finding #2)
+# before the writers were ever touched, and (3) restore the exact quiesced
+# containers to running=true with their original restart policy (finding
+# #1's fixed trap, not the buggy `$?`-only one).
+run_scenario_h(){
+  local name=h project="deploy" work="$WORK_ROOT/h" release predecessor
+  mkdir -p "$work"
+  release="$(hex40)"; predecessor="$(hex40)"
+  local env_pre="$work/pre.env"
+  start_stack "$project" "$env_pre" || { bad "$name" "stack did not start"; return; }
+  seed_migrations "$project" without_m11 || { bad "$name" "seeding M1-M10 failed"; return; }
+  seed_bulk_table "$project" "$env_pre" || { bad "$name" "bulk seed failed"; return; }
+  build_fixtures "$work" "$release" "$predecessor"
+  local env_final="$work/final.env"; write_env_file "$env_final" "$FINAL_IMAGE_REF"
+  local pre_api_id pre_worker_id
+  pre_api_id="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" ps -a -q v1_api)"
+  pre_worker_id="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" ps -a -q v1_game_operations_worker)"
+  local state_dir="$work/state/task168/$release" out_file="$work/h.out" pid rc
+  install -d "$work/state"
+  set +e
+  ALPHA_RELEASE_STATE_DIR="$work/state" "$RUNNER" --source-dir "$work/source" --manifest "$work/manifest.json" --compose-prod "$FIXTURES_DIR/compose-prod.yml" --compose-alpha "$FIXTURES_DIR/compose-alpha.yml" --env-file "$env_final" >"$out_file" 2>&1 &
+  pid=$!
+  if ! wait_for_backup_inflight "$state_dir"; then
+    bad "$name" "backup never became observable mid-flight (harness timing, not the fix under test)"
+    kill -9 "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+    set -e
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+  kill -TERM "$pid"
+  wait "$pid"; rc=$?
+  set -e
+  sed 's/^/  [h] /' "$out_file"
+  [[ "$rc" == 143 ]] && ok "$name SIGTERM mid-backup -> runner exits 143" || bad "$name exit code" "rc=$rc"
+  local quiesce_intent="$state_dir/quiesce-intent.json"
+  if jq -e '.status=="INTENDED" and (.preApiContainerId|length>0) and (.preWorkerContainerId|length>0) and (.restartPolicyBefore.api|length>0)' "$quiesce_intent" >/dev/null 2>&1; then
+    ok "$name quiesce-intent receipt was durable before the kill"
+  else
+    bad "$name quiesce-intent receipt" "$(cat "$quiesce_intent" 2>/dev/null || echo MISSING)"
+  fi
+  [[ ! -f "$state_dir/migration-stage.json" ]] && ok "$name no premature commit/diagnosis receipt" || bad "$name unexpected receipt" "$(cat "$state_dir/migration-stage.json")"
+  local api_id worker_id
+  api_id="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" ps -a -q v1_api)"
+  worker_id="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" ps -a -q v1_game_operations_worker)"
+  if [[ "$api_id" == "$pre_api_id" && "$worker_id" == "$pre_worker_id" ]]; then ok "$name restored the exact same container ids"; else bad "$name container identity after SIGTERM restore" "before=$pre_api_id/$pre_worker_id after=$api_id/$worker_id"; fi
+  if [[ "$(docker inspect --format '{{.State.Running}}' "$api_id" 2>/dev/null)" == true && "$(docker inspect --format '{{.State.Running}}' "$worker_id" 2>/dev/null)" == true ]]; then
+    ok "$name writers running again after SIGTERM restore"
+  else
+    bad "$name writers not running after SIGTERM restore" "api=$(docker inspect --format '{{.State.Running}}' "$api_id" 2>/dev/null) worker=$(docker inspect --format '{{.State.Running}}' "$worker_id" 2>/dev/null)"
+  fi
+  if [[ "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$api_id" 2>/dev/null)" == always && "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$worker_id" 2>/dev/null)" == always ]]; then
+    ok "$name restart policy restored to always after SIGTERM"
+  else
+    bad "$name restart policy not restored after SIGTERM" "api=$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$api_id" 2>/dev/null)"
+  fi
+  docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+}
+
+# ---------------------------------------------------------------------------
+# (i) blocking finding #2: SIGKILL (uncatchable -- no trap, no restore, no
+# diagnosis can run at all) in the same mid-backup window as (h) must still
+# leave a durable on-disk quiesce-intent receipt identifying the exact
+# stopped writers. Before this fix, nothing at all existed on disk in this
+# window (missedDefect: quiesce.json is only written *after* the backup
+# finishes) -- a wrapper-level recovery entrypoint (wiring track, out of
+# scope for this delegation) would have had no receipt to recover from.
+run_scenario_i(){
+  local name=i project="deploy" work="$WORK_ROOT/i" release predecessor
+  mkdir -p "$work"
+  release="$(hex40)"; predecessor="$(hex40)"
+  local env_pre="$work/pre.env"
+  start_stack "$project" "$env_pre" || { bad "$name" "stack did not start"; return; }
+  seed_migrations "$project" without_m11 || { bad "$name" "seeding M1-M10 failed"; return; }
+  seed_bulk_table "$project" "$env_pre" || { bad "$name" "bulk seed failed"; return; }
+  build_fixtures "$work" "$release" "$predecessor"
+  local env_final="$work/final.env"; write_env_file "$env_final" "$FINAL_IMAGE_REF"
+  local pre_api_id
+  pre_api_id="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" ps -a -q v1_api)"
+  local state_dir="$work/state/task168/$release" out_file="$work/i.out" pid
+  install -d "$work/state"
+  set +e
+  ALPHA_RELEASE_STATE_DIR="$work/state" "$RUNNER" --source-dir "$work/source" --manifest "$work/manifest.json" --compose-prod "$FIXTURES_DIR/compose-prod.yml" --compose-alpha "$FIXTURES_DIR/compose-alpha.yml" --env-file "$env_final" >"$out_file" 2>&1 &
+  pid=$!
+  if ! wait_for_backup_inflight "$state_dir"; then
+    bad "$name" "backup never became observable mid-flight (harness timing, not the fix under test)"
+    kill -9 "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+    set -e
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+  kill -KILL "$pid"
+  wait "$pid" 2>/dev/null
+  set -e
+  local quiesce_intent="$state_dir/quiesce-intent.json"
+  if jq -e '.status=="INTENDED" and (.preApiContainerId|length>0) and (.preWorkerContainerId|length>0) and (.databaseIdentity|length>0) and (.manifestSha256|length>0)' "$quiesce_intent" >/dev/null 2>&1; then
+    ok "$name quiesce-intent receipt survives an untrappable SIGKILL"
+  else
+    bad "$name quiesce-intent receipt after SIGKILL" "$(cat "$quiesce_intent" 2>/dev/null || echo MISSING)"
+  fi
+  [[ ! -f "$state_dir/quiesce.json" ]] && ok "$name full quiesce.json correctly absent (killed before the backup finished)" || log "$name note: quiesce.json also present (backup finished before the kill landed -- timing, not a failure)"
+  local api_id
+  api_id="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" ps -a -q v1_api)"
+  if [[ "$api_id" == "$pre_api_id" && "$(docker inspect --format '{{.State.Running}}' "$api_id" 2>/dev/null)" == false && "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$api_id" 2>/dev/null)" == no ]]; then
+    ok "$name writer left stopped/restart=no (no trap runs on SIGKILL; recovery is the wrapper track's job, out of scope here)"
+  else
+    bad "$name writer state after SIGKILL" "id=$api_id running=$(docker inspect --format '{{.State.Running}}' "$api_id" 2>/dev/null) restart=$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$api_id" 2>/dev/null)"
+  fi
+  docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+}
+
+# ---------------------------------------------------------------------------
+# (j) blocking finding #3 (runner-side): if the quiesced writer is revived
+# (started, restart re-enabled) by something outside this run -- modeling an
+# unlocked concurrent deploy racing the wrapper's deploy lock (wiring track,
+# out of scope here) -- between quiescence and the irreversible M11 step,
+# the runner's own re-check right before migrate must refuse rather than
+# trust its earlier stop. The ground truth asserted is the database: M11
+# must never have been applied.
+run_scenario_j(){
+  local name=j project="deploy" work="$WORK_ROOT/j" release predecessor
+  mkdir -p "$work"
+  release="$(hex40)"; predecessor="$(hex40)"
+  local env_pre="$work/pre.env"
+  start_stack "$project" "$env_pre" || { bad "$name" "stack did not start"; return; }
+  seed_migrations "$project" without_m11 || { bad "$name" "seeding M1-M10 failed"; return; }
+  seed_bulk_table "$project" "$env_pre" || { bad "$name" "bulk seed failed"; return; }
+  build_fixtures "$work" "$release" "$predecessor"
+  local env_final="$work/final.env"; write_env_file "$env_final" "$FINAL_IMAGE_REF"
+  local pre_api_id
+  pre_api_id="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" ps -a -q v1_api)"
+  local state_dir="$work/state/task168/$release" out_file="$work/j.out" pid rc i
+  install -d "$work/state"
+  set +e
+  ALPHA_RELEASE_STATE_DIR="$work/state" "$RUNNER" --source-dir "$work/source" --manifest "$work/manifest.json" --compose-prod "$FIXTURES_DIR/compose-prod.yml" --compose-alpha "$FIXTURES_DIR/compose-alpha.yml" --env-file "$env_final" >"$out_file" 2>&1 &
+  pid=$!
+  # Wait for this run's own quiescence to land (restart=no on the exact
+  # container it stopped) before reviving it -- otherwise we would just be
+  # racing compose stop itself, not exercising the post-quiescence re-check.
+  local revived=0
+  for i in $(seq 1 400); do
+    if [[ "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_api_id" 2>/dev/null)" == no && "$(docker inspect --format '{{.State.Running}}' "$pre_api_id" 2>/dev/null)" == false ]]; then
+      docker start "$pre_api_id" >/dev/null 2>&1
+      docker update --restart=always "$pre_api_id" >/dev/null 2>&1
+      revived=1
+      break
+    fi
+    sleep 0.05
+  done
+  if [[ "$revived" != 1 ]]; then
+    bad "$name" "never observed this run's own quiescence to revive against (harness timing, not the fix under test)"
+    kill -9 "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+    set -e
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+  wait "$pid"; rc=$?
+  set -e
+  sed 's/^/  [j] /' "$out_file"
+  if [[ "$rc" != 0 ]] && grep -qi 'refusing to migrate' <<<"$(cat "$out_file")"; then
+    ok "$name externally-revived writer -> refused before migrating"
+  else
+    bad "$name externally-revived writer refusal" "rc=$rc out=$(cat "$out_file")"
+  fi
+  local ledger_has_m11
+  ledger_has_m11="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" exec -T v1_postgres psql -X -At -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name='20260911090000_retire_tournament_fixture_tables'" 2>/dev/null | tr -d '\r')"
+  [[ "$ledger_has_m11" == 0 ]] && ok "$name M11 was never applied (revived-writer window caught before the irreversible step)" || bad "$name M11 leaked into the ledger despite the revived-writer refusal" "count=$ledger_has_m11"
+  docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+}
+
+# Optional: T168_ONLY=a|b|c|d|e|f|g|h|i|j runs a single scenario (used for
+# fast mutation iteration during development; a plain run with no filter runs
+# all).
 case "${T168_ONLY:-}" in
   a) run_scenario_a ;;
   b) run_scenario_b ;;
@@ -443,8 +644,11 @@ case "${T168_ONLY:-}" in
   e) run_scenario_e ;;
   f) run_scenario_f ;;
   g) run_scenario_g ;;
-  "") run_scenario_a; run_scenario_b; run_scenario_c; run_scenario_d; run_scenario_e; run_scenario_f; run_scenario_g ;;
-  *) echo "unknown T168_ONLY=$T168_ONLY (expected a|b|c|d|e|f|g)" >&2; exit 64 ;;
+  h) run_scenario_h ;;
+  i) run_scenario_i ;;
+  j) run_scenario_j ;;
+  "") run_scenario_a; run_scenario_b; run_scenario_c; run_scenario_d; run_scenario_e; run_scenario_f; run_scenario_g; run_scenario_h; run_scenario_i; run_scenario_j ;;
+  *) echo "unknown T168_ONLY=$T168_ONLY (expected a|b|c|d|e|f|g|h|i|j)" >&2; exit 64 ;;
 esac
 
 log "=== summary: $PASS passed, $FAIL failed ==="

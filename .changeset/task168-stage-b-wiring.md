@@ -39,7 +39,7 @@ Task 168 StageB(최종 스키마 이관) 배선을 dev에 들여왔어요. dev p
   자체가 거부돼요.
 
 **행동 없이도 검증**: `scripts/qa/test-task168-*.sh` 6개(wiring·wrapper·manifest·post-live·
-d5-guard·dockerfile-target, 총 73개 케이스)가 가짜 aws/docker/psql로 실제 스크립트를 돌려 각
+d5-guard·dockerfile-target, 총 74개 케이스)가 가짜 aws/docker/psql로 실제 스크립트를 돌려 각
 게이트를 변이(mutation)로 확인해요. 전부 `deploy.yml` gates 에 연결했고 `continue-on-error` 없이
 0 failed 를 요구해요(리뷰 라운드에서 wrapper·manifest 두 fixture 가 최신 계약과 어긋나 잠깐
 `continue-on-error` 로 우회된 적이 있었는데, fixture 를 계약에 맞게 고치고 걷어냈어요).

@@ -151,6 +151,10 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
 
     docker update --restart="${restart_before_api}" "${pre_api_id}" >/dev/null || fail "could not restore API restart policy"
     docker update --restart="${restart_before_worker}" "${pre_worker_id}" >/dev/null || fail "could not restore worker restart policy"
+    # Read the policy back rather than trusting `docker update`'s exit code,
+    # the same way the runner's own restore_pre_quiesce_writers does.
+    [[ "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "${pre_api_id}")" == "${restart_before_api}" ]] || fail "restored API restart policy does not match the ${receipt##*/} receipt"
+    [[ "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "${pre_worker_id}")" == "${restart_before_worker}" ]] || fail "restored worker restart policy does not match the ${receipt##*/} receipt"
     "${compose[@]}" start v1_api v1_game_operations_worker >/dev/null || fail "could not restart the pre-quiesce writers"
     running_api="$(docker inspect --format '{{.State.Running}}' "${pre_api_id}")"
     running_worker="$(docker inspect --format '{{.State.Running}}' "${pre_worker_id}")"

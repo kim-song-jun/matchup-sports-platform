@@ -112,6 +112,9 @@ case "\$*" in
   *"pg_type"*) echo 0; exit 0 ;;
   *"inspect"*"State.Running"*) echo true; exit 0 ;;
   *"update --restart"*) exit 0 ;;
+  # R-B re-reads the policy after the update call rather than trusting its
+  # exit code; the R-B fixture's restartPolicyBefore is always "always".
+  *"HostConfig.RestartPolicy.Name"*) echo always; exit 0 ;;
   *"start v1_api v1_game_operations_worker"*) exit 0 ;;
   *) exit 0 ;;
 esac
@@ -206,6 +209,33 @@ rc="$(run_recover "${root}")"
   && grep -q "start v1_api v1_game_operations_worker" "${log}" \
   && pass "R-B restores the pre-quiesce writer with its original restart policy" \
   || fail "R-B did not restore correctly: rc=${rc} stdout=$(cat "${root}/stdout") stderr=$(cat "${root}/stderr")"
+
+# ── R-B negative: `docker update` "succeeds" but the policy read back
+# afterward does not match — must refuse rather than trust the exit code.
+root="${WORK}/r-b-restart-policy-mismatch"; mkdir -p "${root}"
+setup_recover_fixture "${root}"
+make_fake_docker_for_recover "${bin}" ""
+jq -n '{schemaVersion:1,kind:"quiesce",status:"COMPLETED",stage:"stageBFinal",
+  preApiContainerId:"api123",preWorkerContainerId:"worker123",
+  preApiImage:"",preWorkerImage:"",databaseIdentity:"",
+  restartPolicyBefore:{api:"always",worker:"always"}}' > "${state_dir}/quiesce.json"
+cat > "${bin}/docker" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "docker \$*" >> "${log}"
+case "\$*" in
+  *"label=com.teameet.task168.stage-b"*) exit 0 ;;
+  *"pg_locks"*) echo 0; exit 0 ;;
+  *"_prisma_migrations"*) exit 0 ;;
+  *"HostConfig.RestartPolicy.Name"*) echo no; exit 0 ;;   # update "succeeded" but read-back disagrees
+  *"inspect"*"State.Running"*) echo true; exit 0 ;;
+  *) exit 0 ;;
+esac
+EOF
+chmod +x "${bin}/docker"
+rc="$(run_recover "${root}")"
+[[ "${rc}" -ne 0 ]] && grep -q "restored API restart policy does not match" "${root}/stderr" \
+  && pass "R-B refuses when the restored restart policy does not match the receipt" \
+  || fail "R-B did not re-verify the restored restart policy: rc=${rc} $(cat "${root}/stderr")"
 
 # ── R-A: M11 applied, no migration-stage.json, quiesce.json + backup match,
 # no legacy tables left -> reconstruct MIGRATION_COMMITTED_RECOVERED ───────

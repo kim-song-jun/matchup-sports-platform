@@ -175,24 +175,19 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       exit 1
       ;;
     applied)
-      # R-A candidate: M11 committed. The receipt may be entirely missing
-      # (kill between the runner's migrate step and its own receipt write),
-      # or it may already exist as a stale MIGRATION_DIAGNOSIS_REQUIRED
-      # diagnosis: a SIGTERM landing after M11's foreground `migrate deploy`
-      # finishes is deferred by bash until that child exits, so the runner's
-      # own EXIT trap still sees phase=after_m11 and writes a diagnosis
-      # receipt despite M11 having actually committed
-      # (deploy/task168-stage-b-migrate.sh). Only a receipt that already
-      # reports a committed status is truly nothing to recover; any other
-      # existing receipt is a candidate to supersede once every check below
-      # independently confirms the commit.
-      existing_receipt_status=""
+      # R-A candidate: M11 committed. The receipt may be entirely missing —
+      # the runner's EXIT trap (task168-stage-b-migrate.sh cleanup_pre_quiesce)
+      # writes NO receipt for exactly one case: a deferred TERM/INT/HUP that
+      # lands while blocked inside the M11 migrate/status exec, with M11
+      # already committed. Every other after-M11 exit — every genuine
+      # post-commit check failure included — gets a real
+      # MIGRATION_DIAGNOSIS_REQUIRED with a populated failureReason from that
+      # same trap. So an existing receipt is never a stale placeholder to
+      # reconstruct over; superseding it (a prior round of this script did)
+      # would convert a real failure into a false _RECOVERED.
       if [[ -f "${migration_receipt}" ]]; then
-        existing_receipt_status="$(jq -r '.status // empty' "${migration_receipt}" 2>/dev/null || true)"
-        case "${existing_receipt_status}" in
-          MIGRATION_COMMITTED|MIGRATION_COMMITTED_RECOVERED)
-            fail "migration-stage.json already reports ${existing_receipt_status} for ${ALPHA_SHA} — nothing to recover" ;;
-        esac
+        existing_receipt_status="$(jq -r '.status // "unknown"' "${migration_receipt}" 2>/dev/null || echo unknown)"
+        fail "migration-stage.json already reports ${existing_receipt_status} for ${ALPHA_SHA} — refusing to touch it; if it is MIGRATION_DIAGNOSIS_REQUIRED, see its failureReason and resolve manually before re-attempting"
       fi
       [[ -f "${quiesce}" ]] || fail "M11 is applied but quiesce.json is missing for ${ALPHA_SHA} — RECOVERY_DIAGNOSIS_REQUIRED"
       [[ -f "${m11_marker}" ]] || fail "M11 is applied but the M11 entry marker is missing for ${ALPHA_SHA} — RECOVERY_DIAGNOSIS_REQUIRED"
@@ -213,7 +208,15 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       # restored. finished_at is a hard lower bound: it cannot predate the
       # entry marker written immediately before THIS run's `migrate deploy`.
       entered_at="$(jq -er '.enteredAt' "${m11_marker}")" || fail "M11 entry marker is missing enteredAt — RECOVERY_DIAGNOSIS_REQUIRED"
-      m11_finished_after_entry="$(dbq "SELECT (finished_at >= '${entered_at}'::timestamptz)::text FROM \"_prisma_migrations\" WHERE migration_name = '${TASK168_M11}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL")"
+      # No `::text` cast: psql -At renders an uncast boolean via bool_out
+      # ('t'/'f'), but explicitly casting a boolean expression to text invokes
+      # a different function that spells out 'true'/'false' — confirmed
+      # against a real postgres:16-alpine (`SELECT (now()>=now())::text` ->
+      # "true", `SELECT (now()>=now())` -> "t"). The `::text` form here made
+      # this comparison to the literal `t` always fail, so R-A could never
+      # succeed against a real database; only the fake-docker unit test
+      # (which stubs this query directly) hid it.
+      m11_finished_after_entry="$(dbq "SELECT finished_at >= '${entered_at}'::timestamptz FROM \"_prisma_migrations\" WHERE migration_name = '${TASK168_M11}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL")"
       [[ "${m11_finished_after_entry}" == t ]] || fail "M11's finished_at predates this release's M11 entry marker — RECOVERY_DIAGNOSIS_REQUIRED (the applied M11 row may belong to a different release's run)"
 
       backup_path="$(jq -er '.backupPath' "${quiesce}")" || fail "quiesce.json is missing backupPath"
@@ -237,6 +240,31 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       marker_backup_sha="$(jq -er '.preM11BackupSha256' "${m11_marker}")" || fail "M11 entry marker is missing preM11BackupSha256"
       [[ "${marker_quiesce_sha}" == "${quiesce_sha}" ]] || fail "M11 entry marker's quiesce receipt hash does not match the current quiesce.json — RECOVERY_DIAGNOSIS_REQUIRED"
       [[ "${marker_backup_sha}" == "${backup_sha_actual}" ]] || fail "M11 entry marker's backup hash does not match the current pre-M11 backup — RECOVERY_DIAGNOSIS_REQUIRED"
+      # The quiesce/backup hash cross-check above is self-referential to this
+      # release's own state directory; it does not by itself prove the
+      # marker was written by a run FOR this ALPHA_SHA against THIS manifest
+      # (a copy-pasted or hand-edited marker would still pass it). Bind both
+      # directly.
+      marker_release_sha="$(jq -er '.releaseSha' "${m11_marker}")" || fail "M11 entry marker is missing releaseSha"
+      [[ "${marker_release_sha}" == "${ALPHA_SHA}" ]] || fail "M11 entry marker's releaseSha does not match ${ALPHA_SHA} — RECOVERY_DIAGNOSIS_REQUIRED"
+      marker_manifest_sha="$(jq -er '.manifestSha256' "${m11_marker}")" || fail "M11 entry marker is missing manifestSha256"
+      [[ "${marker_manifest_sha}" == "${manifest_sha}" ]] || fail "M11 entry marker's manifestSha256 does not match quiesce.json's manifestSha256 — RECOVERY_DIAGNOSIS_REQUIRED"
+
+      # The quiesced writers must still be exactly as the runner left them.
+      # If either has been restarted (a compose up outside the deploy lock,
+      # or a daemon/host restart before the runner's own D-6 `restart=no`
+      # took effect) it may already have written to the post-M11 database —
+      # something none of the ledger/catalog checks here would catch, since
+      # they only prove M11's own DDL landed, not that nothing wrote through
+      # a revived writer afterward.
+      pre_api_id="$(jq -er '.preApiContainerId' "${quiesce}")" || fail "quiesce.json is missing preApiContainerId"
+      pre_worker_id="$(jq -er '.preWorkerContainerId' "${quiesce}")" || fail "quiesce.json is missing preWorkerContainerId"
+      docker inspect "${pre_api_id}" >/dev/null 2>&1 || fail "the quiesced API container (${pre_api_id}) no longer exists — RECOVERY_DIAGNOSIS_REQUIRED"
+      docker inspect "${pre_worker_id}" >/dev/null 2>&1 || fail "the quiesced worker container (${pre_worker_id}) no longer exists — RECOVERY_DIAGNOSIS_REQUIRED"
+      [[ "$(docker inspect --format '{{.State.Running}}' "${pre_api_id}")" == false ]] || fail "the quiesced API container is running — RECOVERY_DIAGNOSIS_REQUIRED (it may have written to the post-M11 database)"
+      [[ "$(docker inspect --format '{{.State.Running}}' "${pre_worker_id}")" == false ]] || fail "the quiesced worker container is running — RECOVERY_DIAGNOSIS_REQUIRED (it may have written to the post-M11 database)"
+      [[ "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "${pre_api_id}")" == no ]] || fail "the quiesced API container's restart policy is not 'no' — RECOVERY_DIAGNOSIS_REQUIRED"
+      [[ "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "${pre_worker_id}")" == no ]] || fail "the quiesced worker container's restart policy is not 'no' — RECOVERY_DIAGNOSIS_REQUIRED"
 
       # Same post-M11 catalog checks the runner itself performs
       # (deploy/task168-stage-b-migrate.sh, r1-6 fix) — enough to prove M11's
@@ -278,34 +306,16 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       processing_outbox="$(dbq "SELECT count(*) FROM v1_outbox_events WHERE status::text='PROCESSING'")"
       [[ "${processing_outbox}" == 0 ]] || fail "M11 ledger row exists but processing outbox rows remain — RECOVERY_DIAGNOSIS_REQUIRED"
 
-      # Preserve a stale diagnosis under a distinct path before writing the
-      # recovered receipt to the canonical one — alpha-release-common.sh and
-      # task168-stage-b-post-live-verify.sh both read migration-stage.json,
-      # so the corrected status must land there, never be silently dropped.
-      # `mv -n` + an existence check, not a plain `mv`, so a second recovery
-      # attempt cannot silently clobber an earlier .superseded.json.
-      if [[ -n "${existing_receipt_status}" ]]; then
-        mv -n "${migration_receipt}" "${migration_receipt}.superseded.json"
-        [[ -e "${migration_receipt}" ]] && fail "a .superseded.json for ${ALPHA_SHA} already exists — refusing to overwrite an earlier superseded receipt"
-      fi
-
-      # `select(length>0)` inside a jq object-construction value is a
-      # generator: when $supersededStatus is empty (the ordinary R-A case
-      # with no stale diagnosis to supersede), it produces ZERO outputs, and
-      # jq's object construction with a zero-output value filter produces
-      # ZERO objects for the whole `jq -n` call — not `null`, no error, exit
-      # 0, and an EMPTY receipt file (confirmed by running the exact filter
-      # standalone). Every ordinary R-A recovery
-      # was silently writing a 0-byte migration-stage.json. Fixed with an
-      # if/then/else that always produces exactly one value, and by routing
-      # through write_json_atomic so a mistake like this fails the receipt's
-      # own schema check instead of writing an empty file.
+      # No existing-receipt case reaches here (fails closed above), so this
+      # `jq -n` always produces exactly one object — the prior 0-byte-receipt
+      # bug from a zero-output `select(length>0)` generator inside object
+      # construction cannot recur, since there is no longer a
+      # conditionally-empty argument here at all.
       jq -n \
         --arg sha "${ALPHA_SHA}" --arg apiImage "${api_image}" --arg dbId "${db_identity_actual}" \
         --arg schemaSha "${TASK168_FINAL_SCHEMA_SHA256}" --arg manifestSha "${manifest_sha}" \
         --arg m11 "${TASK168_M11}" --arg m11sha "${TASK168_M11_SHA256}" \
         --arg quiesceSha "${quiesce_sha}" --arg backupSha "${backup_sha_actual}" \
-        --arg supersededStatus "${existing_receipt_status}" \
         --argjson legacyTables "${legacy_tables}" --argjson legacyLinkColumns "${legacy_link_columns}" \
         --argjson retirementTriggers "${retirement_triggers}" --argjson retirementFunctions "${retirement_functions}" \
         --argjson lineageTrigger "${lineage_trigger}" --argjson retiredEnums "${retired_enums}" \
@@ -314,15 +324,11 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
           releaseSha:$sha,apiImage:$apiImage,databaseIdentity:$dbId,schemaSha256:$schemaSha,manifestSha256:$manifestSha,
           m11:$m11,m11Sha256:$m11sha,
           postVerification:{legacyTables:$legacyTables,legacyLinkColumns:$legacyLinkColumns,retirementTriggers:$retirementTriggers,retirementFunctions:$retirementFunctions,lineageTrigger:$lineageTrigger,retiredEnums:$retiredEnums,processingOutbox:$processingOutbox},
-          recoveredFrom:{quiesceReceiptSha256:$quiesceSha,ledgerM11Row:"applied",catalogResult:{legacyTables:$legacyTables,legacyLinkColumns:$legacyLinkColumns,retirementTriggers:$retirementTriggers,retirementFunctions:$retirementFunctions},supersededDiagnosisStatus:(if ($supersededStatus|length)>0 then $supersededStatus else null end)},
+          recoveredFrom:{quiesceReceiptSha256:$quiesceSha,ledgerM11Row:"applied",catalogResult:{legacyTables:$legacyTables,legacyLinkColumns:$legacyLinkColumns,retirementTriggers:$retirementTriggers,retirementFunctions:$retirementFunctions}},
           preM11BackupSha256:$backupSha,completedAt:(now|todate)}' \
       | write_json_atomic "${migration_receipt}" \
           '.status=="MIGRATION_COMMITTED_RECOVERED" and .kind=="task168StageBMigration" and .stage=="stageBFinal" and (.releaseSha|strings|test("^[0-9a-f]{40}$")) and .m11Sha256=="'"${TASK168_M11_SHA256}"'" and (.preM11BackupSha256|strings|test("^[0-9a-f]{64}$")) and .postVerification.legacyTables==0 and .postVerification.retiredEnums==0 and .postVerification.processingOutbox==0'
-      if [[ -n "${existing_receipt_status}" ]]; then
-        echo "[deploy-alpha-stage-b] R-A: superseded a stale ${existing_receipt_status} receipt (see ${migration_receipt}.superseded.json) and reconstructed MIGRATION_COMMITTED_RECOVERED for ${ALPHA_SHA}; writer remains stopped"
-      else
-        echo "[deploy-alpha-stage-b] R-A: reconstructed MIGRATION_COMMITTED_RECOVERED receipt for ${ALPHA_SHA}; writer remains stopped"
-      fi
+      echo "[deploy-alpha-stage-b] R-A: reconstructed MIGRATION_COMMITTED_RECOVERED receipt for ${ALPHA_SHA}; writer remains stopped"
       exit 0
       ;;
     *)

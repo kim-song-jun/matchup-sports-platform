@@ -56,27 +56,37 @@ setup_recover_fixture() {
 # so both share one contract instead of drifting independently. databaseIdentity
 # and apiImage are "" to match the fake docker/psql default case (no case arm
 # matches these queries, so they fall through to `exit 0` with empty stdout).
+# preApiContainerId/preWorkerContainerId + the marker's releaseSha/manifestSha256
+# match ${SHA}/quiesce.json's manifestSha256 by construction, matching R-A's
+# release-binding checks.
 make_r_a_fixture() {
   local state_dir="$1" backup_path="$2" backup_sha="$3"
   jq -n --arg path "${backup_path}" --arg sha "${backup_sha}" \
     '{schemaVersion:1,kind:"quiesce",status:"COMPLETED",backupPath:$path,backupSha256:$sha,
-      manifestSha256:("n"*64),databaseIdentity:"",apiImage:""}' \
+      manifestSha256:("n"*64),databaseIdentity:"",apiImage:"",
+      preApiContainerId:"raApi1",preWorkerContainerId:"raWorker1"}' \
     > "${state_dir}/quiesce.json"
   local quiesce_sha; quiesce_sha="$(sha256sum "${state_dir}/quiesce.json" | awk '{print $1}')"
   # enteredAt is in the past so the fake DB's "finished_at >= enteredAt"
   # binding check (a real Postgres comparison in production; here answered
   # by a fixed 't'/'f' case arm, see make_fake_docker_for_recover) is
   # exercised with a plausible value, not used to derive the fake answer.
-  jq -n --arg quiesceSha "${quiesce_sha}" --arg backupSha "${backup_sha}" \
-    '{schemaVersion:1,kind:"task168StageBM11EntryMarker",quiesceReceiptSha256:$quiesceSha,preM11BackupSha256:$backupSha,runnerContainerId:"runner123",enteredAt:"2026-09-14T00:00:00Z"}' \
+  jq -n --arg sha "${SHA}" --arg quiesceSha "${quiesce_sha}" --arg backupSha "${backup_sha}" \
+    '{schemaVersion:1,kind:"task168StageBM11EntryMarker",releaseSha:$sha,manifestSha256:("n"*64),quiesceReceiptSha256:$quiesceSha,preM11BackupSha256:$backupSha,runnerContainerId:"runner123",enteredAt:"2026-09-14T00:00:00Z"}' \
     > "${state_dir}/m11-entry-marker.json"
 }
 
 # $2 = m11 row the fake DB reports ("" = absent, "sha|applied", "sha|unresolved")
 # $3 = advisory lock count, $4 = labeled container count, $5 = legacy table
-# count, $6 = "t"/"f" for the finished_at>=enteredAt binding check (default t)
+# count, $6 = "t"/"f" for the finished_at>=enteredAt binding check (default t),
+# $7 = quiesced-writer .State.Running for raApi1/raWorker1 (default false —
+# R-A's own scenarios; R-B's positive/mismatch scenarios use api123/worker123
+# and need true, handled by their own arms below regardless of this default),
+# $8 = quiesced-writer .HostConfig.RestartPolicy.Name for raApi1/raWorker1
+# (default no)
 make_fake_docker_for_recover() {
-  local bin="$1" m11="$2" advisory="${3:-0}" labeled="${4:-0}" legacy="${5:-0}" binding="${6:-t}"
+  local bin="$1" m11="$2" advisory="${3:-0}" labeled="${4:-0}" legacy="${5:-0}" binding="${6:-t}" \
+    ra_running="${7:-false}" ra_restart="${8:-no}"
   cat > "${bin}/docker" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "docker \$*" >> "${log}"
@@ -110,6 +120,10 @@ case "\$*" in
   *"pg_proc"*) echo 0; exit 0 ;;
   *"pg_trigger"*) echo 0; exit 0 ;;
   *"pg_type"*) echo 0; exit 0 ;;
+  # R-A's own quiesced-writer re-check (raApi1/raWorker1, make_r_a_fixture)
+  # must be matched before the R-B generic arms below.
+  *"inspect --format {{.State.Running}} raApi1"*|*"inspect --format {{.State.Running}} raWorker1"*) echo "${ra_running}"; exit 0 ;;
+  *"inspect --format {{.HostConfig.RestartPolicy.Name}} raApi1"*|*"inspect --format {{.HostConfig.RestartPolicy.Name}} raWorker1"*) echo "${ra_restart}"; exit 0 ;;
   *"inspect"*"State.Running"*) echo true; exit 0 ;;
   *"update --restart"*) exit 0 ;;
   # R-B re-reads the policy after the update call rather than trusting its
@@ -251,6 +265,60 @@ rc="$(run_recover "${root}")"
   && pass "R-A reconstructs a MIGRATION_COMMITTED_RECOVERED receipt, distinct from the original status" \
   || fail "R-A did not reconstruct correctly: rc=${rc} $(cat "${root}/stdout") $(cat "${root}/stderr")"
 
+# ── R-A negative: a MIGRATION_DIAGNOSIS_REQUIRED receipt already exists ────
+# The runner (task168-stage-b-migrate.sh cleanup_pre_quiesce) writes a real
+# diagnosis receipt for every after-M11 failure except a genuine deferred
+# signal on an already-committed M11 (which gets no receipt at all -- the
+# scenario the positive R-A test above covers). So an existing receipt here
+# is never a stale placeholder; superseding it would silently convert a real
+# verification failure into a false MIGRATION_COMMITTED_RECOVERED.
+root="${WORK}/r-a-existing-diagnosis"; mkdir -p "${root}"
+setup_recover_fixture "${root}"
+printf 'fake backup bytes' > "${state_dir}/pre-m11-backup.sql"
+backup_sha="$(sha256sum "${state_dir}/pre-m11-backup.sql" | awk '{print $1}')"
+make_r_a_fixture "${state_dir}" "${state_dir}/pre-m11-backup.sql" "${backup_sha}"
+jq -n '{schemaVersion:1,kind:"task168StageBMigration",status:"MIGRATION_DIAGNOSIS_REQUIRED",failureReason:"post-M11 Prisma migration status has drift"}' \
+  > "${state_dir}/migration-stage.json"
+make_fake_docker_for_recover "${bin}" "08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323|applied"
+rc="$(run_recover "${root}")"
+[[ "${rc}" -ne 0 ]] && grep -q "already reports MIGRATION_DIAGNOSIS_REQUIRED" "${root}/stderr" \
+  && [[ "$(jq -r .status "${state_dir}/migration-stage.json")" == MIGRATION_DIAGNOSIS_REQUIRED ]] \
+  && [[ ! -f "${state_dir}/migration-stage.json.superseded.json" ]] \
+  && pass "R-A refuses to supersede an existing MIGRATION_DIAGNOSIS_REQUIRED receipt" \
+  || fail "R-A superseded an existing diagnosis receipt: rc=${rc} $(cat "${root}/stderr")"
+
+# ── R-A negative: the M11 entry marker's releaseSha belongs to a different
+# release than ALPHA_SHA -- refuse rather than certify someone else's run ──
+root="${WORK}/r-a-marker-release-mismatch"; mkdir -p "${root}"
+setup_recover_fixture "${root}"
+printf 'fake backup bytes' > "${state_dir}/pre-m11-backup.sql"
+backup_sha="$(sha256sum "${state_dir}/pre-m11-backup.sql" | awk '{print $1}')"
+make_r_a_fixture "${state_dir}" "${state_dir}/pre-m11-backup.sql" "${backup_sha}"
+jq '.releaseSha = "2222222222222222222222222222222222222222"' \
+  "${state_dir}/m11-entry-marker.json" > "${state_dir}/m11-entry-marker.json.tmp" \
+  && mv "${state_dir}/m11-entry-marker.json.tmp" "${state_dir}/m11-entry-marker.json"
+make_fake_docker_for_recover "${bin}" "08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323|applied"
+rc="$(run_recover "${root}")"
+[[ "${rc}" -ne 0 ]] && [[ ! -f "${state_dir}/migration-stage.json" ]] \
+  && grep -q "releaseSha does not match" "${root}/stderr" \
+  && pass "R-A refuses when the M11 entry marker's releaseSha does not match ALPHA_SHA" \
+  || fail "R-A did not enforce the marker releaseSha binding: rc=${rc} $(cat "${root}/stderr")"
+
+# ── R-A negative: the quiesced API writer is running again (revived by a
+# compose up or daemon restart) -- it may have already written to the
+# post-M11 database, so refuse rather than certify recovery blind to that ──
+root="${WORK}/r-a-writer-revived"; mkdir -p "${root}"
+setup_recover_fixture "${root}"
+printf 'fake backup bytes' > "${state_dir}/pre-m11-backup.sql"
+backup_sha="$(sha256sum "${state_dir}/pre-m11-backup.sql" | awk '{print $1}')"
+make_r_a_fixture "${state_dir}" "${state_dir}/pre-m11-backup.sql" "${backup_sha}"
+make_fake_docker_for_recover "${bin}" "08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323|applied" 0 0 0 t true
+rc="$(run_recover "${root}")"
+[[ "${rc}" -ne 0 ]] && [[ ! -f "${state_dir}/migration-stage.json" ]] \
+  && grep -q "quiesced API container is running" "${root}/stderr" \
+  && pass "R-A refuses when the quiesced API writer is running again" \
+  || fail "R-A did not re-check the quiesced writer's running state: rc=${rc} $(cat "${root}/stderr")"
+
 # ── R-A negative: M11 row says applied, but legacy tables are STILL present
 # (schema/ledger disagree) -> must refuse, never fabricate a receipt.
 root="${WORK}/r-a-negative"; mkdir -p "${root}"
@@ -324,7 +392,10 @@ case "\$*" in
   *"pg_proc"*) echo 0; exit 0 ;;
   *"pg_trigger"*) echo 0; exit 0 ;;
   *"pg_type"*) echo 0; exit 0 ;;
-  *"inspect"*"State.Running"*) echo true; exit 0 ;;
+  # Quiesced writers (raApi1/raWorker1, make_r_a_fixture) still correctly
+  # stopped -- this scenario deliberately breaks the lineage trigger only.
+  *"inspect"*"State.Running"*) echo false; exit 0 ;;
+  *"HostConfig.RestartPolicy.Name"*) echo no; exit 0 ;;
   *) exit 0 ;;
 esac
 EOF

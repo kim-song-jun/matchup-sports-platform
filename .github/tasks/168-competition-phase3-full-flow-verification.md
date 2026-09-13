@@ -1,8 +1,52 @@
 # Task 168 — 모든 경기의 팀 매치 통일과 실제 사용자 E2E
 
-## 최신 판정 — Alpha 복구 완료, UI PR 검증 및 공개 경기 상세 오류 수정 중
+## 최신 판정 — Alpha 45104 UI 검수 완료 범위 확인, 가입 흐름 보완 및 최종 이관 준비 중
 
 ### 재개 커서 — 2026-09-13 AWS 재인증 이후
+
+- **2026-09-14 GitHub CI PASS 및 마지막 UX delta:** a0f90deb의 CI34767313327 API/Web/Gates가 모두 SUCCESS로 끝났다. Copilot background auth refetch 지적을 반영한 source7e99451d/testa1f1fb3c는 단일 worker31테스트 PASS(`teams-client-isolated-vitest-20260914-auth-background-final.log`, SHAe2af7d1d). 현재 세션이 정상인 캐시 운영자의 메뉴·CTA·보호 query를 background 갱신 동안 유지하며 초기확인/401/오류 경계는 그대로 검증한다. 이 마지막 delta의 독립 리뷰 후 같은 PR 후속 head CI/Copilot로 검증하며 이전 green head를 먼저 머지하지 않는다. 로컬 CI watch PID63658은 출력 누적을 줄이기 위해 명시 TERM했고 종료143을 확인했다. 원격 CI를 취소한 것은 아니다.
+
+- **2026-09-14 #1187 Copilot UI 회귀 보완:** a0f90deb의 Copilot5191296500은5/5파일 검토 후 `isFetching`만으로 정상 캐시 세션까지 잠가60초 이후 background refetch 때 운영 UI가 사라질 수 있다고 지적했다. source7e99451d는 초기 pending 또는 사용자 캐시가 없는 fetching만 잠그며, 현재401/오류의 권한 차단은 유지한다. Luna가 정상 캐시 운영자의 background refetch 화면 유지 회귀를 추가하고 Sol이 좁은 delta를 검토한다. a0f90 CI34767313327은 진행 중이지만 후속 수정 전 head를 머지하지 않는다.
+
+- **2026-09-14 공개 기록 연결의 실제 클릭 보완:** 첫 검수의 최종결과→대진표 진입은 직접 goto였으므로 연속 클릭 증거로 세지 않았다. Sol이 시작 URL 이후 `대회 상세 보기`→`최종 순위 보기`→`리그 순위`→`마포 레인저스`를 실제 컨트롤로 눌러 팀 전적16경기에 도착했고390 overflow0·관측 오류0을 확인했다. after-7efd의 ui-chain-detail/standings/team-records 스크린샷과 기존 영수증에 정정·증거를 추가했다.
+
+- **2026-09-14 #1187 최종 후보 독립 PASS:** source1fad003d/test17a3e598/loga74063cf를 root와 Sol이 확인했다. 실제 TeamDetailPageView 클릭을 포함한30테스트 PASS(단일 worker, `teams-client-isolated-vitest-20260914-auth-boundaries-final3.log`). 인증 pending/401/cached owner, retry 결과401/500, 콜드 쿠키, private member 비노출, public member/모집 경기 보존, 보호 upcoming-games 차단/허용을 검증한다. 이전29/30 실패는 공개 모집 query를 보호 query로 오인한 잘못된 테스트였고 실제 `useV1TeamUpcomingGames` 부정/긍정 검증으로 교정했다. Sol은 최신 dev7efd의 #1188 seed 보존도 확인했다. 이 후보를 #1187에 반영하여 현재 head CI/Copilot 후 dev 통합·Alpha Ego를 진행한다. M11 candidate는 PR에 포함하지 않는다.
+
+- **2026-09-14 후보 리뷰 후 보완 범위:** #1187의 세션 만료 경계를 CTA에만 적용하면 자동 채팅 mutation·컨택 조회·내 팀 전용 경기 카드·관리 메뉴·캐시된 비공개 멤버가 남는다는 Sol 반례를 반영했다. root source1fad003d는 해당 소비처 전체와 retry 정책을 보완했고 Sol source 검토에서 추가 blocker가 없었다. Luna는 retry401/500 및 비공개 운영자 회귀를 포함한 좁은 테스트를 보강 중이며 아직 PR/CI에 올리지 않았다. 별도 source archive packager8abdbfc7는 host별 tar metadata 차이, 출력 충돌/부분 생성, 선택적인 reviewed schema/M11 검증으로 Sol BLOCK되어 후보만 보완 중이다. 기존 합성 테스트5개 PASS는 실제 최종 이관 준비 완료가 아니다.
+
+- **2026-09-14 Alpha7efd 실제 공개 기록 동선 PASS:** Sol Ego36에서 `x-teameet-commit=7efd1322`를 확인했다. 정규리그 최종 순위 5팀의 승수/득점/득실차 API·UI 일치, bracket 리그 순위→마포 팀 전적16경기→8/12 공식 경기4:2·득점6건·정정 이력→김민준 프로필→개인 기록7건/16골/시상 및 같은 경기2골 동선을 실제 클릭으로 확인했다. 정규리그 최종결과와 팀 목록은390/768/1440, 이어지는 기록 동선은390에서 overflow0·관측 API/console/runtime 오류0이다. 팀 목록50개/가입가능49개와 로딩 문구 사라짐은 settled UI PASS이며 첫 프레임 성능/SSR 원문 PASS는 아니다. 최종결과 표 자체는 팀 링크가 없어 대진표 리그 순위 탭을 경유했다. 근거 `output/ego/task168-ui-pr1184-20260913/after-7efd/alpha-flow-receipt.md` 및 같은 디렉터리 스크린샷. 과거2026-09-12의41/42를 최신7efd전체42 검증 결과로 재사용하지 않는다. Ego36은 #1187 배포 후 비교를 위해 유지하며 실행 단발 프로세스는 모두 종료했다.
+
+- **2026-09-14 독립 리뷰와 실화면 검수 재개:** 게스트 가입 후보3de38735/ae3b888f는 Sol BLOCK이다. authMe 비401 오류의 로그인 오판 및 cached data+최신401의 보호 query 활성화 반례를 보완하도록 Luna에 재배정했다. 기존20테스트 PASS 주장은 이 경계를 검증하지 않으므로 머지 근거로 사용하지 않는다. StageB 직렬화 후보ed7cfd33은 Sol이 실제 parser·SQL·3단계 hash 비교·분류 게이트를 독립 검토하고 7개 검사/bash 문법을 재실행하여 좁은 PASS했다. Ego36은 agent 소유로 정상 재개했으며 최신7efd 헤더와 정규리그 5팀 최종 순위의 실제 전적(예: 마포3승/7득점/+2), 390/768/1440 overflow0을 Sol이 관찰했다. 공개 순위→팀 전적→개인 기록 동선의 나머지 판정은 진행 중이다.
+
+- **2026-09-14 최종 이관 후보 실제 이력 직렬화 수정:** root가 producer3da의 literal `\\n` 행 구분과 SQL 탭 원시행/pipe 비교 불일치를 발견했다. 실제 보존 이력4행으로 이전 SHA77892986이 runner 정본0e099599와 다르고 비교도 실패함을 관찰했다. 후보ed7cfd33은 실제 parser→공통 pipe serializer로 실행 전·중간·후 비교를 통일했으며, 캡처한 실제 이력과 순서변경·변조·누락·중복·빈상태 총7검사 및 bash 문법 검사 PASS다. 근거 `final-retirement-candidate-20260913/resolved-serialization-result-20260914.json`. DB/Docker/M11 실행은 없다. 별도 `source-archive-binding-contract.json`은 외부 sidecar로 source archive 자기해시 순환을 피하고, 불변 StageA 영수증을 보존한 채 새 post-StageA 백업의 출처를 별도 인증하도록 요구한다. 해당 upstream 구현·실제 리허설은 여전히 미완이다.
+
+- **2026-09-14 main 중복 PR 정리 완료:** Sol이 exact dev7efd의 원본 통합 커밋과 실제 동작을 대조했다. #1070은 #1056/#1059/#1066, #1069는 #1055, #585는 #583 및 후속 일반 팀원 후기 목적지 개선에 포함되어 root가 이유를 남기고 세 PR을 닫았다. 브랜치는 삭제하지 않았다. #735 통합 승격 PR은 유지하고 오래된 전체 검증 완료 본문을 현재 미완 상태로 갱신했다. GitHub 판정은 CONFLICTING/DIRTY이므로 충돌 해소와 최종 검증이 남는다. main 머지·프로덕션 승격은 실행하지 않았다. 열린 dev #1187은 계속 수정 중이다.
+
+- **2026-09-14 인수인계 입구 및 PR 통합 정리:** 사용자 요청으로 루트 `readme_codex.md`에 문서 읽기 순서, 현재 상태, 근거 경로, 다음 세션 지시를 작성했다. 상세 정본은 계속 이 문서다. 원격 dev는 #1188 팀 목록 초기 데이터·#1189 리그 통합 순위·#1190 전적 컬럼 수정이 포함된 `7efd1322f03e7773df84d5b2729d35f1b89a9b08`; CI34763630297/Alpha34763630295 성공을 조회했다. 새 배포의 Ego 재검증은 아직 하지 않았다. 보안 workflow34763633312는 CAPI400 모델 미지원 실패로 별도 기록한다. main 대상 #1070/#1069/#585는 Sol이 dev 포함 여부를 조사하고 #735 통합 승격 PR은 유지한다. main 승격은 실행하지 않는다. #1187은 실패 head ec8 그대로 머지하지 않고 Luna가 최신 dev의 팀 초기 데이터 변경까지 보존해 후보를 보완한다. 재개 시 root만 확인되어 이전 에이전트 실행 주장을 폐기하고 새 담당을 배정했다.
+
+- **PR1187 추가 실제 검증 결함 수정 중:** ec8 CI34756546801은 typecheck후unit에서guest CTA router 호출0으로실패했다. PageView는Promise.then에서action을실행하므로실제비동기결과를기다려야한다. 별도로root가cold cookie+localhint없음+authcache없음의실제권한축소를발견해cached-only authMe를실제session probe/verified auth gating으로교체한다. Auth pending/비401실패/retry/401guest·로그인동선의성공메시지·member/pending action우선순위까지같은client/test에서보완하며좁은suite를실행한뒤새CI를올린다. 기존ec8은머지대상이아니다.
+
+- **StageB producer Sol 구현 후 아직 실행금지:** producer3da96291/contract575ee11e/harnessa19d82f2로동결했다. 실제source/input파일hash,StageAbackupreceipt/format/DB/provenance,출력경로충돌·리소스소유라벨·실패diagnostic·atomicreceipt를보강했다. Docker/DB/SSM실행없음. upstream INPUT-MANIFEST의정확한sourceArchive.sha256바인딩과과거backupFormat누락을보완하는진짜artifactproducer가여전히필요하다. GitHubCI/Alpha runtimeimage및postlivewiring도미완. `final-image-wiring-plan.json`5f376576은읽기전용계획이며배포완료증거가아니다.
+
+- **PR1187 CI 실패 수정:** 최초c07 CI34756336154 Web typecheck는 auth mock의data가undefined로만추론되어TS2322 세건으로실패했다. 테스트를실제V1AuthMe 타입·필수user/profile필드로수정했으며any/cast/suppression없음. root가실제타입선언과diff대조PASS, 후속head `ec8d1b4f4c39c26a01f3c76611d557ea012b024c`를같은PR에push했다. 제품source5105는그대로이고새CI전머지하지않는다.
+
+- **PR1187 게스트 가입 흐름 CI 중:** head `c07cfb4bd37e320b5361c697ae88f3675eee5056`, base dev. CI34756336154/Copilot34756338831 진행 중. 팀client·실제CTA회귀test·Changeset·Task168만4경로, 공유HEAD/index불변. Alpha45104의공개/주요멤버검수PASS는유효하지만새게스트가입delta는CI/배포/Ego후확인전미완이다.
+
+- **StageB 실제 resolved 이력 보존 후보:** 최종core현재 preparerf3b45a42/runner9827c2f3/common2b62e9ff/creator57bda147. Active ledger는rolled_back_at NULL의정상행만전체source와대조하고 미해결/불가능상태는거절한다. 과거resolved4행은정렬된원시snapshot SHA `0e0995997b2998c6d87e4bcf841619fa69b0307dd497d13bf2ecbdccad668760`로입력·receipt·manifest·실행전후를바인딩한다. Luna producera01c9f52 및contract9b4af1de는actualcreatorharness/actual171-row반례검증PASS, Sol이실제실행의미와cleanup을독립검토중이다. 이증거는Docker/DB실행이나M11완료가아니다. 배포wiring·최종이미지·실제격리리허설·postlive promotion은미완이다.
+
+- **게스트 가입 후속 source PASS / 팀 선택 실제 계약:** guest join candidate teams-client5105c2b/test3d14b16은 Sol PASS. 실제PageView는 login action이 있으면 활성화되며 기존redirect helper로팀복귀를보존한다. guesteligibility query미실행·실제CTA클릭/router 및eligible/denied/error 테스트 후보를GitHubCI로검증한다. Ego45104의팀장wizard는 저장된유효팀 또는첫생성가능팀을자동선택하므로UI에서eligible+unselected상태를만들수없었다. 이를실행실패로세거나storage를강제조작하지않는다. 기존A팀선택유지·경기생성0. 새final screenshot `after-45104/team-basic-members-frame-390.png`, `...-1440.png` 확보.
+
+- **실제 전체 ledger로 후보 게이트 수정:** 읽기전용 SSM `e5523adf-c607-4ec0-b5f3-e38c78972cb9` Success/0, `full-ledger-readonly-20260913/result-r2.json`의gzip+base64를 완전복원했다. 원시171행은167개 정상 적용+과거 명시적 rolled_back 시도4행이며 각4건은 후속 정상 적용 행을 갖는다. 최초r1은SSM24000byte출력제한으로 잘려 판단근거로 사용하지 않는다. 과거 resolved 시도를 현재 실패/중복적용으로 오판하지 않는다. 현재active applied167개의 source hash 일치 및 resolved역사4행을 별도바인딩해 보존하도록 Sol/Luna 게이트를 수정한다. DBledger삭제/resolve/rollback은 실행하지 않는다. Prisma 공식 hotfix 문서의 rolled-back 후 redeploy 계약과 실제Alpha이력을 함께 근거로 삼는다.
+
+- **45104 Ego 완료 범위:** desktop/tablet/mobile headings20/104/200 좌표정렬·24px gap·overflow0, 공개2경기200/UI, guest auth/me client-error0 확인. 팀장 기존자격증명1회성공, own controls/profilelinks 및 멤버비공개 owner/guest 동작PASS·원래true로복원확인. `after-45104/narrow-verdict.json`에근거. 별도잔여: publicteamguest join-eligibility401→가입불가deadend 확인, 원인은공개seed query.data만으로protectedqueryenabled. 이가입흐름을로그인안내로보완중. 무소속credential 및42전체는미완.
+
+- **45104 최종 UI Delta Alpha health 완료:** CI34755056998/Alpha34755056997 SUCCESS. SSM `062f172d-b525-4b36-a268-4f124c700240` Success/0, `alpha-45104d5d-readback-result-20260913-r1.json` release45104/migration72405a·16/16 true. Sol Ego36에서 새 `after-45104`에 heading/guesttelemetry 및 공개2경기 AFTER를 재검수한다. 관리자/무소속401을 팀장까지 일반화하지 않고 이전에 성공한 정확한 팀장 자격증명은1회 재시도 가능하다. 비공개 변경 검증 시 원값복원 필수. 아직 해당 AFTER PASS나42개 완료 주장은 하지 않는다.
+
+- **최종 이관 핵심 계약 강화 / 모델 승격:** Sol이 전체 migration bundle을 Prisma에 제공하면서 Task168의10개 ledger만 검사하는 결함을 발견했다. 실제 적용 전 전체 source history와 DB ledger의 이름·checksum·성공상태·중복/추가/누락을 대조해 M11만 유일한 미적용임을 증명해야 한다. 반복되는 고위험 계약 수정 때문에 Sol이 candidate creator/common/preparer/runner4개 구현을 담당하고 Luna는 isolated rehearsal producer를 담당한다. `fullMigrationHistory:[{name,sha256}]` 및 raw pre/post full ledger 증거를 공통 계약으로 고정한다. 이전 후보들의 bash-n/부분fixture PASS는 실행 준비 완료가 아니다. 실제Alpha/DB/M11 실행은 여전히 하지 않았다.
+
+- **PR1186 dev 머지 / 최종 UI Delta 배포 중:** exact headb5866bed의 CI34754706562 API/Web/Gates SUCCESS 및 Copilot 6/6·새지적0 승인권고를 확인하여 dev `45104d5d85f476d59e987fe7178960ce2bc86275`로 머지했다. matching CI34755056998/Alpha34755056997 실행 중이다. 새 readback은 migrationSHA72405a를 보존해45104d5d와 바인딩한다. Ego36은 새healthy 신호 후 desktopheading·guesttelemetry 재검수용으로 유지한다. 아직45104 AFTER PASS가 아니다.
+
+- **후속 PR1186 실행 중:** head `b5866bedeea10d33c6a147d188e9646dcafc209d`, base dev, 6개 명시 경로만 커밋. CI34754706562 및 자동 Copilot34754711340 진행 중. 수동 reviewer 로그인 `Copilot` 추가는 GitHub가 로그인명을 해석하지 못했지만 자동 Copilot 실행이 이미 생성되어 중복 요청하지 않는다. StageB runner는 Luna가 보고 뒤 수정했음을 확인했으며 실제 동결 SHA는 `353f4a0a54d64ea48d6a84a0c98d16058885b240fb40ade4431ce863e196cc7d`다. 이전a925 보고를 최종 후보 근거로 사용하지 않는다.
 
 - **b42 AFTER 잔여 두 건 후속 PR 준비:** Sol source PASS: CSS `c19702f6`의1024px 이상 desktop-main 직계 SectionTitle padding0으로 visible label을x200에 통일한다. API client `e51c8f2f`는 정확히 GET `/auth/me`+401+UNAUTHENTICATED만 client-error 수집에서 제외하고 원오류throw는 유지한다. 테스트 `2135af3e`는 실제v1Get 게스트 예외/다른route401 기록을 검증한다. GitHub CI 및 새Alpha AFTER 전에는 최종 완료로 세지 않는다.
 

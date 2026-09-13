@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useV1ApproveTeamJoinApplication,
+  useV1AuthMe,
   useV1CancelTeamInvitation,
   useV1ChangeMembershipJersey,
   useV1ChangeTeamMembershipRole,
@@ -31,11 +32,11 @@ import {
 import { usePendingIds } from '@/hooks/use-pending-ids';
 import { extractErrorMessage } from '@/lib/error-message';
 import { trackEvent } from '@/lib/analytics';
-import { V1ApiError } from '@/lib/api-client';
+import { isUnauthenticatedError, retryTransientFailure, V1ApiError } from '@/lib/api-client';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
-import { hasStoredV1Session } from '@/lib/session-storage';
+import { getLoginPathForRedirect } from '@/lib/session-storage';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
@@ -191,8 +192,16 @@ export function TeamListPageClient({ seed }: { seed?: { teams: V1Team[]; sports:
  */
 export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V1TeamDetail | null }) {
   const router = useRouter();
+  // The current /auth/me result is the only authority for protected actions. A
+  // local hint can be stale, while a cold HttpOnly cookie has no local hint.
+  const authMe = useV1AuthMe({ enabled: true, retry: retryTransientFailure });
+  const authUnauthorized = isUnauthenticatedError(authMe.error);
+  const authRetryable = authMe.isError && retryTransientFailure(0, authMe.error);
+  const authPending = Boolean(authMe.isPending || (authMe.isFetching && !authMe.data?.user?.id));
+  const authVerified = Boolean(authMe.data?.user?.id) && !authPending && !authMe.isError && !authUnauthorized;
+  const authError = Boolean(authMe.isError && !authUnauthorized);
   const query = useV1TeamDetail(teamId, { seed });
-  const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) });
+  const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) && authVerified });
   const join = useV1CreateTeamJoinApplication(teamId);
   const withdraw = useV1WithdrawTeamJoinApplication(teamId, eligibility.data?.applicationId);
   const resolveChat = useV1ResolveChatRoom();
@@ -207,19 +216,13 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
     dateLabel: formatTournamentDateShort(match.startsAt) ?? '',
     venue: match.place?.name ?? match.placeName ?? '',
   }));
-  // 컨택 보내기 CTA 노출 조건 중 "로그인 상태" + "운영 권한 팀 보유"를 함께 판정한다.
-  // 팀 상세는 공개 SEO 페이지라 게스트도 항상 렌더되므로, notification-bell.tsx의
-  // useUnreadState와 동일하게 세션 힌트(hasStoredV1Session, 동기 localStorage 체크)가
-  // 있을 때만 /me/teams 를 호출한다 — SSR에서는 localStorage를 못 읽으므로 useEffect로
-  // 마운트 후 세팅한다. 힌트가 없으면(게스트) 쿼리 자체가 안 돌아 operatorTeamCount는 0.
-  const [hasSessionHint, setHasSessionHint] = useState(false);
-  useEffect(() => {
-    setHasSessionHint(hasStoredV1Session());
-  }, []);
-  const myTeamsQuery = useV1MyTeams(undefined, { enabled: hasSessionHint });
-  const operatorTeamCount = normalizeMyTeamsResponse(myTeamsQuery.data).filter((team) => isTeamOperatorRole(team.role)).length;
+  // 공개 팀 정보와 달리 내 팀·컨택은 현재 세션 확인이 끝난 뒤에만 조회한다.
+  const myTeamsQuery = useV1MyTeams(undefined, { enabled: authVerified });
+  const operatorTeamCount = authVerified
+    ? normalizeMyTeamsResponse(myTeamsQuery.data).filter((team) => isTeamOperatorRole(team.role)).length
+    : 0;
   // 운영 메뉴 "받은 컨택 N" 배지 — 이 팀의 운영진일 때만 조회한다(다른 사용자에겐 메뉴 자체가 없다).
-  const contactSummary = useV1TeamContactSummary({ enabled: isTeamOperatorRole(query.data?.viewer.role) });
+  const contactSummary = useV1TeamContactSummary({ enabled: authVerified && isTeamOperatorRole(query.data?.viewer.role) });
   const pendingInboundContacts =
     contactSummary.data?.byTeam.find((row) => row.teamId === teamId)?.pendingInbound ?? 0;
   /* R4: "내 리그" — 리그 목록 API 의 teamId 필터로 직접 가져온다.
@@ -238,10 +241,10 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
   const fallback = getTeamDetailViewModel();
 
   useEffect(() => {
-    if (!query.data || !isTeamMemberRole(query.data.viewer.role) || autoResolvedChatRef.current === teamId) return;
+    if (!authVerified || !query.data || !isTeamMemberRole(query.data.viewer.role) || autoResolvedChatRef.current === teamId) return;
     autoResolvedChatRef.current = teamId;
     resolveChat.mutate({ targetType: 'team', targetId: teamId });
-  }, [query.data, resolveChat, teamId]);
+  }, [authVerified, query.data, resolveChat, teamId]);
 
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
 
@@ -256,6 +259,10 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
   // 서버 seed 로 그리는 중. 비인증 응답이라 viewer 판정이 "비로그인"으로 고정돼 있으므로
   // 뷰어에 의존하는 것만 잠근다(matches-client.tsx 와 같은 패턴).
   const seeding = query.isPlaceholderData;
+  const detailMode = authVerified
+    ? toDetailMode(query.data, eligibility.data)
+    : query.data.profile.joinPolicy === 'closed' ? 'closed' : 'default';
+  const canViewMembers = query.data.canViewMembers && (query.data.membersVisibilityEnabled || authVerified);
 
   const model: TeamDetailViewModel = {
     ...fallback,
@@ -273,7 +280,7 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
       city: regionParts.city,
       county: regionParts.county,
       level: formatTeamDetailLevel(query.data) || '레벨 미설정',
-      membersList: query.data.membersPreview.map((member) => ({
+      membersList: (canViewMembers ? query.data.membersPreview : []).map((member) => ({
         membershipId: member.membershipId,
         userId: member.userId,
         name: member.displayName,
@@ -282,22 +289,31 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
         profileHref: `/users/${member.userId}`,
       })),
       memberAccess: {
-        canView: query.data.canViewMembers,
+        canView: canViewMembers,
         enabled: query.data.membersVisibilityEnabled,
         message: '',
         // memberCount는 활성 멤버만 세는 캐시 필드지만 비동기 드리프트 가능성을 배제할 수
         // 없으므로(예: standings-wrong-check-fixture-status-first 류 캐시 불일치) 음수로
         // 내려가지 않게 0으로 floor한다 — "+ -2명 더보기" 같은 값을 절대 렌더하지 않기 위함.
-        moreCount: query.data.canViewMembers
+        moreCount: canViewMembers
           ? Math.max(0, query.data.memberCount - query.data.membersPreview.length)
           : 0,
       },
     },
-    mode: toDetailMode(query.data, eligibility.data),
-    ctaLabel: seeding ? '불러오는 중' : teamDetailCtaLabel(query.data, eligibility.data),
+    mode: detailMode,
+    ctaLabel: seeding
+      ? '불러오는 중'
+      : teamDetailCtaLabel(query.data, eligibility.data, {
+        authPending,
+        authUnauthorized,
+        authError,
+        authRetryable,
+        eligibilityError: eligibility.isError,
+        eligibilityUnauthorized: isUnauthenticatedError(eligibility.error),
+      }),
     ctaPending: join.isPending || withdraw.isPending || resolveChat.isPending,
-    // ctaPending 에 seeding 을 넣지 않는다 — 렌더 쪽이 그걸 '처리 중'(= 내 신청 처리
-    // 중)으로 읽어 ctaLabel 을 덮는다. onCta 를 비우면 이미 disabled 다.
+    // ctaPending 에 seeding·authPending 을 넣지 않는다 — 렌더 쪽이 그걸 '처리 중'(= 내
+    // 신청 처리 중)으로 읽어 ctaLabel 을 덮는다. 둘 다 onCta 를 비워 이미 disabled 다.
     onCta: seeding ? undefined : teamDetailCtaAction({
       team: query.data,
       eligibility: eligibility.data,
@@ -309,22 +325,59 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
         trackEvent('team_apply_complete', { teamId });
         return result;
       }),
+      login: () => router.push(getLoginPathForRedirect(`/teams/${teamId}`)),
+      retryAuth: async () => {
+        const result = await authMe.refetch();
+        if (result.error && !isUnauthenticatedError(result.error)) throw result.error;
+      },
+      retryEligibility: async () => {
+        const result = await eligibility.refetch();
+        if (result.error) {
+          if (isUnauthenticatedError(result.error)) {
+            router.push(getLoginPathForRedirect(`/teams/${teamId}`));
+            return;
+          }
+          throw result.error;
+        }
+      },
       withdraw: () => withdraw.mutateAsync({ reason: 'team_join_withdrawn_from_v1_web' }),
+      state: {
+        authPending,
+        authUnauthorized,
+        authError,
+        authRetryable,
+        eligibilityError: eligibility.isError,
+        eligibilityUnauthorized: isUnauthenticatedError(eligibility.error),
+      },
     }),
     // CTA는 상태에 따라 채팅·신청·취소 세 갈래라 안내 문구도 갈래마다 달라야 한다.
     // 특히 신청 성공은 "승인이 남았다"는 사실을 반드시 알려야 사용자가 기다릴 대상을 안다.
-    ctaSuccessMessage: teamDetailCtaSuccessMessage(query.data, eligibility.data),
-    ctaFailureMessage: teamDetailCtaFailureMessage(query.data, eligibility.data),
+    ctaSuccessMessage: teamDetailCtaSuccessMessage(query.data, eligibility.data, {
+      authPending,
+      authUnauthorized,
+      authError,
+      authRetryable,
+      eligibilityError: eligibility.isError,
+      eligibilityUnauthorized: isUnauthenticatedError(eligibility.error),
+    }),
+    ctaFailureMessage: teamDetailCtaFailureMessage(query.data, eligibility.data, {
+      authPending,
+      authUnauthorized,
+      authError,
+      authRetryable,
+      eligibilityError: eligibility.isError,
+      eligibilityUnauthorized: isUnauthenticatedError(eligibility.error),
+    }),
     joinRequest:
-      toDetailMode(query.data, eligibility.data) === 'pending'
+      detailMode === 'pending'
         ? { requestedAtLabel: formatJoinRequestedAt(eligibility.data?.requestedAt) }
         : undefined,
-    operations: buildTeamOperations(query.data, pendingInboundContacts),
+    operations: authVerified ? buildTeamOperations(query.data, pendingInboundContacts) : undefined,
     onShare: () => shareTeam(query.data),
     openMatches,
     openMatchesLoading: openMatchesQuery.isLoading,
     contactHref:
-      !seeding && toDetailMode(query.data, eligibility.data) !== 'mine' && operatorTeamCount > 0
+      authVerified && !seeding && detailMode !== 'mine' && operatorTeamCount > 0
         ? `/teams/${teamId}/contact/new`
         : undefined,
     myLeagues,
@@ -723,9 +776,31 @@ function toDetailMode(
   return 'default';
 }
 
-function teamDetailCtaLabel(team: V1TeamDetail, eligibility?: { message: string; joinState: string; eligible: boolean }) {
+type TeamJoinAuthState = {
+  authPending: boolean;
+  authUnauthorized: boolean;
+  authError: boolean;
+  authRetryable: boolean;
+  eligibilityError: boolean;
+  eligibilityUnauthorized: boolean;
+};
+
+// 취소 요청은 eligibility 의 applicationId 로만 보낼 수 있다. 팀 상세 viewer 에는 신청 id 가
+// 없어서, 상세 joinState 폴백만으로 취소를 열면 `/team-join-applications/undefined/withdraw` 가 된다.
+function canWithdrawJoin(team: V1TeamDetail, eligibility?: { joinState: string; applicationId?: string | null }) {
+  return resolveJoinState(team, eligibility) === 'requested' && Boolean(eligibility?.applicationId);
+}
+
+function teamDetailCtaLabel(team: V1TeamDetail, eligibility: { message: string; joinState: string; eligible: boolean; applicationId?: string | null } | undefined, state: TeamJoinAuthState) {
+  if (state.authPending) return '로그인 상태 확인 중';
+  if (state.authError && state.authRetryable) return '로그인 상태 다시 확인';
+  if (state.authError) return '로그인 상태를 확인할 수 없어요';
+  if (state.authUnauthorized) return '로그인 후 가입 신청';
   if (isTeamMemberRole(team.viewer.role)) return '팀 채팅';
-  if (resolveJoinState(team, eligibility) === 'requested') return '신청 취소';
+  if (canWithdrawJoin(team, eligibility)) return '신청 취소';
+  if (state.eligibilityError && !state.eligibilityUnauthorized) return '다시 시도';
+  if (team.viewer.disabledReason === 'LOGIN_REQUIRED' || state.eligibilityUnauthorized) return '로그인 후 가입 신청';
+  if (resolveJoinState(team, eligibility) === 'requested') return '신청 상태 확인 중';
   if (eligibility?.eligible) return '가입 신청';
   return eligibility?.message ?? '가입 불가';
 }
@@ -736,20 +811,26 @@ function teamDetailCtaLabel(team: V1TeamDetail, eligibility?: { message: string;
  */
 function teamDetailCtaSuccessMessage(
   team: V1TeamDetail,
-  eligibility?: { joinState: string; eligible: boolean },
+  eligibility: { joinState: string; eligible: boolean; applicationId?: string | null } | undefined,
+  state: TeamJoinAuthState,
 ): string | undefined {
+  if (state.authPending || state.authError || state.authUnauthorized) return '';
   if (isTeamMemberRole(team.viewer.role)) return '팀 채팅으로 이동해요.';
-  if (resolveJoinState(team, eligibility) === 'requested') return '가입 신청을 취소했어요.';
+  if (canWithdrawJoin(team, eligibility)) return '가입 신청을 취소했어요.';
+  if (state.eligibilityError || state.eligibilityUnauthorized || team.viewer.disabledReason === 'LOGIN_REQUIRED') return '';
   if (eligibility?.eligible) return '가입 신청을 보냈어요. 관리자가 승인하면 알림으로 알려드려요.';
   return undefined;
 }
 
 function teamDetailCtaFailureMessage(
   team: V1TeamDetail,
-  eligibility?: { joinState: string; eligible: boolean },
+  eligibility: { joinState: string; eligible: boolean; applicationId?: string | null } | undefined,
+  state: TeamJoinAuthState,
 ): string | undefined {
+  if (state.authPending || state.authError || state.authUnauthorized) return '';
   if (isTeamMemberRole(team.viewer.role)) return '팀 채팅을 열지 못했어요. 잠시 후 다시 시도해 주세요.';
-  if (resolveJoinState(team, eligibility) === 'requested') return '가입 신청을 취소하지 못했어요. 잠시 후 다시 시도해 주세요.';
+  if (canWithdrawJoin(team, eligibility)) return '가입 신청을 취소하지 못했어요. 잠시 후 다시 시도해 주세요.';
+  if (state.eligibilityError || state.eligibilityUnauthorized || team.viewer.disabledReason === 'LOGIN_REQUIRED') return '';
   if (eligibility?.eligible) return '가입 신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.';
   return undefined;
 }
@@ -767,16 +848,31 @@ function teamDetailCtaAction({
   eligibility,
   chat,
   join,
+  login,
+  retryAuth,
+  retryEligibility,
   withdraw,
+  state,
 }: {
   team: V1TeamDetail;
-  eligibility?: { eligible: boolean; joinState: string };
+  eligibility?: { eligible: boolean; joinState: string; applicationId?: string | null };
   chat: () => Promise<unknown>;
   join: () => Promise<unknown>;
+  login: () => void;
+  retryAuth: () => Promise<void>;
+  retryEligibility: () => Promise<unknown>;
   withdraw: () => Promise<unknown>;
+  state: TeamJoinAuthState;
 }): (() => void | Promise<unknown>) | undefined {
+  if (state.authPending) return undefined;
+  if (state.authError && state.authRetryable) return retryAuth;
+  if (state.authError) return undefined;
+  if (state.authUnauthorized) return login;
   if (isTeamMemberRole(team.viewer.role)) return chat;
-  if (resolveJoinState(team, eligibility) === 'requested') return withdraw;
+  if (canWithdrawJoin(team, eligibility)) return withdraw;
+  if (state.eligibilityError && !state.eligibilityUnauthorized) return retryEligibility;
+  if (team.viewer.disabledReason === 'LOGIN_REQUIRED' || state.eligibilityUnauthorized) return login;
+  if (resolveJoinState(team, eligibility) === 'requested') return undefined;
   if (eligibility?.eligible) return join;
   return undefined;
 }

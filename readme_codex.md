@@ -23,7 +23,7 @@
 
 ## 상세 증거 위치
 
-- 게스트 가입 BEFORE/AFTER 갤러리: PR #1187 코멘트 `#issuecomment-5654763586` (이미지는 `assets/pr1187-guest-join-gallery-20260914` 브랜치 `ed39de1a`에 SHA 고정).
+- 게스트 가입 BEFORE/AFTER 갤러리: [PR #1187 코멘트](https://github.com/kim-song-jun/matchup-sports-platform/pull/1187#issuecomment-5654763586) (이미지는 `assets/pr1187-guest-join-gallery-20260914` 브랜치 `ed39de1a`에 SHA 고정).
 - 과거 Alpha UI·읽기 검증과 후보 산출물은 로컬 전용 경로다(GitHub에는 없다): `output/ego/task168-ui-pr1184-20260913/`, `output/qa/task168/alpha-45104d5d-readback-result-20260913-r1.json`, `output/qa/task168/final-retirement-candidate-20260913/`.
 - `output/` 아래 자료가 없는 컴퓨터에서 재개하면 Task 168에 기록된 원격 CI/PR 증거와 별도 전달받은 산출물을 확인한다.
 

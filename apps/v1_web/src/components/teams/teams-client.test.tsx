@@ -859,17 +859,44 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
     expect(teamApiMocks.useV1TeamUpcomingGames).toHaveBeenCalledWith('team-1');
   });
 
-  it('verified pending member keeps withdrawal ahead of an eligibility error', async () => {
+  function renderPendingMember(eligibility: Record<string, unknown>) {
     const detail = seededDetail();
     const withdrawMutateAsync = vi.fn().mockResolvedValue({ status: 'withdrawn' });
     teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'pending-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '대기 사용자' } }, isPending: false, isFetching: false, isError: false });
     teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, joinState: 'requested', disabledReason: null } }, isError: false, isPlaceholderData: false });
-    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: undefined, isError: true, error: new Error('temporary') });
+    teamApiMocks.useV1TeamJoinEligibility.mockReturnValue(eligibility);
     teamApiMocks.useV1WithdrawTeamJoinApplication.mockReturnValue({ mutateAsync: withdrawMutateAsync, isPending: false });
-
     render(<TeamDetailPageClient teamId="team-1" />);
+    return { withdrawMutateAsync };
+  }
+
+  it('verified pending member cancels with the eligibility application id', async () => {
+    const { withdrawMutateAsync } = renderPendingMember({
+      data: { eligible: false, joinState: 'requested', applicationId: 'application-7', message: '승인을 기다리고 있어요.', requestedAt: null },
+      isError: false,
+    });
+
     fireEvent.click(screen.getAllByRole('button', { name: '신청 취소' })[0]);
     await waitFor(() => expect(withdrawMutateAsync).toHaveBeenCalledWith({ reason: 'team_join_withdrawn_from_v1_web' }));
+    expect(teamApiMocks.useV1WithdrawTeamJoinApplication).toHaveBeenLastCalledWith('team-1', 'application-7');
+  });
+
+  it('pending member with an eligibility error retries instead of withdrawing without an application id', async () => {
+    const refetch = vi.fn().mockResolvedValue({ error: null });
+    const { withdrawMutateAsync } = renderPendingMember({ data: undefined, isError: true, error: new Error('temporary'), refetch });
+
+    expect(screen.queryByRole('button', { name: '신청 취소' })).toBeNull();
+    fireEvent.click(screen.getAllByRole('button', { name: '다시 시도' })[0]);
+    await waitFor(() => expect(refetch).toHaveBeenCalledTimes(1));
+    expect(withdrawMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('pending member waits for eligibility before offering cancellation', () => {
+    const { withdrawMutateAsync } = renderPendingMember({ data: undefined, isError: false });
+
+    expect(screen.getAllByRole('button', { name: '신청 상태 확인 중' })[0]).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '신청 취소' })).toBeNull();
+    expect(withdrawMutateAsync).not.toHaveBeenCalled();
   });
 
   it('seed 로 그리는 동안 팀 이름은 보여주되 가입 CTA 는 잠근다', () => {

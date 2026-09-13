@@ -785,15 +785,22 @@ type TeamJoinAuthState = {
   eligibilityUnauthorized: boolean;
 };
 
-function teamDetailCtaLabel(team: V1TeamDetail, eligibility: { message: string; joinState: string; eligible: boolean } | undefined, state: TeamJoinAuthState) {
+// 취소 요청은 eligibility 의 applicationId 로만 보낼 수 있다. 팀 상세 viewer 에는 신청 id 가
+// 없어서, 상세 joinState 폴백만으로 취소를 열면 `/team-join-applications/undefined/withdraw` 가 된다.
+function canWithdrawJoin(team: V1TeamDetail, eligibility?: { joinState: string; applicationId?: string | null }) {
+  return resolveJoinState(team, eligibility) === 'requested' && Boolean(eligibility?.applicationId);
+}
+
+function teamDetailCtaLabel(team: V1TeamDetail, eligibility: { message: string; joinState: string; eligible: boolean; applicationId?: string | null } | undefined, state: TeamJoinAuthState) {
   if (state.authPending) return '로그인 상태 확인 중';
   if (state.authError && state.authRetryable) return '로그인 상태 다시 확인';
   if (state.authError) return '로그인 상태를 확인할 수 없어요';
   if (state.authUnauthorized) return '로그인 후 가입 신청';
   if (isTeamMemberRole(team.viewer.role)) return '팀 채팅';
-  if (resolveJoinState(team, eligibility) === 'requested') return '신청 취소';
+  if (canWithdrawJoin(team, eligibility)) return '신청 취소';
   if (state.eligibilityError && !state.eligibilityUnauthorized) return '다시 시도';
   if (team.viewer.disabledReason === 'LOGIN_REQUIRED' || state.eligibilityUnauthorized) return '로그인 후 가입 신청';
+  if (resolveJoinState(team, eligibility) === 'requested') return '신청 상태 확인 중';
   if (eligibility?.eligible) return '가입 신청';
   return eligibility?.message ?? '가입 불가';
 }
@@ -804,12 +811,12 @@ function teamDetailCtaLabel(team: V1TeamDetail, eligibility: { message: string; 
  */
 function teamDetailCtaSuccessMessage(
   team: V1TeamDetail,
-  eligibility: { joinState: string; eligible: boolean } | undefined,
+  eligibility: { joinState: string; eligible: boolean; applicationId?: string | null } | undefined,
   state: TeamJoinAuthState,
 ): string | undefined {
   if (state.authPending || state.authError || state.authUnauthorized) return '';
   if (isTeamMemberRole(team.viewer.role)) return '팀 채팅으로 이동해요.';
-  if (resolveJoinState(team, eligibility) === 'requested') return '가입 신청을 취소했어요.';
+  if (canWithdrawJoin(team, eligibility)) return '가입 신청을 취소했어요.';
   if (state.eligibilityError || state.eligibilityUnauthorized || team.viewer.disabledReason === 'LOGIN_REQUIRED') return '';
   if (eligibility?.eligible) return '가입 신청을 보냈어요. 관리자가 승인하면 알림으로 알려드려요.';
   return undefined;
@@ -817,12 +824,12 @@ function teamDetailCtaSuccessMessage(
 
 function teamDetailCtaFailureMessage(
   team: V1TeamDetail,
-  eligibility: { joinState: string; eligible: boolean } | undefined,
+  eligibility: { joinState: string; eligible: boolean; applicationId?: string | null } | undefined,
   state: TeamJoinAuthState,
 ): string | undefined {
   if (state.authPending || state.authError || state.authUnauthorized) return '';
   if (isTeamMemberRole(team.viewer.role)) return '팀 채팅을 열지 못했어요. 잠시 후 다시 시도해 주세요.';
-  if (resolveJoinState(team, eligibility) === 'requested') return '가입 신청을 취소하지 못했어요. 잠시 후 다시 시도해 주세요.';
+  if (canWithdrawJoin(team, eligibility)) return '가입 신청을 취소하지 못했어요. 잠시 후 다시 시도해 주세요.';
   if (state.eligibilityError || state.eligibilityUnauthorized || team.viewer.disabledReason === 'LOGIN_REQUIRED') return '';
   if (eligibility?.eligible) return '가입 신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.';
   return undefined;
@@ -848,7 +855,7 @@ function teamDetailCtaAction({
   state,
 }: {
   team: V1TeamDetail;
-  eligibility?: { eligible: boolean; joinState: string };
+  eligibility?: { eligible: boolean; joinState: string; applicationId?: string | null };
   chat: () => Promise<unknown>;
   join: () => Promise<unknown>;
   login: () => void;
@@ -862,9 +869,10 @@ function teamDetailCtaAction({
   if (state.authError) return undefined;
   if (state.authUnauthorized) return login;
   if (isTeamMemberRole(team.viewer.role)) return chat;
-  if (resolveJoinState(team, eligibility) === 'requested') return withdraw;
+  if (canWithdrawJoin(team, eligibility)) return withdraw;
   if (state.eligibilityError && !state.eligibilityUnauthorized) return retryEligibility;
   if (team.viewer.disabledReason === 'LOGIN_REQUIRED' || state.eligibilityUnauthorized) return login;
+  if (resolveJoinState(team, eligibility) === 'requested') return undefined;
   if (eligibility?.eligible) return join;
   return undefined;
 }

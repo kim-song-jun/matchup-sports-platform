@@ -110,9 +110,10 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
+  min-height: 24px;
+  padding: 0 8px;
   border-radius: var(--radius-pill);
-  font-size: var(--font-size-micro);
+  font-size: var(--font-size-caption);
   font-weight: 700;
   line-height: 1;
 }

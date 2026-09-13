@@ -167,6 +167,7 @@ export type TeamMatchCreateViewModel = {
   selectedTeam: string;
   selectedSport: string;
   isLoadingTeams?: boolean;
+  teamLoadError?: { message: string; onRetry: () => void };
   teams: Array<{ name: string; sport: string; members: number; role: string; selected?: boolean; disabled?: boolean }>;
   sports: string[];
   draft: {

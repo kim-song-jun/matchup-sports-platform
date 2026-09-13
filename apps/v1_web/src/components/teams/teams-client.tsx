@@ -271,11 +271,10 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
       county: regionParts.county,
       level: formatTeamDetailLevel(query.data) || '레벨 미설정',
       membersList: query.data.membersPreview.map((member) => ({
+        membershipId: member.membershipId,
+        userId: member.userId,
         name: member.displayName,
         role: roleLabel(member.role),
-        meta: member.role,
-        status: member.role === 'owner' || member.role === 'manager' ? '관리자' : '활동중',
-        visibility: query.data.membersVisibilityEnabled ? '공개' : '비공개',
         // 834행 TeamMembersPageClient의 프로필 링크 패턴과 동일 — 새 규칙을 만들지 않는다.
         profileHref: `/users/${member.userId}`,
       })),

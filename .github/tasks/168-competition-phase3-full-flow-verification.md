@@ -1,10 +1,14 @@
 # Task 168 — 모든 경기의 팀 매치 통일과 실제 사용자 E2E
 
-## 최신 판정 — dev 머지 완료, Alpha 이관 사전 검사 실패·API 502
+## 최신 판정 — Alpha 차단 데이터 삭제 완료, 재배포 복구 수정 검증 중
 
 ### 재개 커서 — 2026-09-13 AWS 재인증 이후
 
 이 절과 아래 기존 요구사항·검증 표가 단일 핸드오프다. 별도 보고 MD를 만들지 않는다. 사용자 최신 결정은 Alpha 데이터 삭제 허용, dev 머지·Alpha 배포 계속 진행이며 main/production 승격 권한은 없다.
+
+- **복구 PR 커밋 전 검증 완료:** runner `ff4759…` 실제 PostgreSQL helper 15개 기대 결과를 확인했다(`stage-a-resume-validation-20260913/local-guard-db-result.json`). 하드코딩한 중복 행과 부분 checkout의 archive 누락 행은 계수에서 제외했다. 별도 임시 실행을 수기로 합친 `final-delta-result-r2.json`의 prepare PASS는 최종 근거로 채택하지 않았다. root가 `verify-recovery-prepare-20260913.cjs`를 저장하고 정확한 base `0d76…` archive/schema 및 6개 검토 후보를 재구성해 실제 prepare 실행 3개(고정 JSON·유효 수동 입력 우선·잘못된 수동 입력 거부)를 검증했다. `recovery-prepare-execution-20260913.json` SHA `96689f0a93463549ceea006eb06253fef38079018a35551a508bc306450412c5`, 실행 스크립트 SHA `d8f188e52550022c8836571730cb8d30a8523da9e15eb5e627480d9700c850dd`. Sol 독립 증거 재검토 PASS, 소유 PostgreSQL 컨테이너·임시 fixture 제거 완료. 최초 archive 출력 버퍼 ENOBUFS는 파일 출력 방식으로 수정했고 이후 실행 성공했다. 다음은 정확한 7개 경로 private-index commit → dev PR CI/Copilot → 머지·Alpha 배포이며 새 Alpha E2E0/42는 유지한다.
+
+- **복구 수정 최종 실행 검증 중:** 원격 dev `0d76e6b2`를 기준으로 복구 runner·manifest 입력/생성/검증·workflow·고정 recoveryFrom 6개 파일을 별도 후보로 준비했다. 최초 Sol PASS(b39d71)는 실제 정상 백업 영수증 실행에서 `backupBytes` jq 문맥 오류가 발견되어 철회했다. 정확한 한 줄을 고친 runner `ff4759b263728498683da11d92858654cbc275fb97129c682dc19dc9b1778d8e`는 Sol R2에서 양수/0/문자열/null/누락 반례와 전체 6개 SHA를 재검증해 PASS했다. `final-independent-review-r2.json` SHA `7d8613a8d76bef7c6085f7abd59004aa1291a8c9465cbdd116de9c81d74eda78`. 실제 PostgreSQL guard 및 정확한 archive/schema 기반 prepare 실행이 마지막 커밋 전 검증이다. 첫 harness의 누락 함수·부분 overlay archive 부재는 제품 성공 증거로 세지 않는다. 아래 이전 시점의 “현재” 표현은 역사 기록이며 이 절의 최신 상태를 우선한다.
 
 - **최신 판정 — 실제 scoped 삭제 COMMITTED:** R3에서 `SET CONSTRAINTS ALL IMMEDIATE`로 지연 제약까지 강제 평가한 실제 삭제→ROLLBACK 검증을 통과한 뒤, 동일 SQL 바이트로 실제 커밋했다. SSM `170bd2e7-82f0-45d9-9e9f-1cbe2cb393e1`, `output/qa/task168/alpha-cleanup-commit-result-20260913-r1.json`은 Success/exit0/COMMITTED다. 대진65·경기25 및 종속 행 제거, 정상 대진310·사용자396·팀86·신청481·선수1588·기존 canonical매치350·운영자배정27의 내용 해시 보존을 확인했다. 삭제 대상은 현재 대진0/경기0이며 보호 트리거5개 활성 상태다. `afterRollback`이라는 원래 진단 쿼리 라벨은 동일 SQL 재사용 때문에 commit 결과에도 나타나지만 실제 `commitRequested:true`와 execution COMMITTED가 확정 상태다. SQL source SHA `70ba313760eb6ceaa6e0ed7a43b81b7cf9953c9b55ea465063ab4f01b2b25218`, 실행 SQL SHA `0b9ea7203907627d2201c5dab2c8e0e7ac582f67e28640b4eac29c46ce330f6f`. 호스트 `/home/ec2-user/.teameet-alpha-releases/task168/cleanup-20260913-commit-r1/`에 실행 영수증을 남겼다. **구 API/worker는 계속 정지/restart=no, 새 canonical 배포는 아직이며 Alpha E2E0/42다. 재진입 수정 후보→검토→dev 머지→배포가 바로 다음 단계다.** 아래 R1/R2 준비·실패·미삭제 문구는 시간순 기록으로 보존한다.
 
@@ -19,10 +23,10 @@
 - **구현·검토 담당:** Luna `/root/benchmark_cta_overlap_fix`가 `stage-a-preflight-resume-fix-20260913/`에 재진입 수정 후보를 작성 중이다. 초기 패치는 보고서에 없는 releaseSha 사용·오류 삼킴·실행 불가능한 diff로 Sol이 거절했다. 실제 full-file 후보와 명시적 이전 실패 시도 바인딩이 필요하다. Sol `/root/alpha_recovery_review`는 고위험 삭제의 실제 FK 순서·트리거 복원을 포함한 SQL을 `alpha-cleanup-sol-20260913/`에 준비한다. Luna `/root/alpha_blocker_cleanup`의 `alpha-blocker-cleanup-20260913/`는 진단 준비물이며 plan JSON을 실행 가능한 SSM parameters로 오인하지 않는다.
 - **실행 도구:** `run-alpha-ssm-20260913.cjs send|poll`은 매번 AWS 계정을 검사하고 지정 Alpha 인스턴스만 사용하며, 검토한 task-owned parameters를 실행하고 결과 JSON을 독점 생성한다. 입력 SQL·셸은 실행 전에 root가 검토한다. `.env*`를 읽거나 비밀번호를 출력하지 않는다. PostgreSQL은 컨테이너의 POSTGRES_USER/POSTGRES_DB를 사용하며 기본 teameet_v1 계정은 실제로 없어 첫 조회가 실패했다. current_user() 문법 오류도 current_user로 수정했고 r3 조회는 성공했다.
 
-**전체 남은 작업 (모두 미완료):**
+**전체 실행 체크리스트 (항목별 최신 상태):**
 
 1. 재진입 코드의 실제 실행 파일·manifest 입력 연결 완성 → 독립 리뷰 → 좁은 회귀 증거 → 정확한 commit/PR CI·Copilot → dev 머지.
-2. 65개 대진·25개 경기와 종속 기록만 대상으로 삭제 SQL 검토. 새 백업·현재 writer 정지·정확한 DB/ledger/ID 검증 후 롤백 드라이런, 보존 범위·트리거 복원 검증, 승인된 실제 삭제. 백업과 과거 실패 보고서는 보존.
+2. **완료:** 65개 대진·25개 경기와 종속 기록만 삭제. 새 백업·writer 정지·정확한 DB/ledger/ID 검증 후 R3 롤백 드라이런 및 동일 SQL의 실제 COMMIT 성공. 정상310개·계정·팀·신청과 보호 트리거를 보존했다. 백업과 과거 실패 보고서는 보존.
 3. 수정된 배포 경로로 Stage A 이관 → M8/M9 → 인증된 transition 영수증 → canonical API/worker 시작. 공개 release SHA·이미지·DB 링크0·보존310개 확인. 배포 성공과 전체 QA 성공은 별개다.
 4. 사용자 최신 삭제 허용에 맞춰 final DROP 후보를 별도 검증·머지·배포한다. 현재 runner/manifest는 Stage A 전용이므로 M11을 임의로 추가 실행하지 않는다. 정상 canonical 중간 버전·보존 불변식·지원되는 최종 배포 경로를 먼저 확보한다.
 5. 최종 Alpha에서 역할별30 + 경계12 = **42개 전부 실행**. API 저장·재조회, 동시 정정, 감사 로그 실패 트랜잭션, 권한·오류, 결과→공개 순위→팀·개인 기록을 확인한다. 현재 새 Alpha 실행0/42이며 과거 로컬 증거를 대신 세지 않는다.

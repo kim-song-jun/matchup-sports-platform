@@ -4,6 +4,12 @@ on:
   push:
     branches: [dev]
   workflow_dispatch:
+    inputs:
+      task168_recovery_from_json:
+        description: "Immutable Task168 failed-preflight recovery evidence JSON"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   actions: read
@@ -138,6 +144,8 @@ jobs:
           echo "tool_exists=${tool_exists}" >> "${GITHUB_OUTPUT}"
 
       - name: Bind one-shot Task 168 manifest inputs
+        env:
+          TASK168_RECOVERY_FROM_JSON: ${{ inputs.task168_recovery_from_json }}
         run: bash scripts/release/prepare-task168-stage-manifest-inputs.sh
 
       - name: Set up Docker Buildx

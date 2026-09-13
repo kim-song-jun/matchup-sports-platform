@@ -357,6 +357,15 @@ phase=before_m11
 runner=''
 migration_completed=0
 cleanup(){ [[ -z "${migration_tmp:-}" ]] || rm -rf "$migration_tmp"; }
+# r2-blocking-1: best-effort ledger check from inside the EXIT trap -- if the
+# database is unreachable (e.g. the daemon itself is what's failing), fail
+# closed to the pre-existing diagnosis-receipt behavior rather than silently
+# writing nothing.
+m11_committed_in_ledger(){
+  local row
+  row="$(dbq "SELECT migration_name || '|' || COALESCE(checksum,'') || '|' || CASE WHEN finished_at IS NOT NULL AND rolled_back_at IS NULL THEN 'applied' ELSE 'invalid' END FROM \"_prisma_migrations\" WHERE migration_name = '$M11'" 2>/dev/null || true)"
+  [[ "$row" == "$M11|$M11_SHA|applied" ]]
+}
 restore_pre_quiesce_writers(){
   [[ "$phase" == before_m11 ]] || return 0
   echo '[task168-stage-b] pre-M11 failure; restoring the exact pre-quiesce API and worker containers' >&2
@@ -413,8 +422,24 @@ cleanup_pre_quiesce(){
   if [[ "$status" != 0 && "$phase" == before_m11 ]]; then
     restore_pre_quiesce_writers || status=1
   elif [[ "$status" != 0 && "$phase" == after_m11 ]]; then
-    write_diagnosis_receipt || true
-    echo '[task168-stage-b] MIGRATION_DIAGNOSIS_REQUIRED: writers remain stopped after M11-phase failure' >&2
+    # r2-blocking-1: a signal received while bash is blocked in a foreground
+    # command (the `docker exec ... prisma migrate deploy`, not a command
+    # substitution) is deferred until that command returns -- so a TERM sent
+    # any time during M11's real execution only fires *after* M11 has already
+    # committed. Writing MIGRATION_DIAGNOSIS_REQUIRED unconditionally here
+    # would then be a false receipt for an already-successful migration, and
+    # the only scripted recovery (stageBRecover R-A) refuses whenever
+    # migration-stage.json already exists. Check the ledger directly before
+    # diagnosing: a committed M11 gets no receipt from this trap at all,
+    # exactly as an untrappable SIGKILL in the same window already leaves
+    # (m11-entry-marker.json + ledger are the recoverable trace; writing that
+    # receipt is stageBRecover's job, out of scope here).
+    if m11_committed_in_ledger; then
+      echo '[task168-stage-b] M11 is already committed to the ledger; leaving no MIGRATION_DIAGNOSIS_REQUIRED receipt so recovery judges from the ledger and m11-entry-marker instead of a false diagnosis' >&2
+    else
+      write_diagnosis_receipt || true
+      echo '[task168-stage-b] MIGRATION_DIAGNOSIS_REQUIRED: writers remain stopped after M11-phase failure' >&2
+    fi
   fi
   exit "$status"
 }

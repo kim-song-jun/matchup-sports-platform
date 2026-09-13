@@ -446,6 +446,17 @@ seed_bulk_table(){
 # Polls for the runner's backup temp file to exceed a byte threshold -- the
 # real, external signal that `pg_dump` (deep inside a `$(...)`/pipeline, not
 # a foreground command) is actually in flight for this release.
+wait_for_m11_committed(){
+  local project="$1" env_pre="$2" i
+  for i in $(seq 1 400); do
+    if [[ "$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" exec -T v1_postgres psql -X -At -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name='20260911090000_retire_tournament_fixture_tables' AND finished_at IS NOT NULL AND rolled_back_at IS NULL" 2>/dev/null | tr -d '\r')" == 1 ]]; then
+      return 0
+    fi
+    sleep 0.05
+  done
+  return 1
+}
+
 wait_for_backup_inflight(){
   local state_dir="$1" min_bytes="${2:-1000000}" i f sz
   for i in $(seq 1 400); do
@@ -633,9 +644,147 @@ run_scenario_j(){
   docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
 }
 
-# Optional: T168_ONLY=a|b|c|d|e|f|g|h|i|j runs a single scenario (used for
-# fast mutation iteration during development; a plain run with no filter runs
-# all).
+# ---------------------------------------------------------------------------
+# (k) independent re-review r2-blocking-1: a TERM that lands after M11 has
+# already committed (bash defers the trap until the foreground `prisma
+# migrate deploy`/`migrate status` docker execs return) must not produce a
+# false MIGRATION_DIAGNOSIS_REQUIRED receipt for a migration that actually
+# succeeded -- that receipt permanently blocks stageBRecover's R-A path
+# (`migration-stage.json already exists`). Ground truth is the ledger: once
+# M11's row is finished, this scenario fires TERM immediately and asserts
+# either no receipt at all (deferred to recovery) or a correct
+# MIGRATION_COMMITTED one -- never MIGRATION_DIAGNOSIS_REQUIRED.
+run_scenario_k(){
+  local name=k project="deploy" work="$WORK_ROOT/k" release predecessor
+  mkdir -p "$work"
+  release="$(hex40)"; predecessor="$(hex40)"
+  local env_pre="$work/pre.env"
+  start_stack "$project" "$env_pre" || { bad "$name" "stack did not start"; return; }
+  seed_migrations "$project" without_m11 || { bad "$name" "seeding M1-M10 failed"; return; }
+  build_fixtures "$work" "$release" "$predecessor"
+  local env_final="$work/final.env"; write_env_file "$env_final" "$FINAL_IMAGE_REF"
+  local state_dir="$work/state/task168/$release" out_file="$work/k.out" pid rc
+  install -d "$work/state"
+  set +e
+  ALPHA_RELEASE_STATE_DIR="$work/state" "$RUNNER" --source-dir "$work/source" --manifest "$work/manifest.json" --compose-prod "$FIXTURES_DIR/compose-prod.yml" --compose-alpha "$FIXTURES_DIR/compose-alpha.yml" --env-file "$env_final" >"$out_file" 2>&1 &
+  pid=$!
+  if ! wait_for_m11_committed "$project" "$env_pre"; then
+    bad "$name" "M11 never committed within the timeout (harness timing, not the fix under test)"
+    kill -9 "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+    set -e
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+  if ! kill -0 "$pid" 2>/dev/null; then
+    bad "$name" "runner already exited before the signal could be sent (harness timing, not the fix under test)"
+    wait "$pid" 2>/dev/null
+    set -e
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+  kill -TERM "$pid"
+  wait "$pid"; rc=$?
+  set -e
+  sed 's/^/  [k] /' "$out_file"
+  [[ "$rc" == 143 ]] && ok "$name post-M11-commit SIGTERM -> runner still exits 143" || bad "$name exit code" "rc=$rc"
+  local ledger_m11
+  ledger_m11="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" exec -T v1_postgres psql -X -At -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name='20260911090000_retire_tournament_fixture_tables' AND finished_at IS NOT NULL AND rolled_back_at IS NULL" 2>/dev/null | tr -d '\r')"
+  [[ "$ledger_m11" == 1 ]] && ok "$name M11 is committed in the ledger despite the mid-flight SIGTERM" || bad "$name M11 ledger state" "count=$ledger_m11"
+  local receipt="$state_dir/migration-stage.json"
+  if [[ ! -f "$receipt" ]]; then
+    ok "$name no false MIGRATION_DIAGNOSIS_REQUIRED written once M11 is already committed"
+  elif jq -e '.status=="MIGRATION_COMMITTED"' "$receipt" >/dev/null 2>&1; then
+    ok "$name receipt correctly reflects MIGRATION_COMMITTED (ran to completion before the deferred signal fired)"
+  else
+    bad "$name false diagnosis receipt despite committed M11" "$(cat "$receipt")"
+  fi
+  local marker="$state_dir/m11-entry-marker.json"
+  if jq -e '.status=="ENTERED" and (.quiesceReceiptSha256|length>0) and (.preM11BackupSha256|length>0)' "$marker" >/dev/null 2>&1; then
+    ok "$name m11-entry-marker.json is present for recovery"
+  else
+    bad "$name m11-entry-marker.json" "$(cat "$marker" 2>/dev/null || echo MISSING)"
+  fi
+  docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+}
+
+# ---------------------------------------------------------------------------
+# (l) independent re-review r2-blocking-2 (runner-side portion of spec T1-6):
+# an uncatchable SIGKILL landing right after M11 commits (no trap can run at
+# all) must still leave the on-disk trail a recovery entrypoint needs: the
+# ledger shows M11 applied, m11-entry-marker.json + quiesce.json are present
+# and correctly bound, and no migration-stage.json exists to falsely block
+# recovery. Invoking the actual stageBRecover entrypoint
+# (deploy-alpha-stage-b.sh) against this state is the wiring track's job
+# (out of scope for this delegation) -- this scenario proves only what the
+# runner itself is responsible for leaving behind.
+run_scenario_l(){
+  local name=l project="deploy" work="$WORK_ROOT/l" release predecessor
+  mkdir -p "$work"
+  release="$(hex40)"; predecessor="$(hex40)"
+  local env_pre="$work/pre.env"
+  start_stack "$project" "$env_pre" || { bad "$name" "stack did not start"; return; }
+  seed_migrations "$project" without_m11 || { bad "$name" "seeding M1-M10 failed"; return; }
+  build_fixtures "$work" "$release" "$predecessor"
+  local env_final="$work/final.env"; write_env_file "$env_final" "$FINAL_IMAGE_REF"
+  local pre_api_id pre_worker_id
+  pre_api_id="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" ps -a -q v1_api)"
+  pre_worker_id="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" ps -a -q v1_game_operations_worker)"
+  local state_dir="$work/state/task168/$release" out_file="$work/l.out" pid
+  install -d "$work/state"
+  set +e
+  ALPHA_RELEASE_STATE_DIR="$work/state" "$RUNNER" --source-dir "$work/source" --manifest "$work/manifest.json" --compose-prod "$FIXTURES_DIR/compose-prod.yml" --compose-alpha "$FIXTURES_DIR/compose-alpha.yml" --env-file "$env_final" >"$out_file" 2>&1 &
+  pid=$!
+  if ! wait_for_m11_committed "$project" "$env_pre"; then
+    bad "$name" "M11 never committed within the timeout (harness timing, not the fix under test)"
+    kill -9 "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+    set -e
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+  if ! kill -0 "$pid" 2>/dev/null; then
+    bad "$name" "runner already exited before the signal could be sent (harness timing, not the fix under test)"
+    wait "$pid" 2>/dev/null
+    set -e
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+  kill -KILL "$pid"
+  wait "$pid" 2>/dev/null
+  set -e
+  local ledger_m11
+  ledger_m11="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" exec -T v1_postgres psql -X -At -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name='20260911090000_retire_tournament_fixture_tables' AND finished_at IS NOT NULL AND rolled_back_at IS NULL" 2>/dev/null | tr -d '\r')"
+  [[ "$ledger_m11" == 1 ]] && ok "$name M11 is committed in the ledger despite the untrappable SIGKILL" || bad "$name M11 ledger state" "count=$ledger_m11"
+  [[ ! -f "$state_dir/migration-stage.json" ]] && ok "$name no receipt written (no trap can run on SIGKILL) so a fresh diagnosis isn't falsely blocked" || bad "$name unexpected receipt after SIGKILL" "$(cat "$state_dir/migration-stage.json")"
+  local marker="$state_dir/m11-entry-marker.json"
+  if jq -e '.status=="ENTERED" and (.quiesceReceiptSha256|length>0) and (.preM11BackupSha256|length>0) and (.runnerContainerId|length>0)' "$marker" >/dev/null 2>&1; then
+    ok "$name m11-entry-marker.json survives the SIGKILL for recovery to consult"
+  else
+    bad "$name m11-entry-marker.json after SIGKILL" "$(cat "$marker" 2>/dev/null || echo MISSING)"
+  fi
+  local quiesce="$state_dir/quiesce.json"
+  if jq -e '.status=="COMPLETED" and (.preApiContainerId|length>0) and (.preWorkerContainerId|length>0) and .restartPolicyDuringQuiesce=="no"' "$quiesce" >/dev/null 2>&1; then
+    ok "$name quiesce.json survives the SIGKILL for recovery to consult"
+  else
+    bad "$name quiesce.json after SIGKILL" "$(cat "$quiesce" 2>/dev/null || echo MISSING)"
+  fi
+  # Inspect the pre-captured writer ids directly rather than re-querying
+  # `compose ps -a -q v1_api`: by this point in the after_m11 window the
+  # runner's own ephemeral one-off migration container (`compose run
+  # --no-deps v1_api ...`) also carries the v1_api service label, so a fresh
+  # `ps -a -q v1_api` can return two ids -- exactly the ambiguity the
+  # runner's own blocking-finding-#3 fix (line ~518) exists to avoid.
+  if [[ "$(docker inspect --format '{{.State.Running}}' "$pre_api_id" 2>/dev/null)" == false && "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_api_id" 2>/dev/null)" == no \
+     && "$(docker inspect --format '{{.State.Running}}' "$pre_worker_id" 2>/dev/null)" == false && "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_worker_id" 2>/dev/null)" == no ]]; then
+    ok "$name writers left stopped/restart=no (unchanged by the M11-phase SIGKILL)"
+  else
+    bad "$name writer state after SIGKILL" "api=$pre_api_id running=$(docker inspect --format '{{.State.Running}}' "$pre_api_id" 2>/dev/null) restart=$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_api_id" 2>/dev/null); worker=$pre_worker_id running=$(docker inspect --format '{{.State.Running}}' "$pre_worker_id" 2>/dev/null) restart=$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_worker_id" 2>/dev/null)"
+  fi
+  docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+}
+
+# Optional: T168_ONLY=a|b|c|d|e|f|g|h|i|j|k|l runs a single scenario (used
+# for fast mutation iteration during development; a plain run with no filter
+# runs all).
 case "${T168_ONLY:-}" in
   a) run_scenario_a ;;
   b) run_scenario_b ;;
@@ -647,8 +796,10 @@ case "${T168_ONLY:-}" in
   h) run_scenario_h ;;
   i) run_scenario_i ;;
   j) run_scenario_j ;;
-  "") run_scenario_a; run_scenario_b; run_scenario_c; run_scenario_d; run_scenario_e; run_scenario_f; run_scenario_g; run_scenario_h; run_scenario_i; run_scenario_j ;;
-  *) echo "unknown T168_ONLY=$T168_ONLY (expected a|b|c|d|e|f|g|h|i|j)" >&2; exit 64 ;;
+  k) run_scenario_k ;;
+  l) run_scenario_l ;;
+  "") run_scenario_a; run_scenario_b; run_scenario_c; run_scenario_d; run_scenario_e; run_scenario_f; run_scenario_g; run_scenario_h; run_scenario_i; run_scenario_j; run_scenario_k; run_scenario_l ;;
+  *) echo "unknown T168_ONLY=$T168_ONLY (expected a|b|c|d|e|f|g|h|i|j|k|l)" >&2; exit 64 ;;
 esac
 
 log "=== summary: $PASS passed, $FAIL failed ==="

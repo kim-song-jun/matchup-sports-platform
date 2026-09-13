@@ -38,8 +38,8 @@ validate_alpha_release_manifest() {
       .database.task168.stage == "stageAIntermediate" and
       .database.task168.schemaSha256 == "91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f" and
       .database.task168.runtimeClientSchemaSha256 == .database.task168.schemaSha256 and
-      .database.task168.cutoverArchiveSha256 == "694a17ba8ed3d062b68908d4fd4ca3085be28afbe2c9661dd7a1cfae2c6e799b" and
-      .database.task168.cutoverManifestSha256 == "aa1753551026795af1af70352e54bfed31759fda826fe7a0244f43603ac8bb26" and
+      .database.task168.cutoverArchiveSha256 == "829cbb214afc26c417947c864fd477647498003e06915ca20b4d2f8b44b80c4b" and
+      .database.task168.cutoverManifestSha256 == "b270be3c365ad780a2988ccf16f4850c15807ebc3eb9eb763f2bcdd0418f2f74" and
       (.database.task168.migrations | length == 10) and
       ((.database.task168.recoveryFrom == null) or (.database.task168.recoveryFrom | type == "object" and (.releaseSha | test("^[0-9a-f]{40}$")) and (.cutoverReport | type == "string" and length > 0) and (.quiesceReceipt | type == "string" and length > 0) and (.backupReceipt | type == "string" and length > 0) and (.backupPath | type == "string" and length > 0) and (.cutoverReportSha256 | test("^[0-9a-f]{64}$")) and (.quiesceReceiptSha256 | test("^[0-9a-f]{64}$")) and (.backupReceiptSha256 | test("^[0-9a-f]{64}$")) and (.backupSha256 | test("^[0-9a-f]{64}$")))) and
       ([.database.task168.migrations[] | (.name | test("^[0-9]{14}_v1_")) and (.sha256 | test("^[0-9a-f]{64}$"))] | all) and

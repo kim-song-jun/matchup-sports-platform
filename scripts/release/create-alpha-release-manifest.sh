@@ -44,8 +44,8 @@ if [[ "${1:-}" == '--self-test' ]]; then
   MIGRATION_BASE_SHA="$RELEASE_SHA"
   TASK168_SCHEMA_SHA256=91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f
   TASK168_RUNTIME_CLIENT_SCHEMA_SHA256="$TASK168_SCHEMA_SHA256"
-  TASK168_CUTOVER_ARCHIVE_SHA256=694a17ba8ed3d062b68908d4fd4ca3085be28afbe2c9661dd7a1cfae2c6e799b
-  TASK168_CUTOVER_MANIFEST_SHA256=aa1753551026795af1af70352e54bfed31759fda826fe7a0244f43603ac8bb26
+  TASK168_CUTOVER_ARCHIVE_SHA256=829cbb214afc26c417947c864fd477647498003e06915ca20b4d2f8b44b80c4b
+  TASK168_CUTOVER_MANIFEST_SHA256=b270be3c365ad780a2988ccf16f4850c15807ebc3eb9eb763f2bcdd0418f2f74
   TASK168_MIGRATIONS_JSON='[{"name":"20260908130000_v1_x","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]'
   api_digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   web_digest=sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
@@ -66,7 +66,7 @@ fi
 for name in RELEASE_SHA RELEASE_VERSION REGISTRY DEPLOY_BUCKET EXPECTED_BUCKET_OWNER SOURCE_VERSION_ID SOURCE_SHA256 IMAGE_TAG TOOL_IMAGE_TAG PREVIOUS_SHA MIGRATION_BASE_SHA TASK168_SCHEMA_SHA256 TASK168_RUNTIME_CLIENT_SCHEMA_SHA256 TASK168_CUTOVER_ARCHIVE_SHA256 TASK168_CUTOVER_MANIFEST_SHA256 TASK168_MIGRATIONS_JSON; do
   [[ -n "${!name:-}" ]] || { echo "$name is required" >&2; exit 1; }
 done
-[[ "$TASK168_SCHEMA_SHA256" == 91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f && "$TASK168_RUNTIME_CLIENT_SCHEMA_SHA256" == "$TASK168_SCHEMA_SHA256" && "$TASK168_CUTOVER_ARCHIVE_SHA256" == 694a17ba8ed3d062b68908d4fd4ca3085be28afbe2c9661dd7a1cfae2c6e799b && "$TASK168_CUTOVER_MANIFEST_SHA256" == aa1753551026795af1af70352e54bfed31759fda826fe7a0244f43603ac8bb26 ]] || { echo 'Task168 immutable binding mismatch' >&2; exit 1; }
+[[ "$TASK168_SCHEMA_SHA256" == 91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f && "$TASK168_RUNTIME_CLIENT_SCHEMA_SHA256" == "$TASK168_SCHEMA_SHA256" && "$TASK168_CUTOVER_ARCHIVE_SHA256" == 829cbb214afc26c417947c864fd477647498003e06915ca20b4d2f8b44b80c4b && "$TASK168_CUTOVER_MANIFEST_SHA256" == b270be3c365ad780a2988ccf16f4850c15807ebc3eb9eb763f2bcdd0418f2f74 ]] || { echo 'Task168 immutable binding mismatch' >&2; exit 1; }
 jq -e 'length == 10 and ([.[] | (.name|test("^[0-9]{14}_v1_")) and (.sha256|test("^[0-9a-f]{64}$"))] | all)' <<<"$TASK168_MIGRATIONS_JSON" >/dev/null
 api_digest="$(aws ecr describe-images --repository-name teameet-alpha-v1-api --image-ids "imageTag=${IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text)"
 web_digest="$(aws ecr describe-images --repository-name teameet-alpha-v1-web --image-ids "imageTag=${IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text)"

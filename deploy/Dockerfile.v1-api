@@ -23,23 +23,23 @@ RUN npx prisma generate \
   && printf '{"schemaVersion":1,"stage":"stageAIntermediate","schemaSha256":"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f","generatedClient":true}\n' > .task168-runtime-client-attestation.json
 RUN npx nest build
 
-# This image is an executable view of the immutable v6 tar. No retired source
+# This image is an executable view of the immutable v7 tar. No retired source
 # is copied into the application tree: Docker verifies and extracts the pinned
 # archive, installs its locked dependencies, and generates its archived client.
 FROM base AS task168-cutover-tool
 WORKDIR /opt/task168
 RUN npm install -g pnpm@9.15.4
-COPY deploy/task168-pre-retirement-v6.tar.gz ./release.tar.gz
-RUN test "$(sha256sum release.tar.gz | awk '{print $1}')" = 694a17ba8ed3d062b68908d4fd4ca3085be28afbe2c9661dd7a1cfae2c6e799b \
+COPY deploy/task168-pre-retirement-v7.tar.gz ./release.tar.gz
+RUN test "$(sha256sum release.tar.gz | awk '{print $1}')" = 829cbb214afc26c417947c864fd477647498003e06915ca20b4d2f8b44b80c4b \
   && mkdir release \
   && tar -xzf release.tar.gz -C release \
-  && test "$(sha256sum release/MANIFEST.json | awk '{print $1}')" = aa1753551026795af1af70352e54bfed31759fda826fe7a0244f43603ac8bb26 \
+  && test "$(sha256sum release/MANIFEST.json | awk '{print $1}')" = b270be3c365ad780a2988ccf16f4850c15807ebc3eb9eb763f2bcdd0418f2f74 \
   && cd release && sha256sum -c SHA256SUMS
 WORKDIR /opt/task168/release/bundle
 RUN pnpm --filter v1_api... install --frozen-lockfile --ignore-scripts \
   && cd apps/v1_api \
   && pnpm exec prisma generate --schema prisma/schema.prisma \
-  && printf '{"schemaVersion":1,"archiveSha256":"694a17ba8ed3d062b68908d4fd4ca3085be28afbe2c9661dd7a1cfae2c6e799b","manifestSha256":"aa1753551026795af1af70352e54bfed31759fda826fe7a0244f43603ac8bb26","generatedClient":true}\n' > /opt/task168/tool-attestation.json
+  && printf '{"schemaVersion":1,"archiveSha256":"829cbb214afc26c417947c864fd477647498003e06915ca20b4d2f8b44b80c4b","manifestSha256":"b270be3c365ad780a2988ccf16f4850c15807ebc3eb9eb763f2bcdd0418f2f74","generatedClient":true}\n' > /opt/task168/tool-attestation.json
 WORKDIR /opt/task168/release/bundle/apps/v1_api
 ENTRYPOINT ["node", "-r", "ts-node/register/transpile-only", "src/games/migration/tournament-team-match-cutover-cli.ts"]
 

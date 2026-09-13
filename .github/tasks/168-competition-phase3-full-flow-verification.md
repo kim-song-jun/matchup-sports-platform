@@ -4,6 +4,20 @@
 
 ### 재개 커서 — 2026-09-13 AWS 재인증 이후
 
+- **b42 AFTER 잔여 두 건 후속 PR 준비:** Sol source PASS: CSS `c19702f6`의1024px 이상 desktop-main 직계 SectionTitle padding0으로 visible label을x200에 통일한다. API client `e51c8f2f`는 정확히 GET `/auth/me`+401+UNAUTHENTICATED만 client-error 수집에서 제외하고 원오류throw는 유지한다. 테스트 `2135af3e`는 실제v1Get 게스트 예외/다른route401 기록을 검증한다. GitHub CI 및 새Alpha AFTER 전에는 최종 완료로 세지 않는다.
+
+- **b42 실제 Ego AFTER 결과:** `output/ego/task168-ui-pr1184-20260913/after-b42/narrow-verdict.json`. 기본정보→주요멤버390/768/1440 모두24px·외곽border0·overflow0, 모바일/태블릿 CTA clearance16/16.25px, 멤버 profile href 확인. 공개 리그 상세2건 실제API200+UI정상. 데스크톱 기본정보 visible label x220/멤버x200의20px 불일치는 남아 후보 보완 중. `/logs/client-error`는 guest `/auth/me`의 예상 `V1 authentication is required`를204로 수집하는 잡음이며 window error/rejection/console.error0; 공개 상세 오류로 오판하지 않되 좁게 보완한다. 자격증명401에 막힌 captain/private/zero-team AFTER 및42개 전체 흐름은 미완이다. Ego36 유지.
+
+- **StageB 후보 검증 진행:** final-schema/schema.prisma `e44990c6`는 M11 대상5개 모델·3개 연결컬럼·2개 enum 및 역관계만 제거하고 source enum의 역사값을 유지한다. `/tmp`에서 비연결 dummy URL로 Prisma6.19.2 validate PASS(.env/DB 접근·generate 없음). 7개 소비 경로 좁은 감사는 canonical-safe5/historical-label2/실제 폐기DB 의존0이며 전수 감사로 확대 해석하지 않는다. StageB manifest/runner 후보는 creatorb940cd38/commonf954c0b4/runnera925fe12로 개정했으나 Sol 최종 재검토·실제 rehearsal producer·post-live 검증 연결은 미완이다. report의 숫자/boolean만으로 실행 증거를 대체하지 않는다.
+
+- **b42 Alpha 배포·실제 상태 검증 완료:** dev `b42fec2df4d31843c1bdfa7ce8059167ec9cabb6` CI34753576224 및 Alpha34753576227 SUCCESS. SSM `9ae7d6f1-cf67-4be4-a8c8-3c30dfdae063` Success/0, `alpha-b42fec2d-readback-result-20260913-r1.json`의16개 검증 모두 true로 release·runtime·M1–M10·원본310 연결 보존을 확인했다. Sol Ego36에서 최종 주요멤버 간격390/768/1440 및 이전 공개 리그 경기상세404 두 경로의 AFTER 검수를 시작한다. 이 시점 실제 AFTER 판정은 대기 중이다.
+
+- **StageB 최종 검증 계약 추가 결함:** Luna의 schema-runtime-gap.json과 Sol 검토로, 후보 manifest가 M11 전에 post-M11 runtimeVerification 경로를 요구하는 순환 의존을 확인했다. 실제 증거 없는 미래 경로로 채우지 않는다. 배포 전 최종 이미지·스키마 리허설 증거, M11 runner의 MIGRATION_COMMITTED, 새 런타임 시작 후 live verification 증거를 분리해야 한다. 후보 파일만 수정·독립 재검토하며 실제 M11 실행은 하지 않았다. 최종 schema/client 준비 및 post-live receipt producer·workflow 연결도 여전히 미완이다.
+
+- **별도 보안 자동검사 실행 장애 재확인:** b42 기준 GitHub Advanced Security34753580077도 `Model "claude-opus-5" is not available`로 실패했다. 실패 로그를 확인했으며 기존 외부 모델 가용성 장애와 동일하다. 이 검사를 PASS로 계산하지 않고 PR CI·Copilot 리뷰·실제 Alpha 검증과 구분한다.
+
+- **최신 PR1185 dev 머지 / 배포 확인 중:** exact head `e66e33baf508640718fc4270ef5b46bc94a6a112`의 CI34753212398 API/Web/Gates 전체 PASS 및 Copilot5190468618 10/10·새 지적0을 확인하여 dev `b42fec2df4d31843c1bdfa7ce8059167ec9cabb6`로 머지했다. matching CI34753576224/Alpha34753576227 실행 중이다. 기본정보→주요멤버24px·제목정렬 보완과 공개 정규리그 경기상세404 수정이 포함된다. 최종 Alpha AFTER 및 실제2개 상세 흐름은 아직 미검증이다. dev base 열린 PR은 조회 시0개다. 관리자·무소속 계정은 문서의 자격증명으로 실제 로그인401이며 배포 seed가 해당 비밀번호를 변경하지 않았음을 읽기 검토했다. 최신 계정 문서 경로를 사용자에게 질문한 상태이며 추측·초기화하지 않는다. 공개 화면 검수는 계속한다. M11 및42개 전체 흐름 완료 주장은 금지한다.
+
 - **815 AFTER 중간 판정 및 추가 수정:** Ego 실제 public team390/768/1440에서 hero scrim·한글 역할·프로필 링크·가로넘침0·하단CTA 여유33px를 확인했다. Event 실제 sport=futsal 요청/pressed/복귀 경로와 배지24px·12px700도 확인했다. Tournament sport의 inner label은 직접 DOM 재측정에서700이며, 오래된600/PR범위밖이라는 설명은 철회했다. 그러나 root가 AFTER 이미지를 확인해 기본정보 카드와 주요멤버 외곽 카드의 간격0 및 제목들여쓰기 불일치를 발견했다. 팀 상세 전체 PASS는 보류한다. 좁은 후속 후보는 외곽Card를section으로 바꾸고24px 섹션 간격·12px 제목간격을 준다. root가 미일치 closing tag를 고쳤고 candidate page d1524c70/CSS8fb44127를 검토한다. 이 UI 보완은 열려 있는 API1185에 함께 포함해 CI·배포를 진행할 예정이다. 비공개 멤버/팀생성 전체 상태 등은 계속 Ego 검수 중이다.
 
 - **UI Alpha 실제 배포 완료 / Ego AFTER 실행:** dev815522905의 CI34752286361 및 Alpha34752286382 SUCCESS. SSM `05a2db02-62ae-4d9c-8210-7eff17261dba` readback16/16 true(`alpha-81552290-readback-result-20260913-r1.json`)로 exact release·runtime·M1–M10·원본310 연결을 확인했다. Ego36에서 같은 공개/팀장/팀없는 계정과390/768/1440 AFTER를 시작했다. 멤버 비공개 검증은 실제 설정 UI가 있을 때만 원값을 기록해 일시 변경 후 정확히 복원한다. 아직 AFTER PASS는 아니다. API1185 exactdf3 CI34752403472 전체PASS·Copilot5190438763 7/7 새지적0이며 UI검수의 안정된 release 경계 뒤 머지한다. 선택적 TOCTOU 코멘트는 기존 요청 단위 공개상태 검사이며 새 무조건 노출 경로가 아니라는 Sol 검토를 기록했다.

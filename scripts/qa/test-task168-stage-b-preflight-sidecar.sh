@@ -2,12 +2,30 @@
 set -Eeuo pipefail
 
 # macOS bsdtar embeds AppleDouble ("._*") resource-fork sidecar members
-# in every directory it archives unless this is set; bsdtar's own `-t`
-# listing hides them again on read, but the new member-set check in
-# task168-final-image-preflight.sh parses the raw archive with Python's
-# tarfile module and correctly sees them, so left unset every fixture
-# built below would trip 'unauthenticated member' on macOS only.
+# in every directory it archives unless this is set.
 export COPYFILE_DISABLE=1
+
+# Builds a fixture archive the same way package-task168-final-source.sh does
+# (tarfile.PAX_FORMAT, mtime/uid/gid=0, uname/gname empty) instead of
+# shelling out to `tar`. The preflight's member-set check now walks raw tar
+# headers and enforces that exact contract, and neither the system `tar`
+# (bsdtar tags every member with mtime/xattr pax records; GNU tar's GNU
+# long-name format differs from bsdtar's) nor tarfile.add()'s own default
+# (real filesystem mtimes, also pax-encoded) reproduce it.
+write_clean_tar() {
+  local workdir="$1" out="$2"; shift 2
+  python3 - "$workdir" "$out" "$@" <<'PY'
+import os, sys, tarfile
+workdir, out = sys.argv[1], sys.argv[2]
+names = sys.argv[3:]
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
+with tarfile.open(out, 'w:gz', format=tarfile.PAX_FORMAT) as tar:
+    for name in names:
+        tar.add(os.path.join(workdir, name), arcname=name, filter=clean)
+PY
+}
 
 # Contract tests for the T3 source-archive-attestation consumer logic added to
 # scripts/release/task168-final-image-preflight.sh. Exercises only the static
@@ -123,7 +141,7 @@ build_archive_fixture() {
       archiveLayout: {root: "repository", pathPrefix: "", mapping: "archive member == files[].path"}
     }' > "$dir/stage/INPUT-MANIFEST.json"
 
-  ( cd "$dir/stage" && tar -czf "$dir/source.tar.gz" INPUT-MANIFEST.json apps )
+  write_clean_tar "$dir/stage" "$dir/source.tar.gz" INPUT-MANIFEST.json apps
   local manifest_sha; manifest_sha="$(sha "$dir/stage/INPUT-MANIFEST.json")"
   local archive_sha; archive_sha="$(sha "$dir/source.tar.gz")"
   local archive_bytes; archive_bytes="$(wc -c < "$dir/source.tar.gz" | tr -d ' ')"
@@ -204,7 +222,7 @@ mkdir -p "$TAMPERED_ARCHIVE_DIR/stage"
 cp -R "$FIXTURE/stage/apps" "$TAMPERED_ARCHIVE_DIR/stage/apps"
 jq '.finalSchema.sha256 = "1111111111111111111111111111111111111111111111111111111111111111"' \
   "$FIXTURE/stage/INPUT-MANIFEST.json" > "$TAMPERED_ARCHIVE_DIR/stage/INPUT-MANIFEST.json"
-( cd "$TAMPERED_ARCHIVE_DIR/stage" && tar -czf "$TAMPERED_ARCHIVE_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$TAMPERED_ARCHIVE_DIR/stage" "$TAMPERED_ARCHIVE_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 tampered_archive_sha="$(sha "$TAMPERED_ARCHIVE_DIR/source.tar.gz")"
 tampered_archive_bytes="$(wc -c < "$TAMPERED_ARCHIVE_DIR/source.tar.gz" | tr -d ' ')"
 # The sidecar still claims the *original* (untampered) manifest hash even
@@ -243,7 +261,7 @@ BUNDLE_DIR="$TMP/bundle"
 mkdir -p "$BUNDLE_DIR/stage/bundle"
 cp "$FIXTURE/stage/INPUT-MANIFEST.json" "$BUNDLE_DIR/stage/INPUT-MANIFEST.json"
 cp -R "$FIXTURE/stage/apps" "$BUNDLE_DIR/stage/bundle/apps"
-( cd "$BUNDLE_DIR/stage" && tar -czf "$BUNDLE_DIR/source.tar.gz" INPUT-MANIFEST.json bundle )
+write_clean_tar "$BUNDLE_DIR/stage" "$BUNDLE_DIR/source.tar.gz" INPUT-MANIFEST.json bundle
 bundle_sha="$(sha "$BUNDLE_DIR/source.tar.gz")"
 bundle_bytes="$(wc -c < "$BUNDLE_DIR/source.tar.gz" | tr -d ' ')"
 jq --arg h "$bundle_sha" --argjson b "$bundle_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
@@ -267,7 +285,7 @@ cp "$FIXTURE/stage/INPUT-MANIFEST.json" "$SYMLINK_DIR/stage/INPUT-MANIFEST.json"
 ln -s schema.prisma "$SYMLINK_DIR/stage/apps/v1_api/prisma/schema-link"
 # Plain (non -h) tar stores a symlink as a symlink member rather than
 # dereferencing it.
-( cd "$SYMLINK_DIR/stage" && tar -czf "$SYMLINK_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$SYMLINK_DIR/stage" "$SYMLINK_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 symlink_sha="$(sha "$SYMLINK_DIR/source.tar.gz")"
 symlink_bytes="$(wc -c < "$SYMLINK_DIR/source.tar.gz" | tr -d ' ')"
 jq --arg h "$symlink_sha" --argjson b "$symlink_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
@@ -280,7 +298,7 @@ for i in "${!ARGS[@]}"; do
     --source-archive-attestation) ARGS[$((i+1))]="$SYMLINK_DIR/source.tar.gz.attestation.json" ;;
   esac
 done
-run_expect_fail 'source archive contains a symlink or hardlink member' "${ARGS[@]}"
+run_expect_fail 'source archive contains an unauthorized typeflag' "${ARGS[@]}"
 pass 'rejects an archive that carries a symlink member'
 
 # ---- 7. prisma member set differs from the authenticated inventory -------
@@ -290,7 +308,7 @@ cp -R "$FIXTURE/stage/apps" "$EXTRA_DIR/stage/"
 mkdir -p "$EXTRA_DIR/stage/apps/v1_api/prisma/migrations/20260912000000_extra"
 printf -- '-- extra\nSELECT 1;\n' > "$EXTRA_DIR/stage/apps/v1_api/prisma/migrations/20260912000000_extra/migration.sql"
 cp "$FIXTURE/stage/INPUT-MANIFEST.json" "$EXTRA_DIR/stage/INPUT-MANIFEST.json"
-( cd "$EXTRA_DIR/stage" && tar -czf "$EXTRA_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$EXTRA_DIR/stage" "$EXTRA_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 extra_sha="$(sha "$EXTRA_DIR/source.tar.gz")"
 extra_bytes="$(wc -c < "$EXTRA_DIR/source.tar.gz" | tr -d ' ')"
 jq --arg h "$extra_sha" --argjson b "$extra_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
@@ -316,7 +334,7 @@ cp -R "$FIXTURE/stage/apps" "$NONCONFORMING_DIR/stage/"
 mkdir -p "$NONCONFORMING_DIR/stage/apps/v1_api/prisma/migrations/2026_evil"
 printf -- '-- evil\nSELECT 1;\n' > "$NONCONFORMING_DIR/stage/apps/v1_api/prisma/migrations/2026_evil/migration.sql"
 cp "$FIXTURE/stage/INPUT-MANIFEST.json" "$NONCONFORMING_DIR/stage/INPUT-MANIFEST.json"
-( cd "$NONCONFORMING_DIR/stage" && tar -czf "$NONCONFORMING_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$NONCONFORMING_DIR/stage" "$NONCONFORMING_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 nonconforming_sha="$(sha "$NONCONFORMING_DIR/source.tar.gz")"
 nonconforming_bytes="$(wc -c < "$NONCONFORMING_DIR/source.tar.gz" | tr -d ' ')"
 jq --arg h "$nonconforming_sha" --argjson b "$nonconforming_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
@@ -339,7 +357,7 @@ mkdir -p "$EXTRA_IN_DECLARED_DIR/stage"
 cp -R "$FIXTURE/stage/apps" "$EXTRA_IN_DECLARED_DIR/stage/"
 printf -- '-- smuggled\nSELECT 1;\n' > "$EXTRA_IN_DECLARED_DIR/stage/apps/v1_api/prisma/migrations/$M11_NAME/extra.sql"
 cp "$FIXTURE/stage/INPUT-MANIFEST.json" "$EXTRA_IN_DECLARED_DIR/stage/INPUT-MANIFEST.json"
-( cd "$EXTRA_IN_DECLARED_DIR/stage" && tar -czf "$EXTRA_IN_DECLARED_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$EXTRA_IN_DECLARED_DIR/stage" "$EXTRA_IN_DECLARED_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 extra_in_dir_sha="$(sha "$EXTRA_IN_DECLARED_DIR/source.tar.gz")"
 extra_in_dir_bytes="$(wc -c < "$EXTRA_IN_DECLARED_DIR/source.tar.gz" | tr -d ' ')"
 jq --arg h "$extra_in_dir_sha" --argjson b "$extra_in_dir_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
@@ -364,9 +382,12 @@ mkdir -p "$TRAVERSAL_DIR"
 python3 - "$FIXTURE/stage" "$TRAVERSAL_DIR/source.tar.gz" <<'PY'
 import io, os, sys, tarfile
 stage, out = sys.argv[1], sys.argv[2]
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
 with tarfile.open(out, 'w:gz') as tar:
-    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json')
-    tar.add(os.path.join(stage, 'apps'), arcname='apps')
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
     data = b'evil\n'
     info = tarfile.TarInfo(name='../evil.txt')
     info.size = len(data)
@@ -396,7 +417,7 @@ cp -R "$FIXTURE/stage/apps" "$CONTENT_TAMPER_DIR/stage/apps"
 cp "$FIXTURE/stage/INPUT-MANIFEST.json" "$CONTENT_TAMPER_DIR/stage/INPUT-MANIFEST.json"
 printf -- '-- tampered archive member; manifest still declares the original bytes\nSELECT 2;\n' \
   > "$CONTENT_TAMPER_DIR/stage/apps/v1_api/prisma/migrations/$M1_NAME/migration.sql"
-( cd "$CONTENT_TAMPER_DIR/stage" && tar -czf "$CONTENT_TAMPER_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$CONTENT_TAMPER_DIR/stage" "$CONTENT_TAMPER_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 content_tamper_sha="$(sha "$CONTENT_TAMPER_DIR/source.tar.gz")"
 content_tamper_bytes="$(wc -c < "$CONTENT_TAMPER_DIR/source.tar.gz" | tr -d ' ')"
 jq --arg h "$content_tamper_sha" --argjson b "$content_tamper_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
@@ -421,9 +442,12 @@ mkdir -p "$DUP_DIR"
 python3 - "$FIXTURE/stage" "$DUP_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
 import io, os, sys, tarfile
 stage, out, dup_name = sys.argv[1], sys.argv[2], sys.argv[3]
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
 with tarfile.open(out, 'w:gz') as tar:
-    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json')
-    tar.add(os.path.join(stage, 'apps'), arcname='apps')
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
     info = tarfile.TarInfo(name=dup_name)
     info.size = 0
     tar.addfile(info, io.BytesIO(b''))
@@ -445,16 +469,19 @@ pass 'DUP: rejects an archive that carries a second, empty copy of an already-pr
 
 # ---- DEVDUP. the same empty M11 duplicate as DUP, except its header's
 #      devmajor field is patched to non-octal bytes with a recomputed
-#      checksum -- CPython's tarfile parses devmajor/devminor for every
-#      member type (not only char/block devices, which is all bsdtar/GNU
-#      tar parse them for) and silently stops enumerating at this header
-#      (InvalidHeaderError past the first member -> tarfile.next() returns
-#      None), so `seen` above never even reaches this member -----------------
+#      checksum -- the raw header walk validates devmajor/devminor as
+#      strict octal on every member type, so it rejects this even though
+#      tarfile itself, absent that check, would silently stop enumerating
+#      here (InvalidHeaderError past the first member) ----------------------
 DEVDUP_DIR="$TMP/devdup-member"
 mkdir -p "$DEVDUP_DIR"
 python3 - "$FIXTURE/stage" "$DEVDUP_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
 import io, os, sys, tarfile, gzip
 stage, out, dup_name = sys.argv[1], sys.argv[2], sys.argv[3]
+
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
 
 def with_checksum(buf):
     buf = bytearray(buf)
@@ -464,8 +491,8 @@ def with_checksum(buf):
 
 raw = io.BytesIO()
 with tarfile.open(fileobj=raw, mode='w') as tar:
-    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json')
-    tar.add(os.path.join(stage, 'apps'), arcname='apps')
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
     dup_offset = raw.tell()
     info = tarfile.TarInfo(name=dup_name)
     info.size = 0
@@ -489,28 +516,32 @@ for i in "${!ARGS[@]}"; do
     --source-archive-attestation) ARGS[$((i+1))]="$DEVDUP_DIR/source.tar.gz.attestation.json" ;;
   esac
 done
-run_expect_fail 'source archive member listing disagrees between tarfile and an independent tar listing' "${ARGS[@]}"
-pass 'DEVDUP: rejects a duplicate M11 member hidden from tarfile by a non-octal devmajor field that real tar tools ignore on a regular file'
+run_expect_fail 'source archive contains a non-octal numeric header field' "${ARGS[@]}"
+pass 'DEVDUP: rejects a duplicate M11 member whose devmajor field is non-octal bytes'
 
 # ---- GLOBALPAX. a pax global header sets path=a decoy name, followed by a
 #      per-member pax ('x') header that only sets an unrelated key (not
 #      path) on an empty duplicate of the M11 member. CPython's tarfile
 #      merges the still-active global pax dict into the per-member one and
-#      applies the inherited 'path', renaming the member to the decoy --
-#      which sits outside apps/v1_api/prisma/ and so draws no scrutiny from
-#      any check below. bsdtar/GNU tar do not carry the global 'path' across
-#      to a member with its own (non-path) extended header, and extract the
-#      duplicate at its true, un-renamed path, overwriting the real M11 -----
+#      renames the member to the decoy, outside apps/v1_api/prisma/, so a
+#      count- or tarfile-name-only check draws no scrutiny; GNU tar applies
+#      the same rename, while bsdtar keeps the true path -- either way the
+#      raw header walk rejects the archive outright for carrying a typeflag
+#      'g' header, before any renaming can matter ---------------------------
 GLOBALPAX_DIR="$TMP/globalpax-member"
 mkdir -p "$GLOBALPAX_DIR"
 python3 - "$FIXTURE/stage" "$GLOBALPAX_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" "apps/zz-decoy.txt" <<'PY'
 import io, os, sys, tarfile, gzip
 stage, out, dup_name, decoy_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
+
 raw = io.BytesIO()
 tar = tarfile.open(fileobj=raw, mode='w')
-tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json')
-tar.add(os.path.join(stage, 'apps'), arcname='apps')
+tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
 data = raw.getvalue()  # not closed -- omits tarfile's own end-of-archive trailer
 
 data += tarfile.TarInfo.create_pax_global_header({'path': decoy_name})
@@ -539,8 +570,8 @@ for i in "${!ARGS[@]}"; do
     --source-archive-attestation) ARGS[$((i+1))]="$GLOBALPAX_DIR/source.tar.gz.attestation.json" ;;
   esac
 done
-run_expect_fail 'source archive member listing disagrees between tarfile and an independent tar listing' "${ARGS[@]}"
-pass 'GLOBALPAX: rejects a duplicate M11 member renamed by tarfile via an inherited pax global path override that real tar tools ignore'
+run_expect_fail 'source archive contains a global pax extended header' "${ARGS[@]}"
+pass 'GLOBALPAX: rejects an archive that carries a pax global header, platform-independent of whether the following rename would otherwise apply'
 
 # ---- 10. non-canonical spellings of an in-scope migration path bypass a
 #          check keyed on fixed "obviously bad" shapes only if the check
@@ -558,9 +589,12 @@ for spelling in dotslash dblslash dotmid; do
   python3 - "$NONCANON_DIR/stage" "$NONCANON_DIR/source.tar.gz" "$evil_name" <<'PY'
 import io, os, sys, tarfile
 stage, out, evil_name = sys.argv[1], sys.argv[2], sys.argv[3]
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
 with tarfile.open(out, 'w:gz') as tar:
-    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json')
-    tar.add(os.path.join(stage, 'apps'), arcname='apps')
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
     data = b'-- evil\nSELECT 1;\n'
     info = tarfile.TarInfo(name=evil_name)
     info.size = len(data)
@@ -591,9 +625,12 @@ mkdir -p "$SPACE_TRAVERSAL_DIR"
 python3 - "$FIXTURE/stage" "$SPACE_TRAVERSAL_DIR/source.tar.gz" <<'PY'
 import io, os, sys, tarfile
 stage, out = sys.argv[1], sys.argv[2]
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
 with tarfile.open(out, 'w:gz') as tar:
-    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json')
-    tar.add(os.path.join(stage, 'apps'), arcname='apps')
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
     data = b'evil\n'
     info = tarfile.TarInfo(name='../evil with space.txt')
     info.size = len(data)
@@ -613,6 +650,241 @@ for i in "${!ARGS[@]}"; do
 done
 run_expect_fail 'source archive contains an unsafe path' "${ARGS[@]}"
 pass 'rejects a ../ traversal member whose name contains a space'
+
+# ---- CASEFOLD-DUP. two archive members whose full paths differ only by
+#      case are rejected -- tarfile treats them as distinct, but they
+#      collide on any case-insensitive extraction filesystem --------------
+CASEFOLD_DUP_DIR="$TMP/casefold-dup"
+mkdir -p "$CASEFOLD_DUP_DIR"
+printf 'a\n' > "$CASEFOLD_DUP_DIR/extra-a.txt"
+printf 'b\n' > "$CASEFOLD_DUP_DIR/extra-b.txt"
+python3 - "$FIXTURE/stage" "$CASEFOLD_DUP_DIR" "$CASEFOLD_DUP_DIR/source.tar.gz" <<'PY'
+import os, sys, tarfile
+stage, workdir, out = sys.argv[1], sys.argv[2], sys.argv[3]
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
+with tarfile.open(out, 'w:gz', format=tarfile.PAX_FORMAT) as tar:
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+    # Two on-disk names avoid colliding on this build host's own filesystem;
+    # only the archive's own (distinct) arcnames matter to the check.
+    tar.add(os.path.join(workdir, 'extra-a.txt'), arcname='docs/Foo.txt', filter=clean, recursive=False)
+    tar.add(os.path.join(workdir, 'extra-b.txt'), arcname='docs/foo.txt', filter=clean, recursive=False)
+PY
+casefold_dup_sha="$(sha "$CASEFOLD_DUP_DIR/source.tar.gz")"
+casefold_dup_bytes="$(wc -c < "$CASEFOLD_DUP_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$casefold_dup_sha" --argjson b "$casefold_dup_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$CASEFOLD_DUP_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$CASEFOLD_DUP_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$casefold_dup_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$CASEFOLD_DUP_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains member names that collide only by case' "${ARGS[@]}"
+pass 'CASEFOLD-DUP: rejects two archive members whose full paths differ only by case'
+
+# ---- CASEFOLD-BOUNDARY. a member under Apps/v1_api/prisma/ (wrong case) is
+#      rejected -- the prisma allowlist below matches apps/v1_api/prisma/
+#      case-sensitively, so this would otherwise land inside it unreviewed
+#      on a case-insensitive extraction filesystem --------------------------
+CASEFOLD_BOUNDARY_DIR="$TMP/casefold-boundary"
+mkdir -p "$CASEFOLD_BOUNDARY_DIR"
+printf -- '-- evil\nSELECT 1;\n' > "$CASEFOLD_BOUNDARY_DIR/evil.sql"
+python3 - "$FIXTURE/stage" "$CASEFOLD_BOUNDARY_DIR" "$CASEFOLD_BOUNDARY_DIR/source.tar.gz" <<'PY'
+import os, sys, tarfile
+stage, workdir, out = sys.argv[1], sys.argv[2], sys.argv[3]
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
+with tarfile.open(out, 'w:gz', format=tarfile.PAX_FORMAT) as tar:
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+    tar.add(os.path.join(workdir, 'evil.sql'), arcname='Apps/v1_api/prisma/evil.sql', filter=clean, recursive=False)
+PY
+casefold_boundary_sha="$(sha "$CASEFOLD_BOUNDARY_DIR/source.tar.gz")"
+casefold_boundary_bytes="$(wc -c < "$CASEFOLD_BOUNDARY_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$casefold_boundary_sha" --argjson b "$casefold_boundary_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$CASEFOLD_BOUNDARY_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$CASEFOLD_BOUNDARY_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$casefold_boundary_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$CASEFOLD_BOUNDARY_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains a member whose path collides only by case with apps/v1_api/prisma/' "${ARGS[@]}"
+pass 'CASEFOLD-BOUNDARY: rejects a member under Apps/v1_api/prisma/ (wrong case) that would land inside the reviewed tree on a case-insensitive filesystem'
+
+# ---- LINKNAME. a regular-file ('0') header carrying a non-empty linkname
+#      is rejected -- a regular file has no legitimate use for it ----------
+LINKNAME_DIR="$TMP/linkname-nonempty"
+mkdir -p "$LINKNAME_DIR"
+python3 - "$FIXTURE/stage" "$LINKNAME_DIR/source.tar.gz" <<'PY'
+import io, os, sys, tarfile, gzip
+stage, out = sys.argv[1], sys.argv[2]
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
+def with_checksum(buf):
+    buf = bytearray(buf)
+    unsigned, _ = tarfile.calc_chksums(bytes(buf))
+    buf[148:156] = ("%06o\0 " % unsigned).encode('ascii')
+    return bytes(buf)
+raw = io.BytesIO()
+with tarfile.open(fileobj=raw, mode='w') as tar:
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+    offset = raw.tell()
+    info = tarfile.TarInfo(name='apps/zz-linkname-probe.txt')
+    info.size = 0
+    tar.addfile(info, io.BytesIO(b''))
+data = bytearray(raw.getvalue())
+header = bytearray(data[offset:offset + 512])
+header[157:200] = b'sneaky-linkname-on-a-regular-file'.ljust(43, b'\x00')
+data[offset:offset + 512] = bytearray(with_checksum(bytes(header)))
+with gzip.GzipFile(out, 'wb', mtime=0) as gz:
+    gz.write(bytes(data))
+PY
+linkname_sha="$(sha "$LINKNAME_DIR/source.tar.gz")"
+linkname_bytes="$(wc -c < "$LINKNAME_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$linkname_sha" --argjson b "$linkname_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$LINKNAME_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$LINKNAME_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$linkname_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$LINKNAME_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive regular file member has a non-empty linkname' "${ARGS[@]}"
+pass 'LINKNAME: rejects a regular-file header carrying a non-empty linkname field'
+
+# ---- PAX-SIZE / PAX-LINKPATH. a per-member pax record overriding a key
+#      other than 'path' (the only key the real packager ever emits) is
+#      rejected. The size probe uses 0, not a large value: an inflated pax
+#      size makes the system `tar` used elsewhere in the script to extract
+#      INPUT-MANIFEST.json overrun the archive, rejecting it for that
+#      unrelated reason before this check ever runs -----------------------
+for probe_key in size linkpath; do
+  PAX_KEY_DIR="$TMP/pax-key-$probe_key"
+  mkdir -p "$PAX_KEY_DIR"
+  python3 - "$FIXTURE/stage" "$PAX_KEY_DIR/source.tar.gz" "$probe_key" <<'PY'
+import io, os, sys, tarfile
+stage, out, probe_key = sys.argv[1], sys.argv[2], sys.argv[3]
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
+probe_value = '0' if probe_key == 'size' else '/etc/passwd'
+with tarfile.open(out, 'w:gz') as tar:
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+    data = b'evil\n'
+    info = tarfile.TarInfo(name='apps/zz-pax-%s-probe.txt' % probe_key)
+    info.size = len(data)
+    info.pax_headers = {probe_key: probe_value}
+    tar.addfile(info, io.BytesIO(data))
+PY
+  pax_key_sha="$(sha "$PAX_KEY_DIR/source.tar.gz")"
+  pax_key_bytes="$(wc -c < "$PAX_KEY_DIR/source.tar.gz" | tr -d ' ')"
+  jq --arg h "$pax_key_sha" --argjson b "$pax_key_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+    "$FIXTURE/source.tar.gz.attestation.json" > "$PAX_KEY_DIR/source.tar.gz.attestation.json"
+  common_args
+  for i in "${!ARGS[@]}"; do
+    case "${ARGS[$i]}" in
+      --source-archive) ARGS[$((i+1))]="$PAX_KEY_DIR/source.tar.gz" ;;
+      --source-sha256) ARGS[$((i+1))]="$pax_key_sha" ;;
+      --source-archive-attestation) ARGS[$((i+1))]="$PAX_KEY_DIR/source.tar.gz.attestation.json" ;;
+    esac
+  done
+  run_expect_fail "source archive contains an unauthorized pax extended header key: $probe_key" "${ARGS[@]}"
+  pass "PAX-$probe_key: rejects a per-member pax record overriding $probe_key, a key the real packager never emits"
+done
+
+# ---- LONGNAME. a GNU longname ('L') header is rejected -- PAX_FORMAT (what
+#      the real packager writes) uses a pax 'path' record for an over-length
+#      name, never the GNU longname extension -------------------------------
+LONGNAME_DIR="$TMP/longname"
+mkdir -p "$LONGNAME_DIR"
+python3 - "$FIXTURE/stage" "$LONGNAME_DIR/source.tar.gz" <<'PY'
+import io, os, sys, tarfile
+stage, out = sys.argv[1], sys.argv[2]
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
+with tarfile.open(out, 'w:gz', format=tarfile.GNU_FORMAT) as tar:
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+    data = b'-- x\n'
+    info = tarfile.TarInfo(name='apps/' + ('z' * 100) + '/probe.txt')
+    info.size = len(data)
+    clean(info)
+    tar.addfile(info, io.BytesIO(data))
+PY
+longname_sha="$(sha "$LONGNAME_DIR/source.tar.gz")"
+longname_bytes="$(wc -c < "$LONGNAME_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$longname_sha" --argjson b "$longname_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$LONGNAME_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$LONGNAME_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$longname_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$LONGNAME_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains an unauthorized typeflag' "${ARGS[@]}"
+pass 'LONGNAME: rejects an archive that carries a GNU longname (L) header'
+
+# ---- SPARSE. a header whose typeflag byte is patched to 'S' (GNU sparse) is
+#      rejected -- the real packager only ever writes regular-file '0' -----
+SPARSE_DIR="$TMP/sparse-typeflag"
+mkdir -p "$SPARSE_DIR"
+python3 - "$FIXTURE/stage" "$SPARSE_DIR/source.tar.gz" <<'PY'
+import io, os, sys, tarfile, gzip
+stage, out = sys.argv[1], sys.argv[2]
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
+def with_checksum(buf):
+    buf = bytearray(buf)
+    unsigned, _ = tarfile.calc_chksums(bytes(buf))
+    buf[148:156] = ("%06o\0 " % unsigned).encode('ascii')
+    return bytes(buf)
+raw = io.BytesIO()
+with tarfile.open(fileobj=raw, mode='w') as tar:
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+    offset = raw.tell()
+    info = tarfile.TarInfo(name='apps/zz-sparse-probe.txt')
+    info.size = 0
+    tar.addfile(info, io.BytesIO(b''))
+data = bytearray(raw.getvalue())
+header = bytearray(data[offset:offset + 512])
+header[156:157] = b'S'
+data[offset:offset + 512] = bytearray(with_checksum(bytes(header)))
+with gzip.GzipFile(out, 'wb', mtime=0) as gz:
+    gz.write(bytes(data))
+PY
+sparse_sha="$(sha "$SPARSE_DIR/source.tar.gz")"
+sparse_bytes="$(wc -c < "$SPARSE_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$sparse_sha" --argjson b "$sparse_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$SPARSE_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$SPARSE_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$sparse_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$SPARSE_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains an unauthorized typeflag' "${ARGS[@]}"
+pass 'SPARSE: rejects an archive that carries a GNU sparse (S) typeflag'
 
 # ---- 12. sidecar sourceCommit differs from --release-sha -------------------
 BAD_SIDECAR_COMMIT="$TMP/bad-sidecar-commit.json"
@@ -646,7 +918,7 @@ mkdir -p "$WRONG_EMBEDDED_COMMIT_DIR/stage"
 cp -R "$FIXTURE/stage/apps" "$WRONG_EMBEDDED_COMMIT_DIR/stage/apps"
 jq '.sourceCommit = "dddddddddddddddddddddddddddddddddddddddd"' \
   "$FIXTURE/stage/INPUT-MANIFEST.json" > "$WRONG_EMBEDDED_COMMIT_DIR/stage/INPUT-MANIFEST.json"
-( cd "$WRONG_EMBEDDED_COMMIT_DIR/stage" && tar -czf "$WRONG_EMBEDDED_COMMIT_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$WRONG_EMBEDDED_COMMIT_DIR/stage" "$WRONG_EMBEDDED_COMMIT_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 wrong_commit_manifest_sha="$(sha "$WRONG_EMBEDDED_COMMIT_DIR/stage/INPUT-MANIFEST.json")"
 wrong_commit_archive_sha="$(sha "$WRONG_EMBEDDED_COMMIT_DIR/source.tar.gz")"
 wrong_commit_archive_bytes="$(wc -c < "$WRONG_EMBEDDED_COMMIT_DIR/source.tar.gz" | tr -d ' ')"
@@ -673,7 +945,7 @@ mkdir -p "$NONEMPTY_PREFIX_DIR/stage"
 cp -R "$FIXTURE/stage/apps" "$NONEMPTY_PREFIX_DIR/stage/apps"
 jq '.archiveLayout.pathPrefix = "bundle/"' \
   "$FIXTURE/stage/INPUT-MANIFEST.json" > "$NONEMPTY_PREFIX_DIR/stage/INPUT-MANIFEST.json"
-( cd "$NONEMPTY_PREFIX_DIR/stage" && tar -czf "$NONEMPTY_PREFIX_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$NONEMPTY_PREFIX_DIR/stage" "$NONEMPTY_PREFIX_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 nonempty_prefix_manifest_sha="$(sha "$NONEMPTY_PREFIX_DIR/stage/INPUT-MANIFEST.json")"
 nonempty_prefix_archive_sha="$(sha "$NONEMPTY_PREFIX_DIR/source.tar.gz")"
 nonempty_prefix_archive_bytes="$(wc -c < "$NONEMPTY_PREFIX_DIR/source.tar.gz" | tr -d ' ')"
@@ -768,7 +1040,8 @@ done
 run_expect_fail 'migration contract must contain exactly 11 hashed entries' "${ARGS[@]}"
 pass 'rejects a Task 168 migration contract entry whose sha256 is null'
 
-# ---- G1/G2/G4 (independent adversarial review, T3 consumer binding) -------
+# ---- G1/G2/G4. archive-vs-files[] self-consistency is not the same binding
+#      as files[]-vs-fullMigrationHistory/finalSchema -------------------------
 # The checks exercised through (9) prove files[] is self-consistent with the
 # archive's own bytes. They never compare that inventory against
 # fullMigrationHistory/finalSchema -- the fields --migration-root and
@@ -776,8 +1049,7 @@ pass 'rejects a Task 168 migration contract entry whose sha256 is null'
 # are pinned to. These three probes tamper only the archive + its files[]
 # entries (rehashed to match each other, so archive-vs-files[] alone stays
 # green) while leaving fullMigrationHistory, finalSchema.sha256,
-# --migration-root and --schema exactly as the good fixture built them --
-# reproducing the reviewer's G1/G2/G4 bypass shapes verbatim.
+# --migration-root and --schema exactly as the good fixture built them.
 
 # G1: archive's M1 content + files[] M1 entry are tampered together
 # (rehashed to match each other); fullMigrationHistory (and --migration-root,
@@ -791,7 +1063,7 @@ g1_m1_bytes="$(wc -c < "$G1_DIR/stage/apps/v1_api/prisma/migrations/$M1_NAME/mig
 jq --arg p "apps/v1_api/prisma/migrations/$M1_NAME/migration.sql" --arg h "$g1_m1_sha" --argjson b "$g1_m1_bytes" \
   '.files |= map(if .path == $p then .sha256 = $h | .bytes = $b else . end)' \
   "$FIXTURE/stage/INPUT-MANIFEST.json" > "$G1_DIR/stage/INPUT-MANIFEST.json"
-( cd "$G1_DIR/stage" && tar -czf "$G1_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$G1_DIR/stage" "$G1_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 g1_manifest_sha="$(sha "$G1_DIR/stage/INPUT-MANIFEST.json")"
 g1_archive_sha="$(sha "$G1_DIR/source.tar.gz")"
 g1_archive_bytes="$(wc -c < "$G1_DIR/source.tar.gz" | tr -d ' ')"
@@ -822,7 +1094,7 @@ rm -rf "$G2_DIR/stage/apps/v1_api/prisma/migrations/$M1_NAME"
 jq --arg p "apps/v1_api/prisma/migrations/$M1_NAME/migration.sql" \
   '.files |= map(select(.path != $p))' \
   "$FIXTURE/stage/INPUT-MANIFEST.json" > "$G2_DIR/stage/INPUT-MANIFEST.json"
-( cd "$G2_DIR/stage" && tar -czf "$G2_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$G2_DIR/stage" "$G2_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 g2_manifest_sha="$(sha "$G2_DIR/stage/INPUT-MANIFEST.json")"
 g2_archive_sha="$(sha "$G2_DIR/source.tar.gz")"
 g2_archive_bytes="$(wc -c < "$G2_DIR/source.tar.gz" | tr -d ' ')"
@@ -855,7 +1127,7 @@ g4_schema_bytes="$(wc -c < "$G4_DIR/stage/apps/v1_api/prisma/schema.prisma" | tr
 jq --arg p 'apps/v1_api/prisma/schema.prisma' --arg h "$g4_schema_sha" --argjson b "$g4_schema_bytes" \
   '.files |= map(if .path == $p then .sha256 = $h | .bytes = $b else . end)' \
   "$FIXTURE/stage/INPUT-MANIFEST.json" > "$G4_DIR/stage/INPUT-MANIFEST.json"
-( cd "$G4_DIR/stage" && tar -czf "$G4_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$G4_DIR/stage" "$G4_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 g4_manifest_sha="$(sha "$G4_DIR/stage/INPUT-MANIFEST.json")"
 g4_archive_sha="$(sha "$G4_DIR/source.tar.gz")"
 g4_archive_bytes="$(wc -c < "$G4_DIR/source.tar.gz" | tr -d ' ')"
@@ -893,7 +1165,7 @@ pin1_schema_bytes="$(wc -c < "$PIN1_DIR/stage/apps/v1_api/prisma/schema.prisma" 
 jq --arg p 'apps/v1_api/prisma/schema.prisma' --arg h "$pin1_schema_sha" --argjson b "$pin1_schema_bytes" \
   '.finalSchema.sha256 = $h | .files |= map(if .path == $p then .sha256 = $h | .bytes = $b else . end)' \
   "$FIXTURE/stage/INPUT-MANIFEST.json" > "$PIN1_DIR/stage/INPUT-MANIFEST.json"
-( cd "$PIN1_DIR/stage" && tar -czf "$PIN1_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$PIN1_DIR/stage" "$PIN1_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 pin1_manifest_sha="$(sha "$PIN1_DIR/stage/INPUT-MANIFEST.json")"
 pin1_archive_sha="$(sha "$PIN1_DIR/source.tar.gz")"
 pin1_archive_bytes="$(wc -c < "$PIN1_DIR/source.tar.gz" | tr -d ' ')"
@@ -925,9 +1197,10 @@ pass 'PIN-1: rejects a fully self-consistent schema (archive/files[]/finalSchema
 # (reviewed) fixture built them (so check (b) stays green: files[]'s
 # schema.prisma entry is still, and actually is, FINAL_SCHEMA_SHA), and only
 # moves finalSchema.sha256 + --schema/--schema-sha256 together to a
-# different, self-consistent, dummy value (so the pre-existing :175 binding
-# stays green too). Only the SCHEMA_SHA==FINAL_SCHEMA_SHA pin can catch a
-# rehearsal input that both check (b) and :175 miss this way.
+# different, self-consistent, dummy value (so the input-snapshot's own
+# finalSchema.sha256==--schema-sha256 binding stays green too). Only the
+# SCHEMA_SHA==FINAL_SCHEMA_SHA pin can catch a rehearsal input that both
+# check (b) and that binding miss this way.
 PIN2_DIR="$TMP/pin2-rehearsal-schema-diverges"
 mkdir -p "$PIN2_DIR/stage"
 cp -R "$FIXTURE/stage/apps" "$PIN2_DIR/stage/apps"
@@ -935,11 +1208,11 @@ printf 'generator client {\n  provider = "prisma-client-js"\n}\n// not the revie
 pin2_schema_sha="$(sha "$PIN2_DIR/schema.prisma")"
 # files[] is left untouched -- it still declares the real, reviewed
 # FINAL_SCHEMA_SHA for schema.prisma, matching the archive's actual
-# (unmodified) bytes. Only finalSchema.sha256 (the field :175 and --schema
-# are checked against) is moved to the dummy value.
+# (unmodified) bytes. Only finalSchema.sha256 (the field the input-snapshot
+# binding and --schema are checked against) is moved to the dummy value.
 jq --arg h "$pin2_schema_sha" '.finalSchema.sha256 = $h' \
   "$FIXTURE/stage/INPUT-MANIFEST.json" > "$PIN2_DIR/stage/INPUT-MANIFEST.json"
-( cd "$PIN2_DIR/stage" && tar -czf "$PIN2_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$PIN2_DIR/stage" "$PIN2_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 pin2_manifest_sha="$(sha "$PIN2_DIR/stage/INPUT-MANIFEST.json")"
 pin2_archive_sha="$(sha "$PIN2_DIR/source.tar.gz")"
 pin2_archive_bytes="$(wc -c < "$PIN2_DIR/source.tar.gz" | tr -d ' ')"
@@ -960,7 +1233,8 @@ for i in "${!ARGS[@]}"; do
   esac
 done
 # Every pre-existing check and both new relative cross-checks (a)/(b) stay
-# green here: finalSchema.sha256==SCHEMA_SHA (:175, both dummy), and files[]'s
+# green here: finalSchema.sha256==SCHEMA_SHA (the input-snapshot binding,
+# both dummy), and files[]'s
 # schema.prisma entry is untouched and still equals FINAL_SCHEMA_SHA,
 # matching the archive's real, unmodified bytes (check (b) and the per-file
 # archive-content loop). Only the absolute SCHEMA_SHA==FINAL_SCHEMA_SHA pin
@@ -1046,7 +1320,7 @@ build_golden_fixture() {
       archiveLayout:{root:"repository",pathPrefix:"",mapping:"archive member == files[].path"}}' \
     > "$dir/stage/INPUT-MANIFEST.json"
 
-  ( cd "$dir/stage" && tar -czf "$dir/source.tar.gz" INPUT-MANIFEST.json apps )
+  write_clean_tar "$dir/stage" "$dir/source.tar.gz" INPUT-MANIFEST.json apps
   local manifest_sha archive_sha archive_bytes
   manifest_sha="$(sha "$dir/stage/INPUT-MANIFEST.json")"
   archive_sha="$(sha "$dir/source.tar.gz")"
@@ -1094,6 +1368,34 @@ run_expect_fail 'pinned PostgreSQL image is unavailable locally' "${ARGS[@]}"
 grep -q 'image inspect' "$DOCKER_STUB_LOG" || fail 'docker stub was not invoked -- golden fixture did not reach the docker image checks'
 pass 'GOLDEN: a full 11-entry Task168 contract + matching 12-entry full history clears every static check and reaches the stubbed docker image-inspect call'
 
+# ---- GOLDEN-NONASCII. the golden archive plus a non-ASCII (Korean) name and
+#      a name containing a backslash, both outside apps/v1_api/prisma/, still
+#      clear every static check -- these are exactly the two byte shapes an
+#      external `tar -t` listing reformats (NFD, octal-escaped, doubled
+#      backslash) before the raw header walk replaced that cross-check ------
+NONASCII_DIR="$TMP/golden-nonascii"
+mkdir -p "$NONASCII_DIR/stage/docs"
+cp -R "$GOLDEN/stage/apps" "$NONASCII_DIR/stage/apps"
+cp "$GOLDEN/stage/INPUT-MANIFEST.json" "$NONASCII_DIR/stage/INPUT-MANIFEST.json"
+printf 'hi\n' > "$NONASCII_DIR/stage/docs/한글.md"
+printf 'hi\n' > "$NONASCII_DIR/stage/docs/a b\\c.md"
+write_clean_tar "$NONASCII_DIR/stage" "$NONASCII_DIR/source.tar.gz" INPUT-MANIFEST.json apps docs
+nonascii_sha="$(sha "$NONASCII_DIR/source.tar.gz")"
+nonascii_bytes="$(wc -c < "$NONASCII_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$nonascii_sha" --argjson b "$nonascii_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$GOLDEN/source.tar.gz.attestation.json" > "$NONASCII_DIR/source.tar.gz.attestation.json"
+common_args_golden
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$NONASCII_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$nonascii_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$NONASCII_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'pinned PostgreSQL image is unavailable locally' "${ARGS[@]}"
+grep -q 'image inspect' "$DOCKER_STUB_LOG" || fail 'docker stub was not invoked -- the non-ASCII/backslash golden fixture did not reach the docker image checks'
+pass 'GOLDEN-NONASCII: a golden archive carrying a non-ASCII name and a backslash-containing name outside apps/v1_api/prisma/ still clears every static check'
+
 # ---- F13. snapshot .m11.sha256 disagrees with the reviewed M11_SHA pin,
 #           while fullMigrationHistory/files[]/archive/migration-root/
 #           --migrations-json all still agree with each other and with the
@@ -1103,7 +1405,7 @@ mkdir -p "$F13_DIR/stage"
 cp -R "$GOLDEN/stage/apps" "$F13_DIR/stage/apps"
 jq '.m11.sha256 = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"' \
   "$GOLDEN/stage/INPUT-MANIFEST.json" > "$F13_DIR/stage/INPUT-MANIFEST.json"
-( cd "$F13_DIR/stage" && tar -czf "$F13_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$F13_DIR/stage" "$F13_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 f13_manifest_sha="$(sha "$F13_DIR/stage/INPUT-MANIFEST.json")"
 f13_archive_sha="$(sha "$F13_DIR/source.tar.gz")"
 f13_archive_bytes="$(wc -c < "$F13_DIR/source.tar.gz" | tr -d ' ')"
@@ -1165,15 +1467,15 @@ run_expect_fail 'M11 must be the final migration entry' "${ARGS[@]}"
 pass 'F14: rejects a Task168 contract carrying the correct 11 entries reordered so M11 is not last'
 
 # ---- F15. --full-migrations-json and the snapshot-embedded fullMigrationHistory
-#           are reordered together (so the :188 cross-check still passes) so M11
-#           is not the last entry of either one ----------------------------
+#           are reordered together (so the files[]-vs-fullMigrationHistory
+#           cross-check still passes) so M11 is not the last entry of either --
 F15_DIR="$TMP/f15-full-history-order"
 mkdir -p "$F15_DIR/stage"
 cp -R "$GOLDEN/stage/apps" "$F15_DIR/stage/apps"
 jq -c '[.[-1]] + .[0:-1]' "$GOLDEN/full-migrations.json" > "$F15_DIR/full-migrations.json"
 jq --slurpfile h "$F15_DIR/full-migrations.json" '.fullMigrationHistory = $h[0]' \
   "$GOLDEN/stage/INPUT-MANIFEST.json" > "$F15_DIR/stage/INPUT-MANIFEST.json"
-( cd "$F15_DIR/stage" && tar -czf "$F15_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$F15_DIR/stage" "$F15_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 f15_manifest_sha="$(sha "$F15_DIR/stage/INPUT-MANIFEST.json")"
 f15_archive_sha="$(sha "$F15_DIR/source.tar.gz")"
 f15_archive_bytes="$(wc -c < "$F15_DIR/source.tar.gz" | tr -d ' ')"
@@ -1196,11 +1498,12 @@ pass 'F15: rejects a --full-migrations-json (and matching snapshot fullMigration
 
 # ---- F16. the archive's legacy-migration content, files[] and
 #           fullMigrationHistory (and therefore --full-migrations-json,
-#           rebuilt to match so :188 stays green) are all consistently
-#           tampered together; only --migration-root (left as the golden,
-#           untampered directory) disagrees with the new hash -- the legacy
-#           entry is not part of the Task168 subset, so :234-237 (which only
-#           cross-checks --migrations-json's 11 names) never catches it first
+#           rebuilt to match so files[]-vs-fullMigrationHistory stays green)
+#           are all consistently tampered together; only --migration-root
+#           (left as the golden, untampered directory) disagrees with the
+#           new hash -- the legacy entry is not part of the Task168 subset,
+#           so the --migrations-json-vs-full-history loop (which only
+#           cross-checks the 11 Task168 names) never catches it first
 F16_DIR="$TMP/f16-legacy-checksum"
 mkdir -p "$F16_DIR/stage"
 cp -R "$GOLDEN/stage/apps" "$F16_DIR/stage/apps"
@@ -1210,7 +1513,7 @@ f16_legacy_bytes="$(wc -c < "$F16_DIR/stage/apps/v1_api/prisma/migrations/$LEGAC
 jq --arg p "apps/v1_api/prisma/migrations/$LEGACY_NAME/migration.sql" --arg h "$f16_legacy_sha" --argjson b "$f16_legacy_bytes" --arg legacy "$LEGACY_NAME" \
   '.files |= map(if .path == $p then .sha256 = $h | .bytes = $b else . end) | .fullMigrationHistory |= map(if .name == $legacy then .sha256 = $h else . end)' \
   "$GOLDEN/stage/INPUT-MANIFEST.json" > "$F16_DIR/stage/INPUT-MANIFEST.json"
-( cd "$F16_DIR/stage" && tar -czf "$F16_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$F16_DIR/stage" "$F16_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 f16_manifest_sha="$(sha "$F16_DIR/stage/INPUT-MANIFEST.json")"
 f16_archive_sha="$(sha "$F16_DIR/source.tar.gz")"
 f16_archive_bytes="$(wc -c < "$F16_DIR/source.tar.gz" | tr -d ' ')"
@@ -1261,7 +1564,7 @@ f12_m11_bytes="$(wc -c < "$F12_DIR/stage/apps/v1_api/prisma/migrations/$M11_NAME
 jq --arg p "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" --arg h "$f12_m11_sha" --argjson b "$f12_m11_bytes" \
   '.files |= map(if .path == $p then .sha256 = $h | .bytes = $b else . end) | .fullMigrationHistory |= map(if .name == "'"$M11_NAME"'" then .sha256 = $h else . end)' \
   "$GOLDEN/stage/INPUT-MANIFEST.json" > "$F12_DIR/stage/INPUT-MANIFEST.json"
-( cd "$F12_DIR/stage" && tar -czf "$F12_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+write_clean_tar "$F12_DIR/stage" "$F12_DIR/source.tar.gz" INPUT-MANIFEST.json apps
 f12_manifest_sha="$(sha "$F12_DIR/stage/INPUT-MANIFEST.json")"
 f12_archive_sha="$(sha "$F12_DIR/source.tar.gz")"
 f12_archive_bytes="$(wc -c < "$F12_DIR/source.tar.gz" | tr -d ' ')"

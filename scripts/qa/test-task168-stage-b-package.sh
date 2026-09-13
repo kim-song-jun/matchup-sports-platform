@@ -104,7 +104,7 @@ run_expect_fail() {
   grep -Fq "$expected" <<<"$out" || fail "expected failure text missing ('$expected'): $out"
 }
 
-# ---- 1. determinism: golden sha across umask x3 and TZ x3 (BLOCK-1) --------
+# ---- 1. determinism: golden sha across umask x3 and TZ x3 ------------------
 # EXPECTED_ARCHIVE_SHA is not "whatever the first run produced" (that proves
 # only host-internal umask/TZ independence, not cross-host determinism) — it
 # is pinned once, computed against this exact synthetic fixture (fixed
@@ -141,7 +141,7 @@ jq -e --arg h "$GOLDEN" '.archiveSha256 == $h' "$TMP/pkg-umask-022.tar.gz.attest
   || fail 'sidecar archiveSha256 does not match the published archive'
 pass 'sidecar is published at ${OUTPUT_ARCHIVE}.attestation.json and authenticates the archive bytes'
 
-# ---- 2. existing output is refused, no side effects (BLOCK-2) -------------
+# ---- 2. existing output is refused, no side effects ------------------------
 out="$TMP/pkg-exists.tar.gz"
 : > "$out"
 run_expect_fail 'refusing to overwrite an existing output' \
@@ -152,7 +152,7 @@ run_expect_fail 'refusing to overwrite an existing output' \
 [[ ! -e "$out.attestation.json" ]] || fail 'a sidecar must not appear for a refused publish'
 pass 'refuses to overwrite an existing output archive'
 
-# ---- 3. BLOCK-3: reviewed-hash tamper is rejected even after rehash -------
+# ---- 3. reviewed-hash tamper is rejected even after rehash -----------------
 TAMPER_DIR="$TMP/prepared-tampered"
 cp -R "$PREPARED" "$TAMPER_DIR"
 printf '\n// tampered\n' >> "$TAMPER_DIR/apps/v1_api/prisma/schema.prisma"
@@ -168,7 +168,7 @@ run_expect_fail 'does not match the reviewed checksum' \
 [[ ! -e "$TMP/pkg-tamper.tar.gz" ]] || fail 'tampered packaging must not publish an archive'
 pass 'a 1-byte tamper of the reviewed schema is rejected even after the manifest is rehashed to match'
 
-# ---- 3e. BLOCK item: reviewed M11 checksum tamper is rejected even after
+# ---- 3e. reviewed M11 checksum tamper is rejected even after
 #          rehash -- mirrors 3 above but for M11_SHA, which had no dedicated
 #          negative case (every other test passes the real, untampered M11
 #          file, so this half of the reviewed-checksum pin was untested) ----
@@ -192,7 +192,7 @@ run_expect_fail 'supplied M11 migration does not match the reviewed checksum' \
 [[ ! -e "$TMP/pkg-m11-content-tamper.tar.gz" ]] || fail 'tampered M11 packaging must not publish an archive'
 pass 'a 1-byte tamper of the reviewed M11 migration is rejected even after the manifest is rehashed to match'
 
-# ---- 3f. BLOCK item: a manifest that consistently renames M11 (directory +
+# ---- 3f. a manifest that consistently renames M11 (directory +
 #          .m11.name + fullMigrationHistory[-1].name, content untouched) is
 #          rejected -- the M11_NAME pin, not just M11_SHA, must hold ---------
 M11_RENAME_DIR="$TMP/prepared-m11-rename"
@@ -251,7 +251,7 @@ pass "rejects a manifest whose fullMigrationHistory sha256 disagrees with the ma
 # ---- 3d. a historical migration's content AND its manifest entry are both
 #          tampered consistently (files[] + fullMigrationHistory rehashed
 #          together) -- the packager's own independent re-scan of the pinned
-#          source commit must still reject it (BLOCK item 4: source-commit
+#          source commit must still reject it (source-commit
 #          binding did not previously cover non-schema/non-M11 overlay files)
 PINNED_DRIFT_DIR="$TMP/prepared-pinned-drift"
 cp -R "$PREPARED" "$PINNED_DRIFT_DIR"
@@ -325,7 +325,7 @@ run_expect_fail 'source archive contains a symlink' \
 pass 'rejects a source tree that contains a symlink'
 git -C "$REPO" checkout -q main
 
-# ---- 7. mid-publish failure leaves no unpaired residue (BLOCK-2) ----------
+# ---- 7. mid-publish failure leaves no unpaired residue ---------------------
 # Deterministically fail only the archive-publish hard-link call (the second
 # `ln`) via PATH shadowing, so this does not depend on winning a wall-clock
 # race against the script: a fake `ln` ahead of the real one on PATH passes

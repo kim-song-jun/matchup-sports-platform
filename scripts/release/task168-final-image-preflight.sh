@@ -126,8 +126,120 @@ ATTESTED_MANIFEST_SHA="$(jq -er '.inputManifestSha256' "$SOURCE_ARCHIVE_ATTESTAT
 jq -e '.archiveLayout.pathPrefix==""' "$INPUT_SNAPSHOT" >/dev/null || fail 'input snapshot does not declare a repository-root (empty pathPrefix) archive layout'
 ARCHIVE_REGULAR_MEMBERS="$(mktemp "${TMPDIR:-/tmp}/task168-preflight-members.XXXXXX")"
 python3 - "$SOURCE_ARCHIVE" > "$ARCHIVE_REGULAR_MEMBERS" <<'PY' || fail 'source archive member listing failed or contains a rejected path'
-import posixpath, subprocess, sys, tarfile
+import posixpath, sys, tarfile, gzip
 archive = sys.argv[1]
+
+def fail(msg):
+    sys.stderr.write(msg + '\n')
+    sys.exit(1)
+
+# Raw header walk: independently re-derives the member-name list straight
+# from 512-byte tar headers -- no tarfile, no external `tar` -- and enforces
+# the exact contract package-task168-final-source.sh's tarfile.PAX_FORMAT
+# writer produces (valid checksum, strict-octal numeric fields, and only the
+# typeflags/pax keys that writer ever emits). Running this before tarfile
+# ever opens the archive means a header tarfile would misparse or crash on
+# (a forged devmajor, a pax 'size' override, a pax global header) is
+# rejected here first instead of silently passing or raising uncaught.
+ALLOWED_TYPEFLAGS = {b'0', b'5', b'x'}
+ALLOWED_PAX_KEYS = {'path'}
+
+def parse_octal(field):
+    if not field:
+        return 0
+    if field[0] & 0x80:
+        return None  # GNU base-256 extension: no writer this repo uses emits it
+    text = field.rstrip(b'\x00 ').lstrip(b' ')
+    if not text:
+        return 0
+    for b in text:
+        if b < 0x30 or b > 0x37:
+            return None
+    return int(text, 8)
+
+def read_exact(fh, n):
+    buf = bytearray()
+    while len(buf) < n:
+        chunk = fh.read(n - len(buf))
+        if not chunk:
+            break
+        buf += chunk
+    return bytes(buf)
+
+def decode_name(raw):
+    return raw.decode('utf-8', 'surrogateescape')
+
+raw_names = []
+pending_pax = None
+with gzip.open(archive, 'rb') as fh:
+    while True:
+        header = read_exact(fh, 512)
+        if len(header) < 512:
+            fail('source archive is truncated or malformed')
+        if header == b'\x00' * 512:
+            break
+        chksum = parse_octal(header[148:156])
+        computed = sum(header[:148]) + 8 * 0x20 + sum(header[156:])
+        if chksum is None or chksum != computed:
+            fail('source archive header checksum mismatch')
+        for lo, hi in ((100, 108), (108, 116), (116, 124), (124, 136), (136, 148), (329, 337), (337, 345)):
+            if parse_octal(header[lo:hi]) is None:
+                fail('source archive contains a non-octal numeric header field')
+        size = parse_octal(header[124:136])
+        typeflag = header[156:157]
+        if typeflag == b'g':
+            fail('source archive contains a global pax extended header')
+        if typeflag not in ALLOWED_TYPEFLAGS:
+            fail('source archive contains an unauthorized typeflag: %r' % typeflag)
+        payload_blocks = ((size + 511) // 512) * 512 if size else 0
+        if typeflag == b'x':
+            # Per-member pax extended header: its records override fields of
+            # the single header that immediately follows.
+            payload = read_exact(fh, payload_blocks)
+            if len(payload) < payload_blocks:
+                fail('source archive is truncated or malformed')
+            records, pos = payload[:size], 0
+            overrides = dict(pending_pax) if pending_pax else {}
+            while pos < len(records):
+                sp = records.find(b' ', pos)
+                if sp == -1 or not records[pos:sp].isdigit():
+                    fail('source archive contains a malformed pax extended header record')
+                reclen = int(records[pos:sp])
+                if reclen <= 0 or pos + reclen > len(records) or records[pos + reclen - 1:pos + reclen] != b'\n':
+                    fail('source archive contains a malformed pax extended header record')
+                content = records[sp + 1:pos + reclen - 1]
+                eq = content.find(b'=')
+                if eq == -1:
+                    fail('source archive contains a malformed pax extended header record')
+                key = decode_name(content[:eq])
+                if key not in ALLOWED_PAX_KEYS:
+                    fail('source archive contains an unauthorized pax extended header key: %s' % key)
+                overrides[key] = decode_name(content[eq + 1:])
+                pos += reclen
+            pending_pax = overrides
+            continue
+        if typeflag == b'0' and header[157:257] != b'\x00' * 100:
+            fail('source archive regular file member has a non-empty linkname')
+        if pending_pax and 'path' in pending_pax:
+            name = pending_pax['path']
+        else:
+            prefix = header[345:500].rstrip(b'\x00')
+            namefield = header[0:100].rstrip(b'\x00')
+            name = decode_name(prefix + b'/' + namefield) if prefix else decode_name(namefield)
+        pending_pax = None
+        if typeflag == b'5' and name.endswith('/'):
+            name = name[:-1]
+        raw_names.append(name)
+        if payload_blocks:
+            skipped = read_exact(fh, payload_blocks)
+            if len(skipped) < payload_blocks:
+                fail('source archive is truncated or malformed')
+
+# tarfile's own parse, for the member-classification checks (unsafe path,
+# canonical form, bundle/ prefix, duplicate name) that reuse its higher-level
+# member typing rather than reimplementing it. A symlink/hardlink member
+# never reaches here: ALLOWED_TYPEFLAGS above already rejected typeflag '1'
+# or '2' during the raw header walk.
 seen = set()
 python_names = []
 with tarfile.open(archive, 'r:*') as tar:
@@ -140,49 +252,39 @@ with tarfile.open(archive, 'r:*') as tar:
             or check_name.startswith('../') or '/../' in check_name or check_name.endswith('/..')
         )
         if unsafe:
-            sys.stderr.write('source archive contains an unsafe path: %s\n' % name)
-            sys.exit(1)
+            fail('source archive contains an unsafe path: %s' % name)
         if posixpath.normpath(check_name) != check_name:
-            sys.stderr.write('source archive contains a non-canonical path: %s\n' % name)
-            sys.exit(1)
+            fail('source archive contains a non-canonical path: %s' % name)
         if check_name == 'bundle' or check_name.startswith('bundle/'):
-            sys.stderr.write('source archive uses a bundle/ prefix but declares pathPrefix="": %s\n' % name)
-            sys.exit(1)
-        if member.issym() or member.islnk():
-            sys.stderr.write('source archive contains a symlink or hardlink member: %s\n' % name)
-            sys.exit(1)
+            fail('source archive uses a bundle/ prefix but declares pathPrefix="": %s' % name)
         # `tar -xOf` (used below for the per-file content check) concatenates
         # every copy of a repeated member name; real extraction keeps only
         # the last one. A second, differently-sized copy of an already-hashed
-        # member (e.g. an empty duplicate appended after the real M11 file)
-        # would otherwise clear that content check on the concatenated bytes
-        # while extracting to something else entirely.
+        # member would otherwise clear that content check on the
+        # concatenated bytes while extracting to something else entirely.
         if check_name in seen:
-            sys.stderr.write('source archive contains a duplicate member: %s\n' % name)
-            sys.exit(1)
+            fail('source archive contains a duplicate member: %s' % name)
         seen.add(check_name)
         if member.isdir():
             continue
         sys.stdout.buffer.write(check_name.encode('utf-8', 'surrogateescape') + b'\0')
-# A crafted header (e.g. non-octal devmajor/devminor bytes on a regular-file
-# member, or a per-member pax record that omits 'path' and so inherits it
-# from an earlier pax global header) can make CPython's tarfile silently
-# stop enumerating mid-archive, or rename a member, while bsdtar/GNU tar --
-# the tools that actually extract this archive downstream -- still see the
-# true, unrenamed member set. Cross-checking against that independent parser
-# closes both: any member tarfile hid or renamed shows up as a listing
-# mismatch here, before any of the checks above can be evaded by omission.
-independent = subprocess.run(['tar', '-tzf', archive], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-if independent.returncode != 0:
-    sys.stderr.write('independent archive listing failed: %s\n' % independent.stderr.decode('utf-8', 'replace'))
-    sys.exit(1)
-independent_names = [
-    line[:-1] if line.endswith('/') else line
-    for line in independent.stdout.decode('utf-8', 'surrogateescape').split('\n') if line
-]
-if independent_names != python_names:
-    sys.stderr.write('source archive member listing disagrees between tarfile and an independent tar listing\n')
-    sys.exit(1)
+
+if raw_names != python_names:
+    fail('source archive member listing disagrees between tarfile and a raw header walk')
+
+# Reject a member name that collides with another only by case, and a member
+# outside apps/v1_api/prisma/ whose casefolded name would land inside it --
+# the prisma allowlist below matches case-sensitively, so a case-insensitive
+# extraction filesystem could otherwise be steered into overwriting a
+# reviewed path with an unreviewed one.
+lower_seen = {}
+for n in raw_names:
+    key = n.casefold()
+    if key in lower_seen:
+        fail('source archive contains member names that collide only by case: %s' % n)
+    lower_seen[key] = n
+    if key.startswith('apps/v1_api/prisma/') and not n.startswith('apps/v1_api/prisma/'):
+        fail('source archive contains a member whose path collides only by case with apps/v1_api/prisma/: %s' % n)
 PY
 # Every member the archive carries under apps/v1_api/prisma/ must be either a
 # declared overlay file (files[]) or one of the same non-reviewed extras
@@ -193,8 +295,9 @@ PY
 # outside that shape (a non-conforming migration directory name, or an extra
 # file placed inside an otherwise-declared migration directory), so such a
 # member would previously reach here unexamined. Declared-file presence is
-# still verified independently below (:>=144), so this only needs to reject
-# extras — it is not also required to prove nothing is missing.
+# verified independently by the per-file archive-content loop below, so this
+# only needs to reject extras — it is not also required to prove nothing is
+# missing.
 readonly PRISMA_EXTRA_ALLOW_REGEX='^apps/v1_api/prisma/([^/]+\.ts|data/[^/]+\.json|schema\.stage-a\.prisma)$'
 declare -A DECLARED_PRISMA_PATH_SET=()
 while IFS= read -r declared_path; do
@@ -225,8 +328,8 @@ while IFS=$'\t' read -r path expected bytes; do
   archive_bytes="$(tar -xOf "$SOURCE_ARCHIVE" "$path" | wc -c | tr -d ' ')" || fail "source archive input size is unreadable: $path"
   [[ "$archive_sha" == "$expected" && "$archive_bytes" == "$bytes" ]] || fail "source archive input differs from authenticated snapshot: $path"
 done < <(jq -r '.files | sort_by(.path)[] | [.path,.sha256,(.bytes|tostring)] | @tsv' "$INPUT_SNAPSHOT")
-# T3 consumer gap (independent adversarial review): the checks above prove
-# files[] is self-consistent with the archive's own tar bytes, but nothing
+# The checks above prove files[] is self-consistent with the archive's own
+# tar bytes, but nothing
 # yet ties that inventory to the migration ledger the rehearsal actually
 # replays (fullMigrationHistory / --migration-root, cross-checked further
 # below) or to the pinned final schema. Without this, an archive whose

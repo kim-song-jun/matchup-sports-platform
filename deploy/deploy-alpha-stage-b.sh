@@ -155,9 +155,25 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       exit 1
       ;;
     applied)
-      # R-A candidate: M11 committed but the receipt never got written (kill
-      # between the runner's migrate step and its own receipt write).
-      [[ -f "${migration_receipt}" ]] && fail "migration-stage.json already exists for ${ALPHA_SHA} — nothing to recover"
+      # R-A candidate: M11 committed. The receipt may be entirely missing
+      # (kill between the runner's migrate step and its own receipt write),
+      # or it may already exist as a stale MIGRATION_DIAGNOSIS_REQUIRED
+      # diagnosis: a SIGTERM landing after M11's foreground `migrate deploy`
+      # finishes is deferred by bash until that child exits, so the runner's
+      # own EXIT trap still sees phase=after_m11 and writes a diagnosis
+      # receipt despite M11 having actually committed
+      # (deploy/task168-stage-b-migrate.sh). Only a receipt that already
+      # reports a committed status is truly nothing to recover; any other
+      # existing receipt is a candidate to supersede once every check below
+      # independently confirms the commit.
+      existing_receipt_status=""
+      if [[ -f "${migration_receipt}" ]]; then
+        existing_receipt_status="$(jq -r '.status // empty' "${migration_receipt}" 2>/dev/null || true)"
+        case "${existing_receipt_status}" in
+          MIGRATION_COMMITTED|MIGRATION_COMMITTED_RECOVERED)
+            fail "migration-stage.json already reports ${existing_receipt_status} for ${ALPHA_SHA} — nothing to recover" ;;
+        esac
+      fi
       [[ -f "${quiesce}" ]] || fail "M11 is applied but quiesce.json is missing for ${ALPHA_SHA} — RECOVERY_DIAGNOSIS_REQUIRED"
       [[ -f "${m11_marker}" ]] || fail "M11 is applied but the M11 entry marker is missing for ${ALPHA_SHA} — RECOVERY_DIAGNOSIS_REQUIRED"
 
@@ -201,22 +217,35 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       retirement_triggers="$(dbq "SELECT count(*) FROM pg_trigger WHERE tgname IN ('v1_tournament_fixture_retired_write','v1_tournament_fixture_retired_row_write','v1_000_tournament_fixture_retired_link')")"
       [[ "${retirement_triggers}" == 0 ]] || fail "M11 ledger row exists but retirement triggers are still present — RECOVERY_DIAGNOSIS_REQUIRED"
 
+      # Preserve a stale diagnosis under a distinct path before writing the
+      # recovered receipt to the canonical one — alpha-release-common.sh and
+      # task168-stage-b-post-live-verify.sh both read migration-stage.json,
+      # so the corrected status must land there, never be silently dropped.
+      if [[ -n "${existing_receipt_status}" ]]; then
+        mv "${migration_receipt}" "${migration_receipt}.superseded.json"
+      fi
+
       jq -n \
         --arg sha "${ALPHA_SHA}" --arg apiImage "${api_image}" --arg dbId "${db_identity_actual}" \
         --arg schemaSha "${TASK168_FINAL_SCHEMA_SHA256}" --arg manifestSha "${manifest_sha}" \
         --arg m11 "${TASK168_M11}" --arg m11sha "${TASK168_M11_SHA256}" \
         --arg quiesceSha "${quiesce_sha}" --arg backupSha "${backup_sha_actual}" \
+        --arg supersededStatus "${existing_receipt_status}" \
         --argjson legacyTables "${legacy_tables}" --argjson legacyLinkColumns "${legacy_link_columns}" \
         --argjson retirementTriggers "${retirement_triggers}" --argjson retirementFunctions "${retirement_functions}" \
         '{schemaVersion:1,kind:"task168StageBMigration",status:"MIGRATION_COMMITTED_RECOVERED",stage:"stageBFinal",
           releaseSha:$sha,apiImage:$apiImage,databaseIdentity:$dbId,schemaSha256:$schemaSha,manifestSha256:$manifestSha,
           m11:$m11,m11Sha256:$m11sha,
           postVerification:{legacyTables:$legacyTables,legacyLinkColumns:$legacyLinkColumns,retirementTriggers:$retirementTriggers,retirementFunctions:$retirementFunctions},
-          recoveredFrom:{quiesceReceiptSha256:$quiesceSha,ledgerM11Row:"applied",catalogResult:{legacyTables:$legacyTables,legacyLinkColumns:$legacyLinkColumns,retirementTriggers:$retirementTriggers,retirementFunctions:$retirementFunctions}},
+          recoveredFrom:{quiesceReceiptSha256:$quiesceSha,ledgerM11Row:"applied",catalogResult:{legacyTables:$legacyTables,legacyLinkColumns:$legacyLinkColumns,retirementTriggers:$retirementTriggers,retirementFunctions:$retirementFunctions},supersededDiagnosisStatus:($supersededStatus|select(length>0))},
           preM11BackupSha256:$backupSha,completedAt:(now|todate)}' \
         > "${migration_receipt}"
       chmod 600 "${migration_receipt}"
-      echo "[deploy-alpha-stage-b] R-A: reconstructed MIGRATION_COMMITTED_RECOVERED receipt for ${ALPHA_SHA}; writer remains stopped"
+      if [[ -n "${existing_receipt_status}" ]]; then
+        echo "[deploy-alpha-stage-b] R-A: superseded a stale ${existing_receipt_status} receipt (see ${migration_receipt}.superseded.json) and reconstructed MIGRATION_COMMITTED_RECOVERED for ${ALPHA_SHA}; writer remains stopped"
+      else
+        echo "[deploy-alpha-stage-b] R-A: reconstructed MIGRATION_COMMITTED_RECOVERED receipt for ${ALPHA_SHA}; writer remains stopped"
+      fi
       exit 0
       ;;
     *)

@@ -997,23 +997,96 @@ run_scenario_n(){
   ledger_m11="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" exec -T v1_postgres psql -X -At -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name='20260911090000_retire_tournament_fixture_tables' AND finished_at IS NOT NULL AND rolled_back_at IS NULL" 2>/dev/null | tr -d '\r')"
   [[ "$ledger_m11" == 1 ]] && ok "$name M11 is genuinely committed (this is a real post-commit failure, not a pre-commit RAISE)" || bad "$name M11 ledger state" "count=$ledger_m11"
 
-  # spec T1-6: the real, unmodified wrapper must independently refuse too
-  # (its own backup-hash re-check), not just supersede the runner's own
-  # correct diagnosis.
+  # spec T1-6: the real, unmodified wrapper must never turn this into
+  # MIGRATION_COMMITTED_RECOVERED. It does not reach its own independent
+  # backup-hash re-check here -- a migration-stage.json already exists (the
+  # runner's own MIGRATION_DIAGNOSIS_REQUIRED above), and the wrapper's R-A
+  # branch refuses to touch ANY existing non-terminal receipt before it gets
+  # that far (round-4 wiring-track fix: superseding a real diagnosis used to
+  # be exactly how a genuine post-commit failure became a false recovery).
+  # That earlier, stage-3 fix legitimately shadows the backup-hash message
+  # this scenario originally asserted on -- the independent backup-hash
+  # re-check itself is exercised where it is actually reachable, the
+  # receipt-missing R-A path, by scenario (o) below. Assert the
+  # outcome that matters here: no false recovery, and the runner's original
+  # diagnosis is left untouched, not silently overwritten by either branch.
   invoke_stage_b_recover "$work" "$release" "$env_final"
   sed 's/^/  [n-recover] /' "$recover_out"
-  # As in (m): require the specific backup-hash message, not just "it
-  # failed somehow", so an unrelated earlier refusal in the wrapper's R-A
-  # chain cannot make this pass without exercising the backup-hash re-check.
-  if [[ "$recover_rc" != 0 ]] && ! jq -e '.status=="MIGRATION_COMMITTED_RECOVERED"' "$receipt" >/dev/null 2>&1 && grep -qi 'backup no longer matches' "$recover_out"; then
-    ok "$name real stageBRecover refuses when the pre-M11 backup no longer matches its recorded hash"
+  if [[ "$recover_rc" != 0 ]] \
+    && jq -e '.status=="MIGRATION_DIAGNOSIS_REQUIRED" and (.failureReason|test("backup"))' "$receipt" >/dev/null 2>&1; then
+    ok "$name real stageBRecover never supersedes the runner's own post-commit backup-corruption diagnosis"
   else
     bad "$name recover-with-backup-corruption" "rc=$recover_rc receipt=$(cat "$receipt" 2>/dev/null || echo MISSING) out=$(cat "$recover_out")"
   fi
   docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
 }
 
-# Optional: T168_ONLY=a|b|c|d|e|f|g|h|i|j|k|l|m|n runs a single scenario
+# ---------------------------------------------------------------------------
+# (o) spec T1-6 negative recover scenario, the backup-rehash counterpart to
+# (m)'s catalog-break: reaches the same R-A-eligible state as (l)/(m)
+# (uncatchable SIGKILL right after M11 commits -- ledger applied, marker +
+# quiesce present, no migration-stage.json), then corrupts the on-disk
+# pre-M11 backup file BEFORE invoking the real, unmodified wrapper's
+# stageBRecover. Unlike (n), no receipt exists yet here, so the wrapper's
+# early "refuse to touch an existing receipt" guard cannot fire first -- this
+# is the one state where the wrapper's OWN independent backup-hash re-check
+# (deploy-alpha-stage-b.sh, "backup no longer matches its quiesce receipt
+# hash") is actually reachable and load-bearing. It must refuse and must not
+# write MIGRATION_COMMITTED_RECOVERED.
+run_scenario_o(){
+  local name=o project="deploy" work="$WORK_ROOT/o" release predecessor
+  mkdir -p "$work"
+  release="$(hex40)"; predecessor="$(hex40)"
+  local env_pre="$work/pre.env"
+  start_stack "$project" "$env_pre" || { bad "$name" "stack did not start"; return; }
+  seed_migrations "$project" without_m11 || { bad "$name" "seeding M1-M10 failed"; return; }
+  build_fixtures "$work" "$release" "$predecessor"
+  local env_final="$work/final.env"; write_env_file "$env_final" "$FINAL_IMAGE_REF"
+  local state_dir="$work/state/task168/$release" out_file="$work/o.out" pid
+  install -d "$work/state"
+  set +e
+  ALPHA_RELEASE_STATE_DIR="$work/state" "$RUNNER" --source-dir "$work/source" --manifest "$work/manifest.json" --compose-prod "$FIXTURES_DIR/compose-prod.yml" --compose-alpha "$FIXTURES_DIR/compose-alpha.yml" --env-file "$env_final" >"$out_file" 2>&1 &
+  pid=$!
+  if ! wait_for_m11_committed "$project" "$env_pre"; then
+    bad "$name" "M11 never committed within the timeout (harness timing, not the fix under test)"
+    kill -9 "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+    set -e
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+  if ! kill -0 "$pid" 2>/dev/null; then
+    bad "$name" "runner already exited before the signal could be sent (harness timing, not the fix under test)"
+    wait "$pid" 2>/dev/null
+    set -e
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+  kill -KILL "$pid"
+  wait "$pid" 2>/dev/null
+  set -e
+  if [[ ! -f "$state_dir/m11-entry-marker.json" || ! -f "$state_dir/quiesce.json" || -f "$state_dir/migration-stage.json" ]]; then
+    bad "$name" "did not reach the R-A-eligible state (harness timing, not the fix under test)"
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+
+  printf 'corrupted-after-sigkill' >> "$state_dir/pre-m11-backup.sql"
+
+  invoke_stage_b_recover "$work" "$release" "$env_final"
+  sed 's/^/  [o-recover] /' "$recover_out"
+  # Require the specific backup-hash message, not just "it failed somehow",
+  # so an unrelated earlier refusal in the wrapper's R-A chain cannot make
+  # this pass without exercising the backup-hash re-check this scenario
+  # exists to prove is load-bearing.
+  if [[ "$recover_rc" != 0 ]] && [[ ! -f "$state_dir/migration-stage.json" ]] && grep -qi 'backup no longer matches' "$recover_out"; then
+    ok "$name real stageBRecover refuses when the pre-M11 backup no longer matches its recorded hash (R-A's own re-check)"
+  else
+    bad "$name recover-with-backup-corruption-no-receipt" "rc=$recover_rc receipt=$(cat "$state_dir/migration-stage.json" 2>/dev/null || echo NONE) out=$(cat "$recover_out")"
+  fi
+  docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+}
+
+# Optional: T168_ONLY=a|b|c|d|e|f|g|h|i|j|k|l|m|n|o runs a single scenario
 # (used for fast mutation iteration during development; a plain run with no
 # filter runs all).
 case "${T168_ONLY:-}" in
@@ -1031,8 +1104,9 @@ case "${T168_ONLY:-}" in
   l) run_scenario_l ;;
   m) run_scenario_m ;;
   n) run_scenario_n ;;
-  "") run_scenario_a; run_scenario_b; run_scenario_c; run_scenario_d; run_scenario_e; run_scenario_f; run_scenario_g; run_scenario_h; run_scenario_i; run_scenario_j; run_scenario_k; run_scenario_l; run_scenario_m; run_scenario_n ;;
-  *) echo "unknown T168_ONLY=$T168_ONLY (expected a|b|c|d|e|f|g|h|i|j|k|l|m|n)" >&2; exit 64 ;;
+  o) run_scenario_o ;;
+  "") run_scenario_a; run_scenario_b; run_scenario_c; run_scenario_d; run_scenario_e; run_scenario_f; run_scenario_g; run_scenario_h; run_scenario_i; run_scenario_j; run_scenario_k; run_scenario_l; run_scenario_m; run_scenario_n; run_scenario_o ;;
+  *) echo "unknown T168_ONLY=$T168_ONLY (expected a|b|c|d|e|f|g|h|i|j|k|l|m|n|o)" >&2; exit 64 ;;
 esac
 
 log "=== summary: $PASS passed, $FAIL failed ==="

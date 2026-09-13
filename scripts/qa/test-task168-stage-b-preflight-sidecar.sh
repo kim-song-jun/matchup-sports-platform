@@ -735,4 +735,97 @@ done
 run_expect_fail 'archive files inventory does not authenticate the pinned final schema' "${ARGS[@]}"
 pass 'G4: rejects an archive whose schema.prisma content + files[] entry are tampered together while finalSchema.sha256/--schema still declare the original hash'
 
+# ---- PIN-1: a fully self-consistent but non-reviewed schema is rejected ---
+# G4 tampers the archive against an unchanged --schema/--schema-sha256, so it
+# never exercises the absolute FINAL_SCHEMA_SHA pin on its own. This probe
+# changes schema.prisma content and rehashes *every* dependent field
+# (files[] entry, finalSchema.sha256, --schema, --schema-sha256) to match
+# each other -- every relative cross-check above stays green -- so only the
+# hardcoded pin can catch a caller that is wrong but internally consistent
+# (e.g. accidentally pointed at an unreviewed draft schema).
+PIN1_DIR="$TMP/pin1-self-consistent-wrong-schema"
+mkdir -p "$PIN1_DIR/stage"
+cp -R "$FIXTURE/stage/apps" "$PIN1_DIR/stage/apps"
+printf '// not the reviewed schema\n' >> "$PIN1_DIR/stage/apps/v1_api/prisma/schema.prisma"
+pin1_schema_sha="$(sha "$PIN1_DIR/stage/apps/v1_api/prisma/schema.prisma")"
+pin1_schema_bytes="$(wc -c < "$PIN1_DIR/stage/apps/v1_api/prisma/schema.prisma" | tr -d ' ')"
+jq --arg p 'apps/v1_api/prisma/schema.prisma' --arg h "$pin1_schema_sha" --argjson b "$pin1_schema_bytes" \
+  '.finalSchema.sha256 = $h | .files |= map(if .path == $p then .sha256 = $h | .bytes = $b else . end)' \
+  "$FIXTURE/stage/INPUT-MANIFEST.json" > "$PIN1_DIR/stage/INPUT-MANIFEST.json"
+( cd "$PIN1_DIR/stage" && tar -czf "$PIN1_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+pin1_manifest_sha="$(sha "$PIN1_DIR/stage/INPUT-MANIFEST.json")"
+pin1_archive_sha="$(sha "$PIN1_DIR/source.tar.gz")"
+pin1_archive_bytes="$(wc -c < "$PIN1_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$pin1_archive_sha" --argjson b "$pin1_archive_bytes" --arg m "$pin1_manifest_sha" \
+  '.archiveSha256=$h | .archiveBytes=$b | .inputManifestSha256=$m | .inputSnapshotSha256=$m' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$PIN1_DIR/source.tar.gz.attestation.json"
+cp "$PIN1_DIR/stage/INPUT-MANIFEST.json" "$PIN1_DIR/input-snapshot.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$PIN1_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$pin1_archive_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$PIN1_DIR/source.tar.gz.attestation.json" ;;
+    --input-snapshot) ARGS[$((i+1))]="$PIN1_DIR/input-snapshot.json" ;;
+    --input-snapshot-sha256) ARGS[$((i+1))]="$pin1_manifest_sha" ;;
+    --schema) ARGS[$((i+1))]="$PIN1_DIR/stage/apps/v1_api/prisma/schema.prisma" ;;
+    --schema-sha256) ARGS[$((i+1))]="$pin1_schema_sha" ;;
+  esac
+done
+run_expect_fail 'pinned final schema sha256 does not match the reviewed checksum' "${ARGS[@]}"
+pass 'PIN-1: rejects a fully self-consistent schema (archive/files[]/finalSchema/--schema all agree with each other) that is not the reviewed FINAL_SCHEMA_SHA'
+
+# ---- PIN-2: rehearsal --schema/finalSchema.sha256 diverge from what the
+#             archive's files[] entry (and actual bytes) declare -----------
+# PIN-1 changes files[]/finalSchema/--schema together, so it happens to also
+# trip the files[]-vs-FINAL_SCHEMA_SHA check (b) -- it does not, on its own,
+# prove the separate SCHEMA_SHA==FINAL_SCHEMA_SHA pin is load-bearing. This
+# probe leaves the archive and its files[] entry exactly as the good
+# (reviewed) fixture built them (so check (b) stays green: files[]'s
+# schema.prisma entry is still, and actually is, FINAL_SCHEMA_SHA), and only
+# moves finalSchema.sha256 + --schema/--schema-sha256 together to a
+# different, self-consistent, dummy value (so the pre-existing :175 binding
+# stays green too). Only the SCHEMA_SHA==FINAL_SCHEMA_SHA pin can catch a
+# rehearsal input that both check (b) and :175 miss this way.
+PIN2_DIR="$TMP/pin2-rehearsal-schema-diverges"
+mkdir -p "$PIN2_DIR/stage"
+cp -R "$FIXTURE/stage/apps" "$PIN2_DIR/stage/apps"
+printf 'generator client {\n  provider = "prisma-client-js"\n}\n// not the reviewed schema\n' > "$PIN2_DIR/schema.prisma"
+pin2_schema_sha="$(sha "$PIN2_DIR/schema.prisma")"
+# files[] is left untouched -- it still declares the real, reviewed
+# FINAL_SCHEMA_SHA for schema.prisma, matching the archive's actual
+# (unmodified) bytes. Only finalSchema.sha256 (the field :175 and --schema
+# are checked against) is moved to the dummy value.
+jq --arg h "$pin2_schema_sha" '.finalSchema.sha256 = $h' \
+  "$FIXTURE/stage/INPUT-MANIFEST.json" > "$PIN2_DIR/stage/INPUT-MANIFEST.json"
+( cd "$PIN2_DIR/stage" && tar -czf "$PIN2_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+pin2_manifest_sha="$(sha "$PIN2_DIR/stage/INPUT-MANIFEST.json")"
+pin2_archive_sha="$(sha "$PIN2_DIR/source.tar.gz")"
+pin2_archive_bytes="$(wc -c < "$PIN2_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$pin2_archive_sha" --argjson b "$pin2_archive_bytes" --arg m "$pin2_manifest_sha" \
+  '.archiveSha256=$h | .archiveBytes=$b | .inputManifestSha256=$m | .inputSnapshotSha256=$m' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$PIN2_DIR/source.tar.gz.attestation.json"
+cp "$PIN2_DIR/stage/INPUT-MANIFEST.json" "$PIN2_DIR/input-snapshot.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$PIN2_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$pin2_archive_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$PIN2_DIR/source.tar.gz.attestation.json" ;;
+    --input-snapshot) ARGS[$((i+1))]="$PIN2_DIR/input-snapshot.json" ;;
+    --input-snapshot-sha256) ARGS[$((i+1))]="$pin2_manifest_sha" ;;
+    --schema) ARGS[$((i+1))]="$PIN2_DIR/schema.prisma" ;;
+    --schema-sha256) ARGS[$((i+1))]="$pin2_schema_sha" ;;
+  esac
+done
+# Every pre-existing check and both new relative cross-checks (a)/(b) stay
+# green here: finalSchema.sha256==SCHEMA_SHA (:175, both dummy), and files[]'s
+# schema.prisma entry is untouched and still equals FINAL_SCHEMA_SHA,
+# matching the archive's real, unmodified bytes (check (b) and the per-file
+# archive-content loop). Only the absolute SCHEMA_SHA==FINAL_SCHEMA_SHA pin
+# catches that the rehearsal would run against a schema the archive does not
+# actually ship.
+run_expect_fail 'pinned final schema sha256 does not match the reviewed checksum' "${ARGS[@]}"
+pass 'PIN-2: rejects a rehearsal --schema/finalSchema.sha256 that diverge from the archive while files[] (and the archive'"'"'s actual bytes) still declare the reviewed schema'
+
 echo 'ALL PREFLIGHT SIDECAR CONTRACT TESTS PASSED'

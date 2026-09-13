@@ -78,8 +78,9 @@ assert_committed_post_resume9(){
   jq -e '.status=="COMPLETED" or .status=="COMPLETED_WITH_GATE_RELEASE_ERROR"' "$report" >/dev/null || fail '9-row post-migration resume has unsupported report status';
   jq -e '.result.verification.remainingLegacyGameLinks==0 and .result.verification.remainingLegacyStaffScopes==0 and .result.verification.remainingLegacyAuditScopes==0' "$report" >/dev/null || fail '9-row post-migration report has legacy links';
   receipt "$quiesce" quiesce "$API_IMAGE"; receipt "$backup" backup "$API_IMAGE";
+  [[ -s "$backup_file" ]] || fail '9-row post-migration backup file is missing or empty';
   jq -e --arg path "$backup_file" --arg hash "$(sha "$backup_file")" '.backupPath==$path and .backupSha256==$hash and (.backupBytes|type=="number" and .>0)' "$backup" >/dev/null || fail '9-row post-migration backup is not bound';
-  [[ -s "$backup_file" && "$(wc -c < "$backup_file" | tr -d ' ')" == "$(jq -er '.backupBytes' "$backup")" ]] || fail '9-row post-migration backup bytes are missing or changed';
+  [[ "$(wc -c < "$backup_file" | tr -d ' ')" == "$(jq -er '.backupBytes' "$backup")" ]] || fail '9-row post-migration backup bytes are missing or changed';
   assert_actual_cutover_seals;
 }
 assert_prior_failed_attempt(){

@@ -69,7 +69,7 @@ assert_no_cutover_seals(){
 }
 assert_preflight_failed_report(){
   local path="$1";
-  jq -e '.status=="FAILED" and .error.name=="TournamentTeamMatchFullCutoverError" and .error.code=="PREFLIGHT_BLOCKED" and (.preflightReport|type=="object") and .preflightReport.status=="UNRESOLVED"' "$path" >/dev/null || fail 'resume requires an exact FAILED/PREFLIGHT_BLOCKED report';
+  jq -e '.status=="FAILED" and .error.name=="TournamentTeamMatchFullCutoverError" and .error.code=="PREFLIGHT_BLOCKED" and (.preflightReport|type=="object") and (.preflightReport.status=="BLOCKED" or .preflightReport.status=="UNRESOLVED")' "$path" >/dev/null || fail 'resume requires an exact FAILED/PREFLIGHT_BLOCKED report';
   [[ ! -e "$(dirname "$(dirname "$path")")/transition.json" ]] || fail 'preflight failure must not have a transition receipt';
 }
 assert_prior_failed_attempt(){

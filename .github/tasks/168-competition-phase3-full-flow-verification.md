@@ -1,10 +1,18 @@
 # Task 168 — 모든 경기의 팀 매치 통일과 실제 사용자 E2E
 
-## 최신 판정 — Alpha 차단 데이터 삭제 완료, 재배포 복구 수정 검증 중
+## 최신 판정 — 복구 PR dev 머지 완료, Alpha BLOCKED 보고서 판정 수정 중
 
 ### 재개 커서 — 2026-09-13 AWS 재인증 이후
 
 이 절과 아래 기존 요구사항·검증 표가 단일 핸드오프다. 별도 보고 MD를 만들지 않는다. 사용자 최신 결정은 Alpha 데이터 삭제 허용, dev 머지·Alpha 배포 계속 진행이며 main/production 승격 권한은 없다.
+
+- **Alpha 실제 재시도 실패 / 다음 수정 확정:** dev CI `34744197742`는 전체 성공했으나 Alpha `34744197736`은 SSM 단계에서 `[task168-stage-a] resume requires an exact FAILED/PREFLIGHT_BLOCKED report`로 실패했다. 실제 저장된 incident의 `.parsed[0].preflightReport.status`는 **BLOCKED**이고 기존 복구 조건은 **UNRESOLVED만 허용**했다. 고정 v6 도구는 둘 다 `PREFLIGHT_BLOCKED` 오류로 반환한다. 이전 synthetic helper 검증이 실제 상태 차이를 놓친 것이며 완료로 처리하지 않는다. 새 후보 `preflight-blocked-status-fix-20260913/candidate/deploy/task168-stage-a-migrate.sh` SHA `082c2e8571f7931b7e6ca648159201e375cadde5e3e4061020c7d9e3852648e7`은 정확히 한 줄만 수정했다. root의 저장된 `verify-blocked-status-20260913.cjs` 실행은 실제 보고서 old RED/new GREEN 및 반례 8개를 PASS했고 결과는 같은 후보 디렉터리 `predicate-execution.json`에 남겼다. Sol은 v6 상태 정의·actual report·단일 줄 diff를 확인했고 실행 근거 최종 검토 중이다. 새 이관/새 API 시작 전 실패이며 이전 삭제를 반복하지 않는다. 다음은 이 한 줄+Changeset+진행 문서 PR → CI/Copilot → dev 머지·Alpha 재배포다. 최종 DROP runner/M11은 `final-retirement-candidate-20260913/`에 준비만 됐고 독립 검토·실행되지 않아 지금 배포 대상이 아니다. 전체 Alpha42는0/42 유지다.
+
+- **dev 머지 완료 / 배포 진행:** PR #1179는 최종 head `db5d33200caa4f9bf579a255b04658809d6bef89`의 CI `34743850344` Gates·API·Web 전체 PASS 후 base dev 및 exact head를 확인하여 머지했다. merge/dev `c4cc42e5eb514b9d724a31fe46d5bb95bf5834f5`, mergedAt `2026-09-13T07:01:26Z`. 최종 Copilot `5189909390`은 이 head를 검토하여 새 구체 comment0이며, 정지 컨테이너 포함 의견은 이미 정지한 writer를 복구 대상으로 찾는 의도와 exact-one·이전 이미지 바인딩 계약에 맞지 않아 적용하지 않았다. Alpha run `34744197736`은 matching dev CI `34744197742` 대기 중이다. **배포 성공·새 canonical runtime·Alpha E2E 완료는 아직 아니다.** fetch로 origin/dev는 갱신했지만 로컬 FF는 다른 세션 WIP와 겹쳐 Git이 거부했다. 강제 동기화하지 않았고 공유 HEAD는 `dd4d0733…`로 유지했다. 다음은 dev CI → Alpha 이미지/SSM 이관 → 실제 transition/DB/image/readback 확인이며, 이전 0d76 실패 이관을 반복 실행하거나 삭제를 다시 수행하지 않는다.
+
+- **최종 PR 리뷰 보강:** Sol이 `dff928472..db5d332`의 정확한 미사용 할당 한 줄 삭제와 Changeset만 확인하여 기존 15+3 실행 증거 적용 가능 판정. 최종 runner SHA `34b44f9c40470b9065c0399783a38a80fced056077c5e3c6931d4f2bafe33ff0`. Copilot `5189897728`의 push 입력 컨텍스트 지적은 GitHub 공식 문서의 “없는 속성은 빈 문자열” 계약으로 반증했고, 누락 파일 -s 제안은 기존 pipefail·해시 비교·fail 경로에서 이미 거부되어 오류 문구 개선 수준으로 분류했다. 두 건 때문에 동작 코드를 추가 변경하지 않았다. 최종 head Copilot을 재요청했으며 CI Gates PASS/API·Web 진행 중이다. 읽기 전용 Alpha collector 초안은 실제 해시/이력/런타임 바인딩이 부족해 보완 중이며 그 초안만으로 배포 성공을 주장하지 않는다.
+
+- **원격 PR 최신 커서:** dev 대상 PR [#1179](https://github.com/kim-song-jun/matchup-sports-platform/pull/1179), 최종 head `db5d33200caa4f9bf579a255b04658809d6bef89`. 복구 6개 파일·진행 문서·필수 Changeset만 포함한다. 첫 CI `34737560606`의 API/Web PASS, Gates는 Changeset 누락으로 실패하여 `dff928472…`에서 추가했다. Copilot review `5189517863`의 유일한 구체 지적 `3998707273`(미사용 old_worker)은 최종 head에서 정확히 한 줄 제거했다. 최종 CI `34743850344`와 Copilot 재리뷰 대기이며 **아직 머지·새 배포 아님**. 최초 reviewer 로그인 별칭 오류는 CLI 도움말의 `@copilot`으로 해결했다. private commit의 신규 경로 `--add` 누락도 수정해 커밋 성공했으며 공유 HEAD/index는 불변이다. 다음은 최종 head CI·리뷰 → base dev 재확인 → merge → 새 Alpha 배포/읽기 증거다.
 
 - **복구 PR 커밋 전 검증 완료:** runner `ff4759…` 실제 PostgreSQL helper 15개 기대 결과를 확인했다(`stage-a-resume-validation-20260913/local-guard-db-result.json`). 하드코딩한 중복 행과 부분 checkout의 archive 누락 행은 계수에서 제외했다. 별도 임시 실행을 수기로 합친 `final-delta-result-r2.json`의 prepare PASS는 최종 근거로 채택하지 않았다. root가 `verify-recovery-prepare-20260913.cjs`를 저장하고 정확한 base `0d76…` archive/schema 및 6개 검토 후보를 재구성해 실제 prepare 실행 3개(고정 JSON·유효 수동 입력 우선·잘못된 수동 입력 거부)를 검증했다. `recovery-prepare-execution-20260913.json` SHA `96689f0a93463549ceea006eb06253fef38079018a35551a508bc306450412c5`, 실행 스크립트 SHA `d8f188e52550022c8836571730cb8d30a8523da9e15eb5e627480d9700c850dd`. Sol 독립 증거 재검토 PASS, 소유 PostgreSQL 컨테이너·임시 fixture 제거 완료. 최초 archive 출력 버퍼 ENOBUFS는 파일 출력 방식으로 수정했고 이후 실행 성공했다. 다음은 정확한 7개 경로 private-index commit → dev PR CI/Copilot → 머지·Alpha 배포이며 새 Alpha E2E0/42는 유지한다.
 

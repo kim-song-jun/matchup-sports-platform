@@ -130,9 +130,9 @@ run_recover() {
 echo "== test-task168-stage-b-wrapper =="
 
 # ── Precondition: lock already held -> refuse, touch nothing ───────────────
-# PR-A2 review round 2 blocking finding #3: setup_recover_fixture's fake
-# `flock` (needed elsewhere so this suite runs on macOS, which has no
-# flock(1) at all) always exits 0 unconditionally. Since run_recover puts
+# setup_recover_fixture's fake `flock` (needed elsewhere so this suite runs
+# on macOS, which has no flock(1) at all) always exits 0 unconditionally.
+# Since run_recover puts
 # ${bin} at the FRONT of PATH, the wrapper always found that fake ahead of
 # any real flock(1) and could never actually contend for the lock — a
 # deleted `flock -n 8 || fail ...` check in the script would still pass this
@@ -246,9 +246,9 @@ rc="$(run_recover "${root}")"
   || fail "R-C did not behave correctly: rc=${rc} $(cat "${root}/stderr")"
 
 # ── R-A negative: M11's finished_at predates this release's entry marker ───
-# (PR-A2 review round 1 nonBlocking finding #1: without this, a stale
-# quiesce/backup/marker from a release that never reached M11 could be
-# certified as the origin of an M11 row another release actually committed).
+# Without this check, a stale quiesce/backup/marker from a release that
+# never reached M11 could be certified as the origin of an M11 row another
+# release actually committed.
 root="${WORK}/r-a-stale-binding"; mkdir -p "${root}"
 setup_recover_fixture "${root}"
 printf 'fake backup bytes' > "${state_dir}/pre-m11-backup.sql"

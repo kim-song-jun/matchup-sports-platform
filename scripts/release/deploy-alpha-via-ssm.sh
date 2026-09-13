@@ -26,7 +26,7 @@ declare -a extra_document_params=()
 poll_attempts=150   # 150 * 10s = 25 minutes — StageA, unchanged.
 # StageA's comment stays byte-identical to origin/dev ("Teameet alpha
 # <version> <sha>"); TASK168_STAGE was not an option there because
-# stageBRecover never requires RELEASE_VERSION (item #6, PR-A2 review).
+# stageBRecover never requires RELEASE_VERSION.
 comment="Teameet alpha ${TASK168_STAGE} ${RELEASE_SHA}"
 
 case "${TASK168_STAGE}" in
@@ -37,8 +37,8 @@ case "${TASK168_STAGE}" in
     [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]{8}\.g[0-9a-f]{12}$ ]]
     [[ "${SOURCE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
     [[ "${MANIFEST_SHA256}" =~ ^[0-9a-f]{64}$ ]]
-    # {1,1024} bound, byte-identical to origin/dev (item #6, PR-A2 review):
-    # a narrower {1,255} crept in only because macOS's regex engine rejects
+    # {1,1024} bound, byte-identical to origin/dev: a narrower {1,255}
+    # crept in only because macOS's regex engine rejects
     # a {1,1024} bound ("maximum repetition exceeds 255") — a local-bash
     # portability accommodation, not a real S3 version-id constraint (S3
     # version ids run ~32 chars). The actual gate and host both run on

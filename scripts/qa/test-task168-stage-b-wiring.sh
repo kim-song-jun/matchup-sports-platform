@@ -152,11 +152,11 @@ run_stage_a() {
   grep -q "releases/${SHA}.tar.gz" <<< "$(jq -r '.commands[]' <<< "${params}")" && pass "stageA reads the unnamespaced StageA source key" \
     || fail "stageA source key changed"
 
-  # PR-A2 review round 2 nonBlocking finding #2: the checks above proved
-  # command count/key/target only, never that the send-command --comment and
-  # SOURCE/MANIFEST_VERSION_ID width are byte-identical to origin/dev
-  # (they had in fact drifted: comment lost RELEASE_VERSION, and the
-  # {1,1024} bound had silently narrowed to {1,255}).
+  # The checks above proved command count/key/target only, never that the
+  # send-command --comment and SOURCE/MANIFEST_VERSION_ID width are
+  # byte-identical to origin/dev (they had in fact drifted: comment lost
+  # RELEASE_VERSION, and the {1,1024} bound had silently narrowed to
+  # {1,255}).
   local expected_comment="Teameet alpha ${VERSION} ${SHA}"
   [[ "$(cat "${dir}/last-comment.txt" 2>/dev/null)" == "${expected_comment}" ]] \
     && pass "stageA send-command --comment is byte-identical to origin/dev ('Teameet alpha <version> <sha>')" \
@@ -347,11 +347,11 @@ open('${dir}/resolve-mutated.sh', 'w').write(s.replace(guard, '', 1))
 
 # ── 8. deploy-alpha.yml: EVERY StageB-only step (an exact, named set — not
 # a >=N threshold) evaluates its if: to false once
-# steps.task168.outputs.stage is stageAIntermediate (blocking finding #2,
-# PR-A2 review round 2: the previous >=5-conditions threshold plus a
-# grep -v mutation that happened to remove all 6 identical-text guards at
-# once could not tell "one guard deleted" from "nothing changed" — deleting
-# a single step's if: at either :295 or :434 alone still passed 25/0).
+# steps.task168.outputs.stage is stageAIntermediate. A prior version of
+# this check used a >=5-conditions threshold plus a grep -v mutation that
+# happened to remove all 6 identical-text guards at once, and so could not
+# tell "one guard deleted" from "nothing changed" — deleting a single
+# step's if: alone still passed.
 #
 # Identification of "is this step StageB-only" is deliberately independent
 # of the if: field's CONTENT (name/id only) — the exact failure mode this
@@ -417,8 +417,7 @@ PY
   # all 5 identically-worded guards at once, the old grep -v's blind spot)
   # and require exactly THAT step to come back red, for every one of the 6
   # — proves a missing guard on any single step is caught individually, not
-  # just "the total count changed" (the PR-A2 review round 2 repro deleted
-  # :295 alone, then :434 alone, and the old test passed 25/0 both times).
+  # just "the total count changed".
   local mut_out="${WORK}/stage-b-step-conditions-mutated.json"
   local all_mutations_ok=true target
   while IFS= read -r target; do

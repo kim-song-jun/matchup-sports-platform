@@ -146,12 +146,11 @@ if [[ -f "${state_dir}/runtime-verification.json" ]]; then
     || fail "receipt does not bind the expected hashes"
 fi
 
-# Expected failure message per broken check (PR-A2 review round 2
-# nonBlocking finding: rc!=0 + no receipt alone also passes for an unrelated
-# crash — the implementer's own mutation notes recorded exactly that for two
-# cases, both red only via an unbound-variable crash, not the intended
-# check). Asserting the message ties each case to the SPECIFIC check it
-# broke, taken verbatim from scripts/release/task168-stage-b-post-live-verify.sh.
+# Expected failure message per broken check: rc!=0 + no receipt alone also
+# passes for an unrelated crash (e.g. an unbound-variable error), not only
+# for the intended check failing. Asserting the message ties each case to
+# the SPECIFIC check it broke, taken verbatim from
+# scripts/release/task168-stage-b-post-live-verify.sh.
 declare -A EXPECTED_MESSAGE=(
   [digest]="running API image does not match the manifest"
   [attestation]="running API image attestation is not stageBFinal"

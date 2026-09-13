@@ -41,37 +41,6 @@ readonly TASK168_STAGE_LABEL_PREFIX="com.teameet.task168.stage-b"
 readonly TASK168_FINAL_SCHEMA_SHA256=e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46
 readonly TASK168_M11=20260911090000_retire_tournament_fixture_tables
 readonly TASK168_M11_SHA256=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
-# The rest of the Task168 ledger (M1-M10), frozen the same way TASK168_M11
-# above is: stageBRecover has no manifest to read checksums from (it takes
-# only ALPHA_SHA), so the only way to re-verify the full 11-row ledger
-# (blocking finding #1's "ledger_assert_exact 11") without one is to pin the
-# same byte-fixed migration.sql hashes the runner already pins for M11.
-readonly TASK168_LEDGER_NAMES=(
-  20260908130000_v1_team_match_tournament_expand
-  20260908150000_v1_operation_audit_team_match_expand
-  20260908160000_v1_official_fact_team_match_scope
-  20260908170000_v1_lineup_invalidation
-  20260908180000_v1_staff_scope_team_match
-  20260909000000_v1_tournament_result_lineage
-  20260909110000_v1_operation_audit_canonical_binding
-  20260910010000_v1_official_fact_source_history
-  20260910020000_v1_canonical_game_db_guards
-  20260910160000_v1_outbox_cutover_claim_gate
-  "${TASK168_M11}"
-)
-readonly TASK168_LEDGER_SHA256S=(
-  12bab1bbc0b60a28b6b3aa589a9e9b9aece13a546d47dcb3ff25d934b7754771
-  7b16ecf32b91f8913b7652d593ee6a16d634845cec85b65c21b88292d2c8187a
-  d7ea2976285750c281d6dc16e5610648efefeba2eed88c90bf5f7d9c604931d6
-  747745b355c0a090aef162b5f00a46ce76d02eb38c0456ed465da53af6c15658
-  1c49f17ac790db88b58a5434a5071bb939844c38f748f0090ea89b8e7181777d
-  44d5a81804a8b5110785a88cf21d414cf0519a6e2d9b29d71b6b70b08ff551eb
-  20fbcf7b5617b3c701d26467c03ea0b37b7bccb94f87aaf36b29c34d3232ec03
-  a6855c094946c9298030c804e556ba52d35e7dfec2e97a28c5d4a564008a6211
-  e9827f48a3cdbcff6ff71efee5bc8c1e8516235bb73de9e3720795cca8cd41e6
-  877b557745919d1ebe3e09de9988e7a7fb6e341d4071a8f8d2caa970d903aa7f
-  "${TASK168_M11_SHA256}"
-)
 
 fail() { echo "[deploy-alpha-stage-b] $*" >&2; exit 1; }
 
@@ -229,8 +198,8 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       m11_row_count="$(dbq "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name = '${TASK168_M11}'")"
       [[ "${m11_row_count}" == 1 ]] || fail "expected exactly one M11 ledger row, found ${m11_row_count} — RECOVERY_DIAGNOSIS_REQUIRED"
 
-      # Binding to THIS run (nonBlocking finding #1, PR-A2 review round 1):
-      # neither the ledger checksum above nor the marker cross-check further
+      # Binding to THIS run: neither the ledger checksum above nor the
+      # marker cross-check further
       # down proves the M11 commit in the DB came from the SAME run this
       # ALPHA_SHA's marker describes — the M11 migration's bytes/checksum are
       # identical across every release, and the marker/quiesce/backup
@@ -279,9 +248,8 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       [[ "${retirement_triggers}" == 0 ]] || fail "M11 ledger row exists but retirement triggers are still present — RECOVERY_DIAGNOSIS_REQUIRED"
 
       # Additional post-M11 checks the runner performs
-      # (deploy/task168-stage-b-migrate.sh:555-570) that the four checks
-      # above did not cover (PR-A2 review round 2, blocking finding #1) — the
-      # lineage-reparent guard trigger, the two CHECK constraints M11
+      # (deploy/task168-stage-b-migrate.sh) that the four checks above did
+      # not cover — the lineage-reparent guard trigger, the two CHECK constraints M11
       # re-adds, the audit constraint it drops outright, the three guard
       # functions it CREATE OR REPLACEs (signature, not just name), the
       # retired enum types, and the outbox PROCESSING invariant. Re-running
@@ -310,9 +278,8 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       # recovered receipt to the canonical one — alpha-release-common.sh and
       # task168-stage-b-post-live-verify.sh both read migration-stage.json,
       # so the corrected status must land there, never be silently dropped.
-      # `mv -n` + an existence check (not a plain `mv`, PR-A2 review round 1)
-      # so a second recovery attempt cannot silently clobber an earlier
-      # .superseded.json.
+      # `mv -n` + an existence check, not a plain `mv`, so a second recovery
+      # attempt cannot silently clobber an earlier .superseded.json.
       if [[ -n "${existing_receipt_status}" ]]; then
         mv -n "${migration_receipt}" "${migration_receipt}.superseded.json"
         [[ -e "${migration_receipt}" ]] && fail "a .superseded.json for ${ALPHA_SHA} already exists — refusing to overwrite an earlier superseded receipt"
@@ -323,8 +290,8 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       # with no stale diagnosis to supersede), it produces ZERO outputs, and
       # jq's object construction with a zero-output value filter produces
       # ZERO objects for the whole `jq -n` call — not `null`, no error, exit
-      # 0, and an EMPTY receipt file (PR-A2 review round 1, confirmed by
-      # running the exact filter standalone). Every ordinary R-A recovery
+      # 0, and an EMPTY receipt file (confirmed by running the exact filter
+      # standalone). Every ordinary R-A recovery
       # was silently writing a 0-byte migration-stage.json. Fixed with an
       # if/then/else that always produces exactly one value, and by routing
       # through write_json_atomic so a mistake like this fails the receipt's

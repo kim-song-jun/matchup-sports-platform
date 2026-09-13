@@ -10,6 +10,9 @@ usage() {
   exit 64
 }
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+[[ -f "$HERE/task168_canonical_tar.py" ]] || { echo 'missing sibling module task168_canonical_tar.py' >&2; exit 1; }
+
 SOURCE_DIR= SOURCE_COMMIT= PREPARED_DIR= FINAL_SCHEMA= M11_FILE= OUTPUT_ARCHIVE=
 while (($#)); do
   case "$1" in
@@ -187,29 +190,24 @@ find "$stage" -type f -print | while IFS= read -r p; do printf '%s\n' "${p:$stag
 mkdir -p "$(dirname "$OUTPUT_ARCHIVE")"
 archive_tmp="$(mktemp "${OUTPUT_ARCHIVE}.tmp.XXXXXX")"
 attestation_tmp="$(mktemp "${OUTPUT_ATTESTATION}.tmp.XXXXXX")"
-python3 - "$stage" "$file_list" "$archive_tmp" <<'PY' || fail 'deterministic archive creation failed'
-import gzip, hashlib, os, stat, sys, tarfile
-stage, file_list, output = sys.argv[1:]
+python3 - "$HERE" "$stage" "$file_list" "$archive_tmp" <<'PY' || fail 'deterministic archive creation failed'
+import os, stat, sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes
+stage, file_list, output = sys.argv[2:5]
 with open(file_list, 'r', encoding='utf-8') as fh:
     names = [line.rstrip('\n') for line in fh]
-with open(output, 'wb') as raw:
-    with gzip.GzipFile(filename='', mode='wb', fileobj=raw, mtime=0) as gz:
-        with tarfile.open(fileobj=gz, mode='w|', format=tarfile.PAX_FORMAT) as archive:
-            for name in names:
-                path = os.path.join(stage, name)
-                info = os.lstat(path)
-                if not stat.S_ISREG(info.st_mode):
-                    raise SystemExit(f'non-regular archive member: {name}')
-                member = tarfile.TarInfo(name)
-                member.size = info.st_size
-                member.mode = stat.S_IMODE(info.st_mode)
-                member.mtime = 0
-                member.uid = 0
-                member.gid = 0
-                member.uname = ''
-                member.gname = ''
-                with open(path, 'rb') as source:
-                    archive.addfile(member, source)
+members = []
+for name in names:
+    path = os.path.join(stage, name)
+    info = os.lstat(path)
+    if not stat.S_ISREG(info.st_mode):
+        raise SystemExit(f'non-regular archive member: {name}')
+    with open(path, 'rb') as source:
+        data = source.read()
+    members.append((name, b'0', stat.S_IMODE(info.st_mode), data))
+with open(output, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(canonical_tar_bytes(members)))
 PY
 archive_sha="$(sha "$archive_tmp")"; archive_bytes="$(bytes "$archive_tmp")"
 jq -n --arg sourceCommit "$SOURCE_COMMIT" --arg archivePath "$OUTPUT_ARCHIVE" --arg archiveSha "$archive_sha" --argjson archiveBytes "$archive_bytes" --arg manifestSha "$manifest_sha" \

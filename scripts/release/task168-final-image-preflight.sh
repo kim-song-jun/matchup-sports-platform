@@ -28,6 +28,9 @@ USAGE
   exit 64
 }
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+[[ -f "$HERE/task168_canonical_tar.py" ]] || { echo 'missing sibling module task168_canonical_tar.py' >&2; exit 1; }
+
 BACKUP= BACKUP_SHA= BACKUP_FORMAT= STAGE_A_TRANSITION= STAGE_A_TRANSITION_SHA= STAGE_A_BACKUP_RECEIPT= STAGE_A_BACKUP_RECEIPT_SHA= STAGE_A_RELEASE_SHA= STAGE_A_SCHEMA_SHA= DATABASE_IDENTITY=
 SCHEMA=SCHEMA_SHA= MIGRATION_ROOT= MIGRATIONS_JSON= FULL_MIGRATIONS_JSON= RESOLVED_ATTEMPTS_JSON= SOURCE_ARCHIVE= SOURCE_SHA= SOURCE_ARCHIVE_ATTESTATION= INPUT_SNAPSHOT= INPUT_SNAPSHOT_SHA=
 POSTGRES_IMAGE= API_IMAGE= API_CLIENT_SCHEMA_PATH= WEB_IMAGE= TOOL_IMAGE= API_WORKDIR= API_PRISMA_BIN= TOOL_WORKDIR= TOOL_PRISMA_BIN=
@@ -101,40 +104,56 @@ MIGRATION_LOCK_SHA="$(sha256 "$MIGRATION_ROOT/migration_lock.toml")"
 
 # Archive member set: reject traversal, symlink/hardlink members, and a
 # bundle/ prefix layout (this archive is repository-root, pathPrefix "").
-# A member is rejected unless its raw tar member name is already its own
-# posixpath.normpath(): matching a fixed set of "obviously bad" shapes (a
-# leading "./", a doubled "/", a "/./"/"/../" segment) is blind to any other
-# spelling of the same target path, which still lands at the canonical path
-# on extraction. Member metadata (type, name) is read directly with Python's
-# tarfile module rather than parsed from `tar -tv` text columns, which
-# silently truncates any member name containing whitespace via `awk '{print
-# $NF}'`.
 #
-# This runs before any system `tar` touches the archive, including reading
-# INPUT-MANIFEST.json below: a malformed member elsewhere in the stream can
-# desync GNU tar's own sequential parse and fail an unrelated earlier read.
+# The member list comes from one raw 512-byte-header walk (no external
+# `tar`, so a malformed member elsewhere in the stream can't desync a
+# sequential parse and fail an unrelated earlier read). It used to be
+# authenticated by a second parse through Python's own tarfile module and a
+# `raw_names == python_names` comparison -- two Python-side parsers that can
+# agree with each other about a header shape (e.g. a pax 'x' header
+# immediately following another one) while both disagree with what the
+# system tar that actually extracts the archive does with it. Comparing two
+# implementations of the same interpretation proves nothing about a third,
+# so that cross-check is gone. In its place: the walk re-serializes the
+# exact (name, typeflag, mode, data) sequence it extracted through
+# task168_canonical_tar.py -- the same module package-task168-final-source.sh
+# uses to write the archive -- and requires the result to be byte-identical
+# to the decompressed input. Any header shape that module cannot produce
+# (a second consecutive pax header, a pax key besides 'path', a non-ustar
+# magic, a non-empty prefix, anything after the archive's own end-of-archive
+# marker) makes the reserialization diverge, with no dependency on how any
+# particular tar implementation would resolve the ambiguity. A gzip stream
+# carrying more than one member, or trailing bytes after it, is rejected
+# before the walk even starts.
 jq -e '.archiveLayout.pathPrefix==""' "$INPUT_SNAPSHOT" >/dev/null || fail 'input snapshot does not declare a repository-root (empty pathPrefix) archive layout'
 ARCHIVE_REGULAR_MEMBERS="$(mktemp "${TMPDIR:-/tmp}/task168-preflight-members.XXXXXX")"
 MANIFEST_SHA_FILE="$(mktemp "${TMPDIR:-/tmp}/task168-preflight-manifest-sha.XXXXXX")"
-python3 - "$SOURCE_ARCHIVE" "$MANIFEST_SHA_FILE" > "$ARCHIVE_REGULAR_MEMBERS" <<'PY' || fail 'source archive member listing failed or contains a rejected path'
-import hashlib, posixpath, sys, tarfile, gzip
-archive, manifest_sha_path = sys.argv[1], sys.argv[2]
+python3 - "$HERE" "$SOURCE_ARCHIVE" "$MANIFEST_SHA_FILE" > "$ARCHIVE_REGULAR_MEMBERS" <<'PY' || fail 'source archive member listing failed or contains a rejected path'
+import hashlib, posixpath, sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_tar_bytes, decompress_single_gzip_member
+archive, manifest_sha_path = sys.argv[2], sys.argv[3]
 MANIFEST_NAME = 'INPUT-MANIFEST.json'
+BLOCK = 512
 
 def fail(msg):
     sys.stderr.write(msg + '\n')
     sys.exit(1)
 
-# Raw header walk: independently re-derives the member-name list straight
-# from 512-byte tar headers -- no tarfile, no external `tar` -- and enforces
-# the exact contract package-task168-final-source.sh's tarfile.PAX_FORMAT
-# writer produces (valid checksum, strict-octal numeric fields, ustar magic,
-# empty ustar prefix, and only the typeflags/pax keys that writer ever
-# emits). Running this before tarfile ever opens the archive means a header
-# tarfile would misparse or crash on (a forged devmajor, a pax 'size'
-# override, a pax global header) is rejected here first instead of silently
-# passing or raising uncaught. It also extracts INPUT-MANIFEST.json's bytes
-# directly, so no external `tar` is ever handed the archive.
+with open(archive, 'rb') as fh:
+    raw = fh.read()
+try:
+    tar_bytes = decompress_single_gzip_member(raw)
+except ValueError as exc:
+    fail('source archive %s' % exc)
+
+# Reimplements only what package-task168-final-source.sh's writer ever
+# emits: ustar magic, empty prefix, strict-octal numeric fields, typeflags
+# '0'/'5'/'x', and a pax record set of exactly {'path'}. Anything else is
+# rejected here, per-cause, before the canonical-form check below (whose
+# generic message would otherwise be the only signal): a header name or pax
+# value carrying a control byte, and a pax 'x' header directly following
+# another unconsumed one or carrying no 'path' record at all.
 ALLOWED_TYPEFLAGS = {b'0', b'5', b'x'}
 ALLOWED_PAX_KEYS = {'path'}
 USTAR_MAGIC = b'ustar\x0000'
@@ -152,146 +171,138 @@ def parse_octal(field):
             return None
     return int(text, 8)
 
-def read_exact(fh, n):
-    buf = bytearray()
-    while len(buf) < n:
-        chunk = fh.read(n - len(buf))
-        if not chunk:
-            break
-        buf += chunk
-    return bytes(buf)
+def has_control_byte(b):
+    return any(x < 0x20 for x in b)
 
 def decode_name(raw):
     return raw.decode('utf-8', 'surrogateescape')
 
-raw_names = []
-pending_pax = None
+members = []
+pax_override = None
 manifest_sha256 = None
-with gzip.open(archive, 'rb') as fh:
-    while True:
-        header = read_exact(fh, 512)
-        if len(header) < 512:
-            fail('source archive is truncated or malformed')
-        if header == b'\x00' * 512:
-            break
-        chksum = parse_octal(header[148:156])
-        computed = sum(header[:148]) + 8 * 0x20 + sum(header[156:])
-        if chksum is None or chksum != computed:
-            fail('source archive header checksum mismatch')
-        if header[257:265] != USTAR_MAGIC:
-            fail('source archive contains a header with an unsupported magic value')
-        if header[345:500] != b'\x00' * 155:
-            fail('source archive contains a non-empty ustar prefix field')
-        for lo, hi in ((100, 108), (108, 116), (116, 124), (124, 136), (136, 148), (329, 337), (337, 345)):
-            if parse_octal(header[lo:hi]) is None:
-                fail('source archive contains a non-octal numeric header field')
-        size = parse_octal(header[124:136])
-        typeflag = header[156:157]
-        if typeflag == b'g':
-            fail('source archive contains a global pax extended header')
-        if typeflag not in ALLOWED_TYPEFLAGS:
-            fail('source archive contains an unauthorized typeflag: %r' % typeflag)
-        payload_blocks = ((size + 511) // 512) * 512 if size else 0
-        if typeflag == b'x':
-            # Per-member pax extended header: its records override fields of
-            # the single header that immediately follows.
-            payload = read_exact(fh, payload_blocks)
-            if len(payload) < payload_blocks:
-                fail('source archive is truncated or malformed')
-            records, pos = payload[:size], 0
-            overrides = dict(pending_pax) if pending_pax else {}
-            while pos < len(records):
-                sp = records.find(b' ', pos)
-                if sp == -1 or not records[pos:sp].isdigit():
-                    fail('source archive contains a malformed pax extended header record')
-                reclen = int(records[pos:sp])
-                if reclen <= 0 or pos + reclen > len(records) or records[pos + reclen - 1:pos + reclen] != b'\n':
-                    fail('source archive contains a malformed pax extended header record')
-                content = records[sp + 1:pos + reclen - 1]
-                eq = content.find(b'=')
-                if eq == -1:
-                    fail('source archive contains a malformed pax extended header record')
-                key = decode_name(content[:eq])
-                if key not in ALLOWED_PAX_KEYS:
-                    fail('source archive contains an unauthorized pax extended header key: %s' % key)
-                overrides[key] = decode_name(content[eq + 1:])
-                pos += reclen
-            pending_pax = overrides
-            continue
-        if typeflag == b'0' and header[157:257] != b'\x00' * 100:
-            fail('source archive regular file member has a non-empty linkname')
-        # Prefix is required empty above, so a long name only ever arrives
-        # via a pax 'path' override, never a prefix+name join -- real tar
-        # only honors that join for POSIX-magic headers.
-        if pending_pax and 'path' in pending_pax:
-            name = pending_pax['path']
-        else:
-            name = decode_name(header[0:100].rstrip(b'\x00'))
-        pending_pax = None
-        if typeflag == b'5' and name.endswith('/'):
-            name = name[:-1]
-        raw_names.append(name)
-        payload = b''
-        if payload_blocks:
-            payload = read_exact(fh, payload_blocks)
-            if len(payload) < payload_blocks:
-                fail('source archive is truncated or malformed')
-        if typeflag == b'0' and name == MANIFEST_NAME:
-            manifest_sha256 = hashlib.sha256(payload[:size]).hexdigest()
+pos = 0
+total = len(tar_bytes)
+while True:
+    header = tar_bytes[pos:pos + BLOCK]
+    if len(header) < BLOCK:
+        fail('source archive is truncated or malformed')
+    pos += BLOCK
+    if header == b'\x00' * BLOCK:
+        break
+    chksum = parse_octal(header[148:156])
+    computed = sum(header[:148]) + 8 * 0x20 + sum(header[156:])
+    if chksum is None or chksum != computed:
+        fail('source archive header checksum mismatch')
+    if header[257:265] != USTAR_MAGIC:
+        fail('source archive contains a header with an unsupported magic value')
+    if header[345:500] != b'\x00' * 155:
+        fail('source archive contains a non-empty ustar prefix field')
+    for lo, hi in ((100, 108), (108, 116), (116, 124), (124, 136), (136, 148), (329, 337), (337, 345)):
+        if parse_octal(header[lo:hi]) is None:
+            fail('source archive contains a non-octal numeric header field')
+    size = parse_octal(header[124:136])
+    mode = parse_octal(header[100:108])
+    typeflag = header[156:157]
+    if typeflag == b'g':
+        fail('source archive contains a global pax extended header')
+    if typeflag not in ALLOWED_TYPEFLAGS:
+        fail('source archive contains an unauthorized typeflag: %r' % typeflag)
+    payload_blocks = ((size + 511) // 512) * 512 if size else 0
+    if payload_blocks > total - pos:
+        fail('source archive is truncated or malformed')
+    if typeflag == b'x':
+        if pax_override is not None:
+            fail('source archive contains consecutive pax extended headers')
+        payload = tar_bytes[pos:pos + payload_blocks]
+        pos += payload_blocks
+        records, rpos = payload[:size], 0
+        parsed = {}
+        while rpos < len(records):
+            sp = records.find(b' ', rpos)
+            if sp == -1 or not records[rpos:sp].isdigit():
+                fail('source archive contains a malformed pax extended header record')
+            reclen = int(records[rpos:sp])
+            if reclen <= 0 or rpos + reclen > len(records) or records[rpos + reclen - 1:rpos + reclen] != b'\n':
+                fail('source archive contains a malformed pax extended header record')
+            content = records[sp + 1:rpos + reclen - 1]
+            eq = content.find(b'=')
+            if eq == -1:
+                fail('source archive contains a malformed pax extended header record')
+            key_raw, value_raw = content[:eq], content[eq + 1:]
+            if has_control_byte(key_raw) or has_control_byte(value_raw):
+                fail('source archive contains a pax extended header record with a control byte')
+            key = decode_name(key_raw)
+            if key not in ALLOWED_PAX_KEYS:
+                fail('source archive contains an unauthorized pax extended header key: %s' % key)
+            parsed[key] = decode_name(value_raw)
+            rpos += reclen
+        if 'path' not in parsed:
+            fail('source archive contains a pax extended header with no path record')
+        pax_override = parsed['path']
+        continue
+    if typeflag == b'0' and header[157:257] != b'\x00' * 100:
+        fail('source archive regular file member has a non-empty linkname')
+    if has_control_byte(header[0:100].rstrip(b'\x00')):
+        fail('source archive contains a header name with a control byte')
+    # Prefix is required empty above, so a long name only ever arrives
+    # via a pax 'path' override, never a prefix+name join -- real tar
+    # only honors that join for POSIX-magic headers.
+    if pax_override is not None:
+        name = pax_override
+    else:
+        name = decode_name(header[0:100].rstrip(b'\x00'))
+    pax_override = None
+    if typeflag == b'5' and name.endswith('/'):
+        name = name[:-1]
+    payload = tar_bytes[pos:pos + payload_blocks]
+    pos += payload_blocks
+    data = payload[:size]
+    if typeflag == b'0' and name == MANIFEST_NAME:
+        manifest_sha256 = hashlib.sha256(data).hexdigest()
+    members.append((name, typeflag, mode, data))
 
 if manifest_sha256 is None:
     fail('source archive does not contain INPUT-MANIFEST.json')
 
-# tarfile's own parse, for the member-classification checks (unsafe path,
-# canonical form, bundle/ prefix, duplicate name) that reuse its higher-level
-# member typing rather than reimplementing it. A symlink/hardlink member
-# never reaches here: ALLOWED_TYPEFLAGS above already rejected typeflag '1'
-# or '2' during the raw header walk.
+try:
+    reencoded = canonical_tar_bytes(members)
+except ValueError as exc:
+    fail('source archive is not in canonical form: %s' % exc)
+if reencoded != tar_bytes:
+    fail('source archive is not in canonical form')
+
+# Classification over the now-authenticated member list -- no tarfile, no
+# second parser: every name here is already exactly what canonical_tar_bytes
+# proved the archive encodes.
 seen = set()
-python_names = []
-with tarfile.open(archive, 'r:*') as tar:
-    for member in tar.getmembers():
-        name = member.name
-        check_name = name[:-1] if member.isdir() and name.endswith('/') else name
-        python_names.append(check_name)
-        unsafe = (
-            check_name.startswith('/') or check_name in ('.', '..')
-            or check_name.startswith('../') or '/../' in check_name or check_name.endswith('/..')
-        )
-        if unsafe:
-            fail('source archive contains an unsafe path: %s' % name)
-        if posixpath.normpath(check_name) != check_name:
-            fail('source archive contains a non-canonical path: %s' % name)
-        if check_name == 'bundle' or check_name.startswith('bundle/'):
-            fail('source archive uses a bundle/ prefix but declares pathPrefix="": %s' % name)
-        # `tar -xOf` (used below for the per-file content check) concatenates
-        # every copy of a repeated member name; real extraction keeps only
-        # the last one. A second, differently-sized copy of an already-hashed
-        # member would otherwise clear that content check on the
-        # concatenated bytes while extracting to something else entirely.
-        if check_name in seen:
-            fail('source archive contains a duplicate member: %s' % name)
-        seen.add(check_name)
-        if member.isdir():
-            continue
-        sys.stdout.buffer.write(check_name.encode('utf-8', 'surrogateescape') + b'\0')
-
-if raw_names != python_names:
-    fail('source archive member listing disagrees between tarfile and a raw header walk')
-
-# Reject a member name that collides with another only by case, and a member
-# outside apps/v1_api/prisma/ whose casefolded name would land inside it --
-# the prisma allowlist below matches case-sensitively, so a case-insensitive
-# extraction filesystem could otherwise be steered into overwriting a
-# reviewed path with an unreviewed one.
 lower_seen = {}
-for n in raw_names:
-    key = n.casefold()
+for name, typeflag, mode, data in members:
+    unsafe = (
+        name.startswith('/') or name in ('.', '..')
+        or name.startswith('../') or '/../' in name or name.endswith('/..')
+    )
+    if unsafe:
+        fail('source archive contains an unsafe path: %s' % name)
+    if posixpath.normpath(name) != name:
+        fail('source archive contains a non-canonical path: %s' % name)
+    if name == 'bundle' or name.startswith('bundle/'):
+        fail('source archive uses a bundle/ prefix but declares pathPrefix="": %s' % name)
+    if name in seen:
+        fail('source archive contains a duplicate member: %s' % name)
+    seen.add(name)
+    # A member name that collides with another only by case, or one outside
+    # apps/v1_api/prisma/ whose casefolded name would land inside it, would
+    # let a case-insensitive extraction filesystem overwrite a reviewed path
+    # with an unreviewed one -- the prisma allowlist below matches
+    # case-sensitively.
+    key = name.casefold()
     if key in lower_seen:
-        fail('source archive contains member names that collide only by case: %s' % n)
-    lower_seen[key] = n
-    if key.startswith('apps/v1_api/prisma/') and not n.startswith('apps/v1_api/prisma/'):
-        fail('source archive contains a member whose path collides only by case with apps/v1_api/prisma/: %s' % n)
+        fail('source archive contains member names that collide only by case: %s' % name)
+    lower_seen[key] = name
+    if key.startswith('apps/v1_api/prisma/') and not name.startswith('apps/v1_api/prisma/'):
+        fail('source archive contains a member whose path collides only by case with apps/v1_api/prisma/: %s' % name)
+    if typeflag == b'0':
+        sys.stdout.buffer.write(name.encode('utf-8', 'surrogateescape') + b'\0')
 
 # Only written once every check above has passed, so a caller can never read
 # a manifest hash for an archive this walker rejected.

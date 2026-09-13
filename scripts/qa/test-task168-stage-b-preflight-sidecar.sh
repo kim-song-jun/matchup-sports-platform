@@ -1,29 +1,33 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# macOS bsdtar embeds AppleDouble ("._*") resource-fork sidecar members
-# in every directory it archives unless this is set.
-export COPYFILE_DISABLE=1
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$HERE/../.." && pwd)"
+PREFLIGHT="$REPO_ROOT/scripts/release/task168-final-image-preflight.sh"
+RELEASE_DIR="$REPO_ROOT/scripts/release"
+[[ -x "$PREFLIGHT" ]] || { echo "FAIL: missing $PREFLIGHT" >&2; exit 1; }
+[[ -f "$RELEASE_DIR/task168_canonical_tar.py" ]] || { echo "FAIL: missing $RELEASE_DIR/task168_canonical_tar.py" >&2; exit 1; }
 
-# Builds a fixture archive the same way package-task168-final-source.sh does
-# (tarfile.PAX_FORMAT, mtime/uid/gid=0, uname/gname empty) instead of
-# shelling out to `tar`. The preflight's member-set check now walks raw tar
-# headers and enforces that exact contract, and neither the system `tar`
-# (bsdtar tags every member with mtime/xattr pax records; GNU tar's GNU
-# long-name format differs from bsdtar's) nor tarfile.add()'s own default
-# (real filesystem mtimes, also pax-encoded) reproduce it.
+# Builds a fixture archive through the same canonical serializer
+# scripts/release/package-task168-final-source.sh uses (see
+# task168_canonical_tar.py), instead of shelling out to `tar` or driving
+# Python's own tarfile module. The preflight now proves an archive canonical
+# by re-encoding what it parsed through that exact module and requiring a
+# byte-for-byte match, so any fixture meant to clear that check has to be
+# built by the same module -- tarfile's own PAX_FORMAT writer does not
+# reproduce this module's byte layout (different devmajor/devminor and pax
+# header conventions), and would make every "good" fixture below fail with
+# 'not in canonical form' instead of exercising the check the test names.
 write_clean_tar() {
   local workdir="$1" out="$2"; shift 2
-  python3 - "$workdir" "$out" "$@" <<'PY'
-import os, sys, tarfile
-workdir, out = sys.argv[1], sys.argv[2]
-names = sys.argv[3:]
-def clean(ti):
-    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
-    return ti
-with tarfile.open(out, 'w:gz', format=tarfile.PAX_FORMAT) as tar:
-    for name in names:
-        tar.add(os.path.join(workdir, name), arcname=name, filter=clean)
+  python3 - "$RELEASE_DIR" "$workdir" "$out" "$@" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+workdir, out = sys.argv[2], sys.argv[3]
+members = collect_members(workdir, sys.argv[4:])
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(canonical_tar_bytes(members)))
 PY
 }
 
@@ -48,7 +52,7 @@ PY
 #                                                                    fixture uses the real reviewed bytes
 #   files[] finalSchema entry == pinned schema sha               -> red on (G4)
 #   files[] migration entries == fullMigrationHistory            -> red on (G1), (G2)
-#   duplicate archive member rejection                           -> red on (DUP)
+#   duplicate archive member rejection                           -> red on (DUP), (A_emptym11)
 #   Task168-contract M11 hash pin (caller input vs reviewed sha) -> red on (F12)
 #   snapshot .m11.sha256 pin                                     -> red on (F13)
 #   Task168-contract "M11 must be last" order check               -> red on (F14)
@@ -60,11 +64,24 @@ PY
 #  history entry -- the minimal 2-entry fixture used everywhere else in this
 #  file never reaches those checks, since it always fails the earlier
 #  11-entries-required gate first.)
-
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$HERE/../.." && pwd)"
-PREFLIGHT="$REPO_ROOT/scripts/release/task168-final-image-preflight.sh"
-[[ -x "$PREFLIGHT" ]] || { echo "FAIL: missing $PREFLIGHT" >&2; exit 1; }
+#
+# The canonical-form identity check and the walker's own consecutive-pax,
+# control-byte, and path-less-pax rejections overlap on purpose (each of the
+# latter three exists for a clearer, cause-specific message, not because it
+# is the only thing standing between the archive and acceptance). Deleting
+# them one at a time on a scratch copy: only the identity check itself
+# produces red -- on (END-MARKER-EXTRA), the one new case with no header-level
+# rule of its own -- and only against a single-gzip-member archive; deleting
+# decompress_single_gzip_member's own trailing-data check instead reds
+# (GZIP-TRAILING) and (GZIP-CONCAT). Deleting the consecutive-pax check alone
+# still rejects (CHAINED_PAX) and (A_newmig) (via the identity check and the
+# path-less-pax check respectively, just with a different message); deleting
+# either control-byte check alone still rejects (B_nulm11) and
+# (HEADER-NAME-NUL) via the identity check, because canonical_tar_bytes
+# itself refuses to encode a control byte in a name; deleting the
+# path-less-pax check alone still rejects (PAX-NOPATH) via the identity
+# check, because a physical pax header block that contributes no member
+# override can never be reproduced by re-encoding the member list.
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "PASS: $*"; }
@@ -283,9 +300,20 @@ mkdir -p "$SYMLINK_DIR/stage"
 cp -R "$FIXTURE/stage/apps" "$SYMLINK_DIR/stage/apps"
 cp "$FIXTURE/stage/INPUT-MANIFEST.json" "$SYMLINK_DIR/stage/INPUT-MANIFEST.json"
 ln -s schema.prisma "$SYMLINK_DIR/stage/apps/v1_api/prisma/schema-link"
-# Plain (non -h) tar stores a symlink as a symlink member rather than
-# dereferencing it.
-write_clean_tar "$SYMLINK_DIR/stage" "$SYMLINK_DIR/source.tar.gz" INPUT-MANIFEST.json apps
+# write_clean_tar's collect_members() rejects a symlink outright (it has no
+# canonical byte representation to reproduce), so this builds the archive
+# with plain tarfile instead -- a symlink member is rejected on its typeflag
+# during the walk itself, before the canonical-form check would ever matter.
+python3 - "$SYMLINK_DIR/stage" "$SYMLINK_DIR/source.tar.gz" <<'PY'
+import os, sys, tarfile
+stage, out = sys.argv[1], sys.argv[2]
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
+with tarfile.open(out, 'w:gz') as tar:
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+PY
 symlink_sha="$(sha "$SYMLINK_DIR/source.tar.gz")"
 symlink_bytes="$(wc -c < "$SYMLINK_DIR/source.tar.gz" | tr -d ' ')"
 jq --arg h "$symlink_sha" --argjson b "$symlink_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
@@ -374,24 +402,21 @@ run_expect_fail 'source archive contains an unauthenticated member under apps/v1
 pass 'rejects an extra file smuggled inside an already-declared migration directory'
 
 # ---- 8. a ../ traversal member is rejected ---------------------------------
-# A plain `tar -c` refuses to create a member spelled with a leading `../`, so
-# this uses Python's tarfile module directly (as the preparer/packager do) to
-# inject the unsafe member the same way a hand-crafted malicious archive would.
+# The unsafe-path check runs after the canonical-form identity check, so this
+# extra member has to come from the same canonical serializer as the rest of
+# the archive (see write_clean_tar's docstring) -- a plain `tar -c` refuses to
+# create a member spelled with a leading `../` in the first place.
 TRAVERSAL_DIR="$TMP/traversal"
 mkdir -p "$TRAVERSAL_DIR"
-python3 - "$FIXTURE/stage" "$TRAVERSAL_DIR/source.tar.gz" <<'PY'
-import io, os, sys, tarfile
-stage, out = sys.argv[1], sys.argv[2]
-def clean(ti):
-    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
-    return ti
-with tarfile.open(out, 'w:gz') as tar:
-    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
-    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
-    data = b'evil\n'
-    info = tarfile.TarInfo(name='../evil.txt')
-    info.size = len(data)
-    tar.addfile(info, io.BytesIO(data))
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$TRAVERSAL_DIR/source.tar.gz" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+stage, out = sys.argv[2], sys.argv[3]
+members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
+members.append(('../evil.txt', b'0', 0o644, b'evil\n'))
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(canonical_tar_bytes(members)))
 PY
 traversal_sha="$(sha "$TRAVERSAL_DIR/source.tar.gz")"
 traversal_bytes="$(wc -c < "$TRAVERSAL_DIR/source.tar.gz" | tr -d ' ')"
@@ -439,18 +464,15 @@ pass 'rejects an archive whose M1 migration bytes differ from the authenticated 
 #          pass) while real extraction keeps only the last (empty) one -----
 DUP_DIR="$TMP/duplicate-member"
 mkdir -p "$DUP_DIR"
-python3 - "$FIXTURE/stage" "$DUP_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
-import io, os, sys, tarfile
-stage, out, dup_name = sys.argv[1], sys.argv[2], sys.argv[3]
-def clean(ti):
-    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
-    return ti
-with tarfile.open(out, 'w:gz') as tar:
-    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
-    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
-    info = tarfile.TarInfo(name=dup_name)
-    info.size = 0
-    tar.addfile(info, io.BytesIO(b''))
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$DUP_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+stage, out, dup_name = sys.argv[2], sys.argv[3], sys.argv[4]
+members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
+members.append((dup_name, b'0', 0o644, b''))
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(canonical_tar_bytes(members)))
 PY
 dup_sha="$(sha "$DUP_DIR/source.tar.gz")"
 dup_bytes="$(wc -c < "$DUP_DIR/source.tar.gz" | tr -d ' ')"
@@ -573,6 +595,294 @@ done
 run_expect_fail 'source archive contains a global pax extended header' "${ARGS[@]}"
 pass 'GLOBALPAX: rejects an archive that carries a pax global header, platform-independent of whether the following rename would otherwise apply'
 
+# ---- CHAINED_PAX. a second pax ('x') header directly follows the first,
+#      each carrying its own valid path record -- merging the still-pending
+#      first header's dict into the second (instead of rejecting the second
+#      outright) let GNU tar/bsdtar extract the member under its raw ustar
+#      name while a Python-side parser saw the merged decoy path -------------
+CHAINED_PAX_DIR="$TMP/chained-pax"
+mkdir -p "$CHAINED_PAX_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$CHAINED_PAX_DIR/source.tar.gz" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_gzip_bytes, collect_members, encode_member, end_of_archive_marker, header_block, pax_header_block
+stage, out = sys.argv[2], sys.argv[3]
+trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
+extra = pax_header_block(b'docs/a.txt') + pax_header_block(b'docs/b.txt') + header_block(b'docs/b.txt', 0, 0o644, b'0')
+full = trunk + extra + end_of_archive_marker()
+full += b'\x00' * ((-len(full)) % 10240)  # RECORDSIZE, matching canonical_tar_bytes's own padding
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(full))
+PY
+chained_pax_sha="$(sha "$CHAINED_PAX_DIR/source.tar.gz")"
+chained_pax_bytes="$(wc -c < "$CHAINED_PAX_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$chained_pax_sha" --argjson b "$chained_pax_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$CHAINED_PAX_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$CHAINED_PAX_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$chained_pax_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$CHAINED_PAX_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains consecutive pax extended headers' "${ARGS[@]}"
+pass 'CHAINED_PAX: rejects a second pax header that directly follows an unconsumed first one, even though both carry a valid path record'
+
+# ---- PAX-NOPATH. a pax ('x') header carries zero records (no path at all) --
+#      the packager never emits an empty extended header, and without a path
+#      record the following regular header's raw ustar name is authoritative
+#      only by accident of this walker's own fallback, not by contract -----
+PAX_NOPATH_DIR="$TMP/pax-nopath"
+mkdir -p "$PAX_NOPATH_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$PAX_NOPATH_DIR/source.tar.gz" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_gzip_bytes, collect_members, encode_member, end_of_archive_marker, header_block
+stage, out = sys.argv[2], sys.argv[3]
+trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
+empty_pax = header_block(b'pax_header', 0, 0o644, b'x')
+extra = empty_pax + header_block(b'docs/somefile.txt', 0, 0o644, b'0')
+full = trunk + extra + end_of_archive_marker()
+full += b'\x00' * ((-len(full)) % 10240)  # RECORDSIZE, matching canonical_tar_bytes's own padding
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(full))
+PY
+pax_nopath_sha="$(sha "$PAX_NOPATH_DIR/source.tar.gz")"
+pax_nopath_bytes="$(wc -c < "$PAX_NOPATH_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$pax_nopath_sha" --argjson b "$pax_nopath_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$PAX_NOPATH_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$PAX_NOPATH_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$pax_nopath_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$PAX_NOPATH_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains a pax extended header with no path record' "${ARGS[@]}"
+pass 'PAX-NOPATH: rejects a pax header that sets no path record at all'
+
+# ---- A_newmig. x{path=docs/decoy.txt}, then an empty x{} (no records)
+#      immediately after it, then a regular header whose raw ustar name is a
+#      brand-new migration outside apps/v1_api/prisma/. The old walker
+#      carried the first header's decoy path forward through the empty
+#      second one and used it as the effective name, so the prisma
+#      allowlist below only ever saw "docs/decoy.txt" -- GNU tar and bsdtar
+#      instead extract the member under its raw name. CHAINED_PAX above
+#      already proves the mechanism; this reproduces the migration-hiding
+#      consequence directly -----------------------------------------------
+A_NEWMIG_DIR="$TMP/a-newmig"
+mkdir -p "$A_NEWMIG_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$A_NEWMIG_DIR/source.tar.gz" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_gzip_bytes, collect_members, encode_member, end_of_archive_marker, header_block, pax_header_block
+stage, out = sys.argv[2], sys.argv[3]
+trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
+decoy = pax_header_block(b'docs/decoy.txt')
+empty_x = header_block(b'pax_header', 0, 0o644, b'x')
+data = b'DROP SCHEMA public CASCADE;\n'
+reg = header_block(b'apps/v1_api/prisma/migrations/20990101000000_evil/migration.sql', len(data), 0o644, b'0')
+pad = b'\x00' * ((-len(data)) % 512)
+full = trunk + decoy + empty_x + reg + data + pad + end_of_archive_marker()
+full += b'\x00' * ((-len(full)) % 10240)  # RECORDSIZE, matching canonical_tar_bytes's own padding
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(full))
+PY
+a_newmig_sha="$(sha "$A_NEWMIG_DIR/source.tar.gz")"
+a_newmig_bytes="$(wc -c < "$A_NEWMIG_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$a_newmig_sha" --argjson b "$a_newmig_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$A_NEWMIG_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$A_NEWMIG_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$a_newmig_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$A_NEWMIG_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains consecutive pax extended headers' "${ARGS[@]}"
+pass 'A_newmig: rejects a decoy pax path followed by an empty pax header followed by a raw-named migration outside apps/v1_api/prisma/'
+
+# ---- A_emptym11. a second, empty M11 copy appended with no pax at all --
+#      the same class of attack as DUP above; kept as its own case to
+#      confirm the duplicate-member check still independently covers it
+#      once the tarfile-based member listing is gone ------------------------
+A_EMPTYM11_DIR="$TMP/a-emptym11"
+mkdir -p "$A_EMPTYM11_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$A_EMPTYM11_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+stage, out, dup_name = sys.argv[2], sys.argv[3], sys.argv[4]
+members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
+members.append((dup_name, b'0', 0o644, b''))
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(canonical_tar_bytes(members)))
+PY
+a_emptym11_sha="$(sha "$A_EMPTYM11_DIR/source.tar.gz")"
+a_emptym11_bytes="$(wc -c < "$A_EMPTYM11_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$a_emptym11_sha" --argjson b "$a_emptym11_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$A_EMPTYM11_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$A_EMPTYM11_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$a_emptym11_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$A_EMPTYM11_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains a duplicate member' "${ARGS[@]}"
+pass 'A_emptym11: rejects a second, empty copy of the M11 member appended with no pax header at all'
+
+# ---- B_nulm11. a pax path record containing a NUL byte followed by 'x' --
+#      tarfile and the old walker both kept the NUL in the name, but GNU tar
+#      and bsdtar both cut the ustar/pax name at the first NUL, so a second
+#      archive member could hide behind a name that looks distinct only to
+#      the Python-side parsers -------------------------------------------
+B_NULM11_DIR="$TMP/b-nulm11"
+mkdir -p "$B_NULM11_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$B_NULM11_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_gzip_bytes, collect_members, encode_member, end_of_archive_marker, header_block, pax_header_block
+stage, out, m11_path = sys.argv[2], sys.argv[3], sys.argv[4]
+trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
+nul_path = pax_header_block((m11_path + '\x00x').encode())
+reg = header_block(b'irrelevant', 0, 0o644, b'0')
+full = trunk + nul_path + reg + end_of_archive_marker()
+full += b'\x00' * ((-len(full)) % 10240)  # RECORDSIZE, matching canonical_tar_bytes's own padding
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(full))
+PY
+b_nulm11_sha="$(sha "$B_NULM11_DIR/source.tar.gz")"
+b_nulm11_bytes="$(wc -c < "$B_NULM11_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$b_nulm11_sha" --argjson b "$b_nulm11_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$B_NULM11_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$B_NULM11_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$b_nulm11_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$B_NULM11_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains a pax extended header record with a control byte' "${ARGS[@]}"
+pass 'B_nulm11: rejects a pax path record with an embedded NUL byte'
+
+# ---- HEADER-NAME-NUL. a regular header's raw ustar name field carries a NUL
+#      byte followed by trailing garbage -- accepting only bytes before the
+#      first NUL (the C-string convention every real tar implementation
+#      uses) while keeping everything after it in the parsed name lets a
+#      duplicate-detection check that compares full Python strings miss a
+#      collision two tar implementations would both treat as the same name -
+HEADER_NAME_NUL_DIR="$TMP/header-name-nul"
+mkdir -p "$HEADER_NAME_NUL_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$HEADER_NAME_NUL_DIR/source.tar.gz" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_gzip_bytes, collect_members, encode_member, end_of_archive_marker, header_block
+stage, out = sys.argv[2], sys.argv[3]
+trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
+name_field = (b'apps/zz-nul.txt\x00JUNKDATA').ljust(100, b'\x00')[:100]
+extra = header_block(name_field, 0, 0o644, b'0')
+full = trunk + extra + end_of_archive_marker()
+full += b'\x00' * ((-len(full)) % 10240)  # RECORDSIZE, matching canonical_tar_bytes's own padding
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(full))
+PY
+header_name_nul_sha="$(sha "$HEADER_NAME_NUL_DIR/source.tar.gz")"
+header_name_nul_bytes="$(wc -c < "$HEADER_NAME_NUL_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$header_name_nul_sha" --argjson b "$header_name_nul_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$HEADER_NAME_NUL_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$HEADER_NAME_NUL_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$header_name_nul_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$HEADER_NAME_NUL_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains a header name with a control byte' "${ARGS[@]}"
+pass 'HEADER-NAME-NUL: rejects a raw ustar name field carrying a NUL byte followed by trailing garbage'
+
+# ---- GZIP-TRAILING / GZIP-CONCAT. bytes after the archive's own single gzip
+#      member -- arbitrary garbage, or a second complete, independently-valid
+#      gzip member -- are rejected identically and before the tar walk even
+#      starts, since the packager only ever writes exactly one member -------
+GZIP_TRAILING_DIR="$TMP/gzip-trailing"
+mkdir -p "$GZIP_TRAILING_DIR"
+cp "$FIXTURE/source.tar.gz" "$GZIP_TRAILING_DIR/source.tar.gz"
+printf 'GARBAGE' >> "$GZIP_TRAILING_DIR/source.tar.gz"
+gzip_trailing_sha="$(sha "$GZIP_TRAILING_DIR/source.tar.gz")"
+gzip_trailing_bytes="$(wc -c < "$GZIP_TRAILING_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$gzip_trailing_sha" --argjson b "$gzip_trailing_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$GZIP_TRAILING_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$GZIP_TRAILING_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$gzip_trailing_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$GZIP_TRAILING_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains trailing bytes after the gzip stream' "${ARGS[@]}"
+pass 'GZIP-TRAILING: rejects arbitrary garbage bytes appended after the archive'\''s single gzip member'
+
+GZIP_CONCAT_DIR="$TMP/gzip-concat"
+mkdir -p "$GZIP_CONCAT_DIR"
+cat "$FIXTURE/source.tar.gz" "$FIXTURE/source.tar.gz" > "$GZIP_CONCAT_DIR/source.tar.gz"
+gzip_concat_sha="$(sha "$GZIP_CONCAT_DIR/source.tar.gz")"
+gzip_concat_bytes="$(wc -c < "$GZIP_CONCAT_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$gzip_concat_sha" --argjson b "$gzip_concat_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$GZIP_CONCAT_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$GZIP_CONCAT_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$gzip_concat_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$GZIP_CONCAT_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains trailing bytes after the gzip stream' "${ARGS[@]}"
+pass 'GZIP-CONCAT: rejects a second, independently-valid gzip member concatenated after the first'
+
+# ---- END-MARKER-EXTRA. a real member sits after the tar body's own
+#      end-of-archive marker (two all-NUL blocks) -- every parser this
+#      script was probed against (tarfile, GNU tar, bsdtar, the walker
+#      itself) stops at the first such marker and never looks past it, so
+#      only a check over the archive's *entire* decompressed length (not
+#      just up to the marker the walk stopped at) can catch this -----------
+END_MARKER_EXTRA_DIR="$TMP/end-marker-extra"
+mkdir -p "$END_MARKER_EXTRA_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$END_MARKER_EXTRA_DIR/source.tar.gz" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_gzip_bytes, collect_members, encode_member, end_of_archive_marker
+stage, out = sys.argv[2], sys.argv[3]
+trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
+hidden = encode_member('apps/zz-hidden.txt', b'0', 0o644, b'evil\n')
+full = trunk + end_of_archive_marker() + hidden + end_of_archive_marker()
+full += b'\x00' * ((-len(full)) % 10240)  # RECORDSIZE, matching canonical_tar_bytes's own padding
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(full))
+PY
+end_marker_extra_sha="$(sha "$END_MARKER_EXTRA_DIR/source.tar.gz")"
+end_marker_extra_bytes="$(wc -c < "$END_MARKER_EXTRA_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$end_marker_extra_sha" --argjson b "$end_marker_extra_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$END_MARKER_EXTRA_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$END_MARKER_EXTRA_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$end_marker_extra_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$END_MARKER_EXTRA_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive is not in canonical form' "${ARGS[@]}"
+pass 'END-MARKER-EXTRA: rejects a real member placed after the tar body'\''s own end-of-archive marker'
+
 # ---- 10. non-canonical spellings of an in-scope migration path bypass a
 #          check keyed on fixed "obviously bad" shapes only if the check
 #          does not first demand the member's own canonical form -----------
@@ -586,19 +896,15 @@ for spelling in dotslash dblslash dotmid; do
   mkdir -p "$NONCANON_DIR/stage"
   cp -R "$FIXTURE/stage/apps" "$NONCANON_DIR/stage/apps"
   cp "$FIXTURE/stage/INPUT-MANIFEST.json" "$NONCANON_DIR/stage/INPUT-MANIFEST.json"
-  python3 - "$NONCANON_DIR/stage" "$NONCANON_DIR/source.tar.gz" "$evil_name" <<'PY'
-import io, os, sys, tarfile
-stage, out, evil_name = sys.argv[1], sys.argv[2], sys.argv[3]
-def clean(ti):
-    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
-    return ti
-with tarfile.open(out, 'w:gz') as tar:
-    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
-    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
-    data = b'-- evil\nSELECT 1;\n'
-    info = tarfile.TarInfo(name=evil_name)
-    info.size = len(data)
-    tar.addfile(info, io.BytesIO(data))
+  python3 - "$RELEASE_DIR" "$NONCANON_DIR/stage" "$NONCANON_DIR/source.tar.gz" "$evil_name" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+stage, out, evil_name = sys.argv[2], sys.argv[3], sys.argv[4]
+members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
+members.append((evil_name, b'0', 0o644, b'-- evil\nSELECT 1;\n'))
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(canonical_tar_bytes(members)))
 PY
   noncanon_sha="$(sha "$NONCANON_DIR/source.tar.gz")"
   noncanon_bytes="$(wc -c < "$NONCANON_DIR/source.tar.gz" | tr -d ' ')"
@@ -622,19 +928,15 @@ done
 #          last space and silently drops the rest of the path ---------------
 SPACE_TRAVERSAL_DIR="$TMP/space-traversal"
 mkdir -p "$SPACE_TRAVERSAL_DIR"
-python3 - "$FIXTURE/stage" "$SPACE_TRAVERSAL_DIR/source.tar.gz" <<'PY'
-import io, os, sys, tarfile
-stage, out = sys.argv[1], sys.argv[2]
-def clean(ti):
-    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
-    return ti
-with tarfile.open(out, 'w:gz') as tar:
-    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
-    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
-    data = b'evil\n'
-    info = tarfile.TarInfo(name='../evil with space.txt')
-    info.size = len(data)
-    tar.addfile(info, io.BytesIO(data))
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$SPACE_TRAVERSAL_DIR/source.tar.gz" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+stage, out = sys.argv[2], sys.argv[3]
+members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
+members.append(('../evil with space.txt', b'0', 0o644, b'evil\n'))
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(canonical_tar_bytes(members)))
 PY
 space_traversal_sha="$(sha "$SPACE_TRAVERSAL_DIR/source.tar.gz")"
 space_traversal_bytes="$(wc -c < "$SPACE_TRAVERSAL_DIR/source.tar.gz" | tr -d ' ')"
@@ -656,21 +958,19 @@ pass 'rejects a ../ traversal member whose name contains a space'
 #      collide on any case-insensitive extraction filesystem --------------
 CASEFOLD_DUP_DIR="$TMP/casefold-dup"
 mkdir -p "$CASEFOLD_DUP_DIR"
-printf 'a\n' > "$CASEFOLD_DUP_DIR/extra-a.txt"
-printf 'b\n' > "$CASEFOLD_DUP_DIR/extra-b.txt"
-python3 - "$FIXTURE/stage" "$CASEFOLD_DUP_DIR" "$CASEFOLD_DUP_DIR/source.tar.gz" <<'PY'
-import os, sys, tarfile
-stage, workdir, out = sys.argv[1], sys.argv[2], sys.argv[3]
-def clean(ti):
-    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
-    return ti
-with tarfile.open(out, 'w:gz', format=tarfile.PAX_FORMAT) as tar:
-    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
-    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
-    # Two on-disk names avoid colliding on this build host's own filesystem;
-    # only the archive's own (distinct) arcnames matter to the check.
-    tar.add(os.path.join(workdir, 'extra-a.txt'), arcname='docs/Foo.txt', filter=clean, recursive=False)
-    tar.add(os.path.join(workdir, 'extra-b.txt'), arcname='docs/foo.txt', filter=clean, recursive=False)
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$CASEFOLD_DUP_DIR/source.tar.gz" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+stage, out = sys.argv[2], sys.argv[3]
+members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
+# Both extra names only ever exist as strings in this members list -- never
+# as actual files -- so they can't collide on a case-insensitive filesystem
+# the way two real on-disk paths named this way would.
+members.append(('docs/Foo.txt', b'0', 0o644, b'a\n'))
+members.append(('docs/foo.txt', b'0', 0o644, b'b\n'))
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(canonical_tar_bytes(members)))
 PY
 casefold_dup_sha="$(sha "$CASEFOLD_DUP_DIR/source.tar.gz")"
 casefold_dup_bytes="$(wc -c < "$CASEFOLD_DUP_DIR/source.tar.gz" | tr -d ' ')"
@@ -693,17 +993,15 @@ pass 'CASEFOLD-DUP: rejects two archive members whose full paths differ only by 
 #      on a case-insensitive extraction filesystem --------------------------
 CASEFOLD_BOUNDARY_DIR="$TMP/casefold-boundary"
 mkdir -p "$CASEFOLD_BOUNDARY_DIR"
-printf -- '-- evil\nSELECT 1;\n' > "$CASEFOLD_BOUNDARY_DIR/evil.sql"
-python3 - "$FIXTURE/stage" "$CASEFOLD_BOUNDARY_DIR" "$CASEFOLD_BOUNDARY_DIR/source.tar.gz" <<'PY'
-import os, sys, tarfile
-stage, workdir, out = sys.argv[1], sys.argv[2], sys.argv[3]
-def clean(ti):
-    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
-    return ti
-with tarfile.open(out, 'w:gz', format=tarfile.PAX_FORMAT) as tar:
-    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
-    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
-    tar.add(os.path.join(workdir, 'evil.sql'), arcname='Apps/v1_api/prisma/evil.sql', filter=clean, recursive=False)
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$CASEFOLD_BOUNDARY_DIR/source.tar.gz" <<'PY'
+import sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+stage, out = sys.argv[2], sys.argv[3]
+members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
+members.append(('Apps/v1_api/prisma/evil.sql', b'0', 0o644, b'-- evil\nSELECT 1;\n'))
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(canonical_tar_bytes(members)))
 PY
 casefold_boundary_sha="$(sha "$CASEFOLD_BOUNDARY_DIR/source.tar.gz")"
 casefold_boundary_bytes="$(wc -c < "$CASEFOLD_BOUNDARY_DIR/source.tar.gz" | tr -d ' ')"

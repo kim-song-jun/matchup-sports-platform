@@ -99,20 +99,6 @@ MIGRATION_LOCK_SHA="$(sha256 "$MIGRATION_ROOT/migration_lock.toml")"
 [[ "$INPUT_SNAPSHOT_SHA" =~ ^[0-9a-f]{64}$ && "$(sha256 "$INPUT_SNAPSHOT")" == "$INPUT_SNAPSHOT_SHA" ]] || fail 'input snapshot checksum mismatch'
 [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || fail 'release SHA must be 40 hex characters'
 
-# External sidecar attestation binds the archive to the exact INPUT-MANIFEST.json
-# it carries, without embedding the archive's own hash inside itself (that would
-# be self-hash recursion, which is why the archive's manifest has no
-# sourceArchive.sha256 field for us to compare against below).
-jq -e --arg h "$SOURCE_SHA" --argjson b "$(wc -c < "$SOURCE_ARCHIVE" | tr -d ' ')" --arg commit "$RELEASE_SHA" \
-  '.schemaVersion==1 and .kind=="task168StageBSourceArchiveAttestation" and .sourceCommit==$commit and .archiveSha256==$h and .archiveBytes==$b and .inputManifestPath=="INPUT-MANIFEST.json" and (.inputManifestSha256|strings|test("^[0-9a-f]{64}$")) and .inputManifestSha256==.inputSnapshotSha256' \
-  "$SOURCE_ARCHIVE_ATTESTATION" >/dev/null || fail 'source archive attestation does not authenticate this archive'
-EXTRACTED_MANIFEST_SHA="$(tar -xOf "$SOURCE_ARCHIVE" INPUT-MANIFEST.json | sha256sum | awk '{print $1}')" || fail 'source archive does not contain INPUT-MANIFEST.json'
-ATTESTED_MANIFEST_SHA="$(jq -er '.inputManifestSha256' "$SOURCE_ARCHIVE_ATTESTATION")"
-[[ "$EXTRACTED_MANIFEST_SHA" == "$ATTESTED_MANIFEST_SHA" ]] || fail 'archive-embedded INPUT-MANIFEST.json does not match the attested hash'
-# Do not trust a separately staged --input-snapshot merely because its path
-# looks right: require its bytes to be exactly what the archive itself carries.
-[[ "$INPUT_SNAPSHOT_SHA" == "$ATTESTED_MANIFEST_SHA" ]] || fail 'supplied input snapshot is not the manifest embedded in the attested archive'
-
 # Archive member set: reject traversal, symlink/hardlink members, and a
 # bundle/ prefix layout (this archive is repository-root, pathPrefix "").
 # A member is rejected unless its raw tar member name is already its own
@@ -123,11 +109,17 @@ ATTESTED_MANIFEST_SHA="$(jq -er '.inputManifestSha256' "$SOURCE_ARCHIVE_ATTESTAT
 # tarfile module rather than parsed from `tar -tv` text columns, which
 # silently truncates any member name containing whitespace via `awk '{print
 # $NF}'`.
+#
+# This runs before any system `tar` touches the archive, including reading
+# INPUT-MANIFEST.json below: a malformed member elsewhere in the stream can
+# desync GNU tar's own sequential parse and fail an unrelated earlier read.
 jq -e '.archiveLayout.pathPrefix==""' "$INPUT_SNAPSHOT" >/dev/null || fail 'input snapshot does not declare a repository-root (empty pathPrefix) archive layout'
 ARCHIVE_REGULAR_MEMBERS="$(mktemp "${TMPDIR:-/tmp}/task168-preflight-members.XXXXXX")"
-python3 - "$SOURCE_ARCHIVE" > "$ARCHIVE_REGULAR_MEMBERS" <<'PY' || fail 'source archive member listing failed or contains a rejected path'
-import posixpath, sys, tarfile, gzip
-archive = sys.argv[1]
+MANIFEST_SHA_FILE="$(mktemp "${TMPDIR:-/tmp}/task168-preflight-manifest-sha.XXXXXX")"
+python3 - "$SOURCE_ARCHIVE" "$MANIFEST_SHA_FILE" > "$ARCHIVE_REGULAR_MEMBERS" <<'PY' || fail 'source archive member listing failed or contains a rejected path'
+import hashlib, posixpath, sys, tarfile, gzip
+archive, manifest_sha_path = sys.argv[1], sys.argv[2]
+MANIFEST_NAME = 'INPUT-MANIFEST.json'
 
 def fail(msg):
     sys.stderr.write(msg + '\n')
@@ -136,13 +128,16 @@ def fail(msg):
 # Raw header walk: independently re-derives the member-name list straight
 # from 512-byte tar headers -- no tarfile, no external `tar` -- and enforces
 # the exact contract package-task168-final-source.sh's tarfile.PAX_FORMAT
-# writer produces (valid checksum, strict-octal numeric fields, and only the
-# typeflags/pax keys that writer ever emits). Running this before tarfile
-# ever opens the archive means a header tarfile would misparse or crash on
-# (a forged devmajor, a pax 'size' override, a pax global header) is
-# rejected here first instead of silently passing or raising uncaught.
+# writer produces (valid checksum, strict-octal numeric fields, ustar magic,
+# empty ustar prefix, and only the typeflags/pax keys that writer ever
+# emits). Running this before tarfile ever opens the archive means a header
+# tarfile would misparse or crash on (a forged devmajor, a pax 'size'
+# override, a pax global header) is rejected here first instead of silently
+# passing or raising uncaught. It also extracts INPUT-MANIFEST.json's bytes
+# directly, so no external `tar` is ever handed the archive.
 ALLOWED_TYPEFLAGS = {b'0', b'5', b'x'}
 ALLOWED_PAX_KEYS = {'path'}
+USTAR_MAGIC = b'ustar\x0000'
 
 def parse_octal(field):
     if not field:
@@ -171,6 +166,7 @@ def decode_name(raw):
 
 raw_names = []
 pending_pax = None
+manifest_sha256 = None
 with gzip.open(archive, 'rb') as fh:
     while True:
         header = read_exact(fh, 512)
@@ -182,6 +178,10 @@ with gzip.open(archive, 'rb') as fh:
         computed = sum(header[:148]) + 8 * 0x20 + sum(header[156:])
         if chksum is None or chksum != computed:
             fail('source archive header checksum mismatch')
+        if header[257:265] != USTAR_MAGIC:
+            fail('source archive contains a header with an unsupported magic value')
+        if header[345:500] != b'\x00' * 155:
+            fail('source archive contains a non-empty ustar prefix field')
         for lo, hi in ((100, 108), (108, 116), (116, 124), (124, 136), (136, 148), (329, 337), (337, 345)):
             if parse_octal(header[lo:hi]) is None:
                 fail('source archive contains a non-octal numeric header field')
@@ -220,20 +220,27 @@ with gzip.open(archive, 'rb') as fh:
             continue
         if typeflag == b'0' and header[157:257] != b'\x00' * 100:
             fail('source archive regular file member has a non-empty linkname')
+        # Prefix is required empty above, so a long name only ever arrives
+        # via a pax 'path' override, never a prefix+name join -- real tar
+        # only honors that join for POSIX-magic headers.
         if pending_pax and 'path' in pending_pax:
             name = pending_pax['path']
         else:
-            prefix = header[345:500].rstrip(b'\x00')
-            namefield = header[0:100].rstrip(b'\x00')
-            name = decode_name(prefix + b'/' + namefield) if prefix else decode_name(namefield)
+            name = decode_name(header[0:100].rstrip(b'\x00'))
         pending_pax = None
         if typeflag == b'5' and name.endswith('/'):
             name = name[:-1]
         raw_names.append(name)
+        payload = b''
         if payload_blocks:
-            skipped = read_exact(fh, payload_blocks)
-            if len(skipped) < payload_blocks:
+            payload = read_exact(fh, payload_blocks)
+            if len(payload) < payload_blocks:
                 fail('source archive is truncated or malformed')
+        if typeflag == b'0' and name == MANIFEST_NAME:
+            manifest_sha256 = hashlib.sha256(payload[:size]).hexdigest()
+
+if manifest_sha256 is None:
+    fail('source archive does not contain INPUT-MANIFEST.json')
 
 # tarfile's own parse, for the member-classification checks (unsafe path,
 # canonical form, bundle/ prefix, duplicate name) that reuse its higher-level
@@ -285,6 +292,11 @@ for n in raw_names:
     lower_seen[key] = n
     if key.startswith('apps/v1_api/prisma/') and not n.startswith('apps/v1_api/prisma/'):
         fail('source archive contains a member whose path collides only by case with apps/v1_api/prisma/: %s' % n)
+
+# Only written once every check above has passed, so a caller can never read
+# a manifest hash for an archive this walker rejected.
+with open(manifest_sha_path, 'w') as sha_fh:
+    sha_fh.write(manifest_sha256)
 PY
 # Every member the archive carries under apps/v1_api/prisma/ must be either a
 # declared overlay file (files[]) or one of the same non-reviewed extras
@@ -312,6 +324,23 @@ while IFS= read -r -d '' member_path; do
   [[ "$member_path" =~ $PRISMA_EXTRA_ALLOW_REGEX ]] || fail "source archive contains an unauthenticated member under apps/v1_api/prisma/: $member_path"
 done < "$ARCHIVE_REGULAR_MEMBERS"
 rm -f "$ARCHIVE_REGULAR_MEMBERS"
+
+# External sidecar attestation binds the archive to the exact INPUT-MANIFEST.json
+# it carries, without embedding the archive's own hash inside itself (that would
+# be self-hash recursion, which is why the archive's manifest has no
+# sourceArchive.sha256 field for us to compare against below). The manifest
+# hash itself now comes from the raw header walk above, not a second,
+# external-tar-mediated extraction of the same bytes.
+jq -e --arg h "$SOURCE_SHA" --argjson b "$(wc -c < "$SOURCE_ARCHIVE" | tr -d ' ')" --arg commit "$RELEASE_SHA" \
+  '.schemaVersion==1 and .kind=="task168StageBSourceArchiveAttestation" and .sourceCommit==$commit and .archiveSha256==$h and .archiveBytes==$b and .inputManifestPath=="INPUT-MANIFEST.json" and (.inputManifestSha256|strings|test("^[0-9a-f]{64}$")) and .inputManifestSha256==.inputSnapshotSha256' \
+  "$SOURCE_ARCHIVE_ATTESTATION" >/dev/null || fail 'source archive attestation does not authenticate this archive'
+EXTRACTED_MANIFEST_SHA="$(cat "$MANIFEST_SHA_FILE")"
+rm -f "$MANIFEST_SHA_FILE"
+ATTESTED_MANIFEST_SHA="$(jq -er '.inputManifestSha256' "$SOURCE_ARCHIVE_ATTESTATION")"
+[[ "$EXTRACTED_MANIFEST_SHA" == "$ATTESTED_MANIFEST_SHA" ]] || fail 'archive-embedded INPUT-MANIFEST.json does not match the attested hash'
+# Do not trust a separately staged --input-snapshot merely because its path
+# looks right: require its bytes to be exactly what the archive itself carries.
+[[ "$INPUT_SNAPSHOT_SHA" == "$ATTESTED_MANIFEST_SHA" ]] || fail 'supplied input snapshot is not the manifest embedded in the attested archive'
 [[ "$STAGE_A_RELEASE_SHA" =~ ^[0-9a-f]{40}$ && "$STAGE_A_SCHEMA_SHA" =~ ^[0-9a-f]{64}$ && -n "$DATABASE_IDENTITY" ]] || fail 'Stage A origin identity is malformed'
 [[ "$STAGE_A_TRANSITION_SHA" =~ ^[0-9a-f]{64}$ && "$(sha256 "$STAGE_A_TRANSITION")" == "$STAGE_A_TRANSITION_SHA" ]] || fail 'Stage A transition receipt checksum mismatch'
 [[ "$STAGE_A_BACKUP_RECEIPT_SHA" =~ ^[0-9a-f]{64}$ && "$(sha256 "$STAGE_A_BACKUP_RECEIPT")" == "$STAGE_A_BACKUP_RECEIPT_SHA" ]] || fail 'Stage A backup receipt checksum mismatch'

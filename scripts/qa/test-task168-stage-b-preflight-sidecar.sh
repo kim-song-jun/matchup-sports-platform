@@ -806,9 +806,9 @@ PY
   pass "PAX-$probe_key: rejects a per-member pax record overriding $probe_key, a key the real packager never emits"
 done
 
-# ---- LONGNAME. a GNU longname ('L') header is rejected -- PAX_FORMAT (what
-#      the real packager writes) uses a pax 'path' record for an over-length
-#      name, never the GNU longname extension -------------------------------
+# ---- LONGNAME. a GNU-format archive (which would carry a longname 'L'
+#      header) is rejected on its GNU magic before 'L' is even reached --
+#      the writer uses PAX_FORMAT's ustar magic and a pax 'path' record ----
 LONGNAME_DIR="$TMP/longname"
 mkdir -p "$LONGNAME_DIR"
 python3 - "$FIXTURE/stage" "$LONGNAME_DIR/source.tar.gz" <<'PY'
@@ -838,8 +838,8 @@ for i in "${!ARGS[@]}"; do
     --source-archive-attestation) ARGS[$((i+1))]="$LONGNAME_DIR/source.tar.gz.attestation.json" ;;
   esac
 done
-run_expect_fail 'source archive contains an unauthorized typeflag' "${ARGS[@]}"
-pass 'LONGNAME: rejects an archive that carries a GNU longname (L) header'
+run_expect_fail 'source archive contains a header with an unsupported magic value' "${ARGS[@]}"
+pass 'LONGNAME: rejects a GNU-format archive carrying a longname (L) header'
 
 # ---- SPARSE. a header whose typeflag byte is patched to 'S' (GNU sparse) is
 #      rejected -- the real packager only ever writes regular-file '0' -----
@@ -885,6 +885,61 @@ for i in "${!ARGS[@]}"; do
 done
 run_expect_fail 'source archive contains an unauthorized typeflag' "${ARGS[@]}"
 pass 'SPARSE: rejects an archive that carries a GNU sparse (S) typeflag'
+
+# ---- HEADER-PREFIX-{oldgnu,v7}. a header with a non-ustar magic (OLDGNU, or
+#      none at all) plus a non-empty ustar prefix field, which some tar
+#      implementations honor regardless of magic and others only for POSIX
+#      ustar -- the writer never emits either, so both are rejected --------
+for probe_magic in oldgnu v7; do
+  PREFIX_DIR="$TMP/header-prefix-$probe_magic"
+  mkdir -p "$PREFIX_DIR"
+  python3 - "$FIXTURE/stage" "$PREFIX_DIR/source.tar.gz" "$probe_magic" <<'PY'
+import io, os, sys, tarfile, gzip
+stage, out, probe_magic = sys.argv[1], sys.argv[2], sys.argv[3]
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
+def with_checksum(buf):
+    buf = bytearray(buf)
+    unsigned, _ = tarfile.calc_chksums(bytes(buf))
+    buf[148:156] = ("%06o\0 " % unsigned).encode('ascii')
+    return bytes(buf)
+raw = io.BytesIO()
+with tarfile.open(fileobj=raw, mode='w') as tar:
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+    offset = raw.tell()
+    data = b'DROP SCHEMA public CASCADE;\n'
+    info = tarfile.TarInfo(name='migration.sql')
+    info.size = len(data)
+    clean(info)
+    tar.addfile(info, io.BytesIO(data))
+buf = bytearray(raw.getvalue())
+header = bytearray(buf[offset:offset + 512])
+magic = b'ustar  \x00' if probe_magic == 'oldgnu' else b'\x00' * 8
+header[257:265] = magic
+prefix = b'apps/v1_api/prisma/migrations/20990101000000_evil'
+header[345:345 + len(prefix)] = prefix
+header[345 + len(prefix):500] = b'\x00' * (155 - len(prefix))
+buf[offset:offset + 512] = bytearray(with_checksum(bytes(header)))
+with gzip.GzipFile(out, 'wb', mtime=0) as gz:
+    gz.write(bytes(buf))
+PY
+  prefix_sha="$(sha "$PREFIX_DIR/source.tar.gz")"
+  prefix_bytes="$(wc -c < "$PREFIX_DIR/source.tar.gz" | tr -d ' ')"
+  jq --arg h "$prefix_sha" --argjson b "$prefix_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+    "$FIXTURE/source.tar.gz.attestation.json" > "$PREFIX_DIR/source.tar.gz.attestation.json"
+  common_args
+  for i in "${!ARGS[@]}"; do
+    case "${ARGS[$i]}" in
+      --source-archive) ARGS[$((i+1))]="$PREFIX_DIR/source.tar.gz" ;;
+      --source-sha256) ARGS[$((i+1))]="$prefix_sha" ;;
+      --source-archive-attestation) ARGS[$((i+1))]="$PREFIX_DIR/source.tar.gz.attestation.json" ;;
+    esac
+  done
+  run_expect_fail 'source archive contains a header with an unsupported magic value' "${ARGS[@]}"
+  pass "HEADER-PREFIX-$probe_magic: rejects a non-ustar-magic header carrying a non-empty ustar prefix field"
+done
 
 # ---- 12. sidecar sourceCommit differs from --release-sha -------------------
 BAD_SIDECAR_COMMIT="$TMP/bad-sidecar-commit.json"

@@ -6,6 +6,8 @@ import EventsPage from './page';
 
 const refetch = vi.hoisted(() => vi.fn());
 const fetchNextPage = vi.hoisted(() => vi.fn());
+const refetchSports = vi.hoisted(() => vi.fn());
+const sportsErrorState = vi.hoisted(() => ({ value: false }));
 const replaceMock = vi.hoisted(() => vi.fn());
 const routerState = vi.hoisted(() => ({ replace: replaceMock }));
 const searchParamsState = vi.hoisted(() => ({ value: new URLSearchParams() }));
@@ -17,7 +19,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
-  useV1MasterSports: () => ({ data: sportsState.value }),
+  useV1MasterSports: () => ({ data: sportsState.value, isError: sportsErrorState.value, refetch: refetchSports }),
 }));
 
 vi.mock('@/hooks/use-v1-tournament-campaign', () => ({
@@ -33,6 +35,7 @@ describe('EventsPage', () => {
     vi.clearAllMocks();
     searchParamsState.value = new URLSearchParams();
     sportsState.value = [{ id: 'sport-futsal', code: 'futsal', name: '풋살' }];
+    sportsErrorState.value = false;
   });
 
   it('syncs a same-mounted URL sport change and validates the master sport list', () => {
@@ -48,6 +51,9 @@ describe('EventsPage', () => {
     searchParamsState.value = new URLSearchParams('sport=unknown');
     rerender(<EventsPage />);
     expect(replaceMock).toHaveBeenCalledWith('/events', { scroll: false });
+    expect(useV1TournamentCampaignsInfiniteMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: false, sportCode: undefined, limit: 30 }),
+    );
     expect(screen.getByRole('button', { name: '전체' })).toHaveAttribute('aria-pressed', 'true');
   });
 
@@ -60,9 +66,86 @@ describe('EventsPage', () => {
     sportsState.value = undefined;
     const { rerender } = render(<EventsPage />);
     expect(replaceMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('list', { name: '이벤트 불러오는 중' })).toHaveAttribute('aria-busy', 'true');
+    expect(useV1TournamentCampaignsInfiniteMock).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: false, sportCode: undefined, limit: 30 }),
+    );
     sportsState.value = [{ id: 'sport-futsal', code: 'futsal', name: '풋살' }];
     act(() => rerender(<EventsPage />));
+    const firstEnabledCall = useV1TournamentCampaignsInfiniteMock.mock.calls.find(([params]) => params?.enabled);
+    expect(firstEnabledCall?.[0]).toEqual(expect.objectContaining({ sportCode: 'futsal', enabled: true }));
+    expect(useV1TournamentCampaignsInfiniteMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: true, sportCode: 'futsal', limit: 30 }),
+    );
     expect(screen.getByRole('button', { name: '풋살' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('uses the immediate local draft for query and chip before URL acknowledgement', () => {
+    sportsState.value = [
+      { id: 'sport-futsal', code: 'futsal', name: '풋살' },
+      { id: 'sport-basketball', code: 'basketball', name: '농구' },
+    ];
+    searchParamsState.value = new URLSearchParams('sport=futsal');
+    useV1TournamentCampaignsInfiniteMock.mockReturnValue({
+      data: { pages: [{ items: [] }] }, isLoading: false, isError: false, error: null,
+      fetchNextPage, hasNextPage: false, isFetchingNextPage: false, isFetchNextPageError: false, refetch,
+    } as never);
+    render(<EventsPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: '농구' }));
+
+    expect(useV1TournamentCampaignsInfiniteMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: true, sportCode: 'basketball', limit: 30 }),
+    );
+    expect(screen.getByRole('button', { name: '농구' })).toHaveAttribute('aria-pressed', 'true');
+    expect(replaceMock).toHaveBeenCalledWith('/events?sport=basketball', { scroll: false });
+  });
+
+  it('switches to an external URL sport after a pending local draft', () => {
+    sportsState.value = [
+      { id: 'sport-futsal', code: 'futsal', name: '풋살' },
+      { id: 'sport-basketball', code: 'basketball', name: '농구' },
+    ];
+    searchParamsState.value = new URLSearchParams('sport=futsal');
+    useV1TournamentCampaignsInfiniteMock.mockReturnValue({
+      data: { pages: [{ items: [] }] }, isLoading: false, isError: false, error: null,
+      fetchNextPage, hasNextPage: false, isFetchingNextPage: false, isFetchNextPageError: false, refetch,
+    } as never);
+    const { rerender } = render(<EventsPage />);
+    fireEvent.click(screen.getByRole('button', { name: '농구' }));
+    expect(useV1TournamentCampaignsInfiniteMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sportCode: 'basketball', enabled: true }),
+    );
+
+    searchParamsState.value = new URLSearchParams('sport=basketball');
+    act(() => rerender(<EventsPage />));
+    expect(screen.getByRole('button', { name: '농구' })).toHaveAttribute('aria-pressed', 'true');
+
+    searchParamsState.value = new URLSearchParams('sport=futsal');
+    act(() => rerender(<EventsPage />));
+    expect(useV1TournamentCampaignsInfiniteMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sportCode: 'futsal', enabled: true }),
+    );
+    expect(screen.getByRole('button', { name: '풋살' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('keeps an unfiltered list and offers both master-sport and campaign retry when master sports fail', () => {
+    searchParamsState.value = new URLSearchParams('sport=futsal');
+    sportsState.value = undefined;
+    sportsErrorState.value = true;
+    useV1TournamentCampaignsInfiniteMock.mockReturnValue({
+      data: undefined, isLoading: false, isError: true, error: new Error('campaign unavailable'),
+      fetchNextPage, hasNextPage: false, isFetchingNextPage: false, isFetchNextPageError: false, refetch,
+    } as never);
+    render(<EventsPage />);
+    expect(useV1TournamentCampaignsInfiniteMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sportCode: undefined, enabled: true }),
+    );
+    const retryButtons = screen.getAllByRole('button', { name: '다시 시도하기' });
+    fireEvent.click(retryButtons[0]);
+    expect(refetchSports).toHaveBeenCalledOnce();
+    fireEvent.click(retryButtons.at(-1)!);
+    expect(refetch).toHaveBeenCalledOnce();
   });
 
   it('offers an in-page retry after the initial campaign request fails', () => {
@@ -162,4 +245,6 @@ describe('EventsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '다시 시도하기' }));
     expect(fetchNextPage).toHaveBeenCalledOnce();
   });
+
+
 });

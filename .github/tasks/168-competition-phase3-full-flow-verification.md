@@ -1,8 +1,14 @@
 # Task 168 — 모든 경기의 팀 매치 통일과 실제 사용자 E2E
 
-## 최신 판정 — v7 이관 후 참가자 시드 검증 실패, 실제 DB 진단 중
+## 최신 판정 — Alpha 복구 완료, UI PR 검증 및 공개 경기 상세 오류 수정 중
 
 ### 재개 커서 — 2026-09-13 AWS 재인증 이후
+
+- **dev PR 처리 및 공개 상세 수정 PR:** 문서 PR1181 exact headff9179의 CI/Copilot PASS 및 변경 경로2개를 확인하여 dev `15d619f4de7de171ff7db06897a02e6f3e844afc`로 머지했다. Alpha34751634909 진행 중이며 앱 소스 변경은 없다. 공개 리그 상세404는 PR1185 head `5260075a93ba111cd7d64e38a15671c5688fe236`, CI34751754167에서 검증 중이다. 서비스74a674a·실제 projection 테스트256b4520·API 문서2개·Changeset·이 문서만 포함하며 shared local dev HEAD/index는 보존했다. 서비스/테스트 Sol source PASS, Alpha after는 미검증이다. UI1184는 별도로 local URL draft 경계 수정 중이며 GitHub CI PASS를 UI 완료로 세지 않는다.
+
+- **실측 정정 및 팀장 baseline:** `public-2140/tournament-tag-outer-geometry-correction.json`은 풋살 inner label 대신 semantic outer를 재측정했다. 실제 풋살 배지는 높이16px·pill이며 상태/리그는24px다(plain text라는 이전 판정 철회). Luna의24px/12px700 보완은 Sol source PASS. `captain-2140/` 9개 frame으로 실제 팀장 계정의10개 팀 상세 영역·멤버목록/프로필 이동·하단CTA 비겹침을 확인했다. 비공개 멤버 fixture 미확보이며 공개 범위 검증 PASS는 아니다. 23개 내 리그가 핵심정보를 아래로 미는 기존 문제도 남는다. CI34751060318 API/Web/Gates 모두 PASS이나, 추가 Event URL 수정은 local draft/query 불일치로 Sol BLOCK되어 보완 중이다. 공개 경기404 후보 역시 기존 TOURNAMENT_MATCH_NOT_FOUND를 보존하고 실제 projection 테스트·문서를 보완하여 검토 중이다.
+
+- **실화면 후속 발견 / 현재 UI PR:** PR1184 head `c38f8a5bd7f73089a450758a9145260356a0c4ee`, CI34751060318 Web/Gates PASS·API 진행 중. Copilot5190392436은 17/17 검토·새 코멘트0이며 master sports 로딩 전 전체 이벤트 조회 가능성은 Sol이 별도 검토한다. 공개 Ego 증거 `output/ego/task168-ui-pr1184-20260913/public-2140/`에서 guest auth/me401, 목록·대회 상세·일정·순위200을 확인했으나 두 live 공개 fixture 상세404로 G-R FAIL이다. `/tournaments`에서 status/리그24px pill 대비 풋살12px plain text도 실제 측정됐다. 두 오류를 Luna에게 분리 배정했다. 기존 팀 프로필·주요 멤버·hero·빈 상태 개선은 PR에 포함되었고 아직 Alpha after 검수 전이다. 42개 완료 수는 늘리지 않는다.
 
 - **Ego before 및 UI 최종 보완:** Ego taskspace36에서 before2140 실제 화면을 확보했다. 초기18장은 full-page가 아닌 viewport frame이며 이 잘못된 표현을 정정했다. 팀 상세는 모바일/태블릿 main.tm-scroll-area 및 desktop document를 실제 스크롤해 basic-info/major-members/bottom 추가 frame을 저장했다(`output/ego/task168-ui-pr1184-20260913/before`). 기존 역할 raw enum·enabled empty Next·복잡한 업로드 cover의 가독성 문제를 확인했다. 공개 fixture는 mine-only 섹션을 포함하지 않아 전체10역할섹션 PASS는 아니다. CI34750361583 API/Gates PASS, Web 3566PASS/3FAIL은 기존 events/page.test의 app-router provider 부재다. 새 test SHA7a164727은 실제 route hook 테스트 환경과 URL 변경/마스터 로딩 검증을 추가해 독립 Sol(ui_ci_review) source PASS. hero identity scrim 및 empty-member 목록 링크 유지도 Sol source PASS(page36aa3e4, CSSfdb4f9). 지금 해당3source+진행문서 후속 커밋/CI를 진행한다. actual after Ego는 UI dev머지·배포 후이며 taskspace36은 그 비교를 위해 유지 중이다.
 

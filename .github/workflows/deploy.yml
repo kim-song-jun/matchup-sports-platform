@@ -238,6 +238,48 @@ jobs:
       - name: Prod rollback guard tests
         run: bash scripts/qa/test-prod-rollback-guards.sh
 
+      # Task168 StageB (m11-stageb-spec.md, .task168-stageb-a2-contract.md). All four
+      # run the real target scripts against fake aws/docker, never a hand-copied
+      # excerpt — see each script's own header for what it actually exercises.
+      - name: Task168 StageB dispatch wiring contract tests
+        run: bash scripts/qa/test-task168-stage-b-wiring.sh
+
+      - name: Task168 D-5 guard contract tests
+        run: bash scripts/qa/test-task168-d5-guard.sh
+
+      - name: Task168 StageB wrapper contract tests
+        run: bash scripts/qa/test-task168-stage-b-wrapper.sh
+
+      - name: Task168 StageB manifest and promotion contract tests
+        run: bash scripts/qa/test-task168-stage-b-manifest.sh
+
+      - name: Task168 Dockerfile target stage order (static)
+        run: bash scripts/qa/test-task168-dockerfile-target.sh
+
+      - name: Task168 post-live verify contract tests
+        run: bash scripts/qa/test-task168-post-live.sh
+
+      # Complements the static check above with the one thing it cannot prove
+      # locally: that a real `docker build` with each target actually produces
+      # the attestation static analysis assumes it does. Two builds only — the
+      # StageA default (no --target, must still be `runtime`/91222f...) and the
+      # StageB target (`runtime-task168-final`/e44990c6...) — not the fully
+      # adversarial mutations `test-task168-dockerfile-target.sh` already covers
+      # by rewriting file content, since a self-hosted CI step can't `git mv`
+      # its own Dockerfile mid-run.
+      - name: Task168 Dockerfile target build attestation (CI)
+        run: |
+          set -Eeuo pipefail
+          docker build -f deploy/Dockerfile.v1-api -t task168-target-check:default . >/dev/null
+          docker build -f deploy/Dockerfile.v1-api --target runtime-task168-final -t task168-target-check:final . >/dev/null
+          default_attestation="$(docker run --rm --entrypoint cat task168-target-check:default /app/apps/v1_api/.task168-runtime-client-attestation.json)"
+          final_attestation="$(docker run --rm --entrypoint cat task168-target-check:final /app/apps/v1_api/.task168-runtime-client-attestation.json)"
+          jq -e '.stage == "stageAIntermediate" and .schemaSha256 == "91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f"' \
+            <<< "${default_attestation}" >/dev/null || { echo "target-less build is not the StageA image: ${default_attestation}" >&2; exit 1; }
+          jq -e '.stage == "stageBFinal" and .schemaSha256 == "e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46"' \
+            <<< "${final_attestation}" >/dev/null || { echo "runtime-task168-final build is not the StageB image: ${final_attestation}" >&2; exit 1; }
+          echo "Task168 Dockerfile target build attestation: ok"
+
       # expand-contract 게이트를 **머지 전에** 돌린다.
       #
       # 2026-08-20 사고: 이 검사가 `deploy` job 에만 있었고 그 job 은 PR 에서 skip 된다.
@@ -561,6 +603,10 @@ jobs:
         with:
           context: .
           file: deploy/Dockerfile.v1-api
+          # See deploy-alpha.yml's identical comment: Dockerfile.v1-api now carries a
+          # StageB stage ahead of `runtime` — pin the target explicitly so prod never
+          # silently picks up the newest stage in the file.
+          target: runtime
           push: true
           tags: ${{ steps.login-ecr.outputs.registry }}/teameet-prod-v1-api:${{ steps.images.outputs.imageTag }}
           cache-from: type=gha,scope=prod-v1-api

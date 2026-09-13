@@ -38,6 +38,53 @@ write_candidate_manifest() {
   mv "${candidate_tmp}" "${ALPHA_CANDIDATE_MANIFEST}"
 }
 
+# T7 gate (m11-stageb-spec.md §4 PR-A2 / §5 T7; .task168-stageb-a2-contract.md
+# §4.3). A StageB candidate is not promoted to active without a runtime
+# verification receipt binding both the migration receipt that produced the
+# post-M11 database and this exact candidate manifest — the receipt cannot
+# be swapped in from an unrelated release or migration attempt.
+assert_stage_b_promotion_receipt() {
+  local candidate_sha="$1"
+  local candidate_checksum="$2"
+  local state_root="${ALPHA_RELEASE_STATE_DIR}/task168/${candidate_sha}"
+  local migration_receipt="${state_root}/migration-stage.json"
+  local runtime_receipt="${state_root}/runtime-verification.json"
+  local migration_receipt_sha256
+
+  [[ -f "${migration_receipt}" ]] || {
+    echo "[alpha-release] Refusing StageB promotion: no migration-stage.json for ${candidate_sha}" >&2
+    return 1
+  }
+  jq -e '.status == "MIGRATION_COMMITTED" or .status == "MIGRATION_COMMITTED_RECOVERED"' \
+    "${migration_receipt}" >/dev/null || {
+    echo "[alpha-release] Refusing StageB promotion: migration-stage.json is not a committed receipt" >&2
+    return 1
+  }
+  migration_receipt_sha256="$(sha256sum "${migration_receipt}" | awk '{print $1}')"
+
+  [[ -f "${runtime_receipt}" ]] || {
+    echo "[alpha-release] Refusing StageB promotion: no runtime-verification.json for ${candidate_sha}" >&2
+    return 1
+  }
+  jq -e \
+    --arg migrationSha "${migration_receipt_sha256}" \
+    --arg manifestSha "${candidate_checksum}" \
+    '
+      .schemaVersion == 1 and
+      .kind == "task168StageBRuntimeVerification" and
+      .migrationReceiptSha256 == $migrationSha and
+      .manifestSha256 == $manifestSha and
+      .ledgerCount == 11 and
+      .driftCheck == "none" and
+      .healthDbTrue == true and
+      .workerHealthy == true and
+      (.completedAt | type == "string" and length > 0)
+    ' "${runtime_receipt}" >/dev/null || {
+    echo "[alpha-release] Refusing StageB promotion: runtime-verification.json does not bind this migration receipt and manifest" >&2
+    return 1
+  }
+}
+
 promote_candidate_manifest() {
   local previous_json='null'
   local previous_checksum_json='null'
@@ -45,6 +92,11 @@ promote_candidate_manifest() {
   local state_tmp
 
   candidate_checksum="$(sha256sum "${ALPHA_CANDIDATE_MANIFEST}" | awk '{print $1}')"
+  if [[ "$(jq -r '.database.task168.stage // empty' "${ALPHA_CANDIDATE_MANIFEST}")" == stageBFinal ]]; then
+    assert_stage_b_promotion_receipt \
+      "$(jq -er '.release.sha' "${ALPHA_CANDIDATE_MANIFEST}")" \
+      "${candidate_checksum}" || return 1
+  fi
   if [[ -f "${ALPHA_RELEASE_STATE_FILE}" ]]; then
     previous_json="$(jq -c '.active' "${ALPHA_RELEASE_STATE_FILE}")"
     previous_checksum_json="$(jq -c '.activeManifestSha256' "${ALPHA_RELEASE_STATE_FILE}")"

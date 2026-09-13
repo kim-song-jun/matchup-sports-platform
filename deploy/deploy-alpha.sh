@@ -23,12 +23,17 @@ if [[ ! "${ALPHA_RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9
   exit 1
 fi
 
-readonly LIVE_DIR="/home/ec2-user/teameet"
+# Matches rollback-alpha.sh's ${ALPHA_LIVE_DIR:-...}/${ALPHA_HOME_DIR:-...}
+# override convention (both scripts declare these before sourcing
+# alpha-release-common.sh, which only defines the *same* defaults for the
+# helpers it exports — see deploy/alpha-release-common.sh). Without this,
+# deploy-alpha.sh could not be exercised by a test harness at all.
+readonly LIVE_DIR="${ALPHA_LIVE_DIR:-/home/ec2-user/teameet}"
 readonly ENV_FILE="${LIVE_DIR}/deploy/.env"
 readonly COMPOSE_PROD="${LIVE_DIR}/deploy/docker-compose.prod.yml"
 readonly COMPOSE_ALPHA="${LIVE_DIR}/deploy/docker-compose.alpha.yml"
 
-exec 9>"/home/ec2-user/.teameet-alpha-deploy.lock"
+exec 9>"${ALPHA_HOME_DIR:-/home/ec2-user}/.teameet-alpha-deploy.lock"
 if ! flock -n 9; then
   echo "[alpha-deploy] Another alpha deployment is active" >&2
   exit 1
@@ -188,6 +193,44 @@ fi
 
 write_candidate_manifest "${ALPHA_MANIFEST_FILE}"
 prepare_alpha_release_source "${ALPHA_SOURCE_DIR}" "${ALPHA_SHA}" "${ALPHA_SOURCE_SHA256}"
+
+# D-5 guard (m11-stageb-spec.md §0 item 4 / §3.3 row 1). This manifest was
+# already proven `database.task168.stage == "stageAIntermediate"` above
+# (validate_alpha_release_manifest), so this script only ever runs for
+# StageA. If Task168's M11 is already in the ledger — applied, failed, or
+# rolled back, any row at all — a StageA runner would misclassify it as
+# "unsupported" and fail deep inside task168-stage-a-migrate.sh, which by
+# then would already be past source activation with task168_irreversible=true
+# (the ERR trap intentionally does not unwind that). Rejecting here, before
+# activation, keeps this failure a true no-op: nothing below this block has
+# run yet, so source_activated/runtime_mutated/task168_irreversible are all
+# still false and the ERR trap has nothing to restore.
+#
+# v1_postgres is brought up against whichever release is *currently* live —
+# activate_alpha_release_source has not run yet, so ${compose[@]} still
+# resolves through the live symlink to the release this deploy would replace.
+# That is fine: the ledger being checked is the live database's, which is
+# what M11 would actually apply against.
+"${compose[@]}" up -d v1_postgres >/dev/null
+for attempt in $(seq 1 30); do
+  if "${compose[@]}" exec -T v1_postgres \
+    pg_isready -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" >/dev/null 2>&1; then
+    break
+  fi
+  if [[ "${attempt}" -eq 30 ]]; then
+    echo "[alpha-deploy] PostgreSQL did not become ready for the Task168 D-5 guard" >&2
+    false
+  fi
+  sleep 2
+done
+task168_m11_rows="$("${compose[@]}" exec -T v1_postgres \
+  psql -X -v ON_ERROR_STOP=1 -At -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" \
+  -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name = '20260911090000_retire_tournament_fixture_tables'")"
+[[ "${task168_m11_rows}" == "0" ]] || {
+  echo "[alpha-deploy] Refusing a Stage A manifest: Task 168 M11 is already present in the ledger (${task168_m11_rows} row(s))" >&2
+  exit 1
+}
+
 activate_alpha_release_source "${ALPHA_SHA}"
 source_activated=true
 runtime_mutated=true

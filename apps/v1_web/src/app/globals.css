@@ -9239,7 +9239,7 @@ html[data-teameet-native-app='android'] .tm-search-error-toast {
 .tm-team-detail-info-group + .tm-team-detail-info-group {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid var(--grey100);
+  border-top: 1px solid var(--border);
 }
 
 .tm-team-detail-info-grid {

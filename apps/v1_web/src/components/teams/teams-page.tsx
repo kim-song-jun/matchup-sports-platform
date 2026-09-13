@@ -385,7 +385,7 @@ function TeamDetailMembersCard({ team }: { team: TeamDetailViewModel['team'] }) 
           <div className="tm-text-body-lg">주요 멤버</div>
           {team.memberAccess.message ? <div className="tm-text-caption" style={{ marginTop: 4, lineHeight: 1.45 }}>{team.memberAccess.message}</div> : null}
         </div>
-        {team.memberAccess.enabled ? <span className="tm-badge tm-badge-blue">공개</span> : <span className="tm-badge tm-badge-grey"><Lock size={11} aria-hidden="true" />비공개</span>}
+        {team.memberAccess.enabled ? <span className="tm-badge tm-badge-blue">공개</span> : <span className="tm-badge tm-badge-grey" style={{ gap: 4 }}><Lock size={11} aria-hidden="true" />비공개</span>}
       </div>
       {team.memberAccess.canView ? (
         team.membersList.length ? (

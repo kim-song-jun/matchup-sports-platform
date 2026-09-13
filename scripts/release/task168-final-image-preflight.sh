@@ -126,12 +126,15 @@ ATTESTED_MANIFEST_SHA="$(jq -er '.inputManifestSha256' "$SOURCE_ARCHIVE_ATTESTAT
 jq -e '.archiveLayout.pathPrefix==""' "$INPUT_SNAPSHOT" >/dev/null || fail 'input snapshot does not declare a repository-root (empty pathPrefix) archive layout'
 ARCHIVE_REGULAR_MEMBERS="$(mktemp "${TMPDIR:-/tmp}/task168-preflight-members.XXXXXX")"
 python3 - "$SOURCE_ARCHIVE" > "$ARCHIVE_REGULAR_MEMBERS" <<'PY' || fail 'source archive member listing failed or contains a rejected path'
-import posixpath, sys, tarfile
+import posixpath, subprocess, sys, tarfile
+archive = sys.argv[1]
 seen = set()
-with tarfile.open(sys.argv[1], 'r:*') as tar:
+python_names = []
+with tarfile.open(archive, 'r:*') as tar:
     for member in tar.getmembers():
         name = member.name
         check_name = name[:-1] if member.isdir() and name.endswith('/') else name
+        python_names.append(check_name)
         unsafe = (
             check_name.startswith('/') or check_name in ('.', '..')
             or check_name.startswith('../') or '/../' in check_name or check_name.endswith('/..')
@@ -161,6 +164,25 @@ with tarfile.open(sys.argv[1], 'r:*') as tar:
         if member.isdir():
             continue
         sys.stdout.buffer.write(check_name.encode('utf-8', 'surrogateescape') + b'\0')
+# A crafted header (e.g. non-octal devmajor/devminor bytes on a regular-file
+# member, or a per-member pax record that omits 'path' and so inherits it
+# from an earlier pax global header) can make CPython's tarfile silently
+# stop enumerating mid-archive, or rename a member, while bsdtar/GNU tar --
+# the tools that actually extract this archive downstream -- still see the
+# true, unrenamed member set. Cross-checking against that independent parser
+# closes both: any member tarfile hid or renamed shows up as a listing
+# mismatch here, before any of the checks above can be evaded by omission.
+independent = subprocess.run(['tar', '-tzf', archive], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+if independent.returncode != 0:
+    sys.stderr.write('independent archive listing failed: %s\n' % independent.stderr.decode('utf-8', 'replace'))
+    sys.exit(1)
+independent_names = [
+    line[:-1] if line.endswith('/') else line
+    for line in independent.stdout.decode('utf-8', 'surrogateescape').split('\n') if line
+]
+if independent_names != python_names:
+    sys.stderr.write('source archive member listing disagrees between tarfile and an independent tar listing\n')
+    sys.exit(1)
 PY
 # Every member the archive carries under apps/v1_api/prisma/ must be either a
 # declared overlay file (files[]) or one of the same non-reviewed extras

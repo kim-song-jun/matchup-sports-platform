@@ -443,6 +443,104 @@ done
 run_expect_fail 'source archive contains a duplicate member' "${ARGS[@]}"
 pass 'DUP: rejects an archive that carries a second, empty copy of an already-present member name'
 
+# ---- DEVDUP. the same empty M11 duplicate as DUP, except its header's
+#      devmajor field is patched to non-octal bytes with a recomputed
+#      checksum -- CPython's tarfile parses devmajor/devminor for every
+#      member type (not only char/block devices, which is all bsdtar/GNU
+#      tar parse them for) and silently stops enumerating at this header
+#      (InvalidHeaderError past the first member -> tarfile.next() returns
+#      None), so `seen` above never even reaches this member -----------------
+DEVDUP_DIR="$TMP/devdup-member"
+mkdir -p "$DEVDUP_DIR"
+python3 - "$FIXTURE/stage" "$DEVDUP_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
+import io, os, sys, tarfile, gzip
+stage, out, dup_name = sys.argv[1], sys.argv[2], sys.argv[3]
+
+def with_checksum(buf):
+    buf = bytearray(buf)
+    unsigned, _ = tarfile.calc_chksums(bytes(buf))
+    buf[148:156] = ("%06o\0 " % unsigned).encode('ascii')
+    return bytes(buf)
+
+raw = io.BytesIO()
+with tarfile.open(fileobj=raw, mode='w') as tar:
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json')
+    tar.add(os.path.join(stage, 'apps'), arcname='apps')
+    dup_offset = raw.tell()
+    info = tarfile.TarInfo(name=dup_name)
+    info.size = 0
+    tar.addfile(info, io.BytesIO(b''))
+data = bytearray(raw.getvalue())
+header = bytearray(data[dup_offset:dup_offset + 512])
+header[329:337] = b'ZZZZZZZ\0'
+data[dup_offset:dup_offset + 512] = bytearray(with_checksum(bytes(header)))
+with gzip.GzipFile(out, 'wb', mtime=0) as gz:
+    gz.write(bytes(data))
+PY
+devdup_sha="$(sha "$DEVDUP_DIR/source.tar.gz")"
+devdup_bytes="$(wc -c < "$DEVDUP_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$devdup_sha" --argjson b "$devdup_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$DEVDUP_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$DEVDUP_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$devdup_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$DEVDUP_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive member listing disagrees between tarfile and an independent tar listing' "${ARGS[@]}"
+pass 'DEVDUP: rejects a duplicate M11 member hidden from tarfile by a non-octal devmajor field that real tar tools ignore on a regular file'
+
+# ---- GLOBALPAX. a pax global header sets path=a decoy name, followed by a
+#      per-member pax ('x') header that only sets an unrelated key (not
+#      path) on an empty duplicate of the M11 member. CPython's tarfile
+#      merges the still-active global pax dict into the per-member one and
+#      applies the inherited 'path', renaming the member to the decoy --
+#      which sits outside apps/v1_api/prisma/ and so draws no scrutiny from
+#      any check below. bsdtar/GNU tar do not carry the global 'path' across
+#      to a member with its own (non-path) extended header, and extract the
+#      duplicate at its true, un-renamed path, overwriting the real M11 -----
+GLOBALPAX_DIR="$TMP/globalpax-member"
+mkdir -p "$GLOBALPAX_DIR"
+python3 - "$FIXTURE/stage" "$GLOBALPAX_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" "apps/zz-decoy.txt" <<'PY'
+import io, os, sys, tarfile, gzip
+stage, out, dup_name, decoy_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+
+raw = io.BytesIO()
+tar = tarfile.open(fileobj=raw, mode='w')
+tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json')
+tar.add(os.path.join(stage, 'apps'), arcname='apps')
+data = raw.getvalue()  # not closed -- omits tarfile's own end-of-archive trailer
+
+data += tarfile.TarInfo.create_pax_global_header({'path': decoy_name})
+
+member_buf = io.BytesIO()
+member_tar = tarfile.open(fileobj=member_buf, mode='w')
+info = tarfile.TarInfo(name=dup_name)
+info.pax_headers = {'comment': 'unrelated-per-member-x-header'}
+info.size = 0
+member_tar.addfile(info, io.BytesIO(b''))
+data += member_buf.getvalue()
+data += b'\x00' * 1024  # single end-of-archive trailer
+
+with gzip.GzipFile(out, 'wb', mtime=0) as gz:
+    gz.write(data)
+PY
+globalpax_sha="$(sha "$GLOBALPAX_DIR/source.tar.gz")"
+globalpax_bytes="$(wc -c < "$GLOBALPAX_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$globalpax_sha" --argjson b "$globalpax_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$GLOBALPAX_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$GLOBALPAX_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$globalpax_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$GLOBALPAX_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive member listing disagrees between tarfile and an independent tar listing' "${ARGS[@]}"
+pass 'GLOBALPAX: rejects a duplicate M11 member renamed by tarfile via an inherited pax global path override that real tar tools ignore'
 
 # ---- 10. non-canonical spellings of an in-scope migration path bypass a
 #          check keyed on fixed "obviously bad" shapes only if the check
@@ -1038,6 +1136,22 @@ for i in "${!ARGS[@]}"; do
 done
 run_expect_fail 'input snapshot does not authenticate the prepared Stage B source/archive contract' "${ARGS[@]}"
 pass 'F20: rejects a --full-migrations-json that disagrees with the snapshot-embedded fullMigrationHistory even though the snapshot itself is internally self-consistent'
+
+# ---- F21. a non-M11 --migrations-json entry's hash disagrees with
+#           --full-migrations-json, while the archive/files[]/snapshot/
+#           --migration-root/M11 pin all still agree with each other and
+#           with the real bytes -- isolates the per-entry
+#           Task168-contract-in-full-history loop from the M11-only pin
+#           check (F12) and the snapshot-vs-caller-history check (F20) -----
+F21_MIGRATIONS="$TMP/f21-migrations.json"
+jq '(.[0].sha256) = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"' \
+  "$GOLDEN/migrations.json" > "$F21_MIGRATIONS"
+common_args_golden
+for i in "${!ARGS[@]}"; do
+  if [[ "${ARGS[$i]}" == "--migrations-json" ]]; then ARGS[$((i+1))]="$F21_MIGRATIONS"; fi
+done
+run_expect_fail 'Task 168 migration missing or hash-different in full history' "${ARGS[@]}"
+pass 'F21: rejects a --migrations-json entry (not M11) whose hash disagrees with --full-migrations-json even though every other input still agrees'
 
 # ---- F14. the Task168 contract (--migrations-json) still has all 11
 #           correct entries, only reordered so M11 is not last ------------

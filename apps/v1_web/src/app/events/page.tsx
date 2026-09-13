@@ -53,13 +53,10 @@ function EventsContent() {
 
   useEffect(() => {
     const requestedSport = searchParams.get('sport');
-    if (requestedSport && !sportsData) {
-      setActiveSportCode(undefined);
-      return;
-    }
+    if (!sportsData) return;
     const validSyntax = requestedSport === null || /^[a-z0-9-]{1,40}$/i.test(requestedSport);
     const validMasterSport = requestedSport === null || sportsData.some((sport) => sport.code === requestedSport);
-    if (!validSyntax || (sportsData && !validMasterSport)) {
+    if (!validSyntax || !validMasterSport) {
       setActiveSportCode(undefined);
       router.replace('/events', { scroll: false });
       return;

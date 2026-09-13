@@ -4,6 +4,8 @@
 
 ### 재개 커서 — 2026-09-13 AWS 재인증 이후
 
+- **UI PR #1184:** initial head `57833afc40c378dbe899e4b6100c197d76b01175`, base dev2140, 16 changed paths(사용하지 않는 team-detail-sections 삭제 포함). GitHub CI `34749936087` Web typecheck가 `events/page.tsx:61 TS18048 sportsData possibly undefined`로 실패했다. Luna fix SHA `a56beebcc24dc27192c2f34d6aea8e6bc1bd4b3f67c19a3a9bea303602e2286d`는 master data 부재 시 effect를 반환해 명시적으로 narrowing하며 URL/filter를 보존한다. Sol이 좁은 수정은 PASS, 실제 TypeScript는 재실행 CI 확인 전이다. 팀 상세/생성 및 이벤트 나머지 source 검토는 완료했으나 live UI PASS는 아니다. Ego 계획 `ui-candidates-ego-readiness-20260913.json`은 팀 상세10섹션/팀 생성6상태/이벤트 흐름과 실제 `/tournaments` 리그·종목·상태 태그를 390/768/1440에서 확인한다. 리그 태그는 Event API에 임의 추가하지 않고 실제 regular-league 카드에서 별도 검증한다.
+
 - **18:37 KST #1183 dev 머지:** head ecdf44da의 GitHub CI `34749562550` Gates/API/Web SUCCESS, Copilot exact-head review `5190325693` 4/4 files·0 comments 및 Sol source 검토를 확인했다. merge SHA `2140a04893806fffa0c503cce85fe25cd0475dc1`; matching dev CI `34749865651`, Alpha `34749865636` 실행 중이다. 공유 local dev HEAD/index/WIP는 유지하고 fetch만 했다. 실제 최초 migration transition은 72405a에 남아 있으므로 readback은 deployed=2140a, migration=72405a로 분리한 검토된 collector를 사용한다. 로컬 테스트 prerequisite 실패는 계속 미검증 한계이며, 새 Alpha seed/API 복구·Ego 흐름 PASS를 아직 주장하지 않는다.
 
 - **seed 복구 PR #1183 진행:** head `ecdf44da96f2c5ae8524e9c0336c372f811da3d9`, base dev, GitHub CI `34749562550` 실행 중이다. source/test/Changeset/이 문서만 private index로 커밋했고 로컬 dev HEAD/index는 유지했다. 로컬 M8 선행조건 실패는 PR에 명시했으며 통과로 표기하지 않았다. Copilot 요청 CLI는 응답 JSON 파싱 오류를 냈으나 별도 Copilot workflow `34749576823` 생성은 확인했다; 리뷰 완료 자체는 미확인이다. 현재 #1181은 복구 뒤 머지 대기다.

@@ -12,6 +12,10 @@ set -Eeuo pipefail
 #   source-migration-inventory check (source vs history)   -> red on drift test (4)
 #   apps/v1_api/prisma/ allowlist check                     -> red on rogue-file test (5)
 #   sidecar-first / rollback-on-archive-failure publish     -> red on mid-publish-failure test (7)
+#   per-file "prepared file drift" check (:148)             -> red on file-drift tests (3b)
+#   "files inventory == fullMigrationHistory" check (:74-79) -> red on inventory-mismatch test (3c)
+#   pinned-source-commit content binding (:155-158)          -> red on pinned-drift test (3d)
+#   deterministic golden archive sha assertion               -> red if EXPECTED_ARCHIVE_SHA drifts (1)
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
@@ -37,6 +41,14 @@ mkdir -p "$REPO"
 git -C "$REPO" init -q -b main
 git -C "$REPO" config user.email test@example.com
 git -C "$REPO" config user.name test
+# Pin identity, dates and signing off so the fixture commit sha (and every
+# archive sha derived from it) is byte-identical on every host/run, not just
+# every run on this host. A real global commit.gpgsign would otherwise fold a
+# host-specific key/timestamp into this throwaway scratch commit.
+git -C "$REPO" config commit.gpgsign false
+git -C "$REPO" config tag.gpgsign false
+export GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.com GIT_AUTHOR_DATE='2026-01-01T00:00:00+00:00'
+export GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com GIT_COMMITTER_DATE='2026-01-01T00:00:00+00:00'
 
 MIGRATIONS=(
   20260908130000_v1_team_match_tournament_expand
@@ -91,6 +103,15 @@ run_expect_fail() {
 }
 
 # ---- 1. determinism: golden sha across umask x3 and TZ x3 (BLOCK-1) --------
+# EXPECTED_ARCHIVE_SHA is not "whatever the first run produced" (that proves
+# only host-internal umask/TZ independence, not cross-host determinism) — it
+# is pinned once, computed against this exact synthetic fixture (fixed
+# author/committer identity and dates above, so BASE_SHA and everything
+# derived from it is the same on any host/run). A CI(ubuntu) run of this same
+# test asserts the identical constant; if a host or Python/zlib version
+# difference ever breaks byte-for-byte reproducibility, this line goes red
+# instead of silently reporting "the two runs I happened to make matched".
+readonly EXPECTED_ARCHIVE_SHA=a31ffa044714c222f89119302b2e3266a0bad3e40ca3e752ff7913b221c01b78
 GOLDEN=
 for um in 022 077 002; do
   out="$TMP/pkg-umask-$um.tar.gz"
@@ -101,7 +122,8 @@ for um in 022 077 002; do
   [[ -n "$GOLDEN" ]] || GOLDEN="$sha"
   [[ "$sha" == "$GOLDEN" ]] || fail "umask $um produced a different archive sha ($sha != $GOLDEN)"
 done
-pass "archive sha is umask-independent (022/077/002 all -> $GOLDEN)"
+[[ "$GOLDEN" == "$EXPECTED_ARCHIVE_SHA" ]] || fail "archive sha for the pinned deterministic fixture changed ($GOLDEN != $EXPECTED_ARCHIVE_SHA) -- this host/toolchain no longer reproduces the recorded golden bytes"
+pass "archive sha is umask-independent and matches the pinned cross-run/cross-host constant (022/077/002 all -> $GOLDEN)"
 
 for tz in UTC America/New_York Pacific/Apia; do
   out="$TMP/pkg-tz-$(tr '/' '_' <<<"$tz").tar.gz"
@@ -143,6 +165,63 @@ run_expect_fail 'does not match the reviewed checksum' \
   --output-archive "$TMP/pkg-tamper.tar.gz"
 [[ ! -e "$TMP/pkg-tamper.tar.gz" ]] || fail 'tampered packaging must not publish an archive'
 pass 'a 1-byte tamper of the reviewed schema is rejected even after the manifest is rehashed to match'
+
+# ---- 3b. prepared file drift: a prepared file is changed but the manifest
+#          is left declaring the old (pre-tamper) sha/bytes -----------------
+FILE_DRIFT_DIR="$TMP/prepared-file-drift"
+cp -R "$PREPARED" "$FILE_DRIFT_DIR"
+DRIFT_MIGRATION="${MIGRATIONS[0]}"
+printf -- '-- tampered without rehashing the manifest\nSELECT 2;\n' >> "$FILE_DRIFT_DIR/apps/v1_api/prisma/migrations/$DRIFT_MIGRATION/migration.sql"
+run_expect_fail 'prepared file drift' \
+  "$PACKAGE" --source-dir "$REPO" --source-commit "$BASE_SHA" \
+  --prepared-dir "$FILE_DRIFT_DIR" --final-schema "$FINAL_SCHEMA" --m11 "$M11_FILE" \
+  --output-archive "$TMP/pkg-file-drift.tar.gz"
+pass 'rejects a prepared migration file changed without rehashing the manifest'
+
+SCHEMA_DRIFT_DIR="$TMP/prepared-schema-drift"
+cp -R "$PREPARED" "$SCHEMA_DRIFT_DIR"
+printf '\n// tampered without rehashing the manifest\n' >> "$SCHEMA_DRIFT_DIR/apps/v1_api/prisma/schema.prisma"
+run_expect_fail 'prepared file drift' \
+  "$PACKAGE" --source-dir "$REPO" --source-commit "$BASE_SHA" \
+  --prepared-dir "$SCHEMA_DRIFT_DIR" --final-schema "$FINAL_SCHEMA" --m11 "$M11_FILE" \
+  --output-archive "$TMP/pkg-schema-file-drift.tar.gz"
+pass 'rejects a prepared schema.prisma changed without rehashing the manifest'
+
+# ---- 3c. files[] and fullMigrationHistory disagree on one migration's sha -
+INVENTORY_MISMATCH_DIR="$TMP/prepared-inventory-mismatch"
+cp -R "$PREPARED" "$INVENTORY_MISMATCH_DIR"
+MISMATCH_MIGRATION="${MIGRATIONS[1]}"
+BOGUS_SHA="$(printf 'bogus-history-entry' | sha256sum | awk '{print $1}')"
+jq --arg name "$MISMATCH_MIGRATION" --arg sha "$BOGUS_SHA" \
+  '.fullMigrationHistory = (.fullMigrationHistory | map(if .name == $name then (.sha256 = $sha) else . end))' \
+  "$PREPARED/INPUT-MANIFEST.json" > "$INVENTORY_MISMATCH_DIR/INPUT-MANIFEST.json"
+run_expect_fail 'files inventory does not exactly match the declared full migration history' \
+  "$PACKAGE" --source-dir "$REPO" --source-commit "$BASE_SHA" \
+  --prepared-dir "$INVENTORY_MISMATCH_DIR" --final-schema "$FINAL_SCHEMA" --m11 "$M11_FILE" \
+  --output-archive "$TMP/pkg-inventory-mismatch.tar.gz"
+pass "rejects a manifest whose fullMigrationHistory sha256 disagrees with the matching files[] entry"
+
+# ---- 3d. a historical migration's content AND its manifest entry are both
+#          tampered consistently (files[] + fullMigrationHistory rehashed
+#          together) -- the packager's own independent re-scan of the pinned
+#          source commit must still reject it (BLOCK item 4: source-commit
+#          binding did not previously cover non-schema/non-M11 overlay files)
+PINNED_DRIFT_DIR="$TMP/prepared-pinned-drift"
+cp -R "$PREPARED" "$PINNED_DRIFT_DIR"
+PINNED_TARGET="${MIGRATIONS[2]}"
+printf -- '-- tampered, then the manifest was rehashed to match\nSELECT 3;\n' >> "$PINNED_DRIFT_DIR/apps/v1_api/prisma/migrations/$PINNED_TARGET/migration.sql"
+tampered_migration_sha="$(sha256sum "$PINNED_DRIFT_DIR/apps/v1_api/prisma/migrations/$PINNED_TARGET/migration.sql" | awk '{print $1}')"
+tampered_migration_bytes="$(wc -c < "$PINNED_DRIFT_DIR/apps/v1_api/prisma/migrations/$PINNED_TARGET/migration.sql" | tr -d ' ')"
+jq --arg path "apps/v1_api/prisma/migrations/$PINNED_TARGET/migration.sql" --arg name "$PINNED_TARGET" \
+   --arg sha "$tampered_migration_sha" --argjson bytes "$tampered_migration_bytes" \
+  '.files = (.files | map(if .path == $path then (.sha256 = $sha | .bytes = $bytes) else . end)) |
+   .fullMigrationHistory = (.fullMigrationHistory | map(if .name == $name then (.sha256 = $sha) else . end))' \
+  "$PREPARED/INPUT-MANIFEST.json" > "$PINNED_DRIFT_DIR/INPUT-MANIFEST.json"
+run_expect_fail 'historical migration file does not match the pinned source commit' \
+  "$PACKAGE" --source-dir "$REPO" --source-commit "$BASE_SHA" \
+  --prepared-dir "$PINNED_DRIFT_DIR" --final-schema "$FINAL_SCHEMA" --m11 "$M11_FILE" \
+  --output-archive "$TMP/pkg-pinned-drift.tar.gz"
+pass 'rejects a historical migration whose content and manifest hash were tampered together, since it no longer matches the pinned source commit blob'
 
 # ---- 4. reviewed history is missing a migration the pinned commit really
 #         has (an attacker who edits fullMigrationHistory + files[] + deletes

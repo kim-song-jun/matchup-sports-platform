@@ -146,6 +146,16 @@ for rel in "${declared[@]}"; do
   expected_bytes="$(jq -er --arg p "$rel" '.files[] | select(.path == $p) | .bytes' "$manifest")"
   expected_mode="$(jq -er --arg p "$rel" '.files[] | select(.path == $p) | .mode' "$manifest")"
   [[ "$(sha "$dst")" == "$expected_sha" && "$(bytes "$dst")" == "$expected_bytes" && "$(git_mode "$dst")" == "$expected_mode" ]] || fail "prepared file drift: $rel"
+  # Everything except the two reviewed overlay files (schema.prisma, M11 — the
+  # source commit does not carry M11 yet) must be byte-identical to the pinned
+  # commit's own blob. Without this, a tampered historical migration or
+  # migration_lock.toml whose manifest entry is simply rehashed to match would
+  # pass every check above and silently replace what the earlier `git archive`
+  # extraction (:104-114) already put in $stage.
+  if [[ "$rel" != "$schema_rel" && "$rel" != "$m11_rel" ]]; then
+    pinned_sha="$(git -C "$SOURCE_DIR" cat-file -p "$SOURCE_COMMIT:$rel" 2>/dev/null | sha256sum | awk '{print $1}')" || fail "pinned source commit is missing history file: $rel"
+    [[ "$pinned_sha" == "$expected_sha" ]] || fail "historical migration file does not match the pinned source commit: $rel"
+  fi
 done
 
 # Anything left under apps/v1_api/prisma/ that is not one of the overlay

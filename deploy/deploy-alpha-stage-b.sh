@@ -41,8 +41,54 @@ readonly TASK168_STAGE_LABEL_PREFIX="com.teameet.task168.stage-b"
 readonly TASK168_FINAL_SCHEMA_SHA256=e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46
 readonly TASK168_M11=20260911090000_retire_tournament_fixture_tables
 readonly TASK168_M11_SHA256=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
+# The rest of the Task168 ledger (M1-M10), frozen the same way TASK168_M11
+# above is: stageBRecover has no manifest to read checksums from (it takes
+# only ALPHA_SHA), so the only way to re-verify the full 11-row ledger
+# (blocking finding #1's "ledger_assert_exact 11") without one is to pin the
+# same byte-fixed migration.sql hashes the runner already pins for M11.
+readonly TASK168_LEDGER_NAMES=(
+  20260908130000_v1_team_match_tournament_expand
+  20260908150000_v1_operation_audit_team_match_expand
+  20260908160000_v1_official_fact_team_match_scope
+  20260908170000_v1_lineup_invalidation
+  20260908180000_v1_staff_scope_team_match
+  20260909000000_v1_tournament_result_lineage
+  20260909110000_v1_operation_audit_canonical_binding
+  20260910010000_v1_official_fact_source_history
+  20260910020000_v1_canonical_game_db_guards
+  20260910160000_v1_outbox_cutover_claim_gate
+  "${TASK168_M11}"
+)
+readonly TASK168_LEDGER_SHA256S=(
+  12bab1bbc0b60a28b6b3aa589a9e9b9aece13a546d47dcb3ff25d934b7754771
+  7b16ecf32b91f8913b7652d593ee6a16d634845cec85b65c21b88292d2c8187a
+  d7ea2976285750c281d6dc16e5610648efefeba2eed88c90bf5f7d9c604931d6
+  747745b355c0a090aef162b5f00a46ce76d02eb38c0456ed465da53af6c15658
+  1c49f17ac790db88b58a5434a5071bb939844c38f748f0090ea89b8e7181777d
+  44d5a81804a8b5110785a88cf21d414cf0519a6e2d9b29d71b6b70b08ff551eb
+  20fbcf7b5617b3c701d26467c03ea0b37b7bccb94f87aaf36b29c34d3232ec03
+  a6855c094946c9298030c804e556ba52d35e7dfec2e97a28c5d4a564008a6211
+  e9827f48a3cdbcff6ff71efee5bc8c1e8516235bb73de9e3720795cca8cd41e6
+  877b557745919d1ebe3e09de9988e7a7fb6e341d4071a8f8d2caa970d903aa7f
+  "${TASK168_M11_SHA256}"
+)
 
 fail() { echo "[deploy-alpha-stage-b] $*" >&2; exit 1; }
+
+# Same no-clobber, self-checked write as the runner's write_json
+# (deploy/task168-stage-b-migrate.sh) — a stageBRecover receipt is exactly as
+# irreversible-in-effect (it is what T7/promote/a future stageBResume trust)
+# and must not be left half-written by a signal landing mid-`jq -n | >`.
+write_json_atomic() {
+  local path="$1" validate_filter="$2" tmp
+  install -d -m 700 "$(dirname "${path}")"
+  tmp="$(mktemp "$(dirname "${path}")/.task168-recover.XXXXXX")" || fail "cannot create receipt temp file for ${path}"
+  cat > "${tmp}"
+  chmod 600 "${tmp}"
+  jq -e "${validate_filter}" "${tmp}" >/dev/null || { rm -f "${tmp}"; fail "receipt failed its own schema check: ${path}"; }
+  mv -n "${tmp}" "${path}"
+  if [[ -e "${tmp}" ]]; then rm -f "${tmp}"; fail "receipt already exists, refusing to overwrite: ${path}"; fi
+}
 
 # Shared deploy lock (m11-stageb-spec.md §0 item "동시 실행 lock 없음";
 # .task168-stageb-a2-contract.md §7). deploy-alpha.sh and rollback-alpha.sh
@@ -150,7 +196,8 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       # pointer to the manual `migrate resolve --rolled-back` procedure.
       jq -n --arg sha "${ALPHA_SHA}" --arg m11 "${TASK168_M11}" \
         '{schemaVersion:1,kind:"task168StageBMigration",status:"MIGRATION_DIAGNOSIS_REQUIRED",stage:"stageBFinal",releaseSha:$sha,m11:$m11,failureReason:"unresolved migration attempt (P3009 condition)",note:"manual `prisma migrate resolve --rolled-back` required; do not re-run stageBFinal until resolved",diagnosedAt:(now|todate)}' \
-        > "${migration_receipt}.recover-diagnosis.json"
+      | write_json_atomic "${migration_receipt}.recover-diagnosis.json" \
+          '.status=="MIGRATION_DIAGNOSIS_REQUIRED" and .kind=="task168StageBMigration" and (.releaseSha|strings|test("^[0-9a-f]{40}$")) and (.failureReason|strings|length>0)'
       echo "[deploy-alpha-stage-b] R-C: M11 has an unresolved migration attempt for ${ALPHA_SHA} — manual 'prisma migrate resolve --rolled-back' required, see ${migration_receipt}.recover-diagnosis.json" >&2
       exit 1
       ;;
@@ -181,6 +228,20 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       [[ "${m11_checksum}" == "${TASK168_M11_SHA256}" ]] || fail "M11 ledger row checksum does not match the expected M11 migration — RECOVERY_DIAGNOSIS_REQUIRED (schema/ledger mismatch, do not write a recovered receipt)"
       m11_row_count="$(dbq "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name = '${TASK168_M11}'")"
       [[ "${m11_row_count}" == 1 ]] || fail "expected exactly one M11 ledger row, found ${m11_row_count} — RECOVERY_DIAGNOSIS_REQUIRED"
+
+      # Binding to THIS run (nonBlocking finding #1, PR-A2 review round 1):
+      # neither the ledger checksum above nor the marker cross-check further
+      # down proves the M11 commit in the DB came from the SAME run this
+      # ALPHA_SHA's marker describes — the M11 migration's bytes/checksum are
+      # identical across every release, and the marker/quiesce/backup
+      # cross-check is self-referential to this release's own directory. A
+      # separate release could have applied M11 into this same database
+      # after this release's run failed before_m11 and its writer was
+      # restored. finished_at is a hard lower bound: it cannot predate the
+      # entry marker written immediately before THIS run's `migrate deploy`.
+      entered_at="$(jq -er '.enteredAt' "${m11_marker}")" || fail "M11 entry marker is missing enteredAt — RECOVERY_DIAGNOSIS_REQUIRED"
+      m11_finished_after_entry="$(dbq "SELECT (finished_at >= '${entered_at}'::timestamptz)::text FROM \"_prisma_migrations\" WHERE migration_name = '${TASK168_M11}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL")"
+      [[ "${m11_finished_after_entry}" == t ]] || fail "M11's finished_at predates this release's M11 entry marker — RECOVERY_DIAGNOSIS_REQUIRED (the applied M11 row may belong to a different release's run)"
 
       backup_path="$(jq -er '.backupPath' "${quiesce}")" || fail "quiesce.json is missing backupPath"
       backup_sha_expected="$(jq -er '.backupSha256' "${quiesce}")" || fail "quiesce.json is missing backupSha256"
@@ -217,14 +278,57 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       retirement_triggers="$(dbq "SELECT count(*) FROM pg_trigger WHERE tgname IN ('v1_tournament_fixture_retired_write','v1_tournament_fixture_retired_row_write','v1_000_tournament_fixture_retired_link')")"
       [[ "${retirement_triggers}" == 0 ]] || fail "M11 ledger row exists but retirement triggers are still present — RECOVERY_DIAGNOSIS_REQUIRED"
 
+      # Additional post-M11 checks the runner performs
+      # (deploy/task168-stage-b-migrate.sh:555-570) that the four checks
+      # above did not cover (PR-A2 review round 2, blocking finding #1) — the
+      # lineage-reparent guard trigger, the two CHECK constraints M11
+      # re-adds, the audit constraint it drops outright, the three guard
+      # functions it CREATE OR REPLACEs (signature, not just name), the
+      # retired enum types, and the outbox PROCESSING invariant. Re-running
+      # these closes the gap where R-A previously certified a genuinely
+      # broken post-M11 catalog as recovered.
+      lineage_trigger="$(dbq "SELECT count(*) FROM pg_trigger t WHERE t.tgname='v1_block_tournament_result_lineage_game_reparent' AND t.tgfoid=to_regprocedure('v1_block_tournament_result_lineage_game_reparent()') AND t.tgenabled IN ('O','A') AND NOT t.tgisinternal AND t.tgrelid='v1_games'::regclass")"
+      [[ "${lineage_trigger}" == 1 ]] || fail "M11 ledger row exists but the canonical lineage trigger is missing — RECOVERY_DIAGNOSIS_REQUIRED"
+      games_guard_ck="$(dbq "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='v1_games_canonical_source_guard_ck'")"
+      [[ "${games_guard_ck}" == "CHECK ((((source_type)::text = 'TEAM_MATCH'::text) AND (team_match_id IS NOT NULL)))" ]] || fail "M11 ledger row exists but the games canonical source guard constraint is missing or changed — RECOVERY_DIAGNOSIS_REQUIRED"
+      staff_scope_guard_ck="$(dbq "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='v1_staff_scope_canonical_source_guard_ck'")"
+      [[ "${staff_scope_guard_ck}" == "CHECK (((team_match_id IS NOT NULL) AND (tournament_id IS NOT NULL)))" ]] || fail "M11 ledger row exists but the staff scope canonical source guard constraint is missing or changed — RECOVERY_DIAGNOSIS_REQUIRED"
+      dropped_audit_ck="$(dbq "SELECT count(*) FROM pg_constraint WHERE conname='v1_operation_audits_canonical_source_guard_ck'")"
+      [[ "${dropped_audit_ck}" == 0 ]] || fail "M11 ledger row exists but the legacy audit canonical-source guard constraint remains — RECOVERY_DIAGNOSIS_REQUIRED"
+      guard_fn_resolve="$(dbq "SELECT count(*) FROM pg_proc p WHERE p.proname='v1_resolve_canonical_guard_game' AND pg_get_function_result(p.oid)='TABLE(team_match_id text, semantic_tournament_id text, home_team_id text, away_team_id text)'")"
+      [[ "${guard_fn_resolve}" == 1 ]] || fail "M11 ledger row exists but v1_resolve_canonical_guard_game is missing or its signature changed — RECOVERY_DIAGNOSIS_REQUIRED"
+      guard_fn_staff="$(dbq "SELECT count(*) FROM pg_proc p WHERE p.proname='v1_guard_staff_fixture_scope' AND pg_get_function_result(p.oid)='trigger'")"
+      [[ "${guard_fn_staff}" == 1 ]] || fail "M11 ledger row exists but v1_guard_staff_fixture_scope is missing or its signature changed — RECOVERY_DIAGNOSIS_REQUIRED"
+      guard_fn_lineage="$(dbq "SELECT count(*) FROM pg_proc p WHERE p.proname='v1_guard_tournament_result_lineage_insert' AND pg_get_function_result(p.oid)='trigger'")"
+      [[ "${guard_fn_lineage}" == 1 ]] || fail "M11 ledger row exists but v1_guard_tournament_result_lineage_insert is missing or its signature changed — RECOVERY_DIAGNOSIS_REQUIRED"
+      retired_enums="$(dbq "SELECT count(*) FROM pg_type WHERE typname IN ('V1TournamentGoalTeam','V1TournamentFixtureStatus')")"
+      [[ "${retired_enums}" == 0 ]] || fail "M11 ledger row exists but retired enum types remain — RECOVERY_DIAGNOSIS_REQUIRED"
+      processing_outbox="$(dbq "SELECT count(*) FROM v1_outbox_events WHERE status::text='PROCESSING'")"
+      [[ "${processing_outbox}" == 0 ]] || fail "M11 ledger row exists but processing outbox rows remain — RECOVERY_DIAGNOSIS_REQUIRED"
+
       # Preserve a stale diagnosis under a distinct path before writing the
       # recovered receipt to the canonical one — alpha-release-common.sh and
       # task168-stage-b-post-live-verify.sh both read migration-stage.json,
       # so the corrected status must land there, never be silently dropped.
+      # `mv -n` + an existence check (not a plain `mv`, PR-A2 review round 1)
+      # so a second recovery attempt cannot silently clobber an earlier
+      # .superseded.json.
       if [[ -n "${existing_receipt_status}" ]]; then
-        mv "${migration_receipt}" "${migration_receipt}.superseded.json"
+        mv -n "${migration_receipt}" "${migration_receipt}.superseded.json"
+        [[ -e "${migration_receipt}" ]] && fail "a .superseded.json for ${ALPHA_SHA} already exists — refusing to overwrite an earlier superseded receipt"
       fi
 
+      # `select(length>0)` inside a jq object-construction value is a
+      # generator: when $supersededStatus is empty (the ordinary R-A case
+      # with no stale diagnosis to supersede), it produces ZERO outputs, and
+      # jq's object construction with a zero-output value filter produces
+      # ZERO objects for the whole `jq -n` call — not `null`, no error, exit
+      # 0, and an EMPTY receipt file (PR-A2 review round 1, confirmed by
+      # running the exact filter standalone). Every ordinary R-A recovery
+      # was silently writing a 0-byte migration-stage.json. Fixed with an
+      # if/then/else that always produces exactly one value, and by routing
+      # through write_json_atomic so a mistake like this fails the receipt's
+      # own schema check instead of writing an empty file.
       jq -n \
         --arg sha "${ALPHA_SHA}" --arg apiImage "${api_image}" --arg dbId "${db_identity_actual}" \
         --arg schemaSha "${TASK168_FINAL_SCHEMA_SHA256}" --arg manifestSha "${manifest_sha}" \
@@ -233,14 +337,16 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
         --arg supersededStatus "${existing_receipt_status}" \
         --argjson legacyTables "${legacy_tables}" --argjson legacyLinkColumns "${legacy_link_columns}" \
         --argjson retirementTriggers "${retirement_triggers}" --argjson retirementFunctions "${retirement_functions}" \
+        --argjson lineageTrigger "${lineage_trigger}" --argjson retiredEnums "${retired_enums}" \
+        --argjson processingOutbox "${processing_outbox}" \
         '{schemaVersion:1,kind:"task168StageBMigration",status:"MIGRATION_COMMITTED_RECOVERED",stage:"stageBFinal",
           releaseSha:$sha,apiImage:$apiImage,databaseIdentity:$dbId,schemaSha256:$schemaSha,manifestSha256:$manifestSha,
           m11:$m11,m11Sha256:$m11sha,
-          postVerification:{legacyTables:$legacyTables,legacyLinkColumns:$legacyLinkColumns,retirementTriggers:$retirementTriggers,retirementFunctions:$retirementFunctions},
-          recoveredFrom:{quiesceReceiptSha256:$quiesceSha,ledgerM11Row:"applied",catalogResult:{legacyTables:$legacyTables,legacyLinkColumns:$legacyLinkColumns,retirementTriggers:$retirementTriggers,retirementFunctions:$retirementFunctions},supersededDiagnosisStatus:($supersededStatus|select(length>0))},
+          postVerification:{legacyTables:$legacyTables,legacyLinkColumns:$legacyLinkColumns,retirementTriggers:$retirementTriggers,retirementFunctions:$retirementFunctions,lineageTrigger:$lineageTrigger,retiredEnums:$retiredEnums,processingOutbox:$processingOutbox},
+          recoveredFrom:{quiesceReceiptSha256:$quiesceSha,ledgerM11Row:"applied",catalogResult:{legacyTables:$legacyTables,legacyLinkColumns:$legacyLinkColumns,retirementTriggers:$retirementTriggers,retirementFunctions:$retirementFunctions},supersededDiagnosisStatus:(if ($supersededStatus|length)>0 then $supersededStatus else null end)},
           preM11BackupSha256:$backupSha,completedAt:(now|todate)}' \
-        > "${migration_receipt}"
-      chmod 600 "${migration_receipt}"
+      | write_json_atomic "${migration_receipt}" \
+          '.status=="MIGRATION_COMMITTED_RECOVERED" and .kind=="task168StageBMigration" and .stage=="stageBFinal" and (.releaseSha|strings|test("^[0-9a-f]{40}$")) and .m11Sha256=="'"${TASK168_M11_SHA256}"'" and (.preM11BackupSha256|strings|test("^[0-9a-f]{64}$")) and .postVerification.legacyTables==0 and .postVerification.retiredEnums==0 and .postVerification.processingOutbox==0'
       if [[ -n "${existing_receipt_status}" ]]; then
         echo "[deploy-alpha-stage-b] R-A: superseded a stale ${existing_receipt_status} receipt (see ${migration_receipt}.superseded.json) and reconstructed MIGRATION_COMMITTED_RECOVERED for ${ALPHA_SHA}; writer remains stopped"
       else

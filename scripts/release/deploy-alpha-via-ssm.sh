@@ -24,6 +24,10 @@ set -Eeuo pipefail
 # tree, which is the thing that actually needs to outlive a StageB migration.
 declare -a extra_document_params=()
 poll_attempts=150   # 150 * 10s = 25 minutes — StageA, unchanged.
+# StageA's comment stays byte-identical to origin/dev ("Teameet alpha
+# <version> <sha>"); TASK168_STAGE was not an option there because
+# stageBRecover never requires RELEASE_VERSION (item #6, PR-A2 review).
+comment="Teameet alpha ${TASK168_STAGE} ${RELEASE_SHA}"
 
 case "${TASK168_STAGE}" in
   stageAIntermediate)
@@ -33,8 +37,16 @@ case "${TASK168_STAGE}" in
     [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]{8}\.g[0-9a-f]{12}$ ]]
     [[ "${SOURCE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
     [[ "${MANIFEST_SHA256}" =~ ^[0-9a-f]{64}$ ]]
-    [[ "${SOURCE_VERSION_ID}" =~ ^[A-Za-z0-9._+=/-]{1,255}$ ]]
-    [[ "${MANIFEST_VERSION_ID}" =~ ^[A-Za-z0-9._+=/-]{1,255}$ ]]
+    # {1,1024} bound, byte-identical to origin/dev (item #6, PR-A2 review):
+    # a narrower {1,255} crept in only because macOS's regex engine rejects
+    # a {1,1024} bound ("maximum repetition exceeds 255") — a local-bash
+    # portability accommodation, not a real S3 version-id constraint (S3
+    # version ids run ~32 chars). The actual gate and host both run on
+    # Linux, where {1,1024} is fine; verify this script on Linux, not macOS
+    # system bash.
+    [[ "${SOURCE_VERSION_ID}" =~ ^[A-Za-z0-9._+=/-]{1,1024}$ ]]
+    [[ "${MANIFEST_VERSION_ID}" =~ ^[A-Za-z0-9._+=/-]{1,1024}$ ]]
+    comment="Teameet alpha ${RELEASE_VERSION} ${RELEASE_SHA}"
 
     stage="/home/ec2-user/.teameet-alpha-staging/${RELEASE_SHA}"
     archive="/tmp/teameet-alpha-${RELEASE_SHA}.tar.gz"
@@ -76,8 +88,10 @@ case "${TASK168_STAGE}" in
       [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]{8}\.g[0-9a-f]{12}$ ]]
       [[ "${STAGE_B_SOURCE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
       [[ "${STAGE_B_MANIFEST_SHA256}" =~ ^[0-9a-f]{64}$ ]]
-      [[ "${STAGE_B_SOURCE_VERSION_ID}" =~ ^[A-Za-z0-9._+=/-]{1,255}$ ]]
-      [[ "${STAGE_B_MANIFEST_VERSION_ID}" =~ ^[A-Za-z0-9._+=/-]{1,255}$ ]]
+      # {1,1024}, same width as the StageA checks above and origin/dev.
+      [[ "${STAGE_B_SOURCE_VERSION_ID}" =~ ^[A-Za-z0-9._+=/-]{1,1024}$ ]]
+      [[ "${STAGE_B_MANIFEST_VERSION_ID}" =~ ^[A-Za-z0-9._+=/-]{1,1024}$ ]]
+      comment="Teameet alpha ${RELEASE_VERSION} ${RELEASE_SHA}"
 
       # Own staging directory (task168-stage-b/<sha>), never StageA's — the two
       # can be dispatched for the same SHA without colliding (D-2).
@@ -109,7 +123,7 @@ if ((${#extra_document_params[@]})); then
 fi
 
 command_id="$(aws ssm send-command --instance-ids "${INSTANCE_ID}" \
-  --document-name AWS-RunShellScript --comment "Teameet alpha ${TASK168_STAGE} ${RELEASE_SHA}" \
+  --document-name AWS-RunShellScript --comment "${comment}" \
   --parameters "${parameters}" --query 'Command.CommandId' --output text)"
 for attempt in $(seq 1 "${poll_attempts}"); do
   status="$(aws ssm get-command-invocation --command-id "${command_id}" \

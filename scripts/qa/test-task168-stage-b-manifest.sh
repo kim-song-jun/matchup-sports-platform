@@ -27,7 +27,7 @@ make_stage_b_manifest() {
      release:{sha:$sha, version:"0.1.0-alpha.20260914.g111111111111", createdAt:"2026-09-14T00:00:00Z"},
      source:{bucket:"b", key:("releases/task168-stage-b/"+$sha+".tar.gz"), versionId:"v1", sha256:("c"*64)},
      database:{migrationPolicy:"task168-stageBFinal", rollbackMode:"backup-only", compatibilityCheck:"expand-contract-sql-v1",
-       task168:{stage:"stageBFinal", schemaSha256:$schema,
+       task168:{stage:"stageBFinal", schemaSha256:$schema, runtimeClientSchemaSha256:$schema,
          migrations:[{name:"x",sha256:("d"*64)}],
          fullMigrationHistory:[range(0;12)|{name:("m"+(.|tostring)),sha256:("d"*64)}],
          resolvedMigrationAttemptsSha256:("e"*64),

@@ -72,6 +72,10 @@ case "$1 $2" in
         j=$((i+1))
         printf '%s' "${!j}" > "$(dirname "$0")/last-parameters.json"
       fi
+      if [[ "${!i}" == --comment ]]; then
+        j=$((i+1))
+        printf '%s' "${!j}" > "$(dirname "$0")/last-comment.txt"
+      fi
     done
     echo fake-command-id
     exit 0
@@ -147,6 +151,37 @@ run_stage_a() {
     || pass "stageA never references deploy-alpha-stage-b.sh"
   grep -q "releases/${SHA}.tar.gz" <<< "$(jq -r '.commands[]' <<< "${params}")" && pass "stageA reads the unnamespaced StageA source key" \
     || fail "stageA source key changed"
+
+  # PR-A2 review round 2 nonBlocking finding #2: the checks above proved
+  # command count/key/target only, never that the send-command --comment and
+  # SOURCE/MANIFEST_VERSION_ID width are byte-identical to origin/dev
+  # (they had in fact drifted: comment lost RELEASE_VERSION, and the
+  # {1,1024} bound had silently narrowed to {1,255}).
+  local expected_comment="Teameet alpha ${VERSION} ${SHA}"
+  [[ "$(cat "${dir}/last-comment.txt" 2>/dev/null)" == "${expected_comment}" ]] \
+    && pass "stageA send-command --comment is byte-identical to origin/dev ('Teameet alpha <version> <sha>')" \
+    || fail "stageA --comment changed: got '$(cat "${dir}/last-comment.txt" 2>/dev/null)', want '${expected_comment}'"
+}
+
+# ── 2b. StageA SOURCE_VERSION_ID/MANIFEST_VERSION_ID width is {1,1024}, the
+# same bound origin/dev has — not the {1,255} that crept in as a macOS-bash
+# regex-engine accommodation (macOS's regcomp rejects {1,1024} outright;
+# real S3 version ids are ~32 chars, so this bound is validation width, not
+# behavior real inputs exercise).
+run_stage_a_version_id_width() {
+  local dir="${WORK}/stage-a-version-id-width"
+  make_fake_bin "${dir}" success
+  base_env
+  export TASK168_STAGE=stageAIntermediate
+  export RELEASE_VERSION="${VERSION}"
+  export SOURCE_VERSION_ID="$(printf 'a%.0s' $(seq 1 300))"   # 300 chars: > 255, <= 1024
+  export SOURCE_SHA256="${SHA256_A}"
+  export MANIFEST_VERSION_ID="${VERSION_ID_B}"
+  export MANIFEST_SHA256="${SHA256_B}"
+  local rc=0
+  PATH="${dir}:${PATH}" bash "${SCRIPT}" >/dev/null 2>"${dir}/stderr" || rc=$?
+  [[ "${rc}" -eq 0 ]] && pass "a 300-char SOURCE_VERSION_ID (within origin/dev's {1,1024} bound) is accepted" \
+    || fail "a 300-char SOURCE_VERSION_ID was rejected (bound narrower than origin/dev's {1,1024}): $(cat "${dir}/stderr")"
 }
 
 # ── 3. stageBFinal: namespaced keys, executionTimeout present, wrapper called
@@ -310,51 +345,154 @@ open('${dir}/resolve-mutated.sh', 'w').write(s.replace(guard, '', 1))
     || pass "removing the push guard changes the result (mutation correctly detected)"
 }
 
-# ── 8. deploy-alpha.yml: every StageB-only step's if: evaluates to false
-# once steps.task168.outputs.stage is stageAIntermediate — proves a push (or
-# a stageAIntermediate/stageBRecover dispatch) skips every StageB-only step,
-# not just that the resolver output is right.
+# ── 8. deploy-alpha.yml: EVERY StageB-only step (an exact, named set — not
+# a >=N threshold) evaluates its if: to false once
+# steps.task168.outputs.stage is stageAIntermediate (blocking finding #2,
+# PR-A2 review round 2: the previous >=5-conditions threshold plus a
+# grep -v mutation that happened to remove all 6 identical-text guards at
+# once could not tell "one guard deleted" from "nothing changed" — deleting
+# a single step's if: at either :295 or :434 alone still passed 25/0).
+#
+# Identification of "is this step StageB-only" is deliberately independent
+# of the if: field's CONTENT (name/id only) — the exact failure mode this
+# guards against is a step whose if: was deleted entirely, which must still
+# be found and then fail the "evaluates false" check, not silently vanish
+# from the count the way the old regex-over-if-conditions approach would.
 run_stage_b_step_conditions() {
-  local conditions
-  conditions="$(grep -oE "steps\.task168\.outputs\.stage == '[a-zA-Z]+' \|\| steps\.task168\.outputs\.stage == '[a-zA-Z]+'( && steps\.stageb-images\.outputs\.final_exists != 'true')?" \
-    "${ROOT}/.github/workflows/deploy-alpha.yml")"
-  local count
-  count="$(grep -c . <<< "${conditions}")" || true
-  [[ "${count}" -ge 5 ]] && pass "found ${count} StageB-only step if: conditions to evaluate" \
-    || fail "expected at least 5 StageB-only step if: conditions, found ${count}"
+  local out="${WORK}/stage-b-step-conditions.json"
+  local py_rc=0
+  python3 - "${ROOT}/.github/workflows/deploy-alpha.yml" "${out}" > "${out}" <<'PY' || py_rc=$?
+import json, sys, yaml
 
-  local all_false=true line
-  while IFS= read -r line; do
-    [[ -n "${line}" ]] || continue
-    local py_expr="${line}"
-    py_expr="${py_expr//steps.task168.outputs.stage/\"stageAIntermediate\"}"
-    py_expr="${py_expr//steps.stageb-images.outputs.final_exists/\"\"}"
-    py_expr="${py_expr//||/ or }"
-    py_expr="${py_expr//&&/ and }"
-    if python3 -c "assert not (${py_expr})" 2>/dev/null; then
+workflow_path, out_path = sys.argv[1], sys.argv[2]
+doc = yaml.safe_load(open(workflow_path))
+steps = doc["jobs"]["deploy"]["steps"]
+
+EXPECTED_NAMES = [
+    "Resolve Task168 StageB final image tag",
+    "Build and push Task168 StageB final API image",
+    "Prepare Task168 StageB final source inputs",
+    "Package and upload Task168 StageB source",
+    "Resolve Task168 StageA predecessor transition",
+    "Create or reuse Task168 StageB release manifest",
+]
+
+
+def is_stage_b_only(step):
+    name = step.get("name", "")
+    step_id = str(step.get("id", ""))
+    # Name/id convention marker, not the if: field -- a step whose if: was
+    # deleted still carries its name/id and must still be picked up here.
+    return name in EXPECTED_NAMES or step_id.startswith("stageb-")
+
+
+def evaluates_false_for_stage_a(cond):
+    if cond is None or cond == "":
+        return False  # no guard at all -> the step always runs -> not false
+    expr = cond
+    expr = expr.replace("steps.task168.outputs.stage", "'stageAIntermediate'")
+    expr = expr.replace("steps.stageb-images.outputs.final_exists", "''")
+    expr = expr.replace("||", " or ").replace("&&", " and ")
+    return not eval(expr)  # noqa: S307 -- trusted repo YAML, not user input
+
+
+found = [s for s in steps if is_stage_b_only(s)]
+names_found = sorted(s.get("name") for s in found)
+if names_found != sorted(EXPECTED_NAMES):
+    print(json.dumps({"error": "StageB-only step set changed", "found": names_found, "expected": sorted(EXPECTED_NAMES)}))
+    sys.exit(1)
+
+red = [s.get("name") for s in found if not evaluates_false_for_stage_a(s.get("if"))]
+print(json.dumps({"total": len(found), "red": red}))
+sys.exit(1 if red else 0)
+PY
+  if [[ "${py_rc}" -eq 0 ]]; then
+    local total; total="$(jq -r '.total' "${out}" 2>/dev/null || echo '?')"
+    pass "found exactly the expected ${total} StageB-only step if: conditions, all false for stage=stageAIntermediate"
+  else
+    fail "StageB-only step if: check failed: $(cat "${out}" 2>/dev/null)"
+  fi
+
+  # Mutation-style regression: remove ONE step's if: field at a time (not
+  # all 5 identically-worded guards at once, the old grep -v's blind spot)
+  # and require exactly THAT step to come back red, for every one of the 6
+  # — proves a missing guard on any single step is caught individually, not
+  # just "the total count changed" (the PR-A2 review round 2 repro deleted
+  # :295 alone, then :434 alone, and the old test passed 25/0 both times).
+  local mut_out="${WORK}/stage-b-step-conditions-mutated.json"
+  local all_mutations_ok=true target
+  while IFS= read -r target; do
+    [[ -n "${target}" ]] || continue
+    local mut_rc=0
+    TARGET_STEP_NAME="${target}" python3 - "${ROOT}/.github/workflows/deploy-alpha.yml" "${mut_out}" > "${mut_out}" <<'PY' || mut_rc=$?
+import json, os, sys, yaml
+
+workflow_path, out_path = sys.argv[1], sys.argv[2]
+target_name = os.environ["TARGET_STEP_NAME"]
+doc = yaml.safe_load(open(workflow_path))
+steps = doc["jobs"]["deploy"]["steps"]
+
+mutated = False
+for step in steps:
+    if step.get("name") == target_name:
+        assert "if" in step, f"expected step {target_name!r} to have an if: to delete"
+        del step["if"]
+        mutated = True
+        break
+assert mutated, f"could not find step {target_name!r} to mutate"
+
+
+def is_stage_b_only(step):
+    name = step.get("name", "")
+    step_id = str(step.get("id", ""))
+    return name in [
+        "Resolve Task168 StageB final image tag",
+        "Build and push Task168 StageB final API image",
+        "Prepare Task168 StageB final source inputs",
+        "Package and upload Task168 StageB source",
+        "Resolve Task168 StageA predecessor transition",
+        "Create or reuse Task168 StageB release manifest",
+    ] or step_id.startswith("stageb-")
+
+
+def evaluates_false_for_stage_a(cond):
+    if cond is None or cond == "":
+        return False
+    expr = cond
+    expr = expr.replace("steps.task168.outputs.stage", "'stageAIntermediate'")
+    expr = expr.replace("steps.stageb-images.outputs.final_exists", "''")
+    expr = expr.replace("||", " or ").replace("&&", " and ")
+    return not eval(expr)  # noqa: S307
+
+
+found = [s for s in steps if is_stage_b_only(s)]
+red = [s.get("name") for s in found if not evaluates_false_for_stage_a(s.get("if"))]
+print(json.dumps({"total": len(found), "red": red}))
+sys.exit(1 if red else 0)
+PY
+    local red_names; red_names="$(jq -r '.red | join(",")' "${mut_out}" 2>/dev/null || echo '')"
+    if [[ "${mut_rc}" -ne 0 && "${red_names}" == "${target}" ]]; then
       :
     else
-      all_false=false
-      fail "an if: condition does not evaluate to false for stage=stageAIntermediate: ${line}"
+      all_mutations_ok=false
+      fail "removing '${target}''s if: guard did not produce exactly one red step (itself): rc=${mut_rc} red=${red_names}"
     fi
-  done <<< "${conditions}"
-  [[ "${all_false}" == true ]] && pass "every StageB-only step if: condition is false when stage=stageAIntermediate"
-
-  # Mutation-style regression: drop one step's if: guard entirely and confirm
-  # the extraction above would then find fewer conditions than expected.
-  local mutated
-  mutated="$(grep -v "steps.task168.outputs.stage == 'stageBPreflight' || steps.task168.outputs.stage == 'stageBFinal'" \
-    "${ROOT}/.github/workflows/deploy-alpha.yml")"
-  local mutated_count
-  mutated_count="$(grep -coE "steps\.task168\.outputs\.stage == '[a-zA-Z]+' \|\| steps\.task168\.outputs\.stage == '[a-zA-Z]+'" <<< "${mutated}")" || true
-  [[ "${mutated_count}" -lt "${count}" ]] \
-    && pass "removing one step's if: guard reduces the detected condition count (mutation correctly detected: ${count} -> ${mutated_count})" \
-    || fail "removing a step's if: guard did not change the detected condition count"
+  done <<'NAMES'
+Resolve Task168 StageB final image tag
+Build and push Task168 StageB final API image
+Prepare Task168 StageB final source inputs
+Package and upload Task168 StageB source
+Resolve Task168 StageA predecessor transition
+Create or reuse Task168 StageB release manifest
+NAMES
+  [[ "${all_mutations_ok}" == true ]] \
+    && pass "removing any single step's if: guard (all 6, one at a time) is caught as exactly that one step red"
 }
 
 echo "== test-task168-stage-b-wiring =="
 run_unknown_stage
 run_stage_a
+run_stage_a_version_id_width
 run_stage_b_final
 run_stage_b_recover
 run_missing_timeout

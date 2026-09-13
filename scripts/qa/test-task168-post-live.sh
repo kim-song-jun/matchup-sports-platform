@@ -146,15 +146,36 @@ if [[ -f "${state_dir}/runtime-verification.json" ]]; then
     || fail "receipt does not bind the expected hashes"
 fi
 
+# Expected failure message per broken check (PR-A2 review round 2
+# nonBlocking finding: rc!=0 + no receipt alone also passes for an unrelated
+# crash — the implementer's own mutation notes recorded exactly that for two
+# cases, both red only via an unbound-variable crash, not the intended
+# check). Asserting the message ties each case to the SPECIFIC check it
+# broke, taken verbatim from scripts/release/task168-stage-b-post-live-verify.sh.
+declare -A EXPECTED_MESSAGE=(
+  [digest]="running API image does not match the manifest"
+  [attestation]="running API image attestation is not stageBFinal"
+  [ledger-count]="expected 11"
+  [ledger-checksum]="M11 ledger row checksum mismatch"
+  [legacy-table]="legacy tables are still present"
+  [legacy-column]="legacy link columns remain"
+  [drift]="live database drifts from the final schema"
+  [health]="health check db is not true"
+  [worker]="worker is not healthy"
+  [outbox]="outbox PROCESSING rows did not converge to zero"
+  [smoke]="read-only smoke check returned HTTP"
+)
+
 for break_case in digest attestation ledger-count ledger-checksum legacy-table legacy-column drift health worker outbox smoke; do
   root="${WORK}/break-${break_case}"; mkdir -p "${root}"
   build_case "${root}"
   make_fake_bin "${bin}" "${break_case}"
   rc="$(run_case "${root}")"
-  if [[ "${rc}" -ne 0 && ! -f "${state_dir}/runtime-verification.json" ]]; then
-    pass "breaking '${break_case}' refuses the receipt (rc=${rc})"
+  expected="${EXPECTED_MESSAGE[${break_case}]}"
+  if [[ "${rc}" -ne 0 && ! -f "${state_dir}/runtime-verification.json" ]] && grep -qF "${expected}" "${root}/stderr"; then
+    pass "breaking '${break_case}' refuses the receipt with its specific message (rc=${rc}): ${expected}"
   else
-    fail "breaking '${break_case}' did NOT refuse the receipt: rc=${rc} receipt-exists=$([[ -f "${state_dir}/runtime-verification.json" ]] && echo yes || echo no) stderr=$(cat "${root}/stderr")"
+    fail "breaking '${break_case}' did NOT refuse with the expected message '${expected}': rc=${rc} receipt-exists=$([[ -f "${state_dir}/runtime-verification.json" ]] && echo yes || echo no) stderr=$(cat "${root}/stderr")"
   fi
 done
 

@@ -185,27 +185,13 @@ export async function ensureCanonicalTournamentMatch(
       data: { gameId: game.id, sideId: side.id, revision: 1 },
       select: { id: true },
     });
-    for (const player of sideInput.players) {
-      const participantId = deterministicCanonicalMatchId(`${game.id}:${sideInput.sideKey}:${player.userId}`);
-      const existingParticipant = await tx.v1GameParticipant.findUnique({
-        where: { id: participantId },
-        select: { id: true, gameId: true, sideId: true, lineupId: true, userId: true, displayNameSnapshot: true, jerseyNumber: true },
-      });
-    if (hadExistingGame && (!existingParticipant
-        || existingParticipant.gameId !== game.id
-        || existingParticipant.sideId !== side.id
-        || existingParticipant.userId !== player.userId)) {
-        throw new Error(`Canonical seed participant ${participantId} has an incompatible operational snapshot.`);
-      }
-      const participant = existingParticipant ?? await tx.v1GameParticipant.create({
-        data: { id: participantId, gameId: game.id, sideId: side.id, lineupId: lineup.id, userId: player.userId, displayNameSnapshot: player.displayName, jerseyNumber: player.jerseyNumber, started: true },
-        select: { id: true },
-      });
-      const identity = await tx.v1ParticipantIdentityLinkCurrent.findUnique({ where: { participantId: participant.id }, select: { userId: true } });
-      if (identity && identity.userId !== player.userId) {
-        throw new Error(`Canonical seed participant ${participant.id} is linked to a different user.`);
-      }
-      if (!hadExistingGame) {
+    if (!hadExistingGame) {
+      for (const player of sideInput.players) {
+        const participantId = deterministicCanonicalMatchId(`${game.id}:${sideInput.sideKey}:${player.userId}`);
+        const participant = await tx.v1GameParticipant.create({
+          data: { id: participantId, gameId: game.id, sideId: side.id, lineupId: lineup.id, userId: player.userId, displayNameSnapshot: player.displayName, jerseyNumber: player.jerseyNumber, started: true },
+          select: { id: true },
+        });
         await tx.v1ParticipantIdentityLinkCurrent.create({
           data: {
             participantId: participant.id,

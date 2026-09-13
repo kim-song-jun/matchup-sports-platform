@@ -44,6 +44,18 @@ readonly TASK168_M11_SHA256=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4
 
 fail() { echo "[deploy-alpha-stage-b] $*" >&2; exit 1; }
 
+# Shared deploy lock (m11-stageb-spec.md §0 item "동시 실행 lock 없음";
+# .task168-stageb-a2-contract.md §7). deploy-alpha.sh and rollback-alpha.sh
+# both take this exact lock file. Without also taking it here, a StageA push
+# deploy queued behind a still-running StageB host command (an
+# UNKNOWN_HOST_MAY_BE_RUNNING GitHub Actions cancel/timeout, deploy-alpha-via-ssm.sh)
+# can pass D-5 before M11 commits, activate StageA source, and compose-up
+# recreates api/worker with restart:always — reviving the writers mid-backup.
+# Every StageB entry point (stageBFinal, stageBRecover, and any future
+# stageBResume) takes it too, so all four scripts serialize on one file.
+exec 9>"${ALPHA_HOME_DIR}/.teameet-alpha-deploy.lock"
+flock -n 9 || fail "another alpha deployment (StageA deploy, rollback, or another StageB run) holds the deploy lock — not touching anything"
+
 # ─── stageBRecover (§6.2-8) ──────────────────────────────────────────────────
 # Entirely read-only judgment plus, at most, restoring the exact pre-quiesce
 # writer (R-B) or writing a status-accurate receipt (R-A). Never re-runs the
@@ -56,7 +68,9 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
   state_dir="${STATE_ROOT}/${ALPHA_SHA}"
   lock_path="${state_dir}/stage-b.lock"
   quiesce="${state_dir}/quiesce.json"
+  quiesce_intent="${state_dir}/quiesce-intent.json"
   migration_receipt="${state_dir}/migration-stage.json"
+  m11_marker="${state_dir}/m11-entry-marker.json"
 
   compose_prod="${ALPHA_LIVE_DIR}/deploy/docker-compose.prod.yml"
   compose_alpha="${ALPHA_LIVE_DIR}/deploy/docker-compose.alpha.yml"
@@ -86,25 +100,47 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
   m11_row="$(dbq "SELECT COALESCE(checksum,'') || '|' || CASE WHEN finished_at IS NOT NULL AND rolled_back_at IS NULL THEN 'applied' WHEN finished_at IS NULL AND rolled_back_at IS NULL THEN 'unresolved' ELSE 'other' END FROM \"_prisma_migrations\" WHERE migration_name = '${TASK168_M11}'")"
 
   if [[ -z "${m11_row}" ]]; then
-    # R-B: M11 never applied. Restore the pre-quiesce writer if quiesce.json
-    # says it was ever stopped by this release's run. Depends on the runner
-    # track adding preApiContainerId/preWorkerContainerId/restartPolicyBefore
-    # to quiesce.json (contract §4.1 NEW fields, D-6) — until that lands, a
-    # real quiesce.json from the current candidate runner will fail the
-    # jq -er lookups below and this exits with a clear diagnosis instead of
-    # a wrong restore.
-    [[ -f "${quiesce}" ]] || fail "no M11 row and no quiesce.json for ${ALPHA_SHA} — RECOVERY_DIAGNOSIS_REQUIRED (nothing to restore from and nothing was applied)"
-    pre_api_id="$(jq -er '.preApiContainerId' "${quiesce}")" || fail "quiesce.json is missing preApiContainerId (m11-stageb-spec.md §4.1 NEW field) — cannot identify the writer to restore"
-    pre_worker_id="$(jq -er '.preWorkerContainerId' "${quiesce}")" || fail "quiesce.json is missing preWorkerContainerId"
-    restart_before_api="$(jq -er '.restartPolicyBefore.api' "${quiesce}")" || fail "quiesce.json is missing restartPolicyBefore.api"
-    restart_before_worker="$(jq -er '.restartPolicyBefore.worker' "${quiesce}")" || fail "quiesce.json is missing restartPolicyBefore.worker"
+    # R-B: M11 never applied. Restore the pre-quiesce writer identified by
+    # whichever receipt exists. quiesce.json (written after the backup
+    # completes) is preferred; quiesce-intent.json (blocking finding #1/#2,
+    # deploy/task168-stage-b-migrate.sh — written atomically BEFORE any
+    # writer is stopped) is the fallback for a kill during the backup
+    # window, when quiesce.json was never reached. Both carry the same
+    # preApiContainerId/preWorkerContainerId/preApiImage/preWorkerImage/
+    # restartPolicyBefore/databaseIdentity fields (contract §4.1).
+    if [[ -f "${quiesce}" ]]; then
+      receipt="${quiesce}"
+    elif [[ -f "${quiesce_intent}" ]]; then
+      receipt="${quiesce_intent}"
+    else
+      fail "no M11 row, no quiesce.json and no quiesce-intent.json for ${ALPHA_SHA} — RECOVERY_DIAGNOSIS_REQUIRED (nothing to restore from and nothing was applied)"
+    fi
+    pre_api_id="$(jq -er '.preApiContainerId' "${receipt}")" || fail "$(basename "${receipt}") is missing preApiContainerId — cannot identify the writer to restore"
+    pre_worker_id="$(jq -er '.preWorkerContainerId' "${receipt}")" || fail "$(basename "${receipt}") is missing preWorkerContainerId"
+    pre_api_image="$(jq -er '.preApiImage' "${receipt}")" || fail "$(basename "${receipt}") is missing preApiImage"
+    pre_worker_image="$(jq -er '.preWorkerImage' "${receipt}")" || fail "$(basename "${receipt}") is missing preWorkerImage"
+    restart_before_api="$(jq -er '.restartPolicyBefore.api' "${receipt}")" || fail "$(basename "${receipt}") is missing restartPolicyBefore.api"
+    restart_before_worker="$(jq -er '.restartPolicyBefore.worker' "${receipt}")" || fail "$(basename "${receipt}") is missing restartPolicyBefore.worker"
+    db_identity_expected="$(jq -er '.databaseIdentity' "${receipt}")" || fail "$(basename "${receipt}") is missing databaseIdentity"
+
+    # Verify identity BEFORE mutating anything: the containers still exist
+    # and still carry the exact image the receipt recorded (guards against a
+    # recycled/reused container id), and the database this recover run is
+    # pointed at is the one the quiesce was taken against.
+    docker inspect "${pre_api_id}" >/dev/null 2>&1 || fail "the quiesced API container (${pre_api_id}) no longer exists — RECOVERY_DIAGNOSIS_REQUIRED"
+    docker inspect "${pre_worker_id}" >/dev/null 2>&1 || fail "the quiesced worker container (${pre_worker_id}) no longer exists — RECOVERY_DIAGNOSIS_REQUIRED"
+    [[ "$(docker inspect --format '{{.Config.Image}}' "${pre_api_id}")" == "${pre_api_image}" ]] || fail "the API container's image no longer matches the ${receipt##*/} receipt — refusing to restore a possibly-reused container id"
+    [[ "$(docker inspect --format '{{.Config.Image}}' "${pre_worker_id}")" == "${pre_worker_image}" ]] || fail "the worker container's image no longer matches the ${receipt##*/} receipt — refusing to restore a possibly-reused container id"
+    db_identity_actual="$(dbq "SELECT current_database() || '|' || current_user || '|' || COALESCE(inet_server_addr()::text,'local') || '|' || COALESCE(inet_server_port()::text,'local')")"
+    [[ "${db_identity_actual}" == "${db_identity_expected}" ]] || fail "current database identity does not match the ${receipt##*/} receipt — refusing to restore against a possibly-different database"
+
     docker update --restart="${restart_before_api}" "${pre_api_id}" >/dev/null || fail "could not restore API restart policy"
     docker update --restart="${restart_before_worker}" "${pre_worker_id}" >/dev/null || fail "could not restore worker restart policy"
     "${compose[@]}" start v1_api v1_game_operations_worker >/dev/null || fail "could not restart the pre-quiesce writers"
     running_api="$(docker inspect --format '{{.State.Running}}' "${pre_api_id}")"
     running_worker="$(docker inspect --format '{{.State.Running}}' "${pre_worker_id}")"
     [[ "${running_api}" == true && "${running_worker}" == true ]] || fail "restored writers did not come up running"
-    echo "[deploy-alpha-stage-b] R-B: pre-quiesce writers restored and running for ${ALPHA_SHA}"
+    echo "[deploy-alpha-stage-b] R-B: pre-quiesce writers restored and running for ${ALPHA_SHA} (from $(basename "${receipt}"))"
     exit 0
   fi
 
@@ -123,23 +159,60 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       # between the runner's migrate step and its own receipt write).
       [[ -f "${migration_receipt}" ]] && fail "migration-stage.json already exists for ${ALPHA_SHA} — nothing to recover"
       [[ -f "${quiesce}" ]] || fail "M11 is applied but quiesce.json is missing for ${ALPHA_SHA} — RECOVERY_DIAGNOSIS_REQUIRED"
+      [[ -f "${m11_marker}" ]] || fail "M11 is applied but the M11 entry marker is missing for ${ALPHA_SHA} — RECOVERY_DIAGNOSIS_REQUIRED"
+
+      m11_checksum="${m11_row%%|*}"
+      [[ "${m11_checksum}" == "${TASK168_M11_SHA256}" ]] || fail "M11 ledger row checksum does not match the expected M11 migration — RECOVERY_DIAGNOSIS_REQUIRED (schema/ledger mismatch, do not write a recovered receipt)"
+      m11_row_count="$(dbq "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name = '${TASK168_M11}'")"
+      [[ "${m11_row_count}" == 1 ]] || fail "expected exactly one M11 ledger row, found ${m11_row_count} — RECOVERY_DIAGNOSIS_REQUIRED"
+
       backup_path="$(jq -er '.backupPath' "${quiesce}")" || fail "quiesce.json is missing backupPath"
       backup_sha_expected="$(jq -er '.backupSha256' "${quiesce}")" || fail "quiesce.json is missing backupSha256"
+      manifest_sha="$(jq -er '.manifestSha256' "${quiesce}")" || fail "quiesce.json is missing manifestSha256"
+      db_identity_expected="$(jq -er '.databaseIdentity' "${quiesce}")" || fail "quiesce.json is missing databaseIdentity"
+      api_image="$(jq -er '.apiImage' "${quiesce}")" || fail "quiesce.json is missing apiImage"
       [[ -f "${backup_path}" ]] || fail "pre-M11 backup file is missing at ${backup_path}"
       backup_sha_actual="$(sha256sum "${backup_path}" | awk '{print $1}')"
       [[ "${backup_sha_actual}" == "${backup_sha_expected}" ]] || fail "pre-M11 backup no longer matches its quiesce receipt hash"
-      # Same catalog checks the runner itself performs after M11 (§0
-      # r1-6/spec §5 T4) — a subset here is enough to prove M11's DDL
-      # actually landed, not merely that the ledger row exists.
+
+      db_identity_actual="$(dbq "SELECT current_database() || '|' || current_user || '|' || COALESCE(inet_server_addr()::text,'local') || '|' || COALESCE(inet_server_port()::text,'local')")"
+      [[ "${db_identity_actual}" == "${db_identity_expected}" ]] || fail "current database identity does not match the quiesce receipt — RECOVERY_DIAGNOSIS_REQUIRED"
+
+      # Cross-check the M11 entry marker (deploy/task168-stage-b-migrate.sh,
+      # written right before M11 runs) against what is actually on disk now
+      # — proves this quiesce.json/backup are the SAME ones the migrate run
+      # that entered M11 actually used, not a stale or swapped-in pair.
+      quiesce_sha="$(sha256sum "${quiesce}" | awk '{print $1}')"
+      marker_quiesce_sha="$(jq -er '.quiesceReceiptSha256' "${m11_marker}")" || fail "M11 entry marker is missing quiesceReceiptSha256"
+      marker_backup_sha="$(jq -er '.preM11BackupSha256' "${m11_marker}")" || fail "M11 entry marker is missing preM11BackupSha256"
+      [[ "${marker_quiesce_sha}" == "${quiesce_sha}" ]] || fail "M11 entry marker's quiesce receipt hash does not match the current quiesce.json — RECOVERY_DIAGNOSIS_REQUIRED"
+      [[ "${marker_backup_sha}" == "${backup_sha_actual}" ]] || fail "M11 entry marker's backup hash does not match the current pre-M11 backup — RECOVERY_DIAGNOSIS_REQUIRED"
+
+      # Same post-M11 catalog checks the runner itself performs
+      # (deploy/task168-stage-b-migrate.sh, r1-6 fix) — enough to prove M11's
+      # DDL and its guards actually landed, not merely that the ledger row
+      # exists.
       legacy_tables="$(dbq "SELECT count(*) FROM (VALUES ('v1_tournament_fixtures'),('v1_tournament_fixture_results'),('v1_tournament_fixture_goals'),('v1_tournament_fixture_videos'),('v1_tournament_fixture_advancement_edges')) x(name) WHERE to_regclass(x.name) IS NOT NULL")"
       [[ "${legacy_tables}" == 0 ]] || fail "M11 ledger row exists but legacy tables are still present — RECOVERY_DIAGNOSIS_REQUIRED (schema/ledger mismatch, do not write a recovered receipt)"
-      quiesce_sha="$(sha256sum "${quiesce}" | awk '{print $1}')"
+      legacy_link_columns="$(dbq "SELECT count(*) FROM (VALUES ('tournament_fixture_id'),('fixture_id')) x(name) WHERE EXISTS (SELECT 1 FROM information_schema.columns c WHERE c.column_name=x.name AND c.table_name IN ('v1_games','v1_tournament_staff_fixture_scopes','v1_operation_audits'))")"
+      [[ "${legacy_link_columns}" == 0 ]] || fail "M11 ledger row exists but legacy link columns are still present — RECOVERY_DIAGNOSIS_REQUIRED"
+      retirement_functions="$(dbq "SELECT count(*) FROM pg_proc WHERE proname IN ('v1_reject_retired_tournament_fixture_write','v1_reject_retired_tournament_fixture_link')")"
+      [[ "${retirement_functions}" == 0 ]] || fail "M11 ledger row exists but retirement functions are still present — RECOVERY_DIAGNOSIS_REQUIRED"
+      retirement_triggers="$(dbq "SELECT count(*) FROM pg_trigger WHERE tgname IN ('v1_tournament_fixture_retired_write','v1_tournament_fixture_retired_row_write','v1_000_tournament_fixture_retired_link')")"
+      [[ "${retirement_triggers}" == 0 ]] || fail "M11 ledger row exists but retirement triggers are still present — RECOVERY_DIAGNOSIS_REQUIRED"
+
       jq -n \
-        --arg sha "${ALPHA_SHA}" --arg m11 "${TASK168_M11}" --arg m11sha "${TASK168_M11_SHA256}" \
+        --arg sha "${ALPHA_SHA}" --arg apiImage "${api_image}" --arg dbId "${db_identity_actual}" \
+        --arg schemaSha "${TASK168_FINAL_SCHEMA_SHA256}" --arg manifestSha "${manifest_sha}" \
+        --arg m11 "${TASK168_M11}" --arg m11sha "${TASK168_M11_SHA256}" \
         --arg quiesceSha "${quiesce_sha}" --arg backupSha "${backup_sha_actual}" \
+        --argjson legacyTables "${legacy_tables}" --argjson legacyLinkColumns "${legacy_link_columns}" \
+        --argjson retirementTriggers "${retirement_triggers}" --argjson retirementFunctions "${retirement_functions}" \
         '{schemaVersion:1,kind:"task168StageBMigration",status:"MIGRATION_COMMITTED_RECOVERED",stage:"stageBFinal",
-          releaseSha:$sha,m11:$m11,m11Sha256:$m11sha,
-          recoveredFrom:{quiesceReceiptSha256:$quiesceSha,ledgerM11Row:"applied",catalogResult:{legacyTables:0}},
+          releaseSha:$sha,apiImage:$apiImage,databaseIdentity:$dbId,schemaSha256:$schemaSha,manifestSha256:$manifestSha,
+          m11:$m11,m11Sha256:$m11sha,
+          postVerification:{legacyTables:$legacyTables,legacyLinkColumns:$legacyLinkColumns,retirementTriggers:$retirementTriggers,retirementFunctions:$retirementFunctions},
+          recoveredFrom:{quiesceReceiptSha256:$quiesceSha,ledgerM11Row:"applied",catalogResult:{legacyTables:$legacyTables,legacyLinkColumns:$legacyLinkColumns,retirementTriggers:$retirementTriggers,retirementFunctions:$retirementFunctions}},
           preM11BackupSha256:$backupSha,completedAt:(now|todate)}' \
         > "${migration_receipt}"
       chmod 600 "${migration_receipt}"

@@ -244,6 +244,114 @@ run_classification() {
     || fail "poll budget only made ${calls} attempts, expected >= 61"
 }
 
+# ── 7. deploy-alpha.yml: push never reaches StageB (T1 completion #1) ──────
+# Extracts the REAL "Resolve Task 168 stage" step's run: block out of the
+# live workflow YAML (never a hand-copied excerpt) and executes it, so a
+# regression that weakens the push-pins-to-stageAIntermediate guard shows up
+# here even though this test never actually dispatches the workflow.
+run_stage_resolution_guard() {
+  local dir="${WORK}/stage-resolution"
+  mkdir -p "${dir}"
+  python3 - "${ROOT}/.github/workflows/deploy-alpha.yml" "${dir}/resolve.sh" <<'PY'
+import sys, yaml
+workflow_path, out_path = sys.argv[1], sys.argv[2]
+doc = yaml.safe_load(open(workflow_path))
+job = doc["jobs"]["deploy"]
+for step in job["steps"]:
+    if step.get("name") == "Resolve Task 168 stage":
+        assert step.get("id") == "task168", "step id changed away from 'task168'"
+        open(out_path, "w").write(step["run"])
+        break
+else:
+    raise SystemExit("could not find the 'Resolve Task 168 stage' step in the deploy job")
+PY
+  [[ -s "${dir}/resolve.sh" ]] || { fail "could not extract the Resolve Task 168 stage run: block"; return; }
+
+  # push event, dispatch input claims stageBFinal -> must still resolve to
+  # stageAIntermediate and must not require a timeout.
+  local out="${dir}/github_output"
+  : > "${out}"
+  local rc=0
+  ( GITHUB_EVENT_NAME=push STAGE_INPUT=stageBFinal TIMEOUT_INPUT='' GITHUB_OUTPUT="${out}" \
+    bash "${dir}/resolve.sh" ) > "${dir}/push-stdout" 2> "${dir}/push-stderr" || rc=$?
+  [[ "${rc}" -eq 0 ]] && grep -q '^stage=stageAIntermediate$' "${out}" \
+    && pass "a push event resolves to stage=stageAIntermediate regardless of a stale dispatch input" \
+    || fail "a push event did not resolve to stageAIntermediate: rc=${rc} $(cat "${out}" "${dir}/push-stderr" 2>/dev/null)"
+
+  # workflow_dispatch + a StageB stage but no timeout -> must reject (U11: no
+  # assumed default), never silently pick one.
+  : > "${out}"
+  rc=0
+  ( GITHUB_EVENT_NAME=workflow_dispatch STAGE_INPUT=stageBFinal TIMEOUT_INPUT='' GITHUB_OUTPUT="${out}" \
+    bash "${dir}/resolve.sh" ) > "${dir}/nodispatch-stdout" 2> "${dir}/nodispatch-stderr" || rc=$?
+  [[ "${rc}" -ne 0 ]] && grep -q "task168_stage_b_timeout_seconds is required" "${dir}/nodispatch-stderr" \
+    && pass "a StageB dispatch with no executionTimeout is rejected (U11)" \
+    || fail "a StageB dispatch with no timeout was not rejected: rc=${rc} $(cat "${dir}/nodispatch-stderr" 2>/dev/null)"
+
+  # Mutation-style regression: with the push-pins-to-stageAIntermediate guard
+  # deleted, the same push+stageBFinal input must NOT resolve to
+  # stageAIntermediate — proves the test above actually depends on that guard
+  # rather than passing for an unrelated reason.
+  python3 -c "
+s = open('${dir}/resolve.sh').read()
+guard = '''if [[ \"\${GITHUB_EVENT_NAME}\" != workflow_dispatch ]]; then
+  stage=\"stageAIntermediate\"
+fi
+'''
+assert guard in s, 'guard text not found verbatim -- update this mutation to match the real block'
+open('${dir}/resolve-mutated.sh', 'w').write(s.replace(guard, '', 1))
+"
+  : > "${out}"
+  rc=0
+  ( GITHUB_EVENT_NAME=push STAGE_INPUT=stageBFinal TIMEOUT_INPUT=60 GITHUB_OUTPUT="${out}" \
+    bash "${dir}/resolve-mutated.sh" ) > /dev/null 2>&1 || rc=$?
+  grep -q '^stage=stageAIntermediate$' "${out}" 2>/dev/null \
+    && fail "removing the push guard still resolved to stageAIntermediate (mutation not detected)" \
+    || pass "removing the push guard changes the result (mutation correctly detected)"
+}
+
+# ── 8. deploy-alpha.yml: every StageB-only step's if: evaluates to false
+# once steps.task168.outputs.stage is stageAIntermediate — proves a push (or
+# a stageAIntermediate/stageBRecover dispatch) skips every StageB-only step,
+# not just that the resolver output is right.
+run_stage_b_step_conditions() {
+  local conditions
+  conditions="$(grep -oE "steps\.task168\.outputs\.stage == '[a-zA-Z]+' \|\| steps\.task168\.outputs\.stage == '[a-zA-Z]+'( && steps\.stageb-images\.outputs\.final_exists != 'true')?" \
+    "${ROOT}/.github/workflows/deploy-alpha.yml")"
+  local count
+  count="$(grep -c . <<< "${conditions}")" || true
+  [[ "${count}" -ge 5 ]] && pass "found ${count} StageB-only step if: conditions to evaluate" \
+    || fail "expected at least 5 StageB-only step if: conditions, found ${count}"
+
+  local all_false=true line
+  while IFS= read -r line; do
+    [[ -n "${line}" ]] || continue
+    local py_expr="${line}"
+    py_expr="${py_expr//steps.task168.outputs.stage/\"stageAIntermediate\"}"
+    py_expr="${py_expr//steps.stageb-images.outputs.final_exists/\"\"}"
+    py_expr="${py_expr//||/ or }"
+    py_expr="${py_expr//&&/ and }"
+    if python3 -c "assert not (${py_expr})" 2>/dev/null; then
+      :
+    else
+      all_false=false
+      fail "an if: condition does not evaluate to false for stage=stageAIntermediate: ${line}"
+    fi
+  done <<< "${conditions}"
+  [[ "${all_false}" == true ]] && pass "every StageB-only step if: condition is false when stage=stageAIntermediate"
+
+  # Mutation-style regression: drop one step's if: guard entirely and confirm
+  # the extraction above would then find fewer conditions than expected.
+  local mutated
+  mutated="$(grep -v "steps.task168.outputs.stage == 'stageBPreflight' || steps.task168.outputs.stage == 'stageBFinal'" \
+    "${ROOT}/.github/workflows/deploy-alpha.yml")"
+  local mutated_count
+  mutated_count="$(grep -coE "steps\.task168\.outputs\.stage == '[a-zA-Z]+' \|\| steps\.task168\.outputs\.stage == '[a-zA-Z]+'" <<< "${mutated}")" || true
+  [[ "${mutated_count}" -lt "${count}" ]] \
+    && pass "removing one step's if: guard reduces the detected condition count (mutation correctly detected: ${count} -> ${mutated_count})" \
+    || fail "removing a step's if: guard did not change the detected condition count"
+}
+
 echo "== test-task168-stage-b-wiring =="
 run_unknown_stage
 run_stage_a
@@ -251,6 +359,8 @@ run_stage_b_final
 run_stage_b_recover
 run_missing_timeout
 run_classification
+run_stage_resolution_guard
+run_stage_b_step_conditions
 
 echo "== ${PASS} passed, ${FAIL} failed =="
 (( FAIL == 0 ))

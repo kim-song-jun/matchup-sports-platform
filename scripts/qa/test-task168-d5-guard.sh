@@ -1,16 +1,25 @@
 #!/usr/bin/env bash
 
 # D-5 guard contract test (m11-stageb-spec.md §0 item 4 / §3.3 row 1;
-# .task168-stageb-a2-contract.md). Runs the REAL deploy/deploy-alpha.sh (not
-# a reimplementation) against a fake docker/compose and an instrumented
-# activate_alpha_release_source, so a real regression — the guard deleted, or
-# moved to after activation — shows up as this test failing, not just a unit
-# check on a hand-copied excerpt of the guard's SQL.
+# .task168-stageb-a2-contract.md). Exercises the REAL guard function
+# (assert_task168_m11_absent, deploy/alpha-release-common.sh) that
+# deploy/deploy-alpha.sh calls — not a reimplementation or a hand-copied
+# excerpt of its SQL — against a fake docker/psql on PATH, plus a static
+# check that the call site in deploy-alpha.sh still precedes source
+# activation.
+#
+# deploy-alpha.sh's LIVE_DIR/lock path are fixed operational paths
+# (/home/ec2-user/...), not test-only environment-variable hooks, so this
+# test cannot drive the whole script end-to-end without root access to
+# /home. The guard's actual decision logic lives in
+# assert_task168_m11_absent precisely so it can be unit-tested directly
+# instead of requiring that.
 
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEPLOY_SCRIPT="${ROOT}/deploy/deploy-alpha.sh"
+COMMON_LIB="${ROOT}/deploy/alpha-release-common.sh"
 WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK}"' EXIT
 
@@ -19,90 +28,17 @@ FAIL=0
 pass() { PASS=$((PASS + 1)); echo "  ok: $*"; }
 fail() { FAIL=$((FAIL + 1)); echo "  FAIL: $*" >&2; }
 
-readonly REGISTRY=123456789012.dkr.ecr.ap-northeast-2.amazonaws.com
-readonly SHA=1111111111111111111111111111111111111111
-readonly VERSION=0.1.0-alpha.20260914.g111111111111
-readonly SOURCE_SHA256=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+echo "== test-task168-d5-guard =="
 
-# Builds a fully self-contained fixture: a fake $HOME (ALPHA_HOME_DIR), a live
-# release directory, and a candidate source payload with a valid manifest.
-# $1 = case root. Returns via globals the paths the caller needs.
-build_fixture() {
-  local root="$1"
-  home="${root}/home"
-  live="${home}/teameet"
-  source_dir="${root}/candidate-source"
-  manifest="${root}/manifest.json"
-  log="${root}/calls.log"
+# ── Unit: assert_task168_m11_absent against a fake docker/psql on PATH ─────
+# $1 = case root, $2 = M11 row count the fake DB reports (0 or 1+).
+run_guard_case() {
+  local root="$1" m11_rows="$2"
+  local log="${root}/calls.log"
+  mkdir -p "${root}/bin"
   : > "${log}"
 
-  mkdir -p "${live}/deploy" "${source_dir}/deploy/migrations/x" "${home}"
-  printf 'V1_DB_USER=teameet_v1\nV1_DB_NAME=teameet_v1\n' > "${live}/deploy/.env"
-  printf 'add_header X-Teameet-Release "prior" always;\n' > "${live}/deploy/release-metadata.alpha.conf"
-
-  jq -Sn --arg sha "${SHA}" --arg version "${VERSION}" --arg registry "${REGISTRY}" \
-    --arg srcSha "${SOURCE_SHA256}" \
-    '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version,createdAt:"2026-09-14T00:00:00Z"},
-      source:{bucket:"alpha-bucket",key:("releases/"+$sha+".tar.gz"),versionId:"version-1",sha256:$srcSha},
-      database:{migrationPolicy:"task168-stageAIntermediate",rollbackMode:"canonical-intermediate-only",
-        compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:null,rollbackCompatibleWith:null,
-        task168:{stage:"stageAIntermediate",schemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f",
-          runtimeClientSchemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f",
-          cutoverArchiveSha256:"829cbb214afc26c417947c864fd477647498003e06915ca20b4d2f8b44b80c4b",
-          cutoverManifestSha256:"b270be3c365ad780a2988ccf16f4850c15807ebc3eb9eb763f2bcdd0418f2f74",
-          migrations:[range(0;10)|{name:("2026091200000"+tostring+"_v1_fixture"),sha256:"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}],
-          rollbackTarget:null},
-        },
-      images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",uri:($registry+"/teameet-alpha-v1-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")},
-        web:{repository:($registry+"/teameet-alpha-v1-web"),digest:"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",uri:($registry+"/teameet-alpha-v1-web@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")},
-        cutoverTool:{repository:($registry+"/teameet-alpha-v1-api"),digest:"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",uri:($registry+"/teameet-alpha-v1-api@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")}}}' \
-    > "${manifest}"
-
-  # A pre-existing active release makes had_active=true, so deploy-alpha.sh
-  # skips its separate "first immutable conversion" legacy-receipt branch —
-  # that branch is unrelated to D-5 and would otherwise need its own
-  # docker-container fixtures just to get past it.
-  mkdir -p "${home}/.teameet-alpha-releases"
-  local prior_sha=2222222222222222222222222222222222222222
-  jq --arg sha "${prior_sha}" '.release.sha = $sha' "${manifest}" > "${root}/prior-manifest.json"
-  local prior_checksum
-  prior_checksum="$(sha256sum "${root}/prior-manifest.json" | awk '{print $1}')"
-  jq -n --slurpfile active "${root}/prior-manifest.json" --arg checksum "${prior_checksum}" \
-    '{schemaVersion:1, active: $active[0], activeManifestSha256: $checksum, previous: null, previousManifestSha256: null, updatedAt: "2026-09-14T00:00:00Z"}' \
-    > "${home}/.teameet-alpha-releases/state.json"
-
-  printf '#!/usr/bin/env bash\n' > "${source_dir}/deploy/deploy-alpha.sh"
-  printf '#!/usr/bin/env bash\n' > "${source_dir}/deploy/task168-stage-a-migrate.sh"
-  printf '#!/usr/bin/env bash\n' > "${source_dir}/deploy/rollback-alpha.sh"
-  printf 'SELECT 1;\n' > "${source_dir}/deploy/alpha-sanitize.sql"
-  printf 'services: {}\n' > "${source_dir}/deploy/docker-compose.alpha.yml"
-  printf 'server {}\n' > "${source_dir}/deploy/nginx.alpha.conf"
-  cp "${ROOT}/deploy/alpha-manifest-common.sh" "${source_dir}/deploy/alpha-manifest-common.sh"
-  cp "${ROOT}/deploy/alpha-source-common.sh" "${source_dir}/deploy/alpha-source-common.sh"
-  # A custom alpha-release-common.sh: sources the real one (so
-  # validate_alpha_release_manifest / write_candidate_manifest /
-  # prepare_alpha_release_source are the genuine implementations), then
-  # overrides only activate_alpha_release_source to log the call instead of
-  # doing a real symlink swap. deploy-alpha.sh sources this file *from the
-  # candidate payload it is deploying* — exactly like a real release would —
-  # so this is not a stub replacing the target, it is the same substitution
-  # mechanism restore/rollback tests already rely on (test-alpha-release-state.sh).
-  cat > "${source_dir}/deploy/alpha-release-common.sh" <<EOF
-source "${ROOT}/deploy/alpha-release-common.sh"
-activate_alpha_release_source() {
-  echo "activate_alpha_release_source \$1" >> "${log}"
-  return 0
-}
-EOF
-}
-
-# $1 = case root, $2 = M11 row count the fake DB reports (0 or 1+).
-run_case() {
-  local root="$1" m11_rows="$2"
-  build_fixture "${root}"
-  local bin="${root}/bin"
-  mkdir -p "${bin}"
-  cat > "${bin}/docker" <<EOF
+  cat > "${root}/bin/docker" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "docker \$*" >> "${log}"
 case "\$*" in
@@ -112,71 +48,113 @@ case "\$*" in
   *) exit 0 ;;
 esac
 EOF
-  chmod +x "${bin}/docker"
-  # flock(1) is util-linux-only (no macOS build); a real deploy host always
-  # has it, so this is a test-environment shim, not a behavior change.
-  printf '#!/usr/bin/env bash\nexit 0\n' > "${bin}/flock"
-  chmod +x "${bin}/flock"
+  chmod +x "${root}/bin/docker"
 
   local script="${root}/run.sh"
   cat > "${script}" <<EOF
-export ALPHA_HOME_DIR="${home}"
-export ALPHA_LIVE_DIR="${live}"
-export ALPHA_SOURCE_DIR="${source_dir}"
-export ALPHA_MANIFEST_FILE="${manifest}"
-export ALPHA_MANIFEST_SHA256="\$(sha256sum "${manifest}" | awk '{print \$1}')"
-export ALPHA_SHA="${SHA}"
-export ALPHA_RELEASE_VERSION="${VERSION}"
-export ALPHA_ECR_REGISTRY="${REGISTRY}"
-export ALPHA_AWS_REGION="ap-northeast-2"
-export ALPHA_SOURCE_BUCKET="alpha-bucket"
-export ALPHA_SOURCE_VERSION_ID="version-1"
-export ALPHA_SOURCE_SHA256="${SOURCE_SHA256}"
-export PATH="${bin}:\${PATH}"
-bash "${DEPLOY_SCRIPT}"
+set -Eeuo pipefail
+export PATH="${root}/bin:\${PATH}"
+source "${COMMON_LIB}"
+compose=(docker compose)
+assert_task168_m11_absent compose
 EOF
   local rc=0
   bash "${script}" > "${root}/stdout" 2> "${root}/stderr" || rc=$?
   echo "${rc}"
 }
 
-echo "== test-task168-d5-guard =="
-
-# ── Negative: M11 already in the ledger -> refuse before activation ────────
-neg_root="${WORK}/negative"
+neg_root="${WORK}/guard-negative"
 mkdir -p "${neg_root}"
-rc="$(run_case "${neg_root}" 1)"
-[[ "${rc}" -ne 0 ]] && pass "M11-present is refused (rc=${rc})" || fail "M11-present did not fail"
-grep -q "activate_alpha_release_source" "${neg_root}/calls.log" 2>/dev/null \
-  && fail "activate_alpha_release_source was called despite M11 already being in the ledger" \
-  || pass "activate_alpha_release_source was never called when M11 is already in the ledger"
-grep -q "Refusing a Stage A manifest" "${neg_root}/stderr" \
+rc="$(run_guard_case "${neg_root}" 1)"
+[[ "${rc}" -ne 0 ]] && pass "assert_task168_m11_absent refuses when M11 is already in the ledger (rc=${rc})" \
+  || fail "assert_task168_m11_absent did not fail with an M11 row present"
+grep -q "already present in the ledger" "${neg_root}/stderr" \
   && pass "refusal message names the reason" \
-  || fail "no D-5 refusal message in stderr: $(cat "${neg_root}/stderr")"
+  || fail "no ledger-present message in stderr: $(cat "${neg_root}/stderr")"
 
-# ── Positive: no M11 row -> the guard does not block, activation proceeds ──
-# The script legitimately fails one step later (reading /proc/loadavg, which
-# only exists on the real EC2 Linux host, not on this test machine) — that
-# expected, unrelated failure is what proves execution reached past the
-# guard rather than the guard itself succeeding by staying silent.
-pos_root="${WORK}/positive"
+pos_root="${WORK}/guard-positive"
 mkdir -p "${pos_root}"
-rc="$(run_case "${pos_root}" 0)"
-grep -q "activate_alpha_release_source ${SHA}" "${pos_root}/calls.log" 2>/dev/null \
-  && pass "activate_alpha_release_source was called once M11 is absent from the ledger" \
-  || fail "the guard blocked even though no M11 row exists: $(cat "${pos_root}/stderr")"
+rc="$(run_guard_case "${pos_root}" 0)"
+[[ "${rc}" -eq 0 ]] && pass "assert_task168_m11_absent succeeds when no M11 row exists" \
+  || fail "assert_task168_m11_absent failed with rc=${rc} despite no M11 row: $(cat "${pos_root}/stderr")"
+grep -q "up -d v1_postgres" "${pos_root}/calls.log" \
+  && pass "the guard brought up v1_postgres before querying it" \
+  || fail "the guard never invoked docker compose up"
 
-# ── Static order guard: the D-5 block's source line must precede the
-# activate_alpha_release_source call line in this file. Combined with the
-# dynamic negative test above, this catches "guard moved to after
-# activation" even if some future refactor made the dynamic case pass by
-# accident.
-guard_line="$(grep -n "Refusing a Stage A manifest" "${ROOT}/deploy/deploy-alpha.sh" | head -1 | cut -d: -f1)"
-activate_line="$(grep -n 'activate_alpha_release_source "\${ALPHA_SHA}"' "${ROOT}/deploy/deploy-alpha.sh" | head -1 | cut -d: -f1)"
-if [[ -n "${guard_line}" && -n "${activate_line}" && "${guard_line}" -lt "${activate_line}" ]]; then
-  pass "D-5 guard (line ${guard_line}) precedes source activation (line ${activate_line}) in deploy-alpha.sh"
+# ── Static wiring: the call site in deploy-alpha.sh must still exist and
+# must textually precede source activation. Combined with the unit test
+# above (which proves the function itself is correct), this catches "the
+# guard call was removed" or "the guard call was moved to after
+# activation" without needing to run the whole script.
+call_line="$(grep -n 'assert_task168_m11_absent compose' "${DEPLOY_SCRIPT}" | head -1 | cut -d: -f1)" || true
+refusal_line="$(grep -n "Refusing a Stage A manifest" "${DEPLOY_SCRIPT}" | head -1 | cut -d: -f1)" || true
+activate_line="$(grep -n 'activate_alpha_release_source "\${ALPHA_SHA}"' "${DEPLOY_SCRIPT}" | head -1 | cut -d: -f1)" || true
+
+if [[ -n "${call_line}" && -n "${activate_line}" && "${call_line}" -lt "${activate_line}" ]]; then
+  pass "assert_task168_m11_absent call (line ${call_line}) precedes source activation (line ${activate_line})"
 else
-  fail "D-5 guard does not textually precede source activation (guard=${guard_line:-missing}, activate=${activate_line:-missing})"
+  fail "the D-5 guard call does not textually precede source activation (call=${call_line:-missing}, activate=${activate_line:-missing})"
+fi
+
+if [[ -n "${refusal_line}" && -n "${activate_line}" && "${refusal_line}" -lt "${activate_line}" ]]; then
+  pass "refusal message (line ${refusal_line}) precedes source activation (line ${activate_line})"
+else
+  fail "the D-5 refusal message does not textually precede source activation (refusal=${refusal_line:-missing}, activate=${activate_line:-missing})"
+fi
+
+# ── Regression: deploy-alpha.sh and rollback-alpha.sh must not carry
+# test-only environment-variable override hooks for their live paths — the
+# instruction that created assert_task168_m11_absent exists specifically to
+# let this test avoid needing them.
+if grep -qE '\$\{ALPHA_LIVE_DIR:-|\$\{ALPHA_HOME_DIR:-' "${DEPLOY_SCRIPT}"; then
+  fail "deploy-alpha.sh still has a test-only ALPHA_LIVE_DIR/ALPHA_HOME_DIR override hook"
+else
+  pass "deploy-alpha.sh has no test-only path override hooks"
+fi
+
+# ── Shared deploy lock (m11-stageb-spec.md §0 "동시 실행 lock 없음";
+# .task168-stageb-a2-contract.md §7): deploy-alpha-stage-b.sh must also take
+# the same .teameet-alpha-deploy.lock that deploy-alpha.sh and
+# rollback-alpha.sh take, so a StageB host run in progress blocks a StageA
+# push deploy queued behind it (and vice versa) rather than both running
+# concurrently against the same containers/database.
+STAGE_B_SCRIPT="${ROOT}/deploy/deploy-alpha-stage-b.sh"
+if grep -q '\.teameet-alpha-deploy\.lock' "${STAGE_B_SCRIPT}"; then
+  pass "deploy-alpha-stage-b.sh references the shared .teameet-alpha-deploy.lock"
+else
+  fail "deploy-alpha-stage-b.sh no longer references the shared .teameet-alpha-deploy.lock"
+fi
+
+if command -v flock >/dev/null 2>&1; then
+  lock_root="${WORK}/lock-held"
+  mkdir -p "${lock_root}"
+  (
+    exec 9>"${lock_root}/.teameet-alpha-deploy.lock"
+    flock -x 9
+    sleep 5
+  ) &
+  holder_pid=$!
+  # Give the background subshell time to actually acquire the lock before we
+  # race it.
+  for _ in $(seq 1 20); do
+    [[ -e "${lock_root}/.teameet-alpha-deploy.lock" ]] && break
+    sleep 0.1
+  done
+  sleep 0.2
+
+  rc=0
+  ALPHA_SHA=1111111111111111111111111111111111111111 \
+    ALPHA_HOME_DIR="${lock_root}" \
+    TASK168_STAGE=stageBRecover \
+    bash "${STAGE_B_SCRIPT}" > "${lock_root}/stdout" 2> "${lock_root}/stderr" || rc=$?
+  kill "${holder_pid}" 2>/dev/null || true
+  wait "${holder_pid}" 2>/dev/null || true
+
+  [[ "${rc}" -ne 0 ]] && grep -q "holds the deploy lock" "${lock_root}/stderr" \
+    && pass "stageBRecover refuses while the shared deploy lock is held" \
+    || fail "stageBRecover did not refuse a held shared deploy lock: rc=${rc} $(cat "${lock_root}/stderr" 2>/dev/null)"
+else
+  pass "shared-lock contention case skipped (no real flock(1) on this machine — covered by CI on ubuntu)"
 fi
 
 echo "== ${PASS} passed, ${FAIL} failed =="

@@ -108,6 +108,7 @@ validate_alpha_stage_b_final_manifest() {
       .database.rollbackCompatibleWith == null and
       .database.task168.stage == "stageBFinal" and
       .database.task168.schemaSha256 == $schema and
+      .database.task168.runtimeClientSchemaSha256 == $schema and
       .database.task168.recoveryFrom == null and
       .database.task168.rollbackTarget == null and
       .database.task168.migrations == $migrations and

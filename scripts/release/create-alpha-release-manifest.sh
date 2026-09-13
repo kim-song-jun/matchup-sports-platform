@@ -180,7 +180,7 @@ if [[ "${TASK168_STAGE:-stageAIntermediate}" != stageAIntermediate ]]; then
         source:{bucket:$bucket,key:("releases/task168-stage-b/"+$sha+".tar.gz"),versionId:$sourceVersionId,sha256:$sourceSha256},
         database:{migrationPolicy:"task168-stageBFinal",rollbackMode:"backup-only",compatibilityCheck:"expand-contract-sql-v1",
           migrationValidatedFrom:null,rollbackCompatibleWith:null,
-          task168:{stage:"stageBFinal",schemaSha256:$schema,migrations:$migrations,fullMigrationHistory:$fullHistory,
+          task168:{stage:"stageBFinal",schemaSha256:$schema,runtimeClientSchemaSha256:$schema,migrations:$migrations,fullMigrationHistory:$fullHistory,
             resolvedMigrationAttemptsSha256:$resolvedSha,predecessor:$predecessor,finalImagePreflight:$preflight,
             recoveryFrom:null,rollbackTarget:null}},
         images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$apiDigest,uri:($registry+"/teameet-alpha-v1-api@"+$apiDigest)},

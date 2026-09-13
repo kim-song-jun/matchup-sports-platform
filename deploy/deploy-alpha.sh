@@ -23,17 +23,12 @@ if [[ ! "${ALPHA_RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9
   exit 1
 fi
 
-# Matches rollback-alpha.sh's ${ALPHA_LIVE_DIR:-...}/${ALPHA_HOME_DIR:-...}
-# override convention (both scripts declare these before sourcing
-# alpha-release-common.sh, which only defines the *same* defaults for the
-# helpers it exports — see deploy/alpha-release-common.sh). Without this,
-# deploy-alpha.sh could not be exercised by a test harness at all.
-readonly LIVE_DIR="${ALPHA_LIVE_DIR:-/home/ec2-user/teameet}"
+readonly LIVE_DIR="/home/ec2-user/teameet"
 readonly ENV_FILE="${LIVE_DIR}/deploy/.env"
 readonly COMPOSE_PROD="${LIVE_DIR}/deploy/docker-compose.prod.yml"
 readonly COMPOSE_ALPHA="${LIVE_DIR}/deploy/docker-compose.alpha.yml"
 
-exec 9>"${ALPHA_HOME_DIR:-/home/ec2-user}/.teameet-alpha-deploy.lock"
+exec 9>"/home/ec2-user/.teameet-alpha-deploy.lock"
 if ! flock -n 9; then
   echo "[alpha-deploy] Another alpha deployment is active" >&2
   exit 1
@@ -211,23 +206,8 @@ prepare_alpha_release_source "${ALPHA_SOURCE_DIR}" "${ALPHA_SHA}" "${ALPHA_SOURC
 # resolves through the live symlink to the release this deploy would replace.
 # That is fine: the ledger being checked is the live database's, which is
 # what M11 would actually apply against.
-"${compose[@]}" up -d v1_postgres >/dev/null
-for attempt in $(seq 1 30); do
-  if "${compose[@]}" exec -T v1_postgres \
-    pg_isready -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" >/dev/null 2>&1; then
-    break
-  fi
-  if [[ "${attempt}" -eq 30 ]]; then
-    echo "[alpha-deploy] PostgreSQL did not become ready for the Task168 D-5 guard" >&2
-    false
-  fi
-  sleep 2
-done
-task168_m11_rows="$("${compose[@]}" exec -T v1_postgres \
-  psql -X -v ON_ERROR_STOP=1 -At -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" \
-  -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name = '20260911090000_retire_tournament_fixture_tables'")"
-[[ "${task168_m11_rows}" == "0" ]] || {
-  echo "[alpha-deploy] Refusing a Stage A manifest: Task 168 M11 is already present in the ledger (${task168_m11_rows} row(s))" >&2
+assert_task168_m11_absent compose || {
+  echo "[alpha-deploy] Refusing a Stage A manifest: Task 168 M11 is already present in the ledger" >&2
   exit 1
 }
 

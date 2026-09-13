@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -17,18 +18,18 @@ function getEventErrorMessage(error: unknown, fallback: string) {
 }
 
 export default function EventsPage() {
-  return <EventsContent />;
+  return (
+    <Suspense fallback={<EventListSkeleton />}>
+      <EventsContent />
+    </Suspense>
+  );
 }
 
 function EventsContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeSportCode, setActiveSportCode] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    const sportCode = new URLSearchParams(window.location.search).get('sport');
-    if (sportCode && /^[a-z0-9-]{1,40}$/i.test(sportCode)) {
-      setActiveSportCode(sportCode);
-    }
-  }, []);
-  const { data: sportsData } = useV1MasterSports();
+  const { data: sportsData, isError: isSportsError, refetch: refetchSports } = useV1MasterSports();
   const {
     data,
     isLoading,
@@ -50,12 +51,36 @@ function EventsContent() {
     label: s.name,
   }));
 
+  useEffect(() => {
+    const requestedSport = searchParams.get('sport');
+    if (requestedSport && !sportsData) {
+      setActiveSportCode(undefined);
+      return;
+    }
+    const validSyntax = requestedSport === null || /^[a-z0-9-]{1,40}$/i.test(requestedSport);
+    const validMasterSport = requestedSport === null || sportsData.some((sport) => sport.code === requestedSport);
+    if (!validSyntax || (sportsData && !validMasterSport)) {
+      setActiveSportCode(undefined);
+      router.replace('/events', { scroll: false });
+      return;
+    }
+    setActiveSportCode(requestedSport ?? undefined);
+  }, [router, searchParams, sportsData]);
+
+  const updateSportFilter = (sportCode: string | undefined) => {
+    const nextCode = sportCode && filterSports.some((sport) => sport.code === sportCode)
+      ? sportCode
+      : undefined;
+    setActiveSportCode(nextCode);
+    router.replace(nextCode ? `/events?sport=${encodeURIComponent(nextCode)}` : '/events', { scroll: false });
+  };
+
   return (
     <div className={styles.page}>
       <header className={styles.intro}>
         <div className={styles.titleRow}>
           <Sparkles size={20} aria-hidden="true" />
-          <h2 className="tm-text-heading">이벤트 허브</h2>
+          <h1 className="tm-text-heading">이벤트 허브</h1>
         </div>
         <p>
           지금 참가할 수 있는 대회부터 결과와 시상까지, 팀밋의 주요 이벤트를 한눈에 확인하세요.
@@ -68,7 +93,7 @@ function EventsContent() {
           <button
             aria-pressed={activeSportCode === undefined}
             type="button"
-            onClick={() => setActiveSportCode(undefined)}
+            onClick={() => updateSportFilter(undefined)}
             className={`tm-chip ${styles.filter} ${activeSportCode === undefined ? 'tm-chip-active' : ''}`}
           >
             전체
@@ -78,13 +103,18 @@ function EventsContent() {
               key={s.code}
               aria-pressed={activeSportCode === s.code}
               type="button"
-              onClick={() => setActiveSportCode((prev) => prev === s.code ? undefined : s.code)}
+              onClick={() => updateSportFilter(activeSportCode === s.code ? undefined : s.code)}
               className={`tm-chip ${styles.filter} ${activeSportCode === s.code ? 'tm-chip-active' : ''}`}
             >
               {s.label}
             </button>
           ))}
         </div>
+      ) : isSportsError ? (
+        <ErrorState
+          message="종목 필터를 불러오지 못했어요. 이벤트 목록은 계속 확인할 수 있어요."
+          onRetry={() => void refetchSports()}
+        />
       ) : null}
 
       {/* 목록 */}

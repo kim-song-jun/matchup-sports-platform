@@ -75,7 +75,7 @@ export type TeamDetailViewModel = {
     county: string;
     level: string;
     genderRule: string;
-    membersList: Array<{ name: string; role: string; meta: string; status: string; visibility: '공개' | '비공개'; profileHref?: string }>;
+    membersList: Array<{ membershipId: string; userId: string; name: string; role: string; profileHref?: string }>;
     memberAccess: {
       canView: boolean;
       enabled: boolean;

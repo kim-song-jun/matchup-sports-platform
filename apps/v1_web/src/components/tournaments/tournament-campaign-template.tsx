@@ -55,7 +55,7 @@ export function TournamentCampaignTemplate({
         <div className={styles.heroContent}>
           <div className={styles.heroEyebrow}>
             <span className={`tm-badge ${status.badgeClass}`}>{status.label}</span>
-            <span>{tournament.sport.name}</span>
+            <span className={styles.heroSport}>{tournament.sport.name}</span>
           </div>
           <h1
             id="campaign-title"

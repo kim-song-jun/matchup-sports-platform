@@ -666,6 +666,23 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
   const primaryAction = model.step === 'confirm' || edit ? model.form?.onSubmit : model.form?.onNext;
   const secondaryAction = model.form?.onBack;
   const missingFields = model.form?.missingFields ?? [];
+  const hasEligibleTeams = model.teams.some((team) => !team.disabled);
+  const hasSelectedEligibleTeam = model.teams.some((team) => team.selected && !team.disabled);
+  const teamStepBlocked = model.step === 'team' && (
+    model.isLoadingTeams
+    || Boolean(model.teamLoadError)
+    || !hasSelectedEligibleTeam
+  );
+  const primaryDisabled = Boolean(model.form?.submitting || model.form?.lockedReason || teamStepBlocked);
+  const primaryDisabledReason = teamStepBlocked
+    ? model.isLoadingTeams
+      ? '팀 목록을 불러오는 중이에요.'
+      : model.teamLoadError
+        ? '팀 목록을 다시 불러와 주세요.'
+        : hasEligibleTeams
+          ? '팀을 선택해 주세요.'
+          : '매치 생성 권한이 있는 팀을 찾을 수 없어요.'
+    : null;
   return (
     <>
       <div className={`tm-create-shell tm-team-match-create-shell ${edit ? 'tm-create-shell-edit' : ''} tm-content-enter`}>
@@ -680,7 +697,14 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
         {model.step === 'place-time' ? <PlaceTimeStep model={model} /> : null}
         {model.step === 'confirm' ? <ConfirmStep model={model} /> : null}
       </div>
-      <div className="tm-fixed-cta tm-create-fixed-cta"><div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>{secondaryAction ? <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</button> : <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={prevHref(model.step)}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</Link>}{primaryAction ? <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={model.form?.submitting || Boolean(model.form?.lockedReason)} onClick={primaryAction}>{model.form?.submitting ? '저장 중' : primaryLabel}</button> : <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextHref(model.step)}>{primaryLabel}</Link>}</div>{edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting} onClick={model.form.onCancel}>팀매치 취소</button> : null}</div>
+      <div className="tm-fixed-cta tm-create-fixed-cta">
+        {primaryDisabledReason ? <div role="status" className="tm-text-caption" style={{ marginBottom: 8, textAlign: 'center' }}>{primaryDisabledReason}</div> : null}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+          {secondaryAction ? <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</button> : <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={prevHref(model.step)}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</Link>}
+          {primaryAction ? <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={primaryDisabled} onClick={() => { if (!primaryDisabled) primaryAction(); }}>{model.form?.submitting ? '저장 중' : primaryLabel}</button> : <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextHref(model.step)}>{primaryLabel}</Link>}
+        </div>
+        {edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting} onClick={model.form.onCancel}>팀매치 취소</button> : null}
+      </div>
     </>
   );
 }
@@ -947,14 +971,16 @@ function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
     <div>
       <h1 className="tm-text-heading">어떤 팀의 매치인가요?</h1>
       <p className="tm-text-body" style={{ marginTop: 8 }}>선택한 팀의 종목·등급·권한 정보를 기반으로 팀매치를 만들어요.</p>
-      {model.isLoadingTeams ? (
+      {model.teamLoadError ? (
+        <ErrorState title="팀 목록을 불러오지 못했어요" message={model.teamLoadError.message} onRetry={model.teamLoadError.onRetry} />
+      ) : model.isLoadingTeams ? (
         <div style={{ display: 'grid', gap: 12, marginTop: 20 }}>
           {[0, 1, 2].map((i) => (
             <div key={i} className="tm-review-skeleton" style={{ height: 72 }} aria-hidden="true" />
           ))}
         </div>
       ) : !hasTeams ? (
-        <EmptyState title="팀매치를 만들 수 있는 팀이 없어요" sub="소속된 팀이 없거나 팀 정보를 불러오지 못했어요." />
+        <EmptyState title="팀매치를 만들 수 있는 팀이 없어요" sub="팀을 만들거나 팀 목록에서 가입할 팀을 찾아 주세요." cta="팀 만들기" ctaHref="/teams/new" />
       ) : (
         <div style={{ display: 'grid', gap: 12, marginTop: 20 }}>
           {model.teams.map((team) => (
@@ -981,7 +1007,7 @@ function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
       <FieldErrorText id="field-hostTeamId" message={model.form?.fieldErrors?.hostTeamId} />
       {/* 팀이 없는 경우 EmptyState만 표시하고 권한 카드는 생략한다.
           팀은 있으나 권한이 없는 경우에만 권한 카드를 표시한다. */}
-      {!model.isLoadingTeams && hasTeams ? (() => {
+      {!model.teamLoadError && !model.isLoadingTeams && hasTeams ? (() => {
         const blocked = !hasCreatableTeams;
         // 두 갈래 다 지면에 색이 깔린다 — grey50 4.42:1 · orange50 4.21:1 (기준 4.5).
         return (
@@ -989,9 +1015,10 @@ function TeamStep({ model }: { model: TeamMatchCreateViewModel }) {
             <div className="tm-text-label" style={blocked ? { color: 'var(--orange700)' } : undefined}>권한 기준</div>
             <div className="tm-text-caption" style={{ marginTop: 8 }}>
               {blocked
-                ? '팀장이거나 매치 생성 권한이 있어야 다음으로 진행할 수 있어요. 해당 권한이 있는 팀으로 다시 시도해 주세요.'
+                ? '팀장이거나 매치 생성 권한이 있어야 다음으로 진행할 수 있어요. 팀을 만들거나 팀 목록에서 권한이 있는 팀을 찾아 주세요.'
                 : '팀장이거나 매치 생성 권한이 있는 관리자만 다음으로 진행할 수 있어요.'}
             </div>
+            {blocked ? <div style={{ display: 'flex', gap: 8, marginTop: 12 }}><Link className="tm-btn tm-btn-sm tm-btn-primary" href="/teams/new">팀 만들기</Link><Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/teams">팀 찾기</Link></div> : null}
           </Card>
         );
       })() : null}

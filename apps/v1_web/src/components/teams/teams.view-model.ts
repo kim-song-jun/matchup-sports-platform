@@ -90,11 +90,7 @@ const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel
     city: '서울',
     county: '성동구',
     level: '초보-중수',
-    membersList: [
-      { name: '김도윤', role: '팀장', meta: 'FW', status: '관리자', visibility: '공개' },
-      { name: '박서준', role: '운영진', meta: 'GK', status: '관리자', visibility: '공개' },
-      { name: '이하나', role: '멤버', meta: '최근 4경기', status: '활동중', visibility: '비공개' },
-    ],
+    membersList: [],
   },
   pending: {
     description: '가입 신청이 접수된 팀이에요. 운영진이 프로필, 활동 지역, 최근 매치 이력을 검토하고 있어요.',
@@ -104,10 +100,7 @@ const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel
     city: '서울',
     county: '강동구',
     level: '중수',
-    membersList: [
-      { name: '운영진', role: '관리자', meta: '가입 신청 검토 중', status: '검토 중', visibility: '공개' },
-      { name: '나', role: '신청자', meta: '가입 승인 대기', status: '검토중', visibility: '비공개' },
-    ],
+    membersList: [],
   },
   closed: {
     description: '현재 모집이 마감된 축구 팀이에요. 다음 모집이 열리면 알림을 받을 수 있어요.',
@@ -117,9 +110,7 @@ const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel
     city: '서울',
     county: '마포구',
     level: '중수-고수',
-    membersList: [
-      { name: '모집 상태', role: '마감', meta: '다음 모집 알림 가능', status: '마감', visibility: '비공개' },
-    ],
+    membersList: [],
   },
   mine: {
     description: '내가 관리하는 팀이에요. 팀 정보, 멤버 권한, 가입 신청, 팀매치 생성과 수정 흐름으로 이동할 수 있어요.',
@@ -129,11 +120,7 @@ const detailByMode: Record<TeamDetailViewModel['mode'], Pick<TeamDetailViewModel
     city: '서울',
     county: '구로구',
     level: '초보-중수',
-    membersList: [
-      { name: '나', role: '팀장', meta: '모든 권한', status: '팀장', visibility: '공개' },
-      { name: '정하늘', role: '운영진', meta: '가입 승인 가능', status: '관리자', visibility: '공개' },
-      { name: '문태오', role: '멤버', meta: '최근 3경기', status: '활동중', visibility: '비공개' },
-    ],
+    membersList: [],
   },
 };
 

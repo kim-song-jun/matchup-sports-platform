@@ -4,6 +4,11 @@
 
 ### 재개 커서 — 2026-09-13 AWS 재인증 이후
 
+- **18:37 KST #1183 dev 머지:** head ecdf44da의 GitHub CI `34749562550` Gates/API/Web SUCCESS, Copilot exact-head review `5190325693` 4/4 files·0 comments 및 Sol source 검토를 확인했다. merge SHA `2140a04893806fffa0c503cce85fe25cd0475dc1`; matching dev CI `34749865651`, Alpha `34749865636` 실행 중이다. 공유 local dev HEAD/index/WIP는 유지하고 fetch만 했다. 실제 최초 migration transition은 72405a에 남아 있으므로 readback은 deployed=2140a, migration=72405a로 분리한 검토된 collector를 사용한다. 로컬 테스트 prerequisite 실패는 계속 미검증 한계이며, 새 Alpha seed/API 복구·Ego 흐름 PASS를 아직 주장하지 않는다.
+
+- **seed 복구 PR #1183 진행:** head `ecdf44da96f2c5ae8524e9c0336c372f811da3d9`, base dev, GitHub CI `34749562550` 실행 중이다. source/test/Changeset/이 문서만 private index로 커밋했고 로컬 dev HEAD/index는 유지했다. 로컬 M8 선행조건 실패는 PR에 명시했으며 통과로 표기하지 않았다. Copilot 요청 CLI는 응답 JSON 파싱 오류를 냈으나 별도 Copilot workflow `34749576823` 생성은 확인했다; 리뷰 완료 자체는 미확인이다. 현재 #1181은 복구 뒤 머지 대기다.
+- **UI 후보 독립 검토 현황:** 팀매치 빈 상태 후보는 immutable dev72405a 대비 좁은 guard/error/empty CTA 수정으로 Sol source PASS. 처음 dirty WIP와 비교해 보고한 regression은 철회됐다. 후보 파일을 공유 WIP에 통째로 덮어쓰지 않는다. 테스트는 링크 표시만 증명하며 invalid selection/error retry 실제 client 검증은 추가 필요하다. 이벤트 허브 1차 후보는 URL이 mount 시에만 동기화되고 상세 종목 span이 목록 badge와 계속 달라 Sol BLOCK; Luna가 route-aware 동기화와 상세 sportBadge를 보완 중이다. 팀 상세 전체 후보도 병렬 작업 중이다.
+
 - **팀 상세 전체 UI/UX 추가 요청:** 프로필 카드·주요 멤버·열린 매치·전적·기본 정보 등 팀 상세의 섹션 전체를 하나의 화면으로 점검·개선한다. 정보 위계, 이미지/아바타와 이름·역할, 밀도, 버튼 위치·터치 영역, 정렬·간격을 포함한다. Luna 구현과 Sol 독립 조사/검토를 병렬 배정했다. 완료 증거는 GitHub PR CI와 Alpha Ego 390/768/1440 실제 화면·동선·console/network이며, 현재는 후보 작업 단계다. 이벤트 허브는 다른 Luna가 badge geometry/heading/filter URL/error의 코드상 결함을 담당하고 존재하지 않는 리그 taxonomy는 임의 생성하지 않는다. Alpha seed 복구 PR은 root가 병행한다.
 
 - **팀 상세 간격 — 사용자 첨부 화면:** ‘이 팀의 열린 매치’ 빈 카드와 ‘팀 전적’ 카드가 수직 간격 없이 붙고, 섹션 제목과 카드 외곽 왼쪽 기준선이 다르게 보인다. ‘팀 기본 정보’까지의 섹션 여백을 포함해 카드 사이 간격·콘텐츠 정렬·섹션 리듬을 점검한다. screenshot `codex-clipboard-008d02ac-2b77-4266-b2b1-729e13099d48.png` 관찰이며 실제 viewport/route 실측은 아직 없다. Luna의 기존 팀매치 수정 뒤 독립 범위로 조사·수정하고 Sol 및 Alpha Ego에서 동일 viewport를 확인한다.

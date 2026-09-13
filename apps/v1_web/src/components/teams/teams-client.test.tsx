@@ -3,10 +3,11 @@ import type { ReactElement, ReactNode } from 'react';
 import { fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
+import type { V1AuthMe } from '@/types/api';
 import { TeamDetailPageClient, TeamMembersPageClient } from './teams-client';
 
 const teamApiMocks = vi.hoisted(() => ({
-  useV1AuthMe: vi.fn(() => ({ data: undefined })),
+  useV1AuthMe: vi.fn((): { data: V1AuthMe | undefined } => ({ data: undefined })),
   useV1TeamDetail: vi.fn(),
   useV1TeamJoinEligibility: vi.fn(),
   useV1CreateTeamJoinApplication: vi.fn(),
@@ -635,7 +636,7 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
 
   it('hydrated authenticated user keeps eligible and denied server decisions', () => {
     const detail = seededDetail();
-    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1', email: null, onboardingStatus: 'complete' }, profile: { displayName: '테스트 사용자' } } });
     teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, disabledReason: null, canRequestJoin: true } }, isError: false, isPlaceholderData: false });
     teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: true, joinState: 'none', message: '가입 신청할 수 있어요.' }, isError: false });
 
@@ -647,7 +648,7 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
 
   it('hydrated authenticated user keeps an ineligible server decision disabled', () => {
     const detail = seededDetail();
-    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1', email: null, onboardingStatus: 'complete' }, profile: { displayName: '테스트 사용자' } } });
     teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, disabledReason: null, canRequestJoin: true } }, isError: false, isPlaceholderData: false });
     teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: { eligible: false, joinState: 'none', message: '가입이 마감된 팀이에요.' }, isError: false });
 
@@ -660,7 +661,7 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
   it('authenticated eligibility errors do not invoke the join mutation', () => {
     const detail = seededDetail();
     const joinMutateAsync = vi.fn();
-    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1' } } });
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'user-1', email: null, onboardingStatus: 'complete' }, profile: { displayName: '테스트 사용자' } } });
     teamApiMocks.useV1TeamDetail.mockReturnValue({ data: { ...detail, viewer: { ...detail.viewer, disabledReason: null, canRequestJoin: true } }, isError: false, isPlaceholderData: false });
     teamApiMocks.useV1TeamJoinEligibility.mockReturnValue({ data: undefined, isError: true, error: new Error('temporary failure') });
     teamApiMocks.useV1CreateTeamJoinApplication.mockReturnValue({ mutateAsync: joinMutateAsync, isPending: false });

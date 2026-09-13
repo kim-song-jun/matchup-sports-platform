@@ -31,6 +31,50 @@ describe('getV1DevAuthHeaders', () => {
 });
 
 describe('v1Api error reporting', () => {
+  it('does not report the expected unauthenticated guest /auth/me probe', async () => {
+    const reportSpy = vi.spyOn(clientErrorReporter, 'reportClientError').mockImplementation(() => {});
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({
+          status: 'error',
+          statusCode: 401,
+          code: 'UNAUTHENTICATED',
+          message: 'V1 authentication is required',
+          timestamp: new Date().toISOString(),
+        }),
+      }),
+    );
+
+    await expect(v1Get('/auth/me')).rejects.toThrow('V1 authentication is required');
+
+    expect(reportSpy).not.toHaveBeenCalled();
+  });
+
+  it('still reports a real unauthenticated API failure outside the auth probe', async () => {
+    const reportSpy = vi.spyOn(clientErrorReporter, 'reportClientError').mockImplementation(() => {});
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({
+          status: 'error',
+          statusCode: 401,
+          code: 'UNAUTHENTICATED',
+          message: 'V1 authentication is required',
+          timestamp: new Date().toISOString(),
+        }),
+      }),
+    );
+
+    await expect(v1Get('/tournaments/public-1')).rejects.toThrow('V1 authentication is required');
+
+    expect(reportSpy).toHaveBeenCalledWith(expect.objectContaining({ level: 'warn' }));
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();

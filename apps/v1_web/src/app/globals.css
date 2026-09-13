@@ -9242,6 +9242,14 @@ html[data-teameet-native-app='android'] .tm-search-error-toast {
   padding-right: 0;
 }
 
+/* Desktop detail headings share the main-column edge with the member heading and cards. */
+@media (min-width: 1024px) {
+  .tm-team-detail-desktop-main > .tm-section-title {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
 .tm-team-detail-desktop-main > .tm-team-detail-record-card {
   margin-top: 24px;
 }

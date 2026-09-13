@@ -50,7 +50,7 @@ run_migrations(){ local phase="$1"; (
   copy(){ cp -R "$SOURCE_DIR/apps/v1_api/prisma/migrations/$1" "$tmp/migrations/$1"; }
   while IFS= read -r name; do [[ "$name" < "${M1[0]}" ]] && copy "$name"; done < <(find "$SOURCE_DIR/apps/v1_api/prisma/migrations" -mindepth 1 -maxdepth 1 -type d -exec basename '{}' \; | LC_ALL=C sort)
   for name in "${M1[@]}"; do copy "$name"; done
-  case "$phase" in pre) copy "$M10";; post) copy "$M8"; copy "$M9"; copy "$M10";; *) fail 'unknown migration phase';; esac
+  case "$phase" in pre) copy "$M8"; copy "$M10";; post) copy "$M8"; copy "$M9"; copy "$M10";; *) fail 'unknown migration phase';; esac
   c="$("${compose[@]}" run -d --no-deps --entrypoint sh v1_api -c 'while :; do sleep 3600; done')"
   docker cp "$tmp/." "$c:/tmp/task168"; docker exec -u 0 "$c" sh -ceu 'chown -R app:app /tmp/task168'
   docker exec -u app "$c" sh -ceu 'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy --schema /tmp/task168/schema.prisma'
@@ -71,6 +71,16 @@ assert_preflight_failed_report(){
   local path="$1";
   jq -e '.status=="FAILED" and .error.name=="TournamentTeamMatchFullCutoverError" and .error.code=="PREFLIGHT_BLOCKED" and (.preflightReport|type=="object") and (.preflightReport.status=="BLOCKED" or .preflightReport.status=="UNRESOLVED")' "$path" >/dev/null || fail 'resume requires an exact FAILED/PREFLIGHT_BLOCKED report';
   [[ ! -e "$(dirname "$(dirname "$path")")/transition.json" ]] || fail 'preflight failure must not have a transition receipt';
+}
+assert_committed_post_resume9(){
+  [[ ! -e "$transition" ]] || fail '9-row post-migration resume must not have a transition receipt';
+  [[ -s "$report" ]] || fail '9-row post-migration resume report is missing';
+  jq -e '.status=="COMPLETED" or .status=="COMPLETED_WITH_GATE_RELEASE_ERROR"' "$report" >/dev/null || fail '9-row post-migration resume has unsupported report status';
+  jq -e '.result.verification.remainingLegacyGameLinks==0 and .result.verification.remainingLegacyStaffScopes==0 and .result.verification.remainingLegacyAuditScopes==0' "$report" >/dev/null || fail '9-row post-migration report has legacy links';
+  receipt "$quiesce" quiesce "$API_IMAGE"; receipt "$backup" backup "$API_IMAGE";
+  jq -e --arg path "$backup_file" --arg hash "$(sha "$backup_file")" '.backupPath==$path and .backupSha256==$hash and (.backupBytes|type=="number" and .>0)' "$backup" >/dev/null || fail '9-row post-migration backup is not bound';
+  [[ -s "$backup_file" && "$(wc -c < "$backup_file" | tr -d ' ')" == "$(jq -er '.backupBytes' "$backup")" ]] || fail '9-row post-migration backup bytes are missing or changed';
+  assert_actual_cutover_seals;
 }
 assert_prior_failed_attempt(){
   local report_path="$1" prior_dir="$2" release="$3" backup_path quiesce_image backup_image;
@@ -153,11 +163,31 @@ elif ledger_matches "$initial_rows" "${M1[@]}" "$M10"; then
   else
     initial_state=committed_resume
   fi
+elif ledger_matches "$initial_rows" "${M1[@]}" "$M8" "$M10"; then
+  if [[ -s "$report" && -s "$quiesce" && -s "$backup" && ! -e "$transition" ]] && { jq -e '.status=="COMPLETED" or .status=="COMPLETED_WITH_GATE_RELEASE_ERROR"' "$report" >/dev/null 2>&1; }; then
+    assert_committed_post_resume9
+    [[ "$(jq -er '.status' "$report")" != COMPLETED_WITH_GATE_RELEASE_ERROR ]] || bind_resume_evidence
+    initial_state=committed_post_resume9
+  elif jq -e '.database.task168.recoveryFrom != null' "$MANIFEST" >/dev/null 2>&1; then
+    select_pinned_preflight_failed_attempt
+    prior_failed_report="$PINNED_PREFLIGHT_REPORT"
+    prior_failed_report_sha="$(sha "$prior_failed_report")"
+    prior_failed_release="$(basename "$(dirname "$(dirname "$prior_failed_report")")")"
+    [[ "$prior_failed_release" != "$RELEASE_SHA" ]] || fail 'preflight retry must use a new release SHA'
+    prior_attempt_fields="$(jq -cn --arg path "$prior_failed_report" --arg digest "$prior_failed_report_sha" --arg release "$prior_failed_release" '{priorFailedReport:$path,priorFailedReportSha256:$digest,priorFailedReleaseSha:$release}')"
+    prior_attempt_fields=",${prior_attempt_fields:1:${#prior_attempt_fields}-2}"
+    initial_state=preflight_failed_resume
+  else
+    fail '9-row Task168 ledger requires pinned failed-preflight evidence'
+  fi
 elif ledger_matches "$initial_rows" "${M1[@]}" "$M8" "$M9" "$M10"; then initial_state=complete
 else fail 'Task168 ledger is unsupported or incomplete'; fi
 if [[ "$initial_state" == complete ]]; then assert_existing_transition; assert_actual_cutover_seals; exit 0; fi
 if [[ "$initial_state" == committed_resume ]]; then
   assert_legacy_physical_schema; assert_actual_cutover_seals; assert_committed_report; bind_resume_evidence; finalize_committed_cutover; exit 0
+fi
+if [[ "$initial_state" == committed_post_resume9 ]]; then
+  finalize_committed_cutover; exit 0
 fi
 verify_images
 mapfile -t old_api_candidates < <(docker ps -aq --filter label=com.docker.compose.project=deploy --filter label=com.docker.compose.service=v1_api --filter label=com.docker.compose.oneoff=False)
@@ -178,7 +208,7 @@ receipt "$quiesce" quiesce "$API_IMAGE"; receipt "$backup" backup "$API_IMAGE"
 validate_known_records_profile_migration_failure
 validate_known_played_at_migration_failure
 apply_validated_migration_recoveries
-run_migrations pre; rows="$(ledger_rows)"; assert_exact_ledger "$rows" "${M1[@]}" "$M10"
+run_migrations pre; rows="$(ledger_rows)"; assert_exact_ledger "$rows" "${M1[@]}" "$M8" "$M10"
 if with_compose_api_database_url; then
   jq -e '.status=="COMPLETED" and .result.verification.remainingLegacyGameLinks==0 and .result.verification.remainingLegacyStaffScopes==0 and .result.verification.remainingLegacyAuditScopes==0' "$report" >/dev/null || fail 'archived cutover did not produce zero-legacy completed report'
 else

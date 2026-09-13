@@ -2,6 +2,29 @@
 
 ## 최신 판정 — dev 머지 완료, Alpha 이관 사전 검사 실패·API 502
 
+### 재개 커서 — 2026-09-13 AWS 재인증 이후
+
+이 절과 아래 기존 요구사항·검증 표가 단일 핸드오프다. 별도 보고 MD를 만들지 않는다. 사용자 최신 결정은 Alpha 데이터 삭제 허용, dev 머지·Alpha 배포 계속 진행이며 main/production 승격 권한은 없다.
+
+- **현재 원격:** dev `0d76e6b2d077e505eb746173154f9d2df5128af4`, PR #1178 머지 완료, 열린 dev PR 0개. 마지막 Alpha 배포 `34704065353`은 실패 상태다. 새 코드 배포는 아직 없다.
+- **현재 런타임:** AWS 지정 Alpha 계정 인증 성공. 이전 502와 달리 현재 구 API/worker가 다시 running이며 `/api/v1/health`는 DB 정상 응답한다. 삭제 전에 현재 컨테이너를 다시 고정하고 정지·새 백업을 수행해야 한다. 이전 quiesce 영수증만으로 현재 정지를 주장하지 않는다.
+- **확정 DB 증거:** `output/qa/task168/alpha-catalog-read-result-20260913-r3.json`(SSM `72720509-b654-4dfc-ae50-f4f56f52e12c`)은 M1–7+M10 8개 적용, 미완료 이관 상태를 보여준다. FK는 ON UPDATE CASCADE와 ON DELETE RESTRICT/CASCADE/SET NULL이 섞여 있다. 둘을 혼동하지 않는다. `alpha-guards-read-result-20260913.json`은 실제 3개 삭제 방지 함수와 컬럼 정의다.
+- **삭제 범위 확정:** `alpha-scope-read-result-20260913.json`(SSM `56de67eb-f7fa-4fc1-91ec-991d52242cc9`)에서 차단 대진65 / 전체375, 연결 경기25(ENDED15·PAUSED3·LIVE7), 동일 ID canonical 매치0, lineage0, 정상 대진으로 이어지는 부모/진출 연결0을 확인했다. 정상310개·사용자·팀·신청 명부를 보존할 계획이며 실제 삭제는 아직 없다.
+- **구현·검토 담당:** Luna `/root/benchmark_cta_overlap_fix`가 `stage-a-preflight-resume-fix-20260913/`에 재진입 수정 후보를 작성 중이다. 초기 패치는 보고서에 없는 releaseSha 사용·오류 삼킴·실행 불가능한 diff로 Sol이 거절했다. 실제 full-file 후보와 명시적 이전 실패 시도 바인딩이 필요하다. Sol `/root/alpha_recovery_review`는 고위험 삭제의 실제 FK 순서·트리거 복원을 포함한 SQL을 `alpha-cleanup-sol-20260913/`에 준비한다. Luna `/root/alpha_blocker_cleanup`의 `alpha-blocker-cleanup-20260913/`는 진단 준비물이며 plan JSON을 실행 가능한 SSM parameters로 오인하지 않는다.
+- **실행 도구:** `run-alpha-ssm-20260913.cjs send|poll`은 매번 AWS 계정을 검사하고 지정 Alpha 인스턴스만 사용하며, 검토한 task-owned parameters를 실행하고 결과 JSON을 독점 생성한다. 입력 SQL·셸은 실행 전에 root가 검토한다. `.env*`를 읽거나 비밀번호를 출력하지 않는다. PostgreSQL은 컨테이너의 POSTGRES_USER/POSTGRES_DB를 사용하며 기본 teameet_v1 계정은 실제로 없어 첫 조회가 실패했다. current_user() 문법 오류도 current_user로 수정했고 r3 조회는 성공했다.
+
+**전체 남은 작업 (모두 미완료):**
+
+1. 재진입 코드의 실제 실행 파일·manifest 입력 연결 완성 → 독립 리뷰 → 좁은 회귀 증거 → 정확한 commit/PR CI·Copilot → dev 머지.
+2. 65개 대진·25개 경기와 종속 기록만 대상으로 삭제 SQL 검토. 새 백업·현재 writer 정지·정확한 DB/ledger/ID 검증 후 롤백 드라이런, 보존 범위·트리거 복원 검증, 승인된 실제 삭제. 백업과 과거 실패 보고서는 보존.
+3. 수정된 배포 경로로 Stage A 이관 → M8/M9 → 인증된 transition 영수증 → canonical API/worker 시작. 공개 release SHA·이미지·DB 링크0·보존310개 확인. 배포 성공과 전체 QA 성공은 별개다.
+4. 사용자 최신 삭제 허용에 맞춰 final DROP 후보를 별도 검증·머지·배포한다. 현재 runner/manifest는 Stage A 전용이므로 M11을 임의로 추가 실행하지 않는다. 정상 canonical 중간 버전·보존 불변식·지원되는 최종 배포 경로를 먼저 확보한다.
+5. 최종 Alpha에서 역할별30 + 경계12 = **42개 전부 실행**. API 저장·재조회, 동시 정정, 감사 로그 실패 트랜잭션, 권한·오류, 결과→공개 순위→팀·개인 기록을 확인한다. 현재 새 Alpha 실행0/42이며 과거 로컬 증거를 대신 세지 않는다.
+6. Ego는 서브에이전트가 담당한다. 390/768/1440에서 before/after, 배경·글자·버튼·간격·배치·전체 스크롤·고정 CTA·포커스·애니메이션/딜레이·console/network를 검수한다. raw 근거와 판정을 이 문서에 연결하고 최종 메시지에도 핵심 화면을 표시한다.
+7. 중간마다 dev PR 목록과 작업 중복 확인. 공유 작업트리 FF가 다른 WIP 때문에 거절된 상태이므로 강제 pull/stash/reset/switch 금지. private-index commit 경로를 유지하고 소유 자원만 정리한다. 각 단계 완료 후 이 커서와 기존 검증 표를 갱신한다.
+
+- **2026-09-13 사용자 재개 / 현재 상태 갱신:** 사용자가 AWS 로그인 완료와 dev 머지·Alpha 배포, Alpha 데이터 즉시 삭제를 승인했다. AWS STS 성공 및 지정 Alpha 계정 일치를 확인했다. 열린 dev PR은 0개이고 원격 dev는 여전히 `0d76e6b2d077e505eb746173154f9d2df5128af4`다. 새 배포 run은 없지만 현재 구 API/worker가 다시 실행 중이며 health도 DB 정상 응답한다. 아래 502·정지 기록은 이전 시점의 사실이다. SSM 실제 보고서 `alpha-incident-live-20260913.json`으로 대진 375개 중 READY310 / BLOCKED50 / UNRESOLVED15를 확인했다. 차단 원인은 경기·설정 누락40, LIVE/PAUSED10, 과거 결과 비교 불가15다. 삭제 후보는 이 65개와 검증한 종속 기록으로 제한하며 정상310개·계정·팀은 보존한다. 조회 출력 한도 초과는 간결한 projection으로 해결했다. 기본 DB 계정명 조회 실패는 실제 컨테이너 설정 계정을 사용하는 조회로 수정 중이다. Sol이 `M1–7+M10` ledger를 무조건 committed_resume으로 처리하는 재진입 결함을 발견했고 Luna 수정안·독립 검토를 진행한다. 데이터 삭제·새 배포·Alpha42 검증은 아직 실행하지 않았다.
+
 - **인증 대기 중 진단 명령 검토:** Alpha health 재조회도 502이며 AWS 인증은 여전히 만료 상태다. 보관된 v6 preflight 소스(SHA `f5c7673da8b5a304f61352cb5a77883e8010e514b41091aeee00137426004499`)와 대조해 r2 collector가 중첩 `.source`를 읽지 않아 경기 정보가 null로 출력되는 오류를 수정했다. `output/qa/task168/alpha-host-read-candidate-20260913/incident-host-read-r3.sh` 및 `incident-host-read-parameters-r3.json`을 사용한다. oneoff 컨테이너를 제외하고 복수 대상이면 중단한다. 문자열 생성 중 발생한 셸 문법 오류는 literal replacement callback으로 수정하여 `bash -n` exit 0, script/parameters 일치, 중첩 gameId 추출 검사를 확인했다. 최종 SHA는 각각 `b3052c4c466d563aec7065da09479ab4d75d1bf5cf313b20a5284bb97134b5e3`, `a1ff0072df31e2d5ef8f414a3802ce6af43b4e628626d0b9e547afe7a7bfebaf`다. 현재 소스에서 찾지 못한 초기 검색은 보관 소스 조회로 해결했다. 호스트 진단 실행·실제 차단 사유 확인·복구·신규 Alpha 42개 검증은 여전히 미실행이다.
 
 - **2026-09-13 01:20KST Alpha 배포 실패 / 복구 입력 대기:** dev CI `34704065354`는전체PASS였고Alpha run `34704065353`도API/Web/이관도구이미지·ECRcritical gate·immutablemanifest생성까지성공했다. 서버에서백업후M1–7+M10확장migration8개를적용해이단계165개migration up-to-date까지진행했으나고정이관CLI가`TournamentTeamMatchFullCutoverError:PREFLIGHT_BLOCKED`로exit1했다. 소스상READY가아닌BLOCKED/UNRESOLVED검사결과에대한오류이며backfill/source cutover전transaction에서발생하므로fullcutover는미커밋이다. **확장DDL은이미적용됐으며DB전체무변경을뜻하지않는다.** 보호정책대로구API/worker는중지된채이며공개`/api/v1/health`를직접조회해 **502**를확인했다. 공개버전확인step은SKIP,새Alpha **0/42** 유지다. 원인확인전재배포·재시작·롤백은하지않았다.

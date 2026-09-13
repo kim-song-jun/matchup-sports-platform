@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# macOS bsdtar embeds AppleDouble ("._*") resource-fork sidecar members
+# in every directory it archives unless this is set; bsdtar's own `-t`
+# listing hides them again on read, but the new member-set check in
+# task168-final-image-preflight.sh parses the raw archive with Python's
+# tarfile module and correctly sees them, so left unset every fixture
+# built below would trip 'unauthenticated member' on macOS only.
+export COPYFILE_DISABLE=1
+
 # Contract tests for the T3 source-archive-attestation consumer logic added to
 # scripts/release/task168-final-image-preflight.sh. Exercises only the static
 # checks that run before any Docker resource is created (the first `docker`
@@ -249,7 +257,7 @@ for i in "${!ARGS[@]}"; do
     --source-archive-attestation) ARGS[$((i+1))]="$SYMLINK_DIR/source.tar.gz.attestation.json" ;;
   esac
 done
-run_expect_fail 'source archive contains a symlink member' "${ARGS[@]}"
+run_expect_fail 'source archive contains a symlink or hardlink member' "${ARGS[@]}"
 pass 'rejects an archive that carries a symlink member'
 
 # ---- 7. prisma member set differs from the authenticated inventory -------
@@ -380,5 +388,232 @@ for i in "${!ARGS[@]}"; do
 done
 run_expect_fail 'source archive input differs from authenticated snapshot' "${ARGS[@]}"
 pass 'rejects an archive whose M1 migration bytes differ from the authenticated files[] entry even though the manifest and sidecar are internally self-consistent'
+
+
+# ---- 10. non-canonical spellings of an in-scope migration path bypass a
+#          check keyed on fixed "obviously bad" shapes only if the check
+#          does not first demand the member's own canonical form -----------
+for spelling in dotslash dblslash dotmid; do
+  case "$spelling" in
+    dotslash) evil_name="./apps/v1_api/prisma/migrations/20260912000000_${spelling}/migration.sql" ;;
+    dblslash) evil_name="apps//v1_api/prisma/migrations/20260912000000_${spelling}/migration.sql" ;;
+    dotmid)   evil_name="apps/./v1_api/prisma/migrations/20260912000000_${spelling}/migration.sql" ;;
+  esac
+  NONCANON_DIR="$TMP/noncanon-$spelling"
+  mkdir -p "$NONCANON_DIR/stage"
+  cp -R "$FIXTURE/stage/apps" "$NONCANON_DIR/stage/apps"
+  cp "$FIXTURE/stage/INPUT-MANIFEST.json" "$NONCANON_DIR/stage/INPUT-MANIFEST.json"
+  python3 - "$NONCANON_DIR/stage" "$NONCANON_DIR/source.tar.gz" "$evil_name" <<'PY'
+import io, os, sys, tarfile
+stage, out, evil_name = sys.argv[1], sys.argv[2], sys.argv[3]
+with tarfile.open(out, 'w:gz') as tar:
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json')
+    tar.add(os.path.join(stage, 'apps'), arcname='apps')
+    data = b'-- evil\nSELECT 1;\n'
+    info = tarfile.TarInfo(name=evil_name)
+    info.size = len(data)
+    tar.addfile(info, io.BytesIO(data))
+PY
+  noncanon_sha="$(sha "$NONCANON_DIR/source.tar.gz")"
+  noncanon_bytes="$(wc -c < "$NONCANON_DIR/source.tar.gz" | tr -d ' ')"
+  jq --arg h "$noncanon_sha" --argjson b "$noncanon_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+    "$FIXTURE/source.tar.gz.attestation.json" > "$NONCANON_DIR/source.tar.gz.attestation.json"
+  common_args
+  for i in "${!ARGS[@]}"; do
+    case "${ARGS[$i]}" in
+      --source-archive) ARGS[$((i+1))]="$NONCANON_DIR/source.tar.gz" ;;
+      --source-sha256) ARGS[$((i+1))]="$noncanon_sha" ;;
+      --source-archive-attestation) ARGS[$((i+1))]="$NONCANON_DIR/source.tar.gz.attestation.json" ;;
+    esac
+  done
+  run_expect_fail 'source archive contains a non-canonical path' "${ARGS[@]}"
+  pass "rejects a non-canonical ($spelling) spelling of an extra migration path that a fixed-shape check would miss"
+done
+
+# ---- 11. a traversal (../) member whose name contains a space is still
+#          rejected -- a check that reads the member name via `awk '{print
+#          $NF}'` on `tar -tv` text output keeps only the text after the
+#          last space and silently drops the rest of the path ---------------
+SPACE_TRAVERSAL_DIR="$TMP/space-traversal"
+mkdir -p "$SPACE_TRAVERSAL_DIR"
+python3 - "$FIXTURE/stage" "$SPACE_TRAVERSAL_DIR/source.tar.gz" <<'PY'
+import io, os, sys, tarfile
+stage, out = sys.argv[1], sys.argv[2]
+with tarfile.open(out, 'w:gz') as tar:
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json')
+    tar.add(os.path.join(stage, 'apps'), arcname='apps')
+    data = b'evil\n'
+    info = tarfile.TarInfo(name='../evil with space.txt')
+    info.size = len(data)
+    tar.addfile(info, io.BytesIO(data))
+PY
+space_traversal_sha="$(sha "$SPACE_TRAVERSAL_DIR/source.tar.gz")"
+space_traversal_bytes="$(wc -c < "$SPACE_TRAVERSAL_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$space_traversal_sha" --argjson b "$space_traversal_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$SPACE_TRAVERSAL_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$SPACE_TRAVERSAL_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$space_traversal_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$SPACE_TRAVERSAL_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains an unsafe path' "${ARGS[@]}"
+pass 'rejects a ../ traversal member whose name contains a space'
+
+# ---- 12. sidecar sourceCommit differs from --release-sha -------------------
+BAD_SIDECAR_COMMIT="$TMP/bad-sidecar-commit.json"
+jq '.sourceCommit = "cccccccccccccccccccccccccccccccccccccccc"' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$BAD_SIDECAR_COMMIT"
+common_args
+for i in "${!ARGS[@]}"; do
+  if [[ "${ARGS[$i]}" == "--source-archive-attestation" ]]; then ARGS[$((i+1))]="$BAD_SIDECAR_COMMIT"; fi
+done
+run_expect_fail 'source archive attestation does not authenticate this archive' "${ARGS[@]}"
+pass 'rejects a sidecar whose sourceCommit does not match --release-sha'
+
+# ---- 13. sidecar archiveBytes differs from the actual archive size --------
+BAD_SIDECAR_BYTES="$TMP/bad-sidecar-bytes.json"
+jq '.archiveBytes = (.archiveBytes + 1)' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$BAD_SIDECAR_BYTES"
+common_args
+for i in "${!ARGS[@]}"; do
+  if [[ "${ARGS[$i]}" == "--source-archive-attestation" ]]; then ARGS[$((i+1))]="$BAD_SIDECAR_BYTES"; fi
+done
+run_expect_fail 'source archive attestation does not authenticate this archive' "${ARGS[@]}"
+pass 'rejects a sidecar whose archiveBytes does not match the actual archive size'
+
+# ---- 14. the archive-embedded manifest's own sourceCommit differs from
+#          --release-sha, while the sidecar that vouches for that same
+#          archive is (re-)signed correctly against --release-sha -- this
+#          isolates the INPUT_SNAPSHOT-side binding from the sidecar-side
+#          binding exercised in (12) ----------------------------------------
+WRONG_EMBEDDED_COMMIT_DIR="$TMP/wrong-embedded-commit"
+mkdir -p "$WRONG_EMBEDDED_COMMIT_DIR/stage"
+cp -R "$FIXTURE/stage/apps" "$WRONG_EMBEDDED_COMMIT_DIR/stage/apps"
+jq '.sourceCommit = "dddddddddddddddddddddddddddddddddddddddd"' \
+  "$FIXTURE/stage/INPUT-MANIFEST.json" > "$WRONG_EMBEDDED_COMMIT_DIR/stage/INPUT-MANIFEST.json"
+( cd "$WRONG_EMBEDDED_COMMIT_DIR/stage" && tar -czf "$WRONG_EMBEDDED_COMMIT_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+wrong_commit_manifest_sha="$(sha "$WRONG_EMBEDDED_COMMIT_DIR/stage/INPUT-MANIFEST.json")"
+wrong_commit_archive_sha="$(sha "$WRONG_EMBEDDED_COMMIT_DIR/source.tar.gz")"
+wrong_commit_archive_bytes="$(wc -c < "$WRONG_EMBEDDED_COMMIT_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg commit "$RELEASE_SHA" --arg h "$wrong_commit_archive_sha" --argjson b "$wrong_commit_archive_bytes" --arg m "$wrong_commit_manifest_sha" \
+  '.sourceCommit=$commit | .archiveSha256=$h | .archiveBytes=$b | .inputManifestSha256=$m | .inputSnapshotSha256=$m' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$WRONG_EMBEDDED_COMMIT_DIR/source.tar.gz.attestation.json"
+cp "$WRONG_EMBEDDED_COMMIT_DIR/stage/INPUT-MANIFEST.json" "$WRONG_EMBEDDED_COMMIT_DIR/input-snapshot.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$WRONG_EMBEDDED_COMMIT_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$wrong_commit_archive_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$WRONG_EMBEDDED_COMMIT_DIR/source.tar.gz.attestation.json" ;;
+    --input-snapshot) ARGS[$((i+1))]="$WRONG_EMBEDDED_COMMIT_DIR/input-snapshot.json" ;;
+    --input-snapshot-sha256) ARGS[$((i+1))]="$wrong_commit_manifest_sha" ;;
+  esac
+done
+run_expect_fail 'input snapshot does not authenticate the prepared Stage B source/archive contract' "${ARGS[@]}"
+pass 'rejects an archive-embedded manifest whose own sourceCommit does not match --release-sha, even though its sidecar is correctly (re-)signed'
+
+# ---- 15. archiveLayout.pathPrefix is not empty -----------------------------
+NONEMPTY_PREFIX_DIR="$TMP/nonempty-prefix"
+mkdir -p "$NONEMPTY_PREFIX_DIR/stage"
+cp -R "$FIXTURE/stage/apps" "$NONEMPTY_PREFIX_DIR/stage/apps"
+jq '.archiveLayout.pathPrefix = "bundle/"' \
+  "$FIXTURE/stage/INPUT-MANIFEST.json" > "$NONEMPTY_PREFIX_DIR/stage/INPUT-MANIFEST.json"
+( cd "$NONEMPTY_PREFIX_DIR/stage" && tar -czf "$NONEMPTY_PREFIX_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+nonempty_prefix_manifest_sha="$(sha "$NONEMPTY_PREFIX_DIR/stage/INPUT-MANIFEST.json")"
+nonempty_prefix_archive_sha="$(sha "$NONEMPTY_PREFIX_DIR/source.tar.gz")"
+nonempty_prefix_archive_bytes="$(wc -c < "$NONEMPTY_PREFIX_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$nonempty_prefix_archive_sha" --argjson b "$nonempty_prefix_archive_bytes" --arg m "$nonempty_prefix_manifest_sha" \
+  '.archiveSha256=$h | .archiveBytes=$b | .inputManifestSha256=$m | .inputSnapshotSha256=$m' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$NONEMPTY_PREFIX_DIR/source.tar.gz.attestation.json"
+cp "$NONEMPTY_PREFIX_DIR/stage/INPUT-MANIFEST.json" "$NONEMPTY_PREFIX_DIR/input-snapshot.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$NONEMPTY_PREFIX_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$nonempty_prefix_archive_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$NONEMPTY_PREFIX_DIR/source.tar.gz.attestation.json" ;;
+    --input-snapshot) ARGS[$((i+1))]="$NONEMPTY_PREFIX_DIR/input-snapshot.json" ;;
+    --input-snapshot-sha256) ARGS[$((i+1))]="$nonempty_prefix_manifest_sha" ;;
+  esac
+done
+run_expect_fail 'input snapshot does not declare a repository-root (empty pathPrefix) archive layout' "${ARGS[@]}"
+pass 'rejects an input snapshot that declares a non-empty archiveLayout.pathPrefix'
+
+
+# ---- 16-20. RESOLVED_ATTEMPTS_JSON canonical-rolled-back-row validation ---
+# Synthetic fixtures only (no alpha/production ledger data): each case
+# supplies one malformed resolved-migration-attempt row and expects the
+# static (pre-Docker) canonical-row check to reject it before any other
+# check further down the script can mask the failure.
+RESOLVED_GOOD_ROW='{"migration_name":"20260908130000_m1","checksum":"'"$(printf x | sha256sum | awk '{print $1}')"'","finished_at":null,"rolled_back_at":"2026-09-01T00:00:00Z"}'
+
+run_resolved_case() {
+  local desc="$1" row="$2"
+  local f="$TMP/resolved-bad-$RANDOM.json"
+  printf '[%s]\n' "$row" > "$f"
+  common_args
+  for i in "${!ARGS[@]}"; do
+    if [[ "${ARGS[$i]}" == "--resolved-migration-attempts-json" ]]; then ARGS[$((i+1))]="$f"; fi
+  done
+  run_expect_fail 'resolved migration attempt snapshot must contain canonical rolled-back rows' "${ARGS[@]}"
+  pass "$desc"
+}
+
+# 16. malformed migration_name (not <14-digit>_<slug>)
+run_resolved_case 'rejects a resolved-attempt row with a malformed migration_name' \
+  '{"migration_name":"not-a-migration","checksum":"'"$(printf x | sha256sum | awk '{print $1}')"'","finished_at":null,"rolled_back_at":"2026-09-01T00:00:00Z"}'
+
+# 17. malformed checksum (not 64 lowercase hex)
+run_resolved_case 'rejects a resolved-attempt row with a malformed checksum' \
+  '{"migration_name":"20260908130000_m1","checksum":"nothex","finished_at":null,"rolled_back_at":"2026-09-01T00:00:00Z"}'
+
+# 18. finished_at is not null (not actually an unresolved/rolled-back-only row)
+run_resolved_case 'rejects a resolved-attempt row whose finished_at is not null' \
+  '{"migration_name":"20260908130000_m1","checksum":"'"$(printf x | sha256sum | awk '{print $1}')"'","finished_at":"2026-09-01T00:00:00Z","rolled_back_at":"2026-09-01T00:00:00Z"}'
+
+# 19. rolled_back_at is null (not actually a resolved row)
+run_resolved_case 'rejects a resolved-attempt row whose rolled_back_at is null' \
+  '{"migration_name":"20260908130000_m1","checksum":"'"$(printf x | sha256sum | awk '{print $1}')"'","finished_at":null,"rolled_back_at":null}'
+
+# 20. two rows differing only in ordering must still canonicalize the same
+#     way regardless of input order (sanity: the sort_by comparison itself
+#     is exercised, not just single-row shape) -- supplying them already
+#     out of sort order must still be accepted (canonicalization, not order
+#     rejection) so this is a positive case guarding against an
+#     over-eager order check that would reject valid unsorted input.
+UNSORTED_ROWS='[{"migration_name":"20260911090000_retire_tournament_fixture_tables","checksum":"'"$(printf y | sha256sum | awk '{print $1}')"'","finished_at":null,"rolled_back_at":"2026-09-02T00:00:00Z"},'"$RESOLVED_GOOD_ROW"']'
+f="$TMP/resolved-unsorted.json"
+printf '%s\n' "$UNSORTED_ROWS" > "$f"
+common_args
+for i in "${!ARGS[@]}"; do
+  if [[ "${ARGS[$i]}" == "--resolved-migration-attempts-json" ]]; then ARGS[$((i+1))]="$f"; fi
+done
+run_expect_fail 'migration contract must contain exactly 11 hashed entries' "${ARGS[@]}"
+pass 'accepts two well-formed resolved-attempt rows supplied out of sort order (canonicalized before validation)'
+
+
+# ---- 21. MIGRATIONS_JSON entry with a null sha256 must not silently drop
+#          out of an array-filter check ([x|strings|test(...)]|all treats a
+#          non-string element as absent rather than failing) --------------
+NULL_SHA_MIGRATIONS="$TMP/null-sha-migrations.json"
+# Must be a full 11-entry array: a shorter array would already fail the
+# preceding length==11 check for an unrelated reason, making the null-sha256
+# case vacuous (proving nothing about the sha256 type check being tested).
+python3 -c "
+import json, hashlib
+names = ['20260908%02d0000_m%d' % (n, n) for n in range(1, 11)] + ['20260911090000_retire_tournament_fixture_tables']
+rows = [{'name': n, 'sha256': hashlib.sha256(n.encode()).hexdigest()} for n in names]
+rows[3]['sha256'] = None
+print(json.dumps(rows))
+" > "$NULL_SHA_MIGRATIONS"
+common_args
+for i in "${!ARGS[@]}"; do
+  if [[ "${ARGS[$i]}" == "--migrations-json" ]]; then ARGS[$((i+1))]="$NULL_SHA_MIGRATIONS"; fi
+done
+run_expect_fail 'migration contract must contain exactly 11 hashed entries' "${ARGS[@]}"
+pass 'rejects a Task 168 migration contract entry whose sha256 is null'
 
 echo 'ALL PREFLIGHT SIDECAR CONTRACT TESTS PASSED'

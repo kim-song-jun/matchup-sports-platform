@@ -100,20 +100,44 @@ ATTESTED_MANIFEST_SHA="$(jq -er '.inputManifestSha256' "$SOURCE_ARCHIVE_ATTESTAT
 # looks right: require its bytes to be exactly what the archive itself carries.
 [[ "$INPUT_SNAPSHOT_SHA" == "$ATTESTED_MANIFEST_SHA" ]] || fail 'supplied input snapshot is not the manifest embedded in the attested archive'
 
-# Archive member set: reject traversal, symlink members, and a bundle/ prefix
-# layout (this archive is repository-root, pathPrefix "").
+# Archive member set: reject traversal, symlink/hardlink members, and a
+# bundle/ prefix layout (this archive is repository-root, pathPrefix "").
+# A member is rejected unless its raw tar member name is already its own
+# posixpath.normpath(): matching a fixed set of "obviously bad" shapes (a
+# leading "./", a doubled "/", a "/./"/"/../" segment) is blind to any other
+# spelling of the same target path, which still lands at the canonical path
+# on extraction. Member metadata (type, name) is read directly with Python's
+# tarfile module rather than parsed from `tar -tv` text columns, which
+# silently truncates any member name containing whitespace via `awk '{print
+# $NF}'`.
 jq -e '.archiveLayout.pathPrefix==""' "$INPUT_SNAPSHOT" >/dev/null || fail 'input snapshot does not declare a repository-root (empty pathPrefix) archive layout'
-ARCHIVE_MEMBERS_LIST="$(mktemp "${TMPDIR:-/tmp}/task168-preflight-members.XXXXXX")"
-tar -tvf "$SOURCE_ARCHIVE" > "$ARCHIVE_MEMBERS_LIST" || fail 'source archive member listing failed'
-while IFS= read -r member_line; do
-  [[ "${member_line:0:1}" != l ]] || fail "source archive contains a symlink member: $member_line"
-  member_path="$(awk '{print $NF}' <<<"$member_line")"
-  case "$member_path" in
-    /*|../*|*/../*|*/..) fail "source archive contains an unsafe path: $member_path";;
-    bundle/*) fail "source archive uses a bundle/ prefix but declares pathPrefix=\"\": $member_path";;
-  esac
-done < "$ARCHIVE_MEMBERS_LIST"
-rm -f "$ARCHIVE_MEMBERS_LIST"
+ARCHIVE_REGULAR_MEMBERS="$(mktemp "${TMPDIR:-/tmp}/task168-preflight-members.XXXXXX")"
+python3 - "$SOURCE_ARCHIVE" > "$ARCHIVE_REGULAR_MEMBERS" <<'PY' || fail 'source archive member listing failed or contains a rejected path'
+import posixpath, sys, tarfile
+with tarfile.open(sys.argv[1], 'r:*') as tar:
+    for member in tar.getmembers():
+        name = member.name
+        check_name = name[:-1] if member.isdir() and name.endswith('/') else name
+        unsafe = (
+            check_name.startswith('/') or check_name in ('.', '..')
+            or check_name.startswith('../') or '/../' in check_name or check_name.endswith('/..')
+        )
+        if unsafe:
+            sys.stderr.write('source archive contains an unsafe path: %s\n' % name)
+            sys.exit(1)
+        if posixpath.normpath(check_name) != check_name:
+            sys.stderr.write('source archive contains a non-canonical path: %s\n' % name)
+            sys.exit(1)
+        if check_name == 'bundle' or check_name.startswith('bundle/'):
+            sys.stderr.write('source archive uses a bundle/ prefix but declares pathPrefix="": %s\n' % name)
+            sys.exit(1)
+        if member.issym() or member.islnk():
+            sys.stderr.write('source archive contains a symlink or hardlink member: %s\n' % name)
+            sys.exit(1)
+        if member.isdir():
+            continue
+        sys.stdout.buffer.write(check_name.encode('utf-8', 'surrogateescape') + b'\0')
+PY
 # Every member the archive carries under apps/v1_api/prisma/ must be either a
 # declared overlay file (files[]) or one of the same non-reviewed extras
 # package-task168-final-source.sh allows there (seed scripts, seed data, the
@@ -130,20 +154,15 @@ declare -A DECLARED_PRISMA_PATH_SET=()
 while IFS= read -r declared_path; do
   [[ -n "$declared_path" ]] && DECLARED_PRISMA_PATH_SET["$declared_path"]=1
 done < <(jq -r '.files[].path' "$INPUT_SNAPSHOT")
-# -E (POSIX ERE): the old BSD grep shipped on macOS does not support the
-# GNU BRE `\|` alternation extension used elsewhere in this file's producer
-# counterpart, and silently under-matches instead of erroring.
-# The `|| true` inside the group keeps a legitimate zero-match archive (an
-# attacker's archive with no apps/v1_api/prisma/ members at all) from making
-# this assignment itself fail under `set -e -o pipefail` — grep's own
-# "no matches" exit code would otherwise abort the script here.
-while IFS= read -r member_path; do
-  # A trailing "/" is a directory entry, not content; skip it here (it is
-  # not something files[] ever names, and it carries no bytes to smuggle).
-  [[ -n "$member_path" && "$member_path" != */ ]] || continue
+# ARCHIVE_REGULAR_MEMBERS already holds only canonical, non-symlink regular
+# file paths (directories filtered out above), NUL-separated so a member
+# path containing a literal newline cannot forge an extra line.
+while IFS= read -r -d '' member_path; do
+  case "$member_path" in apps/v1_api/prisma/*) ;; *) continue;; esac
   [[ -n "${DECLARED_PRISMA_PATH_SET[$member_path]:-}" ]] && continue
   [[ "$member_path" =~ $PRISMA_EXTRA_ALLOW_REGEX ]] || fail "source archive contains an unauthenticated member under apps/v1_api/prisma/: $member_path"
-done < <(tar -tf "$SOURCE_ARCHIVE" | { grep -E '^apps/v1_api/prisma/' || true; })
+done < "$ARCHIVE_REGULAR_MEMBERS"
+rm -f "$ARCHIVE_REGULAR_MEMBERS"
 [[ "$STAGE_A_RELEASE_SHA" =~ ^[0-9a-f]{40}$ && "$STAGE_A_SCHEMA_SHA" =~ ^[0-9a-f]{64}$ && -n "$DATABASE_IDENTITY" ]] || fail 'Stage A origin identity is malformed'
 [[ "$STAGE_A_TRANSITION_SHA" =~ ^[0-9a-f]{64}$ && "$(sha256 "$STAGE_A_TRANSITION")" == "$STAGE_A_TRANSITION_SHA" ]] || fail 'Stage A transition receipt checksum mismatch'
 [[ "$STAGE_A_BACKUP_RECEIPT_SHA" =~ ^[0-9a-f]{64}$ && "$(sha256 "$STAGE_A_BACKUP_RECEIPT")" == "$STAGE_A_BACKUP_RECEIPT_SHA" ]] || fail 'Stage A backup receipt checksum mismatch'
@@ -154,14 +173,14 @@ jq -e --arg release "$STAGE_A_RELEASE_SHA" --arg db "$DATABASE_IDENTITY" --arg b
 # recursion inside the archive's own embedded manifest (see the sidecar
 # attestation binding above, which authenticates the archive independently).
 jq -e --arg commit "$RELEASE_SHA" --arg schema "$SCHEMA_SHA" --argjson history "$(cat "$FULL_MIGRATIONS_JSON")" '.schemaVersion==1 and .kind=="task168StageBFinalInputs" and .sourceCommit==$commit and .finalSchema.sha256==$schema and .migrationPolicy=="task168-stageBFinal" and .fullMigrationHistory==$history and .m11.name=="20260911090000_retire_tournament_fixture_tables"' "$INPUT_SNAPSHOT" >/dev/null || fail 'input snapshot does not authenticate the prepared Stage B source/archive contract'
-jq -e '.files | type=="array" and length>0 and (all(.[]; (.path|strings|test("^apps/v1_api/prisma/(schema\\.prisma|migrations/[0-9]{14}_[a-z0-9_]+/migration\\.sql|migrations/migration_lock\\.toml)$")) and (.sha256|strings|test("^[0-9a-f]{64}$")) and (.bytes|numbers|.>=0) and (.mode|strings|test("^(644|755)$")))) and ((map(.path)|unique|length)==length)' "$INPUT_SNAPSHOT" >/dev/null || fail 'input snapshot file inventory is malformed'
+jq -e '.files | type=="array" and length>0 and (all(.[]; ((.path|type)=="string" and (.path|test("^apps/v1_api/prisma/(schema\\.prisma|migrations/[0-9]{14}_[a-z0-9_]+/migration\\.sql|migrations/migration_lock\\.toml)$"))) and ((.sha256|type)=="string" and (.sha256|test("^[0-9a-f]{64}$"))) and ((.bytes|type)=="number" and (.bytes>=0)) and ((.mode|type)=="string" and (.mode|test("^(644|755)$"))))) and ((map(.path)|unique|length)==length)' "$INPUT_SNAPSHOT" >/dev/null || fail 'input snapshot file inventory is malformed'
 while IFS=$'\t' read -r path expected bytes; do
   archive_sha="$(tar -xOf "$SOURCE_ARCHIVE" "$path" | sha256sum | awk '{print $1}')" || fail "source archive is missing prepared input: $path"
   archive_bytes="$(tar -xOf "$SOURCE_ARCHIVE" "$path" | wc -c | tr -d ' ')" || fail "source archive input size is unreadable: $path"
   [[ "$archive_sha" == "$expected" && "$archive_bytes" == "$bytes" ]] || fail "source archive input differs from authenticated snapshot: $path"
 done < <(jq -r '.files | sort_by(.path)[] | [.path,.sha256,(.bytes|tostring)] | @tsv' "$INPUT_SNAPSHOT")
 RESOLVED_ATTEMPTS_CANONICAL="$(jq -c 'sort_by([.migration_name,(.rolled_back_at // ""),.checksum,(.finished_at // "")])' "$RESOLVED_ATTEMPTS_JSON")" || fail 'resolved migration attempt snapshot is invalid JSON'
-jq -e 'type == "array" and (all(.[]; (.migration_name | strings | test("^[0-9]{14}_[a-z0-9_]+$")) and (.checksum | strings | test("^[0-9a-f]{64}$")) and (.finished_at == null) and (.rolled_back_at | strings | length > 0))) and (sort_by([.migration_name,(.rolled_back_at // ""),.checksum,(.finished_at // "")]) == .)' <<<"$RESOLVED_ATTEMPTS_CANONICAL" >/dev/null || fail 'resolved migration attempt snapshot must contain canonical rolled-back rows'
+jq -e 'type == "array" and (all(.[]; ((.migration_name|type)=="string" and (.migration_name|test("^[0-9]{14}_[a-z0-9_]+$"))) and ((.checksum|type)=="string" and (.checksum|test("^[0-9a-f]{64}$"))) and (.finished_at == null) and ((.rolled_back_at|type)=="string" and (.rolled_back_at|length > 0)))) and (sort_by([.migration_name,(.rolled_back_at // ""),.checksum,(.finished_at // "")]) == .)' <<<"$RESOLVED_ATTEMPTS_CANONICAL" >/dev/null || fail 'resolved migration attempt snapshot must contain canonical rolled-back rows'
 RESOLVED_ATTEMPTS_EXPECTED_COUNT="$(jq 'length' <<<"$RESOLVED_ATTEMPTS_CANONICAL")"
 resolved_attempts_pipe() {
   jq -r 'map([.migration_name,.checksum,(.finished_at // ""),(.rolled_back_at // "")] | join("|")) | join("\n")'
@@ -171,12 +190,12 @@ RESOLVED_ATTEMPTS_SHA="$(printf '%s' "$RESOLVED_ATTEMPTS_PIPE" | sha256sum | awk
 for image in POSTGRES_IMAGE API_IMAGE WEB_IMAGE TOOL_IMAGE; do
   [[ "${!image}" =~ ^.+@sha256:[0-9a-f]{64}$ ]] || fail "$image must be an immutable digest reference"
 done
-jq -e 'type == "array" and length == 11 and ([.[].name] | length == 11) and ([.[].sha256 | strings | test("^[0-9a-f]{64}$")] | all)' "$MIGRATIONS_JSON" >/dev/null || fail 'migration contract must contain exactly 11 hashed entries'
+jq -e 'type == "array" and length == 11 and ([.[].name] | length == 11) and (all(.[]; (.name|type)=="string" and (.sha256|type)=="string" and (.sha256|test("^[0-9a-f]{64}$"))))' "$MIGRATIONS_JSON" >/dev/null || fail 'migration contract must contain exactly 11 hashed entries'
 mapfile -t MIGRATION_NAMES < <(jq -er '.[].name' "$MIGRATIONS_JSON")
 [[ "${MIGRATION_NAMES[10]}" == 20260911090000_retire_tournament_fixture_tables ]] || fail 'M11 must be the final migration entry'
 M11_SHA_EXPECTED="$(jq -er '.[10].sha256' "$MIGRATIONS_JSON")"
 [[ -s "$FULL_MIGRATIONS_JSON" ]] || fail 'full migration history JSON is missing or empty'
-jq -e 'type == "array" and length >= 11 and (.[].name | strings) and (([.[].name] as $names | (($names | unique | length) == ($names | length)))) and ([.[].sha256 | strings | test("^[0-9a-f]{64}$")] | all)' "$FULL_MIGRATIONS_JSON" >/dev/null || fail 'full migration history must be an ordered unique hashed array'
+jq -e 'type == "array" and length >= 11 and (all(.[]; (.name|type)=="string")) and (([.[].name] as $names | (($names | unique | length) == ($names | length)))) and (all(.[]; (.sha256|type)=="string" and (.sha256|test("^[0-9a-f]{64}$"))))' "$FULL_MIGRATIONS_JSON" >/dev/null || fail 'full migration history must be an ordered unique hashed array'
 FULL_HISTORY_SHA="$(sha256 "$FULL_MIGRATIONS_JSON")"
 mapfile -t MIGRATION_NAMES_FULL < <(jq -er '.[].name' "$FULL_MIGRATIONS_JSON")
 [[ "${MIGRATION_NAMES_FULL[${#MIGRATION_NAMES_FULL[@]}-1]}" == 20260911090000_retire_tournament_fixture_tables ]] || fail 'full migration history must end at M11'

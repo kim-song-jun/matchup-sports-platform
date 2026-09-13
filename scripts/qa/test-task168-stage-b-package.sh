@@ -8,7 +8,10 @@ set -Eeuo pipefail
 # Deletion -> expected red (recorded here; the session that added this test
 # ran each deletion against a scratch copy of the script and counted red):
 #   git_mode() normalization reverted to raw `stat`         -> red on determinism test (1)
-#   FINAL_SCHEMA_SHA/M11_SHA constants or their assertions  -> red on tamper-reject test (3)
+#   FINAL_SCHEMA_SHA constant or its assertion (:53)        -> red on tamper-reject test (3)
+#   M11_SHA constant or its assertion (:54)                 -> red on M11-tamper test (3e)
+#   M11_NAME pin (readonly M11_NAME + both $m11Name jq
+#     comparisons at :57-69)                                -> red on M11-rename test (3f)
 #   source-migration-inventory check (source vs history)   -> red on drift test (4)
 #   apps/v1_api/prisma/ allowlist check                     -> red on rogue-file test (5)
 #   sidecar-first / rollback-on-archive-failure publish     -> red on mid-publish-failure test (7)
@@ -165,6 +168,51 @@ run_expect_fail 'does not match the reviewed checksum' \
   --output-archive "$TMP/pkg-tamper.tar.gz"
 [[ ! -e "$TMP/pkg-tamper.tar.gz" ]] || fail 'tampered packaging must not publish an archive'
 pass 'a 1-byte tamper of the reviewed schema is rejected even after the manifest is rehashed to match'
+
+# ---- 3e. BLOCK item: reviewed M11 checksum tamper is rejected even after
+#          rehash -- mirrors 3 above but for M11_SHA, which had no dedicated
+#          negative case (every other test passes the real, untampered M11
+#          file, so this half of the reviewed-checksum pin was untested) ----
+M11_NAME_CONST=20260911090000_retire_tournament_fixture_tables
+M11_CONTENT_TAMPER_DIR="$TMP/prepared-m11-content-tamper"
+cp -R "$PREPARED" "$M11_CONTENT_TAMPER_DIR"
+M11_TAMPER_FILE="$TMP/m11-tampered.sql"
+cp "$M11_FILE" "$M11_TAMPER_FILE"
+printf -- '\n-- tampered\n' >> "$M11_TAMPER_FILE"
+m11_tampered_sha="$(sha256sum "$M11_TAMPER_FILE" | awk '{print $1}')"
+m11_tampered_bytes="$(wc -c < "$M11_TAMPER_FILE" | tr -d ' ')"
+jq --arg h "$m11_tampered_sha" --argjson b "$m11_tampered_bytes" --arg name "$M11_NAME_CONST" \
+  '.m11.sha256 = $h |
+   .fullMigrationHistory = (.fullMigrationHistory | map(if .name == $name then (.sha256 = $h) else . end)) |
+   .files = (.files | map(if .path == ("apps/v1_api/prisma/migrations/" + $name + "/migration.sql") then (.sha256 = $h | .bytes = $b) else . end))' \
+  "$PREPARED/INPUT-MANIFEST.json" > "$M11_CONTENT_TAMPER_DIR/INPUT-MANIFEST.json"
+run_expect_fail 'supplied M11 migration does not match the reviewed checksum' \
+  "$PACKAGE" --source-dir "$REPO" --source-commit "$BASE_SHA" \
+  --prepared-dir "$M11_CONTENT_TAMPER_DIR" --final-schema "$FINAL_SCHEMA" --m11 "$M11_TAMPER_FILE" \
+  --output-archive "$TMP/pkg-m11-content-tamper.tar.gz"
+[[ ! -e "$TMP/pkg-m11-content-tamper.tar.gz" ]] || fail 'tampered M11 packaging must not publish an archive'
+pass 'a 1-byte tamper of the reviewed M11 migration is rejected even after the manifest is rehashed to match'
+
+# ---- 3f. BLOCK item: a manifest that consistently renames M11 (directory +
+#          .m11.name + fullMigrationHistory[-1].name, content untouched) is
+#          rejected -- the M11_NAME pin, not just M11_SHA, must hold ---------
+M11_RENAME_DIR="$TMP/prepared-m11-rename"
+cp -R "$PREPARED" "$M11_RENAME_DIR"
+M11_RENAMED_NAME="${M11_NAME_CONST}_renamed"
+mv "$M11_RENAME_DIR/apps/v1_api/prisma/migrations/$M11_NAME_CONST" \
+   "$M11_RENAME_DIR/apps/v1_api/prisma/migrations/$M11_RENAMED_NAME"
+jq --arg oldName "$M11_NAME_CONST" --arg newName "$M11_RENAMED_NAME" \
+  '.m11.name = $newName |
+   .fullMigrationHistory = (.fullMigrationHistory | map(if .name == $oldName then (.name = $newName) else . end)) |
+   .files = (.files | map(if .path == ("apps/v1_api/prisma/migrations/" + $oldName + "/migration.sql")
+     then (.path = "apps/v1_api/prisma/migrations/" + $newName + "/migration.sql") else . end))' \
+  "$PREPARED/INPUT-MANIFEST.json" > "$M11_RENAME_DIR/INPUT-MANIFEST.json"
+run_expect_fail 'prepared manifest is not an authenticated, reviewed StageB input contract' \
+  "$PACKAGE" --source-dir "$REPO" --source-commit "$BASE_SHA" \
+  --prepared-dir "$M11_RENAME_DIR" --final-schema "$FINAL_SCHEMA" --m11 "$M11_FILE" \
+  --output-archive "$TMP/pkg-m11-rename.tar.gz"
+[[ ! -e "$TMP/pkg-m11-rename.tar.gz" ]] || fail 'a manifest with a renamed M11 must not publish an archive'
+pass 'rejects a manifest that consistently renames M11 away from the pinned migration name'
 
 # ---- 3b. prepared file drift: a prepared file is changed but the manifest
 #          is left declaring the old (pre-tamper) sha/bytes -----------------

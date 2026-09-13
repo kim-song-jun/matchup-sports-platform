@@ -114,22 +114,36 @@ while IFS= read -r member_line; do
   esac
 done < "$ARCHIVE_MEMBERS_LIST"
 rm -f "$ARCHIVE_MEMBERS_LIST"
-# Every declared prisma file must be present in the archive, and the archive
-# must not carry an undeclared prisma file at those exact overlay paths
-# (files[] already enumerates schema.prisma, migration_lock.toml, and every
-# migration.sql; package-task168-final-source.sh enforces the surrounding
-# apps/v1_api/prisma/ allowlist at packaging time).
-DECLARED_PRISMA_PATHS="$(jq -r '.files[].path' "$INPUT_SNAPSHOT" | LC_ALL=C sort)"
+# Every member the archive carries under apps/v1_api/prisma/ must be either a
+# declared overlay file (files[]) or one of the same non-reviewed extras
+# package-task168-final-source.sh allows there (seed scripts, seed data, the
+# StageA schema reference copy). This walks the whole subtree rather than
+# matching a fixed migration.sql/schema.prisma/migration_lock.toml regex: a
+# regex keyed on the expected shape is invisible to a member whose path falls
+# outside that shape (a non-conforming migration directory name, or an extra
+# file placed inside an otherwise-declared migration directory), so such a
+# member would previously reach here unexamined. Declared-file presence is
+# still verified independently below (:>=144), so this only needs to reject
+# extras — it is not also required to prove nothing is missing.
+readonly PRISMA_EXTRA_ALLOW_REGEX='^apps/v1_api/prisma/([^/]+\.ts|data/[^/]+\.json|schema\.stage-a\.prisma)$'
+declare -A DECLARED_PRISMA_PATH_SET=()
+while IFS= read -r declared_path; do
+  [[ -n "$declared_path" ]] && DECLARED_PRISMA_PATH_SET["$declared_path"]=1
+done < <(jq -r '.files[].path' "$INPUT_SNAPSHOT")
 # -E (POSIX ERE): the old BSD grep shipped on macOS does not support the
 # GNU BRE `\|` alternation extension used elsewhere in this file's producer
 # counterpart, and silently under-matches instead of erroring.
 # The `|| true` inside the group keeps a legitimate zero-match archive (an
 # attacker's archive with no apps/v1_api/prisma/ members at all) from making
 # this assignment itself fail under `set -e -o pipefail` — grep's own
-# "no matches" exit code would otherwise abort the script here, before the
-# equality check below ever runs, leaving no diagnostic at all.
-ARCHIVE_PRISMA_MEMBERS="$(tar -tf "$SOURCE_ARCHIVE" | { grep -E '^apps/v1_api/prisma/migrations/[0-9]{14}_[a-z0-9_]+/migration\.sql$|^apps/v1_api/prisma/schema\.prisma$|^apps/v1_api/prisma/migrations/migration_lock\.toml$' || true; } | LC_ALL=C sort)"
-[[ "$DECLARED_PRISMA_PATHS" == "$ARCHIVE_PRISMA_MEMBERS" ]] || fail 'archive prisma-overlay member set does not exactly match the authenticated files inventory'
+# "no matches" exit code would otherwise abort the script here.
+while IFS= read -r member_path; do
+  # A trailing "/" is a directory entry, not content; skip it here (it is
+  # not something files[] ever names, and it carries no bytes to smuggle).
+  [[ -n "$member_path" && "$member_path" != */ ]] || continue
+  [[ -n "${DECLARED_PRISMA_PATH_SET[$member_path]:-}" ]] && continue
+  [[ "$member_path" =~ $PRISMA_EXTRA_ALLOW_REGEX ]] || fail "source archive contains an unauthenticated member under apps/v1_api/prisma/: $member_path"
+done < <(tar -tf "$SOURCE_ARCHIVE" | { grep -E '^apps/v1_api/prisma/' || true; })
 [[ "$STAGE_A_RELEASE_SHA" =~ ^[0-9a-f]{40}$ && "$STAGE_A_SCHEMA_SHA" =~ ^[0-9a-f]{64}$ && -n "$DATABASE_IDENTITY" ]] || fail 'Stage A origin identity is malformed'
 [[ "$STAGE_A_TRANSITION_SHA" =~ ^[0-9a-f]{64}$ && "$(sha256 "$STAGE_A_TRANSITION")" == "$STAGE_A_TRANSITION_SHA" ]] || fail 'Stage A transition receipt checksum mismatch'
 [[ "$STAGE_A_BACKUP_RECEIPT_SHA" =~ ^[0-9a-f]{64}$ && "$(sha256 "$STAGE_A_BACKUP_RECEIPT")" == "$STAGE_A_BACKUP_RECEIPT_SHA" ]] || fail 'Stage A backup receipt checksum mismatch'

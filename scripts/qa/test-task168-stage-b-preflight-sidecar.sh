@@ -15,7 +15,7 @@ set -Eeuo pipefail
 #   input-snapshot bytes == archive-embedded manifest bytes     -> red on (4)
 #   bundle/ prefix rejection                                    -> red on (5)
 #   symlink member rejection                                    -> red on (6)
-#   prisma member-set == files[] inventory equality             -> red on (7)
+#   prisma unauthenticated-member rejection                     -> red on (7), (7b), (7c)
 #   unsafe-path (../) member rejection                          -> red on (8)
 #   per-file archive-content-vs-snapshot sha/bytes check (:144-148) -> red on (9)
 
@@ -272,8 +272,57 @@ for i in "${!ARGS[@]}"; do
     --source-archive-attestation) ARGS[$((i+1))]="$EXTRA_DIR/source.tar.gz.attestation.json" ;;
   esac
 done
-run_expect_fail 'archive prisma-overlay member set does not exactly match the authenticated files inventory' "${ARGS[@]}"
+run_expect_fail 'source archive contains an unauthenticated member under apps/v1_api/prisma/' "${ARGS[@]}"
 pass 'rejects an archive that carries an unlisted extra migration.sql not present in the authenticated inventory'
+
+# ---- 7b. an extra migration directory whose name does NOT match the
+#          [0-9]{14}_[a-z0-9_]+ shape must still be caught -- a check keyed
+#          on that shape (as the old regex-based member-set check was) is
+#          blind to a member outside it -------------------------------------
+NONCONFORMING_DIR="$TMP/nonconforming-member"
+mkdir -p "$NONCONFORMING_DIR/stage"
+cp -R "$FIXTURE/stage/apps" "$NONCONFORMING_DIR/stage/"
+mkdir -p "$NONCONFORMING_DIR/stage/apps/v1_api/prisma/migrations/2026_evil"
+printf -- '-- evil\nSELECT 1;\n' > "$NONCONFORMING_DIR/stage/apps/v1_api/prisma/migrations/2026_evil/migration.sql"
+cp "$FIXTURE/stage/INPUT-MANIFEST.json" "$NONCONFORMING_DIR/stage/INPUT-MANIFEST.json"
+( cd "$NONCONFORMING_DIR/stage" && tar -czf "$NONCONFORMING_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+nonconforming_sha="$(sha "$NONCONFORMING_DIR/source.tar.gz")"
+nonconforming_bytes="$(wc -c < "$NONCONFORMING_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$nonconforming_sha" --argjson b "$nonconforming_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$NONCONFORMING_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$NONCONFORMING_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$nonconforming_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$NONCONFORMING_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains an unauthenticated member under apps/v1_api/prisma/' "${ARGS[@]}"
+pass 'rejects an extra migration directory whose name does not match the reviewed migration-name shape'
+
+# ---- 7c. an extra file smuggled inside an already-declared migration
+#          directory must still be caught, not just an extra directory ------
+EXTRA_IN_DECLARED_DIR="$TMP/extra-in-declared-dir"
+mkdir -p "$EXTRA_IN_DECLARED_DIR/stage"
+cp -R "$FIXTURE/stage/apps" "$EXTRA_IN_DECLARED_DIR/stage/"
+printf -- '-- smuggled\nSELECT 1;\n' > "$EXTRA_IN_DECLARED_DIR/stage/apps/v1_api/prisma/migrations/$M11_NAME/extra.sql"
+cp "$FIXTURE/stage/INPUT-MANIFEST.json" "$EXTRA_IN_DECLARED_DIR/stage/INPUT-MANIFEST.json"
+( cd "$EXTRA_IN_DECLARED_DIR/stage" && tar -czf "$EXTRA_IN_DECLARED_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+extra_in_dir_sha="$(sha "$EXTRA_IN_DECLARED_DIR/source.tar.gz")"
+extra_in_dir_bytes="$(wc -c < "$EXTRA_IN_DECLARED_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$extra_in_dir_sha" --argjson b "$extra_in_dir_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$EXTRA_IN_DECLARED_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$EXTRA_IN_DECLARED_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$extra_in_dir_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$EXTRA_IN_DECLARED_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains an unauthenticated member under apps/v1_api/prisma/' "${ARGS[@]}"
+pass 'rejects an extra file smuggled inside an already-declared migration directory'
 
 # ---- 8. a ../ traversal member is rejected ---------------------------------
 # A plain `tar -c` refuses to create a member spelled with a leading `../`, so

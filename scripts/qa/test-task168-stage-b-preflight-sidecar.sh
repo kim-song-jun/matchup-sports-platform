@@ -16,6 +16,8 @@ set -Eeuo pipefail
 #   bundle/ prefix rejection                                    -> red on (5)
 #   symlink member rejection                                    -> red on (6)
 #   prisma member-set == files[] inventory equality             -> red on (7)
+#   unsafe-path (../) member rejection                          -> red on (8)
+#   per-file archive-content-vs-snapshot sha/bytes check (:144-148) -> red on (9)
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
@@ -272,5 +274,62 @@ for i in "${!ARGS[@]}"; do
 done
 run_expect_fail 'archive prisma-overlay member set does not exactly match the authenticated files inventory' "${ARGS[@]}"
 pass 'rejects an archive that carries an unlisted extra migration.sql not present in the authenticated inventory'
+
+# ---- 8. a ../ traversal member is rejected ---------------------------------
+# A plain `tar -c` refuses to create a member spelled with a leading `../`, so
+# this uses Python's tarfile module directly (as the preparer/packager do) to
+# inject the unsafe member the same way a hand-crafted malicious archive would.
+TRAVERSAL_DIR="$TMP/traversal"
+mkdir -p "$TRAVERSAL_DIR"
+python3 - "$FIXTURE/stage" "$TRAVERSAL_DIR/source.tar.gz" <<'PY'
+import io, os, sys, tarfile
+stage, out = sys.argv[1], sys.argv[2]
+with tarfile.open(out, 'w:gz') as tar:
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json')
+    tar.add(os.path.join(stage, 'apps'), arcname='apps')
+    data = b'evil\n'
+    info = tarfile.TarInfo(name='../evil.txt')
+    info.size = len(data)
+    tar.addfile(info, io.BytesIO(data))
+PY
+traversal_sha="$(sha "$TRAVERSAL_DIR/source.tar.gz")"
+traversal_bytes="$(wc -c < "$TRAVERSAL_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$traversal_sha" --argjson b "$traversal_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$TRAVERSAL_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$TRAVERSAL_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$traversal_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$TRAVERSAL_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains an unsafe path' "${ARGS[@]}"
+pass 'rejects an archive that carries a ../ traversal member'
+
+# ---- 9. an archive member's bytes differ from the authenticated files[]
+#         entry while the manifest (and therefore the sidecar) still declares
+#         the original, pre-tamper hash -------------------------------------
+CONTENT_TAMPER_DIR="$TMP/content-tamper"
+mkdir -p "$CONTENT_TAMPER_DIR/stage"
+cp -R "$FIXTURE/stage/apps" "$CONTENT_TAMPER_DIR/stage/apps"
+cp "$FIXTURE/stage/INPUT-MANIFEST.json" "$CONTENT_TAMPER_DIR/stage/INPUT-MANIFEST.json"
+printf -- '-- tampered archive member; manifest still declares the original bytes\nSELECT 2;\n' \
+  > "$CONTENT_TAMPER_DIR/stage/apps/v1_api/prisma/migrations/$M1_NAME/migration.sql"
+( cd "$CONTENT_TAMPER_DIR/stage" && tar -czf "$CONTENT_TAMPER_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+content_tamper_sha="$(sha "$CONTENT_TAMPER_DIR/source.tar.gz")"
+content_tamper_bytes="$(wc -c < "$CONTENT_TAMPER_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$content_tamper_sha" --argjson b "$content_tamper_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$CONTENT_TAMPER_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$CONTENT_TAMPER_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$content_tamper_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$CONTENT_TAMPER_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive input differs from authenticated snapshot' "${ARGS[@]}"
+pass 'rejects an archive whose M1 migration bytes differ from the authenticated files[] entry even though the manifest and sidecar are internally self-consistent'
 
 echo 'ALL PREFLIGHT SIDECAR CONTRACT TESTS PASSED'

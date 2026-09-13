@@ -1,0 +1,8 @@
+{
+  "name": "task168-stage-b-harness-image",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "prisma": "6.19.2"
+  }
+}

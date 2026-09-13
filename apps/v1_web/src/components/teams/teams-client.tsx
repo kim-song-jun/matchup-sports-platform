@@ -39,7 +39,7 @@ import { hasStoredV1Session } from '@/lib/session-storage';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
-import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import type { V1Sport, V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { JerseyNumberDialog } from './jersey-number-dialog';
 import { TeamDetailPageSkeleton, TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
@@ -55,7 +55,7 @@ import {
   toTeam,
 } from './teams.card-model';
 
-export function TeamListPageClient() {
+export function TeamListPageClient({ seed }: { seed?: { teams: V1Team[]; sports: V1Sport[] } } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedSportId = searchParams.get('sportId') ?? undefined;
@@ -72,7 +72,7 @@ export function TeamListPageClient() {
     setSearchValue(initialQuery);
     setSubmittedQuery(initialQuery);
   }, [initialQuery]);
-  const sports = useV1MasterSports();
+  const sports = useV1MasterSports({ seed: seed?.sports });
   const teamFilters = useMemo(() => {
     const filters: { sportId?: string; query?: string; joinPolicy?: 'approval_required'; sort?: 'recommended' | 'latest'; genderRule?: string; levelCodes?: string } = {};
     if (selectedSportId) filters.sportId = selectedSportId;
@@ -89,7 +89,10 @@ export function TeamListPageClient() {
     const { sportId: _sportId, ...filtersWithoutSport } = teamFilters ?? {};
     return { ...filtersWithoutSport, limit: 50 };
   }, [teamFilters]);
-  const query = useV1Teams(listFilters);
+  // /teams가 서버(SEO 프리렌더)에서 이미 받아 둔 무필터 목록을 첫 표시값으로 쓴다 — 필터가
+  // 걸려 있으면 그 목록이 이 화면과 다른 결과를 뜻하므로 seed를 넘기지 않는다(기존 로딩
+  // 스켈레톤 그대로 유지).
+  const query = useV1Teams(listFilters, { seed: !teamFilters && seed ? { items: seed.teams, nextCursor: null } : undefined });
   const sportCounts = useV1Teams(sportCountFilters, { enabled: Boolean(selectedSportId) });
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();

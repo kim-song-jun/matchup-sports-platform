@@ -73,6 +73,18 @@ done
 
 sha256() { sha256sum "$1" | awk '{print $1}'; }
 fail() { echo "[task168-final-image-preflight] $*" >&2; exit 1; }
+
+# Reviewed, pinned identities (same values package-task168-final-source.sh
+# pins). The archive/manifest checks below prove internal self-consistency
+# (files[] matches the tar bytes, fullMigrationHistory matches
+# --migration-root); without also pinning these, a caller that supplies a
+# wrong-but-internally-consistent schema or M11 (e.g. a stale or
+# not-yet-reviewed draft) would still clear every check. Named *_PIN to
+# avoid colliding with M11_NAME, which is later assigned (not readonly) from
+# the caller-supplied Task 168 migration contract.
+readonly FINAL_SCHEMA_SHA=e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46
+readonly M11_SHA=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
+readonly M11_NAME_PIN=20260911090000_retire_tournament_fixture_tables
 for value in BACKUP BACKUP_SHA BACKUP_FORMAT STAGE_A_TRANSITION STAGE_A_TRANSITION_SHA STAGE_A_BACKUP_RECEIPT STAGE_A_BACKUP_RECEIPT_SHA STAGE_A_RELEASE_SHA STAGE_A_SCHEMA_SHA DATABASE_IDENTITY SCHEMA SCHEMA_SHA MIGRATION_ROOT MIGRATIONS_JSON FULL_MIGRATIONS_JSON RESOLVED_ATTEMPTS_JSON SOURCE_ARCHIVE SOURCE_SHA SOURCE_ARCHIVE_ATTESTATION INPUT_SNAPSHOT INPUT_SNAPSHOT_SHA POSTGRES_IMAGE API_IMAGE API_CLIENT_SCHEMA_PATH WEB_IMAGE TOOL_IMAGE API_WORKDIR API_PRISMA_BIN TOOL_WORKDIR TOOL_PRISMA_BIN RELEASE_SHA REPORT RECEIPT; do
   [[ -n "${!value}" ]] || fail "$value is required"
 done
@@ -82,6 +94,7 @@ MIGRATION_LOCK_SHA="$(sha256 "$MIGRATION_ROOT/migration_lock.toml")"
 [[ "$BACKUP_FORMAT" == plain-sql-gzip ]] || fail 'only explicit plain-sql-gzip backups are accepted'
 [[ "$BACKUP_SHA" =~ ^[0-9a-f]{64}$ && "$(sha256 "$BACKUP")" == "$BACKUP_SHA" ]] || fail 'backup checksum mismatch'
 [[ "$SCHEMA_SHA" =~ ^[0-9a-f]{64}$ && "$(sha256 "$SCHEMA")" == "$SCHEMA_SHA" ]] || fail 'schema checksum mismatch'
+[[ "$SCHEMA_SHA" == "$FINAL_SCHEMA_SHA" ]] || fail 'pinned final schema sha256 does not match the reviewed checksum'
 [[ "$SOURCE_SHA" =~ ^[0-9a-f]{64}$ && "$(sha256 "$SOURCE_ARCHIVE")" == "$SOURCE_SHA" ]] || fail 'source archive checksum mismatch'
 [[ "$INPUT_SNAPSHOT_SHA" =~ ^[0-9a-f]{64}$ && "$(sha256 "$INPUT_SNAPSHOT")" == "$INPUT_SNAPSHOT_SHA" ]] || fail 'input snapshot checksum mismatch'
 [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || fail 'release SHA must be 40 hex characters'
@@ -172,13 +185,31 @@ jq -e --arg release "$STAGE_A_RELEASE_SHA" --arg db "$DATABASE_IDENTITY" --arg b
 # No .sourceArchive.sha256 field is asserted here: that would be self-hash
 # recursion inside the archive's own embedded manifest (see the sidecar
 # attestation binding above, which authenticates the archive independently).
-jq -e --arg commit "$RELEASE_SHA" --arg schema "$SCHEMA_SHA" --argjson history "$(cat "$FULL_MIGRATIONS_JSON")" '.schemaVersion==1 and .kind=="task168StageBFinalInputs" and .sourceCommit==$commit and .finalSchema.sha256==$schema and .migrationPolicy=="task168-stageBFinal" and .fullMigrationHistory==$history and .m11.name=="20260911090000_retire_tournament_fixture_tables"' "$INPUT_SNAPSHOT" >/dev/null || fail 'input snapshot does not authenticate the prepared Stage B source/archive contract'
+jq -e --arg commit "$RELEASE_SHA" --arg schema "$SCHEMA_SHA" --arg m11name "$M11_NAME_PIN" --arg m11sha "$M11_SHA" --argjson history "$(cat "$FULL_MIGRATIONS_JSON")" '.schemaVersion==1 and .kind=="task168StageBFinalInputs" and .sourceCommit==$commit and .finalSchema.sha256==$schema and .migrationPolicy=="task168-stageBFinal" and .fullMigrationHistory==$history and .m11.name==$m11name and .m11.sha256==$m11sha' "$INPUT_SNAPSHOT" >/dev/null || fail 'input snapshot does not authenticate the prepared Stage B source/archive contract'
 jq -e '.files | type=="array" and length>0 and (all(.[]; ((.path|type)=="string" and (.path|test("^apps/v1_api/prisma/(schema\\.prisma|migrations/[0-9]{14}_[a-z0-9_]+/migration\\.sql|migrations/migration_lock\\.toml)$"))) and ((.sha256|type)=="string" and (.sha256|test("^[0-9a-f]{64}$"))) and ((.bytes|type)=="number" and (.bytes>=0)) and ((.mode|type)=="string" and (.mode|test("^(644|755)$"))))) and ((map(.path)|unique|length)==length)' "$INPUT_SNAPSHOT" >/dev/null || fail 'input snapshot file inventory is malformed'
 while IFS=$'\t' read -r path expected bytes; do
   archive_sha="$(tar -xOf "$SOURCE_ARCHIVE" "$path" | sha256sum | awk '{print $1}')" || fail "source archive is missing prepared input: $path"
   archive_bytes="$(tar -xOf "$SOURCE_ARCHIVE" "$path" | wc -c | tr -d ' ')" || fail "source archive input size is unreadable: $path"
   [[ "$archive_sha" == "$expected" && "$archive_bytes" == "$bytes" ]] || fail "source archive input differs from authenticated snapshot: $path"
 done < <(jq -r '.files | sort_by(.path)[] | [.path,.sha256,(.bytes|tostring)] | @tsv' "$INPUT_SNAPSHOT")
+# T3 consumer gap (independent adversarial review): the checks above prove
+# files[] is self-consistent with the archive's own tar bytes, but nothing
+# yet ties that inventory to the migration ledger the rehearsal actually
+# replays (fullMigrationHistory / --migration-root, cross-checked further
+# below) or to the pinned final schema. Without this, an archive whose
+# files[] entries are internally consistent with its own bytes could still
+# ship a migration.sql or schema.prisma the rehearsal never exercised, as
+# long as fullMigrationHistory/--migration-root/--schema (supplied
+# separately) still describe the untampered originals.
+jq -e --arg p 'apps/v1_api/prisma/schema.prisma' --arg h "$FINAL_SCHEMA_SHA" \
+  '.finalSchema.path == $p and ([.files[] | select(.path == $p)] | length == 1 and .[0].sha256 == $h)' \
+  "$INPUT_SNAPSHOT" >/dev/null || fail 'archive files inventory does not authenticate the pinned final schema'
+jq -e '
+  ([.files[] | select(.path | test("^apps/v1_api/prisma/migrations/[0-9]{14}_[a-z0-9_]+/migration\\.sql$"))
+    | {name: (.path | capture("migrations/(?<n>[0-9]{14}_[a-z0-9_]+)/migration\\.sql").n), sha256}]
+    | sort_by(.name)) ==
+  (.fullMigrationHistory | map({name, sha256}) | sort_by(.name))
+' "$INPUT_SNAPSHOT" >/dev/null || fail 'archive files inventory does not exactly match the declared full migration history'
 RESOLVED_ATTEMPTS_CANONICAL="$(jq -c 'sort_by([.migration_name,(.rolled_back_at // ""),.checksum,(.finished_at // "")])' "$RESOLVED_ATTEMPTS_JSON")" || fail 'resolved migration attempt snapshot is invalid JSON'
 jq -e 'type == "array" and (all(.[]; ((.migration_name|type)=="string" and (.migration_name|test("^[0-9]{14}_[a-z0-9_]+$"))) and ((.checksum|type)=="string" and (.checksum|test("^[0-9a-f]{64}$"))) and (.finished_at == null) and ((.rolled_back_at|type)=="string" and (.rolled_back_at|length > 0)))) and (sort_by([.migration_name,(.rolled_back_at // ""),.checksum,(.finished_at // "")]) == .)' <<<"$RESOLVED_ATTEMPTS_CANONICAL" >/dev/null || fail 'resolved migration attempt snapshot must contain canonical rolled-back rows'
 RESOLVED_ATTEMPTS_EXPECTED_COUNT="$(jq 'length' <<<"$RESOLVED_ATTEMPTS_CANONICAL")"
@@ -192,13 +223,14 @@ for image in POSTGRES_IMAGE API_IMAGE WEB_IMAGE TOOL_IMAGE; do
 done
 jq -e 'type == "array" and length == 11 and ([.[].name] | length == 11) and (all(.[]; (.name|type)=="string" and (.sha256|type)=="string" and (.sha256|test("^[0-9a-f]{64}$"))))' "$MIGRATIONS_JSON" >/dev/null || fail 'migration contract must contain exactly 11 hashed entries'
 mapfile -t MIGRATION_NAMES < <(jq -er '.[].name' "$MIGRATIONS_JSON")
-[[ "${MIGRATION_NAMES[10]}" == 20260911090000_retire_tournament_fixture_tables ]] || fail 'M11 must be the final migration entry'
+[[ "${MIGRATION_NAMES[10]}" == "$M11_NAME_PIN" ]] || fail 'M11 must be the final migration entry'
 M11_SHA_EXPECTED="$(jq -er '.[10].sha256' "$MIGRATIONS_JSON")"
+[[ "$M11_SHA_EXPECTED" == "$M11_SHA" ]] || fail 'M11 migration hash in the Task 168 contract does not match the reviewed checksum'
 [[ -s "$FULL_MIGRATIONS_JSON" ]] || fail 'full migration history JSON is missing or empty'
 jq -e 'type == "array" and length >= 11 and (all(.[]; (.name|type)=="string")) and (([.[].name] as $names | (($names | unique | length) == ($names | length)))) and (all(.[]; (.sha256|type)=="string" and (.sha256|test("^[0-9a-f]{64}$"))))' "$FULL_MIGRATIONS_JSON" >/dev/null || fail 'full migration history must be an ordered unique hashed array'
 FULL_HISTORY_SHA="$(sha256 "$FULL_MIGRATIONS_JSON")"
 mapfile -t MIGRATION_NAMES_FULL < <(jq -er '.[].name' "$FULL_MIGRATIONS_JSON")
-[[ "${MIGRATION_NAMES_FULL[${#MIGRATION_NAMES_FULL[@]}-1]}" == 20260911090000_retire_tournament_fixture_tables ]] || fail 'full migration history must end at M11'
+[[ "${MIGRATION_NAMES_FULL[${#MIGRATION_NAMES_FULL[@]}-1]}" == "$M11_NAME_PIN" ]] || fail 'full migration history must end at M11'
 for name in "${MIGRATION_NAMES[@]}"; do
   task_hash="$(jq -er --arg n "$name" '.[] | select(.name == $n) | .sha256' "$MIGRATIONS_JSON")"
   jq -e --arg n "$name" --arg h "$task_hash" 'any(.[]; .name == $n and .sha256 == $h)' "$FULL_MIGRATIONS_JSON" >/dev/null || fail "Task 168 migration missing or hash-different in full history: $name"
@@ -297,7 +329,11 @@ cp "$SCHEMA" "$STAGE/prisma/schema.prisma"
 cp "$MIGRATION_ROOT/migration_lock.toml" "$STAGE/prisma/migrations/"
 TASK_NAMES_SQL="$(printf "'%s'," "${MIGRATION_NAMES[@]:0:10}" | sed 's/,$//')"
 M11_NAME="${MIGRATION_NAMES[10]}"
-PRE_HISTORY_JSON="$(jq '[:-1]' "$FULL_MIGRATIONS_JSON")"
+# `.[:-1]` (all but the last element), not `[:-1]` -- the bare form is a jq
+# syntax error and, under `set -e`, kills the script at this assignment
+# before any real rehearsal step runs. The result is JSON *text*, not a file
+# path, so callers below must pass it through directly rather than `cat` it.
+PRE_HISTORY_JSON="$(jq -c '.[:-1]' "$FULL_MIGRATIONS_JSON")"
 ledger_query="SELECT migration_name || '|' || COALESCE(checksum,'') || '|applied' FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name"
 task_ledger_query="SELECT migration_name || '|' || COALESCE(checksum,'') || '|applied' FROM \"_prisma_migrations\" WHERE migration_name IN ($TASK_NAMES_SQL,'$M11_NAME') AND finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name"
 ledger_classification_query="SELECT count(*) FILTER (WHERE finished_at IS NULL AND rolled_back_at IS NULL) || E'\t' || count(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NOT NULL) || E'\t' || count(*) FILTER (WHERE finished_at IS NULL AND rolled_back_at IS NOT NULL) || E'\t' || count(*) FILTER (WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL) FROM \"_prisma_migrations\""
@@ -352,7 +388,7 @@ ledger_matches_history() {
     ($expected | all(. as $expectedRow | (($actual | map(select(.name == $expectedRow.name and .checksum == $expectedRow.sha256 and .status == "applied"))) | length) == 1))
   ' >/dev/null
 }
-ledger_matches_history "$LOG_DIR/ledger-before.txt" "$(cat "$PRE_HISTORY_JSON")" || fail 'pre-replay complete ledger does not exactly match full history minus M11'
+ledger_matches_history "$LOG_DIR/ledger-before.txt" "$PRE_HISTORY_JSON" || fail 'pre-replay complete ledger does not exactly match full history minus M11'
 
 run_tool() {
   local command="$1"
@@ -387,7 +423,7 @@ printf '%s\n' "$task_after_pre_m11" > "$LOG_DIR/task-ledger-after-pre-m11.txt"
 printf '%s\n' "$classification_after_pre_m11" > "$LOG_DIR/ledger-classification-after-pre-m11.txt"
 printf '%s\n' "$resolved_after_pre_m11_json" > "$LOG_DIR/resolved-migration-attempts-after-pre-m11.json"
 [[ "$(grep -c '|' <<<"$ledger_after_pre_m11")" == "$total_before" ]] || fail 'pre-M11 replay changed the complete historical ledger'
-ledger_matches_history "$LOG_DIR/ledger-after-pre-m11.txt" "$(cat "$PRE_HISTORY_JSON")" || fail 'pre-M11 replay changed the complete ledger contents'
+ledger_matches_history "$LOG_DIR/ledger-after-pre-m11.txt" "$PRE_HISTORY_JSON" || fail 'pre-M11 replay changed the complete ledger contents'
 [[ "$(grep -c '|applied$' <<<"$task_after_pre_m11")" == 10 ]] || fail 'pre-M11 replay changed the authenticated Task 168 subset'
 ! grep -q "^$M11_NAME|" <<<"$task_after_pre_m11" || fail 'M11 appeared before the explicit M11 step'
 cp -R "$MIGRATION_ROOT/$M11_NAME" "$STAGE/prisma/migrations/$M11_NAME"

@@ -26,6 +26,10 @@ export COPYFILE_DISABLE=1
 #   prisma unauthenticated-member rejection                     -> red on (7), (7b), (7c)
 #   unsafe-path (../) member rejection                          -> red on (8)
 #   per-file archive-content-vs-snapshot sha/bytes check (:144-148) -> red on (9)
+#   pinned FINAL_SCHEMA_SHA/M11_SHA/M11_NAME_PIN constants       -> red on golden path (1), since the
+#                                                                    fixture uses the real reviewed bytes
+#   files[] finalSchema entry == pinned schema sha (:182-184)    -> red on (G4)
+#   files[] migration entries == fullMigrationHistory (:185-190) -> red on (G1), (G2)
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
@@ -45,6 +49,13 @@ STAGE_A_SCHEMA_SHA="$(printf 'stage-a-schema' | sha256sum | awk '{print $1}')"
 DB_IDENTITY='teameet_alpha|teameet|127.0.0.1|5432'
 M11_NAME=20260911090000_retire_tournament_fixture_tables
 M1_NAME=20260908130000_v1_team_match_tournament_expand
+# The preflight pins FINAL_SCHEMA_SHA/M11_SHA to the actual reviewed bytes,
+# so every fixture below must carry those exact bytes for schema.prisma and
+# M11 (M1 and every other historical migration are not hash-pinned and stay
+# synthetic).
+REVIEWED_FINAL_SCHEMA="$REPO_ROOT/deploy/task168-final-drop/schema.prisma"
+REVIEWED_M11_FILE="$REPO_ROOT/deploy/task168-final-drop/migrations/$M11_NAME/migration.sql"
+[[ -f "$REVIEWED_FINAL_SCHEMA" && -f "$REVIEWED_M11_FILE" ]] || fail 'missing reviewed schema/M11 fixture source'
 
 # ---- T2 scaffolding: a self-consistent Stage A transition + backup receipt,
 # unrelated to this test's subject, needed only to reach the T3 checks. -----
@@ -69,10 +80,10 @@ build_archive_fixture() {
   local dir="$1"
   mkdir -p "$dir/stage/apps/v1_api/prisma/migrations/$M1_NAME"
   mkdir -p "$dir/stage/apps/v1_api/prisma/migrations/$M11_NAME"
-  printf 'generator client {\n  provider = "prisma-client-js"\n}\n' > "$dir/stage/apps/v1_api/prisma/schema.prisma"
+  cp "$REVIEWED_FINAL_SCHEMA" "$dir/stage/apps/v1_api/prisma/schema.prisma"
   printf 'provider = "postgresql"\n' > "$dir/stage/apps/v1_api/prisma/migrations/migration_lock.toml"
   printf -- '-- m1\nSELECT 1;\n' > "$dir/stage/apps/v1_api/prisma/migrations/$M1_NAME/migration.sql"
-  printf -- '-- m11\nSELECT 1;\n' > "$dir/stage/apps/v1_api/prisma/migrations/$M11_NAME/migration.sql"
+  cp "$REVIEWED_M11_FILE" "$dir/stage/apps/v1_api/prisma/migrations/$M11_NAME/migration.sql"
 
   jq -n \
     --arg commit "$RELEASE_SHA" \
@@ -615,5 +626,113 @@ for i in "${!ARGS[@]}"; do
 done
 run_expect_fail 'migration contract must contain exactly 11 hashed entries' "${ARGS[@]}"
 pass 'rejects a Task 168 migration contract entry whose sha256 is null'
+
+# ---- G1/G2/G4 (independent adversarial review, T3 consumer binding) -------
+# The checks exercised through (9) prove files[] is self-consistent with the
+# archive's own bytes. They never compare that inventory against
+# fullMigrationHistory/finalSchema -- the fields --migration-root and
+# --schema (the actual rehearsal inputs, verified elsewhere in the script)
+# are pinned to. These three probes tamper only the archive + its files[]
+# entries (rehashed to match each other, so archive-vs-files[] alone stays
+# green) while leaving fullMigrationHistory, finalSchema.sha256,
+# --migration-root and --schema exactly as the good fixture built them --
+# reproducing the reviewer's G1/G2/G4 bypass shapes verbatim.
+
+# G1: archive's M1 content + files[] M1 entry are tampered together
+# (rehashed to match each other); fullMigrationHistory (and --migration-root,
+# left untouched) still declares the original M1 hash.
+G1_DIR="$TMP/g1-files-vs-history-tamper"
+mkdir -p "$G1_DIR/stage"
+cp -R "$FIXTURE/stage/apps" "$G1_DIR/stage/apps"
+printf -- '-- m1 EVIL\nSELECT 1;\n' > "$G1_DIR/stage/apps/v1_api/prisma/migrations/$M1_NAME/migration.sql"
+g1_m1_sha="$(sha "$G1_DIR/stage/apps/v1_api/prisma/migrations/$M1_NAME/migration.sql")"
+g1_m1_bytes="$(wc -c < "$G1_DIR/stage/apps/v1_api/prisma/migrations/$M1_NAME/migration.sql" | tr -d ' ')"
+jq --arg p "apps/v1_api/prisma/migrations/$M1_NAME/migration.sql" --arg h "$g1_m1_sha" --argjson b "$g1_m1_bytes" \
+  '.files |= map(if .path == $p then .sha256 = $h | .bytes = $b else . end)' \
+  "$FIXTURE/stage/INPUT-MANIFEST.json" > "$G1_DIR/stage/INPUT-MANIFEST.json"
+( cd "$G1_DIR/stage" && tar -czf "$G1_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+g1_manifest_sha="$(sha "$G1_DIR/stage/INPUT-MANIFEST.json")"
+g1_archive_sha="$(sha "$G1_DIR/source.tar.gz")"
+g1_archive_bytes="$(wc -c < "$G1_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$g1_archive_sha" --argjson b "$g1_archive_bytes" --arg m "$g1_manifest_sha" \
+  '.archiveSha256=$h | .archiveBytes=$b | .inputManifestSha256=$m | .inputSnapshotSha256=$m' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$G1_DIR/source.tar.gz.attestation.json"
+cp "$G1_DIR/stage/INPUT-MANIFEST.json" "$G1_DIR/input-snapshot.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$G1_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$g1_archive_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$G1_DIR/source.tar.gz.attestation.json" ;;
+    --input-snapshot) ARGS[$((i+1))]="$G1_DIR/input-snapshot.json" ;;
+    --input-snapshot-sha256) ARGS[$((i+1))]="$g1_manifest_sha" ;;
+  esac
+done
+run_expect_fail 'archive files inventory does not exactly match the declared full migration history' "${ARGS[@]}"
+pass 'G1: rejects an archive whose M1 content + files[] entry are tampered together while fullMigrationHistory/--migration-root still declare the original hash'
+
+# G2: archive drops the M1 member entirely and files[] drops its M1 entry to
+# match (self-consistent with the archive); fullMigrationHistory (and
+# --migration-root, left untouched) still requires M1.
+G2_DIR="$TMP/g2-missing-archive-member"
+mkdir -p "$G2_DIR/stage"
+cp -R "$FIXTURE/stage/apps" "$G2_DIR/stage/apps"
+rm -rf "$G2_DIR/stage/apps/v1_api/prisma/migrations/$M1_NAME"
+jq --arg p "apps/v1_api/prisma/migrations/$M1_NAME/migration.sql" \
+  '.files |= map(select(.path != $p))' \
+  "$FIXTURE/stage/INPUT-MANIFEST.json" > "$G2_DIR/stage/INPUT-MANIFEST.json"
+( cd "$G2_DIR/stage" && tar -czf "$G2_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+g2_manifest_sha="$(sha "$G2_DIR/stage/INPUT-MANIFEST.json")"
+g2_archive_sha="$(sha "$G2_DIR/source.tar.gz")"
+g2_archive_bytes="$(wc -c < "$G2_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$g2_archive_sha" --argjson b "$g2_archive_bytes" --arg m "$g2_manifest_sha" \
+  '.archiveSha256=$h | .archiveBytes=$b | .inputManifestSha256=$m | .inputSnapshotSha256=$m' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$G2_DIR/source.tar.gz.attestation.json"
+cp "$G2_DIR/stage/INPUT-MANIFEST.json" "$G2_DIR/input-snapshot.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$G2_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$g2_archive_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$G2_DIR/source.tar.gz.attestation.json" ;;
+    --input-snapshot) ARGS[$((i+1))]="$G2_DIR/input-snapshot.json" ;;
+    --input-snapshot-sha256) ARGS[$((i+1))]="$g2_manifest_sha" ;;
+  esac
+done
+run_expect_fail 'archive files inventory does not exactly match the declared full migration history' "${ARGS[@]}"
+pass 'G2: rejects an archive with no M1 member at all (files[] dropped to match) while fullMigrationHistory/--migration-root still require it'
+
+# G4: archive's schema.prisma content + files[] schema entry are tampered
+# together; finalSchema.sha256 (and --schema/--schema-sha256, the actual
+# rehearsal input, left untouched) still declares the original hash.
+G4_DIR="$TMP/g4-schema-tamper"
+mkdir -p "$G4_DIR/stage"
+cp -R "$FIXTURE/stage/apps" "$G4_DIR/stage/apps"
+printf '// evil schema\n' >> "$G4_DIR/stage/apps/v1_api/prisma/schema.prisma"
+g4_schema_sha="$(sha "$G4_DIR/stage/apps/v1_api/prisma/schema.prisma")"
+g4_schema_bytes="$(wc -c < "$G4_DIR/stage/apps/v1_api/prisma/schema.prisma" | tr -d ' ')"
+jq --arg p 'apps/v1_api/prisma/schema.prisma' --arg h "$g4_schema_sha" --argjson b "$g4_schema_bytes" \
+  '.files |= map(if .path == $p then .sha256 = $h | .bytes = $b else . end)' \
+  "$FIXTURE/stage/INPUT-MANIFEST.json" > "$G4_DIR/stage/INPUT-MANIFEST.json"
+( cd "$G4_DIR/stage" && tar -czf "$G4_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+g4_manifest_sha="$(sha "$G4_DIR/stage/INPUT-MANIFEST.json")"
+g4_archive_sha="$(sha "$G4_DIR/source.tar.gz")"
+g4_archive_bytes="$(wc -c < "$G4_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$g4_archive_sha" --argjson b "$g4_archive_bytes" --arg m "$g4_manifest_sha" \
+  '.archiveSha256=$h | .archiveBytes=$b | .inputManifestSha256=$m | .inputSnapshotSha256=$m' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$G4_DIR/source.tar.gz.attestation.json"
+cp "$G4_DIR/stage/INPUT-MANIFEST.json" "$G4_DIR/input-snapshot.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$G4_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$g4_archive_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$G4_DIR/source.tar.gz.attestation.json" ;;
+    --input-snapshot) ARGS[$((i+1))]="$G4_DIR/input-snapshot.json" ;;
+    --input-snapshot-sha256) ARGS[$((i+1))]="$g4_manifest_sha" ;;
+  esac
+done
+run_expect_fail 'archive files inventory does not authenticate the pinned final schema' "${ARGS[@]}"
+pass 'G4: rejects an archive whose schema.prisma content + files[] entry are tampered together while finalSchema.sha256/--schema still declare the original hash'
 
 echo 'ALL PREFLIGHT SIDECAR CONTRACT TESTS PASSED'

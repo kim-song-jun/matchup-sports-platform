@@ -388,15 +388,15 @@ function TeamDetailMembersCard({ team }: { team: TeamDetailViewModel['team'] }) 
         {team.memberAccess.enabled ? <span className="tm-badge tm-badge-blue">공개</span> : <span className="tm-badge tm-badge-grey" style={{ gap: 4 }}><Lock size={11} aria-hidden="true" />비공개</span>}
       </div>
       {team.memberAccess.canView ? (
-        team.membersList.length ? (
-          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-            {team.membersList.map((member) => {
+        <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+            {team.membersList.length ? (
+            team.membersList.map((member) => {
               const content = <><TeamAvatar seed={member.userId} name={member.name} size="sm" /><div style={{ flex: 1, minWidth: 0 }}><div className="tm-text-body" style={{ color: 'var(--text-strong)', lineHeight: 1.35 }}>{member.name}</div><div className="tm-text-caption" style={{ marginTop: 2 }}>{member.role}</div></div>{member.profileHref ? <ChevronRightIcon size={18} stroke="var(--text-caption)" strokeWidth={2} /> : null}</>;
               return member.profileHref ? <Link key={member.membershipId} className="tm-list-row tm-pressable" href={member.profileHref}>{content}</Link> : <div key={member.membershipId} className="tm-list-row">{content}</div>;
-            })}
-            <TeamMembersMoreLink teamId={team.id} count={team.memberAccess.moreCount} />
-          </div>
-        ) : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>공개된 멤버가 아직 없어요.</div>
+            })
+          ) : <div className="tm-text-caption" style={{ lineHeight: 1.55 }}>공개된 멤버가 아직 없어요.</div>}
+          <TeamMembersMoreLink teamId={team.id} count={team.memberAccess.moreCount} />
+        </div>
       ) : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
     </Card>
   );
@@ -599,11 +599,13 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               <ShareIcon size={20} />
             </button>
             <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
-            <h2 className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 16 }}>{team.name}</h2>
-            <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-              <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
-              <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
+            <div className="tm-team-detail-hero-identity">
+              <h2 className="tm-text-heading" style={{ color: 'var(--static-white)' }}>{team.name}</h2>
+              <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
+                <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
+              </div>
             </div>
           </Card>
           {/* 전술보드 입구 — 히어로 바로 아래. 팀 일정(V1TeamSchedule)에는 대회 경기가
@@ -742,11 +744,13 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <ShareIcon size={20} />
           </button>
           <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
-          <div className="tm-text-heading" style={{ color: 'var(--static-white)', margin: '16px 0 0' }} aria-hidden="true">{team.name}</div>
-          <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-            <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
-            <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
+          <div className="tm-team-detail-hero-identity">
+            <div className="tm-text-heading" style={{ color: 'var(--static-white)' }} aria-hidden="true">{team.name}</div>
+            <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+              <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
+              <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
+            </div>
           </div>
         </Card>
         {mode === 'pending' ? (

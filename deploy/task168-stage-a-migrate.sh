@@ -166,7 +166,6 @@ old_api="${old_api_candidates[0]}"; old_image="$(docker inspect --format '{{.Con
 [[ "$initial_state" != preflight_failed_resume || "$old_image" == "$prior_previous_api_image" ]] || fail 'known API image drifted from authenticated prior quiesce receipt'
 mapfile -t old_worker_candidates < <(docker ps -aq --filter label=com.docker.compose.project=deploy --filter label=com.docker.compose.service=v1_game_operations_worker --filter label=com.docker.compose.oneoff=False)
 [[ "${#old_worker_candidates[@]}" == 1 ]] || fail 'expected exactly one known worker container'
-old_worker="${old_worker_candidates[0]}"
 "${compose[@]}" stop v1_api v1_game_operations_worker; [[ -z "$("${compose[@]}" ps -q v1_api)" && -z "$("${compose[@]}" ps -q v1_game_operations_worker)" ]] || fail 'writers did not quiesce'
 install -d -m 700 "$state_dir" "$report_dir"; "${compose[@]}" exec -T v1_postgres pg_dump -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" | gzip -9 > "$backup_file"; [[ -s "$backup_file" ]] || fail 'backup is empty'; backup_sha="$(sha "$backup_file")"; backup_bytes="$(wc -c < "$backup_file" | tr -d ' ')"
 write "$quiesce" <<EOF

@@ -300,6 +300,15 @@ describe('ResultsPageContent — 정규 리그 거울 행(kind=regular_league)�
     expect(screen.getByText('Tttt')).toBeInTheDocument();
     expect(screen.queryByText('최종 순위가 아직 등록되지 않았어요.')).not.toBeInTheDocument();
     expect(v1GetMock).toHaveBeenCalledWith(`/tournaments/${tournament.id}/standings/overall`);
+
+    // 감사 evidence: 순위는 뜨지만 W/GF/+/- 칸이 전부 0으로 나오던 결함(별도 수정) —
+    // computeTeamRecord가 tournament.fixtures(거울 행은 항상 [])를 스캔해서 생기는
+    // 문제라, 이 API가 이미 가진 승/득점/실점을 행에 실어야 한다. 우승팀(풋살크루)의
+    // 득실차 +3·챔피언 히어로의 "1경기 중"이 뜨는지로 검증한다 — 둘 다 0/기본값으로는
+    // 절대 안 나오는 값이다.
+    expect(screen.getAllByText('+3').length).toBeGreaterThan(0);
+    expect(screen.getByText('-3')).toBeInTheDocument();
+    expect(screen.getAllByText('1경기 중').length).toBeGreaterThan(0);
   });
 
   it('다조(2개 이상) format=league 대회의 기존 동작은 그대로 유지한다(회귀 방지)', () => {

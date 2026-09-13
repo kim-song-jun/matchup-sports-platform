@@ -392,6 +392,34 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     expect(screen.queryByLabelText('답장을 기다리는 컨택 3건')).not.toBeInTheDocument();
   });
 
+  it('cached verified owner keeps management, member CTA, and protected queries during auth background fetching', () => {
+    teamApiMocks.useV1AuthMe.mockReturnValue({
+      data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } },
+      isPending: false,
+      isFetching: true,
+      isError: false,
+    });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({
+        viewer: { role: 'owner', membershipId: 'mem-owner', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null },
+      }),
+      isError: false,
+      isPlaceholderData: false,
+    });
+    teamApiMocks.useV1TeamContactSummary.mockReturnValue({ data: { pendingInbound: 0, byTeam: [] } });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.queryByRole('button', { name: '로그인 상태 확인 중' })).toBeNull();
+    expect(screen.getAllByRole('link', { name: /^팀 정보 수정/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: /받은 컨택/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: '팀 채팅' }).length).toBeGreaterThan(0);
+    expect(teamApiMocks.useV1TeamContactSummary).toHaveBeenLastCalledWith({ enabled: true });
+    expect(teamApiMocks.useV1TeamJoinEligibility).toHaveBeenLastCalledWith('team-1', { enabled: true });
+    expect(teamApiMocks.useV1MyTeams).toHaveBeenLastCalledWith(undefined, { enabled: true });
+    expect(teamApiMocks.useV1TeamUpcomingGames).toHaveBeenCalledWith('team-1');
+  });
+
   it('총원이 미리보기(8명)보다 많으면 정확한 남은 인원 수로 "+ n명 더보기" CTA가 뜨고 전체 멤버 목록으로 연결된다', () => {
     teamApiMocks.useV1TeamDetail.mockReturnValue({
       data: baseTeamDetail({

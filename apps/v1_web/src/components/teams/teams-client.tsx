@@ -197,7 +197,7 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
   const authMe = useV1AuthMe({ enabled: true, retry: retryTransientFailure });
   const authUnauthorized = isUnauthenticatedError(authMe.error);
   const authRetryable = authMe.isError && retryTransientFailure(0, authMe.error);
-  const authPending = Boolean(authMe.isPending || authMe.isFetching);
+  const authPending = Boolean(authMe.isPending || (authMe.isFetching && !authMe.data?.user?.id));
   const authVerified = Boolean(authMe.data?.user?.id) && !authPending && !authMe.isError && !authUnauthorized;
   const authError = Boolean(authMe.isError && !authUnauthorized);
   const query = useV1TeamDetail(teamId, { seed });

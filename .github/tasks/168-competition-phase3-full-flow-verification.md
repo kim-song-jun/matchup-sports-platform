@@ -4,6 +4,12 @@
 
 ### 재개 커서 — 2026-09-13 AWS 재인증 이후
 
+- **2026-09-14 GitHub CI PASS 및 마지막 UX delta:** a0f90deb의 CI34767313327 API/Web/Gates가 모두 SUCCESS로 끝났다. Copilot background auth refetch 지적을 반영한 source7e99451d/testa1f1fb3c는 단일 worker31테스트 PASS(`teams-client-isolated-vitest-20260914-auth-background-final.log`, SHAe2af7d1d). 현재 세션이 정상인 캐시 운영자의 메뉴·CTA·보호 query를 background 갱신 동안 유지하며 초기확인/401/오류 경계는 그대로 검증한다. 이 마지막 delta의 독립 리뷰 후 같은 PR 후속 head CI/Copilot로 검증하며 이전 green head를 먼저 머지하지 않는다. 로컬 CI watch PID63658은 출력 누적을 줄이기 위해 명시 TERM했고 종료143을 확인했다. 원격 CI를 취소한 것은 아니다.
+
+- **2026-09-14 #1187 Copilot UI 회귀 보완:** a0f90deb의 Copilot5191296500은5/5파일 검토 후 `isFetching`만으로 정상 캐시 세션까지 잠가60초 이후 background refetch 때 운영 UI가 사라질 수 있다고 지적했다. source7e99451d는 초기 pending 또는 사용자 캐시가 없는 fetching만 잠그며, 현재401/오류의 권한 차단은 유지한다. Luna가 정상 캐시 운영자의 background refetch 화면 유지 회귀를 추가하고 Sol이 좁은 delta를 검토한다. a0f90 CI34767313327은 진행 중이지만 후속 수정 전 head를 머지하지 않는다.
+
+- **2026-09-14 공개 기록 연결의 실제 클릭 보완:** 첫 검수의 최종결과→대진표 진입은 직접 goto였으므로 연속 클릭 증거로 세지 않았다. Sol이 시작 URL 이후 `대회 상세 보기`→`최종 순위 보기`→`리그 순위`→`마포 레인저스`를 실제 컨트롤로 눌러 팀 전적16경기에 도착했고390 overflow0·관측 오류0을 확인했다. after-7efd의 ui-chain-detail/standings/team-records 스크린샷과 기존 영수증에 정정·증거를 추가했다.
+
 - **2026-09-14 #1187 최종 후보 독립 PASS:** source1fad003d/test17a3e598/loga74063cf를 root와 Sol이 확인했다. 실제 TeamDetailPageView 클릭을 포함한30테스트 PASS(단일 worker, `teams-client-isolated-vitest-20260914-auth-boundaries-final3.log`). 인증 pending/401/cached owner, retry 결과401/500, 콜드 쿠키, private member 비노출, public member/모집 경기 보존, 보호 upcoming-games 차단/허용을 검증한다. 이전29/30 실패는 공개 모집 query를 보호 query로 오인한 잘못된 테스트였고 실제 `useV1TeamUpcomingGames` 부정/긍정 검증으로 교정했다. Sol은 최신 dev7efd의 #1188 seed 보존도 확인했다. 이 후보를 #1187에 반영하여 현재 head CI/Copilot 후 dev 통합·Alpha Ego를 진행한다. M11 candidate는 PR에 포함하지 않는다.
 
 - **2026-09-14 후보 리뷰 후 보완 범위:** #1187의 세션 만료 경계를 CTA에만 적용하면 자동 채팅 mutation·컨택 조회·내 팀 전용 경기 카드·관리 메뉴·캐시된 비공개 멤버가 남는다는 Sol 반례를 반영했다. root source1fad003d는 해당 소비처 전체와 retry 정책을 보완했고 Sol source 검토에서 추가 blocker가 없었다. Luna는 retry401/500 및 비공개 운영자 회귀를 포함한 좁은 테스트를 보강 중이며 아직 PR/CI에 올리지 않았다. 별도 source archive packager8abdbfc7는 host별 tar metadata 차이, 출력 충돌/부분 생성, 선택적인 reviewed schema/M11 검증으로 Sol BLOCK되어 후보만 보완 중이다. 기존 합성 테스트5개 PASS는 실제 최종 이관 준비 완료가 아니다.

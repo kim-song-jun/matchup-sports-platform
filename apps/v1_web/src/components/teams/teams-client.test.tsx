@@ -718,9 +718,8 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
 
     render(<TeamDetailPageClient teamId="team-1" />);
 
-    // TeamDetailPageView renders every disabled/pending CTA as "처리 중"; the
-    // authPending flag still owns the disabled state and protected-query gates.
-    expect(screen.getAllByRole('button', { name: '처리 중' })[0]).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: '로그인 상태 확인 중' })[0]).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '처리 중' })).toBeNull();
     expect(resolveChat).not.toHaveBeenCalled();
     expect(teamApiMocks.useV1TeamContactSummary).toHaveBeenLastCalledWith({ enabled: false });
     expect(teamApiMocks.useV1TeamJoinEligibility).toHaveBeenLastCalledWith('team-1', { enabled: false });

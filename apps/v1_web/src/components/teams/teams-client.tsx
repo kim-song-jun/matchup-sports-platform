@@ -311,9 +311,9 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
         eligibilityError: eligibility.isError,
         eligibilityUnauthorized: isUnauthenticatedError(eligibility.error),
       }),
-    ctaPending: authPending || join.isPending || withdraw.isPending || resolveChat.isPending,
-    // ctaPending 에 seeding 을 넣지 않는다 — 렌더 쪽이 그걸 '처리 중'(= 내 신청 처리
-    // 중)으로 읽어 ctaLabel 을 덮는다. onCta 를 비우면 이미 disabled 다.
+    ctaPending: join.isPending || withdraw.isPending || resolveChat.isPending,
+    // ctaPending 에 seeding·authPending 을 넣지 않는다 — 렌더 쪽이 그걸 '처리 중'(= 내
+    // 신청 처리 중)으로 읽어 ctaLabel 을 덮는다. 둘 다 onCta 를 비워 이미 disabled 다.
     onCta: seeding ? undefined : teamDetailCtaAction({
       team: query.data,
       eligibility: eligibility.data,

@@ -25,11 +25,23 @@ export COPYFILE_DISABLE=1
 #   symlink member rejection                                    -> red on (6)
 #   prisma unauthenticated-member rejection                     -> red on (7), (7b), (7c)
 #   unsafe-path (../) member rejection                          -> red on (8)
-#   per-file archive-content-vs-snapshot sha/bytes check (:144-148) -> red on (9)
+#   per-file archive-content-vs-snapshot sha/bytes check         -> red on (9)
 #   pinned FINAL_SCHEMA_SHA/M11_SHA/M11_NAME_PIN constants       -> red on golden path (1), since the
 #                                                                    fixture uses the real reviewed bytes
-#   files[] finalSchema entry == pinned schema sha (:182-184)    -> red on (G4)
-#   files[] migration entries == fullMigrationHistory (:185-190) -> red on (G1), (G2)
+#   files[] finalSchema entry == pinned schema sha               -> red on (G4)
+#   files[] migration entries == fullMigrationHistory            -> red on (G1), (G2)
+#   duplicate archive member rejection                           -> red on (DUP)
+#   Task168-contract M11 hash pin (caller input vs reviewed sha) -> red on (F12)
+#   snapshot .m11.sha256 pin                                     -> red on (F13)
+#   Task168-contract "M11 must be last" order check               -> red on (F14)
+#   full-history "must end at M11" order check                    -> red on (F15)
+#   full-history-vs-migration-root-file checksum check             -> red on (F16)
+#   migration-root-directories-vs-full-history set/order check     -> red on (F17)
+#   snapshot fullMigrationHistory == --full-migrations-json check   -> red on (F20)
+# (F12-F20 use a full 11-entry Task168 contract + a 12th pre-Task168
+#  history entry -- the minimal 2-entry fixture used everywhere else in this
+#  file never reaches those checks, since it always fails the earlier
+#  11-entries-required gate first.)
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
@@ -399,6 +411,37 @@ for i in "${!ARGS[@]}"; do
 done
 run_expect_fail 'source archive input differs from authenticated snapshot' "${ARGS[@]}"
 pass 'rejects an archive whose M1 migration bytes differ from the authenticated files[] entry even though the manifest and sidecar are internally self-consistent'
+
+# ---- DUP. a second, empty copy of the already-hashed M11 member appended
+#          after the real one is rejected -- `tar -xOf` concatenates both
+#          copies (so a naive content check on the concatenated bytes could
+#          pass) while real extraction keeps only the last (empty) one -----
+DUP_DIR="$TMP/duplicate-member"
+mkdir -p "$DUP_DIR"
+python3 - "$FIXTURE/stage" "$DUP_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
+import io, os, sys, tarfile
+stage, out, dup_name = sys.argv[1], sys.argv[2], sys.argv[3]
+with tarfile.open(out, 'w:gz') as tar:
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json')
+    tar.add(os.path.join(stage, 'apps'), arcname='apps')
+    info = tarfile.TarInfo(name=dup_name)
+    info.size = 0
+    tar.addfile(info, io.BytesIO(b''))
+PY
+dup_sha="$(sha "$DUP_DIR/source.tar.gz")"
+dup_bytes="$(wc -c < "$DUP_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$dup_sha" --argjson b "$dup_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$DUP_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$DUP_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$dup_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$DUP_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains a duplicate member' "${ARGS[@]}"
+pass 'DUP: rejects an archive that carries a second, empty copy of an already-present member name'
 
 
 # ---- 10. non-canonical spellings of an in-scope migration path bypass a
@@ -827,5 +870,312 @@ done
 # actually ship.
 run_expect_fail 'pinned final schema sha256 does not match the reviewed checksum' "${ARGS[@]}"
 pass 'PIN-2: rejects a rehearsal --schema/finalSchema.sha256 that diverge from the archive while files[] (and the archive'"'"'s actual bytes) still declare the reviewed schema'
+
+
+# ============================================================================
+# GOLDEN: a full 11-entry Task168 migration contract, backed by a 12-entry
+# full migration history (1 pre-Task168 legacy migration + the 10 synthetic
+# Task168 migrations + the real reviewed M11), reaches every static check in
+# the script -- including the ones after the 11-entries gate that every
+# fixture above this point (--migrations-json='[]') never reaches. docker is
+# stubbed via PATH so the golden path can be proven to arrive at the first
+# real docker call without Docker/DB/network.
+# ============================================================================
+DOCKER_STUB_DIR="$TMP/docker-stub-bin"
+mkdir -p "$DOCKER_STUB_DIR"
+DOCKER_STUB_LOG="$TMP/docker-stub.log"
+: > "$DOCKER_STUB_LOG"
+cat > "$DOCKER_STUB_DIR/docker" <<STUB
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$DOCKER_STUB_LOG"
+exit 1
+STUB
+chmod +x "$DOCKER_STUB_DIR/docker"
+export PATH="$DOCKER_STUB_DIR:$PATH"
+
+LEGACY_NAME=20260801000000_legacy_pre_task168
+SYNTH_NAMES=()
+for n in $(seq -w 1 10); do SYNTH_NAMES+=("202609081300${n}_synth_m${n}"); done
+GOLDEN_ALL_NAMES=("$LEGACY_NAME" "${SYNTH_NAMES[@]}" "$M11_NAME")
+GOLDEN_TASK_NAMES=("${SYNTH_NAMES[@]}" "$M11_NAME")
+
+# Builds a full 12-entry Task168 golden fixture (1 pre-Task168 legacy
+# migration + 10 synthetic Task168 migrations + the real reviewed M11) at
+# $1, with a matching 11-entry --migrations-json (legacy excluded).
+build_golden_fixture() {
+  local dir="$1" prisma="$1/stage/apps/v1_api/prisma"
+  mkdir -p "$prisma/migrations"
+  cp "$REVIEWED_FINAL_SCHEMA" "$prisma/schema.prisma"
+  printf 'provider = "postgresql"\n' > "$prisma/migrations/migration_lock.toml"
+  mkdir -p "$prisma/migrations/$LEGACY_NAME"
+  printf -- '-- legacy pre-task168\nSELECT 1;\n' > "$prisma/migrations/$LEGACY_NAME/migration.sql"
+  for n in "${SYNTH_NAMES[@]}"; do
+    mkdir -p "$prisma/migrations/$n"
+    printf -- '-- synthetic %s\nSELECT 1;\n' "$n" > "$prisma/migrations/$n/migration.sql"
+  done
+  mkdir -p "$prisma/migrations/$M11_NAME"
+  cp "$REVIEWED_M11_FILE" "$prisma/migrations/$M11_NAME/migration.sql"
+
+  local full='[]'
+  for n in "${GOLDEN_ALL_NAMES[@]}"; do
+    local sql="$prisma/migrations/$n/migration.sql" h b
+    h="$(sha "$sql")"; b="$(wc -c < "$sql" | tr -d ' ')"
+    full="$(jq -cn --argjson arr "$full" --arg n "$n" --arg h "$h" '$arr + [{name:$n,sha256:$h}]')"
+  done
+  printf '%s' "$full" > "$dir/full-migrations.json"
+  jq -c --arg legacy "$LEGACY_NAME" '[.[] | select(.name != $legacy)]' "$dir/full-migrations.json" > "$dir/migrations.json"
+  echo '[]' > "$dir/resolved-attempts.json"
+
+  local lock="$prisma/migrations/migration_lock.toml" lock_sha lock_bytes schema_sha schema_bytes
+  lock_sha="$(sha "$lock")"; lock_bytes="$(wc -c < "$lock" | tr -d ' ')"
+  schema_sha="$(sha "$prisma/schema.prisma")"; schema_bytes="$(wc -c < "$prisma/schema.prisma" | tr -d ' ')"
+  local files
+  files="$(jq -n --arg lockSha "$lock_sha" --argjson lockBytes "$lock_bytes" --arg schemaSha "$schema_sha" --argjson schemaBytes "$schema_bytes" \
+    '[{path:"apps/v1_api/prisma/schema.prisma",sha256:$schemaSha,bytes:$schemaBytes,mode:"644"},{path:"apps/v1_api/prisma/migrations/migration_lock.toml",sha256:$lockSha,bytes:$lockBytes,mode:"644"}]')"
+  for n in "${GOLDEN_ALL_NAMES[@]}"; do
+    local sql="$prisma/migrations/$n/migration.sql" h b
+    h="$(sha "$sql")"; b="$(wc -c < "$sql" | tr -d ' ')"
+    files="$(jq -c --argjson arr "$files" --arg p "apps/v1_api/prisma/migrations/$n/migration.sql" --arg h "$h" --argjson b "$b" '$arr + [{path:$p,sha256:$h,bytes:$b,mode:"644"}]' <<<null)"
+  done
+  jq -n \
+    --arg commit "$RELEASE_SHA" --arg schemaSha "$schema_sha" \
+    --argjson files "$files" --argjson fullHistory "$(cat "$dir/full-migrations.json")" \
+    --arg m11Name "$M11_NAME" --arg m11Sha "$(sha "$prisma/migrations/$M11_NAME/migration.sql")" \
+    '{schemaVersion:1,kind:"task168StageBFinalInputs",sourceCommit:$commit,
+      finalSchema:{path:"apps/v1_api/prisma/schema.prisma",sha256:$schemaSha},
+      migrationPolicy:"task168-stageBFinal",files:$files,fullMigrationHistory:$fullHistory,
+      m11:{name:$m11Name,sha256:$m11Sha},
+      archiveLayout:{root:"repository",pathPrefix:"",mapping:"archive member == files[].path"}}' \
+    > "$dir/stage/INPUT-MANIFEST.json"
+
+  ( cd "$dir/stage" && tar -czf "$dir/source.tar.gz" INPUT-MANIFEST.json apps )
+  local manifest_sha archive_sha archive_bytes
+  manifest_sha="$(sha "$dir/stage/INPUT-MANIFEST.json")"
+  archive_sha="$(sha "$dir/source.tar.gz")"
+  archive_bytes="$(wc -c < "$dir/source.tar.gz" | tr -d ' ')"
+  jq -n --arg commit "$RELEASE_SHA" --arg p "$dir/source.tar.gz" --arg h "$archive_sha" --argjson b "$archive_bytes" --arg m "$manifest_sha" \
+    '{schemaVersion:1,kind:"task168StageBSourceArchiveAttestation",sourceCommit:$commit,archivePath:$p,archiveSha256:$h,archiveBytes:$b,inputManifestPath:"INPUT-MANIFEST.json",inputManifestSha256:$m,inputSnapshotSha256:$m,archiveLayout:{root:"repository",pathPrefix:"",mapping:"archive member == files[].path"},createdAt:"2026-09-14T00:00:00Z"}' \
+    > "$dir/source.tar.gz.attestation.json"
+  cp "$dir/stage/INPUT-MANIFEST.json" "$dir/input-snapshot.json"
+}
+
+GOLDEN="$TMP/golden"
+mkdir -p "$GOLDEN"
+build_golden_fixture "$GOLDEN"
+
+common_args_golden() {
+  local schema_sha; schema_sha="$(jq -r '.finalSchema.sha256' "$GOLDEN/stage/INPUT-MANIFEST.json")"
+  local source_sha; source_sha="$(sha "$GOLDEN/source.tar.gz")"
+  local input_sha; input_sha="$(sha "$GOLDEN/input-snapshot.json")"
+  ARGS=(
+    --backup "$STAGE_A_DIR/backup.gz" --backup-sha256 "$(sha "$STAGE_A_DIR/backup.gz")" --backup-format plain-sql-gzip
+    --stage-a-transition-receipt "$STAGE_A_DIR/transition.json" --stage-a-transition-receipt-sha256 "$(sha "$STAGE_A_DIR/transition.json")"
+    --stage-a-backup-receipt "$STAGE_A_DIR/backup-receipt.json" --stage-a-backup-receipt-sha256 "$(sha "$STAGE_A_DIR/backup-receipt.json")"
+    --stage-a-release-sha "$STAGE_A_RELEASE" --stage-a-schema-sha256 "$STAGE_A_SCHEMA_SHA" --database-identity "$DB_IDENTITY"
+    --schema "$GOLDEN/stage/apps/v1_api/prisma/schema.prisma" --schema-sha256 "$schema_sha"
+    --migration-root "$GOLDEN/stage/apps/v1_api/prisma/migrations"
+    --migrations-json "$GOLDEN/migrations.json" --full-migrations-json "$GOLDEN/full-migrations.json"
+    --resolved-migration-attempts-json "$GOLDEN/resolved-attempts.json"
+    --source-archive "$GOLDEN/source.tar.gz" --source-sha256 "$source_sha"
+    --source-archive-attestation "$GOLDEN/source.tar.gz.attestation.json"
+    --input-snapshot "$GOLDEN/input-snapshot.json" --input-snapshot-sha256 "$input_sha"
+    --postgres-image postgres@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    --api-image x@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    --api-client-schema-path /x --web-image x@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    --cutover-tool-image x@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    --api-workdir /x --api-prisma-bin /x --tool-workdir /x --tool-prisma-bin /x
+    --release-sha "$RELEASE_SHA" --report "$TMP/golden-report-$RANDOM.json" --receipt "$TMP/golden-receipt-$RANDOM.json"
+  )
+}
+
+# ---- GOLDEN. the full 11-entry contract clears every static check (through
+#              the migration-root/full-history directory match) and reaches
+#              the first real docker call -----------------------------------
+common_args_golden
+run_expect_fail 'pinned PostgreSQL image is unavailable locally' "${ARGS[@]}"
+grep -q 'image inspect' "$DOCKER_STUB_LOG" || fail 'docker stub was not invoked -- golden fixture did not reach the docker image checks'
+pass 'GOLDEN: a full 11-entry Task168 contract + matching 12-entry full history clears every static check and reaches the stubbed docker image-inspect call'
+
+# ---- F13. snapshot .m11.sha256 disagrees with the reviewed M11_SHA pin,
+#           while fullMigrationHistory/files[]/archive/migration-root/
+#           --migrations-json all still agree with each other and with the
+#           real (untampered) M11 bytes ------------------------------------
+F13_DIR="$TMP/f13-snapshot-m11-pin"
+mkdir -p "$F13_DIR/stage"
+cp -R "$GOLDEN/stage/apps" "$F13_DIR/stage/apps"
+jq '.m11.sha256 = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"' \
+  "$GOLDEN/stage/INPUT-MANIFEST.json" > "$F13_DIR/stage/INPUT-MANIFEST.json"
+( cd "$F13_DIR/stage" && tar -czf "$F13_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+f13_manifest_sha="$(sha "$F13_DIR/stage/INPUT-MANIFEST.json")"
+f13_archive_sha="$(sha "$F13_DIR/source.tar.gz")"
+f13_archive_bytes="$(wc -c < "$F13_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$f13_archive_sha" --argjson b "$f13_archive_bytes" --arg m "$f13_manifest_sha" \
+  '.archiveSha256=$h | .archiveBytes=$b | .inputManifestSha256=$m | .inputSnapshotSha256=$m' \
+  "$GOLDEN/source.tar.gz.attestation.json" > "$F13_DIR/source.tar.gz.attestation.json"
+common_args_golden
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$F13_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$f13_archive_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$F13_DIR/source.tar.gz.attestation.json" ;;
+    --input-snapshot) ARGS[$((i+1))]="$F13_DIR/stage/INPUT-MANIFEST.json" ;;
+    --input-snapshot-sha256) ARGS[$((i+1))]="$f13_manifest_sha" ;;
+  esac
+done
+run_expect_fail 'input snapshot does not authenticate the prepared Stage B source/archive contract' "${ARGS[@]}"
+pass 'F13: rejects a snapshot .m11.sha256 that disagrees with the reviewed M11 pin while fullMigrationHistory/files[]/archive/migration-root/migrations-json all agree with the real bytes'
+
+# ---- F20. --full-migrations-json disagrees with the snapshot's embedded
+#           fullMigrationHistory, while the snapshot itself stays internally
+#           self-consistent (files[] still matches its own fullMigrationHistory,
+#           and .m11 still matches the reviewed pin) -----------------------
+F20_BAD_HISTORY="$TMP/f20-bad-history.json"
+jq '.[1].sha256 = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"' \
+  "$GOLDEN/full-migrations.json" > "$F20_BAD_HISTORY"
+common_args_golden
+for i in "${!ARGS[@]}"; do
+  if [[ "${ARGS[$i]}" == "--full-migrations-json" ]]; then ARGS[$((i+1))]="$F20_BAD_HISTORY"; fi
+done
+run_expect_fail 'input snapshot does not authenticate the prepared Stage B source/archive contract' "${ARGS[@]}"
+pass 'F20: rejects a --full-migrations-json that disagrees with the snapshot-embedded fullMigrationHistory even though the snapshot itself is internally self-consistent'
+
+# ---- F14. the Task168 contract (--migrations-json) still has all 11
+#           correct entries, only reordered so M11 is not last ------------
+F14_MIGRATIONS="$TMP/f14-migrations.json"
+jq -c '[.[-1]] + .[0:-1]' "$GOLDEN/migrations.json" > "$F14_MIGRATIONS"
+common_args_golden
+for i in "${!ARGS[@]}"; do
+  if [[ "${ARGS[$i]}" == "--migrations-json" ]]; then ARGS[$((i+1))]="$F14_MIGRATIONS"; fi
+done
+run_expect_fail 'M11 must be the final migration entry' "${ARGS[@]}"
+pass 'F14: rejects a Task168 contract carrying the correct 11 entries reordered so M11 is not last'
+
+# ---- F15. --full-migrations-json and the snapshot-embedded fullMigrationHistory
+#           are reordered together (so the :188 cross-check still passes) so M11
+#           is not the last entry of either one ----------------------------
+F15_DIR="$TMP/f15-full-history-order"
+mkdir -p "$F15_DIR/stage"
+cp -R "$GOLDEN/stage/apps" "$F15_DIR/stage/apps"
+jq -c '[.[-1]] + .[0:-1]' "$GOLDEN/full-migrations.json" > "$F15_DIR/full-migrations.json"
+jq --slurpfile h "$F15_DIR/full-migrations.json" '.fullMigrationHistory = $h[0]' \
+  "$GOLDEN/stage/INPUT-MANIFEST.json" > "$F15_DIR/stage/INPUT-MANIFEST.json"
+( cd "$F15_DIR/stage" && tar -czf "$F15_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+f15_manifest_sha="$(sha "$F15_DIR/stage/INPUT-MANIFEST.json")"
+f15_archive_sha="$(sha "$F15_DIR/source.tar.gz")"
+f15_archive_bytes="$(wc -c < "$F15_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$f15_archive_sha" --argjson b "$f15_archive_bytes" --arg m "$f15_manifest_sha" \
+  '.archiveSha256=$h | .archiveBytes=$b | .inputManifestSha256=$m | .inputSnapshotSha256=$m' \
+  "$GOLDEN/source.tar.gz.attestation.json" > "$F15_DIR/source.tar.gz.attestation.json"
+common_args_golden
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$F15_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$f15_archive_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$F15_DIR/source.tar.gz.attestation.json" ;;
+    --input-snapshot) ARGS[$((i+1))]="$F15_DIR/stage/INPUT-MANIFEST.json" ;;
+    --input-snapshot-sha256) ARGS[$((i+1))]="$f15_manifest_sha" ;;
+    --full-migrations-json) ARGS[$((i+1))]="$F15_DIR/full-migrations.json" ;;
+  esac
+done
+run_expect_fail 'full migration history must end at M11' "${ARGS[@]}"
+pass 'F15: rejects a --full-migrations-json (and matching snapshot fullMigrationHistory) carrying the correct 12 entries reordered so M11 is not last'
+
+# ---- F16. the archive's legacy-migration content, files[] and
+#           fullMigrationHistory (and therefore --full-migrations-json,
+#           rebuilt to match so :188 stays green) are all consistently
+#           tampered together; only --migration-root (left as the golden,
+#           untampered directory) disagrees with the new hash -- the legacy
+#           entry is not part of the Task168 subset, so :234-237 (which only
+#           cross-checks --migrations-json's 11 names) never catches it first
+F16_DIR="$TMP/f16-legacy-checksum"
+mkdir -p "$F16_DIR/stage"
+cp -R "$GOLDEN/stage/apps" "$F16_DIR/stage/apps"
+printf -- '-- legacy pre-task168 (tampered)\nSELECT 2;\n' > "$F16_DIR/stage/apps/v1_api/prisma/migrations/$LEGACY_NAME/migration.sql"
+f16_legacy_sha="$(sha "$F16_DIR/stage/apps/v1_api/prisma/migrations/$LEGACY_NAME/migration.sql")"
+f16_legacy_bytes="$(wc -c < "$F16_DIR/stage/apps/v1_api/prisma/migrations/$LEGACY_NAME/migration.sql" | tr -d ' ')"
+jq --arg p "apps/v1_api/prisma/migrations/$LEGACY_NAME/migration.sql" --arg h "$f16_legacy_sha" --argjson b "$f16_legacy_bytes" --arg legacy "$LEGACY_NAME" \
+  '.files |= map(if .path == $p then .sha256 = $h | .bytes = $b else . end) | .fullMigrationHistory |= map(if .name == $legacy then .sha256 = $h else . end)' \
+  "$GOLDEN/stage/INPUT-MANIFEST.json" > "$F16_DIR/stage/INPUT-MANIFEST.json"
+( cd "$F16_DIR/stage" && tar -czf "$F16_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+f16_manifest_sha="$(sha "$F16_DIR/stage/INPUT-MANIFEST.json")"
+f16_archive_sha="$(sha "$F16_DIR/source.tar.gz")"
+f16_archive_bytes="$(wc -c < "$F16_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$f16_archive_sha" --argjson b "$f16_archive_bytes" --arg m "$f16_manifest_sha" \
+  '.archiveSha256=$h | .archiveBytes=$b | .inputManifestSha256=$m | .inputSnapshotSha256=$m' \
+  "$GOLDEN/source.tar.gz.attestation.json" > "$F16_DIR/source.tar.gz.attestation.json"
+F16_FULL="$TMP/f16-full-migrations.json"
+jq '.fullMigrationHistory' "$F16_DIR/stage/INPUT-MANIFEST.json" > "$F16_FULL"
+common_args_golden
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$F16_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$f16_archive_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$F16_DIR/source.tar.gz.attestation.json" ;;
+    --input-snapshot) ARGS[$((i+1))]="$F16_DIR/stage/INPUT-MANIFEST.json" ;;
+    --input-snapshot-sha256) ARGS[$((i+1))]="$f16_manifest_sha" ;;
+    --full-migrations-json) ARGS[$((i+1))]="$F16_FULL" ;;
+  esac
+done
+run_expect_fail 'full-history migration checksum mismatch' "${ARGS[@]}"
+pass 'F16: rejects a --full-migrations-json (matching archive/files[]/snapshot) legacy-migration hash that disagrees with the real --migration-root file'
+
+# ---- F17. an extra, unlisted migration directory sits in --migration-root
+#           alongside every directory --full-migrations-json actually lists
+#           -----------------------------------------------------------------
+F17_ROOT="$TMP/f17-migration-root"
+cp -R "$GOLDEN/stage/apps/v1_api/prisma/migrations" "$F17_ROOT"
+mkdir -p "$F17_ROOT/20260801000001_stray_dir"
+printf -- '-- stray\nSELECT 1;\n' > "$F17_ROOT/20260801000001_stray_dir/migration.sql"
+common_args_golden
+for i in "${!ARGS[@]}"; do
+  if [[ "${ARGS[$i]}" == "--migration-root" ]]; then ARGS[$((i+1))]="$F17_ROOT"; fi
+done
+run_expect_fail 'migration-root directories or order differ from authenticated full history' "${ARGS[@]}"
+pass 'F17: rejects a --migration-root that carries a stray directory not present in --full-migrations-json'
+
+# ---- F12. the Task168 contract's (--migrations-json) M11 hash, the actual
+#           on-disk M11 bytes, files[], the archive, and --full-migrations-
+#           json are all consistently tampered together; only the snapshot's
+#           .m11.sha256 (left at the real, reviewed value) and the hardcoded
+#           M11_SHA pin in the script disagree with them ------------------
+F12_DIR="$TMP/f12-m11-pin"
+mkdir -p "$F12_DIR/stage"
+cp -R "$GOLDEN/stage/apps" "$F12_DIR/stage/apps"
+printf -- 'DROP SCHEMA public CASCADE;\n' > "$F12_DIR/stage/apps/v1_api/prisma/migrations/$M11_NAME/migration.sql"
+f12_m11_sha="$(sha "$F12_DIR/stage/apps/v1_api/prisma/migrations/$M11_NAME/migration.sql")"
+f12_m11_bytes="$(wc -c < "$F12_DIR/stage/apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" | tr -d ' ')"
+jq --arg p "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" --arg h "$f12_m11_sha" --argjson b "$f12_m11_bytes" \
+  '.files |= map(if .path == $p then .sha256 = $h | .bytes = $b else . end) | .fullMigrationHistory |= map(if .name == "'"$M11_NAME"'" then .sha256 = $h else . end)' \
+  "$GOLDEN/stage/INPUT-MANIFEST.json" > "$F12_DIR/stage/INPUT-MANIFEST.json"
+( cd "$F12_DIR/stage" && tar -czf "$F12_DIR/source.tar.gz" INPUT-MANIFEST.json apps )
+f12_manifest_sha="$(sha "$F12_DIR/stage/INPUT-MANIFEST.json")"
+f12_archive_sha="$(sha "$F12_DIR/source.tar.gz")"
+f12_archive_bytes="$(wc -c < "$F12_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$f12_archive_sha" --argjson b "$f12_archive_bytes" --arg m "$f12_manifest_sha" \
+  '.archiveSha256=$h | .archiveBytes=$b | .inputManifestSha256=$m | .inputSnapshotSha256=$m' \
+  "$GOLDEN/source.tar.gz.attestation.json" > "$F12_DIR/source.tar.gz.attestation.json"
+cp "$F12_DIR/stage/INPUT-MANIFEST.json" "$F12_DIR/input-snapshot.json"
+F12_MIGRATIONS="$TMP/f12-migrations.json"
+jq --arg h "$f12_m11_sha" '(.[-1].sha256) = $h' "$GOLDEN/migrations.json" > "$F12_MIGRATIONS"
+F12_FULL="$TMP/f12-full-migrations.json"
+jq --arg h "$f12_m11_sha" '(.[-1].sha256) = $h' "$GOLDEN/full-migrations.json" > "$F12_FULL"
+F12_ROOT="$TMP/f12-migration-root"
+cp -R "$GOLDEN/stage/apps/v1_api/prisma/migrations" "$F12_ROOT"
+cp "$F12_DIR/stage/apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" "$F12_ROOT/$M11_NAME/migration.sql"
+common_args_golden
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$F12_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$f12_archive_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$F12_DIR/source.tar.gz.attestation.json" ;;
+    --input-snapshot) ARGS[$((i+1))]="$F12_DIR/input-snapshot.json" ;;
+    --input-snapshot-sha256) ARGS[$((i+1))]="$f12_manifest_sha" ;;
+    --migrations-json) ARGS[$((i+1))]="$F12_MIGRATIONS" ;;
+    --full-migrations-json) ARGS[$((i+1))]="$F12_FULL" ;;
+    --migration-root) ARGS[$((i+1))]="$F12_ROOT" ;;
+  esac
+done
+run_expect_fail 'M11 migration hash in the Task 168 contract does not match the reviewed checksum' "${ARGS[@]}"
+pass 'F12: rejects a Task168 contract whose M11 hash (and every consistently-tampered consumer of it) diverges from the reviewed M11_SHA pin'
 
 echo 'ALL PREFLIGHT SIDECAR CONTRACT TESTS PASSED'

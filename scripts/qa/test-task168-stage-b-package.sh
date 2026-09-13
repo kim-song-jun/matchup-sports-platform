@@ -7,18 +7,17 @@ set -Eeuo pipefail
 #
 # Deletion -> expected red (recorded here; the session that added this test
 # ran each deletion against a scratch copy of the script and counted red):
-#   git_mode() normalization reverted to raw `stat`         -> red on determinism test (1)
-#   FINAL_SCHEMA_SHA constant or its assertion (:53)        -> red on tamper-reject test (3)
-#   M11_SHA constant or its assertion (:54)                 -> red on M11-tamper test (3e)
-#   M11_NAME pin (readonly M11_NAME + both $m11Name jq
-#     comparisons at :57-69)                                -> red on M11-rename test (3f)
-#   source-migration-inventory check (source vs history)   -> red on drift test (4)
-#   apps/v1_api/prisma/ allowlist check                     -> red on rogue-file test (5)
-#   sidecar-first / rollback-on-archive-failure publish     -> red on mid-publish-failure test (7)
-#   per-file "prepared file drift" check (:148)             -> red on file-drift tests (3b)
-#   "files inventory == fullMigrationHistory" check (:74-79) -> red on inventory-mismatch test (3c)
-#   pinned-source-commit content binding (:155-158)          -> red on pinned-drift test (3d)
-#   deterministic golden archive sha assertion               -> red if EXPECTED_ARCHIVE_SHA drifts (1)
+#   git_mode() normalization reverted to raw `stat`          -> red on determinism test (1)
+#   FINAL_SCHEMA_SHA constant/assertion                      -> red on tamper-reject test (3)
+#   M11_SHA constant/assertion                                -> red on M11-tamper test (3e)
+#   M11_NAME pin (readonly + manifest .m11.name checks)       -> red on M11-rename test (3f)
+#   source-migration-inventory check (source vs history)      -> red on drift test (4)
+#   apps/v1_api/prisma/ allowlist check                        -> red on rogue-file test (5)
+#   sidecar-first / rollback-on-archive-failure publish        -> red on mid-publish-failure test (7)
+#   per-file "prepared file drift" check                       -> red on file-drift tests (3b)
+#   "files inventory == fullMigrationHistory" check             -> red on inventory-mismatch test (3c)
+#   pinned-source-commit content binding                        -> red on pinned-drift test (3d)
+#   deterministic golden archive sha assertion                  -> red if EXPECTED_ARCHIVE_SHA drifts (1)
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"

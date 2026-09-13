@@ -127,6 +127,7 @@ jq -e '.archiveLayout.pathPrefix==""' "$INPUT_SNAPSHOT" >/dev/null || fail 'inpu
 ARCHIVE_REGULAR_MEMBERS="$(mktemp "${TMPDIR:-/tmp}/task168-preflight-members.XXXXXX")"
 python3 - "$SOURCE_ARCHIVE" > "$ARCHIVE_REGULAR_MEMBERS" <<'PY' || fail 'source archive member listing failed or contains a rejected path'
 import posixpath, sys, tarfile
+seen = set()
 with tarfile.open(sys.argv[1], 'r:*') as tar:
     for member in tar.getmembers():
         name = member.name
@@ -147,6 +148,16 @@ with tarfile.open(sys.argv[1], 'r:*') as tar:
         if member.issym() or member.islnk():
             sys.stderr.write('source archive contains a symlink or hardlink member: %s\n' % name)
             sys.exit(1)
+        # `tar -xOf` (used below for the per-file content check) concatenates
+        # every copy of a repeated member name; real extraction keeps only
+        # the last one. A second, differently-sized copy of an already-hashed
+        # member (e.g. an empty duplicate appended after the real M11 file)
+        # would otherwise clear that content check on the concatenated bytes
+        # while extracting to something else entirely.
+        if check_name in seen:
+            sys.stderr.write('source archive contains a duplicate member: %s\n' % name)
+            sys.exit(1)
+        seen.add(check_name)
         if member.isdir():
             continue
         sys.stdout.buffer.write(check_name.encode('utf-8', 'surrogateescape') + b'\0')
@@ -262,7 +273,12 @@ FAILURE_DIR="${RECEIPT}.failure.evidence"
 for output in "$REPORT" "$RECEIPT" "$CLEANUP_RECORD" "$EVIDENCE_DIR" "$EVIDENCE_TMP" "$FAILURE_DIR"; do
   [[ ! -e "$output" ]] || fail "output already exists: $output"
 done
-OUTPUT_PATHS=("$(realpath -m "$REPORT")" "$(realpath -m "$RECEIPT")" "$(realpath -m "$CLEANUP_RECORD")" "$(realpath -m "$EVIDENCE_DIR")" "$(realpath -m "$EVIDENCE_TMP")" "$(realpath -m "$FAILURE_DIR")")
+# GNU `realpath -m` canonicalizes a path that does not exist yet; BSD/macOS
+# realpath has no -m. python3's os.path.realpath does the same normalization
+# on both platforms without requiring the path to exist, and this script
+# already depends on python3 for the archive member listing above.
+abspath() { python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1"; }
+OUTPUT_PATHS=("$(abspath "$REPORT")" "$(abspath "$RECEIPT")" "$(abspath "$CLEANUP_RECORD")" "$(abspath "$EVIDENCE_DIR")" "$(abspath "$EVIDENCE_TMP")" "$(abspath "$FAILURE_DIR")")
 for ((i=0; i<${#OUTPUT_PATHS[@]}; i++)); do for ((j=i+1; j<${#OUTPUT_PATHS[@]}; j++)); do
   [[ "${OUTPUT_PATHS[i]}" != "${OUTPUT_PATHS[j]}" ]] || fail 'output paths must be pairwise distinct'
 done; done

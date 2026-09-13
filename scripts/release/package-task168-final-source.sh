@@ -25,7 +25,7 @@ done
 
 # Reviewed, pinned identities. These are the promotion contract: nobody can
 # swap in a different final schema or M11 migration by editing only the
-# self-reported INPUT-MANIFEST.json (BLOCK-3).
+# self-reported INPUT-MANIFEST.json.
 readonly FINAL_SCHEMA_SHA=e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46
 readonly M11_SHA=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
 readonly M11_NAME=20260911090000_retire_tournament_fixture_tables
@@ -44,7 +44,7 @@ bytes() { wc -c < "$1" | tr -d ' '; }
 # Git only ever stores regular files as mode 100644 or 100755. Deriving mode
 # from the executable bit (instead of raw `stat`) makes every member's mode
 # in the archive independent of the extracting umask and of macOS/Linux
-# `stat` format differences (BLOCK-1, missed-defect mode-format skew).
+# `stat` format differences.
 git_mode() { [[ -x "$1" ]] && printf '755' || printf '644'; }
 
 [[ ! -e "$OUTPUT_ARCHIVE" && ! -e "$OUTPUT_ATTESTATION" ]] || fail 'refusing to overwrite an existing output'
@@ -70,7 +70,7 @@ jq -e --arg commit "$SOURCE_COMMIT" --arg schemaSha "$FINAL_SCHEMA_SHA" --arg m1
 
 # The files inventory's migration entries must be exactly the reviewed full
 # migration history — no migration missing, none extra, none reordered
-# relative to it (BLOCK-3 remainingFix: files vs fullMigrationHistory).
+# relative to it.
 jq -e '
   ([.files[] | select(.path | test("^apps/v1_api/prisma/migrations/[0-9]{14}_[a-z0-9_]+/migration\\.sql$"))
     | {name: (.path | capture("migrations/(?<n>[0-9]{14}_[a-z0-9_]+)/migration\\.sql").n), sha256}]
@@ -117,7 +117,7 @@ tar -xf "$tmp/source.tar" -C "$stage" || fail 'pinned source archive extraction 
 # actually holds under apps/v1_api/prisma/migrations: any migration directory
 # there that is not part of the reviewed history (minus M11, which the
 # repository does not carry yet) means the source moved out from under the
-# review (BLOCK item: "manifest 밖 migration 디렉터리 거부").
+# review.
 mapfile -t source_migration_dirs < <(find "$stage/apps/v1_api/prisma/migrations" -mindepth 1 -maxdepth 1 -type d -name '[0-9]*_*' -exec basename {} \; | LC_ALL=C sort)
 mapfile -t expected_source_migrations < <(jq -r --arg m11 "$M11_NAME" '.fullMigrationHistory | map(.name) | map(select(. != $m11)) | sort[]' "$manifest")
 [[ "${source_migration_dirs[*]}" == "${expected_source_migrations[*]}" ]] || fail 'pinned source tree has a migration directory outside the reviewed full migration history'
@@ -128,8 +128,7 @@ for rel in "${declared[@]}"; do declared_set["$rel"]=1; done
 
 # PREPARED_DIR is a caller-controlled path. Strip its prefix by length, not
 # by shell/sed pattern, so trailing slashes or glob/regex metacharacters in
-# the path cannot change which relative names come out the other end
-# (missed-defect: PREPARED_DIR sed metachar/trailing-slash platform skew).
+# the path cannot change which relative names come out the other end.
 PREPARED_DIR="${PREPARED_DIR%/}"
 prepared_dir_prefix_len=$((${#PREPARED_DIR} + 1))
 mapfile -t actual_prepared < <(find "$PREPARED_DIR" -type f ! -name INPUT-MANIFEST.json -print | while IFS= read -r p; do printf '%s\n' "${p:$prepared_dir_prefix_len}"; done | LC_ALL=C sort)
@@ -151,7 +150,7 @@ for rel in "${declared[@]}"; do
   # commit's own blob. Without this, a tampered historical migration or
   # migration_lock.toml whose manifest entry is simply rehashed to match would
   # pass every check above and silently replace what the earlier `git archive`
-  # extraction (:104-114) already put in $stage.
+  # extraction already put in $stage.
   if [[ "$rel" != "$schema_rel" && "$rel" != "$m11_rel" ]]; then
     pinned_sha="$(git -C "$SOURCE_DIR" cat-file -p "$SOURCE_COMMIT:$rel" 2>/dev/null | sha256sum | awk '{print $1}')" || fail "pinned source commit is missing history file: $rel"
     [[ "$pinned_sha" == "$expected_sha" ]] || fail "historical migration file does not match the pinned source commit: $rel"
@@ -169,8 +168,8 @@ for rel in "${prisma_files[@]}"; do
 done
 
 # Normalize every member not already installed at an authenticated overlay
-# mode (BLOCK-1): git only stores 644/755, so umask can never leak into the
-# archive regardless of which directory the file lives under.
+# mode: git only stores 644/755, so umask can never leak into the archive
+# regardless of which directory the file lives under.
 while IFS= read -r source_file; do
   source_rel="${source_file#$stage/}"
   [[ -n "${declared_set[$source_rel]:-}" ]] && continue
@@ -183,8 +182,8 @@ install -m 644 "$archive_manifest" "$stage/INPUT-MANIFEST.json"
 manifest_sha="$(sha "$stage/INPUT-MANIFEST.json")"
 
 file_list="$tmp/files.list"
-find "$stage" -type f -exec touch -t 197001010000 {} +
-find "$stage" -type f -print | sed "s#^$stage/##" | LC_ALL=C sort > "$file_list"
+stage_prefix_len=$((${#stage} + 1))
+find "$stage" -type f -print | while IFS= read -r p; do printf '%s\n' "${p:$stage_prefix_len}"; done | LC_ALL=C sort > "$file_list"
 mkdir -p "$(dirname "$OUTPUT_ARCHIVE")"
 archive_tmp="$(mktemp "${OUTPUT_ARCHIVE}.tmp.XXXXXX")"
 attestation_tmp="$(mktemp "${OUTPUT_ATTESTATION}.tmp.XXXXXX")"
@@ -222,8 +221,8 @@ chmod 644 "$archive_tmp" "$attestation_tmp"
 # no-clobber syscall, unlike check-then-mv). A sidecar published without its
 # archive is inert on its own — nothing can act on an attestation whose
 # archive never landed — so this ordering never leaves a *misleading*
-# artifact behind (BLOCK-2). No test-only environment hook exists in this
-# operational script.
+# artifact behind. No test-only environment hook exists in this operational
+# script.
 ln "$attestation_tmp" "$OUTPUT_ATTESTATION" || fail 'attestation publication failed (destination exists or output directory is not on the same filesystem)'
 rm -f -- "$attestation_tmp"; attestation_tmp=
 if ! ln "$archive_tmp" "$OUTPUT_ARCHIVE"; then

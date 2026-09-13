@@ -4,6 +4,16 @@
 
 ### 재개 커서 — 2026-09-13 AWS 재인증 이후
 
+- **UI dev 머지 완료 / Alpha 배포 대기:** PR1184의 exact e4c725ff CI34751988427 API/Web/Gates SUCCESS, Copilot5190424707 19/19·새 코드지적0을 확인해 dev `815522905c4c4693854256cb18dfa5dee5f90df9`로 머지했다. matching CI34752286361/Alpha34752286382 진행 중이다. API PR1185는 b527 CI에서 API PASS를 확인했고 Copilot의 cross-league fixture가 missing과 같은 stub이라는 지적을 보완했다. 새 테스트28a2b23f는 잘못된 리그 소속의 실제 행이 권한 조건 누락 시 반환되므로 회귀를 잡으며 Sol delta PASS다. 공통 Task168 문서 충돌을 통합하고 최신 dev UI를 보존한 PR CI를 다시 수행한다. live UI after는 아직 실행하지 않았다.
+
+- **현재 검증 커서:** PR1184 head `e4c725ff4423c9c164d90b016b144f654b37abb5`, CI34751988427; PR1185 head `b527200d7e2452c25a253e6d6b7ec1b803d3011b`, CI34751988300 실행 중이다. API의 첫 surface gate 실패는 baseline의 정당한 리그 허용 지점1→2 및 사유 등록으로 보완했다(서비스에 주석만 추가한 중간 후보는 채택하지 않음). Event 동기화는 Luna 반복 수정 후 Sol이 import/선언순서·retry/back 테스트를 직접 보완했고 root가 첫 enabled 요청 검증을 추가했다. Badge 실제16→24px, profile/member/spacing/empty-create가 같은 UI PR에 포함된다. docs1181 Alpha34751634909 SUCCESS, SSM bf9a50ef readback16/16 true·원본310 연결 보존(`alpha-15d619f4-readback-result-20260913-r1.json`). 최신 UI/API의 Alpha after는 여전히 미실행이다.
+
+- **최종 이관 후보의 병행 읽기 검토:** StageB manifest validator c7f9ebd0 및 creator cdb96e66는 source SHA 고정·호환필드null·저장된 manifest 재시도 시 stored image사용·StageA 유지에 대해 Sol bounded PASS. common StageB validator만으로 source 바이트가 검증되는 것은 아니며 호출자는 기존 별도 source-binding validator를 유지해야 한다. 최종 runner·workflow 통합과 실제 M11 실행은 미완이다.
+
+- **M11 후보 실행 금지 사유 확인:** runner ee6374의 EXIT trap은 성공(status0)·after_m11에서도 else로 구 writer를 재시작할 수 있어 Sol BLOCK이다. 실제 실행하지 않았다. 복원은 오직 before_m11 실패에만 허용하고 after_m11은 성공·실패 모두 정지를 유지하도록 Luna가 candidate만 수정한다. 복원 분기에도 exact container running 확인이 필요하다. 현재 Alpha는 M1–M10이며 기존 테이블은 유지된다.
+
+- **dev PR 처리 및 공개 상세 수정 PR:** 문서 PR1181 exact headff9179의 CI/Copilot PASS 및 변경 경로2개를 확인하여 dev `15d619f4de7de171ff7db06897a02e6f3e844afc`로 머지했다. Alpha34751634909 진행 중이며 앱 소스 변경은 없다. 공개 리그 상세404는 PR1185 head `5260075a93ba111cd7d64e38a15671c5688fe236`, CI34751754167에서 검증 중이다. 서비스74a674a·실제 projection 테스트256b4520·API 문서2개·Changeset·이 문서만 포함하며 shared local dev HEAD/index는 보존했다. 서비스/테스트 Sol source PASS, Alpha after는 미검증이다. UI1184는 별도로 local URL draft 경계 수정 중이며 GitHub CI PASS를 UI 완료로 세지 않는다.
+
 - **실측 정정 및 팀장 baseline:** `public-2140/tournament-tag-outer-geometry-correction.json`은 풋살 inner label 대신 semantic outer를 재측정했다. 실제 풋살 배지는 높이16px·pill이며 상태/리그는24px다(plain text라는 이전 판정 철회). Luna의24px/12px700 보완은 Sol source PASS. `captain-2140/` 9개 frame으로 실제 팀장 계정의10개 팀 상세 영역·멤버목록/프로필 이동·하단CTA 비겹침을 확인했다. 비공개 멤버 fixture 미확보이며 공개 범위 검증 PASS는 아니다. 23개 내 리그가 핵심정보를 아래로 미는 기존 문제도 남는다. CI34751060318 API/Web/Gates 모두 PASS이나, 추가 Event URL 수정은 local draft/query 불일치로 Sol BLOCK되어 보완 중이다. 공개 경기404 후보 역시 기존 TOURNAMENT_MATCH_NOT_FOUND를 보존하고 실제 projection 테스트·문서를 보완하여 검토 중이다.
 
 - **실화면 후속 발견 / 현재 UI PR:** PR1184 head `c38f8a5bd7f73089a450758a9145260356a0c4ee`, CI34751060318 Web/Gates PASS·API 진행 중. Copilot5190392436은 17/17 검토·새 코멘트0이며 master sports 로딩 전 전체 이벤트 조회 가능성은 Sol이 별도 검토한다. 공개 Ego 증거 `output/ego/task168-ui-pr1184-20260913/public-2140/`에서 guest auth/me401, 목록·대회 상세·일정·순위200을 확인했으나 두 live 공개 fixture 상세404로 G-R FAIL이다. `/tournaments`에서 status/리그24px pill 대비 풋살12px plain text도 실제 측정됐다. 두 오류를 Luna에게 분리 배정했다. 기존 팀 프로필·주요 멤버·hero·빈 상태 개선은 PR에 포함되었고 아직 Alpha after 검수 전이다. 42개 완료 수는 늘리지 않는다.

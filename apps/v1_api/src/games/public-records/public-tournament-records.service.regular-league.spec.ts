@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { PublicTournamentRecordsService } from './public-tournament-records.service';
 
 const LEAGUE_ID = '780f05f1-7dd8-40cf-b3a8-d80cd59504ad';
+const OTHER_LEAGUE_ID = 'f7832e94-e1c9-49a6-8604-e07e77229e92';
 const FIXTURE_ID = '3799be0f-d897-4c2e-bc83-80876e94df98';
 
 function buildLeaguePrisma(options: {
@@ -30,6 +31,7 @@ function buildLeaguePrisma(options: {
       sides: [], lineups: [], participants: [], resultRevisions: [], currentOfficialRevision: null, periods: [],
     },
   };
+  const crossLeagueTeamMatch = { ...teamMatch, leagueId: OTHER_LEAGUE_ID };
   const database = {
     v1Tournament: {
       async findFirst(args: { where?: { AND?: unknown[] } }) {
@@ -56,8 +58,12 @@ function buildLeaguePrisma(options: {
       async findFirst(args: { where?: { id?: string; leagueId?: string; deletedAt?: null } }) {
         if (options.operationalFailure) throw options.operationalFailure;
         capturedLeagueId = args.where?.leagueId;
-        if (args.where?.id !== FIXTURE_ID || args.where?.leagueId !== LEAGUE_ID || args.where?.deletedAt !== null) return null;
-        return options.fixture === 'matching' ? teamMatch : null;
+        if (args.where?.id !== FIXTURE_ID || args.where?.deletedAt !== null) return null;
+        if (options.fixture === 'missing') return null;
+        if (options.fixture === 'cross-league') {
+          return args.where?.leagueId === LEAGUE_ID ? null : crossLeagueTeamMatch;
+        }
+        return args.where?.leagueId === LEAGUE_ID ? teamMatch : null;
       },
       async findMany() { return [{ startAt }]; },
     },

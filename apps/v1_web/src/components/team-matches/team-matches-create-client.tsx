@@ -131,7 +131,8 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   };
 
   // #1·#2 결정의 공유 소스: 이 ctx로 스텝 게이팅과 최종 제출 결측 필드 안내를 둘 다 계산한다.
-  const validationCtx = { hostTeamId: selectedTeamId, sportId: selectedSportId, regionId, draft };
+  const hasEligibleSelectedTeam = creatableTeams.some((team) => team.teamId === selectedTeamId);
+  const validationCtx = { hostTeamId: hasEligibleSelectedTeam ? selectedTeamId : '', sportId: selectedSportId, regionId, draft };
   const fieldErrors = attempted ? getTeamMatchStepErrors(validationCtx, step) : {};
   const missingFields = attempted && step === 'confirm' ? getTeamMatchMissingFields(validationCtx) : [];
   const completeSteps = getCompleteTeamMatchSteps(validationCtx, CREATE_STEP_ORDER);
@@ -166,6 +167,10 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     selectedSportId,
     regionId,
     isLoadingTeams: teams.isLoading,
+    teamLoadError: teams.isError ? {
+      message: extractErrorMessage(teams.error, '팀 목록을 불러오지 못했어요.'),
+      onRetry: () => { void teams.refetch(); },
+    } : undefined,
     teams: allMyTeams.map((team) => ({
       id: team.teamId,
       name: team.name,
@@ -209,8 +214,8 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     onBack: () => router.push(previousHref(step)),
     onGoToStep: handleGoToStep,
     onNext: () => {
-      // #1: "다음"은 절대 disabled 처리하지 않는다 — 대신 클릭 시 이 스텝의 필수 필드만 로컬
-      // 검증해 비어 있으면 이동을 막고, 인라인 에러 + 첫 invalid 필드로 focus를 옮긴다.
+      // 팀 스텝의 데이터 준비·권한 게이트는 TeamMatchCreatePageView의 disabled CTA와
+      // 이 방어 가드가 함께 보장한다. 그 외 스텝은 클릭 시 필수 필드를 로컬 검증한다.
       const errors = getTeamMatchStepErrors(validationCtx, step);
       const firstInvalidField = Object.keys(errors)[0];
       if (firstInvalidField) {
@@ -437,6 +442,7 @@ function buildCreateModel({
   missingFields,
   completeSteps,
   recentVenues,
+  teamLoadError,
 }: {
   step: TeamMatchCreateStep;
   draft: TeamMatchDraft;
@@ -444,6 +450,7 @@ function buildCreateModel({
   selectedSportId: string;
   regionId: string;
   isLoadingTeams?: boolean;
+  teamLoadError?: { message: string; onRetry: () => void };
   teams: Array<{ id: string; name: string; sport: string; members: number; role: string; disabled?: boolean }>;
   sports: Array<{ id: string; name: string }>;
   regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
@@ -481,6 +488,7 @@ function buildCreateModel({
     selectedTeam: selectedTeam?.name ?? '',
     selectedSport: selectedSport?.name ?? '',
     isLoadingTeams,
+    teamLoadError,
     teams: teams.map((team) => ({ name: team.name, sport: team.sport, members: team.members, role: team.role, selected: team.id === selectedTeamId, disabled: team.disabled })),
     sports: sports.map((sport) => sport.name),
     draft,

@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -10,6 +11,7 @@ import { EventCampaignCard } from '@/components/tournaments/event-campaign-card'
 import styles from './events-page.module.css';
 
 const TRANSPORT_ERROR_MESSAGE = /^(failed to fetch|load failed|network(?: error| request failed| unavailable)?)$/i;
+const NO_LOCAL_SPORT_DRAFT = Symbol('no-local-sport-draft');
 
 function getEventErrorMessage(error: unknown, fallback: string) {
   const message = extractErrorMessage(error, fallback).trim();
@@ -17,18 +19,41 @@ function getEventErrorMessage(error: unknown, fallback: string) {
 }
 
 export default function EventsPage() {
-  return <EventsContent />;
+  return (
+    <Suspense fallback={<EventListSkeleton />}>
+      <EventsContent />
+    </Suspense>
+  );
 }
 
 function EventsContent() {
-  const [activeSportCode, setActiveSportCode] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    const sportCode = new URLSearchParams(window.location.search).get('sport');
-    if (sportCode && /^[a-z0-9-]{1,40}$/i.test(sportCode)) {
-      setActiveSportCode(sportCode);
-    }
-  }, []);
-  const { data: sportsData } = useV1MasterSports();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedSportCode = searchParams.get('sport');
+  const requestedSportHasValidSyntax = requestedSportCode !== null && /^[a-z0-9-]{1,40}$/i.test(requestedSportCode);
+  const [, setActiveSportCode] = useState<string | undefined>(undefined);
+  const observedUrlSportCode = useRef<string | null>(requestedSportCode);
+  const pendingLocalSportCode = useRef<string | undefined | typeof NO_LOCAL_SPORT_DRAFT>(NO_LOCAL_SPORT_DRAFT);
+  const { data: sportsData, isError: isSportsError, refetch: refetchSports } = useV1MasterSports();
+  const validatedSportCode = requestedSportHasValidSyntax && sportsData?.some((sport) => sport.code === requestedSportCode)
+    ? requestedSportCode
+    : undefined;
+  const requestedSportIsUnknown = requestedSportHasValidSyntax && sportsData !== undefined && validatedSportCode === undefined;
+  // A local click must win until the router acknowledges that same URL. A different URL
+  // means browser back/forward or an external navigation; the effect clears that draft.
+  const urlChanged = requestedSportCode !== observedUrlSportCode.current;
+  const localDraftIsPending = pendingLocalSportCode.current !== NO_LOCAL_SPORT_DRAFT
+    && pendingLocalSportCode.current !== (requestedSportCode ?? undefined)
+    && !urlChanged;
+  const localDraftIsValid = localDraftIsPending && typeof pendingLocalSportCode.current === 'string'
+    && /^[a-z0-9-]{1,40}$/i.test(pendingLocalSportCode.current);
+  const campaignsQueryEnabled = isSportsError || requestedSportCode === null || !requestedSportHasValidSyntax
+    || (requestedSportHasValidSyntax && !requestedSportIsUnknown && sportsData !== undefined)
+    || (localDraftIsValid && sportsData !== undefined);
+  const masterSportResolutionPending = requestedSportHasValidSyntax && !isSportsError && (sportsData === undefined || requestedSportIsUnknown);
+  const effectiveSportCode: string | undefined = localDraftIsPending
+    ? (typeof pendingLocalSportCode.current === 'string' ? pendingLocalSportCode.current : undefined)
+    : validatedSportCode;
   const {
     data,
     isLoading,
@@ -40,7 +65,8 @@ function EventsContent() {
     isFetchNextPageError,
     refetch,
   } = useV1TournamentCampaignsInfinite({
-    sportCode: activeSportCode,
+    sportCode: isSportsError && sportsData === undefined ? undefined : effectiveSportCode,
+    enabled: campaignsQueryEnabled,
     limit: 30,
   });
   const items = data?.pages.flatMap((page) => page.items) ?? [];
@@ -50,12 +76,42 @@ function EventsContent() {
     label: s.name,
   }));
 
+  useEffect(() => {
+    const requestedSport = searchParams.get('sport');
+    if (urlChanged) {
+      observedUrlSportCode.current = requestedSport;
+      pendingLocalSportCode.current = NO_LOCAL_SPORT_DRAFT;
+    } else if (localDraftIsPending) {
+      return;
+    }
+    if (!sportsData) return;
+    const validSyntax = requestedSport === null || /^[a-z0-9-]{1,40}$/i.test(requestedSport);
+    const validMasterSport = requestedSport === null || sportsData.some((sport) => sport.code === requestedSport);
+    if (!validSyntax || !validMasterSport) {
+      setActiveSportCode(undefined);
+      pendingLocalSportCode.current = NO_LOCAL_SPORT_DRAFT;
+      router.replace('/events', { scroll: false });
+      return;
+    }
+    setActiveSportCode(requestedSport ?? undefined);
+    observedUrlSportCode.current = requestedSport;
+  }, [router, searchParams, sportsData]);
+
+  const updateSportFilter = (sportCode: string | undefined) => {
+    const nextCode = sportCode && filterSports.some((sport) => sport.code === sportCode)
+      ? sportCode
+      : undefined;
+    setActiveSportCode(nextCode);
+    pendingLocalSportCode.current = nextCode;
+    router.replace(nextCode ? `/events?sport=${encodeURIComponent(nextCode)}` : '/events', { scroll: false });
+  };
+
   return (
     <div className={styles.page}>
       <header className={styles.intro}>
         <div className={styles.titleRow}>
           <Sparkles size={20} aria-hidden="true" />
-          <h2 className="tm-text-heading">이벤트 허브</h2>
+          <h1 className="tm-text-heading">이벤트 허브</h1>
         </div>
         <p>
           지금 참가할 수 있는 대회부터 결과와 시상까지, 팀밋의 주요 이벤트를 한눈에 확인하세요.
@@ -66,30 +122,35 @@ function EventsContent() {
       {filterSports.length > 0 ? (
         <div role="group" aria-label="종목 필터" className={styles.filters}>
           <button
-            aria-pressed={activeSportCode === undefined}
+            aria-pressed={effectiveSportCode === undefined}
             type="button"
-            onClick={() => setActiveSportCode(undefined)}
-            className={`tm-chip ${styles.filter} ${activeSportCode === undefined ? 'tm-chip-active' : ''}`}
+            onClick={() => updateSportFilter(undefined)}
+            className={`tm-chip ${styles.filter} ${effectiveSportCode === undefined ? 'tm-chip-active' : ''}`}
           >
             전체
           </button>
           {filterSports.map((s) => (
             <button
               key={s.code}
-              aria-pressed={activeSportCode === s.code}
+              aria-pressed={effectiveSportCode === s.code}
               type="button"
-              onClick={() => setActiveSportCode((prev) => prev === s.code ? undefined : s.code)}
-              className={`tm-chip ${styles.filter} ${activeSportCode === s.code ? 'tm-chip-active' : ''}`}
+              onClick={() => updateSportFilter(effectiveSportCode === s.code ? undefined : s.code)}
+              className={`tm-chip ${styles.filter} ${effectiveSportCode === s.code ? 'tm-chip-active' : ''}`}
             >
               {s.label}
             </button>
           ))}
         </div>
+      ) : isSportsError ? (
+        <ErrorState
+          message="종목 필터를 불러오지 못했어요. 이벤트 목록은 계속 확인할 수 있어요."
+          onRetry={() => void refetchSports()}
+        />
       ) : null}
 
       {/* 목록 */}
       <div className={styles.listSection}>
-        {isLoading ? (
+        {masterSportResolutionPending || isLoading ? (
           <EventListSkeleton />
         ) : isError && !data ? (
           <ErrorState
@@ -110,7 +171,7 @@ function EventsContent() {
             <ul role="list" className={styles.grid} aria-label={`이벤트 목록, ${items.length}개`}>
               {items.map((item) => (
                 <li key={item.id} role="listitem">
-                  <EventCampaignCard item={item} activeSportCode={activeSportCode} />
+                  <EventCampaignCard item={item} activeSportCode={effectiveSportCode} />
                 </li>
               ))}
             </ul>

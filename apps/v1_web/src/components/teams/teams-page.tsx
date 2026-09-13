@@ -377,6 +377,65 @@ function TeamMembersMoreLink({ teamId, count }: { teamId: string; count: number 
   );
 }
 
+function TeamDetailMembersCard({ team }: { team: TeamDetailViewModel['team'] }) {
+  return (
+    <Card pad={16} className="tm-team-detail-members-card">
+      <div className="tm-section-row" style={{ alignItems: 'flex-start', gap: 12, marginTop: 0 }}>
+        <div style={{ minWidth: 0, flex: '1 1 auto' }}>
+          <div className="tm-text-body-lg">주요 멤버</div>
+          {team.memberAccess.message ? <div className="tm-text-caption" style={{ marginTop: 4, lineHeight: 1.45 }}>{team.memberAccess.message}</div> : null}
+        </div>
+        {team.memberAccess.enabled ? <span className="tm-badge tm-badge-blue">공개</span> : <span className="tm-badge tm-badge-grey" style={{ gap: 4 }}><Lock size={11} aria-hidden="true" />비공개</span>}
+      </div>
+      {team.memberAccess.canView ? (
+        <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+            {team.membersList.length ? (
+            team.membersList.map((member) => {
+              const content = <><TeamAvatar seed={member.userId} name={member.name} size="sm" /><div style={{ flex: 1, minWidth: 0 }}><div className="tm-text-body" style={{ color: 'var(--text-strong)', lineHeight: 1.35 }}>{member.name}</div><div className="tm-text-caption" style={{ marginTop: 2 }}>{member.role}</div></div>{member.profileHref ? <ChevronRightIcon size={18} stroke="var(--text-caption)" strokeWidth={2} /> : null}</>;
+              return member.profileHref ? <Link key={member.membershipId} className="tm-list-row tm-pressable" href={member.profileHref}>{content}</Link> : <div key={member.membershipId} className="tm-list-row">{content}</div>;
+            })
+          ) : <div className="tm-text-caption" style={{ lineHeight: 1.55 }}>공개된 멤버가 아직 없어요.</div>}
+          <TeamMembersMoreLink teamId={team.id} count={team.memberAccess.moreCount} />
+        </div>
+      ) : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
+    </Card>
+  );
+}
+
+function TeamBasicInfoCard({ team, capacity }: { team: TeamDetailViewModel['team']; capacity: string }) {
+  return (
+    <>
+      <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
+      <Card pad={16} className="tm-team-detail-basic-info-card">
+        <div className="tm-team-detail-info-group">
+          <div className="tm-text-label">팀 개요</div>
+          <div className="tm-team-detail-info-grid">
+            <InfoRow label="팀명" value={team.name} />
+            <InfoRow label="종목" value={formatTeamSports(team.sports)} muted={team.sports.length === 0} />
+            <InfoRow label="시/도" value={team.city} />
+            <InfoRow label="구/군" value={team.county} />
+          </div>
+        </div>
+        <div className="tm-team-detail-info-group">
+          <div className="tm-text-label">가입 조건</div>
+          <div className="tm-team-detail-info-grid">
+            <InfoRow label="레벨" value={team.level} />
+            <InfoRow label="성별 조건" value={team.genderRule} />
+            <InfoRow label="정원" value={capacity} />
+            <InfoRow label="모집 여부" value={team.statusLabel} />
+          </div>
+        </div>
+        <div className="tm-team-detail-info-group">
+          <div className="tm-text-label">팀 소개와 활동</div>
+          <InfoRow label="팀 소개" value={team.description} preserveLineBreaks />
+          <InfoRow label="활동 일정" value={team.activity || '활동 일정 미정'} muted={!team.activity} />
+          {team.schedule ? <InfoRow label="정기 일정" value={team.schedule} /> : null}
+        </div>
+      </Card>
+    </>
+  );
+}
+
 /** 팀 기록 링크 카드 — 전적·후기가 같은 모양이어야 한 묶음으로 읽힌다. 모바일·데스크톱
  *  두 레이아웃이 **같은 컴포넌트**를 쓴다(예전엔 같은 마크업이 두 벌로 복사돼 있었다). */
 function TeamRecordLinkCard({
@@ -417,9 +476,9 @@ function TeamRecordLinkCard({
     textDecoration: 'none',
     color: 'inherit',
   };
-  if (href === undefined) return <div style={style}>{body}</div>;
+  if (href === undefined) return <div className="tm-team-detail-record-card" style={style}>{body}</div>;
   return (
-    <Link className="tm-pressable" href={href} style={style}>
+    <Link className="tm-pressable tm-team-detail-record-card" href={href} style={style}>
       {body}
     </Link>
   );
@@ -540,11 +599,13 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               <ShareIcon size={20} />
             </button>
             <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
-            <h2 className="tm-text-heading" style={{ color: 'var(--static-white)', marginTop: 16 }}>{team.name}</h2>
-            <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-              <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
-              <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
+            <div className="tm-team-detail-hero-identity">
+              <h2 className="tm-text-heading" style={{ color: 'var(--static-white)' }}>{team.name}</h2>
+              <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
+                <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
+              </div>
             </div>
           </Card>
           {/* 전술보드 입구 — 히어로 바로 아래. 팀 일정(V1TeamSchedule)에는 대회 경기가
@@ -600,59 +661,10 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               <ChevronRightIcon size={18} aria-hidden="true" />
             </Link>
           ) : null}
-          <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
-          <Card pad={16}>
-            <InfoRow label="팀명" value={team.name} />
-            <InfoRow label="종목" value={formatTeamSports(team.sports)} muted={team.sports.length === 0} />
-            <InfoRow label="팀 소개" value={team.description} preserveLineBreaks />
-            <InfoRow label="시/도" value={team.city} />
-            <InfoRow label="구/군" value={team.county} />
-            <InfoRow label="레벨" value={team.level} />
-            <InfoRow label="성별 조건" value={team.genderRule} />
-            <InfoRow label="정원" value={capacity} />
-            <InfoRow label="모집 여부" value={team.statusLabel} />
-            <InfoRow label="활동 일정" value={team.activity || '활동 일정 미정'} muted={!team.activity} />
-            {team.schedule ? <InfoRow label="정기 일정" value={team.schedule} /> : null}
-          </Card>
+          <TeamBasicInfoCard team={team} capacity={capacity} />
           <TeamOperationsSection operations={model.operations} />
           {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
-          <Card pad={16} style={{ marginTop: 16 }}>
-            <div className="tm-section-row" style={{ alignItems: 'flex-start', gap: 12, marginTop: 0 }}>
-              <div style={{ minWidth: 0, flex: '1 1 auto' }}>
-                <div className="tm-text-body-lg">주요 멤버</div>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap', marginTop: 4, minWidth: 0 }}>
-                  {team.memberAccess.message ? (
-                    <span className="tm-text-caption" style={{ minWidth: 0, flex: '1 1 180px', lineHeight: 1.45 }}>{team.memberAccess.message}</span>
-                  ) : null}
-                </div>
-              </div>
-              {team.memberAccess.enabled ? (
-                <span className="tm-badge tm-badge-blue" style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
-                  공개
-                </span>
-              ) : (
-                <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, gap: 4 }}>
-                  <Lock size={11} aria-hidden="true" />
-                  비공개
-                </span>
-              )}
-            </div>
-            {team.memberAccess.canView ? (
-              <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-                {team.membersList.map((member, index) => (
-                  <ListItem
-                    key={index}
-                    title={member.name}
-                    sub={`${member.role} · ${member.meta} · ${member.status}`}
-                    trailing={member.visibility}
-                    href={member.profileHref}
-                    chev={Boolean(member.profileHref)}
-                  />
-                ))}
-                <TeamMembersMoreLink teamId={team.id} count={team.memberAccess.moreCount} />
-              </div>
-            ) : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
-          </Card>
+          <TeamDetailMembersCard team={team} />
         </div>
 
         {/* RIGHT: sticky sidebar
@@ -732,11 +744,13 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <ShareIcon size={20} />
           </button>
           <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="xl" />
-          <div className="tm-text-heading" style={{ color: 'var(--static-white)', margin: '16px 0 0' }} aria-hidden="true">{team.name}</div>
-          <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-            <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
-            <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
+          <div className="tm-team-detail-hero-identity">
+            <div className="tm-text-heading" style={{ color: 'var(--static-white)' }} aria-hidden="true">{team.name}</div>
+            <div className="tm-text-caption" style={{ color: 'var(--overlay-white-72)', marginTop: 4 }}>{team.sport} · {team.region}</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+              <span className={`tm-badge ${teamDetailStatusBadgeClass(mode)}`}>{team.statusLabel}</span>
+              <span className="tm-badge tm-badge-grey">{memberCapacity}</span>
+            </div>
           </div>
         </Card>
         {mode === 'pending' ? (
@@ -780,59 +794,10 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             />
           ) : null}
         </div>
-        <SectionTitle title="팀 기본 정보" sub="가입 전 필요한 정보를 확인해 주세요." />
-        <Card pad={16}>
-          <InfoRow label="팀명" value={team.name} />
-          <InfoRow label="종목" value={formatTeamSports(team.sports)} muted={team.sports.length === 0} />
-          <InfoRow label="팀 소개" value={team.description} preserveLineBreaks />
-          <InfoRow label="시/도" value={team.city} />
-          <InfoRow label="구/군" value={team.county} />
-          <InfoRow label="레벨" value={team.level} />
-          <InfoRow label="성별 조건" value={team.genderRule} />
-          <InfoRow label="정원" value={capacity} />
-          <InfoRow label="모집 여부" value={team.statusLabel} />
-          <InfoRow label="활동 일정" value={team.activity || '활동 일정 미정'} muted={!team.activity} />
-          {team.schedule ? <InfoRow label="정기 일정" value={team.schedule} /> : null}
-        </Card>
+          <TeamBasicInfoCard team={team} capacity={capacity} />
         <TeamOperationsSection operations={model.operations} />
         {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
-        <Card pad={16} style={{ marginTop: 16 }}>
-          <div className="tm-section-row" style={{ alignItems: 'flex-start', gap: 12, marginTop: 0 }}>
-            <div style={{ minWidth: 0, flex: '1 1 auto' }}>
-              <div className="tm-text-body-lg">주요 멤버</div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap', marginTop: 4, minWidth: 0 }}>
-                {team.memberAccess.message ? (
-                  <span className="tm-text-caption" style={{ minWidth: 0, flex: '1 1 180px', lineHeight: 1.45 }}>{team.memberAccess.message}</span>
-                ) : null}
-              </div>
-            </div>
-            {team.memberAccess.enabled ? (
-              <span className="tm-badge tm-badge-blue" style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
-                공개
-              </span>
-            ) : (
-              <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, gap: 4 }}>
-                <Lock size={11} aria-hidden="true" />
-                비공개
-              </span>
-            )}
-          </div>
-          {team.memberAccess.canView ? (
-            <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-              {team.membersList.map((member, index) => (
-                <ListItem
-                  key={index}
-                  title={member.name}
-                  sub={`${member.role} · ${member.meta} · ${member.status}`}
-                  trailing={member.visibility}
-                  href={member.profileHref}
-                  chev={Boolean(member.profileHref)}
-                />
-              ))}
-              <TeamMembersMoreLink teamId={team.id} count={team.memberAccess.moreCount} />
-            </div>
-          ) : <div className="tm-text-caption" style={{ marginTop: 12, lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
-        </Card>
+        <TeamDetailMembersCard team={team} />
       </article>
       <div ref={mobileCtaRef} className="tm-fixed-cta tm-hide-desktop">
         {/* 승인 대기 중에는 본문의 안내 카드가 상태를 이미 설명하므로 같은 말을 반복하지 않는다. */}

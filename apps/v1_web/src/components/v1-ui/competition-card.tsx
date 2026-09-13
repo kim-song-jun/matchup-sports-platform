@@ -138,7 +138,8 @@ export function CompetitionSportChip({ sportCode }: { sportCode: string }) {
         display: 'inline-flex',
         alignItems: 'center',
         gap: 4,
-        padding: '2px 8px',
+        minHeight: 24,
+        padding: '0 8px',
         borderRadius: 'var(--radius-pill)',
         background: sportAccent.badgeBg,
         flexShrink: 0,
@@ -155,7 +156,7 @@ export function CompetitionSportChip({ sportCode }: { sportCode: string }) {
           flexShrink: 0,
         }}
       />
-      <span className="tm-text-caption" style={{ color: sportAccent.badgeText, fontWeight: 600, lineHeight: 1 }}>
+      <span className="tm-text-caption" style={{ color: sportAccent.badgeText, fontWeight: 700, lineHeight: 1 }}>
         {sportAccent.label}
       </span>
     </span>

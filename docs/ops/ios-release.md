@@ -348,7 +348,7 @@ GitHub Actions secrets 는 public 저장소에서도 값이 노출되지 않고 
 
 | 항목 | 위치 | 현재 상태 |
 |---|---|---|
-| iOS 서명 Team ID | `apps/v1_ios/project.yml`, `scripts/ios/archive-and-export.sh:28` | `project.yml` 기본값은 `U9J95Q6XD3`; archive 스크립트의 `TEAMEET_TEAM_ID` 환경변수로 override 가능 |
+| iOS 서명 Team ID | `apps/v1_ios/project.yml`, `scripts/ios/archive-and-export.sh` | `project.yml` 기본값은 `U9J95Q6XD3`; archive 스크립트의 `TEAMEET_TEAM_ID` 환경변수로 override 가능 |
 | APNs 서버 인증 | `scripts/ios/apns-send.mjs`, `.github/workflows/deploy.yml`, `.github/workflows/deploy-alpha.yml` | 두 workflow가 `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_PRIVATE_KEY`라는 같은 secret 이름을 사용한다. production job은 `environment: production`이므로 새 조직 값을 production 환경 secrets에 넣고, alpha의 기존 값은 현재 저장소/조직 secret 범위에서 유지한다. 실제 적용값은 GitHub secret precedence와 workflow job scope를 확인한 뒤 기록한다. |
 | Sign in with Apple / associated domains | `apps/v1_ios/Teameet/Teameet.entitlements` | Team ID 하드코딩 없음(xcconfig 변수) — 새 App ID 에 capability 만 다시 켜면 됨 |
 | production AASA | `deploy/aasa/apple-app-site-association` | alpha와 production App ID가 모두 등록돼 있다. 조직 이전 후 production App ID만 새 Team ID 값으로 갱신하고 alpha 항목은 보존한다. |

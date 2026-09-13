@@ -21,7 +21,7 @@ export default async function TeamsPage() {
 
   return (
     <Suspense fallback={<TeamListSsrView teams={teams} sports={sports} />}>
-      <TeamListPageClient />
+      <TeamListPageClient seed={{ teams, sports }} />
     </Suspense>
   );
 }

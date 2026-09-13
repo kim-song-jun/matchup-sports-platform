@@ -46,7 +46,7 @@ function computeTeamRecord(teamName: string, fixtures: V1TournamentFixture[]) {
   return { w, d, l, gf, ga, games: w + d + l };
 }
 
-interface FinalRankRow { pos: number; name: string; }
+interface FinalRankRow { pos: number; name: string; record?: { w: number; gf: number; ga: number; games: number }; }
 
 function buildKnockoutFinalRanking(fixtures: V1TournamentFixture[]): FinalRankRow[] {
   const finalFix = fixtures.find((f) => f.round === 'final' || f.round === '결승');
@@ -119,7 +119,14 @@ function useLeagueOverallFinalRanking(
         const ranked = data.standings
           .filter((s): s is typeof s & { position: number } => s.position !== null)
           .sort((a, b) => a.position - b.position)
-          .map((s) => ({ pos: s.position, name: s.teamName }));
+          // 정규 리그 거울 행은 tournament.fixtures가 항상 []라 FinalStandingsTable·
+          // 챔피언 히어로의 fixtures 스캔(computeTeamRecord)이 전부 0을 낸다 — 이 API가
+          // 이미 갖고 있는 승/득점/실점을 행에 실어 그 스캔을 대체한다.
+          .map((s) => ({
+            pos: s.position,
+            name: s.teamName,
+            record: { w: s.wins, gf: s.goalsFor, ga: s.goalsAgainst, games: s.wins + s.draws + s.losses },
+          }));
         setRows(ranked);
       })
       .catch(() => {
@@ -201,11 +208,13 @@ function Confetti({ count = 40 }: { count?: number }) {
 function DesktopChampionHero({
   champion,
   tournament,
+  record,
 }: {
   champion: string;
   tournament: V1TournamentDetail;
+  record?: { w: number; gf: number; ga: number; games: number };
 }) {
-  const rec = computeTeamRecord(champion, tournament.fixtures);
+  const rec = record ?? computeTeamRecord(champion, tournament.fixtures);
   const diff = rec.gf - rec.ga;
   return (
     <div className="tm-show-desktop">
@@ -280,12 +289,14 @@ function DesktopChampionHero({
 function MobileChampionBanner({
   champion,
   tournament,
+  record,
 }: {
   champion: string;
   tournament: V1TournamentDetail;
+  record?: { w: number; gf: number; ga: number; games: number };
 }) {
   const [played, setPlayed] = useState(false);
-  const rec = computeTeamRecord(champion, tournament.fixtures);
+  const rec = record ?? computeTeamRecord(champion, tournament.fixtures);
   const diff = rec.gf - rec.ga;
   const rafRef = useRef<number | null>(null);
   const replayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -598,7 +609,7 @@ function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixture
         // 리그는 팀 수만큼 순위가 이어진다(4위 밑으로도 존재) — POS_CFG에 없는 순위는
         // "4위"로 잘못 라벨링하지 않고 실제 순위 숫자로 표기한다.
         const cfg = POS_CFG[row.pos] ?? { bg: 'transparent', numColor: 'var(--text-caption)', label: `${row.pos}위` };
-        const rec = computeTeamRecord(row.name, fixtures);
+        const rec = row.record ?? computeTeamRecord(row.name, fixtures);
         const diff = rec.gf - rec.ga;
         const isChamp = row.pos === 1;
         return (
@@ -964,15 +975,26 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
   // format 만 보면 정규 리그(거울 행 format='group_knockout')를 놓친다 — 두 질문을 다 한다.
   const isLeague = isLeagueCompetition(tournament);
   const isMultiGroupLeague = isLeague && tournament.groups.filter((g) => g.phase === 'group').length > 1;
-  // 다조 리그일 때만 통합 순위 API를 조회한다 — 훅 자체는 매 렌더 동일한 순서로
+  // 정규 리그 거울 행(kind==='regular_league')은 groups가 항상 []다 — 순위는
+  // V1League 축에서 계산되고 대회 행에는 절대 미러링되지 않는다(단일 시즌도 마찬가지).
+  // 그래서 groups.length>1(다조) 판정은 이 행에서 절대 참이 될 수 없고, 이어지는
+  // buildSingleGroupLeagueRanking도 groups.length===1을 요구해 역시 항상 []다 — 시즌이
+  // 전부 끝나도 "최종 순위가 아직 등록되지 않았어요"만 뜨는 결함(감사 evidence: alpha
+  // 실측, 완결 2팀 리그도 재현). 통합 순위 API(GET /standings/overall)는 이미 리그 축
+  // 응답도 반환하므로(V1LeagueOverallStandingRow의 teamId 변형), 조 개수와 무관하게
+  // 거울 행이면 그 API로 보낸다.
+  const isLeagueMirror = tournament.kind === 'regular_league';
+  const needsOverallStandings = isMultiGroupLeague || isLeagueMirror;
+  // 필요할 때만 통합 순위 API를 조회한다 — 훅 자체는 매 렌더 동일한 순서로
   // 호출해야 하므로(react hooks rule) enabled 플래그로 조건을 안쪽에 둔다.
-  const overallLeagueRows = useLeagueOverallFinalRanking(tournament.id, isCompleted && isMultiGroupLeague);
+  const overallLeagueRows = useLeagueOverallFinalRanking(tournament.id, isCompleted && needsOverallStandings);
   const knockoutRows = !isCompleted
     ? []
     : isLeague
-      ? (isMultiGroupLeague ? (overallLeagueRows ?? []) : buildSingleGroupLeagueRanking(tournament))
+      ? (needsOverallStandings ? (overallLeagueRows ?? []) : buildSingleGroupLeagueRanking(tournament))
       : buildKnockoutFinalRanking(tournament.fixtures);
-  const championName = knockoutRows.find((r) => r.pos === 1)?.name ?? null;
+  const championRow = knockoutRows.find((r) => r.pos === 1) ?? null;
+  const championName = championRow?.name ?? null;
 
   // 조별과 같은 이유로 라운드 라벨 정확일치를 쓰지 않는다 — 편성 phase 가 판정 기준이다.
   const { knockoutKind, knockoutOrder } = createStageResolver(tournament.groups);
@@ -987,9 +1009,9 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
       {isCompleted && championName && (
         <div style={{ padding: '16px 20px 0' }}>
           {/* 데스크탑: 풀 화면 히어로 */}
-          <DesktopChampionHero champion={championName} tournament={tournament} />
+          <DesktopChampionHero champion={championName} tournament={tournament} record={championRow?.record} />
           {/* 모바일: 컴팩트 배너 */}
-          <MobileChampionBanner champion={championName} tournament={tournament} />
+          <MobileChampionBanner champion={championName} tournament={tournament} record={championRow?.record} />
           {/* 대회 요약 — 데스크탑에서는 최종 순위 아래(좌측 컬럼)로 이동 */}
           <div className="tm-hide-desktop" style={{ marginTop: 16 }}>
             <TournamentSummaryCard tournament={tournament} />

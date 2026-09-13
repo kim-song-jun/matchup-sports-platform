@@ -1,0 +1,105 @@
+/**
+ * /teams는 서버(SEO 프리렌더)가 이미 받아 둔 무필터 목록을 seed로 클라이언트에 넘긴다.
+ *
+ * seed 연결 전에는 TeamListPageClient가 자신의 로딩 스켈레톤(0건 상태)부터 그리고,
+ * 서버가 이미 그려 둔 실제 목록은 버려졌다 — alpha 실측(2026-09-13): 팀 탭 진입 시
+ * /api/v1/teams fetch만 인위적으로 2.5초 지연시켜 재현하면 "전체 0 · 회색 스켈레톤"이
+ * 지연 시간만큼 그대로 떠 있다가 지연이 풀리는 순간에야 실제 목록으로 바뀌었다. 원인은
+ * teams/page.tsx의 <Suspense fallback={<TeamListSsrView>}>가 실제로는 절대 보이지
+ * 않는다는 것 — TeamListPageClient가 useSearchParams()를 쓰는 일반 클라이언트 컴포넌트라
+ * 서버 렌더 시 실제로 suspend하지 않으므로, fallback이 아니라 클라이언트 자신의 빈 로딩
+ * 상태가 항상 먼저 그려진다.
+ *
+ * useV1TeamDetail의 seed(placeholderData) 패턴을 그대로 재사용해 이 화면도 서버가 이미
+ * 가진 값을 첫 화면부터 보여주게 한다. 단, URL에 필터(종목/성별/레벨/검색어/정렬)가
+ * 걸려 있으면 seed(무필터 스냅샷)를 넘기지 않는다 — 필터링 안 된 결과를 필터링된
+ * 화면인 것처럼 잠깐 보여주는 쪽이 빈 스켈레톤보다 나쁘다.
+ */
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render as rtlRender } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { V1Sport, V1Team } from '@/types/api';
+
+const searchParamsMock = vi.hoisted(() => ({ value: new URLSearchParams('') }));
+
+const hookMocks = vi.hoisted(() => ({
+  // 인자 있는 초기 구현을 주지 않는다 — 주면 TS가 시그니처를 그 초기 구현으로 좁혀
+  // mock.calls 원소 타입이 좁아진다(teams-list-no-n1.test.tsx와 같은 이유). 기본
+  // 반환값은 아래 beforeEach의 mockReturnValue로 준다.
+  useV1Teams: vi.fn(),
+  useV1MasterSports: vi.fn(),
+  useV1RecentSearches: vi.fn(() => ({ data: { items: [] }, isLoading: false })),
+  useV1RecordSearch: vi.fn(() => ({ mutate: vi.fn() })),
+}));
+vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/hooks/use-v1-api')>()),
+  ...hookMocks,
+}));
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/teams',
+  useSearchParams: () => searchParamsMock.value,
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
+}));
+
+import { TeamListPageClient } from './teams-client';
+
+function render(ui: ReactElement) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return rtlRender(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
+
+function seedTeam(index: number): V1Team {
+  return {
+    id: `seed-${index}`,
+    teamId: `seed-${index}`,
+    name: `서버시드팀 ${index}`,
+    sportName: '풋살',
+    regionName: '서울 마포구',
+    memberCount: 5,
+  } as unknown as V1Team;
+}
+
+const seedSport = { id: 'sport-futsal', name: '풋살', code: 'futsal' } as unknown as V1Sport;
+
+describe('TeamListPageClient — 서버 seed 연결', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    searchParamsMock.value = new URLSearchParams('');
+    hookMocks.useV1Teams.mockReturnValue({ data: { items: [] }, isLoading: true, isError: false });
+    hookMocks.useV1MasterSports.mockReturnValue({ data: [] });
+  });
+
+  it('필터 없이 들어오면 seed를 useV1Teams/useV1MasterSports에 placeholderData로 넘긴다', () => {
+    const seed = { teams: [seedTeam(0), seedTeam(1)], sports: [seedSport] };
+
+    render(<TeamListPageClient seed={seed} />);
+
+    const [, teamsOptions] = hookMocks.useV1Teams.mock.calls[0] as [unknown, { seed?: unknown }];
+    expect(teamsOptions.seed).toEqual({ items: seed.teams, nextCursor: null });
+    const [sportsOptions] = hookMocks.useV1MasterSports.mock.calls[0] as [{ seed?: unknown }];
+    expect(sportsOptions.seed).toEqual(seed.sports);
+  });
+
+  it('URL에 종목 필터가 걸려 있으면 무필터 목록 seed는 넘기지 않는다(종목 목록 seed는 그대로 넘긴다)', () => {
+    searchParamsMock.value = new URLSearchParams('sportId=sport-futsal');
+    const seed = { teams: [seedTeam(0)], sports: [seedSport] };
+
+    render(<TeamListPageClient seed={seed} />);
+
+    const [, teamsOptions] = hookMocks.useV1Teams.mock.calls[0] as [unknown, { seed?: unknown }];
+    expect(teamsOptions.seed).toBeUndefined();
+    const [sportsOptions] = hookMocks.useV1MasterSports.mock.calls[0] as [{ seed?: unknown }];
+    expect(sportsOptions.seed).toEqual(seed.sports);
+  });
+
+  it('seed prop이 없으면(예: seed 없이 렌더) 두 훅 다 seed: undefined로 부른다', () => {
+    render(<TeamListPageClient />);
+
+    const [, teamsOptions] = hookMocks.useV1Teams.mock.calls[0] as [unknown, { seed?: unknown }];
+    expect(teamsOptions.seed).toBeUndefined();
+    const [sportsOptions] = hookMocks.useV1MasterSports.mock.calls[0] as [{ seed?: unknown }];
+    expect(sportsOptions.seed).toBeUndefined();
+  });
+});

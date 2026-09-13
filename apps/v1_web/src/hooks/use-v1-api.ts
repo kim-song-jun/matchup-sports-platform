@@ -472,13 +472,14 @@ export function useV1DeferOnboarding() {
   });
 }
 
-export function useV1MasterSports() {
+export function useV1MasterSports(options?: { seed?: V1Sport[] }) {
   return useQuery({
     queryKey: v1Keys.masterSports(),
     queryFn: async () => {
       const response = await v1Get<V1Sport[] | V1MasterSportsResponse>('/master/sports');
       return Array.isArray(response) ? response : response.sports;
     },
+    placeholderData: options?.seed,
   });
 }
 
@@ -866,11 +867,14 @@ export function useV1RejectMatchApplication(matchId: string) {
   });
 }
 
-export function useV1Teams(filters?: ListFilters, options?: QueryOptions) {
+export function useV1Teams(filters?: ListFilters, options?: QueryOptions & { seed?: CursorPage<V1Team> }) {
   return useQuery({
     queryKey: v1Keys.teams(filters),
     queryFn: () => v1Get<CursorPage<V1Team>>('/teams', filters),
     enabled: options?.enabled,
+    // teams/page.tsx가 크롤러용으로 이미 받아 둔 무필터 목록을 첫 표시값으로 쓴다 —
+    // useV1TeamDetail의 seed와 같은 패턴(899행). 추가 요청 없이 첫 화면을 채운다.
+    placeholderData: options?.seed,
   });
 }
 

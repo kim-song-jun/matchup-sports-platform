@@ -1,5 +1,14 @@
 # Public records and consent contract
 
+## Shared tournament fixture detail route
+
+`GET /api/v1/tournaments/:tournamentId/matches/:fixtureId` supports both
+`regular_tournament` and `regular_league` competition rows. Regular leagues use
+the existing league fixture projection (the same projection used by the league
+schedule surface). Unknown, cross-competition, deleted, non-public, and hidden
+fixtures all retain the public `404 TOURNAMENT_MATCH_NOT_FOUND` contract; only
+that not-found error is normalized when crossing into the league projection.
+
 
 ## Task 168 Phase 3 canonical records addendum (candidate)
 

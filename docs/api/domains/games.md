@@ -1,5 +1,13 @@
 # Game aggregate contract
 
+## Public fixture detail compatibility
+
+The shared tournament fixture detail URL may address a regular league
+`TeamMatch`. The API dispatches that case to the existing league public
+projection without changing Game source, visibility, permissions, or history
+rules. Operational failures continue through the normal error pipeline; public
+not-found cases remain indistinguishable as `TOURNAMENT_MATCH_NOT_FOUND`.
+
 
 ## Task 168 Phase 3 contract addendum (candidate)
 

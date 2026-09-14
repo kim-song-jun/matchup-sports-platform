@@ -125,6 +125,81 @@ describe('POST /admin/league-matches + fixtures', () => {
     expect(game.sourceType).toBe('TEAM_MATCH');
   });
 
+  it('참가 명단을 낸 팀은 명단 선수가 계정과 함께 들어가 연결되고, 명단이 없는 팀은 팀원이 계정 없이 들어간다', async () => {
+    const [playerA1, playerA2, removedPlayer] = ['a1', 'a2', 'removed'].map((key) => `t4-league-roster-${key}-${suiteId}`);
+    const memberD = `t4-league-member-d-${suiteId}`;
+    const userIds = [playerA1, playerA2, removedPlayer, memberD];
+    await prisma.v1User.createMany({
+      data: userIds.map((id) => ({ id, email: `${id}@integration.test`, onboardingStatus: 'completed', accountStatus: 'active' })),
+    });
+    await prisma.v1UserProfile.createMany({
+      data: userIds.map((userId, index) => ({ userId, nickname: `명단선수${index}-${suiteId}` })),
+    });
+    const teamC = await prisma.v1Team.create({ data: { ownerUserId, sportId, regionId, name: `roster-team-c-${suiteId}` } });
+    const teamD = await prisma.v1Team.create({ data: { ownerUserId, sportId, regionId, name: `roster-team-d-${suiteId}` } });
+    await prisma.v1TeamMembership.create({ data: { teamId: teamD.id, userId: memberD } });
+
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/admin/league-matches')
+      .set('x-v1-user-id', ownerUserId)
+      .send({
+        title: '명단 연결 리그',
+        sportId,
+        regionId,
+        startsOn: new Date().toISOString(),
+        endsOn: new Date(Date.now() + 7 * 7 * 86_400_000).toISOString(),
+        teamIds: [teamC.id, teamD.id],
+      });
+    expect(createRes.status).toBe(201);
+    const leagueId = createRes.body.data.leagueId;
+    const registration = await prisma.v1TournamentRegistration.findUniqueOrThrow({
+      where: { tournamentId_teamId: { tournamentId: leagueId, teamId: teamC.id } },
+    });
+    await prisma.v1TournamentPlayer.createMany({
+      data: [
+        { registrationId: registration.id, userId: playerA1, realName: '명단선수 하나' },
+        { registrationId: registration.id, userId: playerA2, realName: '명단선수 둘' },
+        { registrationId: registration.id, userId: removedPlayer, realName: '빠진 선수', removedAt: new Date() },
+      ],
+    });
+
+    const fixturesRes = await request(app.getHttpServer())
+      .post(`/api/v1/admin/league-matches/${leagueId}/fixtures`)
+      .set('x-v1-user-id', ownerUserId)
+      .send({ weeksCount: 1 });
+    expect(fixturesRes.status).toBe(201);
+
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId: fixturesRes.body.data.teamMatchIds[0] } });
+    const sides = await prisma.v1GameSide.findMany({ where: { gameId: game.id } });
+    const participants = await prisma.v1GameParticipant.findMany({ where: { gameId: game.id } });
+    const rowsOf = (teamId: string) => {
+      const sideId = sides.find((side) => side.teamId === teamId)!.id;
+      return participants.filter((row) => row.sideId === sideId);
+    };
+
+    const rosterRows = rowsOf(teamC.id);
+    expect(rosterRows.map((row) => row.userId).sort()).toEqual([playerA1, playerA2].sort());
+    expect(rowsOf(teamD.id).map((row) => row.userId)).toEqual([null]);
+
+    const links = await prisma.v1ParticipantIdentityLinkCurrent.findMany({
+      where: { participantId: { in: participants.map((row) => row.id) } },
+    });
+    expect(links.map((link) => `${link.participantId}:${link.userId}`).sort()).toEqual(
+      rosterRows.map((row) => `${row.id}:${row.userId}`).sort(),
+    );
+    const events = await prisma.v1ParticipantIdentityLinkEvent.findMany({
+      where: { participantId: { in: rosterRows.map((row) => row.id) } },
+    });
+    expect(events.map((event) => [event.action, event.eventVersion, event.actorUserId])).toEqual([
+      ['ROSTER_ASSERTED', 1, ownerUserId],
+      ['ROSTER_ASSERTED', 1, ownerUserId],
+    ]);
+    // 트리거가 effective_at 을 덮어쓰므로, 현재 연결이 그 값을 되읽어 실었는지 본다.
+    for (const link of links) {
+      expect(link.effectiveFrom.getTime()).toBe(events.find((event) => event.linkId === link.linkId)!.effectiveAt.getTime());
+    }
+  });
+
   it('요일·시각·장소 템플릿을 지정하면 모든 경기가 그 요일의 그 시각(KST)·장소로 일괄 채워진다', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/api/v1/admin/league-matches')

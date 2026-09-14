@@ -262,6 +262,10 @@ function createFake() {
         state.links.push({ participantId: args.data.participantId, userId: args.data.userId });
         return args.data;
       }),
+      createMany: track('v1ParticipantIdentityLinkCurrent.createMany', async (args: { data: Array<{ participantId: string; userId: string }> }) => {
+        state.links.push(...args.data.map(({ participantId, userId }) => ({ participantId, userId })));
+        return { count: args.data.length };
+      }),
     },
     v1ParticipantIdentityLinkEvent: {
       findFirst: track('v1ParticipantIdentityLinkEvent.findFirst', async () => null),
@@ -270,6 +274,15 @@ function createFake() {
         state.linkEvents.push(row);
         return row;
       }),
+      createManyAndReturn: track(
+        'v1ParticipantIdentityLinkEvent.createManyAndReturn',
+        async (args: { data: Array<{ participantId: string; action: string; userId: string }> }) => {
+          const effectiveAt = new Date();
+          const rows = args.data.map((data) => ({ ...data, effectiveAt }));
+          state.linkEvents.push(...rows);
+          return rows;
+        },
+      ),
     },
     $queryRaw: track('$queryRaw', async () => [{ id: 'league-1' }]),
     $executeRaw: track('$executeRaw', async () => 1),
@@ -383,13 +396,28 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
   it('참가자당 statement 는 create 1건뿐이다 — 대형 리그 트랜잭션 타임아웃 방지', async () => {
     await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
 
-    // 대진 생성은 리그 행을 FOR UPDATE 로 잠근 단일 인터랙티브 트랜잭션(timeout 120s)
+    // 대진 생성은 리그 행을 FOR UPDATE 로 잠근 단일 인터랙티브 트랜잭션(timeout 45s)
     // 안에서 돈다. 참가자당 statement 가 1건을 넘으면 팀·라운드 수에 곱해져 P2028 로
     // 대진 생성 전체가 실패한다(12팀 × 30명 × 104라운드 = 참가자 37,440).
     const perParticipant = state.calls.filter(
       (call) => call === 'v1GameParticipant.create' || call.startsWith('v1ParticipantIdentityLink'),
     );
     expect(perParticipant).toHaveLength(state.participants.length);
+  });
+
+  it('명단 선수 연결은 인원과 상관없이 경기당 statement 2건이다', async () => {
+    const roster = (team: string) =>
+      Array.from({ length: 12 }, (_, index) => ({ id: `player-${team}${index}`, userId: `user-${team}${index}`, nickname: `${team}${index}` }));
+    state.rosterPlayers.set('team-a', roster('a'));
+    state.rosterPlayers.set('team-b', roster('b'));
+
+    await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
+
+    expect(state.links).toHaveLength(24);
+    expect(state.calls.filter((call) => call.startsWith('v1ParticipantIdentityLink'))).toEqual([
+      'v1ParticipantIdentityLinkEvent.createManyAndReturn',
+      'v1ParticipantIdentityLinkCurrent.createMany',
+    ]);
   });
 
   it('리그를 active 로 옮길 때 통합 축 거울의 status 도 같이 옮긴다 (dual-write)', async () => {

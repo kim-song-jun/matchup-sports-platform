@@ -258,6 +258,15 @@ jobs:
       - name: Task168 final-steady migration contract tests
         run: bash scripts/qa/test-task168-final-steady.sh
 
+      # Ordering guarantee around that same gate inside deploy-alpha.sh
+      # itself: check-only must run BEFORE activate_alpha_release_source,
+      # and this path must never set task168_irreversible -- moving the
+      # gate after activation, or re-enabling irreversible mode, would leave
+      # every scenario above green while reopening D-5 (a half-switched
+      # release that cannot be restored).
+      - name: Task168 Alpha steady deploy ordering contract tests
+        run: bash scripts/qa/test-task168-alpha-steady-wiring.sh
+
       # Task168 M11 prod guard (assert_task168_m11_guard,
       # deploy/prod-release-common.sh): prod has no Alpha-style host receipt
       # path, so this is the only thing stopping M11 from running unguarded

@@ -29,13 +29,29 @@
 #      ledger row) turns red.
 #   5. The StageB receipt's databaseIdentity binding removed: negative ⑨ (a
 #      receipt captured against a different alpha environment) turns red.
-#   6. Exact-match reversion (inserting "pending_count == 0 or fail",
+#   5. The migration-receipt scan's databaseIdentity/m11Sha256 filter
+#      removed: negative ⑨ (a receipt bound to a different database) turns
+#      red.
+#   6. runtime-verification.json's binding to the migration receipt's own
+#      sha removed: an unrelated runtime-verification.json left over for a
+#      different release turns red against a legitimate migration receipt.
+#   7. L4's contradictory-row rejection (finished_at AND rolled_back_at both
+#      set) removed: negative ⑪ turns red.
+#   8. STAGE_B_STATE_ROOT reverted to the old (pre-fix) task168-final/ path
+#      real StageB producers never write to: positive ⓐ (a legitimate,
+#      correctly-shaped StageB completion) flips from pass to fail -- this
+#      is the receipt-shape/path bug this file's write_receipts() fixture
+#      was rewritten to catch (see negative ⑩ for the direct case: a
+#      receipt genuinely written in that old shape must read as absent).
+#   9. Exact-match reversion (inserting "pending_count == 0 or fail",
 #      simulating the candidate runner's full-ledger-equality design this
 #      script deliberately does NOT use): positive ⓑ (a legitimate M12
 #      pending after M11) flips from pass to fail -- proving this suite
 #      would catch a regression back to the design D-1 was written to fix.
-# See the bottom of this file for the actual mutation run that measures
-# these counts against the real script.
+# Mutations 8 and 9 above are the two whose expected direction is a false
+# REJECT of a legitimate scenario (checked directly, not through
+# mutate_and_check, which looks for a false ACCEPT); all nine are counted in
+# the same mutation_reds/mutation_total tally at the bottom of this file.
 set -Eeuo pipefail
 
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -197,17 +213,28 @@ export PATH="${MOCK_BIN}:${PATH}"
 export CALL_LOG="${TEST_ROOT}/docker-calls.log"
 export DB_ID="${FAKE_DB_ID}"
 
+# write_receipts STATE_ROOT DB_ID M11_SHA [RELEASE_SHA [STATUS]]
+# Mirrors the exact receipt shape and path the real StageB producers write:
+# deploy/task168-stage-b-migrate.sh's migration-stage.json (status
+# MIGRATION_COMMITTED) at ${STATE_ROOT}/task168/<release-sha>/migration-stage.json
+# (deploy-alpha-stage-b.sh's R-A recovery path can also write
+# MIGRATION_COMMITTED_RECOVERED there), and
+# scripts/release/task168-stage-b-post-live-verify.sh's runtime-verification.json
+# next to it. Neither producer file carries a top-level `status` field on
+# runtime-verification.json or a `databaseIdentity` field there -- the DB
+# binding is transitive, through migrationReceiptSha256 pointing at the
+# already-DB-bound migration-stage.json.
 write_receipts() {
-  local state_root="$1" db_id="$2" m11_sha="$3"
-  local dir="${state_root}/task168-final"
+  local state_root="$1" db_id="$2" m11_sha="$3" release_sha="${4:-1111111111111111111111111111111111111111}" status="${5:-MIGRATION_COMMITTED}"
+  local dir="${state_root}/task168/${release_sha}"
   mkdir -p "${dir}"
-  cat > "${dir}/transition.json" <<EOF
-{"schemaVersion":1,"kind":"task168StageBMigration","status":"MIGRATION_COMMITTED","databaseIdentity":"${db_id}","m11Sha256":"${m11_sha}","completedAt":"2026-09-14T00:00:00Z"}
+  cat > "${dir}/migration-stage.json" <<EOF
+{"schemaVersion":1,"kind":"task168StageBMigration","status":"${status}","stage":"stageBFinal","releaseSha":"${release_sha}","databaseIdentity":"${db_id}","m11Sha256":"${m11_sha}","completedAt":"2026-09-14T00:00:00Z"}
 EOF
-  local transition_sha
-  transition_sha="$(sha256sum "${dir}/transition.json" | awk '{print $1}')"
+  local migration_receipt_sha
+  migration_receipt_sha="$(sha256sum "${dir}/migration-stage.json" | awk '{print $1}')"
   cat > "${dir}/runtime-verification.json" <<EOF
-{"schemaVersion":1,"kind":"task168StageBRuntimeVerification","status":"COMPLETED","databaseIdentity":"${db_id}","migrationReceiptSha256":"${transition_sha}"}
+{"schemaVersion":1,"kind":"task168StageBRuntimeVerification","migrationReceiptSha256":"${migration_receipt_sha}","ledgerCount":11,"completedAt":"2026-09-14T00:05:00Z"}
 EOF
 }
 
@@ -364,6 +391,47 @@ export MIGRATE_RAN_FLAG="${TEST_ROOT}/n9-migrate-ran"
 assert_check_only_fails "receipt-bound-to-other-database" "${dir9}"
 export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
 
+# ── negative ⑩ a receipt exists but in the OLD (pre-fix) shape/path this
+#    script used to read -- ${STATE}/task168-final/transition.json with a
+#    "status" field on runtime-verification.json -- instead of the real
+#    producer's ${STATE}/task168/<sha>/migration-stage.json. A regression
+#    back to reading that shape must be indistinguishable from "no receipt
+#    at all", not silently accepted. ─────────────────────────────────────────
+dir10="${TEST_ROOT}/n10"; make_source_tree "${dir10}"
+applied_rows_for "${dir10}" "${TASK168_M1_M10[@]}" "${M11_NAME}" > "${TEST_ROOT}/rows-n10"
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/n10-state"
+old_shape_dir="${ALPHA_RELEASE_STATE_DIR}/task168-final"
+mkdir -p "${old_shape_dir}"
+cat > "${old_shape_dir}/transition.json" <<EOF
+{"schemaVersion":1,"kind":"task168StageBMigration","status":"MIGRATION_COMMITTED","databaseIdentity":"${FAKE_DB_ID}","m11Sha256":"${M11_SHA}","completedAt":"2026-09-14T00:00:00Z"}
+EOF
+old_shape_sha="$(sha256sum "${old_shape_dir}/transition.json" | awk '{print $1}')"
+cat > "${old_shape_dir}/runtime-verification.json" <<EOF
+{"schemaVersion":1,"kind":"task168StageBRuntimeVerification","status":"COMPLETED","databaseIdentity":"${FAKE_DB_ID}","migrationReceiptSha256":"${old_shape_sha}"}
+EOF
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-n10"
+export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n10"
+export TABLE_EXISTS=t
+export MIGRATE_RAN_FLAG="${TEST_ROOT}/n10-migrate-ran"
+: > "${CALL_LOG}"
+assert_check_only_fails "old-shape-receipt-not-recognized" "${dir10}"
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
+
+# ── negative ⑪ a ledger row has BOTH finished_at and rolled_back_at set --
+#    a contradictory state Prisma itself never produces but L4 must still
+#    reject rather than silently drop. ───────────────────────────────────────
+dir11="${TEST_ROOT}/n11"; make_source_tree "${dir11}"
+{
+  applied_rows_for "${dir11}" "${TASK168_M1_M10[@]}" "${M11_NAME}"
+  ledger_row "20260101000000_v1_contradictory_row" dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd t t
+} > "${TEST_ROOT}/rows-n11"
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-n11"
+export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n11"
+export TABLE_EXISTS=t
+export MIGRATE_RAN_FLAG="${TEST_ROOT}/n11-migrate-ran"
+: > "${CALL_LOG}"
+assert_check_only_fails "contradictory-ledger-row" "${dir11}"
+
 # ── positive ⓐ source == DB == M1-M11, no pending ────────────────────────────
 dira="${TEST_ROOT}/pa"; make_source_tree "${dira}"
 applied_rows_for "${dira}" "${TASK168_M1_M10[@]}" "${M11_NAME}" > "${TEST_ROOT}/rows-pa"
@@ -421,7 +489,7 @@ if [[ "${negatives_failed}" -ne 0 || "${positives_failed}" -ne 0 ]]; then
   echo "[task168-final-steady] FAILED: ${negatives_failed} negative(s), ${positives_failed} positive(s)" >&2
   exit 1
 fi
-echo "[task168-final-steady] all 9 negatives + 3 positives passed"
+echo "[task168-final-steady] all 11 negatives + 3 positives passed"
 
 # ── mutation run: verify the expected red counts in the header comment ──────
 # Applies each mutation to a scratch copy of the script and reruns the exact
@@ -538,49 +606,114 @@ if mutate_and_check "l4-removed" \
   mutation_reds=$((mutation_reds + 1))
 fi
 
-# StageB receipt DB-identity binding removed. Dropping the plain `-s`
-# existence check is safe on its own (jq -e already fails outright on a
-# missing/empty TRANSITION file, so that specific line is redundant); the
-# checks that are NOT redundant with anything else are the two
-# databaseIdentity bindings, one on each of the two receipts write_receipts
-# produces (both bound to the same wrong db in negative ⑨/dir9, so, like
-# the M11 pin above, removing only one still leaves the other to catch it
-# -- both must be removed together).
-mutation_total=$((mutation_total + 1))
-scratch5="${TEST_ROOT}/mut-receipt-db-binding-removed"
-mkdir -p "${scratch5}"
-python3 - "${SCRIPT}" "${scratch5}/task168-final-steady-migrate.sh" <<'PYEOF'
-import sys
-src_path, out_path = sys.argv[1], sys.argv[2]
-src = open(src_path, encoding='utf-8').read()
-targets = [
-    ('.databaseIdentity==$db and .m11Sha256==$m11', '.m11Sha256==$m11'),
-    ('.status=="COMPLETED" and .databaseIdentity==$db and .migrationReceiptSha256==$transitionSha',
-     '.status=="COMPLETED" and .migrationReceiptSha256==$transitionSha'),
-]
-for old, new in targets:
-    c = src.count(old)
-    if c != 1:
-        raise SystemExit(f'expected exactly 1 occurrence, found {c}: {old!r}')
-    src = src.replace(old, new, 1)
-open(out_path, 'w', encoding='utf-8').write(src)
-PYEOF
-compose_prod5="${dir9}/compose-prod.yml"; compose_alpha5="${dir9}/compose-alpha.yml"; env_file5="${dir9}/.env"
+# StageB receipt DB-identity binding removed from the migration-receipt scan
+# filter (negative ⑨/dir9's receipt is bound to a different database with an
+# otherwise-clean M1-M11 ledger, so only this clause catches it -- the
+# runtime-verification.json side has no databaseIdentity of its own to
+# remove; its DB binding is transitive through migrationReceiptSha256).
 export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/n9-state"
 export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-n9"; export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n9"
 export TABLE_EXISTS=t; export MIGRATE_RAN_FLAG="${TEST_ROOT}/mut5-migrate-ran"
-set +e
-bash "${scratch5}/task168-final-steady-migrate.sh" --check-only --source-dir "${dir9}" \
-  --compose-prod "${compose_prod5}" --compose-alpha "${compose_alpha5}" --env-file "${env_file5}" >/dev/null 2>&1
-rc5=$?
-set -e
-if [[ "${rc5}" -eq 0 ]]; then
-  echo "[mutation receipt-db-binding-removed] red (correctly turned the guarded scenario into a false accept)"
+mutation_total=$((mutation_total + 1))
+if mutate_and_check "receipt-db-binding-removed" \
+  '.databaseIdentity==$db and .m11Sha256==$m11' \
+  '.m11Sha256==$m11' \
+  "${dir9}"; then
   mutation_reds=$((mutation_reds + 1))
-else
-  echo "[mutation receipt-db-binding-removed] NOT red — mutation did not weaken the check as expected" >&2
 fi
 export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
+
+# StageB runtime-verification.json's binding to the migration receipt
+# removed -- an unrelated/stale runtime-verification.json (e.g. left over
+# from a different release sha) would then be accepted for any matching
+# migration receipt.
+mutation_total=$((mutation_total + 1))
+scratch5b="${TEST_ROOT}/mut-runtime-verification-binding-removed"
+mkdir -p "${scratch5b}"
+python3 - "${SCRIPT}" "${scratch5b}/task168-final-steady-migrate.sh" <<'PYEOF'
+import sys
+src_path, out_path = sys.argv[1], sys.argv[2]
+src = open(src_path, encoding='utf-8').read()
+old = '.schemaVersion==1 and .kind=="task168StageBRuntimeVerification" and .migrationReceiptSha256==$receiptSha and .ledgerCount==11'
+new = '.schemaVersion==1 and .kind=="task168StageBRuntimeVerification" and .ledgerCount==11'
+c = src.count(old)
+if c != 1:
+    raise SystemExit(f'expected exactly 1 occurrence, found {c}: {old!r}')
+open(out_path, 'w', encoding='utf-8').write(src.replace(old, new, 1))
+PYEOF
+# A runtime-verification.json bound to a DIFFERENT (unrelated) migration
+# receipt sha, sitting next to a legitimate migration-stage.json for dira's
+# clean M1-M11 ledger -- only the migrationReceiptSha256 check catches this.
+dir5b="${TEST_ROOT}/n5b-state"
+write_receipts "${dir5b}" "${FAKE_DB_ID}" "${M11_SHA}"
+printf '{"schemaVersion":1,"kind":"task168StageBRuntimeVerification","migrationReceiptSha256":"%s","ledgerCount":11,"completedAt":"2026-09-14T00:05:00Z"}\n' \
+  'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' \
+  > "${dir5b}/task168/1111111111111111111111111111111111111111/runtime-verification.json"
+compose_prod5b="${dira}/compose-prod.yml"; compose_alpha5b="${dira}/compose-alpha.yml"; env_file5b="${dira}/.env"
+export ALPHA_RELEASE_STATE_DIR="${dir5b}"
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-pa"; export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-pa"
+export TABLE_EXISTS=t; export MIGRATE_RAN_FLAG="${TEST_ROOT}/mut5b-migrate-ran"
+set +e
+bash "${scratch5b}/task168-final-steady-migrate.sh" --check-only --source-dir "${dira}" \
+  --compose-prod "${compose_prod5b}" --compose-alpha "${compose_alpha5b}" --env-file "${env_file5b}" >/dev/null 2>&1
+rc5b=$?
+set -e
+if [[ "${rc5b}" -eq 0 ]]; then
+  echo "[mutation runtime-verification-binding-removed] red (correctly turned an unbound runtime-verification.json into a false accept)"
+  mutation_reds=$((mutation_reds + 1))
+else
+  echo "[mutation runtime-verification-binding-removed] NOT red — mutation did not weaken the check as expected" >&2
+fi
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
+
+# L4's contradictory-row rejection (finished_at NOT NULL AND rolled_back_at
+# NOT NULL) removed: negative ⑪ (dir11) turns red.
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-n11"; export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n11"
+export TABLE_EXISTS=t; export MIGRATE_RAN_FLAG="${TEST_ROOT}/mut-l4-contradictory-migrate-ran"
+mutation_total=$((mutation_total + 1))
+if mutate_and_check "l4-contradictory-removed" \
+  '[[ "${contradictory_count}" -eq 0 ]] || fail "L4 violated: ${contradictory_count} ledger row(s) have both finished_at and rolled_back_at set"' \
+  ':' \
+  "${dir11}"; then
+  mutation_reds=$((mutation_reds + 1))
+fi
+
+# Receipt path/shape regression: reverting STAGE_B_STATE_ROOT back to the old
+# (wrong) task168-final/ location must make even a LEGITIMATE StageB
+# completion (positive ⓐ, real receipts under task168/<sha>/) unreadable --
+# proving this suite would catch a regression back to the path every real
+# StageB run never writes to (this is the exact defect this fix closes: it
+# would otherwise permanently block every post-StageB Alpha deploy). Checked
+# directly, like the exact-match-reversion mutation below, since the
+# expected direction is PASS -> FAIL, not a false accept.
+mutation_total=$((mutation_total + 1))
+scratch5c="${TEST_ROOT}/mut-state-root-path-reverted"
+mkdir -p "${scratch5c}"
+OLD_SNIPPET='STAGE_B_STATE_ROOT="${ALPHA_RELEASE_STATE_DIR:-/home/ec2-user/.teameet-alpha-releases}/task168"' \
+  NEW_SNIPPET='STAGE_B_STATE_ROOT="${ALPHA_RELEASE_STATE_DIR:-/home/ec2-user/.teameet-alpha-releases}/task168-final"' \
+  SRC="${SCRIPT}" OUT="${scratch5c}/task168-final-steady-migrate.sh" python3 - <<'PYEOF'
+import os
+src = open(os.environ['SRC'], 'r', encoding='utf-8').read()
+old = os.environ['OLD_SNIPPET']
+new = os.environ['NEW_SNIPPET']
+count = src.count(old)
+if count != 1:
+    raise SystemExit(f'expected exactly 1 occurrence of the mutation target, found {count}')
+open(os.environ['OUT'], 'w', encoding='utf-8').write(src.replace(old, new, 1))
+PYEOF
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-pa"; export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-pa"
+export TABLE_EXISTS=t; export MIGRATE_RAN_FLAG="${TEST_ROOT}/mut-path-reverted-migrate-ran"
+set +e
+bash "${scratch5c}/task168-final-steady-migrate.sh" --check-only --source-dir "${dira}" \
+  --compose-prod "${dira}/compose-prod.yml" --compose-alpha "${dira}/compose-alpha.yml" --env-file "${dira}/.env" >/dev/null 2>&1
+rc5c=$?
+set -e
+if [[ "${rc5c}" -ne 0 ]]; then
+  echo "[mutation state-root-path-reverted] red (a legitimate post-StageB deploy would now be permanently rejected)"
+  mutation_reds=$((mutation_reds + 1))
+else
+  echo "[mutation state-root-path-reverted] NOT red -- reverting the state root path did not break the legitimate scenario as expected" >&2
+fi
 
 # Exact-match reversion (v3 critique #10 / spec §3.3): if L1's subset check
 # were reverted to the candidate runner's "full ledger == full source
@@ -629,8 +762,8 @@ else
   echo "[mutation exact-match-reversion] NOT red -- an exact-match reversion did not break the pending-M12 scenario as expected" >&2
 fi
 
-echo "[task168-final-steady] mutation reds: ${mutation_reds}/${mutation_total} (expected 6/6)"
-if [[ "${mutation_reds}" -ne 6 ]]; then
+echo "[task168-final-steady] mutation reds: ${mutation_reds}/${mutation_total} (expected 9/9)"
+if [[ "${mutation_reds}" -ne 9 ]]; then
   echo "[task168-final-steady] FAILED: expected all 6 mutations to weaken the check as documented" >&2
   exit 1
 fi

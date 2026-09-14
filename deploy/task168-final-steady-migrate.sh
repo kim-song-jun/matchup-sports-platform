@@ -46,9 +46,14 @@ readonly TASK168_NAMES=(
   "${M11_NAME}"
 )
 
-STATE_ROOT="${ALPHA_RELEASE_STATE_DIR:-/home/ec2-user/.teameet-alpha-releases}/task168-final"
-TRANSITION="${STATE_ROOT}/transition.json"
-RUNTIME_VERIFICATION="${STATE_ROOT}/runtime-verification.json"
+# StageB's actual producers (deploy/task168-stage-b-migrate.sh,
+# deploy/deploy-alpha-stage-b.sh's R-A recovery path) write one
+# migration-stage.json per release sha under task168/<sha>/, not under a
+# fixed task168-final/ path -- this script does not know which sha StageB
+# ran under (it can predate the sha that finally merges this file), so it
+# scans every receipt under STAGE_B_STATE_ROOT below instead of reading one
+# fixed path.
+STAGE_B_STATE_ROOT="${ALPHA_RELEASE_STATE_DIR:-/home/ec2-user/.teameet-alpha-releases}/task168"
 
 compose=(docker compose --project-name deploy -f "${COMPOSE_PROD}" -f "${COMPOSE_ALPHA}" --env-file "${ENV_FILE}")
 dbq(){ "${compose[@]}" exec -T v1_postgres psql -v ON_ERROR_STOP=1 -At -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" -c "$1"; }
@@ -78,22 +83,33 @@ fi
 
 declare -A APPLIED_SHA
 unresolved_count=0
+contradictory_count=0
 while IFS='|' read -r name checksum finished rolledback; do
   [[ -n "${name}" ]] || continue
   if [[ "${finished}" == t && "${rolledback}" == f ]]; then
     APPLIED_SHA["${name}"]="${checksum}"
   elif [[ "${finished}" == f && "${rolledback}" == f ]]; then
     # finished_at IS NULL AND rolled_back_at IS NULL: the P3009 "in-flight or
-    # crashed" state. finished_at IS NULL AND rolled_back_at IS NOT NULL (a
-    # `migrate resolve --rolled-back` attempt) is deliberately excluded here:
-    # it is neither an applied row (L1/L2 do not see it) nor an unresolved
-    # one, so it cannot violate L1, L2, or L4 by construction.
+    # crashed" state.
     unresolved_count=$((unresolved_count + 1))
+  elif [[ "${finished}" == t && "${rolledback}" == t ]]; then
+    # finished_at IS NOT NULL AND rolled_back_at IS NOT NULL: Prisma never
+    # produces this row itself, but nothing stops a manual `migrate resolve`
+    # sequence (or a corrupted table) from leaving one -- it is neither a
+    # valid applied row nor a legitimate resolved-rolled-back one, so it must
+    # be rejected rather than silently dropped.
+    contradictory_count=$((contradictory_count + 1))
   fi
+  # finished_at IS NULL AND rolled_back_at IS NOT NULL (a `migrate resolve
+  # --rolled-back` attempt) is deliberately excluded from all four counts
+  # above: it is neither an applied row (L1/L2 do not see it) nor an
+  # unresolved or contradictory one, so it cannot violate L1, L2, or L4 by
+  # construction.
 done <<<"${rows}"
 
-# L4: zero unresolved (P3009) attempts.
+# L4: zero unresolved (P3009) attempts and zero contradictory rows.
 [[ "${unresolved_count}" -eq 0 ]] || fail "L4 violated: ${unresolved_count} unresolved migration attempt(s) in the ledger"
+[[ "${contradictory_count}" -eq 0 ]] || fail "L4 violated: ${contradictory_count} ledger row(s) have both finished_at and rolled_back_at set"
 
 # L1: every applied DB row exists in the candidate source with the same name and checksum.
 for name in "${!APPLIED_SHA[@]}"; do
@@ -119,14 +135,29 @@ pending_count=$(( ${#source_names[@]} - ${#APPLIED_SHA[@]} ))
 echo "[task168-final-steady] L1-L4 passed (${#APPLIED_SHA[@]} applied, ${pending_count} pending)"
 
 if [[ "${MODE}" == check-only ]]; then
-  [[ -s "${TRANSITION}" ]] || fail 'StageB MIGRATION_COMMITTED receipt is missing'
-  jq -e --arg db "${DB_ID}" --arg m11 "${M11_SHA}" \
-    '.schemaVersion==1 and .kind=="task168StageBMigration" and .status=="MIGRATION_COMMITTED" and .databaseIdentity==$db and .m11Sha256==$m11 and (.completedAt|type=="string" and length>0)' \
-    "${TRANSITION}" >/dev/null || fail 'StageB MIGRATION_COMMITTED receipt is invalid or not bound to this database'
-  [[ -s "${RUNTIME_VERIFICATION}" ]] || fail 'StageB runtimeVerification receipt is missing'
-  jq -e --arg db "${DB_ID}" --arg transitionSha "$(sha "${TRANSITION}")" \
-    '.schemaVersion==1 and .kind=="task168StageBRuntimeVerification" and .status=="COMPLETED" and .databaseIdentity==$db and .migrationReceiptSha256==$transitionSha' \
-    "${RUNTIME_VERIFICATION}" >/dev/null || fail 'StageB runtimeVerification receipt is invalid or not bound to the MIGRATION_COMMITTED receipt'
+  # Find the StageB migration receipt bound to this database and the pinned
+  # M11 checksum. There is exactly one migration-stage.json per release sha
+  # (task168-stage-b-migrate.sh refuses to overwrite one), so scan every sha
+  # directory instead of assuming which sha StageB ran under.
+  migration_receipts=()
+  if [[ -d "${STAGE_B_STATE_ROOT}" ]]; then
+    while IFS= read -r f; do
+      jq -e --arg db "${DB_ID}" --arg m11 "${M11_SHA}" '
+        .schemaVersion==1 and .kind=="task168StageBMigration" and .stage=="stageBFinal" and
+        (.status=="MIGRATION_COMMITTED" or .status=="MIGRATION_COMMITTED_RECOVERED") and
+        .databaseIdentity==$db and .m11Sha256==$m11
+      ' "${f}" >/dev/null 2>&1 && migration_receipts+=("${f}")
+    done < <(find "${STAGE_B_STATE_ROOT}" -mindepth 2 -maxdepth 2 -name migration-stage.json 2>/dev/null | LC_ALL=C sort)
+  fi
+  [[ "${#migration_receipts[@]}" -gt 0 ]] || fail 'StageB MIGRATION_COMMITTED receipt is missing (no migration-stage.json under the StageB state root is bound to this database and the pinned M11 checksum)'
+  [[ "${#migration_receipts[@]}" -eq 1 ]] || fail "StageB MIGRATION_COMMITTED receipt is ambiguous: ${#migration_receipts[@]} receipts are bound to this database and M11 checksum"
+  migration_receipt="${migration_receipts[0]}"
+  migration_receipt_sha="$(sha "${migration_receipt}")"
+  runtime_verification="$(dirname "${migration_receipt}")/runtime-verification.json"
+  [[ -s "${runtime_verification}" ]] || fail 'StageB runtimeVerification receipt is missing'
+  jq -e --arg receiptSha "${migration_receipt_sha}" \
+    '.schemaVersion==1 and .kind=="task168StageBRuntimeVerification" and .migrationReceiptSha256==$receiptSha and .ledgerCount==11' \
+    "${runtime_verification}" >/dev/null || fail 'StageB runtimeVerification receipt is invalid or not bound to the MIGRATION_COMMITTED receipt'
   echo '[task168-final-steady] check-only passed: StageB receipts present and bound to this database'
   exit 0
 fi

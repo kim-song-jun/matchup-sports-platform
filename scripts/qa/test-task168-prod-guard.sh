@@ -1,30 +1,61 @@
 #!/usr/bin/env bash
 # Real test for assert_task168_m11_guard() (deploy/prod-release-common.sh)
-# and its call-site position in deploy/deploy-prod.sh. Sources the common
-# file directly (same convention as scripts/qa/test-prod-release-state.sh)
-# and calls the function against a fake `sudo`/`docker`, so no real prod
-# host, network, or database is needed.
+# AND its actual effect inside deploy/deploy-prod.sh: whether
+# `prisma migrate deploy` runs at all.
 #
-# Scenarios (spec item 10, prod guard (i)(ii)(iii)):
+# Function-level calls into assert_task168_m11_guard alone (the previous
+# version of this file) cannot catch a guard that is still called in the
+# right place but neutralized (`|| true`, wrapped in `if false; then`), nor
+# can a docker CALL LOG that is implemented as an exported shell function --
+# assert_task168_m11_guard invokes docker through `sudo docker ...`, and
+# `sudo` execs its argument as a new process, which never sees a shell
+# function (verified: with `docker` as a function, scenario (iii)'s "no
+# docker touched" check stayed vacuously true even when a docker call was
+# injected ahead of the M11-absence early return). So this file instead:
+#   - fakes `docker` as a real executable on PATH (so calls made via `sudo
+#     docker ...` are actually recorded), and
+#   - extracts the exact `assert_task168_m11_guard ...` through
+#     `prisma migrate deploy` segment out of the CURRENT deploy-prod.sh by
+#     content anchor (not hardcoded line numbers) and runs it as a real bash
+#     subprocess, counting `prisma migrate deploy` invocations in the call
+#     log -- the same "run the real flow, count the call" approach
+#     scripts/qa/test-task168-final-steady.sh and
+#     scripts/qa/test-task168-alpha-steady-wiring.sh use.
+# deploy-prod.sh itself cannot run end-to-end here (ECR/AWS, a real EC2
+# host, /proc reads before this point) -- the extracted segment starts
+# exactly at the guard call, so none of that is needed.
+#
+# Scenarios:
 #   (i)   M11 folder present in the candidate source + prod ledger does NOT
-#         show M11 as an applied row -> guard fails (rc != 0), no
-#         `prisma migrate deploy` may run.
+#         show M11 as an applied row -> guard fails, `prisma migrate
+#         deploy` call count 0, segment exits non-zero.
 #   (ii)  M11 folder present + prod ledger already shows M11 applied with
-#         the pinned checksum -> guard passes (rc == 0).
+#         the pinned checksum -> guard passes, migrate deploy called once.
 #   (iii) M11 folder absent from the candidate source (today's main) ->
-#         guard is a no-op and passes without touching docker/psql at all.
+#         guard is a no-op; migrate deploy called once; NO docker network/
+#         psql call was made at all (checked via the real docker call log,
+#         not a shell-function trick).
 #
 # Expected red counts per mutation, measured at the bottom of this file:
-#   - Guard deleted from deploy-prod.sh entirely: (i) turns red (the
-#     migrate-deploy line becomes reachable with no guard ahead of it).
-#   - Guard's pass/fail verdict inverted (accepts a mismatch, rejects a
-#     match): (ii) and (iii) turn red -- 2/2.
-#   - Guard call moved to after the `prisma migrate deploy` line: (i) turns
-#     red (a static ordering check, since (i)'s harm is exactly that
-#     ordering: touching prod's DB before validating it should be safe to).
+#   1. Guard verdict inverted (accepts mismatch, rejects match): (i) and
+#      (ii) both turn red -- 2/2.
+#   2. Guard call deleted from deploy-prod.sh entirely: (i) turns red (0
+#      migrate-deploy calls becomes 1).
+#   3. Guard call neutralized with `|| true` in place (still textually
+#      before migrate deploy, so a static line-order check alone cannot see
+#      this): (i) turns red.
+#   4. `AND finished_at IS NOT NULL AND rolled_back_at IS NULL` removed from
+#      the ledger query: a P3009-leftover row (finished_at NULL, same
+#      pinned checksum) is wrongly accepted as "applied" -> (i)-shaped
+#      scenario turns red.
+#   5. Fail-open on a psql/docker error (`|| m11_ledger_checksum=""` changed
+#      to fall back to the source checksum instead): a psql failure is
+#      wrongly treated as "already applied" -> turns red.
 set -Eeuo pipefail
 
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+readonly DEPLOY_PROD="${ROOT_DIR}/deploy/deploy-prod.sh"
+readonly PROD_RELEASE_COMMON="${ROOT_DIR}/deploy/prod-release-common.sh"
 readonly TEST_ROOT="$(mktemp -d)"
 trap 'rm -rf "${TEST_ROOT}"' EXIT
 
@@ -37,28 +68,78 @@ readonly M11_SHA=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d932
   exit 1
 }
 
+# ── extract "assert_task168_m11_guard ... through prisma migrate deploy"
+#    from deploy-prod.sh by content anchor ──────────────────────────────────
+extract_segment() {
+  local script="$1" out="$2"
+  local start_line end_line
+  start_line="$(grep -n '^assert_task168_m11_guard "\${PROD_SOURCE_DIR}"$' "${script}" | head -1 | cut -d: -f1)"
+  end_line="$(grep -n "^  'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy'\$" "${script}" | head -1 | cut -d: -f1)"
+  [[ -n "${start_line}" && -n "${end_line}" && "${start_line}" -lt "${end_line}" ]] || {
+    echo "extract_segment: could not find both anchor lines in ${script}" >&2
+    return 1
+  }
+  sed -n "${start_line},${end_line}p" "${script}" > "${out}"
+}
+
+extract_segment "${DEPLOY_PROD}" "${TEST_ROOT}/baseline-segment.sh" ||
+  { echo "[task168-prod-guard] FAILED: baseline segment extraction" >&2; exit 1; }
+
+# ── fake sudo (passthrough exec, same convention as
+#    scripts/qa/test-prod-release-state.sh) and fake docker as a REAL
+#    executable on PATH (not a shell function -- see header) ───────────────
 mock_bin="${TEST_ROOT}/mockbin"
 mkdir -p "${mock_bin}"
 printf '#!/usr/bin/env bash\nexec "$@"\n' > "${mock_bin}/sudo"
 chmod +x "${mock_bin}/sudo"
 
-# DOCKER_DATABASE_URL / DOCKER_NETWORK_OK / DOCKER_LEDGER_CHECKSUM are read by
-# the fake `docker` at call time (exported per-scenario below).
-cat > "${mock_bin}/docker" <<'DOCKEREOF'
+readonly SQL_EVAL="${TEST_ROOT}/eval_sql.py"
+cat > "${SQL_EVAL}" <<'PYEOF'
+import json, os, re, sys
+sql = sys.argv[1]
+fixture = json.load(open(os.environ['LEDGER_FIXTURE_FILE']))
+m = re.search(r"migration_name = '([^']+)'", sql)
+name = m.group(1) if m else None
+want_finished = None
+if 'finished_at IS NOT NULL' in sql:
+    want_finished = True
+elif 'finished_at IS NULL' in sql:
+    want_finished = False
+want_rolledback = None
+if 'rolled_back_at IS NOT NULL' in sql:
+    want_rolledback = True
+elif 'rolled_back_at IS NULL' in sql:
+    want_rolledback = False
+for row in fixture:
+    if row['name'] != name:
+        continue
+    if want_finished is not None and row['finished'] != want_finished:
+        continue
+    if want_rolledback is not None and row['rolledback'] != want_rolledback:
+        continue
+    print(row['checksum'])
+    break
+PYEOF
+
+cat > "${mock_bin}/docker" <<DOCKEREOF
 #!/usr/bin/env bash
 set -Eeuo pipefail
-case "$*" in
-  *'compose --project-name deploy'*'run --rm --no-deps -T v1_api sh -c'*)
-    printf '%s' "${DOCKER_DATABASE_URL:?}"
-    ;;
-  *'network ls --filter name=^deploy_default$ --format {{.Name}}'*)
-    [[ "${DOCKER_NETWORK_OK:?}" == true ]] && printf 'deploy_default\n'
+: "\${CALL_LOG:?}"
+printf '%s\n' "\$*" >> "\${CALL_LOG}"
+case "\$*" in
+  *'network ls --filter name=^deploy_default\$ --format {{.Name}}'*)
+    [[ "\${NETWORK_OK:-true}" == true ]] && printf 'deploy_default\n'
     ;;
   *'run --rm --network deploy_default postgres:16-alpine psql'*)
-    printf '%s' "${DOCKER_LEDGER_CHECKSUM:-}"
+    if [[ "\${PSQL_SHOULD_FAIL:-false}" == true ]]; then
+      echo "fake docker: injected psql failure" >&2
+      exit 1
+    fi
+    sql="\${*: -1}"
+    python3 "${SQL_EVAL}" "\${sql}"
     ;;
   *)
-    echo "fake docker: unrecognized invocation: $*" >&2
+    echo "fake docker: unrecognized invocation: \$*" >&2
     exit 1
     ;;
 esac
@@ -66,61 +147,116 @@ DOCKEREOF
 chmod +x "${mock_bin}/docker"
 export PATH="${mock_bin}:${PATH}"
 
-source "${ROOT_DIR}/deploy/prod-release-common.sh"
-# shellcheck disable=SC2034  # read by assert_task168_m11_guard via "${compose[@]}"
-compose=(sudo docker compose --project-name deploy -f /dev/null --env-file /dev/null)
-export DOCKER_DATABASE_URL='postgresql://teameet_v1:pw@v1_postgres:5432/teameet_v1'
-export DOCKER_NETWORK_OK=true
-
 make_source_with_m11() {
   local dir="$1"
   mkdir -p "${dir}/apps/v1_api/prisma/migrations/${M11_NAME}"
   cp "${M11_SOURCE}" "${dir}/apps/v1_api/prisma/migrations/${M11_NAME}/migration.sql"
 }
+readonly SOURCE_WITH_M11="${TEST_ROOT}/source-with-m11"
+make_source_with_m11 "${SOURCE_WITH_M11}"
+readonly SOURCE_WITHOUT_M11="${TEST_ROOT}/source-without-m11"
+mkdir -p "${SOURCE_WITHOUT_M11}/apps/v1_api/prisma/migrations"
 
+write_fixture() { printf '%s' "$1" > "${TEST_ROOT}/fixture.json"; }
+readonly FIXTURE_EMPTY='[]'
+readonly FIXTURE_APPLIED_MATCH="[{\"name\":\"${M11_NAME}\",\"checksum\":\"${M11_SHA}\",\"finished\":true,\"rolledback\":false}]"
+# A P3009-leftover row: same migration name and the SAME pinned checksum,
+# but finished_at is NULL (never completed) -- must NOT be treated as
+# "already applied". Only the `AND finished_at IS NOT NULL AND
+# rolled_back_at IS NULL` clause in the guard's own SQL excludes it.
+readonly FIXTURE_UNFINISHED_SAME_CHECKSUM="[{\"name\":\"${M11_NAME}\",\"checksum\":\"${M11_SHA}\",\"finished\":false,\"rolledback\":false}]"
+
+compose_mock() {
+  printf '%s\n' "compose $*" >> "${CALL_LOG}"
+  case "$*" in
+    'run --rm --no-deps -T v1_api sh -c printf "%s" "$DATABASE_URL"')
+      printf '%s' "postgresql://teameet_v1:pw@v1_postgres:5432/teameet_v1"
+      ;;
+    'run --rm --no-deps -T v1_api sh -c cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy')
+      printf '%s\n' "MIGRATE_DEPLOY_CALLED" >> "${CALL_LOG}"
+      ;;
+    *)
+      echo "compose_mock: unrecognized invocation: $*" >&2
+      return 1
+      ;;
+  esac
+}
+export -f compose_mock
+
+# run_segment SEGMENT_FILE SOURCE_DIR -> sets SEGMENT_RC, writes CALL_LOG
+run_segment() {
+  local segment_file="$1" source_dir="$2"
+  local wrapper="${TEST_ROOT}/wrapper.sh"
+  {
+    printf '#!/usr/bin/env bash\nset -Eeuo pipefail\n'
+    printf 'source %q\n' "${PROD_RELEASE_COMMON_FOR_RUN}"
+    printf 'compose=(compose_mock)\n'
+    printf 'PROD_SOURCE_DIR=%q\n' "${source_dir}"
+    cat "${segment_file}"
+  } > "${wrapper}"
+  set +e
+  SEGMENT_OUTPUT="$(bash "${wrapper}" 2>&1)"
+  SEGMENT_RC=$?
+  set -e
+}
+
+export PROD_RELEASE_COMMON_FOR_RUN="${PROD_RELEASE_COMMON}"
 failures=0
+migrate_deploy_count() { grep -c '^MIGRATE_DEPLOY_CALLED$' "${CALL_LOG}" 2>/dev/null || true; }
 
-# ── (i) M11 in source, NOT in prod ledger -> guard fails ────────────────────
-dir_i="${TEST_ROOT}/i"; make_source_with_m11 "${dir_i}"
-export DOCKER_LEDGER_CHECKSUM=''
-if assert_task168_m11_guard "${dir_i}"; then
-  echo "(i) FAILED: guard accepted a source with M11 while prod ledger has no applied M11 row" >&2
+# ── (i) M11 in source, NOT in prod ledger -> guard fails, 0 migrate calls ───
+write_fixture "${FIXTURE_EMPTY}"
+export CALL_LOG="${TEST_ROOT}/i-calls.log"; : > "${CALL_LOG}"
+export LEDGER_FIXTURE_FILE="${TEST_ROOT}/fixture.json"
+run_segment "${TEST_ROOT}/baseline-segment.sh" "${SOURCE_WITH_M11}"
+if [[ "${SEGMENT_RC}" -eq 0 ]]; then
+  echo "(i) FAILED: segment unexpectedly succeeded" >&2
+  echo "${SEGMENT_OUTPUT}" >&2
+  failures=$((failures + 1))
+elif [[ "$(migrate_deploy_count)" != 0 ]]; then
+  echo "(i) FAILED: prisma migrate deploy was called despite the guard refusing" >&2
+  cat "${CALL_LOG}" >&2
   failures=$((failures + 1))
 else
-  echo "[(i)] OK: guard correctly refused (M11 in source, not applied in prod)"
+  echo "[(i)] OK: guard refused (M11 in source, not applied in prod), migrate deploy call count 0"
 fi
 
-# ── (ii) M11 in source AND in prod ledger with the matching checksum -> pass ─
-dir_ii="${TEST_ROOT}/ii"; make_source_with_m11 "${dir_ii}"
-export DOCKER_LEDGER_CHECKSUM="${M11_SHA}"
-if assert_task168_m11_guard "${dir_ii}"; then
-  echo "[(ii)] OK: guard correctly passed (M11 already applied in prod)"
-else
-  echo "(ii) FAILED: guard refused a prod ledger that already shows M11 applied" >&2
+# ── (ii) M11 in source AND already applied in prod with the matching
+#    checksum -> guard passes, migrate deploy called once ──────────────────
+write_fixture "${FIXTURE_APPLIED_MATCH}"
+export CALL_LOG="${TEST_ROOT}/ii-calls.log"; : > "${CALL_LOG}"
+run_segment "${TEST_ROOT}/baseline-segment.sh" "${SOURCE_WITH_M11}"
+if [[ "${SEGMENT_RC}" -ne 0 ]]; then
+  echo "(ii) FAILED: segment unexpectedly failed" >&2
+  echo "${SEGMENT_OUTPUT}" >&2
   failures=$((failures + 1))
+elif [[ "$(migrate_deploy_count)" != 1 ]]; then
+  echo "(ii) FAILED: expected exactly 1 prisma migrate deploy call, saw $(migrate_deploy_count)" >&2
+  cat "${CALL_LOG}" >&2
+  failures=$((failures + 1))
+else
+  echo "[(ii)] OK: guard passed (M11 already applied in prod), migrate deploy called once"
 fi
 
-# ── (iii) M11 absent from the candidate source (today's main) -> no-op pass ──
-dir_iii="${TEST_ROOT}/iii"
-mkdir -p "${dir_iii}/apps/v1_api/prisma/migrations"
-call_log="${TEST_ROOT}/iii-calls.log"
-: > "${call_log}"
-# Wrap docker to also log calls for this scenario, proving the no-M11-in-
-# source path never touches docker/psql at all.
-docker() { printf '%s\n' "$*" >> "${call_log}"; command docker "$@"; }
-export -f docker
-if assert_task168_m11_guard "${dir_iii}"; then
-  if [[ -s "${call_log}" ]]; then
-    echo "(iii) FAILED: guard is supposed to no-op when M11 is absent from source, but it invoked docker: $(cat "${call_log}")" >&2
-    failures=$((failures + 1))
-  else
-    echo "[(iii)] OK: guard no-op passed without touching docker (M11 absent from source, e.g. today's main)"
-  fi
-else
-  echo "(iii) FAILED: guard refused a source tree that does not include M11 at all" >&2
+# ── (iii) M11 absent from the candidate source (today's main) -> no-op,
+#    migrate deploy called once, NO docker network/psql call at all ────────
+write_fixture "${FIXTURE_EMPTY}"
+export CALL_LOG="${TEST_ROOT}/iii-calls.log"; : > "${CALL_LOG}"
+run_segment "${TEST_ROOT}/baseline-segment.sh" "${SOURCE_WITHOUT_M11}"
+if [[ "${SEGMENT_RC}" -ne 0 ]]; then
+  echo "(iii) FAILED: segment unexpectedly failed" >&2
+  echo "${SEGMENT_OUTPUT}" >&2
   failures=$((failures + 1))
+elif [[ "$(migrate_deploy_count)" != 1 ]]; then
+  echo "(iii) FAILED: expected exactly 1 prisma migrate deploy call, saw $(migrate_deploy_count)" >&2
+  failures=$((failures + 1))
+elif grep -qE 'network ls|psql' "${CALL_LOG}"; then
+  echo "(iii) FAILED: guard is supposed to no-op when M11 is absent from source, but it touched docker network/psql:" >&2
+  cat "${CALL_LOG}" >&2
+  failures=$((failures + 1))
+else
+  echo "[(iii)] OK: guard no-op passed without touching docker network/psql (M11 absent from source), migrate deploy called once"
 fi
-unset -f docker
 
 if [[ "${failures}" -ne 0 ]]; then
   echo "[task168-prod-guard] FAILED: ${failures} scenario(s)" >&2
@@ -128,16 +264,17 @@ if [[ "${failures}" -ne 0 ]]; then
 fi
 echo "[task168-prod-guard] (i)(ii)(iii) all passed"
 
-# ── mutation 1: guard verdict inverted (accepts mismatch, rejects match) ────
-# prod-release-common.sh sources its two sibling common files by
-# $(dirname "${BASH_SOURCE[0]}"), so the mutated copy must live next to
-# symlinks of those siblings rather than off in $TEST_ROOT alone.
+# ── mutations ────────────────────────────────────────────────────────────
+mutation_reds=0
+mutation_total=0
+
+# 1. Guard verdict inverted -- (i) and (ii) both turn red.
 mut_dir="${TEST_ROOT}/mut-invert-dir"
 mkdir -p "${mut_dir}"
 ln -s "${ROOT_DIR}/deploy/prod-source-common.sh" "${mut_dir}/prod-source-common.sh"
 ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${mut_dir}/prod-manifest-common.sh"
 scratch_invert="${mut_dir}/prod-release-common.sh"
-python3 - "${ROOT_DIR}/deploy/prod-release-common.sh" "${scratch_invert}" <<'PYEOF'
+python3 - "${PROD_RELEASE_COMMON}" "${scratch_invert}" <<'PYEOF'
 import sys
 src_path, out_path = sys.argv[1], sys.argv[2]
 src = open(src_path, encoding='utf-8').read()
@@ -148,75 +285,142 @@ if count != 1:
     raise SystemExit(f'expected exactly 1 occurrence, found {count}')
 open(out_path, 'w', encoding='utf-8').write(src.replace(old, new, 1))
 PYEOF
-(
-  unset -f assert_task168_m11_guard 2>/dev/null || true
-  # shellcheck disable=SC1090
-  source "${scratch_invert}"
-  compose=(sudo docker compose --project-name deploy -f /dev/null --env-file /dev/null)
-  mutation_reds=0
-  mutation_total=2
-  export DOCKER_LEDGER_CHECKSUM="${M11_SHA}"
-  if assert_task168_m11_guard "${dir_ii}"; then
-    echo "[mutation verdict-inverted] (ii) NOT red -- still passed" >&2
-  else
-    echo "[mutation verdict-inverted] (ii) red (a legitimate already-applied M11 is now wrongly refused)"
-    mutation_reds=$((mutation_reds + 1))
-  fi
-  export DOCKER_LEDGER_CHECKSUM=''
-  if assert_task168_m11_guard "${dir_i}"; then
-    echo "[mutation verdict-inverted] (i) red (an unapplied M11 is now wrongly accepted)"
-    mutation_reds=$((mutation_reds + 1))
-  else
-    echo "[mutation verdict-inverted] (i) NOT red -- still refused" >&2
-  fi
-  echo "[task168-prod-guard] verdict-inverted mutation reds: ${mutation_reds}/${mutation_total} (expected 2/2)"
-  [[ "${mutation_reds}" -eq "${mutation_total}" ]]
-)
-
-# ── mutation 2: guard call deleted from deploy-prod.sh -> (i)'s protection is
-#    gone (static check: the call must exist and precede the migrate deploy
-#    invocation) ────────────────────────────────────────────────────────────
-assert_guard_precedes_migrate() {
-  local script="$1"
-  local guard_line migrate_line
-  guard_line="$(grep -n '^assert_task168_m11_guard ' "${script}" | head -1 | cut -d: -f1)"
-  migrate_line="$(grep -n "prisma migrate deploy'" "${script}" | head -1 | cut -d: -f1)"
-  [[ -n "${guard_line}" && -n "${migrate_line}" ]] || return 1
-  [[ "${guard_line}" -lt "${migrate_line}" ]]
-}
-
-if assert_guard_precedes_migrate "${ROOT_DIR}/deploy/deploy-prod.sh"; then
-  echo "[task168-prod-guard] static ordering check: guard precedes migrate deploy (baseline OK)"
+mutation_total=$((mutation_total + 2))
+export PROD_RELEASE_COMMON_FOR_RUN="${scratch_invert}"
+write_fixture "${FIXTURE_APPLIED_MATCH}"
+export CALL_LOG="${TEST_ROOT}/mut1-ii-calls.log"; : > "${CALL_LOG}"
+run_segment "${TEST_ROOT}/baseline-segment.sh" "${SOURCE_WITH_M11}"
+if [[ "${SEGMENT_RC}" -ne 0 || "$(migrate_deploy_count)" != 1 ]]; then
+  echo "[mutation verdict-inverted] (ii) red (a legitimate already-applied M11 is now wrongly refused)"
+  mutation_reds=$((mutation_reds + 1))
 else
-  echo "[task168-prod-guard] FAILED: baseline deploy-prod.sh does not call the guard before migrate deploy" >&2
-  exit 1
+  echo "[mutation verdict-inverted] (ii) NOT red -- still passed" >&2
+fi
+write_fixture "${FIXTURE_EMPTY}"
+export CALL_LOG="${TEST_ROOT}/mut1-i-calls.log"; : > "${CALL_LOG}"
+run_segment "${TEST_ROOT}/baseline-segment.sh" "${SOURCE_WITH_M11}"
+if [[ "${SEGMENT_RC}" -eq 0 && "$(migrate_deploy_count)" == 1 ]]; then
+  echo "[mutation verdict-inverted] (i) red (an unapplied M11 is now wrongly accepted, migrate deploy ran)"
+  mutation_reds=$((mutation_reds + 1))
+else
+  echo "[mutation verdict-inverted] (i) NOT red -- still refused" >&2
+fi
+export PROD_RELEASE_COMMON_FOR_RUN="${PROD_RELEASE_COMMON}"
+
+# 2. Guard call deleted from deploy-prod.sh entirely -- (i) turns red.
+# Mutates the already-extracted baseline segment directly (rather than
+# deploy-prod.sh followed by re-extraction): once the guard call is gone,
+# extract_segment's own start anchor -- which IS that call -- can no longer
+# find it, so deploy-prod.sh is not the right mutation target for this one.
+mutation_total=$((mutation_total + 1))
+guard_call_count="$(grep -c '^assert_task168_m11_guard "\${PROD_SOURCE_DIR}"$' "${TEST_ROOT}/baseline-segment.sh")"
+[[ "${guard_call_count}" -eq 1 ]] || { echo "[mutation guard-deleted] expected exactly 1 guard call line in the segment, found ${guard_call_count}" >&2; exit 1; }
+sed '/^assert_task168_m11_guard "\${PROD_SOURCE_DIR}"$/d' "${TEST_ROOT}/baseline-segment.sh" > "${TEST_ROOT}/mut2-segment.sh"
+write_fixture "${FIXTURE_EMPTY}"
+export CALL_LOG="${TEST_ROOT}/mut2-calls.log"; : > "${CALL_LOG}"
+run_segment "${TEST_ROOT}/mut2-segment.sh" "${SOURCE_WITH_M11}"
+if [[ "${SEGMENT_RC}" -eq 0 && "$(migrate_deploy_count)" == 1 ]]; then
+  echo "[mutation guard-deleted] red (prisma migrate deploy ran with no guard ahead of it)"
+  mutation_reds=$((mutation_reds + 1))
+else
+  echo "[mutation guard-deleted] NOT red -- migrate deploy still did not run" >&2
 fi
 
-scratch_deleted="${TEST_ROOT}/deploy-prod-guard-deleted.sh"
-sed '/^assert_task168_m11_guard /d' "${ROOT_DIR}/deploy/deploy-prod.sh" > "${scratch_deleted}"
-if assert_guard_precedes_migrate "${scratch_deleted}"; then
-  echo "[mutation guard-deleted] NOT red -- ordering check still passed after deleting the call" >&2
-  exit 1
-fi
-echo "[mutation guard-deleted] red (correctly detected the missing guard call)"
-
-# ── mutation 3: guard call moved to AFTER migrate deploy ────────────────────
-scratch_moved="${TEST_ROOT}/deploy-prod-guard-moved.sh"
-python3 - "${ROOT_DIR}/deploy/deploy-prod.sh" "${scratch_moved}" <<'PYEOF'
-import re
+# 3. Guard call neutralized with `|| true` -- a static line-order check
+#    alone cannot see this (the call is still textually first); (i) turns
+#    red because the neutralized guard's failure no longer stops the
+#    segment.
+mutation_total=$((mutation_total + 1))
+python3 - "${TEST_ROOT}/baseline-segment.sh" "${TEST_ROOT}/mut3-segment.sh" <<'PYEOF'
 import sys
 src_path, out_path = sys.argv[1], sys.argv[2]
-lines = open(src_path, encoding='utf-8').read().split('\n')
-guard_idx = next(i for i, l in enumerate(lines) if l.startswith('assert_task168_m11_guard '))
-guard_line = lines.pop(guard_idx)
-migrate_idx = next(i for i, l in enumerate(lines) if "prisma migrate deploy'" in l)
-lines.insert(migrate_idx + 1, guard_line)
-open(out_path, 'w', encoding='utf-8').write('\n'.join(lines))
+src = open(src_path, encoding='utf-8').read()
+old = 'assert_task168_m11_guard "${PROD_SOURCE_DIR}"'
+new = 'assert_task168_m11_guard "${PROD_SOURCE_DIR}" || true'
+count = src.count(old)
+if count != 1:
+    raise SystemExit(f'expected exactly 1 occurrence, found {count}')
+open(out_path, 'w', encoding='utf-8').write(src.replace(old, new, 1))
 PYEOF
-if assert_guard_precedes_migrate "${scratch_moved}"; then
-  echo "[mutation guard-moved-after-migrate] NOT red -- ordering check still passed" >&2
+write_fixture "${FIXTURE_EMPTY}"
+export CALL_LOG="${TEST_ROOT}/mut3-calls.log"; : > "${CALL_LOG}"
+run_segment "${TEST_ROOT}/mut3-segment.sh" "${SOURCE_WITH_M11}"
+if [[ "${SEGMENT_RC}" -eq 0 && "$(migrate_deploy_count)" == 1 ]]; then
+  echo "[mutation guard-neutered] red (\`|| true\` let migrate deploy run after a refusing guard)"
+  mutation_reds=$((mutation_reds + 1))
+else
+  echo "[mutation guard-neutered] NOT red -- migrate deploy still did not run" >&2
+fi
+
+# 4. `AND finished_at IS NOT NULL AND rolled_back_at IS NULL` removed from
+#    the ledger query -- a P3009-leftover row with the pinned checksum but
+#    finished_at NULL is wrongly accepted as applied.
+mutation_total=$((mutation_total + 1))
+scratch_and_removed="${TEST_ROOT}/mut-and-clause-removed-dir"
+mkdir -p "${scratch_and_removed}"
+ln -s "${ROOT_DIR}/deploy/prod-source-common.sh" "${scratch_and_removed}/prod-source-common.sh"
+ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${scratch_and_removed}/prod-manifest-common.sh"
+scratch_and_removed_common="${scratch_and_removed}/prod-release-common.sh"
+python3 - "${PROD_RELEASE_COMMON}" "${scratch_and_removed_common}" <<'PYEOF'
+import sys
+src_path, out_path = sys.argv[1], sys.argv[2]
+src = open(src_path, encoding='utf-8').read()
+old = " AND finished_at IS NOT NULL AND rolled_back_at IS NULL"
+count = src.count(old)
+if count != 1:
+    raise SystemExit(f'expected exactly 1 occurrence, found {count}')
+open(out_path, 'w', encoding='utf-8').write(src.replace(old, '', 1))
+PYEOF
+export PROD_RELEASE_COMMON_FOR_RUN="${scratch_and_removed_common}"
+write_fixture "${FIXTURE_UNFINISHED_SAME_CHECKSUM}"
+export CALL_LOG="${TEST_ROOT}/mut4-calls.log"; : > "${CALL_LOG}"
+run_segment "${TEST_ROOT}/baseline-segment.sh" "${SOURCE_WITH_M11}"
+if [[ "${SEGMENT_RC}" -eq 0 && "$(migrate_deploy_count)" == 1 ]]; then
+  echo "[mutation and-clause-removed] red (an unfinished/P3009 ledger row was wrongly accepted as applied)"
+  mutation_reds=$((mutation_reds + 1))
+else
+  echo "[mutation and-clause-removed] NOT red -- the unfinished row was still correctly rejected" >&2
+fi
+export PROD_RELEASE_COMMON_FOR_RUN="${PROD_RELEASE_COMMON}"
+
+# 5. Fail-open on a psql/docker error: `|| m11_ledger_checksum=""` changed
+#    to fall back to the SOURCE checksum (so any query failure is treated
+#    as "already applied and matching").
+mutation_total=$((mutation_total + 1))
+scratch_failopen="${TEST_ROOT}/mut-fail-open-dir"
+mkdir -p "${scratch_failopen}"
+ln -s "${ROOT_DIR}/deploy/prod-source-common.sh" "${scratch_failopen}/prod-source-common.sh"
+ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${scratch_failopen}/prod-manifest-common.sh"
+scratch_failopen_common="${scratch_failopen}/prod-release-common.sh"
+python3 - "${PROD_RELEASE_COMMON}" "${scratch_failopen_common}" <<'PYEOF'
+import sys
+src_path, out_path = sys.argv[1], sys.argv[2]
+src = open(src_path, encoding='utf-8').read()
+old = '|| m11_ledger_checksum=""'
+new = '|| m11_ledger_checksum="${m11_source_sha}"'
+count = src.count(old)
+if count != 1:
+    raise SystemExit(f'expected exactly 1 occurrence, found {count}')
+open(out_path, 'w', encoding='utf-8').write(src.replace(old, new, 1))
+PYEOF
+export PROD_RELEASE_COMMON_FOR_RUN="${scratch_failopen_common}"
+write_fixture "${FIXTURE_EMPTY}"
+export PSQL_SHOULD_FAIL=true
+export CALL_LOG="${TEST_ROOT}/mut5-calls.log"; : > "${CALL_LOG}"
+run_segment "${TEST_ROOT}/baseline-segment.sh" "${SOURCE_WITH_M11}"
+unset PSQL_SHOULD_FAIL
+if [[ "${SEGMENT_RC}" -eq 0 && "$(migrate_deploy_count)" == 1 ]]; then
+  echo "[mutation fail-open-on-query-error] red (a psql failure was wrongly treated as \"already applied\")"
+  mutation_reds=$((mutation_reds + 1))
+else
+  echo "[mutation fail-open-on-query-error] NOT red -- a psql failure was still correctly refused" >&2
+fi
+export PROD_RELEASE_COMMON_FOR_RUN="${PROD_RELEASE_COMMON}"
+
+echo "[task168-prod-guard] mutation reds: ${mutation_reds}/${mutation_total} (expected 6/6)"
+if [[ "${mutation_reds}" -ne 6 ]]; then
+  echo "[task168-prod-guard] FAILED: expected all mutations to weaken the guard as documented" >&2
   exit 1
 fi
-echo "[mutation guard-moved-after-migrate] red (correctly detected the guard now runs after migrate deploy)"
 
 echo "[task168-prod-guard] passed"

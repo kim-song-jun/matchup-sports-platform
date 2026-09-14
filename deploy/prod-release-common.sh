@@ -263,6 +263,50 @@ restore_active_release() {
   rm -f "${active_tmp}" || return 1
 }
 
+# Task 168 M11 prod guard. If the deploying source's prisma/migrations tree
+# includes M11 (the tournament-fixture retirement), prod's own
+# `_prisma_migrations` ledger must already show it as a finished, non-rolled-
+# back row with the pinned checksum — checked here, before the caller runs
+# `prisma migrate deploy`. Without this, prod would apply M11 unguarded: no
+# writer quiesce, no fresh backup, only the migration's own fail-closed DO
+# block. If prod's legacy fixture tables happen to be non-empty without the
+# Stage-A-style retirement seals, that DO block RAISEs and leaves a P3009
+# unresolved row that blocks every later prod deploy until a manual
+# `prisma migrate resolve --rolled-back`; if the tables are empty, the DROP
+# proceeds without any backup or quiesce guarantee either way. prod has no
+# Alpha-style host receipt path, so the DB ledger is the only source of
+# truth this guard can use — it says nothing about M1-M10, which still apply
+# to prod without any Stage A cutover ceremony (a pre-existing risk this
+# guard does not cover).
+assert_task168_m11_guard() {
+  local source_dir="$1"
+  local m11_name=20260911090000_retire_tournament_fixture_tables
+  local m11_pinned_sha=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
+  local m11_migration_dir="${source_dir}/apps/v1_api/prisma/migrations/${m11_name}"
+  local m11_source_sha database_url network m11_ledger_checksum
+
+  [[ -d "${m11_migration_dir}" ]] || return 0
+
+  m11_source_sha="$(sha256sum "${m11_migration_dir}/migration.sql" | awk '{print $1}')" || return 1
+  database_url="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')" || return 1
+  if [[ -z "${database_url}" ]]; then
+    echo "[prod-deploy] Task168 M11 guard: candidate API's DATABASE_URL is unavailable" >&2
+    return 1
+  fi
+  network="$(sudo docker network ls --filter name='^deploy_default$' --format '{{.Name}}')"
+  if [[ "${network}" != deploy_default ]]; then
+    echo "[prod-deploy] Task168 M11 guard: compose DB network unavailable" >&2
+    return 1
+  fi
+  m11_ledger_checksum="$(sudo docker run --rm --network "${network}" postgres:16-alpine \
+    psql "${database_url}" -At -c "SELECT checksum FROM \"_prisma_migrations\" WHERE migration_name = '${m11_name}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL" 2>/dev/null)" || m11_ledger_checksum=""
+  if [[ "${m11_ledger_checksum}" != "${m11_source_sha}" ]]; then
+    echo "[prod-deploy] Task168 M11 guard: candidate source includes the retirement migration (checksum ${m11_source_sha}) but prod's ledger does not show it as an applied row. Refusing to run prisma migrate deploy." >&2
+    return 1
+  fi
+  echo "[prod-deploy] Task168 M11 guard: prod ledger already shows M11 applied (checksum ${m11_ledger_checksum})"
+}
+
 write_legacy_release_state() {
   local state_tmp
 

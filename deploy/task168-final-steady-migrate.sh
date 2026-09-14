@@ -173,12 +173,18 @@ if [[ "${MODE}" == check-only ]]; then
     '.schemaVersion==1 and .kind=="task168StageBRuntimeVerification" and .migrationReceiptSha256==$receiptSha and .ledgerCount==11' \
     "${runtime_verification}" >/dev/null || fail 'StageB runtimeVerification receipt is invalid or not bound to the MIGRATION_COMMITTED receipt'
 
-  # The MIGRATION_COMMITTED receipt names the exact StageB manifest it was
-  # produced from (deploy/task168-stage-b-migrate.sh's receipt_json:
-  # `manifest`/`manifestSha256`). Re-verify that file is still the same
-  # bytes before trusting anything it says -- a receipt is durable evidence
-  # only as long as the manifest it points at has not been replaced.
-  migration_manifest="$(jq -er '.manifest' "${migration_receipt}")" || fail 'StageB migration receipt does not name its manifest file'
+  # The receipt's own `.manifest` field (when present at all) records the
+  # ephemeral SSM staging path (scripts/release/deploy-alpha-via-ssm.sh's
+  # `${manifest}` under /tmp), which that same SSM command's EXIT trap
+  # deletes before this script ever runs -- it is never a live path on the
+  # real host, and the MIGRATION_COMMITTED_RECOVERED variant
+  # (deploy-alpha-stage-b.sh's R-A path) does not carry that field at all.
+  # Both variants DO write a durable copy next to the receipt itself
+  # (task168-stage-b-migrate.sh's `$state_dir/manifest.json`, the same
+  # directory as `migration-stage.json`) and both bind it with
+  # `.manifestSha256`, so resolve the manifest from the receipt's own
+  # location instead of trusting a path the receipt records.
+  migration_manifest="$(dirname "${migration_receipt}")/manifest.json"
   migration_manifest_sha="$(jq -er '.manifestSha256' "${migration_receipt}")" || fail 'StageB migration receipt does not bind its manifest checksum'
   [[ -s "${migration_manifest}" ]] || fail 'StageB manifest file named by the migration receipt is missing'
   [[ "$(sha "${migration_manifest}")" == "${migration_manifest_sha}" ]] || fail 'StageB manifest file named by the migration receipt has changed since StageB ran'

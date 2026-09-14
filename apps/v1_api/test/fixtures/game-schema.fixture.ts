@@ -524,8 +524,7 @@ export const gameSchemaSourceManifest = {
   // 2026-09-14 재핀 (Task 168 M11 수렴): Stage A 호환 스키마를 최종 post-M11 스키마로
   // 교체했다 — 퇴역 5모델·2enum·3연결(`@ignore` 였던 `V1TournamentFixture*`)이 파일에서
   // 완전히 사라졌다. game domain(V1Game*)은 필드 하나 안 바뀌었다(연결 필드 제거만).
-  // `schema.stage-a.prisma`는 이제 없다 — 최종 스키마 하나만 남는다. 바인딩된
-  // 20260729000100_v1_game_operations는 건드리지 않았으므로 migration 해시는 불변이다.
+  // `schema.stage-a.prisma`는 이제 없다 — 최종 스키마 하나만 남는다.
   schema: 'e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;

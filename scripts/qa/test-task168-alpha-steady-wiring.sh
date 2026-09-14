@@ -182,8 +182,14 @@ write_receipts() {
 {"database":{"task168":{"resolvedMigrationAttemptsSha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}}}
 MANIFESTEOF
   manifest_sha="$(sha256sum "${manifest_path}" | awk '{print $1}')"
+  # `.manifest` deliberately names a path that is never created -- on the
+  # real host that field records the SSM command's own ephemeral /tmp
+  # staging path, deleted by that same command's EXIT trap before this
+  # script ever runs. The script must resolve the manifest from its sibling
+  # file (manifest_path, above) via `.manifestSha256` instead.
+  local ephemeral_manifest_path="${TMPDIR:-/tmp}/deleted-by-ssm-cleanup-never-created-wiring.json"
   cat > "${dir}/migration-stage.json" <<EOF
-{"schemaVersion":1,"kind":"task168StageBMigration","status":"MIGRATION_COMMITTED","stage":"stageBFinal","releaseSha":"1111111111111111111111111111111111111111","databaseIdentity":"${db_id}","m11Sha256":"${m11_sha}","manifest":"${manifest_path}","manifestSha256":"${manifest_sha}","completedAt":"2026-09-14T00:00:00Z"}
+{"schemaVersion":1,"kind":"task168StageBMigration","status":"MIGRATION_COMMITTED","stage":"stageBFinal","releaseSha":"1111111111111111111111111111111111111111","databaseIdentity":"${db_id}","m11Sha256":"${m11_sha}","manifest":"${ephemeral_manifest_path}","manifestSha256":"${manifest_sha}","completedAt":"2026-09-14T00:00:00Z"}
 EOF
   local migration_receipt_sha
   migration_receipt_sha="$(sha256sum "${dir}/migration-stage.json" | awk '{print $1}')"

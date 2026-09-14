@@ -87,8 +87,15 @@ cat > "${manifest_path}" <<EOF
 {"database":{"task168":{"resolvedMigrationAttemptsSha256":"${empty_resolved_sha}"}}}
 EOF
 manifest_sha="$(sha256sum "${manifest_path}" | awk '{print $1}')"
+# `.manifest` deliberately names a path that is never created -- on the real
+# host that field records the SSM command's own ephemeral /tmp staging path,
+# which that same command's EXIT trap deletes before this script ever runs.
+# The script must resolve the manifest from its sibling file
+# (`${state_dir}/manifest.json`, written above) via `.manifestSha256`
+# instead, so this proves that path against a real Postgres ledger too.
+ephemeral_manifest_path="${TMPDIR:-/tmp}/deleted-by-ssm-cleanup-never-created-real-db.json"
 cat > "${state_dir}/migration-stage.json" <<EOF
-{"schemaVersion":1,"kind":"task168StageBMigration","status":"MIGRATION_COMMITTED","stage":"stageBFinal","releaseSha":"1111111111111111111111111111111111111111","databaseIdentity":"${db_id}","m11Sha256":"${M11_SHA}","manifest":"${manifest_path}","manifestSha256":"${manifest_sha}","completedAt":"2026-09-14T00:00:00Z"}
+{"schemaVersion":1,"kind":"task168StageBMigration","status":"MIGRATION_COMMITTED","stage":"stageBFinal","releaseSha":"1111111111111111111111111111111111111111","databaseIdentity":"${db_id}","m11Sha256":"${M11_SHA}","manifest":"${ephemeral_manifest_path}","manifestSha256":"${manifest_sha}","completedAt":"2026-09-14T00:00:00Z"}
 EOF
 migration_receipt_sha="$(sha256sum "${state_dir}/migration-stage.json" | awk '{print $1}')"
 cat > "${state_dir}/runtime-verification.json" <<EOF

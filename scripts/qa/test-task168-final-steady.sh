@@ -64,9 +64,16 @@
 #  14. The StageB manifest checksum binding removed: negative ⑯ (a manifest
 #      file tampered by one appended byte, its JSON content otherwise still
 #      valid) turns red.
-# Mutations 11 and 12 above are the two whose expected direction is a false
-# REJECT of a legitimate scenario (checked directly, not through
-# mutate_and_check, which looks for a false ACCEPT); all fourteen are
+#  15. The manifest-path fix reverted to trusting the receipt's own
+#      `.manifest` field (the pre-fix bug: that field names an ephemeral
+#      /tmp path the producing SSM command's own EXIT trap deletes, so it is
+#      never live on the real host, and MIGRATION_COMMITTED_RECOVERED does
+#      not even carry the field): positive ⓐ, whose fixture only ever
+#      populates the sibling `manifest.json` this fix reads instead, flips
+#      from pass to fail.
+# Mutations 11, 12 and 15 above are the three whose expected direction is a
+# false REJECT of a legitimate scenario (checked directly, not through
+# mutate_and_check, which looks for a false ACCEPT); all fifteen are
 # counted in the same mutation_reds/mutation_total tally at the bottom of
 # this file.
 set -Eeuo pipefail
@@ -257,14 +264,27 @@ EOF
 # write_receipts STATE_ROOT DB_ID M11_SHA [RELEASE_SHA [STATUS [RESOLVED_SNAPSHOT_TEXT]]]
 # Mirrors the exact receipt shape and path the real StageB producers write:
 # deploy/task168-stage-b-migrate.sh's migration-stage.json (status
-# MIGRATION_COMMITTED) at ${STATE_ROOT}/task168/<release-sha>/migration-stage.json
-# (deploy-alpha-stage-b.sh's R-A recovery path can also write
-# MIGRATION_COMMITTED_RECOVERED there), and
+# MIGRATION_COMMITTED) at ${STATE_ROOT}/task168/<release-sha>/migration-stage.json,
+# and deploy-alpha-stage-b.sh's R-A recovery path (status
+# MIGRATION_COMMITTED_RECOVERED there, with its own, SMALLER field set: no
+# `manifest` field at all -- only `manifestSha256`), and
 # scripts/release/task168-stage-b-post-live-verify.sh's runtime-verification.json
 # next to it. Neither producer file carries a top-level `status` field on
 # runtime-verification.json or a `databaseIdentity` field there -- the DB
 # binding is transitive, through migrationReceiptSha256 pointing at the
 # already-DB-bound migration-stage.json.
+#
+# The `.manifest` field (MIGRATION_COMMITTED only) is deliberately set to a
+# path that is never created: on the real host, that field records the SSM
+# command's own ephemeral /tmp staging path
+# (scripts/release/deploy-alpha-via-ssm.sh's `${manifest}`), which the SAME
+# SSM command's EXIT trap deletes before this script ever runs -- it is
+# never a live, readable path. The durable copy both receipt variants
+# actually point consumers at (via `.manifestSha256`) is the file
+# write_manifest wrote next to the receipt (`${dir}/manifest.json`, mirroring
+# task168-stage-b-migrate.sh's `$state_dir/manifest.json`). A scenario that
+# fixes the manifest by reading `.manifest` off the receipt instead of that
+# sibling file must therefore fail here, not pass by accident.
 #
 # RESOLVED_SNAPSHOT_TEXT defaults to empty (no resolved-rolled-back rows at
 # StageB time), matching every scenario's default ledger. A scenario that
@@ -273,13 +293,25 @@ EOF
 write_receipts() {
   local state_root="$1" db_id="$2" m11_sha="$3" release_sha="${4:-1111111111111111111111111111111111111111}" status="${5:-MIGRATION_COMMITTED}" resolved_snapshot_text="${6:-}"
   local dir="${state_root}/task168/${release_sha}"
-  local manifest_path manifest_sha
+  local manifest_path manifest_sha ephemeral_manifest_path
   mkdir -p "${dir}"
   manifest_path="$(write_manifest "${dir}" "${resolved_snapshot_text}")"
   manifest_sha="$(sha256sum "${manifest_path}" | awk '{print $1}')"
-  cat > "${dir}/migration-stage.json" <<EOF
-{"schemaVersion":1,"kind":"task168StageBMigration","status":"${status}","stage":"stageBFinal","releaseSha":"${release_sha}","databaseIdentity":"${db_id}","m11Sha256":"${m11_sha}","manifest":"${manifest_path}","manifestSha256":"${manifest_sha}","completedAt":"2026-09-14T00:00:00Z"}
+  ephemeral_manifest_path="${TMPDIR:-/tmp}/deleted-by-ssm-cleanup-never-created-${release_sha}.json"
+  if [[ "${status}" == MIGRATION_COMMITTED_RECOVERED ]]; then
+    # Verbatim field set from deploy-alpha-stage-b.sh's R-A branch: no
+    # `manifest` field, and several fields MIGRATION_COMMITTED does not
+    # carry (apiImage/schemaSha256/postVerification/recoveredFrom/
+    # preM11BackupSha256). This is the receipt shape a StageB run that
+    # recovered from an SSM timeout produces.
+    cat > "${dir}/migration-stage.json" <<EOF
+{"schemaVersion":1,"kind":"task168StageBMigration","status":"${status}","stage":"stageBFinal","releaseSha":"${release_sha}","apiImage":"851725525576.dkr.ecr.ap-northeast-2.amazonaws.com/teameet-alpha-v1-api@sha256:${manifest_sha}","databaseIdentity":"${db_id}","schemaSha256":"e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46","manifestSha256":"${manifest_sha}","m11Sha256":"${m11_sha}","postVerification":{"legacyTables":0,"legacyLinkColumns":0,"retirementTriggers":0,"retirementFunctions":0,"lineageTrigger":1,"retiredEnums":0,"processingOutbox":0},"recoveredFrom":{"quiesceReceiptSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","ledgerM11Row":"applied","catalogResult":{"legacyTables":0,"legacyLinkColumns":0,"retirementTriggers":0,"retirementFunctions":0}},"preM11BackupSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","completedAt":"2026-09-14T00:00:00Z"}
 EOF
+  else
+    cat > "${dir}/migration-stage.json" <<EOF
+{"schemaVersion":1,"kind":"task168StageBMigration","status":"${status}","stage":"stageBFinal","releaseSha":"${release_sha}","databaseIdentity":"${db_id}","m11Sha256":"${m11_sha}","manifest":"${ephemeral_manifest_path}","manifestSha256":"${manifest_sha}","completedAt":"2026-09-14T00:00:00Z"}
+EOF
+  fi
   local migration_receipt_sha
   migration_receipt_sha="$(sha256sum "${dir}/migration-stage.json" | awk '{print $1}')"
   cat > "${dir}/runtime-verification.json" <<EOF
@@ -674,6 +706,25 @@ export MIGRATE_RAN_FLAG="${TEST_ROOT}/pd-migrate-ran"
 assert_check_only_passes "resolved-row-after-m11-excluded-from-snapshot" "${dird}"
 unset RESOLVED_ATTEMPT_ROWS_FILE
 
+# ── positive ⓔ a MIGRATION_COMMITTED_RECOVERED receipt (deploy-alpha-stage-b.sh's
+#    R-A SSM-timeout recovery path) -- the accepted-status branch at the top of
+#    check-only exists specifically for this shape, which carries no `manifest`
+#    field at all, only `manifestSha256`. Must still resolve and verify the
+#    manifest via the sibling file, not fail looking for a field this receipt
+#    variant never has. ─────────────────────────────────────────────────────
+dire="${TEST_ROOT}/pe"; make_source_tree "${dire}"
+applied_rows_for "${dire}" "${TASK168_M1_M10[@]}" "${M11_NAME}" > "${TEST_ROOT}/rows-pe"
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/pe-state"
+write_receipts "${ALPHA_RELEASE_STATE_DIR}" "${FAKE_DB_ID}" "${M11_SHA}" \
+  1111111111111111111111111111111111111111 MIGRATION_COMMITTED_RECOVERED
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-pe"
+export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-pe"
+export TABLE_EXISTS=t
+export MIGRATE_RAN_FLAG="${TEST_ROOT}/pe-migrate-ran"
+: > "${CALL_LOG}"
+assert_check_only_passes "migration-committed-recovered-receipt" "${dire}"
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
+
 # ── negative ⑮ a resolved-rolled-back row AT OR BEFORE M11 exists but does
 #    NOT match the StageB receipt's resolved-attempt snapshot — the shared
 #    receipts (from line ~341) claim an EMPTY snapshot, but the ledger has
@@ -738,7 +789,7 @@ if [[ "${negatives_failed}" -ne 0 || "${positives_failed}" -ne 0 ]]; then
   echo "[task168-final-steady] FAILED: ${negatives_failed} negative(s), ${positives_failed} positive(s)" >&2
   exit 1
 fi
-echo "[task168-final-steady] all 17 negatives + 4 positives passed"
+echo "[task168-final-steady] all 17 negatives + 5 positives passed"
 
 # ── mutation run: verify the expected red counts in the header comment ──────
 # Applies each mutation to a scratch copy of the script and reruns the exact
@@ -1086,9 +1137,45 @@ if mutate_and_check "manifest-checksum-check-removed" \
 fi
 export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
 
-echo "[task168-final-steady] mutation reds: ${mutation_reds}/${mutation_total} (expected 14/14)"
-if [[ "${mutation_reds}" -ne 14 ]]; then
-  echo "[task168-final-steady] FAILED: expected all 14 mutations to weaken the check as documented" >&2
+# 15. Manifest-path regression: trusting the receipt's OWN `.manifest` field
+#     again (instead of resolving the sibling `manifest.json` next to the
+#     receipt) must break the legitimate positive ⓐ scenario -- its
+#     `.manifest` field points at a path that is never created (write_receipts
+#     mirrors the real producers' /tmp path the SSM command's EXIT trap
+#     deletes). Checked directly, like state-root-path-reverted above, since
+#     the expected direction is PASS -> FAIL, not a false accept.
+mutation_total=$((mutation_total + 1))
+scratch7="${TEST_ROOT}/mut-manifest-path-trusted-from-receipt"
+mkdir -p "${scratch7}"
+OLD_SNIPPET='migration_manifest="$(dirname "${migration_receipt}")/manifest.json"' \
+  NEW_SNIPPET='migration_manifest="$(jq -er '"'"'.manifest'"'"' "${migration_receipt}")" || fail '"'"'StageB migration receipt does not name its manifest file'"'"'' \
+  SRC="${SCRIPT}" OUT="${scratch7}/task168-final-steady-migrate.sh" python3 - <<'PYEOF'
+import os
+src = open(os.environ['SRC'], 'r', encoding='utf-8').read()
+old = os.environ['OLD_SNIPPET']
+new = os.environ['NEW_SNIPPET']
+count = src.count(old)
+if count != 1:
+    raise SystemExit(f'expected exactly 1 occurrence of the mutation target, found {count}')
+open(os.environ['OUT'], 'w', encoding='utf-8').write(src.replace(old, new, 1))
+PYEOF
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-pa"; export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-pa"
+export TABLE_EXISTS=t; export MIGRATE_RAN_FLAG="${TEST_ROOT}/mut-manifest-path-trusted-migrate-ran"
+set +e
+bash "${scratch7}/task168-final-steady-migrate.sh" --check-only --source-dir "${dira}" \
+  --compose-prod "${dira}/compose-prod.yml" --compose-alpha "${dira}/compose-alpha.yml" --env-file "${dira}/.env" >/dev/null 2>&1
+rc7=$?
+set -e
+if [[ "${rc7}" -ne 0 ]]; then
+  echo "[mutation manifest-path-trusted-from-receipt] red (a legitimate post-StageB deploy would now be permanently rejected)"
+  mutation_reds=$((mutation_reds + 1))
+else
+  echo "[mutation manifest-path-trusted-from-receipt] NOT red -- trusting the receipt's .manifest field did not break the legitimate scenario as expected" >&2
+fi
+
+echo "[task168-final-steady] mutation reds: ${mutation_reds}/${mutation_total} (expected 15/15)"
+if [[ "${mutation_reds}" -ne 15 ]]; then
+  echo "[task168-final-steady] FAILED: expected all 15 mutations to weaken the check as documented" >&2
   exit 1
 fi
 

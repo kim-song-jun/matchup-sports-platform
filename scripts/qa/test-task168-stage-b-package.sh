@@ -263,8 +263,9 @@ pass "rejects a manifest whose fullMigrationHistory sha256 disagrees with the ma
 # ---- 3d. a historical migration's content AND its manifest entry are both
 #          tampered consistently (files[] + fullMigrationHistory rehashed
 #          together) -- the packager's own independent re-scan of the pinned
-#          source commit must still reject it (source-commit
-#          binding did not previously cover non-schema/non-M11 overlay files)
+#          source commit must still reject it: source-commit binding has to
+#          cover non-schema/non-M11 overlay files too, not just trust a
+#          manifest whose own entries were rehashed to match the tamper
 PINNED_DRIFT_DIR="$TMP/prepared-pinned-drift"
 cp -R "$PREPARED" "$PINNED_DRIFT_DIR"
 PINNED_TARGET="${MIGRATIONS[2]}"

@@ -112,11 +112,11 @@ MIGRATION_LOCK_SHA="$(sha256 "$MIGRATION_ROOT/migration_lock.toml")"
 # walker first restricts every header to exactly what
 # package-task168-final-source.sh's writer emits (typeflag '0'/'x' only,
 # mode in {0o644, 0o755}, ustar magic, empty prefix, a single pax 'path'
-# record with no successor) -- task168_canonical_tar.py
-# is a general-purpose serializer that *can* faithfully reproduce a
-# typeflag '5' directory or an arbitrary mode if handed one, so it cannot be
-# the thing rejecting a shape the packager merely happens not to emit; only
-# an explicit allowlist here can. Once a header clears that allowlist, the
+# record with no successor). task168_canonical_tar.py's encode_member()
+# rejects any typeflag other than '0' but does not validate mode at all, so
+# only this explicit allowlist gives an unauthorized typeflag or mode a
+# specific, per-cause rejection here instead of a generic crash out of the
+# round-trip below. Once a header clears that allowlist, the
 # walk re-serializes the exact (name, typeflag, mode, data) sequence it
 # extracted through the same module and requires the result to be
 # byte-identical to the decompressed input, closing every remaining
@@ -256,7 +256,9 @@ while True:
             fail('source archive contains a pax extended header with no path record')
         pax_override = parsed['path']
         continue
-    if typeflag == b'0' and header[157:257] != b'\x00' * 100:
+    # ALLOWED_TYPEFLAGS plus the 'x' continue above mean typeflag is always
+    # '0' here.
+    if header[157:257] != b'\x00' * 100:
         fail('source archive regular file member has a non-empty linkname')
     if has_control_byte(header[0:100].rstrip(b'\x00')):
         fail('source archive contains a header name with a control byte')
@@ -279,7 +281,7 @@ while True:
     payload = tar_bytes[pos:pos + payload_blocks]
     pos += payload_blocks
     data = payload[:size]
-    if typeflag == b'0' and name == MANIFEST_NAME:
+    if name == MANIFEST_NAME:
         manifest_sha256 = hashlib.sha256(data).hexdigest()
     members.append((name, typeflag, mode, data))
 
@@ -299,7 +301,7 @@ if reencoded != tar_bytes:
 seen = set()
 lower_seen = {}
 member_data = []
-for name, typeflag, mode, data in members:
+for name, _typeflag, mode, data in members:
     unsafe = (
         name.startswith('/') or name in ('.', '..')
         or name.startswith('../') or '/../' in name or name.endswith('/..')
@@ -324,12 +326,13 @@ for name, typeflag, mode, data in members:
     lower_seen[key] = name
     if key.startswith('apps/v1_api/prisma/') and not name.startswith('apps/v1_api/prisma/'):
         fail('source archive contains a member whose path collides only by case with apps/v1_api/prisma/: %s' % name)
-    if typeflag == b'0':
-        sys.stdout.buffer.write(name.encode('utf-8', 'surrogateescape') + b'\0')
-        # sha256/size come from the same `data` this walker already read and
-        # authenticated above (canonical_tar_bytes proved it byte-identical
-        # to what the archive carries) -- not a second read of the archive.
-        member_data.append('%s\t%03o\t%s\t%d\n' % (name, mode, hashlib.sha256(data).hexdigest(), len(data)))
+    # members only ever holds typeflag '0' (see the loop above), so every
+    # entry here is a regular file.
+    sys.stdout.buffer.write(name.encode('utf-8', 'surrogateescape') + b'\0')
+    # sha256/size come from the same `data` this walker already read and
+    # authenticated above (canonical_tar_bytes proved it byte-identical
+    # to what the archive carries) -- not a second read of the archive.
+    member_data.append('%s\t%03o\t%s\t%d\n' % (name, mode, hashlib.sha256(data).hexdigest(), len(data)))
 
 # Only written once every check above has passed, so a caller can never read
 # a manifest hash -- or a member's authenticated mode/sha256/size -- for an

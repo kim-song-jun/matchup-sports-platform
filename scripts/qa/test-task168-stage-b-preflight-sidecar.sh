@@ -361,8 +361,7 @@ pass 'rejects an archive that carries an unlisted extra migration.sql not presen
 
 # ---- 7b. an extra migration directory whose name does NOT match the
 #          [0-9]{14}_[a-z0-9_]+ shape must still be caught -- a check keyed
-#          on that shape (as the old regex-based member-set check was) is
-#          blind to a member outside it -------------------------------------
+#          on that shape is blind to a member outside it --------------------
 NONCONFORMING_DIR="$TMP/nonconforming-member"
 mkdir -p "$NONCONFORMING_DIR/stage"
 cp -R "$FIXTURE/stage/apps" "$NONCONFORMING_DIR/stage/"
@@ -896,9 +895,8 @@ run_expect_fail 'source archive contains consecutive pax extended headers' "${AR
 pass 'A_newmig: rejects a decoy pax path followed by an empty pax header followed by a raw-named migration outside apps/v1_api/prisma/'
 
 # ---- A_emptym11. a second, empty M11 copy appended with no pax at all --
-#      the same class of attack as DUP above; kept as its own case to
-#      confirm the duplicate-member check still independently covers it
-#      once the tarfile-based member listing is gone ------------------------
+#      the same class of attack as DUP above; kept as its own case because
+#      the duplicate-member check must independently cover it too ----------
 A_EMPTYM11_DIR="$TMP/a-emptym11"
 mkdir -p "$A_EMPTYM11_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$A_EMPTYM11_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
@@ -1645,6 +1643,91 @@ PY
   pass "HEADER-PREFIX-$probe_magic: rejects a non-ustar-magic header carrying a non-empty ustar prefix field"
 done
 
+# ---- HEADER-CHECKSUM. a header whose checksum field disagrees with the sum
+#      of the rest of the header, every other field otherwise valid -- the
+#      HEADER-PREFIX cases above never exercise this check's own message
+#      because they fail the earlier magic check first ---------------------
+CHECKSUM_DIR="$TMP/header-checksum"
+mkdir -p "$CHECKSUM_DIR"
+python3 - "$FIXTURE/stage" "$CHECKSUM_DIR/source.tar.gz" "$HERE" <<'PY'
+import io, os, sys, tarfile, gzip
+stage, out = sys.argv[1], sys.argv[2]
+sys.path.insert(0, sys.argv[3])
+from task168_test_fixtures import add_tar_members
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
+raw = io.BytesIO()
+with tarfile.open(fileobj=raw, mode='w') as tar:
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+    add_tar_members(tar, stage, 'apps', filter=clean)
+data = bytearray(raw.getvalue())
+data[148:156] = b'000000\x00 '
+with gzip.GzipFile(out, 'wb', mtime=0) as gz:
+    gz.write(bytes(data))
+PY
+checksum_sha="$(sha "$CHECKSUM_DIR/source.tar.gz")"
+checksum_bytes="$(wc -c < "$CHECKSUM_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$checksum_sha" --argjson b "$checksum_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$CHECKSUM_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$CHECKSUM_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$checksum_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$CHECKSUM_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive header checksum mismatch' "${ARGS[@]}"
+pass 'HEADER-CHECKSUM: rejects a header whose checksum field does not match the rest of the header'
+
+# ---- HEADER-PREFIX-NONEMPTY. proper ustar magic, correct checksum, but a
+#      non-empty prefix field -- unlike HEADER-PREFIX-{oldgnu,v7} above,
+#      this clears the magic check and reaches the prefix check itself ------
+PREFIX_NONEMPTY_DIR="$TMP/header-prefix-nonempty"
+mkdir -p "$PREFIX_NONEMPTY_DIR"
+python3 - "$FIXTURE/stage" "$PREFIX_NONEMPTY_DIR/source.tar.gz" "$HERE" <<'PY'
+import io, os, sys, tarfile, gzip
+stage, out = sys.argv[1], sys.argv[2]
+sys.path.insert(0, sys.argv[3])
+from task168_test_fixtures import add_tar_members
+def clean(ti):
+    ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
+    return ti
+def with_checksum(buf):
+    buf = bytearray(buf)
+    unsigned, _ = tarfile.calc_chksums(bytes(buf))
+    buf[148:156] = ("%06o\0 " % unsigned).encode('ascii')
+    return bytes(buf)
+raw = io.BytesIO()
+with tarfile.open(fileobj=raw, mode='w') as tar:
+    tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
+    add_tar_members(tar, stage, 'apps', filter=clean)
+data = bytearray(raw.getvalue())
+header = bytearray(data[0:512])
+header[257:265] = b'ustar\x0000'
+prefix = b'apps/v1_api/prisma/migrations/20990101000000_evil'
+header[345:345 + len(prefix)] = prefix
+header[345 + len(prefix):500] = b'\x00' * (155 - len(prefix))
+data[0:512] = bytearray(with_checksum(bytes(header)))
+with gzip.GzipFile(out, 'wb', mtime=0) as gz:
+    gz.write(bytes(data))
+PY
+prefix_nonempty_sha="$(sha "$PREFIX_NONEMPTY_DIR/source.tar.gz")"
+prefix_nonempty_bytes="$(wc -c < "$PREFIX_NONEMPTY_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$prefix_nonempty_sha" --argjson b "$prefix_nonempty_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$PREFIX_NONEMPTY_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$PREFIX_NONEMPTY_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$prefix_nonempty_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$PREFIX_NONEMPTY_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains a non-empty ustar prefix field' "${ARGS[@]}"
+pass 'HEADER-PREFIX-NONEMPTY: rejects a proper-ustar-magic header carrying a non-empty ustar prefix field'
+
 # ---- 12. sidecar sourceCommit differs from --release-sha -------------------
 BAD_SIDECAR_COMMIT="$TMP/bad-sidecar-commit.json"
 jq '.sourceCommit = "cccccccccccccccccccccccccccccccccccccccc"' \
@@ -2151,6 +2234,7 @@ for i in "${!ARGS[@]}"; do
     --source-archive-attestation) ARGS[$((i+1))]="$NONASCII_DIR/source.tar.gz.attestation.json" ;;
   esac
 done
+: > "$DOCKER_STUB_LOG"
 run_expect_fail 'pinned PostgreSQL image is unavailable locally' "${ARGS[@]}"
 grep -q 'image inspect' "$DOCKER_STUB_LOG" || fail 'docker stub was not invoked -- the non-ASCII/backslash golden fixture did not reach the docker image checks'
 pass 'GOLDEN-NONASCII: a golden archive carrying a non-ASCII name and a backslash-containing name outside apps/v1_api/prisma/ still clears every static check'
@@ -2243,6 +2327,7 @@ for i in "${!ARGS[@]}"; do
     --release-sha) ARGS[$((i+1))]="$REALPKG_COMMIT" ;;
   esac
 done
+: > "$DOCKER_STUB_LOG"
 run_expect_fail 'pinned PostgreSQL image is unavailable locally' "${ARGS[@]}"
 grep -q 'image inspect' "$DOCKER_STUB_LOG" || fail 'REALPKG: docker stub was not invoked -- the real packager archive did not reach the docker image checks'
 pass 'REALPKG: a real package-task168-final-source.sh archive (Korean name, >100-byte path, 755 file) clears the walker and reaches the stubbed docker image-inspect call'

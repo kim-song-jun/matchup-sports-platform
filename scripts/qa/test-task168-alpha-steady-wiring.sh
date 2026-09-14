@@ -221,7 +221,17 @@ compose_mock() {
 write_candidate_manifest() { printf '%s\n' "write_candidate_manifest $*" >> "${CALL_LOG}"; }
 prepare_alpha_release_source() { printf '%s\n' "prepare_alpha_release_source $*" >> "${CALL_LOG}"; }
 activate_alpha_release_source() { printf '%s\n' "activate_alpha_release_source $*" >> "${CALL_LOG}"; }
-export -f compose_mock write_candidate_manifest prepare_alpha_release_source activate_alpha_release_source
+# The key derivation is NOT faked: the segment calls the real filter, so a
+# change to it that would break a live deploy fails here too.
+ALPHA_SOURCE_KEY_JQ="$(ALPHA_HOME_DIR="${TEST_ROOT}" ALPHA_LIVE_DIR="${TEST_ROOT}/live" \
+  bash -c 'source "$1"; printf "%s" "${ALPHA_SOURCE_KEY_JQ}"' _ "${ROOT_DIR}/deploy/alpha-source-common.sh")"
+export ALPHA_SOURCE_KEY_JQ
+alpha_release_source_key() {
+  printf '%s\n' "alpha_release_source_key $*" >> "${CALL_LOG}"
+  jq -er "${ALPHA_SOURCE_KEY_JQ}" "$1"
+}
+export -f compose_mock write_candidate_manifest prepare_alpha_release_source activate_alpha_release_source \
+  alpha_release_source_key
 
 # run_segment SEGMENT_FILE STATE_DIR -> writes CALL_LOG, sets SEGMENT_RC and
 # a trailing "FINAL_TASK168_IRREVERSIBLE=<true|false>" line in CALL_LOG.
@@ -244,7 +254,11 @@ run_segment() {
     cat "${segment_file}"
     printf '\nprintf "FINAL_TASK168_IRREVERSIBLE=%%s\\n" "${task168_irreversible}" >> %q\n' "${CALL_LOG}"
   } > "${wrapper}"
-  : > "${TEST_ROOT}/manifest.json"; : > "${TEST_ROOT}/compose-prod.yml"; : > "${TEST_ROOT}/compose-alpha.yml"; : > "${TEST_ROOT}/env-file"
+  # A real (minimal) manifest: the segment derives its source key from this.
+  jq -n '{release:{sha:"1111111111111111111111111111111111111111"},
+    source:{key:"releases/1111111111111111111111111111111111111111.tar.gz"}}' \
+    > "${TEST_ROOT}/manifest.json"
+  : > "${TEST_ROOT}/compose-prod.yml"; : > "${TEST_ROOT}/compose-alpha.yml"; : > "${TEST_ROOT}/env-file"
   export ALPHA_RELEASE_STATE_DIR="${state_dir}"
   export LEDGER_ROWS_FILE="${CLEAN_LEDGER}"
   set +e
@@ -335,7 +349,7 @@ while '--env-file "${ENV_FILE}"' not in lines[check_end]:
 block = lines[check_start:check_end + 1]
 assert '--check-only' in ''.join(block), 'did not capture the check-only invocation block'
 del lines[check_start:check_end + 1]
-activate_idx = next(i for i, l in enumerate(lines) if l.startswith('activate_alpha_release_source "${ALPHA_SHA}"'))
+activate_idx = next(i for i, l in enumerate(lines) if l.startswith('activate_alpha_release_source "${source_key}"'))
 for offset, line in enumerate(block):
     lines.insert(activate_idx + 1 + offset, line)
 open(out_path, 'w', encoding='utf-8').write('\n'.join(lines))
@@ -357,7 +371,7 @@ python3 - "${DEPLOY_ALPHA}" "${scratch2}" <<'PYEOF'
 import sys
 src_path, out_path = sys.argv[1], sys.argv[2]
 lines = open(src_path, encoding='utf-8').read().split('\n')
-idx = next(i for i, l in enumerate(lines) if l.startswith('activate_alpha_release_source "${ALPHA_SHA}"'))
+idx = next(i for i, l in enumerate(lines) if l.startswith('activate_alpha_release_source "${source_key}"'))
 lines.insert(idx + 1, 'task168_irreversible=true')
 open(out_path, 'w', encoding='utf-8').write('\n'.join(lines))
 PYEOF

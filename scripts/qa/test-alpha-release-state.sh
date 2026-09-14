@@ -252,4 +252,124 @@ if [[ -e "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_A}" ]]; then
 fi
 [[ -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_B}" ]]
 
+# ── Source keys come from the manifest's own source key ─────────────────────
+[[ "$(alpha_release_source_key "${manifest_a}")" == "${SHA_A}" ]] ||
+  { echo "a push manifest did not resolve to its bare SHA key" >&2; exit 1; }
+stage_b_key_manifest="${TEST_ROOT}/stage-b-key.json"
+jq --arg sha "${SHA_B}" '.release.sha = $sha | .source.key = ("releases/task168-stage-b/" + $sha + ".tar.gz")' \
+  "${manifest_a}" > "${stage_b_key_manifest}"
+[[ "$(alpha_release_source_key "${stage_b_key_manifest}")" == "task168-stage-b-${SHA_B}" ]] ||
+  { echo "a StageB manifest did not resolve to its namespaced key" >&2; exit 1; }
+jq '.source.key = "releases/elsewhere/x.tar.gz"' "${manifest_a}" > "${tampered}"
+if alpha_release_source_key "${tampered}" >/dev/null 2>&1; then
+  echo "an unrecognized source key was accepted" >&2
+  exit 1
+fi
+
+# The key becomes a path segment, and the stored-manifest validators derive the
+# expected sha from the manifest itself — so the shape has to be checked here.
+traversal_manifest="${TEST_ROOT}/traversal.json"
+jq '.release.sha = "../../../../tmp/pwn" | .source.key = "releases/../../../../tmp/pwn.tar.gz"' \
+  "${manifest_a}" > "${traversal_manifest}"
+if alpha_release_source_key "${traversal_manifest}" >/dev/null 2>&1; then
+  echo "a manifest whose release sha escapes the sources directory was accepted" >&2
+  exit 1
+fi
+if prepare_alpha_release_source "${source_a}" "$(jq -r '.release.sha' "${traversal_manifest}")" \
+  "${DIGEST_A#sha256:}" >/dev/null 2>&1; then
+  echo "staging accepted a key that escapes the sources directory" >&2
+  exit 1
+fi
+[[ ! -e "${TEST_ROOT}/../tmp/pwn" && ! -e /tmp/pwn ]] ||
+  { echo "staging created a directory outside the sources directory" >&2; exit 1; }
+
+# ── The push deploy has staged and activated <sha>; StageB packages a
+#    different tree for the same commit and must stage beside it. ──────────
+readonly SHA_D=4444444444444444444444444444444444444444
+source_push="${TEST_ROOT}/source-push"
+source_final="${TEST_ROOT}/source-final"
+mkdir -p "${source_push}/deploy" "${source_final}/deploy"
+printf '#!/usr/bin/env bash\n' > "${source_push}/deploy/deploy-alpha.sh"
+printf '#!/usr/bin/env bash\n' > "${source_final}/deploy/deploy-alpha.sh"
+printf 'push-tree\n' > "${source_push}/release.txt"
+printf 'final-tree\n' > "${source_final}/release.txt"
+prepare_alpha_release_source "${source_push}" "${SHA_D}" "${DIGEST_A#sha256:}"
+activate_alpha_release_source "${SHA_D}"
+if prepare_alpha_release_source "${source_final}" "${SHA_D}" "${DIGEST_B#sha256:}" 2>/dev/null; then
+  echo "a different tree was staged over the live tree for the same SHA" >&2
+  exit 1
+fi
+prepare_alpha_release_source "${source_final}" "task168-stage-b-${SHA_D}" "${DIGEST_B#sha256:}"
+[[ "$(cat "${ALPHA_LIVE_DIR}/release.txt")" == 'push-tree' ]] ||
+  { echo "staging the StageB tree changed the live tree" >&2; exit 1; }
+activate_alpha_release_source "task168-stage-b-${SHA_D}"
+[[ "$(cat "${ALPHA_LIVE_DIR}/release.txt")" == 'final-tree' ]] ||
+  { echo "activating the StageB key did not switch the live tree" >&2; exit 1; }
+
+mkdir -p "${ALPHA_SOURCE_RELEASES_DIR}/task168-stage-b-${SHA_C}"
+prune_stale_alpha_release_sources "task168-stage-b-${SHA_D}" "${SHA_D}"
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/task168-stage-b-${SHA_D}" && -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_D}" ]] ||
+  { echo "prune removed a kept source key" >&2; exit 1; }
+if [[ -e "${ALPHA_SOURCE_RELEASES_DIR}/task168-stage-b-${SHA_C}" ]]; then
+  echo "a stale namespaced source tree survived pruning" >&2
+  exit 1
+fi
+
+# An empty key names the sources root: it must never be activated, and prune
+# must not run without knowing what is live.
+if activate_alpha_release_source "" 2>/dev/null; then
+  echo "an empty source key was activated" >&2
+  exit 1
+fi
+[[ "$(cat "${ALPHA_LIVE_DIR}/release.txt")" == 'final-tree' ]]
+if prune_stale_alpha_release_sources "" "" 2>/dev/null; then
+  echo "prune ran without an active key" >&2
+  exit 1
+fi
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/task168-stage-b-${SHA_D}" ]]
+
+# ── A failed staging or activation must leave nothing behind ────────────────
+# Both failures are forced without relying on file permissions, so this holds
+# whether the suite runs as root (container) or not (CI runner).
+readonly SHA_E=5555555555555555555555555555555555555555
+source_e="${TEST_ROOT}/source-e"
+mkdir -p "${source_e}/deploy"
+printf '#!/usr/bin/env bash\n' > "${source_e}/deploy/deploy-alpha.sh"
+printf 'release-e\n' > "${source_e}/release.txt"
+# mv refuses to replace a non-directory, so the final move into place fails.
+printf 'not a directory\n' > "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_E}"
+if prepare_alpha_release_source "${source_e}" "${SHA_E}" "${DIGEST_A#sha256:}" 2>/dev/null; then
+  echo "staging reported success even though the final move could not happen" >&2
+  exit 1
+fi
+leftover_tmp="$(find "${ALPHA_SOURCE_RELEASES_DIR}" -maxdepth 1 -name "${SHA_E}.tmp.*" | wc -l | tr -d ' ')"
+if [[ "${leftover_tmp}" != 0 ]]; then
+  echo "a half-built source tree survived a failed staging (${leftover_tmp})" >&2
+  exit 1
+fi
+rm -f "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_E}"
+
+# A failing swap must not leave the ~/.teameet-alpha-live.$$ link behind.
+mv_shim_dir="${TEST_ROOT}/mv-shim"
+mkdir -p "${mv_shim_dir}"
+cat > "${mv_shim_dir}/mv" <<'SHIM'
+#!/usr/bin/env bash
+# Report the capability probe truthfully, then fail the swap itself.
+case " $* " in *" --help "*) echo "--no-target-directory"; exit 0 ;; esac
+exit 1
+SHIM
+chmod +x "${mv_shim_dir}/mv"
+live_before="$(cd -P "${ALPHA_LIVE_DIR}" && pwd)"
+if PATH="${mv_shim_dir}:${PATH}" activate_alpha_release_source "task168-stage-b-${SHA_D}" 2>/dev/null; then
+  echo "activation reported success even though the swap failed" >&2
+  exit 1
+fi
+leftover_links="$(find "${ALPHA_HOME_DIR}" -maxdepth 1 -name '.teameet-alpha-live.*' | wc -l | tr -d ' ')"
+if [[ "${leftover_links}" != 0 ]]; then
+  echo "a stray live link survived a failed activation (${leftover_links})" >&2
+  exit 1
+fi
+[[ "$(cd -P "${ALPHA_LIVE_DIR}" && pwd)" == "${live_before}" ]] ||
+  { echo "a failed activation moved the live link anyway" >&2; exit 1; }
+
 echo "[alpha-release-state] passed"

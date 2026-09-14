@@ -136,3 +136,37 @@ enteredAt·마커/quiesce/backup 상호대조)은 전부 통과하므로, 새로
   fake docker 의 `migrate status` 만 실패로 답하는 케이스를 추가해 rc≠0·진단 메시지·
   `docker rm -f` 호출을 전부 assert 한다 — 고침을 되돌리면 이 케이스가 정확히 그 세 조건 전부로
   red 가 됨을 확인했다.
+
+**이번 라운드 추가 수정 — PR #1194 Copilot 리뷰 4건 대응**
+- **`deploy-alpha.yml`의 `inputSnapshotSha256`이 `receiptSha256`과 같은 값을 재사용했다.**
+  "Package and upload Task168 StageB source" 스텝이 attestation 파일 전체의 sha256
+  (`attestationSha256`)을 `TASK168_FINAL_PREFLIGHT_RECEIPT_SHA256`과
+  `TASK168_FINAL_PREFLIGHT_INPUT_SNAPSHOT_SHA256` 양쪽에 그대로 썼다. 실제 PR-A1
+  `package-task168-final-source.sh`가 attestation JSON 안에 따로 넣는 `inputSnapshotSha256`
+  필드(패키징된 INPUT-MANIFEST.json의 해시, attestation 파일 자체의 해시와 다른 값)를 `jq`로
+  읽어 쓰도록 고쳤다. `test-task168-stage-b-wiring.sh`에 두 값이 서로 다른 스텝 출력을
+  가리키는지 실제 워크플로 YAML에서 `run:`/`env:` 블록을 추출해 확인하는 케이스를 추가했다.
+  다만 이 자리는 더 깊은 문제도 있다 — 러너(`task168-stage-b-migrate.sh`)는
+  `finalImagePreflight.receipt`를 `kind=="task168FinalImagePreflight"` + `.harness`/`.rehearsal`
+  중첩 필드를 갖춘 T5 리허설 영수증으로 검증하는데, 워크플로는 거기에 소스 패키징 attestation
+  (`kind=="task168StageBSourceArchiveAttestation"`, 그런 필드 없음)을 그대로 넣고 있다 — 이번
+  수정 범위 밖이라 고치지 않고 PR 코멘트로만 남겼다(T5 `task168-final-image-preflight.sh` 배선이
+  결정되지 않은 채로 남아 있다).
+- **`alpha-manifest-common.sh`의 StageB `.source.key` 검증이 `.tar.gz`로 끝나는지만 봤다.**
+  StageA 네임스페이스 키(`releases/<sha>.tar.gz`, D-2 네임스페이스 prefix 없음)도 통과했다.
+  StageA 검증기와 동일하게 `.source.key == ("releases/task168-stage-b/" + $sha + ".tar.gz")`
+  정확히 비교하도록 고쳤다. `test-task168-stage-b-manifest.sh`에 StageA 키를 넣은 StageB
+  매니페스트가 거부되는 음성 케이스를 추가했다.
+- **`task168-stage-b-post-live-verify.sh`의 ledger 조회가 `LIKE '202609%_v1_%'`였다.** 무관한
+  9월 마이그레이션까지 포함될 수 있었다. 매니페스트의 `.database.task168.migrations[]`에서
+  정확한 이름 목록을 받아 `IN (...)`으로 조회하고, 각 행의 checksum을 매니페스트 값과 대조하도록
+  고쳤다. 이제 쓰이지 않는 `TASK168_M11`/`TASK168_M11_SHA256` 상수는 제거했다.
+  `test-task168-post-live.sh`(기존 gate 연결 테스트)의 ledger fixture에 Task168 11건과 무관한
+  9월 마이그레이션 2건을 항상 함께 두어 통과 케이스 자체가 이를 증명하게 했고, checksum 불일치
+  음성 케이스와 LIKE 패턴으로 되돌리는 변이(mutation) 케이스를 추가했다 — 가짜 psql은
+  실제 `psql -At` 출력 형식(파이프 구분, 헤더 없음)을 그대로 돌려준다.
+- **`deploy-alpha-via-ssm.sh`의 주석이 실제 동작과 달랐다.** poll 소진 시 "실패로 보고하지
+  않는다"고 적혀 있었는데 실제로는 `exit 1`로 스텝을 실패시킨다 — 다만
+  `FAILED_HOST_EXITED`가 아니라 `UNKNOWN_HOST_MAY_BE_RUNNING`으로 분류해 운영자가 죽은
+  호스트로 오판하지 않게 한다. 주석만 고쳤고(로직 무변경), 기존 `run_classification` 케이스가
+  이미 `rc≠0`을 확인하고 있어 테스트는 추가하지 않았다.

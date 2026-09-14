@@ -486,6 +486,46 @@ NAMES
     && pass "removing any single step's if: guard (all 6, one at a time) is caught as exactly that one step red"
 }
 
+# ── 10. deploy-alpha.yml: stageb-source's inputSnapshotSha256 output must
+# come from a field INSIDE the attestation JSON, and stageb-manifest's
+# INPUT_SNAPSHOT_SHA256 env must source that output -- never
+# attestationSha256 (the whole attestation FILE's hash, already used for
+# RECEIPT_SHA256) (Copilot review, PR #1194).
+run_stageb_input_snapshot_provenance() {
+  local dir="${WORK}/stageb-input-snapshot"
+  mkdir -p "${dir}"
+  python3 - "${ROOT}/.github/workflows/deploy-alpha.yml" "${dir}" <<'PY'
+import json, sys, yaml
+workflow_path, out_dir = sys.argv[1], sys.argv[2]
+doc = yaml.safe_load(open(workflow_path))
+steps = doc["jobs"]["deploy"]["steps"]
+
+source_step = next((s for s in steps if s.get("id") == "stageb-source"), None)
+manifest_step = next((s for s in steps if s.get("id") == "stageb-manifest"), None)
+assert source_step is not None, "could not find the stageb-source step"
+assert manifest_step is not None, "could not find the stageb-manifest step"
+
+open(f"{out_dir}/source-run.sh", "w").write(source_step["run"])
+open(f"{out_dir}/manifest-env.json", "w").write(json.dumps(manifest_step.get("env", {})))
+PY
+  [[ -s "${dir}/source-run.sh" ]] || { fail "could not extract the stageb-source step's run: block"; return; }
+  [[ -s "${dir}/manifest-env.json" ]] || { fail "could not extract the stageb-manifest step's env: block"; return; }
+
+  grep -qE 'inputSnapshotSha256=.*jq.*attestation' "${dir}/source-run.sh" \
+    && pass "stageb-source computes inputSnapshotSha256 by reading a field out of the attestation JSON" \
+    || fail "stageb-source does not compute inputSnapshotSha256 from inside the attestation JSON"
+
+  local snapshot_expr receipt_expr
+  snapshot_expr="$(jq -r '.TASK168_FINAL_PREFLIGHT_INPUT_SNAPSHOT_SHA256 // empty' "${dir}/manifest-env.json")"
+  receipt_expr="$(jq -r '.TASK168_FINAL_PREFLIGHT_RECEIPT_SHA256 // empty' "${dir}/manifest-env.json")"
+  [[ "${snapshot_expr}" == *'steps.stageb-source.outputs.inputSnapshotSha256'* ]] \
+    && pass "stageb-manifest's INPUT_SNAPSHOT_SHA256 env sources steps.stageb-source.outputs.inputSnapshotSha256" \
+    || fail "stageb-manifest's INPUT_SNAPSHOT_SHA256 env does not source inputSnapshotSha256: got '${snapshot_expr}'"
+  [[ -n "${snapshot_expr}" && "${snapshot_expr}" != "${receipt_expr}" ]] \
+    && pass "INPUT_SNAPSHOT_SHA256 and RECEIPT_SHA256 no longer source the identical output (provenance is distinct)" \
+    || fail "INPUT_SNAPSHOT_SHA256 and RECEIPT_SHA256 still source the identical output expression: '${snapshot_expr}'"
+}
+
 echo "== test-task168-stage-b-wiring =="
 run_unknown_stage
 run_stage_a
@@ -496,6 +536,7 @@ run_missing_timeout
 run_classification
 run_stage_resolution_guard
 run_stage_b_step_conditions
+run_stageb_input_snapshot_provenance
 
 echo "== ${PASS} passed, ${FAIL} failed =="
 (( FAIL == 0 ))

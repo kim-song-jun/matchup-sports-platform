@@ -97,7 +97,7 @@ validate_alpha_stage_b_final_manifest() {
       .release.sha == $sha and
       .release.version == $version and
       (.release.createdAt | type == "string" and length > 0) and
-      (.source.key | test("\\.tar\\.gz$")) and
+      .source.key == ("releases/task168-stage-b/" + $sha + ".tar.gz") and
       (.source.bucket | type == "string" and length > 0) and
       (.source.versionId | type == "string" and length > 0) and
       (.source.sha256 | test("^[0-9a-f]{64}$")) and

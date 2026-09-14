@@ -4,6 +4,16 @@
 # Runs the real script against a fake docker/psql/curl. A working baseline is built
 # first, then each of the eight checks is broken exactly once — every
 # break must refuse to write a receipt and exit non-zero.
+#
+# The ledger baseline (used by the passing case AND every break case that
+# isn't itself about the ledger) always includes two migrations outside the
+# Task168 set whose names still match the old `LIKE '202609%_v1_%'`
+# date-range pattern — proving the ledger check names its migrations
+# exactly (from the manifest) rather than date-range-matching them. The
+# fake docker's ledger dispatch only understands an explicit list of quoted
+# migration names (what the real query sends); a regression back to a LIKE
+# pattern has no such names to extract, so it fails closed instead of
+# silently overcounting.
 
 set -Eeuo pipefail
 
@@ -21,8 +31,31 @@ readonly SHA=1111111111111111111111111111111111111111
 readonly REGISTRY=123456789012.dkr.ecr.ap-northeast-2.amazonaws.com
 readonly API_URI="${REGISTRY}/teameet-alpha-v1-api@sha256:$(printf 'a%.0s' {1..64})"
 readonly WEB_URI="${REGISTRY}/teameet-alpha-v1-web@sha256:$(printf 'b%.0s' {1..64})"
-readonly TASK168_M11=20260911090000_retire_tournament_fixture_tables
-readonly TASK168_M11_SHA256=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
+
+# 11 well-formed (^[0-9]{14}_[a-z0-9_]+$) Task168 migration names — the
+# exact set the manifest declares and the ledger check must name
+# individually (item 3 fix replaces a LIKE '202609%_v1_%' date-range query).
+TASK168_NAMES=(
+  20260908130000_v1_m00
+  20260908150000_v1_m01
+  20260908160000_v1_m02
+  20260908170000_v1_m03
+  20260908180000_v1_m04
+  20260909000000_v1_m05
+  20260909110000_v1_m06
+  20260910010000_v1_m07
+  20260910020000_v1_m08
+  20260910160000_v1_m09
+  20260911090000_v1_m10
+)
+# Unrelated migrations sharing the LIKE '202609%_v1_%' shape the old query
+# matched, but not part of Task168 — must never be counted.
+UNRELATED_NAMES=(
+  20260910050000_v1_notification_prefs_extra
+  20260912030000_v1_other_unrelated_migration
+)
+
+name_checksum() { printf '%s' "$1" | sha256sum | awk '{print $1}'; }
 
 # Everything a passing run needs, overridable per-case via env vars read by
 # the fake docker/psql below: BREAK selects which single check to break.
@@ -35,18 +68,48 @@ build_case() {
   touch "${root}/live/deploy/docker-compose.prod.yml" "${root}/live/deploy/docker-compose.alpha.yml"
   printf 'V1_DB_USER=teameet_v1\nV1_DB_NAME=teameet_v1\n' > "${root}/live/deploy/.env"
 
+  local migrations_json='[]' name
+  for name in "${TASK168_NAMES[@]}"; do
+    migrations_json="$(jq -c --arg n "${name}" --arg s "$(name_checksum "${name}")" '. + [{name:$n,sha256:$s}]' <<< "${migrations_json}")"
+  done
+
   manifest="${root}/manifest.json"
-  jq -n --arg api "${API_URI}" --arg web "${WEB_URI}" \
-    '{schemaVersion:1,environment:"alpha",database:{task168:{stage:"stageBFinal"}},
+  jq -n --arg api "${API_URI}" --arg web "${WEB_URI}" --argjson migrations "${migrations_json}" \
+    '{schemaVersion:1,environment:"alpha",database:{task168:{stage:"stageBFinal",migrations:$migrations}},
       images:{api:{uri:$api},web:{uri:$web}}}' > "${manifest}"
 
   jq -n '{schemaVersion:1,kind:"task168StageBMigration",status:"MIGRATION_COMMITTED"}' \
     > "${state_dir}/migration-stage.json"
 }
 
+# Writes the fake DB's full ledger backing table into ${bin}/ledger-rows.txt:
+# the 11 Task168 rows (each `applied` with the manifest's own checksum) plus
+# the 2 unrelated rows, always present so every scenario below implicitly
+# proves they are ignored. break_case=="ledger-count" drops one Task168 row
+# entirely (simulates a migration never applied);
+# break_case=="ledger-checksum" tampers one Task168 row's checksum.
+write_ledger_rows() {
+  local bin="$1" break_case="${2:-}" name sha
+  : > "${bin}/ledger-rows.txt"
+  for name in "${TASK168_NAMES[@]}"; do
+    if [[ "${break_case}" == ledger-count && "${name}" == "${TASK168_NAMES[5]}" ]]; then
+      continue
+    fi
+    sha="$(name_checksum "${name}")"
+    if [[ "${break_case}" == ledger-checksum && "${name}" == "${TASK168_NAMES[5]}" ]]; then
+      sha="$(printf 'f%.0s' {1..64})"
+    fi
+    printf '%s|%s|applied\n' "${name}" "${sha}" >> "${bin}/ledger-rows.txt"
+  done
+  for name in "${UNRELATED_NAMES[@]}"; do
+    printf '%s|%s|applied\n' "${name}" "$(name_checksum "${name}")" >> "${bin}/ledger-rows.txt"
+  done
+}
+
 # $2 = BREAK name (empty for the passing baseline)
 make_fake_bin() {
   local bin="$1" break_case="${2:-}"
+  write_ledger_rows "${bin}" "${break_case}"
   cat > "${bin}/curl" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
@@ -86,15 +149,14 @@ case "\$*" in
     if [[ "${break_case}" == drift ]]; then echo "drift detected" >&2; exit 2; else exit 0; fi
     ;;
   *"_prisma_migrations"*)
-    if [[ "${break_case}" == ledger-count ]]; then
-      echo "${TASK168_M11}|${TASK168_M11_SHA256}|applied"
-    elif [[ "${break_case}" == ledger-checksum ]]; then
-      for i in \$(seq 1 10); do echo "2026090\${i}0000_v1_x|deadbeef|applied"; done
-      echo "${TASK168_M11}|wrongchecksum|applied"
-    else
-      for i in \$(seq 1 10); do echo "2026090\${i}0000_v1_x|deadbeef|applied"; done
-      echo "${TASK168_M11}|${TASK168_M11_SHA256}|applied"
+    names="\$(grep -oE "'[0-9]{14}_[a-z0-9_]+'" <<< "\$*" | tr -d "'")"
+    if [[ -z "\${names}" ]]; then
+      echo "fake docker: no exact migration names found in ledger SQL (regressed to a LIKE pattern?)" >&2
+      exit 1
     fi
+    while IFS= read -r n; do
+      grep "^\${n}|" "${bin}/ledger-rows.txt" || true
+    done <<< "\${names}" | LC_ALL=C sort
     exit 0 ;;
   *"to_regclass"*)
     if [[ "${break_case}" == legacy-table ]]; then echo 1; else echo 0; fi
@@ -134,14 +196,14 @@ build_case "${root}"
 make_fake_bin "${bin}" ""
 rc="$(run_case "${root}")"
 [[ "${rc}" -eq 0 && -f "${state_dir}/runtime-verification.json" ]] \
-  && pass "a fully passing run writes runtime-verification.json" \
+  && pass "11 Task168 rows + 2 unrelated September migrations: a fully passing run writes runtime-verification.json" \
   || fail "the passing baseline did not succeed: rc=${rc} $(cat "${root}/stderr")"
 if [[ -f "${state_dir}/runtime-verification.json" ]]; then
   jq -e --arg m "$(sha256sum "${state_dir}/migration-stage.json" | awk '{print $1}')" \
     --arg n "$(sha256sum "${manifest}" | awk '{print $1}')" \
     '.migrationReceiptSha256 == $m and .manifestSha256 == $n and .ledgerCount == 11' \
     "${state_dir}/runtime-verification.json" >/dev/null \
-    && pass "receipt binds the migration receipt and manifest hashes" \
+    && pass "receipt binds the migration receipt and manifest hashes, ledgerCount stays 11 despite unrelated rows" \
     || fail "receipt does not bind the expected hashes"
 fi
 
@@ -154,7 +216,7 @@ declare -A EXPECTED_MESSAGE=(
   [digest]="running API image does not match the manifest"
   [attestation]="running API image attestation is not stageBFinal"
   [ledger-count]="expected 11"
-  [ledger-checksum]="M11 ledger row checksum mismatch"
+  [ledger-checksum]="is not applied with the manifest checksum"
   [legacy-table]="legacy tables are still present"
   [legacy-column]="legacy link columns remain"
   [drift]="live database drifts from the final schema"
@@ -176,6 +238,46 @@ for break_case in digest attestation ledger-count ledger-checksum legacy-table l
     fail "breaking '${break_case}' did NOT refuse with the expected message '${expected}': rc=${rc} receipt-exists=$([[ -f "${state_dir}/runtime-verification.json" ]] && echo yes || echo no) stderr=$(cat "${root}/stderr")"
   fi
 done
+
+# Mutation regression: reverting the ledger query to the old date-range LIKE
+# pattern has no quoted 14-digit names for the fake to extract, so it must
+# fail closed on the SAME (unrelated-rows-present) fixture the passing case
+# above uses — proving that case actually depends on the exact-name fix.
+(
+  root="${WORK}/mutation-like-pattern"; mkdir -p "${root}"
+  build_case "${root}"
+  make_fake_bin "${bin}" ""
+  mutated="${root}/post-live-verify-mutated.sh"
+  python3 - "${SCRIPT}" "${mutated}" <<'PY'
+import sys
+src_path, out_path = sys.argv[1], sys.argv[2]
+text = open(src_path).read()
+start = text.index("# 3. Ledger:")
+end = text.index("# 4. Catalog:")
+assert text[start:end], "could not locate the ledger-check block to mutate"
+replacement = r'''# 3. Ledger (MUTATED for regression test): date-range LIKE pattern.
+ledger_rows="$(dbq "SELECT migration_name || '|' || COALESCE(checksum,'') || '|' || CASE WHEN finished_at IS NOT NULL AND rolled_back_at IS NULL THEN 'applied' ELSE 'invalid' END FROM \"_prisma_migrations\" WHERE migration_name LIKE '202609%_v1_%' ORDER BY migration_name")"
+ledger_count="$(grep -c '|applied$' <<< "${ledger_rows}" || true)"
+[[ "${ledger_count}" == 11 ]] || fail "ledger has ${ledger_count} Task168 rows, expected 11"
+
+'''
+open(out_path, "w").write(text[:start] + replacement + text[end:])
+PY
+  chmod +x "${mutated}"
+  rc=0
+  ALPHA_RELEASE_STATE_DIR="${home}/.teameet-alpha-releases" PATH="${bin}:${PATH}" \
+    bash "${mutated}" --release-sha "${SHA}" --manifest "${manifest}" \
+      --compose-prod "${root}/live/deploy/docker-compose.prod.yml" \
+      --compose-alpha "${root}/live/deploy/docker-compose.alpha.yml" \
+      --env-file "${root}/live/deploy/.env" \
+      --public-base-url "https://alpha.example.invalid" \
+      >"${root}/stdout" 2>"${root}/stderr" || rc=$?
+  if [[ "${rc}" -ne 0 ]] && grep -q "no exact migration names found in ledger SQL" "${root}/stderr"; then
+    pass "reverting to the LIKE date-range pattern fails on the unrelated-rows-present fixture (mutation correctly detected)"
+  else
+    fail "reverting to the LIKE pattern did not fail as expected: rc=${rc} $(cat "${root}/stderr" 2>/dev/null)"
+  fi
+) && PASS=$((PASS + 1)) || FAIL=$((FAIL + 1))
 
 echo "== ${PASS} passed, ${FAIL} failed =="
 (( FAIL == 0 ))

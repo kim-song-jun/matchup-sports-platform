@@ -33,8 +33,6 @@ fail() { echo "[task168-post-live] $*" >&2; exit 1; }
 sha() { sha256sum "$1" | awk '{print $1}'; }
 
 readonly TASK168_FINAL_SCHEMA_SHA256=e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46
-readonly TASK168_M11=20260911090000_retire_tournament_fixture_tables
-readonly TASK168_M11_SHA256=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
 
 jq -e '.database.task168.stage == "stageBFinal"' "${MANIFEST}" >/dev/null || fail 'manifest is not a StageB manifest'
 manifest_sha256="$(sha "${MANIFEST}")"
@@ -73,11 +71,26 @@ jq -e --arg schema "${TASK168_FINAL_SCHEMA_SHA256}" \
   '.stage == "stageBFinal" and .schemaSha256 == $schema' <<< "${api_attestation}" >/dev/null ||
   fail 'running API image attestation is not stageBFinal'
 
-# 3. Ledger: exactly the 11 Task168 rows, M11 checksum correct.
-ledger_rows="$(dbq "SELECT migration_name || '|' || COALESCE(checksum,'') || '|' || CASE WHEN finished_at IS NOT NULL AND rolled_back_at IS NULL THEN 'applied' ELSE 'invalid' END FROM \"_prisma_migrations\" WHERE migration_name LIKE '202609%_v1_%' OR migration_name = '${TASK168_M11}' ORDER BY migration_name")"
+# 3. Ledger: the exact Task168 migrations from the manifest, each applied
+# with the manifest's own checksum -- named individually, never matched by
+# a `LIKE '202609%_v1_%'` date range (which also catches unrelated
+# September migrations).
+mapfile -t task168_migration_names < <(jq -r '.database.task168.migrations[].name' "${MANIFEST}")
+(( ${#task168_migration_names[@]} > 0 )) || fail 'manifest lists no task168 migrations'
+for name in "${task168_migration_names[@]}"; do
+  [[ "${name}" =~ ^[0-9]{14}_[a-z0-9_]+$ ]] || fail "manifest migration name is not well-formed: ${name}"
+done
+in_list="$(printf "'%s'," "${task168_migration_names[@]}")"
+in_list="${in_list%,}"
+ledger_rows="$(dbq "SELECT migration_name || '|' || COALESCE(checksum,'') || '|' || CASE WHEN finished_at IS NOT NULL AND rolled_back_at IS NULL THEN 'applied' ELSE 'invalid' END FROM \"_prisma_migrations\" WHERE migration_name IN (${in_list}) ORDER BY migration_name")"
 ledger_count="$(grep -c '|applied$' <<< "${ledger_rows}" || true)"
-[[ "${ledger_count}" == 11 ]] || fail "ledger has ${ledger_count} Task168 rows, expected 11"
-grep -q "^${TASK168_M11}|${TASK168_M11_SHA256}|applied$" <<< "${ledger_rows}" || fail 'M11 ledger row checksum mismatch'
+[[ "${ledger_count}" == "${#task168_migration_names[@]}" ]] || fail "ledger has ${ledger_count} Task168 rows, expected ${#task168_migration_names[@]}"
+while IFS='|' read -r row_name row_checksum row_status; do
+  expected_checksum="$(jq -er --arg n "${row_name}" '.database.task168.migrations[] | select(.name == $n) | .sha256' "${MANIFEST}")" ||
+    fail "manifest has no checksum for ledger row ${row_name}"
+  [[ "${row_status}" == applied && "${row_checksum}" == "${expected_checksum}" ]] ||
+    fail "ledger row for ${row_name} is not applied with the manifest checksum"
+done <<< "${ledger_rows}"
 
 # 4. Catalog: legacy schema fully retired.
 catalog_legacy="$(dbq "SELECT count(*) FROM (VALUES ('v1_tournament_fixtures'),('v1_tournament_fixture_results'),('v1_tournament_fixture_goals'),('v1_tournament_fixture_videos'),('v1_tournament_fixture_advancement_edges')) x(name) WHERE to_regclass(x.name) IS NOT NULL")"

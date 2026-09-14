@@ -381,6 +381,12 @@ jobs:
           echo "sourceSha256=${archiveSha256}" >> "${GITHUB_OUTPUT}"
           echo "attestationPath=${attestation}" >> "${GITHUB_OUTPUT}"
           echo "attestationSha256=$(sha256sum "${attestation}" | awk '{print $1}')" >> "${GITHUB_OUTPUT}"
+          # inputSnapshotSha256 is a field INSIDE the attestation JSON (the
+          # packaged INPUT-MANIFEST.json's own hash), distinct from
+          # attestationSha256 above (the whole attestation FILE's hash) --
+          # the manifest's finalImagePreflight.{receiptSha256,inputSnapshotSha256}
+          # must not collapse to the same value.
+          echo "inputSnapshotSha256=$(jq -er '.inputSnapshotSha256' "${attestation}")" >> "${GITHUB_OUTPUT}"
 
       # The StageA predecessor's transition receipt and the live DB identity are
       # generated/known only on the Alpha host — GH Actions has no other path to
@@ -458,7 +464,7 @@ jobs:
           TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256: ${{ steps.stageb-predecessor.outputs.resolvedMigrationAttemptsSha256 }}
           TASK168_FINAL_PREFLIGHT_RECEIPT_PATH: ${{ steps.stageb-source.outputs.attestationPath }}
           TASK168_FINAL_PREFLIGHT_RECEIPT_SHA256: ${{ steps.stageb-source.outputs.attestationSha256 }}
-          TASK168_FINAL_PREFLIGHT_INPUT_SNAPSHOT_SHA256: ${{ steps.stageb-source.outputs.attestationSha256 }}
+          TASK168_FINAL_PREFLIGHT_INPUT_SNAPSHOT_SHA256: ${{ steps.stageb-source.outputs.inputSnapshotSha256 }}
         run: bash scripts/release/create-alpha-release-manifest.sh
 
       - name: Create or reuse immutable release manifest

@@ -147,11 +147,12 @@ for attempt in $(seq 1 "${poll_attempts}"); do
   sleep 10
 done
 # The SSM invocation never reached a terminal status inside our own poll
-# budget (which is set to exceed executionTimeout). This is deliberately
-# NOT reported as a failure — for stageBFinal in particular, that would
-# invite an operator to re-dispatch or restore over a host that may still be
-# mid-migration. stageBRecover's own read-only entry-condition checks
-# (docs/ops/task168-stage-b-runbook.md) are the correct next step, not this
-# script.
+# budget (which is set to exceed executionTimeout). This still exits
+# non-zero — the step fails — but is classified UNKNOWN_HOST_MAY_BE_RUNNING
+# rather than FAILED_HOST_EXITED so an operator does not treat it as a
+# confirmed dead host: for stageBFinal in particular, re-dispatching or
+# restoring over a host that may still be mid-migration would be unsafe.
+# stageBRecover's own read-only entry-condition checks
+# (docs/ops/task168-stage-b-runbook.md) are the correct next step.
 echo "[deploy-alpha-via-ssm] result=UNKNOWN_HOST_MAY_BE_RUNNING — host may still be running; do not re-dispatch or restore, run task168_stage=stageBRecover to diagnose" >&2
 exit 1

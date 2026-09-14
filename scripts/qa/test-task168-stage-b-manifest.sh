@@ -77,7 +77,22 @@ echo "== test-task168-stage-b-manifest =="
   else
     echo "  ok: a mismatched expected migrations array is rejected"
   fi
-) && PASS=$((PASS + 3)) || FAIL=$((FAIL + 1))
+
+  # D-2 namespace (Copilot review, PR #1194): a StageA-shaped key
+  # (releases/<sha>.tar.gz, no task168-stage-b/ prefix) must never validate
+  # on a StageB manifest, even for the same release sha and even though it
+  # still ends in .tar.gz.
+  wrong_key_manifest="${WORK}/direct-wrong-key.json"
+  jq --arg sha "${SHA}" '.source.key = ("releases/" + $sha + ".tar.gz")' "${manifest}" > "${wrong_key_manifest}"
+  wrong_key_checksum="$(sha256sum "${wrong_key_manifest}" | awk '{print $1}')"
+  if validate_alpha_stage_b_final_manifest "${wrong_key_manifest}" "${SHA}" "0.1.0-alpha.20260914.g111111111111" \
+    "${wrong_key_checksum}" "${REGISTRY}" "${FINAL_SCHEMA}" "${migrations}" "${predecessor}" "${preflight}" "${fullHistory}"; then
+    echo "  FAIL: a StageA-namespaced source key (releases/<sha>.tar.gz) was accepted on a StageB manifest" >&2
+    exit 1
+  else
+    echo "  ok: a StageA-namespaced source key is rejected on a StageB manifest"
+  fi
+) && PASS=$((PASS + 4)) || FAIL=$((FAIL + 1))
 
 # ── validate_stored_alpha_manifest: stage branching ─────────────────────────
 (

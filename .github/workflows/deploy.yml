@@ -277,6 +277,9 @@ jobs:
       - name: Task168 StageA predecessor read contract tests
         run: bash scripts/qa/test-task168-predecessor-read.sh
 
+      - name: Task168 StageA predecessor dispatch contract tests
+        run: bash scripts/qa/test-task168-predecessor-dispatch.sh
+
       # A real `docker build` per target (StageA default + StageB
       # runtime-task168-final) is deliberately NOT a step here: this job's
       # own contract (see the file header) is "no app build, seconds-long

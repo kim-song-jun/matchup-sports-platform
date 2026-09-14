@@ -20,6 +20,48 @@ skip() { SKIP=$((SKIP + 1)); echo "  skip: $*"; }
 
 readonly SHA=1111111111111111111111111111111111111111
 
+# The 11 Task168 migration names R-A's ledger checks (post_m11_catalog_violation
+# aside, these come from task168-migration-contract.sh) require to see as the
+# complete post-M11 ledger. M11's checksum is the real one (already fixed
+# elsewhere in this suite via the "08eac734...|applied" m11 row argument);
+# M1-M10 use a per-name placeholder since nothing else here pins their real
+# bytes -- manifest.json and the fake DB's ledger rows below both derive from
+# this one array so they can never disagree with each other.
+TASK168_LEDGER_NAMES=(
+  20260908130000_v1_team_match_tournament_expand
+  20260908150000_v1_operation_audit_team_match_expand
+  20260908160000_v1_official_fact_team_match_scope
+  20260908170000_v1_lineup_invalidation
+  20260908180000_v1_staff_scope_team_match
+  20260909000000_v1_tournament_result_lineage
+  20260909110000_v1_operation_audit_canonical_binding
+  20260910010000_v1_official_fact_source_history
+  20260910020000_v1_canonical_game_db_guards
+  20260910160000_v1_outbox_cutover_claim_gate
+  20260911090000_retire_tournament_fixture_tables
+)
+task168_ledger_sha() {
+  local name="$1"
+  if [[ "${name}" == 20260911090000_retire_tournament_fixture_tables ]]; then
+    echo 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
+  else
+    printf '%s' "task168-fixture-${name}" | sha256sum | awk '{print $1}'
+  fi
+}
+task168_ledger_migrations_json() {
+  local out='[]' name
+  for name in "${TASK168_LEDGER_NAMES[@]}"; do
+    out="$(jq -c --arg n "${name}" --arg s "$(task168_ledger_sha "${name}")" '. + [{name:$n, sha256:$s}]' <<<"${out}")"
+  done
+  printf '%s' "${out}"
+}
+task168_ledger_lines() {
+  local name
+  for name in "${TASK168_LEDGER_NAMES[@]}"; do
+    printf '%s|%s|applied\n' "${name}" "$(task168_ledger_sha "${name}")"
+  done
+}
+
 # ── Static: stageBFinal never activates or composes up the final runtime in
 # this PR (post-commit start pending U2). Real function-call lines only —
 # excludes comments, so this cannot be satisfied by prose alone.
@@ -52,18 +94,32 @@ setup_recover_fixture() {
   chmod +x "${bin}/flock"
 }
 
-# Writes quiesce.json + the M11 entry marker for an R-A(-negative) scenario,
-# so both share one contract instead of drifting independently. databaseIdentity
-# and apiImage are "" to match the fake docker/psql default case (no case arm
-# matches these queries, so they fall through to `exit 0` with empty stdout).
-# preApiContainerId/preWorkerContainerId + the marker's releaseSha/manifestSha256
-# match ${SHA}/quiesce.json's manifestSha256 by construction, matching R-A's
-# release-binding checks.
+# Writes manifest.json + a frozen-source stub + quiesce.json + the M11 entry
+# marker for an R-A(-negative) scenario, so all four share one contract
+# instead of drifting independently. databaseIdentity is "" to match the fake
+# docker/psql default case (no case arm matches that query, so it falls
+# through to `exit 0` with empty stdout). apiImage must be a real-looking
+# immutable digest reference (R-A now rejects anything else before it will
+# even attempt a status check). manifestSha256 must be manifest.json's real
+# hash, not a placeholder, because R-A now re-reads that file and compares
+# its bytes against this value. preApiContainerId/preWorkerContainerId + the
+# marker's releaseSha/manifestSha256 match ${SHA}/quiesce.json's
+# manifestSha256 by construction, matching R-A's release-binding checks.
 make_r_a_fixture() {
   local state_dir="$1" backup_path="$2" backup_sha="$3"
-  jq -n --arg path "${backup_path}" --arg sha "${backup_sha}" \
+  local resolved_empty_sha; resolved_empty_sha="$(printf '' | sha256sum | awk '{print $1}')"
+  local migrations_json; migrations_json="$(task168_ledger_migrations_json)"
+  jq -n --argjson migrations "${migrations_json}" --arg resolvedSha "${resolved_empty_sha}" \
+    '{database:{task168:{resolvedMigrationAttemptsSha256:$resolvedSha,fullMigrationHistory:$migrations,migrations:$migrations}}}' \
+    > "${state_dir}/manifest.json"
+  local manifest_sha; manifest_sha="$(sha256sum "${state_dir}/manifest.json" | awk '{print $1}')"
+  install -d "${state_dir}/frozen-source/migrations"
+  : > "${state_dir}/frozen-source/schema.prisma"
+  : > "${state_dir}/frozen-source/migrations/migration_lock.toml"
+
+  jq -n --arg path "${backup_path}" --arg sha "${backup_sha}" --arg manifestSha "${manifest_sha}" \
     '{schemaVersion:1,kind:"quiesce",status:"COMPLETED",backupPath:$path,backupSha256:$sha,
-      manifestSha256:("n"*64),databaseIdentity:"",apiImage:"",
+      manifestSha256:$manifestSha,databaseIdentity:"",apiImage:("img@sha256:"+("a"*64)),
       preApiContainerId:"raApi1",preWorkerContainerId:"raWorker1"}' \
     > "${state_dir}/quiesce.json"
   local quiesce_sha; quiesce_sha="$(sha256sum "${state_dir}/quiesce.json" | awk '{print $1}')"
@@ -71,8 +127,8 @@ make_r_a_fixture() {
   # binding check (a real Postgres comparison in production; here answered
   # by a fixed 't'/'f' case arm, see make_fake_docker_for_recover) is
   # exercised with a plausible value, not used to derive the fake answer.
-  jq -n --arg sha "${SHA}" --arg quiesceSha "${quiesce_sha}" --arg backupSha "${backup_sha}" \
-    '{schemaVersion:1,kind:"task168StageBM11EntryMarker",releaseSha:$sha,manifestSha256:("n"*64),quiesceReceiptSha256:$quiesceSha,preM11BackupSha256:$backupSha,runnerContainerId:"runner123",enteredAt:"2026-09-14T00:00:00Z"}' \
+  jq -n --arg sha "${SHA}" --arg quiesceSha "${quiesce_sha}" --arg backupSha "${backup_sha}" --arg manifestSha "${manifest_sha}" \
+    '{schemaVersion:1,kind:"task168StageBM11EntryMarker",releaseSha:$sha,manifestSha256:$manifestSha,quiesceReceiptSha256:$quiesceSha,preM11BackupSha256:$backupSha,runnerContainerId:"runner123",enteredAt:"2026-09-14T00:00:00Z"}' \
     > "${state_dir}/m11-entry-marker.json"
 }
 
@@ -87,6 +143,15 @@ make_r_a_fixture() {
 make_fake_docker_for_recover() {
   local bin="$1" m11="$2" advisory="${3:-0}" labeled="${4:-0}" legacy="${5:-0}" binding="${6:-t}" \
     ra_running="${7:-false}" ra_restart="${8:-no}"
+  # R-A's ledger checks (task168-migration-contract.sh) query
+  # _prisma_migrations three more ways than the single-row m11 lookup below:
+  # the full ledger (every migration, any name), the Task168-only subset, and
+  # the unresolved/resolved-attempt rows. Only the R-A positive scenario
+  # reaches these (every negative scenario refuses earlier), so one fixed
+  # "11 rows, all applied, no unresolved attempts" answer -- matching
+  # manifest.json's ledger fixture -- covers it.
+  local ledger_lines_file="$(dirname "${bin}")/task168-ledger-lines.txt"
+  task168_ledger_lines > "${ledger_lines_file}"
   cat > "${bin}/docker" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "docker \$*" >> "${log}"
@@ -96,6 +161,12 @@ case "\$*" in
     exit 0 ;;
   *"pg_locks"*) echo "${advisory}"; exit 0 ;;
   *"finished_at >="*) echo "${binding}"; exit 0 ;;
+  *"finished_at IS NULL AND rolled_back_at IS NOT NULL"*) exit 0 ;;
+  *"(finished_at IS NULL AND rolled_back_at IS NULL) OR (finished_at IS NOT NULL AND rolled_back_at IS NOT NULL)"*) echo 0; exit 0 ;;
+  *"migration_name IN ("*|*"ORDER BY migration_name,id"*) cat "${ledger_lines_file}"; exit 0 ;;
+  # R-A's compose-v1_api-image re-check ahead of the migrate-status
+  # throwaway container -- matches the fixture's apiImage (make_r_a_fixture).
+  *"config --format json"*) echo '{"services":{"v1_api":{"image":"img@sha256:'"$(printf 'a%.0s' $(seq 1 64))"'"}}}'; exit 0 ;;
   *"count(*)"*"_prisma_migrations"*)
     # The row-count query and the row-value query both mention
     # _prisma_migrations, so this arm (matched first) must intercept the

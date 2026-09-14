@@ -38,6 +38,24 @@ Task 168 StageB(최종 스키마 이관) 배선을 dev에 들여왔어요. dev p
 - `task168-stage-b-post-live-verify.sh`(신규, T7)가 8개 검사(digest·attestation·ledger·카탈로그·
   drift·health·outbox·read-only smoke)를 전부 통과해야만 런타임 검증 영수증을 써요.
 
+**이번 라운드 추가 수정 — R-A와 러너의 post-M11 검증을 한 곳으로**
+- 이전 라운드까지 R-A(`stageBRecover`)는 M11 커밋 뒤 러너가 요구하는 검사 중 카탈로그
+  일부만 다시 확인했고, `prisma migrate status` 드리프트·resolved-attempts 감사값·전체
+  ledger 일치·Task168 11행 체크섬은 전혀 재확인하지 않았어요. 킬 직후 이 중 하나라도 깨져
+  있으면 R-A가 `MIGRATION_COMMITTED_RECOVERED`를 잘못 써버릴 수 있었어요. 지금은
+  `deploy/task168-migration-contract.sh`(신규, 러너와 wrapper가 함께 source)에 ledger·카탈로그·
+  `prisma migrate status` 검사를 전부 모아, 러너의 정상 경로와 R-A가 **같은 함수**를 호출해요.
+  R-A는 러너가 M11 진입 직전에 남기는 매니페스트 사본(`manifest.json`)과 동결된 마이그레이션
+  소스(`frozen-source/`)를 state 디렉터리에서 읽어 이 검사들을 재현해요.
+- M11 진입 마커는 이제 **마지막 quiesced-writer 재확인이 끝난 뒤에만** 쓰고, 그 직후 바로
+  `phase=after_m11`로 넘어가요(이전엔 재확인 *전에* 썼어요). before_m11 단계에서 빠져나가는
+  모든 경로는 마커가 있으면 writer를 복원하기 전에 `*.aborted`로 원자적으로 옮겨요 — 그래야
+  이 릴리스가 실제로는 M11 이전에 실패했는데도, 같은 DB에 나중에 다른 릴리스가 커밋한 M11을
+  자기 것으로 잘못 인증하는 경로가 막혀요.
+- `BACKUP_FORMAT=plain-sql-gzip` 분기의 `pg_dump | gzip`에 `set -o pipefail`을 추가했어요 —
+  없으면 `pg_dump` 실패가 `gzip`의 exit 0 뒤에 가려져 잘린 백업이 "성공"으로 기록돼요.
+- 스크립트 주석에서 리뷰 라운드·BLOCK 라벨·행 번호 인용을 모두 걷어내고 실제 제약만 남겼어요.
+
 **보류된 것(추측으로 채우지 않았어요)**
 - U2: `stageBResume` 진입점은 만들지 않았어요.
 - U4: 백업 형식은 러너 트랙(`task168-stage-b-migrate.sh`) 소관이라 이 변경에서 정하지 않았고,
@@ -54,4 +72,17 @@ d5-guard·dockerfile-target, ubuntu CI 기준 총 69개 케이스 — wiring 18 
 고치고 걷어냈어요). macOS 로컬 실행은 wiring 3케이스가 시스템 정규식 엔진의 `{1,1024}` 반복
 제한(`maximum repetition exceeds 255`)과 wrapper 1케이스가 `flock(1)` 부재로 각각 fail/skip
 처리되는데, 둘 다 스크립트 자체 주석에 적힌 Linux 전용 검증 대상이라 ubuntu CI에서는 영향
-없어요.
+없어요(직접 ubuntu:24.04 컨테이너에서 재확인: wiring 26/0, d5-guard 9/0, wrapper 15/0 — 셋 다
+macOS 에서 fail/skip 이던 케이스까지 포함해 전부 green).
+
+`scripts/qa/test-task168-stage-b-runner.sh`(실제 docker/postgres/Prisma 하네스, 별도
+`deploy.yml` 스텝)는 이번 라운드에서 a-o(기존 15개) + p·q·r·t(신규 4개) = 19 시나리오, 총
+**58개 assertion, macOS 로컬 0 failed**로 확인했어요. p/q/r 은 M11 커밋 직후 SIGKILL로 도달한
+R-A 대상 상태에서 각각 ledger 체크섬 변조·source 에 없는 여분 적용행·미해결(unresolved) 시도행을
+DB 에 직접 주입한 뒤 실제 wrapper 의 stageBRecover 를 호출해, `assert_resolved_attempts`/
+`assert_full_ledger`/`ledger_assert_exact`(러너와 R-A 가 공유하는 `task168-migration-contract.sh`)
+가 셋 다 거부하고 `MIGRATION_COMMITTED_RECOVERED` 를 쓰지 않는지 확인해요. t 는 release X 가
+M11 이전 백업 도중 SIGTERM 으로 정상 복구되고(마커 없음), 같은 DB 에 별도 release Y 가 M11 을
+커밋한 뒤 SIGKILL 되는 상황을 만들고 `stageBRecover ALPHA_SHA=X` 를 호출해 X 가 다른 릴리스의
+커밋을 자기 것으로 잘못 인증하지 않는지 확인해요. 매 실행 끝에 라벨 컨테이너/네트워크/볼륨
+0개와 `docker volume ls` 개수를 기준선과 대조해 익명 볼륨 누수도 함께 확인해요.

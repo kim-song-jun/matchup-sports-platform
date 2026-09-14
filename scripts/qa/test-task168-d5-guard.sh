@@ -25,8 +25,10 @@ trap 'rm -rf "${WORK}"' EXIT
 
 PASS=0
 FAIL=0
+SKIP=0
 pass() { PASS=$((PASS + 1)); echo "  ok: $*"; }
 fail() { FAIL=$((FAIL + 1)); echo "  FAIL: $*" >&2; }
+skip() { SKIP=$((SKIP + 1)); echo "  skip: $*"; }
 
 echo "== test-task168-d5-guard =="
 
@@ -154,8 +156,8 @@ if command -v flock >/dev/null 2>&1; then
     && pass "stageBRecover refuses while the shared deploy lock is held" \
     || fail "stageBRecover did not refuse a held shared deploy lock: rc=${rc} $(cat "${lock_root}/stderr" 2>/dev/null)"
 else
-  pass "shared-lock contention case skipped (no real flock(1) on this machine — covered by CI on ubuntu)"
+  skip "shared-lock contention case (no real flock(1) on this machine — covered by CI on ubuntu)"
 fi
 
-echo "== ${PASS} passed, ${FAIL} failed =="
+echo "== ${PASS} passed, ${FAIL} failed, ${SKIP} skipped =="
 (( FAIL == 0 ))

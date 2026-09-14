@@ -38,11 +38,18 @@ ALPHA_HOME_DIR="${ALPHA_HOME_DIR:-/home/ec2-user}"
 ALPHA_LIVE_DIR="${ALPHA_LIVE_DIR:-${ALPHA_HOME_DIR}/teameet}"
 STATE_ROOT="${ALPHA_RELEASE_STATE_DIR:-${ALPHA_HOME_DIR}/.teameet-alpha-releases}/task168"
 readonly TASK168_STAGE_LABEL_PREFIX="com.teameet.task168.stage-b"
-readonly TASK168_FINAL_SCHEMA_SHA256=e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46
-readonly TASK168_M11=20260911090000_retire_tournament_fixture_tables
-readonly TASK168_M11_SHA256=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
 
 fail() { echo "[deploy-alpha-stage-b] $*" >&2; exit 1; }
+
+# Provides TASK168_M11/TASK168_M11_SHA256/TASK168_FINAL_SCHEMA_SHA256 plus the
+# ledger/catalog verification functions (post_m11_catalog_violation,
+# assert_resolved_attempts, assert_full_ledger, ledger_rows,
+# ledger_assert_exact, assert_prisma_migrate_status_clean) that R-A below
+# shares with the runner (deploy/task168-stage-b-migrate.sh) — see that file
+# for why: a post-M11 check the runner would refuse on must never be
+# independently re-implemented (and drift) here.
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/task168-migration-contract.sh"
 
 # Same no-clobber, self-checked write as the runner's write_json
 # (deploy/task168-stage-b-migrate.sh) — a stageBRecover receipt is exactly as
@@ -117,10 +124,10 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
   if [[ -z "${m11_row}" ]]; then
     # R-B: M11 never applied. Restore the pre-quiesce writer identified by
     # whichever receipt exists. quiesce.json (written after the backup
-    # completes) is preferred; quiesce-intent.json (blocking finding #1/#2,
-    # deploy/task168-stage-b-migrate.sh — written atomically BEFORE any
-    # writer is stopped) is the fallback for a kill during the backup
-    # window, when quiesce.json was never reached. Both carry the same
+    # completes) is preferred; quiesce-intent.json (deploy/task168-stage-b-migrate.sh
+    # — written atomically BEFORE any writer is stopped) is the fallback for
+    # a kill during the backup window, when quiesce.json was never reached.
+    # Both carry the same
     # preApiContainerId/preWorkerContainerId/preApiImage/preWorkerImage/
     # restartPolicyBefore/databaseIdentity fields (contract §4.1).
     if [[ -f "${quiesce}" ]]; then
@@ -183,8 +190,8 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       # post-commit check failure included — gets a real
       # MIGRATION_DIAGNOSIS_REQUIRED with a populated failureReason from that
       # same trap. So an existing receipt is never a stale placeholder to
-      # reconstruct over; superseding it (a prior round of this script did)
-      # would convert a real failure into a false _RECOVERED.
+      # reconstruct over; superseding it would convert a real failure into a
+      # false _RECOVERED.
       if [[ -f "${migration_receipt}" ]]; then
         existing_receipt_status="$(jq -r '.status // "unknown"' "${migration_receipt}" 2>/dev/null || echo unknown)"
         fail "migration-stage.json already reports ${existing_receipt_status} for ${ALPHA_SHA} — refusing to touch it; if it is MIGRATION_DIAGNOSIS_REQUIRED, see its failureReason and resolve manually before re-attempting"
@@ -266,65 +273,74 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       [[ "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "${pre_api_id}")" == no ]] || fail "the quiesced API container's restart policy is not 'no' — RECOVERY_DIAGNOSIS_REQUIRED"
       [[ "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "${pre_worker_id}")" == no ]] || fail "the quiesced worker container's restart policy is not 'no' — RECOVERY_DIAGNOSIS_REQUIRED"
 
-      # Same post-M11 catalog checks the runner itself performs
-      # (deploy/task168-stage-b-migrate.sh, r1-6 fix) — enough to prove M11's
-      # DDL and its guards actually landed, not merely that the ledger row
-      # exists.
-      legacy_tables="$(dbq "SELECT count(*) FROM (VALUES ('v1_tournament_fixtures'),('v1_tournament_fixture_results'),('v1_tournament_fixture_goals'),('v1_tournament_fixture_videos'),('v1_tournament_fixture_advancement_edges')) x(name) WHERE to_regclass(x.name) IS NOT NULL")"
-      [[ "${legacy_tables}" == 0 ]] || fail "M11 ledger row exists but legacy tables are still present — RECOVERY_DIAGNOSIS_REQUIRED (schema/ledger mismatch, do not write a recovered receipt)"
-      legacy_link_columns="$(dbq "SELECT count(*) FROM (VALUES ('tournament_fixture_id'),('fixture_id')) x(name) WHERE EXISTS (SELECT 1 FROM information_schema.columns c WHERE c.column_name=x.name AND c.table_name IN ('v1_games','v1_tournament_staff_fixture_scopes','v1_operation_audits'))")"
-      [[ "${legacy_link_columns}" == 0 ]] || fail "M11 ledger row exists but legacy link columns are still present — RECOVERY_DIAGNOSIS_REQUIRED"
-      retirement_functions="$(dbq "SELECT count(*) FROM pg_proc WHERE proname IN ('v1_reject_retired_tournament_fixture_write','v1_reject_retired_tournament_fixture_link')")"
-      [[ "${retirement_functions}" == 0 ]] || fail "M11 ledger row exists but retirement functions are still present — RECOVERY_DIAGNOSIS_REQUIRED"
-      retirement_triggers="$(dbq "SELECT count(*) FROM pg_trigger WHERE tgname IN ('v1_tournament_fixture_retired_write','v1_tournament_fixture_retired_row_write','v1_000_tournament_fixture_retired_link')")"
-      [[ "${retirement_triggers}" == 0 ]] || fail "M11 ledger row exists but retirement triggers are still present — RECOVERY_DIAGNOSIS_REQUIRED"
+      # Same post-M11 catalog checks the runner itself performs — enough to
+      # prove M11's DDL and its guards actually landed, not merely that the
+      # ledger row exists. Preserves this branch's own message wording (kept
+      # distinct from the runner's terser messages so existing operators and
+      # tests are not retargeted) via the violation code the shared check
+      # returns.
+      catalog_violation="$(post_m11_catalog_violation)" || case "${catalog_violation}" in
+        legacy_tables) fail "M11 ledger row exists but legacy tables are still present — RECOVERY_DIAGNOSIS_REQUIRED (schema/ledger mismatch, do not write a recovered receipt)" ;;
+        legacy_link_columns) fail "M11 ledger row exists but legacy link columns are still present — RECOVERY_DIAGNOSIS_REQUIRED" ;;
+        retirement_functions) fail "M11 ledger row exists but retirement functions are still present — RECOVERY_DIAGNOSIS_REQUIRED" ;;
+        retirement_triggers) fail "M11 ledger row exists but retirement triggers are still present — RECOVERY_DIAGNOSIS_REQUIRED" ;;
+        lineage_trigger) fail "M11 ledger row exists but the canonical lineage trigger is missing — RECOVERY_DIAGNOSIS_REQUIRED" ;;
+        games_guard_ck) fail "M11 ledger row exists but the games canonical source guard constraint is missing or changed — RECOVERY_DIAGNOSIS_REQUIRED" ;;
+        staff_guard_ck) fail "M11 ledger row exists but the staff scope canonical source guard constraint is missing or changed — RECOVERY_DIAGNOSIS_REQUIRED" ;;
+        audit_guard_ck) fail "M11 ledger row exists but the legacy audit canonical-source guard constraint remains — RECOVERY_DIAGNOSIS_REQUIRED" ;;
+        guard_fn_resolve) fail "M11 ledger row exists but v1_resolve_canonical_guard_game is missing or its signature changed — RECOVERY_DIAGNOSIS_REQUIRED" ;;
+        guard_fn_staff) fail "M11 ledger row exists but v1_guard_staff_fixture_scope is missing or its signature changed — RECOVERY_DIAGNOSIS_REQUIRED" ;;
+        guard_fn_lineage) fail "M11 ledger row exists but v1_guard_tournament_result_lineage_insert is missing or its signature changed — RECOVERY_DIAGNOSIS_REQUIRED" ;;
+        retired_enums) fail "M11 ledger row exists but retired enum types remain — RECOVERY_DIAGNOSIS_REQUIRED" ;;
+        processing_outbox) fail "M11 ledger row exists but processing outbox rows remain — RECOVERY_DIAGNOSIS_REQUIRED" ;;
+        *) fail "M11 ledger row exists but an unknown post-M11 catalog violation was found (${catalog_violation}) — RECOVERY_DIAGNOSIS_REQUIRED" ;;
+      esac
 
-      # Additional post-M11 checks the runner performs
-      # (deploy/task168-stage-b-migrate.sh) that the four checks above did
-      # not cover — the lineage-reparent guard trigger, the two CHECK constraints M11
-      # re-adds, the audit constraint it drops outright, the three guard
-      # functions it CREATE OR REPLACEs (signature, not just name), the
-      # retired enum types, and the outbox PROCESSING invariant. Re-running
-      # these closes the gap where R-A previously certified a genuinely
-      # broken post-M11 catalog as recovered.
-      lineage_trigger="$(dbq "SELECT count(*) FROM pg_trigger t WHERE t.tgname='v1_block_tournament_result_lineage_game_reparent' AND t.tgfoid=to_regprocedure('v1_block_tournament_result_lineage_game_reparent()') AND t.tgenabled IN ('O','A') AND NOT t.tgisinternal AND t.tgrelid='v1_games'::regclass")"
-      [[ "${lineage_trigger}" == 1 ]] || fail "M11 ledger row exists but the canonical lineage trigger is missing — RECOVERY_DIAGNOSIS_REQUIRED"
-      games_guard_ck="$(dbq "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='v1_games_canonical_source_guard_ck'")"
-      [[ "${games_guard_ck}" == "CHECK ((((source_type)::text = 'TEAM_MATCH'::text) AND (team_match_id IS NOT NULL)))" ]] || fail "M11 ledger row exists but the games canonical source guard constraint is missing or changed — RECOVERY_DIAGNOSIS_REQUIRED"
-      staff_scope_guard_ck="$(dbq "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='v1_staff_scope_canonical_source_guard_ck'")"
-      [[ "${staff_scope_guard_ck}" == "CHECK (((team_match_id IS NOT NULL) AND (tournament_id IS NOT NULL)))" ]] || fail "M11 ledger row exists but the staff scope canonical source guard constraint is missing or changed — RECOVERY_DIAGNOSIS_REQUIRED"
-      dropped_audit_ck="$(dbq "SELECT count(*) FROM pg_constraint WHERE conname='v1_operation_audits_canonical_source_guard_ck'")"
-      [[ "${dropped_audit_ck}" == 0 ]] || fail "M11 ledger row exists but the legacy audit canonical-source guard constraint remains — RECOVERY_DIAGNOSIS_REQUIRED"
-      guard_fn_resolve="$(dbq "SELECT count(*) FROM pg_proc p WHERE p.proname='v1_resolve_canonical_guard_game' AND pg_get_function_result(p.oid)='TABLE(team_match_id text, semantic_tournament_id text, home_team_id text, away_team_id text)'")"
-      [[ "${guard_fn_resolve}" == 1 ]] || fail "M11 ledger row exists but v1_resolve_canonical_guard_game is missing or its signature changed — RECOVERY_DIAGNOSIS_REQUIRED"
-      guard_fn_staff="$(dbq "SELECT count(*) FROM pg_proc p WHERE p.proname='v1_guard_staff_fixture_scope' AND pg_get_function_result(p.oid)='trigger'")"
-      [[ "${guard_fn_staff}" == 1 ]] || fail "M11 ledger row exists but v1_guard_staff_fixture_scope is missing or its signature changed — RECOVERY_DIAGNOSIS_REQUIRED"
-      guard_fn_lineage="$(dbq "SELECT count(*) FROM pg_proc p WHERE p.proname='v1_guard_tournament_result_lineage_insert' AND pg_get_function_result(p.oid)='trigger'")"
-      [[ "${guard_fn_lineage}" == 1 ]] || fail "M11 ledger row exists but v1_guard_tournament_result_lineage_insert is missing or its signature changed — RECOVERY_DIAGNOSIS_REQUIRED"
-      retired_enums="$(dbq "SELECT count(*) FROM pg_type WHERE typname IN ('V1TournamentGoalTeam','V1TournamentFixtureStatus')")"
-      [[ "${retired_enums}" == 0 ]] || fail "M11 ledger row exists but retired enum types remain — RECOVERY_DIAGNOSIS_REQUIRED"
-      processing_outbox="$(dbq "SELECT count(*) FROM v1_outbox_events WHERE status::text='PROCESSING'")"
-      [[ "${processing_outbox}" == 0 ]] || fail "M11 ledger row exists but processing outbox rows remain — RECOVERY_DIAGNOSIS_REQUIRED"
+      # The runner's own post-M11 ledger and `prisma migrate status` checks
+      # (task168-migration-contract.sh, sourced above — the SAME functions
+      # the runner calls, not a second copy that can drift) must all still
+      # pass: the ledger holds exactly M1-M11 with the manifest's checksums,
+      # no unresolved/unclassified migration attempt exists, and migrate
+      # status reports no drift against the pinned final image. A kill can
+      # leave M11 committed but a genuine ledger or schema problem uncaught
+      # by the catalog check above and the narrower marker/backup bindings
+      # earlier -- those only prove specific invariants and this run's own
+      # artifacts are self-consistent, not that the full migration history
+      # landed cleanly.
+      manifest_copy="${state_dir}/manifest.json"
+      [[ -f "${manifest_copy}" ]] || fail "M11 is applied but the manifest copy is missing for ${ALPHA_SHA} — RECOVERY_DIAGNOSIS_REQUIRED"
+      [[ "$(sha256sum "${manifest_copy}" | awk '{print $1}')" == "${manifest_sha}" ]] || fail "manifest copy no longer matches the quiesce receipt's manifestSha256 — RECOVERY_DIAGNOSIS_REQUIRED"
+      MANIFEST="${manifest_copy}"
+      RESOLVED_ATTEMPTS_SHA="$(jq -er '.database.task168.resolvedMigrationAttemptsSha256' "${MANIFEST}")" || fail "manifest copy is missing resolvedMigrationAttemptsSha256 — RECOVERY_DIAGNOSIS_REQUIRED"
+      FULL_MIGRATION_HISTORY="$(jq -cer '.database.task168.fullMigrationHistory' "${MANIFEST}")" || fail "manifest copy is missing fullMigrationHistory — RECOVERY_DIAGNOSIS_REQUIRED"
+      assert_resolved_attempts
+      assert_full_ledger true
+      ledger_after="$(ledger_rows)"
+      ledger_assert_exact 11 "${ledger_after}" "${M1[@]}" "${M8}" "${M9}" "${M10}" "${M11}"
 
-      # No existing-receipt case reaches here (fails closed above), so this
-      # `jq -n` always produces exactly one object — the prior 0-byte-receipt
-      # bug from a zero-output `select(length>0)` generator inside object
-      # construction cannot recur, since there is no longer a
-      # conditionally-empty argument here at all.
+      frozen_source_dir="${state_dir}/frozen-source"
+      [[ -d "${frozen_source_dir}" && -f "${frozen_source_dir}/schema.prisma" && -f "${frozen_source_dir}/migrations/migration_lock.toml" ]] \
+        || fail "M11 is applied but the frozen migration source is missing for ${ALPHA_SHA} — RECOVERY_DIAGNOSIS_REQUIRED (cannot verify prisma migrate status without it)"
+      [[ "${api_image}" =~ @sha256:[0-9a-f]{64}$ ]] || fail "quiesce.json's apiImage is not an immutable digest reference — RECOVERY_DIAGNOSIS_REQUIRED"
+      jq -e --arg api "${api_image}" '.services.v1_api.image == $api' <<<"$("${compose[@]}" config --format json)" >/dev/null \
+        || fail "the running compose config's v1_api image does not match the pinned final image — RECOVERY_DIAGNOSIS_REQUIRED (activate the correct release before retrying recovery)"
+      assert_prisma_migrate_status_clean "${frozen_source_dir}"
+
+      # No existing-receipt case reaches here (fails closed above), and every
+      # postVerification/catalogResult field is hardcoded 0 because
+      # post_m11_catalog_violation above already proved each one is 0 --
+      # re-threading the individual counts through would only reintroduce the
+      # duplicated-query surface this consolidation removes.
       jq -n \
         --arg sha "${ALPHA_SHA}" --arg apiImage "${api_image}" --arg dbId "${db_identity_actual}" \
         --arg schemaSha "${TASK168_FINAL_SCHEMA_SHA256}" --arg manifestSha "${manifest_sha}" \
         --arg m11 "${TASK168_M11}" --arg m11sha "${TASK168_M11_SHA256}" \
         --arg quiesceSha "${quiesce_sha}" --arg backupSha "${backup_sha_actual}" \
-        --argjson legacyTables "${legacy_tables}" --argjson legacyLinkColumns "${legacy_link_columns}" \
-        --argjson retirementTriggers "${retirement_triggers}" --argjson retirementFunctions "${retirement_functions}" \
-        --argjson lineageTrigger "${lineage_trigger}" --argjson retiredEnums "${retired_enums}" \
-        --argjson processingOutbox "${processing_outbox}" \
         '{schemaVersion:1,kind:"task168StageBMigration",status:"MIGRATION_COMMITTED_RECOVERED",stage:"stageBFinal",
           releaseSha:$sha,apiImage:$apiImage,databaseIdentity:$dbId,schemaSha256:$schemaSha,manifestSha256:$manifestSha,
           m11:$m11,m11Sha256:$m11sha,
-          postVerification:{legacyTables:$legacyTables,legacyLinkColumns:$legacyLinkColumns,retirementTriggers:$retirementTriggers,retirementFunctions:$retirementFunctions,lineageTrigger:$lineageTrigger,retiredEnums:$retiredEnums,processingOutbox:$processingOutbox},
-          recoveredFrom:{quiesceReceiptSha256:$quiesceSha,ledgerM11Row:"applied",catalogResult:{legacyTables:$legacyTables,legacyLinkColumns:$legacyLinkColumns,retirementTriggers:$retirementTriggers,retirementFunctions:$retirementFunctions}},
+          postVerification:{legacyTables:0,legacyLinkColumns:0,retirementTriggers:0,retirementFunctions:0,lineageTrigger:1,retiredEnums:0,processingOutbox:0},
+          recoveredFrom:{quiesceReceiptSha256:$quiesceSha,ledgerM11Row:"applied",catalogResult:{legacyTables:0,legacyLinkColumns:0,retirementTriggers:0,retirementFunctions:0}},
           preM11BackupSha256:$backupSha,completedAt:(now|todate)}' \
       | write_json_atomic "${migration_receipt}" \
           '.status=="MIGRATION_COMMITTED_RECOVERED" and .kind=="task168StageBMigration" and .stage=="stageBFinal" and (.releaseSha|strings|test("^[0-9a-f]{40}$")) and .m11Sha256=="'"${TASK168_M11_SHA256}"'" and (.preM11BackupSha256|strings|test("^[0-9a-f]{64}$")) and .postVerification.legacyTables==0 and .postVerification.retiredEnums==0 and .postVerification.processingOutbox==0'

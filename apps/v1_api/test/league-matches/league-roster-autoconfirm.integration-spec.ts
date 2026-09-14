@@ -10,6 +10,9 @@ import {
   scheduleLeagueRosterAutoConfirm,
 } from '../../src/jobs/league-roster/league-roster-autoconfirm.service';
 import { seedLeagueOnTournamentAxis } from '../fixtures/league-on-tournament-axis.fixture';
+import { GamesService } from '../../src/games/games.service';
+import { createLeagueFixture, loadLeagueTeamRosters } from '../../src/league-matches/league-fixture-creation';
+import { resolveTeamMatchCompetitionConfig } from '../../src/team-matches/resolve-team-match-competition-config';
 
 /**
  * D10 (Task 164 BE-4b) — 시즌 시작 자동 명단 확정.
@@ -254,24 +257,44 @@ describe('D10 리그 명단 자동 확정', () => {
     expect(await prisma.v1TournamentPlayer.count({ where: { registrationId: registration.id } })).toBe(3);
   });
 
-  it('대진이 이미 생성된 리그는 건드리지 않는다 (대진 생성 전에만 돈다)', async () => {
-    const { league, registration, startsOn, team } = await seedLeague({ members: 3 });
-    await prisma.v1TeamMatch.create({
-      data: {
-        hostTeamId: team.id,
+  it('대진이 이미 있는 리그도 채우고, 시작 전 경기 명단을 채운 명단으로 맞춘다 (Task 170 D1′)', async () => {
+    const { league, registration, startsOn, team } = await seedLeague({ members: 2 });
+    seq += 1;
+    const opponent = await prisma.v1Team.create({
+      data: { ownerUserId: adminUserId, sportId, regionId, name: `t164-opp-${suiteId}-${seq}` },
+    });
+    await makeMember(opponent.id, { complete: false });
+    const config = await resolveTeamMatchCompetitionConfig(prisma, sportId);
+    const teamMatchId = await prisma.$transaction(async (tx) => {
+      const teams = await loadLeagueTeamRosters(tx, league.id, [team.id, opponent.id]);
+      return createLeagueFixture(tx, app.get(GamesService), {
+        leagueId: league.id,
+        adminUserId,
         sportId,
         regionId,
+        competitionConfigId: config!.id,
         title: '이미 만든 대진',
-        startAt: startsOn,
         placeName: '테스트 구장',
-        createdByUserId: adminUserId,
-        leagueId: league.id,
-      },
+        startAt: new Date(Date.now() + 7 * 86_400_000),
+        endAt: null,
+        home: teams.get(team.id)!,
+        away: teams.get(opponent.id)!,
+      });
     });
 
     await run(league.id, startsOn);
 
-    expect(await prisma.v1TournamentPlayer.count({ where: { registrationId: registration.id } })).toBe(0);
+    const players = await prisma.v1TournamentPlayer.findMany({ where: { registrationId: registration.id, removedAt: null } });
+    expect(players).toHaveLength(2);
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { teamMatchId } });
+    const side = await prisma.v1GameSide.findFirstOrThrow({ where: { gameId: game.id, teamId: team.id } });
+    const latest = await prisma.v1GameLineup.findFirstOrThrow({
+      where: { gameId: game.id, sideId: side.id, invalidatedAt: null },
+      orderBy: { revision: 'desc' },
+    });
+    expect(latest.revision).toBe(2);
+    const participants = await prisma.v1GameParticipant.findMany({ where: { lineupId: latest.id } });
+    expect(participants.map((row) => row.userId).sort()).toEqual(players.map((player) => player.userId).sort());
   });
 
   it('같은 리그의 두 팀에 동시 소속된 사용자는 한쪽 명단에만 들어간다', async () => {

@@ -31,8 +31,7 @@
  * **예시에 `realName` 이 없는 것도 의도다** — 표시에 쓰지 않는 값이라 애초에 가져오지
  * 않는다. 이 예시를 복사하는 새 호출부가 실명을 다시 들여오면 안 된다.
  *
- * 팀 매치·리그 대진은 이 함수를 쓰지 않는다 — 그쪽 입력은 팀 멤버십이라 `realName` 필드
- * 자체가 없다. 폴백 문자열은 이제 양쪽이 같다.
+ * 리그 대진(`league-fixture-creation.ts`)도 참가 명단 선수와 팀 멤버십 모두 이 함수로 이름을 짓는다.
  */
 export function participantDisplayName(player: {
   /**

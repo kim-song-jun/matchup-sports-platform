@@ -822,7 +822,9 @@ async function appendIdentityEvent(
           // 복사를 실행한 상대팀 팀장의 이름을 빌리지 않는다.
           // `system_actor` 는 TEXT 컬럼이고 트리거가 값을 검사하는 것은 EXPIRED 뿐이라
           // (20260729000100 migration 의 v1_guard_identity_event) 스키마 변경이 필요 없다.
-          | 'LINEUP_REVISION_COPY';
+          | 'LINEUP_REVISION_COPY'
+          // 리그 참가 명단이 바뀌어 시작 전 경기 명단을 다시 맞출 때(league-roster-sync.ts).
+          | 'LEAGUE_ROSTER_SYNC';
       }
   ),
 ) {
@@ -877,7 +879,8 @@ export async function createRosterAssertedIdentityLink(
           | 'GAME_END_DERIVER'
           | 'GAME_BACKFILL'
           | 'PROJECTION_REPAIR'
-          | 'LINEUP_REVISION_COPY';
+          | 'LINEUP_REVISION_COPY'
+          | 'LEAGUE_ROSTER_SYNC';
       },
   reason: string,
 ): Promise<void> {
@@ -918,6 +921,48 @@ export async function createRosterAssertedIdentityLink(
       version: 1,
       effectiveFrom: identityEvent.effectiveAt,
     },
+  });
+}
+
+/**
+ * 방금 만든 게임의 명단 참가자들에게 ROSTER_ASSERTED 연결을 한 번에 만든다. 새 참가자라 기존
+ * 연결·이벤트가 있을 수 없어 `createRosterAssertedIdentityLink` 의 두 조회가 필요 없고, 인원과
+ * 무관하게 statement 2건이다 — 리그 대진 일괄 생성은 45초 트랜잭션 하나에 수천 명을 넣는다.
+ * `effective_at` 은 트리거(v1_guard_identity_event)가 덮어쓰므로 돌려받은 값을 현재 연결에 싣는다.
+ */
+export async function createSourceRosterIdentityLinks(
+  tx: Transaction,
+  rows: ReadonlyArray<{ participantId: string; userId: string }>,
+  actor: Parameters<typeof createRosterAssertedIdentityLink>[3],
+  reason: string,
+): Promise<void> {
+  if (rows.length === 0) return;
+  const events = await tx.v1ParticipantIdentityLinkEvent.createManyAndReturn({
+    data: rows.map(({ participantId, userId }) => {
+      const linkId = randomUUID();
+      return {
+        participantId,
+        linkId,
+        eventVersion: 1,
+        requestId: linkId,
+        action: V1IdentityLinkAction.ROSTER_ASSERTED,
+        userId,
+        actorType: actor.actorType === 'USER' ? V1IdentityActorType.USER : V1IdentityActorType.SYSTEM,
+        actorUserId: actor.actorType === 'USER' ? actor.actorUserId : null,
+        systemActor: actor.actorType === 'SYSTEM' ? actor.systemActor : null,
+        reason,
+      };
+    }),
+    select: { participantId: true, linkId: true, userId: true, effectiveAt: true },
+  });
+  await tx.v1ParticipantIdentityLinkCurrent.createMany({
+    data: events.map((event) => ({
+      participantId: event.participantId,
+      linkId: event.linkId,
+      userId: event.userId,
+      version: 1,
+      effectiveFrom: event.effectiveAt,
+    })),
   });
 }
 
@@ -1099,6 +1144,7 @@ export class GamesService {
       }
 
       const visibility = jsonObject(config.visibility);
+      const rosterLinks: Array<{ participantId: string; userId: string }> = [];
       const game = await persistCanonicalGameAggregate(tx, {
         sourceType: input.sourceType,
         sourceId: input.sourceId,
@@ -1108,8 +1154,9 @@ export class GamesService {
         periodCount: this.periodCount(config.periods),
         visibilityMode: visibility.mode === 'status_only' ? V1VisibilityMode.STATUS_ONLY : V1VisibilityMode.LIVE,
       }, async (participantId, userId) => {
-        await createRosterAssertedIdentityLink(tx, participantId, userId, context.actor, 'source_roster');
+        rosterLinks.push({ participantId, userId });
       });
+      await createSourceRosterIdentityLinks(tx, rosterLinks, context.actor, 'source_roster');
 
       const result: GameCreationResult = {
         gameId: game.id,

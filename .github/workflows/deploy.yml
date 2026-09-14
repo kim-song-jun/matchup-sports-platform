@@ -433,6 +433,25 @@ jobs:
             src/config/game-operation-flags-seed.cli.ts
           echo "migration chain OK — empty-DB replay clean, zero schema drift"
 
+      # deploy/task168-final-steady-migrate.sh's --check-only mode against a
+      # REAL Postgres with the real M1-M11 migrations actually applied (the
+      # v1_migrate_check DB the step above just built via `prisma migrate
+      # deploy`). scripts/qa/test-task168-final-steady.sh and
+      # scripts/qa/test-task168-alpha-steady-wiring.sh only fake
+      # `docker compose ... exec v1_postgres psql`, so neither can catch a
+      # mismatch between the tokens those fakes hand back and what Postgres
+      # actually returns for the SQL that produces them -- which is exactly
+      # what broke once: `boolean::text` returns 'true'/'false' on real
+      # Postgres, not the 't'/'f' the fakes always fed the script.
+      - name: Task168 final-steady real-Postgres check-only test
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: teameet_test
+          PGPASSWORD: teameet_test
+          PGDATABASE: v1_migrate_check
+        run: bash scripts/qa/test-task168-final-steady-real-db.sh
+
       - name: V1 API unit tests
         run: pnpm --filter v1_api test
 

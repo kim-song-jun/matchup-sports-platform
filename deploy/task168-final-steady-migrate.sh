@@ -74,11 +74,15 @@ done < <(find "${SOURCE_DIR}/apps/v1_api/prisma/migrations" -mindepth 1 -maxdept
 [[ "${SOURCE_SHA[${M11_NAME}]}" == "${M11_SHA}" ]] || fail 'M11 checksum in the candidate source tree does not match the pinned value'
 
 # ── live DB ledger (L1's left-hand side) ────────────────────────────────────
+# Postgres's `boolean::text` cast (and any boolean forced to text by `||`
+# concatenation) yields 'true'/'false', not the 't'/'f' psql shows for a bare
+# boolean column -- CASE WHEN ... THEN 't' ELSE 'f' END is what actually
+# emits the single-char tokens the parsing below compares against.
 DB_ID="$(db_identity)" || fail 'target DB identity unavailable'
-migrations_table_exists="$(dbq "SELECT (to_regclass('public.\"_prisma_migrations\"') IS NOT NULL)::text")" || fail 'could not check for the Prisma migrations table'
+migrations_table_exists="$(dbq "SELECT CASE WHEN to_regclass('public.\"_prisma_migrations\"') IS NOT NULL THEN 't' ELSE 'f' END")" || fail 'could not check for the Prisma migrations table'
 rows=''
 if [[ "${migrations_table_exists}" == t ]]; then
-  rows="$(dbq "SELECT migration_name || '|' || COALESCE(checksum,'') || '|' || (finished_at IS NOT NULL)::text || '|' || (rolled_back_at IS NOT NULL)::text FROM \"_prisma_migrations\" ORDER BY migration_name")" || fail 'ledger query failed'
+  rows="$(dbq "SELECT migration_name || '|' || COALESCE(checksum,'') || '|' || CASE WHEN finished_at IS NOT NULL THEN 't' ELSE 'f' END || '|' || CASE WHEN rolled_back_at IS NOT NULL THEN 't' ELSE 'f' END FROM \"_prisma_migrations\" ORDER BY migration_name")" || fail 'ledger query failed'
 fi
 
 declare -A APPLIED_SHA
@@ -188,7 +192,7 @@ docker exec -u app "${c}" sh -ceu 'cd /app/apps/v1_api && ./node_modules/.bin/pr
 
 # Re-verify L1 holds after the deploy: every row the deploy just applied must
 # still resolve to a name+checksum pair from the same candidate source tree.
-rows_after="$(dbq "SELECT migration_name || '|' || COALESCE(checksum,'') || '|' || (finished_at IS NOT NULL)::text || '|' || (rolled_back_at IS NOT NULL)::text FROM \"_prisma_migrations\" ORDER BY migration_name")" || fail 'post-migrate ledger query failed'
+rows_after="$(dbq "SELECT migration_name || '|' || COALESCE(checksum,'') || '|' || CASE WHEN finished_at IS NOT NULL THEN 't' ELSE 'f' END || '|' || CASE WHEN rolled_back_at IS NOT NULL THEN 't' ELSE 'f' END FROM \"_prisma_migrations\" ORDER BY migration_name")" || fail 'post-migrate ledger query failed'
 while IFS='|' read -r name checksum finished rolledback; do
   [[ -n "${name}" ]] || continue
   [[ "${finished}" == t && "${rolledback}" == f ]] || continue

@@ -22,12 +22,33 @@
 # numbers (not hardcoded), a mutation applied to a scratch copy of
 # deploy-alpha.sh is picked up automatically when re-extracted and rerun.
 #
+# The extracted segment ends right after activation (source_activated /
+# runtime_mutated flip to true) and does NOT reach the `--migrate` call
+# further down the file -- that stretch is unreachable here for the same
+# reason the whole script can't run end-to-end (the /proc-reading preflight
+# block, `aws ecr`, and the real EC2 release-state layout sit in between).
+# The retired StageA runner used to set task168_irreversible=true right
+# there, and if that line ever comes back in the steady path, the ERR trap
+# (restore_on_failure) skips restore_active_release on a `--migrate` failure
+# -- the D-5 "half-switched, cannot restore" deploy -- with nothing in this
+# file's segment-based checks able to see it. So this file also runs a
+# static, whole-file assertion (assert_no_task168_irreversible_reassignment,
+# below) that deploy-alpha.sh contains no `task168_irreversible=true`
+# assignment anywhere, not only within the extracted segment: it is checked
+# against the live file as a baseline, and against a scratch mutant with the
+# assignment reinserted right before the --migrate call (mutation 3) to
+# prove it actually catches that specific regression.
+#
 # Expected red counts per mutation, measured at the bottom of this file:
 #   1. The check-only call moved to AFTER activate_alpha_release_source:
 #      the "no StageB receipt" negative now reaches activation anyway.
 #   2. `task168_irreversible=true` inserted right after
 #      activate_alpha_release_source: the legitimate positive scenario now
 #      leaves task168_irreversible=true instead of false.
+#   3. `task168_irreversible=true` inserted right before the `--migrate`
+#      call (outside the extracted segment, past deploy-alpha.sh's
+#      /proc/aws/EC2-only stretch): the whole-file static assertion must
+#      catch this even though the segment-based checks above cannot reach it.
 set -Eeuo pipefail
 
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -70,11 +91,29 @@ extract_segment() {
   sed -n "${start_line},${end_line}p" "${script}" > "${out}"
 }
 
+# assert_no_task168_irreversible_reassignment SCRIPT -- fails (nonzero,
+# message on stderr) if SCRIPT contains a `task168_irreversible=true`
+# assignment anywhere. The only legitimate assignment in the whole file is
+# the `=false` initializer; a bare read (`"${task168_irreversible}" ==
+# true`) does not match this pattern because `==` and the surrounding
+# `"${...}"` break the literal `task168_irreversible=true` substring.
+assert_no_task168_irreversible_reassignment() {
+  local script="$1"
+  local hits
+  hits="$(grep -n 'task168_irreversible=true' "${script}" || true)"
+  [[ -z "${hits}" ]] || { printf '%s\n' "${hits}" >&2; return 1; }
+}
+
 readonly TEST_ROOT="$(mktemp -d)"
 trap 'rm -rf "${TEST_ROOT}"' EXIT
 
 extract_segment "${DEPLOY_ALPHA}" "${TEST_ROOT}/baseline-segment.sh" ||
   { echo "[task168-alpha-steady-wiring] FAILED: baseline segment extraction" >&2; exit 1; }
+
+if ! assert_no_task168_irreversible_reassignment "${DEPLOY_ALPHA}"; then
+  echo "[task168-alpha-steady-wiring] FAILED: deploy-alpha.sh assigns task168_irreversible=true somewhere -- the steady path must never do this (see :75 and :124-125)" >&2
+  exit 1
+fi
 
 # ── fake docker (same convention as test-task168-final-steady.sh; the
 #    check-only call inside the segment invokes the real steady script,
@@ -263,7 +302,7 @@ echo "[task168-alpha-steady-wiring] baseline negative + positive passed"
 
 # ── mutation 1: move the check-only call to AFTER activate_alpha_release_source
 mutation_reds=0
-mutation_total=2
+mutation_total=3
 scratch1="${TEST_ROOT}/mut-check-moved-after-activate.sh"
 python3 - "${DEPLOY_ALPHA}" "${scratch1}" <<'PYEOF'
 import sys
@@ -319,9 +358,29 @@ else
   cat "${CALL_LOG}" >&2
 fi
 
-echo "[task168-alpha-steady-wiring] mutation reds: ${mutation_reds}/${mutation_total} (expected 2/2)"
-if [[ "${mutation_reds}" -ne 2 ]]; then
-  echo "[task168-alpha-steady-wiring] FAILED: expected both mutations to weaken the guarantee as documented" >&2
+# ── mutation 3: task168_irreversible=true re-inserted right before the
+#    `--migrate` call -- past the /proc/aws/EC2-only stretch the extracted
+#    segment cannot reach, so only the whole-file static assertion (not the
+#    segment-based checks above) can catch this one.
+scratch3="${TEST_ROOT}/mut-irreversible-before-migrate.sh"
+python3 - "${DEPLOY_ALPHA}" "${scratch3}" <<'PYEOF'
+import sys
+src_path, out_path = sys.argv[1], sys.argv[2]
+lines = open(src_path, encoding='utf-8').read().split('\n')
+idx = next(i for i, l in enumerate(lines) if l.startswith('bash "${ALPHA_SOURCE_DIR}/deploy/task168-final-steady-migrate.sh" \\') and lines[i + 1].strip().startswith('--migrate'))
+lines.insert(idx, 'task168_irreversible=true')
+open(out_path, 'w', encoding='utf-8').write('\n'.join(lines))
+PYEOF
+if assert_no_task168_irreversible_reassignment "${scratch3}"; then
+  echo "[mutation irreversible-before-migrate] NOT red -- the static assertion missed a reassignment right before --migrate" >&2
+else
+  echo "[mutation irreversible-before-migrate] red (static assertion caught task168_irreversible=true right before --migrate)"
+  mutation_reds=$((mutation_reds + 1))
+fi
+
+echo "[task168-alpha-steady-wiring] mutation reds: ${mutation_reds}/${mutation_total} (expected 3/3)"
+if [[ "${mutation_reds}" -ne 3 ]]; then
+  echo "[task168-alpha-steady-wiring] FAILED: expected all three mutations to weaken the guarantee as documented" >&2
   exit 1
 fi
 

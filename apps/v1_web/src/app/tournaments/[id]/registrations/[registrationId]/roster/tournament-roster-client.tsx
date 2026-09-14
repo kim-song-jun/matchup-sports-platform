@@ -35,11 +35,12 @@ import type {
 import {
   getRosterDeadlineState,
   isTournamentRosterMutable,
+  tournamentRosterClosedMessage,
   type RosterDeadlineState,
 } from '@/lib/roster-editability';
 
 // 이 파일에서 가져다 쓰던 소비처(테스트 포함)가 그대로 돌아가게 이름만 다시 내보낸다.
-export { getRosterDeadlineState, isTournamentRosterMutable, type RosterDeadlineState };
+export { getRosterDeadlineState, isTournamentRosterMutable, tournamentRosterClosedMessage, type RosterDeadlineState };
 
 /* ── Helpers ── */
 
@@ -103,14 +104,17 @@ export function getRegistrationDeadlineState(
 export function TournamentRosterDeadlineCard({
   deadlineAt,
   isTournamentRosterClosed = false,
+  tournamentStatus,
   isRosterLocked,
   isRosterEditBlockedByStatus,
   isRosterDeadlineBlocked,
   nowMs,
 }: {
   deadlineAt: string | null;
-  /** 대회가 완료·취소돼 누구도 명단을 못 고치는 상태 — 잠금·마감보다 우선한다(서버 assertRosterMutable과 동일 순서). */
+  /** 대회 상태 때문에 누구도 명단을 못 고치는 상태 — 잠금·마감보다 우선한다(서버 assertRosterMutable과 동일 순서). */
   isTournamentRosterClosed?: boolean;
+  /** 막힌 이유 문구를 고르는 데 쓴다(종료·취소 ≠ 아직 공개 전). */
+  tournamentStatus?: string | null;
   isRosterLocked: boolean;
   isRosterEditBlockedByStatus: boolean;
   isRosterDeadlineBlocked: boolean;
@@ -134,7 +138,7 @@ export function TournamentRosterDeadlineCard({
           ? '제출 마감'
           : '수정 가능';
   const rosterEditMessage = isTournamentRosterClosed
-    ? '대회가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.'
+    ? tournamentRosterClosedMessage(tournamentStatus)
     : isRosterLocked
       ? '선수 명단이 운영진에 의해 마감됐어요.'
       : isRosterEditBlockedByStatus
@@ -1134,7 +1138,7 @@ export function TournamentRosterPageClient({
   // 종료·취소된 대회는 잠금·마감 예외와 무관하게 누구도 명단을 못 고친다 — 서버
   // assertRosterMutable의 첫 번째 검사와 같은 순서(감사 finding #1). 이 값이 아직 로딩 중이면
   // (tournament === undefined) 기존처럼 막지 않는다.
-  const isTournamentRosterClosed = !isTournamentRosterMutable(tournament?.status);
+  const isTournamentRosterClosed = !isTournamentRosterMutable(tournament);
   const isRosterLocked = Boolean(registration?.rosterLockedAt);
   const isRosterEditBlockedByStatus =
     registration?.status === 'cancel_requested' || registration?.status === 'cancelled';
@@ -1319,6 +1323,7 @@ export function TournamentRosterPageClient({
           <TournamentRosterDeadlineCard
             deadlineAt={tournament.registrationDeadlineAt}
             isTournamentRosterClosed={isTournamentRosterClosed}
+            tournamentStatus={tournament?.status}
             isRosterLocked={isRosterLocked}
             isRosterEditBlockedByStatus={isRosterEditBlockedByStatus}
             isRosterDeadlineBlocked={rosterDeadlineState.blocked}
@@ -1343,10 +1348,7 @@ export function TournamentRosterPageClient({
         */}
         {isTournamentRosterClosed ? (
           <div style={{ marginBottom: 16 }}>
-            <AlertBanner
-              message="대회가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요."
-              tone="info"
-            />
+            <AlertBanner message={tournamentRosterClosedMessage(tournament?.status)} tone="info" />
           </div>
         ) : isRosterLocked && rosterDeadlineState.overridden ? (
           <div style={{ marginBottom: 16 }}>

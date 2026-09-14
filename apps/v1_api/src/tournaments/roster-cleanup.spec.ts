@@ -37,19 +37,21 @@ describe('removeUserFromActiveRosters', () => {
       {
         id: 'player-locked',
         registrationId: 'reg-locked',
-        registration: { rosterLockedAt: new Date('2026-08-01T00:00:00.000Z'), tournamentId: 'tournament-1' },
+        registration: { rosterLockedAt: new Date('2026-08-01T00:00:00.000Z'), tournamentId: 'tournament-1', teamId: 'team-1' },
       },
       {
         id: 'player-unlocked',
         registrationId: 'reg-unlocked',
-        registration: { rosterLockedAt: null, tournamentId: 'tournament-1' },
+        registration: { rosterLockedAt: null, tournamentId: 'tournament-1', teamId: 'team-2' },
       },
     ]);
     const updateMany = jest.fn().mockResolvedValue({ count: 2 });
     const createMany = jest.fn().mockResolvedValue({ count: 1 });
+    const gameFindMany = jest.fn().mockResolvedValue([]);
     const tx = {
       v1TournamentPlayer: { findMany, updateMany },
       v1StatusChangeLog: { createMany },
+      v1Game: { findMany: gameFindMany },
     } as unknown as Prisma.TransactionClient;
     const removedAt = new Date('2026-08-07T00:00:00.000Z');
 
@@ -70,6 +72,10 @@ describe('removeUserFromActiveRosters', () => {
         }),
       ],
     });
+    // 팀을 떠난 사람이 리그의 시작 전 경기 명단에 남지 않도록, 명단이 줄어든 팀마다 한 번씩 맞춘다.
+    expect(
+      gameFindMany.mock.calls.map(([args]) => `${args.where.teamMatch.leagueId}:${args.where.sides.some.teamId}`).sort(),
+    ).toEqual(['tournament-1:team-1', 'tournament-1:team-2']);
   });
 
   it('잠긴 신청건이 없으면 감사 로그를 남기지 않는다', async () => {
@@ -77,7 +83,7 @@ describe('removeUserFromActiveRosters', () => {
       {
         id: 'player-unlocked',
         registrationId: 'reg-unlocked',
-        registration: { rosterLockedAt: null, tournamentId: 'tournament-1' },
+        registration: { rosterLockedAt: null, tournamentId: 'tournament-1', teamId: 'team-1' },
       },
     ]);
     const updateMany = jest.fn().mockResolvedValue({ count: 1 });
@@ -85,6 +91,7 @@ describe('removeUserFromActiveRosters', () => {
     const tx = {
       v1TournamentPlayer: { findMany, updateMany },
       v1StatusChangeLog: { createMany },
+      v1Game: { findMany: jest.fn().mockResolvedValue([]) },
     } as unknown as Prisma.TransactionClient;
 
     await removeUserFromActiveRosters(tx, 'user-1', { at: new Date('2026-08-07T00:00:00.000Z') });

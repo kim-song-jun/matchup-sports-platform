@@ -56,6 +56,8 @@ services:
       APPLE_SIGN_IN_AUDIENCES: kr.co.teameet.alpha
       WORKER_PORT: ${WORKER_PORT:-8122}
       FRONTEND_URL: https://alpha.teameet.co.kr
+      # 리그 명단 자동 확정 잡은 이 값이 "false" 일 때만 돈다. 프로덕션은 alpha 실측 뒤 따로 켠다(Task 170 D3).
+      DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON: "false"
     healthcheck:
       test:
         [

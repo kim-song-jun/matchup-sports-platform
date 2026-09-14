@@ -12,7 +12,7 @@ import {
   V1TournamentRegistration,
   V1TournamentStatus,
 } from '@prisma/client';
-import { isRosterMutableTournamentStatus } from './roster-cleanup';
+import { isRosterMutableTournament } from './roster-cleanup';
 import { AdminContextService, type V1ActiveAdmin } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
@@ -24,6 +24,7 @@ import {
   writeJerseyNumber,
 } from './tournament-player-jersey';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from './tournament-surface-lookup';
+import { syncLeagueRosterLineups } from '../league-matches/league-roster-sync';
 
 /**
  * 명단 표면은 **대회와 리그를 함께** 받는다.
@@ -139,7 +140,7 @@ export class TournamentPlayersService {
 
   private assertRosterMutable(
     registration: V1TournamentRegistration,
-    tournament: { rosterDeadlineAt: Date | null; status: V1TournamentStatus },
+    tournament: { rosterDeadlineAt: Date | null } & Parameters<typeof isRosterMutableTournament>[0],
     // 어드민 경로 전용. 잠금(rosterLockedAt)과 마감(rosterDeadlineAt)은 **운영진이 풀라고
     // 있는 장치**이므로 어드민은 넘길 수 있다(이미 roster-lock / roster-deadline-override
     // 엔드포인트가 같은 목적으로 존재한다). 반면 취소된 신청은 어드민도 건드릴 수 없다 —
@@ -149,10 +150,13 @@ export class TournamentPlayersService {
     // 완료·취소된 대회의 명단은 누구도 못 바꾼다. 수상 내역·리뷰·기록이 이 명단을 참조하므로
     // 지난 대회의 선수를 넣고 빼면 과거 기록이 가리키는 대상이 달라진다 — 탈퇴 정리가 완료
     // 대회를 건너뛰는 것과 같은 불변식이다(roster-cleanup.ts 주석 참조).
-    if (!isRosterMutableTournamentStatus(tournament.status)) {
+    if (!isRosterMutableTournament(tournament)) {
       throw new ConflictException({
         code: 'TOURNAMENT_ROSTER_NOT_MUTABLE',
-        message: '종료되었거나 취소된 대회는 선수 명단을 수정할 수 없어요.',
+        message:
+          tournament.status === 'completed' || tournament.status === 'cancelled'
+            ? '종료되었거나 취소된 대회는 선수 명단을 수정할 수 없어요.'
+            : '대회가 아직 공개되지 않아 선수 명단을 수정할 수 없어요.',
       });
     }
     if (!options.allowLockedAndExpired && registration.rosterLockedAt) {
@@ -230,6 +234,7 @@ export class TournamentPlayersService {
         rosterDeadlineAt: true,
         genderCategory: true,
         status: true,
+        kind: true,
       },
     });
     if (!tournament) {
@@ -314,7 +319,7 @@ export class TournamentPlayersService {
         // 잠금·마감과 달리 이 둘은 어드민도 못 넘긴다. lockAndLoadMutableRegistration 이
         // 이미 같은 판정으로 던지므로 여기까지 오면 항상 true 지만, 조건 목록을 한 곳에
         // 모아 두기 위해 함께 넘긴다.
-        tournamentMutable: isRosterMutableTournamentStatus(current.tournament.status),
+        tournamentMutable: isRosterMutableTournament(current.tournament),
         registrationMutable:
           current.registration.status !== 'cancel_requested' &&
           current.registration.status !== 'cancelled',
@@ -412,6 +417,8 @@ export class TournamentPlayersService {
       if (dto.jerseyNumber !== undefined) {
         await writeJerseyNumber(tx, saved.id, dto.jerseyNumber);
       }
+      // 리그면 시작 전 경기 명단을 새 참가 명단에 맞춘다(대회는 대상 경기가 없어 no-op).
+      await syncLeagueRosterLineups(tx, { leagueId: tournamentId, teamId: current.registration.teamId });
       return saved;
     });
   }
@@ -430,7 +437,7 @@ export class TournamentPlayersService {
     // 삭제도 리그의 마감·상태 가드를 그대로 받는다.
     const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
-      select: { rosterDeadlineAt: true, status: true },
+      select: { rosterDeadlineAt: true, status: true, kind: true },
     });
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
@@ -438,6 +445,7 @@ export class TournamentPlayersService {
     this.assertRosterMutable(registration, {
       rosterDeadlineAt: tournament.rosterDeadlineAt,
       status: tournament.status,
+      kind: tournament.kind,
     });
 
     const removed = await this.prisma.$transaction(async (tx) => {
@@ -448,10 +456,12 @@ export class TournamentPlayersService {
       if (!player) {
         throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
       }
-      return tx.v1TournamentPlayer.update({
+      const removedPlayer = await tx.v1TournamentPlayer.update({
         where: { id: playerId },
         data: { removedAt: new Date() },
       });
+      await syncLeagueRosterLineups(tx, { leagueId: tournamentId, teamId: registration.teamId });
+      return removedPlayer;
     });
 
     return this.serializePlayer(removed);
@@ -487,7 +497,7 @@ export class TournamentPlayersService {
     // 번호가 바뀌어 이미 인쇄된 명단과 어긋난다.
     const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
-      select: { rosterDeadlineAt: true, status: true },
+      select: { rosterDeadlineAt: true, status: true, kind: true },
     });
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
@@ -495,6 +505,7 @@ export class TournamentPlayersService {
     this.assertRosterMutable(registration, {
       rosterDeadlineAt: tournament.rosterDeadlineAt,
       status: tournament.status,
+      kind: tournament.kind,
     });
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -531,7 +542,7 @@ export class TournamentPlayersService {
     // 수정도 리그의 마감·상태 가드를 그대로 받는다.
     const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
-      select: { rosterDeadlineAt: true, status: true },
+      select: { rosterDeadlineAt: true, status: true, kind: true },
     });
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
@@ -539,6 +550,7 @@ export class TournamentPlayersService {
     this.assertRosterMutable(registration, {
       rosterDeadlineAt: tournament.rosterDeadlineAt,
       status: tournament.status,
+      kind: tournament.kind,
     });
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -710,7 +722,7 @@ export class TournamentPlayersService {
         status: true,
         tournamentId: true,
         tournament: {
-          select: { genderCategory: true, maxPlayers: true, deletedAt: true, status: true },
+          select: { genderCategory: true, maxPlayers: true, deletedAt: true, status: true, kind: true },
         },
       },
     });
@@ -765,7 +777,7 @@ export class TournamentPlayersService {
     // 빼놓으면 모든 팀원이 "선택 가능" 으로 보이고 눌러야 409 를 받는다. 특히 정원이 찬 경우가
     // 그랬는데, 유령 명단 한 자리 때문에 팀이 선수를 못 넣던 2026-08-03 사고가 바로 이 모양이었다.
     // (잠금·마감은 어드민이 넘길 수 있으므로 여기서 막지 않는다 — assertRosterMutable 주석 참조.)
-    const tournamentClosed = !isRosterMutableTournamentStatus(registration.tournament.status);
+    const tournamentClosed = !isRosterMutableTournament(registration.tournament);
     const registrationCancelled =
       registration.status === 'cancel_requested' || registration.status === 'cancelled';
     const maxPlayers = registration.tournament.maxPlayers;
@@ -827,7 +839,7 @@ export class TournamentPlayersService {
           registrationId: true,
           userId: true,
           realName: true,
-          registration: { select: { tournamentId: true } },
+          registration: { select: { tournamentId: true, teamId: true } },
         },
       });
       if (!player) {
@@ -873,6 +885,10 @@ export class TournamentPlayersService {
       // 제거로 성별 비율이 바뀌어 쿼터를 벗어날 수도 있다(예: 여성 최소 인원 미달) —
       // reconcileGenderQuotaAfterRosterChange 주석 참조.
       await this.reconcileGenderQuotaAfterRosterChange(tx, player.registrationId, tournament);
+      await syncLeagueRosterLineups(tx, {
+        leagueId: player.registration.tournamentId,
+        teamId: player.registration.teamId,
+      });
 
       return updated;
     });
@@ -964,6 +980,7 @@ export class TournamentPlayersService {
         rosterDeadlineAt: true,
         genderCategory: true,
         status: true,
+        kind: true,
         // 잠긴 명단에 어드민이 추가·제거를 가한 뒤 성별 쿼터 재검증(reconcileGenderQuotaAfterRosterChange)에 쓴다.
         genderMinMale: true,
         genderMaxMale: true,

@@ -1,4 +1,5 @@
-import { Prisma, V1StatusActorType, V1TournamentStatus } from '@prisma/client';
+import { Prisma, V1CompetitionKind, V1StatusActorType, V1TournamentStatus } from '@prisma/client';
+import { syncLeagueRosterLineups } from '../league-matches/league-roster-sync';
 
 // 팀을 벗어나는 모든 경로에서 대회 로스터를 함께 정리하기 위한 공용 헬퍼.
 //
@@ -17,22 +18,33 @@ import { Prisma, V1StatusActorType, V1TournamentStatus } from '@prisma/client';
 // 명시적으로 정리한다.
 
 /**
- * 명단을 건드려도 되는 대회 상태. **정리(cleanup)와 수정(추가·제거)의 단일 출처다** —
+ * 명단을 건드려도 되는 대회. **정리(cleanup)와 수정(추가·제거)의 단일 출처다** —
  * 둘은 같은 불변식의 양면이라 갈라 두면 한쪽만 바뀌어 드리프트한다.
  *
  * **완료·취소된 대회는 제외한다** — 수상 내역·리뷰·기록이 로스터를 참조하므로, 지난 대회에서
- * 이름을 지우거나 넣으면 과거 기록이 가리키는 대상이 달라진다. 아직 치르지 않았거나 진행
- * 중인 대회에서만 자리를 비우고, 또 그런 대회에서만 명단을 고칠 수 있다.
+ * 이름을 지우거나 넣으면 과거 기록이 가리키는 대상이 달라진다.
  *
- * `draft` 는 제외해도 안전하다 — 신청 생성이 `status !== 'open'` 을 막으므로(2026-08-04 확인,
- * tournament-registrations.service.ts:103) draft 대회에는 신청 자체가 존재할 수 없다.
+ * **정규 리그는 초안(`draft`)도 포함한다.** 리그는 초안으로 만들어져 일괄 대진 생성 때 진행 중이 되는데
+ * 참가 신청은 초안에서 이미 확정되고, 정본 §3 은 명단을 신청 때 받는다(Task 170). 대회 초안은 신청 생성이
+ * `status !== 'open'` 을 막아(tournament-registrations.service.ts) 명단이 존재할 수 없으므로 제외한 채 둔다.
  */
 export const ROSTER_MUTABLE_TOURNAMENT_STATUSES = ['open', 'closed', 'in_progress'] as const;
 
-/** 위 집합에 속하는지. 리터럴 배열의 `includes` 는 인자 타입을 좁혀 버리므로 헬퍼로 감싼다. */
-export function isRosterMutableTournamentStatus(status: V1TournamentStatus): boolean {
-  return (ROSTER_MUTABLE_TOURNAMENT_STATUSES as readonly string[]).includes(status);
+export function isRosterMutableTournament(tournament: {
+  kind: V1CompetitionKind | null;
+  status: V1TournamentStatus;
+}): boolean {
+  if ((ROSTER_MUTABLE_TOURNAMENT_STATUSES as readonly string[]).includes(tournament.status)) return true;
+  return tournament.kind === V1CompetitionKind.regular_league && tournament.status === V1TournamentStatus.draft;
 }
+
+/** 위 규칙의 Prisma 조건 — 정리 쿼리가 같은 집합을 본다. */
+export const ROSTER_MUTABLE_TOURNAMENT_WHERE = {
+  OR: [
+    { status: { in: [...ROSTER_MUTABLE_TOURNAMENT_STATUSES] } },
+    { kind: V1CompetitionKind.regular_league, status: V1TournamentStatus.draft },
+  ],
+} satisfies Prisma.V1TournamentWhereInput;
 
 export type RosterCleanupOptions = {
   /** 특정 팀의 로스터만 정리한다. 생략하면 사용자의 모든 팀이 대상(회원 탈퇴). */
@@ -69,10 +81,7 @@ export async function removeUserFromActiveRosters(
       removedAt: null,
       registration: {
         ...(options.teamId ? { teamId: options.teamId } : {}),
-        tournament: {
-          status: { in: [...ROSTER_MUTABLE_TOURNAMENT_STATUSES] },
-          deletedAt: null,
-        },
+        tournament: { ...ROSTER_MUTABLE_TOURNAMENT_WHERE, deletedAt: null },
       },
     },
     select: {
@@ -81,7 +90,7 @@ export async function removeUserFromActiveRosters(
       // 잠금 우회 감사 로그를 남기려면 신청건이 잠겨 있었는지가 필요하다. 옵셔널 체이닝으로
       // 읽는 이유는 이 select 자체가 항상 registration 을 포함하므로 런타임엔 undefined 일 수
       // 없지만, 유닛 테스트가 findMany 를 얕게 mock 할 수 있어 방어적으로 접근한다.
-      registration: { select: { rosterLockedAt: true, tournamentId: true } },
+      registration: { select: { rosterLockedAt: true, tournamentId: true, teamId: true } },
     },
   });
 
@@ -112,6 +121,15 @@ export async function removeUserFromActiveRosters(
           reason: `player=${target.id} tournament=${target.registration?.tournamentId ?? 'unknown'} user=${userId}`,
         })),
       });
+    }
+    // 리그면 팀을 떠난 사람을 시작 전 경기 명단에서도 뺀다(대회는 대상 경기가 없어 no-op).
+    const teams = new Map(
+      targets.flatMap((target) =>
+        target.registration ? [[`${target.registration.tournamentId}:${target.registration.teamId}`, target.registration] as const] : [],
+      ),
+    );
+    for (const registration of teams.values()) {
+      await syncLeagueRosterLineups(tx, { leagueId: registration.tournamentId, teamId: registration.teamId });
     }
   }
 

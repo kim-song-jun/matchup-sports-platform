@@ -55,21 +55,130 @@ validate_alpha_release_manifest() {
     ' "${manifest_file}" >/dev/null
 }
 
+# StageB-only. Unlike validate_alpha_release_manifest, the runner
+# (deploy/task168-stage-b-migrate.sh) never calls this — its own jq
+# validation (frozen, CLI contract §3) is already sufficient and
+# exists precisely so this function is not a second, divergent validation
+# path for the same manifest. This function is for the two places that
+# create or re-verify a StageB manifest from the outside: the manifest
+# builder (create-alpha-release-manifest.sh) and validate_stored_alpha_manifest
+# below (used by restore/rollback once a StageB manifest can be active).
+validate_alpha_stage_b_final_manifest() {
+  local manifest_file="$1"
+  local expected_sha="$2"
+  local expected_version="$3"
+  local expected_manifest_sha256="$4"
+  local expected_registry="$5"
+  local expected_schema_sha="$6"
+  local expected_migrations_json="$7"
+  local expected_predecessor_json="$8"
+  local expected_rehearsal_json="$9"
+  local expected_full_history_json="${10}"
+  local actual_manifest_sha256
+
+  actual_manifest_sha256="$(sha256sum "${manifest_file}" | awk '{print $1}')"
+  if [[ "${actual_manifest_sha256}" != "${expected_manifest_sha256}" ]]; then
+    echo "[alpha-release] StageB manifest checksum mismatch" >&2
+    return 1
+  fi
+
+  jq -e \
+    --arg sha "${expected_sha}" \
+    --arg version "${expected_version}" \
+    --arg registry "${expected_registry}" \
+    --arg schema "${expected_schema_sha}" \
+    --argjson migrations "${expected_migrations_json}" \
+    --argjson predecessor "${expected_predecessor_json}" \
+    --argjson rehearsal "${expected_rehearsal_json}" \
+    --argjson fullHistory "${expected_full_history_json}" \
+    '
+      .schemaVersion == 1 and
+      .environment == "alpha" and
+      .release.sha == $sha and
+      .release.version == $version and
+      (.release.createdAt | type == "string" and length > 0) and
+      .source.key == ("releases/task168-stage-b/" + $sha + ".tar.gz") and
+      (.source.bucket | type == "string" and length > 0) and
+      (.source.versionId | type == "string" and length > 0) and
+      (.source.sha256 | test("^[0-9a-f]{64}$")) and
+      .database.migrationPolicy == "task168-stageBFinal" and
+      .database.rollbackMode == "backup-only" and
+      .database.compatibilityCheck == "expand-contract-sql-v1" and
+      .database.migrationValidatedFrom == null and
+      .database.rollbackCompatibleWith == null and
+      .database.task168.stage == "stageBFinal" and
+      .database.task168.schemaSha256 == $schema and
+      .database.task168.runtimeClientSchemaSha256 == $schema and
+      .database.task168.recoveryFrom == null and
+      .database.task168.rollbackTarget == null and
+      .database.task168.migrations == $migrations and
+      (.database.task168.migrations | length == 11) and
+      (.database.task168.migrations | all((.name | test("^[0-9]{14}_[a-z0-9_]+$")) and (.sha256 | test("^[0-9a-f]{64}$")))) and
+      ([.database.task168.migrations[].name] | unique | length == 11) and
+      (.database.task168.fullMigrationHistory | length > 11) and
+      (.database.task168.fullMigrationHistory | all((.name | test("^[0-9]{14}_[a-z0-9_]+$")) and (.sha256 | test("^[0-9a-f]{64}$")))) and
+      .database.task168.fullMigrationHistory == $fullHistory and
+      (.database.task168.resolvedMigrationAttemptsSha256 | test("^[0-9a-f]{64}$")) and
+      (.database.task168.migrationLockSha256 | test("^[0-9a-f]{64}$")) and
+      .database.task168.predecessor == $predecessor and
+      .database.task168.rehearsal == $rehearsal and
+      .images.api.repository == ($registry + "/teameet-alpha-v1-api") and
+      .images.web.repository == ($registry + "/teameet-alpha-v1-web") and
+      (.images.api.digest | test("^sha256:[0-9a-f]{64}$")) and
+      (.images.web.digest | test("^sha256:[0-9a-f]{64}$")) and
+      .images.api.uri == (.images.api.repository + "@" + .images.api.digest) and
+      .images.web.uri == (.images.web.repository + "@" + .images.web.digest) and
+      .images.cutoverTool.repository == ($registry + "/teameet-alpha-v1-api") and
+      (.images.cutoverTool.digest | test("^sha256:[0-9a-f]{64}$")) and
+      .images.cutoverTool.uri == (.images.cutoverTool.repository + "@" + .images.cutoverTool.digest)
+    ' "${manifest_file}" >/dev/null
+}
+
+# D-4. Branches on the manifest's own
+# `.database.task168.stage` and dispatches to the matching validator. The
+# StageB branch derives the six extra validate_alpha_stage_b_final_manifest
+# arguments FROM THE SAME MANIFEST it is validating — this proves internal
+# structural consistency (every field is well-formed and mutually
+# consistent) but NOT agreement with an external authority (it cannot detect
+# a manifest that is internally consistent but simply wrong, e.g. a stale
+# predecessor.databaseIdentity nobody re-checked). Callers that hold an
+# independently-sourced expectation (the manifest builder, at creation time)
+# should call validate_alpha_stage_b_final_manifest directly instead.
 validate_stored_alpha_manifest() {
   local manifest_file="$1"
   local expected_registry="$2"
   local expected_checksum="$3"
   local stored_sha
   local stored_version
+  local stage
 
   stored_sha="$(jq -er '.release.sha' "${manifest_file}")"
   stored_version="$(jq -er '.release.version' "${manifest_file}")"
-  validate_alpha_release_manifest \
-    "${manifest_file}" \
-    "${stored_sha}" \
-    "${stored_version}" \
-    "${expected_checksum}" \
-    "${expected_registry}"
+  stage="$(jq -r '.database.task168.stage // empty' "${manifest_file}")"
+
+  case "${stage}" in
+    stageBFinal)
+      validate_alpha_stage_b_final_manifest \
+        "${manifest_file}" \
+        "${stored_sha}" \
+        "${stored_version}" \
+        "${expected_checksum}" \
+        "${expected_registry}" \
+        "$(jq -er '.database.task168.schemaSha256' "${manifest_file}")" \
+        "$(jq -c '.database.task168.migrations' "${manifest_file}")" \
+        "$(jq -c '.database.task168.predecessor' "${manifest_file}")" \
+        "$(jq -c '.database.task168.rehearsal' "${manifest_file}")" \
+        "$(jq -c '.database.task168.fullMigrationHistory' "${manifest_file}")"
+      ;;
+    *)
+      validate_alpha_release_manifest \
+        "${manifest_file}" \
+        "${stored_sha}" \
+        "${stored_version}" \
+        "${expected_checksum}" \
+        "${expected_registry}"
+      ;;
+  esac
 }
 
 validate_alpha_release_source_binding() {

@@ -188,6 +188,29 @@ fi
 
 write_candidate_manifest "${ALPHA_MANIFEST_FILE}"
 prepare_alpha_release_source "${ALPHA_SOURCE_DIR}" "${ALPHA_SHA}" "${ALPHA_SOURCE_SHA256}"
+
+# D-5 guard. This manifest was
+# already proven `database.task168.stage == "stageAIntermediate"` above
+# (validate_alpha_release_manifest), so this script only ever runs for
+# StageA. If Task168's M11 is already in the ledger — applied, failed, or
+# rolled back, any row at all — a StageA runner would misclassify it as
+# "unsupported" and fail deep inside task168-stage-a-migrate.sh, which by
+# then would already be past source activation with task168_irreversible=true
+# (the ERR trap intentionally does not unwind that). Rejecting here, before
+# activation, keeps this failure a true no-op: nothing below this block has
+# run yet, so source_activated/runtime_mutated/task168_irreversible are all
+# still false and the ERR trap has nothing to restore.
+#
+# v1_postgres is brought up against whichever release is *currently* live —
+# activate_alpha_release_source has not run yet, so ${compose[@]} still
+# resolves through the live symlink to the release this deploy would replace.
+# That is fine: the ledger being checked is the live database's, which is
+# what M11 would actually apply against.
+assert_task168_m11_absent compose || {
+  echo "[alpha-deploy] Refusing a Stage A manifest: Task 168 M11 is already present in the ledger" >&2
+  exit 1
+}
+
 activate_alpha_release_source "${ALPHA_SHA}"
 source_activated=true
 runtime_mutated=true

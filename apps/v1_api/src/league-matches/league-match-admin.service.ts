@@ -34,7 +34,12 @@ import { resolveResultStage } from './league-result-stage';
 import { resolveIsForfeit } from './league-match-forfeit.service';
 import { FixtureScheduleTemplate, FixtureTimingOptions, generateRoundRobinFixtures, resolveFixtureStartAt, resolveFixtureTimeSlots, RoundRobinFixture } from './round-robin-schedule';
 import { createLeagueMirrorWithRosterSchedule } from '../jobs/league-roster/league-roster-autoconfirm.service';
-import { createLeagueFixture, leagueFixtureTitle } from './league-fixture-creation';
+import {
+  createLeagueFixture,
+  leagueFixtureTitle,
+  loadLeagueTeamRosters,
+  type LeagueFixtureTeam,
+} from './league-fixture-creation';
 import { resolveLeagueFixtureDates } from './league-fixture-dates';
 import { resolveLeagueWeekNumbers } from './league-week-number';
 import {
@@ -507,7 +512,7 @@ export class LeagueMatchAdminService {
       if (existingCount > 0) {
         throw new ConflictException({ code: 'LEAGUE_FIXTURES_EXIST', message: '이미 대진이 생성된 리그예요.' });
       }
-      const teamsById = await this.loadTeamsWithMembers(tx, teamIds);
+      const teamsById = await loadLeagueTeamRosters(tx,league.id, teamIds);
       const { ids, placeName } = await this.createFixturesInTx(tx, {
         leagueId: league.id,
         leagueTitle: league.title,
@@ -1015,7 +1020,7 @@ export class LeagueMatchAdminService {
         cancelledCount += 1;
       }
 
-      const teamsById = await this.loadTeamsWithMembers(tx, teamIds);
+      const teamsById = await loadLeagueTeamRosters(tx,league.id, teamIds);
       const { ids, placeName } = await this.createFixturesInTx(tx, {
         leagueId: league.id,
         leagueTitle: league.title,
@@ -1144,7 +1149,7 @@ export class LeagueMatchAdminService {
           message: '이 리그에 등록되지 않은 팀이에요.',
         });
       }
-      const teamsById = await this.loadTeamsWithMembers(tx, [dto.homeTeamId, dto.awayTeamId]);
+      const teamsById = await loadLeagueTeamRosters(tx,leagueId, [dto.homeTeamId, dto.awayTeamId]);
       const home = teamsById.get(dto.homeTeamId);
       const away = teamsById.get(dto.awayTeamId);
       if (home === undefined || away === undefined) {
@@ -1641,14 +1646,7 @@ export class LeagueMatchAdminService {
       regionId: string;
       adminUserId: string;
       competitionConfigId: string;
-      teamsById: Map<
-        string,
-        {
-          id: string;
-          name: string;
-          memberships: Array<{ id: string; user: { profile: { nickname: string | null; displayName: string | null } | null } }>;
-        }
-      >;
+      teamsById: Map<string, LeagueFixtureTeam>;
       schedule: RoundRobinFixture[];
       /** 매치데이 1..N 의 시작 시각(운영자가 고른 날짜 목록에서 푼 것). 미지정이면 주간 폴백. */
       matchdayStartAts?: readonly Date[];
@@ -1734,24 +1732,6 @@ export class LeagueMatchAdminService {
     });
     await cascadeCancelTeamMatchSchedulesInTx(tx, teamMatchId, reason);
     return rejected.count;
-  }
-
-  private async loadTeamsWithMembers(tx: Prisma.TransactionClient, teamIds: string[]) {
-    const teams = await tx.v1Team.findMany({
-      where: { id: { in: teamIds }, status: 'active', deletedAt: null },
-      select: {
-        id: true,
-        name: true,
-        memberships: {
-          where: { status: 'active' },
-          orderBy: { id: 'asc' },
-          // userId 를 일부러 읽지 않는다 — 자동 로스터 참가자에 사람을 붙이면
-          // 신원 연결이 전원에게 생긴다(createFixturesInTx 의 participants 주석 참조).
-          select: { id: true, user: { select: { profile: { select: { nickname: true, displayName: true } } } } },
-        },
-      },
-    });
-    return new Map(teams.map((team) => [team.id, team]));
   }
 
   /**

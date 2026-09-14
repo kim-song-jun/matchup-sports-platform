@@ -238,6 +238,55 @@ jobs:
       - name: Prod rollback guard tests
         run: bash scripts/qa/test-prod-rollback-guards.sh
 
+      # Task 168 M11 StageB 이관 도구 (PR-A1) — 어떤 배포 경로도 아직 호출하지
+      # 않는 도구 계층 계약 테스트. 합성 fixture 로만 실행되고 Docker 는 쓰지
+      # 않는다: package 쪽은 실제 git 저장소를 만들어 패키징 결정성(umask/TZ)과
+      # 검증 우회를 확인하고, preflight 쪽은 Docker 를 만들기 전의 정적 검사
+      # (source-archive-attestation sidecar 인증)만 확인한다.
+      - name: Task 168 StageB packager contract tests
+        run: bash scripts/qa/test-task168-stage-b-package.sh
+
+      - name: Task 168 StageB preflight sidecar contract tests
+        run: bash scripts/qa/test-task168-stage-b-preflight-sidecar.sh
+
+      # A gate that is not wired into any workflow is the same as no gate.
+      - name: Alpha immutable-deploy contract checks
+        run: node scripts/qa/check-alpha-immutable-deploy.mjs
+
+      # Task168 StageB. All four run the real target scripts against fake
+      # aws/docker, never a hand-copied excerpt — see each script's own
+      # header for what it actually exercises.
+      - name: Task168 StageB dispatch wiring contract tests
+        run: bash scripts/qa/test-task168-stage-b-wiring.sh
+
+      - name: Task168 D-5 guard contract tests
+        run: bash scripts/qa/test-task168-d5-guard.sh
+
+      - name: Task168 StageB wrapper contract tests
+        run: bash scripts/qa/test-task168-stage-b-wrapper.sh
+
+      - name: Task168 StageB manifest and promotion contract tests
+        run: bash scripts/qa/test-task168-stage-b-manifest.sh
+
+      - name: Task168 Dockerfile target stage order (static)
+        run: bash scripts/qa/test-task168-dockerfile-target.sh
+
+      - name: Task168 post-live verify contract tests
+        run: bash scripts/qa/test-task168-post-live.sh
+
+      - name: Task168 StageA predecessor read contract tests
+        run: bash scripts/qa/test-task168-predecessor-read.sh
+
+      # A real `docker build` per target (StageA default + StageB
+      # runtime-task168-final) is deliberately NOT a step here: this job's
+      # own contract (see the file header) is "no app build, seconds-long
+      # checks", and two full image builds break that.
+      # scripts/qa/test-task168-dockerfile-target.sh above covers the
+      # target-order/attestation-content contract statically; a real-build
+      # attestation check belongs in a job that does not gate this file's
+      # production deploy (or on workflow_dispatch only), with a real run
+      # result attached before it merges — not here.
+
       # expand-contract 게이트를 **머지 전에** 돌린다.
       #
       # 2026-08-20 사고: 이 검사가 `deploy` job 에만 있었고 그 job 은 PR 에서 skip 된다.
@@ -561,6 +610,10 @@ jobs:
         with:
           context: .
           file: deploy/Dockerfile.v1-api
+          # See deploy-alpha.yml's identical comment: Dockerfile.v1-api now carries a
+          # StageB stage ahead of `runtime` — pin the target explicitly so prod never
+          # silently picks up the newest stage in the file.
+          target: runtime
           push: true
           tags: ${{ steps.login-ecr.outputs.registry }}/teameet-prod-v1-api:${{ steps.images.outputs.imageTag }}
           cache-from: type=gha,scope=prod-v1-api

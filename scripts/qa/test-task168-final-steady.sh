@@ -42,20 +42,24 @@
 #   9. The migration-receipt scan's `kind` check removed: negative ⑬ (a
 #      JSON file at the right path with every OTHER binding field correct
 #      but a wrong `kind`) turns red.
-#  10. STAGE_B_STATE_ROOT reverted to the old (pre-fix) task168-final/ path
+#  10. The migration-receipt scan's `status` check removed: negative ⑭ (a
+#      real MIGRATION_DIAGNOSIS_REQUIRED receipt -- the shape the producer
+#      writes for a FAILED StageB run -- otherwise correctly bound) turns
+#      red.
+#  11. STAGE_B_STATE_ROOT reverted to the old (pre-fix) task168-final/ path
 #      real StageB producers never write to: positive ⓐ (a legitimate,
 #      correctly-shaped StageB completion) flips from pass to fail -- this
 #      is the receipt-shape/path bug this file's write_receipts() fixture
 #      was rewritten to catch (see negative ⑩ for the direct case: a
 #      receipt genuinely written in that old shape must read as absent).
-#  11. Exact-match reversion (inserting "pending_count == 0 or fail",
+#  12. Exact-match reversion (inserting "pending_count == 0 or fail",
 #      simulating the candidate runner's full-ledger-equality design this
 #      script deliberately does NOT use): positive ⓑ (a legitimate M12
 #      pending after M11) flips from pass to fail -- proving this suite
 #      would catch a regression back to the design D-1 was written to fix.
-# Mutations 10 and 11 above are the two whose expected direction is a false
+# Mutations 11 and 12 above are the two whose expected direction is a false
 # REJECT of a legitimate scenario (checked directly, not through
-# mutate_and_check, which looks for a false ACCEPT); all eleven are counted
+# mutate_and_check, which looks for a false ACCEPT); all twelve are counted
 # in the same mutation_reds/mutation_total tally at the bottom of this file.
 set -Eeuo pipefail
 
@@ -483,6 +487,31 @@ export MIGRATE_RAN_FLAG="${TEST_ROOT}/n13-migrate-ran"
 assert_check_only_fails "receipt-wrong-kind" "${dir13}"
 export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
 
+# ── negative ⑭ a migration-stage.json bound correctly in every field but
+#    status -- MIGRATION_DIAGNOSIS_REQUIRED is a real status the producer
+#    writes on a FAILED StageB run (M11 RAISEd; writer stays stopped, no
+#    commit). A receipt in that state must never be read as "M11
+#    committed". ─────────────────────────────────────────────────────────────
+dir14="${TEST_ROOT}/n14"; make_source_tree "${dir14}"
+applied_rows_for "${dir14}" "${TASK168_M1_M10[@]}" "${M11_NAME}" > "${TEST_ROOT}/rows-n14"
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/n14-state"
+diagnosis_dir="${ALPHA_RELEASE_STATE_DIR}/task168/1111111111111111111111111111111111111111"
+mkdir -p "${diagnosis_dir}"
+cat > "${diagnosis_dir}/migration-stage.json" <<EOF
+{"schemaVersion":1,"kind":"task168StageBMigration","status":"MIGRATION_DIAGNOSIS_REQUIRED","stage":"stageBFinal","releaseSha":"1111111111111111111111111111111111111111","databaseIdentity":"${FAKE_DB_ID}","m11Sha256":"${M11_SHA}","failureReason":"M11 precondition RAISE","failedAt":"2026-09-14T00:00:00Z"}
+EOF
+diagnosis_sha="$(sha256sum "${diagnosis_dir}/migration-stage.json" | awk '{print $1}')"
+cat > "${diagnosis_dir}/runtime-verification.json" <<EOF
+{"schemaVersion":1,"kind":"task168StageBRuntimeVerification","migrationReceiptSha256":"${diagnosis_sha}","ledgerCount":11,"completedAt":"2026-09-14T00:05:00Z"}
+EOF
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-n14"
+export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n14"
+export TABLE_EXISTS=t
+export MIGRATE_RAN_FLAG="${TEST_ROOT}/n14-migrate-ran"
+: > "${CALL_LOG}"
+assert_check_only_fails "receipt-diagnosis-required-status" "${dir14}"
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
+
 # ── positive ⓐ source == DB == M1-M11, no pending ────────────────────────────
 dira="${TEST_ROOT}/pa"; make_source_tree "${dira}"
 applied_rows_for "${dira}" "${TASK168_M1_M10[@]}" "${M11_NAME}" > "${TEST_ROOT}/rows-pa"
@@ -540,7 +569,7 @@ if [[ "${negatives_failed}" -ne 0 || "${positives_failed}" -ne 0 ]]; then
   echo "[task168-final-steady] FAILED: ${negatives_failed} negative(s), ${positives_failed} positive(s)" >&2
   exit 1
 fi
-echo "[task168-final-steady] all 13 negatives + 3 positives passed"
+echo "[task168-final-steady] all 14 negatives + 3 positives passed"
 
 # ── mutation run: verify the expected red counts in the header comment ──────
 # Applies each mutation to a scratch copy of the script and reruns the exact
@@ -758,6 +787,21 @@ if mutate_and_check "receipt-kind-check-removed" \
 fi
 export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
 
+# The migration-receipt scan's `status` check removed: negative ⑭ (a real
+# MIGRATION_DIAGNOSIS_REQUIRED receipt from a FAILED StageB run, otherwise
+# correctly bound) turns red.
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/n14-state"
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-n14"; export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n14"
+export TABLE_EXISTS=t; export MIGRATE_RAN_FLAG="${TEST_ROOT}/mut-status-check-migrate-ran"
+mutation_total=$((mutation_total + 1))
+if mutate_and_check "receipt-status-check-removed" \
+  '(.status=="MIGRATION_COMMITTED" or .status=="MIGRATION_COMMITTED_RECOVERED") and' \
+  '' \
+  "${dir14}"; then
+  mutation_reds=$((mutation_reds + 1))
+fi
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
+
 # Receipt path/shape regression: reverting STAGE_B_STATE_ROOT back to the old
 # (wrong) task168-final/ location must make even a LEGITIMATE StageB
 # completion (positive ⓐ, real receipts under task168/<sha>/) unreadable --
@@ -842,8 +886,8 @@ else
   echo "[mutation exact-match-reversion] NOT red -- an exact-match reversion did not break the pending-M12 scenario as expected" >&2
 fi
 
-echo "[task168-final-steady] mutation reds: ${mutation_reds}/${mutation_total} (expected 11/11)"
-if [[ "${mutation_reds}" -ne 11 ]]; then
+echo "[task168-final-steady] mutation reds: ${mutation_reds}/${mutation_total} (expected 12/12)"
+if [[ "${mutation_reds}" -ne 12 ]]; then
   echo "[task168-final-steady] FAILED: expected all 6 mutations to weaken the check as documented" >&2
   exit 1
 fi

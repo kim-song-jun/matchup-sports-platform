@@ -283,11 +283,20 @@ assert_task168_m11_guard() {
   local m11_name=20260911090000_retire_tournament_fixture_tables
   local m11_pinned_sha=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
   local m11_migration_dir="${source_dir}/apps/v1_api/prisma/migrations/${m11_name}"
-  local m11_source_sha database_url network m11_ledger_checksum
+  local m11_source_sha database_url network m11_ledger_checksum psql_stderr query_rc
 
   [[ -d "${m11_migration_dir}" ]] || return 0
 
   m11_source_sha="$(sha256sum "${m11_migration_dir}/migration.sql" | awk '{print $1}')" || return 1
+  # Pin the SOURCE file itself, not just the source-vs-ledger comparison
+  # below -- without this, a candidate tree whose M11 was tampered to some
+  # OTHER checksum, with a prod ledger row that happens to carry that SAME
+  # tampered checksum (e.g. a prior guard-bypassed deploy), would pass the
+  # source-vs-ledger check even though neither side is the real migration.
+  if [[ "${m11_source_sha}" != "${m11_pinned_sha}" ]]; then
+    echo "[prod-deploy] Task168 M11 guard: candidate source's M11 checksum (${m11_source_sha}) does not match the pinned value (${m11_pinned_sha}). Refusing to run prisma migrate deploy." >&2
+    return 1
+  fi
   database_url="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')" || return 1
   if [[ -z "${database_url}" ]]; then
     echo "[prod-deploy] Task168 M11 guard: candidate API's DATABASE_URL is unavailable" >&2
@@ -298,8 +307,35 @@ assert_task168_m11_guard() {
     echo "[prod-deploy] Task168 M11 guard: compose DB network unavailable" >&2
     return 1
   fi
-  m11_ledger_checksum="$(sudo docker run --rm --network "${network}" postgres:16-alpine \
-    psql "${database_url}" -At -c "SELECT checksum FROM \"_prisma_migrations\" WHERE migration_name = '${m11_name}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL" 2>/dev/null)" || m11_ledger_checksum=""
+  # DATABASE_URL (password included) must never appear as a `docker run`
+  # argv element -- that argv is visible to any other user on the host via
+  # `ps`. --env-file with a process-substitution fd exposes only the fd path
+  # (/dev/fd/N) in argv; the value itself is read by docker directly from
+  # the fd, never passed on a command line.
+  psql_stderr="$(mktemp)"
+  # `&& query_rc=0 || query_rc=$?` (not a bare trailing `$?`) is deliberate:
+  # under `set -e`, `var="$(failing_cmd)"` on its own aborts the whole script
+  # at this line -- the very failure this guard exists to diagnose would
+  # never reach the diagnostic below it, only a bare, unexplained script
+  # exit. Wrapping it in an && / || list is the standard way to catch a
+  # command substitution's exit status without triggering errexit.
+  m11_ledger_checksum="$(sudo docker run --rm --network "${network}" \
+    --env-file <(printf 'DATABASE_URL=%s\n' "${database_url}") \
+    postgres:16-alpine sh -c 'exec psql "$DATABASE_URL" -At -c "$1"' sh \
+    "SELECT checksum FROM \"_prisma_migrations\" WHERE migration_name = '${m11_name}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL" \
+    2>"${psql_stderr}")" && query_rc=0 || query_rc=$?
+  if [[ "${query_rc}" -ne 0 ]]; then
+    # Fail closed on a query/connection error instead of silently treating it
+    # as "M11 not applied" via an empty string -- both reach the same
+    # `return 1` below, but surfacing the actual psql/docker error here
+    # means an operator sees WHY (network unreachable, auth failure, ...)
+    # instead of a diagnosis that reads identically to "M11 truly missing".
+    echo "[prod-deploy] Task168 M11 guard: could not query prod's migration ledger. Refusing to run prisma migrate deploy." >&2
+    cat "${psql_stderr}" >&2
+    rm -f "${psql_stderr}"
+    return 1
+  fi
+  rm -f "${psql_stderr}"
   if [[ "${m11_ledger_checksum}" != "${m11_source_sha}" ]]; then
     echo "[prod-deploy] Task168 M11 guard: candidate source includes the retirement migration (checksum ${m11_source_sha}) but prod's ledger does not show it as an applied row. Refusing to run prisma migrate deploy." >&2
     return 1

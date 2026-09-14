@@ -14,6 +14,11 @@
 # `prisma migrate deploy`; M11 itself is always a no-op there (StageB already
 # applied it) so this step behaves like an ordinary additive migration run.
 set -Eeuo pipefail
+# Every name/lexical comparison below (`[[ a > b ]]`, `[[ a == b ]]` on
+# migration names, `sort`) must be byte-order, not locale-dependent -- a host
+# whose collation differs from CI could otherwise judge L3's "pending sorts
+# after M11" differently than the same code was tested under.
+export LC_ALL=C
 usage(){ echo "usage: $0 (--check-only|--migrate) --source-dir D --compose-prod F --compose-alpha F --env-file F" >&2; exit 64; }
 MODE= SOURCE_DIR= COMPOSE_PROD= COMPOSE_ALPHA= ENV_FILE=
 while (($#)); do case "$1" in
@@ -167,6 +172,47 @@ if [[ "${MODE}" == check-only ]]; then
   jq -e --arg receiptSha "${migration_receipt_sha}" \
     '.schemaVersion==1 and .kind=="task168StageBRuntimeVerification" and .migrationReceiptSha256==$receiptSha and .ledgerCount==11' \
     "${runtime_verification}" >/dev/null || fail 'StageB runtimeVerification receipt is invalid or not bound to the MIGRATION_COMMITTED receipt'
+
+  # The MIGRATION_COMMITTED receipt names the exact StageB manifest it was
+  # produced from (deploy/task168-stage-b-migrate.sh's receipt_json:
+  # `manifest`/`manifestSha256`). Re-verify that file is still the same
+  # bytes before trusting anything it says -- a receipt is durable evidence
+  # only as long as the manifest it points at has not been replaced.
+  migration_manifest="$(jq -er '.manifest' "${migration_receipt}")" || fail 'StageB migration receipt does not name its manifest file'
+  migration_manifest_sha="$(jq -er '.manifestSha256' "${migration_receipt}")" || fail 'StageB migration receipt does not bind its manifest checksum'
+  [[ -s "${migration_manifest}" ]] || fail 'StageB manifest file named by the migration receipt is missing'
+  [[ "$(sha "${migration_manifest}")" == "${migration_manifest_sha}" ]] || fail 'StageB manifest file named by the migration receipt has changed since StageB ran'
+
+  # L4's resolved-attempt binding (spec L4: "resolved 시도 행은 ... StageB
+  # 영수증에 기록된 resolved snapshot sha와 같아야 한다"). The manifest fixes
+  # the exact resolved-attempt (finished_at NULL, rolled_back_at NOT NULL)
+  # rows the StageB run started from as
+  # .database.task168.resolvedMigrationAttemptsSha256 -- computed with the
+  # same SQL/order as deploy/task168-migration-contract.sh's
+  # resolved_attempt_rows()/resolved_attempt_sha() (duplicated here, not
+  # sourced, because that file lives on the StageB wiring PR, which has not
+  # landed on this branch yet; keep both in sync if either changes).
+  #
+  # Binding scope (orchestrator decision): only resolved rows named at or
+  # before M11 must match this snapshot exactly. A resolved row named AFTER
+  # M11 (e.g. a later migration that failed and was cleaned up with
+  # `migrate resolve --rolled-back` on some future ordinary deploy) is
+  # excluded from the comparison -- otherwise every deploy after the first
+  # such cleanup would be permanently rejected by a snapshot StageB could
+  # never have known about.
+  expected_resolved_sha="$(jq -er '.database.task168.resolvedMigrationAttemptsSha256' "${migration_manifest}")" || fail 'StageB manifest is missing its resolved migration-attempt snapshot binding'
+  resolved_rows_raw="$(dbq "SELECT migration_name || '|' || COALESCE(checksum,'') || '|' || COALESCE(finished_at::text,'') || '|' || COALESCE(rolled_back_at::text,'') FROM \"_prisma_migrations\" WHERE finished_at IS NULL AND rolled_back_at IS NOT NULL ORDER BY migration_name,rolled_back_at,checksum,id")" || fail 'resolved migration-attempt query failed'
+  resolved_le_m11=()
+  while IFS= read -r resolved_line; do
+    [[ -n "${resolved_line}" ]] || continue
+    resolved_name="${resolved_line%%|*}"
+    [[ "${resolved_name}" == "${M11_NAME}" || "${resolved_name}" < "${M11_NAME}" ]] || continue
+    resolved_le_m11+=("${resolved_line}")
+  done <<<"${resolved_rows_raw}"
+  resolved_snapshot_text="$(printf '%s\n' "${resolved_le_m11[@]:-}")"
+  resolved_snapshot_sha="$(printf '%s' "${resolved_snapshot_text}" | sha256sum | awk '{print $1}')"
+  [[ "${resolved_snapshot_sha}" == "${expected_resolved_sha}" ]] || fail 'L4 violated: rolled-back migration-attempt snapshot at or before M11 differs from the StageB receipt'
+
   echo '[task168-final-steady] check-only passed: StageB receipts present and bound to this database'
   exit 0
 fi

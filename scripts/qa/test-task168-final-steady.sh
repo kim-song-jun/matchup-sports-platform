@@ -57,10 +57,18 @@
 #      script deliberately does NOT use): positive ⓑ (a legitimate M12
 #      pending after M11) flips from pass to fail -- proving this suite
 #      would catch a regression back to the design D-1 was written to fix.
+#  13. The resolved-attempt snapshot binding (spec L4's "resolved snapshot
+#      sha recorded in the StageB receipt") removed: negative ⑮ (a resolved
+#      row at/before M11 the shared receipts' empty snapshot does not
+#      account for) turns red.
+#  14. The StageB manifest checksum binding removed: negative ⑯ (a manifest
+#      file tampered by one appended byte, its JSON content otherwise still
+#      valid) turns red.
 # Mutations 11 and 12 above are the two whose expected direction is a false
 # REJECT of a legitimate scenario (checked directly, not through
-# mutate_and_check, which looks for a false ACCEPT); all twelve are counted
-# in the same mutation_reds/mutation_total tally at the bottom of this file.
+# mutate_and_check, which looks for a false ACCEPT); all fourteen are
+# counted in the same mutation_reds/mutation_total tally at the bottom of
+# this file.
 set -Eeuo pipefail
 
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -122,6 +130,12 @@ source_sha() {
 # ledger_row NAME CHECKSUM FINISHED(t/f) ROLLEDBACK(t/f)
 ledger_row() { printf '%s|%s|%s|%s\n' "$1" "$2" "$3" "$4"; }
 
+# resolved_attempt_row NAME CHECKSUM ROLLED_BACK_AT -> one line in the exact
+# format deploy/task168-migration-contract.sh's resolved_attempt_rows() (and
+# the StageB manifest's resolvedMigrationAttemptsSha256) hash: finished_at is
+# always NULL for a resolved-rolled-back row, so that field is always empty.
+resolved_attempt_row() { printf '%s|%s||%s\n' "$1" "$2" "$3"; }
+
 # applied_rows_for DIR NAME... -> every name applied (finished=t rolledback=f)
 # with that name's OWN checksum from the given source dir.
 applied_rows_for() {
@@ -153,6 +167,9 @@ case "$*" in
         ;;
       *to_regclass*)
         printf '%s\n' "${TABLE_EXISTS}"
+        ;;
+      *'ORDER BY migration_name,rolled_back_at,checksum,id'*)
+        cat "${RESOLVED_ATTEMPT_ROWS_FILE:-/dev/null}"
         ;;
       *'FROM "_prisma_migrations" ORDER BY migration_name'*)
         if [[ -f "${MIGRATE_RAN_FLAG:-/nonexistent}" ]]; then
@@ -222,7 +239,22 @@ export PATH="${MOCK_BIN}:${PATH}"
 export CALL_LOG="${TEST_ROOT}/docker-calls.log"
 export DB_ID="${FAKE_DB_ID}"
 
-# write_receipts STATE_ROOT DB_ID M11_SHA [RELEASE_SHA [STATUS]]
+# write_manifest DIR RESOLVED_SNAPSHOT_TEXT -> writes DIR/manifest.json with
+# .database.task168.resolvedMigrationAttemptsSha256 = sha256(RESOLVED_SNAPSHOT_TEXT),
+# hashed the same way deploy/task168-migration-contract.sh's
+# resolved_attempt_sha() does (printf '%s' "$rows" | sha256sum). Prints the
+# manifest path.
+write_manifest() {
+  local dir="$1" resolved_snapshot_text="$2" resolved_sha manifest_path
+  resolved_sha="$(printf '%s' "${resolved_snapshot_text}" | sha256sum | awk '{print $1}')"
+  manifest_path="${dir}/manifest.json"
+  cat > "${manifest_path}" <<EOF
+{"database":{"task168":{"resolvedMigrationAttemptsSha256":"${resolved_sha}"}}}
+EOF
+  printf '%s' "${manifest_path}"
+}
+
+# write_receipts STATE_ROOT DB_ID M11_SHA [RELEASE_SHA [STATUS [RESOLVED_SNAPSHOT_TEXT]]]
 # Mirrors the exact receipt shape and path the real StageB producers write:
 # deploy/task168-stage-b-migrate.sh's migration-stage.json (status
 # MIGRATION_COMMITTED) at ${STATE_ROOT}/task168/<release-sha>/migration-stage.json
@@ -233,12 +265,20 @@ export DB_ID="${FAKE_DB_ID}"
 # runtime-verification.json or a `databaseIdentity` field there -- the DB
 # binding is transitive, through migrationReceiptSha256 pointing at the
 # already-DB-bound migration-stage.json.
+#
+# RESOLVED_SNAPSHOT_TEXT defaults to empty (no resolved-rolled-back rows at
+# StageB time), matching every scenario's default ledger. A scenario that
+# also sets RESOLVED_ATTEMPT_ROWS_FILE to a fake-DB response must pass the
+# SAME text here for the two to agree.
 write_receipts() {
-  local state_root="$1" db_id="$2" m11_sha="$3" release_sha="${4:-1111111111111111111111111111111111111111}" status="${5:-MIGRATION_COMMITTED}"
+  local state_root="$1" db_id="$2" m11_sha="$3" release_sha="${4:-1111111111111111111111111111111111111111}" status="${5:-MIGRATION_COMMITTED}" resolved_snapshot_text="${6:-}"
   local dir="${state_root}/task168/${release_sha}"
+  local manifest_path manifest_sha
   mkdir -p "${dir}"
+  manifest_path="$(write_manifest "${dir}" "${resolved_snapshot_text}")"
+  manifest_sha="$(sha256sum "${manifest_path}" | awk '{print $1}')"
   cat > "${dir}/migration-stage.json" <<EOF
-{"schemaVersion":1,"kind":"task168StageBMigration","status":"${status}","stage":"stageBFinal","releaseSha":"${release_sha}","databaseIdentity":"${db_id}","m11Sha256":"${m11_sha}","completedAt":"2026-09-14T00:00:00Z"}
+{"schemaVersion":1,"kind":"task168StageBMigration","status":"${status}","stage":"stageBFinal","releaseSha":"${release_sha}","databaseIdentity":"${db_id}","m11Sha256":"${m11_sha}","manifest":"${manifest_path}","manifestSha256":"${manifest_sha}","completedAt":"2026-09-14T00:00:00Z"}
 EOF
   local migration_receipt_sha
   migration_receipt_sha="$(sha256sum "${dir}/migration-stage.json" | awk '{print $1}')"
@@ -249,8 +289,15 @@ EOF
 
 negatives_failed=0
 positives_failed=0
+# assert_check_only_fails LABEL DIR EXPECTED_SUBSTRING
+# EXPECTED_SUBSTRING is required (not optional) -- checking only rc!=0 cannot
+# tell a genuine guard rejection (fail() with the intended message) apart
+# from an unrelated crash (e.g. `set -u` on an unset variable, a typo'd jq
+# filter): both exit non-zero. Asserting the exact fail() text pins down
+# WHICH check actually fired.
 assert_check_only_fails() {
-  local label="$1" dir="$2"
+  local label="$1" dir="$2" expected_substring="$3"
+  [[ -n "${expected_substring}" ]] || { echo "assert_check_only_fails(${label}): missing expected_substring argument" >&2; exit 1; }
   run_steady check-only "${dir}"
   if [[ "${STEADY_RC}" -eq 0 ]]; then
     echo "NEGATIVE FAILED (${label}): check-only unexpectedly passed" >&2
@@ -260,6 +307,13 @@ assert_check_only_fails() {
   fi
   if grep -q "migrate deploy" "${CALL_LOG}" 2>/dev/null; then
     echo "NEGATIVE FAILED (${label}): check-only ran a migrate deploy call" >&2
+    negatives_failed=$((negatives_failed + 1))
+    return 1
+  fi
+  if ! grep -qF -- "${expected_substring}" <<<"${STEADY_OUTPUT}"; then
+    echo "NEGATIVE FAILED (${label}): check-only failed, but not for the expected reason" >&2
+    echo "  expected substring: ${expected_substring}" >&2
+    echo "  actual output: ${STEADY_OUTPUT}" >&2
     negatives_failed=$((negatives_failed + 1))
     return 1
   fi
@@ -287,7 +341,8 @@ export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-before-n1"
 export TABLE_EXISTS=t
 export MIGRATE_RAN_FLAG="${TEST_ROOT}/n1-migrate-ran"
 : > "${CALL_LOG}"
-assert_check_only_fails "no-stageb-receipt" "${dir1}"
+assert_check_only_fails "no-stageb-receipt" "${dir1}" \
+  "StageB MIGRATION_COMMITTED receipt is missing"
 
 # From here on, every scenario has valid receipts for FAKE_DB_ID + M11_SHA.
 export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
@@ -301,7 +356,8 @@ export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n2"
 export TABLE_EXISTS=t
 export MIGRATE_RAN_FLAG="${TEST_ROOT}/n2-migrate-ran"
 : > "${CALL_LOG}"
-assert_check_only_fails "m11-not-applied" "${dir2}"
+assert_check_only_fails "m11-not-applied" "${dir2}" \
+  "L2 violated: Task168 migration '${M11_NAME}' is not an applied ledger row"
 
 # ── negative ③ applied M11 checksum differs from the pinned/source value ────
 dir3="${TEST_ROOT}/n3"; make_source_tree "${dir3}"
@@ -314,7 +370,8 @@ export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n3"
 export TABLE_EXISTS=t
 export MIGRATE_RAN_FLAG="${TEST_ROOT}/n3-migrate-ran"
 : > "${CALL_LOG}"
-assert_check_only_fails "m11-checksum-mismatch" "${dir3}"
+assert_check_only_fails "m11-checksum-mismatch" "${dir3}" \
+  "L1 violated: applied migration '${M11_NAME}' checksum differs from the candidate source tree"
 
 # ── negative ④ DB has an applied row with a name absent from the source tree ─
 dir4="${TEST_ROOT}/n4"; make_source_tree "${dir4}"
@@ -327,7 +384,8 @@ export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n4"
 export TABLE_EXISTS=t
 export MIGRATE_RAN_FLAG="${TEST_ROOT}/n4-migrate-ran"
 : > "${CALL_LOG}"
-assert_check_only_fails "applied-row-not-in-source" "${dir4}"
+assert_check_only_fails "applied-row-not-in-source" "${dir4}" \
+  "L1 violated: applied migration '20260101000000_v1_stray_not_in_source' is not in the candidate source tree"
 
 # ── negative ⑤ a non-Task168 applied row's checksum differs from source ─────
 dir5="${TEST_ROOT}/n5"; make_source_tree "${dir5}" 20260912000000_v1_after_m11
@@ -340,7 +398,8 @@ export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n5"
 export TABLE_EXISTS=t
 export MIGRATE_RAN_FLAG="${TEST_ROOT}/n5-migrate-ran"
 : > "${CALL_LOG}"
-assert_check_only_fails "non-task168-checksum-mismatch" "${dir5}"
+assert_check_only_fails "non-task168-checksum-mismatch" "${dir5}" \
+  "L1 violated: applied migration '20260912000000_v1_after_m11' checksum differs from the candidate source tree"
 
 # ── negative ⑥ a pending source-only name sorts at/before M11 ────────────────
 dir6="${TEST_ROOT}/n6"; make_source_tree "${dir6}" 20260910999999_v1_before_m11
@@ -350,7 +409,8 @@ export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n6"
 export TABLE_EXISTS=t
 export MIGRATE_RAN_FLAG="${TEST_ROOT}/n6-migrate-ran"
 : > "${CALL_LOG}"
-assert_check_only_fails "pending-name-before-m11" "${dir6}"
+assert_check_only_fails "pending-name-before-m11" "${dir6}" \
+  "L3 violated: pending migration '20260910999999_v1_before_m11' sorts at or before M11"
 
 # ── negative ⑦ an unresolved (finished_at NULL, rolled_back_at NULL) row exists ─
 dir7="${TEST_ROOT}/n7"; make_source_tree "${dir7}"
@@ -363,7 +423,8 @@ export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n7"
 export TABLE_EXISTS=t
 export MIGRATE_RAN_FLAG="${TEST_ROOT}/n7-migrate-ran"
 : > "${CALL_LOG}"
-assert_check_only_fails "unresolved-ledger-row" "${dir7}"
+assert_check_only_fails "unresolved-ledger-row" "${dir7}" \
+  "L4 violated: 1 unresolved migration attempt(s) in the ledger"
 
 # ── negative ⑧ M11 tampered identically in source AND ledger (same non-pinned
 #    checksum in both, so L1's general per-name comparison alone would accept
@@ -381,7 +442,8 @@ export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n8"
 export TABLE_EXISTS=t
 export MIGRATE_RAN_FLAG="${TEST_ROOT}/n8-migrate-ran"
 : > "${CALL_LOG}"
-assert_check_only_fails "m11-tampered-consistently" "${dir8}"
+assert_check_only_fails "m11-tampered-consistently" "${dir8}" \
+  "M11 checksum in the candidate source tree does not match the pinned value"
 
 # ── negative ⑨ StageB receipts are valid and complete but bound to a
 #    DIFFERENT database than the one check-only is running against — a
@@ -397,7 +459,8 @@ export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n9"
 export TABLE_EXISTS=t
 export MIGRATE_RAN_FLAG="${TEST_ROOT}/n9-migrate-ran"
 : > "${CALL_LOG}"
-assert_check_only_fails "receipt-bound-to-other-database" "${dir9}"
+assert_check_only_fails "receipt-bound-to-other-database" "${dir9}" \
+  "StageB MIGRATION_COMMITTED receipt is missing"
 export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
 
 # ── negative ⑩ a receipt exists but in the OLD (pre-fix) shape/path this
@@ -423,7 +486,8 @@ export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n10"
 export TABLE_EXISTS=t
 export MIGRATE_RAN_FLAG="${TEST_ROOT}/n10-migrate-ran"
 : > "${CALL_LOG}"
-assert_check_only_fails "old-shape-receipt-not-recognized" "${dir10}"
+assert_check_only_fails "old-shape-receipt-not-recognized" "${dir10}" \
+  "StageB MIGRATION_COMMITTED receipt is missing"
 export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
 
 # ── negative ⑪ a ledger row has BOTH finished_at and rolled_back_at set --
@@ -439,7 +503,8 @@ export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n11"
 export TABLE_EXISTS=t
 export MIGRATE_RAN_FLAG="${TEST_ROOT}/n11-migrate-ran"
 : > "${CALL_LOG}"
-assert_check_only_fails "contradictory-ledger-row" "${dir11}"
+assert_check_only_fails "contradictory-ledger-row" "${dir11}" \
+  "L4 violated: 1 ledger row(s) have both finished_at and rolled_back_at set"
 
 # ── negative ⑫ a Task168 migration (M1) has TWO applied ledger rows, both
 #    with its own correct checksum. _prisma_migrations keys on an id
@@ -460,7 +525,8 @@ export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n12"
 export TABLE_EXISTS=t
 export MIGRATE_RAN_FLAG="${TEST_ROOT}/n12-migrate-ran"
 : > "${CALL_LOG}"
-assert_check_only_fails "duplicate-applied-row" "${dir12}"
+assert_check_only_fails "duplicate-applied-row" "${dir12}" \
+  "L2 violated: migration '${TASK168_M1_M10[0]}' has more than one applied ledger row"
 
 # ── negative ⑬ a migration-stage.json with every binding field correct
 #    (databaseIdentity, m11Sha256, stage) EXCEPT `kind`, which is wrong --
@@ -472,8 +538,15 @@ applied_rows_for "${dir13}" "${TASK168_M1_M10[@]}" "${M11_NAME}" > "${TEST_ROOT}
 export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/n13-state"
 wrong_kind_dir="${ALPHA_RELEASE_STATE_DIR}/task168/1111111111111111111111111111111111111111"
 mkdir -p "${wrong_kind_dir}"
+# Every OTHER binding field, including a valid manifest/manifestSha256, must
+# be correct so that flipping `kind` back (the mutation below) leaves the
+# receipt fully accepted -- otherwise removing the kind check alone would
+# still be masked by an incidental "manifest missing" failure and this
+# negative would no longer be testing what its name says.
+wrong_kind_manifest="$(write_manifest "${wrong_kind_dir}" "")"
+wrong_kind_manifest_sha="$(sha256sum "${wrong_kind_manifest}" | awk '{print $1}')"
 cat > "${wrong_kind_dir}/migration-stage.json" <<EOF
-{"schemaVersion":1,"kind":"someOtherReceiptKind","status":"MIGRATION_COMMITTED","stage":"stageBFinal","releaseSha":"1111111111111111111111111111111111111111","databaseIdentity":"${FAKE_DB_ID}","m11Sha256":"${M11_SHA}","completedAt":"2026-09-14T00:00:00Z"}
+{"schemaVersion":1,"kind":"someOtherReceiptKind","status":"MIGRATION_COMMITTED","stage":"stageBFinal","releaseSha":"1111111111111111111111111111111111111111","databaseIdentity":"${FAKE_DB_ID}","m11Sha256":"${M11_SHA}","manifest":"${wrong_kind_manifest}","manifestSha256":"${wrong_kind_manifest_sha}","completedAt":"2026-09-14T00:00:00Z"}
 EOF
 wrong_kind_sha="$(sha256sum "${wrong_kind_dir}/migration-stage.json" | awk '{print $1}')"
 cat > "${wrong_kind_dir}/runtime-verification.json" <<EOF
@@ -484,7 +557,8 @@ export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n13"
 export TABLE_EXISTS=t
 export MIGRATE_RAN_FLAG="${TEST_ROOT}/n13-migrate-ran"
 : > "${CALL_LOG}"
-assert_check_only_fails "receipt-wrong-kind" "${dir13}"
+assert_check_only_fails "receipt-wrong-kind" "${dir13}" \
+  "StageB MIGRATION_COMMITTED receipt is missing"
 export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
 
 # ── negative ⑭ a migration-stage.json bound correctly in every field but
@@ -497,8 +571,13 @@ applied_rows_for "${dir14}" "${TASK168_M1_M10[@]}" "${M11_NAME}" > "${TEST_ROOT}
 export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/n14-state"
 diagnosis_dir="${ALPHA_RELEASE_STATE_DIR}/task168/1111111111111111111111111111111111111111"
 mkdir -p "${diagnosis_dir}"
+# Same reasoning as negative ⑬: a valid manifest/manifestSha256 must be
+# present so that fixing `status` back (the mutation below) leaves the
+# receipt fully accepted, isolating the status check.
+diagnosis_manifest="$(write_manifest "${diagnosis_dir}" "")"
+diagnosis_manifest_sha="$(sha256sum "${diagnosis_manifest}" | awk '{print $1}')"
 cat > "${diagnosis_dir}/migration-stage.json" <<EOF
-{"schemaVersion":1,"kind":"task168StageBMigration","status":"MIGRATION_DIAGNOSIS_REQUIRED","stage":"stageBFinal","releaseSha":"1111111111111111111111111111111111111111","databaseIdentity":"${FAKE_DB_ID}","m11Sha256":"${M11_SHA}","failureReason":"M11 precondition RAISE","failedAt":"2026-09-14T00:00:00Z"}
+{"schemaVersion":1,"kind":"task168StageBMigration","status":"MIGRATION_DIAGNOSIS_REQUIRED","stage":"stageBFinal","releaseSha":"1111111111111111111111111111111111111111","databaseIdentity":"${FAKE_DB_ID}","m11Sha256":"${M11_SHA}","manifest":"${diagnosis_manifest}","manifestSha256":"${diagnosis_manifest_sha}","failureReason":"M11 precondition RAISE","failedAt":"2026-09-14T00:00:00Z"}
 EOF
 diagnosis_sha="$(sha256sum "${diagnosis_dir}/migration-stage.json" | awk '{print $1}')"
 cat > "${diagnosis_dir}/runtime-verification.json" <<EOF
@@ -509,7 +588,8 @@ export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n14"
 export TABLE_EXISTS=t
 export MIGRATE_RAN_FLAG="${TEST_ROOT}/n14-migrate-ran"
 : > "${CALL_LOG}"
-assert_check_only_fails "receipt-diagnosis-required-status" "${dir14}"
+assert_check_only_fails "receipt-diagnosis-required-status" "${dir14}" \
+  "StageB MIGRATION_COMMITTED receipt is missing"
 export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
 
 # ── positive ⓐ source == DB == M1-M11, no pending ────────────────────────────
@@ -551,25 +631,114 @@ else
   echo "[positive migrate-applies-pending] OK"
 fi
 
-# ── positive ⓒ a resolved-rolled-back row coexists (finished_at NULL,
-#    rolled_back_at NOT NULL) — excluded from L1/L2/L4, not a violation ──────
+# ── positive ⓒ a resolved-rolled-back row AT OR BEFORE M11 coexists
+#    (finished_at NULL, rolled_back_at NOT NULL) AND matches the StageB
+#    receipt's resolved-attempt snapshot exactly — excluded from L1/L2/L4,
+#    and the resolved-snapshot binding must ACCEPT it (not merely fail to
+#    reject it via L1/L2/L4's own exclusion; see negative ⑮ for the case
+#    where it does NOT match). ────────────────────────────────────────────
 dirc="${TEST_ROOT}/pc"; make_source_tree "${dirc}"
 {
   applied_rows_for "${dirc}" "${TASK168_M1_M10[@]}" "${M11_NAME}"
   ledger_row "20260101000000_v1_old_failed_attempt" cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc f t
 } > "${TEST_ROOT}/rows-pc"
+resolved_attempt_row "20260101000000_v1_old_failed_attempt" cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc "2026-01-02 00:00:00+00" > "${TEST_ROOT}/resolved-pc"
+resolved_snapshot_pc="$(cat "${TEST_ROOT}/resolved-pc")"
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/pc-state"
+write_receipts "${ALPHA_RELEASE_STATE_DIR}" "${FAKE_DB_ID}" "${M11_SHA}" \
+  1111111111111111111111111111111111111111 MIGRATION_COMMITTED "${resolved_snapshot_pc}"
 export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-pc"
 export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-pc"
+export RESOLVED_ATTEMPT_ROWS_FILE="${TEST_ROOT}/resolved-pc"
 export TABLE_EXISTS=t
 export MIGRATE_RAN_FLAG="${TEST_ROOT}/pc-migrate-ran"
 : > "${CALL_LOG}"
 assert_check_only_passes "resolved-rolled-back-row-coexists" "${dirc}"
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
+unset RESOLVED_ATTEMPT_ROWS_FILE
+
+# ── positive ⓓ a resolved-rolled-back row named AFTER M11 exists but is NOT
+#    part of the StageB receipt's snapshot (StageB ran before this name
+#    existed) — excluded from the resolved-snapshot comparison by name, per
+#    the orchestrator's binding-scope decision, so it must not block a
+#    deploy the shared (empty-snapshot) receipts would otherwise accept. ──
+dird="${TEST_ROOT}/pd"; make_source_tree "${dird}"
+applied_rows_for "${dird}" "${TASK168_M1_M10[@]}" "${M11_NAME}" > "${TEST_ROOT}/rows-pd"
+resolved_attempt_row "20260916000000_v1_late_failed_attempt" dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd "2026-09-16 00:00:00+00" > "${TEST_ROOT}/resolved-pd"
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-pd"
+export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-pd"
+export RESOLVED_ATTEMPT_ROWS_FILE="${TEST_ROOT}/resolved-pd"
+export TABLE_EXISTS=t
+export MIGRATE_RAN_FLAG="${TEST_ROOT}/pd-migrate-ran"
+: > "${CALL_LOG}"
+assert_check_only_passes "resolved-row-after-m11-excluded-from-snapshot" "${dird}"
+unset RESOLVED_ATTEMPT_ROWS_FILE
+
+# ── negative ⑮ a resolved-rolled-back row AT OR BEFORE M11 exists but does
+#    NOT match the StageB receipt's resolved-attempt snapshot — the shared
+#    receipts (from line ~341) claim an EMPTY snapshot, but the ledger has
+#    one. Must reject (spec L4's resolved-snapshot binding). ───────────────
+dir15="${TEST_ROOT}/n15"; make_source_tree "${dir15}"
+{
+  applied_rows_for "${dir15}" "${TASK168_M1_M10[@]}" "${M11_NAME}"
+  ledger_row "20260101000000_v1_old_failed_attempt" cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc f t
+} > "${TEST_ROOT}/rows-n15"
+resolved_attempt_row "20260101000000_v1_old_failed_attempt" cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc "2026-01-02 00:00:00+00" > "${TEST_ROOT}/resolved-n15"
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-n15"
+export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n15"
+export RESOLVED_ATTEMPT_ROWS_FILE="${TEST_ROOT}/resolved-n15"
+export TABLE_EXISTS=t
+export MIGRATE_RAN_FLAG="${TEST_ROOT}/n15-migrate-ran"
+: > "${CALL_LOG}"
+assert_check_only_fails "resolved-snapshot-mismatch" "${dir15}" \
+  "L4 violated: rolled-back migration-attempt snapshot at or before M11 differs from the StageB receipt"
+unset RESOLVED_ATTEMPT_ROWS_FILE
+
+# ── negative ⑯ the StageB receipt's manifest file has changed since it was
+#    written (its bytes no longer match manifestSha256) — must reject even
+#    though the receipt itself, the ledger, and the manifest's OWN JSON
+#    content (still a valid, matching resolvedMigrationAttemptsSha256) are
+#    otherwise clean. Only appending one byte after write_receipts wrote a
+#    correct manifest, so the resolved-snapshot check alone could not also
+#    catch this (isolating what mutation "manifest-checksum-check-removed"
+#    below is meant to prove). ──────────────────────────────────────────────
+dir16="${TEST_ROOT}/n16"; make_source_tree "${dir16}"
+applied_rows_for "${dir16}" "${TASK168_M1_M10[@]}" "${M11_NAME}" > "${TEST_ROOT}/rows-n16"
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/n16-state"
+write_receipts "${ALPHA_RELEASE_STATE_DIR}" "${FAKE_DB_ID}" "${M11_SHA}"
+printf ' ' >> "${ALPHA_RELEASE_STATE_DIR}/task168/1111111111111111111111111111111111111111/manifest.json"
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-n16"
+export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n16"
+export TABLE_EXISTS=t
+export MIGRATE_RAN_FLAG="${TEST_ROOT}/n16-migrate-ran"
+: > "${CALL_LOG}"
+assert_check_only_fails "manifest-checksum-mismatch" "${dir16}" \
+  "StageB manifest file named by the migration receipt has changed since StageB ran"
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
+
+# ── negative ⑰ migration-stage.json is present and fully valid/bound, but
+#    its runtime-verification.json is missing entirely — the scenario the
+#    original suite never exercised (no negative had a receipt WITHOUT a
+#    runtime-verification.json; only "no receipt at all" was covered). ─────
+dir17="${TEST_ROOT}/n17"; make_source_tree "${dir17}"
+applied_rows_for "${dir17}" "${TASK168_M1_M10[@]}" "${M11_NAME}" > "${TEST_ROOT}/rows-n17"
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/n17-state"
+write_receipts "${ALPHA_RELEASE_STATE_DIR}" "${FAKE_DB_ID}" "${M11_SHA}"
+rm -f "${ALPHA_RELEASE_STATE_DIR}/task168/1111111111111111111111111111111111111111/runtime-verification.json"
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-n17"
+export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n17"
+export TABLE_EXISTS=t
+export MIGRATE_RAN_FLAG="${TEST_ROOT}/n17-migrate-ran"
+: > "${CALL_LOG}"
+assert_check_only_fails "migration-receipt-without-runtime-verification" "${dir17}" \
+  "StageB runtimeVerification receipt is missing"
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
 
 if [[ "${negatives_failed}" -ne 0 || "${positives_failed}" -ne 0 ]]; then
   echo "[task168-final-steady] FAILED: ${negatives_failed} negative(s), ${positives_failed} positive(s)" >&2
   exit 1
 fi
-echo "[task168-final-steady] all 14 negatives + 3 positives passed"
+echo "[task168-final-steady] all 17 negatives + 4 positives passed"
 
 # ── mutation run: verify the expected red counts in the header comment ──────
 # Applies each mutation to a scratch copy of the script and reruns the exact
@@ -886,9 +1055,40 @@ else
   echo "[mutation exact-match-reversion] NOT red -- an exact-match reversion did not break the pending-M12 scenario as expected" >&2
 fi
 
-echo "[task168-final-steady] mutation reds: ${mutation_reds}/${mutation_total} (expected 12/12)"
-if [[ "${mutation_reds}" -ne 12 ]]; then
-  echo "[task168-final-steady] FAILED: expected all 6 mutations to weaken the check as documented" >&2
+# 13. The resolved-attempt snapshot check removed: negative ⑮ (dir15, a
+#     resolved row at/before M11 the shared receipts' snapshot does not
+#     account for) turns red.
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-n15"; export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n15"
+export RESOLVED_ATTEMPT_ROWS_FILE="${TEST_ROOT}/resolved-n15"
+export TABLE_EXISTS=t; export MIGRATE_RAN_FLAG="${TEST_ROOT}/mut-resolved-snapshot-removed-migrate-ran"
+mutation_total=$((mutation_total + 1))
+if mutate_and_check "resolved-snapshot-check-removed" \
+  '[[ "${resolved_snapshot_sha}" == "${expected_resolved_sha}" ]] || fail '"'"'L4 violated: rolled-back migration-attempt snapshot at or before M11 differs from the StageB receipt'"'"'' \
+  ':' \
+  "${dir15}"; then
+  mutation_reds=$((mutation_reds + 1))
+fi
+unset RESOLVED_ATTEMPT_ROWS_FILE
+
+# 14. The StageB manifest checksum check removed: negative ⑯ (dir16, a
+#     manifest file tampered by one appended byte, its JSON content still
+#     otherwise valid) turns red.
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/n16-state"
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-n16"; export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n16"
+export TABLE_EXISTS=t; export MIGRATE_RAN_FLAG="${TEST_ROOT}/mut-manifest-sha-removed-migrate-ran"
+mutation_total=$((mutation_total + 1))
+if mutate_and_check "manifest-checksum-check-removed" \
+  '[[ "$(sha "${migration_manifest}")" == "${migration_manifest_sha}" ]] || fail '"'"'StageB manifest file named by the migration receipt has changed since StageB ran'"'"'' \
+  ':' \
+  "${dir16}"; then
+  mutation_reds=$((mutation_reds + 1))
+fi
+export ALPHA_RELEASE_STATE_DIR="${TEST_ROOT}/state"
+
+echo "[task168-final-steady] mutation reds: ${mutation_reds}/${mutation_total} (expected 14/14)"
+if [[ "${mutation_reds}" -ne 14 ]]; then
+  echo "[task168-final-steady] FAILED: expected all 14 mutations to weaken the check as documented" >&2
   exit 1
 fi
 

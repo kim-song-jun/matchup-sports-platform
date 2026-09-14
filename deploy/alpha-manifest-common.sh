@@ -110,6 +110,77 @@ validate_alpha_final_release_manifest() {
     ' "${manifest_file}" >/dev/null
 }
 
+# Task 168 M11 StageB (post-commit, one-shot) manifest shape. StageB
+# (deploy/deploy-alpha-stage-b.sh's stageBFinal run) activates its manifest
+# through the SAME candidate->promote state machine
+# (deploy/alpha-release-common.sh) every ordinary Alpha deploy uses, so
+# between a completed StageB run and the first post-StageB "final" deploy
+# (PR-B's steady policy, validate_alpha_final_release_manifest above),
+# alpha's active manifest carries stage "stageBFinal" -- not "final" or
+# "stageAIntermediate". Without this validator, a restore or rollback that
+# has to re-read that manifest in that window hits
+# validate_stored_alpha_manifest's "unsupported Task 168 stage" case below
+# and CRITICALs instead of restoring.
+#
+# Deliberately narrower than the producer-side contract
+# deploy/task168-stage-b-migrate.sh checks inline before it will touch a
+# writer (predecessor/preflight receipt paths, full migration history, ...)
+# -- those only matter at StageB CREATION time. This validator's job is
+# restore/rollback-time re-validation: the schema pin and the
+# resolved-attempt snapshot binding are the fields
+# deploy/task168-final-steady-migrate.sh's own checks depend on later, so
+# those stay strict; everything else only needs to be well-formed.
+validate_alpha_stage_b_final_manifest() {
+  local manifest_file="$1"
+  local expected_sha="$2"
+  local expected_version="$3"
+  local expected_manifest_sha256="$4"
+  local expected_registry="$5"
+  local actual_manifest_sha256
+
+  actual_manifest_sha256="$(sha256sum "${manifest_file}" | awk '{print $1}')"
+  if [[ "${actual_manifest_sha256}" != "${expected_manifest_sha256}" ]]; then
+    echo "[alpha-release] Manifest checksum mismatch" >&2
+    return 1
+  fi
+
+  jq -e \
+    --arg sha "${expected_sha}" \
+    --arg version "${expected_version}" \
+    --arg registry "${expected_registry}" \
+    '
+      .schemaVersion == 1 and
+      .environment == "alpha" and
+      .release.sha == $sha and
+      .release.version == $version and
+      (.release.createdAt | type == "string" and length > 0) and
+      (.source.key | type == "string" and endswith(".tar.gz")) and
+      (.source.bucket | type == "string" and length > 0) and
+      (.source.versionId | type == "string" and length > 0) and
+      (.source.sha256 | test("^[0-9a-f]{64}$")) and
+      .database.migrationPolicy == "task168-stageBFinal" and
+      .database.rollbackMode == "backup-only" and
+      .database.compatibilityCheck == "expand-contract-sql-v1" and
+      .database.migrationValidatedFrom == null and
+      .database.rollbackCompatibleWith == null and
+      .database.task168.stage == "stageBFinal" and
+      .database.task168.schemaSha256 == "e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46" and
+      .database.task168.runtimeClientSchemaSha256 == .database.task168.schemaSha256 and
+      (.database.task168.resolvedMigrationAttemptsSha256 | test("^[0-9a-f]{64}$")) and
+      (.database.task168.fullMigrationHistory | type == "array" and length > 11) and
+      (.database.task168.predecessor.releaseSha | test("^[0-9a-f]{40}$")) and
+      .images.api.repository == ($registry + "/teameet-alpha-v1-api") and
+      .images.web.repository == ($registry + "/teameet-alpha-v1-web") and
+      .images.cutoverTool.repository == ($registry + "/teameet-alpha-v1-api") and
+      (.images.api.digest | test("^sha256:[0-9a-f]{64}$")) and
+      (.images.web.digest | test("^sha256:[0-9a-f]{64}$")) and
+      (.images.cutoverTool.digest | test("^sha256:[0-9a-f]{64}$")) and
+      .images.api.uri == (.images.api.repository + "@" + .images.api.digest) and
+      .images.web.uri == (.images.web.repository + "@" + .images.web.digest) and
+      .images.cutoverTool.uri == (.images.cutoverTool.repository + "@" + .images.cutoverTool.digest)
+    ' "${manifest_file}" >/dev/null
+}
+
 # Stage-aware dispatch (D-4): a *stored* manifest (read back for restore or
 # rollback) may be either the legacy StageA policy or the final policy —
 # whichever was active when it was written. Route to the matching validator
@@ -130,6 +201,11 @@ validate_stored_alpha_manifest() {
   case "${stored_stage}" in
     final)
       validate_alpha_final_release_manifest \
+        "${manifest_file}" "${stored_sha}" "${stored_version}" \
+        "${expected_checksum}" "${expected_registry}"
+      ;;
+    stageBFinal)
+      validate_alpha_stage_b_final_manifest \
         "${manifest_file}" "${stored_sha}" "${stored_version}" \
         "${expected_checksum}" "${expected_registry}"
       ;;

@@ -35,6 +35,10 @@
 #         guard is a no-op; migrate deploy called once; NO docker network/
 #         psql call was made at all (checked via the real docker call log,
 #         not a shell-function trick).
+#   (iv)  M11 folder present but its BYTES are tampered (not the pinned
+#         checksum), and the ledger happens to carry a row with that SAME
+#         tampered checksum (a source-vs-ledger match) -> the m11_pinned_sha
+#         check refuses before any DB/network call is made.
 #
 # Expected red counts per mutation, measured at the bottom of this file:
 #   1. Guard verdict inverted (accepts mismatch, rejects match): (i) and
@@ -48,9 +52,11 @@
 #      the ledger query: a P3009-leftover row (finished_at NULL, same
 #      pinned checksum) is wrongly accepted as "applied" -> (i)-shaped
 #      scenario turns red.
-#   5. Fail-open on a psql/docker error (`|| m11_ledger_checksum=""` changed
-#      to fall back to the source checksum instead): a psql failure is
-#      wrongly treated as "already applied" -> turns red.
+#   5. Fail-open on a psql/docker error (the fail-closed `return 1` on
+#      query_rc != 0 changed to fall back to the source checksum instead):
+#      a psql failure is wrongly treated as "already applied" -> turns red.
+#   6. The m11_pinned_sha check removed: scenario (iv)'s tampered-but-
+#      self-consistent source+ledger pair is wrongly accepted -> turns red.
 set -Eeuo pipefail
 
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -130,7 +136,7 @@ case "\$*" in
   *'network ls --filter name=^deploy_default\$ --format {{.Name}}'*)
     [[ "\${NETWORK_OK:-true}" == true ]] && printf 'deploy_default\n'
     ;;
-  *'run --rm --network deploy_default postgres:16-alpine psql'*)
+  *'--env-file'*'postgres:16-alpine sh -c'*)
     if [[ "\${PSQL_SHOULD_FAIL:-false}" == true ]]; then
       echo "fake docker: injected psql failure" >&2
       exit 1
@@ -156,6 +162,15 @@ readonly SOURCE_WITH_M11="${TEST_ROOT}/source-with-m11"
 make_source_with_m11 "${SOURCE_WITH_M11}"
 readonly SOURCE_WITHOUT_M11="${TEST_ROOT}/source-without-m11"
 mkdir -p "${SOURCE_WITHOUT_M11}/apps/v1_api/prisma/migrations"
+
+# A source tree whose M11 file exists at the right path/name but whose BYTES
+# were tampered -- must be refused by the m11_pinned_sha check alone, before
+# any DB/network call, so the fixture's OWN checksum (used below to build a
+# ledger row that happens to match it) is captured for that purpose.
+readonly SOURCE_WITH_TAMPERED_M11="${TEST_ROOT}/source-with-tampered-m11"
+mkdir -p "${SOURCE_WITH_TAMPERED_M11}/apps/v1_api/prisma/migrations/${M11_NAME}"
+printf -- '-- tampered M11\nSELECT 1;\n' > "${SOURCE_WITH_TAMPERED_M11}/apps/v1_api/prisma/migrations/${M11_NAME}/migration.sql"
+readonly TAMPERED_M11_SHA="$(sha256sum "${SOURCE_WITH_TAMPERED_M11}/apps/v1_api/prisma/migrations/${M11_NAME}/migration.sql" | awk '{print $1}')"
 
 write_fixture() { printf '%s' "$1" > "${TEST_ROOT}/fixture.json"; }
 readonly FIXTURE_EMPTY='[]'
@@ -256,6 +271,30 @@ elif grep -qE 'network ls|psql' "${CALL_LOG}"; then
   failures=$((failures + 1))
 else
   echo "[(iii)] OK: guard no-op passed without touching docker network/psql (M11 absent from source), migrate deploy called once"
+fi
+
+# ── (iv) M11 folder present but its BYTES were tampered -> the m11_pinned_sha
+#    check refuses before any DB/network call, even when the (tampered)
+#    ledger checksum happens to match the (tampered) source checksum --
+#    proving the pin is a check independent of the source-vs-ledger compare,
+#    not merely derivable from it. ──────────────────────────────────────────
+write_fixture "[{\"name\":\"${M11_NAME}\",\"checksum\":\"${TAMPERED_M11_SHA}\",\"finished\":true,\"rolledback\":false}]"
+export CALL_LOG="${TEST_ROOT}/iv-calls.log"; : > "${CALL_LOG}"
+run_segment "${TEST_ROOT}/baseline-segment.sh" "${SOURCE_WITH_TAMPERED_M11}"
+if [[ "${SEGMENT_RC}" -eq 0 ]]; then
+  echo "(iv) FAILED: segment unexpectedly succeeded (tampered M11 source was accepted)" >&2
+  echo "${SEGMENT_OUTPUT}" >&2
+  failures=$((failures + 1))
+elif [[ "$(migrate_deploy_count)" != 0 ]]; then
+  echo "(iv) FAILED: prisma migrate deploy was called despite the pin check refusing" >&2
+  cat "${CALL_LOG}" >&2
+  failures=$((failures + 1))
+elif grep -qE 'network ls|psql' "${CALL_LOG}"; then
+  echo "(iv) FAILED: the pin check is supposed to fail BEFORE any DB/network call, but it touched docker network/psql:" >&2
+  cat "${CALL_LOG}" >&2
+  failures=$((failures + 1))
+else
+  echo "[(iv)] OK: guard refused (M11 source checksum does not match the pinned value) before touching docker network/psql, migrate deploy call count 0"
 fi
 
 if [[ "${failures}" -ne 0 ]]; then
@@ -383,9 +422,11 @@ else
 fi
 export PROD_RELEASE_COMMON_FOR_RUN="${PROD_RELEASE_COMMON}"
 
-# 5. Fail-open on a psql/docker error: `|| m11_ledger_checksum=""` changed
-#    to fall back to the SOURCE checksum (so any query failure is treated
-#    as "already applied and matching").
+# 5. Fail-open on a psql/docker error: the `if [[ "${query_rc}" -ne 0 ]] ...
+#    return 1; fi` block replaced with a fallback that treats a query
+#    failure as "already applied and matching" (mirrors the OLD
+#    `|| m11_ledger_checksum=""`-style bug this replaced, which this
+#    scratch copy re-introduces in an equivalent, observably wrong form).
 mutation_total=$((mutation_total + 1))
 scratch_failopen="${TEST_ROOT}/mut-fail-open-dir"
 mkdir -p "${scratch_failopen}"
@@ -396,8 +437,20 @@ python3 - "${PROD_RELEASE_COMMON}" "${scratch_failopen_common}" <<'PYEOF'
 import sys
 src_path, out_path = sys.argv[1], sys.argv[2]
 src = open(src_path, encoding='utf-8').read()
-old = '|| m11_ledger_checksum=""'
-new = '|| m11_ledger_checksum="${m11_source_sha}"'
+old = '''  if [[ "${query_rc}" -ne 0 ]]; then
+    # Fail closed on a query/connection error instead of silently treating it
+    # as "M11 not applied" via an empty string -- both reach the same
+    # `return 1` below, but surfacing the actual psql/docker error here
+    # means an operator sees WHY (network unreachable, auth failure, ...)
+    # instead of a diagnosis that reads identically to "M11 truly missing".
+    echo "[prod-deploy] Task168 M11 guard: could not query prod's migration ledger. Refusing to run prisma migrate deploy." >&2
+    cat "${psql_stderr}" >&2
+    rm -f "${psql_stderr}"
+    return 1
+  fi
+  rm -f "${psql_stderr}"'''
+new = '''  [[ "${query_rc}" -eq 0 ]] || m11_ledger_checksum="${m11_source_sha}"
+  rm -f "${psql_stderr}"'''
 count = src.count(old)
 if count != 1:
     raise SystemExit(f'expected exactly 1 occurrence, found {count}')
@@ -417,8 +470,43 @@ else
 fi
 export PROD_RELEASE_COMMON_FOR_RUN="${PROD_RELEASE_COMMON}"
 
-echo "[task168-prod-guard] mutation reds: ${mutation_reds}/${mutation_total} (expected 6/6)"
-if [[ "${mutation_reds}" -ne 6 ]]; then
+# 6. The m11_pinned_sha check removed: (iv)'s tampered-but-self-consistent
+#    source+ledger pair (both carry the SAME tampered checksum, so the
+#    source-vs-ledger compare alone would accept it) is wrongly accepted.
+mutation_total=$((mutation_total + 1))
+scratch_pin_removed="${TEST_ROOT}/mut-pin-removed-dir"
+mkdir -p "${scratch_pin_removed}"
+ln -s "${ROOT_DIR}/deploy/prod-source-common.sh" "${scratch_pin_removed}/prod-source-common.sh"
+ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${scratch_pin_removed}/prod-manifest-common.sh"
+scratch_pin_removed_common="${scratch_pin_removed}/prod-release-common.sh"
+python3 - "${PROD_RELEASE_COMMON}" "${scratch_pin_removed_common}" <<'PYEOF'
+import sys
+src_path, out_path = sys.argv[1], sys.argv[2]
+src = open(src_path, encoding='utf-8').read()
+old = '''  if [[ "${m11_source_sha}" != "${m11_pinned_sha}" ]]; then
+    echo "[prod-deploy] Task168 M11 guard: candidate source's M11 checksum (${m11_source_sha}) does not match the pinned value (${m11_pinned_sha}). Refusing to run prisma migrate deploy." >&2
+    return 1
+  fi
+'''
+count = src.count(old)
+if count != 1:
+    raise SystemExit(f'expected exactly 1 occurrence, found {count}')
+open(out_path, 'w', encoding='utf-8').write(src.replace(old, '', 1))
+PYEOF
+export PROD_RELEASE_COMMON_FOR_RUN="${scratch_pin_removed_common}"
+write_fixture "[{\"name\":\"${M11_NAME}\",\"checksum\":\"${TAMPERED_M11_SHA}\",\"finished\":true,\"rolledback\":false}]"
+export CALL_LOG="${TEST_ROOT}/mut6-calls.log"; : > "${CALL_LOG}"
+run_segment "${TEST_ROOT}/baseline-segment.sh" "${SOURCE_WITH_TAMPERED_M11}"
+if [[ "${SEGMENT_RC}" -eq 0 && "$(migrate_deploy_count)" == 1 ]]; then
+  echo "[mutation pin-check-removed] red (a source whose M11 checksum does not match the pin, but happens to match the ledger, was wrongly accepted)"
+  mutation_reds=$((mutation_reds + 1))
+else
+  echo "[mutation pin-check-removed] NOT red -- the tampered-but-self-consistent source/ledger pair was still correctly refused" >&2
+fi
+export PROD_RELEASE_COMMON_FOR_RUN="${PROD_RELEASE_COMMON}"
+
+echo "[task168-prod-guard] mutation reds: ${mutation_reds}/${mutation_total} (expected 7/7)"
+if [[ "${mutation_reds}" -ne 7 ]]; then
   echo "[task168-prod-guard] FAILED: expected all mutations to weaken the guard as documented" >&2
   exit 1
 fi

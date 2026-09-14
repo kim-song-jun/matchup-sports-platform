@@ -130,6 +130,7 @@ case "$*" in
     case "${sql}" in
       *current_database*) printf '%s\n' "${DB_ID}" ;;
       *to_regclass*) printf '%s\n' "${TABLE_EXISTS}" ;;
+      *'ORDER BY migration_name,rolled_back_at,checksum,id'*) printf '' ;;
       *'FROM "_prisma_migrations" ORDER BY migration_name'*) cat "${LEDGER_ROWS_FILE}" ;;
       *) echo "fake docker: unrecognized SQL: ${sql}" >&2; exit 1 ;;
     esac
@@ -173,8 +174,16 @@ write_receipts() {
   local state_root="$1" db_id="$2" m11_sha="$3"
   local dir="${state_root}/task168/1111111111111111111111111111111111111111"
   mkdir -p "${dir}"
+  # Empty resolved-attempt snapshot (sha256 of "") -- the fake docker above
+  # always answers the resolved-attempt SQL with no rows, so this must
+  # match deploy/task168-final-steady-migrate.sh's own empty-input hash.
+  local manifest_path="${dir}/manifest.json" manifest_sha
+  cat > "${manifest_path}" <<'MANIFESTEOF'
+{"database":{"task168":{"resolvedMigrationAttemptsSha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}}}
+MANIFESTEOF
+  manifest_sha="$(sha256sum "${manifest_path}" | awk '{print $1}')"
   cat > "${dir}/migration-stage.json" <<EOF
-{"schemaVersion":1,"kind":"task168StageBMigration","status":"MIGRATION_COMMITTED","stage":"stageBFinal","releaseSha":"1111111111111111111111111111111111111111","databaseIdentity":"${db_id}","m11Sha256":"${m11_sha}","completedAt":"2026-09-14T00:00:00Z"}
+{"schemaVersion":1,"kind":"task168StageBMigration","status":"MIGRATION_COMMITTED","stage":"stageBFinal","releaseSha":"1111111111111111111111111111111111111111","databaseIdentity":"${db_id}","m11Sha256":"${m11_sha}","manifest":"${manifest_path}","manifestSha256":"${manifest_sha}","completedAt":"2026-09-14T00:00:00Z"}
 EOF
   local migration_receipt_sha
   migration_receipt_sha="$(sha256sum "${dir}/migration-stage.json" | awk '{print $1}')"

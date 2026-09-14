@@ -2,6 +2,7 @@ import { Prisma, V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
 import { createTeamMatchScheduleInTx } from '../team-schedules/team-schedules.service';
 import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
+import { participantDisplayName } from '../tournaments/participant-display-name';
 
 /**
  * 리그 대진 **한 경기**를 만드는 단일 경로.
@@ -39,11 +40,15 @@ export interface LeagueFixtureCreationInput {
   away: LeagueFixtureTeam;
 }
 
+type ParticipantProfile = { nickname: string | null; displayName: string | null };
+
 /** 자동 로스터를 만들 만큼의 팀 정보 — `loadTeamsWithMembers` 가 돌려주는 모양. */
 export interface LeagueFixtureTeam {
   id: string;
   name: string;
-  memberships: Array<{ id: string; user: { profile: { nickname: string | null; displayName: string | null } | null } }>;
+  memberships: Array<{ id: string; user: { profile: ParticipantProfile | null } }>;
+  /** 이 리그의 참가 명단(confirmed 신청에서 제외되지 않은 선수). 비어 있으면 명단 미제출이다. */
+  registeredPlayers: Array<{ id: string; userId: string; user: { profile: ParticipantProfile | null } }>;
 }
 
 /**
@@ -69,6 +74,32 @@ export function leagueFixtureTitle(input: {
     return `${input.leagueTitle} ${input.matchday}주차 ${input.orderInDay}경기`;
   }
   return `${input.leagueTitle} ${input.round}주차`;
+}
+
+/**
+ * 한 팀의 경기 명단. 정본 §3 "명단 = 출전자" — 참가 명단이 있으면 그 선수들을 계정과 함께
+ * 넣고, `createFromSourceInTransaction` 이 ROSTER_ASSERTED 연결을 만든다(대회와 같은 경로).
+ *
+ * 명단이 없는 팀은 팀원 전원을 **계정 없이** 넣는다. 명단을 내지 않은 팀원 전원을 출전자로
+ * 연결하면 뛰지 않은 사람이 상호평가 대상(reviews.service.ts)과 선수 카드 기록에 오르고,
+ * "이 선수가 저예요" 신청 목록(연결 없는 참가자만)에서도 빠진다.
+ *
+ * 대진 생성 시점의 스냅샷이다 — 이후 명단이 바뀌어도 이미 만든 경기에는 반영되지 않는다.
+ */
+function fixtureRoster(team: LeagueFixtureTeam, sideKey: V1GameSideKey) {
+  if (team.registeredPlayers.length > 0) {
+    return team.registeredPlayers.map((player) => ({
+      sourceParticipantId: player.id,
+      userId: player.userId,
+      sideKey,
+      displayNameSnapshot: participantDisplayName(player),
+    }));
+  }
+  return team.memberships.map((membership) => ({
+    sourceParticipantId: membership.id,
+    sideKey,
+    displayNameSnapshot: participantDisplayName(membership),
+  }));
 }
 
 export async function createLeagueFixture(
@@ -121,47 +152,7 @@ export async function createLeagueFixture(
         { sideKey: V1GameSideKey.HOME, teamId: home.id, displayNameSnapshot: home.name },
         { sideKey: V1GameSideKey.AWAY, teamId: away.id, displayNameSnapshot: away.name },
       ],
-      // 자동 로스터에는 **사람(userId)을 붙이지 않는다.** 이 목록은 팀이 이 경기를
-      // 위해 작성한 명단이 아니라 대진 생성 시점의 **팀 전체 활성 멤버 스냅샷**이다
-      // (loadTeamsWithMembers 의 `status: 'active'` 전원). 여기에 userId 를 실으면
-      // createFromSourceInTransaction 이 그 전원에게 신원 연결(ROSTER_ASSERTED)을
-      // 만드는데, 만들어진 사실이 전부 거짓이 된다:
-      //   · 선수 카드가 한 경기도 안 뛴 팀원에게 "기록 공개 동의를 켜면 골·도움·출전이
-      //     열려요"라고 안내한다. 정작 켜도 출전이 0이라 아무것도 열리지 않는다 —
-      //     2026-08-24 alpha 실측으로 잡은 '거짓 약속' 결함이다. **이 한 줄은 2026-08-26
-      //     에 카드 쪽에서 한 겹 막혔다**: 판정 필드가 옛 `hasRecordLinks`("연결이 있는가")
-      //     에서 `hasUnlockableRecords`("동의를 켜면 실제로 열릴 공식 결과가 있는가")로
-      //     바뀌어(games/public-records/player-card-stats.ts), 연결만 있고 공식 결과가
-      //     0건이면 카드는 이제 동의가 아니라 출전을 안내한다. 회귀는
-      //     profile/player-card.spec.ts 의 "동의를 켜도 열릴 기록이 없는 사용자" 블록이
-      //     못박는다. **그래도 여기서 userId 를 실어도 된다는 뜻은 아니다** — 아래 근거는
-      //     카드 수정과 무관하게 그대로 살아 있다.
-      //   · 상호평가 대상 로스터(reviews.service.ts 의 `userId: { not: null }` 조회)가
-      //     라인업이 아니라 이 행을 그대로 읽어, 뛰지 않은 팀원 전원이 평가 대상으로 뜬다.
-      //     이 조회는 손대지 않았으므로 **여전히 깨진다** — 카드가 고쳐졌으니 괜찮다고
-      //     읽지 말 것. 아래 본인 확인 경로 문단도 마찬가지로 유효하다.
-      // 개인 기록으로 이어지는 연결은 **팀이 실제로 작성한 라인업**에서만 생긴다
-      // (team-matches/team-match-lineup.service.ts 의 saveLineup — 새 리비전의 참가자
-      // 행마다 팀장 이름으로 연결을 만든다). 대회 쪽(tournament-bracket.service.ts)이
-      // `userId: player.userId` 를 싣는 것과 모순되지 않는다: 그 명단은 팀이 대회에
-      // 등록한 선수 명단(V1TournamentRegistrationPlayer)이라 이미 팀의 작성물이다.
-      //
-      // 연결이 없는 채로 두는 것이 오히려 본인 확인 경로를 연다 —
-      // listLeagueClaimableParticipants 는 "연결 없는 참가자"만 돌려주므로, 미리 연결을
-      // 만들어 두면 선수가 자기 기록을 신청(requestIdentityLink → 팀장 승인)할 길까지
-      // 함께 막힌다.
-      participants: [
-        ...home.memberships.map((m) => ({
-          sourceParticipantId: m.id,
-          sideKey: V1GameSideKey.HOME,
-          displayNameSnapshot: m.user.profile?.nickname ?? m.user.profile?.displayName ?? '팀원',
-        })),
-        ...away.memberships.map((m) => ({
-          sourceParticipantId: m.id,
-          sideKey: V1GameSideKey.AWAY,
-          displayNameSnapshot: m.user.profile?.nickname ?? m.user.profile?.displayName ?? '팀원',
-        })),
-      ],
+      participants: [...fixtureRoster(home, V1GameSideKey.HOME), ...fixtureRoster(away, V1GameSideKey.AWAY)],
     },
     {
       actor: { actorType: 'USER', actorUserId: input.adminUserId, role: 'platform_ops' },

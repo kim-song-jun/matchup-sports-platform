@@ -1,23 +1,16 @@
 /**
  * league-match-admin.service.spec.ts
  *
- * 리그 대진 자동 생성이 만드는 **자동 로스터**가 신원 연결(V1ParticipantIdentityLinkCurrent)을
- * 만들지 않는다는 것을 고정한다.
+ * 리그 대진 자동 생성이 경기 명단을 어디서 만들고 누구에게 신원 연결을 만드는지 고정한다.
+ *   · 참가 명단이 있는 팀 — 명단 선수를 계정과 함께 넣고 ROSTER_ASSERTED 연결이 생긴다
+ *     (정본 §3 "명단 = 출전자").
+ *   · 참가 명단이 없는 팀 — 팀원 전원을 계정 없이 넣고 연결은 0건이다. 연결을 만들면 명단을
+ *     내지 않은 팀원이 상호평가 대상·선수 카드 기록에 오른다.
  *
- * 왜 "만들지 않는다"가 계약인가: 자동 로스터는 팀이 이 경기를 위해 작성한 명단이 아니라
- * 대진 생성 시점의 **팀 전체 활성 멤버 스냅샷**이다. 거기에 연결을 만들면 한 경기도 뛰지
- * 않은 팀원이 "연결된 기록이 있는 사람"이 되어
- *   · 선수 카드가 "기록 공개 동의를 켜면 골·도움·출전이 열려요"라고 거짓 안내를 하고
- *     (profile/player-card.spec.ts 의 "연결된 기록이 아예 없는 사용자" 블록이 막는 결함),
- *   · 상호평가 대상 로스터(reviews.service.ts)에 뛰지 않은 팀원 전원이 올라온다.
- * 개인 기록으로 이어지는 연결은 팀이 실제로 작성한 라인업에서만 생긴다
- * (team-matches/team-match-lineup.service.ts saveLineup — 그쪽 스펙이 담당).
- *
- * 그래서 이 스펙은 **GamesService 를 목으로 바꾸지 않고 진짜 구현을 쓴다.** 목을 쓰면
- * "userId 를 안 실었다"까지만 볼 수 있고 "그래서 연결이 0건이다"는 증명되지 않는다 —
- * 자동 연결을 만드는 쪽은 GamesService.createFromSourceInTransaction 이기 때문이다.
- * 가짜 tx 는 호출된 statement 를 전부 기록하므로 트랜잭션 부하(참가자당 statement 수)도
- * 같은 하네스에서 직접 센다.
+ * GamesService 는 목으로 바꾸지 않고 진짜 구현을 쓴다 — 연결을 만드는 쪽이
+ * createFromSourceInTransaction 이라, 목으로는 "userId 를 실었다" 까지만 보이고 "연결이
+ * 생겼다" 는 증명되지 않는다. 가짜 tx 는 호출된 statement 를 전부 기록해 참가자당 statement
+ * 수도 같은 하네스에서 센다.
  */
 import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { leagueFixtureTitle } from './league-fixture-creation';
@@ -69,6 +62,8 @@ interface FakeState {
   applicationCreates: Array<{ message: string; status: string }>;
   /** 잠금 뒤 재조회가 보는 **커밋된** 로스터. 기본은 등록된 두 팀. */
   registeredTeamIds: Set<string>;
+  /** 팀별 리그 참가 명단. 기본은 비어 있다(명단 미제출). */
+  rosterPlayers: Map<string, Array<{ id: string; userId: string; nickname: string }>>;
 }
 
 /** 리그에 등록된 두 팀 — 기존 스펙이 멤버십 이름으로 사이드 배정을 단언하므로 고정한다. */
@@ -85,6 +80,7 @@ function createFake() {
     teamMatchCreates: [],
     applicationCreates: [],
     registeredTeamIds: new Set(['team-a', 'team-b']),
+    rosterPlayers: new Map(),
   };
   let seq = 0;
   let createdGameId: string | null = null;
@@ -156,7 +152,16 @@ function createFake() {
         state.registeredTeamIds.has(args.where.teamId) ? { tournamentId: 'league-1' } : null,
       ),
       findMany: track('v1TournamentRegistration.findMany', async (args: { where: { teamId: { in: string[] } } }) =>
-        args.where.teamId.in.filter((id) => state.registeredTeamIds.has(id)).map((teamId) => ({ teamId })),
+        args.where.teamId.in
+          .filter((id) => state.registeredTeamIds.has(id))
+          .map((teamId) => ({
+            teamId,
+            players: (state.rosterPlayers.get(teamId) ?? []).map((player) => ({
+              id: player.id,
+              userId: player.userId,
+              user: { profile: { nickname: player.nickname, displayName: null } },
+            })),
+          })),
       ),
       count: track('v1TournamentRegistration.count', async (args: { where: { teamId?: string | { not: string } } }) => {
         const teamId = args.where.teamId;
@@ -309,7 +314,7 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
     service = await createModule(fake.prisma, fake.games);
   });
 
-  it('자동 로스터만 있는 대진에서는 신원 연결이 0건이다', async () => {
+  it('참가 명단이 없는 팀은 팀원 전원을 계정 없이 넣고 신원 연결이 0건이다', async () => {
     await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
 
     // 참가자 행 자체는 그대로 만들어진다 — 없애는 게 아니라 "사람을 못박지 않는" 것이다.
@@ -334,6 +339,45 @@ describe('LeagueMatchAdminService.generateFixtures — 자동 로스터와 신�
     // 홈/원정이 뒤바뀌면 나중에 입력된 기록이 상대 팀 선수에게 붙는다.
     expect(namesOn(homeSideId)).toEqual(['membership-a1 님', 'membership-a2 님']);
     expect(namesOn(awaySideId)).toEqual(['membership-b1 님', 'membership-b2 님']);
+  });
+
+  it('참가 명단이 있는 팀은 명단 선수를 계정과 함께 넣고 선수마다 ROSTER_ASSERTED 연결이 생긴다', async () => {
+    state.rosterPlayers.set('team-a', [
+      { id: 'player-a1', userId: 'user-a1', nickname: '가나' },
+      { id: 'player-a2', userId: 'user-a2', nickname: '다라' },
+      { id: 'player-a3', userId: 'user-a3', nickname: '마바' },
+    ]);
+    state.rosterPlayers.set('team-b', [{ id: 'player-b1', userId: 'user-b1', nickname: '사아' }]);
+
+    await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
+
+    const sideRows = (sideKey: V1GameSideKey) => {
+      const sideId = state.sides.find((side) => side.sideKey === sideKey)!.id;
+      return state.participants
+        .filter((row) => row.sideId === sideId)
+        .map((row) => [row.userId, row.displayNameSnapshot]);
+    };
+    // 팀원 수(각 2명)가 아니라 명단 인원(3명·1명)으로 들어가야 한다.
+    expect(sideRows(V1GameSideKey.HOME)).toEqual([['user-a1', '가나'], ['user-a2', '다라'], ['user-a3', '마바']]);
+    expect(sideRows(V1GameSideKey.AWAY)).toEqual([['user-b1', '사아']]);
+
+    expect(state.links).toHaveLength(4);
+    for (const link of state.links) {
+      expect(state.participants.find((row) => row.id === link.participantId)?.userId).toBe(link.userId);
+    }
+    expect(state.linkEvents.map((event) => event.action)).toEqual(Array(4).fill('ROSTER_ASSERTED'));
+  });
+
+  it('한 팀만 명단을 냈으면 그 팀만 연결되고, 다른 팀은 팀원 전원이 계정 없이 들어간다', async () => {
+    state.rosterPlayers.set('team-b', [{ id: 'player-b1', userId: 'user-b1', nickname: '사아' }]);
+
+    await service.generateFixtures(adminUser, 'league-1', { weeksCount: 1 });
+
+    const homeSideId = state.sides.find((side) => side.sideKey === V1GameSideKey.HOME)!.id;
+    const homeRows = state.participants.filter((row) => row.sideId === homeSideId);
+    expect(homeRows.map((row) => row.displayNameSnapshot)).toEqual(['membership-a1 님', 'membership-a2 님']);
+    expect(homeRows.every((row) => row.userId === null)).toBe(true);
+    expect(state.links.map((link) => link.userId)).toEqual(['user-b1']);
   });
 
   it('참가자당 statement 는 create 1건뿐이다 — 대형 리그 트랜잭션 타임아웃 방지', async () => {

@@ -89,7 +89,7 @@ grep -q "up -d v1_postgres" "${pos_root}/calls.log" \
 # activation" without needing to run the whole script.
 call_line="$(grep -n 'assert_task168_m11_absent compose' "${DEPLOY_SCRIPT}" | head -1 | cut -d: -f1)" || true
 refusal_line="$(grep -n "Refusing a Stage A manifest" "${DEPLOY_SCRIPT}" | head -1 | cut -d: -f1)" || true
-activate_line="$(grep -n 'activate_alpha_release_source "\${ALPHA_SHA}"' "${DEPLOY_SCRIPT}" | head -1 | cut -d: -f1)" || true
+activate_line="$(grep -n 'activate_alpha_release_source "\${source_key}"' "${DEPLOY_SCRIPT}" | head -1 | cut -d: -f1)" || true
 
 if [[ -n "${call_line}" && -n "${activate_line}" && "${call_line}" -lt "${activate_line}" ]]; then
   pass "assert_task168_m11_absent call (line ${call_line}) precedes source activation (line ${activate_line})"

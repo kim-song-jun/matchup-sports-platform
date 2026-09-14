@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# Task 168 M11 converged: the "final steady" migration path that every dev
+# push takes once StageB has committed M11 on the live database. Unlike
+# task168-stage-a-migrate.sh (a one-shot writer-quiesced cutover) this script
+# never stops a writer and never runs destructive DDL itself — it only
+# proves the DB ledger and the candidate source tree agree (L1-L4, see
+# docs referenced by the PR that introduced this file) before letting
+# deploy-alpha.sh activate the candidate release, then applies whatever
+# ordinary (already expand-contract-gated) migrations are pending.
+#
+# --check-only runs BEFORE deploy-alpha.sh activates the candidate source or
+# mutates the live runtime. It is read-only: on failure nothing about the
+# live release changes. --migrate runs AFTER activation and actually calls
+# `prisma migrate deploy`; M11 itself is always a no-op there (StageB already
+# applied it) so this step behaves like an ordinary additive migration run.
+set -Eeuo pipefail
+usage(){ echo "usage: $0 (--check-only|--migrate) --source-dir D --compose-prod F --compose-alpha F --env-file F" >&2; exit 64; }
+MODE= SOURCE_DIR= COMPOSE_PROD= COMPOSE_ALPHA= ENV_FILE=
+while (($#)); do case "$1" in
+  --check-only) MODE=check-only; shift;;
+  --migrate) MODE=migrate; shift;;
+  --source-dir) SOURCE_DIR=${2:?}; shift 2;;
+  --compose-prod) COMPOSE_PROD=${2:?}; shift 2;;
+  --compose-alpha) COMPOSE_ALPHA=${2:?}; shift 2;;
+  --env-file) ENV_FILE=${2:?}; shift 2;;
+  *) usage;;
+esac; done
+[[ -n "${MODE}" && -d "${SOURCE_DIR}" && -f "${COMPOSE_PROD}" && -f "${COMPOSE_ALPHA}" && -f "${ENV_FILE}" ]] || usage
+
+sha(){ sha256sum "$1" | awk '{print $1}'; }
+fail(){ echo "[task168-final-steady] $*" >&2; exit 1; }
+
+readonly M11_NAME=20260911090000_retire_tournament_fixture_tables
+readonly M11_SHA=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
+readonly TASK168_NAMES=(
+  20260908130000_v1_team_match_tournament_expand
+  20260908150000_v1_operation_audit_team_match_expand
+  20260908160000_v1_official_fact_team_match_scope
+  20260908170000_v1_lineup_invalidation
+  20260908180000_v1_staff_scope_team_match
+  20260909000000_v1_tournament_result_lineage
+  20260909110000_v1_operation_audit_canonical_binding
+  20260910010000_v1_official_fact_source_history
+  20260910020000_v1_canonical_game_db_guards
+  20260910160000_v1_outbox_cutover_claim_gate
+  "${M11_NAME}"
+)
+
+STATE_ROOT="${ALPHA_RELEASE_STATE_DIR:-/home/ec2-user/.teameet-alpha-releases}/task168-final"
+TRANSITION="${STATE_ROOT}/transition.json"
+RUNTIME_VERIFICATION="${STATE_ROOT}/runtime-verification.json"
+
+compose=(docker compose --project-name deploy -f "${COMPOSE_PROD}" -f "${COMPOSE_ALPHA}" --env-file "${ENV_FILE}")
+dbq(){ "${compose[@]}" exec -T v1_postgres psql -v ON_ERROR_STOP=1 -At -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" -c "$1"; }
+db_identity(){ dbq "SELECT current_database() || '|' || current_user || '|' || COALESCE(inet_server_addr()::text,'local') || '|' || COALESCE(inet_server_port()::text,'local')"; }
+
+# ── candidate source tree (L1's right-hand side) ────────────────────────────
+declare -A SOURCE_SHA
+source_names=()
+while IFS= read -r dir; do
+  name="$(basename "${dir}")"
+  [[ -f "${dir}/migration.sql" ]] || continue
+  SOURCE_SHA["${name}"]="$(sha "${dir}/migration.sql")"
+  source_names+=("${name}")
+done < <(find "${SOURCE_DIR}/apps/v1_api/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | LC_ALL=C sort)
+
+[[ "${#source_names[@]}" -gt 0 ]] || fail 'no migrations found in the candidate source tree'
+[[ -n "${SOURCE_SHA[${M11_NAME}]:-}" ]] || fail 'candidate source tree is missing M11'
+[[ "${SOURCE_SHA[${M11_NAME}]}" == "${M11_SHA}" ]] || fail 'M11 checksum in the candidate source tree does not match the pinned value'
+
+# ── live DB ledger (L1's left-hand side) ────────────────────────────────────
+DB_ID="$(db_identity)" || fail 'target DB identity unavailable'
+migrations_table_exists="$(dbq "SELECT (to_regclass('public.\"_prisma_migrations\"') IS NOT NULL)::text")" || fail 'could not check for the Prisma migrations table'
+rows=''
+if [[ "${migrations_table_exists}" == t ]]; then
+  rows="$(dbq "SELECT migration_name || '|' || COALESCE(checksum,'') || '|' || (finished_at IS NOT NULL)::text || '|' || (rolled_back_at IS NOT NULL)::text FROM \"_prisma_migrations\" ORDER BY migration_name")" || fail 'ledger query failed'
+fi
+
+declare -A APPLIED_SHA
+unresolved_count=0
+while IFS='|' read -r name checksum finished rolledback; do
+  [[ -n "${name}" ]] || continue
+  if [[ "${finished}" == t && "${rolledback}" == f ]]; then
+    APPLIED_SHA["${name}"]="${checksum}"
+  elif [[ "${finished}" == f && "${rolledback}" == f ]]; then
+    # finished_at IS NULL AND rolled_back_at IS NULL: the P3009 "in-flight or
+    # crashed" state. finished_at IS NULL AND rolled_back_at IS NOT NULL (a
+    # `migrate resolve --rolled-back` attempt) is deliberately excluded here:
+    # it is neither an applied row (L1/L2 do not see it) nor an unresolved
+    # one, so it cannot violate L1, L2, or L4 by construction.
+    unresolved_count=$((unresolved_count + 1))
+  fi
+done <<<"${rows}"
+
+# L4: zero unresolved (P3009) attempts.
+[[ "${unresolved_count}" -eq 0 ]] || fail "L4 violated: ${unresolved_count} unresolved migration attempt(s) in the ledger"
+
+# L1: every applied DB row exists in the candidate source with the same name and checksum.
+for name in "${!APPLIED_SHA[@]}"; do
+  [[ -n "${SOURCE_SHA[${name}]:-}" ]] || fail "L1 violated: applied migration '${name}' is not in the candidate source tree"
+  [[ "${APPLIED_SHA[${name}]}" == "${SOURCE_SHA[${name}]}" ]] || fail "L1 violated: applied migration '${name}' checksum differs from the candidate source tree"
+done
+
+# L2: the 11 Task168 names are each applied exactly once, and M11's checksum is pinned.
+for name in "${TASK168_NAMES[@]}"; do
+  [[ -n "${APPLIED_SHA[${name}]:-}" ]] || fail "L2 violated: Task168 migration '${name}' is not an applied ledger row"
+done
+[[ "${APPLIED_SHA[${M11_NAME}]}" == "${M11_SHA}" ]] || fail 'L2 violated: applied M11 checksum does not match the pinned value'
+
+# L3: source-only (pending) names must sort lexically after M11 — a pending
+# migration named before M11 would mean the deploy order assumption (M11 is
+# already the newest applied history) broke.
+for name in "${source_names[@]}"; do
+  [[ -n "${APPLIED_SHA[${name}]:-}" ]] && continue
+  [[ "${name}" > "${M11_NAME}" ]] || fail "L3 violated: pending migration '${name}' sorts at or before M11"
+done
+
+pending_count=$(( ${#source_names[@]} - ${#APPLIED_SHA[@]} ))
+echo "[task168-final-steady] L1-L4 passed (${#APPLIED_SHA[@]} applied, ${pending_count} pending)"
+
+if [[ "${MODE}" == check-only ]]; then
+  [[ -s "${TRANSITION}" ]] || fail 'StageB MIGRATION_COMMITTED receipt is missing'
+  jq -e --arg db "${DB_ID}" --arg m11 "${M11_SHA}" \
+    '.schemaVersion==1 and .kind=="task168StageBMigration" and .status=="MIGRATION_COMMITTED" and .databaseIdentity==$db and .m11Sha256==$m11 and (.completedAt|type=="string" and length>0)' \
+    "${TRANSITION}" >/dev/null || fail 'StageB MIGRATION_COMMITTED receipt is invalid or not bound to this database'
+  [[ -s "${RUNTIME_VERIFICATION}" ]] || fail 'StageB runtimeVerification receipt is missing'
+  jq -e --arg db "${DB_ID}" --arg transitionSha "$(sha "${TRANSITION}")" \
+    '.schemaVersion==1 and .kind=="task168StageBRuntimeVerification" and .status=="COMPLETED" and .databaseIdentity==$db and .migrationReceiptSha256==$transitionSha' \
+    "${RUNTIME_VERIFICATION}" >/dev/null || fail 'StageB runtimeVerification receipt is invalid or not bound to the MIGRATION_COMMITTED receipt'
+  echo '[task168-final-steady] check-only passed: StageB receipts present and bound to this database'
+  exit 0
+fi
+
+# ── --migrate: apply whatever is pending. M11 is always a no-op here (it was
+# applied by StageB); anything after it already passed the expand-contract
+# gate in CI, so this is an ordinary `prisma migrate deploy`. ─────────────────
+tmp="$(mktemp -d "${TMPDIR:-/tmp}/task168-final-steady.XXXXXX")"
+c=''
+cleanup(){ local rc=$?; [[ -z "${c}" ]] || docker rm -f "${c}" >/dev/null 2>&1 || true; rm -rf "${tmp}"; exit "${rc}"; }
+trap cleanup EXIT
+mkdir -p "${tmp}/migrations"
+cp "${SOURCE_DIR}/apps/v1_api/prisma/migrations/migration_lock.toml" "${tmp}/migrations/"
+cp "${SOURCE_DIR}/apps/v1_api/prisma/schema.prisma" "${tmp}/schema.prisma"
+for name in "${source_names[@]}"; do
+  cp -R "${SOURCE_DIR}/apps/v1_api/prisma/migrations/${name}" "${tmp}/migrations/${name}"
+done
+c="$("${compose[@]}" run -d --no-deps --entrypoint sh v1_api -c 'while :; do sleep 3600; done')"
+docker cp "${tmp}/." "${c}:/tmp/task168-final"
+docker exec -u 0 "${c}" sh -ceu 'chown -R app:app /tmp/task168-final'
+docker exec -u app "${c}" sh -ceu 'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy --schema /tmp/task168-final/schema.prisma'
+docker exec -u app "${c}" sh -ceu 'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate status --schema /tmp/task168-final/schema.prisma'
+
+# Re-verify L1 holds after the deploy: every row the deploy just applied must
+# still resolve to a name+checksum pair from the same candidate source tree.
+rows_after="$(dbq "SELECT migration_name || '|' || COALESCE(checksum,'') || '|' || (finished_at IS NOT NULL)::text || '|' || (rolled_back_at IS NOT NULL)::text FROM \"_prisma_migrations\" ORDER BY migration_name")" || fail 'post-migrate ledger query failed'
+while IFS='|' read -r name checksum finished rolledback; do
+  [[ -n "${name}" ]] || continue
+  [[ "${finished}" == t && "${rolledback}" == f ]] || continue
+  [[ -n "${SOURCE_SHA[${name}]:-}" && "${SOURCE_SHA[${name}]}" == "${checksum}" ]] || fail "post-migrate L1 violated: '${name}' is applied but not in (or differs from) the candidate source tree"
+done <<<"${rows_after}"
+
+echo '[task168-final-steady] migrate deploy complete'

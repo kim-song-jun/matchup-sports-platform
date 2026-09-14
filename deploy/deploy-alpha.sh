@@ -43,7 +43,7 @@ for required_path in \
   "${ALPHA_SOURCE_DIR}/deploy/deploy-alpha.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-release-common.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-manifest-common.sh" \
-  "${ALPHA_SOURCE_DIR}/deploy/task168-stage-a-migrate.sh" \
+  "${ALPHA_SOURCE_DIR}/deploy/task168-final-steady-migrate.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-source-common.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/rollback-alpha.sh" \
   "${ALPHA_SOURCE_DIR}/deploy/alpha-sanitize.sql" \
@@ -57,7 +57,7 @@ for required_path in \
 done
 
 source "${ALPHA_SOURCE_DIR}/deploy/alpha-release-common.sh"
-validate_alpha_release_manifest \
+validate_alpha_final_release_manifest \
   "${ALPHA_MANIFEST_FILE}" \
   "${ALPHA_SHA}" \
   "${ALPHA_RELEASE_VERSION}" \
@@ -186,6 +186,34 @@ if ! command -v rsync >/dev/null 2>&1; then
   sudo dnf install -y rsync
 fi
 
+# Task 168 M11 converged: the final-steady ledger/receipt check-only gate
+# runs BEFORE the candidate source is activated and BEFORE the live runtime
+# is touched (source_activated and runtime_mutated are still both false
+# here) — unlike the old Stage A guard, which used to run after activation
+# and pull (deploy/task168-stage-a-migrate.sh, now retired). Postgres has to
+# be up first since the check reads the live `_prisma_migrations` ledger;
+# it uses the CURRENTLY ACTIVE release's compose files (the candidate has
+# not been activated yet), which is fine because the postgres service
+# definition and the data volume are stable across releases.
+"${compose[@]}" up -d v1_postgres
+
+for attempt in $(seq 1 30); do
+  if "${compose[@]}" exec -T v1_postgres \
+    pg_isready -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" >/dev/null 2>&1; then
+    break
+  fi
+  if [[ "${attempt}" -eq 30 ]]; then
+    echo "[alpha-deploy] PostgreSQL did not become ready" >&2
+    false
+  fi
+  sleep 2
+done
+
+[[ "${ALPHA_TASK168_STAGE}" == final ]] || { echo "[alpha-deploy] Refusing a non-final Task168 manifest in this release" >&2; exit 1; }
+bash "${ALPHA_SOURCE_DIR}/deploy/task168-final-steady-migrate.sh" \
+  --check-only --source-dir "${ALPHA_SOURCE_DIR}" \
+  --compose-prod "${COMPOSE_PROD}" --compose-alpha "${COMPOSE_ALPHA}" --env-file "${ENV_FILE}"
+
 write_candidate_manifest "${ALPHA_MANIFEST_FILE}"
 prepare_alpha_release_source "${ALPHA_SOURCE_DIR}" "${ALPHA_SHA}" "${ALPHA_SOURCE_SHA256}"
 activate_alpha_release_source "${ALPHA_SHA}"
@@ -250,24 +278,15 @@ aws ecr get-login-password --region "${ALPHA_AWS_REGION}" |
 
 pull_release_images
 write_release_metadata "${ALPHA_MANIFEST_FILE}"
-"${compose[@]}" up -d v1_postgres
 
-for attempt in $(seq 1 30); do
-  if "${compose[@]}" exec -T v1_postgres \
-    pg_isready -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}" >/dev/null 2>&1; then
-    break
-  fi
-  if [[ "${attempt}" -eq 30 ]]; then
-    echo "[alpha-deploy] PostgreSQL did not become ready" >&2
-    false
-  fi
-  sleep 2
-done
-
-[[ "${ALPHA_TASK168_STAGE}" == stageAIntermediate ]] || { echo "[alpha-deploy] Refusing non-Stage-A manifest in this release" >&2; exit 1; }
-task168_irreversible=true
-bash "${ALPHA_SOURCE_DIR}/deploy/task168-stage-a-migrate.sh" \
-  --source-dir "${ALPHA_SOURCE_DIR}" --manifest "${ALPHA_MANIFEST_FILE}" \
+# The steady path has no writer-quiesce or destructive DDL step of its own —
+# M11 was already applied by StageB (this run's check-only above proved it),
+# and anything pending after it is an ordinary additive migration that
+# already passed the expand-contract gate in CI. So, unlike Stage A,
+# task168_irreversible is never set here: an ordinary failure still takes
+# the normal restore_active_release / restore_legacy_runtime path above.
+bash "${ALPHA_SOURCE_DIR}/deploy/task168-final-steady-migrate.sh" \
+  --migrate --source-dir "${ALPHA_SOURCE_DIR}" \
   --compose-prod "${COMPOSE_PROD}" --compose-alpha "${COMPOSE_ALPHA}" --env-file "${ENV_FILE}"
 # 게임 운영 플래그 불변 행 시드. 마이그레이션에 DML 을 넣을 수 없고(expand-contract 게이트)
 # GameOperationFlagsService.ensureDefaults() 는 platform_ops 가 플래그 API 를 호출할 때만

@@ -47,9 +47,9 @@ build_stage_b_migrations_json() {
 # mirrors that walk exactly so the manifest binds to the same list the
 # runner will independently recompute from the source tree at execution
 # time. Their disagreement is exactly what the runner's own comparison
-# (line 76 of that script) is designed to catch; this function existing does
-# not weaken that check, since the two are computed independently from the
-# same source tree by different code.
+# against FULL_MIGRATION_HISTORY is designed to catch; this function
+# existing does not weaken that check, since the two are computed
+# independently from the same source tree by different code.
 build_stage_b_full_history_json() {
   local dir result='[]' name sha
   while IFS= read -r -d '' dir; do

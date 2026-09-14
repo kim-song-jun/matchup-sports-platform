@@ -67,9 +67,7 @@ Task 168 StageB(최종 스키마 이관) 배선을 dev에 들여왔어요. dev p
 d5-guard·dockerfile-target, ubuntu CI 기준 총 69개 케이스 — wiring 18 · d5-guard 9 · wrapper 15
 · manifest 10 · dockerfile-target 4 · post-live 13)가 가짜 aws/docker/psql로 실제 스크립트를
 돌려 각 게이트를 변이(mutation)로 확인해요. 전부 `deploy.yml` gates 에 연결했고
-`continue-on-error` 없이 0 failed 를 요구해요(리뷰 라운드에서 wrapper·manifest 두 fixture 가
-최신 계약과 어긋나 잠깐 `continue-on-error` 로 우회된 적이 있었는데, fixture 를 계약에 맞게
-고치고 걷어냈어요). macOS 로컬 실행은 wiring 3케이스가 시스템 정규식 엔진의 `{1,1024}` 반복
+`continue-on-error` 없이 0 failed 를 요구해요. macOS 로컬 실행은 wiring 3케이스가 시스템 정규식 엔진의 `{1,1024}` 반복
 제한(`maximum repetition exceeds 255`)과 wrapper 1케이스가 `flock(1)` 부재로 각각 fail/skip
 처리되는데, 둘 다 스크립트 자체 주석에 적힌 Linux 전용 검증 대상이라 ubuntu CI에서는 영향
 없어요(직접 ubuntu:24.04 컨테이너에서 재확인: wiring 26/0, d5-guard 9/0, wrapper 15/0 — 셋 다

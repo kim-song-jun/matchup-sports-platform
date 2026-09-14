@@ -345,8 +345,8 @@ rc="$(run_recover "${root}")"
 
 # ── R-A negative: its own throwaway `prisma migrate status` check reports
 # drift (task168-migration-contract.sh assert_prisma_migrate_status_clean,
-# called under this script's `set -Eeuo pipefail`) — round-5 findings #2/#4.
-# A plain `docker exec ...; rc=$?` there let errexit terminate the function
+# called under this script's `set -Eeuo pipefail`). A plain
+# `docker exec ...; rc=$?` there let errexit terminate the function
 # right at the failing exec, before `rc=$?`, `docker rm -f`, or `fail` could
 # run: the throwaway container leaked and the drift message never printed.
 # Assert all three: refusal, the diagnostic message, and cleanup.

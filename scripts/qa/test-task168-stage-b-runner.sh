@@ -488,11 +488,10 @@ wait_for_backup_inflight(){
 
 # Builds a copy of the runner with a self-signal spliced in immediately after
 # the M11 entry marker is written and before `phase=after_m11` -- the exact
-# window an untrappable SIGKILL between those two points (round-5 finding #1)
-# occupies. Racing a real wall-clock signal against that window is not
-# feasible (the two statements are adjacent with no I/O between them), so
-# this deterministically reaches it by construction instead, the same
-# technique the finding's own evidence used. Never touches the real
+# window an untrappable SIGKILL between those two points occupies. Racing a
+# real wall-clock signal against that window is not feasible (the two
+# statements are adjacent with no I/O between them), so this deterministically
+# reaches it by construction instead. Never touches the real
 # deploy/task168-stage-b-migrate.sh -- only a disposable per-scenario copy.
 build_probe_runner(){
   local dest="$1" inject="$2"
@@ -738,8 +737,7 @@ run_scenario_j(){
   # The M11 entry marker is written only after this exact re-check passes
   # (task168-stage-b-migrate.sh) -- a refusal here must never leave it
   # behind, or a later release committing M11 on this same database could
-  # let this release's stageBRecover borrow that stale marker (round-5
-  # finding #1/#3).
+  # let this release's stageBRecover borrow that stale marker.
   [[ ! -f "$state_dir/m11-entry-marker.json" ]] && ok "$name no M11 entry marker was written before the revived-writer refusal" || bad "$name unexpected M11 entry marker after revived-writer refusal" "$(cat "$state_dir/m11-entry-marker.json")"
   docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
 }
@@ -869,8 +867,8 @@ run_scenario_l(){
   # `compose ps -a -q v1_api`: by this point in the after_m11 window the
   # runner's own ephemeral one-off migration container (`compose run
   # --no-deps v1_api ...`) also carries the v1_api service label, so a fresh
-  # `ps -a -q v1_api` can return two ids -- exactly the ambiguity the
-  # runner's own blocking-finding-#3 fix (line ~518) exists to avoid.
+  # `ps -a -q v1_api` can return two ids -- exactly the ambiguity the runner
+  # avoids by capturing pre_api_id/pre_worker_id once, before quiescence.
   if [[ "$(docker inspect --format '{{.State.Running}}' "$pre_api_id" 2>/dev/null)" == false && "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_api_id" 2>/dev/null)" == no \
      && "$(docker inspect --format '{{.State.Running}}' "$pre_worker_id" 2>/dev/null)" == false && "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_worker_id" 2>/dev/null)" == no ]]; then
     ok "$name writers left stopped/restart=no (unchanged by the M11-phase SIGKILL)"
@@ -1275,14 +1273,14 @@ run_scenario_r(){
 }
 
 # ---------------------------------------------------------------------------
-# (t) round-5 finding #3 rework: release X fails at its own pre-migrate
-# quiesced-writer re-check (j's externally-revived-writer technique, not a
-# signal), which leaves quiesce.json and the pre-M11 backup on disk but --
-# because that re-check runs strictly before the M11 entry marker is ever
-# written -- no marker at all. A SEPARATE release Y then commits M11 on the
-# SAME database. stageBRecover ALPHA_SHA=X must never certify X as the
-# release that entered M11: with no marker of its own to (mis)bind to Y's
-# commit, R-A's own "M11 entry marker is missing" check is what refuses it.
+# (t) release X fails at its own pre-migrate quiesced-writer re-check (j's
+# externally-revived-writer technique, not a signal), which leaves
+# quiesce.json and the pre-M11 backup on disk but -- because that re-check
+# runs strictly before the M11 entry marker is ever written -- no marker at
+# all. A SEPARATE release Y then commits M11 on the SAME database.
+# stageBRecover ALPHA_SHA=X must never certify X as the release that entered
+# M11: with no marker of its own to (mis)bind to Y's commit, R-A's own "M11
+# entry marker is missing" check is what refuses it.
 run_scenario_t(){
   local name=t project="deploy" work="$WORK_ROOT/t" release_x release_y predecessor
   mkdir -p "$work"
@@ -1378,13 +1376,13 @@ run_scenario_t(){
 }
 
 # ---------------------------------------------------------------------------
-# (u) round-5 finding #1, PU: a TERM landing in the exact window between the
-# M11 entry marker being written and `phase` flipping to after_m11 is
-# trappable, so the runner's own EXIT trap (restore_pre_quiesce_writers) must
-# retire the marker to *.aborted before restoring the pre-quiesce writers --
-# a regression check that the pre-existing catch-signal path still works,
-# using build_probe_runner to land the signal deterministically in that
-# window instead of racing a real backup's wall-clock duration.
+# (u) a TERM landing in the exact window between the M11 entry marker being
+# written and `phase` flipping to after_m11 is trappable, so the runner's own
+# EXIT trap (restore_pre_quiesce_writers) must retire the marker to *.aborted
+# before restoring the pre-quiesce writers -- a regression check that the
+# pre-existing catch-signal path still works, using build_probe_runner to
+# land the signal deterministically in that window instead of racing a real
+# backup's wall-clock duration.
 run_scenario_u(){
   local name=u project="deploy" work="$WORK_ROOT/u" release predecessor
   mkdir -p "$work"
@@ -1426,16 +1424,16 @@ run_scenario_u(){
 }
 
 # ---------------------------------------------------------------------------
-# (v) round-5 finding #1, PV: an UNTRAPPABLE SIGKILL in that exact same
-# marker-write-window (no trap runs at all -- the marker is left ENTERED and
-# the writers are left stopped, neither retired nor restored) must not let
-# release X's OWN stageBRecover later borrow a different release Y's actual
-# M11 commit on the same database. First calls stageBRecover for X while M11
-# is still unapplied (R-B): the fix under test retires X's stale marker
-# before restoring the writers. Then release Y runs the real, unmodified
-# runner to a normal MIGRATION_COMMITTED completion on that same database.
-# Calling stageBRecover for X a second time must now refuse -- with the
-# marker already retired, X has nothing left to (falsely) reconstruct from.
+# (v) an UNTRAPPABLE SIGKILL in that exact same marker-write-window (no trap
+# runs at all -- the marker is left ENTERED and the writers are left stopped,
+# neither retired nor restored) must not let release X's OWN stageBRecover
+# later borrow a different release Y's actual M11 commit on the same
+# database. First calls stageBRecover for X while M11 is still unapplied
+# (R-B): the fix under test retires X's stale marker before restoring the
+# writers. Then release Y runs the real, unmodified runner to a normal
+# MIGRATION_COMMITTED completion on that same database. Calling
+# stageBRecover for X a second time must now refuse -- with the marker
+# already retired, X has nothing left to (falsely) reconstruct from.
 run_scenario_v(){
   local name=v project="deploy" work="$WORK_ROOT/v" release_x release_y predecessor
   mkdir -p "$work"

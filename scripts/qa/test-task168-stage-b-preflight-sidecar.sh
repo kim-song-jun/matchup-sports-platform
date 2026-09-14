@@ -1024,6 +1024,41 @@ done
 run_expect_fail 'source archive contains a header name with a control byte' "${ARGS[@]}"
 pass 'HEADER-NAME-NUL: rejects a raw ustar name field carrying a NUL byte followed by trailing garbage'
 
+# ---- HEADER-NAME-DEL. a regular header's name carries DEL (0x7F). DEL is a
+#      control character the writer never emits; leaving it out of the
+#      control-byte predicate would let it through into a member name -------
+HEADER_NAME_DEL_DIR="$TMP/header-name-del"
+mkdir -p "$HEADER_NAME_DEL_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$HEADER_NAME_DEL_DIR/source.tar.gz" <<'PY'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, encode_member, end_of_archive_marker, header_block
+from task168_test_fixtures import collect_members
+stage, out = sys.argv[2], sys.argv[3]
+trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
+name_field = b'apps/zz-del\x7f.txt'.ljust(100, b'\x00')[:100]
+extra = header_block(name_field, 0, 0o644, b'0')
+full = trunk + extra + end_of_archive_marker()
+full += b'\x00' * ((-len(full)) % 10240)
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(full))
+PY
+header_name_del_sha="$(sha "$HEADER_NAME_DEL_DIR/source.tar.gz")"
+header_name_del_bytes="$(wc -c < "$HEADER_NAME_DEL_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$header_name_del_sha" --argjson b "$header_name_del_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$HEADER_NAME_DEL_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$HEADER_NAME_DEL_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$header_name_del_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$HEADER_NAME_DEL_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains a header name with a control byte' "${ARGS[@]}"
+pass 'HEADER-NAME-DEL: rejects a raw ustar name field carrying DEL (0x7F)'
+
 # ---- INVALID-UTF8-NAME. a raw ustar name field carries an overlong-encoded
 #      byte sequence that is not valid UTF-8 (no control byte, so it clears
 #      the control-byte check) -- surrogateescape decoding still produces a

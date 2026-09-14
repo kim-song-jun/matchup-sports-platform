@@ -179,7 +179,7 @@ def parse_octal(field):
     return int(text, 8)
 
 def has_control_byte(b):
-    return any(x < 0x20 for x in b)
+    return any(x < 0x20 or x == 0x7F for x in b)
 
 def decode_name(raw):
     return raw.decode('utf-8', 'surrogateescape')

@@ -53,7 +53,13 @@ export async function syncLeagueRosterLineups(
     for (const side of game.sides) {
       const changed = await syncSide(
         tx,
-        { gameId: game.id, sideId: side.id, teamMatchId: game.teamMatch.id, tournamentId: game.teamMatch.tournamentId },
+        {
+          gameId: game.id,
+          sideId: side.id,
+          teamMatchId: game.teamMatch.id,
+          tournamentId: game.teamMatch.tournamentId,
+          leagueId: input.leagueId,
+        },
         entries,
       );
       if (changed) synced += 1;
@@ -75,7 +81,7 @@ function rosterKey(rows: ReadonlyArray<{ userId: string | null; displayNameSnaps
 
 async function syncSide(
   tx: Transaction,
-  target: { gameId: string; sideId: string; teamMatchId: string; tournamentId: string | null },
+  target: { gameId: string; sideId: string; teamMatchId: string; tournamentId: string | null; leagueId: string },
   entries: readonly LeagueRosterEntry[],
 ): Promise<boolean> {
   const latest = await tx.v1GameLineup.findFirst({
@@ -136,7 +142,9 @@ async function syncSide(
     action: LEAGUE_ROSTER_SYNC_ACTION,
     targetType: 'GAME',
     targetId: target.gameId,
-    tournamentId: target.tournamentId,
+    // 감사의 경기 참조는 (tournamentId, teamMatchId) 복합 FK 라, 경기 행에 tournamentId 가 없는 옛 데이터에
+    // 리그 id 를 짝지으면 FK 위반으로 명단 변경 트랜잭션이 깨진다. 리그 범위만 남기고 경기 참조는 뺀다.
+    tournamentId: target.tournamentId ?? target.leagueId,
     teamMatchId: target.tournamentId === null ? null : target.teamMatchId,
     occurredAt: new Date(),
     before: { lineupId: latest.id },

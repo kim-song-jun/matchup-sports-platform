@@ -461,6 +461,10 @@ jobs:
           TASK168_PREDECESSOR_API_IMAGE: ${{ steps.stageb-predecessor.outputs.apiImage }}
           TASK168_PREDECESSOR_DATABASE_IDENTITY: ${{ steps.stageb-predecessor.outputs.databaseIdentity }}
           TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256: ${{ steps.stageb-predecessor.outputs.resolvedMigrationAttemptsSha256 }}
+          # The StageA build of this same release: what the push deploy that
+          # preceded this dispatch installed, and what the runner requires to
+          # be serving the database when StageB quiesces it.
+          TASK168_EXPECTED_RUNNING_API_IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
           # No isolated T5 rehearsal is wired into this pipeline. Per direct
           # user instruction (2026-09-14): Alpha is a development environment,
           # so M11 runs with this waiver instead of a rehearsal receipt. The

@@ -116,6 +116,7 @@ jq -e --argjson names "$EXPECTED_MIGRATION_NAMES" --arg schema "$TASK_SCHEMA_SHA
   and (.database.task168.migrationLockSha256 | strings | test("^[0-9a-f]{64}$"))
   and (.database.task168.predecessor.releaseSha | strings | test("^[0-9a-f]{40}$"))
   and (.database.task168.predecessor.transition | strings | length > 0)
+  and (.database.task168.expectedRunningApiImage | strings | test("@sha256:[0-9a-f]{64}$"))
   and (.database.task168.rehearsal.mode == "waived")
   and (.database.task168.rehearsal.reason | strings | length > 0)
   and (.database.task168.rehearsal.decidedAt | strings | length > 0)
@@ -136,6 +137,7 @@ PREDECESSOR_TRANSITION="$(jq -er '.database.task168.predecessor.transition | str
 PREDECESSOR_TRANSITION_SHA="$(jq -er '.database.task168.predecessor.transitionSha256 | strings | select(test("^[0-9a-f]{64}$"))' "$MANIFEST")" || fail 'predecessor transition hash is missing'
 PREDECESSOR_SCHEMA_SHA="$(jq -er --arg schema "$STAGE_A_SCHEMA_SHA" '.database.task168.predecessor.schemaSha256 | select(.==$schema)' "$MANIFEST")" || fail 'predecessor Stage A schema binding is missing'
 PREDECESSOR_API_IMAGE="$(jq -er '.database.task168.predecessor.apiImage | strings | select(length > 0)' "$MANIFEST")" || fail 'predecessor API image is missing'
+EXPECTED_RUNNING_API_IMAGE="$(jq -er '.database.task168.expectedRunningApiImage | strings | select(length > 0)' "$MANIFEST")" || fail 'expected running writer image is missing'
 REHEARSAL_MODE="$(jq -er '.database.task168.rehearsal.mode | strings | select(.=="waived")' "$MANIFEST")" || fail 'rehearsal waiver is missing or not exactly "waived" (no other rehearsal mode is wired into this runner)'
 REHEARSAL_REASON="$(jq -er '.database.task168.rehearsal.reason | strings | select(length > 0)' "$MANIFEST")" || fail 'rehearsal waiver reason is missing'
 REHEARSAL_DECIDED_AT="$(jq -er '.database.task168.rehearsal.decidedAt | strings | select(length > 0)' "$MANIFEST")" || fail 'rehearsal waiver decidedAt is missing'
@@ -356,11 +358,15 @@ pre_api_id="$("${compose[@]}" ps -q v1_api | sed '/^$/d')"; pre_worker_id="$("${
 pre_api_image="$(docker inspect --format '{{.Config.Image}}' "$pre_api_id")"; pre_worker_image="$(docker inspect --format '{{.Config.Image}}' "$pre_worker_id")"
 [[ -n "$pre_api_image" && -n "$pre_worker_image" ]] || fail 'pre-quiesce service image identity is unavailable'
 [[ "$(docker inspect --format '{{.State.Running}}' "$pre_api_id")" == true && "$(docker inspect --format '{{.State.Running}}' "$pre_worker_id")" == true ]] || fail 'API and worker must both be running before quiescence'
-# The manifest-bound PREDECESSOR_API_IMAGE must match the image actually
-# running right now -- otherwise a writer running some other image than the
-# authenticated Stage A predecessor would still be quiesced, migrated past,
-# and, on a before_m11 failure, restored back into service unverified.
-[[ "$pre_api_image" == "$PREDECESSOR_API_IMAGE" && "$pre_worker_image" == "$PREDECESSOR_API_IMAGE" ]] || fail 'currently running writer image does not match the authenticated Stage A predecessor image'
+# Both writers must be running the release pipeline's own StageA build of
+# THIS release -- bound at manifest creation from the sha-<release> tag --
+# so an unknown or hand-started image is never quiesced, migrated past, or
+# restarted by the before_m11 recovery path. Pinning the Stage A
+# PREDECESSOR_API_IMAGE here instead would additionally forbid every deploy
+# between Stage A and Stage B, which Alpha does as a matter of course; the
+# predecessor receipt above authenticates the ledger boundary, not what may
+# run after it.
+[[ "$pre_api_image" == "$EXPECTED_RUNNING_API_IMAGE" && "$pre_worker_image" == "$EXPECTED_RUNNING_API_IMAGE" ]] || fail 'currently running writer image is not the authenticated Stage A build of this release'
 pre_api_restart_policy="$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_api_id")" || fail 'cannot read the pre-quiesce v1_api restart policy'
 pre_worker_restart_policy="$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$pre_worker_id")" || fail 'cannot read the pre-quiesce worker restart policy'
 [[ -n "$pre_api_restart_policy" ]] || pre_api_restart_policy=no

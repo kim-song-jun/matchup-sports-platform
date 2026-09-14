@@ -614,6 +614,12 @@ PY
   jq -e '[keys[] | select(startswith("TASK168_FINAL_PREFLIGHT"))] | length == 0' "${out}" >/dev/null \
     && pass "stageb-manifest carries no leftover TASK168_FINAL_PREFLIGHT_* env" \
     || fail "stageb-manifest still sets a TASK168_FINAL_PREFLIGHT_* env: $(cat "${out}")"
+  # The runner's pre-quiesce writer check must compare against the StageA
+  # build of THIS release (steps.images.outputs.imageTag), never the
+  # predecessor's image -- same source as WEB_IMAGE_TAG above it.
+  jq -e '.TASK168_EXPECTED_RUNNING_API_IMAGE_TAG == "${{ steps.images.outputs.imageTag }}"' "${out}" >/dev/null \
+    && pass "stageb-manifest wires TASK168_EXPECTED_RUNNING_API_IMAGE_TAG to steps.images.outputs.imageTag" \
+    || fail "stageb-manifest's TASK168_EXPECTED_RUNNING_API_IMAGE_TAG is not wired to steps.images.outputs.imageTag: $(cat "${out}")"
 }
 
 echo "== test-task168-stage-b-wiring =="

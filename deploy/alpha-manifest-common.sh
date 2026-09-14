@@ -176,6 +176,9 @@ validate_alpha_stage_b_final_manifest() {
       (.database.task168.resolvedMigrationAttemptsSha256 | test("^[0-9a-f]{64}$")) and
       (.database.task168.migrationLockSha256 | test("^[0-9a-f]{64}$")) and
       .database.task168.predecessor == $predecessor and
+      (.database.task168.expectedRunningApiImage | type == "string") and
+      (.database.task168.expectedRunningApiImage | startswith($registry + "/teameet-alpha-v1-api@")) and
+      (.database.task168.expectedRunningApiImage | split("@") | length == 2 and (.[1] | test("^sha256:[0-9a-f]{64}$"))) and
       .database.task168.rehearsal == $rehearsal and
       .images.api.repository == ($registry + "/teameet-alpha-v1-api") and
       .images.web.repository == ($registry + "/teameet-alpha-v1-web") and

@@ -175,10 +175,27 @@ if [[ "${TASK168_STAGE:-final}" != final ]]; then
     SOURCE_VERSION_ID SOURCE_SHA256 IMAGE_TAG WEB_IMAGE_TAG TOOL_IMAGE_TAG \
     TASK168_PREDECESSOR_RELEASE_SHA TASK168_PREDECESSOR_TRANSITION_PATH TASK168_PREDECESSOR_TRANSITION_SHA256 \
     TASK168_PREDECESSOR_API_IMAGE TASK168_PREDECESSOR_DATABASE_IDENTITY TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256 \
+    TASK168_EXPECTED_RUNNING_API_IMAGE_TAG \
     TASK168_REHEARSAL_MODE TASK168_REHEARSAL_REASON TASK168_REHEARSAL_DECIDED_AT; do
     [[ -n "${!name:-}" ]] || { echo "$name is required for TASK168_STAGE=stageBFinal" >&2; exit 1; }
   done
   [[ "${RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || { echo 'RELEASE_SHA must be a full commit SHA' >&2; exit 1; }
+  [[ "${TASK168_PREDECESSOR_RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || { echo 'TASK168_PREDECESSOR_RELEASE_SHA must be a full commit SHA' >&2; exit 1; }
+  # The runner cannot check this: the Alpha host has no git history. A release
+  # that does not descend from the Stage A commit would be missing the
+  # intermediate code the predecessor receipt authenticates, so refuse to mint
+  # a manifest pairing them. A commit is its own ancestor, which is the
+  # ordinary case (StageB dispatched against the SHA StageA deployed).
+  # rc 1 and rc 128 are different operator problems (a wrong-but-real commit vs
+  # one this checkout cannot see), and reporting both as "not an ancestor"
+  # sends the reader to the wrong question.
+  ancestry_rc=0
+  git merge-base --is-ancestor "${TASK168_PREDECESSOR_RELEASE_SHA}" "${RELEASE_SHA}" || ancestry_rc=$?
+  case "${ancestry_rc}" in
+    0) ;;
+    1) echo "StageA predecessor ${TASK168_PREDECESSOR_RELEASE_SHA} is not an ancestor of release ${RELEASE_SHA}" >&2; exit 1 ;;
+    *) echo "could not decide whether ${TASK168_PREDECESSOR_RELEASE_SHA} is an ancestor of ${RELEASE_SHA} (git exited ${ancestry_rc}: unknown commit or unusable history)" >&2; exit 1 ;;
+  esac
   # The only supported rehearsal mode right now is an explicit, user-directed
   # waiver (2026-09-14: Alpha is a dev environment, so M11 runs without an
   # isolated T5 rehearsal) -- no automated producer of a real
@@ -189,6 +206,15 @@ if [[ "${TASK168_STAGE:-final}" != final ]]; then
   api_digest="$(aws ecr describe-images --repository-name teameet-alpha-v1-api --image-ids "imageTag=${IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text)"
   web_digest="$(aws ecr describe-images --repository-name teameet-alpha-v1-web --image-ids "imageTag=${WEB_IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text)"
   tool_digest="$(aws ecr describe-images --repository-name teameet-alpha-v1-api --image-ids "imageTag=${TOOL_IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text)"
+  # What must already be serving this database when StageB starts: the StageA
+  # build of this same release (sha-<release>), which the push deploy that
+  # preceded this dispatch installed. Bound here, from ECR, so the runner
+  # compares the live writers against an authenticated value instead of the
+  # Stage A predecessor's image -- see deploy/task168-stage-b-migrate.sh's
+  # pre-quiesce writer check.
+  expected_running_digest="$(aws ecr describe-images --repository-name teameet-alpha-v1-api --image-ids "imageTag=${TASK168_EXPECTED_RUNNING_API_IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text)"
+  [[ "${expected_running_digest}" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "could not resolve a digest for ${TASK168_EXPECTED_RUNNING_API_IMAGE_TAG}" >&2; exit 1; }
+  expected_running_api_image="${REGISTRY}/teameet-alpha-v1-api@${expected_running_digest}"
 
   migrations_json="$(build_stage_b_migrations_json)" || exit 1
   full_history_json="$(build_stage_b_full_history_json)" || exit 1
@@ -230,6 +256,13 @@ if [[ "${TASK168_STAGE:-final}" != final ]]; then
     jq -e --arg expected "$resolved_migration_attempts_sha256" \
       '.database.task168.resolvedMigrationAttemptsSha256 == $expected' "$manifest" >/dev/null ||
       { echo "Reused StageB manifest's resolvedMigrationAttemptsSha256 does not match the freshly resolved snapshot" >&2; exit 1; }
+    # Same reason: the stored value is only self-consistent. A rebuilt
+    # sha-<release> tag would leave the reused manifest pinning a digest that
+    # is no longer what the host runs, and the runner would refuse on the
+    # host with far less context than this.
+    jq -e --arg expected "$expected_running_api_image" \
+      '.database.task168.expectedRunningApiImage == $expected' "$manifest" >/dev/null ||
+      { echo "Reused StageB manifest's expectedRunningApiImage does not match the current sha-${RELEASE_SHA} image" >&2; exit 1; }
   else
     created_at="$(git show -s --format=%cI "$RELEASE_SHA")"
     jq -n --arg sha "$RELEASE_SHA" --arg version "$RELEASE_VERSION" --arg createdAt "$created_at" \
@@ -238,13 +271,15 @@ if [[ "${TASK168_STAGE:-final}" != final ]]; then
       --arg schema "${TASK168_FINAL_SCHEMA_SHA256}" --argjson migrations "$migrations_json" \
       --argjson fullHistory "$full_history_json" --arg resolvedSha "$resolved_migration_attempts_sha256" \
       --arg migrationLockSha "$migration_lock_sha256" \
+      --arg expectedRunningApiImage "$expected_running_api_image" \
       --argjson predecessor "$predecessor_json" --argjson rehearsal "$rehearsal_json" \
       '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version,createdAt:$createdAt},
         source:{bucket:$bucket,key:("releases/task168-stage-b/"+$sha+".tar.gz"),versionId:$sourceVersionId,sha256:$sourceSha256},
         database:{migrationPolicy:"task168-stageBFinal",rollbackMode:"backup-only",compatibilityCheck:"expand-contract-sql-v1",
           migrationValidatedFrom:null,rollbackCompatibleWith:null,
           task168:{stage:"stageBFinal",schemaSha256:$schema,runtimeClientSchemaSha256:$schema,migrations:$migrations,fullMigrationHistory:$fullHistory,
-            resolvedMigrationAttemptsSha256:$resolvedSha,migrationLockSha256:$migrationLockSha,predecessor:$predecessor,rehearsal:$rehearsal,
+            resolvedMigrationAttemptsSha256:$resolvedSha,migrationLockSha256:$migrationLockSha,predecessor:$predecessor,
+            expectedRunningApiImage:$expectedRunningApiImage,rehearsal:$rehearsal,
             recoveryFrom:null,rollbackTarget:null}},
         images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$apiDigest,uri:($registry+"/teameet-alpha-v1-api@"+$apiDigest)},
           web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$webDigest,uri:($registry+"/teameet-alpha-v1-web@"+$webDigest)},

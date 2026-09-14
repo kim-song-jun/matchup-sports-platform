@@ -7,6 +7,7 @@ PREFLIGHT="$REPO_ROOT/scripts/release/task168-final-image-preflight.sh"
 RELEASE_DIR="$REPO_ROOT/scripts/release"
 [[ -x "$PREFLIGHT" ]] || { echo "FAIL: missing $PREFLIGHT" >&2; exit 1; }
 [[ -f "$RELEASE_DIR/task168_canonical_tar.py" ]] || { echo "FAIL: missing $RELEASE_DIR/task168_canonical_tar.py" >&2; exit 1; }
+[[ -f "$HERE/task168_test_fixtures.py" ]] || { echo "FAIL: missing $HERE/task168_test_fixtures.py" >&2; exit 1; }
 
 # Builds a fixture archive through the same canonical serializer
 # scripts/release/package-task168-final-source.sh uses (see
@@ -21,9 +22,11 @@ RELEASE_DIR="$REPO_ROOT/scripts/release"
 write_clean_tar() {
   local workdir="$1" out="$2"; shift 2
   python3 - "$RELEASE_DIR" "$workdir" "$out" "$@" <<'PY'
-import sys
+import os, sys
 sys.path.insert(0, sys.argv[1])
-from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes
+from task168_test_fixtures import collect_members
 workdir, out = sys.argv[2], sys.argv[3]
 members = collect_members(workdir, sys.argv[4:])
 with open(out, 'wb') as fh:
@@ -409,9 +412,11 @@ pass 'rejects an extra file smuggled inside an already-declared migration direct
 TRAVERSAL_DIR="$TMP/traversal"
 mkdir -p "$TRAVERSAL_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$TRAVERSAL_DIR/source.tar.gz" <<'PY'
-import sys
+import os, sys
 sys.path.insert(0, sys.argv[1])
-from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes
+from task168_test_fixtures import collect_members
 stage, out = sys.argv[2], sys.argv[3]
 members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
 members.append(('../evil.txt', b'0', 0o644, b'evil\n'))
@@ -465,9 +470,11 @@ pass 'rejects an archive whose M1 migration bytes differ from the authenticated 
 DUP_DIR="$TMP/duplicate-member"
 mkdir -p "$DUP_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$DUP_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
-import sys
+import os, sys
 sys.path.insert(0, sys.argv[1])
-from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes
+from task168_test_fixtures import collect_members
 stage, out, dup_name = sys.argv[2], sys.argv[3], sys.argv[4]
 members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
 members.append((dup_name, b'0', 0o644, b''))
@@ -603,9 +610,11 @@ pass 'GLOBALPAX: rejects an archive that carries a pax global header, platform-i
 CHAINED_PAX_DIR="$TMP/chained-pax"
 mkdir -p "$CHAINED_PAX_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$CHAINED_PAX_DIR/source.tar.gz" <<'PY'
-import sys
+import os, sys
 sys.path.insert(0, sys.argv[1])
-from task168_canonical_tar import canonical_gzip_bytes, collect_members, encode_member, end_of_archive_marker, header_block, pax_header_block
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, encode_member, end_of_archive_marker, header_block, pax_header_block
+from task168_test_fixtures import collect_members
 stage, out = sys.argv[2], sys.argv[3]
 trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
 extra = pax_header_block(b'docs/a.txt') + pax_header_block(b'docs/b.txt') + header_block(b'docs/b.txt', 0, 0o644, b'0')
@@ -636,9 +645,11 @@ pass 'CHAINED_PAX: rejects a second pax header that directly follows an unconsum
 PAX_NOPATH_DIR="$TMP/pax-nopath"
 mkdir -p "$PAX_NOPATH_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$PAX_NOPATH_DIR/source.tar.gz" <<'PY'
-import sys
+import os, sys
 sys.path.insert(0, sys.argv[1])
-from task168_canonical_tar import canonical_gzip_bytes, collect_members, encode_member, end_of_archive_marker, header_block
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, encode_member, end_of_archive_marker, header_block
+from task168_test_fixtures import collect_members
 stage, out = sys.argv[2], sys.argv[3]
 trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
 empty_pax = header_block(b'pax_header', 0, 0o644, b'x')
@@ -675,9 +686,11 @@ pass 'PAX-NOPATH: rejects a pax header that sets no path record at all'
 A_NEWMIG_DIR="$TMP/a-newmig"
 mkdir -p "$A_NEWMIG_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$A_NEWMIG_DIR/source.tar.gz" <<'PY'
-import sys
+import os, sys
 sys.path.insert(0, sys.argv[1])
-from task168_canonical_tar import canonical_gzip_bytes, collect_members, encode_member, end_of_archive_marker, header_block, pax_header_block
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, encode_member, end_of_archive_marker, header_block, pax_header_block
+from task168_test_fixtures import collect_members
 stage, out = sys.argv[2], sys.argv[3]
 trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
 decoy = pax_header_block(b'docs/decoy.txt')
@@ -712,9 +725,11 @@ pass 'A_newmig: rejects a decoy pax path followed by an empty pax header followe
 A_EMPTYM11_DIR="$TMP/a-emptym11"
 mkdir -p "$A_EMPTYM11_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$A_EMPTYM11_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
-import sys
+import os, sys
 sys.path.insert(0, sys.argv[1])
-from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes
+from task168_test_fixtures import collect_members
 stage, out, dup_name = sys.argv[2], sys.argv[3], sys.argv[4]
 members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
 members.append((dup_name, b'0', 0o644, b''))
@@ -744,9 +759,11 @@ pass 'A_emptym11: rejects a second, empty copy of the M11 member appended with n
 B_NULM11_DIR="$TMP/b-nulm11"
 mkdir -p "$B_NULM11_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$B_NULM11_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
-import sys
+import os, sys
 sys.path.insert(0, sys.argv[1])
-from task168_canonical_tar import canonical_gzip_bytes, collect_members, encode_member, end_of_archive_marker, header_block, pax_header_block
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, encode_member, end_of_archive_marker, header_block, pax_header_block
+from task168_test_fixtures import collect_members
 stage, out, m11_path = sys.argv[2], sys.argv[3], sys.argv[4]
 trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
 nul_path = pax_header_block((m11_path + '\x00x').encode())
@@ -780,9 +797,11 @@ pass 'B_nulm11: rejects a pax path record with an embedded NUL byte'
 HEADER_NAME_NUL_DIR="$TMP/header-name-nul"
 mkdir -p "$HEADER_NAME_NUL_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$HEADER_NAME_NUL_DIR/source.tar.gz" <<'PY'
-import sys
+import os, sys
 sys.path.insert(0, sys.argv[1])
-from task168_canonical_tar import canonical_gzip_bytes, collect_members, encode_member, end_of_archive_marker, header_block
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, encode_member, end_of_archive_marker, header_block
+from task168_test_fixtures import collect_members
 stage, out = sys.argv[2], sys.argv[3]
 trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
 name_field = (b'apps/zz-nul.txt\x00JUNKDATA').ljust(100, b'\x00')[:100]
@@ -857,9 +876,11 @@ pass 'GZIP-CONCAT: rejects a second, independently-valid gzip member concatenate
 END_MARKER_EXTRA_DIR="$TMP/end-marker-extra"
 mkdir -p "$END_MARKER_EXTRA_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$END_MARKER_EXTRA_DIR/source.tar.gz" <<'PY'
-import sys
+import os, sys
 sys.path.insert(0, sys.argv[1])
-from task168_canonical_tar import canonical_gzip_bytes, collect_members, encode_member, end_of_archive_marker
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, encode_member, end_of_archive_marker
+from task168_test_fixtures import collect_members
 stage, out = sys.argv[2], sys.argv[3]
 trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
 hidden = encode_member('apps/zz-hidden.txt', b'0', 0o644, b'evil\n')
@@ -897,9 +918,11 @@ for spelling in dotslash dblslash dotmid; do
   cp -R "$FIXTURE/stage/apps" "$NONCANON_DIR/stage/apps"
   cp "$FIXTURE/stage/INPUT-MANIFEST.json" "$NONCANON_DIR/stage/INPUT-MANIFEST.json"
   python3 - "$RELEASE_DIR" "$NONCANON_DIR/stage" "$NONCANON_DIR/source.tar.gz" "$evil_name" <<'PY'
-import sys
+import os, sys
 sys.path.insert(0, sys.argv[1])
-from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes
+from task168_test_fixtures import collect_members
 stage, out, evil_name = sys.argv[2], sys.argv[3], sys.argv[4]
 members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
 members.append((evil_name, b'0', 0o644, b'-- evil\nSELECT 1;\n'))
@@ -929,9 +952,11 @@ done
 SPACE_TRAVERSAL_DIR="$TMP/space-traversal"
 mkdir -p "$SPACE_TRAVERSAL_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$SPACE_TRAVERSAL_DIR/source.tar.gz" <<'PY'
-import sys
+import os, sys
 sys.path.insert(0, sys.argv[1])
-from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes
+from task168_test_fixtures import collect_members
 stage, out = sys.argv[2], sys.argv[3]
 members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
 members.append(('../evil with space.txt', b'0', 0o644, b'evil\n'))
@@ -959,9 +984,11 @@ pass 'rejects a ../ traversal member whose name contains a space'
 CASEFOLD_DUP_DIR="$TMP/casefold-dup"
 mkdir -p "$CASEFOLD_DUP_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$CASEFOLD_DUP_DIR/source.tar.gz" <<'PY'
-import sys
+import os, sys
 sys.path.insert(0, sys.argv[1])
-from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes
+from task168_test_fixtures import collect_members
 stage, out = sys.argv[2], sys.argv[3]
 members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
 # Both extra names only ever exist as strings in this members list -- never
@@ -994,9 +1021,11 @@ pass 'CASEFOLD-DUP: rejects two archive members whose full paths differ only by 
 CASEFOLD_BOUNDARY_DIR="$TMP/casefold-boundary"
 mkdir -p "$CASEFOLD_BOUNDARY_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$CASEFOLD_BOUNDARY_DIR/source.tar.gz" <<'PY'
-import sys
+import os, sys
 sys.path.insert(0, sys.argv[1])
-from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes, collect_members
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes
+from task168_test_fixtures import collect_members
 stage, out = sys.argv[2], sys.argv[3]
 members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
 members.append(('Apps/v1_api/prisma/evil.sql', b'0', 0o644, b'-- evil\nSELECT 1;\n'))

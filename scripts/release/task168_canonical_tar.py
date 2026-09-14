@@ -14,7 +14,6 @@ PAX_FORMAT writer uses, reimplemented here so nothing depends on tarfile.
 """
 import gzip
 import io
-import os
 import zlib
 
 BLOCKSIZE = 512
@@ -61,11 +60,8 @@ def _pax_record(key, value_bytes):
 
 def pax_header_block(name_bytes):
     """One complete pax ('x') extended-header member carrying a single
-    `path` record for name_bytes. Exposed (not just used internally by
-    canonical_tar_bytes) because building an intentionally non-canonical
-    fixture -- e.g. two of these back to back -- needs the same exact bytes
-    canonical_tar_bytes would emit for one, with no well-formed public API
-    that produces a malformed sequence on purpose."""
+    `path` record for name_bytes, as canonical_tar_bytes/encode_member emits
+    it for a name that needs one."""
     record = _pax_record("path", name_bytes)
     block = header_block(b"pax_header", len(record), 0o644, b"x")
     pad = (-len(record)) % BLOCKSIZE
@@ -74,10 +70,9 @@ def pax_header_block(name_bytes):
 
 def encode_member(name, typeflag, mode, data):
     """The exact bytes canonical_tar_bytes emits for one member: an optional
-    preceding pax header plus its ustar header and (padded) payload. Exposed
-    on its own so a caller can concatenate a run of clean members with
-    hand-crafted malformed bytes to build a fixture that is deliberately
-    *not* canonical form.
+    preceding pax header plus its ustar header and (padded) payload.
+    canonical_tar_bytes calls this once per member and concatenates the
+    results.
 
     typeflag is b'0' (regular file; data is its exact content) or b'5'
     (directory; data must be empty). A directory's on-the-wire name always
@@ -111,9 +106,7 @@ def encode_member(name, typeflag, mode, data):
 
 def end_of_archive_marker():
     """The two all-NUL blocks that terminate a tar body, before RECORDSIZE
-    padding. Exposed so a fixture built from encode_member() calls (or
-    otherwise deliberately not canonical) can be closed out the same way
-    canonical_tar_bytes closes a well-formed one."""
+    padding. canonical_tar_bytes appends this once, after all members."""
     return b"\x00" * (2 * BLOCKSIZE)
 
 
@@ -154,32 +147,3 @@ def decompress_single_gzip_member(data):
     if decompressor.unused_data:
         raise ValueError("contains trailing bytes after the gzip stream")
     return payload
-
-
-def collect_members(base_dir, names):
-    """Recursively walk each of `names` (a file or directory, relative to
-    base_dir) into an ordered canonical_tar_bytes members list. Rejects a
-    symlink or anything else that is neither a regular file nor a directory
-    -- a caller that needs one of those for a fixture builds it by hand
-    instead of asking this walker to invent a byte representation for it."""
-    members = []
-
-    def add(rel):
-        path = os.path.join(base_dir, rel)
-        if os.path.islink(path):
-            raise ValueError("collect_members does not support symlinks: %s" % rel)
-        if os.path.isdir(path):
-            members.append((rel, b"5", 0o755, b""))
-            for child in sorted(os.listdir(path)):
-                add(rel + "/" + child)
-        elif os.path.isfile(path):
-            with open(path, "rb") as fh:
-                data = fh.read()
-            mode = 0o755 if (os.stat(path).st_mode & 0o111) else 0o644
-            members.append((rel, b"0", mode, data))
-        else:
-            raise ValueError("collect_members does not support this member type: %s" % rel)
-
-    for name in names:
-        add(name)
-    return members

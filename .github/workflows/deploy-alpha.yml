@@ -3,13 +3,7 @@ name: Deploy Alpha
 on:
   push:
     branches: [dev]
-  workflow_dispatch:
-    inputs:
-      task168_recovery_from_json:
-        description: "Immutable Task168 failed-preflight recovery evidence JSON"
-        required: false
-        type: string
-        default: ""
+  workflow_dispatch: {}
 
 permissions:
   actions: read
@@ -38,9 +32,9 @@ jobs:
           [[ "${RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]]
           echo "sha=${RELEASE_SHA}" >> "${GITHUB_OUTPUT}"
 
-      - name: Lock one-shot Task 168 Stage A release
+      - name: Lock Task 168 final-policy release
         id: task168
-        run: echo "stage=stageAIntermediate" >> "${GITHUB_OUTPUT}"
+        run: echo "stage=final" >> "${GITHUB_OUTPUT}"
 
       - name: Wait for matching CI success
         timeout-minutes: 35
@@ -143,10 +137,8 @@ jobs:
           echo "web_exists=${web_exists}" >> "${GITHUB_OUTPUT}"
           echo "tool_exists=${tool_exists}" >> "${GITHUB_OUTPUT}"
 
-      - name: Bind one-shot Task 168 manifest inputs
-        env:
-          TASK168_RECOVERY_FROM_JSON: ${{ inputs.task168_recovery_from_json }}
-        run: bash scripts/release/prepare-task168-stage-manifest-inputs.sh
+      - name: Bind Task 168 final-policy manifest inputs
+        run: bash scripts/release/prepare-task168-final-steady-inputs.sh
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -217,8 +209,8 @@ jobs:
           SOURCE_VERSION_ID: ${{ steps.source.outputs.sourceVersionId }}
           SOURCE_SHA256: ${{ steps.source.outputs.sourceSha256 }}
           IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
-          TOOL_IMAGE_TAG: ${{ steps.images.outputs.toolTag }}
           PREVIOUS_SHA: ${{ steps.rollback-base.outputs.previousSha }}
+          PREVIOUS_STAGE: ${{ steps.rollback-base.outputs.previousStage }}
           MIGRATION_BASE_SHA: ${{ steps.rollback-base.outputs.migrationBaseSha }}
         run: bash scripts/release/create-alpha-release-manifest.sh
 

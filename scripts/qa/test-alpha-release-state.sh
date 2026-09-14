@@ -266,4 +266,48 @@ if prune_stale_alpha_release_sources "" "" 2>/dev/null; then
 fi
 [[ -d "${ALPHA_SOURCE_RELEASES_DIR}/task168-stage-b-${SHA_D}" ]]
 
+# ── A failed staging or activation must leave nothing behind ────────────────
+# Both failures are forced without relying on file permissions, so this holds
+# whether the suite runs as root (container) or not (CI runner).
+readonly SHA_E=5555555555555555555555555555555555555555
+source_e="${TEST_ROOT}/source-e"
+mkdir -p "${source_e}/deploy"
+printf '#!/usr/bin/env bash\n' > "${source_e}/deploy/deploy-alpha.sh"
+printf 'release-e\n' > "${source_e}/release.txt"
+# mv refuses to replace a non-directory, so the final move into place fails.
+printf 'not a directory\n' > "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_E}"
+if prepare_alpha_release_source "${source_e}" "${SHA_E}" "${DIGEST_A#sha256:}" 2>/dev/null; then
+  echo "staging reported success even though the final move could not happen" >&2
+  exit 1
+fi
+leftover_tmp="$(find "${ALPHA_SOURCE_RELEASES_DIR}" -maxdepth 1 -name "${SHA_E}.tmp.*" | wc -l | tr -d ' ')"
+if [[ "${leftover_tmp}" != 0 ]]; then
+  echo "a half-built source tree survived a failed staging (${leftover_tmp})" >&2
+  exit 1
+fi
+rm -f "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_E}"
+
+# A failing swap must not leave the ~/.teameet-alpha-live.$$ link behind.
+mv_shim_dir="${TEST_ROOT}/mv-shim"
+mkdir -p "${mv_shim_dir}"
+cat > "${mv_shim_dir}/mv" <<'SHIM'
+#!/usr/bin/env bash
+# Report the capability probe truthfully, then fail the swap itself.
+case " $* " in *" --help "*) echo "--no-target-directory"; exit 0 ;; esac
+exit 1
+SHIM
+chmod +x "${mv_shim_dir}/mv"
+live_before="$(cd -P "${ALPHA_LIVE_DIR}" && pwd)"
+if PATH="${mv_shim_dir}:${PATH}" activate_alpha_release_source "task168-stage-b-${SHA_D}" 2>/dev/null; then
+  echo "activation reported success even though the swap failed" >&2
+  exit 1
+fi
+leftover_links="$(find "${ALPHA_HOME_DIR}" -maxdepth 1 -name '.teameet-alpha-live.*' | wc -l | tr -d ' ')"
+if [[ "${leftover_links}" != 0 ]]; then
+  echo "a stray live link survived a failed activation (${leftover_links})" >&2
+  exit 1
+fi
+[[ "$(cd -P "${ALPHA_LIVE_DIR}" && pwd)" == "${live_before}" ]] ||
+  { echo "a failed activation moved the live link anyway" >&2; exit 1; }
+
 echo "[alpha-release-state] passed"

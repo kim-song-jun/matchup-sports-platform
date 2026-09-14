@@ -95,7 +95,8 @@ prepare_alpha_release_source() {
     rm -rf "${target_tmp}"
     return 1
   fi
-  mv "${target_tmp}" "${target_dir}"
+  # A failed move must not leave the half-built tree behind for the next run.
+  mv "${target_tmp}" "${target_dir}" || { rm -rf "${target_tmp}"; return 1; }
 }
 
 activate_alpha_release_source() {
@@ -106,12 +107,14 @@ activate_alpha_release_source() {
 
   # An empty key names the sources root itself, which exists.
   [[ -n "${source_key}" && -d "${target_dir}" ]] || return 1
-  ln -s "${target_dir}" "${next_link}"
+  ln -s "${target_dir}" "${next_link}" || return 1
   if [[ -L "${ALPHA_LIVE_DIR}" ]]; then
+    # A failed swap must not leave ~/.teameet-alpha-live.$$ behind: the link is
+    # consumed by a successful mv, so it only survives the failing path.
     if mv --help 2>&1 | grep -q -- '--no-target-directory'; then
-      mv -Tf "${next_link}" "${ALPHA_LIVE_DIR}"
+      mv -Tf "${next_link}" "${ALPHA_LIVE_DIR}" || { rm -f "${next_link}"; return 1; }
     else
-      mv -fh "${next_link}" "${ALPHA_LIVE_DIR}"
+      mv -fh "${next_link}" "${ALPHA_LIVE_DIR}" || { rm -f "${next_link}"; return 1; }
     fi
     [[ "$(cd -P "${ALPHA_LIVE_DIR}" && pwd)" == "$(cd -P "${target_dir}" && pwd)" ]] || return 1
     return 0
@@ -122,6 +125,7 @@ activate_alpha_release_source() {
   fi
   mv "${ALPHA_LIVE_DIR}" "${ALPHA_LEGACY_SOURCE_DIR}" || { rm -f "${next_link}"; return 1; }
   if ! mv "${next_link}" "${ALPHA_LIVE_DIR}"; then
+    rm -f "${next_link}"
     mv "${ALPHA_LEGACY_SOURCE_DIR}" "${ALPHA_LIVE_DIR}"
     return 1
   fi

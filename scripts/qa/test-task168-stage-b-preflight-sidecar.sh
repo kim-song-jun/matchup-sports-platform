@@ -307,15 +307,17 @@ ln -s schema.prisma "$SYMLINK_DIR/stage/apps/v1_api/prisma/schema-link"
 # canonical byte representation to reproduce), so this builds the archive
 # with plain tarfile instead -- a symlink member is rejected on its typeflag
 # during the walk itself, before the canonical-form check would ever matter.
-python3 - "$SYMLINK_DIR/stage" "$SYMLINK_DIR/source.tar.gz" <<'PY'
+python3 - "$SYMLINK_DIR/stage" "$SYMLINK_DIR/source.tar.gz" "$HERE" <<'PY'
 import os, sys, tarfile
+sys.path.insert(0, sys.argv[3])
+from task168_test_fixtures import add_tar_members
 stage, out = sys.argv[1], sys.argv[2]
 def clean(ti):
     ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
     return ti
 with tarfile.open(out, 'w:gz') as tar:
     tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
-    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+    add_tar_members(tar, stage, 'apps', filter=clean)
 PY
 symlink_sha="$(sha "$SYMLINK_DIR/source.tar.gz")"
 symlink_bytes="$(wc -c < "$SYMLINK_DIR/source.tar.gz" | tr -d ' ')"
@@ -404,6 +406,39 @@ done
 run_expect_fail 'source archive contains an unauthenticated member under apps/v1_api/prisma/' "${ARGS[@]}"
 pass 'rejects an extra file smuggled inside an already-declared migration directory'
 
+# ---- EVILDIR. an extra, empty directory member sits under
+#      apps/v1_api/prisma/migrations/ -- the prisma-extra allowlist above
+#      only ever walked typeflag '0' members, so before ALLOWED_TYPEFLAGS
+#      excluded '5' this reached no check at all ---------------------------
+EVILDIR_DIR="$TMP/evil-directory"
+mkdir -p "$EVILDIR_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$EVILDIR_DIR/source.tar.gz" <<'PY'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes
+from task168_test_fixtures import collect_members
+stage, out = sys.argv[2], sys.argv[3]
+members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
+members.append(('apps/v1_api/prisma/migrations/20990101000000_evil', b'5', 0o755, b''))
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(canonical_tar_bytes(members)))
+PY
+evildir_sha="$(sha "$EVILDIR_DIR/source.tar.gz")"
+evildir_bytes="$(wc -c < "$EVILDIR_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$evildir_sha" --argjson b "$evildir_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$EVILDIR_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$EVILDIR_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$evildir_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$EVILDIR_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains an unauthorized typeflag' "${ARGS[@]}"
+pass 'EVILDIR: rejects an extra, empty directory member under apps/v1_api/prisma/migrations/'
+
 # ---- 8. a ../ traversal member is rejected ---------------------------------
 # The unsafe-path check runs after the canonical-form identity check, so this
 # extra member has to come from the same canonical serializer as the rest of
@@ -463,6 +498,144 @@ done
 run_expect_fail 'source archive input differs from authenticated snapshot' "${ARGS[@]}"
 pass 'rejects an archive whose M1 migration bytes differ from the authenticated files[] entry even though the manifest and sidecar are internally self-consistent'
 
+# ---- SETUID. the M11 member's on-the-wire mode carries setuid/setgid/
+#      world-write bits (06777) while files[].mode still declares "644"
+#      and the content is untouched -- re-encoding through the same
+#      canonical serializer reproduces this mode byte for byte, so only an
+#      explicit mode allowlist (not the reencoding identity check) catches
+#      it ------------------------------------------------------------------
+SETUID_DIR="$TMP/setuid-m11"
+mkdir -p "$SETUID_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$SETUID_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes
+from task168_test_fixtures import collect_members
+stage, out, m11_path = sys.argv[2], sys.argv[3], sys.argv[4]
+members = [
+    (name, typeflag, (0o6777 if name == m11_path else mode), data)
+    for name, typeflag, mode, data in collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
+]
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(canonical_tar_bytes(members)))
+PY
+setuid_sha="$(sha "$SETUID_DIR/source.tar.gz")"
+setuid_bytes="$(wc -c < "$SETUID_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$setuid_sha" --argjson b "$setuid_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$SETUID_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$SETUID_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$setuid_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$SETUID_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains a member with an unauthorized mode' "${ARGS[@]}"
+pass 'SETUID: rejects an M11 member whose mode carries setuid/setgid/world-write bits even though its content is untouched'
+
+# ---- MODE000. the M11 member's mode is 0 (no permission bits at all),
+#      content untouched -----------------------------------------------
+MODE000_DIR="$TMP/mode000-m11"
+mkdir -p "$MODE000_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$MODE000_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes
+from task168_test_fixtures import collect_members
+stage, out, m11_path = sys.argv[2], sys.argv[3], sys.argv[4]
+members = [
+    (name, typeflag, (0 if name == m11_path else mode), data)
+    for name, typeflag, mode, data in collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
+]
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(canonical_tar_bytes(members)))
+PY
+mode000_sha="$(sha "$MODE000_DIR/source.tar.gz")"
+mode000_bytes="$(wc -c < "$MODE000_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$mode000_sha" --argjson b "$mode000_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$MODE000_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$MODE000_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$mode000_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$MODE000_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains a member with an unauthorized mode' "${ARGS[@]}"
+pass 'MODE000: rejects an M11 member whose mode carries no permission bits at all'
+
+# ---- MODE_MISMATCH. the M11 member's mode is 755 -- itself an allowed
+#      value -- while files[].mode still declares "644". The blanket
+#      {644,755} allowlist alone would accept this; only comparing each
+#      declared file's authenticated mode against files[].mode catches it -
+MODE_MISMATCH_DIR="$TMP/mode-mismatch-m11"
+mkdir -p "$MODE_MISMATCH_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$MODE_MISMATCH_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes
+from task168_test_fixtures import collect_members
+stage, out, m11_path = sys.argv[2], sys.argv[3], sys.argv[4]
+members = [
+    (name, typeflag, (0o755 if name == m11_path else mode), data)
+    for name, typeflag, mode, data in collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
+]
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(canonical_tar_bytes(members)))
+PY
+mode_mismatch_sha="$(sha "$MODE_MISMATCH_DIR/source.tar.gz")"
+mode_mismatch_bytes="$(wc -c < "$MODE_MISMATCH_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$mode_mismatch_sha" --argjson b "$mode_mismatch_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$MODE_MISMATCH_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$MODE_MISMATCH_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$mode_mismatch_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$MODE_MISMATCH_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive input differs from authenticated snapshot' "${ARGS[@]}"
+pass 'MODE_MISMATCH: rejects an M11 member whose mode (755, itself an allowed value) differs from its files[] entry (644)'
+
+# ---- SETUID_EXTRA. a setuid member outside apps/v1_api/prisma/ entirely,
+#      with no files[] entry to compare against -- isolates the blanket
+#      {644,755} mode allowlist from the per-declared-file mode-equality
+#      check above it, neither of which the other can substitute for -----
+SETUID_EXTRA_DIR="$TMP/setuid-extra"
+mkdir -p "$SETUID_EXTRA_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$SETUID_EXTRA_DIR/source.tar.gz" <<'PY'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes
+from task168_test_fixtures import collect_members
+stage, out = sys.argv[2], sys.argv[3]
+members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
+members.append(('docs/setuid-probe.txt', b'0', 0o6777, b'evil\n'))
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(canonical_tar_bytes(members)))
+PY
+setuid_extra_sha="$(sha "$SETUID_EXTRA_DIR/source.tar.gz")"
+setuid_extra_bytes="$(wc -c < "$SETUID_EXTRA_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$setuid_extra_sha" --argjson b "$setuid_extra_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$SETUID_EXTRA_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$SETUID_EXTRA_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$setuid_extra_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$SETUID_EXTRA_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive contains a member with an unauthorized mode' "${ARGS[@]}"
+pass 'SETUID_EXTRA: rejects a setuid member with no files[] entry, outside apps/v1_api/prisma/ entirely'
+
 # ---- DUP. a second, empty copy of the already-hashed M11 member appended
 #          after the real one is rejected -- `tar -xOf` concatenates both
 #          copies (so a naive content check on the concatenated bytes could
@@ -504,9 +677,11 @@ pass 'DUP: rejects an archive that carries a second, empty copy of an already-pr
 #      here (InvalidHeaderError past the first member) ----------------------
 DEVDUP_DIR="$TMP/devdup-member"
 mkdir -p "$DEVDUP_DIR"
-python3 - "$FIXTURE/stage" "$DEVDUP_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
+python3 - "$FIXTURE/stage" "$DEVDUP_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" "$HERE" <<'PY'
 import io, os, sys, tarfile, gzip
 stage, out, dup_name = sys.argv[1], sys.argv[2], sys.argv[3]
+sys.path.insert(0, sys.argv[4])
+from task168_test_fixtures import add_tar_members
 
 def clean(ti):
     ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
@@ -521,7 +696,7 @@ def with_checksum(buf):
 raw = io.BytesIO()
 with tarfile.open(fileobj=raw, mode='w') as tar:
     tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
-    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+    add_tar_members(tar, stage, 'apps', filter=clean)
     dup_offset = raw.tell()
     info = tarfile.TarInfo(name=dup_name)
     info.size = 0
@@ -559,9 +734,11 @@ pass 'DEVDUP: rejects a duplicate M11 member whose devmajor field is non-octal b
 #      'g' header, before any renaming can matter ---------------------------
 GLOBALPAX_DIR="$TMP/globalpax-member"
 mkdir -p "$GLOBALPAX_DIR"
-python3 - "$FIXTURE/stage" "$GLOBALPAX_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" "apps/zz-decoy.txt" <<'PY'
+python3 - "$FIXTURE/stage" "$GLOBALPAX_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" "apps/zz-decoy.txt" "$HERE" <<'PY'
 import io, os, sys, tarfile, gzip
 stage, out, dup_name, decoy_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+sys.path.insert(0, sys.argv[5])
+from task168_test_fixtures import add_tar_members
 
 def clean(ti):
     ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
@@ -570,7 +747,7 @@ def clean(ti):
 raw = io.BytesIO()
 tar = tarfile.open(fileobj=raw, mode='w')
 tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
-tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+add_tar_members(tar, stage, 'apps', filter=clean)
 data = raw.getvalue()  # not closed -- omits tarfile's own end-of-archive trailer
 
 data += tarfile.TarInfo.create_pax_global_header({'path': decoy_name})
@@ -1051,9 +1228,11 @@ pass 'CASEFOLD-BOUNDARY: rejects a member under Apps/v1_api/prisma/ (wrong case)
 #      is rejected -- a regular file has no legitimate use for it ----------
 LINKNAME_DIR="$TMP/linkname-nonempty"
 mkdir -p "$LINKNAME_DIR"
-python3 - "$FIXTURE/stage" "$LINKNAME_DIR/source.tar.gz" <<'PY'
+python3 - "$FIXTURE/stage" "$LINKNAME_DIR/source.tar.gz" "$HERE" <<'PY'
 import io, os, sys, tarfile, gzip
 stage, out = sys.argv[1], sys.argv[2]
+sys.path.insert(0, sys.argv[3])
+from task168_test_fixtures import add_tar_members
 def clean(ti):
     ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
     return ti
@@ -1065,7 +1244,7 @@ def with_checksum(buf):
 raw = io.BytesIO()
 with tarfile.open(fileobj=raw, mode='w') as tar:
     tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
-    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+    add_tar_members(tar, stage, 'apps', filter=clean)
     offset = raw.tell()
     info = tarfile.TarInfo(name='apps/zz-linkname-probe.txt')
     info.size = 0
@@ -1101,16 +1280,18 @@ pass 'LINKNAME: rejects a regular-file header carrying a non-empty linkname fiel
 for probe_key in size linkpath; do
   PAX_KEY_DIR="$TMP/pax-key-$probe_key"
   mkdir -p "$PAX_KEY_DIR"
-  python3 - "$FIXTURE/stage" "$PAX_KEY_DIR/source.tar.gz" "$probe_key" <<'PY'
+  python3 - "$FIXTURE/stage" "$PAX_KEY_DIR/source.tar.gz" "$probe_key" "$HERE" <<'PY'
 import io, os, sys, tarfile
 stage, out, probe_key = sys.argv[1], sys.argv[2], sys.argv[3]
+sys.path.insert(0, sys.argv[4])
+from task168_test_fixtures import add_tar_members
 def clean(ti):
     ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
     return ti
 probe_value = '0' if probe_key == 'size' else '/etc/passwd'
 with tarfile.open(out, 'w:gz') as tar:
     tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
-    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+    add_tar_members(tar, stage, 'apps', filter=clean)
     data = b'evil\n'
     info = tarfile.TarInfo(name='apps/zz-pax-%s-probe.txt' % probe_key)
     info.size = len(data)
@@ -1138,15 +1319,17 @@ done
 #      the writer uses PAX_FORMAT's ustar magic and a pax 'path' record ----
 LONGNAME_DIR="$TMP/longname"
 mkdir -p "$LONGNAME_DIR"
-python3 - "$FIXTURE/stage" "$LONGNAME_DIR/source.tar.gz" <<'PY'
+python3 - "$FIXTURE/stage" "$LONGNAME_DIR/source.tar.gz" "$HERE" <<'PY'
 import io, os, sys, tarfile
 stage, out = sys.argv[1], sys.argv[2]
+sys.path.insert(0, sys.argv[3])
+from task168_test_fixtures import add_tar_members
 def clean(ti):
     ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
     return ti
 with tarfile.open(out, 'w:gz', format=tarfile.GNU_FORMAT) as tar:
     tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
-    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+    add_tar_members(tar, stage, 'apps', filter=clean)
     data = b'-- x\n'
     info = tarfile.TarInfo(name='apps/' + ('z' * 100) + '/probe.txt')
     info.size = len(data)
@@ -1172,9 +1355,11 @@ pass 'LONGNAME: rejects a GNU-format archive carrying a longname (L) header'
 #      rejected -- the real packager only ever writes regular-file '0' -----
 SPARSE_DIR="$TMP/sparse-typeflag"
 mkdir -p "$SPARSE_DIR"
-python3 - "$FIXTURE/stage" "$SPARSE_DIR/source.tar.gz" <<'PY'
+python3 - "$FIXTURE/stage" "$SPARSE_DIR/source.tar.gz" "$HERE" <<'PY'
 import io, os, sys, tarfile, gzip
 stage, out = sys.argv[1], sys.argv[2]
+sys.path.insert(0, sys.argv[3])
+from task168_test_fixtures import add_tar_members
 def clean(ti):
     ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
     return ti
@@ -1186,7 +1371,7 @@ def with_checksum(buf):
 raw = io.BytesIO()
 with tarfile.open(fileobj=raw, mode='w') as tar:
     tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
-    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+    add_tar_members(tar, stage, 'apps', filter=clean)
     offset = raw.tell()
     info = tarfile.TarInfo(name='apps/zz-sparse-probe.txt')
     info.size = 0
@@ -1220,9 +1405,11 @@ pass 'SPARSE: rejects an archive that carries a GNU sparse (S) typeflag'
 for probe_magic in oldgnu v7; do
   PREFIX_DIR="$TMP/header-prefix-$probe_magic"
   mkdir -p "$PREFIX_DIR"
-  python3 - "$FIXTURE/stage" "$PREFIX_DIR/source.tar.gz" "$probe_magic" <<'PY'
+  python3 - "$FIXTURE/stage" "$PREFIX_DIR/source.tar.gz" "$probe_magic" "$HERE" <<'PY'
 import io, os, sys, tarfile, gzip
 stage, out, probe_magic = sys.argv[1], sys.argv[2], sys.argv[3]
+sys.path.insert(0, sys.argv[4])
+from task168_test_fixtures import add_tar_members
 def clean(ti):
     ti.mtime = 0; ti.uid = 0; ti.gid = 0; ti.uname = ''; ti.gname = ''
     return ti
@@ -1234,7 +1421,7 @@ def with_checksum(buf):
 raw = io.BytesIO()
 with tarfile.open(fileobj=raw, mode='w') as tar:
     tar.add(os.path.join(stage, 'INPUT-MANIFEST.json'), arcname='INPUT-MANIFEST.json', filter=clean)
-    tar.add(os.path.join(stage, 'apps'), arcname='apps', filter=clean)
+    add_tar_members(tar, stage, 'apps', filter=clean)
     offset = raw.tell()
     data = b'DROP SCHEMA public CASCADE;\n'
     info = tarfile.TarInfo(name='migration.sql')

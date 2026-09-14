@@ -822,7 +822,9 @@ async function appendIdentityEvent(
           // 복사를 실행한 상대팀 팀장의 이름을 빌리지 않는다.
           // `system_actor` 는 TEXT 컬럼이고 트리거가 값을 검사하는 것은 EXPIRED 뿐이라
           // (20260729000100 migration 의 v1_guard_identity_event) 스키마 변경이 필요 없다.
-          | 'LINEUP_REVISION_COPY';
+          | 'LINEUP_REVISION_COPY'
+          // 리그 참가 명단이 바뀌어 시작 전 경기 명단을 다시 맞출 때(league-roster-sync.ts).
+          | 'LEAGUE_ROSTER_SYNC';
       }
   ),
 ) {
@@ -877,7 +879,8 @@ export async function createRosterAssertedIdentityLink(
           | 'GAME_END_DERIVER'
           | 'GAME_BACKFILL'
           | 'PROJECTION_REPAIR'
-          | 'LINEUP_REVISION_COPY';
+          | 'LINEUP_REVISION_COPY'
+          | 'LEAGUE_ROSTER_SYNC';
       },
   reason: string,
 ): Promise<void> {
@@ -927,7 +930,7 @@ export async function createRosterAssertedIdentityLink(
  * 무관하게 statement 2건이다 — 리그 대진 일괄 생성은 45초 트랜잭션 하나에 수천 명을 넣는다.
  * `effective_at` 은 트리거(v1_guard_identity_event)가 덮어쓰므로 돌려받은 값을 현재 연결에 싣는다.
  */
-async function createSourceRosterIdentityLinks(
+export async function createSourceRosterIdentityLinks(
   tx: Transaction,
   rows: ReadonlyArray<{ participantId: string; userId: string }>,
   actor: Parameters<typeof createRosterAssertedIdentityLink>[3],

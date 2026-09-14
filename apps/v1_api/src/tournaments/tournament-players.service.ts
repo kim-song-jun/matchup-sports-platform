@@ -24,6 +24,7 @@ import {
   writeJerseyNumber,
 } from './tournament-player-jersey';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from './tournament-surface-lookup';
+import { syncLeagueRosterLineups } from '../league-matches/league-roster-sync';
 
 /**
  * 명단 표면은 **대회와 리그를 함께** 받는다.
@@ -412,6 +413,8 @@ export class TournamentPlayersService {
       if (dto.jerseyNumber !== undefined) {
         await writeJerseyNumber(tx, saved.id, dto.jerseyNumber);
       }
+      // 리그면 시작 전 경기 명단을 새 참가 명단에 맞춘다(대회는 대상 경기가 없어 no-op).
+      await syncLeagueRosterLineups(tx, { leagueId: tournamentId, teamId: current.registration.teamId });
       return saved;
     });
   }
@@ -448,10 +451,12 @@ export class TournamentPlayersService {
       if (!player) {
         throw new NotFoundException({ code: 'PLAYER_NOT_FOUND', message: '선수를 찾을 수 없어요.' });
       }
-      return tx.v1TournamentPlayer.update({
+      const removedPlayer = await tx.v1TournamentPlayer.update({
         where: { id: playerId },
         data: { removedAt: new Date() },
       });
+      await syncLeagueRosterLineups(tx, { leagueId: tournamentId, teamId: registration.teamId });
+      return removedPlayer;
     });
 
     return this.serializePlayer(removed);
@@ -827,7 +832,7 @@ export class TournamentPlayersService {
           registrationId: true,
           userId: true,
           realName: true,
-          registration: { select: { tournamentId: true } },
+          registration: { select: { tournamentId: true, teamId: true } },
         },
       });
       if (!player) {
@@ -873,6 +878,10 @@ export class TournamentPlayersService {
       // 제거로 성별 비율이 바뀌어 쿼터를 벗어날 수도 있다(예: 여성 최소 인원 미달) —
       // reconcileGenderQuotaAfterRosterChange 주석 참조.
       await this.reconcileGenderQuotaAfterRosterChange(tx, player.registrationId, tournament);
+      await syncLeagueRosterLineups(tx, {
+        leagueId: player.registration.tournamentId,
+        teamId: player.registration.teamId,
+      });
 
       return updated;
     });

@@ -45,6 +45,10 @@ jq -e '.status == "MIGRATION_COMMITTED" or .status == "MIGRATION_COMMITTED_RECOV
   || fail 'migration-stage.json is not a committed receipt'
 migration_receipt_sha256="$(sha "${migration_receipt}")"
 
+# A receipt from an earlier run must never survive a failing one: it would read
+# as evidence for the current release.
+rm -f "${state_dir}/runtime-verification.json"
+
 expected_api_image="$(jq -er '.images.api.uri' "${MANIFEST}")"
 expected_web_image="$(jq -er '.images.web.uri' "${MANIFEST}")"
 

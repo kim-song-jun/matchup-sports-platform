@@ -27,8 +27,8 @@ make_stage_b_manifest() {
      source:{bucket:"b", key:("releases/task168-stage-b/"+$sha+".tar.gz"), versionId:"v1", sha256:("c"*64)},
      database:{migrationPolicy:"task168-stageBFinal", rollbackMode:"backup-only", compatibilityCheck:"expand-contract-sql-v1",
        task168:{stage:"stageBFinal", schemaSha256:$schema, runtimeClientSchemaSha256:$schema,
-         migrations:[{name:"x",sha256:("d"*64)}],
-         fullMigrationHistory:[range(0;12)|{name:("m"+(.|tostring)),sha256:("d"*64)}],
+         migrations:[range(0;11)|{name:("202609010000"+((10+.)|tostring)+"_v1_fixture"),sha256:("d"*64)}],
+         fullMigrationHistory:[range(0;12)|{name:("202608010000"+((10+.)|tostring)+"_v1_history"),sha256:("d"*64)}],
          resolvedMigrationAttemptsSha256:("e"*64),
          migrationLockSha256:("1"*64),
          predecessor:{releaseSha:"2222222222222222222222222222222222222222",transition:"/x",transitionSha256:("f"*64),apiImage:"img",databaseIdentity:"id",schemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f"},
@@ -77,6 +77,45 @@ echo "== test-task168-stage-b-manifest =="
     exit 1
   else
     echo "  ok: a mismatched expected migrations array is rejected"
+  fi
+
+  # The stored-manifest path derives the expected arrays from the manifest
+  # itself, so equality alone is tautological: the per-item shape and the
+  # 11-entry count are what refuse a structurally corrupt manifest there.
+  short_manifest="${WORK}/direct-short.json"
+  jq '.database.task168.migrations = (.database.task168.migrations[0:10])' "${manifest}" > "${short_manifest}"
+  short_checksum="$(sha256sum "${short_manifest}" | awk '{print $1}')"
+  short_migrations="$(jq -c '.database.task168.migrations' "${short_manifest}")"
+  if validate_alpha_stage_b_final_manifest "${short_manifest}" "${SHA}" "0.1.0-alpha.20260914.g111111111111" \
+    "${short_checksum}" "${REGISTRY}" "${FINAL_SCHEMA}" "${short_migrations}" "${predecessor}" "${rehearsal}" "${fullHistory}"; then
+    echo "  FAIL: a StageB manifest carrying 10 Task168 migrations was accepted" >&2
+    exit 1
+  else
+    echo "  ok: a StageB manifest without exactly 11 Task168 migrations is rejected"
+  fi
+
+  bad_name_manifest="${WORK}/direct-bad-name.json"
+  jq '.database.task168.migrations[3].name = "not-a-migration-name"' "${manifest}" > "${bad_name_manifest}"
+  bad_name_checksum="$(sha256sum "${bad_name_manifest}" | awk '{print $1}')"
+  bad_name_migrations="$(jq -c '.database.task168.migrations' "${bad_name_manifest}")"
+  if validate_alpha_stage_b_final_manifest "${bad_name_manifest}" "${SHA}" "0.1.0-alpha.20260914.g111111111111" \
+    "${bad_name_checksum}" "${REGISTRY}" "${FINAL_SCHEMA}" "${bad_name_migrations}" "${predecessor}" "${rehearsal}" "${fullHistory}"; then
+    echo "  FAIL: a StageB manifest carrying a malformed migration name was accepted" >&2
+    exit 1
+  else
+    echo "  ok: a StageB manifest carrying a malformed migration name is rejected"
+  fi
+
+  dup_manifest="${WORK}/direct-dup.json"
+  jq '.database.task168.migrations[5].name = .database.task168.migrations[4].name' "${manifest}" > "${dup_manifest}"
+  dup_checksum="$(sha256sum "${dup_manifest}" | awk '{print $1}')"
+  dup_migrations="$(jq -c '.database.task168.migrations' "${dup_manifest}")"
+  if validate_alpha_stage_b_final_manifest "${dup_manifest}" "${SHA}" "0.1.0-alpha.20260914.g111111111111" \
+    "${dup_checksum}" "${REGISTRY}" "${FINAL_SCHEMA}" "${dup_migrations}" "${predecessor}" "${rehearsal}" "${fullHistory}"; then
+    echo "  FAIL: a StageB manifest repeating a migration name was accepted" >&2
+    exit 1
+  else
+    echo "  ok: a StageB manifest repeating a migration name is rejected"
   fi
 
   # D-2 namespace (Copilot review, PR #1194): a StageA-shaped key

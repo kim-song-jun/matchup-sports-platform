@@ -112,7 +112,11 @@ validate_alpha_stage_b_final_manifest() {
       .database.task168.recoveryFrom == null and
       .database.task168.rollbackTarget == null and
       .database.task168.migrations == $migrations and
+      (.database.task168.migrations | length == 11) and
+      (.database.task168.migrations | all((.name | test("^[0-9]{14}_[a-z0-9_]+$")) and (.sha256 | test("^[0-9a-f]{64}$")))) and
+      ([.database.task168.migrations[].name] | unique | length == 11) and
       (.database.task168.fullMigrationHistory | length > 11) and
+      (.database.task168.fullMigrationHistory | all((.name | test("^[0-9]{14}_[a-z0-9_]+$")) and (.sha256 | test("^[0-9a-f]{64}$")))) and
       .database.task168.fullMigrationHistory == $fullHistory and
       (.database.task168.resolvedMigrationAttemptsSha256 | test("^[0-9a-f]{64}$")) and
       (.database.task168.migrationLockSha256 | test("^[0-9a-f]{64}$")) and

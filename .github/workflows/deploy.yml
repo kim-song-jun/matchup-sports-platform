@@ -238,6 +238,23 @@ jobs:
       - name: Prod rollback guard tests
         run: bash scripts/qa/test-prod-rollback-guards.sh
 
+      # Task 168 M11 converged: the final-steady ledger/receipt check-only
+      # gate (deploy/task168-final-steady-migrate.sh) is what stands between
+      # every future dev push and Alpha's live DB once M11 lands — this
+      # fixes D-1 (a StageA runner silently skipping new migrations) but a
+      # regression back to the candidate runner's exact-ledger-equality
+      # design would permanently block every deploy that adds a migration.
+      - name: Task168 final-steady migration contract tests
+        run: bash scripts/qa/test-task168-final-steady.sh
+
+      # Task168 M11 prod guard (assert_task168_m11_guard,
+      # deploy/prod-release-common.sh): prod has no Alpha-style host receipt
+      # path, so this is the only thing stopping M11 from running unguarded
+      # (no writer quiesce, no fresh backup) the first time a dev->main
+      # promotion carries it.
+      - name: Task168 prod guard contract tests
+        run: bash scripts/qa/test-task168-prod-guard.sh
+
       # expand-contract 게이트를 **머지 전에** 돌린다.
       #
       # 2026-08-20 사고: 이 검사가 `deploy` job 에만 있었고 그 job 은 PR 에서 skip 된다.

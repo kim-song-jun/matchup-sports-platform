@@ -106,7 +106,7 @@ forbidPatterns(composePath, [
 ]);
 
 requirePatterns(deployPath, [
-  [/validate_alpha_release_manifest/, 'deploy must validate the release manifest'],
+  [/validate_alpha_final_release_manifest \\/, 'deploy must validate the release manifest'],
   [/write_candidate_manifest/, 'deploy must write candidate state before mutation'],
   [/assert_running_release_digests/, 'deploy must verify running image digests'],
   [/promote_candidate_manifest/, 'deploy must atomically promote candidate state'],
@@ -355,9 +355,9 @@ function verifyNegativeControls(renderedPolicies) {
   assertRejected('tag-only API image');
 
   sources.set(composePath, originalCompose);
-  sources.set(deployPath, originalDeploy.replaceAll('validate_alpha_release_manifest', 'validate_release_candidate'));
+  sources.set(deployPath, originalDeploy.replaceAll('validate_alpha_final_release_manifest', 'validate_release_candidate'));
   errors.length = 0;
-  requirePatterns(deployPath, [[/validate_alpha_release_manifest/, 'deploy must validate the release manifest']]);
+  requirePatterns(deployPath, [[/validate_alpha_final_release_manifest \\/, 'deploy must validate the release manifest']]);
   assertRejected('missing manifest validation');
 
   assertPolicyRejected('swapped runtime Parameter role actions', renderedPolicies, (policies) => {

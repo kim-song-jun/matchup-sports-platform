@@ -249,6 +249,44 @@ jobs:
       - name: Task 168 StageB preflight sidecar contract tests
         run: bash scripts/qa/test-task168-stage-b-preflight-sidecar.sh
 
+      # A gate that is not wired into any workflow is the same as no gate.
+      - name: Alpha immutable-deploy contract checks
+        run: node scripts/qa/check-alpha-immutable-deploy.mjs
+
+      # Task168 StageB. All four run the real target scripts against fake
+      # aws/docker, never a hand-copied excerpt — see each script's own
+      # header for what it actually exercises.
+      - name: Task168 StageB dispatch wiring contract tests
+        run: bash scripts/qa/test-task168-stage-b-wiring.sh
+
+      - name: Task168 StageB wrapper contract tests
+        run: bash scripts/qa/test-task168-stage-b-wrapper.sh
+
+      - name: Task168 StageB manifest and promotion contract tests
+        run: bash scripts/qa/test-task168-stage-b-manifest.sh
+
+      - name: Task168 Dockerfile target stage order (static)
+        run: bash scripts/qa/test-task168-dockerfile-target.sh
+
+      - name: Task168 post-live verify contract tests
+        run: bash scripts/qa/test-task168-post-live.sh
+
+      - name: Task168 StageA predecessor read contract tests
+        run: bash scripts/qa/test-task168-predecessor-read.sh
+
+      - name: Task168 StageA predecessor dispatch contract tests
+        run: bash scripts/qa/test-task168-predecessor-dispatch.sh
+
+      # A real `docker build` per target (StageA default + StageB
+      # runtime-task168-final) is deliberately NOT a step here: this job's
+      # own contract (see the file header) is "no app build, seconds-long
+      # checks", and two full image builds break that.
+      # scripts/qa/test-task168-dockerfile-target.sh above covers the
+      # target-order/attestation-content contract statically; a real-build
+      # attestation check belongs in a job that does not gate this file's
+      # production deploy (or on workflow_dispatch only), with a real run
+      # result attached before it merges — not here.
+
       # Task 168 M11 converged: the final-steady ledger/receipt check-only
       # gate (deploy/task168-final-steady-migrate.sh) is what stands between
       # every future dev push and Alpha's live DB once M11 lands — this
@@ -617,6 +655,10 @@ jobs:
         with:
           context: .
           file: deploy/Dockerfile.v1-api
+          # See deploy-alpha.yml's identical comment: Dockerfile.v1-api now carries a
+          # StageB stage ahead of `runtime` — pin the target explicitly so prod never
+          # silently picks up the newest stage in the file.
+          target: runtime
           push: true
           tags: ${{ steps.login-ecr.outputs.registry }}/teameet-prod-v1-api:${{ steps.images.outputs.imageTag }}
           cache-from: type=gha,scope=prod-v1-api

@@ -216,6 +216,7 @@ bash "${ALPHA_SOURCE_DIR}/deploy/task168-final-steady-migrate.sh" \
 
 write_candidate_manifest "${ALPHA_MANIFEST_FILE}"
 prepare_alpha_release_source "${ALPHA_SOURCE_DIR}" "${ALPHA_SHA}" "${ALPHA_SOURCE_SHA256}"
+
 activate_alpha_release_source "${ALPHA_SHA}"
 source_activated=true
 runtime_mutated=true

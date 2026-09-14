@@ -1,6 +1,6 @@
 # Codex 세션 이어받기
 
-2026-09-14 02:40 KST 갱신. 이 파일은 **읽기 순서와 현재 위치를 안내하는 입구**다. 상세 진행·결정·검증 기록의 정본은 Task 168 하나로 유지한다.
+2026-09-14 21:10 KST 갱신. 이 파일은 **읽기 순서와 현재 위치를 안내하는 입구**다. 상세 진행·결정·검증 기록의 정본은 Task 168 하나로 유지한다.
 
 ## 먼저 읽을 문서
 
@@ -13,11 +13,14 @@
 
 ## 현재 확인한 상태
 
-- 원격 dev는 `3f47bbd9d`(#1187 게스트 팀 가입 수정 머지)이고 Alpha도 이 커밋을 서빙한다. 메인 작업트리 로컬 dev도 `--ff-only`로 같은 커밋까지 따라잡았다. 미커밋 작업은 그대로 보존한다.
+- 원격 dev는 `89f6eaaaa`(PR-A2 StageB 배선 머지)다. 메인 작업트리 로컬 dev는 `--ff-only`로만 따라잡고 미커밋 작업은 그대로 보존한다 — 현재 타 세션 미커밋 파일 두 개가 FF를 막고 있어 `ca988fb3b`에 멈춰 있다(백업은 스크래치패드에 있고, 되돌리기는 사용자 승인 전까지 하지 않는다).
 - **#1187 완료:** 수정·독립 리뷰·CI·Copilot → dev 머지 → Alpha 실화면 BEFORE/AFTER 3폭 검증과 PR 갤러리 코멘트까지 끝났다. 승인 대기 취소 경계와 운영자 background refetch의 실화면은 가입 신청 쓰기가 필요해 검증하지 않았다(단위 테스트 증거만).
 - **#1191 완료:** origin/main 전용 커밋을 dev로 흡수해 #735 충돌이 해소됐다.
 - **Alpha 배포 결함 D-1:** Stage A 러너가 완료 상태에서 migrate 없이 끝나므로, 이후 dev에 migration이 머지되면 배포는 success인데 Alpha DB에는 적용되지 않는다. 현재 누락은 0이다. **migration을 추가하는 PR은 사용자 결정(U3) 전까지 dev에 머지하지 않는다.**
-- **최종 M11 이관은 실행되지 않았다.** 실행 명세 v3(설계 + 적대 비평 2라운드)가 신규 결함 D-2~D-6과 PR 순서(PR-A1 → PR-A2 → 격리 리허설 → 비가역 실행 → post-live → PR-B → PR-C)를 정리했다. 사용자 결정 U1–U11을 기다리고, packager·러너의 기존 BLOCK은 독립 재검토 중이다. 로컬 AWS 세션이 만료돼 SSM 단계는 모두 대기다.
+- **최종 M11 이관은 아직 실행되지 않았다(디스패치 2회 모두 사전 단계에서 fail-closed).** 실행 명세 v3(설계 + 적대 비평 2라운드)가 결함 D-2~D-6과 PR 순서(PR-A1 → PR-A2 → 리허설 → 비가역 실행 → post-live → PR-B → PR-C)를 정리했다. 사용자가 **Alpha에서 백업 결정 없이 지금 실행**하라고 직접 지시했고(개발/alpha 환경), 격리 리허설은 그 지시로 waived(매니페스트의 `rehearsal.mode="waived"`)다. Alpha 쓰기 승인은 이 M11 + 대회 클린업 범위에 한정되며 다른 작업으로 옮겨 쓰지 않는다.
+- **[PR-A1 #1193](https://github.com/kim-song-jun/matchup-sports-platform/pull/1193)(StageB 도구, draft):** 정규형 동일성 설계로 적대 검증 blocking 0, Copilot 5회 반영 뒤 dev 머지(`4e7c47494`). 사용자가 Alpha에서 백업 결정 없이 M11을 실행하라고 직접 지시했다.
+- **[PR-A2 #1194](https://github.com/kim-song-jun/matchup-sports-platform/pull/1194)(StageB 배선):** 적대 검증 라운드와 Copilot 지적(입력 스냅샷 해시 출처, `.source.key` 접두 검사, post-live의 과대 `LIKE` 범위, 재사용된 낡은 매니페스트, post-live 11건 미강제, 실패 실행에 살아남는 낡은 runtime 영수증)을 모두 반영해 dev 머지(`89f6eaaaa`). 영수증 계약(`migration-stage.json` / `runtime-verification.json`)의 소유자이고, U2(자동 계속)까지 배선돼 있다.
+- **M11 디스패치 2회 실패 → 원인 규명·수정:** 두 번 모두 "Resolve Task168 StageA predecessor transition" 스텝에서 죽었다. 호스트에서 직접 실행해 원인을 확정했다 — 그 스텝이 SSM으로 맨 셸에서 돌리는 `scripts/release/read-task168-stage-a-predecessor.sh`가 ① DB 계정을 컴파일된 기본값으로 접속했고(운영 env가 그 셸에 없다) ② 컨테이너를 `docker compose`로 찾았다(alpha compose 파일이 `deploy-alpha.sh`만 내보내는 이미지 변수를 요구해 보간 실패). 둘 다 fail-closed라 **DB는 변경되지 않았고 M11은 실행된 적이 없다**. [PR #1200](https://github.com/kim-song-jun/matchup-sports-platform/pull/1200)이 컨테이너 라벨 조회 + 컨테이너 환경에서 역할·DB 파생으로 고쳤고(덤으로 `docker exec -i`가 스크립트 자신의 stdin을 먹던 잠재 결함 제거), 고친 바이트를 실제 Alpha 호스트에서 읽기 전용 실행해 StageA 영수증의 DB 신원과 일치함을 확인했다.
 - 관리자·무소속 테스트 계정 로그인 401은 해소됐다(비공개 자격증명으로 201). 비밀번호나 토큰은 저장소에 기록하지 않는다.
 - 재개 시 에이전트·세션 상태를 새로 조회한다. 과거 ‘백그라운드 진행 중’ 기록을 현재 실행 상태로 믿지 않는다.
 
@@ -37,4 +40,4 @@
 
 ## 다음 세션에 바로 줄 지시
 
-> readme_codex.md의 순서대로 Task 168 최신 커서와 시나리오 허브를 읽고, 현재 원격 dev·열린 PR·CI·Alpha·에이전트 상태를 새로 대조해 이어서 진행해줘. 구현과 독립 리뷰·Ego UI/UX·역할별 흐름 검증은 서로 다른 에이전트가 맡게 해줘. 공유 dev 작업트리와 다른 세션 변경을 보존하고, 필요한 변경은 PR CI 후 dev에 통합해 Alpha에서 확인해줘. #735 승격 PR은 유지하되 머지·main 승격은 실행하지 마. M11 StageB는 사용자 결정 U1–U11과 AWS 재인증 뒤에 진행하고, 비가역 실행은 사용자 직접 승인 없이는 하지 마. 상세 진행과 남은 작업은 Task 168 한 문서에 계속 기록하고, 42개 흐름·실제 API/DB·동시 정정·감사 실패 복구·Phase 3 최종 이관의 미검증을 완료로 표현하지 마.
+> readme_codex.md의 순서대로 Task 168 최신 커서와 시나리오 허브를 읽고, 현재 원격 dev·열린 PR·CI·Alpha·에이전트 상태를 새로 대조해 이어서 진행해줘. 구현과 독립 리뷰·Ego UI/UX·역할별 흐름 검증은 서로 다른 에이전트가 맡게 해줘. 공유 dev 작업트리와 다른 세션 변경을 보존하고, 필요한 변경은 PR CI 후 dev에 통합해 Alpha에서 확인해줘. #735 승격 PR은 유지하되 머지·main 승격은 실행하지 마. M11 StageB는 사용자 결정 U1–U11 뒤에 PR-A1 → PR-A2 순서로 진행하고, 비가역 실행은 사용자 직접 승인 없이는 하지 마. 상세 진행과 남은 작업은 Task 168 한 문서에 계속 기록하고, 42개 흐름·실제 API/DB·동시 정정·감사 실패 복구·Phase 3 최종 이관의 미검증을 완료로 표현하지 마.

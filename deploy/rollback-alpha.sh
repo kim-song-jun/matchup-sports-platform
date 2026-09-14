@@ -96,7 +96,8 @@ trap 'restore_current_on_failure' ERR
 
 load_alpha_release_manifest "${PREVIOUS_MANIFEST}"
 pull_release_images
-activate_alpha_release_source "${previous_sha}"
+previous_source_key="$(alpha_release_source_key "${PREVIOUS_MANIFEST}")"
+activate_alpha_release_source "${previous_source_key}"
 write_release_metadata "${PREVIOUS_MANIFEST}"
 
 "${compose[@]}" up -d --force-recreate --no-deps \

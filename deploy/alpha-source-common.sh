@@ -8,11 +8,24 @@ ALPHA_RUNTIME_CONFIG_DIR="${ALPHA_RUNTIME_CONFIG_DIR:-${ALPHA_HOME_DIR}/.teameet
 ALPHA_LEGACY_SOURCE_DIR="${ALPHA_LEGACY_SOURCE_DIR:-${ALPHA_SOURCE_RELEASES_DIR}/legacy-pre-immutable}"
 ALPHA_RUNTIME_METADATA_FILE="${ALPHA_RUNTIME_METADATA_FILE:-${ALPHA_RUNTIME_CONFIG_DIR}/release-metadata.alpha.conf}"
 
+# A release's source tree lives under a key taken from its manifest's own
+# source key, not the bare SHA: StageB packages a different tree (final schema
+# and M11 in place) for a SHA the push path has already staged and made live,
+# so the two cannot share `<sha>`. Restore and rollback must derive the same
+# key, or they would reactivate the pre-M11 tree for a StageB release.
+readonly ALPHA_SOURCE_KEY_JQ='if .source.key == ("releases/" + .release.sha + ".tar.gz") then .release.sha
+  elif .source.key == ("releases/task168-stage-b/" + .release.sha + ".tar.gz") then "task168-stage-b-" + .release.sha
+  else error("unrecognized source key: \(.source.key)") end'
+
+alpha_release_source_key() {
+  jq -er "${ALPHA_SOURCE_KEY_JQ}" "$1"
+}
+
 prepare_alpha_release_source() {
   local source_dir="$1"
-  local release_sha="$2"
+  local source_key="$2"
   local source_sha256="$3"
-  local target_dir="${ALPHA_SOURCE_RELEASES_DIR}/${release_sha}"
+  local target_dir="${ALPHA_SOURCE_RELEASES_DIR}/${source_key}"
   local target_tmp="${target_dir}.tmp.$$"
   local drift
 
@@ -33,11 +46,11 @@ prepare_alpha_release_source() {
   fi
   if [[ -d "${target_dir}" ]]; then
     if [[ "$(cat "${target_dir}/.source-sha256" 2>/dev/null)" != "${source_sha256}" ]]; then
-      echo "[alpha-release] Stored source ${release_sha} has a different .source-sha256" >&2
+      echo "[alpha-release] Stored source ${source_key} has a different .source-sha256" >&2
       return 1
     fi
     if [[ ! -f "${target_dir}/deploy/deploy-alpha.sh" ]]; then
-      echo "[alpha-release] Stored source ${release_sha} is missing deploy/deploy-alpha.sh" >&2
+      echo "[alpha-release] Stored source ${source_key} is missing deploy/deploy-alpha.sh" >&2
       return 1
     fi
     # --omit-dir-times 가 없으면 이 검사는 자기가 만든 mtime 을 드리프트로 오판한다.
@@ -54,7 +67,7 @@ prepare_alpha_release_source() {
       --exclude '/deploy/release-metadata.alpha.conf' \
       "${source_dir}/" "${target_dir}/")"
     if [[ -n "${drift}" ]]; then
-      echo "[alpha-release] Stored source ${release_sha} drifted from the packaged source:" >&2
+      echo "[alpha-release] Stored source ${source_key} drifted from the packaged source:" >&2
       printf '%s\n' "${drift}" >&2
       return 1
     fi
@@ -80,11 +93,12 @@ prepare_alpha_release_source() {
 
 activate_alpha_release_source() {
   # 인자 없는 `return` 금지 — ERR trap 안에서는 trap 을 일으킨 종료코드가 돌아온다(scripts/qa/test-release-restore-in-trap.sh).
-  local release_sha="$1"
-  local target_dir="${ALPHA_SOURCE_RELEASES_DIR}/${release_sha}"
+  local source_key="$1"
+  local target_dir="${ALPHA_SOURCE_RELEASES_DIR}/${source_key}"
   local next_link="${ALPHA_HOME_DIR}/.teameet-alpha-live.$$"
 
-  [[ -d "${target_dir}" ]] || return 1
+  # An empty key names the sources root itself, which exists.
+  [[ -n "${source_key}" && -d "${target_dir}" ]] || return 1
   ln -s "${target_dir}" "${next_link}"
   if [[ -L "${ALPHA_LIVE_DIR}" ]]; then
     if mv --help 2>&1 | grep -q -- '--no-target-directory'; then
@@ -110,14 +124,16 @@ activate_alpha_release_source() {
 prune_stale_alpha_release_sources() {
   local keep_active="$1"
   local keep_previous="$2"
-  local entry sha pruned=0
+  local entry key pruned=0
 
+  # Without an active key every tree would be pruned, the live one included.
+  [[ -n "${keep_active}" ]] || return 1
   [[ -d "${ALPHA_SOURCE_RELEASES_DIR}" ]] || return 0
   for entry in "${ALPHA_SOURCE_RELEASES_DIR}"/*; do
     [[ -d "${entry}" ]] || continue
-    sha="$(basename "${entry}")"
-    [[ "${sha}" =~ ^[0-9a-f]{40}$ ]] || continue
-    [[ "${sha}" == "${keep_active}" || "${sha}" == "${keep_previous}" ]] && continue
+    key="$(basename "${entry}")"
+    [[ "${key}" =~ ^(task168-stage-b-)?[0-9a-f]{40}$ ]] || continue
+    [[ "${key}" == "${keep_active}" || "${key}" == "${keep_previous}" ]] && continue
     rm -rf "${entry}"
     pruned=$((pruned + 1))
   done

@@ -187,7 +187,8 @@ if ! command -v rsync >/dev/null 2>&1; then
 fi
 
 write_candidate_manifest "${ALPHA_MANIFEST_FILE}"
-prepare_alpha_release_source "${ALPHA_SOURCE_DIR}" "${ALPHA_SHA}" "${ALPHA_SOURCE_SHA256}"
+source_key="$(alpha_release_source_key "${ALPHA_MANIFEST_FILE}")"
+prepare_alpha_release_source "${ALPHA_SOURCE_DIR}" "${source_key}" "${ALPHA_SOURCE_SHA256}"
 
 # D-5 guard. This manifest was
 # already proven `database.task168.stage == "stageAIntermediate"` above
@@ -211,7 +212,7 @@ assert_task168_m11_absent compose || {
   exit 1
 }
 
-activate_alpha_release_source "${ALPHA_SHA}"
+activate_alpha_release_source "${source_key}"
 source_activated=true
 runtime_mutated=true
 chmod 600 "${ENV_FILE}"
@@ -364,10 +365,15 @@ else
   promote_candidate_manifest
 fi
 trap - ERR
-prune_stale_alpha_release_sources \
-  "$(jq -er '.active.release.sha' "${ALPHA_RELEASE_STATE_FILE}")" \
-  "$(jq -r '.previous.release.sha // empty' "${ALPHA_RELEASE_STATE_FILE}")" ||
-  echo "[alpha-deploy] WARNING: stale release source prune failed" >&2
+# Keys are read into variables first: an inline lookup that failed would hand
+# prune an empty key instead of stopping it.
+if active_source_key="$(jq -er ".active | ${ALPHA_SOURCE_KEY_JQ}" "${ALPHA_RELEASE_STATE_FILE}")" &&
+  previous_source_key="$(jq -er "if .previous == null then \"\" else (.previous | ${ALPHA_SOURCE_KEY_JQ}) end" "${ALPHA_RELEASE_STATE_FILE}")"; then
+  prune_stale_alpha_release_sources "${active_source_key}" "${previous_source_key}" ||
+    echo "[alpha-deploy] WARNING: stale release source prune failed" >&2
+else
+  echo "[alpha-deploy] WARNING: could not resolve release source keys; skipped pruning" >&2
+fi
 if ! write_legacy_release_state; then
   echo "[alpha-deploy] WARNING: canonical state is active but legacy receipt could not be written" >&2
 fi

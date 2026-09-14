@@ -298,7 +298,7 @@ wait_for_alpha_worker_healthy() {
 # 안전하다" 판단이 이 함수가 동작한다는 전제 위에 서 있다** — 여기를 바꾸면 그 가드도 함께 본다.
 restore_active_release() {
   local active_tmp
-  local active_sha
+  local active_source_key
   local active_checksum
 
   active_tmp="$(alpha_restore_step mktemp mktemp "${ALPHA_RELEASE_STATE_DIR}/active.XXXXXX")" || return 1
@@ -307,8 +307,9 @@ restore_active_release() {
     jq -er '.activeManifestSha256' "${ALPHA_RELEASE_STATE_FILE}")" || return 1
   alpha_restore_step validate_stored_manifest \
     validate_stored_alpha_manifest "${active_tmp}" "${ALPHA_ECR_REGISTRY}" "${active_checksum}" || return 1
-  active_sha="$(alpha_restore_step read_active_sha jq -er '.release.sha' "${active_tmp}")" || return 1
-  alpha_restore_step activate_source activate_alpha_release_source "${active_sha}" || return 1
+  active_source_key="$(alpha_restore_step read_active_source_key \
+    alpha_release_source_key "${active_tmp}")" || return 1
+  alpha_restore_step activate_source activate_alpha_release_source "${active_source_key}" || return 1
   alpha_restore_step load_manifest load_alpha_release_manifest "${active_tmp}" || return 1
   alpha_restore_step pull_images pull_release_images || return 1
   alpha_restore_step write_metadata write_release_metadata "${active_tmp}" || return 1

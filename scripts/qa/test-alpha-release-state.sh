@@ -207,4 +207,63 @@ if [[ -e "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_A}" ]]; then
 fi
 [[ -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_B}" ]]
 
+# ── Source keys come from the manifest's own source key ─────────────────────
+[[ "$(alpha_release_source_key "${manifest_a}")" == "${SHA_A}" ]] ||
+  { echo "a push manifest did not resolve to its bare SHA key" >&2; exit 1; }
+stage_b_key_manifest="${TEST_ROOT}/stage-b-key.json"
+jq --arg sha "${SHA_B}" '.release.sha = $sha | .source.key = ("releases/task168-stage-b/" + $sha + ".tar.gz")' \
+  "${manifest_a}" > "${stage_b_key_manifest}"
+[[ "$(alpha_release_source_key "${stage_b_key_manifest}")" == "task168-stage-b-${SHA_B}" ]] ||
+  { echo "a StageB manifest did not resolve to its namespaced key" >&2; exit 1; }
+jq '.source.key = "releases/elsewhere/x.tar.gz"' "${manifest_a}" > "${tampered}"
+if alpha_release_source_key "${tampered}" >/dev/null 2>&1; then
+  echo "an unrecognized source key was accepted" >&2
+  exit 1
+fi
+
+# ── The push deploy has staged and activated <sha>; StageB packages a
+#    different tree for the same commit and must stage beside it. ──────────
+readonly SHA_D=4444444444444444444444444444444444444444
+source_push="${TEST_ROOT}/source-push"
+source_final="${TEST_ROOT}/source-final"
+mkdir -p "${source_push}/deploy" "${source_final}/deploy"
+printf '#!/usr/bin/env bash\n' > "${source_push}/deploy/deploy-alpha.sh"
+printf '#!/usr/bin/env bash\n' > "${source_final}/deploy/deploy-alpha.sh"
+printf 'push-tree\n' > "${source_push}/release.txt"
+printf 'final-tree\n' > "${source_final}/release.txt"
+prepare_alpha_release_source "${source_push}" "${SHA_D}" "${DIGEST_A#sha256:}"
+activate_alpha_release_source "${SHA_D}"
+if prepare_alpha_release_source "${source_final}" "${SHA_D}" "${DIGEST_B#sha256:}" 2>/dev/null; then
+  echo "a different tree was staged over the live tree for the same SHA" >&2
+  exit 1
+fi
+prepare_alpha_release_source "${source_final}" "task168-stage-b-${SHA_D}" "${DIGEST_B#sha256:}"
+[[ "$(cat "${ALPHA_LIVE_DIR}/release.txt")" == 'push-tree' ]] ||
+  { echo "staging the StageB tree changed the live tree" >&2; exit 1; }
+activate_alpha_release_source "task168-stage-b-${SHA_D}"
+[[ "$(cat "${ALPHA_LIVE_DIR}/release.txt")" == 'final-tree' ]] ||
+  { echo "activating the StageB key did not switch the live tree" >&2; exit 1; }
+
+mkdir -p "${ALPHA_SOURCE_RELEASES_DIR}/task168-stage-b-${SHA_C}"
+prune_stale_alpha_release_sources "task168-stage-b-${SHA_D}" "${SHA_D}"
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/task168-stage-b-${SHA_D}" && -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_D}" ]] ||
+  { echo "prune removed a kept source key" >&2; exit 1; }
+if [[ -e "${ALPHA_SOURCE_RELEASES_DIR}/task168-stage-b-${SHA_C}" ]]; then
+  echo "a stale namespaced source tree survived pruning" >&2
+  exit 1
+fi
+
+# An empty key names the sources root: it must never be activated, and prune
+# must not run without knowing what is live.
+if activate_alpha_release_source "" 2>/dev/null; then
+  echo "an empty source key was activated" >&2
+  exit 1
+fi
+[[ "$(cat "${ALPHA_LIVE_DIR}/release.txt")" == 'final-tree' ]]
+if prune_stale_alpha_release_sources "" "" 2>/dev/null; then
+  echo "prune ran without an active key" >&2
+  exit 1
+fi
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/task168-stage-b-${SHA_D}" ]]
+
 echo "[alpha-release-state] passed"

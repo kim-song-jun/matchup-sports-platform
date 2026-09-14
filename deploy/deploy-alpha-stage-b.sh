@@ -444,12 +444,14 @@ validate_stored_alpha_manifest "${ALPHA_MANIFEST_FILE}" "${ALPHA_ECR_REGISTRY}" 
 validate_alpha_release_source_binding "${ALPHA_MANIFEST_FILE}" || fail "source binding does not match this manifest"
 load_alpha_release_manifest "${ALPHA_MANIFEST_FILE}"
 
-# §6.2 step 1 (cont'd): stage the source WITHOUT activating it. Reuses the
-# same target directory convention as StageA (ALPHA_SOURCE_RELEASES_DIR/<sha>)
-# so the eventual activation step (once U2 wires it) needs no new mechanism.
-prepare_alpha_release_source "${ALPHA_SOURCE_DIR}" "${ALPHA_SHA}" "${ALPHA_SOURCE_SHA256}" ||
+# §6.2 step 1 (cont'd): stage the source WITHOUT activating it, under its own
+# key: the push deploy has already staged and activated a different tree at
+# <sha> for this same commit (alpha_release_source_key).
+source_key="$(alpha_release_source_key "${ALPHA_MANIFEST_FILE}")" ||
+  fail "StageB manifest does not name a recognized source key"
+prepare_alpha_release_source "${ALPHA_SOURCE_DIR}" "${source_key}" "${ALPHA_SOURCE_SHA256}" ||
   fail "could not stage the StageB source"
-target_source_dir="${ALPHA_SOURCE_RELEASES_DIR}/${ALPHA_SHA}"
+target_source_dir="${ALPHA_SOURCE_RELEASES_DIR}/${source_key}"
 
 # §6.2 step 2: pull the final image and confirm its attestation before doing
 # anything irreversible with it.
@@ -518,7 +520,7 @@ compose_prod="${ALPHA_LIVE_DIR}/deploy/docker-compose.prod.yml"
     compose=(docker compose --project-name deploy -f "${compose_prod}" -f "${compose_alpha}" --env-file "${env_file}")
 
     activation_step="activate-source"
-    activate_alpha_release_source "${ALPHA_SHA}"
+    activate_alpha_release_source "${source_key}"
 
     activation_step="pull-images"
     pull_release_images

@@ -15,10 +15,10 @@ usage: task168-final-image-preflight.sh \
   --schema FILE --schema-sha256 HEX64 \
   --migration-root DIR --migrations-json FILE --full-migrations-json FILE \
   --resolved-migration-attempts-json FILE \
-  --source-sha256 HEX64 --input-snapshot-sha256 HEX64 \
   --postgres-image IMAGE@sha256:HEX64 --api-image IMAGE@sha256:HEX64 \
   --api-client-schema-path FILE --web-image IMAGE@sha256:HEX64 \
   --cutover-tool-image IMAGE@sha256:HEX64 \
+  --api-workdir DIR --api-prisma-bin FILE \
   --tool-workdir DIR --tool-prisma-bin FILE \
   --release-sha HEX40 --report FILE --receipt FILE
 
@@ -724,7 +724,7 @@ jq -n \
   --arg inputSnapshot "$INPUT_SNAPSHOT_SHA" --arg fullHistorySha "$FULL_HISTORY_SHA" --arg resolvedAttemptsSha "$RESOLVED_ATTEMPTS_SHA" \
   --arg report "$REPORT" --argjson migrations "$(cat "$MIGRATIONS_JSON")" --argjson fullHistory "$(cat "$FULL_MIGRATIONS_JSON")" --argjson resolvedAttempts "$RESOLVED_ATTEMPTS_CANONICAL" \
   --argjson evidence "$report_evidence_json" --arg cleanup "$CLEANUP_RECORD" --arg cleanupSha "$cleanup_sha" \
-  '{schemaVersion:1,kind:"task168FinalImagePreflight",status:"COMPLETED",sourceSha256:$sourceSha,schemaSha256:$schemaSha,apiImage:$api,webImage:$web,cutoverToolImage:$tool,inputSnapshot:{kind:"task168-stageB-inputs",sha256:$inputSnapshot},harness:{sourceSha256:$sourceSha,schemaSha256:$schemaSha,migrationLockSha256:$lockSha,resolvedMigrationAttemptsSha256:$resolvedAttemptsSha,resolvedMigrationAttempts:$resolvedAttempts,migrationHashes:($migrations|map({name,sha256})),fullMigrationHistory:$fullHistory},migrations:($migrations|map({name,sha256})),fullMigrationHistory:$fullHistory,fullMigrationHistorySha256:$fullHistorySha,resolvedMigrationAttemptsSha256:$resolvedAttemptsSha,status:"COMPLETED",catalog:{legacyTables:0,legacyLinkColumns:0,retirementTriggers:0,retirementFunctions:0,evidence:$evidence.catalog},ledger:{count:11,m11OnlyNew:true,applied:($migrations|map(.name)),evidence:$evidence.ledger},execution:{status:"COMPLETED",cleanupStatus:"COMPLETED",imageAttestation:$evidence.apiImageAttestation},rehearsal:{status:"COMPLETED",postM11:true,report:$report,reportSha256:null,catalog:{legacyTables:0,legacyLinkColumns:0,retirementTriggers:0,retirementFunctions:0},ledger:{count:11,m11OnlyNew:true},fullLedger:{applied:($fullHistory|map(.name))}},cleanup:{status:"COMPLETED",record:$cleanup,recordSha256:$cleanupSha}}' > "$report_tmp"
+  '{schemaVersion:1,kind:"task168FinalImagePreflight",status:"COMPLETED",sourceSha256:$sourceSha,schemaSha256:$schemaSha,apiImage:$api,webImage:$web,cutoverToolImage:$tool,inputSnapshot:{kind:"task168-stageB-inputs",sha256:$inputSnapshot},harness:{sourceSha256:$sourceSha,schemaSha256:$schemaSha,migrationLockSha256:$lockSha,resolvedMigrationAttemptsSha256:$resolvedAttemptsSha,resolvedMigrationAttempts:$resolvedAttempts,migrationHashes:($migrations|map({name,sha256})),fullMigrationHistory:$fullHistory},migrations:($migrations|map({name,sha256})),fullMigrationHistory:$fullHistory,fullMigrationHistorySha256:$fullHistorySha,resolvedMigrationAttemptsSha256:$resolvedAttemptsSha,catalog:{legacyTables:0,legacyLinkColumns:0,retirementTriggers:0,retirementFunctions:0,evidence:$evidence.catalog},ledger:{count:11,m11OnlyNew:true,applied:($migrations|map(.name)),evidence:$evidence.ledger},execution:{status:"COMPLETED",cleanupStatus:"COMPLETED",imageAttestation:$evidence.apiImageAttestation},rehearsal:{status:"COMPLETED",postM11:true,report:$report,reportSha256:null,catalog:{legacyTables:0,legacyLinkColumns:0,retirementTriggers:0,retirementFunctions:0},ledger:{count:11,m11OnlyNew:true},fullLedger:{applied:($fullHistory|map(.name))}},cleanup:{status:"COMPLETED",record:$cleanup,recordSha256:$cleanupSha}}' > "$report_tmp"
 chmod 600 "$report_tmp"; mv "$report_tmp" "$REPORT"
 report_sha="$(sha256 "$REPORT")"
 

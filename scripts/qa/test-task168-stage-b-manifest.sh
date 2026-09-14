@@ -32,6 +32,7 @@ make_stage_b_manifest() {
          resolvedMigrationAttemptsSha256:("e"*64),
          migrationLockSha256:("1"*64),
          predecessor:{releaseSha:"2222222222222222222222222222222222222222",transition:"/x",transitionSha256:("f"*64),apiImage:"img",databaseIdentity:"id",schemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f"},
+         expectedRunningApiImage:($registry+"/teameet-alpha-v1-api@sha256:"+("9"*64)),
          rehearsal:{mode:"waived",reason:"user-directed Alpha run without isolated rehearsal",decidedAt:"2026-09-14"},
          recoveryFrom:null, rollbackTarget:null}},
      images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:("sha256:"+("a"*64)),uri:($registry+"/teameet-alpha-v1-api@sha256:"+("a"*64))},
@@ -315,6 +316,7 @@ EOF
 #!/usr/bin/env bash
 case "$*" in
   "show -s --format=%cI "*) echo "2026-09-14T00:00:00+09:00" ;;
+  "merge-base --is-ancestor "*) exit 0 ;;
   *) echo "fake git: unexpected invocation: $*" >&2; exit 1 ;;
 esac
 EOF
@@ -333,6 +335,7 @@ EOF
       TASK168_PREDECESSOR_TRANSITION_PATH="/x" TASK168_PREDECESSOR_TRANSITION_SHA256="$(printf 'f%.0s' {1..64})" \
       TASK168_PREDECESSOR_API_IMAGE="img" TASK168_PREDECESSOR_DATABASE_IDENTITY="id" \
       TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256="${RESOLVED_SHA}" \
+      TASK168_EXPECTED_RUNNING_API_IMAGE_TAG="sha-${SHA}" \
       TASK168_REHEARSAL_MODE=waived TASK168_REHEARSAL_REASON="test waiver" TASK168_REHEARSAL_DECIDED_AT="2026-09-14" \
       PATH="${bin}:${PATH}" bash "${ROOT}/scripts/release/create-alpha-release-manifest.sh" \
       >"${out}" 2>"${err}" || rc=$?
@@ -345,6 +348,18 @@ EOF
     echo "  ok: run 1 creates and stores a fresh StageB manifest (resolvedMigrationAttemptsSha256=${RESOLVED_SHA:0:8}...)"
   else
     echo "  FAIL: run 1 (creating the baseline manifest) failed: rc=${rc1} $(cat "${dir}/stderr.run1" 2>/dev/null)" >&2
+    exit 1
+  fi
+
+  # expectedRunningApiImage must be the registry URI for exactly the digest
+  # ECR reports for TASK168_EXPECTED_RUNNING_API_IMAGE_TAG (fake aws hashes
+  # the literal "imageTag=<tag>" describe-images argument).
+  expected_running_image="${registry}/teameet-alpha-v1-api@sha256:$(printf 'imageTag=sha-%s' "${SHA}" | sha256sum | awk '{print $1}')"
+  actual_running_image="$(jq -r '.database.task168.expectedRunningApiImage' "${saved}")"
+  if [[ "${actual_running_image}" == "${expected_running_image}" ]]; then
+    echo "  ok: the created manifest's expectedRunningApiImage is digest-pinned from TASK168_EXPECTED_RUNNING_API_IMAGE_TAG"
+  else
+    echo "  FAIL: expectedRunningApiImage was ${actual_running_image}, expected ${expected_running_image}" >&2
     exit 1
   fi
 
@@ -396,6 +411,7 @@ PY
     TASK168_PREDECESSOR_TRANSITION_PATH="/x" TASK168_PREDECESSOR_TRANSITION_SHA256="$(printf 'f%.0s' {1..64})" \
     TASK168_PREDECESSOR_API_IMAGE="img" TASK168_PREDECESSOR_DATABASE_IDENTITY="id" \
     TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256="${RESOLVED_SHA}" \
+    TASK168_EXPECTED_RUNNING_API_IMAGE_TAG="sha-${SHA}" \
     TASK168_REHEARSAL_MODE=waived TASK168_REHEARSAL_REASON="test waiver" TASK168_REHEARSAL_DECIDED_AT="2026-09-14" \
     PATH="${bin}:${PATH}" bash "${mutated}" >"${dir}/stdout.mutated" 2>"${dir}/stderr.mutated" || rc3=$?
   if [[ "${rc3}" -eq 0 ]]; then
@@ -404,7 +420,263 @@ PY
     echo "  FAIL: the mutated script (no equality check) still refused: rc=${rc3} $(cat "${dir}/stderr.mutated" 2>/dev/null)" >&2
     exit 1
   fi
-) && PASS=$((PASS + 3)) || FAIL=$((FAIL + 1))
+) && PASS=$((PASS + 4)) || FAIL=$((FAIL + 1))
+
+# ── create-alpha-release-manifest.sh: TASK168_EXPECTED_RUNNING_API_IMAGE_TAG
+# is a required env for the StageB branch, same as the other TASK168_* inputs.
+(
+  dir="${WORK}/manifest-generator-missing-tag"
+  bin="${dir}/bin"; mkdir -p "${bin}"
+  printf '#!/usr/bin/env bash\necho "fake aws: should not be called" >&2; exit 1\n' > "${bin}/aws"; chmod +x "${bin}/aws"
+  printf '#!/usr/bin/env bash\necho "fake git: should not be called" >&2; exit 1\n' > "${bin}/git"; chmod +x "${bin}/git"
+
+  rc=0
+  env RELEASE_SHA="${SHA}" RELEASE_VERSION="0.1.0-alpha.20260914.g111111111111" REGISTRY="${REGISTRY}" \
+    DEPLOY_BUCKET="alpha-bucket" EXPECTED_BUCKET_OWNER="123456789012" \
+    SOURCE_VERSION_ID="v1" SOURCE_SHA256="$(printf 'c%.0s' {1..64})" \
+    IMAGE_TAG="task168-final-${SHA}" WEB_IMAGE_TAG="sha-${SHA}" TOOL_IMAGE_TAG="task168-${SHA}" \
+    TASK168_STAGE=stageBFinal \
+    TASK168_PREDECESSOR_RELEASE_SHA="${SHA}" \
+    TASK168_PREDECESSOR_TRANSITION_PATH="/x" TASK168_PREDECESSOR_TRANSITION_SHA256="$(printf 'f%.0s' {1..64})" \
+    TASK168_PREDECESSOR_API_IMAGE="img" TASK168_PREDECESSOR_DATABASE_IDENTITY="id" \
+    TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256="$(printf 'e%.0s' {1..64})" \
+    TASK168_REHEARSAL_MODE=waived TASK168_REHEARSAL_REASON="test waiver" TASK168_REHEARSAL_DECIDED_AT="2026-09-14" \
+    PATH="${bin}:${PATH}" bash "${ROOT}/scripts/release/create-alpha-release-manifest.sh" \
+    >"${dir}/stdout" 2>"${dir}/stderr" || rc=$?
+  if [[ "${rc}" -ne 0 ]] && grep -q "TASK168_EXPECTED_RUNNING_API_IMAGE_TAG is required" "${dir}/stderr"; then
+    echo "  ok: a missing TASK168_EXPECTED_RUNNING_API_IMAGE_TAG is refused"
+  else
+    echo "  FAIL: missing TASK168_EXPECTED_RUNNING_API_IMAGE_TAG was not refused: rc=${rc} $(cat "${dir}/stderr")" >&2
+    exit 1
+  fi
+) && PASS=$((PASS + 1)) || FAIL=$((FAIL + 1))
+
+# ── create-alpha-release-manifest.sh: TASK168_PREDECESSOR_RELEASE_SHA must be
+# an ancestor of RELEASE_SHA (git merge-base --is-ancestor). The fake git
+# treats a commit as an ancestor of itself only, mirroring the ordinary case
+# the script's own comment documents (StageB dispatched against the SHA
+# StageA deployed).
+(
+  dir="${WORK}/manifest-generator-ancestor-check"
+  bin="${dir}/bin"; mkdir -p "${bin}"
+  registry="${REGISTRY}"
+
+  cat > "${bin}/aws" <<EOF
+#!/usr/bin/env bash
+set -u
+argv=("\$@")
+find_val() { local flag="\$1" i; for ((i=0;i<\${#argv[@]};i++)); do [[ "\${argv[i]}" == "\${flag}" ]] && { echo "\${argv[\$((i+1))]}"; return 0; }; done; return 1; }
+case "\${argv[0]} \${argv[1]}" in
+  "ecr describe-images")
+    tag="\$(find_val --image-ids)"
+    echo "sha256:\$(printf '%s' "\${tag}" | sha256sum | awk '{print \$1}')"
+    ;;
+  "s3api head-object")
+    exit 1
+    ;;
+  "s3api put-object")
+    echo "v1"
+    ;;
+  *) echo "fake aws: unexpected invocation: \$*" >&2; exit 1 ;;
+esac
+EOF
+  chmod +x "${bin}/aws"
+
+  cat > "${bin}/git" <<'EOF'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "show -s") echo "2026-09-14T00:00:00+09:00" ;;
+  "merge-base --is-ancestor") [[ "$3" == "$4" ]] ;;
+  *) echo "fake git: unexpected invocation: $*" >&2; exit 1 ;;
+esac
+EOF
+  chmod +x "${bin}/git"
+
+  run_with_predecessor() {
+    local predecessor="$1" label="$2" rc=0
+    : > "${dir}/github-output.${label}"
+    env GITHUB_OUTPUT="${dir}/github-output.${label}" RELEASE_SHA="${SHA}" RELEASE_VERSION="0.1.0-alpha.20260914.g111111111111" REGISTRY="${registry}" \
+      DEPLOY_BUCKET="alpha-bucket" EXPECTED_BUCKET_OWNER="123456789012" \
+      SOURCE_VERSION_ID="v1" SOURCE_SHA256="$(printf 'c%.0s' {1..64})" \
+      IMAGE_TAG="task168-final-${SHA}" WEB_IMAGE_TAG="sha-${SHA}" TOOL_IMAGE_TAG="task168-${SHA}" \
+      TASK168_STAGE=stageBFinal \
+      TASK168_PREDECESSOR_RELEASE_SHA="${predecessor}" \
+      TASK168_PREDECESSOR_TRANSITION_PATH="/x" TASK168_PREDECESSOR_TRANSITION_SHA256="$(printf 'f%.0s' {1..64})" \
+      TASK168_PREDECESSOR_API_IMAGE="img" TASK168_PREDECESSOR_DATABASE_IDENTITY="id" \
+      TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256="$(printf 'e%.0s' {1..64})" \
+      TASK168_EXPECTED_RUNNING_API_IMAGE_TAG="sha-${SHA}" \
+      TASK168_REHEARSAL_MODE=waived TASK168_REHEARSAL_REASON="test waiver" TASK168_REHEARSAL_DECIDED_AT="2026-09-14" \
+      PATH="${bin}:${PATH}" bash "${ROOT}/scripts/release/create-alpha-release-manifest.sh" \
+      >"${dir}/stdout.${label}" 2>"${dir}/stderr.${label}" || rc=$?
+    echo "${rc}"
+  }
+
+  rc_ok="$(run_with_predecessor "${SHA}" ok)"
+  if [[ "${rc_ok}" -eq 0 ]]; then
+    echo "  ok: a predecessor SHA equal to RELEASE_SHA (self-ancestor) is accepted"
+  else
+    echo "  FAIL: the ordinary predecessor==release case was refused: rc=${rc_ok} $(cat "${dir}/stderr.ok")" >&2
+    exit 1
+  fi
+
+  not_ancestor="2222222222222222222222222222222222222222"
+  rc_bad="$(run_with_predecessor "${not_ancestor}" bad)"
+  if [[ "${rc_bad}" -ne 0 ]] && grep -q "is not an ancestor of release" "${dir}/stderr.bad"; then
+    echo "  ok: a predecessor SHA that is not an ancestor of RELEASE_SHA is refused"
+  else
+    echo "  FAIL: a non-ancestor predecessor was not refused: rc=${rc_bad} $(cat "${dir}/stderr.bad")" >&2
+    exit 1
+  fi
+) && PASS=$((PASS + 2)) || FAIL=$((FAIL + 1))
+
+# ── create-alpha-release-manifest.sh (StageB reuse branch): a manifest
+# fetched back from S3 must have expectedRunningApiImage equal to THIS run's
+# freshly resolved image, not merely a well-formed digest-pinned URI.
+(
+  dir="${WORK}/manifest-generator-stale-running-image"
+  bin="${dir}/bin"; mkdir -p "${bin}"
+  registry="${REGISTRY}"
+  saved="${dir}/saved-manifest.json"
+  exists_flag="${dir}/exists"
+
+  cat > "${bin}/aws" <<EOF
+#!/usr/bin/env bash
+set -u
+argv=("\$@")
+find_val() { local flag="\$1" i; for ((i=0;i<\${#argv[@]};i++)); do [[ "\${argv[i]}" == "\${flag}" ]] && { echo "\${argv[\$((i+1))]}"; return 0; }; done; return 1; }
+case "\${argv[0]} \${argv[1]}" in
+  "ecr describe-images")
+    tag="\$(find_val --image-ids)"
+    echo "sha256:\$(printf '%s' "\${tag}" | sha256sum | awk '{print \$1}')"
+    ;;
+  "s3api head-object")
+    [[ -f "${exists_flag}" ]] || exit 1
+    echo "v1"
+    ;;
+  "s3api get-object")
+    dst="\${argv[-1]}"
+    cp "${saved}" "\${dst}"
+    ;;
+  "s3api put-object")
+    body="\$(find_val --body)"
+    cp "\${body}" "${saved}"
+    : > "${exists_flag}"
+    echo "v1"
+    ;;
+  *) echo "fake aws: unexpected invocation: \$*" >&2; exit 1 ;;
+esac
+EOF
+  chmod +x "${bin}/aws"
+  cat > "${bin}/git" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  "show -s --format=%cI "*) echo "2026-09-14T00:00:00+09:00" ;;
+  "merge-base --is-ancestor "*) exit 0 ;;
+  *) echo "fake git: unexpected invocation: $*" >&2; exit 1 ;;
+esac
+EOF
+  chmod +x "${bin}/git"
+
+  run_generator() {
+    local rc=0 out err
+    out="${dir}/stdout.$1"; err="${dir}/stderr.$1"
+    : > "${dir}/github-output.$1"
+    env GITHUB_OUTPUT="${dir}/github-output.$1" RELEASE_SHA="${SHA}" RELEASE_VERSION="0.1.0-alpha.20260914.g111111111111" REGISTRY="${registry}" \
+      DEPLOY_BUCKET="alpha-bucket" EXPECTED_BUCKET_OWNER="123456789012" \
+      SOURCE_VERSION_ID="v1" SOURCE_SHA256="$(printf 'c%.0s' {1..64})" \
+      IMAGE_TAG="task168-final-${SHA}" WEB_IMAGE_TAG="sha-${SHA}" TOOL_IMAGE_TAG="task168-${SHA}" \
+      TASK168_STAGE=stageBFinal \
+      TASK168_PREDECESSOR_RELEASE_SHA="2222222222222222222222222222222222222222" \
+      TASK168_PREDECESSOR_TRANSITION_PATH="/x" TASK168_PREDECESSOR_TRANSITION_SHA256="$(printf 'f%.0s' {1..64})" \
+      TASK168_PREDECESSOR_API_IMAGE="img" TASK168_PREDECESSOR_DATABASE_IDENTITY="id" \
+      TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256="$(printf 'e%.0s' {1..64})" \
+      TASK168_EXPECTED_RUNNING_API_IMAGE_TAG="sha-${SHA}" \
+      TASK168_REHEARSAL_MODE=waived TASK168_REHEARSAL_REASON="test waiver" TASK168_REHEARSAL_DECIDED_AT="2026-09-14" \
+      PATH="${bin}:${PATH}" bash "${ROOT}/scripts/release/create-alpha-release-manifest.sh" \
+      >"${out}" 2>"${err}" || rc=$?
+    echo "${rc}"
+  }
+
+  rc1="$(run_generator run1)"
+  if [[ "${rc1}" -eq 0 && -f "${saved}" ]]; then
+    echo "  ok: run 1 creates and stores a baseline manifest for the expectedRunningApiImage reuse check"
+  else
+    echo "  FAIL: run 1 (creating the baseline manifest) failed: rc=${rc1} $(cat "${dir}/stderr.run1" 2>/dev/null)" >&2
+    exit 1
+  fi
+
+  # Tamper the stored manifest's expectedRunningApiImage to a different
+  # (still well-formed) digest-pinned URI, simulating a stale S3 object left
+  # over from before sha-<release> was rebuilt.
+  stale="${dir}/tampered.json"
+  jq --arg registry "${registry}" '.database.task168.expectedRunningApiImage = ($registry+"/teameet-alpha-v1-api@sha256:"+("8"*64))' "${saved}" > "${stale}"
+  mv "${stale}" "${saved}"
+
+  rc2="$(run_generator run2)"
+  if [[ "${rc2}" -ne 0 ]] && grep -q "expectedRunningApiImage does not match" "${dir}/stderr.run2"; then
+    echo "  ok: a reused manifest with a stale expectedRunningApiImage is refused"
+  else
+    echo "  FAIL: a stale expectedRunningApiImage was not refused: rc=${rc2} $(cat "${dir}/stderr.run2" 2>/dev/null)" >&2
+    exit 1
+  fi
+) && PASS=$((PASS + 2)) || FAIL=$((FAIL + 1))
+
+# ── create-alpha-release-manifest.sh: a TASK168_EXPECTED_RUNNING_API_IMAGE_TAG
+# whose digest cannot be resolved (aws describe-images returns "None") is
+# refused before any manifest is written.
+(
+  dir="${WORK}/manifest-generator-unresolvable-tag"
+  bin="${dir}/bin"; mkdir -p "${bin}"
+
+  cat > "${bin}/aws" <<'EOF'
+#!/usr/bin/env bash
+set -u
+argv=("$@")
+find_val() { local flag="$1" i; for ((i=0;i<${#argv[@]};i++)); do [[ "${argv[i]}" == "${flag}" ]] && { echo "${argv[$((i+1))]}"; return 0; }; done; return 1; }
+case "${argv[0]} ${argv[1]}" in
+  "ecr describe-images")
+    tag="$(find_val --image-ids)"
+    if [[ "${tag}" == "imageTag=unresolvable-tag" ]]; then
+      echo "None"
+    else
+      echo "sha256:$(printf '%s' "${tag}" | sha256sum | awk '{print $1}')"
+    fi
+    ;;
+  *) echo "fake aws: unexpected invocation: $*" >&2; exit 1 ;;
+esac
+EOF
+  chmod +x "${bin}/aws"
+  cat > "${bin}/git" <<'EOF'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "show -s") echo "2026-09-14T00:00:00+09:00" ;;
+  "merge-base --is-ancestor") exit 0 ;;
+  *) echo "fake git: unexpected invocation: $*" >&2; exit 1 ;;
+esac
+EOF
+  chmod +x "${bin}/git"
+
+  rc=0
+  env RELEASE_SHA="${SHA}" RELEASE_VERSION="0.1.0-alpha.20260914.g111111111111" REGISTRY="${REGISTRY}" \
+    DEPLOY_BUCKET="alpha-bucket" EXPECTED_BUCKET_OWNER="123456789012" \
+    SOURCE_VERSION_ID="v1" SOURCE_SHA256="$(printf 'c%.0s' {1..64})" \
+    IMAGE_TAG="task168-final-${SHA}" WEB_IMAGE_TAG="sha-${SHA}" TOOL_IMAGE_TAG="task168-${SHA}" \
+    TASK168_STAGE=stageBFinal \
+    TASK168_PREDECESSOR_RELEASE_SHA="${SHA}" \
+    TASK168_PREDECESSOR_TRANSITION_PATH="/x" TASK168_PREDECESSOR_TRANSITION_SHA256="$(printf 'f%.0s' {1..64})" \
+    TASK168_PREDECESSOR_API_IMAGE="img" TASK168_PREDECESSOR_DATABASE_IDENTITY="id" \
+    TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256="$(printf 'e%.0s' {1..64})" \
+    TASK168_EXPECTED_RUNNING_API_IMAGE_TAG="unresolvable-tag" \
+    TASK168_REHEARSAL_MODE=waived TASK168_REHEARSAL_REASON="test waiver" TASK168_REHEARSAL_DECIDED_AT="2026-09-14" \
+    PATH="${bin}:${PATH}" bash "${ROOT}/scripts/release/create-alpha-release-manifest.sh" \
+    >"${dir}/stdout" 2>"${dir}/stderr" || rc=$?
+  if [[ "${rc}" -ne 0 ]] && grep -q "could not resolve a digest for unresolvable-tag" "${dir}/stderr"; then
+    echo "  ok: a TASK168_EXPECTED_RUNNING_API_IMAGE_TAG whose digest cannot be resolved is refused"
+  else
+    echo "  FAIL: an unresolvable image tag was not refused: rc=${rc} $(cat "${dir}/stderr")" >&2
+    exit 1
+  fi
+) && PASS=$((PASS + 1)) || FAIL=$((FAIL + 1))
 
 echo "== ${PASS} passed, ${FAIL} failed =="
 (( FAIL == 0 ))

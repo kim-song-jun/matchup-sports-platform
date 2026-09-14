@@ -84,12 +84,16 @@ approval like every other Alpha data-restoring action:
    actually stopped.
 2. If the state is R-B (M11 never applied), no restore is needed — the
    writers are the ones to bring back, which `stageBRecover` already does.
-3. If the state is R-A or R-C (M11 applied, or an unresolved attempt),
-   restoring service means restoring the release's own `pre-m11-backup.sql`
-   (the format is fixed by `BACKUP_FORMAT` in
-   `deploy/task168-stage-b-migrate.sh`) onto the database, then reactivating
-   the predecessor Stage A release's source and image.
-4. Any window in which the final runtime was already brought up and started
+3. If the state is R-C (an unresolved M11 attempt), M11's own explicit
+   transaction means the schema was never actually changed — the fix is the
+   ledger-only `prisma migrate resolve --rolled-back` procedure, not a
+   backup restore.
+4. If the state is R-A (M11 applied), restoring service means restoring the
+   release's own `pre-m11-backup.sql` (the format is fixed by
+   `BACKUP_FORMAT` in `deploy/task168-stage-b-migrate.sh`) onto the
+   database, then reactivating the predecessor Stage A release's source and
+   image.
+5. Any window in which the final runtime was already brought up and started
    accepting writes before the restore begins means those writes are lost by
    the restore — there is no merge path back onto the pre-M11 schema.
 

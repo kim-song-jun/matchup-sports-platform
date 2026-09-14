@@ -6,13 +6,21 @@
 # image pull/attestation, and — for stageBFinal only — invoking the runner and
 # judging its result strictly by migration-stage.json, never by exit code alone.
 #
-# stageBFinal deliberately STOPS once the runner reports MIGRATION_COMMITTED.
-# Whether to continue automatically (activate the final runtime, run T7, and
-# promote) is U2 — undecided — so no such branch exists here yet ("post-commit
-# start pending U2"). Re-dispatching stageBFinal for an already-committed
-# release is refused by the runner itself (§3, "final retirement receipt
-# already exists"); continuing from MIGRATION_COMMITTED is out of scope for
-# this PR and will be a separate `stageBResume` entry point once U2 is decided.
+# stageBFinal continues automatically once the runner reports
+# MIGRATION_COMMITTED (U2 = continue automatically): it activates the final
+# release source, brings up the final runtime, restores each writer's
+# restart policy from quiesce.json (never hardcoded), and runs T7
+# (scripts/release/task168-stage-b-post-live-verify.sh) before promoting.
+# A failure anywhere in that sequence NEVER restores predecessor images —
+# M11 already committed, so the database is irreversibly post-M11 — it
+# writes an activation-stage.json diagnosis receipt naming the failed step
+# and leaves the runtime exactly as the failure left it. Re-dispatching
+# stageBFinal for an already-committed release is refused by the runner
+# itself (§3, "final retirement receipt already exists"); retrying a failed
+# activation is a documented manual procedure
+# (docs/ops/task168-stage-b-runbook.md), not an automated entry point —
+# stageBRecover's R-A/R-B judgments are unchanged and still refuse to touch
+# a release once migration-stage.json exists.
 #
 # stageBPreflight invokes the isolated, non-destructive rehearsal
 # (scripts/release/task168-final-image-preflight.sh, T5/T2 — a different
@@ -475,10 +483,99 @@ case "${TASK168_STAGE}" in
     [[ -f "${migration_receipt}" ]] || fail "runner exited 0 but wrote no migration-stage.json"
     jq -e '.status == "MIGRATION_COMMITTED"' "${migration_receipt}" >/dev/null ||
       fail "runner did not report MIGRATION_COMMITTED — see ${migration_receipt}"
+    echo "[deploy-alpha-stage-b] MIGRATION_COMMITTED for ${ALPHA_SHA}; continuing to final runtime activation"
 
-    # Deliberately stops here — see file header. No activation, no compose
-    # up, no T7, no promote in this PR (post-commit start pending U2).
-    echo "[deploy-alpha-stage-b] MIGRATION_COMMITTED for ${ALPHA_SHA}; writer remains stopped. Continuing to the final runtime is not wired in this release (U2 pending) — see ${migration_receipt}"
+    # §6.2 step 4 (U2 = continue automatically): activate the final release
+    # and bring up the final runtime. The database is irreversibly post-M11
+    # from this point on, so ANY failure below writes a diagnosis receipt
+    # naming the failed step and exits non-zero WITHOUT ever restoring
+    # predecessor images — there is no rollback path once M11 has committed.
+    write_activation_diagnosis() {
+      local step="$1" reason="$2" payload
+      # Computed into a variable (not piped) so write_json_atomic's stdin is
+      # fully buffered before it runs -- a pipe here risks jq getting
+      # SIGPIPE if the ERR-trap context tears down the reader early.
+      payload="$(jq -n --arg sha "${ALPHA_SHA}" --arg step "${step}" --arg reason "${reason}" \
+        '{schemaVersion:1,kind:"task168StageBActivation",status:"ACTIVATION_DIAGNOSIS_REQUIRED",releaseSha:$sha,failedStep:$step,failureReason:$reason,diagnosedAt:(now|todate)}')"
+      write_json_atomic "${state_dir}/activation-stage.json" \
+        '.status=="ACTIVATION_DIAGNOSIS_REQUIRED" and .kind=="task168StageBActivation" and (.releaseSha|strings|test("^[0-9a-f]{40}$")) and (.failedStep|strings|length>0) and (.failureReason|strings|length>0)' \
+        <<< "${payload}"
+    }
+    activation_fail() {
+      trap - ERR
+      write_activation_diagnosis "${activation_step}" "$1"
+      echo "[deploy-alpha-stage-b] MIGRATION_COMMITTED for ${ALPHA_SHA} but activation failed at '${activation_step}': $1 -- writers left exactly as the failure left them; predecessor images are NOT restored (database is post-M11). See ${state_dir}/activation-stage.json (docs/ops/task168-stage-b-runbook.md has the manual retry procedure)." >&2
+      exit 1
+    }
+    activation_step="unexpected"
+    trap 'activation_fail "unexpected failure running: ${BASH_COMMAND} (rc=$?)"' ERR
+
+    activation_step="load-manifest"
+    load_alpha_release_manifest "${ALPHA_MANIFEST_FILE}"
+
+    activation_step="source-runtime-env"
+    set -a
+    # shellcheck disable=SC1090 -- protected operator-managed runtime configuration.
+    source "${env_file}"
+    set +a
+    compose=(docker compose --project-name deploy -f "${compose_prod}" -f "${compose_alpha}" --env-file "${env_file}")
+
+    activation_step="activate-source"
+    activate_alpha_release_source "${ALPHA_SHA}"
+
+    activation_step="pull-images"
+    pull_release_images
+
+    activation_step="write-metadata"
+    write_release_metadata "${ALPHA_MANIFEST_FILE}"
+
+    activation_step="compose-up"
+    "${compose[@]}" up -d --force-recreate --no-deps v1_api v1_web v1_game_operations_worker
+    "${compose[@]}" up -d --force-recreate --no-deps nginx
+
+    # Restore each writer's restart policy from quiesce.json's recorded
+    # pre-quiesce value -- compose's own static `restart: always` would
+    # otherwise silently override whatever policy was actually in effect
+    # before the runner quiesced these two containers (v1_web was never
+    # quiesced, so it has no recorded value and keeps compose's default).
+    activation_step="restore-restart-policy"
+    quiesce_receipt="${state_dir}/quiesce.json"
+    [[ -f "${quiesce_receipt}" ]] || activation_fail "quiesce.json is missing for ${ALPHA_SHA}; cannot restore writer restart policy"
+    restart_api="$(jq -er '.restartPolicyBefore.api' "${quiesce_receipt}")" || activation_fail "quiesce.json is missing restartPolicyBefore.api"
+    restart_worker="$(jq -er '.restartPolicyBefore.worker' "${quiesce_receipt}")" || activation_fail "quiesce.json is missing restartPolicyBefore.worker"
+    api_container="$("${compose[@]}" ps -q v1_api)"
+    worker_container="$("${compose[@]}" ps -q v1_game_operations_worker)"
+    [[ -n "${api_container}" && -n "${worker_container}" ]] || activation_fail "final v1_api or v1_game_operations_worker container did not come up"
+    docker update --restart="${restart_api}" "${api_container}" >/dev/null
+    docker update --restart="${restart_worker}" "${worker_container}" >/dev/null
+    [[ "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "${api_container}")" == "${restart_api}" ]] ||
+      activation_fail "restored API restart policy does not match quiesce.json"
+    [[ "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "${worker_container}")" == "${restart_worker}" ]] ||
+      activation_fail "restored worker restart policy does not match quiesce.json"
+
+    # post-live-verify.sh reads worker health with a single, non-retrying
+    # `docker inspect` -- wait for the healthcheck to actually settle first,
+    # the same bound alpha-release-common.sh's own forward-deploy path uses.
+    activation_step="wait-worker-healthy"
+    wait_for_alpha_worker_healthy
+
+    activation_step="post-live-verify"
+    bash "${target_source_dir}/scripts/release/task168-stage-b-post-live-verify.sh" \
+      --release-sha "${ALPHA_SHA}" --manifest "${ALPHA_MANIFEST_FILE}" \
+      --compose-prod "${compose_prod}" --compose-alpha "${compose_alpha}" --env-file "${env_file}" \
+      --public-base-url "https://alpha.teameet.co.kr"
+    runtime_receipt="${state_dir}/runtime-verification.json"
+    [[ -f "${runtime_receipt}" ]] || activation_fail "post-live-verify exited 0 but wrote no runtime-verification.json"
+
+    # §6.2 step 5: promote. assert_stage_b_promotion_receipt (already gated
+    # by the T7 receipt written above) is the only path that flips this
+    # release to active in state.json.
+    activation_step="promote"
+    write_candidate_manifest "${ALPHA_MANIFEST_FILE}"
+    promote_candidate_manifest || activation_fail "promotion refused despite a written runtime-verification.json"
+
+    trap - ERR
+    echo "[deploy-alpha-stage-b] StageB final runtime activated, verified, and promoted for ${ALPHA_SHA}"
     ;;
 
   stageBPreflight)

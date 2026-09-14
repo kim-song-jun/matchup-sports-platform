@@ -60,7 +60,7 @@ name_checksum() { printf '%s' "$1" | sha256sum | awk '{print $1}'; }
 # Everything a passing run needs, overridable per-case via env vars read by
 # the fake docker/psql below: BREAK selects which single check to break.
 build_case() {
-  local root="$1"
+  local root="$1" manifest_migration_count="${2:-11}"
   home="${root}/home"
   state_dir="${home}/.teameet-alpha-releases/task168/${SHA}"
   bin="${root}/bin"
@@ -68,8 +68,18 @@ build_case() {
   touch "${root}/live/deploy/docker-compose.prod.yml" "${root}/live/deploy/docker-compose.alpha.yml"
   printf 'V1_DB_USER=teameet_v1\nV1_DB_NAME=teameet_v1\n' > "${root}/live/deploy/.env"
 
+  # manifest_migration_count != 11 simulates a manifest that lists the wrong
+  # number of Task168 migrations (a data-integrity bug elsewhere) -- 10 by
+  # dropping the last real name, 12 by appending one extra well-formed but
+  # unrelated name.
+  local manifest_names=("${TASK168_NAMES[@]}")
+  if [[ "${manifest_migration_count}" -lt 11 ]]; then
+    manifest_names=("${manifest_names[@]:0:${manifest_migration_count}}")
+  elif [[ "${manifest_migration_count}" -gt 11 ]]; then
+    manifest_names+=(20260913000000_v1_extra_manifest_entry)
+  fi
   local migrations_json='[]' name
-  for name in "${TASK168_NAMES[@]}"; do
+  for name in "${manifest_names[@]}"; do
     migrations_json="$(jq -c --arg n "${name}" --arg s "$(name_checksum "${name}")" '. + [{name:$n,sha256:$s}]' <<< "${migrations_json}")"
   done
 
@@ -205,6 +215,20 @@ if [[ -f "${state_dir}/runtime-verification.json" ]]; then
     "${state_dir}/runtime-verification.json" >/dev/null \
     && pass "receipt binds the migration receipt and manifest hashes, ledgerCount stays 11 despite unrelated rows" \
     || fail "receipt does not bind the expected hashes"
+  # Shape pin (docs/ops/task168-stage-b-runbook.md "Receipt contract"): the
+  # exact top-level and nested key sets, so a rename or an added/removed
+  # field is caught here rather than silently breaking a downstream
+  # consumer that binds on this documented contract.
+  jq -e '
+    (keys | sort) == ["apiDigest","catalogResult","completedAt","driftCheck","healthDbTrue",
+      "kind","ledgerCount","manifestSha256","migrationReceiptSha256","outboxProcessingZeroAt",
+      "schemaVersion","smokeCheck","webDigest","workerDigest","workerHealthy"] and
+    .kind == "task168StageBRuntimeVerification" and .schemaVersion == 1 and
+    (.catalogResult | keys | sort) == ["legacyLinkColumns","legacyTables"] and
+    (.smokeCheck | keys | sort) == ["fixtureOrMatchId","status","tournamentId"]
+  ' "${state_dir}/runtime-verification.json" >/dev/null \
+    && pass "runtime-verification.json's field set matches the documented Receipt contract exactly" \
+    || fail "runtime-verification.json's shape has drifted from the documented Receipt contract: $(jq -c 'keys' "${state_dir}/runtime-verification.json" 2>/dev/null)"
 fi
 
 # Expected failure message per broken check: rc!=0 + no receipt alone also
@@ -238,6 +262,62 @@ for break_case in digest attestation ledger-count ledger-checksum legacy-table l
     fail "breaking '${break_case}' did NOT refuse with the expected message '${expected}': rc=${rc} receipt-exists=$([[ -f "${state_dir}/runtime-verification.json" ]] && echo yes || echo no) stderr=$(cat "${root}/stderr")"
   fi
 done
+
+# ── Negative: the manifest itself lists the wrong number of Task168
+# migrations (10 or 12, not exactly 11) -- must be refused before any query
+# even runs, since the promotion gate hardcodes ledgerCount == 11 and a
+# wrong count must never reach a written receipt (Copilot review, PR #1194).
+for wrong_count in 10 12; do
+  root="${WORK}/manifest-count-${wrong_count}"; mkdir -p "${root}"
+  build_case "${root}" "${wrong_count}"
+  make_fake_bin "${bin}" ""
+  rc="$(run_case "${root}")"
+  if [[ "${rc}" -ne 0 && ! -f "${state_dir}/runtime-verification.json" ]] \
+    && grep -qF "expected exactly 11" "${root}/stderr"; then
+    pass "a manifest listing ${wrong_count} task168 migrations is refused before any receipt is written"
+  else
+    fail "a manifest listing ${wrong_count} task168 migrations was not refused: rc=${rc} receipt-exists=$([[ -f "${state_dir}/runtime-verification.json" ]] && echo yes || echo no) stderr=$(cat "${root}/stderr")"
+  fi
+done
+
+# Mutation regression: loosening the count check back to "non-empty" must
+# accept the same 10-entry manifest -- proves the two cases above actually
+# depend on the exact-11 check.
+(
+  root="${WORK}/manifest-count-mutation"; mkdir -p "${root}"
+  build_case "${root}" 10
+  make_fake_bin "${bin}" ""
+  mutated="${root}/post-live-verify-mutated.sh"
+  python3 - "${SCRIPT}" "${mutated}" <<'PY'
+import sys
+src_path, out_path = sys.argv[1], sys.argv[2]
+text = open(src_path).read()
+marker = '(( ${#task168_migration_names[@]} == 11 )) || fail "manifest lists ${#task168_migration_names[@]} task168 migrations, expected exactly 11"'
+assert marker in text, "could not find the exact-11 count check to mutate"
+loosened = '(( ${#task168_migration_names[@]} > 0 )) || fail "manifest lists no task168 migrations"'
+open(out_path, "w").write(text.replace(marker, loosened, 1))
+PY
+  chmod +x "${mutated}"
+  rc=0
+  ALPHA_RELEASE_STATE_DIR="${home}/.teameet-alpha-releases" PATH="${bin}:${PATH}" \
+    bash "${mutated}" --release-sha "${SHA}" --manifest "${manifest}" \
+      --compose-prod "${root}/live/deploy/docker-compose.prod.yml" \
+      --compose-alpha "${root}/live/deploy/docker-compose.alpha.yml" \
+      --env-file "${root}/live/deploy/.env" \
+      --public-base-url "https://alpha.example.invalid" \
+      >"${root}/stdout" 2>"${root}/stderr" || rc=$?
+  # A 10-entry manifest under the loosened check proceeds to the ledger
+  # query itself, which then legitimately fails ("expected 10", not 11) --
+  # still a failure, but for a different reason than the count guard this
+  # mutation removed. Passing the mutation proves the removed guard, not the
+  # downstream ledger-count check, was what rejected 10/12 above: it must
+  # NOT fail with "expected exactly 11" anymore.
+  if ! grep -q "expected exactly 11" "${root}/stderr"; then
+    pass "loosening the manifest-count check to non-empty no longer rejects a 10-entry manifest with the exact-11 message (mutation correctly detected)"
+  else
+    fail "the mutated (loosened) check still rejected with the exact-11 message: rc=${rc} $(cat "${root}/stderr" 2>/dev/null)"
+  fi
+) && PASS=$((PASS + 1)) || FAIL=$((FAIL + 1))
 
 # Mutation regression: reverting the ledger query to the old date-range LIKE
 # pattern has no quoted 14-digit names for the fake to extract, so it must

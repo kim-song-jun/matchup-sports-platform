@@ -10,9 +10,13 @@ on:
         required: false
         type: string
         default: ""
-      # StageB entry points.
-      # stageBResume is intentionally absent — its dispatch input is withheld pending
-      # user decision U2; only its receipt/lock/label contract is pre-wired elsewhere.
+      # StageB entry points. stageBFinal continues automatically through
+      # final-runtime activation and promotion once the runner commits M11
+      # (deploy/deploy-alpha-stage-b.sh). stageBResume is intentionally
+      # absent — retrying a failed activation is a documented manual
+      # procedure (docs/ops/task168-stage-b-runbook.md), not a scripted
+      # entry point; stageBRecover's own R-A/R-B judgments already refuse to
+      # touch a release once migration-stage.json exists.
       task168_stage:
         description: >-
           Task 168 stage. stageAIntermediate (default) is the push-equivalent path;

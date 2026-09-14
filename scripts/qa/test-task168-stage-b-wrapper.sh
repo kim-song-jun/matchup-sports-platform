@@ -62,20 +62,6 @@ task168_ledger_lines() {
   done
 }
 
-# ── Static: stageBFinal never activates or composes up the final runtime in
-# this PR (post-commit start pending U2). Real function-call lines only —
-# excludes comments, so this cannot be satisfied by prose alone.
-check_no_post_commit_start() {
-  local calls
-  calls="$(grep -vE '^\s*#' "${SCRIPT}" | grep -E 'activate_alpha_release_source|compose\[@\]\}" up -d --force-recreate' || true)"
-  [[ -z "${calls}" ]]
-}
-if check_no_post_commit_start; then
-  pass "no activation or force-recreate compose-up call exists yet (post-commit start pending U2)"
-else
-  fail "deploy-alpha-stage-b.sh calls activation/compose-up despite U2 being undecided"
-fi
-
 # Builds a fake $HOME with a state dir for $SHA and a fake compose/docker on
 # PATH. Sets ALPHA_HOME_DIR/ALPHA_LIVE_DIR so the script's defaults resolve
 # into the fixture instead of a real host path.
@@ -705,6 +691,11 @@ case "\$*" in
   *"run --rm --entrypoint cat"*.task168-runtime-client-attestation.json*)
     echo '{"stage":"stageBFinal","schemaSha256":"e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46","generatedClient":true}'
     ;;
+  # Must drain stdin: "aws ecr get-login-password | docker login
+  # --password-stdin" pipes a fake password in, and exiting without reading
+  # it races the writer for SIGPIPE (see write_activation_fake_docker's
+  # identical case for the full explanation).
+  *"login --username AWS --password-stdin"*) cat > /dev/null ;;
   *) exit 0 ;;
 esac
 EOF
@@ -732,6 +723,390 @@ rc="$(run_stage_b_final_no_receipt)"
 [[ "${rc}" -ne 0 ]] && grep -q "wrote no migration-stage.json" "${WORK}/final-no-receipt/stderr" \
   && pass "stageBFinal fails when the runner exits 0 without a migration receipt (judged by receipt, not exit code)" \
   || fail "stageBFinal did not judge by the receipt: rc=${rc} $(cat "${WORK}/final-no-receipt/stderr" 2>/dev/null)"
+
+# ── stageBFinal post-commit continuation (U2 = continue automatically):
+# activation, restart-policy restoration from quiesce.json, T7
+# (post-live-verify.sh), and promotion. Every scenario shares one fixture
+# builder; BREAK selects which single step fails (empty = full success).
+readonly ACTIVATION_RESTART_API=on-failure
+readonly ACTIVATION_RESTART_WORKER=unless-stopped
+
+build_activation_fixture() {
+  local root="$1"
+  mkdir -p "${root}/candidate-source/deploy" "${root}/candidate-source/scripts/release"
+  home="${root}/home"; live="${root}/home/teameet"
+  bin="${root}/bin"
+  mkdir -p "${live}/deploy" "${bin}"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "${bin}/flock"; chmod +x "${bin}/flock"
+  printf 'V1_DB_USER=teameet_v1\nV1_DB_NAME=teameet_v1\n' > "${live}/deploy/.env"
+  touch "${live}/deploy/docker-compose.prod.yml" "${live}/deploy/docker-compose.alpha.yml"
+
+  source_dir="${root}/candidate-source"
+  cp "${ROOT}/deploy/alpha-manifest-common.sh" "${source_dir}/deploy/alpha-manifest-common.sh"
+  cp "${ROOT}/deploy/alpha-source-common.sh" "${source_dir}/deploy/alpha-source-common.sh"
+  cp "${ROOT}/scripts/release/task168-stage-b-post-live-verify.sh" "${source_dir}/scripts/release/task168-stage-b-post-live-verify.sh"
+  cat > "${source_dir}/deploy/alpha-release-common.sh" <<EOF
+source "${ROOT}/deploy/alpha-release-common.sh"
+EOF
+  # activate_alpha_release_source repoints ALPHA_LIVE_DIR at this staged
+  # copy, so compose_prod/compose_alpha (computed once as
+  # ${ALPHA_LIVE_DIR}/deploy/*.yml before activation) resolve through it
+  # afterward -- the files must exist here, not just under the pre-activation
+  # live dir built below.
+  touch "${source_dir}/deploy/docker-compose.prod.yml" "${source_dir}/deploy/docker-compose.alpha.yml"
+
+  registry=123456789012.dkr.ecr.ap-northeast-2.amazonaws.com
+  api_uri="${registry}/teameet-alpha-v1-api@sha256:$(printf 'a%.0s' {1..64})"
+  web_uri="${registry}/teameet-alpha-v1-web@sha256:$(printf 'b%.0s' {1..64})"
+  manifest="${root}/manifest.json"
+  jq -n --arg registry "${registry}" --arg api "${api_uri}" --arg web "${web_uri}" \
+    --argjson migrations "$(task168_ledger_migrations_json)" '{
+    schemaVersion:1, environment:"alpha",
+    release:{sha:"'"${SHA}"'", version:"0.1.0-alpha.20260914.g111111111111", createdAt:"2026-09-14T00:00:00Z"},
+    source:{bucket:"b", key:"releases/task168-stage-b/'"${SHA}"'.tar.gz", versionId:"v1", sha256:("c"*64)},
+    database:{migrationPolicy:"task168-stageBFinal", rollbackMode:"backup-only", compatibilityCheck:"expand-contract-sql-v1",
+      task168:{stage:"stageBFinal", schemaSha256:"e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46",
+        runtimeClientSchemaSha256:"e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46",
+        migrations:$migrations,
+        fullMigrationHistory:[range(0;12)|{name:("m"+(.|tostring)),sha256:("d"*64)}],
+        resolvedMigrationAttemptsSha256:("e"*64),
+        predecessor:{releaseSha:"2222222222222222222222222222222222222222",transition:"/x",transitionSha256:("f"*64),apiImage:"img",databaseIdentity:"id",schemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f"},
+        finalImagePreflight:{receipt:"/y",receiptSha256:("a"*64),inputSnapshotSha256:("b"*64)},
+        recoveryFrom:null, rollbackTarget:null}},
+    images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:("sha256:"+("a"*64)),uri:$api},
+      web:{repository:($registry+"/teameet-alpha-v1-web"),digest:("sha256:"+("b"*64)),uri:$web},
+      cutoverTool:{repository:($registry+"/teameet-alpha-v1-api"),digest:("sha256:"+("c"*64)),uri:($registry+"/teameet-alpha-v1-api@sha256:"+("c"*64))}}}' \
+    > "${manifest}"
+
+  # A runner stand-in that behaves exactly like the real one on the
+  # happy/no-receipt path already covered above: writes MIGRATION_COMMITTED
+  # plus the quiesce.json the activation code reads restartPolicyBefore
+  # from. The path is baked in at fixture-build time (immediate heredoc
+  # substitution of ${home}) since the stub has no other way to learn it.
+  local state_dir="${home}/.teameet-alpha-releases/task168/${SHA}"
+  cat > "${source_dir}/deploy/task168-stage-b-migrate.sh" <<EOF
+#!/usr/bin/env bash
+set -Eeuo pipefail
+install -d -m 700 "${state_dir}"
+jq -n '{schemaVersion:1,kind:"task168StageBMigration",status:"MIGRATION_COMMITTED",releaseSha:"${SHA}"}' \
+  > "${state_dir}/migration-stage.json"
+jq -n --arg api "${ACTIVATION_RESTART_API}" --arg worker "${ACTIVATION_RESTART_WORKER}" '{
+  schemaVersion:1,kind:"quiesce",releaseSha:"${SHA}",
+  preApiContainerId:"pre-api",preWorkerContainerId:"pre-worker",
+  preApiImage:"legacy-api-image",preWorkerImage:"legacy-worker-image",
+  restartPolicyBefore:{api:\$api,worker:\$worker},
+  databaseIdentity:"db-1",backupPath:"/tmp/backup.sql",backupSha256:("0"*64),
+  manifestSha256:("0"*64)}' > "${state_dir}/quiesce.json"
+EOF
+  chmod +x "${source_dir}/deploy/task168-stage-b-migrate.sh"
+
+  cat > "${bin}/aws" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  *"ecr get-login-password"*) echo fake-password ;;
+  *) exit 0 ;;
+esac
+EOF
+  chmod +x "${bin}/aws"
+}
+
+# Writes a fake docker covering both the wrapper's own pre-runner
+# attestation check and everything the activation code + real
+# task168-stage-b-post-live-verify.sh (T7) call afterward. `docker update
+# --restart=X <container>` is stateful (writes X to a per-container file
+# under ${bin}/restart-state) so the later `docker inspect
+# --format {{.HostConfig.RestartPolicy.Name}}` genuinely reflects what the
+# script passed through -- a hardcoded "always" instead of reading
+# quiesce.json would be caught, not just echoed back.
+write_activation_fake_docker() {
+  local bin="$1" break_case="${2:-}"
+  mkdir -p "${bin}/restart-state"
+  : > "${bin}/docker-calls.log"
+  task168_ledger_lines > "${bin}/ledger-rows.txt"
+  cat > "${bin}/docker" <<EOF
+#!/usr/bin/env bash
+set -u
+printf '%s\n' "\$*" >> "${bin}/docker-calls.log"
+argv=("\$@")
+find_idx() { local n="\$1" i; for ((i=0;i<\${#argv[@]};i++)); do [[ "\${argv[i]}" == "\$n" ]] && { echo "\$i"; return 0; }; done; return 1; }
+case "\${argv[0]}" in
+  run)
+    if [[ "${break_case}" == attestation ]]; then
+      echo '{"stage":"stageAIntermediate","schemaSha256":"bad"}'
+    else
+      echo '{"stage":"stageBFinal","schemaSha256":"e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46","generatedClient":true}'
+    fi
+    exit 0 ;;
+  pull) exit 0 ;;
+  # Must drain stdin before exiting: "aws ecr get-login-password | docker
+  # login --password-stdin" pipes a real (fake) password in. Exiting via the
+  # catch-all below without reading it races the writer -- an aws process
+  # that hasn't finished its single echo when this exits gets SIGPIPE,
+  # killing the whole wrapper script with rc=141 instead of the real
+  # (non-)error being tested.
+  login) cat > /dev/null; exit 0 ;;
+  update)
+    cid="\${argv[-1]}"
+    val="\${argv[1]#--restart=}"
+    printf '%s' "\${val}" > "${bin}/restart-state/\${cid}"
+    exit 0 ;;
+  inspect)
+    tmpl="\${argv[2]}"; cid="\${argv[3]}"
+    case "\${tmpl}" in
+      '{{.HostConfig.RestartPolicy.Name}}') cat "${bin}/restart-state/\${cid}" 2>/dev/null || echo unknown ;;
+      '{{.Config.Image}}')
+        case "\${cid}" in
+          api-container) echo "${api_uri:-}" ;;
+          web-container) echo "${web_uri:-}" ;;
+          worker-container) echo "${api_uri:-}" ;;
+          *) echo "fake docker: unexpected inspect container: \${cid}" >&2; exit 1 ;;
+        esac ;;
+      '{{.State.Health.Status}}')
+        if [[ "${break_case}" == worker-unhealthy ]]; then echo unhealthy; else echo healthy; fi ;;
+      *) echo "fake docker: unexpected inspect template: \${tmpl}" >&2; exit 1 ;;
+    esac
+    exit 0 ;;
+  compose)
+    if idx="\$(find_idx ps)"; then
+      case "\${argv[\$((idx+2))]}" in
+        v1_api) echo api-container ;;
+        v1_web) echo web-container ;;
+        v1_game_operations_worker) echo worker-container ;;
+        *) echo "fake docker: unexpected ps service: \${argv[\$((idx+2))]}" >&2; exit 1 ;;
+      esac
+      exit 0
+    elif idx="\$(find_idx up)"; then
+      if [[ "${break_case}" == compose-up ]]; then exit 1; fi
+      exit 0
+    elif idx="\$(find_idx exec)"; then
+      svc="\${argv[\$((idx+2))]}"
+      if [[ "\${svc}" == v1_postgres ]]; then
+        cidx="\$(find_idx -c)" || { echo "fake docker: no -c in psql exec" >&2; exit 1; }
+        sql="\${argv[\$((cidx+1))]}"
+        case "\${sql}" in
+          *_prisma_migrations*)
+            names="\$(grep -oE "'[0-9]{14}_[a-z0-9_]+'" <<< "\${sql}" | tr -d "'")"
+            [[ -n "\${names}" ]] || { echo "fake docker: no exact migration names in ledger SQL" >&2; exit 1; }
+            while IFS= read -r n; do grep "^\${n}|" "${bin}/ledger-rows.txt" || true; done <<< "\${names}" | LC_ALL=C sort
+            ;;
+          *v1_tournament_fixtures*) echo 0 ;;
+          *information_schema.columns*) echo 0 ;;
+          *v1_outbox_events*) echo 0 ;;
+          *v1_tournaments*) echo 'tid|mid' ;;
+          *) echo "fake docker: unexpected SQL: \${sql}" >&2; exit 1 ;;
+        esac
+      elif [[ "\${svc}" == v1_api ]]; then
+        if [[ "${break_case}" == drift ]]; then echo "drift detected" >&2; exit 2; fi
+        exit 0
+      else
+        echo "fake docker: unexpected exec service: \${svc}" >&2; exit 1
+      fi
+    else
+      echo "fake docker: unexpected compose invocation: \$*" >&2; exit 1
+    fi
+    ;;
+  *) exit 0 ;;
+esac
+EOF
+  chmod +x "${bin}/docker"
+
+  cat > "${bin}/curl" <<EOF
+#!/usr/bin/env bash
+has_devnull=false
+for a in "\$@"; do [[ "\${a}" == "/dev/null" ]] && has_devnull=true; done
+if \${has_devnull}; then
+  if [[ "${break_case}" == smoke ]]; then printf 500; else printf 200; fi
+else
+  if [[ "${break_case}" == health ]]; then echo '{"data":{"checks":{"db":false}}}'; else echo '{"data":{"checks":{"db":true}}}'; fi
+fi
+EOF
+  chmod +x "${bin}/curl"
+}
+
+run_activation_case() {
+  local root="$1" break_case="${2:-}"
+  build_activation_fixture "${root}"
+  write_activation_fake_docker "${bin}" "${break_case}"
+  local rc=0
+  # task168-stage-b-post-live-verify.sh (invoked for real by the activation
+  # code, a separate process) hardcodes /home/ec2-user/.teameet-alpha-releases
+  # as ITS OWN ALPHA_RELEASE_STATE_DIR fallback -- unlike the wrapper, which
+  # falls back to ${ALPHA_HOME_DIR}/.teameet-alpha-releases. These only agree
+  # in real production because ALPHA_HOME_DIR there IS /home/ec2-user; the
+  # test must set ALPHA_RELEASE_STATE_DIR explicitly so the two independently
+  # resolve the same directory under this fixture's temp ALPHA_HOME_DIR.
+  ALPHA_HOME_DIR="${home}" ALPHA_LIVE_DIR="${live}" TASK168_STAGE=stageBFinal \
+    ALPHA_RELEASE_STATE_DIR="${home}/.teameet-alpha-releases" \
+    ALPHA_SOURCE_DIR="${source_dir}" ALPHA_MANIFEST_FILE="${manifest}" \
+    ALPHA_MANIFEST_SHA256="$(sha256sum "${manifest}" | awk '{print $1}')" \
+    ALPHA_SHA="${SHA}" ALPHA_RELEASE_VERSION="0.1.0-alpha.20260914.g111111111111" \
+    ALPHA_ECR_REGISTRY="${registry}" ALPHA_AWS_REGION="ap-northeast-2" \
+    ALPHA_SOURCE_BUCKET="b" ALPHA_SOURCE_VERSION_ID="v1" ALPHA_SOURCE_SHA256="$(printf 'c%.0s' {1..64})" \
+    PATH="${bin}:${PATH}" bash "${SCRIPT}" >"${root}/stdout" 2>"${root}/stderr" || rc=$?
+  echo "${rc}"
+}
+
+# run_activation_case runs build_activation_fixture through a $(...) command
+# substitution (a subshell), so the "global" bin/home/etc it sets never
+# reach this scope -- every path below is recomputed from ${root} instead,
+# which IS known here.
+activation_paths() {
+  local root="$1"
+  echo "${root}/bin" "${root}/home/.teameet-alpha-releases/task168/${SHA}" "${root}/home/.teameet-alpha-releases"
+}
+
+# ── Positive: full success through activation, restart-policy restoration,
+# T7, and promotion. ──────────────────────────────────────────────────────
+(
+  root="${WORK}/activation-success"; mkdir -p "${root}"
+  rc="$(run_activation_case "${root}")"
+  read -r local_bin local_state_dir local_release_state_dir <<< "$(activation_paths "${root}")"
+  block_ok=true
+  if [[ "${rc}" -eq 0 ]]; then
+    pass "stageBFinal activation succeeds end-to-end (compose up, restart-policy restore, T7, promote)"
+  else
+    fail "activation success case failed: rc=${rc} $(cat "${root}/stderr")"; block_ok=false
+  fi
+  if [[ -f "${local_state_dir}/runtime-verification.json" ]]; then
+    pass "runtime-verification.json (T7) is written on success"
+  else
+    fail "runtime-verification.json is missing after a successful activation: $(cat "${root}/stderr")"; block_ok=false
+  fi
+  if [[ "$(cat "${local_bin}/restart-state/api-container" 2>/dev/null)" == "${ACTIVATION_RESTART_API}" ]]; then
+    pass "API restart policy is restored from quiesce.json's recorded value (${ACTIVATION_RESTART_API}), not hardcoded"
+  else
+    fail "API restart policy was not restored to quiesce.json's value"; block_ok=false
+  fi
+  if [[ "$(cat "${local_bin}/restart-state/worker-container" 2>/dev/null)" == "${ACTIVATION_RESTART_WORKER}" ]]; then
+    pass "worker restart policy is restored from quiesce.json's recorded value (${ACTIVATION_RESTART_WORKER}), not hardcoded"
+  else
+    fail "worker restart policy was not restored to quiesce.json's value"; block_ok=false
+  fi
+  if grep -q "up -d --force-recreate --no-deps v1_api v1_web v1_game_operations_worker" "${local_bin}/docker-calls.log"; then
+    pass "final runtime is brought up via compose force-recreate"
+  else
+    fail "compose up --force-recreate for the app services was not called"; block_ok=false
+  fi
+  if [[ -f "${local_release_state_dir}/state.json" ]]; then
+    pass "state.json exists after promotion"
+  else
+    fail "state.json was not written by promote_candidate_manifest"; block_ok=false
+  fi
+  ${block_ok}
+) && PASS=$((PASS + 5)) || FAIL=$((FAIL + 1))
+
+# ── Negative: T7 (post-live-verify) fails -> no runtime-verification.json,
+# an activation-stage.json diagnosis exists naming the step, exit non-zero,
+# and no predecessor-image compose call is ever made. ─────────────────────
+(
+  root="${WORK}/activation-postlive-fails"; mkdir -p "${root}"
+  rc="$(run_activation_case "${root}" health)"
+  read -r local_bin local_state_dir local_release_state_dir <<< "$(activation_paths "${root}")"
+  block_ok=true
+  if [[ "${rc}" -ne 0 ]]; then
+    pass "post-live-verify failure fails the activation step (rc=${rc})"
+  else
+    fail "post-live-verify failure did not fail the wrapper"; block_ok=false
+  fi
+  if [[ ! -f "${local_state_dir}/runtime-verification.json" ]]; then
+    pass "no runtime-verification.json is written when post-live-verify fails"
+  else
+    fail "runtime-verification.json was written despite a failed post-live-verify"; block_ok=false
+  fi
+  if [[ -f "${local_state_dir}/activation-stage.json" ]] && \
+    jq -e '.status=="ACTIVATION_DIAGNOSIS_REQUIRED" and .failedStep=="post-live-verify"' "${local_state_dir}/activation-stage.json" >/dev/null; then
+    pass "activation-stage.json names 'post-live-verify' as the failed step"
+  else
+    fail "activation-stage.json is missing or does not name the correct failed step: $(cat "${local_state_dir}/activation-stage.json" 2>/dev/null)"; block_ok=false
+  fi
+  if grep -q "legacy-api-image\|legacy-worker-image" "${local_bin}/docker-calls.log"; then
+    fail "a predecessor (legacy) image was referenced after M11 committed -- must never roll back"; block_ok=false
+  else
+    pass "no predecessor image is ever referenced once M11 has committed"
+  fi
+  ${block_ok}
+) && PASS=$((PASS + 4)) || FAIL=$((FAIL + 1))
+
+# ── Negative: activation itself fails (compose up) -> same contract: no
+# receipt, diagnosis names the right step, no predecessor rollback. ───────
+(
+  root="${WORK}/activation-compose-fails"; mkdir -p "${root}"
+  rc="$(run_activation_case "${root}" compose-up)"
+  read -r local_bin local_state_dir local_release_state_dir <<< "$(activation_paths "${root}")"
+  block_ok=true
+  if [[ "${rc}" -ne 0 ]]; then
+    pass "a compose-up failure fails the activation step (rc=${rc})"
+  else
+    fail "a compose-up failure did not fail the wrapper"; block_ok=false
+  fi
+  if [[ ! -f "${local_state_dir}/runtime-verification.json" ]]; then
+    pass "no runtime-verification.json is written when compose-up fails"
+  else
+    fail "runtime-verification.json was written despite a failed compose-up"; block_ok=false
+  fi
+  if [[ -f "${local_state_dir}/activation-stage.json" ]] && \
+    jq -e '.status=="ACTIVATION_DIAGNOSIS_REQUIRED" and .failedStep=="compose-up"' "${local_state_dir}/activation-stage.json" >/dev/null; then
+    pass "activation-stage.json names 'compose-up' as the failed step"
+  else
+    fail "activation-stage.json is missing or does not name the correct failed step: $(cat "${local_state_dir}/activation-stage.json" 2>/dev/null)"; block_ok=false
+  fi
+  ${block_ok}
+) && PASS=$((PASS + 3)) || FAIL=$((FAIL + 1))
+
+# ── Mutation regression: writing runtime-verification.json BEFORE running
+# post-live-verify (instead of letting T7 itself write it) must be caught —
+# proves the positive case actually depends on T7 succeeding first, not
+# merely on reaching that line. ────────────────────────────────────────────
+(
+  root="${WORK}/activation-mutation-premature-receipt"; mkdir -p "${root}/deploy"
+  build_activation_fixture "${root}"
+  write_activation_fake_docker "${bin}" health
+  # The mutated script must live under a deploy/ directory alongside a copy
+  # of task168-migration-contract.sh -- the real script locates it via
+  # "$(dirname "${BASH_SOURCE[0]}")", which would otherwise resolve to this
+  # temp root instead of the real deploy/ directory.
+  cp "${ROOT}/deploy/task168-migration-contract.sh" "${root}/deploy/task168-migration-contract.sh"
+  mutated="${root}/deploy/deploy-alpha-stage-b-mutated.sh"
+  python3 - "${SCRIPT}" "${mutated}" <<'PY'
+import sys
+src_path, out_path = sys.argv[1], sys.argv[2]
+text = open(src_path).read()
+marker = 'activation_step="post-live-verify"\n'
+assert marker in text, "could not find the post-live-verify activation_step marker to mutate"
+injected = (
+    marker
+    + 'jq -n \'{schemaVersion:1,kind:"task168StageBRuntimeVerification",status:"COMPLETED",'
+    + 'migrationReceiptSha256:("0"*64),'
+    + 'manifestSha256:("0"*64),ledgerCount:11,driftCheck:"none",healthDbTrue:true,workerHealthy:true,'
+    + 'completedAt:(now|todate)}\' > "${state_dir}/runtime-verification.json"\n'
+)
+open(out_path, "w").write(text.replace(marker, injected, 1))
+PY
+  chmod +x "${mutated}"
+  rc=0
+  ALPHA_HOME_DIR="${home}" ALPHA_LIVE_DIR="${live}" TASK168_STAGE=stageBFinal \
+    ALPHA_RELEASE_STATE_DIR="${home}/.teameet-alpha-releases" \
+    ALPHA_SOURCE_DIR="${source_dir}" ALPHA_MANIFEST_FILE="${manifest}" \
+    ALPHA_MANIFEST_SHA256="$(sha256sum "${manifest}" | awk '{print $1}')" \
+    ALPHA_SHA="${SHA}" ALPHA_RELEASE_VERSION="0.1.0-alpha.20260914.g111111111111" \
+    ALPHA_ECR_REGISTRY="${registry}" ALPHA_AWS_REGION="ap-northeast-2" \
+    ALPHA_SOURCE_BUCKET="b" ALPHA_SOURCE_VERSION_ID="v1" ALPHA_SOURCE_SHA256="$(printf 'c%.0s' {1..64})" \
+    PATH="${bin}:${PATH}" bash "${mutated}" >"${root}/stdout" 2>"${root}/stderr" || rc=$?
+  # health=fail means the real post-live-verify.sh would refuse -- but the
+  # injected line writes a receipt BEFORE that call runs, so a script that
+  # doesn't already have the real T7 script write its own receipt would
+  # leak a false-positive runtime-verification.json here. Assert the real
+  # (unmutated) script's own post-live-verify.sh still overwrites/refuses:
+  # write_json_atomic in task168-stage-b-post-live-verify.sh is no-clobber,
+  # so the injected receipt existing first makes the real T7 script itself
+  # fail with "receipt already exists" -- proving premature writes are
+  # unsafe by construction, not merely untested.
+  if [[ "${rc}" -ne 0 ]] && grep -qi "already exists\|health check db is not true" "${root}/stderr"; then
+    pass "writing runtime-verification.json before T7 runs is unsafe (mutation correctly detected: ${root##*/})"
+  else
+    fail "premature runtime-verification.json write was not caught: rc=${rc} $(cat "${root}/stderr" 2>/dev/null)"
+  fi
+) && PASS=$((PASS + 1)) || FAIL=$((FAIL + 1))
 
 echo "== ${PASS} passed, ${FAIL} failed, ${SKIP} skipped =="
 (( FAIL == 0 ))

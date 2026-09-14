@@ -168,6 +168,14 @@ if [[ "${TASK168_STAGE:-stageAIntermediate}" != stageAIntermediate ]]; then
     validate_alpha_stage_b_final_manifest "$manifest" "$RELEASE_SHA" "$RELEASE_VERSION" \
       "$(sha256sum "$manifest" | awk '{print $1}')" "$REGISTRY" "${TASK168_FINAL_SCHEMA_SHA256}" \
       "$migrations_json" "$predecessor_json" "$preflight_json" "$full_history_json"
+    # validate_alpha_stage_b_final_manifest only proves the stored value is a
+    # well-formed sha256 (self-consistency); it never compares it against
+    # this run's freshly-read predecessor/live-DB snapshot. A stale reused
+    # manifest would otherwise pass here and only fail once the runner
+    # re-derives and compares it on the host.
+    jq -e --arg expected "$resolved_migration_attempts_sha256" \
+      '.database.task168.resolvedMigrationAttemptsSha256 == $expected' "$manifest" >/dev/null ||
+      { echo "Reused StageB manifest's resolvedMigrationAttemptsSha256 does not match the freshly resolved snapshot" >&2; exit 1; }
   else
     created_at="$(git show -s --format=%cI "$RELEASE_SHA")"
     jq -n --arg sha "$RELEASE_SHA" --arg version "$RELEASE_VERSION" --arg createdAt "$created_at" \

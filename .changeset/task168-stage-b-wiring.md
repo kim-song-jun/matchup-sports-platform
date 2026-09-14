@@ -170,3 +170,59 @@ enteredAt·마커/quiesce/backup 상호대조)은 전부 통과하므로, 새로
   `FAILED_HOST_EXITED`가 아니라 `UNKNOWN_HOST_MAY_BE_RUNNING`으로 분류해 운영자가 죽은
   호스트로 오판하지 않게 한다. 주석만 고쳤고(로직 무변경), 기존 `run_classification` 케이스가
   이미 `rc≠0`을 확인하고 있어 테스트는 추가하지 않았다.
+
+**이번 라운드 추가 수정 — U2(post-commit 활성화) 결정 반영 + Copilot 리뷰 2건 추가 대응**
+- **U2 = 자동 계속으로 확정.** `deploy-alpha-stage-b.sh`의 `stageBFinal`이 러너의
+  `MIGRATION_COMMITTED` 이후 같은 실행 안에서 최종 소스 활성화 → 이미지 pull → 메타데이터
+  기록 → `docker compose up -d --force-recreate`(api/web/worker, 그다음 nginx) → 각 writer의
+  restart policy를 `quiesce.json`의 `restartPolicyBefore.api`/`.worker`에서 복원(compose의
+  정적 `restart: always`로 덮이지 않게, 하드코딩 없음) → worker healthcheck 대기 → T7
+  (`task168-stage-b-post-live-verify.sh`) → `write_candidate_manifest` +
+  `promote_candidate_manifest`(이미 존재하던 `assert_stage_b_promotion_receipt` 게이트가
+  그대로 통과 조건)까지 이어간다. M11 커밋 이후이므로 이 구간의 어떤 실패도 이전 이미지로
+  롤백하지 않는다 — `activation-stage.json`(status `ACTIVATION_DIAGNOSIS_REQUIRED`)에 실패
+  단계 이름과 사유를 남기고 런타임은 실패가 남긴 상태 그대로 둔 채 종료한다. 재시도는 자동
+  entry point 없이 수동 절차이며(`docs/ops/task168-stage-b-runbook.md` "Post-commit activation
+  failure"), `stageBRecover`의 R-A/R-B 판정은 전혀 바꾸지 않았다 — 여전히 `migration-stage.json`
+  존재 여부로만 판단한다. `deploy-alpha.yml`의 `task168_stage` 입력 주석과 `.changeset`,
+  `deploy-alpha-stage-b.sh` 헤더에서 "post-commit start pending U2" 문구를 전부 제거했다.
+  `test-task168-stage-b-wrapper.sh`에서 실제로 아무 활성화 코드도 없다고 주장하던 static guard
+  (`check_no_post_commit_start`)를 지우고, 성공 케이스(활성화→restart policy 복원→T7→promote
+  전부 통과) + 실패 케이스 2건(T7 실패, compose-up 실패 — 각각 영수증 미기록·정확한 실패
+  단계명·이전 이미지 미참조 확인) + premature-receipt mutation 1건을 추가했다.
+- **영수증 계약을 런북에 명문화.** `migration-stage.json`/`runtime-verification.json` 둘 다
+  같은 `<ALPHA_RELEASE_STATE_DIR>/task168/<releaseSha>/` 디렉터리에 release별로 쓰인다(PR-B가
+  가정했던 flat `task168-final/` 경로가 아니다). 전체 필드·타입·소비자가 실제로 바인딩해야
+  하는 jq 조건(정확히 `assert_stage_b_promotion_receipt`가 쓰는 조건)을 런북 "Receipt
+  contract" 절에 적었다. `test-task168-post-live.sh`에 `runtime-verification.json`의 정확한
+  키 집합(중첩 객체 포함)을 고정하는 assertion을 추가해 필드 rename이 red가 되게 했다.
+- **PRRT_kwDORrML2s6iCgGF — `create-alpha-release-manifest.sh`의 StageB 매니페스트 재사용
+  경로가 `resolvedMigrationAttemptsSha256`를 갱신 확인 안 했다.** S3에서 기존 매니페스트를
+  받아올 때 `validate_alpha_stage_b_final_manifest`는 이 필드가 sha256 형식인지만 보고 이번
+  실행에서 새로 읽은 predecessor/live-DB 스냅샷(`TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256`)과
+  같은 값인지는 비교하지 않았다 — 오래된 매니페스트가 CI를 통과하고 호스트에서야 실패할 수
+  있었다. 재사용 분기에 명시적 동등성 비교를 추가해 즉시 실패하게 했다.
+  `test-task168-stage-b-manifest.sh`에 실제 스크립트를 두 번 실행하는(첫 실행이 기준
+  매니페스트를 만들고 S3 put-object를 가짜 aws로 가로채 저장, 그 저장본의
+  resolvedMigrationAttemptsSha256만 변조한 뒤 두 번째 실행이 재사용 경로를 타서 거부하는지
+  확인) 음성 케이스와, 새 동등성 검사를 제거하면 같은 변조 매니페스트가 통과함을 확인하는
+  mutation 케이스를 추가했다.
+- **PRRT_kwDORrML2s6iCgGa — `task168-stage-b-post-live-verify.sh`가 개수만 보고 정확히 11개인지
+  확인 안 했다.** `.database.task168.migrations[]`가 비어있지만 않으면(10개든 12개든) 통과해
+  ledger 조회로 넘어갔는데, 승격 게이트(`assert_stage_b_promotion_receipt`)는
+  `ledgerCount == 11`을 하드코딩해 요구한다 — 개수가 틀리면 영수증을 쓰기 전에 막아야 한다.
+  정확히 11개를 요구하도록 고쳤다. `test-task168-post-live.sh`에 10개·12개 매니페스트가 영수증
+  기록 전에 거부되는 음성 케이스 2건과, 검사를 "비어있지 않음"으로 완화하면 10개짜리가
+  exact-11 메시지로 더 이상 거부되지 않음을 확인하는 mutation 케이스를 추가했다.
+
+**되돌아가며 잡은 테스트 인프라 버그 2건(내가 만든 새 시나리오에서 발견, 별도 커밋 아님)**
+- `test-task168-stage-b-wrapper.sh`의 신규 시나리오들이 `pass`/`fail`만 부르고 `exit`하지 않는
+  서브셸 블록을 썼는데, `pass`/`fail` 둘 다 0을 반환해 바깥의 `) && PASS+=N || FAIL+=1`이
+  항상 성공으로 집계했다 — 실패가 조용히 통과로 보고될 수 있었다. 각 블록에 `block_ok` 플래그를
+  두고 마지막 줄에서 그 값을 그대로 실행해 진짜 종료 코드를 내보내도록 고쳤다.
+  `docker login --username AWS --password-stdin`을 처리하지 않던 가짜 docker(catch-all이 stdin을
+  안 비우고 바로 exit)가 `aws ecr get-login-password | docker login ...` 파이프에서 가끔
+  SIGPIPE(rc=141)로 죽는 레이스가 있었다 — 새 시나리오뿐 아니라 기존 `run_stage_b_final_no_receipt`
+  시나리오의 가짜 docker에도 있던 문제라 같이 고쳤다(`cat > /dev/null`로 stdin을 비우고 exit).
+  고친 뒤 새 wrapper 시나리오를 5회 연속 재실행해 0 failed를 확인했다(고치기 전엔 5회 중 2~3회
+  간헐적으로 실패).

@@ -17,10 +17,155 @@ sync with the scripts when either changes.
 | `migration-stage.json` (status `MIGRATION_DIAGNOSIS_REQUIRED`) | runner's EXIT trap, on any after-M11 failure except a deferred-signal-on-an-already-committed-M11 | a real failure occurred after M11 started; requires manual diagnosis before any further Stage B attempt |
 | `migration-stage.json` (status `MIGRATION_COMMITTED_RECOVERED`) | `stageBRecover`'s R-A branch | a reconstructed success receipt for a run that committed M11 but never got to write its own receipt (signal landed after commit) |
 | `migration-stage.json.recover-diagnosis.json` | `stageBRecover`'s R-C branch | M11 has an unresolved (P3009) migration attempt; not auto-recoverable |
+| `quiesce.json` | runner | also the source `deploy-alpha-stage-b.sh` reads `restartPolicyBefore.api`/`.worker` from when restoring writer restart policy after final-runtime activation (below) |
+| `runtime-verification.json` (`kind: task168StageBRuntimeVerification`) | T7 (`scripts/release/task168-stage-b-post-live-verify.sh`), only once every check passes | binds the migration receipt and manifest hashes; required by `assert_stage_b_promotion_receipt` before a StageB candidate can be promoted |
+| `activation-stage.json` (status `ACTIVATION_DIAGNOSIS_REQUIRED`) | `deploy-alpha-stage-b.sh`'s post-commit activation code, on any failure after MIGRATION_COMMITTED | names the failed step (`load-manifest`, `source-runtime-env`, `activate-source`, `pull-images`, `write-metadata`, `compose-up`, `restore-restart-policy`, `wait-worker-healthy`, `post-live-verify`, or `promote`) and the reason; see "Post-commit activation failure" below |
+
+## Post-commit activation (U2 = continue automatically)
+
+Once the runner reports `MIGRATION_COMMITTED`, `deploy-alpha-stage-b.sh` continues in the same
+run: it activates the final release source, pulls and composes up the final images
+(`v1_api`/`v1_web`/`v1_game_operations_worker`, then `nginx`), restores `v1_api`'s and
+`v1_game_operations_worker`'s restart policy from `quiesce.json`'s `restartPolicyBefore` (never
+hardcoded — compose's own static `restart: always` would otherwise silently override whatever
+policy was actually in effect before quiesce; `v1_web` was never quiesced, so it keeps compose's
+default), waits for the worker healthcheck, runs T7
+(`scripts/release/task168-stage-b-post-live-verify.sh`), and — only once T7 writes
+`runtime-verification.json` — promotes the candidate manifest to active
+(`write_candidate_manifest` + `promote_candidate_manifest`, gated by
+`assert_stage_b_promotion_receipt`).
+
+### Post-commit activation failure
+
+The database is irreversibly post-M11 from the moment the runner commits M11, so **nothing in
+this phase ever restores predecessor images** — there is no rollback path once M11 has
+committed. Any failure writes `activation-stage.json` naming the failed step and exits non-zero,
+leaving the runtime exactly as the failure left it (a service may be down, on the old writer's
+restart policy, or serving the final image without having passed T7 yet).
+
+**This is currently a single-attempt activation with no automated retry entry point.**
+Re-dispatching `stageBFinal` for the same release is refused by the runner itself once
+`migration-stage.json` exists ("final retirement receipt already exists"), and `stageBRecover`'s
+R-A branch also refuses to touch a release once `migration-stage.json` exists (R-A/R-B semantics
+are unchanged by this section — they still judge purely from the ledger and the migration
+receipt, never from `activation-stage.json`). Recovering from a failed activation is a **manual
+procedure**:
+
+1. Read `activation-stage.json` for the failed step and reason.
+2. Confirm live state by hand (`docker compose ... ps`, `docker inspect`, the ledger) rather than
+   trusting the step name alone — the failure may have left a partially-recreated runtime.
+3. Re-run by hand only the remaining steps from the failed one onward, using the same primitives
+   `deploy-alpha-stage-b.sh` uses (`activate_alpha_release_source`, `pull_release_images`,
+   `write_release_metadata`, the `docker compose up -d --force-recreate` calls, `docker update
+   --restart=` from `quiesce.json`'s recorded values, then
+   `scripts/release/task168-stage-b-post-live-verify.sh`, then `write_candidate_manifest` +
+   `promote_candidate_manifest`) — all under the same `direct user approval` rule as every other
+   Alpha runtime/data change.
+4. A future `stageBResume` entry point that automates this retry is out of scope here and was not
+   guessed at — see the changeset for this change.
 
 A `MIGRATION_COMMITTED_RECOVERED` receipt is deliberately never written with
 the same status as an original `MIGRATION_COMMITTED` one — collapsing the two
 would erase the fact that the run needed reconstruction from the audit trail.
+
+## Receipt contract (authoritative — any other consumer must align to this)
+
+Both receipts below live in the **same per-release state directory**:
+
+```
+<ALPHA_RELEASE_STATE_DIR>/task168/<releaseSha>/migration-stage.json
+<ALPHA_RELEASE_STATE_DIR>/task168/<releaseSha>/runtime-verification.json
+```
+
+`<ALPHA_RELEASE_STATE_DIR>` defaults to `/home/ec2-user/.teameet-alpha-releases`
+(the wrapper falls back to `${ALPHA_HOME_DIR}/.teameet-alpha-releases`, which is
+the same path in real production since `ALPHA_HOME_DIR` is always
+`/home/ec2-user` there). There is **no flat, non-per-release path** for either
+receipt — a consumer that reads `<state-dir>/task168-final/...` or any other
+shape is reading a path this contract does not produce.
+
+### `migration-stage.json` (`kind: "task168StageBMigration"`)
+
+Written by the runner (`deploy/task168-stage-b-migrate.sh`) once M11 commits and
+every post-M11 check passes. Full field set on success:
+
+```
+schemaVersion (1), kind ("task168StageBMigration"), status ("MIGRATION_COMMITTED"),
+stage ("stageBFinal"), releaseSha, apiImage, databaseIdentity, schemaSha256,
+manifest, manifestSha256,
+finalImagePreflight: { receipt, receiptSha256, report, reportSha256, inputSnapshotSha256 },
+predecessorStageAReleaseSha, predecessorTransition, predecessorTransitionSha256,
+quiesceReceipt, quiesceReceiptSha256,
+preM11Backup, preM11BackupSha256, preM11BackupBytes, backupFormat,
+m11, m11Sha256, ledger (free-text string),
+postVerification: { legacyTables, legacyLinkColumns, retirementTriggers, retirementFunctions, processingOutbox },
+completedAt
+```
+
+The `MIGRATION_COMMITTED_RECOVERED` variant (`stageBRecover`'s R-A branch,
+`deploy/deploy-alpha-stage-b.sh`) carries a different, smaller field set —
+see that code for its exact shape; it is a reconstruction, not a copy of the
+above.
+
+**The only fields any consumer may bind on** (this is deliberately the
+entirety of what `assert_stage_b_promotion_receipt`,
+`deploy/alpha-release-common.sh`, checks):
+
+```jq
+.status == "MIGRATION_COMMITTED" or .status == "MIGRATION_COMMITTED_RECOVERED"
+```
+
+Everything else in this receipt is audit trail, not a contract another script
+should parse — `databaseIdentity`/`schemaSha256`/etc. exist for a human or
+`stageBRecover` reading this exact file, not as a stable API.
+
+### `runtime-verification.json` (`kind: "task168StageBRuntimeVerification"`)
+
+Written by T7 (`scripts/release/task168-stage-b-post-live-verify.sh`) — see
+that script's `write()` call for the literal `jq -n` template — **only if
+every one of its 8 checks passes** (digests, attestation, ledger names+count+
+checksums, catalog, drift, health, outbox, read-only smoke). Full field set:
+
+```
+schemaVersion (1), kind ("task168StageBRuntimeVerification"),
+migrationReceiptSha256 (sha256 of THIS release's migration-stage.json),
+manifestSha256 (sha256 of the manifest this release activated),
+apiDigest, webDigest, workerDigest (running image refs, as `docker inspect` reported them),
+ledgerCount (int, always 11 on success — task168-stage-b-post-live-verify.sh now
+  refuses to write ANY receipt unless the manifest names exactly 11 migrations),
+catalogResult: { legacyTables, legacyLinkColumns } (both 0 on success),
+driftCheck ("none" on success),
+healthDbTrue (bool), workerHealthy (bool),
+outboxProcessingZeroAt (ISO timestamp),
+smokeCheck: { tournamentId, fixtureOrMatchId, status },
+completedAt (ISO timestamp)
+```
+
+This receipt does **not** carry `status` or `databaseIdentity` fields — a
+consumer that requires either is checking for something this contract does
+not produce. The exact jq predicate a consumer must use to accept this
+receipt for a given candidate (verbatim from
+`assert_stage_b_promotion_receipt`, `deploy/alpha-release-common.sh`):
+
+```jq
+.schemaVersion == 1 and
+.kind == "task168StageBRuntimeVerification" and
+.migrationReceiptSha256 == <sha256sum of that release's migration-stage.json> and
+.manifestSha256 == <sha256sum of the candidate manifest being promoted> and
+.ledgerCount == 11 and
+.driftCheck == "none" and
+.healthDbTrue == true and
+.workerHealthy == true and
+(.completedAt | type == "string" and length > 0)
+```
+
+Both hash comparisons (`migrationReceiptSha256`, `manifestSha256`) are
+computed by the consumer at check time (`sha256sum` of the actual files on
+disk) and compared for exact string equality — never trust a hash embedded
+in one file to describe a *different* file without independently recomputing
+it. `scripts/qa/test-task168-post-live.sh` and
+`scripts/qa/test-task168-stage-b-manifest.sh` pin this shape: a field rename
+or a loosened check in either script goes red there.
 
 ## `stageBRecover`: which branch applies
 

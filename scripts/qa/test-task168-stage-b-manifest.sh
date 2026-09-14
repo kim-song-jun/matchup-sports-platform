@@ -228,5 +228,145 @@ echo "== test-task168-stage-b-manifest =="
     || { echo "  FAIL: rollback-alpha.sh did not refuse: rc=${rc} $(cat "${root}/stderr")" >&2; exit 1; }
 ) && PASS=$((PASS + 1)) || FAIL=$((FAIL + 1))
 
+# ── create-alpha-release-manifest.sh (StageB reuse branch): a manifest
+# fetched back from S3 must have resolvedMigrationAttemptsSha256 equal to
+# THIS run's freshly resolved value, not merely a well-formed sha256
+# (Copilot review, PR #1194). Two real invocations of the real script share
+# one fake aws: run 1 creates a manifest (captured via put-object), then the
+# saved copy's resolvedMigrationAttemptsSha256 is tampered before run 2,
+# which must hit the head-object/get-object reuse branch and refuse.
+(
+  dir="${WORK}/manifest-generator-stale-resolved"
+  bin="${dir}/bin"; mkdir -p "${bin}"
+  registry="${REGISTRY}"
+  key="manifests/task168-stage-b/${SHA}.json"
+  saved="${dir}/saved-manifest.json"
+  exists_flag="${dir}/exists"
+
+  cat > "${bin}/aws" <<EOF
+#!/usr/bin/env bash
+set -u
+argv=("\$@")
+find_val() { local flag="\$1" i; for ((i=0;i<\${#argv[@]};i++)); do [[ "\${argv[i]}" == "\${flag}" ]] && { echo "\${argv[\$((i+1))]}"; return 0; }; done; return 1; }
+case "\${argv[0]} \${argv[1]}" in
+  "ecr describe-images")
+    tag="\$(find_val --image-ids)"
+    echo "sha256:\$(printf '%s' "\${tag}" | sha256sum | awk '{print \$1}')"
+    ;;
+  "s3api head-object")
+    [[ -f "${exists_flag}" ]] || exit 1
+    echo "v1"
+    ;;
+  "s3api get-object")
+    dst="\${argv[-1]}"
+    cp "${saved}" "\${dst}"
+    ;;
+  "s3api put-object")
+    body="\$(find_val --body)"
+    cp "\${body}" "${saved}"
+    : > "${exists_flag}"
+    echo "v1"
+    ;;
+  *) echo "fake aws: unexpected invocation: \$*" >&2; exit 1 ;;
+esac
+EOF
+  chmod +x "${bin}/aws"
+  cat > "${bin}/git" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  "show -s --format=%cI "*) echo "2026-09-14T00:00:00+09:00" ;;
+  *) echo "fake git: unexpected invocation: $*" >&2; exit 1 ;;
+esac
+EOF
+  chmod +x "${bin}/git"
+
+  run_generator() {
+    local rc=0 out err
+    out="${dir}/stdout.$1"; err="${dir}/stderr.$1"
+    : > "${dir}/github-output.$1"
+    env GITHUB_OUTPUT="${dir}/github-output.$1" RELEASE_SHA="${SHA}" RELEASE_VERSION="0.1.0-alpha.20260914.g111111111111" REGISTRY="${registry}" \
+      DEPLOY_BUCKET="alpha-bucket" EXPECTED_BUCKET_OWNER="123456789012" \
+      SOURCE_VERSION_ID="v1" SOURCE_SHA256="$(printf 'c%.0s' {1..64})" \
+      IMAGE_TAG="task168-final-${SHA}" WEB_IMAGE_TAG="sha-${SHA}" TOOL_IMAGE_TAG="task168-${SHA}" \
+      TASK168_STAGE=stageBFinal \
+      TASK168_PREDECESSOR_RELEASE_SHA="2222222222222222222222222222222222222222" \
+      TASK168_PREDECESSOR_TRANSITION_PATH="/x" TASK168_PREDECESSOR_TRANSITION_SHA256="$(printf 'f%.0s' {1..64})" \
+      TASK168_PREDECESSOR_API_IMAGE="img" TASK168_PREDECESSOR_DATABASE_IDENTITY="id" \
+      TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256="${RESOLVED_SHA}" \
+      TASK168_FINAL_PREFLIGHT_RECEIPT_PATH="/y" TASK168_FINAL_PREFLIGHT_RECEIPT_SHA256="$(printf 'a%.0s' {1..64})" \
+      TASK168_FINAL_PREFLIGHT_INPUT_SNAPSHOT_SHA256="$(printf 'b%.0s' {1..64})" \
+      PATH="${bin}:${PATH}" bash "${ROOT}/scripts/release/create-alpha-release-manifest.sh" \
+      >"${out}" 2>"${err}" || rc=$?
+    echo "${rc}"
+  }
+
+  RESOLVED_SHA="$(printf 'e%.0s' {1..64})"
+  rc1="$(run_generator run1)"
+  if [[ "${rc1}" -eq 0 && -f "${saved}" ]]; then
+    echo "  ok: run 1 creates and stores a fresh StageB manifest (resolvedMigrationAttemptsSha256=${RESOLVED_SHA:0:8}...)"
+  else
+    echo "  FAIL: run 1 (creating the baseline manifest) failed: rc=${rc1} $(cat "${dir}/stderr.run1" 2>/dev/null)" >&2
+    exit 1
+  fi
+
+  # Tamper the stored manifest's resolvedMigrationAttemptsSha256 to a
+  # different (still well-formed) value, simulating a stale S3 object left
+  # over from before the predecessor/live-DB snapshot changed.
+  stale="${dir}/tampered.json"
+  jq '.database.task168.resolvedMigrationAttemptsSha256 = ("d"*64)' "${saved}" > "${stale}"
+  mv "${stale}" "${saved}"
+
+  # Run 2 reuses the (now-stale) stored manifest -- TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256
+  # is still the same freshly-resolved "e"*64 value run 1 used, so it disagrees with the
+  # tampered "d"*64 now on disk.
+  rc2="$(run_generator run2)"
+  if [[ "${rc2}" -ne 0 ]] && grep -q "resolvedMigrationAttemptsSha256 does not match" "${dir}/stderr.run2"; then
+    echo "  ok: a reused manifest with a stale resolvedMigrationAttemptsSha256 is refused"
+  else
+    echo "  FAIL: a stale resolvedMigrationAttemptsSha256 was not refused: rc=${rc2} $(cat "${dir}/stderr.run2" 2>/dev/null)" >&2
+    exit 1
+  fi
+
+  # Mutation regression: with the new equality check removed, the exact same
+  # stale-manifest fixture must be ACCEPTED -- proves the positive assertion
+  # above actually depends on this check, not on some other validation.
+  # The mutated copy must live at the same relative depth as the real
+  # script (scripts/release/) -- it locates alpha-manifest-common.sh via
+  # "$(dirname "${BASH_SOURCE[0]}")/../../deploy", which would otherwise
+  # resolve outside this temp root entirely.
+  mkdir -p "${dir}/scripts/release" "${dir}/deploy"
+  cp "${ROOT}/deploy/alpha-manifest-common.sh" "${dir}/deploy/alpha-manifest-common.sh"
+  mutated="${dir}/scripts/release/create-alpha-release-manifest-mutated.sh"
+  python3 - "${ROOT}/scripts/release/create-alpha-release-manifest.sh" "${mutated}" <<'PY'
+import sys
+src_path, out_path = sys.argv[1], sys.argv[2]
+text = open(src_path).read()
+marker = 'jq -e --arg expected "$resolved_migration_attempts_sha256" \\\n      \'.database.task168.resolvedMigrationAttemptsSha256 == $expected\' "$manifest" >/dev/null ||\n      { echo "Reused StageB manifest\'s resolvedMigrationAttemptsSha256 does not match the freshly resolved snapshot" >&2; exit 1; }\n'
+assert marker in text, "could not find the resolvedMigrationAttemptsSha256 equality check to mutate away"
+open(out_path, "w").write(text.replace(marker, "", 1))
+PY
+  chmod +x "${mutated}"
+  rc3=0
+  : > "${dir}/github-output.mutated"
+  env GITHUB_OUTPUT="${dir}/github-output.mutated" RELEASE_SHA="${SHA}" RELEASE_VERSION="0.1.0-alpha.20260914.g111111111111" REGISTRY="${registry}" \
+    DEPLOY_BUCKET="alpha-bucket" EXPECTED_BUCKET_OWNER="123456789012" \
+    SOURCE_VERSION_ID="v1" SOURCE_SHA256="$(printf 'c%.0s' {1..64})" \
+    IMAGE_TAG="task168-final-${SHA}" WEB_IMAGE_TAG="sha-${SHA}" TOOL_IMAGE_TAG="task168-${SHA}" \
+    TASK168_STAGE=stageBFinal \
+    TASK168_PREDECESSOR_RELEASE_SHA="2222222222222222222222222222222222222222" \
+    TASK168_PREDECESSOR_TRANSITION_PATH="/x" TASK168_PREDECESSOR_TRANSITION_SHA256="$(printf 'f%.0s' {1..64})" \
+    TASK168_PREDECESSOR_API_IMAGE="img" TASK168_PREDECESSOR_DATABASE_IDENTITY="id" \
+    TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256="${RESOLVED_SHA}" \
+    TASK168_FINAL_PREFLIGHT_RECEIPT_PATH="/y" TASK168_FINAL_PREFLIGHT_RECEIPT_SHA256="$(printf 'a%.0s' {1..64})" \
+    TASK168_FINAL_PREFLIGHT_INPUT_SNAPSHOT_SHA256="$(printf 'b%.0s' {1..64})" \
+    PATH="${bin}:${PATH}" bash "${mutated}" >"${dir}/stdout.mutated" 2>"${dir}/stderr.mutated" || rc3=$?
+  if [[ "${rc3}" -eq 0 ]]; then
+    echo "  ok: removing the equality check accepts the same stale manifest (mutation correctly detected)"
+  else
+    echo "  FAIL: the mutated script (no equality check) still refused: rc=${rc3} $(cat "${dir}/stderr.mutated" 2>/dev/null)" >&2
+    exit 1
+  fi
+) && PASS=$((PASS + 3)) || FAIL=$((FAIL + 1))
+
 echo "== ${PASS} passed, ${FAIL} failed =="
 (( FAIL == 0 ))

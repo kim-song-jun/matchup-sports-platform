@@ -76,7 +76,12 @@ jq -e --arg schema "${TASK168_FINAL_SCHEMA_SHA256}" \
 # a `LIKE '202609%_v1_%'` date range (which also catches unrelated
 # September migrations).
 mapfile -t task168_migration_names < <(jq -r '.database.task168.migrations[].name' "${MANIFEST}")
-(( ${#task168_migration_names[@]} > 0 )) || fail 'manifest lists no task168 migrations'
+# Exactly 11, not merely non-empty: the promotion gate
+# (assert_stage_b_promotion_receipt, alpha-release-common.sh) hardcodes
+# ledgerCount == 11, so a manifest with 10 or 12 entries must never reach a
+# written receipt at all -- rejecting a wrong count only at promotion time
+# would mean the runtime is already live and serving traffic first.
+(( ${#task168_migration_names[@]} == 11 )) || fail "manifest lists ${#task168_migration_names[@]} task168 migrations, expected exactly 11"
 for name in "${task168_migration_names[@]}"; do
   [[ "${name}" =~ ^[0-9]{14}_[a-z0-9_]+$ ]] || fail "manifest migration name is not well-formed: ${name}"
 done

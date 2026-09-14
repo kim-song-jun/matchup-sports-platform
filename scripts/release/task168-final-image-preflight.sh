@@ -447,7 +447,7 @@ RESOLVED_ATTEMPTS_SHA="$(printf '%s' "$RESOLVED_ATTEMPTS_PIPE" | sha256sum | awk
 for image in POSTGRES_IMAGE API_IMAGE WEB_IMAGE TOOL_IMAGE; do
   [[ "${!image}" =~ ^.+@sha256:[0-9a-f]{64}$ ]] || fail "$image must be an immutable digest reference"
 done
-jq -e 'type == "array" and length == 11 and ([.[].name] | length == 11) and (all(.[]; (.name|type)=="string" and (.sha256|type)=="string" and (.sha256|test("^[0-9a-f]{64}$"))))' "$MIGRATIONS_JSON" >/dev/null || fail 'migration contract must contain exactly 11 hashed entries'
+jq -e 'type == "array" and length == 11 and ([.[].name] as $names | ($names | unique | length) == 11) and (all(.[]; (.name|type)=="string" and (.name|test("^[0-9]{14}_[a-z0-9_]+$")) and (.sha256|type)=="string" and (.sha256|test("^[0-9a-f]{64}$"))))' "$MIGRATIONS_JSON" >/dev/null || fail 'migration contract must contain exactly 11 uniquely named hashed entries'
 mapfile -t MIGRATION_NAMES < <(jq -er '.[].name' "$MIGRATIONS_JSON")
 [[ "${MIGRATION_NAMES[10]}" == "$M11_NAME_PIN" ]] || fail 'M11 must be the final migration entry'
 M11_SHA_EXPECTED="$(jq -er '.[10].sha256' "$MIGRATIONS_JSON")"

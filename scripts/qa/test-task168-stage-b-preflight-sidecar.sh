@@ -224,8 +224,31 @@ run_expect_fail() {
 # test's scope) — reaching that later, unrelated check is itself the proof
 # that every T3 sidecar/member check above it accepted a well-formed input.
 common_args
-run_expect_fail 'migration contract must contain exactly 11 hashed entries' "${ARGS[@]}"
+run_expect_fail 'migration contract must contain exactly 11 uniquely named hashed entries' "${ARGS[@]}"
 pass 'a well-formed archive + sidecar + input snapshot clears the Stage A scaffolding and every new T3 sidecar/member check'
+
+# ---- 1b. Task168 contract entry names: shape and uniqueness ----------------
+# Names reach a SQL literal list, so anything outside the migration-name shape
+# (or a repeat) must be refused before that list is built.
+eleven_entry_contract() {
+  local override="${1:-}"
+  jq -cn --arg m11 "$M11_NAME" --arg override "$override" '
+    [range(0;10) | {name: ("2026010100000" + (.|tostring) + "_seed"), sha256: ("a" * 64)}]
+    + [{name: $m11, sha256: ("b" * 64)}]
+    | if $override == "" then . else (.[4].name = $override) end'
+}
+CONTRACT_BAD="$TMP/contract-bad.json"
+eleven_entry_contract "20260101000004_seed'; DROP TABLE x; --" > "$CONTRACT_BAD"
+common_args
+ARGS=("${ARGS[@]/$FIXTURE\/migrations.json/$CONTRACT_BAD}")
+run_expect_fail 'migration contract must contain exactly 11 uniquely named hashed entries' "${ARGS[@]}"
+pass 'CONTRACT-NAME-SHAPE: rejects a contract entry name that is not a migration name'
+
+eleven_entry_contract '20260101000000_seed' > "$CONTRACT_BAD"
+common_args
+ARGS=("${ARGS[@]/$FIXTURE\/migrations.json/$CONTRACT_BAD}")
+run_expect_fail 'migration contract must contain exactly 11 uniquely named hashed entries' "${ARGS[@]}"
+pass 'CONTRACT-NAME-DUP: rejects a contract that repeats a migration name'
 
 # ---- 2. sidecar does not authenticate this archive -------------------------
 BAD_SIDECAR_HASH="$TMP/bad-sidecar-hash.json"
@@ -1857,7 +1880,7 @@ common_args
 for i in "${!ARGS[@]}"; do
   if [[ "${ARGS[$i]}" == "--resolved-migration-attempts-json" ]]; then ARGS[$((i+1))]="$f"; fi
 done
-run_expect_fail 'migration contract must contain exactly 11 hashed entries' "${ARGS[@]}"
+run_expect_fail 'migration contract must contain exactly 11 uniquely named hashed entries' "${ARGS[@]}"
 pass 'accepts two well-formed resolved-attempt rows supplied out of sort order (canonicalized before validation)'
 
 
@@ -1879,7 +1902,7 @@ common_args
 for i in "${!ARGS[@]}"; do
   if [[ "${ARGS[$i]}" == "--migrations-json" ]]; then ARGS[$((i+1))]="$NULL_SHA_MIGRATIONS"; fi
 done
-run_expect_fail 'migration contract must contain exactly 11 hashed entries' "${ARGS[@]}"
+run_expect_fail 'migration contract must contain exactly 11 uniquely named hashed entries' "${ARGS[@]}"
 pass 'rejects a Task 168 migration contract entry whose sha256 is null'
 
 # ---- G1/G2/G4. archive-vs-files[] self-consistency is not the same binding

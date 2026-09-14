@@ -65,6 +65,7 @@ describe('TournamentRosterDeadlineCard', () => {
       <TournamentRosterDeadlineCard
         deadlineAt={'2026-07-20T18:30:00+09:00'}
         isTournamentRosterClosed
+        tournamentStatus="completed"
         isRosterLocked={false}
         isRosterEditBlockedByStatus={false}
         isRosterDeadlineBlocked={false}
@@ -76,5 +77,22 @@ describe('TournamentRosterDeadlineCard', () => {
     expect(
       screen.getByText('대회가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.'),
     ).toBeInTheDocument();
+  });
+
+  // Task 170 R: 아직 공개되지 않은 대회를 "종료·취소"로 안내하면 팀장이 원인을 잘못 읽는다.
+  it('says the competition is not public yet instead of blaming an ended tournament', () => {
+    render(
+      <TournamentRosterDeadlineCard
+        deadlineAt={null}
+        isTournamentRosterClosed
+        tournamentStatus="draft"
+        isRosterLocked={false}
+        isRosterEditBlockedByStatus={false}
+        isRosterDeadlineBlocked={false}
+      />,
+    );
+
+    expect(screen.getByText('수정 불가')).toBeInTheDocument();
+    expect(screen.getByText('대회가 아직 공개되지 않아 선수 명단을 수정할 수 없어요.')).toBeInTheDocument();
   });
 });

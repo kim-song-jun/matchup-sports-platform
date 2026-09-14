@@ -38,8 +38,8 @@ write_candidate_manifest() {
   mv "${candidate_tmp}" "${ALPHA_CANDIDATE_MANIFEST}"
 }
 
-# D-5 guard (m11-stageb-spec.md §0 item 4 / §3.3 row 1). A Stage A deploy must
-# refuse before source activation if Task 168's M11 is already in the ledger
+# D-5 guard: a Stage A deploy must refuse before source activation if Task
+# 168's M11 is already in the ledger
 # (applied, failed, or rolled back — any row at all), since a Stage A runner
 # would otherwise misclassify the database and fail deep inside
 # task168-stage-a-migrate.sh after activation. Takes the caller's `compose`
@@ -72,8 +72,7 @@ assert_task168_m11_absent() {
   fi
 }
 
-# T7 gate (m11-stageb-spec.md §4 PR-A2 / §5 T7; .task168-stageb-a2-contract.md
-# §4.3). A StageB candidate is not promoted to active without a runtime
+# T7 gate: a StageB candidate is not promoted to active without a runtime
 # verification receipt binding both the migration receipt that produced the
 # post-M11 database and this exact candidate manifest — the receipt cannot
 # be swapped in from an unrelated release or migration attempt.

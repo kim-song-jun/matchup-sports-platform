@@ -48,8 +48,7 @@ ENTRYPOINT ["node", "-r", "ts-node/register/transpile-only", "src/games/migratio
 # unchanged StageA `runtime` stage — Alpha and prod both build without an
 # explicit target today, and PR-A2 adds `target: runtime` to both workflow
 # build steps in the same change to make that binding explicit rather than
-# implicit-by-stage-order (contract m11-stageb-spec.md §9, `deploy-alpha.yml`
-# item PR-A2 Dockerfile (a)).
+# implicit-by-stage-order.
 FROM base AS builder-task168-final
 WORKDIR /app
 RUN npm install -g pnpm@9.15.4

@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
-# Contract test for scripts/release/task168-stage-b-post-live-verify.sh (T7;
-# m11-stageb-spec.md §5 T7; .task168-stageb-a2-contract.md §4.3). Runs the
-# real script against a fake docker/psql/curl. A working baseline is built
+# Contract test for scripts/release/task168-stage-b-post-live-verify.sh (T7).
+# Runs the real script against a fake docker/psql/curl. A working baseline is built
 # first, then each of the eight checks is broken exactly once — every
 # break must refuse to write a receipt and exit non-zero.
 

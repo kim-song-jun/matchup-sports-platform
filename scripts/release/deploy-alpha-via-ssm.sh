@@ -37,13 +37,10 @@ case "${TASK168_STAGE}" in
     [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]{8}\.g[0-9a-f]{12}$ ]]
     [[ "${SOURCE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
     [[ "${MANIFEST_SHA256}" =~ ^[0-9a-f]{64}$ ]]
-    # {1,1024} bound, byte-identical to origin/dev: a narrower {1,255}
-    # crept in only because macOS's regex engine rejects
-    # a {1,1024} bound ("maximum repetition exceeds 255") — a local-bash
-    # portability accommodation, not a real S3 version-id constraint (S3
-    # version ids run ~32 chars). The actual gate and host both run on
-    # Linux, where {1,1024} is fine; verify this script on Linux, not macOS
-    # system bash.
+    # {1,1024} bound, byte-identical to origin/dev. macOS's regcomp rejects
+    # a {1,1024} bound ("maximum repetition exceeds 255"); this is validation
+    # width, not a real S3 version-id constraint (S3 version ids run ~32
+    # chars). Verify this script on Linux, not macOS system bash.
     [[ "${SOURCE_VERSION_ID}" =~ ^[A-Za-z0-9._+=/-]{1,1024}$ ]]
     [[ "${MANIFEST_VERSION_ID}" =~ ^[A-Za-z0-9._+=/-]{1,1024}$ ]]
     comment="Teameet alpha ${RELEASE_VERSION} ${RELEASE_SHA}"
@@ -76,7 +73,7 @@ case "${TASK168_STAGE}" in
     if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       # No new source/manifest: recovery only inspects and repairs already-staged
       # host state, off the currently-active release's own copy of the wrapper
-      # script (m11-stageb-spec.md §6.2-8).
+      # script (docs/ops/task168-stage-b-runbook.md).
       parameters="$(jq -nc \
         --arg strict "set -Eeuo pipefail" \
         --arg recover "sudo -u ec2-user -H env ALPHA_SHA='${RELEASE_SHA}' TASK168_STAGE=stageBRecover bash /home/ec2-user/teameet/deploy/deploy-alpha-stage-b.sh" \
@@ -153,8 +150,8 @@ done
 # budget (which is set to exceed executionTimeout). This is deliberately
 # NOT reported as a failure — for stageBFinal in particular, that would
 # invite an operator to re-dispatch or restore over a host that may still be
-# mid-migration (m11-stageb-spec.md PR-A2 SSM timeout item ②, §6.2-8
-# stageBRecover's own read-only entry-condition checks are the correct next
-# step, not this script).
+# mid-migration. stageBRecover's own read-only entry-condition checks
+# (docs/ops/task168-stage-b-runbook.md) are the correct next step, not this
+# script.
 echo "[deploy-alpha-via-ssm] result=UNKNOWN_HOST_MAY_BE_RUNNING — host may still be running; do not re-dispatch or restore, run task168_stage=stageBRecover to diagnose" >&2
 exit 1

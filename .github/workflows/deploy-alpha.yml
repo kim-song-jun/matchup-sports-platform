@@ -10,7 +10,7 @@ on:
         required: false
         type: string
         default: ""
-      # StageB entry points (m11-stageb-spec.md §2, .task168-stageb-a2-contract.md §2).
+      # StageB entry points.
       # stageBResume is intentionally absent — its dispatch input is withheld pending
       # user decision U2; only its receipt/lock/label contract is pre-wired elsewhere.
       task168_stage:
@@ -282,8 +282,8 @@ jobs:
       # no-op — not merely skipped-looking, but structurally unreachable — on the
       # push trigger and on stageAIntermediate/stageBRecover dispatches (T1
       # completion #1/#2). stageBRecover needs none of these: it only diagnoses
-      # and recovers already-staged host state (m11-stageb-spec.md §6.2-8) and is
-      # wired directly into the SSM step below.
+      # and recovers already-staged host state (docs/ops/task168-stage-b-runbook.md)
+      # and is wired directly into the SSM step below.
       #
       # `prepare-task168-final-stage-inputs.sh` and `package-task168-final-source.sh`
       # are PR-A1 (runner track) deliverables — this block calls them by the CLI
@@ -445,9 +445,9 @@ jobs:
           # Web is unchanged by the Prisma schema — reuse StageA's build rather
           # than rebuild it. cutoverTool likewise reuses StageA's already-built
           # image: the runner validates the manifest's cutoverTool field for
-          # shape only and never actually invokes it in StageB (m11-stageb-spec.md
-          # candidate deploy/task168-stage-b-migrate.sh extracts TOOL_IMAGE but
-          # never runs it), so there is nothing StageB-specific to build here.
+          # shape only and never actually invokes it in StageB
+          # (deploy/task168-stage-b-migrate.sh extracts TOOL_IMAGE but never
+          # runs it), so there is nothing StageB-specific to build here.
           WEB_IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
           TOOL_IMAGE_TAG: ${{ steps.images.outputs.toolTag }}
           TASK168_PREDECESSOR_RELEASE_SHA: ${{ steps.stageb-predecessor.outputs.releaseSha }}

@@ -38,8 +38,8 @@ db_id="$("${psql_cmd[@]}" -c \
   "SELECT current_database() || '|' || current_user || '|' || COALESCE(inet_server_addr()::text,'local') || '|' || COALESCE(inet_server_port()::text,'local')")"
 
 # Same query and row order as deploy/task168-stage-b-migrate.sh's
-# resolved_attempt_rows()/resolved_attempt_sha() (m11-stageb-spec.md §3.3
-# L4) — the runner recomputes this independently at execution time and
+# resolved_attempt_rows()/resolved_attempt_sha() — the runner recomputes this
+# independently at execution time and
 # rejects the manifest if its own answer differs (assert_resolved_attempts),
 # so this is a real, checked commitment, not a cosmetic field.
 resolved_sha="$("${psql_cmd[@]}" -c \

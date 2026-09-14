@@ -58,13 +58,12 @@ case "$(jq -r '.database.task168.stage // "none"' "${active_tmp}")" in
     exit 1
     ;;
   stageBFinal)
-    # D-4 (m11-stageb-spec.md §2.2 row "복구 경로 단절"; .task168-stageb-a2-contract.md
-    # §5). The active database has had M11 (an irreversible DROP) applied — this
+    # D-4. The active database has had M11 (an irreversible DROP) applied — this
     # script's image-swap rollback cannot undo that, and a schema-mismatched
     # previous image would run against a database it does not understand. The
-    # only valid path back is the manual backup-restore procedure
-    # (m11-stageb-spec.md §6.3), never an automated image rollback.
-    echo "[alpha-rollback] Active release is Task168 StageB final; automated image rollback is forbidden — restore from the pre-M11 backup manually (m11-stageb-spec.md §6.3, backup-only procedure)" >&2
+    # only valid path back is the manual backup-restore procedure, never an
+    # automated image rollback.
+    echo "[alpha-rollback] Active release is Task168 StageB final; automated image rollback is forbidden — the only path back is the manual backup-only restore procedure (docs/ops/task168-stage-b-runbook.md, Rollback section)" >&2
     exit 1
     ;;
 esac

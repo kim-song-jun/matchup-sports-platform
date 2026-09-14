@@ -238,15 +238,13 @@ jobs:
       - name: Prod rollback guard tests
         run: bash scripts/qa/test-prod-rollback-guards.sh
 
-      # PR-A2 (m11-stageb-spec.md §2: "a gate that is not wired is the same
-      # as no gate"). This check already existed and already passes at HEAD
-      # — it was simply never connected to a workflow.
+      # A gate that is not wired into any workflow is the same as no gate.
       - name: Alpha immutable-deploy contract checks
         run: node scripts/qa/check-alpha-immutable-deploy.mjs
 
-      # Task168 StageB (m11-stageb-spec.md, .task168-stageb-a2-contract.md). All four
-      # run the real target scripts against fake aws/docker, never a hand-copied
-      # excerpt — see each script's own header for what it actually exercises.
+      # Task168 StageB. All four run the real target scripts against fake
+      # aws/docker, never a hand-copied excerpt — see each script's own
+      # header for what it actually exercises.
       - name: Task168 StageB dispatch wiring contract tests
         run: bash scripts/qa/test-task168-stage-b-wiring.sh
 
@@ -266,11 +264,10 @@ jobs:
         run: bash scripts/qa/test-task168-post-live.sh
 
       # A real `docker build` per target (StageA default + StageB
-      # runtime-task168-final) was here as a "gates" step and ran on every PR
-      # and main push, but this job's own contract (see the file header) is
-      # "no app build, seconds-long checks" — two full image builds break
-      # that and had never actually been run anywhere before landing here.
-      # scripts/qa/test-task168-dockerfile-target.sh above already covers the
+      # runtime-task168-final) is deliberately NOT a step here: this job's
+      # own contract (see the file header) is "no app build, seconds-long
+      # checks", and two full image builds break that.
+      # scripts/qa/test-task168-dockerfile-target.sh above covers the
       # target-order/attestation-content contract statically; a real-build
       # attestation check belongs in a job that does not gate this file's
       # production deploy (or on workflow_dispatch only), with a real run

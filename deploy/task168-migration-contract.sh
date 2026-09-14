@@ -47,6 +47,17 @@ ledger_assert_exact(){
   done
 }
 
+# Direct-catalog evidence the pre-M11 physical schema (the exact tables M11
+# drops) is intact. Shared so the runner's own pre-M11 preflight and
+# stageBRecover's R-B (which revives a predecessor-image writer on the belief
+# that M11 was never applied) check the identical five tables -- reviving a
+# writer against a database whose ledger lacks an M11 row but whose physical
+# schema has ALREADY been altered by some other means would let that writer
+# run against a schema it does not understand.
+legacy_tables_present_count(){
+  dbq "SELECT count(*) FROM (VALUES ('v1_tournament_fixtures'),('v1_tournament_fixture_results'),('v1_tournament_fixture_goals'),('v1_tournament_fixture_videos'),('v1_tournament_fixture_advancement_edges')) x(name) WHERE to_regclass(x.name) IS NOT NULL"
+}
+
 # Direct-catalog evidence M11's DDL landed: legacy tables/columns/functions/
 # triggers gone, the guard functions and CHECK constraints M11 rewrites are
 # exactly as expected, retired enum types gone, no outbox event stuck

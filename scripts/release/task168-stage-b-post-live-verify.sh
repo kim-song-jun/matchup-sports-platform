@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-# Task 168 StageB post-live attestation producer (T7; m11-stageb-spec.md §5
-# T7 / §4 PR-A2; .task168-stageb-a2-contract.md §4.3). Runs after the final
+# Task 168 StageB post-live attestation producer (T7). Runs after the final
 # runtime is composed up (once a future stageBResume wires that step — this
 # script itself does not decide when it runs) and writes
 # runtime-verification.json ONLY if every check below passes. Any single

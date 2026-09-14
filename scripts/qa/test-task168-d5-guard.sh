@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-# D-5 guard contract test (m11-stageb-spec.md §0 item 4 / §3.3 row 1;
-# .task168-stageb-a2-contract.md). Exercises the REAL guard function
+# D-5 guard contract test. Exercises the REAL guard function
 # (assert_task168_m11_absent, deploy/alpha-release-common.sh) that
 # deploy/deploy-alpha.sh calls — not a reimplementation or a hand-copied
 # excerpt of its SQL — against a fake docker/psql on PATH, plus a static
@@ -114,8 +113,7 @@ else
   pass "deploy-alpha.sh has no test-only path override hooks"
 fi
 
-# ── Shared deploy lock (m11-stageb-spec.md §0 "동시 실행 lock 없음";
-# .task168-stageb-a2-contract.md §7): deploy-alpha-stage-b.sh must also take
+# ── Shared deploy lock: deploy-alpha-stage-b.sh must also take
 # the same .teameet-alpha-deploy.lock that deploy-alpha.sh and
 # rollback-alpha.sh take, so a StageB host run in progress blocks a StageA
 # push deploy queued behind it (and vice versa) rather than both running

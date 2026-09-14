@@ -189,7 +189,7 @@ fi
 write_candidate_manifest "${ALPHA_MANIFEST_FILE}"
 prepare_alpha_release_source "${ALPHA_SOURCE_DIR}" "${ALPHA_SHA}" "${ALPHA_SOURCE_SHA256}"
 
-# D-5 guard (m11-stageb-spec.md §0 item 4 / §3.3 row 1). This manifest was
+# D-5 guard. This manifest was
 # already proven `database.task168.stage == "stageAIntermediate"` above
 # (validate_alpha_release_manifest), so this script only ever runs for
 # StageA. If Task168's M11 is already in the ledger — applied, failed, or

@@ -3,7 +3,6 @@
 # Contract test for the StageB manifest validation (D-4) and promotion gate
 # (T7) added to deploy/alpha-manifest-common.sh and deploy/alpha-release-common.sh,
 # plus rollback-alpha.sh's stageBFinal refusal (D-4).
-# (m11-stageb-spec.md §5 T4/T7; .task168-stageb-a2-contract.md §4/§5)
 
 set -Eeuo pipefail
 

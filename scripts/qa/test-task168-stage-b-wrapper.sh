@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# Contract test for deploy/deploy-alpha-stage-b.sh (m11-stageb-spec.md §6.2,
-# §6.2-8 stageBRecover; .task168-stageb-a2-contract.md §7/§8). Runs the real
-# script against fake docker/aws, never a reimplementation.
+# Contract test for deploy/deploy-alpha-stage-b.sh, including stageBRecover
+# (docs/ops/task168-stage-b-runbook.md). Runs the real script against fake
+# docker/aws, never a reimplementation.
 
 set -Eeuo pipefail
 
@@ -141,10 +141,16 @@ make_r_a_fixture() {
 # $8 = quiesced-writer .HostConfig.RestartPolicy.Name for raApi1/raWorker1
 # (default no), $9 = exit code for R-A's own throwaway `prisma migrate
 # status` check (task168-migration-contract.sh assert_prisma_migrate_status_clean,
-# default 0 = clean)
+# default 0 = clean), $10 = one post_m11_catalog_violation code to answer
+# with its FAILING value instead of its passing one (empty = every catalog
+# check passes; legacy_tables/lineage_trigger are covered by $5/a dedicated
+# scenario instead, so not accepted here), $11 = the v1_api image the fake
+# `compose config` reports (default matches the fixture's apiImage — pass a
+# different image to exercise R-A's compose-image re-check)
 make_fake_docker_for_recover() {
   local bin="$1" m11="$2" advisory="${3:-0}" labeled="${4:-0}" legacy="${5:-0}" binding="${6:-t}" \
-    ra_running="${7:-false}" ra_restart="${8:-no}" status_rc="${9:-0}"
+    ra_running="${7:-false}" ra_restart="${8:-no}" status_rc="${9:-0}" break="${10:-}" \
+    compose_image="${11:-img@sha256:$(printf 'a%.0s' $(seq 1 64))}"
   # R-A's ledger checks (task168-migration-contract.sh) query
   # _prisma_migrations three more ways than the single-row m11 lookup below:
   # the full ledger (every migration, any name), the Task168-only subset, and
@@ -154,6 +160,30 @@ make_fake_docker_for_recover() {
   # manifest.json's ledger fixture -- covers it.
   local ledger_lines_file="$(dirname "${bin}")/task168-ledger-lines.txt"
   task168_ledger_lines > "${ledger_lines_file}"
+  # Every catalog-check answer defaults to its PASSING value; $break, if set,
+  # flips exactly one of them to its failing value so that check (and only
+  # that check) is what refuses the run -- the same one-check-at-a-time shape
+  # as the dedicated legacy-table/lineage-trigger scenarios already use.
+  local games_guard_val="CHECK ((((source_type)::text = 'TEAM_MATCH'::text) AND (team_match_id IS NOT NULL)))"
+  local staff_guard_val="CHECK (((team_match_id IS NOT NULL) AND (tournament_id IS NOT NULL)))"
+  local audit_guard_val=0 guard_fn_resolve_val=1 guard_fn_staff_val=1 guard_fn_lineage_val=1 \
+    retired_enums_val=0 retirement_functions_val=0 retirement_triggers_val=0 \
+    legacy_link_columns_val=0 processing_outbox_val=0
+  case "${break}" in
+    games_guard_ck) games_guard_val="CHECK (broken)" ;;
+    staff_guard_ck) staff_guard_val="CHECK (broken)" ;;
+    audit_guard_ck) audit_guard_val=1 ;;
+    guard_fn_resolve) guard_fn_resolve_val=0 ;;
+    guard_fn_staff) guard_fn_staff_val=0 ;;
+    guard_fn_lineage) guard_fn_lineage_val=0 ;;
+    retired_enums) retired_enums_val=1 ;;
+    retirement_functions) retirement_functions_val=1 ;;
+    retirement_triggers) retirement_triggers_val=1 ;;
+    legacy_link_columns) legacy_link_columns_val=1 ;;
+    processing_outbox) processing_outbox_val=1 ;;
+    "") ;;
+    *) echo "make_fake_docker_for_recover: unsupported break code: ${break}" >&2; exit 1 ;;
+  esac
   cat > "${bin}/docker" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "docker \$*" >> "${log}"
@@ -167,8 +197,9 @@ case "\$*" in
   *"(finished_at IS NULL AND rolled_back_at IS NULL) OR (finished_at IS NOT NULL AND rolled_back_at IS NOT NULL)"*) echo 0; exit 0 ;;
   *"migration_name IN ("*|*"ORDER BY migration_name,id"*) cat "${ledger_lines_file}"; exit 0 ;;
   # R-A's compose-v1_api-image re-check ahead of the migrate-status
-  # throwaway container -- matches the fixture's apiImage (make_r_a_fixture).
-  *"config --format json"*) echo '{"services":{"v1_api":{"image":"img@sha256:'"$(printf 'a%.0s' $(seq 1 64))"'"}}}'; exit 0 ;;
+  # throwaway container -- matches the fixture's apiImage (make_r_a_fixture)
+  # unless \$11 overrides it.
+  *"config --format json"*) echo '{"services":{"v1_api":{"image":"${compose_image}"}}}'; exit 0 ;;
   *"count(*)"*"_prisma_migrations"*)
     # The row-count query and the row-value query both mention
     # _prisma_migrations, so this arm (matched first) must intercept the
@@ -177,22 +208,22 @@ case "\$*" in
     exit 0 ;;
   *"_prisma_migrations"*) echo "${m11}"; exit 0 ;;
   *"to_regclass"*) echo "${legacy}"; exit 0 ;;
-  *"information_schema.columns"*) echo 0; exit 0 ;;
+  *"information_schema.columns"*) echo "${legacy_link_columns_val}"; exit 0 ;;
   # Specific pg_proc/pg_trigger predicates (the three re-created guard
   # functions, the lineage-reparent trigger) must be matched before the
   # generic retirement-function/-trigger arms below, which answer a
   # different query over the same two catalog tables.
-  *"v1_resolve_canonical_guard_game"*) echo 1; exit 0 ;;
-  *"v1_guard_staff_fixture_scope"*) echo 1; exit 0 ;;
-  *"v1_guard_tournament_result_lineage_insert"*) echo 1; exit 0 ;;
+  *"v1_resolve_canonical_guard_game"*) echo "${guard_fn_resolve_val}"; exit 0 ;;
+  *"v1_guard_staff_fixture_scope"*) echo "${guard_fn_staff_val}"; exit 0 ;;
+  *"v1_guard_tournament_result_lineage_insert"*) echo "${guard_fn_lineage_val}"; exit 0 ;;
   *"lineage_game_reparent"*) echo 1; exit 0 ;;
-  *"v1_games_canonical_source_guard_ck"*) echo "CHECK ((((source_type)::text = 'TEAM_MATCH'::text) AND (team_match_id IS NOT NULL)))"; exit 0 ;;
-  *"v1_staff_scope_canonical_source_guard_ck"*) echo "CHECK (((team_match_id IS NOT NULL) AND (tournament_id IS NOT NULL)))"; exit 0 ;;
-  *"v1_operation_audits_canonical_source_guard_ck"*) echo 0; exit 0 ;;
-  *"v1_outbox_events"*) echo 0; exit 0 ;;
-  *"pg_proc"*) echo 0; exit 0 ;;
-  *"pg_trigger"*) echo 0; exit 0 ;;
-  *"pg_type"*) echo 0; exit 0 ;;
+  *"v1_games_canonical_source_guard_ck"*) echo "${games_guard_val}"; exit 0 ;;
+  *"v1_staff_scope_canonical_source_guard_ck"*) echo "${staff_guard_val}"; exit 0 ;;
+  *"v1_operation_audits_canonical_source_guard_ck"*) echo "${audit_guard_val}"; exit 0 ;;
+  *"v1_outbox_events"*) echo "${processing_outbox_val}"; exit 0 ;;
+  *"pg_proc"*) echo "${retirement_functions_val}"; exit 0 ;;
+  *"pg_trigger"*) echo "${retirement_triggers_val}"; exit 0 ;;
+  *"pg_type"*) echo "${retired_enums_val}"; exit 0 ;;
   # R-A's own quiesced-writer re-check (raApi1/raWorker1, make_r_a_fixture)
   # must be matched before the R-B generic arms below.
   *"inspect --format {{.State.Running}} raApi1"*|*"inspect --format {{.State.Running}} raWorker1"*) echo "${ra_running}"; exit 0 ;;
@@ -286,7 +317,7 @@ rc="$(run_recover "${root}")"
 # ── R-B: no M11 row, quiesce.json present with new D-6 fields -> restore ───
 root="${WORK}/r-b"; mkdir -p "${root}"
 setup_recover_fixture "${root}"
-make_fake_docker_for_recover "${bin}" ""
+make_fake_docker_for_recover "${bin}" "" 0 0 5
 # preApiImage/preWorkerImage/databaseIdentity are "" to match the fake
 # docker/psql default case (no case arm matches a plain
 # `docker inspect --format '{{.Config.Image}}'` or the identity SELECT, so
@@ -318,6 +349,7 @@ case "\$*" in
   *"label=com.teameet.task168.stage-b"*) exit 0 ;;
   *"pg_locks"*) echo 0; exit 0 ;;
   *"_prisma_migrations"*) exit 0 ;;
+  *"to_regclass"*) echo 5; exit 0 ;;
   *"HostConfig.RestartPolicy.Name"*) echo no; exit 0 ;;   # update "succeeded" but read-back disagrees
   *"inspect"*"State.Running"*) echo true; exit 0 ;;
   *) exit 0 ;;
@@ -505,6 +537,123 @@ rc="$(run_recover "${root}")"
   && grep -q "canonical lineage trigger is missing" "${root}/stderr" \
   && pass "R-A refuses when the post-M11 lineage guard trigger is missing" \
   || fail "R-A did not re-check the lineage trigger: rc=${rc} $(cat "${root}/stderr")"
+
+# ── R-A negative: every OTHER post_m11_catalog_violation code also gates
+# recovery, one at a time (legacy_tables/lineage_trigger are already covered
+# above by dedicated scenarios). Shared with the runner via
+# task168-migration-contract.sh, so a check silently deleted from that one
+# file would otherwise go untested for both callers.
+CATALOG_BREAK_CODES=(games_guard_ck staff_guard_ck audit_guard_ck guard_fn_resolve guard_fn_staff guard_fn_lineage retired_enums retirement_functions retirement_triggers legacy_link_columns processing_outbox)
+CATALOG_BREAK_MESSAGES=(
+  "games canonical source guard constraint is missing or changed"
+  "staff scope canonical source guard constraint is missing or changed"
+  "legacy audit canonical-source guard constraint remains"
+  "v1_resolve_canonical_guard_game is missing or its signature changed"
+  "v1_guard_staff_fixture_scope is missing or its signature changed"
+  "v1_guard_tournament_result_lineage_insert is missing or its signature changed"
+  "retired enum types remain"
+  "retirement functions are still present"
+  "retirement triggers are still present"
+  "legacy link columns are still present"
+  "processing outbox rows remain"
+)
+for i in "${!CATALOG_BREAK_CODES[@]}"; do
+  break_code="${CATALOG_BREAK_CODES[$i]}"; break_msg="${CATALOG_BREAK_MESSAGES[$i]}"
+  root="${WORK}/r-a-catalog-${break_code}"; mkdir -p "${root}"
+  setup_recover_fixture "${root}"
+  printf 'fake backup bytes' > "${state_dir}/pre-m11-backup.sql"
+  backup_sha="$(sha256sum "${state_dir}/pre-m11-backup.sql" | awk '{print $1}')"
+  make_r_a_fixture "${state_dir}" "${state_dir}/pre-m11-backup.sql" "${backup_sha}"
+  make_fake_docker_for_recover "${bin}" "08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323|applied" 0 0 0 t false no 0 "${break_code}"
+  rc="$(run_recover "${root}")"
+  [[ "${rc}" -ne 0 ]] && [[ ! -f "${state_dir}/migration-stage.json" ]] \
+    && grep -q "${break_msg}" "${root}/stderr" \
+    && pass "R-A refuses when the ${break_code} catalog check fails" \
+    || fail "R-A did not enforce ${break_code}: rc=${rc} $(cat "${root}/stderr")"
+done
+
+# ── R-A negative: the running compose config's v1_api image does not match
+# the pinned final image (activated the wrong release before recovering) ──
+root="${WORK}/r-a-compose-image-mismatch"; mkdir -p "${root}"
+setup_recover_fixture "${root}"
+printf 'fake backup bytes' > "${state_dir}/pre-m11-backup.sql"
+backup_sha="$(sha256sum "${state_dir}/pre-m11-backup.sql" | awk '{print $1}')"
+make_r_a_fixture "${state_dir}" "${state_dir}/pre-m11-backup.sql" "${backup_sha}"
+make_fake_docker_for_recover "${bin}" "08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323|applied" 0 0 0 t false no 0 "" "img@sha256:$(printf 'b%.0s' $(seq 1 64))"
+rc="$(run_recover "${root}")"
+[[ "${rc}" -ne 0 ]] && [[ ! -f "${state_dir}/migration-stage.json" ]] \
+  && grep -q "running compose config's v1_api image does not match the pinned final image" "${root}/stderr" \
+  && pass "R-A refuses when the running compose config's v1_api image does not match the pinned final image" \
+  || fail "R-A did not re-check the compose image: rc=${rc} $(cat "${root}/stderr")"
+
+# ── R-A negative: a quiesced writer is stopped (not running) but its restart
+# policy is not 'no' -- isolates this check from the Running==true case
+# ("r-a-writer-revived" above), which would otherwise refuse first ─────────
+root="${WORK}/r-a-writer-restart-not-no"; mkdir -p "${root}"
+setup_recover_fixture "${root}"
+printf 'fake backup bytes' > "${state_dir}/pre-m11-backup.sql"
+backup_sha="$(sha256sum "${state_dir}/pre-m11-backup.sql" | awk '{print $1}')"
+make_r_a_fixture "${state_dir}" "${state_dir}/pre-m11-backup.sql" "${backup_sha}"
+make_fake_docker_for_recover "${bin}" "08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323|applied" 0 0 0 t false always
+rc="$(run_recover "${root}")"
+[[ "${rc}" -ne 0 ]] && [[ ! -f "${state_dir}/migration-stage.json" ]] \
+  && grep -q "restart policy is not 'no'" "${root}/stderr" \
+  && pass "R-A refuses when a stopped quiesced writer's restart policy is not 'no'" \
+  || fail "R-A did not re-check the quiesced writer's restart policy: rc=${rc} $(cat "${root}/stderr")"
+
+# ── R-A negative: the manifest copy on disk no longer matches the hash the
+# quiesce receipt recorded (corrupted or swapped after quiescence) ─────────
+root="${WORK}/r-a-manifest-copy-corrupted"; mkdir -p "${root}"
+setup_recover_fixture "${root}"
+printf 'fake backup bytes' > "${state_dir}/pre-m11-backup.sql"
+backup_sha="$(sha256sum "${state_dir}/pre-m11-backup.sql" | awk '{print $1}')"
+make_r_a_fixture "${state_dir}" "${state_dir}/pre-m11-backup.sql" "${backup_sha}"
+printf '\n' >> "${state_dir}/manifest.json"
+make_fake_docker_for_recover "${bin}" "08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323|applied"
+rc="$(run_recover "${root}")"
+[[ "${rc}" -ne 0 ]] && [[ ! -f "${state_dir}/migration-stage.json" ]] \
+  && grep -q "manifest copy no longer matches the quiesce receipt's manifestSha256" "${root}/stderr" \
+  && pass "R-A refuses when the manifest copy no longer matches its recorded hash" \
+  || fail "R-A did not re-check the manifest copy hash: rc=${rc} $(cat "${root}/stderr")"
+
+# ── R-A negative (cross-release false-green): a sibling release's own M11
+# entry marker was written at or after this release's own -- every OTHER
+# binding is self-referential to this release's own state directory and
+# cannot tell the two apart, so refuse instead of certifying a receipt that
+# may actually belong to the sibling. Reproduces the false-recovery ordering
+# at the wrapper level (see scenario w in test-task168-stage-b-runner.sh for
+# the real end-to-end reproduction).
+root="${WORK}/r-a-sibling-marker"; mkdir -p "${root}"
+setup_recover_fixture "${root}"
+printf 'fake backup bytes' > "${state_dir}/pre-m11-backup.sql"
+backup_sha="$(sha256sum "${state_dir}/pre-m11-backup.sql" | awk '{print $1}')"
+make_r_a_fixture "${state_dir}" "${state_dir}/pre-m11-backup.sql" "${backup_sha}"
+sibling_dir="${home}/.teameet-alpha-releases/task168/2222222222222222222222222222222222222222"
+install -d "${sibling_dir}"
+jq -n '{schemaVersion:1,kind:"task168StageBM11EntryMarker",releaseSha:"2222222222222222222222222222222222222222",enteredAt:"2026-09-14T01:00:00Z"}' \
+  > "${sibling_dir}/m11-entry-marker.json"
+make_fake_docker_for_recover "${bin}" "08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323|applied"
+rc="$(run_recover "${root}")"
+[[ "${rc}" -ne 0 ]] && [[ ! -f "${state_dir}/migration-stage.json" ]] \
+  && grep -q "sibling release" "${root}/stderr" \
+  && pass "R-A refuses when a sibling release has its own M11 entry marker at or after this one" \
+  || fail "R-A did not enforce the sibling-marker cross-release binding: rc=${rc} $(cat "${root}/stderr")"
+
+# ── R-B negative: no M11 ledger row, but the pre-M11 physical schema is not
+# fully present either -- do not trust the ledger's absence alone before
+# reviving a predecessor-image writer against a database in an uncertain
+# state.
+root="${WORK}/r-b-schema-not-pre-m11"; mkdir -p "${root}"
+setup_recover_fixture "${root}"
+jq -n '{schemaVersion:1,kind:"quiesce",status:"COMPLETED",stage:"stageBFinal",
+  preApiContainerId:"api123",preWorkerContainerId:"worker123",
+  preApiImage:"",preWorkerImage:"",databaseIdentity:"",
+  restartPolicyBefore:{api:"always",worker:"always"}}' > "${state_dir}/quiesce.json"
+make_fake_docker_for_recover "${bin}" "" 0 0 3
+rc="$(run_recover "${root}")"
+[[ "${rc}" -ne 0 ]] && grep -q "retired tables are not fully present" "${root}/stderr" \
+  && pass "R-B refuses to restore a writer when the pre-M11 physical schema is not fully present" \
+  || fail "R-B did not check the pre-M11 schema shape: rc=${rc} $(cat "${root}/stderr")"
 
 # ── stageBFinal: runner exits 0 but writes no receipt -> wrapper still fails
 # (judged by migration-stage.json, never by exit code alone — §3).

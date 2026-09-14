@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-# Task168 StageB Dockerfile target-safety contract test (m11-stageb-spec.md
-# PR-A2 Dockerfile items (a)+(d); .task168-stageb-a2-contract.md §9).
+# Task168 StageB Dockerfile target-safety contract test.
 #
 # A target-less `docker build` resolves to a Dockerfile's LAST stage. Adding
 # runtime-task168-final ahead of the existing (default) `runtime` stage is

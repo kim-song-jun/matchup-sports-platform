@@ -7,7 +7,7 @@ set -Eeuo pipefail
 # shellcheck disable=SC1091
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../deploy" && pwd)/alpha-manifest-common.sh"
 
-# Task 168 name list, order fixed (m11-stageb-spec.md §1, identical to
+# Task 168 name list, order fixed (identical to
 # deploy/task168-stage-b-migrate.sh's ALL_MIGRATIONS[0:10] + M11).
 readonly TASK168_M1_M10=(
   20260908130000_v1_team_match_tournament_expand

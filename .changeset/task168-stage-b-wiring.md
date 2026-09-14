@@ -64,23 +64,51 @@ Task 168 StageB(최종 스키마 이관) 배선을 dev에 들여왔어요. dev p
   자체가 거부돼요.
 
 **행동 없이도 검증**: `scripts/qa/test-task168-*.sh` 6개(wiring·wrapper·manifest·post-live·
-d5-guard·dockerfile-target, ubuntu CI 기준 총 69개 케이스 — wiring 18 · d5-guard 9 · wrapper 15
-· manifest 10 · dockerfile-target 4 · post-live 13)가 가짜 aws/docker/psql로 실제 스크립트를
-돌려 각 게이트를 변이(mutation)로 확인해요. 전부 `deploy.yml` gates 에 연결했고
-`continue-on-error` 없이 0 failed 를 요구해요. macOS 로컬 실행은 wiring 3케이스가 시스템 정규식 엔진의 `{1,1024}` 반복
-제한(`maximum repetition exceeds 255`)과 wrapper 1케이스가 `flock(1)` 부재로 각각 fail/skip
-처리되는데, 둘 다 스크립트 자체 주석에 적힌 Linux 전용 검증 대상이라 ubuntu CI에서는 영향
-없어요(직접 ubuntu:24.04 컨테이너에서 재확인: wiring 26/0, d5-guard 9/0, wrapper 15/0 — 셋 다
-macOS 에서 fail/skip 이던 케이스까지 포함해 전부 green).
+d5-guard·dockerfile-target)가 가짜 aws/docker/psql로 실제 스크립트를 돌려 각 게이트를
+변이(mutation)로 확인해요. 전부 `deploy.yml` gates 에 연결했고 `continue-on-error` 없이
+0 failed 를 요구해요. macOS 로컬 케이스 수 — wiring 15(+3 macOS 전용 실패) · d5-guard 8(+1
+macOS 전용 skip) · wrapper 31(+1 macOS 전용 skip) · manifest 10 · dockerfile-target 4 ·
+post-live 13 = 로컬 81 + macOS 전용 4(실패 3·skip 1). macOS 실패 3건은 wiring 스크립트가
+`{1,1024}` 반복을 쓰는데 macOS 시스템 정규식 엔진이 `{1,1024}`를 거부해서(`maximum repetition
+exceeds 255`)이고, skip 1건(d5-guard·wrapper 각 1)은 `flock(1)` 부재예요. 셋 다 스크립트 자체
+주석에 적힌 Linux 전용 검증 대상이라 ubuntu CI에서는 4건 모두 green 으로 실행돼(직전 라운드
+ubuntu:24.04 컨테이너 재확인: wiring 26/0, d5-guard 9/0, wrapper 16/0 — 이번 라운드는 wrapper
+에 15케이스를 추가해 ubuntu 기준 31/0 이 될 것으로 계산돼요), **ubuntu CI 기준 총 94개 케이스**
+(wiring 26 · d5-guard 9 · wrapper 31 · manifest 10 · dockerfile-target 4 · post-live 13)예요.
+
+wrapper 에 추가한 15케이스: `post_m11_catalog_violation`(`task168-migration-contract.sh`, 러너와
+R-A 공유)의 13개 코드 중 이전엔 legacy_tables·lineage_trigger 2개만 개별 테스트가 있었는데 나머지
+11개(games_guard_ck·staff_guard_ck·audit_guard_ck·guard_fn_resolve·guard_fn_staff·
+guard_fn_lineage·retired_enums·retirement_functions·retirement_triggers·legacy_link_columns·
+processing_outbox) 각각을 한 번에 하나씩 깨는 시나리오, R-A 고유 바인딩 3개(러닝 중인 compose
+config 의 v1_api 이미지 불일치·정지된 quiesced writer 의 restart policy != no·manifest 사본
+해시 불일치) 각 1케이스, R-A 의 cross-release false-green(마커/quiesce/backup 이 자기 자신의
+상태 디렉터리에만 자기 일관적이라, 형제 release 가 같은 DB에 나중에 M11 을 커밋해도 모든 바인딩이
+통과하는 결함) 을 막는 새 sibling-marker 체크 1케이스, R-B 가 ledger 의 M11 행 부재만 믿고
+predecessor writer 를 되살리기 전에 pre-M11 물리 스키마(5개 legacy 테이블) 가 실제로 남아있는지
+확인하는 새 체크 1케이스예요.
 
 `scripts/qa/test-task168-stage-b-runner.sh`(실제 docker/postgres/Prisma 하네스, 별도
-`deploy.yml` 스텝)는 a-r(기존 18개) + t(재작성) + u·v(신규 2개) = 21 시나리오, macOS 로컬
-0 failed 로 확인했어요. p/q/r 은 M11 커밋 직후 SIGKILL로 도달한 R-A 대상 상태에서 각각 ledger
-체크섬 변조·source 에 없는 여분 적용행·미해결(unresolved) 시도행을 DB 에 직접 주입한 뒤 실제
-wrapper 의 stageBRecover 를 호출해, `assert_resolved_attempts`/`assert_full_ledger`/
-`ledger_assert_exact`(러너와 R-A 가 공유하는 `task168-migration-contract.sh`)가 셋 다 거부하고
-`MIGRATION_COMMITTED_RECOVERED` 를 쓰지 않는지 확인해요. 매 실행 끝에 라벨 컨테이너/네트워크/
-볼륨 0개와 `docker volume ls` 개수를 기준선과 대조해 익명 볼륨 누수도 함께 확인해요.
+`deploy.yml` 스텝 없음 — CI 미연결, 로컬 전용)는 a-r(기존 18개) + t(재작성) + u·v(기존 2개) +
+w·x(신규 2개) = 23 시나리오, 로컬 macOS 0 failed 로 확인했어요. p/q/r 은 M11 커밋 직후 SIGKILL로
+도달한 R-A 대상 상태에서 각각 ledger 체크섬 변조·source 에 없는 여분 적용행·미해결(unresolved)
+시도행을 DB 에 직접 주입한 뒤 실제 wrapper 의 stageBRecover 를 호출해, `assert_resolved_attempts`/
+`assert_full_ledger`/`ledger_assert_exact`(러너와 R-A 가 공유하는 `task168-migration-contract.sh`)가
+셋 다 거부하고 `MIGRATION_COMMITTED_RECOVERED` 를 쓰지 않는지 확인해요. **w**(신규)는 release X 가
+마커-기록 창에서 SIGKILL 되고(마커 ENTERED 잔존·M11 미적용) 사람이 그 정확한 컨테이너 id 를 손으로
+되살린 뒤, release Y 가 같은 DB 에 M11 을 정상 커밋하는 상태를 실제로 만들고 나서 X 에 대해 처음
+호출하는 stageBRecover 가 거부하는지 확인해요 — X 의 자기 참조적 바인딩(체크섬·finished_at≥
+enteredAt·마커/quiesce/backup 상호대조)은 전부 통과하므로, 새로 추가한 sibling-marker 체크만이
+이 거짓 복구를 막아요(이 체크를 지우는 변이에서 실제로 red 가 되는 것을 확인했어요 — R-A 가
+"MIGRATION_COMMITTED_RECOVERED" 를 X 앞으로 잘못 써요). **x**(신규)는 형제 release 디렉터리가
+전혀 없는 상태(sibling-marker 체크가 비교할 대상이 없는 상태)에서 finished_at≥enteredAt 바인딩만
+단독으로 이 결함을 막는지 확인해요 — 이 바인딩을 항상 참으로 바꾸는 변이(과거 라운드의 mutation ME)
+에서 red 가 되는 것을, 그리고 같은 변이에서도 w 는 sibling-marker 체크가 독립적으로 여전히 거부하는
+것(두 방어선이 서로 독립임)을 함께 확인했어요. 매 실행 끝에 라벨 컨테이너/네트워크/볼륨 0개와
+`docker volume ls` 개수를 기준선과 대조해 익명 볼륨 누수도 함께 확인해요(다른 세션이 동시에 같은
+`com.teameet.task168.harness` 라벨로 별도 하네스를 돌리고 있으면 host 전체 볼륨 개수 기준선이
+그 세션 몫만큼 달라 보일 수 있어요 — 내 라벨 값(RUN_ID)으로 스코프된 컨테이너/네트워크/볼륨 카운트가
+진짜 누수 신호예요).
 
 **이번 라운드 추가 수정 — 독립 검증 2건 대응**
 - **stageBRecover R-B가 M11 진입 마커를 방치하는 false-recovery(2건 지적).** `phase=after_m11`

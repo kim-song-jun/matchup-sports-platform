@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# Task 168 StageB wrapper (m11-stageb-spec.md §6.2; .task168-stageb-a2-contract.md
-# §7/§8). Owns everything the frozen runner CLI (deploy/task168-stage-b-migrate.sh,
-# §3) deliberately does not: locking, manifest validation, source staging,
+# Task 168 StageB wrapper (docs/ops/task168-stage-b-runbook.md). Owns
+# everything the frozen runner CLI (deploy/task168-stage-b-migrate.sh)
+# deliberately does not: locking, manifest validation, source staging,
 # image pull/attestation, and — for stageBFinal only — invoking the runner and
 # judging its result strictly by migration-stage.json, never by exit code alone.
 #
@@ -16,8 +16,8 @@
 #
 # stageBPreflight invokes the isolated, non-destructive rehearsal
 # (scripts/release/task168-final-image-preflight.sh, T5/T2 — a different
-# track's deliverable whose CLI contract m11-stageb-spec.md's T2 item marks as
-# still changing, `--backup` -> `--fresh-pre-m11-backup`). This wrapper calls
+# track's deliverable whose CLI contract is still changing
+# (`--backup` -> `--fresh-pre-m11-backup`). This wrapper calls
 # it with the CURRENT candidate CLI and fails closed with a clear diagnostic
 # if that script or its T2 fresh-backup input is not yet present, rather than
 # guessing at an interface known to be mid-revision.
@@ -66,8 +66,7 @@ write_json_atomic() {
   if [[ -e "${tmp}" ]]; then rm -f "${tmp}"; fail "receipt already exists, refusing to overwrite: ${path}"; fi
 }
 
-# Shared deploy lock (m11-stageb-spec.md §0 item "동시 실행 lock 없음";
-# .task168-stageb-a2-contract.md §7). deploy-alpha.sh and rollback-alpha.sh
+# Shared deploy lock. deploy-alpha.sh and rollback-alpha.sh
 # both take this exact lock file. Without also taking it here, a StageA push
 # deploy queued behind a still-running StageB host command (an
 # UNKNOWN_HOST_MAY_BE_RUNNING GitHub Actions cancel/timeout, deploy-alpha-via-ssm.sh)
@@ -156,6 +155,15 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
     db_identity_actual="$(dbq "SELECT current_database() || '|' || current_user || '|' || COALESCE(inet_server_addr()::text,'local') || '|' || COALESCE(inet_server_port()::text,'local')")"
     [[ "${db_identity_actual}" == "${db_identity_expected}" ]] || fail "current database identity does not match the ${receipt##*/} receipt — refusing to restore against a possibly-different database"
 
+    # The absence of an M11 ledger row is not by itself proof the database is
+    # still pre-M11 -- it only proves Prisma's own bookkeeping has no record
+    # of M11. Confirm the physical schema M11 would have dropped is still
+    # there (legacy_tables_present_count, shared with the runner's own
+    # pre-M11 preflight) before reviving a predecessor-image writer against
+    # it; a writer built for the pre-M11 schema run against anything else
+    # would fail unpredictably instead of cleanly.
+    [[ "$(legacy_tables_present_count)" == 5 ]] || fail "M11's retired tables are not fully present even though no M11 ledger row exists — the database may not actually be pre-M11 — RECOVERY_DIAGNOSIS_REQUIRED (not restoring a writer against an uncertain schema state)"
+
     # An untrappable SIGKILL landing after the runner writes the M11 entry
     # marker (task168-stage-b-migrate.sh) but before M11 actually commits
     # bypasses the runner's own EXIT trap entirely, so the marker is never
@@ -239,6 +247,27 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
       # (which stubs this query directly) hid it.
       m11_finished_after_entry="$(dbq "SELECT finished_at >= '${entered_at}'::timestamptz FROM \"_prisma_migrations\" WHERE migration_name = '${TASK168_M11}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL")"
       [[ "${m11_finished_after_entry}" == t ]] || fail "M11's finished_at predates this release's M11 entry marker — RECOVERY_DIAGNOSIS_REQUIRED (the applied M11 row may belong to a different release's run)"
+
+      # The bound above is only a lower bound, and by itself does not
+      # distinguish THIS release's own (never-executed) M11 attempt from a
+      # DIFFERENT release's real one: if this release was killed in the
+      # marker-write window (marker left ENTERED, M11 never actually run
+      # under it), its writers were later revived by hand, and a later
+      # release then committed M11 on the same database, that later
+      # release's finished_at is -- trivially -- after this release's own
+      # enteredAt too. Every other check above is self-referential to this
+      # release's own state directory and cannot catch that. Refuse instead
+      # of guessing whenever a sibling release's own M11 entry marker was
+      # written at or after this one: that sibling, not this release, is the
+      # more plausible origin of the ledger row.
+      for sibling_marker in "${STATE_ROOT}"/*/m11-entry-marker.json; do
+        [[ -f "${sibling_marker}" ]] || continue
+        sibling_sha="$(basename "$(dirname "${sibling_marker}")")"
+        [[ "${sibling_sha}" != "${ALPHA_SHA}" ]] || continue
+        sibling_entered="$(jq -r '.enteredAt // empty' "${sibling_marker}" 2>/dev/null || true)"
+        [[ -n "${sibling_entered}" ]] || continue
+        [[ "${sibling_entered}" < "${entered_at}" ]] || fail "a sibling release (${sibling_sha}) has its own M11 entry marker at ${sibling_entered}, at or after this release's own (${entered_at}) — cannot attribute the current M11 ledger row to ${ALPHA_SHA} — RECOVERY_DIAGNOSIS_REQUIRED"
+      done
 
       backup_path="$(jq -er '.backupPath' "${quiesce}")" || fail "quiesce.json is missing backupPath"
       backup_sha_expected="$(jq -er '.backupSha256' "${quiesce}")" || fail "quiesce.json is missing backupSha256"
@@ -406,7 +435,7 @@ source "${ALPHA_SOURCE_DIR}/deploy/alpha-release-common.sh"
 validate_stored_alpha_manifest "${ALPHA_MANIFEST_FILE}" "${ALPHA_ECR_REGISTRY}" "${ALPHA_MANIFEST_SHA256}" ||
   fail "StageB manifest failed validation"
 [[ "$(jq -er '.database.task168.stage' "${ALPHA_MANIFEST_FILE}")" == stageBFinal ]] ||
-  fail "manifest is not a StageB manifest (see .task168-stageb-a2-contract.md §2: dispatch-only stages still read the stageBFinal manifest)"
+  fail "manifest is not a StageB manifest (dispatch-only stages still read the stageBFinal manifest)"
 validate_alpha_release_source_binding "${ALPHA_MANIFEST_FILE}" || fail "source binding does not match this manifest"
 load_alpha_release_manifest "${ALPHA_MANIFEST_FILE}"
 
@@ -461,6 +490,6 @@ case "${TASK168_STAGE}" in
       fail "T2 dependency missing: scripts/release/task168-stage-b-fresh-backup.sh is not in this release's source — stageBPreflight cannot produce the fresh pre-M11 backup this rehearsal requires"
     [[ -x "${preflight_script}" || -f "${preflight_script}" ]] ||
       fail "T5 dependency missing: scripts/release/task168-final-image-preflight.sh is not in this release's source"
-    fail "stageBPreflight orchestration is not wired yet: task168-final-image-preflight.sh's CLI is still changing (m11-stageb-spec.md T2 item, --backup -> --fresh-pre-m11-backup) — update this branch once that lands"
+    fail "stageBPreflight orchestration is not wired yet: task168-final-image-preflight.sh's CLI is still changing (--backup -> --fresh-pre-m11-backup) — update this branch once that lands"
     ;;
 esac

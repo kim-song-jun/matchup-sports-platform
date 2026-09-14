@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-# Contract test for the Task168 StageB dispatch wiring (T1, m11-stageb-spec.md
-# §5 T1 items 1/2/6; .task168-stageb-a2-contract.md §2/§6/§7/§8).
+# Contract test for the Task168 StageB dispatch wiring.
 #
 # Runs the real scripts/release/deploy-alpha-via-ssm.sh against a fake `aws`
 # and a no-op `sleep` on PATH (the real 10s*N poll loop would otherwise make
@@ -164,10 +163,9 @@ run_stage_a() {
 }
 
 # ── 2b. StageA SOURCE_VERSION_ID/MANIFEST_VERSION_ID width is {1,1024}, the
-# same bound origin/dev has — not the {1,255} that crept in as a macOS-bash
-# regex-engine accommodation (macOS's regcomp rejects {1,1024} outright;
-# real S3 version ids are ~32 chars, so this bound is validation width, not
-# behavior real inputs exercise).
+# same bound origin/dev has. macOS's regcomp rejects {1,1024} outright; real
+# S3 version ids are ~32 chars, so this bound is validation width, not
+# behavior real inputs exercise.
 run_stage_a_version_id_width() {
   local dir="${WORK}/stage-a-version-id-width"
   make_fake_bin "${dir}" success

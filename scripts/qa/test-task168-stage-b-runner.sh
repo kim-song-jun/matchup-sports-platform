@@ -1495,7 +1495,147 @@ run_scenario_v(){
   docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
 }
 
-# Optional: T168_ONLY=a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|t|u|v runs a single
+# ---------------------------------------------------------------------------
+# (w) item 1 / cross-release false-green: an untrappable SIGKILL leaves
+# release X's own M11 entry marker ENTERED with M11 never actually applied
+# under X (same mechanism as (v)). Unlike (v), nobody runs stageBRecover for
+# X -- an operator instead revives X's EXACT quiesced writer containers by
+# hand (docker start + restore restart=always), the same thing an ordinary
+# `compose up`/StageA deploy does to the same container ids. Release Y then
+# runs the real, unmodified runner to a normal MIGRATION_COMMITTED
+# completion on that same database. The FIRST stageBRecover(X) call must now
+# refuse: every binding self-referential to X's own state directory
+# (checksum, finished_at>=enteredAt, marker/quiesce/backup cross-check) is
+# satisfied by construction (X's own artifacts are internally consistent),
+# so only the cross-release sibling-marker check (deploy-alpha-stage-b.sh)
+# can catch this.
+run_scenario_w(){
+  local name=w project="deploy" work="$WORK_ROOT/w" release_x release_y predecessor
+  mkdir -p "$work"
+  release_x="$(hex40)"; release_y="$(hex40)"; predecessor="$(hex40)"
+  local env_pre="$work/pre.env"
+  start_stack "$project" "$env_pre" || { bad "$name" "stack did not start"; return; }
+  seed_migrations "$project" without_m11 || { bad "$name" "seeding M1-M10 failed"; return; }
+  build_fixtures "$work" "$release_x" "$predecessor"
+  local env_x="$work/x.env"; write_env_file "$env_x" "$FINAL_IMAGE_REF"
+  local probe="$work/probe-runner-kill.sh"
+  build_probe_runner "$probe" 'kill -KILL $$'
+  local pre_api_id pre_worker_id
+  pre_api_id="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" ps -a -q v1_api)"
+  pre_worker_id="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" ps -a -q v1_game_operations_worker)"
+  local state_dir_x="$work/state/task168/$release_x" pid rc
+  install -d "$work/state"
+  set +e
+  ALPHA_RELEASE_STATE_DIR="$work/state" bash "$probe" --source-dir "$work/source" --manifest "$work/manifest.json" --compose-prod "$FIXTURES_DIR/compose-prod.yml" --compose-alpha "$FIXTURES_DIR/compose-alpha.yml" --env-file "$env_x" >"$work/x.out" 2>&1 &
+  pid=$!
+  wait "$pid" 2>/dev/null; rc=$?
+  set -e
+  if [[ ! -f "$state_dir_x/m11-entry-marker.json" || ! -f "$state_dir_x/quiesce.json" ]]; then
+    bad "$name" "release X did not reach the marker-write window (harness timing, not the fix under test): rc=$rc $(cat "$work/x.out" 2>/dev/null)"
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+  ok "$name release X's untrappable SIGKILL lands with the marker ENTERED and no receipt"
+  local ledger_m11
+  ledger_m11="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" exec -T v1_postgres psql -X -At -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name='20260911090000_retire_tournament_fixture_tables'" 2>/dev/null | tr -d '\r')"
+  [[ "$ledger_m11" == 0 ]] && ok "$name M11 genuinely never ran for release X (the SIGKILL preempted the migrate exec)" || bad "$name unexpected M11 ledger row for X" "count=$ledger_m11"
+
+  # A SIGKILL only kills the host bash script, not the detached one-off
+  # migration-runner container X's own run already started (it also carries
+  # the v1_api service label, so it would otherwise make Y's own
+  # `compose ps --status running -q v1_api` see two containers) -- clear it
+  # first, the same stray-container cleanup a real operator does before
+  # reviving anything (invoke_stage_b_recover below does the identical
+  # cleanup for its own recover call).
+  local stale; stale="$(docker ps -aq --filter "label=com.teameet.task168.stage-b=$release_x")"
+  [[ -z "$stale" ]] || docker rm -f $stale >/dev/null 2>&1 || true
+
+  # Revive X's exact quiesced writer containers BY HAND -- no stageBRecover
+  # call for X -- the same operation an ordinary `compose up`/StageA deploy
+  # performs against the same container ids.
+  docker start "$pre_api_id" "$pre_worker_id" >/dev/null
+  docker update --restart=always "$pre_api_id" "$pre_worker_id" >/dev/null
+  local i revived=0
+  for i in $(seq 1 100); do
+    [[ "$(docker inspect --format '{{.State.Running}}' "$pre_api_id" 2>/dev/null)" == true && "$(docker inspect --format '{{.State.Running}}' "$pre_worker_id" 2>/dev/null)" == true ]] && { revived=1; break; }
+    sleep 0.05
+  done
+  if [[ "$revived" != 1 ]]; then
+    bad "$name" "manual revival of X's writers did not take effect (harness timing, not the fix under test)"
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+  ok "$name X's exact quiesced writer containers are revived by hand (no stageBRecover call for X)"
+
+  build_fixtures "$work" "$release_y" "$predecessor"
+  local env_y="$work/y.env"; write_env_file "$env_y" "$FINAL_IMAGE_REF"
+  local state_dir_y="$work/state/task168/$release_y"
+  set +e
+  ALPHA_RELEASE_STATE_DIR="$work/state" "$RUNNER" --source-dir "$work/source" --manifest "$work/manifest.json" --compose-prod "$FIXTURES_DIR/compose-prod.yml" --compose-alpha "$FIXTURES_DIR/compose-alpha.yml" --env-file "$env_y" >"$work/y.out" 2>&1
+  rc=$?
+  set -e
+  if [[ "$rc" != 0 ]] || ! jq -e '.status=="MIGRATION_COMMITTED"' "$state_dir_y/migration-stage.json" >/dev/null 2>&1; then
+    bad "$name" "release Y did not commit M11 cleanly (harness setup, not the fix under test): rc=$rc $(cat "$work/y.out" 2>/dev/null)"
+    docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+    return
+  fi
+  ok "$name release Y commits M11 cleanly on the database X's revived writers were briefly running against"
+
+  invoke_stage_b_recover "$work" "$release_x" "$env_x"
+  sed 's/^/  [w-recover] /' "$recover_out"
+  # First stageBRecover call for X -- vacuous-pass guard: assert the
+  # SPECIFIC sibling-marker message, not just any refusal.
+  if [[ "$recover_rc" != 0 ]] && [[ ! -f "$state_dir_x/migration-stage.json" ]] && grep -qi 'sibling release' "$recover_out"; then
+    ok "$name real stageBRecover refuses to certify release X even though every self-referential binding is satisfied (cross-release false-green closed)"
+  else
+    bad "$name recover-cross-release-false-green" "rc=$recover_rc receipt=$(cat "$state_dir_x/migration-stage.json" 2>/dev/null || echo NONE) out=$(cat "$recover_out")"
+  fi
+  docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+}
+
+# ---------------------------------------------------------------------------
+# (x) item 2: the finished_at>=enteredAt binding (deploy-alpha-stage-b.sh) is
+# the ONLY check able to catch an M11 ledger row whose finished_at predates
+# this release's own marker when NO sibling release directory exists at all
+# (so the (w)/item-1 sibling-marker check has nothing to compare against).
+# M11 is applied directly by seeding -- no release's own runner ever
+# attempts it, so no preflight ever gets a chance to refuse "M11 already
+# present" -- then a release's recovery fixture is hand-built with an
+# enteredAt chosen to be AFTER that real application: exactly the ordering
+# the finished_at check exists to catch. The check fires (and this scenario
+# exits) before quiesce.json's own fields (backup path, database identity,
+# ...) are ever read, so this fixture does not need a real backup or a real
+# frozen migration source to isolate it.
+run_scenario_x(){
+  local name=x project="deploy" work="$WORK_ROOT/x" release
+  mkdir -p "$work"
+  release="$(hex40)"
+  local env_pre="$work/pre.env"
+  start_stack "$project" "$env_pre" || { bad "$name" "stack did not start"; return; }
+  seed_migrations "$project" with_m11 || { bad "$name" "seeding M1-M11 failed"; return; }
+  local env_final="$work/final.env"; write_env_file "$env_final" "$FINAL_IMAGE_REF"
+
+  local state_dir="$work/state/task168/$release"
+  install -d "$state_dir"
+  jq -n '{schemaVersion:1,kind:"quiesce",status:"COMPLETED",stage:"stageBFinal",backupPath:"/nonexistent",backupSha256:("0"*64),manifestSha256:("0"*64),databaseIdentity:"unused",apiImage:"unused",preApiContainerId:"unused",preWorkerContainerId:"unused"}' \
+    > "$state_dir/quiesce.json"
+  local quiesce_sha; quiesce_sha="$(sha256sum "$state_dir/quiesce.json" | awk '{print $1}')"
+  local entered_at; entered_at="$(date -u -v+1H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)"
+  jq -n --arg releaseSha "$release" --arg quiesceSha "$quiesce_sha" --arg now "$entered_at" \
+    '{schemaVersion:1,kind:"task168StageBM11EntryMarker",status:"ENTERED",releaseSha:$releaseSha,manifestSha256:("0"*64),quiesceReceiptSha256:$quiesceSha,preM11BackupSha256:("0"*64),runnerContainerId:"unused",enteredAt:$now}' \
+    > "$state_dir/m11-entry-marker.json"
+
+  invoke_stage_b_recover "$work" "$release" "$env_final"
+  sed 's/^/  [x-recover] /' "$recover_out"
+  if [[ "$recover_rc" != 0 ]] && [[ ! -f "$state_dir/migration-stage.json" ]] && grep -qi 'predates this release' "$recover_out"; then
+    ok "$name real stageBRecover refuses when M11's real finished_at predates this release's own entry marker (no sibling directory to compare against)"
+  else
+    bad "$name recover-finished-at-binding" "rc=$recover_rc receipt=$(cat "$state_dir/migration-stage.json" 2>/dev/null || echo NONE) out=$(cat "$recover_out")"
+  fi
+  docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+}
+
+# Optional: T168_ONLY=a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|t|u|v|w|x runs a single
 # scenario (used for fast mutation iteration during development; a plain run
 # with no filter runs all).
 case "${T168_ONLY:-}" in
@@ -1520,8 +1660,10 @@ case "${T168_ONLY:-}" in
   t) run_scenario_t ;;
   u) run_scenario_u ;;
   v) run_scenario_v ;;
-  "") run_scenario_a; run_scenario_b; run_scenario_c; run_scenario_d; run_scenario_e; run_scenario_f; run_scenario_g; run_scenario_h; run_scenario_i; run_scenario_j; run_scenario_k; run_scenario_l; run_scenario_m; run_scenario_n; run_scenario_o; run_scenario_p; run_scenario_q; run_scenario_r; run_scenario_t; run_scenario_u; run_scenario_v ;;
-  *) echo "unknown T168_ONLY=$T168_ONLY (expected a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|t|u|v)" >&2; exit 64 ;;
+  w) run_scenario_w ;;
+  x) run_scenario_x ;;
+  "") run_scenario_a; run_scenario_b; run_scenario_c; run_scenario_d; run_scenario_e; run_scenario_f; run_scenario_g; run_scenario_h; run_scenario_i; run_scenario_j; run_scenario_k; run_scenario_l; run_scenario_m; run_scenario_n; run_scenario_o; run_scenario_p; run_scenario_q; run_scenario_r; run_scenario_t; run_scenario_u; run_scenario_v; run_scenario_w; run_scenario_x ;;
+  *) echo "unknown T168_ONLY=$T168_ONLY (expected a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|t|u|v|w|x)" >&2; exit 64 ;;
 esac
 
 log "=== summary: $PASS passed, $FAIL failed ==="

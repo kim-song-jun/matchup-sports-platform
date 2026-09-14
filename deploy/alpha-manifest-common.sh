@@ -57,7 +57,7 @@ validate_alpha_release_manifest() {
 
 # StageB-only. Unlike validate_alpha_release_manifest, the runner
 # (deploy/task168-stage-b-migrate.sh) never calls this — its own jq
-# validation (frozen, m11-stageb-spec.md §3) is already sufficient and
+# validation (frozen, CLI contract §3) is already sufficient and
 # exists precisely so this function is not a second, divergent validation
 # path for the same manifest. This function is for the two places that
 # create or re-verify a StageB manifest from the outside: the manifest
@@ -129,8 +129,7 @@ validate_alpha_stage_b_final_manifest() {
     ' "${manifest_file}" >/dev/null
 }
 
-# D-4 (m11-stageb-spec.md §2.2 row "Alpha release-state 계약 테스트";
-# .task168-stageb-a2-contract.md §5). Branches on the manifest's own
+# D-4. Branches on the manifest's own
 # `.database.task168.stage` and dispatches to the matching validator. The
 # StageB branch derives the six extra validate_alpha_stage_b_final_manifest
 # arguments FROM THE SAME MANIFEST it is validating — this proves internal

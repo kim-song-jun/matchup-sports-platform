@@ -7,8 +7,8 @@ Task 168 StageB(최종 스키마 이관) 배선을 dev에 들여왔어요. dev p
 닿을 수 있어요.
 
 **새로 생긴 것**
-- `deploy-alpha.yml`에 `task168_stage`(stageAIntermediate 기본 / stageBPreflight / stageBFinal
-  / stageBRecover) 입력과 StageB 전용 이미지 빌드·소스 패키징·매니페스트 생성·SSM 스텝을 추가했어요.
+- `deploy-alpha.yml`에 `task168_stage`(stageAIntermediate 기본 / stageBFinal / stageBRecover)
+  입력과 StageB 전용 이미지 빌드·소스 패키징·매니페스트 생성·SSM 스텝을 추가했어요.
   전부 push 이벤트에서는 도달 불가능하고, StageB 스텝은 이 입력이 명시될 때만 실행돼요.
 - `deploy-alpha-via-ssm.sh`가 `TASK168_STAGE` 값으로 `deploy-alpha.sh`(기존)와
   `deploy-alpha-stage-b.sh`(신규) 진입점을 나눠 부르고, 알 수 없는 값은 즉시 실패해요.
@@ -146,12 +146,12 @@ enteredAt·마커/quiesce/backup 상호대조)은 전부 통과하므로, 새로
   필드(패키징된 INPUT-MANIFEST.json의 해시, attestation 파일 자체의 해시와 다른 값)를 `jq`로
   읽어 쓰도록 고쳤다. `test-task168-stage-b-wiring.sh`에 두 값이 서로 다른 스텝 출력을
   가리키는지 실제 워크플로 YAML에서 `run:`/`env:` 블록을 추출해 확인하는 케이스를 추가했다.
-  다만 이 자리는 더 깊은 문제도 있다 — 러너(`task168-stage-b-migrate.sh`)는
-  `finalImagePreflight.receipt`를 `kind=="task168FinalImagePreflight"` + `.harness`/`.rehearsal`
-  중첩 필드를 갖춘 T5 리허설 영수증으로 검증하는데, 워크플로는 거기에 소스 패키징 attestation
-  (`kind=="task168StageBSourceArchiveAttestation"`, 그런 필드 없음)을 그대로 넣고 있다 — 이번
-  수정 범위 밖이라 고치지 않고 PR 코멘트로만 남겼다(T5 `task168-final-image-preflight.sh` 배선이
-  결정되지 않은 채로 남아 있다).
+  이 자리엔 더 깊은 문제도 있었다 — 러너는 `finalImagePreflight.receipt`를
+  `kind=="task168FinalImagePreflight"` + `.harness`/`.rehearsal` 중첩 필드를 갖춘 T5 리허설
+  영수증으로 검증하는데, 워크플로는 거기에 소스 패키징 attestation
+  (`kind=="task168StageBSourceArchiveAttestation"`, 그런 필드 없음)을 그대로 넣고 있었다. 이
+  `inputSnapshotSha256`/`finalImagePreflight` 배선 전체는 아래 "리허설 waiver" 라운드에서
+  삭제됐다 — 더 이상 유효하지 않은 서술이다.
 - **`alpha-manifest-common.sh`의 StageB `.source.key` 검증이 `.tar.gz`로 끝나는지만 봤다.**
   StageA 네임스페이스 키(`releases/<sha>.tar.gz`, D-2 네임스페이스 prefix 없음)도 통과했다.
   StageA 검증기와 동일하게 `.source.key == ("releases/task168-stage-b/" + $sha + ".tar.gz")`
@@ -226,3 +226,45 @@ enteredAt·마커/quiesce/backup 상호대조)은 전부 통과하므로, 새로
   시나리오의 가짜 docker에도 있던 문제라 같이 고쳤다(`cat > /dev/null`로 stdin을 비우고 exit).
   고친 뒤 새 wrapper 시나리오를 5회 연속 재실행해 0 failed를 확인했다(고치기 전엔 5회 중 2~3회
   간헐적으로 실패).
+
+**이번 라운드 추가 수정 (2026-09-14) — 리허설 waiver + stageBPreflight 완전 삭제**
+- **사용자 직접 지시로 T5 격리 리허설을 이번 M11 실행에서 생략한다.** manifest와 러너가
+  `finalImagePreflight` 영수증(`kind=="task168FinalImagePreflight"`)을 더 이상 요구하지 않는다.
+  대신 `database.task168.rehearsal: {mode, reason, decidedAt}`을 요구하고, 러너는
+  `mode=="waived"`일 때만 진행하며 같은 값을 `MIGRATION_COMMITTED` 영수증에 그대로 복사한다.
+  `deploy-alpha.yml`은 `TASK168_REHEARSAL_MODE=waived` / `REASON="user-directed Alpha run
+  without isolated rehearsal"` / `DECIDED_AT="2026-09-14"`를 리터럴로 넘긴다. 이 waiver가
+  대체한 finalImagePreflight 경로가 바인딩하던 `migrationLockSha256`(source의
+  `migration_lock.toml` 무결성 검증)은 매니페스트의 독립 필드로 남겼다 — manifest 생성 시점에
+  이 커밋의 실제 migration_lock.toml에서 계산되므로 재사용 경로에서 별도 신선도 검사가 필요
+  없다(resolvedMigrationAttemptsSha256과 달리 커밋 불변값).
+- **`stageBPreflight`를 dispatch 선택지·wrapper·via-ssm·manifest 생성기·테스트·런북에서 전부
+  삭제했다.** 호스트 분기가 무조건 실패(`orchestration is not wired yet`)하는 죽은 선택지였고,
+  T2(`task168-stage-b-fresh-backup.sh`) 의존 스크립트도 없었다. 이제 dispatchable stage는
+  `stageBFinal`/`stageBRecover` 둘뿐이다. `deploy-alpha-stage-b.sh`의 후반부
+  `stageBFinal`/`stageBPreflight` 분기용 `case`문은 이제 값이 하나뿐이라 제거하고 본문만 남겼다.
+- **패키저 옵션 불일치를 고쳤다.** `deploy-alpha.yml`의 "Package and upload Task168 StageB
+  source" 스텝이 `package-task168-final-source.sh`에 없는 `--output-attestation`을 넘기고
+  있었다 — 그 스크립트는 항상 `"${archive}.attestation.json"` 고정 경로에 스스로 쓰고 인식 못한
+  옵션은 `usage`/exit 64로 거부한다. 그 플래그를 뺐다. 이 attestation 사이드카는 더 이상 아무
+  것도 읽지 않는다(rehearsal waiver로 대체) — 패키저 자체와 소스 아카이브 업로드는 그대로
+  필요해 스텝은 유지했다.
+- **불변 stageBFinal manifest는 stageBFinal dispatch에서만 만들어진다.** stageBPreflight
+  삭제로 자연히 해소됐다 — `create-alpha-release-manifest.sh`의 StageB 분기는
+  `TASK168_STAGE==stageBFinal`이 아니면 즉시 거부하고, `manifests/task168-stage-b/<sha>.json`
+  키 하나만 쓴다(직전 라운드에서 도입했던 `task168-stage-b-preflight/` 네임스페이스 분기는
+  되돌렸다).
+- **T7 read-only smoke check의 `'ENDED'` 상태값 버그를 고쳤다.** `V1TeamMatchStatus`에는
+  `ENDED`가 없다(`recruiting|closed|matched|cancelled|completed|archived`) — 모든 stageBFinal
+  실행이 M11 커밋 후 이 검사에서 항상 실패했다. `'completed'`로 고쳤고, 대회 데이터가 0건인
+  Alpha(M11 직후 정리 예정)에서도 거짓 실패하지 않도록 0건이면 `smokeCheck.status:
+  "skipped_no_data"`로 통과시키되(쿼리 자체는 이미 `set -e`+`psql -v ON_ERROR_STOP=1`로
+  fail-closed), 실제 조회 오류는 그대로 실패시킨다. 실제 postgres:16-alpine 하네스
+  (`scripts/qa/test-task168-post-live-smoke-status.sh`)로 ENDED 미존재·completed 값 발견·0건
+  통과·잘못된 enum 리터럴 조회 오류 4가지를 각각 검증했다.
+- **`scripts/qa/harness/task168-stage-b-fixtures/build-fixtures.mjs`**(real-docker 러너 하네스
+  `test-task168-stage-b-runner.sh`의 매니페스트 생성기)도 같은 계약으로 맞췄다 —
+  `finalImagePreflight` 생성 코드를 지우고 `migrationLockSha256`(실제 harness 소스 트리의
+  `migration_lock.toml`에서 계산, 기존 코드가 이미 갖고 있던 값 재사용)과 `rehearsal` waiver를
+  넣었다. real-docker 실행은 host 부하(load avg ~22, 공유 머신) 때문에 이번 라운드에서 돌리지
+  못했다 — 정적으로 필드 대응만 확인했다.

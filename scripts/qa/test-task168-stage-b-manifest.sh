@@ -30,8 +30,9 @@ make_stage_b_manifest() {
          migrations:[{name:"x",sha256:("d"*64)}],
          fullMigrationHistory:[range(0;12)|{name:("m"+(.|tostring)),sha256:("d"*64)}],
          resolvedMigrationAttemptsSha256:("e"*64),
+         migrationLockSha256:("1"*64),
          predecessor:{releaseSha:"2222222222222222222222222222222222222222",transition:"/x",transitionSha256:("f"*64),apiImage:"img",databaseIdentity:"id",schemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f"},
-         finalImagePreflight:{receipt:"/y",receiptSha256:("a"*64),inputSnapshotSha256:("b"*64)},
+         rehearsal:{mode:"waived",reason:"user-directed Alpha run without isolated rehearsal",decidedAt:"2026-09-14"},
          recoveryFrom:null, rollbackTarget:null}},
      images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:("sha256:"+("a"*64)),uri:($registry+"/teameet-alpha-v1-api@sha256:"+("a"*64))},
        web:{repository:($registry+"/teameet-alpha-v1-web"),digest:("sha256:"+("b"*64)),uri:($registry+"/teameet-alpha-v1-web@sha256:"+("b"*64))},
@@ -49,11 +50,11 @@ echo "== test-task168-stage-b-manifest =="
   checksum="$(sha256sum "${manifest}" | awk '{print $1}')"
   migrations="$(jq -c '.database.task168.migrations' "${manifest}")"
   predecessor="$(jq -c '.database.task168.predecessor' "${manifest}")"
-  preflight="$(jq -c '.database.task168.finalImagePreflight' "${manifest}")"
+  rehearsal="$(jq -c '.database.task168.rehearsal' "${manifest}")"
   fullHistory="$(jq -c '.database.task168.fullMigrationHistory' "${manifest}")"
 
   if validate_alpha_stage_b_final_manifest "${manifest}" "${SHA}" "0.1.0-alpha.20260914.g111111111111" \
-    "${checksum}" "${REGISTRY}" "${FINAL_SCHEMA}" "${migrations}" "${predecessor}" "${preflight}" "${fullHistory}"; then
+    "${checksum}" "${REGISTRY}" "${FINAL_SCHEMA}" "${migrations}" "${predecessor}" "${rehearsal}" "${fullHistory}"; then
     echo "  ok: a well-formed StageB manifest validates"
   else
     echo "  FAIL: a well-formed StageB manifest was rejected" >&2
@@ -62,7 +63,7 @@ echo "== test-task168-stage-b-manifest =="
 
   if validate_alpha_stage_b_final_manifest "${manifest}" "${SHA}" "0.1.0-alpha.20260914.g111111111111" \
     "${checksum}" "${REGISTRY}" "91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f" \
-    "${migrations}" "${predecessor}" "${preflight}" "${fullHistory}"; then
+    "${migrations}" "${predecessor}" "${rehearsal}" "${fullHistory}"; then
     echo "  FAIL: a mismatched expected schema sha was accepted" >&2
     exit 1
   else
@@ -71,7 +72,7 @@ echo "== test-task168-stage-b-manifest =="
 
   wrong_migrations='[{"name":"y","sha256":"'"$(printf 'd%.0s' {1..64})"'"}]'
   if validate_alpha_stage_b_final_manifest "${manifest}" "${SHA}" "0.1.0-alpha.20260914.g111111111111" \
-    "${checksum}" "${REGISTRY}" "${FINAL_SCHEMA}" "${wrong_migrations}" "${predecessor}" "${preflight}" "${fullHistory}"; then
+    "${checksum}" "${REGISTRY}" "${FINAL_SCHEMA}" "${wrong_migrations}" "${predecessor}" "${rehearsal}" "${fullHistory}"; then
     echo "  FAIL: a mismatched expected migrations array was accepted" >&2
     exit 1
   else
@@ -86,7 +87,7 @@ echo "== test-task168-stage-b-manifest =="
   jq --arg sha "${SHA}" '.source.key = ("releases/" + $sha + ".tar.gz")' "${manifest}" > "${wrong_key_manifest}"
   wrong_key_checksum="$(sha256sum "${wrong_key_manifest}" | awk '{print $1}')"
   if validate_alpha_stage_b_final_manifest "${wrong_key_manifest}" "${SHA}" "0.1.0-alpha.20260914.g111111111111" \
-    "${wrong_key_checksum}" "${REGISTRY}" "${FINAL_SCHEMA}" "${migrations}" "${predecessor}" "${preflight}" "${fullHistory}"; then
+    "${wrong_key_checksum}" "${REGISTRY}" "${FINAL_SCHEMA}" "${migrations}" "${predecessor}" "${rehearsal}" "${fullHistory}"; then
     echo "  FAIL: a StageA-namespaced source key (releases/<sha>.tar.gz) was accepted on a StageB manifest" >&2
     exit 1
   else
@@ -293,8 +294,7 @@ EOF
       TASK168_PREDECESSOR_TRANSITION_PATH="/x" TASK168_PREDECESSOR_TRANSITION_SHA256="$(printf 'f%.0s' {1..64})" \
       TASK168_PREDECESSOR_API_IMAGE="img" TASK168_PREDECESSOR_DATABASE_IDENTITY="id" \
       TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256="${RESOLVED_SHA}" \
-      TASK168_FINAL_PREFLIGHT_RECEIPT_PATH="/y" TASK168_FINAL_PREFLIGHT_RECEIPT_SHA256="$(printf 'a%.0s' {1..64})" \
-      TASK168_FINAL_PREFLIGHT_INPUT_SNAPSHOT_SHA256="$(printf 'b%.0s' {1..64})" \
+      TASK168_REHEARSAL_MODE=waived TASK168_REHEARSAL_REASON="test waiver" TASK168_REHEARSAL_DECIDED_AT="2026-09-14" \
       PATH="${bin}:${PATH}" bash "${ROOT}/scripts/release/create-alpha-release-manifest.sh" \
       >"${out}" 2>"${err}" || rc=$?
     echo "${rc}"
@@ -357,8 +357,7 @@ PY
     TASK168_PREDECESSOR_TRANSITION_PATH="/x" TASK168_PREDECESSOR_TRANSITION_SHA256="$(printf 'f%.0s' {1..64})" \
     TASK168_PREDECESSOR_API_IMAGE="img" TASK168_PREDECESSOR_DATABASE_IDENTITY="id" \
     TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256="${RESOLVED_SHA}" \
-    TASK168_FINAL_PREFLIGHT_RECEIPT_PATH="/y" TASK168_FINAL_PREFLIGHT_RECEIPT_SHA256="$(printf 'a%.0s' {1..64})" \
-    TASK168_FINAL_PREFLIGHT_INPUT_SNAPSHOT_SHA256="$(printf 'b%.0s' {1..64})" \
+    TASK168_REHEARSAL_MODE=waived TASK168_REHEARSAL_REASON="test waiver" TASK168_REHEARSAL_DECIDED_AT="2026-09-14" \
     PATH="${bin}:${PATH}" bash "${mutated}" >"${dir}/stdout.mutated" 2>"${dir}/stderr.mutated" || rc3=$?
   if [[ "${rc3}" -eq 0 ]]; then
     echo "  ok: removing the equality check accepts the same stale manifest (mutation correctly detected)"

@@ -25,7 +25,6 @@ on:
         type: choice
         options:
           - stageAIntermediate
-          - stageBPreflight
           - stageBFinal
           - stageBRecover
         default: stageAIntermediate
@@ -33,16 +32,16 @@ on:
       # means "the same commit as this dispatch", the expected case (StageB is
       # dispatched against the SHA that a prior push already deployed as StageA).
       task168_predecessor_release_sha:
-        description: "StageA predecessor release SHA for stageBPreflight/stageBFinal (default: this commit)"
+        description: "StageA predecessor release SHA for stageBFinal (default: this commit)"
         required: false
         type: string
         default: ""
       # U11: no default is assumed. StageB dispatch is refused without this.
       task168_stage_b_timeout_seconds:
         description: >-
-          Required for stageBPreflight/stageBFinal/stageBRecover only: the SSM
-          RunShellScript executionTimeout in seconds (U11 — set from T5 rehearsal's
-          measured worst-case duration, no assumed default).
+          Required for stageBFinal/stageBRecover only: the SSM RunShellScript
+          executionTimeout in seconds (U11 — no assumed default; size it from
+          the manual runbook procedure's measured worst-case duration).
         required: false
         type: string
         default: ""
@@ -90,7 +89,7 @@ jobs:
             stage="stageAIntermediate"
           fi
           case "${stage}" in
-            stageAIntermediate|stageBPreflight|stageBFinal|stageBRecover) ;;
+            stageAIntermediate|stageBFinal|stageBRecover) ;;
             *)
               echo "Unknown task168_stage: '${stage}'" >&2
               exit 1
@@ -282,21 +281,15 @@ jobs:
         run: bash scripts/release/check-alpha-image-scans.sh
 
       # ── Task 168 StageB (dispatch-only) ─────────────────────────────────────
-      # Every step in this block is gated on stageBPreflight/stageBFinal and is a
-      # no-op — not merely skipped-looking, but structurally unreachable — on the
-      # push trigger and on stageAIntermediate/stageBRecover dispatches (T1
+      # Every step in this block is gated on stageBFinal and is a no-op — not
+      # merely skipped-looking, but structurally unreachable — on the push
+      # trigger and on stageAIntermediate/stageBRecover dispatches (T1
       # completion #1/#2). stageBRecover needs none of these: it only diagnoses
       # and recovers already-staged host state (docs/ops/task168-stage-b-runbook.md)
       # and is wired directly into the SSM step below.
-      #
-      # `prepare-task168-final-stage-inputs.sh` and `package-task168-final-source.sh`
-      # are PR-A1 (runner track) deliverables — this block calls them by the CLI
-      # contract already frozen in the candidate scripts. Until PR-A1 lands these
-      # two steps fail closed on a genuine StageB dispatch; they can never run on
-      # push, so main CI is unaffected either way.
       - name: Resolve Task168 StageB final image tag
         id: stageb-images
-        if: steps.task168.outputs.stage == 'stageBPreflight' || steps.task168.outputs.stage == 'stageBFinal'
+        if: steps.task168.outputs.stage == 'stageBFinal'
         env:
           RELEASE_SHA: ${{ steps.release.outputs.sha }}
         run: |
@@ -313,7 +306,7 @@ jobs:
           echo "final_exists=${final_exists}" >> "${GITHUB_OUTPUT}"
 
       - name: Build and push Task168 StageB final API image
-        if: (steps.task168.outputs.stage == 'stageBPreflight' || steps.task168.outputs.stage == 'stageBFinal') && steps.stageb-images.outputs.final_exists != 'true'
+        if: steps.task168.outputs.stage == 'stageBFinal' && steps.stageb-images.outputs.final_exists != 'true'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
@@ -328,7 +321,7 @@ jobs:
 
       - name: Prepare Task168 StageB final source inputs
         id: stageb-inputs
-        if: steps.task168.outputs.stage == 'stageBPreflight' || steps.task168.outputs.stage == 'stageBFinal'
+        if: steps.task168.outputs.stage == 'stageBFinal'
         env:
           RELEASE_SHA: ${{ steps.release.outputs.sha }}
         run: |
@@ -345,11 +338,10 @@ jobs:
       # Namespaced key (D-2): releases/task168-stage-b/<sha>.tar.gz — never the
       # StageA key (releases/<sha>.tar.gz), which the push deploy for this same
       # commit has already claimed. Reuses an existing upload by content hash so
-      # re-dispatching the same SHA (e.g. stageBPreflight then stageBFinal) does
-      # not re-upload.
+      # re-dispatching the same SHA does not re-upload.
       - name: Package and upload Task168 StageB source
         id: stageb-source
-        if: steps.task168.outputs.stage == 'stageBPreflight' || steps.task168.outputs.stage == 'stageBFinal'
+        if: steps.task168.outputs.stage == 'stageBFinal'
         env:
           RELEASE_SHA: ${{ steps.release.outputs.sha }}
           PREPARED_DIR: ${{ steps.stageb-inputs.outputs.preparedDir }}
@@ -359,15 +351,13 @@ jobs:
           set -Eeuo pipefail
           work="$(mktemp -d)"
           archive="${work}/task168-stage-b-${RELEASE_SHA}.tar.gz"
-          attestation="${archive}.attestation.json"
           bash scripts/release/package-task168-final-source.sh \
             --source-dir . \
             --source-commit "${RELEASE_SHA}" \
             --prepared-dir "${PREPARED_DIR}" \
             --final-schema deploy/task168-final-drop/schema.prisma \
             --m11 deploy/task168-final-drop/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql \
-            --output-archive "${archive}" \
-            --output-attestation "${attestation}"
+            --output-archive "${archive}"
           archiveSha256="$(sha256sum "${archive}" | awk '{print $1}')"
           key="releases/task168-stage-b/${RELEASE_SHA}.tar.gz"
           if versionId="$(aws s3api head-object --bucket "${DEPLOY_BUCKET}" --key "${key}" \
@@ -383,14 +373,11 @@ jobs:
           fi
           echo "sourceVersionId=${versionId}" >> "${GITHUB_OUTPUT}"
           echo "sourceSha256=${archiveSha256}" >> "${GITHUB_OUTPUT}"
-          echo "attestationPath=${attestation}" >> "${GITHUB_OUTPUT}"
-          echo "attestationSha256=$(sha256sum "${attestation}" | awk '{print $1}')" >> "${GITHUB_OUTPUT}"
-          # inputSnapshotSha256 is a field INSIDE the attestation JSON (the
-          # packaged INPUT-MANIFEST.json's own hash), distinct from
-          # attestationSha256 above (the whole attestation FILE's hash) --
-          # the manifest's finalImagePreflight.{receiptSha256,inputSnapshotSha256}
-          # must not collapse to the same value.
-          echo "inputSnapshotSha256=$(jq -er '.inputSnapshotSha256' "${attestation}")" >> "${GITHUB_OUTPUT}"
+          # The packager also writes a sidecar attestation at
+          # "${archive}.attestation.json" (its own fixed, script-computed
+          # path) -- this pipeline does not currently read or upload it. The
+          # manifest's rehearsal binding is a user-directed waiver
+          # (TASK168_REHEARSAL_* below), not this attestation.
 
       # The StageA predecessor's transition receipt and the live DB identity are
       # generated/known only on the Alpha host — GH Actions has no other path to
@@ -400,7 +387,7 @@ jobs:
       # against real Alpha infra (this session does not touch AWS/SSM/Alpha).
       - name: Resolve Task168 StageA predecessor transition
         id: stageb-predecessor
-        if: steps.task168.outputs.stage == 'stageBPreflight' || steps.task168.outputs.stage == 'stageBFinal'
+        if: steps.task168.outputs.stage == 'stageBFinal'
         env:
           INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
           PREDECESSOR_SHA: ${{ inputs.task168_predecessor_release_sha != '' && inputs.task168_predecessor_release_sha || steps.release.outputs.sha }}
@@ -441,7 +428,7 @@ jobs:
 
       - name: Create or reuse Task168 StageB release manifest
         id: stageb-manifest
-        if: steps.task168.outputs.stage == 'stageBPreflight' || steps.task168.outputs.stage == 'stageBFinal'
+        if: steps.task168.outputs.stage == 'stageBFinal'
         env:
           TASK168_STAGE: stageBFinal
           RELEASE_SHA: ${{ steps.release.outputs.sha }}
@@ -466,9 +453,15 @@ jobs:
           TASK168_PREDECESSOR_API_IMAGE: ${{ steps.stageb-predecessor.outputs.apiImage }}
           TASK168_PREDECESSOR_DATABASE_IDENTITY: ${{ steps.stageb-predecessor.outputs.databaseIdentity }}
           TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256: ${{ steps.stageb-predecessor.outputs.resolvedMigrationAttemptsSha256 }}
-          TASK168_FINAL_PREFLIGHT_RECEIPT_PATH: ${{ steps.stageb-source.outputs.attestationPath }}
-          TASK168_FINAL_PREFLIGHT_RECEIPT_SHA256: ${{ steps.stageb-source.outputs.attestationSha256 }}
-          TASK168_FINAL_PREFLIGHT_INPUT_SNAPSHOT_SHA256: ${{ steps.stageb-source.outputs.inputSnapshotSha256 }}
+          # No isolated T5 rehearsal is wired into this pipeline. Per direct
+          # user instruction (2026-09-14): Alpha is a development environment,
+          # so M11 runs with this waiver instead of a rehearsal receipt. The
+          # runner (deploy/task168-stage-b-migrate.sh) refuses to proceed
+          # unless database.task168.rehearsal.mode is exactly "waived", and
+          # copies this same waiver into the MIGRATION_COMMITTED receipt.
+          TASK168_REHEARSAL_MODE: waived
+          TASK168_REHEARSAL_REASON: "user-directed Alpha run without isolated rehearsal"
+          TASK168_REHEARSAL_DECIDED_AT: "2026-09-14"
         run: bash scripts/release/create-alpha-release-manifest.sh
 
       - name: Create or reuse immutable release manifest

@@ -676,8 +676,9 @@ EOF
         migrations:[{name:"x",sha256:("d"*64)}],
         fullMigrationHistory:[range(0;12)|{name:("m"+(.|tostring)),sha256:("d"*64)}],
         resolvedMigrationAttemptsSha256:("e"*64),
+        migrationLockSha256:("1"*64),
         predecessor:{releaseSha:"2222222222222222222222222222222222222222",transition:"/x",transitionSha256:("f"*64),apiImage:"img",databaseIdentity:"id",schemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f"},
-        finalImagePreflight:{receipt:"/y",receiptSha256:("a"*64),inputSnapshotSha256:("b"*64)},
+        rehearsal:{mode:"waived",reason:"user-directed Alpha run without isolated rehearsal",decidedAt:"2026-09-14"},
         recoveryFrom:null, rollbackTarget:null}},
     images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:("sha256:"+("a"*64)),uri:($registry+"/teameet-alpha-v1-api@sha256:"+("a"*64))},
       web:{repository:($registry+"/teameet-alpha-v1-web"),digest:("sha256:"+("b"*64)),uri:($registry+"/teameet-alpha-v1-web@sha256:"+("b"*64))},
@@ -770,8 +771,9 @@ EOF
         migrations:$migrations,
         fullMigrationHistory:[range(0;12)|{name:("m"+(.|tostring)),sha256:("d"*64)}],
         resolvedMigrationAttemptsSha256:("e"*64),
+        migrationLockSha256:("1"*64),
         predecessor:{releaseSha:"2222222222222222222222222222222222222222",transition:"/x",transitionSha256:("f"*64),apiImage:"img",databaseIdentity:"id",schemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f"},
-        finalImagePreflight:{receipt:"/y",receiptSha256:("a"*64),inputSnapshotSha256:("b"*64)},
+        rehearsal:{mode:"waived",reason:"user-directed Alpha run without isolated rehearsal",decidedAt:"2026-09-14"},
         recoveryFrom:null, rollbackTarget:null}},
     images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:("sha256:"+("a"*64)),uri:$api},
       web:{repository:($registry+"/teameet-alpha-v1-web"),digest:("sha256:"+("b"*64)),uri:$web},
@@ -788,8 +790,6 @@ EOF
 #!/usr/bin/env bash
 set -Eeuo pipefail
 install -d -m 700 "${state_dir}"
-jq -n '{schemaVersion:1,kind:"task168StageBMigration",status:"MIGRATION_COMMITTED",releaseSha:"${SHA}"}' \
-  > "${state_dir}/migration-stage.json"
 jq -n --arg api "${ACTIVATION_RESTART_API}" --arg worker "${ACTIVATION_RESTART_WORKER}" '{
   schemaVersion:1,kind:"quiesce",releaseSha:"${SHA}",
   preApiContainerId:"pre-api",preWorkerContainerId:"pre-worker",
@@ -797,6 +797,9 @@ jq -n --arg api "${ACTIVATION_RESTART_API}" --arg worker "${ACTIVATION_RESTART_W
   restartPolicyBefore:{api:\$api,worker:\$worker},
   databaseIdentity:"db-1",backupPath:"/tmp/backup.sql",backupSha256:("0"*64),
   manifestSha256:("0"*64)}' > "${state_dir}/quiesce.json"
+quiesce_sha="\$(sha256sum "${state_dir}/quiesce.json" | awk '{print \$1}')"
+jq -n --arg qsha "\${quiesce_sha}" '{schemaVersion:1,kind:"task168StageBMigration",status:"MIGRATION_COMMITTED",releaseSha:"${SHA}",quiesceReceiptSha256:\$qsha}' \
+  > "${state_dir}/migration-stage.json"
 EOF
   chmod +x "${source_dir}/deploy/task168-stage-b-migrate.sh"
 

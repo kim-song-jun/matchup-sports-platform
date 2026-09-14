@@ -72,7 +72,7 @@ validate_alpha_stage_b_final_manifest() {
   local expected_schema_sha="$6"
   local expected_migrations_json="$7"
   local expected_predecessor_json="$8"
-  local expected_preflight_json="$9"
+  local expected_rehearsal_json="$9"
   local expected_full_history_json="${10}"
   local actual_manifest_sha256
 
@@ -89,7 +89,7 @@ validate_alpha_stage_b_final_manifest() {
     --arg schema "${expected_schema_sha}" \
     --argjson migrations "${expected_migrations_json}" \
     --argjson predecessor "${expected_predecessor_json}" \
-    --argjson preflight "${expected_preflight_json}" \
+    --argjson rehearsal "${expected_rehearsal_json}" \
     --argjson fullHistory "${expected_full_history_json}" \
     '
       .schemaVersion == 1 and
@@ -115,8 +115,9 @@ validate_alpha_stage_b_final_manifest() {
       (.database.task168.fullMigrationHistory | length > 11) and
       .database.task168.fullMigrationHistory == $fullHistory and
       (.database.task168.resolvedMigrationAttemptsSha256 | test("^[0-9a-f]{64}$")) and
+      (.database.task168.migrationLockSha256 | test("^[0-9a-f]{64}$")) and
       .database.task168.predecessor == $predecessor and
-      .database.task168.finalImagePreflight == $preflight and
+      .database.task168.rehearsal == $rehearsal and
       .images.api.repository == ($registry + "/teameet-alpha-v1-api") and
       .images.web.repository == ($registry + "/teameet-alpha-v1-web") and
       (.images.api.digest | test("^sha256:[0-9a-f]{64}$")) and
@@ -162,7 +163,7 @@ validate_stored_alpha_manifest() {
         "$(jq -er '.database.task168.schemaSha256' "${manifest_file}")" \
         "$(jq -c '.database.task168.migrations' "${manifest_file}")" \
         "$(jq -c '.database.task168.predecessor' "${manifest_file}")" \
-        "$(jq -c '.database.task168.finalImagePreflight' "${manifest_file}")" \
+        "$(jq -c '.database.task168.rehearsal' "${manifest_file}")" \
         "$(jq -c '.database.task168.fullMigrationHistory' "${manifest_file}")"
       ;;
     *)

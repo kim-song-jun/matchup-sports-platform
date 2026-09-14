@@ -209,6 +209,23 @@ run_stage_b_final() {
     || fail "stageBFinal manifest key not namespaced"
 }
 
+# ── 3b. stageBPreflight was deleted (2026-09-14 design: no isolated T5/T2
+# rehearsal is wired into this pipeline) -- it must be rejected exactly like
+# any other unknown stage, before any AWS call.
+run_stage_b_preflight_removed() {
+  local dir="${WORK}/stage-b-preflight-removed"
+  make_fake_bin "${dir}" success
+  base_env
+  export TASK168_STAGE=stageBPreflight
+  export TASK168_STAGE_B_TIMEOUT_SECONDS=3600
+  local rc=0
+  PATH="${dir}:${PATH}" bash "${SCRIPT}" >/dev/null 2>"${dir}/stderr" || rc=$?
+  [[ "${rc}" -ne 0 ]] && pass "stageBPreflight is rejected as an unknown stage" \
+    || fail "stageBPreflight was not rejected (rc=${rc}) -- it should have been deleted"
+  [[ ! -s "${dir}/aws-calls.log" ]] && pass "a rejected stageBPreflight never calls aws" \
+    || fail "stageBPreflight called aws despite being deleted: $(cat "${dir}/aws-calls.log")"
+}
+
 # ── 4. stageBRecover: no source/manifest staging, uses the live wrapper copy
 run_stage_b_recover() {
   local dir="${WORK}/stage-b-recover"
@@ -234,7 +251,7 @@ run_missing_timeout() {
   local dir="${WORK}/missing-timeout"
   make_fake_bin "${dir}" success
   base_env
-  export TASK168_STAGE=stageBPreflight
+  export TASK168_STAGE=stageBFinal
   local rc=0
   PATH="${dir}:${PATH}" bash "${SCRIPT}" >/dev/null 2>"${dir}/stderr" || rc=$?
   [[ "${rc}" -ne 0 ]] && pass "missing task168_stage_b_timeout_seconds exits non-zero" \
@@ -486,44 +503,117 @@ NAMES
     && pass "removing any single step's if: guard (all 6, one at a time) is caught as exactly that one step red"
 }
 
-# ── 10. deploy-alpha.yml: stageb-source's inputSnapshotSha256 output must
-# come from a field INSIDE the attestation JSON, and stageb-manifest's
-# INPUT_SNAPSHOT_SHA256 env must source that output -- never
-# attestationSha256 (the whole attestation FILE's hash, already used for
-# RECEIPT_SHA256) (Copilot review, PR #1194).
-run_stageb_input_snapshot_provenance() {
-  local dir="${WORK}/stageb-input-snapshot"
-  mkdir -p "${dir}"
-  python3 - "${ROOT}/.github/workflows/deploy-alpha.yml" "${dir}" <<'PY'
+# ── 10. deploy-alpha.yml: the stageBPreflight dispatch option was deleted
+# (2026-09-14 design), and no step's `if:` may still special-case it -- a
+# leftover `stage == 'stageBPreflight'` condition would be structurally
+# unreachable (dead) since the workflow_dispatch `choice` input can no longer
+# produce that value, which is exactly the kind of dead branch this checks
+# against directly rather than trusting the choice list alone.
+run_stage_b_preflight_deleted_from_workflow() {
+  local out="${WORK}/preflight-deleted.json"
+  python3 - "${ROOT}/.github/workflows/deploy-alpha.yml" > "${out}" <<'PY'
 import json, sys, yaml
-workflow_path, out_dir = sys.argv[1], sys.argv[2]
+doc = yaml.safe_load(open(sys.argv[1]))
+# PyYAML's default (YAML 1.1) resolver parses the bare top-level `on:` key as
+# the boolean True, not the string "on" -- confirmed against this exact file.
+on_section = doc.get("on", doc.get(True))
+options = on_section["workflow_dispatch"]["inputs"]["task168_stage"]["options"]
+steps = doc["jobs"]["deploy"]["steps"]
+ifs_with_preflight = [s.get("name", s.get("id", "?")) for s in steps if "stageBPreflight" in (s.get("if") or "")]
+json.dump({"options": options, "ifsWithPreflight": ifs_with_preflight}, sys.stdout)
+PY
+  jq -e '(.options | index("stageBPreflight")) == null' "${out}" >/dev/null \
+    && pass "task168_stage's choice list no longer offers stageBPreflight" \
+    || fail "stageBPreflight is still a selectable task168_stage option: $(cat "${out}")"
+  jq -e '.ifsWithPreflight | length == 0' "${out}" >/dev/null \
+    && pass "no step's if: condition still special-cases stageBPreflight" \
+    || fail "a step's if: condition still references stageBPreflight (dead branch): $(cat "${out}")"
+}
+
+# ── 11. deploy-alpha.yml's "Package and upload Task168 StageB source" step
+# must only pass --flags that scripts/release/package-task168-final-source.sh
+# actually recognizes. Round-1 review found the step passed
+# --output-attestation, which the script has no case for (its `*) usage;;`
+# catch-all exits 64) -- every stageBFinal dispatch stopped at this step
+# before reaching AWS. This reads both files fresh each run, so
+# it stays correct if either one's flag set changes later.
+run_stageb_source_flags_match_packager() {
+  local dir="${WORK}/stageb-source-flags"
+  mkdir -p "${dir}"
+  local py_rc=0
+  python3 - "${ROOT}/.github/workflows/deploy-alpha.yml" "${ROOT}/scripts/release/package-task168-final-source.sh" \
+    > "${dir}/flags.json" <<'PY' || py_rc=$?
+import json, re, sys, yaml
+workflow_path, packager_path = sys.argv[1], sys.argv[2]
 doc = yaml.safe_load(open(workflow_path))
 steps = doc["jobs"]["deploy"]["steps"]
+step = next((s for s in steps if s.get("id") == "stageb-source"), None)
+assert step is not None, "could not find the stageb-source step"
+run_text = step["run"]
 
-source_step = next((s for s in steps if s.get("id") == "stageb-source"), None)
-manifest_step = next((s for s in steps if s.get("id") == "stageb-manifest"), None)
-assert source_step is not None, "could not find the stageb-source step"
-assert manifest_step is not None, "could not find the stageb-manifest step"
+# Isolate just the multi-line `bash scripts/release/package-task168-final-source.sh \ ... \` invocation
+# (this run: block also does unrelated aws s3api calls right after it, whose
+# --bucket/--key/etc flags must not bleed into this comparison).
+lines = run_text.splitlines()
+# The line that actually INVOKES the script (not a `#`-comment mentioning
+# its name, e.g. one explaining why a flag was removed).
+start = next(i for i, l in enumerate(lines) if l.strip().startswith("bash scripts/release/package-task168-final-source.sh"))
+block = [lines[start]]
+i = start
+while lines[i].rstrip().endswith("\\"):
+    i += 1
+    block.append(lines[i])
+block_text = "\n".join(block)
+passed_flags = sorted(set(re.findall(r"--[a-z0-9-]+", block_text)))
 
-open(f"{out_dir}/source-run.sh", "w").write(source_step["run"])
-open(f"{out_dir}/manifest-env.json", "w").write(json.dumps(manifest_step.get("env", {})))
+packager_src = open(packager_path).read()
+# Flags the script's own `case` statement recognizes: lines shaped like
+# `--foo) VAR=${2:-}; shift 2;;` inside the arg-parsing while loop.
+packager_flags = sorted(set(re.findall(r"^\s*(--[a-z0-9-]+)\)", packager_src, re.MULTILINE)))
+
+json.dump({"passed": passed_flags, "packager": packager_flags}, sys.stdout)
 PY
-  [[ -s "${dir}/source-run.sh" ]] || { fail "could not extract the stageb-source step's run: block"; return; }
-  [[ -s "${dir}/manifest-env.json" ]] || { fail "could not extract the stageb-manifest step's env: block"; return; }
+  [[ "${py_rc}" -eq 0 ]] || { fail "could not extract/compare the packager invocation's flags"; return; }
 
-  grep -qE 'inputSnapshotSha256=.*jq.*attestation' "${dir}/source-run.sh" \
-    && pass "stageb-source computes inputSnapshotSha256 by reading a field out of the attestation JSON" \
-    || fail "stageb-source does not compute inputSnapshotSha256 from inside the attestation JSON"
+  local unrecognized still_present
+  unrecognized="$(jq -r '.passed - .packager | join(", ")' "${dir}/flags.json")"
+  [[ -z "${unrecognized}" ]] \
+    && pass "every --flag the workflow passes to package-task168-final-source.sh is one the script recognizes" \
+    || fail "workflow passes flag(s) the packager's own case statement does not recognize (would hit '*) usage;;' / exit 64): ${unrecognized}"
 
-  local snapshot_expr receipt_expr
-  snapshot_expr="$(jq -r '.TASK168_FINAL_PREFLIGHT_INPUT_SNAPSHOT_SHA256 // empty' "${dir}/manifest-env.json")"
-  receipt_expr="$(jq -r '.TASK168_FINAL_PREFLIGHT_RECEIPT_SHA256 // empty' "${dir}/manifest-env.json")"
-  [[ "${snapshot_expr}" == *'steps.stageb-source.outputs.inputSnapshotSha256'* ]] \
-    && pass "stageb-manifest's INPUT_SNAPSHOT_SHA256 env sources steps.stageb-source.outputs.inputSnapshotSha256" \
-    || fail "stageb-manifest's INPUT_SNAPSHOT_SHA256 env does not source inputSnapshotSha256: got '${snapshot_expr}'"
-  [[ -n "${snapshot_expr}" && "${snapshot_expr}" != "${receipt_expr}" ]] \
-    && pass "INPUT_SNAPSHOT_SHA256 and RECEIPT_SHA256 no longer source the identical output (provenance is distinct)" \
-    || fail "INPUT_SNAPSHOT_SHA256 and RECEIPT_SHA256 still source the identical output expression: '${snapshot_expr}'"
+  still_present="$(jq -r 'if (.passed | index("--output-attestation")) then "yes" else "no" end' "${dir}/flags.json")"
+  [[ "${still_present}" == no ]] \
+    && pass "workflow no longer passes the unsupported --output-attestation flag" \
+    || fail "workflow still passes --output-attestation, which the packager has no case for"
+}
+
+# ── 12. deploy-alpha.yml's stageb-manifest step must carry the literal
+# rehearsal-waiver envs (TASK168_REHEARSAL_MODE=waived + a non-empty reason/
+# decidedAt) that scripts/release/create-alpha-release-manifest.sh now
+# requires for TASK168_STAGE=stageBFinal, and must carry no leftover
+# TASK168_FINAL_PREFLIGHT_* env (the deleted finalImagePreflight wiring).
+run_stageb_manifest_rehearsal_waiver_env() {
+  local out="${WORK}/rehearsal-env.json"
+  python3 - "${ROOT}/.github/workflows/deploy-alpha.yml" > "${out}" <<'PY'
+import json, sys, yaml
+doc = yaml.safe_load(open(sys.argv[1]))
+steps = doc["jobs"]["deploy"]["steps"]
+step = next((s for s in steps if s.get("id") == "stageb-manifest"), None)
+assert step is not None, "could not find the stageb-manifest step"
+json.dump(step.get("env", {}), sys.stdout)
+PY
+  jq -e '.TASK168_REHEARSAL_MODE == "waived"' "${out}" >/dev/null \
+    && pass "stageb-manifest sets TASK168_REHEARSAL_MODE=waived (literal, not an expression)" \
+    || fail "stageb-manifest's TASK168_REHEARSAL_MODE is not the literal 'waived': $(cat "${out}")"
+  jq -e '(.TASK168_REHEARSAL_REASON // "") | length > 0' "${out}" >/dev/null \
+    && pass "stageb-manifest sets a non-empty TASK168_REHEARSAL_REASON" \
+    || fail "stageb-manifest's TASK168_REHEARSAL_REASON is missing or empty: $(cat "${out}")"
+  jq -e '(.TASK168_REHEARSAL_DECIDED_AT // "") | length > 0' "${out}" >/dev/null \
+    && pass "stageb-manifest sets a non-empty TASK168_REHEARSAL_DECIDED_AT" \
+    || fail "stageb-manifest's TASK168_REHEARSAL_DECIDED_AT is missing or empty: $(cat "${out}")"
+  jq -e '[keys[] | select(startswith("TASK168_FINAL_PREFLIGHT"))] | length == 0' "${out}" >/dev/null \
+    && pass "stageb-manifest carries no leftover TASK168_FINAL_PREFLIGHT_* env" \
+    || fail "stageb-manifest still sets a TASK168_FINAL_PREFLIGHT_* env: $(cat "${out}")"
 }
 
 echo "== test-task168-stage-b-wiring =="
@@ -531,12 +621,15 @@ run_unknown_stage
 run_stage_a
 run_stage_a_version_id_width
 run_stage_b_final
+run_stage_b_preflight_removed
 run_stage_b_recover
 run_missing_timeout
 run_classification
 run_stage_resolution_guard
 run_stage_b_step_conditions
-run_stageb_input_snapshot_provenance
+run_stage_b_preflight_deleted_from_workflow
+run_stageb_manifest_rehearsal_waiver_env
+run_stageb_source_flags_match_packager
 
 echo "== ${PASS} passed, ${FAIL} failed =="
 (( FAIL == 0 ))

@@ -131,14 +131,21 @@ fi
 # keeps byte-identical behavior.
 if [[ "${TASK168_STAGE:-stageAIntermediate}" != stageAIntermediate ]]; then
   [[ "${TASK168_STAGE}" == stageBFinal ]] || { echo "unsupported TASK168_STAGE for manifest creation: ${TASK168_STAGE}" >&2; exit 1; }
+  manifest_namespace="task168-stage-b"
   for name in RELEASE_SHA RELEASE_VERSION REGISTRY DEPLOY_BUCKET EXPECTED_BUCKET_OWNER \
     SOURCE_VERSION_ID SOURCE_SHA256 IMAGE_TAG WEB_IMAGE_TAG TOOL_IMAGE_TAG \
     TASK168_PREDECESSOR_RELEASE_SHA TASK168_PREDECESSOR_TRANSITION_PATH TASK168_PREDECESSOR_TRANSITION_SHA256 \
     TASK168_PREDECESSOR_API_IMAGE TASK168_PREDECESSOR_DATABASE_IDENTITY TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256 \
-    TASK168_FINAL_PREFLIGHT_RECEIPT_PATH TASK168_FINAL_PREFLIGHT_RECEIPT_SHA256 TASK168_FINAL_PREFLIGHT_INPUT_SNAPSHOT_SHA256; do
+    TASK168_REHEARSAL_MODE TASK168_REHEARSAL_REASON TASK168_REHEARSAL_DECIDED_AT; do
     [[ -n "${!name:-}" ]] || { echo "$name is required for TASK168_STAGE=stageBFinal" >&2; exit 1; }
   done
   [[ "${RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || { echo 'RELEASE_SHA must be a full commit SHA' >&2; exit 1; }
+  # The only supported rehearsal mode right now is an explicit, user-directed
+  # waiver (2026-09-14: Alpha is a dev environment, so M11 runs without an
+  # isolated T5 rehearsal) -- no automated producer of a real
+  # task168FinalImagePreflight receipt is wired into this pipeline. Reject
+  # anything else before touching AWS rather than silently accepting it.
+  [[ "${TASK168_REHEARSAL_MODE}" == waived ]] || { echo "unsupported TASK168_REHEARSAL_MODE: ${TASK168_REHEARSAL_MODE} (only 'waived' is wired)" >&2; exit 1; }
 
   api_digest="$(aws ecr describe-images --repository-name teameet-alpha-v1-api --image-ids "imageTag=${IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text)"
   web_digest="$(aws ecr describe-images --repository-name teameet-alpha-v1-web --image-ids "imageTag=${WEB_IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text)"
@@ -146,6 +153,14 @@ if [[ "${TASK168_STAGE:-stageAIntermediate}" != stageAIntermediate ]]; then
 
   migrations_json="$(build_stage_b_migrations_json)" || exit 1
   full_history_json="$(build_stage_b_full_history_json)" || exit 1
+  # Bound in the manifest (not merely re-derived on the host, deploy/
+  # task168-stage-b-migrate.sh's MIGRATION_LOCK_SHA) so a tampered
+  # migration_lock.toml in the staged release source is caught against a
+  # value fixed at manifest-creation time from this exact commit's own
+  # migrations directory -- immutable for a given RELEASE_SHA, so unlike
+  # resolvedMigrationAttemptsSha256 (live-DB derived) it needs no reuse-path
+  # staleness re-check.
+  migration_lock_sha256="$(sha256sum apps/v1_api/prisma/migrations/migration_lock.toml | awk '{print $1}')"
   predecessor_json="$(jq -nc \
     --arg releaseSha "${TASK168_PREDECESSOR_RELEASE_SHA}" \
     --arg transition "${TASK168_PREDECESSOR_TRANSITION_PATH}" \
@@ -153,21 +168,21 @@ if [[ "${TASK168_STAGE:-stageAIntermediate}" != stageAIntermediate ]]; then
     --arg apiImage "${TASK168_PREDECESSOR_API_IMAGE}" \
     --arg databaseIdentity "${TASK168_PREDECESSOR_DATABASE_IDENTITY}" \
     '{releaseSha:$releaseSha,transition:$transition,transitionSha256:$transitionSha256,apiImage:$apiImage,databaseIdentity:$databaseIdentity,schemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f"}')"
-  preflight_json="$(jq -nc \
-    --arg receipt "${TASK168_FINAL_PREFLIGHT_RECEIPT_PATH}" \
-    --arg receiptSha256 "${TASK168_FINAL_PREFLIGHT_RECEIPT_SHA256}" \
-    --arg inputSnapshotSha256 "${TASK168_FINAL_PREFLIGHT_INPUT_SNAPSHOT_SHA256}" \
-    '{receipt:$receipt,receiptSha256:$receiptSha256,inputSnapshotSha256:$inputSnapshotSha256}')"
+  rehearsal_json="$(jq -nc \
+    --arg mode "${TASK168_REHEARSAL_MODE}" \
+    --arg reason "${TASK168_REHEARSAL_REASON}" \
+    --arg decidedAt "${TASK168_REHEARSAL_DECIDED_AT}" \
+    '{mode:$mode,reason:$reason,decidedAt:$decidedAt}')"
 
   resolved_migration_attempts_sha256="${TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256}"
 
-  manifest="/tmp/teameet-alpha-task168-stage-b-${RELEASE_SHA}.json"
-  manifest_key="manifests/task168-stage-b/${RELEASE_SHA}.json"
+  manifest="/tmp/teameet-alpha-${manifest_namespace}-${RELEASE_SHA}.json"
+  manifest_key="manifests/${manifest_namespace}/${RELEASE_SHA}.json"
   if manifest_version_id="$(aws s3api head-object --bucket "$DEPLOY_BUCKET" --key "$manifest_key" --expected-bucket-owner "$EXPECTED_BUCKET_OWNER" --query VersionId --output text 2>/dev/null)"; then
     aws s3api get-object --bucket "$DEPLOY_BUCKET" --key "$manifest_key" --version-id "$manifest_version_id" --expected-bucket-owner "$EXPECTED_BUCKET_OWNER" "$manifest" >/dev/null
     validate_alpha_stage_b_final_manifest "$manifest" "$RELEASE_SHA" "$RELEASE_VERSION" \
       "$(sha256sum "$manifest" | awk '{print $1}')" "$REGISTRY" "${TASK168_FINAL_SCHEMA_SHA256}" \
-      "$migrations_json" "$predecessor_json" "$preflight_json" "$full_history_json"
+      "$migrations_json" "$predecessor_json" "$rehearsal_json" "$full_history_json"
     # validate_alpha_stage_b_final_manifest only proves the stored value is a
     # well-formed sha256 (self-consistency); it never compares it against
     # this run's freshly-read predecessor/live-DB snapshot. A stale reused
@@ -183,13 +198,14 @@ if [[ "${TASK168_STAGE:-stageAIntermediate}" != stageAIntermediate ]]; then
       --arg registry "$REGISTRY" --arg apiDigest "$api_digest" --arg webDigest "$web_digest" --arg toolDigest "$tool_digest" \
       --arg schema "${TASK168_FINAL_SCHEMA_SHA256}" --argjson migrations "$migrations_json" \
       --argjson fullHistory "$full_history_json" --arg resolvedSha "$resolved_migration_attempts_sha256" \
-      --argjson predecessor "$predecessor_json" --argjson preflight "$preflight_json" \
+      --arg migrationLockSha "$migration_lock_sha256" \
+      --argjson predecessor "$predecessor_json" --argjson rehearsal "$rehearsal_json" \
       '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version,createdAt:$createdAt},
         source:{bucket:$bucket,key:("releases/task168-stage-b/"+$sha+".tar.gz"),versionId:$sourceVersionId,sha256:$sourceSha256},
         database:{migrationPolicy:"task168-stageBFinal",rollbackMode:"backup-only",compatibilityCheck:"expand-contract-sql-v1",
           migrationValidatedFrom:null,rollbackCompatibleWith:null,
           task168:{stage:"stageBFinal",schemaSha256:$schema,runtimeClientSchemaSha256:$schema,migrations:$migrations,fullMigrationHistory:$fullHistory,
-            resolvedMigrationAttemptsSha256:$resolvedSha,predecessor:$predecessor,finalImagePreflight:$preflight,
+            resolvedMigrationAttemptsSha256:$resolvedSha,migrationLockSha256:$migrationLockSha,predecessor:$predecessor,rehearsal:$rehearsal,
             recoveryFrom:null,rollbackTarget:null}},
         images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$apiDigest,uri:($registry+"/teameet-alpha-v1-api@"+$apiDigest)},
           web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$webDigest,uri:($registry+"/teameet-alpha-v1-web@"+$webDigest)},
@@ -197,7 +213,7 @@ if [[ "${TASK168_STAGE:-stageAIntermediate}" != stageAIntermediate ]]; then
       > "$manifest"
     validate_alpha_stage_b_final_manifest "$manifest" "$RELEASE_SHA" "$RELEASE_VERSION" \
       "$(sha256sum "$manifest" | awk '{print $1}')" "$REGISTRY" "${TASK168_FINAL_SCHEMA_SHA256}" \
-      "$migrations_json" "$predecessor_json" "$preflight_json" "$full_history_json"
+      "$migrations_json" "$predecessor_json" "$rehearsal_json" "$full_history_json"
     manifest_version_id="$(aws s3api put-object --bucket "$DEPLOY_BUCKET" --key "$manifest_key" --body "$manifest" --content-type application/json --if-none-match '*' --expected-bucket-owner "$EXPECTED_BUCKET_OWNER" --query VersionId --output text)"
   fi
   [[ "$manifest_version_id" =~ ^[A-Za-z0-9._+=/-]{1,255}$ ]]

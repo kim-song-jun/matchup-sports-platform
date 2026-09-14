@@ -116,38 +116,12 @@ writeJson(predTransitionPath, {
 });
 const predTransitionSha = sha256File(predTransitionPath);
 
-// 6. Final-image preflight receipt + report (T5 rehearsal evidence the
-// runner requires but never itself re-executes).
-const preflightDir = path.join(WORK_DIR, 'preflight');
-mkdirSync(preflightDir, { recursive: true });
+// 6. No isolated T5 rehearsal is wired into the runner's manifest contract
+// (2026-09-14: user-directed waiver instead of a finalImagePreflight
+// receipt — see deploy/task168-stage-b-migrate.sh's REHEARSAL_MODE gate).
 const sourceSha = sha256Str(`task168-harness-source-${RELEASE_SHA}`);
-const inputSnapshotSha = sha256Str(`task168-harness-input-snapshot-${RELEASE_SHA}`);
 const webImage = `registry.example.invalid/teameet-harness-v1-web@sha256:${sha256Str('web-' + RELEASE_SHA)}`;
 const toolImage = `registry.example.invalid/teameet-harness-v1-api@sha256:${sha256Str('tool-' + RELEASE_SHA)}`;
-
-const preflightReportPath = path.join(preflightDir, 'report.json');
-writeJson(preflightReportPath, {
-  schemaSha256: TASK_SCHEMA_SHA, migrations: task168Migrations, fullMigrationHistory, resolvedMigrationAttemptsSha256: RESOLVED_ATTEMPTS_SHA,
-  status: 'COMPLETED', catalog: { legacyTables: 0, legacyLinkColumns: 0, retirementTriggers: 0, retirementFunctions: 0 }, ledger: { count: 11, m11OnlyNew: true },
-});
-const preflightReportSha = sha256File(preflightReportPath);
-
-const preflightReceiptPath = path.join(preflightDir, 'receipt.json');
-writeJson(preflightReceiptPath, {
-  schemaVersion: 1, kind: 'task168FinalImagePreflight', status: 'COMPLETED',
-  releaseSha: RELEASE_SHA, sourceSha256: sourceSha, schemaSha256: TASK_SCHEMA_SHA,
-  apiImage: API_IMAGE, webImage, cutoverToolImage: toolImage,
-  harness: { sourceSha256: sourceSha, schemaSha256: TASK_SCHEMA_SHA, migrationHashes: task168Migrations, fullMigrationHistory, migrationLockSha256: migrationLockSha, resolvedMigrationAttemptsSha256: RESOLVED_ATTEMPTS_SHA },
-  inputSnapshot: { kind: 'task168-stageB-inputs', sha256: inputSnapshotSha },
-  execution: { status: 'COMPLETED', cleanupStatus: 'COMPLETED' },
-  rehearsal: {
-    status: 'COMPLETED', postM11: true, report: preflightReportPath, reportSha256: preflightReportSha,
-    catalog: { legacyTables: 0, legacyLinkColumns: 0, retirementTriggers: 0, retirementFunctions: 0 },
-    ledger: { applied: task168Migrations.map((m) => m.name), count: 11, m11OnlyNew: true },
-    fullLedger: { applied: fullMigrationHistory.map((m) => m.name) },
-  },
-});
-const preflightReceiptSha = sha256File(preflightReceiptPath);
 
 // 7. The Stage B manifest itself.
 const manifestPath = path.join(WORK_DIR, 'manifest.json');
@@ -163,8 +137,9 @@ writeJson(manifestPath, {
       recoveryFrom: null, rollbackTarget: null,
       migrations: task168Migrations, fullMigrationHistory,
       resolvedMigrationAttemptsSha256: RESOLVED_ATTEMPTS_SHA,
+      migrationLockSha256: migrationLockSha,
       predecessor: { releaseSha: PREDECESSOR_SHA, apiImage: PREDECESSOR_API_IMAGE, transition: predTransitionPath, transitionSha256: predTransitionSha, schemaSha256: STAGE_A_SCHEMA_SHA, databaseIdentity: DB_ID },
-      finalImagePreflight: { receipt: preflightReceiptPath, receiptSha256: preflightReceiptSha, inputSnapshotSha256: inputSnapshotSha },
+      rehearsal: { mode: 'waived', reason: 'user-directed Alpha run without isolated rehearsal', decidedAt: '2026-09-14' },
     },
   },
   images: {

@@ -93,7 +93,10 @@ every post-M11 check passes. Full field set on success:
 schemaVersion (1), kind ("task168StageBMigration"), status ("MIGRATION_COMMITTED"),
 stage ("stageBFinal"), releaseSha, apiImage, databaseIdentity, schemaSha256,
 manifest, manifestSha256,
-finalImagePreflight: { receipt, receiptSha256, report, reportSha256, inputSnapshotSha256 },
+rehearsal: { mode, reason, decidedAt } (copied verbatim from the manifest's
+`database.task168.rehearsal` — 2026-09-14: no isolated T5 rehearsal is wired
+into this pipeline, so the only supported mode is `"waived"`; the runner
+refuses to proceed on anything else),
 predecessorStageAReleaseSha, predecessorTransition, predecessorTransitionSha256,
 quiesceReceipt, quiesceReceiptSha256,
 preM11Backup, preM11BackupSha256, preM11BackupBytes, backupFormat,

@@ -113,10 +113,12 @@ jq -e --argjson names "$EXPECTED_MIGRATION_NAMES" --arg schema "$TASK_SCHEMA_SHA
   and ([.database.task168.migrations[].name] == $names)
   and (.database.task168.fullMigrationHistory | type == "array" and length > 11)
   and (.database.task168.resolvedMigrationAttemptsSha256 | strings | test("^[0-9a-f]{64}$"))
+  and (.database.task168.migrationLockSha256 | strings | test("^[0-9a-f]{64}$"))
   and (.database.task168.predecessor.releaseSha | strings | test("^[0-9a-f]{40}$"))
   and (.database.task168.predecessor.transition | strings | length > 0)
-  and (.database.task168.finalImagePreflight.receipt | strings | length > 0)
-  and (.database.task168.finalImagePreflight.receiptSha256 | strings | test("^[0-9a-f]{64}$"))
+  and (.database.task168.rehearsal.mode == "waived")
+  and (.database.task168.rehearsal.reason | strings | length > 0)
+  and (.database.task168.rehearsal.decidedAt | strings | length > 0)
   and (.images.api.repository | strings | length > 0)
   and (.images.web.repository | strings | length > 0)
   and (.images.cutoverTool.repository | strings | length > 0)
@@ -134,23 +136,17 @@ PREDECESSOR_TRANSITION="$(jq -er '.database.task168.predecessor.transition | str
 PREDECESSOR_TRANSITION_SHA="$(jq -er '.database.task168.predecessor.transitionSha256 | strings | select(test("^[0-9a-f]{64}$"))' "$MANIFEST")" || fail 'predecessor transition hash is missing'
 PREDECESSOR_SCHEMA_SHA="$(jq -er --arg schema "$STAGE_A_SCHEMA_SHA" '.database.task168.predecessor.schemaSha256 | select(.==$schema)' "$MANIFEST")" || fail 'predecessor Stage A schema binding is missing'
 PREDECESSOR_API_IMAGE="$(jq -er '.database.task168.predecessor.apiImage | strings | select(length > 0)' "$MANIFEST")" || fail 'predecessor API image is missing'
-FINAL_PREFLIGHT_RECEIPT="$(jq -er '.database.task168.finalImagePreflight.receipt | strings | select(length > 0)' "$MANIFEST")" || fail 'final image preflight receipt is missing'
-FINAL_PREFLIGHT_SHA="$(jq -er '.database.task168.finalImagePreflight.receiptSha256 | strings | select(test("^[0-9a-f]{64}$"))' "$MANIFEST")" || fail 'final image preflight receipt hash is missing'
-FINAL_PREFLIGHT_REPORT="$(jq -er '.rehearsal.report | strings | select(length > 0)' "$FINAL_PREFLIGHT_RECEIPT" 2>/dev/null || true)"
-FINAL_PREFLIGHT_REPORT_SHA="$(jq -er '.rehearsal.reportSha256 | strings | select(test("^[0-9a-f]{64}$"))' "$FINAL_PREFLIGHT_RECEIPT" 2>/dev/null || true)"
+REHEARSAL_MODE="$(jq -er '.database.task168.rehearsal.mode | strings | select(.=="waived")' "$MANIFEST")" || fail 'rehearsal waiver is missing or not exactly "waived" (no other rehearsal mode is wired into this runner)'
+REHEARSAL_REASON="$(jq -er '.database.task168.rehearsal.reason | strings | select(length > 0)' "$MANIFEST")" || fail 'rehearsal waiver reason is missing'
+REHEARSAL_DECIDED_AT="$(jq -er '.database.task168.rehearsal.decidedAt | strings | select(length > 0)' "$MANIFEST")" || fail 'rehearsal waiver decidedAt is missing'
 SOURCE_SHA="$(jq -er '.source.sha256 | strings | select(test("^[0-9a-f]{64}$"))' "$MANIFEST")" || fail 'release source hash is missing'
-INPUT_SNAPSHOT_SHA="$(jq -er '.database.task168.finalImagePreflight.inputSnapshotSha256 | strings | select(test("^[0-9a-f]{64}$"))' "$MANIFEST")" || fail 'input snapshot hash is missing'
 WEB_IMAGE="$(jq -er '.images.web.uri | strings | select(length > 0)' "$MANIFEST")" || fail 'final web image is missing'
 RESOLVED_ATTEMPTS_SHA="$(jq -er '.database.task168.resolvedMigrationAttemptsSha256 | strings | select(test("^[0-9a-f]{64}$"))' "$MANIFEST")" || fail 'resolved migration-attempt snapshot binding is missing'
 TOOL_IMAGE="$(jq -er '.images.cutoverTool.uri | strings | select(length > 0)' "$MANIFEST")" || fail 'final cutover image is missing'
 [[ "$API_IMAGE" =~ @sha256:[0-9a-f]{64}$ ]] || fail 'final API image is not immutable'
-[[ -s "$FINAL_PREFLIGHT_RECEIPT" && "$(sha "$FINAL_PREFLIGHT_RECEIPT")" == "$FINAL_PREFLIGHT_SHA" ]] || fail 'final image preflight receipt is missing or changed'
 FULL_MIGRATION_HISTORY="$(jq -cer ' .database.task168.fullMigrationHistory | select(type=="array" and length>11) ' "$MANIFEST")" || fail 'complete migration history is unavailable'
 jq -e --arg m11 "$M11" --arg sha "$M11_SHA" 'length > 11 and ([.[].name] == ([.[].name] | sort)) and ((map(.name)|unique|length)==length) and ([.[] | (.name|strings|test("^[0-9]{14}_")) and (.sha256|strings|test("^[0-9a-f]{64}$"))] | all) and .[-1]=={name:$m11,sha256:$sha}' <<<"$FULL_MIGRATION_HISTORY" >/dev/null || fail 'complete migration history is malformed or M11 is not sole final entry'
 EXPECTED_FINAL_MIGRATIONS="$(jq -c '.database.task168.migrations | map({name,sha256})' "$MANIFEST")" || fail 'final migration hashes are unavailable'
-[[ -s "$FINAL_PREFLIGHT_REPORT" && "$(sha "$FINAL_PREFLIGHT_REPORT")" == "$FINAL_PREFLIGHT_REPORT_SHA" ]] || fail 'final image preflight rehearsal report is missing or changed'
-jq -e --arg release "$RELEASE_SHA" --arg source "$SOURCE_SHA" --arg schema "$TASK_SCHEMA_SHA" --arg snapshot "$INPUT_SNAPSHOT_SHA" --arg api "$API_IMAGE" --arg web "$WEB_IMAGE" --arg tool "$TOOL_IMAGE" --argjson migrations "$EXPECTED_FINAL_MIGRATIONS" --argjson fullHistory "$FULL_MIGRATION_HISTORY" --arg resolvedSha "$RESOLVED_ATTEMPTS_SHA" --arg report "$FINAL_PREFLIGHT_REPORT" --arg reportSha "$FINAL_PREFLIGHT_REPORT_SHA" '.schemaVersion == 1 and .kind == "task168FinalImagePreflight" and .status == "COMPLETED" and .releaseSha == $release and .sourceSha256 == $source and .schemaSha256 == $schema and .apiImage == $api and .webImage == $web and .cutoverToolImage == $tool and (.harness.sourceSha256 == $source) and (.harness.schemaSha256 == $schema) and (.harness.migrationHashes == $migrations) and .harness.fullMigrationHistory == $fullHistory and (.harness.migrationLockSha256 | strings | test("^[0-9a-f]{64}$")) and .harness.resolvedMigrationAttemptsSha256 == $resolvedSha and (.inputSnapshot.kind == "task168-stageB-inputs" and .inputSnapshot.sha256 == $snapshot) and .execution.status == "COMPLETED" and .execution.cleanupStatus == "COMPLETED" and .rehearsal.status == "COMPLETED" and .rehearsal.postM11 == true and .rehearsal.report == $report and .rehearsal.reportSha256 == $reportSha and .rehearsal.catalog.legacyTables == 0 and .rehearsal.catalog.legacyLinkColumns == 0 and .rehearsal.catalog.retirementTriggers == 0 and .rehearsal.catalog.retirementFunctions == 0 and (.rehearsal.ledger.applied == ($migrations | map(.name))) and .rehearsal.fullLedger.applied == ($fullHistory | map(.name)) and .rehearsal.ledger.count == 11 and .rehearsal.ledger.m11OnlyNew == true' "$FINAL_PREFLIGHT_RECEIPT" >/dev/null || fail 'final image preflight receipt is not authenticated for this release/source/schema/images or lacks executable rehearsal evidence'
-jq -e --arg schema "$TASK_SCHEMA_SHA" --argjson migrations "$EXPECTED_FINAL_MIGRATIONS" --argjson fullHistory "$FULL_MIGRATION_HISTORY" --arg resolvedSha "$RESOLVED_ATTEMPTS_SHA" '.schemaSha256 == $schema and .migrations == $migrations and .fullMigrationHistory == $fullHistory and .resolvedMigrationAttemptsSha256 == $resolvedSha and .status == "COMPLETED" and .catalog.legacyTables == 0 and .catalog.legacyLinkColumns == 0 and .catalog.retirementTriggers == 0 and .catalog.retirementFunctions == 0 and .ledger.count == 11 and .ledger.m11OnlyNew == true' "$FINAL_PREFLIGHT_REPORT" >/dev/null || fail 'final image preflight report does not contain matching raw catalog/ledger evidence'
 SCHEMA="$SOURCE_DIR/apps/v1_api/prisma/schema.prisma"
 [[ "$(sha "$SCHEMA")" == "$TASK_SCHEMA_SHA" ]] || fail 'active schema is not the pinned final client schema'
 [[ -f "$SOURCE_DIR/apps/v1_api/prisma/migrations/$M11/migration.sql" && "$(sha "$SOURCE_DIR/apps/v1_api/prisma/migrations/$M11/migration.sql")" == "$M11_SHA" ]] || fail 'M11 raw SQL checksum mismatch'
@@ -175,8 +171,8 @@ canonical_history_from_root(){
 history_dir="$SOURCE_DIR/apps/v1_api/prisma/migrations"
 ACTUAL_SOURCE_HISTORY="$(canonical_history_from_root "$history_dir")"
 [[ "$ACTUAL_SOURCE_HISTORY" == "$FULL_MIGRATION_HISTORY" ]] || fail 'source migration directory set or checksum differs from bound complete history'
-MIGRATION_LOCK_SHA="$(jq -er '.harness.migrationLockSha256 | strings | select(test("^[0-9a-f]{64}$"))' "$FINAL_PREFLIGHT_RECEIPT")" || fail 'preflight receipt does not bind migration lock'
-[[ "$(sha "$history_dir/migration_lock.toml")" == "$MIGRATION_LOCK_SHA" ]] || fail 'source migration lock differs from preflight binding'
+MIGRATION_LOCK_SHA="$(jq -er '.database.task168.migrationLockSha256 | strings | select(test("^[0-9a-f]{64}$"))' "$MANIFEST")" || fail 'manifest does not bind a migration lock hash'
+[[ "$(sha "$history_dir/migration_lock.toml")" == "$MIGRATION_LOCK_SHA" ]] || fail 'source migration lock differs from the manifest binding'
 while IFS=$'\t' read -r name expected; do
   path="$SOURCE_DIR/apps/v1_api/prisma/migrations/$name/migration.sql"
   [[ -f "$path" && "$(sha "$path")" == "$expected" ]] || fail "complete-history source checksum mismatch: $name"
@@ -657,16 +653,14 @@ post_hash="$(sha "$backup_file")"; [[ "$post_hash" == "$backup_sha" ]] || fail '
 receipt_json="$(jq -n \
   --arg releaseSha "$RELEASE_SHA" --arg apiImage "$API_IMAGE" --arg dbId "$DB_ID" --arg schemaSha "$TASK_SCHEMA_SHA" \
   --arg manifest "$MANIFEST" --arg manifestSha "$manifest_sha" \
-  --arg preflightReceipt "$FINAL_PREFLIGHT_RECEIPT" --arg preflightSha "$FINAL_PREFLIGHT_SHA" \
-  --arg preflightReport "$FINAL_PREFLIGHT_REPORT" --arg preflightReportSha "$FINAL_PREFLIGHT_REPORT_SHA" \
-  --arg inputSnapshotSha "$INPUT_SNAPSHOT_SHA" \
+  --arg rehearsalMode "$REHEARSAL_MODE" --arg rehearsalReason "$REHEARSAL_REASON" --arg rehearsalDecidedAt "$REHEARSAL_DECIDED_AT" \
   --arg predecessor "$PREDECESSOR_RELEASE" --arg predecessorTransition "$PREDECESSOR_TRANSITION" --arg predecessorTransitionSha "$PREDECESSOR_TRANSITION_SHA" \
   --arg quiesceReceipt "$quiesce" --arg quiesceSha "$quiesce_sha" \
   --arg backupPath "$backup_file" --arg backupSha "$post_hash" --argjson backupBytes "$backup_bytes" --arg backupFormat "$BACKUP_FORMAT" \
   --arg m11 "$M11" --arg m11Sha "$M11_SHA" \
   --arg now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   '{schemaVersion:1,kind:"task168StageBMigration",status:"MIGRATION_COMMITTED",stage:"stageBFinal",releaseSha:$releaseSha,apiImage:$apiImage,databaseIdentity:$dbId,schemaSha256:$schemaSha,manifest:$manifest,manifestSha256:$manifestSha,
-     finalImagePreflight:{receipt:$preflightReceipt,receiptSha256:$preflightSha,report:$preflightReport,reportSha256:$preflightReportSha,inputSnapshotSha256:$inputSnapshotSha},
+     rehearsal:{mode:$rehearsalMode,reason:$rehearsalReason,decidedAt:$rehearsalDecidedAt},
      predecessorStageAReleaseSha:$predecessor,predecessorTransition:$predecessorTransition,predecessorTransitionSha256:$predecessorTransitionSha,
      quiesceReceipt:$quiesceReceipt,quiesceReceiptSha256:$quiesceSha,
      preM11Backup:$backupPath,preM11BackupSha256:$backupSha,preM11BackupBytes:$backupBytes,backupFormat:$backupFormat,

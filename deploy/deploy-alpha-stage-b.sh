@@ -22,20 +22,17 @@
 # stageBRecover's R-A/R-B judgments are unchanged and still refuse to touch
 # a release once migration-stage.json exists.
 #
-# stageBPreflight invokes the isolated, non-destructive rehearsal
-# (scripts/release/task168-final-image-preflight.sh, T5/T2 — a different
-# track's deliverable whose CLI contract is still changing
-# (`--backup` -> `--fresh-pre-m11-backup`). This wrapper calls
-# it with the CURRENT candidate CLI and fails closed with a clear diagnostic
-# if that script or its T2 fresh-backup input is not yet present, rather than
-# guessing at an interface known to be mid-revision.
+# No isolated T5/T2 rehearsal is wired into this pipeline (2026-09-14:
+# user-directed Alpha run without one — see manifest database.task168.rehearsal
+# and the runner's own waiver gate, deploy/task168-stage-b-migrate.sh). Only
+# stageBFinal and stageBRecover are dispatchable entry points.
 
 set -Eeuo pipefail
 
 : "${TASK168_STAGE:?TASK168_STAGE is required}"
 
 case "${TASK168_STAGE}" in
-  stageBPreflight|stageBFinal|stageBRecover) ;;
+  stageBFinal|stageBRecover) ;;
   *)
     echo "[deploy-alpha-stage-b] Unknown TASK168_STAGE: '${TASK168_STAGE}'" >&2
     exit 1
@@ -404,7 +401,7 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
   esac
 fi
 
-# ─── stageBPreflight / stageBFinal common prefix ────────────────────────────
+# ─── stageBFinal ─────────────────────────────────────────────────────────────
 : "${ALPHA_SOURCE_DIR:?ALPHA_SOURCE_DIR is required}"
 : "${ALPHA_MANIFEST_FILE:?ALPHA_MANIFEST_FILE is required}"
 : "${ALPHA_MANIFEST_SHA256:?ALPHA_MANIFEST_SHA256 is required}"
@@ -443,7 +440,7 @@ source "${ALPHA_SOURCE_DIR}/deploy/alpha-release-common.sh"
 validate_stored_alpha_manifest "${ALPHA_MANIFEST_FILE}" "${ALPHA_ECR_REGISTRY}" "${ALPHA_MANIFEST_SHA256}" ||
   fail "StageB manifest failed validation"
 [[ "$(jq -er '.database.task168.stage' "${ALPHA_MANIFEST_FILE}")" == stageBFinal ]] ||
-  fail "manifest is not a StageB manifest (dispatch-only stages still read the stageBFinal manifest)"
+  fail "manifest is not a StageB manifest"
 validate_alpha_release_source_binding "${ALPHA_MANIFEST_FILE}" || fail "source binding does not match this manifest"
 load_alpha_release_manifest "${ALPHA_MANIFEST_FILE}"
 
@@ -465,9 +462,9 @@ jq -e --arg schema "${TASK168_FINAL_SCHEMA_SHA256}" \
   '.stage == "stageBFinal" and .schemaSha256 == $schema and .generatedClient == true' \
   <<< "${attestation}" >/dev/null || fail "final API image attestation is not stageBFinal/${TASK168_FINAL_SCHEMA_SHA256}"
 
-case "${TASK168_STAGE}" in
-  stageBFinal)
-    compose_prod="${ALPHA_LIVE_DIR}/deploy/docker-compose.prod.yml"
+# Only stageBFinal reaches here — stageBRecover already exited above, and
+# the case statement near the top of this file refuses every other value.
+compose_prod="${ALPHA_LIVE_DIR}/deploy/docker-compose.prod.yml"
     compose_alpha="${ALPHA_LIVE_DIR}/deploy/docker-compose.alpha.yml"
     env_file="${ALPHA_LIVE_DIR}/deploy/.env"
     [[ -f "${env_file}" ]] || fail "protected runtime environment file is missing"
@@ -541,6 +538,12 @@ case "${TASK168_STAGE}" in
     activation_step="restore-restart-policy"
     quiesce_receipt="${state_dir}/quiesce.json"
     [[ -f "${quiesce_receipt}" ]] || activation_fail "quiesce.json is missing for ${ALPHA_SHA}; cannot restore writer restart policy"
+    # Bind to the hash MIGRATION_COMMITTED already recorded (quiesceReceiptSha256)
+    # before trusting restartPolicyBefore from the file on disk -- otherwise a
+    # quiesce.json replaced or edited after M11 committed would be read as-is.
+    quiesce_receipt_sha_expected="$(jq -er '.quiesceReceiptSha256' "${migration_receipt}")" || activation_fail "migration-stage.json is missing quiesceReceiptSha256"
+    quiesce_receipt_sha_actual="$(sha256sum "${quiesce_receipt}" | awk '{print $1}')"
+    [[ "${quiesce_receipt_sha_actual}" == "${quiesce_receipt_sha_expected}" ]] || activation_fail "quiesce.json no longer matches the hash migration-stage.json committed to (quiesceReceiptSha256 mismatch) -- refusing to trust its restartPolicyBefore"
     restart_api="$(jq -er '.restartPolicyBefore.api' "${quiesce_receipt}")" || activation_fail "quiesce.json is missing restartPolicyBefore.api"
     restart_worker="$(jq -er '.restartPolicyBefore.worker' "${quiesce_receipt}")" || activation_fail "quiesce.json is missing restartPolicyBefore.worker"
     api_container="$("${compose[@]}" ps -q v1_api)"
@@ -574,19 +577,5 @@ case "${TASK168_STAGE}" in
     write_candidate_manifest "${ALPHA_MANIFEST_FILE}"
     promote_candidate_manifest || activation_fail "promotion refused despite a written runtime-verification.json"
 
-    trap - ERR
-    echo "[deploy-alpha-stage-b] StageB final runtime activated, verified, and promoted for ${ALPHA_SHA}"
-    ;;
-
-  stageBPreflight)
-    # T5/T2 integration point — see file header. Fails closed rather than
-    # guessing at the currently-changing task168-final-image-preflight.sh CLI.
-    preflight_script="${target_source_dir}/scripts/release/task168-final-image-preflight.sh"
-    fresh_backup_script="${target_source_dir}/scripts/release/task168-stage-b-fresh-backup.sh"
-    [[ -x "${fresh_backup_script}" || -f "${fresh_backup_script}" ]] ||
-      fail "T2 dependency missing: scripts/release/task168-stage-b-fresh-backup.sh is not in this release's source — stageBPreflight cannot produce the fresh pre-M11 backup this rehearsal requires"
-    [[ -x "${preflight_script}" || -f "${preflight_script}" ]] ||
-      fail "T5 dependency missing: scripts/release/task168-final-image-preflight.sh is not in this release's source"
-    fail "stageBPreflight orchestration is not wired yet: task168-final-image-preflight.sh's CLI is still changing (--backup -> --fresh-pre-m11-backup) — update this branch once that lands"
-    ;;
-esac
+trap - ERR
+echo "[deploy-alpha-stage-b] StageB final runtime activated, verified, and promoted for ${ALPHA_SHA}"

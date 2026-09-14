@@ -61,7 +61,7 @@ case "${TASK168_STAGE}" in
       '{commands:[$strict,$cleanup,$prepare,$source,$source_check,$manifest_get,$manifest_check,$extract,$deploy]}')"
     ;;
 
-  stageBPreflight|stageBFinal|stageBRecover)
+  stageBFinal|stageBRecover)
     : "${TASK168_STAGE_B_TIMEOUT_SECONDS:?TASK168_STAGE_B_TIMEOUT_SECONDS is required for ${TASK168_STAGE} (U11 has no assumed default)}"
     [[ "${TASK168_STAGE_B_TIMEOUT_SECONDS}" =~ ^[1-9][0-9]*$ ]]
     extra_document_params=(--arg executionTimeout "${TASK168_STAGE_B_TIMEOUT_SECONDS}")

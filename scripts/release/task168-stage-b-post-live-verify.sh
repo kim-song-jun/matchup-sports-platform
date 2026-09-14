@@ -113,9 +113,19 @@ drift_output="$("${compose[@]}" exec -T v1_api sh -c \
   'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code' 2>&1)" || drift_rc=$?
 [[ "${drift_rc}" == 0 ]] || fail "live database drifts from the final schema: ${drift_output}"
 
-# 6. Health + worker.
-health_db_true="$(curl -fsS --connect-timeout 3 --max-time 10 \
-  "${PUBLIC_BASE_URL%/}/api/v1/health" | jq -r '.data.checks.db // false')"
+# 6. Health + worker. This runs right after force-recreating nginx/api, so a
+# single non-retrying curl can catch the API mid-boot and misdiagnose a slow
+# but otherwise healthy start as a failure -- retry with a bounded 12x5s=60s
+# backstop (wait_for_alpha_worker_healthy already waited for the worker
+# container's own healthcheck immediately before this, so this is a defensive
+# margin for the API/nginx path specifically, not the primary wait).
+health_db_true=false
+for attempt in $(seq 1 12); do
+  health_db_true="$(curl -fsS --connect-timeout 3 --max-time 10 \
+    "${PUBLIC_BASE_URL%/}/api/v1/health" 2>/dev/null | jq -r '.data.checks.db // false' 2>/dev/null || echo false)"
+  [[ "${health_db_true}" == true ]] && break
+  [[ "${attempt}" -eq 12 ]] || sleep 5
+done
 [[ "${health_db_true}" == true ]] || fail 'health check db is not true'
 worker_health="$(docker inspect --format '{{.State.Health.Status}}' "${worker_container}" 2>/dev/null || true)"
 [[ "${worker_health}" == healthy ]] || fail "worker is not healthy (status=${worker_health:-<none>})"
@@ -135,13 +145,28 @@ done
 # 8. Read-only smoke: a real canonical tournament/fixture from the live DB,
 # fetched through the public API — proves the retirement did not break the
 # public read path, not merely that the DB layer is internally consistent.
-smoke_ids="$(dbq "SELECT t.id || '|' || m.id FROM v1_tournaments t JOIN v1_team_matches m ON m.tournament_id = t.id WHERE m.status::text = 'ENDED' ORDER BY m.id LIMIT 1")"
-[[ -n "${smoke_ids}" ]] || fail 'no canonical tournament/match available for the read-only smoke check'
-smoke_tournament_id="${smoke_ids%%|*}"
-smoke_match_id="${smoke_ids##*|}"
-smoke_status_code="$(curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 3 --max-time 10 \
-  "${PUBLIC_BASE_URL%/}/api/v1/tournaments/${smoke_tournament_id}/matches/${smoke_match_id}")"
-[[ "${smoke_status_code}" == 200 ]] || fail "read-only smoke check returned HTTP ${smoke_status_code}"
+# V1TeamMatchStatus has no 'ENDED' value (recruiting|closed|matched|cancelled|
+# completed|archived, apps/v1_api/prisma/schema.prisma) -- 'completed' is the
+# terminal status for a played-out match with a confirmed official result.
+smoke_ids="$(dbq "SELECT t.id || '|' || m.id FROM v1_tournaments t JOIN v1_team_matches m ON m.tournament_id = t.id WHERE m.status::text = 'completed' ORDER BY m.id LIMIT 1")"
+if [[ -n "${smoke_ids}" ]]; then
+  smoke_tournament_id="${smoke_ids%%|*}"
+  smoke_match_id="${smoke_ids##*|}"
+  smoke_status_code="$(curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 3 --max-time 10 \
+    "${PUBLIC_BASE_URL%/}/api/v1/tournaments/${smoke_tournament_id}/matches/${smoke_match_id}")"
+  [[ "${smoke_status_code}" == 200 ]] || fail "read-only smoke check returned HTTP ${smoke_status_code}"
+  smoke_status=ok
+else
+  # No completed team match exists yet on this Alpha database (e.g. right
+  # after M11 retirement, before QA data is recreated) -- record that fact
+  # rather than failing a check that has nothing to sample. A real query
+  # error already fails closed above (`set -Eeuo pipefail` + psql
+  # `-v ON_ERROR_STOP=1`), so reaching this branch means the query
+  # SUCCEEDED and returned zero rows, not that it broke.
+  smoke_tournament_id=""
+  smoke_match_id=""
+  smoke_status=skipped_no_data
+fi
 
 write() {
   local path="$1"
@@ -154,6 +179,6 @@ write() {
 }
 
 write "${state_dir}/runtime-verification.json" <<EOF
-{"schemaVersion":1,"kind":"task168StageBRuntimeVerification","migrationReceiptSha256":"${migration_receipt_sha256}","manifestSha256":"${manifest_sha256}","apiDigest":"${running_api_image}","webDigest":"${running_web_image}","workerDigest":"${running_worker_image}","ledgerCount":11,"catalogResult":{"legacyTables":${catalog_legacy},"legacyLinkColumns":${catalog_columns}},"driftCheck":"none","healthDbTrue":true,"workerHealthy":true,"outboxProcessingZeroAt":"${outbox_zero_at}","smokeCheck":{"tournamentId":"${smoke_tournament_id}","fixtureOrMatchId":"${smoke_match_id}","status":"ok"},"completedAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+{"schemaVersion":1,"kind":"task168StageBRuntimeVerification","migrationReceiptSha256":"${migration_receipt_sha256}","manifestSha256":"${manifest_sha256}","apiDigest":"${running_api_image}","webDigest":"${running_web_image}","workerDigest":"${running_worker_image}","ledgerCount":11,"catalogResult":{"legacyTables":${catalog_legacy},"legacyLinkColumns":${catalog_columns}},"driftCheck":"none","healthDbTrue":true,"workerHealthy":true,"outboxProcessingZeroAt":"${outbox_zero_at}","smokeCheck":{"tournamentId":"${smoke_tournament_id}","fixtureOrMatchId":"${smoke_match_id}","status":"${smoke_status}"},"completedAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
 EOF
 echo "[task168-post-live] runtime-verification.json written for ${RELEASE_SHA}"

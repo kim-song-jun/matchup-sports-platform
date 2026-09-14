@@ -129,6 +129,7 @@ make_stage_b_manifest() {
           resolvedMigrationAttemptsSha256:"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           migrationLockSha256:("1"*64),
           predecessor:{releaseSha:"5555555555555555555555555555555555555555",transition:"/x",transitionSha256:("f"*64),apiImage:"img",databaseIdentity:"id",schemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f"},
+          expectedRunningApiImage:($registry+"/teameet-alpha-v1-api@sha256:"+("9"*64)),
           rehearsal:{mode:"waived",reason:"user-directed Alpha run without isolated rehearsal",decidedAt:"2026-09-14"},
           recoveryFrom:null,rollbackTarget:null}},
       images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$digest,uri:($registry+"/teameet-alpha-v1-api@"+$digest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$digest,uri:($registry+"/teameet-alpha-v1-web@"+$digest)},cutoverTool:{repository:($registry+"/teameet-alpha-v1-api"),digest:$digest,uri:($registry+"/teameet-alpha-v1-api@"+$digest)}}}' \

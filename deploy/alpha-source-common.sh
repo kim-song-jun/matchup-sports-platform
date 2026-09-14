@@ -13,7 +13,12 @@ ALPHA_RUNTIME_METADATA_FILE="${ALPHA_RUNTIME_METADATA_FILE:-${ALPHA_RUNTIME_CONF
 # and M11 in place) for a SHA the push path has already staged and made live,
 # so the two cannot share `<sha>`. Restore and rollback must derive the same
 # key, or they would reactivate the pre-M11 tree for a StageB release.
-readonly ALPHA_SOURCE_KEY_JQ='if .source.key == ("releases/" + .release.sha + ".tar.gz") then .release.sha
+# The sha is checked first because the key becomes a path segment: the stored
+# manifest validators derive the expected sha from the manifest itself, so they
+# cannot reject one carrying traversal characters.
+readonly ALPHA_SOURCE_KEY_JQ='if (.release.sha | type != "string") or (.release.sha | test("^[0-9a-f]{40}$") | not)
+    then error("release sha is not a commit sha")
+  elif .source.key == ("releases/" + .release.sha + ".tar.gz") then .release.sha
   elif .source.key == ("releases/task168-stage-b/" + .release.sha + ".tar.gz") then "task168-stage-b-" + .release.sha
   else error("unrecognized source key: \(.source.key)") end'
 

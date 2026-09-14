@@ -221,6 +221,23 @@ if alpha_release_source_key "${tampered}" >/dev/null 2>&1; then
   exit 1
 fi
 
+# The key becomes a path segment, and the stored-manifest validators derive the
+# expected sha from the manifest itself — so the shape has to be checked here.
+traversal_manifest="${TEST_ROOT}/traversal.json"
+jq '.release.sha = "../../../../tmp/pwn" | .source.key = "releases/../../../../tmp/pwn.tar.gz"' \
+  "${manifest_a}" > "${traversal_manifest}"
+if alpha_release_source_key "${traversal_manifest}" >/dev/null 2>&1; then
+  echo "a manifest whose release sha escapes the sources directory was accepted" >&2
+  exit 1
+fi
+if prepare_alpha_release_source "${source_a}" "$(jq -r '.release.sha' "${traversal_manifest}")" \
+  "${DIGEST_A#sha256:}" >/dev/null 2>&1; then
+  echo "staging accepted a key that escapes the sources directory" >&2
+  exit 1
+fi
+[[ ! -e "${TEST_ROOT}/../tmp/pwn" && ! -e /tmp/pwn ]] ||
+  { echo "staging created a directory outside the sources directory" >&2; exit 1; }
+
 # ── The push deploy has staged and activated <sha>; StageB packages a
 #    different tree for the same commit and must stage beside it. ──────────
 readonly SHA_D=4444444444444444444444444444444444444444

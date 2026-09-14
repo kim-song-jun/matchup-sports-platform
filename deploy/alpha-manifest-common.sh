@@ -55,21 +55,94 @@ validate_alpha_release_manifest() {
     ' "${manifest_file}" >/dev/null
 }
 
+# Task 168 M11 converged (post-StageB): the default release policy is
+# "final" — the live schema.prisma is the post-retirement schema and the
+# candidate migration source may only add migrations lexically after M11
+# (see task168-final-steady-migrate.sh). Unlike the StageA policy this
+# validator does not freeze a fixed migration list in the manifest: the
+# steady check-only script reads the candidate source tree directly and
+# compares it against the live DB ledger at deploy time (L1-L4 in
+# deploy/task168-final-steady-migrate.sh), so the manifest only needs to
+# bind the schema and the M11 migration file's own checksum.
+validate_alpha_final_release_manifest() {
+  local manifest_file="$1"
+  local expected_sha="$2"
+  local expected_version="$3"
+  local expected_manifest_sha256="$4"
+  local expected_registry="$5"
+  local actual_manifest_sha256
+
+  actual_manifest_sha256="$(sha256sum "${manifest_file}" | awk '{print $1}')"
+  if [[ "${actual_manifest_sha256}" != "${expected_manifest_sha256}" ]]; then
+    echo "[alpha-release] Manifest checksum mismatch" >&2
+    return 1
+  fi
+
+  jq -e \
+    --arg sha "${expected_sha}" \
+    --arg version "${expected_version}" \
+    --arg registry "${expected_registry}" \
+    '
+      .schemaVersion == 1 and
+      .environment == "alpha" and
+      .release.sha == $sha and
+      .release.version == $version and
+      (.release.createdAt | type == "string" and length > 0) and
+      .source.key == ("releases/" + $sha + ".tar.gz") and
+      (.source.bucket | type == "string" and length > 0) and
+      (.source.versionId | type == "string" and length > 0) and
+      (.source.sha256 | test("^[0-9a-f]{64}$")) and
+      .database.migrationPolicy == "task168-final" and
+      .database.rollbackMode == "final-only" and
+      .database.compatibilityCheck == "expand-contract-sql-v1" and
+      ((.database.migrationValidatedFrom == null) or (.database.migrationValidatedFrom | test("^[0-9a-f]{40}$"))) and
+      ((.database.rollbackCompatibleWith == null) or (.database.rollbackCompatibleWith | test("^[0-9a-f]{40}$"))) and
+      .database.task168.stage == "final" and
+      .database.task168.schemaSha256 == "e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46" and
+      .database.task168.runtimeClientSchemaSha256 == .database.task168.schemaSha256 and
+      .database.task168.m11Sha256 == "08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323" and
+      .images.api.repository == ($registry + "/teameet-alpha-v1-api") and
+      .images.web.repository == ($registry + "/teameet-alpha-v1-web") and
+      (.images.api.digest | test("^sha256:[0-9a-f]{64}$")) and
+      (.images.web.digest | test("^sha256:[0-9a-f]{64}$")) and
+      .images.api.uri == (.images.api.repository + "@" + .images.api.digest) and
+      .images.web.uri == (.images.web.repository + "@" + .images.web.digest)
+    ' "${manifest_file}" >/dev/null
+}
+
+# Stage-aware dispatch (D-4): a *stored* manifest (read back for restore or
+# rollback) may be either the legacy StageA policy or the final policy —
+# whichever was active when it was written. Route to the matching validator
+# instead of assuming one shape, so restore/rollback fail with a clear
+# "unsupported stage" diagnosis rather than a wrong-schema false negative.
 validate_stored_alpha_manifest() {
   local manifest_file="$1"
   local expected_registry="$2"
   local expected_checksum="$3"
   local stored_sha
   local stored_version
+  local stored_stage
 
   stored_sha="$(jq -er '.release.sha' "${manifest_file}")"
   stored_version="$(jq -er '.release.version' "${manifest_file}")"
-  validate_alpha_release_manifest \
-    "${manifest_file}" \
-    "${stored_sha}" \
-    "${stored_version}" \
-    "${expected_checksum}" \
-    "${expected_registry}"
+  stored_stage="$(jq -r '.database.task168.stage // empty' "${manifest_file}")"
+
+  case "${stored_stage}" in
+    final)
+      validate_alpha_final_release_manifest \
+        "${manifest_file}" "${stored_sha}" "${stored_version}" \
+        "${expected_checksum}" "${expected_registry}"
+      ;;
+    stageAIntermediate)
+      validate_alpha_release_manifest \
+        "${manifest_file}" "${stored_sha}" "${stored_version}" \
+        "${expected_checksum}" "${expected_registry}"
+      ;;
+    *)
+      echo "[alpha-release] stored manifest has an unsupported Task 168 stage: ${stored_stage:-<missing>}" >&2
+      return 1
+      ;;
+  esac
 }
 
 validate_alpha_release_source_binding() {

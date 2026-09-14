@@ -43,6 +43,65 @@ RUN pnpm --filter v1_api... install --frozen-lockfile --ignore-scripts \
 WORKDIR /opt/task168/release/bundle/apps/v1_api
 ENTRYPOINT ["node", "-r", "ts-node/register/transpile-only", "src/games/migration/tournament-team-match-cutover-cli.ts"]
 
+# Task 168 StageB final-schema image. Kept strictly before `runtime` so a
+# target-less build (`docker build .`, no `--target`) still resolves to the
+# unchanged StageA `runtime` stage — Alpha and prod both build without an
+# explicit target today, and PR-A2 adds `target: runtime` to both workflow
+# build steps in the same change to make that binding explicit rather than
+# implicit-by-stage-order.
+FROM base AS builder-task168-final
+WORKDIR /app
+RUN npm install -g pnpm@9.15.4
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/v1_api/package.json apps/v1_api/
+RUN --mount=type=cache,id=teameet-pnpm-store,target=/root/.local/share/pnpm/store,sharing=locked \
+  pnpm install --frozen-lockfile
+
+COPY apps/v1_api/ apps/v1_api/
+# Overlay the post-M11 schema and its migration onto the StageA tree. The
+# checked-in apps/v1_api/prisma/schema.prisma above is still the StageA one
+# (91222f...) — this builder must never generate a client from it.
+COPY deploy/task168-final-drop/schema.prisma apps/v1_api/prisma/schema.prisma
+COPY deploy/task168-final-drop/migrations/20260911090000_retire_tournament_fixture_tables apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables
+
+WORKDIR /app/apps/v1_api
+RUN npx prisma generate \
+  && test "$(sha256sum prisma/schema.prisma | awk '{print $1}')" = e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46 \
+  && printf '{"schemaVersion":1,"stage":"stageBFinal","schemaSha256":"e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46","generatedClient":true}\n' > .task168-runtime-client-attestation.json
+RUN npx nest build
+
+FROM base AS runtime-task168-final
+WORKDIR /app
+RUN corepack enable pnpm
+RUN apk upgrade --no-cache libcrypto3 libssl3 \
+  && rm -rf /usr/local/lib/node_modules/npm \
+  && rm -f /usr/local/bin/npm /usr/local/bin/npx
+
+# COPY only from builder-task168-final, never from the StageA `builder` — the
+# StageA builder's schema assert (91222f...) makes that COPY fail, and mixing
+# the two clients would run StageB code against a StageA-generated client.
+COPY --from=builder-task168-final /app/node_modules ./node_modules
+COPY --from=builder-task168-final /app/apps/v1_api/node_modules ./apps/v1_api/node_modules
+COPY --from=builder-task168-final /app/apps/v1_api/dist ./apps/v1_api/dist
+COPY --from=builder-task168-final /app/apps/v1_api/prisma ./apps/v1_api/prisma
+COPY --from=builder-task168-final /app/apps/v1_api/package.json ./apps/v1_api/package.json
+COPY --from=builder-task168-final /app/apps/v1_api/tsconfig.json ./apps/v1_api/tsconfig.json
+COPY --from=builder-task168-final /app/apps/v1_api/.task168-runtime-client-attestation.json ./apps/v1_api/
+COPY --from=builder-task168-final /app/package.json ./package.json
+COPY --from=builder-task168-final /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+
+ENV NODE_ENV=production
+EXPOSE 8121
+
+RUN addgroup -S -g 1001 app && adduser -S -u 1001 -G app app \
+  && mkdir -p /app/apps/v1_api/uploads \
+  && chown -R app:app /app
+
+WORKDIR /app/apps/v1_api
+USER app
+CMD ["node", "dist/src/main.js"]
+
 FROM base AS runtime
 WORKDIR /app
 RUN corepack enable pnpm

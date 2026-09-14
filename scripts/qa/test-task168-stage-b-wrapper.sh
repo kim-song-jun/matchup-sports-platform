@@ -930,6 +930,14 @@ run_activation_case() {
   local root="$1" break_case="${2:-}"
   build_activation_fixture "${root}"
   write_activation_fake_docker "${bin}" "${break_case}"
+  # The state StageB always meets on the real host: the push deploy for this
+  # same commit has already staged its own, different tree at <sha>.
+  if [[ -n "${PRESTAGE_PUSH_TREE:-}" ]]; then
+    local push_tree="${home}/.teameet-alpha-sources/${SHA}"
+    mkdir -p "${push_tree}/deploy"
+    printf '#!/usr/bin/env bash\n' > "${push_tree}/deploy/deploy-alpha.sh"
+    printf 'push-archive-sha256\n' > "${push_tree}/.source-sha256"
+  fi
   local rc=0
   # task168-stage-b-post-live-verify.sh (invoked for real by the activation
   # code, a separate process) hardcodes /home/ec2-user/.teameet-alpha-releases
@@ -997,6 +1005,32 @@ activation_paths() {
   fi
   ${block_ok}
 ) && PASS=$((PASS + 5)) || FAIL=$((FAIL + 1))
+
+# ── The push deploy has already staged a different tree at <sha>: StageB
+# must stage and activate its own tree beside it, never over it. ─────────────
+(
+  root="${WORK}/activation-push-tree-staged"; mkdir -p "${root}"
+  rc="$(PRESTAGE_PUSH_TREE=1 run_activation_case "${root}")"
+  push_tree="${root}/home/.teameet-alpha-sources/${SHA}"
+  block_ok=true
+  if [[ "${rc}" -eq 0 ]]; then
+    pass "stageBFinal succeeds when the push deploy already staged a different tree for the same SHA"
+  else
+    fail "StageB collided with the push tree: rc=${rc} $(cat "${root}/stderr")"; block_ok=false
+  fi
+  if [[ "$(cat "${push_tree}/.source-sha256" 2>/dev/null)" == push-archive-sha256 ]]; then
+    pass "the push tree at <sha> is left untouched"
+  else
+    fail "the push tree at <sha> was modified"; block_ok=false
+  fi
+  live_target="$(cd -P "${root}/home/teameet" 2>/dev/null && pwd)"
+  if [[ "${live_target}" == */.teameet-alpha-sources/task168-stage-b-${SHA} ]]; then
+    pass "live points at the StageB tree after activation"
+  else
+    fail "live does not point at the StageB tree: ${live_target}"; block_ok=false
+  fi
+  ${block_ok}
+) && PASS=$((PASS + 3)) || FAIL=$((FAIL + 1))
 
 # ── Negative: T7 (post-live-verify) fails -> no runtime-verification.json,
 # an activation-stage.json diagnosis exists naming the step, exit non-zero,

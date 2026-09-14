@@ -5,6 +5,7 @@ import {
   getRegistrationDeadlineState,
   isTournamentRosterMutable,
   normalizeBirthDateForInput,
+  tournamentRosterClosedMessage,
   normalizeProfileText,
 } from './tournament-roster-client';
 
@@ -36,22 +37,40 @@ describe('tournament roster profile/date helpers', () => {
 
 // 감사 finding #1: 이 화면이 대회 status를 전혀 안 봐서, 완료·취소된 대회에서도 '수정
 // 가능' 배지가 그대로 떠 있다가 서버가 409 TOURNAMENT_ROSTER_NOT_MUTABLE로 거절했다.
-// 서버 ROSTER_MUTABLE_TOURNAMENT_STATUSES(roster-cleanup.ts)와 같은 집합을 여기서도 지킨다.
+// 서버 isRosterMutableTournament(roster-cleanup.ts)와 같은 규칙을 여기서도 지킨다.
 describe('isTournamentRosterMutable', () => {
   it('treats open/closed/in_progress tournaments as roster-mutable', () => {
-    expect(isTournamentRosterMutable('open')).toBe(true);
-    expect(isTournamentRosterMutable('closed')).toBe(true);
-    expect(isTournamentRosterMutable('in_progress')).toBe(true);
+    for (const status of ['open', 'closed', 'in_progress']) {
+      expect(isTournamentRosterMutable({ status, kind: 'regular_tournament' })).toBe(true);
+    }
   });
 
-  it('treats completed/cancelled tournaments as roster-immutable', () => {
-    expect(isTournamentRosterMutable('completed')).toBe(false);
-    expect(isTournamentRosterMutable('cancelled')).toBe(false);
+  it('treats completed/cancelled competitions as roster-immutable, league or not', () => {
+    for (const status of ['completed', 'cancelled']) {
+      expect(isTournamentRosterMutable({ status, kind: 'regular_tournament' })).toBe(false);
+      expect(isTournamentRosterMutable({ status, kind: 'regular_league' })).toBe(false);
+    }
+  });
+
+  // Task 170: 리그는 초안에서 신청이 확정되고 명단도 그때 받는다. 대회 초안은 신청이 없어 막힌 채다.
+  it('lets a draft regular league take a roster but not a draft tournament', () => {
+    expect(isTournamentRosterMutable({ status: 'draft', kind: 'regular_league' })).toBe(true);
+    expect(isTournamentRosterMutable({ status: 'draft', kind: 'regular_tournament' })).toBe(false);
+    expect(isTournamentRosterMutable({ status: 'draft', kind: null })).toBe(false);
   });
 
   it('does not block while the tournament is still loading (status undefined)', () => {
     expect(isTournamentRosterMutable(undefined)).toBe(true);
     expect(isTournamentRosterMutable(null)).toBe(true);
+    expect(isTournamentRosterMutable({ status: undefined })).toBe(true);
+  });
+});
+
+describe('tournamentRosterClosedMessage', () => {
+  it('only says "ended or cancelled" when the competition actually ended or was cancelled', () => {
+    expect(tournamentRosterClosedMessage('completed')).toContain('종료되었거나 취소돼');
+    expect(tournamentRosterClosedMessage('cancelled')).toContain('종료되었거나 취소돼');
+    expect(tournamentRosterClosedMessage('draft')).toBe('대회가 아직 공개되지 않아 선수 명단을 수정할 수 없어요.');
   });
 });
 

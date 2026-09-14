@@ -1360,6 +1360,33 @@ describe('TournamentPlayersService', () => {
     },
   );
 
+  // Task 170: 정규 리그는 초안에서 신청이 확정되고 명단도 그때 받는다(정본 §3).
+  it('addPlayer: 정규 리그는 초안(draft)에서도 명단에 선수를 넣을 수 있다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(teamPlayerMembershipRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'draft', kind: 'regular_league' }));
+    prisma.v1TournamentPlayer.upsert.mockResolvedValue(playerRow());
+
+    await service.addPlayer(manager, 'tournament-1', 'reg-1', { userId: 'player-user-id', realName: '홍길동', birthDate: '1995-03-15' });
+
+    expect(prisma.v1TournamentPlayer.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('addPlayer: 대회 초안은 여전히 막고, "종료·취소"가 아니라 공개 전이라고 말한다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'draft', kind: 'regular_tournament' }));
+
+    await expect(
+      service.addPlayer(manager, 'tournament-1', 'reg-1', { userId: 'player-user-id', realName: '홍길동' }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_ROSTER_NOT_MUTABLE', message: '대회가 아직 공개되지 않아 선수 명단을 수정할 수 없어요.' },
+    });
+    expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
+  });
+
   it('removePlayer: 완료된 대회는 명단에서 선수를 뺄 수 없다', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });

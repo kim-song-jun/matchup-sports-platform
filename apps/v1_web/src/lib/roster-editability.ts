@@ -11,17 +11,28 @@
  */
 
 /**
- * 서버 `ROSTER_MUTABLE_TOURNAMENT_STATUSES`(`apps/v1_api/.../roster-cleanup.ts`)와 같은 집합.
+ * 서버 `isRosterMutableTournament`(`apps/v1_api/.../roster-cleanup.ts`)와 같은 규칙 — open·closed·in_progress,
+ * 그리고 **정규 리그는 초안(draft)도**(리그는 초안에서 신청이 확정되고 명단도 그때 받는다, Task 170).
  * 감사 finding #1(2026-08): 화면이 대회 status 를 안 봐서 완료·취소된 대회에서도
  * '수정 가능' 이 떠 있다가 서버 409(`TOURNAMENT_ROSTER_NOT_MUTABLE`)로 실패했다.
- * 서버 값이 바뀌면 이 상수도 함께 고친다.
+ * 서버 규칙이 바뀌면 이 함수도 함께 고친다.
  */
 const ROSTER_MUTABLE_TOURNAMENT_STATUSES = new Set(['open', 'closed', 'in_progress']);
 
 /** 대회가 아직 로딩 중이면(undefined) 막지 않는다 — 기존 낙관적 렌더링과 동일. */
-export function isTournamentRosterMutable(status: string | null | undefined): boolean {
-  if (!status) return true;
-  return ROSTER_MUTABLE_TOURNAMENT_STATUSES.has(status);
+export function isTournamentRosterMutable(
+  tournament: { status?: string | null; kind?: string | null } | null | undefined,
+): boolean {
+  if (!tournament?.status) return true;
+  if (ROSTER_MUTABLE_TOURNAMENT_STATUSES.has(tournament.status)) return true;
+  return tournament.kind === 'regular_league' && tournament.status === 'draft';
+}
+
+/** 명단을 못 고치는 이유를 사실대로 말한다 — 아직 공개 전인 대회를 "종료·취소"로 안내하지 않는다. */
+export function tournamentRosterClosedMessage(status: string | null | undefined): string {
+  return status === 'completed' || status === 'cancelled'
+    ? '대회가 종료되었거나 취소돼 더 이상 선수 명단을 수정할 수 없어요.'
+    : '대회가 아직 공개되지 않아 선수 명단을 수정할 수 없어요.';
 }
 
 export type RosterDeadlineState = {

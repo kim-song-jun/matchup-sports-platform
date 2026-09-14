@@ -666,7 +666,7 @@ function RegistrationDetailView({
   // "수정 가능" 이라고 말했는데, 명단 화면은 **대회 상태(완료·취소)와 명단 제출 마감**도
   // 본다. 그래서 마감이 지난 명단에 카드가 초록 배지를 달아 두고, 눌러 들어가면
   // "제출 마감" 이라 아무것도 못 고치는 상태가 났다(#4 후속).
-  const isTournamentRosterClosed = !isTournamentRosterMutable(tournament.status);
+  const isTournamentRosterClosed = !isTournamentRosterMutable(tournament);
   const rosterDeadlineState = getRosterDeadlineState(
     tournament.rosterDeadlineAt,
     registration.rosterDeadlineOverrideAt,

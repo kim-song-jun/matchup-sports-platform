@@ -29,20 +29,22 @@ prepare_alpha_release_source() {
   local target_tmp="${target_dir}.tmp.$$"
   local drift
 
-  install -d -m 700 "${ALPHA_SOURCE_RELEASES_DIR}" "${ALPHA_RUNTIME_CONFIG_DIR}"
+  # Every caller runs this as `prepare_alpha_release_source … || fail`, which
+  # turns errexit off inside the function: each step has to stop it itself.
+  install -d -m 700 "${ALPHA_SOURCE_RELEASES_DIR}" "${ALPHA_RUNTIME_CONFIG_DIR}" || return 1
   if [[ ! -f "${ALPHA_RUNTIME_CONFIG_DIR}/.env" ]]; then
-    install -m 600 "${ALPHA_LIVE_DIR}/deploy/.env" "${ALPHA_RUNTIME_CONFIG_DIR}/.env"
+    install -m 600 "${ALPHA_LIVE_DIR}/deploy/.env" "${ALPHA_RUNTIME_CONFIG_DIR}/.env" || return 1
   fi
   if [[ ! -d "${ALPHA_RUNTIME_CONFIG_DIR}/certbot" ]]; then
-    install -d -m 700 "${ALPHA_RUNTIME_CONFIG_DIR}/certbot"
+    install -d -m 700 "${ALPHA_RUNTIME_CONFIG_DIR}/certbot" || return 1
     if [[ -d "${ALPHA_LIVE_DIR}/deploy/certbot" ]]; then
-      sudo rsync -a "${ALPHA_LIVE_DIR}/deploy/certbot/" "${ALPHA_RUNTIME_CONFIG_DIR}/certbot/"
+      sudo rsync -a "${ALPHA_LIVE_DIR}/deploy/certbot/" "${ALPHA_RUNTIME_CONFIG_DIR}/certbot/" || return 1
     fi
   fi
   if [[ ! -f "${ALPHA_RUNTIME_METADATA_FILE}" ]]; then
     install -m 600 \
       "${ALPHA_LIVE_DIR}/deploy/release-metadata.alpha.conf" \
-      "${ALPHA_RUNTIME_METADATA_FILE}"
+      "${ALPHA_RUNTIME_METADATA_FILE}" || return 1
   fi
   if [[ -d "${target_dir}" ]]; then
     if [[ "$(cat "${target_dir}/.source-sha256" 2>/dev/null)" != "${source_sha256}" ]]; then
@@ -79,15 +81,18 @@ prepare_alpha_release_source() {
     rm -rf "${target_tmp}"
     return 1
   fi
-  rm -rf "${target_tmp}/deploy/certbot"
-  rm -f "${target_tmp}/deploy/.env"
-  rm -f "${target_tmp}/deploy/release-metadata.alpha.conf"
-  ln -s "${ALPHA_RUNTIME_CONFIG_DIR}/certbot" "${target_tmp}/deploy/certbot"
-  ln -s "${ALPHA_RUNTIME_CONFIG_DIR}/.env" "${target_tmp}/deploy/.env"
-  ln -s "${ALPHA_RUNTIME_METADATA_FILE}" \
-    "${target_tmp}/deploy/release-metadata.alpha.conf"
-  printf '%s\n' "${source_sha256}" > "${target_tmp}/.source-sha256"
-  chmod 600 "${target_tmp}/.source-sha256"
+  if ! {
+    rm -rf "${target_tmp}/deploy/certbot" &&
+      rm -f "${target_tmp}/deploy/.env" "${target_tmp}/deploy/release-metadata.alpha.conf" &&
+      ln -s "${ALPHA_RUNTIME_CONFIG_DIR}/certbot" "${target_tmp}/deploy/certbot" &&
+      ln -s "${ALPHA_RUNTIME_CONFIG_DIR}/.env" "${target_tmp}/deploy/.env" &&
+      ln -s "${ALPHA_RUNTIME_METADATA_FILE}" "${target_tmp}/deploy/release-metadata.alpha.conf" &&
+      printf '%s\n' "${source_sha256}" > "${target_tmp}/.source-sha256" &&
+      chmod 600 "${target_tmp}/.source-sha256"
+  }; then
+    rm -rf "${target_tmp}"
+    return 1
+  fi
   mv "${target_tmp}" "${target_dir}"
 }
 

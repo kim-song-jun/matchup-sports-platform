@@ -75,6 +75,8 @@ setup_recover_fixture() {
   mkdir -p "${live}/deploy" "${state_dir}" "${bin}"
   : > "${log}"
   printf 'V1_DB_USER=teameet_v1\nV1_DB_NAME=teameet_v1\n' > "${live}/deploy/.env"
+  # prepare_alpha_release_source copies this into the runtime config on first use.
+  printf 'ALPHA_RELEASE_VERSION=fixture\n' > "${live}/deploy/release-metadata.alpha.conf"
   touch "${live}/deploy/docker-compose.prod.yml" "${live}/deploy/docker-compose.alpha.yml"
   printf '#!/usr/bin/env bash\nexit 0\n' > "${bin}/flock" # macOS has no flock(1)
   chmod +x "${bin}/flock"
@@ -651,6 +653,8 @@ run_stage_b_final_no_receipt() {
   mkdir -p "${live}/deploy" "${bin}"
   printf '#!/usr/bin/env bash\nexit 0\n' > "${bin}/flock"; chmod +x "${bin}/flock"
   printf 'V1_DB_USER=teameet_v1\nV1_DB_NAME=teameet_v1\n' > "${live}/deploy/.env"
+  # prepare_alpha_release_source copies this into the runtime config on first use.
+  printf 'ALPHA_RELEASE_VERSION=fixture\n' > "${live}/deploy/release-metadata.alpha.conf"
   touch "${live}/deploy/docker-compose.prod.yml" "${live}/deploy/docker-compose.alpha.yml"
 
   local source_dir="${root}/candidate-source"
@@ -740,6 +744,8 @@ build_activation_fixture() {
   mkdir -p "${live}/deploy" "${bin}"
   printf '#!/usr/bin/env bash\nexit 0\n' > "${bin}/flock"; chmod +x "${bin}/flock"
   printf 'V1_DB_USER=teameet_v1\nV1_DB_NAME=teameet_v1\n' > "${live}/deploy/.env"
+  # prepare_alpha_release_source copies this into the runtime config on first use.
+  printf 'ALPHA_RELEASE_VERSION=fixture\n' > "${live}/deploy/release-metadata.alpha.conf"
   touch "${live}/deploy/docker-compose.prod.yml" "${live}/deploy/docker-compose.alpha.yml"
 
   source_dir="${root}/candidate-source"

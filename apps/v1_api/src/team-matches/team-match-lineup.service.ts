@@ -19,6 +19,11 @@ import {
 } from '../league-matches/league-fixture-list-source';
 import { assertNoSuspendedParticipants } from '../tournaments/discipline/suspension-verdicts';
 import {
+  carryRevokedConsent,
+  latestConsentSnapshotByLinkId,
+  loadRevokedConsentByUserId,
+} from './lineup-consent-carry';
+import {
   ChangeRequestTeamMatchLineupDto,
   SaveTeamMatchLineupDto,
   SubmitTeamMatchLineupDto,
@@ -203,7 +208,7 @@ export class TeamMatchLineupService {
           // 바로 이 재저장이라, 여기서 끊기면 사슬이 한 칸 뒤에서 무너진다. 읽기·쓰기 규칙이
           // 두 곳에서 갈리지 않도록 같은 헬퍼(latestConsentSnapshotByLinkId /
           // carryRevokedConsent)를 공유한다.
-          const carriedConsentByUserId = await this.loadRevokedConsentByUserId(tx, previous?.id ?? null);
+          const carriedConsentByUserId = await loadRevokedConsentByUserId(tx, previous?.id ?? null);
           const lineup = await tx.v1GameLineup.create({
             data: {
               gameId: context.gameId,
@@ -266,7 +271,7 @@ export class TeamMatchLineupService {
             // 행을 본인이 신청·승인으로 가져가면 participant.userId 는 null 인데 연결에는
             // 사람이 있다 — 사람 기준으로 이어야 그 경우까지 끊기지 않는다. 게스트
             // (userId === null)는 위에서 이미 걸러져 여기 도달하지 않는다.
-            await this.carryRevokedConsent(tx, created.id, carriedConsentByUserId.get(entry.userId));
+            await carryRevokedConsent(tx, created.id, carriedConsentByUserId.get(entry.userId));
           }
           return {
             teamMatchId,
@@ -451,7 +456,7 @@ export class TeamMatchLineupService {
           // 선정 방식)는 `carryRevokedConsent` / `latestConsentSnapshotByLinkId` 한 곳에
           // 적혀 있고 `saveLineup` 도 같은 헬퍼를 쓴다 — 승계 규칙이 두 경로에서 갈리면
           // 사슬이 한쪽에서만 이어져 숨김이 조용히 새어 나간다.
-          const latestSnapshotByLinkId = await this.latestConsentSnapshotByLinkId(
+          const latestSnapshotByLinkId = await latestConsentSnapshotByLinkId(
             tx,
             sourceLinks.map((link) => link.linkId),
           );
@@ -515,7 +520,7 @@ export class TeamMatchLineupService {
             // 승계 판정 키는 원본 참가자의 **linkId** 다 — 이 경로는 행을 1:1 로 복사하므로
             // 사람 기준으로 되짚을 필요가 없다(saveLineup 은 명단을 DTO 로부터 다시 만들어
             // 1:1 이 아니라 userId 로 잇는다). 옮기는 규칙 자체는 같은 헬퍼를 공유한다.
-            await this.carryRevokedConsent(tx, copied.id, latestSnapshotByLinkId.get(sourceLink.linkId));
+            await carryRevokedConsent(tx, copied.id, latestSnapshotByLinkId.get(sourceLink.linkId));
           }
           await this.operationAuditWriter.create(tx, {
             actor: { type: 'TEAM_MANAGER', id: user.id },
@@ -627,114 +632,6 @@ export class TeamMatchLineupService {
   }
 
   // ─── internals ───────────────────────────────────────────────────────────
-
-  /**
-   * 주어진 연결들의 **최신 참가자 단위 동의 스냅샷**을 linkId 로 색인해 돌려준다.
-   *
-   * 최신 선정은 `consentVersion` 내림차순 + linkId 당 첫 행이다 — 공개 자격 판정
-   * (`games/public-records/public-consent.ts` 의 `loadParticipantConsentEligibility`)이
-   * 쓰는 방식과 **글자 그대로 같다**. 여기서 갈리면 승계한 값과 판정이 읽는 값이 어긋나
-   * 숨김이 조용히 새어 나간다.
-   */
-  private async latestConsentSnapshotByLinkId(tx: Transaction, linkIds: readonly string[]) {
-    const latest = new Map<
-      string,
-      { linkId: string; state: V1ConsentState; policyHash: string; actorUserId: string }
-    >();
-    if (linkIds.length === 0) return latest;
-    const snapshots = await tx.v1ParticipantConsentSnapshot.findMany({
-      where: { linkId: { in: [...linkIds] } },
-      orderBy: { consentVersion: 'desc' },
-      select: { linkId: true, state: true, policyHash: true, actorUserId: true },
-    });
-    for (const snapshot of snapshots) {
-      if (!latest.has(snapshot.linkId)) latest.set(snapshot.linkId, snapshot);
-    }
-    return latest;
-  }
-
-  /**
-   * 직전 리비전에서 **본인이 꺼 둔 공개 제외(REVOKED)** 를 사람(userId) 기준으로 모은다.
-   *
-   * `saveLineup` 은 라인업을 DTO 로부터 다시 만들기 때문에 옛 행과 새 행이 1:1 로 대응하지
-   * 않는다. 그래서 키는 참가자 id 가 아니라 **연결의 userId** 다. `participant.userId`
-   * 컬럼이 아니라 연결 테이블을 읽는 이유도 같다 — 게스트로 올라갔던 행을 본인이
-   * 신청·승인(claim)으로 가져가면 컬럼은 null 인데 연결에는 사람이 있다.
-   *
-   * REVOKED 인 것만 담는다. 같은 사람이 직전 리비전에 두 행으로 올라가 있는 이상 상태라면
-   * 한 번이라도 REVOKED 인 쪽이 남는다 — 노출을 **줄이는** 쪽이 안전한 기본값이다.
-   */
-  private async loadRevokedConsentByUserId(tx: Transaction, previousLineupId: string | null) {
-    const carried = new Map<string, { state: V1ConsentState; policyHash: string; actorUserId: string }>();
-    if (previousLineupId === null) return carried;
-    const previousParticipants = await tx.v1GameParticipant.findMany({
-      where: { lineupId: previousLineupId },
-      select: { id: true },
-    });
-    if (previousParticipants.length === 0) return carried;
-    const previousLinks = await tx.v1ParticipantIdentityLinkCurrent.findMany({
-      where: { participantId: { in: previousParticipants.map((participant) => participant.id) } },
-      select: { userId: true, linkId: true },
-    });
-    if (previousLinks.length === 0) return carried;
-    const latestByLinkId = await this.latestConsentSnapshotByLinkId(
-      tx,
-      previousLinks.map((link) => link.linkId),
-    );
-    for (const link of previousLinks) {
-      const snapshot = latestByLinkId.get(link.linkId);
-      if (snapshot?.state !== V1ConsentState.REVOKED) continue;
-      carried.set(link.userId, snapshot);
-    }
-    return carried;
-  }
-
-  /**
-   * 방금 만든 참가자 행의 **새 연결 아래에** 승계 원본의 공개 제외를 다시 적는다.
-   * `saveLineup`(재저장)과 `requestChange`(정정 복사)가 공유하는 단 하나의 쓰기 규칙이다.
-   *
-   * **연결을 새로 만들지 않고 재사용하는 쪽이 더 근본적이지 않은가**는 검토했고, 구조적으로
-   * 불가능하다: `V1ParticipantIdentityLinkCurrent` 는 participantId 가 PK 이고 linkId 가
-   * unique 라, 옛 리비전의 행이 살아 있는 동안 새 행에 같은 linkId 를 줄 수 없다. 떼어
-   * 옮기면 옛 리비전의 정체성이 사라지고(대체된 옛 결과가 그 행을 가리킬 수 있다) 신원
-   * 이벤트의 `(linkId, action)` unique 도 두 번째 ROSTER_ASSERTED 를 거부한다. 그래서
-   * "새 연결 + 스냅샷 재기록"이 유일하게 가능한 승계 방식이다.
-   */
-  private async carryRevokedConsent(
-    tx: Transaction,
-    participantId: string,
-    sourceSnapshot: { state: V1ConsentState; policyHash: string; actorUserId: string } | undefined,
-  ): Promise<void> {
-    // GRANTED 와 "스냅샷 없음"은 공개 판정 결과가 같다(REVOKED 만 판정을 바꾼다). 없는
-    // 동의를 새 연결 아래에 만들어 주면 본인이 동의한 적 없는 연결에 동의를 날조하는
-    // 셈이고 그 방향은 노출을 **늘린다** — 승계 대상은 REVOKED 하나뿐이다.
-    if (sourceSnapshot?.state !== V1ConsentState.REVOKED) return;
-    // 새 linkId 는 createRosterAssertedIdentityLink 가 내부에서 만들고 돌려주지 않으므로
-    // 방금 걸린 연결을 되읽는다. REVOKED 였던 참가자에서만 도는 드문 경로라 statement 가
-    // 늘어도 라인업 전체 비용에 영향이 없다.
-    // findUnique 가 아니라 **Throw** 인 이유: 위 호출은 반환 시점에 연결 행이 있음을
-    // 보장한다(있으면 조기 반환, 없으면 생성). 그 불변식이 깨졌는데 조용히 넘어가면
-    // 숨김이 소리 없이 사라지는 지금 이 결함이 재발한다.
-    const link = await tx.v1ParticipantIdentityLinkCurrent.findUniqueOrThrow({
-      where: { participantId },
-      select: { linkId: true },
-    });
-    await tx.v1ParticipantConsentSnapshot.create({
-      data: {
-        participantId,
-        linkId: link.linkId,
-        // 방금 만든 새 참가자 행이라 이 참가자 아래 스냅샷이 하나도 없다 —
-        // `@@unique([participantId, consentVersion])` 기준으로 1 번이 항상 비어 있으므로
-        // 최댓값을 다시 조회하지 않는다.
-        consentVersion: 1,
-        state: V1ConsentState.REVOKED,
-        // 숨김을 결정한 사람과 그때의 정책 해시를 그대로 물려받는다. 여기에 저장·정정을
-        // 실행한 팀장을 적으면 본인이 하지 않은 프라이버시 결정을 그의 이름으로 남기게 된다.
-        policyHash: sourceSnapshot.policyHash,
-        actorUserId: sourceSnapshot.actorUserId,
-      },
-    });
-  }
 
   private async loadContext(
     tx: Transaction,

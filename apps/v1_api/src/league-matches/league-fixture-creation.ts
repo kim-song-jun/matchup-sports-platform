@@ -76,30 +76,75 @@ export function leagueFixtureTitle(input: {
   return `${input.leagueTitle} ${input.round}주차`;
 }
 
+export interface LeagueRosterEntry {
+  sourceParticipantId: string;
+  userId?: string;
+  displayNameSnapshot: string;
+}
+
 /**
  * 한 팀의 경기 명단. 정본 §3 "명단 = 출전자" — 참가 명단이 있으면 그 선수들을 계정과 함께
- * 넣고, `createFromSourceInTransaction` 이 ROSTER_ASSERTED 연결을 만든다(대회와 같은 경로).
+ * 넣고, 게임 생성·명단 동기화가 ROSTER_ASSERTED 연결을 만든다(대회와 같은 경로).
  *
  * 명단이 없는 팀은 팀원 전원을 **계정 없이** 넣는다. 명단을 내지 않은 팀원 전원을 출전자로
  * 연결하면 뛰지 않은 사람이 상호평가 대상(reviews.service.ts)과 선수 카드 기록에 오르고,
  * "이 선수가 저예요" 신청 목록(연결 없는 참가자만)에서도 빠진다.
  *
- * 대진 생성 시점의 스냅샷이다 — 이후 명단이 바뀌어도 이미 만든 경기에는 반영되지 않는다.
+ * 대진 생성과 명단 동기화(`league-roster-sync.ts`)가 같은 규칙을 쓴다.
  */
-function fixtureRoster(team: LeagueFixtureTeam, sideKey: V1GameSideKey) {
+export function leagueTeamRosterEntries(team: LeagueFixtureTeam): LeagueRosterEntry[] {
   if (team.registeredPlayers.length > 0) {
     return team.registeredPlayers.map((player) => ({
       sourceParticipantId: player.id,
       userId: player.userId,
-      sideKey,
       displayNameSnapshot: participantDisplayName(player),
     }));
   }
   return team.memberships.map((membership) => ({
     sourceParticipantId: membership.id,
-    sideKey,
     displayNameSnapshot: participantDisplayName(membership),
   }));
+}
+
+function fixtureRoster(team: LeagueFixtureTeam, sideKey: V1GameSideKey) {
+  return leagueTeamRosterEntries(team).map((entry) => ({ ...entry, sideKey }));
+}
+
+/** 대진 생성·명단 동기화가 읽는 팀 정보 — 활성 멤버십과 이 리그의 참가 명단. */
+export async function loadLeagueTeamRosters(
+  tx: Prisma.TransactionClient,
+  leagueId: string,
+  teamIds: string[],
+): Promise<Map<string, LeagueFixtureTeam>> {
+  const profile = { select: { profile: { select: { nickname: true, displayName: true } } } } as const;
+  const teams = await tx.v1Team.findMany({
+    where: { id: { in: teamIds }, status: 'active', deletedAt: null },
+    select: {
+      id: true,
+      name: true,
+      memberships: {
+        where: { status: 'active' },
+        orderBy: { id: 'asc' },
+        // userId 를 읽지 않는다 — 명단 미제출 팀의 팀원은 계정 없이 들어간다.
+        select: { id: true, user: profile },
+      },
+    },
+  });
+  const registrations = await tx.v1TournamentRegistration.findMany({
+    where: { tournamentId: leagueId, teamId: { in: teamIds }, status: 'confirmed' },
+    select: {
+      teamId: true,
+      players: {
+        where: { removedAt: null },
+        orderBy: { id: 'asc' },
+        select: { id: true, userId: true, user: profile },
+      },
+    },
+  });
+  const playersByTeam = new Map(registrations.map((row) => [row.teamId, row.players]));
+  return new Map(
+    teams.map((team) => [team.id, { ...team, registeredPlayers: playersByTeam.get(team.id) ?? [] }]),
+  );
 }
 
 export async function createLeagueFixture(

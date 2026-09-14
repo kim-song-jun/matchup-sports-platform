@@ -1,4 +1,5 @@
 import { Prisma, V1StatusActorType, V1TournamentStatus } from '@prisma/client';
+import { syncLeagueRosterLineups } from '../league-matches/league-roster-sync';
 
 // 팀을 벗어나는 모든 경로에서 대회 로스터를 함께 정리하기 위한 공용 헬퍼.
 //
@@ -81,7 +82,7 @@ export async function removeUserFromActiveRosters(
       // 잠금 우회 감사 로그를 남기려면 신청건이 잠겨 있었는지가 필요하다. 옵셔널 체이닝으로
       // 읽는 이유는 이 select 자체가 항상 registration 을 포함하므로 런타임엔 undefined 일 수
       // 없지만, 유닛 테스트가 findMany 를 얕게 mock 할 수 있어 방어적으로 접근한다.
-      registration: { select: { rosterLockedAt: true, tournamentId: true } },
+      registration: { select: { rosterLockedAt: true, tournamentId: true, teamId: true } },
     },
   });
 
@@ -112,6 +113,15 @@ export async function removeUserFromActiveRosters(
           reason: `player=${target.id} tournament=${target.registration?.tournamentId ?? 'unknown'} user=${userId}`,
         })),
       });
+    }
+    // 리그면 팀을 떠난 사람을 시작 전 경기 명단에서도 뺀다(대회는 대상 경기가 없어 no-op).
+    const teams = new Map(
+      targets.flatMap((target) =>
+        target.registration ? [[`${target.registration.tournamentId}:${target.registration.teamId}`, target.registration] as const] : [],
+      ),
+    );
+    for (const registration of teams.values()) {
+      await syncLeagueRosterLineups(tx, { leagueId: registration.tournamentId, teamId: registration.teamId });
     }
   }
 

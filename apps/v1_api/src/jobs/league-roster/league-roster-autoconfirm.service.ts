@@ -7,6 +7,7 @@ import {
   normalizeGender,
 } from '../../tournaments/tournament-players.service';
 import { isPhoneVerificationEnforced } from '../../verification/phone-verification-access';
+import { syncLeagueRosterLineups } from '../../league-matches/league-roster-sync';
 import {
   findTournamentOnSurface,
   findTournamentOnSurfaceOrThrow,
@@ -154,14 +155,14 @@ export class LeagueRosterAutoConfirmService {
     // 더 새 세대(시작일 변경)로 다시 예약됐으면 이 발화는 무시한다.
     if (league.scheduledAt.toISOString() !== expectedStartsOn) return;
 
-    // 대진이 이미 생성된 리그는 건드리지 않는다 — 그 시점엔 신청이 닫혀 자동 확정 대상이
-    // 없고, 명단을 뒤늦게 바꾸면 이미 만들어진 대진의 전제가 흔들린다.
-    const fixtureCount = await tx.v1TeamMatch.count({ where: { leagueId, deletedAt: null } });
-    if (fixtureCount > 0) return;
-
+    // 대진이 이미 있는 리그도 채운다 — 채운 명단은 시작 전 경기 명단에 곧바로 맞춰진다(Task 170 D1′).
     const outcomes: AutoConfirmOutcome[] = [];
     for (const registration of await this.pendingRegistrations(tx, leagueId)) {
-      outcomes.push(await this.fillRoster(tx, leagueId, registration));
+      const outcome = await this.fillRoster(tx, leagueId, registration);
+      if (outcome.kind === 'filled') {
+        await syncLeagueRosterLineups(tx, { leagueId, teamId: registration.teamId });
+      }
+      outcomes.push(outcome);
     }
     if (outcomes.length === 0) return;
     await this.notify(tx, league, outcomes);

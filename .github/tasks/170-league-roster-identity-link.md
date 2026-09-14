@@ -1,7 +1,7 @@
 # Task 170 — 리그 경기 명단을 참가 명단(계정 포함)으로
 
 > **정본**: `docs/design/competition-canonical-flow.md` §3 "명단 = 출전자".
-> **결정**: 2026-09-14 사용자 확정 — D1=C · D2=A · D3=A · D4=A. D1 은 alpha 실측 뒤 재확인 중(Ambiguity Log 1).
+> **결정**: 2026-09-14 사용자 확정 — D1=C · D2=A · D3=A · D4=A. alpha 실측 뒤 **D1′=A 로 재확정**(Ambiguity Log 1) · alpha QA 전체 흐름 승인(QA=A).
 
 ## Context
 
@@ -22,7 +22,8 @@
 
 ## Original Conditions
 
-- [x] D1=C — 대진 생성 때 참가 명단으로 한 번 만든다(대회와 동일). **재확인 대기**(Ambiguity Log 1)
+- [x] D1=C — 대진 생성 때 참가 명단으로 만든다(대회와 동일) — PR #1195
+- [ ] D1′=A — 참가 명단이 바뀌면 시작 전 경기의 시스템 명단을 다시 맞추고, 자동 확정 잡의 "대진 있으면 건너뜀"을 푼다
 - [x] D2=A — 참가 명단이 없는 팀은 지금처럼 팀원 전원을 계정 없이
 - [ ] D3=A — 명단 자동 확정 잡을 alpha 에서 먼저 켜고, 프로덕션은 alpha 실측 뒤 별도 결정
 - [x] D4=A — 이미 확정된 리그 경기는 백필하지 않는다(새 대진부터)
@@ -41,6 +42,24 @@
 - **edge**: 명단 24명이어도 연결 statement 는 경기당 2건 (unit)
 - **regression**: 명단 없는 팀 연결 0건 (unit) · 대회 경로 `ROSTER_ASSERTED` (unit) · 참가자당 statement 1건 (unit)
 - **mock updates**: `league-match-admin.service.spec.ts` fake tx 에 참가 명단 players · `createManyAndReturn`/`createMany`
+
+### D1′ 동기화 (2026-09-14)
+
+- **happy**: 명단 추가(팀장) → 시작 전 경기 명단이 명단 선수(계정·연결·`started`)로 새 리비전, 감사 표시, 상대 사이드 불변 (integration)
+- **happy**: 명단 삭제 → 동기화 리비전 위에서 다시 맞춤 (integration) · 자동 확정 잡이 대진 있는 리그도 채우고 맞춤 (integration)
+- **edge**: 팀장이 저장한 리비전 · 제출한 리비전 1 · 시작 시각 지난 경기 → 건드리지 않음 · 같은 명단 → 새 리비전 없음 (integration)
+- **wiring**: 명단 추가·삭제·어드민 삭제·팀 탈퇴 정리가 같은 리그·팀으로 동기화를 부른다 (unit)
+
+## D1′ 설계
+
+- **대상**: 리그(`teamMatch.leagueId`)의 그 팀 사이드 · 게임 `SCHEDULED` · 시작 시각 전 · 취소 안 된 경기.
+- **시스템 명단 판정**: 최신 라인업이 DRAFT 이고 (리비전 1 이거나 동기화 감사 행이 있는 리비전). 라인업 행에 작성자
+  칸이 없어 스키마를 늘리지 않고 `V1OperationAudit(action=LEAGUE_ROSTER_SYNCED, requestId=gameId:lineupId)` 로 표시한다
+  — Task 168 의 마이그레이션 체인·스키마 해시 증거를 흔들지 않기 위해서다.
+- **쓰기**: 새 리비전(supersedes) + 참가자 `createManyAndReturn` + 연결 2 statement(SYSTEM `LEAGUE_ROSTER_SYNC`) +
+  본인이 끈 공개 제외(REVOKED) 승계(`team-matches/lineup-consent-carry.ts`, 팀장 재저장·정정 복사와 같은 규칙).
+- **트리거**: `insertPlayerIntoRoster` · `removePlayer` · `removePlayerForAdmin` · `removeUserFromActiveRosters` · 자동 확정 잡.
+  대회에서 불려도 리그 경기가 없어 조회 1건으로 끝난다.
 
 ## Parallel Work Breakdown
 
@@ -67,7 +86,12 @@
 
 ## Risks & Dependencies
 
-- **D1=C 는 대진이 명단보다 먼저 만들어진 리그에서 연결을 만들지 못한다**(alpha 45/58 리그). Ambiguity Log 1.
+- D1=C 만으로는 대진이 명단보다 먼저 만들어진 리그(alpha 45/58)에서 연결이 생기지 않아 D1′ 동기화를 더했다.
+- 동기화와 팀장 라인업 저장이 **같은 순간** 같은 사이드에 새 리비전을 쓰면 `(gameId, sideId, revision)` unique 로 늦은 쪽
+  트랜잭션이 실패한다(명단 변경 또는 저장이 에러로 끝나고 재시도하면 된다). 데이터가 틀어지지는 않는다.
+- `league-result-participants.ts` 의 `assembleLeagueResultParticipants`·`carryForwardResultParticipants` 는 운영 코드
+  호출처 0(스펙만) — 리그 결과가 콘솔 경로로 옮겨진 뒤 남은 dead code 로 보인다. 이 태스크가 건드리지 않은 파일이라
+  제거는 별도로 판단한다.
 - 참가 명단 선수가 상호평가 대상·출전정지 추적 대상이 된다 — 정본 "명단 = 출전자" 와 같은 뜻이라 막지 않는다.
 - 대회도 명단 변경 뒤 기존 경기 명단을 다시 맞추지 않는다 — 범위 밖.
 - Task 168 병렬 세션이 games·league 파일을 수정해 왔다. 착수 시점(2026-09-14) 전 worktree 미커밋 겹침 0 확인.
@@ -76,4 +100,4 @@
 
 | # | 질문 | 상태 |
 |---|---|---|
-| 1 | D1=C 로는 대진이 명단보다 먼저 만들어진 리그(alpha 45/58)에서 연결이 0 — A(명단 변경 시 시작 전 경기 재동기화 + 잡의 건너뜀 해제) / B(명단 없는 팀이 있으면 대진 생성 차단) / C(유지) | 사용자 확인 대기 (2026-09-14) |
+| 1 | D1=C 로는 대진이 명단보다 먼저 만들어진 리그(alpha 45/58)에서 연결이 0 — A(명단 변경 시 시작 전 경기 재동기화 + 잡의 건너뜀 해제) / B(명단 없는 팀이 있으면 대진 생성 차단) / C(유지) | **해소 — A** (2026-09-14 사용자 확정) |

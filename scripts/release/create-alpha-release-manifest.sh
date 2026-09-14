@@ -147,8 +147,16 @@ if [[ "${TASK168_STAGE:-stageAIntermediate}" != stageAIntermediate ]]; then
   # intermediate code the predecessor receipt authenticates, so refuse to mint
   # a manifest pairing them. A commit is its own ancestor, which is the
   # ordinary case (StageB dispatched against the SHA StageA deployed).
-  git merge-base --is-ancestor "${TASK168_PREDECESSOR_RELEASE_SHA}" "${RELEASE_SHA}" ||
-    { echo "StageA predecessor ${TASK168_PREDECESSOR_RELEASE_SHA} is not an ancestor of release ${RELEASE_SHA}" >&2; exit 1; }
+  # rc 1 and rc 128 are different operator problems (a wrong-but-real commit vs
+  # one this checkout cannot see), and reporting both as "not an ancestor"
+  # sends the reader to the wrong question.
+  ancestry_rc=0
+  git merge-base --is-ancestor "${TASK168_PREDECESSOR_RELEASE_SHA}" "${RELEASE_SHA}" || ancestry_rc=$?
+  case "${ancestry_rc}" in
+    0) ;;
+    1) echo "StageA predecessor ${TASK168_PREDECESSOR_RELEASE_SHA} is not an ancestor of release ${RELEASE_SHA}" >&2; exit 1 ;;
+    *) echo "could not decide whether ${TASK168_PREDECESSOR_RELEASE_SHA} is an ancestor of ${RELEASE_SHA} (git exited ${ancestry_rc}: unknown commit or unusable history)" >&2; exit 1 ;;
+  esac
   # The only supported rehearsal mode right now is an explicit, user-directed
   # waiver (2026-09-14: Alpha is a dev environment, so M11 runs without an
   # isolated T5 rehearsal) -- no automated producer of a real

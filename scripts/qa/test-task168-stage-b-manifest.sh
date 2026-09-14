@@ -486,7 +486,8 @@ EOF
 #!/usr/bin/env bash
 case "$1 $2" in
   "show -s") echo "2026-09-14T00:00:00+09:00" ;;
-  "merge-base --is-ancestor") [[ "$3" == "$4" ]] ;;
+  # 128 is what real git returns for a commit this checkout does not have.
+  "merge-base --is-ancestor") [[ "$3" == 3333333333333333333333333333333333333333 ]] && exit 128; [[ "$3" == "$4" ]] ;;
   *) echo "fake git: unexpected invocation: $*" >&2; exit 1 ;;
 esac
 EOF
@@ -525,6 +526,15 @@ EOF
     echo "  ok: a predecessor SHA that is not an ancestor of RELEASE_SHA is refused"
   else
     echo "  FAIL: a non-ancestor predecessor was not refused: rc=${rc_bad} $(cat "${dir}/stderr.bad")" >&2
+    exit 1
+  fi
+
+  unknown_commit="3333333333333333333333333333333333333333"
+  rc_unknown="$(run_with_predecessor "${unknown_commit}" unknown)"
+  if [[ "${rc_unknown}" -ne 0 ]] && grep -q "could not decide whether" "${dir}/stderr.unknown"; then
+    echo "  ok: a predecessor git cannot resolve is refused as undecidable, not as a non-ancestor"
+  else
+    echo "  FAIL: an unresolvable predecessor was not reported distinctly: rc=${rc_unknown} $(cat "${dir}/stderr.unknown")" >&2
     exit 1
   fi
 ) && PASS=$((PASS + 2)) || FAIL=$((FAIL + 1))

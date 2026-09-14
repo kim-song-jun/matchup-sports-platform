@@ -108,6 +108,52 @@ if validate_alpha_release_manifest "${tampered}" "${SHA_A}" \
   exit 1
 fi
 
+# ── validate_stored_alpha_manifest must also accept a stage=stageBFinal
+#    manifest (the shape alpha's active manifest carries between a completed
+#    StageB run and the first post-StageB "final" deploy) -- pinning the
+#    accepted stage set (final / stageAIntermediate / stageBFinal), not just
+#    "final" and "stageAIntermediate". ──────────────────────────────────────
+readonly SHA_SB=4444444444444444444444444444444444444444
+make_stage_b_manifest() {
+  local sha="$1" version="$2" digest="$3" output="$4"
+  # The full shape validate_alpha_stage_b_final_manifest accepts — a loose
+  # fixture would only prove the validator rejects it.
+  jq -Sn \
+    --arg sha "${sha}" --arg version "${version}" --arg registry "${REGISTRY}" --arg digest "${digest}" \
+    '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version,createdAt:"2026-09-14T00:00:00Z"},
+      source:{bucket:"alpha-bucket",key:("releases/task168-stage-b/"+$sha+".tar.gz"),versionId:"version-1",sha256:("e"*64)},
+      database:{migrationPolicy:"task168-stageBFinal",rollbackMode:"backup-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:null,rollbackCompatibleWith:null,
+        task168:{stage:"stageBFinal",schemaSha256:"e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46",runtimeClientSchemaSha256:"e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46",
+          migrations:[range(0;11)|{name:("202609010000"+((10+.)|tostring)+"_v1_fixture"),sha256:("d"*64)}],
+          fullMigrationHistory:[range(0;12)|{name:("202608010000"+((10+.)|tostring)+"_v1_history"),sha256:("d"*64)}],
+          resolvedMigrationAttemptsSha256:"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          migrationLockSha256:("1"*64),
+          predecessor:{releaseSha:"5555555555555555555555555555555555555555",transition:"/x",transitionSha256:("f"*64),apiImage:"img",databaseIdentity:"id",schemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f"},
+          expectedRunningApiImage:($registry+"/teameet-alpha-v1-api@sha256:"+("9"*64)),
+          rehearsal:{mode:"waived",reason:"user-directed Alpha run without isolated rehearsal",decidedAt:"2026-09-14"},
+          recoveryFrom:null,rollbackTarget:null}},
+      images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$digest,uri:($registry+"/teameet-alpha-v1-api@"+$digest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$digest,uri:($registry+"/teameet-alpha-v1-web@"+$digest)},cutoverTool:{repository:($registry+"/teameet-alpha-v1-api"),digest:$digest,uri:($registry+"/teameet-alpha-v1-api@"+$digest)}}}' \
+    > "${output}"
+}
+manifest_sb="${TEST_ROOT}/manifest-stage-b.json"
+make_stage_b_manifest "${SHA_SB}" "0.1.0-alpha.20260914.g444444444444" "${DIGEST_A}" "${manifest_sb}"
+checksum_sb="$(sha256sum "${manifest_sb}" | awk '{print $1}')"
+validate_stored_alpha_manifest "${manifest_sb}" "${REGISTRY}" "${checksum_sb}"
+
+jq '.database.task168.schemaSha256 = "0000000000000000000000000000000000000000000000000000000000000000"' "${manifest_sb}" > "${tampered}"
+tampered_checksum="$(sha256sum "${tampered}" | awk '{print $1}')"
+if validate_stored_alpha_manifest "${tampered}" "${REGISTRY}" "${tampered_checksum}"; then
+  echo "stageBFinal manifest with a wrong final schema pin was accepted" >&2
+  exit 1
+fi
+
+jq '.database.task168.resolvedMigrationAttemptsSha256 = "not-a-hash"' "${manifest_sb}" > "${tampered}"
+tampered_checksum="$(sha256sum "${tampered}" | awk '{print $1}')"
+if validate_stored_alpha_manifest "${tampered}" "${REGISTRY}" "${tampered_checksum}"; then
+  echo "stageBFinal manifest with a malformed resolved-attempt snapshot binding was accepted" >&2
+  exit 1
+fi
+
 write_candidate_manifest "${manifest_a}"
 promote_candidate_manifest
 jq -e --arg sha "${SHA_A}" --arg checksum "${checksum_a}" '.active.release.sha == $sha and .activeManifestSha256 == $checksum and .previous == null and .previousManifestSha256 == null' \
@@ -206,5 +252,125 @@ if [[ -e "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_A}" ]]; then
   exit 1
 fi
 [[ -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_B}" ]]
+
+# ── Source keys come from the manifest's own source key ─────────────────────
+[[ "$(alpha_release_source_key "${manifest_a}")" == "${SHA_A}" ]] ||
+  { echo "a push manifest did not resolve to its bare SHA key" >&2; exit 1; }
+stage_b_key_manifest="${TEST_ROOT}/stage-b-key.json"
+jq --arg sha "${SHA_B}" '.release.sha = $sha | .source.key = ("releases/task168-stage-b/" + $sha + ".tar.gz")' \
+  "${manifest_a}" > "${stage_b_key_manifest}"
+[[ "$(alpha_release_source_key "${stage_b_key_manifest}")" == "task168-stage-b-${SHA_B}" ]] ||
+  { echo "a StageB manifest did not resolve to its namespaced key" >&2; exit 1; }
+jq '.source.key = "releases/elsewhere/x.tar.gz"' "${manifest_a}" > "${tampered}"
+if alpha_release_source_key "${tampered}" >/dev/null 2>&1; then
+  echo "an unrecognized source key was accepted" >&2
+  exit 1
+fi
+
+# The key becomes a path segment, and the stored-manifest validators derive the
+# expected sha from the manifest itself — so the shape has to be checked here.
+traversal_manifest="${TEST_ROOT}/traversal.json"
+jq '.release.sha = "../../../../tmp/pwn" | .source.key = "releases/../../../../tmp/pwn.tar.gz"' \
+  "${manifest_a}" > "${traversal_manifest}"
+if alpha_release_source_key "${traversal_manifest}" >/dev/null 2>&1; then
+  echo "a manifest whose release sha escapes the sources directory was accepted" >&2
+  exit 1
+fi
+if prepare_alpha_release_source "${source_a}" "$(jq -r '.release.sha' "${traversal_manifest}")" \
+  "${DIGEST_A#sha256:}" >/dev/null 2>&1; then
+  echo "staging accepted a key that escapes the sources directory" >&2
+  exit 1
+fi
+[[ ! -e "${TEST_ROOT}/../tmp/pwn" && ! -e /tmp/pwn ]] ||
+  { echo "staging created a directory outside the sources directory" >&2; exit 1; }
+
+# ── The push deploy has staged and activated <sha>; StageB packages a
+#    different tree for the same commit and must stage beside it. ──────────
+readonly SHA_D=4444444444444444444444444444444444444444
+source_push="${TEST_ROOT}/source-push"
+source_final="${TEST_ROOT}/source-final"
+mkdir -p "${source_push}/deploy" "${source_final}/deploy"
+printf '#!/usr/bin/env bash\n' > "${source_push}/deploy/deploy-alpha.sh"
+printf '#!/usr/bin/env bash\n' > "${source_final}/deploy/deploy-alpha.sh"
+printf 'push-tree\n' > "${source_push}/release.txt"
+printf 'final-tree\n' > "${source_final}/release.txt"
+prepare_alpha_release_source "${source_push}" "${SHA_D}" "${DIGEST_A#sha256:}"
+activate_alpha_release_source "${SHA_D}"
+if prepare_alpha_release_source "${source_final}" "${SHA_D}" "${DIGEST_B#sha256:}" 2>/dev/null; then
+  echo "a different tree was staged over the live tree for the same SHA" >&2
+  exit 1
+fi
+prepare_alpha_release_source "${source_final}" "task168-stage-b-${SHA_D}" "${DIGEST_B#sha256:}"
+[[ "$(cat "${ALPHA_LIVE_DIR}/release.txt")" == 'push-tree' ]] ||
+  { echo "staging the StageB tree changed the live tree" >&2; exit 1; }
+activate_alpha_release_source "task168-stage-b-${SHA_D}"
+[[ "$(cat "${ALPHA_LIVE_DIR}/release.txt")" == 'final-tree' ]] ||
+  { echo "activating the StageB key did not switch the live tree" >&2; exit 1; }
+
+mkdir -p "${ALPHA_SOURCE_RELEASES_DIR}/task168-stage-b-${SHA_C}"
+prune_stale_alpha_release_sources "task168-stage-b-${SHA_D}" "${SHA_D}"
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/task168-stage-b-${SHA_D}" && -d "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_D}" ]] ||
+  { echo "prune removed a kept source key" >&2; exit 1; }
+if [[ -e "${ALPHA_SOURCE_RELEASES_DIR}/task168-stage-b-${SHA_C}" ]]; then
+  echo "a stale namespaced source tree survived pruning" >&2
+  exit 1
+fi
+
+# An empty key names the sources root: it must never be activated, and prune
+# must not run without knowing what is live.
+if activate_alpha_release_source "" 2>/dev/null; then
+  echo "an empty source key was activated" >&2
+  exit 1
+fi
+[[ "$(cat "${ALPHA_LIVE_DIR}/release.txt")" == 'final-tree' ]]
+if prune_stale_alpha_release_sources "" "" 2>/dev/null; then
+  echo "prune ran without an active key" >&2
+  exit 1
+fi
+[[ -d "${ALPHA_SOURCE_RELEASES_DIR}/task168-stage-b-${SHA_D}" ]]
+
+# ── A failed staging or activation must leave nothing behind ────────────────
+# Both failures are forced without relying on file permissions, so this holds
+# whether the suite runs as root (container) or not (CI runner).
+readonly SHA_E=5555555555555555555555555555555555555555
+source_e="${TEST_ROOT}/source-e"
+mkdir -p "${source_e}/deploy"
+printf '#!/usr/bin/env bash\n' > "${source_e}/deploy/deploy-alpha.sh"
+printf 'release-e\n' > "${source_e}/release.txt"
+# mv refuses to replace a non-directory, so the final move into place fails.
+printf 'not a directory\n' > "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_E}"
+if prepare_alpha_release_source "${source_e}" "${SHA_E}" "${DIGEST_A#sha256:}" 2>/dev/null; then
+  echo "staging reported success even though the final move could not happen" >&2
+  exit 1
+fi
+leftover_tmp="$(find "${ALPHA_SOURCE_RELEASES_DIR}" -maxdepth 1 -name "${SHA_E}.tmp.*" | wc -l | tr -d ' ')"
+if [[ "${leftover_tmp}" != 0 ]]; then
+  echo "a half-built source tree survived a failed staging (${leftover_tmp})" >&2
+  exit 1
+fi
+rm -f "${ALPHA_SOURCE_RELEASES_DIR}/${SHA_E}"
+
+# A failing swap must not leave the ~/.teameet-alpha-live.$$ link behind.
+mv_shim_dir="${TEST_ROOT}/mv-shim"
+mkdir -p "${mv_shim_dir}"
+cat > "${mv_shim_dir}/mv" <<'SHIM'
+#!/usr/bin/env bash
+# Report the capability probe truthfully, then fail the swap itself.
+case " $* " in *" --help "*) echo "--no-target-directory"; exit 0 ;; esac
+exit 1
+SHIM
+chmod +x "${mv_shim_dir}/mv"
+live_before="$(cd -P "${ALPHA_LIVE_DIR}" && pwd)"
+if PATH="${mv_shim_dir}:${PATH}" activate_alpha_release_source "task168-stage-b-${SHA_D}" 2>/dev/null; then
+  echo "activation reported success even though the swap failed" >&2
+  exit 1
+fi
+leftover_links="$(find "${ALPHA_HOME_DIR}" -maxdepth 1 -name '.teameet-alpha-live.*' | wc -l | tr -d ' ')"
+if [[ "${leftover_links}" != 0 ]]; then
+  echo "a stray live link survived a failed activation (${leftover_links})" >&2
+  exit 1
+fi
+[[ "$(cd -P "${ALPHA_LIVE_DIR}" && pwd)" == "${live_before}" ]] ||
+  { echo "a failed activation moved the live link anyway" >&2; exit 1; }
 
 echo "[alpha-release-state] passed"

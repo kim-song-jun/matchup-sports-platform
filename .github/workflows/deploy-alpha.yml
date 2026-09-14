@@ -5,11 +5,6 @@ on:
     branches: [dev]
   workflow_dispatch:
     inputs:
-      task168_recovery_from_json:
-        description: "Immutable Task168 failed-preflight recovery evidence JSON"
-        required: false
-        type: string
-        default: ""
       # StageB entry points. stageBFinal continues automatically through
       # final-runtime activation and promotion once the runner commits M11
       # (deploy/deploy-alpha-stage-b.sh). stageBResume is intentionally
@@ -19,15 +14,15 @@ on:
       # touch a release once migration-stage.json exists.
       task168_stage:
         description: >-
-          Task 168 stage. stageAIntermediate (default) is the push-equivalent path;
+          Task 168 stage. final (default) is the push-equivalent path;
           the StageB values are dispatch-only and gated below.
         required: false
         type: choice
         options:
-          - stageAIntermediate
+          - final
           - stageBFinal
           - stageBRecover
-        default: stageAIntermediate
+        default: final
       # Optional: the StageA release this StageB dispatch cuts over from. Empty
       # means "the same commit as this dispatch", the expected case (StageB is
       # dispatched against the SHA that a prior push already deployed as StageA).
@@ -75,7 +70,7 @@ jobs:
 
       # Resolves the stage for every step below. A push event never carries
       # workflow_dispatch inputs, so GITHUB_EVENT_NAME pins push to
-      # stageAIntermediate regardless of what a stale UI default might show —
+      # final regardless of what a stale UI default might show —
       # this is the "push never reaches StageB" guarantee (T1 completion #1).
       - name: Resolve Task 168 stage
         id: task168
@@ -84,19 +79,19 @@ jobs:
           TIMEOUT_INPUT: ${{ inputs.task168_stage_b_timeout_seconds }}
         run: |
           set -Eeuo pipefail
-          stage="${STAGE_INPUT:-stageAIntermediate}"
+          stage="${STAGE_INPUT:-final}"
           if [[ "${GITHUB_EVENT_NAME}" != workflow_dispatch ]]; then
-            stage="stageAIntermediate"
+            stage="final"
           fi
           case "${stage}" in
-            stageAIntermediate|stageBFinal|stageBRecover) ;;
+            final|stageBFinal|stageBRecover) ;;
             *)
               echo "Unknown task168_stage: '${stage}'" >&2
               exit 1
               ;;
           esac
           step_timeout_minutes=25
-          if [[ "${stage}" != stageAIntermediate ]]; then
+          if [[ "${stage}" != final ]]; then
             if [[ -z "${TIMEOUT_INPUT:-}" || ! "${TIMEOUT_INPUT}" =~ ^[0-9]+$ ]]; then
               echo "task168_stage_b_timeout_seconds is required for ${stage} (U11 has no assumed default)" >&2
               exit 1
@@ -213,10 +208,8 @@ jobs:
           echo "web_exists=${web_exists}" >> "${GITHUB_OUTPUT}"
           echo "tool_exists=${tool_exists}" >> "${GITHUB_OUTPUT}"
 
-      - name: Bind one-shot Task 168 manifest inputs
-        env:
-          TASK168_RECOVERY_FROM_JSON: ${{ inputs.task168_recovery_from_json }}
-        run: bash scripts/release/prepare-task168-stage-manifest-inputs.sh
+      - name: Bind Task 168 final-policy manifest inputs
+        run: bash scripts/release/prepare-task168-final-steady-inputs.sh
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -283,7 +276,7 @@ jobs:
       # ── Task 168 StageB (dispatch-only) ─────────────────────────────────────
       # Every step in this block is gated on stageBFinal and is a no-op — not
       # merely skipped-looking, but structurally unreachable — on the push
-      # trigger and on stageAIntermediate/stageBRecover dispatches (T1
+      # trigger and on final/stageBRecover dispatches (T1
       # completion #1/#2). stageBRecover needs none of these: it only diagnoses
       # and recovers already-staged host state (docs/ops/task168-stage-b-runbook.md)
       # and is wired directly into the SSM step below.
@@ -402,10 +395,17 @@ jobs:
           # host is not reliable here.
           script_b64="$(base64 < scripts/release/read-task168-stage-a-predecessor.sh | tr -d '\n')"
           remote_command="echo ${script_b64} | base64 -d | bash -s -- ${PREDECESSOR_SHA}"
+          # JSON, never the `commands=[...]` shorthand: the shorthand parser
+          # rewrites backslash escapes, so the trailing \n that `jq -Rsc` emits
+          # arrived on the host as a literal "n" glued to the last argument.
+          # That corrupted the 40-char SHA and every dispatch died on the
+          # script's own usage (rc 64). Every other SSM caller in this repo
+          # already builds parameters this way.
+          params="$(jq -nc --arg c "${remote_command}" '{commands:[$c]}')"
           cmd_id="$(aws ssm send-command --instance-ids "${INSTANCE_ID}" \
             --document-name AWS-RunShellScript \
             --comment "Teameet Task168 StageB predecessor read ${PREDECESSOR_SHA}" \
-            --parameters "commands=[$(jq -Rsc . <<< "${remote_command}")]" \
+            --parameters "${params}" \
             --query 'Command.CommandId' --output text)"
           for _ in $(seq 1 30); do
             status="$(aws ssm get-command-invocation --command-id "${cmd_id}" \
@@ -413,8 +413,16 @@ jobs:
             [[ "${status}" == "InProgress" || "${status}" == "Pending" || -z "${status}" ]] || break
             sleep 3
           done
-          [[ "${status:-}" == "Success" ]] ||
-            { echo "Could not read the StageA predecessor transition (status=${status:-unknown})" >&2; exit 1; }
+          if [[ "${status:-}" != "Success" ]]; then
+            echo "Could not read the StageA predecessor transition (status=${status:-unknown})" >&2
+            # Without this the host's own reason never leaves the host, and the
+            # step reports only that something failed.
+            # No 2>/dev/null: if this fetch itself fails (auth, throttling), that
+            # error is the diagnostic. `|| true` keeps it from changing the exit.
+            aws ssm get-command-invocation --command-id "${cmd_id}" --instance-id "${INSTANCE_ID}" \
+              --query 'StandardErrorContent' --output text 2>&1 | head -20 >&2 || true
+            exit 1
+          fi
           result="$(aws ssm get-command-invocation --command-id "${cmd_id}" \
             --instance-id "${INSTANCE_ID}" --query StandardOutputContent --output text)"
           jq -e 'has("path") and has("sha256") and has("apiImage") and has("databaseIdentity") and has("resolvedMigrationAttemptsSha256")' <<< "${result}" >/dev/null ||
@@ -453,6 +461,10 @@ jobs:
           TASK168_PREDECESSOR_API_IMAGE: ${{ steps.stageb-predecessor.outputs.apiImage }}
           TASK168_PREDECESSOR_DATABASE_IDENTITY: ${{ steps.stageb-predecessor.outputs.databaseIdentity }}
           TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256: ${{ steps.stageb-predecessor.outputs.resolvedMigrationAttemptsSha256 }}
+          # The StageA build of this same release: what the push deploy that
+          # preceded this dispatch installed, and what the runner requires to
+          # be serving the database when StageB quiesces it.
+          TASK168_EXPECTED_RUNNING_API_IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
           # No isolated T5 rehearsal is wired into this pipeline. Per direct
           # user instruction (2026-09-14): Alpha is a development environment,
           # so M11 runs with this waiver instead of a rehearsal receipt. The
@@ -475,8 +487,8 @@ jobs:
           SOURCE_VERSION_ID: ${{ steps.source.outputs.sourceVersionId }}
           SOURCE_SHA256: ${{ steps.source.outputs.sourceSha256 }}
           IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
-          TOOL_IMAGE_TAG: ${{ steps.images.outputs.toolTag }}
           PREVIOUS_SHA: ${{ steps.rollback-base.outputs.previousSha }}
+          PREVIOUS_STAGE: ${{ steps.rollback-base.outputs.previousStage }}
           MIGRATION_BASE_SHA: ${{ steps.rollback-base.outputs.migrationBaseSha }}
         run: bash scripts/release/create-alpha-release-manifest.sh
 
@@ -531,14 +543,14 @@ jobs:
           DEPLOY_BUCKET: ${{ vars.ALPHA_DEPLOY_BUCKET }}
           EXPECTED_BUCKET_OWNER: ${{ steps.target.outputs.account_id }}
           INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
-          # StageA params — byte-identical to before Task168 StageB existed.
+          # final-policy params — the push path.
           SOURCE_VERSION_ID: ${{ steps.source.outputs.sourceVersionId }}
           SOURCE_SHA256: ${{ steps.source.outputs.sourceSha256 }}
           MANIFEST_VERSION_ID: ${{ steps.manifest.outputs.manifestVersionId }}
           MANIFEST_SHA256: ${{ steps.manifest.outputs.manifestSha256 }}
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
-          # StageB params — unused (empty) on the stageAIntermediate path.
+          # StageB params — unused (empty) on the final path.
           STAGE_B_SOURCE_VERSION_ID: ${{ steps.stageb-source.outputs.sourceVersionId }}
           STAGE_B_SOURCE_SHA256: ${{ steps.stageb-source.outputs.sourceSha256 }}
           STAGE_B_MANIFEST_VERSION_ID: ${{ steps.stageb-manifest.outputs.manifestVersionId }}

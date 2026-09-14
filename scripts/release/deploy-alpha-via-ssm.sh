@@ -30,7 +30,7 @@ poll_attempts=150   # 150 * 10s = 25 minutes — StageA, unchanged.
 comment="Teameet alpha ${TASK168_STAGE} ${RELEASE_SHA}"
 
 case "${TASK168_STAGE}" in
-  stageAIntermediate)
+  final)
     for name in RELEASE_VERSION SOURCE_VERSION_ID SOURCE_SHA256 MANIFEST_VERSION_ID MANIFEST_SHA256; do
       [[ -n "${!name:-}" ]] || { echo "${name} is required" >&2; exit 1; }
     done

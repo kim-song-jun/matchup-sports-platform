@@ -19,6 +19,11 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TARGET="${ROOT}/scripts/release/read-task168-stage-a-predecessor.sh"
 SHA="72405a2d5486d64da2855daa56339cbaf09610c3"
+# Two rolled-back attempts, the shape deploy/task168-migration-contract.sh's
+# resolved_attempt_rows() selects.
+RESOLVED_ROWS="20260703000000_v1_a|$(printf '1%.0s' {1..64})||2026-07-03 12:10:15.394186+00
+20260711180000_v1_b|$(printf '2%.0s' {1..64})||2026-07-12 12:35:50.906285+00"
+export RESOLVED_ROWS
 WORK="$(mktemp -d)"
 trap 'rm -rf "${WORK}"' EXIT
 
@@ -60,7 +65,7 @@ case "\$1" in
     case " \$* " in *" -i "*) cat >/dev/null ;; esac
     case " \$* " in
       *current_database*) echo 'teameet_alpha|teameet_alpha|local|local' ;;
-      *_prisma_migrations*) : ;;
+      *_prisma_migrations*) printf '%s\n' "\${RESOLVED_ROWS}" ;;
     esac
     ;;
 esac
@@ -91,6 +96,17 @@ jq -e '(.path | endswith("transition.json")) and (.sha256 | test("^[0-9a-f]{64}$
   "${happy}/stdout" >/dev/null \
   && pass "all five contract fields are emitted and well-formed" \
   || fail "output does not satisfy the field contract: $(cat "${happy}/stdout")"
+
+# The runner recomputes this snapshot at execution time and refuses the
+# manifest when its answer differs, so the digest has to be taken the way
+# resolved_attempt_sha() takes it: over the rows with NO trailing newline.
+# Piping psql straight into sha256sum includes the newline psql emits — same
+# rows, different digest, and StageB stops before reaching the migration.
+expected_resolved="$(printf '%s' "${RESOLVED_ROWS}" | sha256sum | awk '{print $1}')"
+actual_resolved="$(jq -r '.resolvedMigrationAttemptsSha256' "${happy}/stdout" 2>/dev/null || echo '')"
+[[ "${actual_resolved}" == "${expected_resolved}" ]] \
+  && pass "the resolved-attempt digest matches the runner's own formula" \
+  || fail "resolved-attempt digest differs from the runner's: got ${actual_resolved:0:12}, want ${expected_resolved:0:12}"
 
 # The actual regression: the connection must name the role the container
 # serves, never a compiled-in default.

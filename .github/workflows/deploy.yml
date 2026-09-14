@@ -259,9 +259,6 @@ jobs:
       - name: Task168 StageB dispatch wiring contract tests
         run: bash scripts/qa/test-task168-stage-b-wiring.sh
 
-      - name: Task168 D-5 guard contract tests
-        run: bash scripts/qa/test-task168-d5-guard.sh
-
       - name: Task168 StageB wrapper contract tests
         run: bash scripts/qa/test-task168-stage-b-wrapper.sh
 
@@ -277,6 +274,9 @@ jobs:
       - name: Task168 StageA predecessor read contract tests
         run: bash scripts/qa/test-task168-predecessor-read.sh
 
+      - name: Task168 StageA predecessor dispatch contract tests
+        run: bash scripts/qa/test-task168-predecessor-dispatch.sh
+
       # A real `docker build` per target (StageA default + StageB
       # runtime-task168-final) is deliberately NOT a step here: this job's
       # own contract (see the file header) is "no app build, seconds-long
@@ -286,6 +286,32 @@ jobs:
       # attestation check belongs in a job that does not gate this file's
       # production deploy (or on workflow_dispatch only), with a real run
       # result attached before it merges — not here.
+
+      # Task 168 M11 converged: the final-steady ledger/receipt check-only
+      # gate (deploy/task168-final-steady-migrate.sh) is what stands between
+      # every future dev push and Alpha's live DB once M11 lands — this
+      # fixes D-1 (a StageA runner silently skipping new migrations) but a
+      # regression back to the candidate runner's exact-ledger-equality
+      # design would permanently block every deploy that adds a migration.
+      - name: Task168 final-steady migration contract tests
+        run: bash scripts/qa/test-task168-final-steady.sh
+
+      # Ordering guarantee around that same gate inside deploy-alpha.sh
+      # itself: check-only must run BEFORE activate_alpha_release_source,
+      # and this path must never set task168_irreversible -- moving the
+      # gate after activation, or re-enabling irreversible mode, would leave
+      # every scenario above green while reopening D-5 (a half-switched
+      # release that cannot be restored).
+      - name: Task168 Alpha steady deploy ordering contract tests
+        run: bash scripts/qa/test-task168-alpha-steady-wiring.sh
+
+      # Task168 M11 prod guard (assert_task168_m11_guard,
+      # deploy/prod-release-common.sh): prod has no Alpha-style host receipt
+      # path, so this is the only thing stopping M11 from running unguarded
+      # (no writer quiesce, no fresh backup) the first time a dev->main
+      # promotion carries it.
+      - name: Task168 prod guard contract tests
+        run: bash scripts/qa/test-task168-prod-guard.sh
 
       # expand-contract 게이트를 **머지 전에** 돌린다.
       #
@@ -444,6 +470,25 @@ jobs:
           DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
             src/config/game-operation-flags-seed.cli.ts
           echo "migration chain OK — empty-DB replay clean, zero schema drift"
+
+      # deploy/task168-final-steady-migrate.sh's --check-only mode against a
+      # REAL Postgres with the real M1-M11 migrations actually applied (the
+      # v1_migrate_check DB the step above just built via `prisma migrate
+      # deploy`). scripts/qa/test-task168-final-steady.sh and
+      # scripts/qa/test-task168-alpha-steady-wiring.sh only fake
+      # `docker compose ... exec v1_postgres psql`, so neither can catch a
+      # mismatch between the tokens those fakes hand back and what Postgres
+      # actually returns for the SQL that produces them -- which is exactly
+      # what broke once: `boolean::text` returns 'true'/'false' on real
+      # Postgres, not the 't'/'f' the fakes always fed the script.
+      - name: Task168 final-steady real-Postgres check-only test
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: teameet_test
+          PGPASSWORD: teameet_test
+          PGDATABASE: v1_migrate_check
+        run: bash scripts/qa/test-task168-final-steady-real-db.sh
 
       - name: V1 API unit tests
         run: pnpm --filter v1_api test

@@ -96,15 +96,22 @@ REGISTRY_PORT=18917
 docker run -d --label "$LABEL" --name "$REGISTRY_NAME" --network host -e REGISTRY_HTTP_ADDR=0.0.0.0:$REGISTRY_PORT registry:2 >/dev/null
 for i in $(seq 1 30); do curl -fsS "http://127.0.0.1:$REGISTRY_PORT/v2/" >/dev/null 2>&1 && break; sleep 1; done
 docker build --label "$LABEL" -t "t168harness-v1-api:$RUN_ID" "$IMAGE_DIR" >/dev/null
-PREDECESSOR_IMAGE_TAG="t168harness-v1-api:$RUN_ID-stagea"
-docker tag "t168harness-v1-api:$RUN_ID" "$PREDECESSOR_IMAGE_TAG"
+# The writer image has to be digest-pinned too: that is what the deploy
+# pipeline puts in `.Config.Image` on Alpha, and what the runner's
+# manifest-bound expectedRunningApiImage is compared against. A distinguishing
+# label keeps its digest different from the final image's.
+PREDECESSOR_LOCAL_TAG="127.0.0.1:$REGISTRY_PORT/t168harness-v1-api:stagea"
+docker build --label "$LABEL" --label "t168role=stagea" -t "$PREDECESSOR_LOCAL_TAG" "$IMAGE_DIR" >/dev/null
+docker push "$PREDECESSOR_LOCAL_TAG" >/dev/null
+PREDECESSOR_IMAGE_TAG="$(docker inspect --format='{{index .RepoDigests 0}}' "$PREDECESSOR_LOCAL_TAG")"
+[[ "$PREDECESSOR_IMAGE_TAG" =~ ^127\.0\.0\.1:[0-9]+/t168harness-v1-api@sha256:[0-9a-f]{64}$ ]] || { log "could not obtain a digest reference for the predecessor image"; exit 1; }
 FINAL_LOCAL_TAG="127.0.0.1:$REGISTRY_PORT/t168harness-v1-api:final"
 docker tag "t168harness-v1-api:$RUN_ID" "$FINAL_LOCAL_TAG"
 docker push "$FINAL_LOCAL_TAG" >/dev/null
 FINAL_IMAGE_REF="$(docker inspect --format='{{index .RepoDigests 0}}' "$FINAL_LOCAL_TAG")"
 [[ "$FINAL_IMAGE_REF" =~ ^127\.0\.0\.1:[0-9]+/t168harness-v1-api@sha256:[0-9a-f]{64}$ ]] || { log "could not obtain a digest reference for the final image"; exit 1; }
 log "final image (digest-pinned): $FINAL_IMAGE_REF"
-log "predecessor image (plain tag): $PREDECESSOR_IMAGE_TAG"
+log "predecessor/running image (digest-pinned): $PREDECESSOR_IMAGE_TAG"
 
 DB_USER=teameet_v1
 DB_NAME=teameet_v1
@@ -175,7 +182,11 @@ SQL
 
 build_fixtures(){
   local work="$1" release="$2" predecessor="$3" predecessor_image="${4:-$PREDECESSOR_IMAGE_TAG}"
+  # Defaults to the image start_stack actually runs, NOT to $predecessor_image:
+  # the two are independent, which is the whole point of the pre-quiesce check.
+  local expected_running_image="${5:-$PREDECESSOR_IMAGE_TAG}"
   API_IMAGE="$FINAL_IMAGE_REF" PREDECESSOR_API_IMAGE="$predecessor_image" \
+  EXPECTED_RUNNING_API_IMAGE="$expected_running_image" \
   REPO_MIGRATIONS_DIR="$REPO_ROOT/apps/v1_api/prisma/migrations" \
   M11_DIR="$CANDIDATE_M11_DIR" FINAL_SCHEMA_FILE="$CANDIDATE_FINAL_SCHEMA" \
   WORK_DIR="$work" RELEASE_SHA="$release" PREDECESSOR_SHA="$predecessor" DB_USER="$DB_USER" DB_NAME="$DB_NAME" \
@@ -359,9 +370,9 @@ run_scenario_d(){
 }
 
 # ---------------------------------------------------------------------------
-# (e) the manifest-bound predecessor image does not match the image the
-# currently-running writer actually uses -> rejected before any container is
-# stopped.
+# (e) the manifest-bound expectedRunningApiImage is not the image the writer
+# actually runs (a hand-started or unknown writer) -> rejected before any
+# container is stopped.
 run_scenario_e(){
   local name=e project="deploy" work="$WORK_ROOT/e" release predecessor
   mkdir -p "$work"
@@ -369,17 +380,20 @@ run_scenario_e(){
   local env_pre="$work/pre.env"
   start_stack "$project" "$env_pre" || { bad "$name" "stack did not start"; return; }
   seed_migrations "$project" without_m11 || { bad "$name" "seeding M1-M10 failed"; return; }
-  build_fixtures "$work" "$release" "$predecessor" "${PREDECESSOR_IMAGE_TAG}-WRONG"
+  # Same shape, different digest -- so this is rejected by the image check,
+  # not by the manifest's digest-format contract.
+  build_fixtures "$work" "$release" "$predecessor" "$PREDECESSOR_IMAGE_TAG" \
+    "${PREDECESSOR_IMAGE_TAG%@*}@sha256:$(printf '0%.0s' {1..64})"
   local env_final="$work/final.env"; write_env_file "$env_final" "$FINAL_IMAGE_REF"
   local out rc
   set +e
   out="$(ALPHA_RELEASE_STATE_DIR="$work/state" "$RUNNER" --source-dir "$work/source" --manifest "$work/manifest.json" --compose-prod "$FIXTURES_DIR/compose-prod.yml" --compose-alpha "$FIXTURES_DIR/compose-alpha.yml" --env-file "$env_final" 2>&1)"; rc=$?
   set -e
   echo "$out" | sed 's/^/  [e] /'
-  if [[ "$rc" != 0 ]] && grep -qi 'does not match the authenticated Stage A predecessor image' <<<"$out"; then
-    ok "$name predecessor-image-mismatch -> rejection"
+  if [[ "$rc" != 0 ]] && grep -qi 'not the authenticated Stage A build of this release' <<<"$out"; then
+    ok "$name running-image-mismatch -> rejection"
   else
-    bad "$name predecessor-image-mismatch rejection" "rc=$rc out=$out"
+    bad "$name running-image-mismatch rejection" "rc=$rc out=$out"
   fi
   local api_id
   api_id="$(docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" ps -a -q v1_api)"
@@ -387,6 +401,33 @@ run_scenario_e(){
     ok "$name writer never stopped (rejected before quiescing)"
   else
     bad "$name writer touched despite mismatch rejection" "running=$(docker inspect --format '{{.State.Running}}' "$api_id" 2>/dev/null)"
+  fi
+  docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
+}
+
+# ---------------------------------------------------------------------------
+# (y) Alpha is redeployed between Stage A and Stage B, so the writer running at
+# Stage B is a later release than the Stage A predecessor. The predecessor
+# receipt still authenticates the ledger boundary; the run must proceed.
+run_scenario_y(){
+  local name=y project="deploy" work="$WORK_ROOT/y" release predecessor
+  mkdir -p "$work"
+  release="$(hex40)"; predecessor="$(hex40)"
+  local env_pre="$work/pre.env"
+  start_stack "$project" "$env_pre" || { bad "$name" "stack did not start"; return; }
+  seed_migrations "$project" without_m11 || { bad "$name" "seeding M1-M10 failed"; return; }
+  build_fixtures "$work" "$release" "$predecessor" "$FINAL_IMAGE_REF" "$PREDECESSOR_IMAGE_TAG"
+  local env_final="$work/final.env"; write_env_file "$env_final" "$FINAL_IMAGE_REF"
+  local out rc receipt
+  set +e
+  out="$(ALPHA_RELEASE_STATE_DIR="$work/state" "$RUNNER" --source-dir "$work/source" --manifest "$work/manifest.json" --compose-prod "$FIXTURES_DIR/compose-prod.yml" --compose-alpha "$FIXTURES_DIR/compose-alpha.yml" --env-file "$env_final" 2>&1)"; rc=$?
+  set -e
+  echo "$out" | sed 's/^/  [y] /'
+  receipt="$work/state/task168/$release/migration-stage.json"
+  if [[ "$rc" == 0 ]] && jq -e '.status=="MIGRATION_COMMITTED"' "$receipt" >/dev/null 2>&1; then
+    ok "$name predecessor image differs from the running writer -> still commits"
+  else
+    bad "$name intervening-deploy commit" "rc=$rc out=$out"
   fi
   docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
 }
@@ -1635,7 +1676,7 @@ run_scenario_x(){
   docker compose -p "$project" --env-file "$env_pre" -f "$FIXTURES_DIR/compose-prod.yml" down -v >/dev/null 2>&1 || true
 }
 
-# Optional: T168_ONLY=a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|t|u|v|w|x runs a single
+# Optional: T168_ONLY=a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|t|u|v|w|x|y runs a single
 # scenario (used for fast mutation iteration during development; a plain run
 # with no filter runs all).
 case "${T168_ONLY:-}" in
@@ -1662,8 +1703,9 @@ case "${T168_ONLY:-}" in
   v) run_scenario_v ;;
   w) run_scenario_w ;;
   x) run_scenario_x ;;
-  "") run_scenario_a; run_scenario_b; run_scenario_c; run_scenario_d; run_scenario_e; run_scenario_f; run_scenario_g; run_scenario_h; run_scenario_i; run_scenario_j; run_scenario_k; run_scenario_l; run_scenario_m; run_scenario_n; run_scenario_o; run_scenario_p; run_scenario_q; run_scenario_r; run_scenario_t; run_scenario_u; run_scenario_v; run_scenario_w; run_scenario_x ;;
-  *) echo "unknown T168_ONLY=$T168_ONLY (expected a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|t|u|v|w|x)" >&2; exit 64 ;;
+  y) run_scenario_y ;;
+  "") run_scenario_a; run_scenario_b; run_scenario_c; run_scenario_d; run_scenario_e; run_scenario_f; run_scenario_g; run_scenario_h; run_scenario_i; run_scenario_j; run_scenario_k; run_scenario_l; run_scenario_m; run_scenario_n; run_scenario_o; run_scenario_p; run_scenario_q; run_scenario_r; run_scenario_t; run_scenario_u; run_scenario_v; run_scenario_w; run_scenario_x; run_scenario_y ;;
+  *) echo "unknown T168_ONLY=$T168_ONLY (expected a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|t|u|v|w|x|y)" >&2; exit 64 ;;
 esac
 
 log "=== summary: $PASS passed, $FAIL failed ==="

@@ -195,4 +195,34 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
     expect(await sync(f.league.id, f.team.id)).toBe(0);
     expect((await latestLineup(f.game.id, f.side.id)).revision).toBe(2);
   });
+
+  it('초안(draft) 리그에서도 팀장이 참가 명단을 낼 수 있다 — 대진 전에 명단을 받는다', async () => {
+    const captainId = await makeUser();
+    const team = await prisma.v1Team.create({
+      data: { ownerUserId: captainId, sportId, regionId, name: `t170-draft-team-${suiteId}-${seq}` },
+    });
+    await prisma.v1TeamMembership.create({ data: { teamId: team.id, userId: captainId, role: 'owner', status: 'active' } });
+    const member = await makeMember(team.id);
+    const league = await seedLeagueOnTournamentAxis(prisma, {
+      title: `T170 초안 리그 ${suiteId}-${seq}`,
+      sportId,
+      regionId,
+      state: 'draft',
+      teamIds: [team.id],
+      appliedByUserId: captainId,
+    });
+    const registration = await prisma.v1TournamentRegistration.findUniqueOrThrow({
+      where: { tournamentId_teamId: { tournamentId: league.id, teamId: team.id } },
+    });
+    expect((await prisma.v1Tournament.findUniqueOrThrow({ where: { id: league.id } })).status).toBe('draft');
+
+    await app.get(TournamentPlayersService).addPlayer(
+      { id: captainId, email: `${captainId}@integration.test`, accountStatus: 'active', onboardingStatus: 'completed' },
+      league.id,
+      registration.id,
+      { userId: member } as never,
+    );
+
+    expect(await prisma.v1TournamentPlayer.count({ where: { registrationId: registration.id, removedAt: null } })).toBe(1);
+  });
 });

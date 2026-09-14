@@ -424,8 +424,10 @@ jobs:
             echo "Could not read the StageA predecessor transition (status=${status:-unknown})" >&2
             # Without this the host's own reason never leaves the host, and the
             # step reports only that something failed.
+            # No 2>/dev/null: if this fetch itself fails (auth, throttling), that
+            # error is the diagnostic. `|| true` keeps it from changing the exit.
             aws ssm get-command-invocation --command-id "${cmd_id}" --instance-id "${INSTANCE_ID}" \
-              --query 'StandardErrorContent' --output text 2>/dev/null | head -20 >&2 || true
+              --query 'StandardErrorContent' --output text 2>&1 | head -20 >&2 || true
             exit 1
           fi
           result="$(aws ssm get-command-invocation --command-id "${cmd_id}" \

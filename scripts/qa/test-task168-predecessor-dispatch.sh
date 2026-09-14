@@ -122,9 +122,20 @@ remote="$(jq -r '.commands[0]' <<<"${params}" 2>/dev/null || echo '')"
   && pass "exactly one command is sent" \
   || fail "expected exactly one command"
 
-grep -q "transitionSha256=" "${ok}/github_output" && grep -q "apiImage=" "${ok}/github_output" \
-  && pass "the five contract fields are written to GITHUB_OUTPUT" \
-  || fail "GITHUB_OUTPUT is missing fields: $(cat "${ok}/github_output" 2>/dev/null)"
+missing=""
+for key in releaseSha transitionPath transitionSha256 apiImage databaseIdentity \
+           resolvedMigrationAttemptsSha256; do
+  grep -q "^${key}=." "${ok}/github_output" 2>/dev/null || missing="${missing} ${key}"
+done
+[[ -z "${missing}" ]] \
+  && pass "every downstream output is written to GITHUB_OUTPUT with a value" \
+  || fail "GITHUB_OUTPUT is missing:${missing}"
+
+# A later step consuming an empty predecessor binding would be worse than a
+# failed read, so the values must be the ones the host returned.
+grep -q "^databaseIdentity=d|d|local|local$" "${ok}/github_output" \
+  && pass "the output carries the host's value, not a placeholder" \
+  || fail "databaseIdentity was not taken from the invocation output"
 
 # ── The failure path must carry the host's reason ─────────────────────────
 rc="$(run_step Failed failed)"

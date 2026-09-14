@@ -156,6 +156,20 @@ if [[ "${TASK168_STAGE}" == stageBRecover ]]; then
     db_identity_actual="$(dbq "SELECT current_database() || '|' || current_user || '|' || COALESCE(inet_server_addr()::text,'local') || '|' || COALESCE(inet_server_port()::text,'local')")"
     [[ "${db_identity_actual}" == "${db_identity_expected}" ]] || fail "current database identity does not match the ${receipt##*/} receipt — refusing to restore against a possibly-different database"
 
+    # An untrappable SIGKILL landing after the runner writes the M11 entry
+    # marker (task168-stage-b-migrate.sh) but before M11 actually commits
+    # bypasses the runner's own EXIT trap entirely, so the marker is never
+    # retired to *.aborted the way a caught signal in that same window would
+    # be. Left ENTERED, it would let THIS release's own stageBRecover run
+    # falsely "recover" a later, unrelated release's M11 commit on the same
+    # database (borrowing this release's self-consistent quiesce/backup as
+    # if they were that commit's). Retire it before mutating any container,
+    # and refuse rather than proceed if that cannot be done durably.
+    if [[ -f "${m11_marker}" ]]; then
+      mv -n "${m11_marker}" "${m11_marker}.aborted" || fail "could not retire the M11 entry marker for ${ALPHA_SHA} before restoring pre-quiesce writers — not touching anything"
+      [[ ! -e "${m11_marker}" ]] || fail "M11 entry marker still exists after the retirement rename for ${ALPHA_SHA} — refusing to restore pre-quiesce writers with a live marker in place"
+    fi
+
     docker update --restart="${restart_before_api}" "${pre_api_id}" >/dev/null || fail "could not restore API restart policy"
     docker update --restart="${restart_before_worker}" "${pre_worker_id}" >/dev/null || fail "could not restore worker restart policy"
     # Read the policy back rather than trusting `docker update`'s exit code,

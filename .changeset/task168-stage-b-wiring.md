@@ -76,13 +76,37 @@ d5-guard·dockerfile-target, ubuntu CI 기준 총 69개 케이스 — wiring 18 
 macOS 에서 fail/skip 이던 케이스까지 포함해 전부 green).
 
 `scripts/qa/test-task168-stage-b-runner.sh`(실제 docker/postgres/Prisma 하네스, 별도
-`deploy.yml` 스텝)는 이번 라운드에서 a-o(기존 15개) + p·q·r·t(신규 4개) = 19 시나리오, 총
-**58개 assertion, macOS 로컬 0 failed**로 확인했어요. p/q/r 은 M11 커밋 직후 SIGKILL로 도달한
-R-A 대상 상태에서 각각 ledger 체크섬 변조·source 에 없는 여분 적용행·미해결(unresolved) 시도행을
-DB 에 직접 주입한 뒤 실제 wrapper 의 stageBRecover 를 호출해, `assert_resolved_attempts`/
-`assert_full_ledger`/`ledger_assert_exact`(러너와 R-A 가 공유하는 `task168-migration-contract.sh`)
-가 셋 다 거부하고 `MIGRATION_COMMITTED_RECOVERED` 를 쓰지 않는지 확인해요. t 는 release X 가
-M11 이전 백업 도중 SIGTERM 으로 정상 복구되고(마커 없음), 같은 DB 에 별도 release Y 가 M11 을
-커밋한 뒤 SIGKILL 되는 상황을 만들고 `stageBRecover ALPHA_SHA=X` 를 호출해 X 가 다른 릴리스의
-커밋을 자기 것으로 잘못 인증하지 않는지 확인해요. 매 실행 끝에 라벨 컨테이너/네트워크/볼륨
-0개와 `docker volume ls` 개수를 기준선과 대조해 익명 볼륨 누수도 함께 확인해요.
+`deploy.yml` 스텝)는 a-r(기존 18개) + t(재작성) + u·v(신규 2개) = 21 시나리오, macOS 로컬
+0 failed 로 확인했어요. p/q/r 은 M11 커밋 직후 SIGKILL로 도달한 R-A 대상 상태에서 각각 ledger
+체크섬 변조·source 에 없는 여분 적용행·미해결(unresolved) 시도행을 DB 에 직접 주입한 뒤 실제
+wrapper 의 stageBRecover 를 호출해, `assert_resolved_attempts`/`assert_full_ledger`/
+`ledger_assert_exact`(러너와 R-A 가 공유하는 `task168-migration-contract.sh`)가 셋 다 거부하고
+`MIGRATION_COMMITTED_RECOVERED` 를 쓰지 않는지 확인해요. 매 실행 끝에 라벨 컨테이너/네트워크/
+볼륨 0개와 `docker volume ls` 개수를 기준선과 대조해 익명 볼륨 누수도 함께 확인해요.
+
+**이번 라운드 추가 수정 — 독립 검증 2건 대응**
+- **stageBRecover R-B가 M11 진입 마커를 방치하는 false-recovery(2건 지적).** `phase=after_m11`
+  직전에 마커를 쓰고 그 뒤 M11 이 커밋되기 전에 온 untrappable SIGKILL 은 러너 자신의 trap 을
+  전혀 못 돌린다 — trap 이 도는 catchable 신호와 달리 마커가 ENTERED 로 남는다. 이 상태에서
+  R-B(같은 release 의 recover)가 writer 만 복원하고 마커는 그대로 두면, 나중에 **다른** release
+  가 같은 DB 에 M11 을 실제로 커밋했을 때 원래 release 의 stageBRecover 가 그 커밋을 자기 것으로
+  잘못 인증할 수 있었다(마커의 releaseSha/quiesce/backup 이 전부 자기 자신과만 self-consistent
+  하기 때문에 그 자체 검증으로는 못 잡는다). R-B 가 writer 를 되살리기 **전에** 마커를
+  `*.aborted` 로 원자적 rename 하도록 고쳤다 — 실패하면 fail-closed. 새 시나리오 v(release X 를
+  이 정확한 창에서 SIGKILL → R-B 호출로 마커 회수 확인 → 별도 release Y 가 같은 DB 에 M11 을
+  정상 커밋 → X 를 다시 recover 시도하면 "M11 entry marker is missing" 으로 거부)가 이 경로
+  전체를 real docker 로 재현·검증한다. 고침을 되돌리면 v 가 실제로 `MIGRATION_COMMITTED_RECOVERED`
+  를 X 앞으로 잘못 써서 red 로 확인했다. 시나리오 u 는 같은 창에서의 TERM(catchable, 기존 trap
+  경로)이 여전히 동작함을 회귀 확인한다. 시나리오 t 는 release X 가 (j 와 같은 externally-revived
+  writer 기법으로) marker 를 쓰기 **전에** 자기 pre-migrate 재확인에서 실패하는 경우로 다시 짰다 —
+  이전 버전은 X 를 마커 쓰기 훨씬 전(SIGTERM mid-backup)에 세워서 이 정확한 결함 상태에 닿지
+  못했다. j 에도 재확인 실패 뒤 마커가 전혀 안 쓰였는지 확인하는 assertion 을 추가했다.
+- **`assert_prisma_migrate_status_clean`(task168-migration-contract.sh, 러너와 R-A 공유)가
+  `set -Eeuo pipefail` 아래서 자신의 실패를 스스로 못 봤다(2건 지적).** `docker exec ...; rc=$?`
+  형태는 errexit 아래서 "체크된" 명령이 아니라서, `prisma migrate status` 가 non-zero 로 끝나면
+  그 줄에서 함수가 즉시 종료되고 `rc=$?`·`docker rm -f`·`fail` 메시지가 전부 안 돈다 — R-A 의
+  일회용 status-check 컨테이너가 Alpha 호스트에 무기한 남고 진단 메시지도 없다. `if ... ; then
+  rc=0; else rc=$?; fi` 로 바꿔 errexit 이 실제로 "체크"하는 형태로 고쳤다. wrapper 테스트에
+  fake docker 의 `migrate status` 만 실패로 답하는 케이스를 추가해 rc≠0·진단 메시지·
+  `docker rm -f` 호출을 전부 assert 한다 — 고침을 되돌리면 이 케이스가 정확히 그 세 조건 전부로
+  red 가 됨을 확인했다.

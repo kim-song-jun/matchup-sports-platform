@@ -139,10 +139,12 @@ make_r_a_fixture() {
 # R-A's own scenarios; R-B's positive/mismatch scenarios use api123/worker123
 # and need true, handled by their own arms below regardless of this default),
 # $8 = quiesced-writer .HostConfig.RestartPolicy.Name for raApi1/raWorker1
-# (default no)
+# (default no), $9 = exit code for R-A's own throwaway `prisma migrate
+# status` check (task168-migration-contract.sh assert_prisma_migrate_status_clean,
+# default 0 = clean)
 make_fake_docker_for_recover() {
   local bin="$1" m11="$2" advisory="${3:-0}" labeled="${4:-0}" legacy="${5:-0}" binding="${6:-t}" \
-    ra_running="${7:-false}" ra_restart="${8:-no}"
+    ra_running="${7:-false}" ra_restart="${8:-no}" status_rc="${9:-0}"
   # R-A's ledger checks (task168-migration-contract.sh) query
   # _prisma_migrations three more ways than the single-row m11 lookup below:
   # the full ledger (every migration, any name), the Task168-only subset, and
@@ -201,6 +203,11 @@ case "\$*" in
   # exit code; the R-B fixture's restartPolicyBefore is always "always".
   *"HostConfig.RestartPolicy.Name"*) echo always; exit 0 ;;
   *"start v1_api v1_game_operations_worker"*) exit 0 ;;
+  # R-A's own throwaway status-check container (task168-migration-contract.sh
+  # assert_prisma_migrate_status_clean) -- gets a distinct id so its cleanup
+  # ("docker rm -f statuscheckcid") is separately verifiable in \${log}.
+  *"run --pull never -d --no-deps --entrypoint sh v1_api"*) echo statuscheckcid; exit 0 ;;
+  *"exec -u app statuscheckcid"*"migrate status"*) exit ${status_rc} ;;
   *) exit 0 ;;
 esac
 EOF
@@ -335,6 +342,28 @@ rc="$(run_recover "${root}")"
   && [[ "$(jq -r .status "${state_dir}/migration-stage.json")" == MIGRATION_COMMITTED_RECOVERED ]] \
   && pass "R-A reconstructs a MIGRATION_COMMITTED_RECOVERED receipt, distinct from the original status" \
   || fail "R-A did not reconstruct correctly: rc=${rc} $(cat "${root}/stdout") $(cat "${root}/stderr")"
+
+# ── R-A negative: its own throwaway `prisma migrate status` check reports
+# drift (task168-migration-contract.sh assert_prisma_migrate_status_clean,
+# called under this script's `set -Eeuo pipefail`) — round-5 findings #2/#4.
+# A plain `docker exec ...; rc=$?` there let errexit terminate the function
+# right at the failing exec, before `rc=$?`, `docker rm -f`, or `fail` could
+# run: the throwaway container leaked and the drift message never printed.
+# Assert all three: refusal, the diagnostic message, and cleanup.
+root="${WORK}/r-a-migrate-status-drift"; mkdir -p "${root}"
+setup_recover_fixture "${root}"
+printf 'fake backup bytes' > "${state_dir}/pre-m11-backup.sql"
+backup_sha="$(sha256sum "${state_dir}/pre-m11-backup.sql" | awk '{print $1}')"
+make_r_a_fixture "${state_dir}" "${state_dir}/pre-m11-backup.sql" "${backup_sha}"
+make_fake_docker_for_recover "${bin}" "08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323|applied" 0 0 0 t false no 1
+rc="$(run_recover "${root}")"
+if [[ "${rc}" -ne 0 ]] && [[ ! -f "${state_dir}/migration-stage.json" ]] \
+  && grep -q "prisma migrate status reports drift" "${root}/stderr" \
+  && grep -q "^docker rm -f statuscheckcid" "${log}"; then
+  pass "R-A refuses and cleans up its throwaway container when its own migrate-status check reports drift"
+else
+  fail "R-A did not handle migrate-status drift correctly: rc=${rc} stderr=$(cat "${root}/stderr") calls=$(grep statuscheckcid "${log}" || true)"
+fi
 
 # ── R-A negative: a MIGRATION_DIAGNOSIS_REQUIRED receipt already exists ────
 # The runner (task168-stage-b-migrate.sh cleanup_pre_quiesce) writes a real

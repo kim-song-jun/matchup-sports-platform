@@ -95,7 +95,18 @@ assert_prisma_migrate_status_clean(){
   docker exec -u 0 "$cid" sh -ceu 'mkdir -p /tmp/task168.staging' || { docker rm -f "$cid" >/dev/null 2>&1; fail 'could not prepare the status-check container'; }
   docker cp "$source_dir/." "$cid:/tmp/task168.staging" || { docker rm -f "$cid" >/dev/null 2>&1; fail 'could not copy the frozen migration source into the status-check container'; }
   docker exec -u 0 "$cid" sh -ceu 'chown -R app:app /tmp/task168.staging && mv /tmp/task168.staging /tmp/task168' || { docker rm -f "$cid" >/dev/null 2>&1; fail 'could not prepare the status-check container'; }
-  docker exec -u app "$cid" sh -ceu 'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate status --schema /tmp/task168/schema.prisma'; rc=$?
+  # Plain `cmd; rc=$?` is NOT the same as `cmd || rc=$?` under `set -e`: a
+  # simple command's nonzero exit is not "checked" merely because the next
+  # statement reads $?, so errexit still terminates the function right at
+  # `docker exec` and both `rc=$?` and the cleanup/fail below never run --
+  # verified with `bash -c 'set -Eeuo pipefail; f(){ false; rc=$?; echo
+  # after; }; f'`, which exits 1 without printing "after". `if ... ; then
+  # ... else ...; fi` is the one shape errexit actually treats as checked.
+  if docker exec -u app "$cid" sh -ceu 'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate status --schema /tmp/task168/schema.prisma'; then
+    rc=0
+  else
+    rc=$?
+  fi
   docker rm -f "$cid" >/dev/null 2>&1 || true
   [[ "$rc" == 0 ]] || fail 'prisma migrate status reports drift against the pinned final image'
 }

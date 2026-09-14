@@ -38,40 +38,6 @@ write_candidate_manifest() {
   mv "${candidate_tmp}" "${ALPHA_CANDIDATE_MANIFEST}"
 }
 
-# D-5 guard: a Stage A deploy must refuse before source activation if Task
-# 168's M11 is already in the ledger
-# (applied, failed, or rolled back — any row at all), since a Stage A runner
-# would otherwise misclassify the database and fail deep inside
-# task168-stage-a-migrate.sh after activation. Takes the caller's `compose`
-# array by name so callers (deploy-alpha.sh) and tests share one
-# implementation instead of a copy the test only pretends to exercise.
-assert_task168_m11_absent() {
-  local -n __compose="$1"
-  local db_user="${V1_DB_USER:-teameet_v1}" db_name="${V1_DB_NAME:-teameet_v1}"
-  local attempt rows
-
-  "${__compose[@]}" up -d v1_postgres >/dev/null
-  for attempt in $(seq 1 30); do
-    if "${__compose[@]}" exec -T v1_postgres \
-      pg_isready -U "${db_user}" -d "${db_name}" >/dev/null 2>&1; then
-      break
-    fi
-    if [[ "${attempt}" -eq 30 ]]; then
-      echo "[task168-d5-guard] PostgreSQL did not become ready" >&2
-      return 1
-    fi
-    sleep 2
-  done
-
-  rows="$("${__compose[@]}" exec -T v1_postgres \
-    psql -X -v ON_ERROR_STOP=1 -At -U "${db_user}" -d "${db_name}" \
-    -c "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name = '20260911090000_retire_tournament_fixture_tables'")"
-  if [[ "${rows}" != "0" ]]; then
-    echo "[task168-d5-guard] Task 168 M11 is already present in the ledger (${rows} row(s))" >&2
-    return 1
-  fi
-}
-
 # T7 gate: a StageB candidate is not promoted to active without a runtime
 # verification receipt binding both the migration receipt that produced the
 # post-M11 database and this exact candidate manifest — the receipt cannot

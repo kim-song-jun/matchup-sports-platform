@@ -108,6 +108,52 @@ if validate_alpha_release_manifest "${tampered}" "${SHA_A}" \
   exit 1
 fi
 
+# ── validate_stored_alpha_manifest must also accept a stage=stageBFinal
+#    manifest (the shape alpha's active manifest carries between a completed
+#    StageB run and the first post-StageB "final" deploy) -- pinning the
+#    accepted stage set (final / stageAIntermediate / stageBFinal), not just
+#    "final" and "stageAIntermediate". ──────────────────────────────────────
+readonly SHA_SB=4444444444444444444444444444444444444444
+make_stage_b_manifest() {
+  local sha="$1" version="$2" digest="$3" output="$4"
+  # The full shape validate_alpha_stage_b_final_manifest accepts — a loose
+  # fixture would only prove the validator rejects it.
+  jq -Sn \
+    --arg sha "${sha}" --arg version "${version}" --arg registry "${REGISTRY}" --arg digest "${digest}" \
+    '{schemaVersion:1,environment:"alpha",release:{sha:$sha,version:$version,createdAt:"2026-09-14T00:00:00Z"},
+      source:{bucket:"alpha-bucket",key:("releases/task168-stage-b/"+$sha+".tar.gz"),versionId:"version-1",sha256:("e"*64)},
+      database:{migrationPolicy:"task168-stageBFinal",rollbackMode:"backup-only",compatibilityCheck:"expand-contract-sql-v1",migrationValidatedFrom:null,rollbackCompatibleWith:null,
+        task168:{stage:"stageBFinal",schemaSha256:"e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46",runtimeClientSchemaSha256:"e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46",
+          migrations:[range(0;11)|{name:("202609010000"+((10+.)|tostring)+"_v1_fixture"),sha256:("d"*64)}],
+          fullMigrationHistory:[range(0;12)|{name:("202608010000"+((10+.)|tostring)+"_v1_history"),sha256:("d"*64)}],
+          resolvedMigrationAttemptsSha256:"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          migrationLockSha256:("1"*64),
+          predecessor:{releaseSha:"5555555555555555555555555555555555555555",transition:"/x",transitionSha256:("f"*64),apiImage:"img",databaseIdentity:"id",schemaSha256:"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f"},
+          expectedRunningApiImage:($registry+"/teameet-alpha-v1-api@sha256:"+("9"*64)),
+          rehearsal:{mode:"waived",reason:"user-directed Alpha run without isolated rehearsal",decidedAt:"2026-09-14"},
+          recoveryFrom:null,rollbackTarget:null}},
+      images:{api:{repository:($registry+"/teameet-alpha-v1-api"),digest:$digest,uri:($registry+"/teameet-alpha-v1-api@"+$digest)},web:{repository:($registry+"/teameet-alpha-v1-web"),digest:$digest,uri:($registry+"/teameet-alpha-v1-web@"+$digest)},cutoverTool:{repository:($registry+"/teameet-alpha-v1-api"),digest:$digest,uri:($registry+"/teameet-alpha-v1-api@"+$digest)}}}' \
+    > "${output}"
+}
+manifest_sb="${TEST_ROOT}/manifest-stage-b.json"
+make_stage_b_manifest "${SHA_SB}" "0.1.0-alpha.20260914.g444444444444" "${DIGEST_A}" "${manifest_sb}"
+checksum_sb="$(sha256sum "${manifest_sb}" | awk '{print $1}')"
+validate_stored_alpha_manifest "${manifest_sb}" "${REGISTRY}" "${checksum_sb}"
+
+jq '.database.task168.schemaSha256 = "0000000000000000000000000000000000000000000000000000000000000000"' "${manifest_sb}" > "${tampered}"
+tampered_checksum="$(sha256sum "${tampered}" | awk '{print $1}')"
+if validate_stored_alpha_manifest "${tampered}" "${REGISTRY}" "${tampered_checksum}"; then
+  echo "stageBFinal manifest with a wrong final schema pin was accepted" >&2
+  exit 1
+fi
+
+jq '.database.task168.resolvedMigrationAttemptsSha256 = "not-a-hash"' "${manifest_sb}" > "${tampered}"
+tampered_checksum="$(sha256sum "${tampered}" | awk '{print $1}')"
+if validate_stored_alpha_manifest "${tampered}" "${REGISTRY}" "${tampered_checksum}"; then
+  echo "stageBFinal manifest with a malformed resolved-attempt snapshot binding was accepted" >&2
+  exit 1
+fi
+
 write_candidate_manifest "${manifest_a}"
 promote_candidate_manifest
 jq -e --arg sha "${SHA_A}" --arg checksum "${checksum_a}" '.active.release.sha == $sha and .activeManifestSha256 == $checksum and .previous == null and .previousManifestSha256 == null' \

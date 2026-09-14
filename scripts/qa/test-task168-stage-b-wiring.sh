@@ -129,7 +129,7 @@ run_stage_a() {
   local dir="${WORK}/stage-a"
   make_fake_bin "${dir}" success
   base_env
-  export TASK168_STAGE=stageAIntermediate
+  export TASK168_STAGE=final
   export RELEASE_VERSION="${VERSION}"
   export SOURCE_VERSION_ID="${VERSION_ID_A}"
   export SOURCE_SHA256="${SHA256_A}"
@@ -137,7 +137,7 @@ run_stage_a() {
   export MANIFEST_SHA256="${SHA256_B}"
   local rc=0
   PATH="${dir}:${PATH}" bash "${SCRIPT}" >/dev/null 2>"${dir}/stderr" || rc=$?
-  [[ "${rc}" -eq 0 ]] || { fail "stageAIntermediate run failed: $(cat "${dir}/stderr")"; return; }
+  [[ "${rc}" -eq 0 ]] || { fail "final run failed: $(cat "${dir}/stderr")"; return; }
   local params
   params="$(cat "${dir}/last-parameters.json")"
   jq -e '.commands | length == 9' <<< "${params}" >/dev/null && pass "stageA sends exactly 9 commands (unchanged)" \
@@ -170,7 +170,7 @@ run_stage_a_version_id_width() {
   local dir="${WORK}/stage-a-version-id-width"
   make_fake_bin "${dir}" success
   base_env
-  export TASK168_STAGE=stageAIntermediate
+  export TASK168_STAGE=final
   export RELEASE_VERSION="${VERSION}"
   export SOURCE_VERSION_ID="$(printf 'a%.0s' $(seq 1 300))"   # 300 chars: > 255, <= 1024
   export SOURCE_SHA256="${SHA256_A}"
@@ -297,7 +297,7 @@ run_classification() {
 # ── 7. deploy-alpha.yml: push never reaches StageB (T1 completion #1) ──────
 # Extracts the REAL "Resolve Task 168 stage" step's run: block out of the
 # live workflow YAML (never a hand-copied excerpt) and executes it, so a
-# regression that weakens the push-pins-to-stageAIntermediate guard shows up
+# regression that weakens the push-pins-to-final guard shows up
 # here even though this test never actually dispatches the workflow.
 run_stage_resolution_guard() {
   local dir="${WORK}/stage-resolution"
@@ -318,15 +318,15 @@ PY
   [[ -s "${dir}/resolve.sh" ]] || { fail "could not extract the Resolve Task 168 stage run: block"; return; }
 
   # push event, dispatch input claims stageBFinal -> must still resolve to
-  # stageAIntermediate and must not require a timeout.
+  # final and must not require a timeout.
   local out="${dir}/github_output"
   : > "${out}"
   local rc=0
   ( GITHUB_EVENT_NAME=push STAGE_INPUT=stageBFinal TIMEOUT_INPUT='' GITHUB_OUTPUT="${out}" \
     bash "${dir}/resolve.sh" ) > "${dir}/push-stdout" 2> "${dir}/push-stderr" || rc=$?
-  [[ "${rc}" -eq 0 ]] && grep -q '^stage=stageAIntermediate$' "${out}" \
-    && pass "a push event resolves to stage=stageAIntermediate regardless of a stale dispatch input" \
-    || fail "a push event did not resolve to stageAIntermediate: rc=${rc} $(cat "${out}" "${dir}/push-stderr" 2>/dev/null)"
+  [[ "${rc}" -eq 0 ]] && grep -q '^stage=final$' "${out}" \
+    && pass "a push event resolves to stage=final regardless of a stale dispatch input" \
+    || fail "a push event did not resolve to final: rc=${rc} $(cat "${out}" "${dir}/push-stderr" 2>/dev/null)"
 
   # workflow_dispatch + a StageB stage but no timeout -> must reject (U11: no
   # assumed default), never silently pick one.
@@ -338,14 +338,14 @@ PY
     && pass "a StageB dispatch with no executionTimeout is rejected (U11)" \
     || fail "a StageB dispatch with no timeout was not rejected: rc=${rc} $(cat "${dir}/nodispatch-stderr" 2>/dev/null)"
 
-  # Mutation-style regression: with the push-pins-to-stageAIntermediate guard
+  # Mutation-style regression: with the push-pins-to-final guard
   # deleted, the same push+stageBFinal input must NOT resolve to
-  # stageAIntermediate — proves the test above actually depends on that guard
+  # final — proves the test above actually depends on that guard
   # rather than passing for an unrelated reason.
   python3 -c "
 s = open('${dir}/resolve.sh').read()
 guard = '''if [[ \"\${GITHUB_EVENT_NAME}\" != workflow_dispatch ]]; then
-  stage=\"stageAIntermediate\"
+  stage=\"final\"
 fi
 '''
 assert guard in s, 'guard text not found verbatim -- update this mutation to match the real block'
@@ -355,14 +355,14 @@ open('${dir}/resolve-mutated.sh', 'w').write(s.replace(guard, '', 1))
   rc=0
   ( GITHUB_EVENT_NAME=push STAGE_INPUT=stageBFinal TIMEOUT_INPUT=60 GITHUB_OUTPUT="${out}" \
     bash "${dir}/resolve-mutated.sh" ) > /dev/null 2>&1 || rc=$?
-  grep -q '^stage=stageAIntermediate$' "${out}" 2>/dev/null \
-    && fail "removing the push guard still resolved to stageAIntermediate (mutation not detected)" \
+  grep -q '^stage=final$' "${out}" 2>/dev/null \
+    && fail "removing the push guard still resolved to final (mutation not detected)" \
     || pass "removing the push guard changes the result (mutation correctly detected)"
 }
 
 # ── 8. deploy-alpha.yml: EVERY StageB-only step (an exact, named set — not
 # a >=N threshold) evaluates its if: to false once
-# steps.task168.outputs.stage is stageAIntermediate. A prior version of
+# steps.task168.outputs.stage is final. A prior version of
 # this check used a >=5-conditions threshold plus a grep -v mutation that
 # happened to remove all 6 identical-text guards at once, and so could not
 # tell "one guard deleted" from "nothing changed" — deleting a single
@@ -405,7 +405,7 @@ def evaluates_false_for_stage_a(cond):
     if cond is None or cond == "":
         return False  # no guard at all -> the step always runs -> not false
     expr = cond
-    expr = expr.replace("steps.task168.outputs.stage", "'stageAIntermediate'")
+    expr = expr.replace("steps.task168.outputs.stage", "'final'")
     expr = expr.replace("steps.stageb-images.outputs.final_exists", "''")
     expr = expr.replace("||", " or ").replace("&&", " and ")
     return not eval(expr)  # noqa: S307 -- trusted repo YAML, not user input
@@ -423,7 +423,7 @@ sys.exit(1 if red else 0)
 PY
   if [[ "${py_rc}" -eq 0 ]]; then
     local total; total="$(jq -r '.total' "${out}" 2>/dev/null || echo '?')"
-    pass "found exactly the expected ${total} StageB-only step if: conditions, all false for stage=stageAIntermediate"
+    pass "found exactly the expected ${total} StageB-only step if: conditions, all false for stage=final"
   else
     fail "StageB-only step if: check failed: $(cat "${out}" 2>/dev/null)"
   fi
@@ -473,7 +473,7 @@ def evaluates_false_for_stage_a(cond):
     if cond is None or cond == "":
         return False
     expr = cond
-    expr = expr.replace("steps.task168.outputs.stage", "'stageAIntermediate'")
+    expr = expr.replace("steps.task168.outputs.stage", "'final'")
     expr = expr.replace("steps.stageb-images.outputs.final_exists", "''")
     expr = expr.replace("||", " or ").replace("&&", " and ")
     return not eval(expr)  # noqa: S307

@@ -221,13 +221,18 @@ describe('Task 11 competition configuration', () => {
     );
   });
 
+  // Task 168 M11 retired v1_tournament_fixtures outright, so this can no
+  // longer probe non-reads by renaming the table away and back (there is
+  // nothing left to rename). It instead asserts the table's actual absence
+  // — the migration's own regression target — alongside the original
+  // "backfill never references it" contract.
   it('canonical config backfill does not read the retired fixture table', async () => {
-    const executeRaw = jest.spyOn(prisma, '$executeRaw');
-    const retiredProbeTable = 'v1_tournament_fixtures_task168_probe';
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE "v1_tournament_fixtures" RENAME TO "${retiredProbeTable}"`,
-    );
+    const tableExists = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT to_regclass('public.v1_tournament_fixtures') IS NOT NULL AS exists
+    `;
+    expect(tableExists[0]?.exists).toBe(false);
 
+    const executeRaw = jest.spyOn(prisma, '$executeRaw');
     try {
       await backfillCompetitionConfigVersionIds(prisma);
       const sql = executeRaw.mock.calls
@@ -237,9 +242,6 @@ describe('Task 11 competition configuration', () => {
       expect(sql).not.toContain('v1_tournament_fixtures');
     } finally {
       executeRaw.mockRestore();
-      await prisma.$executeRawUnsafe(
-        `ALTER TABLE "${retiredProbeTable}" RENAME TO "v1_tournament_fixtures"`,
-      );
     }
   });
 

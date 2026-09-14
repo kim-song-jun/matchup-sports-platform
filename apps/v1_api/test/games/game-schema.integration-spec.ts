@@ -209,19 +209,22 @@ describe('v1 game operations schema', () => {
   });
 
   it('rejects a game without its canonical TeamMatch source at the database boundary', async () => {
+    // Task 168 M11 retired the dual-mode (legacy-or-canonical) source guard
+    // this test used to name (v1_games_source_expand_ck) and replaced it
+    // with a canonical-only check of the same shape, v1_games_canonical_source_guard_ck.
     expectRawFailure(await captureRawFailure(() => prisma.$executeRaw`
       INSERT INTO v1_games
         (id, source_type, state, version, last_sequence, competition_config_version_id, created_at, updated_at)
       VALUES
         (${gameSchemaFixture.gameId}, 'TEAM_MATCH', 'SCHEDULED', 0, 0, ${gameSchemaFixture.configId}, ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
-    `), '23514', 'v1_games_source_expand_ck');
+    `), '23514', 'v1_games_canonical_source_guard_ck');
 
     expectRawFailure(await captureRawFailure(() => prisma.$executeRaw`
       INSERT INTO v1_games
         (id, source_type, team_match_id, state, version, last_sequence, competition_config_version_id, created_at, updated_at)
         VALUES
         (${gameSchemaFixture.secondGameId}, 'FRIENDLY_MATCH', ${gameSchemaFixture.teamMatchId}, 'SCHEDULED', 0, 0, ${gameSchemaFixture.configId}, ${gameSchemaFixture.now}, ${gameSchemaFixture.now})
-    `), '23514', 'v1_games_source_expand_ck');
+    `), '23514', 'v1_games_canonical_source_guard_ck');
   });
 
   it('keeps the canonical TeamMatch binding nullable and unique for soft-deleted source records', async () => {

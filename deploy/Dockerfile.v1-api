@@ -18,9 +18,13 @@ RUN --mount=type=cache,id=teameet-pnpm-store,target=/root/.local/share/pnpm/stor
 COPY apps/v1_api/ apps/v1_api/
 
 WORKDIR /app/apps/v1_api
+# Task 168 M11 converged: schema.prisma is now the final post-retirement
+# schema (5 legacy models, 2 enums and 3 relations removed). The assert pins
+# the runtime client to that exact schema so a stale builder cache or an
+# accidental schema edit fails the build instead of shipping a silent drift.
 RUN npx prisma generate \
-  && test "$(sha256sum prisma/schema.prisma | awk '{print $1}')" = 91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f \
-  && printf '{"schemaVersion":1,"stage":"stageAIntermediate","schemaSha256":"91222f64cf30dd15169a17cf5eb096c446861c5f578a31c51d44c92b3a321f3f","generatedClient":true}\n' > .task168-runtime-client-attestation.json
+  && test "$(sha256sum prisma/schema.prisma | awk '{print $1}')" = e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46 \
+  && printf '{"schemaVersion":1,"stage":"final","schemaSha256":"e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46","generatedClient":true}\n' > .task168-runtime-client-attestation.json
 RUN npx nest build
 
 # This image is an executable view of the immutable v7 tar. No retired source

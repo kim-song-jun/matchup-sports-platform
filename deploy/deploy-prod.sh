@@ -261,6 +261,8 @@ else
   echo "[prod-deploy] 외부 DB(${V1_DB_HOST}) 사용 — 로컬 v1_postgres 기동을 건너뜁니다"
 fi
 
+assert_task168_m11_guard "${PROD_SOURCE_DIR}"
+
 # D7: prisma migrate deploy 는 이 스크립트 안에서 정확히 1회만 실행한다(구 restart-containers.sh
 # 의 이중 실행을 이번 변경에서 제거). alpha 와 달리 sanitize/QA 시드는 절대 이식하지 않는다
 # (§6 — prod 는 진짜 사용자 데이터다).

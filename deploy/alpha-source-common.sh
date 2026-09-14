@@ -34,6 +34,13 @@ prepare_alpha_release_source() {
   local target_tmp="${target_dir}.tmp.$$"
   local drift
 
+  # The key becomes a path segment, so refuse anything that is not one of the
+  # two release-key shapes even when a caller builds it by hand.
+  [[ "${source_key}" =~ ^(task168-stage-b-)?[0-9a-f]{40}$ ]] || {
+    echo "[alpha-release] refusing a source key that is not a release key" >&2
+    return 1
+  }
+
   # Callers that run this as `prepare_alpha_release_source … || fail`
   # (deploy-alpha-stage-b.sh) turn errexit off inside the function, so each
   # step stops it itself rather than relying on the caller's `set -e`.
@@ -110,8 +117,13 @@ activate_alpha_release_source() {
   local target_dir="${ALPHA_SOURCE_RELEASES_DIR}/${source_key}"
   local next_link="${ALPHA_HOME_DIR}/.teameet-alpha-live.$$"
 
-  # An empty key names the sources root itself, which exists.
-  [[ -n "${source_key}" && -d "${target_dir}" ]] || return 1
+  # The key becomes a path segment, so refuse anything that is not one of the
+  # two release-key shapes even when a caller builds it by hand.
+  [[ "${source_key}" =~ ^(task168-stage-b-)?[0-9a-f]{40}$ ]] || {
+    echo "[alpha-release] refusing a source key that is not a release key" >&2
+    return 1
+  }
+  [[ -d "${target_dir}" ]] || return 1
   ln -s "${target_dir}" "${next_link}" || return 1
   if [[ -L "${ALPHA_LIVE_DIR}" ]]; then
     # A failed swap must not leave ~/.teameet-alpha-live.$$ behind: the link is

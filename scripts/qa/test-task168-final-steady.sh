@@ -27,8 +27,6 @@
 #      before M11) turns red.
 #   4. L4 unresolved-row rule removed: negative ⑦ (a crashed/in-flight
 #      ledger row) turns red.
-#   5. The StageB receipt's databaseIdentity binding removed: negative ⑨ (a
-#      receipt captured against a different alpha environment) turns red.
 #   5. The migration-receipt scan's databaseIdentity/m11Sha256 filter
 #      removed: negative ⑨ (a receipt bound to a different database) turns
 #      red.
@@ -37,20 +35,24 @@
 #      different release turns red against a legitimate migration receipt.
 #   7. L4's contradictory-row rejection (finished_at AND rolled_back_at both
 #      set) removed: negative ⑪ turns red.
-#   8. STAGE_B_STATE_ROOT reverted to the old (pre-fix) task168-final/ path
+#   8. L2's duplicate-applied-row rejection removed: negative ⑫ (the same
+#      Task168 name applied twice, both rows with their own correct
+#      checksum) turns red -- an associative array keyed by name would
+#      otherwise silently collapse the duplicate into a single entry.
+#   9. STAGE_B_STATE_ROOT reverted to the old (pre-fix) task168-final/ path
 #      real StageB producers never write to: positive ⓐ (a legitimate,
 #      correctly-shaped StageB completion) flips from pass to fail -- this
 #      is the receipt-shape/path bug this file's write_receipts() fixture
 #      was rewritten to catch (see negative ⑩ for the direct case: a
 #      receipt genuinely written in that old shape must read as absent).
-#   9. Exact-match reversion (inserting "pending_count == 0 or fail",
+#  10. Exact-match reversion (inserting "pending_count == 0 or fail",
 #      simulating the candidate runner's full-ledger-equality design this
 #      script deliberately does NOT use): positive ⓑ (a legitimate M12
 #      pending after M11) flips from pass to fail -- proving this suite
 #      would catch a regression back to the design D-1 was written to fix.
-# Mutations 8 and 9 above are the two whose expected direction is a false
+# Mutations 9 and 10 above are the two whose expected direction is a false
 # REJECT of a legitimate scenario (checked directly, not through
-# mutate_and_check, which looks for a false ACCEPT); all nine are counted in
+# mutate_and_check, which looks for a false ACCEPT); all ten are counted in
 # the same mutation_reds/mutation_total tally at the bottom of this file.
 set -Eeuo pipefail
 
@@ -432,6 +434,27 @@ export MIGRATE_RAN_FLAG="${TEST_ROOT}/n11-migrate-ran"
 : > "${CALL_LOG}"
 assert_check_only_fails "contradictory-ledger-row" "${dir11}"
 
+# ── negative ⑫ a Task168 migration (M1) has TWO applied ledger rows, both
+#    with its own correct checksum. _prisma_migrations keys on an id
+#    column, not migration_name, so this is possible on a corrupted table;
+#    an associative array keyed by name would silently collapse them to a
+#    single entry, and since both rows carry the SAME (correct) checksum
+#    every other check (L1's per-name comparison, L2's pinned-M11 check)
+#    would stay green -- only an explicit "seen twice" check catches the
+#    duplicate row itself. ───────────────────────────────────────────────
+dir12="${TEST_ROOT}/n12"; make_source_tree "${dir12}"
+{
+  ledger_row "${TASK168_M1_M10[0]}" "$(source_sha "${dir12}" "${TASK168_M1_M10[0]}")" t f
+  ledger_row "${TASK168_M1_M10[0]}" "$(source_sha "${dir12}" "${TASK168_M1_M10[0]}")" t f
+  applied_rows_for "${dir12}" "${TASK168_M1_M10[@]:1}" "${M11_NAME}"
+} > "${TEST_ROOT}/rows-n12"
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-n12"
+export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n12"
+export TABLE_EXISTS=t
+export MIGRATE_RAN_FLAG="${TEST_ROOT}/n12-migrate-ran"
+: > "${CALL_LOG}"
+assert_check_only_fails "duplicate-applied-row" "${dir12}"
+
 # ── positive ⓐ source == DB == M1-M11, no pending ────────────────────────────
 dira="${TEST_ROOT}/pa"; make_source_tree "${dira}"
 applied_rows_for "${dira}" "${TASK168_M1_M10[@]}" "${M11_NAME}" > "${TEST_ROOT}/rows-pa"
@@ -489,7 +512,7 @@ if [[ "${negatives_failed}" -ne 0 || "${positives_failed}" -ne 0 ]]; then
   echo "[task168-final-steady] FAILED: ${negatives_failed} negative(s), ${positives_failed} positive(s)" >&2
   exit 1
 fi
-echo "[task168-final-steady] all 11 negatives + 3 positives passed"
+echo "[task168-final-steady] all 12 negatives + 3 positives passed"
 
 # ── mutation run: verify the expected red counts in the header comment ──────
 # Applies each mutation to a scratch copy of the script and reruns the exact
@@ -678,6 +701,20 @@ if mutate_and_check "l4-contradictory-removed" \
   mutation_reds=$((mutation_reds + 1))
 fi
 
+# L2's duplicate-applied-row rejection removed: negative ⑫ (dir12, M11
+# applied twice with different checksums) turns red -- the associative
+# array would otherwise silently collapse both rows into whichever the
+# ledger query happens to read last.
+export LEDGER_ROWS_BEFORE_FILE="${TEST_ROOT}/rows-n12"; export LEDGER_ROWS_AFTER_FILE="${TEST_ROOT}/rows-n12"
+export TABLE_EXISTS=t; export MIGRATE_RAN_FLAG="${TEST_ROOT}/mut-l2-duplicate-migrate-ran"
+mutation_total=$((mutation_total + 1))
+if mutate_and_check "l2-duplicate-applied-row-removed" \
+  '[[ -z "${APPLIED_SHA[${name}]+x}" ]] || fail "L2 violated: migration '"'"'${name}'"'"' has more than one applied ledger row"' \
+  ':' \
+  "${dir12}"; then
+  mutation_reds=$((mutation_reds + 1))
+fi
+
 # Receipt path/shape regression: reverting STAGE_B_STATE_ROOT back to the old
 # (wrong) task168-final/ location must make even a LEGITIMATE StageB
 # completion (positive ⓐ, real receipts under task168/<sha>/) unreadable --
@@ -762,8 +799,8 @@ else
   echo "[mutation exact-match-reversion] NOT red -- an exact-match reversion did not break the pending-M12 scenario as expected" >&2
 fi
 
-echo "[task168-final-steady] mutation reds: ${mutation_reds}/${mutation_total} (expected 9/9)"
-if [[ "${mutation_reds}" -ne 9 ]]; then
+echo "[task168-final-steady] mutation reds: ${mutation_reds}/${mutation_total} (expected 10/10)"
+if [[ "${mutation_reds}" -ne 10 ]]; then
   echo "[task168-final-steady] FAILED: expected all 6 mutations to weaken the check as documented" >&2
   exit 1
 fi

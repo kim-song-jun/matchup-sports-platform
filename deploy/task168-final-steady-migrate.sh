@@ -87,6 +87,11 @@ contradictory_count=0
 while IFS='|' read -r name checksum finished rolledback; do
   [[ -n "${name}" ]] || continue
   if [[ "${finished}" == t && "${rolledback}" == f ]]; then
+    # _prisma_migrations keys on an id column, not migration_name -- a
+    # second applied row for the same name (corrupted table, or a manual
+    # `migrate resolve` sequence gone wrong) must be rejected, not silently
+    # collapsed into a single associative-array entry (L2's "exactly 1 row").
+    [[ -z "${APPLIED_SHA[${name}]+x}" ]] || fail "L2 violated: migration '${name}' has more than one applied ledger row"
     APPLIED_SHA["${name}"]="${checksum}"
   elif [[ "${finished}" == f && "${rolledback}" == f ]]; then
     # finished_at IS NULL AND rolled_back_at IS NULL: the P3009 "in-flight or

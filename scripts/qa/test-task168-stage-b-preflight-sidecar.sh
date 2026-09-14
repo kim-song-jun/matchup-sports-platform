@@ -73,9 +73,11 @@ PY
 # latter three exists for a clearer, cause-specific message, not because it
 # is the only thing standing between the archive and acceptance). Deleting
 # them one at a time on a scratch copy: only the identity check itself
-# produces red -- on (END-MARKER-EXTRA), the one new case with no header-level
-# rule of its own -- and only against a single-gzip-member archive; deleting
-# decompress_single_gzip_member's own trailing-data check instead reds
+# produces red, on five cases with no header-level rule of their own --
+# (END-MARKER-EXTRA), (SHORT_PAX_DECOY), (LONG_PAX_WRONG_USTAR),
+# (LONE_ZERO_THEN_MEMBER) and (AFTER_EOA_MEMBER) -- and only against a
+# single-gzip-member archive; deleting decompress_single_gzip_member's own
+# trailing-data check instead reds
 # (GZIP-TRAILING) and (GZIP-CONCAT). Deleting the consecutive-pax check alone
 # still rejects (CHAINED_PAX) and (A_newmig) (via the identity check and the
 # path-less-pax check respectively, just with a different message); deleting
@@ -408,21 +410,23 @@ pass 'rejects an extra file smuggled inside an already-declared migration direct
 
 # ---- EVILDIR. an extra, empty directory member sits under
 #      apps/v1_api/prisma/migrations/ -- the prisma-extra allowlist above
-#      only ever walked typeflag '0' members, so before ALLOWED_TYPEFLAGS
-#      excluded '5' this reached no check at all ---------------------------
+#      only ever walks typeflag '0' members, so a directory member reaches
+#      no check at all until ALLOWED_TYPEFLAGS rejects it by typeflag -------
 EVILDIR_DIR="$TMP/evil-directory"
 mkdir -p "$EVILDIR_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$EVILDIR_DIR/source.tar.gz" <<'PY'
 import os, sys
 sys.path.insert(0, sys.argv[1])
 sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
-from task168_canonical_tar import canonical_gzip_bytes, canonical_tar_bytes
+from task168_canonical_tar import canonical_gzip_bytes, encode_member, end_of_archive_marker, header_block
 from task168_test_fixtures import collect_members
 stage, out = sys.argv[2], sys.argv[3]
-members = collect_members(stage, ['INPUT-MANIFEST.json', 'apps'])
-members.append(('apps/v1_api/prisma/migrations/20990101000000_evil', b'5', 0o755, b''))
+trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
+evil_dir_header = header_block(b'apps/v1_api/prisma/migrations/20990101000000_evil/', 0, 0o755, b'5')
+full = trunk + evil_dir_header + end_of_archive_marker()
+full += b'\x00' * ((-len(full)) % 10240)  # RECORDSIZE, matching canonical_tar_bytes's own padding
 with open(out, 'wb') as fh:
-    fh.write(canonical_gzip_bytes(canonical_tar_bytes(members)))
+    fh.write(canonical_gzip_bytes(full))
 PY
 evildir_sha="$(sha "$EVILDIR_DIR/source.tar.gz")"
 evildir_bytes="$(wc -c < "$EVILDIR_DIR/source.tar.gz" | tr -d ' ')"
@@ -853,13 +857,9 @@ pass 'PAX-NOPATH: rejects a pax header that sets no path record at all'
 
 # ---- A_newmig. x{path=docs/decoy.txt}, then an empty x{} (no records)
 #      immediately after it, then a regular header whose raw ustar name is a
-#      brand-new migration outside apps/v1_api/prisma/. The old walker
-#      carried the first header's decoy path forward through the empty
-#      second one and used it as the effective name, so the prisma
-#      allowlist below only ever saw "docs/decoy.txt" -- GNU tar and bsdtar
-#      instead extract the member under its raw name. CHAINED_PAX above
-#      already proves the mechanism; this reproduces the migration-hiding
-#      consequence directly -----------------------------------------------
+#      brand-new migration outside apps/v1_api/prisma/. This is CHAINED_PAX's
+#      consecutive-pax shape again, reproduced with a migration-hiding member
+#      as the payload instead of a generic decoy -----------------------------
 A_NEWMIG_DIR="$TMP/a-newmig"
 mkdir -p "$A_NEWMIG_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$A_NEWMIG_DIR/source.tar.gz" <<'PY'
@@ -929,10 +929,10 @@ run_expect_fail 'source archive contains a duplicate member' "${ARGS[@]}"
 pass 'A_emptym11: rejects a second, empty copy of the M11 member appended with no pax header at all'
 
 # ---- B_nulm11. a pax path record containing a NUL byte followed by 'x' --
-#      tarfile and the old walker both kept the NUL in the name, but GNU tar
-#      and bsdtar both cut the ustar/pax name at the first NUL, so a second
-#      archive member could hide behind a name that looks distinct only to
-#      the Python-side parsers -------------------------------------------
+#      a Python-side parser that keeps the NUL in the decoded name would
+#      treat this as distinct from the truncated name GNU tar/bsdtar
+#      actually extract (both cut at the first NUL), letting a second
+#      archive member hide behind the difference -----------------------
 B_NULM11_DIR="$TMP/b-nulm11"
 mkdir -p "$B_NULM11_DIR"
 python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$B_NULM11_DIR/source.tar.gz" "apps/v1_api/prisma/migrations/$M11_NAME/migration.sql" <<'PY'
@@ -1002,6 +1002,43 @@ for i in "${!ARGS[@]}"; do
 done
 run_expect_fail 'source archive contains a header name with a control byte' "${ARGS[@]}"
 pass 'HEADER-NAME-NUL: rejects a raw ustar name field carrying a NUL byte followed by trailing garbage'
+
+# ---- INVALID-UTF8-NAME. a raw ustar name field carries an overlong-encoded
+#      byte sequence that is not valid UTF-8 (no control byte, so it clears
+#      the control-byte check) -- surrogateescape decoding still produces a
+#      Python str for it, so this must be rejected by name, not left to
+#      surface later as an encoding exception from some other consumer -----
+INVALID_UTF8_NAME_DIR="$TMP/invalid-utf8-name"
+mkdir -p "$INVALID_UTF8_NAME_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$INVALID_UTF8_NAME_DIR/source.tar.gz" <<'PY'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, encode_member, end_of_archive_marker, header_block
+from task168_test_fixtures import collect_members
+stage, out = sys.argv[2], sys.argv[3]
+trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
+name_field = (b'apps/zz-\xc0\xaf.txt').ljust(100, b'\x00')[:100]
+extra = header_block(name_field, 0, 0o644, b'0')
+full = trunk + extra + end_of_archive_marker()
+full += b'\x00' * ((-len(full)) % 10240)  # RECORDSIZE, matching canonical_tar_bytes's own padding
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(full))
+PY
+invalid_utf8_name_sha="$(sha "$INVALID_UTF8_NAME_DIR/source.tar.gz")"
+invalid_utf8_name_bytes="$(wc -c < "$INVALID_UTF8_NAME_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$invalid_utf8_name_sha" --argjson b "$invalid_utf8_name_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$INVALID_UTF8_NAME_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$INVALID_UTF8_NAME_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$invalid_utf8_name_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$INVALID_UTF8_NAME_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive member name is not valid UTF-8' "${ARGS[@]}"
+pass 'INVALID-UTF8-NAME: rejects a raw ustar name field that is not valid UTF-8'
 
 # ---- GZIP-TRAILING / GZIP-CONCAT. bytes after the archive's own single gzip
 #      member -- arbitrary garbage, or a second complete, independently-valid
@@ -1080,6 +1117,159 @@ for i in "${!ARGS[@]}"; do
 done
 run_expect_fail 'source archive is not in canonical form' "${ARGS[@]}"
 pass 'END-MARKER-EXTRA: rejects a real member placed after the tar body'\''s own end-of-archive marker'
+
+# ---- SHORT_PAX_DECOY. a pax path record names a short, all-ASCII file that
+#      would never need a pax header under canonical_tar_bytes' own rule
+#      (needs_pax is name length/non-ASCII driven), while the header's raw
+#      ustar name field carries a different short, all-ASCII name -- real
+#      tar always prefers a pax path when one is present, so this and
+#      END-MARKER-EXTRA are two independent shapes only the identity check
+#      (not any header-level rule) can catch ------------------------------
+SHORT_PAX_DECOY_DIR="$TMP/short-pax-decoy"
+mkdir -p "$SHORT_PAX_DECOY_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$SHORT_PAX_DECOY_DIR/source.tar.gz" <<'PY'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, encode_member, end_of_archive_marker, header_block, pax_header_block
+from task168_test_fixtures import collect_members
+stage, out = sys.argv[2], sys.argv[3]
+trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
+data = b'decoy\n'
+extra = pax_header_block(b'apps/zz-short-real.txt') + header_block(b'apps/zz-short-decoy.txt', len(data), 0o644, b'0') + data
+extra += b'\x00' * ((-len(data)) % 512)
+full = trunk + extra + end_of_archive_marker()
+full += b'\x00' * ((-len(full)) % 10240)  # RECORDSIZE, matching canonical_tar_bytes's own padding
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(full))
+PY
+short_pax_decoy_sha="$(sha "$SHORT_PAX_DECOY_DIR/source.tar.gz")"
+short_pax_decoy_bytes="$(wc -c < "$SHORT_PAX_DECOY_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$short_pax_decoy_sha" --argjson b "$short_pax_decoy_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$SHORT_PAX_DECOY_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$SHORT_PAX_DECOY_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$short_pax_decoy_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$SHORT_PAX_DECOY_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive is not in canonical form' "${ARGS[@]}"
+pass 'SHORT_PAX_DECOY: rejects a pax path naming a short ASCII file while the raw ustar name field carries a different short ASCII name'
+
+# ---- LONG_PAX_WRONG_USTAR. a name long enough to require a pax path record
+#      (>100 bytes) carries the correct pax path, but the header's raw ustar
+#      name field (ignored by real tar whenever a pax path is present) is a
+#      different string instead of canonical_tar_bytes' own name_bytes[:100]
+#      -------------------------------------------------------------------
+LONG_PAX_WRONG_USTAR_DIR="$TMP/long-pax-wrong-ustar"
+mkdir -p "$LONG_PAX_WRONG_USTAR_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$LONG_PAX_WRONG_USTAR_DIR/source.tar.gz" <<'PY'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, encode_member, end_of_archive_marker, header_block, pax_header_block
+from task168_test_fixtures import collect_members
+stage, out = sys.argv[2], sys.argv[3]
+trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
+real_name = ('apps/' + 'z' * 120 + '.txt').encode('ascii')
+data = b'long name\n'
+extra = pax_header_block(real_name) + header_block(b'apps/zz-wrong-ustar-field.txt', len(data), 0o644, b'0') + data
+extra += b'\x00' * ((-len(data)) % 512)
+full = trunk + extra + end_of_archive_marker()
+full += b'\x00' * ((-len(full)) % 10240)  # RECORDSIZE, matching canonical_tar_bytes's own padding
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(full))
+PY
+long_pax_wrong_ustar_sha="$(sha "$LONG_PAX_WRONG_USTAR_DIR/source.tar.gz")"
+long_pax_wrong_ustar_bytes="$(wc -c < "$LONG_PAX_WRONG_USTAR_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$long_pax_wrong_ustar_sha" --argjson b "$long_pax_wrong_ustar_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$LONG_PAX_WRONG_USTAR_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$LONG_PAX_WRONG_USTAR_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$long_pax_wrong_ustar_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$LONG_PAX_WRONG_USTAR_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive is not in canonical form' "${ARGS[@]}"
+pass 'LONG_PAX_WRONG_USTAR: rejects a long pax-named member whose raw ustar name field is not canonical_tar_bytes'\''s own name_bytes[:100]'
+
+# ---- LONE_ZERO_THEN_MEMBER. a single all-NUL 512-byte block (not the two
+#      consecutive blocks canonical_tar_bytes' own end_of_archive_marker
+#      always emits), followed by another real member and only then the
+#      genuine end-of-archive marker -- POSIX tar requires two consecutive
+#      zero blocks to mark end-of-archive, so GNU tar/bsdtar read past a
+#      lone one and would extract the hidden member for real -------------
+LONE_ZERO_THEN_MEMBER_DIR="$TMP/lone-zero-then-member"
+mkdir -p "$LONE_ZERO_THEN_MEMBER_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$LONE_ZERO_THEN_MEMBER_DIR/source.tar.gz" <<'PY'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, encode_member, end_of_archive_marker
+from task168_test_fixtures import collect_members
+stage, out = sys.argv[2], sys.argv[3]
+trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
+lone_zero = b'\x00' * 512
+hidden = encode_member('apps/zz-hidden-behind-lone-zero.txt', b'0', 0o644, b'evil\n')
+full = trunk + lone_zero + hidden + end_of_archive_marker()
+full += b'\x00' * ((-len(full)) % 10240)  # RECORDSIZE, matching canonical_tar_bytes's own padding
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(full))
+PY
+lone_zero_then_member_sha="$(sha "$LONE_ZERO_THEN_MEMBER_DIR/source.tar.gz")"
+lone_zero_then_member_bytes="$(wc -c < "$LONE_ZERO_THEN_MEMBER_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$lone_zero_then_member_sha" --argjson b "$lone_zero_then_member_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$LONE_ZERO_THEN_MEMBER_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$LONE_ZERO_THEN_MEMBER_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$lone_zero_then_member_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$LONE_ZERO_THEN_MEMBER_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive is not in canonical form' "${ARGS[@]}"
+pass 'LONE_ZERO_THEN_MEMBER: rejects a real member hidden behind a single (non-terminating) all-NUL block'
+
+# ---- AFTER_EOA_MEMBER. a real member sits immediately after the genuine
+#      end-of-archive marker with no second marker closing it off again --
+#      END-MARKER-EXTRA above additionally re-closes the hidden member with
+#      its own end marker; this is the plainer shape, one member appended
+#      right where only RECORDSIZE zero padding should follow ------------
+AFTER_EOA_MEMBER_DIR="$TMP/after-eoa-member"
+mkdir -p "$AFTER_EOA_MEMBER_DIR"
+python3 - "$RELEASE_DIR" "$FIXTURE/stage" "$AFTER_EOA_MEMBER_DIR/source.tar.gz" <<'PY'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, os.path.join(os.path.dirname(sys.argv[1]), 'qa'))
+from task168_canonical_tar import canonical_gzip_bytes, encode_member, end_of_archive_marker
+from task168_test_fixtures import collect_members
+stage, out = sys.argv[2], sys.argv[3]
+trunk = b''.join(encode_member(*m) for m in collect_members(stage, ['INPUT-MANIFEST.json', 'apps']))
+hidden = encode_member('apps/zz-hidden-after-eoa.txt', b'0', 0o644, b'evil\n')
+full = trunk + end_of_archive_marker() + hidden
+full += b'\x00' * ((-len(full)) % 10240)  # RECORDSIZE, matching canonical_tar_bytes's own padding
+with open(out, 'wb') as fh:
+    fh.write(canonical_gzip_bytes(full))
+PY
+after_eoa_member_sha="$(sha "$AFTER_EOA_MEMBER_DIR/source.tar.gz")"
+after_eoa_member_bytes="$(wc -c < "$AFTER_EOA_MEMBER_DIR/source.tar.gz" | tr -d ' ')"
+jq --arg h "$after_eoa_member_sha" --argjson b "$after_eoa_member_bytes" '.archiveSha256=$h | .archiveBytes=$b' \
+  "$FIXTURE/source.tar.gz.attestation.json" > "$AFTER_EOA_MEMBER_DIR/source.tar.gz.attestation.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --source-archive) ARGS[$((i+1))]="$AFTER_EOA_MEMBER_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$after_eoa_member_sha" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$AFTER_EOA_MEMBER_DIR/source.tar.gz.attestation.json" ;;
+  esac
+done
+run_expect_fail 'source archive is not in canonical form' "${ARGS[@]}"
+pass 'AFTER_EOA_MEMBER: rejects a real member appended right after the genuine end-of-archive marker'
 
 # ---- 10. non-canonical spellings of an in-scope migration path bypass a
 #          check keyed on fixed "obviously bad" shapes only if the check
@@ -1940,8 +2130,8 @@ pass 'GOLDEN: a full 11-entry Task168 contract + matching 12-entry full history 
 # ---- GOLDEN-NONASCII. the golden archive plus a non-ASCII (Korean) name and
 #      a name containing a backslash, both outside apps/v1_api/prisma/, still
 #      clear every static check -- these are exactly the two byte shapes an
-#      external `tar -t` listing reformats (NFD, octal-escaped, doubled
-#      backslash) before the raw header walk replaced that cross-check ------
+#      external `tar -t` listing would reformat (NFD, octal-escaped, doubled
+#      backslash), which the raw header walk above never runs -------------
 NONASCII_DIR="$TMP/golden-nonascii"
 mkdir -p "$NONASCII_DIR/stage/docs"
 cp -R "$GOLDEN/stage/apps" "$NONASCII_DIR/stage/apps"
@@ -1964,6 +2154,98 @@ done
 run_expect_fail 'pinned PostgreSQL image is unavailable locally' "${ARGS[@]}"
 grep -q 'image inspect' "$DOCKER_STUB_LOG" || fail 'docker stub was not invoked -- the non-ASCII/backslash golden fixture did not reach the docker image checks'
 pass 'GOLDEN-NONASCII: a golden archive carrying a non-ASCII name and a backslash-containing name outside apps/v1_api/prisma/ still clears every static check'
+
+# ---- REALPKG. an archive built by the real package-task168-final-source.sh
+#      (via the real prepare-task168-final-stage-inputs.sh), not by this
+#      suite's own write_clean_tar/collect_members, still clears the
+#      walker's canonical-form and prisma-inventory checks and reaches the
+#      same stubbed docker image-inspect call as GOLDEN. The synthetic
+#      source commit carries a Korean-named file, a >100-byte-path file, and
+#      a 755 file outside apps/v1_api/prisma/, so this also proves the real
+#      packager's own pax/mode encoding round-trips through the preflight,
+#      not only through write_clean_tar's -----------------------------------
+REALPKG_DIR="$TMP/real-package"
+REALPKG_REPO="$REALPKG_DIR/repo"
+mkdir -p "$REALPKG_REPO"
+git -C "$REALPKG_REPO" init -q -b main
+git -C "$REALPKG_REPO" config user.email test@example.com
+git -C "$REALPKG_REPO" config user.name test
+git -C "$REALPKG_REPO" config commit.gpgsign false
+git -C "$REALPKG_REPO" config tag.gpgsign false
+(
+  export GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.com GIT_AUTHOR_DATE='2026-01-01T00:00:00+00:00'
+  export GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com GIT_COMMITTER_DATE='2026-01-01T00:00:00+00:00'
+  # prepare-task168-final-stage-inputs.sh hardcodes these exact 10 names and
+  # requires each to already be a directory in the pinned commit -- M11
+  # itself is never committed here (prepare/package both materialize it
+  # fresh from --m11, mirroring that the real repository does not carry it
+  # yet either).
+  REALPKG_MIGRATIONS=(
+    20260908130000_v1_team_match_tournament_expand
+    20260908150000_v1_operation_audit_team_match_expand
+    20260908160000_v1_official_fact_team_match_scope
+    20260908170000_v1_lineup_invalidation
+    20260908180000_v1_staff_scope_team_match
+    20260909000000_v1_tournament_result_lineage
+    20260909110000_v1_operation_audit_canonical_binding
+    20260910010000_v1_official_fact_source_history
+    20260910020000_v1_canonical_game_db_guards
+    20260910160000_v1_outbox_cutover_claim_gate
+  )
+  mkdir -p "$REALPKG_REPO/apps/v1_api/prisma/migrations/$LEGACY_NAME"
+  printf 'provider = "postgresql"\n' > "$REALPKG_REPO/apps/v1_api/prisma/migrations/migration_lock.toml"
+  printf -- '-- legacy pre-task168\nSELECT 1;\n' > "$REALPKG_REPO/apps/v1_api/prisma/migrations/$LEGACY_NAME/migration.sql"
+  for m in "${REALPKG_MIGRATIONS[@]}"; do
+    mkdir -p "$REALPKG_REPO/apps/v1_api/prisma/migrations/$m"
+    printf -- '-- synthetic migration %s\nSELECT 1;\n' "$m" > "$REALPKG_REPO/apps/v1_api/prisma/migrations/$m/migration.sql"
+  done
+  cp "$REVIEWED_FINAL_SCHEMA" "$REALPKG_REPO/apps/v1_api/prisma/schema.prisma"
+  mkdir -p "$REALPKG_REPO/docs"
+  printf '# korean-named fixture doc\n' > "$REALPKG_REPO/docs/한글이름-파일.md"
+  REALPKG_LONG_NAME="$(printf 'a%.0s' $(seq 1 100)).md"
+  printf '#!/bin/sh\necho long-path fixture\n' > "$REALPKG_REPO/docs/$REALPKG_LONG_NAME"
+  chmod 755 "$REALPKG_REPO/docs/$REALPKG_LONG_NAME"
+  printf '# real-packager preflight fixture\n' > "$REALPKG_REPO/README.md"
+  git -C "$REALPKG_REPO" add -A
+  git -C "$REALPKG_REPO" commit -q -m 'real packager preflight fixture'
+)
+REALPKG_COMMIT="$(git -C "$REALPKG_REPO" rev-parse HEAD)"
+"$RELEASE_DIR/prepare-task168-final-stage-inputs.sh" --source-dir "$REALPKG_REPO" --source-commit "$REALPKG_COMMIT" \
+  --final-schema "$REVIEWED_FINAL_SCHEMA" --m11 "$REVIEWED_M11_FILE" --output-dir "$REALPKG_DIR/prepared" >/dev/null \
+  || fail 'REALPKG: preparer run against the synthetic fixture should succeed'
+"$RELEASE_DIR/package-task168-final-source.sh" --source-dir "$REALPKG_REPO" --source-commit "$REALPKG_COMMIT" \
+  --prepared-dir "$REALPKG_DIR/prepared" --final-schema "$REVIEWED_FINAL_SCHEMA" --m11 "$REVIEWED_M11_FILE" \
+  --output-archive "$REALPKG_DIR/source.tar.gz" >/dev/null \
+  || fail 'REALPKG: real packager run against the synthetic fixture should succeed'
+# The archive-embedded INPUT-MANIFEST.json is exactly this transform of the
+# prepared manifest (package-task168-final-source.sh's own archive_manifest
+# step) -- reproducing it here is how a caller obtains --input-snapshot.
+jq '. + {archiveLayout:{root:"repository",pathPrefix:"",mapping:"archive member == files[].path"}}' \
+  "$REALPKG_DIR/prepared/INPUT-MANIFEST.json" > "$REALPKG_DIR/input-snapshot.json"
+jq -c --arg legacy "$LEGACY_NAME" '[.fullMigrationHistory[] | select(.name != $legacy)]' \
+  "$REALPKG_DIR/prepared/INPUT-MANIFEST.json" > "$REALPKG_DIR/migrations.json"
+jq -c '.fullMigrationHistory' "$REALPKG_DIR/prepared/INPUT-MANIFEST.json" > "$REALPKG_DIR/full-migrations.json"
+echo '[]' > "$REALPKG_DIR/resolved-attempts.json"
+common_args
+for i in "${!ARGS[@]}"; do
+  case "${ARGS[$i]}" in
+    --schema) ARGS[$((i+1))]="$REALPKG_DIR/prepared/apps/v1_api/prisma/schema.prisma" ;;
+    --schema-sha256) ARGS[$((i+1))]="$(sha "$REVIEWED_FINAL_SCHEMA")" ;;
+    --migration-root) ARGS[$((i+1))]="$REALPKG_DIR/prepared/apps/v1_api/prisma/migrations" ;;
+    --migrations-json) ARGS[$((i+1))]="$REALPKG_DIR/migrations.json" ;;
+    --full-migrations-json) ARGS[$((i+1))]="$REALPKG_DIR/full-migrations.json" ;;
+    --resolved-migration-attempts-json) ARGS[$((i+1))]="$REALPKG_DIR/resolved-attempts.json" ;;
+    --source-archive) ARGS[$((i+1))]="$REALPKG_DIR/source.tar.gz" ;;
+    --source-sha256) ARGS[$((i+1))]="$(sha "$REALPKG_DIR/source.tar.gz")" ;;
+    --source-archive-attestation) ARGS[$((i+1))]="$REALPKG_DIR/source.tar.gz.attestation.json" ;;
+    --input-snapshot) ARGS[$((i+1))]="$REALPKG_DIR/input-snapshot.json" ;;
+    --input-snapshot-sha256) ARGS[$((i+1))]="$(sha "$REALPKG_DIR/input-snapshot.json")" ;;
+    --release-sha) ARGS[$((i+1))]="$REALPKG_COMMIT" ;;
+  esac
+done
+run_expect_fail 'pinned PostgreSQL image is unavailable locally' "${ARGS[@]}"
+grep -q 'image inspect' "$DOCKER_STUB_LOG" || fail 'REALPKG: docker stub was not invoked -- the real packager archive did not reach the docker image checks'
+pass 'REALPKG: a real package-task168-final-source.sh archive (Korean name, >100-byte path, 755 file) clears the walker and reaches the stubbed docker image-inspect call'
 
 # ---- F13. snapshot .m11.sha256 disagrees with the reviewed M11_SHA pin,
 #           while fullMigrationHistory/files[]/archive/migration-root/

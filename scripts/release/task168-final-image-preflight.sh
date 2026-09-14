@@ -106,18 +106,13 @@ MIGRATION_LOCK_SHA="$(sha256 "$MIGRATION_ROOT/migration_lock.toml")"
 # bundle/ prefix layout (this archive is repository-root, pathPrefix "").
 #
 # The member list comes from one raw 512-byte-header walk (no external
-# `tar`, so a malformed member elsewhere in the stream can't desync a
-# sequential parse and fail an unrelated earlier read). It used to be
-# authenticated by a second parse through Python's own tarfile module and a
-# `raw_names == python_names` comparison -- two Python-side parsers that can
-# agree with each other about a header shape (e.g. a pax 'x' header
-# immediately following another one) while both disagree with what the
-# system tar that actually extracts the archive does with it. Comparing two
-# implementations of the same interpretation proves nothing about a third,
-# so that cross-check is gone. In its place: the walker first restricts
-# every header to exactly what package-task168-final-source.sh's writer
-# emits (typeflag '0'/'x' only, mode in {0o644, 0o755}, ustar magic, empty
-# prefix, a single pax 'path' record with no successor) -- task168_canonical_tar.py
+# `tar` and no second Python-side parser to disagree with it -- comparing
+# two implementations of the same interpretation would prove nothing about
+# what the system tar that actually extracts the archive does with it). The
+# walker first restricts every header to exactly what
+# package-task168-final-source.sh's writer emits (typeflag '0'/'x' only,
+# mode in {0o644, 0o755}, ustar magic, empty prefix, a single pax 'path'
+# record with no successor) -- task168_canonical_tar.py
 # is a general-purpose serializer that *can* faithfully reproduce a
 # typeflag '5' directory or an arbitrary mode if handed one, so it cannot be
 # the thing rejecting a shape the packager merely happens not to emit; only
@@ -133,12 +128,12 @@ MIGRATION_LOCK_SHA="$(sha256 "$MIGRATION_ROOT/migration_lock.toml")"
 jq -e '.archiveLayout.pathPrefix==""' "$INPUT_SNAPSHOT" >/dev/null || fail 'input snapshot does not declare a repository-root (empty pathPrefix) archive layout'
 ARCHIVE_REGULAR_MEMBERS="$(mktemp "${TMPDIR:-/tmp}/task168-preflight-members.XXXXXX")"
 MANIFEST_SHA_FILE="$(mktemp "${TMPDIR:-/tmp}/task168-preflight-manifest-sha.XXXXXX")"
-MEMBER_MODE_FILE="$(mktemp "${TMPDIR:-/tmp}/task168-preflight-member-modes.XXXXXX")"
-python3 - "$HERE" "$SOURCE_ARCHIVE" "$MANIFEST_SHA_FILE" "$MEMBER_MODE_FILE" > "$ARCHIVE_REGULAR_MEMBERS" <<'PY' || fail 'source archive member listing failed or contains a rejected path'
+MEMBER_DATA_FILE="$(mktemp "${TMPDIR:-/tmp}/task168-preflight-member-data.XXXXXX")"
+python3 - "$HERE" "$SOURCE_ARCHIVE" "$MANIFEST_SHA_FILE" "$MEMBER_DATA_FILE" > "$ARCHIVE_REGULAR_MEMBERS" <<'PY' || fail 'source archive member listing failed or contains a rejected path'
 import hashlib, posixpath, sys
 sys.path.insert(0, sys.argv[1])
 from task168_canonical_tar import canonical_tar_bytes, decompress_single_gzip_member
-archive, manifest_sha_path, member_mode_path = sys.argv[2], sys.argv[3], sys.argv[4]
+archive, manifest_sha_path, member_data_path = sys.argv[2], sys.argv[3], sys.argv[4]
 MANIFEST_NAME = 'INPUT-MANIFEST.json'
 BLOCK = 512
 
@@ -220,12 +215,12 @@ while True:
     if typeflag not in ALLOWED_TYPEFLAGS:
         fail('source archive contains an unauthorized typeflag: %r' % typeflag)
     # A pax ('x') header's own mode field carries no permission semantics --
-    # it is never applied to anything on disk, and different pax writers
-    # default it differently (this walker's own canonical_tar_bytes always
-    # writes 0o644 there; CPython's tarfile writes 0). Restrict the mode
-    # allowlist to what it actually governs: the regular-file member mode
-    # the packager derives from git_mode() and that this walker exposes to
-    # a caller's declared files[].mode.
+    # it is never applied to anything on disk. The canonical-form identity
+    # check below already pins it to 0o644 (canonical_tar_bytes always
+    # writes that value there), so this allowlist only needs to govern what
+    # a pax mode does not: the regular-file member mode the packager
+    # derives from git_mode() and that this walker exposes to a caller's
+    # declared files[].mode.
     if typeflag == b'0' and mode not in ALLOWED_MODES:
         fail('source archive contains a member with an unauthorized mode: %04o' % mode)
     payload_blocks = ((size + 511) // 512) * 512 if size else 0
@@ -273,6 +268,14 @@ while True:
     else:
         name = decode_name(header[0:100].rstrip(b'\x00'))
     pax_override = None
+    # decode_name uses surrogateescape so an invalid-UTF-8 byte sequence
+    # still produces a str here instead of raising -- reject it explicitly
+    # now, rather than letting it surface later as an encoding exception
+    # from whichever consumer first re-encodes this name strictly.
+    try:
+        name.encode('utf-8', 'strict')
+    except UnicodeEncodeError:
+        fail('source archive member name is not valid UTF-8')
     payload = tar_bytes[pos:pos + payload_blocks]
     pos += payload_blocks
     data = payload[:size]
@@ -295,7 +298,7 @@ if reencoded != tar_bytes:
 # proved the archive encodes.
 seen = set()
 lower_seen = {}
-member_modes = []
+member_data = []
 for name, typeflag, mode, data in members:
     unsafe = (
         name.startswith('/') or name in ('.', '..')
@@ -323,15 +326,18 @@ for name, typeflag, mode, data in members:
         fail('source archive contains a member whose path collides only by case with apps/v1_api/prisma/: %s' % name)
     if typeflag == b'0':
         sys.stdout.buffer.write(name.encode('utf-8', 'surrogateescape') + b'\0')
-        member_modes.append('%s\t%03o\n' % (name, mode))
+        # sha256/size come from the same `data` this walker already read and
+        # authenticated above (canonical_tar_bytes proved it byte-identical
+        # to what the archive carries) -- not a second read of the archive.
+        member_data.append('%s\t%03o\t%s\t%d\n' % (name, mode, hashlib.sha256(data).hexdigest(), len(data)))
 
 # Only written once every check above has passed, so a caller can never read
-# a manifest hash -- or a member's authenticated mode -- for an archive this
-# walker rejected.
+# a manifest hash -- or a member's authenticated mode/sha256/size -- for an
+# archive this walker rejected.
 with open(manifest_sha_path, 'w') as sha_fh:
     sha_fh.write(manifest_sha256)
-with open(member_mode_path, 'w', encoding='utf-8', newline='\n') as mode_fh:
-    mode_fh.writelines(member_modes)
+with open(member_data_path, 'w', encoding='utf-8', newline='\n') as data_fh:
+    data_fh.writelines(member_data)
 PY
 # Every member the archive carries under apps/v1_api/prisma/ must be either a
 # declared overlay file (files[]) or one of the same non-reviewed extras
@@ -340,8 +346,8 @@ PY
 # matching a fixed migration.sql/schema.prisma/migration_lock.toml regex: a
 # regex keyed on the expected shape is invisible to a member whose path falls
 # outside that shape (a non-conforming migration directory name, or an extra
-# file placed inside an otherwise-declared migration directory), so such a
-# member would previously reach here unexamined. Declared-file presence is
+# file placed inside an otherwise-declared migration directory), which a
+# regex would leave unexamined. Declared-file presence is
 # verified independently by the per-file archive-content loop below, so this
 # only needs to reject extras — it is not also required to prove nothing is
 # missing.
@@ -360,13 +366,17 @@ while IFS= read -r -d '' member_path; do
   [[ "$member_path" =~ $PRISMA_EXTRA_ALLOW_REGEX ]] || fail "source archive contains an unauthenticated member under apps/v1_api/prisma/: $member_path"
 done < "$ARCHIVE_REGULAR_MEMBERS"
 rm -f "$ARCHIVE_REGULAR_MEMBERS"
-# Member mode, keyed by path, as the walker itself parsed and authenticated
-# it (never from a second `tar -tv` interpretation of the same bytes).
-declare -A ARCHIVE_MEMBER_MODE=()
-while IFS=$'\t' read -r mode_member_path mode_member_mode; do
-  [[ -n "$mode_member_path" ]] && ARCHIVE_MEMBER_MODE["$mode_member_path"]="$mode_member_mode"
-done < "$MEMBER_MODE_FILE"
-rm -f "$MEMBER_MODE_FILE"
+# Mode/sha256/size, keyed by path, as the walker itself parsed, hashed and
+# authenticated in one pass over the archive bytes (never a second read).
+declare -A ARCHIVE_MEMBER_MODE=() ARCHIVE_MEMBER_SHA=() ARCHIVE_MEMBER_BYTES=()
+while IFS=$'\t' read -r data_member_path data_member_mode data_member_sha data_member_bytes; do
+  if [[ -n "$data_member_path" ]]; then
+    ARCHIVE_MEMBER_MODE["$data_member_path"]="$data_member_mode"
+    ARCHIVE_MEMBER_SHA["$data_member_path"]="$data_member_sha"
+    ARCHIVE_MEMBER_BYTES["$data_member_path"]="$data_member_bytes"
+  fi
+done < "$MEMBER_DATA_FILE"
+rm -f "$MEMBER_DATA_FILE"
 
 # External sidecar attestation binds the archive to the exact INPUT-MANIFEST.json
 # it carries, without embedding the archive's own hash inside itself (that would
@@ -396,13 +406,13 @@ jq -e --arg release "$STAGE_A_RELEASE_SHA" --arg db "$DATABASE_IDENTITY" --arg b
 jq -e --arg commit "$RELEASE_SHA" --arg schema "$SCHEMA_SHA" --arg m11name "$M11_NAME_PIN" --arg m11sha "$M11_SHA" --argjson history "$(cat "$FULL_MIGRATIONS_JSON")" '.schemaVersion==1 and .kind=="task168StageBFinalInputs" and .sourceCommit==$commit and .finalSchema.sha256==$schema and .migrationPolicy=="task168-stageBFinal" and .fullMigrationHistory==$history and .m11.name==$m11name and .m11.sha256==$m11sha' "$INPUT_SNAPSHOT" >/dev/null || fail 'input snapshot does not authenticate the prepared Stage B source/archive contract'
 jq -e '.files | type=="array" and length>0 and (all(.[]; ((.path|type)=="string" and (.path|test("^apps/v1_api/prisma/(schema\\.prisma|migrations/[0-9]{14}_[a-z0-9_]+/migration\\.sql|migrations/migration_lock\\.toml)$"))) and ((.sha256|type)=="string" and (.sha256|test("^[0-9a-f]{64}$"))) and ((.bytes|type)=="number" and (.bytes>=0)) and ((.mode|type)=="string" and (.mode|test("^(644|755)$"))))) and ((map(.path)|unique|length)==length)' "$INPUT_SNAPSHOT" >/dev/null || fail 'input snapshot file inventory is malformed'
 while IFS=$'\t' read -r path expected bytes expected_mode; do
-  archive_sha="$(tar -xOf "$SOURCE_ARCHIVE" "$path" | sha256sum | awk '{print $1}')" || fail "source archive is missing prepared input: $path"
-  archive_bytes="$(tar -xOf "$SOURCE_ARCHIVE" "$path" | wc -c | tr -d ' ')" || fail "source archive input size is unreadable: $path"
+  # sha256/bytes/mode all come from ARCHIVE_MEMBER_* (the walker's own
+  # authenticated parse of the bytes it already read) -- not a second
+  # `tar -xOf` extraction of the same member.
+  archive_sha="${ARCHIVE_MEMBER_SHA[$path]:-}"
+  archive_bytes="${ARCHIVE_MEMBER_BYTES[$path]:-}"
   archive_mode="${ARCHIVE_MEMBER_MODE[$path]:-}"
-  # Mode comes from ARCHIVE_MEMBER_MODE (the walker's own authenticated
-  # parse), not from a second `tar` interpretation of the same member --
-  # `tar -xOf` has no mode-of-the-extracted-file output to compare against.
-  [[ -n "$archive_mode" ]] || fail "source archive member mode is unknown: $path"
+  [[ -n "$archive_sha" && -n "$archive_bytes" && -n "$archive_mode" ]] || fail "source archive is missing prepared input: $path"
   [[ "$archive_sha" == "$expected" && "$archive_bytes" == "$bytes" && "$archive_mode" == "$expected_mode" ]] || fail "source archive input differs from authenticated snapshot: $path"
 done < <(jq -r '.files | sort_by(.path)[] | [.path,.sha256,(.bytes|tostring),.mode] | @tsv' "$INPUT_SNAPSHOT")
 # The checks above prove files[] is self-consistent with the archive's own

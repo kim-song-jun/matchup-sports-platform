@@ -6,8 +6,9 @@ second parser thinks it wrote".
 
 Every header field this module writes is fixed: mtime/uid/gid=0, uname/gname
 empty, devmajor/devminor all-NUL, ustar magic, empty ustar prefix. The only
-per-member inputs are name, typeflag ('0' regular file or '5' directory),
-mode, and (for files) content. A name that is not pure ASCII or does not fit
+per-member inputs are name, typeflag (always b'0', regular file -- neither
+the packager nor its walker handles any other member type), mode, and
+content. A name that is not pure ASCII or does not fit
 the 100-byte ustar name field gets exactly one preceding pax ('x') header
 carrying a single `path` record -- the same trigger condition CPython's own
 PAX_FORMAT writer uses, reimplemented here so nothing depends on tarfile.
@@ -74,21 +75,11 @@ def encode_member(name, typeflag, mode, data):
     canonical_tar_bytes calls this once per member and concatenates the
     results.
 
-    typeflag is b'0' (regular file; data is its exact content) or b'5'
-    (directory; data must be empty). A directory's on-the-wire name always
-    carries exactly one trailing '/', appended here if the caller omitted it,
-    so callers can pass the same stripped name they use for path-policy
-    checks elsewhere.
+    typeflag is always b'0' (regular file; data is its exact content).
     """
-    if typeflag not in (b"0", b"5"):
+    if typeflag != b"0":
         raise ValueError("unsupported typeflag %r for member %s" % (typeflag, name))
-    if typeflag == b"5":
-        if data:
-            raise ValueError("directory member must carry no data: %s" % name)
-        wire_name = name if name.endswith("/") else name + "/"
-    else:
-        wire_name = name
-    name_bytes = wire_name.encode("utf-8", "surrogateescape")
+    name_bytes = name.encode("utf-8", "surrogateescape")
     if any(b < 0x20 for b in name_bytes):
         # A control byte (NUL included) never has a legitimate use in a real
         # path, and without this a name short and ASCII enough to skip the

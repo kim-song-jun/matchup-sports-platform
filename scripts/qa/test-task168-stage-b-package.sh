@@ -83,6 +83,15 @@ mkdir -p "$REPO/apps/v1_api/prisma/data"
 printf '{}\n' > "$REPO/apps/v1_api/prisma/data/terms.json"
 printf 'generator client {\n  provider = "prisma-client-js"\n}\n' > "$REPO/apps/v1_api/prisma/schema.stage-a.prisma"
 printf '# synthetic fixture repo\n' > "$REPO/README.md"
+# Two files outside apps/v1_api/prisma/ so the golden archive sha pins the
+# packager's pax encoding (a non-ASCII or >100-byte name needs one; a plain
+# ASCII short name never does) and its mode normalization, not only the
+# no-pax-needed shapes every other file in this fixture happens to be.
+mkdir -p "$REPO/docs"
+printf '# korean-named fixture doc\n' > "$REPO/docs/한글이름-파일.md"
+LONG_DOC_NAME="$(printf 'a%.0s' $(seq 1 100)).md"
+printf '#!/bin/sh\necho long-path fixture\n' > "$REPO/docs/$LONG_DOC_NAME"
+chmod 755 "$REPO/docs/$LONG_DOC_NAME"
 git -C "$REPO" add -A
 git -C "$REPO" commit -q -m 'synthetic base'
 BASE_SHA="$(git -C "$REPO" rev-parse HEAD)"
@@ -113,7 +122,10 @@ run_expect_fail() {
 # test asserts the identical constant; if a host or Python/zlib version
 # difference ever breaks byte-for-byte reproducibility, this line goes red
 # instead of silently reporting "the two runs I happened to make matched".
-readonly EXPECTED_ARCHIVE_SHA=a31ffa044714c222f89119302b2e3266a0bad3e40ca3e752ff7913b221c01b78
+# The fixture's docs/한글이름-파일.md and docs/<100 a's>.md (755) members pin
+# the packager's pax-header and per-file-mode encoding into this constant,
+# not only the no-pax-needed ASCII short names every other member here is.
+readonly EXPECTED_ARCHIVE_SHA=d12eac2fa04342c708a26c8a2095c8162202b3d00c028a1117413c140bb2ae56
 GOLDEN=
 for um in 022 077 002; do
   out="$TMP/pkg-umask-$um.tar.gz"

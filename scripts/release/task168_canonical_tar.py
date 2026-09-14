@@ -80,7 +80,7 @@ def encode_member(name, typeflag, mode, data):
     if typeflag != b"0":
         raise ValueError("unsupported typeflag %r for member %s" % (typeflag, name))
     name_bytes = name.encode("utf-8", "surrogateescape")
-    if any(b < 0x20 for b in name_bytes):
+    if any(b < 0x20 or b == 0x7F for b in name_bytes):
         # A control byte (NUL included) never has a legitimate use in a real
         # path, and without this a name short and ASCII enough to skip the
         # pax path below would otherwise round-trip through this function

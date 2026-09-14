@@ -338,6 +338,23 @@ run_expect_fail 'source archive contains a symlink' \
 pass 'rejects a source tree that contains a symlink'
 git -C "$REPO" checkout -q main
 
+# ---- 6b. the serializer refuses control bytes in member names --------------
+# The packager and the preflight share one control-byte rule; DEL (0x7F) must
+# be refused here too, or the packager could emit an archive the preflight
+# then rejects.
+python3 - "$(dirname "$PACKAGE")" <<'PY' || fail 'serializer accepted a member name carrying a control byte'
+import sys
+sys.path.insert(0, sys.argv[1])
+from task168_canonical_tar import encode_member
+for bad in ('docs/del\x7f.txt', 'docs/soh\x01.txt'):
+    try:
+        encode_member(bad, b'0', 0o644, b'x')
+    except ValueError:
+        continue
+    raise SystemExit('accepted %r' % bad)
+PY
+pass 'serializer refuses member names carrying a control byte, DEL included'
+
 # ---- 7. mid-publish failure leaves no unpaired residue ---------------------
 # Deterministically fail only the archive-publish hard-link call (the second
 # `ln`) via PATH shadowing, so this does not depend on winning a wall-clock

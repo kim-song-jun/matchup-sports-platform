@@ -26,13 +26,28 @@ transition="${state_dir}/transition.json"
 
 api_image="$(jq -er '.apiImage' "${transition}")"
 
-live_dir="${ALPHA_LIVE_DIR:-/home/ec2-user/teameet}"
-compose_prod="${live_dir}/deploy/docker-compose.prod.yml"
-compose_alpha="${live_dir}/deploy/docker-compose.alpha.yml"
-env_file="${live_dir}/deploy/.env"
-psql_cmd=(docker compose --project-name deploy -f "${compose_prod}" -f "${compose_alpha}" \
-  --env-file "${env_file}" exec -T v1_postgres psql -X -v ON_ERROR_STOP=1 -At \
-  -U "${V1_DB_USER:-teameet_v1}" -d "${V1_DB_NAME:-teameet_v1}")
+# Not `docker compose`: it resolves the whole model before any subcommand, and
+# the alpha compose files require image variables only deploy-alpha.sh exports,
+# so every compose call fails on interpolation in this standalone SSM shell.
+postgres_id="$(docker ps -q \
+  --filter label=com.docker.compose.project="${ALPHA_COMPOSE_PROJECT:-deploy}" \
+  --filter label=com.docker.compose.service=v1_postgres)"
+[[ "$(printf '%s\n' "${postgres_id}" | grep -c .)" == 1 ]] ||
+  { echo 'expected exactly one running database container' >&2; exit 1; }
+
+# Role and database come from the container's own environment, as in
+# deploy/task168-stage-b-migrate.sh: the operator env file is not sourced into
+# this shell, so a hardcoded default would name a role the host may not have.
+db_env="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "${postgres_id}")"
+db_user="$(awk -F= '$1=="POSTGRES_USER" {print substr($0,index($0,"=")+1)}' <<< "${db_env}")"
+db_name="$(awk -F= '$1=="POSTGRES_DB" {print substr($0,index($0,"=")+1)}' <<< "${db_env}")"
+[[ "${db_user}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ && "${db_name}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] ||
+  { echo 'database container does not expose one valid POSTGRES_USER/POSTGRES_DB binding' >&2; exit 1; }
+
+# No `-i`: this script is piped into `bash -s`, so a child holding stdin open
+# would swallow the not-yet-read remainder of the script itself.
+psql_cmd=(docker exec "${postgres_id}" psql -X -v ON_ERROR_STOP=1 -At \
+  -U "${db_user}" -d "${db_name}")
 
 db_id="$("${psql_cmd[@]}" -c \
   "SELECT current_database() || '|' || current_user || '|' || COALESCE(inet_server_addr()::text,'local') || '|' || COALESCE(inet_server_port()::text,'local')")"

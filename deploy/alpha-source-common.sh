@@ -29,8 +29,9 @@ prepare_alpha_release_source() {
   local target_tmp="${target_dir}.tmp.$$"
   local drift
 
-  # Every caller runs this as `prepare_alpha_release_source … || fail`, which
-  # turns errexit off inside the function: each step has to stop it itself.
+  # Callers that run this as `prepare_alpha_release_source … || fail`
+  # (deploy-alpha-stage-b.sh) turn errexit off inside the function, so each
+  # step stops it itself rather than relying on the caller's `set -e`.
   install -d -m 700 "${ALPHA_SOURCE_RELEASES_DIR}" "${ALPHA_RUNTIME_CONFIG_DIR}" || return 1
   if [[ ! -f "${ALPHA_RUNTIME_CONFIG_DIR}/.env" ]]; then
     install -m 600 "${ALPHA_LIVE_DIR}/deploy/.env" "${ALPHA_RUNTIME_CONFIG_DIR}/.env" || return 1
@@ -62,12 +63,13 @@ prepare_alpha_release_source() {
     # -t 포함)를 돌리면 내용이 완전히 같아도 `.d..t......  ./` 두 줄이 나와 드리프트로
     # 판정됐다. 같은 SHA 를 재배포할 때(전송 실패 후 재시도 등) 반드시 밟는 경로다.
     # 파일 시각은 그대로 비교하므로 실제 내용 변조 탐지는 약해지지 않는다.
+    # Empty output means "no drift", so a failed rsync must not reach that test.
     drift="$(rsync -ani --delete --omit-dir-times \
       --exclude '/.source-sha256' \
       --exclude '/deploy/.env' \
       --exclude '/deploy/certbot' \
       --exclude '/deploy/release-metadata.alpha.conf' \
-      "${source_dir}/" "${target_dir}/")"
+      "${source_dir}/" "${target_dir}/")" || return 1
     if [[ -n "${drift}" ]]; then
       echo "[alpha-release] Stored source ${source_key} drifted from the packaged source:" >&2
       printf '%s\n' "${drift}" >&2
@@ -118,7 +120,7 @@ activate_alpha_release_source() {
     rm -f "${next_link}"
     return 1
   fi
-  mv "${ALPHA_LIVE_DIR}" "${ALPHA_LEGACY_SOURCE_DIR}"
+  mv "${ALPHA_LIVE_DIR}" "${ALPHA_LEGACY_SOURCE_DIR}" || { rm -f "${next_link}"; return 1; }
   if ! mv "${next_link}" "${ALPHA_LIVE_DIR}"; then
     mv "${ALPHA_LEGACY_SOURCE_DIR}" "${ALPHA_LIVE_DIR}"
     return 1

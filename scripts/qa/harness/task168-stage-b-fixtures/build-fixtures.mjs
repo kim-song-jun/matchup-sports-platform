@@ -27,10 +27,13 @@ const PREDECESSOR_SHA = env.PREDECESSOR_SHA;
 const DB_USER = env.DB_USER;
 const DB_NAME = env.DB_NAME;
 const API_IMAGE = env.API_IMAGE; // real, docker-resolvable, digest-pinned final image ref
-const PREDECESSOR_API_IMAGE = env.PREDECESSOR_API_IMAGE; // plain tag, matches the currently-running writer
+const PREDECESSOR_API_IMAGE = env.PREDECESSOR_API_IMAGE; // plain tag, what the Stage A receipt records
+// What the runner requires to be running when Stage B starts. Separate from
+// PREDECESSOR_API_IMAGE: Alpha is redeployed between the two stages.
+const EXPECTED_RUNNING_API_IMAGE = env.EXPECTED_RUNNING_API_IMAGE;
 const RESOLVED_ATTEMPTS_SHA = env.RESOLVED_ATTEMPTS_SHA || sha256Str(''); // empty-DB default (no resolved attempts)
 
-for (const [name, v] of Object.entries({ REPO_MIGRATIONS_DIR, M11_DIR, FINAL_SCHEMA_FILE, WORK_DIR, RELEASE_SHA, PREDECESSOR_SHA, DB_USER, DB_NAME, API_IMAGE, PREDECESSOR_API_IMAGE })) {
+for (const [name, v] of Object.entries({ REPO_MIGRATIONS_DIR, M11_DIR, FINAL_SCHEMA_FILE, WORK_DIR, RELEASE_SHA, PREDECESSOR_SHA, DB_USER, DB_NAME, API_IMAGE, PREDECESSOR_API_IMAGE, EXPECTED_RUNNING_API_IMAGE })) {
   if (!v) { console.error(`missing required env: ${name}`); process.exit(1); }
 }
 
@@ -139,6 +142,7 @@ writeJson(manifestPath, {
       resolvedMigrationAttemptsSha256: RESOLVED_ATTEMPTS_SHA,
       migrationLockSha256: migrationLockSha,
       predecessor: { releaseSha: PREDECESSOR_SHA, apiImage: PREDECESSOR_API_IMAGE, transition: predTransitionPath, transitionSha256: predTransitionSha, schemaSha256: STAGE_A_SCHEMA_SHA, databaseIdentity: DB_ID },
+      expectedRunningApiImage: EXPECTED_RUNNING_API_IMAGE,
       rehearsal: { mode: 'waived', reason: 'user-directed Alpha run without isolated rehearsal', decidedAt: '2026-09-14' },
     },
   },

@@ -238,6 +238,17 @@ jobs:
       - name: Prod rollback guard tests
         run: bash scripts/qa/test-prod-rollback-guards.sh
 
+      # Task 168 M11 StageB 이관 도구 (PR-A1) — 어떤 배포 경로도 아직 호출하지
+      # 않는 도구 계층 계약 테스트. 합성 fixture 로만 실행되고 Docker 는 쓰지
+      # 않는다: package 쪽은 실제 git 저장소를 만들어 패키징 결정성(umask/TZ)과
+      # 검증 우회를 확인하고, preflight 쪽은 Docker 를 만들기 전의 정적 검사
+      # (source-archive-attestation sidecar 인증)만 확인한다.
+      - name: Task 168 StageB packager contract tests
+        run: bash scripts/qa/test-task168-stage-b-package.sh
+
+      - name: Task 168 StageB preflight sidecar contract tests
+        run: bash scripts/qa/test-task168-stage-b-preflight-sidecar.sh
+
       # Task 168 M11 converged: the final-steady ledger/receipt check-only
       # gate (deploy/task168-final-steady-migrate.sh) is what stands between
       # every future dev push and Alpha's live DB once M11 lands — this

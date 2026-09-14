@@ -52,14 +52,16 @@ psql_cmd=(docker exec "${postgres_id}" psql -X -v ON_ERROR_STOP=1 -At \
 db_id="$("${psql_cmd[@]}" -c \
   "SELECT current_database() || '|' || current_user || '|' || COALESCE(inet_server_addr()::text,'local') || '|' || COALESCE(inet_server_port()::text,'local')")"
 
-# Same query and row order as deploy/task168-stage-b-migrate.sh's
-# resolved_attempt_rows()/resolved_attempt_sha() — the runner recomputes this
-# independently at execution time and
-# rejects the manifest if its own answer differs (assert_resolved_attempts),
-# so this is a real, checked commitment, not a cosmetic field.
-resolved_sha="$("${psql_cmd[@]}" -c \
-  "SELECT migration_name || '|' || COALESCE(checksum,'') || '|' || COALESCE(finished_at::text,'') || '|' || COALESCE(rolled_back_at::text,'') FROM \"_prisma_migrations\" WHERE finished_at IS NULL AND rolled_back_at IS NOT NULL ORDER BY migration_name,rolled_back_at,checksum,id" \
-  | sha256sum | awk '{print $1}')"
+# Same query, row order AND hashing as deploy/task168-migration-contract.sh's
+# resolved_attempt_rows()/resolved_attempt_sha(): the runner recomputes this at
+# execution time and refuses the manifest when its answer differs
+# (assert_resolved_attempts). The hash must be taken over the rows WITHOUT the
+# trailing newline psql emits — `$(...)` strips it and `printf '%s'` adds none,
+# exactly as resolved_attempt_sha does. Piping psql straight into sha256sum
+# includes that newline and yields a different digest for identical rows.
+resolved_rows="$("${psql_cmd[@]}" -c \
+  "SELECT migration_name || '|' || COALESCE(checksum,'') || '|' || COALESCE(finished_at::text,'') || '|' || COALESCE(rolled_back_at::text,'') FROM \"_prisma_migrations\" WHERE finished_at IS NULL AND rolled_back_at IS NOT NULL ORDER BY migration_name,rolled_back_at,checksum,id")"
+resolved_sha="$(printf '%s' "${resolved_rows}" | sha256sum | awk '{print $1}')"
 
 jq -nc \
   --arg path "${transition}" \

@@ -7,9 +7,12 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
+import { TOURNAMENT_SURFACE_KIND } from './tournament-surface';
 
 export class ListTournamentReviewsQueryDto {
   @IsOptional()
@@ -75,6 +78,9 @@ export class TournamentAwardItemDto {
   @IsString()
   recipientName!: string;
 
+  @IsUUID()
+  recipientUserId!: string;
+
   @IsOptional()
   @IsString()
   teamName?: string;
@@ -89,7 +95,7 @@ export class TournamentAwardItemDto {
 }
 
 export class SetTournamentAwardsDto {
-  /** 어워드 배열. awardType 중복 시 upsert 처리. */
+  /** 어워드 배열. 같은 대회 안에서 awardType은 한 번만 보낼 수 있다. */
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => TournamentAwardItemDto)
@@ -112,6 +118,7 @@ export class TournamentReviewsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminContext: AdminContextService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private buildReviewWhere(
@@ -150,6 +157,34 @@ export class TournamentReviewsService {
         some: { userId, status: 'active', role: { in: ['owner', 'manager'] } },
       },
     };
+  }
+
+  /**
+   * 리뷰 `photoUrls` 는 "내가 방금 올린 이미지"만 등록할 수 있다 — 업로드 원장
+   * (`V1UploadAsset`)에서 소유자·종류를 대조한다. `tournament-fixture-videos.service.ts`의
+   * `assertOwnUploadedVideo`(영상)와 동일한 위협 모델: 임의의 외부 URL이나 남이 올린
+   * 업로드 URL을 로그인하지 않은 방문자까지 보는 공개 후기 화면에 그대로 박아 넣는
+   * 경로를 막는다(감사 evidence). 업로드 실패로 존재하지 않는 URL도 이 경로로 함께 걸린다.
+   */
+  private async assertOwnUploadedPhotos(userId: string, urls: string[]) {
+    if (urls.length === 0) return;
+    const uniqueUrls = [...new Set(urls)];
+    const assets = await this.prisma.v1UploadAsset.findMany({
+      where: { url: { in: uniqueUrls } },
+      select: { url: true, ownerUserId: true, kind: true },
+    });
+    const ownedImageUrls = new Set(
+      assets
+        .filter((asset) => asset.kind === 'image' && asset.ownerUserId === userId)
+        .map((asset) => asset.url),
+    );
+    const invalidUrl = uniqueUrls.find((url) => !ownedImageUrls.has(url));
+    if (invalidUrl !== undefined) {
+      throw new BadRequestException({
+        code: 'REVIEW_PHOTO_UPLOAD_NOT_FOUND',
+        message: '업로드한 사진 파일을 찾을 수 없어요. 사진을 다시 업로드해 주세요.',
+      });
+    }
   }
 
   /** 이 대회에 confirmed 등록이 있고, 내가 owner/manager인 팀 목록 (팀 여러 개면 다건). */
@@ -219,7 +254,7 @@ export class TournamentReviewsService {
     dto: SubmitTournamentReviewDto,
   ) {
     // 1. 대회 존재 확인
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {
@@ -275,6 +310,13 @@ export class TournamentReviewsService {
       throw new BadRequestException({ code: 'ALREADY_REVIEWED', message: '이미 리뷰를 작성했어요.' });
     }
 
+    // 3.5. photoUrls 소유권 검증 — 형제 소비처(tournament-fixture-videos.service.ts의
+    //      assertOwnUploadedVideo, league-fixture-videos.service.ts도 동일)와 같은 위협을
+    //      막는다. DTO는 문자열 배열이라는 것만 검증하므로, 여기서 걸지 않으면 로그인하지
+    //      않은 방문자도 보는 공개 후기 화면에 임의의 외부 URL이나 남의 업로드 URL을
+    //      그대로 박아 넣을 수 있다(감사 evidence).
+    await this.assertOwnUploadedPhotos(user.id, dto.photoUrls ?? []);
+
     // 4. 저장
     const review = await this.prisma.v1TournamentReview.create({
       data: {
@@ -296,16 +338,24 @@ export class TournamentReviewsService {
 
   /**
    * 내가 팀장·운영진인 팀이 참가 확정한 대회 중 종료됐지만 아직 리뷰가 없는 대회 목록
-   * (최근 종료순). "리뷰가 없다"는 authorUserId(나) 또는 내 자격 팀 어느 쪽 기준으로도
-   * 없어야 한다 — 다른 운영진이 이미 우리 팀 리뷰를 썼으면 더는 pending이 아니다(대회당
-   * 인당 1건 제약이라 어차피 내가 또 쓸 수 없다).
+   * (최근 종료순). "리뷰가 없다"는 authorUserId(나) 기준 — 대회당 인당 1건 정책(2026-08-17)
+   * 아래에서는 같은 팀 다른 운영진이 먼저 썼더라도 나는 여전히 별도로 쓸 수 있으므로 이
+   * 대회는 내 pending 목록에 남아 있어야 한다(팀 기준으로 걸러내면 안 된다).
    */
   async listMyPendingReviews(userId: string) {
     const registrations = await this.prisma.v1TournamentRegistration.findMany({
       where: {
         status: 'confirmed',
         team: this.eligibleTeamWhere(userId),
-        tournament: { status: 'completed', deletedAt: null },
+        // **`tournamentId` 스코프가 없는 유일한 `status: 'confirmed'` 쿼리다**(19곳 전수 분류).
+        // 사용자의 팀이 확정 등록된 **모든** 대회를 훑으므로, 리그 시즌 행에 확정 등록이
+        // 생기면 여기 걸린다 — 참가팀 백필이 `confirmed` 로 행을 만들 것이므로 실재하는 경로다.
+        //
+        // 지금까지 안 보였던 건 `status: 'completed'` 덕이다(백필 리그는 `draft` 이고
+        // 어드민 `changeStatus` 가 리그를 막는다). 그건 **다른 파일의 가드에 기댄 것**이고,
+        // 그 의존은 어디에도 안 적혀 있었다 — P0~P3 가 49곳에서 없앤 바로 그 구조다.
+        // 여기서도 종류를 직접 건다.
+        tournament: { ...TOURNAMENT_SURFACE_KIND, status: 'completed', deletedAt: null },
       },
       select: {
         teamId: true,
@@ -347,23 +397,17 @@ export class TournamentReviewsService {
   }
 
   /**
-   * 내 리뷰 조회. "내"의 기준은 (a) 내가 직접 작성한 리뷰(authorUserId) 또는 (b) 내가
-   * 팀장·운영진인 팀 몫으로 다른 운영진이 작성한 리뷰 — 둘 중 하나라도 있으면 반환한다.
-   * (a)만으로는 팀장이 쓴 리뷰를 매니저가 "이미 작성됨"으로 못 봐서 재작성을 시도하다
-   * ALREADY_REVIEWED로 막히는 UX가 생긴다.
+   * 내 리뷰 조회. "내"의 기준은 authorUserId — 내가 직접 작성한 리뷰만이다.
+   * 중복검사(submitReview)·pending 목록(listMyPendingReviews)이 2026-08-17에 사람 기준으로
+   * 바뀌면서(대회당 인당 1건, 팀당 1건 아님) 팀장과 운영진은 각자 독립적으로 후기를 쓸 수
+   * 있게 됐다 — 그러므로 여기서도 팀 기준 OR fallback을 쓰면 안 된다. 팀 기준으로 남겨두면
+   * 팀장이 먼저 쓴 순간 같은 팀 나머지 운영진은 자기가 쓴 적 없는 리뷰를 "이미 작성함"으로
+   * 판정받아 영영 쓸 수 없게 된다(서버 submitReview는 이들을 막지 않으므로 순전히 이 조회의
+   * 오판정 문제였다).
    */
   async getMyReview(tournamentId: string, userId: string) {
-    const eligibleTeams = await this.findEligibleTeams(tournamentId, userId);
     const review = await this.prisma.v1TournamentReview.findFirst({
-      where: {
-        tournamentId,
-        OR: [
-          { authorUserId: userId },
-          ...(eligibleTeams.length > 0
-            ? [{ teamId: { in: eligibleTeams.map((t) => t.teamId) } }]
-            : []),
-        ],
-      },
+      where: { tournamentId, authorUserId: userId },
     });
     if (!review) return null;
     return {
@@ -493,6 +537,7 @@ export class TournamentReviewsService {
       awardLabel: a.awardLabel,
       iconKey: a.iconKey ?? null,
       recipientName: a.recipientName,
+      recipientUserId: a.recipientUserId,
       teamName: a.teamName ?? null,
       note: a.note ?? null,
     }));
@@ -511,7 +556,7 @@ export class TournamentReviewsService {
   async setAwards(user: V1AuthUser, tournamentId: string, dto: SetTournamentAwardsDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
 
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!tournament) {
@@ -519,58 +564,95 @@ export class TournamentReviewsService {
     }
 
     // 검증과 저장이 같은 값을 쓰도록 선(先)정규화 — 공백 섞인 입력이 그대로 저장되는 것을 방지.
-    const awards = dto.awards.map((a) => ({
+    const submittedAwards = dto.awards.map((a) => ({
       ...a,
+      awardType: a.awardType.trim(),
       recipientName: a.recipientName.trim(),
       teamName: a.teamName?.trim() || null,
     }));
+    const duplicateAwardTypes = [...new Set(
+      submittedAwards
+        .map((award) => award.awardType.trim())
+        .filter((awardType, index, awardTypes) => awardTypes.indexOf(awardType) !== index),
+    )];
+    if (duplicateAwardTypes.length > 0) {
+      throw new BadRequestException({
+        code: 'DUPLICATE_AWARD_TYPE',
+        message: '같은 종류의 어워드가 중복되어 있어요. 중복 항목을 제거한 뒤 다시 저장해 주세요.',
+      });
+    }
 
-    // 로스터 전용 강제 — 수상자는 해당 대회 확정(confirmed) 등록 팀 명단의 선수여야 하고,
-    // 팀명이 지정된 경우 확정 등록 팀명과 일치해야 한다 (자유 입력 차단).
-    if (awards.length > 0) {
+    // 로스터 전용 강제 — 이름만 비교하면 동명이인을 잘못 연결할 수 있으므로 계정 ID,
+    // 이름 스냅샷, 팀을 같은 confirmed 등록 행에서 교차 검증한다.
+    let awards: Array<TournamentAwardItemDto & { teamName: string }> = [];
+    if (submittedAwards.length > 0) {
       const registrations = await this.prisma.v1TournamentRegistration.findMany({
         where: { tournamentId, status: 'confirmed' },
         select: {
           team: { select: { name: true } },
-          players: { where: { removedAt: null }, select: { realName: true } },
+          players: { where: { removedAt: null }, select: { userId: true, realName: true } },
         },
       });
-      const rosterNames = new Set(
-        registrations.flatMap((r) => r.players.map((p) => p.realName.trim())),
-      );
-      // 팀명 → 그 팀의 선수 집합 (팀명 지정 시 수상자-팀 소속 교차 검증용)
-      const teamRosters = new Map<string, Set<string>>();
-      for (const r of registrations) {
-        const teamName = r.team.name.trim();
-        const roster = teamRosters.get(teamName) ?? new Set<string>();
-        for (const p of r.players) roster.add(p.realName.trim());
-        teamRosters.set(teamName, roster);
-      }
+      const roster = registrations.flatMap((registration) => {
+        const teamName = registration.team.name.trim();
+        return registration.players.map((player) => ({
+          userId: player.userId,
+          realName: player.realName.trim(),
+          teamName,
+        }));
+      });
 
-      for (const a of awards) {
-        if (!rosterNames.has(a.recipientName)) {
+      awards = submittedAwards.map((award) => {
+        // 신원의 1차 키는 계정(userId)이다 — teamName은 DB에 저장된 스냅샷이라
+        // 팀이 그 사이 개명하면 낡은 채로 남는다(`UpdateTeamDto.name`은 필수 필드라
+        // 언제든 바뀔 수 있다). userId만으로 이미 후보가 하나로 좁혀지면 그게
+        // 정답이다 — 스냅샷과 문자열이 다르다는 이유로 거부하면, 손대지도 않은
+        // 다른 행까지 같은 저장(전체 replace)에 묶여 전부 400으로 되돌아간다
+        // (감사 evidence: 팀 개명 후 오타 하나 고치는 저장까지 막힘).
+        //
+        // teamName은 오직 **같은 사람이 이 대회에 두 confirmed 팀에 걸쳐 등록된
+        // 드문 동명이인/중복 등록**을 가르는 2차 판정으로만 쓴다 — userId만으로
+        // 후보가 둘 이상일 때만 좁힌다.
+        const byUserId = roster.filter((player) => player.userId === award.recipientUserId);
+        const recipient =
+          byUserId.length === 1
+            ? byUserId[0]
+            : byUserId.length > 1
+              ? (byUserId.filter(
+                  (player) => award.teamName === null || player.teamName === award.teamName,
+                )[0] ?? null)
+              : null;
+        // 소속 팀이 둘 이상으로 여전히 갈리면(동명 팀 등) 안전하게 재확인을 요구한다.
+        const ambiguous =
+          byUserId.length > 1 &&
+          byUserId.filter((player) => award.teamName === null || player.teamName === award.teamName).length > 1;
+        if (recipient === null || ambiguous || recipient.realName !== award.recipientName) {
           throw new BadRequestException({
             code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
-            message: `'${a.recipientName}'은(는) 대회 참가 명단에 없어요. 명단에서 수상자를 선택해 주세요.`,
+            message: `'${award.recipientName}' 수상자를 해당 대회 확정 명단에서 확인할 수 없어요. 명단에서 다시 선택해 주세요.`,
           });
         }
-        if (a.teamName) {
-          const teamRoster = teamRosters.get(a.teamName);
-          if (!teamRoster) {
-            throw new BadRequestException({
-              code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
-              message: `'${a.teamName}'은(는) 대회에 참가 확정된 팀이 아니에요. 참가 팀에서 선택해 주세요.`,
-            });
-          }
-          if (!teamRoster.has(a.recipientName)) {
-            throw new BadRequestException({
-              code: 'AWARD_RECIPIENT_NOT_IN_ROSTER',
-              message: `'${a.recipientName}'은(는) '${a.teamName}' 팀 명단에 없어요. 수상자와 팀을 다시 확인해 주세요.`,
-            });
-          }
-        }
-      }
+        return {
+          ...award,
+          recipientName: recipient.realName,
+          recipientUserId: recipient.userId,
+          // 저장 시 항상 라이브 팀명으로 다시 정규화한다 — 팀이 나중에 다시 개명해도
+          // 다음 저장(전체 replace 특성상 매번 전 행을 다시 씀)에서 스냅샷이 스스로
+          // 최신화된다.
+          teamName: recipient.teamName,
+        };
+      });
     }
+
+    /**
+     * 이번 저장으로 **새로 수상한 사람**만 담는다. 알림 발송 대상이다.
+     *
+     * `setAwards` 는 전체 교체(deleteMany + 재생성)라, 저장할 때마다 전원에게 보내면
+     * 어드민이 오타 하나 고칠 때도 같은 사람에게 축하 알림이 다시 간다. 감사 로그용으로
+     * 이미 뜨는 `before` 스냅샷을 그대로 재사용해 (수상항목, 수상자) 쌍이 새로 생긴
+     * 경우만 고른다 — 같은 사람이 다른 상을 새로 받은 것도 새 수상으로 친다.
+     */
+    const newlyAwarded: Array<{ userId: string; awardLabel: string }> = [];
 
     // 스냅샷 → 전체 교체 → 감사 기록을 한 트랜잭션에서 원자적으로 수행
     // (감사 로그 실패 시 데이터 변경도 함께 롤백, before/after drift 방지 — 타 admin mutation과 동일 패턴)
@@ -579,6 +661,20 @@ export class TournamentReviewsService {
         where: { tournamentId },
         orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
       });
+
+      // 키는 JSON 배열로 만든다 — awardType 이 자유 문자열이라 구분자를 문자로 고르면
+      // 그 문자가 값에 섞였을 때 서로 다른 쌍이 같은 키로 뭉개진다.
+      const pairKey = (awardType: string, userId: string) => JSON.stringify([awardType, userId]);
+      const previousPairs = new Set(
+        before
+          .filter((a) => a.recipientUserId !== null)
+          .map((a) => pairKey(a.awardType, a.recipientUserId as string)),
+      );
+      for (const a of awards) {
+        if (a.recipientUserId === null || a.recipientUserId === undefined) continue;
+        if (previousPairs.has(pairKey(a.awardType, a.recipientUserId))) continue;
+        newlyAwarded.push({ userId: a.recipientUserId, awardLabel: a.awardLabel });
+      }
 
       await tx.v1TournamentAward.deleteMany({ where: { tournamentId } });
       for (const [idx, a] of awards.entries()) {
@@ -589,6 +685,7 @@ export class TournamentReviewsService {
             awardLabel: a.awardLabel,
             iconKey: a.iconKey ?? null,
             recipientName: a.recipientName,
+            recipientUserId: a.recipientUserId,
             teamName: a.teamName,
             note: a.note ?? null,
             sortOrder: a.sortOrder ?? idx,
@@ -607,6 +704,7 @@ export class TournamentReviewsService {
               awardLabel: a.awardLabel,
               iconKey: a.iconKey ?? null,
               recipientName: a.recipientName,
+              recipientUserId: a.recipientUserId,
               teamName: a.teamName ?? null,
             })),
           },
@@ -615,6 +713,7 @@ export class TournamentReviewsService {
               awardLabel: a.awardLabel,
               iconKey: a.iconKey ?? null,
               recipientName: a.recipientName,
+              recipientUserId: a.recipientUserId,
               teamName: a.teamName,
             })),
           },
@@ -622,6 +721,36 @@ export class TournamentReviewsService {
         tx,
       );
     });
+
+    /**
+     * 알림은 **트랜잭션 밖**에서 보낸다. 발송은 fire-and-forget 이고 외부(web-push)로
+     * 나가므로, 트랜잭션 안에 두면 알림 실패가 수상 저장을 롤백시킬 수 있다 —
+     * 이 저장소의 다른 알림 호출부(tournaments-admin.service.ts)도 같은 위치다.
+     *
+     * 사람마다 받은 상이 다르므로 emitNotificationToMany 로 뭉뚱그리지 않고 개별
+     * 발송한다 — 본문에 상 이름을 담아야 "무엇을 받았는지"가 알림만 보고 전해진다.
+     *
+     * 정상 운영 흐름은 "시상식 당일 저장 → 나중에 status 를 completed 로 전환"이라
+     * (1차 대회 회고), 발송 자체를 status===completed 로 막으면 정작 필요한 순간에
+     * 알림이 영영 안 간다. 대신 **본문을 현재 상태에 맞게 정직하게** 쓴다 — 아직 대회가
+     * completed 가 아니면 `/tournaments/:id/awards` 링크를 눌러도
+     * `NotCompletedNotice`("대회가 진행 중이에요. 종료 후 시상 결과가 공개돼요.")만
+     * 보이므로, 알림 문구도 "지금 보면 있다"고 약속하지 않고 같은 사실을 미리 알린다
+     * (감사 evidence: 알림과 착지 화면이 서로 다른 말을 하는 막다른 길).
+     */
+    for (const recipient of newlyAwarded) {
+      const awardedBody = `${tournament.title} — '${recipient.awardLabel}' 수상자로 선정됐어요.`;
+      const body =
+        tournament.status === 'completed'
+          ? awardedBody
+          : `${awardedBody} 공식 발표는 대회 종료 후 이 화면에서 확인할 수 있어요.`;
+      await this.notifications.emitNotification(
+        recipient.userId,
+        'tournament_award_received',
+        tournamentId,
+        body,
+      );
+    }
 
     return this.listAwardsInternal(tournamentId);
   }

@@ -41,10 +41,56 @@ jobs:
           HEAD_REF: ${{ github.event_name == 'pull_request' && github.head_ref || '' }}
         run: |
           set -Eeuo pipefail
-          if [[ ! "${BASE_SHA}" =~ ^[0-9a-f]{40}$ ]] || [[ "${BASE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
-            BASE_SHA="$(git merge-base origin/main "${HEAD_SHA}")"
+          # base 해석은 세 가지가 함께 맞아야 한다. 하나만 고치면 나머지가 깨진다.
+          #
+          # ① 가드는 **형식이 아니라 연산**을 시험한다. 예전 `=~ ^[0-9a-f]{40}$` 는 payload 의
+          #    base.sha 가 항상 40자 hex 라 PR 이벤트에서 참이 된 적이 없고, 붙어 있던
+          #    `== 000…0` 도 push 로 브랜치를 **새로 만들 때**만 참이라 dev 에선 안 탄다.
+          #    즉 아래 보강은 사실상 죽어 있었다.
+          #
+          #    rc 1 도 보강 대상으로 둔다 — expand-contract 스텝과 다른 점이고 이유가 있다.
+          #    그쪽은 rc 1("공통 조상 없음")을 게이트가 **문장으로 보고**하지만, 여기서는
+          #    아래 `A...B` diff 가 아예 계산 불가라 보고할 것도 없이 죽는다. base tip 을
+          #    받아오면 대개 풀린다.
+          #
+          # ② `BASE_SHA` 에는 **base tip** 을 넣는다. merge-base 결과를 넣으면 안 된다 —
+          #    이 스텝의 base 는 "무엇이 변경됐는가"를 정하므로 더 오래된 커밋을 넣으면
+          #    diff 창이 넓어져 **남의 changeset 을 내 것으로 세게 된다**(= fail-open).
+          #    아래 3-dot 이 분기점을 알아서 구하므로 tip 을 주는 게 맞다. 승격 절의
+          #    `git show ${BASE_SHA}:…` 도 tip 이어야 옳은 값을 읽는다.
+          #
+          # ③ 보강은 **실제 base** 를 받는다. 예전엔 `origin/main` 고정이라, base=dev 인 PR 에서
+          #    이게 타면 main 기준으로 잡혀 diff 가 통째로 부풀었다. push 이벤트에선 BASE_REF
+          #    가 '' 인데, 이 스텝은 push 일 때 `refs/heads/dev` 에서만 돌므로 dev 가 그 기준이다.
+          # ⚠️ all-zero 는 **따로 다룬다.** push 로 브랜치를 새로 만들면 `event.before` 가
+          #    all-zero 인데, 이때 아래 보강을 그대로 태우면 `BASE_REF` 가 '' 라 dev 를 받고
+          #    그게 곧 HEAD 라 **diff 가 비어 게이트가 통과해 버린다**(실측: 파일 0건).
+          #    "이전 상태가 없다" 는 뜻이므로 비교 기준은 main 뿐이다. 여기서 main 을 쓰는 건
+          #    옳다 — 아래 보강에서 main 을 안 쓰는 이유(PR 의 base 는 dev 일 수 있다)와
+          #    상황이 다르다.
+          if [[ "${BASE_SHA}" == "0000000000000000000000000000000000000000" ]]; then
+            git fetch --no-tags origin main
+            BASE_SHA="$(git merge-base FETCH_HEAD "${HEAD_SHA}")"
           fi
-          git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > /tmp/teameet-changed-files.txt
+          base_rc=0
+          git merge-base "${BASE_SHA}" "${HEAD_SHA}" >/dev/null 2>&1 || base_rc=$?
+          if [[ ${base_rc} -ne 0 ]]; then
+            git fetch --no-tags origin "${BASE_REF:-dev}"
+            BASE_SHA="$(git rev-parse FETCH_HEAD)"
+          fi
+          # base 가 head 와 같으면 **아무 변경도 없는 것으로 보인다** — 게이트가 있으나
+          # 아무것도 못 막는 상태다. 통과시키지 말고 그 자리에서 이름을 대며 죽는다.
+          if [[ "$(git rev-parse "${BASE_SHA}")" == "$(git rev-parse "${HEAD_SHA}")" ]]; then
+            echo "changeset gate: base 와 head 가 같다 (${BASE_SHA}) — 변경을 판정할 수 없다." >&2
+            exit 1
+          fi
+          # 3-dot: **분기점부터 head 까지** — 이 PR 이 실제로 바꾼 것만 센다.
+          # 2-dot 은 base 에만 있고 head 엔 없는 커밋까지 diff 에 넣어서, base 가 전진하면
+          # 남의 파일과 **남의 changeset** 이 내 변경으로 잡힌다. 그러면 게이트가 있는데
+          # 아무것도 안 막는다(실측: 열린 PR 하나가 2-dot 에선 "325 behavior files,
+          # 20 changed Changesets" 로 통과했고 3-dot 에선 "changeset not required" 였다.
+          # 그 PR 이 실제로 건드린 건 scripts/ 6파일뿐이다).
+          git diff --name-only "${BASE_SHA}...${HEAD_SHA}" > /tmp/teameet-changed-files.txt
           if [[ ${BASE_REF} == main && ${HEAD_REF} == dev ]]; then
             # A Changeset can be added and consumed entirely between main and dev,
             # so it is absent from the final tree diff. Preserve deleted Changeset
@@ -60,6 +106,18 @@ jobs:
           node scripts/release/check-changeset-policy.mjs \
             --repo . \
             --changed-files-file /tmp/teameet-changed-files.txt
+
+      - name: Verify changeset gate base resolution
+        if: >-
+          github.event_name == 'pull_request' ||
+          (github.event_name == 'push' && github.ref == 'refs/heads/dev')
+        run: |
+          set -Eeuo pipefail
+          # 위 스텝의 셸을 픽스처 저장소에서 그대로 돌려, base 가 전진했을 때 **남의
+          # changeset 을 내 변경으로 세지 않는지**를 본다. 2-dot 은 더 자연스러워 보여서
+          # 되돌리기 쉬운데, 되돌려도 아무것도 안 깨지고 **더 많이 통과할 뿐**이라
+          # 텍스트로는 못 막는다. 덮는 범위와 못 덮는 범위는 스크립트 헤더에 적혀 있다.
+          node scripts/qa/check-changeset-gate-base.mjs --self-test
 
       - name: Validate planned SemVer
         if: >-
@@ -90,6 +148,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Android Play policy contracts
+        run: node scripts/qa/check-android-play-policy.mjs
+
       - name: V1 DB guardrails
         run: pnpm qa:v1-db-guardrails
 
@@ -101,6 +162,28 @@ jobs:
       - name: Prod deploy security guard tests
         run: node --test scripts/qa/prod-deploy-security-guard.test.mjs
 
+      # `v1_game_operations_worker` 가 alpha compose 에만 선언되고 prod 에는 끝내 들어가지
+      # 않아, 프로덕션이 아웃박스 디스패처 없이 돌던 것을 오래 아무도 몰랐다(2026-08-16).
+      # 그 건은 배포 검증에 해당 서비스를 명시해 막았지만 그건 서비스 하나짜리 방어라,
+      # 다음에 alpha 에만 추가되는 서비스는 똑같이 누락된다 — 집합 자체를 비교한다.
+      - name: Compose service parity (alpha-only service guard)
+        run: pnpm qa:compose-service-parity
+
+      - name: Compose service parity guard tests
+        run: node --test scripts/qa/check-compose-service-parity.test.mjs
+
+      # alpha 배포 시드가 이미지에 없는 파일을 참조하면 배포가 죽는다(2026-09-08 실사고).
+      - name: Alpha seed runtime contracts
+        run: pnpm qa:alpha-seed-runtime
+
+      - name: Alpha seed runtime guard tests
+        run: node --test scripts/qa/check-alpha-seed-runtime.test.mjs
+
+      # 배포 실패 시 되돌리는 경로가 **어느 단계에서 막혔는지** 말하는지 본다(2026-09-08 실사고:
+      # 네 번 실패했는데 로그엔 "restore failed" 한 줄뿐이라 원인을 못 좁혔다).
+      - name: Alpha restore diagnostics contracts
+        run: node --test scripts/qa/check-restore-diagnostics.test.mjs
+
       # 이 스위트는 존재만 하고 CI 에서 한 번도 실행되지 않았다 — 그래서
       # "changeset 을 전부 소비하면 alpha 배포가 깨진다"는 계약 위반이 계속 살아 있었다.
       # 디렉터리 인자(`node --test scripts/release/`)는 Node 버전에 따라 모듈 해석으로
@@ -110,6 +193,13 @@ jobs:
 
       - name: Alpha release-state contract tests
         run: bash scripts/qa/test-alpha-release-state.sh
+
+      # 배포 실패를 되돌리는 restore_active_release() 는 ERR trap 안에서 돈다. bash 는 trap 안의
+      # 인자 없는 `return` 에 trap 을 일으킨 종료코드를 돌려주므로, 정상 흐름에서 멀쩡한 함수가
+      # 복구에서만 조용히 실패한다(2026-09-08 alpha 복구 5회 연속 실패의 원인). alpha·prod 둘 다
+      # 실제 trap 문맥에서 복구를 끝까지 돌려 본다.
+      - name: Release restore-in-trap contract tests
+        run: bash scripts/qa/test-release-restore-in-trap.sh
 
       # alpha 는 로컬 이미지 GC 가 없어 dangling 이미지가 배포마다 쌓였고, 실제로 EC2
       # 디스크가 28G/30G 까지 차서 배포와 롤백이 함께 "no space left on device" 로 실패했다
@@ -148,6 +238,81 @@ jobs:
       - name: Prod rollback guard tests
         run: bash scripts/qa/test-prod-rollback-guards.sh
 
+      # Task 168 M11 StageB 이관 도구 (PR-A1) — 어떤 배포 경로도 아직 호출하지
+      # 않는 도구 계층 계약 테스트. 합성 fixture 로만 실행되고 Docker 는 쓰지
+      # 않는다: package 쪽은 실제 git 저장소를 만들어 패키징 결정성(umask/TZ)과
+      # 검증 우회를 확인하고, preflight 쪽은 Docker 를 만들기 전의 정적 검사
+      # (source-archive-attestation sidecar 인증)만 확인한다.
+      - name: Task 168 StageB packager contract tests
+        run: bash scripts/qa/test-task168-stage-b-package.sh
+
+      - name: Task 168 StageB preflight sidecar contract tests
+        run: bash scripts/qa/test-task168-stage-b-preflight-sidecar.sh
+
+      # A gate that is not wired into any workflow is the same as no gate.
+      - name: Alpha immutable-deploy contract checks
+        run: node scripts/qa/check-alpha-immutable-deploy.mjs
+
+      # Task168 StageB. All four run the real target scripts against fake
+      # aws/docker, never a hand-copied excerpt — see each script's own
+      # header for what it actually exercises.
+      - name: Task168 StageB dispatch wiring contract tests
+        run: bash scripts/qa/test-task168-stage-b-wiring.sh
+
+      - name: Task168 StageB wrapper contract tests
+        run: bash scripts/qa/test-task168-stage-b-wrapper.sh
+
+      - name: Task168 StageB manifest and promotion contract tests
+        run: bash scripts/qa/test-task168-stage-b-manifest.sh
+
+      - name: Task168 Dockerfile target stage order (static)
+        run: bash scripts/qa/test-task168-dockerfile-target.sh
+
+      - name: Task168 post-live verify contract tests
+        run: bash scripts/qa/test-task168-post-live.sh
+
+      - name: Task168 StageA predecessor read contract tests
+        run: bash scripts/qa/test-task168-predecessor-read.sh
+
+      - name: Task168 StageA predecessor dispatch contract tests
+        run: bash scripts/qa/test-task168-predecessor-dispatch.sh
+
+      # A real `docker build` per target (StageA default + StageB
+      # runtime-task168-final) is deliberately NOT a step here: this job's
+      # own contract (see the file header) is "no app build, seconds-long
+      # checks", and two full image builds break that.
+      # scripts/qa/test-task168-dockerfile-target.sh above covers the
+      # target-order/attestation-content contract statically; a real-build
+      # attestation check belongs in a job that does not gate this file's
+      # production deploy (or on workflow_dispatch only), with a real run
+      # result attached before it merges — not here.
+
+      # Task 168 M11 converged: the final-steady ledger/receipt check-only
+      # gate (deploy/task168-final-steady-migrate.sh) is what stands between
+      # every future dev push and Alpha's live DB once M11 lands — this
+      # fixes D-1 (a StageA runner silently skipping new migrations) but a
+      # regression back to the candidate runner's exact-ledger-equality
+      # design would permanently block every deploy that adds a migration.
+      - name: Task168 final-steady migration contract tests
+        run: bash scripts/qa/test-task168-final-steady.sh
+
+      # Ordering guarantee around that same gate inside deploy-alpha.sh
+      # itself: check-only must run BEFORE activate_alpha_release_source,
+      # and this path must never set task168_irreversible -- moving the
+      # gate after activation, or re-enabling irreversible mode, would leave
+      # every scenario above green while reopening D-5 (a half-switched
+      # release that cannot be restored).
+      - name: Task168 Alpha steady deploy ordering contract tests
+        run: bash scripts/qa/test-task168-alpha-steady-wiring.sh
+
+      # Task168 M11 prod guard (assert_task168_m11_guard,
+      # deploy/prod-release-common.sh): prod has no Alpha-style host receipt
+      # path, so this is the only thing stopping M11 from running unguarded
+      # (no writer quiesce, no fresh backup) the first time a dev->main
+      # promotion carries it.
+      - name: Task168 prod guard contract tests
+        run: bash scripts/qa/test-task168-prod-guard.sh
+
       # expand-contract 게이트를 **머지 전에** 돌린다.
       #
       # 2026-08-20 사고: 이 검사가 `deploy` job 에만 있었고 그 job 은 PR 에서 skip 된다.
@@ -174,10 +339,44 @@ jobs:
           # 구하려다 실패했는데(2026-08-20), PR 체크아웃에는 base 브랜치의 원격 추적 ref
           # 가 없어 `origin/dev` 를 해석하지 못한다 — 바로 위 changeset 스텝이 payload
           # 값을 먼저 쓰고 못 쓸 때만 fetch 로 보강하는 것도 같은 이유다.
-          if [[ ! "${BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
-            git fetch --no-tags origin "${BASE_REF}"
-            BASE_SHA="$(git merge-base FETCH_HEAD "${HEAD_SHA}")"
-          fi
+          #
+          # 폴백 조건은 **형식이 아니라 실제로 필요한 연산**이다. 예전엔 `=~ ^[0-9a-f]{40}$`
+          # 였는데, payload 의 base.sha 는 **항상** 40자 hex 라 그 조건은 PR 이벤트에서 한
+          # 번도 참이 된 적이 없다 — 즉 아래 두 줄은 도달 불가였다. 정작 실패하는 모양은
+          # "형식은 맞는데 그 SHA 로 merge-base 가 안 되는" 것이라(2026-09-01 #941), 형식·
+          # 객체 존재 같은 **대리 지표** 대신 그 명령 자체가 되는지를 묻는다.
+          #
+          # **rc 를 봐야 한다.** merge-base 의 실패는 두 종류이고 처방이 정반대다:
+          #   rc 1   → "공통 조상이 없다". git 의 **정상적인 답**이다. 여기서 보강하면 안 된다 —
+          #            아래 스크립트가 그 상태를 이름으로 보고하게 두는 것이 이 변경의 목적이다.
+          #   rc 128 → 객체·저장소 문제. base tip 을 받아오면 풀린다.
+          #
+          # 그리고 보강할 때도 BASE_SHA 에 **merge-base 결과를 넣지 않는다.** 스크립트는
+          # baseSha 를 "대상 브랜치 tip"으로 쓴다(collectBaseFunctionNames) — 함수가 이미
+          # 존재하는지를 **머지된 뒤의 현실**로 판정해야 CREATE OR REPLACE 가 새 함수로
+          # 오인되지 않기 때문이다. 더 오래된 커밋을 넣으면 그 판정이 약해져 **게이트가
+          # 조용히 느슨해진다.** diff base 를 분기점으로 옮기는 일은 스크립트가 자기 안에서
+          # 따로 한다. 그러니 여기서는 tip 을 tip 으로만 보강한다.
+          # `-ge 2` 로 뭉뚱그리면 **예상 밖 코드까지 "fetch 하면 될지도"로 삼킨다** —
+          # 인자 오류나 시그널 종료가 조용히 보강 경로를 타 버린다. 위 표대로 딱 갈라 두고,
+          # 표에 없는 코드는 삼키지 말고 그 자리에서 죽인다.
+          merge_base_rc=0
+          git merge-base "${BASE_SHA}" "${HEAD_SHA}" >/dev/null 2>&1 || merge_base_rc=$?
+          case "${merge_base_rc}" in
+            0|1) ;;
+            128)
+              git fetch --no-tags origin "${BASE_REF}"
+              BASE_SHA="$(git rev-parse FETCH_HEAD)"
+              ;;
+            *)
+              echo "expand-contract gate: git merge-base 가 예상 밖 코드로 끝났다 (exit ${merge_base_rc})" >&2
+              exit 1
+              ;;
+          esac
+          # 게이트 자신의 규칙(SQL 추가성 판정 + base 해석)을 먼저 돌린다. 이게 없던 동안
+          # base 해석 쪽 결함이 오래 살아남아, 대상 브랜치가 전진할 때마다 마이그레이션과
+          # 무관한 PR 이 죽었다. 임시 저장소 몇 개를 만드는 정도라 수 초면 끝난다.
+          node scripts/qa/check-expand-contract-migrations.mjs --self-test
           echo "expand-contract gate: ${BASE_SHA} -> ${HEAD_SHA}"
           node scripts/qa/check-expand-contract-migrations.mjs "${BASE_SHA}" "${HEAD_SHA}"
 
@@ -225,6 +424,15 @@ jobs:
       - name: V1 API type-check
         run: pnpm --filter v1_api exec tsc --noEmit
 
+      # 대회 표면 게이트: `v1Tournament.findUnique/findFirst` **원시 호출 수**를 파일별
+      # baseline 으로 묶어 늘지 못하게 한다(줄었는데 baseline 이 그대로여도 실패).
+      # **이 스텝이 없으면 스크립트가 디스크에만 있고 CI 에서 한 번도 안 돈다** — 이
+      # 저장소는 그 사고를 이미 겪었다(jest.config.ts 의 glob 미등록 주석들 참조).
+      # 로그에 스캔 파일 수와 조회 개수가 찍히므로, 스텝이 돌았는지뿐 아니라
+      # **실제로 세었는지**까지 로그로 확인할 수 있다.
+      - name: V1 API tournament surface gate
+        run: pnpm --filter v1_api lint:surface
+
       # 마이그레이션 게이트: 빈 DB에 전체 체인 재생 + schema.prisma 드리프트 0 검증.
       # db push로만 스키마를 바꾸면 여기서 CI가 깨진다 — 반드시 migration 파일 동반.
       # (2026-07-12 프로덕션 장애 재발 방지: 리뷰 테이블 migration 누락 → deploy 중단)
@@ -246,6 +454,8 @@ jobs:
           # here so `test:integration` sees the same DB state.
           DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
             src/tournaments/competition-config/competition-config-backfill.cli.ts
+          DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
+            src/tournaments/migration/tournament-award-recipient-backfill.cli.ts --dry-run
           DATABASE_URL="$MIGRATE_URL" pnpm test:integration
           # 게임 운영 플래그 불변 행 시드 CLI 가 실제로 기동하는지 확인한다
           # (배포 경로 deploy/deploy-alpha.sh 가 migrate deploy 직후 돌리는 그 CLI).
@@ -260,6 +470,25 @@ jobs:
           DATABASE_URL="$MIGRATE_URL" ./node_modules/.bin/ts-node --transpile-only \
             src/config/game-operation-flags-seed.cli.ts
           echo "migration chain OK — empty-DB replay clean, zero schema drift"
+
+      # deploy/task168-final-steady-migrate.sh's --check-only mode against a
+      # REAL Postgres with the real M1-M11 migrations actually applied (the
+      # v1_migrate_check DB the step above just built via `prisma migrate
+      # deploy`). scripts/qa/test-task168-final-steady.sh and
+      # scripts/qa/test-task168-alpha-steady-wiring.sh only fake
+      # `docker compose ... exec v1_postgres psql`, so neither can catch a
+      # mismatch between the tokens those fakes hand back and what Postgres
+      # actually returns for the SQL that produces them -- which is exactly
+      # what broke once: `boolean::text` returns 'true'/'false' on real
+      # Postgres, not the 't'/'f' the fakes always fed the script.
+      - name: Task168 final-steady real-Postgres check-only test
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: teameet_test
+          PGPASSWORD: teameet_test
+          PGDATABASE: v1_migrate_check
+        run: bash scripts/qa/test-task168-final-steady-real-db.sh
 
       - name: V1 API unit tests
         run: pnpm --filter v1_api test
@@ -426,6 +655,10 @@ jobs:
         with:
           context: .
           file: deploy/Dockerfile.v1-api
+          # See deploy-alpha.yml's identical comment: Dockerfile.v1-api now carries a
+          # StageB stage ahead of `runtime` — pin the target explicitly so prod never
+          # silently picks up the newest stage in the file.
+          target: runtime
           push: true
           tags: ${{ steps.login-ecr.outputs.registry }}/teameet-prod-v1-api:${{ steps.images.outputs.imageTag }}
           cache-from: type=gha,scope=prod-v1-api
@@ -631,6 +864,19 @@ jobs:
           SECRET_VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           SECRET_VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           SECRET_VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          SECRET_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          SECRET_FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          SECRET_FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+          # iOS push (APNs). One Apple key covers sandbox and production and every App ID of
+          # the team, so the same three secrets alpha uses are reused. The bundle id is NOT
+          # the alpha secret: `ApnsPushService` accepts exactly `kr.co.teameet` when
+          # V1_PUSH_ENVIRONMENT=production (the compose default here) and refuses to start
+          # on anything else — a fixed, public value, so it is written here, not stored.
+          # Only takes effect once main carries the APNs adapter (dev → main promotion).
+          SECRET_APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+          SECRET_APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+          SECRET_APNS_BUNDLE_ID: kr.co.teameet
+          SECRET_APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
           SECRET_SMS_PROVIDER: ${{ secrets.SMS_PROVIDER }}
           SECRET_SOLAPI_API_KEY: ${{ secrets.SOLAPI_API_KEY }}
           SECRET_SOLAPI_API_SECRET: ${{ secrets.SOLAPI_API_SECRET }}
@@ -641,6 +887,7 @@ jobs:
           SECRET_SES_REGION: ${{ vars.SES_REGION }}
           SECRET_EMAIL_FROM: ${{ vars.EMAIL_FROM }}
           SECRET_SLACK_INQUIRY_WEBHOOK_URL: ${{ secrets.SLACK_INQUIRY_WEBHOOK_URL }}
+          SECRET_ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS: ${{ vars.ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS }}
         run: bash scripts/release/sync-prod-runtime-env.sh
 
       - name: Run deploy-prod.sh

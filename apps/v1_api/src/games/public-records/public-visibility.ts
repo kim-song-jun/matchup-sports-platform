@@ -1,4 +1,4 @@
-import type { V1GameState, V1TournamentFixtureStatus, V1VisibilityMode } from '@prisma/client';
+import type { V1GameState, V1VisibilityMode } from '@prisma/client';
 import type { PublicGameVisibilityMode } from '../games.types';
 
 /**
@@ -74,14 +74,29 @@ export function resolveResultState(input: {
   return input.supersedesId === null ? 'official' : 'corrected';
 }
 
-const FIXTURE_STATUS_TO_PUBLIC_STATUS: Record<V1TournamentFixtureStatus, string> = {
+/**
+ * 공개 화면이 쓰는 진행 상태 어휘. 저장소의 legacy fixture status와 이름이
+ * 겹치지 않게 별도 어휘를 쓰는 이유는 둘의 authoritative 소스가 다르기 때문이다 —
+ * 이 값은 `V1Game.state` 우선으로 파생되고, 컬럼은 결과 확정 시점에만 움직인다.
+ */
+export type PublicFixtureStatus = 'scheduled' | 'live' | 'ended' | 'cancelled';
+
+/**
+ * Canonical public-records callers normalize both tournament and TeamMatch
+ * lifecycle rows into this stable wire vocabulary before reaching this mapper.
+ * Keep the input contract local so the public read lane does not depend on the
+ * retired tournament-fixture Prisma enum.
+ */
+type FixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+
+const FIXTURE_STATUS_TO_PUBLIC_STATUS: Record<FixtureStatus, PublicFixtureStatus> = {
   scheduled: 'scheduled',
   in_progress: 'live',
   completed: 'ended',
   cancelled: 'cancelled',
 };
 
-const GAME_STATE_TO_PUBLIC_STATUS: Record<V1GameState, string> = {
+const GAME_STATE_TO_PUBLIC_STATUS: Record<V1GameState, PublicFixtureStatus> = {
   SCHEDULED: 'scheduled',
   LIVE: 'live',
   PAUSED: 'live',
@@ -98,8 +113,8 @@ const GAME_STATE_TO_PUBLIC_STATUS: Record<V1GameState, string> = {
  */
 export function publicFixtureStatus(input: {
   readonly gameState: V1GameState | null;
-  readonly fixtureStatus: V1TournamentFixtureStatus;
-}): string {
+  readonly fixtureStatus: FixtureStatus;
+}): PublicFixtureStatus {
   if (input.gameState !== null) return GAME_STATE_TO_PUBLIC_STATUS[input.gameState];
   return FIXTURE_STATUS_TO_PUBLIC_STATUS[input.fixtureStatus];
 }

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
@@ -22,7 +24,7 @@ const teamApiMocks = vi.hoisted(() => ({
   useV1LeaveTeam: vi.fn(),
   // 기본 반환값이 없으면 이 훅을 신경 쓰지 않는 기존 테스트들이 전부 undefined.data 로 깨진다.
   // 반환 타입을 명시하지 않으면 `{ data: undefined }` 로 좁혀져 mockReturnValue 가 막힌다.
-  useV1ReceivedReviewSummary: vi.fn((): { data: unknown } => ({ data: undefined })),
+  useV1PublicTeamReviewSummary: vi.fn((): { data: unknown } => ({ data: undefined })),
 }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
@@ -153,7 +155,9 @@ describe('TeamListPageView', () => {
     render(<TeamListPageView model={model} />);
 
     expect(screen.getByText('라이브 팀')).toBeInTheDocument();
-    expect(screen.getByText('가입 신청 가능')).toBeInTheDocument();
+    // 가입 가능은 목록에서 50/50 이 같은 값이라(alpha 실측 2026-09-07) 더는 쓰지 않는다 —
+    // 예외(가입 닫힘·정원 마감)만 배지로 알린다. 아래 별도 describe 에서 그 계약을 지킨다.
+    expect(screen.queryByText('가입 신청 가능')).not.toBeInTheDocument();
     expect(screen.getByText('레벨 미설정')).toBeInTheDocument();
     expect(screen.getByText('짧은 소개')).toBeInTheDocument();
     expect(screen.getByText('팀장 김도윤 · 감독 박서준')).toBeInTheDocument();
@@ -356,6 +360,7 @@ describe('TeamMembersPageView — 보낸 초대 목록', () => {
     const fallback = getTeamMembersViewModel();
     return {
       ...fallback,
+      viewerRole: 'owner',
       activeTab: 'invitations',
       invitations: {
         form: {
@@ -474,6 +479,40 @@ describe('TeamFormPageView', () => {
 });
 
 describe('TeamMembersPageView — 팀 나가기 (self-leave)', () => {
+  it('일반 멤버는 관리자 문구·가입 신청 탭·비활성 관리 버튼 없이 본인 탈퇴만 본다', () => {
+    const base = getTeamMembersViewModel();
+    const model: TeamMembersViewModel = {
+      ...base,
+      viewerRole: 'member',
+      activeTab: 'requests',
+      tabs: [
+        { key: 'members', label: '멤버', count: 2, onSelect: vi.fn() },
+        { key: 'requests', label: '가입 신청', count: 4, onSelect: vi.fn() },
+        { key: 'invitations', label: '초대', count: 2, onSelect: vi.fn() },
+      ],
+      members: [
+        { name: '김도윤', role: '팀장', meta: '가입 2024.03', actions: [] },
+        {
+          name: '이하나',
+          role: '멤버',
+          meta: '가입 2024.05',
+          actions: [],
+          selfLeave: { disabled: false, pending: false, onSelect: vi.fn() },
+        },
+      ],
+    };
+
+    render(<TeamMembersPageView model={model} />);
+
+    expect(screen.getByRole('heading', { level: 1, name: '성수 러너스 FC · 멤버 목록' })).toBeInTheDocument();
+    expect(screen.queryByText('권한 규칙')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^가입 신청/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^초대/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '관리' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: '멤버 탭 선택' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '팀 나가기' })).toBeEnabled();
+  });
+
   it('본인 행에만 "팀 나가기" 버튼이 보이고 클릭 시 onSelect가 호출된다', () => {
     const onSelect = vi.fn();
     const base = getTeamMembersViewModel();
@@ -579,7 +618,7 @@ describe('TeamDetailPageView — 팀 기록 섹션', () => {
   }
 
   it('내 팀이면 전적과 받은 후기 링크를 함께 보여주고, 요약을 배지로 적는다', () => {
-    teamApiMocks.useV1ReceivedReviewSummary.mockReturnValue({
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({
       data: {
         bySport: [
           { sportId: 's1', sportCode: 'futsal', ratingAvg: 5, ratingCount: 3, tagRates: [] },
@@ -598,25 +637,230 @@ describe('TeamDetailPageView — 팀 기록 섹션', () => {
     expect(reviewLinks).toHaveLength(2);
     const reviewLink = reviewLinks[0];
     expect(reviewLink).toHaveAttribute('href', '/my/reviews?tab=received');
-    // 개수로 가중 평균: (5×3 + 4×1) / 4 = 4.75 → 4.8, 총 4개
+    // 종목별 가중 평균: (5×3 + 4×1) / 4 = 4.75 → 4.8.
+    // 단위는 후기 건수가 아니라 **평가한 팀 수**다 — 팀 평점이 팀당 1표로 계산되므로
+    // 가중치도 팀 수여야 하고, 배지도 같은 단위로 적어야 숫자가 거짓말을 하지 않는다.
     expect(reviewLink).toHaveTextContent('4.8');
-    expect(reviewLink).toHaveTextContent('4개');
+    expect(reviewLink).toHaveTextContent('4팀');
   });
 
-  it('남의 팀에는 받은 후기 링크를 두지 않는다 (내 후기를 그 팀 평가로 보이게 하면 안 된다)', () => {
-    teamApiMocks.useV1ReceivedReviewSummary.mockReturnValue({ data: undefined });
+  it('남의 팀도 그 팀이 받은 후기를 보여주되, 내 후기 화면으로 보내지는 않는다', () => {
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({
+      data: { bySport: [{ sportId: 's1', sportCode: 'futsal', ratingAvg: 4.5, ratingCount: 2, tagRates: [] }], availableMonths: [] },
+    });
 
     render(<TeamDetailPageView model={modelWithMode('default')} />);
 
-    expect(screen.getAllByRole('link', { name: /팀 전적/ })).toHaveLength(2);
+    // 요약은 보인다 — 공개 엔드포인트라 그 팀이 받은 평가가 맞다.
+    expect(screen.getAllByText('받은 후기').length).toBeGreaterThan(0);
+    // 하지만 링크는 아니다: /my/reviews 는 "내" 후기 화면이라 남의 팀에서 그리로 보내면 거짓말이 된다.
     expect(screen.queryAllByRole('link', { name: /받은 후기/ })).toHaveLength(0);
   });
 
+  it('남의 팀이고 받은 후기가 0건이면 카드 자체를 두지 않는다', () => {
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({ data: { bySport: [], availableMonths: [] } });
+
+    render(<TeamDetailPageView model={modelWithMode('default')} />);
+
+    expect(screen.queryAllByText('받은 후기')).toHaveLength(0);
+  });
+
   it('받은 후기가 아직 없으면 배지 없이 안내만 보여준다', () => {
-    teamApiMocks.useV1ReceivedReviewSummary.mockReturnValue({ data: { bySport: [], availableMonths: [] } });
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({ data: { bySport: [], availableMonths: [] } });
 
     render(<TeamDetailPageView model={modelWithMode('mine')} />);
 
     expect(screen.getAllByRole('link', { name: /받은 후기/ })[0]).toHaveTextContent('아직 받은 후기가 없어요');
+  });
+});
+
+/**
+ * "내 리그" (R4, 2026-08-20) — 리그 상세로 가는 인앱 진입점이 team-matches 상세 화면의
+ * 배지 하나뿐이었어서(team-matches-page.tsx 참고) 팀장·선수가 자기 팀의 리그를 발견할
+ * 방법이 사실상 없었다. 팀 상세에 이 팀이 속한 리그 목록을 보여준다.
+ */
+describe('TeamDetailPageView — 내 리그 섹션', () => {
+  function modelWithLeagues(
+    myLeagues: TeamDetailViewModel['myLeagues'],
+    myLeaguesLoading = false,
+    myLeaguesError = false,
+    onRetryMyLeagues?: () => void,
+  ): TeamDetailViewModel {
+    return { ...getTeamDetailViewModel('default'), myLeagues, myLeaguesLoading, myLeaguesError, onRetryMyLeagues };
+  }
+
+  it('소속 리그가 있으면 리그별로 리그 상세 링크를 보여준다', () => {
+    render(
+      <TeamDetailPageView
+        model={modelWithLeagues([
+          { leagueId: 'lg-1', title: '가을 리그' },
+          { leagueId: 'lg-2', title: '겨울 리그' },
+        ])}
+      />,
+    );
+
+    expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
+    // 모바일·데스크톱 두 레이아웃이 동시에 마운트되므로 리그당 2개씩 나온다.
+    const autumnLinks = screen.getAllByRole('link', { name: /가을 리그/ });
+    expect(autumnLinks).toHaveLength(2);
+    autumnLinks.forEach((link) => expect(link).toHaveAttribute('href', '/league-matches/lg-1'));
+    const winterLinks = screen.getAllByRole('link', { name: /겨울 리그/ });
+    expect(winterLinks).toHaveLength(2);
+    winterLinks.forEach((link) => expect(link).toHaveAttribute('href', '/league-matches/lg-2'));
+  });
+
+  it('소속 리그가 없으면 "내 리그" 섹션 자체를 렌더하지 않는다 — 빈 섹션 노출 금지', () => {
+    render(<TeamDetailPageView model={modelWithLeagues([])} />);
+
+    expect(screen.queryByText('내 리그')).not.toBeInTheDocument();
+  });
+
+  it('아직 로딩 중이면(빈 배열이어도) 섹션 제목과 스켈레톤을 보여준다', () => {
+    render(<TeamDetailPageView model={modelWithLeagues([], true)} />);
+
+    expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('내 리그 불러오는 중').length).toBeGreaterThan(0);
+  });
+
+  /**
+   * 그룹 F 재감사 — myLeaguesQuery 가 실패하면 items도 빈 배열이 되어 위 "소속 리그가
+   * 없으면 섹션을 감춘다" 케이스와 화면이 100% 같아지던 결함. 에러 플래그가 있으면
+   * items가 비어 있어도 섹션이 감춰지지 않고 재시도 UI가 떠야 한다.
+   */
+  it('통신 오류면(items가 비어 있어도) 섹션을 감추지 않고 재시도 안내를 보여준다', () => {
+    render(<TeamDetailPageView model={modelWithLeagues([], false, true)} />);
+
+    expect(screen.queryByLabelText('내 리그 불러오는 중')).not.toBeInTheDocument();
+    expect(screen.getAllByText('내 리그').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('리그 정보를 불러오지 못했어요').length).toBeGreaterThan(0);
+  });
+
+  it('재시도 버튼을 누르면 onRetryMyLeagues가 호출된다', () => {
+    const onRetryMyLeagues = vi.fn();
+    render(<TeamDetailPageView model={modelWithLeagues([], false, true, onRetryMyLeagues)} />);
+
+    const retryButtons = screen.getAllByRole('button', { name: '다시 시도' });
+    fireEvent.click(retryButtons[0]);
+
+    expect(onRetryMyLeagues).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * 팀 카드 밀도 (2026-09-07 alpha 실측 · 사용자 A안 확정).
+ *
+ * 카드 217px 중 맨 아래 49px(구분선 + 액션 행)이 '활동 일정'과 '가입 상태'를 담고 있었는데,
+ * 상태 문구는 **50팀 중 50팀이 같은 값**('가입 신청 가능')이었다. 머리말에도
+ * "50팀 · 가입 가능 50" 이 이미 있어, 그 49px 은 정보량 0 이었다.
+ *
+ * 그래서 ① 가입 가능은 안 쓰고 예외만 배지로 알리고 ② 활동 일정은 있을 때만 한 줄로 쓴다.
+ * 예전 액션 행은 `aria-hidden="true"` 라 스크린리더에는 아예 안 읽혔다 — 배지로 옮기며
+ * 읽히게 되는 것도 함께 지킨다.
+ */
+describe('TeamListPageView — 팀 카드 밀도', () => {
+  function listWith(overrides: Partial<TeamListViewModel['teams'][number]>) {
+    const base = getTeamListViewModel();
+    return {
+      ...base,
+      summary: { ...base.summary, total: 1, recruiting: 1 },
+      teams: [{ ...base.teams[0], ...overrides }],
+    } as TeamListViewModel;
+  }
+
+  it('구분선이 있던 액션 행 자체를 그리지 않는다', () => {
+    const { container } = render(<TeamListPageView model={listWith({ status: 'open', statusLabel: '가입 신청 가능' })} />);
+
+    expect(container.querySelector('.tm-team-card-action-row')).toBeNull();
+    expect(container.querySelector('.tm-team-card-action-status')).toBeNull();
+  });
+
+  it("가입 가능한 팀에는 상태 배지를 붙이지 않는다 — 목록에서 전부 같은 값이다", () => {
+    render(<TeamListPageView model={listWith({ status: 'open', statusLabel: '가입 신청 가능' })} />);
+
+    expect(screen.queryByText('가입 신청 가능')).not.toBeInTheDocument();
+  });
+
+  it('가입이 막힌 팀에만 상태 배지를 붙이고, 스크린리더에도 읽힌다', () => {
+    const { container } = render(<TeamListPageView model={listWith({ status: 'closed', statusLabel: '가입 닫힘' })} />);
+
+    const badge = container.querySelector('.tm-team-card-status-badge');
+    expect(badge).not.toBeNull();
+    expect(badge!.textContent).toContain('가입 닫힘');
+    // 예전 액션 행은 aria-hidden 이라 안 읽혔다. 배지에는 그 속성이 없어야 한다.
+    expect(badge!.closest('[aria-hidden="true"]')).toBeNull();
+  });
+
+  it("활동 일정이 없으면 '활동 일정 미정' 으로 채우지 않고 줄 자체를 뺀다", () => {
+    const { container } = render(<TeamListPageView model={listWith({ next: '' })} />);
+
+    expect(screen.queryByText('활동 일정 미정')).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-team-card-activity')).toBeNull();
+  });
+
+  it('FAB 가림 보호는 활동 줄이 없는 카드에도 걸린다 — 마지막 자식 기준이다', () => {
+    // 활동 줄에만 걸면 그 줄이 없는 카드는 마지막 줄(소개)이 FAB 에 가려진다(#1095 Copilot).
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const block = css.match(/@media \(max-width: 767px\) \{\s*\.tm-team-list \.tm-team-card > :last-child \{[^}]*\}/);
+
+    expect(block).not.toBeNull();
+    expect(block![0]).toContain('padding-right: 64px');
+    // 예전처럼 활동 줄만 겨냥하는 규칙이 남아 있으면 의도가 반쯤만 지켜진다.
+    expect(css).not.toContain('.tm-team-list .tm-team-card-activity {');
+  });
+
+  /**
+   * 레벨 태그는 서버 자유 텍스트라 길이가 보장되지 않는다. alpha 실측(2026-09-07):
+   * `중급 · 빌드업과 패스 플레이 중심`(170px)이 태그 행 232px 안에서 형제(`성별 무관` 62px
+   * + gap 8)를 둘째 줄로 밀어내 카드가 32px 커졌다(50팀 중 4팀). 폭 상한으로 칩 한 줄을 지킨다.
+   */
+  it('긴 태그도 잘릴 뿐 DOM 에는 전문이 남는다 — 스크린리더는 다 읽는다', () => {
+    const long = '중급 · 빌드업과 패스 플레이 중심';
+    const { container } = render(<TeamListPageView model={listWith({ tags: [long], genderRule: '성별 무관' })} />);
+
+    const tag = [...container.querySelectorAll('.tm-team-tag-text')].find((el) => el.textContent === long);
+    expect(tag).toBeDefined();
+    // 잘림은 CSS 가 하지 텍스트를 지우지 않는다 — 지우면 접근성이 함께 깎인다.
+    expect(tag!.textContent).toBe(long);
+    expect(tag!.closest('.tm-team-tag')).not.toBeNull();
+  });
+
+  it('태그마다 폭 상한 훅이 붙는다 — 레벨만이 아니라 전부 서버 문자열이다', () => {
+    const { container } = render(<TeamListPageView model={listWith({ tags: ['입문-고수'], genderRule: '성별 무관' })} />);
+
+    const tags = [...container.querySelectorAll('.tm-team-tag')];
+    expect(tags).toHaveLength(2);
+    tags.forEach((t) => expect(t.querySelector('.tm-team-tag-text')).not.toBeNull());
+  });
+
+  it('상한은 형제 배지 자리를 남긴다 — 62% 이하여야 한 줄이 유지된다', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const rule = css.match(/\.tm-team-tag\s*\{([^}]*)\}/)?.[1];
+
+    expect(rule).toBeDefined();
+    const pct = Number(rule!.match(/max-width:\s*(\d+)%/)?.[1]);
+    // 232px 행에서 형제(~73px = 31%) + gap(8px = 3%) 자리를 남기려면 66% 아래여야 한다.
+    expect(pct).toBeGreaterThan(0);
+    expect(pct).toBeLessThanOrEqual(66);
+  });
+
+  it('소개가 없으면 소개 상자를 그리지 않는다 — 지역·종목을 문장으로 되풀이하지 않는다', () => {
+    // 예전 폴백 `{지역}에서 활동하는 {종목} 팀이에요.` 는 바로 윗줄(`풋살 · 서울 전체 · 4/24명`)
+    // 과 같은 말이라 정보가 되지 않았다. alpha 50팀 중 25팀이 그 문장을 보여주고 있었다.
+    const { container } = render(<TeamListPageView model={listWith({ intro: '' })} />);
+
+    expect(container.querySelector('.tm-team-intro-box')).toBeNull();
+    expect(screen.queryByText(/에서 활동하는 .+ 팀이에요\./)).not.toBeInTheDocument();
+  });
+
+  it('소개가 있으면 그대로 쓴다', () => {
+    const { container } = render(<TeamListPageView model={listWith({ intro: '매주 토요일에 모여요' })} />);
+
+    expect(container.querySelector('.tm-team-intro-box')?.textContent).toContain('매주 토요일에 모여요');
+  });
+
+  it('활동 일정이 있으면 그대로 한 줄로 쓴다', () => {
+    const { container } = render(<TeamListPageView model={listWith({ next: '매일 · 저녁 · 실력 중심' })} />);
+
+    expect(container.querySelector('.tm-team-card-activity')?.textContent).toBe('매일 · 저녁 · 실력 중심');
   });
 });

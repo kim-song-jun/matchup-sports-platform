@@ -1,0 +1,748 @@
+package kr.co.teameet;
+
+import android.Manifest;
+import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.app.DownloadManager;
+import android.content.ActivityNotFoundException;
+import android.content.ClipData;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.res.Configuration;
+import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.provider.Settings;
+import android.webkit.CookieManager;
+import android.webkit.GeolocationPermissions;
+import android.webkit.RenderProcessGoneDetail;
+import android.webkit.URLUtil;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
+import androidx.webkit.WebMessageCompat;
+import androidx.webkit.WebSettingsCompat;
+import androidx.webkit.WebViewCompat;
+import androidx.webkit.WebViewFeature;
+import com.google.firebase.messaging.FirebaseMessaging;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Consumer;
+import org.json.JSONObject;
+
+public final class MainActivity extends AppCompatActivity {
+    private FrameLayout rootView;
+    private WebView webView;
+    private View webErrorView;
+    private TextView inAppMessageView;
+    private ValueCallback<Uri[]> pendingFileChooser;
+    private ActivityResultLauncher<Intent> fileChooserLauncher;
+    private ActivityResultLauncher<String> notificationPermissionLauncher;
+    private ActivityResultLauncher<String> locationPermissionLauncher;
+    private GeolocationPermissions.Callback pendingLocationCallback;
+    private String pendingLocationOrigin;
+    private String pendingPushRequestId;
+    private String pendingPushSettingsRequestId;
+    private int bottomSystemInsetCssPixels;
+    private int keyboardInsetCssPixels;
+    private boolean keyboardVisible;
+    private String lastRecoverableUrl = BuildConfig.WEB_ORIGIN + "/home";
+
+    @Override protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        fileChooserLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> deliverFileChooserResult(result.getResultCode(), result.getData()));
+        notificationPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(),
+            granted -> {
+                String requestId = pendingPushRequestId;
+                pendingPushRequestId = null;
+                if (!granted) {
+                    InstallationIdentity.markOptedIn(this, false);
+                    revokePushAndDeleteToken(revoked -> reportPushResult(
+                        requestId, false, revoked ? null : "revocation-failed"));
+                    return;
+                }
+                registerPushAndReport(requestId);
+            });
+        locationPermissionLauncher = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(),
+            this::completeLocationPermissionRequest);
+        configureWebView();
+        configureRootView();
+        setContentView(rootView);
+        applySystemBarAppearance();
+        applySystemBarInsets();
+        registerBackHandler();
+        if (FirebaseBootstrap.initialize(this) && canRegisterPush()) {
+            FirebaseMessaging.getInstance().setAutoInitEnabled(true);
+            FirebaseMessaging.getInstance().getToken().addOnSuccessListener(token -> {
+                InstallationIdentity.saveToken(this, token);
+                PushRegistrationClient.register(this);
+            });
+        }
+        if (savedInstanceState == null || webView.restoreState(savedInstanceState) == null) {
+            webView.loadUrl(BuildConfig.WEB_ORIGIN + routeFromIntent(getIntent()));
+        }
+    }
+
+    private void applySystemBarInsets() {
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        ViewCompat.setOnApplyWindowInsetsListener(rootView, (view, windowInsets) -> {
+            Insets insets = windowInsets.getInsets(
+                WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
+            );
+            Insets imeInsets = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
+            keyboardVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime());
+            // Keep the WebView edge-to-edge at the bottom so fixed web chrome can paint behind the
+            // navigation bar. Only its interactive content consumes the bottom inset via the CSS
+            // variable below; padding the native root on all four sides makes the whole web viewport
+            // float above three-button navigation.
+            // Edge-to-edge WebViews do not consistently shrink their CSS viewport for the IME even
+            // with adjustResize. Shrink the native content box only while the keyboard is visible;
+            // normal web/browser layout and the edge-to-edge navigation surface stay unchanged.
+            view.setPadding(insets.left, insets.top, insets.right, keyboardVisible ? imeInsets.bottom : 0);
+            float density = getResources().getDisplayMetrics().density;
+            bottomSystemInsetCssPixels = Math.round(insets.bottom / density);
+            keyboardInsetCssPixels = keyboardVisible ? Math.round(imeInsets.bottom / density) : 0;
+            publishSystemInsets();
+            return windowInsets;
+        });
+        ViewCompat.requestApplyInsets(rootView);
+    }
+
+    private void applySystemBarAppearance() {
+        boolean isDarkMode = (getResources().getConfiguration().uiMode
+            & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        int systemBarColor = ContextCompat.getColor(this, R.color.system_bar_background);
+        getWindow().setStatusBarColor(systemBarColor);
+        getWindow().setNavigationBarColor(systemBarColor);
+        WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(
+            getWindow(), rootView
+        );
+        controller.setAppearanceLightStatusBars(!isDarkMode);
+        controller.setAppearanceLightNavigationBars(!isDarkMode);
+        rootView.setBackgroundColor(systemBarColor);
+    }
+
+    private void configureRootView() {
+        rootView = new FrameLayout(this);
+        rootView.addView(webView, new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ));
+        webErrorView = createWebErrorView();
+        rootView.addView(webErrorView, new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ));
+    }
+
+    private View createWebErrorView() {
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.VERTICAL);
+        container.setGravity(Gravity.CENTER);
+        container.setBackgroundColor(ContextCompat.getColor(this, R.color.native_error_background));
+        int padding = Math.round(32 * getResources().getDisplayMetrics().density);
+        container.setPadding(padding, padding, padding, padding);
+        container.setVisibility(View.GONE);
+
+        TextView title = new TextView(this);
+        title.setText(R.string.web_error_title);
+        title.setTextColor(ContextCompat.getColor(this, R.color.native_error_title));
+        title.setTextSize(22);
+        title.setGravity(Gravity.CENTER);
+        container.addView(title);
+
+        TextView description = new TextView(this);
+        description.setText(R.string.web_error_description);
+        description.setTextColor(ContextCompat.getColor(this, R.color.native_error_body));
+        description.setTextSize(15);
+        description.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        descriptionParams.topMargin = Math.round(12 * getResources().getDisplayMetrics().density);
+        container.addView(description, descriptionParams);
+
+        Button retry = new Button(this);
+        retry.setText(R.string.web_error_retry);
+        retry.setOnClickListener(view -> webView.loadUrl(lastRecoverableUrl));
+        LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        retryParams.topMargin = Math.round(20 * getResources().getDisplayMetrics().density);
+        container.addView(retry, retryParams);
+        return container;
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private void configureWebView() {
+        // Alpha devices expose the embedded page to chrome://inspect for font/network diagnostics.
+        // The production flavor hard-disables this independently of the Android build type.
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.WEBVIEW_DEBUGGING_ENABLED);
+        webView = new WebView(this);
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(false);
+        settings.setAllowContentAccess(false);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        CookieManager.getInstance().setAcceptCookie(true);
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false);
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.SAFE_BROWSING_ENABLE)) {
+            WebSettingsCompat.setSafeBrowsingEnabled(settings, true);
+        }
+        // bfcache(뒤로/앞으로 캐시) 활성화: origin 밖(카카오/네이버 OAuth 리다이렉트 등)으로
+        // 나갔다 돌아올 때 즉시 스냅샷 복원을 제공한다. 인앱 SPA 전환(pushState)에는 영향 없다
+        // — 같은 문서 로드 안의 히스토리 변경이라 WebView 레벨 탐색이 아니기 때문. setCacheMode는
+        // 여기서 건드리지 않는다(SW가 이미 리소스 타입별 정밀 캐싱을 맡고 있어, WebView 레벨의
+        // blunt한 캐시 정책까지 추가하면 오히려 배포 직후 구버전 서빙 위험만 커진다).
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.BACK_FORWARD_CACHE)) {
+            WebSettingsCompat.setBackForwardCacheEnabled(settings, true);
+        }
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            WebViewCompat.addWebMessageListener(
+                webView,
+                "TeameetNative",
+                Collections.singleton(BuildConfig.WEB_ORIGIN),
+                (view, message, sourceOrigin, isMainFrame, replyProxy) -> {
+                    if (isMainFrame) handleNativeMessage(message);
+                });
+        }
+        webView.setWebViewClient(new WebViewClient() {
+            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                if (AllowedNavigation.isInternalAbsoluteUrl(url)) {
+                    lastRecoverableUrl = url;
+                }
+                hideWebError();
+            }
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri target = request.getUrl();
+                if (AllowedNavigation.isInternal(target)) return false;
+                if (!request.isForMainFrame()) return true;
+                if (AllowedNavigation.isTrustedAuthProvider(target)) return false;
+                openExternal(target);
+                return true;
+            }
+            @Override public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (AllowedNavigation.isInternal(Uri.parse(url))) {
+                    lastRecoverableUrl = url;
+                    publishSystemInsets();
+                    if (canRegisterPush()) {
+                        PushRegistrationClient.register(MainActivity.this);
+                    } else if (InstallationIdentity.isRegistered(MainActivity.this)) {
+                        revokePushAndDeleteToken(ignored -> {});
+                    }
+                }
+            }
+            @Override public void onReceivedError(
+                WebView view, WebResourceRequest request, WebResourceError error
+            ) {
+                super.onReceivedError(view, request, error);
+                if (request.isForMainFrame()) showWebError();
+            }
+            @Override public void onReceivedHttpError(
+                WebView view, WebResourceRequest request, WebResourceResponse response
+            ) {
+                super.onReceivedHttpError(view, request, response);
+                if (request.isForMainFrame() && response.getStatusCode() >= 400) showWebError();
+            }
+            @Override public boolean onRenderProcessGone(
+                WebView view, RenderProcessGoneDetail detail
+            ) {
+                return recoverFromRendererFailure(view);
+            }
+        });
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onShowFileChooser(
+                WebView view, ValueCallback<Uri[]> callback, FileChooserParams params
+            ) {
+                if (pendingFileChooser != null) pendingFileChooser.onReceiveValue(null);
+                pendingFileChooser = callback;
+                try {
+                    fileChooserLauncher.launch(buildStoragePickerIntent(params));
+                } catch (Exception ignored) {
+                    pendingFileChooser.onReceiveValue(null);
+                    pendingFileChooser = null;
+                    showInAppMessage(R.string.file_chooser_failed);
+                }
+                return true;
+            }
+            @Override public void onGeolocationPermissionsShowPrompt(
+                String origin, GeolocationPermissions.Callback callback
+            ) {
+                requestLocationPermission(origin, callback);
+            }
+            @Override public void onGeolocationPermissionsHidePrompt() {
+                completeLocationPermissionRequest(false);
+            }
+        });
+        webView.setDownloadListener(this::enqueueInternalDownload);
+    }
+
+    private Intent buildStoragePickerIntent(WebChromeClient.FileChooserParams params) {
+        List<String> mimeTypes = FileChooserPolicy.acceptedMimeTypes(params.getAcceptTypes());
+        Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType(FileChooserPolicy.primaryMimeType(mimeTypes))
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        if (!(mimeTypes.size() == 1 && "*/*".equals(mimeTypes.get(0)))) {
+            picker.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes.toArray(new String[0]));
+        }
+        if (params.getMode() == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE) {
+            picker.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        }
+        return picker;
+    }
+
+    private void deliverFileChooserResult(int resultCode, Intent resultData) {
+        ValueCallback<Uri[]> callback = pendingFileChooser;
+        pendingFileChooser = null;
+        if (callback == null) return;
+        if (resultCode != Activity.RESULT_OK || resultData == null) {
+            callback.onReceiveValue(null);
+            return;
+        }
+        Set<Uri> selectedUris = new LinkedHashSet<>();
+        ClipData clipData = resultData.getClipData();
+        if (clipData != null) {
+            for (int index = 0; index < clipData.getItemCount(); index += 1) {
+                Uri uri = clipData.getItemAt(index).getUri();
+                if (uri != null) selectedUris.add(uri);
+            }
+        }
+        Uri singleUri = resultData.getData();
+        if (singleUri != null) selectedUris.add(singleUri);
+        callback.onReceiveValue(
+            selectedUris.isEmpty() ? null : selectedUris.toArray(new Uri[0])
+        );
+    }
+
+    private boolean recoverFromRendererFailure(WebView failedView) {
+        if (failedView != webView) {
+            failedView.destroy();
+            return true;
+        }
+        if (pendingFileChooser != null) {
+            pendingFileChooser.onReceiveValue(null);
+            pendingFileChooser = null;
+        }
+        rootView.removeView(failedView);
+        failedView.destroy();
+        configureWebView();
+        rootView.addView(webView, 0, new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ));
+        ViewCompat.requestApplyInsets(rootView);
+        showWebError();
+        return true;
+    }
+
+    private void hideWebError() {
+        if (webErrorView != null) webErrorView.setVisibility(View.GONE);
+    }
+
+    private void showWebError() {
+        if (webErrorView != null) webErrorView.setVisibility(View.VISIBLE);
+    }
+
+    private void requestLocationPermission(
+        String origin, GeolocationPermissions.Callback callback
+    ) {
+        if (!AllowedNavigation.isInternalOrigin(origin)) {
+            callback.invoke(origin, false, false);
+            return;
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED) {
+            callback.invoke(origin, true, false);
+            return;
+        }
+        completeLocationPermissionRequest(false);
+        pendingLocationOrigin = origin;
+        pendingLocationCallback = callback;
+        locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION);
+    }
+
+    private void completeLocationPermissionRequest(boolean granted) {
+        GeolocationPermissions.Callback callback = pendingLocationCallback;
+        String origin = pendingLocationOrigin;
+        pendingLocationCallback = null;
+        pendingLocationOrigin = null;
+        if (callback != null) callback.invoke(origin, granted, false);
+    }
+
+    private void publishSystemInsets() {
+        if (webView == null) return;
+        webView.evaluateJavascript(
+            "document.documentElement.style.setProperty('--teameet-native-safe-bottom','"
+                + bottomSystemInsetCssPixels
+                + "px');document.documentElement.style.setProperty('--v1-shell-safe-bottom','"
+                + bottomSystemInsetCssPixels
+                + "px');document.documentElement.dataset.teameetNativeApp='android'",
+            null
+        );
+        webView.evaluateJavascript(
+            "document.documentElement.style.setProperty(\"--teameet-native-keyboard-inset\",\""
+                + keyboardInsetCssPixels
+                + "px\");document.documentElement.dataset.teameetNativeKeyboard=\""
+                + (keyboardVisible ? "open" : "closed")
+                + "\"",
+            null
+        );
+    }
+
+    private void enqueueInternalDownload(
+        String url,
+        String userAgent,
+        String contentDisposition,
+        String mimeType,
+        long contentLength
+    ) {
+        if (!AllowedNavigation.isInternalAbsoluteUrl(url)) {
+            showDownloadFailure();
+            return;
+        }
+        try {
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url))
+                .setTitle(URLUtil.guessFileName(url, contentDisposition, mimeType))
+                .setNotificationVisibility(
+                    DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+                );
+            if (mimeType != null && !mimeType.isBlank()) request.setMimeType(mimeType);
+            String cookie = CookieManager.getInstance().getCookie(BuildConfig.WEB_ORIGIN);
+            if (cookie != null && !cookie.isBlank()) request.addRequestHeader("Cookie", cookie);
+            if (userAgent != null && !userAgent.isBlank()) {
+                request.addRequestHeader("User-Agent", userAgent);
+            }
+            getSystemService(DownloadManager.class).enqueue(request);
+            showInAppMessage(R.string.download_started);
+        } catch (Exception ignored) {
+            showDownloadFailure();
+        }
+    }
+
+    private void showDownloadFailure() {
+        showInAppMessage(R.string.download_failed);
+    }
+
+    private void openExternal(Uri target) {
+        if (!AllowedNavigation.isAllowedExternal(target)) return;
+        try {
+            Intent external = new Intent(Intent.ACTION_VIEW, target);
+            external.addCategory(Intent.CATEGORY_BROWSABLE);
+            external.setComponent(null);
+            external.setSelector(null);
+            try {
+                startActivity(external);
+                return;
+            } catch (ActivityNotFoundException ignored) {
+                // The reviewed Play fallback below is the only recovery path for missing map apps.
+            }
+            String fallbackUrl = AllowedNavigation.externalAppStoreFallback(target);
+            if (fallbackUrl != null) {
+                Intent fallback = new Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl));
+                fallback.addCategory(Intent.CATEGORY_BROWSABLE);
+                try {
+                    startActivity(fallback);
+                    return;
+                } catch (ActivityNotFoundException ignored) {
+                    // Surface the same honest unavailable state when no browser or Play Store can open it.
+                }
+            }
+            showInAppMessage(R.string.external_app_unavailable);
+        } catch (Exception ignored) {
+            showInAppMessage(R.string.external_app_unavailable);
+        }
+    }
+
+    private void showInAppMessage(int messageResource) {
+        runOnUiThread(() -> {
+            if (rootView == null) return;
+            if (inAppMessageView != null) rootView.removeView(inAppMessageView);
+
+            float density = getResources().getDisplayMetrics().density;
+            TextView messageView = new TextView(this);
+            messageView.setText(messageResource);
+            messageView.setTextColor(ContextCompat.getColor(this, R.color.native_message_text));
+            messageView.setTextSize(15);
+            messageView.setGravity(Gravity.CENTER);
+            messageView.setMaxWidth(Math.round(360 * density));
+            int horizontalPadding = Math.round(22 * density);
+            int verticalPadding = Math.round(16 * density);
+            messageView.setPadding(
+                horizontalPadding,
+                verticalPadding,
+                horizontalPadding,
+                verticalPadding
+            );
+            messageView.setElevation(8 * density);
+            messageView.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+
+            GradientDrawable background = new GradientDrawable();
+            background.setColor(ContextCompat.getColor(this, R.color.native_message_background));
+            background.setCornerRadius(18 * density);
+            background.setStroke(
+                Math.max(1, Math.round(density)),
+                ContextCompat.getColor(this, R.color.native_message_border)
+            );
+            messageView.setBackground(background);
+
+            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER
+            );
+            int margin = Math.round(24 * density);
+            params.leftMargin = margin;
+            params.rightMargin = margin;
+            rootView.addView(messageView, params);
+            inAppMessageView = messageView;
+            messageView.announceForAccessibility(getString(messageResource));
+            messageView.postDelayed(() -> {
+                if (inAppMessageView != messageView || rootView == null) return;
+                rootView.removeView(messageView);
+                inAppMessageView = null;
+            }, 3200);
+        });
+    }
+    private void handleNativeMessage(WebMessageCompat message) {
+        String data = message.getData();
+        if (data == null) return;
+        try {
+            JSONObject request = new JSONObject(data);
+            String requestId = request.optString("requestId", "");
+            switch (request.optString("type", "")) {
+                case "get-push-state" -> reportPushResult(
+                    requestId, canRegisterPush() && InstallationIdentity.isRegistered(this));
+                case "request-notification-permission" -> requestPushPermission(requestId);
+                case "open-notification-settings" -> openNotificationSettings(requestId);
+                case "revoke-push-device" -> {
+                    boolean keepOptIn = PushRevocationPolicy.keepsOptIn(
+                        request.optString("reason", ""));
+                    if (keepOptIn) {
+                        PushRegistrationClient.revoke(this, revoked -> reportPushResult(
+                            requestId, false, revoked ? null : "revocation-failed"));
+                    } else {
+                        InstallationIdentity.markOptedIn(this, false);
+                        revokePushAndDeleteToken(revoked -> reportPushResult(
+                            requestId, false, revoked ? null : "revocation-failed"));
+                    }
+                }
+                default -> reportPushResult(requestId, false);
+            }
+        } catch (Exception ignored) {
+            // Ignore malformed messages from the page; no native action is performed.
+        }
+    }
+
+    private void requestPushPermission(String requestId) {
+        InstallationIdentity.markOptedIn(this, true);
+        if (hasNotificationPermission()) {
+            registerPushAndReport(requestId);
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pendingPushRequestId = requestId;
+            InstallationIdentity.markPermissionRequested(this);
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+            return;
+        }
+        reportPushResult(requestId, false);
+    }
+
+    private void openNotificationSettings(String requestId) {
+        InstallationIdentity.markOptedIn(this, true);
+        pendingPushSettingsRequestId = requestId;
+        boolean launched = false;
+        try {
+            Intent settingsIntent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+            startActivity(settingsIntent);
+            launched = true;
+        } catch (Exception primaryFailure) {
+            try {
+                startActivity(new Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + getPackageName())
+                ));
+                launched = true;
+            } catch (Exception ignored) {
+                // The Web UI will keep the manual settings instructions visible.
+            }
+        }
+        if (!launched) {
+            pendingPushSettingsRequestId = null;
+            InstallationIdentity.markOptedIn(this, false);
+            reportPushResult(requestId, false);
+        }
+    }
+
+    private boolean hasNotificationPermission() {
+        return PushPermission.isGranted(this);
+    }
+
+    private boolean canRegisterPush() {
+        return PushPermission.isGranted(this) && InstallationIdentity.isOptedIn(this);
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if (rootView != null) applySystemBarAppearance();
+        String settingsRequestId = pendingPushSettingsRequestId;
+        if (settingsRequestId != null) {
+            pendingPushSettingsRequestId = null;
+            if (PushPermission.isGranted(this)) {
+                registerPushAndReport(settingsRequestId);
+            } else {
+                InstallationIdentity.markOptedIn(this, false);
+                reportPushResult(settingsRequestId, false);
+            }
+            return;
+        }
+        if (!PushPermission.isGranted(this)) InstallationIdentity.markOptedIn(this, false);
+        if (!canRegisterPush() && InstallationIdentity.isRegistered(this)) {
+            revokePushAndDeleteToken(ignored -> {});
+        }
+    }
+
+    private void registerPushAndReport(String requestId) {
+        if (!FirebaseBootstrap.initialize(this)) {
+            reportPushResult(requestId, false);
+            return;
+        }
+        FirebaseMessaging.getInstance().setAutoInitEnabled(true);
+        FirebaseMessaging.getInstance().getToken()
+            .addOnSuccessListener(token -> {
+                InstallationIdentity.saveToken(this, token);
+                PushRegistrationClient.register(this, registered -> reportPushResult(requestId, registered));
+            })
+            .addOnFailureListener(ignored -> reportPushResult(requestId, false));
+    }
+
+    private void revokePushAndDeleteToken(Consumer<Boolean> completion) {
+        boolean firebaseReady = FirebaseBootstrap.initialize(this);
+        FirebaseMessaging messaging = firebaseReady ? FirebaseMessaging.getInstance() : null;
+        if (messaging != null) messaging.setAutoInitEnabled(false);
+        InstallationIdentity.clearToken(this);
+        InstallationIdentity.markRegistered(this, false);
+        PushRegistrationClient.revoke(this, revoked -> {
+            if (messaging == null) {
+                completion.accept(revoked);
+                return;
+            }
+            messaging.deleteToken().addOnCompleteListener(task -> {
+                completion.accept(revoked);
+            });
+        });
+    }
+
+    private void reportPushResult(String requestId, boolean subscribed) {
+        reportPushResult(requestId, subscribed, null);
+    }
+
+    private void reportPushResult(String requestId, boolean subscribed, String errorCode) {
+        try {
+            JSONObject detail = new JSONObject()
+                .put("requestId", requestId == null ? "" : requestId)
+                .put("permission", notificationPermissionState())
+                .put("subscribed", subscribed);
+            if (errorCode != null) detail.put("errorCode", errorCode);
+            String script = "window.dispatchEvent(new CustomEvent('teameet:native-push-result',{detail:"
+                + detail + "}))";
+            webView.evaluateJavascript(script, null);
+        } catch (Exception ignored) {
+            // The web page may have navigated away before the asynchronous result arrives.
+        }
+    }
+
+    private String notificationPermissionState() {
+        if (hasNotificationPermission()) return "granted";
+        return InstallationIdentity.wasPermissionRequested(this) ? "denied" : "default";
+    }
+
+    private void registerBackHandler() {
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override public void handleOnBackPressed() {
+                if (webView.canGoBack()) webView.goBack(); else finish();
+            }
+        });
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String route = explicitRouteFromIntent(intent);
+        // singleTask delivers a plain MAIN/LAUNCHER intent when the user reopens the running app.
+        // It has no destination and must leave the current WebView page/history untouched. FCM and
+        // verified App Links still carry an explicit route and intentionally navigate here.
+        if (route != null) webView.loadUrl(BuildConfig.WEB_ORIGIN + route);
+    }
+
+    private String routeFromIntent(Intent intent) {
+        String explicitRoute = explicitRouteFromIntent(intent);
+        return explicitRoute == null ? "/home" : explicitRoute;
+    }
+
+    private String explicitRouteFromIntent(Intent intent) {
+        if (intent == null) return null;
+        String route = intent.getStringExtra(TeameetMessagingService.EXTRA_ROUTE);
+        if (route == null) route = intent.getStringExtra("route");
+        if (route != null) return AllowedNavigation.safeRoute(route);
+        Uri data = intent.getData();
+        if (data == null) return null;
+        if (!AllowedNavigation.isInternal(data)) return "/home";
+        route = data.getEncodedPath();
+        if (data.getEncodedQuery() != null) route += "?" + data.getEncodedQuery();
+        return AllowedNavigation.safeRoute(route);
+    }
+
+    @Override protected void onSaveInstanceState(Bundle outState) {
+        if (webView != null) webView.saveState(outState);
+        super.onSaveInstanceState(outState);
+    }
+
+    @Override protected void onDestroy() {
+        completeLocationPermissionRequest(false);
+        if (pendingFileChooser != null) {
+            pendingFileChooser.onReceiveValue(null);
+            pendingFileChooser = null;
+        }
+        if (webView != null) {
+            webView.stopLoading();
+            webView.destroy();
+        }
+        super.onDestroy();
+    }
+}

@@ -1,5 +1,14 @@
+'use client';
+// AppChrome 은 이중 셸 가드(ShellMountedContext)를 위해 createContext/useContext 를 쓴다.
+// React Server Component 는 createContext 에 의존하는 모듈을 import 할 수 없으므로 이
+// 지시어가 없으면 `app/not-found.tsx`(유일한 서버 컴포넌트 소비처)에서 프로덕션 빌드가
+// 깨진다 — tsc 와 jsdom 테스트는 RSC 경계를 검사하지 않아 `next build` 에서만 드러났다.
+// 실질 비용은 없다: 다른 소비처인 app-shell-frame.tsx 가 이미 'use client' 라 셸은
+// 어차피 클라이언트 청크에 들어 있었고, 이 지시어는 404 화면의 셸도 같은 청크를 쓰게 할 뿐이다.
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { createContext, useContext, useRef } from 'react';
+import { useSlidingIndicatorRect } from './use-sliding-indicator';
 import {
   ChevronLeftIcon,
   HomeIcon,
@@ -16,6 +25,16 @@ import { NotificationBellLink } from './notification-bell';
 
 export type V1NavTab = 'home' | 'matches' | 'tournaments' | 'teams' | 'my';
 
+// 하단 탭 **5개**(홈/매치/대회/팀/마이).
+//
+// 이전에는 '대회'와 '리그'가 **나란히 있었다.** 그런데 리그 방식으로 열린 대회와 정규
+// 리그가 서로 다른 탭에서 같은 이름으로 보여서, 사용자가 "무엇이 어디 있는지"를 탭
+// 이름만으로는 알 수 없었다. 통합 설계(D1)에서 리그는 **대회의 한 종류**가 되므로 탭도
+// 하나로 합치고, 그 안에서 [정규 대회 · 정규 리그] 세그먼트로 가른다.
+//
+// 리그 진입 경로는 사라지지 않는다 — `CompetitionKindSegment` 가 두 목록을 잇고
+// (`/tournaments` ↔ `/league-matches`), 리그 화면들은 `activeTab='tournaments'` 로
+// 대회 탭을 활성 표시한다. **탭만 지우고 세그먼트를 안 넣으면 리그가 도달 불가능해진다.**
 const tabs: Array<{
   id: V1NavTab;
   label: string;
@@ -53,9 +72,33 @@ type AppChromeProps = {
   desktopHead?: boolean;
   backHref?: string;
   centerTitle?: boolean;
+  titleAsHeading?: boolean;
 };
 
-export function AppChrome({
+/**
+ * 상위(AppShellFrame)가 이미 AppChrome을 렌더했음을 하위의 또 다른 AppChrome 호출이
+ * 감지하는 신호. 마이그레이션 도중 아직 자체 <AppChrome> 래퍼를 못 걷어낸 페이지가
+ * 섞여 있어도 topbar/bottomnav가 두 번 그려지지 않게 하는 안전망이다. **정상 절차라면
+ * 이 분기가 실행될 일이 없다** — 테이블 등록과 페이지 자체 AppChrome 제거를 같은
+ * 커밋에서 하기 때문. 이 분기가 실행 중이라는 건 그 규율이 깨졌다는 신호이므로 오래
+ * 방치하면 안 된다 — 안쪽 호출에만 있던 floatingSlot/동적 title 같은 props는 여기서
+ * 조용히 버려진다.
+ */
+export const ShellMountedContext = createContext(false);
+
+export function AppChrome(props: AppChromeProps) {
+  const alreadyMounted = useContext(ShellMountedContext);
+  if (alreadyMounted) {
+    return <>{props.children}</>;
+  }
+  return (
+    <ShellMountedContext.Provider value={true}>
+      <AppChromeInner {...props} />
+    </ShellMountedContext.Provider>
+  );
+}
+
+function AppChromeInner({
   title,
   children,
   floatingSlot,
@@ -71,6 +114,7 @@ export function AppChrome({
   desktopHead = false,
   backHref,
   centerTitle = false,
+  titleAsHeading = false,
 }: AppChromeProps) {
   const frameClassName = [
     'tm-app-frame',
@@ -95,7 +139,11 @@ export function AppChrome({
                 <ChevronLeftIcon size={22} strokeWidth={2.2} />
               </AppBackLink>
             ) : null}
-            <div className="tm-text-body-lg tm-topbar-heading" style={{ color: 'var(--text-strong)' }}>{title}</div>
+            {titleAsHeading ? (
+              <h1 className="tm-text-body-lg tm-topbar-heading" style={{ color: 'var(--text-strong)' }}>{title}</h1>
+            ) : (
+              <div className="tm-text-body-lg tm-topbar-heading" style={{ color: 'var(--text-strong)' }}>{title}</div>
+            )}
           </div>
           <div className="tm-topbar-actions">
             {showHomeShortcut ? (
@@ -168,8 +216,49 @@ function DesktopFooter() {
 }
 
 function BottomNav({ activeTab }: { activeTab?: V1NavTab }) {
+  const tabCount = tabs.length;
+  const activeIndex = tabs.findIndex((tab) => tab.id === activeTab);
+
   return (
-    <nav className="tm-bottom-nav" aria-label="주요 메뉴">
+    <nav
+      className="tm-bottom-nav"
+      aria-label="주요 메뉴"
+      // 탭 개수가 CSS의 하드코딩된 5열에 묶이지 않도록 tabs.length로 열 수를 계산한다.
+      // 390px 폭 계산 근거는 shell.tsx 주변 PR 설명 참조 — 6열 기준 탭당 65px,
+      // 아이콘 23px + 라벨(최대 2글자, 12px)이 전부 여유 있게 들어간다.
+      style={{ gridTemplateColumns: `repeat(${tabCount}, 1fr)` }}
+    >
+      {/*
+        활성 탭 인디케이터. 예전엔 탭마다 ::before 의사요소가 하나씩 있어서 활성 탭이
+        바뀌면 pill 이 한 탭에서 사라지고 다른 탭에서 나타났다 — 미끄러질 수 없는 구조였다.
+        미끄러지게 하려면 pill 이 하나뿐이어야 하므로 nav 안에 슬롯을 하나만 두고
+        activeIndex 에 따라 transform: translateX 로 옮긴다.
+
+        슬롯 폭을 탭 1개 폭(`calc(100% / tabCount)`)으로 잡아 두면 transform 의
+        `100%` 가 슬롯 자기 자신의 폭(=탭 1칸)을 가리키므로 `translateX(index * 100%)` 만으로
+        정확히 index 칸을 이동한다 — `left` 처럼 매 렌더마다 레이아웃을 다시 흘리는 속성을
+        건드리지 않고 transform 합성만으로 전환된다(`transition-all` 금지 규칙과 별개로,
+        여기서는 애초에 transform 외의 속성이 바뀌지 않는다).
+
+        activeTab 이 어떤 탭에도 속하지 않는 화면(검색 등)에서는 activeIndex 가 -1이 되는데,
+        그때 임의의 탭 위로 pill 을 붙여두면 "그 탭이 활성"이라는 거짓 신호가 되므로 숨긴다.
+
+        첫 렌더 시에도 activeIndex 는 이미 props 로부터 계산되어 초기 style 에 그대로
+        박히므로(별도의 mount 애니메이션 로직 없음) pill 이 왼쪽 끝에서 미끄러져
+        들어오는 일은 없다 — transition 은 이미 마운트된 DOM 에서 activeTab 이 바뀔
+        때만(재렌더로 style 값이 달라질 때만) 발동한다.
+      */}
+      <div
+        className="tm-bottom-nav-pill-slot"
+        aria-hidden="true"
+        style={{
+          width: `calc(100% / ${tabCount})`,
+          transform: activeIndex >= 0 ? `translateX(calc(${activeIndex} * 100%))` : undefined,
+          opacity: activeIndex >= 0 ? 1 : 0,
+        }}
+      >
+        <span className="tm-bottom-nav-pill" />
+      </div>
       {tabs.map(({ id, label, href, Icon }) => {
         const active = id === activeTab;
         return (
@@ -193,6 +282,15 @@ function DesktopNav({
   activeTab?: V1NavTab;
   hasNewNotification: boolean;
 }) {
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const activeIndex = tabs.findIndex((tab) => tab.id === activeTab);
+  // 라벨 길이가 제각각(홈/매치/대회/팀/마이)이라 하단탭 pill 처럼 "index * 100%" 로
+  // 계산할 수 없다 — 실제 탭 요소의 offsetLeft/offsetWidth 를 측정한다(use-sliding-indicator).
+  const tabRect = useSlidingIndicatorRect(tabsRef, ':scope > a.tm-desktop-nav-tab', activeIndex);
+  // 밑줄은 탭 padding(16px)만큼 안쪽에서 시작·끝난다 — 이전 ::after(`left:16px; right:16px`)와
+  // 같은 시각 폭을 유지한다.
+  const UNDERLINE_INSET = 16;
+
   return (
     <nav className="tm-desktop-nav" aria-label="데스크톱 주요 메뉴">
       <Link
@@ -204,7 +302,22 @@ function DesktopNav({
         <BrandMark size={24} />
         teameet
       </Link>
-      <div className="tm-desktop-nav-tabs">
+      {/* data-indicator-ready 가 없는 동안(SSR HTML·하이드레이션 전)은 _shell.css 의
+          CSS 전용 밑줄(::after)이 대신 보인다 — 측정값이 들어오기 전까지 활성 탭 밑줄이
+          비어 보이는 FOUC 를 막는다(적대 리뷰 지적). */}
+      <div className="tm-desktop-nav-tabs" ref={tabsRef} data-indicator-ready={tabRect ? 'true' : undefined}>
+        {/* 활성 표시 밑줄 — 트랙에 하나뿐인 슬라이딩 인디케이터(하단탭 pill·세부탭
+            thumb과 같은 아키텍처). 선택 상태 자체는 각 탭의 aria-current 가 계속
+            담당하므로 스크린리더에서는 숨긴다. */}
+        <span
+          className="tm-desktop-nav-tab-indicator"
+          aria-hidden="true"
+          style={{
+            transform: tabRect ? `translateX(${tabRect.left + UNDERLINE_INSET}px)` : undefined,
+            width: tabRect ? `${Math.max(0, tabRect.width - UNDERLINE_INSET * 2)}px` : undefined,
+            opacity: tabRect ? 1 : 0,
+          }}
+        />
         {tabs.map(({ id, label, href }) => {
           const active = id === activeTab;
           return (

@@ -2,9 +2,10 @@
  * 대진 관리 "조 카드" 플로우의 순수 함수 모음.
  *
  * 여기 있는 함수는 전부 입력→출력만 있는 순수 함수라 컴포넌트 렌더링 없이 단위 테스트로
- * 검증할 수 있다(bracket-group-helpers.test.ts 참고). `roundRobinRounds`/`knockoutSeedPairs`
- * (lib/tournament-bracket-gen.ts)는 이미 검증된 페어링 로직이라 건드리지 않는다 — 이 파일은
- * 그 호출을 더 쉽게 만드는 상위 UX 레이어(조 이름 자동 채움·진출팀 추천·준비완료 판정)만 담당한다.
+ * 검증할 수 있다(bracket-group-helpers.test.ts 참고). 녹아웃 시드 페어링
+ * (`knockoutSeedPairs`, lib/tournament-bracket-gen.ts)은 이미 검증된 로직이라 건드리지 않고,
+ * 조별리그 라운드로빈은 서버(POST /admin/tournaments/:id/league/fixtures/generate)가 만든다 —
+ * 이 파일은 그 호출을 더 쉽게 만드는 상위 UX 레이어(조 이름 자동 채움·진출팀 추천·준비완료 판정)만 담당한다.
  */
 import type {
   V1AdminBracketFixture,

@@ -1,6 +1,26 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * 셀프테스트가 **자기 자신을 자식 프로세스로** 다시 띄울 때 쓰는 경로.
+ *
+ * `new URL(import.meta.url).pathname` 을 쓰면 안 된다 — 그건 **URL 경로**라 퍼센트
+ * 인코딩돼 있어서, 저장소 경로에 공백이나 비ASCII 가 섞이면 파일시스템에 **존재하지 않는
+ * 문자열**이 된다(실측: `has space/디렉터리` 아래에서 `existsSync(pathname) === false`,
+ * `existsSync(fileURLToPath(...)) === true`). 그러면 셀프테스트가 조용히 못 돌거나
+ * 엉뚱한 실패로 보인다.
+ *
+ * **위치가 중요하다** — 바로 위 주석대로 `selfTest()` 는 **모듈 평가 중에** 실행되므로,
+ * 이 `const` 를 파일 아래쪽에 두면 그 시점엔 아직 TDZ 라 `ReferenceError` 가 난다. 그리고
+ * `gateExits` 의 맨 `catch` 가 그걸 삼켜 **"게이트가 exit 1 했다"로 보인다**(실제로 이 PR
+ * 작업 중에 그렇게 한 번 헛짚었다). 선언은 첫 사용보다 위, 여기에 둔다.
+ */
+const SELF_PATH = fileURLToPath(import.meta.url);
 
 // Declared here rather than beside parseStatements because selfTest() runs
 // during module evaluation, before a class declaration further down the file
@@ -22,6 +42,357 @@ class UnparsableSqlError extends Error {}
 // the gate exists to catch does not apply. Keep this list SHORT: every entry
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
+  {
+    file: "apps/v1_api/prisma/migrations/20260908130000_v1_team_match_tournament_expand/migration.sql",
+    statement: "ALTER TABLE \"v1_games\" DROP CONSTRAINT \"v1_games_source_exactly_one_ck\"",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the old v1_games source check is replaced by the immediately following expanded check inside one PostgreSQL transaction. The replacement is a strict compatibility expansion: each source_type still requires its own non-null source, and a dual link is accepted only when both IDs are equal. The Stage A operator stops the API and game worker and takes a bound backup before this migration, so no writer observes the interval between DROP and ADD; the nonempty rehearsal preserved four legacy fixtures and completed the later canonical cutover.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908130000_v1_team_match_tournament_expand/migration.sql",
+    statement: "ALTER TABLE \"v1_games\" ADD CONSTRAINT \"v1_games_source_expand_ck\" CHECK ( (\"source_type\" = 'TEAM_MATCH' AND \"team_match_id\" IS NOT NULL AND (\"tournament_fixture_id\" IS NULL OR \"tournament_fixture_id\" = \"team_match_id\")) OR (\"source_type\" = 'TOURNAMENT_FIXTURE' AND \"tournament_fixture_id\" IS NOT NULL AND (\"team_match_id\" IS NULL OR \"team_match_id\" = \"tournament_fixture_id\")) )",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: this is the transactional replacement paired with the preceding DROP. It preserves every old valid TEAM_MATCH and TOURNAMENT_FIXTURE row and adds only the same-UUID dual-link intermediate required by Stage A. Invalid missing-source or mismatched-dual-source rows remain rejected. The API and worker are quiesced before M1, rollback restores the old check if this ADD fails, and the exact migration digest succeeded in the nonempty rehearsal.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908130000_v1_team_match_tournament_expand/migration.sql",
+    statement: "ALTER TABLE \"v1_team_matches\" ALTER COLUMN \"host_team_id\" DROP NOT NULL, ALTER COLUMN \"created_by_user_id\" DROP NOT NULL, ALTER COLUMN \"region_id\" DROP NOT NULL, ALTER COLUMN \"place_name\" DROP NOT NULL, ALTER COLUMN \"start_at\" DROP NOT NULL",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: dropping NOT NULL from the five TeamMatch presentation/ownership fields is a compatibility relaxation needed for unresolved tournament fixtures. It deletes no data and cannot reject an old row. Old application writers are stopped before M1 and are not restored after cutover; the candidate runtime owns nullable handling. The later friendly_required check preserves the old required-field invariant for rows without tournament or league ownership.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908130000_v1_team_match_tournament_expand/migration.sql",
+    statement: "UPDATE \"v1_team_matches\" SET \"tournament_id\" = \"league_id\" WHERE \"tournament_id\" IS NULL AND \"league_id\" IS NOT NULL",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the update writes only the newly added tournament_id column, only where it is null, and copies the already canonical same-ID league owner. It is idempotent and is followed in the same transaction by foreign-key and consistency checks that abort the migration on any bad ownership. The exact bytes were applied to the nonempty rehearsal and the preserved registration/team data checks passed.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908130000_v1_team_match_tournament_expand/migration.sql",
+    statement: "ALTER TABLE \"v1_team_matches\" ADD CONSTRAINT \"v1_team_matches_tournament_id_id_key\" UNIQUE (\"tournament_id\", \"id\")",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the new composite uniqueness is required only as a foreign-key target. v1_team_matches.id is already globally unique, so adding (tournament_id,id) cannot discover a duplicate that the primary key allowed. The table is writer-quiesced, and any lock or validation failure rolls back M1 without exposing a partial constraint set.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908130000_v1_team_match_tournament_expand/migration.sql",
+    statement: "ALTER TABLE \"v1_tournament_groups\" ADD CONSTRAINT \"v1_tournament_groups_tournament_id_id_key\" UNIQUE (\"tournament_id\", \"id\")",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: v1_tournament_groups.id is already globally unique, so the added (tournament_id,id) key cannot fail for duplicate data and does not change existing row values. It runs within the quiesced M1 transaction and is rolled back atomically if validation cannot complete.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908130000_v1_team_match_tournament_expand/migration.sql",
+    statement: "ALTER TABLE \"v1_tournament_registrations\" ADD CONSTRAINT \"v1_tournament_registrations_tournament_id_id_key\" UNIQUE (\"tournament_id\", \"id\")",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: v1_tournament_registrations.id is already globally unique, so the composite key used by scoped foreign keys cannot introduce a duplicate-data failure. The Stage A operator has stopped writers before M1, and the exact migration completed against the nonempty rehearsal with registrations preserved.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908150000_v1_operation_audit_team_match_expand/migration.sql",
+    statement: "UPDATE \"v1_team_matches\" SET \"tournament_id\" = \"league_id\" WHERE \"tournament_id\" IS NULL AND \"league_id\" IS NOT NULL",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: this repeats M1's idempotent tournament_id backfill before adding audit bindings. After M1 it is normally a zero-row update; if resumed from a valid transactional boundary it still writes only null values from same-ID league ownership. The subsequent scoped foreign key rejects inconsistent data, and the nonempty rehearsal preserved the affected entities.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908150000_v1_operation_audit_team_match_expand/migration.sql",
+    statement: "ALTER TABLE \"v1_operation_audits\" ADD CONSTRAINT \"v1_operation_audits_team_match_scope_ck\" CHECK ( \"team_match_id\" IS NULL OR ( \"tournament_id\" IS NOT NULL AND (\"fixture_id\" IS NULL OR \"fixture_id\" = \"team_match_id\") ) )",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: every existing audit row has the newly added team_match_id as null, so the new check accepts all preexisting history. It constrains only future canonical bindings to carry tournament ownership and to agree with any retained fixture ID. The one-way audit conversion later runs while writers are quiesced and is independently guarded by the constrained mutation function.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908160000_v1_official_fact_team_match_scope/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_guard_game_official_fact_insert() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE revision_row RECORD; game_source_type \"V1GameSourceType\"; fixture_tournament_id_value TEXT; game_tournament_fixture_id_value TEXT; team_match_id_value TEXT; team_match_tournament_id_value TEXT; league_id_value TEXT; details_team_match_id_value TEXT; details_tournament_id_value TEXT; semantic_tournament_id TEXT; home_team_id_value TEXT; away_team_id_value TEXT; revision_home JSONB; revision_away JSONB; BEGIN SELECT state, revision, score, events_hash, official_at INTO revision_row FROM v1_game_result_revisions WHERE game_id = NEW.game_id AND id = NEW.revision_id FOR KEY SHARE; IF NOT FOUND OR revision_row.state IS DISTINCT FROM 'OFFICIAL' OR revision_row.official_at IS NULL THEN RAISE EXCEPTION 'official fact requires an official game revision' USING ERRCODE = '23514'; END IF; SELECT game.source_type, fixture.tournament_id, game.tournament_fixture_id, team_match.id, team_match.tournament_id, team_match.league_id, details.team_match_id, details.tournament_id, home_side.team_id, away_side.team_id INTO game_source_type, fixture_tournament_id_value, game_tournament_fixture_id_value, team_match_id_value, team_match_tournament_id_value, league_id_value, details_team_match_id_value, details_tournament_id_value, home_team_id_value, away_team_id_value FROM v1_games AS game LEFT JOIN v1_tournament_fixtures AS fixture ON fixture.id = game.tournament_fixture_id LEFT JOIN v1_team_matches AS team_match ON team_match.id = game.team_match_id LEFT JOIN v1_tournament_match_details AS details ON details.team_match_id = team_match.id LEFT JOIN v1_game_sides AS home_side ON home_side.game_id = game.id AND home_side.side_key = 'HOME' LEFT JOIN v1_game_sides AS away_side ON away_side.game_id = game.id AND away_side.side_key = 'AWAY' WHERE game.id = NEW.game_id FOR KEY SHARE OF game; IF NOT FOUND THEN RAISE EXCEPTION 'official fact requires an existing game source' USING ERRCODE = '23514'; END IF; IF game_source_type = 'TOURNAMENT_FIXTURE' THEN IF fixture_tournament_id_value IS NULL OR game_tournament_fixture_id_value IS NULL THEN RAISE EXCEPTION 'legacy fixture source requires fixture ownership' USING ERRCODE = '23514'; END IF; IF team_match_id_value IS NOT NULL AND team_match_id_value IS DISTINCT FROM game_tournament_fixture_id_value THEN RAISE EXCEPTION 'legacy fixture and TeamMatch sources must share the same id' USING ERRCODE = '23514'; END IF; IF details_team_match_id_value IS NOT NULL AND details_team_match_id_value IS DISTINCT FROM game_tournament_fixture_id_value THEN RAISE EXCEPTION 'legacy fixture has mismatched tournament details' USING ERRCODE = '23514'; END IF; IF team_match_tournament_id_value IS NOT NULL AND team_match_tournament_id_value IS DISTINCT FROM fixture_tournament_id_value THEN RAISE EXCEPTION 'legacy fixture has conflicting TeamMatch ownership' USING ERRCODE = '23514'; END IF; IF details_tournament_id_value IS NOT NULL AND details_tournament_id_value IS DISTINCT FROM fixture_tournament_id_value THEN RAISE EXCEPTION 'legacy fixture has conflicting tournament details ownership' USING ERRCODE = '23514'; END IF; semantic_tournament_id := fixture_tournament_id_value; ELSIF game_source_type = 'TEAM_MATCH' THEN IF team_match_id_value IS NULL THEN RAISE EXCEPTION 'TeamMatch source requires TeamMatch ownership' USING ERRCODE = '23514'; END IF; IF game_tournament_fixture_id_value IS NOT NULL AND game_tournament_fixture_id_value IS DISTINCT FROM team_match_id_value THEN RAISE EXCEPTION 'TeamMatch source has a mismatched legacy fixture' USING ERRCODE = '23514'; END IF; IF details_team_match_id_value IS NOT NULL AND details_team_match_id_value IS DISTINCT FROM team_match_id_value THEN RAISE EXCEPTION 'TeamMatch source has mismatched tournament details' USING ERRCODE = '23514'; END IF; IF details_tournament_id_value IS NOT NULL AND details_team_match_id_value IS NULL THEN RAISE EXCEPTION 'TeamMatch source has orphan tournament details' USING ERRCODE = '23514'; END IF; IF details_tournament_id_value IS NOT NULL AND team_match_tournament_id_value IS NULL THEN RAISE EXCEPTION 'TeamMatch tournament details have no raw tournament owner' USING ERRCODE = '23514'; END IF; IF team_match_tournament_id_value IS NOT NULL AND details_tournament_id_value IS NOT NULL AND team_match_tournament_id_value IS DISTINCT FROM details_tournament_id_value THEN RAISE EXCEPTION 'TeamMatch source has conflicting tournament ownership' USING ERRCODE = '23514'; END IF; IF team_match_tournament_id_value IS NOT NULL AND league_id_value IS NOT NULL AND team_match_tournament_id_value IS DISTINCT FROM league_id_value THEN RAISE EXCEPTION 'TeamMatch source has mixed league and tournament ownership' USING ERRCODE = '23514'; END IF; IF team_match_tournament_id_value IS NOT NULL AND league_id_value IS NULL AND details_tournament_id_value IS NULL THEN RAISE EXCEPTION 'TeamMatch tournament ownership requires matching details' USING ERRCODE = '23514'; END IF; IF game_tournament_fixture_id_value IS NOT NULL AND (fixture_tournament_id_value IS NULL OR details_tournament_id_value IS NULL OR fixture_tournament_id_value IS DISTINCT FROM details_tournament_id_value OR team_match_tournament_id_value IS DISTINCT FROM fixture_tournament_id_value) THEN RAISE EXCEPTION 'TeamMatch dual source requires matching fixture and details ownership' USING ERRCODE = '23514'; END IF; IF details_tournament_id_value IS NOT NULL AND league_id_value IS NOT NULL THEN RAISE EXCEPTION 'TeamMatch source mixes league and tournament details ownership' USING ERRCODE = '23514'; END IF; semantic_tournament_id := details_tournament_id_value; ELSE RAISE EXCEPTION 'unsupported official fact source type' USING ERRCODE = '23514'; END IF; revision_home := COALESCE(revision_row.score -> 'home', revision_row.score -> 'regulation' -> 'home'); revision_away := COALESCE(revision_row.score -> 'away', revision_row.score -> 'regulation' -> 'away'); IF NEW.revision IS DISTINCT FROM revision_row.revision OR NEW.source_type IS DISTINCT FROM game_source_type OR NEW.tournament_id IS DISTINCT FROM semantic_tournament_id OR NEW.home_team_id IS DISTINCT FROM home_team_id_value OR NEW.away_team_id IS DISTINCT FROM away_team_id_value OR NEW.score IS DISTINCT FROM revision_row.score OR NEW.events_hash IS DISTINCT FROM revision_row.events_hash OR NEW.official_at IS DISTINCT FROM revision_row.official_at OR jsonb_typeof(revision_home) IS DISTINCT FROM 'number' OR jsonb_typeof(revision_away) IS DISTINCT FROM 'number' OR NEW.home_score IS DISTINCT FROM (revision_home #>> '{}')::INTEGER OR NEW.away_score IS DISTINCT FROM (revision_away #>> '{}')::INTEGER THEN RAISE EXCEPTION 'official fact must exactly snapshot its official game revision' USING ERRCODE = '23514'; END IF; RETURN NEW; END $$",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the existing official-fact trigger function is transactionally replaced with a version that accepts legacy fixture, same-ID dual-link, and canonical TeamMatch sources while retaining exact revision, score, events hash, official time, team, and tournament checks. M1 has already installed the expanded schema, application writers remain stopped, and exact-byte nonempty rehearsal evidence shows official revisions and game identity were preserved.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908160000_v1_official_fact_team_match_scope/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_guard_game_official_result_cache() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE revision_row RECORD; game_source_type \"V1GameSourceType\"; game_tournament_fixture_id_value TEXT; fixture_tournament_id_value TEXT; team_match_id_value TEXT; team_match_tournament_id_value TEXT; league_id_value TEXT; details_team_match_id_value TEXT; details_tournament_id_value TEXT; semantic_tournament_id TEXT; BEGIN SELECT revision.game_id, revision.revision, revision.state, revision.events_hash, revision.official_at, game.current_official_revision_id INTO revision_row FROM v1_game_result_revisions revision INNER JOIN v1_games game ON game.id = revision.game_id LEFT JOIN v1_tournament_fixtures fixture ON fixture.id = game.tournament_fixture_id LEFT JOIN v1_team_matches team_match ON team_match.id = game.team_match_id LEFT JOIN v1_tournament_match_details details ON details.team_match_id = team_match.id WHERE revision.id = NEW.revision_id FOR KEY SHARE OF revision, game; IF NOT FOUND OR revision_row.state IS DISTINCT FROM 'OFFICIAL' OR revision_row.official_at IS NULL THEN RAISE EXCEPTION 'public result cache requires an exact official revision snapshot' USING ERRCODE = '23514'; END IF; SELECT game.source_type, game.tournament_fixture_id, fixture.tournament_id, team_match.id, team_match.tournament_id, team_match.league_id, details.team_match_id, details.tournament_id INTO game_source_type, game_tournament_fixture_id_value, fixture_tournament_id_value, team_match_id_value, team_match_tournament_id_value, league_id_value, details_team_match_id_value, details_tournament_id_value FROM v1_games game LEFT JOIN v1_tournament_fixtures fixture ON fixture.id = game.tournament_fixture_id LEFT JOIN v1_team_matches team_match ON team_match.id = game.team_match_id LEFT JOIN v1_tournament_match_details details ON details.team_match_id = team_match.id WHERE game.id = revision_row.game_id; IF game_source_type = 'TOURNAMENT_FIXTURE' THEN IF game_tournament_fixture_id_value IS NULL OR fixture_tournament_id_value IS NULL OR (team_match_id_value IS NOT NULL AND team_match_id_value IS DISTINCT FROM game_tournament_fixture_id_value) OR (details_team_match_id_value IS NOT NULL AND details_team_match_id_value IS DISTINCT FROM game_tournament_fixture_id_value) OR (team_match_tournament_id_value IS NOT NULL AND team_match_tournament_id_value IS DISTINCT FROM fixture_tournament_id_value) OR (details_tournament_id_value IS NOT NULL AND details_tournament_id_value IS DISTINCT FROM fixture_tournament_id_value) THEN RAISE EXCEPTION 'legacy fixture has mixed official cache ownership' USING ERRCODE = '23514'; END IF; semantic_tournament_id := fixture_tournament_id_value; ELSIF game_source_type = 'TEAM_MATCH' THEN IF team_match_id_value IS NULL OR (game_tournament_fixture_id_value IS NOT NULL AND game_tournament_fixture_id_value IS DISTINCT FROM team_match_id_value) OR (details_team_match_id_value IS NOT NULL AND details_team_match_id_value IS DISTINCT FROM team_match_id_value) OR (details_tournament_id_value IS NOT NULL AND details_team_match_id_value IS NULL) OR (details_tournament_id_value IS NOT NULL AND team_match_tournament_id_value IS NULL) OR (team_match_tournament_id_value IS NOT NULL AND details_tournament_id_value IS NOT NULL AND team_match_tournament_id_value IS DISTINCT FROM details_tournament_id_value) OR (team_match_tournament_id_value IS NOT NULL AND league_id_value IS NOT NULL AND team_match_tournament_id_value IS DISTINCT FROM league_id_value) OR (team_match_tournament_id_value IS NOT NULL AND league_id_value IS NULL AND details_tournament_id_value IS NULL) OR (details_tournament_id_value IS NOT NULL AND league_id_value IS NOT NULL) OR (game_tournament_fixture_id_value IS NOT NULL AND (fixture_tournament_id_value IS NULL OR details_tournament_id_value IS NULL OR fixture_tournament_id_value IS DISTINCT FROM details_tournament_id_value OR team_match_tournament_id_value IS DISTINCT FROM fixture_tournament_id_value)) THEN RAISE EXCEPTION 'TeamMatch has mixed official cache ownership' USING ERRCODE = '23514'; END IF; semantic_tournament_id := details_tournament_id_value; ELSE RAISE EXCEPTION 'unsupported official cache source type' USING ERRCODE = '23514'; END IF; IF NEW.game_id IS DISTINCT FROM revision_row.game_id OR NEW.revision IS DISTINCT FROM revision_row.revision OR NEW.tournament_id IS DISTINCT FROM semantic_tournament_id OR NEW.source_hash IS DISTINCT FROM revision_row.events_hash OR (NEW.is_current AND revision_row.current_official_revision_id IS DISTINCT FROM NEW.revision_id) THEN RAISE EXCEPTION 'public result cache requires an exact official revision snapshot' USING ERRCODE = '23514'; END IF; RETURN NEW; END $$",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the official-result-cache guard is transactionally widened to resolve the same three Stage A source shapes while retaining official revision, current-pointer, events hash, and semantic tournament equality checks. It remains fail-closed on mixed ownership. Writers are quiesced for M1-M10, and the exact migration digest is bound to the successful nonempty rehearsal.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908180000_v1_staff_scope_team_match/migration.sql",
+    statement: "ALTER TABLE \"v1_tournament_staff_fixture_scopes\" ALTER COLUMN \"fixture_id\" DROP NOT NULL",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: making fixture_id nullable is a data-preserving relaxation required for canonical team_match_id scopes. Existing rows still have fixture_id at this point and remain valid. The API and worker are stopped before the migration, so no old writer can create a row that depends on the old NOT NULL contract after the default is removed.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908180000_v1_staff_scope_team_match/migration.sql",
+    statement: "ALTER TABLE \"v1_tournament_staff_fixture_scopes\" ADD CONSTRAINT \"v1_staff_scope_source_ck\" CHECK (num_nonnulls(\"fixture_id\", \"team_match_id\") = 1), ADD CONSTRAINT \"v1_staff_scope_tournament_id_ck\" CHECK (\"tournament_id\" <> '') NOT VALID",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the source check requires exactly one of fixture_id or team_match_id, and the tournament check is introduced NOT VALID until the controlled backfill completes. Existing rows initially retain fixture_id, so the source check passes; the transaction explicitly flushes deferred guards and validates tournament ownership before commit. Any mismatch aborts the entire migration.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908180000_v1_staff_scope_team_match/migration.sql",
+    statement: "CREATE UNIQUE INDEX \"v1_tournament_staff_fixture_scopes_assignment_team_match_key\" ON \"v1_tournament_staff_fixture_scopes\"(\"assignment_id\", \"team_match_id\")",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the unique index includes the newly added nullable team_match_id. All preexisting rows have team_match_id null when the index is built, so PostgreSQL indexes no conflicting canonical key; later canonical rows are uniquely scoped per assignment. Writer quiescence removes concurrent-build risk, and the exact migration completed in the populated rehearsal.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908180000_v1_staff_scope_team_match/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_guard_staff_fixture_scope() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE assignment_tournament TEXT; scope_tournament TEXT; BEGIN SELECT tournament_id INTO assignment_tournament FROM v1_tournament_staff_assignments WHERE id = NEW.assignment_id; IF NEW.fixture_id IS NOT NULL THEN SELECT tournament_id INTO scope_tournament FROM v1_tournament_fixtures WHERE id = NEW.fixture_id; ELSE SELECT tournament_id INTO scope_tournament FROM v1_team_matches WHERE tournament_id = NEW.tournament_id AND id = NEW.team_match_id; END IF; IF assignment_tournament IS NULL OR scope_tournament IS NULL OR NEW.tournament_id <> assignment_tournament OR scope_tournament <> assignment_tournament THEN RAISE EXCEPTION 'staff scope must stay within tournament' USING ERRCODE = '23514'; END IF; RETURN NEW; END $$",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the deferred staff-scope trigger function is replaced before the controlled backfill so it can validate both retained fixture rows and canonical TeamMatch rows against assignment tournament ownership. The function and following update commit atomically, writers are stopped, and unmatched fixture rows remain supported until the archived cutover converts them.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908180000_v1_staff_scope_team_match/migration.sql",
+    statement: "UPDATE \"v1_tournament_staff_fixture_scopes\" s SET \"tournament_id\" = a.\"tournament_id\", \"team_match_id\" = ( SELECT tm.\"id\" FROM \"v1_team_matches\" tm JOIN \"v1_tournament_match_details\" d ON d.\"team_match_id\" = tm.\"id\" AND d.\"tournament_id\" = tm.\"tournament_id\" WHERE tm.\"id\" = s.\"fixture_id\" AND tm.\"tournament_id\" = a.\"tournament_id\" ), \"fixture_id\" = CASE WHEN EXISTS ( SELECT 1 FROM \"v1_team_matches\" tm JOIN \"v1_tournament_match_details\" d ON d.\"team_match_id\" = tm.\"id\" AND d.\"tournament_id\" = tm.\"tournament_id\" WHERE tm.\"id\" = s.\"fixture_id\" AND tm.\"tournament_id\" = a.\"tournament_id\" ) THEN NULL ELSE s.\"fixture_id\" END FROM \"v1_tournament_staff_assignments\" a WHERE a.\"id\" = s.\"assignment_id\"",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the backfill always fills tournament_id from the assignment and switches fixture_id to team_match_id only when an equal-ID TeamMatch plus matching Details row exists in the same tournament; otherwise it retains the fixture link. The exactly-one-source check, deferred trigger flush, validation, and transaction rollback prevent partial or cross-tournament conversion. The later rehearsal verified zero remaining legacy staff scopes after cutover.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908180000_v1_staff_scope_team_match/migration.sql",
+    statement: "SET CONSTRAINTS ALL IMMEDIATE",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: SET CONSTRAINTS ALL IMMEDIATE is transaction-local and mutates no schema or row. It deliberately executes the deferred staff-scope guards queued by the preceding backfill before validation/default DDL, so an invalid row aborts M5 rather than surfacing after later DDL. The populated rehearsal passed this boundary.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260908180000_v1_staff_scope_team_match/migration.sql",
+    statement: "ALTER TABLE \"v1_tournament_staff_fixture_scopes\" VALIDATE CONSTRAINT \"v1_staff_scope_tournament_id_ck\", ALTER COLUMN \"tournament_id\" DROP DEFAULT",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: VALIDATE proves every populated row has a nonempty tournament_id, then DROP DEFAULT prevents future empty-string ownership. These actions are in the same transaction as the backfill and deferred-trigger flush. Old writers are already stopped and will not be restored, while the candidate application supplies real tournament IDs; failure rolls back M5.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260909000000_v1_tournament_result_lineage/migration.sql",
+    statement: "CREATE TRIGGER v1_block_tournament_result_lineage_game_reparent BEFORE UPDATE OF source_type, team_match_id, tournament_fixture_id ON \"v1_games\" FOR EACH ROW EXECUTE FUNCTION v1_block_tournament_result_lineage_game_reparent()",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the new reparent trigger targets an existing games table, but the new lineage table is empty when M6 is installed, so it blocks no pre-cutover row. After the archived cutover records lineage, it prevents source_type or source IDs from changing. The cutover runs under quiescence and the rehearsal preserved game identity and official revision history.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260909110000_v1_operation_audit_canonical_binding/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_reject_operation_audit_mutation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'v1_operation_audits_append_only: DELETE is forbidden' USING ERRCODE = '55000'; END IF; IF OLD.fixture_id IS NULL OR OLD.tournament_id IS NULL OR NEW.fixture_id IS NOT NULL OR NEW.team_match_id IS DISTINCT FROM OLD.fixture_id OR (OLD.team_match_id IS NOT NULL AND OLD.team_match_id IS DISTINCT FROM OLD.fixture_id) OR OLD.tournament_id IS DISTINCT FROM NEW.tournament_id OR NOT EXISTS ( SELECT 1 FROM \"v1_tournament_fixtures\" fixture WHERE fixture.id = OLD.fixture_id AND fixture.tournament_id = OLD.tournament_id ) OR NOT EXISTS ( SELECT 1 FROM \"v1_team_matches\" match WHERE match.id = NEW.team_match_id AND match.tournament_id = NEW.tournament_id ) OR NOT EXISTS ( SELECT 1 FROM \"v1_tournament_match_details\" details WHERE details.team_match_id = NEW.team_match_id AND details.tournament_id = NEW.tournament_id ) OR (to_jsonb(NEW) - 'fixture_id' - 'team_match_id') IS DISTINCT FROM (to_jsonb(OLD) - 'fixture_id' - 'team_match_id') THEN RAISE EXCEPTION 'v1_operation_audits_append_only: UPDATE is forbidden except same-ID canonical binding' USING ERRCODE = '55000'; END IF; RETURN NEW; END; $$",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the replacement keeps audit history append-only except for one exact, one-way fixture-to-TeamMatch binding: same fixture/match ID, same tournament, existing fixture, existing TeamMatch plus Details, and byte-equality of every other column. DELETE and any content mutation still fail. The temporary allowance exists only while writers are stopped and M9 restores unconditional append-only behavior before the candidate runtime starts.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260910010000_v1_official_fact_source_history/migration.sql",
+    statement: "SET LOCAL lock_timeout = '5s'",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: SET LOCAL lock_timeout changes no persistent data or schema and bounds the table-lock acquisition for the following enum-column rewrite to five seconds. It is transaction-local, so failure aborts M8 without weakening any database invariant.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260910010000_v1_official_fact_source_history/migration.sql",
+    statement: "ALTER TABLE \"v1_game_official_facts\" ALTER COLUMN \"source_type\" TYPE \"V1GameOfficialFactSourceType\" USING \"source_type\"::text::\"V1GameOfficialFactSourceType\"",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the source_type column is cast through text into a new historical enum containing the exact four values of the operational enum. The change intentionally preserves immutable fact values while decoupling future operational enum retirement. It runs post-cutover with writers stopped and a five-second lock timeout; the exact digest succeeded with nonempty official facts preserved.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260910010000_v1_official_fact_source_history/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_guard_game_official_fact_insert() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE revision_row RECORD; game_source_type \"V1GameSourceType\"; fixture_tournament_id_value TEXT; game_tournament_fixture_id_value TEXT; team_match_id_value TEXT; team_match_tournament_id_value TEXT; league_id_value TEXT; details_team_match_id_value TEXT; details_tournament_id_value TEXT; semantic_tournament_id TEXT; home_team_id_value TEXT; away_team_id_value TEXT; revision_home JSONB; revision_away JSONB; BEGIN SELECT state, revision, score, events_hash, official_at INTO revision_row FROM v1_game_result_revisions WHERE game_id = NEW.game_id AND id = NEW.revision_id FOR KEY SHARE; IF NOT FOUND OR revision_row.state IS DISTINCT FROM 'OFFICIAL' OR revision_row.official_at IS NULL THEN RAISE EXCEPTION 'official fact requires an official game revision' USING ERRCODE = '23514'; END IF; SELECT game.source_type, fixture.tournament_id, game.tournament_fixture_id, team_match.id, team_match.tournament_id, team_match.league_id, details.team_match_id, details.tournament_id, home_side.team_id, away_side.team_id INTO game_source_type, fixture_tournament_id_value, game_tournament_fixture_id_value, team_match_id_value, team_match_tournament_id_value, league_id_value, details_team_match_id_value, details_tournament_id_value, home_team_id_value, away_team_id_value FROM v1_games AS game LEFT JOIN v1_tournament_fixtures AS fixture ON fixture.id = game.tournament_fixture_id LEFT JOIN v1_team_matches AS team_match ON team_match.id = game.team_match_id LEFT JOIN v1_tournament_match_details AS details ON details.team_match_id = team_match.id LEFT JOIN v1_game_sides AS home_side ON home_side.game_id = game.id AND home_side.side_key = 'HOME' LEFT JOIN v1_game_sides AS away_side ON away_side.game_id = game.id AND away_side.side_key = 'AWAY' WHERE game.id = NEW.game_id FOR KEY SHARE OF game; IF NOT FOUND THEN RAISE EXCEPTION 'official fact requires an existing game source' USING ERRCODE = '23514'; END IF; IF game_source_type = 'TOURNAMENT_FIXTURE' THEN IF fixture_tournament_id_value IS NULL OR game_tournament_fixture_id_value IS NULL THEN RAISE EXCEPTION 'legacy fixture source requires fixture ownership' USING ERRCODE = '23514'; END IF; IF team_match_id_value IS NOT NULL AND team_match_id_value IS DISTINCT FROM game_tournament_fixture_id_value THEN RAISE EXCEPTION 'legacy fixture and TeamMatch sources must share the same id' USING ERRCODE = '23514'; END IF; IF details_team_match_id_value IS NOT NULL AND details_team_match_id_value IS DISTINCT FROM game_tournament_fixture_id_value THEN RAISE EXCEPTION 'legacy fixture has mismatched tournament details' USING ERRCODE = '23514'; END IF; IF team_match_tournament_id_value IS NOT NULL AND team_match_tournament_id_value IS DISTINCT FROM fixture_tournament_id_value THEN RAISE EXCEPTION 'legacy fixture has conflicting TeamMatch ownership' USING ERRCODE = '23514'; END IF; IF details_tournament_id_value IS NOT NULL AND details_tournament_id_value IS DISTINCT FROM fixture_tournament_id_value THEN RAISE EXCEPTION 'legacy fixture has conflicting tournament details ownership' USING ERRCODE = '23514'; END IF; semantic_tournament_id := fixture_tournament_id_value; ELSIF game_source_type = 'TEAM_MATCH' THEN IF team_match_id_value IS NULL THEN RAISE EXCEPTION 'TeamMatch source requires TeamMatch ownership' USING ERRCODE = '23514'; END IF; IF game_tournament_fixture_id_value IS NOT NULL AND game_tournament_fixture_id_value IS DISTINCT FROM team_match_id_value THEN RAISE EXCEPTION 'TeamMatch source has a mismatched legacy fixture' USING ERRCODE = '23514'; END IF; IF details_team_match_id_value IS NOT NULL AND details_team_match_id_value IS DISTINCT FROM team_match_id_value THEN RAISE EXCEPTION 'TeamMatch source has mismatched tournament details' USING ERRCODE = '23514'; END IF; IF details_tournament_id_value IS NOT NULL AND details_team_match_id_value IS NULL THEN RAISE EXCEPTION 'TeamMatch source has orphan tournament details' USING ERRCODE = '23514'; END IF; IF details_tournament_id_value IS NOT NULL AND team_match_tournament_id_value IS NULL THEN RAISE EXCEPTION 'TeamMatch tournament details have no raw tournament owner' USING ERRCODE = '23514'; END IF; IF team_match_tournament_id_value IS NOT NULL AND details_tournament_id_value IS NOT NULL AND team_match_tournament_id_value IS DISTINCT FROM details_tournament_id_value THEN RAISE EXCEPTION 'TeamMatch source has conflicting tournament ownership' USING ERRCODE = '23514'; END IF; IF team_match_tournament_id_value IS NOT NULL AND league_id_value IS NOT NULL AND team_match_tournament_id_value IS DISTINCT FROM league_id_value THEN RAISE EXCEPTION 'TeamMatch source has mixed league and tournament ownership' USING ERRCODE = '23514'; END IF; IF team_match_tournament_id_value IS NOT NULL AND league_id_value IS NULL AND details_tournament_id_value IS NULL THEN RAISE EXCEPTION 'TeamMatch tournament ownership requires matching details' USING ERRCODE = '23514'; END IF; IF game_tournament_fixture_id_value IS NOT NULL AND (fixture_tournament_id_value IS NULL OR details_tournament_id_value IS NULL OR fixture_tournament_id_value IS DISTINCT FROM details_tournament_id_value OR team_match_tournament_id_value IS DISTINCT FROM fixture_tournament_id_value) THEN RAISE EXCEPTION 'TeamMatch dual source requires matching fixture and details ownership' USING ERRCODE = '23514'; END IF; IF details_tournament_id_value IS NOT NULL AND league_id_value IS NOT NULL THEN RAISE EXCEPTION 'TeamMatch source mixes league and tournament details ownership' USING ERRCODE = '23514'; END IF; semantic_tournament_id := details_tournament_id_value; ELSE RAISE EXCEPTION 'unsupported official fact source type' USING ERRCODE = '23514'; END IF; revision_home := COALESCE(revision_row.score -> 'home', revision_row.score -> 'regulation' -> 'home'); revision_away := COALESCE(revision_row.score -> 'away', revision_row.score -> 'regulation' -> 'away'); IF NEW.revision IS DISTINCT FROM revision_row.revision OR NEW.source_type::text IS DISTINCT FROM game_source_type::text OR NEW.tournament_id IS DISTINCT FROM semantic_tournament_id OR NEW.home_team_id IS DISTINCT FROM home_team_id_value OR NEW.away_team_id IS DISTINCT FROM away_team_id_value OR NEW.score IS DISTINCT FROM revision_row.score OR NEW.events_hash IS DISTINCT FROM revision_row.events_hash OR NEW.official_at IS DISTINCT FROM revision_row.official_at OR jsonb_typeof(revision_home) IS DISTINCT FROM 'number' OR jsonb_typeof(revision_away) IS DISTINCT FROM 'number' OR NEW.home_score IS DISTINCT FROM (revision_home #>> '{}')::INTEGER OR NEW.away_score IS DISTINCT FROM (revision_away #>> '{}')::INTEGER THEN RAISE EXCEPTION 'official fact must exactly snapshot its official game revision' USING ERRCODE = '23514'; END IF; RETURN NEW; END $$",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: after source_type moves to the historical enum, this transactional function replacement changes only the source comparison to explicit text equality; the M3 ownership and byte-exact revision snapshot checks remain intact. Writers are quiesced, and the exact M8 digest completed in the populated rehearsal with official history unchanged.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260910020000_v1_canonical_game_db_guards/migration.sql",
+    statement: "SET LOCAL lock_timeout = '5s'",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: SET LOCAL lock_timeout is transaction-local and bounds acquisition of the explicit table locks used by the canonical seal to five seconds. It changes no persistent object and fails closed before the guard installation if the locks cannot be obtained.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260910020000_v1_canonical_game_db_guards/migration.sql",
+    statement: "DO $$ DECLARE legacy_games BIGINT; legacy_staff_scopes BIGINT; legacy_audits BIGINT; legacy_fixtures BIGINT; retired_write_seals BIGINT; retired_link_seals BIGINT; retired_write_tables BIGINT; retired_link_tables BIGINT; retired_write_function_missing BOOLEAN; retired_link_function_missing BOOLEAN; retired_table TEXT; retired_row_seals BIGINT; BEGIN LOCK TABLE \"v1_games\" IN EXCLUSIVE MODE; LOCK TABLE \"v1_operation_audits\" IN SHARE ROW EXCLUSIVE MODE; LOCK TABLE \"v1_tournament_staff_fixture_scopes\" IN SHARE ROW EXCLUSIVE MODE; LOCK TABLE \"v1_tournament_fixtures\", \"v1_tournament_fixture_results\", \"v1_tournament_fixture_goals\", \"v1_tournament_fixture_videos\", \"v1_tournament_fixture_advancement_edges\" IN SHARE ROW EXCLUSIVE MODE; SELECT count(*) INTO legacy_games FROM \"v1_games\" WHERE \"source_type\"::text = 'TOURNAMENT_FIXTURE' OR \"tournament_fixture_id\" IS NOT NULL; SELECT count(*) INTO legacy_staff_scopes FROM \"v1_tournament_staff_fixture_scopes\" WHERE \"fixture_id\" IS NOT NULL; SELECT count(*) INTO legacy_audits FROM \"v1_operation_audits\" WHERE \"fixture_id\" IS NOT NULL; SELECT count(*) INTO legacy_fixtures FROM \"v1_tournament_fixtures\"; SELECT count(*) INTO retired_write_tables FROM (VALUES ('v1_tournament_fixtures'), ('v1_tournament_fixture_results'), ('v1_tournament_fixture_goals'), ('v1_tournament_fixture_videos'), ('v1_tournament_fixture_advancement_edges') ) AS wanted(table_name) WHERE to_regclass(wanted.table_name) IS NOT NULL; SELECT count(*) INTO retired_link_tables FROM (VALUES ('v1_games'), ('v1_tournament_staff_fixture_scopes'), ('v1_operation_audits')) AS wanted(table_name) WHERE to_regclass(wanted.table_name) IS NOT NULL; SELECT count(*) INTO retired_write_seals FROM pg_trigger t WHERE t.tgname = 'v1_tournament_fixture_retired_write' AND t.tgfoid = to_regprocedure('v1_reject_retired_tournament_fixture_write()') AND t.tgenabled = 'A' AND t.tgtype::int = 62 AND NOT t.tgisinternal AND t.tgrelid IN ( to_regclass('v1_tournament_fixtures'), to_regclass('v1_tournament_fixture_results'), to_regclass('v1_tournament_fixture_goals'), to_regclass('v1_tournament_fixture_videos'), to_regclass('v1_tournament_fixture_advancement_edges') ); SELECT count(*) INTO retired_link_seals FROM pg_trigger t WHERE t.tgname = 'v1_000_tournament_fixture_retired_link' AND t.tgfoid = to_regprocedure('v1_reject_retired_tournament_fixture_link()') AND t.tgenabled = 'A' AND t.tgtype::int = 23 AND NOT t.tgisinternal AND t.tgrelid IN ( to_regclass('v1_games'), to_regclass('v1_tournament_staff_fixture_scopes'), to_regclass('v1_operation_audits') ); retired_write_function_missing := to_regprocedure('v1_reject_retired_tournament_fixture_write()') IS NULL; retired_link_function_missing := to_regprocedure('v1_reject_retired_tournament_fixture_link()') IS NULL; IF legacy_fixtures > 0 AND ( retired_write_tables <> 5 OR retired_link_tables <> 3 OR retired_write_seals <> 5 OR retired_link_seals <> 3 OR retired_write_function_missing OR retired_link_function_missing ) THEN RAISE EXCEPTION 'CANONICAL_GAME_GUARD_PRECONDITION_FAILED legacy_fixtures=% write_tables=% write_seals=% link_tables=% link_seals=% write_fn_missing=% link_fn_missing=%', legacy_fixtures, retired_write_tables, retired_write_seals, retired_link_tables, retired_link_seals, retired_write_function_missing, retired_link_function_missing USING ERRCODE = '55000'; END IF; IF legacy_games <> 0 OR legacy_staff_scopes <> 0 OR legacy_audits <> 0 THEN RAISE EXCEPTION 'CANONICAL_GAME_GUARD_PRECONDITION_FAILED games=% staff_scopes=% audits=%', legacy_games, legacy_staff_scopes, legacy_audits USING ERRCODE = '55000'; END IF; EXECUTE $fn$ CREATE OR REPLACE FUNCTION v1_reject_retired_tournament_fixture_write() RETURNS trigger LANGUAGE plpgsql AS $seal$ BEGIN IF TG_LEVEL = 'STATEMENT' AND TG_OP IN ('UPDATE', 'DELETE') AND pg_trigger_depth() > 1 THEN RETURN NULL; END IF; RAISE EXCEPTION 'tournament_fixture_retired: % on % is forbidden', TG_OP, TG_TABLE_NAME USING ERRCODE = '55000'; END; $seal$; $fn$; EXECUTE $fn$ CREATE OR REPLACE FUNCTION v1_reject_retired_tournament_fixture_link() RETURNS trigger LANGUAGE plpgsql AS $seal$ BEGIN IF TG_TABLE_NAME = 'v1_games' THEN IF NEW.tournament_fixture_id IS NOT NULL OR NEW.source_type::text = 'TOURNAMENT_FIXTURE' THEN RAISE EXCEPTION 'tournament_fixture_retired: legacy game source is forbidden' USING ERRCODE = '55000'; END IF; ELSIF NEW.fixture_id IS NOT NULL THEN RAISE EXCEPTION 'tournament_fixture_retired: legacy fixture scope is forbidden' USING ERRCODE = '55000'; END IF; RETURN NEW; END; $seal$; $fn$; EXECUTE 'CREATE OR REPLACE TRIGGER v1_tournament_fixture_retired_write BEFORE INSERT OR UPDATE OR DELETE OR TRUNCATE ON \"v1_tournament_fixtures\" FOR EACH STATEMENT EXECUTE FUNCTION v1_reject_retired_tournament_fixture_write()'; EXECUTE 'CREATE OR REPLACE TRIGGER v1_tournament_fixture_retired_write BEFORE INSERT OR UPDATE OR DELETE OR TRUNCATE ON \"v1_tournament_fixture_results\" FOR EACH STATEMENT EXECUTE FUNCTION v1_reject_retired_tournament_fixture_write()'; EXECUTE 'CREATE OR REPLACE TRIGGER v1_tournament_fixture_retired_write BEFORE INSERT OR UPDATE OR DELETE OR TRUNCATE ON \"v1_tournament_fixture_goals\" FOR EACH STATEMENT EXECUTE FUNCTION v1_reject_retired_tournament_fixture_write()'; EXECUTE 'CREATE OR REPLACE TRIGGER v1_tournament_fixture_retired_write BEFORE INSERT OR UPDATE OR DELETE OR TRUNCATE ON \"v1_tournament_fixture_videos\" FOR EACH STATEMENT EXECUTE FUNCTION v1_reject_retired_tournament_fixture_write()'; EXECUTE 'CREATE OR REPLACE TRIGGER v1_tournament_fixture_retired_write BEFORE INSERT OR UPDATE OR DELETE OR TRUNCATE ON \"v1_tournament_fixture_advancement_edges\" FOR EACH STATEMENT EXECUTE FUNCTION v1_reject_retired_tournament_fixture_write()'; EXECUTE 'ALTER TABLE \"v1_tournament_fixtures\" ENABLE ALWAYS TRIGGER v1_tournament_fixture_retired_write'; EXECUTE 'ALTER TABLE \"v1_tournament_fixture_results\" ENABLE ALWAYS TRIGGER v1_tournament_fixture_retired_write'; EXECUTE 'ALTER TABLE \"v1_tournament_fixture_goals\" ENABLE ALWAYS TRIGGER v1_tournament_fixture_retired_write'; EXECUTE 'ALTER TABLE \"v1_tournament_fixture_videos\" ENABLE ALWAYS TRIGGER v1_tournament_fixture_retired_write'; EXECUTE 'ALTER TABLE \"v1_tournament_fixture_advancement_edges\" ENABLE ALWAYS TRIGGER v1_tournament_fixture_retired_write'; FOREACH retired_table IN ARRAY ARRAY[ 'v1_tournament_fixtures', 'v1_tournament_fixture_results', 'v1_tournament_fixture_goals', 'v1_tournament_fixture_videos', 'v1_tournament_fixture_advancement_edges' ] LOOP EXECUTE format('CREATE OR REPLACE TRIGGER v1_tournament_fixture_retired_row_write BEFORE UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION v1_reject_retired_tournament_fixture_write()', retired_table); EXECUTE format('ALTER TABLE %I ENABLE ALWAYS TRIGGER v1_tournament_fixture_retired_row_write', retired_table); END LOOP; EXECUTE 'CREATE OR REPLACE TRIGGER v1_000_tournament_fixture_retired_link BEFORE INSERT OR UPDATE ON \"v1_games\" FOR EACH ROW EXECUTE FUNCTION v1_reject_retired_tournament_fixture_link()'; EXECUTE 'CREATE OR REPLACE TRIGGER v1_000_tournament_fixture_retired_link BEFORE INSERT OR UPDATE ON \"v1_tournament_staff_fixture_scopes\" FOR EACH ROW EXECUTE FUNCTION v1_reject_retired_tournament_fixture_link()'; EXECUTE 'CREATE OR REPLACE TRIGGER v1_000_tournament_fixture_retired_link BEFORE INSERT OR UPDATE ON \"v1_operation_audits\" FOR EACH ROW EXECUTE FUNCTION v1_reject_retired_tournament_fixture_link()'; EXECUTE 'ALTER TABLE \"v1_games\" ENABLE ALWAYS TRIGGER v1_000_tournament_fixture_retired_link'; EXECUTE 'ALTER TABLE \"v1_tournament_staff_fixture_scopes\" ENABLE ALWAYS TRIGGER v1_000_tournament_fixture_retired_link'; EXECUTE 'ALTER TABLE \"v1_operation_audits\" ENABLE ALWAYS TRIGGER v1_000_tournament_fixture_retired_link'; SELECT count(*) INTO retired_row_seals FROM pg_trigger WHERE tgname = 'v1_tournament_fixture_retired_row_write' AND tgfoid = to_regprocedure('v1_reject_retired_tournament_fixture_write()') AND tgtype::int = 27 AND tgenabled = 'A' AND NOT tgisinternal AND tgrelid IN ( 'v1_tournament_fixtures'::regclass, 'v1_tournament_fixture_results'::regclass, 'v1_tournament_fixture_goals'::regclass, 'v1_tournament_fixture_videos'::regclass, 'v1_tournament_fixture_advancement_edges'::regclass ); IF retired_row_seals <> 5 THEN RAISE EXCEPTION 'CANONICAL_GAME_GUARD_ROW_SEAL_INCOMPLETE count=%', retired_row_seals USING ERRCODE = '55000'; END IF; ALTER TABLE \"v1_games\" ADD CONSTRAINT \"v1_games_canonical_source_guard_ck\" CHECK (\"source_type\"::text <> 'TOURNAMENT_FIXTURE' AND \"tournament_fixture_id\" IS NULL) NOT VALID; ALTER TABLE \"v1_tournament_staff_fixture_scopes\" ADD CONSTRAINT \"v1_staff_scope_canonical_source_guard_ck\" CHECK (\"fixture_id\" IS NULL AND \"team_match_id\" IS NOT NULL) NOT VALID; ALTER TABLE \"v1_operation_audits\" ADD CONSTRAINT \"v1_operation_audits_canonical_source_guard_ck\" CHECK (\"fixture_id\" IS NULL) NOT VALID; ALTER TABLE \"v1_games\" VALIDATE CONSTRAINT \"v1_games_canonical_source_guard_ck\"; ALTER TABLE \"v1_tournament_staff_fixture_scopes\" VALIDATE CONSTRAINT \"v1_staff_scope_canonical_source_guard_ck\"; ALTER TABLE \"v1_operation_audits\" VALIDATE CONSTRAINT \"v1_operation_audits_canonical_source_guard_ck\"; END $$",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the DO block is the post-cutover seal. It locks all three link tables and five retained fixture tables, requires zero legacy game/staff/audit links, and for nonempty fixture history requires the exact 5 write seals and 3 link seals already committed by the archived cutover. It then installs ALWAYS statement/row/link triggers, adds and validates canonical checks, and verifies five row seals. Any unmet count raises and rolls back M9. Existing evidence shows four preserved fixtures, zero legacy links, and live 5/5/3 plus five row seals; no table or source column is dropped.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260910020000_v1_canonical_game_db_guards/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_guard_game_official_fact_insert() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE revision_row RECORD; source_row RECORD; revision_home JSONB; revision_away JSONB; BEGIN SELECT state, revision, score, events_hash, official_at INTO revision_row FROM \"v1_game_result_revisions\" WHERE game_id = NEW.game_id AND id = NEW.revision_id FOR KEY SHARE; IF NOT FOUND OR revision_row.state IS DISTINCT FROM 'OFFICIAL' OR revision_row.official_at IS NULL THEN RAISE EXCEPTION 'official fact requires an official game revision' USING ERRCODE = '23514'; END IF; SELECT * INTO source_row FROM v1_resolve_canonical_guard_game(NEW.game_id); revision_home := COALESCE(revision_row.score -> 'home', revision_row.score -> 'regulation' -> 'home'); revision_away := COALESCE(revision_row.score -> 'away', revision_row.score -> 'regulation' -> 'away'); IF NEW.revision IS DISTINCT FROM revision_row.revision OR NEW.source_type::text IS DISTINCT FROM 'TEAM_MATCH' OR NEW.tournament_id IS DISTINCT FROM source_row.semantic_tournament_id OR NEW.home_team_id IS DISTINCT FROM source_row.home_team_id OR NEW.away_team_id IS DISTINCT FROM source_row.away_team_id OR NEW.score IS DISTINCT FROM revision_row.score OR NEW.events_hash IS DISTINCT FROM revision_row.events_hash OR NEW.official_at IS DISTINCT FROM revision_row.official_at OR jsonb_typeof(revision_home) IS DISTINCT FROM 'number' OR jsonb_typeof(revision_away) IS DISTINCT FROM 'number' OR NEW.home_score IS DISTINCT FROM (revision_home #>> '{}')::INTEGER OR NEW.away_score IS DISTINCT FROM (revision_away #>> '{}')::INTEGER THEN RAISE EXCEPTION 'official fact must exactly snapshot its official game revision' USING ERRCODE = '23514'; END IF; RETURN NEW; END $$",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the official-fact guard is tightened after the zero-legacy precondition to use the canonical resolver only. It still checks the exact official revision, score shape, events hash, official time, sides, source type, and semantic tournament. M9 is post-cutover under quiescence, so no legacy writer can be broken between guard versions.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260910020000_v1_canonical_game_db_guards/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_guard_game_official_result_cache() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE revision_row RECORD; source_row RECORD; BEGIN SELECT r.game_id, r.revision, r.state, r.events_hash, r.official_at, g.current_official_revision_id INTO revision_row FROM \"v1_game_result_revisions\" r JOIN \"v1_games\" g ON g.id = r.game_id WHERE r.id = NEW.revision_id FOR KEY SHARE OF r, g; IF NOT FOUND OR revision_row.state IS DISTINCT FROM 'OFFICIAL' OR revision_row.official_at IS NULL THEN RAISE EXCEPTION 'public result cache requires an exact official revision snapshot' USING ERRCODE = '23514'; END IF; SELECT * INTO source_row FROM v1_resolve_canonical_guard_game(revision_row.game_id); IF NEW.game_id IS DISTINCT FROM revision_row.game_id OR NEW.revision IS DISTINCT FROM revision_row.revision OR NEW.tournament_id IS DISTINCT FROM source_row.semantic_tournament_id OR NEW.source_hash IS DISTINCT FROM revision_row.events_hash OR (NEW.is_current AND revision_row.current_official_revision_id IS DISTINCT FROM NEW.revision_id) THEN RAISE EXCEPTION 'public result cache requires an exact official revision snapshot' USING ERRCODE = '23514'; END IF; RETURN NEW; END $$",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the official-cache guard is tightened after the locked zero-legacy check to accept only the canonical resolver while preserving official revision, current pointer, events hash, and tournament equality. The replacement commits with the canonical checks and all other M9 guard changes; failure rolls the transaction back.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260910020000_v1_canonical_game_db_guards/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_guard_staff_fixture_scope() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE assignment_tournament TEXT; scope_tournament TEXT; BEGIN IF NEW.fixture_id IS NOT NULL OR NEW.team_match_id IS NULL THEN RAISE EXCEPTION 'staff scope requires a canonical TeamMatch' USING ERRCODE = '23514'; END IF; SELECT tournament_id INTO assignment_tournament FROM \"v1_tournament_staff_assignments\" WHERE id = NEW.assignment_id; SELECT tournament_id INTO scope_tournament FROM \"v1_team_matches\" WHERE id = NEW.team_match_id AND tournament_id = NEW.tournament_id AND deleted_at IS NULL; IF assignment_tournament IS NULL OR scope_tournament IS NULL OR NEW.tournament_id IS DISTINCT FROM assignment_tournament OR scope_tournament IS DISTINCT FROM assignment_tournament THEN RAISE EXCEPTION 'staff scope must stay within tournament' USING ERRCODE = '23514'; END IF; RETURN NEW; END $$",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the staff-scope guard becomes canonical-only only after M9 proves fixture_id is zero across the table while holding a conflicting table lock. It continues to verify assignment, TeamMatch, deletion state, and tournament ownership. Old application writers remain stopped and are not restored after the seal.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260910020000_v1_canonical_game_db_guards/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_block_used_config_mutation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF EXISTS (SELECT 1 FROM \"v1_games\" WHERE competition_config_version_id = OLD.id) OR EXISTS (SELECT 1 FROM \"v1_tournaments\" WHERE competition_config_version_id = OLD.id) OR EXISTS (SELECT 1 FROM \"v1_team_matches\" WHERE competition_config_version_id = OLD.id) THEN RAISE EXCEPTION 'COMPETITION_CONFIG_VERSION_IN_USE' USING ERRCODE = '55000'; END IF; IF TG_OP = 'DELETE' THEN RETURN OLD; END IF; RETURN NEW; END $$",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the config mutation guard is strengthened to consider references from games, tournaments, and TeamMatches. It grants no new mutation path and only blocks additional unsafe updates/deletes. The replacement is transactional with the canonical seal and runs while application writers are quiesced.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260910020000_v1_canonical_game_db_guards/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_reject_operation_audit_mutation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'v1_operation_audits_append_only: mutation is forbidden' USING ERRCODE = '55000'; END $$",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: this removes M7's temporary same-ID audit-binding allowance after the locked cutover precondition proves fixture_id is zero. UPDATE and DELETE become unconditionally forbidden again, preserving immutable history before the candidate runtime starts. The function replacement is transactional with the rest of M9.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260910160000_v1_outbox_cutover_claim_gate/migration.sql",
+    statement: "CREATE TRIGGER v1_guard_outbox_cutover_claim BEFORE UPDATE OF status ON v1_outbox_events FOR EACH ROW EXECUTE FUNCTION v1_guard_outbox_cutover_claim()",
+    reason: "Independent gpt-5.6-sol SQL review on 2026-09-12: the trigger takes the shared counterpart of the cutover advisory lock whenever an outbox row first enters PROCESSING and suppresses the claim if the cutover holds the exclusive lock. The normal API and game worker are already stopped before M10; the trigger protects against an unexpected direct claimant and is installed before the archived cutover begins. Function plus trigger commit atomically, and the committed-error rehearsal preserved the seal/resume state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260904120000_v1_tournament_player_jersey_number/migration.sql",
+    statement: "CREATE UNIQUE INDEX IF NOT EXISTS \"v1_tournament_players_registration_jersey_key\" ON \"v1_tournament_players\" (\"registration_id\", \"jersey_number\") WHERE \"removed_at\" IS NULL AND \"jersey_number\" IS NOT NULL",
+    reason:
+      "Task 167 expand step: add the tournament-roster jersey number. The gate rejects CREATE UNIQUE INDEX as a category because a unique index can fail on existing data and can block writes while it builds -- neither applies here, and the reasons are checkable rather than asserted. (a) It cannot fail on existing data: the column is introduced by the ADD COLUMN statement immediately above in the same file, so every pre-existing row has jersey_number = NULL, and the index is partial on \"jersey_number\" IS NOT NULL -- it indexes zero rows at creation time. (b) It cannot break an old instance mid-rollout: instances running the previous release do not know the column exists, so no write from them can populate it, let alone collide. New instances are the only writers, and they go through the service guard that raises 409 ROSTER_DUPLICATE_JERSEY_NUMBER before insert. (c) Build cost is nil for the same reason as (a) -- zero rows to scan -- so CONCURRENTLY is not used; it cannot run inside the transaction Prisma wraps a migration in, and using it would trade a no-op lock for a non-atomic migration. The scope is deliberate: (registration_id, jersey_number) is per TEAM ENTRY, not per tournament -- two teams in the same tournament both wearing 7 is normal, and a tournament-wide constraint would forbid it. The \"removed_at\" IS NULL predicate keeps a removed player from holding a number hostage for the rest of the tournament. Reviewed 2026-09-04.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903180000_v1_drop_league_tables/migration.sql",
+    statement: "DO $$ DECLARE orphan_fixtures integer; orphan_promotions integer; league_count integer; matched_count integer; BEGIN IF to_regclass('public.v1_leagues') IS NULL THEN RAISE NOTICE 'task164-be5-drop: \ub9ac\uadf8 \ud14c\uc774\ube14\uc774 \uc774\ubbf8 \uc5c6\ub2e4 \u2014 \uac74\ub108\ub6f4\ub2e4'; RETURN; END IF; SELECT count(*) INTO orphan_fixtures FROM v1_team_matches m WHERE m.league_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM v1_tournaments t WHERE t.id = m.league_id); SELECT count(*) INTO orphan_promotions FROM v1_league_promotions p WHERE NOT EXISTS (SELECT 1 FROM v1_tournaments t WHERE t.id = p.from_league_id); SELECT count(*) INTO league_count FROM v1_leagues; SELECT count(*) INTO matched_count FROM v1_leagues l JOIN v1_tournaments t ON t.id = l.id AND t.kind = 'regular_league'; RAISE NOTICE 'task164-be5-drop: leagues=% matched=% orphan_fixtures=% orphan_promotions=%', league_count, matched_count, orphan_fixtures, orphan_promotions; IF orphan_fixtures > 0 OR orphan_promotions > 0 THEN RAISE EXCEPTION 'TASK164_BE5_ORPHAN: \ud1b5\ud569 \ucd95\uc5d0 \ub300\uc751 \ud589\uc774 \uc5c6\ub294 \ucc38\uc870\uac00 \uc788\ub2e4 (\ub300\uc9c4 % \u00b7 \uc2b9\uac15 %) \u2014 \uc7ac\ud0c0\uae43\ud558\uba74 \uadf8 \ud589\ub4e4\uc774 \ub04a\uae34\ub2e4. \uac70\uc6b8 \ubc31\ud544\uc744 \uba3c\uc800 \ud655\uc778\ud558\ub77c.', orphan_fixtures, orphan_promotions; END IF; IF matched_count <> league_count THEN RAISE EXCEPTION 'TASK164_BE5_MIRROR_MISSING: 리그 % 건 중 통합 축 대응 행이 있는 것이 % 건뿐이다 — 나머지는 DROP 하면 사라진다. 거울 백필을 먼저 돌려라.', league_count, matched_count; END IF; END $$",
+    reason:
+      "Contract half of Task 164 BE-5: leagues moved onto the unified competition axis (V1Tournament kind='regular_league' + V1TournamentRegistration). The rewiring release moved every READ; earlier commits in this release moved the dual-write writes and the alpha QA seed. No code touches v1_leagues / v1_league_teams any more (surface gate: v1League writes 0 against baseline 0, and that gate is bidirectional). Mirror rows carry the SAME id as their league, so the FK retarget needs no data backfill -- and the migration proves that for the database it is running against instead of assuming it. Alpha measurement 2026-09-03 (read-only): leagues 89 / same-id mirrors 89 / orphan fixtures 0 / orphan promotions 0 / league_teams 215 / confirmed registrations 211 -- the 4-row gap is handled by the backfill step below. Every statement is guarded so a hand re-run is a no-op (measured: run 1 inserts 4 and drops, run 2 exits 0 changing nothing). The self-check, which is read-only and aborts the whole transaction on either of two failures. (a) Orphans: fixtures and promotions whose league id has no row in v1_tournaments -- retargeting the FK would sever them. (b) Mirror-missing: leagues with no same-id row on the unified axis. This second one is NOT covered by (a): the orphan counts only see leagues that some fixture or promotion points at, so a league with no fixtures passes (a) while having no mirror at all -- and DROPping the table would erase that league outright, since nothing else holds it. Measured locally 2026-09-04 on a migrated copy of the alpha shape: with one mirror-less, fixture-less league present the migration exits non-zero with TASK164_BE5_MIRROR_MISSING and leaves v1_leagues and both FKs untouched; with it removed the same file runs to completion (2 DROP TABLE + 1 DROP TYPE). Without the self-check a violated assumption surfaces as an opaque FK violation halfway through, or as silent data loss. Reviewed 2026-09-04.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903180000_v1_drop_league_tables/migration.sql",
+    statement: "DO $$ DECLARE inserted_count bigint; still_missing bigint; BEGIN IF to_regclass('public.v1_leagues') IS NULL THEN RAISE NOTICE 'task164-be5-drop: \ub9ac\uadf8 \ud14c\uc774\ube14\uc774 \uc774\ubbf8 \uc5c6\ub2e4 \u2014 \uac74\ub108\ub6f4\ub2e4'; RETURN; END IF; INSERT INTO v1_tournament_registrations (id, tournament_id, team_id, applied_by_user_id, status, entry_source, confirmed_at, created_at, updated_at) SELECT gen_random_uuid(), lt.league_id, lt.team_id, tm.owner_user_id, 'confirmed'::\"V1TournamentRegistrationStatus\", 'seeded'::\"V1CompetitionEntrySource\", lt.created_at, lt.created_at, CURRENT_TIMESTAMP FROM v1_league_teams lt JOIN v1_teams tm ON tm.id = lt.team_id WHERE NOT EXISTS ( SELECT 1 FROM v1_tournament_registrations r WHERE r.tournament_id = lt.league_id AND r.team_id = lt.team_id ); GET DIAGNOSTICS inserted_count = ROW_COUNT; RAISE NOTICE 'task164-be5-drop: \ub4f1\ub85d \uc5c6\ub294 \ub85c\uc2a4\ud130 % \ud589\uc744 confirmed \ub4f1\ub85d\uc73c\ub85c \ud761\uc218\ud588\ub2e4', inserted_count; SELECT count(*) INTO still_missing FROM v1_league_teams lt WHERE NOT EXISTS ( SELECT 1 FROM v1_tournament_registrations r WHERE r.tournament_id = lt.league_id AND r.team_id = lt.team_id AND r.status = 'confirmed' ); IF still_missing > 0 THEN RAISE EXCEPTION 'TASK164_BE5_ROSTER_UNMIGRATED: confirmed \ub4f1\ub85d\uc774 \uc5c6\ub294 \ub85c\uc2a4\ud130\uac00 \uc544\uc9c1 % \ud589 \uc788\ub2e4 \u2014 \uadf8\ub300\ub85c DROP \ud558\uba74 \uadf8 \ud300\ub4e4\uc758 \ucc38\uac00 \uc0ac\uc2e4\uc774 \uc0ac\ub77c\uc9c4\ub2e4.', still_missing; END IF; END $$",
+    reason:
+      "Contract half of Task 164 BE-5: leagues moved onto the unified competition axis (V1Tournament kind='regular_league' + V1TournamentRegistration). The rewiring release moved every READ; earlier commits in this release moved the dual-write writes and the alpha QA seed. No code touches v1_leagues / v1_league_teams any more (surface gate: v1League writes 0 against baseline 0, and that gate is bidirectional). Mirror rows carry the SAME id as their league, so the FK retarget needs no data backfill -- and the migration proves that for the database it is running against instead of assuming it. Alpha measurement 2026-09-03 (read-only): leagues 89 / same-id mirrors 89 / orphan fixtures 0 / orphan promotions 0 / league_teams 215 / confirmed registrations 211 -- the 4-row gap is handled by the backfill step below. Every statement is guarded so a hand re-run is a no-op (measured: run 1 inserts 4 and drops, run 2 exits 0 changing nothing). The roster backfill. Alpha has 4 v1_league_teams rows with no matching registration: one league created 2026-09-02 12:18 got its teams through the old create path (`teams: { createMany }`), which wrote the roster but no registration -- all five roster paths only started writing registrations on 2026-09-03 04:33, and the 08-31 backfill ran before that league existed. Dropping those rows as-is would erase four teams' participation. This INSERT absorbs them in the SAME shape the 08-31 backfill used (applied_by = team owner, entry_source='seeded', status='confirmed', created_at/confirmed_at from the roster row so the two axes' timestamps do not diverge -- fixture generation order depends on it), with no eligibility gate (they were already on the roster; filtering now would erase participation). It then re-counts and RAISE EXCEPTIONs if any roster row is still without a confirmed registration -- that happens when a CANCELLED registration already occupies the (tournament, team) unique key, which a human must decide about. The gate rejects INSERT..SELECT as a category because it cannot prove additivity; this one only adds rows for pairs that have none. Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903180000_v1_drop_league_tables/migration.sql",
+    statement: "DO $$ BEGIN IF (SELECT confrelid::regclass::text FROM pg_constraint WHERE conname = 'v1_team_matches_league_fk') IS DISTINCT FROM 'v1_tournaments' THEN EXECUTE 'ALTER TABLE \"v1_team_matches\" DROP CONSTRAINT IF EXISTS \"v1_team_matches_league_fk\"'; EXECUTE 'ALTER TABLE \"v1_team_matches\" ADD CONSTRAINT \"v1_team_matches_league_fk\" FOREIGN KEY (\"league_id\") REFERENCES \"v1_tournaments\"(\"id\") ON DELETE SET NULL ON UPDATE CASCADE'; END IF; IF (SELECT confrelid::regclass::text FROM pg_constraint WHERE conname = 'v1_league_promotions_league_fk') IS DISTINCT FROM 'v1_tournaments' THEN EXECUTE 'ALTER TABLE \"v1_league_promotions\" DROP CONSTRAINT IF EXISTS \"v1_league_promotions_league_fk\"'; EXECUTE 'ALTER TABLE \"v1_league_promotions\" ADD CONSTRAINT \"v1_league_promotions_league_fk\" FOREIGN KEY (\"from_league_id\") REFERENCES \"v1_tournaments\"(\"id\") ON DELETE CASCADE ON UPDATE CASCADE'; END IF; END $$",
+    reason:
+      "Contract half of Task 164 BE-5: leagues moved onto the unified competition axis (V1Tournament kind='regular_league' + V1TournamentRegistration). The rewiring release moved every READ; earlier commits in this release moved the dual-write writes and the alpha QA seed. No code touches v1_leagues / v1_league_teams any more (surface gate: v1League writes 0 against baseline 0, and that gate is bidirectional). Mirror rows carry the SAME id as their league, so the FK retarget needs no data backfill -- and the migration proves that for the database it is running against instead of assuming it. Alpha measurement 2026-09-03 (read-only): leagues 89 / same-id mirrors 89 / orphan fixtures 0 / orphan promotions 0 / league_teams 215 / confirmed registrations 211 -- the 4-row gap is handled by the backfill step below. Every statement is guarded so a hand re-run is a no-op (measured: run 1 inserts 4 and drops, run 2 exits 0 changing nothing). FK retarget for both league-referencing tables, guarded on the constraint not already pointing at v1_tournaments. Column values are untouched (same ids). ON DELETE semantics are preserved exactly: SET NULL for fixtures (a league disappearing must not take its fixtures with it) and CASCADE for promotions (a promotion record is meaningless without its league). Both run inside one transaction, so the instant where a constraint is dropped is not observable. Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903180000_v1_drop_league_tables/migration.sql",
+    statement: "DROP TABLE IF EXISTS \"v1_league_teams\"",
+    reason:
+      "Contract half of Task 164 BE-5: leagues moved onto the unified competition axis (V1Tournament kind='regular_league' + V1TournamentRegistration). The rewiring release moved every READ; earlier commits in this release moved the dual-write writes and the alpha QA seed. No code touches v1_leagues / v1_league_teams any more (surface gate: v1League writes 0 against baseline 0, and that gate is bidirectional). Mirror rows carry the SAME id as their league, so the FK retarget needs no data backfill -- and the migration proves that for the database it is running against instead of assuming it. Alpha measurement 2026-09-03 (read-only): leagues 89 / same-id mirrors 89 / orphan fixtures 0 / orphan promotions 0 / league_teams 215 / confirmed registrations 211 -- the 4-row gap is handled by the backfill step below. Every statement is guarded so a hand re-run is a no-op (measured: run 1 inserts 4 and drops, run 2 exits 0 changing nothing). Drops v1_league_teams. Its contents live in V1TournamentRegistration rows with status='confirmed' -- established by the 08-31 backfill, maintained by every write path since, and completed for the remaining 4 rows by the backfill step above (which fails the migration if any row is still unmigrated). Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903180000_v1_drop_league_tables/migration.sql",
+    statement: "DROP TABLE IF EXISTS \"v1_leagues\"",
+    reason:
+      "Contract half of Task 164 BE-5: leagues moved onto the unified competition axis (V1Tournament kind='regular_league' + V1TournamentRegistration). The rewiring release moved every READ; earlier commits in this release moved the dual-write writes and the alpha QA seed. No code touches v1_leagues / v1_league_teams any more (surface gate: v1League writes 0 against baseline 0, and that gate is bidirectional). Mirror rows carry the SAME id as their league, so the FK retarget needs no data backfill -- and the migration proves that for the database it is running against instead of assuming it. Alpha measurement 2026-09-03 (read-only): leagues 89 / same-id mirrors 89 / orphan fixtures 0 / orphan promotions 0 / league_teams 215 / confirmed registrations 211 -- the 4-row gap is handled by the backfill step below. Every statement is guarded so a hand re-run is a no-op (measured: run 1 inserts 4 and drops, run 2 exits 0 changing nothing). Drops v1_leagues. Every league row has a same-id mirror in v1_tournaments (the self-check proves it at deploy time), and both FKs that pointed here were retargeted earlier in this migration. Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903180000_v1_drop_league_tables/migration.sql",
+    statement: "DROP TYPE IF EXISTS \"V1LeagueState\"",
+    reason:
+      "Contract half of Task 164 BE-5: leagues moved onto the unified competition axis (V1Tournament kind='regular_league' + V1TournamentRegistration). The rewiring release moved every READ; earlier commits in this release moved the dual-write writes and the alpha QA seed. No code touches v1_leagues / v1_league_teams any more (surface gate: v1League writes 0 against baseline 0, and that gate is bidirectional). Mirror rows carry the SAME id as their league, so the FK retarget needs no data backfill -- and the migration proves that for the database it is running against instead of assuming it. Alpha measurement 2026-09-03 (read-only): leagues 89 / same-id mirrors 89 / orphan fixtures 0 / orphan promotions 0 / league_teams 215 / confirmed registrations 211 -- the 4-row gap is handled by the backfill step below. Every statement is guarded so a hand re-run is a no-op (measured: run 1 inserts 4 and drops, run 2 exits 0 changing nothing). Drops the V1LeagueState enum, which existed only for the column on the table dropped one statement earlier. The response vocabulary draft/active/completed survives as a hand-written union in league-state.ts; storage is V1TournamentStatus and LEAGUE_STATE_BY_STATUS maps between them. Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903150000_v1_result_revision_drop_review_states/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_block_terminal_revision_mutation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF TG_OP = 'DELETE' THEN IF OLD.state IN ('CHANGE_REQUESTED','OFFICIAL','VOID') THEN RAISE EXCEPTION 'terminal result revisions are immutable' USING ERRCODE = '55000'; END IF; RETURN OLD; END IF; IF OLD.state IN ('CHANGE_REQUESTED','OFFICIAL','VOID') AND NEW IS DISTINCT FROM OLD THEN RAISE EXCEPTION 'terminal result revisions are immutable' USING ERRCODE = '55000'; END IF; IF OLD.state <> 'DRAFT' AND (NEW.game_id IS DISTINCT FROM OLD.game_id OR NEW.revision IS DISTINCT FROM OLD.revision OR NEW.score IS DISTINCT FROM OLD.score OR NEW.events_hash IS DISTINCT FROM OLD.events_hash OR NEW.missing_scorer IS DISTINCT FROM OLD.missing_scorer OR NEW.mvp_participant_id IS DISTINCT FROM OLD.mvp_participant_id OR NEW.reason IS DISTINCT FROM OLD.reason OR NEW.created_by_actor_type IS DISTINCT FROM OLD.created_by_actor_type OR NEW.created_by_user_id IS DISTINCT FROM OLD.created_by_user_id OR NEW.created_by_system_actor IS DISTINCT FROM OLD.created_by_system_actor OR NEW.supersedes_id IS DISTINCT FROM OLD.supersedes_id OR NEW.created_at IS DISTINCT FROM OLD.created_at) THEN RAISE EXCEPTION 'submitted result content is frozen' USING ERRCODE = '55000'; END IF; RETURN NEW; END $$",
+    reason:
+      "Contract half of Task 166's removal of the REJECTED / SUPPLEMENT_REQUESTED result-revision states. Rewrites the immutability trigger function with the new 3-value terminal list. The DISABLE/ENABLE pair earlier in this migration only stops the trigger from FIRING; the function body still names the removed values as string literals, so leaving it alone would make the next UPDATE on this table raise 'invalid input value for enum'. CREATE OR REPLACE keeps the same trigger wiring, and the new list is exactly the old one minus the two removed values -- nothing that was mutable becomes immutable or vice versa. Alpha measurement 2026-09-03: 1 SUPPLEMENT_REQUESTED row (revivable=false, so it moves to CHANGE_REQUESTED), 0 REJECTED. Reviewed 2026-09-04.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903150000_v1_result_revision_drop_review_states/migration.sql",
+    statement: "CREATE TEMP TABLE task166_contract_targets AS SELECT r.id, r.state::text AS old_state, ( g.current_official_revision_id IS NULL AND NOT EXISTS (SELECT 1 FROM v1_game_result_revisions s WHERE s.supersedes_id = r.id) AND r.revision = (SELECT MAX(x.revision) FROM v1_game_result_revisions x WHERE x.game_id = r.game_id) ) AS revivable FROM v1_game_result_revisions r JOIN v1_games g ON g.id = r.game_id WHERE r.state::text IN ('REJECTED', 'SUPPLEMENT_REQUESTED')",
+    reason:
+      "This is the contract half of Task 166's two-release removal of the REJECTED and SUPPLEMENT_REQUESTED result-revision states. The expand half (no code can produce either state any more) is already deployed on dev/alpha; this release moves the rows that are still stored in those states and then narrows the enum. Because it narrows an enum, the release order matters: deploy-alpha.sh runs prisma migrate deploy BEFORE it recreates containers, so an OLD container that still wrote 'REJECTED' would fail for that span. Verified on dev before writing this: Prisma code writing either value: 0; the only remaining readers were doc comments, removed in this same release. The migration is re-runnable by hand -- statements compare state::text and the type swap is guarded on the enum label still existing, so a second run reports 0 rows and changes nothing (measured locally on a seeded database: run 1 moved 4 rows, run 2 moved 0 and left every row unchanged). Creates a SESSION-LOCAL temporary table holding the rows this migration will move and, for each, which of the two destinations it belongs to. The gate rejects CREATE TEMP TABLE AS SELECT because it cannot prove additivity, but a TEMP table exists only inside this migration's own session and is dropped a few statements later -- no running instance can see it and no persistent schema changes. Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903150000_v1_result_revision_drop_review_states/migration.sql",
+    statement: "DO $$ DECLARE rejected_count integer; supplement_count integer; revivable_count integer; frozen_count integer; BEGIN SELECT count(*) FILTER (WHERE old_state = 'REJECTED'), count(*) FILTER (WHERE old_state = 'SUPPLEMENT_REQUESTED'), count(*) FILTER (WHERE revivable), count(*) FILTER (WHERE NOT revivable) INTO rejected_count, supplement_count, revivable_count, frozen_count FROM task166_contract_targets; RAISE NOTICE 'task166-contract: REJECTED=% SUPPLEMENT_REQUESTED=% | -> SUBMITTED=% -> CHANGE_REQUESTED=%', rejected_count, supplement_count, revivable_count, frozen_count; END $$",
+    reason:
+      "This is the contract half of Task 166's two-release removal of the REJECTED and SUPPLEMENT_REQUESTED result-revision states. The expand half (no code can produce either state any more) is already deployed on dev/alpha; this release moves the rows that are still stored in those states and then narrows the enum. Because it narrows an enum, the release order matters: deploy-alpha.sh runs prisma migrate deploy BEFORE it recreates containers, so an OLD container that still wrote 'REJECTED' would fail for that span. Verified on dev before writing this: Prisma code writing either value: 0; the only remaining readers were doc comments, removed in this same release. The migration is re-runnable by hand -- statements compare state::text and the type swap is guarded on the enum label still existing, so a second run reports 0 rows and changes nothing (measured locally on a seeded database: run 1 moved 4 rows, run 2 moved 0 and left every row unchanged). Read-only accounting: counts the rows about to move, split by destination, and RAISE NOTICEs them into the migration log. Nothing is written. This exists because the original REJECTED / SUPPLEMENT_REQUESTED distinction cannot be recovered after the UPDATE, so the counts have to be captured before it. Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903150000_v1_result_revision_drop_review_states/migration.sql",
+    statement: "ALTER TABLE v1_game_result_revisions DISABLE TRIGGER v1_block_terminal_revision_mutation",
+    reason:
+      "This is the contract half of Task 166's two-release removal of the REJECTED and SUPPLEMENT_REQUESTED result-revision states. The expand half (no code can produce either state any more) is already deployed on dev/alpha; this release moves the rows that are still stored in those states and then narrows the enum. Because it narrows an enum, the release order matters: deploy-alpha.sh runs prisma migrate deploy BEFORE it recreates containers, so an OLD container that still wrote 'REJECTED' would fail for that span. Verified on dev before writing this: Prisma code writing either value: 0; the only remaining readers were doc comments, removed in this same release. The migration is re-runnable by hand -- statements compare state::text and the type swap is guarded on the enum label still existing, so a second run reports 0 rows and changes nothing (measured locally on a seeded database: run 1 moved 4 rows, run 2 moved 0 and left every row unchanged). Disables the v1_block_terminal_revision_mutation trigger for the length of this migration. That trigger enforces 'terminal revisions are immutable' and lists REJECTED / SUPPLEMENT_REQUESTED among the terminal states, so it would block this migration's own UPDATE. It is re-enabled three statements later, in this same transaction -- no window exists where a concurrent writer could bypass it. Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903150000_v1_result_revision_drop_review_states/migration.sql",
+    statement: "UPDATE v1_game_result_revisions r SET state = CASE WHEN t.revivable THEN 'SUBMITTED'::\"V1GameResultRevisionState\" ELSE 'CHANGE_REQUESTED'::\"V1GameResultRevisionState\" END FROM task166_contract_targets t WHERE t.id = r.id",
+    reason:
+      "This is the contract half of Task 166's two-release removal of the REJECTED and SUPPLEMENT_REQUESTED result-revision states. The expand half (no code can produce either state any more) is already deployed on dev/alpha; this release moves the rows that are still stored in those states and then narrows the enum. Because it narrows an enum, the release order matters: deploy-alpha.sh runs prisma migrate deploy BEFORE it recreates containers, so an OLD container that still wrote 'REJECTED' would fail for that span. Verified on dev before writing this: Prisma code writing either value: 0; the only remaining readers were doc comments, removed in this same release. The migration is re-runnable by hand -- statements compare state::text and the type swap is guarded on the enum label still existing, so a second run reports 0 rows and changes nothing (measured locally on a seeded database: run 1 moved 4 rows, run 2 moved 0 and left every row unchanged). The data move itself. It sends each stored row to one of TWO destinations, because sending them all one way breaks in two different directions: everything to CHANGE_REQUESTED strands the fixture (CHANGE_REQUESTED is terminal and every tournament-lane rewrite path is closed to it), while everything to SUBMITTED lets an un-superseded old row be officialized over a game that already has an official result. So a row becomes SUBMITTED only when all three hold -- the game has no current official revision, no newer revision supersedes it, and it is that game's latest revision -- and CHANGE_REQUESTED otherwise. The gate rejects UPDATE as a category because it cannot prove additivity; this one is measured instead (see the two-run evidence above). Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903150000_v1_result_revision_drop_review_states/migration.sql",
+    statement: "ALTER TABLE v1_game_result_revisions ENABLE TRIGGER v1_block_terminal_revision_mutation",
+    reason:
+      "This is the contract half of Task 166's two-release removal of the REJECTED and SUPPLEMENT_REQUESTED result-revision states. The expand half (no code can produce either state any more) is already deployed on dev/alpha; this release moves the rows that are still stored in those states and then narrows the enum. Because it narrows an enum, the release order matters: deploy-alpha.sh runs prisma migrate deploy BEFORE it recreates containers, so an OLD container that still wrote 'REJECTED' would fail for that span. Verified on dev before writing this: Prisma code writing either value: 0; the only remaining readers were doc comments, removed in this same release. The migration is re-runnable by hand -- statements compare state::text and the type swap is guarded on the enum label still existing, so a second run reports 0 rows and changes nothing (measured locally on a seeded database: run 1 moved 4 rows, run 2 moved 0 and left every row unchanged). Re-enables the immutability trigger disabled three statements earlier. This RESTORES a protection rather than relaxing one. Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903150000_v1_result_revision_drop_review_states/migration.sql",
+    statement: "DROP TABLE task166_contract_targets",
+    reason:
+      "This is the contract half of Task 166's two-release removal of the REJECTED and SUPPLEMENT_REQUESTED result-revision states. The expand half (no code can produce either state any more) is already deployed on dev/alpha; this release moves the rows that are still stored in those states and then narrows the enum. Because it narrows an enum, the release order matters: deploy-alpha.sh runs prisma migrate deploy BEFORE it recreates containers, so an OLD container that still wrote 'REJECTED' would fail for that span. Verified on dev before writing this: Prisma code writing either value: 0; the only remaining readers were doc comments, removed in this same release. The migration is re-runnable by hand -- statements compare state::text and the type swap is guarded on the enum label still existing, so a second run reports 0 rows and changes nothing (measured locally on a seeded database: run 1 moved 4 rows, run 2 moved 0 and left every row unchanged). Drops the session-local temporary table created at the top of this migration. It never existed outside this session, so nothing can be reading it. Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903150000_v1_result_revision_drop_review_states/migration.sql",
+    statement: "DO $$ BEGIN IF NOT EXISTS ( SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid WHERE t.typname = 'V1GameResultRevisionState' AND e.enumlabel = 'REJECTED' ) THEN RAISE NOTICE 'task166-contract: enum \uc774 \uc774\ubbf8 5\uac12\uc774\ub77c \ud0c0\uc785 \uad50\uccb4\ub97c \uac74\ub108\ub6f4\ub2e4'; RETURN; END IF; EXECUTE 'ALTER TYPE \"V1GameResultRevisionState\" RENAME TO \"V1GameResultRevisionState_old\"'; EXECUTE 'CREATE TYPE \"V1GameResultRevisionState\" AS ENUM (''DRAFT'', ''SUBMITTED'', ''CHANGE_REQUESTED'', ''OFFICIAL'', ''VOID'')'; EXECUTE 'ALTER TABLE v1_game_result_revisions ALTER COLUMN state DROP DEFAULT'; EXECUTE 'ALTER TABLE v1_game_result_revisions ALTER COLUMN state TYPE \"V1GameResultRevisionState\" USING state::text::\"V1GameResultRevisionState\"'; EXECUTE 'ALTER TABLE v1_game_result_revisions ALTER COLUMN state SET DEFAULT ''DRAFT''::\"V1GameResultRevisionState\"'; EXECUTE 'DROP TYPE \"V1GameResultRevisionState_old\"'; END $$",
+    reason:
+      "This is the contract half of Task 166's two-release removal of the REJECTED and SUPPLEMENT_REQUESTED result-revision states. The expand half (no code can produce either state any more) is already deployed on dev/alpha; this release moves the rows that are still stored in those states and then narrows the enum. Because it narrows an enum, the release order matters: deploy-alpha.sh runs prisma migrate deploy BEFORE it recreates containers, so an OLD container that still wrote 'REJECTED' would fail for that span. Verified on dev before writing this: Prisma code writing either value: 0; the only remaining readers were doc comments, removed in this same release. The migration is re-runnable by hand -- statements compare state::text and the type swap is guarded on the enum label still existing, so a second run reports 0 rows and changes nothing (measured locally on a seeded database: run 1 moved 4 rows, run 2 moved 0 and left every row unchanged). The enum narrowing, wrapped in a guard so a hand re-run skips it: renames the old type, creates the 5-value type, drops the column default (Postgres refuses the cast while a default is attached), casts the column, re-attaches the default, drops the old type. This is the statement the release-order note above is about -- it must land only after every old instance is down. Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903150000_v1_result_revision_drop_review_states/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_block_terminal_revision_mutation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF TG_OP = 'DELETE' THEN IF OLD.state IN ('CHANGE_REQUESTED','OFFICIAL','VOID') THEN RAISE EXCEPTION 'terminal result revisions are immutable' USING ERRCODE = '55000'; END IF; RETURN OLD; END IF; IF OLD.state IN ('CHANGE_REQUESTED','OFFICIAL','VOID') AND NEW IS DISTINCT FROM OLD THEN RAISE EXCEPTION 'terminal result revisions are immutable' USING ERRCODE = '55000'; END IF; IF OLD.state <> 'DRAFT' AND (NEW.game_id IS DISTINCT FROM OLD.game_id OR NEW.revision IS DISTINCT FROM OLD.revision OR NEW.score IS DISTINCT FROM OLD.score OR NEW.events_hash IS DISTINCT FROM OLD.events_hash OR NEW.missing_scorer IS DISTINCT FROM OLD.missing_scorer OR NEW.mvp_participant_id IS DISTINCT FROM OLD.mvp_participant_id OR NEW.reason IS DISTINCT FROM OLD.reason OR NEW.created_by_actor_type IS DISTINCT FROM OLD.created_by_actor_type OR NEW.created_by_user_id IS DISTINCT FROM OLD.created_by_user_id OR NEW.created_by_system_actor IS DISTINCT FROM OLD.created_by_system_actor OR NEW.supersedes_id IS DISTINCT FROM OLD.supersedes_id OR NEW.created_at IS DISTINCT FROM OLD.created_at) THEN RAISE EXCEPTION 'submitted result content is frozen' USING ERRCODE = '55000'; END IF; RETURN NEW; END $$",
+    reason:
+      "This is the contract half of Task 166's two-release removal of the REJECTED and SUPPLEMENT_REQUESTED result-revision states. The expand half (no code can produce either state any more) is already deployed on dev/alpha; this release moves the rows that are still stored in those states and then narrows the enum. Because it narrows an enum, the release order matters: deploy-alpha.sh runs prisma migrate deploy BEFORE it recreates containers, so an OLD container that still wrote 'REJECTED' would fail for that span. Verified on dev before writing this: Prisma code writing either value: 0; the only remaining readers were doc comments, removed in this same release. The migration is re-runnable by hand -- statements compare state::text and the type swap is guarded on the enum label still existing, so a second run reports 0 rows and changes nothing (measured locally on a seeded database: run 1 moved 4 rows, run 2 moved 0 and left every row unchanged). Rewrites the immutability trigger function with the new 3-value terminal list. The DISABLE/ENABLE pair only stops the trigger from FIRING; the function body still names REJECTED and SUPPLEMENT_REQUESTED as string literals, so leaving it alone would make the next UPDATE on this table raise 'invalid input value for enum'. CREATE OR REPLACE keeps the same trigger wiring. Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903170000_v1_drop_league_match_disputes/migration.sql",
+    statement: "DO $$ DECLARE dispute_count bigint; BEGIN IF to_regclass('public.v1_league_match_disputes') IS NULL THEN RAISE NOTICE 'task166-dispute-drop: \ud14c\uc774\ube14\uc774 \uc774\ubbf8 \uc5c6\ub2e4 \u2014 \uac74\ub108\ub6f4\ub2e4'; RETURN; END IF; EXECUTE 'SELECT count(*) FROM v1_league_match_disputes' INTO dispute_count; RAISE NOTICE 'task166-dispute-drop: v1_league_match_disputes \ud589 \uc218 = %', dispute_count; END $$",
+    reason:
+      "This is the contract half of Task 166's removal of the league result-dispute path. The canonical flow doc settled on \"submit the result, an admin confirms it -- one step, no disputes\", and the expand half (PR #999) already removed the API routes, services, screens and notifications; it is deployed on dev/alpha. What remains is this table and its two enums, which NO code reads or writes: `git grep -i LeagueMatchDispute -- apps` returns only the schema definition, the old migration that created the table, and comments. That is why dropping here cannot trip a running instance even though prisma migrate deploy runs BEFORE containers are recreated -- the old containers do not touch it either. Every statement is `IF EXISTS`, so a hand re-run is a no-op (measured locally: run 1 reported 3 rows and dropped everything, run 2 reported \"already gone\" and changed nothing). Read-only accounting: counts the rows about to be destroyed and RAISE NOTICEs the number into the migration log, then returns early if the table is already gone. Nothing is written. This exists because the rows cannot be recovered after the DROP, so the count has to be captured before it -- the approval request and the after-the-fact reconciliation both hang on that number. Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903170000_v1_drop_league_match_disputes/migration.sql",
+    statement: "DROP TABLE IF EXISTS \"v1_league_match_disputes\"",
+    reason:
+      "This is the contract half of Task 166's removal of the league result-dispute path. The canonical flow doc settled on \"submit the result, an admin confirms it -- one step, no disputes\", and the expand half (PR #999) already removed the API routes, services, screens and notifications; it is deployed on dev/alpha. What remains is this table and its two enums, which NO code reads or writes: `git grep -i LeagueMatchDispute -- apps` returns only the schema definition, the old migration that created the table, and comments. That is why dropping here cannot trip a running instance even though prisma migrate deploy runs BEFORE containers are recreated -- the old containers do not touch it either. Every statement is `IF EXISTS`, so a hand re-run is a no-op (measured locally: run 1 reported 3 rows and dropped everything, run 2 reported \"already gone\" and changed nothing). Drops the table itself. The gate rejects DROP as a category because destroying data is never provably additive, which is right -- and here the justification is the grep above plus the captured row count. The table has no FK relations in either direction (its reference columns are deliberately plain strings, audit-ledger style), so dropping it leaves every other model untouched. Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903170000_v1_drop_league_match_disputes/migration.sql",
+    statement: "DROP TYPE IF EXISTS \"V1LeagueMatchDisputeStatus\"",
+    reason:
+      "This is the contract half of Task 166's removal of the league result-dispute path. The canonical flow doc settled on \"submit the result, an admin confirms it -- one step, no disputes\", and the expand half (PR #999) already removed the API routes, services, screens and notifications; it is deployed on dev/alpha. What remains is this table and its two enums, which NO code reads or writes: `git grep -i LeagueMatchDispute -- apps` returns only the schema definition, the old migration that created the table, and comments. That is why dropping here cannot trip a running instance even though prisma migrate deploy runs BEFORE containers are recreated -- the old containers do not touch it either. Every statement is `IF EXISTS`, so a hand re-run is a no-op (measured locally: run 1 reported 3 rows and dropped everything, run 2 reported \"already gone\" and changed nothing). Drops the `V1LeagueMatchDisputeStatus` enum type, which existed only for the column dropped one statement earlier. A type with no remaining column cannot be read by anything. Reviewed 2026-09-03.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260903170000_v1_drop_league_match_disputes/migration.sql",
+    statement: "DROP TYPE IF EXISTS \"V1LeagueMatchDisputeResolution\"",
+    reason:
+      "This is the contract half of Task 166's removal of the league result-dispute path. The canonical flow doc settled on \"submit the result, an admin confirms it -- one step, no disputes\", and the expand half (PR #999) already removed the API routes, services, screens and notifications; it is deployed on dev/alpha. What remains is this table and its two enums, which NO code reads or writes: `git grep -i LeagueMatchDispute -- apps` returns only the schema definition, the old migration that created the table, and comments. That is why dropping here cannot trip a running instance even though prisma migrate deploy runs BEFORE containers are recreated -- the old containers do not touch it either. Every statement is `IF EXISTS`, so a hand re-run is a no-op (measured locally: run 1 reported 3 rows and dropped everything, run 2 reported \"already gone\" and changed nothing). Drops the `V1LeagueMatchDisputeResolution` enum type -- same reasoning as the status enum above: its only column went with the table. Reviewed 2026-09-03.",
+  },
+  // --- team contact rooms: archive ended (2026-09-03) ------------------------
+  {
+    file: "apps/v1_api/prisma/migrations/20260903000000_v1_team_contact_rooms_archive_ended/migration.sql",
+    statement:
+      "UPDATE \"v1_chat_rooms\" AS room SET \"status\" = 'archived' FROM \"v1_team_contacts\" AS contact WHERE contact.\"id\" = room.\"team_contact_id\" AND room.\"status\" = 'active' AND contact.\"status\" IN ('declined', 'withdrawn', 'expired')",
+    reason:
+      "Follow-up to PR #977 (team contact -> chat absorption). One-shot data cleanup: marks v1_chat_rooms.status='archived' for rooms whose team contact already ended (declined/withdrawn/expired). Idempotent (WHERE room.status='active'). Rolling-deploy safe both ways: the old app still serves archived rooms via GET /chat/rooms/:id and /messages (only the default list hides them; sendMessage on a non-active room already returned 409 before this change), and the new app performs the same transition itself on decline/withdraw/expiry, so a rollback leaves nothing inconsistent. No schema change. Reviewed 2026-09-03.",
+  },
+  // --- team contact rooms backfill (PR #977, 2026-09-02) ---------------------
+  {
+    file: "apps/v1_api/prisma/migrations/20260902000000_v1_team_contact_rooms_backfill/migration.sql",
+    statement:
+      "UPDATE \"v1_chat_rooms\" AS room SET \"last_message_at\" = latest.\"max_sent_at\", \"updated_at\" = CURRENT_TIMESTAMP FROM ( SELECT \"chat_room_id\", MAX(\"sent_at\") AS \"max_sent_at\" FROM \"v1_chat_messages\" GROUP BY \"chat_room_id\" ) AS latest WHERE latest.\"chat_room_id\" = room.\"id\" AND room.\"team_contact_id\" IS NOT NULL AND (room.\"last_message_at\" IS NULL OR room.\"last_message_at\" < latest.\"max_sent_at\")",
+    reason:
+      "PR #977. Part 4 of 4: moves v1_chat_rooms.last_message_at forward to the room's newest sent_at for contact rooms only, guarded by IS NULL OR < so it never moves backwards and is a no-op on re-run. Ordering-only metadata that both old and new instances read the same way. Reviewed 2026-09-02.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260902000000_v1_team_contact_rooms_backfill/migration.sql",
+    statement:
+      "INSERT INTO \"v1_chat_messages\" (\"id\", \"chat_room_id\", \"sender_user_id\", \"body\", \"status\", \"message_type\", \"sent_at\", \"created_at\", \"updated_at\") SELECT gen_random_uuid()::text, room.\"id\", contact.\"requested_by_user_id\", contact.\"message\", 'sent', 'text', contact.\"created_at\", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM \"v1_team_contacts\" AS contact JOIN \"v1_chat_rooms\" AS room ON room.\"team_contact_id\" = contact.\"id\" WHERE NOT EXISTS ( SELECT 1 FROM \"v1_chat_messages\" AS existing WHERE existing.\"chat_room_id\" = room.\"id\" AND existing.\"sender_user_id\" = contact.\"requested_by_user_id\" AND existing.\"sent_at\" = contact.\"created_at\" )",
+    reason:
+      "PR #977. Part 3 of 4: inserts the original contact request text as the first chat message (sender = requested_by_user_id, sent_at = contact.created_at) only when no such message exists (NOT EXISTS on sender + sent_at). Insert-only; no existing message is modified. Old instances render it as a normal text message. Second run inserts 0 rows (verified). Reviewed 2026-09-02.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260902000000_v1_team_contact_rooms_backfill/migration.sql",
+    statement:
+      "WITH target_participants AS ( SELECT DISTINCT room.\"id\" AS chat_room_id, membership.\"user_id\" AS user_id, contact.\"created_at\" AS visible_from_at FROM \"v1_team_contacts\" AS contact JOIN \"v1_chat_rooms\" AS room ON room.\"team_contact_id\" = contact.\"id\" JOIN \"v1_team_memberships\" AS membership ON membership.\"team_id\" IN (contact.\"from_team_id\", contact.\"to_team_id\") AND membership.\"status\" = 'active' AND membership.\"role\" IN ('owner', 'manager') ) INSERT INTO \"v1_chat_room_participants\" (\"id\", \"chat_room_id\", \"user_id\", \"status\", \"visible_from_at\", \"created_at\", \"updated_at\") SELECT gen_random_uuid()::text, tp.\"chat_room_id\", tp.\"user_id\", 'active', tp.\"visible_from_at\", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP FROM target_participants AS tp ON CONFLICT (\"chat_room_id\", \"user_id\") DO UPDATE SET \"visible_from_at\" = LEAST( COALESCE(\"v1_chat_room_participants\".\"visible_from_at\", EXCLUDED.\"visible_from_at\"), EXCLUDED.\"visible_from_at\" ), \"updated_at\" = CURRENT_TIMESTAMP",
+    reason:
+      "PR #977. Part 2 of 4: adds both teams' active owner/manager memberships as participants of each contact room, deduplicated in a DISTINCT CTE so a person managing both teams cannot make ON CONFLICT DO UPDATE touch the same row twice (SQLSTATE 21000 — reproduced and fixed). Existing participants only have visible_from_at lowered via LEAST(COALESCE(existing, EXCLUDED), EXCLUDED); no participant is removed or demoted. An old instance treats the extra participants like any other member (it already lists them on resolve); on rollback they are inert rows. Idempotent by construction. Reviewed 2026-09-02.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260902000000_v1_team_contact_rooms_backfill/migration.sql",
+    statement:
+      "INSERT INTO \"v1_chat_rooms\" (\"id\", \"team_contact_id\", \"status\", \"created_at\", \"updated_at\") SELECT gen_random_uuid()::text, contact.\"id\", 'active', contact.\"created_at\", CURRENT_TIMESTAMP FROM \"v1_team_contacts\" AS contact LEFT JOIN \"v1_chat_rooms\" AS room ON room.\"team_contact_id\" = contact.\"id\" WHERE room.\"id\" IS NULL AND contact.\"status\" IN ('requested', 'accepted')",
+    reason:
+      "PR #977 (team contact -> chat absorption). Data-only backfill, part 1 of 4: creates one v1_chat_rooms row per pre-existing requested/accepted team contact that has none (LEFT JOIN ... IS NULL), so it is insert-only and idempotent; rows that already have a room are untouched. The new app creates this room at request time; an old app instance ignores the row (its contact detail never resolved a room before accept), so both rolling-deploy directions are safe. The gate rejects INSERT as a category because it cannot PROVE additivity, not because these rows are unsafe. Verified on a throwaway Postgres 16 with the full migration chain replayed, seeded scenarios, and a second run producing 0 new rows. Reviewed 2026-09-02.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260902000000_v1_lineup_bench_to_started/migration.sql',
+    statement:
+      "DO $$ DECLARE bench_rows bigint; not_started_rows bigint; BEGIN SELECT count(*) INTO bench_rows FROM \"v1_game_participants\" WHERE \"position\" = 'BENCH'; SELECT count(*) INTO not_started_rows FROM \"v1_game_participants\" WHERE \"started\" = false; RAISE NOTICE 'task163: position=BENCH rows=%', bench_rows; RAISE NOTICE 'task163: started=false rows=% (overlaps the above)', not_started_rows; END $$",
+    reason:
+      'Task 163 BE-3. Read-only accounting that runs immediately before the repair UPDATE in the same '
+      + 'file: it counts the rows each of the two conditions matches and RAISE NOTICEs them. It writes '
+      + 'nothing — no table, column, index, constraint, or row is created, altered, or deleted — so it is '
+      + 'safe in a rolling deploy in both directions and a rollback leaves no trace of it. The gate rejects '
+      + 'it only because a DO block is not in its provably-additive list, which cannot inspect the body. '
+      + 'It exists because the repair erases its own evidence: after the UPDATE runs, WHERE position = '
+      + "'BENCH' OR started = false matches nothing, so the sizes can no longer be recovered — and this "
+      + 'migration changes alpha production data, where approval and audit need "how many of what". The '
+      + 'two counts overlap (a bench row could also be started=false) and are reported separately rather '
+      + 'than summed, so the numbers are not misread as disjoint. Reviewed 2026-09-02.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260902000000_v1_lineup_bench_to_started/migration.sql',
+    statement:
+      'UPDATE "v1_game_participants" SET "started" = true, "position" = CASE WHEN "position" = \'BENCH\' THEN NULL ELSE "position" END WHERE "started" = false OR "position" = \'BENCH\'',
+    reason:
+      'Task 163 BE-3. Deletes the bench/starter distinction rather than translating it: the canonical '
+      + 'flow (docs/design/competition-canonical-flow.md §3) makes the submitted roster the list of '
+      + 'players who appeared, it fixes BOTH ways a substitute was recorded: team-match lineups wrote `position=\'BENCH\'` and '
+      + 'left started at its true default, while tournament lineups wrote `started=false` from the DTO. '
+      + 'Repairing only the sentinel would leave the tournament rows false and split the official record '
+      + 'by which path saved it. Not additive '
+      + 'because it rewrites two pre-existing columns on pre-existing rows, so it needs review rather than '
+      + 'a rule change — isAdditiveStatement has no data-statement branch and cannot prove any UPDATE safe. '
+      + 'Rolling-deploy safety: benign in this direction. The OLD app reads bench as `position === '
+      + '\'BENCH\'`; after this runs it simply sees those players as starters, which is the state the new '
+      + 'app also reports, so old and new agree during the window. No row is deleted and no old write path '
+      + 'can corrupt the new shape — an old instance would write the sentinel back, and the new app reads '
+      + 'that as a starter with a stray position, not as data loss. Re-runnable: the first run sets position '
+      + 'to NULL, so a second execution matches zero rows. NOT reversible — which rows were bench is not '
+      + 'recoverable afterwards (started is true both before and after, and position is cleared); a '
+      + 'pre-migration backup is the only rollback, and the canonical flow retires the concept so nothing '
+      + 'consumes it. Reviewed 2026-09-02.',
+  },
   {
     file: 'apps/v1_api/prisma/migrations/20260821115900_v1_team_record_facts_played_at_compat/migration.sql',
     statement:
@@ -191,6 +562,27 @@ const REVIEWED_NON_ADDITIVE = [
       "ALTER TABLE v1_game_result_participants ENABLE TRIGGER v1_guard_result_participant_mutation",
     reason:
       "PR #563 재수행(#600 이후 alpha 차단 복구). Restores the guard disabled above, in the same transaction. If the migration fails at any point the transaction rolls back and the trigger is never left off — the disabled state cannot outlive this file. Reviewed 2026-08-20.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818090000_v1_tournament_record_disclosure_consent/migration.sql',
+    statement:
+      "INSERT INTO \"v1_managed_terms_placements\" (\"id\", \"policy_id\", \"context\", \"requirement\", \"display_order\", \"is_active\", \"created_at\", \"updated_at\") VALUES ( '7ef702a4-6289-4913-a31a-319de15bebd8', 'f772fb99-2671-4066-8874-54867ce0ecf4', 'tournament_application'::\"V1ManagedTermsContext\", 'optional'::\"V1ManagedTermsRequirement\", 4, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP ) ON CONFLICT (\"id\") DO NOTHING",
+    reason:
+      "Seeds the tournament_application PLACEMENT that binds the policy above, explicitly as requirement='optional' (PR #516). This is the row that makes the other two safe: optional placements are excluded from assertTournamentAcceptances()'s missingRequiredDocumentIds, so neither a new nor an old instance can require it. One new row, ON CONFLICT DO NOTHING, no existing row touched. Reviewed 2026-08-18.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818090000_v1_tournament_record_disclosure_consent/migration.sql',
+    statement:
+      "INSERT INTO \"v1_managed_terms_documents\" (\"id\", \"policy_id\", \"version\", \"title\", \"content\", \"content_hash\", \"change_summary\", \"requires_reconsent\", \"status\", \"effective_at\", \"published_at\", \"created_at\", \"updated_at\") VALUES ( '86b39028-bd47-4a4e-9c09-6a4c71c34df6', 'f772fb99-2671-4066-8874-54867ce0ecf4', 'v1.1', '\ub300\ud68c \uacbd\uae30 \uae30\ub85d \uacf5\uac1c \ub3d9\uc758', $terms$\ubcf8\uc778\uc740 \ud300\ubc0b \ub300\ud68c \uacbd\uae30 \uae30\ub85d(\ub77c\uc778\uc5c5, \ub4dd\uc810\u00b7\uc5b4\uc2dc\uc2a4\ud2b8 \ub4f1 \uc774\ubca4\ud2b8 \uae30\ub85d, MVP \ub4f1)\uc5d0 \ub2c9\ub124\uc784 \ub300\uc2e0 \uc2e4\uba85\uc774 \ud45c\uc2dc\ub418\ub294 \uac83\uc5d0 \ub3d9\uc758\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4. \uc774 \ub3d9\uc758\ub294 \uc120\ud0dd \uc0ac\ud56d\uc774\uba70, \ub3d9\uc758\ud558\uc9c0 \uc54a\uc544\ub3c4 \ub300\ud68c \uc2e0\uccad \ubc0f \ucc38\uac00\uc5d0\ub294 \uc5b4\ub5a0\ud55c \uc81c\ud55c\ub3c4 \uc5c6\uc2b5\ub2c8\ub2e4. 1. \uacf5\uac1c \ud56d\ubaa9 \uc774\ub984, \ub4f1\ubc88\ud638, \ud3ec\uc9c0\uc158, \uc18c\uc18d \ud300\uba85, \uacbd\uae30\ubcc4 \uae30\ub85d(\ucd9c\uc804\u00b7\ub4dd\uc810\u00b7\uc5b4\uc2dc\uc2a4\ud2b8\u00b7\uacbd\uace0\u00b7\ud1f4\uc7a5\u00b7MVP \ub4f1) 2. \uacf5\uac1c \ubaa9\uc801 \ub300\ud68c \uacbd\uae30 \uae30\ub85d \ubc0f \ucc38\uac00 \uba85\ub2e8\uc744 \ud300\ubc0b \uc11c\ube44\uc2a4 \ub0b4\uc5d0\uc11c \uacf5\uac1c \uac8c\uc2dc\ud558\uae30 \uc704\ud55c \ubaa9\uc801\uc73c\ub85c \uc774\uc6a9\ud569\ub2c8\ub2e4. 3. \uacf5\uac1c \uc704\uce58 \ud300\ubc0b \uc11c\ube44\uc2a4 \ub0b4 \ub300\ud68c \uae30\ub85d, \uc21c\uc704\ud45c, \uc120\uc218 \uae30\ub85d \ud654\uba74 4. \uacf5\uac1c \uae30\uac04 \ub3d9\uc758 \uc2dc\uc810\ubd80\ud130 \ubcf8\uc778\uc774 \ucca0\ud68c\ud558\uae30 \uc804\uae4c\uc9c0 \uacc4\uc18d \uacf5\uac1c\ub429\ub2c8\ub2e4. \ucca0\ud68c \ud6c4\uc5d0\ub294 \ubcc4\ub3c4 \uc694\uccad \uc5c6\uc774 \uc989\uc2dc \ub2c9\ub124\uc784 \ud45c\uc2dc\ub85c \uc804\ud658\ub429\ub2c8\ub2e4. 5. \ub3d9\uc758 \uac70\ubd80 \ubc0f \ucca0\ud68c \uc548\ub0b4 \ubcf8 \ub3d9\uc758\ub294 \uc120\ud0dd \uc0ac\ud56d\uc785\ub2c8\ub2e4. \ub3d9\uc758\ud558\uc9c0 \uc54a\uc544\ub3c4 \ub300\ud68c \uc2e0\uccad \ubc0f \ucc38\uac00\uc5d0\ub294 \uc81c\ud55c\uc774 \uc5c6\uc73c\uba70, \uc774 \uacbd\uc6b0 \uacbd\uae30 \uae30\ub85d\uc5d0\ub294 \ub2c9\ub124\uc784\uc774 \ud45c\uc2dc\ub429\ub2c8\ub2e4. \uc774\ubbf8 \ub3d9\uc758\ud55c \uacbd\uc6b0\uc5d0\ub3c4 \ub9c8\uc774\ud398\uc774\uc9c0 > \uc124\uc815 > \ub300\ud68c \uae30\ub85d \uc2e4\uba85 \ud45c\uc2dc\uc5d0\uc11c \uc5b8\uc81c\ub4e0\uc9c0 \ucca0\ud68c\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4. 6. \uc720\uc758\uc0ac\ud56d \ud68c\uc0ac\ub294 \uacf5\uac1c\ub41c \uacbd\uae30 \uae30\ub85d\uc744 \ub300\ud68c \uc6b4\uc601, \uae30\ub85d \uac8c\uc2dc, \uc11c\ube44\uc2a4 \uc81c\uacf5 \ubaa9\uc801 \ubc94\uc704 \ub0b4\uc5d0\uc11c\ub9cc \uc0ac\uc6a9\ud569\ub2c8\ub2e4. \ubcf8\uc778\uc740 \uc704 \ub0b4\uc6a9\uc744 \ud655\uc778\ud558\uc600\uc73c\uba70 \ub300\ud68c \uacbd\uae30 \uae30\ub85d \uacf5\uac1c(\uc2e4\uba85 \ud45c\uc2dc)\uc5d0 \ub3d9\uc758\ud569\ub2c8\ub2e4. \ud68c\uc0ac\uba85: \uc544\uc774\uc704(IWI) \ub300\ud45c\uc790: \uae40\ubd09\ubaa9 \uc774\uba54\uc77c: teameetsports@naver.com \uc2dc\ud589\uc77c: 2026\ub144 8\uc6d4 18\uc77c$terms$, 'b0527fa26264263b1ed78388472df50499c9e2cb0730ff0a3d28e090f278e65a', '\ub300\ud68c \uacbd\uae30 \uae30\ub85d(\ub77c\uc778\uc5c5/\ub4dd\uc810/MVP \ub4f1)\uc5d0 \uc2e4\uba85 \ud45c\uc2dc\ub97c \uc120\ud0dd\uc801\uc73c\ub85c \ub3d9\uc758\ubc1b\uae30 \uc704\ud55c \uc2e0\uaddc \uc815\ucc45 \ucd5c\ucd08 \ubc1c\ud589', true, 'published'::\"V1TermsDocumentStatus\", '2026-08-18T00:00:00.000Z'::timestamptz, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP ) ON CONFLICT (\"id\") DO NOTHING",
+    reason:
+      "Seeds the v1.1 consent DOCUMENT for that same optional policy (PR #516). Same reasoning as the policy row: one new row, ON CONFLICT DO NOTHING, nothing existing modified. Because its policy's placement is optional it never enters the required-terms set an older instance computes, so it cannot trigger forced re-consent, and tournament_privacy stays at v1.1 untouched. Reviewed 2026-08-18.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818090000_v1_tournament_record_disclosure_consent/migration.sql',
+    statement:
+      "INSERT INTO \"v1_managed_terms_policies\" (\"id\", \"code\", \"name\", \"is_active\", \"created_at\", \"updated_at\") VALUES ('f772fb99-2671-4066-8874-54867ce0ecf4', 'tournament_record_disclosure', '\ub300\ud68c \uacbd\uae30 \uae30\ub85d \uacf5\uac1c \ub3d9\uc758', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) ON CONFLICT (\"id\") DO NOTHING",
+    reason:
+      "Seeds the new OPTIONAL 'tournament_record_disclosure' consent POLICY row (PR #516). Rolling-deploy safe both ways: it only INSERTs a brand-new row with ON CONFLICT DO NOTHING and touches no existing row, and its placement is requirement='optional', so ManagedTermsRuntimeService.currentTournamentTerms() leaves it out of missingRequiredDocumentIds. An older instance therefore sees no new required term and blocks no registration; on rollback the row is simply ignored. The gate rejects INSERT as a category because it cannot PROVE additivity, not because this row is unsafe. Reviewed 2026-08-18.",
   },
   {
     file: 'apps/v1_api/prisma/migrations/20260817120000_v1_tournament_review_drop_team_unique/migration.sql',
@@ -600,6 +992,45 @@ END $$`,
       "Reviewed 2026-08-18.",
   },
   {
+    file: 'apps/v1_api/prisma/migrations/20260818120000_v1_league_expand/migration.sql',
+    statement: `INSERT INTO "v1_leagues" ( "id", "title", "sport_id", "region_id", "created_by_admin_user_id", "starts_on", "ends_on", "tie_break_json", "state", "created_at", "updated_at" ) SELECT s."id", s."title", s."sport_id", s."region_id", s."created_by_admin_user_id", s."starts_on", s."ends_on", s."tie_break_json", s."state"::text::"V1LeagueState", s."created_at", s."updated_at" FROM "v1_team_match_series" s ON CONFLICT ("id") DO NOTHING`,
+    reason:
+      "Copies existing rows from v1_team_match_series into the newly created v1_leagues table -- the expand " +
+      "half of a two-release rename (2026-08-18 user decision: expand-contract, zero downtime). It writes " +
+      "only to a table this same migration creates three statements earlier, so no deployed revision -- old " +
+      "or new -- can observe it as a change: the old app has never heard of v1_leagues, and the new app " +
+      "finds it already populated. The source table is left completely untouched and keeps serving old " +
+      "containers through the rolling window. Row ids are carried over verbatim rather than regenerated, so " +
+      "v1_team_matches.series_id and .league_id always point at the same league and no id-mapping table is " +
+      "needed. INSERT ... SELECT with ON CONFLICT (\"id\") DO NOTHING, so a re-run is a no-op. Why a straight " +
+      "RENAME was rejected instead: deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it " +
+      "recreates the containers (line 288), with seeds and standings recalculation in between -- renaming " +
+      "in place would leave old containers querying a table that no longer exists for that whole span. " +
+      "Reviewed 2026-08-18.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818120000_v1_league_expand/migration.sql',
+    statement: `INSERT INTO "v1_league_teams" ("id", "league_id", "team_id", "created_at") SELECT t."id", t."series_id", t."team_id", t."created_at" FROM "v1_team_match_series_teams" t ON CONFLICT ("id") DO NOTHING`,
+    reason:
+      "Same expand-half copy for the join table: v1_team_match_series_teams -> v1_league_teams, into a " +
+      "table created by this same migration. Carries ids over verbatim for the same reason as the parent " +
+      "copy, and maps the old series_id column onto the new league_id column. The source table is " +
+      "untouched. ON CONFLICT (\"id\") DO NOTHING makes a re-run a no-op. Reviewed 2026-08-18.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260818120000_v1_league_expand/migration.sql',
+    statement: `UPDATE "v1_team_matches" SET "league_id" = "series_id" WHERE "series_id" IS NOT NULL AND "league_id" IS NULL`,
+    reason:
+      "Backfills the new v1_team_matches.league_id column that this same migration adds, from the existing " +
+      "series_id. This is the one statement that touches a pre-existing table, and it is safe in the " +
+      "rolling window for two reasons: it only writes the brand-new column (WHERE league_id IS NULL), so no " +
+      "column any deployed revision reads is modified, and series_id -- which old containers do read -- is " +
+      "left exactly as it was. Since ids were carried over by the two copies above, league_id ends up " +
+      "holding the identical value as series_id, so the two columns can never disagree about which league a " +
+      "match belongs to during the window. Re-running is a no-op because of the IS NULL guard. The " +
+      "contract-phase release drops series_id once no old container remains. Reviewed 2026-08-18.",
+  },
+  {
     file: 'apps/v1_api/prisma/migrations/20260818160000_v1_team_record_facts_penalty_result/migration.sql',
     statement: 'ALTER TABLE v1_team_record_facts DISABLE TRIGGER v1_block_team_record_fact_mutation',
     reason:
@@ -638,6 +1069,424 @@ END $$`,
       "no-op: the WHERE clause only selects result = 'DRAWN', which an already-corrected row no longer is. " +
       'The gate rejects UPDATE as a category because it cannot prove additivity. Reviewed 2026-08-19.',
   },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `ALTER TABLE "v1_team_matches" DROP CONSTRAINT IF EXISTS "v1_team_matches_series_fk"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops the FK first because the column it " +
+      "constrains cannot be dropped while it exists. Removing a constraint only RELAXES the schema, so no " +
+      "running instance can be tripped by it. Reviewed 2026-08-19.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `DROP INDEX IF EXISTS "v1_team_matches_series_start_at_idx"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops the index on (series_id, start_at). An " +
+      "index is pure read acceleration -- no query depends on it for correctness, and nothing reads " +
+      "series_id any more. Reviewed 2026-08-19.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `ALTER TABLE "v1_team_matches" DROP COLUMN IF EXISTS "series_id"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops v1_team_matches.series_id. Its data is " +
+      "not lost: the expand migration copied it into league_id carrying the SAME ids, and every write since " +
+      "then set both columns to the same value (the dual write removed in this release), so league_id is a " +
+      "complete and identical replacement. Reviewed 2026-08-19.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `DROP TABLE IF EXISTS "v1_team_match_series_teams"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops the join table. Dropped before its " +
+      "parent because it holds the FK pointing at it. Its rows were copied id-for-id into v1_league_teams " +
+      "by the expand migration. Reviewed 2026-08-19.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `DROP TABLE IF EXISTS "v1_team_match_series"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops the legacy league table. Its rows were " +
+      "copied id-for-id into v1_leagues by the expand migration and kept in sync afterwards by " +
+      "mirrorLeagueToLegacy, so what is dropped here is a mirror, not an original. Reviewed 2026-08-19.",
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260819100000_v1_league_contract/migration.sql',
+    statement: `DROP TYPE IF EXISTS "V1TeamMatchSeriesState"`,
+    reason:
+      "This is the contract half of the two-release league rename whose expand half shipped in " +
+      "20260818120000_v1_league_expand (2026-08-18 user decision: expand-contract, zero downtime). The gate " +
+      "rejects it because dropping is never provably additive, which is exactly right for a rename done in " +
+      "ONE release -- deploy-alpha.sh runs prisma migrate deploy (line 246) BEFORE it recreates containers " +
+      "(line 289), so a same-release drop would leave old containers reading a column that no longer exists " +
+      "for that whole span. That is not the situation here: the expand release is already deployed and " +
+      "every running container reads only the new names. Verified by exhaustive grep on dev before writing " +
+      "this migration -- raw SQL referencing v1_team_match_series or team_match.series_id: 0; Prisma code " +
+      "READING the legacy models: 0; tests using them: 0. The only remaining references were the " +
+      "expand-phase dual writes, removed in this same release. Drops the now-unreferenced enum type. Its " +
+      "only users were the two tables dropped just above, so this cannot affect anything still in the " +
+      "schema. Reviewed 2026-08-19.",
+  },
+  // ── PR #627 v1_team_contacts (2026-08-21) ───────────────────────────────
+  // 링크 대상 CHECK 제약에 새 컬럼을 편입하는 DROP+재생성 쌍의 앞 절반.
+  {
+    file: 'apps/v1_api/prisma/migrations/20260821000000_v1_team_contacts/migration.sql',
+    statement: `ALTER TABLE "v1_chat_rooms" DROP CONSTRAINT IF EXISTS "v1_chat_rooms_exactly_one_target_check"`,
+    reason:
+      'v1_chat_rooms 의 "링크 대상은 정확히 하나" CHECK 를 team_contact_id 까지 포함하도록 넓히는 ' +
+      'DROP + 즉시 재생성 쌍의 앞 절반이다. 게이트가 막는 이유는 DROP 이 결코 provably additive 하지 ' +
+      '않기 때문인데, 실제로 일어나는 일은 제약의 **완화**다: 새 술어는 ' +
+      '(match_id) + (team_id) + (team_match_id) + (team_contact_id) = 1 로, 기존 3개 술어를 만족하는 ' +
+      '모든 행이 새 술어도 그대로 만족한다(네 번째 항이 0 이라 합이 변하지 않는다). ' +
+      '롤링 배포 양방향 검증: (1) 구 인스턴스는 team_contact_id 를 아는 코드가 없어 match/team/team_match ' +
+      '방만 쓰는데 그 write 는 새 제약에서도 합=1 이라 거부되지 않는다. (2) 신 인스턴스가 만드는 ' +
+      'team_contact 방은 구 제약에서 합=0 으로 거부되므로, 이 마이그레이션이 신 코드보다 먼저 도는 ' +
+      '기존 배포 순서(deploy-alpha.sh 가 migrate deploy 를 컨테이너 재생성보다 먼저 실행)를 그대로 전제한다. ' +
+      '(3) 롤백 시 구 앱은 team_contact 행을 읽지도 쓰지도 않으므로 영향이 없다. ' +
+      'DROP 과 ADD 가 같은 migration.sql 안에 있어 제약 없는 창이 커밋 밖으로 노출되지 않는다. ' +
+      '같은 테이블에 team_id 를 추가했을 때도 동일한 DROP+재생성을 했다 ' +
+      '(20260630000000_v1_chat_room_team_target_constraint). Reviewed 2026-08-21.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260821000000_v1_team_contacts/migration.sql',
+    statement:
+      `ALTER TABLE "v1_chat_rooms" ADD CONSTRAINT "v1_chat_rooms_exactly_one_target_check" ` +
+      `CHECK ( ( ("match_id" IS NOT NULL)::int + ("team_id" IS NOT NULL)::int ` +
+      `+ ("team_match_id" IS NOT NULL)::int + ("team_contact_id" IS NOT NULL)::int ) = 1 )`,
+    reason:
+      '위 DROP 의 짝 — 같은 이름의 제약을 team_contact_id 를 포함한 형태로 되돌려 놓는다. ' +
+      '게이트가 ADD CONSTRAINT 를 막는 이유는 새 제약이 기존 행을 거부할 수 있어 provably additive 가 ' +
+      '아니기 때문인데, 여기서는 그 위험이 구조적으로 없다: 새 술어는 직전 술어에 ' +
+      '`+ ("team_contact_id" IS NOT NULL)::int` 항 하나만 더한 것이고, 이 마이그레이션 이전에는 ' +
+      '그 컬럼 자체가 존재하지 않았으므로 모든 기존 행에서 그 항은 0 이다. 따라서 합이 변하지 않아 ' +
+      '**기존 제약을 만족하던 모든 행이 새 제약도 만족한다** — ADD 시점의 검증이 실패할 수 없다. ' +
+      '같은 이유로 구 인스턴스의 write(match/team/team_match 중 하나만 채움)도 새 제약을 통과한다. ' +
+      '즉 이 ADD 는 스키마를 조이는 것이 아니라 직전 DROP 이 만든 공백을 **더 느슨한 형태로** 메우는 ' +
+      '것이고, 둘이 같은 migration.sql 에 있어 제약 없는 창이 커밋 밖으로 노출되지 않는다. ' +
+      'Reviewed 2026-08-21.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260824100100_v1_inquiry_reported_team_backfill/migration.sql',
+    statement:
+      'UPDATE "v1_inquiries" i SET "reported_team_id" = sub.reported_team_id FROM ( SELECT i2."id" AS id, CASE WHEN EXISTS (SELECT 1 FROM "v1_team_memberships" m WHERE m."team_id" = c."from_team_id" AND m."user_id" = i2."user_id" AND m."status" = \'active\') THEN c."to_team_id" WHEN EXISTS (SELECT 1 FROM "v1_team_memberships" m WHERE m."team_id" = c."to_team_id" AND m."user_id" = i2."user_id" AND m."status" = \'active\') THEN c."from_team_id" ELSE NULL END AS reported_team_id FROM "v1_inquiries" i2 JOIN "v1_team_contacts" c ON c."id" = i2."related_id" WHERE i2."related_type" = \'team_contact\' AND i2."category" = \'report\' AND i2."user_id" IS NOT NULL ) sub WHERE i."id" = sub.id AND sub.reported_team_id IS NOT NULL',
+    reason:
+      'Backfills only the newly introduced nullable reported_team_id. It reads existing rows but writes no pre-existing column, so a rolling deploy running the old code sees an unchanged schema surface. Rollback is DROP COLUMN, which the preceding additive migration owns. Rows whose reporter has no active membership on either side are intentionally left NULL rather than guessed.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260831090000_android_privacy_policy_v12/migration.sql',
+    statement: String.raw`INSERT INTO "v1_managed_terms_documents" (
+  "id",
+  "policy_id",
+  "version",
+  "title",
+  "subtitle",
+  "content",
+  "content_hash",
+  "change_summary",
+  "requires_reconsent",
+  "status",
+  "effective_at",
+  "published_at",
+  "supersedes_document_id",
+  "created_at",
+  "updated_at"
+)
+SELECT
+  'a1130000-0000-4000-8000-000000000004',
+  "policy_id",
+  'v1.2',
+  '개인정보처리방침',
+  '회원가입 및 서비스 이용에 필요한 개인정보 수집·이용 동의예요.',
+  regexp_replace("content", E'\n시행일: 2026년 7월 1일$', '') || $android_privacy$
+
+11. Android 앱에서의 개인정보 처리
+
+Android 앱은 teameet.co.kr 서비스를 WebView로 제공하며 로그인 세션을 위한 쿠키와 서비스 이용 기록을 처리합니다.
+
+이용자가 앱에서 알림 수신에 명시적으로 동의하면 Firebase Cloud Messaging 알림 전송을 위해 앱 설치 식별자, FCM 토큰, 앱 버전, 기기 제조사·모델 정보를 처리합니다. 알림 동의를 철회하거나 로그아웃하면 해당 설치의 푸시 등록을 해제하고 토큰 삭제를 요청합니다. Firebase Cloud Messaging 제공 과정에서는 Google이 수탁자로서 관련 정보를 처리할 수 있습니다.
+
+이용자가 현재 위치 기능을 직접 실행한 경우에만 Android의 대략적 위치 권한을 요청합니다. 제공된 좌표는 가까운 지역을 확인하기 위해 회사 서버로 전송되고, 현재 날씨 제공을 위해 Open-Meteo에 전송될 수 있습니다. 위치 권한을 거부해도 위치 기반 편의 기능을 제외한 서비스는 이용할 수 있습니다.
+
+사진·파일은 이용자가 파일 선택기를 직접 실행하고 제출한 경우에만 업로드됩니다. 앱은 기기 저장소 전체를 조회하는 권한을 요청하지 않습니다.
+
+계정 삭제는 앱의 설정 > 회원 탈퇴에서 직접 진행하거나 https://teameet.co.kr/account-deletion 에서 요청할 수 있습니다. 법령상 보관 의무가 있는 정보를 제외한 계정 연결 정보는 처리 목적이 끝난 뒤 파기합니다.
+
+시행일: 2026년 7월 1일
+최종 변경일: 2026년 8월 31일$android_privacy$,
+  '8b157cae4348c80f0a185a555b29666c16a5122e516b0f8f17dcc0e55457f8a9',
+  'Android 앱의 WebView, FCM, 대략적 위치, 파일 선택 및 계정 삭제 처리 기준 추가',
+  false,
+  'published'::"V1TermsDocumentStatus",
+  '2026-08-31T00:00:00.000Z'::timestamptz,
+  CURRENT_TIMESTAMP,
+  "id",
+  CURRENT_TIMESTAMP,
+  CURRENT_TIMESTAMP
+FROM "v1_managed_terms_documents"
+WHERE "id" = 'a1110000-0000-4000-8000-000000000004'
+ON CONFLICT ("policy_id", "version") DO NOTHING`,
+    reason:
+      'Publishes one immutable v1.2 privacy document derived from the retained v1.1 row. It inserts a new version only, uses ON CONFLICT (policy_id, version) DO NOTHING, and never updates or deletes legal history. requires_reconsent=false means old and new app instances do not block existing users during a rolling deploy; older code can render the same managed-terms shape and safely ignores the Android-specific appendix on rollback. Reviewed 2026-08-31 for PR #838.',
+  },
+  {
+    file: 'apps/v1_api/prisma/migrations/20260831090000_android_privacy_policy_v12/migration.sql',
+    statement: String.raw`DO $privacy_v12_guard$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM "v1_managed_terms_documents" AS candidate
+    INNER JOIN "v1_managed_terms_documents" AS baseline
+      ON baseline."id" = 'a1110000-0000-4000-8000-000000000004'
+    WHERE candidate."id" = 'a1130000-0000-4000-8000-000000000004'
+      AND candidate."policy_id" = baseline."policy_id"
+      AND candidate."version" = 'v1.2'
+      AND candidate."content_hash" = '8b157cae4348c80f0a185a555b29666c16a5122e516b0f8f17dcc0e55457f8a9'
+      AND md5(candidate."content") = 'd31b4d3136f443697c08b4f987a69f2d'
+      AND candidate."requires_reconsent" = false
+      AND candidate."status" = 'published'::"V1TermsDocumentStatus"
+      AND candidate."effective_at" = '2026-08-31T00:00:00.000Z'::timestamptz
+      AND candidate."supersedes_document_id" = baseline."id"
+  ) THEN
+    RAISE EXCEPTION 'canonical Android privacy policy v1.2 was not materialized'
+      USING ERRCODE = '23514';
+  END IF;
+END
+$privacy_v12_guard$`,
+    reason:
+      'Read-only postcondition guard for the immutable v1.2 insert above. It mutates no row or schema: the block only verifies the retained baseline and exact canonical candidate identity, metadata, SHA-256 field, and independently computed content digest, then aborts the migration with SQLSTATE 23514 instead of recording a silent no-op. Reviewed 2026-08-31 for PR #838 remediation.',
+  },
+
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "SET LOCAL lock_timeout = '5s'",
+    reason:
+      "Session-scoped statement timeout for the DDL below. It takes no lock itself and is automatically cleared at COMMIT/ROLLBACK; it changes no schema or data.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "CREATE FUNCTION pg_temp.task168_stable_json(value JSONB) RETURNS TEXT LANGUAGE plpgsql IMMUTABLE STRICT AS $$ DECLARE serialized TEXT; BEGIN CASE jsonb_typeof(value) WHEN 'object' THEN SELECT '{' || COALESCE(string_agg(to_jsonb(key)::text || ':' || pg_temp.task168_stable_json(val), ',' ORDER BY key COLLATE \"C\"), '') || '}' INTO serialized FROM jsonb_each(value) AS item(key,val); WHEN 'array' THEN SELECT '[' || COALESCE(string_agg(pg_temp.task168_stable_json(val), ',' ORDER BY ordinal), '') || ']' INTO serialized FROM jsonb_array_elements(value) WITH ORDINALITY AS item(val,ordinal); WHEN 'number' THEN serialized := trim_scale((value #>> '{}')::numeric)::text; ELSE serialized := value::text; END CASE; RETURN serialized; END $$",
+    reason:
+      "Creates a connection-local helper in the pg_temp schema, used only by the precondition block immediately below to compute a canonical JSON digest for existing rows. It is not a persistent database object and no application code can reference it.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "DO $$ DECLARE processing_jobs BIGINT; legacy_game_links BIGINT; legacy_staff_links BIGINT; legacy_audit_links BIGINT; fixture_errors BIGINT; result_errors BIGINT; goal_errors BIGINT; video_errors BIGINT; edge_errors BIGINT; retired_write_seals BIGINT; retired_row_seals BIGINT; retired_link_seals BIGINT; retired_tables BIGINT; canonical_game_errors BIGINT; missing_tournament_details BIGINT; orphan_tournament_details BIGINT; lineage_errors BIGINT; advancement_errors BIGINT; cutover_epoch_count BIGINT; append_only_trigger_count BIGINT; lineage_append_only_trigger_count BIGINT; legacy_evidence_rows BIGINT; constraint_errors BIGINT; BEGIN LOCK TABLE \"v1_outbox_events\", \"v1_games\", \"v1_tournament_staff_fixture_scopes\", \"v1_operation_audits\", \"v1_tournament_fixtures\", \"v1_tournament_fixture_results\", \"v1_tournament_fixture_goals\", \"v1_tournament_fixture_videos\", \"v1_tournament_fixture_advancement_edges\", \"v1_team_matches\", \"v1_tournament_match_details\", \"v1_tournament_match_advancement_edges\", \"v1_team_match_videos\", \"v1_tournament_result_lineages\", \"v1_game_cutover_epochs\", \"v1_game_result_revisions\", \"v1_game_events\", \"v1_game_official_facts\", \"v1_game_official_result_cache\", \"v1_game_sides\", \"v1_tournaments\", \"v1_tournament_registrations\" IN ACCESS EXCLUSIVE MODE; SELECT count(*) INTO processing_jobs FROM \"v1_outbox_events\" WHERE \"status\"::text = 'PROCESSING'; IF processing_jobs <> 0 THEN RAISE EXCEPTION 'RETIREMENT_PRECONDITION_FAILED processing_outbox=%', processing_jobs USING ERRCODE = '55000'; END IF; SELECT count(*) INTO cutover_epoch_count FROM \"v1_game_cutover_epochs\" WHERE \"write_mode\"::text <> 'new'; IF cutover_epoch_count <> 0 THEN RAISE EXCEPTION 'RETIREMENT_PRECONDITION_FAILED noncanonical_game_cutover_epochs=%', cutover_epoch_count USING ERRCODE = '55000'; END IF; SELECT count(*) INTO retired_tables FROM (VALUES ('v1_tournament_fixtures'), ('v1_tournament_fixture_results'), ('v1_tournament_fixture_goals'), ('v1_tournament_fixture_videos'), ('v1_tournament_fixture_advancement_edges') ) AS wanted(table_name) WHERE to_regclass(wanted.table_name) IS NOT NULL; IF retired_tables <> 5 THEN RAISE EXCEPTION 'RETIREMENT_PRECONDITION_FAILED legacy_tables=%', retired_tables USING ERRCODE = '55000'; END IF; SELECT count(*) INTO retired_write_seals FROM pg_trigger t WHERE t.tgname = 'v1_tournament_fixture_retired_write' AND t.tgfoid = to_regprocedure('v1_reject_retired_tournament_fixture_write()') AND t.tgenabled = 'A' AND t.tgtype::int = 62 AND NOT t.tgisinternal AND t.tgrelid IN ( 'v1_tournament_fixtures'::regclass, 'v1_tournament_fixture_results'::regclass, 'v1_tournament_fixture_goals'::regclass, 'v1_tournament_fixture_videos'::regclass, 'v1_tournament_fixture_advancement_edges'::regclass ); SELECT count(*) INTO retired_row_seals FROM pg_trigger t WHERE t.tgname = 'v1_tournament_fixture_retired_row_write' AND t.tgfoid = to_regprocedure('v1_reject_retired_tournament_fixture_write()') AND t.tgenabled = 'A' AND t.tgtype::int = 27 AND NOT t.tgisinternal AND t.tgrelid IN ( 'v1_tournament_fixtures'::regclass, 'v1_tournament_fixture_results'::regclass, 'v1_tournament_fixture_goals'::regclass, 'v1_tournament_fixture_videos'::regclass, 'v1_tournament_fixture_advancement_edges'::regclass ); SELECT count(*) INTO retired_link_seals FROM pg_trigger t WHERE t.tgname = 'v1_000_tournament_fixture_retired_link' AND t.tgfoid = to_regprocedure('v1_reject_retired_tournament_fixture_link()') AND t.tgenabled = 'A' AND t.tgtype::int = 23 AND NOT t.tgisinternal AND t.tgrelid IN ( 'v1_games'::regclass, 'v1_tournament_staff_fixture_scopes'::regclass, 'v1_operation_audits'::regclass ); SELECT count(*) INTO append_only_trigger_count FROM pg_trigger t WHERE t.tgname = 'v1_operation_audits_append_only' AND t.tgfoid = to_regprocedure('v1_reject_operation_audit_mutation()') AND t.tgenabled = 'O' AND NOT t.tgisinternal AND t.tgrelid = 'v1_operation_audits'::regclass; SELECT count(*) INTO lineage_append_only_trigger_count FROM pg_trigger t WHERE t.tgname = 'v1_tournament_result_lineage_append_only' AND t.tgfoid = to_regprocedure('v1_block_tournament_result_lineage_mutation()') AND t.tgenabled IN ('O','A') AND t.tgtype::int = 27 AND NOT t.tgisinternal AND t.tgrelid = 'v1_tournament_result_lineages'::regclass; SELECT (SELECT count(*) FROM v1_tournament_fixtures) + (SELECT count(*) FROM v1_tournament_fixture_results) + (SELECT count(*) FROM v1_tournament_fixture_goals) + (SELECT count(*) FROM v1_tournament_fixture_videos) + (SELECT count(*) FROM v1_tournament_fixture_advancement_edges) + (SELECT count(*) FROM v1_games WHERE tournament_fixture_id IS NOT NULL OR source_type::text = 'TOURNAMENT_FIXTURE') + (SELECT count(*) FROM v1_tournament_staff_fixture_scopes WHERE fixture_id IS NOT NULL) + (SELECT count(*) FROM v1_operation_audits WHERE fixture_id IS NOT NULL) + (SELECT count(*) FROM v1_tournament_result_lineages) INTO legacy_evidence_rows; IF (legacy_evidence_rows > 0 AND (retired_write_seals <> 5 OR retired_row_seals <> 5 OR retired_link_seals <> 3)) OR append_only_trigger_count <> 1 OR lineage_append_only_trigger_count <> 1 THEN RAISE EXCEPTION 'RETIREMENT_PRECONDITION_FAILED seals=write:% row:% link:% audit:%', retired_write_seals, retired_row_seals, retired_link_seals, append_only_trigger_count USING ERRCODE = '55000'; END IF; SELECT count(*) INTO legacy_game_links FROM \"v1_games\" WHERE \"source_type\"::text = 'TOURNAMENT_FIXTURE' OR \"tournament_fixture_id\" IS NOT NULL; SELECT count(*) INTO legacy_staff_links FROM \"v1_tournament_staff_fixture_scopes\" WHERE \"fixture_id\" IS NOT NULL; SELECT count(*) INTO legacy_audit_links FROM \"v1_operation_audits\" WHERE \"fixture_id\" IS NOT NULL; IF legacy_game_links <> 0 OR legacy_staff_links <> 0 OR legacy_audit_links <> 0 THEN RAISE EXCEPTION 'RETIREMENT_PRECONDITION_FAILED legacy_links games:% staff:% audits:%', legacy_game_links, legacy_staff_links, legacy_audit_links USING ERRCODE = '55000'; END IF; SELECT count(*) INTO fixture_errors FROM \"v1_tournament_fixtures\" f JOIN v1_tournaments tournament ON tournament.id = f.tournament_id LEFT JOIN v1_tournament_registrations home_registration ON home_registration.id = f.home_registration_id LEFT JOIN v1_tournament_registrations away_registration ON away_registration.id = f.away_registration_id WHERE NOT EXISTS ( SELECT 1 FROM \"v1_team_matches\" tm WHERE tm.\"id\" = f.\"id\" AND tm.\"tournament_id\" = f.\"tournament_id\" AND tm.league_id IS NULL AND tm.sport_id = tournament.sport_id AND tm.field_id IS NOT DISTINCT FROM f.field_id AND tm.start_at IS NOT DISTINCT FROM f.scheduled_at AND tm.place_name IS NOT DISTINCT FROM f.venue AND tm.status::text = CASE f.status::text WHEN 'completed' THEN 'completed' WHEN 'cancelled' THEN 'cancelled' ELSE 'matched' END AND tm.host_team_id IS NOT DISTINCT FROM COALESCE( (SELECT side.team_id FROM v1_game_sides side JOIN v1_games game ON game.id=side.game_id WHERE game.team_match_id=f.id AND side.side_key::text='HOME'), home_registration.team_id) AND tm.approved_applicant_team_id IS NOT DISTINCT FROM COALESCE( (SELECT side.team_id FROM v1_game_sides side JOIN v1_games game ON game.id=side.game_id WHERE game.team_match_id=f.id AND side.side_key::text='AWAY'), away_registration.team_id) AND tm.competition_config_version_id = COALESCE(f.competition_config_version_id, (SELECT game.competition_config_version_id FROM v1_games game WHERE game.team_match_id=f.id)) ) OR NOT EXISTS ( SELECT 1 FROM \"v1_tournament_match_details\" d WHERE d.\"team_match_id\" = f.\"id\" AND d.\"tournament_id\" = f.\"tournament_id\" AND d.group_id IS NOT DISTINCT FROM f.group_id AND d.round = f.round AND d.fixture_number = f.fixture_number AND d.leg_number = f.leg_number AND d.parent_team_match_id IS NOT DISTINCT FROM f.parent_fixture_id AND d.home_registration_id IS NOT DISTINCT FROM f.home_registration_id AND d.away_registration_id IS NOT DISTINCT FROM f.away_registration_id ) OR NOT EXISTS ( SELECT 1 FROM \"v1_games\" g WHERE g.\"team_match_id\" = f.\"id\" AND g.\"source_type\"::text = 'TEAM_MATCH' AND g.competition_config_version_id = (SELECT tm.competition_config_version_id FROM v1_team_matches tm WHERE tm.id=f.id) ); SELECT count(*) INTO result_errors FROM \"v1_tournament_fixture_results\" r JOIN \"v1_tournament_fixtures\" f ON f.\"id\" = r.\"fixture_id\" WHERE NOT EXISTS ( SELECT 1 FROM \"v1_tournament_result_lineages\" l WHERE l.\"original_result_id\" = r.\"id\" AND l.\"original_fixture_id\" = r.\"fixture_id\" AND l.\"team_match_id\" = r.\"fixture_id\" AND l.\"tournament_id\" = f.\"tournament_id\" AND l.\"home_score\" = r.\"home_score\" AND l.\"away_score\" = r.\"away_score\" AND l.\"has_penalty\" = r.\"has_penalty\" AND l.\"home_penalty_score\" IS NOT DISTINCT FROM r.\"home_penalty_score\" AND l.\"away_penalty_score\" IS NOT DISTINCT FROM r.\"away_penalty_score\" AND l.\"note\" IS NOT DISTINCT FROM r.\"note\" AND l.\"original_recorded_at\" = r.\"recorded_at\" AND l.\"original_created_at\" = r.\"created_at\" AND l.\"original_updated_at\" = r.\"updated_at\" AND EXISTS ( SELECT 1 FROM \"v1_game_result_revisions\" rev WHERE rev.\"game_id\" = l.\"game_id\" AND rev.\"id\" = l.\"official_revision_id\" AND rev.\"state\"::text = 'OFFICIAL' AND COALESCE(NULLIF(rev.score->'home','null'::jsonb),rev.score->'regulation'->'home') = l.official_score->'home' AND COALESCE(NULLIF(rev.score->'away','null'::jsonb),rev.score->'regulation'->'away') = l.official_score->'away' AND COALESCE(NULLIF(rev.score->'penalties','null'::jsonb),NULLIF(rev.score->'penalty','null'::jsonb)) IS NOT DISTINCT FROM NULLIF(l.official_score->'penalties','null'::jsonb) AND rev.\"events_hash\" = l.\"official_events_hash\" ) AND l.\"recorded_by_admin_user_id\" IS NOT DISTINCT FROM r.\"recorded_by_admin_user_id\" AND l.\"original_fixture_tournament_id\" = f.\"tournament_id\" AND l.\"snapshot_hash\" = encode(sha256(convert_to(pg_temp.task168_stable_json(l.\"snapshot\"), 'UTF8')), 'hex') AND l.\"official_score_hash\" = encode(sha256(convert_to(pg_temp.task168_stable_json(l.\"official_score\"), 'UTF8')), 'hex') AND l.\"snapshot\" - 'parity' = jsonb_build_object( 'originalResultId', r.\"id\", 'originalFixtureId', r.\"fixture_id\", 'originalFixtureTournamentId', f.\"tournament_id\", 'homeScore', r.\"home_score\", 'awayScore', r.\"away_score\", 'hasPenalty', r.\"has_penalty\", 'homePenaltyScore', r.\"home_penalty_score\", 'awayPenaltyScore', r.\"away_penalty_score\", 'note', r.\"note\", 'recordedByAdminUserId', r.\"recorded_by_admin_user_id\", 'recordedAt', to_char(r.\"recorded_at\" AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), 'createdAt', to_char(r.\"created_at\" AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), 'updatedAt', to_char(r.\"updated_at\" AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), 'goals', COALESCE((SELECT jsonb_agg(jsonb_build_object( 'id', goal.id, 'team', goal.team::text, 'playerId', goal.player_id, 'playerName', goal.player_name, 'minute', goal.minute, 'createdAt', to_char(goal.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"') ) ORDER BY goal.created_at, goal.id COLLATE \"C\") FROM v1_tournament_fixture_goals goal WHERE goal.fixture_result_id = r.id), '[]'::jsonb), 'officialScore', l.official_score, 'officialEventsHash', l.official_events_hash, 'canonicalGoalEvents', (SELECT rev.goal_events FROM v1_game_result_revisions rev WHERE rev.id = l.official_revision_id) ) AND l.snapshot->'parity'->>'method' = 'SCORE_AND_LOSSLESS_GOAL_MULTIMAP' AND l.snapshot->'parity'->'matchedCandidateIds' = jsonb_build_array(l.official_revision_id) AND l.snapshot->'parity'->>'source' IN ('GOAL_EVENTS','FROZEN_FIXTURE_SCORE','EXPLICIT_IMPORT_ORIGIN') ); SELECT count(*) INTO goal_errors FROM \"v1_tournament_fixture_goals\" g JOIN \"v1_tournament_fixture_results\" r ON r.\"id\" = g.\"fixture_result_id\" WHERE NOT EXISTS ( SELECT 1 FROM \"v1_tournament_result_lineages\" l WHERE l.\"original_result_id\" = r.\"id\" AND EXISTS (SELECT 1 FROM jsonb_array_elements(l.snapshot->'goals') AS item(goal) WHERE goal->>'id' = g.id AND goal->>'team' = g.team::text AND goal->>'playerId' IS NOT DISTINCT FROM g.player_id AND goal->>'playerName' = g.player_name AND (goal->>'minute')::integer IS NOT DISTINCT FROM g.minute AND (goal->>'createdAt')::timestamptz IS NOT DISTINCT FROM g.created_at AT TIME ZONE 'UTC') ); SELECT count(*) INTO video_errors FROM \"v1_tournament_fixture_videos\" v JOIN \"v1_tournament_fixtures\" f ON f.\"id\" = v.\"fixture_id\" WHERE NOT EXISTS ( SELECT 1 FROM \"v1_team_match_videos\" cv WHERE cv.\"id\" = v.\"id\" AND cv.\"team_match_id\" = f.\"id\" AND cv.\"title\" IS NOT DISTINCT FROM v.\"title\" AND cv.\"url\" = v.\"url\" AND cv.\"sort_order\" = v.\"sort_order\" AND cv.\"created_at\" = v.\"created_at\" ); SELECT count(*) INTO edge_errors FROM \"v1_tournament_fixture_advancement_edges\" e WHERE NOT EXISTS ( SELECT 1 FROM \"v1_tournament_match_advancement_edges\" ce WHERE ce.\"id\" = e.\"id\" AND ce.\"tournament_id\" = e.\"tournament_id\" AND ce.\"source_team_match_id\" = e.\"source_fixture_id\" AND ce.\"source_outcome\"::text = e.\"source_outcome\"::text AND ce.\"target_team_match_id\" = e.\"target_fixture_id\" AND ce.\"target_side\"::text = e.\"target_side\"::text AND ce.\"created_at\" = e.\"created_at\" ); IF fixture_errors <> 0 OR result_errors <> 0 OR goal_errors <> 0 OR video_errors <> 0 OR edge_errors <> 0 THEN RAISE EXCEPTION 'RETIREMENT_PRECONDITION_FAILED preservation fixtures:% results:% goals:% videos:% edges:%', fixture_errors, result_errors, goal_errors, video_errors, edge_errors USING ERRCODE = '55000'; END IF; SELECT count(*) INTO canonical_game_errors FROM \"v1_games\" g WHERE g.\"source_type\"::text <> 'TEAM_MATCH' OR g.\"team_match_id\" IS NULL; SELECT count(*) INTO missing_tournament_details FROM \"v1_team_matches\" tm WHERE tm.\"tournament_id\" IS NOT NULL AND tm.\"league_id\" IS NULL AND NOT EXISTS ( SELECT 1 FROM \"v1_tournament_match_details\" d WHERE d.\"team_match_id\" = tm.\"id\" AND d.\"tournament_id\" = tm.\"tournament_id\" ); SELECT count(*) INTO orphan_tournament_details FROM \"v1_tournament_match_details\" d WHERE NOT EXISTS ( SELECT 1 FROM \"v1_team_matches\" tm WHERE tm.\"id\" = d.\"team_match_id\" AND tm.\"tournament_id\" = d.\"tournament_id\" ); IF canonical_game_errors <> 0 OR missing_tournament_details <> 0 OR orphan_tournament_details <> 0 THEN RAISE EXCEPTION 'RETIREMENT_PRECONDITION_FAILED canonical_games:% missing_details:% orphan_details:%', canonical_game_errors, missing_tournament_details, orphan_tournament_details USING ERRCODE = '55000'; END IF; SELECT count(*) INTO lineage_errors FROM \"v1_tournament_result_lineages\" l WHERE l.\"original_fixture_id\" IS NULL OR l.\"original_fixture_id\" <> l.\"team_match_id\" OR NOT EXISTS (SELECT 1 FROM \"v1_team_matches\" tm WHERE tm.\"id\" = l.\"team_match_id\" AND tm.\"tournament_id\" = l.\"tournament_id\") OR NOT EXISTS (SELECT 1 FROM \"v1_tournament_match_details\" d WHERE d.\"team_match_id\" = l.\"team_match_id\" AND d.\"tournament_id\" = l.\"tournament_id\") OR NOT EXISTS (SELECT 1 FROM \"v1_games\" g WHERE g.\"id\" = l.\"game_id\" AND g.\"team_match_id\" = l.\"team_match_id\" AND g.\"source_type\"::text = 'TEAM_MATCH') OR NOT EXISTS (SELECT 1 FROM \"v1_game_result_revisions\" r WHERE r.\"game_id\" = l.\"game_id\" AND r.\"id\" = l.\"official_revision_id\" AND r.\"state\"::text = 'OFFICIAL'); SELECT count(*) INTO video_errors FROM \"v1_team_match_videos\" v WHERE NOT EXISTS (SELECT 1 FROM \"v1_team_matches\" tm WHERE tm.\"id\" = v.\"team_match_id\"); SELECT count(*) INTO advancement_errors FROM \"v1_tournament_match_advancement_edges\" e WHERE NOT EXISTS (SELECT 1 FROM \"v1_tournament_match_details\" d WHERE d.\"team_match_id\" = e.\"source_team_match_id\" AND d.\"tournament_id\" = e.\"tournament_id\") OR NOT EXISTS (SELECT 1 FROM \"v1_tournament_match_details\" d WHERE d.\"team_match_id\" = e.\"target_team_match_id\" AND d.\"tournament_id\" = e.\"tournament_id\"); IF lineage_errors <> 0 OR video_errors <> 0 OR advancement_errors <> 0 THEN RAISE EXCEPTION 'RETIREMENT_PRECONDITION_FAILED lineage:% videos:% advancement:%', lineage_errors, video_errors, advancement_errors USING ERRCODE = '55000'; END IF; SELECT count(*) INTO constraint_errors FROM pg_constraint WHERE conname IN ( 'v1_games_canonical_source_guard_ck', 'v1_staff_scope_canonical_source_guard_ck', 'v1_operation_audits_canonical_source_guard_ck' ) AND NOT convalidated; IF constraint_errors <> 0 THEN RAISE EXCEPTION 'RETIREMENT_PRECONDITION_FAILED invalid_canonical_constraints=%', constraint_errors USING ERRCODE = '55000'; END IF; END $$",
+    reason:
+      "Guarded by the migration's own precondition block (lines 27-353): it takes ACCESS EXCLUSIVE locks on every affected table for the whole transaction and RAISEs SQLSTATE 55000 before any DDL below runs unless the retirement invariants it checks (zero PROCESSING outbox jobs, canonical write-mode cutover, all five retirement seals present when legacy_evidence_rows>0, zero remaining legacy links on v1_games/staff-scope/audits, and exact row-level parity between every surviving legacy fixture/result/goal/video/edge row and its canonical v1_team_matches/v1_tournament_result_lineages/v1_team_match_videos/v1_tournament_match_advancement_edges counterpart) hold. The StageB runner additionally only invokes this migration with the API and worker containers stopped (writer quiesced), so no concurrent writer can observe a partial state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_resolve_canonical_guard_game(p_game_id TEXT) RETURNS TABLE (team_match_id TEXT, semantic_tournament_id TEXT, home_team_id TEXT, away_team_id TEXT) LANGUAGE plpgsql AS $$ DECLARE game_source TEXT; game_team_match_id TEXT; tm_tournament_id TEXT; tm_league_id TEXT; details_team_match_id TEXT; details_tournament_id TEXT; details_exist BOOLEAN; BEGIN SELECT g.\"source_type\"::text, g.\"team_match_id\" INTO game_source, game_team_match_id FROM \"v1_games\" g WHERE g.\"id\" = p_game_id FOR KEY SHARE; IF NOT FOUND OR game_source <> 'TEAM_MATCH' OR game_team_match_id IS NULL THEN RAISE EXCEPTION 'canonical game source must be TEAM_MATCH with TeamMatch ownership' USING ERRCODE = '23514'; END IF; SELECT tm.\"tournament_id\", tm.\"league_id\", d.\"team_match_id\", d.\"tournament_id\" INTO tm_tournament_id, tm_league_id, details_team_match_id, details_tournament_id FROM \"v1_team_matches\" tm LEFT JOIN \"v1_tournament_match_details\" d ON d.\"team_match_id\" = tm.\"id\" AND d.\"tournament_id\" = tm.\"tournament_id\" WHERE tm.\"id\" = game_team_match_id AND tm.\"deleted_at\" IS NULL FOR KEY SHARE OF tm; IF NOT FOUND THEN RAISE EXCEPTION 'canonical game TeamMatch is missing or deleted' USING ERRCODE = '23514'; END IF; SELECT EXISTS (SELECT 1 FROM \"v1_tournament_match_details\" d WHERE d.\"team_match_id\" = game_team_match_id) INTO details_exist; IF details_exist AND details_team_match_id IS NULL THEN RAISE EXCEPTION 'canonical TeamMatch has mismatched tournament details' USING ERRCODE = '23514'; END IF; IF tm_league_id IS NOT NULL AND details_team_match_id IS NOT NULL THEN RAISE EXCEPTION 'league TeamMatch cannot have tournament match details' USING ERRCODE = '23514'; END IF; IF tm_league_id IS NULL AND tm_tournament_id IS NOT NULL AND (details_team_match_id IS DISTINCT FROM game_team_match_id OR details_tournament_id IS DISTINCT FROM tm_tournament_id) THEN RAISE EXCEPTION 'tournament TeamMatch requires matching tournament details' USING ERRCODE = '23514'; END IF; team_match_id := game_team_match_id; semantic_tournament_id := CASE WHEN tm_league_id IS NULL THEN details_tournament_id ELSE NULL END; SELECT s.\"team_id\" INTO home_team_id FROM \"v1_game_sides\" s WHERE s.\"game_id\" = p_game_id AND s.\"side_key\" = 'HOME'; SELECT s.\"team_id\" INTO away_team_id FROM \"v1_game_sides\" s WHERE s.\"game_id\" = p_game_id AND s.\"side_key\" = 'AWAY'; RETURN NEXT; END $$",
+    reason:
+      "Replaces the canonical game-ownership resolver so it stops reading the legacy tournament_fixture_id/fixture_id columns dropped later in this same transaction. Guarded by the migration's own precondition block (lines 27-353): it takes ACCESS EXCLUSIVE locks on every affected table for the whole transaction and RAISEs SQLSTATE 55000 before any DDL below runs unless the retirement invariants it checks (zero PROCESSING outbox jobs, canonical write-mode cutover, all five retirement seals present when legacy_evidence_rows>0, zero remaining legacy links on v1_games/staff-scope/audits, and exact row-level parity between every surviving legacy fixture/result/goal/video/edge row and its canonical v1_team_matches/v1_tournament_result_lineages/v1_team_match_videos/v1_tournament_match_advancement_edges counterpart) hold. The StageB runner additionally only invokes this migration with the API and worker containers stopped (writer quiesced), so no concurrent writer can observe a partial state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_guard_staff_fixture_scope() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE assignment_tournament TEXT; scope_tournament TEXT; BEGIN IF NEW.team_match_id IS NULL THEN RAISE EXCEPTION 'staff scope requires a canonical TeamMatch' USING ERRCODE = '23514'; END IF; SELECT tournament_id INTO assignment_tournament FROM \"v1_tournament_staff_assignments\" WHERE id = NEW.assignment_id; SELECT tournament_id INTO scope_tournament FROM \"v1_team_matches\" WHERE id = NEW.team_match_id AND tournament_id = NEW.tournament_id AND deleted_at IS NULL; IF assignment_tournament IS NULL OR scope_tournament IS NULL OR NEW.tournament_id IS DISTINCT FROM assignment_tournament OR scope_tournament IS DISTINCT FROM assignment_tournament THEN RAISE EXCEPTION 'staff scope must stay within tournament' USING ERRCODE = '23514'; END IF; RETURN NEW; END $$",
+    reason:
+      "Replaces the staff-scope trigger function to validate against the canonical v1_team_matches ownership instead of the legacy fixture_id column dropped later in this same transaction. Guarded by the migration's own precondition block (lines 27-353): it takes ACCESS EXCLUSIVE locks on every affected table for the whole transaction and RAISEs SQLSTATE 55000 before any DDL below runs unless the retirement invariants it checks (zero PROCESSING outbox jobs, canonical write-mode cutover, all five retirement seals present when legacy_evidence_rows>0, zero remaining legacy links on v1_games/staff-scope/audits, and exact row-level parity between every surviving legacy fixture/result/goal/video/edge row and its canonical v1_team_matches/v1_tournament_result_lineages/v1_team_match_videos/v1_tournament_match_advancement_edges counterpart) hold. The StageB runner additionally only invokes this migration with the API and worker containers stopped (writer quiesced), so no concurrent writer can observe a partial state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_block_tournament_result_lineage_game_reparent() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF EXISTS (SELECT 1 FROM \"v1_tournament_result_lineages\" WHERE game_id = OLD.id) AND (NEW.source_type IS DISTINCT FROM OLD.source_type OR NEW.team_match_id IS DISTINCT FROM OLD.team_match_id) THEN RAISE EXCEPTION 'game ownership is immutable after tournament result lineage capture' USING ERRCODE = '55000'; END IF; RETURN NEW; END $$",
+    reason:
+      "Replaces the game-reparent guard function body ahead of the DROP/CREATE TRIGGER pair below (statements 8 and 25) that re-attaches it to v1_games without referencing the retired fixture linkage. Same transaction, same precondition.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "CREATE OR REPLACE FUNCTION v1_guard_tournament_result_lineage_insert() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE game_team_match_id TEXT; game_source_type TEXT; revision_state \"V1GameResultRevisionState\"; source_row RECORD; BEGIN SELECT g.\"team_match_id\", g.\"source_type\"::text INTO game_team_match_id, game_source_type FROM \"v1_games\" g WHERE g.\"id\" = NEW.\"game_id\" FOR UPDATE; SELECT r.\"state\" INTO revision_state FROM \"v1_game_result_revisions\" r WHERE r.\"game_id\" = NEW.\"game_id\" AND r.\"id\" = NEW.\"official_revision_id\"; SELECT * INTO source_row FROM v1_resolve_canonical_guard_game(NEW.\"game_id\"); IF game_source_type IS DISTINCT FROM 'TEAM_MATCH' OR game_team_match_id IS DISTINCT FROM NEW.\"team_match_id\" OR source_row.semantic_tournament_id IS DISTINCT FROM NEW.\"tournament_id\" OR NEW.\"original_fixture_id\" IS DISTINCT FROM NEW.\"team_match_id\" OR revision_state IS DISTINCT FROM 'OFFICIAL'::\"V1GameResultRevisionState\" THEN RAISE EXCEPTION 'tournament result lineage requires the matching canonical TeamMatch official revision' USING ERRCODE = '23514'; END IF; RETURN NEW; END $$",
+    reason:
+      "Replaces the tournament-result-lineage insert guard to stop requiring source_type = 'TOURNAMENT_FIXTURE' provenance now that the legacy source is retired. Guarded by the migration's own precondition block (lines 27-353): it takes ACCESS EXCLUSIVE locks on every affected table for the whole transaction and RAISEs SQLSTATE 55000 before any DDL below runs unless the retirement invariants it checks (zero PROCESSING outbox jobs, canonical write-mode cutover, all five retirement seals present when legacy_evidence_rows>0, zero remaining legacy links on v1_games/staff-scope/audits, and exact row-level parity between every surviving legacy fixture/result/goal/video/edge row and its canonical v1_team_matches/v1_tournament_result_lineages/v1_team_match_videos/v1_tournament_match_advancement_edges counterpart) hold. The StageB runner additionally only invokes this migration with the API and worker containers stopped (writer quiesced), so no concurrent writer can observe a partial state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "DROP TRIGGER IF EXISTS v1_block_tournament_result_lineage_game_reparent ON \"v1_games\"",
+    reason:
+      "Drops the trigger bound to the function just replaced in statement 6 so CREATE TRIGGER (statement 25) can re-attach the updated definition; the guard is absent for no observable interval because both statements run inside this same transaction with the writer quiesced.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "DROP TRIGGER IF EXISTS v1_000_tournament_fixture_retired_link ON \"v1_games\"",
+    reason:
+      "Removes the legacy fixture-link ingress trigger from v1_games. Guarded by the migration's own precondition block (lines 27-353): it takes ACCESS EXCLUSIVE locks on every affected table for the whole transaction and RAISEs SQLSTATE 55000 before any DDL below runs unless the retirement invariants it checks (zero PROCESSING outbox jobs, canonical write-mode cutover, all five retirement seals present when legacy_evidence_rows>0, zero remaining legacy links on v1_games/staff-scope/audits, and exact row-level parity between every surviving legacy fixture/result/goal/video/edge row and its canonical v1_team_matches/v1_tournament_result_lineages/v1_team_match_videos/v1_tournament_match_advancement_edges counterpart) hold. The StageB runner additionally only invokes this migration with the API and worker containers stopped (writer quiesced), so no concurrent writer can observe a partial state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "DROP TRIGGER IF EXISTS v1_000_tournament_fixture_retired_link ON \"v1_tournament_staff_fixture_scopes\"",
+    reason:
+      "Removes the legacy fixture-link ingress trigger from v1_tournament_staff_fixture_scopes. Guarded by the migration's own precondition block (lines 27-353): it takes ACCESS EXCLUSIVE locks on every affected table for the whole transaction and RAISEs SQLSTATE 55000 before any DDL below runs unless the retirement invariants it checks (zero PROCESSING outbox jobs, canonical write-mode cutover, all five retirement seals present when legacy_evidence_rows>0, zero remaining legacy links on v1_games/staff-scope/audits, and exact row-level parity between every surviving legacy fixture/result/goal/video/edge row and its canonical v1_team_matches/v1_tournament_result_lineages/v1_team_match_videos/v1_tournament_match_advancement_edges counterpart) hold. The StageB runner additionally only invokes this migration with the API and worker containers stopped (writer quiesced), so no concurrent writer can observe a partial state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "DROP TRIGGER IF EXISTS v1_000_tournament_fixture_retired_link ON \"v1_operation_audits\"",
+    reason:
+      "Removes the legacy fixture-link ingress trigger from v1_operation_audits. Guarded by the migration's own precondition block (lines 27-353): it takes ACCESS EXCLUSIVE locks on every affected table for the whole transaction and RAISEs SQLSTATE 55000 before any DDL below runs unless the retirement invariants it checks (zero PROCESSING outbox jobs, canonical write-mode cutover, all five retirement seals present when legacy_evidence_rows>0, zero remaining legacy links on v1_games/staff-scope/audits, and exact row-level parity between every surviving legacy fixture/result/goal/video/edge row and its canonical v1_team_matches/v1_tournament_result_lineages/v1_team_match_videos/v1_tournament_match_advancement_edges counterpart) hold. The StageB runner additionally only invokes this migration with the API and worker containers stopped (writer quiesced), so no concurrent writer can observe a partial state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "ALTER TABLE \"v1_games\" DROP CONSTRAINT IF EXISTS \"v1_games_canonical_source_guard_ck\"",
+    reason:
+      "Drops the combined (legacy-or-canonical) source guard on v1_games so it can be replaced by the canonical-only CHECK added in statement 26 later in this same transaction.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "ALTER TABLE \"v1_tournament_staff_fixture_scopes\" DROP CONSTRAINT IF EXISTS \"v1_staff_scope_canonical_source_guard_ck\"",
+    reason:
+      "Drops the combined (legacy-or-canonical) source guard on v1_tournament_staff_fixture_scopes so it can be replaced by the canonical-only CHECK added in statement 27 later in this same transaction.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "ALTER TABLE \"v1_operation_audits\" DROP CONSTRAINT IF EXISTS \"v1_operation_audits_canonical_source_guard_ck\"",
+    reason:
+      "Drops the combined (legacy-or-canonical) source guard on v1_operation_audits; this table has no canonical-only replacement because it only ever recorded which source produced an audit row, not the row's validity.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "ALTER TABLE \"v1_games\" DROP CONSTRAINT IF EXISTS \"v1_games_source_expand_ck\"",
+    reason:
+      "Drops the dual-source expansion CHECK on v1_games (added in 20260908130000 as a temporary compatibility bridge and already an accepted expand entry above); it names the tournament_fixture_id column dropped in statement 17 of this same transaction, so it cannot outlive that column.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "ALTER TABLE \"v1_tournament_staff_fixture_scopes\" DROP CONSTRAINT IF EXISTS \"v1_staff_scope_source_ck\"",
+    reason:
+      "Drops the dual-source expansion CHECK on v1_tournament_staff_fixture_scopes; it names the fixture_id column dropped in statement 18 of this same transaction, so it cannot outlive that column.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "ALTER TABLE \"v1_games\" DROP CONSTRAINT IF EXISTS \"v1_games_tournament_fixture_id_fkey\", DROP COLUMN IF EXISTS \"tournament_fixture_id\"",
+    reason:
+      "Drops the legacy tournament_fixture_id FK and column on v1_games. Guarded by the migration's own precondition block (lines 27-353): it takes ACCESS EXCLUSIVE locks on every affected table for the whole transaction and RAISEs SQLSTATE 55000 before any DDL below runs unless the retirement invariants it checks (zero PROCESSING outbox jobs, canonical write-mode cutover, all five retirement seals present when legacy_evidence_rows>0, zero remaining legacy links on v1_games/staff-scope/audits, and exact row-level parity between every surviving legacy fixture/result/goal/video/edge row and its canonical v1_team_matches/v1_tournament_result_lineages/v1_team_match_videos/v1_tournament_match_advancement_edges counterpart) hold. The StageB runner additionally only invokes this migration with the API and worker containers stopped (writer quiesced), so no concurrent writer can observe a partial state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "ALTER TABLE \"v1_tournament_staff_fixture_scopes\" DROP CONSTRAINT IF EXISTS \"v1_staff_scope_fixture_fk\", DROP COLUMN IF EXISTS \"fixture_id\"",
+    reason:
+      "Drops the legacy fixture_id FK and column on v1_tournament_staff_fixture_scopes. Guarded by the migration's own precondition block (lines 27-353): it takes ACCESS EXCLUSIVE locks on every affected table for the whole transaction and RAISEs SQLSTATE 55000 before any DDL below runs unless the retirement invariants it checks (zero PROCESSING outbox jobs, canonical write-mode cutover, all five retirement seals present when legacy_evidence_rows>0, zero remaining legacy links on v1_games/staff-scope/audits, and exact row-level parity between every surviving legacy fixture/result/goal/video/edge row and its canonical v1_team_matches/v1_tournament_result_lineages/v1_team_match_videos/v1_tournament_match_advancement_edges counterpart) hold. The StageB runner additionally only invokes this migration with the API and worker containers stopped (writer quiesced), so no concurrent writer can observe a partial state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "ALTER TABLE \"v1_operation_audits\" DROP CONSTRAINT IF EXISTS \"v1_operation_audits_fixture_fk\", DROP COLUMN IF EXISTS \"fixture_id\"",
+    reason:
+      "Drops the legacy fixture_id FK and column on v1_operation_audits. Guarded by the migration's own precondition block (lines 27-353): it takes ACCESS EXCLUSIVE locks on every affected table for the whole transaction and RAISEs SQLSTATE 55000 before any DDL below runs unless the retirement invariants it checks (zero PROCESSING outbox jobs, canonical write-mode cutover, all five retirement seals present when legacy_evidence_rows>0, zero remaining legacy links on v1_games/staff-scope/audits, and exact row-level parity between every surviving legacy fixture/result/goal/video/edge row and its canonical v1_team_matches/v1_tournament_result_lineages/v1_team_match_videos/v1_tournament_match_advancement_edges counterpart) hold. The StageB runner additionally only invokes this migration with the API and worker containers stopped (writer quiesced), so no concurrent writer can observe a partial state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "DROP TABLE \"v1_tournament_fixture_goals\"",
+    reason:
+      "Drops the retired v1_tournament_fixture_goals table. Guarded by the migration's own precondition block (lines 27-353): it takes ACCESS EXCLUSIVE locks on every affected table for the whole transaction and RAISEs SQLSTATE 55000 before any DDL below runs unless the retirement invariants it checks (zero PROCESSING outbox jobs, canonical write-mode cutover, all five retirement seals present when legacy_evidence_rows>0, zero remaining legacy links on v1_games/staff-scope/audits, and exact row-level parity between every surviving legacy fixture/result/goal/video/edge row and its canonical v1_team_matches/v1_tournament_result_lineages/v1_team_match_videos/v1_tournament_match_advancement_edges counterpart) hold. The StageB runner additionally only invokes this migration with the API and worker containers stopped (writer quiesced), so no concurrent writer can observe a partial state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "DROP TABLE \"v1_tournament_fixture_results\"",
+    reason:
+      "Drops the retired v1_tournament_fixture_results table. Guarded by the migration's own precondition block (lines 27-353): it takes ACCESS EXCLUSIVE locks on every affected table for the whole transaction and RAISEs SQLSTATE 55000 before any DDL below runs unless the retirement invariants it checks (zero PROCESSING outbox jobs, canonical write-mode cutover, all five retirement seals present when legacy_evidence_rows>0, zero remaining legacy links on v1_games/staff-scope/audits, and exact row-level parity between every surviving legacy fixture/result/goal/video/edge row and its canonical v1_team_matches/v1_tournament_result_lineages/v1_team_match_videos/v1_tournament_match_advancement_edges counterpart) hold. The StageB runner additionally only invokes this migration with the API and worker containers stopped (writer quiesced), so no concurrent writer can observe a partial state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "DROP TABLE \"v1_tournament_fixture_videos\"",
+    reason:
+      "Drops the retired v1_tournament_fixture_videos table. Guarded by the migration's own precondition block (lines 27-353): it takes ACCESS EXCLUSIVE locks on every affected table for the whole transaction and RAISEs SQLSTATE 55000 before any DDL below runs unless the retirement invariants it checks (zero PROCESSING outbox jobs, canonical write-mode cutover, all five retirement seals present when legacy_evidence_rows>0, zero remaining legacy links on v1_games/staff-scope/audits, and exact row-level parity between every surviving legacy fixture/result/goal/video/edge row and its canonical v1_team_matches/v1_tournament_result_lineages/v1_team_match_videos/v1_tournament_match_advancement_edges counterpart) hold. The StageB runner additionally only invokes this migration with the API and worker containers stopped (writer quiesced), so no concurrent writer can observe a partial state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "DROP TABLE \"v1_tournament_fixture_advancement_edges\"",
+    reason:
+      "Drops the retired v1_tournament_fixture_advancement_edges table. Guarded by the migration's own precondition block (lines 27-353): it takes ACCESS EXCLUSIVE locks on every affected table for the whole transaction and RAISEs SQLSTATE 55000 before any DDL below runs unless the retirement invariants it checks (zero PROCESSING outbox jobs, canonical write-mode cutover, all five retirement seals present when legacy_evidence_rows>0, zero remaining legacy links on v1_games/staff-scope/audits, and exact row-level parity between every surviving legacy fixture/result/goal/video/edge row and its canonical v1_team_matches/v1_tournament_result_lineages/v1_team_match_videos/v1_tournament_match_advancement_edges counterpart) hold. The StageB runner additionally only invokes this migration with the API and worker containers stopped (writer quiesced), so no concurrent writer can observe a partial state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "DROP TABLE \"v1_tournament_fixtures\"",
+    reason:
+      "Drops the retired v1_tournament_fixtures table itself, last of the five so every table that referenced it (dropped above) is already gone. Guarded by the migration's own precondition block (lines 27-353): it takes ACCESS EXCLUSIVE locks on every affected table for the whole transaction and RAISEs SQLSTATE 55000 before any DDL below runs unless the retirement invariants it checks (zero PROCESSING outbox jobs, canonical write-mode cutover, all five retirement seals present when legacy_evidence_rows>0, zero remaining legacy links on v1_games/staff-scope/audits, and exact row-level parity between every surviving legacy fixture/result/goal/video/edge row and its canonical v1_team_matches/v1_tournament_result_lineages/v1_team_match_videos/v1_tournament_match_advancement_edges counterpart) hold. The StageB runner additionally only invokes this migration with the API and worker containers stopped (writer quiesced), so no concurrent writer can observe a partial state.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "CREATE TRIGGER v1_block_tournament_result_lineage_game_reparent BEFORE UPDATE OF \"source_type\", \"team_match_id\" ON \"v1_games\" FOR EACH ROW EXECUTE FUNCTION v1_block_tournament_result_lineage_game_reparent()",
+    reason:
+      "Re-attaches the game-reparent guard trigger to the existing v1_games table using the function body replaced in statement 6, closing the gap opened by DROP TRIGGER in statement 8 within the same transaction.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "ALTER TABLE \"v1_games\" ADD CONSTRAINT \"v1_games_canonical_source_guard_ck\" CHECK (\"source_type\"::text = 'TEAM_MATCH' AND \"team_match_id\" IS NOT NULL)",
+    reason:
+      "Replaces the dropped combined guard (statement 12) with a canonical-only CHECK on v1_games. The precondition block already proved every existing row has source_type = 'TEAM_MATCH' with a non-null team_match_id (the legacy_game_links=0 assertion), so no pre-existing row can violate it.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "ALTER TABLE \"v1_tournament_staff_fixture_scopes\" ADD CONSTRAINT \"v1_staff_scope_canonical_source_guard_ck\" CHECK (\"team_match_id\" IS NOT NULL AND \"tournament_id\" IS NOT NULL)",
+    reason:
+      "Replaces the dropped combined guard (statement 13) with a canonical-only CHECK on v1_tournament_staff_fixture_scopes. The precondition block already proved every existing row has a non-null team_match_id and no fixture_id link (the legacy_staff_links=0 assertion), so no pre-existing row can violate it.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "DROP FUNCTION IF EXISTS v1_reject_retired_tournament_fixture_write()",
+    reason:
+      "Drops the legacy write-rejection function now that its two triggers (dropped in statements 9-11's sibling on v1_games plus the write/row-level triggers this function backed) reference nothing after the tables above are gone; DROP FUNCTION on a still-referenced function fails, so success itself proves no live trigger remained bound to it.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "DROP FUNCTION IF EXISTS v1_reject_retired_tournament_fixture_link()",
+    reason:
+      "Drops the legacy link-rejection function for the same reason as statement 28: its triggers are removed in statements 9-11 within this same transaction, and DROP FUNCTION fails outright if any trigger still depends on it.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "DROP TYPE \"V1TournamentGoalTeam\"",
+    reason:
+      "Drops the V1TournamentGoalTeam enum. Postgres refuses DROP TYPE while any column still references it (v1_tournament_fixture_goals.team, dropped in statement 20), so the DROP succeeding is itself proof no live column used it.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql",
+    statement: "DROP TYPE \"V1TournamentFixtureStatus\"",
+    reason:
+      "Drops the V1TournamentFixtureStatus enum. Postgres refuses DROP TYPE while any column still references it (v1_tournament_fixtures.status, dropped in statement 24), so the DROP succeeding is itself proof no live column used it.",
+  },
 ];
 
 const normalizeStatementText = (statement) => statement.replace(/\s+/g, ' ').trim();
@@ -657,9 +1506,19 @@ for (const [label, sha] of [['base', baseSha], ['head', headSha]]) {
   if (!/^[0-9a-f]{40}$/.test(sha ?? '')) fail(`${label} SHA must be a full lowercase commit`);
 }
 
-runGit(['merge-base', '--is-ancestor', baseSha, headSha]);
+// PR 이벤트가 넘기는 base 는 **대상 브랜치의 현재 tip** 이다(github.event.pull_request.base.sha).
+// 브랜치를 딴 뒤 dev 가 전진하면 그 tip 은 head 의 조상이 아니게 되고, 아래 diff 가 "dev 에는
+// 있고 내 브랜치엔 없는" 남의 마이그레이션까지 D 로 뱉어 `existing migration changed (D)` 로
+// 엉뚱하게 죽는다 — 이 PR 이 마이그레이션을 전혀 건드리지 않아도 그렇다(2026-08-21 리그전
+// 작업에서 5개 PR 이 이 사유로 red 였다). 그래서 조상이 아니면 **실제 분기점** 을 diff base 로
+// 쓴다. 그래야 이 PR 이 정말로 **추가한** 마이그레이션만 A 로 잡힌다.
+//
+// 게이트를 느슨하게 만들지 않는다는 점이 중요하다: 바꾸는 것은 "무엇을 이 PR 의 변경으로 볼
+// 것인가" 뿐이고, 아래 collectBaseFunctionNames 는 계속 **대상 브랜치 tip**(baseSha)을 본다 —
+// 함수 존재 여부는 머지된 뒤의 현실로 판정해야 CREATE OR REPLACE 가 새 함수로 오인되지 않는다.
+const diffBase = isAncestorOf(baseSha, headSha) ? baseSha : mergeBaseOf(baseSha, headSha);
 const changes = runGit([
-  'diff', '--name-status', '--find-renames', baseSha, headSha, '--',
+  'diff', '--name-status', '--find-renames', diffBase, headSha, '--',
   'apps/v1_api/prisma/migrations/*/migration.sql',
 ]).trim();
 const addedFiles = [];
@@ -820,13 +1679,22 @@ function splitTopLevel(text) {
 // Returns [{ column }] for every `ADD COLUMN <name> ...` clause in an ALTER
 // TABLE statement that does NOT carry `NOT NULL` (i.e. genuinely nullable,
 // matching the same safety bar the existing ADD COLUMN additive rule uses).
+//
+// `splitTopLevel` keeps the separator's trailing whitespace, so every clause
+// after the first arrives as " ADD COLUMN …" — and this match is anchored.
+// Without the trim only the FIRST column of a multi-column ALTER TABLE was
+// ever registered, which silently withdrew the unique-index and FK exemptions
+// from columns 2..n even though they are just as newly-added-and-nullable as
+// the first. Prisma emits exactly that shape (one ALTER TABLE, one ADD COLUMN
+// clause per new column), so the gap fired on ordinary generated migrations.
+// The sibling parsers (uniqueIndexColumns, foreignKeyColumns) already trim.
 function addedNullableColumns(statement) {
   if (!/^ALTER TABLE\b/i.test(statement)) return [];
   const afterTable = statement.replace(/^ALTER TABLE\s+(?:"[^"]+"\.)?(?:"[^"]+"|[a-zA-Z_][\w$]*)\s*/i, '');
   const clauses = splitTopLevel(afterTable);
   const columns = [];
   for (const clause of clauses) {
-    const match = clause.match(/^ADD COLUMN\s+(?:IF NOT EXISTS\s+)?("[^"]+"|[a-zA-Z_][\w$]*)([\s\S]*)$/i);
+    const match = clause.trim().match(/^ADD COLUMN\s+(?:IF NOT EXISTS\s+)?("[^"]+"|[a-zA-Z_][\w$]*)([\s\S]*)$/i);
     if (!match) continue;
     const [, rawColumn, rest] = match;
     if (/\bNOT NULL\b/i.test(rest)) continue;
@@ -984,13 +1852,127 @@ function isAdditiveStatement(statement, { newTables, nullableNewColumnsByTable, 
   return false;
 }
 
+// runGit 과 달리 실패를 예외로 흘리지 않고 boolean 으로 돌려준다 — 조상이 아닌 것은
+// 오류가 아니라 판정해야 할 상태다(runGit 은 git 이 non-zero 면 곧바로 fail() 로 종료한다).
+/**
+ * 분기점을 구한다. `runGit` 을 안 쓰는 이유는 **rc 1 이 오류가 아니기 때문**이다 — git 은
+ * "공통 조상이 없다"를 rc 1 + 빈 출력으로 답한다(실측 2026-09-01). 그걸 `Command failed`
+ * 로 뭉뚱그리면 읽는 사람이 원인을 못 짚는다.
+ */
+function mergeBaseOf(baseSha, headSha) {
+  let out;
+  try {
+    out = execFileSync('git', ['merge-base', baseSha, headSha], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+  } catch (error) {
+    if (error?.status === 1) {
+      // rc 1 = git 이 정상적으로 답한 "공통 조상 없음". **원인은 여기서 단정하지 않는다** —
+      // 대신 그 순간의 저장소 상태를 찍는다. 예전엔 "얕은 클론이면 fetch 깊이를 늘려라"고
+      // 적어 뒀는데, 이 저장소에서 그 조언은 **틀렸다**: 이게 실제로 터진 두 번(2026-09-01
+      // #941 · 2026-09-02 #951) 모두 그 job 은 `fetch-depth: 0` 에 브랜치 630여 개를
+      // 받은 상태였다. 읽는 사람은 이미 0 인 깊이를 늘리려 하게 된다.
+      //
+      // 원인은 여전히 미상이고, 그래서 **추측 대신 측정값을 남긴다.** 세 번째 발생 때
+      // 이 줄들이 답을 준다.
+      fail(
+        `base 와 head 의 공통 조상을 찾지 못했다: ${baseSha} / ${headSha}\n`
+        + `  ${describeRepoState(baseSha, headSha)}\n`
+        + '  두 이력이 정말 무관하거나, 이 저장소가 분기점까지의 이력을 갖고 있지 않다.\n'
+        + '  위 상태값으로 어느 쪽인지 가른다 — 얕은 저장소면 깊이 문제이고,\n'
+        + '  얕지 않은데 양쪽 객체가 다 있으면 그건 아직 설명되지 않은 경우다.',
+      );
+    }
+    fail(`git merge-base ${baseSha} ${headSha} failed${describeGitFailure(error)}`);
+  }
+  if (!out) fail(`git merge-base ${baseSha} ${headSha} 가 빈 값을 돌려줬다`);
+  return out;
+}
+
+/**
+ * 실패한 그 순간의 저장소 상태를 한 줄로 만든다 — **추측을 대신할 측정값.**
+ *
+ * 이 함수 자체가 죽으면 원래 진단까지 못 보게 되므로, 각 항목은 실패해도 `?` 로 남기고
+ * 계속 간다. 진단을 돕는 코드가 진단을 가려서는 안 된다.
+ */
+function describeRepoState(baseSha, headSha) {
+  const probe = (args, fallback = '?') => {
+    try {
+      return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+  const has = (sha) => {
+    try {
+      execFileSync('git', ['cat-file', '-e', `${sha}^{commit}`], { stdio: 'ignore' });
+      return 'yes';
+    } catch {
+      return 'no';
+    }
+  };
+  const shallow = probe(['rev-parse', '--is-shallow-repository']);
+  return [
+    `shallow=${shallow}`,
+    `base객체=${has(baseSha)}`,
+    `head객체=${has(headSha)}`,
+    `base에서닿는커밋=${probe(['rev-list', '--count', baseSha])}`,
+    `head에서닿는커밋=${probe(['rev-list', '--count', headSha])}`,
+  ].join(' · ');
+}
+
+function isAncestorOf(ancestor, descendant) {
+  try {
+    // `stdio: 'ignore'` 였을 땐 git 의 말을 **받지도 않았다.** 고장을 가려내려면 stderr 가 필요하다.
+    // `encoding` 은 진단 문구를 바꾸지 않는다 — `error.message` 에는 둘 다 `fatal: …` 이 실린다
+    // (실측: 차이는 `error.stderr` 가 Uint8Array 냐 String 이냐뿐이고, describeGitFailure 는
+    // message 만 쓴다). 그래도 명시한다 — runGit·mergeBaseOf 와 **세 호출부가 어긋나 있으면**
+    // 나중에 누가 stderr 를 직접 읽도록 고칠 때 여기만 Buffer 라 조용히 달라진다.
+    execFileSync('git', ['merge-base', '--is-ancestor', ancestor, descendant], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'ignore', 'pipe'],
+    });
+    return true;
+  } catch (error) {
+    // 맨 `catch { return false }` 는 **"조상이 아니다"(판정)와 "저장소가 고장났다"(오류)를
+    // 같은 값으로 만든다.** 그래서 base 객체가 없거나 저장소가 깨져도 조용히 `false` 가 되고,
+    // 호출부는 아무 일 없다는 듯 merge-base 로 내려가 거기서 죽는다 — **첫 신호를 여기서
+    // 삼킨다.** git 은 이 둘을 rc 로 구분해 준다(실측 2026-09-01):
+    //   rc 1   → 조상이 아니다. stderr 는 비어 있다. **정상적인 답이다.**
+    //   rc 128 → `fatal: Not a valid commit name …` 류. **고장이다.**
+    if (error?.status === 1) return false;
+    fail(`git merge-base --is-ancestor ${ancestor} ${descendant} failed${describeGitFailure(error)}`);
+  }
+}
+
 function runGit(args) {
   try {
     return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1024 * 1024 * 64 });
   } catch (error) {
-    const details = error instanceof Error ? error.message : String(error);
-    fail(`git ${args.join(' ')} failed: ${details}`);
+    // 없던 건 **exit status** 다. stderr 는 원래도 안 사라졌다 — Node 가 `error.message`
+    // 뒤에 붙여 준다(describeGitFailure 참조). 2026-09-01 로그에 아무 말이 없었던 건
+    // 유실이 아니라 **rc 1 이라 stderr 가 실제로 비어 있었기** 때문이고, 그 사실을 알려면
+    // rc 가 필요했다. 아래 판정들이 전부 rc 로 갈린다.
+    fail(`git ${args.join(' ')} failed${describeGitFailure(error)}`);
   }
+}
+
+/**
+ * `execFileSync` 가 던진 것에서 **밖에서 판단에 쓸 수 있는 것**만 뽑아 한 줄로 만든다.
+ *
+ * stderr 를 따로 붙이지 않는다 — Node 가 이미 `error.message` 뒤에 이어 준다(실측):
+ *   rc 128 → `Command failed: git merge-base … \nfatal: Not a valid commit name …`
+ *   rc 1   → `Command failed: git merge-base …`            (stderr 가 비어 있다)
+ * 따로 붙이면 같은 문장이 두 번 나오거나, 아무 차이도 없는 분기가 하나 남는다.
+ *
+ * 없던 것은 **exit status** 다. 그리고 그게 이 게이트에서 실제로 갈리는 값이다 —
+ * rc 1 은 git 의 정상적인 답이고 rc 128 은 고장이다.
+ */
+function describeGitFailure(error) {
+  const status = typeof error?.status === 'number' ? ` (exit ${error.status})` : '';
+  const details = error instanceof Error ? error.message : String(error);
+  return `${status}: ${details}`;
 }
 
 function selfTest() {
@@ -1054,12 +2036,21 @@ function selfTest() {
   ];
   for (const [label, sql] of unparsableCases) {
     let refused = false;
+    let unexpected = null;
     try {
       parseStatements(sql, 'selftest.sql');
     } catch (error) {
+      // 기대한 타입이 아니면 `refused` 가 false 로 남아 아래 메시지가 **"splitter 가
+      // 삼켰다"** 라고 말한다 — 실제로는 삼킨 게 아니라 **다른 이유로 죽은** 것이다.
+      // 소리 없이 통과하진 않지만 원인을 엉뚱한 데로 보낸다. 어떤 오류였는지 남긴다.
       refused = error instanceof UnparsableSqlError;
+      if (!refused) unexpected = error;
     }
-    if (!refused) fail(`splitter swallowed ${label} instead of refusing to parse it`);
+    if (!refused) {
+      fail(unexpected
+        ? `splitter threw an unexpected error for ${label}: ${unexpected?.message ?? unexpected}`
+        : `splitter swallowed ${label} instead of refusing to parse it`);
+    }
   }
 
   // A FK on an existing table's column is additive only while that column
@@ -1080,6 +2071,32 @@ function selfTest() {
     !fkAfterNotNullFailures.some((message) => message.includes('User_planId_fkey'))
   ) {
     fail('FK-after-SET-NOT-NULL must be rejected once nullability is revoked');
+  }
+
+  // A multi-column ALTER TABLE must register EVERY nullable column it adds,
+  // not just the first — Prisma generates one ALTER TABLE with several ADD
+  // COLUMN clauses, and the clause parser is anchored, so columns 2..n used to
+  // be dropped. Both directions are asserted: the second added column earns the
+  // unique-index exemption, and a NOT NULL DEFAULT column in the same statement
+  // does not (it is not nullable, so a legacy row could collide on it).
+  const multiColumnAccepted = [
+    { file: 'multi.sql', statement: 'ALTER TABLE "User" ADD COLUMN "firstNew" TEXT, ADD COLUMN "secondNew" TEXT' },
+    { file: 'multi.sql', statement: 'CREATE UNIQUE INDEX "User_secondNew_key" ON "User"("secondNew")' },
+  ];
+  const multiColumnAcceptedFailures = [];
+  runAdditivityCheck(multiColumnAccepted, baseFunctionNames, (message) => multiColumnAcceptedFailures.push(message));
+  if (multiColumnAcceptedFailures.length > 0) {
+    fail(`non-first column of a multi-column ADD COLUMN lost its nullable-new status: ${multiColumnAcceptedFailures.join(' | ')}`);
+  }
+
+  const multiColumnRejected = [
+    { file: 'multi.sql', statement: 'ALTER TABLE "User" ADD COLUMN "nullableNew" TEXT, ADD COLUMN "requiredNew" TEXT NOT NULL DEFAULT \'x\'' },
+    { file: 'multi.sql', statement: 'CREATE UNIQUE INDEX "User_requiredNew_key" ON "User"("requiredNew")' },
+  ];
+  const multiColumnRejectedFailures = [];
+  runAdditivityCheck(multiColumnRejected, baseFunctionNames, (message) => multiColumnRejectedFailures.push(message));
+  if (!multiColumnRejectedFailures.some((message) => message.includes('User_requiredNew_key'))) {
+    fail('a NOT NULL column added alongside a nullable one must not earn the unique-index exemption');
   }
 
   // A unique index on an existing table without the `id` column, and with no
@@ -1151,7 +2168,186 @@ function selfTest() {
     fail('the allowlist must be scoped to its exact file, not match the same statement elsewhere');
   }
 
+  // **allowlist 의 객체가 닫혔는지 본다.** 이 파일은 한 배열에 항목을 모으는데, 양쪽
+  // 브랜치가 각각 항목을 추가하면 3-way merge 가 객체 하나를 닫지 않고 붙여 놓는 일이
+  // 생긴다(2026-09-04 실사고, #1004·#1007 에서 두 번). 그러면 뒤 항목의 키가 앞 항목을
+  // **덮어써 항목 하나가 조용히 죽는다** — 문법은 온전하니 `node --check` 도, 게이트 실행도
+  // (덮인 항목을 안 쓰는 PR 이면) 통과한다.
+  //
+  // 소스에서 `file:` 줄 수와 항목 수가 같은지 비교한다. 한 객체에 `file` 이 둘이면 항목 수가
+  // 줄어들어 여기서 걸린다.
+  {
+    const source = readFileSync(new URL(import.meta.url), 'utf8');
+    const fileKeyLines = (source.match(/^ {4}file: /gm) ?? []).length;
+    if (fileKeyLines !== REVIEWED_NON_ADDITIVE.length) {
+      fail(
+        `allowlist 항목이 뭉쳤다: 소스의 file: 줄 ${fileKeyLines}개 vs 배열 길이 ` +
+          `${REVIEWED_NON_ADDITIVE.length}개 — 닫히지 않은 객체가 있어 항목이 서로를 덮고 있다`,
+      );
+    }
+  }
+  console.log('[expand-contract-sql-v1] allowlist 객체 무결성 통과');
   console.log('[expand-contract-sql-v1] negative controls passed');
+
+  baseResolutionSelfTest();
+  baseFailureDiagnosticsSelfTest();
+}
+
+/**
+ * base 해석이 **실패할 때 무엇을 말하는가**를 검증한다.
+ *
+ * 위 baseResolutionSelfTest 는 해석이 **성공하는** 경로만 본다. 그런데 2026-09-01 에 실제로
+ * 터진 것은 실패 경로였고, 그때 로그에 남은 건 `Command failed: git merge-base …` 한 줄뿐이라
+ * **원인을 아무도 못 짚었다**(가설이 여러 개 나왔고 전부 증거와 충돌했다). 그래서 여기서는
+ * 판정 결과가 아니라 **메시지가 원인을 담는지**를 본다.
+ *
+ * ⚠️ 이 대조군은 **프로덕션 실패를 재현하지 않는다.** 그 실패의 원인은 아직 미상이다
+ * (그 CI job 은 `fetch-depth: 0` 이고 두 SHA 는 체크아웃된 머지 커밋의 부모였다 — 아래 두
+ * 모양 어느 쪽도 아니다). 여기서 덮는 것은 **git 이 실패를 알리는 두 가지 방식**이고,
+ * 목적은 다음번에 게이트가 **스스로 원인을 말하게** 하는 것이다.
+ */
+function baseFailureDiagnosticsSelfTest() {
+  const origin = mkdtempSync(join(tmpdir(), 'ec-origin-'));
+  const shallow = mkdtempSync(join(tmpdir(), 'ec-shallow-'));
+  const gitIn = (repo) => (...args) =>
+    execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const git = gitIn(origin);
+  const commitIn = (repo, dir, sql, message) => {
+    mkdirSync(join(repo, 'apps/v1_api/prisma/migrations', dir), { recursive: true });
+    writeFileSync(join(repo, 'apps/v1_api/prisma/migrations', dir, 'migration.sql'), `${sql}\n`);
+    gitIn(repo)('add', '-A');
+    gitIn(repo)('-c', 'user.email=selftest@local', '-c', 'user.name=selftest', 'commit', '-qm', message);
+    return gitIn(repo)('rev-parse', 'HEAD');
+  };
+  /** 게이트를 돌려 **종료코드와 사람이 읽을 메시지**를 함께 받는다. */
+  const gateRun = (repo, base, head) => {
+    try {
+      execFileSync(process.execPath, [SELF_PATH, base, head], {
+        cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      return { code: 0, text: '' };
+    } catch (error) {
+      return { code: error?.status ?? -1, text: `${error?.stdout ?? ''}${error?.stderr ?? ''}` };
+    }
+  };
+  const expectMessage = (label, got, needles) => {
+    if (got.code === 0) fail(`base failure self-test: ${label} 은 실패해야 하는데 통과했다`);
+    for (const needle of needles) {
+      if (!got.text.includes(needle)) {
+        fail(`base failure self-test: ${label} 메시지에 "${needle}" 이 없다 — 받은 것: ${got.text.trim()}`);
+      }
+    }
+  };
+
+  try {
+    git('init', '-q', '.');
+    const fork = commitIn(origin, '20260101000000_base', 'CREATE TABLE "Thing" ("id" UUID NOT NULL);', 'base');
+    git('checkout', '-q', '-b', 'mainline');
+    const movedTip = commitIn(origin, '20260103000000_other', 'ALTER TABLE "Thing" ADD COLUMN "other" TEXT;', 'other');
+    git('checkout', '-q', fork);
+    git('checkout', '-q', '-b', 'feature');
+    const featureHead = commitIn(origin, '20260102000000_safe', 'ALTER TABLE "Thing" ADD COLUMN "note" TEXT;', 'safe');
+
+    // (A) 형식은 맞지만 **없는** base — base 가 force-push 로 사라지면 실제로 생긴다.
+    //
+    //     ⚠️ `Not a valid commit name` 만 단언하면 **이 케이스는 헛돈다.** isAncestorOf 를
+    //     예전의 맨 catch 로 되돌려도 통과하기 때문이다 — 거기서 조용히 false 가 된 뒤
+    //     mergeBaseOf 가 같은 rc 128 을 다시 만나 같은 문장을 뱉는다(실제로 변이를 걸어
+    //     확인했다: 통과했다). 그러니 여기서 봐야 하는 건 문구가 아니라 **어느 층이 먼저
+    //     보고하는가** 다. 고장은 처음 감지되는 자리에서 이름을 대야 한다 — 한 층 미뤄지면
+    //     읽는 사람은 "조상이 아니었나 보다" 라고 잘못 읽는다.
+    const missing = '0'.repeat(40);
+    expectMessage('없는 base SHA', gateRun(origin, missing, featureHead), [
+      '--is-ancestor',
+      'Not a valid commit name',
+    ]);
+
+    // (B) 객체는 있는데 **분기점이 없는** 저장소. 얕게 받은 두 tip 이 그 모양이다.
+    //     git 은 이걸 rc 1 + **빈 stderr** 로 답한다 — 그래서 stderr 를 실어도 아무 말이 없고,
+    //     게이트가 직접 문장을 만들어 줘야 한다.
+    gitIn(shallow)('init', '-q', '.');
+    gitIn(shallow)('remote', 'add', 'origin', origin);
+    gitIn(shallow)('fetch', '-q', '--depth=1', 'origin', 'mainline', 'feature');
+    //     문구만 보면 부족하다 — **원인을 가를 상태값이 실제로 실려 있는지**까지 본다.
+    //     이게 없으면 다음 사람이 또 추측한다(예전 메시지는 '얕은 클론이면 깊이를 늘려라'
+    //     라고 단정했는데, 실제로 터진 두 번 다 그 job 은 fetch-depth: 0 이었다).
+    expectMessage('분기점이 없는 저장소', gateRun(shallow, movedTip, featureHead), [
+      '공통 조상', 'shallow=', 'base객체=', 'head객체=',
+    ]);
+
+    console.log('[expand-contract-sql-v1] base failure diagnostics passed');
+  } finally {
+    rmSync(origin, { recursive: true, force: true });
+    rmSync(shallow, { recursive: true, force: true });
+  }
+}
+
+/**
+ * base 해석(조상 여부에 따른 diff base 선택)을 임시 저장소로 검증한다.
+ *
+ * 이 케이스가 없으면 조상이 아닐 때의 동작을 CI 가 전혀 보지 못한다 — 실제로 그 구간이
+ * 비어 있어서, 대상 브랜치가 전진할 때마다 무관한 PR 이 죽는 결함이 오래 남아 있었다.
+ * 특히 C 케이스(조상이 아니면서 위험한 마이그레이션)가 중요하다: base 를 느슨하게 고르면
+ * 게이트가 조용히 fail-open 되는데, 그건 원래 결함보다 훨씬 나쁘다.
+ */
+function baseResolutionSelfTest() {
+  const repo = mkdtempSync(join(tmpdir(), 'ec-gate-'));
+  const git = (...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const commit = (dir, sql, message) => {
+    mkdirSync(join(repo, 'apps/v1_api/prisma/migrations', dir), { recursive: true });
+    writeFileSync(join(repo, 'apps/v1_api/prisma/migrations', dir, 'migration.sql'), `${sql}\n`);
+    git('add', '-A');
+    git('-c', 'user.email=selftest@local', '-c', 'user.name=selftest', 'commit', '-qm', message);
+    return git('rev-parse', 'HEAD');
+  };
+  const gateExits = (base, head) => {
+    try {
+      execFileSync(process.execPath, [SELF_PATH, base, head], { cwd: repo, stdio: ['ignore', 'ignore', 'pipe'], encoding: 'utf8' });
+      return 0;
+    } catch (error) {
+      // 맨 `catch { return 1 }` 은 **게이트가 판정으로 exit 1 한 것**과 **자식이 아예 못 뜬
+      // 것**을 같은 값으로 만든다. 이 PR 작업 중에 실제로 당했다 — SELF_PATH 가 TDZ 라
+      // `node undefined` 가 실행됐고, 그것도 exit 1 이라 "게이트가 잘못 판정한다"로 보였다.
+      //
+      // **종료코드로는 못 가른다** — node 가 스크립트를 못 찾아도 1 이다(실측). 가를 수 있는
+      // 것은 게이트가 자기 판정 경로에서 **반드시 찍는 표식**이다. 표식 없이 죽었으면 그건
+      // 판정이 아니라 고장이니 삼키지 않는다.
+      const text = String(error?.stderr ?? '');
+      if (text.includes('[expand-contract-sql-v1]')) return 1;
+      throw new Error(`게이트를 띄우지 못했다 (exit ${error?.status}): ${text.trim() || error?.message}`);
+    }
+  };
+
+  try {
+    git('init', '-q', '.');
+    const fork = commit('20260101000000_base', 'CREATE TABLE "Thing" ("id" UUID NOT NULL);', 'base');
+
+    git('checkout', '-q', '-b', 'safe');
+    const safeHead = commit('20260102000000_safe', 'ALTER TABLE "Thing" ADD COLUMN "note" TEXT;', 'safe');
+
+    git('checkout', '-q', fork);
+    git('checkout', '-q', '-b', 'risky');
+    const riskyHead = commit('20260102000000_risky', 'ALTER TABLE "Thing" DROP COLUMN "id";', 'risky');
+
+    // 대상 브랜치가 그사이 전진해 fork 이후로 벌어진다 — 여기서 조상 관계가 깨진다.
+    git('checkout', '-q', fork);
+    git('checkout', '-q', '-b', 'mainline');
+    const movedTip = commit('20260103000000_other', 'ALTER TABLE "Thing" ADD COLUMN "other" TEXT;', 'other');
+
+    const cases = [
+      ['ancestor base, additive migration', fork, safeHead, 0],
+      ['moved base, additive migration', movedTip, safeHead, 0],
+      ['moved base, destructive migration', movedTip, riskyHead, 1],
+      ['ancestor base, destructive migration', fork, riskyHead, 1],
+    ];
+    for (const [label, base, head, expected] of cases) {
+      const actual = gateExits(base, head);
+      if (actual !== expected) fail(`base resolution self-test: ${label} expected exit ${expected}, got ${actual}`);
+    }
+    console.log('[expand-contract-sql-v1] base resolution controls passed');
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
 }
 
 function fail(message) {

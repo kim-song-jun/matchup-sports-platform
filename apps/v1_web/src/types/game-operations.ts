@@ -2,7 +2,7 @@
  * Task 21 — types for the live tournament operations console.
  *
  * These mirror the frozen REST/realtime contract in
- * `.omo/plans/teameet-team-tournament-operations-v1.md` ("Frozen REST and
+ * `.project-artifacts/plans/teameet-team-tournament-operations-v1.md` ("Frozen REST and
  * idempotency contract" / "Frozen realtime contract") and the shipped
  * `apps/v1_api/src/games/**` DTOs/service responses (Task 18/20). Kept as a
  * dedicated domain file (not folded into `types/api.ts`) because this is a
@@ -97,6 +97,10 @@ export interface GameLineupParticipant {
   positionY: number | null;
   /** 선발(true)/후보(false). 새로고침 시 후보 상태가 소실되던 결함을 고치는 컬럼(2026-08). */
   started: boolean;
+  /** 명단 검인 — 현장에서 도착을 확인한 시각. null = 아직 확인 안 함.
+   * `started`(팀이 제출한 계획)와 다른 축이다 — "선발인데 안 온 사람"을 표현하려면
+   * 둘이 분리돼 있어야 한다(1차 대회 회고). */
+  arrivedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -116,6 +120,7 @@ export interface GameLineup {
   formation: string | null;
   createdAt: string;
   updatedAt: string;
+  invalidatedAt: string | null;
   participants: GameLineupParticipant[];
 }
 

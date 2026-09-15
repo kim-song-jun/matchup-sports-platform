@@ -200,9 +200,11 @@ describe('Task 14 generic Game lineup routes refuse TEAM_MATCH-sourced games', (
     // seed lineup from game creation), so it must be read fresh rather than
     // assumed to be 0 for "the first save". futsal-v1 also requires a
     // minimum of 3 starters, so a single-player roster (which the seeded
-    // version-conflict masked from ever actually running) would fail
-    // LINEUP_SIZE_INVALID here too - pad out with unlinked guests, which
-    // resolveEntry allows without any extra membership/attendance fixtures.
+    // version-conflict masked from ever actually running) used to fail
+    // LINEUP_SIZE_INVALID here too. **Task 163 removed that gate** — roster
+    // size no longer blocks a save. The padding stays because this spec is
+    // about the team-match source being forbidden on this route, and shrinking
+    // the roster would only add an unrelated variable.
     const priorLineup = await prisma.v1GameLineup.findFirst({
       where: { gameId, sideId: hostSideId },
       orderBy: { revision: 'desc' },

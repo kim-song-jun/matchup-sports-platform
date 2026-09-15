@@ -39,7 +39,9 @@ import {
   buildTournamentCreatePayload,
   buildTournamentPreviewItem,
   canSubmitTournamentCreate,
+  hasPromoFactEdits,
   tournamentCreateReducer,
+  isShortLeadTime,
   validateTournamentCreateStep,
   type TournamentCreateAction,
   type TournamentCreateState,
@@ -48,7 +50,7 @@ import {
 const inputClass =
   'h-[44px] w-full rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 const textareaClass =
-  'w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-2.5 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
+  'w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--card-surface)] px-3 py-3 text-sm text-[var(--text-strong)] placeholder:text-[var(--text-caption)] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50';
 
 export default function AdminTournamentsNewPage() {
   const router = useRouter();
@@ -260,7 +262,7 @@ export default function AdminTournamentsNewPage() {
 
   return (
     <>
-      <div className="mb-3">
+      <div className="tm-content-enter mb-3">
         <Link
           href="/admin/tournaments"
           className="inline-flex min-h-[44px] items-center gap-1 rounded text-sm text-[var(--text-caption)] hover:text-[var(--text-body)] focus-visible:outline-2 focus-visible:outline-blue-500"
@@ -271,7 +273,7 @@ export default function AdminTournamentsNewPage() {
       </div>
 
       <AdminPageHeader
-        eyebrow="대회 관리"
+        eyebrow="플랫폼 · 대회"
         title="새 대회 만들기"
         description="기본 정보부터 참가 조건까지 입력하면 대회가 초안으로 만들어져요. 마지막 확인 화면에서 참가자에게 보일 모습을 확인한 뒤 접수를 시작하세요."
       />
@@ -349,7 +351,7 @@ export default function AdminTournamentsNewPage() {
           </div>
         </div>
 
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border)] bg-white/95 px-4 py-3 backdrop-blur lg:pl-[var(--admin-sidebar-width,0px)]">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border)] bg-[var(--card-surface)]/95 px-4 py-3 backdrop-blur lg:pl-[var(--admin-sidebar-width,0px)]">
           <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
             {state.step === 0 ? (
               <Link
@@ -498,15 +500,15 @@ function WizardStepper({
                       active
                         ? 'bg-blue-500 text-white'
                         : done
-                          ? 'bg-blue-100 text-[var(--blue700)]'
-                          : 'bg-[var(--grey150)] text-[var(--text-caption)]',
+                          ? 'bg-[var(--blue50)] text-[var(--blue700)]'
+                          : 'tm-on-tint bg-[var(--grey150)] text-[var(--text-caption)]',
                     ].join(' ')}
                   >
                     {done ? <Check size={14} /> : locked ? <Lock size={12} /> : index + 1}
                   </span>
                   <span className="hidden min-w-0 sm:block" aria-hidden="true">
                     <span className="block truncate text-xs font-bold">{step.title}</span>
-                    <span className="mt-0.5 block truncate text-[var(--font-size-caption)]">{step.description}</span>
+                    <span className="mt-0.5 block truncate text-[length:var(--font-size-caption)]">{step.description}</span>
                   </span>
                 </button>
               </li>
@@ -586,14 +588,14 @@ function BasicStep({
           {([
             ['group_knockout', '조별리그 + 토너먼트', '예선 순위 후 결선'],
             ['knockout', '토너먼트', '패하면 탈락'],
-            ['league', '리그', '모든 팀이 순위 경쟁'],
+            ['league', '리그 방식', '모든 팀이 순위 경쟁'],
           ] as const).map(([value, label, description]) => (
             <label
               key={value}
               className={[
                 'cursor-pointer rounded-xl border p-3 transition-colors',
                 state.format === value
-                  ? 'border-blue-500 bg-[var(--blue50)]'
+                  ? 'tm-on-tint border-blue-500 bg-[var(--blue50)]'
                   : 'border-[var(--border)] hover:border-[var(--border-strong)]',
               ].join(' ')}
             >
@@ -673,8 +675,21 @@ function ScheduleStep({
   setField: SetField;
   clearError: (field: string) => void;
 }) {
+  // 대회 시작이 7일 이내면 D-7 자동 제안이 **지난 시각이 될 수 있다**(D-3 은 3일 이내일 때).
+  // 그때 모델이 자동 채움을 비우므로, 여기서는 왜 비었는지·무엇을 해야 하는지 알려 준다.
+  // 이 경고가 없으면 운영자는 필수 항목이 이유 없이 빈 것으로 본다.
+  const shortLeadTime = isShortLeadTime(state.scheduledAt);
   return (
     <div className="grid gap-5">
+      {shortLeadTime && (
+        <p
+          role="status"
+          className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 text-sm text-[var(--orange700)]"
+        >
+          대회 시작이 7일 이내예요. 신청·명단 제출 마감을 직접 정해 주세요 — 자동 제안(시작 D-7·D-3)이
+          이미 지난 시각이 될 수 있고, 그러면 참가팀이 명단을 아예 낼 수 없어요.
+        </p>
+      )}
       <div className="grid gap-4 md:grid-cols-2">
         <TournamentDatetimeField
           id="scheduled-at"
@@ -709,7 +724,11 @@ function ScheduleStep({
           required
           disabled={pending}
           error={errors.registrationDeadlineAt}
-          hint="대회 시작 D-3 23:59를 자동 제안해요. 직접 바꾸면 이후에는 덮어쓰지 않아요."
+          hint={
+            shortLeadTime
+              ? '대회 시작이 가까워 자동 제안이 지난 시각이 될 수 있어요. 마감을 직접 정해 주세요.'
+              : '대회 시작 D-3 23:59를 자동 제안해요. 직접 바꾸면 이후에는 덮어쓰지 않아요.'
+          }
         />
         <TournamentDatetimeField
           id="roster-deadline-at"
@@ -722,7 +741,11 @@ function ScheduleStep({
           required
           disabled={pending}
           error={errors.rosterDeadlineAt}
-          hint="대회 시작 D-7 23:59를 자동 제안해요."
+          hint={
+            shortLeadTime
+              ? '대회 시작이 가까워 자동 제안이 지난 시각이 될 수 있어요. 마감을 직접 정해 주세요.'
+              : '대회 시작 D-7 23:59를 자동 제안해요.'
+          }
         />
       </div>
       <Field id="venue" label="장소" hint="입력한 장소는 서버에서 지도 좌표를 찾아 저장해요.">
@@ -938,8 +961,30 @@ function ParticipationStep({
         )}
       </Field>
 
+      {state.format === 'league' ? (
+        <Field
+          id="minMatchesPerTeam"
+          label="최소 경기 수"
+          hint="각 팀이 최소 몇 경기를 보장받을지 정해요. 비워두면 검증하지 않아요."
+          error={errors.minMatchesPerTeam}
+        >
+          <input
+            id="minMatchesPerTeam"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={50}
+            value={state.minMatchesPerTeam}
+            onChange={(event) => setField('minMatchesPerTeam', event.target.value)}
+            disabled={pending}
+            aria-invalid={Boolean(errors.minMatchesPerTeam)}
+            className={inputClass}
+          />
+        </Field>
+      ) : null}
+
       {state.genderCategory === 'mixed' ? (
-        <section className="rounded-2xl border border-[var(--border)] bg-[var(--grey50)] p-4">
+        <section className="tm-on-tint rounded-2xl border border-[var(--border)] bg-[var(--grey50)] p-4">
           <h3 className="text-sm font-bold text-[var(--text-strong)]">혼성 명단 쿼터</h3>
           <p className="mt-1 text-xs leading-5 text-[var(--text-caption)]">
             선수 추가는 막지 않고, 운영자가 명단을 확정할 때 이 조건을 검사해요.
@@ -993,7 +1038,7 @@ function ParticipationStep({
           ) : null}
         </section>
       ) : (
-        <div className="rounded-xl bg-[var(--grey50)] p-4 text-sm text-[var(--text-caption)]">
+        <div className="tm-on-tint rounded-xl bg-[var(--grey50)] p-4 text-sm text-[var(--text-caption)]">
           {state.genderCategory === 'male' ? '남성부' : '여성부'}는 별도 쿼터 없이 카테고리만
           표시해요.
         </div>
@@ -1139,6 +1184,46 @@ function PresentationStep({
         </Field>
       </section>
 
+      {/* 카드 정지 규정 — 비워 두면 이 대회에는 적용되지 않는다. 기본값을 채워 두지
+          않는 것이 의도다: 운영자가 의식하지 못한 채 정지 규정이 켜진 대회가 만들어지면,
+          이미 카드를 받은 선수가 갑자기 못 뛰게 된다. */}
+      <section className="grid gap-4 sm:grid-cols-2">
+        <Field id="yellow-accumulation-limit" label="경고 누적 출전정지 (장)">
+          <input
+            id="yellow-accumulation-limit"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={20}
+            value={state.yellowAccumulationLimit}
+            onChange={(event) => setField('yellowAccumulationLimit', event.target.value)}
+            disabled={pending}
+            placeholder="비우면 적용 안 함"
+            className={inputClass}
+          />
+          <p className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
+            옐로카드가 이 장수만큼 쌓일 때마다 다음 1경기 출전이 막혀요. 비워 두면 적용하지 않아요.
+          </p>
+        </Field>
+        <Field id="red-card-suspension-matches" label="퇴장 시 출전정지 (경기)">
+          <input
+            id="red-card-suspension-matches"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={20}
+            value={state.redCardSuspensionMatches}
+            onChange={(event) => setField('redCardSuspensionMatches', event.target.value)}
+            disabled={pending}
+            placeholder="비우면 적용 안 함"
+            className={inputClass}
+          />
+          <p className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>
+            레드카드 1장당 막히는 경기 수예요. 비워 두면 적용하지 않아요.
+          </p>
+        </Field>
+      </section>
+
       <section className="grid gap-4 sm:grid-cols-2">
         <Field id="rules-text" label="대회 규정">
           <textarea
@@ -1169,7 +1254,8 @@ function PresentationStep({
           <h3 className="text-sm font-bold text-[var(--text-strong)]">홍보 카드</h3>
           <p className="mt-1 text-xs text-[var(--text-caption)]">
             생성과 동시에 홈·대회 목록 홍보를 준비할 수 있어요. 노출은 각 카드에서 켜세요.
-            홍보 이미지를 비워두면 위에서 올린 대표 이미지를 함께 사용해요.
+            날짜·장소·상금 문구는 앞 단계에 입력한 대회 정보로 미리 채워 두었고, 직접 고치면
+            그 문구는 그대로 유지돼요. 홍보 이미지를 비워두면 위에서 올린 대표 이미지를 함께 사용해요.
           </p>
         </div>
         <PromoCardFields
@@ -1183,6 +1269,8 @@ function PresentationStep({
           uploading={promoUploadingSlot === 'promoHome'}
           disabled={pending}
           priorityError={errors.promoHomePriority}
+          onResetFacts={() => dispatch({ type: 'reset-promo-facts', slot: 'promoHome' })}
+          canResetFacts={hasPromoFactEdits(state, 'promoHome')}
           // 이 자리를 비웠을 때 실제로 노출될 이미지 — 자기 자리를 뺀 폴백 결과를 그대로 넘겨
           // 미리보기가 공개 화면과 어긋나지 않게 한다.
           defaultImageUrl={resolveTournamentImage(
@@ -1205,6 +1293,8 @@ function PresentationStep({
           uploading={promoUploadingSlot === 'promoList'}
           disabled={pending}
           priorityError={errors.promoListPriority}
+          onResetFacts={() => dispatch({ type: 'reset-promo-facts', slot: 'promoList' })}
+          canResetFacts={hasPromoFactEdits(state, 'promoList')}
           defaultImageUrl={resolveTournamentImage(
             {
               coverImageUrl: state.coverImageUrl,
@@ -1235,7 +1325,7 @@ function ConfirmStep({
   return (
     <div className="grid gap-5">
       <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--grey50)] p-4 sm:p-5">
-        <p className="mb-3 text-xs font-bold text-[var(--text-caption)]">참가자에게 이렇게 보여요</p>
+        <p className="tm-on-tint mb-3 text-xs font-bold text-[var(--text-caption)]">참가자에게 이렇게 보여요</p>
         <div className="mx-auto max-w-sm">
           <TournamentCard item={previewItem} interactive={false} />
         </div>
@@ -1304,7 +1394,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid gap-1.5">
+    <div className="grid gap-2">
       <label htmlFor={id} className="text-sm font-semibold text-[var(--text-body)]">
         {label}
         {required ? (

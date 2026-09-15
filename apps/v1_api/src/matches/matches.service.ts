@@ -19,7 +19,7 @@ import {
   WithdrawMatchApplicationDto,
 } from './dto/match-application.dto';
 import { MatchesQueryDto, MyMatchesQueryDto } from './dto/matches-query.dto';
-import { CancelMatchDto, MutateMatchDto, UpdateMatchDto } from './dto/mutate-match.dto';
+import { CancelMatchDto, CloseMatchDto, MutateMatchDto, ReopenMatchDto, UpdateMatchDto } from './dto/mutate-match.dto';
 
 type MatchWithRelations = V1Match & {
   sport: { id: string; name: string };
@@ -69,6 +69,12 @@ export class MatchesService {
     ];
     const where: Prisma.V1MatchWhereInput = {
       deletedAt: null,
+      // status='recruiting'인 raw DB 행에는 시작 시각이 이미 지난("만료") 매치도 섞여 있다 —
+      // v1에는 만료를 자동으로 다른 status로 넘기는 cron이 없기 때문이다. 'recruiting' 조회는
+      // 그 만료분을 제외해야 목록 정렬(startAt asc)이 가장 오래된 죽은 매치로 첫 페이지를
+      // 채우지 않는다(2026-08-27 감사 M-A-personal-match-state). 'expired' 조회 분기와
+      // completed/cancelled 등 나머지 status 조회는 과거 startAt을 의도적으로 포함해야 하므로
+      // 그대로 둔다.
       ...(status === 'expired'
         ? { startAt: { lt: now } }
         : isDefaultDiscovery
@@ -224,7 +230,7 @@ export class MatchesService {
    * Prisma `distinct`는 Postgres `DISTINCT ON`으로 컴파일되는데, 이때
    * `orderBy`가 distinct 필드로 시작해야 한다 — `distinct: ['placeName']` +
    * `orderBy: { createdAt: 'desc' }` 조합은 "최근순 distinct 장소"라는 의도와
-   * 어긋난다(team-match-series-admin.service.ts의 loadRecentVenues와 동일한
+   * 어긋난다(league-match-admin.service.ts의 loadRecentVenues와 동일한
    * 이유로, 넉넉히 가져온 뒤 애플리케이션에서 dedup한다).
    */
   async recentVenues(user: V1AuthUser) {
@@ -234,7 +240,7 @@ export class MatchesService {
       take: 30,
       select: { placeName: true, placeAddress: true },
     });
-    // 레거시 행에 앞뒤 공백이 섞여 있을 수 있어 trim 후 dedup한다(team-match-series-admin
+    // 레거시 행에 앞뒤 공백이 섞여 있을 수 있어 trim 후 dedup한다(league-match-admin
     // .service.ts의 loadRecentVenues와 동일한 방어) — 안 하면 공백만 다른 "중복" 장소가
     // 서로 다른 칩으로 뜨거나, 공백뿐인 값이 빈 칩으로 렌더될 수 있다.
     const seen = new Set<string>();
@@ -345,11 +351,21 @@ export class MatchesService {
   async edit(user: V1AuthUser, matchId: string) {
     const match = await this.getHostMatch(user, matchId);
     const participantCount = await this.getActiveParticipantCount(match.id);
-    const editable = match.status === 'recruiting' || match.status === 'closed';
+    // update()/cancel()은 raw status뿐 아니라 getApiStatus(match)==='expired'(recruiting +
+    // startAt이 지남)도 막는다 — edit()이 raw status만 봤을 때는 이 판정이 어긋나 수정 화면이
+    // editable:true로 열리고, 저장 시점에야 서버가 영문 'Terminal match cannot be updated' 409로
+    // 거부해 호스트가 일정을 고쳐 탈출할 방법조차 없었다(2026-08-27 감사
+    // M-A-personal-match-state). 세 메서드가 같은 만료 판정을 쓰도록 통일한다.
+    const editable =
+      (match.status === 'recruiting' || match.status === 'closed') && this.getApiStatus(match) !== 'expired';
 
     return {
       matchId: match.id,
       editable,
+      // 값은 기존 'terminal_status' 하나로 통일한다 — 프론트 공용 라벨(lib/v1-status-labels.ts)의
+      // 'terminal_status' 문구("완료·취소·종료된 매치는 수정할 수 없어요.")가 이미 도메인 중립적이라
+      // 만료 케이스에도 그대로 맞고, 팀매치 전용 'expired' 키("...팀매치는...")를 재사용하면
+      // 오문구가 된다.
       lockedReason: editable ? null : 'terminal_status',
       form: {
         sportId: match.sportId,
@@ -498,6 +514,143 @@ export class MatchesService {
       status: 'cancelled',
       cancelledApplications: result.applications.count,
       cancelledParticipants: result.participants.count,
+      detailRoute: `/matches/${match.id}`,
+    };
+  }
+
+  /**
+   * 호스트가 직접 모집을 닫는다 — 팀매치 close() 와 같은 계약이다.
+   *
+   * 취소(cancel)와 다르다: 매치는 그대로 열려 있고 확정된 참가자도 유지된다. 닫히는 건
+   * "새 신청을 더 받는 것"뿐이라 reopen() 으로 되돌릴 수 있다. 대기 중(requested)이던
+   * 신청서만 expired 로 정리하는 것도 팀매치와 같다 — 닫힌 매치에 답을 기다리는
+   * 신청서를 남겨두면 신청자 화면에 영원히 "승인 대기"가 뜬다.
+   */
+  async close(user: V1AuthUser, matchId: string, dto: CloseMatchDto) {
+    this.assertActiveAccount(user);
+    const match = await this.getHostMatch(user, matchId);
+
+    if (match.status === 'closed') {
+      throw new ConflictException({
+        code: 'ALREADY_PROCESSED',
+        message: 'Match is already closed',
+      });
+    }
+    if (match.status !== 'recruiting' || this.getApiStatus(match) === 'expired') {
+      throw stateConflict('Only active recruiting matches can be closed');
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.v1Match.update({
+        where: { id: match.id },
+        data: { status: 'closed' },
+      });
+
+      // updateMany 는 갱신된 행을 돌려주지 않는다 — 누구에게 알릴지는 갱신 "전"에 읽어야 한다.
+      const pending = await tx.v1MatchApplication.findMany({
+        where: { matchId: match.id, status: 'requested' },
+        select: { applicantUserId: true },
+      });
+      const applications = await tx.v1MatchApplication.updateMany({
+        where: { matchId: match.id, status: 'requested' },
+        data: {
+          status: 'expired',
+          reviewedByUserId: user.id,
+          reviewedAt: new Date(),
+        },
+      });
+
+      await tx.v1StatusChangeLog.create({
+        data: {
+          targetType: 'match',
+          targetId: match.id,
+          fromStatus: match.status,
+          toStatus: 'closed',
+          actorType: 'user',
+          actorUserId: user.id,
+          reason: dto.reason ?? 'match_closed',
+        },
+      });
+
+      return { applications, notifyUserIds: pending.map((row) => row.applicantUserId) };
+    });
+
+    void this.notifications.emitNotificationToMany(
+      result.notifyUserIds,
+      'match_closed',
+      match.id,
+      `"${match.title}" 매치 모집이 마감되어 대기 중인 신청이 종료됐어요.`,
+    );
+
+    return {
+      matchId: match.id,
+      status: 'closed',
+      expiredApplications: result.applications.count,
+      detailRoute: `/matches/${match.id}`,
+    };
+  }
+
+  /**
+   * 닫힌 모집을 다시 연다.
+   *
+   * 개인 매치의 "마감"은 두 갈래다 — ① 호스트가 close() 로 닫은 status='closed' ②
+   * deadlineAt 이 지나 displayState 만 'closed' 인 recruiting. **둘 다 되돌린다.**
+   * ②를 빼면 화면에는 똑같이 "신청 마감"으로 보이는데 다시 열기가 한쪽에서만 듣는다.
+   *
+   * 지난 마감 시각은 그대로 두면 안 된다 — status 를 recruiting 으로 돌려놔도
+   * getDisplayState 가 곧바로 다시 'closed' 를 돌려주기 때문에 눌러도 아무 변화가 없는
+   * 것처럼 보인다. 새 마감을 받았으면 그걸 쓰고, 없으면 마감을 지워 경기 시작 전까지
+   * 받는다(마감 없음 = 시작 전까지, create/update 와 같은 규약).
+   */
+  async reopen(user: V1AuthUser, matchId: string, dto: ReopenMatchDto) {
+    this.assertActiveAccount(user);
+    const match = await this.getHostMatch(user, matchId);
+
+    if (match.status !== 'closed' && match.status !== 'recruiting') {
+      throw stateConflict('Only closed matches can be reopened');
+    }
+    const now = new Date();
+    if (match.startAt < now) {
+      throw stateConflict('Expired matches cannot be reopened');
+    }
+
+    const deadlinePassed = Boolean(match.deadlineAt && match.deadlineAt < now);
+    if (match.status === 'recruiting' && !deadlinePassed) {
+      throw new ConflictException({
+        code: 'ALREADY_PROCESSED',
+        message: 'Match is already recruiting',
+      });
+    }
+
+    const deadlineAt = resolveReopenDeadline(
+      { deadlineAt: match.deadlineAt, startAt: match.startAt },
+      dto.deadlineAt,
+      now,
+    );
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const next = await tx.v1Match.update({
+        where: { id: match.id },
+        data: { status: 'recruiting', deadlineAt },
+      });
+      await tx.v1StatusChangeLog.create({
+        data: {
+          targetType: 'match',
+          targetId: match.id,
+          fromStatus: match.status,
+          toStatus: 'recruiting',
+          actorType: 'user',
+          actorUserId: user.id,
+          reason: dto.reason ?? 'match_reopened',
+        },
+      });
+      return next;
+    });
+
+    return {
+      matchId: updated.id,
+      status: updated.status,
+      deadlineAt: updated.deadlineAt,
       detailRoute: `/matches/${match.id}`,
     };
   }
@@ -910,6 +1063,16 @@ export class MatchesService {
       genderRule: match.genderRule,
       approvalRequired: true,
       paymentRequired: false,
+      // detail()과 같은 hostUser include(matchInclude())를 이미 공유하므로 추가 쿼리 없이
+      // 채울 수 있다 — 예전엔 이 필드가 빠져 있어 프론트가 항상 mock 호스트 이름으로
+      // 폴백했다(실사고: 모든 카드가 '김정민'/'박서준' 등 목업 이름을 보여줌).
+      host: {
+        userId: match.hostUser.id,
+        displayName:
+          match.hostUser.profile?.nickname ?? match.hostUser.profile?.displayName ?? '호스트',
+        profileImageUrl: match.hostUser.profile?.profileImageUrl ?? null,
+        trustState: match.hostUser.reputationSummary?.trustState ?? 'none',
+      },
       viewerState: this.getViewer(match, user).state === 'guest' ? 'none' : this.getViewer(match, user).state,
     };
   }
@@ -983,6 +1146,12 @@ export class MatchesService {
     if (viewerState === 'approved' || viewerState === 'participant') return 'ALREADY_PARTICIPANT';
     if (this.getParticipantCount(match) >= match.maxParticipants) return 'FULL';
     if (match.deadlineAt && match.deadlineAt < new Date()) return 'DEADLINE_PASSED';
+    // status='recruiting'인데 시작 시각이 지난 매치("만료")는 raw status만으로는 구분되지 않는다
+    // — 이 서비스의 다른 모든 만료 판정(getApiStatus/getDisplayState, update/cancel의 가드)이 쓰는
+    // 것과 같은 조건을 그대로 재사용해 여기서도 신청을 막는다(2026-08-27 감사
+    // M-A-personal-match-state: 이 검사가 없어 시작 시각이 지난 매치에 신청이 그대로 접수되고,
+    // approveApplication의 startAt 가드에 걸려 호스트가 영원히 승인할 수 없었다).
+    if (match.status === 'recruiting' && match.startAt < new Date()) return 'EXPIRED';
     if (match.status !== 'recruiting') return 'NOT_RECRUITING';
     return 'OK';
   }
@@ -1139,6 +1308,7 @@ function getReasonMessage(reasonCode: string) {
     ALREADY_PARTICIPANT: '이미 참여가 확정된 매치예요.',
     FULL: '정원이 모두 찼어요.',
     DEADLINE_PASSED: '신청 가능 시간이 지났어요.',
+    EXPIRED: '경기 시작 시간이 지나 신청할 수 없어요.',
     NOT_RECRUITING: '지금은 모집 중인 매치가 아니에요.',
     BLOCKED_USER: '신청할 수 없는 계정 상태예요.',
   };
@@ -1152,6 +1322,28 @@ function validationError(message: string, field: string) {
     message,
     details: { field },
   });
+}
+
+/**
+ * reopen() 이 저장할 신청 마감 시각을 정한다.
+ *  - 호출자가 새 마감을 줬으면 그 값을 쓴다(지금 이후 · 경기 시작 이전이어야 한다 — update() 의
+ *    validateMatchDates 와 같은 불변식).
+ *  - 안 줬는데 기존 마감이 이미 지났으면 지운다(null = 경기 시작 전까지 받는다).
+ *  - 안 줬고 기존 마감이 아직 남았으면 건드리지 않는다.
+ */
+function resolveReopenDeadline(
+  match: { deadlineAt: Date | null; startAt: Date },
+  requested: string | null | undefined,
+  now: Date,
+): Date | null {
+  if (requested == null) {
+    return match.deadlineAt && match.deadlineAt < now ? null : match.deadlineAt;
+  }
+  const parsed = new Date(requested);
+  if (Number.isNaN(parsed.getTime())) throw validationError('deadlineAt must be a valid date', 'deadlineAt');
+  if (parsed <= now) throw validationError('deadlineAt must be in the future', 'deadlineAt');
+  if (parsed >= match.startAt) throw validationError('deadlineAt must be before startsAt', 'deadlineAt');
+  return parsed;
 }
 
 function stateConflict(message: string, code = 'STATE_CONFLICT') {

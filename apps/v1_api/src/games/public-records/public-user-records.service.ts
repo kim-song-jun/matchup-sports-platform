@@ -3,17 +3,20 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { resolveTeamRecordResult } from '../../game-operations/team-record-result';
 import { parseTournamentFixtureOfficialScore } from '../../tournaments/tournament-fixture-official-result';
-import { PublicRecordsQueryDto } from './dto/public-records-query.dto';
+import { UserRecordsQueryDto } from './dto/public-records-query.dto';
+import { classifyTeamRecordCategory, type TeamRecordCategory } from './team-record-category';
 import { decodeRecordCursor, encodeRecordCursor, isAfterCursor, type RecordCursor } from './public-cursor';
-import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from './public-consent';
+import {
+  isParticipantOwnerVisible,
+  isParticipantPubliclyEligible,
+  loadParticipantConsentEligibility,
+} from './public-consent';
 
 interface EligibleResultRow {
   readonly participantResultId: string;
-  readonly resultRevisionId: string;
   readonly participantId: string;
   readonly gameId: string;
-  readonly sourceType: string;
-  readonly tournamentFixtureId: string | null;
+  readonly teamMatchId: string | null;
   readonly sideId: string;
   readonly goals: number;
   readonly assists: number;
@@ -56,9 +59,15 @@ interface EligibleResultRow {
 export class PublicUserRecordsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getRecords(userId: string, query: PublicRecordsQueryDto, viewerId?: string) {
-    const user = await this.prisma.v1User.findUnique({
-      where: { id: userId },
+  async getRecords(userId: string, query: UserRecordsQueryDto, viewerId?: string) {
+    // profile.service.ts의 publicProfile과 동일한 게이트(`deletedAt: null, accountStatus: 'active'`).
+    // 탈퇴 계정은 profile.nickname이 내부 삭제 식별자(`deleted_xxxxxxxx`)로 덮여 있고
+    // (admin.service.ts deleteUser), 그 값을 그대로 공개 응답에 실으면 SEO 인덱싱되는
+    // 페이지 제목에 그대로 노출된다 -- 자매 라우트인 public-profile은 이미 404를 던지는데
+    // 이 라우트만 계정 상태를 보지 않아 비대칭이 생겼던 것을 바로잡는다. 정지/차단/탈퇴대기
+    // 중인 계정도 같은 이유로 함께 막는다(publicProfile과 정확히 같은 기준).
+    const user = await this.prisma.v1User.findFirst({
+      where: { id: userId, deletedAt: null, accountStatus: 'active' },
       select: { id: true, profile: { select: { nickname: true } } },
     });
     if (user === null) {
@@ -67,20 +76,34 @@ export class PublicUserRecordsService {
 
     const viewerIsOwner = viewerId !== undefined && viewerId === userId;
 
-    // 동의 행은 본인 조회일 때만 읽는다 -- 타인 조회에서는 응답에 싣지도 않으므로
-    // (아래 `consentGranted` 주석 참고) 공개 라우트의 hot path 에 쓸모없는 왕복이 하나
-    // 붙는 셈이었다. 개별 참가 기록의 동의 판정은 `loadEligibleRows` 가 자체적으로
-    // (`loadParticipantConsentEligibility`) 하므로 이 조회와 무관하다.
     const [eligibleRows, consent] = await Promise.all([
       this.loadEligibleRows(userId, query.season, viewerIsOwner),
-      viewerIsOwner
-        ? this.prisma.v1UserRecordConsent.findUnique({ where: { userId }, select: { state: true } })
-        : Promise.resolve(null),
+      this.prisma.v1UserRecordConsent.findUnique({ where: { userId }, select: { state: true } }),
     ]);
+    const tournamentAwards =
+      viewerIsOwner || consent?.state === 'GRANTED'
+        ? await this.loadTournamentAwards(userId, query.season)
+        : [];
+    // Task 166 BE-4: 리그/대회/친선 분류를 **전체 행**에 대해 한 번 구한다 — 필터와
+    // `summary.byType` 둘 다 페이지가 아니라 전체를 봐야 한다.
+    const {
+      categoryByResultId,
+      invalidResultIds,
+      tournamentIdByTeamMatchId,
+      roundByTeamMatchId,
+      leagueIdByTeamMatchId,
+    } =
+      await this.classifyRows(eligibleRows);
+    const validRows = eligibleRows.filter((row) => !invalidResultIds.has(row.participantResultId));
+    const categoryOf = (row: EligibleResultRow): TeamRecordCategory =>
+      categoryByResultId.get(row.participantResultId) ?? 'friendly';
+    const typedRows =
+      query.type === undefined ? validRows : validRows.filter((row) => categoryOf(row) === query.type);
+
     const cursor = decodeRecordCursor(query.cursor);
     const limit = query.limit ?? 20;
 
-    const ordered = eligibleRows
+    const ordered = typedRows
       .slice()
       .sort((a, b) => rowCursorOf(b).key.localeCompare(rowCursorOf(a).key) || rowCursorOf(b).id.localeCompare(rowCursorOf(a).id));
     const afterCursor =
@@ -88,19 +111,37 @@ export class PublicUserRecordsService {
     const page = afterCursor.slice(0, limit);
     const hasMore = afterCursor.length > limit;
 
-    const detail = await this.hydrate(page);
+    const detail = await this.hydrate(page, { tournamentIdByTeamMatchId, roundByTeamMatchId, leagueIdByTeamMatchId });
 
     // 파울 누적치는 공개 응답에 싣지 않는다. 카드(경고/퇴장)는 경기 서사로서
     // 공개하지만, 일반 파울 개수는 선수 개인 프로필에 낙인으로 남을 뿐
     // 관전자에게 주는 정보가 없다. DB(`V1GameResultParticipant.fouls`)와
     // 운영 콘솔의 팀 파울 카운터는 그대로 유지된다.
+    const matchMvpCount = validRows.filter((row) => row.isMvp).length;
+    // `summary` 는 **필터와 무관하게 전체 기준**이다(팀 전적과 같은 계약) — 화면이
+    // 탭을 바꿀 때마다 KPI 를 다시 받지 않고 `byType[탭]` 을 읽는다.
+    const totalsOf = (rows: readonly EligibleResultRow[]) => ({
+      appearances: rows.length,
+      goals: rows.reduce((sum, row) => sum + row.goals, 0),
+      assists: rows.reduce((sum, row) => sum + row.assists, 0),
+      yellowCards: rows.reduce((sum, row) => sum + row.cardsYellow, 0),
+      redCards: rows.reduce((sum, row) => sum + row.cardsRed, 0),
+      mvpCount: rows.filter((row) => row.isMvp).length,
+    });
+    const byType: Record<TeamRecordCategory, ReturnType<typeof totalsOf>> = {
+      league: totalsOf(validRows.filter((row) => categoryOf(row) === 'league')),
+      tournament: totalsOf(validRows.filter((row) => categoryOf(row) === 'tournament')),
+      friendly: totalsOf(validRows.filter((row) => categoryOf(row) === 'friendly')),
+    };
     const summary = {
-      appearances: eligibleRows.length,
-      goals: eligibleRows.reduce((sum, row) => sum + row.goals, 0),
-      assists: eligibleRows.reduce((sum, row) => sum + row.assists, 0),
-      yellowCards: eligibleRows.reduce((sum, row) => sum + row.cardsYellow, 0),
-      redCards: eligibleRows.reduce((sum, row) => sum + row.cardsRed, 0),
-      mvpCount: eligibleRows.filter((row) => row.isMvp).length,
+      // 전체 합계도 `totalsOf` 를 쓴다 — 같은 계산을 두 벌로 두면 한쪽만 고쳐져
+      // `byType` 합과 전체가 어긋난다(Copilot 리뷰).
+      ...totalsOf(validRows),
+      byType,
+      matchMvpCount,
+      // 구 Web 클라이언트 호환용 별칭. 신규 화면은 matchMvpCount를 사용한다.
+      mvpCount: matchMvpCount,
+      tournamentAwardCount: tournamentAwards.length,
     };
 
     const lastRow = page[page.length - 1];
@@ -122,9 +163,51 @@ export class PublicUserRecordsService {
       // 구분하지 않고 함께 안내) 기능 손실 없이 막을 수 있다.
       ...(viewerIsOwner ? { consentGranted: consent?.state === 'GRANTED' } : {}),
       summary,
+      tournamentAwards,
       items: detail,
       nextCursor,
     };
+  }
+
+  private async loadTournamentAwards(userId: string, season: string | undefined) {
+    const awards = await this.prisma.v1TournamentAward.findMany({
+      where: { recipientUserId: userId },
+      orderBy: [{ tournament: { scheduledEndAt: 'desc' } }, { sortOrder: 'asc' }],
+      select: {
+        id: true,
+        tournamentId: true,
+        awardType: true,
+        awardLabel: true,
+        iconKey: true,
+        teamName: true,
+        note: true,
+        createdAt: true,
+        tournament: {
+          select: { title: true, scheduledEndAt: true, updatedAt: true },
+        },
+      },
+    });
+    const seasonRange = seasonBounds(season);
+    return awards
+      .map((award) => {
+        const awardedAt = award.tournament.scheduledEndAt ?? award.tournament.updatedAt ?? award.createdAt;
+        return {
+          id: award.id,
+          tournamentId: award.tournamentId,
+          tournamentTitle: award.tournament.title,
+          awardType: award.awardType,
+          awardLabel: award.awardLabel,
+          iconKey: award.iconKey,
+          teamName: award.teamName,
+          note: award.note,
+          awardedAt: awardedAt.toISOString(),
+        };
+      })
+      .filter(
+        (award) =>
+          seasonRange === null ||
+          (new Date(award.awardedAt) >= seasonRange.gte && new Date(award.awardedAt) < seasonRange.lt),
+      );
   }
 
   private async loadEligibleRows(
@@ -142,10 +225,18 @@ export class PublicUserRecordsService {
     const eligibility = await loadParticipantConsentEligibility(this.prisma, participantIds);
 
     const resultRows = await this.prisma.v1GameResultParticipant.findMany({
-      where: { participantId: { in: participantIds } },
+      // Public personal records are canonical V1TeamMatch records only. Keep the
+      // source gate in SQL so legacy fixture rows cannot enter classification and
+      // accidentally be projected as friendly matches.
+      where: {
+        participantId: { in: participantIds },
+        resultRevision: {
+          officialAt: { not: null },
+          game: { sourceType: 'TEAM_MATCH' },
+        },
+      },
       select: {
         id: true,
-        resultRevisionId: true,
         participantId: true,
         sideId: true,
         started: true,
@@ -162,7 +253,13 @@ export class PublicUserRecordsService {
             mvpParticipantId: true,
             score: true,
             game: {
-              select: { sourceType: true, tournamentFixtureId: true, currentOfficialRevisionId: true },
+              select: {
+                // 리그 맥락은 게임에 직접 실려 있지 않다 -- 팀매치를 거쳐야만 얻어진다
+                // (game.teamMatchId -> V1TeamMatch.leagueId -> V1League.title). 팀 전적
+                // (`public-team-records.service.ts`)이 쓰는 것과 같은 사슬이다.
+                teamMatchId: true,
+                currentOfficialRevisionId: true,
+              },
             },
           },
         },
@@ -183,8 +280,11 @@ export class PublicUserRecordsService {
         // (이론상 항상 참이다. 위 links 쿼리가 이미 userId로 필터링했으므로), participant
         // 단위 개별 숨김(REVOKED 스냅샷)은 본인이 "이 경기 하나만 숨기겠다"고 명시적으로
         // 끈 것이므로 본인 화면에서도 그대로 존중한다.
-        if (consent.linkedUserId === null) continue;
-        if (consent.latestParticipantSnapshotState === 'REVOKED') continue;
+        //
+        // 이 판정은 `countOwnerVisibleParticipations`("지금 동의를 켜면 공개될 경기 수",
+        // 동의 유도 UI 가 쓴다)와 **반드시 같아야** 하므로 조건을 여기 인라인으로 두지
+        // 않고 `isParticipantOwnerVisible` 하나를 양쪽이 공유한다.
+        if (!isParticipantOwnerVisible(consent)) continue;
       } else if (!isParticipantPubliclyEligible(consent)) {
         continue;
       }
@@ -196,11 +296,9 @@ export class PublicUserRecordsService {
       const cards = parseCards(row.cards);
       eligible.push({
         participantResultId: row.id,
-        resultRevisionId: revision.id,
         participantId: row.participantId,
         gameId: revision.gameId,
-        sourceType: revision.game.sourceType,
-        tournamentFixtureId: revision.game.tournamentFixtureId,
+        teamMatchId: revision.game.teamMatchId,
         sideId: row.sideId,
         goals: row.goals,
         assists: row.assists,
@@ -217,25 +315,128 @@ export class PublicUserRecordsService {
     return eligible;
   }
 
-  private async hydrate(rows: readonly EligibleResultRow[]) {
+  /**
+   * 모든 eligible 행을 리그/대회/친선으로 분류한다 (Task 166 BE-4).
+   *
+   * **페이지가 아니라 전체를 본다.** `?type=` 필터와 `summary.byType` 은 둘 다 사용자의
+   * *모든* 기록을 대상으로 해야 한다 — `hydrate` 는 그 페이지의 맥락만 붙이므로 여기에
+   * 쓸 수 없다. 조회 두 개(대진 → tournamentId, 팀매치 → leagueId)는 `hydrate` 와 같은
+   * "단일 IN 조회" 패턴이다(행마다 조회하면 N+1).
+   *
+   * 분류 자체는 팀 전적과 **같은 함수**(`classifyTeamRecordCategory`)를 지난다 — 두 화면이
+   * 같은 경기를 다르게 부르지 않게 하는 것이 그 함수가 존재하는 이유다.
+   */
+  private async classifyRows(rows: readonly EligibleResultRow[]): Promise<{
+    readonly categoryByResultId: ReadonlyMap<string, TeamRecordCategory>;
+    readonly invalidResultIds: ReadonlySet<string>;
+    /** `hydrate` 가 **다시 조회하지 않도록** 그대로 넘긴다 — 같은 IN 조회를 두 번 내면
+     *  N+1 방지 스펙이 잡는다(실제로 잡혔다). */
+    readonly tournamentIdByTeamMatchId: ReadonlyMap<string, string>;
+    readonly roundByTeamMatchId: ReadonlyMap<string, string>;
+    readonly leagueIdByTeamMatchId: ReadonlyMap<string, string | null>;
+  }> {
+    const byResultId = new Map<string, TeamRecordCategory>();
+    const invalidResultIds = new Set<string>();
+    if (rows.length === 0) {
+      return {
+        categoryByResultId: byResultId,
+        invalidResultIds,
+        tournamentIdByTeamMatchId: new Map(),
+        roundByTeamMatchId: new Map(),
+        leagueIdByTeamMatchId: new Map(),
+      };
+    }
+
+    const teamMatchIds = Array.from(
+      new Set(rows.map((row) => row.teamMatchId).filter((id): id is string => id !== null)),
+    );
+    const [teamMatches, tournamentDetails] = await Promise.all([
+      teamMatchIds.length === 0
+        ? []
+        : this.prisma.v1TeamMatch.findMany({
+            where: { id: { in: teamMatchIds } },
+            select: {
+              id: true,
+              leagueId: true,
+              tournamentId: true,
+              deletedAt: true,
+              tournament: { select: { kind: true } },
+            },
+          }),
+      teamMatchIds.length === 0
+        ? []
+        : this.prisma.v1TournamentMatchDetails.findMany({
+            where: { teamMatchId: { in: teamMatchIds } },
+            select: { teamMatchId: true, tournamentId: true, round: true },
+          }),
+    ]);
+    const tournamentIdByTeamMatchId = new Map(tournamentDetails.map((row) => [row.teamMatchId, row.tournamentId]));
+    const roundByTeamMatchId = new Map(tournamentDetails.map((row) => [row.teamMatchId, row.round]));
+    const leagueIdByTeamMatchId = new Map(teamMatches.map((t) => [t.id, t.leagueId]));
+    const teamMatchById = new Map(teamMatches.map((teamMatch) => [teamMatch.id, teamMatch]));
+
+    for (const row of rows) {
+      const canonicalTournamentId =
+        row.teamMatchId === null ? null : (tournamentIdByTeamMatchId.get(row.teamMatchId) ?? null);
+      const teamMatch = row.teamMatchId === null ? null : teamMatchById.get(row.teamMatchId) ?? null;
+      const hasCanonicalDetails = canonicalTournamentId !== null;
+      const isRegularLeague =
+        teamMatch?.deletedAt === null &&
+        teamMatch.leagueId !== null &&
+        teamMatch.tournamentId === teamMatch.leagueId &&
+        teamMatch.tournament?.kind === 'regular_league' &&
+        !hasCanonicalDetails;
+      const isCanonicalTournament =
+        teamMatch?.deletedAt === null &&
+        teamMatch.tournamentId !== null &&
+        teamMatch.leagueId === null &&
+        teamMatch.tournament?.kind !== 'regular_league' &&
+        hasCanonicalDetails &&
+        teamMatch.tournamentId === canonicalTournamentId;
+      const isFriendly =
+        teamMatch?.deletedAt === null &&
+        teamMatch.tournamentId === null &&
+        teamMatch.leagueId === null &&
+        !hasCanonicalDetails;
+      if (!isRegularLeague && !isCanonicalTournament && !isFriendly) {
+        invalidResultIds.add(row.participantResultId);
+      }
+      byResultId.set(
+        row.participantResultId,
+        classifyTeamRecordCategory({
+          tournamentId: isCanonicalTournament ? canonicalTournamentId : null,
+          leagueId:
+            isRegularLeague ? teamMatch?.leagueId ?? null : null,
+        }),
+      );
+    }
+    return {
+      categoryByResultId: byResultId,
+      invalidResultIds,
+      tournamentIdByTeamMatchId,
+      roundByTeamMatchId,
+      leagueIdByTeamMatchId,
+    };
+  }
+
+  private async hydrate(
+    rows: readonly EligibleResultRow[],
+    /** `classifyRows` 가 **이미 조회한** 맵. 여기서 다시 조회하면 같은 IN 쿼리가 두 번
+     *  나가고 N+1 방지 스펙이 잡는다. `round` 만 이 화면 전용이라 따로 가져온다. */
+    prefetched: {
+      readonly tournamentIdByTeamMatchId: ReadonlyMap<string, string>;
+      readonly roundByTeamMatchId: ReadonlyMap<string, string>;
+      readonly leagueIdByTeamMatchId: ReadonlyMap<string, string | null>;
+    },
+  ) {
     if (rows.length === 0) return [];
 
     const gameIds = Array.from(new Set(rows.map((row) => row.gameId)));
-    const fixtureIds = Array.from(
-      new Set(rows.map((row) => row.tournamentFixtureId).filter((id): id is string => id !== null)),
-    );
-
-    const [sides, fixtures] = await Promise.all([
+    const [sides] = await Promise.all([
       this.prisma.v1GameSide.findMany({
         where: { gameId: { in: gameIds } },
         select: { id: true, gameId: true, sideKey: true, teamId: true, displayNameSnapshot: true },
       }),
-      fixtureIds.length === 0
-        ? []
-        : this.prisma.v1TournamentFixture.findMany({
-            where: { id: { in: fixtureIds } },
-            select: { id: true, tournamentId: true, round: true },
-          }),
     ]);
 
     const sidesByGame = new Map<string, typeof sides>();
@@ -244,30 +445,47 @@ export class PublicUserRecordsService {
       list.push(side);
       sidesByGame.set(side.gameId, list);
     }
-    const fixtureById = new Map(fixtures.map((fixture) => [fixture.id, fixture]));
+    const leagueIdByTeamMatchId = prefetched.leagueIdByTeamMatchId;
 
     const teamIds = Array.from(
       new Set(sides.map((side) => side.teamId).filter((id): id is string => id !== null)),
     );
     const tournamentIds = Array.from(
-      new Set(fixtures.map((fixture) => fixture.tournamentId)),
+      new Set([
+        ...rows.map((row) => row.teamMatchId === null ? null : prefetched.tournamentIdByTeamMatchId.get(row.teamMatchId) ?? null).filter((id): id is string => id !== null),
+      ]),
     );
-    const [teams, tournaments] = await Promise.all([
+    const leagueIds = Array.from(
+      new Set(Array.from(leagueIdByTeamMatchId.values()).filter((id): id is string => id !== null)),
+    );
+    const [teams, tournaments, leagues] = await Promise.all([
       teamIds.length === 0
         ? []
         : this.prisma.v1Team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true } }),
       tournamentIds.length === 0
         ? []
         : this.prisma.v1Tournament.findMany({ where: { id: { in: tournamentIds } }, select: { id: true, title: true } }),
+      leagueIds.length === 0
+        ? []
+        : this.prisma.v1Tournament.findMany({
+            where: { id: { in: leagueIds }, kind: 'regular_league' },
+            select: { id: true, title: true },
+          }),
     ]);
     const teamNameById = new Map(teams.map((team) => [team.id, team.name]));
     const tournamentTitleById = new Map(tournaments.map((tournament) => [tournament.id, tournament.title]));
+    const leagueTitleById = new Map(leagues.map((league) => [league.id, league.title]));
 
     return rows.map((row) => {
       const gameSides = sidesByGame.get(row.gameId) ?? [];
       const ownSide = gameSides.find((side) => side.id === row.sideId) ?? null;
       const opponentSide = gameSides.find((side) => side.id !== row.sideId) ?? null;
-      const fixture = row.tournamentFixtureId === null ? null : (fixtureById.get(row.tournamentFixtureId) ?? null);
+      const canonicalTournamentId =
+        row.teamMatchId === null ? null : (prefetched.tournamentIdByTeamMatchId.get(row.teamMatchId) ?? null);
+      const tournamentId = canonicalTournamentId;
+      const leagueId = row.teamMatchId === null ? null : (leagueIdByTeamMatchId.get(row.teamMatchId) ?? null);
+      const round =
+        row.teamMatchId === null ? null : (prefetched.roundByTeamMatchId.get(row.teamMatchId) ?? null);
 
       let result: 'WON' | 'LOST' | 'DRAWN' | null = null;
       if (row.score !== null && ownSide !== null) {
@@ -288,10 +506,22 @@ export class PublicUserRecordsService {
       return {
         id: row.participantResultId,
         gameId: row.gameId,
-        matchType: row.sourceType === 'TOURNAMENT_FIXTURE' ? ('tournament' as const) : ('team_match' as const),
-        tournamentId: fixture?.tournamentId ?? null,
-        tournamentTitle: fixture ? (tournamentTitleById.get(fixture.tournamentId) ?? null) : null,
-        round: fixture?.round ?? null,
+        // Every row reaching this projection is a validated canonical TEAM_MATCH.
+        // Keep its stable ID for tournament, league, and friendly detail routes;
+        // legacy fixture-only results are rejected during classification.
+        teamMatchId: row.teamMatchId,
+        // `type` 이 화면이 읽는 정본 분류다 -- 팀 전적(`public-team-records.service.ts`)과
+        // **같은 함수**(`classifyTeamRecordCategory`)를 그대로 호출해 두 화면이 같은
+        // 경기를 다르게 부르지 않게 한다(리그 경기가 친선과 뭉뚱그려지던 F6 결함).
+        type: classifyTeamRecordCategory({ tournamentId, leagueId }),
+        // 구 클라이언트의 대회/팀매치 별칭도 저장 소스 전환과 무관하게 대회 소속을 유지한다.
+        // 리그까지 구분하는 신규 화면은 위 `type`을 사용한다.
+        matchType: tournamentId !== null ? ('tournament' as const) : ('team_match' as const),
+        tournamentId,
+        tournamentTitle: tournamentId === null ? null : (tournamentTitleById.get(tournamentId) ?? null),
+        leagueId,
+        leagueTitle: leagueId === null ? null : (leagueTitleById.get(leagueId) ?? null),
+        round,
         teamId: ownSide?.teamId ?? null,
         teamName: ownSide ? (ownSide.teamId ? (teamNameById.get(ownSide.teamId) ?? null) : ownSide.displayNameSnapshot) : null,
         opponentTeamId: opponentSide?.teamId ?? null,
@@ -312,7 +542,7 @@ export class PublicUserRecordsService {
 }
 
 function rowCursorOf(row: EligibleResultRow): RecordCursor {
-  return { key: row.officialAt.toISOString(), id: row.resultRevisionId };
+  return { key: row.officialAt.toISOString(), id: row.participantResultId };
 }
 
 function parseCards(value: Prisma.JsonValue): { yellow: number; red: number } {

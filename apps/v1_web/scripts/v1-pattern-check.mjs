@@ -9,11 +9,23 @@
  *  1) 합니다체(입니다/습니다/됩니다/합니다 등) — 사용자 노출 UI 문자열은 해요체 단일 어조.
  *  2) 미정의 CSS 토큰 — globals.css가 var(--x)로 참조하지만 정의도 fallback도 없는 토큰
  *     (런타임 silent fail 방지, WS1 사고 재발 차단).
+ *  3) 무효한 폰트 크기 토큰 클래스. Tailwind v4 는
+ *     `text-[...]` 안의 맨 var() 를 **색상**으로 해석해 `color: var(--font-size-x)` 를
+ *     내보낸다. 폰트 크기가 아예 안 걸리고 부모 크기를 상속하는데, 클래스 이름만 보면
+ *     맞아 보여서 코드 리뷰로는 안 잡힌다(2026-08-18 실측: h1 24px 의도 → 16px 렌더,
+ *     42개 파일 168곳). 임의값의 타입을 `length:` 로 명시해야 크기로 해석된다.
+ *
+ *     주의 — 이 주석에 그 클래스 형태를 **그대로 적지 않는다.** Tailwind 스캐너는
+ *     주석·문자열을 가리지 않고 후보를 줍기 때문에, 예시로 적은 자리표시자까지
+ *     실제 클래스로 만들어 CSS 를 생성한다(`<이름>` 같은 걸 넣었더니 `<` 가 든
+ *     CSS 가 나와 **빌드가 깨졌다** — 2026-08-18). 형태는 아래 정규식과 위반
+ *     메시지가 이미 정확히 보여준다.
  *
  * 사용: node scripts/v1-pattern-check.mjs   (apps/v1_web에서)
  */
 import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
 
 const violations = [];
 
@@ -56,10 +68,31 @@ function checkHapnida() {
 }
 
 /* ── 2) 미정의 CSS 토큰 검사 ───────────────────────────────────────── */
-function checkUndefinedTokens() {
-  const css = readFileSync('src/app/globals.css', 'utf8');
+// 엔트리 CSS 와 그것이 로컬 @import 하는 파일들을 따라가며 토큰 정의를 모은다.
+// globals.css 만 읽으면 tokens.css(치수 계열 SSOT)에 정의된 토큰이 전부 "미정의"로
+// 잡힌다 — 정의 위치가 @theme 블록이든 :root 든 이 검사에는 상관없다. 중요한 건
+// "런타임에 값이 실제로 존재하는가" 이고, 그건 import 그래프를 따라가야 알 수 있다.
+function collectDefinedTokens(entry) {
   const defined = new Set();
-  for (const m of css.matchAll(/(?:^|[\s;{])(--[a-zA-Z0-9_-]+)\s*:/g)) defined.add(m[1]);
+  const seen = new Set();
+  const stack = [entry];
+  while (stack.length) {
+    const file = stack.pop();
+    if (seen.has(file)) continue;
+    seen.add(file);
+    let css;
+    try { css = readFileSync(file, 'utf8'); } catch { continue; }
+    for (const m of css.matchAll(/(?:^|[\s;{])(--[a-zA-Z0-9_-]+)\s*:/g)) defined.add(m[1]);
+    // 상대 경로 @import 만 따라간다 ("tailwindcss" 같은 패키지 import 는 제외)
+    for (const m of css.matchAll(/@import\s+["']([^"']+)["']/g)) {
+      if (m[1].startsWith('.')) stack.push(join(dirname(file), m[1]));
+    }
+  }
+  return defined;
+}
+
+function checkUndefinedTokens() {
+  const defined = collectDefinedTokens('src/app/globals.css');
   // tournaments.css 등 desktop css도 참조 대상
   let cssFiles = '';
   try { cssFiles = execSync('find src -name "*.css"', { encoding: 'utf8' }); } catch {}
@@ -75,8 +108,390 @@ function checkUndefinedTokens() {
   }
 }
 
+/* ── 3) 무효한 폰트 크기 토큰 클래스 검사 ─────────────────────────── */
+function checkInertFontSizeClasses() {
+  let files = '';
+  try {
+    files = execSync("grep -rl 'text-\\[var(--font-size-' src || true", { encoding: 'utf8' });
+  } catch {}
+  for (const f of files.split('\n').filter(Boolean)) {
+    const txt = readFileSync(f, 'utf8');
+    for (const [index, line] of txt.split('\n').entries()) {
+      // 한 줄에 여러 개가 있을 수 있다(클래스 문자열이 길어 줄이 잘 안 나뉜다) —
+      // match() 로 첫 건만 보면 나머지가 보고에서 빠진다.
+      for (const m of line.matchAll(/text-\[var\((--font-size-[a-zA-Z0-9_-]+)\)\]/g)) {
+        violations.push(
+          `[무효 폰트 크기 클래스] ${f}:${index + 1}: text-[var(${m[1]})] — ` +
+            `Tailwind v4 가 색상으로 해석해 크기가 안 걸린다. text-[length:var(${m[1]})] 로 쓸 것`,
+        );
+      }
+    }
+  }
+}
+
+/* ── CSS 파일 목록 + 주석 제거 (아래 두 검사 공용) ─────────────────── */
+function eachCssFile(fn) {
+  // 게이트는 fail-closed 여야 한다. 목록을 못 만들거나 파일이 0개면 조용히
+  // 통과시키지 않고 위반으로 올린다 — 검사를 못 돌린 것과 위반이 없는 것은 다르다.
+  let list;
+  try {
+    list = execSync('find src -name "*.css"', { encoding: 'utf8' });
+  } catch (e) {
+    violations.push(`[게이트 실행 실패] CSS 목록을 만들 수 없다 (${e.message}). 검사를 건너뛰지 않는다`);
+    return;
+  }
+  const files = list.split('\n').filter(Boolean);
+  if (!files.length) {
+    violations.push('[게이트 실행 실패] src 아래 CSS 파일이 0개다 — 실행 위치나 경로가 바뀐 것으로 본다');
+    return;
+  }
+  for (const f of files) {
+    // 주석 안의 예시 값(문서용)을 위반으로 세지 않도록 공백으로 치환한다
+    fn(f, readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ' '));
+  }
+}
+
+/* ── 4) 간격 4px 격자 검사 ─────────────────────────────────────────
+ * gap / padding / margin 은 4의 배수만 쓴다. 예외는 1~3px 광학 보정 하나뿐이다
+ * (아이콘 baseline 정렬 등 — tokens.css 의 SPACING 절 참조).
+ * 이 게이트가 없으면 격자는 조용히 무너진다: 2026-08-26 에 전 CSS 를 격자로
+ * 맞춘 그 날, 병행 작업이 10px·14px·6px 을 4건 다시 들여왔다.
+ * ────────────────────────────────────────────────────────────────── */
+function checkSpacingGrid() {
+  // logical property(padding-inline / margin-block-start 등)까지 포함한다.
+  const PROP =
+    /(?:^|[;{}\s])((?:row-|column-)?gap|padding|margin)(-(?:top|right|bottom|left|inline|block)(?:-(?:start|end))?)?\s*:\s*([^;{}]+)/g;
+  eachCssFile((f, txt) => {
+    for (const m of txt.matchAll(PROP)) {
+      const prop = m[1] + (m[2] || '');
+      const value = m[3].trim();
+      // 값을 공백으로 쪼개지 않고 px 토큰을 통째로 훑는다. 그래야
+      //   음수(-10px) · 함수 인자(max(10px, 2vw)) · var() fallback(var(--x, 10px))
+      // 이 전부 걸린다. var(--spacing-3) 처럼 px 가 없는 값은 자연히 통과한다.
+      //
+      // 단위를 px 로 한정한 것은 의도다. em/rem 간격(리치텍스트의
+      // `margin: 0.75em 0` 등)은 글자 크기에 비례하는 흐름 여백이라 4px 격자와
+      // 개념이 다르다 — 격자로 강제하면 본문 리듬이 깨진다. radius 쪽은 반대로
+      // 단위를 넓게 잡는다(그쪽은 "토큰만 쓴다" 가 규칙이라 단위 교체가 곧 우회다).
+      for (const px of value.matchAll(/(-?[\d.]+)px/g)) {
+        const signed = parseFloat(px[1]);
+        const n = Math.abs(signed); // 음수 마진도 격자를 지켜야 한다
+        if (!n || n <= 3) continue; // 0 과 광학 보정(±1~3px)은 허용
+        if (n % 4 !== 0) {
+          const snapped = (signed < 0 ? -1 : 1) * (Math.round(n / 4) * 4);
+          violations.push(
+            `[간격 격자 이탈] ${f}: ${prop}: ${value} — ${signed}px 는 4의 배수가 아니다. ` +
+              `${snapped}px 로 맞추거나, 정렬 보정이면 3px 이하로 줄일 것`,
+          );
+        }
+      }
+    }
+  });
+}
+
+/* ── 5) radius 리터럴 금지 ─────────────────────────────────────────
+ * border-radius 는 tokens.css 의 역할 토큰만 쓴다(chip/control/field/
+ * container/hero/pill/circle/tight). px 를 직접 적으면 21종으로 분화됐던
+ * 그 상태로 되돌아간다.
+ * ────────────────────────────────────────────────────────────────── */
+function checkRadiusLiteral() {
+  eachCssFile((f, txt) => {
+    // shorthand 만 보면 코너별 longhand(border-top-left-radius,
+    // border-start-start-radius …)로 그대로 우회된다. 실제로 6건이 그렇게 남아
+    // 있었다. 속성 이름을 넓게 잡고 위반 메시지에 실제 속성명을 싣는다.
+    for (const m of txt.matchAll(/(border-(?:[a-z]+-)*radius)\s*:\s*([^;{}]+)/g)) {
+      const prop = m[1];
+      const value = m[2].trim();
+      // 단위를 열거하지 않는다. 열거하면 목록에 없는 단위(vmin/vmax, 신규
+      // viewport 단위 dvh·svw·lvh, lh/cap/ic …)로 바꾸는 것만으로 우회되고,
+      // CSS 에 단위가 추가될 때마다 게이트가 뒤처진다.
+      //
+      // 대신 반대로 본다: 이 속성에 허용된 것은 토큰 참조와 0 / 100% 뿐이므로,
+      // **토큰 참조를 걷어낸 뒤 숫자가 남아 있으면 리터럴**이다.
+      // var( 와 토큰 이름만 지우고 닫는 괄호 안쪽은 남기는 게 핵심 — 그래야
+      // var(--x, 12px) 의 fallback 이 계속 검사 대상으로 남는다.
+      // 정당한 참조는 --radius-* 하나뿐이다. 아무 변수나 통과시키면
+      // `border-radius: var(--font-size-body)` 같은 것으로 우회할 수 있고,
+      // 되살아난 --card-radius 처럼 폐기한 토큰도 조용히 다시 들어온다.
+      const stripped = value.replace(/var\(\s*--radius-[\w-]+/g, ' ');
+      for (const other of stripped.matchAll(/var\(\s*(--[\w-]+)/g)) {
+        violations.push(
+          `[radius 리터럴] ${f}: ${prop}: ${value} — ${other[1]} 는 radius 토큰이 아니다. ` +
+            `var(--radius-*) 를 쓸 것 (tight/chip/control/field/container/hero/pill/circle)`,
+        );
+      }
+      for (const lit of stripped.matchAll(/(-?[\d.]+)\s*([a-z%]*)/gi)) {
+        const n = parseFloat(lit[1]);
+        if (n === 0) continue; // 0 / 0px / 0% — 모서리 없음
+        if (lit[2] === '%' && n === 100) continue; // 100% — 컨테이너 전체를 덮는 곡률
+        violations.push(
+          `[radius 리터럴] ${f}: ${prop}: ${value} — ${lit[1]}${lit[2]} 대신 tokens.css 의 ` +
+            `var(--radius-*) 를 쓸 것 (tight/chip/control/field/container/hero/pill/circle)`,
+        );
+      }
+    }
+  });
+}
+
+/* ── 6) TSX 임의값 간격 검사 ───────────────────────────────────────
+ * 4번 검사는 CSS 파일만 본다. 그런데 이 저장소는 Tailwind 유틸도 쓰기 때문에
+ * 마크업 쪽으로 격자 밖 값이 그대로 들어올 수 있다 — CSS 를 아무리 격자로
+ * 맞춰도 `py-[14px]` 한 줄이면 우회된다.
+ *
+ * 여기서는 **임의값 대괄호 표기**(`py-[14px]`)만 본다. 스케일 유틸(`gap-1.5`
+ * = 6px)까지 한꺼번에 막지 않는 것은 의도다: 그쪽은 800곳 규모라 일괄 스냅이
+ * 화면 전반을 바꾸는 결정이고, 게이트는 그 결정을 대신할 수 없다. 임의값은
+ * 반대로 "스케일을 벗어나려고 일부러 쓴 표기"라 지금 막는 게 맞다.
+ *
+ * radius(`rounded-[2px]`)는 포함하지 않는다. 현재 1건뿐이고 그건 축구 카드
+ * 아이콘의 모서리라 도메인 형태에 가깝다 — 토큰(4px)으로 올리면 카드 모양이
+ * 바뀐다. 늘어나면 그때 별도 판단한다.
+ * ────────────────────────────────────────────────────────────────── */
+function checkTsxArbitrarySpacing() {
+  const SPACING_UTIL = /\b(gap|gap-x|gap-y|p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr|space-x|space-y)-\[(-?[\d.]+)px\]/g;
+  let list;
+  try {
+    list = execSync('find src \\( -name "*.tsx" -o -name "*.ts" \\)', { encoding: 'utf8' });
+  } catch (e) {
+    violations.push(`[게이트 실행 실패] TSX 목록을 만들 수 없다 (${e.message}). 검사를 건너뛰지 않는다`);
+    return;
+  }
+  const files = list.split('\n').filter(Boolean);
+  if (!files.length) {
+    violations.push('[게이트 실행 실패] src 아래 TSX/TS 파일이 0개다 — 실행 위치나 경로가 바뀐 것으로 본다');
+    return;
+  }
+  for (const f of files) {
+    const txt = readFileSync(f, 'utf8');
+    for (const [index, line] of txt.split('\n').entries()) {
+      for (const m of line.matchAll(SPACING_UTIL)) {
+        const n = Math.abs(parseFloat(m[2]));
+        if (!n || n <= 3) continue; // 1~3px 광학 보정 — CSS 검사와 같은 예외
+        if (n % 4 !== 0) {
+          violations.push(
+            `[간격 격자 이탈] ${f}:${index + 1}: ${m[0]} — 4의 배수만 쓴다 ` +
+              `(1~3px 광학 보정은 예외). 스케일 유틸이나 4의 배수 임의값으로 바꿀 것`,
+          );
+        }
+      }
+    }
+  }
+}
+
+/* ── 7) 글자 크기 하드코딩 — 새 유입만 막는다 ─────────────────────
+ * 같은 12px 를 text-xs · text-[12px] · text-[length:var(--font-size-caption)] ·
+ * .tm-text-caption 네 가지로 적고 있다(실측 1,541곳). 표기가 갈리면 스케일을
+ * 조정할 때 콜사이트를 하나씩 찾아야 한다.
+ *
+ * **기존 463곳을 한 번에 고치지는 않는다.** 값이 하나도 안 바뀌는 치환이라
+ * 리뷰가 잡을 결함이 없는데 규모만 크다(격자 작업 세 층보다 크다). 대신
+ * 파일별 baseline 을 두고 **그 수를 넘으면 실패**시킨다 — 새 코드는 토큰을
+ * 쓰게 되고, 기존은 그 파일을 손댈 때 자연히 줄어든다.
+ *
+ * 줄인 뒤에는 baseline 을 갱신해 다시 늘지 못하게 한다(그 갱신도 이 게이트가
+ * 요구한다 — 줄었는데 baseline 이 그대로면 그만큼 다시 들어올 여지가 남는다).
+ * ────────────────────────────────────────────────────────────────── */
+/** 파일별 baseline 을 두고 그 수를 넘지 않는지 보는 공용 검사.
+ *  글자 크기와 radius 가 같은 구조라 헬퍼로 묶는다 — 복붙하면 "파일이
+ *  사라졌는데 baseline 에 남아 있다" 같은 가장자리 처리가 한쪽에만 남는다.
+ *  count 는 정규식이 아니라 함수로 받는다: radius 는 "토큰 참조를 걷어낸 뒤
+ *  숫자가 남는가" 로 세야 해서(CSS 쪽 5번 검사가 이미 배운 방식) 단순 매칭으로는
+ *  안 된다. */
+function checkLiteralBaseline({ label, baselinePath, count, hint }) {
+  const BASELINE_PATH = baselinePath;
+  let baseline;
+  try {
+    baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
+  } catch (e) {
+    violations.push(`[게이트 실행 실패] ${BASELINE_PATH} 를 읽을 수 없다 (${e.message})`);
+    return;
+  }
+  let list;
+  try {
+    list = execSync('find src \\( -name "*.tsx" -o -name "*.ts" \\)', { encoding: 'utf8' });
+  } catch (e) {
+    violations.push(`[게이트 실행 실패] TSX 목록을 만들 수 없다 (${e.message})`);
+    return;
+  }
+  const files = list.split('\n').filter(Boolean);
+  if (!files.length) {
+    violations.push('[게이트 실행 실패] src 아래 TSX/TS 파일이 0개다');
+    return;
+  }
+  const seen = new Set();
+  for (const f of files) {
+    const n = count(readFileSync(f, 'utf8'));
+    const allowed = baseline[f] ?? 0;
+    seen.add(f);
+    if (n > allowed) {
+      violations.push(
+        `[${label}] ${f}: ${n}곳 (허용 ${allowed}) — ${hint}`,
+      );
+    } else if (n < allowed) {
+      violations.push(
+        `[baseline 갱신 필요] ${f}: ${n}곳으로 줄었는데 baseline 은 ${allowed} 이다 — ` +
+          `${BASELINE_PATH} 를 ${n} 로 낮춰야 그만큼 다시 들어오지 못한다`,
+      );
+    }
+  }
+  // 파일이 사라졌는데 baseline 에 남아 있으면 그 몫이 다른 곳으로 새어 나갈 수 있다
+  for (const f of Object.keys(baseline)) {
+    if (f.startsWith('_') || seen.has(f)) continue;
+    violations.push(`[baseline 갱신 필요] ${f}: 파일이 없는데 baseline 에 남아 있다`);
+  }
+}
+
 checkHapnida();
 checkUndefinedTokens();
+checkInertFontSizeClasses();
+checkSpacingGrid();
+checkRadiusLiteral();
+checkTsxArbitrarySpacing();
+checkLiteralBaseline({
+  label: '글자 크기 하드코딩',
+  baselinePath: 'scripts/font-size-baseline.json',
+  // 소수도 잡는다 — text-[13.5px] 같은 값이 baseline 밖에서 조용히 통과하고
+  // 있었다(실측 3곳). px 리터럴은 정수만 쓰인다는 보장이 없다.
+  //
+  // Tailwind 기본 이름 클래스(text-xs·text-sm·text-base·text-lg·text-xl·text-Nxl)도 센다.
+  // 이 검사의 머리말이 `text-xs` 를 네 가지 표기 중 하나로 지목해 놓고 정작 세지 않았다 —
+  // 719곳(92파일)이 그 구멍으로 들어와 있었다. 단순한 표기 문제가 아니다: 이 이름들은
+  // **사다리에 없는 크기를 들여온다.** text-base=16px, text-lg=18px 인데 타입 스케일은
+  // 15(body) 다음이 17(body-lg), 그 다음이 20(subhead)이라 16·18 단계가 아예 없다.
+  // 실제로 어드민 모달 제목 하나가 text-base 로 16px 이 되어 형제 모달(17px)과 어긋나 있었다.
+  count: (txt) =>
+    (txt.match(/\btext-\[(\d+(?:\.\d+)?)px\]|fontSize:\s*(\d+(?:\.\d+)?)\b/g) || []).length +
+    (txt.match(/\btext-(?:xs|sm|base|lg|xl|[2-9]xl)\b/g) || []).length,
+  hint: 'text-[Npx] · fontSize:N · text-sm 류 Tailwind 기본 이름 대신 .tm-text-* 나 var(--font-size-*) 를 쓸 것',
+});
+/* ── 8) 틴트 지면에 보조 텍스트 처방이 빠진 곳 ─────────────────────
+ * `--text-caption`(=grey600)은 **흰 배경에서만** AA 를 넘는다(4.62:1). 지면에 색이
+ * 조금이라도 깔리면 아래로 떨어진다 — alpha 실측으로 다섯 틴트 토큰 전부 미달이다:
+ *
+ *   tint-grey 4.09 · tint-red 4.16 · tint-blue 4.21 · tint-green 4.25 · tint-orange 4.27
+ *   (grey700 이면 각각 6.31 / 6.42 / 6.49 / 6.55 / 6.57)
+ *
+ * CSS 에 셀렉터가 있는 지면은 globals.css 의 "틴트 지면 위의 보조 텍스트" 목록이
+ * 처리한다. 문제는 **인라인 style 로 까는 곳**이다 — 겨냥할 셀렉터가 없어 목록에
+ * 넣을 수 없고, 그래서 `.tm-on-tint` 표시 클래스를 함께 붙이기로 했다.
+ *
+ * 그 규약이 사람의 기억에만 의존하고 있었다. 실제로 스윕을 돌 때마다 새 지면이
+ * 계속 나왔다(#1104 7곳 → #1108 1 → #1110 3 → #1114 12 → #1116 2 → #1117 1).
+ * 여기서 세어 **새로 늘지 못하게** 막는다. 기존 84곳은 baseline 으로 인정한다 —
+ * 색이 깔렸다고 다 문제가 아니라 그 위에 캡션 텍스트가 있을 때만 미달이므로,
+ * 일괄 치환은 효과 없는 선언만 늘린다.
+ *
+ * **이 게이트가 못 잡는 것**: 배경이 변수를 거치는 경우다. matches-page.tsx 의
+ * StateCard 는 `const tint = tone === 'green' ? … : …` 로 세 토큰 중 하나를 고른 뒤
+ * `background: tint` 로 쓴다 — 태그 안에 `var(--tint-*)` 리터럴이 없어 여기 안 걸린다.
+ * 그런 곳은 실화면 대비 측정으로만 나온다(StateCard 도 이 게이트가 아니라 alpha
+ * 스윕에서 나왔다, #1117). 이 게이트는 **가장 흔한 형태를 막는 것**이지 전수 보장이 아니다.
+ * ────────────────────────────────────────────────────────────────── */
+checkLiteralBaseline({
+  label: '틴트 지면에 tm-on-tint 누락',
+  baselinePath: 'scripts/tint-marker-baseline.json',
+  count: (txt) => {
+    // 지면으로 쓰이는 옅은 토큰을 전부 담는다. `--*50` 은 **일곱 색 모두** grey600 에서
+    // 미달이다(alpha 값 기준 계산): red 4.02 · blue 4.11 · teal 4.15 · green 4.16 ·
+    // orange 4.21 · yellow 4.32 · grey 4.42. 처음엔 blue/grey/red 만 넣었다가
+    // /tournaments/:id/my 의 orange50 안내가 스윕에서 나와 나머지를 채웠다.
+    const TOKEN =
+      /var\(--(?:tint-(?:blue|grey|green|orange|red)|(?:blue|green|orange|red|yellow|teal|grey)50|grey100|surface-soft)\)/;
+    // 배경 선언과 토큰이 **같은 태그 안에 함께** 있으면 센다. `background: var(--x)` 만
+    // 보면 조건부 배경을 놓친다 — 이 저장소는 `background: blocked ? 'var(--orange50)' :
+    // 'var(--grey50)'` 같은 삼항을 자주 쓰고, 실제로 그런 곳이 10군데 더 있었다.
+    const BG = /background(?:Color)?:/;
+    // **className 값 안에서** 단어 경계로 찾는다. 단순 문자열 포함으로 보면 태그 안
+    // 주석이나 data-* 속성에 이름만 스쳐도 "붙어 있다"고 오인한다 — 이 저장소는 실제로
+    // 태그 안에 `// … (globals.css .tm-on-tint)` 같은 주석을 달고 있어 그대로 뚫린다.
+    // globals.test.ts 의 검사와 같은 방식이다.
+    // \b 는 하이픈을 경계로 보므로 tm-on-tint-header · x-tm-on-tint 같은 다른 클래스가 통과한다.
+    const CLASS_EDGE = String.raw`(?<![\w-])tm-on-tint(?![\w-])`;
+    const MARKED = new RegExp(`className=(?:"[^"]*|'[^']*|\\{[^}]*)${CLASS_EDGE}`);
+    // 여는 태그 단위로 본다 — 배경과 className 이 같은 태그 안에 있어야 처방이 닿는다.
+    // 여는 태그를 정규식 `[^>]*?>` 로 끊으면 **`onClick={() => …}` 의 `>` 에서 조기
+    // 종료**된다. 그러면 그 뒤에 오는 `style={{ background: … }}` 를 못 봐서 누락을
+    // 세지 못한다(실측 6곳). 따옴표·중괄호 깊이를 세며 depth 0 의 `>` 만 태그 끝으로
+    // 본다 — 이 파일의 radius 검사가 값을 읽을 때 쓰는 방식과 같다.
+    const openingTags = (src) => {
+      const found = [];
+      const START = /<[A-Za-z][A-Za-z0-9]*\b/g;
+      let m;
+      while ((m = START.exec(src)) !== null) {
+        let depth = 0;
+        let quote = '';
+        let j = START.lastIndex;
+        for (; j < src.length; j++) {
+          const c = src[j];
+          if (quote) {
+            if (c === '\\') { j += 1; continue; }
+            if (c === quote) quote = '';
+          } else if (c === '"' || c === "'" || c === '`') {
+            quote = c;
+          } else if (c === '{') {
+            depth += 1;
+          } else if (c === '}') {
+            depth -= 1;
+          } else if (c === '>' && depth === 0) {
+            found.push(src.slice(m.index, j + 1));
+            break;
+          }
+        }
+        START.lastIndex = j + 1;
+      }
+      return found;
+    };
+    return openingTags(txt).filter((tag) => BG.test(tag) && TOKEN.test(tag) && !MARKED.test(tag)).length;
+  },
+  hint: '인라인으로 지면 색을 깔면 같은 태그에 className="tm-on-tint" 를 함께 붙일 것 (globals.css .tm-on-tint)',
+});
+checkLiteralBaseline({
+  label: 'radius 리터럴(TSX)',
+  baselinePath: 'scripts/radius-baseline.json',
+  // 5번 검사는 CSS 파일만 본다. 이 저장소는 인라인 style 도 쓰기 때문에
+  // 마크업 쪽으로 그대로 들어올 수 있었고, 실제로 201곳이 그렇게 있었다
+  // (그중 139곳은 토큰과 값이 같아 무손실로 치환했다).
+  count: (txt) => {
+    // 값을 정규식으로 끊으면 표현식에서 샌다. `borderRadius: isRect ? 2 : '50%'` 나
+    // `borderRadius: radius ?? 12` 는 속성 뒤 한 토큰만 보는 정규식에 걸리지 않아
+    // 그 안의 리터럴이 통째로 빠져나갔다(실측 2곳). 값 끝까지 괄호·따옴표 깊이를
+    // 세면서 읽는다.
+    const readValue = (src, from) => {
+      let depth = 0, quote = '';
+      for (let k = from; k < src.length; k++) {
+        const c = src[k];
+        if (quote) {
+          if (c === '\\') k++;
+          else if (c === quote) quote = '';
+          continue;
+        }
+        if (c === "'" || c === '"' || c === '`') { quote = c; continue; }
+        if ('([{'.includes(c)) depth++;
+        else if (')]}'.includes(c)) { if (depth === 0) return src.slice(from, k); depth--; }
+        else if ((c === ',' || c === '\n') && depth === 0) return src.slice(from, k);
+      }
+      return src.slice(from);
+    };
+    const literalsIn = (value) => {
+      // 토큰 참조를 걷어낸 뒤 0 이 아닌 숫자가 남으면 리터럴이다. 단위는 열거하지
+      // 않는다 — 열거하면 목록에 없는 단위로 우회된다.
+      const rest = value.replace(/var\(\s*--radius-[\w-]+\s*\)/g, ' ');
+      let c = 0;
+      for (const lit of rest.matchAll(/(-?\d+(?:\.\d+)?)/g)) if (parseFloat(lit[1]) !== 0) c++;
+      return c;
+    };
+    let n = 0;
+    // 코너별 longhand 와 Tailwind 임의값까지 함께 본다 — shorthand 만 보면
+    // borderTopLeftRadius / rounded-[12px] 로 그대로 우회된다(CSS 쪽에서
+    // 실제로 6건이 그랬다).
+    for (const m of txt.matchAll(/border(?:Start|End|Top|Bottom)?(?:Start|End|Left|Right)?Radius\s*:/g)) {
+      n += literalsIn(readValue(txt, m.index + m[0].length));
+    }
+    for (const m of txt.matchAll(/\brounded-\[([^\]]+)\]/g)) n += literalsIn(m[1]);
+    return n;
+  },
+  hint: 'borderRadius 에 px 를 직접 적지 말고 var(--radius-*) 를 쓸 것 (tight/chip/control/field/container/hero/pill/circle)',
+});
 
 if (violations.length) {
   console.error(`\n✗ v1 패턴 검사 실패 — ${violations.length}건:\n`);
@@ -84,4 +499,6 @@ if (violations.length) {
   console.error('\n참고: docs/v1-coding-patterns.md\n');
   process.exit(1);
 }
-console.log('✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0)');
+console.log(
+  '✓ v1 패턴 검사 통과 (합니다체 0, 미정의 CSS 토큰 0, 무효 폰트 크기 클래스 0, 간격 격자 이탈 0(CSS+TSX 임의값), radius 리터럴 0(CSS), 글자 크기·TSX radius baseline 유지)',
+);

@@ -13,6 +13,8 @@ const ids = {
   hostTeam: '65000000-0000-4000-8000-000000000020',
   awayTeam: '65000000-0000-4000-8000-000000000021',
   tournament: '65000000-0000-4000-8000-000000000030',
+  hostRegistration: '65000000-0000-4000-8000-000000000050',
+  awayRegistration: '65000000-0000-4000-8000-000000000051',
   fixture: '65000000-0000-4000-8000-000000000031',
   assignment: '65000000-0000-4000-8000-000000000040',
 } as const;
@@ -71,7 +73,14 @@ describe('POST /games/:gameId/events — ASSIST_INVALID (T1-2)', () => {
       ],
     });
     await prisma.v1Tournament.create({ data: { id: ids.tournament, sportId: ids.sport, title: 'Task Assist Tournament', competitionConfigVersionId: config.id } });
-    await prisma.v1TournamentFixture.create({ data: { id: ids.fixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, competitionConfigVersionId: config.id } });
+    await prisma.v1TournamentRegistration.createMany({
+      data: [
+        { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.operator, status: 'confirmed' },
+        { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.awayTeam, appliedByUserId: ids.operator, status: 'confirmed' },
+      ],
+    });
+    await prisma.v1TeamMatch.create({ data: { id: ids.fixture, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.awayTeam, startAt: new Date(Date.now() - 60_000), title: 'Canonical assist match', status: 'matched', competitionConfigVersionId: config.id } });
+    await prisma.v1TournamentMatchDetails.create({ data: { teamMatchId: ids.fixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, legNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.awayRegistration } });
     await prisma.v1TournamentStaffAssignment.create({
       data: { id: ids.assignment, tournamentId: ids.tournament, userId: ids.operator, role: 'TOURNAMENT_DIRECTOR', grantedByUserId: ids.operator },
     });
@@ -82,7 +91,7 @@ describe('POST /games/:gameId/events — ASSIST_INVALID (T1-2)', () => {
     });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: config.id,
       sides: [

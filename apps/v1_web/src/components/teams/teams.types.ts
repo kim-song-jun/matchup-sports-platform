@@ -60,7 +60,7 @@ export type TeamListViewModel = {
 };
 
 export type TeamStateViewModel = TeamListViewModel & {
-  state: 'empty' | 'error' | 'filter' | 'restricted';
+  state: 'empty' | 'error' | 'restricted';
   title: string;
   description: string;
 };
@@ -75,7 +75,7 @@ export type TeamDetailViewModel = {
     county: string;
     level: string;
     genderRule: string;
-    membersList: Array<{ name: string; role: string; meta: string; status: string; visibility: '공개' | '비공개'; profileHref?: string }>;
+    membersList: Array<{ membershipId: string; userId: string; name: string; role: string; profileHref?: string }>;
     memberAccess: {
       canView: boolean;
       enabled: boolean;
@@ -92,14 +92,34 @@ export type TeamDetailViewModel = {
   ctaSuccessMessage?: string;
   ctaFailureMessage?: string;
   /**
+   * 팀 컨택 작성 화면(`/teams/:id/contact/new`) 링크. 로그인 상태 + 내 팀이 아님 + 운영
+   * 권한(owner/manager) 팀을 1개 이상 보유 — 세 조건을 모두 만족할 때만 채워지는 보조 CTA.
+   * 계산 위치: `TeamDetailPageClient`(teams-client.tsx).
+   */
+  contactHref?: string;
+  /**
    * 승인 대기 중일 때만 채워진다(mode === 'pending'). 토스트는 2초 뒤 사라지므로
    * "무엇을 기다리는 중인지"는 화면에 계속 남아 있어야 한다.
    */
   joinRequest?: { requestedAtLabel?: string };
-  operations?: Array<{ label: string; sub: string; href: string }>;
+  operations?: Array<{ label: string; sub: string; href: string; badge?: number; badgeLabel?: string }>;
   /** Recruiting matches this team currently hosts — "이 팀의 열린 매치" section. */
   openMatches?: Array<{ id: string; title: string; dateLabel: string; venue: string }>;
   openMatchesLoading?: boolean;
+  /**
+   * 이 팀의 팀매치 목록(host/신청 모두)에서 distinct 로 추린 리그 — "내 리그" section.
+   * R4: 전용 리그 API 없이 GET /team-matches?teamId= 응답의 league 필드만으로 구성한다.
+   * 값이 비어 있으면(리그 소속 매치 없음) 섹션 자체를 렌더하지 않는다.
+   */
+  myLeagues?: Array<{ leagueId: string; title: string }>;
+  myLeaguesLoading?: boolean;
+  /**
+   * 그룹 F 재감사: myLeaguesQuery 가 실패해도 items가 빈 배열이 되어 "참가 리그 0개"와
+   * 화면이 100% 동일했다(재시도 버튼도 없음). isError 를 뷰모델까지 끌고 와 통신 오류를
+   * 별도 3번째 상태로 구분한다 — loading / error / empty(진짜 0개) 는 서로 다른 화면.
+   */
+  myLeaguesError?: boolean;
+  onRetryMyLeagues?: () => void;
 };
 
 export type TeamFormMode = 'create' | 'edit';
@@ -146,6 +166,8 @@ export type TeamFormViewModel = {
 
 export type TeamMembersViewModel = {
   teamName: string;
+  /** Live viewer role from the team detail response; absent only in the loading fallback. */
+  viewerRole?: string | null;
   activeTab: 'members' | 'requests' | 'invitations';
   tabs: Array<{ key: 'members' | 'requests' | 'invitations'; label: string; count: number; onSelect: () => void }>;
   summary: { total: number; managers: number; pending: number };

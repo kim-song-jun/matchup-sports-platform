@@ -16,6 +16,15 @@ import {
   isoToDatetimeLocal,
 } from '@/components/admin/tournaments/tournament-datetime-field';
 import { parsePrizeRows } from '@/lib/prize-breakdown';
+import {
+  applyPromoFactDefaults,
+  buildTournamentPromoFactDefaults,
+  EMPTY_PROMO_FACTS_DIRTY,
+  markChangedPromoFacts,
+  PROMO_FACT_KEYS,
+  type PromoFactKey,
+  type PromoFactsDirty,
+} from '@/lib/tournament-promo-defaults';
 
 export const TOURNAMENT_CREATE_STEPS = [
   { title: '기본 정보', description: '종목과 대회 성격' },
@@ -60,6 +69,8 @@ export type TournamentCreateState = {
   genderMaxMale: string;
   genderMinFemale: string;
   genderMaxFemale: string;
+  /** "최소 경기 수" — format이 'league'일 때만 노출. 빈 문자열이면 미설정(서버 검증 안 함). */
+  minMatchesPerTeam: string;
   entryFee: string;
   bankName: string;
   bankAccount: string;
@@ -67,11 +78,20 @@ export type TournamentCreateState = {
   prizePool: string;
   prizeSummary: string;
   prizeRows: TournamentPrizeRow[];
+  /** 경고 누적 출전정지 기준(장). 빈 문자열 = 이 대회에는 규정 미적용. */
+  yellowAccumulationLimit: string;
+  /** 퇴장 1장당 정지 경기 수. 빈 문자열 = 미적용. */
+  redCardSuspensionMatches: string;
   rulesText: string;
   refundPolicyText: string;
   coverImageUrl: string | null;
   promoHome: TournamentPromoCardValue;
   promoList: TournamentPromoCardValue;
+  /**
+   * 홍보 카드의 날짜/팀/장소/상금 문구 중 관리자가 직접 고친 것 — true인 문구는 앞 단계
+   * 값이 바뀌어도 자동 갱신하지 않는다(registrationDeadlineDirty와 같은 규칙).
+   */
+  promoFactsDirty: { promoHome: PromoFactsDirty; promoList: PromoFactsDirty };
 };
 
 const EMPTY_PROMO: TournamentPromoCardValue = {
@@ -111,6 +131,7 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   genderMaxMale: '',
   genderMinFemale: '',
   genderMaxFemale: '',
+  minMatchesPerTeam: '',
   entryFee: '0',
   bankName: '',
   bankAccount: '',
@@ -122,16 +143,24 @@ export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
     { id: 'prize-2', label: '2위', value: '' },
     { id: 'prize-3', label: '3위', value: '' },
   ],
+  // 기본값은 빈 문자열(미적용)이다 — 기본값을 넣으면 운영자가 의식하지 못한 채
+  // 정지 규정이 켜진 대회가 만들어진다.
+  yellowAccumulationLimit: '',
+  redCardSuspensionMatches: '',
   rulesText: '',
   refundPolicyText: '',
   coverImageUrl: null,
   promoHome: { ...EMPTY_PROMO },
   promoList: { ...EMPTY_PROMO },
+  promoFactsDirty: {
+    promoHome: { ...EMPTY_PROMO_FACTS_DIRTY },
+    promoList: { ...EMPTY_PROMO_FACTS_DIRTY },
+  },
 };
 
 type FormField = Exclude<
   keyof TournamentCreateState,
-  'step' | 'prizeRows' | 'promoHome' | 'promoList'
+  'step' | 'prizeRows' | 'promoHome' | 'promoList' | 'promoFactsDirty'
 >;
 
 export type TournamentCreateAction =
@@ -147,6 +176,8 @@ export type TournamentCreateAction =
       slot: 'promoHome' | 'promoList';
       patch: Partial<TournamentPromoCardValue>;
     }
+  /** 한 홍보 카드의 사실 문구를 앞 단계 값 기준으로 되돌린다("대회 정보로 다시 채우기"). */
+  | { type: 'reset-promo-facts'; slot: 'promoHome' | 'promoList' }
   | { type: 'copy-bank'; bankName: string; bankAccount: string; bankHolder: string }
   /** 초안 생성/수정 성공 직후 — draftId를 고정하고 확인 단계로 넘어간다. */
   | { type: 'draft-created'; tournament: V1Tournament }
@@ -167,7 +198,7 @@ export function tournamentCreateReducer(
       if (action.field === 'sportId' && action.value !== state.sportId) {
         return { ...state, sportId: action.value as string, lineupMaxPlayers: '' };
       }
-      return { ...state, [action.field]: action.value };
+      return syncPromoFacts({ ...state, [action.field]: action.value }, action.field);
     case 'set-scheduled-at': {
       const registrationDeadlineAt = state.registrationDeadlineDirty
         ? state.registrationDeadlineAt
@@ -175,7 +206,10 @@ export function tournamentCreateReducer(
       const rosterDeadlineAt = state.rosterDeadlineDirty
         ? state.rosterDeadlineAt
         : suggestDeadline(action.value, 7);
-      return { ...state, scheduledAt: action.value, registrationDeadlineAt, rosterDeadlineAt };
+      return syncPromoFacts(
+        { ...state, scheduledAt: action.value, registrationDeadlineAt, rosterDeadlineAt },
+        'scheduledAt',
+      );
     }
     case 'set-registration-deadline':
       return {
@@ -188,9 +222,26 @@ export function tournamentCreateReducer(
     case 'set-prize-rows':
       return { ...state, prizeRows: action.rows };
     case 'set-promo':
-      return { ...state, [action.slot]: action.value };
+      return withPromoValue(state, action.slot, action.value);
     case 'patch-promo':
-      return { ...state, [action.slot]: { ...state[action.slot], ...action.patch } };
+      return withPromoValue(state, action.slot, { ...state[action.slot], ...action.patch });
+    case 'reset-promo-facts':
+      return {
+        ...state,
+        // 되돌리기는 "대회 정보 기준으로 맞춘다"는 뜻이라 파생값을 그대로 덮어쓴다 —
+        // 대회 정보에 값이 없으면 그 칸도 비운다. 자동 동기화(applyPromoFactDefaults)는
+        // 반대로 빈 파생값으로 기존 문구를 지우지 않는데, 그건 관리자가 앞 단계를 입력하는
+        // 도중 잠깐 비는 것과 구분해야 하기 때문이다. 여기서 같은 규칙을 쓰면 되돌릴 파생값이
+        // 없는 칸이 그냥 남아 버튼이 아무 일도 안 한 것처럼 보인다(실제 제보).
+        [action.slot]: {
+          ...state[action.slot],
+          ...buildTournamentPromoFactDefaults(state),
+        },
+        promoFactsDirty: {
+          ...state.promoFactsDirty,
+          [action.slot]: { ...EMPTY_PROMO_FACTS_DIRTY },
+        },
+      };
     case 'copy-bank':
       return {
         ...state,
@@ -210,6 +261,79 @@ export function tournamentCreateReducer(
 }
 
 /**
+ * 이 홍보 카드에 "되돌릴 것"이 있는지 — 관리자가 사실 문구를 하나라도 직접 고쳤는가.
+ * 되돌릴 게 없는데 버튼이 눌리면 아무 일도 일어나지 않아 무반응처럼 보이므로, 그때는
+ * 버튼을 비활성으로 두어 상태를 드러낸다.
+ */
+export function hasPromoFactEdits(
+  state: TournamentCreateState,
+  slot: 'promoHome' | 'promoList',
+): boolean {
+  return PROMO_FACT_KEYS.some((key) => state.promoFactsDirty[slot][key]);
+}
+
+/** buildTournamentPromoFactDefaults의 입력이 되는 앞 단계 필드 — 이 값이 바뀌면 문구를 다시 만든다. */
+const PROMO_FACT_SOURCE_FIELDS = [
+  'scheduledAt',
+  'scheduledEndAt',
+  'venue',
+  'prizePool',
+  'prizeSummary',
+] as const;
+
+/**
+ * 앞 단계 값이 바뀐 뒤, 관리자가 손대지 않은 홍보 문구를 새 값으로 다시 채운다.
+ * changedField를 주면 그 필드가 홍보 문구의 출처일 때만 동작하고, 생략하면 항상 다시 채운다.
+ */
+function syncPromoFacts(
+  state: TournamentCreateState,
+  changedField?: keyof TournamentCreateState,
+): TournamentCreateState {
+  if (changedField && !(PROMO_FACT_SOURCE_FIELDS as readonly string[]).includes(changedField)) {
+    return state;
+  }
+  const defaults = buildTournamentPromoFactDefaults(state);
+  const promoHome = applyPromoFactDefaults(state.promoHome, defaults, state.promoFactsDirty.promoHome);
+  const promoList = applyPromoFactDefaults(state.promoList, defaults, state.promoFactsDirty.promoList);
+  if (promoHome === state.promoHome && promoList === state.promoList) return state;
+  return { ...state, promoHome, promoList };
+}
+
+/** 홍보 카드 값을 교체하면서, 관리자가 직접 바꾼 사실 문구를 dirty로 표시한다. */
+function withPromoValue(
+  state: TournamentCreateState,
+  slot: 'promoHome' | 'promoList',
+  value: TournamentPromoCardValue,
+): TournamentCreateState {
+  const dirty = markChangedPromoFacts(state[slot], value, state.promoFactsDirty[slot]);
+  if (dirty === state.promoFactsDirty[slot]) return { ...state, [slot]: value };
+  return {
+    ...state,
+    [slot]: value,
+    promoFactsDirty: { ...state.promoFactsDirty, [slot]: dirty },
+  };
+}
+
+/**
+ * 서버에 저장돼 있던 문구가 "관리자가 정한 값"인지 판정한다.
+ *
+ * 이 위저드는 자동으로 채운 문구도 그대로 저장하므로, 저장돼 있다는 사실만으로는 관리자가
+ * 손댔는지 알 수 없다. 대신 지금 대회 정보로 만든 파생값과 대조한다 — 같으면 자동으로
+ * 채워진 그대로이므로 dirty가 아니고(초안 저장·새로고침 뒤에도 자동 갱신이 이어진다),
+ * 다르면 관리자가 고쳤거나 지운 것이므로 dirty다.
+ */
+function dirtyFromSavedPromo(
+  saved: Record<PromoFactKey, string>,
+  defaults: Record<PromoFactKey, string>,
+): PromoFactsDirty {
+  const dirty = { ...EMPTY_PROMO_FACTS_DIRTY };
+  for (const key of PROMO_FACT_KEYS) {
+    if (saved[key].trim() !== defaults[key]) dirty[key] = true;
+  }
+  return dirty;
+}
+
+/**
  * V1Tournament(서버 응답) → 위저드 폼 필드. 새로고침으로 `?draftId=`만 남았을 때 폼 전체를
  * 되살리는 데 쓴다(뒤로가기 없이 "이전"으로 3단계를 다시 열어도 값이 비어 있지 않아야 한다).
  * buildTournamentCreatePayload의 정확한 역변환 — 필드가 늘어나면 두 함수를 함께 갱신할 것.
@@ -223,7 +347,7 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
       }))
     : INITIAL_TOURNAMENT_CREATE_STATE.prizeRows;
 
-  return {
+  const restored: TournamentCreateState = {
     ...INITIAL_TOURNAMENT_CREATE_STATE,
     draftId: tournament.id,
     sportId: tournament.sportId,
@@ -248,6 +372,8 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
     genderMaxMale: tournament.genderMaxMale !== null ? String(tournament.genderMaxMale) : '',
     genderMinFemale: tournament.genderMinFemale !== null ? String(tournament.genderMinFemale) : '',
     genderMaxFemale: tournament.genderMaxFemale !== null ? String(tournament.genderMaxFemale) : '',
+    minMatchesPerTeam:
+      tournament.minMatchesPerTeam !== null ? String(tournament.minMatchesPerTeam) : '',
     entryFee: String(tournament.entryFee),
     bankName: tournament.bankName ?? '',
     bankAccount: tournament.bankAccount ?? '',
@@ -255,6 +381,14 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
     prizePool: tournament.prizePool !== null ? String(tournament.prizePool) : '',
     prizeSummary: tournament.prizeSummary ?? '',
     prizeRows,
+    yellowAccumulationLimit:
+      tournament.yellowAccumulationLimit === null || tournament.yellowAccumulationLimit === undefined
+        ? ''
+        : String(tournament.yellowAccumulationLimit),
+    redCardSuspensionMatches:
+      tournament.redCardSuspensionMatches === null || tournament.redCardSuspensionMatches === undefined
+        ? ''
+        : String(tournament.redCardSuspensionMatches),
     rulesText: tournament.rulesText ?? '',
     refundPolicyText: tournament.refundPolicyText ?? '',
     coverImageUrl: tournament.coverImageUrl,
@@ -283,6 +417,29 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
       priority: String(tournament.promoListPriority),
     },
   };
+
+  const defaults = buildTournamentPromoFactDefaults(restored);
+  return syncPromoFacts({
+    ...restored,
+    promoFactsDirty: {
+      promoHome: dirtyFromSavedPromo(
+        {
+          dateText: tournament.promoHomeDateText ?? '',
+          locationText: tournament.promoHomeLocationText ?? '',
+          prizeText: tournament.promoHomePrizeText ?? '',
+        },
+        defaults,
+      ),
+      promoList: dirtyFromSavedPromo(
+        {
+          dateText: tournament.promoListDateText ?? '',
+          locationText: tournament.promoListLocationText ?? '',
+          prizeText: tournament.promoListPrizeText ?? '',
+        },
+        defaults,
+      ),
+    },
+  });
 }
 
 /**
@@ -303,6 +460,9 @@ export function buildTournamentPreviewItem(
     title: state.title.trim() || '새 대회',
     status: 'open',
     format: state.format,
+    // 이 위저드는 단발 대회만 만든다(정규 리그 시즌은 리그 어드민에서 만들어진다).
+    // state.format 이 'league' 여도 그건 "리그 방식으로 치른다"는 뜻이지 리그 시즌이 아니다.
+    kind: 'regular_tournament',
     registrationDeadlineAt: datetimeLocalToIso(state.registrationDeadlineAt),
     scheduledAt: datetimeLocalToIso(state.scheduledAt),
     scheduledEndAt: datetimeLocalToIso(state.scheduledEndAt),
@@ -363,11 +523,31 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
     if (start !== null && end !== null && end < start) {
       errors.scheduledEndAt = '종료 일시는 시작 일시 이후여야 해요.';
     }
-    if (start !== null && registrationDeadline !== null && registrationDeadline >= start) {
+    const nowTs = Date.now();
+    // **시작일 자체가 과거면 거기서만 말한다.** 이 검사가 없으면 과거 시작일이 "마감은 대회 시작
+    // 전이어야 해요" 처럼 **엉뚱한 필드의** 오류로 나타나 운영자가 고칠 곳을 못 찾는다.
+    // 이 마법사는 생성 전용이라(편집 경로가 이 검증을 쓰지 않는다) 지난 대회 편집을 막지 않는다.
+    const startIsFuture = start !== null && start > nowTs;
+    if (start !== null && !startIsFuture) {
+      errors.scheduledAt = '대회 시작 일시는 지금 이후여야 해요.';
+    }
+    // **"마감 < 시작" 은 시작일이 유효할 때만 본다.** 시작일이 이미 틀렸는데 마감 필드까지
+    // 빨개지면, 운영자는 멀쩡한 마감을 고치려 든다 — 원인 하나에 오류 하나여야 한다.
+    if (startIsFuture && registrationDeadline !== null && registrationDeadline >= start) {
       errors.registrationDeadlineAt = '신청 마감은 대회 시작 전이어야 해요.';
     }
-    if (start !== null && rosterDeadline !== null && rosterDeadline >= start) {
+    if (startIsFuture && rosterDeadline !== null && rosterDeadline >= start) {
       errors.rosterDeadlineAt = '명단 제출 마감은 대회 시작 전이어야 해요.';
+    }
+    // **지난 마감은 만들 수 없다.** "대회 시작 전" 만 보면 시작이 임박한 대회에서 과거 시각이
+    // 통과한다 — 그러면 팀이 명단을 아예 못 낸다(서버 409 ROSTER_DEADLINE_PASSED).
+    // 이 검사는 시작일 유효성과 무관하게 돈다 — 지난 마감은 그 자체로 틀렸다.
+    // 두 필드를 각각 본다: 같은 자동 제안 로직을 두 곳이 쓰므로 한쪽만 막으면 반쪽이다.
+    if (registrationDeadline !== null && registrationDeadline <= nowTs) {
+      errors.registrationDeadlineAt = '신청 마감은 지금 이후여야 해요.';
+    }
+    if (rosterDeadline !== null && rosterDeadline <= nowTs) {
+      errors.rosterDeadlineAt = '명단 제출 마감은 지금 이후여야 해요.';
     }
   }
 
@@ -412,6 +592,17 @@ export function validateTournamentCreateStep(state: TournamentCreateState, step 
       if (!state.bankName.trim()) errors.bankName = '유료 대회는 은행명이 필요해요.';
       if (!state.bankAccount.trim()) errors.bankAccount = '유료 대회는 계좌번호가 필요해요.';
       if (!state.bankHolder.trim()) errors.bankHolder = '유료 대회는 예금주가 필요해요.';
+    }
+    if (state.format === 'league' && state.minMatchesPerTeam.trim() !== '') {
+      const minMatchesPerTeam = numeric(state.minMatchesPerTeam);
+      if (
+        minMatchesPerTeam === null ||
+        !Number.isInteger(minMatchesPerTeam) ||
+        minMatchesPerTeam < 1 ||
+        minMatchesPerTeam > 50
+      ) {
+        errors.minMatchesPerTeam = '최소 경기 수는 1~50경기 사이의 정수여야 해요.';
+      }
     }
     if (state.genderCategory === 'mixed') {
       const minMale = optionalNumeric(state.genderMinMale);
@@ -503,6 +694,9 @@ export function buildTournamentCreatePayload(
       state.substitutionMode === 'limited' && state.maxSubstitutions.trim() !== ''
         ? Number(state.maxSubstitutions.trim())
         : undefined,
+    // 빈 값이면 아예 보내지 않는다 — 0이나 빈 문자열을 보내면 서버 @IsInt @Min(1)이 422로
+    // 거절한다(관리자가 아무것도 입력하지 않았는데 검증 요청이 되는 사고).
+    minMatchesPerTeam: state.minMatchesPerTeam.trim() !== '' ? Number(state.minMatchesPerTeam.trim()) : undefined,
     entryFee: Number(state.entryFee || '0'),
     bankName: state.bankName.trim() || undefined,
     bankAccount: state.bankAccount.trim() || undefined,
@@ -510,6 +704,14 @@ export function buildTournamentCreatePayload(
     prizePool: state.prizePool ? Number(state.prizePool) : undefined,
     prizeSummary: state.prizeSummary.trim() || undefined,
     prizeBreakdown: serializeTournamentPrizeRows(state.prizeRows) || undefined,
+    // 빈 문자열은 undefined 로 보낸다(= 값을 건드리지 않음). 규정을 **끄려면**
+    // 화면에서 비우는 것만으로는 부족하고 null 을 명시해야 하는데, 생성 폼에는
+    // 끌 대상이 없으므로 여기서는 undefined 로 충분하다.
+    // numeric() 재사용 — 직접 Number() 를 쓰면 비정상 입력이 NaN 이 되고, JSON
+    // 직렬화에서 null 로 바뀌어 서버에 "규정 끔"으로 전달된다(Copilot 리뷰 지적).
+    // numeric() 은 유한수가 아니면 null 을 주므로, ?? undefined 로 "안 보냄"으로 바꾼다.
+    yellowAccumulationLimit: numeric(state.yellowAccumulationLimit) ?? undefined,
+    redCardSuspensionMatches: numeric(state.redCardSuspensionMatches) ?? undefined,
     rulesText: state.rulesText.trim() || undefined,
     refundPolicyText: state.refundPolicyText.trim() || undefined,
     ...promoPayload('promoHome', state.promoHome),
@@ -571,12 +773,40 @@ function promoPayload(
       };
 }
 
+/**
+ * 대회 시작 기준 D-N 23:59 을 제안한다. **이미 지난 시각이면 제안하지 않는다(빈 값).**
+ *
+ * 하한이 없던 동안, 시작이 임박한 대회를 만들면 명단 제출 마감이 **과거로 자동 입력되고
+ * 그대로 저장**됐다(2026-09-04 alpha 실측: 시작 +3일 대회의 명단 마감이 -4일). 서버는
+ * `assertRosterMutable` 에서 지난 마감을 409 `ROSTER_DEADLINE_PASSED` 로 하드 차단하므로,
+ * 그렇게 만들어진 대회는 **어떤 팀도 명단을 제출할 수 없다** — 운영자가 팀별 예외를 일일이
+ * 주기 전까지. 화면 어디에도 경고가 없었다.
+ *
+ * 빈 값을 돌려주면 그 필드는 필수 검증에 걸려 운영자가 **직접 정하게** 된다. 임박한 대회의
+ * 마감을 기계가 정할 수 있는 옳은 값은 없다 — 운영자만 안다.
+ */
+/**
+ * 대회 시작이 7일 이내인가 — 화면이 "마감을 직접 정해 주세요" 안내·경고 배너를 띄우는 근거다.
+ * 값이 없거나 형식이 깨졌으면 `false`(입력 중에 배너가 깜빡이지 않게).
+ */
+export function isShortLeadTime(scheduledAt: string) {
+  const start = new Date(scheduledAt);
+  if (!scheduledAt || Number.isNaN(start.getTime())) return false;
+  const remaining = start.getTime() - Date.now();
+  // **과거 시작일은 경고 대상이 아니다.** `remaining <= 7일` 만 보면 과거는 음수라 항상 참이 돼서
+  // 이미 지난 날짜를 넣었을 때 "대회 시작이 7일 이내예요" 라는 엉뚱한 경고가 뜬다.
+  // 과거 시작일은 아래 `scheduledAt` 검증이 원인 있는 필드에서 잡는다.
+  // 경계(정확히 7일)는 포함한다 — 문구가 "7일 이내" 이므로 `<` 이면 딱 7일일 때 경고가 안 뜬다.
+  return remaining >= 0 && remaining <= 7 * 24 * 60 * 60 * 1000;
+}
+
 function suggestDeadline(startValue: string, daysBefore: number) {
   const start = new Date(startValue);
   if (!startValue || Number.isNaN(start.getTime())) return '';
   const deadline = new Date(start);
   deadline.setDate(deadline.getDate() - daysBefore);
   deadline.setHours(23, 59, 0, 0);
+  if (deadline.getTime() <= Date.now()) return '';
   return formatDatetimeLocal(deadline);
 }
 

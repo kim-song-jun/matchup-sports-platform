@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { ShieldAlert, X } from 'lucide-react';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useRouter } from 'next/navigation';
+import { Eye, ShieldAlert, X } from 'lucide-react';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { LineupTodoCard } from '@/components/lineup/lineup-todo-card';
 import {
-  BellIcon,
   ChatIcon,
   ChevronRightIcon,
   MatchIcon,
@@ -14,12 +14,15 @@ import {
   TeamsIcon,
   TrophyIcon,
 } from '@/components/v1-ui/icons';
-import { Card, ErrorState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
+import { Card, EmptyState, ErrorState, KPIStat, ListItem, NumberDisplay, SectionTitle, WeatherStrip } from '@/components/v1-ui/primitives';
 import { cssUrl } from '@/lib/assets';
+import { SportIllustration } from '@/components/v1-ui/sport-illustration';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
-import { useV1AllTournaments } from '@/hooks/use-v1-api';
+import { useV1AllTournaments, useV1LeagueMatches } from '@/hooks/use-v1-api';
 import type { V1TournamentListItem } from '@/types/api';
+import type { V1PublicLeagueListItem } from '@/types/league-match';
 import { TournamentHeroCard } from './tournament-hero-card';
+import { FeaturedSlotSkeleton } from './featured-slot-skeleton';
 import type { HomeChatRoom, HomeMatchCard, HomeQuickAction, HomeViewModel } from './home.types';
 import { homeCapacity } from './home-capacity';
 
@@ -27,23 +30,50 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
   const dash = model.signedOut || model.network;
   const tournaments = useV1AllTournaments({ status: 'open' });
   const tournamentItems = tournaments.data ?? [];
+  // 그룹 C 리그 발견성 감사(Task 153 Wave 3): 홈에는 관리자가 홍보를 켠 대회만 노출되고
+  // 리그는 동급 프로모션이 전혀 없었다. 대회의 "오늘의 추천"은 V1Tournament의
+  // promoHomeEnabled/promoHomeTitle 등 관리자 토글 필드(V1Tournament 모델)를 그대로
+  // 따르는데, V1League 모델에는 그런 홍보 필드가 없다(schema.prisma 확인) — 새로 추가하려면
+  // 백엔드 스키마 + 마이그레이션 + 어드민 편집 UI까지 필요해 이 프론트엔드 전용 감사
+  // 수정의 범위를 벗어난다. 그래서 관리자 토글 대신 "진행 중(active)" 상태를 자동 홍보
+  // 신호로 쓴다 — 어차피 진행 중 리그는 시즌 중 발견될수록 가치가 있고, 사이드바 위젯
+  // 하나만 추가해 대회 히어로 카드처럼 메인 컬럼 밀도(오늘의 추천)는 건드리지 않는다.
+  const leagues = useV1LeagueMatches({ state: 'active', limit: 4 });
+  const leagueItems = leagues.data?.items ?? [];
   // TournamentHeroCard owns the promoHomeEnabled filter + sort — this only needs
   // to know whether *any* eligible item exists, to decide the section's visibility.
   const hasHomePromo = tournamentItems.some((item) => item.status === 'open' && item.promoHomeEnabled);
-  const hasFeaturedContent = model.network || Boolean(model.featuredMatch) || tournaments.isLoading || tournaments.isError || hasHomePromo;
+  // `isLoading`(= isPending && isFetching) 이 아니라 `isPending`(= 아직 데이터가 없다)을 본다.
+  // 서버 렌더에서는 쿼리가 돌지 않아 isFetching 이 false → isLoading 도 false 라, 이 조건이
+  // **"아직 모름"을 "없음"으로** 읽고 섹션을 통째로 빼 버렸다. 그래서 서버 HTML 에 슬롯이
+  // 아예 없다가 하이드레이션(느린 기기에서 10초)이 끝나는 순간 통째로 나타나 아래를 밀었다
+  // (alpha 실측: CLS 0.549 중 0.319 가 이 한 번의 등장이다).
+  // isPending 은 서버에서도 true 이므로 슬롯이 첫 HTML 부터 자리를 잡는다.
+  // model.statsLoading(= 홈 응답 미도착)도 "아직 모름"이다. 이게 빠지면, 로컬 캐시 복원으로
+  // tournaments.isPending 이 이미 false 인 재방문에서 홍보 대회가 하나도 없으면 섹션 자체가
+  // 사라졌다가 홈 응답이 도착하며 통째로 삽입된다 — 슬롯 안에서 자리를 잡아 봐야 소용없다.
+  const hasFeaturedContent =
+    model.network ||
+    Boolean(model.featuredMatch) ||
+    tournaments.isPending ||
+    tournaments.isError ||
+    model.statsLoading ||
+    hasHomePromo;
   const hasRecommendedMatches = model.network || model.recommendedMatches.length > 0;
   const weatherPermission = model.weatherPermission ?? 'prompt';
   const weatherPermissionCopy = getWeatherPermissionCopy(weatherPermission);
 
+  // 셸 승격(U25): title/activeTab/showSearch는 route-chrome/fragments/home.ts의 정적 테이블로
+  // 옮겼다. hasNewNotification·floatingSlot은 model(런타임 상태) 의존이라 여기서 override로
+  // 밀어넣는다 — 렌더 함수 본문(조건부 return 위)에서 직접 호출(Hooks 규칙 + useSyncExternalStore
+  // 루프 방지, shell-override.ts 주석 참조).
+  useShellOverride({
+    hasNewNotification: model.hasNewNotification && !model.network,
+    floatingSlot: <HomeChatFloatingButton model={model} />,
+  });
+
   return (
     <>
-      <AppChrome
-        title="teameet"
-        activeTab="home"
-        showSearch
-        hasNewNotification={model.hasNewNotification && !model.network}
-        floatingSlot={<HomeChatFloatingButton model={model} />}
-      >
       <h1 className="sr-only">Teameet 홈</h1>
       {/*
        * .tm-home-desktop: display:contents on mobile → transparent to layout.
@@ -61,12 +91,18 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
               카드가 화면 끝에서 끝까지 늘어나 아래 콘텐츠의 여백선과 어긋났다(390 실측: 배너
               0~390 vs 다른 카드 20~370). 배너 슬롯이 그 여백을 책임진다. */}
           <div className="tm-home-banner-slot">
-            {model.pushNudge ? <PushNudgeBanner pushNudge={model.pushNudge} /> : null}
+            {/* Task 154 P2-1: 조건이 맞아도 이번 방문에 선택된 유도 배너 하나만 렌더한다.
+                차단성인 휴대폰 인증은 이 예산 밖이라 조건만 맞으면 항상 보인다 --
+                밀려서 안 보이면 사용자는 신청이 왜 거부되는지 알 길이 없다.
+                판정은 model.bannerDecision(lib/home-banner-policy.ts) 하나로 모았다. */}
             {model.phoneVerifyNudge ? <PhoneVerifyBanner phoneVerifyNudge={model.phoneVerifyNudge} /> : null}
+            {model.bannerDecision.nudge === 'recordConsent' && model.recordConsentNudge ? (
+              <RecordConsentNudgeBanner recordConsentNudge={model.recordConsentNudge} />
+            ) : null}
           {/* 남은 후기 유도 — 홈에는 대회 후기 전용 바텀시트 모달만 있어서 경기 후기는
               마이 메뉴 서브텍스트 한 줄 말고 알릴 길이 없었다. 마이페이지와 같은 컴포넌트를
               써서 두 화면의 숫자가 갈리지 않게 한다(남은 게 없으면 스스로 null). */}
-            <PendingReviewsCard />
+            {model.bannerDecision.nudge === 'pendingReviews' ? <PendingReviewsCard /> : null}
           </div>
 
           {/* Greeting + activity stats */}
@@ -84,41 +120,66 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
             <div className="tm-home-stats">
               <div>
                 <div className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>이번 달 활동</div>
-                <NumberDisplay
-                  value={dash ? '-' : model.stats.monthlyActivity}
-                  unit={dash ? '' : '경기'}
-                  size={24}
-                  sub={dash ? undefined : model.stats.monthlyActivitySub}
-                />
+                {/* 로딩 중엔 '-'(값이 없다는 뜻)와 구분되게 스켈레톤을 그린다 — 레이블은
+                    그대로 둬서 데이터가 도착해도 줄 높이가 바뀌지 않는다. */}
+                {model.statsLoading ? (
+                  <StatValueSkeleton />
+                ) : (
+                  <NumberDisplay
+                    value={dash ? '-' : model.stats.monthlyActivity}
+                    unit={dash ? '' : '경기'}
+                    size={24}
+                    sub={dash ? undefined : model.stats.monthlyActivitySub}
+                  />
+                )}
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div className="tm-text-micro" style={{ color: 'var(--text-muted)' }}>매너 점수</div>
-                <NumberDisplay
-                  value={dash ? '-' : model.stats.mannerScore}
-                  /* 점수 없을 때(빈 sentinel '-')는 '점' 단위 숨김 → "- 점" 어색함 방지 */
-                  unit={dash || model.stats.mannerScore === '-' ? '' : '점'}
-                  size={24}
-                  sub={
-                    /* '-' 단독 문자는 의미 없으므로 리뷰 누적 안내로 대체. */
-                    dash || model.stats.mannerScoreSub === '-'
-                      ? '경기 후 리뷰가 쌓이면 보여요'
-                      : model.stats.mannerScoreSub
-                  }
-                />
+                {model.statsLoading ? (
+                  <StatValueSkeleton align="right" />
+                ) : (
+                  <NumberDisplay
+                    value={dash ? '-' : model.stats.mannerScore}
+                    /* 점수 없을 때(빈 sentinel '-')는 '점' 단위 숨김 → "- 점" 어색함 방지 */
+                    unit={dash || model.stats.mannerScore === '-' ? '' : '점'}
+                    size={24}
+                    sub={
+                      /* '-' 단독 문자는 의미 없으므로 리뷰 누적 안내로 대체. */
+                      dash || model.stats.mannerScoreSub === '-'
+                        ? '경기 후 리뷰가 쌓이면 보여요'
+                        : model.stats.mannerScoreSub
+                    }
+                  />
+                )}
               </div>
             </div>
           </div>
 
           {/* Featured recommendation hero — 가로 캐러셀(스와이프) */}
+          {/* aria-busy: 두 슬롯 중 **하나라도** 자리표시를 그리고 있으면 로딩이다.
+              tournaments 만 보면, 대회 목록은 캐시돼 있고 홈 응답만 늦은 경우(추천 매치
+              자리표시가 떠 있는데 aria-busy 는 꺼진 상태)를 놓친다. */}
           {hasFeaturedContent ? (
-          <div className="tm-home-featured-block">
-            <div style={{ marginBottom: 10 }}>
-              <div className="tm-text-label">오늘의 추천</div>
-              <div className="tm-text-caption" style={{ color: 'var(--text-muted)', marginTop: 2 }}>지금 눈여겨볼 매치·대회</div>
-            </div>
+          <div
+            className="tm-home-featured-block"
+            aria-busy={tournaments.isPending || model.statsLoading || undefined}
+          >
+            {/* 같은 화면의 "추천 매치"·"최근 채팅" 과 같은 역할인데 인라인 tm-text-label(13px)
+                이라 4px 작았다(2026-09-07 alpha 실측: 홈의 섹션 제목 역할 요소 28개 중 26개가
+                13px). 공유 SectionTitle 로 옮겨 17px/700 로 통일한다 — DESIGN.md §2.1. */}
+            <SectionTitle title="오늘의 추천" sub="지금 눈여겨볼 매치·대회" />
             <div className="tm-home-featured-carousel">
+              {/* 추천 매치 슬롯도 **자리를 먼저 잡는다**. 이 카드는 /api/v1/home 응답으로 나타나는데
+                  캐러셀의 0번 자리라, 늦게 끼어들면 이미 자리 잡은 대회 슬롯을 통째로 오른쪽으로
+                  밀어낸다 — alpha 실측에서 남아 있던 CLS 0.1286 이 전부 이것이었다(10.7초에
+                  자식 1개 → 2개로 바뀌는 중간 프레임을 포착했다).
+                  model.statsLoading 은 "홈 응답이 아직 안 왔다"는 뜻으로 모델이 이미 쓰는
+                  신호다(no-data fallback 경로에서만 true 로 설정된다).
+                  대가: 추천 매치가 없는 날엔 빈 자리가 잠깐 보였다가 접힌다(사용자 확정). */}
               {model.featuredMatch ? (
                 <FeaturedMatchCard match={model.featuredMatch} network={model.network} signedOut={model.signedOut} onRetry={model.retry} />
+              ) : model.statsLoading ? (
+                <FeaturedSlotSkeleton eyebrow="오늘의 매치" title="추천 매치를 가져오고 있어요" />
               ) : null}
               {tournaments.isError ? (
                 <Card pad={16}>
@@ -130,7 +191,7 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
                   />
                 </Card>
               ) : (
-                <TournamentHeroCard items={tournamentItems} loading={tournaments.isLoading} />
+                <TournamentHeroCard items={tournamentItems} loading={tournaments.isPending} />
               )}
             </div>
           </div>
@@ -225,11 +286,38 @@ export function HomePageView({ model }: { model: HomeViewModel }) {
           {/* Upcoming tournaments — fills remaining sidebar height, avoids ~830px gap */}
           <SidebarTournamentsWidget items={tournamentItems} loading={tournaments.isLoading} />
 
+          {/* 진행 중인 정규 리그 — 대회 위젯 바로 아래에 붙는다. 두 위젯이 인접해 보이는 이
+              자리가 감사 C-3("리그"가 두 제품을 가리킴)의 핵심 지점이라, 여기서는 반드시
+              "정규 리그"로 불러 대회(리그 방식 대회)와 구분한다. 위 주석 참조: promoHomeEnabled 같은
+              관리자 토글이 리그엔 없어 자동으로 active 리그를 보여준다. */}
+          <SidebarLeaguesWidget items={leagueItems} loading={leagues.isLoading} />
+
         </div>{/* /tm-home-sidebar */}
 
       </div>{/* /tm-home-desktop */}
-      </AppChrome>
     </>
+  );
+}
+
+/**
+ * 홈 통계 값 자리의 로딩 스켈레톤. NumberDisplay(size 24 + sub 한 줄)와 같은 세로 공간을
+ * 차지해, 값이 도착해도 인사말 블록의 높이가 바뀌지 않는다.
+ */
+function StatValueSkeleton({ align = 'left' }: { align?: 'left' | 'right' }) {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: align === 'right' ? 'flex-end' : 'flex-start',
+        gap: 6,
+        marginTop: 4,
+      }}
+    >
+      <div className="tm-skeleton" style={{ width: 64, height: 24, borderRadius: 'var(--radius-chip)' }} />
+      <div className="tm-skeleton" style={{ width: 92, height: 12, borderRadius: 'var(--radius-tight)' }} />
+    </div>
   );
 }
 
@@ -242,6 +330,7 @@ function getWeatherPermissionCopy(permission: NonNullable<HomeViewModel['weather
 }
 
 function HomeChatSummary({ model }: { model: HomeViewModel }) {
+  const router = useRouter();
   const unreadLabel = model.chatUnreadCount > 0 ? `읽지 않은 메시지 ${model.chatUnreadCount}개` : '새 메시지 없음';
   const body = (() => {
     if (model.signedOut) {
@@ -273,11 +362,15 @@ function HomeChatSummary({ model }: { model: HomeViewModel }) {
     }
 
     if (model.chatRooms.length === 0) {
+      // 빈 상태 = 그래픽(대화는 경기에서 시작된다) → 무슨 상태 → 다음 행동. 예전엔 테두리 카드 + 문구 2줄뿐이었다.
       return (
-        <Card pad={16} className="tm-home-chat-empty">
-          <div className="tm-text-body-lg">아직 열려 있는 채팅방이 없어요</div>
-          <div className="tm-text-caption" style={{ marginTop: 4 }}>매치에 참가하거나 팀에 가입하면 채팅방이 생겨요.</div>
-        </Card>
+        <EmptyState
+          illustration={{ name: 'chat-empty' }}
+          title="아직 열려 있는 채팅방이 없어요"
+          sub="매치에 참가하거나 팀에 가입하면 채팅방이 생겨요."
+          cta="매치 둘러보기"
+          onCta={() => router.push('/matches')}
+        />
       );
     }
 
@@ -306,7 +399,9 @@ function HomeChatRoomRow({ room }: { room: HomeChatRoom }) {
       </div>
       <div className="tm-home-chat-copy">
         <div className="tm-home-chat-title-line">
-          <span className="tm-text-label line-clamp-1">{room.title}</span>
+          {/* 행 제목이 바로 아래 마지막 메시지(tm-text-caption 12px)와 1px 차이였다 —
+              홈 레일 카드 제목과 같은 역할이므로 같은 클래스를 쓴다(DESIGN.md §2.1). */}
+          <span className="tm-text-card-title line-clamp-1">{room.title}</span>
           <span className="tm-badge tm-badge-grey tm-badge-sm">{room.typeLabel}</span>
         </div>
         <div className={`tm-text-caption line-clamp-1 ${room.unreadCount > 0 ? 'tm-home-chat-last-unread' : ''}`}>
@@ -340,59 +435,87 @@ function HomeChatFloatingButton({ model }: { model: HomeViewModel }) {
   );
 }
 
-function PushNudgeBanner({ pushNudge }: { pushNudge: NonNullable<HomeViewModel['pushNudge']> }) {
+/**
+ * 경기 기록 공개 동의 유도 배너 (Task 154 P0-3).
+ *
+ * 형태는 `PushNudgeBanner` 를 그대로 따른다 -- 아이콘 + 문구 2줄 + 닫기, 그리고 CTA 는
+ * 아래 줄로 분리. 390px 에서 한 줄에 다 넣으면 문구 자리가 남지 않는다는 그쪽 주석의
+ * 판단이 여기서도 그대로 적용된다.
+ *
+ * 다른 점은 **문구가 아니라 숫자로 이유를 준다**는 것이다. "공개할까요?" 만으로는 왜 지금
+ * 나에게 뜨는지 알 수 없고, 켜고 나서 뭐가 달라지는지도 모른다. 서버가 계산한
+ * `pendingCount`(지금 켜면 즉시 공개될 경기 수)를 앞세워 그 둘을 한 번에 답한다 --
+ * 이 숫자가 0 인 사용자에겐 배너 자체가 뜨지 않으므로 "0경기" 는 렌더되지 않는다.
+ */
+function RecordConsentNudgeBanner({
+  recordConsentNudge,
+}: {
+  recordConsentNudge: NonNullable<HomeViewModel['recordConsentNudge']>;
+}) {
   return (
-    // 390px 에서 아이콘(36) + 문구 + CTA + 닫기(44) 를 한 줄에 넣으면 gap·패딩까지 합쳐
-    // 220px 넘게 먹어 문구가 들어갈 자리가 거의 남지 않는다. 정보 줄과 CTA 를 분리해
-    // 같은 자리에 뜨는 "남은 후기" 배너와 같은 리듬으로 맞춘다.
-    <Card pad={14}>
+    <Card pad={16} style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <span
-        aria-hidden="true"
-        style={{
-          flexShrink: 0,
-          width: 36,
-          height: 36,
-          borderRadius: 10,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'var(--blue-soft)',
-          color: 'var(--blue700)',
-        }}
-      >
-        <BellIcon size={18} strokeWidth={2} />
-      </span>
+        <span
+          aria-hidden="true"
+          style={{
+            flexShrink: 0,
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--blue-soft)',
+            color: 'var(--blue700)',
+          }}
+        >
+          <Eye size={18} strokeWidth={2} />
+        </span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="tm-text-label">알림을 받아보세요</div>
-          <div className="tm-text-caption" style={{ marginTop: 2 }}>매칭, 채팅, 경기 결과 소식을 놓치지 않아요.</div>
+          <div className="tm-text-label">
+            {recordConsentNudge.pendingCount}경기가 공개를 기다려요
+          </div>
+          <div className="tm-text-caption" style={{ marginTop: 2 }}>
+            공개하면 내 출전·득점이 프로필에 표시돼요.
+          </div>
         </div>
         <button
           type="button"
-          aria-label="알림 받기 안내 닫기"
+          aria-label="경기 기록 공개 안내 닫기"
           className="tm-pressable"
-          style={{ flexShrink: 0, padding: 6, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={pushNudge.onDismiss}
+          style={{ flexShrink: 0, padding: 8, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={recordConsentNudge.onDismiss}
         >
           <X size={18} aria-hidden="true" />
         </button>
       </div>
-      <button
-        type="button"
-        className="tm-btn tm-btn-sm tm-btn-primary tm-btn-block"
-        style={{ marginTop: 12, minHeight: 44 }}
-        disabled={pushNudge.subscribing}
-        onClick={pushNudge.onSubscribe}
-      >
-        {pushNudge.subscribing ? '확인 중' : '알림 받기'}
-      </button>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        {/* 무엇이 공개되는지 확인할 경로를 항상 함께 둔다 -- 개인정보 공개를 "보지 않고
+            버튼 한 번"으로 켜게 만들지 않기 위한 것이다. */}
+        <Link
+          href="/my/settings/record-consent"
+          className="tm-btn tm-btn-sm tm-btn-neutral"
+          style={{ flex: 1, minHeight: 44 }}
+        >
+          어떤 기록인지 보기
+        </Link>
+        <button
+          type="button"
+          className="tm-btn tm-btn-sm tm-btn-primary"
+          style={{ flex: 1, minHeight: 44 }}
+          disabled={recordConsentNudge.saving}
+          onClick={recordConsentNudge.onGrant}
+        >
+          {recordConsentNudge.saving ? '적용 중' : '공개하기'}
+        </button>
+      </div>
     </Card>
   );
 }
 
 function PhoneVerifyBanner({ phoneVerifyNudge }: { phoneVerifyNudge: NonNullable<HomeViewModel['phoneVerifyNudge']> }) {
   return (
-    <Card pad={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <span
         aria-hidden="true"
         style={{
@@ -501,23 +624,44 @@ function FeaturedMatchCard({
   const capacity = homeCapacity(match.currentParticipants, match.maxParticipants);
   const card = (
     <Card pad={0} className="tm-featured-card" style={{ overflow: 'hidden' }}>
+      {/* 사진이 없으면 목업 사진을 깔지 않고 종목 그래픽을 그린다 — 예전엔 모든 추천 카드가
+          같은 스톡 사진 한 장이라 서로 다른 실제 매치가 구분되지 않았다(웨이브 8). */}
+      {/* 미디어 밴드는 사진이 있든 없든 같은 비율(2:1)이다. 그래픽 카드만 밴드가 커지면
+          같은 그리드 행의 사진 카드가 텍스트만 위에 뜬 채 아래가 비어 보인다
+          (alpha 실측 2026-09-07: 그래픽 308px vs 사진 152px). */}
       <div
-        className="tm-featured-media"
-        style={{ background: network ? 'var(--grey100)' : `${cssUrl(match.imageUrl)} center/cover` }}
+        className={`tm-featured-media${!network && !match.imageUrl ? ' tm-home-featured-stack' : ''}`}
+        style={network ? { background: 'var(--grey100)' } : match.imageUrl ? { background: `${cssUrl(match.imageUrl)} center/cover` } : undefined}
       >
-        {!network ? (
+        {!network && !match.imageUrl ? (
+          <div className="tm-match-hero-graphic">
+            <SportIllustration sizes="(min-width: 1024px) 128px, 112px" sport={match.sportLabel} />
+          </div>
+        ) : null}
+        {!network && match.imageUrl ? (
           <div className="tm-featured-overlay">
             <div className="tm-featured-text">
-              <div className="tm-text-micro" style={{ color: 'var(--static-white)' }}>
+              <div className="tm-text-micro tm-featured-eyebrow">
                 {signedOut ? '랜덤 추천 매치' : match.reason ?? '관심 종목 기반 추천'}
               </div>
-              <div className="tm-text-subhead" style={{ color: 'var(--static-white)', marginTop: 4 }}>
+              <div className="tm-text-subhead tm-featured-headline" style={{ marginTop: 4 }}>
                 {match.title}
               </div>
             </div>
           </div>
         ) : null}
       </div>
+      {/* 사진이 없으면 흰 글씨 오버레이를 쓸 수 없어 카피를 밴드 아래로 내린다. */}
+      {!network && !match.imageUrl ? (
+        <div className="tm-featured-stack-copy">
+          <div className="tm-text-micro tm-featured-eyebrow">
+            {signedOut ? '랜덤 추천 매치' : match.reason ?? '관심 종목 기반 추천'}
+          </div>
+          <div className="tm-text-subhead tm-featured-headline" style={{ marginTop: 4 }}>
+            {match.title}
+          </div>
+        </div>
+      ) : null}
       <div className={network ? 'tm-featured-content' : 'tm-featured-content tm-featured-content-with-cta'}>
         {network ? (
           <ErrorState title="목록을 불러오지 못했어요" message="잠시 후 다시 시도해 주세요." onRetry={onRetry} retryLabel="다시 불러오기" />
@@ -527,7 +671,7 @@ function FeaturedMatchCard({
               <div className="tm-text-body-lg">{match.venue}</div>
               <div
                 className="tm-text-caption tm-featured-meta"
-                style={{ marginTop: 6, display: 'flex', alignItems: 'center', columnGap: 8, rowGap: 4, flexWrap: 'wrap' }}
+                style={{ marginTop: 8, display: 'flex', alignItems: 'center', columnGap: 8, rowGap: 4, flexWrap: 'wrap' }}
               >
                 <span style={{ color: 'var(--text-strong)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                   {match.date} {match.time}
@@ -543,8 +687,13 @@ function FeaturedMatchCard({
                 ) : null}
               </div>
             </div>
+            {/* 카드 CTA 는 secondary(outline) 다. 홈은 추천 매치·추천 대회 카드가 여러 장
+                이어서, 카드마다 solid 파란 버튼을 두면 한 화면에 primary 가 5개까지 생긴다
+                (alpha 실측 2026-09-07). solid 는 화면 최상위 행동(알림 받기·인증하기 같은
+                nudge) 하나에만 남긴다 — DESIGN.md 의 시각 절제·위계 기준.
+                카드 전체가 이미 상세로 가는 링크라 이 버튼은 행동의 반복이기도 하다. */}
             <span
-              className="tm-btn tm-btn-primary tm-btn-sm tm-featured-cta"
+              className="tm-btn tm-btn-outline tm-btn-sm tm-featured-cta"
               aria-hidden="true"
             >
               {match.actionLabel ?? '신청하기'}
@@ -613,8 +762,8 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 10,
-                  padding: '10px 12px',
+                  gap: 12,
+                  padding: '12px 12px',
                   borderRadius: 10,
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
@@ -634,7 +783,7 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
                     flexShrink: 0,
                     width: 32,
                     height: 32,
-                    borderRadius: 8,
+                    borderRadius: 'var(--radius-chip)',
                     color: 'var(--text-strong)',
                   }}
                   aria-hidden="true"
@@ -642,10 +791,7 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
                   <TrophyIcon size={16} strokeWidth={2} />
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    className="tm-text-label line-clamp-1"
-                    style={{ color: 'var(--text-strong)' }}
-                  >
+                  <div className="tm-text-card-title line-clamp-1">
                     {t.title}
                   </div>
                   <div
@@ -677,6 +823,110 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
   );
 }
 
+// 대회 위젯(SidebarTournamentsWidget)과 같은 카드 관례 — 컴포넌트 파일 상단 주석 참조:
+// V1League엔 promoHomeEnabled 같은 관리자 토글이 없어 "진행 중(active)" 상태를 그대로
+// 홍보 신호로 쓴다. 아이콘도 같은 TrophyIcon을 재사용한다 — 대회와 리그는 같은 "대회
+// 유형" 축이라(둘 다 경쟁 컨테이너) 리그 전용 아이콘을 새로 만드는 대신 그 관례를
+// 그대로 따른다.
+function SidebarLeaguesWidget({ items, loading }: { items: V1PublicLeagueListItem[]; loading: boolean }) {
+  const visibleItems = items.slice(0, 4);
+
+  return (
+    <div className="tm-home-sidebar-notices">
+      <div className="tm-notice-head">
+        <div className="tm-text-body-lg">진행 중인 정규 리그</div>
+        <Link
+          className="tm-btn tm-btn-sm tm-btn-ghost"
+          /* 리그 목록은 통합 목록으로 넘어갔다(2026-09-01) — 리다이렉트를 한 번 더 타지
+             않도록 **직접** 보낸다. 개별 리그 링크(아래)는 그대로다. */
+          href="/tournaments?kind=league"
+          style={{ alignSelf: 'flex-end', padding: '0 4px' }}
+        >
+          전체보기
+        </Link>
+      </div>
+
+      {loading ? (
+        /* [P2 UX 라이팅] 능동형 로딩 안내 */
+        <div
+          className="tm-text-caption"
+          style={{ color: 'var(--text-muted)', paddingTop: 8 }}
+          aria-busy="true"
+          role="status"
+        >
+          정규 리그 목록을 가져오고 있어요…
+        </div>
+      ) : visibleItems.length === 0 ? (
+        <div
+          className="tm-text-caption"
+          style={{ color: 'var(--text-muted)', paddingTop: 8 }}
+        >
+          현재 진행 중인 정규 리그가 없어요.
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {visibleItems.map((l) => {
+            const dateLabel = formatTournamentDateRangeShort(l.startsOn, l.endsOn);
+            return (
+              <Link
+                key={l.leagueId}
+                href={`/league-matches/${l.leagueId}`}
+                className="tm-pressable"
+                aria-label={`정규 리그 상세 보기 — ${l.title}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '12px 12px',
+                  borderRadius: 10,
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  minHeight: 44,
+                }}
+              >
+                <span
+                  className="tm-tournament-widget-icon"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    width: 32,
+                    height: 32,
+                    borderRadius: 'var(--radius-chip)',
+                    color: 'var(--text-strong)',
+                  }}
+                  aria-hidden="true"
+                >
+                  <TrophyIcon size={16} strokeWidth={2} />
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="tm-text-card-title line-clamp-1">
+                    {l.title}
+                  </div>
+                  <div
+                    className="tm-text-micro"
+                    style={{ color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'baseline', gap: 2, flexWrap: 'wrap' }}
+                  >
+                    {l.sport.name}
+                    {dateLabel ? ` · ${dateLabel}` : ''}
+                    {' · '}
+                    <span style={{ fontVariantNumeric: 'tabular-nums', display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
+                      <span style={{ fontWeight: 600 }}>{l.teamCount}</span>
+                      <span style={{ fontSize: 12 }}>팀 참가</span>
+                    </span>
+                  </div>
+                </div>
+                <ChevronRightIcon size={14} strokeWidth={2} style={{ flexShrink: 0, color: 'var(--text-muted)' }} aria-hidden="true" />
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
   return (
     <div className="tm-match-rail">
@@ -685,10 +935,17 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
 
         return (
         <Link key={match.id} className="tm-pressable tm-match-card" href={`/matches/${match.id}`}>
-          <div className="tm-match-card-media" style={{ background: `${cssUrl(match.imageUrl)} center/cover` }} />
+          <div
+            className={`tm-match-card-media${match.imageUrl ? '' : ' tm-match-media-sport'}`}
+            style={match.imageUrl ? { background: `${cssUrl(match.imageUrl)} center/cover` } : undefined}
+          >
+            {match.imageUrl ? null : <SportIllustration sizes="132px" sport={match.sportLabel} />}
+          </div>
           <div style={{ padding: 16 }}>
             <div className="tm-text-micro" style={{ color: 'var(--blue700)' }}>{match.sportLabel}</div>
-            <div className="tm-text-label line-clamp-2" style={{ color: 'var(--text-strong)', marginTop: 4, minHeight: 36 }}>
+            {/* minHeight 36 → 40: 2줄 예약 높이라 line-height(18→20)와 함께 올린다.
+                줄이지 않으면 제목 2줄일 때 카드 높이가 다시 흔들린다. */}
+            <div className="tm-text-card-title line-clamp-2" style={{ marginTop: 4, minHeight: 40 }}>
               {match.title}
             </div>
             <div className="tm-match-card-footer">
@@ -698,10 +955,10 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
                   ambient tm-text-micro(12px, globals.css)와 맞춰 12로 올림. */}
               {capacity?.almostFull ? (
                 <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2, fontVariantNumeric: 'tabular-nums' }}>
-                  <span className="tm-text-micro" style={{ color: 'var(--orange600)', fontWeight: 700 }}>
+                  <span className="tm-text-micro" style={{ color: 'var(--orange700)', fontWeight: 700 }}>
                     {capacity.current}/{capacity.max}
                   </span>
-                  <span style={{ fontSize: 12, color: 'var(--orange600)', fontWeight: 600 }}>명</span>
+                  <span style={{ fontSize: 12, color: 'var(--orange700)', fontWeight: 600 }}>명</span>
                   <span className="tm-badge tm-badge-orange" style={{ marginLeft: 2 }}>마감 임박</span>
                 </span>
               ) : capacity ? (

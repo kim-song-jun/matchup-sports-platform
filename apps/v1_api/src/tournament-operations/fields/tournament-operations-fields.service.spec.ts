@@ -10,6 +10,7 @@ import {
   TournamentOperationsFieldsService,
   type TournamentOperationsFieldAuditContext,
 } from './tournament-operations-fields.service';
+import { kindAwareFindFirst } from '../../../test/helpers/kind-aware-find-first';
 
 const tournamentId = '00000000-0000-4000-8000-000000000001';
 const fixtureId = '00000000-0000-4000-8000-000000000002';
@@ -31,6 +32,7 @@ function platformOpsPrincipal(): TournamentStaffPrincipal {
     authorizationSubject: `platform_ops:${actorUserId}@0`,
     assignmentId: null,
     assignmentVersion: null,
+    expiresAt: null,
   };
 }
 
@@ -93,6 +95,9 @@ function createFakeTx(initialFixtureFieldId: string | null) {
       ),
     },
     v1TournamentField: {
+      // finding #76: create()가 이름 중복을 먼저 findFirst로 확인한다. 기본값은
+      // "중복 없음"(null) -- 이름 중복 자체를 검증하는 케이스만 아래에서 override한다.
+      findFirst: jest.fn(async (): Promise<{ id: string } | null> => null),
       create: jest.fn(async ({ data }: { data: { scopeKey: string; name: string; sortOrder: number } }) => ({
         id: fieldId,
         tournamentId,
@@ -113,8 +118,26 @@ function createFakeTx(initialFixtureFieldId: string | null) {
       })),
       updateMany: jest.fn(async () => ({ count: 0 })),
     },
-    v1TournamentFixture: {
-      findUnique: jest.fn(async () => ({ id: fixture.id, tournamentId: fixture.tournamentId, fieldId: fixture.fieldId })),
+    $queryRaw: jest.fn(async (query: { sql: string } | TemplateStringsArray) => ('sql' in query ? query.sql : query.join(' ')).includes('FROM v1_team_matches')
+      ? [{ fieldId: fixture.fieldId, deletedAt: null }]
+      : [{ id: 'canonical-game' }]),
+    v1TournamentMatchDetails: {
+      findUnique: jest.fn(async () => ({
+        tournamentId: fixture.tournamentId,
+        teamMatch: { id: fixture.id, fieldId: fixture.fieldId, deletedAt: null, game: { id: 'canonical-game', sourceType: 'TEAM_MATCH' } },
+      })),
+    },
+    v1TeamMatch: {
+      findUnique: jest.fn(async () => ({
+        id: fixture.id,
+        tournamentId: fixture.tournamentId,
+        leagueId: null,
+        fieldId: fixture.fieldId,
+        deletedAt: null,
+        tournament: { kind: 'regular_tournament' },
+        tournamentDetails: { tournamentId: fixture.tournamentId, teamMatchId: fixture.id },
+        game: { id: 'canonical-game', sourceType: 'TEAM_MATCH' },
+      })),
       updateMany: jest.fn(async ({ where, data }: { where: { fieldId: string | null }; data: { fieldId: string | null } }) => {
         if (where.fieldId !== fixture.fieldId) {
           return { count: 0 };
@@ -159,7 +182,7 @@ describe('TournamentOperationsFieldsService', () => {
   //
   // A prior version of this test mocked `assertAccess` with
   // `mockRejectedValue` (always rejects) and asserted only that the promise
-  // rejected and that `tx.v1TournamentFixture.updateMany`/`findUnique` were
+  // rejected and that canonical TeamMatch/Details persistence methods were
   // never called. That passes identically whether the recheck runs BEFORE
   // `this.prisma.$transaction(...)` is even called (the pre-fix arrangement)
   // or, as shipped, AFTER `$transaction` has already opened: either way, an
@@ -198,22 +221,42 @@ describe('TournamentOperationsFieldsService', () => {
       expect(order).toEqual(['transaction-opened', 'access-recheck']);
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
       expect(assertAccess).toHaveBeenCalledTimes(1);
-      expect(tx.v1TournamentFixture.updateMany).not.toHaveBeenCalled();
-      expect(tx.v1TournamentFixture.findUnique).not.toHaveBeenCalled();
+      expect(tx.v1TeamMatch.updateMany).not.toHaveBeenCalled();
+      expect(tx.v1TournamentMatchDetails.findUnique).not.toHaveBeenCalled();
     } finally {
       await moduleRef.close();
     }
   });
 
+  // Public league operations use the same field surface as tournament operations.
+  it('리그 id 에도 필드를 만들 수 있다 — 모든 competition kind 가 같은 운영 필드 surface 를 쓴다', async () => {
+    const assertAccess = jest.fn().mockResolvedValue(platformOpsPrincipal());
+    const { service, moduleRef, prisma, tx } = await buildHarness({ assertAccess, fixtureFieldId: null });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: tournamentId, kind: 'regular_league' }),
+    );
+
+    await expect(service.create(
+      actorUserId,
+      tournamentId,
+      { scopeKey: 'A', name: 'A구장', sortOrder: 1 },
+      audit('req-league'),
+    )).resolves.toMatchObject({ tournamentId, scopeKey: 'A', name: 'A구장' });
+
+    expect(tx.v1TournamentField.create).toHaveBeenCalledTimes(1);
+    expect(tx.v1OperationAudit.create).toHaveBeenCalledTimes(1);
+    await moduleRef.close();
+  });
+
   // Finding #8 -- lost update: two operators who both observed fieldId=null
   // must not both succeed. The CAS predicate losing (count !== 1) must
-  // surface as a conflict, not a silently accepted overwrite.
+  // surface as a conflict, not a silently accepted overwrite or audit event.
   it('assignFixtureField returns 409 when the CAS predicate no longer matches (lost-update race)', async () => {
     const assertAccess = jest.fn().mockResolvedValue(platformOpsPrincipal());
     const { service, moduleRef, tx } = await buildHarness({ assertAccess, fixtureFieldId: null });
     // Force the CAS to lose regardless of the observed value, simulating a
     // concurrent winner that already moved the row.
-    tx.v1TournamentFixture.updateMany.mockResolvedValueOnce({ count: 0 });
+    tx.v1TeamMatch.updateMany.mockResolvedValueOnce({ count: 0 });
 
     try {
       const promise = service.assignFixtureField(actorUserId, tournamentId, fixtureId, { fieldId }, audit('req-2'));
@@ -221,6 +264,7 @@ describe('TournamentOperationsFieldsService', () => {
       await expect(promise).rejects.toMatchObject({
         response: { code: 'FIXTURE_FIELD_ASSIGNMENT_CONFLICT' },
       });
+      expect(tx.v1OperationAudit.create).not.toHaveBeenCalled();
     } finally {
       await moduleRef.close();
     }
@@ -269,6 +313,30 @@ describe('TournamentOperationsFieldsService', () => {
       ).rejects.toMatchObject({ response: { code: 'IDEMPOTENCY_PAYLOAD_CONFLICT' } });
 
       expect(tx.v1TournamentField.create).toHaveBeenCalledTimes(1);
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  // finding #76 -- 이름에는 DB unique 제약이 없어 클라이언트 가드를 우회하면(직접 API
+  // 호출, 오래된 목록을 들고 있는 두 번째 기기 등) 동명 필드가 그대로 생겼다. 서버가
+  // 대소문자 무시 비교로 한 번 더 막아야 한다.
+  it('create() rejects a name that already exists in this tournament (case-insensitive)', async () => {
+    const assertAccess = jest.fn().mockResolvedValue(platformOpsPrincipal());
+    const { service, moduleRef, tx } = await buildHarness({ assertAccess });
+    tx.v1TournamentField.findFirst = jest.fn(async () => ({ id: 'existing-field' }));
+
+    try {
+      await expect(
+        service.create(
+          actorUserId,
+          tournamentId,
+          { scopeKey: 'court-b', name: '  court a  ', sortOrder: 1 },
+          audit('dup-name-key'),
+        ),
+      ).rejects.toMatchObject({ response: { code: 'FIELD_NAME_DUPLICATE' } });
+
+      expect(tx.v1TournamentField.create).not.toHaveBeenCalled();
     } finally {
       await moduleRef.close();
     }

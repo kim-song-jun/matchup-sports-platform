@@ -11,6 +11,7 @@ function buildHost(request: Record<string, unknown>) {
   const response = {
     status: jest.fn().mockReturnThis(),
     json: jest.fn(),
+    setHeader: jest.fn(),
   };
   const host = {
     switchToHttp: () => ({
@@ -307,5 +308,74 @@ describe('AllExceptionsFilter', () => {
         message: 'request entity too large',
       }),
     );
+  });
+
+  // ── Prisma 가용성 실패(커넥션 풀 포화 등) ────────────────────────────────
+  // alpha 실측(2026-08-23): 승강 확정 6건 동시 요청이 전부 코드 없는 500 이었다.
+  // 요청 자체는 멀쩡해서(같은 body 를 단발로 보내면 201) 재시도하면 성공하는데,
+  // 500 INTERNAL_ERROR 로는 운영자도 클라이언트도 그걸 알 수 없었다.
+  describe('Prisma 가용성 실패', () => {
+    function availabilityError() {
+      // PrismaClientKnownRequestError 의 형태만 흉내낸다 — 이 저장소는 공유 Prisma
+      // 클라이언트를 로컬에서 재생성할 수 없어 실제 클래스를 import 하면 테스트가 안 돈다.
+      return Object.assign(new Error('Transaction API error: Unable to start a transaction in the given time.'), {
+        code: 'P2028',
+      });
+    }
+
+    it('500 이 아니라 503 + 도메인 코드로 응답한다', () => {
+      const request = { id: 'req-busy', method: 'POST', originalUrl: '/api/v1/admin/league-series/x/seasons/2/promotions/commit' };
+      const { host, response } = buildHost(request);
+
+      filter.catch(availabilityError(), host);
+
+      expect(response.status).toHaveBeenCalledWith(HttpStatus.SERVICE_UNAVAILABLE);
+      const [body] = response.json.mock.calls[0];
+      expect(body.statusCode).toBe(HttpStatus.SERVICE_UNAVAILABLE);
+      expect(body.code).toBe('SERVICE_TEMPORARILY_BUSY');
+      expect(body.message).toContain('다시 시도');
+    });
+
+    it('Retry-After 를 붙인다 — 없으면 클라이언트가 즉시 재시도해 혼잡을 키운다', () => {
+      const { host, response } = buildHost({ id: 'r', method: 'POST', originalUrl: '/api/v1/x' });
+      filter.catch(availabilityError(), host);
+      expect(response.setHeader).toHaveBeenCalledWith('Retry-After', '5');
+    });
+
+    it('혼잡은 코드 결함이 아니므로 error 가 아니라 warn 으로 남긴다', () => {
+      const { host } = buildHost({ id: 'r', method: 'POST', originalUrl: '/api/v1/x' });
+      filter.catch(availabilityError(), host);
+      expect(logger.error).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalled();
+    });
+
+    it('원인 추적을 위해 스택은 그대로 적재한다', () => {
+      const { host } = buildHost({ id: 'r', method: 'POST', originalUrl: '/api/v1/x' });
+      filter.catch(availabilityError(), host);
+      const [recorded] = errorLogService.record.mock.calls[0];
+      expect(recorded.statusCode).toBe(HttpStatus.SERVICE_UNAVAILABLE);
+      expect(recorded.errorCode).toBe('SERVICE_TEMPORARILY_BUSY');
+      expect(recorded.stack).toContain('Unable to start a transaction');
+    });
+
+    it('행 경합(P2034)은 여기서 건드리지 않는다 — 도메인이 409 로 번역할 몫이다', () => {
+      const conflict = Object.assign(new Error('write conflict'), { code: 'P2034' });
+      const { host, response } = buildHost({ id: 'r', method: 'POST', originalUrl: '/api/v1/x' });
+
+      filter.catch(conflict, host);
+
+      expect(response.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
+      expect(response.setHeader).not.toHaveBeenCalled();
+    });
+
+    it('도메인이 이미 HttpException 으로 번역했으면 손대지 않는다', () => {
+      const { host, response } = buildHost({ id: 'r', method: 'POST', originalUrl: '/api/v1/x' });
+      filter.catch(
+        new HttpException({ code: 'PROMOTION_ALREADY_DECIDED', message: '이미 확정됐어요.' }, HttpStatus.CONFLICT),
+        host,
+      );
+      expect(response.status).toHaveBeenCalledWith(HttpStatus.CONFLICT);
+      expect(response.setHeader).not.toHaveBeenCalled();
+    });
   });
 });

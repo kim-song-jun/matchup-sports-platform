@@ -13,7 +13,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import type { V1FoundAccount } from '@/types/api';
-import { AuthFrame } from './auth-page';
+import { AUTH_NOTICE_STAGE, AuthFrame } from './auth-page';
 import { formatPhone, normalizeSeparatedDigits } from './signup-profile-validation';
 
 type Mode = 'find-id' | 'reset-password';
@@ -143,7 +143,7 @@ export function AccountRecoveryClient() {
   };
 
   return (
-    <AuthFrame topTitle="계정 찾기" backHref="/login/email">
+    <AuthFrame topTitle="계정 찾기" backHref="/login/email" stage={AUTH_NOTICE_STAGE}>
       <div className="tm-auth-body">
         <div className="tm-auth-segmented" role="tablist" aria-label="찾기 방법">
           <button
@@ -285,7 +285,7 @@ export function AccountRecoveryClient() {
                   이 계정은 카카오 로그인으로 가입했어요. 카카오로 로그인해 주세요.
                 </div>
               ) : null}
-              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href="/login/email" style={{ marginTop: 14 }}>
+              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href="/login/email" style={{ marginTop: 16 }}>
                 로그인하러 가기
               </Link>
             </Card>
@@ -297,7 +297,7 @@ export function AccountRecoveryClient() {
               <div className="tm-text-caption" style={{ marginTop: 4 }}>
                 카카오 로그인으로 가입해서 바꿀 비밀번호가 없어요. 카카오로 로그인해 주세요.
               </div>
-              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href="/login" style={{ marginTop: 14 }}>
+              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href="/login" style={{ marginTop: 16 }}>
                 로그인 화면으로
               </Link>
             </Card>
@@ -348,7 +348,7 @@ export function AccountRecoveryClient() {
             <Card pad={16} className="tm-auth-soft-card">
               <div className="tm-text-body-lg">비밀번호를 바꿨어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }}>새 비밀번호로 로그인해 주세요.</div>
-              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href="/login/email" style={{ marginTop: 14 }}>
+              <Link className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href="/login/email" style={{ marginTop: 16 }}>
                 로그인하러 가기
               </Link>
             </Card>

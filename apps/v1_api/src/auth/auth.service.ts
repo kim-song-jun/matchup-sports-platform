@@ -2,6 +2,8 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { V1AccountStatus, V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { buildOnboardingSummary, hasAcceptedRequiredTerms } from '../onboarding/onboarding-summary';
+import { AppleLoginDto } from './dto/apple-login.dto';
+import { AppleIdentityService } from './apple-identity.service';
 import { KakaoLoginDto } from './dto/kakao-login.dto';
 import { buildKakaoSignupPrefill, readKakaoSignupPrefill, type KakaoSignupPrefill } from './kakao-profile';
 import { isPendingSocialSignup } from './social-signup-access';
@@ -17,9 +19,50 @@ import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 
 const SOCIAL_SIGNUP_TTL_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Providers whose signup goes through the terms step rather than the email form.
+ *
+ * The two gates below used to name Kakao alone — true while it was the only social login,
+ * and silently wrong the moment a second one existed: an Apple signup could not have
+ * finished onboarding at all.
+ */
+// `as const` 를 붙이지 않는다 — Prisma 의 `in` 은 mutable 배열을 요구해서 readonly 튜플은
+// 타입이 맞지 않고, 그 자리에서 select 전체의 추론이 무너져 관계 필드까지 사라진다.
+const SOCIAL_AUTH_PROVIDERS: V1AuthProvider[] = [V1AuthProvider.kakao, V1AuthProvider.apple];
+
+/**
+ * 소셜 로그인이 이메일만 보고 기존 계정을 흡수할 때 우리 쪽 이메일 인증까지 요구한다.
+ *
+ * 제공자가 "이 이메일은 확인된 것" 이라고 말해도, 그 말은 **제공자 쪽 소유**만 증명한다.
+ * 우리 계정의 이메일은 `PATCH /me/profile` 로 소유 증명 없이 바꿀 수 있고(휴대폰은
+ * phoneProofToken 으로 막혀 있지만 이메일은 열려 있다) 바뀌는 순간 `emailVerifiedAt` 은
+ * null 이 된다. 그래서 우리가 검증한 적 없는 이메일을 신뢰하면 이런 순서가 성립한다:
+ *
+ *   1. 공격자가 자기 계정 이메일을 피해자의 Apple ID 주소로 바꿔 둔다
+ *   2. 피해자가 **처음으로** Apple 로그인을 한다
+ *   3. 그 계정이 이메일로 매칭돼 공격자 계정에 피해자의 Apple identity 가 붙는다
+ *   4. 피해자는 공격자의 계정으로 들어가고, 공격자는 계속 그 계정에 들어갈 수 있다
+ *
+ * 흔히 account pre-hijacking 이라 부르는 모양이다. 막는 방법은 **우리가 인증한 이메일일
+ * 때만** 흡수하는 것 하나뿐이다.
+ *
+ * 매칭 실패로 떨어뜨리지 않고 명시적으로 끊는 이유: `V1User.email` 은 unique 라, 그냥
+ * 못 찾은 척하면 아래 create 가 P2002 로 터져 500 이 된다. 사용자에게는 무엇을 해야
+ * 하는지 말해 주는 편이 낫다.
+ */
+function assertLinkableByEmail(user: { emailVerifiedAt: Date | null }): void {
+  if (user.emailVerifiedAt) return;
+  throw new ConflictException({
+    code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
+    message: '이 이메일을 쓰는 계정이 이미 있는데 이메일 인증이 끝나지 않았어요. 기존 방법으로 로그인해 이메일 인증을 마친 뒤 다시 시도해 주세요.',
+  });
+}
+
 type KakaoProfile = {
   providerUserKey: string;
   email: string | null;
+  emailValid: boolean;
+  emailVerified: boolean;
   profileImageUrl: string | null;
   /** 콘솔 동의항목이 승인된 앱에서만 값이 온다. 미승인이면 null. */
   signupPrefill: KakaoSignupPrefill | null;
@@ -28,6 +71,7 @@ type KakaoProfile = {
 @Injectable()
 export class AuthService {
   constructor(
+    private readonly appleIdentity: AppleIdentityService,
     private readonly prisma: PrismaService,
     private readonly managedTerms: ManagedTermsRuntimeService,
     private readonly phoneVerification: PhoneVerificationService,
@@ -306,7 +350,10 @@ export class AuthService {
         await this.prisma.$transaction([
           this.prisma.v1AuthIdentity.update({
             where: { id: existingIdentity.id },
-            data: { email: profile.email, lastLoginAt: now },
+            // An already-linked provider ID remains a valid login even when
+            // Kakao omits email consent. Preserve the stored identity email;
+            // never overwrite it with an untrusted provider payload.
+            data: { lastLoginAt: now },
           }),
           this.prisma.v1User.update({
             where: { id: existingIdentity.user.id },
@@ -324,10 +371,9 @@ export class AuthService {
         await this.prisma.$transaction([
           this.prisma.v1AuthIdentity.update({
             where: { id: existingIdentity.id },
-            data: {
-              email: profile.email,
-              lastLoginAt: now,
-            },
+            // The provider user key is the established identity. Keep its
+            // stored email stable when a later profile response is unverified.
+            data: { lastLoginAt: now },
           }),
           this.prisma.v1User.update({
             where: { id: existingIdentity.user.id },
@@ -339,45 +385,40 @@ export class AuthService {
       }
     }
 
-    const email = profile.email ? normalizeEmail(profile.email) : null;
-    const existingUser = email
+    const providerEmail = profile.email ? normalizeEmail(profile.email) : null;
+    const providerEmailVerified =
+      providerEmail !== null && profile.emailValid === true && profile.emailVerified === true;
+    // Kakao email is a linking key only when both provider assertions are
+    // strict true. If email consent is absent, keep social signup available
+    // without persisting an untrusted address.
+    const email = providerEmailVerified ? providerEmail : null;
+    const existingUser = providerEmail
       ? await this.prisma.v1User.findUnique({
-          where: { email },
+          where: { email: providerEmail },
           select: {
             id: true,
             email: true,
             accountStatus: true,
+            emailVerifiedAt: true,
           },
         })
       : null;
 
     if (existingUser) {
-      if (existingUser.accountStatus !== 'active') {
-        this.assertNotWithdrawalPending(existingUser.accountStatus);
-        throw new ForbiddenException({
-          code: 'PERMISSION_DENIED',
-          message: 'This account cannot sign in',
+      if (!providerEmailVerified || providerEmail === null) {
+        throw new ConflictException({
+          code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
+          message: '카카오에서 이메일 소유 확인이 되지 않아 기존 계정과 연결할 수 없어요. 카카오 이메일 인증 후 다시 시도해 주세요.',
         });
       }
-
-      await this.prisma.$transaction([
-        this.prisma.v1AuthIdentity.create({
-          data: {
-            userId: existingUser.id,
-            provider: V1AuthProvider.kakao,
-            providerUserKey: profile.providerUserKey,
-            email,
-            status: 'active',
-            lastLoginAt: now,
-          },
-        }),
-        this.prisma.v1User.update({
-          where: { id: existingUser.id },
-          data: { lastLoginAt: now },
-        }),
-      ]);
-
-      return this.sessionResponse(existingUser.id, existingUser.email, { social: true });
+      const linked = await this.linkExistingSocialIdentity({
+        provider: V1AuthProvider.kakao,
+        providerUserKey: profile.providerUserKey,
+        email: providerEmail,
+        existingUserId: existingUser.id,
+        now,
+      });
+      return this.sessionResponse(linked.id, linked.email, { social: true });
     }
 
     const user = await this.prisma.v1User.create({
@@ -426,6 +467,212 @@ export class AuthService {
     return this.sessionResponse(user.id, user.email, { social: true });
   }
 
+  /**
+   * Sign in with Apple, from the identity token the iOS shell collected.
+   *
+   * Required by App Store Review Guideline 4.8: an app that offers Kakao — a third-party
+   * social login — must offer an equivalent login that limits collection to name and email
+   * and lets the reader keep the address private. Apple's private relay is exactly that, so
+   * a `@privaterelay.appleid.com` address arriving here is the normal case, not a degraded one.
+   *
+   * The account is keyed on Apple's `sub`, never on the email: the reader can change or hide
+   * the relay address, and `sub` is the only value Apple promises stays stable for our team.
+   */
+  async appleSignIn(dto: AppleLoginDto) {
+    const claims = await this.appleIdentity.verifyIdentityToken(dto.identityToken, dto.nonce);
+    const now = new Date();
+    // Only a verified address may match an existing account. Linking on an unverified one
+    // would hand the account that owns the mailbox to whoever can mint that claim.
+    const email = claims.email && claims.emailVerified ? normalizeEmail(claims.email) : null;
+
+    const existingIdentity = await this.prisma.v1AuthIdentity.findUnique({
+      where: {
+        provider_providerUserKey: {
+          provider: V1AuthProvider.apple,
+          providerUserKey: claims.subject,
+        },
+      },
+      select: {
+        id: true,
+        status: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            accountStatus: true,
+            onboardingStatus: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
+
+    if (existingIdentity) {
+      if (existingIdentity.status !== 'active' || existingIdentity.user.accountStatus !== 'active') {
+        this.assertNotWithdrawalPending(existingIdentity.user.accountStatus);
+        throw new ForbiddenException({
+          code: 'PERMISSION_DENIED',
+          message: 'This account cannot sign in',
+        });
+      }
+
+      // A signup that was started and abandoned goes back to the terms step rather than
+      // straight into the app, exactly as the Kakao path does — the account exists but has
+      // agreed to nothing yet.
+      if (isExpiredSocialSignup(existingIdentity.user)) {
+        await this.prisma.$transaction([
+          this.prisma.v1AuthIdentity.update({
+            where: { id: existingIdentity.id },
+            // Preserve the stored identity email for an already-linked Apple subject.
+            data: { lastLoginAt: now },
+          }),
+          this.prisma.v1User.update({
+            where: { id: existingIdentity.user.id },
+            data: { onboardingStatus: 'social_terms_required', lastLoginAt: now },
+          }),
+          this.prisma.v1UserOnboardingProgress.upsert({
+            where: { userId: existingIdentity.user.id },
+            update: { currentStep: 'terms' },
+            create: { userId: existingIdentity.user.id, currentStep: 'terms' },
+          }),
+        ]);
+
+        return this.sessionResponse(existingIdentity.user.id, existingIdentity.user.email, { social: true });
+      }
+
+      await this.prisma.$transaction([
+        this.prisma.v1AuthIdentity.update({
+          where: { id: existingIdentity.id },
+          data: { lastLoginAt: now },
+        }),
+        this.prisma.v1User.update({
+          where: { id: existingIdentity.user.id },
+          data: { lastLoginAt: now },
+        }),
+      ]);
+
+      return this.sessionResponse(existingIdentity.user.id, existingIdentity.user.email, { social: true });
+    }
+
+    const existingUser = email
+      ? await this.prisma.v1User.findUnique({
+          where: { email },
+          select: { id: true, email: true, accountStatus: true, emailVerifiedAt: true },
+        })
+      : null;
+
+    if (existingUser && email !== null) {
+      const linked = await this.linkExistingSocialIdentity({
+        provider: V1AuthProvider.apple,
+        providerUserKey: claims.subject,
+        email,
+        existingUserId: existingUser.id,
+        now,
+      });
+      return this.sessionResponse(linked.id, linked.email, { social: true });
+    }
+
+    const displayName = dto.fullName?.trim();
+    const user = await this.prisma.v1User.create({
+      data: {
+        email,
+        accountStatus: 'active',
+        onboardingStatus: 'social_terms_required',
+        lastLoginAt: now,
+        authIdentities: {
+          create: {
+            provider: V1AuthProvider.apple,
+            providerUserKey: claims.subject,
+            email,
+            status: 'active',
+            lastLoginAt: now,
+          },
+        },
+        onboardingProgress: {
+          create: {
+            currentStep: 'terms',
+            // Apple sends the name on the **first** authorization only and never again — not
+            // even after a delete and reinstall. Storing it here is the only chance to have
+            // it; drop it and the reader retypes their own name during onboarding.
+            draftJson: displayName ? { appleName: displayName } : {},
+          },
+        },
+        notificationPreference: {
+          create: {
+            importantEnabled: true,
+            activityEnabled: true,
+            marketingEnabled: false,
+          },
+        },
+      },
+      select: { id: true, email: true },
+    });
+
+    return this.sessionResponse(user.id, user.email, { social: true });
+  }
+
+  /**
+   * Re-reads and conditionally locks the candidate in the same transaction as
+   * the provider identity insert. Profile email changes also lock this user
+   * row, so a changed email or cleared verification makes the guarded update
+   * affect zero rows and no identity is created.
+   */
+  private async linkExistingSocialIdentity(input: {
+    provider: V1AuthProvider;
+    providerUserKey: string;
+    email: string;
+    existingUserId: string;
+    now: Date;
+  }): Promise<{ id: string; email: string }> {
+    return this.prisma.$transaction(async (tx) => {
+      const candidate = await tx.v1User.findUnique({
+        where: { id: input.existingUserId },
+        select: { id: true, email: true, accountStatus: true, emailVerifiedAt: true },
+      });
+
+      if (!candidate || candidate.email !== input.email) {
+        throw new ConflictException({
+          code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
+          message: '이메일 계정 정보가 바뀌어 소셜 계정을 연결할 수 없어요. 다시 시도해 주세요.',
+        });
+      }
+      if (candidate.accountStatus !== 'active') {
+        this.assertNotWithdrawalPending(candidate.accountStatus);
+        throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'This account cannot sign in' });
+      }
+      assertLinkableByEmail(candidate);
+
+      const claimed = await tx.v1User.updateMany({
+        where: {
+          id: candidate.id,
+          email: input.email,
+          accountStatus: 'active',
+          emailVerifiedAt: { not: null },
+        },
+        data: { lastLoginAt: input.now },
+      });
+      if (claimed.count !== 1) {
+        throw new ConflictException({
+          code: 'SOCIAL_LINK_REQUIRES_VERIFIED_EMAIL',
+          message: '이메일 계정 정보가 바뀌어 소셜 계정을 연결할 수 없어요. 다시 시도해 주세요.',
+        });
+      }
+
+      await tx.v1AuthIdentity.create({
+        data: {
+          userId: candidate.id,
+          provider: input.provider,
+          providerUserKey: input.providerUserKey,
+          email: input.email,
+          status: 'active',
+          lastLoginAt: input.now,
+        },
+      });
+      return { id: candidate.id, email: candidate.email };
+    });
+  }
+
   async completeSocialTerms(userId: string, dto: SocialTermsDto) {
     if (!dto.requiredTermsAccepted) {
       throw new BadRequestException({
@@ -447,7 +694,7 @@ export class AuthService {
           select: { draftJson: true },
         },
         authIdentities: {
-          where: { provider: V1AuthProvider.kakao, status: 'active' },
+          where: { provider: { in: SOCIAL_AUTH_PROVIDERS }, status: 'active' },
           select: { id: true },
         },
       },
@@ -552,7 +799,7 @@ export class AuthService {
         createdAt: true,
         updatedAt: true,
         authIdentities: {
-          where: { provider: V1AuthProvider.kakao, status: 'active' },
+          where: { provider: { in: SOCIAL_AUTH_PROVIDERS }, status: 'active' },
           select: { id: true },
         },
         termsConsents: {
@@ -902,6 +1149,8 @@ export class AuthService {
       id?: number | string;
       kakao_account?: {
         email?: string;
+        is_email_valid?: boolean;
+        is_email_verified?: boolean;
         // 이름/전화번호/성별은 카카오 콘솔 동의항목이 승인된 앱에만 내려온다(미승인 시 필드 자체가 없음).
         // 따라서 전부 optional 로 두고, 없으면 프리필을 포기한다.
         name?: string;
@@ -929,6 +1178,8 @@ export class AuthService {
     return {
       providerUserKey: String(userData.id),
       email: userData.kakao_account?.email ?? null,
+      emailValid: userData.kakao_account?.is_email_valid === true,
+      emailVerified: userData.kakao_account?.is_email_verified === true,
       profileImageUrl:
         userData.kakao_account?.profile?.profile_image_url ??
         userData.properties?.profile_image ??

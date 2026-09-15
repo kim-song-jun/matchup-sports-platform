@@ -5,14 +5,15 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { resolveGameSource } from '../resolve-game-source';
 import { assertPenaltyShootoutPersistable } from '../../games/core/penalty-shootout-outcome';
 import { parseResultPolicy } from '../../tournaments/competition-config/competition-config.parse';
 import {
   Prisma,
   V1GameEventType,
+  V1GameOutcomeReason,
   V1GameResultRevisionState,
   V1GameSourceType,
-  V1TournamentFixtureStatus,
 } from '@prisma/client';
 import {
   OperationAuditWriterService,
@@ -20,6 +21,7 @@ import {
 } from '../../common/audit/operation-audit-writer.service';
 import {
   canonicalGameCommandPayloadHash,
+  extractEndOutcome,
   extractEndPenalties,
   gameOperationAuditActor,
   toGameHttpException,
@@ -32,7 +34,17 @@ import {
   requiresDecisiveResult,
   type StoredPenalties,
 } from '../../games/core/knockout-penalties';
-import { readKnockoutFixtureFacts } from '../../tournaments/knockout-fixture';
+import { completeTeamMatchAtResultBoundary } from '../../games/team-match-result-boundary';
+import {
+  projectCanonicalAdvancement,
+  reprojectCanonicalAdvancement,
+  reverseCanonicalAdvancement,
+  assertCanonicalDownstreamScheduled,
+} from '../../game-operations/tournament-team-match-advancement';
+import type { OfficialRevisionRow, OfficialRevisionRowRaw } from '../../game-operations/game-result-official-projection.types';
+import { normalizeOfficialRevisionRow } from '../../game-operations/official-revision-row.normalizer';
+import { officialRevisionRowSelect } from '../../game-operations/official-revision-row.query';
+import { parseOfficialScore } from '../../game-operations/parse-official-score';
 import {
   assertGameCommandContext,
   assertRevisionSupersession,
@@ -59,7 +71,6 @@ import type {
   CreateGameResultCorrectionDto,
   GameResultCorrectionChangesDto,
   OfficializeGameResultRevisionDto,
-  ReviewDecisionGameResultRevisionDto,
   SupersedeAndSubmitGameResultRevisionDto,
   VoidGameResultRevisionDto,
 } from './tournament-result-review.dto';
@@ -69,7 +80,7 @@ type Transaction = Prisma.TransactionClient;
 type LockedTournamentGame = {
   id: string;
   sourceType: V1GameSourceType;
-  tournamentFixtureId: string | null;
+  teamMatchId: string | null;
   state: string;
   version: number;
   currentOfficialRevisionId: string | null;
@@ -131,7 +142,8 @@ type ResultRevisionContentInput = {
   actualParticipants: ReadonlyArray<{
     participantId: string;
     sideId: string;
-    started: boolean;
+    // `started` 는 여기 없다 — 정본 §3 이 선발/후보를 없앴고 결과 리비전은 출전자를
+    // 전부 true 로 기록한다. DTO 가 보내오는 값은 읽지 않으므로 타입에서도 뺀다.
     minutesPlayed?: number;
     goals: number;
     cards: { yellow: number; red: number };
@@ -168,6 +180,32 @@ type ResultCommandBoundaryInput = {
  * for actor resolution in place of `GamesService.resolveActor`'s
  * tournament branch.
  */
+/**
+ * 새 리비전의 몰수·중단 표식을 정한다 (Task 165 BE-3).
+ *
+ * **미전송(또는 `null`)이면 base 를 승계한다** — 그래야 몰수로 끝난 경기의 정정·재제출이
+ * 표식을 지우지 않는다(그 승계가 원래 있던 이유이고, 이의 수락 경로가 그것에 기대고 있다).
+ *
+ * ## 사유 검증은 `extractEndOutcome` 을 그대로 지난다
+ * 이 저장소는 **몰수·중단에 사유를 필수**로 한다 — "나중에 왜 그 점수인지 설명할 수 있는
+ * 유일한 기록" 이라서다(`GamesService.extractEndOutcome` 의 docblock). 여기서 그 규칙을
+ * 다시 적으면 두 벌이 되고 한쪽만 바뀐다. **같은 순수 함수를 부른다**: 코드도
+ * `GAME_OUTCOME_NOTE_REQUIRED` 로 같고, 공백만 있는 사유도 같은 자리에서 걸린다.
+ *
+ * (첫 구현은 공백·미전송을 조용히 `null` 로 접어 그 규칙을 우회했고, `@IsOptional` 이라
+ * `null` 이 들어오면 `input.reason` 접근으로 500 이었다 — Copilot 리뷰가 잡았다.)
+ */
+function resolveOutcome(
+  input: { reason: 'NORMAL' | 'FORFEIT' | 'ABANDONED'; note?: string } | null | undefined,
+  base: { outcomeReason: V1GameOutcomeReason; outcomeNote: string | null },
+): { outcomeReason: V1GameOutcomeReason; outcomeNote: string | null } {
+  if (input === undefined || input === null) {
+    return { outcomeReason: base.outcomeReason, outcomeNote: base.outcomeNote };
+  }
+  const extracted = extractEndOutcome({ outcomeReason: input.reason, outcomeNote: input.note });
+  return { outcomeReason: extracted.outcomeReason, outcomeNote: extracted.note };
+}
+
 @Injectable()
 export class TournamentResultReviewService {
   constructor(
@@ -177,89 +215,16 @@ export class TournamentResultReviewService {
   ) {}
 
   /**
-   * Tournament review reject/request_supplement. Never approves -- approval
-   * for a tournament fixture goes through `officializeResultRevision`
-   * instead, because normal `end` already auto-derives+submits and the
-   * separate reviewer decides pass/reject/supplement from there.
-   */
-  async reviewDecision(
-    user: V1AuthUser,
-    gameId: string,
-    revisionId: string,
-    headerIdempotencyKey: string | undefined,
-    dto: ReviewDecisionGameResultRevisionDto,
-  ): Promise<GameRevisionMutationResult> {
-    return this.withResultCommand(
-      {
-        gameId,
-        action: `result_revision_${dto.decision}`,
-        staffAction: 'result_review',
-        userId: user.id,
-        expectedVersion: dto.expectedVersion,
-        headerIdempotencyKey,
-        bodyCommandId: dto.clientCommandId,
-        payload: { revisionId, ...dto },
-      },
-      async (tx, game, context) => {
-        await tx.$queryRaw`SELECT id FROM v1_game_result_revisions WHERE id = ${revisionId} FOR UPDATE`;
-        const revision = await tx.v1GameResultRevision.findFirst({ where: { id: revisionId, gameId } });
-        if (revision === null) {
-          throw this.notFound('RESULT_REVISION_NOT_FOUND');
-        }
-        const target =
-          dto.decision === 'reject'
-            ? V1GameResultRevisionState.REJECTED
-            : V1GameResultRevisionState.SUPPLEMENT_REQUESTED;
-        this.assertTransition({ from: revision.state, to: target, flow: 'STANDARD' });
-        const decided = await tx.v1GameResultRevision.update({
-          where: { id: revision.id },
-          data: { state: target },
-        });
-        await tx.v1GameResultDecision.create({
-          data: {
-            revisionId: revision.id,
-            decision: dto.decision,
-            reason: dto.reason,
-            actorType: 'USER',
-            actorUserId: user.id,
-          },
-        });
-        const updated = await tx.v1Game.update({
-          where: { id: game.id },
-          data: { version: { increment: 1 } },
-        });
-        // reject/request_supplement are both terminal for this revision: no
-        // public numeric result is exposed and currentOfficialRevisionId is
-        // left untouched, so the review SLA for this revision must close now
-        // rather than keep reminding/escalating a decided review.
-        await this.closeReviewSla(tx, decided.id, dto.reason);
-        await this.writeOutbox(
-          tx,
-          `game:${gameId}:revision:${decided.revision}:${dto.decision === 'reject' ? 'rejected' : 'supplement-requested'}`,
-          gameId,
-          dto.decision === 'reject' ? 'GAME_RESULT_REJECTED' : 'GAME_RESULT_SUPPLEMENT_REQUESTED',
-          { revisionId: decided.id },
-          decided.id,
-        );
-        return {
-          gameId,
-          state: updated.state,
-          version: updated.version,
-          durableCommandId: context.durableCommandId,
-          replayed: false,
-          revisionId: decided.id,
-          revision: decided.revision,
-          revisionState: decided.state,
-        };
-      },
-    );
-  }
-
-  /**
-   * Creates and submits a superseding revision atomically from a REJECTED
-   * or SUPPLEMENT_REQUESTED base, starting a fresh review SLA. A stale or
-   * wrong-state base writes zero new rows (the state check throws before
-   * any create()).
+   * 제출된(SUBMITTED) 결과를 **어드민·운영자가 그 자리에서 고쳐** 새 리비전으로 대체하고
+   * 곧바로 제출한다. Task 166 전에는 base 가 REJECTED/SUPPLEMENT_REQUESTED 였다 — 즉
+   * "어드민이 팀에게 되돌려 보냈고 팀이 다시 제출한다" 는 왕복을 전제했다. 정본 §4 가
+   * 그 왕복을 없앴으므로(결과는 보내기 → 확인 한 단계) 이제 base 는 SUBMITTED 다.
+   *
+   * **팀 actor 는 여전히 불가능하다.** 이 명령은 `withResultCommand` 의
+   * `staffAction: 'result_review'` 를 지나므로 스태프 배정 없는 팀장은 403 이다 — base
+   * 상태를 넓힌 것이 권한을 넓힌 것은 아니다(회귀 스펙으로 고정).
+   *
+   * 상태가 어긋난 base 는 **한 행도 쓰지 않는다**(상태 검사가 create() 앞에서 던진다).
    */
   async supersedeAndSubmit(
     user: V1AuthUser,
@@ -287,16 +252,14 @@ export class TournamentResultReviewService {
         }
         // The frozen contract names a dedicated code for this exact
         // precondition (distinct from the generic REVISION_MUST_BE_SUPERSEDED
-        // used by void/correction): base must be REJECTED or
-        // SUPPLEMENT_REQUESTED, otherwise 409 RESULT_RESUBMISSION_NOT_ALLOWED
-        // with zero new rows.
-        if (
-          base.state !== V1GameResultRevisionState.REJECTED &&
-          base.state !== V1GameResultRevisionState.SUPPLEMENT_REQUESTED
-        ) {
+        // used by void/correction). Task 166 added SUBMITTED — 되돌려 보내는 왕복이
+        // 사라져 어드민이 그 자리에서 고친다. 레거시 두 상태는 contract 마이그레이션이
+        // 그 행들을 CHANGE_REQUESTED 로 옮겨 base 가 될 행 자체가 없다(2026-09-03).
+        // 그 밖에는 409 RESULT_RESUBMISSION_NOT_ALLOWED with zero new rows.
+        if (base.state !== V1GameResultRevisionState.SUBMITTED) {
           throw new ConflictException({
             code: 'RESULT_RESUBMISSION_NOT_ALLOWED',
-            message: 'supersede-and-submit requires a REJECTED or SUPPLEMENT_REQUESTED base revision',
+            message: 'supersede-and-submit requires a SUBMITTED base revision',
           });
         }
         try {
@@ -366,6 +329,10 @@ export class TournamentResultReviewService {
             eventsHash: dto.eventsHash,
             missingScorer,
             mvpParticipantId: dto.mvpParticipantId,
+            // 몰수·중단 표식과 사유를 승계한다. 빠뜨리면 기본값 NORMAL 로 떨어져 몰수로
+            // 끝난 경기가 재제출 한 번에 정상 종료로 둔갑한다(games.service.ts의
+            // 어시스트 동기화 승계와 동일한 이유 — Copilot 리뷰 지적 재현).
+            ...resolveOutcome(dto.outcome, base),
             reason: dto.reason,
             createdByActorType: 'USER',
             createdByUserId: user.id,
@@ -377,7 +344,8 @@ export class TournamentResultReviewService {
             resultRevisionId: successor.id,
             participantId: participant.participantId,
             sideId: participant.sideId,
-            started: participant.started,
+            // **명단 = 출전자**(정본 §3) — 결과 행이 있다는 것이 곧 출전이다.
+            started: true,
             minutesPlayed: participant.minutesPlayed,
             goals: participant.goals,
             assists: participant.assists ?? 0,
@@ -510,7 +478,25 @@ export class TournamentResultReviewService {
               message: 'This revision has already been superseded by a newer revision',
             });
           }
+          // Task 166 contract: 위 승계 검사는 "더 새 리비전이 이 행을 대체했나" 만 본다 —
+          // **이 경기에 이미 공식 결과가 있나** 는 보지 않는다. 그래서 승계되지 않은 옛
+          // 리비전이 SUBMITTED 로 남아 있으면 그대로 확정돼 `currentOfficialRevisionId` 를
+          // 빼앗을 수 있었다. 공식 결과가 이미 있는 경기를 다시 확정하는 정당한 경로는
+          // **정정(CORRECTION)** 뿐이고, 그쪽은 위 분기가 "base 가 현재 공식 리비전" 을
+          // 이미 강제한다. STANDARD 흐름은 첫 확정 전용이므로 여기서 닫는다.
+          //
+          // contract 마이그레이션(20260903150000)이 옛 반려 행을 되살릴지 얼릴지 가를 때
+          // 이 구멍을 조건으로 썼는데, 정책이 구멍에 기대는 건 한 번이면 족하다 — 코드가
+          // 스스로 닫는다.
+          if (game.currentOfficialRevisionId !== null) {
+            throw new ConflictException({
+              code: 'RESULT_ALREADY_OFFICIAL',
+              message: 'This game already has an official result; use a correction instead',
+            });
+          }
         }
+        const previousOfficialRevisionId =
+          flow === 'CORRECTION' ? game.currentOfficialRevisionId : null;
         const officialized = await tx.v1GameResultRevision.update({
           where: { id: revision.id },
           data: { state: V1GameResultRevisionState.OFFICIAL, officialAt: new Date() },
@@ -520,21 +506,41 @@ export class TournamentResultReviewService {
           data: { version: { increment: 1 }, currentOfficialRevisionId: revision.id },
         });
         // `GameResultBracketProjectionService.project` gates advancement on
-        // the source fixture's own `status` being 'completed' -- that
-        // column defaults to 'scheduled' and, per
-        // docs/api/domains/tournament-operations.md, no other writer ever
-        // advances it once the Game model became authoritative. Officialize
-        // is this fixture's authoritative "result decided" moment, so the
-        // fixture is marked completed in the *same* transaction as the
-        // official pointer swap: the async bracket projection (dispatched
-        // via the outbox event below) then always observes a consistent,
-        // already-committed 'completed' status with no eventual-consistency
-        // gap. Idempotent on repeat officialize (e.g. a later correction).
-        if (game.tournamentFixtureId !== null) {
-          await tx.v1TournamentFixture.update({
-            where: { id: game.tournamentFixtureId },
-            data: { status: V1TournamentFixtureStatus.completed },
-          });
+        if (game.teamMatchId !== null) {
+          await completeTeamMatchAtResultBoundary(tx, game.teamMatchId, user.id, 'result_officialized');
+          const canonicalRevision = await this.loadOfficialRevisionRow(tx, officialized.id);
+          if (canonicalRevision !== null && canonicalRevision.tournamentTeamMatchId !== null) {
+            if (previousOfficialRevisionId !== null) {
+              const previousRevision = await this.loadOfficialRevisionRow(tx, previousOfficialRevisionId);
+              if (previousRevision !== null && previousRevision.tournamentTeamMatchId !== null) {
+                const previousState = await tx.v1GameResultRevision.findUnique({
+                  where: { id: previousOfficialRevisionId },
+                  select: { state: true },
+                });
+                if (previousState?.state === V1GameResultRevisionState.VOID) {
+                  await projectCanonicalAdvancement(
+                    tx,
+                    canonicalRevision,
+                    parseOfficialScore(canonicalRevision.score),
+                  );
+                } else {
+                  await reprojectCanonicalAdvancement(
+                    tx,
+                    canonicalRevision,
+                    parseOfficialScore(canonicalRevision.score),
+                    previousRevision,
+                    parseOfficialScore(previousRevision.score),
+                  );
+                }
+              }
+            } else {
+              await projectCanonicalAdvancement(
+                tx,
+                canonicalRevision,
+                parseOfficialScore(canonicalRevision.score),
+              );
+            }
+          }
         }
         await this.writeOutbox(
           tx,
@@ -602,8 +608,20 @@ export class TournamentResultReviewService {
             message: 'Only the current official revision can be voided',
           });
         }
-        if (game.tournamentFixtureId !== null) {
-          await this.assertNoLockedDownstreamFixture(tx, game.tournamentFixtureId);
+        const canonicalRevision = game.teamMatchId !== null
+          ? await this.loadOfficialRevisionRow(tx, revision.id)
+          : null;
+        if (canonicalRevision !== null && canonicalRevision.tournamentTeamMatchId !== null) {
+          await this.assertNoLockedDownstreamTeamMatch(tx, game.teamMatchId!);
+        }
+        if (game.teamMatchId !== null) {
+          if (canonicalRevision !== null && canonicalRevision.tournamentTeamMatchId !== null) {
+            await reverseCanonicalAdvancement(
+              tx,
+              canonicalRevision,
+              parseOfficialScore(revision.score),
+            );
+          }
         }
         const voidRevision = await tx.v1GameResultRevision.create({
           data: {
@@ -615,6 +633,12 @@ export class TournamentResultReviewService {
             eventsHash: revision.eventsHash,
             missingScorer: revision.missingScorer,
             mvpParticipantId: revision.mvpParticipantId,
+            // 몰수·중단 표식과 사유를 승계한다. VOID 리비전 자체는 공개 화면에
+            // 점수를 노출하지 않지만(showOfficialResult가 state==='OFFICIAL'을
+            // 요구), 이후 VOID_REENTRY 정정이 이 리비전을 base로 승계하므로
+            // 여기서 빠뜨리면 재입력 시점에 몰수 사실이 사라진다.
+            outcomeReason: revision.outcomeReason,
+            outcomeNote: revision.outcomeNote,
             reason: dto.reason,
             createdByActorType: 'USER',
             createdByUserId: user.id,
@@ -755,6 +779,10 @@ export class TournamentResultReviewService {
             eventsHash: dto.changes.eventsHash,
             missingScorer,
             mvpParticipantId: dto.changes.mvpParticipantId,
+            // 몰수·중단 표식과 사유를 승계한다. 빠뜨리면 기본값 NORMAL 로 떨어져 몰수로
+            // 끝난 경기가 정정 한 번에 정상 종료로 둔갑한다(games.service.ts의
+            // 어시스트 동기화 승계와 동일한 이유 — Copilot 리뷰 지적 재현).
+            ...resolveOutcome(dto.changes.outcome, base),
             reason: dto.reason,
             createdByActorType: 'USER',
             createdByUserId: user.id,
@@ -766,7 +794,8 @@ export class TournamentResultReviewService {
             resultRevisionId: draft.id,
             participantId: participant.participantId,
             sideId: participant.sideId,
-            started: participant.started,
+            // **명단 = 출전자**(정본 §3) — 결과 행이 있다는 것이 곧 출전이다.
+            started: true,
             minutesPlayed: participant.minutesPlayed,
             goals: participant.goals,
             assists: participant.assists ?? 0,
@@ -825,28 +854,42 @@ export class TournamentResultReviewService {
             select: {
               id: true,
               sourceType: true,
-              tournamentFixtureId: true,
+              teamMatchId: true,
               state: true,
               version: true,
               currentOfficialRevisionId: true,
               competitionConfigVersionId: true,
             },
           });
-          if (game === null || game.sourceType !== V1GameSourceType.TOURNAMENT_FIXTURE || game.tournamentFixtureId === null) {
+          if (game === null) {
             throw this.notFound();
           }
-          const fixture = await tx.v1TournamentFixture.findUnique({
-            where: { id: game.tournamentFixtureId },
-            select: { tournamentId: true },
-          });
-          if (fixture === null) {
+          // **이 한 줄이 콘솔의 유일한 출처 경계다.** 다섯 개 공개 명령이 전부 이
+          // Every live review command uses the canonical TeamMatch resolver;
+          // regular-league TeamMatch games remain on this shared console path.
+          const source = await resolveGameSource(tx, game);
+          if (source === null) {
             throw this.notFound();
+          }
+          if (game.sourceType !== V1GameSourceType.TEAM_MATCH || game.teamMatchId === null) {
+            throw this.notFound('GAME_NOT_FOUND');
           }
           const principal = await this.staffAccess.assertAccess(
             {
               userId: input.userId,
               action: input.staffAction,
-              resource: { tournamentId: fixture.tournamentId, fixtureId: game.tournamentFixtureId },
+              // 대회와 **같은 함수**를 지난다. 리그 거울엔 스태프 배정이 보통 없지만,
+              // 플랫폼 관리자와 대회 운영자는 배정 없이도 통과하는 것이 원래 규칙이라
+              // 그대로 성립한다 — 배정 없는 일반 사용자는 여전히 403 이다.
+              // ⚠️ 미정인 `fixtureId`/`fieldId`는 **키 자체를 뺀다.** `undefined` 를 담아 보내면
+              // 정책 파서가 `hasOwn` 으로 "있다" 고 보고 값이 stable id 가 아니라며
+              // 리소스 전체를 무효로 만든다 → 플랫폼 관리자까지 STAFF_SCOPE_DENIED
+              // (실측: 이 한 줄 때문에 리그 경기가 권한에서 막혔다).
+              resource: {
+                tournamentId: source.tournamentId,
+                ...(source.fixtureId === null ? {} : { fixtureId: source.fixtureId }),
+                ...(source.fieldId === null ? {} : { fieldId: source.fieldId }),
+              },
             },
             tx,
           );
@@ -854,15 +897,16 @@ export class TournamentResultReviewService {
             actorType: 'USER',
             actorUserId: input.userId,
             role: principal.role,
-            tournamentId: fixture.tournamentId,
-            fixtureId: game.tournamentFixtureId,
+            tournamentId: source.tournamentId,
+            ...(source.fixtureId === null ? {} : { fixtureId: source.fixtureId }),
+            ...(source.fieldId === null ? {} : { fieldId: source.fieldId }),
             authorizationSubject: principal.authorizationSubject,
           };
           const payloadHash = canonicalGameCommandPayloadHash(input.payload);
           const context = this.assertCommandContext({
             actor,
             expectedVersion: input.expectedVersion,
-            currentVersion: game.version,
+            currentVersion: input.expectedVersion,
             headerIdempotencyKey: input.headerIdempotencyKey ?? '',
             bodyClientCommandId: input.bodyCommandId,
             payloadHash,
@@ -895,8 +939,8 @@ export class TournamentResultReviewService {
                   authorizationSubject: principal.authorizationSubject,
                   directorOfficializeFlag,
                 },
-                tournamentId: fixture.tournamentId,
-                fixtureId: game.tournamentFixtureId,
+                tournamentId: source.tournamentId,
+                teamMatchId: game.teamMatchId,
               };
               throw new ForbiddenException({
                 code: 'DIRECTOR_OFFICIALIZE_DISABLED',
@@ -928,6 +972,14 @@ export class TournamentResultReviewService {
           if (decision.kind === 'REPLAY') {
             return { ...decision.responseBody, replayed: true };
           }
+          this.assertCommandContext({
+            actor,
+            expectedVersion: input.expectedVersion,
+            currentVersion: game.version,
+            headerIdempotencyKey: input.headerIdempotencyKey ?? '',
+            bodyClientCommandId: input.bodyCommandId,
+            payloadHash,
+          });
           const response = await mutate(tx, game, context);
           await tx.v1IdempotencyRecord.create({
             data: {
@@ -959,8 +1011,8 @@ export class TournamentResultReviewService {
               authorizationSubject: principal.authorizationSubject,
               ...(directorOfficializeFlag === null ? {} : { directorOfficializeFlag }),
             },
-            tournamentId: fixture.tournamentId,
-            fixtureId: game.tournamentFixtureId,
+            tournamentId: source.tournamentId,
+            teamMatchId: game.teamMatchId,
           });
           return { ...response, replayed: false };
         },
@@ -972,6 +1024,9 @@ export class TournamentResultReviewService {
         // so this write uses `this.prisma` directly (a fresh statement, not
         // `tx`) and is the *only* place the denial audit is ever persisted.
         await this.auditWriter.create(this.prisma, deniedAuditInput);
+      }
+      if (error instanceof Error && error.message.startsWith('BRACKET_')) {
+        throw new ConflictException({ code: 'NEXT_FIXTURE_CONFLICT', message: '다음 경기의 상태 또는 팀 배정을 확인해 주세요.' });
       }
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -1069,6 +1124,19 @@ export class TournamentResultReviewService {
    * the same command transaction instead of the async projection worker,
    * because reject/request_supplement/void never emit GAME_RESULT_OFFICIAL.
    */
+  private async loadOfficialRevisionRow(
+    tx: Transaction,
+    revisionId: string,
+  ): Promise<OfficialRevisionRow | null> {
+    const rows = await tx.$queryRaw<Array<Omit<OfficialRevisionRowRaw, 'officialAt'> & { officialAt: Date | null }>>`
+      ${officialRevisionRowSelect()}
+      WHERE revision.id = ${revisionId}
+    `;
+    const row = rows[0];
+    if (row === undefined || row.officialAt === null) return null;
+    return normalizeOfficialRevisionRow({ ...row, officialAt: row.officialAt });
+  }
+
   private async closeReviewSla(tx: Transaction, revisionId: string, reason: string): Promise<void> {
     await tx.$executeRaw`
       UPDATE v1_result_escalations
@@ -1094,33 +1162,20 @@ export class TournamentResultReviewService {
   }
 
   /**
-   * Blocks voiding the current official revision of a tournament fixture
-   * whose bracket advancement already reached a downstream fixture that is
-   * no longer 'scheduled' -- un-advancing a team that is already
-   * live/finished downstream is not safe. Locks every candidate target row
-   * so a concurrent advancement cannot race past this check.
+   * Canonical tournament TeamMatches use Details and TeamMatch advancement
+   * edges. Locking the target TeamMatch, Details, and game in stable id order
+   * makes confirm/correction/void fail synchronously if the next match has
+   * already started or completed; league-only TeamMatches have no Details and
+   * therefore have no downstream bracket to gate.
    */
-  private async assertNoLockedDownstreamFixture(tx: Transaction, sourceFixtureId: string): Promise<void> {
-    const edges = await tx.v1TournamentFixtureAdvancementEdge.findMany({
-      where: { sourceFixtureId },
-      select: { targetFixtureId: true },
-    });
-    if (edges.length === 0) {
-      return;
-    }
-    const targetIds = [...new Set(edges.map((edge) => edge.targetFixtureId))].sort();
-    const targets = await tx.$queryRaw<Array<{ id: string; status: string }>>`
-      SELECT id, status::text AS status
-      FROM v1_tournament_fixtures
-      WHERE id IN (${Prisma.join(targetIds)})
-      ORDER BY id ASC
-      FOR UPDATE
-    `;
-    if (targets.some((target) => target.status !== 'scheduled')) {
-      throw new ConflictException({
-        code: 'NEXT_FIXTURE_CONFLICT',
-        message: 'A downstream bracket fixture already advanced past scheduled',
-      });
+  private async assertNoLockedDownstreamTeamMatch(tx: Transaction, sourceTeamMatchId: string): Promise<void> {
+    try {
+      await assertCanonicalDownstreamScheduled(tx, sourceTeamMatchId);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('BRACKET_')) {
+        throw new ConflictException({ code: 'NEXT_FIXTURE_CONFLICT', message: '다음 경기의 상태 또는 팀 배정을 확인해 주세요.' });
+      }
+      throw error;
     }
   }
 
@@ -1181,7 +1236,10 @@ export class TournamentResultReviewService {
     if (!needsKnockoutFixtureFacts(regulation, submitted)) {
       return regulation;
     }
-    const facts = await readKnockoutFixtureFacts(tx, game.tournamentFixtureId);
+    if (game.teamMatchId === null) {
+      throw this.notFound('GAME_NOT_FOUND');
+    }
+    const facts = await this.readTeamMatchKnockoutFacts(tx, game.teamMatchId);
     if (submitted !== undefined) {
       // 클라이언트가 킥 수·우회 표식을 빠뜨렸으면 **base 에서 메운다.** 정정 폼에는
       // 승부차기 입력란이 아예 없어(2026-08-18 실측: 폼 필드 186개 중 0개) 폼이 보내는
@@ -1241,6 +1299,25 @@ export class TournamentResultReviewService {
     // 해결 불가한 무승부로 거부된다(`assertBracketResolvable`의 동점 분기).
     assertBracketResolvable({ ...regulation, penalties: carried }, facts);
     return assertPenaltiesNotAllowed(regulation, carried, facts);
+  }
+
+  /** Canonical tournament bracket facts live on Details, not the legacy fixture. */
+  private async readTeamMatchKnockoutFacts(
+    tx: Transaction,
+    teamMatchId: string,
+  ): Promise<{ isKnockoutFixture: boolean; hasAdvancementEdges: boolean }> {
+    const details = await tx.v1TournamentMatchDetails.findUnique({
+      where: { teamMatchId },
+      select: {
+        group: { select: { phase: true } },
+        _count: { select: { advancementSources: true } },
+      },
+    });
+    return {
+      isKnockoutFixture:
+        details?.group !== null && details?.group !== undefined && details.group.phase !== 'group',
+      hasAdvancementEdges: (details?._count.advancementSources ?? 0) > 0,
+    };
   }
 
   private async assertStoredPenaltiesPersistable(
@@ -1449,6 +1526,19 @@ export class TournamentResultReviewService {
               : 'Anonymous goal must be explicitly marked',
           });
         }
+        // finding #67: 이 분기가 `missingScorer`를 대입한 적이 없어서(초기값 false 를
+        // 그대로 반환) 정정·재제출로 goalEvents 가 실릴 때마다 MISSING_SCORER 경고가
+        // 조용히 사라졌다 — 득점자 미상 골을 실제로 만난 여기서 표식을 세운다.
+        //
+        // 자책골(ownGoal)은 예외로 둔다 — `resultInvariantInput`(:1538, 실시간 이벤트
+        // 스트림에서 계산하는 정본)도 `event.type === GOAL`만 보고 OWN_GOAL은 애초에
+        // missingScorer 판정에서 제외한다(자책골은 상대 팀 득점일 뿐 "누가 넣었는지"를
+        // 추적해야 할 개인 기록이 아니기 때문). 이 함수에 도달하는 모든 무득점자 골은
+        // (바로 위에서 검증했듯) `anonymous: true`가 붙어 있어야만 하는데, 정정 폼은
+        // "득점자를 아직 못 찾았다"와 "이 골은 원래 개인 득점자가 없다(자책골)"를
+        // 구분 없이 같은 표식으로 보낸다 — 그래서 타입(ownGoal)으로 나눈다: 일반 GOAL은
+        // 여전히 "채워 넣어야 할 미상"으로 취급하고, OWN_GOAL만 정본과 같은 이유로 제외한다.
+        if (!goal.ownGoal) missingScorer = true;
         continue;
       }
       const participant = participantById.get(goal.participantId);
@@ -1489,9 +1579,8 @@ export class TournamentResultReviewService {
 
   /**
    * Reads the same inputs `GamesService.resultInvariantInput` reads for a
-   * team match, but keyed on the TOURNAMENT scorer policy column
-   * (`tournamentScorerPolicy`) instead of `teamMatchScorerPolicy`, since
-   * every game this lane ever touches is `TOURNAMENT_FIXTURE`-sourced.
+   * canonical TeamMatch, but keyed on the tournament scorer policy column
+   * (`tournamentScorerPolicy`) instead of `teamMatchScorerPolicy`.
    */
   private async resultInvariantInput(
     tx: Transaction,
@@ -1542,11 +1631,8 @@ export class TournamentResultReviewService {
       ...(participant.minutesPlayed === undefined ? {} : { minutesPlayed: participant.minutesPlayed }),
     }));
     return {
-      // Task 17이 GameResultInvariantInput에 sourceType을 필수로 추가했다
-      // (TEAM_MATCH는 자체 보고라 이벤트-스코어 교차검증에서 면제,
-      // TOURNAMENT_FIXTURE는 엄격 검증 유지 — game-invariants.ts 참조).
-      // 이 레인은 위 docblock대로 항상 TOURNAMENT_FIXTURE지만, 하드코딩 대신
-      // 잠근 게임의 실제 값을 넘겨 704행의 sourceType 가드와 단일 출처를 유지한다.
+      // The invariant layer uses the locked canonical source type directly;
+      // no legacy fixture source is admitted by withResultCommand.
       sourceType: game.sourceType,
       score: dto.score,
       sides: sides.map((side) => ({ id: side.id, sideKey: side.sideKey })),

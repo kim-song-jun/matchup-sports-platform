@@ -4,6 +4,7 @@ import type {
 } from './my.types';
 
 export const myUser = {
+  userId: null,
   name: '—',
   handle: '—',
   region: '지역 미정',
@@ -38,7 +39,15 @@ export const myHomeModel: MyHomeViewModel = {
     {
       title: '커뮤니티',
       items: [
+        // 채팅(=매치·팀·팀컨택 대화)으로 가는 상시 입구. 하단탭엔 채팅이 없어 홈 위젯과 여기서만 닿는다.
+        // badge 는 my-api-clients 가 대기 중 받은 컨택 수로 채운다.
+        { label: '채팅', sub: '매치·팀·컨택 대화를 한곳에서 확인해요', href: '/chat', icon: 'MessageCircle' },
         { label: '내 팀', sub: '소속 팀과 운영 권한을 확인해요', href: '/my/teams', icon: 'Users' },
+        // R4: 리그 참가는 운영자가 지정하므로(D-2) 팀이 참가 사실을 알 계기가 이 노출뿐이다.
+        { label: '내 리그', sub: '내 팀이 참가 중인 리그를 확인해요', href: '/my/leagues', icon: 'ListOrdered' },
+        // 2026-09-04 감사: /my/schedule 은 앱 안에서 들어갈 링크가 한 곳도 없어 URL 직접 입력으로만
+        // 닿는 고아 라우트였다. 소속 팀 일정을 한 번에 보는 화면이라 팀 항목 옆에 둔다.
+        { label: '내 일정', sub: '소속 팀 일정을 한 번에 확인해요', href: '/my/schedule', icon: 'CalendarDays' },
         { label: '받은 초대', sub: '팀에서 보낸 초대를 확인하고 수락해요', href: '/my/invitations', icon: 'Mail' },
         { label: '보낸 가입 신청', sub: '승인 대기와 처리 결과를 확인해요', href: '/my/join-applications', icon: 'Send' },
         // 리뷰 항목은 my-api-clients.tsx의 toMyHomeModel에서 동적으로 추가됨
@@ -76,6 +85,9 @@ export const settingsModel: SettingsViewModel = {
         // 실명으로 바꾸는 스위치. 위 record-consent와는 별개 축 -- 그건 "기록이 보이는가",
         // 이건 "보이면 어떤 이름인가". API 계약: GET/PATCH /me/tournament-real-name-visibility.
         { label: '대회 기록 실명 표시', sub: '대회 라인업·득점자 이름을 실명으로 보여줄지 정해요', href: '/my/settings/tournament-real-name', icon: 'UserCheck' },
+        // 선수 카드 숨김(Task 155). 컬럼은 카드와 함께 넣었는데 켜는 경로가 없어
+        // 사용자가 잠글 수 없었다 -- 게임화 거부감에 대한 탈출구가 목적이므로 여기서 연다.
+        { label: '선수 카드', sub: '경기 기록으로 만든 카드를 숨길 수 있어요', href: '/my/settings/player-card', icon: 'Award' },
       ],
     },
     {

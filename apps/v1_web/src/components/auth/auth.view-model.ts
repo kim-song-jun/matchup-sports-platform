@@ -14,7 +14,8 @@ export function getLoginViewModel(redirectPath?: string | null): LoginViewModel 
     providers: [
       { label: '카카오', background: 'var(--kakao-yellow)', foreground: 'var(--static-black)', ...(kakaoHref ? { href: kakaoHref } : {}), disabled: !kakaoHref },
       { label: '네이버', background: 'var(--naver-green)', foreground: 'var(--static-white)', disabled: true },
-      { label: 'Apple', background: 'var(--static-black)', foreground: 'var(--static-white)', disabled: true },
+      // Apple 은 여기 없다. 네이티브 셸에서만 동작하므로 AppleLoginButton 이 브리지 존재
+      // 여부를 보고 스스로 나타난다 — 목록에 두면 브라우저에서 영영 "준비 중" 으로 남는다.
     ],
   };
 }

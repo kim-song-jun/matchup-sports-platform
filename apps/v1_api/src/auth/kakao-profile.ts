@@ -66,7 +66,11 @@ export function readKakaoSignupPrefill(draftJson: unknown): KakaoSignupPrefill |
   const draft = draftJson as Record<string, unknown>;
 
   return buildKakaoSignupPrefill({
-    name: typeof draft.kakaoName === 'string' ? draft.kakaoName : null,
+    // Apple's name lands in the same slot: it arrives once, at first authorization, and the
+    // onboarding form is the only place it is ever used.
+    name: typeof draft.kakaoName === 'string'
+      ? draft.kakaoName
+      : typeof draft.appleName === 'string' ? draft.appleName : null,
     phone: typeof draft.kakaoPhone === 'string' ? draft.kakaoPhone : null,
     gender: typeof draft.kakaoGender === 'string' ? draft.kakaoGender : null,
   });

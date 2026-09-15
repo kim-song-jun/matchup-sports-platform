@@ -261,11 +261,15 @@ else
   echo "[prod-deploy] 외부 DB(${V1_DB_HOST}) 사용 — 로컬 v1_postgres 기동을 건너뜁니다"
 fi
 
+assert_task168_m11_guard "${PROD_SOURCE_DIR}"
+
 # D7: prisma migrate deploy 는 이 스크립트 안에서 정확히 1회만 실행한다(구 restart-containers.sh
 # 의 이중 실행을 이번 변경에서 제거). alpha 와 달리 sanitize/QA 시드는 절대 이식하지 않는다
 # (§6 — prod 는 진짜 사용자 데이터다).
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy'
+"${compose[@]}" run --rm --no-deps -T v1_api sh -c \
+  'cd /app/apps/v1_api && node dist/src/tournaments/migration/tournament-award-recipient-backfill.cli.js'
 
 # restart-containers.sh 의 업로드 백업/복원 왕복을 그대로 흡수한다(D 표에 없던 prod 전용
 # 안전장치 — alpha 에는 없지만 기존 prod 배포가 볼륨 마운트에도 불구하고 방어적으로 이

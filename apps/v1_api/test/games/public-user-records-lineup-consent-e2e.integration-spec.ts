@@ -37,6 +37,9 @@ const ids = {
   awayTeam: '6e000000-0000-4000-8000-000000000021',
   tournament: '6e000000-0000-4000-8000-000000000030',
   fixture: '6e000000-0000-4000-8000-000000000031',
+  hostRegistration: '6e000000-0000-4000-8000-000000000032',
+  awayRegistration: '6e000000-0000-4000-8000-000000000033',
+  tournamentPlayer: '6e000000-0000-4000-8000-000000000034',
 } as const;
 
 const prisma = new PrismaService();
@@ -105,20 +108,43 @@ describe('End-to-end: lineup roster link -> official result -> user-consent-gate
       data: { teamId: ids.hostTeam, userId: ids.targetUser, role: 'member', status: 'active' },
     });
     await prisma.v1Tournament.create({
-      data: { id: ids.tournament, sportId: ids.sport, title: 'Records E2E Cup' },
+      data: { id: ids.tournament, sportId: ids.sport, regionId: ids.region, title: 'Records E2E Cup', kind: 'regular_tournament', format: 'league' },
     });
-    await prisma.v1TournamentFixture.create({
+    await prisma.v1TournamentRegistration.createMany({ data: [
+      { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
+      { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.awayTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
+    ] });
+    await prisma.v1TournamentPlayer.create({
+      data: { id: ids.tournamentPlayer, registrationId: ids.hostRegistration, userId: ids.targetUser, realName: 'Records E2E Player' },
+    });
+    await prisma.v1TeamMatch.create({
       data: {
         id: ids.fixture,
         tournamentId: ids.tournament,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.awayTeam,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: 'Records E2E Match',
+        status: 'matched',
+        startAt: new Date('2026-07-31T00:00:00.000Z'),
+        competitionConfigVersionId: config.id,
+      },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: ids.fixture,
+        tournamentId: ids.tournament,
         round: 'group',
         fixtureNumber: 1,
-        competitionConfigVersionId: config.id,
+        legNumber: 1,
+        homeRegistrationId: ids.hostRegistration,
+        awayRegistrationId: ids.awayRegistration,
       },
     });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: config.id,
       sides: [

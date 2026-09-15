@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useV1MyTeams, useV1ReceivedReviews, useV1ReceivedReviewSummary, useV1Reviews, useV1ReviewSource, useV1SubmitReview } from '@/hooks/use-v1-api';
 import type { V1ReviewSourceType, V1ReviewTargetType } from '@/types/api';
-import { ReviewSourcePageView, ReviewsPageView, ReviewsReceivedPageView, ReviewSubmitCompleteView } from './reviews-page';
-import type { ReviewTargetDraft, ReviewsTab } from './reviews.types';
+import { ReviewSourcePageView, ReviewsPageView, ReviewSubmitCompleteView } from './reviews-page';
+import { DEFAULT_REVIEW_RATING, type ReviewMetricDraft, type ReviewTargetDraft, type ReviewsTab } from './reviews.types';
 import { toReviewSourcePageModel, toReviewsPageModel, toReviewsReceivedPageModel } from './reviews.view-model';
 
 export function ReviewsPageClient({ initialTab }: { initialTab: ReviewsTab }) {
@@ -66,9 +66,14 @@ export function ReviewSourcePageClient({
       for (const target of query.data.targets) {
         const key = targetKey(target.targetType, target.targetUserId, target.targetTeamId);
         if (next[key]) continue;
+        const baseRating = target.review?.rating ?? DEFAULT_REVIEW_RATING;
         next[key] = {
-          rating: target.review?.rating ?? 4,
+          rating: baseRating,
           tagCodes: target.review?.tags.map((tag) => tag.tagCode) ?? [],
+          // 4항목은 사람 대상에만. 기본값은 종합 별점 -- 세부를 안 만져도 제출이 막히지 않는다.
+          ...(target.targetType === 'user'
+            ? { metricScores: { skill: baseRating, manner: baseRating, punctuality: baseRating, safety: baseRating } }
+            : {}),
         };
       }
       return next;
@@ -80,12 +85,38 @@ export function ReviewSourcePageClient({
   }
 
   const setRating = (key: string, rating: number) => {
-    setDrafts((current) => ({ ...current, [key]: { rating, tagCodes: current[key]?.tagCodes ?? [] } }));
+    setDrafts((current) => {
+      const draft = current[key];
+      return {
+        ...current,
+        [key]: {
+          rating,
+          tagCodes: draft?.tagCodes ?? [],
+          // 세부 항목을 아직 안 만졌으면(전부 이전 종합값과 동일) 종합 별점을 따라간다 --
+          // 만진 뒤에는 사용자의 세부 판단을 종합 별점이 덮어쓰지 않는다.
+          ...(draft?.metricScores
+            ? {
+                metricScores: Object.values(draft.metricScores).every((score) => score === draft.rating)
+                  ? { skill: rating, manner: rating, punctuality: rating, safety: rating }
+                  : draft.metricScores,
+              }
+            : {}),
+        },
+      };
+    });
+  };
+
+  const setMetricScore = (key: string, metric: keyof ReviewMetricDraft, score: number) => {
+    setDrafts((current) => {
+      const draft = current[key];
+      if (!draft?.metricScores) return current;
+      return { ...current, [key]: { ...draft, metricScores: { ...draft.metricScores, [metric]: score } } };
+    });
   };
 
   const toggleTag = (key: string, tagCode: string) => {
     setDrafts((current) => {
-      const draft = current[key] ?? { rating: 4, tagCodes: [] };
+      const draft = current[key] ?? { rating: DEFAULT_REVIEW_RATING, tagCodes: [] };
       const exists = draft.tagCodes.includes(tagCode);
       return {
         ...current,
@@ -114,7 +145,7 @@ export function ReviewSourcePageClient({
     try {
       for (const target of readyTargets) {
         const key = targetKey(target.targetType, target.targetUserId, target.targetTeamId);
-        const draft = drafts[key] ?? { rating: 4, tagCodes: [] };
+        const draft = drafts[key] ?? { rating: DEFAULT_REVIEW_RATING, tagCodes: [] };
         await submit.mutateAsync({
           sourceType,
           sourceId,
@@ -123,6 +154,8 @@ export function ReviewSourcePageClient({
           targetTeamId: target.targetTeamId,
           rating: draft.rating,
           tagCodes: draft.tagCodes,
+          // 4항목 채점은 사람 대상에만 -- 팀 대상에 실으면 서버가 400 으로 거부한다.
+          ...(target.targetType === 'user' && draft.metricScores ? { metricScores: draft.metricScores } : {}),
         });
       }
       router.replace(`/my/reviews/${sourceType}/${sourceId}?complete=1`);
@@ -141,40 +174,13 @@ export function ReviewSourcePageClient({
       onRetry={() => void query.refetch()}
       onSubmit={submitAll}
       onToggleTag={toggleTag}
+      onUpdateMetricScore={setMetricScore}
       onUpdateRating={setRating}
       submitting={submit.isPending}
     />
   );
 }
 
-export function ReviewsReceivedPageClient() {
-  const [period, setPeriod] = useState<string | null>(null);
-  const [teamPeriod, setTeamPeriod] = useState<string | null>(null);
-  const query = useV1ReceivedReviews();
-  const summaryQuery = useV1ReceivedReviewSummary('user', period ?? undefined);
-  const teamsQuery = useV1MyTeams();
-  const hasManagedTeam = (teamsQuery.data?.items ?? []).some((team) => team.canManage);
-  const teamSummaryQuery = useV1ReceivedReviewSummary('team', teamPeriod ?? undefined, { enabled: hasManagedTeam });
-  const model = useMemo(() => toReviewsReceivedPageModel(query.data), [query.data]);
-
-  return (
-    <ReviewsReceivedPageView
-      errorMessage={query.error instanceof Error ? query.error.message : null}
-      hasManagedTeam={hasManagedTeam}
-      loading={query.isLoading}
-      model={model}
-      onPeriodChange={setPeriod}
-      onRetry={() => void query.refetch()}
-      onTeamPeriodChange={setTeamPeriod}
-      period={period}
-      summary={summaryQuery.data}
-      summaryLoading={summaryQuery.isLoading}
-      teamPeriod={teamPeriod}
-      teamSummary={teamSummaryQuery.data}
-      teamSummaryLoading={teamSummaryQuery.isLoading}
-    />
-  );
-}
 
 function targetKey(targetType: V1ReviewTargetType, targetUserId: string | null, targetTeamId: string | null) {
   return targetType === 'team' ? `team:${targetTeamId ?? 'unknown'}` : `user:${targetUserId ?? 'unknown'}`;

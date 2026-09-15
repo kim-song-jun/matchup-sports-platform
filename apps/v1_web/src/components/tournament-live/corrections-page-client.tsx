@@ -1,0 +1,182 @@
+'use client';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { RequireAuth } from '@/components/auth/require-auth';
+import { ErrorState } from '@/components/v1-ui/primitives';
+import { OpsPageHeader } from '@/components/tournament-ops/ops-page-header';
+import { fixtureDetailHref } from '@/lib/fixture-detail-route';
+import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
+import { useV1Tournament } from '@/hooks/use-v1-api';
+import { useTournamentEndedFixtures, type TournamentOperationsBoardItem } from '@/hooks/use-tournament-result-review';
+import { buildLeagueFixtureTitles, resolveFixtureLabel } from '@/components/tournament-result-review/fixture-label';
+import { FixturePickerList } from '@/components/tournament-result-review/fixture-picker-list';
+import { GameResultCorrectionPanel } from '@/components/tournament-result-review/game-result-correction-panel';
+import { describeResultReviewError } from '@/components/tournament-result-review/result-review-copy';
+import { ResultReviewGridStyles } from '@/components/tournament-result-review/result-review-grid-styles';
+
+/**
+ * Screen A-04 -- `/tournament-ops/tournaments/:tournamentId/records/
+ * corrections`. Same worktree gap as `result-review-page-client.tsx`: Task
+ * 19's shared shell has not landed, so this page self-wraps in `RequireAuth`
+ * and relies on the server (`TournamentResultReviewService`) for true
+ * authorization.
+ */
+export function CorrectionsPageClient({ tournamentId }: { tournamentId: string }) {
+  const tournament = useV1Tournament(tournamentId);
+  const boardQuery = useTournamentEndedFixtures(tournamentId);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const deepLinkFixtureId = searchParams.get('fixtureId');
+  const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(() => deepLinkFixtureId);
+  const [deepLinkNotFound, setDeepLinkNotFound] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  /* 보드 API 응답에는 팀 이름이 없어서 목록이 "group · 1경기"로만 보였다 —
+     어느 경기를 정정하는지 알 수 없다. 운영 보드와 같은 소스에서 이름을 채운다. */
+  const teamNamesByFixtureId = useMemo(() => {
+    // 참가팀 공개 정책 통일(fix/v1-publish) — useV1Tournament는 공개 상세 응답을
+    // 그대로 쓰므로 타입상 null일 수 있다. 이 화면에 접근하는 스태프는 대회 전체
+    // 단위로 인가되어 항상 실명을 받으므로(operations-board-client.tsx와 동일 근거)
+    // 실질적으로 null은 나타나지 않지만, 방어적으로 '미정'을 fallback한다.
+    const map = new Map<string, { home: string; away: string }>();
+    for (const fixture of tournament.data?.fixtures ?? []) {
+      map.set(fixture.id, { home: fixture.homeTeamName ?? '미정', away: fixture.awayTeamName ?? '미정' });
+    }
+    return map;
+  }, [tournament.data?.fixtures]);
+
+  const leagueTitlesByFixtureId = useMemo(
+    () => buildLeagueFixtureTitles(tournament.data?.leagueFixtures),
+    [tournament.data?.leagueFixtures],
+  );
+
+  const hasOfficialResult = useMemo(
+    () =>
+      (boardQuery.data?.items ?? []).filter(
+        (item): item is TournamentOperationsBoardItem & { gameId: string } =>
+          item.gameId !== null && item.revisionId !== null,
+      ),
+    [boardQuery.data],
+  );
+
+  const selectedItem = hasOfficialResult.find((item) => item.fixtureId === selectedFixtureId) ?? null;
+
+  /**
+   * **확정된 결과를 관전자 화면에서 확인하는 자리.** 원래 결과 검토 화면에 뒀는데 거기서는
+   * 도달할 수 없었다 — 확정 한 번에 "링크를 띄우는 무효화"(revisions)와 "패널을 걷어내는
+   * 무효화"(board)가 같은 콜백에서 나가, 링크의 수명이 두 refetch 사이 간격이었다.
+   * 이 화면은 `revisionId !== null` 만 모으므로 **확정된 항목이 사라지지 않는다.**
+   *
+   * ⚠️ `kind` 가 오기 전에는 만들지 않는다. 목록은 보드 쿼리로 뜨고 `kind` 는 다른
+   * 쿼리에서 온다 — 보드가 먼저 성공하면 `tournament.data` 가 undefined 라 정규 리그가
+   * 대회 라우트로 링크돼 404 다(결과 검토 화면에서 실제로 났던 경합).
+   */
+  const publicHref =
+    selectedItem !== null && tournament.data
+      ? fixtureDetailHref({
+          isRegularLeague: tournament.data.kind === 'regular_league',
+          competitionId: tournamentId,
+          fixtureId: selectedItem.fixtureId,
+        })
+      : undefined;
+  const selectedFixtureTitle = selectedItem
+    ? resolveFixtureLabel(
+        selectedItem,
+        teamNamesByFixtureId.get(selectedItem.fixtureId),
+        leagueTitlesByFixtureId,
+      ).title
+    : null;
+
+  // T6-2: 딥링크로 들어왔는데 목록이 로드된 뒤에도 해당 fixture가 없으면(아직 공식
+  // 결과가 확정되지 않은 경우) 조용히 미선택 상태로 두지 않고 안내한다.
+  // Fix round 1 — `useTournamentEndedFixtures`는 staleTime: 15_000(창 포커스 등으로
+  // 백그라운드 refetch됨)이라, 안내를 띄운 뒤 refetch로 그 fixture가 목록에
+  // 들어오면 selectedItem이 truthy가 되는데 deepLinkNotFound는 계속 true로
+  // 남아 배너와 패널이 동시에 보이는 버그가 있었다. selectedItem이 다시
+  // truthy가 되면 배너를 명시적으로 내린다.
+  useEffect(() => {
+    if (!boardQuery.isSuccess || !deepLinkFixtureId) return;
+    if (selectedItem) {
+      setDeepLinkNotFound(false);
+      setTimeout(() => panelRef.current?.focus(), 0);
+      return;
+    }
+    setDeepLinkNotFound(true);
+  }, [boardQuery.isSuccess, deepLinkFixtureId, selectedItem]);
+
+  return (
+    <RequireAuth>
+      <div className="tm-content-enter flex flex-col gap-4">
+        <OpsPageHeader
+          tournamentTitle={tournament.data?.title}
+          title="결과 정정"
+          description="이미 확정된 공식 결과를 사유와 함께 바로잡아요."
+        />
+
+        {deepLinkNotFound ? (
+          <p className="tm-text-caption" role="status" style={{ color: 'var(--text-muted)' }}>
+            전달받은 경기는 지금 정정 목록에 없어요. 아직 공식 결과가 확정되지 않았을 수 있어요.
+          </p>
+        ) : null}
+
+        {boardQuery.isPending ? <p className="tm-text-label">불러오는 중…</p> : null}
+        {boardQuery.isError ? (
+          <ErrorState
+            message={describeResultReviewError(boardQuery.error)}
+            onRetry={() => void boardQuery.refetch()}
+          />
+        ) : null}
+
+        {boardQuery.isSuccess ? (
+          <>
+          <ResultReviewGridStyles />
+          <div className="tm-result-review-grid tm-result-review-grid--corrections">
+            <FixturePickerList
+              items={hasOfficialResult}
+              teamNamesByFixtureId={teamNamesByFixtureId}
+              leagueTitlesByFixtureId={leagueTitlesByFixtureId}
+              selectedFixtureId={selectedFixtureId}
+              onSelect={(item) => {
+                setSelectedFixtureId(item.fixtureId);
+                setTimeout(() => panelRef.current?.focus(), 0);
+              }}
+              emptyTitle="정정할 결과가 없어요"
+              emptySub="정정은 공식 확정된 결과가 있어야 할 수 있어요. 아직 확정한 경기가 없다면 결과 검토에서 먼저 확정해 주세요."
+              emptyCta="결과 검토로 가기"
+              onEmptyCta={() => router.push(`${resolveTournamentLiveBase(pathname, tournamentId)}/result-review`)}
+            />
+
+            {selectedItem && selectedItem.gameId ? (
+              <div
+                ref={panelRef}
+                tabIndex={-1}
+                aria-label={`${selectedFixtureTitle} 결과 정정 패널`}
+                className="rounded-md outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--static-blue)]"
+              >
+                {publicHref ? (
+                  <Link
+                    href={publicHref}
+                    className="tm-section-action inline-flex min-h-[44px] items-center"
+                    style={{ marginBottom: 12 }}
+                  >
+                    공개 화면에서 보기
+                  </Link>
+                ) : null}
+                <GameResultCorrectionPanel
+                  key={selectedItem.gameId}
+                  gameId={selectedItem.gameId}
+                  tournamentId={tournamentId}
+                  inline
+                />
+              </div>
+            ) : null}
+          </div>
+          </>
+        ) : null}
+      </div>
+    </RequireAuth>
+  );
+}

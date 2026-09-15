@@ -57,14 +57,14 @@ describe('OperationAuditWriterService', () => {
         actor,
         requestId: 'request-7-audit-001',
         action: 'tournament.fixture.publish',
-        targetType: 'TOURNAMENT_FIXTURE',
-        targetId: 'fixture-42',
+        targetType: 'TEAM_MATCH',
+        targetId: 'team-match-42',
         occurredAt: new Date('2026-08-01T04:59:00.000Z'),
         sourceIp,
         before,
         after,
         tournamentId: 'tournament-42',
-        fixtureId: 'fixture-42',
+        teamMatchId: 'team-match-42',
         fieldId: 'field-7',
       });
 
@@ -77,16 +77,16 @@ describe('OperationAuditWriterService', () => {
         actorUserId,
         systemActor,
         action: 'tournament.fixture.publish',
-        resourceType: 'TOURNAMENT_FIXTURE',
-        resourceId: 'fixture-42',
+        resourceType: 'TEAM_MATCH',
+        resourceId: 'team-match-42',
         requestId: 'request-7-audit-001',
         maskedSourceIp,
         before: { state: 'stale_state', nested: { version: 7 } },
         after: { state: 'PUBLISHED', nested: { version: 8 } },
         tournamentId: 'tournament-42',
-        fixtureId: 'fixture-42',
         fieldId: 'field-7',
         createdAt: new Date('2026-08-01T04:59:00.000Z'),
+        teamMatchId: 'team-match-42',
         // The writer persists `reason` in the CREATE because
         // `v1_operation_audits_append_only` forbids UPDATE on
         // v1_operation_audits; it is null when the caller supplies none.
@@ -124,9 +124,9 @@ describe('OperationAuditWriterService', () => {
         occurredAt: new Date('2026-08-01T04:59:00.000Z'),
         before: null,
         after: { state: 'PUBLISHED' },
-        fixtureId: 'fixture-42',
+        teamMatchId: 'team-match-42',
       }),
-    ).rejects.toThrow('tournamentId is required when fixtureId or fieldId is present');
+    ).rejects.toThrow('tournamentId is required when teamMatchId or fieldId is present');
     expect(createCalls).toBe(0);
   });
 
@@ -192,13 +192,13 @@ describe('OperationAuditWriterService', () => {
         actor: { type: 'TOURNAMENT_STAFF', id: 'user:staff-18' },
         requestId: 'request-7-audit-privacy',
         action: 'tournament.fixture.publish',
-        targetType: 'TOURNAMENT_FIXTURE',
-        targetId: 'fixture-42',
+        targetType: 'TEAM_MATCH',
+        targetId: 'team-match-42',
         occurredAt: new Date('2026-08-01T05:00:00.000Z'),
         before,
         after: { state: 'PUBLISHED' },
         tournamentId: 'tournament-42',
-        fixtureId: 'fixture-42',
+        teamMatchId: 'team-match-42',
       }),
     ).rejects.toThrow('is not permitted in operation audit snapshots');
     expect(createCalls).toBe(0);
@@ -219,13 +219,13 @@ describe('OperationAuditWriterService', () => {
       actor: { type: 'TOURNAMENT_STAFF', id: 'user:staff-18' },
       requestId: 'request-7-audit-display-name',
       action: 'tournament.lineup.publish',
-      targetType: 'TOURNAMENT_FIXTURE',
-      targetId: 'fixture-42',
+      targetType: 'TEAM_MATCH',
+      targetId: 'team-match-42',
       occurredAt: new Date('2026-08-01T05:00:00.000Z'),
       before: { playerDisplayName: '닉네임' },
       after: { playerDisplayName: '새 닉네임' },
       tournamentId: 'tournament-42',
-      fixtureId: 'fixture-42',
+      teamMatchId: 'team-match-42',
     });
 
     expect(persistedData?.before).toEqual({ playerDisplayName: '닉네임' });

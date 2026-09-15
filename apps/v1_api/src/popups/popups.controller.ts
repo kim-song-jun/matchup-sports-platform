@@ -7,7 +7,7 @@ export class PopupsController {
   constructor(private readonly popupsService: PopupsService) {}
 
   @Get('active')
-  async getActive(@Query() query: ActivePopupQueryDto) {
+  async getActive(@Query() query: ActivePopupQueryDto): Promise<{ popup: Awaited<ReturnType<PopupsService['findActive']>> }> {
     return { popup: await this.popupsService.findActive(query.screen, query.path) };
   }
 }

@@ -63,8 +63,27 @@ export class GameLineupParticipantDto {
   @Max(100)
   positionY?: number;
 
+  /**
+   * **더 이상 읽지 않는다** (Task 163, 정본 §3). 선발/후보 구분 자체가 없어졌다 —
+   * 명단에 있으면 그 경기에 뛴 것이고 `started` 는 항상 true 다. optional 로 남겨 둔
+   * 이유는 **옛 클라이언트가 보내도 400 을 내지 않기 위해서**이며, 값은 저장 경로에서
+   * 무시된다.
+   *
+   * 프론트가 전부 갱신되고 alpha 에서 미전송이 확인되면 이 필드를 지운다.
+   *
+   * **지금 지우면 안 된다** — `main.ts` 의 `ValidationPipe` 가 `forbidNonWhitelisted: true`
+   * 라, 모르는 속성을 조용히 떼는 게 아니라 **400 을 던진다.** 즉 이 필드를 없애는 순간
+   * `started` 를 보내는 옛 클라이언트(번들된 web 자산을 든 Capacitor 설치본 포함)는
+   * 라인업 저장이 통째로 막힌다. **죽은 코드가 아니라 의도적 하위호환 창이다.**
+   *
+   * 삭제 조건 ②("alpha 미전송")는 코드로 못 닫는다 — 그래서 서비스가 이 값이 실제로
+   * 실려 오면 경고 로그를 남긴다. **그 로그가 일정 기간 0건이면 그때 지운다.**
+   *
+   * @deprecated 저장 경로에서 무시된다. 하위호환 창이 닫히면 삭제.
+   */
+  @IsOptional()
   @IsBoolean()
-  started!: boolean;
+  started?: boolean;
 }
 
 export class SaveGameLineupDto {
@@ -103,4 +122,17 @@ export class SubmitGameLineupDto {
   @IsString()
   @IsNotEmpty()
   takeoverToken?: string;
+}
+
+/**
+ * 명단 검인(체크인) — 이 참가자가 실제로 도착했는지를 현장에서 확정한다.
+ *
+ * 저장/제출과 달리 `expectedVersion` 을 받지 않는다. 체크인은 킥오프 직전 여러 명을
+ * 연달아 누르는 조작이고 라인업 내용을 바꾸지 않는다 — 버전 커맨드로 만들면 한 명 누를
+ * 때마다 revision 이 올라 다음 사람에서 곧바로 409 가 난다(라인업 화면이 겪던 바로 그
+ * 함정이다). 그래서 라인업 revision 과 완전히 분리된 단순 상태 토글로 둔다.
+ */
+export class SetParticipantArrivalDto {
+  @IsBoolean()
+  arrived!: boolean;
 }

@@ -16,10 +16,16 @@ import type {
   HomeStats,
   HomeViewModel,
 } from './home.types';
+import { chatRoomTypeLabel } from '@/lib/chat-route';
+
+/** 위치 권한이 없거나 날씨를 아직 못 받았을 때 쓰는 빈 값. 목업 날씨('마포 18도 맑음')를
+ *  실제 관측치처럼 보여주지 않는다 — 권한 안내 문구(getWeatherPermissionCopy)가 이유를 말한다. */
+export const EMPTY_WEATHER: HomeViewModel['weather'] = { city: '-', temp: '-', cond: '-', wind: '-' };
 
 export function withoutHomeContent(model: HomeViewModel): HomeViewModel {
   return {
     ...model,
+    weather: EMPTY_WEATHER,
     viewerName: null,
     signedOut: true,
     hasNewNotification: false,
@@ -52,11 +58,11 @@ export function toHomeModel(
     retry,
     hasNewNotification: unreadCount > 0,
     chatUnreadCount,
-    stats: normalizeStats(home, fallback),
+    stats: normalizeStats(home),
     featuredMatch: normalizeFeaturedMatch(home, recommendedMatches),
     recommendedMatches,
     quickActions: normalizeShortcuts(home.shortcuts, fallback.quickActions),
-    weather: weather ?? fallback.weather,
+    weather: weather ?? EMPTY_WEATHER,
     popup: normalizePopup(home.popup),
     notices: normalizeNotices(home),
   };
@@ -72,7 +78,7 @@ export function toHomeChatRooms(rooms: V1ChatRoom[]): HomeChatRoom[] {
     .map((room) => ({
       id: room.roomId,
       title: room.title,
-      typeLabel: room.roomType === 'match' ? '개인매치' : room.roomType === 'team' ? '팀' : '팀매치',
+      typeLabel: chatRoomTypeLabel(room.roomType),
       lastMessage: room.lastMessage?.contentPreview ?? '아직 메시지가 없어요',
       time: formatRelative(room.lastMessage?.sentAt),
       unreadCount: room.unreadCount,
@@ -94,15 +100,25 @@ function formatRelative(value?: string) {
   return date.toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-function normalizeStats(home: V1Home, fallback: HomeViewModel): HomeStats {
+/** summary 가 없을 때 쓰는 빈 통계 — 목업 숫자(12경기·+3·8)를 사용자 자기 기록으로 보여주면 안 된다. */
+const BLANK_STATS: HomeStats = {
+  monthlyActivity: '-',
+  monthlyActivitySub: '집계 준비 중',
+  mannerScore: '-',
+  mannerScoreSub: '-',
+  joined: '-',
+  trustState: '-',
+  pending: '-',
+};
+
+function normalizeStats(home: V1Home): HomeStats {
   const summary = home.summary;
-  if (!summary) return fallback.stats;
+  if (!summary) return BLANK_STATS;
 
   const monthlyMatches = summary.monthlyMatches ?? 0;
   const mannerScore = summary.mannerScore;
 
   return {
-    ...fallback.stats,
     monthlyActivity: monthlyMatches,
     monthlyActivitySub: summary.pendingLabel ?? '신청·참가 합산',
     mannerScore: mannerScore === null ? '-' : mannerScore.toFixed(1),
@@ -140,10 +156,14 @@ function normalizeMatches(home: V1Home) {
   // API 가 안 준 칸(종목 아이콘, 장소, 참가 인원)에 **다른 매치의 값**이 남았다 —
   // 실제로 홈 카드에 "18/22명" 같은 목업 인원이 그대로 보였다.
   const legacyMatches = Array.isArray(home.recommendedMatches) ? home.recommendedMatches : [];
-  if (legacyMatches.length) return legacyMatches.map((match) => toHomeMatch(match));
+  if (legacyMatches.length) {
+    return legacyMatches.map((match) => toHomeMatch(match));
+  }
 
   const recommendations = Array.isArray(home.recommendations) ? home.recommendations : [];
-  return recommendations.length ? recommendations.map((match) => toHomeRecommendation(match)) : [];
+  return recommendations.length
+    ? recommendations.map((match) => toHomeRecommendation(match))
+    : [];
 }
 
 function normalizePopup(popup: V1Popup | null | undefined): HomePopup | null {
@@ -209,6 +229,7 @@ function toHomeMatch(match: V1Match): HomeMatchCard {
     sportLabel: match.sportName,
     title: match.title,
     venue: match.placeName,
+    imageUrl: match.imageUrl ?? null,
     date: formatDate(match.startsAt),
     time: formatTime(match.startsAt),
     currentParticipants: capacity.current,
@@ -231,7 +252,7 @@ function emptyMatchCard(): HomeMatchCard {
     currentParticipants: null,
     maxParticipants: null,
     actionLabel: '',
-    imageUrl: '/mock/generated/team-huddle.webp',
+    imageUrl: null,
   };
 }
 

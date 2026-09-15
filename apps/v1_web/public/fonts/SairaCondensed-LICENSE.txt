@@ -1,0 +1,3 @@
+Saira Condensed — Copyright 2020 The Saira Project Authors (https://github.com/Omnibus-Type/Saira)
+Licensed under the SIL Open Font License, Version 1.1: https://openfontlicense.org
+선수 카드(Task 155)의 숫자 전용 서체. latin 서브셋 700/800 두 웨이트만 동봉한다.

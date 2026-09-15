@@ -20,6 +20,16 @@ const ids = {
   sideA: '71000000-0000-4000-8000-000000000041',
   sideB: '71000000-0000-4000-8000-000000000042',
   config: '71000000-0000-4000-8000-000000000050',
+  // TeamMatchLineupService의 실제 저장 계약(선발/후보는 `started` 컬럼, 골키퍼는 종목과
+  // 무관하게 GOALKEEPER_MARKER)을 재현하는 두 번째 게임 — 풋살처럼 사전 골키퍼 코드가 'GK'가
+  // 아닌 config로 이 계약이 히스토리 리더에서 올바르게 풀리는지 확인한다.
+  futsalTeamMatch: '71000000-0000-4000-8000-000000000060',
+  futsalGame: '71000000-0000-4000-8000-000000000061',
+  futsalSideA: '71000000-0000-4000-8000-000000000062',
+  futsalConfig: '71000000-0000-4000-8000-000000000063',
+  invalidatedOnlyTeamMatch: '71000000-0000-4000-8000-000000000070',
+  invalidatedOnlyGame: '71000000-0000-4000-8000-000000000071',
+  invalidatedOnlySideA: '71000000-0000-4000-8000-000000000072',
 } as const;
 
 const prisma = new PrismaService();
@@ -160,23 +170,38 @@ describe('팀 스코프 라인업 재사용 (히스토리 · 프리셋 · 고정
       ],
     });
 
-    // 우리 팀은 revision 1 → 2로 두 번 저장했다. 히스토리는 최신 하나만 보여야 한다.
-    for (const [revision, jersey] of [[1, 7], [2, 9]] as const) {
-      const lineup = await prisma.v1GameLineup.create({
-        data: { gameId: ids.game, sideId: ids.sideA, revision, formation: '2-2' },
-      });
-      await prisma.v1GameParticipant.create({
-        data: {
-          gameId: ids.game,
-          sideId: ids.sideA,
-          lineupId: lineup.id,
-          userId: ids.ownerA,
-          displayNameSnapshot: '팀장A',
-          jerseyNumber: jersey,
-          started: true,
-        },
-      });
-    }
+    // 대진 팀 교체를 재현한다. 이전 revision 2는 무효화됐지만 revision 번호가 더 높고,
+    // 교체 전 선수 스냅샷도 남아 있다. 현재 팀의 active revision 3만 히스토리에 보여야 한다.
+    const firstLineup = await prisma.v1GameLineup.create({
+      data: { gameId: ids.game, sideId: ids.sideA, revision: 1, formation: '2-2' },
+    });
+    await prisma.v1GameParticipant.create({
+      data: {
+        gameId: ids.game, sideId: ids.sideA, lineupId: firstLineup.id, userId: ids.ownerA,
+        displayNameSnapshot: '팀장A', jerseyNumber: 7, started: true,
+      },
+    });
+    const invalidatedLineup = await prisma.v1GameLineup.create({
+      data: {
+        gameId: ids.game, sideId: ids.sideA, revision: 2, formation: '3-3',
+        invalidatedAt: new Date('2026-08-09T00:00:00.000Z'), invalidationReason: 'SIDE_TEAM_CHANGED',
+      },
+    });
+    await prisma.v1GameParticipant.create({
+      data: {
+        gameId: ids.game, sideId: ids.sideA, lineupId: invalidatedLineup.id, userId: ids.ownerB,
+        displayNameSnapshot: '교체전선수', jerseyNumber: 9, started: true,
+      },
+    });
+    const currentLineup = await prisma.v1GameLineup.create({
+      data: { gameId: ids.game, sideId: ids.sideA, revision: 3, formation: '2-2' },
+    });
+    await prisma.v1GameParticipant.create({
+      data: {
+        gameId: ids.game, sideId: ids.sideA, lineupId: currentLineup.id, userId: ids.ownerA,
+        displayNameSnapshot: '교체후선수', jerseyNumber: 11, started: true,
+      },
+    });
     const opponentLineup = await prisma.v1GameLineup.create({
       data: { gameId: ids.game, sideId: ids.sideB, revision: 1 },
     });
@@ -190,20 +215,157 @@ describe('팀 스코프 라인업 재사용 (히스토리 · 프리셋 · 고정
         started: true,
       },
     });
+
+    // 풋살처럼 골키퍼 사전 코드가 'GK'가 아닌(config: 'GOLEIRO') 두 번째 팀 매치.
+    // TeamMatchLineupService(saveLineup)가 실제로 쓰는 계약을 그대로 재현한다 —
+    // 명단은 전원 출전자이고, 골키퍼만 종목 사전 코드가 아니라 항상
+    // GOALKEEPER_MARKER('GK') sentinel 이다.
+    const futsalConfig = await prisma.v1CompetitionConfigVersion.create({
+      data: {
+        id: ids.futsalConfig,
+        sportCode: 'lineup-reuse-futsal-goleiro',
+        name: 'lineup-reuse-futsal-v1',
+        version: 1,
+        periods: [{ code: 'H1', label: '전반', durationMinutes: 20, extraTime: false }],
+        events: ['GOAL'],
+        lineup: {
+          minPlayers: 1,
+          maxPlayers: 6,
+          substitutions: 'rolling',
+          maxSubstitutions: null,
+          positions: [
+            { code: 'GOLEIRO', label: '골레이로', short: 'GK', goalkeeper: true },
+            { code: 'FP', label: '필드', short: 'FP' },
+          ],
+          formations: [],
+        },
+        result: {
+          tournamentScorerPolicy: 'optional',
+          teamMatchScorerPolicy: 'optional_with_warning',
+          mvpMin: 0,
+          mvpMax: 1,
+        },
+        tieBreak: {
+          points: { win: 3, draw: 1, loss: 0 },
+          order: ['points', 'head_to_head', 'goal_difference', 'goals_for', 'fair_play', 'seeded_draw'],
+          seededDraw: 'sha256-v1',
+        },
+        visibility: { default: 'live', allowed: ['live', 'official'] },
+        contentHash: 'lineup-reuse-futsal-content-hash',
+      },
+    });
+    await prisma.v1TeamMatch.create({
+      data: {
+        id: ids.futsalTeamMatch,
+        hostTeamId: ids.teamA,
+        approvedApplicantTeamId: null,
+        sportId: ids.sport,
+        regionId: ids.region,
+        status: 'matched',
+        title: '라인업 재사용 검증 경기 (풋살 GK 코드)',
+        placeName: '검증 풋살장 2',
+        startAt: new Date('2026-08-11T10:00:00.000Z'),
+        createdByUserId: ids.ownerA,
+        competitionConfigVersionId: futsalConfig.id,
+      },
+    });
+    await prisma.v1Game.create({
+      data: {
+        id: ids.futsalGame,
+        sourceType: V1GameSourceType.TEAM_MATCH,
+        teamMatchId: ids.futsalTeamMatch,
+        competitionConfigVersionId: futsalConfig.id,
+      },
+    });
+    await prisma.v1GameSide.create({
+      data: {
+        id: ids.futsalSideA,
+        gameId: ids.futsalGame,
+        sideKey: V1GameSideKey.HOME,
+        teamId: ids.teamA,
+        displayNameSnapshot: '우리팀',
+      },
+    });
+    const futsalLineup = await prisma.v1GameLineup.create({
+      data: { gameId: ids.futsalGame, sideId: ids.futsalSideA, revision: 1, formation: '2-2' },
+    });
+    // TeamMatchLineupService.resolveEntries 가 실제로 만드는 행 모양을 그대로 재현한다.
+    // **전원이 출전자다**(정본 §3) — 선발/후보 구분이 없으므로 `started` 는 모두 true 이고,
+    // 갈리는 것은 골키퍼뿐이다. 예전엔 후보를 position='BENCH' 센티널로 표시했고
+    // 마이그레이션 20260902000000_v1_lineup_bench_to_started 가 그 구분을 지웠다.
+    await prisma.v1GameParticipant.createMany({
+      data: [
+        {
+          gameId: ids.futsalGame,
+          sideId: ids.futsalSideA,
+          lineupId: futsalLineup.id,
+          userId: ids.ownerA,
+          displayNameSnapshot: '팀장A',
+          jerseyNumber: 1,
+          started: true,
+          position: 'GK',
+        },
+        {
+          gameId: ids.futsalGame,
+          sideId: ids.futsalSideA,
+          lineupId: futsalLineup.id,
+          userId: ids.managerA,
+          displayNameSnapshot: '매니저A',
+          jerseyNumber: 2,
+          started: true,
+          position: null,
+        },
+        {
+          gameId: ids.futsalGame,
+          sideId: ids.futsalSideA,
+          lineupId: futsalLineup.id,
+          userId: ids.memberA,
+          displayNameSnapshot: '멤버A',
+          jerseyNumber: 3,
+          started: true,
+          position: null,
+        },
+      ],
+    });
+
+    // 무효화된 라인업만 남은 별도 경기. 이 경기는 히스토리에서 완전히 사라져야 한다.
+    await prisma.v1TeamMatch.create({
+      data: {
+        id: ids.invalidatedOnlyTeamMatch, hostTeamId: ids.teamA, approvedApplicantTeamId: ids.teamB,
+        sportId: ids.sport, regionId: ids.region, status: 'matched', title: '무효화 전용 경기',
+        placeName: '검증 풋살장 3', startAt: new Date('2026-08-12T10:00:00.000Z'),
+        createdByUserId: ids.ownerA, competitionConfigVersionId: configId,
+      },
+    });
+    await prisma.v1Game.create({
+      data: { id: ids.invalidatedOnlyGame, sourceType: V1GameSourceType.TEAM_MATCH, teamMatchId: ids.invalidatedOnlyTeamMatch, competitionConfigVersionId: configId },
+    });
+    await prisma.v1GameSide.create({
+      data: { id: ids.invalidatedOnlySideA, gameId: ids.invalidatedOnlyGame, sideKey: V1GameSideKey.HOME, teamId: ids.teamA, displayNameSnapshot: '우리팀' },
+    });
+    const invalidatedOnlyLineup = await prisma.v1GameLineup.create({
+      data: { gameId: ids.invalidatedOnlyGame, sideId: ids.invalidatedOnlySideA, revision: 1, invalidatedAt: new Date(), invalidationReason: 'SIDE_TEAM_CHANGED' },
+    });
+    await prisma.v1GameParticipant.create({
+      data: {
+        gameId: ids.invalidatedOnlyGame, sideId: ids.invalidatedOnlySideA, lineupId: invalidatedOnlyLineup.id,
+        userId: ids.ownerB, displayNameSnapshot: '무효화된교체전선수', jerseyNumber: 99, started: true,
+      },
+    });
   });
 
   afterAll(async () => {
-    await prisma.v1GameParticipant.deleteMany({ where: { gameId: ids.game } });
-    await prisma.v1GameLineup.deleteMany({ where: { gameId: ids.game } });
-    await prisma.v1GameSide.deleteMany({ where: { gameId: ids.game } });
-    await prisma.v1Game.deleteMany({ where: { id: ids.game } });
-    await prisma.v1TeamMatch.deleteMany({ where: { id: ids.teamMatch } });
+    await prisma.v1GameParticipant.deleteMany({ where: { gameId: { in: [ids.game, ids.futsalGame, ids.invalidatedOnlyGame] } } });
+    await prisma.v1GameLineup.deleteMany({ where: { gameId: { in: [ids.game, ids.futsalGame, ids.invalidatedOnlyGame] } } });
+    await prisma.v1GameSide.deleteMany({ where: { gameId: { in: [ids.game, ids.futsalGame, ids.invalidatedOnlyGame] } } });
+    await prisma.v1Game.deleteMany({ where: { id: { in: [ids.game, ids.futsalGame, ids.invalidatedOnlyGame] } } });
+    await prisma.v1TeamMatch.deleteMany({ where: { id: { in: [ids.teamMatch, ids.futsalTeamMatch, ids.invalidatedOnlyTeamMatch] } } });
     await prisma.v1TeamLineupPreset.deleteMany({ where: { teamId: { in: [ids.teamA, ids.teamB] } } });
     await prisma.v1TeamMembership.deleteMany({ where: { teamId: { in: [ids.teamA, ids.teamB] } } });
     await prisma.v1Team.deleteMany({ where: { id: { in: [ids.teamA, ids.teamB] } } });
     await prisma.v1Region.deleteMany({ where: { id: ids.region } });
     await prisma.v1Sport.deleteMany({ where: { id: ids.sport } });
-    await prisma.v1CompetitionConfigVersion.deleteMany({ where: { id: ids.config } });
+    await prisma.v1CompetitionConfigVersion.deleteMany({ where: { id: { in: [ids.config, ids.futsalConfig] } } });
     await prisma.v1User.deleteMany({
       where: { id: { in: [ids.ownerA, ids.managerA, ids.memberA, ids.ownerB] } },
     });
@@ -224,8 +386,17 @@ describe('팀 스코프 라인업 재사용 (히스토리 · 프리셋 · 고정
 
       const forThisGame = result.items.filter((item) => item.gameId === ids.game);
       expect(forThisGame).toHaveLength(1);
-      // 최신 revision(등번호 9)이어야 한다 — 옛 revision(7)이 아니라.
-      expect(forThisGame[0].participants[0].jerseyNumber).toBe(9);
+      // revision 2는 번호가 더 높아도 대진 교체로 무효화됐으므로 revision 3만 선택된다.
+      expect(forThisGame[0].participants[0].jerseyNumber).toBe(11);
+      expect(forThisGame[0].participants.map((participant) => participant.displayName)).not.toContain('교체전선수');
+    });
+
+    it('무효화된 라인업만 남은 경기는 히스토리에서 제외한다', async () => {
+      const result = await history.list(authUser(ids.ownerA), ids.teamA, 20);
+
+      expect(result.items.map((item) => item.gameId)).not.toContain(ids.invalidatedOnlyGame);
+      const names = result.items.flatMap((item) => item.participants.map((participant) => participant.displayName));
+      expect(names).not.toContain('무효화된교체전선수');
     });
 
     it('상대팀 매니저는 우리 팀 히스토리를 볼 수 없다', async () => {
@@ -245,6 +416,38 @@ describe('팀 스코프 라인업 재사용 (히스토리 · 프리셋 · 고정
 
       expect(result.items.length).toBeGreaterThan(0);
     });
+
+    it(
+      '팀 매치 명단은 전원 출전자이고, 골키퍼만 종목 사전이 아니라 GK sentinel 로 판정한다 ' +
+        '— 사전 코드가 GOLEIRO인 풋살에서도 골키퍼로 잡혀야 한다',
+      async () => {
+        const result = await history.list(authUser(ids.ownerA), ids.teamA, 20);
+        const item = result.items.find((entry) => entry.gameId === ids.futsalGame);
+        if (item === undefined) throw new Error('futsal team-match lineup missing from history');
+
+        // 명단 = 출전자이므로 전원이 선발로 세어지고 후보는 0이다(정본 §3).
+        // `benchCount` 가 0 이 아니게 되면 어딘가가 다시 후보를 만들고 있다는 뜻이다.
+        expect(item.starterCount).toBe(3);
+        expect(item.benchCount).toBe(0);
+
+        const byName = new Map(item.participants.map((p) => [p.displayName, p]));
+        const goalkeeper = byName.get('팀장A');
+        const fieldPlayer = byName.get('매니저A');
+        const thirdPlayer = byName.get('멤버A');
+        if (goalkeeper === undefined || fieldPlayer === undefined || thirdPlayer === undefined) {
+          throw new Error('expected futsal participants missing');
+        }
+
+        // 저장된 position은 'GK'(GOALKEEPER_MARKER)인데 이 게임의 사전 골키퍼 코드는
+        // 'GOLEIRO'다 — 사전 코드로만 비교했다면 goalkeeper:false로 새고 position:'GK'가
+        // 그대로 노출된다.
+        expect(goalkeeper).toMatchObject({ goalkeeper: true, position: null, started: true });
+        expect(fieldPlayer).toMatchObject({ goalkeeper: false, started: true });
+        // 세 번째 사람도 **출전자**다 — 예전엔 여기가 후보(started:false)였고, 그 구분을
+        // 정본 §3 이 없앴다. 이 줄이 다시 false 를 기대하게 되면 후보 개념이 되살아난 것이다.
+        expect(thirdPlayer).toMatchObject({ goalkeeper: false, position: null, started: true });
+      },
+    );
   });
 
   describe('라인업 프리셋', () => {

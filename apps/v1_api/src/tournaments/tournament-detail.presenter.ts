@@ -1,5 +1,57 @@
+import { V1CompetitionKind, V1TeamMatchStatus } from '@prisma/client';
+import { publicFixtureStatus } from '../games/public-records/public-visibility';
+import {
+  resolveParticipantDisplayName,
+  type ParticipantNameProfileRow,
+} from '../games/public-records/participant-name-gating';
+import type { LeagueFixtureListItem } from '../league-matches/league-fixture-list-source';
 import type { TournamentDetailRow } from './tournaments-read.query';
 import { resolveTournamentFixtureOfficialResult } from './tournament-fixture-official-result';
+import type { PublicRosterPlayer } from './public-roster';
+
+type PublicFixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+
+/**
+ * 어워드 수상자 표시 이름 -- 저장된 `recipientName`(명단 실명 스냅샷, `tournament-reviews.service.ts`의
+ * 저장부가 로스터 검증을 위해 강제한 값)을 그대로 내보내지 않고, 대회 경기 기록·랭킹과 동일한
+ * 이름 공개 정책(`resolveParticipantDisplayName`, 2026-08-18 닉네임 기본 + 프로필 토글)으로
+ * 재해석한다. 이 화면만 실명 정책을 안 거치면 같은 대회 한 화면 안에서 득점왕은 닉네임인데
+ * MVP만 실명으로 보이는 불일치가 생긴다(감사 evidence).
+ *
+ * `resolveParticipantDisplayName`은 `participant.userId`가 null이거나 프로필이 없으면
+ * `displayNameSnapshot`으로 그대로 폴백하므로, `recipientUserId`가 없는 레거시 미연동
+ * 수상 행(계정 연결이 모호해 backfill이 null로 남긴 경우)도 저장된 스냅샷을 안전하게 유지한다.
+ */
+function presentAwardRecipientName(award: TournamentDetailRow['awards'][number]): string {
+  const profileByUserId = new Map<string, ParticipantNameProfileRow>();
+  if (award.recipientUserId !== null && award.recipient?.profile) {
+    profileByUserId.set(award.recipientUserId, {
+      userId: award.recipientUserId,
+      ...award.recipient.profile,
+    });
+  }
+  return (
+    resolveParticipantDisplayName(
+      { userId: award.recipientUserId, displayNameSnapshot: award.recipientName },
+      profileByUserId,
+    ) ?? award.recipientName
+  );
+}
+
+/**
+ * 수상자 프로필 링크 대상 -- 계정이 연동돼 있고(`recipientUserId`) 그 계정이
+ * 탈퇴하지 않았을 때만(`deletedAt === null`) 링크를 내보낸다. 탈퇴 계정으로 링크하면
+ * '탈퇴 회원' 표시 이름과 달리 `/users/:id`가 존재하지 않는 프로필을 가리키게 된다.
+ * `PublicTournamentPlayerRecordRow.profileHref`(개인 기록 랭킹)와 같은 화면에서
+ * 이미 공개하는 계정 연결이라 새 노출이 아니다 -- 어워드 섹션만 빠져 있었다.
+ */
+function presentAwardRecipientLink(
+  award: TournamentDetailRow['awards'][number],
+): { userId: string; profileImageUrl: string | null } | null {
+  if (award.recipientUserId === null) return null;
+  if (!award.recipient?.profile || award.recipient.profile.deletedAt !== null) return null;
+  return { userId: award.recipientUserId, profileImageUrl: award.recipient.profile.profileImageUrl ?? null };
+}
 
 /**
  * 대진표 공개 여부 판정의 단일 소스. 즉시 공개(bracketPublishedAt)와 예약 공개
@@ -42,16 +94,20 @@ export function shouldHideParticipantIdentity(
 /**
  * 공개 상세의 fixtures[].result 조립 -- 응답 필드 형태(homeScore/awayScore/hasPenalty/
  * homePenaltyScore/awayPenaltyScore/note/recordedAt/goals[])는 레거시와 동일하게 유지한다.
- * 신규 경로(`V1Game.currentOfficialRevision`)를 우선하고, OFFICIAL 리비전이 없을 때만
- * (game 백필 전 등) 레거시 `V1TournamentFixtureResult`로 폴백한다(R3 §4-3~§4-4단계 사이
- * 한시적 — resolveTournamentFixtureOfficialResult() 참고). `note`는 새 경로에서 조립된
- * 결과일 때만 항상 null이고, 레거시 폴백 결과는 레거시 note를 그대로 보존한다.
+ * TeamMatch의 Game.currentOfficialRevision만 사용한다. OFFICIAL이 아니거나 VOID면
+ * 결과를 내보내지 않는다. `resolveTournamentFixtureOfficialResult`는 현재 revision과
+ * canonical event projection을 함께 해석하되, legacy fixture result는 전달하지 않는다.
  */
+type CanonicalTournamentGame = TournamentDetailRow['tournamentMatchDetails'][number]['teamMatch']['game'];
+
 function presentOfficialResult(
-  game: TournamentDetailRow['fixtures'][number]['game'],
-  legacyResult: TournamentDetailRow['fixtures'][number]['result'],
+  game: CanonicalTournamentGame,
+  canSeeRestrictedResult: boolean,
 ) {
-  const resolved = resolveTournamentFixtureOfficialResult(game, legacyResult ?? undefined);
+  if (!canSeeRestrictedResult && (game?.visibilityPolicy?.mode === 'HIDDEN' || game?.visibilityPolicy?.mode === 'STATUS_ONLY')) {
+    return null;
+  }
+  const resolved = resolveTournamentFixtureOfficialResult(game);
   if (!resolved) return null;
   return {
     homeScore: resolved.score.homeScore,
@@ -61,14 +117,143 @@ function presentOfficialResult(
     awayPenaltyScore: resolved.score.awayPenaltyScore,
     note: resolved.note,
     recordedAt: (resolved.officialAt ?? resolved.createdAt).toISOString(),
-    goals: resolved.goals,
+    // Tournament detail is a public DTO even when a staff member uses its
+    // read bypass. Raw account ids belong only to the admin bracket DTO; keep
+    // the activity name and game-scoped participant id here.
+    goals: resolved.goals.map((goal) => ({ ...goal, playerUserId: null })),
   };
+}
+
+type CanonicalTournamentMatchDetail = TournamentDetailRow['tournamentMatchDetails'][number];
+
+type PresentedFixture = Pick<CanonicalTournamentMatchDetail, 'tournamentId' | 'groupId' | 'round' | 'fixtureNumber' | 'legNumber' | 'homeRegistrationId' | 'awayRegistrationId' | 'homeRegistration' | 'awayRegistration'> & {
+  id: string;
+  parentFixtureId: string | null;
+  scheduledAt: Date | null;
+  fieldId: string | null;
+  venue: string | null;
+  status: PublicFixtureStatus;
+  createdAt: Date;
+  updatedAt: Date;
+  competitionConfigVersionId: string | null;
+  game: CanonicalTournamentGame;
+  result: ReturnType<typeof presentOfficialResult>;
+  videos: Array<{
+    id: string;
+    fixtureId: string;
+    title: string | null;
+    url: string;
+    sortOrder: number;
+    createdAt: Date;
+  }>;
+};
+
+function fixtureStatusFromTeamMatch(status: V1TeamMatchStatus): PublicFixtureStatus {
+  switch (status) {
+    case V1TeamMatchStatus.completed:
+      return 'completed';
+    case V1TeamMatchStatus.cancelled:
+    case V1TeamMatchStatus.archived:
+      return 'cancelled';
+    default:
+      return 'scheduled';
+  }
+}
+
+/**
+ * Read the expand-phase canonical row through the old public fixture contract.
+ * TeamMatch/Game are the operational authorities; Details contributes only the
+ * bracket coordinates and registration slots. The fixture-shaped response is
+ * retained for API compatibility, but no legacy fixture row is read here.
+ */
+function presentCanonicalFixture(
+  details: TournamentDetailRow['tournamentMatchDetails'][number],
+  staffBypass: boolean,
+): PresentedFixture {
+  const match = details.teamMatch;
+  const videos = match.videos.map((video) => ({
+    id: video.id,
+    fixtureId: details.teamMatchId,
+    title: video.title,
+    url: video.url,
+    sortOrder: video.sortOrder,
+    createdAt: video.createdAt,
+  }));
+  return {
+    id: details.teamMatchId,
+    tournamentId: details.tournamentId,
+    groupId: details.groupId,
+    round: details.round,
+    fixtureNumber: details.fixtureNumber,
+    legNumber: details.legNumber,
+    parentFixtureId: details.parentTeamMatchId,
+    homeRegistrationId: details.homeRegistrationId,
+    awayRegistrationId: details.awayRegistrationId,
+    scheduledAt: match.startAt,
+    fieldId: match.fieldId,
+    venue: match.placeName,
+    status: fixtureStatusFromTeamMatch(match.status),
+    homeRegistration: details.homeRegistration,
+    awayRegistration: details.awayRegistration,
+    result: presentOfficialResult(match.game, staffBypass),
+    game: match.game,
+    videos,
+    createdAt: details.createdAt,
+    updatedAt: details.updatedAt,
+    competitionConfigVersionId: match.competitionConfigVersionId,
+  };
+}
+
+function mergedPublicFixtures(row: TournamentDetailRow, staffBypass: boolean): PresentedFixture[] {
+  const byId = new Map<string, PresentedFixture>();
+  for (const details of row.tournamentMatchDetails) {
+    // A missing policy is fail-closed in the public surface. Staff/admin
+    // callers retain the operational view of malformed legacy data.
+    const visibilityMode = details.teamMatch.game?.visibilityPolicy?.mode;
+    if (!staffBypass && visibilityMode !== 'LIVE' && visibilityMode !== 'STATUS_ONLY' && visibilityMode !== 'OFFICIAL_ONLY') continue;
+    byId.set(details.teamMatchId, presentCanonicalFixture(details, staffBypass));
+  }
+  return [...byId.values()].sort((a, b) =>
+    a.round.localeCompare(b.round) || a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber,
+  );
+}
+
+/**
+ * **공개 참가팀 목록에 그려지는 등록 상태.** 조회에 실린 상태(`TOURNAMENT_DETAIL_INCLUDE` 는
+ * 결제 진행 중 3개까지 포함한다)와 **다르다** — 화면에 안 나오는 등록의 명단까지 읽지 않도록
+ * 호출부가 이 술어로 좁힌다. 두 곳이 각자 배열을 적으면 조용히 갈리므로 여기 하나만 둔다.
+ */
+const PUBLICLY_LISTED_REGISTRATION_STATUSES = ['confirmed', 'waitlisted'] as const;
+
+export function isPubliclyListedRegistration(status: string): boolean {
+  return (PUBLICLY_LISTED_REGISTRATION_STATUSES as readonly string[]).includes(status);
 }
 
 export function presentTournamentDetail(
   row: TournamentDetailRow,
   now: Date = new Date(),
   staffBypass = false,
+  /**
+   * 정규 리그 시즌(거울 행)의 대진 목록. **호출부가 리그 축에서 조회해 넘긴다** —
+   * 이 presenter 는 조회하지 않는다.
+   *
+   * ⚠️ **`fixtures` 에 합치지 않는다.** 대회 fixture 와 리그
+   * `V1LeagueFixture` 는 겹치는 필드가 셋뿐이고, 하필 그 겹치는 `status` 의 **값 영역이
+   * 다르다**(`scheduled|completed` vs `matched|completed|cancelled|…`). 같은 이름에 다른
+   * 것을 담으면 `status === 'scheduled'` 같은 코드가 **모든 리그 경기에서 조용히 거짓**이
+   * 된다 — 타입도 값도 정상으로 보인다. 그래서 별도 필드로 낸다.
+   */
+  leagueFixtures: LeagueFixtureListItem[] = [],
+  /**
+   * 공개 명단(키: 등록 id). **호출부가 배치로 한 번에 읽어 넘긴다** — `leagueFixtures` 와
+   * 같은 규약이고, presenter 는 조회하지 않는다.
+   *
+   * **명단을 감출 때는 호출부가 아예 안 읽고 빈 맵을 넘긴다.** 그래서 이 자리에 기본값
+   * `new Map()` 이 있는 것이 곧 "명단 없음" 이다 — 예전처럼 `registration.players` 를
+   * 읽으면 include 가 조인을 하고 있어야만 맞는 값이 되어, 조인을 빼는 순간 조용히
+   * 빈 배열이 된다.
+   */
+  rosterByRegistrationId: ReadonlyMap<string, PublicRosterPlayer[]> = new Map(),
 ) {
   // Task 109 Track 6: bracketPublishedAt이 null이면 대진표(조/픽스처)를 관리자가 아직
   // 일괄 공개하지 않은 상태 — 공개 조회에서는 groups/fixtures를 빈 배열로 감춘다.
@@ -77,6 +262,16 @@ export function presentTournamentDetail(
   // 예약 공개는 스케줄러 없이 여기서 판정한다. 예약 시각이 지났으면 아직
   // bracketPublishedAt이 비어 있어도 공개로 간주하므로, 예약 시각과 실제 노출 사이에
   // cron 주기만큼의 지연이 생기지 않는다.
+  //
+  // **리그 거울에 예외를 두지 않는다 — 둘 필요가 없다.** 처음엔 `kind === regular_league`
+  // 면 이 게이트를 건너뛰게 짰는데, 변이 검증에서 그 분기를 없애도 **red 가 0건**이었다.
+  // 확인해보니 리그 대진은 이 게이트 **밖**의 `leagueFixtures` 로 나가고, 게이트가 가리는
+  // `groups`/`fixtures` 는 거울 행에서 어차피 비어 있다 — 즉 그 예외는 **아무것도 하지
+  // 않는 코드**였다. 필드를 나눈 설계(②)가 이미 그 문제를 풀어 놓은 것이다.
+  //
+  // 그래서 여기 리그 분기를 **다시 넣지 마라.** "리그의 대진표를 아직 공개하지 않은 상태"
+  // 는 존재하지 않지만(`league-match-public.service.ts` 에 이 게이트 참조가 0건),
+  // 그 사실은 리그 데이터가 이 게이트를 지나지 않는 것으로 이미 지켜진다.
   const bracketPublished = isBracketPublished(row.bracketPublishedAt, row.bracketPublishScheduledAt, now);
   // 참가팀 공개 정책 통일(fix/v1-publish) — participantTeams와 groups/fixtures의 팀명이
   // 같은 조건으로 감춰진다. 대진표 공개 여부(bracketPublished)와는 독립 — 대진표는
@@ -89,7 +284,25 @@ export function presentTournamentDetail(
     sport: { code: row.sport.code, name: row.sport.name },
     title: row.title,
     status: row.status,
+    // ⚠️ `format` 은 **종류 판별자가 아니다.** "어떤 방식으로 치르나"(리그전/토너먼트)를
+    // 말할 뿐이고, 대회가 리그 방식으로 치러질 수 있다(alpha 실측 7건 — 전부
+    // registrationDeadlineAt 이 있는 진짜 대회다). `format === 'league'` 로 정규 리그를
+    // 가려내면 그 7건이 신청·참가등록을 잃는다. **종류는 아래 `kind` 를 쓴다.**
     format: row.format,
+    /**
+     * 단발 대회(regular_tournament) / 정규 리그 시즌(regular_league) 구분.
+     *
+     * nullable 인 채로 내려보낸다 — DB 가 아직 nullable 이라서다(R5 에서 NOT NULL 승격).
+     * `?? 'regular_tournament'` 로 메우지 않는다: null 은 "채워지지 않은 행"이라는 사실이고,
+     * 그걸 대회라고 단언하면 리그를 대회로 잘못 그리게 된다 — 지금 이 필드가 막으려는
+     * 사고와 정확히 같은 모양이다. 소비처가 null 을 직접 다루게 둔다.
+    */
+    kind: row.kind,
+    // 정규 리그 거울이 목록 카드에서 제공하는 시즌 식별자도 상세에서 유지한다.
+    // 일반 대회에는 이 메타데이터를 추가하지 않아 두 표면의 응답 모양을 섞지 않는다.
+    ...(row.kind === V1CompetitionKind.regular_league
+      ? { tier: row.tier, seasonNo: row.seasonNo, seriesId: row.seriesId }
+      : {}),
     registrationDeadlineAt: row.registrationDeadlineAt?.toISOString() ?? null,
     rosterDeadlineAt: row.rosterDeadlineAt?.toISOString() ?? null,
     bracketPublishedAt: row.bracketPublishedAt?.toISOString() ?? null,
@@ -147,7 +360,7 @@ export function presentTournamentDetail(
     participantTeams: hideIdentity
       ? []
       : row.registrations
-            .filter((registration) => ['confirmed', 'waitlisted'].includes(registration.status))
+            .filter((registration) => isPubliclyListedRegistration(registration.status))
             .sort((a, b) => {
               const aRank = a.status === 'confirmed' ? 0 : 1;
               const bRank = b.status === 'confirmed' ? 0 : 1;
@@ -161,6 +374,17 @@ export function presentTournamentDetail(
               teamRegionName: registration.team.region?.name ?? null,
               status: registration.status,
               confirmedAt: registration.confirmedAt?.toISOString() ?? null,
+              // **팀 식별정보와 같은 게이트를 탄다** — `hideIdentity` 가 참이면 이 분기
+              // 자체가 안 돈다. 명단만 따로 게이트를 두면 "팀명은 가렸는데 선수는 보인다"
+              // 같은 어긋남이 생긴다(이 파일이 통일한 그 정책).
+              //
+              // **팀의 `membersVisible` 은 보지 않는다**(2026-09-06 사용자 확정) —
+              // 대회 명단은 팀의 멤버 목록이 아니라 **이 대회에 누가 나오는지**라는
+              // 대회의 사실이다.
+              // **`registration.players` 를 읽지 않는다.** include 에서 빠졌으므로 그 자리를
+              // 그대로 두면 `?? []` 가 삼켜 **명단이 조용히 빈 배열**이 된다 — tsc·lint 둘 다
+              // 못 잡고, row 를 인라인으로 만드는 유닛 스펙도 그대로 통과한다.
+              players: rosterByRegistrationId.get(registration.id) ?? [],
             })),
     pendingPaymentCount: row.registrations.filter((registration) =>
       ['awaiting_payment', 'payment_checking', 'paid'].includes(registration.status),
@@ -206,7 +430,7 @@ export function presentTournamentDetail(
     })),
     fixtures: !bracketPublished
       ? []
-      : row.fixtures.map((fixture) => ({
+      : mergedPublicFixtures(row, staffBypass).map((fixture) => ({
       id: fixture.id,
       groupId: fixture.groupId,
       round: fixture.round,
@@ -215,6 +439,23 @@ export function presentTournamentDetail(
       scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
       venue: fixture.venue,
       status: fixture.status,
+      /**
+       * 라이브 여부를 말할 수 있는 유일한 필드. `status`는 아래 이유로 그 답을 낼 수
+       * 없어서 남겨두되 손대지 않는다(어드민 화면이 원본 컬럼 어휘에 의존한다).
+       *
+       * 구형 fixture status는 `scheduled`로 생성돼(tournament-bracket.service.ts)
+       * 결과 확정 시 `completed`로 한 번 움직이는 것이 전부다 — 어디에서도
+       * `in_progress`로 전이시키지 않는다(tournament-result-review.service.ts의
+       * "no other writer ever advances it once the Game model became authoritative").
+       * 그래서 이 컬럼만 보는 소비자는 경기가 진행 중인 순간에도 영영 `scheduled`를 본다.
+       * 실제 진행 상태는 `V1Game.state`가 authoritative하며, 공개 일정·경기 상세 API가
+       * 이미 `publicFixtureStatus()`로 같은 판정을 하고 있다 — 여기서 같은 함수를 써서
+       * 대회 상세 응답도 그 어휘(`scheduled|live|ended|cancelled`)를 함께 내려준다.
+       */
+      liveStatus: publicFixtureStatus({
+        gameState: fixture.game?.state ?? null,
+        fixtureStatus: fixture.status,
+      }),
       homeRegistrationId: fixture.homeRegistrationId,
       // homeTeamName은 세 갈래: 슬롯에 팀이 아직 배정 안 됐으면 'TBD'(기존 동작 유지),
       // 배정은 됐지만 모집 중이라 가려야 하면 null(진짜 미배정과 구분되는 값 —
@@ -228,10 +469,9 @@ export function presentTournamentDetail(
       awayTeamName:
         fixture.awayRegistration === null ? 'TBD' : hideIdentity ? null : fixture.awayRegistration.team.name,
       awayTeamLogoUrl: hideIdentity ? null : (fixture.awayRegistration?.team.profile?.logoUrl ?? null),
-      // R3 §4-3단계: 공개 스코어보드를 신규 경로(V1Game.currentOfficialRevision) 우선으로
-      // 조립하고, OFFICIAL 리비전이 없을 때만(game 백필 전) 레거시 V1TournamentFixtureResult로
-      // 폴백한다 -- 문서 §1-2/§4 참고. §4-4단계에서 result 조인과 함께 폴백을 제거한다.
-      result: presentOfficialResult(fixture.game, fixture.result),
+      // TeamMatch/Game의 현재 OFFICIAL 리비전만 공개한다. VOID 또는 미공식 상태는
+      // 결과가 없으며, 과거 fixture result를 재사용하지 않는다.
+      result: presentOfficialResult(fixture.game, staffBypass),
       videos: fixture.videos.map((video) => ({
         id: video.id,
         title: video.title,
@@ -279,14 +519,31 @@ export function presentTournamentDetail(
       photoUrls: review.photoUrls,
       createdAt: review.createdAt.toISOString(),
     })),
-    awards: (row.awards ?? []).map((award) => ({
-      id: award.id,
-      awardType: award.awardType,
-      awardLabel: award.awardLabel,
-      iconKey: award.iconKey ?? null,
-      recipientName: award.recipientName,
-      teamName: award.teamName ?? null,
-      note: award.note ?? null,
+    // `reviews` 배열은 take:30으로 잘려 있다 — 개수 배지는 이 잘리지 않은 전체
+    // 카운트를 써야 `/tournaments/:id/reviews` 전용 목록 화면의 total과 일치한다
+    // (감사 evidence: 두 화면이 31건째부터 서로 다른 숫자를 보여줌).
+    reviewsTotalCount: row._count.reviews,
+    awards: (row.awards ?? []).map((award) => {
+      const link = presentAwardRecipientLink(award);
+      return {
+        id: award.id,
+        awardType: award.awardType,
+        awardLabel: award.awardLabel,
+        iconKey: award.iconKey ?? null,
+        recipientName: presentAwardRecipientName(award),
+        recipientUserId: link?.userId ?? null,
+        recipientProfileImageUrl: link?.profileImageUrl ?? null,
+        teamName: award.teamName ?? null,
+        note: award.note ?? null,
+      };
+    }),
+    // 정규 리그 시즌에만 채워진다. 대회는 항상 빈 배열 — 화면이 길이 0이면 이 섹션을
+    // 아예 그리지 않는다(`fixtures` 와 같은 규약).
+    leagueFixtures: leagueFixtures.map((fixture) => ({
+      ...fixture,
+      homeTeamId: hideIdentity ? null : fixture.homeTeamId,
+      awayTeamId: hideIdentity ? null : fixture.awayTeamId,
+      startAt: fixture.startAt.toISOString(),
     })),
   };
 }

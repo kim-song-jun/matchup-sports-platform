@@ -54,7 +54,14 @@ const nextConfig: NextConfig = {
   // 404s. Skipping the redirect lets the rewrite match the original request as-is.
   skipTrailingSlashRedirect: true,
   experimental: {
-    optimizePackageImports: ['@tanstack/react-query'],
+    // lucide-react는 134곳 전부 named import — 이 옵션 하나로 Next가 빌드 시점에
+    // 개별 아이콘 딥 임포트로 자동 변환한다(호출부 수정 불필요).
+    optimizePackageImports: ['@tanstack/react-query', 'lucide-react'],
+  },
+  images: {
+    // 유튜브 썸네일(match-videos.tsx의 youtubeThumbnailUrl())만 외부 호스트가 필요하다.
+    // /uploads/*·/brand/*·/fonts/*는 같은 origin이라 remotePatterns 없이도 next/image가 동작한다.
+    remotePatterns: [{ protocol: 'https', hostname: 'i.ytimg.com', pathname: '/vi/**' }],
   },
   turbopack: {
     root: path.resolve(__dirname, '../..'),
@@ -74,6 +81,13 @@ const nextConfig: NextConfig = {
       // 아직 살아있어서 현재 경로로 넘겨준다. 쿼리스트링은 Next가 그대로 이어붙인다.
       { source: '/v1', destination: '/', permanent: true },
       { source: '/v1/:path*', destination: '/:path*', permanent: true },
+      // 대회별 팝업 화면을 전역 팝업 하나로 합쳤다(대회 어드민 '팝업' 항목도 이 링크로 간다).
+      // 운영자 북마크가 죽지 않도록 옛 하위 탭 URL 을 경로 프리필한 전역 화면으로 넘긴다.
+      {
+        source: '/admin/tournaments/:id/popups',
+        destination: '/admin/popups?targetPath=/tournaments/:id',
+        permanent: false,
+      },
     ];
   },
   async rewrites() {

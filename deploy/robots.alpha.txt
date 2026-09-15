@@ -1,0 +1,7 @@
+# alpha.teameet.co.kr — 검증 환경입니다. 검색·AI 어디에도 노출되어서는 안 됩니다.
+#
+# 프로덕션(teameet.co.kr)의 robots.txt 는 앱이 생성하며(apps/v1_web/src/app/robots.ts)
+# 공개 경로를 허용합니다. 이 파일은 alpha 에서만 nginx 가 그 응답을 대신합니다 —
+# deploy/nginx.alpha.conf 의 `location = /robots.txt` 참고.
+User-agent: *
+Disallow: /

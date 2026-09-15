@@ -10,8 +10,7 @@ import {
   useV1MatchApplicationsInfinite,
   useV1RejectMatchApplication,
 } from '@/hooks/use-v1-api';
-import { AppChrome } from '@/components/v1-ui/shell';
-import { AlertBanner, Card, EmptyState } from '@/components/v1-ui/primitives';
+import { AlertBanner, Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -47,29 +46,37 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
 
   if (matchQuery.isError) {
     return (
-      <AppChrome title="신청자 관리" activeTab="matches" bottomNav={false} backHref={`/matches/${matchId}`}>
+      <>
         <DesktopPageHead matchId={matchId} />
         <div className="tm-match-list">
-          <ErrorCard message="매치 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." />
+          <ErrorState title="매치 정보를 불러오지 못했어요" message="잠시 후 다시 시도해 주세요." onRetry={() => void matchQuery.refetch()} retryLabel="다시 불러오기" />
         </div>
-      </AppChrome>
+      </>
     );
   }
 
   // While loading or redirecting non-host, show skeleton
   if (!matchQuery.data || !isHost) {
     return (
-      <AppChrome title="신청자 관리" activeTab="matches" bottomNav={false} backHref={`/matches/${matchId}`}>
+      <>
         <DesktopPageHead matchId={matchId} />
         <div className="tm-match-list">
           <ApplicationsSkeletonList />
         </div>
-      </AppChrome>
+      </>
     );
   }
 
   const match = matchQuery.data;
   const matchTitle = match.title;
+  // 상세 직렬화(matches.service.ts)는 capacityText를 내려주지 않는다 — 실제로 오는 건
+  // participantCount/capacity 숫자 필드뿐이다(V1Match 타입의 capacityText 선언은 런타임과
+  // 어긋나 있지만, 그 필드는 이 배치의 소유 범위 밖 다른 소비처에서도 쓰여 타입 자체는
+  // 건드리지 않는다 — 여기서는 실제로 오는 숫자 필드로 직접 정원 문구를 계산한다).
+  const capacityLabel =
+    typeof match.participantCount === 'number' && typeof match.capacity === 'number'
+      ? `${match.participantCount}/${match.capacity}명`
+      : null;
   const items = applicationsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const pendingCount = items.filter((a) => a.status === 'requested').length;
   const actionPending = approveApplication.isPending || rejectApplication.isPending;
@@ -113,7 +120,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
   }
 
   return (
-    <AppChrome title="신청자 관리" activeTab="matches" bottomNav={false} backHref={`/matches/${matchId}`}>
+    <>
       {/* 확인 모달 — window.confirm 대체 */}
       {ConfirmModal}
       <DesktopPageHead matchId={matchId} />
@@ -127,38 +134,40 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
         {/* 매치 요약 카드 */}
         <Card pad={16} style={{ background: 'var(--tint-blue)', borderColor: 'var(--tint-blue-border)' }}>
           <div className="tm-text-body-lg">{matchTitle}</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>
             {/* eligibility 미도착 시 기본값 '자동 승인'을 보여주면 호스트가 승인 방식을
                 오인할 수 있어, 데이터가 준비될 때까지 중립 문구를 표시한다. */}
             {!eligibilityData
               ? '승인 방식 불러오는 중'
               : eligibilityData.requiresApproval
                 ? '수동 승인 매치'
-                : '자동 승인 매치'} ·
-            {' '}
-            {match.capacityText}
+                : '자동 승인 매치'}
+            {capacityLabel ? ` · ${capacityLabel}` : ''}
             {pendingCount > 0 ? ` · 대기 ${pendingCount}명` : ''}
           </div>
         </Card>
 
         {/* 로딩 중 */}
         {applicationsQuery.isLoading ? (
-          <div style={{ marginTop: 14 }}>
+          <div style={{ marginTop: 16 }}>
             <ApplicationsSkeletonList />
           </div>
         ) : applicationsQuery.isError ? (
-          <div style={{ marginTop: 14 }}>
-            <ErrorCard message="신청 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." />
+          <div style={{ marginTop: 16 }}>
+            <ErrorState title="신청 목록을 불러오지 못했어요" message="잠시 후 다시 시도해 주세요." onRetry={() => void applicationsQuery.refetch()} retryLabel="다시 불러오기" />
           </div>
         ) : items.length === 0 ? (
-          <div style={{ marginTop: 14 }}>
+          <div style={{ marginTop: 16 }}>
             <EmptyState
+              illustration={{ name: 'matches-empty' }}
               title="신청자가 없어요"
-              sub="신청자가 생기면 여기서 바로 승인하거나 거절할 수 있어요."
+              sub="신청자가 생기면 여기서 바로 승인하거나 거절할 수 있어요. 매치 링크를 공유하면 더 빨리 모여요."
+              cta="매치 상세 보기"
+              ctaHref={`/matches/${matchId}`}
             />
           </div>
         ) : (
-          <div className="tm-my-list-stack" style={{ marginTop: 14 }}>
+          <div className="tm-my-list-stack" style={{ marginTop: 16 }}>
             {items.map((application) => (
               <ApplicationRow
                 key={application.applicationId}
@@ -182,7 +191,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
           </div>
         )}
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -222,7 +231,7 @@ function ApplicationRow({
     application.mannerScore !== null ? application.mannerScore.toFixed(1) : null;
 
   return (
-    <Card pad={14}>
+    <Card pad={16}>
       {/* 신청자 정보 행 */}
       <div
         style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 }}
@@ -235,7 +244,7 @@ function ApplicationRow({
           style={{
             width: 44,
             height: 44,
-            borderRadius: 14,
+            borderRadius: 'var(--radius-field)',
             backgroundColor: 'var(--grey200)',
             backgroundImage: application.profileImageUrl
               ? cssUrl(application.profileImageUrl)
@@ -267,7 +276,7 @@ function ApplicationRow({
           </div>
           <div
             className="tm-text-caption"
-            style={{ marginTop: 2, display: 'flex', gap: 6, flexWrap: 'wrap' }}
+            style={{ marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}
           >
             {mannerScore !== null ? (
               /* [P1 숫자:단위 2:1 + tabular-nums] 매너점수 숫자(body-sm weight600) : 단위(caption) */
@@ -310,7 +319,7 @@ function ApplicationRow({
           <button
             className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block"
             type="button"
-            style={{ marginTop: 10 }}
+            style={{ marginTop: 12 }}
             disabled={actionPending}
             aria-expanded={actionsOpen}
             aria-label={`${application.displayName} 신청 관리`}
@@ -321,7 +330,7 @@ function ApplicationRow({
           {actionsOpen ? (
             <div
               className="tm-member-actions"
-              style={{ marginTop: 10, display: 'flex', gap: 8 }}
+              style={{ marginTop: 12, display: 'flex', gap: 8 }}
             >
               <button
                 className="tm-btn tm-btn-sm tm-btn-primary"
@@ -364,22 +373,11 @@ function ApplicationsSkeletonList() {
         <div
           key={i}
           className="tm-review-skeleton"
-          style={{ minHeight: 76, borderRadius: 16 }}
+          style={{ minHeight: 76, borderRadius: 'var(--radius-container)' }}
           aria-hidden="true"
         />
       ))}
     </div>
-  );
-}
-
-function ErrorCard({ message }: { message: string }) {
-  return (
-    <Card pad={16} style={{ background: 'var(--grey50)' }}>
-      <div className="tm-text-label">{message}</div>
-      <div className="tm-text-caption" style={{ marginTop: 6, lineHeight: 1.55 }}>
-        새로고침 후에도 같은 문제가 반복되면 잠시 뒤 다시 시도해 주세요.
-      </div>
-    </Card>
   );
 }
 

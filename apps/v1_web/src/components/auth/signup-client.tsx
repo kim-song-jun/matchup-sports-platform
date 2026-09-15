@@ -24,7 +24,7 @@ import {
   clearSignupTermsDocumentIds,
   readSignupTermsDocumentIds,
 } from '@/lib/signup-terms-storage';
-import { AuthFrame } from './auth-page';
+import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import {
   formatBirthDate,
   formatPhone,
@@ -201,12 +201,8 @@ export function SignupClient() {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      setProfileError('프로필 사진은 2MB 이하 이미지로 선택해 주세요.');
-      event.target.value = '';
-      return;
-    }
-
+    // 용량으로 거부하지 않는다 -- 제출 시 업로드 훅이 2MB 초과 사진을 자동으로 줄여
+    // WebP 로 변환한다(프로필 수정 화면과 같은 정책, 2026-08-25 사용자 확정).
     const reader = new FileReader();
     setUploadingProfileImage(true);
     reader.onload = () => {
@@ -405,6 +401,7 @@ export function SignupClient() {
 
   return (
     <AuthFrame
+      stage={AUTH_WELCOME_STAGE}
       // 이 화면만 상단바 없이 렌더돼 회원가입을 시작하면 빠져나갈 컨트롤이 없었다.
       // 뒤로가기 목적지는 이미 getSignupFormViewModel().backHref 로 선언돼 있던 '/terms?mode=signup'
       // (직전 단계)를 그대로 쓴다 — 약관 화면에 다시 /login 으로 나가는 뒤로가기가 있어
@@ -422,7 +419,7 @@ export function SignupClient() {
             {primary.label}
           </button>
           {disabledHint ? (
-            <p className="tm-text-caption" role="status" style={{ margin: '6px 0 0', textAlign: 'center' }}>
+            <p className="tm-text-caption" role="status" style={{ margin: '8px 0 0', textAlign: 'center' }}>
               {disabledHint}
             </p>
           ) : null}
@@ -619,7 +616,7 @@ export function SignupClient() {
                 >
                   <span
                     aria-hidden="true"
-                    style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue500)', display: 'inline-block' }}
+                    style={{ width: 6, height: 6, borderRadius: 'var(--radius-circle)', background: 'var(--blue500)', display: 'inline-block' }}
                   />
                   <span className="tm-text-label" style={{ color: 'var(--blue700)' }}>
                     휴대폰 본인인증이 완료됐어요
@@ -645,7 +642,7 @@ export function SignupClient() {
                 </label>
                 <div>
                   <div className="tm-text-label">프로필 사진 <em className="tm-auth-optional">선택</em></div>
-                  <div className="tm-auth-profile-upload-body" style={{ marginTop: 10 }}>
+                  <div className="tm-auth-profile-upload-body" style={{ marginTop: 12 }}>
                     <label className="tm-btn tm-btn-md tm-btn-neutral">
                       {uploadingProfileImage ? '올리는 중' : profileImageUrl ? '사진 변경' : '사진 선택'}
                       <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} disabled={uploadingProfileImage} />
@@ -656,7 +653,7 @@ export function SignupClient() {
                       </button>
                     ) : null}
                   </div>
-                  <div className="tm-text-caption" style={{ marginTop: 6 }}>{profileImageName || '이미지 1장, 2MB 이하'}</div>
+                  <div className="tm-text-caption" style={{ marginTop: 8 }}>{profileImageName || '이미지 1장 — 큰 사진은 자동으로 줄여 올려요'}</div>
                 </div>
               </section>
 

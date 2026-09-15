@@ -41,13 +41,16 @@ export function useV1TournamentCampaigns(params?: PublicCampaignListParams) {
 export function useV1TournamentCampaignsInfinite(params?: {
   limit?: number;
   sportCode?: string;
+  enabled?: boolean;
 }) {
+  const { enabled, ...queryParams } = params ?? {};
   return useInfiniteQuery({
-    queryKey: [...v1Keys.tournamentCampaigns(params ?? {}), 'infinite'] as const,
+    queryKey: [...v1Keys.tournamentCampaigns(queryParams), 'infinite'] as const,
     queryFn: ({ pageParam }) =>
       v1Get<V1TournamentCampaignList>(
-        publicCampaignListPath({ ...params, cursor: pageParam ?? undefined }),
+        publicCampaignListPath({ ...queryParams, cursor: pageParam ?? undefined }),
       ),
+    enabled: enabled ?? true,
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     staleTime: 60_000,

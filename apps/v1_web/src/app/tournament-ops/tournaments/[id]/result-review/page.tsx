@@ -1,4 +1,4 @@
-import { ResultReviewPageClient } from './result-review-page-client';
+import { ResultReviewPageClient } from '@/components/tournament-live/result-review-page-client';
 
 export default async function TournamentResultReviewPage({
   params,

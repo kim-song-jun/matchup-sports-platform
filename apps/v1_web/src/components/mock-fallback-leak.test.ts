@@ -10,10 +10,10 @@
  * 결과에 나타나지 않는지를 본다.
  */
 import { describe, expect, it } from 'vitest';
-import { toMatchCard } from './matches/matches-client';
+import { toMatchCard } from './matches/matches.card-model';
 import { getMatchDetailViewModel } from './matches/matches.view-model';
 import { toTeamDetail } from './teams/teams-client';
-import { toTeamMatch } from './team-matches/team-matches-client';
+import { toTeamMatch } from './team-matches/team-matches.card-model';
 import { getTeamMatchListViewModel } from './team-matches/team-matches.view-model';
 import type { V1Match, V1TeamDetail, V1TeamMatch } from '@/types/api';
 
@@ -129,5 +129,9 @@ describe('목업(view-model)이 실제 개체의 폴백으로 새지 않는다',
     // costNote 가 없으면 목업 금액(280,000 / 140,000)이 아니라 "모른다"(null)다.
     expect(model.cost).toBeNull();
     expect(model.opponentCost).toBeNull();
+    // imageUrl 이 없으면 목업 사진(team-huddle.webp/futsal-rooftop.webp)이 아니라 null —
+    // 화면이 종목 그래픽을 그린다(웨이브4, 2026-09-04).
+    expect(model.imageUrl).not.toBe(mock.imageUrl);
+    expect(model.imageUrl).toBeNull();
   });
 });

@@ -18,12 +18,106 @@ RUN --mount=type=cache,id=teameet-pnpm-store,target=/root/.local/share/pnpm/stor
 COPY apps/v1_api/ apps/v1_api/
 
 WORKDIR /app/apps/v1_api
-RUN npx prisma generate
+# Task 168 M11 converged: schema.prisma is now the final post-retirement
+# schema (5 legacy models, 2 enums and 3 relations removed). The assert pins
+# the runtime client to that exact schema so a stale builder cache or an
+# accidental schema edit fails the build instead of shipping a silent drift.
+RUN npx prisma generate \
+  && test "$(sha256sum prisma/schema.prisma | awk '{print $1}')" = e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46 \
+  && printf '{"schemaVersion":1,"stage":"final","schemaSha256":"e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46","generatedClient":true}\n' > .task168-runtime-client-attestation.json
 RUN npx nest build
+
+# This image is an executable view of the immutable v7 tar. No retired source
+# is copied into the application tree: Docker verifies and extracts the pinned
+# archive, installs its locked dependencies, and generates its archived client.
+FROM base AS task168-cutover-tool
+WORKDIR /opt/task168
+RUN npm install -g pnpm@9.15.4
+COPY deploy/task168-pre-retirement-v7.tar.gz ./release.tar.gz
+RUN test "$(sha256sum release.tar.gz | awk '{print $1}')" = 829cbb214afc26c417947c864fd477647498003e06915ca20b4d2f8b44b80c4b \
+  && mkdir release \
+  && tar -xzf release.tar.gz -C release \
+  && test "$(sha256sum release/MANIFEST.json | awk '{print $1}')" = b270be3c365ad780a2988ccf16f4850c15807ebc3eb9eb763f2bcdd0418f2f74 \
+  && cd release && sha256sum -c SHA256SUMS
+WORKDIR /opt/task168/release/bundle
+RUN pnpm --filter v1_api... install --frozen-lockfile --ignore-scripts \
+  && cd apps/v1_api \
+  && pnpm exec prisma generate --schema prisma/schema.prisma \
+  && printf '{"schemaVersion":1,"archiveSha256":"829cbb214afc26c417947c864fd477647498003e06915ca20b4d2f8b44b80c4b","manifestSha256":"b270be3c365ad780a2988ccf16f4850c15807ebc3eb9eb763f2bcdd0418f2f74","generatedClient":true}\n' > /opt/task168/tool-attestation.json
+WORKDIR /opt/task168/release/bundle/apps/v1_api
+ENTRYPOINT ["node", "-r", "ts-node/register/transpile-only", "src/games/migration/tournament-team-match-cutover-cli.ts"]
+
+# Task 168 StageB final-schema image. Kept strictly before `runtime` so a
+# target-less build (`docker build .`, no `--target`) still resolves to the
+# unchanged StageA `runtime` stage — Alpha and prod both build without an
+# explicit target today, and PR-A2 adds `target: runtime` to both workflow
+# build steps in the same change to make that binding explicit rather than
+# implicit-by-stage-order.
+FROM base AS builder-task168-final
+WORKDIR /app
+RUN npm install -g pnpm@9.15.4
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/v1_api/package.json apps/v1_api/
+RUN --mount=type=cache,id=teameet-pnpm-store,target=/root/.local/share/pnpm/store,sharing=locked \
+  pnpm install --frozen-lockfile
+
+COPY apps/v1_api/ apps/v1_api/
+# Overlay the post-M11 schema and its migration onto the StageA tree. The
+# checked-in apps/v1_api/prisma/schema.prisma above is still the StageA one
+# (91222f...) — this builder must never generate a client from it.
+COPY deploy/task168-final-drop/schema.prisma apps/v1_api/prisma/schema.prisma
+COPY deploy/task168-final-drop/migrations/20260911090000_retire_tournament_fixture_tables apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables
+
+WORKDIR /app/apps/v1_api
+RUN npx prisma generate \
+  && test "$(sha256sum prisma/schema.prisma | awk '{print $1}')" = e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46 \
+  && printf '{"schemaVersion":1,"stage":"stageBFinal","schemaSha256":"e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46","generatedClient":true}\n' > .task168-runtime-client-attestation.json
+RUN npx nest build
+
+FROM base AS runtime-task168-final
+WORKDIR /app
+RUN corepack enable pnpm
+RUN apk upgrade --no-cache libcrypto3 libssl3 \
+  && rm -rf /usr/local/lib/node_modules/npm \
+  && rm -f /usr/local/bin/npm /usr/local/bin/npx
+
+# COPY only from builder-task168-final, never from the StageA `builder` — the
+# StageA builder's schema assert (91222f...) makes that COPY fail, and mixing
+# the two clients would run StageB code against a StageA-generated client.
+COPY --from=builder-task168-final /app/node_modules ./node_modules
+COPY --from=builder-task168-final /app/apps/v1_api/node_modules ./apps/v1_api/node_modules
+COPY --from=builder-task168-final /app/apps/v1_api/dist ./apps/v1_api/dist
+COPY --from=builder-task168-final /app/apps/v1_api/prisma ./apps/v1_api/prisma
+COPY --from=builder-task168-final /app/apps/v1_api/package.json ./apps/v1_api/package.json
+COPY --from=builder-task168-final /app/apps/v1_api/tsconfig.json ./apps/v1_api/tsconfig.json
+COPY --from=builder-task168-final /app/apps/v1_api/.task168-runtime-client-attestation.json ./apps/v1_api/
+COPY --from=builder-task168-final /app/package.json ./package.json
+COPY --from=builder-task168-final /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+
+ENV NODE_ENV=production
+EXPOSE 8121
+
+RUN addgroup -S -g 1001 app && adduser -S -u 1001 -G app app \
+  && mkdir -p /app/apps/v1_api/uploads \
+  && chown -R app:app /app
+
+WORKDIR /app/apps/v1_api
+USER app
+CMD ["node", "dist/src/main.js"]
 
 FROM base AS runtime
 WORKDIR /app
 RUN corepack enable pnpm
+
+# The Node 22.23.2 image bundles npm 10.9.8 with tar 7.5.11, which is affected
+# by CVE-2026-59873. Runtime operations use node and Corepack-managed pnpm;
+# npm/npx are build-only tools, so exclude the bundled npm tree from the final
+# image instead of shipping an unused Critical package. Upgrade the Alpine
+# OpenSSL runtime libraries to the 3.5.8 fix for CVE-2026-63073 as well.
+RUN apk upgrade --no-cache libcrypto3 libssl3 \
+  && rm -rf /usr/local/lib/node_modules/npm \
+  && rm -f /usr/local/bin/npm /usr/local/bin/npx
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/v1_api/node_modules ./apps/v1_api/node_modules
@@ -31,6 +125,7 @@ COPY --from=builder /app/apps/v1_api/dist ./apps/v1_api/dist
 COPY --from=builder /app/apps/v1_api/prisma ./apps/v1_api/prisma
 COPY --from=builder /app/apps/v1_api/package.json ./apps/v1_api/package.json
 COPY --from=builder /app/apps/v1_api/tsconfig.json ./apps/v1_api/tsconfig.json
+COPY --from=builder /app/apps/v1_api/.task168-runtime-client-attestation.json ./apps/v1_api/
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 

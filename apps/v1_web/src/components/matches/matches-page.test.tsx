@@ -104,6 +104,119 @@ describe('MatchListPageView — 매치 카드 종목 배지', () => {
   });
 });
 
+/**
+ * 목록에는 이제 마감된 매치도 경기 시작 전까지 남는다(matches.service.ts list()) —
+ * 남기기만 하고 모집 중 카드와 똑같이 그리면 "밖에서는 모집중, 안에서는 신청 마감"이라는
+ * 원래 제보(2026-09-07)가 그대로 재현된다. 배지와 흐림 처리가 실제로 붙는지 본다.
+ */
+describe('MatchListPageView — 신청 마감 카드 구분', () => {
+  // 기본 목업 목록에는 status 가 서로 다른 카드가 섞여 있어(open/pending/approved/full/mine)
+  // "배지가 하나도 없다" 류 단언이 다른 카드 때문에 흔들린다 — 카드 하나짜리 모델로 좁힌다.
+  function modelWithSingleCard(overrides: Partial<ReturnType<typeof getMatchListViewModel>['matches'][number]>) {
+    const base = getMatchListViewModel();
+    return { ...base, matches: [{ ...base.matches[0], ...overrides }] };
+  }
+
+  it('마감 시각이 지난 카드에 회색 "신청 마감" 배지를 붙이고 카드를 눌러 표시한다', () => {
+    const { container } = render(
+      <MatchListPageView model={modelWithSingleCard({ status: 'full', current: 2, capacity: 6 })} />,
+    );
+
+    expect(screen.getAllByText('신청 마감').length).toBeGreaterThan(0);
+    expect(container.querySelector('.tm-match-row.tm-card-closed')).not.toBeNull();
+  });
+
+  it('정원이 찬 카드는 "모집 완료"로 구분한다 (자리가 날 수 있는 것과 기한이 끝난 것은 다르다)', () => {
+    render(<MatchListPageView model={modelWithSingleCard({ status: 'full', current: 6, capacity: 6 })} />);
+
+    expect(screen.getAllByText('모집 완료').length).toBeGreaterThan(0);
+    expect(screen.queryByText('신청 마감')).not.toBeInTheDocument();
+  });
+
+  it('아직 신청할 수 있는 카드에는 마감 배지도 흐림 처리도 붙지 않는다', () => {
+    const { container } = render(
+      <MatchListPageView model={modelWithSingleCard({ status: 'open', current: 2, capacity: 6 })} />,
+    );
+
+    expect(screen.queryByText('신청 마감')).not.toBeInTheDocument();
+    expect(screen.queryByText('모집 완료')).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-card-closed')).toBeNull();
+  });
+});
+
+// motion-audit 그룹6(F1 desktop card hover) — 데스크톱 매치 리스트 카드는 tm-pressable
+// (:active 전용)만 쓰고 있어 마우스 hover 에 아무 피드백도 없었다(getAnimationsSnapshots
+// count:0 3회 확인). 이미 존재하는 .tm-card-interactive:hover(box-shadow elevation,
+// @media(hover:hover) 가드) 패턴을 카드에 붙이기만 하면 되는 국소 결함이다.
+describe('MatchListPageView — 매치 카드 hover 피드백(motion-audit F1)', () => {
+  it('카드 링크에 tm-card-interactive 가 붙어 데스크톱 hover 시 elevation 이 걸린다', () => {
+    const model = getMatchListViewModel();
+    const { container } = render(<MatchListPageView model={model} />);
+
+    const card = container.querySelector('.tm-match-list-card');
+    expect(card).not.toBeNull();
+    expect(card).toHaveClass('tm-card-interactive');
+    // tm-pressable(:active 눌림 피드백)은 그대로 남아 있어야 한다 — hover 추가가
+    // 기존 press 피드백을 대체한 게 아니라 나란히 쓰는 것이다.
+    expect(card).toHaveClass('tm-pressable');
+  });
+});
+
+// team-matches-page.test.tsx의 동일 계열 회귀 방지(#5)를 matches 쪽에도 적용한다 —
+// 로딩 중을 "조건에 맞는 매치가 없어요"로 잘못 그리던 결함(2026-08-27 감사).
+describe('MatchListPageView — 로딩 중 EmptyState 오표시 방지', () => {
+  it('isLoading=true면 매치가 0개여도 EmptyState 대신 스켈레톤을 그린다', () => {
+    const model = { ...getMatchListViewModel(), matches: [], isLoading: true };
+    const { container } = render(<MatchListPageView model={model} />);
+
+    expect(screen.queryByText('조건에 맞는 매치가 없어요')).not.toBeInTheDocument();
+    expect(container.querySelector('.tm-skeleton')).toBeInTheDocument();
+  });
+
+  it('isLoading이 없고(로딩 완료) 매치가 0개면 EmptyState를 그린다', () => {
+    const model = { ...getMatchListViewModel(), matches: [] };
+    render(<MatchListPageView model={model} />);
+
+    expect(screen.getByText('조건에 맞는 매치가 없어요')).toBeInTheDocument();
+  });
+});
+
+// 20건 컷오프 페이지네이션 결함 회귀 방지(2026-08-27 감사) — 서버는 커서로 20건씩
+// 자르는데 화면에 다음 페이지로 갈 방법이 없었다.
+describe('MatchListPageView — 더 보기 (20건 컷오프 페이지네이션)', () => {
+  it('hasNext=true면 "더 보기" 버튼을 보여준다', () => {
+    const onLoadMore = vi.fn();
+    const model = { ...getMatchListViewModel(), hasNext: true, onLoadMore };
+    render(<MatchListPageView model={model} />);
+
+    const button = screen.getByRole('button', { name: '더 보기' });
+    button.click();
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it('hasNext가 없으면(마지막 페이지) "더 보기" 버튼이 없다', () => {
+    const model = { ...getMatchListViewModel(), hasNext: false };
+    render(<MatchListPageView model={model} />);
+
+    expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
+  });
+
+  it('loadMorePending 중에는 버튼이 "불러오는 중…"으로 바뀌고 비활성화된다', () => {
+    const model = { ...getMatchListViewModel(), hasNext: true, onLoadMore: vi.fn(), loadMorePending: true };
+    render(<MatchListPageView model={model} />);
+
+    const button = screen.getByRole('button', { name: '불러오는 중…' });
+    expect(button).toBeDisabled();
+  });
+
+  it('로딩 중(스켈레톤 표시)에는 hasNext여도 더 보기 버튼을 보여주지 않는다', () => {
+    const model = { ...getMatchListViewModel(), matches: [], isLoading: true, hasNext: true };
+    render(<MatchListPageView model={model} />);
+
+    expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
+  });
+});
+
 describe('MatchCreatePageView — 장소와 시간 단계', () => {
   it('경기와 신청 마감 날짜·시간을 네이티브 선택 필드로 제공한다', () => {
     const model = getMatchCreateViewModel('place-time');
@@ -126,6 +239,27 @@ describe('MatchCreatePageView — 장소와 시간 단계', () => {
     expect(screen.getByLabelText('종료 시간')).toHaveAttribute('type', 'time');
     expect(screen.getByLabelText('신청 마감일')).toHaveAttribute('type', 'date');
     expect(screen.getByLabelText('신청 마감시간')).toHaveAttribute('type', 'time');
+  });
+});
+
+describe('MatchCreatePageView — confirm 단계 일시 표기 (종료 시간 미입력 시 하이픈 매달림 방지)', () => {
+  it('종료 시간이 비어 있으면 하이픈 없이 시작 시간까지만 보여준다', () => {
+    const model = getMatchCreateViewModel('confirm');
+    model.draft = { ...model.draft, date: '2026-09-05', startTime: '18:00', endTime: '' };
+
+    render(<MatchCreatePageView model={model} />);
+
+    expect(screen.getByText('2026-09-05 18:00')).toBeInTheDocument();
+    expect(screen.queryByText('2026-09-05 18:00-')).not.toBeInTheDocument();
+  });
+
+  it('종료 시간이 있으면 하이픈으로 구간을 보여준다', () => {
+    const model = getMatchCreateViewModel('confirm');
+    model.draft = { ...model.draft, date: '2026-09-05', startTime: '18:00', endTime: '20:00' };
+
+    render(<MatchCreatePageView model={model} />);
+
+    expect(screen.getByText('2026-09-05 18:00-20:00')).toBeInTheDocument();
   });
 });
 
@@ -158,5 +292,68 @@ describe('MatchCreatePageView — 매치 수정 전체 필드', () => {
     expect(screen.getByText('성별 조건')).toBeInTheDocument();
     expect(screen.getByText('대표 이미지')).toBeInTheDocument();
     expect(screen.getByLabelText('최대 인원 선택')).toContainHTML('<option value="100">100명</option>');
+  });
+});
+
+// 2026-08-27 감사 M-A-personal-match-state: '매치 취소' 버튼은 lockedReason 게이트가 없어,
+// 시작 시각이 지난(터미널) 매치에서도 눌리는 죽은 버튼이었다 — 서버 cancel()이 결국 409로
+// 거부하는데도 화면은 아무 사전 신호를 주지 않았다.
+describe('MatchCreatePageView — 매치 취소 버튼 잠금', () => {
+  function editModel(lockedReason: string | null) {
+    const model = getMatchCreateViewModel('edit');
+    model.matchId = 'match-locked';
+    model.form = {
+      selectedSportId: 'sport-futsal',
+      regionId: 'region-gangnam',
+      regions: [{ id: 'region-gangnam', name: '강남구' }],
+      onSelectSport: vi.fn(),
+      onFieldChange: vi.fn(),
+      onRegionChange: vi.fn(),
+      onBack: vi.fn(),
+      onNext: vi.fn(),
+      onSubmit: vi.fn(),
+      onCancel: vi.fn(),
+      lockedReason,
+    };
+    return model;
+  }
+
+  it('lockedReason이 있으면(시작 시각이 지난 매치 등) 매치 취소 버튼도 함께 비활성화한다', () => {
+    render(<MatchCreatePageView model={editModel('완료·취소·종료된 매치는 수정할 수 없어요.')} />);
+
+    expect(screen.getByRole('button', { name: '매치 취소' })).toBeDisabled();
+  });
+
+  it('lockedReason이 없으면 매치 취소 버튼은 눌린다', () => {
+    render(<MatchCreatePageView model={editModel(null)} />);
+
+    expect(screen.getByRole('button', { name: '매치 취소' })).not.toBeDisabled();
+  });
+});
+
+describe('MatchListPageView — 빈 목록의 세로 정렬', () => {
+  // 빈 상태를 화면 중앙에 놓으려면 컨테이너(.tm-list-empty)와 자식(.tm-empty-state-fill)이
+  // **둘 다** 필요하다 — 하나만 있으면 예전처럼 상단에 붙는다. 그래서 짝으로 검증한다.
+  it('결과가 0건이면 컨테이너에 tm-list-empty 가 붙고 빈 상태가 fill 로 렌더된다', () => {
+    const model = { ...getMatchListViewModel(), matches: [], isLoading: false };
+    const { container } = render(<MatchListPageView model={model} />);
+
+    expect(container.querySelector('.tm-match-list')).toHaveClass('tm-list-empty');
+    expect(container.querySelector('.tm-empty-state')).toHaveClass('tm-empty-state-fill');
+  });
+
+  it('카드가 있으면 tm-list-empty 를 붙이지 않는다 — 평소 목록 레이아웃을 건드리지 않는다', () => {
+    const model = { ...getMatchListViewModel(), isLoading: false };
+    const { container } = render(<MatchListPageView model={model} />);
+
+    expect(model.matches.length).toBeGreaterThan(0);
+    expect(container.querySelector('.tm-match-list')).not.toHaveClass('tm-list-empty');
+  });
+
+  it('로딩 중에는 붙이지 않는다 — 스켈레톤이 차지하는 자리를 흔들지 않는다', () => {
+    const model = { ...getMatchListViewModel(), matches: [], isLoading: true };
+    const { container } = render(<MatchListPageView model={model} />);
+
+    expect(container.querySelector('.tm-match-list')).not.toHaveClass('tm-list-empty');
   });
 });

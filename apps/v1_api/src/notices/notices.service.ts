@@ -1,12 +1,27 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma, V1NoticeAudience } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { NoticesQueryDto } from './dto/notices-query.dto';
+
+type PublicNotice = {
+  noticeId: string;
+  audience: V1NoticeAudience;
+  category: string;
+  title: string;
+  body: string;
+  content: Prisma.JsonValue | null;
+  contentVersion: number;
+  publishedAt: Date | null;
+};
 
 @Injectable()
 export class NoticesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(query: NoticesQueryDto = {}) {
+  async list(query: NoticesQueryDto = {}): Promise<{
+    notices: PublicNotice[];
+    pageInfo: { hasNextPage: false; nextCursor: null };
+  }> {
     const notices = await this.prisma.v1Notice.findMany({
       where: {
         status: 'published',
@@ -45,7 +60,7 @@ export class NoticesService {
     };
   }
 
-  async detail(noticeId: string) {
+  async detail(noticeId: string): Promise<{ notice: PublicNotice }> {
     const notice = await this.prisma.v1Notice.findFirst({
       where: {
         id: noticeId,

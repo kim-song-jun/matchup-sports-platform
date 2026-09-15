@@ -45,6 +45,12 @@ export type TournamentCampaignFormErrors = Partial<Record<
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+// apps/v1_api/src/tournaments/dto/tournament-campaign.dto.ts 의 PLAIN_TEXT 와 동일한 규칙.
+// 서버 400을 제출 전에 필드별로 미리 잡아내기 위해 그대로 복제해 둔다(단일 소스 불가 — 앱 경계).
+const PLAIN_TEXT = /^(?=[\s\S]*\S)(?![\s\S]*(?:javascript\s*:|(?:alert|eval|fetch|Function|setTimeout|setInterval)\s*\(|(?:document|window)\s*\.|on[a-z]+\s*=|(?:^|[;\s])(?:color|background(?:-color)?|font(?:-size|-family|-weight)?|display|position|margin|padding|width|height|border|transform|animation|opacity)\s*:))[^<>{}]*$/iu;
+
+const PLAIN_TEXT_ERROR = '<, >, { }, 자바스크립트 코드, "속성명:" 형태의 문구는 사용할 수 없어요.';
+
 export function emptyTournamentCampaignForm(tournamentId: string): TournamentCampaignForm {
   return {
     slug: `campaign-${tournamentId}`,
@@ -115,6 +121,8 @@ export function validateTournamentCampaignForm(
     errors.highlights = '각 참가 이유의 제목과 내용을 모두 입력해 주세요.';
   } else if (form.highlights.some((item) => item.title.trim().length > 100 || item.body.trim().length > 500)) {
     errors.highlights = '참가 이유 제목은 100자, 내용은 500자 이하여야 해요.';
+  } else if (form.highlights.some((item) => !PLAIN_TEXT.test(item.title.trim()) || !PLAIN_TEXT.test(item.body.trim()))) {
+    errors.highlights = `참가 이유: ${PLAIN_TEXT_ERROR}`;
   } else if (form.highlights.some((item) => !isValidImage(item.imageUrl))) {
     errors.highlights = '참가 이유 이미지는 업로드된 이미지여야 해요.';
   }
@@ -125,6 +133,8 @@ export function validateTournamentCampaignForm(
     errors.faq = '각 FAQ의 질문과 답변을 모두 입력해 주세요.';
   } else if (form.faq.some((item) => item.question.trim().length > 200 || item.answer.trim().length > 1000)) {
     errors.faq = 'FAQ 질문은 200자, 답변은 1,000자 이하여야 해요.';
+  } else if (form.faq.some((item) => !PLAIN_TEXT.test(item.question.trim()) || !PLAIN_TEXT.test(item.answer.trim()))) {
+    errors.faq = `FAQ: ${PLAIN_TEXT_ERROR}`;
   }
 
   return errors;
@@ -184,6 +194,7 @@ function validateRequired(
   const trimmed = value.trim();
   if (!trimmed) errors[key] = `${label}${objectParticle(label)} 입력해 주세요.`;
   else if (trimmed.length > max) errors[key] = `${label}은 ${max.toLocaleString('ko-KR')}자 이하여야 해요.`;
+  else if (!PLAIN_TEXT.test(trimmed)) errors[key] = `${label}: ${PLAIN_TEXT_ERROR}`;
 }
 
 function objectParticle(label: string): '을' | '를' {
@@ -199,7 +210,9 @@ function validateOptional(
   max: number,
   label: string,
 ): void {
-  if (value.trim().length > max) errors[key] = `${label}은 ${max}자 이하여야 해요.`;
+  const trimmed = value.trim();
+  if (trimmed.length > max) errors[key] = `${label}은 ${max}자 이하여야 해요.`;
+  else if (trimmed && !PLAIN_TEXT.test(trimmed)) errors[key] = `${label}: ${PLAIN_TEXT_ERROR}`;
 }
 
 function validateImage(

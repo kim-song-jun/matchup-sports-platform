@@ -33,7 +33,7 @@ function Pill({ tone, icon, label }: { tone: Tone; icon: ReactNode; label: strin
   return (
     <span
       className={[
-        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium whitespace-nowrap',
+        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[length:var(--font-size-caption)] font-medium whitespace-nowrap',
         TONE_CLASSES[tone],
       ].join(' ')}
     >

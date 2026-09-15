@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import { HomePageClient } from './home-client';
@@ -35,7 +35,7 @@ function authMeResult(phoneVerified: boolean) {
 
 // PendingSocialSignupGate (rendered above HomePageClient via Providers) also calls
 // useV1AuthMe() unconditionally on every render — default to a fully-shaped,
-// already-verified result so the unrelated push-nudge tests below don't crash it.
+// already-verified result so unrelated home tests do not crash it.
 const authMeMock = vi.fn(() => authMeResult(true));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
@@ -47,67 +47,6 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
     useV1PendingTournamentReviews: () => ({ data: undefined }),
     useV1AuthMe: () => authMeMock(),
   };
-});
-
-vi.mock('@/lib/session-storage', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/session-storage')>();
-  return {
-    ...actual,
-    shouldShowPushNudge: () => true,
-    dismissPushNudge: vi.fn(),
-  };
-});
-
-const subscribe = vi.fn();
-vi.mock('@/hooks/use-v1-push-registration', () => ({
-  useV1PushRegistration: () => ({
-    subscribe,
-    unsubscribe: vi.fn(),
-    permission: 'default',
-    isSubscribed: false,
-  }),
-}));
-
-describe('HomePageClient push nudge banner', () => {
-  beforeEach(() => {
-    subscribe.mockReset();
-  });
-
-  it('dismisses the banner only after a confirmed subscription', async () => {
-    subscribe.mockResolvedValue(true);
-
-    render(
-      <Providers>
-        <HomePageClient />
-      </Providers>,
-    );
-
-    const subscribeButton = await screen.findByRole('button', { name: '알림 받기' });
-    fireEvent.click(subscribeButton);
-
-    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.queryByText('알림을 받아보세요')).not.toBeInTheDocument());
-  });
-
-  it('keeps the banner visible for retry when subscribe resolves without a confirmed subscription', async () => {
-    subscribe.mockResolvedValue(false);
-
-    render(
-      <Providers>
-        <HomePageClient />
-      </Providers>,
-    );
-
-    const subscribeButton = await screen.findByRole('button', { name: '알림 받기' });
-    fireEvent.click(subscribeButton);
-
-    await waitFor(() => expect(subscribe).toHaveBeenCalledTimes(1));
-    // subscribe() resolved (it never rejects, even on decline/failure) but did not
-    // confirm a subscription — the banner must stay so the user can retry, not
-    // silently disappear as if the attempt had succeeded.
-    expect(await screen.findByText('알림을 받아보세요')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '알림 받기' })).not.toBeDisabled();
-  });
 });
 
 describe('HomePageClient phone verify nudge banner', () => {

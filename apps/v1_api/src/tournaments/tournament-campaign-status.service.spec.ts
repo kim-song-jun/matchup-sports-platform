@@ -157,11 +157,24 @@ describe('TournamentCampaignStatusService', () => {
         reason: '공개 검수 완료',
       }),
     ).rejects.toMatchObject({ response: { code: 'NOT_PUBLISHABLE' } });
-    expect(prisma.v1Tournament.findFirst.mock.calls[0][0].where).toEqual({
+    // `findTournamentOnSurface` 가 종류 조건과 호출부 조건을 `AND` 로 묶으므로 호출부
+    // 조건이 한 겹 안으로 들어간다. 인덱스(AND[1])로 집지 않고 **id 를 가진 절**을 찾는다 —
+    // 인덱스로 집으면 헬퍼가 절을 하나 더 붙이는 날 조용히 깨진다.
+    const where = prisma.v1Tournament.findFirst.mock.calls[0][0].where as {
+      AND: Array<Record<string, unknown>>;
+    };
+    expect(where.AND.find((clause) => 'id' in clause)).toEqual({
       id: 'tournament-1',
       deletedAt: null,
       status: { in: ['open', 'closed', 'in_progress', 'completed'] },
     });
+    // 종류 조건이 실제로 걸렸는지도 본다 — 호출부 조건만 보면 봉쇄가 빠져도 통과한다.
+    // **`OR` 이 있는지가 아니라 그 `OR` 이 kind 조건인지**를 본다(Copilot 리뷰 지적):
+    // 호출부가 자기 `OR` 을 쓰는 날 "OR 존재"만 보는 단언은 봉쇄 없이도 통과한다.
+    const kindClause = where.AND.find((clause) => Array.isArray(clause.OR)) as {
+      OR: Array<{ kind: unknown }>;
+    };
+    expect(kindClause.OR).toEqual([{ kind: 'regular_tournament' }, { kind: null }]);
   });
 
   it('returns NOT_PUBLISHABLE for a forbidden archived to published transition', async () => {

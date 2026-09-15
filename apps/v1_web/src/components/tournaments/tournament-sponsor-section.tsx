@@ -1,9 +1,10 @@
 'use client';
 
+import { useState } from 'react';
+import Image from 'next/image';
 import { Card } from '@/components/v1-ui/primitives';
 import { Handshake } from 'lucide-react';
 import type { V1TournamentSponsor } from '@/types/api';
-import { TournamentCampaignMedia } from './tournament-campaign-media';
 import styles from './tournament-sponsor-section.module.css';
 
 type SponsorFact = {
@@ -150,15 +151,25 @@ function makeLink(label: string, href: string | null): SponsorLink | null {
   return href ? { label, href } : null;
 }
 
+/**
+ * 스폰서 로고는 대회 사진과 달리 종목 그래픽 폴백이 어울리지 않는다(회사 로고 자리에
+ * 뜬금없는 축구공이 뜬다) — 로드 실패 시 이니셜 배지로 돌아간다. `logoUrl` 없음과
+ * 로드 실패 둘 다 같은 이니셜 폴백으로 수렴한다.
+ */
 function SponsorLogo({ name, logoUrl }: { name: string; logoUrl: string | null }) {
+  const [errored, setErrored] = useState(false);
+  const showImage = Boolean(logoUrl) && !errored;
+
   return (
     <div aria-hidden="true" className={styles.logo}>
-      {logoUrl ? (
-        <TournamentCampaignMedia
-          src={logoUrl}
+      {showImage ? (
+        <Image
+          src={logoUrl as string}
           alt=""
-          sportCode="sponsor"
+          width={176}
+          height={176}
           className={styles.logoImage}
+          onError={() => setErrored(true)}
         />
       ) : (
         <span className="tm-text-label">{name.slice(0, 2)}</span>

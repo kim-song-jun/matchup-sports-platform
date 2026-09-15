@@ -1,4 +1,4 @@
-import type { V1ScheduleState, V1ScheduleType, V1ScheduleVisibility } from '@/types/api';
+import type { V1GuestRecruitmentVisibility, V1ScheduleState, V1ScheduleType, V1ScheduleVisibility } from '@/types/api';
 
 export type ScheduleTypeFilter = 'all' | V1ScheduleType;
 export type ScheduleStateFilter = 'all' | V1ScheduleState;
@@ -88,6 +88,9 @@ export type ScheduleGuestRecruitmentModel = {
   closesAtLabel: string;
   note: string | null;
   stateLabel: string;
+  /** "전체 공개"(PUBLIC) 또는 "팀원 전용"(MEMBERS) — 비멤버가 이 모집을 볼 수 있는지가
+   * 화면에서 바로 드러나야, 팀원 전용으로 열어둔 모집에 신청이 안 들어오는 걸 방치하지 않는다. */
+  visibilityLabel: string;
   isOpen: boolean;
   /** owner/manager 전용 */
   manage?: {
@@ -101,16 +104,36 @@ export type ScheduleGuestRecruitmentModel = {
       slots: string;
       closesAt: string;
       note: string;
+      /** 공개 범위 — PUBLIC이어야 비멤버(용병 신청의 유일한 대상)에게 노출된다. */
+      visibility: V1GuestRecruitmentVisibility;
       onSlotsChange: (value: string) => void;
       onClosesAtChange: (value: string) => void;
       onNoteChange: (value: string) => void;
+      onVisibilityChange: (value: V1GuestRecruitmentVisibility) => void;
       onSave: () => void;
       onDismiss: () => void;
       pending: boolean;
       error: string | null;
     };
+    /** manager+ 전용 신청자 목록·승인/거절. 신청이 하나도 없어도 섹션은 노출한다(0건임을 보여줘야 함). */
+    applications: {
+      items: ScheduleGuestApplicantItem[];
+      loading: boolean;
+      error: string | null;
+      onApprove: (applicationId: string) => void;
+      onReject: (applicationId: string) => void;
+      pendingApplicationId: string | null;
+    };
   };
   applicationForm?: ScheduleGuestApplicationFormModel;
+};
+
+export type ScheduleGuestApplicantItem = {
+  applicationId: string;
+  displayName: string;
+  note: string | null;
+  state: 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
+  stateLabel: string;
 };
 
 export type ScheduleAttendanceModel = {
@@ -145,6 +168,30 @@ export type ScheduleAttendeeListModel = {
   visible: boolean;
   items: ScheduleAttendeeItem[];
   counts: { all: number; going: number; noResponse: number };
+  /**
+   * 팀장·매니저가 팀원의 참석을 대신 표시할 수 있는지. 리그 대진은 운영자가 일방 배정하는
+   * 의무 경기라 선수가 앱을 안 열면 팀장이 라인업을 못 짠다(라인업 저장의 출석 게이트).
+   * false 면 대리 버튼 자체가 렌더되지 않는다 — 서버도 403 으로 막지만, 누를 수 없는
+   * 버튼을 보여주고 눌러서 실패하게 두지 않는다.
+   */
+  canProxy: boolean;
+  /**
+   * 대리 표시 진행 중인 팀원 userId. 진행 중에는 **모든 줄의** 대리 버튼이 잠기고,
+   * 그 줄만 "처리 중…" 으로 바뀐다 -- 대리 응답은 스케줄의 `expectedVersion` 을 실어
+   * 보내므로 두 줄을 동시에 누르면 뒤엣것이 버전 충돌로 실패한다. 한 번에 하나씩
+   * 보내 실패를 아예 만들지 않는 쪽을 택했다.
+   */
+  proxyPendingUserId: string | null;
+  /** 대리 표시 실패 사유. 실패해도 목록은 그대로 두고 이 문구만 덧붙인다. */
+  proxyError: string | null;
+  /**
+   * 보고 있는 사람의 userId. 참석자 목록은 active 멤버 **전원**이라 팀장 자신의 줄도
+   * 거기 있는데, 자기 줄에까지 "대신 표시"가 뜨면 위쪽 "내 참석" 버튼과 같은 일을 하는
+   * 버튼이 두 개가 된다(alpha 실화면에서 확인). 자기 줄을 가려내는 데만 쓴다.
+   * 아직 로그인 정보를 못 받았으면 null -- 그동안은 대리 버튼을 내지 않는다.
+   */
+  viewerUserId: string | null;
+  onProxyGoing: (userId: string) => void;
 };
 
 export type ScheduleManageActionsModel = {
@@ -179,6 +226,8 @@ export type ScheduleDetailViewModel = {
   dateTimeLabel: string;
   visibilityLabel: string;
   capacityLabel: string | null;
+  /** MATCH 타입이 확정됐고(matchConfirmed) 상대팀 이름을 불러왔을 때만 채워진다. */
+  opponent: { teamName: string; placeName: string | null; teamMatchHref: string } | null;
   version: number;
   conflictBanner: string | null;
   onDismissConflict: () => void;

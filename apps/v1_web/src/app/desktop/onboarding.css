@@ -39,11 +39,11 @@
 }
 
 .tm-onboarding-frame .tm-auth-scroll-with-cta {
-  bottom: calc(132px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(132px + var(--v1-shell-safe-bottom));
 }
 
 .tm-onboarding-frame .tm-auth-fixed-cta {
-  padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(24px + var(--v1-shell-safe-bottom));
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -60,6 +60,12 @@
     /* Vertical placement is handled by the parent's `justify-content: safe center`
      * (see _shell.css) — keep margins horizontal-only so the wizard card centers. */
     margin-block: 0;
+  }
+
+  /* 2단 스테이지(auth.css §11)에서는 오른쪽 카드가 위저드 폭(560px)을 가진다. */
+  .tm-auth-frame.tm-onboarding-frame.tm-auth-frame-staged {
+    width: min(100%, 1160px);
+    grid-template-columns: minmax(0, 1fr) 560px;
   }
 }
 
@@ -84,7 +90,7 @@
     justify-content: center;
     width: 44px;
     height: 44px;
-    border-radius: 12px;
+    border-radius: var(--radius-control);
     color: var(--grey700);
     text-decoration: none;
     flex-shrink: 0;
@@ -99,7 +105,7 @@
   .tm-onboarding-desktop-back:focus-visible {
     outline: 2px solid var(--blue500);
     outline-offset: 2px;
-    border-radius: 12px;
+    border-radius: var(--radius-control);
   }
 
   .tm-onboarding-desktop-nav-title {
@@ -119,7 +125,7 @@
   }
 
   .tm-onboarding-frame .tm-auth-heading {
-    margin-top: 14px;
+    margin-top: 16px;
   }
 
   .tm-onboarding-frame .tm-auth-sub {
@@ -138,7 +144,7 @@
   }
 
   .tm-onboarding-frame .tm-auth-progress-bars {
-    gap: 6px;
+    gap: 8px;
   }
 
   .tm-onboarding-frame .tm-auth-progress-bars span {
@@ -156,7 +162,7 @@
 @media (min-width: 1024px) {
   .tm-onboarding-frame .tm-auth-sport-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    gap: 12px;
     margin-top: 24px;
   }
 
@@ -175,7 +181,7 @@
 @media (min-width: 1024px) {
   .tm-onboarding-frame .tm-auth-stack {
     margin-top: 20px;
-    gap: 10px;
+    gap: 12px;
   }
 }
 
@@ -185,7 +191,7 @@
 @media (min-width: 1024px) {
   .tm-onboarding-frame .tm-auth-chip-wrap {
     gap: 8px;
-    margin-top: 18px;
+    margin-top: 20px;
   }
 }
 
@@ -199,7 +205,7 @@
      to a 2-column grid inside the wider wizard card on desktop. */
   .tm-onboarding-frame .tm-auth-stack.tm-onboarding-confirm-grid {
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
+    gap: 12px;
     margin-top: 20px;
   }
 
@@ -255,10 +261,10 @@
   }
 
   .tm-onboarding-frame .tm-auth-fixed-cta {
-    padding: 18px 36px 32px;
+    padding: 20px 36px 32px;
   }
 
-  .tm-onboarding-frame .tm-onboarding-desktop-nav {
+  .tm-onboarding-frame:not(.tm-auth-frame-staged) .tm-onboarding-desktop-nav {
     padding: 24px 36px 0;
   }
 }

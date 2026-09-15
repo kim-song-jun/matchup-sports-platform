@@ -25,6 +25,46 @@ PARAM_PREFIX="${PARAM_PREFIX:-/teameet/prod/env}"
 [[ "${AWS_REGION}" =~ ^[a-z]{2}-[a-z]+-[0-9]$ ]] || {
   echo "[prod-env] AWS_REGION 형식이 올바르지 않습니다 (실제: '${AWS_REGION}')" >&2; exit 1; }
 
+# shellcheck source=scripts/release/lib/private-key-pem.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/private-key-pem.sh"
+
+# --- private keys -----------------------------------------------------------------------
+# The host .env is compose's raw KEY=VALUE form (deploy-prod.sh never sources it), so a value
+# must be one line. A PEM pasted with real newlines would turn every line after the first into
+# a junk key and take the deploy down with a compose parse error. Each *_PRIVATE_KEY is
+# therefore normalised to one line with literal backslash-n, in whichever shape it arrived;
+# one that OpenSSL cannot read is dropped with a warning rather than written broken.
+#
+# Dropped together with its group, not alone. `ApnsPushService` refuses to start on a
+# half-configured set ("APNs credentials are partially configured") and the Firebase adapter
+# does the same — writing three of four values would take the API down on the next deploy,
+# which is worse than leaving push off. The group's earlier values in Parameter Store, if any,
+# stay as they were.
+# An explicit list, not a *_PRIVATE_KEY glob: VAPID_PRIVATE_KEY is a base64url string, not a
+# PEM, and a glob would have "normalised" it into a warning and dropped the web-push key.
+for var_name in SECRET_APNS_PRIVATE_KEY SECRET_FIREBASE_PRIVATE_KEY; do
+  raw="${!var_name-}"
+  [[ -n "${raw}" ]] || continue
+  if pem="$(normalize_private_key "${raw}")"; then
+    printf -v "${var_name}" '%s' "$(private_key_one_line "${pem}")"
+  else
+    echo "::warning::${var_name#SECRET_} is not a readable private key (${#raw} chars); it and its group were left unchanged" >&2
+    unset "${var_name}"
+  fi
+done
+for group in APNS_KEY_ID:APNS_TEAM_ID:APNS_BUNDLE_ID:APNS_PRIVATE_KEY FIREBASE_PROJECT_ID:FIREBASE_CLIENT_EMAIL:FIREBASE_PRIVATE_KEY; do
+  IFS=: read -r -a members <<<"${group}"
+  present=0
+  for member in "${members[@]}"; do
+    value_var="SECRET_${member}"
+    [[ -n "${!value_var-}" ]] && present=$((present + 1))
+  done
+  if (( present > 0 && present < ${#members[@]} )); then
+    echo "::warning::${members[0]%%_*} group is incomplete (${present}/${#members[@]} set); none of it was written so the API keeps starting" >&2
+    for member in "${members[@]}"; do unset "SECRET_${member}"; done
+  fi
+done
+
 pushed=0
 skipped=0
 # `env` 로 SECRET_ 접두사 변수를 훑는다. 값에 개행이 있을 수 있으므로 이름만 뽑고

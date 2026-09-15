@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { V1AccountStatus, V1TournamentStaffRole, V1TournamentStatus } from '@prisma/client';
+import { type Prisma, V1AccountStatus, V1TournamentStaffRole, V1TournamentStatus } from '@prisma/client';
 import { maskEmail } from '../../auth/account-recovery.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
@@ -32,6 +32,12 @@ export type StaffCandidate = {
  */
 const SEARCH_RESULT_LIMIT = 10;
 
+function scopeIdentifier(scope: { readonly teamMatchId: string | null }): string {
+  const id = scope.teamMatchId;
+  if (id === null) throw new Error('STAFF_SCOPE_SOURCE_MISSING');
+  return id;
+}
+
 export type TournamentStaffAssignmentListItem = TournamentStaffAssignmentResult & {
   readonly grantedByUserId: string | null;
   readonly createdAt: Date;
@@ -48,11 +54,14 @@ const STAFF_LIST_SELECT = {
   revokedAt: true,
   grantedByUserId: true,
   createdAt: true,
-  fixtureScopes: { select: { fixtureId: true }, orderBy: { fixtureId: 'asc' as const } },
+  fixtureScopes: {
+    select: { teamMatchId: true },
+    orderBy: [{ teamMatchId: 'asc' }],
+  },
   // 표가 담당자를 userId 앞 8자로만 보여주고 있었다 — 누가 누구인지 알 수 없다는 뜻이다.
   // 공개 신원으로 쓸 수 있는 값은 닉네임뿐이므로(D-03/D-11) 그것만 함께 읽는다.
   user: { select: { profile: { select: { nickname: true } } } },
-} as const;
+} satisfies Prisma.V1TournamentStaffAssignmentSelect;
 
 export type MyTournamentStaffAssignmentItem = {
   readonly id: string;
@@ -70,11 +79,33 @@ export type MyTournamentStaffAssignmentItem = {
   readonly fixtureIds: readonly string[];
 };
 
+export type MyTournamentStaffFixtureItem = {
+  /** Canonical V1TeamMatch id; this is also the fixture deep-link id. */
+  readonly fixtureId: string;
+  readonly gameId: string;
+  readonly tournamentId: string;
+  readonly title: string;
+  readonly scheduledAt: Date | null;
+  readonly status: string;
+  readonly gameState: string | null;
+  readonly round: string;
+  readonly fixtureNumber: number;
+  readonly legNumber: number;
+  readonly fieldId: string | null;
+  readonly fieldName: string | null;
+};
+
 export type MyTournamentStaffGroup = {
   readonly tournamentId: string;
   readonly tournamentTitle: string;
   readonly tournamentStatus: V1TournamentStatus;
   readonly assignments: readonly MyTournamentStaffAssignmentItem[];
+  /**
+   * Canonical fixture summaries covered by this user's active assignments. This is deliberately
+   * resolved from TeamMatch/Details rather than public schedule visibility, because an unpublished
+   * tournament may still have a valid field-operator assignment.
+   */
+  readonly fixtures: readonly MyTournamentStaffFixtureItem[];
 };
 
 // 진행 중인 대회를 먼저 보여준다 -- "지금 뭘 해야 하는지"가 급한 순서. 대기(open)는 곧 시작할
@@ -123,8 +154,25 @@ export class TournamentOperationsStaffService {
    */
   async myAssignments(
     userId: string,
-  ): Promise<{ readonly items: readonly MyTournamentStaffGroup[] }> {
+  ): Promise<{ readonly platformRole: 'PLATFORM_OPS' | null; readonly items: readonly MyTournamentStaffGroup[] }> {
     const now = new Date();
+    const admin = await this.prisma.v1AdminUser.findUnique({
+      where: { userId },
+      select: {
+        adminRole: true,
+        status: true,
+        revokedAt: true,
+        user: { select: { accountStatus: true } },
+      },
+    });
+    const platformRole =
+      admin !== null &&
+      admin.status === 'active' &&
+      admin.revokedAt === null &&
+      admin.user.accountStatus === 'active' &&
+      (admin.adminRole === 'owner' || admin.adminRole === 'ops')
+        ? 'PLATFORM_OPS'
+        : null;
     const assignments = await this.prisma.v1TournamentStaffAssignment.findMany({
       where: {
         userId,
@@ -143,7 +191,10 @@ export class TournamentOperationsStaffService {
         // 담당 경기 식별자 — 필드 담당자(FIELD_OPERATOR)가 대회 셸을 거치지 않고 자기 경기
         // 콘솔로 바로 들어갈 때 진입 판정에 쓴다. 이 역할은 대회 전역 리소스를 읽을 권한이
         // 없어 셸 진입이 구조적으로 막히므로, 이 목록이 담당 경기를 아는 유일한 출처다.
-        fixtureScopes: { select: { fixtureId: true }, orderBy: { fixtureId: 'asc' } },
+        fixtureScopes: {
+          select: { teamMatchId: true },
+          orderBy: [{ teamMatchId: 'asc' }],
+        },
       },
       orderBy: [{ tournamentId: 'asc' }, { createdAt: 'asc' }],
     });
@@ -152,7 +203,7 @@ export class TournamentOperationsStaffService {
     // 단위로 묶어 진입 경로가 대회당 하나만 노출되게 한다(중복 카드 방지).
     const groups = new Map<
       string,
-      { tournamentId: string; tournamentTitle: string; tournamentStatus: V1TournamentStatus; assignments: MyTournamentStaffAssignmentItem[] }
+      { tournamentId: string; tournamentTitle: string; tournamentStatus: V1TournamentStatus; assignments: MyTournamentStaffAssignmentItem[]; fixtures: MyTournamentStaffFixtureItem[] }
     >();
     for (const assignment of assignments) {
       let group = groups.get(assignment.tournamentId);
@@ -162,6 +213,7 @@ export class TournamentOperationsStaffService {
           tournamentTitle: assignment.tournament.title,
           tournamentStatus: assignment.tournament.status,
           assignments: [],
+          fixtures: [],
         };
         groups.set(assignment.tournamentId, group);
       }
@@ -172,12 +224,88 @@ export class TournamentOperationsStaffService {
         fieldName: assignment.field?.name ?? null,
         version: assignment.version,
         expiresAt: assignment.expiresAt,
-        fixtureIds: assignment.fixtureScopes.map((scope) => scope.fixtureId),
+        fixtureIds: assignment.fixtureScopes.map(scopeIdentifier),
       });
     }
 
     const items = [...groups.values()];
     for (const group of items) {
+      const fieldAssignments = group.assignments.filter((assignment) => assignment.role === 'FIELD_OPERATOR');
+      const scopedFixtureIds = new Set(fieldAssignments.flatMap((assignment) => assignment.fixtureIds));
+      const scopedFieldIds = new Set(
+        fieldAssignments
+          .filter((assignment) => assignment.fixtureIds.length === 0 && assignment.fieldId !== null)
+          .map((assignment) => assignment.fieldId as string),
+      );
+      if (scopedFixtureIds.size > 0 || scopedFieldIds.size > 0) {
+        const fixtures = await this.prisma.v1TeamMatch.findMany({
+          where: {
+            tournamentId: group.tournamentId,
+            deletedAt: null,
+            tournamentDetails: { isNot: null },
+            game: { is: { sourceType: 'TEAM_MATCH' } },
+            OR: [
+              ...(scopedFixtureIds.size > 0 ? [{ id: { in: [...scopedFixtureIds] } }] : []),
+              ...(scopedFieldIds.size > 0 ? [{ fieldId: { in: [...scopedFieldIds] } }] : []),
+            ],
+          },
+          select: {
+            id: true,
+            tournamentId: true,
+            title: true,
+            startAt: true,
+            status: true,
+            fieldId: true,
+            field: { select: { name: true } },
+            game: { select: { id: true, state: true, sourceType: true } },
+            tournamentDetails: { select: { tournamentId: true, round: true, fixtureNumber: true, legNumber: true } },
+          },
+          orderBy: [{ startAt: 'asc' }, { id: 'asc' }],
+        });
+        group.fixtures.push(
+          ...fixtures.flatMap((fixture) => {
+            const game = fixture.game;
+            const details = fixture.tournamentDetails;
+            const fixtureTournamentId = fixture.tournamentId;
+            if (
+              game === null ||
+              game.sourceType !== 'TEAM_MATCH' ||
+              details === null ||
+              fixtureTournamentId === null ||
+              fixtureTournamentId !== group.tournamentId ||
+              details.tournamentId !== group.tournamentId
+            ) return [];
+            const covered = fieldAssignments.some((assignment) => {
+              const fixtureMatches =
+                assignment.fixtureIds.length === 0 || assignment.fixtureIds.includes(fixture.id);
+              const fieldMatches =
+                assignment.fieldId === null || assignment.fieldId === fixture.fieldId;
+              return fixtureMatches && fieldMatches;
+            });
+            if (!covered) return [];
+            return [{
+              fixtureId: fixture.id,
+              gameId: game.id,
+              tournamentId: fixtureTournamentId,
+              title: fixture.title,
+              scheduledAt: fixture.startAt,
+              status: fixture.status,
+              gameState: game.state,
+              round: details.round,
+              fixtureNumber: details.fixtureNumber,
+              legNumber: details.legNumber,
+              fieldId: fixture.fieldId,
+              fieldName: fixture.field?.name ?? null,
+            }];
+          }),
+        );
+      }
+      group.fixtures.sort((a, b) => {
+        const aTime = a.scheduledAt?.getTime() ?? Number.POSITIVE_INFINITY;
+        const bTime = b.scheduledAt?.getTime() ?? Number.POSITIVE_INFINITY;
+        return aTime - bTime || a.fixtureId.localeCompare(b.fixtureId);
+      });
+
       group.assignments.sort((a, b) => {
         const roleDiff = STAFF_ROLE_PRIORITY[a.role] - STAFF_ROLE_PRIORITY[b.role];
         if (roleDiff !== 0) return roleDiff;
@@ -191,7 +319,7 @@ export class TournamentOperationsStaffService {
       return a.tournamentTitle.localeCompare(b.tournamentTitle, 'ko');
     });
 
-    return { items };
+    return { platformRole, items };
   }
 
   async list(
@@ -217,7 +345,7 @@ export class TournamentOperationsStaffService {
         userId: assignment.userId,
         role: assignment.role,
         fieldId: assignment.fieldId,
-        fixtureIds: assignment.fixtureScopes.map((scope) => scope.fixtureId),
+        fixtureIds: assignment.fixtureScopes.map(scopeIdentifier),
         version: assignment.version,
         expiresAt: assignment.expiresAt,
         revokedAt: assignment.revokedAt,

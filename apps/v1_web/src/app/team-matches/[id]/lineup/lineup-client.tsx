@@ -1,12 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/components/v1-ui/primitives';
-import {
-  buildFormationPresets, describeSquadSize, slotsWithGoalkeeper, type FormationPreset,
-} from '@/components/lineup/formation-slots';
-import { PitchFormationEditor } from '@/components/lineup/pitch-formation-editor';
 import { LoadLineupSheet, type LoadableLineup } from '@/components/lineup/load-lineup-sheet';
 import { SavePresetDialog } from '@/components/lineup/save-preset-dialog';
 import {
@@ -14,6 +9,7 @@ import {
 } from '@/components/lineup/lineup-source';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import {
   useV1MyTeams,
   useV1RequestTeamMatchLineupChange,
@@ -30,36 +26,28 @@ import {
 import { V1ApiError } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatMonthDay, formatTournamentDateTimeLong } from '@/lib/date-utils';
+import Link from 'next/link';
+import { josa } from '@/lib/korean';
 import { randomUuid } from '@/lib/uuid';
-import type { LineupEditorState, LineupEntryDraft, LineupSlot, RosterOption } from './lineup.view-model';
+import type { LineupEditorState, LineupEntryDraft, RosterOption } from './lineup.view-model';
 import {
-  addGuestToBench,
-  addGuestToStarters,
-  addRosterMemberToBench,
-  addRosterMemberToStarters,
   applySaveResult,
   applyVersionConflictReload,
   buildSavePayload,
-  clearPlayerPosition,
   deriveLineupCounts,
   describeLineupPhase,
   describePublicationCountdown,
   extractConflictCurrentVersion,
   hydrateLineupEditorState,
   isRosterMemberPlaced,
+  addGuestToLineup,
+  addRosterMemberToLineup,
   replaceEntries,
-  moveEntry,
-  placeInSlot,
   removeEntry,
   resolveOwnTeamId,
   restoreEntry,
-  applyFormationPreset,
-  seatStartersInEmptySlots,
-  selectFormation,
   setGoalkeeper,
   setJerseyNumber,
-  setPlayerPosition,
-  unplaceFromSlot,
   validateLineupForSubmit,
 } from './lineup.view-model';
 
@@ -92,6 +80,8 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
    * 참석 응답)을 그대로 계산해 내려준 목록이다. 이게 없으면 화면은 팀원 전체만 알아서,
    * 참석하지 않은 사람을 넣고 저장을 눌러야 비로소 422를 만난다. */
   const eligibleMembers = lineupQuery.data?.eligibleMembers ?? [];
+  // 전술보드 링크에 쓴다 — 배치는 그 화면이 담당한다(정본 §3).
+  const gameId = lineupQuery.data?.gameId ?? null;
 
   const [state, setState] = useState<LineupEditorState | null>(null);
   const hydratedRevisionRef = useRef<number | null>(null);
@@ -124,18 +114,19 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   }, []);
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  // 명단(선발·후보·추가 가능한 팀원 편집)과 피치 배치(포메이션 시각화)는 같은 화면
-  // 두 가지 뷰다 — 기본은 명단(기존 화면과 동일한 첫인상 유지), 사용자가 "피치 배치"를
-  // 눌러야 전환된다.
-  const [activeView, setActiveView] = useState<'roster' | 'pitch'>('roster');
-  // 피치 배치(코트 위 포지션 시각화)는 지금은 축구/풋살 코트 도형(PitchFormationEditor)만
-  // 구현돼 있다. 농구·배드민턴·아이스하키 등은 코트 모양·포지션 개념이 아예 다르므로
-  // 이 컴포넌트를 그대로 재사용할 수 없다 — TODO: 종목별 코트 배치 컴포넌트를 추가하고
-  // 이 allowlist를 확장한다. team-match 응답이 안정적인 sport.code를 아직 노출하지
-  // 않아 한글 이름으로 매칭한다(코드가 추가되면 교체).
+  // 종목 이름은 "이전 라인업 불러오기"가 **다른 종목의 명단을 끌어오지 않도록** 거르는 데
+  // 쓴다(아래 sportName 필터). 코트 배치·포메이션 선택은 Task 163 에서 전술보드로 옮겨
+  // 이 화면에서 사라졌다 — 그래서 종목별 코트 allowlist 도 여기 남지 않는다.
   const formationSupportedSportName = teamMatchQuery.data?.sport?.name ?? null;
-  const formationSupported =
-    formationSupportedSportName !== null && ['축구', '풋살'].includes(formationSupportedSportName);
+  /**
+   * 정규 리그의 대진인가. **참석 응답 게이트가 리그에는 걸리지 않으므로** 안내 문구가
+   * 달라야 한다 — 서버가 리그에서는 `eligibleMembers` 를 전원 `attending: true` 로 내려준다
+   * (`team-match-lineup.service.ts` 의 그 자리 주석: 리그 대진에는 참석을 묻는 입구가 없어
+   * 게이트를 걸면 아무도 명단에 못 든다).
+   *
+   * 새 조회를 붙이지 않는다 — 이 화면이 이미 부르는 팀매치 상세가 `league` 를 싣고 있다.
+   */
+  const isLeagueFixture = teamMatchQuery.data?.league != null;
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
   const saveMutation = useV1SaveTeamMatchLineup(teamMatchId);
@@ -270,44 +261,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [state?.dirty, editable]);
 
-  // D-17: 종목별 포메이션·포지션 사전은 서버 lineupConfig가 유일한 출처다 — 종목명으로
-  // 하드코딩 카탈로그를 스위치하지 않는다. lineupConfig가 아직 없는(구버전 응답) 경우
-  // sportCatalog는 빈 배열이 되고, formationOptions도 자연히 비어 "자유 배치"만 남는다.
-  const sportCatalog: FormationPreset[] = lineupQuery.data?.lineupConfig
-    ? buildFormationPresets(lineupQuery.data.lineupConfig.positions, lineupQuery.data.lineupConfig.formations)
-    : [];
-  // 선발 인원수로 선택지를 거르지 않는다 — 명단을 다 채우기 전에도 포메이션을 먼저 고를
-  // 수 있어야 빈 자리가 눈에 보이고, 그 자리를 채워 나갈 수 있다. 인원이 대형과 맞지
-  // 않는다는 사실은 선택을 막는 대신 드롭다운 아래 안내 문구로 알린다(PitchFormationEditor).
-  const formationOptions = sportCatalog;
-  /**
-   * 이 경기에 설정된 출전 인원(GK 포함). **범위**다 — canonical config가 축구 7~11, 풋살 3~6이고
-   * 관리자가 상한만 고르므로 minPlayers와 maxPlayers가 서로 다를 수 있다
-   * (competition-config.presets.ts, lineup-size.ts#buildLineupSizeConfig). maxPlayers만 단일
-   * 값처럼 비교하면 7~11 경기에서 선발 9명(정상)에게 "11명인데 9명이에요"라는 틀린 경고가 뜬다.
-   * 구버전 응답에는 두 필드가 없을 수 있어 null 허용.
-   */
-  const { label: squadSizeLabel, outOfRange: starterCountOutOfRange } = describeSquadSize(
-    lineupQuery.data?.lineupConfig?.minPlayers ?? null,
-    lineupQuery.data?.lineupConfig?.maxPlayers ?? null,
-    state?.starters.length ?? 0,
-  );
-
-  // 서버 카탈로그에 아예 없는 formation 코드(예: 대회 종목 설정이 바뀐 뒤 다시 연 옛
-  // 초안)만 자유 배치로 되돌린다 — 그대로 두면 화면은 이전 formation 라벨을 계속
-  // 보여주면서도 슬롯 모드는 이미 꺼져(selectedPreset=null → activeSlots=null) 제출
-  // 검증이 빈 슬롯 체크를 건너뛰고, 저장 페이로드에도 유효하지 않은 코드가 실린다.
-  // 카탈로그가 아직 안 실린 동안(sportCatalog=[])에는 아무것도 하지 않는다 — 로딩
-  // 중이라는 이유로 사용자가 고른 포메이션을 지우면 그대로 자동저장까지 따라 나간다.
-  useEffect(() => {
-    if (sportCatalog.length === 0) return;
-    if (state && state.formation !== null && !sportCatalog.some((preset) => preset.code === state.formation)) {
-      setState((prev) => (prev ? selectFormation(prev, null) : prev));
-    }
-    // state 전체를 deps에 넣으면 selectFormation 자체가 새 state를 만들어 무한 루프가 된다.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sportCatalog, state?.formation]);
-
   function handleConflictReload() {
     lineupQuery.refetch().then((result) => {
       if (result.data) {
@@ -320,60 +273,21 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   }
 
   const [guestName, setGuestName] = useState('');
-  const [guestSlot, setGuestSlot] = useState<LineupSlot>('bench');
   const [changeRequestOpen, setChangeRequestOpen] = useState(false);
   const [changeRequestReason, setChangeRequestReason] = useState('');
   const [changeRequestError, setChangeRequestError] = useState<string | null>(null);
-  const changeRequestDialogRef = useRef<HTMLElement | null>(null);
-  const changeRequestReasonRef = useRef<HTMLTextAreaElement | null>(null);
-  const changeRequestPreviousFocusRef = useRef<Element | null>(null);
 
-  // 접근성: ESC로 닫기 + 열릴 때 이전 포커스 저장/닫힐 때 복원 (WCAG 2.4.3)
-  // — components/v1-ui/confirm-modal.tsx와 동일 패턴
-  useEffect(() => {
-    if (!changeRequestOpen) return;
-    changeRequestPreviousFocusRef.current = document.activeElement;
-    const id = window.setTimeout(() => changeRequestReasonRef.current?.focus(), 60);
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setChangeRequestOpen(false);
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.clearTimeout(id);
-      document.removeEventListener('keydown', handleKeyDown);
-      const previous = changeRequestPreviousFocusRef.current;
-      if (previous && typeof (previous as HTMLElement).focus === 'function') {
-        (previous as HTMLElement).focus();
-      }
-      changeRequestPreviousFocusRef.current = null;
-    };
-  }, [changeRequestOpen]);
-
-  // 접근성: Tab/Shift-Tab 포커스트랩 — components/v1-ui/confirm-modal.tsx와 동일 패턴
-  useEffect(() => {
-    if (!changeRequestOpen) return;
-    const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-    const handleTab = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
-      const dialog = changeRequestDialogRef.current;
-      if (!dialog) return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey) {
-        if (document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        }
-      } else if (document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', handleTab);
-    return () => document.removeEventListener('keydown', handleTab);
-  }, [changeRequestOpen]);
+  // 접근성(ESC 닫기·포커스 저장/복원·Tab 포커스트랩·body 스크롤 잠금·backdrop 클릭 닫기)은
+  // 공용 훅 useModalA11y 로 위임 — 조건부 마운트형(changeRequestOpen ? … : null)이라
+  // open 은 실제 state 를 그대로 넘긴다.
+  const {
+    dialogRef: changeRequestDialogRef,
+    initialFocusRef: changeRequestReasonRef,
+    onBackdropClick: onChangeRequestBackdropClick,
+  } = useModalA11y<HTMLTextAreaElement, HTMLElement>({
+    open: changeRequestOpen,
+    onClose: () => setChangeRequestOpen(false),
+  });
 
   // insane review(P1-3, 2026-08 GPT Pro): "제외" 버튼은 실제로는 완전 삭제(moveEntry의
   // 선발↔후보 이동과 다르다) — 등번호·GK 지정·피치 좌표가 전부 소실되고, 재수화된 뒤라면
@@ -381,7 +295,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   // 모달 대신 5초 실행취소 토스트로 되돌릴 수 있게 한다 — pendingRemoval이 지운 엔트리
   // 전체(등번호·GK·좌표 포함)와 원래 슬롯·인덱스를 들고 있다가, 실행취소 시 그 자리에
   // 그대로 복원한다(restoreEntry).
-  const [pendingRemoval, setPendingRemoval] = useState<{ entry: LineupEntryDraft; slot: LineupSlot; index: number } | null>(
+  const [pendingRemoval, setPendingRemoval] = useState<{ entry: LineupEntryDraft; index: number } | null>(
     null,
   );
   const pendingRemovalTimerRef = useRef<number | null>(null);
@@ -393,12 +307,12 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     };
   }, []);
 
-  function handleRemoveEntry(slot: LineupSlot, entry: LineupEntryDraft, index: number) {
-    setState((prev) => (prev ? removeEntry(prev, slot, entry.key) : prev));
+  function handleRemoveEntry(entry: LineupEntryDraft, index: number) {
+    setState((prev) => (prev ? removeEntry(prev, entry.key) : prev));
     if (pendingRemovalTimerRef.current !== null) {
       window.clearTimeout(pendingRemovalTimerRef.current);
     }
-    setPendingRemoval({ entry, slot, index });
+    setPendingRemoval({ entry, index });
     pendingRemovalTimerRef.current = window.setTimeout(() => {
       setPendingRemoval(null);
       pendingRemovalTimerRef.current = null;
@@ -407,8 +321,8 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
   function handleUndoRemoval() {
     if (!pendingRemoval) return;
-    const { entry, slot, index } = pendingRemoval;
-    setState((prev) => (prev ? restoreEntry(prev, slot, entry, index) : prev));
+    const { entry, index } = pendingRemoval;
+    setState((prev) => (prev ? restoreEntry(prev, entry, index) : prev));
     if (pendingRemovalTimerRef.current !== null) {
       window.clearTimeout(pendingRemovalTimerRef.current);
       pendingRemovalTimerRef.current = null;
@@ -450,11 +364,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   }
 
   if (teamMatchQuery.isLoading || lineupQuery.isLoading || myTeamsQuery.isLoading) {
-    return (
-      <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false} desktopHead>
-        <PageSkeleton variant="detail" />
-      </AppChrome>
-    );
+    return <PageSkeleton variant="detail" />;
   }
 
   if (lineupQuery.isError) {
@@ -468,27 +378,38 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             ? '경기 정보가 아직 준비되지 않았어요. 잠시 후 다시 시도해 주세요.'
             : extractErrorMessage(lineupQuery.error, '라인업을 불러오지 못했어요.');
     return (
-      <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false} desktopHead>
-        <div style={{ padding: '40px 20px' }}>
-          <ErrorState
-            message={message}
-            onRetry={code === 'PERMISSION_DENIED' || code === 'TEAM_MATCH_NOT_FOUND' ? undefined : () => void lineupQuery.refetch()}
-          />
-        </div>
-      </AppChrome>
+      <div style={{ padding: '40px 20px' }}>
+        <ErrorState
+          message={message}
+          onRetry={code === 'PERMISSION_DENIED' || code === 'TEAM_MATCH_NOT_FOUND' ? undefined : () => void lineupQuery.refetch()}
+        />
+      </div>
     );
   }
 
   if (!lineupQuery.data || !state || !phase) {
-    return (
-      <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false} desktopHead>
-        <PageSkeleton variant="detail" />
-      </AppChrome>
-    );
+    return <PageSkeleton variant="detail" />;
   }
 
   const counts = deriveLineupCounts(state, rosterPool);
   const waitingMembers = rosterPool.filter((member) => !isRosterMemberPlaced(state, member));
+  /** 서버가 저장 시 강제하는 것과 동일한 조건(팀 일정에 '참석'으로 응답)을 화면에서도
+   * 미리 반영한다 — eligibleMembers는 이미 이 판정을 담아 내려온다(위 :94 선언 참조).
+   * `attending`은 이 매치에 팀 일정이 없으면 전원 true다.
+   *
+   * 필드 자체가 없는 응답(구버전 캐시 등)에서는 판정할 근거가 없으므로 걸러내지 않는다
+   * — `eligibleMembers?:`가 optional인 이유가 이것이다. 실제 서버는 항상 이 필드를
+   * 채워 보낸다(team-match-lineup.service.ts loadEligibleMembers). */
+  const hasEligibilityData = lineupQuery.data?.eligibleMembers !== undefined;
+  const attendingUserIds = new Set(
+    eligibleMembers.filter((member) => member.attending).map((member) => member.userId),
+  );
+  const addableWaitingMembers = hasEligibilityData
+    ? waitingMembers.filter((member) => attendingUserIds.has(member.userId))
+    : waitingMembers;
+  const blockedWaitingMembers = hasEligibilityData
+    ? waitingMembers.filter((member) => !attendingUserIds.has(member.userId))
+    : [];
 
   const loadableHistory: LoadableLineup[] = (historyQuery.data?.items ?? []).map((item) => ({
     key: `history:${item.lineupId}`,
@@ -575,26 +496,21 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   async function handleSavePreset(name: string) {
     if (state === null) return;
     setPresetError(null);
-    const entries = [
-      ...state.starters.map((entry) => ({
-        ...(entry.userId !== null ? { userId: entry.userId } : {}),
-        displayName: entry.displayName,
-        ...(entry.jerseyNumber !== null ? { jerseyNumber: entry.jerseyNumber } : {}),
-        ...(entry.position !== null ? { position: entry.position } : {}),
-        ...(entry.positionX !== null && entry.positionY !== null
-          ? { positionX: entry.positionX, positionY: entry.positionY }
-          : {}),
-        started: true,
-        goalkeeper: entry.goalkeeper,
-      })),
-      ...state.bench.map((entry) => ({
-        ...(entry.userId !== null ? { userId: entry.userId } : {}),
-        displayName: entry.displayName,
-        ...(entry.jerseyNumber !== null ? { jerseyNumber: entry.jerseyNumber } : {}),
-        started: false,
-        goalkeeper: false,
-      })),
-    ];
+    // 프리셋은 **팀 내부 도구**라 이 태스크가 계약을 바꾸지 않는다(163: `V1TeamLineupPresetEntry`
+    // 는 건드리지 않는다). 그래서 `started` 를 계속 싣되, 명단에 선발 구분이 없으므로
+    // **전원 `true`** 로 보낸다 — 불러올 때 `replaceEntries` 가 그 값을 무시하고 전원을
+    // 명단에 넣으므로 왕복이 성립한다.
+    const entries = state.participants.map((entry) => ({
+      ...(entry.userId !== null ? { userId: entry.userId } : {}),
+      displayName: entry.displayName,
+      ...(entry.jerseyNumber !== null ? { jerseyNumber: entry.jerseyNumber } : {}),
+      ...(entry.position !== null ? { position: entry.position } : {}),
+      ...(entry.positionX !== null && entry.positionY !== null
+        ? { positionX: entry.positionX, positionY: entry.positionY }
+        : {}),
+      started: true,
+      goalkeeper: entry.goalkeeper,
+    }));
     const payload = {
       name,
       ...(state.formation !== null ? { formation: state.formation } : {}),
@@ -614,44 +530,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
       setPresetError(extractErrorMessage(error, '프리셋을 저장하지 못했어요.'));
     }
   }
-  // ① 이 종목에 등록된 대형이 아예 없을 때(축구처럼 서버 카탈로그가 비어 있는 경우),
-  // ② 대형은 있지만 선발 수가 이 경기가 허용하는 출전 인원 **범위**를 벗어났을 때.
-  // ②는 서버가 lineupConfig에 출전 인원을 함께 내려주면서 처음 가능해졌다(그전에는 화면이
-  // "몇 명이어야 맞는지"를 알 방법이 없었다). 고른 대형과 선발 수의 차이 자체는 여기가
-  // 아니라 PitchFormationEditor가 드롭다운 바로 아래에서 따로 알려준다.
-  const starterCount = state.starters.length;
-  const outfieldGuidance = !formationSupported
-    ? null
-    : formationOptions.length === 0
-      ? '이 종목은 등록된 포지션 대형이 없어요. 자유 배치로 직접 배치해 주세요.'
-      : starterCountOutOfRange && squadSizeLabel !== null
-        ? `이 경기 출전 인원은 ${squadSizeLabel}인데 지금 선발은 ${starterCount}명이에요.`
-        : null;
-  const selectedPreset = state.formation !== null ? formationOptions.find((preset) => preset.code === state.formation) ?? null : null;
-  const activeSlots = selectedPreset !== null ? slotsWithGoalkeeper(selectedPreset) : null;
-  const validationErrors = validateLineupForSubmit(state, activeSlots);
+  const validationErrors = validateLineupForSubmit(state);
   const publicationLabel = describePublicationCountdown(lineupQuery.data.publicLineupAt, now);
 
-  /**
-   * 선발 명단을 바꾸는 편집 액션의 결과를 통과시키면, **이번에 새로 선발이 된 사람**과
-   * **이번에 골키퍼로 지정된 사람**만 골라 지금 포메이션의 빈 자리에 앉힌다. 이전 상태와
-   * 비교해 대상 key를 뽑기 때문에, 사용자가 일부러 대기로 남겨둔 선수는 다른 사람을
-   * 등록해도 그대로 대기에 남는다 — 자동 배치를 "등록한 그 순간, 그 사람에게만" 묶어두는
-   * 것이 포메이션 변경 때 선수가 멋대로 들어오던 과거 동작과 갈리는 지점이다.
-   */
-  function withSeatedNewcomers(prev: LineupEditorState, next: LineupEditorState): LineupEditorState {
-    if (next === prev || activeSlots === null) return next;
-    const before = new Map(prev.starters.map((entry) => [entry.key, entry]));
-    const seatKeys = next.starters
-      .filter((entry) => {
-        const previous = before.get(entry.key);
-        return previous === undefined || (entry.goalkeeper && !previous.goalkeeper);
-      })
-      .map((entry) => entry.key);
-    if (seatKeys.length === 0) return next;
-    const starters = seatStartersInEmptySlots(next.starters, activeSlots, seatKeys);
-    return starters === next.starters ? next : { ...next, starters, dirty: true };
-  }
 
   // insane review(P0-1, 2026-08 GPT Pro): 제출은 항상 서버에 마지막 저장된 revision만 실어
   // 보내야 한다. 자동저장은 900ms 디바운스 뒤에야 실행되므로, 방금 입력을 마치자마자 제출을
@@ -676,7 +557,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   }
 
   return (
-    <AppChrome title="라인업" backHref={`/team-matches/${teamMatchId}`} bottomNav={false} desktopHead>
+    <>
       <div style={{ padding: '16px 20px 168px' }}>
         {!isOnline ? (
           <div style={{ marginBottom: 12 }}>
@@ -686,7 +567,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
         {conflict ? (
           <div style={{ marginBottom: 12 }}>
-            <Card pad={14} style={{ background: 'var(--red50)' }}>
+            <Card pad={16} style={{ background: 'var(--red50)' }}>
               <p className="tm-text-label" style={{ color: 'var(--red700)', fontWeight: 700, marginBottom: 8 }}>
                 라인업이 그새 변경됐어요.
               </p>
@@ -702,7 +583,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
         {pendingRemoval ? (
           <div style={{ marginBottom: 12 }}>
-            <Card pad={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <p role="status" aria-live="polite" className="tm-text-caption" style={{ color: 'var(--text-muted)', flex: 1, margin: 0 }}>
                 {pendingRemoval.entry.displayName} 선수를 명단에서 제거했어요.
               </p>
@@ -761,90 +642,20 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           ) : null}
         </div>
 
-        <div
-          role="tablist"
-          aria-label="라인업 뷰 전환"
-          style={{ display: 'flex', gap: 8, marginBottom: 16 }}
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeView === 'roster'}
-            className={`tm-btn tm-btn-sm ${activeView === 'roster' ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
-            onClick={() => setActiveView('roster')}
-          >
-            명단
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeView === 'pitch'}
-            className={`tm-btn tm-btn-sm ${activeView === 'pitch' ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
-            onClick={() => setActiveView('pitch')}
-          >
-            피치 배치
-          </button>
-        </div>
-
-        {activeView === 'pitch' ? (
-          <section
-            aria-labelledby="lineup-pitch-heading"
-            // 편집 가능한 상태에서는 화면 하단에 고정된 "라인업 제출하기" 바(.tm-fixed-cta)가
-            // 겹칠 수 있는 여유 공간을 아래에 둔다 — 안 그러면 피치 하단(자기 진영 골대 쪽,
-            // 골키퍼 토큰 위치)이 고정 바에 가려 보이지 않는다(실제 화면 확인으로 발견).
-            style={{ marginBottom: phase?.editable ? 112 : 16 }}
-          >
-            <SectionTitle id="lineup-pitch-heading" title="피치 배치" />
-            {!formationSupported ? (
-              <EmptyState
-                title="이 종목은 피치 배치를 아직 지원하지 않아요"
-                sub={`${formationSupportedSportName ?? '이 종목'}은 축구·풋살과 코트 모양·포지션 개념이 달라 준비 중이에요. 명단 탭에서 선발·후보는 그대로 관리할 수 있어요.`}
-              />
-            ) : state.starters.length === 0 ? (
-              <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
-                먼저 명단에서 선발을 등록해야 피치에 배치할 수 있어요.
-              </p>
-            ) : (
-              <div style={{ marginTop: 8 }}>
-                {/* insane review(P1-2, 2026-08 GPT Pro): 명단 편집은 `editable`(phase.editable &&
-                    isOnline)로 잠기는데, 여기는 phase.editable만 봐서 오프라인 배너가 떠도
-                    피치에서는 선수 이동·배치취소·포메이션 변경이 계속 됐다 — 위에서 이미 정의한
-                    `editable` 상수를 그대로 재사용해 두 뷰가 같은 규칙을 따르게 한다. */}
-                <PitchFormationEditor
-                  starters={state.starters}
-                  formation={state.formation}
-                  formationOptions={formationOptions}
-                  slots={activeSlots}
-                  outfieldGuidance={outfieldGuidance}
-                  editable={editable}
-                  onSelectFormation={(nextFormation) =>
-                    setState((prev) => {
-                      if (!prev) return prev;
-                      // 프리셋을 고르면 배치된 선수를 새 슬롯으로 재배치한다(좌표를 그대로
-                      // 두면 새 프리셋에 없는 포지션의 선수가 피치에서 사라졌다). 자유
-                      // 배치(null)는 슬롯이 없으니 라벨만 바꾼다.
-                      const preset =
-                        nextFormation === null
-                          ? null
-                          : formationOptions.find((option) => option.code === nextFormation) ?? null;
-                      return preset === null
-                        ? selectFormation(prev, nextFormation)
-                        : applyFormationPreset(prev, preset.code, slotsWithGoalkeeper(preset));
-                    })
-                  }
-                  onPlacePlayer={(key, x, y) =>
-                    setState((prev) => (prev ? setPlayerPosition(prev, key, x, y) : prev))
-                  }
-                  onUnplacePlayer={(key) => setState((prev) => (prev ? clearPlayerPosition(prev, key) : prev))}
-                  onPlaceInSlot={(key, slot) => setState((prev) => (prev ? placeInSlot(prev, key, slot) : prev))}
-                  onUnplaceFromSlot={(key) => setState((prev) => (prev ? unplaceFromSlot(prev, key) : prev))}
-                />
-              </div>
-            )}
-          </section>
+        {/* Task 163: 선발/후보 구분과 피치 배치를 여기서 뺐다(정본 §3 — 명단 = 출전자).
+            배치는 팀 내부 도구인 전술보드가 담당하고, 이 화면은 **누가 뛰는가**만 정한다.
+            좌표·포메이션은 저장 페이로드에 그대로 실려 보존된다(편집만 여기서 안 한다). */}
+        {editable && ownTeamId !== null && gameId !== null ? (
+          <p className="tm-text-body-sm" style={{ marginBottom: 16 }}>
+            <Link
+              href={`/teams/${encodeURIComponent(ownTeamId)}/tactics/${encodeURIComponent(gameId)}`}
+              className="tm-link"
+            >
+              선발·배치는 전술보드에서 →
+            </Link>
+          </p>
         ) : null}
 
-        <div style={{ display: activeView === 'roster' ? 'contents' : 'none' }}>
         {/* 지난 경기와 같은 명단을 매번 처음부터 다시 채우지 않도록. 팀 매치는 명단 자체를
             팀장이 정하므로, 대회 경기와 달리 불러오기가 명단을 통째로 대신 채운다. */}
         {editable && ownTeamId !== null ? (
@@ -857,7 +668,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             >
               이전 라인업 불러오기
             </button>
-            {state.starters.length > 0 ? (
+            {state.participants.length > 0 ? (
               <button
                 type="button"
                 className="tm-btn tm-btn-sm tm-btn-outline"
@@ -878,11 +689,12 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           </div>
         ) : null}
 
-        <section aria-labelledby="lineup-starters-heading" style={{ marginBottom: 16 }}>
-          <SectionTitle id="lineup-starters-heading" title={`선발 (${counts.starterCount})`} />
-          {state.starters.length === 0 ? (
+        {/* Task 163: 선발/후보 두 섹션을 **하나**로 합쳤다 — 명단 = 출전자(정본 §3). */}
+        <section aria-labelledby="lineup-roster-list-heading" style={{ marginBottom: 16 }}>
+          <SectionTitle id="lineup-roster-list-heading" title={`출전 명단 (${counts.participantCount})`} />
+          {state.participants.length === 0 ? (
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
-              선발 명단이 비어 있어요.
+              출전 명단이 비어 있어요.
             </p>
           ) : (
             <>
@@ -891,7 +703,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                   등번호")로 이미 문맥을 얻으므로 헤더 자체는 장식으로 숨긴다. */}
               <div
                 aria-hidden="true"
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', marginTop: 8 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0 12px', marginTop: 8 }}
               >
                 <span className="tm-text-micro" style={{ color: 'var(--text-muted)', fontWeight: 600, minWidth: 44 }}>
                   GK
@@ -907,7 +719,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                 </span>
               </div>
               <Card pad={0} style={{ marginTop: 4 }}>
-              {state.starters.map((entry, index) => (
+              {state.participants.map((entry, index) => (
                 <div
                   key={entry.key}
                   style={{
@@ -915,7 +727,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                     ...(index > 0 ? { borderTop: '1px solid var(--border)' } : {}),
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     {/* 예전엔 네이티브 라디오 + "선택됐을 때만 보이는 GK 텍스트"였는데, 브라우저
                         기본 라디오가 작고(터치 타겟 미달) 밋밋해서 "이게 뭘 누르는 버튼인지"
                         한눈에 안 읽힌다는 지적(QA)을 받았다. 항상 "GK" 글자가 보이는 토글 칩으로
@@ -927,20 +739,33 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         똑같아 보여 "전원 골키퍼로 표시된다"는 알파 실측 지적을 받았다 — 같은
                         화면 계열인 대회 fixture 라인업(lineup-client.tsx, 2026-08-11)에서 이미
                         적용한 "미지정=점선 아웃라인, 지정=orange700 채움"을 그대로 옮겨 두
-                        화면이 같은 의미를 같은 형태로 전달하게 한다. */}
+                        화면이 같은 의미를 같은 형태로 전달하게 한다.
+
+                        **글자는 지정된 행에만 넣는다**(2026-09-08 사용자 확정). 항상 "GK" 를
+                        띄우니 이번엔 반대로 **글자가 값으로 읽혀** QA 가 두 라운드 연속
+                        "전원이 GK" 로 보고했다. 라벨을 지우면 못 찾고, 항상 띄우면 값으로
+                        읽힌다 — 미지정을 **빈 컨트롤**로 두면 둘 다 피한다. 열 헤더('GK')가
+                        이 열이 무엇인지 말하고, 각 버튼의 aria-label 이 스크린리더에 같은
+                        문맥을 준다. 피치 배치 화면도 지정된 선수에게만 GK 를 붙인다. */}
                     <button
                       type="button"
                       aria-pressed={entry.goalkeeper}
                       disabled={!editable}
                       onClick={() =>
-                        setState((prev) => (prev ? withSeatedNewcomers(prev, setGoalkeeper(prev, entry.key)) : prev))
+                        setState((prev) => (prev ? setGoalkeeper(prev, entry.key) : prev))
                       }
-                      aria-label={`${entry.displayName}${entry.goalkeeper ? ', 골키퍼로 지정됨' : '을 골키퍼로 지정'}`}
+                      // 조사는 이름의 받침에 따라 갈린다 — 고정하면 "김철수을" 이 그대로
+                      // 스크린리더로 읽힌다. 화면엔 글자가 없으니 이 라벨이 유일한 안내다.
+                      aria-label={
+                        entry.goalkeeper
+                          ? `${entry.displayName}, 골키퍼로 지정됨`
+                          : `${josa(entry.displayName, ['을', '를'])} 골키퍼로 지정`
+                      }
                       style={{
                         flexShrink: 0,
                         minWidth: 44,
                         minHeight: 44,
-                        borderRadius: 999,
+                        borderRadius: 'var(--radius-pill)',
                         border: entry.goalkeeper ? '1.5px solid var(--orange700)' : '1.5px dashed var(--grey300)',
                         background: entry.goalkeeper ? 'var(--orange700)' : 'transparent',
                         color: entry.goalkeeper ? '#fff' : 'var(--text-caption)',
@@ -949,14 +774,14 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         cursor: editable ? 'pointer' : 'default',
                       }}
                     >
-                      GK
+                      {entry.goalkeeper ? 'GK' : ''}
                     </button>
                     <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>
                       {entry.displayName}
                       {entry.position ? (
                         <span
                           className="tm-text-micro"
-                          style={{ marginLeft: 6, color: 'var(--text-muted)', fontWeight: 400 }}
+                          style={{ marginLeft: 8, color: 'var(--text-muted)', fontWeight: 400 }}
                         >
                           {entry.position}
                         </span>
@@ -975,7 +800,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                           prev
                             ? setJerseyNumber(
                                 prev,
-                                'starter',
                                 entry.key,
                                 event.target.value === '' ? null : Number(event.target.value),
                               )
@@ -987,101 +811,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                       <>
                         <button
                           type="button"
-                          className="tm-btn tm-btn-sm tm-btn-outline"
-                          onClick={() => setState((prev) => (prev ? moveEntry(prev, 'starter', entry.key, 'bench') : prev))}
-                        >
-                          후보로
-                        </button>
-                        <button
-                          type="button"
                           className="tm-btn tm-btn-sm tm-btn-ghost"
-                          aria-label={`${entry.displayName} 선발 명단에서 제거`}
-                          onClick={() => handleRemoveEntry('starter', entry, index)}
-                        >
-                          명단에서 제거
-                        </button>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-              </Card>
-            </>
-          )}
-        </section>
-
-        <section aria-labelledby="lineup-bench-heading" style={{ marginBottom: 16 }}>
-          <SectionTitle id="lineup-bench-heading" title={`후보 (${counts.benchCount})`} />
-          {state.bench.length === 0 ? (
-            <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
-              후보 명단이 비어 있어요.
-            </p>
-          ) : (
-            <>
-              <div
-                aria-hidden="true"
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', marginTop: 8 }}
-              >
-                <span className="tm-text-micro" style={{ flex: 1, color: 'var(--text-muted)', fontWeight: 600 }}>
-                  이름
-                </span>
-                <span
-                  className="tm-text-micro"
-                  style={{ width: 56, textAlign: 'center', color: 'var(--text-muted)', fontWeight: 600 }}
-                >
-                  등번호
-                </span>
-              </div>
-              <Card pad={0} style={{ marginTop: 4 }}>
-              {state.bench.map((entry, index) => (
-                <div
-                  key={entry.key}
-                  style={{
-                    padding: 12,
-                    ...(index > 0 ? { borderTop: '1px solid var(--border)' } : {}),
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{entry.displayName}</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      aria-label={`${entry.displayName} 등번호`}
-                      className="tm-input"
-                      style={{ width: 56, textAlign: 'center' }}
-                      value={entry.jerseyNumber ?? ''}
-                      disabled={!editable}
-                      onChange={(event) =>
-                        setState((prev) =>
-                          prev
-                            ? setJerseyNumber(
-                                prev,
-                                'bench',
-                                entry.key,
-                                event.target.value === '' ? null : Number(event.target.value),
-                              )
-                            : prev,
-                        )
-                      }
-                    />
-                    {editable ? (
-                      <>
-                        <button
-                          type="button"
-                          className="tm-btn tm-btn-sm tm-btn-outline"
-                          onClick={() =>
-                            setState((prev) =>
-                              prev ? withSeatedNewcomers(prev, moveEntry(prev, 'bench', entry.key, 'starter')) : prev,
-                            )
-                          }
-                        >
-                          선발로
-                        </button>
-                        <button
-                          type="button"
-                          className="tm-btn tm-btn-sm tm-btn-ghost"
-                          aria-label={`${entry.displayName} 후보 명단에서 제거`}
-                          onClick={() => handleRemoveEntry('bench', entry, index)}
+                          aria-label={`${entry.displayName} 출전 명단에서 제거`}
+                          onClick={() => handleRemoveEntry(entry, index)}
                         >
                           명단에서 제거
                         </button>
@@ -1097,13 +829,21 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
         {editable ? (
           <section aria-labelledby="lineup-roster-heading" style={{ marginBottom: 16 }}>
-            <SectionTitle id="lineup-roster-heading" title={`추가 가능한 팀원 (${counts.waitingCount})`} />
-            {/* 참석 여부로 미리 걸러 보여줄 방법이 없다(Task 15 blocker-5): 일정별 참석자
-                명단을 조회하는 API가 없어 여기 뜨는 목록은 "활성 팀원 전체"다. 실제 등록
-                가능 여부(참석으로 응답했는지 등)는 서버가 저장 시점에 최종 검증하고,
-                해당하지 않으면 위 자동저장 오류 메시지로 이유를 알려준다. */}
+            <SectionTitle id="lineup-roster-heading" title={`추가 가능한 팀원 (${addableWaitingMembers.length})`} />
+            {/* eligibleMembers(:94)가 서버 저장 검증과 동일한 조건(팀 일정에 '참석'으로
+                응답)을 이미 담아 내려주므로, 여기서도 그 조건으로 걸러서 보여준다 — 이
+                일정에 딸린 참석 조건은 "불참을 명시적으로 누른 사람"만이 아니라 무응답·
+                대기(WAITLISTED)까지 전부 포함한다(팀 일정이 없는 매치는 전원 통과).
+
+                **리그 대진에는 그 조건이 없다.** 대진을 운영자가 일괄 생성하면서 팀 일정이
+                함께 깔리지만 그 일정의 참석을 묻는 입구가 없어, 게이트를 걸면 아무도 명단에
+                못 든다 — 서버가 그래서 리그에서는 전원 통과시킨다. 문구가 그대로면 화면이
+                자기모순이 된다: "참석으로 확정된 팀원만" 이라고 적어 놓고 바로 아래에
+                **응답한 적 없는 팀원 전원**을 나열한다(alpha 실측). */}
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '4px 0 8px' }}>
-              참석 여부와 무관하게 활성 팀원 전체가 표시돼요. 불참으로 응답한 팀원을 추가하면 저장할 때 알려드려요.
+              {isLeagueFixture
+                ? '리그 경기는 참석 응답과 상관없이 팀원을 명단에 넣을 수 있어요. 실제로 뛸 선수만 골라 주세요.'
+                : '참석으로 확정된 팀원만 추가할 수 있어요. 아직 확정되지 않은 팀원은 참석 응답 후 다시 보여드려요.'}
             </p>
             {rosterQuery.isLoading ? (
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
@@ -1118,31 +858,63 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                {waitingMembers.map((member) => (
-                  <Card key={member.userId} pad={12}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{member.displayName}</span>
-                      <button
-                        type="button"
-                        className="tm-btn tm-btn-sm tm-btn-primary"
-                        onClick={() =>
-                          setState((prev) =>
-                            prev ? withSeatedNewcomers(prev, addRosterMemberToStarters(prev, member)) : prev,
-                          )
-                        }
-                      >
-                        선발 추가
-                      </button>
-                      <button
-                        type="button"
-                        className="tm-btn tm-btn-sm tm-btn-outline"
-                        onClick={() => setState((prev) => (prev ? addRosterMemberToBench(prev, member) : prev))}
-                      >
-                        후보 추가
-                      </button>
-                    </div>
-                  </Card>
-                ))}
+                {addableWaitingMembers.length === 0 ? (
+                  <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+                    지금 추가할 수 있는 팀원이 없어요. 아래 팀원들의 참석 확정을 기다리고 있어요.
+                  </p>
+                ) : (
+                  addableWaitingMembers.map((member) => (
+                    <Card key={member.userId} pad={12}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{member.displayName}</span>
+                        {/* Task 163: "선발 추가"/"후보 추가" 두 버튼을 하나로 — 명단에
+                            선발 구분이 없다(정본 §3). 행마다 반복되는 버튼이라 primary 가 아니라
+                            outline 이다 — 목록 전체가 파랗게 차면 주 행동(명단 제출)이 묻힌다. */}
+                        <button
+                          type="button"
+                          className="tm-btn tm-btn-sm tm-btn-outline"
+                          onClick={() => setState((prev) => (prev ? addRosterMemberToLineup(prev, member) : prev))}
+                        >
+                          명단 추가
+                        </button>
+                      </div>
+                    </Card>
+                  ))
+                )}
+                {blockedWaitingMembers.length > 0 ? (
+                  <>
+                    <p
+                      className="tm-text-caption"
+                      style={{ color: 'var(--text-muted)', margin: '12px 0 4px' }}
+                    >
+                      참석 미확정 팀원 ({blockedWaitingMembers.length})
+                    </p>
+                    {blockedWaitingMembers.map((member) => (
+                      // opacity 로 카드를 통째로 흐리면 이름과 '참석 미확정' 배지의 대비가
+                      // 라이트 2.27:1 / 다크 3.20:1 로 떨어져 WCAG AA(4.5:1) 미달이 된다. 이 둘은
+                      // disabled 컨트롤이 아니라 a11y-decisions.md 의 disabled 예외 대상도 아니다.
+                      // '지금은 추가할 수 없다'는 신호는 이미 배지 텍스트 + disabled 버튼 두 개가
+                      // 전달하므로 opacity 는 정보를 더하지 않고 대비만 깎는다.
+                      <Card key={member.userId} pad={12}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{member.displayName}</span>
+                          <span className="tm-badge tm-badge-grey" aria-label={`${member.displayName}, 참석 미확정이라 지금은 추가할 수 없어요`}>
+                            참석 미확정
+                          </span>
+                          {/* Task 163: 추가 버튼도 하나다 — 명단에 선발 구분이 없다(정본 §3). */}
+                          <button
+                            type="button"
+                            className="tm-btn tm-btn-sm tm-btn-outline"
+                            disabled
+                            aria-label={`${member.displayName} 명단 추가 — 참석 확정 전이라 비활성화됨`}
+                          >
+                            명단 추가
+                          </button>
+                        </div>
+                      </Card>
+                    ))}
+                  </>
+                ) : null}
               </div>
             )}
 
@@ -1161,27 +933,12 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                   value={guestName}
                   onChange={(event) => setGuestName(event.target.value)}
                 />
-                <select
-                  aria-label="게스트를 추가할 명단"
-                  className="tm-input"
-                  value={guestSlot}
-                  onChange={(event) => setGuestSlot(event.target.value as LineupSlot)}
-                  style={{ width: 96 }}
-                >
-                  <option value="starter">선발</option>
-                  <option value="bench">후보</option>
-                </select>
                 <button
                   type="button"
                   className="tm-btn tm-btn-sm tm-btn-outline"
                   aria-label="게스트 추가"
                   onClick={() => {
-                    setState((prev) => {
-                      if (!prev) return prev;
-                      return guestSlot === 'starter'
-                        ? withSeatedNewcomers(prev, addGuestToStarters(prev, guestName))
-                        : addGuestToBench(prev, guestName);
-                    });
+                    setState((prev) => (prev ? addGuestToLineup(prev, guestName) : prev));
                     setGuestName('');
                   }}
                 >
@@ -1195,8 +952,8 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
         <section aria-labelledby="lineup-change-request-heading" style={{ marginBottom: 16 }}>
           <SectionTitle id="lineup-change-request-heading" title="상대팀 라인업 정정 요청" />
-          <Card pad={14} style={{ marginTop: 8 }}>
-            <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 10 }}>
+          <Card pad={16} style={{ marginTop: 8 }}>
+            <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 12 }}>
               상대팀이 제출한 라인업에 문제가 있다면 재작성을 요청할 수 있어요. 상대팀 라인업 내용은 직접 볼 수 없고, 사유만 남겨 다시 작성해 달라고 요청하는 기능이에요.
             </p>
             <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" onClick={() => setChangeRequestOpen(true)}>
@@ -1210,7 +967,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             <AlertBanner tone="warning" message={validationErrors.join(' ')} />
           </div>
         ) : null}
-      </div>
 
       {editable ? (
         <div className="tm-fixed-cta">
@@ -1258,7 +1014,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
       {changeRequestOpen ? (
         <div
           role="presentation"
-          onClick={() => setChangeRequestOpen(false)}
+          onClick={onChangeRequestBackdropClick}
           style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'var(--scrim-dark-32)', padding: 20 }}
         >
           <section
@@ -1267,12 +1023,12 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             aria-modal="true"
             aria-labelledby="lineup-change-request-dialog-title"
             onClick={(event) => event.stopPropagation()}
-            style={{ width: 'min(100%, 420px)', borderRadius: 18, background: 'var(--bg)', boxShadow: 'var(--shadow-modal)', padding: 18 }}
+            style={{ width: 'min(100%, 420px)', borderRadius: 18, background: 'var(--bg)', boxShadow: 'var(--shadow-modal)', padding: 20 }}
           >
             <h2 id="lineup-change-request-dialog-title" className="tm-text-subhead" style={{ margin: 0 }}>
               상대팀에 정정을 요청할까요?
             </h2>
-            <label htmlFor="lineup-change-request-reason" className="tm-text-caption" style={{ display: 'block', margin: '12px 0 6px', color: 'var(--text-muted)' }}>
+            <label htmlFor="lineup-change-request-reason" className="tm-text-caption" style={{ display: 'block', margin: '12px 0 8px', color: 'var(--text-muted)' }}>
               사유
             </label>
             <textarea
@@ -1285,7 +1041,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               placeholder="예: 등번호가 중복된 것 같아요"
             />
             {changeRequestError ? (
-              <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 6 }}>
+              <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 8 }}>
                 {changeRequestError}
               </p>
             ) : null}
@@ -1324,6 +1080,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         error={presetError}
         onSave={(name) => void handleSavePreset(name)}
       />
-    </AppChrome>
+    </>
   );
 }

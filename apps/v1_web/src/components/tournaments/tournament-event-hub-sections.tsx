@@ -1,4 +1,8 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
+import { ChevronRight } from 'lucide-react';
 import { Card } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import type { V1TournamentParticipantTeam, V1TournamentStatus } from '@/types/api';
@@ -58,9 +62,9 @@ export function TournamentApplicationGuideSection() {
         <div className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 4 }}>
           팀장 또는 운영진이 팀을 선택해 신청하고, 입금 확인 후 참가가 확정돼요. 선수단은 마감일 전까지 등록·수정할 수 있어요.
         </div>
-        <ol style={{ display: 'grid', gap: 10, listStyle: 'none', margin: '14px 0 0', padding: 0 }}>
+        <ol style={{ display: 'grid', gap: 12, listStyle: 'none', margin: '16px 0 0', padding: 0 }}>
           {steps.map((step, index) => (
-            <li key={step.title} style={{ display: 'grid', gridTemplateColumns: '28px 1fr', gap: 10 }}>
+            <li key={step.title} style={{ display: 'grid', gridTemplateColumns: '28px 1fr', gap: 12 }}>
               <span
                 aria-hidden="true"
                 className="tab-num tm-guide-step-num"
@@ -72,7 +76,7 @@ export function TournamentApplicationGuideSection() {
                 style={{
                   width: 28,
                   height: 28,
-                  borderRadius: 14,
+                  borderRadius: 'var(--radius-field)',
                   color: 'var(--text-strong)',
                   display: 'grid',
                   placeItems: 'center',
@@ -105,7 +109,14 @@ export function TournamentParticipantSection({
   confirmedCount,
 }: {
   teams: V1TournamentParticipantTeam[];
-  teamCount: number;
+  /**
+   * **정원.** 리그면 `null` 을 넘긴다 — 리그에는 정원 개념이 없다(`V1League` 에 정원 계열
+   * 필드가 아예 없다). 거울 행은 `v1_tournaments` 에 살고 `team_count` 가 `@default(8)`
+   * 이라, 그대로 그리면 참가 2팀인 리그에 **"2/8팀 확정"** 이 뜬다.
+   *
+   * `0` 으로 메우지 않는 이유는 목록 카드와 같다 — `0` 은 "정원이 0" 으로 읽힌다.
+   */
+  teamCount: number | null;
   /** 'open'(모집 중)에는 참가팀 명단(팀명·로고)을 숨긴다 — 확정 인원수는 계속 노출. */
   status: V1TournamentStatus;
   confirmedCount: number;
@@ -124,7 +135,8 @@ export function TournamentParticipantSection({
           참가팀
         </div>
         <div className="tm-text-caption" style={{ color: 'var(--text-caption)', whiteSpace: 'nowrap' }}>
-          {confirmedDisplayCount}/{teamCount}팀 확정
+          {/* 정원이 없으면 비율이 성립하지 않는다 — 수를 그대로 적는다(목록 카드와 같은 문구). */}
+          {teamCount === null ? `${confirmedDisplayCount}팀 참가` : `${confirmedDisplayCount}/${teamCount}팀 확정`}
         </div>
       </div>
 
@@ -138,7 +150,7 @@ export function TournamentParticipantSection({
           ) : null}
         </Card>
       ) : (
-        <Card pad={16} style={{ background: 'var(--grey50)', marginTop: 4 }}>
+        <Card pad={16} className="tm-on-tint" style={{ background: 'var(--grey50)', marginTop: 4 }}>
           <div className="tm-text-label" style={{ color: 'var(--text-muted)' }}>
             참가팀 공개 전
           </div>
@@ -174,8 +186,38 @@ function ParticipantTeamList({
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       {teams.map((team) => (
+        <ParticipantTeamRow key={team.registrationId} team={team} label={label} badgeClass={badgeClass} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * 참가팀 한 줄 + **공개 명단 펼치기**(사용자 A안, 2026-09-06).
+ *
+ * 정본 §3 이 "명단 공개는 등번호·이름(닉네임)" 으로 확정했고, 그걸 묻는 사람이 가는 자리가
+ * 여기(참가팀)다. 새 페이지를 만들지 않고 이 카드 안에서 펼친다.
+ *
+ * **토글은 링크 안에 넣지 않는다.** 팀 이름 줄은 이미 팀 상세로 가는 `<Link>` 라, 그 안에
+ * 버튼을 두면 인터랙티브 요소가 중첩돼 키보드·스크린리더에서 무엇이 눌리는지 갈린다.
+ * 링크 **옆**에 별도 버튼을 둔다.
+ */
+function ParticipantTeamRow({
+  team,
+  label,
+  badgeClass,
+}: {
+  team: V1TournamentParticipantTeam;
+  label: string;
+  badgeClass: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const rosterId = `roster-${team.registrationId}`;
+
+  return (
+    <div style={{ display: 'grid', gap: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 8 }}>
         <Link
-          key={team.registrationId}
           href={`/teams/${team.teamId}`}
           className="tm-list-row-interactive tm-pressable"
           style={{
@@ -184,7 +226,7 @@ function ParticipantTeamList({
             alignItems: 'center',
             gap: 12,
             minHeight: 44,
-            borderRadius: 12,
+            borderRadius: 'var(--radius-control)',
             textDecoration: 'none',
           }}
         >
@@ -209,7 +251,80 @@ function ParticipantTeamList({
             {label}
           </span>
         </Link>
-      ))}
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-expanded={open}
+          aria-controls={rosterId}
+          // **접근성 이름에 팀명을 넣는다.** 보이는 글자는 "명단" 이라 짧아도 되지만,
+          // 스크린리더 사용자는 버튼 목록을 훑기 때문에 팀마다 이름이 같으면 **어느 팀의
+          // 명단인지 구분할 수 없다**(Copilot 지적).
+          aria-label={`${team.teamName} 명단 ${open ? '접기' : '펼치기'}`}
+          // **같은 페이지의 펼치기 토글과 같은 모양을 쓴다**(`tournament-detail-client.tsx` 의
+          // 소개 글 "전체 보기"): ghost 버튼 + 회전하는 ChevronRight.
+          //
+          // 예전엔 인라인 스타일로 `--card-surface` 배경에 테두리를 둘렀는데, 그 색이
+          // **카드 배경과 같아** 눌리는 것이 아니라 빈 상자로 보였다. 바로 옆의 `참가 확정`
+          // 은 채워진 칩이라, 정작 누를 수 있는 쪽이 덜 눌러 보이는 **어포던스 역전**이었다.
+          // `.tm-btn-sm` 이 이미 `min-height: 44px` 를 갖고 있어(globals.css) 터치 타깃을
+          // 인라인으로 다시 적을 필요도 없다 — 새 CSS 없이 있는 패턴만 재사용한다.
+          className="tm-btn tm-btn-sm tm-btn-ghost"
+          style={{
+            fontSize: 'var(--font-size-caption)',
+            fontWeight: 500,
+            color: 'var(--text-muted)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {open ? '명단 접기' : '명단'}
+          <ChevronRight
+            size={12}
+            strokeWidth={2.2}
+            aria-hidden="true"
+            style={{
+              marginLeft: 2,
+              transform: open ? 'rotate(-90deg)' : 'rotate(90deg)',
+              transition: 'transform 0.16s ease',
+            }}
+          />
+        </button>
+      </div>
+      {open ? (
+        <div
+          id={rosterId}
+          style={{
+            padding: '8px 12px',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-control)',
+            background: 'var(--grey50)',
+          }}
+        >
+          {team.players.length === 0 ? (
+            <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+              아직 명단을 등록하지 않았어요.
+            </div>
+          ) : (
+            <ul style={{ display: 'grid', gap: 4, margin: 0, padding: 0, listStyle: 'none' }}>
+              {team.players.map((player) => (
+                <li
+                  key={player.id}
+                  style={{ display: 'grid', gridTemplateColumns: '32px 1fr', alignItems: 'baseline', gap: 8 }}
+                >
+                  {/* 등번호가 없는 선수는 `—` — 0 으로 채우면 아무도 안 단 번호가 전원 0번이 된다. */}
+                  <span className="tm-text-caption tab-num" style={{ color: 'var(--text-caption)' }}>
+                    {player.jerseyNumber ?? '—'}
+                  </span>
+                  {/* 닉네임을 못 찾으면(탈퇴·프로필 삭제) 자리표시자다. **실명으로 떨어뜨리지
+                      않는다** — 정본 §3 은 공개 명단을 등번호·닉네임으로 못 박았다. */}
+                  <span className="tm-text-caption" style={{ color: 'var(--text-strong)' }}>
+                    {player.nickname ?? '(탈퇴한 선수)'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

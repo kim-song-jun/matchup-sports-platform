@@ -16,6 +16,7 @@ const scheduleApiMocks = vi.hoisted(() => ({
   useV1TeamDetail: vi.fn(),
   useV1TeamSchedules: vi.fn(),
   useV1TeamSchedule: vi.fn(),
+  useV1TeamMatch: vi.fn(),
   useV1SetMyScheduleAttendance: vi.fn(),
   useV1CancelTeamSchedule: vi.fn(),
   useV1CompleteTeamSchedule: vi.fn(),
@@ -108,6 +109,7 @@ function scheduleSummary(overrides: Partial<V1TeamScheduleSummary> = {}): V1Team
     state: 'SCHEDULED',
     version: 0,
     teamMatchId: null,
+    linkedMatch: null,
     matchConfirmed: null,
     goingCount: 5,
     waitlistedCount: 2,
@@ -144,6 +146,7 @@ beforeEach(() => {
     isError: false,
     refetch: vi.fn(),
   });
+  scheduleApiMocks.useV1TeamMatch.mockReturnValue({ data: undefined, isLoading: false, isError: false });
   scheduleApiMocks.useV1SetMyScheduleAttendance.mockReturnValue(idleMutation());
   scheduleApiMocks.useV1CancelTeamSchedule.mockReturnValue(idleMutation());
   scheduleApiMocks.useV1CompleteTeamSchedule.mockReturnValue(idleMutation());
@@ -309,6 +312,60 @@ describe('TeamScheduleDetailPage — 상세 라우트 권한 게이팅', () => {
     expect(screen.getByText(/참석 5명.*대기 2명/)).toBeInTheDocument();
     expect(screen.queryByText(/미정 ?\d+명/)).not.toBeInTheDocument();
     expect(screen.queryByText(/불참 ?\d+명/)).not.toBeInTheDocument();
+  });
+
+  // M-M 감사: 상태 배지가 "상대팀 확정"이라 말하면서도 화면 어디에도 상대팀 이름·
+  // 장소·매치 상세 링크가 없었다. matchConfirmed일 때만 매치 상세를 불러 요약을 보여준다.
+  it('matchConfirmed면 상대팀명·장소·매치 상세 링크를 보여준다', async () => {
+    scheduleApiMocks.useV1TeamDetail.mockReturnValue({ data: makeTeamDetail('member'), isError: false });
+    scheduleApiMocks.useV1TeamSchedule.mockReturnValue({
+      data: scheduleDetail({
+        type: 'MATCH',
+        teamMatchId: 'tm-1',
+        linkedMatch: { teamMatchId: 'tm-1', tournamentId: null, leagueId: null },
+        matchConfirmed: true,
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    scheduleApiMocks.useV1TeamMatch.mockReturnValue({
+      data: {
+        approvedOpponentTeam: { teamId: 'team-2', name: 'E2E 알파 B팀' },
+        place: { name: '(테스트) 알파 구장' },
+      },
+      isLoading: false,
+      isError: false,
+    });
+
+    const page = await TeamScheduleDetailPage({ params: Promise.resolve({ id: 'team-1', scheduleId: 'sched-1' }) });
+    render(page);
+
+    expect(screen.getByText('E2E 알파 B팀')).toBeInTheDocument();
+    expect(screen.getByText('(테스트) 알파 구장')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /경기 상세 보기/ })).toHaveAttribute('href', '/team-matches/tm-1');
+  });
+
+  it('상대팀 모집 중(matchConfirmed=false)이면 상대팀 요약을 보여주지 않는다', async () => {
+    scheduleApiMocks.useV1TeamDetail.mockReturnValue({ data: makeTeamDetail('member'), isError: false });
+    scheduleApiMocks.useV1TeamSchedule.mockReturnValue({
+      data: scheduleDetail({
+        type: 'MATCH',
+        teamMatchId: 'tm-1',
+        linkedMatch: { teamMatchId: 'tm-1', tournamentId: null, leagueId: null },
+        matchConfirmed: false,
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    const page = await TeamScheduleDetailPage({ params: Promise.resolve({ id: 'team-1', scheduleId: 'sched-1' }) });
+    render(page);
+
+    expect(screen.queryByRole('link', { name: /경기 상세 보기/ })).not.toBeInTheDocument();
+    // 확정 전이라 team-match를 조회조차 하지 않는다 — 상대가 없는데 불러오는 건 헛수고.
+    expect(scheduleApiMocks.useV1TeamMatch).toHaveBeenCalledWith('');
   });
 
   it('상세 조회 실패 시 재시도 가능한 에러 상태를 보여준다', async () => {

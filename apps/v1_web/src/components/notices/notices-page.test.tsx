@@ -1,14 +1,9 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { NoticeDetailPageView, NoticeListPageView } from './notices-page';
 import type { NoticeDetailViewModel, NoticeListViewModel } from './notices.types';
-
-vi.mock('next/navigation', () => ({
-  usePathname: () => '/notices/notice-1',
-  useSearchParams: () => new URLSearchParams(),
-}));
 
 const baseModel: NoticeDetailViewModel = {
   notice: {

@@ -67,7 +67,7 @@ export function TournamentVenueNavigationButton({
         ref={triggerRef}
         type="button"
         className="tm-btn tm-btn-sm tm-btn-neutral"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 44 }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 44 }}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}
@@ -85,15 +85,17 @@ export function TournamentVenueNavigationButton({
           aria-label="내비게이션 앱 선택"
           style={{
             position: 'absolute',
-            top: '100%',
+            bottom: 'calc(100% + 8px)',
             left: 0,
-            marginTop: 6,
             minWidth: 260,
+            maxHeight: 'min(260px, calc(100dvh - 32px - var(--v1-shell-safe-bottom)))',
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
             background: 'var(--surface, #fff)',
             border: '1px solid var(--border)',
-            borderRadius: 12,
+            borderRadius: 'var(--radius-control)',
             boxShadow: '0 8px 24px rgba(20,28,45,0.14)',
-            padding: 6,
+            padding: 8,
             zIndex: 20,
           }}
         >
@@ -106,7 +108,7 @@ export function TournamentVenueNavigationButton({
                 justifyContent: 'space-between',
                 gap: 8,
                 padding: '4px 8px',
-                borderRadius: 8,
+                borderRadius: 'var(--radius-chip)',
               }}
             >
               <a

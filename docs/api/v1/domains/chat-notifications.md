@@ -5,14 +5,14 @@
 | Method | Path | Auth | Request | Response |
 |---|---|---|---|---|
 | `GET` | `/api/v1/chat/rooms` | user | `roomType?`, `status?`, `cursor?`, `limit?` | linked room list |
-| `POST` | `/api/v1/chat/rooms/resolve` | user participant | `{ targetType: "match" | "team" | "team_match"; targetId: uuid }` | existing or created room with web route `/chat/:roomId` |
+| `POST` | `/api/v1/chat/rooms/resolve` | user participant | `{ targetType: "match" | "team" | "team_match" | "team_contact"; targetId: uuid }` | existing or created room with web route `/chat/:roomId` |
 | `GET` | `/api/v1/chat/rooms/:roomId` | room participant | path id | room detail |
 | `GET` | `/api/v1/chat/rooms/:roomId/messages` | room participant | `cursor?`, `limit?`, `direction?` | message list |
 | `POST` | `/api/v1/chat/rooms/:roomId/messages` | room participant | `{ content: string }` | sent message |
 | `PATCH` | `/api/v1/chat/rooms/:roomId/me` | room participant | `pinned?`, `lastReadMessageId?`, `mutedUntil?` | my room state; future `mutedUntil` suppresses app chat notifications |
 | `POST` | `/api/v1/chat/rooms/:roomId/leave` | room participant | `{ reason?: string | null }` | left room state |
 
-Chat v1 is linked-room and text-only for user-authored messages. Match, team match, and team detail entry resolves the linked room for eligible users so chat participation is repaired automatically. Team chat is created automatically when a team is created, and owner/member participants are activated from confirmed team membership. Join approval or invitation acceptance immediately starts the member's team-chat visibility and creates the joined system notice in the same transaction, so opening the room is not required before later messages accumulate. `resolve` can still repair a missing team room or participant for an active team member. The public web room page is `/chat/:roomId`; `/api/v1/chat/rooms/:roomId` remains the API detail endpoint. DM and file attachment are deferred. The web chat list does not expose leaving a linked room; users can mute or unmute app chat notifications per room.
+Chat v1 is linked-room and text-only for user-authored messages. A `team_contact` room is created when a team contact is sent (both teams' owner/manager become participants, the request text is the first message); list/detail items carry a `teamContact` block (`contactId`, display `status`, `expiresAt`, `declineReason`, `mySide`, `fromTeam`, `toTeam`) and sending returns `409 TEAM_CONTACT_NOT_ACCEPTED` until the contact is accepted. Match, team match, and team detail entry resolves the linked room for eligible users so chat participation is repaired automatically. Team chat is created automatically when a team is created, and owner/member participants are activated from confirmed team membership. Join approval or invitation acceptance immediately starts the member's team-chat visibility and creates the joined system notice in the same transaction, so opening the room is not required before later messages accumulate. `resolve` can still repair a missing team room or participant for an active team member. The public web room page is `/chat/:roomId`; `/api/v1/chat/rooms/:roomId` remains the API detail endpoint. DM and file attachment are deferred. The web chat list does not expose leaving a linked room; users can mute or unmute app chat notifications per room.
 
 ## Chat Room Entry And Read State
 
@@ -34,6 +34,8 @@ Chat v1 is linked-room and text-only for user-authored messages. Match, team mat
 | `GET` | `/api/v1/notifications` | user | `status?`, `type?`, `cursor?`, `limit?` | notification list |
 | `PATCH` | `/api/v1/notifications/:notificationId/read` | user owner | path id | read notification |
 | `POST` | `/api/v1/notifications/read-all` | user | `{ type?: string | null }` | read-all result |
+| `POST` | `/api/v1/notifications/push-devices` | user | Android FCM or iOS APNs installation/token/platform/app/device metadata | token-free device summary |
+| `DELETE` | `/api/v1/notifications/push-devices/:installationId` | user owner | installation id | revoke result |
 | `GET` | `/api/v1/notification-preferences` | user | none | preference row |
 | `PATCH` | `/api/v1/notification-preferences` | user | `importantEnabled?`, `activityEnabled?`, `marketingEnabled?` | updated preferences |
 
@@ -41,9 +43,13 @@ Chat v1 is linked-room and text-only for user-authored messages. Match, team mat
 
 Notification rows may carry a deep link target. Tapping a notification card opens a detail sheet rather than navigating: the card tap marks the row read, and navigation happens only from the sheet's CTA. This keeps the read mutation, list invalidation, and route navigation from racing, and gives the full body a place to render (the card clamps it to two lines). The web client accepts only same-origin root-relative paths beginning with one `/`; absolute URLs, protocol-relative URLs, backslash paths, and non-path schemes resolve to `/notifications` instead of being passed to the router.
 
-Every notification is an in-app database row. The same emit path also attempts a Web Push delivery (`WebPushService.sendToUser`) on a separate, non-blocking channel: when `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` are unset the service logs a warning at boot and every send is a silent no-op, so the in-app row is still created. Push therefore requires those three environment variables in the target environment — see `docs/ops/vapid-setup.md`.
+Every notification is an in-app database row. The same emit path independently fans out to browser Web Push, Android FCM, and iOS APNs. An individual delivery failure does not roll back the canonical notification row or cancel another channel. Web Push requires `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`. For Android, the Teameet API signs a service-account JWT, exchanges and caches a short-lived OAuth token, and calls FCM HTTP v1 directly using `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY`; `firebase-admin` is not used. For iOS, the API calls APNs directly over HTTP/2 using `APNS_KEY_ID` / `APNS_TEAM_ID` / `APNS_BUNDLE_ID` / `APNS_PRIVATE_KEY`. An entirely absent credential set disables only that adapter, while a partial or cross-environment set fails startup. Permanent invalid/unregistered token results revoke only the affected device.
+
+The registration environment is server-owned rather than accepted from the client. `alpha` and `production` use distinct Android application IDs/Firebase projects, iOS bundle IDs/APNs topics, and `v1_push_devices.environment` values. Registration tokens and provider credentials never appear in API responses or application logs. The WebView bridge reports subscribed only after the authenticated registration API returns success, and logout attempts device revoke before clearing the session cookie. Android sign-out retains local opt-in/token for the next authenticated re-registration; explicit opt-out still deletes the local token.
 
 `targetType` values are `match`, `team`, `team_match`, `chat`, `notice`, `system`, `tournament`, `inquiry`. Admin replies to a 1:1 inquiry emit `inquiry_answered` (targetType `inquiry`, deep link `/my/inquiries/:inquiryId`) to the member who asked; guest inquiries have no account and are answered through their contact details instead. That event is gated by `importantEnabled`, not `activityEnabled`.
+
+`chatEnabled=false` suppresses chat notification-center rows, `notification:new` badge events, and push delivery. It does not suppress the live `chat:message` event while the user is in the room.
 
 ## Primary Tables
 
@@ -52,3 +58,4 @@ Every notification is an in-app database row. The same emit path also attempts a
 - `v1_chat_messages`
 - `v1_notifications`
 - `v1_notification_preferences`
+- `v1_push_devices`

@@ -5,7 +5,7 @@ import {
   FOOTBALL_V1_CONFIG,
   validateCompetitionConfig,
 } from '../../src/tournaments/competition-config/competition-config';
-import { runCompetitionConfigContractPhaseBackfill } from '../../src/tournaments/competition-config/competition-config-backfill';
+import { seedCompetitionConfigVersions } from '../../src/tournaments/competition-config/competition-config-backfill';
 
 export const competitionConfigFixture = {
   now: new Date('2026-07-29T12:00:00.000Z'),
@@ -28,10 +28,20 @@ export const competitionConfigFixture = {
     '11000000-0000-4000-8000-000000000053',
     '11000000-0000-4000-8000-000000000054',
   ],
-  fixtureIds: [
+  teamMatchIds: [
     '11000000-0000-4000-8000-000000000061',
     '11000000-0000-4000-8000-000000000062',
     '11000000-0000-4000-8000-000000000063',
+  ],
+  canonicalGameIds: [
+    '11000000-0000-4000-8000-000000000071',
+    '11000000-0000-4000-8000-000000000072',
+    '11000000-0000-4000-8000-000000000073',
+  ],
+  canonicalRevisionIds: [
+    '11000000-0000-4000-8000-000000000081',
+    '11000000-0000-4000-8000-000000000082',
+    '11000000-0000-4000-8000-000000000083',
   ],
   teamMatchId: '11000000-0000-4000-8000-000000000070',
 } as const;
@@ -96,12 +106,14 @@ export async function seedCompetitionConfigFixture(
       name: `Task 11 team ${index + 1}`,
     })),
   });
+  await seedCompetitionConfigVersions(prisma);
   await prisma.v1Tournament.create({
     data: {
       id: competitionConfigFixture.tournamentId,
       sportId: competitionConfigFixture.soccerSportId,
       title: 'Task 11 baseline tournament',
       status: 'in_progress',
+      competitionConfigVersionId: '11111111-1111-4111-8111-111111111111',
     },
   });
   await prisma.v1TournamentGroup.create({
@@ -132,45 +144,91 @@ export async function seedCompetitionConfigFixture(
     });
   }
 
-  const fixtureScores = [
+  const matchScores = [
     { home: 0, away: 3, homeScore: 2, awayScore: 0 },
     { home: 1, away: 3, homeScore: 3, awayScore: 1 },
     { home: 2, away: 3, homeScore: 0, awayScore: 0 },
   ] as const;
-  for (let index = 0; index < fixtureScores.length; index += 1) {
-    const score = fixtureScores[index];
-    await prisma.v1TournamentFixture.create({
+  const tournament = await prisma.v1Tournament.findUniqueOrThrow({
+    where: { id: competitionConfigFixture.tournamentId },
+    select: { competitionConfigVersionId: true },
+  });
+  if (tournament.competitionConfigVersionId === null) {
+    throw new Error('Task 11 fixture tournament did not receive a competition config version.');
+  }
+  const matchScoresWithTeams = matchScores.map((score, index) => ({
+    ...score,
+    teamMatchId: competitionConfigFixture.teamMatchIds[index],
+    gameId: competitionConfigFixture.canonicalGameIds[index],
+    revisionId: competitionConfigFixture.canonicalRevisionIds[index],
+    homeRegistrationId: competitionConfigFixture.registrationIds[score.home],
+    awayRegistrationId: competitionConfigFixture.registrationIds[score.away],
+    homeTeamId: competitionConfigFixture.teamIds[score.home],
+    awayTeamId: competitionConfigFixture.teamIds[score.away],
+  }));
+  for (const score of matchScoresWithTeams) {
+    await prisma.v1TeamMatch.create({
       data: {
-        id: competitionConfigFixture.fixtureIds[index],
+        id: score.teamMatchId,
+        tournamentId: competitionConfigFixture.tournamentId,
+        hostTeamId: score.homeTeamId,
+        createdByUserId: competitionConfigFixture.adminUserId,
+        sportId: competitionConfigFixture.soccerSportId,
+        regionId: competitionConfigFixture.regionId,
+        title: `Task 11 canonical match ${score.teamMatchId}`,
+        placeName: 'Task 11 venue',
+        startAt: competitionConfigFixture.now,
+        status: 'completed',
+        approvedApplicantTeamId: score.awayTeamId,
+        competitionConfigVersionId: tournament.competitionConfigVersionId,
+      },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: score.teamMatchId,
         tournamentId: competitionConfigFixture.tournamentId,
         groupId: competitionConfigFixture.groupId,
         round: 'group_a',
-        fixtureNumber: index + 1,
-        homeRegistrationId: competitionConfigFixture.registrationIds[score.home],
-        awayRegistrationId: competitionConfigFixture.registrationIds[score.away],
-        status: 'completed',
-        result: {
+        fixtureNumber: matchScoresWithTeams.indexOf(score) + 1,
+        homeRegistrationId: score.homeRegistrationId,
+        awayRegistrationId: score.awayRegistrationId,
+      },
+    });
+    await prisma.v1Game.create({
+      data: {
+        id: score.gameId,
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: score.teamMatchId,
+        state: 'ENDED',
+        competitionConfigVersionId: tournament.competitionConfigVersionId,
+        sides: {
+          create: [
+            { sideKey: 'HOME', teamId: score.homeTeamId, displayNameSnapshot: `Task 11 team ${score.home + 1}` },
+            { sideKey: 'AWAY', teamId: score.awayTeamId, displayNameSnapshot: `Task 11 team ${score.away + 1}` },
+          ],
+        },
+        resultRevisions: {
           create: {
-            homeScore: score.homeScore,
-            awayScore: score.awayScore,
-            recordedByAdminUserId: competitionConfigFixture.adminId,
+            id: score.revisionId,
+            revision: 1,
+            state: 'OFFICIAL',
+            score: { home: score.homeScore, away: score.awayScore },
+            goalEvents: [],
+            missingScorer: score.homeScore + score.awayScore > 0,
+            eventsHash: `task11-events-${score.teamMatchId}`,
+            createdByActorType: 'SYSTEM',
+            createdBySystemActor: 'GAME_BACKFILL',
+            officialAt: competitionConfigFixture.now,
+            submittedAt: competitionConfigFixture.now,
           },
         },
       },
     });
+    await prisma.v1Game.update({
+      where: { id: score.gameId },
+      data: { currentOfficialRevisionId: score.revisionId },
+    });
   }
-
-  // The tournament above is created without an explicit
-  // competitionConfigVersionId — the v1_pin_tournament_competition_config
-  // trigger used to fill it in automatically, but that trigger is part of
-  // the deferred contract-phase migration (see
-  // docs/ops/task9-competition-config-contract-phase.md). Run the same
-  // production backfill CLI here so this fixture's tournament/fixtures end
-  // up pinned exactly the way they will be in production once the backfill
-  // CLI has run — seeding creates the canonical v1_competition_config_versions
-  // rows only when missing and otherwise verifies them by content hash, so
-  // this is safe even if a prior seed already created them.
-  await runCompetitionConfigContractPhaseBackfill(prisma);
 }
 
 export function deterministicStandingOrder() {
@@ -220,6 +278,9 @@ export async function exerciseCompetitionConfigChange(
     competitionConfigFixture.tournamentId,
     request,
   );
+  if (preview.confirmationRequired !== true || !('expectedVersion' in preview)) {
+    throw new Error('Expected the config change preview to include a confirmation expectedVersion.');
+  }
   const pinnedBeforeConfirmation = (
     await prisma.v1Tournament.findUniqueOrThrow({
       where: { id: competitionConfigFixture.tournamentId },
@@ -228,7 +289,12 @@ export async function exerciseCompetitionConfigChange(
   const changed = await bracketService.changeTournamentCompetitionConfig(
     authUser,
     competitionConfigFixture.tournamentId,
-    { ...request, confirmRecalculation: true, previewHash: preview.previewHash },
+    {
+      ...request,
+      expectedVersion: preview.expectedVersion,
+      confirmRecalculation: true,
+      previewHash: preview.previewHash,
+    },
   );
   await bracketService.recalculateStandings(authUser, competitionConfigFixture.tournamentId);
   const standings = await prisma.v1TournamentStanding.findMany({

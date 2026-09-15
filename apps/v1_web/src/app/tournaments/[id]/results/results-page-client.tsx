@@ -4,13 +4,15 @@ import { useState, useEffect, useId, useRef } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Trophy } from 'lucide-react';
 import { MatchVideos } from '@/components/tournaments/match-videos';
-import { AppChrome } from '@/components/v1-ui/shell';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useV1Tournament } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { v1Get } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { formatTournamentDateRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { isLeagueCompetition } from '@/lib/competition-kind';
 import type {
+  V1LeagueOverallStandingsResponse,
   V1TournamentDetail,
   V1TournamentFixture,
   V1TournamentFixtureResult,
@@ -25,13 +27,6 @@ function getWinnerSide(result: V1TournamentFixtureResult): 'home' | 'away' | nul
   if (homeScore > awayScore) return 'home';
   if (awayScore > homeScore) return 'away';
   return null;
-}
-
-function getChampionName(tournament: V1TournamentDetail): string | null {
-  const f = tournament.fixtures.find((x) => x.round === 'final' || x.round === '결승');
-  if (!f?.result) return null;
-  const w = getWinnerSide(f.result);
-  return w === 'home' ? (f.homeTeamName || null) : w === 'away' ? (f.awayTeamName || null) : null;
 }
 
 function computeTeamRecord(teamName: string, fixtures: V1TournamentFixture[]) {
@@ -51,7 +46,7 @@ function computeTeamRecord(teamName: string, fixtures: V1TournamentFixture[]) {
   return { w, d, l, gf, ga, games: w + d + l };
 }
 
-interface FinalRankRow { pos: number; name: string; }
+interface FinalRankRow { pos: number; name: string; record?: { w: number; gf: number; ga: number; games: number }; }
 
 function buildKnockoutFinalRanking(fixtures: V1TournamentFixture[]): FinalRankRow[] {
   const finalFix = fixtures.find((f) => f.round === 'final' || f.round === '결승');
@@ -71,6 +66,77 @@ function buildKnockoutFinalRanking(fixtures: V1TournamentFixture[]): FinalRankRo
     if (third)  rows.push({ pos: 3, name: third });
     if (fourth) rows.push({ pos: 4, name: fourth });
   }
+  return rows;
+}
+
+/**
+ * 리그(format==='league') 대회 최종 순위 — 단일 조 전용. 리그 대진의 round는 백엔드가
+ * `league_r{N}`으로 생성해 'final'/'결승' 라운드가 존재하지 않으므로
+ * `buildKnockoutFinalRanking`은 항상 빈 배열을 반환한다(감사 대상 결함: results-page
+ * 리그 미지원). 순위 정본은 `groups[].standings`(조별 순위 재계산 서비스가 이미 채워 둔다)
+ * — tournament-detail-client.tsx:131-137의 챔피언 계산과 같은 소스를 쓴다.
+ *
+ * 조가 2개 이상인 리그는 조별 position이 조 단위로 1부터 다시 매겨지므로 여기서 단순
+ * 병합하면 순위가 뒤섞인다(awards-page-client.tsx의 getTopThree와 동일 제약) — 그 경우는
+ * 이 함수가 아니라 `useLeagueOverallFinalRanking`(통합 순위 API)이 답을 낸다.
+ */
+function buildSingleGroupLeagueRanking(tournament: V1TournamentDetail): FinalRankRow[] {
+  const leagueGroups = tournament.groups.filter((g) => g.phase === 'group');
+  if (leagueGroups.length !== 1) return [];
+  return [...leagueGroups[0].standings]
+    .filter((s): s is typeof s & { teamName: string } => Boolean(s.teamName))
+    .sort((a, b) => a.position - b.position)
+    .map((s) => ({ pos: s.position, name: s.teamName }));
+}
+
+/**
+ * 다조(2개 이상) 리그 전용 최종 순위 override. 통합 순위 정본
+ * (`GET /tournaments/:id/standings/overall` — 대진표 탭 `LeagueStandingsSection`,
+ * awards-page-client.tsx의 `useMultiGroupLeagueTopThree`와 동일 엔드포인트)을 별도
+ * 조회한다. 이 파일은 도메인 훅 배정 파일(`hooks/use-v1-api.ts`)이 아니라서 두 참조
+ * 구현과 같은 이유로 `v1Get`을 인라인 `useEffect`로 호출한다(react-query가 아니다 —
+ * 이 화면도 QueryClientProvider 없이 단독 렌더되는 테스트가 있어 동일 제약을 따른다).
+ *
+ * `enabled=false`(단일 조·미완료·리그 아님)면 요청하지 않고 `null`을 유지한다 — 호출부가
+ * `null`이면 단일 조 계산 결과를 그대로 쓰고, `[]`(로딩 실패 포함)이면 빈 상태를 보여준다
+ * (틀린 순위를 보여주는 것보다 안전).
+ */
+function useLeagueOverallFinalRanking(
+  tournamentId: string,
+  enabled: boolean,
+): FinalRankRow[] | null {
+  const [rows, setRows] = useState<FinalRankRow[] | null>(null);
+
+  useEffect(() => {
+    if (!enabled) {
+      setRows(null);
+      return;
+    }
+    let cancelled = false;
+    v1Get<V1LeagueOverallStandingsResponse>(`/tournaments/${tournamentId}/standings/overall`)
+      .then((data) => {
+        if (cancelled) return;
+        const ranked = data.standings
+          .filter((s): s is typeof s & { position: number } => s.position !== null)
+          .sort((a, b) => a.position - b.position)
+          // 정규 리그 거울 행은 tournament.fixtures가 항상 []라 FinalStandingsTable·
+          // 챔피언 히어로의 fixtures 스캔(computeTeamRecord)이 전부 0을 낸다 — 이 API가
+          // 이미 갖고 있는 승/득점/실점을 행에 실어 그 스캔을 대체한다.
+          .map((s) => ({
+            pos: s.position,
+            name: s.teamName,
+            record: { w: s.wins, gf: s.goalsFor, ga: s.goalsAgainst, games: s.wins + s.draws + s.losses },
+          }));
+        setRows(ranked);
+      })
+      .catch(() => {
+        if (!cancelled) setRows([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tournamentId, enabled]);
+
   return rows;
 }
 
@@ -142,11 +208,13 @@ function Confetti({ count = 40 }: { count?: number }) {
 function DesktopChampionHero({
   champion,
   tournament,
+  record,
 }: {
   champion: string;
   tournament: V1TournamentDetail;
+  record?: { w: number; gf: number; ga: number; games: number };
 }) {
-  const rec = computeTeamRecord(champion, tournament.fixtures);
+  const rec = record ?? computeTeamRecord(champion, tournament.fixtures);
   const diff = rec.gf - rec.ga;
   return (
     <div className="tm-show-desktop">
@@ -155,7 +223,7 @@ function DesktopChampionHero({
       style={{
         position: 'relative',
         background: 'linear-gradient(160deg, #0A0E1A 0%, #0D1B2A 40%, #1A0A2E 100%)',
-        borderRadius: 16,
+        borderRadius: 'var(--radius-container)',
         padding: '44px 56px 40px',
         overflow: 'hidden',
         display: 'flex',
@@ -174,7 +242,7 @@ function DesktopChampionHero({
         pointerEvents: 'none',
       }} />
       {/* 트로피 */}
-      <div className="tm-resd-trophy" style={{ display: 'flex', justifyContent: 'center', lineHeight: 1, marginBottom: 18, filter: 'drop-shadow(0 6px 20px rgba(246,185,59,0.45))' }} aria-hidden="true">
+      <div className="tm-resd-trophy" style={{ display: 'flex', justifyContent: 'center', lineHeight: 1, marginBottom: 20, filter: 'drop-shadow(0 6px 20px rgba(246,185,59,0.45))' }} aria-hidden="true">
         <TrophyMark size={60} />
       </div>
       {/* 팀명 — 배지 제거 후에도 스크린리더에는 '우승팀' 맥락 유지 */}
@@ -221,12 +289,14 @@ function DesktopChampionHero({
 function MobileChampionBanner({
   champion,
   tournament,
+  record,
 }: {
   champion: string;
   tournament: V1TournamentDetail;
+  record?: { w: number; gf: number; ga: number; games: number };
 }) {
   const [played, setPlayed] = useState(false);
-  const rec = computeTeamRecord(champion, tournament.fixtures);
+  const rec = record ?? computeTeamRecord(champion, tournament.fixtures);
   const diff = rec.gf - rec.ga;
   const rafRef = useRef<number | null>(null);
   const replayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -375,11 +445,11 @@ function KnockoutResultsTable({
     date?: string; isAccent?: boolean; isAgg?: boolean;
   }) => (
     <div style={{
-      padding: '10px 16px',
+      padding: '12px 16px',
       background: 'transparent',
     }}>
       {/* 상단: 라벨 + 날짜 */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         {/* [R-T2] accent 라운드(10→12로 통일)와 일반 라운드가 같은 12px가 됐다 —
             accent 구분은 옆 스코어 폰트(16 vs 14)가 계속 담당해 위계 손실 없음. */}
         <span style={{ fontSize: 12, fontWeight: 700, color: labelColor, letterSpacing: '0.02em' }}>
@@ -388,7 +458,7 @@ function KnockoutResultsTable({
         {date && <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>{date}</span>}
       </div>
       {/* 팀 – 스코어 – 팀 (전체 팀명 노출, 잘리지 않음) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{
           flex: 1, textAlign: 'right',
           fontSize: isAccent ? 15 : 13, fontWeight: winner === 'home' ? 700 : 400,
@@ -401,7 +471,7 @@ function KnockoutResultsTable({
           flex: '0 0 60px', textAlign: 'center',
           background: 'var(--grey100)',
           border: 'none',
-          borderRadius: 8, padding: '4px 0',
+          borderRadius: 'var(--radius-chip)', padding: '4px 0',
         }}>
           <div style={{
             fontSize: isAccent ? 16 : 14, fontWeight: 900,
@@ -429,7 +499,7 @@ function KnockoutResultsTable({
   );
 
   const divider = <div style={{ height: 1, background: 'var(--grey100)', margin: '0 16px' }} />;
-  const cardStyle: React.CSSProperties = { borderRadius: 12, overflow: 'hidden', border: '1px solid var(--grey150)' };
+  const cardStyle: React.CSSProperties = { borderRadius: 'var(--radius-control)', overflow: 'hidden', border: '1px solid var(--grey150)' };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -524,10 +594,10 @@ const POS_CFG: Record<number, { bg: string; numColor: string; label: string }> =
 
 function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixtures: V1TournamentFixture[] }) {
   return (
-    <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--grey150)' }}>
+    <div style={{ borderRadius: 'var(--radius-control)', overflow: 'hidden', border: '1px solid var(--grey150)' }}>
       <div style={{
         display: 'grid', gridTemplateColumns: '40px 1fr 64px 36px 36px 40px',
-        padding: '7px 14px', background: 'var(--grey50)', borderBottom: '1px solid var(--grey150)',
+        padding: '8px 16px', background: 'var(--grey50)', borderBottom: '1px solid var(--grey150)',
       }}>
         {/* [R-T2] 그리드 컬럼(40px/1fr/64px/36px/36px/40px) 헤더 — 가장 좁은 36px도
             'W'/'GF' 한두 글자라 12px 여유. */}
@@ -536,14 +606,16 @@ function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixture
         ))}
       </div>
       {rows.map((row, idx) => {
-        const cfg = POS_CFG[row.pos] ?? POS_CFG[4];
-        const rec = computeTeamRecord(row.name, fixtures);
+        // 리그는 팀 수만큼 순위가 이어진다(4위 밑으로도 존재) — POS_CFG에 없는 순위는
+        // "4위"로 잘못 라벨링하지 않고 실제 순위 숫자로 표기한다.
+        const cfg = POS_CFG[row.pos] ?? { bg: 'transparent', numColor: 'var(--text-caption)', label: `${row.pos}위` };
+        const rec = row.record ?? computeTeamRecord(row.name, fixtures);
         const diff = rec.gf - rec.ga;
         const isChamp = row.pos === 1;
         return (
           <div key={row.pos} style={{
             display: 'grid', gridTemplateColumns: '40px 1fr 64px 36px 36px 40px',
-            padding: '11px 14px', background: cfg.bg,
+            padding: '12px 16px', background: cfg.bg,
             borderTop: idx > 0 ? '1px solid var(--grey100)' : 'none',
             alignItems: 'center',
           }}>
@@ -627,7 +699,7 @@ function VideoGallerySection({ fixtures }: { fixtures: V1TournamentFixture[] }) 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {withVideos.map((f) => (
             <div key={f.id}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 2 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-strong)' }}>{fixtureVideoLabel(f)}</span>
                 <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>{f.homeTeamName} vs {f.awayTeamName}</span>
               </div>
@@ -753,12 +825,16 @@ function buildGroupSections(
 /** 결과가 아직 없는 경기의 상태 표시 — 색만으로 구분하지 않도록 항상 텍스트를 함께 낸다. */
 function GroupFixtureStatusChip({ fixture }: { fixture: V1TournamentFixture }) {
   if (fixture.result !== null) return null;
+  // 원본 `status` 컬럼이 아니라 `liveStatus`(V1Game.state 파생)로 판정한다. 컬럼에는
+  // `in_progress`/`cancelled` 가 기록되지 않아서(생성 시 scheduled, 결과 확정 시
+  // completed 뿐) 그 두 분기는 도달 불가능한 죽은 가지였다 — 진행 중인 경기가 계속
+  // "경기 예정" 으로 표시되던 원인이다.
   const chip =
-    fixture.status === 'cancelled'
+    fixture.liveStatus === 'cancelled'
       ? { tone: 'tm-badge-red', label: '취소' }
-      : fixture.status === 'in_progress'
+      : fixture.liveStatus === 'live'
         ? { tone: 'tm-badge-blue', label: '진행 중' }
-        : fixture.status === 'completed'
+        : fixture.liveStatus === 'ended'
           ? { tone: 'tm-badge-grey', label: '결과 미등록' }
           : { tone: 'tm-badge-grey', label: '경기 예정' };
   return <span className={`tm-badge tm-badge-sm ${chip.tone}`}>{chip.label}</span>;
@@ -848,7 +924,7 @@ export function GroupStageFixtures({ tournament }: { tournament: V1TournamentDet
         <span>
           조별리그 경기 {fixtures.length}경기
           {recorded < fixtures.length && (
-            <span style={{ marginLeft: 6, fontWeight: 500, color: 'var(--text-caption)' }}>
+            <span style={{ marginLeft: 8, fontWeight: 500, color: 'var(--text-caption)' }}>
               결과 등록 {recorded}경기
             </span>
           )}
@@ -865,6 +941,7 @@ export function GroupStageFixtures({ tournament }: { tournament: V1TournamentDet
         <div id={panelId} style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {sections.length === 0 ? (
             <EmptyState
+              illustration={{ name: 'journey-done' }}
               title="조별리그 경기가 아직 등록되지 않았어요."
               sub="운영진이 조별 대진을 확정하면 이곳에서 경기를 확인할 수 있어요."
             />
@@ -895,8 +972,29 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
   );
   const isCompleted  = tournament.status === 'completed';
   const isInProgress = tournament.status === 'in_progress';
-  const championName = isCompleted ? getChampionName(tournament) : null;
-  const knockoutRows = !isCompleted ? [] : buildKnockoutFinalRanking(tournament.fixtures);
+  // format 만 보면 정규 리그(거울 행 format='group_knockout')를 놓친다 — 두 질문을 다 한다.
+  const isLeague = isLeagueCompetition(tournament);
+  const isMultiGroupLeague = isLeague && tournament.groups.filter((g) => g.phase === 'group').length > 1;
+  // 정규 리그 거울 행(kind==='regular_league')은 groups가 항상 []다 — 순위는
+  // V1League 축에서 계산되고 대회 행에는 절대 미러링되지 않는다(단일 시즌도 마찬가지).
+  // 그래서 groups.length>1(다조) 판정은 이 행에서 절대 참이 될 수 없고, 이어지는
+  // buildSingleGroupLeagueRanking도 groups.length===1을 요구해 역시 항상 []다 — 시즌이
+  // 전부 끝나도 "최종 순위가 아직 등록되지 않았어요"만 뜨는 결함(감사 evidence: alpha
+  // 실측, 완결 2팀 리그도 재현). 통합 순위 API(GET /standings/overall)는 이미 리그 축
+  // 응답도 반환하므로(V1LeagueOverallStandingRow의 teamId 변형), 조 개수와 무관하게
+  // 거울 행이면 그 API로 보낸다.
+  const isLeagueMirror = tournament.kind === 'regular_league';
+  const needsOverallStandings = isMultiGroupLeague || isLeagueMirror;
+  // 필요할 때만 통합 순위 API를 조회한다 — 훅 자체는 매 렌더 동일한 순서로
+  // 호출해야 하므로(react hooks rule) enabled 플래그로 조건을 안쪽에 둔다.
+  const overallLeagueRows = useLeagueOverallFinalRanking(tournament.id, isCompleted && needsOverallStandings);
+  const knockoutRows = !isCompleted
+    ? []
+    : isLeague
+      ? (needsOverallStandings ? (overallLeagueRows ?? []) : buildSingleGroupLeagueRanking(tournament))
+      : buildKnockoutFinalRanking(tournament.fixtures);
+  const championRow = knockoutRows.find((r) => r.pos === 1) ?? null;
+  const championName = championRow?.name ?? null;
 
   // 조별과 같은 이유로 라운드 라벨 정확일치를 쓰지 않는다 — 편성 phase 가 판정 기준이다.
   const { knockoutKind, knockoutOrder } = createStageResolver(tournament.groups);
@@ -911,35 +1009,40 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
       {isCompleted && championName && (
         <div style={{ padding: '16px 20px 0' }}>
           {/* 데스크탑: 풀 화면 히어로 */}
-          <DesktopChampionHero champion={championName} tournament={tournament} />
+          <DesktopChampionHero champion={championName} tournament={tournament} record={championRow?.record} />
           {/* 모바일: 컴팩트 배너 */}
-          <MobileChampionBanner champion={championName} tournament={tournament} />
+          <MobileChampionBanner champion={championName} tournament={tournament} record={championRow?.record} />
           {/* 대회 요약 — 데스크탑에서는 최종 순위 아래(좌측 컬럼)로 이동 */}
           <div className="tm-hide-desktop" style={{ marginTop: 16 }}>
             <TournamentSummaryCard tournament={tournament} />
           </div>
-          {videosTotal > 0 && (
-            <nav className="tm-segment-row" aria-label="결과 보기 전환" style={{ marginTop: 16 }}>
-              <button
-                type="button"
-                className="tm-review-tab"
-                data-active={activeTab === 'results'}
-                aria-pressed={activeTab === 'results'}
-                onClick={() => setActiveTab('results')}
-              >
-                경기 결과
-              </button>
-              <button
-                type="button"
-                className="tm-review-tab"
-                data-active={activeTab === 'videos'}
-                aria-pressed={activeTab === 'videos'}
-                onClick={() => setActiveTab('videos')}
-              >
-                경기 영상 {videosTotal}
-              </button>
-            </nav>
-          )}
+        </div>
+      )}
+
+      {/* 결과/영상 탭 전환 — 우승팀을 못 뽑는 대회(리그전, 결승 무승부 등)에서도
+          등록된 경기 영상에 접근할 수 있어야 하므로 챔피언 섹션과 무관하게 렌더한다. */}
+      {isCompleted && videosTotal > 0 && (
+        <div style={{ padding: '16px 20px 0' }}>
+          <nav className="tm-segment-row" aria-label="결과 보기 전환">
+            <button
+              type="button"
+              className="tm-review-tab"
+              data-active={activeTab === 'results'}
+              aria-pressed={activeTab === 'results'}
+              onClick={() => setActiveTab('results')}
+            >
+              경기 결과
+            </button>
+            <button
+              type="button"
+              className="tm-review-tab"
+              data-active={activeTab === 'videos'}
+              aria-pressed={activeTab === 'videos'}
+              onClick={() => setActiveTab('videos')}
+            >
+              경기 영상 {videosTotal}
+            </button>
+          </nav>
         </div>
       )}
 
@@ -968,11 +1071,12 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
       {isCompleted && activeTab === 'results' && (
         <div className="tm-tourn-sub-grid tm-tourn-sub-grid-6040 tm-results-grid">
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
-            <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>최종 순위</h3>
+            <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>최종 순위</h3>
             {knockoutRows.length > 0 ? (
               <FinalStandingsTable rows={knockoutRows} fixtures={tournament.fixtures} />
             ) : (
               <EmptyState
+                illustration={{ name: 'journey-done' }}
                 title="최종 순위가 아직 등록되지 않았어요."
                 sub="운영진이 결과를 확정하면 이곳에서 순위를 확인할 수 있어요."
               />
@@ -985,7 +1089,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
             {knockoutFixtures.length > 0 && (
               <>
-                <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>결선 경기</h3>
+                <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>결선 경기</h3>
                 <KnockoutResultsTable fixtures={knockoutFixtures} kindOf={knockoutKind} />
               </>
             )}
@@ -1009,8 +1113,8 @@ function ResultsPageSkeleton() {
   return (
     <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="tm-skeleton" style={{ height: 56, borderRadius: 10 }} />
-      <div className="tm-skeleton" style={{ height: 180, borderRadius: 16 }} />
-      <div className="tm-skeleton" style={{ height: 160, borderRadius: 12 }} />
+      <div className="tm-skeleton" style={{ height: 180, borderRadius: 'var(--radius-container)' }} />
+      <div className="tm-skeleton" style={{ height: 160, borderRadius: 'var(--radius-control)' }} />
     </div>
   );
 }
@@ -1018,24 +1122,18 @@ function ResultsPageSkeleton() {
 export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
   const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
   if (isLoading) {
-    return (
-      <AppChrome title="최종결과" backHref={'/tournaments/' + tournamentId + '/bracket'} activeTab="tournaments" desktopHead>
-        <ResultsPageSkeleton />
-      </AppChrome>
-    );
+    return <ResultsPageSkeleton />;
   }
   if (isError || !data) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요.');
     return (
-      <AppChrome title="최종결과" backHref={'/tournaments/' + tournamentId + '/bracket'} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '40px 20px' }}>
-          <ErrorState message={msg} onRetry={() => void refetch()} />
-        </div>
-      </AppChrome>
+      <div style={{ padding: '40px 20px' }}>
+        <ErrorState message={msg} onRetry={() => void refetch()} />
+      </div>
     );
   }
   return (
-    <AppChrome title="최종결과" backHref={'/tournaments/' + tournamentId + '/bracket'} activeTab="tournaments" desktopHead>
+    <>
       <ResultsPageContent tournament={data} />
       <div className="tm-tourn-sub-flownav">
         <TournamentFlowNav
@@ -1043,6 +1141,6 @@ export function ResultsPageClient({ tournamentId }: { tournamentId: string }) {
           next={{ href: '/tournaments/' + tournamentId + '/awards', label: '시상·리뷰', enabled: data.status === 'completed', disabledHint: '대회 종료 후 공개' }}
         />
       </div>
-    </AppChrome>
+    </>
   );
 }

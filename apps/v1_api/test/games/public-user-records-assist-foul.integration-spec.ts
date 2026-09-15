@@ -15,6 +15,9 @@ const ids = {
   awayTeam: '67000000-0000-4000-8000-000000000021',
   tournament: '67000000-0000-4000-8000-000000000030',
   fixture: '67000000-0000-4000-8000-000000000031',
+  hostRegistration: '67000000-0000-4000-8000-000000000032',
+  awayRegistration: '67000000-0000-4000-8000-000000000033',
+  tournamentPlayer: '67000000-0000-4000-8000-000000000034',
   assignment: '67000000-0000-4000-8000-000000000040',
   linkId: '67000000-0000-4000-8000-000000000050',
 } as const;
@@ -49,13 +52,40 @@ describe('PublicUserRecordsService.getRecords — assist/foul summary (T1-4)', (
         { id: ids.awayTeam, ownerUserId: ids.operator, sportId: ids.sport, regionId: ids.region, name: 'Summary Away' },
       ],
     });
-    await prisma.v1Tournament.create({ data: { id: ids.tournament, sportId: ids.sport, title: 'Task Summary Tournament', competitionConfigVersionId: config.id } });
-    await prisma.v1TournamentFixture.create({ data: { id: ids.fixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, competitionConfigVersionId: config.id } });
+    await prisma.v1Tournament.create({ data: { id: ids.tournament, sportId: ids.sport, regionId: ids.region, title: 'Task Summary Tournament', kind: 'regular_tournament', format: 'league', competitionConfigVersionId: config.id } });
+    await prisma.v1TournamentRegistration.createMany({ data: [
+      { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.operator, status: 'confirmed' },
+      { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.awayTeam, appliedByUserId: ids.operator, status: 'confirmed' },
+    ] });
+    await prisma.v1TournamentPlayer.create({
+      data: { id: ids.tournamentPlayer, registrationId: ids.hostRegistration, userId: ids.targetUser, realName: 'Player' },
+    });
+    await prisma.v1TeamMatch.create({ data: {
+      id: ids.fixture,
+      tournamentId: ids.tournament,
+      hostTeamId: ids.hostTeam,
+      approvedApplicantTeamId: ids.awayTeam,
+      sportId: ids.sport,
+      regionId: ids.region,
+      title: 'Task Summary Match',
+      status: 'matched',
+      startAt: new Date('2026-07-31T00:00:00.000Z'),
+      competitionConfigVersionId: config.id,
+    } });
+    await prisma.v1TournamentMatchDetails.create({ data: {
+      teamMatchId: ids.fixture,
+      tournamentId: ids.tournament,
+      round: 'group',
+      fixtureNumber: 1,
+      legNumber: 1,
+      homeRegistrationId: ids.hostRegistration,
+      awayRegistrationId: ids.awayRegistration,
+    } });
     await prisma.v1TournamentStaffAssignment.create({ data: { id: ids.assignment, tournamentId: ids.tournament, userId: ids.operator, role: 'TOURNAMENT_DIRECTOR', grantedByUserId: ids.operator } });
     await prisma.v1GameOperationFlag.upsert({ where: { key: 'PUBLIC_LIVE' }, create: { key: 'PUBLIC_LIVE', value: 'off', ownerActor: 'platform_ops' }, update: {} });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: config.id,
       sides: [

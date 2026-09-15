@@ -256,7 +256,7 @@ export class UploadsService {
     if (!resolvedPath.startsWith(`${basePath}${path.sep}`)) {
       throw new BadRequestException('삭제할 업로드 경로가 올바르지 않아요.');
     }
-    await this.safeUnlink(resolvedPath);
+    await this.strictUnlink(resolvedPath);
   }
 
   /**
@@ -291,6 +291,20 @@ export class UploadsService {
       this.logger.warn(
         `임시 파일 삭제 실패 (${filePath}): ${err instanceof Error ? err.message : String(err)}`,
       );
+    }
+  }
+
+  private async strictUnlink(filePath: string): Promise<void> {
+    try {
+      await fs.unlink(filePath);
+    } catch (err) {
+      if (
+        err !== null &&
+        typeof err === 'object' &&
+        'code' in err &&
+        (err as { code?: string }).code === 'ENOENT'
+      ) return;
+      throw err;
     }
   }
 }

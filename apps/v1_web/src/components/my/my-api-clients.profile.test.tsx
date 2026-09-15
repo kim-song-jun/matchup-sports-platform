@@ -20,6 +20,9 @@ const hooks = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
   useSearchParams: () => new URLSearchParams(),
+  // U37: useShellOverride(shell-override.ts)가 usePathname을 쓴다 — 셸 승격 전엔 이 화면이
+  // 직접 AppChrome을 렌더해 필요 없었지만, 이제 desktopHead override 배관에 필요하다.
+  usePathname: () => '/my/profile/edit',
 }));
 
 // 실제 인증 카드는 발급/검증 API를 호출한다. 여기서 검증할 계약은 "번호를 바꾸면 증명 없이는

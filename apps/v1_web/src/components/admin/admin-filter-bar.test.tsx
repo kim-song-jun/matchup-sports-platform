@@ -27,18 +27,43 @@ describe('AdminFilterBar', () => {
     expect(onStatusChange).toHaveBeenCalledWith('active');
   });
 
-  it('shows a pending placeholder until summary data is available', () => {
+  it('shows a pending placeholder for a chip still loading while sibling chips already have counts', () => {
     render(
       <AdminFilterBar
         hideSearch
         searchValue=""
         onSearchChange={vi.fn()}
-        statusOptions={[{ value: '', label: '전체' }]}
+        statusOptions={[
+          { value: '', label: '전체', count: 12 },
+          { value: 'pending', label: '대기' },
+        ]}
         activeStatus=""
         onStatusChange={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole('button', { name: '전체' })).toHaveTextContent('전체—');
+    expect(screen.getByRole('button', { name: '대기' })).toHaveTextContent('대기—');
+  });
+
+  it('renders no count span at all when the screen never provides counts for any chip', () => {
+    // 리그 허브 체계 필터처럼 애초에 count 를 제공하지 않는 화면 — '—' 가 영구
+    // 로딩처럼 보이는 것을 막는다 (index 12 회귀 테스트).
+    render(
+      <AdminFilterBar
+        hideSearch
+        searchValue=""
+        onSearchChange={vi.fn()}
+        statusOptions={[
+          { value: '', label: '전체' },
+          { value: 'sr-1', label: '서울 풋살 리그' },
+        ]}
+        activeStatus=""
+        onStatusChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: '전체' })).toHaveTextContent('전체');
+    expect(screen.getByRole('button', { name: '전체' })).not.toHaveTextContent('—');
+    expect(screen.getByRole('button', { name: '서울 풋살 리그' })).not.toHaveTextContent('—');
   });
 });

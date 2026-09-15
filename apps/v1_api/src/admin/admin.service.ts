@@ -20,6 +20,7 @@ import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation
 import { normalizeRichContent } from '../content/rich-content';
 import { UploadedFile, UploadsService } from '../uploads/uploads.service';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
+import { TOURNAMENT_SURFACE_KIND } from '../tournaments/tournament-surface';
 import {
   AdminListQueryDto,
   AdminLogsQueryDto,
@@ -27,6 +28,8 @@ import {
   AdminMatchListQueryDto,
   AdminOverviewQueryDto,
   AdminPopupListQueryDto,
+  AdminReportedTeamListQueryDto,
+  AdminGlobalSearchQueryDto,
   AdminTeamListQueryDto,
   AdminTeamMatchListQueryDto,
   AdminNoticeListQueryDto,
@@ -80,7 +83,10 @@ const NOTICE_AUDIENCES = ['public', 'users', 'admins'] as const;
 const POPUP_LIST_STATUSES = ['published', 'archived', 'draft'] as const;
 const INQUIRY_LIST_STATUSES = ['received', 'reviewing', 'answered', 'closed'] as const;
 const INQUIRY_CATEGORIES = ['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other'] as const;
+const INQUIRY_REPORT_REASONS = ['spam', 'harassment', 'impersonation', 'inappropriate', 'other'] as const;
 const ADMIN_LIST_STATUSES = ['active', 'suspended', 'revoked'] as const;
+// 신고 롤업 집계 윈도우 — 신고 상세 요약과 신고 누적 팀 목록의 "최근" 이 이 값을 공유한다.
+const REPORT_ROLLUP_WINDOW_DAYS = 30;
 
 @Injectable()
 export class AdminService implements OnModuleInit, OnModuleDestroy {
@@ -220,6 +226,28 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
       const target = await tx.v1User.findUnique({ where: { id: userId } });
       if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'User was not found' });
+
+      // 탈퇴 처리(deleteUser)는 되돌릴 수 없다. 그 경로는 이메일·전화번호를 tombstone 값으로
+      // 덮고 인증 시각을 지우며 프로필을 마스킹한다 — 그 계정을 다시 active 로 올리면 연락처가
+      // 없고 인증도 안 된 채 살아 있는 계정이 된다. 로그인도, 인증번호 재발송도, 연락도 안
+      // 되는데 목록에는 정상 회원으로 보인다.
+      //
+      // 다만 accountStatus === 'deleted' 만으로는 그 계정인지 알 수 없다. 이 상태를 만드는
+      // 경로가 둘이고 성격이 정반대다:
+      //   1) deleteUser()          — 스크럽 + deletedAt 기록. 되살리면 안 된다.
+      //   2) changeUserStatus('deleted') — accountStatus 한 줄만 바꾼다. 스크럽도 없고
+      //      deletedAt 도 null 이라 개인정보·인증이 그대로 남아 있다(어드민 회원 모달의
+      //      '삭제' 선택지가 실제로 이 경로다).
+      // deletedAt 을 쓰는 곳은 deleteUser() 뿐이므로 그것이 두 경로의 판별자다. 이걸 함께
+      // 보지 않으면 모달 오클릭 한 번으로 만들어진 2)번 계정이 어떤 어드민 경로로도 복구
+      // 불가가 되고(본인 로그인도 차단), 아래 409 문구("개인정보가 지워져")도 그 행에는
+      // 거짓이 된다.
+      if (target.accountStatus === 'deleted' && target.deletedAt !== null && dto.status !== 'deleted') {
+        throw new ConflictException({
+          code: 'USER_DELETED_IRREVERSIBLE',
+          message: '이미 삭제된 계정이에요. 개인정보가 지워져 되살릴 수 없어요.',
+        });
+      }
 
       const targetAdminRecord = await tx.v1AdminUser.findUnique({ where: { userId } });
       if (targetAdminRecord?.status === 'active') {
@@ -365,11 +393,35 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
           nickname: buildDeletedNickname(userId),
           displayName: '탈퇴 회원',
           realName: null,
+          gender: null,
+          birthDate: null,
           bio: null,
           profileImageUrl: null,
+          displayRegion: null,
+          visibility: 'private',
+          tournamentRealNameVisible: false,
           deletedAt,
         },
       });
+      // 공개 개인 기록 게이트(`isParticipantPubliclyEligible`, public-consent.ts)는
+      // `V1UserRecordConsent.state`가 GRANTED인지만 본다 -- 여기서 REVOKED로 함께
+      // 전환하지 않으면 탈퇴 전 동의를 켰던 사용자의 경기 기록(사용자 기록 페이지 +
+      // 대회 기록/랭킹 등 같은 게이트를 쓰는 다른 공개 화면)이 탈퇴 후에도 계속 공개
+      // 후보로 남는다. 동의 행이 없던 사용자는 그대로 두어도 이미 non-eligible이므로
+      // updateMany 로 기존 GRANTED 행만 REVOKED 전환한다(없는 행을 새로 만들 필요 없음).
+      await tx.v1UserRecordConsent.updateMany({
+        where: { userId, state: 'GRANTED' },
+        data: { state: 'REVOKED', effectiveAt: deletedAt },
+      });
+      // 탈퇴 요청 단계에서는 기기 등록을 revoked 상태로 남겨 운영 이력을 보존하지만,
+      // 최종 삭제 단계에서는 FCM/APNs 토큰과 웹 Push endpoint 자체가 더 이상 필요하지
+      // 않다. 둘 다 재식별 가능한 기기 식별자이므로 계정 삭제 트랜잭션 안에서 제거한다.
+      await tx.v1PushSubscription.deleteMany({ where: { userId } });
+      await tx.v1PushDevice.deleteMany({ where: { userId } });
+      await tx.v1UserRegion.deleteMany({ where: { userId } });
+      await tx.v1UserSportPreference.deleteMany({ where: { userId } });
+      await tx.v1SearchHistory.deleteMany({ where: { userId } });
+      await tx.v1VerificationToken.deleteMany({ where: { userId } });
       const result = await this.writeAdminStatusLogs(
         admin,
         {
@@ -413,9 +465,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   async changeMatchStatus(user: V1AuthUser, matchId: string, dto: ChangeMatchStatusDto) {
     const admin = await this.getMutationAdmin(user.id);
-    const target = await this.prisma.v1Match.findUnique({ where: { id: matchId } });
-    if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Match was not found' });
     return this.prisma.$transaction(async (tx) => {
+      // 로그의 "이전 상태"는 바꾸기 직전 값이어야 한다. 트랜잭션 밖에서 읽으면 그 사이에
+      // 다른 조작이 커밋됐을 때 실제와 다른 값이 감사 로그에 남는다 — changeUserStatus 는
+      // 이미 트랜잭션 안에서 행을 잠그고 읽는다. 같은 방식으로 맞춘다.
+      await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${matchId} FOR UPDATE`;
+      const target = await tx.v1Match.findUnique({ where: { id: matchId } });
+      if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Match was not found' });
       const updated = await tx.v1Match.update({ where: { id: matchId }, data: { status: dto.status } });
       return this.writeAdminStatusLogs(
         admin,
@@ -437,9 +493,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   async changeTeamStatus(user: V1AuthUser, teamId: string, dto: ChangeTeamStatusDto) {
     const admin = await this.getMutationAdmin(user.id);
-    const target = await this.prisma.v1Team.findUnique({ where: { id: teamId } });
-    if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team was not found' });
     return this.prisma.$transaction(async (tx) => {
+      // 로그의 "이전 상태"는 바꾸기 직전 값이어야 한다. 트랜잭션 밖에서 읽으면 그 사이에
+      // 다른 조작이 커밋됐을 때 실제와 다른 값이 감사 로그에 남는다 — changeUserStatus 는
+      // 이미 트랜잭션 안에서 행을 잠그고 읽는다. 같은 방식으로 맞춘다.
+      await tx.$queryRaw`SELECT id FROM "v1_teams" WHERE id = ${teamId} FOR UPDATE`;
+      const target = await tx.v1Team.findUnique({ where: { id: teamId } });
+      if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team was not found' });
       const updated = await tx.v1Team.update({ where: { id: teamId }, data: { status: dto.status } });
       return this.writeAdminStatusLogs(
         admin,
@@ -461,8 +521,6 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   async changeTeamMatchStatus(user: V1AuthUser, teamMatchId: string, dto: ChangeTeamMatchStatusDto) {
     const admin = await this.getMutationAdmin(user.id);
-    const target = await this.prisma.v1TeamMatch.findUnique({ where: { id: teamMatchId } });
-    if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team match was not found' });
     // Task 25: `completed` now flows exclusively through the Game result-official
     // transaction (games.service.ts), which also writes the status-change log and
     // keeps the review/projection surface consistent. An admin-driven direct flip
@@ -476,6 +534,12 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       });
     }
     return this.prisma.$transaction(async (tx) => {
+      // 로그의 "이전 상태"는 바꾸기 직전 값이어야 한다. 트랜잭션 밖에서 읽으면 그 사이에
+      // 다른 조작이 커밋됐을 때 실제와 다른 값이 감사 로그에 남는다 — changeUserStatus 는
+      // 이미 트랜잭션 안에서 행을 잠그고 읽는다. 같은 방식으로 맞춘다.
+      await tx.$queryRaw`SELECT id FROM "v1_team_matches" WHERE id = ${teamMatchId} FOR UPDATE`;
+      const target = await tx.v1TeamMatch.findUnique({ where: { id: teamMatchId } });
+      if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team match was not found' });
       const updated = await tx.v1TeamMatch.update({ where: { id: teamMatchId }, data: { status: dto.status } });
       return this.writeAdminStatusLogs(
         admin,
@@ -952,7 +1016,276 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /**
+   * 팀매치 상세. getMatch 와 같은 모양이되 팀매치에만 있는 것들을 더한다:
+   * 상대팀 신청 목록, 승인된 상대팀, 소속 리그, 경기 조건(형식·성별 규칙 등).
+   *
+   * 라이브 경기 상태는 넣지 않는다 — 그건 현장 콘솔(/admin/live/:tournamentId)의 일이고,
+   * 여기서 다시 보여주면 같은 정보가 두 화면에 갈린다. 대신 연결된 게임이 있는지만 알린다.
+   */
+  async getTeamMatch(user: V1AuthUser, teamMatchId: string) {
+    await this.getActiveAdmin(user.id);
+
+    const row = await this.prisma.v1TeamMatch.findUnique({
+      where: { id: teamMatchId },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        placeName: true,
+        placeAddress: true,
+        startAt: true,
+        endAt: true,
+        deadlineAt: true,
+        status: true,
+        matchFormat: true,
+        formatNote: true,
+        matchStyle: true,
+        genderRule: true,
+        uniformColor: true,
+        costNote: true,
+        createdAt: true,
+        hostTeamId: true,
+        hostTeam: { select: { name: true } },
+        approvedApplicantTeamId: true,
+        approvedApplicantTeam: { select: { name: true } },
+        sport: { select: { name: true, code: true } },
+        region: { select: { name: true } },
+        createdByUser: { select: { id: true, profile: { select: { nickname: true } } } },
+        league: { select: { id: true, title: true } },
+        tournament: { select: { id: true, title: true } },
+        game: { select: { id: true } },
+        applications: {
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+          select: {
+            id: true,
+            status: true,
+            message: true,
+            createdAt: true,
+            applicantTeamId: true,
+            applicantTeam: { select: { name: true } },
+          },
+        },
+        _count: { select: { applications: true } },
+      },
+    });
+
+    if (!row) {
+      throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team match was not found' });
+    }
+
+    return {
+      teamMatchId: row.id,
+      title: row.title,
+      description: row.description ?? null,
+      sportName: row.sport.name,
+      sportCode: row.sport.code,
+      regionName: row.region?.name ?? null,
+      placeName: row.placeName,
+      placeAddress: row.placeAddress ?? null,
+      startAt: row.startAt,
+      endAt: row.endAt ?? null,
+      deadlineAt: row.deadlineAt ?? null,
+      status: row.status,
+      hostTeamId: row.hostTeamId,
+      hostTeamName: row.hostTeam?.name ?? null,
+      approvedApplicantTeamId: row.approvedApplicantTeamId ?? null,
+      approvedApplicantTeamName: row.approvedApplicantTeam?.name ?? null,
+      createdByUserId: row.createdByUser?.id ?? null,
+      createdByName: row.createdByUser?.profile?.nickname ?? null,
+      league: row.league ? { leagueId: row.league.id, title: row.league.title } : null,
+      tournament: row.tournament ? { tournamentId: row.tournament.id, title: row.tournament.title } : null,
+      // 게임이 붙어 있으면 현장 콘솔에서 다룰 수 있는 경기라는 뜻이다.
+      hasGame: row.game !== null,
+      matchFormat: row.matchFormat ?? null,
+      formatNote: row.formatNote ?? null,
+      matchStyle: row.matchStyle,
+      genderRule: row.genderRule ?? null,
+      uniformColor: row.uniformColor ?? null,
+      costNote: row.costNote ?? null,
+      applicationCount: row._count.applications,
+      applications: row.applications.map((application) => ({
+        applicationId: application.id,
+        status: application.status,
+        message: application.message ?? null,
+        applicantTeamId: application.applicantTeamId,
+        applicantTeamName: application.applicantTeam.name,
+        createdAt: application.createdAt,
+      })),
+      createdAt: row.createdAt,
+    };
+  }
+
   // ─── Team list / detail ────────────────────────────────────────────────────
+
+  /**
+   * 전역 검색 (커맨드 팔레트용) — 회원/팀/매치 3도메인을 도메인당 최대 5건으로 가볍게 조회한다.
+   * 목록 API들과 동일한 검색 필드를 쓰되(list* 메서드의 q where 절과 동일 계약),
+   * summary groupBy·상세 select 없이 팔레트에 필요한 최소 필드만 내려준다.
+   */
+  async globalSearch(user: V1AuthUser, query: AdminGlobalSearchQueryDto) {
+    await this.getActiveAdmin(user.id);
+    const q = query.q.trim();
+    if (!q) return { users: [], teams: [], matches: [] };
+
+    const contains = { contains: q, mode: 'insensitive' as const };
+    const TAKE = 5;
+
+    const [users, teams, matches] = await Promise.all([
+      this.prisma.v1User.findMany({
+        where: {
+          OR: [
+            { profile: { nickname: contains } },
+            { profile: { realName: contains } },
+            { profile: { displayName: contains } },
+            { email: contains },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: TAKE,
+        select: {
+          id: true,
+          email: true,
+          accountStatus: true,
+          profile: { select: { nickname: true, displayName: true } },
+        },
+      }),
+      this.prisma.v1Team.findMany({
+        where: { name: contains },
+        orderBy: { createdAt: 'desc' },
+        take: TAKE,
+        select: { id: true, name: true, status: true },
+      }),
+      this.prisma.v1Match.findMany({
+        where: { OR: [{ title: contains }, { placeName: contains }] },
+        orderBy: { createdAt: 'desc' },
+        take: TAKE,
+        select: { id: true, title: true, placeName: true, status: true },
+      }),
+    ]);
+
+    return {
+      users: users.map((row) => ({
+        userId: row.id,
+        label: row.profile?.nickname ?? row.profile?.displayName ?? row.email ?? '프로필 없음',
+        sublabel: row.email,
+        status: row.accountStatus,
+      })),
+      teams: teams.map((row) => ({ teamId: row.id, label: row.name, status: row.status })),
+      matches: matches.map((row) => ({
+        matchId: row.id,
+        label: row.title,
+        sublabel: row.placeName,
+        status: row.status,
+      })),
+    };
+  }
+
+  /**
+   * 어드민 할 일 인박스 (M3) — 운영자 액션을 기다리는 항목의 요약 집계.
+   * - pendingRegistrations: 처리 대기 대회 신청 (입금확인·확정/대기·취소요청 대기 상태)
+   * - resultReviewPending: tournament-ops result-review 화면의 '검토 대기'와 동일 정의 —
+   *   ENDED 게임 중 공식 리비전이 없거나 열린(PENDING/ACKNOWLEDGED) SLA 에스컬레이션이 있는 경기.
+   *   (raw SQL 대신 관계 필터로 재현 — 운영 보드 서비스 로직과 드리프트를 만들지 않는다)
+   * - pendingInquiries / tournamentsInProgress: 기존 집계와 동일 where 재사용
+   */
+  async hubInbox(user: V1AuthUser) {
+    await this.getActiveAdmin(user.id);
+
+    const REGISTRATION_ACTIONABLE = [
+      'awaiting_payment',
+      'payment_checking',
+      'paid',
+      'cancel_requested',
+    ] as const;
+
+    const [regGroups, rawReviewGroups, pendingInquiries, tournamentsInProgress] = await Promise.all([
+      this.prisma.v1TournamentRegistration.groupBy({
+        by: ['tournamentId'],
+        where: {
+          status: { in: [...REGISTRATION_ACTIONABLE] },
+          tournament: { deletedAt: null },
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.v1TeamMatch.groupBy({
+        by: ['tournamentId'],
+        where: {
+          // Canonical tournament matches are owned by tournamentId and have
+          // no league mirror. Keep the public tournament surface gate so a
+          // regular-league row sharing the same id cannot leak into this inbox.
+          leagueId: null,
+          tournament: { ...TOURNAMENT_SURFACE_KIND, deletedAt: null },
+          tournamentDetails: { isNot: null },
+          game: {
+            is: {
+              sourceType: 'TEAM_MATCH',
+              state: 'ENDED',
+              OR: [
+                { currentOfficialRevisionId: null },
+                {
+                  resultRevisions: {
+                    some: {
+                      resultEscalations: {
+                        some: { status: { in: ['PENDING', 'ACKNOWLEDGED'] } },
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.v1Inquiry.count({ where: { status: { in: ['received', 'reviewing'] } } }),
+      // 대시보드 '진행 중 대회' KPI — 정규 리그 시즌은 세지 않는다(상수 주석 참고).
+      this.prisma.v1Tournament.count({ where: { ...TOURNAMENT_SURFACE_KIND, status: 'in_progress', deletedAt: null } }),
+    ]);
+    const reviewGroups = rawReviewGroups.filter(
+      (group): group is (typeof rawReviewGroups)[number] & { tournamentId: string } => group.tournamentId !== null,
+    );
+
+    const tournamentIds = [
+      ...new Set([
+        ...regGroups.map((group) => group.tournamentId),
+        ...reviewGroups.map((group) => group.tournamentId),
+      ]),
+    ];
+    const titles = tournamentIds.length
+      ? await this.prisma.v1Tournament.findMany({
+          where: { id: { in: tournamentIds } },
+          select: { id: true, title: true },
+        })
+      : [];
+    const titleById = new Map(titles.map((row) => [row.id, row.title]));
+
+    return {
+      pendingRegistrations: {
+        total: regGroups.reduce((sum, group) => sum + group._count._all, 0),
+        tournaments: regGroups
+          .map((group) => ({
+            tournamentId: group.tournamentId,
+            title: titleById.get(group.tournamentId) ?? '',
+            count: group._count._all,
+          }))
+          .sort((a, b) => b.count - a.count),
+      },
+      resultReviewPending: {
+        total: reviewGroups.reduce((sum, group) => sum + group._count._all, 0),
+        tournaments: reviewGroups
+          .map((group) => ({
+            tournamentId: group.tournamentId,
+            title: titleById.get(group.tournamentId) ?? '',
+            count: group._count._all,
+          }))
+          .sort((a, b) => b.count - a.count),
+      },
+      pendingInquiries,
+      tournamentsInProgress,
+    };
+  }
 
   async listTeams(user: V1AuthUser, query: AdminTeamListQueryDto) {
     await this.getActiveAdmin(user.id);
@@ -1574,15 +1907,35 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         }
       : {};
 
+    // 각 facet 은 "자기 자신을 뺀 나머지 필터" 로 집계한다 — 그래야 칩에 붙는 건수가
+    // "이걸 고르면 몇 건이 되는지" 를 뜻한다. 새로 들어온 reportReason 도 같은 규칙을 따른다.
+    const reportReasonWhere: Prisma.V1InquiryWhereInput = query.reportReason
+      ? { reportReason: query.reportReason }
+      : {};
+    // reportedTeamId 는 칩이 없는 딥링크 필터라 "자기 facet" 이 없다 — 세 facet 모두에 건다.
+    // 그래야 특정 팀 신고함으로 들어왔을 때 사유 칩 건수가 "이 팀 안에서" 의 숫자가 된다.
+    const reportedTeamWhere: Prisma.V1InquiryWhereInput = query.reportedTeamId
+      ? { reportedTeamId: query.reportedTeamId }
+      : {};
     const statusFacetWhere: Prisma.V1InquiryWhereInput = {
       ...(query.category ? { category: query.category } : {}),
+      ...reportReasonWhere,
+      ...reportedTeamWhere,
       ...searchWhere,
     };
     const categoryFacetWhere: Prisma.V1InquiryWhereInput = {
       ...(query.status ? { status: query.status } : {}),
+      ...reportReasonWhere,
+      ...reportedTeamWhere,
       ...searchWhere,
     };
-    const [rows, statusGroups, categoryGroups] = await Promise.all([this.prisma.v1Inquiry.findMany({
+    const reportReasonFacetWhere: Prisma.V1InquiryWhereInput = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.category ? { category: query.category } : {}),
+      ...reportedTeamWhere,
+      ...searchWhere,
+    };
+    const [rows, statusGroups, categoryGroups, reportReasonGroups] = await Promise.all([this.prisma.v1Inquiry.findMany({
       where: {
         ...(query.status ? { status: query.status } : {}),
         ...statusFacetWhere,
@@ -1597,6 +1950,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         status: true,
         relatedType: true,
         relatedId: true,
+        reportReason: true,
         createdAt: true,
         updatedAt: true,
         closedAt: true,
@@ -1613,6 +1967,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     }), this.prisma.v1Inquiry.groupBy({
       by: ['category'],
       where: categoryFacetWhere,
+      _count: { _all: true },
+    }), this.prisma.v1Inquiry.groupBy({
+      by: ['reportReason'],
+      where: reportReasonFacetWhere,
       _count: { _all: true },
     })]);
 
@@ -1640,6 +1998,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         byCategory: buildCountMap(
           INQUIRY_CATEGORIES,
           categoryGroups.map((group) => ({ key: group.category, count: group._count._all })),
+        ),
+        // reportReason 은 nullable 이라 groupBy 결과에 null 키가 섞인다 — 신고가 아닌 문의들이다.
+        // 필터 칩은 실제 사유만 보여주면 되므로 null 그룹은 버린다.
+        byReportReason: buildCountMap(
+          INQUIRY_REPORT_REASONS,
+          reportReasonGroups
+            .filter((group) => group.reportReason !== null)
+            .map((group) => ({ key: group.reportReason as string, count: group._count._all })),
         ),
       },
     };
@@ -1669,6 +2035,9 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         contact: true,
         relatedType: true,
         relatedId: true,
+        reportReason: true,
+        reportedTeamId: true,
+        reportedTeam: { select: { id: true, name: true, status: true } },
         status: true,
         closedAt: true,
         createdAt: true,
@@ -1693,7 +2062,154 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       },
     });
     if (!row) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Inquiry was not found' });
-    return this.toAdminInquiryDetail(row);
+    // 대상 팀이 없으면 집계 쿼리를 돌리지 않는다 — 신고가 아닌 문의 상세가 비용을 치를 이유가 없다.
+    const reportedTeam = row.reportedTeam ? await this.buildReportedTeamSummary(row.reportedTeam) : null;
+    return this.toAdminInquiryDetail(row, reportedTeam);
+  }
+
+  /**
+   * 신고 누적 팀 랭킹 (GET /admin/reports/teams) — 반복 신고되는 팀을 운영자가 한눈에 보는 목록.
+   * 전체 누적 건수로 순위를 매긴다. 최근 30일만으로 세우면 과거에 반복 신고된 팀이 목록에서
+   * 사라진다 — 순위는 전체 누적, "최근" 컬럼만 30일 윈도우로 별도 표기한다.
+   */
+  async listReportedTeams(user: V1AuthUser, query: AdminReportedTeamListQueryDto) {
+    await this.getActiveAdmin(user.id);
+    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+    const since = new Date(Date.now() - REPORT_ROLLUP_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+    const allGroups = await this.prisma.v1Inquiry.groupBy({
+      by: ['reportedTeamId'],
+      where: { category: 'report', reportedTeamId: { not: null } },
+      _count: { _all: true },
+      _max: { createdAt: true },
+    });
+    // 랭킹 정렬은 JS 에서 한다(hubInbox 와 같은 관용구) — groupBy 의 _count 기준 orderBy 는
+    // 이 저장소 어디서도 쓰지 않아 안전성이 검증돼 있지 않다.
+    const groups = [...allGroups].sort((a, b) => b._count._all - a._count._all).slice(0, limit);
+    const teamIds = groups.map((group) => group.reportedTeamId as string);
+    if (teamIds.length === 0) return { items: [], windowDays: REPORT_ROLLUP_WINDOW_DAYS };
+
+    const [teams, recentGroups, reasonGroups] = await Promise.all([
+      this.prisma.v1Team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true, status: true } }),
+      this.prisma.v1Inquiry.groupBy({
+        by: ['reportedTeamId'],
+        where: { category: 'report', reportedTeamId: { in: teamIds }, createdAt: { gte: since } },
+        _count: { _all: true },
+      }),
+      this.prisma.v1Inquiry.groupBy({
+        by: ['reportedTeamId', 'reportReason'],
+        where: { category: 'report', reportedTeamId: { in: teamIds } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const teamById = new Map(teams.map((team) => [team.id, team]));
+    const recentById = new Map(recentGroups.map((group) => [group.reportedTeamId as string, group._count._all]));
+    const topReasonById = new Map<string, string | null>();
+    for (const teamId of teamIds) {
+      const rows = reasonGroups
+        .filter((group) => group.reportedTeamId === teamId && group.reportReason !== null)
+        .sort((a, b) => b._count._all - a._count._all);
+      topReasonById.set(teamId, (rows[0]?.reportReason as string | undefined) ?? null);
+    }
+
+    return {
+      items: groups.map((group) => {
+        const teamId = group.reportedTeamId as string;
+        const team = teamById.get(teamId);
+        return {
+          teamId,
+          name: team?.name ?? null,
+          status: team?.status ?? null,
+          totalCount: group._count._all,
+          recentCount: recentById.get(teamId) ?? 0,
+          topReason: topReasonById.get(teamId) ?? null,
+          lastReportedAt: group._max.createdAt,
+        };
+      }),
+      windowDays: REPORT_ROLLUP_WINDOW_DAYS,
+    };
+  }
+
+  /**
+   * 신고를 근거로 **신고자 팀 명의** 로 대상 팀을 차단한다.
+   *
+   * 이 조치는 운영자가 남의 팀 설정을 대신 바꾸는 것이다. 그래서 reason 에 근거를 남기고(팀
+   * 설정 화면이 이 사유를 보여준다), 팀이 직접 해제할 수 있게 잠그지 않는다 — 신고한 것은 그
+   * 팀이고 나중에 화해하면 풀 수 있어야 한다.
+   */
+  async blockReportedTeam(user: V1AuthUser, inquiryId: string) {
+    const admin = await this.getMutationAdmin(user.id);
+
+    const inquiry = await this.prisma.v1Inquiry.findUnique({
+      where: { id: inquiryId },
+      select: { id: true, category: true, relatedType: true, relatedId: true, reportedTeamId: true },
+    });
+    if (!inquiry) throw new NotFoundException({ code: 'NOT_FOUND', message: '문의를 찾을 수 없어요.' });
+    if (inquiry.category !== 'report' || !inquiry.reportedTeamId) {
+      throw new ConflictException({
+        code: 'REPORT_TARGET_UNKNOWN',
+        message: '신고 대상 팀을 알 수 없어 차단할 수 없어요.',
+      });
+    }
+
+    const contact = inquiry.relatedId
+      ? await this.prisma.v1TeamContact.findUnique({
+          where: { id: inquiry.relatedId },
+          select: { fromTeamId: true, toTeamId: true },
+        })
+      : null;
+    if (!contact) {
+      throw new ConflictException({
+        code: 'REPORT_TARGET_UNKNOWN',
+        message: '신고된 컨택을 찾을 수 없어 차단할 수 없어요.',
+      });
+    }
+
+    // 신고자 팀 = 컨택의 두 팀 중 대상이 아닌 쪽.
+    const reporterTeamId =
+      contact.fromTeamId === inquiry.reportedTeamId ? contact.toTeamId : contact.fromTeamId;
+
+    // 두 문자열을 나눈다 — **읽는 사람이 다르다.**
+    // blockReason 은 차단당한 팀의 운영진이 자기 설정 화면에서 본다. 여기에 문의 UUID 를
+    // 넣으면 아무 의미도 전달하지 못하면서 390 폭에서 두 줄로 접혀 해제 버튼까지 밀어낸다
+    // (alpha 캡처에서 실제로 그랬다). auditReason 은 운영자가 보는 감사 로그용이라
+    // 어떤 신고에서 비롯됐는지 추적할 수 있어야 한다.
+    const blockReason = '운영자가 접수된 신고를 확인해 차단했어요.';
+    const auditReason = `운영자 조치 (신고 ${inquiry.id})`;
+    let alreadyBlocked = false;
+    try {
+      await this.prisma.v1TeamContactBlock.create({
+        data: {
+          teamId: reporterTeamId,
+          blockedTeamId: inquiry.reportedTeamId,
+          createdByUserId: user.id,
+          reason: blockReason,
+        },
+      });
+    } catch (error) {
+      // @@unique([teamId, blockedTeamId]) — 두 번 눌러도 500 이 되면 안 된다.
+      // 이 저장소엔 전역 P2002 필터가 없어 여기서 직접 잡는다.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        alreadyBlocked = true;
+      } else {
+        throw error;
+      }
+    }
+
+    await this.writeAdminStatusLogs(admin, {
+      action: 'inquiry.block_reported_team',
+      targetType: 'inquiry',
+      targetId: inquiry.id,
+      previousStatus: alreadyBlocked ? 'blocked' : 'not_blocked',
+      status: 'blocked',
+      reason: auditReason,
+      beforeState: { blocked: alreadyBlocked ? 'true' : 'false' },
+      afterState: { blocked: 'true' },
+      responseIdKey: 'inquiryId',
+    });
+
+    return { blocked: true, alreadyBlocked, teamId: reporterTeamId, blockedTeamId: inquiry.reportedTeamId };
   }
 
   async replyInquiry(user: V1AuthUser, inquiryId: string, dto: ReplyInquiryDto) {
@@ -1825,9 +2341,20 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
 
+    // 경기 제목 또는 호스트 팀명으로 찾는다 — listMatches의 q 계약과 동일한 방식.
+    const statusFacetWhere: Prisma.V1TeamMatchWhereInput = query.q
+      ? {
+          OR: [
+            { title: { contains: query.q, mode: 'insensitive' as const } },
+            { hostTeam: { name: { contains: query.q, mode: 'insensitive' as const } } },
+          ],
+        }
+      : {};
+
     const [rows, statusGroups] = await Promise.all([this.prisma.v1TeamMatch.findMany({
       where: {
         ...(query.status ? { status: query.status } : {}),
+        ...statusFacetWhere,
       },
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
@@ -1841,9 +2368,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         hostTeamId: true,
         hostTeam: { select: { name: true } },
         sport: { select: { name: true } },
+        // 리그전 표시(사용자 결정 3-C) -- 운영자도 목록에서 리그 경기를 바로 구분한다.
+        league: { select: { id: true, title: true } },
+        tournament: { select: { id: true, title: true } },
       },
     }), this.prisma.v1TeamMatch.groupBy({
       by: ['status'],
+      where: statusFacetWhere,
       _count: { _all: true },
     })]);
 
@@ -1860,7 +2391,9 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         teamMatchId: row.id,
         title: row.title,
         hostTeamId: row.hostTeamId,
-        hostTeamName: row.hostTeam.name,
+        hostTeamName: row.hostTeam?.name ?? null,
+        league: row.league ? { leagueId: row.league.id, title: row.league.title } : null,
+        tournament: row.tournament ? { tournamentId: row.tournament.id, title: row.tournament.title } : null,
         sportName: row.sport.name,
         startAt: row.startAt,
         status: row.status,
@@ -2548,6 +3081,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     status: string;
     relatedType: string | null;
     relatedId: string | null;
+    reportReason: string | null;
     createdAt: Date;
     updatedAt: Date;
     closedAt: Date | null;
@@ -2567,6 +3101,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       status: row.status,
       relatedType: row.relatedType,
       relatedId: row.relatedId,
+      reportReason: row.reportReason,
       replyCount: row._count.replies,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -2585,6 +3120,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     contact: string | null;
     relatedType: string | null;
     relatedId: string | null;
+    reportReason: string | null;
     status: string;
     closedAt: Date | null;
     createdAt: Date;
@@ -2601,7 +3137,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null };
       } | null;
     }>;
-  }) {
+  }, reportedTeam: {
+    teamId: string;
+    name: string;
+    status: string;
+    windowDays: number;
+    recentReportCount: number;
+    reasonBreakdown: Record<string, number>;
+  } | null) {
     return {
       ...this.toAdminInquiryRow({
         id: row.id,
@@ -2613,6 +3156,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         status: row.status,
         relatedType: row.relatedType,
         relatedId: row.relatedId,
+        reportReason: row.reportReason,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
         closedAt: row.closedAt,
@@ -2634,6 +3178,33 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         createdAt: reply.createdAt,
         updatedAt: reply.updatedAt,
       })),
+      reportedTeam,
+    };
+  }
+
+  /** 신고 대상 팀의 최근 30일 누적. 조치를 판단하는 자리(문의 상세)에 맥락을 놓는 것이 목적이다. */
+  private async buildReportedTeamSummary(team: { id: string; name: string; status: string }) {
+    const since = new Date(Date.now() - REPORT_ROLLUP_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const where: Prisma.V1InquiryWhereInput = {
+      reportedTeamId: team.id,
+      category: 'report',
+      createdAt: { gte: since },
+    };
+    const [recentReportCount, reasonGroups] = await Promise.all([
+      this.prisma.v1Inquiry.count({ where }),
+      this.prisma.v1Inquiry.groupBy({ by: ['reportReason'], where, _count: { _all: true } }),
+    ]);
+    return {
+      teamId: team.id,
+      name: team.name,
+      status: team.status,
+      windowDays: REPORT_ROLLUP_WINDOW_DAYS,
+      recentReportCount,
+      reasonBreakdown: Object.fromEntries(
+        reasonGroups
+          .filter((group) => group.reportReason !== null)
+          .map((group) => [group.reportReason as string, group._count._all]),
+      ),
     };
   }
 }

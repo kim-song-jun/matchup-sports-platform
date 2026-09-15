@@ -15,6 +15,7 @@ function participant(id: string, sideId: string, started: boolean): GameLineupPa
     positionX: null,
     positionY: null,
     started,
+    arrivedAt: null,
     createdAt: '',
     updatedAt: '',
   };

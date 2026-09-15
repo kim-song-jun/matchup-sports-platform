@@ -28,6 +28,7 @@ export type GameActorScope =
       role: GameActorRole;
       tournamentId?: string;
       fixtureId?: string;
+      fieldId?: string;
       teamId?: string;
       authorizationSubject?: string;
     }

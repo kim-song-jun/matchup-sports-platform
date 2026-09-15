@@ -120,6 +120,8 @@ function revision(overrides: Partial<V1GameResultRevision> = {}): V1GameResultRe
     missingScorer: false,
     mvpParticipantId: null,
     reason: null,
+    outcomeReason: 'NORMAL',
+    outcomeNote: null,
     createdByActorType: 'USER',
     createdByUserId: 'user-host',
     createdBySystemActor: null,
@@ -163,7 +165,9 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
 
   it('상대팀(opponent) 담당자는 결과를 작성할 수 없다', () => {
     useV1TeamMatchMock.mockReturnValue(
-      settledQuery(teamMatch({ viewer: { state: 'approved', manageableHostTeam: false } })),
+      settledQuery(
+        teamMatch({ viewer: { state: 'approved', manageableHostTeam: false, manageableOpponentTeam: true } }),
+      ),
     );
     render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
     expect(screen.getByText('호스트만 결과를 입력할 수 있어요')).toBeInTheDocument();
@@ -251,6 +255,96 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
     expect(screen.getByText(/개인 기록·팀 전적 반영에는/)).toBeInTheDocument();
     // 확정 상태에서는 새 초안 작성 폼이 다시 보이면 안 된다
     expect(screen.queryByText('결과 작성 완료')).not.toBeInTheDocument();
+  });
+
+  // 감사 백로그 M-E 재현: OFFICIAL로 확정되는 순간 입력한 득점자·카드·MVP가 화면에서
+  // 통째로 사라졌다 — GoalTimeline은 이 화면이 만드는 평평한 score({home,away})에서는
+  // 항상 null을 반환하고, 확정 카드에는 다른 대체 블록이 없었다. 호스트는 자기 팀
+  // 라인업이 있으므로 실명(잠실 배정 등번호 포함)으로 보여야 한다.
+  it('공식 확정(OFFICIAL) 상태에서도 득점자·카드·MVP를 roster 실명으로 보여준다', () => {
+    useV1GameResultRevisionsMock.mockReturnValue(
+      settledQuery<V1GameResultRevision[]>([
+        revision({
+          state: 'OFFICIAL',
+          officialAt: '2026-08-01T01:00:00.000Z',
+          score: { home: 1, away: 0 },
+          mvpParticipantId: 'p-1',
+          resultParticipants: [
+            {
+              id: 'rp-1',
+              resultRevisionId: 'rev-1',
+              participantId: 'p-1',
+              sideId: 'side-home',
+              started: true,
+              minutesPlayed: null,
+              goals: 1,
+              assists: 0,
+              fouls: 0,
+              cards: { yellow: 1, red: 0 },
+              goalkeeper: false,
+            },
+          ],
+        }),
+      ]),
+    );
+    render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+    expect(screen.getByText(/#7 김민준.*1골/)).toBeInTheDocument();
+    expect(screen.getByText(/#7 김민준.*옐로/)).toBeInTheDocument();
+    expect(screen.getAllByText('#7 김민준').length).toBeGreaterThan(0); // MVP 줄
+    // participantId 원문이 그대로 노출되면 안 된다(이름 매핑 실패 회귀 가드)
+    expect(screen.queryByText(/^p-1$/)).not.toBeInTheDocument();
+  });
+
+  // 감사 백로그 M-E 재현: 제출 직후에는 latest.state가 SUBMITTED로 넘어가는데, 그 화면은
+  // "상대팀 승인을 기다리고 있어요" 문구만 남기고 방금 입력한 기록을 보여주지 않았다.
+  it('제출 후 SUBMITTED(승인 대기) 상태에서도 득점자·MVP를 roster 실명으로 보여준다', () => {
+    useV1GameResultRevisionsMock.mockReturnValue(
+      settledQuery<V1GameResultRevision[]>([
+        revision({
+          state: 'SUBMITTED',
+          score: { home: 1, away: 0 },
+          mvpParticipantId: 'p-1',
+          submittedAt: '2026-08-01T00:00:00.000Z',
+          resultParticipants: [
+            {
+              id: 'rp-1',
+              resultRevisionId: 'rev-1',
+              participantId: 'p-1',
+              sideId: 'side-home',
+              started: true,
+              minutesPlayed: null,
+              goals: 1,
+              assists: 0,
+              fouls: 0,
+              cards: { yellow: 0, red: 0 },
+              goalkeeper: false,
+            },
+          ],
+        }),
+      ]),
+    );
+    render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+    expect(screen.getByText('상대팀 승인을 기다리고 있어요')).toBeInTheDocument();
+    expect(screen.getByText(/#7 김민준.*1골/)).toBeInTheDocument();
+  });
+
+  it('친선 자가 제출 결과는 어시스트 입력란이 없으므로 골이 있어도 "어시스트 미기입" 경고를 띄우지 않는다', () => {
+    // 친선 팀매치 자가 제출 폼은 assists를 상수 0으로 고정 전송한다(입력란 자체가 없음) —
+    // countMissingAssists(totalGoals - totalAssists)를 이 화면에 그대로 적용하면 골이 있는
+    // 모든 결과에 예외 없이 경고가 뜨고, 재제출해도 절대 사라지지 않는다.
+    useV1GameResultRevisionsMock.mockReturnValue(
+      settledQuery<V1GameResultRevision[]>([
+        revision({
+          state: 'OFFICIAL',
+          officialAt: '2026-08-01T01:00:00.000Z',
+          resultParticipants: [
+            { id: 'rp-1', resultRevisionId: 'rev-1', participantId: 'p-1', sideId: 'side-home', started: true, minutesPlayed: null, goals: 3, assists: 0, fouls: 0, cards: { yellow: 0, red: 0 }, goalkeeper: false },
+          ],
+        }),
+      ]),
+    );
+    render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+    expect(screen.queryByText(/어시스트 미기입/)).not.toBeInTheDocument();
   });
 
   it('상대팀 정정 요청(CHANGE_REQUESTED) 사유를 배너로 보여주고 재작성 폼을 연다', () => {
@@ -477,7 +571,9 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
   beforeEach(() => {
     vi.clearAllMocks();
     useV1TeamMatchMock.mockReturnValue(
-      settledQuery(teamMatch({ viewer: { state: 'approved', manageableHostTeam: false } })),
+      settledQuery(
+        teamMatch({ viewer: { state: 'approved', manageableHostTeam: false, manageableOpponentTeam: true } }),
+      ),
     );
     useV1GameMock.mockReturnValue(settledQuery(game()));
     // 승인 화면은 own-side 라인업을 쓰지 않지만(needsOwnLineup:false), 훅 자체는 항상 호출되므로
@@ -503,10 +599,32 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
   });
 
   it('호스트도 상대팀도 아닌 사용자는 승인 화면에 접근할 수 없다', () => {
-    useV1TeamMatchMock.mockReturnValue(settledQuery(teamMatch({ viewer: { state: 'none', manageableHostTeam: false } })));
+    useV1TeamMatchMock.mockReturnValue(
+      settledQuery(teamMatch({ viewer: { state: 'none', manageableHostTeam: false, manageableOpponentTeam: false } })),
+    );
     useV1GameResultRevisionsMock.mockReturnValue(settledQuery<V1GameResultRevision[]>([]));
     render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
     expect(screen.getByText('상대팀만 결과를 승인할 수 있어요')).toBeInTheDocument();
+  });
+
+  // 리그 대진 회귀: 상대팀 매니저의 viewer.state 는 'none' 이지만 승인 권한은 있다.
+  // 게이트가 state 기반으로 되돌아가면 이 화면 전체가 다시 막힌다.
+  it('신청서를 직접 내지 않은 상대팀 매니저(리그 대진)도 승인 화면에 들어간다', () => {
+    useV1TeamMatchMock.mockReturnValue(
+      settledQuery(teamMatch({ viewer: { state: 'none', manageableHostTeam: false, manageableOpponentTeam: true } })),
+    );
+    useV1GameResultRevisionsMock.mockReturnValue(
+      settledQuery<V1GameResultRevision[]>([
+        revision({
+          state: 'SUBMITTED',
+          score: { regulation: { home: 2, away: 1 }, penalty: null, goals: [], incomplete: false },
+          submittedAt: '2026-08-01T00:00:00.000Z',
+        }),
+      ]),
+    );
+    render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
+    expect(screen.queryByText('상대팀만 결과를 승인할 수 있어요')).not.toBeInTheDocument();
+    expect(screen.getByText('승인하기')).toBeInTheDocument();
   });
 
   it('409 race: 승인 처리 중 그새 바뀐 버전 충돌을 actionable 메시지로 보여준다', async () => {
@@ -562,6 +680,42 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
     expect(screen.getByText('승인 확정')).toBeInTheDocument();
   });
 
+  // 감사 백로그 M-E 재현: 승인 전(SUBMITTED)에는 보이던 득점자·MVP 요약이 "승인하기"를
+  // 눌러 OFFICIAL로 확정된 순간 사라졌다 — 승인 화면은 호스트 라인업을 조회할 수 없으므로
+  // (roster 없음) 이전과 같은 participantId 라벨로라도 계속 보여야 한다.
+  it('OFFICIAL 확정 후에도 승인 화면은 득점자·MVP 요약을 계속 보여준다', () => {
+    useV1GameResultRevisionsMock.mockReturnValue(
+      settledQuery<V1GameResultRevision[]>([
+        revision({
+          state: 'OFFICIAL',
+          score: { home: 1, away: 0 },
+          officialAt: '2026-08-01T01:00:00.000Z',
+          mvpParticipantId: 'p-1',
+          resultParticipants: [
+            {
+              id: 'rp-1',
+              resultRevisionId: 'rev-1',
+              participantId: 'p-1',
+              sideId: 'side-home',
+              started: true,
+              minutesPlayed: null,
+              goals: 1,
+              assists: 0,
+              fouls: 0,
+              cards: { yellow: 0, red: 0 },
+              goalkeeper: false,
+            },
+          ],
+        }),
+      ]),
+    );
+    render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
+
+    expect(screen.getByText('공식 결과로 확정됐어요')).toBeInTheDocument();
+    expect(screen.getByText(/선수 #p-1.*1골/)).toBeInTheDocument();
+    expect(screen.getByText('선수 #p-1')).toBeInTheDocument(); // MVP 줄
+  });
+
   it('정정 요청은 사유 입력 전에는 비활성화, 입력 후 전송된다', async () => {
     useV1GameResultRevisionsMock.mockReturnValue(
       settledQuery<V1GameResultRevision[]>([revision({ state: 'SUBMITTED', score: { regulation: { home: 2, away: 1 }, penalty: null, goals: [], incomplete: false } })]),
@@ -590,11 +744,110 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
     render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
     expect(screen.getByText(/개인 기록·팀 전적 반영에는/)).toBeInTheDocument();
   });
+
+  it('제출/확정 결과 모두 골이 있어도 "어시스트 미기입" 경고를 띄우지 않는다 (친선 자가 제출은 어시스트 입력란이 없음)', () => {
+    const goalsOnlyParticipants = [
+      { id: 'rp-1', resultRevisionId: 'rev-1', participantId: 'p-1', sideId: 'side-home', started: true, minutesPlayed: null, goals: 2, assists: 0, fouls: 0, cards: { yellow: 0, red: 0 }, goalkeeper: false },
+    ];
+    useV1GameResultRevisionsMock.mockReturnValue(
+      settledQuery<V1GameResultRevision[]>([
+        revision({
+          state: 'SUBMITTED',
+          score: { regulation: { home: 2, away: 1 }, penalty: null, goals: [], incomplete: false },
+          submittedAt: '2026-08-01T00:00:00.000Z',
+          resultParticipants: goalsOnlyParticipants,
+        }),
+      ]),
+    );
+    render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
+    expect(screen.queryByText(/어시스트 미기입/)).not.toBeInTheDocument();
+  });
 });
 
 function decideRevisionRejects(error: unknown) {
   decideMutateAsync.mockRejectedValue(error);
 }
+
+function leagueInfo(overrides: Record<string, unknown> = {}) {
+  return {
+    leagueId: 'league-1',
+    title: '테스트 리그',
+    ...overrides,
+  };
+}
+
+// U3-A안: 리그 대진은 호스트/상대 두 진입점 모두 같은 "확정 영수증 + 이의 D-day 카드"
+// 뷰로 합류한다 — "호스트만 입력"/"상대팀만 승인" 프레이밍과 "승인하기" 버튼이 아예
+// 뜨면 안 된다.
+describe('리그 대진 결과 - 확정 영수증', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1GameMock.mockReturnValue(settledQuery(game()));
+    useV1TeamMatchLineupMock.mockReturnValue(settledQuery(lineup()));
+  });
+
+  function renderReceipt(
+    entry: 'host' | 'approval',
+    viewerOverrides: Record<string, unknown> = {},
+    leagueOverrides: Record<string, unknown> = {},
+    revisions: V1GameResultRevision[] = [],
+  ) {
+    useV1TeamMatchMock.mockReturnValue(
+      settledQuery(
+        teamMatch({
+          league: leagueInfo(leagueOverrides),
+          viewer: {
+            state: 'none',
+            manageableHostTeam: false,
+            manageableOpponentTeam: false,
+            participantMember: true,
+            ...viewerOverrides,
+          },
+        }),
+      ),
+    );
+    useV1GameResultRevisionsMock.mockReturnValue(settledQuery<V1GameResultRevision[]>(revisions));
+    return entry === 'host'
+      ? render(<TeamMatchResultPageClient teamMatchId="tm-1" />)
+      : render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
+  }
+
+  it.each([
+    ['host' as const, '호스트만 결과를 입력할 수 있어요'],
+    ['approval' as const, '상대팀만 결과를 승인할 수 있어요'],
+  ])('%s 진입점도 리그 대진이면 "%s" 문구 대신 확정 영수증을 보여준다', (entry, gatedText) => {
+    renderReceipt(
+      entry,
+      { manageableHostTeam: entry === 'host', manageableOpponentTeam: entry === 'approval' },
+      {},
+      [revision({ state: 'OFFICIAL', score: { home: 2, away: 1 }, officialAt: '2026-08-01T00:00:00.000Z' })],
+    );
+    expect(screen.getByText('공식 결과로 확정됐어요')).toBeInTheDocument();
+    expect(screen.queryByText(gatedText)).not.toBeInTheDocument();
+    expect(screen.queryByText('승인하기')).not.toBeInTheDocument();
+    expect(screen.queryByText('결과 작성 완료')).not.toBeInTheDocument();
+  });
+
+  it('아직 공식 결과가 없으면 "운영자가 입력하면 표시된다"는 빈 상태를 보여준다', () => {
+    renderReceipt('host', { manageableHostTeam: true }, {}, []);
+    expect(screen.getByText('아직 결과가 없어요')).toBeInTheDocument();
+    expect(screen.getByText('운영자가 결과를 입력하면 여기에 표시돼요.')).toBeInTheDocument();
+  });
+
+  it('참가팀 멤버가 아니면 결과 대신 접근 제한 안내를 보여준다', () => {
+    renderReceipt('host', { participantMember: false }, {}, []);
+    expect(screen.getByText('참가팀만 볼 수 있어요')).toBeInTheDocument();
+    expect(screen.queryByText('아직 결과가 없어요')).not.toBeInTheDocument();
+  });
+
+  it('무효 처리된 결과는 무효 안내를 보여준다', () => {
+    renderReceipt('host', {}, {}, [revision({ state: 'VOID', reason: '오심 확인' })]);
+    expect(screen.getByText('이 결과는 무효 처리됐어요')).toBeInTheDocument();
+    // 무효 사유는 이 카드와 아래 변경 이력 두 곳에 함께 나온다.
+    expect(screen.getAllByText('오심 확인').length).toBeGreaterThan(0);
+  });
+
+});
 
 describe('scoreLabel', () => {
   // 스코어는 score.regulation 아래에 있다. 예전 구현은 score.home 을 읽어서 화면에
@@ -624,5 +877,24 @@ describe('scoreLabel', () => {
   it('renders the flat {home, away} shape this screen\'s own submissions actually produce', () => {
     const flatRevision = { score: { home: 3, away: 1 } } as unknown as V1GameResultRevision;
     expect(scoreLabel(flatRevision)).toBe('3 : 1');
+  });
+});
+
+
+describe('displayRevisionReason — 내부 마커 표시 제거', () => {
+  // 서버는 멱등 판정용으로 reason 앞에 [LEAGUE_RESULT_ENTRY]/[LEAGUE_RESULT_CORRECTION]
+  // 마커를 붙여 저장한다. 화면이 그걸 그대로 렌더해 내부 식별자가 사용자에게 노출됐다
+  // (2026-08-25 alpha 실측). 저장값은 못 바꾸므로 표시에서 벗긴다.
+  it('맨 앞의 대문자 마커를 벗기고 본문만 남긴다', async () => {
+    const { displayRevisionReason } = await import('./team-match-result.types');
+    expect(displayRevisionReason('[LEAGUE_RESULT_CORRECTION] 검증: 스코어 정정')).toBe('검증: 스코어 정정');
+    expect(displayRevisionReason('[LEAGUE_RESULT_ENTRY] 1주차 입력')).toBe('1주차 입력');
+  });
+
+  it('마커가 없거나 사용자가 쓴 소문자 대괄호 사유는 건드리지 않는다', async () => {
+    const { displayRevisionReason } = await import('./team-match-result.types');
+    expect(displayRevisionReason('상대 요청으로 정정')).toBe('상대 요청으로 정정');
+    expect(displayRevisionReason('[비고] 우천 단축')).toBe('[비고] 우천 단축');
+    expect(displayRevisionReason(null)).toBe('');
   });
 });

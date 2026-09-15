@@ -5,11 +5,13 @@ import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useRouter } from 'next/navigation';
 import {
   useV1CancelMatch,
+  useV1CloseMatch,
   useV1CreateMatch,
   useV1MasterRegions,
   useV1MasterSports,
   useV1MatchEdit,
   useV1MyRecentVenues,
+  useV1ReopenMatch,
   useV1UpdateMatch,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
@@ -201,11 +203,14 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
 
 export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const router = useRouter();
+  const { confirm, ConfirmModal } = useConfirm();
   const editQuery = useV1MatchEdit(matchId);
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();
   const updateMatch = useV1UpdateMatch(matchId);
   const cancelMatch = useV1CancelMatch(matchId);
+  const closeMatch = useV1CloseMatch(matchId);
+  const reopenMatch = useV1ReopenMatch(matchId);
   const uploadImages = useV1UploadImages();
   const [draft, setDraft] = useState<MatchDraft>(() => buildDefaultDraft());
   const [selectedSportId, setSelectedSportId] = useState('');
@@ -238,6 +243,21 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const editMissingFields = editAttempted ? getMatchMissingFields(editCtx) : [];
   const editFieldErrors = toFieldErrorMap(editMissingFields);
 
+  // 모집 마감 / 다시 열기 — 서버 close()/reopen() 이 받아주는 상태와 정확히 같은 조건으로
+  // 버튼을 고른다. 마감은 두 갈래(호스트가 닫은 status='closed' · 마감 시각 경과)라
+  // 둘 다 "다시 열기"로 모은다 — 화면에는 똑같이 "신청 마감"으로 보이기 때문이다.
+  const editStatus = editQuery.data?.status ?? null;
+  const editDeadlineAt = editQuery.data?.form.deadlineAt ?? null;
+  const deadlinePassed = Boolean(editDeadlineAt && new Date(editDeadlineAt).getTime() < Date.now());
+  const recruitingToggleKind = !editQuery.data || editQuery.data.editable === false
+    ? null
+    : editStatus === 'closed' || (editStatus === 'recruiting' && deadlinePassed)
+      ? 'reopen'
+      : editStatus === 'recruiting'
+        ? 'close'
+        : null;
+  const togglePending = closeMatch.isPending || reopenMatch.isPending;
+
   const model = buildCreateModel({
     step: 'edit',
     matchId,
@@ -250,6 +270,44 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     lockedReason: editQuery.data?.editable === false ? lockedReasonLabel(editQuery.data.lockedReason ?? '') : null,
     submitting: updateMatch.isPending || cancelMatch.isPending || editQuery.isLoading,
     fieldErrors: editFieldErrors,
+    recruitingToggle: recruitingToggleKind
+      ? {
+          label: recruitingToggleKind === 'close' ? '모집 마감' : '모집 다시 열기',
+          hint: recruitingToggleKind === 'close'
+            ? '매치는 그대로 두고 새 신청만 받지 않아요. 언제든 다시 열 수 있어요.'
+            : deadlinePassed
+              ? '신청 마감 시각을 지우고 경기 시작 전까지 다시 받아요.'
+              : '다시 신청을 받아요.',
+          pending: togglePending,
+          onClick: async () => {
+            if (togglePending || updateMatch.isPending || cancelMatch.isPending) return;
+            setError(null);
+            if (recruitingToggleKind === 'close') {
+              const ok = await confirm({
+                title: '모집을 마감할까요?',
+                message: '새 신청을 받지 않고, 대기 중인 신청은 종료돼요. 확정된 참가자는 그대로예요 — 나중에 다시 열 수 있어요.',
+                confirmLabel: '모집 마감',
+              });
+              if (!ok) return;
+              closeMatch.mutate(
+                { reason: 'host_closed_from_v1_web' },
+                {
+                  onSuccess: () => router.push(`/matches/${matchId}`),
+                  onError: (err) => setError(err instanceof Error ? err.message : '모집을 마감하지 못했어요. 다시 시도해 주세요.'),
+                },
+              );
+              return;
+            }
+            reopenMatch.mutate(
+              { reason: 'host_reopened_from_v1_web' },
+              {
+                onSuccess: () => router.push(`/matches/${matchId}`),
+                onError: (err) => setError(err instanceof Error ? err.message : '모집을 다시 열지 못했어요. 다시 시도해 주세요.'),
+              },
+            );
+          },
+        }
+      : undefined,
     onSelectSport: (sportName) => {
       const sport = sportOptions.find((item) => item.name === sportName);
       if (sport) setSelectedSportId(sport.id);
@@ -290,8 +348,18 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
         },
       );
     },
-    onCancel: () => {
+    onCancel: async () => {
       if (updateMatch.isPending || cancelMatch.isPending) return;
+      // 되돌리는 API가 없는 파괴적 동작 — 신청자 전원이 cancelled_by_host로 넘어가고
+      // 알림도 나간다. '변경사항 저장' 바로 아래 붙은 버튼이라 오탭 가능성이 높으므로
+      // 확인 없이 즉시 실행하지 않는다.
+      const ok = await confirm({
+        title: '매치를 취소할까요?',
+        message: '취소하면 되돌릴 수 없어요. 신청자 전원의 참가가 취소되고 취소 알림이 발송돼요.',
+        confirmLabel: '매치 취소',
+        tone: 'danger',
+      });
+      if (!ok) return;
       setError(null);
       cancelMatch.mutate(
         { reason: 'host_cancelled_from_v1_web' },
@@ -304,7 +372,12 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     submitLabel: '변경사항 저장',
   });
 
-  return <MatchCreatePageView model={model} />;
+  return (
+    <>
+      <MatchCreatePageView model={model} />
+      {ConfirmModal}
+    </>
+  );
 }
 
 function buildCreateModel({
@@ -325,6 +398,7 @@ function buildCreateModel({
   onNext,
   onSubmit,
   onCancel,
+  recruitingToggle,
   uploadImage,
   submitLabel,
   fieldErrors,
@@ -349,6 +423,7 @@ function buildCreateModel({
   onNext: () => void;
   onSubmit: () => void;
   onCancel?: () => void;
+  recruitingToggle?: NonNullable<MatchCreateViewModel['form']>['recruitingToggle'];
   uploadImage?: (file: File) => Promise<string>;
   submitLabel?: string;
   /** #1·#2: 스텝별 즉시 검증(create)과 결측 필드 안내(create/edit)가 공유하는 필드 → 문구 맵. */
@@ -381,6 +456,7 @@ function buildCreateModel({
       onNext,
       onSubmit,
       onCancel,
+      recruitingToggle,
       uploadImage,
       submitLabel,
       submitting,
@@ -518,8 +594,14 @@ function nextCreateHref(step: MatchCreateStep) {
   return '/matches/new/confirm';
 }
 
+// toISOString()은 UTC 기준이라 toTimeInput()(로컬 기준)과 섞어 쓰면 KST 00:00~08:59 시작
+// 매치를 수정 화면에서 열 때 날짜만 하루 앞으로 밀린다(2026-08-27 감사
+// M-A-personal-match-state) — 날짜도 로컬 기준으로 뽑아 시간과 같은 기준시를 쓰게 한다.
 function toDateInput(date: Date) {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function toTimeInput(date: Date) {

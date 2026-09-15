@@ -24,8 +24,8 @@ describe('TournamentOpsQuickLinks (T6-5, D-16)', () => {
   it('접근 가능하면 from=admin이 붙은 활성 링크 2개를 렌더한다', () => {
     vi.mocked(useV1TournamentStaffAssignments).mockReturnValue({ isPending: false, isError: false, data: { items: [] } } as never);
     render(<TournamentOpsQuickLinks tournamentId="t-1" />);
-    expect(screen.getByRole('link', { name: '스태프 배정 콘솔' })).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/staff?from=admin');
-    expect(screen.getByRole('link', { name: '운영 보드' })).toHaveAttribute('href', '/tournament-ops/tournaments/t-1/operations?from=admin');
+    expect(screen.getByRole('link', { name: '스태프 배정 콘솔' })).toHaveAttribute('href', '/admin/live/t-1/staff');
+    expect(screen.getByRole('link', { name: '운영 보드' })).toHaveAttribute('href', '/admin/live/t-1/operations');
   });
 
   it('403이면 숨기지 않고 비활성 버튼 + 사유 문구를 보여준다', () => {

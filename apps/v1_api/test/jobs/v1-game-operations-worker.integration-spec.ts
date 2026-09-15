@@ -194,9 +194,10 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
   // change-request branch; game-operation-flags.ts's writeControlEffect for
   // the simplified-gate toggle) with NO registered handler anywhere -- alpha
   // found them retrying 6 times then sitting POISONED forever. Both now get
-  // the exact same durable-audit treatment as GAME_OPERATION_FLAG_CHANGED /
-  // GAME_RESULT_REJECTED, proven end-to-end here (not just "a handler is
-  // registered" but "the real dispatch completes and writes the audit row").
+  // the exact same durable-audit treatment as GAME_OPERATION_FLAG_CHANGED,
+  // proven end-to-end here (not just "a handler is registered" but "the real
+  // dispatch completes and writes the audit row"). (예전엔 GAME_RESULT_REJECTED
+  // 도 그 예시였는데 Task 166 이 그 핸들러를 없앴다.)
   it.each([
     ['GAME_RESULT_CHANGE_REQUESTED', () => new V1GameOperationsWorkerService(prisma)],
     ['GAME_OPERATION_GATE_MODE_CHANGED', worker],
@@ -265,15 +266,23 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
 
   it('reports built-in handler readiness and poisoned queue health without leaking owner identity', async () => {
     const service = new V1GameOperationsWorkerService(prisma);
-    // Built-in handlers as of the outbox-handler cleanup task: GAME_RESULT_OFFICIAL,
-    // GAME_RESULT_VOIDED, GAME_RESULT_SUBMITTED, GAME_RESULT_REVIEW_REMINDER,
-    // GAME_RESULT_REVIEW_ESCALATION, and the three durable-audit-only handlers
-    // GAME_RESULT_REJECTED / GAME_RESULT_SUPPLEMENT_REQUESTED / GAME_RESULT_CHANGE_REQUESTED
-    // (the last one added this task -- see v1-game-operations-worker.service.ts's
-    // constructor) -- 8 total.
+    // Built-in handlers: GAME_RESULT_OFFICIAL, GAME_RESULT_VOIDED,
+    // GAME_RESULT_SUBMITTED, GAME_RESULT_REVIEW_REMINDER,
+    // GAME_RESULT_REVIEW_ESCALATION, the durable-audit-only
+    // GAME_RESULT_CHANGE_REQUESTED, GAME_RESULT_LEAGUE_AUTO_APPROVE (D2, 리그
+    // 결과 24시간 자동 승인), LEAGUE_RESULT_ENTRY_REMINDER (리그 대진 결과 미입력
+    // +24시간 운영자 리마인더), IDENTITY_LINK_EXPIRY (신원 연결 요청 +24시간 만료
+    // 확정·신청자 통보), LEAGUE_ROSTER_AUTOCONFIRM·LEAGUE_ROSTER_REMINDER (D10, Task 164
+    // BE-4b — 시즌 시작 자동 명단 확정과 그 24h 전 리마인더. **핸들러는 항상 등록**하고
+    // 실행 여부만 env 로 가른다: 등록을 걸어 두지 않으면 예약된 잡이 핸들러 없이 6회
+    // 재시도 후 POISONED 로 가고, 나중에 켜는 순간 그 행들이 이미 죽어 있다) -- 11 total.
+    //
+    // Task 166 이 `GAME_RESULT_REJECTED`·`GAME_RESULT_SUPPLEMENT_REQUESTED` 둘을
+    // 뺐다(11 → 9). 그 두 결정 — 어드민이 팀에게 결과를 되돌려 보내는 왕복 — 이
+    // 사라져 그 이름의 아웃박스 이벤트가 더는 만들어지지 않는다(정본 §4).
     await expect(service.getHealth()).resolves.toMatchObject({
       status: 'healthy',
-      registeredHandlers: 8,
+      registeredHandlers: 11,
       queue: {
         pending: 0,
         retry: 0,
@@ -286,7 +295,7 @@ describe('V1GameOperationsWorkerService database lease contract', () => {
     service.registerDurableAuditHandler('GAME_OPERATION_FLAG_CHANGED');
     await expect(service.getHealth()).resolves.toMatchObject({
       status: 'healthy',
-      registeredHandlers: 9,
+      registeredHandlers: 12,
     });
 
     await insertJob({ status: 'POISONED', attempts: 6 });

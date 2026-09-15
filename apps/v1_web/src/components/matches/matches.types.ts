@@ -13,7 +13,8 @@ export type MatchCardModel = {
   level: string;
   gender: string;
   host: string;
-  image: string;
+  /** 업로드된 대표 사진. 없으면 null — 목업 사진으로 메우지 않는다(2026-09-04 감사). */
+  image: string | null;
   deadline: string;
   deadlineDetail?: string;
   status: 'open' | 'pending' | 'approved' | 'full' | 'mine';
@@ -57,10 +58,26 @@ export type MatchListViewModel = {
     urgent: number;
   };
   matches: MatchCardModel[];
+  /** 결과가 1~2건뿐인 "희소" 상태에서 목록 아래를 채우는 인접 매치 (디자인 검수 W-3, B안).
+   * 0건은 EmptyState 가 받지만 1건은 그 경로를 타지 않아 카드 한 장 아래로 화면 끝까지
+   * 비어 있었다(390 실측: 약 500px). 조건 밖이지만 지금 모집 중인 매치를 채워
+   * DESIGN.md §15("한 화면에 3-5개 카드")에 근접시킨다.
+   * 비었으면 아무것도 그리지 않는다 — 빈 레일을 남기지 않는다. */
+  nearbyMatches?: MatchCardModel[];
+  /** team-matches.types.ts의 #5와 같은 목적 — true일 때 EmptyState 대신 PageSkeleton 렌더.
+   * 로딩 중(items === undefined)에 matches: []를 EmptyState로 그대로 그리면 "조건에 맞는
+   * 매치가 없어요"가 실제로는 아직 응답을 못 받은 상태에서도 뜬다. */
+  isLoading?: boolean;
+  /** 서버 커서 페이지네이션(20건/페이지)에 다음 페이지가 더 있는지. true면 "더 보기" 노출. */
+  hasNext?: boolean;
+  onLoadMore?: () => void;
+  loadMorePending?: boolean;
 };
 
 export type MatchStateViewModel = MatchListViewModel & {
   state: 'empty' | 'error' | 'joined';
+  /** error 상태의 재시도(쿼리 refetch). 없으면 재시도 버튼을 그리지 않는다. */
+  retry?: () => void;
   title: string;
   description: string;
 };
@@ -97,7 +114,7 @@ export type MatchDetailViewModel = {
   onShare?: () => void | string | null | Promise<void | string | null>;
 };
 
-export type MatchCreateStep = 'sport' | 'info' | 'place-time' | 'confirm' | 'complete' | 'edit';
+export type MatchCreateStep = 'sport' | 'info' | 'place-time' | 'confirm' | 'edit';
 
 export type MatchCreateViewModel = {
   step: MatchCreateStep;
@@ -135,6 +152,17 @@ export type MatchCreateViewModel = {
     onNext: () => void;
     onSubmit: () => void;
     onCancel?: () => void;
+    /**
+     * 모집 마감 / 다시 열기 토글 (호스트 전용, 수정 화면 하단).
+     * 취소(onCancel)와 달리 **되돌릴 수 있는** 동작이라 danger 가 아니라 neutral 로 두고
+     * 취소 버튼 위에 놓는다 — 마감하려다 취소를 누르는 사고를 막는다.
+     */
+    recruitingToggle?: {
+      label: string;
+      hint: string;
+      pending?: boolean;
+      onClick: () => void;
+    };
     uploadImage?: (file: File) => Promise<string>;
     submitLabel?: string;
     submitting?: boolean;

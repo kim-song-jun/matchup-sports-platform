@@ -20,6 +20,7 @@ const ids = {
   hostUser: '61000000-0000-4000-8000-000000000001',
   opponentUser: '61000000-0000-4000-8000-000000000002',
   operatorUser: '61000000-0000-4000-8000-000000000003',
+  outsiderUser: '61000000-0000-4000-8000-000000000004',
   sport: '61000000-0000-4000-8000-000000000010',
   region: '61000000-0000-4000-8000-000000000011',
   hostTeam: '61000000-0000-4000-8000-000000000020',
@@ -28,6 +29,8 @@ const ids = {
   tournament: '61000000-0000-4000-8000-000000000040',
   fixture: '61000000-0000-4000-8000-000000000041',
   invalidFixture: '61000000-0000-4000-8000-000000000042',
+  homeRegistration: '61000000-0000-4000-8000-000000000043',
+  awayRegistration: '61000000-0000-4000-8000-000000000044',
   assignment: '61000000-0000-4000-8000-000000000050',
 } as const;
 
@@ -95,7 +98,7 @@ describe('Task 6 L1 game lifecycle', () => {
     }
     configId = config.id;
     await prisma.v1User.createMany({
-      data: [ids.hostUser, ids.opponentUser, ids.operatorUser].map((id, index) => ({
+      data: [ids.hostUser, ids.opponentUser, ids.operatorUser, ids.outsiderUser].map((id, index) => ({
         id,
         email: `task6-l1-${index}@example.test`,
         accountStatus: 'active',
@@ -163,23 +166,36 @@ describe('Task 6 L1 game lifecycle', () => {
         competitionConfigVersionId: configId,
       },
     });
-    await prisma.v1TournamentFixture.createMany({
+    await prisma.v1TournamentRegistration.createMany({
       data: [
-        {
-          id: ids.fixture,
-          tournamentId: ids.tournament,
-          round: 'group',
-          fixtureNumber: 1,
-          competitionConfigVersionId: configId,
-        },
-        {
-          id: ids.invalidFixture,
-          tournamentId: ids.tournament,
-          round: 'group',
-          fixtureNumber: 2,
-          competitionConfigVersionId: configId,
-        },
+        { id: ids.homeRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.hostUser, status: 'confirmed' },
+        { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.opponentUser, status: 'confirmed' },
       ],
+    });
+    await prisma.v1TeamMatch.create({
+      data: {
+        id: ids.fixture,
+        tournamentId: ids.tournament,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+        createdByUserId: ids.operatorUser,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: 'Task 6 L1 canonical tournament match',
+        status: 'matched',
+        startAt: new Date('2026-09-12T00:00:00.000Z'),
+        competitionConfigVersionId: configId,
+      },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: ids.fixture,
+        tournamentId: ids.tournament,
+        round: 'group',
+        fixtureNumber: 1,
+        homeRegistrationId: ids.homeRegistration,
+        awayRegistrationId: ids.awayRegistration,
+      },
     });
     await prisma.$transaction(async (tx) => {
       await tx.v1TournamentStaffAssignment.create({
@@ -205,7 +221,7 @@ describe('Task 6 L1 game lifecycle', () => {
 
   it('creates a tournament game atomically from a valid immutable pin and replays the same source command', async () => {
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: configId,
       sides: [
@@ -362,7 +378,7 @@ describe('Task 6 L1 game lifecycle', () => {
       ),
     );
     expectHttpCode(missingPin, 409, 'COMPETITION_CONFIG_REQUIRED');
-    expect(await prisma.v1Game.findUnique({ where: { tournamentFixtureId: ids.invalidFixture } })).toBeNull();
+    expect(await prisma.v1Game.findUnique({ where: { teamMatchId: ids.invalidFixture } })).toBeNull();
   });
 
   it('enforces header/body durable IDs, payload reuse, lifecycle, event append, and visibility', async () => {
@@ -586,6 +602,29 @@ describe('Task 6 L1 game lifecycle', () => {
     );
     expectHttpCode(genericCommand, 409, 'TEAM_MATCH_GENERIC_COMMAND_FORBIDDEN');
 
+    const beforeTournamentGame = await prisma.v1Game.findUniqueOrThrow({
+      where: { id: tournamentGameId },
+      select: { version: true, lastSequence: true, currentOfficialRevisionId: true },
+    });
+    const beforeTournamentAudits = await prisma.v1OperationAudit.count({ where: { resourceId: tournamentGameId } });
+    const beforeTournamentIdempotency = await prisma.v1IdempotencyRecord.count({ where: { resourceId: tournamentGameId } });
+    const tournamentOutsider = await captureFailure(() =>
+      service.createResultRevision(
+        authUser(ids.outsiderUser),
+        tournamentGameId,
+        'tournament-outsider-draft',
+        {
+          expectedVersion: 7,
+          clientCommandId: 'tournament-outsider-draft',
+          score: { home: 0, away: 0 },
+          actualParticipants: [],
+          eventsHash: 'events-tournament-outsider',
+        },
+      ),
+    );
+    expectHttpCode(tournamentOutsider, 403, 'PERMISSION_DENIED');
+    expect(await prisma.v1OperationAudit.count({ where: { resourceId: tournamentGameId } })).toBe(beforeTournamentAudits);
+    expect(await prisma.v1IdempotencyRecord.count({ where: { resourceId: tournamentGameId } })).toBe(beforeTournamentIdempotency);
     const tournamentDraft = await captureFailure(() =>
       service.createResultRevision(
         authUser(ids.operatorUser),
@@ -602,6 +641,12 @@ describe('Task 6 L1 game lifecycle', () => {
     );
     expectHttpCode(tournamentDraft, 409, 'TOURNAMENT_RESULT_DERIVED_ONLY');
     expect(await prisma.v1GameResultRevision.count({ where: { gameId: tournamentGameId } })).toBe(1);
+    expect(await prisma.v1Game.findUniqueOrThrow({
+      where: { id: tournamentGameId },
+      select: { version: true, lastSequence: true, currentOfficialRevisionId: true },
+    })).toEqual(beforeTournamentGame);
+    expect(await prisma.v1OperationAudit.count({ where: { resourceId: tournamentGameId } })).toBe(beforeTournamentAudits);
+    expect(await prisma.v1IdempotencyRecord.count({ where: { resourceId: tournamentGameId } })).toBe(beforeTournamentIdempotency);
   });
 
   it('freezes submitted result content and gives concurrent approve/change-request exactly one winner', async () => {

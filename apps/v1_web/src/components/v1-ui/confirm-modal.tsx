@@ -236,7 +236,7 @@ export function ConfirmModal({
           <p
             id={titleId}
             className="tm-text-body-lg"
-            style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 10 }}
+            style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 12 }}
           >
             {title}
           </p>
@@ -248,7 +248,7 @@ export function ConfirmModal({
             {message}
           </p>
           {confirmationPhrase ? (
-            <div style={{ marginTop: 18 }}>
+            <div style={{ marginTop: 20 }}>
               <label
                 htmlFor={phraseId}
                 className="tm-text-label"

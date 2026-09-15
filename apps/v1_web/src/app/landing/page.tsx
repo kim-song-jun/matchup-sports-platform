@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { BellIcon, HomeIcon, MatchIcon, TeamsIcon, TeamMatchIcon, SearchIcon } from '@/components/v1-ui/icons';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
@@ -63,31 +64,51 @@ export default function LandingPage() {
                 회원가입 없이도 매치를 둘러볼 수 있어요
               </p>
             </div>
-            {/* Hero stat strip */}
-            {/* P1 숫자:단위 2:1 + tabular-nums — stat-num(24px mobile/28px desktop) : label(11px/13px) ≈ 2.2:1. tabular-nums는 .tm-landing-stat-num CSS에 적용됨 */}
-            <div className="tm-landing-hero-stats" role="list">
-              <div className="tm-landing-stat" role="listitem">
-                <span className="tm-landing-stat-num">124</span>
-                <span className="tm-landing-stat-label">오늘 열린 매치</span>
+            {/* 그래픽 영역 — landing-rhythm 모듈의 네 번째 칸. 메시지 "오늘, 가장 빠르게 같이 뛴다"(스톱워치+공+콘).
+                사실 스트립은 그래픽 아래로 내려 보조 정보로 둔다. */}
+            <div className="tm-landing-hero-aside">
+              <div className="tm-landing-hero-graphic">
+                <Image
+                  src="/illustrations/landing-hero-640.webp"
+                  alt=""
+                  aria-hidden="true"
+                  width={640}
+                  height={640}
+                  sizes="(min-width: 1024px) 248px, 62vw"
+                  priority
+                />
               </div>
-              <div className="tm-landing-stat-divider" aria-hidden="true" />
-              <div className="tm-landing-stat" role="listitem">
-                <span className="tm-landing-stat-num">4+</span>
-                <span className="tm-landing-stat-label">운영 종목</span>
-              </div>
-              <div className="tm-landing-stat-divider" aria-hidden="true" />
-              <div className="tm-landing-stat" role="listitem">
-                <span className="tm-landing-stat-num">4.8</span>
-                <span className="tm-landing-stat-label">평균 매너 점수</span>
+            {/* 히어로 사실 스트립.
+                예전에는 "124 오늘 열린 매치" · "4.8 평균 매너 점수" 처럼 근거 없는 숫자를
+                사실로 적고 있었다 — 이 페이지는 데이터를 전혀 조회하지 않는 정적 화면이라
+                저 값들은 어떤 집계도 아닌 하드코딩 리터럴이었고, 프로덕션에서도 같은 값이
+                나갔다. 방문자에게 확인해 줄 수 없는 수치는 싣지 않는다. 세 칸 모두 코드나
+                화면에서 바로 검증되는 사실로 바꿨다(2026-09-04 사용자 확정). */}
+              <div className="tm-landing-hero-facts" role="list">
+                <div className="tm-landing-fact" role="listitem">
+                  <span className="tm-landing-fact-value">축구·풋살·러닝·수영</span>
+                  <span className="tm-landing-fact-label">운영 중인 종목</span>
+                </div>
+                <div className="tm-landing-fact-divider" aria-hidden="true" />
+                <div className="tm-landing-fact" role="listitem">
+                  <span className="tm-landing-fact-value">매치·팀매치·대회</span>
+                  <span className="tm-landing-fact-label">참여 방식</span>
+                </div>
+                <div className="tm-landing-fact-divider" aria-hidden="true" />
+                <div className="tm-landing-fact" role="listitem">
+                  <span className="tm-landing-fact-value">무료</span>
+                  <span className="tm-landing-fact-label">가입도 매치 탐색도</span>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
         {/* ── Features ── */}
-        <section id="features" className="tm-landing-section tm-landing-section-alt" aria-labelledby="features-heading">
+        <section id="features" className="tm-landing-section" aria-labelledby="features-heading">
           <div className="tm-landing-section-inner">
             <div className="tm-landing-section-header">
+              <p className="tm-landing-section-kw">기능</p>
               <h2 id="features-heading" className="tm-text-heading">Teameet에서 할 수 있는 것</h2>
               <p className="tm-text-body" style={{ color: 'var(--text-muted)' }}>
                 개인 매치부터 팀 경기, 용병 모집까지 생활체육의 모든 것을 한곳에서 해결해요
@@ -171,7 +192,8 @@ export default function LandingPage() {
         <section id="sports" className="tm-landing-section" aria-labelledby="sports-heading">
           <div className="tm-landing-section-inner">
             <div className="tm-landing-section-header">
-              <h2 id="sports-heading" className="tm-text-heading">지원 종목</h2>
+              <p className="tm-landing-section-kw">종목</p>
+              <h2 id="sports-heading" className="tm-text-heading">지금 뛸 수 있는 종목</h2>
               <p className="tm-text-body" style={{ color: 'var(--text-muted)' }}>
                 지금 4개 종목으로 운영 중이에요. 더 많은 종목을 순차적으로 열고 있어요.
               </p>
@@ -216,12 +238,13 @@ export default function LandingPage() {
         </section>
 
         {/* ── How it works ── */}
-        <section id="how" className="tm-landing-section tm-landing-section-alt" aria-labelledby="how-heading">
+        <section id="how" className="tm-landing-section" aria-labelledby="how-heading">
           <div className="tm-landing-section-inner">
             <div className="tm-landing-section-header">
-              <h2 id="how-heading" className="tm-text-heading">이용 방법</h2>
+              <p className="tm-landing-section-kw">이용 방법</p>
+              <h2 id="how-heading" className="tm-text-heading">세 단계면 바로 뛸 수 있어요</h2>
               <p className="tm-text-body" style={{ color: 'var(--text-muted)' }}>
-                세 단계면 바로 뛸 수 있어요
+                가입부터 첫 경기 후 리뷰까지, 흐름은 늘 같아요
               </p>
             </div>
             <ol className="tm-landing-steps" aria-label="이용 단계">
@@ -281,7 +304,7 @@ export default function LandingPage() {
                 <BrandMark size={24} />
                 <span className="tm-landing-brand">teameet</span>
               </span>
-              <p className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-caption)' }}>
+              <p className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
                 AI 스포츠 매칭 플랫폼
               </p>
             </div>

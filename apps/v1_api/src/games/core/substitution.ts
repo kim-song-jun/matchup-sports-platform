@@ -152,9 +152,9 @@ export interface ValidateSubstitutionInput {
   readonly participants: readonly SubstitutionParticipant[];
   readonly priorEvents: readonly SubstitutionPriorEvent[];
   readonly substitutionMode: 'limited' | 'rolling';
-  /** `null` = no configured cap. Ignored entirely when `substitutionMode` is
-   * `'rolling'` — rolling is unlimited by definition regardless of what a
-   * stray config value says. */
+  /** `null` = no configured cap. Irrelevant when `substitutionMode` is
+   * `'rolling'` — Task 166 이후 롤링은 교체 기록 자체를 거부하므로 이 값이 읽히는
+   * 지점에 도달하지 않는다. */
   readonly maxSubstitutions: number | null;
 }
 
@@ -168,6 +168,23 @@ export function validateSubstitution(input: ValidateSubstitutionInput): {
   readonly positionX: number | null;
   readonly positionY: number | null;
 } {
+  // Task 166 BE-3: **롤링 교체 종목은 교체를 기록하지 않는다**(정본 §3 — 롤링 종목은
+  // 교체 기록이 없다). 롤링에서는 선수가 경기 내내 자유롭게 드나들어 "교체 이벤트" 라는
+  // 개념 자체가 성립하지 않는다 — 그런데도 기록을 받으면 그 경기의 출전 시간·on-pitch
+  // 파생이 실제와 무관한 값이 된다.
+  //
+  // **다른 모든 검사보다 먼저** 던진다: 롤링 경기에서는 뒤따르는 검사들(같은 팀인지,
+  // 피치 위에 있는지)이 물어보는 질문 자체가 의미가 없다. 그 검사들이 먼저 걸리면
+  // 운영자가 "선수를 잘못 골랐다" 로 읽고 다른 조합을 계속 시도하게 된다.
+  //
+  // 이미 기록된 SUBSTITUTION 이벤트는 그대로 읽힌다(`deriveOnPitchParticipantIds`) —
+  // 이 가드는 **새 기록만** 막는다.
+  if (input.substitutionMode === 'rolling') {
+    throw new GameContractError(
+      'SUBSTITUTION_NOT_TRACKED',
+      '이 종목은 자유(롤링) 교체라 교체를 따로 기록하지 않아요',
+    );
+  }
   if (input.inParticipantId === input.outParticipantId) {
     throw new GameContractError(
       'SUBSTITUTION_INVALID',

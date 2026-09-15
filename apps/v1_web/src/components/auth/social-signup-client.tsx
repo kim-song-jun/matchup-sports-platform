@@ -12,7 +12,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { saveStoredV1Session } from '@/lib/session-storage';
-import { AuthFrame } from './auth-page';
+import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import {
   formatBirthDate,
   formatPhone,
@@ -174,6 +174,7 @@ export function SocialSignupClient() {
 
   return (
     <AuthFrame
+      stage={AUTH_WELCOME_STAGE}
       topTitle="카카오 가입"
       onBack={() => void exitFlow.exit()}
       backLabel="가입 그만두기"
@@ -298,11 +299,11 @@ export function SocialSignupClient() {
             <div
               className="tm-text-caption"
               role="status"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--blue700)' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--blue700)' }}
             >
               <span
                 aria-hidden="true"
-                style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue500)', display: 'inline-block' }}
+                style={{ width: 6, height: 6, borderRadius: 'var(--radius-circle)', background: 'var(--blue500)', display: 'inline-block' }}
               />
               휴대폰 본인인증이 완료됐어요
             </div>

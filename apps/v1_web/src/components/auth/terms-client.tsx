@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
+import { TermsDocumentSubtitleAndCard } from '@/components/auth/terms-document-body';
 import { Button } from '@/components/v1-ui/button';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import {
   useV1AcceptSignupTerms,
   useV1CompleteSocialTerms,
@@ -14,7 +16,7 @@ import { V1ApiError } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { saveSignupTermsDocumentIds } from '@/lib/signup-terms-storage';
-import { AuthFrame } from './auth-page';
+import { AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { getTermsViewModel } from './auth.view-model';
 import { useSocialSignupExit } from './use-social-signup-exit';
 
@@ -89,20 +91,8 @@ export function TermsClient() {
     setCheckedByDocumentId((current) => ({ ...current, [documentId]: nextChecked }));
   };
 
-  useEffect(() => {
-    if (!legalDialog) {
-      return undefined;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setLegalDialog(null);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [legalDialog]);
+  // ESC 닫기는 LegalDocumentDialog 내부의 useModalA11y 로 이관했다(포커스 트랩·스크롤
+  // 잠금·포커스 복원도 함께 그 훅이 담당).
 
   useEffect(() => {
     if (!isRenewalMode || document) return undefined;
@@ -205,16 +195,10 @@ export function TermsClient() {
             </div>
           ) : null}
           {managedDocument ? (
-            <>
-              {managedDocument.subtitle ? (
-                <p className="tm-text-body tm-auth-sub">{managedDocument.subtitle}</p>
-              ) : null}
-              <div className="tm-auth-soft-card" style={{ display: 'grid', gap: 14, marginTop: 18 }}>
-                <p className="tm-text-caption" style={{ margin: 0, lineHeight: 1.65, whiteSpace: 'pre-line' }}>
-                  {managedDocument.content}
-                </p>
-              </div>
-            </>
+            <TermsDocumentSubtitleAndCard
+              subtitle={managedDocument.subtitle}
+              content={managedDocument.content}
+            />
           ) : null}
         </div>
       </AuthFrame>
@@ -223,6 +207,7 @@ export function TermsClient() {
 
   return (
     <AuthFrame
+      stage={AUTH_WELCOME_STAGE}
       topTitle="약관 동의"
       // social 모드는 가입이 끝날 때까지 게이트가 다른 경로를 전부 되돌리므로, 단순 이동 링크
       // 대신 "가입 그만두기(로그아웃)" 출구를 준다. renewal(기존 회원 재동의)은 성격이 달라
@@ -657,7 +642,21 @@ function getPrivacyPolicySections(): LegalDocumentSection[] {
 
 회사명: 아이위(IWI)
 대표자: 김봉목
-시행일: 2026년 7월 1일`,
+
+11. Android 앱에서의 개인정보 처리
+
+Android 앱은 teameet.co.kr 서비스를 WebView로 제공하며 로그인 세션을 위한 쿠키와 서비스 이용 기록을 처리합니다.
+
+이용자가 앱에서 알림 수신에 명시적으로 동의하면 Firebase Cloud Messaging 알림 전송을 위해 앱 설치 식별자, FCM 토큰, 앱 버전, 기기 제조사·모델 정보를 처리합니다. 알림 동의를 철회하거나 로그아웃하면 해당 설치의 푸시 등록을 해제하고 토큰 삭제를 요청합니다. Firebase Cloud Messaging 제공 과정에서는 Google이 수탁자로서 관련 정보를 처리할 수 있습니다.
+
+이용자가 현재 위치 기능을 직접 실행한 경우에만 Android의 대략적 위치 권한을 요청합니다. 제공된 좌표는 가까운 지역을 확인하기 위해 회사 서버로 전송되고, 현재 날씨 제공을 위해 Open-Meteo에 전송될 수 있습니다. 위치 권한을 거부해도 위치 기반 편의 기능을 제외한 서비스는 이용할 수 있습니다.
+
+사진·파일은 이용자가 파일 선택기를 직접 실행하고 제출한 경우에만 업로드됩니다. 앱은 기기 저장소 전체를 조회하는 권한을 요청하지 않습니다.
+
+계정 삭제는 앱의 설정 > 회원 탈퇴에서 직접 진행하거나 https://teameet.co.kr/account-deletion 에서 요청할 수 있습니다. 법령상 보관 의무가 있는 정보를 제외한 계정 연결 정보는 처리 목적이 끝난 뒤 파기합니다.
+
+시행일: 2026년 7월 1일
+최종 변경일: 2026년 8월 31일`,
     },
   ];
 }
@@ -1004,10 +1003,18 @@ function getSupportSections(): LegalDocumentSection[] {
 }
 
 function LegalDocumentDialog({ title, sections, onClose }: { title: string; sections: LegalDocumentSection[]; onClose: () => void }) {
+  // 포커스 트랩·스크롤 잠금·포커스 복원·ESC 닫기·backdrop 클릭 닫기를 공용 훅에 위임한다.
+  // 이 컴포넌트는 부모(legalDialog ? <LegalDocumentDialog/> : null)가 조건부로만
+  // 마운트하므로 open 은 true 로 고정한다.
+  const { dialogRef, onBackdropClick } = useModalA11y<HTMLElement, HTMLElement>({
+    open: true,
+    onClose,
+  });
+
   return (
     <div
       role="presentation"
-      onClick={onClose}
+      onClick={onBackdropClick}
       style={{
         position: 'fixed',
         inset: 0,
@@ -1020,10 +1027,10 @@ function LegalDocumentDialog({ title, sections, onClose }: { title: string; sect
       }}
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="terms-dialog-title"
-        onClick={(event) => event.stopPropagation()}
         style={{
           width: 'min(100%, 480px)',
           maxHeight: '82dvh',
@@ -1041,7 +1048,7 @@ function LegalDocumentDialog({ title, sections, onClose }: { title: string; sect
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 12,
-            padding: '18px 18px 12px',
+            padding: '20px 20px 12px',
             borderBottom: '1px solid var(--grey100)',
           }}
         >
@@ -1050,7 +1057,7 @@ function LegalDocumentDialog({ title, sections, onClose }: { title: string; sect
             닫기
           </button>
         </header>
-        <div style={{ overflowY: 'auto', padding: '18px', display: 'grid', gap: 18 }}>
+        <div style={{ overflowY: 'auto', padding: '20px', display: 'grid', gap: 20 }}>
           {sections.map((section) => (
             <section key={section.title}>
               <h3 className="tm-text-body-lg" style={{ margin: 0 }}>{section.title}</h3>

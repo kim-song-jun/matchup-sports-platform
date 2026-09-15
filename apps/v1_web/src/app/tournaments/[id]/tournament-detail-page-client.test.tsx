@@ -187,3 +187,59 @@ describe('TournamentDetailPageClient GA events', () => {
     expect(screen.queryByRole('complementary', { name: '참가 신청' })).not.toBeInTheDocument();
   });
 });
+
+// 벤치마크 감사(P0 ①): "참가 전 꼭 확인해 주세요" 체크리스트의 고정 문구("환불 불가" 등)와
+// 운영자가 대회별로 쓰는 refundPolicyText가 같은 화면에서 서로 다른 말을 했다 — 운영자
+// 정책이 있으면 그 항목들을 빼고, 없으면 고정문구가 fallback으로 남는다(2026-09-15 사용자 결정).
+describe('TournamentDetailPageClient — 참가 전 유의사항과 환불 정책의 모순 해소', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tournamentApiMocks.useV1MyRegistrations.mockReturnValue({ data: [] });
+    tournamentApiMocks.useV1Reviews.mockReturnValue({
+      data: undefined,
+      isError: false,
+      isPending: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('운영자가 환불 정책을 직접 썼으면 고정 환불 문구(환불 불가·주최 취소·대회 연기)는 빠지고 운영자 문구만 보인다', async () => {
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ refundPolicyText: '경기 시작 48시간 전까지 100% 환불, 24시간 전까지 50% 환불됩니다.' }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.getByText(/경기 시작 48시간 전까지 100% 환불/)).toBeInTheDocument();
+    expect(screen.queryByText('환불 불가')).not.toBeInTheDocument();
+    expect(screen.queryByText('주최 취소')).not.toBeInTheDocument();
+    expect(screen.queryByText('대회 연기')).not.toBeInTheDocument();
+    // 환불이 아니라 자격 문제인 항목은 운영자 정책과 무관하게 그대로 남는다(모바일+데스크톱 두 사본).
+    expect(screen.getAllByText('노쇼 실격').length).toBeGreaterThan(0);
+  });
+
+  it('운영자가 환불 정책을 안 썼으면 기존 고정 문구가 그대로 fallback으로 남는다', async () => {
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament({ refundPolicyText: null }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    // 모바일 하단 카드가 데스크톱 클래스 은닉과 무관하게 jsdom에는 항상 그려지므로,
+    // 존재 자체(개수 ≥1)만 본다 — 이 테스트의 관심사는 fallback이 여전히 나오는가다.
+    expect(screen.getAllByText('환불 불가').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('주최 취소').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('대회 연기').length).toBeGreaterThan(0);
+  });
+});

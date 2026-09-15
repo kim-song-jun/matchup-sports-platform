@@ -111,10 +111,10 @@ function EventsContent() {
       <header className={styles.intro}>
         <div className={styles.titleRow}>
           <Sparkles size={20} aria-hidden="true" />
-          <h1 className="tm-text-heading">이벤트 허브</h1>
+          <h1 className="tm-text-heading">팀밋이 여는 대회</h1>
         </div>
         <p>
-          지금 참가할 수 있는 대회부터 결과와 시상까지, 팀밋의 주요 이벤트를 한눈에 확인하세요.
+          팀밋이 직접 기획해 여는 대회예요. 지금 참가할 수 있는 대회부터 결과와 시상까지 한눈에 확인하세요.
         </p>
       </header>
 

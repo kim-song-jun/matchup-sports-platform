@@ -1638,7 +1638,7 @@ function getFlowSteps(competition: V1TournamentDetail): Array<{ title: string; b
   // "조별 리그 → 결선 진출 → 결선 토너먼트" 를 리그 참가자에게 보여준다.
   if (isLeagueCompetition(competition)) {
     return [
-      { title: '풀리그', body: '참가한 모든 팀이 서로 한 번씩 맞붙어요.' },
+      { title: '풀리그', body: '참가한 모든 팀이 서로 맞붙어요. 맞붙는 횟수는 시즌 주차 수에 따라 달라져요.' },
       { title: '순위 집계', body: '승점과 득실차로 최종 순위를 가려요.' },
       { title: '시상', body: '최종 순위에 따라 상금과 순위를 시상해요.' },
     ];
@@ -1659,7 +1659,7 @@ function getFlowSteps(competition: V1TournamentDetail): Array<{ title: string; b
     ];
   }
   return [
-    { title: '풀리그', body: '참가한 모든 팀이 서로 한 번씩 맞붙어요.' },
+    { title: '풀리그', body: '참가한 모든 팀이 서로 맞붙어요. 맞붙는 횟수는 시즌 주차 수에 따라 달라져요.' },
     { title: '순위 집계', body: '승점과 득실차로 최종 순위를 가려요.' },
     { title: '시상', body: '최종 순위에 따라 상금과 순위를 시상해요.' },
   ];

@@ -199,7 +199,7 @@ export function BracketGroupCard({
   const teamCount = group.groupTeams.length;
   const fixtureCount = groupFixtures.length;
   const ready = teamCount > 0 && fixtureCount > 0;
-  const teamLabel = teamCount === 0 ? '배정 대기' : `${teamCount}명 배정됨`;
+  const teamLabel = teamCount === 0 ? '배정 대기' : `${teamCount}팀 배정됨`;
   const fixtureLabel = fixtureCount === 0 ? '대진 미생성' : `대진 ${fixtureCount}경기`;
 
   const assignedIds = new Set(group.groupTeams.map((gt) => gt.registrationId));

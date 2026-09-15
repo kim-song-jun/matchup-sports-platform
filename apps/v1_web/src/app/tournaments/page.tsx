@@ -88,13 +88,13 @@ function TournamentEventHubEntry() {
           padding: '12px 16px',
           textDecoration: 'none',
         }}
-        aria-label="이벤트 허브 — 팀밋 주관 대회 캠페인 모아보기"
+        aria-label="팀밋이 여는 대회 — 직접 기획해 여는 대회 모아보기"
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Sparkles size={18} style={{ color: 'var(--blue700)', flexShrink: 0 }} aria-hidden="true" />
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue700)' }}>이벤트 허브</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>팀밋 주관 대회 캠페인 모아보기</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue700)' }}>팀밋이 여는 대회</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>직접 기획해 여는 대회를 모았어요</div>
           </div>
         </div>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--blue700)', whiteSpace: 'nowrap' }}>바로가기 →</span>
@@ -315,7 +315,7 @@ export function TournamentsListContent() {
             illustration={{ name: 'journey-done' }}
             title={activeSportLabel ? `${activeSportLabel} 모집 중인 대회가 없어요` : '현재 모집 중인 대회가 없어요'}
             sub={activeSportLabel ? '다른 종목을 선택하거나 새로운 대회 알림을 기다려 주세요.' : '새로운 대회가 열리면 앱 알림으로 안내드릴게요.'}
-            cta="이벤트 허브 보기"
+            cta="팀밋 대회 보기"
             ctaHref="/events"
           />
         ) : (

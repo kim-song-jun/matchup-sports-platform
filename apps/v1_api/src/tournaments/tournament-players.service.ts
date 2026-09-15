@@ -524,6 +524,9 @@ export class TournamentPlayersService {
         await assertJerseyAvailable(tx, registrationId, jerseyNumber, playerId);
       }
       await writeJerseyNumber(tx, playerId, jerseyNumber);
+      // 등번호도 참가자 스냅샷의 일부라 시작 전 대진 경기 명단에 다시 찍는다(멤버십은
+      // 안 바뀌었어도 번호만 바뀌면 새 참가자 행을 만들어야 한다).
+      await syncTournamentRosterLineups(tx, { tournamentId, teamId: registration.teamId });
       return player;
     });
 

@@ -180,6 +180,26 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
     expect(rows.map((row) => row.jerseyNumber)).toEqual([7]);
   });
 
+  it('멤버십은 그대로인데 등번호만 바뀌어도 새 리비전에 그 번호가 찍힌다 — Copilot 지적 회귀 테스트', async () => {
+    const f = await seedFixture();
+    await app.get(TournamentPlayersService).addPlayer(
+      f.captain,
+      f.tournament.id,
+      f.registration.id,
+      { userId: f.members[0], jerseyNumber: 7 } as never,
+    );
+    expect((await latestLineup(f.game.id, f.side.id)).revision).toBe(2);
+
+    const player = await prisma.v1TournamentPlayer.findFirstOrThrow({
+      where: { registrationId: f.registration.id, userId: f.members[0], removedAt: null },
+    });
+    await app.get(TournamentPlayersService).updatePlayerJersey(f.captain, f.tournament.id, f.registration.id, player.id, 9);
+
+    const latest = await latestLineup(f.game.id, f.side.id);
+    expect(latest.revision).toBe(3);
+    expect((await participantsOf(latest.id)).map((row) => row.jerseyNumber)).toEqual([9]);
+  });
+
   it('팀장이 저장한 라인업은 덮지 않는다', async () => {
     const f = await seedFixture();
     const generated = await latestLineup(f.game.id, f.side.id);

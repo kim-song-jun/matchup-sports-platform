@@ -101,9 +101,11 @@ function auditRequestId(gameId: string, lineupId: string): string {
   return `${gameId}:${lineupId}`;
 }
 
-function rosterKey(rows: ReadonlyArray<{ userId: string | null; displayNameSnapshot: string }>): string {
+function rosterKey(
+  rows: ReadonlyArray<{ userId: string | null; displayNameSnapshot: string; jerseyNumber: number | null | undefined }>,
+): string {
   return rows
-    .map((row) => `${row.userId ?? ''}␟${row.displayNameSnapshot}`)
+    .map((row) => `${row.userId ?? ''}␟${row.displayNameSnapshot}␟${row.jerseyNumber ?? ''}`)
     .sort()
     .join('␞');
 }
@@ -128,10 +130,9 @@ async function syncSide(
 
   const current = await tx.v1GameParticipant.findMany({
     where: { lineupId: latest.id },
-    select: { userId: true, displayNameSnapshot: true },
+    select: { userId: true, displayNameSnapshot: true, jerseyNumber: true },
   });
-  const desired = entries.map((entry) => ({ userId: entry.userId, displayNameSnapshot: entry.displayNameSnapshot }));
-  if (rosterKey(current) === rosterKey(desired)) return false;
+  if (rosterKey(current) === rosterKey(entries)) return false;
 
   const carried = await loadRevokedConsentByUserId(tx, latest.id);
   const lineup = await tx.v1GameLineup.create({

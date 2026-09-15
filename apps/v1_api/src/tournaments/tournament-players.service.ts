@@ -25,6 +25,7 @@ import {
 } from './tournament-player-jersey';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from './tournament-surface-lookup';
 import { syncLeagueRosterLineups } from '../league-matches/league-roster-sync';
+import { syncTournamentRosterLineups } from './tournament-roster-sync';
 
 /**
  * 명단 표면은 **대회와 리그를 함께** 받는다.
@@ -417,8 +418,9 @@ export class TournamentPlayersService {
       if (dto.jerseyNumber !== undefined) {
         await writeJerseyNumber(tx, saved.id, dto.jerseyNumber);
       }
-      // 리그면 시작 전 경기 명단을 새 참가 명단에 맞춘다(대회는 대상 경기가 없어 no-op).
+      // 리그·대회 둘 다 시작 전 경기 명단을 새 참가 명단에 맞춘다 — 대상 경기가 없는 쪽은 no-op.
       await syncLeagueRosterLineups(tx, { leagueId: tournamentId, teamId: current.registration.teamId });
+      await syncTournamentRosterLineups(tx, { tournamentId, teamId: current.registration.teamId });
       return saved;
     });
   }
@@ -461,6 +463,7 @@ export class TournamentPlayersService {
         data: { removedAt: new Date() },
       });
       await syncLeagueRosterLineups(tx, { leagueId: tournamentId, teamId: registration.teamId });
+      await syncTournamentRosterLineups(tx, { tournamentId, teamId: registration.teamId });
       return removedPlayer;
     });
 
@@ -521,6 +524,9 @@ export class TournamentPlayersService {
         await assertJerseyAvailable(tx, registrationId, jerseyNumber, playerId);
       }
       await writeJerseyNumber(tx, playerId, jerseyNumber);
+      // 등번호도 참가자 스냅샷의 일부라 시작 전 대진 경기 명단에 다시 찍는다(멤버십은
+      // 안 바뀌었어도 번호만 바뀌면 새 참가자 행을 만들어야 한다).
+      await syncTournamentRosterLineups(tx, { tournamentId, teamId: registration.teamId });
       return player;
     });
 
@@ -887,6 +893,10 @@ export class TournamentPlayersService {
       await this.reconcileGenderQuotaAfterRosterChange(tx, player.registrationId, tournament);
       await syncLeagueRosterLineups(tx, {
         leagueId: player.registration.tournamentId,
+        teamId: player.registration.teamId,
+      });
+      await syncTournamentRosterLineups(tx, {
+        tournamentId: player.registration.tournamentId,
         teamId: player.registration.teamId,
       });
 

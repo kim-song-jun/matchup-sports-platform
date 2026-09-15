@@ -72,10 +72,11 @@ describe('removeUserFromActiveRosters', () => {
         }),
       ],
     });
-    // 팀을 떠난 사람이 리그의 시작 전 경기 명단에 남지 않도록, 명단이 줄어든 팀마다 한 번씩 맞춘다.
+    // 팀을 떠난 사람이 리그·대회 양쪽의 시작 전 경기 명단에 남지 않도록, 명단이 줄어든
+    // 팀마다 리그판(leagueId=tournamentId)과 대회판(leagueId=null) 양쪽을 한 번씩 맞춘다.
     expect(
       gameFindMany.mock.calls.map(([args]) => `${args.where.teamMatch.leagueId}:${args.where.sides.some.teamId}`).sort(),
-    ).toEqual(['tournament-1:team-1', 'tournament-1:team-2']);
+    ).toEqual(['null:team-1', 'null:team-2', 'tournament-1:team-1', 'tournament-1:team-2']);
   });
 
   it('잠긴 신청건이 없으면 감사 로그를 남기지 않는다', async () => {

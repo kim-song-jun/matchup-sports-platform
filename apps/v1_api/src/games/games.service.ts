@@ -824,7 +824,9 @@ async function appendIdentityEvent(
           // (20260729000100 migration 의 v1_guard_identity_event) 스키마 변경이 필요 없다.
           | 'LINEUP_REVISION_COPY'
           // 리그 참가 명단이 바뀌어 시작 전 경기 명단을 다시 맞출 때(league-roster-sync.ts).
-          | 'LEAGUE_ROSTER_SYNC';
+          | 'LEAGUE_ROSTER_SYNC'
+          // 대회 참가 명단이 바뀌어 시작 전 대진 경기 명단을 다시 맞출 때(tournament-roster-sync.ts).
+          | 'TOURNAMENT_ROSTER_SYNC';
       }
   ),
 ) {
@@ -880,7 +882,8 @@ export async function createRosterAssertedIdentityLink(
           | 'GAME_BACKFILL'
           | 'PROJECTION_REPAIR'
           | 'LINEUP_REVISION_COPY'
-          | 'LEAGUE_ROSTER_SYNC';
+          | 'LEAGUE_ROSTER_SYNC'
+          | 'TOURNAMENT_ROSTER_SYNC';
       },
   reason: string,
 ): Promise<void> {

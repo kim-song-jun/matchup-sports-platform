@@ -123,12 +123,16 @@ export function TournamentRosterDeadlineCard({
   isRosterDeadlineBlocked: boolean;
   /** 팀 멤버는 명단을 읽을 수 있지만, owner/manager만 수정할 수 있다(M-T 감사). */
   canManageRoster?: boolean;
-  /** 뷰어 권한을 아직 확인하지 못한 첫 렌더에서는 "팀장에게 요청" 문구를 섣불리 보여주지 않는다. */
+  /**
+   * 뷰어의 팀 role을 확인했는지 — 로딩 중이거나(false) 조회가 실패했을 때(false)는
+   * '팀장에게 요청'을 단정적으로 보여주지 않는다. **카드 전체가 아니라 아래 '선수 명단'
+   * 행만 가린다** — 위 '대회 신청 마감' 정보는 팀 권한과 무관하므로 항상 보인다
+   * (Copilot 리뷰: 실패 시에도 카드가 통째로 '멤버라 요청하세요'로 렌더돼, 바로 아래
+   * 재시도 배너와 서로 다른 말을 하는 모순이 있었다).
+   */
   permissionResolved?: boolean;
   nowMs?: number;
 }) {
-  if (!permissionResolved) return null;
-
   const deadlineState = getRegistrationDeadlineState(deadlineAt, nowMs);
   const deadlineBadge = deadlineState === 'upcoming'
     ? { label: '신청 접수 중', className: 'tm-badge-green' }
@@ -177,19 +181,21 @@ export function TournamentRosterDeadlineCard({
         </span>
       </div>
 
-      <div style={{ borderTop: '1px solid var(--border)', marginTop: 16, paddingTop: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <span className={'tm-text-caption'} style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
-            선수 명단
-          </span>
-          <span className={`tm-badge ${canEditRoster ? 'tm-badge-green' : 'tm-badge-grey'}`}>
-            {rosterEditBadge}
-          </span>
+      {permissionResolved ? (
+        <div style={{ borderTop: '1px solid var(--border)', marginTop: 16, paddingTop: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <span className={'tm-text-caption'} style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+              선수 명단
+            </span>
+            <span className={`tm-badge ${canEditRoster ? 'tm-badge-green' : 'tm-badge-grey'}`}>
+              {rosterEditBadge}
+            </span>
+          </div>
+          <div className={'tm-text-micro'} style={{ color: 'var(--text-caption)', lineHeight: 1.5, marginTop: 8 }}>
+            {rosterEditMessage}
+          </div>
         </div>
-        <div className={'tm-text-micro'} style={{ color: 'var(--text-caption)', lineHeight: 1.5, marginTop: 8 }}>
-          {rosterEditMessage}
-        </div>
-      </div>
+      ) : null}
     </Card>
   );
 }
@@ -1372,7 +1378,7 @@ export function TournamentRosterPageClient({
             isRosterEditBlockedByStatus={isRosterEditBlockedByStatus}
             isRosterDeadlineBlocked={rosterDeadlineState.blocked}
             canManageRoster={canManageRoster}
-            permissionResolved={teamPermissionResolved || teamPermissionError}
+            permissionResolved={teamPermissionResolved}
           />
         ) : null}
 

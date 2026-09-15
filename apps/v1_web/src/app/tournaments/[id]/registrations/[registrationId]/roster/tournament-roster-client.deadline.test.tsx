@@ -591,5 +591,10 @@ describe('TournamentRosterPageClient — 명단 수정 권한(M-T)', () => {
     expect(screen.getByText(/팀 정보를 불러오지 못해 수정 권한을 확인할 수 없어요/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '선수 추가하기' })).not.toBeInTheDocument();
+    // Copilot 리뷰: 실패는 "멤버라 확정됨"이 아니라 "확인 못 함"이다 — '팀장에게 요청'을
+    // 단정적으로 보여주면 재시도 배너와 서로 다른 말을 하는 모순이 생긴다.
+    expect(screen.queryByText('팀장에게 요청')).not.toBeInTheDocument();
+    // 팀 권한과 무관한 마감 정보는 조회 실패와 상관없이 그대로 보인다.
+    expect(screen.getByText('대회 신청 마감')).toBeInTheDocument();
   });
 });

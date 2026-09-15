@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { FormattedText } from '@/components/v1-ui/formatted-text';
+import { BlockedAction } from '@/components/v1-ui/blocked-action';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { Trophy, Goal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useV1Tournament, useV1MyRegistrations } from '@/hooks/use-v1-api';
@@ -377,21 +378,12 @@ function ApplyCTAButtons({
       tournament.entryFee === 0,
     );
     return (
-      <div style={{ display: 'grid', gap: 8 }}>
-        <button
-          type="button"
-          className={primaryButtonClass}
-          style={{ fontSize: 'var(--font-size-body-lg)' }}
-          disabled
-          aria-disabled="true"
-          aria-label={description}
-        >
-          {getApplyBlockButtonLabel(blockReason)}
-        </button>
-        <p className="tm-text-caption" style={{ margin: 0, color: 'var(--text-muted)', lineHeight: 1.5, textAlign: 'center' }}>
-          {description}
-        </p>
-      </div>
+      <BlockedAction
+        label={getApplyBlockButtonLabel(blockReason)}
+        reason={description}
+        className={primaryButtonClass}
+        buttonStyle={{ fontSize: 'var(--font-size-body-lg)' }}
+      />
     );
   }
 

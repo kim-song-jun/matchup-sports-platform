@@ -181,6 +181,15 @@ describe('로스터 — 화면당 primary CTA 1개', () => {
     vi.spyOn(api, 'useV1Registration').mockReturnValue({
       data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
     } as never);
+    // M-T 게이트(팀 role owner/manager만 편집)가 이 스위트의 관심사(primary CTA 개수)와
+    // 무관하게 항상 owner로 통과하게 해서, 버튼 존재 자체는 그대로 전제로 둔다.
+    vi.spyOn(api, 'useV1TeamDetail').mockReturnValue({
+      data: { viewer: { role: 'owner' } },
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+      refetch: vi.fn(),
+    } as never);
     vi.spyOn(api, 'useV1TournamentPlayers').mockReturnValue({
       data: { players: [player], belowMinimum: false },
       isLoading: false,

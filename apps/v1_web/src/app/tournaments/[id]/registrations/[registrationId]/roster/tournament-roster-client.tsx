@@ -9,6 +9,7 @@ import {
   useV1TournamentPlayers,
   useV1Tournament,
   useV1Registration,
+  useV1TeamDetail,
   useV1AddPlayer,
   useV1UpdatePlayer,
   useV1UpdatePlayerJersey,
@@ -108,6 +109,8 @@ export function TournamentRosterDeadlineCard({
   isRosterLocked,
   isRosterEditBlockedByStatus,
   isRosterDeadlineBlocked,
+  canManageRoster = true,
+  permissionResolved = true,
   nowMs,
 }: {
   deadlineAt: string | null;
@@ -118,6 +121,16 @@ export function TournamentRosterDeadlineCard({
   isRosterLocked: boolean;
   isRosterEditBlockedByStatus: boolean;
   isRosterDeadlineBlocked: boolean;
+  /** 팀 멤버는 명단을 읽을 수 있지만, owner/manager만 수정할 수 있다(M-T 감사). */
+  canManageRoster?: boolean;
+  /**
+   * 뷰어의 팀 role을 확인했는지 — 로딩 중이거나(false) 조회가 실패했을 때(false)는
+   * '팀장에게 요청'을 단정적으로 보여주지 않는다. **카드 전체가 아니라 아래 '선수 명단'
+   * 행만 가린다** — 위 '대회 신청 마감' 정보는 팀 권한과 무관하므로 항상 보인다
+   * (Copilot 리뷰: 실패 시에도 카드가 통째로 '멤버라 요청하세요'로 렌더돼, 바로 아래
+   * 재시도 배너와 서로 다른 말을 하는 모순이 있었다).
+   */
+  permissionResolved?: boolean;
   nowMs?: number;
 }) {
   const deadlineState = getRegistrationDeadlineState(deadlineAt, nowMs);
@@ -127,8 +140,11 @@ export function TournamentRosterDeadlineCard({
       ? { label: '신청 마감', className: 'tm-badge-grey' }
       : { label: '일정 미정', className: 'tm-badge-grey' };
   const canEditRoster =
+    canManageRoster &&
     !isTournamentRosterClosed && !isRosterLocked && !isRosterEditBlockedByStatus && !isRosterDeadlineBlocked;
-  const rosterEditBadge = isTournamentRosterClosed
+  const rosterEditBadge = !canManageRoster
+    ? '팀장에게 요청'
+    : isTournamentRosterClosed
     ? '수정 불가'
     : isRosterLocked
       ? '명단 마감'
@@ -137,15 +153,17 @@ export function TournamentRosterDeadlineCard({
         : isRosterDeadlineBlocked
           ? '제출 마감'
           : '수정 가능';
-  const rosterEditMessage = isTournamentRosterClosed
+  const rosterEditMessage = !canManageRoster
+    ? '선수 명단은 확인할 수 있어요. 추가·수정·삭제는 팀장 또는 매니저에게 요청해 주세요.'
+    : isTournamentRosterClosed
     ? tournamentRosterClosedMessage(tournamentStatus)
-    : isRosterLocked
-      ? '선수 명단이 운영진에 의해 마감됐어요.'
-      : isRosterEditBlockedByStatus
-        ? '취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요.'
-        : isRosterDeadlineBlocked
-          ? '선수 명단 제출 기간이 종료됐어요.'
-          : '대회 신청 마감과 별개로, 운영진이 명단을 잠그기 전까지 수정할 수 있어요.';
+      : isRosterLocked
+        ? '선수 명단이 운영진에 의해 마감됐어요.'
+        : isRosterEditBlockedByStatus
+          ? '취소 요청 또는 취소 완료된 신청은 선수 명단을 수정할 수 없어요.'
+          : isRosterDeadlineBlocked
+            ? '선수 명단 제출 기간이 종료됐어요.'
+            : '대회 신청 마감과 별개로, 운영진이 명단을 잠그기 전까지 수정할 수 있어요.';
 
   return (
     <Card pad={16} style={{ marginBottom: 16 }}>
@@ -163,19 +181,21 @@ export function TournamentRosterDeadlineCard({
         </span>
       </div>
 
-      <div style={{ borderTop: '1px solid var(--border)', marginTop: 16, paddingTop: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <span className={'tm-text-caption'} style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
-            선수 명단
-          </span>
-          <span className={`tm-badge ${canEditRoster ? 'tm-badge-green' : 'tm-badge-grey'}`}>
-            {rosterEditBadge}
-          </span>
+      {permissionResolved ? (
+        <div style={{ borderTop: '1px solid var(--border)', marginTop: 16, paddingTop: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <span className={'tm-text-caption'} style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+              선수 명단
+            </span>
+            <span className={`tm-badge ${canEditRoster ? 'tm-badge-green' : 'tm-badge-grey'}`}>
+              {rosterEditBadge}
+            </span>
+          </div>
+          <div className={'tm-text-micro'} style={{ color: 'var(--text-caption)', lineHeight: 1.5, marginTop: 8 }}>
+            {rosterEditMessage}
+          </div>
         </div>
-        <div className={'tm-text-micro'} style={{ color: 'var(--text-caption)', lineHeight: 1.5, marginTop: 8 }}>
-          {rosterEditMessage}
-        </div>
-      </div>
+      ) : null}
     </Card>
   );
 }
@@ -1107,6 +1127,17 @@ export function TournamentRosterPageClient({
 }) {
   const { data: tournament } = useV1Tournament(tournamentId);
   const { data: registration } = useV1Registration(tournamentId, registrationId);
+  // M-T 감사: member 역할에게도 '+ 추가'·'수정'·'삭제'가 전부 활성 상태로 노출됐다 —
+  // 이 화면은 신청 목록을 거치지 않고 URL로 바로 올 수 있어 팀장/매니저 권한을 여기서
+  // 직접 확인해야 한다(내 신청 카드는 useMyTeams()로 이미 아는 role을 prop으로 받지만,
+  // 이 화면엔 그 목록이 없다). `useV1TeamDetail`이 로그인한 뷰어 기준 role을 함께 준다.
+  const {
+    data: team,
+    isPending: isTeamPending,
+    isError: isTeamError,
+    isPlaceholderData: isTeamPlaceholderData,
+    refetch: refetchTeamDetail,
+  } = useV1TeamDetail(registration?.teamId ?? '');
   const {
     data: rosterData,
     isLoading,
@@ -1150,8 +1181,17 @@ export function TournamentRosterPageClient({
     rosterDeadlineAt,
     registration?.rosterDeadlineOverrideAt,
   );
+  // 팀 조회가 아직 안 끝났거나(로딩·placeholder) 실패했으면 권한을 "판정 전"으로 둔다 —
+  // fail-open(끝나기 전에 잠깐 수정 버튼을 보여줌)을 피한다. registration.teamId가 아직
+  // 없으면(등록 자체가 로딩 중) 마찬가지로 미확정.
+  const teamPermissionResolved =
+    Boolean(registration?.teamId) && Boolean(team) && !isTeamPending && !isTeamPlaceholderData && !isTeamError;
+  const teamPermissionError = Boolean(registration?.teamId) && isTeamError;
+  const canManageRoster =
+    teamPermissionResolved && (team?.viewer.role === 'owner' || team?.viewer.role === 'manager');
   const canEditRoster =
     Boolean(registration) &&
+    canManageRoster &&
     !isTournamentRosterClosed &&
     !isRosterLocked &&
     !isRosterEditBlockedByStatus &&
@@ -1164,6 +1204,16 @@ export function TournamentRosterPageClient({
     [players],
   );
   const canAddDraftForm = canEditRoster && players.length + draftForms.length < maxPlayers;
+
+  // 권한이 사라지면(팀에서 제외됨, 세션 중 역할 강등 등) 남아 있던 편집 상태를 비운다 —
+  // 안 그러면 버튼은 비활성인데 이미 열려 있던 입력 폼이 화면에 그대로 남는다.
+  useEffect(() => {
+    if (!canEditRoster) {
+      setDraftForms([]);
+      setDraftErrors({});
+      setEditingPlayerId(null);
+    }
+  }, [canEditRoster]);
 
   if (isLoading) {
     return (
@@ -1327,7 +1377,26 @@ export function TournamentRosterPageClient({
             isRosterLocked={isRosterLocked}
             isRosterEditBlockedByStatus={isRosterEditBlockedByStatus}
             isRosterDeadlineBlocked={rosterDeadlineState.blocked}
+            canManageRoster={canManageRoster}
+            permissionResolved={teamPermissionResolved}
           />
+        ) : null}
+
+        {teamPermissionError ? (
+          <div style={{ marginBottom: 16 }}>
+            <AlertBanner
+              message="팀 정보를 불러오지 못해 수정 권한을 확인할 수 없어요. 잠시 후 다시 시도해 주세요."
+              tone="warning"
+            />
+            <button
+              type="button"
+              className="tm-btn tm-btn-sm tm-btn-outline"
+              style={{ marginTop: 8 }}
+              onClick={() => void refetchTeamDetail()}
+            >
+              다시 시도
+            </button>
+          </div>
         ) : null}
 
         {/* Roster deadline info row */}

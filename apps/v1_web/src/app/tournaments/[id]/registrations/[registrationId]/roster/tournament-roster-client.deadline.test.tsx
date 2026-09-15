@@ -5,6 +5,7 @@ import {
   useV1AddPlayer,
   useV1Registration,
   useV1RemovePlayer,
+  useV1TeamDetail,
   useV1Tournament,
   useV1TournamentPlayers,
   useV1UpdatePlayer,
@@ -23,6 +24,7 @@ vi.mock('@/components/v1-ui/shell', () => ({
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1Tournament: vi.fn(),
   useV1Registration: vi.fn(),
+  useV1TeamDetail: vi.fn(),
   useV1TournamentPlayers: vi.fn(),
   useV1AddPlayer: vi.fn(),
   useV1UpdatePlayer: vi.fn(),
@@ -34,6 +36,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
 
 const useV1TournamentMock = vi.mocked(useV1Tournament);
 const useV1RegistrationMock = vi.mocked(useV1Registration);
+const useV1TeamDetailMock = vi.mocked(useV1TeamDetail);
 const useV1TournamentPlayersMock = vi.mocked(useV1TournamentPlayers);
 const useV1AddPlayerMock = vi.mocked(useV1AddPlayer);
 const useV1UpdatePlayerMock = vi.mocked(useV1UpdatePlayer);
@@ -63,6 +66,16 @@ describe('TournamentRosterPageClient — 명단 제출 마감 배너/액션 차�
   });
 
   beforeEach(() => {
+    // 이 스위트의 모든 기존 테스트는 마감·잠금만 다루고 권한은 항상 있다고 가정하므로,
+    // 기본값을 owner로 둬 M-T 게이트 추가로 기존 동작이 조용히 바뀌지 않게 한다
+    // (member 권한 자체는 아래 전용 describe에서 별도로 검증한다).
+    useV1TeamDetailMock.mockReturnValue({
+      data: { viewer: { role: 'owner' } },
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TeamDetail>);
     useV1TournamentPlayersMock.mockReturnValue({
       data: { players: [mockPlayer()], belowMinimum: false },
       isLoading: false,
@@ -494,5 +507,94 @@ describe('등번호 입력 종류', () => {
     } finally {
       fetchSpy.mockRestore();
     }
+  });
+});
+
+// M-T 감사: 팀 role='멤버'인 뷰어에게 신청 명단 페이지의 '+ 추가'·'수정'·'삭제'가
+// 전부 활성 상태(disabled=false)로 노출됐다. 서버(tournament-players.service.ts)는
+// manager+ 만 허용해 실제 변경은 막지만(보안 구멍 아님), 화면이 활성 버튼을 보여준
+// 채 눌렀을 때만 403이 나면 "성공처럼 보이는 조용한 실패"다 — 화면 자체가 뷰어 role을
+// 먼저 확인해 버튼을 숨겨야 한다.
+describe('TournamentRosterPageClient — 명단 수정 권한(M-T)', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  beforeEach(() => {
+    useV1TournamentMock.mockReturnValue({
+      data: { minPlayers: 5, maxPlayers: 20, rosterDeadlineAt: null, status: 'open' },
+    } as unknown as ReturnType<typeof useV1Tournament>);
+    useV1RegistrationMock.mockReturnValue({
+      data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
+    } as unknown as ReturnType<typeof useV1Registration>);
+    useV1TournamentPlayersMock.mockReturnValue({
+      data: { players: [mockPlayer()], belowMinimum: false },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TournamentPlayers>);
+    useV1AddPlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1AddPlayer>);
+    useV1UpdatePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1UpdatePlayer>);
+    useV1RemovePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1RemovePlayer>);
+  });
+
+  function mockTeam(role: 'owner' | 'manager' | 'member', overrides: Record<string, unknown> = {}) {
+    useV1TeamDetailMock.mockReturnValue({
+      data: { viewer: { role } },
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+      refetch: vi.fn(),
+      ...overrides,
+    } as unknown as ReturnType<typeof useV1TeamDetail>);
+  }
+
+  it('member 역할은 추가·수정·삭제 버튼이 전부 안 보이고, "팀장에게 요청"으로 안내한다', () => {
+    mockTeam('member');
+
+    render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
+
+    expect(screen.getByText('팀장에게 요청')).toBeInTheDocument();
+    expect(screen.getByText(/추가·수정·삭제는 팀장 또는 매니저에게 요청해 주세요/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '선수 추가하기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '홍길동 수정' })).not.toBeInTheDocument();
+    // 명단 자체(읽기)는 그대로 보인다 — 막는 건 쓰기뿐이다.
+    expect(screen.getByText('홍길동')).toBeInTheDocument();
+  });
+
+  it.each(['owner', 'manager'] as const)('%s 역할은 기존과 동일하게 추가·수정 버튼이 보인다', (role) => {
+    mockTeam(role);
+
+    render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
+
+    expect(screen.queryByText('팀장에게 요청')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '선수 추가하기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '홍길동 수정' })).toBeInTheDocument();
+  });
+
+  it('팀 조회가 아직 로딩 중이면 권한 배지를 보여주지 않는다(판정 전 fail-open 방지)', () => {
+    mockTeam('owner', { isPending: true, data: undefined });
+
+    render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
+
+    expect(screen.queryByText('팀장에게 요청')).not.toBeInTheDocument();
+    expect(screen.queryByText('수정 가능')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '선수 추가하기' })).not.toBeInTheDocument();
+  });
+
+  it('팀 조회가 실패하면 재시도 배너를 보여주고 쓰기 버튼은 숨긴다', () => {
+    mockTeam('owner', { isError: true, data: undefined });
+
+    render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
+
+    expect(screen.getByText(/팀 정보를 불러오지 못해 수정 권한을 확인할 수 없어요/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '선수 추가하기' })).not.toBeInTheDocument();
+    // Copilot 리뷰: 실패는 "멤버라 확정됨"이 아니라 "확인 못 함"이다 — '팀장에게 요청'을
+    // 단정적으로 보여주면 재시도 배너와 서로 다른 말을 하는 모순이 생긴다.
+    expect(screen.queryByText('팀장에게 요청')).not.toBeInTheDocument();
+    // 팀 권한과 무관한 마감 정보는 조회 실패와 상관없이 그대로 보인다.
+    expect(screen.getByText('대회 신청 마감')).toBeInTheDocument();
   });
 });

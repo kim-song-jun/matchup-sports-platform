@@ -3484,8 +3484,9 @@ export type V1TournamentAward = {
   awardLabel: string;  // 'MVP' | '득점왕' | ...
   iconKey?: V1TournamentAwardIconKey | null;
   recipientName: string;
-  /** Admin award reads include this; public tournament detail omits account linkage. */
+  /** Present only when the recipient's account is still linked and not withdrawn — link to `/users/:id`. */
   recipientUserId?: string | null;
+  recipientProfileImageUrl?: string | null;
   teamName: string | null;
   note: string | null;
 };

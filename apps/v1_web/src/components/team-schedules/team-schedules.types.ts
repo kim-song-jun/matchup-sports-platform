@@ -226,6 +226,8 @@ export type ScheduleDetailViewModel = {
   dateTimeLabel: string;
   visibilityLabel: string;
   capacityLabel: string | null;
+  /** MATCH 타입이 확정됐고(matchConfirmed) 상대팀 이름을 불러왔을 때만 채워진다. */
+  opponent: { teamName: string; placeName: string | null; teamMatchHref: string } | null;
   version: number;
   conflictBanner: string | null;
   onDismissConflict: () => void;

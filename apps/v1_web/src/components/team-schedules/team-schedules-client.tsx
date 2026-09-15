@@ -14,6 +14,7 @@ import {
   useV1SetMyScheduleAttendance,
   useV1SetScheduleAttendanceOnBehalf,
   useV1TeamDetail,
+  useV1TeamMatch,
   useV1TeamSchedule,
   useV1TeamSchedules,
   useV1TriggerScheduleReminder,
@@ -174,6 +175,13 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   const queryClient = useQueryClient();
   const team = useV1TeamDetail(teamId);
   const detail = useV1TeamSchedule(teamId, scheduleId);
+  // M-M 감사: 상태 배지가 "상대팀 확정"이라 말하면서도 화면 어디에도 그 상대팀 이름·
+  // 장소가 없었다. 확정된 매치일 때만(그 전엔 approvedOpponentTeam이 비어 헛수고다)
+  // 매치 상세를 한 번 더 불러 요약을 보여준다 — 매치 상세(/team-matches/:id)가 이미
+  // 갖고 있는 approvedOpponentTeam/place를 재사용할 뿐, 새 백엔드 필드는 필요 없다.
+  const linkedTeamMatchId =
+    detail.data?.matchConfirmed === true ? (detail.data.linkedMatch?.teamMatchId ?? '') : '';
+  const opponentMatch = useV1TeamMatch(linkedTeamMatchId);
   const setAttendance = useV1SetMyScheduleAttendance(teamId, scheduleId);
   const cancelSchedule = useV1CancelTeamSchedule(teamId, scheduleId);
   const completeSchedule = useV1CompleteTeamSchedule(teamId, scheduleId);
@@ -394,6 +402,16 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
 
   const matchDisplay = schedule ? matchScheduleDisplay(schedule.type, schedule.state, schedule.matchConfirmed) : null;
 
+  const opponentTeamName = opponentMatch.data?.approvedOpponentTeam?.name ?? null;
+  const opponent: ScheduleDetailViewModel['opponent'] =
+    linkedTeamMatchId && opponentTeamName
+      ? {
+          teamName: opponentTeamName,
+          placeName: opponentMatch.data?.place?.name ?? null,
+          teamMatchHref: `/team-matches/${linkedTeamMatchId}`,
+        }
+      : null;
+
   const model: ScheduleDetailViewModel = {
     teamId,
     scheduleId,
@@ -406,6 +424,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
     dateTimeLabel: schedule ? formatTournamentDateRangeWithTime(schedule.startAt, schedule.endAt) ?? '일정 미정' : '',
     visibilityLabel: schedule ? scheduleVisibilityLabel(schedule.visibility) : '',
     capacityLabel: schedule?.capacity != null ? `정원 ${schedule.goingCount}/${schedule.capacity}명` : null,
+    opponent,
     version: schedule?.version ?? 0,
     conflictBanner,
     onDismissConflict: () => setConflictBanner(null),

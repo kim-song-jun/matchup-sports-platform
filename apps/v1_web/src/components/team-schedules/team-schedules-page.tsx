@@ -267,6 +267,19 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
           <div className="tm-text-body-lg" style={{ marginBottom: 4 }}>{model.title}</div>
           <div className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{model.dateTimeLabel}</div>
           {model.capacityLabel ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{model.capacityLabel}</div> : null}
+          {/* M-M 감사: 배지가 "상대팀 확정"이라 말하면서 상대팀·장소가 화면 어디에도
+              없었다 — 매치 상세(/team-matches/:id)가 이미 갖고 있는 값을 요약해 보여준다. */}
+          {model.opponent ? (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--grey100)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div className="tm-text-body" style={{ fontWeight: 700 }}>{model.opponent.teamName}</div>
+              {model.opponent.placeName ? (
+                <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>{model.opponent.placeName}</div>
+              ) : null}
+              <Link href={model.opponent.teamMatchHref} className="tm-text-caption" style={{ color: 'var(--blue700)', fontWeight: 700 }}>
+                경기 상세 보기 ›
+              </Link>
+            </div>
+          ) : null}
         </Card>
 
         {/* 변경 이력·내 참석·용병 모집·운영 관리를 카드마다 따로 감싸면 화면이 상자

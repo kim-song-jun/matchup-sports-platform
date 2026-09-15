@@ -39,6 +39,21 @@ function presentAwardRecipientName(award: TournamentDetailRow['awards'][number])
 }
 
 /**
+ * 수상자 프로필 링크 대상 -- 계정이 연동돼 있고(`recipientUserId`) 그 계정이
+ * 탈퇴하지 않았을 때만(`deletedAt === null`) 링크를 내보낸다. 탈퇴 계정으로 링크하면
+ * '탈퇴 회원' 표시 이름과 달리 `/users/:id`가 존재하지 않는 프로필을 가리키게 된다.
+ * `PublicTournamentPlayerRecordRow.profileHref`(개인 기록 랭킹)와 같은 화면에서
+ * 이미 공개하는 계정 연결이라 새 노출이 아니다 -- 어워드 섹션만 빠져 있었다.
+ */
+function presentAwardRecipientLink(
+  award: TournamentDetailRow['awards'][number],
+): { userId: string; profileImageUrl: string | null } | null {
+  if (award.recipientUserId === null) return null;
+  if (!award.recipient?.profile || award.recipient.profile.deletedAt !== null) return null;
+  return { userId: award.recipientUserId, profileImageUrl: award.recipient.profile.profileImageUrl ?? null };
+}
+
+/**
  * 대진표 공개 여부 판정의 단일 소스. 즉시 공개(bracketPublishedAt)와 예약 공개
  * (bracketPublishScheduledAt)를 함께 본다. 공개 경로가 둘로 나뉘면 목록·상세·어드민이
  * 서로 다른 답을 낼 수 있으므로 판정은 반드시 이 함수를 거친다.
@@ -508,15 +523,20 @@ export function presentTournamentDetail(
     // 카운트를 써야 `/tournaments/:id/reviews` 전용 목록 화면의 total과 일치한다
     // (감사 evidence: 두 화면이 31건째부터 서로 다른 숫자를 보여줌).
     reviewsTotalCount: row._count.reviews,
-    awards: (row.awards ?? []).map((award) => ({
-      id: award.id,
-      awardType: award.awardType,
-      awardLabel: award.awardLabel,
-      iconKey: award.iconKey ?? null,
-      recipientName: presentAwardRecipientName(award),
-      teamName: award.teamName ?? null,
-      note: award.note ?? null,
-    })),
+    awards: (row.awards ?? []).map((award) => {
+      const link = presentAwardRecipientLink(award);
+      return {
+        id: award.id,
+        awardType: award.awardType,
+        awardLabel: award.awardLabel,
+        iconKey: award.iconKey ?? null,
+        recipientName: presentAwardRecipientName(award),
+        recipientUserId: link?.userId ?? null,
+        recipientProfileImageUrl: link?.profileImageUrl ?? null,
+        teamName: award.teamName ?? null,
+        note: award.note ?? null,
+      };
+    }),
     // 정규 리그 시즌에만 채워진다. 대회는 항상 빈 배열 — 화면이 길이 0이면 이 섹션을
     // 아예 그리지 않는다(`fixtures` 와 같은 규약).
     leagueFixtures: leagueFixtures.map((fixture) => ({

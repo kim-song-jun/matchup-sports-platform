@@ -1053,7 +1053,7 @@ export function TournamentDetailView({
 
         <AccordionSection id="precheck-content" title="참가 전 유의사항">
           <div style={{ display: 'grid', gap: 0 }}>
-            {PRE_PARTICIPATION_CHECK_ITEMS.map((item, idx, arr) => (
+            {preParticipationCheckItems(Boolean(tournament.refundPolicyText)).map((item, idx, arr) => (
               <div
                 key={item.label}
                 style={{
@@ -1134,7 +1134,11 @@ export function TournamentDetailView({
               { label: '본인 확인', text: '당일 신분증 또는 확인 자료 제출을 요청할 수 있습니다.' },
               { label: '부상 책임', text: '경기 전 본인 건강 상태를 확인 후 참가하세요.' },
               { label: '현장 촬영', text: '대회 현장에서 사진·영상이 촬영될 수 있습니다.' },
-            ] as { label: string; text: string }[]).map((item, idx, arr) => (
+            ] as { label: string; text: string }[])
+              // 벤치마크 감사(P0 ①): 이 데스크톱 aside 목록도 모바일 카드와 같은 라벨을 쓰는
+              // 별도 사본이라 같은 모순이 생긴다 — 같은 기준(REFUND_RELATED_LABELS)으로 거른다.
+              .filter((item) => !(tournament.refundPolicyText && REFUND_RELATED_LABELS.has(item.label)))
+              .map((item, idx, arr) => (
               <div
                 key={item.label}
                 style={{
@@ -1432,7 +1436,9 @@ export function TournamentDetailView({
             남겨두면 in_progress 페이지 하나에 같은 의미의 CTA가 3개(옛 topCTA는 이미
             제거, 이 카드, 새 하단 CTA) 쌓이는 상황이었다. */}
         {!isCompleted && <BracketSection tournament={tournament} />}
-        {!isCompleted && <TournamentPreParticipationNotice />}
+        {!isCompleted && (
+          <TournamentPreParticipationNotice hasCustomRefundPolicy={Boolean(tournament.refundPolicyText)} />
+        )}
       </div>
     </article>
   );
@@ -1581,7 +1587,23 @@ const PRE_PARTICIPATION_CHECK_ITEMS: { label: string; text: string }[] = [
   { label: '현장 촬영', text: '대회 현장에서 사진 및 영상이 촬영될 수 있습니다.' },
 ];
 
-function TournamentPreParticipationNotice() {
+/** 환불·취소 조건만 다루는 항목(다른 항목 — 노쇼 실격·허위 정보 등 — 은 환불이 아니라 자격 문제라 유지). */
+const REFUND_RELATED_LABELS = new Set(['환불 불가', '주최 취소', '대회 연기']);
+
+/**
+ * 벤치마크 감사(P0 ①): 운영자가 대회별 환불 정책(`refundPolicyText`)을 직접 써 넣으면 이
+ * 고정 체크리스트의 "환불 불가/주최 취소/대회 연기" 항목과 같은 화면에서 서로 다른 말을
+ * 했다(예: 운영자가 "48시간 전 100% 환불"이라 적어도 체크리스트는 "환불 불가"라고 고정
+ * 표시). 운영자 정책이 있으면 그 세 항목을 빼 모순을 없애고, 없으면 기존 고정문구가
+ * fallback으로 남는다(사용자 결정, 2026-09-15).
+ */
+function preParticipationCheckItems(hasCustomRefundPolicy: boolean) {
+  return hasCustomRefundPolicy
+    ? PRE_PARTICIPATION_CHECK_ITEMS.filter((item) => !REFUND_RELATED_LABELS.has(item.label))
+    : PRE_PARTICIPATION_CHECK_ITEMS;
+}
+
+function TournamentPreParticipationNotice({ hasCustomRefundPolicy }: { hasCustomRefundPolicy: boolean }) {
   return (
     <div className="tm-tournament-bleed tm-hide-desktop">
       <div className="tm-match-detail-body">
@@ -1590,7 +1612,7 @@ function TournamentPreParticipationNotice() {
             참가 전 꼭 확인해 주세요
           </div>
           <Card pad={0} className="tm-on-tint" style={{ background: 'var(--grey50)', overflow: 'hidden' }}>
-            {PRE_PARTICIPATION_CHECK_ITEMS.map((item, idx, arr) => (
+            {preParticipationCheckItems(hasCustomRefundPolicy).map((item, idx, arr) => (
               <div
                 key={item.label}
                 style={{

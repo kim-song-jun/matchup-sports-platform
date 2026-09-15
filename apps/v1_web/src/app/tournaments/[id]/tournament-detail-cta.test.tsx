@@ -194,7 +194,7 @@ describe('TournamentDetailView — 통합 CTA가 실제 화면에 상태별로 �
 });
 
 describe('TournamentDetailView — 신청 차단 사유 표시', () => {
-  it('신청 마감 사유를 disabled CTA의 접근성 이름과 화면 텍스트로 함께 보여준다', () => {
+  it('신청 마감 사유를 disabled CTA의 설명으로 이어 붙이고 화면에도 보여준다', () => {
     const tournament = makeTournament({
       id: 't-deadline',
       status: 'open',
@@ -204,9 +204,12 @@ describe('TournamentDetailView — 신청 차단 사유 표시', () => {
     render(<TournamentDetailView tournament={tournament} myRegistration={null} />);
 
     const reason = '신청이 마감돼서 새로 신청할 수 없어요.';
-    const button = screen.getByRole('button', { name: reason });
+    // 버튼의 이름은 보이는 글자 그대로 두고(WCAG 2.5.3), 사유는 설명으로 잇는다.
+    const button = screen.getByRole('button', { name: '신청 마감' });
     expect(button).toBeDisabled();
     expect(screen.getByText(reason)).toBeVisible();
+    const describedBy = button.getAttribute('aria-describedby');
+    expect(document.getElementById(describedBy as string)?.textContent).toBe(reason);
   });
 });
 

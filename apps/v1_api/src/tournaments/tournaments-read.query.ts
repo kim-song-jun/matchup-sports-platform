@@ -188,6 +188,9 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
   // 2026-08-18 사용자 결정: 닉네임 기본 + 프로필 토글)으로 다시 해석해야 하므로,
   // 그 판정에 필요한 프로필 필드만 좁혀서 함께 가져온다. `recipient`가 null이거나
   // (미연동 레거시 수상 행) 프로필이 없으면 presenter가 저장된 스냅샷으로 폴백한다.
+  // `profileImageUrl`은 이름 판정에는 안 쓰이지만 presenter가 수상자 프로필 링크의
+  // 아바타로 내보낸다(M-A 감사: 개인 기록 섹션은 이미 같은 화면에서 프로필 링크를
+  // 공개하는데 어워드 섹션만 빠져 있었다).
   awards: {
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     include: {
@@ -200,6 +203,7 @@ export const TOURNAMENT_DETAIL_INCLUDE = {
               nickname: true,
               tournamentRealNameVisible: true,
               deletedAt: true,
+              profileImageUrl: true,
             },
           },
         },

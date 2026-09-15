@@ -32,6 +32,7 @@ function buildModel(
     dateTimeLabel: '5월 11일 09:00-11:00',
     visibilityLabel: '팀 전체',
     capacityLabel: null,
+    opponent: null,
     version: 1,
     conflictBanner: null,
     onDismissConflict: () => undefined,

@@ -295,6 +295,90 @@ describe('AwardsPageClient — 완료 전 상금 정보 노출 (hasPrizeData 판
   });
 });
 
+// M-A 감사: 수상자 이름이 전부 일반 텍스트였고 /users/:id 로 가는 링크가 0건이었다
+// (바로 위 개인 기록 섹션은 이미 같은 화면에서 그 링크를 공개하는데 어워드만 빠져
+// 있었다). recipientUserId가 있을 때만 링크+아바타, 없으면 기존 아이콘 그대로.
+describe('AwardsPageClient — 개인 어워드 수상자 프로필 링크(M-A)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    awardsApiMocks.usePublicTournamentPlayerRecords.mockReturnValue({
+      data: { goals: [], assists: [] },
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    awardsApiMocks.useV1LeagueMatchPlayerRecords.mockReturnValue({
+      data: { leagueId: 'tournament-1', goals: [], assists: [] },
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('recipientUserId가 있으면 /users/:id 링크로 감싸고 아바타를 보여준다', () => {
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({
+        awards: [
+          {
+            id: 'award-1',
+            awardType: 'mvp',
+            awardLabel: 'MVP',
+            iconKey: 'trophy',
+            recipientName: 'tester',
+            recipientUserId: 'user-59050e8a',
+            recipientProfileImageUrl: null,
+            teamName: 'A팀',
+            note: null,
+          },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    const link = screen.getByRole('link', { name: 'MVP 수상자 tester 프로필 보기' });
+    expect(link).toHaveAttribute('href', '/users/user-59050e8a');
+    expect(link).toHaveTextContent('tester');
+  });
+
+  it('recipientUserId가 없으면(레거시/탈퇴 계정) 링크 없이 일반 텍스트로 남는다', () => {
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({
+        awards: [
+          {
+            id: 'award-2',
+            awardType: 'top_scorer',
+            awardLabel: '득점왕',
+            iconKey: 'crown',
+            recipientName: '이팀장',
+            recipientUserId: null,
+            recipientProfileImageUrl: null,
+            teamName: 'B팀',
+            note: null,
+          },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    expect(screen.getByText('이팀장')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /이팀장 프로필 보기/ })).not.toBeInTheDocument();
+  });
+});
+
 // 감사 evidence: 이 바텀시트는 role=dialog·aria-modal만 선언하고 ESC·backdrop 닫기가
 // onClose로 연결돼 있지 않았다(백드롭 클릭은 인라인 핸들러로 이미 동작했지만 ESC는
 // 전혀 없었다) — 공용 `useModalA11y` 훅으로 옮긴 뒤 계약이 실제로 지켜지는지 검증한다.

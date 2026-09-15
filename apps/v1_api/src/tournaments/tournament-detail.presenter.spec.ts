@@ -536,7 +536,11 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     expect(presentTournamentDetail(row).fixtures[0].liveStatus).toBe('live');
   });
 
-  it('공개 대회 수상에는 관리자용 recipientUserId 계정 연결을 노출하지 않는다', () => {
+  // M-A 감사(2026-09-15): 개인 기록 랭킹 섹션은 이미 같은 화면에서 /users/:id 링크를
+  // 공개하는데 어워드 섹션만 recipientUserId를 빼서 프로필로 이어지지 않았다. 계정이
+  // 연동돼 있고 탈퇴하지 않았을 때만 노출하도록 바꿨다 — 아래 두 테스트가 그 조건을
+  // 각각 검증한다. 이 테스트는 `recipient` 자체가 없는(미연동) 픽스처의 null 폴백만 본다.
+  it('award.recipient가 없으면(미연동) recipientUserId를 null로 낸다', () => {
     const row = baseRow({
       awards: [
         {
@@ -554,8 +558,39 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
 
     const presented = presentTournamentDetail(row);
 
-    expect(presented.awards[0]).toMatchObject({ awardLabel: 'MVP', recipientName: '김선수' });
-    expect(presented.awards[0]).not.toHaveProperty('recipientUserId');
+    expect(presented.awards[0]).toMatchObject({ awardLabel: 'MVP', recipientName: '김선수', recipientUserId: null });
+  });
+
+  it('recipient 계정이 연동돼 있고 탈퇴하지 않았으면 recipientUserId·프로필 이미지를 그대로 낸다', () => {
+    const row = baseRow({
+      awards: [
+        {
+          id: 'award-1',
+          awardType: 'mvp',
+          awardLabel: 'MVP',
+          iconKey: 'crown',
+          recipientName: '스냅샷실명',
+          recipientUserId: 'user-1',
+          recipient: {
+            profile: {
+              realName: '홍길동',
+              displayName: '홍길동',
+              nickname: '골넣는홍길동',
+              tournamentRealNameVisible: false,
+              deletedAt: null,
+              profileImageUrl: 'https://cdn.example.com/user-1.jpg',
+            },
+          },
+          teamName: '서울 FC',
+          note: null,
+        },
+      ],
+    } as never);
+
+    const presented = presentTournamentDetail(row);
+
+    expect(presented.awards[0].recipientUserId).toBe('user-1');
+    expect(presented.awards[0].recipientProfileImageUrl).toBe('https://cdn.example.com/user-1.jpg');
   });
 
   // 위 테스트는 award.recipient 자체가 없는(as never로 타입만 우회한) 픽스처를 쓰기 때문에
@@ -653,6 +688,8 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     const presented = presentTournamentDetail(row);
 
     expect(presented.awards[0].recipientName).toBe('탈퇴 회원');
+    // 탈퇴 계정은 /users/:id 프로필이 더 이상 존재하지 않으므로 링크 대상에서도 뺀다.
+    expect(presented.awards[0].recipientUserId).toBeNull();
   });
 
   // 감사 evidence: `reviews` 배열은 조회 시 take:30으로 잘린다. 시상 화면의 개수

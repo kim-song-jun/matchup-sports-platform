@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { createPortal } from 'react-dom';
-import { Star, ImagePlus, X, Trophy, Medal } from 'lucide-react';
+import { Star, ImagePlus, X, Trophy, Medal, ChevronRight } from 'lucide-react';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { useEffect, useRef, useState } from 'react';
@@ -16,6 +16,7 @@ import {
   useV1LeagueMatchPlayerRecords,
 } from '@/hooks/use-v1-api';
 import { usePublicTournamentPlayerRecords } from '@/components/public-game-records/use-public-game-records';
+import { ProfileAvatar } from '@/components/users/public-profile-client';
 import { TournamentPlayerRecordsSections } from '@/components/public-game-records/player-records-sections';
 import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session } from '@/lib/session-storage';
@@ -343,34 +344,72 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
     <section style={{ marginBottom: 20 }}>
       <h3 className="tm-hub-section-title">개인 어워드</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {awards.map((award) => (
-          <div key={award.id} className="tm-award-card" style={{
+        {awards.map((award) => {
+          // M-A 감사: 바로 위 개인 기록 섹션은 이미 같은 화면에서 /users/:id 링크를
+          // 공개한다 — recipientUserId가 있을 때만(탈퇴 계정 제외, presenter가 걸러줌)
+          // 같은 방식으로 아바타+링크를 붙인다. 없으면 기존 아이콘·일반 텍스트 그대로.
+          const profileHref = award.recipientUserId ? `/users/${award.recipientUserId}` : null;
+          const content = (
+            <>
+              {profileHref ? (
+                <ProfileAvatar
+                  imageUrl={award.recipientProfileImageUrl}
+                  initials={Array.from(award.recipientName || '?')[0] ?? '?'}
+                  size={36}
+                />
+              ) : (
+                <span style={{ display: 'inline-flex', flexShrink: 0 }} aria-hidden="true">
+                  <TournamentAwardIcon iconKey={award.iconKey} awardType={award.awardType} />
+                </span>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {/* [R-T2] flex:1/minWidth:0 컬럼 — 고정폭 아님, 12로 상향. */}
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 2 }}>
+                  {award.awardLabel}
+                </div>
+                <div style={{
+                  fontSize: 15, fontWeight: 800,
+                  color: profileHref ? 'var(--blue700)' : 'var(--text-strong)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {award.recipientName}
+                </div>
+                {award.teamName && (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>{award.teamName}</div>
+                )}
+              </div>
+              {award.note && (
+                // [R-T2] maxWidth:80이지만 overflow/ellipsis 미설정이라 넘치면 줄바꿈으로
+                // 흡수된다(잘림 없음) — 12로 상향.
+                <div style={{ fontSize: 12, color: 'var(--text-caption)', flexShrink: 0, maxWidth: 80, textAlign: 'right' }}>{award.note}</div>
+              )}
+              {profileHref && (
+                <ChevronRight size={16} style={{ color: 'var(--grey500)', flexShrink: 0 }} aria-hidden="true" />
+              )}
+            </>
+          );
+          const cardStyle: React.CSSProperties = {
             alignItems: 'center', gap: 12,
             padding: '12px 16px', background: 'var(--surface)',
             borderRadius: 10, border: '1px solid var(--grey150)',
-          }}>
-            <span style={{ display: 'inline-flex', flexShrink: 0 }} aria-hidden="true">
-              <TournamentAwardIcon iconKey={award.iconKey} awardType={award.awardType} />
-            </span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {/* [R-T2] flex:1/minWidth:0 컬럼 — 고정폭 아님, 12로 상향. */}
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 2 }}>
-                {award.awardLabel}
-              </div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {award.recipientName}
-              </div>
-              {award.teamName && (
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>{award.teamName}</div>
-              )}
+            textDecoration: 'none',
+          };
+          return profileHref ? (
+            <Link
+              key={award.id}
+              href={profileHref}
+              className="tm-award-card"
+              style={cardStyle}
+              aria-label={`${award.awardLabel} 수상자 ${award.recipientName} 프로필 보기`}
+            >
+              {content}
+            </Link>
+          ) : (
+            <div key={award.id} className="tm-award-card" style={cardStyle}>
+              {content}
             </div>
-            {award.note && (
-              // [R-T2] maxWidth:80이지만 overflow/ellipsis 미설정이라 넘치면 줄바꿈으로
-              // 흡수된다(잘림 없음) — 12로 상향.
-              <div style={{ fontSize: 12, color: 'var(--text-caption)', flexShrink: 0, maxWidth: 80, textAlign: 'right' }}>{award.note}</div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

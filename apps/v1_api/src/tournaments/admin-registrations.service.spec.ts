@@ -76,6 +76,7 @@ describe('AdminRegistrationsService', () => {
     v1TournamentRegistration: { findUnique: jest.Mock; findMany: jest.Mock; update: jest.Mock; count: jest.Mock };
     v1TournamentPayment: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
     v1TournamentPlayer: { count: jest.Mock; findMany: jest.Mock };
+    v1Game: { findMany: jest.Mock };
     v1AdminActionLog: { create: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
     $transaction: jest.Mock;
@@ -92,6 +93,10 @@ describe('AdminRegistrationsService', () => {
         count: jest.fn().mockResolvedValue(0),
         findMany: jest.fn().mockResolvedValue([]),
       },
+      // roster_lock 이 대진 재동기화(syncTournamentRosterLineups)를 태운다 — 이 스위트는 그
+      // 자체 로직이 아니라 잠금 게이트/감사로그를 검증하므로 "이 팀의 시작 전 대진 없음"으로
+      // 즉시 no-op 처리되게 둔다. 실제 동기화 동작은 tournament-roster-sync.integration-spec.ts.
+      v1Game: { findMany: jest.fn().mockResolvedValue([]) },
       v1AdminActionLog: { create: jest.fn().mockResolvedValue({ id: 'action-log-1' }) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
       $transaction: jest.fn(),

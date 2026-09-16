@@ -24,6 +24,7 @@ import {
 import { capacityLimitOf, isCapacityFull } from './registration-capacity';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface, LEAGUE_KINDS } from './tournament-surface-lookup';
 import { readRosterAutoConfirmedAt } from './registration-auto-confirm';
+import { syncTournamentRosterLineups } from './tournament-roster-sync';
 
 /** 어드민이 취소 처리할 수 있는 신청 상태 목록. */
 const ADMIN_CANCELLABLE_STATUSES: V1TournamentRegistration['status'][] = [
@@ -539,6 +540,12 @@ export class AdminRegistrationsService {
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
         data: { rosterLockedAt: new Date() },
+      });
+      // 대진이 이미 만들어진 뒤 명단을 잠그는 흐름(신청 확정 → 대진 생성 → 명단 잠금)에서는
+      // 대진 생성 시점 스냅샷이 지금 잠그는 명단과 다를 수 있다 — 잠그는 순간 다시 맞춘다.
+      await syncTournamentRosterLineups(tx, {
+        tournamentId: registration.tournamentId,
+        teamId: registration.teamId,
       });
       await this.adminContext.logAdminAction(
         admin,

@@ -3,6 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import type { V1AuthUser } from '../../src/auth/v1-auth-user';
 import { runCompetitionConfigContractPhaseBackfill } from '../../src/tournaments/competition-config/competition-config-backfill';
 import { TOURNAMENT_ROSTER_SYNC_ACTION, syncTournamentRosterLineups } from '../../src/tournaments/tournament-roster-sync';
+import { AdminRegistrationsService } from '../../src/tournaments/admin-registrations.service';
 import { TournamentBracketService } from '../../src/tournaments/tournament-bracket.service';
 import { TournamentPlayersService } from '../../src/tournaments/tournament-players.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -248,6 +249,32 @@ describe('대회 참가 명단 → 시작 전 대진 경기 명단 동기화', (
     await prisma.v1TournamentRegistration.update({ where: { id: f.registration.id }, data: { status: 'cancelled' } });
 
     expect(await sync(f.tournament.id, f.team.id)).toBe(0);
+  });
+
+  it('대진 생성 뒤 선수 등록 없이 "명단 잠금"만 눌러도 시작 전 경기 참가자가 되살아난다', async () => {
+    const f = await seedFixture();
+    // TournamentPlayersService 를 거치지 않고 직접 심는다 — 기존 4개 동기화 호출 지점이
+    // 하나도 안 탔다는 걸 보장한다. 그런데도 "명단을 잠그면" 되살아나야 한다는 게 이 테스트의
+    // 요지다 — 실사용자 순서(참가 신청 → 명단 잠금 → 대진 생성 → 그 뒤로 손 안 댐)에서는
+    // 선수 추가/삭제 이벤트 자체가 다시는 안 일어나므로, 그 4개 지점만으로는 절대 못 미친다.
+    await prisma.v1TournamentPlayer.create({
+      data: { registrationId: f.registration.id, userId: f.members[0], realName: '명단 선수' },
+    });
+    expect((await latestLineup(f.game.id, f.side.id)).revision).toBe(1);
+
+    const admin: V1AuthUser = {
+      id: adminUserId,
+      email: `${adminUserId}@integration.test`,
+      accountStatus: 'active',
+      onboardingStatus: 'completed',
+    };
+    await app.get(AdminRegistrationsService).rosterLock(admin, f.registration.id, {});
+
+    const latest = await latestLineup(f.game.id, f.side.id);
+    expect(latest.revision).toBe(2);
+    expect((await participantsOf(latest.id)).map((row) => row.userId)).toEqual([f.members[0]]);
+    // 상대 사이드는 안 건드린다 — 잠근 건 이쪽 팀 신청 하나뿐이다.
+    expect((await latestLineup(f.game.id, f.opponentSide.id)).revision).toBe(1);
   });
 
   it('리그 전용 함수(syncLeagueRosterLineups)는 이 대회 경기에 손대지 않는다 — leagueId가 null이라 대상이 아니다', async () => {

@@ -274,7 +274,7 @@ describe('TournamentBracketService', () => {
     v1TournamentRegistration: { findFirst: jest.Mock; findMany: jest.Mock; findUnique: jest.Mock };
     v1GameResultRevision: { findUnique: jest.Mock };
     v1IdempotencyRecord: { findFirst: jest.Mock };
-    v1Game: { update: jest.Mock };
+    v1Game: { update: jest.Mock; findMany: jest.Mock };
     v1GameLineup: { findFirst: jest.Mock; updateMany: jest.Mock; create: jest.Mock };
     v1GameSide: { update: jest.Mock };
     v1TeamTacticsBoard: { deleteMany: jest.Mock };
@@ -329,7 +329,11 @@ describe('TournamentBracketService', () => {
       },
       v1GameResultRevision: { findUnique: jest.fn().mockResolvedValue({ state: 'VOID' }) },
       v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null) },
-      v1Game: { update: jest.fn().mockResolvedValue({}) },
+      // createFixture 가 대진 생성 직후 대진 재동기화(syncTournamentRosterLineups)를 태운다 —
+      // 이 스위트는 그 자체 로직이 아니라 최초 참가자 스냅샷 복사를 검증하므로 "이 팀의 시작
+      // 전 대진 없음"으로 즉시 no-op 처리되게 둔다. 실제 동기화 동작은
+      // tournament-roster-sync.integration-spec.ts.
+      v1Game: { update: jest.fn().mockResolvedValue({}), findMany: jest.fn().mockResolvedValue([]) },
       v1GameLineup: {
         findFirst: jest.fn().mockResolvedValue(null),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),

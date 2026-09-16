@@ -270,7 +270,14 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
 
     const after = await prisma.v1TeamMatch.findUniqueOrThrow({
       where: { id: created.id },
-      include: { game: { include: { sides: { orderBy: { sideKey: 'asc' } } } } },
+      include: {
+        game: {
+          include: {
+            sides: { orderBy: { sideKey: 'asc' } },
+            participants: true,
+          },
+        },
+      },
     });
     const home = after.game?.sides.find((side) => side.sideKey === V1GameSideKey.HOME);
     const away = after.game?.sides.find((side) => side.sideKey === V1GameSideKey.AWAY);
@@ -281,6 +288,23 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
     // 표시 이름도 "홈 팀 미정" 에서 실제 팀명으로 바뀌어야 한다
     expect(home?.displayNameSnapshot).not.toBe('홈 팀 미정');
     expect(away?.displayNameSnapshot).not.toBe('어웨이 팀 미정');
+
+    // 실사용자 발견 결함(2026-09-16): 사이드는 옮겨졌는데 참가자는 하나도 안 들어와서
+    // "라인업이 없어요"로 계속 남았다 — TBD 슬롯에 팀을 배정하는 것도 createFixture 의
+    // 최초 참가자 복사와 똑같이 그 팀의 확정 신청 명단을 채워 넣어야 한다.
+    const homeParticipants = after.game?.participants.filter((p) => p.sideId === home?.id) ?? [];
+    const awayParticipants = after.game?.participants.filter((p) => p.sideId === away?.id) ?? [];
+    expect(homeParticipants).toHaveLength(1);
+    expect(awayParticipants).toHaveLength(1);
+    expect(homeParticipants[0].userId).toBe(ids.user);
+    expect(awayParticipants[0].userId).toBe(ids.user);
+    // 여기도 실명이 아니라 닉네임이어야 한다.
+    expect(homeParticipants[0].displayNameSnapshot).toBe('어댑터닉');
+    expect(awayParticipants[0].displayNameSnapshot).toBe('어댑터닉');
+    const links = await prisma.v1ParticipantIdentityLinkCurrent.findMany({
+      where: { participantId: { in: [homeParticipants[0].id, awayParticipants[0].id] } },
+    });
+    expect(links.map((link) => link.userId).sort()).toEqual([ids.user, ids.user]);
   });
 
   it('rolls back the fixture when its tournament pin is not active', async () => {

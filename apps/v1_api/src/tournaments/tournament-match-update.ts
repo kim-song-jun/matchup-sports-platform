@@ -1,6 +1,9 @@
 import { Prisma, V1GameSideKey } from '@prisma/client';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { createTeamMatchScheduleInTx, MATCH_SCHEDULE_DEFAULT_DURATION_MS } from '../team-schedules/team-match-schedule';
+import { createSourceRosterIdentityLinks } from '../games/games.service';
+import { participantDisplayName } from './participant-display-name';
+import { readJerseyNumbers } from './tournament-player-jersey';
 
 type Tx = Prisma.TransactionClient;
 
@@ -100,12 +103,31 @@ export async function updateTournamentMatchInTx(
   const registrationIds = [nextHome, nextAway].filter((id): id is string => id !== null);
   const registrations = await tx.v1TournamentRegistration.findMany({
     where: { id: { in: registrationIds }, tournamentId: detail.tournamentId, status: 'confirmed' },
-    select: { id: true, teamId: true, team: { select: { name: true } } },
+    select: {
+      id: true,
+      teamId: true,
+      team: { select: { name: true } },
+      players: {
+        where: { removedAt: null },
+        select: {
+          id: true,
+          userId: true,
+          realName: true,
+          registrationId: true,
+          user: { select: { profile: { select: { nickname: true, displayName: true } } } },
+        },
+        orderBy: { id: 'asc' },
+      },
+    },
   });
   if (registrations.length !== registrationIds.length) throw new BadRequestException({ code: 'REGISTRATION_INVALID', message: '대진 등록이 해당 대회에 없거나 확정되지 않았어요.' });
   const registrationById = new Map(registrations.map((row) => [row.id, row]));
   const home = nextHome === null ? null : registrationById.get(nextHome)!;
   const away = nextAway === null ? null : registrationById.get(nextAway)!;
+  const [homeJerseys, awayJerseys] = await Promise.all([
+    home ? readJerseyNumbers(tx, home.id) : Promise.resolve(new Map<string, number>()),
+    away ? readJerseyNumbers(tx, away.id) : Promise.resolve(new Map<string, number>()),
+  ]);
   const nextHomeTeamId = home?.teamId ?? null;
   const nextAwayTeamId = away?.teamId ?? null;
   const homeChanged = detail.teamMatch.hostTeamId !== nextHomeTeamId;
@@ -152,15 +174,40 @@ export async function updateTournamentMatchInTx(
   });
 
   const sideChanges = [
-    { key: V1GameSideKey.HOME, oldTeamId: detail.teamMatch.hostTeamId, nextTeamId: nextHomeTeamId, name: home?.team.name ?? '홈 팀 미정', changed: homeChanged },
-    { key: V1GameSideKey.AWAY, oldTeamId: detail.teamMatch.approvedApplicantTeamId, nextTeamId: nextAwayTeamId, name: away?.team.name ?? '어웨이 팀 미정', changed: awayChanged },
+    { key: V1GameSideKey.HOME, oldTeamId: detail.teamMatch.hostTeamId, nextTeamId: nextHomeTeamId, name: home?.team.name ?? '홈 팀 미정', changed: homeChanged, registration: home, jerseys: homeJerseys },
+    { key: V1GameSideKey.AWAY, oldTeamId: detail.teamMatch.approvedApplicantTeamId, nextTeamId: nextAwayTeamId, name: away?.team.name ?? '어웨이 팀 미정', changed: awayChanged, registration: away, jerseys: awayJerseys },
   ];
   for (const sideChange of sideChanges) {
     const side = game.sides.find((candidate) => candidate.sideKey === sideChange.key);
     if (side === undefined) throw new ConflictException({ code: 'TOURNAMENT_MATCH_GAME_SIDE_MISSING', message: '대회 경기의 게임 사이드를 찾을 수 없어요.' });
     if (sideChange.changed) {
-      await invalidateLineupAndTactics(tx, game.id, side.id);
+      const newLineupId = await invalidateLineupAndTactics(tx, game.id, side.id);
       await tx.v1GameSide.update({ where: { id: side.id }, data: { teamId: sideChange.nextTeamId, displayNameSnapshot: sideChange.name } });
+      // TBD 슬롯이 실제 팀을 배정받는 시점 — createFixture 의 최초 참가자 복사와 같은 일을
+      // 여기서도 해준다. 안 해주면 이 사이드는 영원히 빈 라인업으로 남는다(실사용자 발견 결함,
+      // 2026-09-16) — syncTournamentRosterLineups 는 "이미 있던 자동 명단만 다시 맞추는" 함수라
+      // 이 시점엔 도와줄 수 없다(방금 만든 리비전이 revision 1도, 동기화 마커도 없어 안전장치가
+      // 오히려 이 새 리비전을 "누가 손댄 것"으로 보고 덮어쓰길 거부한다).
+      if (newLineupId !== null && sideChange.nextTeamId !== null && sideChange.registration !== null) {
+        const created = await tx.v1GameParticipant.createManyAndReturn({
+          data: sideChange.registration.players.map((player) => ({
+            gameId: game.id,
+            sideId: side.id,
+            lineupId: newLineupId,
+            userId: player.userId,
+            displayNameSnapshot: participantDisplayName(player),
+            jerseyNumber: sideChange.jerseys.get(player.id),
+            started: true,
+          })),
+          select: { id: true, userId: true },
+        });
+        await createSourceRosterIdentityLinks(
+          tx,
+          created.flatMap((row) => (row.userId === null ? [] : [{ participantId: row.id, userId: row.userId }])),
+          { actorType: 'SYSTEM', systemActor: 'TOURNAMENT_ROSTER_SYNC' },
+          'tournament_bracket_team_assigned',
+        );
+      }
     }
     if (teamsChanged && sideChange.oldTeamId !== sideChange.nextTeamId) {
       if (sideChange.oldTeamId !== null) {
@@ -199,13 +246,17 @@ export async function updateTournamentMatchInTx(
   };
 }
 
-async function invalidateLineupAndTactics(tx: Tx, gameId: string, sideId: string): Promise<void> {
+/** 새로 만든 대체 리비전의 id를 돌려준다 — 팀이 갓 배정된 것이면 호출자가 그 위에 참가자를 채운다. */
+async function invalidateLineupAndTactics(tx: Tx, gameId: string, sideId: string): Promise<string | null> {
   const latest = await tx.v1GameLineup.findFirst({ where: { gameId, sideId }, orderBy: { revision: 'desc' }, select: { id: true, revision: true } });
   await tx.v1GameLineup.updateMany({ where: { gameId, sideId, invalidatedAt: null }, data: { invalidatedAt: new Date(), invalidationReason: 'SIDE_TEAM_CHANGED' } });
+  let newLineupId: string | null = null;
   if (latest !== null) {
-    await tx.v1GameLineup.create({ data: { gameId, sideId, revision: latest.revision + 1, state: 'DRAFT', supersedesId: latest.id } });
+    const created = await tx.v1GameLineup.create({ data: { gameId, sideId, revision: latest.revision + 1, state: 'DRAFT', supersedesId: latest.id } });
+    newLineupId = created.id;
   }
   await tx.v1TeamTacticsBoard.deleteMany({ where: { gameId, sideId } });
+  return newLineupId;
 }
 
 async function upsertSchedule(

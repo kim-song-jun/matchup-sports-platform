@@ -108,30 +108,39 @@ export function getTopThree(tournament: V1TournamentDetail): Array<{ pos: number
 }
 
 /**
- * 다조(2개 이상) 리그 전용 top3 override. `getTopThree`가 (조 구분 없이 병합하면
- * 우승팀을 잘못 확정하므로) 다조 리그에서는 fail-closed로 빈 배열만 돌려주기 때문에,
- * 통합 순위 정본(`GET /tournaments/:id/standings/overall` — 대진표 탭
- * `LeagueStandingsSection`과 동일 엔드포인트)을 여기서 별도 조회해 그 자리를 채운다.
+ * 다조(2개 이상) 리그 · 정규 리그 단일 시즌(거울 행) 전용 top3 override.
+ *
+ * `getTopThree`는 두 경우 다 답을 못 낸다 — 다조는 (조 구분 없이 병합하면 우승팀을
+ * 잘못 확정하므로) fail-closed로 빈 배열, 거울 행(`kind==='regular_league'`)은
+ * `tournament.groups`·`tournament.fixtures`가 항상 []라 팀 수와 무관하게 항상 빈
+ * 배열이다(실사용자 발견, 2026-09-16 — 시상 페이지가 이 override를 안 태워 완결된
+ * 단일 시즌 리그에서도 시상대가 계속 빈 채로 남아 있었다). 통합 순위 정본
+ * (`GET /tournaments/:id/standings/overall` — 대진표 탭 `LeagueStandingsSection`과
+ * 동일 엔드포인트)을 여기서 별도 조회해 그 자리를 채운다.
  *
  * 이 파일은 도메인 훅 배정 파일(`hooks/use-v1-api.ts`)이 아니라서 `LeagueStandingsSection`
  * (tournament-detail-client.tsx)과 같은 이유로 `v1Get`을 인라인 `useEffect`로 호출한다
  * (react-query가 아니다 — 이 화면도 QueryClientProvider 없이 단독 렌더되는 테스트가
  * 있으므로 동일 제약을 따른다).
  *
- * `enabled=false`(단일 조·미완료·knockout 등 `getTopThree`가 이미 정확한 답을 내는
+ * `enabled=false`(단일 조 대회·미완료·knockout 등 `getTopThree`가 이미 정확한 답을 내는
  * 경우)면 요청하지 않고 `null`을 유지한다 — 호출부가 `null`이면 `getTopThree` 결과를
- * 그대로 쓰고, `[]`(로딩 실패 포함)이면 시상대를 비워 보여준다(틀린 우승팀을 보여주는
- * 것보다 안전).
+ * 그대로 쓰고, `top3: []`(로딩 실패 포함)이면 시상대를 비워 보여준다(틀린 우승팀을
+ * 보여주는 것보다 안전).
+ *
+ * `championCount`는 1위 동점 처리 기준을 전부 소진하고도 안 갈려 공동 우승으로 처리된
+ * 팀 수다(`resolveLeagueChampions`, 2 이상 = 공동 우승). 결과 페이지(`results-page-client.tsx`)
+ * 의 `useLeagueOverallFinalRanking`과 같은 계약.
  */
 function useMultiGroupLeagueTopThree(
   tournamentId: string,
   enabled: boolean,
-): Array<{ pos: number; name: string }> | null {
-  const [top3, setTop3] = useState<Array<{ pos: number; name: string }> | null>(null);
+): { top3: Array<{ pos: number; name: string }>; championCount: number } | null {
+  const [result, setResult] = useState<{ top3: Array<{ pos: number; name: string }>; championCount: number } | null>(null);
 
   useEffect(() => {
     if (!enabled) {
-      setTop3(null);
+      setResult(null);
       return;
     }
     let cancelled = false;
@@ -142,17 +151,17 @@ function useMultiGroupLeagueTopThree(
           .filter((s): s is typeof s & { position: number } => s.position !== null && s.position <= 3)
           .sort((a, b) => a.position - b.position)
           .map((s) => ({ pos: s.position, name: s.teamName }));
-        setTop3(ranked);
+        setResult({ top3: ranked, championCount: Math.max(data.champions.length, 1) });
       })
       .catch(() => {
-        if (!cancelled) setTop3([]);
+        if (!cancelled) setResult({ top3: [], championCount: 1 });
       });
     return () => {
       cancelled = true;
     };
   }, [tournamentId, enabled]);
 
-  return top3;
+  return result;
 }
 
 /* ── 시상대 (podium) ── */
@@ -163,18 +172,31 @@ function AwardsPodium({
 }) {
   if (top3.length === 0) return null;
 
+  // 1위는 동점 처리 기준(승점·골득실·다득점·상대전적·최소실점)을 전부 소진해도 안 갈리면
+  // 공동 우승으로 2개 이상 들어올 수 있다 — `top3.find`로 하나만 집으면 나머지 팀이
+  // 조용히 사라진다(실사용자 발견, 2026-09-16의 시상대판). 시상대 구조(3슬롯)는 새로
+  // 짜지 않고, 금메달 한 슬롯에 이름을 모아 담백하게 보여준다(결과 페이지 "B안"과 동일).
+  const champions = top3.filter((t) => t.pos === 1);
+  const isCoChampion = champions.length > 1;
   // 2위(왼) / 1위(중) / 3위(오) 배치
   const podiumOrder = [2, 1, 3];
-  const podiumSlots = podiumOrder.map((pos) => top3.find((t) => t.pos === pos) ?? null);
-  const champion = top3.find((t) => t.pos === 1)?.name;
+  const podiumSlots = podiumOrder.map((pos) =>
+    pos === 1
+      ? (champions.length > 0 ? { pos: 1, name: champions.map((c) => c.name).join(' · ') } : null)
+      : top3.find((t) => t.pos === pos) ?? null,
+  );
   // 3위 → 2위 → 1위 순으로 차오르는 등장 딜레이(챔피언 공개에 살짝 뜸을 둠)
   const REVEAL_DELAY_MS: Record<number, number> = { 3: 0, 2: 140, 1: 300 };
 
   return (
     <div>
-      {champion ? (
+      {isCoChampion ? (
         <p className="tm-awards-podium-caption">
-          <strong>{champion}</strong>, 우승을 축하드려요! 🎉
+          <strong>{champions.map((c) => c.name).join(' · ')}</strong>, 공동 우승이에요.
+        </p>
+      ) : champions[0] ? (
+        <p className="tm-awards-podium-caption">
+          <strong>{champions[0].name}</strong>, 우승을 축하드려요! 🎉
         </p>
       ) : null}
       <div className="tm-awards-podium" aria-label="최종 시상대">
@@ -237,7 +259,12 @@ function PrizeSection({
 
   const rows = tournament.prizeBreakdown ? parsePrizeRows(tournament.prizeBreakdown) : [];
   const safeTop3 = Array.isArray(top3) ? top3 : [];
-  const teamByPos = Object.fromEntries(safeTop3.map((t) => [t.pos, t.name]));
+  // 공동 우승이면 여러 팀이 같은 pos(=1)를 공유한다 — Object.fromEntries는 마지막 값만
+  // 남기고 나머지를 조용히 버리므로, 이름을 모아서 같은 자리에 함께 담는다.
+  const teamByPos: Record<number, string> = {};
+  for (const t of safeTop3) {
+    teamByPos[t.pos] = teamByPos[t.pos] ? `${teamByPos[t.pos]} · ${t.name}` : t.name;
+  }
 
   return (
     <section className="tm-prize-section" style={{ marginBottom: 20 }}>
@@ -928,10 +955,22 @@ function NotCompletedNotice({ status }: { status: string }) {
 function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const isCompleted = tournament.status === 'completed';
   const isMultiGroupLeague = isLeagueCompetition(tournament) && tournament.groups.length > 1;
-  const multiGroupTop3 = useMultiGroupLeagueTopThree(tournament.id, isCompleted && isMultiGroupLeague);
-  // 다조 리그는 getTopThree가 fail-closed로 []을 낸다 — 통합 순위 override(multiGroupTop3)가
+  // 정규 리그 단일 시즌(거울 행)도 다조와 같은 이유로 getTopThree가 답을 못 낸다 —
+  // groups·fixtures가 항상 []이기 때문이다(위 useMultiGroupLeagueTopThree 주석 참조).
+  const isLeagueMirror = tournament.kind === 'regular_league';
+  const needsOverallStandings = isMultiGroupLeague || isLeagueMirror;
+  const overall = useMultiGroupLeagueTopThree(tournament.id, isCompleted && needsOverallStandings);
+  // 동점 처리 기준을 전부 소진하고도 1위가 안 갈리면(공동 우승) 순차 순위 대신 그 자리를
+  // 나눠 가진 팀 전부를 "1위"로 함께 표기한다 — 결과 페이지와 같은 이유(실사용자 발견,
+  // 2026-09-16)의 시상대판.
+  const championCount = needsOverallStandings ? (overall?.championCount ?? 1) : 1;
+  const isCoChampion = championCount > 1;
+  // 다조·거울 리그는 getTopThree가 fail-closed로 []을 낸다 — 통합 순위 override(overall)가
   // 도착하기 전(null)에도 틀린 우승팀 대신 빈 시상대를 보여준다(로딩 중 깜빡임보다 안전).
-  const top3 = isCompleted ? (isMultiGroupLeague ? (multiGroupTop3 ?? []) : getTopThree(tournament)) : [];
+  const rawTop3 = isCompleted ? (needsOverallStandings ? (overall?.top3 ?? []) : getTopThree(tournament)) : [];
+  const top3 = isCoChampion
+    ? rawTop3.map((row) => (row.pos <= championCount ? { ...row, pos: 1 } : row))
+    : rawTop3;
   const showPrizeColumn = isCompleted && hasPrizeData(tournament);
 
   return (

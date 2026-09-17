@@ -1,11 +1,28 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
-import type { V1TournamentDetail } from '@/types/api';
+import type { V1LeagueOverallStandingsResponse, V1TournamentDetail } from '@/types/api';
 import type { V1LeaguePlayerRecordRow } from '@/types/league-match';
 import { AwardsPageClient, ReviewFormModal } from './awards-page-client';
+
+const { v1GetMock } = vi.hoisted(() => ({ v1GetMock: vi.fn() }));
+vi.mock('@/lib/api-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api-client')>()),
+  v1Get: v1GetMock,
+}));
+// 다조·거울 리그가 아닌 기존 테스트들은 이 API를 호출하는지 신경 쓰지 않으므로,
+// 항상 빈 응답을 기본값으로 둔다(호출돼도 top3:[]·championCount:1로 기존 동작과 동일).
+const emptyOverallStandings: V1LeagueOverallStandingsResponse = {
+  standings: [],
+  progress: { total: 0, played: 0, remaining: 0, percent: 0 },
+  magicNumber: null,
+  recalculatedAt: null,
+  champions: [],
+  tieBreakGroups: [],
+};
+v1GetMock.mockResolvedValue(emptyOverallStandings);
 
 const awardsApiMocks = vi.hoisted(() => ({
   useV1Tournament: vi.fn(),
@@ -244,6 +261,139 @@ describe('AwardsPageClient — regular league player records endpoint', () => {
     expect(awardsApiMocks.usePublicTournamentPlayerRecords).toHaveBeenCalledWith('tournament-1', { enabled: false });
     expect(screen.getByText('리그 득점자')).toBeInTheDocument();
     expect(screen.getByText('리그 도움자')).toBeInTheDocument();
+  });
+});
+
+/**
+ * 정규 리그 거울 행(kind==='regular_league') 시상 페이지 회귀 테스트.
+ *
+ * `getTopThree`는 거울 행에서 `tournament.groups`·`fixtures`가 항상 []라 팀 수와 무관하게
+ * 항상 빈 배열을 낸다. 결과 페이지는 이미 `isLeagueMirror` 라우팅으로 통합 순위 API를
+ * 타지만, 이 페이지는 그 체크가 없어 단일 시즌 리그가 완료돼도 시상대가 계속 비어
+ * 있었다(실사용자 발견, 2026-09-16). 아래는 그 라우팅 수정과, 라우팅이 뚫린 뒤 드러나는
+ * 공동 우승 데이터 손실(포디움 `.find`, 상금란 `teamByPos`)을 함께 검증한다.
+ */
+describe('AwardsPageClient — 정규 리그 거울 행(kind=regular_league)의 시상대·상금', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    awardsApiMocks.usePublicTournamentPlayerRecords.mockReturnValue({
+      data: { goals: [], assists: [] },
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    awardsApiMocks.useV1LeagueMatchPlayerRecords.mockReturnValue({
+      data: { leagueId: 'tournament-1', goals: [], assists: [] },
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  it('단일 시즌 거울 행은 groups가 비어 있어도 통합 순위 API로 시상대를 채운다(라우팅 수정)', async () => {
+    const overall: V1LeagueOverallStandingsResponse = {
+      standings: [
+        { teamId: 'team-1', teamName: '풋살크루', position: 1, points: 3, wins: 1, draws: 0, losses: 0, goalsFor: 3, goalsAgainst: 0 },
+        { teamId: 'team-2', teamName: 'Tttt', position: 2, points: 0, wins: 0, draws: 0, losses: 1, goalsFor: 0, goalsAgainst: 3 },
+      ],
+      progress: { total: 1, played: 1, remaining: 0, percent: 100 },
+      magicNumber: null,
+      recalculatedAt: null,
+      champions: [{ teamId: 'team-1', teamName: '풋살크루', teamLogoUrl: null }],
+      tieBreakGroups: [],
+    };
+    v1GetMock.mockResolvedValueOnce(overall);
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({ kind: 'regular_league', groups: [], fixtures: [] }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    await waitFor(() => expect(screen.getByText('풋살크루', { selector: '.tm-awards-podium-name' })).toBeInTheDocument());
+    // caption은 "<strong>팀명</strong>, 우승을 축하드려요! 🎉" — 쉼표가 붙은 텍스트 노드라 정규식으로 부분 매칭한다.
+    expect(screen.getByText(/우승을 축하드려요/)).toBeInTheDocument();
+    expect(v1GetMock).toHaveBeenCalledWith('/tournaments/tournament-1/standings/overall');
+  });
+
+  /**
+   * 실사용자 발견 결함(2026-09-16)과 같은 마포 레인저스 vs 풋살크루 완전 동률 재현
+   * (results-page-client.test.tsx와 동일 데이터) — 라우팅이 뚫린 뒤에도 포디움이
+   * `top3.find(pos===1)`로 하나만 집으면 공동 우승 팀 하나가 조용히 사라진다.
+   */
+  it('공동 우승이면 포디움 금메달 자리에 두 팀 이름을 함께 보여준다', async () => {
+    const overall: V1LeagueOverallStandingsResponse = {
+      standings: [
+        { teamId: 'team-mapo', teamName: '마포 레인저스', position: 1, points: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1 },
+        { teamId: 'team-futsal', teamName: '풋살크루', position: 2, points: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1 },
+      ],
+      progress: { total: 1, played: 1, remaining: 0, percent: 100 },
+      magicNumber: null,
+      recalculatedAt: null,
+      champions: [
+        { teamId: 'team-mapo', teamName: '마포 레인저스', teamLogoUrl: null },
+        { teamId: 'team-futsal', teamName: '풋살크루', teamLogoUrl: null },
+      ],
+      tieBreakGroups: [{ teamIds: ['team-mapo', 'team-futsal'], teamNames: ['마포 레인저스', '풋살크루'] }],
+    };
+    v1GetMock.mockResolvedValueOnce(overall);
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({ kind: 'regular_league', groups: [], fixtures: [] }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    await waitFor(() => expect(screen.getByText(/공동 우승이에요/)).toBeInTheDocument());
+    expect(screen.getByText('마포 레인저스 · 풋살크루', { selector: '.tm-awards-podium-name' })).toBeInTheDocument();
+  });
+
+  it('공동 우승이고 상금이 걸려 있으면 1위 상금란에도 두 팀 이름을 함께 보여준다(한쪽만 남기지 않는다)', async () => {
+    const overall: V1LeagueOverallStandingsResponse = {
+      standings: [
+        { teamId: 'team-mapo', teamName: '마포 레인저스', position: 1, points: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1 },
+        { teamId: 'team-futsal', teamName: '풋살크루', position: 2, points: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1 },
+      ],
+      progress: { total: 1, played: 1, remaining: 0, percent: 100 },
+      magicNumber: null,
+      recalculatedAt: null,
+      champions: [
+        { teamId: 'team-mapo', teamName: '마포 레인저스', teamLogoUrl: null },
+        { teamId: 'team-futsal', teamName: '풋살크루', teamLogoUrl: null },
+      ],
+      tieBreakGroups: [{ teamIds: ['team-mapo', 'team-futsal'], teamNames: ['마포 레인저스', '풋살크루'] }],
+    };
+    v1GetMock.mockResolvedValueOnce(overall);
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament({
+        kind: 'regular_league',
+        groups: [],
+        fixtures: [],
+        prizePool: 1000000,
+        prizeBreakdown: '1위,1000000',
+      }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    await waitFor(() => expect(screen.getByText('마포 레인저스 · 풋살크루', { selector: '.tm-awards-podium-name' })).toBeInTheDocument());
+    // 상금란의 "1위" 행 — teamByPos가 Object.fromEntries였다면 마지막 팀(풋살크루)만
+    // 남고 마포 레인저스는 조용히 사라졌을 것이다.
+    expect(screen.getByText('마포 레인저스 · 풋살크루', { selector: 'div:not(.tm-awards-podium-name)' })).toBeInTheDocument();
   });
 });
 

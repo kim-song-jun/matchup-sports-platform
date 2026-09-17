@@ -383,6 +383,15 @@ export class TournamentsAdminService {
     if (!existing) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
+    // 동시 편집 CAS — 빠른 실패. 실제 방어는 아래 트랜잭션의 updateMany where절이 원자적으로
+    // 한다(이 사이 다른 요청이 끼어들 수 있으므로); 여기서는 흔한 경우를 조기에 걸러낸다.
+    // 같은 관례는 tournament-competition-config.ts:162, tournament-period-settings.service.ts:85.
+    if (existing.updatedAt.toISOString() !== dto.expectedVersion) {
+      throw new ConflictException({
+        code: 'TOURNAMENT_VERSION_CONFLICT',
+        message: '대회 정보가 다른 곳에서 이미 수정됐어요. 새로고침 후 다시 시도해 주세요.',
+      });
+    }
 
     // "출전 인원"과 "교체 방식/횟수"는 같은 V1CompetitionConfigVersion.lineup에 함께
     // pin되는 설정이라 변경 정책도 동일해야 한다(오너 지시 #4) — 아래 게이트를 두
@@ -557,6 +566,14 @@ export class TournamentsAdminService {
     if (dto.promoListPrizeText !== undefined) data.promoListPrizeText = nullableText(dto.promoListPrizeText);
     if (dto.promoListPriority !== undefined) data.promoListPriority = dto.promoListPriority;
 
+    // 아래 최종 업데이트의 CAS 기준값. 기본은 이 메서드가 시작할 때 읽은 existing.updatedAt
+    // 이지만, 바로 아래 lineupConfigChangeRequested 분기가 실제로 TournamentCompetitionConfig
+    // .change()를 커밋하면 그 자체가 Prisma @updatedAt으로 이 행의 updatedAt을 이미 한 번
+    // 앞당긴다 — 그 새 값을 반영하지 않으면 같은 요청 안에서 스스로 CAS 충돌을 내게 된다
+    // (Copilot 리뷰 지적, 실제 결함: 출전 인원과 다른 필드를 한 요청에 같이 보내면 매번
+    // TOURNAMENT_VERSION_CONFLICT가 났을 것).
+    let casBaseline = existing.updatedAt;
+
     // 출전 인원/교체 정책 변경은 다른 필드들과 별도 트랜잭션으로 처리한다 —
     // TournamentCompetitionConfig.change()가 자기 CAS(expectedVersion)와 미완료 픽스처
     // 리포인트, 감사 로그를 이미 원자적으로 다 갖고 있어 여기서 재구현하지 않는다. CAS는
@@ -608,11 +625,28 @@ export class TournamentsAdminService {
             message: `이미 진행된 경기나 기록된 결과가 있어 ${lockedFieldLabel}을 변경할 수 없어요. ${LINEUP_LOCK_ESCAPE_HINT}`,
           });
         }
+        // confirmationRequired가 아니면 change()가 실제로 커밋된 것이다 — 그 트랜잭션이
+        // 남긴 새 updatedAt을 이후 CAS 기준으로 삼는다.
+        casBaseline = new Date(changeResult.expectedVersion);
       }
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const tournament = await tx.v1Tournament.update({ where: { id: tournamentId }, data });
+    await this.prisma.$transaction(async (tx) => {
+      // 원자적 CAS 시행부 — where절의 updatedAt이 그 사이 이미 바뀌었으면 count가 0이라
+      // "쓴 줄 없음"으로 걸린다. 이게 X03(관리자 두 명 동시 편집 시 나중 저장이 CAS 충돌
+      // 경고 없이 앞선 저장을 조용히 덮어쓰던 결함)의 근본 수정이다. updateMany는 갱신된
+      // 행을 돌려주지 않으므로, 감사 로그의 afterJson.title은 이번에 보낸 값(data.title)이
+      // 있으면 그 값을, 없으면(제목을 안 바꿨으면) 기존 값을 그대로 쓴다 — 재조회 불필요.
+      const changed = await tx.v1Tournament.updateMany({
+        where: { id: tournamentId, updatedAt: casBaseline },
+        data,
+      });
+      if (changed.count !== 1) {
+        throw new ConflictException({
+          code: 'TOURNAMENT_VERSION_CONFLICT',
+          message: '대회 정보가 다른 곳에서 이미 수정됐어요. 새로고침 후 다시 시도해 주세요.',
+        });
+      }
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -620,14 +654,13 @@ export class TournamentsAdminService {
           targetType: 'tournament',
           targetId: tournamentId,
           beforeJson: { title: existing.title },
-          afterJson: { title: tournament.title },
+          afterJson: { title: data.title ?? existing.title },
         },
         tx,
       );
-      return tournament;
     });
 
-    return this.get(user, updated.id);
+    return this.get(user, tournamentId);
   }
 
   async changeStatus(user: V1AuthUser, tournamentId: string, dto: ChangeTournamentStatusDto) {

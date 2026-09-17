@@ -6,6 +6,7 @@
  * 되돌아가지 않도록 "한 번만 나온다"를 고정하고, 함께 고친 권한 게이팅을 검증한다.
  */
 import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 import type { V1Tournament } from '@/types/api';
 import { TournamentInfoSection } from './info-section';
@@ -93,10 +94,15 @@ const tournament = {
 
 function renderSection(canWrite: boolean) {
   hooks.tournament = tournament;
+  // useV1AdminTournament/useV1UpdateTournament는 위에서 모킹되지만, CAS 충돌(409) 처리를
+  // 위해 컴포넌트가 직접 부르는 useQueryClient()는 실제 QueryClientProvider가 있어야 한다.
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <TournamentAdminProvider value={{ tournamentId: 'tournament-1', role: canWrite ? 'PLATFORM_OPS' : 'SUPPORT_READONLY', canWrite, showToast: vi.fn() }}>
-      <TournamentInfoSection />
-    </TournamentAdminProvider>,
+    <QueryClientProvider client={queryClient}>
+      <TournamentAdminProvider value={{ tournamentId: 'tournament-1', role: canWrite ? 'PLATFORM_OPS' : 'SUPPORT_READONLY', canWrite, showToast: vi.fn() }}>
+        <TournamentInfoSection />
+      </TournamentAdminProvider>
+    </QueryClientProvider>,
   );
 }
 

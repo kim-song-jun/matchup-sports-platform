@@ -3967,6 +3967,8 @@ export type V1UpdateTournamentPayload = Omit<
   bankHolder?: string | null;
   rulesText?: string | null;
   refundPolicyText?: string | null;
+  /** 동시 편집 CAS — 폼을 불러온 시점 V1Tournament.updatedAt을 그대로 되돌려 보낸다. */
+  expectedVersion: string;
 };
 
 export type V1ChangeTournamentStatusPayload = {

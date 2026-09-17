@@ -14,7 +14,7 @@ import {
   useV1UpdateTournament,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
-import { extractErrorMessage } from '@/lib/error-message';
+import { extractErrorMessage, extractErrorCode } from '@/lib/error-message';
 import { formatWithComma, onlyDigits } from '@/lib/number-format';
 import type { V1TournamentFormat, V1TournamentGenderCategory } from '@/types/api';
 import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin';
@@ -205,11 +205,19 @@ export default function AdminTournamentsNewPage() {
     const payload = buildTournamentCreatePayload(state);
 
     if (state.draftId) {
-      updateTournament.mutate(payload, {
+      if (!state.draftUpdatedAt) {
+        showToast('초안 정보를 다시 불러온 뒤 시도해 주세요.', 'error');
+        return;
+      }
+      updateTournament.mutate({ ...payload, expectedVersion: state.draftUpdatedAt }, {
         onSuccess: (tournament) => {
           dispatch({ type: 'draft-created', tournament });
         },
         onError: (error) => {
+          if (extractErrorCode(error) === 'TOURNAMENT_VERSION_CONFLICT') {
+            showToast('다른 곳에서 이미 수정된 초안이에요. 페이지를 새로고침해 최신 내용을 불러와 주세요.', 'error');
+            return;
+          }
           showToast(extractErrorMessage(error, '대회 수정에 실패했어요.'), 'error');
         },
       });

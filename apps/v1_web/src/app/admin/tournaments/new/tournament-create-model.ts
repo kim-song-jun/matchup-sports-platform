@@ -44,6 +44,9 @@ export type TournamentCreateState = {
   /** 초안이 이미 생성된 뒤의 대회 id. null이면 아직 서버에 아무것도 만들지 않은 상태 —
    * "참가 조건" 다음 단계에서 이 값의 유무로 생성(POST)인지 수정(PATCH)인지를 가른다. */
   draftId: string | null;
+  /** draftId가 가리키는 대회의 마지막으로 알려진 updatedAt — PATCH 시 expectedVersion으로
+   * 그대로 되돌려 보낸다(동시 편집 CAS). draft-created/hydrate-from-draft가 채운다. */
+  draftUpdatedAt: string | null;
   sportId: string;
   title: string;
   format: V1TournamentFormat;
@@ -110,6 +113,7 @@ const EMPTY_PROMO: TournamentPromoCardValue = {
 export const INITIAL_TOURNAMENT_CREATE_STATE: TournamentCreateState = {
   step: 0,
   draftId: null,
+  draftUpdatedAt: null,
   sportId: '',
   title: '',
   format: 'group_knockout',
@@ -250,8 +254,14 @@ export function tournamentCreateReducer(
         bankHolder: action.bankHolder,
       };
     case 'draft-created':
-      // 지금 폼에 입력된 값은 이미 서버에 그대로 반영됐다 — id만 고정하고 확인 단계로 이동한다.
-      return { ...state, draftId: action.tournament.id, step: CONFIRM_STEP_INDEX };
+      // 지금 폼에 입력된 값은 이미 서버에 그대로 반영됐다 — id·updatedAt만 고정하고
+      // 확인 단계로 이동한다. updatedAt은 다음 PATCH의 expectedVersion으로 쓰인다.
+      return {
+        ...state,
+        draftId: action.tournament.id,
+        draftUpdatedAt: action.tournament.updatedAt,
+        step: CONFIRM_STEP_INDEX,
+      };
     case 'hydrate-from-draft':
       return {
         ...mapTournamentToWizardFields(action.tournament),
@@ -350,6 +360,7 @@ export function mapTournamentToWizardFields(tournament: V1Tournament): Tournamen
   const restored: TournamentCreateState = {
     ...INITIAL_TOURNAMENT_CREATE_STATE,
     draftId: tournament.id,
+    draftUpdatedAt: tournament.updatedAt,
     sportId: tournament.sportId,
     title: tournament.title,
     format: tournament.format,

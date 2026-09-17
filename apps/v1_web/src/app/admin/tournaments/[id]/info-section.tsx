@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Pencil } from 'lucide-react';
 import { onlyDigits, formatWithComma } from '@/lib/number-format';
 import { parsePrizeRows } from '@/lib/prize-breakdown';
 import { useV1AdminTournament, useV1LineupSizeOptions, useV1MasterSports, useV1UpdateTournament, useV1UploadImages } from '@/hooks/use-v1-api';
 import type { V1Tournament, V1UpdateTournamentPayload, V1TournamentGenderCategory } from '@/types/api';
-import { extractErrorMessage } from '@/lib/error-message';
+import { extractErrorMessage, extractErrorCode } from '@/lib/error-message';
+import { v1Keys } from '@/lib/query-keys';
 import { CoverImageUploader } from '@/components/admin/tournaments/cover-image-uploader';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
 import { PrizeBreakdownEditor, createPrizeRowId, serializeTournamentPrizeRows, type TournamentPrizeRow } from '@/components/admin/tournaments/prize-breakdown-editor';
@@ -50,6 +52,7 @@ function isPastDeadline(value: string | null | undefined) {
 
 export function TournamentInfoSection() {
   const { tournamentId: id, canWrite, showToast } = useTournamentAdmin();
+  const queryClient = useQueryClient();
   const { data: tournament } = useV1AdminTournament(id);
   const updateTournament = useV1UpdateTournament(id);
   const { data: masterSports } = useV1MasterSports();
@@ -267,7 +270,10 @@ export function TournamentInfoSection() {
       showToast('혼성 명단의 최소·최대 인원 조건을 다시 확인해 주세요.', 'error');
       return;
     }
-    const payload: V1UpdateTournamentPayload = {};
+    // expectedVersion은 diff 축적이 끝난 뒤 mutate() 호출부에서 tournament.updatedAt으로
+    // 채운다 — 여기서 처음부터 넣으면 아래 "변경 없음" 판정(Object.keys 길이)이 항상
+    // 1 이상이 돼 깨진다.
+    const payload: Omit<V1UpdateTournamentPayload, 'expectedVersion'> = {};
     if (normalizedTitle !== tournament.title) payload.title = normalizedTitle;
     if (editSportId && editSportId !== tournament.sportId) payload.sportId = editSportId;
     if (editScheduledAt !== isoToDatetimeLocalValue(tournament.scheduledAt)) {
@@ -373,13 +379,22 @@ export function TournamentInfoSection() {
       return;
     }
 
-    updateTournament.mutate(payload, {
+    updateTournament.mutate({ ...payload, expectedVersion: tournament.updatedAt }, {
       onSuccess: () => {
         setEditOpen(false);
         showToast('대회 정보를 수정했어요.', 'success');
       },
-      onError: (err) =>
-        showToast(extractErrorMessage(err, '대회 정보 수정에 실패했어요.'), 'error'),
+      onError: (err) => {
+        // 동시 편집 CAS 충돌(409) — 이 저장은 반영되지 않았다. 모달의 입력값(editTitle 등)은
+        // 그대로 두어(그리기 취소 방지) 사용자가 다시 확인할 수 있게 하고, 캐시는 갱신해
+        // 다음에 모달을 다시 열 때 최신 updatedAt을 받게 한다.
+        if (extractErrorCode(err) === 'TOURNAMENT_VERSION_CONFLICT') {
+          queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(id) });
+          showToast('다른 곳에서 이미 저장돼서 이번 저장은 반영되지 않았어요. 창을 닫았다가 다시 열어 최신 내용을 확인해 주세요.', 'error');
+          return;
+        }
+        showToast(extractErrorMessage(err, '대회 정보 수정에 실패했어요.'), 'error');
+      },
     });
   };
 
@@ -417,9 +432,10 @@ export function TournamentInfoSection() {
 
   const handlePromoSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!tournament) return;
     const homePriority = Number(promoHomePriority);
     const listPriority = Number(promoListPriority);
-    const payload: V1UpdateTournamentPayload = {
+    const payload: Omit<V1UpdateTournamentPayload, 'expectedVersion'> = {
       promoHomeEnabled,
       promoHomeTitle: promoHomeTitle.trim(),
       promoHomeSubtitle: promoHomeSubtitle.trim(),
@@ -442,13 +458,19 @@ export function TournamentInfoSection() {
       promoListPriority: Number.isNaN(listPriority) ? 0 : listPriority,
     };
 
-    updateTournament.mutate(payload, {
+    updateTournament.mutate({ ...payload, expectedVersion: tournament.updatedAt }, {
       onSuccess: () => {
         setPromoOpen(false);
         showToast('홍보 카드 설정을 저장했어요.', 'success');
       },
-      onError: (err) =>
-        showToast(extractErrorMessage(err, '홍보 카드 설정 저장에 실패했어요.'), 'error'),
+      onError: (err) => {
+        if (extractErrorCode(err) === 'TOURNAMENT_VERSION_CONFLICT') {
+          queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(id) });
+          showToast('다른 곳에서 이미 저장돼서 이번 저장은 반영되지 않았어요. 창을 닫았다가 다시 열어 최신 내용을 확인해 주세요.', 'error');
+          return;
+        }
+        showToast(extractErrorMessage(err, '홍보 카드 설정 저장에 실패했어요.'), 'error');
+      },
     });
   };
 
@@ -1271,8 +1293,18 @@ function CoverImageCard({
   canWrite: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
+  const queryClient = useQueryClient();
   const updateTournament = useV1UpdateTournament(tournament.id);
   const uploadImages = useV1UploadImages();
+
+  const handleConflict = (err: unknown, fallback: string) => {
+    if (extractErrorCode(err) === 'TOURNAMENT_VERSION_CONFLICT') {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournament.id) });
+      showToast('다른 곳에서 이미 저장돼서 이번 저장은 반영되지 않았어요. 화면을 새로고침해 주세요.', 'error');
+      return;
+    }
+    showToast(extractErrorMessage(err, fallback), 'error');
+  };
 
   const handleUpload = async (file: File) => {
     try {
@@ -1281,9 +1313,9 @@ function CoverImageCard({
         showToast('업로드된 이미지 URL을 받지 못했어요.', 'error');
         return;
       }
-      updateTournament.mutate({ coverImageUrl: urls[0] }, {
+      updateTournament.mutate({ coverImageUrl: urls[0], expectedVersion: tournament.updatedAt }, {
         onSuccess: () => showToast('커버 이미지를 저장했어요.', 'success'),
-        onError: (err) => showToast(extractErrorMessage(err, '커버 이미지 저장에 실패했어요.'), 'error'),
+        onError: (err) => handleConflict(err, '커버 이미지 저장에 실패했어요.'),
       });
     } catch (err) {
       showToast(extractErrorMessage(err, '이미지 업로드에 실패했어요.'), 'error');
@@ -1291,9 +1323,9 @@ function CoverImageCard({
   };
 
   const handleRemove = () => {
-    updateTournament.mutate({ coverImageUrl: null }, {
+    updateTournament.mutate({ coverImageUrl: null, expectedVersion: tournament.updatedAt }, {
       onSuccess: () => showToast('커버 이미지를 제거했어요.', 'success'),
-      onError: (err) => showToast(extractErrorMessage(err, '커버 이미지 제거에 실패했어요.'), 'error'),
+      onError: (err) => handleConflict(err, '커버 이미지 제거에 실패했어요.'),
     });
   };
 
@@ -1328,6 +1360,7 @@ function PrizeCard({
   canWrite: boolean;
   showToast: (msg: string, v?: 'success' | 'error') => void;
 }) {
+  const queryClient = useQueryClient();
   const updateTournament = useV1UpdateTournament(tournament.id);
 
   // 대회 데이터를 prop 으로 받으므로 초기값을 한 번만 계산한다 — 예전에는 렌더 도중
@@ -1347,7 +1380,10 @@ function PrizeCard({
   );
 
   const handleSave = () => {
-    const payload: V1UpdateTournamentPayload = {};
+    // expectedVersion은 diff 축적이 끝난 뒤 mutate() 호출부에서 tournament.updatedAt으로
+    // 채운다 — 여기서 처음부터 넣으면 아래 "변경 없음" 판정(Object.keys 길이)이 항상
+    // 1 이상이 돼 깨진다.
+    const payload: Omit<V1UpdateTournamentPayload, 'expectedVersion'> = {};
     const pool = prizePool.trim();
     if (pool !== '') {
       const n = Number(pool);
@@ -1365,9 +1401,16 @@ function PrizeCard({
       showToast('변경할 상금 정보를 입력해주세요.', 'error');
       return;
     }
-    updateTournament.mutate(payload, {
+    updateTournament.mutate({ ...payload, expectedVersion: tournament.updatedAt }, {
       onSuccess: () => showToast('상금 정보를 저장했어요.', 'success'),
-      onError: (err) => showToast(extractErrorMessage(err, '상금 정보 저장에 실패했어요.'), 'error'),
+      onError: (err) => {
+        if (extractErrorCode(err) === 'TOURNAMENT_VERSION_CONFLICT') {
+          queryClient.invalidateQueries({ queryKey: v1Keys.adminTournament(tournament.id) });
+          showToast('다른 곳에서 이미 저장돼서 이번 저장은 반영되지 않았어요. 화면을 새로고침해 주세요.', 'error');
+          return;
+        }
+        showToast(extractErrorMessage(err, '상금 정보 저장에 실패했어요.'), 'error');
+      },
     });
   };
 

@@ -378,6 +378,11 @@ export class CreateTournamentDto {
 
 /** 모든 필드 optional — 부분 수정(PATCH). status는 별도 엔드포인트로 분리. */
 export class UpdateTournamentDto {
+  // 동시 편집 CAS(낙관적 잠금) — 클라이언트가 폼을 불러온 시점의 updatedAt을 그대로 되돌려 보낸다.
+  // tournament-period-settings.dto.ts의 expectedVersion과 같은 관례(문자열 ISO 타임스탬프 비교).
+  @IsString()
+  expectedVersion!: string;
+
   @IsOptional()
   @IsUUID(undefined, { message: '올바른 종목 ID를 입력해 주세요.' })
   sportId?: string;

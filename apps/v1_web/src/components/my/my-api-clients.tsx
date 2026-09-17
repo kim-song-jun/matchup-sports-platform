@@ -143,7 +143,6 @@ export function MyHomePageClient() {
     }
     return toMyHomeModel(
       profile.data,
-      teams.data?.items ?? [],
       notificationUnreadCount(notifications.data) > 0,
       activitySummary.data,
       hasPendingReview(pendingReviews.data),
@@ -153,7 +152,6 @@ export function MyHomePageClient() {
     );
   }, [
     profile.data,
-    teams.data,
     notifications.data,
     activitySummary.data,
     pendingReviews.data,
@@ -2276,7 +2274,6 @@ export function WithdrawalPageClient() {
 
 function toMyHomeModel(
   profile: V1Profile,
-  teams: V1MyTeam[],
   hasNewNotification: boolean,
   activitySummary?: V1MyActivitySummary,
   hasPendingReviews?: boolean,
@@ -2368,7 +2365,11 @@ function toMyHomeModel(
       ),
       stats: [
         { label: '활동', value: activityCount, unit: activitySummary ? '회' : undefined },
-        { label: '소속 팀', value: activitySummary?.totals.teamCount ?? teams.length, unit: '팀' },
+        // teamCount 는 activitySummary 응답의 필수(non-optional) 필드라 activitySummary 가
+        // 로딩됐다면 항상 채워져 있다 — 이전엔 activitySummary 로딩 중일 때 아직 못 채운
+        // teams(초기값 [])의 length(=0)로 폴백해서, 실제로 팀이 여러 개인 사용자에게도
+        // 로딩 중 잠깐(또는 이 쿼리가 느릴 때 계속) "소속 팀: 0팀"으로 보이는 결함이 있었다.
+        { label: '소속 팀', value: activitySummary ? activitySummary.totals.teamCount : '—', unit: activitySummary ? '팀' : undefined },
         { label: '매너 점수', value: formatScore(totalMannerScore) },
       ],
       // '매너 점수'는 상단 활동 요약(stats)에만 표시. monthly는 경기 수·승률만 — 이중 표기 해소.

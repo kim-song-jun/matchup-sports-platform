@@ -3764,6 +3764,10 @@ export interface V1LeagueOverallStandingsResponse {
   progress: { total: number; played: number; remaining: number; percent: number };
   magicNumber: { registrationId: string; value: number; clinched: boolean } | null;
   recalculatedAt: string | null;
+  /** 종료된 대회의 우승팀(들) — 동점 처리 기준을 전부 소진하고도 안 갈리면 2개 이상(공동 우승). 종료 전엔 항상 []. */
+  champions: { teamId: string; teamName: string; teamLogoUrl: string | null }[];
+  /** tie-break 기준을 전부 소진하고도 갈리지 않아 팀ID 사전순 폴백으로 순위가 결정된 팀 그룹. 대부분 []. */
+  tieBreakGroups: { teamIds: string[]; teamNames: string[] }[];
 }
 
 /** Admin tournament announcement (includes tournamentId, body, updatedAt — full admin serialize) */

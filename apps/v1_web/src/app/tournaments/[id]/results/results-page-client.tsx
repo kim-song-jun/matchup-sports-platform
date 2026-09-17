@@ -101,22 +101,25 @@ function buildSingleGroupLeagueRanking(tournament: V1TournamentDetail): FinalRan
  * `null`이면 단일 조 계산 결과를 그대로 쓰고, `[]`(로딩 실패 포함)이면 빈 상태를 보여준다
  * (틀린 순위를 보여주는 것보다 안전).
  */
+/** `rows`는 언제나 순차 순위(1,2,3…)다 — 동점 처리 기준을 전부 소진하고도 안 갈리면
+ * `championCount`가 그 잔여 동률로 1위를 나눠 가진 팀 수를 알려준다(2 이상 = 공동 우승).
+ * `resolveLeagueChampions`는 **1위 자리만** 판정하므로 이 값은 딱 그만큼만 의미가 있다. */
 function useLeagueOverallFinalRanking(
   tournamentId: string,
   enabled: boolean,
-): FinalRankRow[] | null {
-  const [rows, setRows] = useState<FinalRankRow[] | null>(null);
+): { rows: FinalRankRow[]; championCount: number } | null {
+  const [result, setResult] = useState<{ rows: FinalRankRow[]; championCount: number } | null>(null);
 
   useEffect(() => {
     if (!enabled) {
-      setRows(null);
+      setResult(null);
       return;
     }
     let cancelled = false;
     v1Get<V1LeagueOverallStandingsResponse>(`/tournaments/${tournamentId}/standings/overall`)
       .then((data) => {
         if (cancelled) return;
-        const ranked = data.standings
+        const rows = data.standings
           .filter((s): s is typeof s & { position: number } => s.position !== null)
           .sort((a, b) => a.position - b.position)
           // 정규 리그 거울 행은 tournament.fixtures가 항상 []라 FinalStandingsTable·
@@ -127,17 +130,17 @@ function useLeagueOverallFinalRanking(
             name: s.teamName,
             record: { w: s.wins, gf: s.goalsFor, ga: s.goalsAgainst, games: s.wins + s.draws + s.losses },
           }));
-        setRows(ranked);
+        setResult({ rows, championCount: Math.max(data.champions.length, 1) });
       })
       .catch(() => {
-        if (!cancelled) setRows([]);
+        if (!cancelled) setResult({ rows: [], championCount: 1 });
       });
     return () => {
       cancelled = true;
     };
   }, [tournamentId, enabled]);
 
-  return rows;
+  return result;
 }
 
 /* ── 트로피 마크 — 골드 그라디언트 필드 SVG (lucide 스트로크 대체, 토스풍 솔리드 아이콘) ── */
@@ -360,6 +363,29 @@ function MobileChampionBanner({
         ))}
       </div>
     </div>
+  );
+}
+
+/**
+ * 공동 우승 배너 — 동점 처리 기준(승점·골득실·다득점·상대전적·최소실점)을 전부 소진하고도
+ * 1위가 안 갈렸을 때만 뜬다. 트로피·컨페티·개인 스탯으로 화려하게 꾸미는 단독 우승
+ * 히어로와 달리 담백하게 사실만 전한다 — "어느 한쪽이 이겼다"는 인상을 주지 않으려는
+ * 의도적 절제다(2026-09-17 3안 중 B 선택). 순위는 아래 최종 순위 표가 보여준다.
+ */
+function CoChampionBanner({ names }: { names: string[] }) {
+  return (
+    <Card pad={20} style={{ textAlign: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }} aria-hidden="true">
+        <TrophyMark size={36} />
+      </div>
+      <div style={{ fontSize: 'var(--font-size-label)', fontWeight: 700, color: 'var(--text-caption)', marginBottom: 4 }}>공동 우승</div>
+      <div style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 800, color: 'var(--text-strong)', wordBreak: 'keep-all' }}>
+        {names.join(' · ')}
+      </div>
+      <div style={{ fontSize: 'var(--font-size-caption)', color: 'var(--text-muted)', marginTop: 8 }}>
+        동점 처리 기준을 모두 적용해도 순위를 가릴 수 없어 공동 우승으로 처리했어요.
+      </div>
+    </Card>
   );
 }
 
@@ -613,7 +639,8 @@ function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixture
         const diff = rec.gf - rec.ga;
         const isChamp = row.pos === 1;
         return (
-          <div key={row.pos} style={{
+          // 공동 우승이면 두 행이 pos===1을 공유한다 — key는 팀 이름으로 유일성을 보장한다.
+          <div key={row.name} style={{
             display: 'grid', gridTemplateColumns: '40px 1fr 64px 36px 36px 40px',
             padding: '12px 16px', background: cfg.bg,
             borderTop: idx > 0 ? '1px solid var(--grey100)' : 'none',
@@ -987,14 +1014,23 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
   const needsOverallStandings = isMultiGroupLeague || isLeagueMirror;
   // 필요할 때만 통합 순위 API를 조회한다 — 훅 자체는 매 렌더 동일한 순서로
   // 호출해야 하므로(react hooks rule) enabled 플래그로 조건을 안쪽에 둔다.
-  const overallLeagueRows = useLeagueOverallFinalRanking(tournament.id, isCompleted && needsOverallStandings);
-  const knockoutRows = !isCompleted
+  const overallLeague = useLeagueOverallFinalRanking(tournament.id, isCompleted && needsOverallStandings);
+  const rawKnockoutRows = !isCompleted
     ? []
     : isLeague
-      ? (needsOverallStandings ? (overallLeagueRows ?? []) : buildSingleGroupLeagueRanking(tournament))
+      ? (needsOverallStandings ? (overallLeague?.rows ?? []) : buildSingleGroupLeagueRanking(tournament))
       : buildKnockoutFinalRanking(tournament.fixtures);
+  // 동점 처리 기준을 전부 소진하고도 1위가 안 갈리면(공동 우승) 순차 순위(1,2…) 대신
+  // 그 자리를 나눠 가진 팀 전부를 "1위"로 함께 표기한다 — 실제로 갈리지 않은 걸 팀ID
+  // 사전순으로 임의 확정해 트로피를 씌우던 결함(실사용자 발견, 2026-09-16)의 화면판.
+  const championCount = needsOverallStandings ? (overallLeague?.championCount ?? 1) : 1;
+  const isCoChampion = championCount > 1;
+  const knockoutRows = isCoChampion
+    ? rawKnockoutRows.map((row) => (row.pos <= championCount ? { ...row, pos: 1 } : row))
+    : rawKnockoutRows;
   const championRow = knockoutRows.find((r) => r.pos === 1) ?? null;
-  const championName = championRow?.name ?? null;
+  const championName = isCoChampion ? null : (championRow?.name ?? null);
+  const coChampionNames = isCoChampion ? knockoutRows.filter((r) => r.pos === 1).map((r) => r.name) : [];
 
   // 조별과 같은 이유로 라운드 라벨 정확일치를 쓰지 않는다 — 편성 phase 가 판정 기준이다.
   const { knockoutKind, knockoutOrder } = createStageResolver(tournament.groups);
@@ -1006,7 +1042,15 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
     <div className="tm-tourn-sub-page" style={{ paddingBottom: 40 }}>
       <h1 className="sr-only">{tournament.title} 최종 결과</h1>
       {/* ── 챔피언 섹션 ── */}
-      {isCompleted && championName && (
+      {isCompleted && isCoChampion && (
+        <div style={{ padding: '16px 20px 0' }}>
+          <CoChampionBanner names={coChampionNames} />
+          <div style={{ marginTop: 16 }}>
+            <TournamentSummaryCard tournament={tournament} />
+          </div>
+        </div>
+      )}
+      {isCompleted && !isCoChampion && championName && (
         <div style={{ padding: '16px 20px 0' }}>
           {/* 데스크탑: 풀 화면 히어로 */}
           <DesktopChampionHero champion={championName} tournament={tournament} record={championRow?.record} />

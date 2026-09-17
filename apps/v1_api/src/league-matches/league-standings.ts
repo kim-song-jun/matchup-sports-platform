@@ -20,7 +20,12 @@ export interface LeagueStanding extends LeagueStandingTotals {
   position: number;
 }
 
-export type LeagueTieBreakCriterion = 'points' | 'goalDifference' | 'goalsFor' | 'headToHead';
+export type LeagueTieBreakCriterion =
+  | 'points'
+  | 'goalDifference'
+  | 'goalsFor'
+  | 'headToHead'
+  | 'fewestGoalsAgainst';
 
 const POINTS = { win: 3, draw: 1, loss: 0 } as const;
 
@@ -72,6 +77,9 @@ function criterionValue(
 ): number {
   if (criterion === 'points') return totals.points;
   if (criterion === 'goalDifference') return totals.goalsFor - totals.goalsAgainst;
+  // 버킷을 값 내림차순(orderGroup의 `sort((a, b) => b - a)`)으로 매기므로, "적을수록 좋다"는
+  // 기준은 부호를 뒤집어 넣는다 — 실점이 더 적은 쪽이 더 큰(덜 음수인) 값을 갖게 된다.
+  if (criterion === 'fewestGoalsAgainst') return -totals.goalsAgainst;
   return totals.goalsFor;
 }
 

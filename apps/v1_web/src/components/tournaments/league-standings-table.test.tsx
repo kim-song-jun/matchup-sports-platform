@@ -10,6 +10,8 @@ const baseData = {
   progress: { total: 30, played: 21, remaining: 9, percent: 70 },
   magicNumber: { registrationId: 'r1', value: 4, clinched: false },
   recalculatedAt: '2026-08-17T10:00:00.000Z',
+  champions: [],
+  tieBreakGroups: [],
 };
 
 describe('LeagueStandingsTable', () => {

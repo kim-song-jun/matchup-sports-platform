@@ -80,6 +80,10 @@ function tournamentRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// tournamentRow()의 기본 updatedAt — update() 호출부의 CAS(expectedVersion)를 통과시키려면
+// dto.expectedVersion을 이 값과 맞춰야 한다(달리 오버라이드한 테스트는 없음).
+const TOURNAMENT_ROW_UPDATED_AT = '2026-06-14T00:00:00.000Z';
+
 describe('TournamentsAdminService', () => {
   let service: TournamentsAdminService;
   let kakaoGeocoding: { geocode: jest.Mock };
@@ -346,7 +350,7 @@ describe('TournamentsAdminService', () => {
   // 나머지 어드민 경로도 같은 조건으로 막힌다. 각각 **쓰기/노출이 일어나지 않는지**까지 본다.
   it.each([
     ['get', (svc: TournamentsAdminService) => svc.get(ownerAuthUser, 'league-1')],
-    ['update', (svc: TournamentsAdminService) => svc.update(ownerAuthUser, 'league-1', { title: '바뀐 제목' })],
+    ['update', (svc: TournamentsAdminService) => svc.update(ownerAuthUser, 'league-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, title: '바뀐 제목' })],
     ['publishBracket', (svc: TournamentsAdminService) => svc.publishBracket(ownerAuthUser, 'league-1')],
     ['unpublishBracket', (svc: TournamentsAdminService) => svc.unpublishBracket(ownerAuthUser, 'league-1')],
   ])('%s: 리그 id 로는 열리지 않고 쓰기도 일어나지 않는다', async (_name, call) => {
@@ -740,13 +744,13 @@ describe('TournamentsAdminService', () => {
       .mockResolvedValueOnce(existing)
       // second call inside get() which update() delegates to
       .mockResolvedValueOnce({ ...updated, _count: { registrations: 0 } });
-    prisma.v1Tournament.update.mockResolvedValue(updated);
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
 
-    const result = await service.update(ownerAuthUser, 'tournament-1', { title: '새 제목' });
+    const result = await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, title: '새 제목' });
 
     expect(result).toMatchObject({ id: 'tournament-1', title: '새 제목' });
     // Only `title` was in the dto — verify update was called with exactly that field.
-    expect(prisma.v1Tournament.update).toHaveBeenCalledWith(
+    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ title: '새 제목' }) }),
     );
   });
@@ -758,13 +762,13 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst
       .mockResolvedValueOnce(existing)
       .mockResolvedValueOnce({ ...updated, _count: { registrations: 0 } });
-    prisma.v1Tournament.update.mockResolvedValue(updated);
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
     kakaoGeocoding.geocode.mockResolvedValue({ latitude: 37.4, longitude: 127.1 });
 
-    await service.update(ownerAuthUser, 'tournament-1', { venue: '새 장소' });
+    await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, venue: '새 장소' });
 
     expect(kakaoGeocoding.geocode).toHaveBeenCalledWith('새 장소');
-    expect(prisma.v1Tournament.update).toHaveBeenCalledWith(
+    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ venue: '새 장소', latitude: 37.4, longitude: 127.1 }) }),
     );
   });
@@ -775,12 +779,12 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst
       .mockResolvedValueOnce(existing)
       .mockResolvedValueOnce({ ...existing, _count: { registrations: 0 } });
-    prisma.v1Tournament.update.mockResolvedValue(existing);
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
 
-    await service.update(ownerAuthUser, 'tournament-1', { venue: '동일 장소' });
+    await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, venue: '동일 장소' });
 
     expect(kakaoGeocoding.geocode).not.toHaveBeenCalled();
-    const updateCallData = prisma.v1Tournament.update.mock.calls[0][0].data;
+    const updateCallData = prisma.v1Tournament.updateMany.mock.calls[0][0].data;
     expect(updateCallData).not.toHaveProperty('latitude');
     expect(updateCallData).not.toHaveProperty('longitude');
   });
@@ -807,9 +811,10 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst
       .mockResolvedValueOnce(existing)
       .mockResolvedValueOnce({ ...updated, _count: { registrations: 0 } });
-    prisma.v1Tournament.update.mockResolvedValue(updated);
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
 
     await service.update(ownerAuthUser, 'tournament-1', {
+      expectedVersion: TOURNAMENT_ROW_UPDATED_AT,
       venue: null,
       parkingInfo: null,
       bankName: null,
@@ -817,7 +822,7 @@ describe('TournamentsAdminService', () => {
     });
 
     expect(kakaoGeocoding.geocode).not.toHaveBeenCalled();
-    expect(prisma.v1Tournament.update).toHaveBeenCalledWith(
+    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           venue: null,
@@ -837,12 +842,12 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst
       .mockResolvedValueOnce(existing)
       .mockResolvedValueOnce({ ...existing, _count: { registrations: 0 } });
-    prisma.v1Tournament.update.mockResolvedValue(existing);
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
 
-    await service.update(ownerAuthUser, 'tournament-1', { title: '제목만 변경' });
+    await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, title: '제목만 변경' });
 
     expect(kakaoGeocoding.geocode).not.toHaveBeenCalled();
-    const updateCallData = prisma.v1Tournament.update.mock.calls[0][0].data;
+    const updateCallData = prisma.v1Tournament.updateMany.mock.calls[0][0].data;
     expect(updateCallData).not.toHaveProperty('latitude');
     expect(updateCallData).not.toHaveProperty('longitude');
   });
@@ -854,13 +859,13 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst
       .mockResolvedValueOnce(existing)
       .mockResolvedValueOnce({ ...updated, _count: { registrations: 0 } });
-    prisma.v1Tournament.update.mockResolvedValue(updated);
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
     kakaoGeocoding.geocode.mockResolvedValue(null);
 
-    const result = await service.update(ownerAuthUser, 'tournament-1', { venue: '지오코딩 실패 장소' });
+    const result = await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, venue: '지오코딩 실패 장소' });
 
     expect(result).toMatchObject({ venue: '지오코딩 실패 장소' });
-    expect(prisma.v1Tournament.update).toHaveBeenCalledWith(
+    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ latitude: null, longitude: null }) }),
     );
   });
@@ -873,10 +878,11 @@ describe('TournamentsAdminService', () => {
 
     await expect(
       service.update(ownerAuthUser, 'tournament-1', {
+        expectedVersion: TOURNAMENT_ROW_UPDATED_AT,
         scheduledEndAt: '2026-08-14T18:00:00.000Z',
       }),
     ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_SCHEDULE_RANGE_INVALID' } });
-    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
   });
 
   it('update: minPlayers > maxPlayers (merged with existing) → 400 TOURNAMENT_PLAYER_RANGE_INVALID', async () => {
@@ -886,9 +892,9 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ minPlayers: 6, maxPlayers: 10 }));
 
     await expect(
-      service.update(ownerAuthUser, 'tournament-1', { minPlayers: 11 }),
+      service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, minPlayers: 11 }),
     ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_PLAYER_RANGE_INVALID' } });
-    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
   });
 
   it('update: sending only maxPlayers that falls below existing minPlayers → 400', async () => {
@@ -897,9 +903,9 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ minPlayers: 6, maxPlayers: 10 }));
 
     await expect(
-      service.update(ownerAuthUser, 'tournament-1', { maxPlayers: 3 }),
+      service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, maxPlayers: 3 }),
     ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_PLAYER_RANGE_INVALID' } });
-    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
   });
 
   it('update: non-existent tournament → 404 TOURNAMENT_NOT_FOUND', async () => {
@@ -907,9 +913,9 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.update(ownerAuthUser, 'ghost-tournament', { title: '변경 시도' }),
+      service.update(ownerAuthUser, 'ghost-tournament', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, title: '변경 시도' }),
     ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
-    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
   });
 
   it('update: emits audit log with before/after titles', async () => {
@@ -919,9 +925,9 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst
       .mockResolvedValueOnce(existing)
       .mockResolvedValueOnce({ ...updated, _count: { registrations: 0 } });
-    prisma.v1Tournament.update.mockResolvedValue(updated);
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
 
-    await service.update(ownerAuthUser, 'tournament-1', { title: '이후 제목' });
+    await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, title: '이후 제목' });
 
     expect(prisma.v1AdminActionLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -934,6 +940,46 @@ describe('TournamentsAdminService', () => {
         }),
       }),
     );
+  });
+
+  // X03 회귀 테스트 — 관리자 두 탭이 같은 대회를 동시 편집하면 나중 저장(stale)이 CAS 충돌
+  // 경고 없이 앞선 저장을 조용히 덮어쓰던 결함. 아래 두 테스트가 두 방어선을 각각 증명한다.
+  it('update: stale expectedVersion (다른 값이 이미 저장된 뒤) → 409 TOURNAMENT_VERSION_CONFLICT, 쓰기 시도 자체가 없음', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({}));
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', {
+        expectedVersion: '2020-01-01T00:00:00.000Z',
+        title: 'B탭이 보낸 낡은 편집',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_VERSION_CONFLICT' } });
+
+    // 빠른 실패 — existing.updatedAt과 다르면 트랜잭션/쓰기 자체를 시도하지 않는다.
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('update: expectedVersion은 일치했지만 원자적 갱신 시점에 이미 바뀌어 있음(count=0) → 409 TOURNAMENT_VERSION_CONFLICT', async () => {
+    // 사전 체크(existing.updatedAt) 통과 후, 실제 쓰기 직전 다른 트랜잭션이 먼저 커밋된
+    // 경합 상황을 재현한다 — updateMany의 where절(id+updatedAt)이 0건을 갱신하면 원자적
+    // CAS가 이 경우도 잡아야 한다(사전 체크 하나만으로는 이 창을 못 막는다).
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({}));
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.update(ownerAuthUser, 'tournament-1', {
+        expectedVersion: TOURNAMENT_ROW_UPDATED_AT,
+        title: '경합에서 진 편집',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_VERSION_CONFLICT' } });
+
+    expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'tournament-1', updatedAt: new Date(TOURNAMENT_ROW_UPDATED_AT) },
+      }),
+    );
+    expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
   });
 
   it('create: rejects an impossible mixed gender quota', async () => {
@@ -1000,11 +1046,11 @@ describe('TournamentsAdminService', () => {
     );
 
     await expect(
-      service.update(ownerAuthUser, 'tournament-1', { maxPlayers: 8 }),
+      service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, maxPlayers: 8 }),
     ).rejects.toMatchObject({
       response: { code: 'TOURNAMENT_GENDER_QUOTA_CONFIG_INVALID' },
     });
-    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
   });
 
   it('create: rejects a gender maximum above the roster capacity', async () => {
@@ -1115,10 +1161,10 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
 
     await expect(
-      service.update(ownerAuthUser, 'tournament-1', { lineupMaxPlayers: 6 }),
+      service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, lineupMaxPlayers: 6 }),
     ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_LINEUP_SIZE_LOCKED' } });
     expect(prisma.v1CompetitionConfigVersion.findFirst).not.toHaveBeenCalled();
-    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
   });
 
   it('update: lineupMaxPlayers on a completed tournament → 409 TOURNAMENT_LINEUP_SIZE_LOCKED', async () => {
@@ -1126,7 +1172,7 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'completed' }));
 
     await expect(
-      service.update(ownerAuthUser, 'tournament-1', { lineupMaxPlayers: 6 }),
+      service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, lineupMaxPlayers: 6 }),
     ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_LINEUP_SIZE_LOCKED' } });
   });
 
@@ -1135,9 +1181,9 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ sportId: 'sport-1', status: 'draft' }));
 
     await expect(
-      service.update(ownerAuthUser, 'tournament-1', { sportId: 'sport-2', lineupMaxPlayers: 6 }),
+      service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, sportId: 'sport-2', lineupMaxPlayers: 6 }),
     ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_LINEUP_SIZE_SPORT_CHANGE_CONFLICT' } });
-    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
   });
 
   it('update: draft tournament + valid lineupMaxPlayers → resolves a version and pins it via TournamentCompetitionConfig.change()', async () => {
@@ -1166,7 +1212,7 @@ describe('TournamentsAdminService', () => {
     prisma.v1CompetitionConfigVersion.findUnique.mockResolvedValue({
       lineup: { minPlayers: 3, maxPlayers: 6 },
     });
-    prisma.v1Tournament.update.mockResolvedValue(tournamentRow());
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
 
     const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'change').mockResolvedValue({
       changed: true,
@@ -1179,7 +1225,7 @@ describe('TournamentsAdminService', () => {
     });
 
     try {
-      await service.update(ownerAuthUser, 'tournament-1', { lineupMaxPlayers: 6 });
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, lineupMaxPlayers: 6 });
       expect(changeSpy).toHaveBeenCalledWith(
         ownerAuthUser,
         'tournament-1',
@@ -1218,9 +1264,9 @@ describe('TournamentsAdminService', () => {
 
     try {
       await expect(
-        service.update(ownerAuthUser, 'tournament-1', { lineupMaxPlayers: 6 }),
+        service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, lineupMaxPlayers: 6 }),
       ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_LINEUP_SIZE_LOCKED' } });
-      expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+      expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
     } finally {
       changeSpy.mockRestore();
     }
@@ -1248,9 +1294,9 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
 
     await expect(
-      service.update(ownerAuthUser, 'tournament-1', { substitutionMode: 'rolling' }),
+      service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, substitutionMode: 'rolling' }),
     ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_LINEUP_SIZE_LOCKED' } });
-    expect(prisma.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prisma.v1Tournament.updateMany).not.toHaveBeenCalled();
   });
 
   /**
@@ -1266,7 +1312,7 @@ describe('TournamentsAdminService', () => {
     // 포함 검사만으로는 '출전 인원·교체 설정' 과 구분되지 않는다 — 손대지 않은 필드가
     // **빠져 있는지**가 이 테스트의 핵심이므로 메시지를 직접 꺼내 본다.
     const message = await service
-      .update(ownerAuthUser, 'tournament-1', { substitutionMode: 'rolling' })
+      .update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, substitutionMode: 'rolling' })
       .then(
         () => { throw new Error('거부되지 않았다'); },
         (err: { response?: { code?: string; message?: string } }) => {
@@ -1283,7 +1329,7 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
 
     await expect(
-      service.update(ownerAuthUser, 'tournament-1', { lineupMaxPlayers: 5 }),
+      service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, lineupMaxPlayers: 5 }),
     ).rejects.toMatchObject({
       response: { code: 'TOURNAMENT_LINEUP_SIZE_LOCKED', message: expect.stringContaining('출전 인원을') },
     });
@@ -1301,7 +1347,7 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
 
     const message = await service
-      .update(ownerAuthUser, 'tournament-1', { substitutionMode: 'rolling' })
+      .update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, substitutionMode: 'rolling' })
       .then(
         () => { throw new Error('거부되지 않았다'); },
         (err: { response?: { message?: string } }) => err.response?.message ?? '',
@@ -1316,7 +1362,7 @@ describe('TournamentsAdminService', () => {
     prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'in_progress' }));
 
     await expect(
-      service.update(ownerAuthUser, 'tournament-1', { lineupMaxPlayers: 5, substitutionMode: 'rolling' }),
+      service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, lineupMaxPlayers: 5, substitutionMode: 'rolling' }),
     ).rejects.toMatchObject({
       response: { code: 'TOURNAMENT_LINEUP_SIZE_LOCKED', message: expect.stringContaining('출전 인원·교체 설정') },
     });
@@ -1350,7 +1396,7 @@ describe('TournamentsAdminService', () => {
     prisma.v1CompetitionConfigVersion.findFirst
       .mockResolvedValueOnce(undefined) // find-or-create: 이 content_hash의 버전은 아직 없음
       .mockResolvedValueOnce({ id: 'latest-version-id' }); // 계열의 최신 버전(신규 버전의 base)
-    prisma.v1Tournament.update.mockResolvedValue(tournamentRow());
+    prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
 
     const createVersionSpy = jest
       .spyOn(CompetitionConfigRegistry.prototype, 'createVersion')
@@ -1370,7 +1416,7 @@ describe('TournamentsAdminService', () => {
     });
 
     try {
-      await service.update(ownerAuthUser, 'tournament-1', { substitutionMode: 'rolling' });
+      await service.update(ownerAuthUser, 'tournament-1', { expectedVersion: TOURNAMENT_ROW_UPDATED_AT, substitutionMode: 'rolling' });
       expect(createVersionSpy).toHaveBeenCalledWith(
         ownerAuthUser,
         'latest-version-id',

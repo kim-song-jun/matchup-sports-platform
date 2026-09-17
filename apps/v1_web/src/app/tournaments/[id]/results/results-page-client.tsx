@@ -378,11 +378,11 @@ function CoChampionBanner({ names }: { names: string[] }) {
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }} aria-hidden="true">
         <TrophyMark size={36} />
       </div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 4 }}>공동 우승</div>
-      <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-strong)', wordBreak: 'keep-all' }}>
+      <div style={{ fontSize: 'var(--font-size-label)', fontWeight: 700, color: 'var(--text-caption)', marginBottom: 4 }}>공동 우승</div>
+      <div style={{ fontSize: 'var(--font-size-subhead)', fontWeight: 800, color: 'var(--text-strong)', wordBreak: 'keep-all' }}>
         {names.join(' · ')}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
+      <div style={{ fontSize: 'var(--font-size-caption)', color: 'var(--text-muted)', marginTop: 8 }}>
         동점 처리 기준을 모두 적용해도 순위를 가릴 수 없어 공동 우승으로 처리했어요.
       </div>
     </Card>

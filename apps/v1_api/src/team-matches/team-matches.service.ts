@@ -15,6 +15,7 @@ import {
 import { V1AuthUser } from '../auth/v1-auth-user';
 import {
   canonicalGameCommandPayloadHash,
+  createSourceRosterIdentityLinks,
   GamesService,
 } from '../games/games.service';
 import type {
@@ -1757,6 +1758,10 @@ export class TeamMatchesService {
       ],
       participants: source.hostTeam.memberships.map((membership) => ({
         sourceParticipantId: membership.id,
+        // 호스트 팀원의 실제 계정 — 이게 빠지면 `createFromSourceInTransaction`이
+        // 신원 연결(ROSTER_ASSERTED)을 만들 대상 자체를 모른다. 팀장이 라인업을
+        // 따로 저장하지 않으면 이 초기 스냅샷이 그대로 최신 리비전으로 남는다.
+        userId: membership.userId,
         sideKey: V1GameSideKey.HOME,
         displayNameSnapshot:
           membership.user.profile?.nickname ??
@@ -1796,6 +1801,7 @@ export class TeamMatchesService {
         sourceParticipantId: participant.id,
         sideKey,
         displayNameSnapshot: participant.displayNameSnapshot,
+        ...(participant.userId === null ? {} : { userId: participant.userId }),
         ...(participant.jerseyNumber === null
           ? {}
           : { jerseyNumber: participant.jerseyNumber }),
@@ -1837,6 +1843,7 @@ export class TeamMatchesService {
             where: { status: 'active' },
             orderBy: { id: 'asc' },
             select: {
+              userId: true,
               user: {
                 select: {
                   profile: { select: { nickname: true, displayName: true } },
@@ -1871,17 +1878,31 @@ export class TeamMatchesService {
       where: { id: awaySide.id },
       data: { teamId: awayTeam.id, displayNameSnapshot: awayTeam.name },
     });
-    await tx.v1GameParticipant.createMany({
+    // createMany 대신 createManyAndReturn — 신원 연결의 키가 생성된 participantId라
+    // id를 돌려받아야 한다(saveLineup과 같은 이유). 이 스냅샷은 팀장이 라인업을 따로
+    // 저장하지 않으면 그대로 최신 리비전으로 남으므로, 여기서 연결을 안 만들면 그 팀
+    // 전원의 개인 기록이 이 경기에서 영원히 공개될 수 없다.
+    const createdParticipants = await tx.v1GameParticipant.createManyAndReturn({
       data: awayTeam.memberships.map((membership) => ({
         gameId: game.id,
         sideId: awaySide.id,
         lineupId: awayLineup.id,
+        userId: membership.userId,
         displayNameSnapshot:
           membership.user.profile?.nickname ??
           membership.user.profile?.displayName ??
           '팀원',
       })),
+      select: { id: true, userId: true },
     });
+    await createSourceRosterIdentityLinks(
+      tx,
+      createdParticipants
+        .filter((participant): participant is { id: string; userId: string } => participant.userId !== null)
+        .map((participant) => ({ participantId: participant.id, userId: participant.userId })),
+      { actorType: 'SYSTEM', systemActor: 'TEAM_MATCH_AWAY_ROSTER_SYNC' },
+      'team_match_away_approval_snapshot',
+    );
   }
 
   private assertActiveAccount(user: V1AuthUser) {

@@ -116,7 +116,12 @@ describe('TeamMatchesService', () => {
     v1Team: { findFirst: jest.Mock; findMany: jest.Mock };
     v1Game: { findUnique: jest.Mock };
     v1GameSide: { update: jest.Mock };
-    v1GameParticipant: { createMany: jest.Mock };
+    v1GameParticipant: { createManyAndReturn: jest.Mock };
+    // approveApplication의 초기 라인업 스냅샷(hydrateApprovedAwaySnapshot)이 신원 연결까지
+    // 만드는지 검증하는 데 필요하다 — createSourceRosterIdentityLinks(games.service.ts)가
+    // 이 두 델리게이트를 직접 호출한다(GamesService 목 우회, 모듈 레벨 함수라서).
+    v1ParticipantIdentityLinkEvent: { createManyAndReturn: jest.Mock };
+    v1ParticipantIdentityLinkCurrent: { createMany: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock; createMany: jest.Mock };
     v1PostEventReview: { findMany: jest.Mock };
     v1IdempotencyRecord: { findFirst: jest.Mock };
@@ -163,7 +168,9 @@ describe('TeamMatchesService', () => {
         }),
       },
       v1GameSide: { update: jest.fn().mockResolvedValue({}) },
-      v1GameParticipant: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1GameParticipant: { createManyAndReturn: jest.fn().mockResolvedValue([]) },
+      v1ParticipantIdentityLinkEvent: { createManyAndReturn: jest.fn().mockResolvedValue([]) },
+      v1ParticipantIdentityLinkCurrent: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
       v1StatusChangeLog: { create: jest.fn(), createMany: jest.fn() },
       v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
       v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -682,6 +689,86 @@ describe('TeamMatchesService', () => {
     // 서비스가 실제로 status='matched'를 update에 전달하는지 검증(stub 반환값 echo 방지)
     expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'matched' }) }),
+    );
+  });
+
+  // 실사고: 친선 팀 매치에서 결과가 OFFICIAL로 확정되고 팀 전적은 정상 반영됐는데
+  // 득점자로 지정된 상대팀(신청팀) 선수의 개인 기록(`GET /users/:id/records`)은 항상
+  // 비어 있었다. 원인은 이 승인 경로다 — hydrateApprovedAwaySnapshot이 상대팀 명단으로
+  // 초기 라인업 참가자 행을 만들면서 userId를 싣지 않았고(신원 연결의 열쇠), 그래서
+  // 신원 연결(V1ParticipantIdentityLinkCurrent)이 단 하나도 생기지 않았다. 팀장이
+  // saveLineup으로 라인업을 다시 저장하지 않는 한(이미 명단이 맞아 보여 저장할 이유가
+  // 없다) 이 스냅샷이 최신 리비전으로 남아 결과가 이 참가자 id를 그대로 참조한다.
+  it('approveApplication: 상대팀 신청 승인 시 초기 라인업 스냅샷에도 신원 연결(ROSTER_ASSERTED)을 만든다', async () => {
+    const app = applicationWithTeamMatch({ status: 'requested' }, { status: 'recruiting', startAt: FUTURE });
+    prisma.v1TeamMatchApplication.findFirst.mockResolvedValue(app);
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatchRow());
+    prisma.v1TeamMatchApplication.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+    prisma.v1TeamMatch.update.mockResolvedValue(
+      teamMatchRow({ status: 'matched', approvedApplicantTeamId: 'team-applicant' }),
+    );
+    prisma.v1StatusChangeLog.createMany.mockResolvedValue({ count: 2 });
+
+    // 상대팀(신청팀)에는 계정에 연동된 멤버 2명이 있다 — 둘 다 게스트가 아니다.
+    prisma.v1Team.findFirst.mockResolvedValue({
+      id: 'team-applicant',
+      name: 'Applicant Team',
+      memberships: [
+        { userId: 'away-user-1', user: { profile: { nickname: '어웨이1', displayName: null } } },
+        { userId: 'away-user-2', user: { profile: { nickname: null, displayName: '어웨이2' } } },
+      ],
+    });
+    prisma.v1GameParticipant.createManyAndReturn.mockResolvedValue([
+      { id: 'participant-away-1', userId: 'away-user-1' },
+      { id: 'participant-away-2', userId: 'away-user-2' },
+    ]);
+    const effectiveAt = new Date('2026-06-03T00:00:00Z');
+    prisma.v1ParticipantIdentityLinkEvent.createManyAndReturn.mockResolvedValue([
+      { participantId: 'participant-away-1', linkId: 'link-1', userId: 'away-user-1', effectiveAt },
+      { participantId: 'participant-away-2', linkId: 'link-2', userId: 'away-user-2', effectiveAt },
+    ]);
+
+    await service.approveApplication(manager, 'app-1', {});
+
+    // 참가자 스냅샷 자체가 userId를 실어야 한다 — 아니면 아래 연결도 만들어질 수 없다.
+    expect(prisma.v1GameParticipant.createManyAndReturn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({ userId: 'away-user-1' }),
+          expect.objectContaining({ userId: 'away-user-2' }),
+        ]),
+      }),
+    );
+    // 이 두 호출이 고쳐지기 전에는 통째로 빠져 있었다 — participant.userId 컬럼만으로는
+    // 공개 자격 판정(isParticipantPubliclyEligible)을 절대 통과하지 못한다.
+    expect(prisma.v1ParticipantIdentityLinkEvent.createManyAndReturn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            participantId: 'participant-away-1',
+            userId: 'away-user-1',
+            action: 'ROSTER_ASSERTED',
+            actorType: 'SYSTEM',
+            systemActor: 'TEAM_MATCH_AWAY_ROSTER_SYNC',
+          }),
+          expect.objectContaining({
+            participantId: 'participant-away-2',
+            userId: 'away-user-2',
+            action: 'ROSTER_ASSERTED',
+            actorType: 'SYSTEM',
+            systemActor: 'TEAM_MATCH_AWAY_ROSTER_SYNC',
+          }),
+        ]),
+      }),
+    );
+    expect(prisma.v1ParticipantIdentityLinkCurrent.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({ participantId: 'participant-away-1', userId: 'away-user-1', linkId: 'link-1' }),
+          expect.objectContaining({ participantId: 'participant-away-2', userId: 'away-user-2', linkId: 'link-2' }),
+        ]),
+      }),
     );
   });
 

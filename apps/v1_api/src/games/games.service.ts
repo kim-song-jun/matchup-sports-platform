@@ -826,7 +826,12 @@ async function appendIdentityEvent(
           // 리그 참가 명단이 바뀌어 시작 전 경기 명단을 다시 맞출 때(league-roster-sync.ts).
           | 'LEAGUE_ROSTER_SYNC'
           // 대회 참가 명단이 바뀌어 시작 전 대진 경기 명단을 다시 맞출 때(tournament-roster-sync.ts).
-          | 'TOURNAMENT_ROSTER_SYNC';
+          | 'TOURNAMENT_ROSTER_SYNC'
+          // 친선 팀 매치의 상대팀 신청이 승인되어 그 팀의 초기 라인업 스냅샷이
+          // 자동 생성될 때(team-matches.service.ts hydrateApprovedAwaySnapshot).
+          // 승인을 실행하는 사람은 호스트 팀장이라 그 이름으로 "이 사람은 상대팀의
+          // 아무개다"를 주장할 수 없다 — LINEUP_REVISION_COPY와 같은 이유.
+          | 'TEAM_MATCH_AWAY_ROSTER_SYNC';
       }
   ),
 ) {
@@ -883,7 +888,8 @@ export async function createRosterAssertedIdentityLink(
           | 'PROJECTION_REPAIR'
           | 'LINEUP_REVISION_COPY'
           | 'LEAGUE_ROSTER_SYNC'
-          | 'TOURNAMENT_ROSTER_SYNC';
+          | 'TOURNAMENT_ROSTER_SYNC'
+          | 'TEAM_MATCH_AWAY_ROSTER_SYNC';
       },
   reason: string,
 ): Promise<void> {

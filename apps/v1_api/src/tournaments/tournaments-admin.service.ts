@@ -566,6 +566,14 @@ export class TournamentsAdminService {
     if (dto.promoListPrizeText !== undefined) data.promoListPrizeText = nullableText(dto.promoListPrizeText);
     if (dto.promoListPriority !== undefined) data.promoListPriority = dto.promoListPriority;
 
+    // 아래 최종 업데이트의 CAS 기준값. 기본은 이 메서드가 시작할 때 읽은 existing.updatedAt
+    // 이지만, 바로 아래 lineupConfigChangeRequested 분기가 실제로 TournamentCompetitionConfig
+    // .change()를 커밋하면 그 자체가 Prisma @updatedAt으로 이 행의 updatedAt을 이미 한 번
+    // 앞당긴다 — 그 새 값을 반영하지 않으면 같은 요청 안에서 스스로 CAS 충돌을 내게 된다
+    // (Copilot 리뷰 지적, 실제 결함: 출전 인원과 다른 필드를 한 요청에 같이 보내면 매번
+    // TOURNAMENT_VERSION_CONFLICT가 났을 것).
+    let casBaseline = existing.updatedAt;
+
     // 출전 인원/교체 정책 변경은 다른 필드들과 별도 트랜잭션으로 처리한다 —
     // TournamentCompetitionConfig.change()가 자기 CAS(expectedVersion)와 미완료 픽스처
     // 리포인트, 감사 로그를 이미 원자적으로 다 갖고 있어 여기서 재구현하지 않는다. CAS는
@@ -617,6 +625,9 @@ export class TournamentsAdminService {
             message: `이미 진행된 경기나 기록된 결과가 있어 ${lockedFieldLabel}을 변경할 수 없어요. ${LINEUP_LOCK_ESCAPE_HINT}`,
           });
         }
+        // confirmationRequired가 아니면 change()가 실제로 커밋된 것이다 — 그 트랜잭션이
+        // 남긴 새 updatedAt을 이후 CAS 기준으로 삼는다.
+        casBaseline = new Date(changeResult.expectedVersion);
       }
     }
 
@@ -627,7 +638,7 @@ export class TournamentsAdminService {
       // 행을 돌려주지 않으므로, 감사 로그의 afterJson.title은 이번에 보낸 값(data.title)이
       // 있으면 그 값을, 없으면(제목을 안 바꿨으면) 기존 값을 그대로 쓴다 — 재조회 불필요.
       const changed = await tx.v1Tournament.updateMany({
-        where: { id: tournamentId, updatedAt: existing.updatedAt },
+        where: { id: tournamentId, updatedAt: casBaseline },
         data,
       });
       if (changed.count !== 1) {

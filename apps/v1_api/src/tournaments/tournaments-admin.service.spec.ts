@@ -1214,10 +1214,13 @@ describe('TournamentsAdminService', () => {
     });
     prisma.v1Tournament.updateMany.mockResolvedValue({ count: 1 });
 
+    // change()가 실제로 커밋하면 그 트랜잭션이 Prisma @updatedAt으로 이 대회의 updatedAt을
+    // existing.updatedAt(TOURNAMENT_ROW_UPDATED_AT)과는 다른 새 값으로 이미 앞당긴다.
+    const freshVersionAfterConfigChange = '2026-09-17T03:00:00.000Z';
     const changeSpy = jest.spyOn(TournamentCompetitionConfig.prototype, 'change').mockResolvedValue({
       changed: true,
       currentCompetitionConfigVersionId: 'new-config-version-6',
-      expectedVersion: new Date().toISOString(),
+      expectedVersion: freshVersionAfterConfigChange,
       previewHash: 'hash-6-new',
       impact: { fixtureCount: 0, completedFixtureCount: 0, standingCount: 0, requiresRecalculation: false },
       confirmationRequired: false,
@@ -1232,6 +1235,15 @@ describe('TournamentsAdminService', () => {
         expect.objectContaining({
           competitionConfigVersionId: 'new-config-version-6',
           expectedVersion: existing.updatedAt.toISOString(),
+        }),
+      );
+      // Copilot 리뷰 지적, 실제 결함으로 확인됨: 이 뒤에 이어지는 일반 필드 업데이트
+      // 트랜잭션이 여전히 existing.updatedAt(옛 값)을 CAS 기준으로 썼다면, change()가
+      // 방금 앞당긴 실제 행과 절대 일치하지 않아 같은 요청 안에서 스스로 409를 냈을 것이다
+      // — 반드시 change()가 돌려준 새 expectedVersion을 기준으로 원자적 갱신해야 한다.
+      expect(prisma.v1Tournament.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'tournament-1', updatedAt: new Date(freshVersionAfterConfigChange) },
         }),
       );
     } finally {

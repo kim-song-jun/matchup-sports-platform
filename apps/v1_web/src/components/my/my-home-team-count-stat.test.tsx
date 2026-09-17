@@ -19,6 +19,10 @@ const apiMocks = vi.hoisted(() => ({
   useV1Reviews: vi.fn(),
   useV1AuthMe: vi.fn(),
   useV1MyTournamentStaffAssignments: vi.fn(),
+  // 이 테스트는 owner 역할 팀을 채워 useV1TeamContactSummary 의 enabled 조건을 참으로
+  // 만든다 — 명시적으로 mock 하지 않으면 실제 훅이 실행돼 네트워크 의존적인
+  // flaky 테스트가 된다(Copilot 리뷰 지적, 2026-09-17).
+  useV1TeamContactSummary: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
@@ -72,6 +76,7 @@ describe('MyHomePageClient — 소속 팀 KPI', () => {
     apiMocks.useV1Reviews.mockReturnValue({ data: undefined });
     apiMocks.useV1AuthMe.mockReturnValue({ data: { verification: { phoneVerified: true } } });
     apiMocks.useV1MyTournamentStaffAssignments.mockReturnValue({ data: { items: [] } });
+    apiMocks.useV1TeamContactSummary.mockReturnValue({ data: undefined });
 
     render(<MyHomePageClient />);
 
@@ -92,6 +97,7 @@ describe('MyHomePageClient — 소속 팀 KPI', () => {
     apiMocks.useV1Reviews.mockReturnValue({ data: undefined });
     apiMocks.useV1AuthMe.mockReturnValue({ data: { verification: { phoneVerified: true } } });
     apiMocks.useV1MyTournamentStaffAssignments.mockReturnValue({ data: { items: [] } });
+    apiMocks.useV1TeamContactSummary.mockReturnValue({ data: undefined });
 
     render(<MyHomePageClient />);
 

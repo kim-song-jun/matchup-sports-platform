@@ -1,4 +1,5 @@
 import { calculateLeagueStandings, calculateLeagueStandingsWithTieBreakInfo, resolveLeagueChampions } from './league-standings';
+import { LEAGUE_TIE_BREAK_ORDER } from './league-tie-break';
 
 const ORDER = ['points', 'goalDifference', 'goalsFor', 'headToHead'] as const;
 
@@ -97,6 +98,28 @@ describe('calculateLeagueStandings', () => {
     const result = calculateLeagueStandings({ teamIds: ['A', 'B', 'C'], fixtures: [], tieBreakOrder: ORDER });
     expect(result.every((r) => r.played === 0 && r.points === 0)).toBe(true);
     expect(result.map((r) => r.teamId)).toEqual(['A', 'B', 'C']); // 사전순 폴백
+  });
+
+  it('fewestGoalsAgainst — goalDifference 앞에 두면 실점이 더 적은 팀이 위로 간다', () => {
+    // A·B 승점 동일(3점), goalDifference도 동일(+2) — 하지만 A(5:3)가 B(3:1)보다 더 많이
+    // 먹었다. LEAGUE_TIE_BREAK_ORDER 의 실제 자리(goalDifference·goalsFor 다음)에서는
+    // goalDifference·goalsFor 가 둘 다 같으면 goalsAgainst 도 대수적으로 항상 같아져
+    // 이 기준이 절대 발동하지 않는다(league-tie-break.ts 상단 경고 참조) — 그래서 여기서는
+    // 그 기준을 **앞으로** 당긴 순서로 "계산 자체는 맞다"는 것만 별도로 검증한다.
+    const fixtures = [
+      { homeTeamId: 'A', awayTeamId: 'X', homeScore: 5, awayScore: 3 },
+      { homeTeamId: 'B', awayTeamId: 'X', homeScore: 3, awayScore: 1 },
+    ];
+    const result = calculateLeagueStandings({
+      teamIds: ['A', 'B', 'X'],
+      fixtures,
+      tieBreakOrder: ['points', 'fewestGoalsAgainst', 'goalDifference', 'goalsFor'],
+    });
+    const a = result.find((r) => r.teamId === 'A')!;
+    const b = result.find((r) => r.teamId === 'B')!;
+    expect(a.points).toBe(b.points);
+    expect(a.goalsFor - a.goalsAgainst).toBe(b.goalsFor - b.goalsAgainst); // goalDifference 동일
+    expect(b.position).toBeLessThan(a.position); // 실점 더 적은 B가 위
   });
 });
 
@@ -222,5 +245,22 @@ describe('resolveLeagueChampions', () => {
     expect(tieGroups).toEqual([{ teamIds: ['A', 'C'] }]);
     const champions = resolveLeagueChampions(withTeamNames(standings), tieGroups);
     expect(champions.map((c) => c.teamId).sort()).toEqual(['A', 'C']);
+  });
+
+  it('실사용자 발견 결함(2026-09-16) — 서로 한 번만 붙은 무승부는 실전 5단계 순서로도 공동 우승으로 남는다', () => {
+    // 마포 레인저스 vs 풋살크루, 1:1 무승부 재현 — 두 팀이 이 경기 하나뿐이면 승점·골득실·
+    // 다득점·상대전적·최소실점 전부가 정의상 완전히 대칭이라, LEAGUE_TIE_BREAK_ORDER를
+    // 아무리 늘려도 갈릴 수 없다. 고치기 전에는 이 잔여 동률이 팀ID 사전순으로 조용히
+    // "1위/2위"가 되어 트로피 히어로에 확정 우승팀으로 떴다 — 이 테스트는 그 대신
+    // tieGroups·champions 양쪽 다 두 팀을 공동으로 잡는다는 계약을 고정한다.
+    const fixtures = [{ homeTeamId: '마포', awayTeamId: '풋살', homeScore: 1, awayScore: 1 }];
+    const { standings, tieGroups } = calculateLeagueStandingsWithTieBreakInfo({
+      teamIds: ['마포', '풋살'],
+      fixtures,
+      tieBreakOrder: LEAGUE_TIE_BREAK_ORDER,
+    });
+    expect(tieGroups).toEqual([{ teamIds: ['마포', '풋살'] }]);
+    const champions = resolveLeagueChampions(withTeamNames(standings), tieGroups);
+    expect(champions.map((c) => c.teamId).sort()).toEqual(['마포', '풋살']);
   });
 });

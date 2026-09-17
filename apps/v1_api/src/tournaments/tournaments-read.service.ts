@@ -30,6 +30,7 @@ import {
 } from '../league-matches/league-fixture-list-source';
 import {
   calculateLeagueStandingsWithTieBreakInfo,
+  resolveLeagueChampions,
 } from '../league-matches/league-standings';
 import { LEAGUE_TIE_BREAK_ORDER } from '../league-matches/league-tie-break';
 import { readPublicRostersForRegistrations, type PublicRosterPlayer } from './public-roster';
@@ -324,7 +325,7 @@ export class TournamentsReadService {
     // 404 대신 빈 표를 주는 것이 더 나쁘다 — 에러가 아니라 "아직 순위가 없다" 로 읽힌다.
     // 그래서 종류로 갈라 리그 축에서 같은 모양을 만든다.
     if (tournament.kind === V1CompetitionKind.regular_league) {
-      return this.leagueOverallStandings(tournamentId, hideIdentity);
+      return this.leagueOverallStandings(tournamentId, hideIdentity, tournament.status === 'completed');
     }
 
     const [standingRows, fixtures]: [OverallStandingRow[], OverallStandingsFixtureRow[]] = await Promise.all([
@@ -428,7 +429,7 @@ export class TournamentsReadService {
    * 취소·무효 대진은 분모에서도 빠진다 — 앞으로도 치러지지 않을 경기를 "남은 경기" 로 세면
    * 진행률이 영원히 100% 에 못 닿는다. 그 분류는 `bucketLeagueFixtures` 가 한다.
    */
-  private async leagueOverallStandings(leagueId: string, hideIdentity: boolean) {
+  private async leagueOverallStandings(leagueId: string, hideIdentity: boolean, isCompleted: boolean) {
     const leagueRow = await findTournamentOnSurface(this.prisma, ['regular_league'], {
       where: { id: leagueId, deletedAt: null },
       select: {
@@ -437,7 +438,11 @@ export class TournamentsReadService {
         // 로스터 = confirmed 등록.
         registrations: {
           where: { status: 'confirmed' },
-          select: { id: true, teamId: true, team: { select: { name: true } } },
+          select: {
+            id: true,
+            teamId: true,
+            team: { select: { name: true, profile: { select: { logoUrl: true } } } },
+          },
         },
       },
     });
@@ -484,13 +489,31 @@ export class TournamentsReadService {
     });
     const buckets = bucketLeagueFixtures(validTeamMatches, factByGameId);
     const teamNameById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.name]));
+    const teamLogoById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.profile?.logoUrl ?? null]));
     const registrationIdByTeamId = new Map(league.teams.map((entry) => [entry.teamId, entry.id]));
     const tieBreakOrder = LEAGUE_TIE_BREAK_ORDER;
-    const { standings: leagueStandings } = calculateLeagueStandingsWithTieBreakInfo({
+    const { standings: leagueStandings, tieGroups } = calculateLeagueStandingsWithTieBreakInfo({
       teamIds: league.teams.map((entry) => entry.teamId),
       fixtures: buckets.confirmed,
       tieBreakOrder,
     });
+
+    // 그룹 B(시즌 결산·시상 화면 감사)와 같은 계산 — league-match-public.service.ts의
+    // standings()가 이미 쓰고 있는 것을 거울 행(정규 리그 kind='regular_league')에도
+    // 그대로 포팅한다. 대회가 끝나기 전엔 "우승"이 아직 성립하지 않으므로 완료 전에는
+    // 항상 빈 배열이다(사용자 확정 2026-08-23). hideIdentity(신원 비공개) 상태에서도
+    // 팀 이름을 새어 보내지 않는다.
+    const champions =
+      !isCompleted || hideIdentity
+        ? []
+        : resolveLeagueChampions(
+            leagueStandings.map((row) => ({
+              teamId: row.teamId,
+              teamName: teamNameById.get(row.teamId) ?? '',
+              teamLogoUrl: teamLogoById.get(row.teamId) ?? null,
+            })),
+            tieGroups,
+          );
 
     return {
       standings: leagueStandings.map((row) => ({
@@ -515,6 +538,17 @@ export class TournamentsReadService {
       // 별도 판단이라 여기서 지어내지 않는다.
       magicNumber: null,
       recalculatedAt: null,
+      // 그룹 B(시즌 결산·시상 화면 감사)와 감사 H-5 — league-match-public.service.ts의
+      // standings()가 이미 계산하는 것을 거울 행에도 그대로 포팅했다. champions는 종료된
+      // 대회에만(공동 우승 가능), tieBreakGroups는 tie-break 5단계를 전부 소진하고도
+      // 안 갈려 팀ID 사전순 폴백으로 순위가 정해진 팀 그룹(대부분 빈 배열)이다.
+      champions,
+      tieBreakGroups: hideIdentity
+        ? []
+        : tieGroups.map((group) => ({
+            teamIds: group.teamIds,
+            teamNames: group.teamIds.map((teamId) => teamNameById.get(teamId) ?? ''),
+          })),
     };
   }
 

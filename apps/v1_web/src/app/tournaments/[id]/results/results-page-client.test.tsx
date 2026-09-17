@@ -234,6 +234,8 @@ describe('ResultsPageContent — 완료된 리그 방식 대회의 최종 순위
       progress: { total: 10, played: 10, remaining: 0, percent: 100 },
       magicNumber: null,
       recalculatedAt: null,
+      champions: [],
+      tieBreakGroups: [],
     };
     v1GetMock.mockResolvedValueOnce(overall);
 
@@ -284,6 +286,8 @@ describe('ResultsPageContent — 정규 리그 거울 행(kind=regular_league)�
       progress: { total: 1, played: 1, remaining: 0, percent: 100 },
       magicNumber: null,
       recalculatedAt: null,
+      champions: [{ teamId: 'team-1', teamName: '풋살크루', teamLogoUrl: null }],
+      tieBreakGroups: [],
     };
     v1GetMock.mockResolvedValueOnce(overall);
 
@@ -309,6 +313,49 @@ describe('ResultsPageContent — 정규 리그 거울 행(kind=regular_league)�
     expect(screen.getAllByText('+3').length).toBeGreaterThan(0);
     expect(screen.getByText('-3')).toBeInTheDocument();
     expect(screen.getAllByText('1경기 중').length).toBeGreaterThan(0);
+  });
+
+  /**
+   * 실사용자 발견 결함(2026-09-16) — 마포 레인저스 vs 풋살크루, 1:1 무승부. 두 팀이 이
+   * 경기 하나뿐이면 승점·골득실·다득점·상대전적·최소실점 전부 완전히 대칭이라 절대
+   * 안 갈린다. 고치기 전에는 이 잔여 동률이 팀ID 사전순으로 조용히 "1위/2위"가 되어
+   * 트로피 히어로에 한쪽 팀만 확정 우승팀으로 떴다 — API가 `champions`(2개)로 그
+   * 동률을 알려주면 화면은 단독 우승 히어로 대신 담백한 공동 우승 배너를 보여줘야
+   * 한다(2026-09-17 3안 중 B 선택).
+   */
+  it('완전 동률(공동 우승)이면 단독 챔피언 히어로 대신 공동 우승 배너를 보여준다', async () => {
+    const overall: V1LeagueOverallStandingsResponse = {
+      standings: [
+        { teamId: 'team-mapo', teamName: '마포 레인저스', position: 1, points: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1 },
+        { teamId: 'team-futsal', teamName: '풋살크루', position: 2, points: 1, wins: 0, draws: 1, losses: 0, goalsFor: 1, goalsAgainst: 1 },
+      ],
+      progress: { total: 1, played: 1, remaining: 0, percent: 100 },
+      magicNumber: null,
+      recalculatedAt: null,
+      champions: [
+        { teamId: 'team-mapo', teamName: '마포 레인저스', teamLogoUrl: null },
+        { teamId: 'team-futsal', teamName: '풋살크루', teamLogoUrl: null },
+      ],
+      tieBreakGroups: [{ teamIds: ['team-mapo', 'team-futsal'], teamNames: ['마포 레인저스', '풋살크루'] }],
+    };
+    v1GetMock.mockResolvedValueOnce(overall);
+
+    const tournament = baseTournament({
+      format: 'group_knockout',
+      kind: 'regular_league',
+      groups: [],
+      fixtures: [],
+    });
+
+    render(<ResultsPageContent tournament={tournament} />);
+
+    await waitFor(() => expect(screen.getByText('공동 우승')).toBeInTheDocument());
+    expect(screen.getByText('마포 레인저스 · 풋살크루')).toBeInTheDocument();
+    // 단독 우승 히어로는 아예 렌더되지 않는다 — "득실차"는 그 히어로에만 있는 라벨이다.
+    expect(screen.queryByText('득실차')).not.toBeInTheDocument();
+    // 최종 순위 표: 두 팀 다 "우승"을 공유하고, 아무도 "준우승"이 아니다.
+    expect(screen.getAllByText('우승').length).toBe(2);
+    expect(screen.queryByText('준우승')).not.toBeInTheDocument();
   });
 
   it('다조(2개 이상) format=league 대회의 기존 동작은 그대로 유지한다(회귀 방지)', () => {

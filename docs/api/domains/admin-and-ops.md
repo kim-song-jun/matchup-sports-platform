@@ -22,6 +22,7 @@
 | Method | Path | DTO / Query | 권한 | 용도 |
 |---|---|---|---|---|
 | `GET` | `/api/v1/admin/me` | - | active admin | 내 운영자 역할·capability |
+| `GET` | `/api/v1/admin/hub/inbox` | - | active admin | 처리할 대회 신청·결과 검토·문의·진행 중 대회 집계 |
 | `GET` | `/api/v1/admin/overview` | `AdminOverviewQueryDto` | active admin | 운영 현황 요약 |
 | `GET` | `/api/v1/admin/action-logs` | `AdminLogsQueryDto` | active admin | 관리자 액션 로그 |
 | `GET` | `/api/v1/admin/status-change-logs` | `AdminLogsQueryDto` | active admin | 상태 변경 로그 |
@@ -251,3 +252,7 @@ type AdminListSummary = {
 - `apps/v1_api/src/admin/dto/admin-terms.dto.ts`
 - `apps/v1_api/prisma/migrations/20260719043000_v1_admin_active_account_invariant/migration.sql`
 - `apps/v1_web/src/hooks/use-v1-api.ts`
+
+## 대시보드 신청 집계
+
+`GET /api/v1/admin/hub/inbox`의 `pendingRegistrations`는 삭제되지 않은 대회(`regular_tournament` 또는 기존 `kind=null`)의 `awaiting_payment`, `payment_checking`, `paid`, `cancel_requested` 신청만 포함한다. 정규 리그 시즌은 `/admin/tournaments/:id/registrations`에서 조회할 수 없으므로 이 대회 전용 집계에 포함하지 않는다. 리그 신청은 `/admin/league-matches/:leagueId/registrations`에서 관리한다. 응답 필드와 관리자 권한 계약은 유지한다.

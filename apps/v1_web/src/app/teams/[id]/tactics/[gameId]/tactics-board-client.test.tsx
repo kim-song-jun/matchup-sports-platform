@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { V1ApiError } from '@/lib/api-client';
 import { TacticsBoardClient } from './tactics-board-client';
 
 /**
@@ -216,6 +217,29 @@ describe('TacticsBoardClient — 선발과 후보를 오갈 수 있다', () => {
     });
     render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
     expect(screen.queryByRole('button', { name: /후보로 내리기|선발로 올리기/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '전술 저장' })).not.toBeInTheDocument();
+  });
+});
+
+describe('전술 조회 실패', () => {
+  it.each([403, 404, 500])('첫 조회 %i 오류를 로딩 화면에 숨기지 않는다', (statusCode) => {
+    apiMocks.useV1TacticsBoard.mockReturnValue({
+      isLoading: false, isError: true, data: undefined, refetch: vi.fn(),
+      error: new V1ApiError({ status: 'error', timestamp: '2026-09-19T00:00:00Z', statusCode, code: 'TACTICS_ERROR', message: '조회 실패' }),
+    });
+    render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
+    expect(screen.getByText(statusCode === 403 ? '이 팀의 전술은 볼 수 없어요' : '전술을 불러오지 못했어요')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '전술 저장' })).not.toBeInTheDocument();
+    if (statusCode === 500) expect(screen.getByRole('button', { name: /다시 시도/ })).toBeInTheDocument();
+  });
+
+  it('팀원 조회 실패를 빈 명단으로 표시하지 않고 재시도할 수 있다', () => {
+    const refetch = vi.fn();
+    apiMocks.useV1TeamMembers.mockReturnValue({ isLoading: false, isError: true, data: undefined, error: new Error('연결 실패'), refetch });
+    render(<TacticsBoardClient teamId={TEAM_ID} gameId={GAME_ID} />);
+    expect(screen.getByText('팀원을 불러오지 못했어요')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /다시 시도/ }));
+    expect(refetch).toHaveBeenCalledOnce();
     expect(screen.queryByRole('button', { name: '전술 저장' })).not.toBeInTheDocument();
   });
 });

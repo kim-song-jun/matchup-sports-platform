@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { TournamentsListContent } from './page';
+import TournamentsPage from './page';
 
 /**
  * 통합 목록의 유형 축(`?kind=`)이 **주소에서 서버까지 실제로 이어지는가**를 잠근다.
@@ -41,31 +41,31 @@ function kindSentToServer(): unknown {
 describe('대회 목록 — 유형(kind) 축', () => {
   it('?kind=league 면 서버에 league 를 묻는다', () => {
     search = 'kind=league';
-    render(<TournamentsListContent />);
+    render(<TournamentsPage />);
     expect(kindSentToServer()).toBe('league');
   });
 
   it('?kind=all 이면 서버에 all 을 묻는다 — 대회와 리그가 한 목록에 섞이는 표면', () => {
     search = 'kind=all';
-    render(<TournamentsListContent />);
+    render(<TournamentsPage />);
     expect(kindSentToServer()).toBe('all');
   });
 
   it('쿼리가 없으면 전체를 묻는다 — 통합 목록이 기본 화면이다', () => {
     search = '';
-    render(<TournamentsListContent />);
+    render(<TournamentsPage />);
     expect(kindSentToServer()).toBe('all');
   });
 
   it('모르는 값이 와도 목록이 비지 않는다 — 기본 표면으로 떨어진다', () => {
     search = 'kind=regular_league';
-    render(<TournamentsListContent />);
+    render(<TournamentsPage />);
     expect(kindSentToServer()).toBe('all');
   });
 
   it('현재 유형이 세그먼트에 반영된다', () => {
     search = 'kind=league';
-    render(<TournamentsListContent />);
+    render(<TournamentsPage />);
     const nav = screen.getByRole('navigation', { name: '대회 유형' });
     expect(within(nav).getByRole('link', { name: '정규 리그' })).toHaveAttribute('aria-current', 'page');
   });
@@ -86,7 +86,7 @@ describe('대회 목록 — 유형(kind) 축', () => {
    */
   it('유형 세그먼트는 목록 섹션 안에, 필터 요약 줄보다 앞에 있다', () => {
     search = '';
-    const { container } = render(<TournamentsListContent />);
+    const { container } = render(<TournamentsPage />);
     const section = container.querySelector('#tournament-list');
     expect(section).not.toBeNull();
 
@@ -106,7 +106,7 @@ describe('대회 목록 — 유형(kind) 축', () => {
    */
   it('종목 칩 줄과 요약 줄이 동시에 있지 않다 — 교체지 추가가 아니다', () => {
     search = '';
-    const { container } = render(<TournamentsListContent />);
+    const { container } = render(<TournamentsPage />);
     const section = container.querySelector('#tournament-list') as HTMLElement;
 
     expect(section.querySelector('.tm-competition-filter-summary')).not.toBeNull();

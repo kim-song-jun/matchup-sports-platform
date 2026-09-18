@@ -1205,7 +1205,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         by: ['tournamentId'],
         where: {
           status: { in: [...REGISTRATION_ACTIONABLE] },
-          tournament: { deletedAt: null },
+          tournament: { ...TOURNAMENT_SURFACE_KIND, deletedAt: null },
         },
         _count: { _all: true },
       }),

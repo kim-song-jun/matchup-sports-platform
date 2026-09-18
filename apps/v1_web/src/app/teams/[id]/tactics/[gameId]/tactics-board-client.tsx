@@ -152,10 +152,6 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
     }
   }
 
-  if (board.isLoading || members.isLoading || entries === null) {
-    return <PageSkeleton />;
-  }
-
   if (board.isError) {
     const status = board.error instanceof V1ApiError ? board.error.statusCode : null;
     return (
@@ -171,6 +167,20 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
         onRetry={status === 403 || status === 404 ? undefined : () => void board.refetch()}
       />
     );
+  }
+
+  if (members.isError) {
+    return (
+      <ErrorState
+        title="팀원을 불러오지 못했어요"
+        message={extractErrorMessage(members.error, '잠시 후 다시 시도해 주세요.')}
+        onRetry={() => void members.refetch()}
+      />
+    );
+  }
+
+  if (board.isLoading || members.isLoading || entries === null) {
+    return <PageSkeleton />;
   }
 
   return (
@@ -271,18 +281,7 @@ export function TacticsBoardClient({ teamId, gameId }: { teamId: string; gameId:
             <h2 className="tm-text-body-lg" style={{ fontWeight: 700, margin: '0 0 8px' }}>
               팀원 추가
             </h2>
-            {members.isError ? (
-              // 조회가 실패했는데 "전원이 이미 보드에 있어요"를 띄우면 거짓말이 된다 —
-              // 목록이 비어서가 아니라 못 불러온 것이므로 그렇게 말하고 다시 시도하게 한다.
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: 0, flex: 1 }}>
-                  팀원 목록을 불러오지 못했어요.
-                </p>
-                <Button variant="outline" size="sm" onClick={() => void members.refetch()}>
-                  다시 시도
-                </Button>
-              </div>
-            ) : available.length === 0 ? (
+            {available.length === 0 ? (
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: 0 }}>
                 팀원 전원이 이미 보드에 있어요.
               </p>

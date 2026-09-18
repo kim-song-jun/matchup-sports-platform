@@ -1,5 +1,5 @@
 'use client';
-import { useSyncExternalStore } from 'react';
+import { useLayoutEffect, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
@@ -42,22 +42,20 @@ function getSnapshot() { return current; }
 // Query)이므로 승격 전/후 SSR 결과는 동일하다(회귀 아님).
 function getServerSnapshot() { return EMPTY; }
 
-/**
- * 셸에 런타임 값을 밀어넣는다. **반드시 렌더 함수 본문에서 직접 호출한다(useEffect 아님).**
- * 렌더 단계에서 store.set을 부르면: AppChrome(조상)이 재구독으로 다시 렌더 → 그때
- * `children`(페이지) prop은 AppShellFrame이 만든 그 엘리먼트 그대로(참조 동일)이므로
- * React가 그 아래를 다시 렌더하지 않고 멈춘다(Dan Abramov, "Before You memo()") — 정확히
- * 1번 더 렌더되고 종료. useEffect 버전과 달리 페이지 자신의 렌더 함수가 다시 불릴 일이
- * 없으므로 루프가 성립하지 않는다.
+/** 페이지가 커밋된 뒤, 페인트 전에 셸의 동적 제목/액션을 반영한다.
+ * 렌더 도중 store 구독자(조상)를 갱신하면 React 경고와 중단된 렌더의 값 누출이 생긴다.
+ * children 참조는 셸의 store 갱신으로 바뀌지 않아 페이지를 다시 렌더하지 않는다.
  */
 export function useShellOverride(override: ShellOverride): void {
   const pathname = usePathname();
-  // typeof window 가드: 이 저장소 기존 관례(pending-social-signup-gate.tsx)와 동일 패턴.
-  // 서버에서 부르면 위 getServerSnapshot 주석과 같은 교차 요청 오염이 생기므로 클라이언트
-  // 커밋 이후에만 store를 쓴다.
-  if (typeof window !== 'undefined') {
-    setOverride({ pathname, override });
-  }
+  useLayoutEffect(() => {
+    const snapshot = { pathname, override };
+    setOverride(snapshot);
+    return () => {
+      // 다른 페이지가 이미 게시한 값을 이전 페이지의 cleanup이 지우지 않는다.
+      if (current === snapshot) setOverride(EMPTY);
+    };
+  });
 }
 
 /** AppShellFrame 전용 판독. pathname이 안 맞으면(=다른 라우트가 남긴 값) 빈 override로

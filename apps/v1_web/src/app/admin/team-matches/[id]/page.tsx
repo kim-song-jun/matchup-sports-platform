@@ -117,41 +117,41 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
 
       {isPlatformRecruitment && teamMatch.status === 'recruiting' && canWrite && (
         <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-          <h3 className="text-sm font-bold text-[var(--text-strong)]">참가팀 확정</h3>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">신청한 팀 중 홈팀과 상대팀을 각각 선택하세요. 확정하면 나머지 신청은 거절 처리돼요.</p>
+          <h3 className="text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)]">참가팀 확정</h3>
+          <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">신청한 팀 중 홈팀과 상대팀을 각각 선택하세요. 확정하면 나머지 신청은 거절 처리돼요.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="text-xs font-semibold text-[var(--text-muted)]">
+            <label className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)]">
               홈팀
               <select
                 aria-label="홈팀 신청"
                 value={homeApplicationId}
                 onChange={(event) => setHomeApplicationId(event.target.value)}
-                className="mt-1 h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)]"
+                className="mt-1 h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]"
               >
                 <option value="">신청 선택</option>
                 {requested.map((application) => <option key={application.applicationId} value={application.applicationId} disabled={application.applicationId === awayApplicationId}>{application.applicantTeamName}</option>)}
               </select>
             </label>
-            <label className="text-xs font-semibold text-[var(--text-muted)]">
+            <label className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)]">
               상대팀
               <select
                 aria-label="상대팀 신청"
                 value={awayApplicationId}
                 onChange={(event) => setAwayApplicationId(event.target.value)}
-                className="mt-1 h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)]"
+                className="mt-1 h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]"
               >
                 <option value="">신청 선택</option>
                 {requested.map((application) => <option key={application.applicationId} value={application.applicationId} disabled={application.applicationId === homeApplicationId}>{application.applicantTeamName}</option>)}
               </select>
             </label>
           </div>
-          {requested.length < 2 && <p className="mt-3 text-xs text-[var(--text-muted)]">대기 중인 신청이 두 건 이상 모이면 확정할 수 있어요.</p>}
-          {message && <p role="status" className="mt-3 text-xs text-[var(--text-body)]">{message}</p>}
+          {requested.length < 2 && <p className="mt-3 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">대기 중인 신청이 두 건 이상 모이면 확정할 수 있어요.</p>}
+          {message && <p role="status" className="mt-3 text-[length:var(--font-size-caption)] text-[var(--text-body)]">{message}</p>}
           <button
             type="button"
             disabled={!canAssign || assign.isPending}
             onClick={() => void submitAssignment()}
-            className="mt-4 min-h-[44px] w-full rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-4 min-h-[44px] w-full rounded-xl bg-blue-500 px-4 text-[length:var(--font-size-body-sm)] font-semibold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {assign.isPending ? '두 팀 확정 중…' : '선택한 두 팀 매치 확정'}
           </button>

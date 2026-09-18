@@ -419,6 +419,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       // 않다. 둘 다 재식별 가능한 기기 식별자이므로 계정 삭제 트랜잭션 안에서 제거한다.
       await tx.v1PushSubscription.deleteMany({ where: { userId } });
       await tx.v1PushDevice.deleteMany({ where: { userId } });
+      await tx.v1ChatUserBlock.deleteMany({ where: { OR: [{ blockerUserId: userId }, { blockedUserId: userId }] } });
       await tx.v1UserRegion.deleteMany({ where: { userId } });
       await tx.v1UserSportPreference.deleteMany({ where: { userId } });
       await tx.v1SearchHistory.deleteMany({ where: { userId } });

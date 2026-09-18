@@ -40,3 +40,15 @@ Account-deletion lifecycle implemented by the service:
 Before submission, legal/product must confirm every **Shared** cell (including Play's service-provider
 exemptions), encryption-in-transit answer, retention period, physical-object deletion behavior, processor,
 account-age declaration, and whether any SDK added after this audit introduces another data category.
+
+2026-09-19 readiness delta:
+
+- Chat reports retain a server-owned message snapshot, reporter/target identifiers, reason and operator
+  handling record. Chat blocks store the two user IDs until unblock or final account deletion.
+- Sign-out revokes the server device registration but deliberately retains on-device notification consent
+  and the FCM token for re-login. Explicit opt-out or OS permission withdrawal requests token deletion.
+- Deploy immutable privacy v1.3 (not just the `/terms` page). Confirm the public
+  `/api/v1/terms/current?context=footer` payload selects v1.3 before Play submission.
+- Upload-object removal/retention is not proven by clearing a profile URL. Product/operations must record
+  personal-object ownership, shared-content/legal exceptions, deletion executor and retention period before
+  answering that all uploaded account data is deleted. Do not delete shared team/event files by user ID alone.

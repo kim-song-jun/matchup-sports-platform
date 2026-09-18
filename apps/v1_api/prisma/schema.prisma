@@ -590,6 +590,8 @@ model V1User {
   phoneVerifiedAt  DateTime?          @map("phone_verified_at")
   themePreference  V1ThemePreference  @default(light) @map("theme_preference")
 
+  chatBlocksMade                 V1ChatUserBlock[] @relation("ChatBlockActor")
+  chatBlocksReceived             V1ChatUserBlock[] @relation("ChatBlockTarget")
   authIdentities                 V1AuthIdentity[]
   profile                        V1UserProfile?
   onboardingProgress             V1UserOnboardingProgress?
@@ -3789,4 +3791,15 @@ model V1OperationAudit {
   @@index([teamMatchId, createdAt], map: "v1_operation_audits_team_match_idx")
   @@index([fieldId, createdAt], map: "v1_operation_audits_field_idx")
   @@map("v1_operation_audits")
+}
+
+model V1ChatUserBlock {
+  blockerUserId String @map("blocker_user_id")
+  blockedUserId String @map("blocked_user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  blocker V1User @relation("ChatBlockActor", fields: [blockerUserId], references: [id], onDelete: Cascade)
+  blocked V1User @relation("ChatBlockTarget", fields: [blockedUserId], references: [id], onDelete: Cascade)
+  @@id([blockerUserId, blockedUserId])
+  @@index([blockedUserId])
+  @@map("v1_chat_user_blocks")
 }

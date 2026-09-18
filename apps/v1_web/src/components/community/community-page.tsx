@@ -169,6 +169,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
       </div>
       <div className="tm-chat-room">
         <div className="tm-chat-context">
+          {model.onManageBlocked ? <button type="button" className="tm-btn tm-btn-md tm-btn-ghost" onClick={model.onManageBlocked}>채팅 차단 관리</button> : null}
           {model.teamContact ? (
             <TeamContactStatusCard contact={model.teamContact} />
           ) : (
@@ -239,6 +240,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
                         <div className="tm-text-body">{message.body}</div>
                       </div>
                       {message.who === 'other' && showTime ? <time className="tm-chat-message-time" dateTime={message.sentAt}>{timeLabel}</time> : null}
+                      {message.who === 'other' && model.onMessageSafety ? <button type="button" className="tm-btn tm-btn-icon tm-btn-ghost shrink-0" style={{ minWidth: 44, minHeight: 44 }} aria-label={`${message.label} 메시지 신고·차단`} onClick={() => model.onMessageSafety?.({ id: message.id, label: message.label })}>⋯</button> : null}
                     </div>
                   </div>
                 )}

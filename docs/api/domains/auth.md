@@ -239,3 +239,11 @@ production 환경 dev-login 차단:
 - 소셜 로그인 env가 비어 있는 개발 런타임에서는 provider mock/fallback behavior가 섞일 수 있으므로, production UI copy와 동일하게 취급하지 않는다.
 
 ## Source References
+
+## Android Play readiness — age gate (2026-09-19)
+
+Email registration and social profile completion reject valid calendar birthdays younger than 14 years,
+including future dates, with HTTP 400 `SIGNUP_AGE_RESTRICTED`. Age uses UTC calendar dates and the birthday
+must have occurred. A February 29 birthday reaches the boundary on March 1 in a non-leap year. Invalid
+calendar dates retain the validation error contract. Frontend email/social forms share the same rule;
+client controls do not replace server enforcement. No signup payload fields were added.

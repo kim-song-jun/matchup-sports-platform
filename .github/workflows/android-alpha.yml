@@ -38,6 +38,9 @@ jobs:
           java-version: '17'
 
       - uses: android-actions/setup-android@v3
+        with:
+          # Legacy SDK tools are no longer published; sdkmanager comes from cmdline-tools.
+          packages: platform-tools
 
       - name: Install Android API 36 SDK
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'

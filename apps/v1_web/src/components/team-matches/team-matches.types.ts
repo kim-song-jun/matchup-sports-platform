@@ -130,6 +130,11 @@ export type TeamMatchDetailViewModel = {
     label: string;
     tone?: 'neutral' | 'primary' | 'danger';
     pending?: boolean;
+    confirm?: {
+      title: string;
+      message: string;
+      confirmLabel: string;
+    };
     onClick: () => void | Promise<unknown>;
   }>;
   // Task 17: navigates to /team-matches/:id/result(/approval) — a matched/completed match

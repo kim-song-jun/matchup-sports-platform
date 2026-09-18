@@ -316,7 +316,6 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       applicantTeams: toApplicantTeamsWithActions(
         query.data,
         applications.data,
-        canManageHostTeam ? `/team-matches/${teamMatchId}/edit` : undefined,
         (applicationId) => {
           setActionError(null);
           approveApplication.mutate(
@@ -465,13 +464,18 @@ function countTeamMatchFilters(
 function toApplicantTeamsWithActions(
   match: V1TeamMatch,
   applications: import('@/types/api').V1TeamMatchApplicationsPage | undefined,
-  manageHref: string | undefined,
   onApprove: (applicationId: string) => void,
   onReject: (applicationId: string) => void,
   actionPending: boolean,
 ): TeamMatchDetailViewModel['match']['applicantTeams'] {
   if (match.approvedOpponentTeam) {
-    return [{ name: match.approvedOpponentTeam.name, meta: '승인된 상대팀', status: '승인 완료', href: manageHref, applicationId: match.approvedOpponentTeam.applicationId }];
+    return [{
+      name: match.approvedOpponentTeam.name,
+      meta: '승인된 상대팀',
+      status: '승인 완료',
+      href: `/teams/${match.approvedOpponentTeam.teamId}`,
+      applicationId: match.approvedOpponentTeam.applicationId,
+    }];
   }
 
   if (applications?.items.length) {
@@ -479,7 +483,7 @@ function toApplicantTeamsWithActions(
       name: app.applicantTeam.name,
       meta: `매너 ${app.applicantTeam.score?.toFixed(1) ?? '-'} · ${app.applicantTeam.matchCount}전`,
       status: app.status === 'requested' ? '승인 대기' : app.status === 'approved' ? '승인 완료' : app.status === 'rejected' ? '미승인' : app.status,
-      href: manageHref,
+      href: `/teams/${app.applicantTeam.teamId}`,
       applicationId: app.applicationId,
       actionPending,
       onApprove: app.canApprove ? () => onApprove(app.applicationId) : undefined,
@@ -582,6 +586,11 @@ function buildHostActions({
     label: '팀매치 취소',
     tone: 'danger',
     pending,
+    confirm: {
+      title: '팀매치를 취소할까요?',
+      message: '취소하면 되돌릴 수 없어요. 신청자 전원의 참가가 취소되고 취소 알림이 발송돼요.',
+      confirmLabel: '팀매치 취소',
+    },
     onClick: cancelTeamMatch,
   };
   if (status === 'recruiting') {

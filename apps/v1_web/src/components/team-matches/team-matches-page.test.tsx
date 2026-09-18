@@ -766,6 +766,55 @@ describe('TeamMatchDetailPageView — 히어로 액션', () => {
   });
 });
 
+describe('TeamMatchDetailPageView — 신청팀 후속 행동', () => {
+  it('신청팀 카드에서 실제 상대팀 상세로 이동할 수 있다', () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.match.applicantTeams = [{
+      name: '브라보FC',
+      meta: '매너 4.8 · 12전',
+      status: '승인 대기',
+      href: '/teams/team-bravo',
+      applicationId: 'application-1',
+    }];
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getByRole('link', { name: '브라보FC 팀 보기' })).toHaveAttribute('href', '/teams/team-bravo');
+  });
+
+  it('신청팀이 없으면 빈 카드 대신 현재 상태를 설명한다', () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.match.applicantTeams = [];
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getByText('아직 신청한 팀이 없어요.')).toBeInTheDocument();
+  });
+
+  it('상세의 팀매치 취소는 확인 전에는 실행하지 않는다', async () => {
+    const onCancel = vi.fn();
+    const model = getTeamMatchDetailViewModel('mine');
+    model.hostActions = [{
+      label: '팀매치 취소',
+      tone: 'danger',
+      confirm: {
+        title: '팀매치를 취소할까요?',
+        message: '취소하면 되돌릴 수 없어요.',
+        confirmLabel: '팀매치 취소',
+      },
+      onClick: onCancel,
+    }];
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+    fireEvent.click(screen.getByRole('button', { name: '팀매치 취소' }));
+
+    expect(onCancel).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('dialog', { name: '팀매치를 취소할까요?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: '팀매치 취소' }));
+    await waitFor(() => expect(onCancel).toHaveBeenCalledTimes(1));
+  });
+});
+
 // C2 — 상세 히어로 CTA가 '신청 취소'라고 적어두고 실제로는 다른 팀으로 **새 신청**을 보내던
 // 결함의 화면 쪽 계약. 근거를 하나로 모으는 수정은 team-matches-client.tsx에서 했고, 여기서는
 // ① 실행할 액션이 없으면 버튼이 눌리지 않는다 ② 눌렀을 때의 안내가 실제로 한 일과 일치한다

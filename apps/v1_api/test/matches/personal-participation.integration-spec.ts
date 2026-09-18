@@ -188,6 +188,92 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
       .toBe(absence.status === 201 ? 'cancelled_by_host' : 'approved');
   });
 
+  it('모집 마감·재개·재신청·거절·취소가 실제 상태와 권한을 보존한다', async () => {
+    const id = await createMatch();
+    const applicationId = (await post(member, `/matches/${id}/applications`).expect(201)).body.data.applicationId;
+    await post(outsider, `/matches/${id}/close`).expect(403);
+    await post(host, `/matches/${id}/close`).expect(201);
+    expect(await db.v1MatchApplication.findUnique({ where: { id: applicationId } })).toMatchObject({ status: 'expired' });
+    await post(member, `/matches/${id}/applications`).expect(409);
+    await post(outsider, `/matches/${id}/reopen`).expect(403);
+    await post(host, `/matches/${id}/reopen`).expect(201);
+    await post(host, `/matches/${id}/reopen`).expect(409);
+    await post(member, `/matches/${id}/applications`).expect(201);
+    await post(host, `/match-applications/${applicationId}/reject`, { reason: '일정 불일치' }).expect(201);
+    expect(await db.v1MatchApplication.findUnique({ where: { id: applicationId } })).toMatchObject({ status: 'rejected' });
+    await post(member, `/matches/${id}/applications`).expect(201);
+    await post(member, `/match-applications/${applicationId}/withdraw`).expect(201);
+    await post(host, `/matches/${id}/cancel`).expect(201);
+    await post(host, `/matches/${id}/reopen`).expect(409);
+    await post(member, `/matches/${id}/applications`).expect(409);
+    expect(await db.v1Match.findUnique({ where: { id } })).toMatchObject({ status: 'cancelled' });
+  });
+
+  it('동시 모집 재개와 취소는 취소를 되돌리거나 이중 재개 로그를 만들지 않는다', async () => {
+    const id = await createMatch();
+    await post(host, `/matches/${id}/close`).expect(201);
+    const results = await Promise.all([
+      post(host, `/matches/${id}/reopen`), post(host, `/matches/${id}/reopen`), post(host, `/matches/${id}/cancel`),
+    ]);
+    expect(results[2].status).toBe(201);
+    expect(results.slice(0, 2).filter((r) => r.status === 201).length).toBeLessThanOrEqual(1);
+    for (const result of results) expect([201, 409]).toContain(result.status);
+    expect(await db.v1Match.findUnique({ where: { id } })).toMatchObject({ status: 'cancelled' });
+    expect(await db.v1StatusChangeLog.count({ where: { targetId: id, toStatus: 'recruiting', fromStatus: 'closed' } })).toBeLessThanOrEqual(1);
+  });
+
+  it('수정은 실제 엔티티를 저장하고 같은 버전의 동시 저장 중 하나만 허용한다', async () => {
+    const id = await createMatch();
+    const original = await db.v1Match.findUniqueOrThrow({ where: { id } });
+    await get(outsider, `/matches/${id}/edit`).expect(403);
+    await get(host, `/matches/${id}/edit`).expect(200);
+    const body = {
+      sportId, regionId, title: '수정된 개인 매치', manualPlaceName: '수정 운동장', capacity: 3,
+      startsAt: original.startAt.toISOString(), endsAt: original.endAt?.toISOString(), version: original.updatedAt.toISOString(),
+    };
+    const patch = (user: string, payload = body) => request(app.getHttpServer()).patch(`/api/v1/matches/${id}`).set('x-v1-user-id', user).send(payload);
+    await patch(outsider).expect(403);
+    const results = await Promise.all([patch(host), patch(host, { ...body, title: '다른 수정' })]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+    const winner = results.find((r) => r.status === 200)!;
+    const stored = await db.v1Match.findUniqueOrThrow({ where: { id } });
+    expect(stored.updatedAt.toISOString()).toBe(winner.body.data.version);
+    expect(['수정된 개인 매치', '다른 수정']).toContain(stored.title);
+    expect(stored.placeName).toBe('수정 운동장');
+    await patch(host).expect(409);
+  });
+
+  it('정원 축소와 동시 승인은 초과 정원을 만들지 않는다', async () => {
+    const id = await createMatch();
+    await join(id);
+    const pending = (await post(outsider, `/matches/${id}/applications`).expect(201)).body.data.applicationId;
+    const original = await db.v1Match.findUniqueOrThrow({ where: { id } });
+    const results = await Promise.all([
+      request(app.getHttpServer()).patch(`/api/v1/matches/${id}`).set('x-v1-user-id', host).send({
+        sportId, regionId, title: original.title, manualPlaceName: original.placeName, capacity: 2,
+        startsAt: original.startAt.toISOString(), endsAt: original.endAt?.toISOString(), version: original.updatedAt.toISOString(),
+      }),
+      post(host, `/match-applications/${pending}/approve`),
+    ]);
+    expect(results.filter((r) => r.status >= 200 && r.status < 300)).toHaveLength(1);
+    expect(results.filter((r) => r.status === 409)).toHaveLength(1);
+    const stored = await db.v1Match.findUniqueOrThrow({ where: { id } });
+    const count = await db.v1MatchParticipant.count({ where: { matchId: id, status: 'active' } });
+    expect(count).toBeLessThanOrEqual(stored.maxParticipants);
+  });
+
+  it('시작된 closed 매치는 편집 가능으로 표시하거나 미래 일정으로 되살리지 않는다', async () => {
+    const id = await createMatch();
+    await post(host, `/matches/${id}/close`).expect(201);
+    await end(id);
+    const edit = (await get(host, `/matches/${id}/edit`).expect(200)).body.data;
+    expect(edit.editable).toBe(false);
+    await request(app.getHttpServer()).patch(`/api/v1/matches/${id}`).set('x-v1-user-id', host).send({
+      ...edit.form, version: edit.version,
+      startsAt: new Date(Date.now() + 86400000).toISOString(), endsAt: new Date(Date.now() + 90000000).toISOString(),
+    }).expect(409);
+  });
+
   it('취소된 참가자는 완료해도 참여 횟수에 포함되지 않는다', async () => {
     const id = await createMatch();
     const applicationId = await join(id);

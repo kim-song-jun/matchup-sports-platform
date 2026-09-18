@@ -137,9 +137,47 @@ PR용 대표 증거는 `docs/screenshots/personal-match-participation/`의 모�
 - 이 두 신규 메뉴의 변경 전 전용 캡처는 없다(기존 화면에 기능 자체가 없었음).
   이전 명단 baseline은 앞선 참여 흐름 QA 증거로만 유지하며 신규 메뉴의 before로 오인하지 않는다.
 - 이번 변경은 승인 취소·불참 처리 누락 보완이며 개인 매치 모든 기능에 대한 전수 완료 선언은 아니다.
-  후속 분석 항목: `reopen`의 트랜잭션 밖 상태 판정과 unconditional update 경합은 별도 회귀 검증 필요.
+  당시 후속 항목이었던 `reopen` stale-read 경합은 아래 최종 점검에서 재현·수정했다.
 
 ### 호스트 액션 대표 증거
+
+### 최종 점검 재개
+
+- [x] 모집 재개 stale-read 경합 RED/GREEN 및 실제 DB 검증
+- [x] 개인 매치 17개 계약 코드/테스트 점검표와 채팅/후기 연계 확인 (배포 E2E 완료와 구분)
+- [ ] PR CI와 리뷰 게이트, dev 머지, alpha 배포 검증. alpha 인증 QA는 유효 세션 필요.
+- 이번 구현 범위는 backend/docs 중심이며 기존 A안 UI 디자인은 변경하지 않는다.
+
+재개가 cancelled/completed를 recruiting으로 되돌리는 단위 회귀 2건 RED를 먼저 확인한 뒤,
+매치 행 잠금 + 최신 상태/시간 재검사로 수정했다. 수정 API도 같은 잠금에서 버전과 참가 인원을
+재검사하도록 보완했다. 서비스 단위 34/34, 실DB 기존+추가 13/13 및 시작된 closed 편집 1/1 통과.
+이번 backend `tsc --noEmit` 1회 통과, diff check 통과. 재시작한 QA DB는 검증 후 다시 종료했다.
+DB: `V1Match`/`v1_matches`, `V1MatchParticipant`/`v1_match_participants`,
+`V1StatusChangeLog`/`v1_status_change_logs`; 기존 컬럼 사용, migration 없음.
+
+| # | 계약 | 점검 증거 / 남은 한계 |
+|---|---|---|
+| 1 | 탐색·필터·정렬 | list/query DTO, matches-client/validation 및 이전 Web CI 성공; alpha 재확인 전 |
+| 2 | 상세 CTA·권한 | detail/getViewer/eligibility, 서비스·화면 테스트와 이전 headed 상세 캡처 |
+| 3 | 생성·입력·이미지 | create/DTO/form 계약, 기존 create tests와 실DB 모든 시나리오의 실제 생성; 이번 업로드 E2E 재실행 안 함 |
+| 4 | 수정·실제 엔티티 | 실DB edit 403, 현재 폼 조회, 동시 동일 버전 200/409, 정원 경합 검증 |
+| 5 | 신청 | 실DB requested 생성, 닫힘/취소 후 거절 확인 |
+| 6 | 재신청 | expired/rejected/withdrawn/removed 뒤 신청/승인 실DB 확인 |
+| 7 | 승인·정원 | 실DB active 전환, 정원 축소와 경합 시 초과 인원 없음 |
+| 8 | 거절 | 실DB rejected, 재신청 경로, 상태 로그 코드 확인 |
+| 9 | 대기 신청 철회 | 실DB withdrawn, expected-status 조건 확인 |
+| 10 | 승인 후 본인 취소 | 실DB cancelled/인원/채팅, 이전 headed 철회 확인 |
+| 11 | 호스트 승인 취소 | 실DB removed/권한/감사 로그 + 3폭 메뉴와 실제 처리 |
+| 12 | 불참 | 실DB no_show/완료 경합/후기 차단 + 3폭 메뉴와 실제 처리 |
+| 13 | 모집 마감 | 실DB closed와 requested→expired, 비호스트 403 |
+| 14 | 모집 재개 | stale terminal 상태 회귀 RED→GREEN, 실DB 중복 재개/취소 경합 |
+| 15 | 매치 취소 | 실DB cancelled 및 재개/신청 차단, 서비스 권한 테스트 |
+| 16 | 경기 완료·활동·후기·채팅 | 완료 실DB/재시도/권한 및 이전 headed 완료·채팅·후기 진입 |
+| 17 | 내 매치 이력 | myMatches cursor/관계 조건 및 화면 더 보기 테스트, 이전 headed 51번째 기록 |
+
+코드/계약 점검 17/17이며, 이것을 alpha 전수 E2E 17/17로 해석하지 않는다.
+이번 변경의 잔여 외부 게이트: Copilot 요청 CLI와 정식 GraphQL botLogins API가 모두
+빈 reviewRequests를 반환한다. 리뷰 clean 판정 불가이므로 사용자 확인 없이 dev 머지하지 않는다.
 
 ![모바일 승인 취소 메뉴](../../docs/screenshots/personal-match-participation/host-actions-removed-menu-390.png)
 ![모바일 불참 확인](../../docs/screenshots/personal-match-participation/host-actions-no_show-confirm-390.png)

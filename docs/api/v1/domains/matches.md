@@ -72,6 +72,11 @@
 
 `UpdateMatchDto` adds `version: string`.
 
+Update and reopen lock the match row before validating current state. Updates recheck version and active
+capacity under that lock; concurrent edits with the same version return one success and one 409.
+Capacity reductions serialize with approvals. Started matches, including raw `closed`, are not editable.
+Reopen cannot overwrite concurrent cancellation/completion and duplicate reopen does not duplicate logs.
+
 ## State And Permissions
 
 - Creating a match requires profile `realName`, phone, and gender; missing fields return `422 PROFILE_COMPLETION_REQUIRED`. Application and management endpoints are exempt.

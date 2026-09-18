@@ -383,7 +383,7 @@ export class MatchesService {
     // 거부해 호스트가 일정을 고쳐 탈출할 방법조차 없었다(2026-08-27 감사
     // M-A-personal-match-state). 세 메서드가 같은 만료 판정을 쓰도록 통일한다.
     const editable =
-      (match.status === 'recruiting' || match.status === 'closed') && this.getApiStatus(match) !== 'expired';
+      (match.status === 'recruiting' || match.status === 'closed') && match.startAt > new Date();
 
     return {
       matchId: match.id,
@@ -430,31 +430,36 @@ export class MatchesService {
     const dates = this.validateMatchDates(dto);
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const levelRange = await resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
-    const participantCount = await this.getActiveParticipantCount(match.id);
-
-    if (dto.capacity < participantCount) {
-      throw stateConflict('Capacity cannot be lower than active participants');
-    }
-
-    const updated = await this.prisma.v1Match.update({
-      where: { id: match.id },
-      data: {
-        sportId: dto.sportId,
-        regionId: dto.regionId,
-        title: dto.title,
-        description: dto.description ?? null,
-        imageUrl: dto.imageUrl ?? null,
-        placeName: dto.manualPlaceName,
-        placeAddress: dto.addressText ?? null,
-        startAt: dates.startsAt,
-        endAt: dates.endsAt,
-        deadlineAt: dates.deadlineAt,
-        maxParticipants: dto.capacity,
-        levelNote: dto.rulesText ?? null,
-        minSportLevelId: levelRange.minSportLevelId,
-        maxSportLevelId: levelRange.maxSportLevelId,
-        genderRule: dto.genderRule ?? null,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${match.id} FOR UPDATE`;
+      const current = await tx.v1Match.findFirst({ where: { id: match.id, deletedAt: null } });
+      if (!current || current.hostUserId !== user.id || !['recruiting', 'closed'].includes(current.status) || current.startAt <= new Date()) {
+        throw stateConflict('매치 상태가 바뀌었어요. 다시 확인해 주세요.');
+      }
+      if (current.updatedAt.toISOString() !== dto.version) throw stateConflict('Match version is stale', 'VERSION_CONFLICT');
+      if (dto.capacity < await this.getActiveParticipantCount(match.id, tx)) {
+        throw stateConflict('Capacity cannot be lower than active participants');
+      }
+      return tx.v1Match.update({
+        where: { id: match.id },
+        data: {
+          sportId: dto.sportId,
+          regionId: dto.regionId,
+          title: dto.title,
+          description: dto.description ?? null,
+          imageUrl: dto.imageUrl ?? null,
+          placeName: dto.manualPlaceName,
+          placeAddress: dto.addressText ?? null,
+          startAt: dates.startsAt,
+          endAt: dates.endsAt,
+          deadlineAt: dates.deadlineAt,
+          maxParticipants: dto.capacity,
+          levelNote: dto.rulesText ?? null,
+          minSportLevelId: levelRange.minSportLevelId,
+          maxSportLevelId: levelRange.maxSportLevelId,
+          genderRule: dto.genderRule ?? null,
+        },
+      });
     });
 
     return {
@@ -638,29 +643,32 @@ export class MatchesService {
     this.assertActiveAccount(user);
     const match = await this.getHostMatch(user, matchId);
 
-    if (match.status !== 'closed' && match.status !== 'recruiting') {
-      throw stateConflict('Only closed matches can be reopened');
-    }
-    const now = new Date();
-    if (match.startAt < now) {
-      throw stateConflict('Expired matches cannot be reopened');
-    }
-
-    const deadlinePassed = Boolean(match.deadlineAt && match.deadlineAt < now);
-    if (match.status === 'recruiting' && !deadlinePassed) {
-      throw new ConflictException({
-        code: 'ALREADY_PROCESSED',
-        message: 'Match is already recruiting',
-      });
-    }
-
-    const deadlineAt = resolveReopenDeadline(
-      { deadlineAt: match.deadlineAt, startAt: match.startAt },
-      dto.deadlineAt,
-      now,
-    );
-
     const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${match.id} FOR UPDATE`;
+      const current = await tx.v1Match.findFirst({ where: { id: match.id, deletedAt: null } });
+      if (!current || current.hostUserId !== user.id) throw stateConflict('매치 상태가 바뀌었어요. 다시 확인해 주세요.');
+      if (current.status !== 'closed' && current.status !== 'recruiting') {
+        throw stateConflict('Only closed matches can be reopened');
+      }
+      const now = new Date();
+      if (current.startAt <= now) {
+        throw stateConflict('Expired matches cannot be reopened');
+      }
+
+      const deadlinePassed = Boolean(current.deadlineAt && current.deadlineAt <= now);
+      if (current.status === 'recruiting' && !deadlinePassed) {
+        throw new ConflictException({
+          code: 'ALREADY_PROCESSED',
+          message: 'Match is already recruiting',
+        });
+      }
+
+      const deadlineAt = resolveReopenDeadline(
+        { deadlineAt: current.deadlineAt, startAt: current.startAt },
+        dto.deadlineAt,
+        now,
+      );
+
       const next = await tx.v1Match.update({
         where: { id: match.id },
         data: { status: 'recruiting', deadlineAt },
@@ -669,7 +677,7 @@ export class MatchesService {
         data: {
           targetType: 'match',
           targetId: match.id,
-          fromStatus: match.status,
+          fromStatus: current.status,
           toStatus: 'recruiting',
           actorType: 'user',
           actorUserId: user.id,

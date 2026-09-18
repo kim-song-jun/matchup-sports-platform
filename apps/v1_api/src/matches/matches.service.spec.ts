@@ -598,6 +598,16 @@ describe('MatchesService', () => {
     expect(prisma.v1Match.update).not.toHaveBeenCalled();
   });
 
+  it.each(['cancelled', 'completed'])('reopen: 최초 조회 뒤 %s로 바뀐 매치를 되살리지 않는다', async (status) => {
+    prisma.v1Match.findFirst
+      .mockResolvedValueOnce(matchRow({ status: 'closed' }))
+      .mockResolvedValueOnce(matchRow({ status }));
+    prisma.v1Match.update.mockResolvedValue(matchRow());
+    await expect(service.reopen(host, 'match-1', {})).rejects.toMatchObject({ response: { code: 'STATE_CONFLICT' } });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+  });
+
   it('reopen: 지난 마감 시각을 지워 다시 모집 상태로 만든다 (안 지우면 눌러도 그대로 마감으로 보인다)', async () => {
     prisma.v1Match.findFirst.mockResolvedValue(
       matchRow({ status: 'closed', startAt: FUTURE, deadlineAt: PAST }),

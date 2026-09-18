@@ -80,6 +80,9 @@
 - host만 가능
 - `cancelled`, `completed`, `expired` 상태에서는 수정 불가
 - `capacity`를 현재 참가자 수보다 낮게 수정 불가. `version` 필수.
+- 수정은 매치 행 잠금 후 최신 상태·버전·참가 인원을 재확인한다. 같은 버전의 동시 수정은
+  하나만 저장되며 나머지는 `409 VERSION_CONFLICT`. 승인과 정원 축소가 겹쳐도 정원 초과를 허용하지 않는다.
+- 시작된 매치는 raw status가 `closed`여도 edit 응답 `editable=false`, 저장은 409다.
 - `imageUrl`은 `null` 전달로 제거 가능
 - `minLevelCode`, `maxLevelCode`는 create와 동일 계약이며 미전달 시 레벨 FK를 비운다.
 
@@ -110,6 +113,8 @@
   남겨두면 `getDisplayState` 가 곧바로 다시 `closed` 를 돌려줘 눌러도 아무 변화가 없다.
   `deadlineAt` 을 주면 그 값으로 갱신하며 지금 이후 · 시작 이전이어야 한다(`400 VALIDATION_FAILED`).
   이미 모집 중이면 `409 ALREADY_PROCESSED`, 시작 시각이 지났으면 `409 STATE_CONFLICT`.
+- 재개도 매치 행을 잠근 뒤 최신 상태·시작·마감 시각을 검사한다. 최초 조회 이후 취소/완료된
+  매치를 되살리지 않으며 동시 재개 중 하나만 성공한다. 상태 로그도 잠금 후 상태를 기록한다.
 
 ## POST /matches/:id/complete (host)
 

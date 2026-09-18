@@ -690,3 +690,5 @@ report, upgrade preservation, and the remaining OEM/foldable/multi-window matrix
 - 코드 커밋: `24a323505`. 자동 승인 검토가 GitHub push 및 dev PR 생성을 거부했다. 공개 저장소로 코드를 전송하는 작업의 명시적 사용자 승인이 필요하다는 사유이며, 사용자에게 승인을 요청한 상태다. 원격 변경은 실행되지 않았다.
 - 이벤트 fallback도 실기기 임시 비교에서 64→208.07px(슬롯 208.07px)로 정상화됐다. 임시 CSS를 제거하고 앱을 홈으로 복귀했다.
 - 소유 Next/API 프로세스와 dependency symlink, ADB tcp:9223 포워드를 정리했다. 최신 APK 및 사용자 로그인은 유지하고, 기존 DB/다른 세션 프로세스는 변경하지 않았다.
+
+- 사용자 명시 승인 후 작업 브랜치 push 및 dev 대상 PR [#1226](https://github.com/kim-song-jun/matchup-sports-platform/pull/1226) 생성 완료. base=`dev` 확인. CI/리뷰 및 Alpha 배포 후 검증은 별도 완료 조건이며 현재 미머지다.

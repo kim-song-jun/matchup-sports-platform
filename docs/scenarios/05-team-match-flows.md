@@ -1,3 +1,6 @@
+> 친선 팀매치의 현재 전체 화면 흐름, 화면별 입출력, 공식 기록 반영 규칙과 모바일/데스크톱
+> 스크린샷 32개는 [`friendly-team-match-screen-flow.md`](../qa-screenshots/friendly-team-match-screen-flow.md)를 참고한다.
+
 # Team Match Flow Scenarios
 
 > **Stack scope note (Todo 26 reconciliation, 2026-08-04):** everything from `## Scenario Checklist` through `## Notes` below describes the **legacy** `apps/api` (port 8111) / `apps/web` (port 3003) stack. Its routes (`POST /team-matches/:id/result`, `POST /team-matches/:id/check-in`, `POST /team-matches/:id/evaluate`, `GET /team-matches/:id/referee-schedule`) still exist verbatim in `apps/api/src/team-matches/team-matches.controller.ts` — none of this is false, it just documents a different, older team-match implementation than the one Tasks 12-24 shipped. The **v1 team-match implementation is a full rewrite** with a different controller, different route shapes, a versioned `Game`/`GameResultRevision` result model, and no `check-in`/`evaluate`/`referee-schedule` routes at all. See `## v1 stack (Tasks 12-24)` immediately below for the current, verified v1 surface and the two Todo-26 E2E scenario IDs this domain owns.
@@ -25,6 +28,8 @@ v1 team-match lives in `apps/v1_api/src/team-matches/team-matches.controller.ts`
 There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this controller — the legacy section below's `TM-004` "도착 인증 / 경기 후 평가" scenario has no v1 equivalent today; it is not implemented, not merely undocumented.
 
 **Result entry is a Game aggregate concern, not a `team-matches` route at all.** Per `docs/api/domains/games.md` (Task 16), a team match's result is drafted and submitted through `POST /games/:gameId/result-revisions` and `POST /games/:gameId/result-revisions/:revisionId/submit` (host team owner/manager only), and decided by the opposing team through `POST /games/:gameId/result-revisions/:revisionId/decision` (`approve`/`change_request`). The old `POST /api/v1/team-matches/:teamMatchId/complete` shortcut this replaced no longer exists (Task 16 removed it — see `games.md`'s route table). Web screens: `apps/v1_web/src/app/team-matches/[id]/result/page.tsx` (host draft/submit) and `apps/v1_web/src/app/team-matches/[id]/result/approval/page.tsx` (opponent decision) — these call the Game result-revision routes above, not a `team-matches`-namespaced result route.
+
+**Friendly player records (Task 159):** the host result screen submits detailed statistics for its own visible lineup. The API then merges the latest valid lineup for both HOME and AWAY before freezing the revision. Missing opponent rows receive zero counting stats but keep their side and identity link, so approval makes both teams' lineup participants eligible for appearance and win/draw/loss records. Team facts remain the existing two-sided official-result projection.
 
 ### Todo 26 E2E scenario ledger for this domain
 

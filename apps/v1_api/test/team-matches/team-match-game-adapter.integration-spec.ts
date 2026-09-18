@@ -479,14 +479,6 @@ describe('Task 6 L2 team-match Game adapter', () => {
             cards: { yellow: 0, red: 0 },
             goalkeeper: false,
           },
-          {
-            participantId: opponentParticipant?.id ?? '',
-            sideId: awaySide?.id ?? '',
-            started: true,
-            goals: 0,
-            cards: { yellow: 0, red: 0 },
-            goalkeeper: true,
-          },
         ],
         eventsHash: 'task6-l2-one-goal',
       },
@@ -498,19 +490,56 @@ describe('Task 6 L2 team-match Game adapter', () => {
       'team-result-submit',
       { expectedVersion: 2, clientCommandId: 'team-result-submit' },
     );
+    const decided = await games.decideResultRevision(
+      authUser(ids.opponentUser),
+      game.id,
+      draft.revisionId,
+      'team-result-approve',
+      {
+        expectedVersion: submitted.version,
+        clientCommandId: 'team-result-approve',
+        decision: 'approve',
+      },
+    );
     const ended = await prisma.v1Game.findUniqueOrThrow({ where: { id: game.id } });
-    const frozen = await prisma.v1GameResultRevision.findUniqueOrThrow({
+    const official = await prisma.v1GameResultRevision.findUniqueOrThrow({
       where: { id: draft.revisionId },
       include: { resultParticipants: true },
     });
 
     expect(submitted.state).toBe(V1GameState.ENDED);
+    expect(decided.revisionState).toBe('OFFICIAL');
     expect(ended.state).toBe(V1GameState.ENDED);
-    expect(frozen.state).toBe('SUBMITTED');
-    expect(frozen.resultParticipants).toHaveLength(2);
+    expect(ended.currentOfficialRevisionId).toBe(draft.revisionId);
+    expect(official.state).toBe('OFFICIAL');
+    expect(official.resultParticipants).toHaveLength(2);
+    expect(official.resultParticipants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          participantId: hostParticipant?.id,
+          sideId: homeSide?.id,
+          goals: 1,
+          goalkeeper: false,
+        }),
+        expect.objectContaining({
+          participantId: opponentParticipant?.id,
+          sideId: awaySide?.id,
+          goals: 0,
+          assists: 0,
+          fouls: 0,
+          cards: { yellow: 0, red: 0 },
+          goalkeeper: false,
+        }),
+      ]),
+    );
+    await expect(
+      prisma.v1ParticipantIdentityLinkCurrent.findUniqueOrThrow({
+        where: { participantId: opponentParticipant?.id },
+      }),
+    ).resolves.toMatchObject({ userId: ids.opponentUser });
     const terminalMutation = await captureFailure(() =>
       prisma.v1GameResultRevision.update({
-        where: { id: frozen.id },
+        where: { id: official.id },
         data: { score: { home: 9, away: 9 } },
       }),
     );

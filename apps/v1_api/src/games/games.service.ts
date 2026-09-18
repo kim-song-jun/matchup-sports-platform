@@ -95,6 +95,9 @@ import {
   validateSubstitution,
   type PublicParticipantProjection,
 } from './core';
+import {
+  hydrateFriendlyTeamMatchResultParticipants as mergeFriendlyTeamMatchResultParticipants,
+} from './core/friendly-team-match-result-participants';
 import type {
   GameActorScope,
   GameCommandContext,
@@ -121,6 +124,7 @@ import type {
 import type {
   CreateGameResultRevisionDto,
   DecideGameResultRevisionDto,
+  GameResultParticipantDto,
   GameResultRecoveryDto,
   SubmitGameResultRevisionDto,
   VoidTeamMatchResultDto,
@@ -4035,6 +4039,8 @@ export class GamesService {
         message: 'Tournament result revisions are derived by the end command',
       });
     }
+    const isFriendlyTeamMatch =
+      (await this.resolveTeamMatchCompetitionContext(this.prisma, source.teamMatchId)) === null;
     return this.withCommand(
       {
         gameId,
@@ -4047,7 +4053,19 @@ export class GamesService {
       },
       async (tx, game, context) => {
         await this.assertTeamMatchMatched(tx, game.teamMatchId);
-        const invariant = await this.resultInvariantInput(tx, game, dto);
+        // 친선 팀매치는 양 팀이 서로 다른 화면에서 명단을 관리하지만 결과 초안은
+        // 호스트만 만든다. 클라이언트가 자기 팀 선수만 보내더라도 상대팀의 출전·승패
+        // 기록이 사라지지 않도록, 사이드별 최신 유효 명단을 결과 참가자에 합친다.
+        // 클라이언트가 보낸 득점·카드 등은 그대로 우선하고 누락 행만 0스탯으로 채운다.
+        const actualParticipants = isFriendlyTeamMatch
+          ? await this.hydrateFriendlyTeamMatchResultParticipants(
+              tx,
+              gameId,
+              dto.actualParticipants,
+            )
+          : dto.actualParticipants;
+        const normalizedDto = { ...dto, actualParticipants };
+        const invariant = await this.resultInvariantInput(tx, game, normalizedDto);
         try {
           validateGameResultInvariants(invariant);
         } catch (error) {
@@ -4096,7 +4114,7 @@ export class GamesService {
           },
         });
         await tx.v1GameResultParticipant.createMany({
-          data: dto.actualParticipants.map((participant) => ({
+          data: actualParticipants.map((participant) => ({
             resultRevisionId: revision.id,
             participantId: participant.participantId,
             sideId: participant.sideId,
@@ -6796,6 +6814,41 @@ export class GamesService {
       missingScorer,
       ...(dto.mvpParticipantId === undefined ? {} : { mvpParticipantId: dto.mvpParticipantId }),
     };
+  }
+
+  /**
+   * 친선 팀매치 결과에 양 팀의 최신 명단을 빠짐없이 고정한다.
+   *
+   * v1의 현재 명단 계약은 "명단 = 출전자"다. 결과 입력 권한은 호스트에만 있고
+   * `GET /team-matches/:id/lineup`도 자기 팀만 반환하므로, 화면 payload만 신뢰하면
+   * 원정팀은 신원 연결이 있어도 `V1GameResultParticipant`가 0행이 되어 개인 기록이
+   * 영구히 남지 않는다. 대회/리그 결과는 이 메서드를 호출하는 경로에 들어오기 전에
+   * 거부되므로 기존 파생 결과 계약에는 영향을 주지 않는다.
+   *
+   * 제출본이 있으면 그 최신 제출본을, 없으면 최신 DRAFT 스냅샷을 쓰는 선택 규칙은
+   * 라이브/리그 결과 파생과 동일한 공용 셀렉터를 재사용한다. 정정 요청으로 열린 최신
+   * DRAFT가 이미 제출된 직전 명단을 덮어쓰지 않는 보호도 그 셀렉터가 담당한다.
+   */
+  private async hydrateFriendlyTeamMatchResultParticipants(
+    tx: Transaction,
+    gameId: string,
+    submitted: readonly GameResultParticipantDto[],
+  ): Promise<GameResultParticipantDto[]> {
+    const [participantCandidates, lineups] = await Promise.all([
+      tx.v1GameParticipant.findMany({
+        where: { gameId },
+        select: { id: true, sideId: true, lineupId: true, position: true },
+      }),
+      tx.v1GameLineup.findMany({
+        where: { gameId, invalidatedAt: null },
+        select: { id: true, sideId: true, revision: true, state: true },
+      }),
+    ]);
+    return mergeFriendlyTeamMatchResultParticipants(
+      submitted,
+      participantCandidates,
+      lineups,
+    );
   }
 
   private async nextGameRevisionNumber(tx: Transaction, gameId: string): Promise<number> {

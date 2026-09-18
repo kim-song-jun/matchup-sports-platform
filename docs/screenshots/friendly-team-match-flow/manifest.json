@@ -1,0 +1,370 @@
+[
+  {
+    "slug": "list",
+    "title": "팀매치 탐색",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [
+      "Cannot update a component (`%s`) while rendering a different component (`%s`). To locate the bad setState() call inside `%s`, follow the stack trace as described in https://react.dev/link/setstate-in-render AppShellFrame TeamMatchListPageView TeamMatchListPageView"
+    ],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/list/mobile.png"
+  },
+  {
+    "slug": "list",
+    "title": "팀매치 탐색",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [
+      "Cannot update a component (`%s`) while rendering a different component (`%s`). To locate the bad setState() call inside `%s`, follow the stack trace as described in https://react.dev/link/setstate-in-render AppShellFrame TeamMatchListPageView TeamMatchListPageView"
+    ],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/list/desktop.png"
+  },
+  {
+    "slug": "create-team",
+    "title": "팀 선택",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/new/team",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/create-team/mobile.png"
+  },
+  {
+    "slug": "create-team",
+    "title": "팀 선택",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/new/team",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/create-team/desktop.png"
+  },
+  {
+    "slug": "create-sport",
+    "title": "종목 확인",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/new/sport",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/create-sport/mobile.png"
+  },
+  {
+    "slug": "create-sport",
+    "title": "종목 확인",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/new/sport",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/create-sport/desktop.png"
+  },
+  {
+    "slug": "create-info",
+    "title": "매치 정보 입력",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/new/info",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/create-info/mobile.png"
+  },
+  {
+    "slug": "create-info",
+    "title": "매치 정보 입력",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/new/info",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/create-info/desktop.png"
+  },
+  {
+    "slug": "create-condition",
+    "title": "경기 조건 입력",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/new/condition",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/create-condition/mobile.png"
+  },
+  {
+    "slug": "create-condition",
+    "title": "경기 조건 입력",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/new/condition",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/create-condition/desktop.png"
+  },
+  {
+    "slug": "create-place-time",
+    "title": "장소·시간 입력",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/new/place-time",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/create-place-time/mobile.png"
+  },
+  {
+    "slug": "create-place-time",
+    "title": "장소·시간 입력",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/new/place-time",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/create-place-time/desktop.png"
+  },
+  {
+    "slug": "create-confirm",
+    "title": "입력 내용 확인",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/new/confirm",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/create-confirm/mobile.png"
+  },
+  {
+    "slug": "create-confirm",
+    "title": "입력 내용 확인",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/new/confirm",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/create-confirm/desktop.png"
+  },
+  {
+    "slug": "host-detail",
+    "title": "호스트 상세·신청팀 관리",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 409 (Conflict)"
+    ],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/host-detail/mobile.png"
+  },
+  {
+    "slug": "host-detail",
+    "title": "호스트 상세·신청팀 관리",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 409 (Conflict)"
+    ],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/host-detail/desktop.png"
+  },
+  {
+    "slug": "edit",
+    "title": "팀매치 수정",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/edit",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/edit/mobile.png"
+  },
+  {
+    "slug": "edit",
+    "title": "팀매치 수정",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/edit",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/edit/desktop.png"
+  },
+  {
+    "slug": "matched-detail",
+    "title": "매칭 완료 상세",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/matched-detail/mobile.png"
+  },
+  {
+    "slug": "matched-detail",
+    "title": "매칭 완료 상세",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/matched-detail/desktop.png"
+  },
+  {
+    "slug": "lineup",
+    "title": "출전 명단",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/lineup",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/lineup/mobile.png"
+  },
+  {
+    "slug": "lineup",
+    "title": "출전 명단",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/lineup",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/lineup/desktop.png"
+  },
+  {
+    "slug": "result-entry",
+    "title": "경기 결과 입력",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/result",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/result-entry/mobile.png"
+  },
+  {
+    "slug": "result-entry",
+    "title": "경기 결과 입력",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/result",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/result-entry/desktop.png"
+  },
+  {
+    "slug": "result-approval",
+    "title": "상대팀 결과 승인",
+    "actor": "owner@teameet.v1",
+    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/result/approval",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/result-approval/mobile.png"
+  },
+  {
+    "slug": "result-approval",
+    "title": "상대팀 결과 승인",
+    "actor": "owner@teameet.v1",
+    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/result/approval",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/result-approval/desktop.png"
+  },
+  {
+    "slug": "official-result",
+    "title": "공식 결과",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/result",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/official-result/mobile.png"
+  },
+  {
+    "slug": "official-result",
+    "title": "공식 결과",
+    "actor": "host@teameet.v1",
+    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/result",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/official-result/desktop.png"
+  },
+  {
+    "slug": "team-records",
+    "title": "팀 친선 전적",
+    "actor": "host@teameet.v1",
+    "path": "/teams/00000000-0000-4000-8000-000000000102/records",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [
+      "Cannot update a component (`%s`) while rendering a different component (`%s`). To locate the bad setState() call inside `%s`, follow the stack trace as described in https://react.dev/link/setstate-in-render AppShellFrame TeamRecordsPageClient TeamRecordsPageClient"
+    ],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/team-records/mobile.png"
+  },
+  {
+    "slug": "team-records",
+    "title": "팀 친선 전적",
+    "actor": "host@teameet.v1",
+    "path": "/teams/00000000-0000-4000-8000-000000000102/records",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [
+      "Cannot update a component (`%s`) while rendering a different component (`%s`). To locate the bad setState() call inside `%s`, follow the stack trace as described in https://react.dev/link/setstate-in-render AppShellFrame TeamRecordsPageClient TeamRecordsPageClient"
+    ],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/team-records/desktop.png"
+  },
+  {
+    "slug": "user-records",
+    "title": "사용자 친선 기록",
+    "actor": "host@teameet.v1",
+    "path": "/users/74410f0d-39c2-4c92-b5f1-aed15260947f/records",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [
+      "Cannot update a component (`%s`) while rendering a different component (`%s`). To locate the bad setState() call inside `%s`, follow the stack trace as described in https://react.dev/link/setstate-in-render AppShellFrame UserRecordsPageClient UserRecordsPageClient"
+    ],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/user-records/mobile.png"
+  },
+  {
+    "slug": "user-records",
+    "title": "사용자 친선 기록",
+    "actor": "host@teameet.v1",
+    "path": "/users/74410f0d-39c2-4c92-b5f1-aed15260947f/records",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [
+      "Cannot update a component (`%s`) while rendering a different component (`%s`). To locate the bad setState() call inside `%s`, follow the stack trace as described in https://react.dev/link/setstate-in-render AppShellFrame UserRecordsPageClient UserRecordsPageClient"
+    ],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/user-records/desktop.png"
+  }
+]

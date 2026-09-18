@@ -121,6 +121,7 @@ describe('MatchesService', () => {
       findMany: jest.Mock;
       count: jest.Mock;
       create: jest.Mock;
+      update: jest.Mock;
       updateMany: jest.Mock;
       upsert: jest.Mock;
     };
@@ -138,21 +139,22 @@ describe('MatchesService', () => {
       v1User: { findUnique: jest.fn().mockResolvedValue({ phone: '01012345678', profile: { realName: '호스트 실명', gender: 'male' } }) },
       v1Match: {
         findFirst: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
         update: jest.fn(),
       },
       v1MatchApplication: {
         findFirst: jest.fn(),
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         create: jest.fn(),
         update: jest.fn(),
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       v1MatchParticipant: {
         findMany: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
         create: jest.fn(),
+        update: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         upsert: jest.fn(),
       },
@@ -229,6 +231,61 @@ describe('MatchesService', () => {
   });
 
   // ─── 1. 비-호스트 취소 → 403 ──────────────────────────────────────────────
+
+  it('complete: 호스트가 모든 활성 참가자의 참여 여부를 확정하면 매치와 참가자 기록을 함께 완료한다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({
+      startAt: PAST,
+      participants: [
+        { id: 'host-participant', userId: host.id, role: 'host', status: 'active' },
+        { id: 'guest-participant', userId: otherUser.id, role: 'participant', status: 'active' },
+      ],
+    }));
+    prisma.v1Match.update.mockResolvedValue(matchRow({ status: 'completed', completedAt: new Date() }));
+    prisma.v1MatchParticipant.update.mockResolvedValue({});
+    prisma.v1MatchApplication.findMany.mockResolvedValue([{ applicantUserId: 'waiting-user' }]);
+    prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await service.complete(host, 'match-1', {
+      participants: [{ participantId: 'guest-participant', status: 'completed' }],
+    });
+
+    expect(result).toMatchObject({
+      matchId: 'match-1',
+      status: 'completed',
+      completedParticipants: 2,
+      noShowParticipants: 0,
+      expiredApplications: 1,
+    });
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'match-1' },
+      data: expect.objectContaining({ status: 'completed', completedAt: expect.any(Date) }),
+    }));
+    expect(prisma.v1MatchParticipant.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'guest-participant' },
+      data: expect.objectContaining({ status: 'completed', completedAt: expect.any(Date) }),
+    }));
+    expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(
+      [otherUser.id],
+      'match_completed',
+      'match-1',
+      expect.any(String),
+    );
+  });
+
+  it('complete: 활성 참가자를 빠뜨리면 완료하지 않는다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({
+      startAt: PAST,
+      participants: [
+        { id: 'host-participant', userId: host.id, role: 'host', status: 'active' },
+        { id: 'guest-participant', userId: otherUser.id, role: 'participant', status: 'active' },
+      ],
+    }));
+
+    await expect(service.complete(host, 'match-1', { participants: [] })).rejects.toMatchObject({
+      response: { code: 'VALIDATION_FAILED' },
+    });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
 
   it('cancel: 호스트가 아닌 사용자가 취소하면 403 PERMISSION_DENIED를 던진다', async () => {
     // getHostMatch 내부 v1Match.findFirst → 매치 존재, but hostUserId != otherUser.id

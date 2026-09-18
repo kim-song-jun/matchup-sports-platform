@@ -1,8 +1,20 @@
 # Task 13: match lifecycle completion
 
-**Status**: In Progress
+**Status**: Completed (2026-09-18; Progress Snapshot supersedes the legacy checklist below)
 **Owner**: Planning team -> backend-dev / frontend-dev
 **Created**: 2026-04-08
+
+## Progress Snapshot — 2026-09-18
+
+- [x] 신청 메시지 → 호스트 승인/거절 → 승인 후 채팅을 실제 API에 연결했다.
+- [x] 경기 후 참가자별 `completed` 또는 `no_show`를 확정한다.
+- [x] 개인 점수·승패는 만들지 않고 참여 완료/불참만 남긴다.
+- [x] 완료 상태를 상세, 내 매치, 리뷰 진입에 반영했다.
+- [x] 완료 뒤에도 호스트/참가자의 매치 채팅 entitlement를 유지한다.
+- [x] 관리자 직접 완료는 차단하고 현장 호스트 확인을 source of truth로 고정했다.
+- [x] 390/768/1440에서 27상태, 총 81장과 manifest를 남겼다.
+
+Acceptance: 81/81 screenshots, console/pageerror/HTTP 5xx 0건. Evidence: `docs/visual-qa/individual-friendly-match-lifecycle-20260918/README.md`
 
 ## Context
 

@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   useV1ApproveMatchApplication,
   useV1ChangeMatchParticipant,
+  useV1CompleteMatch,
   useV1Match,
   useV1MatchApplicationEligibility,
   useV1MatchApplicationsInfinite,
@@ -17,6 +18,8 @@ import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { extractErrorMessage } from '@/lib/error-message';
 import { cssUrl } from '@/lib/assets';
 import type { V1MatchApplication } from '@/types/api';
+
+type Attendance = Record<string, 'completed' | 'no_show'>;
 
 export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
   const router = useRouter();
@@ -36,7 +39,9 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
   const approveApplication = useV1ApproveMatchApplication(matchId);
   const rejectApplication = useV1RejectMatchApplication(matchId);
   const changeParticipant = useV1ChangeMatchParticipant();
+  const completeMatch = useV1CompleteMatch(matchId);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [attendance, setAttendance] = useState<Attendance>({});
   const { confirm, ConfirmModal } = useConfirm();
 
   // Non-host redirect: once viewer state is resolved, push to detail
@@ -46,6 +51,27 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
       router.replace(`/matches/${matchId}`);
     }
   }, [matchQuery.data, matchQuery.isPlaceholderData, matchQuery.isError, isHost, matchId, router]);
+
+  const items = useMemo(
+    () => applicationsQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [applicationsQuery.data],
+  );
+  const active = useMemo(
+    () => items.filter((item) => item.status === 'approved' && item.participantStatus === 'active'),
+    [items],
+  );
+
+  useEffect(() => {
+    setAttendance((current) => {
+      const next = { ...current };
+      for (const application of active) {
+        if (application.participantId && !next[application.participantId]) {
+          next[application.participantId] = 'completed';
+        }
+      }
+      return next;
+    });
+  }, [active]);
 
   if (matchQuery.isError) {
     return (
@@ -80,9 +106,9 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
     typeof match.participantCount === 'number' && typeof match.capacity === 'number'
       ? `${match.participantCount}/${match.capacity}명`
       : null;
-  const items = applicationsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const pendingCount = items.filter((a) => a.status === 'requested').length;
-  const actionPending = approveApplication.isPending || rejectApplication.isPending || changeParticipant.isPending;
+  const canComplete = match.canComplete === true;
+  const actionPending = approveApplication.isPending || rejectApplication.isPending || changeParticipant.isPending || completeMatch.isPending;
   const eligibilityData = eligibility.data;
 
   async function handleApprove(application: V1MatchApplication) {
@@ -137,6 +163,28 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
     changeParticipant.mutate({ participantId: application.participantId, action, reason: reason.trim() }, {
       onError: (err) => setActionError(extractErrorMessage(err, `${label}하지 못했어요. 상태를 확인하고 다시 시도해 주세요.`)),
     });
+  }
+
+  async function handleComplete() {
+    const ok = await confirm({
+      title: '경기 참여를 확정할까요?',
+      message: '참여 완료와 불참 기록이 저장되고 매치가 완료돼요. 완료 후에는 수정할 수 없어요.',
+      confirmLabel: '완료 확정',
+    });
+    if (!ok) return;
+    setActionError(null);
+    completeMatch.mutate(
+      {
+        participants: active.flatMap((application) => application.participantId
+          ? [{ participantId: application.participantId, status: attendance[application.participantId] ?? 'completed' }]
+          : []),
+        reason: 'host_confirmed_attendance_from_v1_web',
+      },
+      {
+        onSuccess: () => router.push(`/matches/${matchId}`),
+        onError: (error) => setActionError(extractErrorMessage(error, '경기 완료를 확정하지 못했어요.')),
+      },
+    );
   }
 
   return (
@@ -202,7 +250,25 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
                 onApprove={() => handleApprove(application)}
                 onReject={() => handleReject(application)}
                 onChangeParticipant={(reason) => handleChangeParticipant(application, reason)}
-              />
+              >
+                {tab === 'approved' && canComplete && application.participantStatus === 'active' && application.participantId ? (
+                  <label className="tm-text-caption" style={{ display: 'grid', gap: 6, marginTop: 12 }}>
+                    참여 여부
+                    <select
+                      className="tm-input"
+                      aria-label={`${application.displayName} 참여 여부`}
+                      value={attendance[application.participantId] ?? 'completed'}
+                      onChange={(event) => setAttendance((current) => ({
+                        ...current,
+                        [application.participantId!]: event.target.value as 'completed' | 'no_show',
+                      }))}
+                    >
+                      <option value="completed">참여 완료</option>
+                      <option value="no_show">불참</option>
+                    </select>
+                  </label>
+                ) : null}
+              </ApplicationRow>
             ))}
             {applicationsQuery.hasNextPage ? (
               <button
@@ -213,6 +279,21 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
                 onClick={() => applicationsQuery.fetchNextPage()}
               >
                 {applicationsQuery.isFetchingNextPage ? '불러오는 중…' : '더 보기'}
+              </button>
+            ) : null}
+            {tab === 'approved' && canComplete ? (
+              <button
+                className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+                type="button"
+                style={{ marginTop: 12 }}
+                disabled={actionPending || Boolean(applicationsQuery.hasNextPage)}
+                onClick={handleComplete}
+              >
+                {applicationsQuery.hasNextPage
+                  ? '확정 명단을 모두 불러와 주세요'
+                  : completeMatch.isPending
+                    ? '완료 처리 중…'
+                    : '참여 여부 확인하고 경기 완료'}
               </button>
             ) : null}
           </div>
@@ -245,12 +326,14 @@ function ApplicationRow({
   onApprove,
   onReject,
   onChangeParticipant,
+  children,
 }: {
   application: V1MatchApplication;
   actionPending: boolean;
   onApprove: () => void;
   onReject: () => void;
   onChangeParticipant: (reason: string) => void;
+  children?: React.ReactNode;
 }) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const [reason, setReason] = useState('');
@@ -347,6 +430,8 @@ function ApplicationRow({
           {statusLabel}
         </span>
       </div>
+
+      {children}
 
       {/* 승인/거절 버튼 — requested(대기중) 상태일 때만 */}
       {isPending || canChangeParticipant ? (

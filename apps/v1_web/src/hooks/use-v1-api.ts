@@ -98,6 +98,8 @@ import type {
   V1MasterRegionsResponse,
   V1MasterSportsResponse,
   V1Match,
+  V1MatchCompletionPayload,
+  V1MatchCompletionResult,
   V1MatchApplicationEligibility,
   V1MatchApplicationsPage,
   V1MatchApplicationResult,
@@ -658,14 +660,6 @@ export function useV1MyMatchesInfinite(mode: 'joined' | 'created') {
   });
 }
 
-export function useV1CompleteMatch(matchId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: () => v1Post<{ matchId: string; status: 'completed' }>(`/matches/${matchId}/complete`, {}),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.all }),
-  });
-}
-
 export function useV1Match(matchId: string, options?: { seed?: V1Match | null }) {
   const queryClient = useQueryClient();
   const seed = options?.seed;
@@ -770,6 +764,19 @@ export function useV1CloseMatch(matchId: string) {
     mutationFn: (body?: { reason?: string | null }) =>
       v1Post<{ matchId: string; status: string; expiredApplications: number; detailRoute: string }>(`/matches/${matchId}/close`, body ?? {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.all }),
+  });
+}
+
+export function useV1CompleteMatch(matchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1MatchCompletionPayload) =>
+      v1Post<V1MatchCompletionResult>(`/matches/${matchId}/complete`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.match(matchId), 'applications'] });
+    },
   });
 }
 

@@ -1,3 +1,5 @@
+import type { V1MatchApiStatus } from '@/types/api';
+
 export type MatchCardModel = {
   id: string;
   title: string;
@@ -91,6 +93,7 @@ export type MatchDetailViewModel = {
   canComplete?: boolean;
   withdrawApplicationId?: string | null;
   match: MatchCardModel & {
+    lifecycleStatus?: V1MatchApiStatus;
     description: string;
     address: string;
     rules: string[];

@@ -499,6 +499,24 @@ describe('ChatService', () => {
 
     const first = await service.resolve(userA, { targetType: 'match', targetId: 'match-1' });
     expect(first).toMatchObject({ roomId: 'room-new', roomType: 'match', created: true, route: '/chat/room-new' });
+    expect(prisma.v1MatchParticipant.findFirst).toHaveBeenCalledWith({
+      where: {
+        matchId: 'match-1',
+        userId: userA.id,
+        status: { in: ['active', 'completed'] },
+        match: { deletedAt: null },
+      },
+      select: { id: true },
+    });
+    expect(prisma.v1MatchParticipant.findFirst).toHaveBeenCalledWith({
+      where: {
+        matchId: 'match-1',
+        userId: userA.id,
+        status: { in: ['active', 'completed'] },
+        match: { deletedAt: null },
+      },
+      select: { id: true },
+    });
 
     // Second call: room already exists → return existing, created=false
     prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(newRoom);

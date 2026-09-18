@@ -468,6 +468,12 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
 
   async changeMatchStatus(user: V1AuthUser, matchId: string, dto: ChangeMatchStatusDto) {
     const admin = await this.getMutationAdmin(user.id);
+    if (dto.status === 'completed') {
+      throw new ConflictException({
+        code: 'MATCH_COMPLETION_ADMIN_FORBIDDEN',
+        message: '개인 매치 완료는 호스트의 참가 여부 확인 절차를 통해서만 처리할 수 있어요.',
+      });
+    }
     return this.prisma.$transaction(async (tx) => {
       // 로그의 "이전 상태"는 바꾸기 직전 값이어야 한다. 트랜잭션 밖에서 읽으면 그 사이에
       // 다른 조작이 커밋됐을 때 실제와 다른 값이 감사 로그에 남는다 — changeUserStatus 는

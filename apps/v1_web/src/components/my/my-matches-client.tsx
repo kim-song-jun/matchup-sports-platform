@@ -37,7 +37,7 @@ function toMyMatch(match: V1Match): MyMatch {
     title: match.title,
     meta: `${formatDateTime(match.startsAt)} · ${match.place?.name ?? match.placeName ?? '장소 미정'}`,
     status,
-    statusLabel: statusLabel(status),
+    statusLabel: statusLabel(status, match),
     note: buildNote(match, status),
     href: `/matches/${id}`,
     reviewHref: canReview ? `/my/reviews/match/${id}` : undefined,
@@ -48,7 +48,7 @@ function buildSummary(mode: 'joined' | 'created', matches: MyMatch[]) {
   return [
     { label: '전체', value: matches.length, unit: '건' },
     { label: mode === 'joined' ? '승인 대기' : '모집 중', value: matches.filter((item) => item.status === 'pending' || item.status === 'recruiting').length, unit: '건' },
-    { label: '확정', value: matches.filter((item) => item.status === 'approved').length, unit: '건' },
+    { label: mode === 'joined' ? '참가 확정' : '완료', value: matches.filter((item) => item.status === 'approved' || item.statusLabel === '참여 완료').length, unit: '건' },
   ];
 }
 
@@ -66,10 +66,13 @@ function toMyStatus(match: V1Match): MyMatchStatus {
 }
 
 function isReviewableMatch(match: V1Match) {
-  return (match.displayState ?? match.status) === 'completed';
+  return (match.displayState ?? match.status) === 'completed' && match.viewer?.participantStatus !== 'no_show';
 }
 
-function statusLabel(status: MyMatchStatus) {
+function statusLabel(status: MyMatchStatus, match: V1Match) {
+  if ((match.displayState ?? match.status) === 'completed') {
+    return match.viewer?.participantStatus === 'no_show' ? '불참' : '참여 완료';
+  }
   if (status === 'pending') return '승인 대기';
   if (status === 'approved') return '승인 완료';
   if (status === 'ended') return '종료';
@@ -77,9 +80,10 @@ function statusLabel(status: MyMatchStatus) {
 }
 
 function buildNote(match: V1Match, status: MyMatchStatus) {
+  if ((match.displayState ?? match.status) === 'completed' && match.viewer?.participantStatus === 'no_show') return '불참으로 확인된 경기예요. 개인 경기 점수는 기록되지 않아요.';
   if (status === 'pending') return '호스트가 신청을 검토 중이에요.';
   if (status === 'approved') return '참가가 확정됐어요. 장소와 시간을 확인해 보세요.';
-  if (status === 'ended' && isReviewableMatch(match)) return '상대 평가와 리뷰를 남길 수 있어요.';
+  if (status === 'ended' && isReviewableMatch(match)) return '참여한 경기로 기록됐어요. 함께한 참가자에게 후기를 남길 수 있어요.';
   if (status === 'ended') return '경기가 종료됐거나 모집이 마감된 상태예요.';
   return `${match.participantCount ?? 0}/${match.capacity ?? 0}명이 참가 확정했어요.`;
 }

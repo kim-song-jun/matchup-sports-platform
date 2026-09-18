@@ -248,18 +248,14 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
   const eligibility = useV1MatchApplicationEligibility(matchId, { enabled: Boolean(query.data) });
   const viewerState = query.data ? getViewerState(query.data, eligibility.data?.viewerState) : 'none';
   const applyMatch = useV1ApplyMatch(matchId);
+  const [applyDialogOpen, setApplyDialogOpen] = useState(false);
+  const [applyMessage, setApplyMessage] = useState('');
+  const [applyError, setApplyError] = useState<string | null>(null);
   const withdrawMatch = useV1WithdrawMatchApplication(matchId, eligibility.data?.applicationId ?? query.data?.viewer?.applicationId);
   const resolveChatRoom = useV1ResolveChatRoom();
-  const autoResolvedChatRef = useRef<string | null>(null);
   const matchViewTrackedRef = useRef<string | null>(null);
   const fallback = getMatchDetailViewModel();
   const matchSportType = query.data ? query.data.sport?.name ?? query.data.sportName : undefined;
-
-  useEffect(() => {
-    if (!query.data || !canOpenMatchChat(viewerState) || autoResolvedChatRef.current === matchId) return;
-    autoResolvedChatRef.current = matchId;
-    resolveChatRoom.mutate({ targetType: 'match', targetId: matchId });
-  }, [matchId, query.data, resolveChatRoom, viewerState]);
 
   useEffect(() => {
     if (!query.data || matchViewTrackedRef.current === matchId) return;
@@ -303,6 +299,7 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
       rules: query.data.rulesText ? [query.data.rulesText] : [],
       editHref: viewerState === 'host' ? `/matches/${matchId}/edit` : undefined,
       applicationsHref: viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,
+      lifecycleStatus: getStatus(query.data),
       participants: toParticipants(
         query.data,
         viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,
@@ -312,13 +309,13 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
     completed: getStatus(query.data) === 'completed',
     canComplete: !seeding && query.data.canComplete === true,
     withdrawApplicationId: !seeding && query.data.canWithdraw ? query.data.viewer?.applicationId : null,
-    reviewAction: buildMatchReviewAction(matchId, viewerState, getStatus(query.data)),
+    reviewAction: buildMatchReviewAction(matchId, viewerState, getStatus(query.data), query.data.viewer?.participantStatus),
     applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), eligibility.data?.eligible, eligibility.data?.message),
     // seeding 을 여기 넣지 않는다 — 렌더 쪽이 applyPending 을 '처리 중'(= 내 신청을
     // 처리하는 중)으로 읽어 applyLabel 을 덮어쓴다. 잠금은 onApply 를 비우는 것으로
     // 충분하고(canRunAction=false → disabled), 라벨은 '불러오는 중'이 남는다.
     applyPending: applyMatch.isPending || withdrawMatch.isPending,
-    statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data)),
+    statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data), query.data.viewer?.participantStatus),
     chatLabel: chatLabel(viewerState),
     chatPending: resolveChatRoom.isPending,
     onChat: !seeding && canOpenMatchChat(viewerState)
@@ -332,11 +329,11 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
       viewerState,
       eligible: eligibility.data?.eligible,
       applicationId: eligibility.data?.applicationId ?? query.data.viewer?.applicationId,
-      apply: () =>
-        applyMatch.mutateAsync({ message: null }).then((result) => {
-          trackEvent('match_join_complete', { matchId, sportType: matchSportType ?? '' });
-          return result;
-        }),
+      apply: async () => {
+        setApplyError(null);
+        setApplyDialogOpen(true);
+        return null;
+      },
       withdraw: () =>
         withdrawMatch.mutateAsync({ reason: 'applicant_withdrawn_from_v1_web' }).then((result) => {
           trackEvent('match_leave', { matchId });
@@ -345,7 +342,74 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
     }),
   };
 
-  return <MatchDetailPageView model={model} />;
+  return (
+    <>
+      <MatchDetailPageView model={model} />
+      <MatchApplyDialog
+        open={applyDialogOpen}
+        message={applyMessage}
+        error={applyError}
+        pending={applyMatch.isPending}
+        onMessageChange={setApplyMessage}
+        onClose={() => {
+          if (!applyMatch.isPending) setApplyDialogOpen(false);
+        }}
+        onSubmit={() => {
+          setApplyError(null);
+          applyMatch.mutate(
+            { message: applyMessage.trim() || null },
+            {
+              onSuccess: () => {
+                trackEvent('match_join_complete', { matchId, sportType: matchSportType ?? '' });
+                setApplyDialogOpen(false);
+                setApplyMessage('');
+              },
+              onError: () => setApplyError('신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.'),
+            },
+          );
+        }}
+      />
+    </>
+  );
+}
+
+function MatchApplyDialog({ open, message, error, pending, onMessageChange, onClose, onSubmit }: {
+  open: boolean;
+  message: string;
+  error: string | null;
+  pending: boolean;
+  onMessageChange: (value: string) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !pending) onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose, pending]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center" style={{ background: 'rgba(25,31,40,0.45)' }} onClick={(event) => { if (event.target === event.currentTarget && !pending) onClose(); }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="match-apply-title" className="w-full max-w-[420px] rounded-2xl" style={{ background: 'var(--surface, #fff)', padding: 24 }}>
+        <h2 id="match-apply-title" className="tm-text-subhead" style={{ margin: 0 }}>참가 신청</h2>
+        <p className="tm-text-body" style={{ marginTop: 8, color: 'var(--text-muted)' }}>호스트가 신청자와 메시지를 확인한 뒤 참가를 승인해요.</p>
+        <label className="tm-create-field" style={{ marginTop: 18 }}>
+          <span className="tm-text-label">호스트에게 남길 메시지 <span className="tm-text-caption">(선택)</span></span>
+          <textarea className="tm-input tm-create-input-multiline" value={message} maxLength={500} placeholder="경험이나 전달할 내용을 적어 주세요." onChange={(event) => onMessageChange(event.target.value)} autoFocus />
+          <span className="tm-text-caption" style={{ textAlign: 'right' }}>{message.length}/500</span>
+        </label>
+        {error ? <p className="tm-text-caption" role="alert" style={{ color: 'var(--danger)', marginTop: 8 }}>{error}</p> : null}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 20 }}>
+          <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled={pending} onClick={onClose}>닫기</button>
+          <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={pending} onClick={onSubmit}>{pending ? '신청 중…' : '신청 보내기'}</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 
@@ -466,14 +530,21 @@ function buildMatchReviewAction(
   matchId: string,
   viewerState: V1ViewerState,
   status: V1MatchApiStatus,
+  participantStatus?: 'active' | 'completed' | 'no_show' | 'cancelled' | 'removed' | null,
 ): MatchDetailViewModel['reviewAction'] {
   if (status !== 'completed') return null;
+  if (participantStatus === 'no_show') return null;
   if (viewerState !== 'host' && viewerState !== 'approved' && viewerState !== 'participant') return null;
   return { label: '후기 남기기', href: `/my/reviews/match/${matchId}` };
 }
 
 
-function statusLabel(viewerState: V1ViewerState, status: V1MatchApiStatus) {
+function statusLabel(
+  viewerState: V1ViewerState,
+  status: V1MatchApiStatus,
+  participantStatus?: 'active' | 'completed' | 'no_show' | 'cancelled' | 'removed' | null,
+) {
+  if (status === 'completed' && participantStatus === 'no_show') return '불참 기록';
   if (status === 'completed' && (viewerState === 'host' || viewerState === 'approved' || viewerState === 'participant')) return '참여 완료';
   if (viewerState === 'host') return '내가 만든 매치';
   if (viewerState === 'requested') return '승인 대기';

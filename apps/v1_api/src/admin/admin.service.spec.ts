@@ -241,6 +241,31 @@ describe('AdminService.changeUserStatus — realtime disconnect side effect', ()
   });
 });
 
+describe('AdminService.changeMatchStatus completion boundary', () => {
+  it('rejects direct admin completion before opening a transaction', async () => {
+    const prisma = {
+      v1AdminUser: { findUnique: jest.fn().mockResolvedValue(actorAdminRecord) },
+      $transaction: jest.fn(),
+    };
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AdminService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: RealtimeGateway, useValue: { forceDisconnectUser: jest.fn() } },
+        { provide: getLoggerToken(AdminService.name), useValue: { warn: jest.fn() } },
+      ],
+    }).compile();
+    const service = module.get(AdminService);
+
+    await expect(
+      service.changeMatchStatus(actorAuthUser, 'match-1', { status: 'completed', reason: 'direct completion' }),
+    ).rejects.toMatchObject({
+      response: { code: 'MATCH_COMPLETION_ADMIN_FORBIDDEN' },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
 describe('AdminService.deleteUser — realtime disconnect side effect', () => {
   // deleteUser() is a separate mutation path from changeUserStatus() (a distinct
   // controller endpoint) that also lands on the disable-class accountStatus

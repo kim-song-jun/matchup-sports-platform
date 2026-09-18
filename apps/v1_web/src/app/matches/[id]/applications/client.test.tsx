@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MatchApplicationsPageClient } from './client';
-const mocks = vi.hoisted(() => ({ replace: vi.fn(), query: vi.fn(), applications: vi.fn(), changeParticipant: vi.fn() }));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: mocks.replace }) }));
+const mocks = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), query: vi.fn(), applications: vi.fn(), changeParticipant: vi.fn(), completeMatch: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: mocks.replace, push: mocks.push }) }));
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1Match: mocks.query,
   useV1MatchApplicationEligibility: () => ({ data: { requiresApproval: true } }),
@@ -10,6 +10,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1ApproveMatchApplication: () => ({ isPending: false }),
   useV1RejectMatchApplication: () => ({ isPending: false }),
   useV1ChangeMatchParticipant: () => ({ isPending: false, mutate: mocks.changeParticipant }),
+  useV1CompleteMatch: () => ({ isPending: false, mutate: mocks.completeMatch }),
 }));
 
 beforeEach(() => {

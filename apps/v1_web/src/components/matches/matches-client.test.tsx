@@ -8,6 +8,7 @@ vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
 const {
   applyMatchMutateAsync,
+  applyMatchMutate,
   withdrawMatchMutateAsync,
   routerPush,
   useV1MatchMock,
@@ -16,6 +17,7 @@ const {
   searchParamsRef,
 } = vi.hoisted(() => ({
   applyMatchMutateAsync: vi.fn(),
+  applyMatchMutate: vi.fn(),
   withdrawMatchMutateAsync: vi.fn(),
   routerPush: vi.fn(),
   useV1MatchMock: vi.fn(),
@@ -34,7 +36,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1Match: useV1MatchMock,
   useV1MatchApplicationEligibility: useV1MatchApplicationEligibilityMock,
-  useV1ApplyMatch: () => ({ mutateAsync: applyMatchMutateAsync, isPending: false }),
+  useV1ApplyMatch: () => ({ mutateAsync: applyMatchMutateAsync, mutate: applyMatchMutate, isPending: false }),
   useV1WithdrawMatchApplication: () => ({ mutateAsync: withdrawMatchMutateAsync, isPending: false }),
   useV1ResolveChatRoom: () => ({ mutate: vi.fn(), isPending: false }),
   useV1Matches: useV1MatchesMock,
@@ -98,6 +100,7 @@ describe('MatchDetailPageClient — GA events', () => {
     });
     useV1MatchApplicationEligibilityMock.mockReturnValue({ data: { eligible: true, applicationId: null } });
     applyMatchMutateAsync.mockResolvedValue({ applicationId: 'app-1' });
+    applyMatchMutate.mockImplementation((_body, options) => options?.onSuccess?.({ applicationId: 'app-1' }));
     withdrawMatchMutateAsync.mockResolvedValue({ applicationId: 'app-1' });
   });
 
@@ -113,9 +116,10 @@ describe('MatchDetailPageClient — GA events', () => {
     render(<MatchDetailPageClient matchId="match-1" />);
 
     fireEvent.click(screen.getByRole('button', { name: '참가 신청' }));
+    fireEvent.click(screen.getByRole('button', { name: '신청 보내기' }));
 
     await waitFor(() => {
-      expect(applyMatchMutateAsync).toHaveBeenCalledWith({ message: null });
+      expect(applyMatchMutate).toHaveBeenCalledWith({ message: null }, expect.any(Object));
     });
     expect(trackEvent).toHaveBeenCalledWith('match_join_complete', { matchId: 'match-1', sportType: '풋살' });
   });
@@ -187,9 +191,9 @@ describe('MatchDetailPageClient — 주소·설명 목업 폴백 (2026-08-27 감
 // 매치 상세에서 후기로 가는 유일한 진입점. 이게 없던 동안 완료 알림(match_completed)이
 // 매치 상세로 보내는데 거기서 더 갈 곳이 없어 후기를 쓸 수 없는 막다른 길이었다.
 describe('MatchDetailPageClient — 후기 진입점', () => {
-  function mockMatch(viewerState: string, status: string) {
+  function mockMatch(viewerState: string, status: string, viewerOverrides: Record<string, unknown> = {}) {
     useV1MatchMock.mockReturnValue({
-      data: { ...baseMatch, status, displayState: status, viewer: { state: viewerState } },
+      data: { ...baseMatch, status, displayState: status, viewer: { state: viewerState, ...viewerOverrides } },
       isError: false,
     });
   }
@@ -241,6 +245,14 @@ describe('MatchDetailPageClient — 후기 진입점', () => {
     mockMatch('none', 'completed');
 
     render(<MatchDetailPageClient matchId="match-1" />);
+
+    expect(screen.queryByRole('link', { name: '후기 남기기' })).not.toBeInTheDocument();
+  });
+
+  it('불참 기록 참가자에게는 후기 진입점을 노출하지 않는다', () => {
+    mockMatch('participant', 'completed', { participantStatus: 'no_show' });
+
+    render(<MatchDetailPageClient matchId={'match-1'} />);
 
     expect(screen.queryByRole('link', { name: '후기 남기기' })).not.toBeInTheDocument();
   });

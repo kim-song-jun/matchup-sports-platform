@@ -483,7 +483,7 @@ export class ChatService {
       where: { matchId, userId, status: { in: ['active', 'completed'] }, match: { deletedAt: null } },
       select: { id: true },
     });
-    if (!participant) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Match chat requires active participation' });
+    if (!participant) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Match chat requires confirmed participation' });
   }
 
   private async assertCanUseTeamChat(userId: string, teamId: string) {

@@ -122,14 +122,15 @@
 
 ## POST /matches/:id/complete (host)
 
-- `recruiting` 또는 `closed` 개인 매치를 `endsAt` 이후(종료 시각이 없으면 `startsAt` 이후)에만
-  완료할 수 있다. 호스트가 아닌 사용자는 `403 PERMISSION_DENIED`, 너무 이른 완료는
-  `409 MATCH_NOT_ENDED`다.
-- 완료 트랜잭션은 매치 행을 잠근 뒤 매치 `status/completedAt`과 현재 `active` 참가자(호스트 포함)의
-  `status/completedAt`을 함께 갱신하고, 남은 `requested` 신청은 `expired`로 닫는다. 따라서 프로필의
-  개인 매치 활동 횟수와 후기 자격은 같은 저장 상태를 사용한다.
-- 완료 재시도와 동시 요청은 성공으로 수렴하되 이미 `completed`인 참가자를 다시 집계하지 않는다.
-  완료된 매치는 다시 모집/취소 상태로 되돌릴 수 없고 관리자 완료도 같은 참가자 전환을 사용한다.
+- body는 `{ participants: [{ participantId, status: 'completed' | 'no_show' }], reason? }`다.
+- 호스트만 경기 시작 이후의 raw `recruiting` 또는 `closed` 개인 매치를 완료할 수 있다.
+- 현재 `active`인 일반 참가자를 정확히 한 번씩 전부 지정해야 한다. 중복 ID, 누락, 매치에 속하지 않은
+  ID는 `400 VALIDATION_FAILED`다.
+- 완료 트랜잭션은 매치 행을 잠근 뒤 호스트와 매치를 `completed`로, 각 참가자를 제출한
+  `completed` 또는 `no_show`로 갱신하고 남은 `requested` 신청을 `expired`로 닫는다.
+- 오래된 데이터에 호스트 참가자 행이 없으면 같은 트랜잭션 안에서 복구한다.
+- `completed` 참가자는 참여 기록과 후기 자격을 유지하고, `no_show` 참가자는 불참 기록으로 표시되며
+  후기 CTA가 제공되지 않는다.
 - 이 완료는 참여 이력만 확정한다. 득점·도움·승패 같은 공식 경기 기록은 별도 Game/결과 리비전이
   없는 개인 모집 매치에서 생성하지 않는다.
 

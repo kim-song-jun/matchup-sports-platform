@@ -255,7 +255,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
   const canRunAction = Boolean(model.onApply);
   const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : mode === 'closed' || match.status === 'full' ? '신청 마감' : '참가 신청');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
-  const showChat = (mode === 'approved' || mode === 'mine') && Boolean(model.onChat);
+  const showChat = Boolean(model.onChat);
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
   // 경기가 끝난 뒤 후기로 가는 유일한 상세 화면 진입점. 완료 알림도 후기 화면으로 보내지만,
   // 매치 상세에서 직접 들어갈 길이 없으면 알림을 지운 사용자는 후기를 쓸 방법이 사라진다.
@@ -410,7 +410,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 ))}
               </div>
             </Card>
-            {model.canComplete || model.withdrawApplicationId ? <MatchParticipationActions matchId={match.id} canComplete={Boolean(model.canComplete)} applicationId={model.withdrawApplicationId} /> : null}
+            {model.withdrawApplicationId ? <MatchParticipationActions matchId={match.id} applicationId={model.withdrawApplicationId} /> : null}
             {reviewCard}
           </div>
 
@@ -487,7 +487,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               ))}
             </div>
           </Card>
-          {model.canComplete || model.withdrawApplicationId ? <MatchParticipationActions matchId={match.id} canComplete={Boolean(model.canComplete)} applicationId={model.withdrawApplicationId} /> : null}
+          {model.withdrawApplicationId ? <MatchParticipationActions matchId={match.id} applicationId={model.withdrawApplicationId} /> : null}
             {reviewCard}
         </div>
       </article>

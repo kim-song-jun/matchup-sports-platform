@@ -413,6 +413,6 @@ describe('개인 매치 참여 기능', () => {
   it('종료 확인이 가능한 호스트에게 더 이상 저장할 수 없는 수정 CTA를 보여주지 않는다', () => {
     render(<MatchDetailPageView model={{ ...getMatchDetailViewModel('mine'), canComplete: true }} />);
     expect(screen.queryByRole('link', { name: '매치 수정' })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: '경기 완료' })).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: '신청자 관리' })).toHaveLength(2);
   });
 });

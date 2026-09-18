@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, CalendarClock, ListOrdered, MapPin, Trophy, Users } from 'lucide-react';
 import {
@@ -11,9 +12,10 @@ import {
   AdminSummaryItem,
   AdminTableSkeleton,
 } from '@/components/admin';
-import { useV1AdminTeamMatch } from '@/hooks/use-v1-api';
+import { useV1AdminMe, useV1AdminTeamMatch, useV1AssignAdminTeamMatchApplications } from '@/hooks/use-v1-api';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
+import { randomUuid } from '@/lib/uuid';
 import type { V1AdminTeamMatchDetail } from '@/types/api';
 
 /**
@@ -45,10 +47,36 @@ function BackLink() {
 
 function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
   const truncated = teamMatch.applications.length < teamMatch.applicationCount;
+  const isPlatformRecruitment = teamMatch.hostTeamId === null && !teamMatch.league && !teamMatch.tournament;
+  const { data: adminMe } = useV1AdminMe();
+  const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
+  const requested = teamMatch.applications.filter((application) => application.status === 'requested');
+  const [homeApplicationId, setHomeApplicationId] = useState('');
+  const [awayApplicationId, setAwayApplicationId] = useState('');
+  const [message, setMessage] = useState('');
+  const assign = useV1AssignAdminTeamMatchApplications(teamMatch.teamMatchId);
+  const canAssign =
+    canWrite &&
+    isPlatformRecruitment &&
+    teamMatch.status === 'recruiting' &&
+    homeApplicationId !== '' &&
+    awayApplicationId !== '' &&
+    homeApplicationId !== awayApplicationId;
+
+  const submitAssignment = async () => {
+    if (!canAssign) return;
+    setMessage('');
+    try {
+      await assign.mutateAsync({ clientCommandId: randomUuid(), homeApplicationId, awayApplicationId });
+      setMessage('두 팀을 확정했어요. 경기와 양 팀 일정이 생성됐어요.');
+    } catch (error) {
+      setMessage(extractErrorMessage(error, '두 팀을 확정하지 못했어요.'));
+    }
+  };
   return (
-    <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="상대팀 신청">
+    <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label={isPlatformRecruitment ? '참가팀 신청' : '상대팀 신청'}>
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">상대팀 신청</h2>
+        <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">{isPlatformRecruitment ? '참가팀 신청' : '상대팀 신청'}</h2>
         <span className="text-sm font-semibold tabular-nums text-[var(--text-muted)]">
           {/* 서버가 최근 50건만 내려준다 — 총계만 적으면 목록이 전부인 것처럼 읽힌다. */}
           {truncated ? `${teamMatch.applications.length} / ${teamMatch.applicationCount}건` : `${teamMatch.applicationCount}건`}
@@ -84,6 +112,49 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
       ) : (
         <div className="tm-on-tint mt-4 rounded-xl bg-[var(--surface-soft)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
           아직 신청한 팀이 없어요.
+        </div>
+      )}
+
+      {isPlatformRecruitment && teamMatch.status === 'recruiting' && canWrite && (
+        <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
+          <h3 className="text-sm font-bold text-[var(--text-strong)]">참가팀 확정</h3>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">신청한 팀 중 홈팀과 상대팀을 각각 선택하세요. 확정하면 나머지 신청은 거절 처리돼요.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className="text-xs font-semibold text-[var(--text-muted)]">
+              홈팀
+              <select
+                aria-label="홈팀 신청"
+                value={homeApplicationId}
+                onChange={(event) => setHomeApplicationId(event.target.value)}
+                className="mt-1 h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)]"
+              >
+                <option value="">신청 선택</option>
+                {requested.map((application) => <option key={application.applicationId} value={application.applicationId} disabled={application.applicationId === awayApplicationId}>{application.applicantTeamName}</option>)}
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">
+              상대팀
+              <select
+                aria-label="상대팀 신청"
+                value={awayApplicationId}
+                onChange={(event) => setAwayApplicationId(event.target.value)}
+                className="mt-1 h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-sm text-[var(--text-strong)]"
+              >
+                <option value="">신청 선택</option>
+                {requested.map((application) => <option key={application.applicationId} value={application.applicationId} disabled={application.applicationId === homeApplicationId}>{application.applicantTeamName}</option>)}
+              </select>
+            </label>
+          </div>
+          {requested.length < 2 && <p className="mt-3 text-xs text-[var(--text-muted)]">대기 중인 신청이 두 건 이상 모이면 확정할 수 있어요.</p>}
+          {message && <p role="status" className="mt-3 text-xs text-[var(--text-body)]">{message}</p>}
+          <button
+            type="button"
+            disabled={!canAssign || assign.isPending}
+            onClick={() => void submitAssignment()}
+            className="mt-4 min-h-[44px] w-full rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {assign.isPending ? '두 팀 확정 중…' : '선택한 두 팀 매치 확정'}
+          </button>
         </div>
       )}
     </section>
@@ -137,7 +208,7 @@ export default function AdminTeamMatchDetailPage() {
                   팀매치
                 </div>
                 <h2 className="mt-2 break-words text-[length:var(--font-size-subhead)] font-bold text-[var(--text-strong)]">{teamMatch.title}</h2>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">{teamMatch.sportName} · {teamMatch.hostTeamName}</p>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">{teamMatch.sportName} · {teamMatch.hostTeamName ?? '플랫폼 모집'}</p>
               </div>
               <AdminStatusPill status={teamMatch.status} />
             </div>
@@ -156,7 +227,7 @@ export default function AdminTeamMatchDetailPage() {
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
               <AdminDetailRow label="팀매치 ID" value={teamMatch.teamMatchId} />
               <AdminDetailRow label="종목" value={teamMatch.sportName} />
-              <AdminDetailRow label="주최 팀" value={teamMatch.hostTeamName} />
+              <AdminDetailRow label="주최" value={teamMatch.hostTeamName ?? 'Teameet 운영'} />
               <AdminDetailRow label="확정 상대팀" value={teamMatch.approvedApplicantTeamName ?? '미확정'} />
               <AdminDetailRow label="장소" value={teamMatch.placeName} />
               <AdminDetailRow label="주소" value={teamMatch.placeAddress} />
@@ -211,16 +282,18 @@ export default function AdminTeamMatchDetailPage() {
           </section>
 
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4">
-            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">주최 팀</h2>
+            <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">주최</h2>
             <dl className="mt-4 grid gap-3">
-              <AdminSummaryItem icon={<Users size={16} />} label="이름" value={teamMatch.hostTeamName} />
+              <AdminSummaryItem icon={<Users size={16} />} label="이름" value={teamMatch.hostTeamName ?? 'Teameet 운영'} />
             </dl>
-            <Link
-              href={`/admin/teams/${encodeURIComponent(teamMatch.hostTeamId)}`}
-              className="mt-3 inline-flex h-[44px] w-full items-center justify-center rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
-            >
-              주최 팀 상세 보기
-            </Link>
+            {teamMatch.hostTeamId && (
+              <Link
+                href={`/admin/teams/${encodeURIComponent(teamMatch.hostTeamId)}`}
+                className="mt-3 inline-flex h-[44px] w-full items-center justify-center rounded-xl border border-[var(--border)] px-4 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                주최 팀 상세 보기
+              </Link>
+            )}
           </section>
         </aside>
       </div>

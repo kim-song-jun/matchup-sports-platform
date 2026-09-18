@@ -9,15 +9,15 @@ import { CreatorProfileGuard } from '../profile/creator-profile.guard';
 import { TeamMatchLineupService } from './team-match-lineup.service';
 import { TeamMatchesController } from './team-matches.controller';
 import { TeamMatchesService } from './team-matches.service';
-import { AdminAssignedTeamMatchesController } from './admin-assigned-team-matches.controller';
-import { AdminAssignedTeamMatchesService } from './admin-assigned-team-matches.service';
+import { AdminTeamMatchRecruitmentsController } from './admin-team-match-recruitments.controller';
+import { AdminTeamMatchRecruitmentsService } from './admin-team-match-recruitments.service';
 
 @Module({
   imports: [AdminContextModule, GamesModule, NotificationsModule, OperationAuditModule],
-  controllers: [TeamMatchesController, AdminAssignedTeamMatchesController],
+  controllers: [TeamMatchesController, AdminTeamMatchRecruitmentsController],
   providers: [
     TeamMatchesService,
-    AdminAssignedTeamMatchesService,
+    AdminTeamMatchRecruitmentsService,
     TeamMatchLineupService,
     OptionalV1AuthGuard,
     V1AuthGuard,

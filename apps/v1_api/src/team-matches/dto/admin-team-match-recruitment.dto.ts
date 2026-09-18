@@ -1,14 +1,11 @@
 import { IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
-export class CreateAdminAssignedTeamMatchDto {
+export class CreateAdminTeamMatchRecruitmentDto {
   @IsUUID()
   clientCommandId!: string;
 
   @IsUUID()
-  homeTeamId!: string;
-
-  @IsUUID()
-  awayTeamId!: string;
+  sportId!: string;
 
   @IsUUID()
   regionId!: string;
@@ -30,6 +27,9 @@ export class CreateAdminAssignedTeamMatchDto {
   @IsDateString()
   endsAt?: string | null;
 
+  @IsDateString()
+  deadlineAt!: string;
+
   @IsString()
   @IsNotEmpty()
   @MaxLength(120)
@@ -49,4 +49,15 @@ export class CreateAdminAssignedTeamMatchDto {
   @IsString()
   @MaxLength(2000)
   rulesText?: string | null;
+}
+
+export class AssignAdminTeamMatchApplicationsDto {
+  @IsUUID()
+  clientCommandId!: string;
+
+  @IsUUID()
+  homeApplicationId!: string;
+
+  @IsUUID()
+  awayApplicationId!: string;
 }

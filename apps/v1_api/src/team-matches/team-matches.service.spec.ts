@@ -580,7 +580,14 @@ describe('TeamMatchesService', () => {
     expect(args.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
     expect(args.where.status).toEqual({ in: ['recruiting', 'closed', 'matched'] });
     expect(args.where.startAt).toEqual({ gte: expect.any(Date) });
-    expect(args.where.AND).toBeUndefined();
+    expect(args.where.AND).toEqual([
+      {
+        OR: [
+          { hostTeam: { deletedAt: null, status: 'active' } },
+          { hostTeamId: null, leagueId: null, tournamentId: null },
+        ],
+      },
+    ]);
   });
 
   it('list: 추천순은 신청 마감이 지나지 않은 모집 행만 조회한다', async () => {
@@ -1182,9 +1189,40 @@ describe('TeamMatchesService', () => {
     const result = await service.list(null, {});
 
     expect(result.items).toHaveLength(1);
-    expect(result.items[0].hostTeam.trustState).toBe('verified');
-    expect(result.items[0].hostTeam.mannerScore).toBe(5);
-    expect(result.items[0].hostTeam.wins).toBe(3);
+    expect(result.items[0].hostTeam!.trustState).toBe('verified');
+    expect(result.items[0].hostTeam!.mannerScore).toBe(5);
+    expect(result.items[0].hostTeam!.wins).toBe(3);
+  });
+
+  it('list: 플랫폼 모집은 호스트팀 없이 공개 목록에 노출된다', async () => {
+    prisma.v1TeamMatch.findMany.mockResolvedValue([
+      {
+        ...teamMatchRow({
+          hostTeamId: null,
+          createdByUserId: 'admin-user',
+          leagueId: null,
+          tournamentId: null,
+        }),
+        sport: { id: 'sport-1', name: '풋살' },
+        region: { id: 'region-1', name: '서울' },
+        minSportLevel: null,
+        maxSportLevel: null,
+        hostTeam: null,
+        approvedApplicantTeam: null,
+        applications: [],
+      },
+    ]);
+
+    const result = await service.list(null, {});
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      teamMatchId: 'tm-1',
+      status: 'recruiting',
+      platformManaged: true,
+      hostTeam: null,
+    });
+    expect(prisma.v1PostEventReview.findMany).not.toHaveBeenCalled();
   });
 
   it('applications: 신청 팀이 2개 이상일 때 배치 크로스토크 없이 각 팀의 live 값을 정확히 매핑한다', async () => {
@@ -1307,6 +1345,38 @@ describe('TeamMatchesService', () => {
     // 신청 제출(POST)은 쓰기 경로의 critical path다 — 응답에 노출되지 않는 hostTeam 신뢰점수를 위해
     // 추가 쿼리를 태우면 안 된다.
     expect(prisma.v1PostEventReview.findMany).not.toHaveBeenCalled();
+  });
+
+  it('createApplication: 플랫폼 모집에도 관리 중인 같은 종목 팀으로 신청할 수 있다', async () => {
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-applicant', team: { sportId: 'sport-1' } });
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      ...teamMatchRow({
+        status: 'recruiting',
+        startAt: FUTURE,
+        hostTeamId: null,
+        createdByUserId: 'admin-user',
+        leagueId: null,
+        tournamentId: null,
+      }),
+      sport: { id: 'sport-1', name: '풋살' },
+      region: { id: 'region-1', name: '서울' },
+      minSportLevel: null,
+      maxSportLevel: null,
+      hostTeam: null,
+      approvedApplicantTeam: null,
+      applications: [],
+    });
+    prisma.v1TeamMatchApplication.create.mockResolvedValue({
+      id: 'app-platform',
+      teamMatchId: 'tm-1',
+      applicantTeamId: 'team-applicant',
+      status: 'requested',
+    });
+
+    const result = await service.createApplication(manager, 'tm-1', { applicantTeamId: 'team-applicant' });
+
+    expect(result).toMatchObject({ applicationId: 'app-platform', status: 'requested' });
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
   });
 
   it('createApplication: 신청 마감시간이 지나면 새 신청을 거부한다', async () => {
@@ -1628,8 +1698,8 @@ describe('TeamMatchesService', () => {
 
     const result = await service.detail(null, 'tm-1');
 
-    expect(result.hostTeam.trustState).toBe('estimated');
-    expect(result.hostTeam.mannerScore).toBe(4);
-    expect(result.hostTeam.wins).toBe(2);
+    expect(result.hostTeam!.trustState).toBe('estimated');
+    expect(result.hostTeam!.mannerScore).toBe(4);
+    expect(result.hostTeam!.wins).toBe(2);
   });
 });

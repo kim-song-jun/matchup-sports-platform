@@ -71,8 +71,10 @@ import type {
   V1AdminStatusChangeLog,
   V1AdminStatusChangeResult,
   V1AdminTeamDetail,
-  V1AdminAssignedTeamMatchPayload,
-  V1AdminAssignedTeamMatchResult,
+  V1AdminTeamMatchAssignmentPayload,
+  V1AdminTeamMatchAssignmentResult,
+  V1AdminTeamMatchRecruitmentPayload,
+  V1AdminTeamMatchRecruitmentResult,
   V1AdminTeamMatchRow,
   V1AdminTeamRow,
   V1AdminDeleteUserPayload,
@@ -3104,14 +3106,27 @@ export function useV1AdminTeamMatches(filters?: AdminListFilters) {
   });
 }
 
-export function useV1CreateAdminAssignedTeamMatch() {
+export function useV1CreateAdminTeamMatchRecruitment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: V1AdminAssignedTeamMatchPayload) =>
-      v1Post<V1AdminAssignedTeamMatchResult>('/admin/team-matches', body),
+    mutationFn: (body: V1AdminTeamMatchRecruitmentPayload) =>
+      v1Post<V1AdminTeamMatchRecruitmentResult>('/admin/team-matches', body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'team-matches'] });
       queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'team-matches'] });
+    },
+  });
+}
+
+export function useV1AssignAdminTeamMatchApplications(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminTeamMatchAssignmentPayload) =>
+      v1Post<V1AdminTeamMatchAssignmentResult>(`/admin/team-matches/${teamMatchId}/assign`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatch(teamMatchId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'team-matches'] });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'team-matches'] });
     },
   });

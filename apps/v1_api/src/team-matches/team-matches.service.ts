@@ -53,7 +53,7 @@ type TeamMatchWithRelations = V1TeamMatch & {
   sport: { id: string; name: string };
   minSportLevel: { id: string; code: string; name: string; sortOrder: number; sportId: string } | null;
   maxSportLevel: { id: string; code: string; name: string; sortOrder: number; sportId: string } | null;
-  region: { id: string; name: string };
+  region: { id: string; name: string } | null;
   hostTeam: {
     id: string;
     name: string;
@@ -65,7 +65,7 @@ type TeamMatchWithRelations = V1TeamMatch & {
       mannerScore: Prisma.Decimal | number | null;
     } | null;
     memberships: Array<{ id: string; userId: string; role: 'owner' | 'manager' | 'member'; status: string }>;
-  };
+  } | null;
   approvedApplicantTeam: {
     id: string;
     name: string;
@@ -113,7 +113,15 @@ export class TeamMatchesService {
       where: {
         deletedAt: null,
         OR: [{ tournamentId: null }, { leagueId: { not: null } }],
-        hostTeam: { status: 'active', deletedAt: null },
+        AND: [
+          ...constraints,
+          {
+            OR: [
+              { hostTeam: { status: 'active', deletedAt: null } },
+              { hostTeamId: null, leagueId: null, tournamentId: null },
+            ],
+          },
+        ],
         ...(status === 'expired'
           ? { startAt: { lt: now } }
           : isDefaultDiscovery
@@ -138,7 +146,6 @@ export class TeamMatchesService {
         // 검색창 placeholder 가 "지역, 팀 이름, 경기조건"을 약속하므로 그 셋을 모두 훑는다.
         // hostTeam·region 이 빠져 있어서 팀 이름이나 지역명으로 검색하면 실제로 존재하는
         // 경기가 0건으로 나왔다.
-        ...(constraints.length ? { AND: constraints } : {}),
       },
       include: this.teamMatchInclude(user),
       orderBy: getOrderBy(query.sort),
@@ -154,12 +161,13 @@ export class TeamMatchesService {
 
     // 캐시(V1TeamTrustScore)는 72시간 경과만으로는 안 갱신될 수 있으므로 이 페이지에 등장하는
     // hostTeam들의 신뢰점수를 배치 1회 호출로 live 재계산해 덮어쓴다 (N+1 방지, computeRevealedTeamTrustBatch 참조).
-    const hostTeamIds = [...new Set(pageItems.map((teamMatch) => teamMatch.hostTeamId))];
+    const hostTeamIds = [...new Set(pageItems.map((teamMatch) => teamMatch.hostTeamId).filter((teamId): teamId is string => teamId !== null))];
     const [trustByHostTeam, winsByHostTeam] = await Promise.all([
       computeRevealedTeamTrustBatch(this.prisma, hostTeamIds),
       this.loadOfficialWinCounts(hostTeamIds),
     ]);
     for (const teamMatch of pageItems) {
+      if (!teamMatch.hostTeam || !teamMatch.hostTeamId) continue;
       const trust = trustByHostTeam.get(teamMatch.hostTeamId);
       teamMatch.hostTeam.trustScore = trust
         ? {
@@ -171,7 +179,7 @@ export class TeamMatchesService {
 
     return {
       items: pageItems.map((teamMatch) =>
-        this.toListItem(teamMatch, user, winsByHostTeam.get(teamMatch.hostTeamId) ?? 0),
+        this.toListItem(teamMatch, user, teamMatch.hostTeamId ? winsByHostTeam.get(teamMatch.hostTeamId) ?? 0 : 0),
       ),
       pageInfo: { nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null, hasNext },
     };
@@ -179,9 +187,11 @@ export class TeamMatchesService {
 
   async detail(user: V1AuthUser | null, teamMatchId: string) {
     const teamMatch = await this.getPublicTeamMatch(teamMatchId, user, { includeTrust: true });
-    const winsByHostTeam = await this.loadOfficialWinCounts([teamMatch.hostTeamId]);
+    const winsByHostTeam = await this.loadOfficialWinCounts(teamMatch.hostTeamId ? [teamMatch.hostTeamId] : []);
     const viewer = await this.getViewer(teamMatch, user);
-    const approvedApplication = teamMatch.applications.find((item) => item.status === 'approved');
+    const approvedApplication = teamMatch.applications.find(
+      (item) => item.status === 'approved' && item.applicantTeamId === teamMatch.approvedApplicantTeamId,
+    );
 
     return {
       teamMatchId: teamMatch.id,
@@ -219,18 +229,21 @@ export class TeamMatchesService {
       matchStyle: teamMatch.matchStyle,
       uniformColor: teamMatch.uniformColor,
       paymentRequired: false,
-      hostTeam: {
-        teamId: teamMatch.hostTeam.id,
-        name: teamMatch.hostTeam.name,
-        logoUrl: teamMatch.hostTeam.profile?.logoUrl ?? null,
-        trustState: teamMatch.hostTeam.trustScore?.trustState ?? 'none',
-        mannerScore:
-          teamMatch.hostTeam.trustScore?.mannerScore == null
-            ? null
-            : Number(teamMatch.hostTeam.trustScore.mannerScore),
-        wins: winsByHostTeam.get(teamMatch.hostTeamId) ?? 0,
-        ownerUserId: teamMatch.hostTeam.ownerUserId,
-      },
+      platformManaged: teamMatch.hostTeamId === null,
+      hostTeam: teamMatch.hostTeam && teamMatch.hostTeamId
+        ? {
+            teamId: teamMatch.hostTeam.id,
+            name: teamMatch.hostTeam.name,
+            logoUrl: teamMatch.hostTeam.profile?.logoUrl ?? null,
+            trustState: teamMatch.hostTeam.trustScore?.trustState ?? 'none',
+            mannerScore:
+              teamMatch.hostTeam.trustScore?.mannerScore == null
+                ? null
+                : Number(teamMatch.hostTeam.trustScore.mannerScore),
+            wins: winsByHostTeam.get(teamMatch.hostTeamId) ?? 0,
+            ownerUserId: teamMatch.hostTeam.ownerUserId,
+          }
+        : null,
       approvedOpponentTeam:
         approvedApplication && teamMatch.approvedApplicantTeam
           ? {
@@ -933,19 +946,22 @@ export class TeamMatchesService {
       // SERVICE_TEMPORARILY_BUSY + 해요체 안내로 번역하므로 여기서 또 의미를 붙이지 않는다.
     });
 
-    // 알림: 호스트팀 manager+에게 신청 접수 안내 (fire-and-forget — 수신자 조회 실패도 본 요청을 깨지 않음)
-    this.notifications.emitToManyDeferred(
-      async () =>
-        (
-          await this.prisma.v1TeamMembership.findMany({
-            where: { teamId: teamMatch.hostTeamId, status: 'active', role: { in: ['owner', 'manager'] } },
-            select: { userId: true },
-          })
-        ).map((m) => m.userId),
-      'team_match_application_received',
-      teamMatch.id,
-      `"${teamMatch.title}" 팀매치 신청을 확인해 주세요.`,
-    );
+    // 팀 주최 모집은 호스트 관리자에게 알리고, 플랫폼 모집은 관리자 상세의 신청 목록에서
+    // 처리한다. hostTeamId=null 을 가짜 팀 알림 대상으로 만들지 않는다.
+    if (teamMatch.hostTeamId) {
+      this.notifications.emitToManyDeferred(
+        async () =>
+          (
+            await this.prisma.v1TeamMembership.findMany({
+              where: { teamId: teamMatch.hostTeamId!, status: 'active', role: { in: ['owner', 'manager'] } },
+              select: { userId: true },
+            })
+          ).map((m) => m.userId),
+        'team_match_application_received',
+        teamMatch.id,
+        `"${teamMatch.title}" 팀매치 신청을 확인해 주세요.`,
+      );
+    }
 
     return {
       applicationId: result.id,
@@ -1095,6 +1111,7 @@ export class TeamMatchesService {
   ) {
     this.assertActiveAccount(user);
     const application = await this.getApplicationWithTeamMatch(applicationId);
+    assertTeamMatchHasHostAndStart(application.teamMatch);
     await this.assertCanManageTeam(user.id, application.teamMatch.hostTeamId);
 
     if (application.status !== 'requested') {
@@ -1163,7 +1180,7 @@ export class TeamMatchesService {
         application.applicantTeamId,
         application.teamMatchId,
         application.teamMatch.title,
-        application.teamMatch.startAt,
+        application.teamMatch.startAt!,
         application.teamMatch.endAt,
       );
       await tx.v1TeamMatchApplication.updateMany({
@@ -1248,6 +1265,7 @@ export class TeamMatchesService {
   ) {
     this.assertActiveAccount(user);
     const application = await this.getApplicationWithTeamMatch(applicationId);
+    assertTeamMatchHasHostAndStart(application.teamMatch);
     await this.assertCanManageTeam(user.id, application.teamMatch.hostTeamId);
 
     if (application.status !== 'requested') {
@@ -1410,23 +1428,26 @@ export class TeamMatchesService {
       descriptionPreview: teamMatch.description ? teamMatch.description.slice(0, 120) : null,
       imageUrl: teamMatch.imageUrl,
       sport: { sportId: teamMatch.sport.id, name: teamMatch.sport.name },
-      region: { regionId: teamMatch.region.id, name: teamMatch.region.name },
+      region: teamMatch.region ? { regionId: teamMatch.region.id, name: teamMatch.region.name } : null,
       place: { name: teamMatch.placeName, addressText: teamMatch.placeAddress },
       startsAt: teamMatch.startAt,
       deadlineAt: teamMatch.deadlineAt,
       status: this.getApiStatus(teamMatch),
       displayState: this.getDisplayState(teamMatch),
-      hostTeam: {
-        teamId: teamMatch.hostTeam.id,
-        name: teamMatch.hostTeam.name,
-        logoUrl: teamMatch.hostTeam.profile?.logoUrl ?? null,
-        trustState: teamMatch.hostTeam.trustScore?.trustState ?? 'none',
-        mannerScore:
-          teamMatch.hostTeam.trustScore?.mannerScore == null
-            ? null
-            : Number(teamMatch.hostTeam.trustScore.mannerScore),
-        wins,
-      },
+      platformManaged: teamMatch.hostTeamId === null,
+      hostTeam: teamMatch.hostTeam
+        ? {
+            teamId: teamMatch.hostTeam.id,
+            name: teamMatch.hostTeam.name,
+            logoUrl: teamMatch.hostTeam.profile?.logoUrl ?? null,
+            trustState: teamMatch.hostTeam.trustScore?.trustState ?? 'none',
+            mannerScore:
+              teamMatch.hostTeam.trustScore?.mannerScore == null
+                ? null
+                : Number(teamMatch.hostTeam.trustScore.mannerScore),
+            wins,
+          }
+        : null,
       costNote: teamMatch.costNote,
       // **누구와 붙는지**. 목록 카드가 이 값이 없어서 상대팀 이름 자리에 신청 상태
       // ('승인 완료'·'신청 마감')를 그렸다 — 상세에서 2026-08-25 에 이미 고친 결함인데
@@ -1461,7 +1482,12 @@ export class TeamMatchesService {
         id: teamMatchId,
         deletedAt: null,
         OR: [{ tournamentId: null }, { leagueId: { not: null } }],
-        hostTeam: { status: 'active', deletedAt: null },
+        AND: [{
+          OR: [
+            { hostTeam: { status: 'active', deletedAt: null } },
+            { hostTeamId: null, leagueId: null, tournamentId: null },
+          ],
+        }],
       },
       include: this.teamMatchInclude(user),
     });
@@ -1470,7 +1496,7 @@ export class TeamMatchesService {
 
     // hostTeam 신뢰점수는 detail() 응답에만 노출된다. applicationEligibility()/createApplication()은
     // hostTeam.trustScore를 전혀 참조하지 않으므로 불필요한 live 재계산(추가 쿼리)을 건너뛴다.
-    if (options.includeTrust) {
+    if (options.includeTrust && teamMatch.hostTeam && teamMatch.hostTeamId) {
       const trustByHostTeam = await computeRevealedTeamTrustBatch(this.prisma, [teamMatch.hostTeamId]);
       const trust = trustByHostTeam.get(teamMatch.hostTeamId);
       teamMatch.hostTeam.trustScore = trust
@@ -1479,7 +1505,7 @@ export class TeamMatchesService {
             mannerScore: trust.mannerScore == null ? null : new Prisma.Decimal(trust.mannerScore),
           }
         : null;
-    } else {
+    } else if (teamMatch.hostTeam) {
       teamMatch.hostTeam.trustScore = null;
     }
 
@@ -1514,7 +1540,7 @@ export class TeamMatchesService {
         manageRoute: null,
       };
     }
-    const hostMembership = teamMatch.hostTeam.memberships[0];
+    const hostMembership = teamMatch.hostTeam?.memberships[0];
     const manageableHostTeam = hostMembership?.role === 'owner' || hostMembership?.role === 'manager';
     // 결과 승인 게이트용 — "상대팀(승인된 신청팀)의 owner/manager 인가".
     // `state === 'approved'` 로는 이 판정을 할 수 없다: 그건 **신청서를 낸 사람 한 명**만
@@ -1534,7 +1560,7 @@ export class TeamMatchesService {
     // 상대가 확정되지 않았으면 후기 대상 자체가 없으므로 false 다.
     const participantMember =
       teamMatch.approvedApplicantTeamId !== null &&
-      (teamMatch.hostTeam.memberships.length > 0 || (teamMatch.approvedApplicantTeam?.memberships.length ?? 0) > 0);
+      ((teamMatch.hostTeam?.memberships.length ?? 0) > 0 || (teamMatch.approvedApplicantTeam?.memberships.length ?? 0) > 0);
     const eligibleTeams = await this.getUserManageableTeams(user.id);
     // 상세 응답에도 같은 자격 목록이 실린다 — applicationEligibility 와 **같은 근거**로
     // 판정해야 한다. 한쪽만 원장을 보게 두면 같은 팀이 두 응답에서 다른 자격으로 내려가고,
@@ -1556,7 +1582,7 @@ export class TeamMatchesService {
   private getViewerState(teamMatch: TeamMatchWithRelations, user: V1AuthUser | null) {
     if (!user) return 'none';
     if (
-      teamMatch.hostTeam.memberships.some(
+      teamMatch.hostTeam?.memberships.some(
         (membership) =>
           membership.userId === user.id &&
           (membership.role === 'owner' || membership.role === 'manager'),
@@ -1609,10 +1635,7 @@ export class TeamMatchesService {
       });
     }
 
-    const teamMatch = application.teamMatch;
-    assertTeamMatchHasHostAndStart(teamMatch);
-
-    return { ...application, teamMatch };
+    return application;
   }
 
   private async getUserManageableTeams(userId: string, teamId?: string) {
@@ -1970,6 +1993,8 @@ type TeamMatchOperationalFields = {
 type TeamMatchPublicFields = TeamMatchOperationalFields & {
   hostTeam: { id: string } | null;
   region: { id: string; name: string } | null;
+  leagueId: string | null;
+  tournamentId: string | null;
 };
 
 type TeamMatchHostFields = {
@@ -2000,13 +2025,23 @@ function assertTeamMatchHasHostRelation<T extends TeamMatchHostFields>(
 
 function assertTeamMatchPublicInvariant<T extends TeamMatchPublicFields>(
   teamMatch: T,
-): asserts teamMatch is T & { hostTeamId: string; startAt: Date; hostTeam: NonNullable<T['hostTeam']>; region: NonNullable<T['region']> } {
-  assertTeamMatchHasHostAndStart(teamMatch);
-  assertTeamMatchHasHostRelation(teamMatch);
-  if (teamMatch.hostTeam.id !== teamMatch.hostTeamId) {
+): asserts teamMatch is T & { startAt: Date; region: NonNullable<T['region']> } {
+  if (teamMatch.startAt === null) {
+    throw new ConflictException({
+      code: 'TEAM_MATCH_OPERATIONAL_DATA_INVALID',
+      message: '팀 매치의 경기 시작 시간이 없습니다.',
+    });
+  }
+  if (teamMatch.hostTeamId !== null && teamMatch.hostTeam?.id !== teamMatch.hostTeamId) {
     throw new ConflictException({
       code: 'TEAM_MATCH_OPERATIONAL_DATA_INVALID',
       message: '팀 매치의 호스트 팀 정보가 일치하지 않습니다.',
+    });
+  }
+  if (teamMatch.hostTeamId === null && (teamMatch.hostTeam !== null || teamMatch.leagueId !== null || teamMatch.tournamentId !== null)) {
+    throw new ConflictException({
+      code: 'TEAM_MATCH_OPERATIONAL_DATA_INVALID',
+      message: '플랫폼 모집 팀매치의 팀 정보가 올바르지 않습니다.',
     });
   }
   if (teamMatch.region === null) {

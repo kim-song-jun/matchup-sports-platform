@@ -128,7 +128,7 @@ function AdminTeamMatchesPageContent() {
               href="/admin/team-matches/new"
               className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
             >
-              팀매치 배정
+              모집 만들기
             </Link>
           ) : null
         }
@@ -198,7 +198,7 @@ function AdminTeamMatchesPageContent() {
                   </span>
                 </div>
                 <span className="block truncate text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
-                  {row.league ? `${row.league.title} · ${row.hostTeamName}` : row.hostTeamName}
+                  {row.league ? `${row.league.title} · ${row.hostTeamName ?? '팀 미정'}` : row.hostTeamName ?? '플랫폼 모집'}
                 </span>
               </div>
             ),

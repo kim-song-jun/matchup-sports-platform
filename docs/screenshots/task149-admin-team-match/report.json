@@ -11,7 +11,10 @@
     "verdict": "PASS",
     "overflow": false,
     "httpStatus": 200,
-    "submitEnabled": true
+    "submitEnabled": true,
+    "assignmentEnabled": true,
+    "detailHttpStatus": 200,
+    "detailOverflow": false
   },
   {
     "viewport": {
@@ -25,7 +28,10 @@
     "verdict": "PASS",
     "overflow": false,
     "httpStatus": 200,
-    "submitEnabled": true
+    "submitEnabled": true,
+    "assignmentEnabled": true,
+    "detailHttpStatus": 200,
+    "detailOverflow": false
   },
   {
     "viewport": {
@@ -39,6 +45,9 @@
     "verdict": "PASS",
     "overflow": false,
     "httpStatus": 200,
-    "submitEnabled": true
+    "submitEnabled": true,
+    "assignmentEnabled": true,
+    "detailHttpStatus": 200,
+    "detailOverflow": false
   }
 ]

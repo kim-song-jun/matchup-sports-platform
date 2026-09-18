@@ -293,6 +293,9 @@ jobs:
       # fixes D-1 (a StageA runner silently skipping new migrations) but a
       # regression back to the candidate runner's exact-ledger-equality
       # design would permanently block every deploy that adds a migration.
+      - name: Current and historical final-schema binding tests
+        run: python3 scripts/qa/test-final-schema-binding.py
+
       - name: Task168 final-steady migration contract tests
         run: bash scripts/qa/test-task168-final-steady.sh
 

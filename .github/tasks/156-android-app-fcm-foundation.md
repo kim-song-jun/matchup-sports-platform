@@ -736,3 +736,11 @@ Reviewed 8/8 areas: signup age; chat access/blocking; report processing; final a
 - CI follow-up: schema guard integration 9/9 passed locally after re-pin. Exact v1.3 INSERT and read-only conflict guard statements registered in the existing expand-contract review list; negative controls, base-resolution self-tests and PR diff gate passed. Android Alpha and Web CI passed on d3506c04c. Copilot request unavailable: latest CLI returned reviewer not found; no review request or completed review exists, so automated-review clean is not claimed.
 
 - PR 생성 후 최신 dev `e4caade04` 동기화를 준비했다. Task 156의 동시 추가 문단만 충돌하여 두 작업 기록을 모두 보존했다. Copilot CLI는 reviewer not found로 요청 실패했다. 기존 캡처는 감사 기준 SHA의 증거이며 이후 dev 신규 기능의 재검증을 뜻하지 않는다.
+
+### Alpha deploy follow-up — reviewed schema binding
+
+- PR #1226 merged to dev `94f554369`; PR and merge-commit CI passed. Deploy Alpha `35378366792` stopped before image build/server mutation at `Task168 final-policy schema/M11 digest mismatch`.
+- Cause: PR #1225 added only `V1ChatUserBlock` and the two V1User relations. The integration schema snapshot was updated, but the normal runtime Docker builder, release binder and manifest creator still pinned the pre-addition full schema.
+- Scope: normal `final` schema pin becomes `158eb655609db3136765f043ddb82b71c6b39319bf09aacf8226fdfa29c0bee0`. M11 remains `08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323`; frozen StageA/StageB snapshots, migrations, ledger/catalog checks and destructive-operation gates remain unchanged.
+- Stored `final` manifests accept the two explicitly reviewed schema hashes so prior release history remains readable. The producer/Docker builder accept only the current hash, and schema/client/M11/checksum consistency is still mandatory.
+- Validation: failed live binder is RED evidence; new actual-script tests 7/7 PASS (current source binding, historical/current manifest, modified schema/M11, unknown schema, client mismatch and checksum tampering). Manifest creator self-test and Docker target negative controls 4/4 PASS; shell syntax and diff checks PASS. Existing release-state test needs passwordless sudo unavailable locally; CI owns that existing gate. No live database mutation performed during this fix.

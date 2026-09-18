@@ -64,6 +64,8 @@ validate_alpha_release_manifest() {
 # compares it against the live DB ledger at deploy time (L1-L4 in
 # deploy/task168-final-steady-migrate.sh), so the manifest only needs to
 # bind the schema and the M11 migration file's own checksum.
+# Stored pre-chat-block releases remain readable for release history/rollback checks.
+# Only these two reviewed schemas are accepted; StageB snapshots stay frozen.
 validate_alpha_final_release_manifest() {
   local manifest_file="$1"
   local expected_sha="$2"
@@ -98,7 +100,8 @@ validate_alpha_final_release_manifest() {
       ((.database.migrationValidatedFrom == null) or (.database.migrationValidatedFrom | test("^[0-9a-f]{40}$"))) and
       ((.database.rollbackCompatibleWith == null) or (.database.rollbackCompatibleWith | test("^[0-9a-f]{40}$"))) and
       .database.task168.stage == "final" and
-      .database.task168.schemaSha256 == "e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46" and
+      (.database.task168.schemaSha256 == "e44990c6d17e612b9d93e4ce41a6c5adaacb813ab3c67f75fd4f05b185736f46" or
+       .database.task168.schemaSha256 == "158eb655609db3136765f043ddb82b71c6b39319bf09aacf8226fdfa29c0bee0") and
       .database.task168.runtimeClientSchemaSha256 == .database.task168.schemaSha256 and
       .database.task168.m11Sha256 == "08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323" and
       .images.api.repository == ($registry + "/teameet-alpha-v1-api") and

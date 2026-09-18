@@ -1,0 +1,44 @@
+[
+  {
+    "viewport": {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900
+    },
+    "consoleErrors": [],
+    "pageErrors": [],
+    "networkErrors": [],
+    "verdict": "PASS",
+    "overflow": false,
+    "httpStatus": 200,
+    "submitEnabled": true
+  },
+  {
+    "viewport": {
+      "name": "tablet",
+      "width": 768,
+      "height": 1024
+    },
+    "consoleErrors": [],
+    "pageErrors": [],
+    "networkErrors": [],
+    "verdict": "PASS",
+    "overflow": false,
+    "httpStatus": 200,
+    "submitEnabled": true
+  },
+  {
+    "viewport": {
+      "name": "mobile",
+      "width": 390,
+      "height": 844
+    },
+    "consoleErrors": [],
+    "pageErrors": [],
+    "networkErrors": [],
+    "verdict": "PASS",
+    "overflow": false,
+    "httpStatus": 200,
+    "submitEnabled": true
+  }
+]

@@ -24,6 +24,28 @@
 | POST | `/team-matches/:id/result` | Yes | 결과 입력 |
 | POST | `/team-matches/:id/evaluate` | Yes | 상대 팀 평가 |
 | GET | `/team-matches/:id/referee-schedule` | Yes | 심판 배정 조회 |
+| POST | `/admin/team-matches` | Admin owner/ops | 두 팀 직접 배정 |
+
+## POST /admin/team-matches
+
+플랫폼 운영자가 기존 `모집 → 신청 → 승인` 단계를 대신 수행하는 별도 생성 경로다. 일반 팀 owner/manager의 `POST /team-matches` 계약은 변경하지 않는다.
+
+Required body:
+
+- `clientCommandId` (UUID, 재시도 멱등 키)
+- `homeTeamId`, `awayTeamId` (서로 다른 활성 팀)
+- `regionId` (활성 시·군·구)
+- `title`, `startsAt`, `manualPlaceName`
+
+Optional body: `description`, `endsAt`, `addressText`, `costNote`, `rulesText`.
+
+Rules:
+
+- active `owner` 또는 `ops` admin만 생성할 수 있으며 `support`는 `403 PERMISSION_DENIED`다.
+- 두 팀은 서로 달라야 하고 동일 종목이어야 한다.
+- 성공 시 `V1TeamMatch(status=matched, approvedApplicantTeamId=awayTeamId)`, 승인 상태 application, 양 팀이 연결된 Game, 양 팀 schedule, admin action/status log를 한 트랜잭션에서 생성한다.
+- 같은 `clientCommandId`와 같은 payload 재시도는 기존 결과를 반환한다. 같은 키의 다른 payload는 `409 IDEMPOTENCY_CONFLICT`다.
+- 성공 응답은 `teamMatchId`, `gameId`, `homeTeamId`, `awayTeamId`, `detailRoute`, `replayed`를 포함한다.
 
 ## GET /team-matches
 

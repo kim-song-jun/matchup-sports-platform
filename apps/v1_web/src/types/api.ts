@@ -2600,6 +2600,7 @@ export type V1AdminMatchDetail = V1AdminMatchRow & {
 export type V1AdminTeamRow = {
   teamId: string;
   name: string;
+  sportId: string;
   sportName: string;
   ownerUserId: string;
   ownerName: string | null;
@@ -2680,6 +2681,31 @@ export type V1AdminTeamMatchDetail = V1AdminTeamMatchRow & {
   costNote: string | null;
   applicationCount: number;
   applications: V1AdminTeamMatchApplicationRow[];
+};
+
+export type V1AdminAssignedTeamMatchPayload = {
+  clientCommandId: string;
+  homeTeamId: string;
+  awayTeamId: string;
+  regionId: string;
+  title: string;
+  description?: string | null;
+  startsAt: string;
+  endsAt?: string | null;
+  manualPlaceName: string;
+  addressText?: string | null;
+  costNote?: string | null;
+  rulesText?: string | null;
+};
+
+export type V1AdminAssignedTeamMatchResult = {
+  teamMatchId: string;
+  gameId: string;
+  status: 'matched';
+  homeTeamId: string;
+  awayTeamId: string;
+  detailRoute: string;
+  replayed: boolean;
 };
 
 export type V1AdminStatusChangeResult = {

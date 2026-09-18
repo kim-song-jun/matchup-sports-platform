@@ -691,3 +691,5 @@ Reviewed 8/8 areas: signup age; chat access/blocking; report processing; final a
 - Existing 24 captures reviewed; no new layout changes in this review. Known render-time shell warnings and pending-signup settings 403 remain explicitly recorded, not masked.
 - Submission remains separate: public UGC outside chat (profiles/reviews/team content) needs a service-wide report/block coverage audit; chat-only blocking does not certify all public UGC surfaces. Reference: https://support.google.com/googleplay/android-developer/answer/9876937
 - Remaining production/Console/native/storage gates stay open. This PR does not claim Play acceptance or a signed native-device test.
+
+- PR #1225 CI uncovered setup-android v3 default `tools platform-tools` failing because `tools` is no longer available. Alpha and production bundle now explicitly install `platform-tools`; their existing API 36/build-tools installation stays intact. Source: https://github.com/android-actions/setup-android/blob/v3/action.yml.

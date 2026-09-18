@@ -1,5 +1,20 @@
 # Match Flow Scenarios
 
+## MATCH-004 개인 친선매치 신청·참여 기록 전체 흐름 (2026-09-18)
+
+- [x] 목록 → 만들기 4단계 → 상세
+- [x] 참가 신청 메시지 → 승인 대기 → 호스트 승인/거절
+- [x] 승인 후 호스트/참가자 채팅
+- [x] 수정 → 모집 마감 → 모집 재개 → 취소
+- [x] 참가자별 참여 완료/불참 → 경기 완료
+- [x] 완료 상세 → 내 매치 → 리뷰
+- [x] 관리자 목록 → 관리자 상세
+
+기록 계약: 점수·승패·개인 성적은 남기지 않는다. 실제 참석은 `participant.status=completed`, 불참은 `no_show`로 남기며 모든 active 참가자를 지정해야 완료된다. 완료 참가자만 리뷰 CTA를 갖고, 완료 후에도 매치 채팅 권한을 유지한다.
+
+수동/시각 QA: host/applicant/owner/admin, 390×844·768×1024·1440×900, 27/27 상태, 81/81 screenshots, console/pageerror/HTTP 5xx 0건. Evidence: `docs/visual-qa/individual-friendly-match-lifecycle-20260918/README.md`
+
+
 > Status: Verified with follow-up
 > `MATCH-001/002/003`는 문서상 검증됨이다. 남은 follow-up은 API/app restart persistence와 broader multi-browser expansion이다.
 

@@ -94,6 +94,8 @@ import type {
   V1MasterRegionsResponse,
   V1MasterSportsResponse,
   V1Match,
+  V1MatchCompletionPayload,
+  V1MatchCompletionResult,
   V1MatchApplicationEligibility,
   V1MatchApplicationsPage,
   V1MatchApplicationResult,
@@ -758,6 +760,19 @@ export function useV1CloseMatch(matchId: string) {
   return useMutation({
     mutationFn: (body?: { reason?: string | null }) =>
       v1Post<{ matchId: string; status: string; expiredApplications: number; detailRoute: string }>(`/matches/${matchId}/close`, body ?? {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
+      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.match(matchId), 'applications'] });
+    },
+  });
+}
+
+export function useV1CompleteMatch(matchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1MatchCompletionPayload) =>
+      v1Post<V1MatchCompletionResult>(`/matches/${matchId}/complete`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
       queryClient.invalidateQueries({ queryKey: v1Keys.matches() });

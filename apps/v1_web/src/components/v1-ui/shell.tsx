@@ -146,20 +146,27 @@ function AppChromeInner({
             )}
           </div>
           <div className="tm-topbar-actions">
+            {/* prefetch={false}: `DesktopNav`는 뷰포트와 무관하게 항상 마운트돼 있고
+                (이 파일 아래 `<DesktopNav>` 참조) 같은 href(/home, /search, /notifications)를
+                이미 프리페치한다 — 여기서 또 프리페치하면 페이지 하나당 같은 라우트를
+                중복으로 미리 받는다(2026-09-18 알파 실측: 홈 화면 방문 1회에 중복 프리페치
+                69건). Next 라우터 캐시는 URL 기준으로 공유되므로, 어느 Link가 미리 받았든
+                다른 Link 클릭 시 그대로 재사용돼 이 자리의 prefetch를 꺼도 내비게이션
+                체감 속도는 그대로다. */}
             {showHomeShortcut ? (
-              <Link className="tm-btn tm-btn-icon tm-btn-ghost" href="/home" aria-label="홈으로">
+              <Link className="tm-btn tm-btn-icon tm-btn-ghost" href="/home" aria-label="홈으로" prefetch={false}>
                 <HomeIcon size={21} strokeWidth={2} />
               </Link>
             ) : null}
             {topbarActions ?? (
               <>
                 {showSearch ? (
-                  <Link className="tm-btn tm-btn-icon tm-btn-ghost" href="/search" aria-label="검색">
+                  <Link className="tm-btn tm-btn-icon tm-btn-ghost" href="/search" aria-label="검색" prefetch={false}>
                     <SearchIcon size={21} strokeWidth={2} />
                   </Link>
                 ) : null}
                 {showNotifications ? (
-                  <NotificationBellLink className="tm-btn tm-btn-icon tm-btn-ghost" forceUnread={hasNewNotification} />
+                  <NotificationBellLink className="tm-btn tm-btn-icon tm-btn-ghost" forceUnread={hasNewNotification} prefetch={false} />
                 ) : null}
               </>
             )}
@@ -201,13 +208,17 @@ function DesktopFooter() {
           </span>
           <span className="tm-desktop-footer-tagline">같이 뛸 사람을 한 번에</span>
         </div>
+        {/* prefetch={false}: 약관·공지 6개는 거의 클릭되지 않는 저빈도 유틸리티 페이지라
+            페이지마다 미리 받아 둘 가치가 없다 — 알파 실측에서 홈 화면 방문 1회당 이 6개
+            링크만으로 프리페치 요청이 10건 나갔다(문서별 쿼리라 캐시가 개별 URL로 갈린다).
+            prefetch를 꺼도 클릭 시 정상적으로 그때 받아오므로 기능 손실은 없다. */}
         <nav className="tm-desktop-footer-links" aria-label="푸터 링크">
-          <Link href="/notices">공지사항</Link>
-          <Link href="/terms?document=terms">서비스 이용약관</Link>
-          <Link href="/terms?document=privacy">개인정보처리방침</Link>
-          <Link href="/terms?document=location">위치기반서비스 이용약관</Link>
-          <Link href="/terms?document=tournament-policy">대회 운영정책</Link>
-          <Link href="/terms?document=support">고객센터</Link>
+          <Link href="/notices" prefetch={false}>공지사항</Link>
+          <Link href="/terms?document=terms" prefetch={false}>서비스 이용약관</Link>
+          <Link href="/terms?document=privacy" prefetch={false}>개인정보처리방침</Link>
+          <Link href="/terms?document=location" prefetch={false}>위치기반서비스 이용약관</Link>
+          <Link href="/terms?document=tournament-policy" prefetch={false}>대회 운영정책</Link>
+          <Link href="/terms?document=support" prefetch={false}>고객센터</Link>
         </nav>
         <p className="tm-desktop-footer-copy">© 2026 Teameet</p>
       </div>
@@ -262,7 +273,12 @@ function BottomNav({ activeTab }: { activeTab?: V1NavTab }) {
       {tabs.map(({ id, label, href, Icon }) => {
         const active = id === activeTab;
         return (
-          <Link key={id} className="tm-bottom-tab" href={href} aria-current={active ? 'page' : undefined} data-active={active}>
+          // prefetch={false}: `DesktopNav`가 뷰포트와 무관하게 항상 마운트돼 이 5개
+          // href를 이미 프리페치한다 — 여기서 또 프리페치하면 탭 5개가 그대로 중복된다
+          // (모바일 폭에서도 DesktopNav는 CSS로만 숨겨질 뿐 DOM에는 남아 있다). Next
+          // 라우터 캐시는 URL 기준 공유라 DesktopNav 쪽 프리페치만으로 이 탭 클릭도
+          // 그대로 빨라진다.
+          <Link key={id} className="tm-bottom-tab" href={href} aria-current={active ? 'page' : undefined} data-active={active} prefetch={false}>
             <Icon size={23} strokeWidth={active ? 2.2 : 1.7} />
             <span>{label}</span>
           </Link>
@@ -293,11 +309,15 @@ function DesktopNav({
 
   return (
     <nav className="tm-desktop-nav" aria-label="데스크톱 주요 메뉴">
+      {/* prefetch={false}: 바로 옆 탭 목록의 "홈" 탭(tabs.map, href="/home")이 이미
+          같은 라우트를 프리페치한다 — 브랜드 로고 링크까지 켜 두면 이 nav 하나에서만
+          "/home"이 두 번 프리페치된다. */}
       <Link
         className="tm-desktop-nav-brand"
         href="/home"
         style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
         aria-label="teameet 홈"
+        prefetch={false}
       >
         <BrandMark size={24} />
         teameet

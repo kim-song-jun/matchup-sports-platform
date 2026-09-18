@@ -73,3 +73,13 @@ export class LeaveChatRoomDto {
   @MaxLength(500)
   reason?: string | null;
 }
+
+export class ReportChatMessageDto {
+  @IsIn(['spam', 'harassment', 'impersonation', 'inappropriate', 'other'])
+  reason!: 'spam' | 'harassment' | 'impersonation' | 'inappropriate' | 'other';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  detail?: string;
+}

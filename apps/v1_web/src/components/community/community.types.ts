@@ -45,6 +45,8 @@ export type ChatListViewModel = {
 };
 
 export type ChatRoomViewModel = {
+  onMessageSafety?: (message: { id: string; label: string }) => void;
+  onManageBlocked?: () => void;
   title: string;
   context: { title: string; sub: string; href: string };
   /** 팀컨택 방이면 상단 컨텍스트 카드 대신 상태 카드를 그린다. */

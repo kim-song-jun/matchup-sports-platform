@@ -260,6 +260,7 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
     v1UserRecordConsent: { updateMany: jest.Mock };
     v1PushSubscription: { deleteMany: jest.Mock };
     v1PushDevice: { deleteMany: jest.Mock };
+    v1ChatUserBlock: { deleteMany: jest.Mock };
     v1UserRegion: { deleteMany: jest.Mock };
     v1UserSportPreference: { deleteMany: jest.Mock };
     v1SearchHistory: { deleteMany: jest.Mock };
@@ -289,6 +290,7 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
       v1UserRecordConsent: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       v1PushSubscription: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
       v1PushDevice: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      v1ChatUserBlock: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
       v1UserRegion: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
       v1UserSportPreference: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
       v1SearchHistory: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) },
@@ -313,7 +315,7 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
         cb: (
           tx: Pick<
             typeof p,
-            'v1AdminUser' | 'v1User' | 'v1AdminActionLog' | 'v1StatusChangeLog' | 'v1AuthIdentity' | 'v1UserProfile' | 'v1UserRecordConsent' | 'v1PushSubscription' | 'v1PushDevice' | 'v1UserRegion' | 'v1UserSportPreference' | 'v1SearchHistory' | 'v1VerificationToken' | 'v1TeamMembership' | 'v1Team' | 'v1TournamentPlayer' | '$queryRaw'
+            'v1AdminUser' | 'v1User' | 'v1AdminActionLog' | 'v1StatusChangeLog' | 'v1AuthIdentity' | 'v1UserProfile' | 'v1UserRecordConsent' | 'v1PushSubscription' | 'v1PushDevice' | 'v1ChatUserBlock' | 'v1UserRegion' | 'v1UserSportPreference' | 'v1SearchHistory' | 'v1VerificationToken' | 'v1TeamMembership' | 'v1Team' | 'v1TournamentPlayer' | '$queryRaw'
           >,
         ) => Promise<unknown>,
       ) =>
@@ -327,6 +329,7 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
           v1UserRecordConsent: p.v1UserRecordConsent,
           v1PushSubscription: p.v1PushSubscription,
           v1PushDevice: p.v1PushDevice,
+          v1ChatUserBlock: p.v1ChatUserBlock,
           v1UserRegion: p.v1UserRegion,
           v1UserSportPreference: p.v1UserSportPreference,
           v1SearchHistory: p.v1SearchHistory,
@@ -391,6 +394,9 @@ describe('AdminService.deleteUser — realtime disconnect side effect', () => {
 
     await service.deleteUser(actorAuthUser, targetUserId, { reason: '계정 삭제 요청 처리' });
 
+    expect(prisma.v1ChatUserBlock.deleteMany).toHaveBeenCalledWith({
+      where: { OR: [{ blockerUserId: targetUserId }, { blockedUserId: targetUserId }] },
+    });
     expect(prisma.v1PushSubscription.deleteMany).toHaveBeenCalledWith({
       where: { userId: targetUserId },
     });

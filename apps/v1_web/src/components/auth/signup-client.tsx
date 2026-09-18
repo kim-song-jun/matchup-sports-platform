@@ -30,6 +30,7 @@ import {
   formatPhone,
   getSignupProfileIssue,
   isCompleteSignupProfile,
+  isSignupAgeEligible,
   normalizeSeparatedDigits,
   normalizeSignupDisplayName,
   SIGNUP_PROFILE_ERROR_MESSAGES,
@@ -712,6 +713,13 @@ export function SignupClient() {
                   required
                   value={formatBirthDate(birthDateDigits)}
                 />
+                <span
+                  className="tm-text-caption"
+                  role="status"
+                  style={{ color: birthDateDigits.length === 8 && !isSignupAgeEligible(birthDateDigits) ? 'var(--red700)' : 'var(--text-caption)' }}
+                >
+                  만 14세 이상만 가입할 수 있어요.
+                </span>
               </label>
 
             </>

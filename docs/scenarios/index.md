@@ -403,3 +403,8 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 | Kakao OAuth /callback/kakao 경로 동작 | 실 OAuth 앱 redirect_uri 수정 필요 (운영자) |
 | notification href DB migration | 기존 DB의 /v1/* route는 runtime migrateV1NotificationHref로 자동 처리됨 |
 | 세션 1 (backend security) · 세션 2 (campaign/tournament) 커밋 | 아직 미커밋 working tree 상태 |
+
+## Android Play readiness — 2026-09-19
+
+Task 156 continuation: [scenario](./android-play-readiness.md). Organization D-U-N-S pending.
+Implementation and isolated API/browser evidence tracked in Task 156; production and Play/device gates remain separate.

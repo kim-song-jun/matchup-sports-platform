@@ -655,3 +655,27 @@ report, upgrade preservation, and the remaining OEM/foldable/multi-window matrix
   alternative instead of leaving a blocked user at a dead end.
 - Public deletion copy continues to distinguish immediate account lock/push revocation, operator final PII
   cleanup, and narrowly retained completed-match/payment/dispute/security records.
+
+## Play readiness implementation — 2026-09-19
+
+Base: `82698757d` (`origin/dev`); isolated worktree `/tmp/teameet-android-play-readiness`.
+Owner: main session only. Scope: v1 API/Web/Android listing, migrations, contracts and screenshot evidence.
+Forbidden: unrelated WIP, production data, dev→main promotion, Play Console submission.
+
+- [x] Phase 1: enforce age 14+ for email/social signup in API and UI; publish immutable privacy v1.3 matching logout behavior; remove unsupported listing claims.
+- [x] Phase 2: authenticated chat message reporting into operator inquiries; persistent chat user blocking/unblocking, message/preview/realtime/push filtering; API docs and meaningful tests.
+- [x] Phase 3: narrow validation, responsive before/after captures and review; record exact build/runtime/persona and remaining device/Console gates.
+
+Acceptance: no self/nonparticipant reporting/blocking; blocked pairs cannot see each other's chat content or receive future message notifications; errors remain visible; normal users can undo blocks. Age boundary is enforced server-side for both signup paths. Legal document history is immutable.
+
+Ambiguity: user is awaiting D-U-N-S for organization registration; Play-signed screenshots and Console verification cannot be represented as completed. Physical upload-object retention needs an audited ownership/retention policy; do not delete shared team/event files by guessing ownership. Public deletion route and privacy deployment are user-controlled production-release gates.
+
+
+### Progress snapshot
+
+- Implemented email/social age boundary, chat message report→inquiry/outbox, bilateral block filters and owner-only unblock, final account-deletion block-record cleanup, additive privacy v1.3 and corrected listing claims.
+- Validation: targeted backend unit 75 passed (two existing strict query-shape expectations updated for the new filter); frontend 24 passed; HTTP+PostgreSQL integration 4 passed; fresh database migration chain 170 applied; API/Web typechecks and Android source policy gate passed. Final integration rerun additionally checks safety refresh for both users after unblock.
+- Headed browser evidence: 24 before/after screenshots, 3/3 viewports, real isolated API/database with fictional users. Canonical gallery and explicit pre-existing console/403 findings: `docs/scenarios/android-play-readiness.md`.
+- Local source work only; no commit/PR/deployment/Play submission claimed. Remaining gates: D-U-N-S and organization verification; user-controlled dev→main promotion and public deletion/privacy/assetlinks probes; signed AAB and native device/FCM/pre-launch validation; final Data safety and physical upload retention/removal audit.
+
+- Cleanup: owned headed browser contexts, local Web/API processes and PostgreSQL cluster stopped. Final diff whitespace check passed; touched source has no new debt markers. New modules/tests/migrations/screenshots remain untracked until a deliberate scoped commit.

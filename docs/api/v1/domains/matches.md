@@ -13,6 +13,7 @@
 | `POST` | `/api/v1/matches/:matchId/applications` | user | `{ message?: string | null }` | application |
 | `GET` | `/api/v1/matches/:matchId/applications` | user host | `status?`, `cursor?`, `limit?` | applicant list |
 | `PATCH` | `/api/v1/matches/:matchId` | user host | `UpdateMatchDto` | updated match |
+| `POST` | `/api/v1/matches/:matchId/complete` | user host | empty body | completed match and participant count |
 | `POST` | `/api/v1/matches/:matchId/cancel` | user host | `{ reason?: string | null }` | cancelled match |
 | `POST` | `/api/v1/match-applications/:applicationId/withdraw` | user applicant | `{ reason?: string | null }` | withdrawn application |
 | `POST` | `/api/v1/match-applications/:applicationId/approve` | user host | `{ note?: string | null }` | approved application and participant |
@@ -66,8 +67,19 @@
 - `deadlineAt` is persisted and returned on list/detail/edit responses. Once it passes, application eligibility returns `DEADLINE_PASSED` and the display state is treated as closed for CTA purposes.
 - Apply creates a `requested` application. There is no payment or checkout step.
 - Host approval creates or activates a participant and updates capacity-derived CTA state.
+- Detail returns `canComplete`, `canWithdraw`, and `completedAt`. A host can complete a
+  `recruiting`/`closed` match only after `endsAt` (or `startsAt` when no end exists). Completion locks the
+  match and atomically marks the match and all current active participants `completed`, expires remaining
+  requested applications, and is retry-safe without double-counting profile activity. It records participation
+  only; personal recruitment matches do not synthesize goals, assists, wins, or losses.
 - Approval locks and re-reads the match before capacity and status checks, then conditionally moves only a still-`requested` application to `approved`. Withdrawal and rejection use the same expected-status transition, and resubmission only replaces the previously observed terminal state, so concurrent approval, withdrawal, rejection, resubmission, and cancellation cannot report contradictory success.
-- Withdraw/reject/cancel preserve history through application/status rows.
+- An applicant may also withdraw an `approved` application before kickoff. The same locked transaction changes
+  its active participant row to `cancelled`, restoring capacity and removing current chat/completion eligibility.
+  Withdrawal after kickoff or in a terminal match returns `409 STATE_CONFLICT`.
+- Withdraw/reject/cancel preserve history through application/status rows. The host applicant list accepts all
+  application states as filters so the web UI can expose pending, confirmed, and full-history tabs.
+- `GET /me/matches` is consumed with `pageInfo` cursor pagination; the web client accumulates pages instead of
+  truncating personal history at the first 50 rows.
 - Host-only manage actions must reject non-host users.
 
 Primary tables:

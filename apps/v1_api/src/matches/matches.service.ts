@@ -1,3 +1,4 @@
+import { completePersonalMatch } from './complete-personal-match';
 import {
   BadRequestException,
   ConflictException,
@@ -219,6 +220,11 @@ export class MatchesService {
       },
       participantsPreview,
       viewer,
+      canComplete: viewer.state === 'host' && ['recruiting', 'closed'].includes(match.status)
+        && (match.endAt ?? match.startAt) <= new Date(),
+      canWithdraw: viewer.state === 'participant' && ['recruiting', 'closed'].includes(match.status)
+        && match.startAt > new Date(),
+      completedAt: match.completedAt,
     };
   }
 
@@ -344,8 +350,27 @@ export class MatchesService {
       status: result.match.status,
       hostParticipantId: result.participant.id,
       detailRoute: `/matches/${result.match.id}`,
-      manageRoute: `/matches/${result.match.id}/manage`,
+      manageRoute: `/matches/${result.match.id}/applications`,
     };
+  }
+
+  async complete(user: V1AuthUser, matchId: string) {
+    this.assertActiveAccount(user);
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${matchId} FOR UPDATE`;
+      const match = await tx.v1Match.findFirst({ where: { id: matchId, deletedAt: null } });
+      if (!match) throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: '매치를 찾을 수 없어요.' });
+      if (match.hostUserId !== user.id) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '호스트만 참여를 확정할 수 있어요.' });
+      const completed = await completePersonalMatch(tx, match);
+      if (match.status !== 'completed') {
+        await tx.v1StatusChangeLog.create({ data: {
+          targetType: 'match', targetId: matchId, fromStatus: match.status, toStatus: 'completed',
+          actorType: 'user', actorUserId: user.id, reason: 'host_confirmed_participation',
+        } });
+      }
+      return { matchId, status: 'completed' as const, ...completed, detailRoute: `/matches/${matchId}` };
+    });
+    return result;
   }
 
   async edit(user: V1AuthUser, matchId: string) {
@@ -455,6 +480,9 @@ export class MatchesService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${match.id} FOR UPDATE`;
+      const current = await tx.v1Match.findFirst({ where: { id: match.id, deletedAt: null } });
+      if (!current || !['recruiting', 'closed'].includes(current.status) || (current.status === 'recruiting' && current.startAt <= new Date())) throw stateConflict('매치 상태가 바뀌었어요. 다시 확인해 주세요.');
       await tx.v1Match.update({
         where: { id: match.id },
         data: {
@@ -541,6 +569,9 @@ export class MatchesService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${match.id} FOR UPDATE`;
+      const current = await tx.v1Match.findFirst({ where: { id: match.id, deletedAt: null } });
+      if (!current || current.status !== 'recruiting' || current.startAt <= new Date()) throw stateConflict('매치 상태가 바뀌었어요. 다시 확인해 주세요.');
       await tx.v1Match.update({
         where: { id: match.id },
         data: { status: 'closed' },
@@ -677,6 +708,9 @@ export class MatchesService {
 
     const existing = match.applications[0] ?? null;
     const application = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${match.id} FOR UPDATE`;
+      const current = await tx.v1Match.findFirst({ where: { id: match.id, deletedAt: null } });
+      if (!current || current.status !== 'recruiting' || current.startAt <= new Date() || (current.deadlineAt && current.deadlineAt <= new Date())) throw stateConflict('매치 상태가 바뀌었어요. 다시 확인해 주세요.');
       const nextApplication = existing
         ? await (async () => {
             const transition = await tx.v1MatchApplication.updateMany({
@@ -800,34 +834,35 @@ export class MatchesService {
         message: 'Only the applicant can withdraw this application',
       });
     }
-    if (application.status !== 'requested') {
-      throw stateConflict('Only requested applications can be withdrawn');
+    if (application.status !== 'requested' && application.status !== 'approved') {
+      throw stateConflict('대기 중이거나 승인된 신청만 취소할 수 있어요.');
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const transition = await tx.v1MatchApplication.updateMany({
-        where: { id: application.id, applicantUserId: user.id, status: 'requested' },
-        data: {
-          status: 'withdrawn',
-          withdrawnAt: new Date(),
-        },
-      });
-      if (transition.count !== 1) {
-        throw stateConflict('Only requested applications can be withdrawn');
+      await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${application.matchId} FOR UPDATE`;
+      const match = await tx.v1Match.findFirst({ where: { id: application.matchId, deletedAt: null } });
+      if (!match) throw stateConflict('매치를 찾을 수 없어요.');
+      if (application.status === 'approved' &&
+          (!['recruiting', 'closed'].includes(match.status) || match.startAt <= new Date())) {
+        throw stateConflict('참가 확정 후 취소는 경기 시작 전에만 가능해요.');
       }
-
-      await tx.v1StatusChangeLog.create({
-        data: {
-          targetType: 'match_application',
-          targetId: application.id,
-          fromStatus: application.status,
-          toStatus: 'withdrawn',
-          actorType: 'user',
-          actorUserId: user.id,
-          reason: dto.reason ?? 'applicant_withdrawn',
-        },
+      const transition = await tx.v1MatchApplication.updateMany({
+        where: { id: application.id, applicantUserId: user.id, status: application.status },
+        data: { status: 'withdrawn', withdrawnAt: new Date() },
       });
-
+      if (transition.count !== 1) throw stateConflict('신청 상태가 바뀌었어요. 다시 확인해 주세요.');
+      if (application.status === 'approved') {
+        const cancelled = await tx.v1MatchParticipant.updateMany({
+          where: { matchId: match.id, userId: user.id, applicationId: application.id, role: 'participant', status: 'active' },
+          data: { status: 'cancelled', cancelledAt: new Date() },
+        });
+        if (cancelled.count !== 1) throw stateConflict('참가 상태가 바뀌었어요. 다시 확인해 주세요.');
+      }
+      await tx.v1StatusChangeLog.create({ data: {
+        targetType: 'match_application', targetId: application.id,
+        fromStatus: application.status, toStatus: 'withdrawn',
+        actorType: 'user', actorUserId: user.id, reason: dto.reason ?? 'applicant_withdrawn',
+      } });
       return { id: application.id, matchId: application.matchId, status: 'withdrawn' as const };
     });
 
@@ -1157,7 +1192,7 @@ export class MatchesService {
   }
 
   private getParticipantCount(match: Pick<MatchWithRelations, 'participants'>) {
-    return match.participants.filter((participant) => participant.status === 'active').length;
+    return match.participants.filter((participant) => participant.status === 'active' || participant.status === 'completed').length;
   }
 
   private getApiStatus(match: V1Match) {

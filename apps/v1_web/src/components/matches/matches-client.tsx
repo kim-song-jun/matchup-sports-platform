@@ -304,6 +304,9 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
       ),
     },
     mode: toDetailMode(viewerState, getStatus(query.data)),
+    completed: getStatus(query.data) === 'completed',
+    canComplete: !seeding && query.data.canComplete === true,
+    withdrawApplicationId: !seeding && query.data.canWithdraw ? query.data.viewer?.applicationId : null,
     reviewAction: buildMatchReviewAction(matchId, viewerState, getStatus(query.data)),
     applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), eligibility.data?.eligible, eligibility.data?.message),
     // seeding 을 여기 넣지 않는다 — 렌더 쪽이 applyPending 을 '처리 중'(= 내 신청을
@@ -348,7 +351,7 @@ function toParticipants(match: V1Match, manageHref?: string) {
       // 호스트가 다른 사람 이름으로 보이던 결함이었다.
       name: match.host?.displayName ?? '호스트',
       meta: '호스트',
-      status: '승인완료',
+      status: getStatus(match) === 'completed' ? '참여 완료' : '승인 완료',
       href: manageHref,
     }];
   }
@@ -356,7 +359,7 @@ function toParticipants(match: V1Match, manageHref?: string) {
   return match.participantsPreview.filter((participant) => participant.role === 'host').map((participant) => ({
     name: participant.displayName,
     meta: '매치 만든 사람',
-    status: participant.status === 'confirmed' ? '승인완료' : participant.status,
+    status: participant.status === 'completed' ? '참여 완료' : participant.status === 'confirmed' ? '승인 완료' : participant.status,
     href: manageHref,
   }));
 }
@@ -442,12 +445,13 @@ function buildMatchReviewAction(
   status: V1MatchApiStatus,
 ): MatchDetailViewModel['reviewAction'] {
   if (status !== 'completed') return null;
-  if (viewerState !== 'host' && viewerState !== 'approved') return null;
+  if (viewerState !== 'host' && viewerState !== 'approved' && viewerState !== 'participant') return null;
   return { label: '후기 남기기', href: `/my/reviews/match/${matchId}` };
 }
 
 
 function statusLabel(viewerState: V1ViewerState, status: V1MatchApiStatus) {
+  if (status === 'completed' && (viewerState === 'host' || viewerState === 'approved' || viewerState === 'participant')) return '참여 완료';
   if (viewerState === 'host') return '내가 만든 매치';
   if (viewerState === 'requested') return '승인 대기';
   if (viewerState === 'approved' || viewerState === 'participant') return '승인 완료';
@@ -511,5 +515,3 @@ function getApplyAction({
   if (eligible) return apply;
   return undefined;
 }
-
-

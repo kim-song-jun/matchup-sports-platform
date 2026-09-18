@@ -306,7 +306,7 @@ describe('ChatService', () => {
             {
               user: {
                 matchParticipants: {
-                  some: { matchId: 'match-1', status: 'active', match: { deletedAt: null } },
+                  some: { matchId: 'match-1', status: { in: ['active', 'completed'] }, match: { deletedAt: null } },
                 },
               },
             },

@@ -229,6 +229,7 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 
 | Date | Scenario | Result | Summary | Follow-up |
 |------|----------|--------|---------|-----------|
+| 2026-09-19 | Personal match participation lifecycle | Passed | 호스트 완료·채팅, 승인 참가자의 시작 전 철회, 완료 후 후기 진입, 확정 명단/전체 이력, 내 매치 cursor pagination을 실DB와 headed Chromium 390/768/1440에서 검증했다. API unit 52/52, Web focused 53/53, integration 5/5, 21 screenshots, 7 actions, console/network 오류 0건이다. | PR에서 `docs/screenshots/personal-match-participation/` 대표 이미지와 Task 130 계약을 검토 |
 | 2026-04-07 | Initial | Drafted | 시나리오 문서 구조 생성 완료 | 실제 실행 후 업데이트 |
 | 2026-04-07 | Auth + Home + Match + Team + Chat | Failed | 96 tests run, 3 passed, 93 failed. Main blockers were API container health failure, host Prisma DB access mismatch, and Playwright worker dependency instability. | `docs/plans/2026-04-07-qa-remediation-plan.md` 기준으로 runtime → harness → suite rerun 순서로 수정 |
 | 2026-04-07 | Auth / Home / Match / Team / Chat | Failed | Playwright 데스크톱 스모크 실행 48건 중 11건 통과, 37건 실패. 핵심 장애는 API 컨테이너 비정상, DB 포트 드리프트, Playwright 의존성 해상 실패, 일부 brittle selector. | `docs/plans/2026-04-07-agent-all-qa-remediation-plan.md` 기준으로 정리 및 수정 |

@@ -337,7 +337,8 @@ describe('MatchesService', () => {
 
   // ─── 6. 비-requested 상태 신청 철회 → 409 STATE_CONFLICT ─────────────────
 
-  it('withdrawApplication: approved 상태 신청을 철회하면 409 STATE_CONFLICT를 던진다', async () => {
+  it('withdrawApplication: 시작한 매치의 approved 신청 철회는 409 STATE_CONFLICT를 던진다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({ startAt: PAST }));
     prisma.v1MatchApplication.findFirst.mockResolvedValue(
       applicationRow({
         applicantUserId: otherUser.id,
@@ -353,6 +354,7 @@ describe('MatchesService', () => {
   });
 
   it('withdrawApplication: 승인이 먼저 확정돼 requested 전이가 실패하면 withdrawn으로 보고하지 않는다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow());
     prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow());
     prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 0 });
 

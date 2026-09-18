@@ -410,7 +410,7 @@ export class ChatService {
 
   private async assertCanUseMatchChat(userId: string, matchId: string) {
     const participant = await this.prisma.v1MatchParticipant.findFirst({
-      where: { matchId, userId, status: 'active', match: { deletedAt: null } },
+      where: { matchId, userId, status: { in: ['active', 'completed'] }, match: { deletedAt: null } },
       select: { id: true },
     });
     if (!participant) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Match chat requires active participation' });

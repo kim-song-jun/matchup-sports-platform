@@ -22,13 +22,14 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
   const matchQuery = useV1Match(matchId);
   const eligibility = useV1MatchApplicationEligibility(matchId, { enabled: Boolean(matchQuery.data) });
   const viewerState = matchQuery.data?.viewer?.state ?? matchQuery.data?.viewerState ?? 'none';
-  const isHost = viewerState === 'host';
+  const isHost = !matchQuery.isPlaceholderData && viewerState === 'host';
+  const [tab, setTab] = useState<'requested' | 'approved' | 'all'>('requested');
   // Fetch once we know user is host — avoids 403 for non-hosts.
   // Cursor-paginated: a match can hold up to 100 participants while the API caps each
   // page at 50, so the host loads further pages via "더 보기" to manage every applicant.
   const applicationsQuery = useV1MatchApplicationsInfinite(
     matchId,
-    { status: 'requested', limit: 50 },
+    { ...(tab === 'all' ? {} : { status: tab }), limit: 50 },
     { enabled: Boolean(matchQuery.data) && isHost },
   );
   const approveApplication = useV1ApproveMatchApplication(matchId);
@@ -38,11 +39,11 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
 
   // Non-host redirect: once viewer state is resolved, push to detail
   useEffect(() => {
-    if (!matchQuery.data) return;
+    if (!matchQuery.data || matchQuery.isPlaceholderData || matchQuery.isError) return;
     if (!isHost) {
       router.replace(`/matches/${matchId}`);
     }
-  }, [matchQuery.data, isHost, matchId, router]);
+  }, [matchQuery.data, matchQuery.isPlaceholderData, matchQuery.isError, isHost, matchId, router]);
 
   if (matchQuery.isError) {
     return (
@@ -147,6 +148,12 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
           </div>
         </Card>
 
+        <div className="tm-segment-row" role="group" aria-label="신청 상태" style={{ marginTop: 16 }}>
+          {([['requested', '승인 대기'], ['approved', '확정 명단'], ['all', '전체 이력']] as const).map(([value, label]) => (
+            <button key={value} type="button" className={`tm-chip ${tab === value ? 'tm-chip-active' : ''}`} aria-pressed={tab === value} onClick={() => setTab(value)}>{label}</button>
+          ))}
+        </div>
+        {tab === 'approved' && match.host ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body">{match.host.displayName}</div><div className="tm-text-caption">호스트 · 참가 인원에 포함</div></Card> : null}
         {/* 로딩 중 */}
         {applicationsQuery.isLoading ? (
           <div style={{ marginTop: 16 }}>
@@ -160,8 +167,8 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
           <div style={{ marginTop: 16 }}>
             <EmptyState
               illustration={{ name: 'matches-empty' }}
-              title="신청자가 없어요"
-              sub="신청자가 생기면 여기서 바로 승인하거나 거절할 수 있어요. 매치 링크를 공유하면 더 빨리 모여요."
+              title={tab === 'approved' ? '확정된 참가자가 없어요' : tab === 'all' ? '신청 이력이 없어요' : '대기 중인 신청자가 없어요'}
+              sub={tab === 'approved' ? '신청을 승인하면 확정 명단에 표시돼요.' : tab === 'all' ? '신청·승인·취소 이력을 여기서 확인할 수 있어요.' : '새 신청이 들어오면 여기서 승인하거나 거절할 수 있어요.'}
               cta="매치 상세 보기"
               ctaHref={`/matches/${matchId}`}
             />

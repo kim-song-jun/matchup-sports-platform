@@ -57,6 +57,7 @@ vi.mock('./matches-page', () => ({
       <div data-testid="apply-pending">{String(model.applyPending)}</div>
       <div data-testid="rules">{model.match.rules.join('|')}</div>
       <div data-testid="participants">{model.match.participants.map((p) => p.name).join('|')}</div>
+      <div data-testid="participant-statuses">{model.match.participants.map((p) => p.status).join('|')}</div>
     </div>
   ),
   MatchListPageView: ({ model }: { model: MatchListViewModel }) => (
@@ -198,7 +199,16 @@ describe('MatchDetailPageClient — 후기 진입점', () => {
   });
 
   it('완료된 매치의 참가자에게 후기 진입점이 보인다', () => {
-    mockMatch('approved', 'completed');
+    useV1MatchMock.mockReturnValue({
+      data: {
+        ...baseMatch,
+        status: 'completed',
+        displayState: 'completed',
+        viewer: { state: 'participant' },
+        participantsPreview: [{ participantId: 'host-participant', userId: 'host', displayName: '이서준', role: 'host', status: 'completed' }],
+      },
+      isError: false,
+    });
 
     render(<MatchDetailPageClient matchId="match-1" />);
 
@@ -206,6 +216,8 @@ describe('MatchDetailPageClient — 후기 진입점', () => {
       'href',
       '/my/reviews/match/match-1',
     );
+    expect(screen.getByTestId('participant-statuses')).toHaveTextContent('참여 완료');
+    expect(screen.getByTestId('status-label')).toHaveTextContent('참여 완료');
   });
 
   it('호스트에게도 보인다', () => {

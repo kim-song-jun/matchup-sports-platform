@@ -377,6 +377,9 @@ export type V1CreateInquiryPayload = {
 };
 
 export type V1Match = {
+  canComplete?: boolean;
+  canWithdraw?: boolean;
+  completedAt?: string | null;
   id: string;
   matchId?: string;
   title: string;

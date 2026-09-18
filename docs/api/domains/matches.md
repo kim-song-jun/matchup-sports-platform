@@ -15,7 +15,7 @@
 | POST | `/matches/:id/join` | Yes | 참가 |
 | DELETE | `/matches/:id/leave` | Yes | 탈퇴 |
 | POST | `/matches/:id/teams` | Yes | 팀 자동 배정 (host) |
-| POST | `/matches/:id/complete` | Yes | 완료 처리 (host) |
+| POST | `/matches/:id/complete` | Yes | 경기 종료 뒤 참여 이력 확정 (host) |
 | POST | `/matches/:id/arrive` | Yes | 도착 인증 |
 
 ## GET /matches (MatchFilterDto)
@@ -123,11 +123,35 @@
   `deadlineAt` 을 주면 그 값으로 갱신하며 지금 이후 · 시작 이전이어야 한다(`400 VALIDATION_FAILED`).
   이미 모집 중이면 `409 ALREADY_PROCESSED`, 시작 시각이 지났으면 `409 STATE_CONFLICT`.
 
+## POST /matches/:id/complete (host)
+
+- `recruiting` 또는 `closed` 개인 매치를 `endsAt` 이후(종료 시각이 없으면 `startsAt` 이후)에만
+  완료할 수 있다. 호스트가 아닌 사용자는 `403 PERMISSION_DENIED`, 너무 이른 완료는
+  `409 MATCH_NOT_ENDED`다.
+- 완료 트랜잭션은 매치 행을 잠근 뒤 매치 `status/completedAt`과 현재 `active` 참가자(호스트 포함)의
+  `status/completedAt`을 함께 갱신하고, 남은 `requested` 신청은 `expired`로 닫는다. 따라서 프로필의
+  개인 매치 활동 횟수와 후기 자격은 같은 저장 상태를 사용한다.
+- 완료 재시도와 동시 요청은 성공으로 수렴하되 이미 `completed`인 참가자를 다시 집계하지 않는다.
+  완료된 매치는 다시 모집/취소 상태로 되돌릴 수 없고 관리자 완료도 같은 참가자 전환을 사용한다.
+- 이 완료는 참여 이력만 확정한다. 득점·도움·승패 같은 공식 경기 기록은 별도 Game/결과 리비전이
+  없는 개인 모집 매치에서 생성하지 않는다.
+
+## Application management and withdrawal
+
+- `GET /matches/:id/applications`는 호스트 전용이며 `status=requested|approved|rejected|withdrawn|cancelled_by_host|expired`
+  필터와 cursor pagination을 지원한다. 프론트의 승인 대기·확정 명단·전체 이력 탭은 각각 이 실제
+  필터를 사용하며 확정 명단에는 호스트도 별도로 표시한다.
+- 신청자는 `requested` 신청을 철회할 수 있다. `approved` 신청도 매치 시작 전에는 철회할 수 있으며,
+  같은 트랜잭션에서 연결 참가자를 `cancelled`로 바꿔 정원, 채팅 권한, 완료 집계에서 즉시 제외한다.
+  시작 이후 또는 완료/취소 상태에서는 승인 참가 철회를 `409 STATE_CONFLICT`로 거절한다.
+- `GET /me/matches`는 `mode=joined|created`, `cursor`, `limit`을 지원한다. 화면은 `pageInfo`를 따라
+  다음 페이지를 누적하며 50건 이후 이력도 조회한다.
+
 ## Idempotency / Duplicate Behavior
 
 - `join`: 이미 참가면 실패
 - `arrive`: 이미 도착 인증이면 실패
-- `cancel`/`complete`: 이미 종료 상태면 실패
+- `cancel`: 이미 종료 상태면 실패. `complete`: 동일 완료 요청은 성공으로 수렴하며 중복 집계하지 않음
 - `close`: 이미 마감이면 `409 ALREADY_PROCESSED` / `reopen`: 이미 모집 중이면 `409 ALREADY_PROCESSED`
 
 ## Task 6 Game source boundary

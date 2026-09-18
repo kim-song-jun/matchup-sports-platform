@@ -101,7 +101,7 @@ export async function loadParticipantNameProfiles(
  *
  * `public-consent.ts`의 판정 로직 자체는 건드리지 않는다 -- 위 "이름이 보이는가" 게이트와
  * 그 롤백 경로, 그리고 이 파일 밖의 다른 두 소비자(`public-user-records.service.ts`의
- * 개인 기록, `team-match-series-public.service.ts`의 팀 매치 시리즈)가 여전히 그대로
+ * 개인 기록, `league-match-public.service.ts`의 리그)가 여전히 그대로
  * 의존한다. `V1_TOURNAMENT_PARTICIPANT_NAMES_CONSENT_GATE`로 되돌렸을 때도
  * `resolveParticipantDisplayName`의 토글 기반 이름 선택은 그대로 적용된다 -- 그 환경
  * 변수가 통제하는 것은 "이름이 보이는가"뿐이고 "어떤 이름인가"는 이번 정책이 대체한
@@ -128,6 +128,35 @@ export function isTournamentParticipantNameGatingReverted(): boolean {
  * `isStaffBypass=false`로 호출해 되돌린 상태에서도 기존 동작과 완전히 동일하게
  * 유지한다.
  */
+/**
+ * 참가자의 **공개 프로필 주소**. 열어도 되면 경로를, 아니면 `null` 을 돌려준다.
+ *
+ * 공개 응답에 `userId` 를 싣지 않기로 한 결정(2026-08-24 B-2)의 구현이다. 계정 식별자를
+ * 내보내면 이름을 가려 둔 경기에서도 같은 id 로 사람을 이어 붙일 수 있게 되는데, 링크를
+ * 걸기 위해 그 표면을 새로 만들 이유가 없다. 대신 **열어도 되는지 판단까지 여기서 끝내고**
+ * 소비처에는 바로 쓸 수 있는 경로만 준다 — 화면 세 곳이 각자 게이팅을 다시 판단하면
+ * 언젠가 갈린다.
+ *
+ * 두 가지를 모두 만족해야 열린다:
+ *   1. `userId` 가 있다 — 라인업은 이름만으로도 짤 수 있어서, 계정이 없는 참가자에게는
+ *      애초에 열어 줄 프로필이 없다.
+ *   2. 사용자 단위 공개 동의가 켜져 있다 — 프로필 화면(`/users/:id`) 자체가 같은 조건으로
+ *      게이팅하므로, 이걸 빼면 열어도 빈 화면이 나오는 링크를 걸게 된다.
+ *
+ * **`resolveParticipantNameEligible` 의 롤백 스위치를 타지 않는다.** 그 스위치는 "이름을
+ * 보여줄지"를 되돌리는 것이고, 프로필 링크는 이름보다 강한 노출(그 사람의 전체 활동 기록)
+ * 이라 동의를 직접 확인한다. 이름 게이팅이 꺼져 있어도 동의하지 않은 사람의 프로필은
+ * 열리지 않는다.
+ */
+export function resolveParticipantProfileHref(
+  userId: string | null,
+  consent: ParticipantConsentEligibility | undefined,
+): string | null {
+  if (userId === null) return null;
+  if (consent === undefined || !isParticipantPubliclyEligible(consent)) return null;
+  return `/users/${encodeURIComponent(userId)}`;
+}
+
 export function resolveParticipantNameEligible(
   isStaffBypass: boolean,
   consent: ParticipantConsentEligibility | undefined,

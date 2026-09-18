@@ -86,3 +86,22 @@ describe('TournamentHeroCard', () => {
     );
   });
 });
+
+/**
+ * 카드 CTA 위계 (2026-09-07). 홈에는 추천 대회 카드가 여러 장 깔릴 수 있어, 카드마다
+ * solid 파란 버튼을 두면 한 화면의 primary 가 겹겹이 쌓인다(alpha 실측: 홈 5개).
+ * 카드 CTA 는 secondary(outline) 로 두고 solid 는 화면 최상위 행동에만 남긴다.
+ */
+describe('TournamentHeroCard — CTA 위계', () => {
+  it('카드 CTA 는 solid primary 가 아니라 outline 이다', () => {
+    const { container } = render(<TournamentHeroCard items={[promo('a', 0), promo('b', 1)]} />);
+
+    const ctas = [...container.querySelectorAll('.tm-featured-cta')];
+    // 카드가 두 장이므로 CTA 도 두 개여야 한다 — 하나만 잡히면 아래 forEach 가 반만 검사한다.
+    expect(ctas).toHaveLength(2);
+    ctas.forEach((cta) => {
+      expect(cta.classList.contains('tm-btn-outline')).toBe(true);
+      expect(cta.classList.contains('tm-btn-primary')).toBe(false);
+    });
+  });
+});

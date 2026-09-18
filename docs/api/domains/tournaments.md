@@ -6,6 +6,7 @@
 |---|---|---|---|---|
 | `GET` | `/api/v1/tournaments` | optional user | `TournamentListQueryDto` | public tournament list page |
 | `GET` | `/api/v1/tournaments/:tournamentId` | optional user | path id | public tournament detail |
+| `GET` | `/api/v1/tournaments/:tournamentId/standings/overall` | optional user | path id | overall standings + progress + magic number |
 | `GET` | `/api/v1/tournaments/campaigns/:slug` | public | lowercase kebab slug | published campaign + safe tournament facts |
 
 Tournament list/detail reads are public. Clients may call them without a stored v1 session; authenticated-only state such as the caller's registrations must use the registration endpoints below and should only be queried after login. Public read endpoints expose only tournaments with `open`, `closed`, `in_progress`, or `completed` status and `deletedAt = null`. Registration, roster, and admin tournament routes remain authenticated.
@@ -14,13 +15,52 @@ Public list/detail items include `campaignSlug` only while the related campaign 
 
 After bracket publication, each public `groups[].standings[]` row includes nullable `teamLogoUrl` from the registered team's current profile. Tournament detail and bracket clients render it through the shared team-avatar fallback contract, so a missing or failed image remains distinguishable without replacing valid saved logos.
 
+### Overall standings — two competition kinds, two row shapes
+
+`v1_tournaments` holds both single tournaments (`kind = regular_tournament`) and the mirror rows of
+regular league seasons (`kind = regular_league`, whose id equals the league id). This endpoint serves
+both, but a mirror row has no groups and no tournament fixtures — those are created only on the
+tournament axis — so its standings are computed from the league axis instead. The response envelope is
+identical; the fields below differ:
+
+| Field | Regular tournament | Regular league | Why |
+|---|---|---|---|
+| `registrationId` | present | **absent** | league standings are computed on the league axis (`v1_league_teams`), which does not carry a registration id — see the note below |
+| `teamId` | absent | **present** | the team id is the row's identity on the league axis |
+| `fairPlayPoints` | present | **absent** | the league standings engine has no fair-play criterion at all — there is no input slot for penalty points (`league-vs-competition-standings.spec.ts`, case ④). `0` would read as "no penalties", so the field is omitted rather than zero-filled |
+| `magicNumber` | computed | `null` | the magic number is tied to the tournament axis's remaining-fixture count; the league equivalent is a separate decision and is not invented here |
+| `recalculatedAt` | last recalculation | `null` | league standings are computed per request, not persisted |
+
+The handler reads no caller identity, so the response carries no viewer-dependent fields; the
+optional-auth guard is inherited from the controller.
+
+> **`registrationId` about the mirror row — a correction.** An earlier version of this table said
+> *"a league has no entry-registration concept"*. That is **not true**: a mirror row does carry
+> `v1_tournament_registrations` (measured on alpha — a 2-team league season had two `confirmed`
+> registrations whose team ids matched the league's teams exactly, and the detail response's
+> `participantTeams` is built from them). The accurate reason is narrower: the **standings
+> computation** runs on the league axis and never has a registration id in hand. The field is
+> omitted because that code path cannot produce it, not because the concept is absent.
+
+Clients must key each row on **whichever identity field is present** (`registrationId ?? teamId`);
+exactly one of the two is always populated, and treating either as required breaks the other kind.
+
+For a league, `progress` counts only fixtures that can still be played: cancelled and voided fixtures
+are excluded from `played`, `remaining`, **and `total`**. Counting a fixture that will never be played
+as "remaining" would keep progress permanently below 100%.
+
 ## Individual awards
 
-`GET /api/v1/admin/tournaments/:tournamentId/awards` returns the saved award list, and `PUT` to the same path replaces it atomically. Each item contains `awardType`, `awardLabel`, nullable `iconKey`, `recipientName`, nullable `teamName`, nullable `note`, and optional `sortOrder` on writes. `iconKey` accepts `trophy`, `crown`, `goal`, `shield`, `glove`, `handshake`, `sparkles`, `medal`, or `star`; unknown values are rejected by DTO validation. Public `GET /api/v1/tournaments/:id` exposes the same nullable `iconKey` within `awards[]`. Existing rows with `iconKey=null` retain the legacy `awardType`-based icon mapping in the Web client.
+`GET /api/v1/admin/tournaments/:tournamentId/awards` returns the saved award list, and `PUT` to the same path replaces it atomically. Each admin item contains `awardType`, `awardLabel`, nullable `iconKey`, `recipientName`, nullable `recipientUserId`, nullable `teamName`, nullable `note`, and optional `sortOrder` on writes. New writes require a UUID `recipientUserId`; the nullable admin read shape only accommodates historical rows that could not be linked without ambiguity. `iconKey` accepts `trophy`, `crown`, `goal`, `shield`, `glove`, `handshake`, `sparkles`, `medal`, or `star`; unknown values are rejected by DTO validation. Public `GET /api/v1/tournaments/:id` keeps the display snapshot but deliberately omits `recipientUserId`, so a public award cannot bypass the user's record-consent gate to reveal account linkage. Existing rows with `iconKey=null` retain the legacy `awardType`-based icon mapping in the Web client.
 
-Award mutations require a mutation-capable active admin. Recipients must belong to a confirmed tournament roster, and a supplied team name must match both a confirmed registration and that recipient's roster membership. The mutation replaces awards and writes its admin audit record in one transaction.
+Award mutations require a mutation-capable active admin. The submitted `recipientUserId`, `recipientName`, and optional `teamName` must resolve to the same active player row under a confirmed registration. The server persists the roster's canonical real-name and team snapshots rather than trusting arbitrary identity text. The mutation replaces awards and writes its admin audit record in one transaction. Schema migration remains additive-only; the post-migrate `tournament-award-recipient-backfill.cli.ts` links historical rows only when tournament/team/name matching produces exactly one distinct user. It is idempotent, supports `--dry-run`, and leaves ambiguous rows null for manual reselection.
 
 Published `fixtures[]` also includes nullable `homeTeamId`, `homeTeamLogoUrl`, `awayTeamId`, and `awayTeamLogoUrl`. Bracket match cards use these identity fields for saved team logos and reserve the generated fallback only for missing, undecided, or failed images.
+
+Each published fixture carries two distinct status fields, and public surfaces must not confuse them:
+
+- `status` — the raw `V1TournamentFixture.status` column. The enum has four values (`scheduled | in_progress | completed | cancelled`), but only two are ever written: `scheduled` at bracket creation and `completed` when a result is officialized. **No writer advances it to `in_progress` or `cancelled`**, so it stays `scheduled` for the entire duration of a live match. Treat it as "has this fixture's result been decided", never as "is this match live".
+- `liveStatus` — required, one of `scheduled | live | ended | cancelled`. Derived by `publicFixtureStatus()` (`PublicFixtureStatus`), which prefers the authoritative `V1Game.state` and falls back to the column only when no game row exists yet. This is the same vocabulary and the same function that `GET /api/v1/tournaments/:id/schedule` and `GET /api/v1/tournaments/:id/matches/:fixtureId` already return, so all three public reads agree. **Every live-state decision — LIVE badges, bracket/stepper progress, spectator polling gates — must read `liveStatus`.**
 
 ## Tournament staff runtime boundary
 
@@ -147,6 +187,16 @@ Tournament announcement `audience` values are `public`, `all_registered`, `confi
 | `POST` | `/api/v1/tournaments/:tournamentId/registrations/:registrationId/cancel-request/withdraw` | user, team manager+ | empty body | `cancel_requested` returns to its saved previous status |
 
 `cancel-request` stores the status that existed before `cancel_requested`. `cancel-request/withdraw` is allowed only while the registration status is `cancel_requested`; it clears `cancelRequestedAt`, `cancelReason`, and the stored previous status after restoring the registration.
+
+`cancel-request/withdraw` re-reads the tournament under a row lock before restoring the registration, so it can reject after the outer checks passed. **Three** conflicts are possible there:
+
+| code | when | what the client should do |
+|---|---|---|
+| `409 TOURNAMENT_STATE_CHANGED` | the tournament is no longer reachable on the tournament surface at that moment (deleted, or its kind moved off the surface) | refresh and retry — **not** a dead link |
+| `409 TOURNAMENT_ALREADY_CANCELLED` | the tournament was cancelled meanwhile | refresh; the withdrawal can never succeed now |
+| `409 TOURNAMENT_CAPACITY_FULL` | the status being restored holds a capacity slot and the other capacity-holding registrations already fill `teamCount` | refresh; retrying only helps if someone else frees a slot |
+
+The first two mean *the tournament changed while the request was in flight* — not *the tournament does not exist*, which is a `404 TOURNAMENT_NOT_FOUND` from the entry check. The third is different in kind: the tournament is fine, but **someone else took the slot this registration gave up**, so a withdrawal must not push the tournament over its limit. Retrying without a freed slot returns the same `409`.
 
 `POST /registrations` is resumable for the same tournament/team while the existing registration is still `draft`. This covers users leaving the apply flow before final submit; the endpoint returns the existing draft instead of `ALREADY_REGISTERED`.
 

@@ -39,6 +39,14 @@ export function isUnauthenticatedError(error: unknown): boolean {
 // 외에 403이 계정 정지·소셜 가입 미완·약관 재동의로 흔하게 나오는데, 이걸 재시도하면
 // 사용자에게는 지수 백오프만큼 지연이 얹히고 서버에는 요청이 3배로 간다. rate limit을
 // 고치려는 코드가 스스로 한도를 3배로 소모하는 셈이 된다.
+function isExpectedGuestAuthProbe(path: string, init: RequestInit, error: V1ApiError): boolean {
+  const method = String(init.method ?? 'GET').toUpperCase();
+  return method === 'GET'
+    && path.split('?')[0] === '/auth/me'
+    && error.statusCode === 401
+    && error.code === 'UNAUTHENTICATED';
+}
+
 export function retryTransientFailure(failureCount: number, error: unknown): boolean {
   if (failureCount >= 2) return false;
   // 네트워크 단절은 응답 자체가 없어 V1ApiError로 감싸이지 않고 그대로 전파된다.
@@ -108,7 +116,7 @@ export async function v1Api<T>(path: string, init: RequestInit = {}): Promise<T>
     // 10초 창이라 미인증 사용자 수만큼 에러 로그가 실제로 쌓이고, 그러면 어드민 에러 뷰어에서
     // 진짜 장애가 이 잡음에 묻힌다 — 로그는 건너뛰고 안내 신호만 보낸다.
     const phoneVerificationRequired = error.code === PHONE_VERIFICATION_REQUIRED_CODE;
-    if (!phoneVerificationRequired) {
+    if (!phoneVerificationRequired && !isExpectedGuestAuthProbe(path, init, error)) {
       reportClientError({
         message: error.message,
         level: error.statusCode >= 500 ? 'error' : 'warn',

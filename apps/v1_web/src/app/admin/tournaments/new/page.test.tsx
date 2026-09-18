@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
   useV1ActivePopup,
@@ -16,8 +16,13 @@ import AdminTournamentsNewPage from './page';
 import {
   INITIAL_TOURNAMENT_CREATE_STATE,
   buildTournamentCreatePayload,
+  hasPromoFactEdits,
   tournamentCreateReducer,
   validateTournamentCreateStep,
+} from './tournament-create-model';
+import type {
+  TournamentCreateAction,
+  TournamentCreateState,
 } from './tournament-create-model';
 import type { V1Tournament } from '@/types/api';
 
@@ -96,6 +101,7 @@ function previousTournament(): V1Tournament {
     genderMaxMale: null,
     genderMinFemale: null,
     genderMaxFemale: null,
+    minMatchesPerTeam: null,
     entryFee: 50000,
     prizePool: null,
     prizeSummary: null,
@@ -124,6 +130,8 @@ function previousTournament(): V1Tournament {
     bankAccount: '123-456',
     bankHolder: '티밋',
     rulesText: null,
+    yellowAccumulationLimit: null,
+    redCardSuspensionMatches: null,
     refundPolicyText: null,
     registrationCount: 8,
     createdAt: '2026-06-01T00:00:00.000Z',
@@ -179,6 +187,20 @@ function goToParticipationStep() {
 }
 
 describe('AdminTournamentsNewPage four-step wizard', () => {
+  // **시계를 고정한다.** 이 스위트의 픽스처는 `2026-08-15` 같은 고정 날짜로 대회 시작을 넣고,
+  // 자동 제안된 마감(D-3/D-7)의 **정확한 값**을 단언한다. 그 날짜들이 과거가 되는 순간
+  // "마감은 지금 이후" 규칙에 걸려 step 1 을 못 넘고, 뒤 단계 요소를 못 찾아 12건이 한꺼번에
+  // 깨진다(2026-09-04 실측). 이건 새 규칙이 만든 문제라기보다 **시간이 흐르면 어차피 깨질
+  // 픽스처**였다 — 시계를 픽스처보다 앞선 시점에 고정해 단언을 그대로 살리고 결정적으로 만든다.
+  // `shouldAdvanceTime` 이 있어야 testing-library 의 `findBy*`/`waitFor` 가 멈추지 않는다.
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-01T00:00:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     searchParamsValue = new URLSearchParams();
@@ -438,6 +460,48 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
     expect(rolling.maxSubstitutions).toBeUndefined();
   });
 
+  it('T6c omits minMatchesPerTeam from the payload when left blank', () => {
+    const payload = buildTournamentCreatePayload({
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      sportId: 'sport-futsal',
+      title: 'x',
+      format: 'league',
+      minMatchesPerTeam: '',
+    });
+    expect(payload.minMatchesPerTeam).toBeUndefined();
+    // undefined 값은 JSON.stringify에서 키 자체가 사라진다 — 실제로 서버에 전송되지
+    // 않는다는 것을 axios가 쓰는 것과 같은 직렬화 경로로 증명한다(0/빈 문자열이 실려
+    // @IsInt @Min(1)에 422로 거절되는 걸 막는 게 이 필드의 핵심 계약이다).
+    expect(JSON.parse(JSON.stringify(payload))).not.toHaveProperty('minMatchesPerTeam');
+  });
+
+  it('T6d serializes minMatchesPerTeam as a number when set', () => {
+    const payload = buildTournamentCreatePayload({
+      ...INITIAL_TOURNAMENT_CREATE_STATE,
+      sportId: 'sport-futsal',
+      title: 'x',
+      format: 'league',
+      minMatchesPerTeam: '6',
+    });
+    expect(payload.minMatchesPerTeam).toBe(6);
+  });
+
+  it('T6e hydrates minMatchesPerTeam from a draft tournament in edit mode', () => {
+    const draft = fakeDraftTournament({ format: 'league', minMatchesPerTeam: 8 });
+    const hydrated = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+      type: 'hydrate-from-draft',
+      tournament: draft,
+    });
+    expect(hydrated.minMatchesPerTeam).toBe('8');
+
+    const withoutValue = fakeDraftTournament({ format: 'league', minMatchesPerTeam: null });
+    const hydratedEmpty = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+      type: 'hydrate-from-draft',
+      tournament: withoutValue,
+    });
+    expect(hydratedEmpty.minMatchesPerTeam).toBe('');
+  });
+
   it('blocks moving forward and shows the current step validation error', async () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /다음/ }));
@@ -502,6 +566,20 @@ describe('AdminTournamentsNewPage four-step wizard', () => {
 });
 
 describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
+  // **시계를 고정한다.** 이 스위트의 픽스처는 `2026-08-15` 같은 고정 날짜로 대회 시작을 넣고,
+  // 자동 제안된 마감(D-3/D-7)의 **정확한 값**을 단언한다. 그 날짜들이 과거가 되는 순간
+  // "마감은 지금 이후" 규칙에 걸려 step 1 을 못 넘고, 뒤 단계 요소를 못 찾아 12건이 한꺼번에
+  // 깨진다(2026-09-04 실측). 이건 새 규칙이 만든 문제라기보다 **시간이 흐르면 어차피 깨질
+  // 픽스처**였다 — 시계를 픽스처보다 앞선 시점에 고정해 단언을 그대로 살리고 결정적으로 만든다.
+  // `shouldAdvanceTime` 이 있어야 testing-library 의 `findBy*`/`waitFor` 가 멈추지 않는다.
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-01T00:00:00.000Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     searchParamsValue = new URLSearchParams();
@@ -680,5 +758,162 @@ describe('AdminTournamentsNewPage — 4단계(공개 확인)', () => {
     renderPage();
 
     expect(routerReplace).toHaveBeenCalledWith('/admin/tournaments/draft-1');
+  });
+  describe('홍보 카드 사실 문구 자동 채움', () => {
+    /** 날짜·팀 수·장소·총 상금을 넣은 상태 — 홍보 문구의 출처가 되는 앞 단계 값이다. */
+    function stateWithTournamentInfo() {
+      return [
+        { type: 'set-scheduled-at', value: '2026-08-29T09:00' },
+        { type: 'set-field', field: 'scheduledEndAt', value: '2026-08-29T18:00' },
+        { type: 'set-field', field: 'teamCount', value: '16' },
+        { type: 'set-field', field: 'venue', value: '서울월드컵보조경기장' },
+        { type: 'set-field', field: 'prizePool', value: '3000000' },
+      ].reduce<TournamentCreateState>(
+        (state, action) => tournamentCreateReducer(state, action as TournamentCreateAction),
+        INITIAL_TOURNAMENT_CREATE_STATE,
+      );
+    }
+
+    it('앞 단계 대회 정보를 넣으면 두 홍보 카드의 날짜·장소·상금 문구가 채워진다', () => {
+      const state = stateWithTournamentInfo();
+
+      for (const promo of [state.promoHome, state.promoList]) {
+        expect(promo).toMatchObject({
+          dateText: '8월 29일 (토)',
+          locationText: '서울월드컵보조경기장',
+          prizeText: '총 상금 3,000,000원',
+        });
+      }
+    });
+
+    it('강조 문구는 팀 수로 자동 채우지 않는다 — 운영에서 상태 문구로 쓰는 자리다', () => {
+      const state = stateWithTournamentInfo();
+
+      expect(state.promoHome.teamsText).toBe('');
+      expect(state.promoList.teamsText).toBe('');
+    });
+
+    it('관리자가 고친 문구는 앞 단계 값을 다시 바꿔도 그대로 둔다', () => {
+      const edited = tournamentCreateReducer(stateWithTournamentInfo(), {
+        type: 'set-promo',
+        slot: 'promoHome',
+        value: { ...stateWithTournamentInfo().promoHome, locationText: '수원 실내구장 A코트' },
+      });
+
+      const relocated = tournamentCreateReducer(edited, {
+        type: 'set-field',
+        field: 'venue',
+        value: '수원종합운동장',
+      });
+
+      expect(relocated.promoHome.locationText).toBe('수원 실내구장 A코트');
+      // 손대지 않은 목록 카드는 새 값을 그대로 따라간다.
+      expect(relocated.promoList.locationText).toBe('수원종합운동장');
+    });
+
+    it('관리자가 빈 칸으로 지운 문구는 다시 채우지 않는다', () => {
+      const cleared = tournamentCreateReducer(stateWithTournamentInfo(), {
+        type: 'set-promo',
+        slot: 'promoList',
+        value: { ...stateWithTournamentInfo().promoList, prizeText: '' },
+      });
+
+      const repriced = tournamentCreateReducer(cleared, {
+        type: 'set-field',
+        field: 'prizePool',
+        value: '5000000',
+      });
+
+      expect(repriced.promoList.prizeText).toBe('');
+      expect(repriced.promoHome.prizeText).toBe('총 상금 5,000,000원');
+    });
+
+    it('되돌릴 파생값이 없는 칸도 다시 채우기로 비워진다 — 버튼이 무반응처럼 보이던 결함', () => {
+      // 장소·상금을 앞 단계에서 입력하지 않아 파생값이 빈 칸인 상태에서, 관리자가 문구만
+      // 직접 써 넣었다. 이때 "다시 채우기"가 그 칸을 건너뛰면 버튼이 아무 일도 안 한 것처럼
+      // 보인다(alpha 재현 확인).
+      const dated = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+        type: 'set-scheduled-at',
+        value: '2026-08-29T09:00',
+      });
+      const typed = tournamentCreateReducer(dated, {
+        type: 'set-promo',
+        slot: 'promoHome',
+        value: { ...dated.promoHome, locationText: '직접 쓴 장소', prizeText: '직접 쓴 상금' },
+      });
+
+      expect(hasPromoFactEdits(typed, 'promoHome')).toBe(true);
+
+      const reset = tournamentCreateReducer(typed, {
+        type: 'reset-promo-facts',
+        slot: 'promoHome',
+      });
+
+      expect(reset.promoHome.locationText).toBe('');
+      expect(reset.promoHome.prizeText).toBe('');
+      // 파생값이 있는 날짜는 그대로 유지된다.
+      expect(reset.promoHome.dateText).toBe('8월 29일 (토)');
+      // 되돌린 뒤에는 되돌릴 것이 없다 — 버튼이 비활성으로 바뀐다.
+      expect(hasPromoFactEdits(reset, 'promoHome')).toBe(false);
+    });
+
+    it('직접 고친 문구가 없으면 되돌릴 것도 없다고 알린다', () => {
+      const state = stateWithTournamentInfo();
+
+      expect(hasPromoFactEdits(state, 'promoHome')).toBe(false);
+      expect(hasPromoFactEdits(state, 'promoList')).toBe(false);
+    });
+
+    it('초안 저장 후 새로고침해도 자동으로 채워졌던 문구는 계속 대회 정보를 따라간다', () => {
+      // 서버에는 자동 파생 문구도 그대로 저장된다 — 저장돼 있다는 이유만으로 dirty로 굳으면
+      // 새로고침 뒤 일정·장소를 고쳐도 홍보 문구가 옛 값에 멈춘다.
+      const hydrated = tournamentCreateReducer(INITIAL_TOURNAMENT_CREATE_STATE, {
+        type: 'hydrate-from-draft',
+        tournament: fakeDraftTournament({
+          venue: '서울월드컵보조경기장',
+          // 관리자가 손대지 않아 파생값 그대로 저장된 문구
+          promoHomeLocationText: '서울월드컵보조경기장',
+          // 관리자가 직접 고쳐 저장한 문구
+          promoHomePrizeText: '🎁 특별 상품 증정',
+        }),
+      });
+
+      const relocated = tournamentCreateReducer(hydrated, {
+        type: 'set-field',
+        field: 'venue',
+        value: '수원종합운동장',
+      });
+
+      expect(relocated.promoHome.locationText).toBe('수원종합운동장');
+      expect(relocated.promoHome.prizeText).toBe('🎁 특별 상품 증정');
+    });
+
+    it('"대회 정보로 다시 채우기"는 해당 카드만 현재 대회 정보로 되돌린다', () => {
+      const edited = tournamentCreateReducer(stateWithTournamentInfo(), {
+        type: 'set-promo',
+        slot: 'promoHome',
+        value: {
+          ...stateWithTournamentInfo().promoHome,
+          dateText: '이번 주말 단 하루',
+          locationText: '',
+        },
+      });
+      const editedList = tournamentCreateReducer(edited, {
+        type: 'set-promo',
+        slot: 'promoList',
+        value: { ...edited.promoList, locationText: '목록 전용 장소' },
+      });
+
+      const reset = tournamentCreateReducer(editedList, {
+        type: 'reset-promo-facts',
+        slot: 'promoHome',
+      });
+
+      expect(reset.promoHome).toMatchObject({
+        dateText: '8월 29일 (토)',
+        locationText: '서울월드컵보조경기장',
+      });
+      expect(reset.promoList.locationText).toBe('목록 전용 장소');
+    });
   });
 });

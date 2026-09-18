@@ -337,7 +337,8 @@ describe('MatchesService', () => {
 
   // ─── 6. 비-requested 상태 신청 철회 → 409 STATE_CONFLICT ─────────────────
 
-  it('withdrawApplication: approved 상태 신청을 철회하면 409 STATE_CONFLICT를 던진다', async () => {
+  it('withdrawApplication: 시작한 매치의 approved 신청 철회는 409 STATE_CONFLICT를 던진다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({ startAt: PAST }));
     prisma.v1MatchApplication.findFirst.mockResolvedValue(
       applicationRow({
         applicantUserId: otherUser.id,
@@ -353,6 +354,7 @@ describe('MatchesService', () => {
   });
 
   it('withdrawApplication: 승인이 먼저 확정돼 requested 전이가 실패하면 withdrawn으로 보고하지 않는다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow());
     prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow());
     prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 0 });
 
@@ -406,6 +408,88 @@ describe('MatchesService', () => {
     expect(prisma.v1Match.findFirst).not.toHaveBeenCalled();
   });
 
+  // ─── 2026-08-27 감사 M-A-personal-match-state ────────────────────────────
+  // status='recruiting'인데 startAt이 이미 지난("만료") 매치는 raw status 만으로는 다른
+  // 종료 상태와 구분되지 않는다. getApiStatus/getDisplayState/update()/cancel()은 이미 이
+  // 판정을 쓰는데 getEligibilityReason()과 edit()의 editable 계산은 빠져 있었다.
+
+  it('createApplication: 시작 시각이 지난 매치는 마감시각이 없어도(deadlineAt:null) 신청을 막는다', async () => {
+    const expiredMatch = matchRow({
+      hostUserId: host.id,
+      status: 'recruiting',
+      startAt: PAST,
+      deadlineAt: null,
+      maxParticipants: 6,
+      participants: [],
+      applications: [],
+    });
+    prisma.v1Match.findFirst.mockResolvedValue(expiredMatch);
+
+    await expect(service.createApplication(otherUser, 'match-1', {})).rejects.toThrow(ConflictException);
+    await expect(service.createApplication(otherUser, 'match-1', {})).rejects.toMatchObject({
+      response: { code: 'EXPIRED' },
+    });
+    expect(prisma.v1MatchApplication.create).not.toHaveBeenCalled();
+  });
+
+  it('createApplication: 시작 시각이 아직 남은 매치는 정상적으로 신청을 접수한다 (회귀 방지)', async () => {
+    const openMatch = matchRow({
+      hostUserId: host.id,
+      status: 'recruiting',
+      startAt: FUTURE,
+      deadlineAt: null,
+      maxParticipants: 6,
+      participants: [],
+      applications: [],
+    });
+    prisma.v1Match.findFirst.mockResolvedValue(openMatch);
+    prisma.v1MatchApplication.create.mockResolvedValue({
+      id: 'app-new',
+      matchId: 'match-1',
+      status: 'requested',
+    });
+
+    await expect(service.createApplication(otherUser, 'match-1', {})).resolves.toMatchObject({
+      status: 'requested',
+      viewerState: 'requested',
+    });
+  });
+
+  it('edit: 시작 시각이 지난 매치는 status가 여전히 recruiting이어도 editable:false + lockedReason:terminal_status를 반환한다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ hostUserId: host.id, status: 'recruiting', startAt: PAST }),
+    );
+    prisma.v1MatchParticipant.count.mockResolvedValue(1);
+
+    const result = await service.edit(host, 'match-1');
+
+    expect(result.editable).toBe(false);
+    expect(result.lockedReason).toBe('terminal_status');
+    expect(result.status).toBe('expired');
+  });
+
+  it('edit: 시작 시각이 남은 recruiting 매치는 editable:true를 반환한다 (회귀 방지)', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ hostUserId: host.id, status: 'recruiting', startAt: FUTURE }),
+    );
+    prisma.v1MatchParticipant.count.mockResolvedValue(1);
+
+    const result = await service.edit(host, 'match-1');
+
+    expect(result.editable).toBe(true);
+    expect(result.lockedReason).toBeNull();
+  });
+
+  it('list: status 생략 기본 탐색은 시작 시각이 지난 매치를 where에서 제외한다', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([]);
+
+    await service.list(null, {});
+
+    const where = prisma.v1Match.findMany.mock.calls[0][0].where;
+    expect(where.status).toEqual({ in: ['recruiting', 'closed'] });
+    expect(where.startAt).toEqual({ gte: expect.any(Date) });
+  });
+
   it('list: 기본 조회는 최신 생성순이며 경기 전 마감 행도 신청마감 상태로 노출한다', async () => {
     prisma.v1Match.findMany.mockResolvedValue([]);
 
@@ -428,5 +512,182 @@ describe('MatchesService', () => {
     expect(args.where.AND).toEqual(expect.arrayContaining([
       { OR: [{ deadlineAt: null }, { deadlineAt: { gte: expect.any(Date) } }] },
     ]));
+  });
+
+  // 감사 결함 회귀 방지(2026-08-27): toListItem()이 host를 아예 내려주지 않아 프론트가
+  // 항상 목업 호스트 이름으로 폴백했다(모든 카드가 '김정민' 등 동일 이름). detail()과 같은
+  // hostUser include를 목록 직렬화에도 그대로 매핑하는지 고정한다.
+  it('list: 각 아이템에 실제 호스트(hostUser)를 매핑해 내려준다', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([
+      matchRow({
+        hostUserId: 'host-1',
+        sport: { id: 'sport-1', name: '풋살' },
+        region: null,
+        participants: [],
+        hostUser: {
+          id: 'host-1',
+          profile: { nickname: '박지훈', displayName: null, profileImageUrl: null },
+          reputationSummary: { trustState: 'verified' },
+        },
+      }),
+    ]);
+
+    const result = await service.list(null, {});
+
+    expect(result.items[0].host).toEqual({
+      userId: 'host-1',
+      displayName: '박지훈',
+      profileImageUrl: null,
+      trustState: 'verified',
+    });
+  });
+
+  it('list: status=completed 조회는 startAt 필터를 적용하지 않는다 (지난 매치를 의도적으로 조회)', async () => {
+    prisma.v1Match.findMany.mockResolvedValue([]);
+
+    await service.list(null, { status: 'completed' });
+
+    const where = prisma.v1Match.findMany.mock.calls[0][0].where;
+    expect(where.status).toBe('completed');
+    expect(where.startAt).toBeUndefined();
+  });
+
+  // ─── 모집 마감 / 다시 열기 (2026-09-07 제보 대응) ─────────────────────────
+
+  it('close: 대기 중이던 신청서를 expired로 넘기고 그 신청자에게만 알린다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({ status: 'recruiting', startAt: FUTURE }));
+    prisma.v1MatchApplication.findMany.mockResolvedValue([
+      { applicantUserId: 'applicant-1' },
+      { applicantUserId: 'applicant-2' },
+    ]);
+    prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 2 });
+
+    const result = await service.close(host, 'match-1', {});
+
+    expect(result).toMatchObject({ status: 'closed', expiredApplications: 2 });
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'closed' } }),
+    );
+    expect(prisma.v1MatchApplication.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { matchId: 'match-1', status: 'requested' },
+        data: expect.objectContaining({ status: 'expired' }),
+      }),
+    );
+    expect(notifications.emitNotificationToMany).toHaveBeenCalledWith(
+      ['applicant-1', 'applicant-2'],
+      'match_closed',
+      'match-1',
+      expect.stringContaining('마감'),
+    );
+  });
+
+  it('close: 이미 닫힌 매치를 또 닫으면 409 ALREADY_PROCESSED (취소와 달리 상태를 덮지 않는다)', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({ status: 'closed' }));
+
+    await expect(service.close(host, 'match-1', {})).rejects.toMatchObject({
+      response: { code: 'ALREADY_PROCESSED' },
+    });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+
+  it('close: 호스트가 아니면 403 PERMISSION_DENIED', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({ hostUserId: host.id }));
+
+    await expect(service.close(otherUser, 'match-1', {})).rejects.toThrow(ForbiddenException);
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+
+  it.each(['cancelled', 'completed'])('reopen: 최초 조회 뒤 %s로 바뀐 매치를 되살리지 않는다', async (status) => {
+    prisma.v1Match.findFirst
+      .mockResolvedValueOnce(matchRow({ status: 'closed' }))
+      .mockResolvedValueOnce(matchRow({ status }));
+    prisma.v1Match.update.mockResolvedValue(matchRow());
+    await expect(service.reopen(host, 'match-1', {})).rejects.toMatchObject({ response: { code: 'STATE_CONFLICT' } });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
+  });
+
+  it('reopen: 지난 마감 시각을 지워 다시 모집 상태로 만든다 (안 지우면 눌러도 그대로 마감으로 보인다)', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ status: 'closed', startAt: FUTURE, deadlineAt: PAST }),
+    );
+    prisma.v1Match.update.mockResolvedValue(
+      matchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: null }),
+    );
+
+    const result = await service.reopen(host, 'match-1', {});
+
+    expect(result).toMatchObject({ status: 'recruiting', deadlineAt: null });
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'recruiting', deadlineAt: null } }),
+    );
+  });
+
+  it('reopen: 마감 시각이 지나 displayState만 닫힌 recruiting 매치도 되돌린다', async () => {
+    // 호스트가 close()를 누른 적이 없어도 화면에는 똑같이 "신청 마감"으로 보인다 —
+    // 이 경로를 빼면 다시 열기가 한쪽에서만 듣는다.
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: PAST }),
+    );
+    prisma.v1Match.update.mockResolvedValue(
+      matchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: null }),
+    );
+
+    await service.reopen(host, 'match-1', {});
+
+    // 응답의 deadlineAt 은 mock 이 돌려준 값이라 아무것도 증명하지 못한다 —
+    // **무엇을 쓰라고 보냈는지**를 본다.
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'recruiting', deadlineAt: null } }),
+    );
+  });
+
+  it('reopen: 새 마감 시각을 주면 그 값으로 갱신한다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ status: 'closed', startAt: FUTURE, deadlineAt: PAST }),
+    );
+    prisma.v1Match.update.mockResolvedValue(matchRow({ status: 'recruiting' }));
+    const nextDeadline = new Date(FUTURE.getTime() - 60 * 60 * 1000);
+
+    await service.reopen(host, 'match-1', { deadlineAt: nextDeadline.toISOString() });
+
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'recruiting', deadlineAt: nextDeadline } }),
+    );
+  });
+
+  it('reopen: 아직 남은 마감 시각은 건드리지 않고, 이미 모집 중이면 409 ALREADY_PROCESSED', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ status: 'recruiting', startAt: FUTURE, deadlineAt: FUTURE }),
+    );
+
+    await expect(service.reopen(host, 'match-1', {})).rejects.toMatchObject({
+      response: { code: 'ALREADY_PROCESSED' },
+    });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+
+  it('reopen: 시작 시각이 지난 매치는 되돌릴 수 없다 (409 STATE_CONFLICT)', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ status: 'closed', startAt: PAST, deadlineAt: PAST }),
+    );
+
+    await expect(service.reopen(host, 'match-1', {})).rejects.toMatchObject({
+      response: { code: 'STATE_CONFLICT' },
+    });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+
+  it('reopen: 새 마감 시각이 경기 시작 이후면 400 VALIDATION_FAILED', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(
+      matchRow({ status: 'closed', startAt: FUTURE, deadlineAt: PAST }),
+    );
+    const afterStart = new Date(FUTURE.getTime() + 60 * 60 * 1000).toISOString();
+
+    await expect(service.reopen(host, 'match-1', { deadlineAt: afterStart })).rejects.toMatchObject({
+      response: { code: 'VALIDATION_FAILED', details: { field: 'deadlineAt' } },
+    });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
   });
 });

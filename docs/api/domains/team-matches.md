@@ -1,5 +1,12 @@
 # Domain Contract - Team Matches
 
+
+## Task 168 Phase 3 canonical source addendum (candidate)
+
+- A TeamMatch owns the canonical Game identity for tournament, regular-league, and friendly flows. Existing fixture-shaped URLs and `fixtureId` response fields continue to carry the same TeamMatch UUID for compatibility.
+- Result correction and public record projections follow the Game current official revision; a correction does not change the TeamMatch start time or create a second appearance.
+- This is a contract candidate pending the selected API overlay review; it does not claim Alpha migration completion.
+
 ## Endpoint Matrix
 
 | Method | Path | Auth | Description |
@@ -10,13 +17,55 @@
 | POST | `/team-matches` | Yes | 모집글 생성 |
 | PATCH | `/team-matches/:id` | Yes | 모집글 수정 또는 취소 |
 | GET | `/team-matches/:id/applications` | Yes | 신청 목록 조회 (호스트 team manager+) |
-| POST | `/team-matches/:id/apply` | Yes | 다른 팀이 모집글에 신청 |
+| POST | `/team-matches/:id/applications` | Yes | 다른 팀이 모집글에 신청 |
 | PATCH | `/team-matches/:id/applications/:appId/approve` | Yes | 신청 승인 |
 | PATCH | `/team-matches/:id/applications/:appId/reject` | Yes | 신청 거절 |
 | POST | `/team-matches/:id/check-in` | Yes | 도착 인증 |
 | POST | `/team-matches/:id/result` | Yes | 결과 입력 |
 | POST | `/team-matches/:id/evaluate` | Yes | 상대 팀 평가 |
 | GET | `/team-matches/:id/referee-schedule` | Yes | 심판 배정 조회 |
+| POST | `/admin/team-matches` | Admin owner/ops | 플랫폼 팀매치 모집 생성 |
+| POST | `/admin/team-matches/:id/assign` | Admin owner/ops | 신청한 두 팀을 홈·원정으로 확정 |
+
+## POST /admin/team-matches
+
+플랫폼 운영자가 팀을 미리 지정하지 않고 공개 모집을 여는 별도 생성 경로다. 일반 팀 owner/manager의 `POST /team-matches` 계약과 기존 신청 API는 변경하지 않는다.
+
+Required body:
+
+- `clientCommandId` (UUID, 재시도 멱등 키)
+- `sportId` (활성 종목)
+- `regionId` (활성 시·군·구)
+- `title`, `startsAt`, `deadlineAt`, `manualPlaceName`
+
+Optional body: `description`, `endsAt`, `addressText`, `costNote`, `rulesText`.
+
+Rules:
+
+- active `owner` 또는 `ops` admin만 생성할 수 있으며 `support`는 `403 PERMISSION_DENIED`다.
+- 생성된 행은 `hostTeamId=null`, `status=recruiting`인 독립 플랫폼 모집이다.
+- 생성 시 Game, team schedule, application을 만들지 않는다.
+- 공개 목록/상세 응답은 `platformManaged=true`, `hostTeam=null`을 반환하며 같은 종목의 관리 팀이 `POST /team-matches/:id/applications`로 신청할 수 있다.
+- 같은 `clientCommandId`와 같은 payload 재시도는 기존 결과를 반환한다. 같은 키의 다른 payload는 `409 IDEMPOTENCY_CONFLICT`다.
+- 성공 응답은 `teamMatchId`, `status=recruiting`, `detailRoute`(관리자 상세), `replayed`를 포함한다.
+
+## POST /admin/team-matches/:id/assign
+
+플랫폼 모집에 접수된 신청 중 두 개를 홈·원정으로 선택해 경기를 확정한다.
+
+Required body:
+
+- `clientCommandId` (UUID, 재시도 멱등 키)
+- `homeApplicationId`, `awayApplicationId` (서로 다른 `requested` 신청)
+
+Rules:
+
+- 대상은 `hostTeamId=null`, 리그·토너먼트에 속하지 않은 `recruiting` 플랫폼 모집이어야 한다.
+- 두 신청 팀은 활성 상태이고 모집 종목과 같아야 하며 서로 달라야 한다.
+- 성공 시 홈 팀을 `hostTeamId`, 원정 팀을 `approvedApplicantTeamId`로 연결하고 팀매치를 `matched`로 바꾼다.
+- 선택한 두 신청은 `approved`, 나머지 `requested` 신청은 `rejected`로 전환한다.
+- Game HOME/AWAY side, 양 팀 schedule, application/team-match 상태 로그, admin action log를 한 트랜잭션에서 생성한다.
+- 성공 응답은 `teamMatchId`, `gameId`, `homeTeamId`, `awayTeamId`, `detailRoute`, `replayed`를 포함한다.
 
 ## GET /team-matches
 
@@ -55,6 +104,7 @@ Required:
 - `hostTeamId`
 - `sportId`
 - `regionId`
+  - Required non-empty string; accepts stable catalog slugs such as `region-seoul-jongno`.
 - `title`
 - `startsAt`
 - `manualPlaceName`

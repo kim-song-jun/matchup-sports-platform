@@ -118,7 +118,15 @@ export class HomeService {
         where: {
           userId: user.id,
           status: { in: ['active', 'completed'] },
-          match: { startAt: { gte: monthStart } },
+          // 참가자 row 의 상태만 보면 안 된다 — 매치 자체의 상태도 함께 건다.
+          // matches.service.ts 의 cancel() 은 참가자 row 를 `role: 'participant'` 인 것만
+          // cancelled 로 바꾸므로 **호스트 자신의 row(role: 'host')는 active 로 남는다.**
+          // 그래서 자기가 만들었다 취소한 매치가 "이번 달 활동"에 계속 잡혔다
+          // (2026-09-07 alpha 실측: 매치 3건 생성 → 전량 취소했는데 8 → 11 로 오른 값이
+          // 취소 후에도 11 그대로. 정확히 +3 일치).
+          // profile.service.ts 의 같은 계열 count 4곳은 이미 match.status·deletedAt 을
+          // 함께 걸고 있었다 — 이 한 곳만 빠져 있었다.
+          match: { startAt: { gte: monthStart }, status: { not: 'cancelled' }, deletedAt: null },
         },
       }),
       this.prisma.v1UserReputationSummary.findUnique({
@@ -142,8 +150,13 @@ export class HomeService {
     const limit = Math.min(Math.max(input.limit ?? 5, 1), 20);
     const where: Prisma.V1MatchWhereInput = {
       status: 'recruiting',
-      // 홈 추천/대표 매치는 일반 탐색과 달리 지금 신청 가능한 모집 글만 노출한다.
+      // v1에는 만료를 자동으로 다른 status로 넘기는 cron이 없어 시작 시각이 지나도 status는
+      // 계속 'recruiting'으로 남는다 — startAt 필터가 없으면 홈 히어로(featuredMatch)가 가장
+      // 오래 지난 죽은 매치를 "신청 가능"인 것처럼(만료 표시 자체가 없는 payload라 더 나쁘다)
+      // 노출한다(2026-08-27 감사 M-A-personal-match-state, matches.service.ts list()의 동일
+      // 결함과 같은 근본 원인).
       startAt: { gte: new Date() },
+      // 홈 추천/대표 매치는 일반 탐색과 달리 지금 신청 가능한 모집 글만 노출한다.
       OR: [{ deadlineAt: null }, { deadlineAt: { gte: new Date() } }],
       deletedAt: null,
       ...(input.sportId ? { sportId: input.sportId } : {}),

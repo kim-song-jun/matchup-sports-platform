@@ -42,6 +42,7 @@ case "${mode}" in
     case "${args}" in
       *imageScanStatus.status*) emit_status; exit 0 ;;
       *wait*) exit 0 ;;
+      *attributes*) echo '[{"name":"CVE-TEST","uri":"https://example.invalid/CVE-TEST","attributes":[{"key":"package_name","value":"tar"},{"key":"package_version","value":"7.5.11"}]}]'; exit 0 ;;
       *findingSeverityCounts*) echo '{"CRITICAL":2,"HIGH":7}'; exit 0 ;;
     esac
     ;;

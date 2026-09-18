@@ -1,0 +1,6 @@
+# Stand-in for the alpha overlay (docker-compose.alpha.yml). Real StageB
+# dispatch layers this over compose-prod.yml; the harness needs no alpha-only
+# overrides, so this is intentionally a no-op overlay that only proves the
+# runner's `-f compose-prod -f compose-alpha` layering still works.
+services:
+  v1_postgres: {}

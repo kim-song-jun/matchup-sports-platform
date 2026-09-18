@@ -2,7 +2,7 @@ import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../../auth/optional-v1-auth.guard';
 import { V1AuthUser } from '../../auth/v1-auth-user';
-import { PublicRecordsQueryDto } from './dto/public-records-query.dto';
+import { UserRecordsQueryDto } from './dto/public-records-query.dto';
 import { PublicUserRecordsService } from './public-user-records.service';
 
 /**
@@ -22,7 +22,7 @@ export class PublicUserRecordsController {
   getRecords(
     @CurrentUser() viewer: V1AuthUser | undefined,
     @Param('userId') userId: string,
-    @Query() query: PublicRecordsQueryDto,
+    @Query() query: UserRecordsQueryDto,
   ) {
     return this.userRecords.getRecords(userId, query, viewer?.id);
   }

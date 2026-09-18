@@ -4,11 +4,13 @@ import { apiGet, apiPost, commandId, unwrap } from './helpers/v1-http';
 import {
   createTournamentFixtureGame,
   endGameToSubmittedRevision,
+  projectionPreviewHash,
 } from './helpers/tournament-fixture';
 
 /**
- * E2E-TOUR-01 -- tournament result review: reject / request_supplement /
- * supersede-and-submit, wrong-base rejection, atomic successor rollback
+ * E2E-TOUR-01 -- tournament result review: supersede-and-submit from a
+ * SUBMITTED base (Task 166 — 되돌려 보내는 왕복 없이 그 자리에서 고친다),
+ * stale-version rollback, stale-officialize refusal
  * (plan Todo 22/23 scope; routes in
  * `apps/v1_api/src/tournament-operations/results/
  * tournament-result-review.controller.ts`).
@@ -17,8 +19,8 @@ import {
  *
  * The two outermost, route-shape-independent guards that run before ANY
  * business logic on every endpoint in this controller
- * (`review-decision`/`supersede-and-submit`/`officialize`/`void`/
- * `corrections`):
+ * (`supersede-and-submit`/`officialize`/`void`/`corrections` — Task 166 이
+ * `review-decision` 을 없앴다):
  *   - No auth headers at all -> 401 `UNAUTHENTICATED` (`V1AuthGuard`).
  *   - A syntactically valid but nonexistent `gameId` -> 404 (`this.notFound()`
  *     in `TournamentResultReviewService.withResultCommand`, which resolves
@@ -32,22 +34,20 @@ import {
  * `helpers/tournament-fixture.ts` and `helpers/ws-takeover.ts` for the full
  * provisioning chain) the scenario's actual subject on a real
  * `TOURNAMENT_FIXTURE` game carrying a real result revision:
- *   - `review-decision` `reject` on a SUBMITTED revision -> REJECTED.
- *   - `supersede-and-submit` against a base that is NOT REJECTED/
- *     SUPPLEMENT_REQUESTED (still SUBMITTED) -> 409
- *     `RESULT_RESUBMISSION_NOT_ALLOWED`, the "wrong-base rejection".
- *   - `supersede-and-submit` with a stale `expectedVersion` against an
- *     otherwise-eligible REJECTED base -> 409 `VERSION_CONFLICT`, and the
- *     revision list is unchanged afterward (no orphan DRAFT successor row) --
- *     the "atomic successor rollback" (`assertGameCommandContext`'s CAS check
- *     runs and throws before `withResultCommand`'s `mutate()` callback ever
- *     creates the successor row, and the whole command runs inside one
+ *   - `supersede-and-submit` with a stale `expectedVersion` against the
+ *     SUBMITTED base -> 409 `VERSION_CONFLICT`, and the revision list is
+ *     unchanged afterward (no orphan DRAFT successor row) -- the "atomic
+ *     successor rollback" (`assertGameCommandContext`'s CAS check runs and
+ *     throws before `withResultCommand`'s `mutate()` callback ever creates
+ *     the successor row, and the whole command runs inside one
  *     `$transaction`, so a mid-callback throw would roll back any partial
  *     write just the same).
  *   - `supersede-and-submit` with the correct `expectedVersion` against the
- *     REJECTED base -> a new SUBMITTED successor revision (resubmission).
- *   - `review-decision` `request_supplement` on that successor ->
- *     SUPPLEMENT_REQUESTED.
+ *     SUBMITTED base -> a new SUBMITTED successor (Task 166: 어드민이 되돌려
+ *     보내지 않고 **그 자리에서 고친다**).
+ *   - `officialize` on the now-superseded base -> 409. base 의 `state` 는
+ *     SUBMITTED 그대로라 상태만 보면 확정 가능해 보인다 — `supersedesId` 로
+ *     따로 판정하지 않으면 **고치기 전 결과가 공식이 된다.**
  *
  * Every mutation reuses the same all-zero score (`{home:0,away:0}`) the
  * `end` command derives from an empty event log -- `supersede-and-submit`'s
@@ -55,18 +55,14 @@ import {
  * score that doesn't match the actually-appended goal events, and these
  * specs never append any.
  */
-test.describe('[E2E-TOUR-01] 대회 결과 검토 (반려/보완요청/재제출)', () => {
-  test('미인증은 401, 존재하지 않는 gameId는 404 -- review-decision/supersede-and-submit 공통 경계', async ({
+test.describe('[E2E-TOUR-01] 대회 결과 검토 (그 자리에서 고쳐 재제출)', () => {
+  test('미인증은 401, 존재하지 않는 gameId는 404 -- supersede-and-submit 경계', async ({
     request,
   }) => {
     const missingGameId = randomUUID();
     const missingRevisionId = randomUUID();
 
     for (const [route, body] of [
-      [
-        `review-decision`,
-        { expectedVersion: 0, clientCommandId: commandId(), decision: 'reject', reason: 'e2e probe' },
-      ],
       [
         `supersede-and-submit`,
         {
@@ -98,56 +94,19 @@ test.describe('[E2E-TOUR-01] 대회 결과 검토 (반려/보완요청/재제출
     }
   });
 
-  test('reject/request_supplement 결정, supersede-and-submit 재제출, wrong-base 거부, 원자적 후속 롤백', async ({
+  test('SUBMITTED 를 그 자리에서 재제출로 대체한다 — DRAFT base 거부, 원자적 후속 롤백 (Task 166)', async ({
     request,
   }) => {
+    // Task 166: 예전 시나리오는 `review-decision('reject')` 로 **팀에게 되돌려 보낸 뒤**에야
+    // 재제출이 가능했다(base = REJECTED). 정본 §4 가 그 왕복을 없애 base 가 SUBMITTED 다 —
+    // 어드민은 되돌려 보내지 않고 그 자리에서 고쳐 확정한다.
     const email = 'admin@teameet.v1';
     const { gameId } = await createTournamentFixtureGame(request, { titlePrefix: 'E2E-TOUR-01' });
     const submitted = await endGameToSubmittedRevision(request, { gameId, email });
 
-    // wrong-base rejection: the base is still SUBMITTED, not REJECTED/SUPPLEMENT_REQUESTED.
-    const wrongBaseId = commandId();
-    const wrongBase = await apiPost(
-      request,
-      `/api/v1/games/${gameId}/result-revisions/${submitted.revisionId}/supersede-and-submit`,
-      {
-        email,
-        idempotencyKey: wrongBaseId,
-        data: {
-          expectedVersion: submitted.gameVersion,
-          clientCommandId: wrongBaseId,
-          score: { home: 0, away: 0 },
-          actualParticipants: [],
-          eventsHash: submitted.eventsHash,
-          reason: 'wrong-base probe',
-        },
-      },
-    );
-    expect(wrongBase.status, JSON.stringify(wrongBase.body)).toBe(409);
-    expect((wrongBase.body as { code?: string }).code).toBe('RESULT_RESUBMISSION_NOT_ALLOWED');
-
-    // reject the SUBMITTED revision.
-    const rejectId = commandId();
-    const rejected = await apiPost(
-      request,
-      `/api/v1/games/${gameId}/result-revisions/${submitted.revisionId}/review-decision`,
-      {
-        email,
-        idempotencyKey: rejectId,
-        data: {
-          expectedVersion: submitted.gameVersion,
-          clientCommandId: rejectId,
-          decision: 'reject',
-          reason: 'missing scorer detail',
-        },
-      },
-    );
-    const rejectedData = unwrap<{ version: number; revisionState: string }>(rejected);
-    expect(rejectedData.revisionState).toBe('REJECTED');
-    const gameVersionAfterReject = rejectedData.version;
-
-    // atomic successor rollback: supersede-and-submit with a STALE expectedVersion against the
-    // now-eligible REJECTED base must fail closed and create zero new rows.
+    // 원자적 후속 롤백: **stale expectedVersion** 이면 실패하고 새 행이 하나도 안 생긴다.
+    // (예전엔 이 자리에 'wrong-base 거부(base 가 아직 SUBMITTED)' 가 있었는데, 그건 이제
+    //  정상 경로라 음성 케이스가 되지 못한다 — 버전 충돌로 바꿔 원자성만 그대로 잰다.)
     const staleId = commandId();
     const staleAttempt = await apiPost(
       request,
@@ -156,7 +115,7 @@ test.describe('[E2E-TOUR-01] 대회 결과 검토 (반려/보완요청/재제출
         email,
         idempotencyKey: staleId,
         data: {
-          expectedVersion: gameVersionAfterReject - 1,
+          expectedVersion: submitted.gameVersion - 1,
           clientCommandId: staleId,
           score: { home: 0, away: 0 },
           actualParticipants: [],
@@ -173,7 +132,7 @@ test.describe('[E2E-TOUR-01] 대회 결과 검토 (반려/보완요청/재제출
     );
     expect(revisionsAfterStaleAttempt).toHaveLength(1);
 
-    // resubmission: supersede-and-submit with the CORRECT expectedVersion succeeds.
+    // 재제출: 올바른 expectedVersion 이면 SUBMITTED base 에서 곧바로 성공한다.
     const resubmitId = commandId();
     const resubmitted = await apiPost(
       request,
@@ -182,12 +141,12 @@ test.describe('[E2E-TOUR-01] 대회 결과 검토 (반려/보완요청/재제출
         email,
         idempotencyKey: resubmitId,
         data: {
-          expectedVersion: gameVersionAfterReject,
+          expectedVersion: submitted.gameVersion,
           clientCommandId: resubmitId,
           score: { home: 0, away: 0 },
           actualParticipants: [],
           eventsHash: submitted.eventsHash,
-          reason: 'resubmit after reject',
+          reason: 'fixed in place',
         },
       },
     );
@@ -202,23 +161,35 @@ test.describe('[E2E-TOUR-01] 대회 결과 검토 (반려/보완요청/재제출
     );
     expect(revisionsAfterResubmit).toHaveLength(2);
 
-    // request_supplement on the new SUBMITTED successor.
-    const supplementId = commandId();
-    const supplemented = await apiPost(
+    // **대체된 base 는 확정할 수 없다.** base 의 state 는 SUBMITTED 그대로라(supersede 는
+    // predecessor 를 건드리지 않는다) 상태만 보면 확정 가능해 보인다 — officialize 가
+    // `supersedesId` 로 따로 판정한다. 이게 없으면 어드민의 오래된 화면이 **고치기 전**
+    // 결과를 공식으로 만들 수 있다.
+    //
+    // ⚠️ **hash 는 맞게 보낸다.** projection-preview 검사가 supersede 검사보다 먼저 걸리므로
+    // 아무 문자열이나 넣으면 `PROJECTION_PREVIEW_MISMATCH` 에서 멈춰 **정작 재려는 가드에
+    // 도달하지 못한다** — 상태 코드만 보면 둘 다 409 라 통과로 읽힌다. 그래서 base 리비전
+    // 내용으로 진짜 hash 를 만들고, **에러 코드까지** 단언한다.
+    const baseRevision = unwrap<Array<{ id: string; score: unknown; goalEvents: unknown; eventsHash: string; mvpParticipantId: string | null }>>(
+      await apiGet(request, `/api/v1/games/${gameId}/result-revisions`, { email }),
+    ).find((revision) => revision.id === submitted.revisionId);
+    expect(baseRevision, 'base 리비전을 목록에서 찾지 못했다').toBeTruthy();
+
+    const staleOfficialId = commandId();
+    const staleOfficialize = await apiPost(
       request,
-      `/api/v1/games/${gameId}/result-revisions/${resubmittedData.revisionId}/review-decision`,
+      `/api/v1/games/${gameId}/result-revisions/${submitted.revisionId}/officialize`,
       {
         email,
-        idempotencyKey: supplementId,
+        idempotencyKey: staleOfficialId,
         data: {
           expectedVersion: resubmittedData.version,
-          clientCommandId: supplementId,
-          decision: 'request_supplement',
-          reason: 'need lineup detail',
+          clientCommandId: staleOfficialId,
+          projectionPreviewHash: projectionPreviewHash(baseRevision!),
         },
       },
     );
-    const supplementedData = unwrap<{ revisionState: string }>(supplemented);
-    expect(supplementedData.revisionState).toBe('SUPPLEMENT_REQUESTED');
+    expect(staleOfficialize.status, JSON.stringify(staleOfficialize.body)).toBe(409);
+    expect((staleOfficialize.body as { code?: string }).code).toBe('REVISION_MUST_BE_SUPERSEDED');
   });
 });

@@ -4,8 +4,10 @@ import { V1GameState, type V1GameParticipant } from '@prisma/client';
 import { validate } from 'class-validator';
 import { GameContractError } from './core';
 import { GameCommandDto } from './dto/game-command.dto';
+import type { V1AuthUser } from '../auth/v1-auth-user';
 import {
   canonicalGameCommandPayloadHash,
+  extractEndOutcome,
   extractEndPenalties,
   gameAuthorizationAction,
   gameCommandAuditAction,
@@ -15,6 +17,7 @@ import {
   resolveLineupRosterRegistration,
   staffLineupSubmitRequiresTakeover,
   toGameHttpException,
+  GamesService,
 } from './games.service';
 
 function participant(overrides: Partial<V1GameParticipant>): V1GameParticipant {
@@ -30,6 +33,7 @@ function participant(overrides: Partial<V1GameParticipant>): V1GameParticipant {
     positionX: null,
     positionY: null,
     started: true,
+    arrivedAt: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     ...overrides,
@@ -242,6 +246,68 @@ describe('GamesService command boundary', () => {
     });
   });
 
+  // 1차 대회 회고 "몰수·중단 등 특수 상황 처리". 지금까지 운영자는 몰수를 임의 점수로
+  // 수기 입력하는 수밖에 없어 정상 종료와 구분되지 않았고, "왜 그 점수인지" 근거가
+  // 남지 않았다. 2026-08-23 사용자 결정(Q3)은 표준 스코어 자동 부여가 아니라
+  // **운영자 입력 + 사유 필수**다 — 이 파서의 존재 이유가 그 "필수"이므로,
+  // 사유 없는 몰수가 실제로 막히는지가 이 스위트의 핵심 계약이다.
+  describe('extractEndOutcome (몰수·중단 종결 사유 파싱)', () => {
+    it('사유가 없으면 정상 종료다 — 기존 end 호출은 그대로 통과해야 한다', () => {
+      expect(extractEndOutcome({})).toEqual({ outcomeReason: 'NORMAL', note: null });
+      expect(extractEndOutcome({ outcomeReason: 'NORMAL' })).toEqual({
+        outcomeReason: 'NORMAL',
+        note: null,
+      });
+    });
+
+    it('몰수·중단은 사유 본문과 함께 통과한다', () => {
+      expect(extractEndOutcome({ outcomeReason: 'FORFEIT', outcomeNote: '원정팀 미출석' })).toEqual({
+        outcomeReason: 'FORFEIT',
+        note: '원정팀 미출석',
+      });
+      expect(extractEndOutcome({ outcomeReason: 'ABANDONED', outcomeNote: '낙뢰로 중단' })).toEqual({
+        outcomeReason: 'ABANDONED',
+        note: '낙뢰로 중단',
+      });
+    });
+
+    // 이 스위트에서 가장 중요한 계약 — 사유를 안 적고 몰수로 끝낼 수 있으면
+    // 이 기능은 회고가 지적한 문제를 하나도 해결하지 못한다(점수의 임의성은
+    // 그대로인데 근거만 없는 상태가 된다).
+    it('사유 없는 몰수·중단은 막는다', () => {
+      expect(() => extractEndOutcome({ outcomeReason: 'FORFEIT' })).toThrow(
+        UnprocessableEntityException,
+      );
+      expect(() => extractEndOutcome({ outcomeReason: 'ABANDONED', outcomeNote: '' })).toThrow(
+        UnprocessableEntityException,
+      );
+      // 공백만 적은 것도 사유가 아니다.
+      expect(() => extractEndOutcome({ outcomeReason: 'FORFEIT', outcomeNote: '   ' })).toThrow(
+        UnprocessableEntityException,
+      );
+      // 문자열이 아닌 값도 사유로 인정하지 않는다.
+      expect(() => extractEndOutcome({ outcomeReason: 'FORFEIT', outcomeNote: 123 })).toThrow(
+        UnprocessableEntityException,
+      );
+    });
+
+    it('앞뒤 공백은 다듬어 저장한다', () => {
+      expect(extractEndOutcome({ outcomeReason: 'FORFEIT', outcomeNote: '  원정팀 미출석  ' })).toEqual({
+        outcomeReason: 'FORFEIT',
+        note: '원정팀 미출석',
+      });
+    });
+
+    it('알 수 없는 사유 값은 막는다 (오타가 조용히 정상 종료로 읽히면 안 된다)', () => {
+      expect(() => extractEndOutcome({ outcomeReason: 'forfeit' })).toThrow(
+        UnprocessableEntityException,
+      );
+      expect(() => extractEndOutcome({ outcomeReason: 'WALKOVER' })).toThrow(
+        UnprocessableEntityException,
+      );
+    });
+  });
+
   describe('extractEndPenalties (트랙 B: end 커맨드의 승부차기 payload 파싱)', () => {
     // 킥 수(`takenHome`/`takenAway`)와 우회 표식(`operatorOverride`)은 서버가
     // 승부차기 종료를 스스로 판정하고, 규칙과 다른 결론을 기록에 남기기 위한 필드다.
@@ -360,6 +426,7 @@ describe('GamesService command boundary', () => {
       },
     );
   });
+
 });
 
 /**
@@ -452,5 +519,188 @@ describe('latestLineupStateBySideId', () => {
 
   it('라인업이 하나도 없으면 빈 맵이다 — 화면은 이걸 "미작성"으로 읽는다', () => {
     expect(latestLineupStateBySideId([]).size).toBe(0);
+  });
+});
+
+describe('GamesService.listMyTournamentFixtures canonical source', () => {
+  it.each([false, true])('lists canonical matches by time then ID, ignoring fixture number (same time: %s)', async (sameTime) => {
+    const startedAt = new Date('2026-09-09T09:00:00.000Z');
+    const laterAt = sameTime ? startedAt : new Date('2026-09-09T10:00:00.000Z');
+    const prisma = {
+      v1TeamMembership: {
+        findMany: jest.fn().mockResolvedValue([{ teamId: 'team-home' }]),
+      },
+      v1TournamentRegistration: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'registration-home', teamId: 'team-home', team: { name: 'Home' } },
+        ]),
+      },
+      v1TeamMatch: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'match-later',
+            startAt: laterAt,
+            status: 'matched',
+            game: { id: 'game-team-match', sourceType: 'TEAM_MATCH' },
+            tournamentDetails: {
+              round: '2',
+              legNumber: 1,
+              fixtureNumber: 2,
+              group: { name: 'Group A' },
+              homeRegistrationId: 'registration-home',
+              awayRegistrationId: 'registration-away',
+              homeRegistration: { teamId: 'team-home', team: { name: 'Home' } },
+              awayRegistration: { teamId: 'team-away', team: { name: 'Away' } },
+            },
+          },
+          {
+            id: 'match-first',
+            startAt: startedAt,
+            status: 'matched',
+            game: null,
+            tournamentDetails: {
+              round: '1',
+              legNumber: 1,
+              fixtureNumber: 99,
+              group: { name: 'Group A' },
+              homeRegistrationId: 'registration-home',
+              awayRegistrationId: 'registration-away',
+              homeRegistration: { teamId: 'team-home', team: { name: 'Home' } },
+              awayRegistration: { teamId: 'team-away', team: { name: 'Away' } },
+            },
+          },
+        ]),
+      },
+      v1GameSide: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'side-home', gameId: 'game-team-match', teamId: 'team-home' },
+        ]),
+      },
+      v1GameLineup: {
+        findMany: jest.fn().mockResolvedValue([
+          { sideId: 'side-home', state: 'SUBMITTED', revision: 2 },
+        ]),
+      },
+    };
+    const service = new GamesService(
+      prisma as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.listMyTournamentFixtures({ id: 'user-1' } as V1AuthUser, 'tournament-1'),
+    ).resolves.toEqual({
+      teams: [
+        {
+          registrationId: 'registration-home',
+          teamId: 'team-home',
+          teamName: 'Home',
+          fixtures: [
+            expect.objectContaining({ fixtureId: 'match-first', gameId: null, round: '1' }),
+            expect.objectContaining({
+              fixtureId: 'match-later',
+              gameId: 'game-team-match',
+              lineupState: 'SUBMITTED',
+              round: '2',
+            }),
+          ],
+        },
+      ],
+    });
+    expect(prisma.v1TeamMembership.findMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', status: 'active', role: { in: ['owner', 'manager'] } },
+      select: { teamId: true },
+    });
+    expect(prisma.v1TournamentRegistration.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { tournamentId: 'tournament-1', teamId: { in: ['team-home'] } },
+    }));
+    expect(prisma.v1TeamMatch.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        tournamentId: 'tournament-1', deletedAt: null,
+        OR: [
+          { tournamentDetails: { is: { OR: [
+            { homeRegistrationId: { in: ['registration-home'] } },
+            { awayRegistrationId: { in: ['registration-home'] } },
+          ] } } },
+          { tournamentDetails: null, OR: [
+            { hostTeamId: { in: ['team-home'] } },
+            { approvedApplicantTeamId: { in: ['team-home'] } },
+          ] },
+        ],
+      },
+    }));
+  });
+
+  it('fails closed when a canonical match still points at a legacy game source', async () => {
+    const prisma = {
+      v1TeamMembership: {
+        findMany: jest.fn().mockResolvedValue([{ teamId: 'team-home' }]),
+      },
+      v1TournamentRegistration: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'registration-home', teamId: 'team-home', team: { name: 'Home' } },
+        ]),
+      },
+      v1TeamMatch: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'match-legacy-source',
+            startAt: new Date('2026-09-09T09:00:00.000Z'),
+            status: 'matched',
+            game: { id: 'game-legacy', sourceType: 'TOURNAMENT_FIXTURE' },
+            tournamentDetails: {
+              round: '1',
+              legNumber: 1,
+              fixtureNumber: 1,
+              group: { name: 'Group A' },
+              homeRegistrationId: 'registration-home',
+              awayRegistrationId: 'registration-away',
+              homeRegistration: { teamId: 'team-home', team: { name: 'Home' } },
+              awayRegistration: { teamId: 'team-away', team: { name: 'Away' } },
+            },
+          },
+        ]),
+      },
+    };
+    const service = new GamesService(prisma as never, {} as never, {} as never);
+
+    await expect(
+      service.listMyTournamentFixtures({ id: 'user-1' } as V1AuthUser, 'tournament-1'),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'TOURNAMENT_MATCH_MIGRATION_REQUIRED' }),
+    });
+  });
+
+  it('fails closed when a tournament-owned match has no bracket details', async () => {
+    const prisma = {
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId: 'team-home' }]) },
+      v1TournamentRegistration: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'registration-home', teamId: 'team-home', team: { name: 'Home' } },
+        ]),
+      },
+      v1TeamMatch: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 'match-missing-details',
+            hostTeamId: 'team-home',
+            approvedApplicantTeamId: null,
+            tournament: { kind: 'regular_tournament' },
+            startAt: new Date('2026-09-09T09:00:00.000Z'),
+            status: 'matched',
+            game: null,
+            tournamentDetails: null,
+          },
+        ]),
+      },
+    };
+    const service = new GamesService(prisma as never, {} as never, {} as never);
+
+    await expect(
+      service.listMyTournamentFixtures({ id: 'user-1' } as V1AuthUser, 'tournament-1'),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'TOURNAMENT_MATCH_MIGRATION_REQUIRED' }),
+    });
   });
 });

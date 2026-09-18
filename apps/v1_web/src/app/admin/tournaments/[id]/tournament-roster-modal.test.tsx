@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1AdminTournamentRegistration } from '@/types/api';
-import { RosterModal } from './tournament-detail-client';
+import { RosterModal } from './registrations-tab';
 
 const refetch = vi.fn();
 const updateEligibility = vi.fn();

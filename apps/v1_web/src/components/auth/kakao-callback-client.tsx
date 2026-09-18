@@ -9,7 +9,7 @@ import { trackEvent } from '@/lib/analytics';
 import { clearV1IdentityCache } from '@/lib/query-keys';
 import { sanitizeRedirectPath, saveStoredV1Session } from '@/lib/session-storage';
 import type { V1AuthSessionResponse } from '@/types/api';
-import { AuthFrame } from './auth-page';
+import { AUTH_NOTICE_STAGE, AUTH_WELCOME_STAGE, AuthFrame } from './auth-page';
 import { KAKAO_OAUTH_STATE_STORAGE_KEY } from './auth.view-model';
 
 function getKakaoRedirectUri() {
@@ -109,7 +109,7 @@ export function KakaoCallbackClient() {
 
   if (error) {
     return (
-      <AuthFrame topTitle="카카오 로그인" backHref="/login">
+      <AuthFrame topTitle="카카오 로그인" backHref="/login" stage={AUTH_NOTICE_STAGE}>
         <div className="tm-auth-body">
           <span className="tm-badge tm-badge-orange">로그인 오류</span>
           <h1 className="tm-text-heading tm-auth-heading">로그인을 완료하지 못했어요</h1>
@@ -123,7 +123,7 @@ export function KakaoCallbackClient() {
   }
 
   return (
-    <AuthFrame>
+    <AuthFrame stage={AUTH_WELCOME_STAGE}>
       <div className="tm-auth-body tm-auth-center">
         <h1 className="tm-text-heading tm-auth-heading">카카오 로그인을 확인하고 있어요</h1>
         <p className="tm-text-body tm-auth-sub">잠시만 기다려 주세요.</p>

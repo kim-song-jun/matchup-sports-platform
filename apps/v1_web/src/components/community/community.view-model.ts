@@ -4,6 +4,9 @@ const CHAT_AVATARS = {
   개인매치: '/mock/profile/profile-01.svg',
   팀매치: '/mock/profile/profile-03.svg',
   팀: '/mock/profile/profile-02.svg',
+  // 팀컨택 로딩 스켈레톤용 placeholder는 없다 — 이 목록에는 항상 팀컨택 mock room이 없으므로
+  // 실제로 소비되지 않지만, ChatRoomModel['type']을 satisfies하려면 4개 키가 모두 필요하다.
+  팀컨택: '/mock/profile/profile-02.svg',
 } satisfies Record<ChatRoomModel['type'], string>;
 
 // Loading-state placeholder rooms — shown only until useV1ChatRooms resolves.

@@ -13,6 +13,7 @@ function tournament(
     title: id,
     status: 'open',
     format: 'group_knockout',
+    kind: 'regular_tournament',
     registrationDeadlineAt: null,
     scheduledAt: '2026-08-01T09:00:00.000Z',
     scheduledEndAt: null,

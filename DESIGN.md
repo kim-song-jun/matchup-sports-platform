@@ -12,11 +12,20 @@
 
 ## 1. Source Of Truth Order
 
+> **2026-09-07 정정.** 3·4번은 `apps/web`을 가리키고 있었다. 그 앱은 **배포되지 않는다** —
+> alpha·프로덕션 모두 `deploy/Dockerfile.v1-web`로 **`apps/v1_web`**을 빌드하고, `apps/web`은
+> 어떤 워크플로에도 등장하지 않으며 마지막 커밋이 2026-07-20이다. 또 v1_web은 치수 토큰과
+> 색·타입 토큰을 **다른 파일**에 둔다.
+
 1. `DESIGN.md` — canonical design rules, surface policy, review checklist
 2. `.impeccable.md` — brand memo와 aesthetic summary를 담는 compatibility entry
-3. `apps/web/src/app/globals.css` `@theme` — token truth
-4. shared UI primitives and established layout patterns in `apps/web/src/components/`
-5. audit/report/task documents — evidence, rollout history, follow-up only
+3. `apps/v1_web/src/app/tokens.css` `@theme` — **치수 토큰의 SSOT**
+   (radius 8종 · spacing 4px 격자 · shadow 4종 · control size · easing · breakpoint)
+4. `apps/v1_web/src/app/globals.css` `:root` — **색·타입 토큰의 SSOT**
+   (grey/blue/green/orange/red 스케일, `--font-size-micro`(11) ~ `--font-size-heading`(24) 8단계)
+5. shared UI primitives and established layout patterns in `apps/v1_web/src/components/`
+   (특히 `components/v1-ui/primitives.tsx`)
+6. audit/report/task documents — evidence, rollout history, follow-up only
 
 ## 2. Brand North Star
 
@@ -29,12 +38,26 @@
 
 토스에서 배울 것은 **시인성(readability)**이다. 모든 페이지에 아래 특성이 적용되어야 한다.
 
-**타이포그래피 위계**
-- 페이지 제목: `text-2xl font-bold tracking-tight` — 크고 또렷하게
-- 섹션 제목: `text-base font-bold tracking-tight` — 본문보다 확실히 구분
-- 카드 제목: `text-sm font-semibold` — 클릭 가능한 핵심 정보
-- 보조 텍스트: `text-xs text-gray-500` — 시간, 장소, 부가 정보
-- 각 단계 사이에 최소 2px 이상의 크기 차이와 weight 차이가 있어야 한다
+**타이포그래피 위계** *(2026-09-07: v1_web 실제 토큰·클래스로 갱신)*
+
+| 역할 | 토큰 / 클래스 | 값 |
+|---|---|---|
+| 페이지 제목 | `--font-size-heading` · `.tm-text-heading` | 24px / 700 |
+| 섹션 제목 | `--font-size-body-lg` · `.tm-text-body-lg`<br>= 공유 `SectionTitle` 프리미티브 | **17px / 700** |
+| 카드·리스트 항목 제목 | `--font-size-body` · `.tm-text-card-title` | 15px / 600 |
+| 라벨 | `--font-size-label` · `.tm-text-label` | 13px / 600 |
+| 보조 텍스트 | `--font-size-caption` · `.tm-text-caption` / `.tm-text-micro` | 12px / 400·500 |
+
+- **각 단계 사이에 최소 2px 이상의 크기 차이와 weight 차이가 있어야 한다.**
+- 섹션 제목이 16px이 아니라 **17px**인 이유: v1_web 타입 스케일에 16px 단계가 없다
+  (15 → 17로 건너뛴다). 새 토큰을 만드는 대신 기존 `--font-size-body-lg`를 정본으로 삼는다.
+- **섹션 제목은 반드시 `SectionTitle` 프리미티브를 쓴다.** 인라인 `<div className="tm-text-label">`로
+  섹션 제목을 만들지 않는다 — 2026-09-07 alpha 실측에서 같은 역할이 13px/600 · 12px/800 ·
+  15px/850 · 17px/700 네 값으로 갈라져 있었다.
+- **`font-weight: 850`은 쓰지 않는다.** 스케일 밖 값이고 700·800과 육안 구분이 되지 않는다.
+- 예외 — 마이의 `.tm-my-section-label`(12px/800 회색 오버라인)은 섹션 제목이 아니라
+  **오버라인(eyebrow)** 으로 인정한다(2026-09-07 사용자 확정). 그 아래 카드 제목과
+  경쟁하지 않는 자리에서만 쓴다.
 
 **여백 리듬**
 - 페이지 내 대섹션 간격: `mt-10` (40px) — 호흡을 준다
@@ -92,6 +115,20 @@
 - 기본 카드에는 `none` 또는 hairline-level shadow만 허용한다.
 - 큰 blur radius, 다중 누적 shadow, glow성 shadow, hover 시 과한 lift는 금지한다.
 - 떠 있는 chrome, overlay, dropdown, bottom nav처럼 실제로 떠 있어야 하는 surface에서만 stronger shadow를 허용한다.
+
+**토큰 매핑** *(2026-09-07 추가 — `tokens.css` @theme)*
+
+| 토큰 | 값 | 쓰는 곳 |
+|---|---|---|
+| `--shadow-card` | `0 1px 2px rgba(15,23,42,.05)` | **콘텐츠 카드는 여기까지만.** 이게 "hairline"이다 |
+| `--shadow-dropdown` | `0 8px 24px rgba(20,28,45,.08)` | 검색 드롭다운 · 툴팁 · 데스크톱 셸 프레임 |
+| `--shadow-modal` | `0 8px 32px rgba(20,28,45,.14)` | 모달 · 바텀시트 · FAB |
+| `--shadow-drawer` | `4px 0 24px rgba(20,28,45,.12)` | 사이드 드로어 |
+
+> 콘텐츠 카드에 `--shadow-dropdown`을 걸지 않는다. 2026-09-07에 `.tm-featured-card`와
+> `.tm-match-card`가 주석에는 "hairline"이라고 적어 두고 실제로는 `--shadow-dropdown`
+> (blur 12배)을 쓰고 있었다. **컬러 글로우(`rgba(blue, .32)` 류)는 FAB에도 쓰지 않는다** —
+> 부양감은 중립 elevation으로 낸다.
 
 ### 4.2 Border
 
@@ -206,7 +243,15 @@
 - 아이콘(우측) + 숫자(크게) + 레이블(작게)
 - 상세: 섹션 12 참조
 
-모든 카드 공통: `rounded-2xl`, `border border-gray-100`, hairline shadow, `active:scale-[0.98]`
+모든 카드 공통 *(2026-09-07: v1_web 실제 구현으로 갱신)*:
+`.tm-card` = `border-radius: var(--radius-container)`(16px) + `border: 1px solid var(--card-border)` +
+`background: var(--card-surface)`. 그림자는 **없거나 `var(--shadow-card)`까지**(§4.1 토큰 매핑 참조).
+누름 피드백은 `.tm-pressable` = `transform: scale(0.985)` + `var(--duration-fast)`.
+
+> 아래 §9·§10·§13에 남아 있는 Tailwind 표기(`rounded-2xl`, `border-gray-100`, `p-4`, `gap-3`,
+> `text-sm` 등)는 **의도를 읽는 용도**다. v1_web은 `.tm-*` 클래스 + `tokens.css` 변수를 쓴다 —
+> `p-4` → `var(--spacing-4)`, `gap-3` → `var(--spacing-3)`, `text-sm` → `var(--font-size-body-sm)`.
+> 새 코드는 토큰·클래스 쪽 표기를 쓴다.
 
 ## 11. Information Hierarchy (TeamMeet 핵심)
 
@@ -268,8 +313,14 @@ TeamMeet은 금융 앱이 아니다. 사용자가 첫 3초에 읽어야 할 것�
 
 ## 14. CTA Placement
 
-**리스트 페이지:** CTA는 `MobilePageTopZone`에만 배치. 페이지 본문에 추가 CTA 금지
-**디테일 페이지:** 모바일은 콘텐츠 아래 자연 배치, 데스크톱은 우측 `sticky` 사이드바
+**리스트 페이지:** 생성 CTA는 **플로팅 FAB**(`.tm-floating-fab`) 하나로 낸다. 페이지 본문에 추가 CTA 금지
+  *(2026-09-07 실측 정정 — 이 항목은 "CTA는 `MobilePageTopZone`에만"이라고 적혀 있었으나,
+  `/matches`·`/teams` 등 리스트 화면은 상단이 검색+필터바이고 생성 동선은 FAB이다. 문서가 실제
+  패턴을 따라간다. FAB을 걷어내고 TopZone으로 되돌리는 것은 별도 결정 사항으로 남긴다.)*
+**디테일 페이지:** 모바일은 하단 고정 CTA(`.tm-fixed-cta`, `z-index: var(--z-cta)`), 데스크톱은 우측 `sticky` 사이드바
+  *(2026-09-07 실측 정정 — "모바일은 콘텐츠 아래 자연 배치"라고 적혀 있었으나 전용 토큰
+  `--z-cta: 31`이 이 패턴을 위해 존재하고, 디테일 라우트에는 바텀 내비가 렌더되지 않아
+  아래 "바텀 고정 CTA 금지 원칙"의 겹침 문제가 발생하지 않는다.)*
 **폼 페이지:** 제출 버튼은 폼 마지막에 배치. 플로팅/고정 CTA 금지
 **유틸리티 페이지:** CTA는 인라인 텍스트 링크 또는 메뉴 행으로만 표현
 

@@ -38,3 +38,27 @@ describe('AuthFrame 뒤로가기 컨트롤', () => {
     expect(screen.queryByRole('link', { name: /뒤로가기/ })).not.toBeInTheDocument();
   });
 });
+
+// 데스크톱 2단(B안, 2026-09-04): stage 가 있으면 왼쪽 스테이지(슬로건·그래픽)를 그리고
+// 프레임에 staged 클래스가 붙어 desktop/auth.css §11 이 2단으로 놓는다. 없으면 예전 폰 카드 그대로.
+describe('AuthFrame 데스크톱 스테이지', () => {
+  it('stage 를 주면 슬로건·부제·그래픽을 가진 aside 와 staged 프레임 클래스를 렌더한다', () => {
+    const { container } = render(
+      <AuthFrame stage={{ eyebrow: '로그인 확인', slogan: '다른 방법으로\n계속할 수 있어요', sub: '정보는 안전해요.', illustration: 'auth-notice' }}>본문</AuthFrame>,
+    );
+    expect(container.querySelector('.tm-auth-frame')).toHaveClass('tm-auth-frame-staged');
+    const aside = container.querySelector('aside.tm-auth-stage');
+    expect(aside).not.toBeNull();
+    expect(aside).toHaveTextContent('다른 방법으로');
+    expect(aside).toHaveTextContent('정보는 안전해요.');
+    const img = aside!.querySelector('img.tm-auth-stage-illustration');
+    expect(img).not.toBeNull();
+    expect(decodeURIComponent(img!.getAttribute('src') ?? '')).toContain('/illustrations/auth-notice-640.webp');
+  });
+
+  it('stage 가 없으면 aside 도 staged 클래스도 없다 — 약관·계정 삭제 안내는 폰 카드를 유지한다', () => {
+    const { container } = render(<AuthFrame topTitle="약관 동의">본문</AuthFrame>);
+    expect(container.querySelector('aside.tm-auth-stage')).toBeNull();
+    expect(container.querySelector('.tm-auth-frame')).not.toHaveClass('tm-auth-frame-staged');
+  });
+});

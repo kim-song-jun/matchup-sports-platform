@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { UsersRound } from 'lucide-react';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
-import { AppChrome } from '@/components/v1-ui/shell';
-import { AlertBanner, Card, EmptyState, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { AlertBanner, Card, EmptyState, ErrorState, InfoRow, SectionTitle } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { getTournamentRosterNextStep } from '@/components/tournaments/tournament-roster-next-step';
 import { SponsorLogoStrip } from '@/components/tournaments/tournament-sponsor-logo-strip';
@@ -54,11 +55,21 @@ function normalizeMyTeams(data: ReturnType<typeof useV1MyTeams>['data']): V1MyTe
 
 type ApplyStep = 'team' | 'agreements' | 'payment';
 
-const STEPS: Array<{ id: ApplyStep; label: string }> = [
-  { id: 'team', label: '팀 선택' },
-  { id: 'agreements', label: '동의 · 결제 수단' },
-  { id: 'payment', label: '결제 안내' },
-];
+/**
+ * 단계 라벨은 **참가비 유무로 갈린다.**
+ *
+ * 무료 대회는 결제 수단·입금자명을 아예 묻지 않는데(#1017) 라벨만 결제를 전제하고 있었다 —
+ * 2026-09-04 alpha 실측: 본문이 "이 대회는 무료로 참가할 수 있어요" 인 화면의 진행 표시가
+ * `동의 · 결제 수단` / `다음: 결제 안내` 였다. **없을 결제를 예고하는 잘못된 안내**이고,
+ * 완료 화면에서는 제목(`결제 안내`)과 본문(`참가비가 없는 대회예요`)이 서로 모순됐다.
+ */
+function stepsFor(isFreeEntry: boolean): Array<{ id: ApplyStep; label: string }> {
+  return [
+    { id: 'team', label: '팀 선택' },
+    { id: 'agreements', label: isFreeEntry ? '참가 동의' : '동의 · 결제 수단' },
+    { id: 'payment', label: isFreeEntry ? '신청 완료' : '결제 안내' },
+  ];
+}
 
 /** 위저드로 복원 가능한 단계 (팀 선택은 registration 없이 시작하는 최초 진입점이라 제외). */
 type ResumableApplyStep = Extract<ApplyStep, 'agreements' | 'payment'>;
@@ -93,12 +104,13 @@ function resolveResumableRegistrationId(
   return action === 'agreements' || action === 'payment' ? registration.id : null;
 }
 
-function StepIndicator({ current }: { current: ApplyStep }) {
+function StepIndicator({ current, isFreeEntry }: { current: ApplyStep; isFreeEntry: boolean }) {
+  const STEPS = stepsFor(isFreeEntry);
   const currentIndex = STEPS.findIndex((s) => s.id === current);
   const currentLabel = STEPS[currentIndex]?.label ?? '';
   const nextStep = STEPS[currentIndex + 1];
   return (
-    <div className="tm-create-progress" style={{ padding: '14px 20px 0' }} aria-label="신청 단계">
+    <div className="tm-create-progress" style={{ padding: '16px 20px 0' }} aria-label="신청 단계">
       {/* a11y: 단계 전환 시 스크린리더에 현재 단계 공지 (aria-live polite) */}
       <span
         role="status"
@@ -149,8 +161,10 @@ function OrderSummaryCard({
   step?: ApplyStep;
   compact?: boolean;
 }) {
-  // Hide payment-related rows on step 'team' (not yet entered)
-  const showPaymentRows = step !== 'team';
+  // Hide payment-related rows on step 'team' (not yet entered).
+  // **무료 대회에서는 아예 보여 주지 않는다** — 결제 수단·입금자명을 묻지 않는데 요약만
+  // "계좌이체" 라고 말하면, 참가자는 내지도 않을 돈의 결제 수단을 확인하게 된다.
+  const showPaymentRows = step !== 'team' && tournament.entryFee > 0;
 
   return (
     <Card
@@ -231,7 +245,7 @@ function DesktopRailSummary({
       {step === 'team' && (
         <button
           type="button"
-          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))] tm-btn-block"
           disabled={!selectedTeamId || !hasManagerTeam || isCreating}
           onClick={onNext}
           aria-label="다음 단계: 동의 및 결제 수단 선택"
@@ -243,7 +257,7 @@ function DesktopRailSummary({
       {step === 'agreements' && (
         <button
           type="button"
-          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))] tm-btn-block"
           disabled={!canSubmit || isSubmitting}
           onClick={onSubmitFromRail}
           aria-label="신청 제출하기"
@@ -255,7 +269,7 @@ function DesktopRailSummary({
       {step === 'payment' && tournament && (
         <Link
           href={`/tournaments/${tournament.id}/my`}
-          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))] tm-btn-block"
         >
           내 신청 확인하기
         </Link>
@@ -312,7 +326,7 @@ function TeamSelectStep({
               <div
                 key={i}
                 aria-hidden="true"
-                style={{ height: 72, borderRadius: 14, background: 'var(--grey100)' }}
+                style={{ height: 72, borderRadius: 'var(--radius-field)', background: 'var(--grey100)' }}
               />
             ))}
           </div>
@@ -345,15 +359,27 @@ function TeamSelectStep({
                   disabled={!isManager}
                   type="button"
                   onClick={() => isManager && onSelectTeam(team.teamId)}
+                  className="tm-pressable"
                   style={{
-                    all: 'unset',
+                    // all:'unset' 은 button 기본값을 지우면서 :focus-visible 링까지
+                    // 함께 지웠다 — 키보드로 팀을 고를 때 어느 카드에 있는지 알 수
+                    // 없었다. 지워야 할 것만 명시하고, 링은 .tm-pressable 로 받는다.
                     display: 'block',
                     width: '100%',
                     boxSizing: 'border-box',
+                    margin: 0,
+                    padding: 0,
+                    border: 0,
+                    background: 'transparent',
+                    font: 'inherit',
+                    color: 'inherit',
+                    textAlign: 'left',
+                    appearance: 'none',
+                    cursor: isManager ? 'pointer' : 'default',
                   }}
                 >
                   <Card
-                    pad={14}
+                    pad={16}
                     className={isSelected ? 'tm-create-selected' : undefined}
                     style={{
                       opacity: isManager ? 1 : 0.55,
@@ -361,10 +387,10 @@ function TeamSelectStep({
                       transition: 'border-color 0.15s, background 0.15s',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <TeamAvatar seed={team.teamId} name={team.name} logoUrl={team.logoUrl} size="md" />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <span
                             className="tm-text-label"
                             style={{
@@ -408,7 +434,7 @@ function TeamSelectStep({
                             flexShrink: 0,
                             width: 20,
                             height: 20,
-                            borderRadius: '50%',
+                            borderRadius: 'var(--radius-circle)',
                             background: 'var(--blue500)',
                             display: 'grid',
                             placeItems: 'center',
@@ -451,7 +477,7 @@ function TeamSelectStep({
           </Link>
           <button
             type="button"
-            className="tm-btn tm-btn-lg tm-btn-primary"
+            className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]"
             disabled={!selectedTeamId || !hasManagerTeam || isCreating}
             onClick={onNext}
             aria-label="다음 단계: 동의 및 결제수단 선택"
@@ -495,11 +521,12 @@ function ExpandableCheckRow({
     >
       {/* Main row: checkbox label + expand toggle */}
       <div
+        className="tm-auth-check-row"
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
-          padding: '12px 14px',
+          gap: 12,
+          padding: '12px 16px',
           minHeight: 44,
         }}
       >
@@ -524,7 +551,7 @@ function ExpandableCheckRow({
             ✓
           </span>
           <span style={{ display: 'grid', gap: 3, flex: 1, minWidth: 0 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
               <span className="tm-text-body" style={{ color: 'var(--text-strong)', lineHeight: 1.35 }}>
                 {label}
               </span>
@@ -533,10 +560,10 @@ function ExpandableCheckRow({
                   className="tm-text-micro"
                   style={{
                     flexShrink: 0,
-                    padding: '2px 6px',
-                    borderRadius: 999,
+                    padding: '2px 8px',
+                    borderRadius: 'var(--radius-pill)',
                     background: consentType === 'required' ? 'var(--red50)' : 'var(--grey100)',
-                    color: consentType === 'required' ? 'var(--red600)' : 'var(--text-muted)',
+                    color: consentType === 'required' ? 'var(--red700)' : 'var(--text-muted)',
                     fontWeight: 700,
                     lineHeight: 1.2,
                   }}
@@ -562,7 +589,7 @@ function ExpandableCheckRow({
               flexShrink: 0,
               background: 'none',
               border: 'none',
-              padding: '4px 6px',
+              padding: '4px 8px',
               cursor: 'pointer',
               color: 'var(--text-caption)',
               minWidth: 44,
@@ -570,7 +597,7 @@ function ExpandableCheckRow({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: 8,
+              borderRadius: 'var(--radius-chip)',
               fontSize: 12,
               fontWeight: 600,
             }}
@@ -869,6 +896,7 @@ function AgreementsStep({
   onSubmit,
   isSubmitting,
   error,
+  termsError,
   terms,
 }: {
   tournament: V1TournamentDetail;
@@ -879,6 +907,9 @@ function AgreementsStep({
   onSubmit: () => void;
   isSubmitting: boolean;
   error: string | null;
+  /** 약관 조회 실패 — 제출 에러(error)와 원인이 달라(네트워크/설정 문제) 재시도가
+   * 의미 있다. 그래서 AlertBanner 가 아니라 ErrorState + onRetry 로 따로 그린다. */
+  termsError: { message: string; onRetry: () => void } | null;
   terms: V1CurrentTermsItem[];
 }) {
   const [activeConsentDocument, setActiveConsentDocument] = useState<TournamentConsentDocument | null>(null);
@@ -894,8 +925,10 @@ function AgreementsStep({
   const allRequired = visibleTerms.length > 0
     && visibleTerms.filter((term) => term.requirement === 'required').every(isChecked);
   const allAgreed = visibleTerms.length > 0 && visibleTerms.every(isChecked);
+  // 참가비 0원이면 입금이라는 절차 자체가 없다 — 결제 수단도, 입금자명도 묻지 않는다.
+  const isFreeEntry = tournament.entryFee === 0;
   const bankTransferValid =
-    state.paymentMethod !== 'bank_transfer' || state.depositorName.trim().length > 0;
+    isFreeEntry || state.paymentMethod !== 'bank_transfer' || state.depositorName.trim().length > 0;
   const canSubmit = allRequired && bankTransferValid;
   const toggleAllAgreements = (checked: boolean) => {
     onChange({
@@ -950,12 +983,15 @@ function AgreementsStep({
         </Card>
       </section>
 
-      {/* Payment method — bank transfer only */}
+      {/* Payment method — bank transfer only. 무료 대회에서는 통째로 그리지 않는다:
+          같은 화면에 "이 대회는 무료로 참가할 수 있어요." 를 띄우면서 결제 수단과 **필수**
+          입금자명을 함께 요구하면, 안내와 요구가 서로 모순된다(2026-09-04 alpha 실측). */}
+      {!isFreeEntry && (
       <section aria-labelledby="payment-method-heading" style={{ marginTop: 16 }}>
         <div style={{ marginLeft: -20, marginRight: -20 }}>
           <SectionTitle id="payment-method-heading" title="결제 수단" />
         </div>
-        <Card pad={14} style={{ marginTop: 8 }}>
+        <Card pad={16} style={{ marginTop: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44 }}>
             <div
               aria-hidden="true"
@@ -963,7 +999,7 @@ function AgreementsStep({
                 flexShrink: 0,
                 width: 22,
                 height: 22,
-                borderRadius: '50%',
+                borderRadius: 'var(--radius-circle)',
                 border: '2px solid var(--blue500)',
                 background: 'var(--blue500)',
                 display: 'grid',
@@ -974,7 +1010,7 @@ function AgreementsStep({
                 style={{
                   width: 8,
                   height: 8,
-                  borderRadius: '50%',
+                  borderRadius: 'var(--radius-circle)',
                   background: 'var(--static-white)',
                   display: 'block',
                 }}
@@ -1002,8 +1038,8 @@ function AgreementsStep({
           카드 결제는 준비 중이에요. 계좌이체를 이용해 주세요.
         </p>
 
-        <Card pad={14} style={{ marginTop: 10 }}>
-          <label htmlFor="depositor-name" className="tm-text-caption" style={{ display: 'block', marginBottom: 6 }}>
+        <Card pad={16} style={{ marginTop: 12 }}>
+          <label htmlFor="depositor-name" className="tm-text-caption" style={{ display: 'block', marginBottom: 8 }}>
             입금자명 <span style={{ color: 'var(--red700)' }}>*</span>
           </label>
           <input
@@ -1030,8 +1066,10 @@ function AgreementsStep({
         </Card>
       </section>
 
+      )}
+
       {/* Free tournament notice */}
-      {tournament.entryFee === 0 ? (
+      {isFreeEntry ? (
         <Card pad={12} style={{ marginTop: 16, background: 'var(--grey50)' }}>
           <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
             이 대회는 무료로 참가할 수 있어요.
@@ -1056,6 +1094,12 @@ function AgreementsStep({
         />
       </div>
 
+      {termsError ? (
+        <div style={{ marginTop: 12 }}>
+          <ErrorState message={termsError.message} onRetry={termsError.onRetry} />
+        </div>
+      ) : null}
+
       {error ? (
         <div style={{ marginTop: 12 }}>
           <AlertBanner message={error} />
@@ -1070,7 +1114,7 @@ function AgreementsStep({
           </button>
           <button
             type="button"
-            className="tm-btn tm-btn-lg tm-btn-primary"
+            className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]"
             disabled={!canSubmit || isSubmitting}
             onClick={onSubmit}
             aria-label="신청 제출하기"
@@ -1096,19 +1140,17 @@ function TournamentConsentDialog({
   document: TournamentConsentDocument;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  // a11y: focus trap·스크롤 잠금·포커스 저장/복원·ESC 닫기는 공용 훅에 위임
+  // (조건부 마운트형 모달이라 open 은 true 고정)
+  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLButtonElement, HTMLElement>({
+    open: true,
+    onClose,
+  });
 
   return (
     <div
       role="presentation"
-      onClick={onClose}
+      onClick={onBackdropClick}
       style={{
         position: 'fixed',
         inset: 0,
@@ -1121,6 +1163,7 @@ function TournamentConsentDialog({
       }}
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="tournament-consent-dialog-title"
@@ -1142,18 +1185,18 @@ function TournamentConsentDialog({
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: 12,
-            padding: '18px 18px 12px',
+            padding: '20px 20px 12px',
             borderBottom: '1px solid var(--grey100)',
           }}
         >
           <h2 id="tournament-consent-dialog-title" className="tm-text-subhead" style={{ margin: 0 }}>
             {document.title}
           </h2>
-          <button className="tm-btn tm-btn-sm tm-btn-ghost" onClick={onClose} type="button" autoFocus>
+          <button ref={initialFocusRef} className="tm-btn tm-btn-sm tm-btn-ghost" onClick={onClose} type="button">
             닫기
           </button>
         </header>
-        <div style={{ overflowY: 'auto', padding: '18px' }}>
+        <div style={{ overflowY: 'auto', padding: '20px' }}>
           <p
             className="tm-text-caption"
             style={{ margin: 0, color: 'var(--text-muted)', lineHeight: 1.75, whiteSpace: 'pre-line' }}
@@ -1175,21 +1218,18 @@ function TournamentSubmitConfirmDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  useEffect(() => {
-    if (isSubmitting) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCancel();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSubmitting, onCancel]);
+  // a11y: focus trap·스크롤 잠금·포커스 저장/복원·ESC 닫기는 공용 훅에 위임
+  // (조건부 마운트형 모달이라 open 은 true 고정). 제출 중에는 pending 으로 ESC·backdrop 닫기 잠금
+  const { dialogRef, initialFocusRef, onBackdropClick } = useModalA11y<HTMLButtonElement, HTMLElement>({
+    open: true,
+    onClose: onCancel,
+    pending: isSubmitting,
+  });
 
   return (
     <div
       role="presentation"
-      onClick={isSubmitting ? undefined : onCancel}
+      onClick={onBackdropClick}
       style={{
         position: 'fixed',
         inset: 0,
@@ -1202,6 +1242,7 @@ function TournamentSubmitConfirmDialog({
       }}
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="tournament-submit-confirm-title"
@@ -1211,7 +1252,7 @@ function TournamentSubmitConfirmDialog({
           borderRadius: 18,
           background: 'var(--bg)',
           boxShadow: 'var(--shadow-modal)',
-          padding: 18,
+          padding: 20,
         }}
       >
         <h2 id="tournament-submit-confirm-title" className="tm-text-subhead" style={{ margin: 0 }}>
@@ -1223,19 +1264,19 @@ function TournamentSubmitConfirmDialog({
         >
           참가비 입금 후 단순 변심 또는 팀 사정으로 인한 신청 취소는 불가합니다.
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 8, marginTop: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 8, marginTop: 20 }}>
           <button
+            ref={initialFocusRef}
             type="button"
             className="tm-btn tm-btn-lg tm-btn-neutral"
             disabled={isSubmitting}
             onClick={onCancel}
-            autoFocus
           >
             취소
           </button>
           <button
             type="button"
-            className="tm-btn tm-btn-lg tm-btn-primary"
+            className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]"
             disabled={isSubmitting}
             onClick={onConfirm}
           >
@@ -1264,6 +1305,8 @@ function PaymentGuideStep({
   const { data: registration } = useV1Registration(tournament.id, registrationId);
   const paymentInstructions =
     registration?.paymentInstructions ?? initialPaymentInstructions;
+  // 참가비 0원이면 입금 절차 자체가 없다 — 계좌 안내도, 계좌 미설정 경고도 그리지 않는다.
+  const isFreeEntry = tournament.entryFee === 0;
 
   // aria-live region ref for clipboard confirmation
   const copyLiveRef = useRef<HTMLSpanElement>(null);
@@ -1272,6 +1315,7 @@ function PaymentGuideStep({
     registrationId,
     minPlayers: tournament.minPlayers,
     maxPlayers: tournament.maxPlayers,
+    isFreeEntry,
   });
 
   function handleCopyAccount() {
@@ -1306,7 +1350,7 @@ function PaymentGuideStep({
       <div
         role="status"
         aria-label="신청했어요"
-        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '24px 0 8px' }}
+        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '24px 0 8px' }}
       >
         <div
           className="tm-complete-check"
@@ -1314,7 +1358,7 @@ function PaymentGuideStep({
           style={{
             width: 56,
             height: 56,
-            borderRadius: '50%',
+            borderRadius: 'var(--radius-circle)',
             background: 'var(--blue500)',
             display: 'grid',
             placeItems: 'center',
@@ -1326,17 +1370,33 @@ function PaymentGuideStep({
           </svg>
         </div>
         <div className="tm-text-body-lg" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>신청했어요</div>
-        <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>아래 계좌로 참가비를 입금해 주세요</div>
+        {/* **참가비가 없으면 돈 이야기를 하지 않는다.** step 1(요약)·step 2(안내)는 이미
+            `entryFee` 를 분기하는데 이 완료 화면만 빠져 있어서, 무료 대회 신청자 전원이
+            "계좌로 입금하라" + "입금 계좌가 준비되지 않았어요" 를 봤다(2026-09-04 alpha 실측).
+            같은 신청이 `/tournaments/{id}/my` 와 어드민 목록에서는 "결제 완료" 로 뜨는 상태였다. */}
+        <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+          {isFreeEntry ? '참가비가 없는 대회예요. 이제 명단을 등록해 주세요.' : '아래 계좌로 참가비를 입금해 주세요'}
+        </div>
       </div>
 
-      <section aria-labelledby="bank-guide-heading" style={{ marginTop: 12 }}>
-        <div style={{ marginLeft: -20, marginRight: -20 }}>
-          <SectionTitle id="bank-guide-heading" title="입금 안내" />
-        </div>
+      {/* 무료 대회에서는 입금 안내 제목·계좌 카드·입금 확인 안내를 모두 건너뛴다.
+          **명단 등록 섹션은 이 섹션 안에 중첩돼 있으므로 함께 숨기면 안 된다** — 무료 대회일수록
+          다음 할 일(명단 등록)로 이끄는 것이 이 화면의 유일한 역할이 된다. */}
+      <section aria-labelledby={isFreeEntry ? undefined : 'bank-guide-heading'} style={{ marginTop: 12 }}>
+        {!isFreeEntry && (
+          <div style={{ marginLeft: -20, marginRight: -20 }}>
+            <SectionTitle id="bank-guide-heading" title="입금 안내" />
+          </div>
+        )}
+        {!isFreeEntry && (
         <Card pad={0} style={{ marginTop: 8 }}>
           {paymentInstructions ? (
             <div style={{ padding: '0 16px' }}>
-              <InfoRow label="은행" value={paymentInstructions.bankName} />
+              {/* 이 블록의 어휘는 '—' 다(입금자명·참가 팀과 같은 말). 공유 InfoRow 의
+                  기본 폴백('미정')이 닿으면 바로 아래 행과 말이 갈린다.
+                  **판정 기준을 공유본과 같게 맞춘다** — `|| '—'` 만으로는 공백만 있는 값을
+                  못 잡고, 그때 공유본이 `trim()` 으로 판정해 '미정' 을 그린다(같은 갈림 재현). */}
+              <InfoRow label="은행" value={paymentInstructions.bankName.trim() || '—'} />
               {/* Account number row with copy button */}
               <div
                 className="tm-info-row"
@@ -1363,7 +1423,7 @@ function PaymentGuideStep({
                   </button>
                 </div>
               </div>
-              <InfoRow label="예금주" value={paymentInstructions.bankHolder} />
+              <InfoRow label="예금주" value={paymentInstructions.bankHolder.trim() || '—'} />
               <InfoRow label="입금액" value={formatEntryFee(tournament.entryFee)} />
               <InfoRow
                 label="입금자명"
@@ -1372,12 +1432,12 @@ function PaymentGuideStep({
               />
             </div>
           ) : (
-            <div style={{ padding: '0 16px 14px' }}>
+            <div style={{ padding: '0 16px 16px' }}>
               <AlertBanner
                 tone="error"
                 message="입금 계좌가 준비되지 않았어요. 운영팀에 문의해 주세요."
               />
-              <div style={{ marginTop: 10 }}>
+              <div style={{ marginTop: 12 }}>
                 <InfoRow
                   label="입금액"
                   value={formatEntryFee(tournament.entryFee)}
@@ -1387,15 +1447,18 @@ function PaymentGuideStep({
             </div>
           )}
         </Card>
+        )}
 
-        <Card pad={14} style={{ marginTop: 12, background: 'var(--grey50)' }}>
-          <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
-            입금이 확인되면 신청이 최종 확정돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.
-          </p>
-        </Card>
+        {!isFreeEntry && (
+          <Card pad={16} style={{ marginTop: 12, background: 'var(--grey50)' }}>
+            <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.65 }}>
+              입금이 확인되면 신청이 최종 확정돼요. 입금자명이 다르면 확인이 늦어질 수 있어요.
+            </p>
+          </Card>
+        )}
 
         <section aria-labelledby="roster-next-step-heading" style={{ marginTop: 12, scrollMarginBottom: 144 }}>
-          <Card pad={14}>
+          <Card pad={16}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
               <div style={{ minWidth: 0 }}>
                 <div id="roster-next-step-heading" className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
@@ -1424,7 +1487,7 @@ function PaymentGuideStep({
       <div className="tm-fixed-cta tm-hide-desktop">
         <Link
           href={`/tournaments/${tournament.id}/my`}
-          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          className="tm-btn tm-btn-lg tm-btn-primary [--button-fill-primary:var(--static-blue)] hover:[--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))] tm-btn-block"
         >
           내 신청 확인하기
         </Link>
@@ -1442,7 +1505,7 @@ function LoadingSkeleton() {
         <div
           key={i}
           aria-hidden="true"
-          style={{ height: 64, borderRadius: 14, background: 'var(--grey100)', marginBottom: 10 }}
+          style={{ height: 64, borderRadius: 'var(--radius-field)', background: 'var(--grey100)', marginBottom: 12 }}
         />
       ))}
     </div>
@@ -1458,7 +1521,18 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const hubHref = `/tournaments/${tournamentId}/my`;
   const detailHref = `/tournaments/${tournamentId}`;
   const applyBackHref = requestedTeamId ? hubHref : detailHref;
-  const { data: tournament, isLoading: loadingTournament, isError: tournamentError, error: tournamentErr } = useV1Tournament(tournamentId);
+  // route-chrome 테이블(fragments/tournaments-extra.ts)의 backHref는 항상 detailHref로
+  // 고정돼 있다 — `?team=` 딥링크(내 신청 페이지에서 팀을 골라 들어온 경우, my-registration-
+  // client.tsx의 apply?team= 링크 참조)로 들어온 경우엔 셸 topbar 뒤로가기도 hubHref로
+  // 가야 한다. 이미 콘텐츠 영역의 cancelHref가 쓰는 것과 같은 값을 override로 셸에 밀어넣는다.
+  useShellOverride({ backHref: applyBackHref });
+  const {
+    data: tournament,
+    isLoading: loadingTournament,
+    isError: tournamentError,
+    error: tournamentErr,
+    refetch: refetchTournament,
+  } = useV1Tournament(tournamentId);
   const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
   const { data: myRegistrations = [], isLoading: loadingMyRegistrations } = useV1MyRegistrations(tournamentId);
   const tournamentTerms = useV1CurrentTerms('tournament_application');
@@ -1481,6 +1555,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     ? describeTournamentRegistrationBlock(
         newRegistrationBlockReason,
         resolveTournamentCapacity(tournament),
+        tournament.entryFee === 0,
       )
     : null;
 
@@ -1573,9 +1648,26 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
       return;
     }
 
-    const needsRedirect = myManagedRegistrations.find(
-      (reg) => resolveRegistrationResumeAction(reg.status) === 'redirect',
+    // **신청할 팀이 아직 남아 있으면 되돌리지 않는다.**
+    //
+    // 예전엔 `confirmed`/`waitlisted`/`cancel_requested` 신청이 **하나라도** 있으면 무조건
+    // `/my` 로 보냈다. 그래서 **두 팀을 가진 팀장이 다른 팀으로 신청할 수 없었다** — 1군을
+    // 넣은 클럽이 2군을 넣으려 하면 1군 신청 화면으로 튕겼다(2026-09-05 alpha 실측:
+    // 팀장B 가 B팀 확정 상태에서 C팀으로 신청할 경로가 없었다).
+    //
+    // 되돌리는 것이 옳은 경우는 하나다 — **더 넣을 팀이 없을 때.** 그때 이 화면은 빈 팀
+    // 선택지만 보여 주므로, 자기 신청을 보여 주는 편이 낫다.
+    const registeredTeamIds = new Set(
+      myManagedRegistrations
+        .filter((reg) => resolveRegistrationResumeAction(reg.status) === 'redirect')
+        .map((reg) => reg.teamId),
     );
+    const hasTeamLeftToApply = managerTeams.some((team) => !registeredTeamIds.has(team.teamId));
+    const needsRedirect = hasTeamLeftToApply
+      ? undefined
+      : myManagedRegistrations.find(
+          (reg) => resolveRegistrationResumeAction(reg.status) === 'redirect',
+        );
 
     if (needsRedirect) {
       setIsRedirectingAway(true);
@@ -1657,7 +1749,12 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
     .filter((term) => term.requirement === 'required')
     .every((term) => (agreements.acceptedTermsDocumentIds ?? []).includes(term.documentId));
   const bankTransferValid =
-    agreements.paymentMethod !== 'bank_transfer' || agreements.depositorName.trim().length > 0;
+    // 무료 대회는 입금자명을 묻지 않으므로 제출 조건에서도 빼야 한다. **여기가 페이지 레벨
+    // 게이트다** — `AgreementsStep` 안쪽 조건만 고치면 화면에는 필드가 없는데 제출 버튼은
+    // 계속 잠긴 채로 남는다(그 상태를 테스트가 잡았다).
+    tournament?.entryFee === 0
+    || agreements.paymentMethod !== 'bank_transfer'
+    || agreements.depositorName.trim().length > 0;
   const requiredTournamentTerms = tournamentTerms.data?.items.filter(
     (term) => term.requirement === 'required',
   ) ?? [];
@@ -1671,28 +1768,24 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
 
   if (loadingTournament || loadingMyRegistrations || (requestedTeamId && loadingTeams) || isRedirectingAway) {
     return (
-      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments" desktopHead>
-        <LoadingSkeleton />
-      </AppChrome>
-    );
+              <LoadingSkeleton />
+      );
   }
 
   if (tournamentError || !tournament) {
     const msg = extractErrorMessage(tournamentErr, '대회 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
     return (
-      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '0 20px', marginTop: 24 }}>
-          <AlertBanner message={msg} />
+              <div style={{ padding: '0 20px', marginTop: 24 }}>
+          <ErrorState message={msg} onRetry={() => void refetchTournament()} />
           <Link
             href={`/tournaments/${tournamentId}`}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-            style={{ marginTop: 14 }}
+            style={{ marginTop: 16 }}
           >
             대회 상세로 돌아가기
           </Link>
         </div>
-      </AppChrome>
-    );
+      );
   }
 
   // 대회 신청은 본인확인이 전제다(서버도 submit에서 403 PHONE_NOT_VERIFIED로 막는다).
@@ -1700,8 +1793,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   // 인증이 끝나면 이 신청 화면으로 정확히 되돌아오게 한다.
   if (phoneVerified === false) {
     return (
-      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '0 20px', marginTop: 24 }}>
+              <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner
             message="대회 신청은 휴대폰 본인인증을 마친 계정만 할 수 있어요. 인증 후 이 화면으로 돌아옵니다."
             tone="info"
@@ -1709,27 +1801,28 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           <Link
             href={buildPhoneVerifyHref(`/tournaments/${tournamentId}/apply`)}
             className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
-            style={{ marginTop: 14 }}
+            style={{ marginTop: 16 }}
           >
             본인인증 하러 가기
           </Link>
           <Link
             href={`/tournaments/${tournamentId}`}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-            style={{ marginTop: 10 }}
+            style={{ marginTop: 12 }}
           >
             대회 상세로 돌아가기
           </Link>
         </div>
-      </AppChrome>
-    );
+      );
   }
 
   // Only allow apply when tournament is open
-  if (tournament.status !== 'open') {
+  const applicationSurfaceOpen = tournament.kind === 'regular_league'
+    ? tournament.status !== 'completed' && tournament.status !== 'cancelled'
+    : tournament.status === 'open';
+  if (!applicationSurfaceOpen) {
     return (
-      <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '0 20px', marginTop: 24 }}>
+              <div style={{ padding: '0 20px', marginTop: 24 }}>
           <AlertBanner
             message="지금은 참가 신청을 받지 않아요."
             tone="info"
@@ -1737,13 +1830,12 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           <Link
             href={`/tournaments/${tournamentId}`}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
-            style={{ marginTop: 14 }}
+            style={{ marginTop: 16 }}
           >
             대회 상세로 돌아가기
           </Link>
         </div>
-      </AppChrome>
-    );
+      );
   }
 
   async function handleTeamNext() {
@@ -1846,12 +1938,12 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   }
 
   return (
-    <AppChrome title="참가 신청" backHref={applyBackHref} bottomNav={false} activeTab="tournaments" desktopHead>
+    <>
       {/* maxWidth/marginInline 인라인 스타일 제거:
           모바일은 globals.css 기본값이 처리, 데스크톱은 tournaments.css의
           .tm-tournament-apply-body { max-width:unset } + .tm-tournament-form-grid 가 담당 */}
       <div className="tm-tournament-apply-body">
-        <StepIndicator current={step} />
+        <StepIndicator current={step} isFreeEntry={tournament.entryFee === 0} />
 
         {/* Desktop 2-column layout via .tm-tournament-form-grid */}
         <div className="tm-tournament-form-grid">
@@ -1886,14 +1978,13 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
                 onBack={handleAgreementsBack}
                 onSubmit={requestAgreementsSubmit}
                 isSubmitting={isSubmittingApplication}
-                error={
-                  submitError
-                  ?? newRegistrationBlockMessage
-                  ?? (tournamentTerms.isError
-                    ? '현재 대회 약관을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
+                error={submitError ?? newRegistrationBlockMessage}
+                termsError={
+                  tournamentTerms.isError
+                    ? { message: '현재 대회 약관을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.', onRetry: () => void tournamentTerms.refetch() }
                     : tournamentTerms.data && !tournamentTerms.data.ready
-                      ? '현재 대회 필수 약관이 준비되지 않아 신청할 수 없어요.'
-                      : null)
+                      ? { message: '현재 대회 필수 약관이 준비되지 않아 신청할 수 없어요.', onRetry: () => void tournamentTerms.refetch() }
+                      : null
                 }
                 terms={tournamentTerms.data?.items ?? []}
               />
@@ -1946,12 +2037,12 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
               background: 'var(--scrim-dark-32)',
               display: 'grid',
               placeItems: 'center',
-              zIndex: 9999,
+              zIndex: 'var(--z-top)',
             }}
           >
             <div
               className="tm-text-label"
-              style={{ color: 'var(--static-white)', background: 'var(--scrim-dark-72)', padding: '12px 20px', borderRadius: 14 }}
+              style={{ color: 'var(--static-white)', background: 'var(--scrim-dark-72)', padding: '12px 20px', borderRadius: 'var(--radius-field)' }}
             >
               잠깐만요…
             </div>
@@ -1965,6 +2056,6 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
           />
         ) : null}
       </div>
-    </AppChrome>
+    </>
   );
 }

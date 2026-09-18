@@ -8,6 +8,8 @@
  * paid · confirmed`를 모두 정원 점유로 세므로(`tournament-registrations.service.ts`),
  * 입금대기 팀이 정원을 채운 대회는 "5 / 8"처럼 여유가 있어 보여도 실제로는 신청을 받을 수 없다.
  * 그 간극이 "왜 신청이 안 받아지냐"의 원인이었다.
+ * 정규 리그는 fixture 생성 뒤에도 미래 registrationDeadlineAt까지 신청할 수 있고, 정원은
+ * 신청 가능 여부를 결정하지 않는다.
  */
 
 export type TournamentRegistrationBlockReason =
@@ -16,6 +18,8 @@ export type TournamentRegistrationBlockReason =
   | 'capacity_full';
 
 export type TournamentCapacityInput = {
+  /** regular_league uses deadline/status only; other competitions use open + capacity. */
+  kind?: 'regular_league' | 'regular_tournament' | null;
   status: string;
   teamCount: number;
   confirmedCount: number;
@@ -52,12 +56,25 @@ export function resolveTournamentCapacity(tournament: TournamentCapacityInput): 
 
 /**
  * 새 신청(취소 후 재신청 포함)을 막는 이유. 막을 이유가 없으면 null.
- * 서버가 거절하는 순서와 같게 검사한다 — 상태 → 마감 → 정원.
+ * 일반 대회는 서버가 거절하는 순서와 같게 상태 → 마감 → 정원을 검사한다. 정규 리그는
+ * 종료 상태와 마감만 검사한다.
  */
 export function resolveTournamentRegistrationBlock(
   tournament: TournamentCapacityInput,
   now: Date = new Date(),
 ): TournamentRegistrationBlockReason | null {
+  if (tournament.kind === 'regular_league') {
+    // The API keeps league registration open while a future deadline exists, even
+    // after fixture generation changes the mirror status to in_progress. Leagues
+    // have no capacity gate; only terminal status, missing deadline, and expiry
+    // block the request.
+    if (tournament.status === 'completed' || tournament.status === 'cancelled') return 'not_open';
+    if (!tournament.registrationDeadlineAt) return 'not_open';
+    const deadline = new Date(tournament.registrationDeadlineAt).getTime();
+    if (!Number.isFinite(deadline)) return 'not_open';
+    if (deadline < now.getTime()) return 'deadline_passed';
+    return null;
+  }
   if (tournament.status !== 'open') return 'not_open';
   if (tournament.registrationDeadlineAt) {
     const deadline = new Date(tournament.registrationDeadlineAt).getTime();
@@ -74,11 +91,32 @@ export function canStartTournamentRegistration(
   return resolveTournamentRegistrationBlock(tournament, now) === null;
 }
 
-/** "확정 5팀 · 입금대기 3팀 / 총 8팀" — 세 화면이 같은 낱말을 쓰게 한다. */
-export function describeTournamentCapacity(capacity: TournamentCapacity): string {
+/**
+ * 정원을 쥔 채 기다리는 팀을 뭐라고 부를지. **한 곳에서만 정한다.**
+ *
+ * 무료 대회에서 기다리는 것은 입금이 아니라 운영자 확인이다. 이 낱말이 화면마다 하드코딩돼
+ * 있어서 한 군데를 고쳐도 목록 카드·진행바 `aria-label`·모바일 정원 카드에는 옛 문구가
+ * 그대로 남았다(2026-09-04 Copilot 리뷰). **특히 `aria-label`** — 스크린리더 사용자에게는
+ * 화면에서 고친 문구가 아니라 그쪽이 들린다.
+ */
+export function pendingCapacityLabel(isFreeEntry: boolean): string {
+  return isFreeEntry ? '확인대기' : '입금대기';
+}
+
+/**
+ * "확정 5팀 · 입금대기 3팀 / 총 8팀" — 세 화면이 같은 낱말을 쓰게 한다.
+ *
+ * **무료 대회에서는 "입금대기" 가 틀린 말이다.** 낼 돈이 없으니 기다리는 것은 입금이 아니라
+ * 운영자 확인이다. 서버 필드 이름(`pendingPaymentCount`)이 그대로 화면 낱말이 돼 있었고,
+ * 2026-09-04 alpha 실측에서 참가비 0원 대회의 요약줄이 "입금대기 1팀" 으로 떴다.
+ */
+export function describeTournamentCapacity(
+  capacity: TournamentCapacity,
+  isFreeEntry = false,
+): string {
   const parts = [`확정 ${capacity.confirmedCount}팀`];
   if (capacity.pendingPaymentCount > 0) {
-    parts.push(`입금대기 ${capacity.pendingPaymentCount}팀`);
+    parts.push(`${pendingCapacityLabel(isFreeEntry)} ${capacity.pendingPaymentCount}팀`);
   }
   return `${parts.join(' · ')} / 총 ${capacity.teamCount}팀`;
 }
@@ -87,10 +125,12 @@ export function describeTournamentCapacity(capacity: TournamentCapacity): string
 export function describeTournamentRegistrationBlock(
   reason: TournamentRegistrationBlockReason,
   capacity: TournamentCapacity,
+  isFreeEntry = false,
 ): string {
   if (reason === 'not_open') return '지금은 참가 신청을 받지 않아요.';
   if (reason === 'deadline_passed') return '신청이 마감돼서 새로 신청할 수 없어요.';
+  const waiting = pendingCapacityLabel(isFreeEntry);
   return capacity.pendingPaymentCount > 0
-    ? `정원이 가득 찼어요 — 입금대기 ${capacity.pendingPaymentCount}팀이 자리를 잡고 있어요. (${describeTournamentCapacity(capacity)})`
-    : `정원이 가득 차서 새로 신청할 수 없어요. (${describeTournamentCapacity(capacity)})`;
+    ? `정원이 가득 찼어요 — ${waiting} ${capacity.pendingPaymentCount}팀이 자리를 잡고 있어요. (${describeTournamentCapacity(capacity, isFreeEntry)})`
+    : `정원이 가득 차서 새로 신청할 수 없어요. (${describeTournamentCapacity(capacity, isFreeEntry)})`;
 }

@@ -22,6 +22,7 @@ import type {
   CreateTournamentFieldDto,
   UpdateTournamentFieldDto,
 } from './dto/tournament-operations-field.dto';
+import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../../tournaments/tournament-surface-lookup';
 
 export type TournamentOperationsFieldAuditContext = {
   readonly requestId: string;
@@ -59,9 +60,9 @@ export type TournamentFixtureFieldResult = {
  * tournament_director read" -- director explicitly excluded from mutation):
  * TOURNAMENT_STAFF_ACTIONS has no action where allowsRoleAction() separates
  * platform_ops from tournament_director (both return true for every action).
- * So field create/update calls assertAccess({action:'event_reverse'}) first
- * (this at least excludes field_operator/support_readonly, who are denied
- * 'event_reverse'), then layers an explicit `principal.role ===
+ * So field create/update calls assertAccess({action:'tournament_admin'})
+ * first (this at least excludes field_operator/support_readonly, who are
+ * denied 'tournament_admin'), then layers an explicit `principal.role ===
  * 'platform_ops'` check on top -- the exact reasoning TournamentStaffService
  * already documents for its own grant-authority nuances
  * (apps/v1_api/src/tournaments/staff/tournament-staff.service.ts,
@@ -71,7 +72,7 @@ export type TournamentFixtureFieldResult = {
  * no such carve-out in the frozen contract or the plan -- it is a Task
  * 18-introduced write path (user decision 2). Sensible default: treat it as
  * an operational action available to the same principals as any other
- * 'event_reverse' action (platform_ops + tournament_director), scoped to the
+ * 'tournament_admin' action (platform_ops + tournament_director), scoped to the
  * fixture's tournamentId. This does NOT require platform_ops-only, unlike
  * literal field CRUD, because assigning an existing field to a fixture is
  * day-of-tournament operations work, not field inventory management.
@@ -95,13 +96,13 @@ export type TournamentFixtureFieldResult = {
  * complete using authorization that a concurrent revoke already committed,
  * nor one where this recheck's own read races that revoke unordered.
  *
- * Both fixture-field writes are also optimistic-concurrency CAS'd against
- * the exact fieldId value this request observed (`where: {..., fieldId:
- * before}`), not a blind `update()`. Postgres re-validates an UPDATE's WHERE
- * clause against the latest committed row when a concurrent transaction has
- * already changed it, so two requests that both observed the same prior
- * fieldId can never both silently win -- the loser's affected-row count is 0
- * and it gets a 409 instead of a swallowed lost update (finding #8).
+ * Both fixture-field writes use a fieldId predicate in the same transaction
+ * (`where: {..., fieldId: before}`), rather than a blind update. This protects
+ * overlapping server-side reads and writes: Postgres re-validates the UPDATE
+ * predicate against the latest committed row and returns a 409 when the value
+ * changed before the write. The existing API has no client expectedVersion
+ * field, so a stale client request that starts after a prior commit remains
+ * last-write-wins by contract.
  *
  * `Idempotency-Key` is enforced as real idempotency, not just an audit
  * correlation id (finding #9): every mutation locks a durable, per-actor
@@ -178,13 +179,37 @@ export class TournamentOperationsFieldsService {
         return replay;
       }
 
+      // finding #76: 이름에는 DB unique 제약이 없다(scopeKey/id만 unique) -- 클라이언트
+      // (staff-client.tsx)가 이제 같은 이름을 막지만, API를 직접 호출하는 경로나
+      // 클라이언트가 오래된 목록을 들고 있는 경합 상황까지 막으려면 서버도 같은 규칙을
+      // 다시 확인해야 한다. 이름이 중복되면 공개 일정의 `fieldId` 매칭(finding #57 fix)
+      // 자체는 더 이상 잘못된 경기를 섞지 않지만, 운영자가 배정 드롭다운에서 어느 필드가
+      // 어느 필드인지 구분할 수 없게 되는 문제는 여전하므로 생성 단계에서 막는다.
+      // 대소문자만 다른 이름도 같은 이름으로 본다(case-insensitive). 앞뒤 공백은 트림해
+      // 비교하고 **트림한 값을 그대로 저장한다** -- 비교 기준과 저장값이 다르면 공백 하나로
+      // 이 가드를 우회할 수 있다(Copilot 리뷰 지적, PR #805).
+      const trimmedName = dto.name.trim();
+      const duplicate = await tx.v1TournamentField.findFirst({
+        where: { tournamentId, name: { equals: trimmedName, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      if (duplicate !== null) {
+        throw new ConflictException({
+          code: 'FIELD_NAME_DUPLICATE',
+          message: '이미 같은 이름의 경기장이 있어요.',
+        });
+      }
+
       let field: V1TournamentField;
       try {
         field = await tx.v1TournamentField.create({
           data: {
             tournamentId,
             scopeKey: dto.scopeKey,
-            name: dto.name,
+            // **비교와 저장이 같은 값이어야 중복 가드가 성립한다.** 위에서 `trim()` 한 값으로
+            // 중복을 찾아 놓고 원문을 저장하면, 앞뒤 공백이 섞인 이름이 통과해 저장된 뒤
+            // 다음 요청이 그 공백 이름과 대조하지 못해 같은 이름이 두 번 만들어진다.
+            name: trimmedName,
             sortOrder: dto.sortOrder ?? 0,
           },
         });
@@ -344,7 +369,7 @@ export class TournamentOperationsFieldsService {
       const principal = await this.access.assertAccess(
         {
           userId: actorUserId,
-          action: 'event_reverse',
+          action: 'tournament_admin',
           resource: { tournamentId, fixtureId },
         },
         tx,
@@ -363,85 +388,61 @@ export class TournamentOperationsFieldsService {
         return replay;
       }
 
-      const fixture = await tx.v1TournamentFixture.findUnique({
-        where: { tournamentId_id: { tournamentId, id: fixtureId } },
-        select: { id: true, tournamentId: true, fieldId: true },
+      const canonical = await tx.v1TeamMatch.findUnique({
+        where: { id: fixtureId },
+        select: {
+          id: true, tournamentId: true, leagueId: true, fieldId: true, deletedAt: true,
+          tournament: { select: { kind: true } },
+          tournamentDetails: { select: { tournamentId: true, teamMatchId: true } },
+          game: { select: { id: true, sourceType: true } },
+        },
       });
-      if (fixture === null) {
-        throw new NotFoundException({
-          code: 'TOURNAMENT_FIXTURE_NOT_FOUND',
-          message: '경기를 찾을 수 없어요.',
+      const canonicalOwned = canonical !== null
+        && canonical.tournamentId === tournamentId
+        && canonical.deletedAt === null
+        && ((canonical.tournamentDetails !== null
+          && canonical.leagueId === null
+          && canonical.tournamentDetails.tournamentId === tournamentId
+          && canonical.tournamentDetails.teamMatchId === fixtureId
+          && (canonical.tournament?.kind === 'regular_tournament' || canonical.tournament?.kind === null))
+          || (canonical.tournamentDetails === null
+            && canonical.leagueId === tournamentId
+            && canonical.tournament?.kind === 'regular_league'));
+      if (canonicalOwned) {
+        await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${fixtureId} FOR UPDATE`;
+        const locked = await tx.$queryRaw<Array<{ fieldId: string | null; deletedAt: Date | null }>>`SELECT field_id AS "fieldId", deleted_at AS "deletedAt" FROM v1_team_matches WHERE id = ${fixtureId} FOR UPDATE`;
+        if (locked.length !== 1 || locked[0].deletedAt !== null) {
+          throw new NotFoundException({ code: 'TOURNAMENT_FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
+        }
+        if (canonical.game === null || canonical.game.sourceType !== 'TEAM_MATCH') {
+          throw new ConflictException({ code: 'TOURNAMENT_MATCH_GAME_MISSING', message: '대회 경기의 정본 게임을 찾을 수 없어요.' });
+        }
+        const field = await tx.v1TournamentField.findUnique({
+          where: { tournamentId_id: { tournamentId, id: dto.fieldId } },
+          select: { id: true },
         });
+        if (field === null) throw new NotFoundException({ code: 'FIELD_NOT_FOUND', message: '필드를 찾을 수 없어요.' });
+        const before = canonical.fieldId;
+        if (locked[0].fieldId !== before) {
+          throw new ConflictException({ code: 'FIXTURE_FIELD_ASSIGNMENT_CONFLICT', message: '다른 요청이 먼저 경기장을 변경했어요. 새로고침 후 다시 시도해주세요.' });
+        }
+        if (before === dto.fieldId) {
+          const response: TournamentFixtureFieldResult = { fixtureId, tournamentId, fieldId: before };
+          await this.recordIdempotency(tx, actorUserId, action, resourceType, fixtureId, audit.requestId, payloadHash, 200, response);
+          return response;
+        }
+        const cas = await tx.v1TeamMatch.updateMany({ where: { id: fixtureId, tournamentId, deletedAt: null, fieldId: before }, data: { fieldId: dto.fieldId } });
+        if (cas.count !== 1) throw new ConflictException({ code: 'FIXTURE_FIELD_ASSIGNMENT_CONFLICT', message: '다른 요청이 먼저 경기장을 변경했어요. 새로고침 후 다시 시도해주세요.' });
+        const response: TournamentFixtureFieldResult = { fixtureId, tournamentId, fieldId: dto.fieldId };
+        await this.writeAudit(tx, principal, audit, {
+          action, targetType: 'TEAM_MATCH', targetId: fixtureId, tournamentId, teamMatchId: fixtureId, fieldId: dto.fieldId,
+          before: { fieldId: before }, after: { fieldId: dto.fieldId },
+        });
+        await this.recordIdempotency(tx, actorUserId, action, resourceType, fixtureId, audit.requestId, payloadHash, 200, response);
+        return response;
       }
 
-      const field = await tx.v1TournamentField.findUnique({
-        where: { tournamentId_id: { tournamentId, id: dto.fieldId } },
-        select: { id: true },
-      });
-      if (field === null) {
-        throw new NotFoundException({
-          code: 'FIELD_NOT_FOUND',
-          message: '필드를 찾을 수 없어요.',
-        });
-      }
-
-      // CAS on the fieldId value this request actually observed instead of a
-      // blind update, so a concurrent assignment can never be silently
-      // clobbered (lost-update half of finding #8): Postgres re-evaluates
-      // this WHERE clause against the latest committed row when another
-      // transaction changed it first, so the loser here gets 0 affected rows
-      // instead of an accepted-but-overwritten write.
-      const before = fixture.fieldId;
-      const cas = await tx.v1TournamentFixture.updateMany({
-        where: { tournamentId, id: fixtureId, fieldId: before },
-        data: { fieldId: dto.fieldId },
-      });
-      if (cas.count !== 1) {
-        throw new ConflictException({
-          code: 'FIXTURE_FIELD_ASSIGNMENT_CONFLICT',
-          message: '다른 요청이 먼저 경기장을 변경했어요. 새로고침 후 다시 시도해주세요.',
-        });
-      }
-
-      const after = await tx.v1TournamentFixture.findUnique({
-        where: { tournamentId_id: { tournamentId, id: fixtureId } },
-        select: { id: true, tournamentId: true, fieldId: true },
-      });
-      if (after === null) {
-        throw new ConflictException({
-          code: 'TOURNAMENT_FIXTURE_NOT_PERSISTED',
-          message: '경기 정보를 다시 불러오지 못했어요.',
-        });
-      }
-
-      await this.writeAudit(tx, principal, audit, {
-        action,
-        targetType: 'TOURNAMENT_FIXTURE',
-        targetId: fixtureId,
-        tournamentId,
-        fixtureId,
-        fieldId: after.fieldId,
-        before: { fieldId: before },
-        after: { fieldId: after.fieldId },
-      });
-
-      const response: TournamentFixtureFieldResult = {
-        fixtureId: after.id,
-        tournamentId: after.tournamentId,
-        fieldId: after.fieldId,
-      };
-      await this.recordIdempotency(
-        tx,
-        actorUserId,
-        action,
-        resourceType,
-        fixtureId,
-        audit.requestId,
-        payloadHash,
-        200,
-        response,
-      );
-      return response;
+      throw new NotFoundException({ code: 'TOURNAMENT_FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
     });
   }
 
@@ -460,7 +461,7 @@ export class TournamentOperationsFieldsService {
       const principal = await this.access.assertAccess(
         {
           userId: actorUserId,
-          action: 'event_reverse',
+          action: 'tournament_admin',
           resource: { tournamentId, fixtureId },
         },
         tx,
@@ -479,71 +480,56 @@ export class TournamentOperationsFieldsService {
         return replay;
       }
 
-      const fixture = await tx.v1TournamentFixture.findUnique({
-        where: { tournamentId_id: { tournamentId, id: fixtureId } },
-        select: { id: true, tournamentId: true, fieldId: true },
+      const canonical = await tx.v1TeamMatch.findUnique({
+        where: { id: fixtureId },
+        select: {
+          id: true, tournamentId: true, leagueId: true, fieldId: true, deletedAt: true,
+          tournament: { select: { kind: true } },
+          tournamentDetails: { select: { tournamentId: true, teamMatchId: true } },
+          game: { select: { id: true, sourceType: true } },
+        },
       });
-      if (fixture === null) {
-        throw new NotFoundException({
-          code: 'TOURNAMENT_FIXTURE_NOT_FOUND',
-          message: '경기를 찾을 수 없어요.',
+      const canonicalOwned = canonical !== null
+        && canonical.tournamentId === tournamentId
+        && canonical.deletedAt === null
+        && ((canonical.tournamentDetails !== null
+          && canonical.leagueId === null
+          && canonical.tournamentDetails.tournamentId === tournamentId
+          && canonical.tournamentDetails.teamMatchId === fixtureId
+          && (canonical.tournament?.kind === 'regular_tournament' || canonical.tournament?.kind === null))
+          || (canonical.tournamentDetails === null
+            && canonical.leagueId === tournamentId
+            && canonical.tournament?.kind === 'regular_league'));
+      if (canonicalOwned) {
+        await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${fixtureId} FOR UPDATE`;
+        const locked = await tx.$queryRaw<Array<{ fieldId: string | null; deletedAt: Date | null }>>`SELECT field_id AS "fieldId", deleted_at AS "deletedAt" FROM v1_team_matches WHERE id = ${fixtureId} FOR UPDATE`;
+        if (locked.length !== 1 || locked[0].deletedAt !== null) {
+          throw new NotFoundException({ code: 'TOURNAMENT_FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
+        }
+        if (canonical.game === null || canonical.game.sourceType !== 'TEAM_MATCH') {
+          throw new ConflictException({ code: 'TOURNAMENT_MATCH_GAME_MISSING', message: '대회 경기의 정본 게임을 찾을 수 없어요.' });
+        }
+        const before = canonical.fieldId;
+        if (locked[0].fieldId !== before) {
+          throw new ConflictException({ code: 'FIXTURE_FIELD_ASSIGNMENT_CONFLICT', message: '다른 요청이 먼저 경기장을 변경했어요. 새로고침 후 다시 시도해주세요.' });
+        }
+        if (before === null) {
+          const response: TournamentFixtureFieldResult = { fixtureId, tournamentId, fieldId: null };
+          await this.recordIdempotency(tx, actorUserId, action, resourceType, fixtureId, audit.requestId, payloadHash, 200, response);
+          return response;
+        }
+        const cas = await tx.v1TeamMatch.updateMany({ where: { id: fixtureId, tournamentId, deletedAt: null, fieldId: before }, data: { fieldId: null } });
+        if (cas.count !== 1) throw new ConflictException({ code: 'FIXTURE_FIELD_ASSIGNMENT_CONFLICT', message: '다른 요청이 먼저 경기장을 변경했어요. 새로고침 후 다시 시도해주세요.' });
+        const response: TournamentFixtureFieldResult = { fixtureId, tournamentId, fieldId: null };
+        await this.writeAudit(tx, principal, audit, {
+          action, targetType: 'TEAM_MATCH', targetId: fixtureId, tournamentId, teamMatchId: fixtureId, fieldId: before,
+          before: { fieldId: before }, after: { fieldId: null },
         });
+        await this.recordIdempotency(tx, actorUserId, action, resourceType, fixtureId, audit.requestId, payloadHash, 200, response);
+        return response;
       }
 
-      // Same CAS discipline as assignFixtureField() (finding #8): clearing is
-      // only ever a no-op race (both converge on fieldId=null), but the CAS
-      // still ensures we clear the field we actually observed.
-      const before = fixture.fieldId;
-      const cas = await tx.v1TournamentFixture.updateMany({
-        where: { tournamentId, id: fixtureId, fieldId: before },
-        data: { fieldId: null },
-      });
-      if (cas.count !== 1) {
-        throw new ConflictException({
-          code: 'FIXTURE_FIELD_ASSIGNMENT_CONFLICT',
-          message: '다른 요청이 먼저 경기장을 변경했어요. 새로고침 후 다시 시도해주세요.',
-        });
-      }
-
-      const after = await tx.v1TournamentFixture.findUnique({
-        where: { tournamentId_id: { tournamentId, id: fixtureId } },
-        select: { id: true, tournamentId: true, fieldId: true },
-      });
-      if (after === null) {
-        throw new ConflictException({
-          code: 'TOURNAMENT_FIXTURE_NOT_PERSISTED',
-          message: '경기 정보를 다시 불러오지 못했어요.',
-        });
-      }
-
-      await this.writeAudit(tx, principal, audit, {
-        action,
-        targetType: 'TOURNAMENT_FIXTURE',
-        targetId: fixtureId,
-        tournamentId,
-        fixtureId,
-        fieldId: before,
-        before: { fieldId: before },
-        after: { fieldId: null },
-      });
-
-      const response: TournamentFixtureFieldResult = {
-        fixtureId: after.id,
-        tournamentId: after.tournamentId,
-        fieldId: after.fieldId,
-      };
-      await this.recordIdempotency(
-        tx,
-        actorUserId,
-        action,
-        resourceType,
-        fixtureId,
-        audit.requestId,
-        payloadHash,
-        200,
-        response,
-      );
-      return response;
+      throw new NotFoundException({ code: 'TOURNAMENT_FIXTURE_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
     });
   }
 
@@ -557,7 +543,7 @@ export class TournamentOperationsFieldsService {
     const principal = await this.access.assertAccess(
       {
         userId: actorUserId,
-        action: 'event_reverse',
+        action: 'tournament_admin',
         resource: { tournamentId },
       },
       tx,
@@ -573,7 +559,7 @@ export class TournamentOperationsFieldsService {
   }
 
   private async assertTournamentExists(tournamentId: string): Promise<void> {
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: { id: true },
     });
@@ -713,7 +699,7 @@ export class TournamentOperationsFieldsService {
       readonly targetType: string;
       readonly targetId: string;
       readonly tournamentId: string;
-      readonly fixtureId?: string | null;
+      readonly teamMatchId?: string | null;
       readonly fieldId?: string | null;
       readonly before: JsonValue;
       readonly after: JsonValue;
@@ -735,7 +721,7 @@ export class TournamentOperationsFieldsService {
       before: mutation.before,
       after: mutation.after,
       tournamentId: mutation.tournamentId,
-      fixtureId: mutation.fixtureId ?? null,
+      teamMatchId: mutation.teamMatchId ?? null,
       fieldId: mutation.fieldId ?? null,
     });
   }

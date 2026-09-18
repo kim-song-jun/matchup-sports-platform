@@ -5,12 +5,14 @@ import {
   getTournamentPostEventCards,
   getTournamentVenuePrepItems,
 } from '@/components/tournaments/tournament-venue-retention-sections';
+import { v1Get } from '@/lib/api-client';
 import { getTournamentSponsorCards } from '@/components/tournaments/tournament-sponsor-section';
 import {
   getCompletedChampionName,
   getParticipantTeamBuckets,
   getPrizeBreakdownChips,
   partitionTournamentSections,
+  FixtureCard,
   TournamentDetailView,
 } from './tournament-detail-client';
 import type {
@@ -24,6 +26,16 @@ import type {
 
 vi.mock('@/components/tournaments/tournament-inquiry-section', () => ({
   TournamentInquirySection: () => null,
+}));
+
+// 리그(format='league') 대회는 LeagueStandingsSection 이 마운트되면서
+// GET /tournaments/:id/standings/overall 을 호출한다. 스텁하지 않으면 실제 fetch 가
+// 나가거나 비동기 setState 로 act 경고·플레이키 테스트가 된다.
+// never-resolving Promise 로 두면 컴포넌트가 loading 상태(렌더 없음)에 머물러
+// 이 파일의 단언(순위표가 아니라 대진표/안내 문구를 본다)이 결정적으로 유지된다.
+vi.mock('@/lib/api-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api-client')>()),
+  v1Get: vi.fn(() => new Promise(() => {})),
 }));
 
 /* ── Factories ── */
@@ -52,6 +64,7 @@ function makeFixture(
     scheduledAt: null,
     venue: null,
     status: 'scheduled',
+    liveStatus: 'scheduled',
     homeRegistrationId: null,
     homeTeamId: null,
     homeTeamName: 'Home',
@@ -75,6 +88,7 @@ function makeParticipantTeam(
     teamLogoUrl: null,
     teamRegionName: null,
     confirmedAt: null,
+    players: [],
     ...overrides,
   };
 }
@@ -113,6 +127,7 @@ function makeTournament(
   overrides: Partial<V1TournamentDetail> & Pick<V1TournamentDetail, 'id' | 'status' | 'format'>,
 ): V1TournamentDetail {
   return {
+    kind: 'regular_tournament',
     sportId: 'sport-futsal',
     sport: { code: 'futsal', name: '풋살' },
     title: '테스트 대회',
@@ -160,17 +175,20 @@ function makeTournament(
     promoListPriority: 0,
     campaignSlug: null,
     rulesText: null,
+    yellowAccumulationLimit: null,
+    redCardSuspensionMatches: null,
     refundPolicyText: null,
     confirmedCount: 0,
     participantTeams: [],
     pendingPaymentCount: 0,
     groups: [],
     fixtures: [],
+    leagueFixtures: [],
     announcements: [],
     sponsors: [],
     reviews: [],
+    reviewsTotalCount: 0,
     awards: [],
-    popup: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -722,6 +740,12 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
     expect(screen.queryByText('참가 신청 안내')).not.toBeInTheDocument();
     expect(screen.queryByText('대회 진행 방식')).not.toBeInTheDocument();
     expect(screen.queryByText('순위표')).not.toBeInTheDocument();
+    // **문구가 아니라 섹션 자체가 없는지 본다.** 특정 문구의 부재만 단언하면 *"무엇이
+    // 있으면 안 되는지"* 를 안 보게 된다 — 실제로 리그용 문구를 대회용
+    // `FixturesPlaceholder` 로 바꾸는 변이에도 이 테스트가 **통과했다**(vacuous).
+    // 헤더 부재로 단언하면 리그 문구든 대회 문구든 **무엇이 렌더돼도 red** 다.
+    expect(screen.queryByText('일정 · 대진')).not.toBeInTheDocument();
+    expect(screen.queryByText('아직 등록된 경기가 없어요')).not.toBeInTheDocument();
     expect(screen.queryByText('대진표 준비 중')).not.toBeInTheDocument();
   });
 
@@ -739,11 +763,20 @@ describe('TournamentDetailView — completed vs non-completed section rendering'
 
     expect(screen.getByText('참가 신청 안내')).toBeInTheDocument();
     expect(screen.getByText('대회 진행 방식')).toBeInTheDocument();
-    // 순위표는 상세 화면에 인라인으로 남지 않고 /bracket 바로가기 안내(StandingsMovedNotice)로
-    // 대체됐다(§A-1) — 이 파일 상단 주석 참고. 옛 인라인 '순위표' 헤딩을 찾던 단언을
-    // 실제 렌더 문구로 갱신한다.
-    expect(screen.getByText('실시간 순위표는 대진표에서 확인하세요')).toBeInTheDocument();
-    expect(screen.getByText('대진표 준비 중')).toBeInTheDocument();
+    // §A-1에서 순위표는 /bracket 바로가기 안내(StandingsMovedNotice)로 대체됐지만,
+    // 리그전 도입(2026-08-17 스펙 §9)으로 **format='league'인 대회에 한해** 상세 화면이
+    // 통합 순위표(LeagueStandingsSection)를 직접 렌더한다 — 조별 순위가 아니라 대회 전체를
+    // 합산한 새 개념이라 /bracket의 조별 순위표와 역할이 겹치지 않는다.
+    // 그 섹션은 서버 조회 완료 전에는 아무것도 렌더하지 않으므로(레이아웃 흔들림 방지),
+    // 여기서는 옛 안내 문구가 더 이상 나오지 않는 것을 확인한다.
+    // 다른 format(group_knockout 등)에서는 StandingsMovedNotice가 그대로 유지된다.
+    expect(screen.queryByText('실시간 순위표는 대진표에서 확인하세요')).not.toBeInTheDocument();
+    // **대회용 문구를 쓰지 않는다.** "대회 시작 전에 대진표가 공개돼요" 는 진행 중인 리그
+    // 시즌에 뜨면 틀린 말이다 — 리그에는 "대진표 공개" 라는 사건이 없고 "대진 확정" 이
+    // 있다. 문구는 리그 일정 목록이 같은 상황에 쓰는 것을 그대로 가져왔다.
+    expect(screen.queryByText('대진표 준비 중')).not.toBeInTheDocument();
+    expect(screen.getByText('아직 등록된 경기가 없어요')).toBeInTheDocument();
+    expect(screen.getByText('대진이 확정되면 경기 일정이 여기에 나타나요.')).toBeInTheDocument();
   });
 
   it('shows a pre-created pending knockout bracket before the group stage finishes', () => {
@@ -931,6 +964,8 @@ describe('AccordionSection toggle (rendered via completed TournamentDetailView)'
       format: 'league',
       groups: [],
       rulesText: '경기 시작 10분 전까지 집합해 주세요.',
+      yellowAccumulationLimit: null,
+      redCardSuspensionMatches: null,
     });
 
     render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
@@ -946,5 +981,323 @@ describe('AccordionSection toggle (rendered via completed TournamentDetailView)'
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('경기 시작 10분 전까지 집합해 주세요.')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * **거울 행(정규 리그 시즌)이 대회 표면에서 자기 축의 데이터로 그려지는가.**
+ *
+ * 여기서 쓰는 픽스처는 **실제 거울 모양**이다 — `format: 'group_knockout'`(스키마 기본값,
+ * 거울 생성이 format 을 안 쓴다) + `kind: 'regular_league'`. `format: 'league'` 로 테스트하면
+ * 실제로 존재하지 않는 조합을 검증하게 되고, 누군가 게이트를 `format` 으로 좁혀도 green 이다.
+ */
+describe('TournamentDetailView — 정규 리그 거울 행', () => {
+  const standingsResponse = {
+    standings: [
+      { teamId: 'team-a', teamName: '강남 유나이티드', position: 1, points: 3, wins: 1, draws: 0, losses: 0, goalsFor: 3, goalsAgainst: 1 },
+      { teamId: 'team-b', teamName: '종로 FC', position: 2, points: 0, wins: 0, draws: 0, losses: 1, goalsFor: 1, goalsAgainst: 3 },
+    ],
+    progress: { total: 2, played: 1, remaining: 1, percent: 50 },
+    magicNumber: null,
+    recalculatedAt: null,
+  };
+
+  function makeMirror(overrides: Partial<V1TournamentDetail> = {}): V1TournamentDetail {
+    return makeTournament({
+      id: 'league-1',
+      status: 'in_progress',
+      // 거울 행은 format 을 쓰지 않아 스키마 기본값이 남는다 — 종류는 kind 가 말한다.
+      format: 'group_knockout',
+      kind: 'regular_league',
+      groups: [],
+      fixtures: [],
+      leagueFixtures: [
+        {
+          teamMatchId: 'tm-1',
+          title: '1R',
+          homeTeamId: 'team-a',
+          awayTeamId: 'team-b',
+          startAt: '2026-08-31T05:00:00.000Z',
+          placeName: '올림픽공원 풋살장 A',
+          status: 'matched',
+        },
+      ],
+      ...overrides,
+    });
+  }
+
+  /**
+   * **정원 블록이 리그에 그려지면 안 된다 — 이 결함은 실제로 alpha 에 떠 있었다.**
+   *
+   * `#898` 로 이 화면을 연 뒤 리그 상세에 *"정원 2 /8팀 아직 6자리 남았어요"* 가 떴다.
+   * 8 은 `team_count` 의 스키마 기본값이고(거울은 아무도 안 넣는다) 리그엔 정원 개념이
+   * 없다 — 게다가 **참여할 방법도 없다**(리그는 status 가 `open` 이 될 수 없다).
+   *
+   * 상세는 타입이 아니라 **분기**로 닫았다(리그가 도달 못 하는 화면 5개를 안 열려고).
+   * 분기는 기억에 의존하므로 여기서 못박는다 — **진행바(컨테이너) 부재**로 단언한다.
+   * 문자열 부재만 보면 "무엇이 있으면 안 되는지" 를 안 보게 된다.
+   */
+  it('리그 상세에 정원 진행바가 없다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    const { container } = render(
+      createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }),
+    );
+    await screen.findByText('통합 순위');
+
+    // ⚠️ 진행바가 **둘**이다 — 순위표의 "전체 일정 진행률" 은 리그에 있는 게 정상이고,
+    // 정원 진행바만 없어야 한다. `[role=progressbar]` 를 통째로 세면 그 둘이 섞여
+    // "리그에 진행바가 있다" 로 잘못 읽힌다(실제로 처음에 그렇게 틀렸다).
+    // aria-label 로 **정원 쪽만** 겨냥한다.
+    const bars = [...container.querySelectorAll('[role="progressbar"]')];
+    expect(bars.filter((b) => (b.getAttribute('aria-label') ?? '').startsWith('정원'))).toEqual([]);
+    // 순위 진행률은 리그에도 있어야 한다 — 대조군을 같은 자리에 둔다.
+    expect(bars.some((b) => (b.getAttribute('aria-label') ?? '').includes('일정 진행률'))).toBe(true);
+    expect(screen.queryByText(/자리 남았어요/)).toBeNull();
+  });
+
+  /**
+   * 게이트를 처음 넣었을 때 **정원 진행바 두 자리만** 막았는데, 정원·참가비는 화면에 더
+   * 흩어져 있었다. 거울이 안 채우는 필드를 전수로 훑어(`teamCount` · `genderCategory` ·
+   * `entryFee` · `format` · `parkingInfo` …) 실제로 그려지는 자리를 마저 찾은 결과다.
+   *
+   * ```
+   * 참가팀 섹션        "2/8팀 확정"    ← 8 은 스키마 기본값
+   * 완료 기본정보      "2/8팀 확정" + "참가비 무료"
+   * ```
+   * `V1League` 에는 정원도 참가비도 **필드가 아예 없다** — 둘 다 미설정이 화면에 뜬 것이다.
+   */
+  it('리그 상세의 참가팀 줄에 정원이 없다 — 수를 그대로 적는다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    render(createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }));
+    await screen.findByText('통합 순위');
+    expect(screen.queryByText(/\/\s*8팀 확정/)).toBeNull();
+    expect(screen.getByText(/팀 참가/)).toBeInTheDocument();
+  });
+
+  it('대회 상세의 참가팀 줄에는 정원이 있다 — 대조군', () => {
+    // status='open' 이어야 헤더 숫자가 `confirmedCount` 를 쓴다(모집 중에는 서버가
+    // participantTeams 를 비워 보내므로 그쪽을 세면 0 이 된다 — 컴포넌트 주석 참조).
+    render(
+      createElement(TournamentDetailView, {
+        tournament: makeTournament({ id: 't-cap', status: 'open', format: 'knockout', teamCount: 16, confirmedCount: 4 }),
+        myRegistration: null,
+      }),
+    );
+    // 'open' 대회는 참가팀 헤더 말고도 같은 문구가 더 나온다 — 개수는 이 테스트의 관심사가 아니다.
+    expect(screen.getAllByText('4/16팀 확정').length).toBeGreaterThan(0);
+  });
+
+  it('리그 상세에 참가비를 적지 않는다 — 0 은 "무료"가 아니라 미설정이다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    render(createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }));
+    await screen.findByText('통합 순위');
+    expect(screen.queryByText('참가비')).toBeNull();
+  });
+
+  it('대회 상세에는 참가비를 적는다 — 대조군', () => {
+    render(
+      createElement(TournamentDetailView, {
+        tournament: makeTournament({ id: 't-cap', status: 'closed', format: 'knockout', teamCount: 16, confirmedCount: 4 }),
+        myRegistration: null,
+      }),
+    );
+    expect(screen.getAllByText('참가비').length).toBeGreaterThan(0);
+  });
+
+  it('대회 상세에는 정원 진행바가 있다 — 대조군', async () => {
+    // 이 대조군이 없으면 정원 블록을 통째로 지워도 위 테스트가 통과한다.
+    //
+    // ⚠️ **정원 진행바가 두 자리에 있다** — 모바일 카드(`tm-hide-desktop`)와 데스크탑
+    // 우측 레일. 게이트(`showsCapacity`)가 지키는 것은 **모바일 쪽**이고, 레일은
+    // `isOpen` 안에 있어 애초에 리그가 도달하지 못한다(아래 테스트에서 못박는다).
+    // 그래서 `container.querySelector('[role=progressbar]')` 로 통째로 잡으면 **레일
+    // 것이 잡혀 게이트를 지워도 통과한다** — 실제로 처음에 그렇게 vacuous 였다.
+    // 게이트가 지키는 자리만 겨냥한다.
+    //
+    // ⚠️ `mockResolvedValueOnce` 를 **쓰지 않는다** — 대회는 순위 섹션을 안 그려 v1Get 을
+    // 부르지 않고, 그러면 큐에 남은 값이 **다음 테스트로 샌다**(실제로 그렇게 깨졌다).
+    const tournament = makeTournament({
+      id: 't-capacity',
+      status: 'open',
+      format: 'knockout',
+      kind: 'regular_tournament',
+      teamCount: 16,
+      confirmedCount: 4,
+    });
+    const { container } = render(
+      createElement(TournamentDetailView, { tournament, myRegistration: null }),
+    );
+    const capacityBars = [...container.querySelectorAll('[role="progressbar"]')].filter((b) =>
+      (b.getAttribute('aria-label') ?? '').startsWith('정원'),
+    );
+    expect(capacityBars.some((b) => b.closest('.tm-hide-desktop') !== null)).toBe(true);
+  });
+
+  /**
+   * 정규 리그에도 공통 참가 신청 rail은 있지만, 토너먼트 전용 capacity/fee rail과는
+   * 분리한다. 이 회귀는 리그 rail이 사라지는지보다, 거울의 기본 teamCount/entryFee가
+   * 신청 정원·참가비처럼 잘못 표시되지 않는지를 확인한다.
+   */
+  it('리그 상세에는 토너먼트 참가 신청 레일이 없다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    const { container } = render(
+      createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }),
+    );
+    await screen.findByText('통합 순위');
+    expect(container.querySelector('[aria-label="참가 신청"]')).toBeNull();
+  });
+
+  it('미래 마감 정규 리그에는 정원·참가비 없는 공통 참가 신청 레일이 있다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    render(
+      createElement(TournamentDetailView, {
+        tournament: makeMirror({ registrationDeadlineAt: '2099-08-10T14:59:00.000Z' }),
+        myRegistration: null,
+      }),
+    );
+    await screen.findByText('통합 순위');
+    const rail = screen.getByRole('complementary', { name: '리그 참가 신청' });
+    expect(within(rail).getByRole('link', { name: '참가 신청하기' })).toHaveAttribute(
+      'href', '/tournaments/league-1/my',
+    );
+    expect(within(rail).queryByText('정원')).toBeNull();
+    expect(within(rail).queryByText('참가비')).toBeNull();
+  });
+
+  it('조가 없어도 통합 순위 섹션을 그린다 — 조 개수로 게이팅하면 리그는 영영 안 뜬다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    render(createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }));
+
+    expect(await screen.findByText('통합 순위')).toBeInTheDocument();
+    // 팀명은 순위표와 일정 카드 **양쪽에** 나온다(그게 정상이다) — 순위 섹션 안으로
+    // 범위를 좁혀 단언한다. 좁히지 않으면 "여러 개 찾음" 으로 실패한다.
+    const standings = screen.getByRole('region', { name: '통합 순위' });
+    expect(within(standings).getByText('강남 유나이티드')).toBeInTheDocument();
+  });
+
+  it('일정은 리그 카드로 그리고 팀 이름을 순위 응답에서 붙인다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    render(createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }));
+
+    // 대진에는 팀 id 만 실려 온다 — 이름이 붙었다는 것은 lookup 이 동작했다는 뜻이다.
+    expect(await screen.findByRole('group', { name: '강남 유나이티드 대 종로 FC' })).toBeInTheDocument();
+    // 리그 어휘로 그려진다. 대회 카드였다면 status 'matched' 가 어느 분기에도 안 걸려
+    // '예정'(대회의 scheduled 라벨)으로 떨어졌을 것이다.
+    expect(screen.getByText('매칭됨')).toBeInTheDocument();
+    expect(screen.getByText('올림픽공원 풋살장 A')).toBeInTheDocument();
+  });
+
+  it('순위 조회가 실패해도 일정 섹션이 깨지지 않는다 — 팀 이름만 fallback 으로 떨어진다', async () => {
+    vi.mocked(v1Get).mockRejectedValueOnce(new Error('boom'));
+    render(createElement(TournamentDetailView, { tournament: makeMirror(), myRegistration: null }));
+
+    expect(await screen.findByText('홈팀 정보 없음')).toBeInTheDocument();
+    expect(screen.getByText('상대팀 정보 없음')).toBeInTheDocument();
+    // 일정 자체는 그대로 있다 — 장소·상태는 대진에 실려 오므로 순위와 무관하다.
+    expect(screen.getByText('올림픽공원 풋살장 A')).toBeInTheDocument();
+  });
+
+  it('상대팀이 아직 없는 대진은 "상대팀 미정" 으로 구분한다 — 이름을 못 찾은 것과 다르다', async () => {
+    vi.mocked(v1Get).mockResolvedValueOnce(standingsResponse);
+    const tournament = makeMirror({
+      leagueFixtures: [
+        {
+          teamMatchId: 'tm-2',
+          title: '1R',
+          homeTeamId: 'team-a',
+          awayTeamId: null,
+          startAt: '2026-08-31T05:00:00.000Z',
+          placeName: '',
+          status: 'matched',
+        },
+      ],
+    });
+    render(createElement(TournamentDetailView, { tournament, myRegistration: null }));
+
+    expect(await screen.findByText('상대팀 미정')).toBeInTheDocument();
+    expect(screen.queryByText('상대팀 정보 없음')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 2026-09-04 alpha 실측 결함: 끝난 경기가 공개 대회 상세의 "조별 일정" 에서 **"예정"** 으로
+ * 보이고 점수가 없었다. 같은 대회의 `/bracket` 은 "종료 · 1 : 0" 을 보여줘 **두 공개 화면이
+ * 같은 경기를 두고 서로 다른 상태를 말했다.**
+ *
+ * 원인은 이 카드가 `status` 만 읽은 것이다. `status` 는 타입 주석이 이미 경고하듯
+ * **라이브 판정에 쓰면 안 된다** — 서버가 실제로 쓰는 값은 `scheduled`(생성)와
+ * `completed`(확정) 둘뿐이라 경기가 뛰는 중에도 `scheduled` 로 남는다. 진행 상태는
+ * `liveStatus`, 점수는 `result` 다.
+ */
+describe('FixtureCard — 진행 상태 배지', () => {
+  it('경기가 끝났으면 status 가 scheduled 여도 "종료" 로 보인다', () => {
+    // alpha 가 실제로 준 모양: 확정 전이라 status 는 아직 scheduled 인데 경기는 끝났다.
+    render(
+      createElement(FixtureCard, {
+        fixture: makeFixture({ id: 'f1', status: 'scheduled', liveStatus: 'ended' }),
+      }),
+    );
+    expect(screen.getByText('종료')).toBeInTheDocument();
+    expect(screen.queryByText('예정')).not.toBeInTheDocument();
+  });
+
+  it('진행 중인 경기는 "진행 중" 으로 보인다 — status 로는 절대 알 수 없는 상태다', () => {
+    render(
+      createElement(FixtureCard, {
+        fixture: makeFixture({ id: 'f2', status: 'scheduled', liveStatus: 'live' }),
+      }),
+    );
+    expect(screen.getByText('진행 중')).toBeInTheDocument();
+  });
+
+  it('아직 안 시작한 경기는 그대로 "예정" 이다 (회귀 방지)', () => {
+    render(
+      createElement(FixtureCard, {
+        fixture: makeFixture({ id: 'f3', status: 'scheduled', liveStatus: 'scheduled' }),
+      }),
+    );
+    expect(screen.getByText('예정')).toBeInTheDocument();
+  });
+
+  // 점수·득점자는 **일부러 안 싣는다** — 오너 결정("몇 대 몇인지랑 누가 넣었는지 그건 빼주고
+  // 장소랑 누가 누구 하는지만"). 그 계약은 `fixture-card-goals.test.tsx` 가 지키므로 여기서
+  // 중복해서 단언하지 않는다. 이 결함의 범위는 **진행 상태 배지**뿐이다.
+});
+
+/**
+ * 정원 진행바의 `aria-label` 은 **스크린리더 사용자가 듣는 유일한 문구**다. 화면 라벨만
+ * 고치고 여길 두면 무료 대회에서 "입금 대기" 를 듣게 된다 — 눈으로는 안 보이는 회귀라
+ * 테스트로만 잡힌다(2026-09-04 Copilot 리뷰가 짚은 자리).
+ */
+describe('정원 표시 — 무료 대회의 대기 낱말', () => {
+  it('무료 대회는 aria-label 에도 "입금" 을 쓰지 않는다', () => {
+    const tournament = makeTournament({
+      id: 't-free', status: 'open', format: 'group_knockout',
+      entryFee: 0, teamCount: 8, confirmedCount: 5, pendingPaymentCount: 3,
+    });
+    const { container } = render(
+      createElement(TournamentDetailView, { tournament, myRegistration: null }),
+    );
+    const labels = [...container.querySelectorAll('[aria-label]')].map((el) => el.getAttribute('aria-label') ?? '');
+    const capacity = labels.filter((label) => label.includes('정원'));
+    expect(capacity.length).toBeGreaterThan(0);
+    for (const label of capacity) {
+      expect(label).not.toContain('입금');
+      expect(label).toContain('확인대기');
+    }
+  });
+
+  it('유료 대회는 그대로 "입금 대기" 로 읽어 준다 — 무료 분기가 유료를 삼키면 안 된다', () => {
+    const tournament = makeTournament({
+      id: 't-paid', status: 'open', format: 'group_knockout',
+      entryFee: 20000, teamCount: 8, confirmedCount: 5, pendingPaymentCount: 3,
+    });
+    const { container } = render(
+      createElement(TournamentDetailView, { tournament, myRegistration: null }),
+    );
+    const capacity = [...container.querySelectorAll('[aria-label]')]
+      .map((el) => el.getAttribute('aria-label') ?? '')
+      .filter((label) => label.includes('정원'));
+    expect(capacity.some((label) => label.includes('입금대기'))).toBe(true);
   });
 });

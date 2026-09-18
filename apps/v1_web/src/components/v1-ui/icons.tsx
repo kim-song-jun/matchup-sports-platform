@@ -197,3 +197,13 @@ export function InfoCircleIcon(props: IconProps) {
     </SvgIcon>
   );
 }
+
+/** 리그 이의 제기 D-day 카드에서 쓴다(U3) — 마감이 다가온다는 것을 텍스트와 함께 보강한다. */
+export function ClockIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <circle cx="12" cy="12" r="9.5" />
+      <path d="M12 6.5 V12 L15.5 14" />
+    </SvgIcon>
+  );
+}

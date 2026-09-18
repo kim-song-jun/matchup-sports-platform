@@ -1,5 +1,4 @@
 import {
-  V1TournamentFixtureStatus,
   V1TournamentRegistrationStatus,
   V1TournamentStatus,
 } from '@prisma/client';
@@ -9,7 +8,6 @@ import {
   FUTSAL_COMPETITION_CONFIG_ID,
   runCompetitionConfigContractPhaseBackfill,
 } from '../../src/tournaments/competition-config/competition-config-backfill';
-import { runFixtureGameBackfill } from '../../src/games/migration/fixture-game-backfill';
 
 /**
  * alpha 배포마다 공개 대회 일정이 비어버리던 결함의 회귀 테스트.
@@ -25,8 +23,8 @@ import { runFixtureGameBackfill } from '../../src/games/migration/fixture-game-b
  * 행은 이전 내용) — 그래서 공개 일정이 0건이었다. 값을 아는 쪽(시드)이 픽스처를 만들 때
  * 바로 넣도록 고쳤고, 이 스펙이 그 계약을 고정한다.
  *
- * 두 번째 케이스가 핵심이다: 첫 케이스만 있으면 "필드가 채워졌다"는 것만 보고 **그래서 공개
- * 일정이 실제로 채워지는가**는 검증하지 못한다.
+ * Phase 3에서는 시드 자체가 TeamMatch/Details/Game을 함께 생성한다. 두 번째 케이스는
+ * 별도 legacy 백필 없이 공개 조회의 실제 Game 연결과 설정이 완성되는지 검증한다.
  */
 const prisma = new PrismaService();
 
@@ -127,44 +125,65 @@ describe('alpha QA seed — 픽스처에 competitionConfigVersionId 를 직접 �
         registrations,
         SCHEDULED_AT,
         FUTSAL_COMPETITION_CONFIG_ID,
+        ids.sport,
       );
     });
 
-    const fixtures = await prisma.v1TournamentFixture.findMany({
+    const fixtures = await prisma.v1TournamentMatchDetails.findMany({
       where: { tournamentId: ids.tournament },
-      select: { id: true, competitionConfigVersionId: true },
+      select: { teamMatchId: true, teamMatch: { select: { competitionConfigVersionId: true } } },
     });
 
     expect(fixtures.length).toBeGreaterThan(0);
-    const missing = fixtures.filter((fixture) => fixture.competitionConfigVersionId === null);
+    const missing = fixtures.filter((fixture) => fixture.teamMatch.competitionConfigVersionId === null);
     expect(missing).toEqual([]);
     for (const fixture of fixtures) {
-      expect(fixture.competitionConfigVersionId).toBe(FUTSAL_COMPETITION_CONFIG_ID);
+      expect(fixture.teamMatch.competitionConfigVersionId).toBe(FUTSAL_COMPETITION_CONFIG_ID);
     }
   });
 
-  it('그 결과 fixture-game 백필이 하나도 격리하지 않고 실제로 V1Game 을 만든다 — 공개 일정이 비지 않는 이유', async () => {
-    // `completed` 픽스처의 Game 생성은 이 백필의 몫이 아니다 — Task 10
-    // (`game-result-backfill`)이 소유하고, 이 백필은 이미 있는 Game 에 period/policy 만
-    // 보강한다. 그러니 기대치는 "완료되지 않은 픽스처 수" 다.
-    const backfillOwnedCount = await prisma.v1TournamentFixture.count({
-      where: {
-        tournamentId: ids.tournament,
-        status: { not: V1TournamentFixtureStatus.completed },
+  it('별도 백필 없이 모든 대회 경기의 canonical Game과 설정이 실제로 연결된다', async () => {
+    const fixtures = await prisma.v1TournamentMatchDetails.findMany({
+      where: { tournamentId: ids.tournament },
+      select: {
+        teamMatchId: true,
+        teamMatch: {
+          select: {
+            game: { select: { sourceType: true, teamMatchId: true, competitionConfigVersionId: true } },
+          },
+        },
       },
     });
-    expect(backfillOwnedCount).toBeGreaterThan(0);
+    expect(fixtures).toHaveLength(3);
+    for (const fixture of fixtures) {
+      expect(fixture.teamMatch.game).toMatchObject({
+        sourceType: 'TEAM_MATCH',
+        teamMatchId: fixture.teamMatchId,
+        competitionConfigVersionId: FUTSAL_COMPETITION_CONFIG_ID,
+      });
+    }
+  });
 
-    const result = await runFixtureGameBackfill(prisma, { mode: 'apply' });
-
-    // 이 대회의 픽스처가 CONFIG_MISSING 으로 격리되면 안 된다 (수정 전의 실제 증상).
-    const quarantinedHere = result.quarantine.filter((entry) => entry.reason === 'CONFIG_MISSING');
-    expect(quarantinedHere).toEqual([]);
-    expect(result.counts.gamesCreated).toBeGreaterThan(0);
-
-    const gamesForTournament = await prisma.v1Game.count({
-      where: { tournamentFixture: { tournamentId: ids.tournament } },
+  it('다시 실행해도 경기·공식 revision ID를 보존하고 경기 양쪽에 실제 팀명을 저장한다', async () => {
+    const readGames = () => prisma.v1Game.findMany({
+      where: { teamMatch: { tournamentId: ids.tournament } },
+      orderBy: { id: 'asc' },
+      select: {
+        id: true, teamMatchId: true, state: true, currentOfficialRevisionId: true,
+        currentOfficialRevision: { select: { score: true } },
+        sides: { orderBy: { sideKey: 'asc' }, select: { teamId: true, displayNameSnapshot: true } },
+      },
     });
-    expect(gamesForTournament).toBe(backfillOwnedCount);
+    const before = await readGames();
+    expect(before).toHaveLength(3);
+    for (const game of before) {
+      expect(game.sides).toHaveLength(2);
+      for (const side of game.sides) expect(side.displayNameSnapshot).toMatch(/^시드 설정 검증 팀 [1-4]$/);
+    }
+    await prisma.$transaction((tx) => createCompetitionData(tx, {
+      id: ids.tournament, title: '시드 설정 검증 대회', status: V1TournamentStatus.in_progress,
+      startsInDays: 7, entryFee: 0, hasCampaign: false,
+    } as Parameters<typeof createCompetitionData>[1], registrations, SCHEDULED_AT, FUTSAL_COMPETITION_CONFIG_ID, ids.sport));
+    expect(await readGames()).toEqual(before);
   });
 });

@@ -4,6 +4,7 @@ import type { PrismaService } from '../../prisma/prisma.service';
 import type { UploadedFile, UploadsService } from '../../uploads/uploads.service';
 import { TournamentStaffAccessService } from '../staff/tournament-staff-access.service';
 import { TournamentFixtureVideosService } from './tournament-fixture-videos.service';
+import { kindAwareFindFirst } from '../../../test/helpers/kind-aware-find-first';
 
 const tournamentId = '00000000-0000-4000-8000-000000000001';
 const fixtureId = '00000000-0000-4000-8000-000000000002';
@@ -46,11 +47,14 @@ function createHarness(options: {
   videos?: VideoRow[];
   uploadAssets?: { url: string; ownerUserId: string; kind: 'image' | 'video' }[];
   fixtureExists?: boolean;
+  /** 다른 canonical 팀매치가 같은 업로드 URL을 참조하는 행 수. */
+  teamMatchVideoRefCount?: number;
 }) {
   const assignments = options.assignments ?? [];
   const videos: VideoRow[] = [...(options.videos ?? [])];
   const uploadAssets = [...(options.uploadAssets ?? [])];
   const fixtureExists = options.fixtureExists ?? true;
+  const teamMatchVideoRefCount = options.teamMatchVideoRefCount ?? 0;
 
   const removedUrls: string[] = [];
   const discarded: UploadedFile[][] = [];
@@ -70,38 +74,41 @@ function createHarness(options: {
             createdAt: new Date('2026-01-01T00:00:00.000Z'),
             expiresAt: null,
             revokedAt: null,
-            fixtureScopes: assignment.fixtureIds.map((id) => ({ fixtureId: id })),
+            fixtureScopes: assignment.fixtureIds.map((id) => ({ teamMatchId: id })),
           })),
       ),
     },
     v1Tournament: { findFirst: jest.fn().mockResolvedValue({ id: tournamentId }) },
-    v1TournamentFixture: {
-      findUnique: jest.fn(async ({ where }: { where: { tournamentId_id: { id: string } } }) =>
+    v1TeamMatch: {
+      findFirst: jest.fn(async ({ where }: { where: { id: string } }) =>
         fixtureExists
-          ? { id: where.tournamentId_id.id, fieldId: options.fixtureFieldId ?? null }
+          ? { id: where.id, fieldId: options.fixtureFieldId ?? null }
           : null,
       ),
+      findMany: jest.fn().mockResolvedValue([]),
     },
-    v1TournamentFixtureVideo: {
-      findMany: jest.fn(async ({ where }: { where: { fixtureId: string } }) =>
-        videos.filter((video) => video.fixtureId === where.fixtureId),
+    // 다른 canonical 팀매치가 같은 업로드 URL을 참조하면 파일을 지우지 않는다.
+    v1TeamMatchVideo: {
+      findMany: jest.fn(async ({ where }: { where: { teamMatchId: string } }) =>
+        videos
+          .filter((video) => video.fixtureId === where.teamMatchId)
+          .map(({ id, title, url, sortOrder, createdAt }) => ({ id, title, url, sortOrder, createdAt })),
       ),
-      findFirst: jest.fn(async ({ where }: { where: { id: string; fixtureId: string } }) =>
-        videos.find((video) => video.id === where.id && video.fixtureId === where.fixtureId) ?? null,
-      ),
-      count: jest.fn(async ({ where }: { where: { url: string } }) =>
-        videos.filter((video) => video.url === where.url).length,
-      ),
-      create: jest.fn(async ({ data }: { data: Omit<VideoRow, 'id' | 'createdAt'> }) => {
-        const row: VideoRow = { id: `video-${videos.length + 1}`, createdAt: new Date(), ...data };
+      findFirst: jest.fn(async ({ where }: { where: { id: string; teamMatchId: string } }) => {
+        const video = videos.find((candidate) => candidate.id === where.id && candidate.fixtureId === where.teamMatchId);
+        return video === undefined ? null : { id: video.id, title: video.title, url: video.url, sortOrder: video.sortOrder, createdAt: video.createdAt };
+      }),
+      create: jest.fn(async ({ data }: { data: { teamMatchId: string; title: string | null; url: string; sortOrder: number } }) => {
+        const row: VideoRow = { id: `video-${videos.length + 1}`, fixtureId: data.teamMatchId, createdAt: new Date(), ...data };
         videos.push(row);
-        return row;
+        return { id: row.id, title: row.title, url: row.url, sortOrder: row.sortOrder, createdAt: row.createdAt };
       }),
       delete: jest.fn(async ({ where }: { where: { id: string } }) => {
         const index = videos.findIndex((video) => video.id === where.id);
         const [removed] = videos.splice(index, 1);
-        return removed;
+        return removed === undefined ? null : { id: removed.id };
       }),
+      count: jest.fn(async () => teamMatchVideoRefCount),
     },
     v1UploadAsset: {
       findUnique: jest.fn(async ({ where }: { where: { url: string } }) =>
@@ -115,7 +122,14 @@ function createHarness(options: {
         return { count: before - uploadAssets.length };
       }),
     },
+    $executeRaw: jest.fn().mockResolvedValue(0),
+    $queryRaw: jest.fn().mockResolvedValue([]),
   };
+
+  const prismaWithTransaction = prisma as unknown as {
+    $transaction: (callback: (tx: typeof prisma) => Promise<unknown>) => Promise<unknown>;
+  };
+  prismaWithTransaction.$transaction = async (callback) => callback(prisma);
 
   const uploads = {
     storeFiles: jest.fn(),
@@ -247,7 +261,7 @@ describe('TournamentFixtureVideosService — 등록', () => {
     ).rejects.toMatchObject({
       response: { code: 'FIXTURE_VIDEO_URL_INVALID', details: { reason: 'SCHEME_NOT_ALLOWED' } },
     });
-    expect(prisma.v1TournamentFixtureVideo.create).not.toHaveBeenCalled();
+    expect(prisma.v1TeamMatchVideo.create).not.toHaveBeenCalled();
   });
 
   it('내가 올린 업로드 파일만 등록할 수 있다', async () => {
@@ -311,7 +325,9 @@ describe('TournamentFixtureVideosService — 등록', () => {
       harness.service.uploadAndCreateVideo(user('director'), tournamentId, fixtureId, [], undefined),
     ).rejects.toMatchObject({ response: { code: 'FIXTURE_VIDEO_LIMIT_EXCEEDED' } });
 
-    expect(harness.removedUrls).toEqual([url]);
+    // Cleanup is durable now: the transaction retires the asset and enqueues
+    // physical deletion for the worker; it does not unlink before commit.
+    expect(harness.removedUrls).toEqual([]);
     expect(harness.uploadAssets).toHaveLength(0);
   });
 
@@ -360,7 +376,7 @@ describe('TournamentFixtureVideosService — 삭제와 파일 회수', () => {
       harness.service.deleteVideo(user('director'), tournamentId, fixtureId, 'video-1'),
     ).resolves.toEqual({ deleted: true });
 
-    expect(harness.removedUrls).toEqual([uploadUrl]);
+    expect(harness.removedUrls).toEqual([]);
     expect(harness.uploadAssets).toHaveLength(0);
     expect(harness.videos).toHaveLength(0);
   });
@@ -370,10 +386,27 @@ describe('TournamentFixtureVideosService — 삭제와 파일 회수', () => {
       assignments: [director],
       videos: [videoRow(), videoRow({ id: 'video-2', fixtureId: otherFixtureId })],
       uploadAssets: [{ url: uploadUrl, ownerUserId: 'director', kind: 'video' }],
+      teamMatchVideoRefCount: 1,
     });
 
     await harness.service.deleteVideo(user('director'), tournamentId, fixtureId, 'video-1');
 
+    expect(harness.removedUrls).toEqual([]);
+    expect(harness.uploadAssets).toHaveLength(1);
+  });
+
+  it('같은 업로드 URL을 리그 대진(V1TeamMatchVideo)이 아직 참조하면 파일을 남긴다', async () => {
+    // 현재 경기 행을 삭제해도 다른 canonical 팀매치 참조가 남아 있다.
+    const harness = createHarness({
+      assignments: [director],
+      videos: [videoRow()],
+      uploadAssets: [{ url: uploadUrl, ownerUserId: 'director', kind: 'video' }],
+      teamMatchVideoRefCount: 1,
+    });
+
+    await harness.service.deleteVideo(user('director'), tournamentId, fixtureId, 'video-1');
+
+    expect(harness.prisma.v1TeamMatchVideo.count).toHaveBeenCalledWith({ where: { url: uploadUrl } });
     expect(harness.removedUrls).toEqual([]);
     expect(harness.uploadAssets).toHaveLength(1);
   });
@@ -400,19 +433,17 @@ describe('TournamentFixtureVideosService — 삭제와 파일 회수', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('파일 삭제가 실패해도 영상 삭제는 끝나고 업로드 원장은 남는다', async () => {
+  it('파일 cleanup은 worker가 맡으므로 영상 삭제와 원장 retirement가 먼저 끝난다', async () => {
     const harness = createHarness({
       assignments: [director],
       videos: [videoRow()],
       uploadAssets: [{ url: uploadUrl, ownerUserId: 'director', kind: 'video' }],
     });
-    harness.uploads.removeStoredUrl.mockRejectedValue(new Error('EACCES'));
-
     await expect(
       harness.service.deleteVideo(user('director'), tournamentId, fixtureId, 'video-1'),
     ).resolves.toEqual({ deleted: true });
-    // 원장이 남아 있어야 어떤 파일이 남았는지 나중에 추적할 수 있다.
-    expect(harness.uploadAssets).toHaveLength(1);
+    expect(harness.removedUrls).toEqual([]);
+    expect(harness.uploadAssets).toHaveLength(0);
   });
 });
 
@@ -422,6 +453,38 @@ describe('TournamentFixtureVideosService — 대회 단위 조회', () => {
     await expect(
       denied.service.listTournamentVideos(user('stranger'), tournamentId),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('리그 id 로는 대회 영상 목록이 열리지 않는다', async () => {
+    // 이 응답은 대회의 fixture 와 영상 URL 을 통째로 담는다 — 리그 id 가 통과하면
+    // 팀명·일정·영상 링크가 '대회 영상 관리' 화면에 그대로 나간다.
+    const harness = createHarness({
+      assignments: [
+        { userId: 'director', role: 'TOURNAMENT_DIRECTOR', fieldId: null, fixtureIds: [] },
+      ],
+    });
+    harness.prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: tournamentId, kind: 'regular_league' }),
+    );
+    await expect(
+      harness.service.listTournamentVideos(user('director'), tournamentId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('대회 id 와 kind=null(R1 이전 행)은 그대로 열린다', async () => {
+    for (const kind of ['regular_tournament', null]) {
+      const harness = createHarness({
+        assignments: [
+          { userId: 'director', role: 'TOURNAMENT_DIRECTOR', fieldId: null, fixtureIds: [] },
+        ],
+      });
+      harness.prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst({ id: tournamentId, kind }),
+      );
+      await expect(
+        harness.service.listTournamentVideos(user('director'), tournamentId),
+      ).resolves.toBeDefined();
+    }
   });
 
   it('없는 대회는 404', async () => {
@@ -435,6 +498,15 @@ describe('TournamentFixtureVideosService — 대회 단위 조회', () => {
     await expect(
       harness.service.listTournamentVideos(user('director'), tournamentId),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('canonical 영상이 남은 대회 전체 목록을 반환한다', async () => {
+    const harness = createHarness({
+      assignments: [
+        { userId: 'director', role: 'TOURNAMENT_DIRECTOR', fieldId: null, fixtureIds: [] },
+      ],
+    });
+    await expect(harness.service.listTournamentVideos(user('director'), tournamentId)).resolves.toBeDefined();
   });
 });
 

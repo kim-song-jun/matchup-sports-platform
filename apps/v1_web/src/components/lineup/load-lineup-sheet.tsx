@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { EmptyState } from '@/components/v1-ui/primitives';
 import type { LoadableEntry } from './lineup-source';
+import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 
 /** 불러올 수 있는 라인업 한 건 — 과거 경기와 프리셋이 같은 모양으로 들어온다. */
 export type LoadableLineup = {
@@ -136,7 +137,7 @@ export function LoadLineupSheet({
       >
         <div
           style={{
-            padding: '18px 20px 12px',
+            padding: '20px 20px 12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -159,25 +160,20 @@ export function LoadLineupSheet({
           </button>
         </div>
 
-        <div role="tablist" aria-label="불러올 라인업 종류" style={{ display: 'flex', gap: 8, padding: '12px 20px 0' }}>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'history'}
-            className={`tm-btn tm-btn-sm ${tab === 'history' ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
-            onClick={() => setTab('history')}
-          >
-            최근 경기 ({history.length})
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'preset'}
-            className={`tm-btn tm-btn-sm ${tab === 'preset' ? 'tm-btn-primary' : 'tm-btn-neutral'}`}
-            onClick={() => setTab('preset')}
-          >
-            저장한 프리셋 ({presets.length})
-          </button>
+        {/* 선택 상태를 tm-btn-primary 로 칠하면 이 시트의 주 행동(불러오기)과 같은 무게가 된다 —
+            세그먼트는 공유 컴포넌트를 쓴다(2026-09-02 마이그레이션에서 이 파일만 빠져 있었다). */}
+        <div style={{ padding: '12px 20px 0' }}>
+          <SegmentedTabs
+            activeId={tab}
+            ariaLabel="불러올 라인업 종류"
+            items={[
+              { id: 'history', label: `최근 경기 (${history.length})` },
+              { id: 'preset', label: `저장한 프리셋 (${presets.length})` },
+            ]}
+            onSelect={(id) => setTab(id as 'history' | 'preset')}
+            role="tablist"
+            size="sm"
+          />
         </div>
 
         <div style={{ overflowY: 'auto', padding: '12px 20px 20px', flex: 1 }}>
@@ -208,8 +204,8 @@ export function LoadLineupSheet({
                         width: '100%',
                         minHeight: 44,
                         textAlign: 'left',
-                        padding: 14,
-                        borderRadius: 12,
+                        padding: 16,
+                        borderRadius: 'var(--radius-control)',
                         border: '1px solid var(--border)',
                         background: 'var(--card-surface)',
                         cursor: 'pointer',
@@ -223,7 +219,7 @@ export function LoadLineupSheet({
                       <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
                         {item.subtitle}
                       </span>
-                      <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                      <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
                         <Badge>선발 {item.starterCount}명</Badge>
                         {item.formation !== null ? <Badge>{item.formation}</Badge> : null}
                         {sportMismatch ? <Badge tone="warn">{item.sportName} 라인업</Badge> : null}
@@ -247,7 +243,7 @@ function Badge({ children, tone = 'default' }: { children: React.ReactNode; tone
       className="tm-text-micro"
       style={{
         padding: '2px 8px',
-        borderRadius: 999,
+        borderRadius: 'var(--radius-pill)',
         fontWeight: 600,
         // 색만으로 뜻을 전하지 않는다 — 경고는 문구 자체("○○ 라인업")가 이유를 말한다.
         border: `1px solid ${isWarn ? 'var(--orange700)' : 'var(--border)'}`,

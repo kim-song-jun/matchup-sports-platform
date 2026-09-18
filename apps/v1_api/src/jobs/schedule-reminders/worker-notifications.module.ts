@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { REALTIME_NOTIFIER } from '../../notifications/realtime-notifier.port';
-import { WebPushService } from '../../notifications/web-push.service';
+import { WebPushModule } from '../../notifications/web-push.module';
 import { WorkerRealtimeNotifier } from './worker-realtime-notifier';
 
 /**
- * Standalone-worker declaring module for NotificationsService + WebPushService.
+ * Standalone-worker module for NotificationsService and the shared WebPushModule dispatcher.
  *
  * Task 12 fix (B1/B2 — see git history for the original defect report): V1GameOperationsWorkerModule
  * previously imported the HTTP-side notifications-service.module.ts, which (via RealtimeModule)
@@ -41,7 +41,7 @@ import { WorkerRealtimeNotifier } from './worker-realtime-notifier';
  * WorkerRealtimeNotifier's docblock for that explicit, unrelated behavioural delta.
  *
  * This module and the HTTP app's notifications-service.module.ts both declare
- * NotificationsService/WebPushService as providers, but that is safe: the worker
+ * NotificationsService, but that is safe: the worker
  * (v1-game-operations-worker.main.ts) and the HTTP app (main.ts) are two entirely separate
  * NestFactory.create() applications/processes, not two modules imported into one shared graph —
  * duplicate declarations across separate applications create separate instances in separate
@@ -50,11 +50,11 @@ import { WorkerRealtimeNotifier } from './worker-realtime-notifier';
  * Task 9 declarations (ResultEscalationController etc.) out of the HTTP-side module.
  */
 @Module({
+  imports: [WebPushModule],
   providers: [
     NotificationsService,
-    WebPushService,
     { provide: REALTIME_NOTIFIER, useClass: WorkerRealtimeNotifier },
   ],
-  exports: [NotificationsService, WebPushService],
+  exports: [NotificationsService, WebPushModule],
 })
 export class WorkerNotificationsModule {}

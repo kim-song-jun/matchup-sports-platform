@@ -12,13 +12,15 @@ Scope: **entire repository**. 이 파일은 Codex용 프로젝트 엔트리이�
 2. `.codex/AGENTS.md`
 3. `.codex/qa-rules.md`
 4. 작업과 관련된 `.codex/*.md`
-5. 관련 v1 소스: `apps/v1_api`, `apps/v1_web`
+5. 관련 v1 소스: `apps/v1_api`, `apps/v1_web`, Android 작업이면 `apps/v1_android`, iOS 작업이면 `apps/v1_ios`
 6. UI/디자인 작업이면 `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`
 
 유효한 소스는 아래로 제한한다.
 
 - Backend: `apps/v1_api`
 - Frontend: `apps/v1_web`
+- Android: `apps/v1_android`
+- iOS: `apps/v1_ios`
 - Design source of truth: `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`
 - Scoped Open Design source: explicitly requested/pinned Open Design recovery tasks may use `docs/reference/open-design/**` and the user-provided Open Design export as read-only visual references. This does not make design-only Open Design pages valid runtime routes without a v1 route/API contract.
 - Codex project rules: `.codex/*`
@@ -78,6 +80,8 @@ Errors:
 ## 0) Repo Map
 
 - `apps/v1_web`: v1 Next.js App Router 프론트엔드.
+- `apps/v1_android`: 배포된 v1 Web을 로드하고 Android FCM/권한/딥링크를 담당하는 네이티브 셸.
+- `apps/v1_ios`: 같은 역할의 iOS 셸. 푸시는 Firebase 없이 API가 APNs로 직접 보낸다. Xcode 프로젝트는 생성물이고 정의는 `project.yml`이다.
 - `apps/v1_api`: v1 NestJS 백엔드.
 - `apps/v1_api/prisma`: v1 Prisma schema, migration, seed.
 - `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`: v1 UI/디자인 source of truth.
@@ -378,6 +382,17 @@ The sections below fill project-specific gaps while preserving curated content a
 - **worktree는 항상 `git fetch origin dev` **직후** `origin/dev`에서 만든다.**
   로컬 `dev` 브랜치를 체크아웃해 base로 쓰지 않는다 — 여러 세션이 각자
   `.claude/worktrees/*`를 쓰는 공유 환경이라 로컬 `dev`가 이미 다른 worktree에 물려 있다.
+- **착수 전 `fetch`, 머지 후 로컬 `dev` 동기화 (2026-08-23 사용자 지시, 양쪽 다 필수).**
+  어떤 작업이든 시작 전에 `git fetch origin dev`를 먼저 돌린다 — 뒤처진 ref를 현행으로 착각하면
+  이미 고쳐진 것을 다시 고친다. 그리고 PR이 `origin/dev`에 머지되면 **머지 하나당 한 번, 즉시**
+  메인 작업트리의 로컬 `dev`를 따라잡힌다:
+  ```bash
+  cd /Users/sungjun/Dev/projects/matchup-sports-platform
+  git fetch origin dev -q && git merge --ff-only origin/dev
+  ```
+  **반드시 `--ff-only`** (`git pull`·rebase·`reset` 금지 — 공유 트리의 타 세션 변경을 건드린다).
+  FF가 거부되면 `git status --porcelain` ∩ `git diff --name-only HEAD origin/dev`로 충돌 파일만
+  특정해 스크래치패드에 백업한 뒤 원복·FF 하고, 백업 경로를 사용자에게 알린다. 지우지 않는다.
 
 ## S2) 공유 작업트리 git 안전 (Critical)
 
@@ -420,6 +435,19 @@ The sections below fill project-specific gaps while preserving curated content a
 
 ## S5) UI 변경
 
+- **착수 전: A·B·C 3안 브레인스토밍 필수** (2026-08-23 사용자 지시). 화면·컴포넌트·레이아웃을
+  새로 만들거나 바꾸는 작업은 **코드를 쓰기 전에** A·B·C 3안 + 추천안을 제시하고 선택을 받는다.
+  - 3안은 **서로 다른 원칙**이어야 한다(같은 안의 미세 변형 3개는 3안이 아니다). 각 안에
+    **장점과 단점을 모두** 적는다 — "단점 없음" 금지.
+  - 목업은 **production fidelity** — low-fi 와이어프레임 금지. 실제 디자인 시스템(토큰·기존
+    컴포넌트·다크모드·44px 터치·WCAG AA)을 그대로 적용하고, 재사용할 기존 컴포넌트를 명시한다.
+  - 제시 순서: ① 3안 비교표(축·장단점·작업규모) → ② `AskUserQuestion` 으로 선택. 선택 전 구현 금지.
+  - 대상 아님: 오타·토큰 치환 같은 1줄 기계적 수정, 백엔드/로직 전용 변경.
+  - 정본: `CLAUDE.md` 의 "UI 착수 규칙 — A·B·C 3안 브레인스토밍 필수".
+- **접근성 위반을 지적하기 전에 `docs/design/a11y-decisions.md` 를 먼저 본다.** 기준(WCAG 2.1 AA,
+  대비 4.5:1, 44px 터치)에 못 미치지만 **근거와 함께 그대로 두기로 결정한 것들**이 거기 모여 있다 —
+  등재돼 있으면 그 지적은 닫고, 없으면 고칠 대상이다. 새로 "안 고치기로" 정하면 그 문서에 추가한다.
+  정본: `CLAUDE.md` 의 "프론트엔드 품질 기준 > 접근성 기준".
 - **변경 후 라이브 시각 검증 필수.** 단위 테스트는 요소 존재/부재만 잡고 레이아웃 균형·정렬을
   못 잡는다 → `tsc 0 + 테스트 pass + lint 0`만으로는 완료가 아니다. 스크린샷으로 확인한다.
 - **요소 제거/재배치 = 레이아웃 재균형까지가 한 작업.** 제거한 요소가 채우던 공간·시각 무게를
@@ -484,6 +512,24 @@ The sections below fill project-specific gaps while preserving curated content a
   `pnpm qa:v1-db-guardrails`가 그 파일을 정규식으로 검사하므로 **반드시 둘 다 통과시켜라.**
 - **alpha는 헤더 인증을 차단한다**(`x-v1-user-id` → 401). 브라우저 세션 쿠키는 httpOnly다.
   alpha 화면 검증은 실제 로그인을 거쳐야 한다.
+- **alpha 실측 검증 절차** (정본: `CLAUDE.md` "Alpha 실측 검증", 스크립트: `scripts/README-alpha-verify.md`):
+  1. **자격증명을 저장소에 적지 마라 — 이 저장소는 PUBLIC이다.** 계정·비밀번호·세션 토큰은
+     `CLAUDE.md`·`AGENTS.md`·`scripts/`·PR 코멘트 어디에도 넣지 않는다. 세션은 `teameet_v1_session`
+     쿠키 하나이고 `v1.<payload>.<HMAC>` 로 **서명만** 해서 발급된다(저장 테이블 없음 → DB에서
+     못 뽑는다). `POST /api/v1/auth/login` 이 유일한 발급 경로이고, 스크립트엔 `ALPHA_SESSION_TOKEN`
+     환경변수로만 넘긴다. alpha E2E 계정 목록은 저장소 밖 비공개 메모리에 있다(Codex는 사용자에게 요청).
+  2. **배포 창을 피하라**(2026-08-13 실사고). 배포 중 502를 결함으로 오진한다. 측정 전에
+     `curl -fsSI .../landing | grep -iE 'x-teameet-(release|commit)'` 로 서빙 버전·SHA를 확인하고 그것이 내 머지를
+     포함하는지 `git merge-base --is-ancestor` 로 검증한다. 앞 배포 run이 `cancelled` 로 남을 수
+     있으니(뒤 머지가 대체) 마지막 **성공** 배포 SHA를 봐야 한다.
+  3. **라이브 경기는 운영 API로 만든다.** alpha엔 `live` 경기가 보통 없다. 재사용 하네스
+     `scripts/verify-alpha-period-break.mjs`. 계약 4개: takeover 토큰은 Socket.IO
+     `game.takeover.request` 로만 발급 / `Idempotency-Key` 헤더 = body `clientCommandId` /
+     라인업 참가자 `started: boolean` 필수 / 라인업 수정은 `state === 'SCHEDULED'` 동안만.
+  4. **판정은 비인증 공개 API**(`GET /tournaments/:id/matches/:fixtureId`)를 ground truth로. 육안
+     스크린샷 대조로 "차이 없음"을 결론내지 말고 computed 값을 직접 읽는다.
+  5. 라이브 페이지는 10초 폴링이라 Playwright `networkidle`이 끝나지 않는다 →
+     `domcontentloaded` + 명시적 `waitForTimeout`.
 - **alpha에서 "오류 + 인증 풀림"은 세션 문제가 아니라 nginx `limit_req`를 먼저 의심하라**
   (ALB IP 합산으로 rate limit에 걸린 이력이 있다).
 - **`globals.css`는 혼합 개행 파일이다.** 편집 후 전체 CRLF 정규화가 일어나면 1,200줄대
@@ -514,3 +560,8 @@ The sections below fill project-specific gaps while preserving curated content a
   같은 수준을 적용한다.**
 - 작업을 다른 세션에 넘길 조건이 주어지면 분석만 주지 말고 **바로 붙여넣을 수 있는 완결형
   프롬프트**를 함께 낸다.
+
+## 대회 · 리그 · 매치 정본 (Codex 미러 — 정본은 CLAUDE.md 와 아래 문서)
+
+`docs/design/competition-canonical-flow.md` 가 대회·정규 리그·팀 매치·명단·결과 확정·전적의 정본이다(2026-09-02 사용자 확정).
+충돌하는 태스크 문서보다 이 문서를 따르고, 바꾸려면 그 문서의 결정 이력 표에 먼저 적는다.

@@ -17,6 +17,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { TournamentReviewsService } from './tournament-reviews.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
 
 const ownerAuthUser = {
   id: 'owner-user-id',
@@ -30,6 +32,12 @@ const supportAuthUser = {
   accountStatus: 'active' as const,
   onboardingStatus: 'completed' as const,
 };
+/**
+ * 수상 알림 발송 목. 이 스위트는 DB 없이 도는 서비스 단위 테스트라 실제 발송을
+ * 태우지 않는다 — "누구에게 몇 번 보냈는가"만 계약으로 고정한다.
+ */
+const notifications = { emitNotification: jest.fn() } as unknown as NotificationsService;
+
 const plainUser = {
   id: 'plain-user-id',
   email: 'user@teameet.v1',
@@ -60,6 +68,7 @@ function awardRow(overrides: Record<string, unknown> = {}) {
     awardLabel: 'MVP',
     iconKey: 'crown',
     recipientName: '김철수',
+    recipientUserId: 'user-kim',
     teamName: '레알마드리드',
     note: null,
     sortOrder: 0,
@@ -89,11 +98,14 @@ function reviewRow(overrides: Record<string, unknown> = {}) {
 const confirmedRegistrationRows = [
   {
     team: { name: '레알마드리드' },
-    players: [{ realName: '김철수' }, { realName: '이영희' }],
+    players: [
+      { userId: 'user-kim', realName: '김철수' },
+      { userId: 'user-lee', realName: '이영희' },
+    ],
   },
   {
     team: { name: '바르셀로나' },
-    players: [{ realName: '박지성' }],
+    players: [{ userId: 'user-park', realName: '박지성' }],
   },
 ];
 
@@ -119,6 +131,8 @@ describe('TournamentReviewsService — awards admin gate', () => {
   };
 
   beforeEach(async () => {
+    // 알림 목은 스위트 전역이라 테스트마다 초기화하지 않으면 호출 횟수가 누적된다.
+    (notifications.emitNotification as jest.Mock).mockClear();
     prisma = {
       v1AdminUser: { findUnique: jest.fn() },
       v1Tournament: { findFirst: jest.fn() },
@@ -148,6 +162,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
         TournamentReviewsService,
         AdminContextService,
         { provide: PrismaService, useValue: prisma },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile();
 
@@ -186,6 +201,29 @@ describe('TournamentReviewsService — awards admin gate', () => {
     expect(result).toEqual([]);
   });
 
+  // ─── listMyPendingReviews (GET) ─────────────────────────────────────────
+
+  // `listMyPendingReviews` 는 `status: 'confirmed'` 를 쓰는 19곳 중 **유일하게
+  // `tournamentId` 스코프가 없는** 쿼리다 — 사용자의 팀이 확정 등록된 **모든** 대회를 훑는다.
+  // 참가팀 백필이 리그 시즌에 `confirmed` 등록을 만들 것이므로 실재하는 경로다.
+  //
+  // 지금까지 안 보였던 건 `tournament.status = 'completed'` 덕이지만(백필 리그는 draft),
+  // 그건 **다른 파일의 가드에 기댄 것**이다 — P0~P3 가 49곳에서 없앤 그 구조.
+  it('listMyPendingReviews: 종류 조건을 걸어 리그 시즌이 후기 대기 목록에 들어오지 않는다', async () => {
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
+
+    await service.listMyPendingReviews(plainUser.id);
+
+    const where = prisma.v1TournamentRegistration.findMany.mock.calls[0][0].where as {
+      tournament: Record<string, unknown>;
+    };
+    // `OR` 이 있는지가 아니라 **그 OR 이 kind 조건인지**를 본다 — 존재만 보면 호출부가
+    // 자기 OR 을 쓰는 날 봉쇄가 빠져도 통과한다(#866 에서 같은 지적을 받았다).
+    expect(where.tournament.OR).toEqual([{ kind: 'regular_tournament' }, { kind: null }]);
+    // 기존 조건도 살아 있어야 한다 — 종류 조건을 넣다 이걸 덮으면 draft·삭제 대회가 샌다.
+    expect(where.tournament).toMatchObject({ status: 'completed', deletedAt: null });
+  });
+
   // ─── setAwards (PUT) ────────────────────────────────────────────────────
 
   it('setAwards: non-admin authenticated user → 403 PERMISSION_DENIED, no data mutated', async () => {
@@ -207,6 +245,26 @@ describe('TournamentReviewsService — awards admin gate', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it('setAwards: 리그 id 는 어워드를 만들지 못한다 — 삭제·생성 모두 일어나지 않는다', async () => {
+    // 어워드는 공개 사용자 기록(`public-user-records`)으로 흘러나간다 — 리그 id 로 만들어지면
+    // 대회 수상 이력에 섞인다. 404 만 보지 않고 **쓰기가 0회**인지 함께 단언한다.
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ id: 'league-1', deletedAt: null, kind: 'regular_league' }),
+    );
+    // 봉쇄가 없으면 실제로 성공하도록 채운다.
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 1 });
+    prisma.v1TournamentAward.create.mockResolvedValue(awardRow());
+
+    await expect(
+      service.setAwards(ownerAuthUser, 'league-1', { awards: [] }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+
+    expect(prisma.v1TournamentAward.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentAward.create).not.toHaveBeenCalled();
+  });
+
   it('setAwards: owner admin replaces awards and returns the updated list', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
@@ -222,6 +280,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
           awardLabel: 'MVP',
           iconKey: 'medal',
           recipientName: '김철수',
+          recipientUserId: 'user-kim',
           teamName: '레알마드리드',
         },
       ],
@@ -247,10 +306,202 @@ describe('TournamentReviewsService — awards admin gate', () => {
     );
   });
 
-  it('setAwards: 다른 팀 소속 수상자 + 팀명 조합 → 400, DB 무변경 (교차 검증)', async () => {
+  // ─── 수상 알림 (1차 대회 회고: "시상식에 딱 1,2,3등 팀만 남음") ──────────────
+  //
+  // 실은 통지 문제였다 — 수상자가 저장돼도 본인이 알 방법이 없어서, 자리를 뜬 사람은
+  // 자기가 받았다는 사실조차 몰랐다.
+  //
+  // 이 스위트의 핵심 계약은 **재저장 시 중복 발송 금지**다. setAwards 는 전체 교체
+  // (deleteMany + 재생성)라 순진하게 걸면 어드민이 오타 하나 고칠 때마다 같은 사람에게
+  // 축하 알림이 다시 간다 — 그건 기능이 아니라 스팸이다.
+
+  it('setAwards: 새로 수상한 사람에게만 알림을 보낸다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', title: '테스트 대회', deletedAt: null });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.findMany.mockResolvedValueOnce([]); // before: 수상 없음
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.v1TournamentAward.create.mockResolvedValue(awardRow());
+    prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow()]);
+
+    await service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [
+        {
+          awardType: 'mvp', awardLabel: 'MVP', iconKey: 'medal',
+          recipientName: '김철수', recipientUserId: 'user-kim', teamName: '레알마드리드',
+        },
+      ],
+    });
+
+    expect(notifications.emitNotification).toHaveBeenCalledTimes(1);
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'user-kim',
+      'tournament_award_received',
+      'tournament-1',
+      // 본문에 상 이름이 들어가야 알림만 보고 "무엇을 받았는지"가 전해진다.
+      expect.stringContaining('MVP'),
+    );
+  });
+
+  // 이 스위트에서 가장 중요한 계약.
+  it('setAwards: 같은 수상자를 그대로 다시 저장하면 알림을 또 보내지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', title: '테스트 대회', deletedAt: null });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    // before: 이미 같은 (awardType, recipientUserId) 조합이 저장돼 있다.
+    prisma.v1TournamentAward.findMany.mockResolvedValueOnce([
+      { ...awardRow(), awardType: 'mvp', recipientUserId: 'user-kim' },
+    ]);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 1 });
+    prisma.v1TournamentAward.create.mockResolvedValue(awardRow());
+    prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow()]);
+
+    await service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [
+        {
+          awardType: 'mvp', awardLabel: 'MVP', iconKey: 'medal',
+          recipientName: '김철수', recipientUserId: 'user-kim', teamName: '레알마드리드',
+        },
+      ],
+    });
+
+    expect(notifications.emitNotification).not.toHaveBeenCalled();
+  });
+
+  it('setAwards: 같은 사람이 다른 상을 새로 받으면 그건 새 수상이라 알린다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', title: '테스트 대회', deletedAt: null });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.findMany.mockResolvedValueOnce([
+      { ...awardRow(), awardType: 'mvp', recipientUserId: 'user-kim' },
+    ]);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 1 });
+    prisma.v1TournamentAward.create.mockResolvedValue(awardRow());
+    prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow()]);
+
+    await service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [
+        {
+          awardType: 'mvp', awardLabel: 'MVP', iconKey: 'medal',
+          recipientName: '김철수', recipientUserId: 'user-kim', teamName: '레알마드리드',
+        },
+        {
+          awardType: 'top_scorer', awardLabel: '득점왕', iconKey: 'goal',
+          recipientName: '김철수', recipientUserId: 'user-kim', teamName: '레알마드리드',
+        },
+      ],
+    });
+
+    expect(notifications.emitNotification).toHaveBeenCalledTimes(1);
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'user-kim', 'tournament_award_received', 'tournament-1', expect.stringContaining('득점왕'),
+    );
+  });
+
+  // 감사 evidence: 대회가 아직 completed 로 전환되지 않은 채(정상 운영 흐름 —
+  // "시상식 당일 저장 → 나중에 status 전환") 수상을 저장하면, 알림이 "공개됐어요"라고
+  // 단정해도 착지 화면(`/tournaments/:id/awards`)은 `NotCompletedNotice`만 보여줘
+  // 알림이 약속을 못 지키는 막다른 길이 됐다. 알림 본문이 그 사실을 미리 알려야 한다.
+  it('setAwards: 대회가 completed 가 아니면 알림 본문에 "종료 후 확인" 안내를 덧붙인다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({
+      id: 'tournament-1',
+      title: '테스트 대회',
+      status: 'in_progress',
+      deletedAt: null,
+    });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.findMany.mockResolvedValueOnce([]);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.v1TournamentAward.create.mockResolvedValue(awardRow());
+    prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow()]);
+
+    await service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [
+        {
+          awardType: 'mvp', awardLabel: 'MVP', iconKey: 'medal',
+          recipientName: '김철수', recipientUserId: 'user-kim', teamName: '레알마드리드',
+        },
+      ],
+    });
+
+    expect(notifications.emitNotification).toHaveBeenCalledWith(
+      'user-kim', 'tournament_award_received', 'tournament-1',
+      expect.stringContaining('공식 발표는 대회 종료 후'),
+    );
+  });
+
+  it('setAwards: 대회가 이미 completed 면 알림 본문에 "종료 후" 안내를 덧붙이지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({
+      id: 'tournament-1',
+      title: '테스트 대회',
+      status: 'completed',
+      deletedAt: null,
+    });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.findMany.mockResolvedValueOnce([]);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.v1TournamentAward.create.mockResolvedValue(awardRow());
+    prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow()]);
+
+    await service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [
+        {
+          awardType: 'mvp', awardLabel: 'MVP', iconKey: 'medal',
+          recipientName: '김철수', recipientUserId: 'user-kim', teamName: '레알마드리드',
+        },
+      ],
+    });
+
+    const [, , , body] = (notifications.emitNotification as jest.Mock).mock.calls[0];
+    expect(body).not.toContain('공식 발표는 대회 종료 후');
+  });
+
+  // 감사 evidence(정합성 회귀 방지): 예전엔 제출된 teamName이 이 대회의 다른 confirmed
+  // 팀 이름과 문자열이 다르기만 해도 400으로 전체 저장을 거부했다. 그런데 신원의
+  // 1차 키는 recipientUserId(계정)이지 teamName 문자열이 아니다 — 이 사람이 이 대회에
+  // confirmed 팀 하나에만(레알마드리드) 속해 있으면, 제출된 teamName이 낡았든(팀 개명)
+  // 잘못 입력됐든 서버는 **그 사람의 실제 라이브 소속 팀**으로 정규화해 저장해야 한다.
+  // (다른 후보와 충돌해 진짜 모호한 경우는 아래 "동일 계정이 두 팀에 걸쳐 있으면" 테스트가
+  // 커버한다.)
+  it('setAwards: userId가 유일하게 일치하면 제출된 teamName이 달라도 실제 소속 팀으로 정규화해 저장한다', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
     prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
+    prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.v1TournamentAward.create.mockResolvedValue(awardRow());
+    prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow()]);
+
+    await service.setAwards(ownerAuthUser, 'tournament-1', {
+      awards: [
+        {
+          awardType: 'mvp',
+          awardLabel: 'MVP',
+          recipientName: '김철수', // 실제로는 레알마드리드 소속
+          recipientUserId: 'user-kim',
+          teamName: '바르셀로나', // 낡았거나 잘못 제출된 값 — 실제 소속이 아니다
+        },
+      ],
+    });
+
+    expect(prisma.v1TournamentAward.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ recipientUserId: 'user-kim', teamName: '레알마드리드' }),
+      }),
+    );
+  });
+
+  // 신규: userId만으로 후보가 둘 이상(같은 사람이 이 대회 confirmed 팀 두 곳에 등록된
+  // 드문 경우)이면, 그때는 teamName이 진짜 판별자가 된다 — 둘 다 만족하는 후보가
+  // 여전히 둘 이상이면 모호하다고 보고 400.
+  it('setAwards: 동일 계정이 두 confirmed 팀에 걸쳐 있고 teamName으로도 못 가르면 400', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
+    prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { team: { name: '레알마드리드' }, players: [{ userId: 'user-kim', realName: '김철수' }] },
+      { team: { name: '바르셀로나' }, players: [{ userId: 'user-kim', realName: '김철수' }] },
+    ]);
 
     await expect(
       service.setAwards(ownerAuthUser, 'tournament-1', {
@@ -258,8 +509,10 @@ describe('TournamentReviewsService — awards admin gate', () => {
           {
             awardType: 'mvp',
             awardLabel: 'MVP',
-            recipientName: '김철수', // 레알마드리드 소속
-            teamName: '바르셀로나', // 다른 참가 팀
+            recipientName: '김철수',
+            recipientUserId: 'user-kim',
+            // teamName 미제출 — award.teamName === null 취급되어 두 후보 모두를 통과시키므로
+            // (2차 판별자가 없다) 모호한 채로 남는다.
           },
         ],
       }),
@@ -281,6 +534,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
           awardType: 'mvp',
           awardLabel: 'MVP',
           recipientName: '  김철수  ',
+          recipientUserId: 'user-kim',
           teamName: ' 레알마드리드 ',
         },
       ],
@@ -315,7 +569,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
 
     const attempt = service.setAwards(ownerAuthUser, 'tournament-1', {
       awards: [
-        { awardType: 'mvp', awardLabel: 'MVP', recipientName: '외부인' },
+        { awardType: 'mvp', awardLabel: 'MVP', recipientName: '외부인', recipientUserId: 'user-external' },
       ],
     });
 
@@ -327,7 +581,10 @@ describe('TournamentReviewsService — awards admin gate', () => {
     expect(prisma.v1TournamentAward.deleteMany).not.toHaveBeenCalled();
   });
 
-  it('setAwards: teamName not among confirmed registrations → 400 AWARD_RECIPIENT_NOT_IN_ROSTER, no mutation', async () => {
+  // recipientUserId는 유일하게 일치해도, 함께 제출된 recipientName이 그 계정의 실제
+  // 명단 실명과 다르면 여전히 거부한다 — userId를 신원의 1차 키로 승격했다고 해서
+  // 이름 검증까지 없앤 건 아니다.
+  it('setAwards: userId는 일치해도 recipientName이 명단 실명과 다르면 400', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(ownerAdminRecord);
     prisma.v1Tournament.findFirst.mockResolvedValue({ id: 'tournament-1', deletedAt: null });
     prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
@@ -338,7 +595,8 @@ describe('TournamentReviewsService — awards admin gate', () => {
           {
             awardType: 'mvp',
             awardLabel: 'MVP',
-            recipientName: '김철수',
+            recipientName: '전혀다른이름',
+            recipientUserId: 'user-kim',
             teamName: '미참가팀',
           },
         ],
@@ -354,17 +612,22 @@ describe('TournamentReviewsService — awards admin gate', () => {
     prisma.v1TournamentRegistration.findMany.mockResolvedValue(confirmedRegistrationRows);
     prisma.v1TournamentAward.deleteMany.mockResolvedValue({ count: 0 });
     prisma.v1TournamentAward.create.mockResolvedValue(
-      awardRow({ recipientName: '이영희', teamName: null }),
+      awardRow({ recipientName: '이영희', recipientUserId: 'user-lee', teamName: '레알마드리드' }),
     );
     prisma.v1TournamentAward.findMany.mockResolvedValue([
-      awardRow({ recipientName: '이영희', teamName: null }),
+      awardRow({ recipientName: '이영희', recipientUserId: 'user-lee', teamName: '레알마드리드' }),
     ]);
 
     const result = await service.setAwards(ownerAuthUser, 'tournament-1', {
-      awards: [{ awardType: 'mvp', awardLabel: 'MVP', recipientName: '이영희' }],
+      awards: [{ awardType: 'mvp', awardLabel: 'MVP', recipientName: '이영희', recipientUserId: 'user-lee' }],
     });
 
-    expect(result[0]).toMatchObject({ recipientName: '이영희', teamName: null });
+    expect(result[0]).toMatchObject({ recipientName: '이영희', recipientUserId: 'user-lee', teamName: '레알마드리드' });
+    expect(prisma.v1TournamentAward.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ recipientUserId: 'user-lee', teamName: '레알마드리드' }),
+      }),
+    );
   });
 
   it('setAwards: roster is scoped to confirmed registrations of the tournament', async () => {
@@ -376,7 +639,7 @@ describe('TournamentReviewsService — awards admin gate', () => {
     prisma.v1TournamentAward.findMany.mockResolvedValue([awardRow()]);
 
     await service.setAwards(ownerAuthUser, 'tournament-1', {
-      awards: [{ awardType: 'mvp', awardLabel: 'MVP', recipientName: '김철수' }],
+      awards: [{ awardType: 'mvp', awardLabel: 'MVP', recipientName: '김철수', recipientUserId: 'user-kim' }],
     });
 
     expect(prisma.v1TournamentRegistration.findMany).toHaveBeenCalledWith(
@@ -424,6 +687,7 @@ describe('TournamentReviewsService — review hide moderation', () => {
         TournamentReviewsService,
         AdminContextService,
         { provide: PrismaService, useValue: prisma },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile();
 
@@ -640,6 +904,7 @@ describe('TournamentReviewsService — 팀 후기 권한 (팀장·운영진 mana
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentRegistration: { findMany: jest.Mock; findFirst: jest.Mock };
     v1TournamentReview: { findFirst: jest.Mock; create: jest.Mock };
+    v1UploadAsset: { findMany: jest.Mock };
   };
 
   const completedTournament = { id: 'tournament-1', status: 'completed', deletedAt: null };
@@ -649,6 +914,7 @@ describe('TournamentReviewsService — 팀 후기 권한 (팀장·운영진 mana
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentRegistration: { findMany: jest.fn(), findFirst: jest.fn() },
       v1TournamentReview: { findFirst: jest.fn(), create: jest.fn() },
+      v1UploadAsset: { findMany: jest.fn() },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -656,6 +922,7 @@ describe('TournamentReviewsService — 팀 후기 권한 (팀장·운영진 mana
         TournamentReviewsService,
         AdminContextService,
         { provide: PrismaService, useValue: prisma },
+        { provide: NotificationsService, useValue: notifications },
       ],
     }).compile();
 
@@ -663,6 +930,25 @@ describe('TournamentReviewsService — 팀 후기 권한 (팀장·운영진 mana
   });
 
   afterEach(() => jest.clearAllMocks());
+
+  // 통합 백필(R3) 이후 리그 id 가 이 조회를 통과할 수 있게 됐다. 리뷰 생성은 **쓰기**이고,
+  // 만들어진 리뷰는 공개 조회(`listReviews`)로 그대로 나간다.
+  //
+  // **오늘 당장 뚫리지는 않는다** — 이 경로는 `status === 'completed'` 를 요구하는데 백필
+  // 리그는 `draft` 라 400 에서 걸린다. 다만 운영자가 `changeStatus` 로 상태를 바꾸면 그
+  // 게이트가 사라지고, 그 전이는 아직 종류 조건이 없다(감사 운영자 11건 중 하나).
+  // **이 지점은 P2 의 `changeStatus` 차단과 함께라야 닫힌다.**
+  it('submitReview: 리그 id 로는 열리지 않는다 (상태 게이트보다 먼저 막힌다)', async () => {
+    // status 를 completed 로 줘서 **상태 게이트를 무력화**한다 — 그래야 404 가 종류 조건
+    // 때문임이 증명된다. 상태로 막히는 걸 보고 "막혔다"고 하면 필터를 안 걸어도 통과한다.
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst({ ...completedTournament, id: 'league-1', kind: 'regular_league' }),
+    );
+    await expect(
+      service.submitReview('league-1', plainUser, { rating: 5, comment: '좋은 대회였어요' }),
+    ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_FOUND' } });
+    expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
+  });
 
   // (a) manager가 후기 작성 성공
   it('submitReview: 팀장이 아닌 매니저(manager)도 참가 확정 팀 몫으로 후기를 작성할 수 있다', async () => {
@@ -705,6 +991,82 @@ describe('TournamentReviewsService — 팀 후기 권한 (팀장·운영진 mana
       }),
     );
     expect(result.teamName).toBe('레알마드리드');
+  });
+
+  // 감사 evidence: photoUrls 는 형식·소유 검증이 전혀 없어 임의의 외부 URL이나 남이
+  // 올린 업로드 URL을 그대로 저장해 공개 후기 화면(비로그인 방문자 포함)에 노출할 수
+  // 있었다. tournament-fixture-videos.service.ts 의 assertOwnUploadedVideo 와 동일한
+  // 위협 모델을 후기 사진에도 적용했는지 직접 검증한다.
+  it('submitReview: 내가 업로드한 이미지 URL 은 photoUrls 로 그대로 저장된다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(completedTournament);
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { teamId: 'team-1', team: { name: '레알마드리드' } },
+    ]);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
+    prisma.v1UploadAsset.findMany.mockResolvedValue([
+      { url: '/uploads/2026/08/mine.jpg', ownerUserId: 'manager-user-id', kind: 'image' },
+    ]);
+    prisma.v1TournamentReview.create.mockResolvedValue(
+      reviewRow({
+        authorUserId: 'manager-user-id',
+        teamName: '레알마드리드',
+        photoUrls: ['/uploads/2026/08/mine.jpg'],
+      }),
+    );
+
+    await service.submitReview(
+      'tournament-1',
+      { ...plainUser, id: 'manager-user-id' },
+      { rating: 5, photoUrls: ['/uploads/2026/08/mine.jpg'] },
+    );
+
+    expect(prisma.v1UploadAsset.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { url: { in: ['/uploads/2026/08/mine.jpg'] } } }),
+    );
+    expect(prisma.v1TournamentReview.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ photoUrls: ['/uploads/2026/08/mine.jpg'] }),
+      }),
+    );
+  });
+
+  it('submitReview: 남이 올린 업로드 URL 을 photoUrls 에 넣으면 400, DB 무변경', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(completedTournament);
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { teamId: 'team-1', team: { name: '레알마드리드' } },
+    ]);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
+    // 남의 자산(ownerUserId 불일치)
+    prisma.v1UploadAsset.findMany.mockResolvedValue([
+      { url: '/uploads/2026/08/someone-else.jpg', ownerUserId: 'other-user-id', kind: 'image' },
+    ]);
+
+    await expect(
+      service.submitReview(
+        'tournament-1',
+        { ...plainUser, id: 'manager-user-id' },
+        { rating: 5, photoUrls: ['/uploads/2026/08/someone-else.jpg'] },
+      ),
+    ).rejects.toMatchObject({ response: { code: 'REVIEW_PHOTO_UPLOAD_NOT_FOUND' } });
+    expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
+  });
+
+  it('submitReview: 원장에 없는 임의의 외부 URL 을 photoUrls 에 넣으면 400, DB 무변경', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(completedTournament);
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { teamId: 'team-1', team: { name: '레알마드리드' } },
+    ]);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
+    prisma.v1UploadAsset.findMany.mockResolvedValue([]); // 등록된 적 없는 URL
+
+    await expect(
+      service.submitReview(
+        'tournament-1',
+        { ...plainUser, id: 'manager-user-id' },
+        { rating: 5, photoUrls: ['https://attacker.example/nsfw.gif'] },
+      ),
+    ).rejects.toMatchObject({ response: { code: 'REVIEW_PHOTO_UPLOAD_NOT_FOUND' } });
+    expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
   });
 
   // (b) 중복 판정 단위는 팀이 아니라 사람이다 (2026-08-17)
@@ -835,42 +1197,43 @@ describe('TournamentReviewsService — 팀 후기 권한 (팀장·운영진 mana
     expect(prisma.v1TournamentReview.create).not.toHaveBeenCalled();
   });
 
-  // (d) getMyReview가 팀장이 쓴 후기를 운영진에게도 보여준다
-  it('getMyReview: 팀장이 작성한 후기를 같은 팀 운영진 조회에도 반환한다', async () => {
+  // (d) 대회 후기는 팀당 1건이 아니라 사람당 1건이다.
+  //
+  // 이 두 테스트는 원래 반대 계약("팀장이 쓴 후기를 같은 팀 운영진 조회에도 반환한다")을
+  // 박제하고 있었다. submitReview 의 중복 검사와 listMyPendingReviews 는 2026-08-17 에
+  // 이미 사람(authorUserId) 기준으로 바뀌었는데 getMyReview 만 팀 기준 OR fallback 을
+  // 남겨서, 팀장이 먼저 쓰면 같은 팀의 두 번째 운영진 화면이 '이미 작성함'으로 잠기고
+  // 그 사람은 후기를 영영 못 쓰게 됐다 — 즉 이 테스트들이 결함 쪽을 지키고 있었다.
+  // 단언만 뒤집으면 이름이 옛 정책을 계속 주장하므로 의도까지 새 계약으로 다시 쓴다.
+  it('getMyReview: 같은 팀이라도 남이 쓴 후기는 내 후기로 반환하지 않는다', async () => {
+    prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+      { teamId: 'team-1', team: { name: '레알마드리드' } },
+    ]);
+    prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
+
+    const result = await service.getMyReview('tournament-1', 'manager-user-id');
+
+    // 팀 기준 OR fallback 이 사라졌다 — 조회 조건은 오직 '내가 쓴 것'이다.
+    expect(prisma.v1TournamentReview.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tournamentId: 'tournament-1', authorUserId: 'manager-user-id' },
+      }),
+    );
+    // 팀장이 쓴 후기가 DB 에 있어도(findFirst 가 authorUserId 로 걸러 null 을 준다)
+    // 두 번째 운영진에게는 '아직 안 씀'으로 보여야 작성 화면이 열린다.
+    expect(result).toBeNull();
+  });
+
+  it('getMyReview: 내가 쓴 후기는 그대로 반환한다', async () => {
     prisma.v1TournamentRegistration.findMany.mockResolvedValue([
       { teamId: 'team-1', team: { name: '레알마드리드' } },
     ]);
     prisma.v1TournamentReview.findFirst.mockResolvedValue(
-      reviewRow({ id: 'review-9', authorUserId: 'owner-user-id', teamId: 'team-1', rating: 5 }),
+      reviewRow({ id: 'review-9', authorUserId: 'manager-user-id', teamId: 'team-1', rating: 5 }),
     );
 
     const result = await service.getMyReview('tournament-1', 'manager-user-id');
 
-    expect(prisma.v1TournamentReview.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          tournamentId: 'tournament-1',
-          OR: [{ authorUserId: 'manager-user-id' }, { teamId: { in: ['team-1'] } }],
-        },
-      }),
-    );
     expect(result).toMatchObject({ id: 'review-9', rating: 5 });
-  });
-
-  it('getMyReview: 참가 확정 팀이 전혀 없으면 authorUserId 기준으로만 조회한다', async () => {
-    prisma.v1TournamentRegistration.findMany.mockResolvedValue([]);
-    prisma.v1TournamentReview.findFirst.mockResolvedValue(null);
-
-    const result = await service.getMyReview('tournament-1', 'stranger-user-id');
-
-    expect(prisma.v1TournamentReview.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          tournamentId: 'tournament-1',
-          OR: [{ authorUserId: 'stranger-user-id' }],
-        },
-      }),
-    );
-    expect(result).toBeNull();
   });
 });

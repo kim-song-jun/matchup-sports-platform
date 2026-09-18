@@ -29,15 +29,16 @@ function loaded(overrides: Partial<{
  * 명단이 소리 없이 어긋난 상태로 저장된다.
  */
 describe('replaceEntries', () => {
-  it('선발과 후보를 started 플래그대로 나눠 담는다', () => {
+  it('started 플래그와 무관하게 전원을 한 명단에 담는다 (Task 163)', () => {
+    // 저장된 프리셋·과거 라인업에는 아직 `started` 가 있지만, 명단에는 선발/후보 구분이
+    // 없다(정본 §3). **후보였던 사람을 빠뜨리면 불러오기가 명단을 조용히 줄인다.**
     const next = replaceEntries(
       createEmptyLineupEditorState(3),
       [loaded({ userId: 'u1', started: true }), loaded({ userId: 'u2', displayName: '김철수', started: false })],
       { formation: null, keepPlacement: true },
     );
 
-    expect(next.starters.map((entry) => entry.userId)).toEqual(['u1']);
-    expect(next.bench.map((entry) => entry.userId)).toEqual(['u2']);
+    expect(next.participants.map((entry) => entry.userId)).toEqual(['u1', 'u2']);
   });
 
   it('기존 명단은 남기지 않고 통째로 교체한다', () => {
@@ -48,7 +49,7 @@ describe('replaceEntries', () => {
     );
     const after = replaceEntries(before, [loaded({ userId: 'u1' })], { formation: null, keepPlacement: true });
 
-    expect([...after.starters, ...after.bench].map((entry) => entry.userId)).toEqual(['u1']);
+    expect(after.participants.map((entry) => entry.userId)).toEqual(['u1']);
   });
 
   it('CAS 토큰(baseRevision)은 건드리지 않는다 — 불러오기는 서버 상태와 무관하다', () => {
@@ -67,7 +68,7 @@ describe('replaceEntries', () => {
       { formation: '4-4-2', keepPlacement: true },
     );
 
-    expect(next.starters[0]).toMatchObject({ position: 'MF', positionX: 40, positionY: 70, jerseyNumber: 7 });
+    expect(next.participants[0]).toMatchObject({ position: 'MF', positionX: 40, positionY: 70, jerseyNumber: 7 });
     expect(next.formation).toBe('4-4-2');
   });
 
@@ -78,20 +79,23 @@ describe('replaceEntries', () => {
       { formation: '1-2-1', keepPlacement: false },
     );
 
-    expect(next.starters[0]).toMatchObject({ position: null, positionX: null, positionY: null });
+    expect(next.participants[0]).toMatchObject({ position: null, positionX: null, positionY: null });
     expect(next.formation).toBeNull();
     // 명단과 등번호는 살아 있다.
-    expect(next.starters[0].jerseyNumber).toBe(7);
+    expect(next.participants[0].jerseyNumber).toBe(7);
   });
 
-  it('후보에게는 골키퍼 표시도 좌표도 남지 않는다', () => {
+  it('started: false 인 사람도 골키퍼 표시·좌표를 그대로 지닌다 (Task 163)', () => {
+    // 예전엔 "후보는 피치 위에 없다" 며 좌표·GK 를 지웠다. 명단에 후보가 없어졌으므로
+    // 그 소거도 근거를 잃었다 — 전술보드가 그 좌표의 편집기이고, 여기서 지우면
+    // **불러오기 한 번에 배치가 사라진다.**
     const next = replaceEntries(
       createEmptyLineupEditorState(0),
       [loaded({ started: false, goalkeeper: true, positionX: 50, positionY: 6 })],
       { formation: null, keepPlacement: true },
     );
 
-    expect(next.bench[0]).toMatchObject({ goalkeeper: false, positionX: null, positionY: null });
+    expect(next.participants[0]).toMatchObject({ goalkeeper: true, positionX: 50, positionY: 6 });
   });
 
   it('불러오면 저장해야 할 변경으로 표시된다', () => {
@@ -110,7 +114,7 @@ describe('replaceEntries', () => {
       { formation: null, keepPlacement: true },
     );
 
-    expect(next.starters[0]).toMatchObject({ userId: null, displayName: '용병친구' });
+    expect(next.participants[0]).toMatchObject({ userId: null, displayName: '용병친구' });
   });
 });
 

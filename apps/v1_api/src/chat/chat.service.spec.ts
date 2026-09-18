@@ -306,7 +306,7 @@ describe('ChatService', () => {
             {
               user: {
                 matchParticipants: {
-                  some: { matchId: 'match-1', status: 'active', match: { deletedAt: null } },
+                  some: { matchId: 'match-1', status: { in: ['active', 'completed'] }, match: { deletedAt: null } },
                 },
               },
             },
@@ -447,33 +447,43 @@ describe('ChatService', () => {
     prisma.v1ChatRoom.update.mockResolvedValue({});
     prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: 'user-2' }, { userId: 'user-3' }]);
     prisma.v1Notification.createMany.mockResolvedValue({ count: 2 });
-    // The message/notifications are already committed above by the time this runs —
-    // a rejection here must not turn an already-successful send into a 500.
+    // The message is already committed by the time this runs — a rejection here
+    // must not turn an already-successful send into a 500.
     prisma.v1NotificationPreference.findMany.mockRejectedValueOnce(new Error('db unavailable'));
 
     await expect(service.sendMessage(userA, 'room-1', { content: 'ping' })).resolves.toMatchObject({
       messageId: 'msg-pref-lookup-fail',
     });
+    expect(prisma.v1Notification.createMany).not.toHaveBeenCalled();
     expect(webPushService.sendToUser).not.toHaveBeenCalled();
   });
 
-  it('sendMessage: skips WebPushService.sendToUser for recipients with chatEnabled=false', async () => {
+  it('sendMessage: chatEnabled=false 수신자는 채팅 메시지만 받고 알림함·배지·푸시는 받지 않는다', async () => {
     const sentAt = new Date('2026-06-21T10:00:00Z');
     const createdMessage = { id: 'msg-muted-pref', chatRoomId: 'room-1', senderUserId: userA.id, body: 'quiet', status: 'sent', sentAt };
     prisma.v1ChatRoom.findFirst.mockResolvedValue(roomWithTwoRecipients());
     prisma.v1ChatMessage.create.mockResolvedValue(createdMessage);
     prisma.v1ChatRoom.update.mockResolvedValue({});
     prisma.v1ChatRoomParticipant.findMany.mockResolvedValue([{ userId: 'user-2' }, { userId: 'user-3' }]);
-    prisma.v1Notification.createMany.mockResolvedValue({ count: 2 });
-    // user-2 disabled chat push; user-3 has no preference row (default enabled)
+    prisma.v1Notification.createMany.mockResolvedValue({ count: 1 });
+    // user-2 disabled chat notifications; user-3 has no preference row (default enabled)
     prisma.v1NotificationPreference.findMany.mockResolvedValue([{ userId: 'user-2', chatEnabled: false }]);
 
     await service.sendMessage(userA, 'room-1', { content: 'quiet' });
 
     expect(webPushService.sendToUser).not.toHaveBeenCalledWith('user-2', expect.anything());
     expect(webPushService.sendToUser).toHaveBeenCalledWith('user-3', expect.anything());
-    // Realtime in-app notification must still fire for the pref-disabled recipient (push-only gate)
     expect(realtimeGateway.emitToUser).toHaveBeenCalledWith('user-2', 'chat:message', expect.anything());
+    expect(realtimeGateway.emitToUser).not.toHaveBeenCalledWith('user-2', 'notification:new', expect.anything());
+    expect(prisma.v1Notification.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          recipientUserId: 'user-3',
+          targetType: 'chat',
+          targetId: 'room-1',
+        }),
+      ],
+    });
   });
 
   it('resolve(match): 첫 호출 시 created=true, 두 번째 호출 시 created=false (멱등성)', async () => {
@@ -518,6 +528,39 @@ describe('ChatService', () => {
       roomType: 'team',
       created: true,
       route: '/chat/team-room-1',
+    });
+  });
+
+  // 감사 결함 회귀 방지(2026-08-27): 결과 제출로 V1TeamMatch.status가 matched→completed로
+  // 넘어간 뒤에도 팀 owner/manager는 채팅을 계속 열 수 있어야 한다. 예전엔
+  // assertCanUseTeamMatchChat이 status:'matched'로 exact-match 해서, completed가 된 팀매치의
+  // resolve/detail/sendMessage 전부가 409 STATE_CONFLICT('Team match chat is available after
+  // matching')로 죽었다 — 버튼은 여전히 활성인데 눌러도 반응이 없는 증상의 원인.
+  it('resolve(team_match): completed 상태에서도 팀 owner/manager 는 채팅을 연다', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue({
+      hostTeamId: 'team-host', approvedApplicantTeamId: 'team-guest',
+    });
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'membership-1' });
+    prisma.v1ChatRoom.findUnique.mockResolvedValueOnce(null);
+    prisma.v1ChatRoom.create.mockResolvedValueOnce({ id: 'tm-room-1', teamMatchId: 'tm-1', status: 'active' });
+    prisma.v1ChatRoomParticipant.findUnique.mockResolvedValueOnce(null);
+    prisma.v1ChatRoomParticipant.create.mockResolvedValueOnce({});
+
+    const result = await service.resolve(userA, { targetType: 'team_match', targetId: 'tm-1' });
+
+    expect(result).toMatchObject({ roomId: 'tm-room-1', roomType: 'team_match', created: true, route: '/chat/tm-room-1' });
+    // status가 matched/completed 둘 다 통과하도록 findFirst where에 in 조건이 전달됐는지도
+    // 함께 고정한다 — 이 단언 없이는 하드코딩된 'matched'로 되돌아가도 이 테스트는 여전히
+    // 통과한다(위 mockResolvedValue가 무조건 값을 돌려주므로).
+    const where = prisma.v1TeamMatch.findFirst.mock.calls[0][0].where;
+    expect(where.status).toEqual({ in: ['matched', 'completed'] });
+  });
+
+  it('resolve(team_match): 매칭 전(승인된 상대팀 없음) 이면 409 STATE_CONFLICT', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(null);
+
+    await expect(service.resolve(userA, { targetType: 'team_match', targetId: 'tm-1' })).rejects.toMatchObject({
+      response: { code: 'STATE_CONFLICT' },
     });
   });
 

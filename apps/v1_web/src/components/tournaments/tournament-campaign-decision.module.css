@@ -5,7 +5,7 @@
   gap: 32px;
   margin-top: 24px;
   padding: 28px;
-  border-radius: 20px;
+  border-radius: var(--radius-hero);
   background: var(--blue50);
 }
 
@@ -57,10 +57,10 @@
 }
 
 @media (max-width: 767px) {
-  .decision { grid-template-columns: 1fr; gap: 8px; margin-top: 12px; padding: 20px 18px; }
+  .decision { grid-template-columns: 1fr; gap: 8px; margin-top: 12px; padding: 20px 20px; }
   .decisionEyebrow { margin-bottom: 8px; }
   .decisionTitle { font-size: 24px; }
-  .decisionCopy p { margin-top: 6px; line-height: 1.5; }
+  .decisionCopy p { margin-top: 8px; line-height: 1.5; }
   .decisionConversion { align-items: stretch; }
   .decisionActions { align-items: stretch; flex-direction: column; order: -1; }
   .decisionActions :global(.tm-btn) { justify-content: center; width: 100%; }

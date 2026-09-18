@@ -81,6 +81,19 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      V1_PUSH_ENVIRONMENT: ${V1_PUSH_ENVIRONMENT:-production}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      # Sign in with Apple 이 받아들일 audience(= 번들 id). 비밀이 아니라 앱 스토어에 찍히는
+      # 값이라 시크릿 동기화 없이 리터럴로 둔다. 비어 있으면(또는 V1_SESSION_SECRET 이 32자
+      # 미만이면) /auth/apple 과 /auth/apple/nonce 가 503 APPLE_SIGN_IN_NOT_CONFIGURED 로
+      # 답한다 — 나머지 로그인 경로는 영향받지 않는다.
+      APPLE_SIGN_IN_AUDIENCES: ${APPLE_SIGN_IN_AUDIENCES:-kr.co.teameet}
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
+      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-}
+      APNS_PRIVATE_KEY: ${APNS_PRIVATE_KEY:-}
     logging:
       driver: json-file
       options:
@@ -124,6 +137,19 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      V1_PUSH_ENVIRONMENT: ${V1_PUSH_ENVIRONMENT:-production}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      # Sign in with Apple 이 받아들일 audience(= 번들 id). 비밀이 아니라 앱 스토어에 찍히는
+      # 값이라 시크릿 동기화 없이 리터럴로 둔다. 비어 있으면(또는 V1_SESSION_SECRET 이 32자
+      # 미만이면) /auth/apple 과 /auth/apple/nonce 가 503 APPLE_SIGN_IN_NOT_CONFIGURED 로
+      # 답한다 — 나머지 로그인 경로는 영향받지 않는다.
+      APPLE_SIGN_IN_AUDIENCES: ${APPLE_SIGN_IN_AUDIENCES:-kr.co.teameet}
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
+      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-}
+      APNS_PRIVATE_KEY: ${APNS_PRIVATE_KEY:-}
     logging:
       driver: json-file
       options:
@@ -135,7 +161,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:${WORKER_PORT:-8122}/api/v1/game-operations-worker/health').then(async (res) => { const json = await res.json(); const status = json?.data?.status ?? json?.status; if (!res.ok || status !== 'healthy') throw new Error('game operations worker health ' + res.status + ' status=' + status); }).catch(() => process.exit(1));",
+          "fetch('http://127.0.0.1:${WORKER_PORT:-8122}/api/v1/game-operations-worker/health').then(async (res) => { const json = await res.json(); const status = json?.data?.deploymentStatus ?? json?.deploymentStatus; if (!res.ok || status !== 'healthy') throw new Error('game operations worker health ' + res.status + ' deploymentStatus=' + status); }).catch(() => process.exit(1));",
         ]
       interval: 10s
       timeout: 5s
@@ -158,6 +184,7 @@ services:
       NEXT_PUBLIC_KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
       NEXT_PUBLIC_KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}
       NEXT_PUBLIC_KAKAO_SCOPE: ${KAKAO_SCOPE:-}
+      ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS: ${ANDROID_APP_LINKS_SHA256_CERT_FINGERPRINTS:-}
       INTERNAL_API_ORIGIN: ${V1_INTERNAL_API_ORIGIN:-http://v1_api:8121}
       HOSTNAME: 0.0.0.0
       PORT: 3013
@@ -198,6 +225,7 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./aasa:/etc/nginx/teameet-aasa:ro
       - ./release-metadata.prod.conf:/etc/nginx/snippets/teameet-release-metadata.conf:ro
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot

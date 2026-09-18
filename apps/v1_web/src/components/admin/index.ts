@@ -4,6 +4,7 @@ export { AdminShell } from './admin-shell';
 // ── Page primitives ───────────────────────────────────────────────────────
 export { AdminPageHeader } from './admin-page-header';
 export { AdminKpiCard } from './admin-kpi-card';
+export { AdminDetailRow, AdminSummaryItem } from './admin-detail-row';
 
 // ── Data display ──────────────────────────────────────────────────────────
 export { AdminDataTable } from './admin-data-table';
@@ -27,6 +28,7 @@ export { OperationFlagTogglePanel } from './operation-flag-toggle-panel';
 
 // ── Empty / error / loading ───────────────────────────────────────────────
 export { AdminEmpty } from './admin-empty';
+export { AdminInlineError } from './admin-inline-error';
 export {
   AdminKpiGridSkeleton,
   AdminListSkeleton,

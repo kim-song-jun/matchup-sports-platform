@@ -14,7 +14,13 @@ const KNOWN_ERROR_MESSAGES: Record<string, string> = {
   PROJECTION_PREVIEW_MISMATCH: '결과 내용이 방금 바뀌었어요. 최신 내용을 다시 확인한 뒤 시도해 주세요.',
   REVISION_MUST_BE_SUPERSEDED: '이 결과는 이미 다른 처리로 대체됐어요. 화면을 새로고침해 주세요.',
   NEXT_FIXTURE_CONFLICT: '다음 라운드 경기가 이미 진행돼서 무효화할 수 없어요.',
-  RESULT_RESUBMISSION_NOT_ALLOWED: '반려되거나 보완 요청된 결과만 다시 제출할 수 있어요.',
+  // contract 이후 base 는 `SUBMITTED` 뿐이다 — 반려·보완 요청 상태가 사라졌으므로
+  // 그 어휘로 안내하면 있지도 않은 상태를 찾게 만든다.
+  RESULT_RESUBMISSION_NOT_ALLOWED: '확인 대기 중인 결과만 다시 보낼 수 있어요.',
+  // contract 가 새로 만든 409 다(`officializeResultRevision` STANDARD 흐름의 공식 탈취 가드).
+  // 매핑이 없으면 서버 원문(영문)이 그대로 화면에 뜬다.
+  RESULT_ALREADY_OFFICIAL:
+    '이미 공식 결과가 있는 경기예요. 결과를 바꾸려면 결과 정정으로 해주세요.',
   RESULT_REVISION_NOT_FOUND: '결과 정보를 찾을 수 없어요. 화면을 새로고침해 주세요.',
   COMMAND_CONCURRENCY_CONFLICT: '다른 처리와 동시에 진행돼 반영하지 못했어요. 화면을 새로고침해 주세요.',
   VERSION_CONFLICT: '경기 정보가 그 사이 바뀌었어요. 화면을 새로고침해 주세요.',
@@ -63,8 +69,6 @@ export const REVISION_STATE_LABELS: Record<GameResultRevisionState, string> = {
   DRAFT: '작성 중(정정 초안)',
   SUBMITTED: '제출됨 · 검토 대기',
   CHANGE_REQUESTED: '수정 요청됨',
-  SUPPLEMENT_REQUESTED: '보완 요청됨',
-  REJECTED: '반려됨',
   OFFICIAL: '공식 확정',
   VOID: '무효 처리됨',
 };
@@ -73,17 +77,27 @@ export const REVISION_STATE_BADGE_TONE: Record<GameResultRevisionState, 'blue' |
   DRAFT: 'grey',
   SUBMITTED: 'blue',
   CHANGE_REQUESTED: 'orange',
-  SUPPLEMENT_REQUESTED: 'orange',
-  REJECTED: 'red',
   OFFICIAL: 'green',
   VOID: 'red',
 };
 
+/**
+ * **팀 역할까지 덮는다.** 이 화면은 이제 리그 대진(팀매치 소스)도 지나고, 그때 액터는
+ * 팀 쪽 역할로 해석된다. 예전엔 대회 스태프 4개만 있어서 팀 역할이 오면
+ * `ACTOR_ROLE_LABELS[role]` 이 `undefined` 가 되고, 그걸 템플릿 리터럴에 넣던 자리가
+ * 화면에 **"종료 · undefined"** 를 찍었다(2026-09-06 alpha 실측).
+ *
+ * `Record<GameActorRole, string>` 이라 **역할이 늘면 tsc 가 여기 누락을 잡는다** — 그게
+ * 이 타입을 넓게 유지하는 이유다.
+ */
 export const ACTOR_ROLE_LABELS: Record<GameActorRole, string> = {
   platform_ops: '플랫폼 운영자',
   tournament_director: '대회 감독관',
   field_operator: '현장 진행요원',
   support_readonly: '고객지원(읽기 전용)',
+  team_owner: '팀장',
+  team_manager: '팀 매니저',
+  opponent_manager: '상대팀 매니저',
 };
 
 /** tournament_director/platform_ops only -- field_operator/support_readonly

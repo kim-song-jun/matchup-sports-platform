@@ -1,0 +1,43 @@
+{
+  "_comment": "raw SQL($queryRaw/$executeRaw) 안에서 v1_tournaments 를 직접 만지는 자리. 목표는 0 이 아니라 '새로 늘어나면 눈에 띄게 하는 것'이다 — 아래 항목은 전부 남을 이유가 있다. 늘리려면 why 를 함께 적어라. 주석 줄은 세지 않는다.",
+  "src/tournaments/tournament-registrations.service.ts": {
+    "allowed": 2,
+    "why": "SELECT id ... FOR UPDATE — 잠금만 잡고 데이터를 돌려주지 않아 누출은 아니다. 다만 잠금은 리그 행에도 걸리고 실제 게이트는 그 뒤의 Prisma 검사다: 순서를 바꾸거나 뒤 검사를 지우면 곧바로 구멍이 된다."
+  },
+  "src/tournaments/admin-registrations.service.ts": {
+    "allowed": 1,
+    "why": "위와 같은 FOR UPDATE 잠금. 게이트는 뒤의 Prisma 검사다."
+  },
+  "src/tournaments/competition-config/competition-config-backfill.ts": {
+    "allowed": 2,
+    "why": "설정 축 — 대회와 리그가 이미 공유하는 축이라 일부러 종류를 가르지 않는다. 여기서 갈라내면 리그만 옛 설정에 남거나 설정 없는 상태로 방치돼 통합을 되돌리는 셈이 된다(tournament-surface.ts 의 '여기 걸지 않는 곳' 참조)."
+  },
+  "src/games/migration/participant-identity-link-backfill.ts": {
+    "allowed": 1,
+    "why": "일회성 마이그레이션 백필. 사용자 요청 경로가 아니다."
+  },
+  "prisma/cleanup-demo-data.ts": {
+    "allowed": 3,
+    "why": "The cleanup script uses three CTE/delete references to collect and remove explicitly demo-owned tournament IDs; execution requires both --execute and --confirm=delete-v1-demo-data, and protected official/audit-linked rows are excluded before deletion."
+  },
+  "src/league-matches/league-match-admin.service.ts": {
+    "allowed": 4,
+    "why": "BE-5 drop: 리그 정본 행에 거는 `SELECT id FROM \"v1_tournaments\" ... FOR UPDATE` 4곳(대진 생성·재생성·팀 추가·팀 제거). Prisma 로는 행 잠금을 걸 수 없어 raw SQL 이어야 하고, 이 자리는 잠금 대상 **한 행**을 id 로 특정하므로 종류 조건이 없어도 다른 대회를 건드리지 않는다(그 id 로 진행하는 리그 트랜잭션이 이미 kind 를 확인한 뒤다). 문자열 안의 테이블명은 타입 시스템이 못 보므로 저장 축을 옮길 때 함께 옮겨야 한다 — BE-5 drop 이 그 사고를 실제로 냈고(v1_leagues 를 겨냥한 채 남아 relation does not exist), 통합 스펙이 500 으로 잡았다."
+  },
+  "src/game-operations/result-escalation-access.service.ts": {
+    "allowed": 1,
+    "why": "Escalation access is intentionally shared by tournament and league result revisions; canonicalSourcePredicate requires the matching tournament/league kind, ownership shape, source type, and details relation before returning rows."
+  },
+  "src/jobs/result-escalation/game-result-submitted-escalation.service.ts": {
+    "allowed": 1,
+    "why": "Submitted-result locking serves both canonical tournament and league TeamMatch revisions; the SQL predicate explicitly requires regular_tournament/null with details or regular_league without details."
+  },
+  "src/tournaments/tournament-standings-source.ts": {
+    "allowed": 1,
+    "why": "The raw tournament row is locked before the kind-gated findTournamentOnSurface lookup; it is a concurrency lock only and never supplies a returned tournament surface."
+  },
+  "src/tournaments/competition-config/tournament-competition-config.ts": {
+    "allowed": 1,
+    "why": "The raw tournament row is locked before the resolved kind-gated lookup and ownership-specific game/TeamMatch locks; it does not select an exposed surface."
+  }
+}

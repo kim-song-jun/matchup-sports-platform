@@ -18,7 +18,7 @@ import type { GameScore } from '../games.types';
 
 /**
  * 승부차기 가드가 한 픽스처에 대해 필요로 하는 사실 전부. DB 접근은
- * `src/tournaments/knockout-fixture.ts`의 read 함수들이 담당하고, 여기 두
+ * 각 호출 경로의 canonical TeamMatch Details 조회가 담당하고, 여기 두
  * 순수 함수는 그 결과만 받는다 — 그래야 판정 규칙을 DB 없이 단위 검증할 수
  * 있고, 같은 규칙을 서로 다른 트랜잭션 레인(정본 `end`/복구/정정/재제출)에서
  * 복제 없이 재사용할 수 있다.
@@ -52,7 +52,7 @@ export type StoredPenalties = NonNullable<GameScore['penalties']>;
  *  - 결선 phase 픽스처여야 한다(`V1TournamentGroup.phase !== 'group'` —
  *    phase 컬럼이며 `V1TournamentFixture.round`가 아니다. `round`는 한글/영문이
  *    섞인 표시용 라벨이라 판별 기준으로 쓰면 함정이다.
- *    `readIsKnockoutFixture` 참조). 조별리그 무승부는 무승부로 남아야 한다 —
+ *    TeamMatch Details의 group 관계 참조). 조별리그 무승부는 무승부로 남아야 한다 —
  *    거기에 "승부차기 승자"를 기록하면 무엇이든 `score.penalties`를 순위
  *    계산에 쓰는 순간 `calculateCompetitionStandings`가 오염된다.
  *  - 정규시간이 실제로 동점이어야 한다. 이미 승자가 난 결과에 붙은 승부차기
@@ -166,14 +166,14 @@ export function requiresDecisiveResult(facts: KnockoutFixtureFacts): boolean {
  *
  * POISONED의 실제 조건은 knockout phase가 아니라 **진출 엣지**다
  * (`GameResultBracketProjectionService.project`는
- * `tournamentFixtureId === null`이나 `edges.length === 0`이면 그냥 return하고,
+ * canonical tournament Details가 없거나 `edges.length === 0`이면 그냥 return하고,
  * 그 뒤 `resolveWinnerSide`가 승자를 못 찾으면 throw한다). 두 기준은 양방향으로
  * 어긋난다:
  *  - 결선이지만 outgoing 엣지가 없는 픽스처(결승·3/4위전)는 무승부여도
  *    POISONED가 되지 않는다. 그런데 기존 `end` 동작은 여기서도 무승부를
  *    거부해 왔다 — 그 정책을 그대로 보존해야 하므로 `isKnockoutFixture` 항이
  *    필요하다.
- *  - `groupId`가 없어 `readIsKnockoutFixture`가 보수적으로 false를 주는
+ *  - `groupId`가 없어 canonical knockout 조회가 보수적으로 false를 주는
  *    픽스처인데 엣지는 걸려 있는 경우는 현행 코드가 무승부를 통과시키고 그
  *    결과가 정확히 POISONED다 — 그래서 `hasAdvancementEdges` 항이 필요하다
  *    (이 조합만이 이 가드의 의도된 확장이다).

@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import { useModalA11y } from '../v1-ui/use-modal-a11y';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 export interface ReasonStatusOption {
@@ -37,10 +38,13 @@ export function AdminReasonModal({
   );
   const [reason, setReason] = useState('');
 
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const firstFocusableRef = useRef<HTMLSelectElement>(null);
-  /** Saved reference to the element that was focused before the modal opened (for focus restore on close) */
-  const previousFocusRef = useRef<Element | null>(null);
+  // focus 저장·복원 / 첫 컨트롤 포커스 / ESC / focus trap / 스크롤 잠금 — 공용 훅.
+  // 이 파일의 구현을 리그 모달 3종이 "그대로 본떠" 네 벌이 됐던 것을 한 벌로 모았다.
+  const { dialogRef, initialFocusRef, onBackdropClick, mounted, closing } = useModalA11y<HTMLSelectElement>({
+    open,
+    onClose,
+    pending,
+  });
 
   // Reset form whenever the modal opens
   useEffect(() => {
@@ -50,81 +54,7 @@ export function AdminReasonModal({
     }
   }, [open, currentStatus, statusOptions]);
 
-  // Save focus on open; restore it on close via every path (ESC / backdrop / Cancel / submit) (WCAG 2.4.3)
-  useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
-    } else {
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') {
-        (el as HTMLElement).focus();
-      }
-      previousFocusRef.current = null;
-    }
-  }, [open]);
-
-  // Focus the first control on open
-  useEffect(() => {
-    if (open) {
-      const id = setTimeout(() => firstFocusableRef.current?.focus(), 60);
-      return () => clearTimeout(id);
-    }
-  }, [open]);
-
-  // ESC to close (unless pending)
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !pending) onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose, pending]);
-
-  // Focus trap
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const focusableSelectors =
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-
-    const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelectors));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
-  }, [open]);
-
-  // Prevent body scroll while open
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [open]);
-
-  if (!open) return null;
+  if (!mounted) return null;
 
   const trimmedReason = reason.trim();
   const canSubmit = trimmedReason.length > 0 && !pending;
@@ -138,12 +68,8 @@ export function AdminReasonModal({
   return (
     /* Backdrop */
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
-      aria-hidden={!open}
-      onClick={(e) => {
-        // Close on backdrop click (not on panel click)
-        if (e.target === e.currentTarget && !pending) onClose();
-      }}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px] tm-modal-scrim${closing ? ' is-closing' : ''}`}
+      onClick={onBackdropClick}
     >
       {/* Panel */}
       <div
@@ -151,13 +77,13 @@ export function AdminReasonModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="admin-reason-modal-title"
-        className="bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[440px] overflow-hidden"
+        className={`bg-[var(--card-surface)] rounded-2xl shadow-[0_8px_32px_rgba(20,28,45,0.14)] w-full max-w-[440px] overflow-hidden tm-modal-panel${closing ? ' is-closing' : ''}`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <h2
             id="admin-reason-modal-title"
-            className="text-[16px] font-bold text-[var(--text-strong)]"
+            className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]"
           >
             {title}
           </h2>
@@ -166,7 +92,7 @@ export function AdminReasonModal({
             onClick={() => !pending && onClose()}
             disabled={pending}
             aria-label="모달 닫기"
-            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -176,16 +102,16 @@ export function AdminReasonModal({
         <form onSubmit={handleSubmit} noValidate>
           <div className="px-5 py-5 flex flex-col gap-4">
             {/* Status selector */}
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label
                 htmlFor="admin-reason-status"
-                className="text-[13px] font-semibold text-[var(--text-body)]"
+                className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]"
               >
                 변경할 상태
               </label>
               <select
                 id="admin-reason-status"
-                ref={firstFocusableRef}
+                ref={initialFocusRef}
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
                 disabled={pending}
@@ -204,10 +130,10 @@ export function AdminReasonModal({
             </div>
 
             {/* Reason textarea */}
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label
                 htmlFor="admin-reason-text"
-                className="text-[13px] font-semibold text-[var(--text-body)]"
+                className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]"
               >
                 사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
@@ -221,8 +147,8 @@ export function AdminReasonModal({
                 disabled={pending}
                 placeholder="처리 사유를 입력해 주세요."
                 className={[
-                  'px-3 py-2.5 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
-                  'placeholder:text-gray-400',
+                  'px-3 py-3 text-sm bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
+                  'placeholder:text-[var(--text-muted)]',
                   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
                   'transition-colors disabled:opacity-50',
                   trimmedReason.length === 0 ? 'border-[var(--border)]' : 'border-[var(--border-strong)]',
@@ -233,8 +159,8 @@ export function AdminReasonModal({
               <p
                 id="admin-reason-char-count"
                 className={[
-                  'text-[var(--font-size-caption)] text-right tabular-nums',
-                  reason.length >= REASON_MAX ? 'text-[var(--red700)]' : 'text-gray-400',
+                  'text-[length:var(--font-size-caption)] text-right tabular-nums',
+                  reason.length >= REASON_MAX ? 'text-[var(--red700)]' : 'text-[var(--text-muted)]',
                 ].join(' ')}
                 aria-live="polite"
               >
@@ -244,7 +170,7 @@ export function AdminReasonModal({
 
             {/* Required hint */}
             {trimmedReason.length === 0 && reason.length > 0 && (
-              <p className="text-[12px] text-[var(--red700)]" role="alert">
+              <p className="text-[length:var(--font-size-caption)] text-[var(--red700)]" role="alert">
                 공백만 입력하면 제출할 수 없어요.
               </p>
             )}
@@ -256,7 +182,7 @@ export function AdminReasonModal({
               type="button"
               onClick={() => !pending && onClose()}
               disabled={pending}
-              className="flex-1 h-[48px] rounded-xl text-[15px] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="tm-on-tint flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--grey300)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -264,11 +190,11 @@ export function AdminReasonModal({
               type="submit"
               disabled={!canSubmit}
               className={[
-                'flex-1 h-[48px] rounded-xl text-[15px] font-semibold transition-colors',
+                'flex-1 h-[48px] rounded-xl text-[length:var(--font-size-body)] font-semibold transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 canSubmit
                   ? 'bg-blue-500 text-white hover:bg-blue-600'
-                  : 'bg-blue-200 text-white cursor-not-allowed',
+                  : 'bg-[var(--grey100)] text-[var(--text-caption)] cursor-not-allowed',
               ].join(' ')}
               aria-disabled={!canSubmit}
             >

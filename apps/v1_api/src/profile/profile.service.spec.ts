@@ -149,6 +149,21 @@ describe('ProfileService settings theme preference', () => {
     expect(result.theme).toBe('system');
   });
 
+
+  it('persists activityEnabled so the grouped 경기·대회 setting controls tournament notifications', async () => {
+    const prisma = buildPrisma();
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    await service.updateSettings(user, { notifications: { activityEnabled: false } });
+
+    expect(prisma.v1NotificationPreference.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ activityEnabled: false }),
+        create: expect.objectContaining({ activityEnabled: false }),
+      }),
+    );
+  });
+
   // Copilot 리뷰 지적: ThemeProvider가 앱 루트에서 GET /me/settings를 상시 호출하게
   // 되면서, settings()가 upsert(update:{})로 알림설정을 읽으면 요청마다 불필요한
   // UPDATE(@updatedAt 갱신 포함)가 발생한다 — GET은 순수 읽기여야 한다.
@@ -332,6 +347,11 @@ describe('ProfileService activitySummary', () => {
         .mockResolvedValueOnce([reverseReview]);
 
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([{ teamId: 'team-1' }]) },
         v1PostEventReview: { findMany },
         v1MatchParticipant: {
@@ -343,14 +363,14 @@ describe('ProfileService activitySummary', () => {
 
       const result = await service.activitySummary(user);
 
-      // sourceType='match' — 대회 개인 후기(tournament_fixture)는 V1UserReputationSummary의
-      // tournament_* 컬럼에 따로 집계되므로 이 헤드라인 평점 모집단에 섞이면 안 된다.
+      // 개인 매치와 공식 팀 매치의 개인 후기는 같은 사용자 평판 모집단이다.
+      // 대회 개인 후기(tournament_fixture)는 별도 tournament_* 집계이므로 포함하지 않는다.
       expect(findMany).toHaveBeenNthCalledWith(1, {
-        where: { targetUserId: user.id, targetType: 'user', status: 'submitted', sourceType: 'match' },
+        where: { targetUserId: user.id, targetType: 'user', status: 'submitted', sourceType: { in: ['match', 'team_match'] } },
         select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
       });
       expect(findMany).toHaveBeenNthCalledWith(2, {
-        where: { reviewerUserId: user.id, sourceType: 'match', sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
+        where: { reviewerUserId: user.id, sourceType: { in: ['match', 'team_match'] }, sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
         select: { sourceId: true, reviewerUserId: true, targetUserId: true },
       });
       expect(result.totals).toEqual({ activityCount: 7, teamCount: 1, mannerScore: 5 });
@@ -374,6 +394,11 @@ describe('ProfileService activitySummary', () => {
       };
       const findMany = jest.fn().mockResolvedValueOnce([hiddenReview]).mockResolvedValueOnce([]);
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany },
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
@@ -409,6 +434,11 @@ describe('ProfileService activitySummary', () => {
       // reverse 조회 결과는 비어있음 — 상대가 끝까지 반대 방향 리뷰를 제출하지 않았지만, 시간 경과만으로 공개됨
       const findMany = jest.fn().mockResolvedValueOnce([staleRevealedReview]).mockResolvedValueOnce([]);
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany },
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
@@ -438,9 +468,15 @@ describe('ProfileService tournament appearance aggregation', () => {
     currentOfficialRevisionId: string | null;
     officialAt: Date | null;
     tournamentId?: string | null;
+    canonicalTournamentId?: string | null;
+    canonicalLeagueId?: string | null;
+    canonicalKind?: 'regular_tournament' | 'regular_league' | null;
+    legacy?: boolean;
   }) {
-    // sourceType 은 select 에 없다 — where 가 이미 TOURNAMENT_FIXTURE 로 좁히므로
-    // 서비스가 그 필드를 읽지 않는다(위 TEAM_MATCH 테스트가 where 쪽을 검증한다).
+    const sourceType = config.legacy === true ? 'TOURNAMENT_FIXTURE' : 'TEAM_MATCH';
+    const canonicalTournamentId = config.canonicalTournamentId === undefined
+      ? `${config.gameId}-tournament`
+      : config.canonicalTournamentId;
     const tournamentId = config.tournamentId === undefined ? `${config.gameId}-tournament` : config.tournamentId;
     return {
       resultRevision: {
@@ -449,7 +485,24 @@ describe('ProfileService tournament appearance aggregation', () => {
         officialAt: config.officialAt,
         game: {
           currentOfficialRevisionId: config.currentOfficialRevisionId,
-          tournamentFixture: tournamentId === null ? null : { tournamentId },
+          sourceType,
+          teamMatch: config.legacy === true
+            ? undefined
+            : {
+                id: `${config.gameId}-team-match`,
+                leagueId: config.canonicalLeagueId ?? null,
+                tournamentId: canonicalTournamentId,
+                tournament: canonicalTournamentId === null
+                  ? null
+                  : { kind: config.canonicalKind ?? 'regular_tournament' },
+                tournamentDetails: canonicalTournamentId === null
+                  ? null
+                  : {
+                      teamMatchId: `${config.gameId}-team-match`,
+                      tournamentId: canonicalTournamentId,
+                    },
+              },
+          tournamentFixture: config.legacy === true && tournamentId !== null ? { tournamentId } : undefined,
         },
       },
     };
@@ -460,6 +513,11 @@ describe('ProfileService tournament appearance aggregation', () => {
     try {
       const gameResultParticipantFindMany = jest.fn();
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValueOnce(3).mockResolvedValueOnce(1) },
@@ -484,7 +542,7 @@ describe('ProfileService tournament appearance aggregation', () => {
       const rows = [
         // 현재 공식 리비전 + 이번 달 → total, monthly 모두 카운트
         gameResultRow({
-          gameId: 'game-1',
+        gameId: 'game-1',
           revisionId: 'revision-1-current',
           currentOfficialRevisionId: 'revision-1-current',
           officialAt: new Date('2026-08-10T00:00:00Z'),
@@ -510,8 +568,22 @@ describe('ProfileService tournament appearance aggregation', () => {
           currentOfficialRevisionId: 'revision-4-current',
           officialAt: new Date('2026-07-20T00:00:00Z'),
         }),
+        // legacy fixture rows are still present in the transitional database, but must not
+        // re-enter the canonical profile activity aggregate.
+        gameResultRow({
+          gameId: 'game-legacy-fixture',
+          revisionId: 'revision-legacy-current',
+          currentOfficialRevisionId: 'revision-legacy-current',
+          officialAt: new Date('2026-08-12T00:00:00Z'),
+          legacy: true,
+        }),
       ];
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(0) },
@@ -533,7 +605,7 @@ describe('ProfileService tournament appearance aggregation', () => {
           participantId: { in: ['participant-1'] },
           resultRevision: {
             officialAt: { not: null },
-            game: { sourceType: 'TOURNAMENT_FIXTURE' },
+            game: { sourceType: 'TEAM_MATCH' },
           },
         },
         select: {
@@ -545,7 +617,16 @@ describe('ProfileService tournament appearance aggregation', () => {
               game: {
                 select: {
                   currentOfficialRevisionId: true,
-                  tournamentFixture: { select: { tournamentId: true } },
+                  sourceType: true,
+                  teamMatch: {
+                    select: {
+                      id: true,
+                      leagueId: true,
+                      tournamentId: true,
+                      tournament: { select: { kind: true } },
+                      tournamentDetails: { select: { teamMatchId: true, tournamentId: true } },
+                    },
+                  },
                 },
               },
             },
@@ -557,12 +638,9 @@ describe('ProfileService tournament appearance aggregation', () => {
     }
   });
 
-  it('activitySummary(): TEAM_MATCH(팀 매치) 결과가 섞이지 않도록 쿼리에서 sourceType 을 제한한다', async () => {
-    // 레거시 2자 승인 API(identity-link-requests + attest)는 sourceType 검사 없이
-    // TEAM_MATCH 게임 참가자에도 identity link 를 걸 수 있다 — "대회 경기 출전 수"는
-    // TOURNAMENT_FIXTURE 만 세어야 한다(확정 계약). 걸러내는 주체가 DB(where)이므로
-    // 이 테스트는 "그 필터가 쿼리에 실려 나가는가"를 본다 — 필터를 빼면 TEAM_MATCH 행이
-    // 그대로 합산되고 이 단언이 깨진다.
+  it('activitySummary(): 공식 대회와 TEAM_MATCH 결과를 같은 개인 활동 경기로 집계한다', async () => {
+    // 공개 개인 기록과 마이페이지 활동의 경기 수가 서로 달라지지 않도록 두 공식 게임
+    // sourceType을 같은 쿼리 모집단으로 고정한다.
     jest.useFakeTimers().setSystemTime(now);
     try {
       const rows = [
@@ -574,6 +652,11 @@ describe('ProfileService tournament appearance aggregation', () => {
         }),
       ];
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(0) },
@@ -591,7 +674,10 @@ describe('ProfileService tournament appearance aggregation', () => {
       expect(prisma.v1GameResultParticipant.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            resultRevision: { officialAt: { not: null }, game: { sourceType: 'TOURNAMENT_FIXTURE' } },
+            resultRevision: {
+              officialAt: { not: null },
+              game: { sourceType: 'TEAM_MATCH' },
+            },
           }),
         }),
       );
@@ -619,6 +705,11 @@ describe('ProfileService tournament appearance aggregation', () => {
         }),
       ];
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
         v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
@@ -658,32 +749,138 @@ describe('ProfileService tournament appearance aggregation', () => {
           revisionId: 'revision-1-current',
           currentOfficialRevisionId: 'revision-1-current',
           officialAt: new Date('2026-08-10T00:00:00Z'),
+          tournamentId: null,
+          canonicalTournamentId: 'canonical-tournament-1',
+        }),
+        gameResultRow({
+          gameId: 'game-malformed-league-details',
+          revisionId: 'revision-malformed-league-details',
+          currentOfficialRevisionId: 'revision-malformed-league-details',
+          officialAt: new Date('2026-08-10T00:00:00Z'),
+          tournamentId: null,
+          canonicalTournamentId: 'canonical-tournament-1',
+          canonicalLeagueId: 'canonical-tournament-1',
+          canonicalKind: 'regular_league',
+        }),
+        gameResultRow({
+          gameId: 'game-friendly-team-match',
+          revisionId: 'revision-friendly-current',
+          currentOfficialRevisionId: 'revision-friendly-current',
+          officialAt: new Date('2026-08-11T00:00:00Z'),
+          tournamentId: null,
+          canonicalTournamentId: null,
+          canonicalKind: null,
         }),
       ];
       const prisma = {
+        // Task 155: publicProfile() 이 선수 카드를 함께 만든다 -- 카드 입력을 목에 두지
+        // 않으면 이 스펙이 검증하는 것과 무관한 이유로 죽는다. null 은 '카드는 만들어지되
+        // 아무 능력치도 열리지 않는' 최소 상태다.
+        v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
         v1User: { findFirst: jest.fn().mockResolvedValue(baseUser) },
         v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
-        v1TeamMembership: { count: jest.fn().mockResolvedValue(0) },
+        v1TeamMembership: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
         v1PostEventReview: { findMany: jest.fn().mockResolvedValue([]) },
         v1ParticipantIdentityLinkCurrent: {
-          // 사용자 단위/participant 단위 동의를 아예 조회하지 않는다 — 이 집계는 게이트 대상이 아니다.
-          findMany: jest.fn().mockResolvedValue([{ participantId: 'participant-1' }]),
+          findMany: jest
+            .fn()
+            .mockResolvedValue([{ participantId: 'participant-1', linkId: 'link-1', userId: targetUserId }]),
         },
         v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue(rows) },
-        v1UserRecordConsent: { findMany: jest.fn() },
-        v1ParticipantConsentSnapshot: { findMany: jest.fn() },
+        // Task 154 P2: publicProfile 이 최근 활동(경기별 상세)을 위해 동의를 **조회하게** 됐다.
+        // 그래서 "동의를 호출하지 않는다"는 예전 단언은 더 이상 계약을 정확히 표현하지 않는다 --
+        // 진짜 계약은 "출전 **횟수** 집계가 동의에 좌우되지 않는다" 이므로, 호출 여부(mechanism)
+        // 대신 결과(outcome)로 검증한다: 동의를 REVOKED 로 두고도 matchCount 가 그대로인지 본다.
+        // 이 편이 예전 단언보다 강하다 -- 구현이 동의를 조회하든 말든 집계가 흔들리면 잡힌다.
+        v1UserRecordConsent: {
+          // Task 155: 선수 카드가 동의 상태를 findUnique 로 읽는다(이 스펙의 findMany 와 별개 경로).
+          findUnique: jest.fn().mockResolvedValue(null),
+          findMany: jest.fn().mockResolvedValue([{ userId: targetUserId, state: 'REVOKED' }]),
+        },
+        v1ParticipantConsentSnapshot: { findMany: jest.fn().mockResolvedValue([]) },
+        v1GameParticipant: { findUnique: jest.fn().mockResolvedValue(null) },
+        v1GameSide: { findUnique: jest.fn().mockResolvedValue(null) },
       };
       const service = new ProfileService(prisma as never);
 
       const result = await service.publicProfile(null, targetUserId);
 
-      expect(result.activitySummary.totals.matchCount).toBe(1);
-      expect(result.activitySummary.monthly.matchCount).toBe(1);
-      expect(prisma.v1UserRecordConsent.findMany).not.toHaveBeenCalled();
-      expect(prisma.v1ParticipantConsentSnapshot.findMany).not.toHaveBeenCalled();
+      // 동의가 REVOKED 인데도 출전 **횟수**는 그대로다 -- 이 집계는 게이트 대상이 아니다
+      // (사용자 결정: 총계 숫자 하나는 개별 경기 상세와 노출 수준이 다르다).
+      expect(result.activitySummary.totals.matchCount).toBe(3);
+      expect(result.activitySummary.monthly.matchCount).toBe(3);
+      expect(result.activitySummary.totals.tournamentCount).toBe(1);
+      expect(result.activitySummary.monthly.tournamentCount).toBe(1);
+      // 반대로 경기별 상세(최근 활동)는 같은 REVOKED 에 막혀야 한다 -- 두 노출 수준이
+      // 실제로 분리돼 있음을 여기서 함께 고정한다.
+      expect(result.recentActivity).toBeNull();
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+/**
+ * alpha 실측(2026-08-24)에서 잡은 회귀. bio 는 DB 에 저장됐는데 `toProfilePayload` 가
+ * 그 필드를 안 실어 보내서, `PATCH /me/profile` 응답과 `GET /me/profile` 둘 다 값을
+ * 돌려주지 않았다. 프론트는 그 응답으로 캐시를 갱신하고 편집 폼 초깃값을 채우므로,
+ * **저장 직후 편집 화면에 다시 들어가면 방금 쓴 소개가 비어 보였다**(DB 엔 남아 있는데).
+ *
+ * 공개 프로필에는 별도 경로로 나갔기 때문에 "저장은 됐다"는 착시가 생겨 더 늦게 발견된다.
+ */
+describe('ProfileService 내 프로필 응답의 bio 왕복', () => {
+  function buildMePrisma(bio: string | null) {
+    return {
+      v1TeamMembership: { findMany: jest.fn().mockResolvedValue([]) },
+      v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
+      v1User: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'user-1',
+          email: 'a@b.test',
+          phone: null,
+          emailVerifiedAt: null,
+          phoneVerifiedAt: null,
+          accountStatus: 'active',
+          onboardingStatus: 'completed',
+          themePreference: 'system',
+          profile: {
+            nickname: '테스트닉',
+            displayName: null,
+            realName: null,
+            profileImageUrl: null,
+            birthDate: null,
+            gender: 'male',
+            bio,
+          },
+          regions: [],
+          sportPreferences: [],
+          reputationSummary: null,
+          authIdentities: [],
+        }),
+      },
+    };
+  }
+
+  const authUser = {
+    id: 'user-1',
+    email: 'a@b.test',
+    accountStatus: 'active',
+    onboardingStatus: 'completed',
+  } as never;
+
+  it('저장한 bio 를 응답으로 다시 돌려준다', async () => {
+    const service = new ProfileService(buildMePrisma('풋살 좋아하는 미드필더예요.') as never);
+    const result = await service.me(authUser);
+    expect(result.profile.bio).toBe('풋살 좋아하는 미드필더예요.');
+  });
+
+  it('bio 가 없으면 키를 빼지 않고 null 로 내려준다', async () => {
+    // undefined 로 새면 JSON 직렬화에서 키 자체가 사라져, 클라이언트가 "필드를 모르는
+    // 옛 서버"와 "값이 비어 있음"을 구분하지 못한다.
+    const service = new ProfileService(buildMePrisma(null) as never);
+    const result = await service.me(authUser);
+    expect(result.profile).toHaveProperty('bio');
+    expect(result.profile.bio).toBeNull();
   });
 });
 
@@ -741,9 +938,16 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
     return {
       v1User: { findFirst: jest.fn().mockResolvedValue(baseUser) },
       v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
-      v1TeamMembership: { count: jest.fn().mockResolvedValue(0) },
+      v1TeamMembership: { count: jest.fn().mockResolvedValue(0), findMany: jest.fn().mockResolvedValue([]) },
       v1PostEventReview: { findMany },
       v1ParticipantIdentityLinkCurrent: { findMany: jest.fn().mockResolvedValue([]) },
+      // Task 154 P2: 연결이 0개면 최근 활동 조회는 즉시 null 로 끝나지만, 방어적으로 둔다.
+      v1GameResultParticipant: { findMany: jest.fn().mockResolvedValue([]) },
+      // Task 155: publicProfile() 이 선수 카드도 함께 만든다. 이 describe 가 검증하는 것은
+      // 후기 reveal 필터라 카드는 무관하지만, 입력이 없으면 카드 계산에서 죽는다.
+      // null 은 '카드는 만들어지되 아무 능력치도 열리지 않는' 최소 상태다.
+      v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+      v1UserRecordConsent: { findUnique: jest.fn().mockResolvedValue(null) },
     };
   }
 
@@ -837,9 +1041,9 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
 
       expect(result.activitySummary.monthly.reviewCount).toBe(1);
       expect(prisma.v1PostEventReview.findMany).toHaveBeenCalledWith({
-        // 월별 개수도 헤드라인 평점과 같은 모집단(개인 매치)이어야 한다 — 한쪽만 대회 후기를
+        // 월별 개수도 헤드라인 평점과 같은 모집단(개인/공식 팀 매치)이어야 한다 — 한쪽만 대회 후기를
         // 더하면 "이번 달 3건인데 누적은 1건" 같은 어긋난 숫자가 한 화면에 함께 나온다.
-        where: { reviewerUserId: targetUserId, sourceType: 'match', sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
+        where: { reviewerUserId: targetUserId, sourceType: { in: ['match', 'team_match'] }, sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
         select: { sourceId: true, reviewerUserId: true, targetUserId: true },
       });
     } finally {
@@ -890,16 +1094,38 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
             officialAt: now,
             game: {
               currentOfficialRevisionId: `${gameId}-revision`,
-              tournamentFixture: { tournamentId },
+              sourceType: 'TEAM_MATCH',
+              teamMatch: {
+                id: `${gameId}-team-match`,
+                leagueId: null,
+                tournamentId,
+                tournament: { kind: 'regular_tournament' },
+                tournamentDetails: {
+                  teamMatchId: `${gameId}-team-match`,
+                  tournamentId,
+                },
+              },
             },
           },
         };
       }
       const prisma = {
+        // 카드 입력(v1UserReputationSummary/v1UserRecordConsent)은 buildPrisma() 가 이미 준다.
         ...buildPrisma(),
         v1ParticipantIdentityLinkCurrent: {
-          findMany: jest.fn().mockResolvedValue([{ participantId: 'participant-1' }]),
+          // linkId/userId 는 최근 활동 조회(loadParticipantConsentEligibility)가 select 한다.
+          findMany: jest
+            .fn()
+            .mockResolvedValue([{ participantId: 'participant-1', linkId: 'link-1', userId: targetUserId }]),
         },
+        // Task 154 P2: 최근 활동은 동의 게이트를 탄다. 이 스펙의 관심사는 출전 수 집계이므로
+        // 동의 없음(=최근 활동 null)으로 두고 집계만 본다.
+        // Task 155: 선수 카드는 동의 상태를 findUnique 로 읽는다(참가자 스냅샷용 findMany 와 별개 경로).
+        v1UserRecordConsent: {
+          findMany: jest.fn().mockResolvedValue([]),
+          findUnique: jest.fn().mockResolvedValue(null),
+        },
+        v1ParticipantConsentSnapshot: { findMany: jest.fn().mockResolvedValue([]) },
         v1GameResultParticipant: {
           findMany: jest.fn().mockResolvedValue([
             row('game-1', 'tournament-1'),
@@ -945,6 +1171,8 @@ describe('ProfileService withdrawal admin lockout', () => {
       },
       v1Team: { update: jest.fn().mockResolvedValue({}) },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
+      v1PushSubscription: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      v1PushDevice: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       $queryRaw: jest.fn().mockResolvedValue([]),
       v1TournamentPlayer: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
       $transaction: jest.fn(),
@@ -1009,6 +1237,13 @@ describe('ProfileService withdrawal admin lockout', () => {
       where: { id: user.id },
       data: { accountStatus: 'withdrawal_pending' },
     });
+    expect(prisma.v1PushSubscription.deleteMany).toHaveBeenCalledWith({
+      where: { userId: user.id },
+    });
+    expect(prisma.v1PushDevice.updateMany).toHaveBeenCalledWith({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
   });
 
   it('rejects when the transaction-time account status is no longer active', async () => {
@@ -1062,5 +1297,36 @@ describe('ProfileService withdrawal admin lockout', () => {
         }),
       }),
     );
+  });
+});
+
+describe('ProfileService logout — 웹 푸시 구독 정리', () => {
+  // 로그아웃이 서버 쪽 V1PushSubscription row 를 지우지 않으면, 로그아웃한 계정 앞으로
+  // 오는 알림(채팅 원문 포함)이 그 기기에 계속 도착하고, 같은 기기에 다음에 로그인한
+  // 사용자는 서버 구독이 없는데도 브라우저 pushManager 구독이 남아 '켜짐'으로 보인다.
+  function createPrisma() {
+    return {
+      v1PushSubscription: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+  }
+
+  it('인증된 사용자로 로그아웃하면 그 사용자의 모든 웹 푸시 구독을 지운다', async () => {
+    const prisma = createPrisma();
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    await expect(service.logout(user)).resolves.toEqual({ ok: true });
+
+    expect(prisma.v1PushSubscription.deleteMany).toHaveBeenCalledWith({ where: { userId: user.id } });
+  });
+
+  it('세션이 이미 무효라 사용자를 식별할 수 없어도(OptionalV1AuthGuard 결과 undefined) 에러 없이 성공한다', async () => {
+    const prisma = createPrisma();
+    const service = new ProfileService(prisma as unknown as PrismaService);
+
+    await expect(service.logout(undefined)).resolves.toEqual({ ok: true });
+
+    expect(prisma.v1PushSubscription.deleteMany).not.toHaveBeenCalled();
   });
 });

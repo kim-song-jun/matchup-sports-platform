@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useV1Notice, useV1Notices } from '@/hooks/use-v1-api';
-import type { V1Notice } from '@/types/api';
+import type { V1Notice, V1NoticeResponse } from '@/types/api';
 import { toNotice } from './notices.format';
 import { NoticeDetailPageView, NoticeListPageView } from './notices-page';
 import type { NoticeDetailViewModel, NoticeListViewModel, NoticeModel } from './notices.types';
@@ -50,8 +50,8 @@ export function NoticeListPageClient() {
   return <NoticeListPageView model={model} />;
 }
 
-export function NoticeDetailPageClient({ noticeId }: { noticeId: string }) {
-  const query = useV1Notice(noticeId);
+export function NoticeDetailPageClient({ noticeId, seed }: { noticeId: string; seed?: V1NoticeResponse | null }) {
+  const query = useV1Notice(noticeId, { seed });
   const fallback = getNoticeDetailViewModel(noticeId);
 
   const status: NoticeDetailViewModel['status'] = query.isPending

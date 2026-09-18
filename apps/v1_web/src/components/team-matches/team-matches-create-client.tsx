@@ -131,7 +131,8 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   };
 
   // #1·#2 결정의 공유 소스: 이 ctx로 스텝 게이팅과 최종 제출 결측 필드 안내를 둘 다 계산한다.
-  const validationCtx = { hostTeamId: selectedTeamId, sportId: selectedSportId, regionId, draft };
+  const hasEligibleSelectedTeam = creatableTeams.some((team) => team.teamId === selectedTeamId);
+  const validationCtx = { hostTeamId: hasEligibleSelectedTeam ? selectedTeamId : '', sportId: selectedSportId, regionId, draft };
   const fieldErrors = attempted ? getTeamMatchStepErrors(validationCtx, step) : {};
   const missingFields = attempted && step === 'confirm' ? getTeamMatchMissingFields(validationCtx) : [];
   const completeSteps = getCompleteTeamMatchSteps(validationCtx, CREATE_STEP_ORDER);
@@ -166,6 +167,10 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     selectedSportId,
     regionId,
     isLoadingTeams: teams.isLoading,
+    teamLoadError: teams.isError ? {
+      message: extractErrorMessage(teams.error, '팀 목록을 불러오지 못했어요.'),
+      onRetry: () => { void teams.refetch(); },
+    } : undefined,
     teams: allMyTeams.map((team) => ({
       id: team.teamId,
       name: team.name,
@@ -209,8 +214,8 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     onBack: () => router.push(previousHref(step)),
     onGoToStep: handleGoToStep,
     onNext: () => {
-      // #1: "다음"은 절대 disabled 처리하지 않는다 — 대신 클릭 시 이 스텝의 필수 필드만 로컬
-      // 검증해 비어 있으면 이동을 막고, 인라인 에러 + 첫 invalid 필드로 focus를 옮긴다.
+      // 팀 스텝의 데이터 준비·권한 게이트는 TeamMatchCreatePageView의 disabled CTA와
+      // 이 방어 가드가 함께 보장한다. 그 외 스텝은 클릭 시 필수 필드를 로컬 검증한다.
       const errors = getTeamMatchStepErrors(validationCtx, step);
       const firstInvalidField = Object.keys(errors)[0];
       if (firstInvalidField) {
@@ -269,6 +274,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
 
 export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }) {
   const router = useRouter();
+  const { confirm, ConfirmModal } = useConfirm();
   const editQuery = useV1TeamMatchEdit(teamMatchId);
   const teams = useV1MyTeams();
   const sports = useV1MasterSports();
@@ -374,8 +380,19 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
         },
       );
     },
-    onCancel: () => {
+    onCancel: async () => {
       if (updateTeamMatch.isPending || cancelTeamMatch.isPending) return;
+      // 되돌리는 API가 없는 파괴적 동작 — 신청자 전원이 cancelled_by_host로 넘어가고
+      // 알림도 나간다. '변경사항 저장' 바로 아래 붙은 버튼이라 오탭 가능성이 높으므로
+      // 확인 없이 즉시 실행하지 않는다.
+      const ok = await confirm({
+        title: '팀매치를 취소할까요?',
+        message: '취소하면 되돌릴 수 없어요. 신청자 전원의 참가가 취소되고 취소 알림이 발송돼요.',
+        confirmLabel: '팀매치 취소',
+        tone: 'danger',
+      });
+      if (!ok) return;
+      setError(null);
       cancelTeamMatch.mutate(
         { reason: 'host_cancelled_from_v1_web' },
         {
@@ -388,7 +405,12 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
     backHref: `/team-matches/${teamMatchId}`,
   });
 
-  return <TeamMatchCreatePageView model={model} />;
+  return (
+    <>
+      <TeamMatchCreatePageView model={model} />
+      {ConfirmModal}
+    </>
+  );
 }
 
 function buildCreateModel({
@@ -420,6 +442,7 @@ function buildCreateModel({
   missingFields,
   completeSteps,
   recentVenues,
+  teamLoadError,
 }: {
   step: TeamMatchCreateStep;
   draft: TeamMatchDraft;
@@ -427,6 +450,7 @@ function buildCreateModel({
   selectedSportId: string;
   regionId: string;
   isLoadingTeams?: boolean;
+  teamLoadError?: { message: string; onRetry: () => void };
   teams: Array<{ id: string; name: string; sport: string; members: number; role: string; disabled?: boolean }>;
   sports: Array<{ id: string; name: string }>;
   regions: Array<{ id: string; name: string; shortName?: string; parentName?: string }>;
@@ -464,6 +488,7 @@ function buildCreateModel({
     selectedTeam: selectedTeam?.name ?? '',
     selectedSport: selectedSport?.name ?? '',
     isLoadingTeams,
+    teamLoadError,
     teams: teams.map((team) => ({ name: team.name, sport: team.sport, members: team.members, role: team.role, selected: team.id === selectedTeamId, disabled: team.disabled })),
     sports: sports.map((sport) => sport.name),
     draft,
@@ -534,8 +559,21 @@ function buildDefaultDraft(): TeamMatchDraft {
 }
 
 function normalizeDraftDate(draft: TeamMatchDraft): TeamMatchDraft {
-  const startsAt = new Date(`${draft.date}T${draft.startTime || '18:00'}:00`);
-  if (!Number.isNaN(startsAt.getTime()) && startsAt > new Date()) return draft;
+  // 위저드 각 스텝은 별도 라우트라 '이전'만 눌러도 이 컴포넌트가 재마운트되고, 그때마다
+  // usePersistedDraft의 useEffect가 이 함수를 다시 태운다. 시작 시간을 아직 입력하지 않은
+  // 상태(startTime === '')에서 빈 값을 18:00으로 가정해 판정하면, 저녁 18시 이후에 스텝만
+  // 왕복해도 "오늘"이 이미 지난 시각으로 오판돼 사용자가 고른 날짜가 조용히 일주일 뒤로
+  // 리셋된다(같은 세션 안의 정상 왕복인데도). 시작 시간이 아직 없으면 시:분이 아니라
+  // 날짜(당일 자정 기준) 단위로만 지난 초안인지 판단한다 — 오늘 이후는 전부 유효.
+  if (draft.startTime) {
+    const startsAt = new Date(`${draft.date}T${draft.startTime}:00`);
+    if (!Number.isNaN(startsAt.getTime()) && startsAt > new Date()) return draft;
+  } else {
+    const dateOnly = new Date(`${draft.date}T00:00:00`);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    if (!Number.isNaN(dateOnly.getTime()) && dateOnly >= todayStart) return draft;
+  }
 
   const fallback = buildDefaultDraft();
   return {

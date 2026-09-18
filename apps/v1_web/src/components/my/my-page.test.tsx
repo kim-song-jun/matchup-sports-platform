@@ -84,8 +84,10 @@ describe('MyInvitationsPageView — 받은 초대 아이템별 처리 상태', (
 
     render(<MyInvitationsPageView model={model} />);
 
-    expect(screen.getByText('초대 목록을 불러오지 못했어요')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('다시 시도'));
+    // 2026-09-04 감사: 오류를 EmptyState(회색 인박스, role 없음)로 그리던 것을 ErrorState 로 바꿨다 —
+    // 스크린리더가 오류로 읽도록 role="alert" 를 함께 못박는다.
+    expect(screen.getByRole('alert')).toHaveTextContent('초대 목록을 불러오지 못했어요');
+    fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });

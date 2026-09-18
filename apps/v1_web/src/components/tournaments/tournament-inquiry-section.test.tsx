@@ -83,6 +83,31 @@ describe('TournamentInquirySection', () => {
     );
   });
 
+  it('경기 결과 화면은 기존 문의 폼에 match 관련 대상을 전달한다', () => {
+    hookMocks.authMode = 'authenticated';
+    render(
+      <TournamentInquirySection
+        tournamentId="tournament-1"
+        tournamentTitle="알파 풋살 컵"
+        relatedType="team_match"
+        relatedId="fixture-1"
+        targetLabel="경기"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '문의하기' }));
+    expect(screen.getByRole('heading', { name: '경기 문의하기' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '문의 유형' })).toHaveValue('result');
+    fireEvent.change(screen.getByLabelText('제목'), { target: { value: '기록 정정 문의' } });
+    fireEvent.change(screen.getByLabelText('내용'), { target: { value: '이 경기 기록을 확인해 주세요.' } });
+    fireEvent.click(screen.getByRole('button', { name: '문의 접수' }));
+
+    expect(hookMocks.mutate).toHaveBeenCalledWith(
+      expect.objectContaining({ relatedType: 'team_match', relatedId: 'fixture-1', title: '[경기 결과 정정] 기록 정정 문의' }),
+      expect.any(Object),
+    );
+  });
+
   it('비회원은 문의 폼 대신 로그인으로 이동하며 현재 대회 경로를 복귀 경로로 유지한다', () => {
     window.history.replaceState({}, '', '/tournaments/tournament-1');
     renderSection();

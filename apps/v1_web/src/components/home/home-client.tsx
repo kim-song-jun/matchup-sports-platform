@@ -2,17 +2,29 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useV1AuthMe, useV1ChatRooms, useV1Home } from '@/hooks/use-v1-api';
-import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
+import {
+  useV1AuthMe,
+  useV1ChatRooms,
+  useV1Home,
+  useV1RecordConsent,
+  useV1UpdateRecordConsent,
+} from '@/hooks/use-v1-api';
 import { v1Post } from '@/lib/api-client';
 import { trackEvent } from '@/lib/analytics';
-import { dismissPushNudge, shouldShowPushNudge } from '@/lib/session-storage';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import type { V1ResolveLocationResponse } from '@/types/api';
 import { HomePageView } from './home-page';
-import { toHomeChatRooms, toHomeModel, withoutHomeContent } from './home-client-model';
+import { EMPTY_WEATHER, toHomeChatRooms, toHomeModel, withoutHomeContent } from './home-client-model';
 import type { HomeViewModel } from './home.types';
 import { getHomeViewModel } from './home.view-model';
+import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
+import {
+  dismissRecordConsentNudge,
+  markRecordConsentNudgeSeen,
+  shouldShowRecordConsentNudge,
+} from '@/lib/session-storage';
+import { decideHomeBanners } from '@/lib/home-banner-policy';
+import { usePendingReviewsSummary } from '@/components/tournaments/pending-review-card';
 
 export function HomePageClient() {
   const router = useRouter();
@@ -32,38 +44,52 @@ export function HomePageClient() {
     refreshing: weatherRefreshing,
     refresh: refreshWeather,
   } = useCurrentLocationWeather();
-  const pushRegistration = useV1PushRegistration();
-  const [pushNudgeSubscribing, setPushNudgeSubscribing] = useState(false);
-  const [pushNudgeDismissed, setPushNudgeDismissed] = useState(true);
+  // ─── 경기 기록 공개 동의 넛지 (Task 154 P0-3) ────────────────────────────────
+  //
+  // 노출 조건이 까다로운 이유: 켜도 아무것도 안 보이는 사람에게 조르면 켜고 나서
+  // 화면이 그대로라 신뢰만 잃는다. 그래서 서버가 계산한 `pendingRecordCount`(지금 켜면
+  // 공개될 경기 수)가 1 이상일 때만 뜬다. `hasResponded` 로 "명시적 거부"와 "아직 안
+  // 물어봄"을 구분해, 한 번 끈 사람은 다시 조르지 않는다.
+  const recordConsent = useV1RecordConsent();
+  const updateRecordConsent = useV1UpdateRecordConsent();
+  const [recordNudgeDismissed, setRecordNudgeDismissed] = useState(true);
   useEffect(() => {
-    setPushNudgeDismissed(!shouldShowPushNudge());
+    setRecordNudgeDismissed(!shouldShowRecordConsentNudge());
   }, []);
-  const showPushNudge =
+  const recordPendingCount = recordConsent.data?.pendingRecordCount ?? 0;
+  const showRecordConsentNudge =
     isAuthenticated &&
     onboardingCompleted &&
-    !pushNudgeDismissed &&
-    pushRegistration.permission === 'default' &&
-    !pushRegistration.isSubscribed;
-  const pushNudge = showPushNudge
+    !recordNudgeDismissed &&
+    // 옛 서버 응답에는 이 필드가 없다 -- 그때는 판단 근거가 없으므로 띄우지 않는다.
+    recordConsent.data?.hasResponded === false &&
+    recordPendingCount > 0;
+  // 실제로 렌더될 때만 횟수를 올린다(조건 미충족으로 안 뜬 회차는 세지 않는다).
+  useEffect(() => {
+    if (showRecordConsentNudge) markRecordConsentNudgeSeen();
+  }, [showRecordConsentNudge]);
+  const recordConsentNudge = showRecordConsentNudge
     ? {
-        subscribing: pushNudgeSubscribing,
-        onSubscribe: () => {
-          setPushNudgeSubscribing(true);
-          void pushRegistration.subscribe().then((subscribed) => {
-            if (subscribed) {
-              dismissPushNudge();
-              setPushNudgeDismissed(true);
-            }
-          }).finally(() => {
-            setPushNudgeSubscribing(false);
-          });
+        pendingCount: recordPendingCount,
+        saving: updateRecordConsent.isPending,
+        onGrant: () => {
+          updateRecordConsent.mutate(
+            { granted: true, policyHash: RECORD_CONSENT_POLICY_HASH },
+            {
+              onSuccess: () => {
+                dismissRecordConsentNudge();
+                setRecordNudgeDismissed(true);
+              },
+            },
+          );
         },
         onDismiss: () => {
-          dismissPushNudge();
-          setPushNudgeDismissed(true);
+          dismissRecordConsentNudge();
+          setRecordNudgeDismissed(true);
         },
       }
     : undefined;
+
   // 인증을 마칠 때까지 계속 보이는 상시 배너 — 닫을 수 있게 두면 한 번 닫은 사용자는
   // 왜 신청·등록이 막히는지 알 방법이 없어진다(조회는 열려 있어 화면상 정상으로 보인다).
   const phoneVerifyNudge =
@@ -72,6 +98,22 @@ export function HomePageClient() {
       : undefined;
   const fallback = getHomeViewModel();
   const chatUnreadCount = chatRooms.data?.items.reduce((sum, room) => sum + room.unreadCount, 0) ?? 0;
+  // ─── 홈 배너 표시 상한 (Task 154 P2-1) ──────────────────────────────────────
+  //
+  // 각 배너는 자기 조건만 보고 뜨므로, 조건이 겹치면 넷이 한꺼번에 쌓여 인사말·통계·
+  // 추천이 전부 접힘 아래로 밀린다. 어느 것을 이번 방문에 보여줄지 여기서 한 번에
+  // 정한다 -- 판정 자체는 순수 함수(lib/home-banner-policy.ts)라 테스트로 고정돼 있다.
+  //
+  // 후기 카드는 자기 데이터를 직접 가져와 0건이면 스스로 사라진다. 그 사실을 모르고
+  // 자리를 내주면 그 방문엔 유도 배너가 하나도 안 보이므로, 같은 훅으로 총계를 먼저
+  // 확인한다(React Query 가 dedupe 하므로 요청은 늘지 않는다).
+  const pendingReviews = usePendingReviewsSummary();
+  const bannerDecision = decideHomeBanners({
+    phoneVerify: phoneVerifyNudge !== undefined,
+    recordConsent: recordConsentNudge !== undefined,
+    pendingReviews: pendingReviews.total > 0,
+  });
+
   const chatStatus: HomeViewModel['chatStatus'] = !isAuthenticated ? 'ready' : chatRooms.isPending ? 'loading' : chatRooms.isError ? 'error' : 'ready';
   const chatRoomSummaries = chatRooms.data?.items ? toHomeChatRooms(chatRooms.data.items) : [];
   const nonDataFallback = withoutHomeContent(fallback);
@@ -87,7 +129,7 @@ export function HomePageClient() {
             chatUnreadCount,
             chatStatus,
             chatRooms: chatRoomSummaries,
-            weather: weather ?? fallback.weather,
+            weather: weather ?? EMPTY_WEATHER,
             weatherPermission,
             weatherRefreshing,
             refreshWeather,
@@ -112,11 +154,12 @@ export function HomePageClient() {
                 weatherPermission,
                 weatherRefreshing,
                 refreshWeather,
-                pushNudge,
+                recordConsentNudge,
+                bannerDecision,
                 phoneVerifyNudge,
                 chatRetry: () => void chatRooms.refetch(),
               }
-            : { ...nonDataFallback, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? fallback.weather, weatherPermission, weatherRefreshing, refreshWeather, phoneVerifyNudge, chatRetry: () => void chatRooms.refetch() }
+            : { ...nonDataFallback, statsLoading: true, chatUnreadCount, chatStatus, chatRooms: chatRoomSummaries, weather: weather ?? EMPTY_WEATHER, weatherPermission, weatherRefreshing, refreshWeather, phoneVerifyNudge, chatRetry: () => void chatRooms.refetch() }
         }
       />
     </>

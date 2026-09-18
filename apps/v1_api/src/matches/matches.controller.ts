@@ -9,7 +9,7 @@ import {
   CreateMatchApplicationDto,
   ListMatchApplicationsQueryDto,
 } from './dto/match-application.dto';
-import { CancelMatchDto, MutateMatchDto, UpdateMatchDto } from './dto/mutate-match.dto';
+import { CancelMatchDto, CloseMatchDto, MutateMatchDto, ReopenMatchDto, UpdateMatchDto } from './dto/mutate-match.dto';
 import { MatchesService } from './matches.service';
 
 @Controller('matches')
@@ -87,6 +87,12 @@ export class MatchesController {
     return this.matchesService.update(user, matchId, dto);
   }
 
+  @Post(':matchId/complete')
+  @UseGuards(V1AuthGuard)
+  complete(@CurrentUser() user: V1AuthUser, @Param('matchId') matchId: string) {
+    return this.matchesService.complete(user, matchId);
+  }
+
   @Post(':matchId/cancel')
   @UseGuards(V1AuthGuard)
   cancel(
@@ -95,5 +101,25 @@ export class MatchesController {
     @Body() dto: CancelMatchDto,
   ) {
     return this.matchesService.cancel(user, matchId, dto);
+  }
+
+  @Post(':matchId/close')
+  @UseGuards(V1AuthGuard)
+  close(
+    @CurrentUser() user: V1AuthUser,
+    @Param('matchId') matchId: string,
+    @Body() dto: CloseMatchDto,
+  ) {
+    return this.matchesService.close(user, matchId, dto);
+  }
+
+  @Post(':matchId/reopen')
+  @UseGuards(V1AuthGuard)
+  reopen(
+    @CurrentUser() user: V1AuthUser,
+    @Param('matchId') matchId: string,
+    @Body() dto: ReopenMatchDto,
+  ) {
+    return this.matchesService.reopen(user, matchId, dto);
   }
 }

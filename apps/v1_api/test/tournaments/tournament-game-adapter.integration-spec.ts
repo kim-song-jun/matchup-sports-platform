@@ -59,6 +59,10 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
         email: authUser.email,
         accountStatus: 'active',
         onboardingStatus: 'completed',
+        // 참가자 이름은 **닉네임이 먼저다**(`participantDisplayName`). 프로필이 없으면
+        // 그 규칙이 폴백으로 떨어져 이 스펙이 무엇을 재는지 흐려진다 — 여기서 재려는 건
+        // "대진 생성이 등록 명단의 그 사람을 참가자로 잇는가" 이고, 이름은 그 증거다.
+        profile: { create: { nickname: '어댑터닉' } },
       },
     });
     await prisma.v1AdminUser.create({
@@ -191,9 +195,10 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
       bracket.createFixture(authUser, ids.tournament, request),
       bracket.createFixture(authUser, ids.tournament, request),
     ]);
-    const fixture = await prisma.v1TournamentFixture.findUniqueOrThrow({
+    const fixture = await prisma.v1TeamMatch.findUniqueOrThrow({
       where: { id: first.id },
       include: {
+        tournamentDetails: true,
         game: {
           include: {
             sides: { orderBy: { sideKey: 'asc' } },
@@ -219,13 +224,15 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
         displayNameSnapshot: 'Task 6 Home',
       }),
     ]));
+    // **실명이 아니라 닉네임이다.** 두 명단 행이 같은 계정을 가리키므로 둘 다 같은 닉네임이
+    // 된다 — 실명(`Away Player`/`Home Player`)이 여기 나오면 규칙이 안 걸린 것이다.
     expect(fixture.game?.participants.map((participant) => participant.displayNameSnapshot)).toEqual([
-      'Away Player',
-      'Home Player',
+      '어댑터닉',
+      '어댑터닉',
     ]);
     expect(
-      await prisma.v1TournamentFixture.count({
-        where: { tournamentId: ids.tournament, round: 'group_a', fixtureNumber: 41 },
+      await prisma.v1TeamMatch.count({
+        where: { tournamentId: ids.tournament, tournamentDetails: { is: { round: 'group_a', fixtureNumber: 41 } } },
       }),
     ).toBe(1);
 
@@ -250,7 +257,7 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
       // 팀 미정으로 생성 — 결선 대진을 미리 깔아두는 실제 운영 흐름이다
     });
 
-    const before = await prisma.v1TournamentFixture.findUniqueOrThrow({
+    const before = await prisma.v1TeamMatch.findUniqueOrThrow({
       where: { id: created.id },
       include: { game: { include: { sides: { orderBy: { sideKey: 'asc' } } } } },
     });
@@ -261,9 +268,16 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
       awayRegistrationId: ids.awayRegistration,
     });
 
-    const after = await prisma.v1TournamentFixture.findUniqueOrThrow({
+    const after = await prisma.v1TeamMatch.findUniqueOrThrow({
       where: { id: created.id },
-      include: { game: { include: { sides: { orderBy: { sideKey: 'asc' } } } } },
+      include: {
+        game: {
+          include: {
+            sides: { orderBy: { sideKey: 'asc' } },
+            participants: true,
+          },
+        },
+      },
     });
     const home = after.game?.sides.find((side) => side.sideKey === V1GameSideKey.HOME);
     const away = after.game?.sides.find((side) => side.sideKey === V1GameSideKey.AWAY);
@@ -274,6 +288,23 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
     // 표시 이름도 "홈 팀 미정" 에서 실제 팀명으로 바뀌어야 한다
     expect(home?.displayNameSnapshot).not.toBe('홈 팀 미정');
     expect(away?.displayNameSnapshot).not.toBe('어웨이 팀 미정');
+
+    // 실사용자 발견 결함(2026-09-16): 사이드는 옮겨졌는데 참가자는 하나도 안 들어와서
+    // "라인업이 없어요"로 계속 남았다 — TBD 슬롯에 팀을 배정하는 것도 createFixture 의
+    // 최초 참가자 복사와 똑같이 그 팀의 확정 신청 명단을 채워 넣어야 한다.
+    const homeParticipants = after.game?.participants.filter((p) => p.sideId === home?.id) ?? [];
+    const awayParticipants = after.game?.participants.filter((p) => p.sideId === away?.id) ?? [];
+    expect(homeParticipants).toHaveLength(1);
+    expect(awayParticipants).toHaveLength(1);
+    expect(homeParticipants[0].userId).toBe(ids.user);
+    expect(awayParticipants[0].userId).toBe(ids.user);
+    // 여기도 실명이 아니라 닉네임이어야 한다.
+    expect(homeParticipants[0].displayNameSnapshot).toBe('어댑터닉');
+    expect(awayParticipants[0].displayNameSnapshot).toBe('어댑터닉');
+    const links = await prisma.v1ParticipantIdentityLinkCurrent.findMany({
+      where: { participantId: { in: [homeParticipants[0].id, awayParticipants[0].id] } },
+    });
+    expect(links.map((link) => link.userId).sort()).toEqual([ids.user, ids.user]);
   });
 
   it('rolls back the fixture when its tournament pin is not active', async () => {
@@ -288,16 +319,16 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
     expect((failure as ConflictException).getStatus()).toBe(409);
     expect(failure).toMatchObject({ response: { code: 'COMPETITION_CONFIG_REQUIRED' } });
     expect(
-      await prisma.v1TournamentFixture.count({
-        where: { tournamentId: ids.invalidTournament, fixtureNumber: 42 },
+      await prisma.v1TeamMatch.count({
+        where: { tournamentId: ids.invalidTournament, tournamentDetails: { is: { fixtureNumber: 42 } } },
       }),
     ).toBe(0);
-    expect(await prisma.v1Game.count({ where: { tournamentFixture: { tournamentId: ids.invalidTournament } } })).toBe(0);
+    expect(await prisma.v1Game.count({ where: { teamMatch: { tournamentId: ids.invalidTournament } } })).toBe(0);
   });
 
   it('rejects generic result create/delete without legacy rows, revisions, or events', async () => {
-    const fixture = await prisma.v1TournamentFixture.findFirstOrThrow({
-      where: { tournamentId: ids.tournament, round: 'group_a', fixtureNumber: 41 },
+    const fixture = await prisma.v1TeamMatch.findFirstOrThrow({
+      where: { tournamentId: ids.tournament, tournamentDetails: { is: { round: 'group_a', fixtureNumber: 41 } } },
       include: { game: true },
     });
     const createFailure = await captureFailure(() =>
@@ -313,7 +344,6 @@ describe('Task 6 L3 tournament fixture Game adapter', () => {
     expect(deleteFailure).toBeInstanceOf(ConflictException);
     expect((deleteFailure as ConflictException).getStatus()).toBe(409);
     expect(deleteFailure).toMatchObject({ response: { code: 'TOURNAMENT_RESULT_DERIVED_ONLY' } });
-    expect(await prisma.v1TournamentFixtureResult.count({ where: { fixtureId: fixture.id } })).toBe(0);
     expect(await prisma.v1GameResultRevision.count({ where: { gameId: fixture.game!.id } })).toBe(0);
     expect(await prisma.v1GameEvent.count({ where: { gameId: fixture.game!.id } })).toBe(0);
     console.log(

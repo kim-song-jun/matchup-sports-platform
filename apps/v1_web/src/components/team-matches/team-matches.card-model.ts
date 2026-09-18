@@ -1,0 +1,197 @@
+/**
+ * 팀매치 목록 화면이 API 응답(`V1TeamMatch`)을 카드 모델로 옮기는 순수 변환 로직.
+ *
+ * `matches.card-model.ts` 와 같은 이유로 `'use client'` 를 붙이지 않는다 — 팀매치 목록도
+ * 크롤러가 받는 HTML 이 비어 있었고, 서버 컴포넌트가 같은 변환을 돌려 첫 화면을 미리
+ * 그려야 한다.
+ */
+import { formatCardDate as formatDate, formatCardTime as formatTime } from '@/lib/date-utils';
+import type { TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
+import type { V1Sport, V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
+
+// 경기조건은 구조화 필드(matchFormat/matchStyle/uniformColor, levelLabel)가 진실이다. `fallback`은
+// 화면 스켈레톤용 하드코딩 목업(team-matches.view-model.ts)일 뿐 이 매치의 실제 조건이 아니므로
+// grade/format/style/uniform에는 쓰지 않는다 — 실제 매치에 다른 매치의 목업 문구("A등급",
+// "11:11" 등)를 그대로 노출하는 회귀였다(리뷰 지적).
+//
+// 백필 CLI 실행 전(구조화 컬럼 3종이 전부 비어 있는) 레거시 row는 서버가 만든 표시 전용 파생값인
+// rulesText(formatMatchConditionsRulesText, team-matches.service.ts 참고 — 그 케이스에서는
+// formatNote 원문을 그대로 담아 내려준다)를 style 한 칸에 그대로 보여준다. rulesText를 ' · '로
+// 재-split해 grade/format/style/uniform 네 칸에 다시 배정하지는 않는다(예전 parseRules가 이
+// 방식이었다) — 원래 저장 로직이 filter(Boolean)으로 빈 필드를 건너뛰고 이어붙여 위치를 보존하지
+// 않았기 때문에 재분해는 값을 엉뚱한 칸에 잘못 배정할 수 있다(team-match-conditions-backfill.ts
+// 문서 주석 참고, 동일한 근거). style 한 칸에 그대로 두면 값을 잃지도, 틀린 라벨을 붙이지도 않는다.
+// exported for direct unit coverage (see team-matches-client.test.tsx) — a pure mapping
+// function, cheaper to test directly than by plumbing new testids through the mocked
+// page-view component tree.
+
+export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamMatchModel {
+  const apiStatus = getStatus(match);
+  const status = statusToCardStatus(apiStatus, getViewerState(match));
+  const costs = parseCosts(match.costNote);
+  const hasStructuredConditions = Boolean(match.matchFormat) || (match.matchStyle?.length ?? 0) > 0 || Boolean(match.uniformColor);
+  const legacyNote = !hasStructuredConditions ? match.rulesText ?? '' : '';
+
+  return {
+    ...fallback,
+    id: match.teamMatchId ?? match.id ?? fallback.id,
+    title: match.title,
+    // image 도 목업의 폴백으로 쓰지 않는다(웨이브4, 2026-09-04) — 예전엔 `fallback.imageUrl`
+    // (목업 사진 team-huddle.webp/futsal-rooftop.webp)로 메워서 사진 없는 실제 팀매치에
+    // 다른 매치의 옥상 풋살 사진이 그대로 붙었다(matches.card-model.ts의 image와 같은 결함).
+    // 없으면 null 로 두고 화면이 종목 그래픽(sportIllustration)을 그린다.
+    imageUrl: match.imageUrl ?? null,
+    // 목업(team-matches.view-model.ts)을 사실 값의 폴백으로 쓰지 않는다 — 폴백이 걸리면
+    // 실제 매치에 **존재하지 않는 팀 이름**('FC 발빠른놈들')과 남의 경기장·지역이 붙었다.
+    sport: match.sport?.name ?? match.sportName ?? '',
+    hostTeam: match.hostTeam?.name ?? match.hostTeamName ?? (match.platformManaged ? 'Teameet 운영' : ''),
+    platformManaged: match.platformManaged ?? false,
+    venue: match.place?.name ?? match.placeName ?? '',
+    region: match.region?.name ?? match.regionName ?? '지역 미정',
+    date: formatDate(match.startsAt),
+    time: formatTime(match.startsAt),
+    endTime: match.endsAt ? formatTime(match.endsAt) : undefined,
+    grade: match.levelLabel || '',
+    format: match.matchFormat || '',
+    style: match.matchStyle?.length ? match.matchStyle.join(' · ') : legacyNote,
+    cost: costs.cost,
+    opponentCost: costs.opponentCost,
+    league: match.league ?? null,
+    opponentTeam: match.approvedOpponentTeam?.name ?? null,
+    uniform: match.uniformColor || '',
+    // **빈 값을 문자열로 채우지 않는다.** `'성별 미설정'` 을 넣으면 카드의
+    // `match.gender ? … : null` 가드가 **절대 안 걸려**, 성별을 안 정한 매치(리그 대진이
+    // 기본이다)에도 회색 배지가 항상 뜬다. 같은 파일이 매너·승·비용에서는 이미 "모르면
+    // null" 을 지키는데 성별만 어긋나 있었다.
+    // 상세는 `InfoRow` 가 빈 값을 '미정' 으로 그리므로 라벨 있는 자리에서는 뜻이 살아난다.
+    gender: match.genderRule ?? '',
+    // 매너 평점·승수는 이제 API 가 실제로 내려준다(hostTeam.mannerScore / hostTeam.wins —
+    // team-matches.service.ts 의 computeRevealedTeamTrustBatch · loadOfficialWinCounts).
+    // `...fallback` 스프레드에 맡겨두면 매치마다 다른 실제 팀인데도 항상 같은 목업
+    // (매너 4.8·승 23 등)이 그대로 노출됐다(실사고 원인) — 그래서 여기서 명시적으로 덮어쓴다.
+    // 값이 없으면(공개된 팀 후기가 0건 등) null 로 두고 화면이 '-' 를 그린다. 0 으로 채우면
+    // "매너 0점"이라는 새 거짓말이 된다.
+    manner: match.hostTeam?.mannerScore ?? null,
+    wins: match.hostTeam?.wins ?? null,
+    status,
+    closed: isClosedApiStatus(apiStatus),
+  };
+}
+
+export function buildSportChips({
+  base,
+  params,
+  sports,
+  matches,
+  selectedSportId,
+}: {
+  base: TeamMatchListViewModel;
+  params: URLSearchParams;
+  sports?: Array<{ id: string; name: string }>;
+  matches: V1TeamMatch[];
+  selectedSportId?: string;
+}): TeamMatchListViewModel['sports'] {
+  // 마스터 종목 목록이 없으면(서버 프리렌더 등) fallback 칩의 id 는 **라벨 문자열**이다.
+  // 그대로 sportId 쿼리에 넣으면 `?sportId=풋살` 같은 URL 이 HTML 에 나가는데, 실제 API 필터는
+  // ID 를 받으므로 아무 것도 걸리지 않는 링크다 — 크롤러가 그런 URL 을 수집하게 두지 않는다.
+  const hasMasterSportIds = Boolean(sports?.length);
+  const fixedSports = hasMasterSportIds
+    ? sports!.slice(0, 4)
+    : base.sports.slice(1, 5).map((sport) => ({ id: sport.label, name: sport.label }));
+
+  return [
+    {
+      label: base.sports[0]?.label ?? '전체',
+      count: matches.length,
+      active: !selectedSportId,
+      href: buildTeamMatchHref(params, { sportId: null, filter: null }),
+    },
+    ...fixedSports.map((sport) => ({
+      label: sport.name,
+      count: matches.filter((match) => {
+        const matchSport = match.sport;
+        return matchSport?.sportId === sport.id || matchSport?.name === sport.name || match.sportName === sport.name;
+      }).length,
+      active: hasMasterSportIds && selectedSportId === sport.id,
+      // ID 를 모르면 링크를 아예 붙이지 않는다 — 붙이면 '종목 필터'처럼 보이는데 눌러도
+      // 아무 필터가 걸리지 않는다(teams 목록과 같은 규약).
+      ...(hasMasterSportIds ? { href: buildTeamMatchHref(params, { sportId: sport.id, filter: null }) } : {}),
+    })),
+  ];
+}
+
+/**
+ * 목록 요약 줄의 지역 라벨 — 예전엔 실제 선택 여부와 무관하게 "서울 전체"를 그대로 하드코딩
+ * 했다(2026-09-04 발견, matches.view-model.ts 의 같은 하드코딩과 짝). 목록에는 아직 지역
+ * 필터가 없어 `selectedRegionName`은 지금은 항상 undefined지만, 값이 없는 상태를 지어낸
+ * "서울"이 아니라 정직하게 "전체"로 보여준다 — 나중에 지역 필터가 추가돼도 이 함수만
+ * 인자를 받으면 되고 호출부를 다시 고칠 필요가 없다.
+ */
+export function buildTeamMatchSummaryLabel(selectedRegionName?: string | null): string {
+  return `${selectedRegionName ?? '전체'} · 팀매치`;
+}
+
+export function buildTeamMatchHref(params: URLSearchParams, overrides: Record<string, string | null>) {
+  const next = new URLSearchParams(params.toString());
+  Object.entries(overrides).forEach(([key, value]) => {
+    if (value === null || value === '') next.delete(key);
+    else next.set(key, value);
+  });
+  const queryString = next.toString();
+  return queryString ? `/team-matches?${queryString}` : '/team-matches';
+}
+
+export function getStatus(match: V1TeamMatch): V1TeamMatchApiStatus {
+  const base = (match.displayState as V1TeamMatchApiStatus | undefined) ?? (match.status as V1TeamMatchApiStatus);
+  // 개인 매치 카드모델(matches.card-model.ts getStatus)과 같은 마감 폴백.
+  // 서버가 이미 displayState 로 같은 판정을 내려주지만, 그 필드를 싣지 않는 응답이
+  // 섞여도(실제로 GET /me/team-matches 가 그랬다) 카드가 마감된 팀매치를 '모집 중'으로
+  // 그리지 않게 한다 — 목록과 상세가 서로 다른 상태를 말하던 결함의 프론트 쪽 방어선.
+  if (base === 'recruiting') {
+    const deadline = match.deadlineAt ? new Date(match.deadlineAt) : null;
+    if (deadline && !Number.isNaN(deadline.getTime()) && deadline.getTime() < Date.now()) return 'closed';
+  }
+  return base;
+}
+
+/** 개인 매치와 같은 공개 목록 계약: 신청 가능 우선, 마감 하단, 그룹 내부 서버 순서 유지. */
+export function sortTeamMatchesByAvailability(items: V1TeamMatch[]): V1TeamMatch[] {
+  return items
+    .map((item, index) => ({ item, index, rank: statusToCardStatus(getStatus(item)) === 'open' ? 0 : 1 }))
+    .sort((left, right) => left.rank - right.rank || left.index - right.index)
+    .map(({ item }) => item);
+}
+
+export function getViewerState(match: V1TeamMatch): V1TeamMatchViewerState {
+  return match.viewer?.state ?? match.viewerState ?? 'none';
+}
+
+/**
+ * 매치가 더는 신청을 받지 않는 상태인지 — **보는 사람과 무관하게** API status 만 본다.
+ * `statusToCardStatus` 는 viewerState 를 먼저 보므로 호스트에게는 항상 'mine' 을 돌려준다.
+ * 그 때문에 호스트는 자기 매치가 마감돼도 목록에서 마감 표시를 못 봤다(2026-09-07).
+ */
+export function isClosedApiStatus(status: V1TeamMatchApiStatus): boolean {
+  return status === 'matched' || status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired';
+}
+
+export function statusToCardStatus(status: V1TeamMatchApiStatus, viewerState: V1TeamMatchViewerState = 'none'): TeamMatchModel['status'] {
+  if (viewerState === 'host_team') return 'mine';
+  if (viewerState === 'requested') return 'pending';
+  if (viewerState === 'approved') return 'approved';
+  if (isClosedApiStatus(status)) return 'closed';
+  return 'open';
+}
+
+export function parseCosts(value: string | null | undefined) {
+  const amounts = value?.match(/\d[\d,]*/g)?.map((item) => Number(item.replace(/,/g, ''))) ?? [];
+  // costNote가 없으면(호스트가 비용을 안 적었으면) 이 매치의 실제 비용은 "모른다"이지, 다른
+  // 목업 매치의 280,000원/140,000원이 아니다. 0으로 채우면 '무료초청' 배지가 붙어 "공짜다"라는
+  // 또 다른 거짓말이 되므로(리그 대진처럼 costNote가 항상 비는 매치가 통째로 무료초청으로
+  // 표시된다), 모르는 값은 null 로 두고 화면이 그 자리를 감추게 한다.
+  return {
+    cost: amounts[0] ?? null,
+    opponentCost: amounts[1] ?? null,
+  };
+}
+

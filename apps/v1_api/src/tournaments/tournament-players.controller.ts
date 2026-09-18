@@ -2,7 +2,11 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@n
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
-import { AddPlayerDto, UpdatePlayerEligibilityDto } from './dto/tournament-player.dto';
+import {
+  AddPlayerDto,
+  UpdatePlayerEligibilityDto,
+  UpdatePlayerJerseyDto,
+} from './dto/tournament-player.dto';
 import { TournamentPlayersService } from './tournament-players.service';
 
 // ─── 소비자/팀 라우트 ──────────────────────────────────────────────────────────
@@ -39,6 +43,30 @@ export class TournamentPlayersController {
     @Param('playerId') playerId: string,
   ) {
     return this.playersService.removePlayer(user, tournamentId, registrationId, playerId);
+  }
+
+  /**
+   * 등번호만 고친다 — 자격 판정(`PATCH :playerId`)과 **다른 경로**다.
+   *
+   * 등번호를 잘못 넣었을 때 예전엔 **선수를 지우고 다시 넣는 수밖에** 없었다
+   * (2026-09-04 alpha 실측). 그 우회는 명단 잠금 전에만 되고, 되살린 행의 자격 판정이
+   * `needs_review` 로 리셋되는 부작용도 있다.
+   */
+  @Patch(':playerId/jersey-number')
+  updatePlayerJersey(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Param('registrationId') registrationId: string,
+    @Param('playerId') playerId: string,
+    @Body() dto: UpdatePlayerJerseyDto,
+  ) {
+    return this.playersService.updatePlayerJersey(
+      user,
+      tournamentId,
+      registrationId,
+      playerId,
+      dto.jerseyNumber,
+    );
   }
 
   @Patch(':playerId')

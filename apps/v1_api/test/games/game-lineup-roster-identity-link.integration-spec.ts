@@ -28,8 +28,10 @@ import { PrismaService } from '../../src/prisma/prisma.service';
  *  5) userId를 아예 안 보내면 게스트 그대로 -- participant.userId는 null이고
  *     링크 행이 전혀 생기지 않는다.
  *
- * 3)/4)는 futsal-v1(minPlayers=3)의 최소 인원 안에서 게스트 필러로 채워
- * LINEUP_SIZE_INVALID와 뒤섞이지 않게 한다.
+ * 3)/4)는 futsal-v1(minPlayers=3)의 최소 인원 안에서 게스트 필러로 채운다.
+ * 원래는 `LINEUP_SIZE_INVALID` 와 뒤섞이지 않게 하려던 것인데, **Task 163 에서 그 게이트가
+ * 사라졌다** — 이제 인원은 저장을 막지 않는다. 필러 자체는 그대로 두는 게 낫다: 이 스펙이
+ * 보려는 건 신원 연결이고, 인원 구성을 바꾸면 그 관심사와 무관한 변수를 하나 늘린다.
  */
 
 const ids = {
@@ -152,7 +154,7 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
       ],
     });
     await prisma.v1Tournament.create({
-      data: { id: ids.tournament, sportId: ids.sport, title: 'Roster link tournament' },
+      data: { id: ids.tournament, sportId: ids.sport, title: 'Roster link tournament', competitionConfigVersionId: config.id },
     });
     await prisma.v1TournamentRegistration.createMany({
       data: [
@@ -160,15 +162,28 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
         { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.awayTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
       ],
     });
-    await prisma.v1TournamentFixture.create({
+    await prisma.v1TeamMatch.create({
       data: {
         id: ids.fixture,
         tournamentId: ids.tournament,
+        sportId: ids.sport,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.awayTeam,
+        title: 'Roster link match',
+        status: 'matched',
+        startAt: new Date(Date.now() - 60_000),
+        competitionConfigVersionId: config.id,
+      },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: ids.fixture,
+        tournamentId: ids.tournament,
         round: 'group',
         fixtureNumber: 1,
-        competitionConfigVersionId: config.id,
+        legNumber: 1,
         // team_manager 액터 경로(self 케이스)가 resolveActor에서 자기 팀
-        // 라인업 권한을 얻으려면 이 fixture의 homeRegistration이 hostTeam을
+        // 라인업 권한을 얻으려면 이 Details row가 hostTeam registration을
         // 가리켜야 한다.
         homeRegistrationId: ids.hostRegistration,
         awayRegistrationId: ids.awayRegistration,
@@ -176,7 +191,7 @@ describe('GamesService.saveLineup auto-links roster userIds via ROSTER_ASSERTED'
     });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: config.id,
       sides: [

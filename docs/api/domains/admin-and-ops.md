@@ -22,6 +22,7 @@
 | Method | Path | DTO / Query | 권한 | 용도 |
 |---|---|---|---|---|
 | `GET` | `/api/v1/admin/me` | - | active admin | 내 운영자 역할·capability |
+| `GET` | `/api/v1/admin/hub/inbox` | - | active admin | 처리할 대회 신청·결과 검토·문의·진행 중 대회 집계 |
 | `GET` | `/api/v1/admin/overview` | `AdminOverviewQueryDto` | active admin | 운영 현황 요약 |
 | `GET` | `/api/v1/admin/action-logs` | `AdminLogsQueryDto` | active admin | 관리자 액션 로그 |
 | `GET` | `/api/v1/admin/status-change-logs` | `AdminLogsQueryDto` | active admin | 상태 변경 로그 |
@@ -36,6 +37,9 @@
 | `GET` | `/api/v1/admin/teams/:teamId` | - | active admin | 팀 상세·활성 팀원 연락처/역할 목록 |
 | `POST` | `/api/v1/admin/teams/:teamId/status` | `ChangeTeamStatusDto` | owner/ops | 팀 상태 변경 |
 | `GET` | `/api/v1/admin/team-matches` | `AdminTeamMatchListQueryDto` | active admin | 팀 매치 목록 |
+| `GET` | `/api/v1/admin/team-matches/:teamMatchId` | — | active admin | 팀 매치 상세 — 상대팀 신청(최근 50건)·확정 상대팀·소속 리그·경기 조건 포함. 라이브 경기 상태는 현장 콘솔 소관이라 `hasGame` 여부만 준다 |
+| `POST` | `/api/v1/admin/team-matches` | `CreateAdminTeamMatchRecruitmentDto` | owner/ops | 팀을 지정하지 않은 플랫폼 팀매치 모집 생성 |
+| `POST` | `/api/v1/admin/team-matches/:teamMatchId/assign` | `AssignAdminTeamMatchApplicationsDto` | owner/ops | 신청 목록에서 홈·원정 두 팀을 선택해 경기 확정 |
 | `POST` | `/api/v1/admin/team-matches/:teamMatchId/status` | `ChangeTeamMatchStatusDto` | owner/ops | 팀 매치 상태 변경 |
 | `GET` | `/api/v1/admin/popups` | `AdminPopupListQueryDto` | active admin | 팝업 목록 |
 | `GET` | `/api/v1/admin/popups/:popupId` | - | active admin | 팝업 상세 |
@@ -169,6 +173,8 @@ type AdminListSummary = {
 ## 상태 변경 DTO
 
 - 매치 `ChangeMatchStatusDto`: `status=recruiting|closed|cancelled|completed|archived`, `reason` 필수(max 500).
+- 개인 매치를 `completed`로 바꾸면 일반 호스트 완료 API와 같은 트랜잭션 계약으로 현재 `active`
+  참가자도 `completed` 처리한다. 완료된 매치는 `archived` 외의 비종료 상태로 되돌릴 수 없다.
 - 팀 `ChangeTeamStatusDto`: `status=active|suspended|archived`, `reason` 필수(max 500).
 - 팀 매치 `ChangeTeamMatchStatusDto`: `status=recruiting|closed|matched|cancelled|completed|archived`, `reason` 필수(max 500).
 - 성공 시 대상 ID, 이전/신규 상태, action/status-change log ID를 반환한다.
@@ -250,3 +256,7 @@ type AdminListSummary = {
 - `apps/v1_api/src/admin/dto/admin-terms.dto.ts`
 - `apps/v1_api/prisma/migrations/20260719043000_v1_admin_active_account_invariant/migration.sql`
 - `apps/v1_web/src/hooks/use-v1-api.ts`
+
+## 대시보드 신청 집계
+
+`GET /api/v1/admin/hub/inbox`의 `pendingRegistrations`는 삭제되지 않은 대회(`regular_tournament` 또는 기존 `kind=null`)의 `awaiting_payment`, `payment_checking`, `paid`, `cancel_requested` 신청만 포함한다. 정규 리그 시즌은 `/admin/tournaments/:id/registrations`에서 조회할 수 없으므로 이 대회 전용 집계에 포함하지 않는다. 리그 신청은 `/admin/league-matches/:leagueId/registrations`에서 관리한다. 응답 필드와 관리자 권한 계약은 유지한다.

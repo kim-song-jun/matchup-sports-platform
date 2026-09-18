@@ -145,7 +145,7 @@ archive_failed_candidate() {
   local failed_path
 
   if [[ ! -f "${PROD_CANDIDATE_MANIFEST}" ]]; then
-    return
+    return 0
   fi
   failed_sha="$(jq -r '.release.sha // "unknown"' "${PROD_CANDIDATE_MANIFEST}")"
   failed_path="${PROD_FAILED_RELEASE_DIR}/${failed_sha}-$(date -u +%Y%m%dT%H%M%SZ).json"
@@ -209,6 +209,12 @@ check_prod_health_contract() {
   fi
   worker_container="$("${compose[@]}" ps -q v1_game_operations_worker)" || return 1
   [[ -n "${worker_container}" ]] || return 1
+  # docker inspect 가 읽는 Health.Status 는 docker-compose.prod.yml 의 healthcheck 스크립트가
+  # 정한다. 그 스크립트는 워커 /health 응답의 status(운영 알람용, POISONED 잡이 하나라도
+  # 남아 있으면 영구히 'degraded')가 아니라 deploymentStatus(새 잡을 받을 수 있는지만 보는
+  # 배포 전용 지표)를 본다 — 그래야 알려진 정상 경로(녹아웃 무승부 등)로 생긴 POISONED
+  # 잡 1건이 이 배포 게이트와, 실패한 배포를 되돌리는 restore_active_release() 의 롤백까지
+  # 영구히 막는 사고를 반복하지 않는다(2026-08-27, C-poisoned-outbox-deploy-gate).
   worker_health="$(sudo docker inspect --format '{{.State.Health.Status}}' "${worker_container}")" || return 1
   [[ "${worker_health}" == "healthy" ]] || return 1
   headers="$(curl -fsSI --connect-timeout 3 --max-time 10 \
@@ -226,7 +232,7 @@ check_prod_health_contract() {
 wait_for_prod_health_contract() {
   for attempt in $(seq 1 36); do
     if check_prod_health_contract; then
-      return
+      return 0
     fi
     if [[ "${attempt}" -eq 36 ]]; then
       echo "[prod-release] Health contract failed" >&2
@@ -255,6 +261,86 @@ restore_active_release() {
   wait_for_prod_health_contract || return 1
   assert_running_release_digests || return 1
   rm -f "${active_tmp}" || return 1
+}
+
+# Task 168 M11 prod guard. If the deploying source's prisma/migrations tree
+# includes M11 (the tournament-fixture retirement), prod's own
+# `_prisma_migrations` ledger must already show it as a finished, non-rolled-
+# back row with the pinned checksum — checked here, before the caller runs
+# `prisma migrate deploy`. Without this, prod would apply M11 unguarded: no
+# writer quiesce, no fresh backup, only the migration's own fail-closed DO
+# block. If prod's legacy fixture tables happen to be non-empty without the
+# Stage-A-style retirement seals, that DO block RAISEs and leaves a P3009
+# unresolved row that blocks every later prod deploy until a manual
+# `prisma migrate resolve --rolled-back`; if the tables are empty, the DROP
+# proceeds without any backup or quiesce guarantee either way. prod has no
+# Alpha-style host receipt path, so the DB ledger is the only source of
+# truth this guard can use — it says nothing about M1-M10, which still apply
+# to prod without any Stage A cutover ceremony (a pre-existing risk this
+# guard does not cover).
+assert_task168_m11_guard() {
+  local source_dir="$1"
+  local m11_name=20260911090000_retire_tournament_fixture_tables
+  local m11_pinned_sha=08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323
+  local m11_migration_dir="${source_dir}/apps/v1_api/prisma/migrations/${m11_name}"
+  local m11_source_sha database_url network m11_ledger_checksum psql_stderr query_rc
+
+  [[ -d "${m11_migration_dir}" ]] || return 0
+
+  m11_source_sha="$(sha256sum "${m11_migration_dir}/migration.sql" | awk '{print $1}')" || return 1
+  # Pin the SOURCE file itself, not just the source-vs-ledger comparison
+  # below -- without this, a candidate tree whose M11 was tampered to some
+  # OTHER checksum, with a prod ledger row that happens to carry that SAME
+  # tampered checksum (e.g. a prior guard-bypassed deploy), would pass the
+  # source-vs-ledger check even though neither side is the real migration.
+  if [[ "${m11_source_sha}" != "${m11_pinned_sha}" ]]; then
+    echo "[prod-deploy] Task168 M11 guard: candidate source's M11 checksum (${m11_source_sha}) does not match the pinned value (${m11_pinned_sha}). Refusing to run prisma migrate deploy." >&2
+    return 1
+  fi
+  database_url="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')" || return 1
+  if [[ -z "${database_url}" ]]; then
+    echo "[prod-deploy] Task168 M11 guard: candidate API's DATABASE_URL is unavailable" >&2
+    return 1
+  fi
+  network="$(sudo docker network ls --filter name='^deploy_default$' --format '{{.Name}}')"
+  if [[ "${network}" != deploy_default ]]; then
+    echo "[prod-deploy] Task168 M11 guard: compose DB network unavailable" >&2
+    return 1
+  fi
+  # DATABASE_URL (password included) must never appear as a `docker run`
+  # argv element -- that argv is visible to any other user on the host via
+  # `ps`. --env-file with a process-substitution fd exposes only the fd path
+  # (/dev/fd/N) in argv; the value itself is read by docker directly from
+  # the fd, never passed on a command line.
+  psql_stderr="$(mktemp)"
+  # `&& query_rc=0 || query_rc=$?` (not a bare trailing `$?`) is deliberate:
+  # under `set -e`, `var="$(failing_cmd)"` on its own aborts the whole script
+  # at this line -- the very failure this guard exists to diagnose would
+  # never reach the diagnostic below it, only a bare, unexplained script
+  # exit. Wrapping it in an && / || list is the standard way to catch a
+  # command substitution's exit status without triggering errexit.
+  m11_ledger_checksum="$(sudo docker run --rm --network "${network}" \
+    --env-file <(printf 'DATABASE_URL=%s\n' "${database_url}") \
+    postgres:16-alpine sh -c 'exec psql "$DATABASE_URL" -At -c "$1"' sh \
+    "SELECT checksum FROM \"_prisma_migrations\" WHERE migration_name = '${m11_name}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL" \
+    2>"${psql_stderr}")" && query_rc=0 || query_rc=$?
+  if [[ "${query_rc}" -ne 0 ]]; then
+    # Fail closed on a query/connection error instead of silently treating it
+    # as "M11 not applied" via an empty string -- both reach the same
+    # `return 1` below, but surfacing the actual psql/docker error here
+    # means an operator sees WHY (network unreachable, auth failure, ...)
+    # instead of a diagnosis that reads identically to "M11 truly missing".
+    echo "[prod-deploy] Task168 M11 guard: could not query prod's migration ledger. Refusing to run prisma migrate deploy." >&2
+    cat "${psql_stderr}" >&2
+    rm -f "${psql_stderr}"
+    return 1
+  fi
+  rm -f "${psql_stderr}"
+  if [[ "${m11_ledger_checksum}" != "${m11_source_sha}" ]]; then
+    echo "[prod-deploy] Task168 M11 guard: candidate source includes the retirement migration (checksum ${m11_source_sha}) but prod's ledger does not show it as an applied row. Refusing to run prisma migrate deploy." >&2
+    return 1
+  fi
+  echo "[prod-deploy] Task168 M11 guard: prod ledger already shows M11 applied (checksum ${m11_ledger_checksum})"
 }
 
 write_legacy_release_state() {

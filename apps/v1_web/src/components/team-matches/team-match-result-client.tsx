@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/v1-ui/button';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AlertBanner, Card, EmptyState, ErrorState, TextField } from '@/components/v1-ui/primitives';
+import { ClockIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import {
   useV1CreateGameResultRevision,
@@ -16,7 +17,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
-import { countMissingAssists } from '@/lib/result-review-warnings';
+import { formatTournamentDateLong } from '@/lib/date-utils';
 import type {
   V1GameResultParticipantInput,
   V1GameResultRevision,
@@ -29,6 +30,7 @@ import {
   hashResultPayload,
   hydrateResultFormFromRevision,
   toResultRosterRows,
+  displayRevisionReason,
 } from './team-match-result.types';
 import type { CardDraft, GoalDraft, ResultRosterRow } from './team-match-result.types';
 
@@ -61,6 +63,7 @@ const RESULT_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   // 안 나는데도 사용자에게 거짓 제약을 안내하고 있었음). 이 에러가 실제로 뜬다면
   // 진짜 다른 결함(예: 관리자가 별도로 기록한 이벤트와 불일치)이라 일반 메시지로 안내한다.
   SCORE_EVENT_MISMATCH: '결과 내용에 문제가 있어 저장하지 못했어요. 입력한 득점·카드를 다시 확인해 주세요.',
+  LEAGUE_NOT_FOUND: '이 리그의 대진이 아니에요.',
 };
 
 function resultErrorMessage(err: unknown): string {
@@ -93,7 +96,7 @@ function GoalTimeline({ revision, homeName, awayName }: {
   const goals = score && 'goals' in score ? score.goals ?? [] : [];
   if (goals.length === 0) return null;
   return (
-    <div style={{ display: 'grid', gap: 6, marginTop: 12 }}>
+    <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
       <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>득점 기록</div>
       {goals
         .slice()
@@ -141,27 +144,37 @@ function formatDateTime(value: string | null): string {
 
 function revisionBadgeTone(state: V1GameResultRevision['state']) {
   if (state === 'OFFICIAL') return 'tm-badge-green';
-  if (state === 'CHANGE_REQUESTED' || state === 'REJECTED' || state === 'VOID') return 'tm-badge-red';
+  if (state === 'CHANGE_REQUESTED' || state === 'VOID') return 'tm-badge-red';
   if (state === 'SUBMITTED') return 'tm-badge-orange';
-  if (state === 'SUPPLEMENT_REQUESTED') return 'tm-badge-blue';
   return 'tm-badge-grey';
 }
 
-/** Shared loading/error/not-ready gate for both the entry and approval screens. */
+/**
+ * Shared loading/error/not-ready gate for both the entry and approval screens.
+ *
+ * U3: 리그 대진에서는 라인업 조회를 아예 건너뛴다. 리그전은 참가팀의 **모든 active
+ * 멤버**가 결과 영수증을 볼 수 있는데(participantMember), `GET /team-matches/:id/lineup`은
+ * owner/manager가 아니면 403을 던진다(team-match-lineup.service.ts loadContext) — 일반
+ * 멤버가 리그 결과 화면에 들어오면 needsOwnLineup=true 그대로는 이 403이 `isError`를
+ * 덮어써서 정상적인 영수증 대신 에러 화면을 보게 된다. 리그 결과는 애초에 라인업을
+ * 쓰지 않는다(LeagueMatchResultEntryService는 항상 actualParticipants=[]).
+ */
 function useResultScreenBase(teamMatchId: string, options: { needsOwnLineup: boolean }) {
   const teamMatch = useV1TeamMatch(teamMatchId);
   const gameId = teamMatch.data?.gameId ?? null;
+  const isLeague = teamMatch.data?.league != null;
+  const shouldFetchLineup = options.needsOwnLineup && !isLeague;
   const game = useV1Game(gameId, { enabled: Boolean(teamMatch.data) });
   const revisions = useV1GameResultRevisions(gameId, { enabled: Boolean(teamMatch.data) });
   const lineup = useV1TeamMatchLineup(teamMatchId, {
-    enabled: options.needsOwnLineup && Boolean(teamMatch.data),
+    enabled: shouldFetchLineup && Boolean(teamMatch.data),
   });
 
-  const isError = teamMatch.isError || game.isError || revisions.isError || (options.needsOwnLineup && lineup.isError);
+  const isError = teamMatch.isError || game.isError || revisions.isError || (shouldFetchLineup && lineup.isError);
   const isLoading =
     teamMatch.isLoading ||
     (Boolean(gameId) && (game.isLoading || revisions.isLoading)) ||
-    (options.needsOwnLineup && Boolean(teamMatch.data) && lineup.isLoading);
+    (shouldFetchLineup && Boolean(teamMatch.data) && lineup.isLoading);
 
   return { teamMatch, game, revisions, lineup, isError, isLoading, gameId };
 }
@@ -171,30 +184,40 @@ function retryAll(...queries: Array<{ refetch: () => unknown }>) {
 }
 
 /**
- * P0-4: 상대팀 승인 화면에서 득점자·카드·MVP를 보여준다.
+ * P0-4: 상대팀 승인 화면 + 호스트의 SUBMITTED/OFFICIAL 화면에서 득점자·카드·MVP를 보여준다.
  *
  * `resultParticipants`에는 이름이 없다(participantId만 있음, `V1GameResultParticipantRow`
- * 참고) — 그리고 승인 화면은 애초에 이름을 가져올 방법이 없다. `TeamMatchLineupService.getLineup`도
+ * 참고). 상대팀 승인 화면은 애초에 이름을 가져올 방법이 없다 — `TeamMatchLineupService.getLineup`도
  * `GamesService.listLineups`도 참가팀 액터에게는 항상 자기 팀(ownSideId) 라인업만 돌려주고,
  * 상대팀(호스트) 라인업을 조회하는 엔드포인트는 존재하지 않는다(공정성 원칙 — 정정 요청은
- * blind action). 그래서 이름 대신 participantId 앞 8자를 노출한다 — "완전히 안 보이는 것"보다는
- * 선수를 구분할 수 있는 만큼은 낫다.
+ * blind action). 그래서 `roster`가 없으면 이름 대신 participantId 앞 8자를 노출한다 —
+ * "완전히 안 보이는 것"보다는 선수를 구분할 수 있는 만큼은 낫다.
+ *
+ * 호스트는 자기 팀 라인업(`roster`)을 항상 조회할 수 있으므로, 호스트 화면에서는 이 컴포넌트에
+ * `roster`를 넘겨 실명 표시로 격상한다 — SUBMITTED 승인 대기 중과 OFFICIAL 확정 후에도(감사
+ * 백로그 M-E) 제출 직후 입력한 득점자·카드·MVP가 화면에서 사라지면 안 된다.
  */
 function ApprovalParticipantSummary({
   resultParticipants,
   mvpParticipantId,
+  roster,
 }: {
   resultParticipants: V1GameResultRevision['resultParticipants'];
   mvpParticipantId: string | null;
+  roster?: ResultRosterRow[];
 }) {
   const scorers = resultParticipants.filter((row) => row.goals > 0);
   const carded = resultParticipants.filter((row) => row.cards.yellow > 0 || row.cards.red > 0);
   if (scorers.length === 0 && carded.length === 0 && !mvpParticipantId) return null;
 
-  const label = (participantId: string) => `선수 #${participantId.slice(0, 8)}`;
+  const label = (participantId: string) => {
+    const rosterRow = roster?.find((row) => row.participantId === participantId);
+    if (rosterRow) return `${rosterRow.jerseyNumber ? `#${rosterRow.jerseyNumber} ` : ''}${rosterRow.displayName}`;
+    return `선수 #${participantId.slice(0, 8)}`;
+  };
 
   return (
-    <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
+    <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
       {scorers.length > 0 ? (
         <div>
           <div className="tm-text-label">득점자</div>
@@ -263,7 +286,7 @@ function ResultDraftSummary({
   }
 
   return (
-    <div style={{ display: 'grid', gap: 14, marginTop: 12 }}>
+    <div style={{ display: 'grid', gap: 16, marginTop: 12 }}>
       <div>
         <div className="tm-text-label">스코어</div>
         <div className="tm-text-subhead" style={{ marginTop: 4, fontWeight: 700 }}>
@@ -273,7 +296,7 @@ function ResultDraftSummary({
       {homeGoals.length > 0 ? (
         <div>
           <div className="tm-text-label">득점자</div>
-          <div style={{ display: 'grid', gap: 4, marginTop: 6 }}>
+          <div style={{ display: 'grid', gap: 4, marginTop: 8 }}>
             {homeGoals.map((goal, index) => (
               <div key={goal.key} className="tm-text-caption">
                 {index + 1}번 골 · {nameFor(goal.participantId)}
@@ -285,7 +308,7 @@ function ResultDraftSummary({
       {cardDrafts.length > 0 ? (
         <div>
           <div className="tm-text-label">옐로카드·레드카드</div>
-          <div style={{ display: 'grid', gap: 4, marginTop: 6 }}>
+          <div style={{ display: 'grid', gap: 4, marginTop: 8 }}>
             {cardDrafts.map((card) => (
               <div key={card.key} className="tm-text-caption">
                 {nameFor(card.participantId)} · {CARD_TYPE_LABEL[card.type]}
@@ -296,17 +319,100 @@ function ResultDraftSummary({
       ) : null}
       <div>
         <div className="tm-text-label">MVP</div>
-        <div className="tm-text-caption" style={{ marginTop: 6 }}>
+        <div className="tm-text-caption" style={{ marginTop: 8 }}>
           {mvpParticipantId ? nameFor(mvpParticipantId) : '선택 안 함'}
         </div>
       </div>
       {reason.trim() ? (
         <div>
           <div className="tm-text-label">메모</div>
-          <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>{reason.trim()}</div>
+          <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(reason)}</div>
         </div>
       ) : null}
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// League fixtures: 확정 영수증
+//
+// Task 166: 여기 있던 "이의 D-day 카드"(U3, 2026-08-24 A안)를 없앴다 — 정본 §4 가
+// 이의 경로 자체를 제거했다(2026-09-02 사용자 확정). 팀이 결과에 문제를 발견하면
+// 운영자에게 연락하고, 운영자가 콘솔에서 정정·무효한다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * U3-A안(2026-08-24 사용자 확정): 리그 대진의 결과 화면은 "확정 영수증"이 최상단이고
+ * 이의는 그 아래 D-day 카드다 — "승인" 프레이밍이 없다. 호스트 진입점
+ * (`TeamMatchResultPageClient`)과 상대팀 진입점(`TeamMatchResultApprovalPageClient`)
+ * 양쪽 다 이 컴포넌트로 합류한다: 리그 결과는 운영자가 입력·즉시 확정하므로(E1) 두
+ * 팀이 서로 승인할 대상 자체가 없다.
+ */
+function LeagueTeamMatchResultPage({
+  teamMatchId,
+  teamMatch,
+  revisions,
+}: {
+  teamMatchId: string;
+  teamMatch: V1TeamMatch;
+  revisions: V1GameResultRevision[];
+}) {
+  const league = teamMatch.league;
+  const hostName = teamMatch.hostTeam?.name ?? '홈팀';
+  const opponentName = teamMatch.approvedOpponentTeam?.name ?? '상대팀';
+  const latest = revisions[0] ?? null;
+  const participantMember = teamMatch.viewer?.participantMember === true;
+  // 리그 대진일 때만 아는 값(teamMatch.league는 fetch 이후에만 존재) — 이 함수는
+  // TeamMatchResultPageClient/TeamMatchResultApprovalPageClient 양쪽에서 진입하는데
+  // 두 라우트 모두 route-chrome 테이블 기본 제목은 "경기 결과 입력"/"경기 결과 승인"이라
+  // 이 화면에서만 "경기 결과"로 덮어써야 한다(fragments/team-matches.ts 주석 참고).
+  useShellOverride({ title: '경기 결과' });
+
+  return (
+    <>
+      <div style={{ display: 'grid', gap: 16, padding: '16px 20px 24px' }}>
+        <Card pad={16}>
+          <div className="tm-text-body-lg">
+            {hostName} <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>(홈)</span>
+            {' vs '}
+            {opponentName} <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>(원정)</span>
+          </div>
+        </Card>
+
+        {!participantMember ? (
+          <EmptyState title="참가팀만 볼 수 있어요" sub="이 리그 대진에 참가한 팀의 멤버만 결과를 확인할 수 있어요." />
+        ) : (
+          <>
+            {latest?.state === 'OFFICIAL' ? (
+              <Card pad={16}>
+                <div className="tm-text-body-lg">공식 결과로 확정됐어요</div>
+                <div className="tm-text-subhead" style={{ marginTop: 12, fontWeight: 700 }}>{scoreLabel(latest)}</div>
+                <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
+                <ApprovalParticipantSummary
+                  resultParticipants={latest.resultParticipants}
+                  mvpParticipantId={latest.mvpParticipantId}
+                />
+                {latest.reason ? (
+                  <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
+                ) : null}
+              </Card>
+            ) : latest?.state === 'VOID' ? (
+              <Card pad={16} style={{ background: 'var(--red50)' }}>
+                <div className="tm-text-body-lg">이 결과는 무효 처리됐어요</div>
+                {latest.reason ? (
+                  <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
+                ) : null}
+              </Card>
+            ) : (
+              <EmptyState title="아직 결과가 없어요" sub="운영자가 결과를 입력하면 여기에 표시돼요." />
+            )}
+
+          </>
+        )}
+
+        <ResultRevisionHistory history={revisions} />
+      </div>
+    </>
   );
 }
 
@@ -450,37 +556,45 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
 
   if (isError) {
     return (
-      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+      <>
         <ErrorState
           message="결과 정보를 불러오지 못했어요."
           onRetry={() => retryAll(teamMatch, game, revisions, lineup)}
         />
-      </AppChrome>
+      </>
     );
   }
 
   if (isLoading || !teamMatch.data) {
     return (
-      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+      <>
         <PageSkeleton variant="detail" />
-      </AppChrome>
+      </>
+    );
+  }
+
+  // U3-A안: 리그 대진은 "호스트만 입력" 프레이밍이 아예 없다 — 운영자가 결과를
+  // 입력·즉시 확정하므로(E1) 양 팀 참가자 전원이 같은 확정 영수증 뷰로 합류한다.
+  if (teamMatch.data.league) {
+    return (
+      <LeagueTeamMatchResultPage teamMatchId={teamMatchId} teamMatch={teamMatch.data} revisions={revisions.data ?? []} />
     );
   }
 
   if (!isHost) {
     return (
-      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+      <>
         <EmptyState title="호스트만 결과를 입력할 수 있어요" sub="상대팀은 제출된 결과를 승인하거나 정정을 요청할 수 있어요." />
-      </AppChrome>
+      </>
     );
   }
 
   const status = teamMatchStatus(teamMatch.data);
   if (status !== 'matched' && status !== 'completed') {
     return (
-      <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+      <>
         <EmptyState title="아직 결과를 입력할 수 없어요" sub="상대팀이 정해진 이후(매칭 완료)부터 결과를 입력할 수 있어요." />
-      </AppChrome>
+      </>
     );
   }
 
@@ -580,10 +694,10 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
   }
 
   return (
-    <AppChrome title="경기 결과 입력" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+    <>
       {/* 상단 여백이 0이라 헤더 바로 아래 카드가 붙어 답답해 보인다는 지적(QA) — 다른
           화면(예: 라인업 페이지)의 16px 20px 관례를 그대로 맞춘다. */}
-      <div style={{ display: 'grid', gap: 14, padding: '16px 20px 24px' }}>
+      <div className="tm-content-enter" style={{ display: 'grid', gap: 16, padding: '16px 20px 24px' }}>
         <Card pad={16}>
           <div className="tm-text-body-lg">
             {hostName} <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>(홈)</span>
@@ -609,22 +723,29 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
               {opponentName}이(가) 결과를 확인하면 공식 기록으로 확정되거나 정정 요청이 도착해요. 48시간 이내에
               응답이 없으면 운영팀이 대신 검토해요.
             </div>
+            {/* 감사 백로그 M-E: 제출 직후(SUBMITTED)에도 방금 입력한 득점자·카드·MVP가 그대로
+                남아 있어야 한다 — roster를 넘겨 실명으로 보여준다. */}
+            <ApprovalParticipantSummary resultParticipants={latest.resultParticipants} mvpParticipantId={latest.mvpParticipantId} roster={roster} />
+            {latest.missingScorer ? (
+              <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
+                일부 득점은 선수 지정 없이 기록됐어요.
+              </div>
+            ) : null}
           </Card>
         ) : null}
 
         {latest?.state === 'OFFICIAL' ? (
           <Card pad={16}>
             <div className="tm-text-body-lg">공식 결과로 확정됐어요</div>
-            <div className="tm-text-subhead" style={{ marginTop: 10, fontWeight: 700 }}>{scoreLabel(latest)}</div>
+            <div className="tm-text-subhead" style={{ marginTop: 12, fontWeight: 700 }}>{scoreLabel(latest)}</div>
             <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
+            {/* 감사 백로그 M-E: GoalTimeline은 레거시 백필 score({goals:[...]})에서만 렌더된다
+                (docblock 참고) — 이 화면이 만드는 평평한 score({home,away})에서는 항상 null이라
+                득점자·카드·MVP를 보여줄 방법이 없었다. resultParticipants + roster로 실명 요약을 보여준다. */}
+            <ApprovalParticipantSummary resultParticipants={latest.resultParticipants} mvpParticipantId={latest.mvpParticipantId} roster={roster} />
             {latest.missingScorer ? (
               <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
                 일부 득점은 선수 지정 없이 기록됐어요.
-              </div>
-            ) : null}
-            {countMissingAssists(latest.resultParticipants) > 0 ? (
-              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
-                어시스트 미기입 {countMissingAssists(latest.resultParticipants)}건 — 확정에는 영향 없어요.
               </div>
             ) : null}
             <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
@@ -638,7 +759,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
           <Card pad={16} style={{ background: 'var(--red50)' }}>
             <div className="tm-text-body-lg">이 결과는 무효 처리됐어요</div>
             {latest.reason ? (
-              <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{latest.reason}</div>
+              <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
             ) : null}
           </Card>
         ) : null}
@@ -646,53 +767,21 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
         {canSubmit && latest ? (
           <Card pad={16}>
             <div className="tm-text-body-lg">작성한 결과를 확인해 주세요</div>
-            <div className="tm-text-label" style={{ marginTop: 10 }}>스코어 {scoreLabel(latest)}</div>
-            {latest.resultParticipants.length > 0 ? (
-              <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
-                {latest.resultParticipants.some((row) => row.goals > 0) ? (
-                  <div>
-                    <div className="tm-text-label">득점자</div>
-                    <div style={{ display: 'grid', gap: 4, marginTop: 4 }}>
-                      {latest.resultParticipants
-                        .filter((row) => row.goals > 0)
-                        .map((row) => {
-                          const rosterRow = roster.find((r) => r.participantId === row.participantId);
-                          const name = rosterRow
-                            ? `${rosterRow.jerseyNumber ? `#${rosterRow.jerseyNumber} ` : ''}${rosterRow.displayName}`
-                            : row.participantId;
-                          return (
-                            <div key={row.id} className="tm-text-caption">{name} · {row.goals}골</div>
-                          );
-                        })}
-                    </div>
-                  </div>
-                ) : null}
-                {latest.mvpParticipantId ? (
-                  <div>
-                    <div className="tm-text-label">MVP</div>
-                    <div className="tm-text-caption" style={{ marginTop: 4 }}>
-                      {(() => {
-                        const rosterRow = roster.find((r) => r.participantId === latest.mvpParticipantId);
-                        return rosterRow
-                          ? `${rosterRow.jerseyNumber ? `#${rosterRow.jerseyNumber} ` : ''}${rosterRow.displayName}`
-                          : latest.mvpParticipantId;
-                      })()}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+            <div className="tm-text-label" style={{ marginTop: 12 }}>스코어 {scoreLabel(latest)}</div>
+            {/* 카드(옐로/레드)는 이전에 이 블록에서 누락돼 있었다 — ApprovalParticipantSummary로
+                통일해 득점자·카드·MVP를 빠짐없이 보여준다(감사 백로그 M-E). */}
+            <ApprovalParticipantSummary resultParticipants={latest.resultParticipants} mvpParticipantId={latest.mvpParticipantId} roster={roster} />
             {latest.reason ? (
-              <div className="tm-text-caption" style={{ marginTop: 6, color: 'var(--text-muted)' }}>{latest.reason}</div>
+              <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
             ) : null}
-            <div className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-caption)' }}>
+            <div className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-caption)' }}>
               제출하면 되돌릴 수 없어요. {opponentName}이(가) 확인 후 승인하거나 정정을 요청할 수 있어요.
             </div>
             <Button
               variant="primary"
               size="lg"
               block
-              style={{ marginTop: 14 }}
+              style={{ marginTop: 16 }}
               loading={submitRevision.isPending}
               onClick={handleSubmit}
             >
@@ -745,7 +834,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
         {canDraft && stage === 'editing' ? (
           <Card pad={16}>
             {latest?.state === 'CHANGE_REQUESTED' && latest.reason ? (
-              <AlertBanner tone="warning" message={`상대팀 정정 요청: ${latest.reason}`} />
+              <AlertBanner tone="warning" message={`상대팀 정정 요청: ${displayRevisionReason(latest.reason)}`} />
             ) : null}
             <div className="tm-text-body-lg" style={{ marginTop: latest?.state === 'CHANGE_REQUESTED' ? 12 : 0 }}>
               1. 스코어
@@ -788,16 +877,16 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                   선수만 체크해 주세요 — 체크하지 않은 선수는 이 경기에 출전한 것으로 기록되지 않아요.
                 </div>
                 {benchRoster.length === 0 ? (
-                  <div className="tm-text-caption" style={{ marginTop: 10, color: 'var(--text-muted)' }}>
+                  <div className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-muted)' }}>
                     교체 명단이 비어 있어요.
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gap: 4, marginTop: 10 }}>
+                  <div style={{ display: 'grid', gap: 4, marginTop: 12 }}>
                     {benchRoster.map((row) => (
                       <label
                         key={row.participantId}
                         className="tm-text-body"
-                        style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44, cursor: 'pointer' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 44, cursor: 'pointer' }}
                       >
                         <input
                           type="checkbox"
@@ -822,9 +911,9 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                     위에서 홈 득점 수를 입력하면 골마다 득점자를 고를 수 있어요.
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                  <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
                     {homeGoals.map((goal, index) => (
-                      <div key={goal.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div key={goal.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         {/* 프로젝트 컨벤션(label htmlFor + input id)에 맞춘다 — 예전엔 시각 라벨(span)과
                             select가 접근성 이름만 aria-label로 따로 갖고 있어 스크린리더용 이름과
                             눈에 보이는 텍스트가 서로 다른 엘리먼트였다(QA 지적). */}
@@ -852,7 +941,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                 )}
 
                 <div className="tm-text-body-lg" style={{ marginTop: 20 }}>4. 옐로카드·레드카드</div>
-                <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
                   {cardDrafts.map((card) => (
                     <div key={card.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <label htmlFor={`card-player-${card.key}`} className="sr-only">
@@ -912,7 +1001,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                 <select
                   id="result-mvp-select"
                   className="tm-input"
-                  style={{ marginTop: 10, width: '100%' }}
+                  style={{ marginTop: 12, width: '100%' }}
                   value={mvpParticipantId}
                   onChange={(event) => setMvpParticipantId(event.target.value)}
                 >
@@ -960,7 +1049,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
 
         <ResultRevisionHistory history={revisions.data ?? []} />
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -981,29 +1070,41 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
   const [showApproveConfirm, setShowApproveConfirm] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const isOpponent = teamMatch.data?.viewer?.state === 'approved';
+  // 홈팀 게이트(isHost)와 대칭으로 팀 멤버십을 본다. `state === 'approved'` 는 신청서를 낸
+  // 사람 한 명만 통과해서, 운영자가 대진을 만드는 리그전에서는 상대팀 전원이 이 화면에서
+  // "상대팀만 결과를 승인할 수 있어요" 로 튕겨 나갔다.
+  const isOpponent = teamMatch.data?.viewer?.manageableOpponentTeam === true;
 
   if (isError) {
     return (
-      <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+      <>
         <ErrorState message="결과 정보를 불러오지 못했어요." onRetry={() => retryAll(teamMatch, game, revisions)} />
-      </AppChrome>
+      </>
     );
   }
 
   if (isLoading || !teamMatch.data) {
     return (
-      <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+      <>
         <PageSkeleton variant="detail" />
-      </AppChrome>
+      </>
+    );
+  }
+
+  // U3-A안: 리그 대진은 "상대팀만 승인" 프레이밍이 아예 없다 — 위 주석이 설명하는
+  // alpha 실측 결함(상대팀 전원이 튕겨 나감)도 애초에 이 분기로 우회된다. 운영자가
+  // 결과를 입력·즉시 확정하므로(E1) 양 팀 참가자 전원이 같은 확정 영수증 뷰로 합류한다.
+  if (teamMatch.data.league) {
+    return (
+      <LeagueTeamMatchResultPage teamMatchId={teamMatchId} teamMatch={teamMatch.data} revisions={revisions.data ?? []} />
     );
   }
 
   if (!isOpponent) {
     return (
-      <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+      <>
         <EmptyState title="상대팀만 결과를 승인할 수 있어요" sub="결과 작성/제출은 홈팀 담당자만 할 수 있어요." />
-      </AppChrome>
+      </>
     );
   }
 
@@ -1039,10 +1140,10 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
   }
 
   return (
-    <AppChrome title="경기 결과 승인" activeTab="matches" bottomNav={false} backHref={`/team-matches/${teamMatchId}`} desktopHead>
+    <>
       {/* 상단 여백이 0이라 헤더 바로 아래 카드가 붙어 답답해 보인다는 지적(QA) — 다른
           화면(예: 라인업 페이지)의 16px 20px 관례를 그대로 맞춘다. */}
-      <div style={{ display: 'grid', gap: 14, padding: '16px 20px 24px' }}>
+      <div className="tm-content-enter" style={{ display: 'grid', gap: 16, padding: '16px 20px 24px' }}>
         <Card pad={16}>
           <div className="tm-text-body-lg">
             {hostName} <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>(홈)</span>
@@ -1058,7 +1159,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
         ) : latest.state === 'SUBMITTED' ? (
           <Card pad={16}>
             <div className="tm-text-body-lg">제출된 결과예요. 확인 후 승인해 주세요</div>
-            <div className="tm-text-subhead" style={{ marginTop: 10, fontWeight: 700 }}>{scoreLabel(latest)}</div>
+            <div className="tm-text-subhead" style={{ marginTop: 12, fontWeight: 700 }}>{scoreLabel(latest)}</div>
             <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
             <ApprovalParticipantSummary resultParticipants={latest.resultParticipants} mvpParticipantId={latest.mvpParticipantId} />
             {latest.missingScorer ? (
@@ -1066,12 +1167,6 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
                 일부 득점은 선수 지정 없이 기록됐어요.
               </div>
             ) : null}
-            {countMissingAssists(latest.resultParticipants) > 0 ? (
-              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
-                어시스트 미기입 {countMissingAssists(latest.resultParticipants)}건 — 승인에는 영향 없어요.
-              </div>
-            ) : null}
-
             {showChangeForm ? (
               <div style={{ marginTop: 16 }}>
                 <TextField
@@ -1083,7 +1178,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
                   fieldId="result-change-reason"
                   placeholder="어떤 부분이 다른지 알려주세요"
                 />
-                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                   <Button
                     variant="danger"
                     disabled={!changeReason.trim()}
@@ -1103,7 +1198,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
                   tone="warning"
                   message={`${scoreLabel(latest)} 결과와 선수 기록을 공식 기록으로 승인할까요? 승인 후에는 직접 수정할 수 없어요.`}
                 />
-                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                   <Button variant="primary" size="lg" loading={decideRevision.isPending} onClick={handleApprove}>
                     승인 확정
                   </Button>
@@ -1131,16 +1226,15 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
         ) : latest.state === 'OFFICIAL' ? (
           <Card pad={16}>
             <div className="tm-text-body-lg">공식 결과로 확정됐어요</div>
-            <div className="tm-text-subhead" style={{ marginTop: 10, fontWeight: 700 }}>{scoreLabel(latest)}</div>
+            <div className="tm-text-subhead" style={{ marginTop: 12, fontWeight: 700 }}>{scoreLabel(latest)}</div>
             <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
+            {/* 감사 백로그 M-E: 승인 전(SUBMITTED)에는 보이던 득점자·카드·MVP 요약이 승인 버튼을
+                누른 순간(OFFICIAL) 사라지고 있었다 — 상대팀은 호스트 라인업이 없어 roster 없이
+                호출한다(참가자 #앞 8자 표시, 위 docblock 참고). */}
+            <ApprovalParticipantSummary resultParticipants={latest.resultParticipants} mvpParticipantId={latest.mvpParticipantId} />
             {latest.missingScorer ? (
               <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
                 일부 득점은 선수 지정 없이 기록됐어요.
-              </div>
-            ) : null}
-            {countMissingAssists(latest.resultParticipants) > 0 ? (
-              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
-                어시스트 미기입 {countMissingAssists(latest.resultParticipants)}건 — 확정에는 영향 없어요.
               </div>
             ) : null}
             <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
@@ -1162,7 +1256,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
 
         <ResultRevisionHistory history={revisions.data ?? []} />
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -1171,20 +1265,20 @@ function ResultRevisionHistory({ history }: { history: V1GameResultRevision[] })
   return (
     <Card pad={16}>
       <div className="tm-text-body-lg">변경 이력</div>
-      <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
+      <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
         {history.map((revision) => (
-          <div key={revision.id} style={{ borderTop: '1px solid var(--grey100)', paddingTop: 10 }}>
+          <div key={revision.id} style={{ borderTop: '1px solid var(--grey100)', paddingTop: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span className="tm-text-label">
                 {revision.revision}차 · {scoreLabel(revision)}
-                {revision.supersedesId ? <span className="tm-badge tm-badge-grey" style={{ marginLeft: 6 }}>정정</span> : null}
+                {revision.supersedesId ? <span className="tm-badge tm-badge-grey" style={{ marginLeft: 8 }}>정정</span> : null}
               </span>
               <span className={`tm-badge ${revisionBadgeTone(revision.state)}`}>
                 {RESULT_REVISION_STATE_LABEL[revision.state]}
               </span>
             </div>
             {revision.reason ? (
-              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>{revision.reason}</div>
+              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>{displayRevisionReason(revision.reason)}</div>
             ) : null}
             <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
               제출 {formatDateTime(revision.submittedAt)}

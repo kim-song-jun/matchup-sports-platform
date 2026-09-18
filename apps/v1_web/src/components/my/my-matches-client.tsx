@@ -1,45 +1,31 @@
 'use client';
 
-import { useV1MyMatches } from '@/hooks/use-v1-api';
+import { useV1MyMatchesInfinite } from '@/hooks/use-v1-api';
 import type { V1Match } from '@/types/api';
 import { MyMatchesPageView } from './my-page';
 import type { MyMatch, MyMatchesViewModel, MyMatchStatus } from './my.types';
 
 export function MyMatchesPageClient({ mode }: { mode: 'joined' | 'created' }) {
-  const query = useV1MyMatches({ mode, limit: 50 });
+  const query = useV1MyMatchesInfinite(mode);
   // Only show real data. Mock fallback matches must never appear in place of real data.
-  const matches = query.data ? query.data.items.map(toMyMatch) : [];
+  const matches = query.data ? query.data.pages.flatMap((page) => page.items).filter((item, index, items) => items.findIndex((other) => (other.matchId ?? other.id) === (item.matchId ?? item.id)) === index).map(toMyMatch) : [];
 
   const model: MyMatchesViewModel = {
     mode,
-    title: mode === 'joined' ? '참여한 매치' : '내가 만든 매치',
     matches,
     summary: buildSummary(mode, matches),
-    apiNotice: getApiNotice(query.isLoading, query.isError),
+    loading: query.isLoading,
+    error: query.isError && !query.data,
+    onRetry: () => void query.refetch(),
+    hasNext: query.hasNextPage,
+    loadMorePending: query.isFetchingNextPage,
+    loadMoreError: query.isFetchNextPageError,
+    onLoadMore: () => { if (!query.isFetching) void query.fetchNextPage(); },
   };
 
   return <MyMatchesPageView model={model} />;
 }
 
-function getApiNotice(isLoading: boolean, isError: boolean): MyMatchesViewModel['apiNotice'] {
-  if (isLoading) {
-    return {
-      title: '내 매치를 불러오고 있어요',
-      body: '잠깐만 기다려 주세요.',
-      tone: 'info',
-    };
-  }
-
-  if (isError) {
-    return {
-      title: '매치 목록을 불러오지 못했어요',
-      body: '잠시 후 다시 시도해 주세요. 계속되면 새로고침해 보세요.',
-      tone: 'warning',
-    };
-  }
-
-  return undefined;
-}
 
 function toMyMatch(match: V1Match): MyMatch {
   const status = toMyStatus(match);

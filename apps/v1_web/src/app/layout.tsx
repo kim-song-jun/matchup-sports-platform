@@ -2,8 +2,11 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Providers } from './providers';
 import { JsonLd } from '@/components/seo/json-ld';
+import { PageTransitionController } from '@/components/v1-ui/page-transition-controller';
 import { ReleaseVersionWatcher } from '@/components/v1-ui/release-version-watcher';
 import { RouteProgressBar } from '@/components/v1-ui/route-progress';
+import { ScrollRestoration } from '@/components/v1-ui/scroll-restoration';
+import { StaticCacheBootstrap } from '@/components/v1-ui/static-cache-bootstrap';
 import { publicAssetPath } from '@/lib/assets';
 import { getSiteOrigin } from '@/lib/seo';
 import { buildSiteIdentityLd } from '@/lib/structured-data';
@@ -56,7 +59,10 @@ export default function RootLayout({
       </head>
       <body>
         <RouteProgressBar />
+        <PageTransitionController />
         <ReleaseVersionWatcher />
+        <ScrollRestoration />
+        <StaticCacheBootstrap />
         <Providers>{children}</Providers>
       </body>
     </html>

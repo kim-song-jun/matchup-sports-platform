@@ -1,9 +1,16 @@
 export type TeamMatchModel = {
   id: string;
   title: string;
-  imageUrl: string;
+  /**
+   * API 가 사진을 안 주면 null — matches.card-model.ts 의 `image` 와 같은 이유(웨이브4,
+   * 2026-09-04). 목업 사진(`/mock/generated/team-huddle.webp`)으로 메우면 실제 팀매치에
+   * 다른 매치의 사진이 그대로 붙는다. 화면은 null 이면 종목 그래픽(sportIllustration)을 그린다.
+   */
+  imageUrl: string | null;
   sport: string;
   hostTeam: string;
+  /** 플랫폼이 개설해 두 팀의 신청을 받는 모집이면 true. */
+  platformManaged?: boolean;
   venue: string;
   region: string;
   date: string;
@@ -13,23 +20,36 @@ export type TeamMatchModel = {
   grade: string;
   style: string;
   /**
-   * 비용은 **모를 수 있다**(null). 호스트가 costNote 를 안 적은 매치가 있고(리그 대진이
-   * 대표적), 그때 목업 금액(280,000원 · 140,000원)을 그대로 보여주던 것이 원래 결함이다.
-   * 0 으로 채우는 것도 '무료초청'이라는 새 거짓말이라 null 로 두고 화면이 그 자리를 감춘다.
+   * 비용·매너·전적은 **모를 수 있다**(null). 호스트가 costNote 를 안 적은 매치가 있고,
+   * 팀 매너 점수·승수는 애초에 API 응답에 없는 값이다(V1TeamMatch.hostTeam 은
+   * trustState 카테고리만 준다). 예전에는 이 자리를 화면 골격용 목업(140,000원 · 매너 4.8 ·
+   * 승 23)으로 채워 **어느 매치를 열어도 같은 가짜 숫자가 보였다**(2026-08-23 alpha 실측).
+   * 숫자로 강제하지 않고 null 을 허용해, 모르는 값은 화면에서 감춘다.
    */
   cost: number | null;
   opponentCost: number | null;
+  /** 값이 있으면 리그전 경기다. */
+  league?: { leagueId: string; title: string } | null;
+  /**
+   * 확정된 상대팀 이름. 없으면 아직 상대가 안 정해진 것이다.
+   *
+   * 이 값이 없던 동안 카드는 **상대팀 이름 자리에 신청 상태**('승인 완료'·'신청 마감')를
+   * 그렸다 — 상세에서 2026-08-25 에 고친 결함인데(`teamMatchOpponentLabel` 주석) 목록만
+   * 남아 있었다. 리그 대진은 상대가 항상 확정돼 있어 그 자리가 늘 상태 배지였다.
+   */
+  opponentTeam: string | null;
   uniform: string;
   gender: string;
-  /**
-   * 매너 평점·승수는 **모를 수 있다**(null). 매너는 공개된 팀 후기가 한 건도 없으면 집계값이
-   * 없고, 승수는 API 를 못 받은 프리렌더/폴백 경로에서 비어 있다. 예전에는 이 자리를 화면
-   * 골격용 목업(매너 4.8 · 승 23)이 채워 **어느 팀 매치를 열어도 같은 가짜 숫자**가 보였다.
-   * null 을 허용하고 화면은 그 줄을 감춘다 — 모르는 값을 지어내지 않는다(dev 와 같은 계약).
-   */
   manner: number | null;
   wins: number | null;
+  /**
+   * 나와의 관계('내 매치'·'승인 대기'…)와 매치 상태가 한 필드에 눌려 있다 —
+   * `statusToCardStatus` 가 viewerState 를 먼저 보기 때문에, 호스트가 보는 매치는
+   * 마감·취소·종료여도 항상 'mine' 이다. 그래서 매치 상태는 별도 필드로 둔다.
+   */
   status: 'open' | 'pending' | 'approved' | 'closed' | 'mine';
+  /** API status 만으로 판정한 "더는 신청받지 않는다" — 관계와 무관하다. */
+  closed: boolean;
 };
 
 export type TeamMatchListViewModel = {
@@ -67,12 +87,18 @@ export type TeamMatchListViewModel = {
   matches: TeamMatchModel[];
   /** #5: 로딩 중 여부 — true일 때 EmptyState 대신 PageSkeleton 렌더 */
   isLoading?: boolean;
+  /** 서버 커서 페이지네이션(20건/페이지)에 다음 페이지가 더 있는지. true면 "더 보기" 노출. */
+  hasNext?: boolean;
+  onLoadMore?: () => void;
+  loadMorePending?: boolean;
 };
 
 export type TeamMatchStateViewModel = TeamMatchListViewModel & {
   state: 'empty' | 'error';
   title: string;
   description: string;
+  /** matches.types.ts 의 MatchStateViewModel 과 동일 — ErrorState 재시도 버튼이 호출한다. */
+  retry?: () => void;
 };
 
 export type TeamMatchDetailViewModel = {
@@ -83,6 +109,8 @@ export type TeamMatchDetailViewModel = {
     hostTeamId?: string | null;
     hostTeamLogoUrl?: string | null;
     hostTeamTrustState?: string | null;
+    /** 값이 있으면 리그전 경기다(리그 홈으로 딥링크). null 이면 일반 팀 매치. */
+    league?: { leagueId: string; title: string } | null;
     applicantActionError?: string | null;
     manageHref?: string;
     applicantTeams: Array<{
@@ -104,18 +132,29 @@ export type TeamMatchDetailViewModel = {
     label: string;
     tone?: 'neutral' | 'primary' | 'danger';
     pending?: boolean;
+    confirm?: {
+      title: string;
+      message: string;
+      confirmLabel: string;
+    };
     onClick: () => void | Promise<unknown>;
   }>;
   // Task 17: navigates to /team-matches/:id/result(/approval) — a matched/completed match
   // no longer has a standalone "complete" mutation (Task 16 removed it); completion is now
   // an atomic side effect of submitting a validated result revision on that screen.
-  resultAction?: { label: string; href: string; tone?: 'primary' | 'neutral' } | null;
+  // tone(웨이브4 이전): 이 행 하나의 primary/neutral 색을 골랐다. team-matches-page.tsx의
+  // 매치 관리 카드가 라인업→경기 결과→후기 순서로 "화면 전체에 primary 하나만" 규칙을
+  // 새로 적용하면서(2026-09-04) 행별 tone 은 더 이상 읽히지 않는다 — 죽은 필드로 남기지 않고
+  // 제거한다.
+  resultAction?: { label: string; href: string } | null;
   /** 경기 종료 후 후기 작성 화면(/my/reviews/team_match/:id) 링크. 참가팀 소속일 때만 설정된다.
    * 이 링크가 없던 동안 팀매치 후기는 /my/reviews 목록에 뜨기를 기다리는 수밖에 없었다. */
   reviewAction?: { label: string; href: string } | null;
   statusLabel?: string;
   chatLabel?: string;
   chatPending?: boolean;
+  /** 채팅방 열기 실패 사유(409/403 등). onChat 버튼이 조용히 죽지 않도록 클릭 결과를 보여준다. */
+  chatError?: string | null;
   onChat?: () => void;
   onShare?: () => void;
   /** 라인업 관리 화면(Task 15) 링크. 내가 owner/manager로 속한 팀(호스트팀 또는 승인된
@@ -123,7 +162,10 @@ export type TeamMatchDetailViewModel = {
   lineupHref?: string;
 };
 
-export type TeamMatchCreateStep = 'team' | 'sport' | 'info' | 'condition' | 'place-time' | 'confirm' | 'complete' | 'edit';
+// 'complete' 스텝(웨이브4 이전): /team-matches/new/complete 페이지가 썼는데, 실제 제출 성공
+// 경로는 항상 /team-matches/:id 로 바로 이동해(team-matches-create-client.tsx) 이 스텝에
+// 닿는 진짜 경로가 없었다(죽은 라우트, 2026-09-04 감사) — 라우트·컴포넌트와 함께 제거한다.
+export type TeamMatchCreateStep = 'team' | 'sport' | 'info' | 'condition' | 'place-time' | 'confirm' | 'edit';
 
 export type TeamMatchCreateViewModel = {
   step: TeamMatchCreateStep;
@@ -132,6 +174,7 @@ export type TeamMatchCreateViewModel = {
   selectedTeam: string;
   selectedSport: string;
   isLoadingTeams?: boolean;
+  teamLoadError?: { message: string; onRetry: () => void };
   teams: Array<{ name: string; sport: string; members: number; role: string; selected?: boolean; disabled?: boolean }>;
   sports: string[];
   draft: {

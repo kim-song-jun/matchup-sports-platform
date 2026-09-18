@@ -1,10 +1,11 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, V1TournamentPayment, V1TournamentRegistration } from '@prisma/client';
+import { Prisma, V1CompetitionKind, V1TournamentPayment, V1TournamentRegistration } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,6 +17,14 @@ import {
   AdminRegistrationListQueryDto,
   AdminRosterLockDto,
 } from './dto/admin-registration.dto';
+import {
+  findLeagueAdmissionBlocker,
+  leagueAdmissionBlockerMessage,
+} from '../league-matches/league-team-admission';
+import { capacityLimitOf, isCapacityFull } from './registration-capacity';
+import { ALL_COMPETITION_KINDS, findTournamentOnSurface, LEAGUE_KINDS } from './tournament-surface-lookup';
+import { readRosterAutoConfirmedAt } from './registration-auto-confirm';
+import { syncTournamentRosterLineups } from './tournament-roster-sync';
 
 /** 어드민이 취소 처리할 수 있는 신청 상태 목록. */
 const ADMIN_CANCELLABLE_STATUSES: V1TournamentRegistration['status'][] = [
@@ -27,10 +36,29 @@ const ADMIN_CANCELLABLE_STATUSES: V1TournamentRegistration['status'][] = [
   'waitlisted',
 ];
 
-/** 확정/대기 처리 가능 상태 목록. */
+/**
+ * 확정/대기 처리 가능 상태 목록. `waitlisted`가 포함돼야 대기 승격(자리가 나서 대기 팀을
+ * confirmed로 올리는 것)이 가능하다 — 감사 finding(reg-confirm-reapply-state-machine #1):
+ * 이 배열에 waitlisted가 빠져 있어 대기 팀은 취소 후 재신청 말고는 확정될 방법이 없었다.
+ */
 const ADMIN_CONFIRMABLE_STATUSES: V1TournamentRegistration['status'][] = [
   'payment_checking',
   'paid',
+  'waitlisted',
+];
+
+/**
+ * 정원 한 자리를 점유하는 상태 목록. tournament-registrations.service.ts의 동일 이름 상수와
+ * 같은 목록이다 — 그 파일은 이 배치(T-reg-roster-state-machine)의 ownedFiles 밖이라 공유
+ * export로 승격하지 않고 여기 그대로 중복 정의한다. **상태값이 바뀌면 두 곳을 함께 고친다**
+ * (감사 finding #48: 팀 자진 철회(withdrawCancelRequest, R17-006)에는 이미 이 가드가 있었는데
+ * 운영자 잔류 처리(rejectCancelRequest)에는 빠져 있어 정원을 넘는 확정 팀이 생길 수 있었다).
+ */
+const CAPACITY_HOLD_STATUSES: V1TournamentRegistration['status'][] = [
+  'awaiting_payment',
+  'payment_checking',
+  'paid',
+  'confirmed',
 ];
 
 @Injectable()
@@ -46,7 +74,7 @@ export class AdminRegistrationsService {
     const limit = query.limit ?? 20;
 
     // 대회 존재 여부 간단 확인 (deleted 포함 어드민은 볼 수 있어야 함).
-    const tournament = await this.prisma.v1Tournament.findFirst({ where: { id: tournamentId } });
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, { where: { id: tournamentId } });
     if (!tournament) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
@@ -71,10 +99,28 @@ export class AdminRegistrationsService {
     const hasNext = rows.length > limit;
     const pageItems = hasNext ? rows.slice(0, limit) : rows;
 
+    // **자동 확정 명단인지 알려 준다.** 시즌 시작까지 명단을 안 낸 팀은 잡이 현재 멤버로
+    // 명단을 만드는데(`rosterAutoConfirmedAt`), 그 값이 어떤 응답에도 없어서 운영자는
+    // 눈앞의 명단이 팀이 낸 것인지 시스템이 만든 것인지 구분할 수 없었다 — 자동 확정
+    // 명단은 "팀이 검토한 적 없는 명단" 이라 운영 판단이 달라진다.
+    //
+    // **리그일 때만 묻는다.** 자동 확정 잡은 리그 전용이라 대회 신청에는 이 값이 절대
+    // 없는데, 그때도 raw 쿼리를 돌리면 목록을 열 때마다 헛도는 왕복이 하나씩 붙는다.
+    // 종류는 위에서 이미 읽었다 — 새로 조회하지 않는다.
+    const autoConfirmedAt =
+      tournament.kind === V1CompetitionKind.regular_league
+        ? await readRosterAutoConfirmedAt(
+            this.prisma,
+            pageItems.map((row) => row.id),
+          )
+        : new Map<string, string>();
+
     return {
       items: pageItems.map((row) => ({
         ...this.serialize(row, row.payment ?? null, row._count.players),
         teamName: row.team?.name ?? null,
+        // 자동 확정이 아니면 `null` — 맵에 없는 것이 곧 "팀이 직접 낸 명단" 이다.
+        rosterAutoConfirmedAt: autoConfirmedAt.get(row.id) ?? null,
       })),
       pageInfo: {
         nextCursor: hasNext ? (pageItems.at(-1)?.id ?? null) : null,
@@ -172,14 +218,18 @@ export class AdminRegistrationsService {
     const result = await this.prisma.$transaction(async (tx) => {
       // AREG-03: confirm 분기에서 정원 초과 여부 확인.
       if (dto.decision === 'confirm') {
-        const confirmedCount = await tx.v1TournamentRegistration.count({
-          where: { tournamentId: registration.tournamentId, status: 'confirmed' },
-        });
-        const tournament = await tx.v1Tournament.findUnique({
+        // 대회를 **먼저** 읽는다 — 상한이 없으면(정규 리그) COUNT 자체를 건너뛴다.
+        const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
           where: { id: registration.tournamentId },
-          select: { teamCount: true },
+          select: { teamCount: true, kind: true },
         });
-        if (tournament && confirmedCount >= tournament.teamCount) {
+        const confirmedCount =
+          tournament === null || capacityLimitOf(tournament) === null
+            ? 0
+            : await tx.v1TournamentRegistration.count({
+                where: { tournamentId: registration.tournamentId, status: 'confirmed' },
+              });
+        if (tournament && isCapacityFull(tournament, confirmedCount)) {
           throw new ConflictException({
             code: 'TOURNAMENT_CAPACITY_FULL',
             message: '정원이 모두 찼어요. 더 확정할 수 없어요.',
@@ -187,12 +237,50 @@ export class AdminRegistrationsService {
         }
       }
 
+      // 리그 확정은 **리그 축 로스터도 만든다** (D7, contract 전까지 역방향 dual-write).
+      //
+      // 리그 순위·대진·승강은 전부 `V1LeagueTeam` 을 읽는다 — 통합 축 등록만 `confirmed` 로
+      // 두면 운영자 화면엔 "확정" 이 뜨는데 **그 팀은 순위표에도 대진 생성 대상에도 없다.**
+      // 에러가 아니라 조용한 누락이라 대진을 짜고 나서야 드러난다.
+      //
+      // 판정은 `findLeagueAdmissionBlocker` 를 지난다 — 어드민 `addTeam` 과 같은 함수다.
+      // 신청 시점에 통과했어도 확정까지 사이에 팀이 해체되거나 형제 티어에 들어갈 수
+      // 있으므로 **여기서 다시** 본다.
+      if (dto.decision === 'confirm') {
+        const leagueMirror = await findTournamentOnSurface(tx, LEAGUE_KINDS, {
+          where: { id: registration.tournamentId },
+          select: { id: true },
+        });
+        if (leagueMirror !== null) {
+          const blocker = await findLeagueAdmissionBlocker(tx, {
+            leagueId: registration.tournamentId,
+            teamId: registration.teamId,
+          });
+          // 이미 로스터에 있으면 통과시킨다 — 백필로 들어온 팀이나 어드민이 손으로 넣은
+          // 팀의 신청을 확정하는 것은 정상이고, 그때 막으면 확정 자체가 불가능해진다.
+          if (blocker !== null && blocker.kind !== 'ALREADY_IN_LEAGUE') {
+            throw new ConflictException({
+              code: 'LEAGUE_TEAM_INVALID',
+              message: leagueAdmissionBlockerMessage(blocker),
+            });
+          }
+          // BE-5 drop: 예전엔 확정과 함께 레거시 로스터 행을 만들었다. 이제 로스터 =
+          // confirmed 등록이라, 바로 아래에서 이 등록의 status 를 confirmed 로 옮기는 것이
+          // 곧 참가다 — 여기서 따로 만들 것이 없다. (`blocker` 검사는 그대로 남는다:
+          // 확정 직전에 팀이 해체됐거나 형제 티어에 들어간 경우를 여기서 막는다.)
+        }
+      }
+
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
         data: {
           status: targetStatus,
-          confirmedAt: new Date(),
-          confirmedByAdminUserId: admin.id,
+          // 감사 finding #47: 이전에는 decision과 무관하게 항상 confirmedAt을 채워, '대기(waitlist)'
+          // 처리된 팀도 참가 화면에 "확정일"이 표시됐다 — 팀이 대회 참가가 확정된 줄 알고 선수
+          // 소집·이동을 준비하게 된다. confirmedAt은 실제로 '확정'된 경우에만 의미가 있다.
+          ...(dto.decision === 'confirm'
+            ? { confirmedAt: new Date(), confirmedByAdminUserId: admin.id }
+            : {}),
         },
       });
       await this.adminContext.logAdminAction(
@@ -237,6 +325,19 @@ export class AdminRegistrationsService {
       throw new ConflictException({
         code: 'REGISTRATION_NOT_CANCELLABLE',
         message: '현재 상태에서는 취소할 수 없어요.',
+      });
+    }
+
+    // ## 정규 리그는 거부 사유가 필수다 (D9) — 대회는 선택 그대로
+    // DTO 에서 `@IsNotEmpty()` 로 막지 않는 이유는 **같은 DTO 를 대회도 쓰기 때문**이다.
+    // 거기서 막으면 대회 운영이 함께 바뀐다. `kind` 로 갈라 리그에서만 요구한다.
+    //
+    // 리그 거부는 팀이 그 시즌을 통째로 못 뛰게 되는 조치라, 나중에 "왜 떨어졌나" 를
+    // 답할 수 있어야 한다(정본: "정원 초과는 운영자가 **사유와 함께** 조정").
+    if (registration.tournament.kind === V1CompetitionKind.regular_league && !dto.reason?.trim()) {
+      throw new BadRequestException({
+        code: 'LEAGUE_CANCEL_REASON_REQUIRED',
+        message: '리그 참가를 거부하려면 사유를 입력해 주세요.',
       });
     }
 
@@ -308,6 +409,36 @@ export class AdminRegistrationsService {
     const restoredStatus = registration.cancelPreviousStatus ?? 'confirmed';
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // 감사 finding #48: 잔류 처리도 팀 자진 철회(withdrawCancelRequest)와 같은 '이전 상태로
+      // 복원' 동작이라 같은 위험(정원 초과)을 안는다 — R17-006과 동일한 가드를 여기도 건다.
+      // FOR UPDATE로 대회 row를 잠가 두 관리자가 동시에 마지막 자리를 처리해도 안전하게 만든다.
+      if (CAPACITY_HOLD_STATUSES.includes(restoredStatus)) {
+        await tx.$queryRaw`SELECT id FROM "v1_tournaments" WHERE id = ${registration.tournamentId} FOR UPDATE`;
+        const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
+          where: { id: registration.tournamentId, deletedAt: null },
+          select: { teamCount: true, kind: true },
+        });
+        if (!tournament) {
+          throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+        }
+        const reservedCount =
+          capacityLimitOf(tournament) === null
+            ? 0
+            : await tx.v1TournamentRegistration.count({
+                where: {
+                  tournamentId: registration.tournamentId,
+                  id: { not: registrationId },
+                  status: { in: CAPACITY_HOLD_STATUSES },
+                },
+              });
+        if (isCapacityFull(tournament, reservedCount)) {
+          throw new ConflictException({
+            code: 'TOURNAMENT_CAPACITY_FULL',
+            message: '정원이 가득 차 취소 요청을 잔류 처리할 수 없어요.',
+          });
+        }
+      }
+
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
         data: {
@@ -362,7 +493,7 @@ export class AdminRegistrationsService {
         });
       }
 
-      const tournament = await tx.v1Tournament.findUnique({
+      const tournament = await findTournamentOnSurface(tx, ALL_COMPETITION_KINDS, {
         where: { id: registration.tournamentId },
         select: {
           genderCategory: true,
@@ -409,6 +540,12 @@ export class AdminRegistrationsService {
       const updated = await tx.v1TournamentRegistration.update({
         where: { id: registrationId },
         data: { rosterLockedAt: new Date() },
+      });
+      // 대진이 이미 만들어진 뒤 명단을 잠그는 흐름(신청 확정 → 대진 생성 → 명단 잠금)에서는
+      // 대진 생성 시점 스냅샷이 지금 잠그는 명단과 다를 수 있다 — 잠그는 순간 다시 맞춘다.
+      await syncTournamentRosterLineups(tx, {
+        tournamentId: registration.tournamentId,
+        teamId: registration.teamId,
       });
       await this.adminContext.logAdminAction(
         admin,
@@ -526,10 +663,15 @@ export class AdminRegistrationsService {
 
   private async loadRegistration(
     registrationId: string,
-  ): Promise<V1TournamentRegistration & { tournament: { title: string } }> {
+  ): Promise<
+    V1TournamentRegistration & { tournament: { title: string; kind: V1CompetitionKind | null } }
+  > {
     const registration = await this.prisma.v1TournamentRegistration.findUnique({
       where: { id: registrationId },
-      include: { tournament: { select: { title: true } } },
+      // `kind` 를 함께 싣는다 — 리그에만 걸리는 규칙(D9 거부 사유)이 이 값을 봐야 하는데,
+      // 따로 조회하면 왕복이 하나 늘고 표면 게이트에 자리가 하나 더 생긴다. 이 조회는
+      // 등록 id 로 시작하므로 **종류를 게이트로 쓰는 자리가 아니다**(무엇인지만 묻는다).
+      include: { tournament: { select: { title: true, kind: true } } },
     });
     if (!registration) {
       throw new NotFoundException({

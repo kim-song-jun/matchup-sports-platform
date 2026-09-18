@@ -2,6 +2,7 @@
 
 import type { KeyboardEvent, ReactNode } from 'react';
 import { AdminEmpty } from './admin-empty';
+import { PaginationBar, type PaginationBarProps } from '../v1-ui/pagination-bar';
 import { AdminListSkeleton } from './admin-skeleton';
 
 // ── Column definition ─────────────────────────────────────────────────────
@@ -52,6 +53,13 @@ interface AdminDataTableProps<T> {
    */
   tableMaxWidth?: string;
   /**
+   * 폭이 넓어 가로 스크롤이 생기는 표에서 관리(actions) 열을 오른쪽에 고정한다.
+   * 핵심 액션 버튼이 스크롤해야만 보이는 것을 막는다(2026-08-25 사용자 확정 — 리그 대진 표).
+   * 고정 셀은 스크롤 콘텐츠가 비쳐 보이지 않도록 카드 배경을 불투명하게 깐다 —
+   * rowTone 틴트·hover 배경은 고정 셀 아래에서는 보이지 않는 것이 의도된 트레이드오프다.
+   */
+  stickyActions?: boolean;
+  /**
    * #9: Per-row visual tone for dangerous/warning states (suspended, blocked, cancelled…).
    * danger → var(--red50)/40 + left red accent bar.
    * warning → var(--tint-orange) + left amber accent bar.
@@ -68,15 +76,8 @@ interface AdminDataTableProps<T> {
   pagination?: AdminTablePagination;
 }
 
-export interface AdminTablePagination {
-  page: number;
-  totalPages: number;
-  total: number;
-  limit: number;
-  onPageChange: (page: number) => void;
-  /** 페이지 이동 요청이 진행 중이면 버튼을 잠근다. */
-  loading?: boolean;
-}
+/** 표 하단 페이지네이션 props — 공용 `PaginationBar` 와 같은 계약을 쓴다. */
+export type AdminTablePagination = PaginationBarProps;
 
 // ── Alignment utility ─────────────────────────────────────────────────────
 function alignClass(align: AdminTableColumn<unknown>['align']): string {
@@ -109,6 +110,7 @@ export function AdminDataTable<T>({
   skeletonRows = 5,
   scrollOnMobile = false,
   tableMaxWidth,
+  stickyActions = false,
   rowTone,
   onRowClick,
   rowClickLabel,
@@ -157,12 +159,12 @@ export function AdminDataTable<T>({
   // smaller text, no forced tableMaxWidth (the table sizes to its content
   // inside a horizontally scrollable wrapper instead).
   function renderTable(compact: boolean) {
-    const cellPad = compact ? 'px-3 py-2.5' : 'px-4 py-3';
+    const cellPad = compact ? 'px-3 py-3' : 'px-4 py-3';
     // tableMaxWidth는 데스크톱 래퍼(아래 hidden lg:block div)에만 적용한다 —
     // 여기 <table> 자체에 같이 걸면 w-max로 콘텐츠 폭까지 자라야 할 테이블이
     // 그 cap에 눌려 overflow-x-auto 스크롤 대신 다시 컬럼 압축이 재발한다.
     const tableClassName = compact
-      ? 'w-max min-w-full text-[13px] text-[var(--text-body)]'
+      ? 'w-max min-w-full text-[length:var(--font-size-label)] text-[var(--text-body)]'
       : 'w-max min-w-full text-sm text-[var(--text-body)]';
 
     return (
@@ -175,7 +177,7 @@ export function AdminDataTable<T>({
                 scope="col"
                 className={[
                   cellPad,
-                  'font-semibold text-[var(--text-muted)] text-[12px] tracking-wide whitespace-nowrap select-none',
+                  'font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)] tracking-wide whitespace-nowrap select-none',
                   alignClass(col.align),
                   col.width ?? '',
                   col.className ?? '',
@@ -187,7 +189,11 @@ export function AdminDataTable<T>({
             {hasActions && (
               <th
                 scope="col"
-                className={[cellPad, 'font-semibold text-[var(--text-muted)] text-[12px] tracking-wide text-right whitespace-nowrap'].join(' ')}
+                className={[
+                  cellPad,
+                  'font-semibold text-[var(--text-muted)] text-[length:var(--font-size-caption)] tracking-wide text-right whitespace-nowrap',
+                  stickyActions ? 'sticky right-0 z-20 bg-[var(--card-surface)] border-l border-[var(--border)]' : '',
+                ].filter(Boolean).join(' ')}
               >
                 {actionsHeader ?? '작업'}
               </th>
@@ -222,7 +228,8 @@ export function AdminDataTable<T>({
                   onRowClick
                     ? 'cursor-pointer hover:bg-[var(--surface-soft)]/60 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2'
                     : '',
-                  tone ? ROW_TONE_TR[tone] : '',
+                  // 틴트 지면(#feebec/orange tint) 위 grey600 캡션은 4.0~4.3:1 — grey700으로 올린다.
+                  tone ? 'tm-on-tint ' + ROW_TONE_TR[tone] : '',
                 ].filter(Boolean).join(' ')}
               >
                 {columns.map((col, colIdx) => (
@@ -242,8 +249,19 @@ export function AdminDataTable<T>({
                   </td>
                 ))}
                 {hasActions && (
-                  <td className={[cellPad, 'text-right align-middle'].join(' ')}>
-                    <div className="flex items-center justify-end gap-2">
+                  <td
+                    className={[
+                      cellPad,
+                      'text-right align-middle',
+                      stickyActions ? 'sticky right-0 z-[5] bg-[var(--card-surface)] border-l border-[var(--border)]' : '',
+                    ].filter(Boolean).join(' ')}
+                  >
+                    {/* 액션 클릭이 행 클릭(onRowClick)으로 전파되면 버튼을 눌렀는데 상세로
+                        이동한다 — 소비자마다 stopPropagation 을 복제하는 대신 여기서 끊는다. */}
+                    <div
+                      className="flex items-center justify-end gap-2"
+                      onClick={onRowClick ? (event) => event.stopPropagation() : undefined}
+                    >
                       {renderActions!(row)}
                     </div>
                   </td>
@@ -286,18 +304,49 @@ export function AdminDataTable<T>({
             return (
             <li
               key={keyExtractor(row)}
-              className={['bg-[var(--card-surface)] rounded-xl border border-[var(--border)] px-4 py-3', tone ? ROW_TONE_TR[tone] : '', tone ? ROW_TONE_ACCENT[tone] : ''].filter(Boolean).join(' ')}
+              // 데스크톱 <tr>과 같은 행 진입 계약 — 모바일이 본무대인데 카드 스택에만
+              // 클릭 배선이 없어 목록→상세 진입이 데스크톱 전용이었다.
+              {...(onRowClick
+                ? {
+                    onClick: () => onRowClick(row),
+                    onKeyDown: (event: KeyboardEvent<HTMLLIElement>) => {
+                      if (event.key !== 'Enter' && event.key !== ' ') return;
+                      // 카드 안의 버튼·링크에서 올라온 키 입력까지 행 클릭으로 삼키지 않는다.
+                      if (event.target !== event.currentTarget) return;
+                      event.preventDefault();
+                      onRowClick(row);
+                    },
+                    tabIndex: 0,
+                    role: 'button' as const,
+                    'aria-label': rowClickLabel?.(row),
+                  }
+                : {})}
+              className={[
+                'bg-[var(--card-surface)] rounded-xl border border-[var(--border)] px-4 py-3',
+                onRowClick
+                  ? 'cursor-pointer transition-colors hover:bg-[var(--surface-soft)]/60 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:-outline-offset-2'
+                  : '',
+                tone ? 'tm-on-tint ' + ROW_TONE_TR[tone] : '',
+                tone ? ROW_TONE_ACCENT[tone] : '',
+              ].filter(Boolean).join(' ')}
             >
-              <dl className="flex flex-col gap-1.5">
+              <dl className="flex flex-col gap-2">
                 {columns.map((col) => (
-                  <div key={col.key} className="flex items-start gap-2 text-[13px]">
+                  <div key={col.key} className="flex items-start gap-2 text-[length:var(--font-size-label)]">
                     <dt className="shrink-0 text-[var(--text-muted)] w-[90px] font-medium">{col.header}</dt>
-                    <dd className="text-[var(--text-body)] flex-1 tabular-nums">{col.render(row)}</dd>
+                    {/* min-w-0: flex item 의 기본 min-width 는 auto 라, 셀 내용이 길면 dd 가
+                        줄어들지 못하고 뷰포트를 밀어낸다(390px 화면에서 dd 가 410px 로 버텨
+                        문서에 가로 스크롤 +151px 발생 — /admin/notices 실측). 안쪽 truncate 도
+                        이 min-width 가 풀려야 동작한다. */}
+                    <dd className="min-w-0 text-[var(--text-body)] flex-1 tabular-nums">{col.render(row)}</dd>
                   </div>
                 ))}
               </dl>
               {hasActions && (
-                <div className="mt-3 flex items-center gap-2 justify-end border-t border-[var(--border)] pt-2.5">
+                <div
+                  className="mt-3 flex items-center gap-2 justify-end border-t border-[var(--border)] pt-3"
+                  onClick={onRowClick ? (event) => event.stopPropagation() : undefined}
+                >
                   {renderActions!(row)}
                 </div>
               )}
@@ -308,7 +357,7 @@ export function AdminDataTable<T>({
       )}
 
       {pagination && pagination.totalPages > 1 && (
-        <AdminTablePaginationBar {...pagination} />
+        <PaginationBar {...pagination} />
       )}
     </>
   );
@@ -317,109 +366,8 @@ export function AdminDataTable<T>({
 /**
  * 표 하단 페이지네이션. "전체 N건 중 M–K"를 함께 보여준다 — 운영자가 목록 어디쯤을 보고
  * 있는지 알아야 하고, 커서 기반 "더 보기"만으로는 그 감각이 생기지 않는다.
+ *
+ * 구현은 `components/v1-ui/pagination-bar.tsx` 로 옮겼다(소비자 대회 목록도 같은 바를
+ * 쓴다). 이 이름은 어드민 19곳의 호출부를 그대로 두려고 남긴 재수출이다.
  */
-export function AdminTablePaginationBar({
-  page,
-  totalPages,
-  total,
-  limit,
-  onPageChange,
-  loading,
-}: AdminTablePagination) {
-  const from = (page - 1) * limit + 1;
-  const to = Math.min(page * limit, total);
-  const pages = visiblePages(page, totalPages);
-
-  const btn = [
-    'inline-flex items-center justify-center min-w-[40px] min-h-[40px] px-2 rounded-lg',
-    'text-[var(--font-size-label)] font-medium transition-colors',
-    'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-    'disabled:cursor-not-allowed disabled:opacity-40',
-  ].join(' ');
-
-  return (
-    <nav
-      className="flex flex-wrap items-center justify-between gap-3 pt-1"
-      aria-label="목록 페이지"
-    >
-      <p className="text-[var(--font-size-label)] text-[var(--text-muted)] tabular-nums">
-        전체 {total.toLocaleString('ko-KR')}건 중 {from.toLocaleString('ko-KR')}–
-        {to.toLocaleString('ko-KR')}
-      </p>
-
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => onPageChange(page - 1)}
-          disabled={page <= 1 || loading}
-          className={[btn, 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)]'].join(' ')}
-          aria-label="이전 페이지"
-        >
-          이전
-        </button>
-
-        {pages.map((item, index) =>
-          item === null ? (
-            // 페이지가 많을 때의 생략 구간. 버튼이 아니므로 포커스를 받지 않는다.
-            <span
-              key={`gap-${index}`}
-              className="px-1 text-[var(--text-muted)] select-none"
-              aria-hidden="true"
-            >
-              …
-            </span>
-          ) : (
-            <button
-              key={item}
-              type="button"
-              onClick={() => onPageChange(item)}
-              disabled={loading}
-              aria-current={item === page ? 'page' : undefined}
-              aria-label={`${item}페이지`}
-              className={[
-                btn,
-                'tabular-nums',
-                item === page
-                  ? 'bg-blue-500 text-white'
-                  : 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)]',
-              ].join(' ')}
-            >
-              {item}
-            </button>
-          ),
-        )}
-
-        <button
-          type="button"
-          onClick={() => onPageChange(page + 1)}
-          disabled={page >= totalPages || loading}
-          className={[btn, 'text-[var(--text-muted)] hover:bg-[var(--surface-soft)]'].join(' ')}
-          aria-label="다음 페이지"
-        >
-          다음
-        </button>
-      </div>
-    </nav>
-  );
-}
-
-/**
- * 현재 페이지 주변만 보여주고 나머지는 생략(null)으로 접는다. 페이지가 수백 개가 되어도
- * 버튼 줄이 넘치지 않게 한다.
- */
-function visiblePages(page: number, totalPages: number): Array<number | null> {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1);
-  }
-
-  const pages: Array<number | null> = [1];
-  const start = Math.max(2, page - 1);
-  const end = Math.min(totalPages - 1, page + 1);
-
-  if (start > 2) pages.push(null);
-  for (let current = start; current <= end; current += 1) pages.push(current);
-  if (end < totalPages - 1) pages.push(null);
-
-  pages.push(totalPages);
-  return pages;
-}
+export { PaginationBar as AdminTablePaginationBar };

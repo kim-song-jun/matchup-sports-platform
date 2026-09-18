@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
-import { FOOTBALL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config.presets';
+import { FOOTBALL_V1_CONFIG, FUTSAL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config.presets';
 import type { GameActorScope, GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
@@ -32,6 +32,13 @@ const ids = {
   fixture: '66000000-0000-4000-8000-000000000031',
   assignment: '66000000-0000-4000-8000-000000000040',
   config: '66000000-0000-4000-8000-000000000050',
+  futsalSport: '66000000-0000-4000-8000-000000000060',
+  futsalHostTeam: '66000000-0000-4000-8000-000000000061',
+  futsalAwayTeam: '66000000-0000-4000-8000-000000000062',
+  futsalTournament: '66000000-0000-4000-8000-000000000063',
+  futsalMatch: '66000000-0000-4000-8000-000000000064',
+  futsalAssignment: '66000000-0000-4000-8000-000000000065',
+  futsalConfig: '66000000-0000-4000-8000-000000000066',
 } as const;
 
 const prisma = new PrismaService();
@@ -73,6 +80,10 @@ describe('POST /games/:gameId/events — SUBSTITUTION (live-substitution)', () =
   let homeBench1Id: string;
   let homeBench2Id: string;
   let awayStarterId: string;
+  let rollingGameId: string;
+  let rollingHomeSideId: string;
+  let rollingHomeStarterId: string;
+  let rollingHomeBenchId: string;
 
   beforeAll(async () => {
     if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required');
@@ -100,20 +111,63 @@ describe('POST /games/:gameId/events — SUBSTITUTION (live-substitution)', () =
         contentHash,
       },
     });
+    const rollingHash = createHash('sha256').update(JSON.stringify(FUTSAL_V1_CONFIG)).digest('hex');
+    const rollingConfig = await prisma.v1CompetitionConfigVersion.create({
+      data: {
+        id: ids.futsalConfig,
+        sportCode: 'futsal',
+        name: 'futsal-v1-substitution-test',
+        version: 1,
+        status: 'ACTIVE',
+        periods: FUTSAL_V1_CONFIG.periods,
+        events: FUTSAL_V1_CONFIG.events,
+        lineup: FUTSAL_V1_CONFIG.lineup,
+        result: FUTSAL_V1_CONFIG.result,
+        tieBreak: FUTSAL_V1_CONFIG.tieBreak,
+        visibility: FUTSAL_V1_CONFIG.visibility,
+        contentHash: rollingHash,
+      },
+    });
 
     await prisma.v1User.create({ data: { id: ids.operator, email: 'task-substitution-operator@example.test', accountStatus: 'active', onboardingStatus: 'completed' } });
     await prisma.v1Sport.create({ data: { id: ids.sport, code: 'football-substitution', name: 'Task Substitution Football' } });
+    await prisma.v1Sport.create({ data: { id: ids.futsalSport, code: 'futsal-substitution', name: 'Task Substitution Futsal' } });
     await prisma.v1Region.create({ data: { id: ids.region, code: 'TASK_SUB_REGION', name: 'Task Substitution Region', level: 1 } });
     await prisma.v1Team.createMany({
       data: [
         { id: ids.hostTeam, ownerUserId: ids.operator, sportId: ids.sport, regionId: ids.region, name: 'Substitution Host' },
         { id: ids.awayTeam, ownerUserId: ids.operator, sportId: ids.sport, regionId: ids.region, name: 'Substitution Away' },
+        { id: ids.futsalHostTeam, ownerUserId: ids.operator, sportId: ids.futsalSport, regionId: ids.region, name: 'Rolling Host' },
+        { id: ids.futsalAwayTeam, ownerUserId: ids.operator, sportId: ids.futsalSport, regionId: ids.region, name: 'Rolling Away' },
       ],
     });
-    await prisma.v1Tournament.create({ data: { id: ids.tournament, sportId: ids.sport, title: 'Task Substitution Tournament', competitionConfigVersionId: config.id } });
-    await prisma.v1TournamentFixture.create({ data: { id: ids.fixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, competitionConfigVersionId: config.id } });
+    await prisma.v1Tournament.create({ data: { id: ids.tournament, sportId: ids.sport, title: 'Task Substitution Tournament', kind: 'regular_tournament', format: 'league', status: 'in_progress', competitionConfigVersionId: config.id } });
+    await prisma.v1Tournament.create({ data: { id: ids.futsalTournament, sportId: ids.futsalSport, title: 'Task Rolling Tournament', kind: 'regular_tournament', format: 'league', status: 'in_progress', competitionConfigVersionId: rollingConfig.id } });
+    await prisma.v1TournamentRegistration.createMany({
+      data: [
+        { id: '66000000-0000-4000-8000-000000000067', tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.operator, status: 'confirmed' },
+        { id: '66000000-0000-4000-8000-000000000068', tournamentId: ids.tournament, teamId: ids.awayTeam, appliedByUserId: ids.operator, status: 'confirmed' },
+        { id: '66000000-0000-4000-8000-000000000069', tournamentId: ids.futsalTournament, teamId: ids.futsalHostTeam, appliedByUserId: ids.operator, status: 'confirmed' },
+        { id: '66000000-0000-4000-8000-00000000006a', tournamentId: ids.futsalTournament, teamId: ids.futsalAwayTeam, appliedByUserId: ids.operator, status: 'confirmed' },
+      ],
+    });
+    await prisma.v1TeamMatch.createMany({
+      data: [
+        { id: ids.fixture, tournamentId: ids.tournament, sportId: ids.sport, regionId: ids.region, title: 'Canonical limited match', createdByUserId: ids.operator, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.awayTeam, startAt: new Date(Date.now() - 60_000), status: 'matched', competitionConfigVersionId: config.id },
+        { id: ids.futsalMatch, tournamentId: ids.futsalTournament, sportId: ids.futsalSport, regionId: ids.region, title: 'Canonical rolling match', createdByUserId: ids.operator, hostTeamId: ids.futsalHostTeam, approvedApplicantTeamId: ids.futsalAwayTeam, startAt: new Date(Date.now() - 60_000), status: 'matched', competitionConfigVersionId: rollingConfig.id },
+      ],
+    });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: [
+        { teamMatchId: ids.fixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, legNumber: 1, homeRegistrationId: '66000000-0000-4000-8000-000000000067', awayRegistrationId: '66000000-0000-4000-8000-000000000068' },
+        { teamMatchId: ids.futsalMatch, tournamentId: ids.futsalTournament, round: 'group', fixtureNumber: 1, legNumber: 1, homeRegistrationId: '66000000-0000-4000-8000-000000000069', awayRegistrationId: '66000000-0000-4000-8000-00000000006a' },
+      ],
+    });
     await prisma.v1TournamentStaffAssignment.create({
       data: { id: ids.assignment, tournamentId: ids.tournament, userId: ids.operator, role: 'TOURNAMENT_DIRECTOR', grantedByUserId: ids.operator },
+    });
+    await prisma.v1TournamentStaffAssignment.create({
+      data: { id: ids.futsalAssignment, tournamentId: ids.futsalTournament, userId: ids.operator, role: 'TOURNAMENT_DIRECTOR', grantedByUserId: ids.operator },
     });
     await prisma.v1GameOperationFlag.upsert({
       where: { key: 'PUBLIC_LIVE' },
@@ -122,7 +176,7 @@ describe('POST /games/:gameId/events — SUBSTITUTION (live-substitution)', () =
     });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: config.id,
       sides: [
@@ -137,7 +191,7 @@ describe('POST /games/:gameId/events — SUBSTITUTION (live-substitution)', () =
         { sourceParticipantId: 'away-starter', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Away Starter' },
       ],
     };
-    const actor: GameActorScope = { actorType: 'USER', actorUserId: ids.operator, role: 'field_operator', tournamentId: ids.tournament, fixtureId: ids.fixture };
+    const actor: GameActorScope = { actorType: 'SYSTEM', systemActor: 'GAME_BACKFILL' };
     const created = await prisma.$transaction((tx) => service.createFromSourceInTransaction(tx, input, context(actor, 'substitution-source-create', input)));
     gameId = created.gameId;
 
@@ -160,7 +214,10 @@ describe('POST /games/:gameId/events — SUBSTITUTION (live-substitution)', () =
     });
     await prisma.v1GameParticipant.update({
       where: { id: homeStarter1Id },
-      data: { position: 'FW', positionX: 50, positionY: 80 },
+      // This is a position-inheritance regression, not a goalkeeper-specific
+      // rule: the configured limited-substitution path must carry the outgoing
+      // goalkeeper's placement onto the incoming participant unchanged.
+      data: { position: 'GK', positionX: 50, positionY: 80 },
     });
 
     // GamesService.assertLineupsSubmittedForStart requires a SUBMITTED/LOCKED
@@ -171,6 +228,38 @@ describe('POST /games/:gameId/events — SUBSTITUTION (live-substitution)', () =
     await prisma.v1GameLineup.updateMany({
       where: { gameId, revision: 1 },
       data: { state: 'SUBMITTED' },
+    });
+
+    const rollingInput: GameSourceCreationInput = {
+      sourceType: V1GameSourceType.TEAM_MATCH,
+      sourceId: ids.futsalMatch,
+      competitionConfigVersionId: rollingConfig.id,
+      sides: [
+        { sideKey: V1GameSideKey.HOME, teamId: ids.futsalHostTeam, displayNameSnapshot: 'Rolling Host' },
+        { sideKey: V1GameSideKey.AWAY, teamId: ids.futsalAwayTeam, displayNameSnapshot: 'Rolling Away' },
+      ],
+      participants: [
+        { sourceParticipantId: 'rolling-home-starter', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Rolling Home Starter' },
+        { sourceParticipantId: 'rolling-home-bench', sideKey: V1GameSideKey.HOME, displayNameSnapshot: 'Rolling Home Bench' },
+        { sourceParticipantId: 'rolling-away-starter', sideKey: V1GameSideKey.AWAY, displayNameSnapshot: 'Rolling Away Starter' },
+      ],
+    };
+    const rollingCreated = await prisma.$transaction((tx) => service.createFromSourceInTransaction(tx, rollingInput, context(actor, 'rolling-source-create', rollingInput)));
+    rollingGameId = rollingCreated.gameId;
+    const rollingPersisted = await prisma.v1Game.findUniqueOrThrow({ where: { id: rollingGameId }, include: { sides: true, participants: true } });
+    rollingHomeSideId = rollingPersisted.sides.find((side) => side.sideKey === V1GameSideKey.HOME)!.id;
+    rollingHomeStarterId = rollingPersisted.participants.find((participant) => participant.displayNameSnapshot === 'Rolling Home Starter')!.id;
+    rollingHomeBenchId = rollingPersisted.participants.find((participant) => participant.displayNameSnapshot === 'Rolling Home Bench')!.id;
+    await prisma.v1GameParticipant.update({ where: { id: rollingHomeStarterId }, data: { started: true } });
+    await prisma.v1GameLineup.updateMany({ where: { gameId: rollingGameId, revision: 1 }, data: { state: 'SUBMITTED' } });
+    const rollingStartToken = (await prisma.v1Game.findUniqueOrThrow({ where: { id: rollingGameId }, select: { lastSequence: true } })).lastSequence;
+    const rollingTakeover = await service.requestTakeover(authUser(ids.operator), rollingGameId, { clientInstanceId: 'rolling-substitution-client', lastSequence: rollingStartToken });
+    await service.executeCommand(authUser(ids.operator), rollingGameId, 'start', 'rolling-substitution-start', {
+      expectedVersion: 0,
+      clientCommandId: 'rolling-substitution-start',
+      takeoverToken: rollingTakeover.takeoverToken,
+      occurredAt: new Date().toISOString(),
+      payload: {},
     });
 
     const startToken = (await service.requestTakeover(authUser(ids.operator), gameId, { clientInstanceId: 'substitution-client', lastSequence: 0 })).takeoverToken;
@@ -268,7 +357,7 @@ describe('POST /games/:gameId/events — SUBSTITUTION (live-substitution)', () =
     expect((stored.payload as { outParticipantId: string }).outParticipantId).toBe(homeStarter1Id);
 
     const incoming = await prisma.v1GameParticipant.findUniqueOrThrow({ where: { id: homeBench1Id } });
-    expect(incoming.position).toBe('FW');
+    expect(incoming.position).toBe('GK');
     expect(incoming.positionX).toBe(50);
     expect(incoming.positionY).toBe(80);
   });
@@ -330,5 +419,29 @@ describe('POST /games/:gameId/events — SUBSTITUTION (live-substitution)', () =
       payload: { outParticipantId: homeStarter1Id },
     });
     expect(appended.sequence).toBeGreaterThan(0);
+  });
+
+  it('롤링 교체 종목에서는 교체 커맨드가 422 SUBSTITUTION_NOT_TRACKED 로 거부된다 (Task 166 BE-3)', async () => {
+    // 독립된 canonical futsal TEAM_MATCH fixture다. football game의 config를
+    // 바꿔서 rolling을 흉내 내면 실제 source/config pin 분리를 검증하지 못한다.
+    expect(FUTSAL_V1_CONFIG.lineup.substitutions).toBe('rolling');
+    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: rollingGameId }, select: { version: true } });
+    const token = await service.requestTakeover(authUser(ids.operator), rollingGameId, { clientInstanceId: 'sub-rolling-blocked', lastSequence: 0 });
+    const failure = await captureFailure(() =>
+      service.appendEvent(authUser(ids.operator), rollingGameId, 'sub-rolling-blocked', {
+        expectedVersion: game.version,
+        clientEventId: 'sub-rolling-blocked',
+        takeoverToken: token.takeoverToken,
+        type: 'SUBSTITUTION' as never,
+        sideId: rollingHomeSideId,
+        participantId: rollingHomeBenchId,
+        period: 1,
+        clockMs: 4000,
+        occurredAt: new Date().toISOString(),
+        payload: { outParticipantId: rollingHomeStarterId },
+      }),
+    );
+    expectHttpCode(failure, 422, 'SUBSTITUTION_NOT_TRACKED');
+    expect(await prisma.v1GameEvent.findFirst({ where: { gameId: rollingGameId, clientEventId: 'sub-rolling-blocked' } })).toBeNull();
   });
 });

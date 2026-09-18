@@ -4,7 +4,7 @@ import Link from 'next/link';
 import type { MouseEvent, PointerEvent, ReactNode } from 'react';
 import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Check, Pin, Send } from 'lucide-react';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChatIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
@@ -13,43 +13,63 @@ import { formatChatDate, formatChatTime, shouldShowChatDate } from './chat-messa
 import { NotificationDetailSheet } from './notification-detail-sheet';
 import { NotificationTypeIcon, notificationTypeLabel } from './notification-visual';
 import type { ChatListViewModel, ChatRoomModel, ChatRoomViewModel, NotificationModel, NotificationsViewModel } from './community.types';
+import { TeamContactStatusCard, contactStatusLabel } from './team-contact-status-card';
 
 export function ChatListPageView({ model }: { model: ChatListViewModel }) {
+  // 셸 승격(U34): title/activeTab/bottomNav/backHref/showNotifications 전부 정적이라
+  // route-chrome/fragments/community.ts 테이블로 옮겼다 — 이 뷰엔 override가 필요 없다.
   return (
-    <AppChrome
-      title="채팅"
-      activeTab="my"
-      bottomNav={false}
-      backHref="/home"
-      showNotifications={false}
-    >
-      <div className="tm-chat-mobile-pane">
+    <>
+      <div className="tm-chat-mobile-pane tm-content-enter">
         <ChatListContent model={model} />
       </div>
       <ChatDesktopWorkspace listModel={model} />
-    </AppChrome>
+    </>
   );
 }
 
 function ChatListContent({ model, selectedRoomId }: { model: ChatListViewModel; selectedRoomId?: string }) {
-  const hasRooms = model.pinnedRooms.length > 0 || model.rooms.length > 0;
+  const ended = model.endedContacts;
+  const hasEndedRooms = Boolean(ended?.visible && ended.rooms.length > 0);
+  // "종료된 컨택 보기" 가 켜져 있으면 목록이 (아직) 비어 있어도 빈 상태를 띄우지 않는다 — 보관 목록이
+  // 로딩 중이거나 0건일 때 "아직 채팅방이 없어요" 가 잠깐 겹쳐 보이던 결함(#992 Copilot).
+  const endedVisible = Boolean(ended?.visible);
+  const hasRooms = model.pinnedRooms.length > 0 || model.rooms.length > 0 || endedVisible;
 
   return (
-    <div className="tm-chat-list">
-          <div className="tm-sport-chip-row" role="group" aria-label="채팅 카테고리 필터">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect} aria-pressed={category.active}>{category.label} {category.count}</button>)}</div>
+    // 방이 없을 때만 tm-list-empty — 목록이 있는 평소 레이아웃은 그대로 둔다.
+    <div className={`tm-chat-list${!hasRooms ? ' tm-list-empty' : ''}`}>
+          <div className="tm-sport-chip-row" role="group" aria-label="채팅 카테고리 필터">{model.categories.map((category) => <button key={category.label} className={`tm-chip ${category.active ? 'tm-chip-active' : ''}`} type="button" onClick={category.onSelect} aria-pressed={category.active}>{category.label}{category.count === undefined ? '' : ` ${category.count}`}</button>)}</div>
+          {ended ? (
+            <div className="tm-chat-ended-toggle">
+              <button
+                type="button"
+                className={`tm-btn tm-btn-sm ${ended.visible ? 'tm-btn-neutral' : 'tm-btn-ghost'}`}
+                aria-pressed={ended.visible}
+                onClick={ended.onToggle}
+              >
+                {ended.visible ? '종료된 컨택 숨기기' : '종료된 컨택 보기'}
+              </button>
+            </div>
+          ) : null}
           {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
           {model.status === 'error' && !hasRooms ? (
             <ErrorState
-              message={model.emptyTitle ?? '채팅방을 불러오지 못했어요.'}
+              title={model.emptyTitle ?? '채팅방을 불러오지 못했어요'}
+              message={model.emptyBody ?? '잠시 후 다시 시도해 주세요.'}
               onRetry={model.onRetry}
+              retryLabel="다시 불러오기"
             />
           ) : model.status !== 'loading' && model.status !== 'error' && !hasRooms ? (
             /* [P2 UX 라이팅] cta 능동형 표현 */
             <EmptyState
+              fill
+              illustration={{ name: 'chat-empty' }}
               title={model.emptyTitle ?? '아직 채팅방이 없어요'}
               sub={model.emptyBody ?? '매치에 참가하거나 팀에 가입하면 채팅방이 열려요.'}
               cta={model.emptyHref ? '매치 찾아보기' : undefined}
-              onCta={model.emptyHref ? () => { window.location.href = model.emptyHref!; } : undefined}
+              /* window.location.href 는 전체 새로고침이라 앱 셸까지 다시 그린다 — 링크로 SPA 이동한다. */
+              ctaHref={model.emptyHref}
             />
           ) : null}
           {hasRooms ? (
@@ -61,10 +81,24 @@ function ChatListContent({ model, selectedRoomId }: { model: ChatListViewModel; 
                   {model.pinnedRooms.map((room) => <ChatRoomRow key={room.id} room={room} selected={room.id === selectedRoomId} />)}
                 </ChatSection>
               ) : null}
-              <ChatSection title={`채팅방 ${model.rooms.length}`}>
-                {model.rooms.map((room) => <ChatRoomRow key={room.id} room={room} selected={room.id === selectedRoomId} />)}
-              </ChatSection>
+              {model.rooms.length > 0 || !endedVisible ? (
+                <ChatSection title={`채팅방 ${model.rooms.length}`}>
+                  {model.rooms.map((room) => <ChatRoomRow key={room.id} room={room} selected={room.id === selectedRoomId} />)}
+                </ChatSection>
+              ) : null}
+              {hasEndedRooms ? (
+                <ChatSection title={`종료된 컨택 ${ended!.rooms.length}`}>
+                  {ended!.rooms.map((room) => <ChatRoomRow key={room.id} room={room} selected={room.id === selectedRoomId} />)}
+                </ChatSection>
+              ) : null}
             </>
+          ) : null}
+          {ended?.visible && ended.status === 'loading' ? <PageSkeleton variant="list" /> : null}
+          {ended?.visible && ended.status === 'error' ? (
+            <div role="status" className="tm-text-caption" style={{ color: 'var(--orange700)', padding: '4px 16px' }}>종료된 컨택을 불러오지 못했어요.</div>
+          ) : null}
+          {ended?.visible && ended.status === 'ready' && ended.rooms.length === 0 ? (
+            <div role="status" className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '4px 16px' }}>종료된 컨택이 없어요.</div>
           ) : null}
     </div>
   );
@@ -105,9 +139,15 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
     return undefined;
   }, [model.sending, model.sendError]);
 
+  // 셸 승격(U34): 채팅방 제목은 fetch 의존(§1.9 "fetch된 제목" 유형) — 테이블(community.ts)엔
+  // 로딩 중 기본값만 있고, 실제 값(model.title — room.data.title 또는 로딩 placeholder)은
+  // 여기서 매 렌더 직접 override로 밀어넣는다. Hooks 규칙: 조건부 return보다 위, 렌더 함수
+  // 본문에서 직접 호출(useEffect 아님 — shell-override.ts 주석 참조).
+  useShellOverride({ title: model.title });
+
   return (
-    <AppChrome title={model.title} activeTab="my" bottomNav={false} backHref="/chat" showNotifications={false}>
-      <div className="tm-chat-desktop-workspace">
+    <>
+      <div className="tm-chat-desktop-workspace tm-content-enter">
         <aside className="tm-chat-desktop-list-pane" aria-label="채팅방 목록">
           <div className="tm-chat-desktop-pane-head">
             <h1 className="tm-text-heading">채팅</h1>
@@ -129,25 +169,37 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
       </div>
       <div className="tm-chat-room">
         <div className="tm-chat-context">
-          <Link className="tm-card tm-chat-context-card" href={model.context.href}>
-            <div className="tm-chat-context-icon"><ChatIcon size={20} strokeWidth={2} /></div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="tm-text-body-lg tm-chat-context-title">{model.context.title}</div>
-              <div className="tm-text-caption" style={{ marginTop: 3 }}>{model.context.sub}</div>
-            </div>
-            <ChevronRightIcon size={18} stroke="var(--text-caption)" />
-          </Link>
+          {model.onManageBlocked ? <button type="button" className="tm-btn tm-btn-md tm-btn-ghost" onClick={model.onManageBlocked}>채팅 차단 관리</button> : null}
+          {model.teamContact ? (
+            <TeamContactStatusCard contact={model.teamContact} />
+          ) : (
+            <Link className="tm-card tm-chat-context-card" href={model.context.href}>
+              <div className="tm-chat-context-icon"><ChatIcon size={20} strokeWidth={2} /></div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="tm-text-body-lg tm-chat-context-title">{model.context.title}</div>
+                <div className="tm-text-caption" style={{ marginTop: 3 }}>{model.context.sub}</div>
+              </div>
+              <ChevronRightIcon size={18} stroke="var(--text-caption)" />
+            </Link>
+          )}
         </div>
-        <div ref={threadRef} className="tm-chat-thread">
+        <div
+          ref={threadRef}
+          className={`tm-chat-thread${model.messages.length === 0 ? ' tm-list-empty' : ''}`}
+        >
           {model.status === 'loading' ? <PageSkeleton variant="list" /> : null}
           {model.status === 'error' && model.messages.length === 0 ? (
             <ErrorState
-              message={model.emptyTitle ?? '메시지를 불러오지 못했어요.'}
+              title={model.emptyTitle ?? '메시지를 불러오지 못했어요'}
+              message={model.emptyBody ?? '잠시 후 다시 시도해 주세요.'}
               onRetry={model.onRetry}
+              retryLabel="다시 불러오기"
             />
           ) : model.status !== 'loading' && model.status !== 'error' && model.messages.length === 0 ? (
             /* [P2 UX 라이팅] 능동형 */
             <EmptyState
+              fill
+              illustration={{ name: 'chat-empty' }}
               title={model.emptyTitle ?? '아직 메시지가 없어요'}
               sub={model.emptyBody ?? '먼저 인사를 건네 대화를 시작해요.'}
             />
@@ -188,6 +240,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
                         <div className="tm-text-body">{message.body}</div>
                       </div>
                       {message.who === 'other' && showTime ? <time className="tm-chat-message-time" dateTime={message.sentAt}>{timeLabel}</time> : null}
+                      {message.who === 'other' && model.onMessageSafety ? <button type="button" className="tm-btn tm-btn-icon tm-btn-ghost shrink-0" style={{ minWidth: 44, minHeight: 44 }} aria-label={`${message.label} 메시지 신고·차단`} onClick={() => model.onMessageSafety?.({ id: message.id, label: message.label })}>⋯</button> : null}
                     </div>
                   </div>
                 )}
@@ -200,13 +253,20 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
         {/* [P2 마이크로인터랙션] justSent: Send → Check 아이콘 + tm-complete-check 애니메이션 (0.4s) */}
         <div className="tm-chat-inputbar">
           <button className="tm-btn tm-btn-icon tm-btn-neutral" type="button" aria-label="이미지 첨부 (준비 중)" disabled><PlusIcon size={20} strokeWidth={2.2} /></button>
-          <input className="tm-chat-input-placeholder tm-create-native-input" value={model.draft ?? ''} onChange={(event) => model.onDraftChange?.(event.target.value)} placeholder="메시지 입력" aria-label="메시지 입력" disabled={model.status === 'error'} />
+          <input
+            className="tm-chat-input-placeholder tm-create-native-input"
+            value={model.draft ?? ''}
+            onChange={(event) => model.onDraftChange?.(event.target.value)}
+            placeholder={model.inputLockedMessage ?? '메시지 입력'}
+            aria-label="메시지 입력"
+            disabled={model.status !== 'ready' || Boolean(model.inputLockedMessage)}
+          />
           <button
             className="tm-btn tm-btn-icon tm-btn-primary"
             type="button"
             aria-label={justSent ? '전송 완료' : '전송'}
             aria-busy={model.sending}
-            disabled={!model.onSend || model.sending || model.status === 'error' || !model.draft?.trim()}
+            disabled={!model.onSend || model.sending || model.status !== 'ready' || Boolean(model.inputLockedMessage) || !model.draft?.trim()}
             onClick={model.onSend}
           >
             {model.sending ? '...' : justSent ? (
@@ -219,7 +279,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
       </div>
         </section>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -249,30 +309,30 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
   // 카드 탭 → 상세 시트. 시트에는 탭한 시점의 모델을 그대로 담아두므로,
   // 읽음 처리로 목록이 갱신돼도 시트 내용이 흔들리지 않는다.
   const [detail, setDetail] = useState<NotificationModel | null>(null);
+  // 셸 승격(U34): title이 ReactNode(안읽음 카운트 뱃지)라 정적 테이블(string)에 못 담고,
+  // topbarActions("모두 읽기" 버튼)도 인터랙티브 JSX라 둘 다 override 대상(§1.9 표).
+  // activeTab/bottomNav/backHref/showNotifications는 정적이라 community.ts 테이블로 옮겼다.
+  useShellOverride({
+    title: <span>알림 <span className={`tm-notification-count ${allRead ? 'tm-notification-count-muted' : ''}`}>{model.unreadCount}</span></span>,
+    topbarActions: (
+      <button
+        className="tm-btn tm-btn-sm tm-btn-ghost"
+        type="button"
+        disabled={allRead || !model.onReadAll || model.readAllPending}
+        onClick={model.onReadAll}
+      >
+        {model.readAllPending ? '읽는 중' : '모두 읽기'}
+      </button>
+    ),
+  });
   return (
-    <AppChrome
-      title={<span>알림 <span className={`tm-notification-count ${allRead ? 'tm-notification-count-muted' : ''}`}>{model.unreadCount}</span></span>}
-      activeTab="my"
-      bottomNav={false}
-      backHref="/home"
-      showNotifications={false}
-      topbarActions={(
-        <button
-          className="tm-btn tm-btn-sm tm-btn-ghost"
-          type="button"
-          disabled={allRead || !model.onReadAll || model.readAllPending}
-          onClick={model.onReadAll}
-        >
-          {model.readAllPending ? '읽는 중' : '모두 읽기'}
-        </button>
-      )}
-    >
+    <>
       {/*
        * Desktop column wrapper — display:contents on mobile, centered block on desktop.
        * Also provides the desktop page head (back + title + read-all action)
        * since the mobile topbar is hidden at ≥1024px.
        */}
-      <div className="tm-notifications-desktop-wrap">
+      <div className="tm-notifications-desktop-wrap tm-content-enter">
         {/* Desktop page head: only visible on desktop (tm-show-desktop) */}
         <div className="tm-notifications-desktop-head tm-show-desktop">
           <Link className="tm-desktop-back" href="/home" aria-label="홈으로 돌아가기">
@@ -297,18 +357,29 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
             </button>
           </div>
         </div>
-        <div className="tm-notification-list">
+        <div
+          className={`tm-notification-list${model.status !== 'loading' && model.notifications.length === 0 ? ' tm-list-empty' : ''}`}
+        >
           {/* 로딩 중에는 EmptyState 노출을 막는다 — ready 이후에만 빈 상태를 판정한다 */}
           {model.status === 'loading' ? (
             <PageSkeleton variant="list" />
           ) : model.status === 'error' ? (
             <ErrorState
-              message="알림을 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+              title="알림을 불러오지 못했어요"
+              message="잠시 후 다시 시도해 주세요."
               onRetry={model.onRetry}
+              retryLabel="다시 불러오기"
             />
           ) : model.notifications.length === 0 ? (
             /* [P2 UX 라이팅] 능동형 */
-            <EmptyState title="아직 알림이 없어요" sub="매치, 팀매치, 채팅에 새 소식이 생기면 여기서 바로 알려드려요." />
+            <EmptyState
+              fill
+              illustration={{ name: 'chat-empty' }}
+              title="아직 알림이 없어요"
+              sub="매치, 팀매치, 채팅에 새 소식이 생기면 여기서 바로 알려드려요."
+              cta="매치 둘러보기"
+              ctaHref="/matches"
+            />
           ) : (
             groups.map((group) => {
               const items = model.notifications.filter((notification) => notification.group === group);
@@ -344,7 +415,7 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
         }}
       />
       {model.readAllToastVisible ? <div className="tm-notification-toast" role="status">모든 알림을 읽었어요</div> : null}
-    </AppChrome>
+    </>
   );
 }
 
@@ -441,7 +512,16 @@ function ChatRoomRow({ room, selected = false }: { room: ChatRoomModel; selected
         <Link className="tm-chat-row-main" href={`/chat/${room.id}`} onClick={handleClick} aria-current={selected ? 'page' : undefined}>
           <div className="tm-chat-avatar" style={room.avatarUrl ? { backgroundImage: cssUrl(room.avatarUrl) } : undefined}>{room.avatarUrl ? null : room.initials}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><div className="tm-text-body-lg tm-chat-row-title">{room.title}</div>{room.pinned ? <span className="tm-badge tm-badge-blue tm-chat-pinned-badge">고정</span> : null}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <div className="tm-text-body-lg tm-chat-row-title">{room.title}</div>
+              {room.pinned ? <span className="tm-badge tm-badge-blue tm-chat-pinned-badge">고정</span> : null}
+              {/* 팀컨택 방: 컨택 상태를 텍스트 배지로 병기한다(컬러만으로 구분 금지). 받는 팀의 미응답 요청은 "답장 필요". */}
+              {room.contactNeedsReply ? (
+                <span className="tm-badge tm-badge-orange tm-chat-pinned-badge">답장 필요</span>
+              ) : room.contactStatus ? (
+                <span className="tm-badge tm-badge-grey tm-chat-pinned-badge">{room.contactStatus === 'requested' ? '대기 중' : contactStatusLabel(room.contactStatus)}</span>
+              ) : null}
+            </div>
             <div className="tm-chat-last-line" style={{ marginTop: 3 }}>
               <span className="tm-chat-room-type">{room.type}</span>
               <span className={`tm-chat-last-message ${room.unread > 0 ? 'tm-chat-last-message-unread' : ''}`}>{room.last}</span>

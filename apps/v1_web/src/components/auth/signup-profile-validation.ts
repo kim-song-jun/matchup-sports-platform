@@ -14,14 +14,14 @@ type CompleteSignupProfileDraft = SignupProfileDraft & {
 export const SIGNUP_PROFILE_ERROR_MESSAGES: Readonly<Record<SignupProfileField, string>> = {
   displayName: '이름을 입력해 주세요.',
   phone: '휴대폰 번호는 숫자 11자리로 입력해 주세요.',
-  birthDate: '생년월일은 올바른 날짜로 입력해 주세요. 예: 1995-01-15',
+  birthDate: '만 14세 이상만 가입할 수 있어요. 생년월일을 확인해 주세요.',
   gender: '성별을 선택해 주세요.',
 };
 
 export function getSignupProfileIssue(profile: SignupProfileDraft): SignupProfileField | null {
   if (!normalizeSignupDisplayName(profile.displayName)) return 'displayName';
   if (!/^\d{11}$/.test(profile.phone)) return 'phone';
-  if (!isValidBirthDateDigits(profile.birthDate)) return 'birthDate';
+  if (!isSignupAgeEligible(profile.birthDate)) return 'birthDate';
   if (!profile.gender) return 'gender';
   return null;
 }
@@ -61,4 +61,11 @@ export function isValidBirthDateDigits(value: string): boolean {
 
 export function normalizeSignupDisplayName(value: string): string {
   return value.replace(/[\u200B-\u200D\uFEFF]/gu, '').trim();
+}
+
+/** UTC calendar age; birthday must have occurred, including leap-day boundaries. */
+export function isSignupAgeEligible(value: string, now = new Date()): boolean {
+  if (!isValidBirthDateDigits(value)) return false;
+  const cutoff = `${now.getUTCFullYear() - 14}${String(now.getUTCMonth() + 1).padStart(2, '0')}${String(now.getUTCDate()).padStart(2, '0')}`;
+  return value <= cutoff;
 }

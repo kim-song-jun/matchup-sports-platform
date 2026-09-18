@@ -3,6 +3,7 @@ import { AdminContextService } from '../common/admin-context.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { CreateTournamentSponsorDto, UpdateTournamentSponsorDto } from './dto/tournament-sponsor.dto';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 
 type TournamentSponsorRow = {
   id: string;
@@ -150,7 +151,7 @@ export class TournamentSponsorsService {
   }
 
   private async assertTournamentExists(tournamentId: string, requireLive: boolean) {
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: requireLive ? { id: tournamentId, deletedAt: null } : { id: tournamentId },
     });
 

@@ -65,3 +65,32 @@ export function extractErrorCode(err: unknown): string | null {
 
   return null;
 }
+
+/**
+ * 에러 객체에서 응답 본문의 `details` 를 꺼내요.
+ *
+ * `TEAM_CONTACT_ALREADY_ACTIVE` 처럼 code 만으로는 부족하고 부가 데이터(예:
+ * `existingContactId`)가 필요한 경우를 위한 것 — extractErrorCode 와 같은 방어적
+ * 스타일로, 호출부가 컴포넌트 안에서 직접 타입 단언을 하지 않도록 이 유틸을 거치게 해요.
+ *
+ * details 가 없거나 에러 형태를 못 찾으면 undefined — 호출부는 "부가 데이터 없음"으로
+ * 보고 fallback 문구/링크를 쓰면 돼요.
+ */
+export function extractErrorDetails(err: unknown): unknown {
+  if (!err || typeof err !== 'object') return undefined;
+
+  // 응답 본문의 details 를 먼저 본다 — Axios 에러는 body 안에 담겨 온다.
+  const maybeAxios = err as { response?: { data?: { details?: unknown } } };
+  const responseDetails = maybeAxios.response?.data?.details;
+  if (responseDetails !== undefined) {
+    return responseDetails;
+  }
+
+  // V1ApiError 는 응답 래퍼 없이 최상위 details 에 부가 데이터를 그대로 담는다.
+  const maybeApiError = err as { details?: unknown };
+  if (maybeApiError.details !== undefined) {
+    return maybeApiError.details;
+  }
+
+  return undefined;
+}

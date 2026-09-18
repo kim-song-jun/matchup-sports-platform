@@ -155,7 +155,7 @@ async function buildTournamentGame(fixtureId: string): Promise<string> {
     orderBy: { version: 'desc' },
   });
   const input: GameSourceCreationInput = {
-    sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+    sourceType: V1GameSourceType.TEAM_MATCH,
     sourceId: fixtureId,
     competitionConfigVersionId: config.id,
     sides: [
@@ -417,74 +417,56 @@ describe('대회 결과 정정 레인 가드', () => {
         { id: ids.groupPhaseGroup, tournamentId: ids.tournament, name: 'A조', phase: 'group' },
       ],
     });
-    await prisma.v1TournamentFixture.createMany({
-      data: [
+    const matchDefinitions = [
         {
           id: ids.drawCorrectionFixture,
-          tournamentId: ids.tournament,
           groupId: ids.semiGroup,
           round: '준결승',
           fixtureNumber: 1,
-          competitionConfigVersionId: config.id,
         },
         {
           id: ids.nextRoundFixture,
-          tournamentId: ids.tournament,
           groupId: ids.semiGroup,
           round: '결승',
           fixtureNumber: 1,
-          competitionConfigVersionId: config.id,
         },
         {
           id: ids.penaltyCorrectionFixture,
-          tournamentId: ids.tournament,
           groupId: ids.semiGroup,
           round: '준결승',
           fixtureNumber: 2,
-          competitionConfigVersionId: config.id,
         },
         {
           id: ids.penaltyNextRoundFixture,
-          tournamentId: ids.tournament,
           groupId: ids.semiGroup,
           round: '결승',
           fixtureNumber: 2,
-          competitionConfigVersionId: config.id,
         },
         {
           id: ids.kickCountBypassFixture,
-          tournamentId: ids.tournament,
           groupId: ids.semiGroup,
           round: '준결승',
           fixtureNumber: 6,
-          competitionConfigVersionId: config.id,
         },
         {
           id: ids.participantGuardFixture,
-          tournamentId: ids.tournament,
           groupId: ids.groupPhaseGroup,
           round: '조별리그',
           fixtureNumber: 1,
-          competitionConfigVersionId: config.id,
         },
         {
           id: ids.foreignFixture,
-          tournamentId: ids.tournament,
           groupId: ids.groupPhaseGroup,
           round: '조별리그',
           fixtureNumber: 2,
-          competitionConfigVersionId: config.id,
         },
         {
           id: ids.carryOverFixture,
-          tournamentId: ids.tournament,
           groupId: ids.semiGroup,
           round: '준결승',
           fixtureNumber: 3,
-          competitionConfigVersionId: config.id,
         },
-      ],
-    });
+    ] as const;
     await prisma.v1TournamentRegistration.createMany({
       data: [
         {
@@ -503,36 +485,45 @@ describe('대회 결과 정정 레인 가드', () => {
         },
       ],
     });
-    for (const fixtureId of [
-      ids.drawCorrectionFixture,
-      ids.penaltyCorrectionFixture,
-      ids.participantGuardFixture,
-      ids.foreignFixture,
-      ids.carryOverFixture,
-      ids.kickCountBypassFixture,
-    ]) {
-      // eslint-disable-next-line no-await-in-loop
-      await prisma.v1TournamentFixture.update({
-        where: { id: fixtureId },
-        data: { homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration },
-      });
-    }
+    await prisma.v1TeamMatch.createMany({
+      data: matchDefinitions.map((match) => ({
+        id: match.id,
+        tournamentId: ids.tournament,
+        sportId: ids.sport,
+        title: `Correction ${match.id}`,
+        status: 'matched' as const,
+        competitionConfigVersionId: config.id,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+      })),
+    });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: matchDefinitions.map((match) => ({
+        teamMatchId: match.id,
+        tournamentId: ids.tournament,
+        groupId: match.groupId,
+        round: match.round,
+        fixtureNumber: match.fixtureNumber,
+        homeRegistrationId: ids.hostRegistration,
+        awayRegistrationId: ids.opponentRegistration,
+      })),
+    });
     // 진출 엣지가 있어야 브래킷 프로젝션이 실제로 승자를 판정한다
     // (`edges.length === 0`이면 그냥 return하므로 POISONED가 될 수 없다).
-    await prisma.v1TournamentFixtureAdvancementEdge.createMany({
+    await prisma.v1TournamentMatchAdvancementEdge.createMany({
       data: [
         {
           tournamentId: ids.tournament,
-          sourceFixtureId: ids.drawCorrectionFixture,
+          sourceTeamMatchId: ids.drawCorrectionFixture,
           sourceOutcome: 'WINNER',
-          targetFixtureId: ids.nextRoundFixture,
+          targetTeamMatchId: ids.nextRoundFixture,
           targetSide: 'HOME',
         },
         {
           tournamentId: ids.tournament,
-          sourceFixtureId: ids.penaltyCorrectionFixture,
+          sourceTeamMatchId: ids.penaltyCorrectionFixture,
           sourceOutcome: 'WINNER',
-          targetFixtureId: ids.penaltyNextRoundFixture,
+          targetTeamMatchId: ids.penaltyNextRoundFixture,
           targetSide: 'HOME',
         },
       ],
@@ -542,6 +533,10 @@ describe('대회 결과 정정 레인 가드', () => {
       create: { key: 'DIRECTOR_OFFICIALIZE', value: 'off', ownerActor: 'platform_ops' },
       update: { value: 'off' },
     });
+    // Canonical advancement validates scheduled target Games and both sides
+    // before assigning the projected registration.
+    await buildTournamentGame(ids.nextRoundFixture);
+    await buildTournamentGame(ids.penaltyNextRoundFixture);
   });
 
   afterAll(async () => {
@@ -606,8 +601,8 @@ describe('대회 결과 정정 레인 가드', () => {
     });
 
     // 최초 확정은 home 승 → 다음 라운드 HOME 슬롯은 host 팀.
-    const targetBefore = await prisma.v1TournamentFixture.findUniqueOrThrow({
-      where: { id: ids.penaltyNextRoundFixture },
+    const targetBefore = await prisma.v1TournamentMatchDetails.findUniqueOrThrow({
+      where: { teamMatchId: ids.penaltyNextRoundFixture },
     });
     expect(targetBefore.homeRegistrationId).toBe(ids.hostRegistration);
 
@@ -647,8 +642,8 @@ describe('대회 결과 정정 레인 가드', () => {
 
     // 승자가 그대로이므로 브래킷 배정도 그대로다(`assignTarget`은
     // `current === registrationId`에서 조용히 return한다).
-    const targetAfter = await prisma.v1TournamentFixture.findUniqueOrThrow({
-      where: { id: ids.penaltyNextRoundFixture },
+    const targetAfter = await prisma.v1TournamentMatchDetails.findUniqueOrThrow({
+      where: { teamMatchId: ids.penaltyNextRoundFixture },
     });
     expect(targetAfter.homeRegistrationId).toBe(ids.hostRegistration);
 

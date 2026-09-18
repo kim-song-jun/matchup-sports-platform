@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
 import { TournamentRegistrationsService } from './tournament-registrations.service';
+import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
 
 const manager = { id: 'manager-user', email: 'm@teameet.v1', accountStatus: 'active' as const, onboardingStatus: 'completed' as const };
 
@@ -70,12 +71,14 @@ describe('TournamentRegistrationsService', () => {
     v1Tournament: { findFirst: jest.Mock };
     v1TournamentRegistration: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock; create: jest.Mock; update: jest.Mock; count: jest.Mock };
     v1TournamentPayment: { upsert: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
-    v1TournamentPlayer: { count: jest.Mock; groupBy: jest.Mock };
+    v1TournamentPlayer: { count: jest.Mock; groupBy: jest.Mock; findMany: jest.Mock };
+    // 쓰기 메서드를 일부러 두지 않는다 -- 구현이 기록 공개 상태를 쓰려 하면 즉시 깨져야 한다.
+    v1UserRecordConsent: { findMany: jest.Mock };
     v1UserProfile: { updateMany: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
   };
-  let notifications: { emitNotification: jest.Mock };
+  let notifications: { emitNotification: jest.Mock; emitToManyDeferred: jest.Mock };
   let managedTerms: {
     assertTournamentAcceptances: jest.Mock;
     recordTournamentDecisions: jest.Mock;
@@ -92,7 +95,8 @@ describe('TournamentRegistrationsService', () => {
       v1Tournament: { findFirst: jest.fn() },
       v1TournamentRegistration: { findUnique: jest.fn(), findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn().mockResolvedValue(0) },
       v1TournamentPayment: { upsert: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
-      v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]) },
+      v1TournamentPlayer: { count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]), findMany: jest.fn().mockResolvedValue([]) },
+      v1UserRecordConsent: { findMany: jest.fn().mockResolvedValue([]) },
       v1UserProfile: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       $transaction: jest.fn(),
       // R17-005 / R16-001 / R17-006: $queryRaw is called inside transactions for
@@ -108,7 +112,12 @@ describe('TournamentRegistrationsService', () => {
       team: { sportId: 'sport-futsal' },
     });
 
-    notifications = { emitNotification: jest.fn().mockResolvedValue(undefined) };
+    notifications = {
+      emitNotification: jest.fn().mockResolvedValue(undefined),
+      // 실제 구현은 resolver 를 즉시 실행하고 에러를 삼킨다. 테스트에서는 resolver 를
+      // 붙잡아 두고 개별 테스트가 직접 await 해서 "누구를 고르는가"를 검증한다.
+      emitToManyDeferred: jest.fn(),
+    };
     managedTerms = {
       assertTournamentAcceptances: jest.fn().mockImplementation(async (documentIds: string[]) => {
         if (![RULES_ID, PRIVACY_ID, REFUND_ID].every((id) => documentIds.includes(id))) {
@@ -137,6 +146,216 @@ describe('TournamentRegistrationsService', () => {
   });
 
   afterEach(() => jest.clearAllMocks());
+
+  /**
+   * **리그는 마감이 있어야 열린다.** 2026-09-04 사용자 확정으로 리그의 신청 판정자는
+   * `registrationDeadlineAt` 하나가 됐고(`status` 는 수명주기 표시 전용), 정본 §6 이
+   * "안 정하면(`null`) 그 리그는 신청을 안 받는다" 를 그 대가로 명시한다.
+   * 그래서 아래 리그 픽스처들은 **미래 마감**을 갖는다 — 없으면 종류 게이트가 아니라
+   * 마감에서 막혀 이 테스트들이 보려는 것을 못 본다.
+   */
+  const LEAGUE_OPEN_DEADLINE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  // ─── 통합 표면 개방 (D7 — 리그도 같은 신청 스택을 쓴다) ──────────────────────
+  // 예전엔 이 자리가 **봉쇄**였다. 통합 백필(R3)이 `v1_tournaments` 에 정규 리그 시즌을
+  // 만들면서 리그 id 가 이 조회들을 통과하기 시작했고(#863 이 공개 경로에서 실측), 등록
+  // 경로는 **쓰기**라 통과하면 리그 행에 실제 참가 신청이 붙기 때문이었다.
+  //
+  // **D7 이 바로 그것을 원한다** — 정본은 리그 참가도 신청제이고 대회와 같은 스택을 쓴다.
+  // 그래서 종류 게이트를 열었다. 아래 테스트들은 그 반대 방향을 고정한다: 리그가 실제로
+  // 통과하는지, 그리고 **종류 말고 남은 게이트들은 그대로인지**(상태·마감·권한·경합).
+  describe('통합 표면 개방', () => {
+    /**
+     * 이번 변경의 요지 — **대진이 있어 `in_progress` 인 리그도 신청을 받는다.**
+     * 예전엔 `status === 'open'` 을 요구해서 `generateFixtures` 가 status 를 옮기는 순간
+     * 신청이 영영 닫혔다(2026-09-04 alpha 실측 409). 정본 §6: "대진 생성은 신청 상태를
+     * 건드리지 않는다."
+     */
+    it('create: 진행 중(in_progress) 리그도 마감이 남아 있으면 신청을 받는다', async () => {
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(
+          openTournament({
+            kind: 'regular_league',
+            status: 'in_progress',
+            registrationDeadlineAt: LEAGUE_OPEN_DEADLINE,
+          }),
+        ),
+      );
+      prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+      // 종류·상태에서 막히면 Conflict 다. **팀 권한 403 까지 가야** 신청 게이트를 지났다는 증거다.
+      await expect(
+        service.create(manager, 'league-1', { teamId: 'team-1' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('create: 마감이 없는 리그는 받지 않는다 — 아무도 연 적이 없는 리그다', async () => {
+      // 정본 §6 "안 정하면(null) 그 리그는 신청을 안 받는다". 판정에서 status 를 뺀 이상
+      // 열렸다는 신호는 마감밖에 없다.
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(
+          openTournament({ kind: 'regular_league', status: 'in_progress', registrationDeadlineAt: null }),
+        ),
+      );
+      await expect(
+        service.create(manager, 'league-1', { teamId: 'team-1' }),
+      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_OPEN' } });
+    });
+
+    it('create: 마감이 지난 리그는 마감으로 막는다 — 상태 문제와 구분된다', async () => {
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(
+          openTournament({
+            kind: 'regular_league',
+            status: 'in_progress',
+            registrationDeadlineAt: new Date(Date.now() - 1000),
+          }),
+        ),
+      );
+      await expect(
+        service.create(manager, 'league-1', { teamId: 'team-1' }),
+      ).rejects.toMatchObject({ response: { code: 'REGISTRATION_DEADLINE_PASSED' } });
+    });
+
+    it('대회는 그대로다 — status 가 open 이 아니면 마감이 남아 있어도 안 받는다', async () => {
+      // 리그만 갈랐다는 것을 못박는다. 대회의 `status === 'open'` 요구를 건드리면 대회
+      // 신청 경로 전체가 회귀 범위에 들어온다.
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(
+          openTournament({
+            kind: 'regular_tournament',
+            status: 'in_progress',
+            registrationDeadlineAt: LEAGUE_OPEN_DEADLINE,
+          }),
+        ),
+      );
+      await expect(
+        service.create(manager, 'tournament-1', { teamId: 'team-1' }),
+      ).rejects.toMatchObject({ response: { code: 'TOURNAMENT_NOT_OPEN' } });
+    });
+
+    it('create: 리그 id 도 열린다 — 종류 게이트를 지나 다음 게이트까지 간다', async () => {
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(openTournament({ kind: 'regular_league', registrationDeadlineAt: LEAGUE_OPEN_DEADLINE })),
+      );
+      prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+      // 404 로 끝나면 종류에서 막힌 것이다. **팀 권한 403 까지 도달**해야 지났다는 증거가 된다
+      // — 통과를 "에러가 안 났다" 로 보면 다음 게이트에서 막힌 것과 구분할 수 없다.
+      await expect(service.create(manager, 'league-1', { teamId: 'team-1' })).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('create: 대회 id 와 kind=null(R1 이전 행)도 그대로 열린다', async () => {
+      // 리그만 열고 대회를 닫는 회귀를 막는다 — 셋 다 같은 자리를 지나야 한다.
+      for (const kind of ['regular_tournament', null]) {
+        prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(openTournament({ kind })));
+        prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+        await expect(service.create(manager, 'tournament-1', { teamId: 'team-1' })).rejects.toThrow(
+          ForbiddenException,
+        );
+      }
+    });
+
+    it('create: 없는 id 는 여전히 404 — 조회 자체가 사라진 것은 아니다', async () => {
+      // 종류 조건을 넓힌 것이지 조회를 없앤 것이 아니다. 이게 없으면 위 두 테스트는
+      // "`findFirst` 가 뭘 주든 통과" 와 구분되지 않는다.
+      prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(null));
+      await expect(service.create(manager, 'missing-1', { teamId: 'team-1' })).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_NOT_FOUND' },
+      });
+    });
+
+    // `submit` 은 트랜잭션 **밖**(loadOpenTournament)과 **안**(TOCTOU 재검증) 두 곳에서
+    // 대회를 읽는다. 종류 게이트는 열렸지만 **이 재검증 자체는 그대로 필요하다** — 두 조회
+    // 사이에 대회가 닫히면(운영자가 마감) 그 틈으로 신청이 들어간다. 예전엔 이 자리를
+    // "리그 행으로 바뀌는" 상황으로 태웠는데, 이제 그건 막을 이유가 아니라서 **상태가
+    // 바뀌는** 상황으로 태운다. 안 그러면 안쪽 가드가 조건 없이 남고 그 사실이 밖에서
+    // 드러나지 않는다(밖에서 이미 막히니 겉보기엔 닫혀 보인다).
+    it('submit: 트랜잭션 안 재검증이 그 사이 닫힌 대회를 막는다', async () => {
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+      prisma.v1Tournament.findFirst
+        // 바깥 조회: 신청 받는 중 → loadOpenTournament 통과
+        .mockImplementationOnce(kindAwareFindFirst(openTournament({ kind: 'regular_tournament' })))
+        // 트랜잭션 안: 같은 id 가 이미 마감돼 있다
+        .mockImplementationOnce(
+          kindAwareFindFirst(openTournament({ kind: 'regular_tournament', status: 'closed' })),
+        );
+
+      await expect(service.submit(manager, 'tournament-1', 'reg-1', validSubmit)).rejects.toMatchObject({
+        response: { code: 'TOURNAMENT_NOT_OPEN' },
+      });
+      expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+      expect(prisma.v1TournamentPayment.upsert).not.toHaveBeenCalled();
+    });
+
+    it('submit: 리그 거울도 제출까지 간다 — 정원 8 에 막히지 않는다', async () => {
+      // 거울의 `teamCount` 는 스키마 기본값 8 이라, 정원을 끄지 않으면 9번째 팀부터
+      // 409 로 막힌다. 이 테스트가 그 자리를 지킨다.
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(openTournament({ kind: 'regular_league', registrationDeadlineAt: LEAGUE_OPEN_DEADLINE, teamCount: 8 })),
+      );
+      prisma.v1TournamentRegistration.count.mockResolvedValue(20);
+      prisma.v1TournamentRegistration.update.mockResolvedValue(
+        registrationRow({ status: 'awaiting_payment' }),
+      );
+      prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+      await service.submit(manager, 'league-1', 'reg-1', validSubmit);
+      // **정원 초과 상태(20 >= 8)에서 실제로 상태가 바뀌었는지**까지 본다 — 호출 여부만
+      // 보면 정원 검사가 되살아나도 그 전에 이미 불린 호출로 green 이 될 수 있다.
+      expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'awaiting_payment' }) }),
+      );
+    });
+
+    it('리그는 정원 COUNT 자체를 날리지 않는다 — 결과를 안 쓸 쿼리다', async () => {
+      // 정원이 꺼진 것을 "409 가 안 난다" 로만 보면, COUNT 를 계속 날리면서 결과만 버리는
+      // 구현과 구분되지 않는다. 호출 자체가 없어야 한다(Copilot 리뷰 지적).
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(openTournament({ kind: 'regular_league', registrationDeadlineAt: LEAGUE_OPEN_DEADLINE, teamCount: 8 })),
+      );
+      prisma.v1TournamentRegistration.update.mockResolvedValue(
+        registrationRow({ status: 'awaiting_payment' }),
+      );
+      prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+      prisma.v1TournamentRegistration.count.mockClear();
+
+      await service.submit(manager, 'league-1', 'reg-1', validSubmit);
+      expect(prisma.v1TournamentRegistration.count).not.toHaveBeenCalled();
+    });
+
+    it('대회는 정원 COUNT 를 그대로 날린다 — 리그만 끈 것이지 기능을 지운 게 아니다', async () => {
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(openTournament({ kind: 'regular_tournament', teamCount: 8 })),
+      );
+      prisma.v1TournamentRegistration.update.mockResolvedValue(
+        registrationRow({ status: 'awaiting_payment' }),
+      );
+      prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+      prisma.v1TournamentRegistration.count.mockClear();
+      prisma.v1TournamentRegistration.count.mockResolvedValue(0);
+
+      await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+      expect(prisma.v1TournamentRegistration.count).toHaveBeenCalled();
+    });
+
+    it('내 신청 입금 안내: 리그도 입금 정보를 함께 받는다', async () => {
+      // 예전엔 이 조회를 막았다 — 리그 백필 행의 계좌 필드가 채워지면 그대로 새기 때문이다.
+      // D7 은 리그도 참가비를 받을 수 있는 구조이므로(거울의 `entryFee` 기본값이 0 이라
+      // 지금은 무료지만) 조회를 막지 않고, **운영자가 채운 값만** 나가게 둔다.
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(openTournament({ kind: 'regular_league', registrationDeadlineAt: LEAGUE_OPEN_DEADLINE })),
+      );
+      prisma.v1TournamentRegistration.findMany.mockResolvedValue([
+        { ...registrationRow({ status: 'awaiting_payment' }), payment: paymentRow(), team: null },
+      ]);
+      const rows = await service.getMyRegistrations(manager, 'league-1');
+      expect(JSON.stringify(rows)).toContain('국민은행');
+    });
+  });
 
   // ─── create ───────────────────────────────────────────────────────────────────
 
@@ -268,7 +487,97 @@ describe('TournamentRegistrationsService', () => {
     expect(prisma.v1TournamentRegistration.create).not.toHaveBeenCalled();
   });
 
+  // 감사 finding(reg-confirm-reapply-state-machine #2/#3): 취소 후 재신청은 완전히 새로운
+  // 사이클인데, 되살아난 draft가 이전 사이클(확정→잠금→취소)의 흔적을 그대로 물려받아
+  // (a) 새 신청인데 명단이 잠긴 채 시작하고 (b) 임시저장인데 확정일이 함께 표시됐다.
+  // 이전 status 값 하나만 보는 위 테스트는 이 회귀를 못 잡는다 — 취소된 신청건이 실제로
+  // 그 사이클을 거쳤다면(확정→명단잠금→마감예외부여→취소) 4개 필드가 전부 값을 갖고
+  // 있는 상태이고, update() 호출 인자가 그 4개를 명시적으로 null 로 되돌리는지를 직접 봐야 한다.
+  it('create: 재활성화된 신청은 rosterLockedAt/rosterDeadlineOverrideAt/confirmedAt/confirmedByAdminUserId를 모두 null로 초기화한다', async () => {
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue(
+      registrationRow({
+        status: 'cancelled',
+        // 취소 전 실제로 확정 → 명단잠금 → 마감예외 부여까지 거쳤던 신청건.
+        confirmedAt: new Date('2026-06-01T00:00:00Z'),
+        confirmedByAdminUserId: 'admin-1',
+        rosterLockedAt: new Date('2026-06-05T00:00:00Z'),
+        rosterDeadlineOverrideAt: new Date('2026-06-10T00:00:00Z'),
+      }),
+    );
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'draft' }));
+
+    await service.create(manager, 'tournament-1', { teamId: 'team-1' });
+
+    const call = prisma.v1TournamentRegistration.update.mock.calls[0][0];
+    expect(call.data.status).toBe('draft');
+    expect(call.data.rosterLockedAt).toBeNull();
+    expect(call.data.rosterDeadlineOverrideAt).toBeNull();
+    expect(call.data.confirmedAt).toBeNull();
+    expect(call.data.confirmedByAdminUserId).toBeNull();
+  });
+
   // ─── submit ───────────────────────────────────────────────────────────────────
+
+  describe('참가비 0원이면 입금 단계를 건너뛴다 (Task 164 BE-4)', () => {
+    function arrangeSubmit(entryFee: number) {
+      prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+      prisma.v1Tournament.findFirst.mockImplementation(
+        kindAwareFindFirst(openTournament({ kind: 'regular_tournament', entryFee })),
+      );
+      prisma.v1TournamentRegistration.update.mockImplementation(
+        async (args: { data: { status: string } }) => registrationRow({ status: args.data.status }),
+      );
+      prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+    }
+
+    it('0원: 등록은 payment_checking · 결제는 paid 로 곧바로 간다 — 확인할 입금이 없다', async () => {
+      arrangeSubmit(0);
+      await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+
+      // 착지 상태는 `confirmPayment` 가 만드는 것과 **같아야** 한다. 다른 상태로 보내면
+      // 그 뒤의 취소·환불·목록 필터가 0원 건만 다르게 다루게 된다.
+      expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'payment_checking' }) }),
+      );
+      const upsert = prisma.v1TournamentPayment.upsert.mock.calls[0][0] as {
+        create: { status: string; paidAt: Date | null };
+        update: { status: string; paidAt: Date | null; confirmedByAdminUserId: string | null };
+      };
+      expect(upsert.create.status).toBe('paid');
+      expect(upsert.update.status).toBe('paid');
+      // **`update` 쪽도 본다.** 결제 레코드가 이미 있는 재제출에서는 `create` 가 아니라
+      // 이쪽이 쓰인다 — `create` 만 단언하면 `update` 에서 `paidAt` 이 빠지는 회귀를
+      // 못 잡고, 그 결과는 "paid 인데 결제 시각이 null" 이다(Copilot 리뷰 지적).
+      expect(upsert.create.paidAt).toBeInstanceOf(Date);
+      expect(upsert.update.paidAt).toBeInstanceOf(Date);
+      // **과거 사이클의 운영자 id 를 물려받지 않는다.** 결제 행을 재사용하면 이전 제출에서
+      // "입금 확인" 을 누른 어드민 id 가 남아 어드민 응답에 실린다 — 이번 제출은 아무도
+      // 확인하지 않았는데 확인한 사람이 있는 것처럼 보인다.
+      expect(upsert.update.confirmedByAdminUserId).toBeNull();
+    });
+
+    it('유료: 지금까지처럼 awaiting_payment 로 간다 — 리그 편의가 대회 회귀가 되면 안 된다', async () => {
+      arrangeSubmit(120000);
+      await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+
+      expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ status: 'awaiting_payment' }) }),
+      );
+      const upsert = prisma.v1TournamentPayment.upsert.mock.calls[0][0] as {
+        create: { status: string; paidAt: Date | null };
+        update: { status: string; paidAt: Date | null; confirmedByAdminUserId: string | null };
+      };
+      expect(upsert.create.status).toBe('ready');
+      expect(upsert.update.status).toBe('ready');
+      expect(upsert.update.confirmedByAdminUserId).toBeNull();
+      // 낸 적 없는 돈에 결제 시각이 찍히면 정산·환불이 그것을 근거로 삼는다. 양쪽 다 본다.
+      // `null` 이다(미설정이 아니라 **명시적으로 비움**) — 재제출에서 옛 결제의 시각이
+      // 남아 있으면 안 되기 때문이다.
+      expect(upsert.create.paidAt).toBeNull();
+      expect(upsert.update.paidAt).toBeNull();
+    });
+  });
 
   it('submit: 본인인증을 안 한 신청자는 403 PHONE_NOT_VERIFIED 로 막고 약관 검증까지 가지 않는다', async () => {
     prisma.v1User.findUnique.mockResolvedValue({ phoneVerifiedAt: null });
@@ -314,11 +623,121 @@ describe('TournamentRegistrationsService', () => {
     ).rejects.toMatchObject({ response: { code: 'AGREEMENTS_REQUIRED' } });
   });
 
-  it('submit: bank_transfer without depositorName → 400 DEPOSITOR_NAME_REQUIRED', async () => {
+  it('submit: 제출 직전 유료 → 0원으로 바뀌면 계좌 안내가 없어도 통과한다 (반대 방향 TOCTOU)', async () => {
+    // 계좌 안내 검증을 **잠그기 전**에도 부르면, 그 사이 참가비가 0원이 됐을 때
+    // **잠근 뒤에는 통과할 요청을 사전 호출이 거짓으로 막는다** — 0원이면 낼 곳이 없으니
+    // 계좌가 필요 없다(Copilot 리뷰 지적).
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst
+      // 트랜잭션 **밖**: 유료인데 계좌 정보가 비어 있다 (사전 호출이 있으면 여기서 409)
+      .mockImplementationOnce(
+        kindAwareFindFirst(
+          openTournament({
+            kind: 'regular_tournament',
+            entryFee: 120000,
+            bankName: null,
+            bankAccount: null,
+            bankHolder: null,
+          }),
+        ),
+      )
+      // 잠근 **뒤**: 그 사이 0원이 됐다 → 계좌가 필요 없다
+      .mockImplementationOnce(
+        kindAwareFindFirst(
+          openTournament({
+            kind: 'regular_tournament',
+            entryFee: 0,
+            bankName: null,
+            bankAccount: null,
+            bankHolder: null,
+          }),
+        ),
+      );
+    prisma.v1TournamentRegistration.update.mockImplementation(
+      async (args: { data: { status: string } }) => registrationRow({ status: args.data.status }),
+    );
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'payment_checking' }) }),
+    );
+  });
+
+  it('submit: 제출 직전 0원 → 유료로 바뀌면 입금자명을 요구한다 (TOCTOU)', async () => {
+    // 가드가 **잠그기 전** 값으로 판단하면, 그 사이 운영자가 참가비를 올렸을 때
+    // **가드는 건너뛰고 청구는 발생**한다 — 입금자명이 null 인 계좌이체 신청이 남고
+    // 운영자는 들어온 입금을 어느 팀 것인지 못 맞춘다(Copilot 리뷰 지적).
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst
+      // 트랜잭션 **밖** 조회: 아직 0원
+      .mockImplementationOnce(kindAwareFindFirst(openTournament({ kind: 'regular_tournament', entryFee: 0 })))
+      // 잠근 **뒤** 재조회: 그 사이 유료로 바뀌었다
+      .mockImplementationOnce(
+        kindAwareFindFirst(openTournament({ kind: 'regular_tournament', entryFee: 120000 })),
+      );
+
+    const { depositorName: _omitted, ...withoutDepositor } = validSubmit;
+    await expect(
+      service.submit(manager, 'tournament-1', 'reg-1', withoutDepositor as typeof validSubmit),
+    ).rejects.toMatchObject({ response: { code: 'DEPOSITOR_NAME_REQUIRED' } });
+    // 막았으면 **아무것도 쓰지 않아야** 한다.
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+    expect(prisma.v1TournamentPayment.upsert).not.toHaveBeenCalled();
+  });
+
+  it('submit: 0원에 공백만 있는 입금자명은 null 로 저장한다 — 빈 문자열은 "이름이 있다"로 읽힌다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(openTournament({ kind: 'regular_tournament', entryFee: 0 })),
+    );
+    prisma.v1TournamentRegistration.update.mockImplementation(
+      async (args: { data: { status: string } }) => registrationRow({ status: args.data.status }),
+    );
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    await service.submit(manager, 'tournament-1', 'reg-1', { ...validSubmit, depositorName: '   ' });
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ depositorName: null }) }),
+    );
+  });
+
+  it('submit: 유료 bank_transfer 에 입금자명이 없으면 400 DEPOSITOR_NAME_REQUIRED', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    // 이 가드는 이제 **대회를 읽은 뒤** 돈다(`entryFee` 를 알아야 하므로) — 그 전엔
+    // 대회 fake 없이도 통과했다. 순서가 바뀌었다는 사실 자체가 여기 드러난다.
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(openTournament({ kind: 'regular_tournament', entryFee: 120000 })),
+    );
     await expect(
       service.submit(manager, 'tournament-1', 'reg-1', { ...validSubmit, depositorName: '   ' }),
     ).rejects.toMatchObject({ response: { code: 'DEPOSITOR_NAME_REQUIRED' } });
+  });
+
+  it('submit: 0원이면 입금자명 없이도 제출된다 — 낼 돈이 없는데 입금자를 물을 이유가 없다', async () => {
+    // 화면이 안 물어도 옛 클라이언트·API 직접 호출은 그대로 걸렸다. 정본 §4 "스텝 최소" 는
+    // 화면이 아니라 **계약**의 문제다.
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    // **무료 대회**로 태운다. 무료 처리는 종류와 무관한 로직이고, 이 브랜치(dev 기준)는
+    // 아직 등록 스택이 리그를 안 보므로(#984 의 표면 확대 이전) 리그 행은 여기까지 오지도
+    // 못한다 — 그걸로 쓰면 이 스펙은 무료 경로가 아니라 표면 게이트를 시험하게 된다.
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(openTournament({ kind: 'regular_tournament', entryFee: 0 })),
+    );
+    prisma.v1TournamentRegistration.update.mockImplementation(
+      async (args: { data: { status: string } }) => registrationRow({ status: args.data.status }),
+    );
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    // **`undefined` 로 보낸다** — 공백 문자열(`'   '`)로 쓰면 `.trim()` 이 그냥 동작해서
+    // non-null 단언이 깨지는 자리를 못 잡는다(Copilot 리뷰가 그 구멍을 짚었다).
+    const { depositorName: _omitted, ...withoutDepositor } = validSubmit;
+    await service.submit(manager, 'tournament-1', 'reg-1', withoutDepositor as typeof validSubmit);
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'payment_checking', depositorName: null }),
+      }),
+    );
   });
 
   it('submit: paid bank transfer without account instructions is rejected before the payment clock starts', async () => {
@@ -435,6 +854,125 @@ describe('TournamentRegistrationsService', () => {
       'tournament-1',
       expect.any(String),
     );
+  });
+
+  // ─── Task 154 P0-4: 기록 공개 동의는 팀장이 대신 켜주지 않는다 ─────────────────
+  //
+  // 이 저장소는 "선수 본인이 켠다"는 옵트인 구조를 유지하기로 결정했다(사용자 결정 ①⑤).
+  // 그런데 대회 참가 신청은 팀장만 할 수 있으므로, 여기서 명단 선수들의 공개 상태를
+  // 건드리는 순간 그 구조가 팀장 대리 동의로 조용히 바뀐다. 아래 첫 테스트가 그
+  // 불변식을 고정하는 회귀 방어선이다 -- 여기가 깨지면 정책이 깨진 것이다.
+
+  function submitWithRecordDisclosure() {
+    // 기본 mock 은 RECORD_DISCLOSURE_ID 를 코드로 매핑하지 않는다(위 '미동의' 테스트들이
+    // 그 기본값에 의존한다) -- 기존 2026-08-18 테스트들과 같은 방식으로 이 호출에만 덮어쓴다.
+    managedTerms.assertTournamentAcceptances.mockResolvedValueOnce({
+      acceptedDocumentIds: [RULES_ID, PRIVACY_ID, REFUND_ID, RECORD_DISCLOSURE_ID],
+      notAcceptedDocumentIds: [MEDIA_ID],
+      acceptedCodes: new Set([
+        'tournament_rules',
+        'tournament_privacy',
+        'tournament_refund',
+        'tournament_record_disclosure',
+      ]),
+    });
+    return service.submit(manager, 'tournament-1', 'reg-1', {
+      ...validSubmit,
+      termsDocumentIds: [RULES_ID, PRIVACY_ID, REFUND_ID, RECORD_DISCLOSURE_ID],
+    });
+  }
+
+  it('submit: 팀장이 기록 공개 동의를 체크해도 어떤 계정의 기록 공개 상태도 바뀌지 않는다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { userId: 'player-a' },
+      { userId: 'player-b' },
+    ]);
+
+    await submitWithRecordDisclosure();
+    // 지연 발송 resolver 까지 실제로 실행해 본다 -- 여기서 쓰기가 일어나면 안 된다.
+    const resolveUserIds = notifications.emitToManyDeferred.mock.calls[0][0] as () => Promise<string[]>;
+    await resolveUserIds();
+
+    // 공개 여부를 결정하는 유일한 테이블은 V1UserRecordConsent 다. 이 경로는 "누구에게
+    // 물어볼지" 고르기 위해 읽기만 하고 절대 쓰지 않는다. mock 에 쓰기 메서드를 아예
+    // 두지 않았으므로, 구현이 쓰기를 시도하면 TypeError 로 이 테스트가 깨진다.
+    expect((prisma.v1UserRecordConsent as Record<string, unknown>).upsert).toBeUndefined();
+    expect((prisma.v1UserRecordConsent as Record<string, unknown>).update).toBeUndefined();
+    expect((prisma.v1UserRecordConsent as Record<string, unknown>).create).toBeUndefined();
+
+    // 프로필 토글도 호출자(팀장) 본인 것만 건드린다 -- 명단 선수 계정은 대상이 아니다.
+    for (const call of prisma.v1UserProfile.updateMany.mock.calls) {
+      expect(call[0].where.userId).toBe(manager.id);
+    }
+  });
+
+  it('submit: 기록 공개 동의를 체크하면 명단 선수 각자에게 동의 안내 알림을 예약한다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    await submitWithRecordDisclosure();
+
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
+      expect.any(Function),
+      'tournament_record_consent_invite',
+      'tournament-1',
+      expect.any(String),
+    );
+  });
+
+  it('submit: 기록 공개 동의를 체크하지 않으면 안내 알림도 보내지 않는다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+
+    await service.submit(manager, 'tournament-1', 'reg-1', validSubmit);
+
+    expect(notifications.emitToManyDeferred).not.toHaveBeenCalled();
+  });
+
+  it('submit: 안내 알림 대상에서 이미 응답한 사람(켠 사람·끈 사람 모두)을 제외한다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { userId: 'player-new' },
+      { userId: 'player-granted' },
+      { userId: 'player-revoked' },
+      { userId: 'player-new' }, // 중복 행이 있어도 한 번만 보낸다
+    ]);
+    // 켠 사람에겐 불필요하고, 끈 사람에게 다시 묻는 건 그 거부를 무시하는 것이다.
+    prisma.v1UserRecordConsent.findMany.mockResolvedValue([
+      { userId: 'player-granted' },
+      { userId: 'player-revoked' },
+    ]);
+
+    await submitWithRecordDisclosure();
+
+    const resolveUserIds = notifications.emitToManyDeferred.mock.calls[0][0] as () => Promise<string[]>;
+    await expect(resolveUserIds()).resolves.toEqual(['player-new']);
+  });
+
+  it('submit: 명단이 비어 있으면 동의 조회를 아예 하지 않는다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(openTournament());
+    prisma.v1TournamentRegistration.update.mockResolvedValue(registrationRow({ status: 'awaiting_payment' }));
+    prisma.v1TournamentPayment.upsert.mockResolvedValue(paymentRow());
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([]);
+
+    await submitWithRecordDisclosure();
+
+    const resolveUserIds = notifications.emitToManyDeferred.mock.calls[0][0] as () => Promise<string[]>;
+    await expect(resolveUserIds()).resolves.toEqual([]);
+    expect(prisma.v1UserRecordConsent.findMany).not.toHaveBeenCalled();
   });
 
   it('submit: pg method does not require depositorName', async () => {

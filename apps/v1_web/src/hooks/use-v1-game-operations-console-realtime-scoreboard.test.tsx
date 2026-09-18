@@ -145,7 +145,11 @@ describe('useV1GameOperationsConsole — GOAL append committed broadcast reaches
         participantId: 'p-1',
         period: 1,
         clockMs: 60_000,
-        occurredAt: '2026-08-11T00:00:00.000Z',
+        // 고정된 과거 날짜가 아니라 "지금"이어야 한다 — 오프라인 큐 첫 전송의
+        // CLOCK_DRIFT 오탐 수정(sendQueuedItem의 isClockDrifted 게이트) 이후,
+        // 30초 넘게 지난 occurredAt은 첫 시도부터 game.event.retry로 나가고
+        // 이 mock 소켓은 'game.event.retry'를 처리하지 않는다(append만 흉내).
+        occurredAt: new Date().toISOString(),
         payload: {},
       });
     });

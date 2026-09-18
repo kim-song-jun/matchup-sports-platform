@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { V1TournamentStaffRole } from '@/types/api';
 import type { TournamentOpsOrigin } from '@/lib/session-storage';
+import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { staffRoleLabel } from './badges';
 
 // ── 대회 아이덴티티 배지 ──────────────────────────────────────────────────
@@ -59,7 +60,7 @@ function TournamentEmblem({
         aria-hidden="true"
         width={size}
         height={size}
-        style={{ width: size, height: size, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+        style={{ width: size, height: size, borderRadius: 'var(--radius-chip)', objectFit: 'cover', flexShrink: 0 }}
       />
     );
   }
@@ -72,7 +73,7 @@ function TournamentEmblem({
       style={{
         width: size,
         height: size,
-        borderRadius: 8,
+        borderRadius: 'var(--radius-chip)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -112,8 +113,8 @@ const RESULT_MANAGEMENT_DISABLED_REASON = '결과 검토·정정은 대회 운�
  * 아는 사람만 갈 수 있는 고아 라우트였다(여정 검수 major 2건). 화면을 만들 때 셸의 nav 를
  * 함께 갱신하지 않으면 같은 일이 반복되므로, 라우트를 추가하는 쪽에서 이 목록도 같이 본다.
  */
-function buildNavItems(tournamentId: string, role: V1TournamentStaffRole): NavItem[] {
-  const base = `/tournament-ops/tournaments/${tournamentId}`;
+function buildNavItems(basePath: string, role: V1TournamentStaffRole): NavItem[] {
+  const base = basePath;
   const canManageResults = role === 'TOURNAMENT_DIRECTOR' || role === 'PLATFORM_OPS';
   const resultGate = canManageResults ? {} : { disabled: true, disabledReason: RESULT_MANAGEMENT_DISABLED_REASON };
   return [
@@ -150,7 +151,7 @@ function buildNavItems(tournamentId: string, role: V1TournamentStaffRole): NavIt
 }
 
 // 공용 비활성 행 — Drawer/데스크톱 사이드바 둘 다에서 쓴다.
-function NavItemDisabledRow({ item, dense }: { item: NavItem; dense?: boolean }) {
+function NavItemDisabledRow({ item }: { item: NavItem }) {
   return (
     <button
       type="button"
@@ -160,14 +161,14 @@ function NavItemDisabledRow({ item, dense }: { item: NavItem; dense?: boolean })
       className={[
         'flex w-full items-center gap-3 px-4 min-h-[44px] text-sm text-left border-l-2 border-transparent',
         'text-gray-300 dark:text-gray-600 cursor-not-allowed',
-        dense ? 'py-3' : 'py-2.5',
+        'py-3',
       ].join(' ')}
     >
       <span className="text-gray-300 dark:text-gray-600" aria-hidden="true">{item.icon}</span>
       <span className="flex flex-col items-start">
         <span>{item.label}</span>
         {item.disabledReason ? (
-          <span className="text-[var(--font-size-micro)] font-normal text-gray-400 dark:text-gray-500">{item.disabledReason}</span>
+          <span className="text-[length:var(--font-size-micro)] font-normal text-[var(--text-muted)] dark:text-gray-500">{item.disabledReason}</span>
         ) : null}
       </span>
     </button>
@@ -204,14 +205,16 @@ interface DrawerProps {
   tournamentCoverImageUrl?: string | null;
   role: V1TournamentStaffRole;
   pathname: string;
+  /** 지금 표면(스태프/어드민)의 nav base — 경로를 하드코딩하면 다른 표면으로 튕긴다. */
+  basePath: string;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   returnHref: string;
   returnLabel: string;
 }
 
-function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, pathname, triggerRef, returnHref, returnLabel }: DrawerProps) {
+function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, pathname, basePath, triggerRef, returnHref, returnLabel }: DrawerProps) {
   const isActive = useIsActive(pathname);
-  const navItems = buildNavItems(tournamentId, role);
+  const navItems = buildNavItems(basePath, role);
   const panelRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -297,14 +300,20 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
         ].join(' ')}
       >
         <div className="flex items-center justify-between px-4 h-[52px] border-b border-[var(--border)] shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
             <TournamentEmblem tournamentId={tournamentId} coverImageUrl={tournamentCoverImageUrl} title={tournamentTitle} size={28} />
             <div className="flex flex-col min-w-0">
-              <span className="text-[13px] font-bold text-[var(--text-strong)] truncate">
+              {/* 목업처럼 접두어가 긴 이름은 뒤쪽 식별자가 통째로 잘려 어느 대회인지
+                  구분이 안 된다("(목업) 0818-0641 조..."). truncate 는 유지하되 전체
+                  이름을 title 로 남겨 확인할 방법을 준다. */}
+              <span
+                className="text-[length:var(--font-size-label)] font-bold text-[var(--text-strong)] truncate"
+                title={tournamentTitle ?? '대회 운영'}
+              >
                 {tournamentTitle ?? '대회 운영'}
               </span>
               {/* [알파 감사 C] ops shell 역할 배지 "플랫폼 운영자" — 알파 실측 지적(10px → 12px). */}
-              <span className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+              <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-2 py-0.5 w-fit mt-0.5">
                 {staffRoleLabel(role)}
               </span>
             </div>
@@ -319,10 +328,10 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
           </button>
         </div>
 
-        <nav className="flex-1 py-1.5 overflow-y-auto" aria-label="주 메뉴">
+        <nav className="flex-1 py-2 overflow-y-auto" aria-label="주 메뉴">
           {navItems.map((item) => {
             const active = isActive(item);
-            if (item.disabled) return <NavItemDisabledRow key={item.href} item={item} dense />;
+            if (item.disabled) return <NavItemDisabledRow key={item.href} item={item} />;
             return (
               <Link
                 key={item.href}
@@ -337,7 +346,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
                     : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
                 ].join(' ')}
               >
-                <span className={active ? 'text-blue-500 dark:text-blue-300' : 'text-gray-400'} aria-hidden="true">
+                <span className={active ? 'text-blue-500 dark:text-blue-300' : 'text-[var(--text-muted)]'} aria-hidden="true">
                   {item.icon}
                 </span>
                 <span>{item.label}</span>
@@ -350,7 +359,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
           <Link
             href={returnHref}
             onClick={onClose}
-            className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="flex items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             {returnLabel}
@@ -371,7 +380,8 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
 export function TournamentOpsShell({ children, tournamentId, tournamentTitle, tournamentCoverImageUrl, role, origin }: TournamentOpsShellProps) {
   const pathname = usePathname();
   const isActive = useIsActive(pathname);
-  const navItems = buildNavItems(tournamentId, role);
+  const basePath = resolveTournamentLiveBase(pathname, tournamentId);
+  const navItems = buildNavItems(basePath, role);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const returnTarget = RETURN_TARGET[origin](tournamentId);
@@ -386,26 +396,29 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
   const sectionLabel = navItems.find((item) => isActive(item))?.label ?? '대회 운영';
 
   return (
-    <div className="min-h-screen bg-[var(--surface-soft)] flex">
+    <div className="min-h-screen bg-[var(--surface-soft)] flex [--tournament-ops-mobile-header-offset:52px] lg:[--tournament-ops-mobile-header-offset:0px]">
       {/* ── Desktop sidebar (lg+) ─────────────────────────────────────── */}
       <aside
         className="hidden lg:flex w-[240px] min-h-screen bg-[var(--card-surface)] border-r border-[var(--border)] flex-col fixed top-0 left-0 h-screen overflow-y-auto z-30 shrink-0"
         aria-label="대회 운영 사이드바"
       >
-        <div className="px-5 py-4 border-b border-[var(--border)] flex items-center gap-2.5 min-h-[64px]">
+        <div className="px-5 py-4 border-b border-[var(--border)] flex items-center gap-3 min-h-[64px]">
           <TournamentEmblem tournamentId={tournamentId} coverImageUrl={tournamentCoverImageUrl} title={tournamentTitle} size={34} />
           <div className="flex flex-col min-w-0">
-            <span className="text-[15px] font-bold text-[var(--text-strong)] leading-tight truncate">
+            <span
+              className="text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)] leading-tight truncate"
+              title={tournamentTitle ?? '대회 운영'}
+            >
               {tournamentTitle ?? '대회 운영'}
             </span>
             {/* [알파 감사 C] ops shell 역할 배지 "플랫폼 운영자" — 알파 실측 지적(10px → 12px). */}
-            <span className="text-[var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-1.5 py-0.5 w-fit mt-0.5">
+            <span className="text-[length:var(--font-size-caption)] font-semibold text-[var(--blue700)] bg-[var(--blue50)] rounded-full px-2 py-0.5 w-fit mt-0.5">
               {staffRoleLabel(role)}
             </span>
           </div>
         </div>
 
-        <nav className="flex-1 py-1.5" aria-label="주 메뉴">
+        <nav className="flex-1 py-2" aria-label="주 메뉴">
           {navItems.map((item) => {
             const active = isActive(item);
             if (item.disabled) return <NavItemDisabledRow key={item.href} item={item} />;
@@ -415,14 +428,14 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
                 className={[
-                  'flex items-center gap-3 px-4 py-2.5 min-h-[44px] text-sm transition-colors border-l-2',
+                  'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
                   active
                     ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-500/10 text-[var(--blue700)] font-semibold'
                     : 'border-transparent text-[var(--text-muted)] hover:bg-[var(--surface-soft)] hover:text-[var(--text-strong)]',
                 ].join(' ')}
               >
-                <span className={active ? 'text-blue-500 dark:text-blue-300' : 'text-gray-400'} aria-hidden="true">
+                <span className={active ? 'text-blue-500 dark:text-blue-300' : 'text-[var(--text-muted)]'} aria-hidden="true">
                   {item.icon}
                 </span>
                 <span>{item.label}</span>
@@ -434,7 +447,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
         <div className="px-4 py-4 border-t border-[var(--border)] shrink-0">
           <Link
             href={returnTarget.href}
-            className="flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
+            className="flex items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />
             {returnTarget.label}
@@ -447,6 +460,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
         <Drawer
           open={drawerOpen}
           onClose={closeDrawer}
+          basePath={basePath}
           tournamentId={tournamentId}
           tournamentTitle={tournamentTitle}
           tournamentCoverImageUrl={tournamentCoverImageUrl}
@@ -460,7 +474,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
 
       {/* ── Right column ─────────────────────────────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0 lg:pl-[240px]">
-        <header className="lg:hidden sticky top-0 z-20 bg-[var(--card-surface)] border-b border-[var(--border)] h-[52px] flex items-center px-2">
+        <header className="lg:hidden sticky top-0 z-20 bg-[var(--card-surface)] border-b border-[var(--border)] h-[var(--tournament-ops-mobile-header-offset)] flex items-center px-2">
           <button
             ref={hamburgerRef}
             onClick={openDrawer}
@@ -471,7 +485,7 @@ export function TournamentOpsShell({ children, tournamentId, tournamentTitle, to
           >
             <Menu size={20} aria-hidden="true" />
           </button>
-          <span className="flex-1 text-center text-[15px] font-bold text-[var(--text-strong)] truncate px-2">
+          <span className="flex-1 text-center text-[length:var(--font-size-body)] font-bold text-[var(--text-strong)] truncate px-2">
             {sectionLabel}
           </span>
           <div className="w-[44px]" aria-hidden="true" />

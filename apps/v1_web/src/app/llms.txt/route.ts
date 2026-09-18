@@ -37,7 +37,7 @@ export async function GET(): Promise<Response> {
     '## 핵심 페이지',
     '',
     `- [대회 목록](${absoluteSiteUrl('/tournaments')}): 모집 중·진행 중·종료된 아마추어 대회 전체`,
-    `- [정규 리그](${absoluteSiteUrl('/league-matches')}): 시즌제로 운영되는 리그와 순위표`,
+    `- [정규 리그](${absoluteSiteUrl('/tournaments?kind=league')}): 시즌제로 운영되는 리그와 순위표`,
     `- [팀 찾기](${absoluteSiteUrl('/teams')}): 종목·지역별 팀 목록`,
     `- [팀 매치](${absoluteSiteUrl('/team-matches')}): 팀 대 팀 친선경기 모집`,
     `- [개인 매치](${absoluteSiteUrl('/matches')}): 개인 단위로 참가하는 매치 모집`,

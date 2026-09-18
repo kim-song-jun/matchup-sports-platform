@@ -27,9 +27,9 @@ V1 session authentication and current room entitlement are required. Development
   nonparticipants 403; unauthenticated requests 401. Unknown DTO properties are rejected.
 - Reports persist the server-owned message snapshot and actor/target/reason in `V1Inquiry` (`category=report`,
   `relatedType=user`). The existing operator inbox and transactional outbox receive the report; no external
-  Slack request is made directly by the route. Report submission is not deduplicated: avoid repeated taps.
+  Slack request is made directly by the route. Report submission is not deduplicated; the route uses the same production 5/minute throttle as inquiry creation.
 - `V1ChatUserBlock` is persistent, bilateral **within chat**, across all rooms. It filters REST history,
-  last-message previews, unread totals, future message recipients, realtime content, notification creation,
+  last-message previews, unread totals and per-message reader counts, future message recipients, realtime content, notification creation,
   and push delivery. Other group members retain access. This does not remove shared team membership,
   erase evidence, or recall previously delivered OS notifications.
 - Blocks do not prevent sending to other group members. Removing one's own block does not remove a block

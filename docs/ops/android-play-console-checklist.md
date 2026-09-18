@@ -182,3 +182,10 @@ The account owner controls the production promotion and Console actions.
   production/release-equivalent device build before placing screenshots into `play/listing/`.
 - No Play Console declaration, Firebase/signing secret value, actual FCM device delivery or uploaded-object
   deletion completion is inferred from source tests.
+
+### Re-review scope caveat
+
+This change closes the ordinary-chat reporting/blocking gap. Public profiles, reviews and team content
+still require an explicit service-wide report/block coverage audit before declaring all UGC compliant.
+See [Google Play UGC policy](https://support.google.com/googleplay/android-developer/answer/9876937).
+The 8-area PR preflight and remaining evidence are recorded in task 156; Console checks are not code-test results.

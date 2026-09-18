@@ -679,3 +679,15 @@ Ambiguity: user is awaiting D-U-N-S for organization registration; Play-signed s
 - Local source work only; no commit/PR/deployment/Play submission claimed. Remaining gates: D-U-N-S and organization verification; user-controlled dev→main promotion and public deletion/privacy/assetlinks probes; signed AAB and native device/FCM/pre-launch validation; final Data safety and physical upload retention/removal audit.
 
 - Cleanup: owned headed browser contexts, local Web/API processes and PostgreSQL cluster stopped. Final diff whitespace check passed; touched source has no new debt markers. New modules/tests/migrations/screenshots remain untracked until a deliberate scoped commit.
+
+
+### PR preflight review — 2026-09-19
+
+Reviewed 8/8 areas: signup age; chat access/blocking; report processing; final account deletion; privacy/migrations; Android policy/listing; responsive UI/accessibility; release/PR configuration.
+
+- Synced current dev `6f149855c`; preserved new personal-match chat entitlement rules in the merge.
+- Fixed block-related per-message unread counts and the final-deletion fixture drift (5 RED tests → all 14 admin tests GREEN). Added the existing production inquiry throttle (5/minute) to chat reports.
+- Revalidated 89 backend unit + 24 frontend unit + 4 actual PostgreSQL/HTTP integration cases. Two-sided safety refresh and cache eviction remain covered. Android permission/SDK/source policy gate passed.
+- Existing 24 captures reviewed; no new layout changes in this review. Known render-time shell warnings and pending-signup settings 403 remain explicitly recorded, not masked.
+- Submission remains separate: public UGC outside chat (profiles/reviews/team content) needs a service-wide report/block coverage audit; chat-only blocking does not certify all public UGC surfaces. Reference: https://support.google.com/googleplay/android-developer/answer/9876937
+- Remaining production/Console/native/storage gates stay open. This PR does not claim Play acceptance or a signed native-device test.

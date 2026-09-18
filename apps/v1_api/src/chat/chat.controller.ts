@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
@@ -34,6 +35,7 @@ export class ChatController {
   }
 
   @Post('rooms/:roomId/messages/:messageId/report')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   reportMessage(@CurrentUser() user: V1AuthUser, @Param('roomId') roomId: string, @Param('messageId') messageId: string, @Body() dto: ReportChatMessageDto) {
     return this.chatService.reportMessage(user, roomId, messageId, dto);
   }

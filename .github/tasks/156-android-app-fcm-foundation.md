@@ -693,3 +693,7 @@ Reviewed 8/8 areas: signup age; chat access/blocking; report processing; final a
 - Remaining production/Console/native/storage gates stay open. This PR does not claim Play acceptance or a signed native-device test.
 
 - PR #1225 CI uncovered setup-android v3 default `tools platform-tools` failing because `tools` is no longer available. Alpha and production bundle now explicitly install `platform-tools`; their existing API 36/build-tools installation stays intact. Source: https://github.com/android-actions/setup-android/blob/v3/action.yml.
+
+- Full API CI: 709 integration cases passed; one schema snapshot guard failed because Task 156 added V1ChatUserBlock. Re-pinned the normalized full-schema digest with an explicit additive-change rationale; the game-domain schema and bound migration digest are unchanged.
+
+- CI follow-up: schema guard integration 9/9 passed locally after re-pin. Exact v1.3 INSERT and read-only conflict guard statements registered in the existing expand-contract review list; negative controls, base-resolution self-tests and PR diff gate passed. Android Alpha and Web CI passed on d3506c04c. Copilot request unavailable: latest CLI returned reviewer not found; no review request or completed review exists, so automated-review clean is not claimed.

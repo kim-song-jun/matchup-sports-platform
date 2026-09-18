@@ -45,6 +45,8 @@ Status: complete
 - [x] v1 API/web typecheck (once, after host-load preflight)
 - [x] Admin route visual/manual QA: headed Windows Chrome, desktop/tablet/mobile, empty + completed form states.
 - [x] Each viewport returned HTTP 200 with no console/page/network errors, no horizontal overflow, and an enabled submit action after valid input.
+- [x] Real API/DB E2E: admin create `201` -> public list exposes the same platform-managed ID -> team manager applies through the browser with `201 requested` -> admin API/UI shows the persisted application.
+- [x] Reproducible Playwright spec passed in the repository QA container (`desktop`, 1/1); headed Chrome evidence captured at 1440×900, 834×1112, and 390×844.
 - [x] Touched-path debt grep and diff checks
 
 ## Ambiguity Log
@@ -58,6 +60,7 @@ Status: complete
 - 2026-09-19: Initial direct-assignment interpretation was corrected after user clarification.
 - 2026-09-19: Platform recruitment creation, public team application, and admin two-application finalization implemented; focused backend/frontend tests passed.
 - 2026-09-19: Headed Windows Chrome visual QA passed at 1440×900, 768×1024, and 390×844 for empty/filled recruitment creation and two-application finalization. The isolated QA worktree used deterministic API fixtures without loading repository secrets; focused backend tests cover the server contract. Evidence is committed under `docs/screenshots/task149-admin-team-match/`.
+- 2026-09-19: A fresh isolated PostgreSQL runtime proved the real public journey with `host@teameet.v1` managing `송파 풋살 모임`: admin recruitment create `201`, public list same-ID lookup, browser application `201 requested`, and admin persisted count `1`. `e2e/v1-tests/admin-platform-team-match-flow.spec.ts` passed 1/1 in the official Playwright QA container. Headed Chrome reported zero console, page, request, or API errors; 40 cancelled Next RSC prefetches were classified separately as expected navigation aborts.
 
 ## Screenshot Evidence
 
@@ -65,3 +68,7 @@ Status: complete
 - Tablet: [empty](../../docs/screenshots/task149-admin-team-match/tablet-empty.png) · [completed](../../docs/screenshots/task149-admin-team-match/tablet-filled.png) · [applications](../../docs/screenshots/task149-admin-team-match/tablet-applications.png)
 - Mobile: [empty](../../docs/screenshots/task149-admin-team-match/mobile-empty.png) · [completed](../../docs/screenshots/task149-admin-team-match/mobile-filled.png) · [applications](../../docs/screenshots/task149-admin-team-match/mobile-applications.png)
 - Machine-readable verdict: [report.json](../../docs/screenshots/task149-admin-team-match/report.json)
+- Real public/application flow — Desktop: [public list](../../docs/screenshots/task149-admin-team-match/real-desktop-public-list.png) · [before apply](../../docs/screenshots/task149-admin-team-match/real-desktop-detail-before-apply.png) · [applied](../../docs/screenshots/task149-admin-team-match/real-desktop-detail-applied.png) · [admin received](../../docs/screenshots/task149-admin-team-match/real-desktop-admin-application.png)
+- Real public/application flow — Tablet: [public list](../../docs/screenshots/task149-admin-team-match/real-tablet-public-list.png) · [applied](../../docs/screenshots/task149-admin-team-match/real-tablet-detail-applied.png) · [admin received](../../docs/screenshots/task149-admin-team-match/real-tablet-admin-application.png)
+- Real public/application flow — Mobile: [public list](../../docs/screenshots/task149-admin-team-match/real-mobile-public-list.png) · [applied](../../docs/screenshots/task149-admin-team-match/real-mobile-detail-applied.png) · [admin received](../../docs/screenshots/task149-admin-team-match/real-mobile-admin-application.png)
+- Real-flow machine-readable verdict: [real-flow-report.json](../../docs/screenshots/task149-admin-team-match/real-flow-report.json)

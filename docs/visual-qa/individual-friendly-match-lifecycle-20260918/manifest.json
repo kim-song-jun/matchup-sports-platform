@@ -1,0 +1,1108 @@
+{
+  "generatedAt": "2026-09-18T09:32:34.306Z",
+  "webBase": "http://localhost:23013",
+  "apiBase": "http://localhost:28121/api/v1",
+  "screenshotCount": 81,
+  "viewports": [
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "tablet",
+      "width": 768,
+      "height": 1024
+    },
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "states": [
+    {
+      "slug": "01-match-list",
+      "title": "개인매치 목록"
+    },
+    {
+      "slug": "02-create-sport",
+      "title": "매치 만들기 · 종목"
+    },
+    {
+      "slug": "03-create-info",
+      "title": "매치 만들기 · 기본 정보"
+    },
+    {
+      "slug": "04-create-place-time",
+      "title": "매치 만들기 · 장소와 시간"
+    },
+    {
+      "slug": "05-create-confirm",
+      "title": "매치 만들기 · 최종 확인"
+    },
+    {
+      "slug": "06-guest-detail",
+      "title": "신청 전 매치 상세"
+    },
+    {
+      "slug": "07-apply-dialog",
+      "title": "참가 신청 메시지"
+    },
+    {
+      "slug": "08-pending-detail",
+      "title": "승인 대기 상세"
+    },
+    {
+      "slug": "09-host-applications",
+      "title": "호스트 참가자 관리"
+    },
+    {
+      "slug": "10-approval-confirm",
+      "title": "참가 신청 승인 확인"
+    },
+    {
+      "slug": "11-approved-participant",
+      "title": "승인된 참가자 상세"
+    },
+    {
+      "slug": "12-approved-chat",
+      "title": "승인 후 매치 채팅"
+    },
+    {
+      "slug": "13-host-edit",
+      "title": "호스트 매치 수정"
+    },
+    {
+      "slug": "14-close-confirm",
+      "title": "모집 마감 확인"
+    },
+    {
+      "slug": "15-closed-detail",
+      "title": "모집 마감 상세"
+    },
+    {
+      "slug": "16-reopen-control",
+      "title": "모집 다시 열기"
+    },
+    {
+      "slug": "17-cancel-confirm",
+      "title": "매치 취소 확인"
+    },
+    {
+      "slug": "18-cancelled-detail",
+      "title": "취소된 매치 상세"
+    },
+    {
+      "slug": "19-attendance",
+      "title": "경기 후 참여 여부 기록"
+    },
+    {
+      "slug": "20-complete-confirm",
+      "title": "경기 완료 확인"
+    },
+    {
+      "slug": "21-completed-host-detail",
+      "title": "완료된 매치 · 호스트"
+    },
+    {
+      "slug": "22-completed-participant-detail",
+      "title": "완료된 매치 · 참가자"
+    },
+    {
+      "slug": "23-my-joined-matches",
+      "title": "내 신청·참여 매치"
+    },
+    {
+      "slug": "24-my-created-matches",
+      "title": "내가 만든 매치"
+    },
+    {
+      "slug": "25-review-compose",
+      "title": "참여 후 리뷰 작성"
+    },
+    {
+      "slug": "26-admin-match-list",
+      "title": "관리자 개인매치 목록"
+    },
+    {
+      "slug": "27-admin-match-detail",
+      "title": "관리자 개인매치 상세"
+    }
+  ],
+  "runtimeIssues": [],
+  "screenshots": [
+    {
+      "order": 1,
+      "slug": "01-match-list",
+      "title": "개인매치 목록",
+      "viewport": "mobile",
+      "actor": "applicant@teameet.v1",
+      "from": "/matches",
+      "to": "/matches",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/01-match-list.png",
+      "issues": []
+    },
+    {
+      "order": 1,
+      "slug": "01-match-list",
+      "title": "개인매치 목록",
+      "viewport": "tablet",
+      "actor": "applicant@teameet.v1",
+      "from": "/matches",
+      "to": "/matches",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/01-match-list.png",
+      "issues": []
+    },
+    {
+      "order": 1,
+      "slug": "01-match-list",
+      "title": "개인매치 목록",
+      "viewport": "desktop",
+      "actor": "applicant@teameet.v1",
+      "from": "/matches",
+      "to": "/matches",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/01-match-list.png",
+      "issues": []
+    },
+    {
+      "order": 2,
+      "slug": "02-create-sport",
+      "title": "매치 만들기 · 종목",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/new/sport",
+      "to": "/matches/new/sport",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/02-create-sport.png",
+      "issues": []
+    },
+    {
+      "order": 2,
+      "slug": "02-create-sport",
+      "title": "매치 만들기 · 종목",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/new/sport",
+      "to": "/matches/new/sport",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/02-create-sport.png",
+      "issues": []
+    },
+    {
+      "order": 2,
+      "slug": "02-create-sport",
+      "title": "매치 만들기 · 종목",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/new/sport",
+      "to": "/matches/new/sport",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/02-create-sport.png",
+      "issues": []
+    },
+    {
+      "order": 3,
+      "slug": "03-create-info",
+      "title": "매치 만들기 · 기본 정보",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/new",
+      "to": "/matches/new",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/03-create-info.png",
+      "issues": []
+    },
+    {
+      "order": 3,
+      "slug": "03-create-info",
+      "title": "매치 만들기 · 기본 정보",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/new",
+      "to": "/matches/new",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/03-create-info.png",
+      "issues": []
+    },
+    {
+      "order": 3,
+      "slug": "03-create-info",
+      "title": "매치 만들기 · 기본 정보",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/new",
+      "to": "/matches/new",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/03-create-info.png",
+      "issues": []
+    },
+    {
+      "order": 4,
+      "slug": "04-create-place-time",
+      "title": "매치 만들기 · 장소와 시간",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/new/place-time",
+      "to": "/matches/new/place-time",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/04-create-place-time.png",
+      "issues": []
+    },
+    {
+      "order": 4,
+      "slug": "04-create-place-time",
+      "title": "매치 만들기 · 장소와 시간",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/new/place-time",
+      "to": "/matches/new/place-time",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/04-create-place-time.png",
+      "issues": []
+    },
+    {
+      "order": 4,
+      "slug": "04-create-place-time",
+      "title": "매치 만들기 · 장소와 시간",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/new/place-time",
+      "to": "/matches/new/place-time",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/04-create-place-time.png",
+      "issues": []
+    },
+    {
+      "order": 5,
+      "slug": "05-create-confirm",
+      "title": "매치 만들기 · 최종 확인",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/new/confirm",
+      "to": "/matches/new/confirm",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/05-create-confirm.png",
+      "issues": []
+    },
+    {
+      "order": 5,
+      "slug": "05-create-confirm",
+      "title": "매치 만들기 · 최종 확인",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/new/confirm",
+      "to": "/matches/new/confirm",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/05-create-confirm.png",
+      "issues": []
+    },
+    {
+      "order": 5,
+      "slug": "05-create-confirm",
+      "title": "매치 만들기 · 최종 확인",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/new/confirm",
+      "to": "/matches/new/confirm",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/05-create-confirm.png",
+      "issues": []
+    },
+    {
+      "order": 6,
+      "slug": "06-guest-detail",
+      "title": "신청 전 매치 상세",
+      "viewport": "mobile",
+      "actor": "applicant@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/06-guest-detail.png",
+      "issues": []
+    },
+    {
+      "order": 6,
+      "slug": "06-guest-detail",
+      "title": "신청 전 매치 상세",
+      "viewport": "tablet",
+      "actor": "applicant@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/06-guest-detail.png",
+      "issues": []
+    },
+    {
+      "order": 6,
+      "slug": "06-guest-detail",
+      "title": "신청 전 매치 상세",
+      "viewport": "desktop",
+      "actor": "applicant@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/06-guest-detail.png",
+      "issues": []
+    },
+    {
+      "order": 7,
+      "slug": "07-apply-dialog",
+      "title": "참가 신청 메시지",
+      "viewport": "mobile",
+      "actor": "applicant@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "action": "참가 신청 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/07-apply-dialog.png",
+      "issues": []
+    },
+    {
+      "order": 7,
+      "slug": "07-apply-dialog",
+      "title": "참가 신청 메시지",
+      "viewport": "tablet",
+      "actor": "applicant@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "action": "참가 신청 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/07-apply-dialog.png",
+      "issues": []
+    },
+    {
+      "order": 7,
+      "slug": "07-apply-dialog",
+      "title": "참가 신청 메시지",
+      "viewport": "desktop",
+      "actor": "applicant@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "action": "참가 신청 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/07-apply-dialog.png",
+      "issues": []
+    },
+    {
+      "order": 8,
+      "slug": "08-pending-detail",
+      "title": "승인 대기 상세",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000207",
+      "to": "/matches/00000000-0000-4000-8000-000000000207",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/08-pending-detail.png",
+      "issues": []
+    },
+    {
+      "order": 8,
+      "slug": "08-pending-detail",
+      "title": "승인 대기 상세",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000207",
+      "to": "/matches/00000000-0000-4000-8000-000000000207",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/08-pending-detail.png",
+      "issues": []
+    },
+    {
+      "order": 8,
+      "slug": "08-pending-detail",
+      "title": "승인 대기 상세",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000207",
+      "to": "/matches/00000000-0000-4000-8000-000000000207",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/08-pending-detail.png",
+      "issues": []
+    },
+    {
+      "order": 9,
+      "slug": "09-host-applications",
+      "title": "호스트 참가자 관리",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000201/applications",
+      "to": "/matches/00000000-0000-4000-8000-000000000201/applications",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/09-host-applications.png",
+      "issues": []
+    },
+    {
+      "order": 9,
+      "slug": "09-host-applications",
+      "title": "호스트 참가자 관리",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000201/applications",
+      "to": "/matches/00000000-0000-4000-8000-000000000201/applications",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/09-host-applications.png",
+      "issues": []
+    },
+    {
+      "order": 9,
+      "slug": "09-host-applications",
+      "title": "호스트 참가자 관리",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000201/applications",
+      "to": "/matches/00000000-0000-4000-8000-000000000201/applications",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/09-host-applications.png",
+      "issues": []
+    },
+    {
+      "order": 10,
+      "slug": "10-approval-confirm",
+      "title": "참가 신청 승인 확인",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000201/applications",
+      "to": "/matches/00000000-0000-4000-8000-000000000201/applications",
+      "action": "승인 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/10-approval-confirm.png",
+      "issues": []
+    },
+    {
+      "order": 10,
+      "slug": "10-approval-confirm",
+      "title": "참가 신청 승인 확인",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000201/applications",
+      "to": "/matches/00000000-0000-4000-8000-000000000201/applications",
+      "action": "승인 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/10-approval-confirm.png",
+      "issues": []
+    },
+    {
+      "order": 10,
+      "slug": "10-approval-confirm",
+      "title": "참가 신청 승인 확인",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000201/applications",
+      "to": "/matches/00000000-0000-4000-8000-000000000201/applications",
+      "action": "승인 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/10-approval-confirm.png",
+      "issues": []
+    },
+    {
+      "order": 11,
+      "slug": "11-approved-participant",
+      "title": "승인된 참가자 상세",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208",
+      "to": "/matches/00000000-0000-4000-8000-000000000208",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/11-approved-participant.png",
+      "issues": []
+    },
+    {
+      "order": 11,
+      "slug": "11-approved-participant",
+      "title": "승인된 참가자 상세",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208",
+      "to": "/matches/00000000-0000-4000-8000-000000000208",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/11-approved-participant.png",
+      "issues": []
+    },
+    {
+      "order": 11,
+      "slug": "11-approved-participant",
+      "title": "승인된 참가자 상세",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208",
+      "to": "/matches/00000000-0000-4000-8000-000000000208",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/11-approved-participant.png",
+      "issues": []
+    },
+    {
+      "order": 12,
+      "slug": "12-approved-chat",
+      "title": "승인 후 매치 채팅",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208",
+      "to": "/chat/cb00ea8b-7989-4d94-a575-1b2657aa1470",
+      "action": "채팅 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/12-approved-chat.png",
+      "issues": []
+    },
+    {
+      "order": 12,
+      "slug": "12-approved-chat",
+      "title": "승인 후 매치 채팅",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208",
+      "to": "/chat/cb00ea8b-7989-4d94-a575-1b2657aa1470",
+      "action": "채팅 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/12-approved-chat.png",
+      "issues": []
+    },
+    {
+      "order": 12,
+      "slug": "12-approved-chat",
+      "title": "승인 후 매치 채팅",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208",
+      "to": "/chat/cb00ea8b-7989-4d94-a575-1b2657aa1470",
+      "action": "채팅 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/12-approved-chat.png",
+      "issues": []
+    },
+    {
+      "order": 13,
+      "slug": "13-host-edit",
+      "title": "호스트 매치 수정",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/13-host-edit.png",
+      "issues": []
+    },
+    {
+      "order": 13,
+      "slug": "13-host-edit",
+      "title": "호스트 매치 수정",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/13-host-edit.png",
+      "issues": []
+    },
+    {
+      "order": 13,
+      "slug": "13-host-edit",
+      "title": "호스트 매치 수정",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/13-host-edit.png",
+      "issues": []
+    },
+    {
+      "order": 14,
+      "slug": "14-close-confirm",
+      "title": "모집 마감 확인",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "action": "모집 마감 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/14-close-confirm.png",
+      "issues": []
+    },
+    {
+      "order": 14,
+      "slug": "14-close-confirm",
+      "title": "모집 마감 확인",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "action": "모집 마감 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/14-close-confirm.png",
+      "issues": []
+    },
+    {
+      "order": 14,
+      "slug": "14-close-confirm",
+      "title": "모집 마감 확인",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "action": "모집 마감 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/14-close-confirm.png",
+      "issues": []
+    },
+    {
+      "order": 15,
+      "slug": "15-closed-detail",
+      "title": "모집 마감 상세",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/15-closed-detail.png",
+      "issues": []
+    },
+    {
+      "order": 15,
+      "slug": "15-closed-detail",
+      "title": "모집 마감 상세",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/15-closed-detail.png",
+      "issues": []
+    },
+    {
+      "order": 15,
+      "slug": "15-closed-detail",
+      "title": "모집 마감 상세",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/15-closed-detail.png",
+      "issues": []
+    },
+    {
+      "order": 16,
+      "slug": "16-reopen-control",
+      "title": "모집 다시 열기",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/16-reopen-control.png",
+      "issues": []
+    },
+    {
+      "order": 16,
+      "slug": "16-reopen-control",
+      "title": "모집 다시 열기",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/16-reopen-control.png",
+      "issues": []
+    },
+    {
+      "order": 16,
+      "slug": "16-reopen-control",
+      "title": "모집 다시 열기",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/16-reopen-control.png",
+      "issues": []
+    },
+    {
+      "order": 17,
+      "slug": "17-cancel-confirm",
+      "title": "매치 취소 확인",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "action": "매치 취소 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/17-cancel-confirm.png",
+      "issues": []
+    },
+    {
+      "order": 17,
+      "slug": "17-cancel-confirm",
+      "title": "매치 취소 확인",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "action": "매치 취소 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/17-cancel-confirm.png",
+      "issues": []
+    },
+    {
+      "order": 17,
+      "slug": "17-cancel-confirm",
+      "title": "매치 취소 확인",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb/edit",
+      "action": "매치 취소 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/17-cancel-confirm.png",
+      "issues": []
+    },
+    {
+      "order": 18,
+      "slug": "18-cancelled-detail",
+      "title": "취소된 매치 상세",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/18-cancelled-detail.png",
+      "issues": []
+    },
+    {
+      "order": 18,
+      "slug": "18-cancelled-detail",
+      "title": "취소된 매치 상세",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/18-cancelled-detail.png",
+      "issues": []
+    },
+    {
+      "order": 18,
+      "slug": "18-cancelled-detail",
+      "title": "취소된 매치 상세",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "to": "/matches/61cbb1c3-fd2d-4f48-9b9f-2a1195a463bb",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/18-cancelled-detail.png",
+      "issues": []
+    },
+    {
+      "order": 19,
+      "slug": "19-attendance",
+      "title": "경기 후 참여 여부 기록",
+      "viewport": "mobile",
+      "actor": "owner@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208/applications",
+      "to": "/matches/00000000-0000-4000-8000-000000000208/applications",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/19-attendance.png",
+      "issues": []
+    },
+    {
+      "order": 19,
+      "slug": "19-attendance",
+      "title": "경기 후 참여 여부 기록",
+      "viewport": "tablet",
+      "actor": "owner@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208/applications",
+      "to": "/matches/00000000-0000-4000-8000-000000000208/applications",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/19-attendance.png",
+      "issues": []
+    },
+    {
+      "order": 19,
+      "slug": "19-attendance",
+      "title": "경기 후 참여 여부 기록",
+      "viewport": "desktop",
+      "actor": "owner@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208/applications",
+      "to": "/matches/00000000-0000-4000-8000-000000000208/applications",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/19-attendance.png",
+      "issues": []
+    },
+    {
+      "order": 20,
+      "slug": "20-complete-confirm",
+      "title": "경기 완료 확인",
+      "viewport": "mobile",
+      "actor": "owner@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208/applications",
+      "to": "/matches/00000000-0000-4000-8000-000000000208/applications",
+      "action": "참여 여부 확인하고 경기 완료 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/20-complete-confirm.png",
+      "issues": []
+    },
+    {
+      "order": 20,
+      "slug": "20-complete-confirm",
+      "title": "경기 완료 확인",
+      "viewport": "tablet",
+      "actor": "owner@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208/applications",
+      "to": "/matches/00000000-0000-4000-8000-000000000208/applications",
+      "action": "참여 여부 확인하고 경기 완료 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/20-complete-confirm.png",
+      "issues": []
+    },
+    {
+      "order": 20,
+      "slug": "20-complete-confirm",
+      "title": "경기 완료 확인",
+      "viewport": "desktop",
+      "actor": "owner@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208/applications",
+      "to": "/matches/00000000-0000-4000-8000-000000000208/applications",
+      "action": "참여 여부 확인하고 경기 완료 클릭",
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/20-complete-confirm.png",
+      "issues": []
+    },
+    {
+      "order": 21,
+      "slug": "21-completed-host-detail",
+      "title": "완료된 매치 · 호스트",
+      "viewport": "mobile",
+      "actor": "owner@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208",
+      "to": "/matches/00000000-0000-4000-8000-000000000208",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/21-completed-host-detail.png",
+      "issues": []
+    },
+    {
+      "order": 21,
+      "slug": "21-completed-host-detail",
+      "title": "완료된 매치 · 호스트",
+      "viewport": "tablet",
+      "actor": "owner@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208",
+      "to": "/matches/00000000-0000-4000-8000-000000000208",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/21-completed-host-detail.png",
+      "issues": []
+    },
+    {
+      "order": 21,
+      "slug": "21-completed-host-detail",
+      "title": "완료된 매치 · 호스트",
+      "viewport": "desktop",
+      "actor": "owner@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208",
+      "to": "/matches/00000000-0000-4000-8000-000000000208",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/21-completed-host-detail.png",
+      "issues": []
+    },
+    {
+      "order": 22,
+      "slug": "22-completed-participant-detail",
+      "title": "완료된 매치 · 참가자",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208",
+      "to": "/matches/00000000-0000-4000-8000-000000000208",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/22-completed-participant-detail.png",
+      "issues": []
+    },
+    {
+      "order": 22,
+      "slug": "22-completed-participant-detail",
+      "title": "완료된 매치 · 참가자",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208",
+      "to": "/matches/00000000-0000-4000-8000-000000000208",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/22-completed-participant-detail.png",
+      "issues": []
+    },
+    {
+      "order": 22,
+      "slug": "22-completed-participant-detail",
+      "title": "완료된 매치 · 참가자",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/matches/00000000-0000-4000-8000-000000000208",
+      "to": "/matches/00000000-0000-4000-8000-000000000208",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/22-completed-participant-detail.png",
+      "issues": []
+    },
+    {
+      "order": 23,
+      "slug": "23-my-joined-matches",
+      "title": "내 신청·참여 매치",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/my/matches/joined",
+      "to": "/my/matches/joined",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/23-my-joined-matches.png",
+      "issues": []
+    },
+    {
+      "order": 23,
+      "slug": "23-my-joined-matches",
+      "title": "내 신청·참여 매치",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/my/matches/joined",
+      "to": "/my/matches/joined",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/23-my-joined-matches.png",
+      "issues": []
+    },
+    {
+      "order": 23,
+      "slug": "23-my-joined-matches",
+      "title": "내 신청·참여 매치",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/my/matches/joined",
+      "to": "/my/matches/joined",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/23-my-joined-matches.png",
+      "issues": []
+    },
+    {
+      "order": 24,
+      "slug": "24-my-created-matches",
+      "title": "내가 만든 매치",
+      "viewport": "mobile",
+      "actor": "owner@teameet.v1",
+      "from": "/my/matches/created",
+      "to": "/my/matches/created",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/24-my-created-matches.png",
+      "issues": []
+    },
+    {
+      "order": 24,
+      "slug": "24-my-created-matches",
+      "title": "내가 만든 매치",
+      "viewport": "tablet",
+      "actor": "owner@teameet.v1",
+      "from": "/my/matches/created",
+      "to": "/my/matches/created",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/24-my-created-matches.png",
+      "issues": []
+    },
+    {
+      "order": 24,
+      "slug": "24-my-created-matches",
+      "title": "내가 만든 매치",
+      "viewport": "desktop",
+      "actor": "owner@teameet.v1",
+      "from": "/my/matches/created",
+      "to": "/my/matches/created",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/24-my-created-matches.png",
+      "issues": []
+    },
+    {
+      "order": 25,
+      "slug": "25-review-compose",
+      "title": "참여 후 리뷰 작성",
+      "viewport": "mobile",
+      "actor": "host@teameet.v1",
+      "from": "/my/reviews/match/00000000-0000-4000-8000-000000000208",
+      "to": "/my/reviews/match/00000000-0000-4000-8000-000000000208",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/25-review-compose.png",
+      "issues": []
+    },
+    {
+      "order": 25,
+      "slug": "25-review-compose",
+      "title": "참여 후 리뷰 작성",
+      "viewport": "tablet",
+      "actor": "host@teameet.v1",
+      "from": "/my/reviews/match/00000000-0000-4000-8000-000000000208",
+      "to": "/my/reviews/match/00000000-0000-4000-8000-000000000208",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/25-review-compose.png",
+      "issues": []
+    },
+    {
+      "order": 25,
+      "slug": "25-review-compose",
+      "title": "참여 후 리뷰 작성",
+      "viewport": "desktop",
+      "actor": "host@teameet.v1",
+      "from": "/my/reviews/match/00000000-0000-4000-8000-000000000208",
+      "to": "/my/reviews/match/00000000-0000-4000-8000-000000000208",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/25-review-compose.png",
+      "issues": []
+    },
+    {
+      "order": 26,
+      "slug": "26-admin-match-list",
+      "title": "관리자 개인매치 목록",
+      "viewport": "mobile",
+      "actor": "admin@teameet.v1",
+      "from": "/admin/matches",
+      "to": "/admin/matches",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/26-admin-match-list.png",
+      "issues": []
+    },
+    {
+      "order": 26,
+      "slug": "26-admin-match-list",
+      "title": "관리자 개인매치 목록",
+      "viewport": "tablet",
+      "actor": "admin@teameet.v1",
+      "from": "/admin/matches",
+      "to": "/admin/matches",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/26-admin-match-list.png",
+      "issues": []
+    },
+    {
+      "order": 26,
+      "slug": "26-admin-match-list",
+      "title": "관리자 개인매치 목록",
+      "viewport": "desktop",
+      "actor": "admin@teameet.v1",
+      "from": "/admin/matches",
+      "to": "/admin/matches",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/26-admin-match-list.png",
+      "issues": []
+    },
+    {
+      "order": 27,
+      "slug": "27-admin-match-detail",
+      "title": "관리자 개인매치 상세",
+      "viewport": "mobile",
+      "actor": "admin@teameet.v1",
+      "from": "/admin/matches/00000000-0000-4000-8000-000000000208",
+      "to": "/admin/matches/00000000-0000-4000-8000-000000000208",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/mobile/27-admin-match-detail.png",
+      "issues": []
+    },
+    {
+      "order": 27,
+      "slug": "27-admin-match-detail",
+      "title": "관리자 개인매치 상세",
+      "viewport": "tablet",
+      "actor": "admin@teameet.v1",
+      "from": "/admin/matches/00000000-0000-4000-8000-000000000208",
+      "to": "/admin/matches/00000000-0000-4000-8000-000000000208",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/tablet/27-admin-match-detail.png",
+      "issues": []
+    },
+    {
+      "order": 27,
+      "slug": "27-admin-match-detail",
+      "title": "관리자 개인매치 상세",
+      "viewport": "desktop",
+      "actor": "admin@teameet.v1",
+      "from": "/admin/matches/00000000-0000-4000-8000-000000000208",
+      "to": "/admin/matches/00000000-0000-4000-8000-000000000208",
+      "action": null,
+      "file": "docs/visual-qa/individual-friendly-match-lifecycle-20260918/desktop/27-admin-match-detail.png",
+      "issues": []
+    }
+  ]
+}

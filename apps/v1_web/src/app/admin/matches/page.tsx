@@ -26,7 +26,7 @@ import type { V1AdminMatchRow } from '@/types/api';
 
 // ── Status options for moderation modal ──────────────────────────────────────
 const MATCH_STATUS_OPTIONS = (
-  ['recruiting', 'closed', 'cancelled', 'completed', 'archived'] as const
+  ['recruiting', 'closed', 'cancelled', 'archived'] as const
 ).map((v) => ({
   value: v,
   label: STATUS_META[v]?.label ?? v,

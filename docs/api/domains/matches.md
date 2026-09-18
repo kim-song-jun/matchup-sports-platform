@@ -1,166 +1,91 @@
 # Domain Contract — Matches
 
+개인 친선매치의 생성, 신청 승인, 참가 상태, 경기 완료 계약이다. 정규 리그 및 팀 친선매치는 이 문서 범위가 아니다.
+
 ## Endpoint Matrix
 
 | Method | Path | Auth | 설명 |
 |---|---|---|---|
-| GET | `/matches` | No | 목록 조회 |
-| GET | `/home/recommendations` | No | 신청 가능한 추천 매치 |
-| POST | `/matches` | Yes | 생성 |
-| GET | `/matches/:id` | No | 상세 |
-| PATCH | `/matches/:id` | Yes | 수정 |
-| POST | `/matches/:id/cancel` | Yes | 취소 (host) |
-| POST | `/matches/:id/close` | Yes | 모집 마감 (host) |
-| POST | `/matches/:id/reopen` | Yes | 모집 재개 (host) |
-| POST | `/matches/:id/join` | Yes | 참가 |
-| DELETE | `/matches/:id/leave` | Yes | 탈퇴 |
-| POST | `/matches/:id/teams` | Yes | 팀 자동 배정 (host) |
-| POST | `/matches/:id/complete` | Yes | 완료 처리 (host) |
-| POST | `/matches/:id/arrive` | Yes | 도착 인증 |
+| GET | `/matches` | Optional | 개인매치 목록 |
+| POST | `/matches` | User + creator profile | 개인매치 생성 |
+| GET | `/matches/me/recent-venues` | User | 최근 입력 장소 |
+| GET | `/matches/:matchId` | Optional | 상세 및 viewer 상태 |
+| GET | `/matches/:matchId/edit` | Host | 수정 폼 데이터 |
+| PATCH | `/matches/:matchId` | Host | 수정 |
+| GET | `/matches/:matchId/application-eligibility` | User | 신청 가능 여부 |
+| POST | `/matches/:matchId/applications` | User | 참가 신청 |
+| GET | `/matches/:matchId/applications` | Host | 신청·참가·처리 내역 |
+| POST | `/match-applications/:applicationId/withdraw` | Applicant | 신청 철회 |
+| POST | `/match-applications/:applicationId/approve` | Host | 신청 승인 |
+| POST | `/match-applications/:applicationId/reject` | Host | 신청 거절 |
+| POST | `/matches/:matchId/close` | Host | 모집 마감 |
+| POST | `/matches/:matchId/reopen` | Host | 모집 재개 |
+| POST | `/matches/:matchId/cancel` | Host | 매치 취소 |
+| POST | `/matches/:matchId/complete` | Host | 참여 여부 확정 및 경기 완료 |
 
-## GET /matches (MatchFilterDto)
+`/matches/:id/join`, `/leave`, `/teams`, `/arrive`는 현재 v1 개인매치 계약에 존재하지 않는다.
 
-- Query
+## 생성·수정
 
-| 필드 | 타입 | 필수 | 비고 |
-|---|---|---|---|
-| `query` | string | No | title/description/place 검색 |
-| `sportId` | uuid | No | `v1_master_sports.id` |
-| `regionId` | uuid | No | district region |
-| `levelCodes` | comma string | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |
-| `genderRule` | string | No | `성별 무관`, `남`, `여` |
-| `status` | recruiting/closed/completed/cancelled/expired | No | 기본 recruiting |
-| `sort` | recommended/latest/starts_at/deadline | No | 기본 latest |
-| `cursor` | string | No | cursor pagination |
-| `limit` | 1~50 | No | 기본 20 |
+- 필수: `sportId`, `regionId`, `title`, `startsAt`, `capacity`, `manualPlaceName`
+- 선택: `description`, `imageUrl`, `endsAt`, `deadlineAt`, `addressText`, `rulesText`, `minLevelCode`, `maxLevelCode`, `genderRule`
+- 수정에는 optimistic concurrency용 `version`이 추가로 필요하다.
+- 생성 시 호스트 참가자(`role=host`, `status=active`)를 함께 만든다.
+- 완료·취소 상태와 시작 시각이 지난 매치는 수정할 수 없다.
 
-- Response: `{ items, pageInfo }`
-- 기본 목록은 `createdAt DESC, id DESC` 최신 생성순이다. `deadline`/`starts_at`은 경기 시작 임박순이며 `recommended`는 현재 시작 임박순으로 처리한다.
-- `status`를 생략한 일반 목록은 경기 시작 전인 raw `recruiting`과 `closed`를 포함한다. 신청 마감이 지났거나 raw `closed`인 항목도 경기 시작 전까지 `displayState=closed`(신청마감)로 노출하고, 경기 시작 시각 이후에는 목록에서 제외한다.
-- `sort=recommended` 목록과 `GET /home/recommendations`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다.
-- Each list item includes `host.userId`, `host.displayName`, `host.profileImageUrl`, and `host.trustState`.
-  `host.displayName` resolves the creator profile nickname first, then the profile display name, then the semantic `호스트` fallback.
-- Level response fields: `levelLabel`, `minLevel`, `maxLevel`
+## 참가 신청
 
-## POST /matches (CreateMatchDto)
+- `POST /matches/:matchId/applications`: body `{ message?: string | null }`, 최대 500자
+- `GET /matches/:matchId/applications`: status 생략 시 요청·승인·거절·철회·마감 내역 전체
+- 허용 status: `requested`, `approved`, `rejected`, `withdrawn`, `cancelled_by_host`, `expired`
+- 목록 항목에는 `participantId`, `participantStatus`, `participantCompletedAt`이 포함된다.
+- 승인하면 `role=participant`, `status=active` 참가자가 생기고 신청은 `approved`가 된다.
+- 마지막 자리를 승인하면 남은 대기 신청은 `expired`로 정리되고 알림을 보낸다.
+- 승인 전에는 채팅할 수 없고 승인된 호스트·참가자는 같은 매치 채팅방을 연다.
+- 완료된 참가자도 채팅 entitlement를 유지한다.
 
-- Body
+## 모집·취소
 
-| 필드 | 타입 | 필수 | 기본값 |
-|---|---|---|---|
-| `sportId` | uuid | Yes | - |
-| `regionId` | uuid | Yes | - |
-| `title` | string | Yes | - |
-| `description` | string | No | - |
-| `imageUrl` | string | No | - |
-| `startsAt` | ISO datetime | Yes | - |
-| `endsAt` | ISO datetime | No | - |
-| `deadlineAt` | ISO datetime | No | - |
-| `capacity` | int(2~100) | Yes | - |
-| `manualPlaceName` | string | Yes | - |
-| `addressText` | string | No | - |
-| `rulesText` | string | No | 안내/규칙 표시용 |
-| `minLevelCode` | level code | No | - |
-| `maxLevelCode` | level code | No | - |
-| `genderRule` | string | No | 성별 무관 |
+- `close`: `recruiting -> closed`; 대기 신청은 `expired`
+- `reopen`: 시작 전 `closed -> recruiting`; 필요하면 새 `deadlineAt`
+- `cancel`: 호스트만 실행하며 신청·참가 상태와 알림을 정리
+- 중복 요청은 `ALREADY_PROCESSED`, 허용되지 않는 전이는 `STATE_CONFLICT`
 
-- Level codes는 `beginner`, `novice`, `intermediate`, `advanced`만 허용한다.
-- `minLevelCode === maxLevelCode`는 단일 레벨 조건으로 유효하다.
-- `minLevelCode`가 `maxLevelCode`보다 높은 단계면 `400 VALIDATION_FAILED`.
+## 경기 완료와 개인 참여 기록
 
-- 부가 동작
-- host는 자동 participant 생성
-- host participant `paymentStatus=completed`
+`POST /matches/:matchId/complete`
 
-## PATCH /matches/:id
+- body: `{ participants: [{ participantId, status: 'completed' | 'no_show' }], reason? }`
+- 호스트만, 경기 시작 이후, raw `recruiting` 또는 `closed`에서 실행한다.
+- 모든 active 일반 참가자를 정확히 한 번씩 지정해야 한다.
+- 점수·승패·개인 성적은 저장하지 않고 “참여 완료/불참”만 남긴다.
+- 호스트와 매치는 `completed`; 매치에는 `completedAt`이 남는다.
+- 오래된 데이터에 호스트 참가자 행이 없으면 완료 트랜잭션 안에서 복구한다.
+- 대기 신청은 `expired`, 참가자 변경은 status log, 완료·마감 대상은 notification으로 남긴다.
+- 완료 참가자는 상세·내 매치에서 “참여 완료”를 보고 리뷰에 진입한다.
+- `no_show` 참가자는 “불참 기록”을 보고 리뷰 CTA가 없다.
 
-- host만 가능
-- `cancelled`, `completed`, `in_progress` 상태에서는 수정 불가
-- `maxPlayers`를 현재 참가자 수보다 낮게 수정 불가
-- `imageUrl`은 `null` 전달로 제거 가능
-- `minLevelCode`, `maxLevelCode`는 create와 동일 계약이며 미전달 시 레벨 FK를 비운다.
+## 목록과 관리자 경계
 
-## POST /matches/:id/join
+- `status=expired`는 raw `recruiting`이면서 시작 시각이 지난 매치만 반환한다.
+- raw `closed`는 시작 이후에도 expired 필터에 섞지 않는다.
+- `viewer.state`와 `viewer.participantStatus`로 승인/참여/불참을 표시한다.
+- 완료 참가자도 표시 인원수에 포함한다.
+- 관리자는 목록·상세를 볼 수 있지만 개인매치 완료를 직접 만들 수 없다(`MATCH_COMPLETION_ADMIN_FORBIDDEN`). 참여 여부의 source of truth는 현장 호스트다.
 
-- recruiting 상태에서만 가능
-- 정원 가득 찬 경우 실패
-- 중복 참가 실패
-- 참가 성공 시 `currentPlayers` 증가 및 상태 `full/recruiting` 갱신
+## Frontend Mapping
 
-## DELETE /matches/:id/leave
-
-- host는 탈퇴 불가
-- `in_progress`, `cancelled`, `completed` 상태 탈퇴 불가
-
-## POST /matches/:id/arrive
-
-- Body
-
-| 필드 | 타입 | 필수 |
-|---|---|---|
-| `lat` | number | Yes |
-| `lng` | number | Yes |
-| `photoUrl` | string | Yes |
-
-- 조건
-- 참가자만 가능
-- 중복 인증 불가
-- 시간 창: 시작 30분 전 ~ 종료 30분 후
-- venue 좌표가 있으면 200m 이내만 허용
-
-## POST /matches/:id/close · /matches/:id/reopen (host)
-
-팀매치 `close`/`reopen` 과 같은 계약이다. **취소와 다르다** — 매치와 확정 참가자는 그대로 두고
-"새 신청을 더 받는 것"만 닫으므로 되돌릴 수 있다.
-
-- `close` (body `{ reason? }`): `recruiting` + 시작 전에만. `status='closed'` 로 바꾸고 대기 중
-  (`requested`)이던 신청서를 `expired` 로 정리한 뒤 그 신청자에게 `match_closed` 알림을 보낸다.
-  이미 `closed` 면 `409 ALREADY_PROCESSED`.
-- `reopen` (body `{ reason?, deadlineAt? }`): 시작 전에만. **닫힌 두 갈래를 모두 되돌린다** —
-  호스트가 닫은 `status='closed'` 와, 마감 시각이 지나 `displayState` 만 `closed` 인 `recruiting`
-  (화면에는 둘 다 "신청 마감"으로 보인다). 지난 마감 시각은 지운다(= 경기 시작 전까지 받는다) —
-  남겨두면 `getDisplayState` 가 곧바로 다시 `closed` 를 돌려줘 눌러도 아무 변화가 없다.
-  `deadlineAt` 을 주면 그 값으로 갱신하며 지금 이후 · 시작 이전이어야 한다(`400 VALIDATION_FAILED`).
-  이미 모집 중이면 `409 ALREADY_PROCESSED`, 시작 시각이 지났으면 `409 STATE_CONFLICT`.
-
-## Idempotency / Duplicate Behavior
-
-- `join`: 이미 참가면 실패
-- `arrive`: 이미 도착 인증이면 실패
-- `cancel`/`complete`: 이미 종료 상태면 실패
-- `close`: 이미 마감이면 `409 ALREADY_PROCESSED` / `reopen`: 이미 모집 중이면 `409 ALREADY_PROCESSED`
-
-## Task 6 Game source boundary
-
-This document's `/matches` routes are player-match routes and are unchanged by Task 6. The
-separate `/api/v1/team-matches` source flow creates one pinned `TEAM_MATCH` Game in the same
-transaction; the Team Match module obtains `GamesService` from `GamesModule`, rather than
-duplicating Game persistence. Its source must resolve an active immutable competition
-configuration, otherwise it returns `409 COMPETITION_CONFIG_REQUIRED` with no orphan Team Match
-or Game. See [Games](./games.md#current-task-6-runtime-surface) for the resulting Game routes,
-idempotency rules, result DTOs, and the ordinary-team-match result-submit transition to `ENDED`.
-
-Task 6 does not add a generic `/matches` result endpoint and does not turn fixture data into a
-verified record. Any sample or fixture result remains explicitly non-verified until the Game
-revision flow has produced the applicable persisted result state.
-
-## Frontend Mapping Notes
-
-- `useV1Matches`, `useV1Match`, `useV1CreateMatch`, `useV1UpdateMatch` 사용
-- 목록 필터 URL은 `levelCodes`를 canonical source로 사용한다. legacy `levels` query는 읽기 호환만 유지한다.
-- `useCancelMatch`는 body optional(`reason`)이며 미전달 가능
-
-## CAUTION
-
-- 프론트 `UpdateMatchInput`에 `location`, `status`가 있으나 backend `UpdateMatchDto`에는 없음
-- submit 전에 DTO 필드로 정제하지 않으면 `400` 가능
-- 레벨 표시 텍스트는 `rulesText`가 아니라 `minSportLevelId`, `maxSportLevelId` FK에서 계산한 `levelLabel`을 사용한다.
+- 목록/상세: `useV1Matches`, `useV1Match`
+- 신청: `useV1ApplyMatch`, `useV1MatchApplicationEligibility`
+- 신청 관리: `useV1MatchApplicationsInfinite`, approve/reject hooks
+- 완료: `useV1CompleteMatch`
+- 채팅방은 상세 진입 때 선생성하지 않고 채팅 버튼을 누를 때 resolve한다.
 
 ## Source References
 
 - `apps/v1_api/src/matches/matches.controller.ts`
+- `apps/v1_api/src/matches/match-applications.controller.ts`
 - `apps/v1_api/src/matches/dto/*.ts`
 - `apps/v1_api/src/matches/matches.service.ts`
-- `apps/v1_api/src/sports/level-range.ts`
 - `apps/v1_web/src/hooks/use-v1-api.ts`
 - `apps/v1_web/src/types/api.ts`

@@ -407,6 +407,7 @@ export type V1Match = {
     state: V1ViewerState;
     applicationId: string | null;
     participantId: string | null;
+    participantStatus?: 'active' | 'completed' | 'no_show' | 'cancelled' | 'removed' | null;
     canApply: boolean;
     ctaLabel?: string;
     disabledReason?: string | null;
@@ -479,6 +480,21 @@ export type V1MatchApplicationResult = {
   detailRoute: string;
 };
 
+export type V1MatchCompletionPayload = {
+  participants: Array<{ participantId: string; status: 'completed' | 'no_show' }>;
+  reason?: string | null;
+};
+
+export type V1MatchCompletionResult = {
+  matchId: string;
+  status: 'completed';
+  completedAt: string;
+  completedParticipants: number;
+  noShowParticipants: number;
+  expiredApplications: number;
+  detailRoute: string;
+};
+
 export type V1MatchMutationPayload = {
   sportId: string;
   regionId: string;
@@ -523,6 +539,9 @@ export type V1MatchApplication = {
   message: string | null;
   createdAt: string;
   reviewedAt: string | null;
+  participantId: string | null;
+  participantStatus: 'active' | 'completed' | 'no_show' | 'cancelled' | 'removed' | null;
+  participantCompletedAt: string | null;
 };
 
 export type V1MatchApplicationsPage = {

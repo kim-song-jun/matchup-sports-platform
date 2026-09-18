@@ -193,7 +193,7 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
         </div>
         {/* 선택 상태를 primary 로 칠하면 "이 화면의 주요 행동"으로 읽힌다(§14) — 칩으로 표현한다. */}
         <div className="tm-segment-row">
-          <Link className={`tm-chip ${joined ? 'tm-chip-active' : ''}`} href="/my/matches/joined" aria-current={joined ? 'page' : undefined}>참여한 매치</Link>
+          <Link className={`tm-chip ${joined ? 'tm-chip-active' : ''}`} href="/my/matches/joined" aria-current={joined ? 'page' : undefined}>신청·참여 매치</Link>
           <Link className={`tm-chip ${!joined ? 'tm-chip-active' : ''}`} href="/my/matches/created" aria-current={!joined ? 'page' : undefined}>생성한 매치</Link>
         </div>
         {model.loading ? <PageSkeleton variant="list" /> : null}
@@ -212,7 +212,7 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
               fill
               illustration={{ name: 'matches-empty' }}
               title="표시할 매치가 없어요"
-              sub={model.mode === 'joined' ? '매치에 참여하면 여기에 표시돼요.' : '매치를 만들면 여기에 표시돼요.'}
+              sub={model.mode === 'joined' ? '신청하거나 참여한 개인 매치가 여기에 표시돼요.' : '매치를 만들면 여기에 표시돼요.'}
               cta={model.mode === 'joined' ? '매치 둘러보기' : '매치 만들기'}
               ctaHref={model.mode === 'joined' ? '/matches' : '/matches/new/sport'}
             />

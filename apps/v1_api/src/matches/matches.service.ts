@@ -19,6 +19,7 @@ import {
   WithdrawMatchApplicationDto,
 } from './dto/match-application.dto';
 import { MatchesQueryDto, MyMatchesQueryDto } from './dto/matches-query.dto';
+import { CompleteMatchDto } from './dto/complete-match.dto';
 import { CancelMatchDto, CloseMatchDto, MutateMatchDto, ReopenMatchDto, UpdateMatchDto } from './dto/mutate-match.dto';
 
 type MatchWithRelations = V1Match & {
@@ -76,7 +77,7 @@ export class MatchesService {
       // completed/cancelled 등 나머지 status 조회는 과거 startAt을 의도적으로 포함해야 하므로
       // 그대로 둔다.
       ...(status === 'expired'
-        ? { startAt: { lt: now } }
+        ? { status: 'recruiting', startAt: { lt: now } }
         : isDefaultDiscovery
           ? {
               // 상태를 닫은 글도 경기 전까지 일반 목록에 남겨 신청마감으로 보여준다.
@@ -655,6 +656,149 @@ export class MatchesService {
     };
   }
 
+  async complete(user: V1AuthUser, matchId: string, dto: CompleteMatchDto) {
+    this.assertActiveAccount(user);
+    const requestedStatuses = new Map(dto.participants.map((item) => [item.participantId, item.status]));
+    if (requestedStatuses.size !== dto.participants.length) {
+      throw validationError('participants must not contain duplicate participantId values', 'participants');
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${matchId} FOR UPDATE`;
+      const match = await tx.v1Match.findFirst({
+        where: { id: matchId, deletedAt: null },
+        include: {
+          participants: {
+            where: { status: 'active' },
+            select: { id: true, userId: true, role: true },
+            orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+          },
+        },
+      });
+      if (!match) {
+        throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Match was not found' });
+      }
+      if (match.hostUserId !== user.id) {
+        throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Only the match host can complete this match' });
+      }
+      if (match.status !== 'recruiting' && match.status !== 'closed') {
+        throw stateConflict('Match cannot be completed in current status');
+      }
+      if (match.startAt > new Date()) {
+        throw stateConflict('Match cannot be completed before it starts', 'MATCH_NOT_STARTED');
+      }
+
+      const guests = match.participants.filter((participant) => participant.role === 'participant');
+      const activeGuestIds = new Set(guests.map((participant) => participant.id));
+      if (
+        requestedStatuses.size !== activeGuestIds.size ||
+        [...requestedStatuses.keys()].some((participantId) => !activeGuestIds.has(participantId))
+      ) {
+        throw validationError('Every active participant must be marked completed or no_show', 'participants');
+      }
+
+      const completedAt = new Date();
+      await tx.v1Match.update({
+        where: { id: match.id },
+        data: { status: 'completed', completedAt },
+      });
+      const host = match.participants.find((participant) => participant.role === 'host');
+      if (host) {
+        await tx.v1MatchParticipant.update({
+          where: { id: host.id },
+          data: { status: 'completed', completedAt },
+        });
+      } else {
+        // Older seed/runtime rows can predate the host-participant invariant.
+        // Repair the relation while completing instead of leaving the match stuck.
+        await tx.v1MatchParticipant.upsert({
+          where: { matchId_userId: { matchId: match.id, userId: match.hostUserId } },
+          update: { role: 'host', status: 'completed', completedAt },
+          create: {
+            matchId: match.id,
+            userId: match.hostUserId,
+            role: 'host',
+            status: 'completed',
+            completedAt,
+          },
+        });
+      }
+
+      for (const participant of guests) {
+        const nextStatus = requestedStatuses.get(participant.id)!;
+        await tx.v1MatchParticipant.update({
+          where: { id: participant.id },
+          data: { status: nextStatus, completedAt: nextStatus === 'completed' ? completedAt : null },
+        });
+        await tx.v1StatusChangeLog.create({
+          data: {
+            targetType: 'match_participant',
+            targetId: participant.id,
+            fromStatus: 'active',
+            toStatus: nextStatus,
+            actorType: 'user',
+            actorUserId: user.id,
+            reason: dto.reason ?? 'match_attendance_confirmed',
+          },
+        });
+      }
+
+      const pending = await tx.v1MatchApplication.findMany({
+        where: { matchId: match.id, status: 'requested' },
+        select: { applicantUserId: true },
+      });
+      const expiredApplications = await tx.v1MatchApplication.updateMany({
+        where: { matchId: match.id, status: 'requested' },
+        data: { status: 'expired', reviewedByUserId: user.id, reviewedAt: completedAt },
+      });
+      await tx.v1StatusChangeLog.create({
+        data: {
+          targetType: 'match',
+          targetId: match.id,
+          fromStatus: match.status,
+          toStatus: 'completed',
+          actorType: 'user',
+          actorUserId: user.id,
+          reason: dto.reason ?? 'match_completed',
+        },
+      });
+
+      return {
+        completedAt,
+        expiredApplications: expiredApplications.count,
+        completedUserIds: guests
+          .filter((participant) => requestedStatuses.get(participant.id) === 'completed')
+          .map((participant) => participant.userId),
+        expiredUserIds: pending.map((application) => application.applicantUserId),
+        completedParticipants: 1 + guests.filter((participant) => requestedStatuses.get(participant.id) === 'completed').length,
+        noShowParticipants: guests.filter((participant) => requestedStatuses.get(participant.id) === 'no_show').length,
+      };
+    });
+
+    void this.notifications.emitNotificationToMany(
+      result.completedUserIds,
+      'match_completed',
+      matchId,
+      '참여한 개인 매치가 완료됐어요. 함께한 참가자에게 후기를 남겨보세요.',
+    );
+    void this.notifications.emitNotificationToMany(
+      result.expiredUserIds,
+      'match_closed',
+      matchId,
+      '매치가 완료되어 대기 중이던 신청이 종료됐어요.',
+    );
+
+    return {
+      matchId,
+      status: 'completed',
+      completedAt: result.completedAt,
+      completedParticipants: result.completedParticipants,
+      noShowParticipants: result.noShowParticipants,
+      expiredApplications: result.expiredApplications,
+      detailRoute: `/matches/${matchId}`,
+    };
+  }
+
   async createApplication(user: V1AuthUser, matchId: string, dto: CreateMatchApplicationDto) {
     this.assertActiveAccount(user);
     const match = await this.prisma.v1Match.findFirst({
@@ -754,6 +898,9 @@ export class MatchesService {
             reputationSummary: { select: { trustState: true, mannerScore: true, reviewCount: true } },
           },
         },
+        participant: {
+          select: { id: true, status: true, completedAt: true },
+        },
       },
     });
 
@@ -778,6 +925,9 @@ export class MatchesService {
         message: application.message,
         createdAt: application.createdAt,
         reviewedAt: application.reviewedAt,
+        participantId: application.participant?.id ?? null,
+        participantStatus: application.participant?.status ?? null,
+        participantCompletedAt: application.participant?.completedAt ?? null,
       })),
       pageInfo: {
         nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
@@ -918,6 +1068,19 @@ export class MatchesService {
         },
       });
 
+      const fullCapacityPending = activeParticipantCount + 1 >= currentMatch.maxParticipants
+        ? await tx.v1MatchApplication.findMany({
+            where: { matchId: application.matchId, status: 'requested', id: { not: application.id } },
+            select: { applicantUserId: true },
+          })
+        : [];
+      if (fullCapacityPending.length > 0) {
+        await tx.v1MatchApplication.updateMany({
+          where: { matchId: application.matchId, status: 'requested', id: { not: application.id } },
+          data: { status: 'expired', reviewedByUserId: user.id, reviewedAt: new Date() },
+        });
+      }
+
       await tx.v1StatusChangeLog.create({
         data: {
           targetType: 'match_application',
@@ -933,6 +1096,7 @@ export class MatchesService {
       return {
         updated: { id: application.id, matchId: application.matchId, status: 'approved' as const },
         participant,
+        expiredUserIds: fullCapacityPending.map((item) => item.applicantUserId),
       };
     });
 
@@ -942,6 +1106,12 @@ export class MatchesService {
       'match_application_approved',
       application.matchId,
       `"${application.match.title}" 매치 참가가 확정됐어요.`,
+    );
+    void this.notifications.emitNotificationToMany(
+      result.expiredUserIds,
+      'match_closed',
+      application.matchId,
+      `"${application.match.title}" 매치 정원이 마감되어 대기 중이던 신청이 종료됐어요.`,
     );
 
     return {
@@ -1013,7 +1183,7 @@ export class MatchesService {
       maxSportLevel: { select: { id: true, code: true, name: true, sortOrder: true, sportId: true } },
       region: { select: { id: true, name: true } },
       participants: {
-        where: { status: { in: ['active', 'completed'] } },
+        where: { status: { in: ['active', 'completed', 'no_show'] } },
         include: {
           user: {
             select: {
@@ -1108,6 +1278,7 @@ export class MatchesService {
         state: participant.role === 'host' ? 'host' : 'participant',
         applicationId: participant.applicationId,
         participantId: participant.id,
+        participantStatus: participant.status,
         canApply: false,
         ctaLabel: '참여 확정',
         disabledReason: null,
@@ -1157,7 +1328,9 @@ export class MatchesService {
   }
 
   private getParticipantCount(match: Pick<MatchWithRelations, 'participants'>) {
-    return match.participants.filter((participant) => participant.status === 'active').length;
+    return match.participants.filter((participant) =>
+      participant.status === 'active' || participant.status === 'completed',
+    ).length;
   }
 
   private getApiStatus(match: V1Match) {

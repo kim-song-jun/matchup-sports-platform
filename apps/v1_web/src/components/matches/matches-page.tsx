@@ -249,7 +249,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
   const canRunAction = Boolean(model.onApply);
   const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : mode === 'closed' || match.status === 'full' ? '신청 마감' : '참가 신청');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
-  const showChat = mode === 'approved' && Boolean(model.onChat);
+  const showChat = Boolean(model.onChat);
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
   // 경기가 끝난 뒤 후기로 가는 유일한 상세 화면 진입점. 완료 알림도 후기 화면으로 보내지만,
   // 매치 상세에서 직접 들어갈 길이 없으면 알림을 지운 사용자는 후기를 쓸 방법이 사라진다.
@@ -382,8 +382,9 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 </Link>
               </>
             ) : null}
-            {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
-            {mode === 'closed' ? <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." /> : null}
+            {mode === 'approved' && match.lifecycleStatus !== 'completed' ? <StateCard tone="green" title="승인 완료" body="참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
+            {match.lifecycleStatus === 'completed' ? <StateCard tone="green" title="경기 완료" body="개인 기록 점수 없이 이 경기에 참여한 이력이 남았어요." /> : null}
+            {mode === 'closed' && match.lifecycleStatus !== 'completed' ? <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." /> : null}
             {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
             <Card pad={16} style={{ marginTop: 12 }}>
               <div className="tm-text-body-lg">참가자</div>
@@ -457,8 +458,9 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               </Link>
             </>
           ) : null}
-          {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
-          {mode === 'closed' ? <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." /> : null}
+          {mode === 'approved' && match.lifecycleStatus !== 'completed' ? <StateCard tone="green" title="승인 완료" body="참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
+          {match.lifecycleStatus === 'completed' ? <StateCard tone="green" title="경기 완료" body="개인 기록 점수 없이 이 경기에 참여한 이력이 남았어요." /> : null}
+          {mode === 'closed' && match.lifecycleStatus !== 'completed' ? <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." /> : null}
           {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
           <Card pad={16} style={{ marginTop: 12 }}>
             <div className="tm-text-body-lg">참가자</div>

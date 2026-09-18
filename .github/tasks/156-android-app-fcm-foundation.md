@@ -684,3 +684,9 @@ report, upgrade preservation, and the remaining OEM/foldable/multi-window matrix
 - 관리자 대시보드 잘못된 대회 링크는 실제 정규 league API 200 / tournament API 404로 확인. 대회 전용 집계의 surface filter 누락을 수정했다.
 - 로컬 기존 DB는 변경하지 않고 별도 QA DB를 사용했다. 원격 Alpha에서는 읽기/탐색/스크롤만 수행했으며 채팅 전송·신청·운영 수정은 하지 않았다.
 - 캡처는 첫 viewport 시각 검수이며 모든 입력/버튼 동작 완료를 뜻하지 않는다. 권한 안내·redirect·오류 상태를 기능 성공으로 합산하지 않는다.
+
+### 배포 대기 / cleanup
+
+- 코드 커밋: `24a323505`. 자동 승인 검토가 GitHub push 및 dev PR 생성을 거부했다. 공개 저장소로 코드를 전송하는 작업의 명시적 사용자 승인이 필요하다는 사유이며, 사용자에게 승인을 요청한 상태다. 원격 변경은 실행되지 않았다.
+- 이벤트 fallback도 실기기 임시 비교에서 64→208.07px(슬롯 208.07px)로 정상화됐다. 임시 CSS를 제거하고 앱을 홈으로 복귀했다.
+- 소유 Next/API 프로세스와 dependency symlink, ADB tcp:9223 포워드를 정리했다. 최신 APK 및 사용자 로그인은 유지하고, 기존 DB/다른 세션 프로세스는 변경하지 않았다.

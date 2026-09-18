@@ -656,6 +656,43 @@ report, upgrade preservation, and the remaining OEM/foldable/multi-window matrix
 - Public deletion copy continues to distinguish immediate account lock/push revocation, operator final PII
   cleanup, and narrowly retained completed-match/payment/dispute/security records.
 
+
+## Android 전체 UI 재검증 — 2026-09-19
+
+### Progress Snapshot
+
+- 기준: origin/dev `82698757d`, 독립 worktree `/tmp/teameet-android-ui-audit-20260919`, branch `fix/android-ui-audit-20260919`.
+- [x] 최신 native 소스/성공 APK 확인, SHA256 확인, 사용자 승인하에 기존 앱 삭제 및 최신 Alpha 설치.
+- [x] 사용자가 USB 디버깅 허용, 일반 계정 로그인, 관리자 계정 전환 완료.
+- [x] 180/180 라우트 처리; 177개 경로 실기기 캡처, 일반/관리자/추가/최종 sweep 합계 242장.
+- [x] 홈·마이·팀 상세 끝까지 스크롤, 채팅 키보드 열기/닫기, 실제 system inset 비교.
+- [x] 재현된 결함 6건 수정: IME 48px 중복 공간, shell render 갱신 경고, reviewerTeam key 충돌, 이벤트 fallback 높이, 관리자 대회 집계의 리그 링크 404, 전술보드 조회 실패 무한 로딩.
+- [x] 대회 page named export로 인한 기존 Next 타입 검사 blocker 수정; 테스트는 default route 사용.
+- [x] Web 117 + API 53 tests PASS, 양쪽 타입 검사 PASS, v1 pattern check PASS. 신규 DB migration 없음.
+- [ ] dev/Alpha 반영 및 배포된 수정안의 실기기 최종 확인.
+- [ ] 개인 리뷰 상세, 팀 컨택 상세, 담당 경기 상세: 현재 계정에 실제 데이터가 없어 내부 화면 미검증.
+- [ ] 최고운영자/다른 팀 전용 화면: 제공된 계정으로 권한 안내만 확인. 권한 우회 없음.
+
+### 증거와 한계
+
+- [감사 시나리오 및 3폭 이미지](../../docs/scenarios/android-device-ui-audit.md).
+- 원본: `output/playwright/visual-audit/android-20260919/`, `reviewed-results.json` 및 로컬 `index.html` 갤러리. 개인정보가 있는 실기기 원본은 공개 저장소에 추가하지 않는다.
+- Samsung Galaxy A32(SM-A325N), Android 13, 1080×2400, CSS width 411px. Actions `34565292770`, APK source `11bdded28`는 기준 dev의 Android 트리와 동일.
+- 실기기 IME 닫힘 viewport 884px → 열림 506px. 입력바 128.76px에서 CSS 패치 비교 80.76px, 키보드 닫힘 시 native safe-bottom 48px 정상 복원. 임시 CSS는 제거했다. 이는 배포된 웹 수정 검증과 구분한다.
+- 브라우저 실제 native inline token 계약 재현: 입력바 129→81→129px, 390/768/1440 focus 18회. 이벤트 fallback 높이는 3폭 모두 슬롯 높이와 일치.
+- 관리자 후반 ALB 403(awselb/2.0)을 별도로 기록. 낮은 속도로 재시도해 정상 화면을 확보했다. 실제 앱 권한 403과 혼동하지 않는다.
+- 관리자 대시보드 잘못된 대회 링크는 실제 정규 league API 200 / tournament API 404로 확인. 대회 전용 집계의 surface filter 누락을 수정했다.
+- 로컬 기존 DB는 변경하지 않고 별도 QA DB를 사용했다. 원격 Alpha에서는 읽기/탐색/스크롤만 수행했으며 채팅 전송·신청·운영 수정은 하지 않았다.
+- 캡처는 첫 viewport 시각 검수이며 모든 입력/버튼 동작 완료를 뜻하지 않는다. 권한 안내·redirect·오류 상태를 기능 성공으로 합산하지 않는다.
+
+### 배포 대기 / cleanup
+
+- 코드 커밋: `24a323505`. 자동 승인 검토가 GitHub push 및 dev PR 생성을 거부했다. 공개 저장소로 코드를 전송하는 작업의 명시적 사용자 승인이 필요하다는 사유이며, 사용자에게 승인을 요청한 상태다. 원격 변경은 실행되지 않았다.
+- 이벤트 fallback도 실기기 임시 비교에서 64→208.07px(슬롯 208.07px)로 정상화됐다. 임시 CSS를 제거하고 앱을 홈으로 복귀했다.
+- 소유 Next/API 프로세스와 dependency symlink, ADB tcp:9223 포워드를 정리했다. 최신 APK 및 사용자 로그인은 유지하고, 기존 DB/다른 세션 프로세스는 변경하지 않았다.
+
+- 사용자 명시 승인 후 작업 브랜치 push 및 dev 대상 PR [#1226](https://github.com/kim-song-jun/matchup-sports-platform/pull/1226) 생성 완료. base=`dev` 확인. CI/리뷰 및 Alpha 배포 후 검증은 별도 완료 조건이며 현재 미머지다.
+
 ## Play readiness implementation — 2026-09-19
 
 Base: `82698757d` (`origin/dev`); isolated worktree `/tmp/teameet-android-play-readiness`.
@@ -697,3 +734,5 @@ Reviewed 8/8 areas: signup age; chat access/blocking; report processing; final a
 - Full API CI: 709 integration cases passed; one schema snapshot guard failed because Task 156 added V1ChatUserBlock. Re-pinned the normalized full-schema digest with an explicit additive-change rationale; the game-domain schema and bound migration digest are unchanged.
 
 - CI follow-up: schema guard integration 9/9 passed locally after re-pin. Exact v1.3 INSERT and read-only conflict guard statements registered in the existing expand-contract review list; negative controls, base-resolution self-tests and PR diff gate passed. Android Alpha and Web CI passed on d3506c04c. Copilot request unavailable: latest CLI returned reviewer not found; no review request or completed review exists, so automated-review clean is not claimed.
+
+- PR 생성 후 최신 dev `e4caade04` 동기화를 준비했다. Task 156의 동시 추가 문단만 충돌하여 두 작업 기록을 모두 보존했다. Copilot CLI는 reviewer not found로 요청 실패했다. 기존 캡처는 감사 기준 SHA의 증거이며 이후 dev 신규 기능의 재검증을 뜻하지 않는다.

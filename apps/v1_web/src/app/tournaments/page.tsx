@@ -137,7 +137,7 @@ const TOURNAMENT_PAGE_SIZE = 20;
  *
  * 서버는 한 엔드포인트로 둘 다 받는다(`page` ↔ `cursor`, `paginationArgs`).
  */
-export function TournamentsListContent() {
+function TournamentsListContent() {
   const isDesktop = useMediaQuery(DESKTOP_LIST_MEDIA_QUERY);
 
   // 데스크톱 = 페이지 번호, 모바일 = 커서 누적. 두 상태를 함께 두고 화면 폭에 맞는

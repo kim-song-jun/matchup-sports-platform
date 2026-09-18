@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TournamentsListContent } from './page';
+import TournamentsPage from './page';
 
 /**
  * 대회 목록의 페이지 이동은 **화면 폭에 따라 서버에 다른 것을 묻는다** — 데스크톱은
@@ -89,7 +89,7 @@ describe('대회 목록 — 데스크톱 페이지네이션 / 모바일 무한 �
       }),
     );
 
-    render(<TournamentsListContent />);
+    render(<TournamentsPage />);
 
     const params = tournamentsMock.mock.calls[0][0];
     expect(params.page).toBe(1);
@@ -102,7 +102,7 @@ describe('대회 목록 — 데스크톱 페이지네이션 / 모바일 무한 �
       listResult({ items: [card('t-1')], pageInfo: { nextCursor: 'c-1', hasNext: true } }),
     );
 
-    render(<TournamentsListContent />);
+    render(<TournamentsPage />);
 
     const params = tournamentsMock.mock.calls[0][0];
     expect(params).not.toHaveProperty('page');
@@ -118,7 +118,7 @@ describe('대회 목록 — 데스크톱 페이지네이션 / 모바일 무한 �
       }),
     );
 
-    render(<TournamentsListContent />);
+    render(<TournamentsPage />);
     await userEvent.click(screen.getByRole('button', { name: '3페이지' }));
 
     const lastParams = tournamentsMock.mock.calls.at(-1)?.[0];
@@ -134,7 +134,7 @@ describe('대회 목록 — 데스크톱 페이지네이션 / 모바일 무한 �
       }),
     );
 
-    render(<TournamentsListContent />);
+    render(<TournamentsPage />);
 
     expect(screen.getByText(/전체 45건 중 21–40/)).toBeInTheDocument();
   });
@@ -148,7 +148,7 @@ describe('대회 목록 — 데스크톱 페이지네이션 / 모바일 무한 �
       }),
     );
 
-    render(<TournamentsListContent />);
+    render(<TournamentsPage />);
 
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });
@@ -159,7 +159,7 @@ describe('대회 목록 — 데스크톱 페이지네이션 / 모바일 무한 �
       listResult({ items: [card('t-1')], pageInfo: { nextCursor: 'c-1', hasNext: true } }),
     );
 
-    render(<TournamentsListContent />);
+    render(<TournamentsPage />);
 
     expect(screen.getByRole('button', { name: '더 보기' })).toBeInTheDocument();
   });
@@ -170,7 +170,7 @@ describe('대회 목록 — 데스크톱 페이지네이션 / 모바일 무한 �
       listResult({ items: [card('t-1')], pageInfo: { nextCursor: null, hasNext: false } }),
     );
 
-    render(<TournamentsListContent />);
+    render(<TournamentsPage />);
 
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });
@@ -181,14 +181,14 @@ describe('대회 목록 — 데스크톱 페이지네이션 / 모바일 무한 �
       listResult({ items: [card('t-1')], pageInfo: { nextCursor: 'c-1', hasNext: true } }),
     );
 
-    const view = render(<TournamentsListContent />);
+    const view = render(<TournamentsPage />);
 
     // "더 보기" 이후에는 훅이 2페이지를 돌려준다 — 실제 흐름과 같다.
     tournamentsMock.mockReturnValue(
       listResult({ items: [card('t-2')], pageInfo: { nextCursor: null, hasNext: false } }),
     );
     await userEvent.click(screen.getByRole('button', { name: '더 보기' }));
-    view.rerender(<TournamentsListContent />);
+    view.rerender(<TournamentsPage />);
 
     expect(screen.getByText('대회 t-1')).toBeInTheDocument();
     expect(screen.getByText('대회 t-2')).toBeInTheDocument();

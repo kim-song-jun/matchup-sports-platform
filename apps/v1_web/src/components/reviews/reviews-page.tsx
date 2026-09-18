@@ -111,7 +111,7 @@ export function ReviewsPageView({
                 />
               ) : null}
               {!loading && !errorMessage ? model.cards.map((card) => (
-                <Link key={`${card.sourceType}:${card.sourceId}`} className="tm-review-schedule-card tm-pressable" href={card.href}>
+                <Link key={`${card.sourceType}:${card.sourceId}:${card.reviewerTeam?.teamId ?? card.targetType}`} className="tm-review-schedule-card tm-pressable" href={card.href}>
                   <div className="tm-review-card-head">
                     <div style={{ minWidth: 0 }}>
                       <div className="tm-text-body-lg line-clamp-2">{card.title}</div>

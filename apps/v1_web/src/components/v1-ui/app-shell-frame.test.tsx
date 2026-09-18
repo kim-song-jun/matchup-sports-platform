@@ -1,4 +1,5 @@
-import { render, screen, within } from '@testing-library/react';
+import { useState } from 'react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AppShellFrame } from './app-shell-frame';
 import { AppChrome } from './shell';
@@ -31,6 +32,26 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('AppShellFrame — 셸 지속성 (진단 #1의 반증)', () => {
+  it('페이지의 비동기 제목 변경을 렌더 중 조상 갱신 없이 셸에 반영한다', () => {
+    mockPathname = '/home';
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    function AsyncTitlePage() {
+      const [title, setTitle] = useState('채팅 로딩');
+      useShellOverride({ title });
+      return <button onClick={() => setTitle('실제 채팅방')}>채팅방 로드</button>;
+    }
+    try {
+      render(<AppShellFrame><AsyncTitlePage /></AppShellFrame>);
+      const header = screen.getByRole('banner');
+      fireEvent.click(screen.getByRole('button', { name: '채팅방 로드' }));
+      expect(within(header).getByText('실제 채팅방')).toBeInTheDocument();
+      expect(screen.getByRole('banner')).toBe(header);
+      expect(errors.mock.calls.filter(([message]) => String(message).includes('Cannot update a component'))).toEqual([]);
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
   it('pathname이 바뀌어도 topbar/bottomnav/스크롤 컨테이너 DOM은 리마운트되지 않는다', () => {
     mockPathname = '/home';
     const { rerender } = render(

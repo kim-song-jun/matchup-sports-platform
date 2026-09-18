@@ -1162,7 +1162,10 @@ describe('AdminService — list/detail endpoints', () => {
         'paid',
         'cancel_requested',
       ]);
-      expect(regWhere.tournament).toEqual({ deletedAt: null });
+      expect(regWhere.tournament).toEqual({
+        OR: [{ kind: 'regular_tournament' }, { kind: null }],
+        deletedAt: null,
+      });
 
       // 검토 대기 = ENDED + (공식 리비전 없음 OR 열린 에스컬레이션) — result-review 화면과 동일 정의
       const teamMatchCall = prisma.v1TeamMatch.groupBy.mock.calls[0][0];

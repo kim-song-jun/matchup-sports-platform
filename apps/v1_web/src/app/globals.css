@@ -3548,7 +3548,8 @@ label.tm-btn:focus-within {
 /* Keep ordinary browser layout unchanged. These overrides exist only while a text-entry IME is open. */
 html.tm-keyboard-open,
 html[data-teameet-native-keyboard="open"] {
-  --v1-shell-safe-bottom: 0px;
+  /* Shipped Android shells publish this token inline. The IME already consumes the system inset. */
+  --v1-shell-safe-bottom: 0px !important;
 }
 
 html.tm-keyboard-open .tm-bottom-nav,

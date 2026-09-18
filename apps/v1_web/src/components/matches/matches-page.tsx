@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { MatchParticipationActions } from './match-participation-actions';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ChangeEvent } from 'react';
@@ -217,7 +218,12 @@ function matchStatusBadgeClass(mode: MatchDetailViewModel['mode'], status: Match
   return 'tm-badge-grey';
 }
 
-function matchStatusBadgeLabel(mode: MatchDetailViewModel['mode'], status: MatchDetailViewModel['match']['status']) {
+function matchStatusBadgeLabel(
+  mode: MatchDetailViewModel['mode'],
+  status: MatchDetailViewModel['match']['status'],
+  completed = false,
+) {
+  if (completed) return '참여 완료';
   if (mode === 'pending') return '승인 대기';
   if (mode === 'approved') return '승인 완료';
   if (mode === 'mine') return '내 매치';
@@ -249,7 +255,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
   const canRunAction = Boolean(model.onApply);
   const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : mode === 'closed' || match.status === 'full' ? '신청 마감' : '참가 신청');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
-  const showChat = mode === 'approved' && Boolean(model.onChat);
+  const showChat = (mode === 'approved' || mode === 'mine') && Boolean(model.onChat);
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
   // 경기가 끝난 뒤 후기로 가는 유일한 상세 화면 진입점. 완료 알림도 후기 화면으로 보내지만,
   // 매치 상세에서 직접 들어갈 길이 없으면 알림을 지운 사용자는 후기를 쓸 방법이 사라진다.
@@ -347,7 +353,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 {/* 성별을 안 정한 매치에는 배지를 붙이지 않는다 — 카드 모델이 빈 값을
                     문자열로 채우지 않게 바뀌면서 이 가드가 비로소 의미를 갖는다. */}
                 {match.gender ? <span className="tm-badge tm-badge-grey">{match.gender}</span> : null}
-                <span className={`tm-badge ${matchStatusBadgeClass(mode, match.status)}`}>{matchStatusBadgeLabel(mode, match.status)}</span>
+                <span className={`tm-badge ${matchStatusBadgeClass(mode, match.status)}`}>{matchStatusBadgeLabel(mode, match.status, model.completed)}</span>
               </div>
               <h2 className="tm-match-detail-title">{match.title}</h2>
               <div className="tm-text-caption tm-match-detail-meta" style={{ marginTop: 8 }}>{match.host} 호스트 · {match.deadline}</div>
@@ -382,7 +388,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 </Link>
               </>
             ) : null}
-            {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
+            {mode === 'approved' ? <StateCard tone="green" title={model.completed ? "참여 완료" : "승인 완료"} body={model.completed ? "함께한 참여 이력이 저장됐어요. 후기를 남겨 보세요." : "참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요."} /> : null}
             {mode === 'closed' ? <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." /> : null}
             {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
             <Card pad={16} style={{ marginTop: 12 }}>
@@ -401,6 +407,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 ))}
               </div>
             </Card>
+            {model.canComplete || model.withdrawApplicationId ? <MatchParticipationActions matchId={match.id} canComplete={Boolean(model.canComplete)} applicationId={model.withdrawApplicationId} /> : null}
             {reviewCard}
           </div>
 
@@ -408,7 +415,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           <div className="tm-match-detail-desktop-cta" role="complementary" aria-label="매치 신청">
             <div className="tm-match-detail-desktop-cta-label">
               <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
-              <span className="tm-text-label">{model.statusLabel ?? match.actionLabel}</span>
+              <span className="tm-text-label">{model.completed ? '참여 완료' : model.statusLabel ?? match.actionLabel}</span>
             </div>
             <div className="tm-match-detail-desktop-cta-actions">
               {showChat ? (
@@ -419,7 +426,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               {mode === 'mine' ? (
                 <>
                   <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={match.applicationsHref ?? `/matches/${match.id}/applications`}>신청자 관리</Link>
-                  <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link>
+                  {!model.completed && !model.canComplete ? <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link> : null}
                 </>
               ) : (
                 <Button
@@ -457,7 +464,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               </Link>
             </>
           ) : null}
-          {mode === 'approved' ? <StateCard tone="green" title="승인 완료" body="참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요." /> : null}
+          {mode === 'approved' ? <StateCard tone="green" title={model.completed ? "참여 완료" : "승인 완료"} body={model.completed ? "함께한 참여 이력이 저장됐어요. 후기를 남겨 보세요." : "참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요."} /> : null}
           {mode === 'closed' ? <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." /> : null}
           {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
           <Card pad={16} style={{ marginTop: 12 }}>
@@ -476,7 +483,8 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               ))}
             </div>
           </Card>
-          {reviewCard}
+          {model.canComplete || model.withdrawApplicationId ? <MatchParticipationActions matchId={match.id} canComplete={Boolean(model.canComplete)} applicationId={model.withdrawApplicationId} /> : null}
+            {reviewCard}
         </div>
       </article>
 
@@ -484,7 +492,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
       <div className="tm-fixed-cta tm-hide-desktop">
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
           <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
-          <span className="tm-text-label">{model.statusLabel ?? match.actionLabel}</span>
+          <span className="tm-text-label">{model.completed ? '참여 완료' : model.statusLabel ?? match.actionLabel}</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: showChat || mode === 'mine' ? '1fr 1fr' : '1fr', gap: 8 }}>
           {showChat ? (
@@ -495,7 +503,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           {mode === 'mine' ? (
             <>
               <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={match.applicationsHref ?? `/matches/${match.id}/applications`}>신청자 관리</Link>
-              <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link>
+              {!model.completed && !model.canComplete ? <Link className="tm-btn tm-btn-lg tm-btn-primary" href={match.editHref ?? `/matches/${match.id}/edit`}>매치 수정</Link> : null}
             </>
           ) : (
             <Button

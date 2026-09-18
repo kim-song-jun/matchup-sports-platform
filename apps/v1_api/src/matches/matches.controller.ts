@@ -87,6 +87,12 @@ export class MatchesController {
     return this.matchesService.update(user, matchId, dto);
   }
 
+  @Post(':matchId/complete')
+  @UseGuards(V1AuthGuard)
+  complete(@CurrentUser() user: V1AuthUser, @Param('matchId') matchId: string) {
+    return this.matchesService.complete(user, matchId);
+  }
+
   @Post(':matchId/cancel')
   @UseGuards(V1AuthGuard)
   cancel(

@@ -170,6 +170,8 @@ type AdminListSummary = {
 ## 상태 변경 DTO
 
 - 매치 `ChangeMatchStatusDto`: `status=recruiting|closed|cancelled|completed|archived`, `reason` 필수(max 500).
+- 개인 매치를 `completed`로 바꾸면 일반 호스트 완료 API와 같은 트랜잭션 계약으로 현재 `active`
+  참가자도 `completed` 처리한다. 완료된 매치는 `archived` 외의 비종료 상태로 되돌릴 수 없다.
 - 팀 `ChangeTeamStatusDto`: `status=active|suspended|archived`, `reason` 필수(max 500).
 - 팀 매치 `ChangeTeamMatchStatusDto`: `status=recruiting|closed|matched|cancelled|completed|archived`, `reason` 필수(max 500).
 - 성공 시 대상 ID, 이전/신규 상태, action/status-change log ID를 반환한다.

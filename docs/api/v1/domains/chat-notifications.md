@@ -14,6 +14,10 @@
 
 Chat v1 is linked-room and text-only for user-authored messages. A `team_contact` room is created when a team contact is sent (both teams' owner/manager become participants, the request text is the first message); list/detail items carry a `teamContact` block (`contactId`, display `status`, `expiresAt`, `declineReason`, `mySide`, `fromTeam`, `toTeam`) and sending returns `409 TEAM_CONTACT_NOT_ACCEPTED` until the contact is accepted. Match, team match, and team detail entry resolves the linked room for eligible users so chat participation is repaired automatically. Team chat is created automatically when a team is created, and owner/member participants are activated from confirmed team membership. Join approval or invitation acceptance immediately starts the member's team-chat visibility and creates the joined system notice in the same transaction, so opening the room is not required before later messages accumulate. `resolve` can still repair a missing team room or participant for an active team member. The public web room page is `/chat/:roomId`; `/api/v1/chat/rooms/:roomId` remains the API detail endpoint. DM and file attachment are deferred. The web chat list does not expose leaving a linked room; users can mute or unmute app chat notifications per room.
 
+For personal matches, both the host and an approved participant can resolve and enter the linked room. Completing
+the match changes participant rows from `active` to `completed` but preserves that room entitlement. A participant
+who withdraws before kickoff is changed to `cancelled` and no longer has current match-chat entitlement.
+
 ## Chat Room Entry And Read State
 
 - `v1_chat_room_participants.visible_from_at` is the participant visibility boundary.

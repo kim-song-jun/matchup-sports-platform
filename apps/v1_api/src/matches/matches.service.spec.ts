@@ -337,7 +337,8 @@ describe('MatchesService', () => {
 
   // ─── 6. 비-requested 상태 신청 철회 → 409 STATE_CONFLICT ─────────────────
 
-  it('withdrawApplication: approved 상태 신청을 철회하면 409 STATE_CONFLICT를 던진다', async () => {
+  it('withdrawApplication: 시작한 매치의 approved 신청 철회는 409 STATE_CONFLICT를 던진다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({ startAt: PAST }));
     prisma.v1MatchApplication.findFirst.mockResolvedValue(
       applicationRow({
         applicantUserId: otherUser.id,
@@ -353,6 +354,7 @@ describe('MatchesService', () => {
   });
 
   it('withdrawApplication: 승인이 먼저 확정돼 requested 전이가 실패하면 withdrawn으로 보고하지 않는다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow());
     prisma.v1MatchApplication.findFirst.mockResolvedValue(applicationRow());
     prisma.v1MatchApplication.updateMany.mockResolvedValue({ count: 0 });
 
@@ -594,6 +596,16 @@ describe('MatchesService', () => {
 
     await expect(service.close(otherUser, 'match-1', {})).rejects.toThrow(ForbiddenException);
     expect(prisma.v1Match.update).not.toHaveBeenCalled();
+  });
+
+  it.each(['cancelled', 'completed'])('reopen: 최초 조회 뒤 %s로 바뀐 매치를 되살리지 않는다', async (status) => {
+    prisma.v1Match.findFirst
+      .mockResolvedValueOnce(matchRow({ status: 'closed' }))
+      .mockResolvedValueOnce(matchRow({ status }));
+    prisma.v1Match.update.mockResolvedValue(matchRow());
+    await expect(service.reopen(host, 'match-1', {})).rejects.toMatchObject({ response: { code: 'STATE_CONFLICT' } });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+    expect(prisma.v1StatusChangeLog.create).not.toHaveBeenCalled();
   });
 
   it('reopen: 지난 마감 시각을 지워 다시 모집 상태로 만든다 (안 지우면 눌러도 그대로 마감으로 보인다)', async () => {

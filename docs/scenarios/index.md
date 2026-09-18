@@ -140,6 +140,15 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 
 ## Recommended Execution Order
 
+### 개인 매치 호스트 처리 보완 — 2026-09-19
+
+V1-03-007 승인 취소 / V1-03-008 불참 처리 2/2 구현·검증.
+확정 명단의 기존 참가자 메뉴에서 필수 사유와 확인 모달을 사용한다.
+실DB 통합 9/9, 화면 단위 8/8, headed 390/768/1440px 캡처 14장과 동작 8/8 통과.
+콘솔 error/pageerror/requestfailed/API HTTP 오류 각각 0건.
+범위·대표 스크린샷·남은 분석 항목은 [Task 130](../../.github/tasks/130-v1-match-create-edit-contract-audit.md#progress-snapshot--host-actions).
+이 결과는 개인 매치 전체 기능의 전수 완료 판정이 아니다.
+
 1. 인증 / 세션 / 권한
 2. 개인 매치
 3. 팀 / 팀 권한

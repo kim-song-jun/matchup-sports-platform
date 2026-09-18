@@ -12,11 +12,14 @@
 | POST | `/matches/:id/cancel` | Yes | 취소 (host) |
 | POST | `/matches/:id/close` | Yes | 모집 마감 (host) |
 | POST | `/matches/:id/reopen` | Yes | 모집 재개 (host) |
-| POST | `/matches/:id/join` | Yes | 참가 |
-| DELETE | `/matches/:id/leave` | Yes | 탈퇴 |
-| POST | `/matches/:id/teams` | Yes | 팀 자동 배정 (host) |
+| POST | `/matches/:id/applications` | Yes | 참가 신청 |
+| GET | `/matches/:id/applications` | Yes | 호스트 신청자 목록 |
+| POST | `/match-applications/:id/approve` | Yes | 신청 승인 (host) |
+| POST | `/match-applications/:id/reject` | Yes | 신청 거절 (host) |
+| POST | `/match-applications/:id/withdraw` | Yes | 본인 신청/참가 취소 |
+| POST | `/match-participants/:id/cancel-approval` | Yes | 시작 전 승인 취소 (host) |
+| POST | `/match-participants/:id/mark-cancelled` | Yes | 시작 후 불참 처리 (host) |
 | POST | `/matches/:id/complete` | Yes | 경기 종료 뒤 참여 이력 확정 (host) |
-| POST | `/matches/:id/arrive` | Yes | 도착 인증 |
 
 ## GET /matches (MatchFilterDto)
 
@@ -70,43 +73,28 @@
 
 - 부가 동작
 - host는 자동 participant 생성
-- host participant `paymentStatus=completed`
+- 호스트는 active 참가자로 정원에 포함된다. 개인 모집 매치의 결제·도착 인증·팀 자동 배정 API는 없다.
 
 ## PATCH /matches/:id
 
 - host만 가능
-- `cancelled`, `completed`, `in_progress` 상태에서는 수정 불가
-- `maxPlayers`를 현재 참가자 수보다 낮게 수정 불가
+- `cancelled`, `completed`, `expired` 상태에서는 수정 불가
+- `capacity`를 현재 참가자 수보다 낮게 수정 불가. `version` 필수.
 - `imageUrl`은 `null` 전달로 제거 가능
 - `minLevelCode`, `maxLevelCode`는 create와 동일 계약이며 미전달 시 레벨 FK를 비운다.
 
-## POST /matches/:id/join
+## Host participant actions
 
-- recruiting 상태에서만 가능
-- 정원 가득 찬 경우 실패
-- 중복 참가 실패
-- 참가 성공 시 `currentPlayers` 증가 및 상태 `full/recruiting` 갱신
-
-## DELETE /matches/:id/leave
-
-- host는 탈퇴 불가
-- `in_progress`, `cancelled`, `completed` 상태 탈퇴 불가
-
-## POST /matches/:id/arrive
-
-- Body
-
-| 필드 | 타입 | 필수 |
-|---|---|---|
-| `lat` | number | Yes |
-| `lng` | number | Yes |
-| `photoUrl` | string | Yes |
-
-- 조건
-- 참가자만 가능
-- 중복 인증 불가
-- 시간 창: 시작 30분 전 ~ 종료 30분 후
-- venue 좌표가 있으면 200m 이내만 허용
+- `/match-participants/:id/cancel-approval`: 시작 전 active 참가자를 `removed`로 전환한다.
+- `/match-participants/:id/mark-cancelled`: 시작 이후 완료 확정 전 active 참가자를 `no_show`로 전환한다.
+- 호스트만 가능하며 호스트 자신·완료된 참가 이력은 변경하지 않는다. 매치는 recruiting/closed여야 한다.
+- 두 액션 모두 `{ reason: string }` 필수(앞뒤 공백 제거 후 1~500자). 입력 오류 400,
+  비호스트 403, 참가자 없음 404, 시점/상태 위반·재처리 409. 실패를 성공으로 처리하지 않는다.
+- 매치 행 잠금 안에서 참가자·신청(`cancelled_by_host`)·두 상태 변경 로그를 함께 저장한다.
+  로그에 처리자와 사유를 남기며 정원·채팅·완료 활동·후기 자격에서 해당 참가자를 제외한다.
+- 신청 목록은 `participantId`, `participantStatus`, `canCancelApproval`, `canMarkCancelled`를 반환한다.
+  화면은 확정 명단의 참가자 관리 메뉴에서 사유와 확인 모달을 거쳐 실제 participantId로 요청한다.
+  성공하면 v1 query를 무효화하고, 실패하면 오류와 입력 사유를 유지한다.
 
 ## POST /matches/:id/close · /matches/:id/reopen (host)
 
@@ -149,8 +137,7 @@
 
 ## Idempotency / Duplicate Behavior
 
-- `join`: 이미 참가면 실패
-- `arrive`: 이미 도착 인증이면 실패
+- `applications`: 활성 신청 중복은 실패; 취소 후 재신청은 기존 신청/참가자를 재사용한다.
 - `cancel`: 이미 종료 상태면 실패. `complete`: 동일 완료 요청은 성공으로 수렴하며 중복 집계하지 않음
 - `close`: 이미 마감이면 `409 ALREADY_PROCESSED` / `reopen`: 이미 모집 중이면 `409 ALREADY_PROCESSED`
 

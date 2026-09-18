@@ -14,6 +14,7 @@ import { assertCreatorProfileComplete } from '../profile/creator-profile.guard';
 import { formatLevelRange, levelCodeWhere, parseLevelCodes, resolveSportLevelRange } from '../sports/level-range';
 import {
   ApproveMatchApplicationDto,
+  ChangeMatchParticipantDto,
   CreateMatchApplicationDto,
   ListMatchApplicationsQueryDto,
   RejectMatchApplicationDto,
@@ -781,6 +782,7 @@ export class MatchesService {
       take: limit + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
       include: {
+        participant: { select: { id: true, role: true, status: true, cancelledAt: true } },
         applicantUser: {
           select: {
             id: true,
@@ -809,6 +811,14 @@ export class MatchesService {
           : null,
         reviewCount: application.applicantUser.reputationSummary?.reviewCount ?? 0,
         status: application.status,
+        participantId: application.participant?.id ?? null,
+        participantStatus: application.participant?.status ?? null,
+        canCancelApproval: application.status === 'approved' && application.participant?.role === 'participant'
+          && application.participant.status === 'active' && ['recruiting', 'closed'].includes(match.status)
+          && match.startAt > new Date(),
+        canMarkCancelled: application.status === 'approved' && application.participant?.role === 'participant'
+          && application.participant.status === 'active' && ['recruiting', 'closed'].includes(match.status)
+          && match.startAt <= new Date(),
         message: application.message,
         createdAt: application.createdAt,
         reviewedAt: application.reviewedAt,
@@ -818,6 +828,42 @@ export class MatchesService {
         hasNext,
       },
     };
+  }
+
+  async changeParticipant(user: V1AuthUser, participantId: string, status: 'removed' | 'no_show', dto: ChangeMatchParticipantDto) {
+    this.assertActiveAccount(user);
+    const reason = dto.reason?.trim();
+    if (!reason || reason.length > 500) {
+      throw new BadRequestException({ code: 'VALIDATION_ERROR', message: '처리 사유를 1~500자로 입력해 주세요.' });
+    }
+    const target = await this.prisma.v1MatchParticipant.findUnique({ where: { id: participantId }, select: { matchId: true } });
+    if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: '참가자를 찾을 수 없어요.' });
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${target.matchId} FOR UPDATE`;
+      const match = await tx.v1Match.findFirst({ where: { id: target.matchId, deletedAt: null } });
+      if (!match) throw new NotFoundException({ code: 'NOT_FOUND', message: '매치를 찾을 수 없어요.' });
+      if (match.hostUserId !== user.id) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '호스트만 참가자를 관리할 수 있어요.' });
+      const participant = await tx.v1MatchParticipant.findUnique({ where: { id: participantId } });
+      if (!participant || participant.matchId !== match.id) throw stateConflict('참가 상태가 바뀌었어요. 다시 확인해 주세요.');
+      if (participant.role === 'host' || participant.userId === match.hostUserId) throw stateConflict('호스트 자신의 참가는 변경할 수 없어요.');
+      if (!['recruiting', 'closed'].includes(match.status) || participant.status !== 'active') throw stateConflict('확정된 활성 참가자만 처리할 수 있어요. 완료된 이력은 변경할 수 없어요.');
+      const now = new Date();
+      if (status === 'removed' && match.startAt <= now) throw stateConflict('승인 취소는 경기 시작 전에만 가능해요.');
+      if (status === 'no_show' && match.startAt > now) throw stateConflict('불참 처리는 경기 시작 이후에 가능해요.');
+      if (!participant.applicationId) throw stateConflict('연결된 신청 이력을 찾을 수 없어요.');
+      const changed = await tx.v1MatchApplication.updateMany({
+        where: { id: participant.applicationId, matchId: match.id, applicantUserId: participant.userId, status: 'approved' },
+        data: { status: 'cancelled_by_host', reviewedByUserId: user.id, reviewedAt: now },
+      });
+      if (changed.count !== 1) throw stateConflict('신청 상태가 바뀌었어요. 다시 확인해 주세요.');
+      await tx.v1MatchParticipant.update({ where: { id: participantId }, data: { status, cancelledAt: now } });
+      await tx.v1StatusChangeLog.createMany({ data: [
+        { targetType: 'match_participant', targetId: participantId, fromStatus: 'active', toStatus: status, actorType: 'user', actorUserId: user.id, reason },
+        { targetType: 'match_application', targetId: participant.applicationId, fromStatus: 'approved', toStatus: 'cancelled_by_host', actorType: 'user', actorUserId: user.id, reason },
+      ] });
+      return { matchId: match.id, participantId, applicationId: participant.applicationId, status, applicationStatus: 'cancelled_by_host' as const, detailRoute: `/matches/${match.id}` };
+    });
   }
 
   async withdrawApplication(

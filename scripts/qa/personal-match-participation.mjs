@@ -10,11 +10,16 @@ const { PrismaClient } = requireApi('@prisma/client');
 const dbUrl = new URL(process.env.DATABASE_URL ?? '');
 if (!['127.0.0.1', 'localhost'].includes(dbUrl.hostname) || !['55432', '55433'].includes(dbUrl.port) || dbUrl.pathname !== '/v1_migrate_check') throw new Error('Only the task-local QA database on port 55432/55433 is allowed');
 const db = new PrismaClient();
+const apiOrigin = process.env.PERSONAL_QA_API_ORIGIN ?? 'http://127.0.0.1:8121';
+const webOrigin = process.env.PERSONAL_QA_WEB_ORIGIN ?? 'http://127.0.0.1:3013';
+for (const origin of [apiOrigin, webOrigin]) {
+  if (!['127.0.0.1', 'localhost'].includes(new URL(origin).hostname)) throw new Error('QA origins must be local');
+}
 const output = path.resolve('output/playwright/visual-audit/personal-participation');
 await mkdir(output, { recursive: true });
 const manifest = path.join(output, 'fixture.json');
 const api = async (user, route, body) => {
-  const response = await fetch(`http://127.0.0.1:8121/api/v1${route}`, {
+  const response = await fetch(`${apiOrigin}/api/v1${route}`, {
     method: body === undefined ? 'GET' : 'POST', headers: { 'content-type': 'application/json', ...(user ? { 'x-v1-user-id': user } : {}) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
@@ -72,15 +77,17 @@ const cdpUrl = process.env.PLAYWRIGHT_CDP_URL;
 const browser = cdpUrl
   ? await chromium.connectOverCDP(cdpUrl)
   : await chromium.launch({ headless: false, ...(executablePath ? { executablePath } : {}) });
-const report = { stage, browser: 'headed Chromium', runnerPid: process.pid, executablePath: cdpUrl ? `cdp:${cdpUrl}` : executablePath ?? 'playwright-managed', consoleErrors: [], networkErrors: [], screenshots: [], actions: [] };
+const report = { stage, browser: 'headed Chromium', runnerPid: process.pid, executablePath: cdpUrl ? `cdp:${cdpUrl}` : executablePath ?? 'playwright-managed', consoleErrors: [], pageErrors: [], requestFailures: [], networkErrors: [], screenshots: [], actions: [] };
 async function contextFor(user, width) {
   const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 1000 }, locale: 'ko-KR', reducedMotion: 'reduce' });
   await context.addInitScript(id => { localStorage.setItem('teameet.v1.userId', id); localStorage.setItem('teameet.v1.session', 'active'); }, user);
   const page = await context.newPage();
-  page.on('pageerror', e => report.consoleErrors.push(e.message));
+  page.on('pageerror', e => report.pageErrors.push(e.message));
+  page.on('console', e => { if (e.type() === 'error') report.consoleErrors.push({ route: page.url(), message: e.text() }); });
+  page.on('requestfailed', r => report.requestFailures.push({ url: r.url(), error: r.failure()?.errorText }));
   page.on('response', r => { if (r.status() >= 400 && r.url().includes('/api/v1')) report.networkErrors.push({ status: r.status(), url: r.url() }); });
   const hydrated = page.waitForResponse(r => r.url().includes('/api/v1/auth/me') && r.status() === 200);
-  await page.goto('http://127.0.0.1:3013/home');
+  await page.goto(`${webOrigin}/my/matches/joined`);
   await hydrated;
   await page.locator('body').waitFor();
   return { context, page };
@@ -96,9 +103,48 @@ async function capture(page, name, width, fullPage = true) {
   report.screenshots.push({ file, width, overflow, route: new URL(page.url()).pathname });
 }
 try {
-  for (const width of [390, 768, 1440]) {
+  if (stage === 'host-actions') {
+    for (const width of [390, 768, 1440]) {
+      const h = await contextFor(data.host, width);
+      for (const [id, label, status] of [[data.upcoming, '승인 취소', 'removed'], [data.ended, '불참 처리', 'no_show']]) {
+        await h.page.goto(`${webOrigin}/matches/${id}/applications`);
+        await h.page.getByRole('button', { name: '확정 명단', exact: true }).click();
+        await h.page.getByRole('button', { name: '김민준 참가자 관리' }).click();
+        assert.equal(await h.page.getByRole('button', { name: label, exact: true }).isDisabled(), true);
+        await h.page.getByLabel('처리 사유 (필수)').fill('현장 확인 후 호스트 처리');
+        await capture(h.page, `${status}-menu`, width);
+        await h.page.getByRole('button', { name: label, exact: true }).click();
+        await h.page.getByRole('dialog').waitFor();
+        await capture(h.page, `${status}-confirm`, width);
+        await h.page.getByRole('dialog').getByRole('button', { name: '취소', exact: true }).click();
+        const before = await api(data.host, `/matches/${id}/applications?status=approved`);
+        assert.equal(before.items.length, 1, 'Modal cancellation must not change persisted state');
+        report.actions.push({ action: `${status}-confirmation-cancel`, width, pass: true });
+      }
+      await h.context.close();
+    }
+    const h = await contextFor(data.host, 390);
+    for (const [id, label, status, badge] of [[data.upcoming, '승인 취소', 'removed', '승인 취소'], [data.ended, '불참 처리', 'no_show', '불참']]) {
+      await h.page.goto(`${webOrigin}/matches/${id}/applications`);
+      await h.page.getByRole('button', { name: '확정 명단', exact: true }).click();
+      await h.page.getByRole('button', { name: '김민준 참가자 관리' }).click();
+      await h.page.getByLabel('처리 사유 (필수)').fill('현장 확인 후 호스트 처리');
+      await h.page.getByRole('button', { name: label, exact: true }).click();
+      await h.page.getByRole('dialog').getByRole('button', { name: label, exact: true }).click();
+      await h.page.getByText('확정된 참가자가 없어요', { exact: true }).waitFor();
+      await h.page.getByRole('button', { name: '전체 이력', exact: true }).click();
+      await h.page.getByLabel(`상태: ${badge}`, { exact: true }).waitFor();
+      const participant = await db.v1MatchParticipant.findUnique({ where: { matchId_userId: { matchId: id, userId: data.member } } });
+      assert.equal(participant.status, status);
+      assert.equal((await api(data.host, `/matches/${id}`)).participantCount, 1);
+      await capture(h.page, `${status}-persisted`, 390);
+      report.actions.push({ action: `${status}-persisted`, width: 390, pass: true });
+    }
+    await h.context.close();
+  }
+  for (const width of stage === 'host-actions' ? [] : [390, 768, 1440]) {
     const h = await contextFor(data.host, width);
-    await h.page.goto(`http://127.0.0.1:3013/matches/${data.ended}`);
+    await h.page.goto(`${webOrigin}/matches/${data.ended}`);
     await h.page.getByRole('link', { name: '신청자 관리', exact: true }).filter({ visible: true }).waitFor();
     await capture(h.page, 'host-completion', width);
     await h.page.getByRole('button', { name: '경기 완료', exact: true }).filter({ visible: true }).scrollIntoViewIfNeeded();
@@ -112,11 +158,11 @@ try {
     await capture(h.page, 'host-applicants', width);
     await h.context.close();
     const m = await contextFor(data.member, width);
-    await m.page.goto(`http://127.0.0.1:3013/matches/${data.completed}`);
+    await m.page.goto(`${webOrigin}/matches/${data.completed}`);
     await m.page.getByRole('button', { name: '채팅', exact: true }).filter({ visible: true }).waitFor();
     if (stage === 'after') await m.page.getByRole('link', { name: '후기 남기기' }).filter({ visible: true }).waitFor();
     await capture(m.page, 'member-completed', width);
-    await m.page.goto(`http://127.0.0.1:3013/matches/${data.upcoming}`);
+    await m.page.goto(`${webOrigin}/matches/${data.upcoming}`);
     await m.page.getByRole('button', { name: '채팅', exact: true }).filter({ visible: true }).waitFor();
     if (stage === 'after') await m.page.getByRole('button', { name: '참가 취소', exact: true }).filter({ visible: true }).waitFor();
     await capture(m.page, 'member-withdraw', width);
@@ -124,7 +170,7 @@ try {
       await m.page.getByRole('button', { name: '참가 취소', exact: true }).filter({ visible: true }).scrollIntoViewIfNeeded();
       await capture(m.page, 'member-withdraw-action', width, false);
     }
-    await m.page.goto('http://127.0.0.1:3013/my/matches/joined');
+    await m.page.goto(`${webOrigin}/my/matches/joined`);
     await m.page.getByText('참여한 매치', { exact: true }).first().waitFor();
     if (stage === 'after') {
       const more = m.page.getByRole('button', { name: '더 보기', exact: true });
@@ -138,7 +184,7 @@ try {
   }
   if (stage === 'after') {
     const h = await contextFor(data.host, 390);
-    await h.page.goto(`http://127.0.0.1:3013/matches/${data.ended}`);
+    await h.page.goto(`${webOrigin}/matches/${data.ended}`);
     await h.page.getByRole('button', { name: '경기 완료', exact: true }).filter({ visible: true }).click();
     await h.page.getByRole('dialog').getByRole('button', { name: '경기 완료', exact: true }).click();
     await h.page.getByRole('link', { name: '후기 남기기' }).filter({ visible: true }).waitFor();
@@ -149,19 +195,21 @@ try {
     report.actions.push({ action: 'host-chat-navigation', pass: true });
     await h.context.close();
     const m = await contextFor(data.member, 390);
-    await m.page.goto(`http://127.0.0.1:3013/matches/${data.upcoming}`);
+    await m.page.goto(`${webOrigin}/matches/${data.upcoming}`);
     await m.page.getByRole('button', { name: '참가 취소', exact: true }).filter({ visible: true }).click();
     await m.page.getByRole('dialog').getByRole('button', { name: '참가 취소', exact: true }).click();
     await m.page.getByRole('button', { name: /다시 신청|참가 신청/ }).filter({ visible: true }).waitFor();
     assert.equal((await db.v1MatchParticipant.findUniqueOrThrow({ where: { matchId_userId: { matchId: data.upcoming, userId: data.member } } })).status, 'cancelled');
     report.actions.push({ action: 'member-withdraw-persisted', pass: true });
-    await m.page.goto(`http://127.0.0.1:3013/matches/${data.completed}`);
+    await m.page.goto(`${webOrigin}/matches/${data.completed}`);
     await m.page.getByRole('link', { name: '후기 남기기' }).filter({ visible: true }).click();
     await m.page.waitForURL(`**/my/reviews/match/${data.completed}`);
     report.actions.push({ action: 'review-navigation', pass: true });
     await m.context.close();
   }
   assert.equal(report.consoleErrors.length, 0, JSON.stringify(report.consoleErrors));
+  assert.equal(report.pageErrors.length, 0, JSON.stringify(report.pageErrors));
+  assert.equal(report.requestFailures.filter(r => r.error !== 'net::ERR_ABORTED').length, 0, JSON.stringify(report.requestFailures));
   assert.equal(report.networkErrors.length, 0, JSON.stringify(report.networkErrors));
 } finally {
   await writeFile(path.join(output, `${stage}-report.json`), JSON.stringify(report, null, 2));

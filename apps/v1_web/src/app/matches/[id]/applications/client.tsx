@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   useV1ApproveMatchApplication,
+  useV1ChangeMatchParticipant,
   useV1Match,
   useV1MatchApplicationEligibility,
   useV1MatchApplicationsInfinite,
@@ -34,6 +35,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
   );
   const approveApplication = useV1ApproveMatchApplication(matchId);
   const rejectApplication = useV1RejectMatchApplication(matchId);
+  const changeParticipant = useV1ChangeMatchParticipant();
   const [actionError, setActionError] = useState<string | null>(null);
   const { confirm, ConfirmModal } = useConfirm();
 
@@ -80,7 +82,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
       : null;
   const items = applicationsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const pendingCount = items.filter((a) => a.status === 'requested').length;
-  const actionPending = approveApplication.isPending || rejectApplication.isPending;
+  const actionPending = approveApplication.isPending || rejectApplication.isPending || changeParticipant.isPending;
   const eligibilityData = eligibility.data;
 
   async function handleApprove(application: V1MatchApplication) {
@@ -118,6 +120,23 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
         },
       },
     );
+  }
+
+  async function handleChangeParticipant(application: V1MatchApplication, reason: string) {
+    if (!application.participantId || !reason.trim()) return;
+    const action = application.canCancelApproval ? 'cancel-approval' : 'mark-cancelled';
+    const label = action === 'cancel-approval' ? '승인 취소' : '불참 처리';
+    const ok = await confirm({
+      title: label,
+      message: `${application.displayName}님을 ${label}할까요? 참가 인원에서 제외되며 채팅과 참여 리뷰를 이용할 수 없어요. 사유: ${reason.trim()}`,
+      confirmLabel: label,
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setActionError(null);
+    changeParticipant.mutate({ participantId: application.participantId, action, reason: reason.trim() }, {
+      onError: (err) => setActionError(extractErrorMessage(err, `${label}하지 못했어요. 상태를 확인하고 다시 시도해 주세요.`)),
+    });
   }
 
   return (
@@ -182,6 +201,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
                 actionPending={actionPending}
                 onApprove={() => handleApprove(application)}
                 onReject={() => handleReject(application)}
+                onChangeParticipant={(reason) => handleChangeParticipant(application, reason)}
               />
             ))}
             {applicationsQuery.hasNextPage ? (
@@ -224,16 +244,24 @@ function ApplicationRow({
   actionPending,
   onApprove,
   onReject,
+  onChangeParticipant,
 }: {
   application: V1MatchApplication;
   actionPending: boolean;
   onApprove: () => void;
   onReject: () => void;
+  onChangeParticipant: (reason: string) => void;
 }) {
   const [actionsOpen, setActionsOpen] = useState(false);
-  const statusLabel = applicationStatusLabel(application.status);
+  const [reason, setReason] = useState('');
+  const statusLabel = application.participantStatus === 'no_show' ? '불참'
+    : application.participantStatus === 'removed' ? '승인 취소'
+    : application.participantStatus === 'completed' ? '참여 완료'
+    : applicationStatusLabel(application.status);
   const statusBadgeClass = applicationStatusBadgeClass(application.status);
   const isPending = application.status === 'requested';
+  const canChangeParticipant = application.status === 'approved' && Boolean(application.participantId)
+    && (application.canCancelApproval || application.canMarkCancelled);
   const mannerScore =
     application.mannerScore !== null ? application.mannerScore.toFixed(1) : null;
 
@@ -321,7 +349,7 @@ function ApplicationRow({
       </div>
 
       {/* 승인/거절 버튼 — requested(대기중) 상태일 때만 */}
-      {isPending ? (
+      {isPending || canChangeParticipant ? (
         <>
           <button
             className="tm-btn tm-btn-sm tm-btn-neutral tm-btn-block"
@@ -329,12 +357,12 @@ function ApplicationRow({
             style={{ marginTop: 12 }}
             disabled={actionPending}
             aria-expanded={actionsOpen}
-            aria-label={`${application.displayName} 신청 관리`}
+            aria-label={`${application.displayName} ${isPending ? '신청' : '참가자'} 관리`}
             onClick={() => setActionsOpen((prev) => !prev)}
           >
             관리
           </button>
-          {actionsOpen ? (
+          {actionsOpen && isPending ? (
             <div
               className="tm-member-actions"
               style={{ marginTop: 12, display: 'flex', gap: 8 }}
@@ -364,6 +392,30 @@ function ApplicationRow({
                 }}
               >
                 거절
+              </button>
+            </div>
+          ) : null}
+          {actionsOpen && canChangeParticipant ? (
+            <div style={{ marginTop: 12 }}>
+              <label className="tm-text-caption" htmlFor={`participant-reason-${application.applicationId}`}>처리 사유 (필수)</label>
+              <textarea
+                id={`participant-reason-${application.applicationId}`}
+                className="tm-input"
+                style={{ width: '100%', marginTop: 8 }}
+                rows={3}
+                maxLength={500}
+                value={reason}
+                disabled={actionPending}
+                onChange={(event) => setReason(event.target.value)}
+              />
+              <button
+                className="tm-btn tm-btn-sm tm-btn-danger tm-btn-block"
+                type="button"
+                style={{ marginTop: 8 }}
+                disabled={actionPending || !reason.trim()}
+                onClick={() => onChangeParticipant(reason)}
+              >
+                {actionPending ? '처리 중…' : application.canCancelApproval ? '승인 취소' : '불참 처리'}
               </button>
             </div>
           ) : null}

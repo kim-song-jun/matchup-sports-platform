@@ -18,6 +18,21 @@
 | `POST` | `/api/v1/match-applications/:applicationId/withdraw` | user applicant | `{ reason?: string | null }` | withdrawn application |
 | `POST` | `/api/v1/match-applications/:applicationId/approve` | user host | `{ note?: string | null }` | approved application and participant |
 | `POST` | `/api/v1/match-applications/:applicationId/reject` | user host | `{ reason?: string | null }` | rejected application |
+| `POST` | `/api/v1/match-participants/:participantId/cancel-approval` | user host | `{ reason: string }` | removed participant, cancelled_by_host application |
+| `POST` | `/api/v1/match-participants/:participantId/mark-cancelled` | user host | `{ reason: string }` | no_show participant, cancelled_by_host application |
+
+### Host participant actions
+
+- Cancellation is available before `startsAt`; no-show handling is available from `startsAt` until completion.
+- Only active non-host participants in recruiting/closed matches can be changed. Completed history is immutable.
+- A trimmed reason of 1–500 characters is required. Invalid input returns 400, non-host callers 403,
+  missing participants 404, and invalid/repeated transitions 409. No simulated success or idempotency key.
+- Match-row locking serializes participant changes with completion/withdrawal. Participant and application
+  changes plus both actor/reason audit entries commit atomically. Removed/no-show users are excluded from
+  occupancy, chat access, completed activity and review eligibility.
+- Host application lists include `participantId`, `participantStatus`, `canCancelApproval`, `canMarkCancelled`.
+  The web uses these flags, collects a reason and confirms the action before submitting the participant ID;
+  success invalidates v1 queries, failure keeps the reason and shows the server error.
 
 ## Query DTO
 

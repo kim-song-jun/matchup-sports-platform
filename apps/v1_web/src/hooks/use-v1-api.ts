@@ -846,6 +846,20 @@ export function useV1ApproveMatchApplication(matchId: string) {
   });
 }
 
+export function useV1ChangeMatchParticipant() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ participantId, action, reason }: {
+      participantId: string;
+      action: 'cancel-approval' | 'mark-cancelled';
+      reason: string;
+    }) => v1Post<{ participantId: string; status: 'removed' | 'no_show' }>(
+      `/match-participants/${participantId}/${action}`, { reason },
+    ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.all }),
+  });
+}
+
 export function useV1RejectMatchApplication(matchId: string) {
   const queryClient = useQueryClient();
   return useMutation({

@@ -1,7 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MatchApplicationsPageClient } from './client';
-const mocks = vi.hoisted(() => ({ replace: vi.fn(), query: vi.fn(), applications: vi.fn() }));
+const mocks = vi.hoisted(() => ({ replace: vi.fn(), query: vi.fn(), applications: vi.fn(), changeParticipant: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: mocks.replace }) }));
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1Match: mocks.query,
@@ -9,6 +9,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1MatchApplicationsInfinite: mocks.applications,
   useV1ApproveMatchApplication: () => ({ isPending: false }),
   useV1RejectMatchApplication: () => ({ isPending: false }),
+  useV1ChangeMatchParticipant: () => ({ isPending: false, mutate: mocks.changeParticipant }),
 }));
 
 beforeEach(() => {
@@ -16,6 +17,57 @@ beforeEach(() => {
   mocks.applications.mockReturnValue({ data: { pages: [{ items: [] }] } });
 });
 describe('개인 매치 신청 관리', () => {
+  function confirmedApplication(overrides = {}) {
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
+    mocks.applications.mockReturnValue({ data: { pages: [{ items: [{
+      applicationId: 'a1', participantId: 'p1', displayName: '참가자', status: 'approved',
+      participantStatus: 'active', mannerScore: null, reviewCount: 0,
+      canCancelApproval: true, canMarkCancelled: false, ...overrides,
+    }] }] } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    fireEvent.click(screen.getByRole('button', { name: '확정 명단' }));
+  }
+
+  it('승인 취소는 사유와 확인을 거쳐 실제 참가자 ID로 요청한다', async () => {
+    confirmedApplication();
+    fireEvent.click(screen.getByRole('button', { name: '참가자 참가자 관리' }));
+    expect(screen.getByRole('button', { name: '승인 취소' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('처리 사유 (필수)'), { target: { value: '  참가자 요청  ' } });
+    fireEvent.click(screen.getByRole('button', { name: '승인 취소' }));
+    expect(mocks.changeParticipant).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '승인 취소' }));
+    await waitFor(() => expect(mocks.changeParticipant).toHaveBeenCalledWith(
+      { participantId: 'p1', action: 'cancel-approval', reason: '참가자 요청' }, expect.any(Object),
+    ));
+  });
+
+  it('시작 후 불참 처리를 취소하면 요청을 보내지 않는다', async () => {
+    confirmedApplication({ canCancelApproval: false, canMarkCancelled: true });
+    fireEvent.click(screen.getByRole('button', { name: '참가자 참가자 관리' }));
+    expect(screen.queryByRole('button', { name: '승인 취소' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('처리 사유 (필수)'), { target: { value: '현장 불참' } });
+    fireEvent.click(screen.getByRole('button', { name: '불참 처리' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '취소' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(mocks.changeParticipant).not.toHaveBeenCalled();
+  });
+
+  it('처리 실패를 노출하고 입력 사유를 보존한다', async () => {
+    mocks.changeParticipant.mockImplementation((_body, options) => options.onError(new Error('매치가 이미 완료됐어요')));
+    confirmedApplication({ canCancelApproval: false, canMarkCancelled: true });
+    fireEvent.click(screen.getByRole('button', { name: '참가자 참가자 관리' }));
+    fireEvent.change(screen.getByLabelText('처리 사유 (필수)'), { target: { value: '현장 불참' } });
+    fireEvent.click(screen.getByRole('button', { name: '불참 처리' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '불참 처리' }));
+    await waitFor(() => expect(screen.getByText('매치가 이미 완료됐어요')).toBeInTheDocument());
+    expect(screen.getByLabelText('처리 사유 (필수)')).toHaveValue('현장 불참');
+  });
+
+  it.each([['no_show', '불참'], ['removed', '승인 취소'], ['completed', '참여 완료']])('처리 이력 %s와 비활성 관리를 표시한다', (participantStatus, label) => {
+    confirmedApplication({ participantStatus, canCancelApproval: false, canMarkCancelled: false });
+    expect(screen.getByLabelText(`상태: ${label}`)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '참가자 참가자 관리' })).not.toBeInTheDocument();
+  });
   it('placeholder로 호스트 권한을 판정하거나 상세로 돌려보내지 않는다', () => {
     mocks.query.mockReturnValue({ data: { matchId: 'm1', title: '매치' }, isPlaceholderData: true });
     const { rerender } = render(<MatchApplicationsPageClient matchId="m1" />);

@@ -121,6 +121,73 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     expect((await db.v1Match.findUniqueOrThrow({ where: { id } })).completedAt).not.toBeNull();
   });
 
+  it('승인 취소는 권한·사유를 검증하고 명단·채팅·신청 이력을 함께 변경한다', async () => {
+    const id = await createMatch();
+    const applicationId = await join(id);
+    const participant = await db.v1MatchParticipant.findUniqueOrThrow({ where: { applicationId } });
+    const route = `/match-participants/${participant.id}/cancel-approval`;
+    await post(member, route, { reason: '권한 없음' }).expect(403);
+    await post(host, route, { reason: '   ' }).expect(400);
+    await post(host, route, { reason: 'x'.repeat(501) }).expect(400);
+    await post(host, `/match-participants/${participant.id}/mark-cancelled`, { reason: '아직 시작 전' }).expect(409);
+    await post(host, route, { reason: '  참가 일정 변경 요청  ' }).expect(201);
+    expect(await db.v1MatchParticipant.findUnique({ where: { id: participant.id } })).toMatchObject({ status: 'removed' });
+    expect(await db.v1MatchApplication.findUnique({ where: { id: applicationId } })).toMatchObject({ status: 'cancelled_by_host', reviewedByUserId: host });
+    expect(await db.v1StatusChangeLog.findFirst({ where: { targetId: participant.id } })).toMatchObject({ actorUserId: host, reason: '참가 일정 변경 요청', toStatus: 'removed' });
+    expect((await get(host, `/matches/${id}/applications?status=approved`)).body.data.items).toHaveLength(0);
+    expect((await get(host, `/matches/${id}/applications`)).body.data.items[0]).toMatchObject({ participantId: participant.id, participantStatus: 'removed', canCancelApproval: false, canMarkCancelled: false });
+    expect((await get(member, `/matches/${id}`)).body.data.participantCount).toBe(1);
+    await post(member, '/chat/rooms/resolve', { targetType: 'match', targetId: id }).expect(403);
+    await post(host, route, { reason: '중복 처리' }).expect(409);
+    await post(member, `/matches/${id}/applications`).expect(201);
+    await post(host, `/match-applications/${applicationId}/approve`).expect(201);
+    expect(await db.v1MatchParticipant.findUnique({ where: { id: participant.id } })).toMatchObject({ status: 'active', cancelledAt: null });
+  });
+
+  it('불참 처리 후 완료해도 불참자는 후기·활동 횟수에서 제외된다', async () => {
+    const id = await createMatch();
+    const applicationId = await join(id);
+    const participant = await db.v1MatchParticipant.findUniqueOrThrow({ where: { applicationId } });
+    await end(id);
+    await post(host, `/match-participants/${participant.id}/cancel-approval`, { reason: '늦은 승인 취소' }).expect(409);
+    expect((await get(host, `/matches/${id}/applications?status=approved`)).body.data.items[0]).toMatchObject({ canCancelApproval: false, canMarkCancelled: true });
+    await post(host, `/match-participants/${participant.id}/mark-cancelled`, { reason: '경기에 참석하지 않음' }).expect(201);
+    await post(host, `/matches/${id}/complete`).expect(201);
+    expect(await db.v1MatchParticipant.findUnique({ where: { id: participant.id } })).toMatchObject({ status: 'no_show', completedAt: null });
+    expect(await db.v1MatchParticipant.count({ where: { matchId: id, status: 'completed' } })).toBe(1);
+    await get(member, `/reviews/sources/match/${id}`).expect(403);
+    await post(member, '/chat/rooms/resolve', { targetType: 'match', targetId: id }).expect(403);
+  });
+
+  it('호스트 자신과 완료 참가자는 처리할 수 없다', async () => {
+    const id = await createMatch();
+    const applicationId = await join(id);
+    const hostParticipant = await db.v1MatchParticipant.findUniqueOrThrow({ where: { matchId_userId: { matchId: id, userId: host } } });
+    await post(host, `/match-participants/${hostParticipant.id}/cancel-approval`, { reason: '자기 취소' }).expect(409);
+    await end(id);
+    await post(host, `/matches/${id}/complete`).expect(201);
+    const memberParticipant = await db.v1MatchParticipant.findUniqueOrThrow({ where: { applicationId } });
+    await post(host, `/match-participants/${memberParticipant.id}/mark-cancelled`, { reason: '확정 후 변경' }).expect(409);
+    expect(await db.v1MatchParticipant.findUnique({ where: { id: memberParticipant.id } })).toMatchObject({ status: 'completed' });
+  });
+
+  it('완료와 불참 처리 경합은 하나의 최종 참가 상태로 직렬화된다', async () => {
+    const id = await createMatch();
+    const applicationId = await join(id);
+    const participant = await db.v1MatchParticipant.findUniqueOrThrow({ where: { applicationId } });
+    await end(id);
+    const [complete, absence] = await Promise.all([
+      post(host, `/matches/${id}/complete`),
+      post(host, `/match-participants/${participant.id}/mark-cancelled`, { reason: '현장 불참 확인' }),
+    ]);
+    expect(complete.status).toBe(201);
+    expect([201, 409]).toContain(absence.status);
+    const stored = await db.v1MatchParticipant.findUniqueOrThrow({ where: { id: participant.id } });
+    expect(stored.status).toBe(absence.status === 201 ? 'no_show' : 'completed');
+    expect((await db.v1MatchApplication.findUniqueOrThrow({ where: { id: applicationId } })).status)
+      .toBe(absence.status === 201 ? 'cancelled_by_host' : 'approved');
+  });
+
   it('취소된 참가자는 완료해도 참여 횟수에 포함되지 않는다', async () => {
     const id = await createMatch();
     const applicationId = await join(id);

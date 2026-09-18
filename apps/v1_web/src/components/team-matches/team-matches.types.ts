@@ -9,6 +9,8 @@ export type TeamMatchModel = {
   imageUrl: string | null;
   sport: string;
   hostTeam: string;
+  /** 플랫폼이 개설해 두 팀의 신청을 받는 모집이면 true. */
+  platformManaged?: boolean;
   venue: string;
   region: string;
   date: string;

@@ -71,6 +71,10 @@ import type {
   V1AdminStatusChangeLog,
   V1AdminStatusChangeResult,
   V1AdminTeamDetail,
+  V1AdminTeamMatchAssignmentPayload,
+  V1AdminTeamMatchAssignmentResult,
+  V1AdminTeamMatchRecruitmentPayload,
+  V1AdminTeamMatchRecruitmentResult,
   V1AdminTeamMatchRow,
   V1AdminTeamRow,
   V1AdminDeleteUserPayload,
@@ -3101,6 +3105,32 @@ export function useV1AdminTeamMatches(filters?: AdminListFilters) {
     // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 표가 빈 화면으로 깜빡이면
     // 운영자가 위치를 잃는다. isFetching 이 하단 페이지 버튼의 잠금 상태를 담당한다.
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useV1CreateAdminTeamMatchRecruitment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminTeamMatchRecruitmentPayload) =>
+      v1Post<V1AdminTeamMatchRecruitmentResult>('/admin/team-matches', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'team-matches'] });
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminOverview() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'team-matches'] });
+    },
+  });
+}
+
+export function useV1AssignAdminTeamMatchApplications(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminTeamMatchAssignmentPayload) =>
+      v1Post<V1AdminTeamMatchAssignmentResult>(`/admin/team-matches/${teamMatchId}/assign`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatch(teamMatchId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'team-matches'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'team-matches'] });
+    },
   });
 }
 

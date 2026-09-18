@@ -1317,7 +1317,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         managerCount: true,
         createdAt: true,
         ownerUserId: true,
-        sport: { select: { name: true } },
+        sport: { select: { id: true, name: true } },
         ownerUser: { select: { profile: { select: { nickname: true } } } },
       },
     }), this.prisma.v1Team.groupBy({
@@ -1338,6 +1338,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       items: pageItems.map((row) => ({
         teamId: row.id,
         name: row.name,
+        sportId: row.sport.id,
         sportName: row.sport.name,
         ownerUserId: row.ownerUserId,
         ownerName: row.ownerUser.profile?.nickname ?? null,

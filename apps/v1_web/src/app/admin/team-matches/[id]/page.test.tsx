@@ -3,15 +3,23 @@
  * 이 화면의 존재 이유다. 라이브 경기 상태는 **일부러 넣지 않는다** — 현장 콘솔의 일이고,
  * 같은 정보를 두 화면이 각자 그리면 어느 쪽이 최신인지 알 수 없게 된다.
  */
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { V1AdminTeamMatchDetail } from '@/types/api';
 import AdminTeamMatchDetailPage from './page';
 
-const { hooks } = vi.hoisted(() => ({ hooks: { query: {} as Record<string, unknown> } }));
+const { hooks, assign } = vi.hoisted(() => ({
+  hooks: { query: {} as Record<string, unknown> },
+  assign: { mutateAsync: vi.fn(), isPending: false },
+}));
 
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'tm-1' }) }));
-vi.mock('@/hooks/use-v1-api', () => ({ useV1AdminTeamMatch: () => hooks.query }));
+vi.mock('@/hooks/use-v1-api', () => ({
+  useV1AdminTeamMatch: () => hooks.query,
+  useV1AdminMe: () => ({ data: { capabilities: ['status:write'] } }),
+  useV1AssignAdminTeamMatchApplications: () => assign,
+}));
+vi.mock('@/lib/uuid', () => ({ randomUuid: () => '00000000-0000-4000-8000-000000000099' }));
 
 const DETAIL: V1AdminTeamMatchDetail = {
   teamMatchId: 'tm-1',
@@ -64,6 +72,7 @@ describe('AdminTeamMatchDetailPage', () => {
     expect(within(section).getByRole('link', { name: '왕십리 유나이티드' })).toHaveAttribute('href', '/admin/teams/team-2');
     expect(within(section).getByText('승인')).toBeInTheDocument();
     expect(within(section).getByText('거절')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '선택한 두 팀 매치 확정' })).not.toBeInTheDocument();
   });
 
   it('리그 소속이면 그 리그로 가는 길을 준다', () => {
@@ -112,6 +121,37 @@ describe('AdminTeamMatchDetailPage', () => {
   it('신청이 없으면 빈칸 대신 안내를 보여준다', () => {
     renderWith({ ...OK, data: { ...DETAIL, applications: [], applicationCount: 0 } });
     expect(screen.getByText('아직 신청한 팀이 없어요.')).toBeInTheDocument();
+  });
+
+  it('플랫폼 모집에서 신청 두 팀을 선택해 확정한다', async () => {
+    assign.mutateAsync.mockResolvedValue({ status: 'matched' });
+    renderWith({
+      ...OK,
+      data: {
+        ...DETAIL,
+        hostTeamId: null,
+        hostTeamName: null,
+        league: null,
+        hasGame: false,
+        approvedApplicantTeamId: null,
+        approvedApplicantTeamName: null,
+        applications: [
+          { ...DETAIL.applications[0], applicationId: 'app-home', status: 'requested', applicantTeamName: '성수 FC' },
+          { ...DETAIL.applications[1], applicationId: 'app-away', status: 'requested', applicantTeamName: '왕십리 FC' },
+        ],
+      },
+    });
+
+    fireEvent.change(screen.getByRole('combobox', { name: '홈팀 신청' }), { target: { value: 'app-home' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '상대팀 신청' }), { target: { value: 'app-away' } });
+    fireEvent.click(screen.getByRole('button', { name: '선택한 두 팀 매치 확정' }));
+
+    await waitFor(() => expect(assign.mutateAsync).toHaveBeenCalledWith({
+      clientCommandId: '00000000-0000-4000-8000-000000000099',
+      homeApplicationId: 'app-home',
+      awayApplicationId: 'app-away',
+    }));
+    expect(screen.getAllByText('Teameet 운영').length).toBeGreaterThan(0);
   });
 
   it('불러오지 못하면 재시도 경로를 준다', () => {

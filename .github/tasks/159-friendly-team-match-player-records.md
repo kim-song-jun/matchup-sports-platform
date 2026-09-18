@@ -50,6 +50,12 @@ not receive an appearance or result in public/user records.
   received `1 appearance / 1 goal`; the guest remained team-only as designed.
 - 2026-09-18: Captured all 16 route/state screens at mobile and desktop viewports and documented
   their inputs, displayed information, record semantics, privacy, and async projection behavior.
+- 2026-09-18: Audited the real click journey requested in PR follow-up. Added a missing applicant
+  team-profile CTA, an honest empty-applicant state, and a confirmation modal before destructive
+  cancellation from the detail page. Verified 18 interaction states at mobile and desktop
+  viewports (36 additional screenshots): list/detail/edit/share, apply/withdraw/approve/reject,
+  pre/post approval chat, close/reopen/cancel confirmation, team profiles, lineup, team/user
+  record rows, result, and review.
 
 ## Validation
 
@@ -65,3 +71,6 @@ not receive an appearance or result in public/user records.
 - PASS: 36 headed Chromium captures (18 states × mobile/desktop), including actual `친선` tab
   clicks on team and user records; all HTTP 200 with zero page
   errors. Known `useShellOverride` render-time React warnings are recorded in the screenshot doc.
+- PASS: 36 headed Chromium interaction captures (18 states × mobile/desktop). Every recorded
+  navigation reached the asserted concrete route; approval opened a real team-match chat room,
+  and both public record rows opened their team-match detail.

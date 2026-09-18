@@ -1,0 +1,358 @@
+[
+  {
+    "slug": "applicant-before-apply",
+    "title": "다른 팀 신청 전 상세",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/team-matches/0709daab-b094-44da-971a-987ea7d000b5",
+    "file": "docs/screenshots/friendly-team-match-interactions/applicant-before-apply/mobile.png",
+    "actor": "owner@teameet.v1"
+  },
+  {
+    "slug": "list-card-detail-click",
+    "title": "목록 경기 카드 클릭 상세",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/team-matches/0709daab-b094-44da-971a-987ea7d000b5",
+    "file": "docs/screenshots/friendly-team-match-interactions/list-card-detail-click/mobile.png",
+    "actor": "owner@teameet.v1",
+    "action": "목록 경기 카드",
+    "from": "/team-matches",
+    "to": "/team-matches/0709daab-b094-44da-971a-987ea7d000b5"
+  },
+  {
+    "slug": "applicant-pending",
+    "title": "신청 승인 대기·채팅 잠금",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/team-matches/0709daab-b094-44da-971a-987ea7d000b5",
+    "file": "docs/screenshots/friendly-team-match-interactions/applicant-pending/mobile.png",
+    "actor": "owner@teameet.v1"
+  },
+  {
+    "slug": "host-application-review",
+    "title": "호스트 신청팀 승인·거절 화면",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/team-matches/0709daab-b094-44da-971a-987ea7d000b5",
+    "file": "docs/screenshots/friendly-team-match-interactions/host-application-review/mobile.png",
+    "actor": "host@teameet.v1"
+  },
+  {
+    "slug": "host-edit-click",
+    "title": "호스트 매치 관리 클릭",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/team-matches/0709daab-b094-44da-971a-987ea7d000b5/edit",
+    "file": "docs/screenshots/friendly-team-match-interactions/host-edit-click/mobile.png",
+    "actor": "host@teameet.v1",
+    "action": "매치 관리",
+    "from": "/team-matches/0709daab-b094-44da-971a-987ea7d000b5",
+    "to": "/team-matches/0709daab-b094-44da-971a-987ea7d000b5/edit"
+  },
+  {
+    "slug": "applicant-team-detail",
+    "title": "신청팀 상세 이동",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/teams/190dd4ab-9af8-4bc8-b143-1a48bbf6b4dc",
+    "file": "docs/screenshots/friendly-team-match-interactions/applicant-team-detail/mobile.png",
+    "actor": "host@teameet.v1",
+    "action": "신청팀 팀 보기",
+    "from": "/team-matches/0709daab-b094-44da-971a-987ea7d000b5",
+    "to": "/teams/190dd4ab-9af8-4bc8-b143-1a48bbf6b4dc"
+  },
+  {
+    "slug": "host-approved",
+    "title": "호스트 승인 완료 상세",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/team-matches/0709daab-b094-44da-971a-987ea7d000b5",
+    "file": "docs/screenshots/friendly-team-match-interactions/host-approved/mobile.png",
+    "actor": "host@teameet.v1"
+  },
+  {
+    "slug": "team-match-chat",
+    "title": "승인 후 팀매치 채팅방",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/chat/de602c76-fb4c-4de3-bd28-366449f8ad32",
+    "file": "docs/screenshots/friendly-team-match-interactions/team-match-chat/mobile.png",
+    "actor": "host@teameet.v1",
+    "action": "승인 후 채팅",
+    "from": "/team-matches/0709daab-b094-44da-971a-987ea7d000b5",
+    "to": "/chat/de602c76-fb4c-4de3-bd28-366449f8ad32"
+  },
+  {
+    "slug": "application-withdrawn",
+    "title": "다른 팀 신청 취소 후",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/team-matches/4f3b9a3e-b1d9-48ce-9072-4bbca76165ea",
+    "file": "docs/screenshots/friendly-team-match-interactions/application-withdrawn/mobile.png",
+    "actor": "owner@teameet.v1",
+    "action": "신청 취소"
+  },
+  {
+    "slug": "host-closed",
+    "title": "호스트 모집 마감 후",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/team-matches/5d015b1c-bedc-4526-a2bc-9e8e7b79c4c9",
+    "file": "docs/screenshots/friendly-team-match-interactions/host-closed/mobile.png",
+    "actor": "host@teameet.v1",
+    "action": "모집 마감"
+  },
+  {
+    "slug": "host-cancel-confirm",
+    "title": "상세 팀매치 취소 확인",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/team-matches/5d015b1c-bedc-4526-a2bc-9e8e7b79c4c9",
+    "file": "docs/screenshots/friendly-team-match-interactions/host-cancel-confirm/mobile.png",
+    "actor": "host@teameet.v1",
+    "action": "팀매치 취소 확인"
+  },
+  {
+    "slug": "application-rejected",
+    "title": "호스트 신청 거절 후",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/team-matches/ff6b3b76-dce9-4723-b55a-1401b68b3604",
+    "file": "docs/screenshots/friendly-team-match-interactions/application-rejected/mobile.png",
+    "actor": "host@teameet.v1",
+    "action": "신청 거절"
+  },
+  {
+    "slug": "home-team-detail-click",
+    "title": "홈팀 카드 클릭 상세",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/teams/00000000-0000-4000-8000-000000000102",
+    "file": "docs/screenshots/friendly-team-match-interactions/home-team-detail-click/mobile.png",
+    "actor": "host@teameet.v1",
+    "action": "홈팀 보기",
+    "from": "/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940",
+    "to": "/teams/00000000-0000-4000-8000-000000000102"
+  },
+  {
+    "slug": "completed-lineup-click",
+    "title": "완료 경기 라인업 관리",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940/lineup",
+    "file": "docs/screenshots/friendly-team-match-interactions/completed-lineup-click/mobile.png",
+    "actor": "host@teameet.v1",
+    "action": "라인업 관리",
+    "from": "/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940",
+    "to": "/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940/lineup"
+  },
+  {
+    "slug": "team-record-detail-click",
+    "title": "팀 전적 경기 클릭 상세",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940",
+    "file": "docs/screenshots/friendly-team-match-interactions/team-record-detail-click/mobile.png",
+    "actor": "host@teameet.v1",
+    "action": "팀 전적 경기 행",
+    "from": "/teams/00000000-0000-4000-8000-000000000102/records",
+    "to": "/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940"
+  },
+  {
+    "slug": "user-record-detail-click",
+    "title": "사용자 기록 경기 클릭 상세",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e",
+    "file": "docs/screenshots/friendly-team-match-interactions/user-record-detail-click/mobile.png",
+    "actor": "host@teameet.v1",
+    "action": "사용자 기록 경기 행",
+    "from": "/users/74410f0d-39c2-4c92-b5f1-aed15260947f/records",
+    "to": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e"
+  },
+  {
+    "slug": "completed-result-click",
+    "title": "완료 경기 결과 보기",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940/result",
+    "file": "docs/screenshots/friendly-team-match-interactions/completed-result-click/mobile.png",
+    "actor": "host@teameet.v1",
+    "action": "경기 결과 보기",
+    "from": "/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940",
+    "to": "/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940/result"
+  },
+  {
+    "slug": "completed-review-click",
+    "title": "완료 경기 후기 작성",
+    "viewport": "mobile",
+    "url": "http://localhost:3013/my/reviews/team_match/62b5d6a2-2d8e-41e5-8678-bc75864e0940",
+    "file": "docs/screenshots/friendly-team-match-interactions/completed-review-click/mobile.png",
+    "actor": "host@teameet.v1",
+    "action": "후기 남기기",
+    "from": "/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940",
+    "to": "/my/reviews/team_match/62b5d6a2-2d8e-41e5-8678-bc75864e0940"
+  },
+  {
+    "slug": "applicant-before-apply",
+    "title": "다른 팀 신청 전 상세",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/team-matches/a7929606-583a-403f-8888-c17565bec073",
+    "file": "docs/screenshots/friendly-team-match-interactions/applicant-before-apply/desktop.png",
+    "actor": "owner@teameet.v1"
+  },
+  {
+    "slug": "list-card-detail-click",
+    "title": "목록 경기 카드 클릭 상세",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/team-matches/a7929606-583a-403f-8888-c17565bec073",
+    "file": "docs/screenshots/friendly-team-match-interactions/list-card-detail-click/desktop.png",
+    "actor": "owner@teameet.v1",
+    "action": "목록 경기 카드",
+    "from": "/team-matches",
+    "to": "/team-matches/a7929606-583a-403f-8888-c17565bec073"
+  },
+  {
+    "slug": "applicant-pending",
+    "title": "신청 승인 대기·채팅 잠금",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/team-matches/a7929606-583a-403f-8888-c17565bec073",
+    "file": "docs/screenshots/friendly-team-match-interactions/applicant-pending/desktop.png",
+    "actor": "owner@teameet.v1"
+  },
+  {
+    "slug": "host-application-review",
+    "title": "호스트 신청팀 승인·거절 화면",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/team-matches/a7929606-583a-403f-8888-c17565bec073",
+    "file": "docs/screenshots/friendly-team-match-interactions/host-application-review/desktop.png",
+    "actor": "host@teameet.v1"
+  },
+  {
+    "slug": "host-edit-click",
+    "title": "호스트 매치 관리 클릭",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/team-matches/a7929606-583a-403f-8888-c17565bec073/edit",
+    "file": "docs/screenshots/friendly-team-match-interactions/host-edit-click/desktop.png",
+    "actor": "host@teameet.v1",
+    "action": "매치 관리",
+    "from": "/team-matches/a7929606-583a-403f-8888-c17565bec073",
+    "to": "/team-matches/a7929606-583a-403f-8888-c17565bec073/edit"
+  },
+  {
+    "slug": "applicant-team-detail",
+    "title": "신청팀 상세 이동",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/teams/6dde134b-ae4b-49bd-8096-f4b149915462",
+    "file": "docs/screenshots/friendly-team-match-interactions/applicant-team-detail/desktop.png",
+    "actor": "host@teameet.v1",
+    "action": "신청팀 팀 보기",
+    "from": "/team-matches/a7929606-583a-403f-8888-c17565bec073",
+    "to": "/teams/6dde134b-ae4b-49bd-8096-f4b149915462"
+  },
+  {
+    "slug": "host-approved",
+    "title": "호스트 승인 완료 상세",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/team-matches/a7929606-583a-403f-8888-c17565bec073",
+    "file": "docs/screenshots/friendly-team-match-interactions/host-approved/desktop.png",
+    "actor": "host@teameet.v1"
+  },
+  {
+    "slug": "team-match-chat",
+    "title": "승인 후 팀매치 채팅방",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/chat/550ee8ac-6773-4824-aff1-f7a510c3a780",
+    "file": "docs/screenshots/friendly-team-match-interactions/team-match-chat/desktop.png",
+    "actor": "host@teameet.v1",
+    "action": "승인 후 채팅",
+    "from": "/team-matches/a7929606-583a-403f-8888-c17565bec073",
+    "to": "/chat/550ee8ac-6773-4824-aff1-f7a510c3a780"
+  },
+  {
+    "slug": "application-withdrawn",
+    "title": "다른 팀 신청 취소 후",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/team-matches/a9e48fe5-365d-4c3b-8268-584db969d76f",
+    "file": "docs/screenshots/friendly-team-match-interactions/application-withdrawn/desktop.png",
+    "actor": "owner@teameet.v1",
+    "action": "신청 취소"
+  },
+  {
+    "slug": "host-closed",
+    "title": "호스트 모집 마감 후",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/team-matches/ca79519e-d298-4407-bfd6-23e4bc5ec2a3",
+    "file": "docs/screenshots/friendly-team-match-interactions/host-closed/desktop.png",
+    "actor": "host@teameet.v1",
+    "action": "모집 마감"
+  },
+  {
+    "slug": "host-cancel-confirm",
+    "title": "상세 팀매치 취소 확인",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/team-matches/ca79519e-d298-4407-bfd6-23e4bc5ec2a3",
+    "file": "docs/screenshots/friendly-team-match-interactions/host-cancel-confirm/desktop.png",
+    "actor": "host@teameet.v1",
+    "action": "팀매치 취소 확인"
+  },
+  {
+    "slug": "application-rejected",
+    "title": "호스트 신청 거절 후",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/team-matches/72a013ff-0af2-4c3a-af4b-cc800b333745",
+    "file": "docs/screenshots/friendly-team-match-interactions/application-rejected/desktop.png",
+    "actor": "host@teameet.v1",
+    "action": "신청 거절"
+  },
+  {
+    "slug": "home-team-detail-click",
+    "title": "홈팀 카드 클릭 상세",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/teams/00000000-0000-4000-8000-000000000102",
+    "file": "docs/screenshots/friendly-team-match-interactions/home-team-detail-click/desktop.png",
+    "actor": "host@teameet.v1",
+    "action": "홈팀 보기",
+    "from": "/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940",
+    "to": "/teams/00000000-0000-4000-8000-000000000102"
+  },
+  {
+    "slug": "completed-lineup-click",
+    "title": "완료 경기 라인업 관리",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940/lineup",
+    "file": "docs/screenshots/friendly-team-match-interactions/completed-lineup-click/desktop.png",
+    "actor": "host@teameet.v1",
+    "action": "라인업 관리",
+    "from": "/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940",
+    "to": "/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940/lineup"
+  },
+  {
+    "slug": "team-record-detail-click",
+    "title": "팀 전적 경기 클릭 상세",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940",
+    "file": "docs/screenshots/friendly-team-match-interactions/team-record-detail-click/desktop.png",
+    "actor": "host@teameet.v1",
+    "action": "팀 전적 경기 행",
+    "from": "/teams/00000000-0000-4000-8000-000000000102/records",
+    "to": "/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940"
+  },
+  {
+    "slug": "user-record-detail-click",
+    "title": "사용자 기록 경기 클릭 상세",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e",
+    "file": "docs/screenshots/friendly-team-match-interactions/user-record-detail-click/desktop.png",
+    "actor": "host@teameet.v1",
+    "action": "사용자 기록 경기 행",
+    "from": "/users/74410f0d-39c2-4c92-b5f1-aed15260947f/records",
+    "to": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e"
+  },
+  {
+    "slug": "completed-result-click",
+    "title": "완료 경기 결과 보기",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940/result",
+    "file": "docs/screenshots/friendly-team-match-interactions/completed-result-click/desktop.png",
+    "actor": "host@teameet.v1",
+    "action": "경기 결과 보기",
+    "from": "/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940",
+    "to": "/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940/result"
+  },
+  {
+    "slug": "completed-review-click",
+    "title": "완료 경기 후기 작성",
+    "viewport": "desktop",
+    "url": "http://localhost:3013/my/reviews/team_match/62b5d6a2-2d8e-41e5-8678-bc75864e0940",
+    "file": "docs/screenshots/friendly-team-match-interactions/completed-review-click/desktop.png",
+    "actor": "host@teameet.v1",
+    "action": "후기 남기기",
+    "from": "/team-matches/62b5d6a2-2d8e-41e5-8678-bc75864e0940",
+    "to": "/my/reviews/team_match/62b5d6a2-2d8e-41e5-8678-bc75864e0940"
+  }
+]

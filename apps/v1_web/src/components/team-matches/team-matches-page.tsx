@@ -13,6 +13,7 @@ import { MatchTypeSegment } from '@/components/v1-ui/match-type-segment';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { CreateField, FieldErrorText, GenderRuleSelector, MissingFieldsBanner, MultiPresetChipSelector, PresetChipSelector, RecentVenueChips } from '@/components/v1-ui/create-form-fields';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
+import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { cssUrl } from '@/lib/assets';
 import { formatAmountNumber } from '@/lib/date-utils';
 // 사진 없는 팀매치의 종목 그래픽 — 매치·홈과 같은 공용 컴포넌트를 쓴다(웨이브8에서
@@ -209,6 +210,7 @@ export function TeamMatchDetailPageSkeleton() {
 }
 
 export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewModel }) {
+  const { confirm, ConfirmModal } = useConfirm();
   const { match, mode } = model;
   const league = match.league;
   /* 매치 관리 카드의 "화면당 primary 1개" 규칙(DESIGN.md §14) — 라인업 → 경기 결과 → 후기
@@ -264,6 +266,14 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
       .finally(() => {
         heroActionBusyRef.current = false;
       });
+  };
+
+  const runHostAction = async (action: NonNullable<TeamMatchDetailViewModel['hostActions']>[number]) => {
+    if (action.confirm) {
+      const accepted = await confirm({ ...action.confirm, tone: 'danger' });
+      if (!accepted) return;
+    }
+    runHeroAction(action.onClick, `${action.label} 처리를 완료했어요.`);
   };
 
   /* Chat button — rendered only when showChat is true (approved/mine/pending).
@@ -559,11 +569,16 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                           className={`tm-btn tm-btn-sm ${hostActionClass(action.tone)}`}
                           type="button"
                           disabled={action.pending}
-                          onClick={() => runHeroAction(action.onClick, `${action.label} 처리를 완료했어요.`)}
+                          onClick={() => { void runHostAction(action); }}
                         >
                           {action.pending ? '처리 중' : action.label}
                         </button>
                       ))}
+                    </div>
+                  ) : null}
+                  {match.applicantTeams.length === 0 ? (
+                    <div className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-caption)' }}>
+                      아직 신청한 팀이 없어요.
                     </div>
                   ) : null}
                   <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
@@ -586,6 +601,16 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                             {team.status}
                           </span>
                         </div>
+                        {team.href ? (
+                          <Link
+                            className="tm-btn tm-btn-sm tm-btn-neutral"
+                            href={team.href}
+                            style={{ marginTop: 12, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}
+                            aria-label={`${team.name} 팀 보기`}
+                          >
+                            팀 보기
+                          </Link>
+                        ) : null}
                         {(team.onApprove ?? team.onReject) ? (
                           // #4: 순서 [거절(좌)] [승인(우)] — 위험 행동을 왼쪽, 확정 행동을 오른쪽으로.
                           // 웨이브4(2026-09-04): 신청팀 행은 접기/펼치기 없이 전부 항상 펼쳐진
@@ -655,6 +680,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
           {ctaButtons}
         </div>
       </div>
+      {ConfirmModal}
     </>
   );
 }

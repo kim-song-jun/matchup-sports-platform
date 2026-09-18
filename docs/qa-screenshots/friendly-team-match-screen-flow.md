@@ -67,6 +67,46 @@
 
 원본 캡처 메타데이터는 [manifest.json](../screenshots/friendly-team-match-flow/manifest.json)에 있다.
 
+## 실제 버튼 클릭 검증
+
+아래 화면은 URL 직접 진입이 아니라 목록·상세·전적 화면의 버튼/행을 실제로 눌러 만든 결과다.
+모바일(390×844)과 데스크톱(1440×900)을 각각 독립 실데이터로 검증했다.
+
+| 실제 클릭 상태 | mobile | desktop |
+| --- | --- | --- |
+| 다른 팀 신청 전 상세 | [mobile](../screenshots/friendly-team-match-interactions/applicant-before-apply/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/applicant-before-apply/desktop.png) |
+| 목록 경기 카드 → 상세 | [mobile](../screenshots/friendly-team-match-interactions/list-card-detail-click/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/list-card-detail-click/desktop.png) |
+| 신청 승인 대기·승인 전 채팅 잠금 | [mobile](../screenshots/friendly-team-match-interactions/applicant-pending/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/applicant-pending/desktop.png) |
+| 호스트 신청팀 승인·거절 | [mobile](../screenshots/friendly-team-match-interactions/host-application-review/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/host-application-review/desktop.png) |
+| 호스트 매치 관리 → 수정 | [mobile](../screenshots/friendly-team-match-interactions/host-edit-click/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/host-edit-click/desktop.png) |
+| 신청팀의 실제 팀 상세 | [mobile](../screenshots/friendly-team-match-interactions/applicant-team-detail/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/applicant-team-detail/desktop.png) |
+| 신청 승인 완료 | [mobile](../screenshots/friendly-team-match-interactions/host-approved/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/host-approved/desktop.png) |
+| 승인 후 팀매치 채팅방 | [mobile](../screenshots/friendly-team-match-interactions/team-match-chat/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/team-match-chat/desktop.png) |
+| 신청 취소 후 재신청 가능 상태 | [mobile](../screenshots/friendly-team-match-interactions/application-withdrawn/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/application-withdrawn/desktop.png) |
+| 모집 마감 후 재개 가능 상태 | [mobile](../screenshots/friendly-team-match-interactions/host-closed/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/host-closed/desktop.png) |
+| 상세 화면 팀매치 취소 확인 | [mobile](../screenshots/friendly-team-match-interactions/host-cancel-confirm/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/host-cancel-confirm/desktop.png) |
+| 신청 거절 후 빈 신청팀 상태 | [mobile](../screenshots/friendly-team-match-interactions/application-rejected/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/application-rejected/desktop.png) |
+| 홈팀 카드 → 팀 상세 | [mobile](../screenshots/friendly-team-match-interactions/home-team-detail-click/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/home-team-detail-click/desktop.png) |
+| 완료 상세 → 라인업 관리 | [mobile](../screenshots/friendly-team-match-interactions/completed-lineup-click/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/completed-lineup-click/desktop.png) |
+| 팀 전적 경기 행 → 팀매치 상세 | [mobile](../screenshots/friendly-team-match-interactions/team-record-detail-click/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/team-record-detail-click/desktop.png) |
+| 사용자 기록 경기 행 → 팀매치 상세 | [mobile](../screenshots/friendly-team-match-interactions/user-record-detail-click/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/user-record-detail-click/desktop.png) |
+| 완료 상세 → 경기 결과 | [mobile](../screenshots/friendly-team-match-interactions/completed-result-click/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/completed-result-click/desktop.png) |
+| 완료 상세 → 후기 작성 | [mobile](../screenshots/friendly-team-match-interactions/completed-review-click/mobile.png) | [desktop](../screenshots/friendly-team-match-interactions/completed-review-click/desktop.png) |
+
+검증 결과:
+
+- 목록의 경기 카드, 공유, 매치 관리, 홈팀 카드, 라인업 관리 버튼이 각각 실제 상세·수정·팀·라인업 경로로 이어진다.
+- 신청 전에는 관리 중인 팀 이름을 포함한 신청 버튼이 활성화된다.
+- 신청 직후 승인 대기 상태와 신청 취소 버튼이 나타나며, 채팅은 `승인 후 채팅`으로 잠긴다.
+- 호스트는 신청팀을 승인·거절할 수 있고, `팀 보기`로 실제 신청팀 상세를 확인할 수 있다.
+- 승인 후 양 팀 운영진은 팀매치 채팅방으로 이동한다. 빈 방도 메시지 입력창이 있는 실제 채팅 화면이다.
+- 신청 취소 후에는 같은 팀으로 다시 신청할 수 있다. 거절된 신청은 호스트 목록에서 제거되고 빈 상태 안내가 보인다.
+- 모집 마감 후 `모집 재개`가 나타난다. 상세의 `팀매치 취소`는 즉시 실행하지 않고 되돌릴 수 없다는 확인 모달을 거친다.
+- 팀 전적·사용자 기록의 개별 친선 경기 행은 모두 실제 `/team-matches/:id` 상세로 이동한다.
+- 완료 경기 상세에서 결과 화면과 후기 작성 화면으로 이동한다.
+
+클릭 전후 URL과 캡처 파일의 정본은 [interaction manifest](../screenshots/friendly-team-match-interactions/manifest.json)에 있다.
+
 ## `친선` 탭 클릭 확인
 
 - 팀 전적과 사용자 기록 모두 `친선` 탭이 `aria-selected=true`로 전환된다.

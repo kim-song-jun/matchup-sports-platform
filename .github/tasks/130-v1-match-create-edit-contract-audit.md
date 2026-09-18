@@ -91,7 +91,7 @@ upload persistence, and the absence of hard-coded production form values.
 - [x] Phase 1: 최신 코드 재점검·범위 확정
 - [x] Phase 2: API·UI 구현 (7개 항목)
 - [x] Phase 3: 단위/실DB/브라우저 검증과 390/768/1440 스크린샷
-- [ ] Phase 4: 계약 문서·changeset·PR·리뷰
+- [x] Phase 4: 계약 문서·changeset·PR·리뷰 — PR #1223 (`dev` 대상)
 
 ### Progress Snapshot
 

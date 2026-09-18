@@ -62,12 +62,22 @@
 | 공식 결과 | [mobile](../screenshots/friendly-team-match-flow/official-result/mobile.png) | [desktop](../screenshots/friendly-team-match-flow/official-result/desktop.png) |
 | 팀 친선 전적 | [mobile](../screenshots/friendly-team-match-flow/team-records/mobile.png) | [desktop](../screenshots/friendly-team-match-flow/team-records/desktop.png) |
 | 사용자 친선 기록 | [mobile](../screenshots/friendly-team-match-flow/user-records/mobile.png) | [desktop](../screenshots/friendly-team-match-flow/user-records/desktop.png) |
+| 팀 전적 `친선` 탭 선택 | [mobile](../screenshots/friendly-team-match-flow/team-records-friendly/mobile.png) | [desktop](../screenshots/friendly-team-match-flow/team-records-friendly/desktop.png) |
+| 사용자 기록 `친선` 탭 선택 | [mobile](../screenshots/friendly-team-match-flow/user-records-friendly/mobile.png) | [desktop](../screenshots/friendly-team-match-flow/user-records-friendly/desktop.png) |
 
 원본 캡처 메타데이터는 [manifest.json](../screenshots/friendly-team-match-flow/manifest.json)에 있다.
 
+## `친선` 탭 클릭 확인
+
+- 팀 전적과 사용자 기록 모두 `친선` 탭이 `aria-selected=true`로 전환된다.
+- 두 화면 모두 `/records?type=friendly` API를 새로 요청하며, 응답 목록은 `type=friendly`만 포함한다.
+- 캡처에 사용한 현재 경기 `gameId`가 팀·사용자 친선 목록 양쪽에 포함된다.
+- 팀 KPI는 친선 기준 경기·승무패·득실차로, 사용자 KPI는 친선 기준 엔트리·골로 바뀐다.
+- 사용자 본인 화면에서는 기록 공개 동의 전이라는 안내 배너가 탭 전환 후에도 유지된다.
+
 ## QA 결과
 
-- 16개 상태 × 2개 viewport = 32개 응답 모두 HTTP 200.
+- 18개 상태 × 2개 viewport = 36개 응답 모두 HTTP 200.
 - 브라우저 page error 0건.
-- 캡처용 현재 매치가 팀·사용자 기록 양쪽에 같은 `gameId`로 반영된 것을 확인했다. 한 경기 기여분은 `1승, 2득점 1실점 / 사용자 1경기 1골`이며, 최종 캡처의 누적 QA 데이터는 두 번의 동일 시나리오 실행으로 `2승, 4득점 2실점 / 사용자 2경기 2골`이다.
+- 캡처용 현재 매치가 팀·사용자 기록 양쪽에 같은 `gameId`로 반영된 것을 확인했다. 한 경기 기여분은 `1승, 2득점 1실점 / 사용자 1경기 1골`이며, 최종 캡처의 누적 QA 데이터는 세 번의 동일 시나리오 실행으로 `3승, 6득점 3실점 / 사용자 3경기 3골`이다.
 - 기존 React 경고인 `AppShellFrame` 렌더 중 `useShellOverride` 상태 갱신 경고가 탐색·상세·전적 화면에서 남아 있다. 캡처 실패나 데이터 누락은 아니지만 후속 UI 정리 대상으로 기록한다.

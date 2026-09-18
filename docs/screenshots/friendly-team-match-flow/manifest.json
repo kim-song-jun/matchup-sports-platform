@@ -161,7 +161,7 @@
     "slug": "host-detail",
     "title": "호스트 상세·신청팀 관리",
     "actor": "host@teameet.v1",
-    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796",
+    "path": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e",
     "viewport": "mobile",
     "status": 200,
     "consoleErrors": [
@@ -174,7 +174,7 @@
     "slug": "host-detail",
     "title": "호스트 상세·신청팀 관리",
     "actor": "host@teameet.v1",
-    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796",
+    "path": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e",
     "viewport": "desktop",
     "status": 200,
     "consoleErrors": [
@@ -187,7 +187,7 @@
     "slug": "edit",
     "title": "팀매치 수정",
     "actor": "host@teameet.v1",
-    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/edit",
+    "path": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e/edit",
     "viewport": "mobile",
     "status": 200,
     "consoleErrors": [],
@@ -198,7 +198,7 @@
     "slug": "edit",
     "title": "팀매치 수정",
     "actor": "host@teameet.v1",
-    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/edit",
+    "path": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e/edit",
     "viewport": "desktop",
     "status": 200,
     "consoleErrors": [],
@@ -209,7 +209,7 @@
     "slug": "matched-detail",
     "title": "매칭 완료 상세",
     "actor": "host@teameet.v1",
-    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796",
+    "path": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e",
     "viewport": "mobile",
     "status": 200,
     "consoleErrors": [],
@@ -220,7 +220,7 @@
     "slug": "matched-detail",
     "title": "매칭 완료 상세",
     "actor": "host@teameet.v1",
-    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796",
+    "path": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e",
     "viewport": "desktop",
     "status": 200,
     "consoleErrors": [],
@@ -231,7 +231,7 @@
     "slug": "lineup",
     "title": "출전 명단",
     "actor": "host@teameet.v1",
-    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/lineup",
+    "path": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e/lineup",
     "viewport": "mobile",
     "status": 200,
     "consoleErrors": [],
@@ -242,7 +242,7 @@
     "slug": "lineup",
     "title": "출전 명단",
     "actor": "host@teameet.v1",
-    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/lineup",
+    "path": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e/lineup",
     "viewport": "desktop",
     "status": 200,
     "consoleErrors": [],
@@ -253,7 +253,7 @@
     "slug": "result-entry",
     "title": "경기 결과 입력",
     "actor": "host@teameet.v1",
-    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/result",
+    "path": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e/result",
     "viewport": "mobile",
     "status": 200,
     "consoleErrors": [],
@@ -264,7 +264,7 @@
     "slug": "result-entry",
     "title": "경기 결과 입력",
     "actor": "host@teameet.v1",
-    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/result",
+    "path": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e/result",
     "viewport": "desktop",
     "status": 200,
     "consoleErrors": [],
@@ -275,7 +275,7 @@
     "slug": "result-approval",
     "title": "상대팀 결과 승인",
     "actor": "owner@teameet.v1",
-    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/result/approval",
+    "path": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e/result/approval",
     "viewport": "mobile",
     "status": 200,
     "consoleErrors": [],
@@ -286,7 +286,7 @@
     "slug": "result-approval",
     "title": "상대팀 결과 승인",
     "actor": "owner@teameet.v1",
-    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/result/approval",
+    "path": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e/result/approval",
     "viewport": "desktop",
     "status": 200,
     "consoleErrors": [],
@@ -297,7 +297,7 @@
     "slug": "official-result",
     "title": "공식 결과",
     "actor": "host@teameet.v1",
-    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/result",
+    "path": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e/result",
     "viewport": "mobile",
     "status": 200,
     "consoleErrors": [],
@@ -308,7 +308,7 @@
     "slug": "official-result",
     "title": "공식 결과",
     "actor": "host@teameet.v1",
-    "path": "/team-matches/983f33ea-09a3-4c27-8136-68fee7c8d796/result",
+    "path": "/team-matches/86c42fb6-26da-488e-bdda-72d133fc4f0e/result",
     "viewport": "desktop",
     "status": 200,
     "consoleErrors": [],
@@ -366,5 +366,57 @@
     ],
     "pageErrors": [],
     "file": "docs/screenshots/friendly-team-match-flow/user-records/desktop.png"
+  },
+  {
+    "slug": "team-records-friendly",
+    "title": "팀 전적 친선 탭",
+    "actor": "host@teameet.v1",
+    "path": "/teams/00000000-0000-4000-8000-000000000102/records",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [
+      "Cannot update a component (`%s`) while rendering a different component (`%s`). To locate the bad setState() call inside `%s`, follow the stack trace as described in https://react.dev/link/setstate-in-render AppShellFrame TeamRecordsPageClient TeamRecordsPageClient"
+    ],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/team-records-friendly/mobile.png"
+  },
+  {
+    "slug": "team-records-friendly",
+    "title": "팀 전적 친선 탭",
+    "actor": "host@teameet.v1",
+    "path": "/teams/00000000-0000-4000-8000-000000000102/records",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [
+      "Cannot update a component (`%s`) while rendering a different component (`%s`). To locate the bad setState() call inside `%s`, follow the stack trace as described in https://react.dev/link/setstate-in-render AppShellFrame TeamRecordsPageClient TeamRecordsPageClient"
+    ],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/team-records-friendly/desktop.png"
+  },
+  {
+    "slug": "user-records-friendly",
+    "title": "사용자 기록 친선 탭",
+    "actor": "host@teameet.v1",
+    "path": "/users/74410f0d-39c2-4c92-b5f1-aed15260947f/records",
+    "viewport": "mobile",
+    "status": 200,
+    "consoleErrors": [
+      "Cannot update a component (`%s`) while rendering a different component (`%s`). To locate the bad setState() call inside `%s`, follow the stack trace as described in https://react.dev/link/setstate-in-render AppShellFrame UserRecordsPageClient UserRecordsPageClient"
+    ],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/user-records-friendly/mobile.png"
+  },
+  {
+    "slug": "user-records-friendly",
+    "title": "사용자 기록 친선 탭",
+    "actor": "host@teameet.v1",
+    "path": "/users/74410f0d-39c2-4c92-b5f1-aed15260947f/records",
+    "viewport": "desktop",
+    "status": 200,
+    "consoleErrors": [
+      "Cannot update a component (`%s`) while rendering a different component (`%s`). To locate the bad setState() call inside `%s`, follow the stack trace as described in https://react.dev/link/setstate-in-render AppShellFrame UserRecordsPageClient UserRecordsPageClient"
+    ],
+    "pageErrors": [],
+    "file": "docs/screenshots/friendly-team-match-flow/user-records-friendly/desktop.png"
   }
 ]

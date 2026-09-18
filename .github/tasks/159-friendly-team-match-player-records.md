@@ -62,5 +62,6 @@ not receive an appearance or result in public/user records.
   it was still extended as executable adapter contract coverage.
 - PASS: real local v1 API flow from application through opponent approval and async official-fact
   projection; both team and owner-visible user records were verified.
-- PASS: 32 headed Chromium captures (16 screens × mobile/desktop), all HTTP 200 with zero page
+- PASS: 36 headed Chromium captures (18 states × mobile/desktop), including actual `친선` tab
+  clicks on team and user records; all HTTP 200 with zero page
   errors. Known `useShellOverride` render-time React warnings are recorded in the screenshot doc.

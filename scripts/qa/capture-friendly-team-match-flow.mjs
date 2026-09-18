@@ -294,6 +294,30 @@ async function capture(browser, route, state) {
     const response = await page.goto(`${WEB_BASE}${route.path}`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     await passTermsGate(page);
     await page.waitForTimeout(3000);
+    if (route.clickFriendlyTab) {
+      const filteredResponsePromise = page.waitForResponse(
+        (candidate) => candidate.url().includes('/records?') && candidate.url().includes('type=friendly'),
+        { timeout: 15_000 },
+      );
+      const friendlyTab = page.getByRole('tab', { name: '친선', exact: true });
+      await friendlyTab.click();
+      const filteredResponse = await filteredResponsePromise;
+      if (filteredResponse.status() !== 200) {
+        throw new Error(`Friendly records request failed: ${filteredResponse.status()}`);
+      }
+      const envelope = await filteredResponse.json();
+      const filtered = envelope.data ?? envelope;
+      if (!filtered.items?.length || filtered.items.some((item) => item.type !== 'friendly')) {
+        throw new Error('Friendly tab returned an empty or mixed record list.');
+      }
+      if (!filtered.items.some((item) => item.gameId === state.gameId)) {
+        throw new Error(`Friendly tab does not contain the current game: ${state.gameId}`);
+      }
+      await page.waitForTimeout(500);
+      if ((await friendlyTab.getAttribute('aria-selected')) !== 'true') {
+        throw new Error('Friendly tab did not become selected.');
+      }
+    }
     const dir = `${OUT}/${route.slug}`;
     mkdirSync(dir, { recursive: true });
     const file = `${dir}/${viewport.name}.png`;
@@ -350,6 +374,18 @@ try {
   await capture(browser, { slug: 'official-result', title: '공식 결과', path: `/team-matches/${state.teamMatchId}/result` }, state);
   await capture(browser, { slug: 'team-records', title: '팀 친선 전적', path: `/teams/${state.hostTeamId}/records` }, state);
   await capture(browser, { slug: 'user-records', title: '사용자 친선 기록', path: `/users/${state.playerIds[0]}/records` }, state);
+  await capture(browser, {
+    slug: 'team-records-friendly',
+    title: '팀 전적 친선 탭',
+    path: `/teams/${state.hostTeamId}/records`,
+    clickFriendlyTab: true,
+  }, state);
+  await capture(browser, {
+    slug: 'user-records-friendly',
+    title: '사용자 기록 친선 탭',
+    path: `/users/${state.playerIds[0]}/records`,
+    clickFriendlyTab: true,
+  }, state);
 } finally {
   await browser.close();
 }

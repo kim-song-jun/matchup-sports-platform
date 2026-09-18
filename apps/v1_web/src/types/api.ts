@@ -377,6 +377,9 @@ export type V1CreateInquiryPayload = {
 };
 
 export type V1Match = {
+  canComplete?: boolean;
+  canWithdraw?: boolean;
+  completedAt?: string | null;
   id: string;
   matchId?: string;
   title: string;
@@ -513,6 +516,10 @@ export type V1MatchMutationResult = {
 
 export type V1MatchApplication = {
   applicationId: string;
+  participantId?: string | null;
+  participantStatus?: 'active' | 'removed' | 'cancelled' | 'no_show' | 'completed' | null;
+  canCancelApproval?: boolean;
+  canMarkCancelled?: boolean;
   applicantUserId: string;
   displayName: string;
   profileImageUrl: string | null;

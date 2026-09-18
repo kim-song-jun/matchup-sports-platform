@@ -140,6 +140,20 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 
 ## Recommended Execution Order
 
+### 개인 매치 호스트 처리 보완 — 2026-09-19
+
+V1-03-007 승인 취소 / V1-03-008 불참 처리 2/2 구현·검증.
+확정 명단의 기존 참가자 메뉴에서 필수 사유와 확인 모달을 사용한다.
+실DB 통합 9/9, 화면 단위 8/8, headed 390/768/1440px 캡처 14장과 동작 8/8 통과.
+콘솔 error/pageerror/requestfailed/API HTTP 오류 각각 0건.
+범위·대표 스크린샷·남은 분석 항목은 [Task 130](../../.github/tasks/130-v1-match-create-edit-contract-audit.md#progress-snapshot--host-actions).
+이 결과는 개인 매치 전체 기능의 전수 완료 판정이 아니다.
+
+후속 최종 코드/계약 점검은 Task 130의 17개 항목을 확인했다. 모집 재개의 취소/완료 덮어쓰기와
+수정 저장의 버전·정원 경합을 수정했고 서비스 34/34, 실제 DB 13/13 + 추가 편집 제한 1/1 통과.
+검증 수준(코드/단위/DB/기존 브라우저/alpha 미검증)을 구분한 표를 Task 130에 유지한다.
+dev 머지와 alpha 최종 검증은 필수 리뷰 게이트 미충족으로 아직 완료하지 않았다.
+
 1. 인증 / 세션 / 권한
 2. 개인 매치
 3. 팀 / 팀 권한
@@ -229,6 +243,7 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 
 | Date | Scenario | Result | Summary | Follow-up |
 |------|----------|--------|---------|-----------|
+| 2026-09-19 | Personal match participation lifecycle | Passed | 호스트 완료·채팅, 승인 참가자의 시작 전 철회, 완료 후 후기 진입, 확정 명단/전체 이력, 내 매치 cursor pagination을 실DB와 headed Chromium 390/768/1440에서 검증했다. API unit 52/52, Web focused 53/53, integration 5/5, 21 screenshots, 7 actions, console/network 오류 0건이다. | PR에서 `docs/screenshots/personal-match-participation/` 대표 이미지와 Task 130 계약을 검토 |
 | 2026-04-07 | Initial | Drafted | 시나리오 문서 구조 생성 완료 | 실제 실행 후 업데이트 |
 | 2026-04-07 | Auth + Home + Match + Team + Chat | Failed | 96 tests run, 3 passed, 93 failed. Main blockers were API container health failure, host Prisma DB access mismatch, and Playwright worker dependency instability. | `docs/plans/2026-04-07-qa-remediation-plan.md` 기준으로 runtime → harness → suite rerun 순서로 수정 |
 | 2026-04-07 | Auth / Home / Match / Team / Chat | Failed | Playwright 데스크톱 스모크 실행 48건 중 11건 통과, 37건 실패. 핵심 장애는 API 컨테이너 비정상, DB 포트 드리프트, Playwright 의존성 해상 실패, 일부 brittle selector. | `docs/plans/2026-04-07-agent-all-qa-remediation-plan.md` 기준으로 정리 및 수정 |

@@ -357,3 +357,26 @@ describe('MatchListPageView — 빈 목록의 세로 정렬', () => {
     expect(container.querySelector('.tm-match-list')).not.toHaveClass('tm-list-empty');
   });
 });
+
+
+describe('개인 매치 참여 기능', () => {
+  it('호스트도 상세에서 채팅으로 진입할 수 있다', () => {
+    const onChat = vi.fn();
+    const model = { ...getMatchDetailViewModel('mine'), onChat };
+    render(<MatchDetailPageView model={model} />);
+    const buttons = screen.getAllByRole('button', { name: '채팅' });
+    buttons[0].click();
+    expect(onChat).toHaveBeenCalledOnce();
+  });
+  it('완료 참가자에게 경기 전 안내를 보여주지 않는다', () => {
+    render(<MatchDetailPageView model={{ ...getMatchDetailViewModel('approved'), completed: true }} />);
+    expect(screen.getAllByText('참여 완료').length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText(/경기 당일 늦지 않게/)).not.toBeInTheDocument();
+  });
+
+  it('종료 확인이 가능한 호스트에게 더 이상 저장할 수 없는 수정 CTA를 보여주지 않는다', () => {
+    render(<MatchDetailPageView model={{ ...getMatchDetailViewModel('mine'), canComplete: true }} />);
+    expect(screen.queryByRole('link', { name: '매치 수정' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '경기 완료' })).toHaveLength(2);
+  });
+});

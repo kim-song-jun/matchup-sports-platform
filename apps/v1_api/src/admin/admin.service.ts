@@ -1,3 +1,4 @@
+import { completePersonalMatch } from '../matches/complete-personal-match';
 import {
   BadRequestException,
   ConflictException,
@@ -473,7 +474,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${matchId} FOR UPDATE`;
       const target = await tx.v1Match.findUnique({ where: { id: matchId } });
       if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Match was not found' });
-      const updated = await tx.v1Match.update({ where: { id: matchId }, data: { status: dto.status } });
+      if (target.status === 'completed' && dto.status !== 'completed' && dto.status !== 'archived') {
+        throw new ConflictException({ code: 'STATE_CONFLICT', message: '참여가 확정된 매치는 다시 모집하거나 취소할 수 없어요.' });
+      }
+      if (dto.status === 'completed') await completePersonalMatch(tx, target);
+      const updated = dto.status === 'completed'
+        ? { ...target, status: 'completed' as const }
+        : await tx.v1Match.update({ where: { id: matchId }, data: { status: dto.status } });
       return this.writeAdminStatusLogs(
         admin,
         {

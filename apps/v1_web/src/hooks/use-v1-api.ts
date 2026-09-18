@@ -645,6 +645,23 @@ export function useV1MyMatches(filters?: ListFilters) {
   });
 }
 
+export function useV1MyMatchesInfinite(mode: 'joined' | 'created') {
+  return useInfiniteQuery({
+    queryKey: [...v1Keys.all, 'me', 'matches', 'infinite', mode] as const,
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => v1Get<CursorPage<V1Match>>('/me/matches', { mode, limit: 50, ...(pageParam ? { cursor: pageParam } : {}) }),
+    getNextPageParam: (last) => last.pageInfo?.hasNext ? last.pageInfo.nextCursor ?? undefined : undefined,
+  });
+}
+
+export function useV1CompleteMatch(matchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => v1Post<{ matchId: string; status: 'completed' }>(`/matches/${matchId}/complete`, {}),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.all }),
+  });
+}
+
 export function useV1Match(matchId: string, options?: { seed?: V1Match | null }) {
   const queryClient = useQueryClient();
   const seed = options?.seed;
@@ -710,7 +727,7 @@ export function useV1CreateMatch() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1MatchMutationPayload) => v1Post<V1MatchMutationResult>('/matches', body),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.matches() }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.all }),
   });
 }
 
@@ -718,11 +735,7 @@ export function useV1ApplyMatch(matchId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body?: { message?: string | null }) => v1Post<V1MatchApplicationResult>(`/matches/${matchId}/applications`, body ?? {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
-      queryClient.invalidateQueries({ queryKey: [...v1Keys.match(matchId), 'application-eligibility'] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.all }),
   });
 }
 
@@ -730,10 +743,7 @@ export function useV1UpdateMatch(matchId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body: V1MatchUpdatePayload) => v1Patch<V1MatchMutationResult>(`/matches/${matchId}`, body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.all }),
   });
 }
 
@@ -741,10 +751,7 @@ export function useV1CancelMatch(matchId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (body?: { reason?: string | null }) => v1Post<{ matchId: string; status: string; detailRoute: string }>(`/matches/${matchId}/cancel`, body ?? {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.all }),
   });
 }
 
@@ -758,11 +765,7 @@ export function useV1CloseMatch(matchId: string) {
   return useMutation({
     mutationFn: (body?: { reason?: string | null }) =>
       v1Post<{ matchId: string; status: string; expiredApplications: number; detailRoute: string }>(`/matches/${matchId}/close`, body ?? {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
-      queryClient.invalidateQueries({ queryKey: [...v1Keys.match(matchId), 'applications'] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.all }),
   });
 }
 
@@ -772,10 +775,7 @@ export function useV1ReopenMatch(matchId: string) {
   return useMutation({
     mutationFn: (body?: { reason?: string | null; deadlineAt?: string | null }) =>
       v1Post<{ matchId: string; status: string; deadlineAt: string | null; detailRoute: string }>(`/matches/${matchId}/reopen`, body ?? {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.all }),
   });
 }
 
@@ -833,11 +833,7 @@ export function useV1WithdrawMatchApplication(matchId: string, applicationId?: s
   return useMutation({
     mutationFn: (body?: { reason?: string | null }) =>
       v1Post<V1MatchApplicationResult>(`/match-applications/${applicationId}/withdraw`, body ?? {}),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
-      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
-      queryClient.invalidateQueries({ queryKey: [...v1Keys.match(matchId), 'application-eligibility'] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.all }),
   });
 }
 
@@ -846,11 +842,21 @@ export function useV1ApproveMatchApplication(matchId: string) {
   return useMutation({
     mutationFn: ({ applicationId, note }: { applicationId: string; note?: string | null }) =>
       v1Post<V1MatchApplicationResult>(`/match-applications/${applicationId}/approve`, { note: note ?? null }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
-      queryClient.invalidateQueries({ queryKey: [...v1Keys.match(matchId), 'applications'] });
-      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.all }),
+  });
+}
+
+export function useV1ChangeMatchParticipant() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ participantId, action, reason }: {
+      participantId: string;
+      action: 'cancel-approval' | 'mark-cancelled';
+      reason: string;
+    }) => v1Post<{ participantId: string; status: 'removed' | 'no_show' }>(
+      `/match-participants/${participantId}/${action}`, { reason },
+    ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.all }),
   });
 }
 
@@ -859,11 +865,7 @@ export function useV1RejectMatchApplication(matchId: string) {
   return useMutation({
     mutationFn: ({ applicationId, reason }: { applicationId: string; reason?: string | null }) =>
       v1Post<V1MatchApplicationResult>(`/match-applications/${applicationId}/reject`, { reason: reason ?? null }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: v1Keys.match(matchId) });
-      queryClient.invalidateQueries({ queryKey: [...v1Keys.match(matchId), 'applications'] });
-      queryClient.invalidateQueries({ queryKey: v1Keys.matches() });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: v1Keys.all }),
   });
 }
 

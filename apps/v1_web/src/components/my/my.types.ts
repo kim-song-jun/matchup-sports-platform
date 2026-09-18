@@ -61,6 +61,10 @@ export type MyMatch = {
 };
 
 export type MyMatchesViewModel = {
+  hasNext?: boolean;
+  loadMorePending?: boolean;
+  loadMoreError?: boolean;
+  onLoadMore?: () => void;
   mode: 'joined' | 'created';
   summary: Array<{ label: string; value: number; unit: string }>;
   matches: MyMatch[];

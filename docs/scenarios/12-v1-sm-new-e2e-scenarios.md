@@ -178,8 +178,8 @@ DB evidence:
 | V1-03-004 | Withdraw application | Application becomes `withdrawn`; duplicate withdraw converges or returns processed conflict |
 | V1-03-005 | Host approves applicant | Application approved, participant active, capacity updates, status log exists |
 | V1-03-006 | Host rejects applicant | Application rejected, no participant row created, applicant sees rejected state |
-| V1-03-007 | Host cancels approval | Participant removed, application history preserved |
-| V1-03-008 | Participant cancellation handling | Host marks participant cancelled; participant no longer counted as active |
+| V1-03-007 | Host cancels approval | Before start: confirmed roster menu → required reason → confirmation; participant removed, application cancelled_by_host and actor/reason logs preserved. Non-host/self/completed/repeat rejected. |
+| V1-03-008 | Participant no-show handling | From start until completion: confirmed roster menu → required reason → confirmation; participant no_show, no active count/chat/review/activity eligibility. Completion race stays consistent. |
 
 ## 03-1. Personal Match Create And Edit
 

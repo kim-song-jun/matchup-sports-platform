@@ -7,10 +7,11 @@ import { MatchApplicationsController } from './match-applications.controller';
 import { MatchesController } from './matches.controller';
 import { MatchesService } from './matches.service';
 import { MyMatchesController } from './my-matches.controller';
+import { MatchParticipantsController } from './match-participants.controller';
 
 @Module({
   imports: [NotificationsModule],
-  controllers: [MatchesController, MatchApplicationsController, MyMatchesController],
+  controllers: [MatchesController, MatchApplicationsController, MatchParticipantsController, MyMatchesController],
   providers: [MatchesService, OptionalV1AuthGuard, V1AuthGuard, CreatorProfileGuard],
 })
 export class MatchesModule {}

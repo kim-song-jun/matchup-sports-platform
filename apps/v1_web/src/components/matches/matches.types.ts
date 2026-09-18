@@ -83,6 +83,9 @@ export type MatchStateViewModel = MatchListViewModel & {
 };
 
 export type MatchDetailViewModel = {
+  completed?: boolean;
+  canComplete?: boolean;
+  withdrawApplicationId?: string | null;
   match: MatchCardModel & {
     description: string;
     address: string;

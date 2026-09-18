@@ -119,7 +119,7 @@ describe('ChatService room polish', () => {
     );
     expect(prisma.v1ChatMessage.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { chatRoomId: 'room-1', sentAt: { gte: expect.any(Date) } },
+        where: expect.objectContaining({ chatRoomId: 'room-1', sentAt: { gte: expect.any(Date) } }),
       }),
     );
   });
@@ -161,7 +161,7 @@ describe('ChatService room polish', () => {
 
     expect(prisma.v1ChatMessage.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { chatRoomId: 'room-1', sentAt: { gte: visibleFromAt } },
+        where: expect.objectContaining({ chatRoomId: 'room-1', sentAt: { gte: visibleFromAt } }),
       }),
     );
     expect(result.items).toEqual([

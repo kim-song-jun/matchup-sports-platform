@@ -19,6 +19,8 @@ v1 team-match lives in `apps/v1_api/src/team-matches/team-matches.controller.ts`
 | `POST` | `/team-matches/:teamMatchId/cancel`, `/close`, `/reopen` | lifecycle mutations |
 | `POST` / `GET` | `/team-matches/:teamMatchId/applications` | apply / list applications (host view) |
 | `POST` | `/team-match-applications/:applicationId/withdraw\|approve\|reject` | application lifecycle (own top-level path, not nested under `/team-matches`) |
+| `POST` | `/admin/team-matches` | owner/ops 플랫폼 운영자가 팀을 지정하지 않은 `recruiting` 팀매치 생성 |
+| `POST` | `/admin/team-matches/:teamMatchId/assign` | owner/ops 플랫폼 운영자가 신청 목록에서 홈·원정 두 팀을 골라 `matched`로 확정 |
 | `GET` | `/me/team-matches` | my team matches |
 | `GET` | `/team-matches/:teamMatchId/lineup` | lineup read |
 | `PUT` | `/team-matches/:teamMatchId/lineup` | lineup save, via `TeamMatchLineupService` — **not** the generic `PUT /games/:gameId/lineups/:sideId` route, which returns `409 TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN` for a team-match-sourced game (Task 14 deviation, see `docs/api/domains/games.md`) |
@@ -37,8 +39,20 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 |---|---|---|
 | `E2E-TEAM-01` | Opponent lineup-change authorization: `POST /team-matches/:teamMatchId/lineup/change-request` is reachable only by the approved opponent team (not the host, not a non-participant team), and a host's own `PUT`/`submit` on their own lineup is unaffected by an opponent's pending change request. | `e2e/v1-tests/team-match.spec.ts` |
 | `E2E-TEAM-02` | Host result submit → opponent decision round trip: host drafts and submits a `V1GameResultRevision` via the Game result-revision routes above, the match transitions to `completed` (idempotently, per the `games.md` "Deviations" `status != completed` guard), and only the *opposing* team's manager/owner — never the host's own manager/owner — can call the `decision` route (`approve`/`change_request`). | `e2e/v1-tests/team-match.spec.ts` |
+| `E2E-TEAM-03` | Platform admin creates a hostless recruitment, the exact ID appears in the public list, a same-sport team manager applies through the real browser/API path, and the persisted `requested` application appears in admin detail. | `e2e/v1-tests/admin-platform-team-match-flow.spec.ts` |
 
-Both IDs are **new** as of this reconciliation — `e2e/v1-tests/team-match.spec.ts` today only asserts `/team-matches` list render and the desktop/mobile "팀매치 만들기" CTA (step-0 smoke, verified by reading the spec file); it does not yet drive create→apply→approve, lineup save/submit/change-request, or result submit/decision. Implementing `E2E-TEAM-01`/`E2E-TEAM-02` end to end is out of this doc-reconciliation task's own scope (Todo 26 names the two IDs and points at where they belong; a later pass in the same task adds the actual Playwright assertions). Do not mark this row `Verified` until that Playwright coverage exists — this section is `Implemented` (routes exist and are wired) but `Unverified` (no E2E proof) as of this revision.
+`E2E-TEAM-01` and `E2E-TEAM-02` remain unverified: `e2e/v1-tests/team-match.spec.ts` does not yet drive lineup-change authorization or result submit/decision end to end. `E2E-TEAM-03` is separately verified by Task 149's real API/DB and browser run below; that proof does not imply the other two scenarios passed.
+
+### Admin platform recruitment
+
+- active owner/ops admin은 `/admin/team-matches/new`에서 종목·지역·장소·일정을 입력해 팀 없는 모집을 연다.
+- 생성 직후 팀매치는 `recruiting`이며 Game과 팀 일정은 아직 만들지 않는다.
+- 같은 종목의 활성 팀 manager 이상이 공개 상세에서 기존 신청 API로 참가를 요청한다.
+- 관리자는 `/admin/team-matches/:id`의 신청 목록에서 서로 다른 두 신청을 홈·원정으로 선택한다.
+- 확정 시 서버는 팀 상태와 종목을 다시 검증한 뒤 팀매치를 `matched`로 바꾸고 Game의 HOME/AWAY side, 양 팀 일정, 선택 신청 승인, 나머지 신청 거절, 감사 로그를 같은 트랜잭션에서 기록한다.
+- support admin은 생성·확정 UI 대신 권한 안내를 보고, API 직접 호출도 `403`으로 거절된다.
+- 기존 팀 관리자용 모집/신청/승인 시나리오는 그대로 유지된다.
+- 2026-09-19 actual-runtime proof: isolated v1 PostgreSQL/API/Web + headed Chrome에서 관리자 생성 `201`, 공개 목록 same-ID 노출, `송파 풋살 모임` 브라우저 신청 `201 requested`, 관리자 상세 신청 1건 영속 조회를 확인했다. 데스크톱·태블릿·모바일 증거와 JSON verdict는 `docs/screenshots/task149-admin-team-match/real-*`에 있다. 재현 스펙은 공식 Playwright QA 컨테이너 desktop 1/1 통과했다.
 
 ## Legacy stack (`apps/api` / `apps/web`) — Scenario Checklist
 

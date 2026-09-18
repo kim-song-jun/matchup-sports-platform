@@ -377,6 +377,9 @@ export type V1CreateInquiryPayload = {
 };
 
 export type V1Match = {
+  canComplete?: boolean;
+  canWithdraw?: boolean;
+  completedAt?: string | null;
   id: string;
   matchId?: string;
   title: string;
@@ -402,6 +405,8 @@ export type V1Match = {
   displayState?: string;
   approvalRequired?: boolean;
   paymentRequired?: boolean;
+  /** 팀이 아닌 플랫폼 운영자가 개설해 두 팀의 신청을 받는 모집인지 여부. */
+  platformManaged?: boolean;
   viewerState?: V1ViewerState;
   viewer?: {
     state: V1ViewerState;
@@ -513,6 +518,10 @@ export type V1MatchMutationResult = {
 
 export type V1MatchApplication = {
   applicationId: string;
+  participantId?: string | null;
+  participantStatus?: 'active' | 'removed' | 'cancelled' | 'no_show' | 'completed' | null;
+  canCancelApproval?: boolean;
+  canMarkCancelled?: boolean;
   applicantUserId: string;
   displayName: string;
   profileImageUrl: string | null;
@@ -1113,7 +1122,7 @@ export type V1TeamMatch = V1Match & {
     mannerScore?: number | null;
     wins?: number;
     ownerUserId?: string;
-  };
+  } | null;
   /**
    * 확정된 상대팀. **목록과 상세가 같은 필드를 쓰되 `applicationId` 는 상세에만 있다** —
    * 목록 카드는 "누구와 붙는지" 만 필요하고, 신청서 id 를 얻으려면 목록이 항목마다 승인된
@@ -2600,6 +2609,7 @@ export type V1AdminMatchDetail = V1AdminMatchRow & {
 export type V1AdminTeamRow = {
   teamId: string;
   name: string;
+  sportId: string;
   sportName: string;
   ownerUserId: string;
   ownerName: string | null;
@@ -2633,8 +2643,8 @@ export type V1AdminTeamDetail = V1AdminTeamRow & {
 export type V1AdminTeamMatchRow = {
   teamMatchId: string;
   title: string;
-  hostTeamId: string;
-  hostTeamName: string;
+  hostTeamId: string | null;
+  hostTeamName: string | null;
   /**
    * 이 팀매치를 담고 있는 리그. 단발 팀매치면 null.
    *
@@ -2643,6 +2653,7 @@ export type V1AdminTeamMatchRow = {
    * 이 타입에 선언이 없어 화면이 통째로 버리고 있었다.
    */
   league: { leagueId: string; title: string } | null;
+  tournament?: { tournamentId: string; title: string } | null;
   sportName: string;
   startAt: string;
   status: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'archived';
@@ -2680,6 +2691,44 @@ export type V1AdminTeamMatchDetail = V1AdminTeamMatchRow & {
   costNote: string | null;
   applicationCount: number;
   applications: V1AdminTeamMatchApplicationRow[];
+};
+
+export type V1AdminTeamMatchRecruitmentPayload = {
+  clientCommandId: string;
+  sportId: string;
+  regionId: string;
+  title: string;
+  description?: string | null;
+  startsAt: string;
+  endsAt?: string | null;
+  deadlineAt: string;
+  manualPlaceName: string;
+  addressText?: string | null;
+  costNote?: string | null;
+  rulesText?: string | null;
+};
+
+export type V1AdminTeamMatchRecruitmentResult = {
+  teamMatchId: string;
+  status: 'recruiting';
+  detailRoute: string;
+  replayed: boolean;
+};
+
+export type V1AdminTeamMatchAssignmentPayload = {
+  clientCommandId: string;
+  homeApplicationId: string;
+  awayApplicationId: string;
+};
+
+export type V1AdminTeamMatchAssignmentResult = {
+  teamMatchId: string;
+  gameId: string;
+  status: 'matched';
+  homeTeamId: string;
+  awayTeamId: string;
+  detailRoute: string;
+  replayed: boolean;
 };
 
 export type V1AdminStatusChangeResult = {

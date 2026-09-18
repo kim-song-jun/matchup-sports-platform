@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { trackEvent } from '@/lib/analytics';
 import { normalizeNotificationHref } from '@/lib/notification-route';
+import { ChatSafetyDialog, type ChatSafetyTarget } from './chat-safety-dialog';
 import { useV1ChatRoomSocket } from '@/hooks/use-v1-realtime-socket';
 import {
   useV1ChatMessages,
@@ -132,6 +133,7 @@ function useChatListPageModel(): ChatListViewModel {
 }
 
 export function ChatRoomPageClient({ roomId }: { roomId: string }) {
+  const [safety, setSafety] = useState<ChatSafetyTarget | 'manage' | null>(null);
   // 실시간 수신. 이 훅은 만들어져 있었지만 **어디에도 마운트되지 않아** 열어 둔 채팅방에
   // 새 메시지가 실시간으로 들어오지 않았다 -- 30초 stale 이 지난 뒤 창 포커스가 바뀔 때만
   // 갱신됐다. 형제 훅(useV1NotificationSocket)은 notification-socket-bridge 로 마운트돼
@@ -167,6 +169,8 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
   // 노출되면 알림으로 들어온 실제 채팅방 대신 엉뚱한 채팅방이 보이는 것처럼 보인다.
   const messageItems = messages.data ? items.map(toChatMessageModel) : isLoading ? fallback.messages : [];
   const model: ChatRoomViewModel = {
+    onMessageSafety: setSafety,
+    onManageBlocked: () => setSafety('manage'),
     title: room.data?.title ?? (isLoading ? fallback.title : '채팅'),
     context: room.data
       ? {
@@ -212,7 +216,7 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
       : undefined,
   };
 
-  return <ChatRoomPageView model={model} listModel={listModel} roomId={roomId} />;
+  return <><ChatRoomPageView model={model} listModel={listModel} roomId={roomId} />{safety ? <ChatSafetyDialog roomId={roomId} target={safety === 'manage' ? null : safety} onClose={() => setSafety(null)} /> : null}</>;
 }
 
 export function NotificationsPageClient() {

@@ -44,7 +44,8 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
     // 목업(team-matches.view-model.ts)을 사실 값의 폴백으로 쓰지 않는다 — 폴백이 걸리면
     // 실제 매치에 **존재하지 않는 팀 이름**('FC 발빠른놈들')과 남의 경기장·지역이 붙었다.
     sport: match.sport?.name ?? match.sportName ?? '',
-    hostTeam: match.hostTeam?.name ?? match.hostTeamName ?? '',
+    hostTeam: match.hostTeam?.name ?? match.hostTeamName ?? (match.platformManaged ? 'Teameet 운영' : ''),
+    platformManaged: match.platformManaged ?? false,
     venue: match.place?.name ?? match.placeName ?? '',
     region: match.region?.name ?? match.regionName ?? '지역 미정',
     date: formatDate(match.startsAt),
@@ -193,5 +194,4 @@ export function parseCosts(value: string | null | undefined) {
     opponentCost: amounts[1] ?? null,
   };
 }
-
 

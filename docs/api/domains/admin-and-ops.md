@@ -38,6 +38,8 @@
 | `POST` | `/api/v1/admin/teams/:teamId/status` | `ChangeTeamStatusDto` | owner/ops | 팀 상태 변경 |
 | `GET` | `/api/v1/admin/team-matches` | `AdminTeamMatchListQueryDto` | active admin | 팀 매치 목록 |
 | `GET` | `/api/v1/admin/team-matches/:teamMatchId` | — | active admin | 팀 매치 상세 — 상대팀 신청(최근 50건)·확정 상대팀·소속 리그·경기 조건 포함. 라이브 경기 상태는 현장 콘솔 소관이라 `hasGame` 여부만 준다 |
+| `POST` | `/api/v1/admin/team-matches` | `CreateAdminTeamMatchRecruitmentDto` | owner/ops | 팀을 지정하지 않은 플랫폼 팀매치 모집 생성 |
+| `POST` | `/api/v1/admin/team-matches/:teamMatchId/assign` | `AssignAdminTeamMatchApplicationsDto` | owner/ops | 신청 목록에서 홈·원정 두 팀을 선택해 경기 확정 |
 | `POST` | `/api/v1/admin/team-matches/:teamMatchId/status` | `ChangeTeamMatchStatusDto` | owner/ops | 팀 매치 상태 변경 |
 | `GET` | `/api/v1/admin/popups` | `AdminPopupListQueryDto` | active admin | 팝업 목록 |
 | `GET` | `/api/v1/admin/popups/:popupId` | - | active admin | 팝업 상세 |
@@ -171,6 +173,8 @@ type AdminListSummary = {
 ## 상태 변경 DTO
 
 - 매치 `ChangeMatchStatusDto`: `status=recruiting|closed|cancelled|completed|archived`, `reason` 필수(max 500).
+- 개인 매치를 `completed`로 바꾸면 일반 호스트 완료 API와 같은 트랜잭션 계약으로 현재 `active`
+  참가자도 `completed` 처리한다. 완료된 매치는 `archived` 외의 비종료 상태로 되돌릴 수 없다.
 - 팀 `ChangeTeamStatusDto`: `status=active|suspended|archived`, `reason` 필수(max 500).
 - 팀 매치 `ChangeTeamMatchStatusDto`: `status=recruiting|closed|matched|cancelled|completed|archived`, `reason` 필수(max 500).
 - 성공 시 대상 ID, 이전/신규 상태, action/status-change log ID를 반환한다.

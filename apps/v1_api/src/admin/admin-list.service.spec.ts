@@ -92,7 +92,7 @@ function makeTeamRow(overrides: Record<string, unknown> = {}) {
     managerCount: 1,
     createdAt: new Date('2026-05-18T00:00:00.000Z'),
     ownerUserId: 'u-1',
-    sport: { name: '러닝' },
+    sport: { id: 'sport-running', name: '러닝' },
     ownerUser: { profile: { nickname: '팀장원' } },
     memberships: [],
     ...overrides,
@@ -575,6 +575,7 @@ describe('AdminService — list/detail endpoints', () => {
       expect(result.items[0]).toMatchObject({
         teamId: 't-1',
         name: '강남 러닝 크루',
+        sportId: 'sport-running',
         sportName: '러닝',
         ownerUserId: 'u-1',
         ownerName: '팀장원',

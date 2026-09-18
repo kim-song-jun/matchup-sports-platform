@@ -1,108 +1,50 @@
-# Domain Contract — Chat
+# V1 chat contract
 
-## Domain Overview
+Source: `apps/v1_api/src/chat/{chat.controller,chat.service}.ts`, `dto/chat.dto.ts`,
+`apps/v1_web/src/hooks/{use-v1-api,use-chat-safety,use-v1-realtime-socket}.ts`.
+All paths below are prefixed with `/api/v1`; responses use `{ status, data, timestamp }`.
+V1 session authentication and current room entitlement are required. Development header auth is local-only.
 
-- JWT required 도메인
-- REST + WebSocket 병행
-- soft delete, unread 집계, room access 권한 검증 포함
+| Method | Path | Contract |
+| --- | --- | --- |
+| GET | `/chat/rooms` | `roomType`, `status`, `cursor`, `limit` (1–50); `{ items, pageInfo: { nextCursor, hasNext } }` |
+| POST | `/chat/rooms/resolve` | `{ targetType: match \| team \| team_match \| team_contact, targetId }`; checks domain membership |
+| GET | `/chat/rooms/:roomId` | room, linked target, current participant and context |
+| GET | `/chat/rooms/:roomId/messages` | `cursor`, `limit` (1–100), `direction: before \| after`; cursor page, only messages since entry |
+| POST | `/chat/rooms/:roomId/messages` | `{ content }`, nonblank, max 2,000; text only; active room, accepted team contact if applicable |
+| PATCH | `/chat/rooms/:roomId/me` | optional `pinned`, `lastReadMessageId`, `mutedUntil` |
+| POST | `/chat/rooms/:roomId/leave` | optional `reason`, max 500 |
+| POST | `/chat/rooms/:roomId/messages/:messageId/report` | `{ reason, detail? }`; returns `{ inquiryId }` |
+| POST | `/chat/rooms/:roomId/messages/:messageId/block` | empty body; returns `{ blocked: true }` |
+| GET | `/chat/blocked-users` | own blocks only; `{ items: [{ userId, displayName }] }` |
+| DELETE | `/chat/blocked-users/:userId` | removes caller's block only; idempotent `{ blocked: false }` |
 
-## Endpoint Matrix
+## Reporting and blocking
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| GET | `/chat/rooms` | JWT | 채팅방 목록 |
-| POST | `/chat/rooms` | JWT | 채팅방 생성 |
-| GET | `/chat/rooms/:id` | JWT | 채팅방 상세 |
-| GET | `/chat/rooms/:id/messages` | JWT | 메시지 목록 |
-| POST | `/chat/rooms/:id/messages` | JWT | 메시지 전송 |
-| DELETE | `/chat/rooms/:roomId/messages/:messageId` | JWT | 메시지 soft delete |
-| PATCH | `/chat/rooms/:id/read` | JWT | 읽음 처리 |
-| GET | `/chat/unread-count` | JWT | unread 총합 |
+- Report reasons: `spam`, `harassment`, `impersonation`, `inappropriate`, `other`; detail max 500.
+- Both actions require current room entitlement, an active participant, an entered room, and a visible,
+  sent text message from another user. Cross-room/invisible messages return 404; self-targets 400;
+  nonparticipants 403; unauthenticated requests 401. Unknown DTO properties are rejected.
+- Reports persist the server-owned message snapshot and actor/target/reason in `V1Inquiry` (`category=report`,
+  `relatedType=user`). The existing operator inbox and transactional outbox receive the report; no external
+  Slack request is made directly by the route. Report submission is not deduplicated; the route uses the same production 5/minute throttle as inquiry creation.
+- `V1ChatUserBlock` is persistent, bilateral **within chat**, across all rooms. It filters REST history,
+  last-message previews, unread totals and per-message reader counts, future message recipients, realtime content, notification creation,
+  and push delivery. Other group members retain access. This does not remove shared team membership,
+  erase evidence, or recall previously delivered OS notifications.
+- Blocks do not prevent sending to other group members. Removing one's own block does not remove a block
+  independently created by the other user. Message history may become visible again after unblocking.
+- `chat:safety-changed` carries no message content. Clients cancel/reset chat caches, and refresh their
+  own block list. A socket error after persistence is logged, not misreported as a failed database write.
+- User final deletion removes both outgoing and incoming chat block identifiers.
+- Deploy `20260919090000_chat_user_blocks` before the API. Old app shells load the updated web UI;
+  no Android binary permission change is required.
 
-## Request / Response Details
+## Verification
 
-### GET `/chat/rooms`
+`test/chat/chat-safety.integration-spec.ts` uses actual HTTP, DTO guards and PostgreSQL, with isolated
+fictional users. It verifies reporting, membership/self guards, bilateral history/preview/unread filtering,
+notification/realtime recipient exclusion, other-member delivery and owner-only unblock.
 
-- Query: `before`, `limit`
-- `data` shape: `{ data, nextCursor, hasMore }`
-
-### GET `/chat/rooms/:id/messages`
-
-- Query: `before`, `limit`
-- `data` shape: `{ data, nextCursor, hasMore }`
-- 삭제 메시지는 `content="삭제된 메시지입니다"`, `imageUrl=null`로 마스킹
-
-### POST `/chat/rooms`
-
-Body(`CreateRoomDto`) 핵심:
-
-- `type` 필수 (`team_match`, `direct`, `team`)
-- `type=team_match`: `teamMatchId` 필요, `participantIds` 무시될 수 있음
-- 그 외 type: `participantIds` 필요
-
-동작:
-
-- `team_match`는 get-or-create(idempotent) 경로
-
-### POST `/chat/rooms/:id/messages`
-
-Body(`PostMessageDto`):
-
-```json
-{
-  "content": "안녕하세요",
-  "imageUrl": "https://..."
-}
-```
-
-- `content`와 `imageUrl` 둘 다 비어있으면 400
-- 차단 관계가 있으면 403(`CHAT_BLOCKED`)
-
-### PATCH `/chat/rooms/:id/read`
-
-Body:
-
-```json
-{
-  "messageId": "chat-message-id"
-}
-```
-
-- participant가 아니면 403
-- message가 room에 속하지 않으면 404
-
-## Frontend Mapping Notes
-
-- `useChatRooms`는 `{ data, nextCursor, hasMore }`와 배열 응답 둘 다 방어적으로 처리
-- `useChatMessages`는 cursor page object(`{ data, nextCursor, hasMore }`)를 그대로 파싱한다.
-- `useCreateChatRoom`는 `CreateRoomDto`와 동일하게 `type`, `teamMatchId`, `participantIds`만 전달한다.
-- `useMarkChatRead`는 최신 메시지 id를 기준으로 `PATCH /chat/rooms/:id/read`를 호출한다.
-- WS 수신(`chat:message`)과 REST 재조회를 동시에 aggressive하게 하면 중복 렌더 가능성이 있으므로 invalidate 전략을 명확히 분리한다.
-
-## Edge Cases
-
-- room participant가 아니면 대부분 403(`CHAT_FORBIDDEN`)
-- 메시지 삭제는 idempotent(no-op) 처리
-- unread count는 단일 raw query 기반 집계로 계산
-
-## Error Example
-
-```json
-{
-  "status": "error",
-  "statusCode": 403,
-  "message": {
-    "code": "CHAT_FORBIDDEN",
-    "message": "채팅방 접근 권한이 없습니다."
-  },
-  "timestamp": "2026-04-11T12:00:00.000Z"
-}
-```
-
-## Source References
-
-- `apps/api/src/chat/chat.controller.ts`
-- `apps/api/src/chat/chat.service.ts`
-- `apps/api/src/chat/dto/*.ts`
-- `apps/web/src/hooks/use-api.ts` (`useChatRooms`, `useChatMessages`, `useCreateChatRoom`, `useSendMessage`, `useMarkChatRead`, `useChatUnreadTotal`)
-- `apps/web/src/hooks/use-realtime.ts`
+The web dialog shows API errors and exposes report receipts, explicit block confirmation and an unblock
+list. Browser evidence is under `output/playwright/visual-audit/android-play-readiness/`.

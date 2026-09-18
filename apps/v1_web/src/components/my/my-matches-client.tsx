@@ -1,22 +1,26 @@
 'use client';
 
-import { useV1MyMatches } from '@/hooks/use-v1-api';
+import { useV1MyMatchesInfinite } from '@/hooks/use-v1-api';
 import type { V1Match } from '@/types/api';
 import { MyMatchesPageView } from './my-page';
 import type { MyMatch, MyMatchesViewModel, MyMatchStatus } from './my.types';
 
 export function MyMatchesPageClient({ mode }: { mode: 'joined' | 'created' }) {
-  const query = useV1MyMatches({ mode, limit: 50 });
+  const query = useV1MyMatchesInfinite(mode);
   // Only show real data. Mock fallback matches must never appear in place of real data.
-  const matches = query.data ? query.data.items.map(toMyMatch) : [];
+  const matches = query.data ? query.data.pages.flatMap((page) => page.items).filter((item, index, items) => items.findIndex((other) => (other.matchId ?? other.id) === (item.matchId ?? item.id)) === index).map(toMyMatch) : [];
 
   const model: MyMatchesViewModel = {
     mode,
     matches,
     summary: buildSummary(mode, matches),
     loading: query.isLoading,
-    error: query.isError,
+    error: query.isError && !query.data,
     onRetry: () => void query.refetch(),
+    hasNext: query.hasNextPage,
+    loadMorePending: query.isFetchingNextPage,
+    loadMoreError: query.isFetchNextPageError,
+    onLoadMore: () => { if (!query.isFetching) void query.fetchNextPage(); },
   };
 
   return <MyMatchesPageView model={model} />;

@@ -692,3 +692,47 @@ report, upgrade preservation, and the remaining OEM/foldable/multi-window matrix
 - 소유 Next/API 프로세스와 dependency symlink, ADB tcp:9223 포워드를 정리했다. 최신 APK 및 사용자 로그인은 유지하고, 기존 DB/다른 세션 프로세스는 변경하지 않았다.
 
 - 사용자 명시 승인 후 작업 브랜치 push 및 dev 대상 PR [#1226](https://github.com/kim-song-jun/matchup-sports-platform/pull/1226) 생성 완료. base=`dev` 확인. CI/리뷰 및 Alpha 배포 후 검증은 별도 완료 조건이며 현재 미머지다.
+
+## Play readiness implementation — 2026-09-19
+
+Base: `82698757d` (`origin/dev`); isolated worktree `/tmp/teameet-android-play-readiness`.
+Owner: main session only. Scope: v1 API/Web/Android listing, migrations, contracts and screenshot evidence.
+Forbidden: unrelated WIP, production data, dev→main promotion, Play Console submission.
+
+- [x] Phase 1: enforce age 14+ for email/social signup in API and UI; publish immutable privacy v1.3 matching logout behavior; remove unsupported listing claims.
+- [x] Phase 2: authenticated chat message reporting into operator inquiries; persistent chat user blocking/unblocking, message/preview/realtime/push filtering; API docs and meaningful tests.
+- [x] Phase 3: narrow validation, responsive before/after captures and review; record exact build/runtime/persona and remaining device/Console gates.
+
+Acceptance: no self/nonparticipant reporting/blocking; blocked pairs cannot see each other's chat content or receive future message notifications; errors remain visible; normal users can undo blocks. Age boundary is enforced server-side for both signup paths. Legal document history is immutable.
+
+Ambiguity: user is awaiting D-U-N-S for organization registration; Play-signed screenshots and Console verification cannot be represented as completed. Physical upload-object retention needs an audited ownership/retention policy; do not delete shared team/event files by guessing ownership. Public deletion route and privacy deployment are user-controlled production-release gates.
+
+
+### Progress snapshot
+
+- Implemented email/social age boundary, chat message report→inquiry/outbox, bilateral block filters and owner-only unblock, final account-deletion block-record cleanup, additive privacy v1.3 and corrected listing claims.
+- Validation: targeted backend unit 75 passed (two existing strict query-shape expectations updated for the new filter); frontend 24 passed; HTTP+PostgreSQL integration 4 passed; fresh database migration chain 170 applied; API/Web typechecks and Android source policy gate passed. Final integration rerun additionally checks safety refresh for both users after unblock.
+- Headed browser evidence: 24 before/after screenshots, 3/3 viewports, real isolated API/database with fictional users. Canonical gallery and explicit pre-existing console/403 findings: `docs/scenarios/android-play-readiness.md`.
+- Local source work only; no commit/PR/deployment/Play submission claimed. Remaining gates: D-U-N-S and organization verification; user-controlled dev→main promotion and public deletion/privacy/assetlinks probes; signed AAB and native device/FCM/pre-launch validation; final Data safety and physical upload retention/removal audit.
+
+- Cleanup: owned headed browser contexts, local Web/API processes and PostgreSQL cluster stopped. Final diff whitespace check passed; touched source has no new debt markers. New modules/tests/migrations/screenshots remain untracked until a deliberate scoped commit.
+
+
+### PR preflight review — 2026-09-19
+
+Reviewed 8/8 areas: signup age; chat access/blocking; report processing; final account deletion; privacy/migrations; Android policy/listing; responsive UI/accessibility; release/PR configuration.
+
+- Synced current dev `6f149855c`; preserved new personal-match chat entitlement rules in the merge.
+- Fixed block-related per-message unread counts and the final-deletion fixture drift (5 RED tests → all 14 admin tests GREEN). Added the existing production inquiry throttle (5/minute) to chat reports.
+- Revalidated 89 backend unit + 24 frontend unit + 4 actual PostgreSQL/HTTP integration cases. Two-sided safety refresh and cache eviction remain covered. Android permission/SDK/source policy gate passed.
+- Existing 24 captures reviewed; no new layout changes in this review. Known render-time shell warnings and pending-signup settings 403 remain explicitly recorded, not masked.
+- Submission remains separate: public UGC outside chat (profiles/reviews/team content) needs a service-wide report/block coverage audit; chat-only blocking does not certify all public UGC surfaces. Reference: https://support.google.com/googleplay/android-developer/answer/9876937
+- Remaining production/Console/native/storage gates stay open. This PR does not claim Play acceptance or a signed native-device test.
+
+- PR #1225 CI uncovered setup-android v3 default `tools platform-tools` failing because `tools` is no longer available. Alpha and production bundle now explicitly install `platform-tools`; their existing API 36/build-tools installation stays intact. Source: https://github.com/android-actions/setup-android/blob/v3/action.yml.
+
+- Full API CI: 709 integration cases passed; one schema snapshot guard failed because Task 156 added V1ChatUserBlock. Re-pinned the normalized full-schema digest with an explicit additive-change rationale; the game-domain schema and bound migration digest are unchanged.
+
+- CI follow-up: schema guard integration 9/9 passed locally after re-pin. Exact v1.3 INSERT and read-only conflict guard statements registered in the existing expand-contract review list; negative controls, base-resolution self-tests and PR diff gate passed. Android Alpha and Web CI passed on d3506c04c. Copilot request unavailable: latest CLI returned reviewer not found; no review request or completed review exists, so automated-review clean is not claimed.
+
+- PR 생성 후 최신 dev `e4caade04` 동기화를 준비했다. Task 156의 동시 추가 문단만 충돌하여 두 작업 기록을 모두 보존했다. Copilot CLI는 reviewer not found로 요청 실패했다. 기존 캡처는 감사 기준 SHA의 증거이며 이후 dev 신규 기능의 재검증을 뜻하지 않는다.

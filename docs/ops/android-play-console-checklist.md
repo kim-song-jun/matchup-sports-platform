@@ -164,3 +164,28 @@ Additional official compatibility references:
 - [16 KB page-size support](https://developer.android.com/guide/practices/page-sizes)
 - [Notification runtime permission](https://developer.android.com/develop/ui/views/notifications/notification-permission)
 - [Permissions and sensitive APIs declaration](https://support.google.com/googleplay/android-developer/answer/9214102)
+
+## 2026-09-19 readiness audit and account update
+
+The operator reports waiting for a D-U-N-S number for organization onboarding. Personal-account closed-test
+requirements must not be treated as a confirmed dependency; confirm final account type after verification.
+The account owner controls the production promotion and Console actions.
+
+- Public production `/account-deletion` and `/.well-known/assetlinks.json`: 404 at audit time.
+- Public production privacy payload: v1.1, although Android v1.2 exists on dev. This follow-up adds v1.3
+  to accurately describe sign-out token retention and chat reporting/blocking. Verify the **returned legal
+  document version**, not only HTTP 200, after deployment.
+- Public production `/lessons` and `/venues`: 404; remove these unsupported features from Play copy.
+- Alpha build run 34565292770 succeeded and retained an APK. Production Bundle is absent from the registered
+  workflow list and main; there is no verified Play-signed artifact in this audit.
+- Development/browser screenshots are QA evidence only. Recapture the final accepted UI from a signed
+  production/release-equivalent device build before placing screenshots into `play/listing/`.
+- No Play Console declaration, Firebase/signing secret value, actual FCM device delivery or uploaded-object
+  deletion completion is inferred from source tests.
+
+### Re-review scope caveat
+
+This change closes the ordinary-chat reporting/blocking gap. Public profiles, reviews and team content
+still require an explicit service-wide report/block coverage audit before declaring all UGC compliant.
+See [Google Play UGC policy](https://support.google.com/googleplay/android-developer/answer/9876937).
+The 8-area PR preflight and remaining evidence are recorded in task 156; Console checks are not code-test results.

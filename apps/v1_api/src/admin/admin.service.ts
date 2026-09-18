@@ -1,3 +1,4 @@
+import { completePersonalMatch } from '../matches/complete-personal-match';
 import {
   BadRequestException,
   ConflictException,
@@ -418,6 +419,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       // 않다. 둘 다 재식별 가능한 기기 식별자이므로 계정 삭제 트랜잭션 안에서 제거한다.
       await tx.v1PushSubscription.deleteMany({ where: { userId } });
       await tx.v1PushDevice.deleteMany({ where: { userId } });
+      await tx.v1ChatUserBlock.deleteMany({ where: { OR: [{ blockerUserId: userId }, { blockedUserId: userId }] } });
       await tx.v1UserRegion.deleteMany({ where: { userId } });
       await tx.v1UserSportPreference.deleteMany({ where: { userId } });
       await tx.v1SearchHistory.deleteMany({ where: { userId } });
@@ -472,7 +474,13 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${matchId} FOR UPDATE`;
       const target = await tx.v1Match.findUnique({ where: { id: matchId } });
       if (!target) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Match was not found' });
-      const updated = await tx.v1Match.update({ where: { id: matchId }, data: { status: dto.status } });
+      if (target.status === 'completed' && dto.status !== 'completed' && dto.status !== 'archived') {
+        throw new ConflictException({ code: 'STATE_CONFLICT', message: '참여가 확정된 매치는 다시 모집하거나 취소할 수 없어요.' });
+      }
+      if (dto.status === 'completed') await completePersonalMatch(tx, target);
+      const updated = dto.status === 'completed'
+        ? { ...target, status: 'completed' as const }
+        : await tx.v1Match.update({ where: { id: matchId }, data: { status: dto.status } });
       return this.writeAdminStatusLogs(
         admin,
         {
@@ -1310,7 +1318,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         managerCount: true,
         createdAt: true,
         ownerUserId: true,
-        sport: { select: { name: true } },
+        sport: { select: { id: true, name: true } },
         ownerUser: { select: { profile: { select: { nickname: true } } } },
       },
     }), this.prisma.v1Team.groupBy({
@@ -1331,6 +1339,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       items: pageItems.map((row) => ({
         teamId: row.id,
         name: row.name,
+        sportId: row.sport.id,
         sportName: row.sport.name,
         ownerUserId: row.ownerUserId,
         ownerName: row.ownerUser.profile?.nickname ?? null,

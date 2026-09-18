@@ -100,7 +100,7 @@
 - [ ] [02-home-and-discovery.md](./02-home-and-discovery.md)
 - [x] [03-match-flows.md](./03-match-flows.md) - `MATCH-001/002/003` verified, restart-persistence follow-up remains
 - [x] [04-team-and-membership.md](./04-team-and-membership.md) - Legacy stack (`apps/api`/`apps/web`): `TEAM-001-A~D`, `TEAM-002-A~C`, `TEAM-004-A`, `TEAM-005-A/B` verified. **v1 stack (Task 26, 2026-08-04)**: `TeamsController` route table documented; `e2e/v1-tests/team-join.spec.ts` + `team-management.spec.ts` cover list/detail/owner-menu render only, deeper apply/role-change round trip unverified
-- [ ] [05-team-match-flows.md](./05-team-match-flows.md) - Legacy stack: partial, `TM-004` operational spec exists, stale `submitResult` contract issue is cleared, but host Next dev still returns intermittent `/team-matches` `ERR_CONNECTION_RESET` / generic `Internal Server Error`. **v1 stack (Task 26, 2026-08-04)**: route table + Game result-revision result flow documented; owns `E2E-TEAM-01`/`E2E-TEAM-02` (unimplemented in `e2e/v1-tests/team-match.spec.ts` as of this revision)
+- [ ] [05-team-match-flows.md](./05-team-match-flows.md) - Legacy stack remains partial. **v1 stack:** `E2E-TEAM-01`/`E2E-TEAM-02` remain pending; Task 149's `E2E-TEAM-03` platform recruitment -> public same-ID listing -> real manager application -> admin persisted receipt is verified in isolated API/DB and headed 3-viewport Chrome evidence.
 - [ ] [06-mercenary-flows.md](./06-mercenary-flows.md) - not implemented in active v1: prior checked lifecycle evidence belonged to legacy `apps/api` + `apps/web`; v1 DB/API/list-create-detail flow is gated by the new-page A/B/C decision
 - [ ] [07-chat-and-notifications.md](./07-chat-and-notifications.md) - partial: `NOTI-001` verified, chat realtime/unread scenarios pending
 - [ ] [08-marketplace-and-lessons.md](./08-marketplace-and-lessons.md) - partial: `MKT-003` / `LES-003` verified, lesson user-side purchase/ownership is implemented via Task 42, but live smoke is blocked by current dev runtime and host-side reflection remains follow-up
@@ -144,6 +144,20 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 
 ## Recommended Execution Order
 
+### 개인 매치 호스트 처리 보완 — 2026-09-19
+
+V1-03-007 승인 취소 / V1-03-008 불참 처리 2/2 구현·검증.
+확정 명단의 기존 참가자 메뉴에서 필수 사유와 확인 모달을 사용한다.
+실DB 통합 9/9, 화면 단위 8/8, headed 390/768/1440px 캡처 14장과 동작 8/8 통과.
+콘솔 error/pageerror/requestfailed/API HTTP 오류 각각 0건.
+범위·대표 스크린샷·남은 분석 항목은 [Task 130](../../.github/tasks/130-v1-match-create-edit-contract-audit.md#progress-snapshot--host-actions).
+이 결과는 개인 매치 전체 기능의 전수 완료 판정이 아니다.
+
+후속 최종 코드/계약 점검은 Task 130의 17개 항목을 확인했다. 모집 재개의 취소/완료 덮어쓰기와
+수정 저장의 버전·정원 경합을 수정했고 서비스 34/34, 실제 DB 13/13 + 추가 편집 제한 1/1 통과.
+검증 수준(코드/단위/DB/기존 브라우저/alpha 미검증)을 구분한 표를 Task 130에 유지한다.
+dev 머지와 alpha 최종 검증은 필수 리뷰 게이트 미충족으로 아직 완료하지 않았다.
+
 1. 인증 / 세션 / 권한
 2. 개인 매치
 3. 팀 / 팀 권한
@@ -177,7 +191,7 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 | `02-home-and-discovery.md` | `e2e/tests/home.spec.ts`, `e2e/tests/match-discovery.spec.ts` | Home smoke passed (`Desktop Chrome`, `Mobile Chrome`), discovery deep-link/url persistence `Desktop Chrome 3/3`, `HOME-002` pending |
 | `03-match-flows.md` | `e2e/tests/match-join-flow.spec.ts` | Verified: `MATCH-001/002/003` covered (`Desktop Chrome 13/13`, `Mobile Chrome deep 2/2`) with restart-persistence follow-up |
 | `04-team-and-membership.md` | `e2e/tests/team-owner-flow.spec.ts`, `e2e/tests/team-manager-membership.spec.ts` | TDD pack verified: `TEAM-001-A~D`, `TEAM-002-A~C`, `TEAM-004-A`, `TEAM-005-A/B` passed. `TEAM-003` and `TEAM-004-B/TEAM-005-C` are planned. `TM-SMOKE-001` skip lives in the same spec file but belongs to `05-team-match-flows.md`. |
-| `05-team-match-flows.md` | `e2e/tests/team-owner-flow.spec.ts`, `e2e/tests/team-match-operations.spec.ts` | Partial: step-0 smoke exists and `TM-004` operational spec now passes live API `health`/`dev-login`, but host Next dev still returns intermittent `/team-matches` `ERR_CONNECTION_RESET` / generic `Internal Server Error`, so full Desktop Chrome green is pending |
+| `05-team-match-flows.md` | `e2e/tests/team-owner-flow.spec.ts`, `e2e/tests/team-match-operations.spec.ts`, `e2e/v1-tests/admin-platform-team-match-flow.spec.ts` | Partial overall: legacy and `E2E-TEAM-01/02` remain pending; v1 platform recruitment public listing/application/admin receipt is verified against isolated PostgreSQL/API/Web, Playwright desktop 1/1, and headed Chrome at 1440×900/834×1112/390×844. |
 | `06-mercenary-flows.md` | `e2e/tests/mercenary-flow.spec.ts` | Partial: create -> detail redirect, unauthenticated apply redirect, apply -> host accept -> applicant status flow verified in targeted automation, but explicit reload/API-restart persistence and local Next `webServer` cold-boot instability (`.next/routes-manifest.json` / `app-paths-manifest.json` ENOENT) remain |
 | `07-chat-and-notifications.md` | `e2e/tests/chat-realtime.spec.ts`, `e2e/tests/notification-center.spec.ts` | Partial: chat room smoke verified, notification center `Desktop Chrome 3/3` verified (`match_created`, `player_joined`, `payment_confirmed`) |
 | `08-marketplace-and-lessons.md` | `e2e/tests/marketplace-flow.spec.ts` | Partial: marketplace browse smoke exists, `MKT-003` / `LES-003` visual fallback verified, lesson user-side purchase/ownership contract is implemented in Task 42, but live browser smoke is blocked by current dev runtime and host-side reflection remains follow-up |
@@ -233,6 +247,7 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 
 | Date | Scenario | Result | Summary | Follow-up |
 |------|----------|--------|---------|-----------|
+| 2026-09-19 | Personal match participation lifecycle | Passed | 호스트 완료·채팅, 승인 참가자의 시작 전 철회, 완료 후 후기 진입, 확정 명단/전체 이력, 내 매치 cursor pagination을 실DB와 headed Chromium 390/768/1440에서 검증했다. API unit 52/52, Web focused 53/53, integration 5/5, 21 screenshots, 7 actions, console/network 오류 0건이다. | PR에서 `docs/screenshots/personal-match-participation/` 대표 이미지와 Task 130 계약을 검토 |
 | 2026-04-07 | Initial | Drafted | 시나리오 문서 구조 생성 완료 | 실제 실행 후 업데이트 |
 | 2026-04-07 | Auth + Home + Match + Team + Chat | Failed | 96 tests run, 3 passed, 93 failed. Main blockers were API container health failure, host Prisma DB access mismatch, and Playwright worker dependency instability. | `docs/plans/2026-04-07-qa-remediation-plan.md` 기준으로 runtime → harness → suite rerun 순서로 수정 |
 | 2026-04-07 | Auth / Home / Match / Team / Chat | Failed | Playwright 데스크톱 스모크 실행 48건 중 11건 통과, 37건 실패. 핵심 장애는 API 컨테이너 비정상, DB 포트 드리프트, Playwright 의존성 해상 실패, 일부 brittle selector. | `docs/plans/2026-04-07-agent-all-qa-remediation-plan.md` 기준으로 정리 및 수정 |
@@ -407,3 +422,8 @@ Todo 26 of `.omo/plans/teameet-team-tournament-operations-v1.md` requires this i
 | Kakao OAuth /callback/kakao 경로 동작 | 실 OAuth 앱 redirect_uri 수정 필요 (운영자) |
 | notification href DB migration | 기존 DB의 /v1/* route는 runtime migrateV1NotificationHref로 자동 처리됨 |
 | 세션 1 (backend security) · 세션 2 (campaign/tournament) 커밋 | 아직 미커밋 working tree 상태 |
+
+## Android Play readiness — 2026-09-19
+
+Task 156 continuation: [scenario](./android-play-readiness.md). Organization D-U-N-S pending.
+Implementation and isolated API/browser evidence tracked in Task 156; production and Play/device gates remain separate.

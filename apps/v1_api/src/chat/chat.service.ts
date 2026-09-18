@@ -1,3 +1,4 @@
+import { INQUIRY_SLACK_NOTIFICATION_TYPE } from '../inquiries/inquiry-slack-notifier';
 import {
   BadRequestException,
   ConflictException,
@@ -14,6 +15,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { currentChatEntitlementWhere, currentChatRecipientEntitlementWhere } from './chat-entitlement';
 import { archiveEndedContactRooms } from '../team-contacts/contact-room-archive';
 import {
+  ReportChatMessageDto,
   ChatMessagesQueryDto,
   ChatRoomsQueryDto,
   LeaveChatRoomDto,
@@ -56,6 +58,69 @@ export class ChatService {
     private readonly webPushService: WebPushService,
     @InjectPinoLogger(ChatService.name) private readonly logger: PinoLogger,
   ) {}
+
+  private emitSafetyChanged(userId: string) {
+    try { this.realtimeGateway.emitToUser(userId, 'chat:safety-changed', {}); }
+    catch (err) { this.logger.warn({ err }, '차단 설정은 저장됐지만 실시간 갱신을 전달하지 못했습니다'); }
+  }
+
+  async blockedUsers(user: V1AuthUser) {
+    const rows = await this.prisma.v1ChatUserBlock.findMany({
+      where: { blockerUserId: user.id },
+      orderBy: { createdAt: 'desc' },
+      include: { blocked: { select: { profile: { select: { nickname: true, displayName: true } } } } },
+    });
+    return { items: rows.map((row) => ({ userId: row.blockedUserId, displayName: row.blocked.profile?.nickname ?? row.blocked.profile?.displayName ?? '사용자' })) };
+  }
+
+  async unblockUser(user: V1AuthUser, blockedUserId: string) {
+    const removed = await this.prisma.v1ChatUserBlock.deleteMany({ where: { blockerUserId: user.id, blockedUserId } });
+    this.emitSafetyChanged(user.id);
+    if (removed.count > 0) this.emitSafetyChanged(blockedUserId);
+    return { blocked: false };
+  }
+
+  private async safetyMessage(user: V1AuthUser, roomId: string, messageId: string) {
+    const room = await this.getActiveParticipantRoom(user.id, roomId);
+    const visibleFromAt = room.participants[0]?.visibleFromAt;
+    if (!visibleFromAt) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: '먼저 채팅방에 입장해 주세요.' });
+    const message = await this.prisma.v1ChatMessage.findFirst({
+      where: { id: messageId, chatRoomId: roomId, messageType: 'text', status: 'sent', sentAt: { gte: visibleFromAt }, senderUser: chatVisibleUserWhere(user.id) },
+    });
+    if (!message) throw new NotFoundException({ code: 'NOT_FOUND', message: '신고할 메시지를 찾을 수 없어요.' });
+    if (message.senderUserId === user.id) throw new BadRequestException({ code: 'INVALID_TARGET', message: '본인의 메시지는 신고하거나 차단할 수 없어요.' });
+    return message;
+  }
+
+  async blockMessageSender(user: V1AuthUser, roomId: string, messageId: string) {
+    const message = await this.safetyMessage(user, roomId, messageId);
+    await this.prisma.v1ChatUserBlock.upsert({
+      where: { blockerUserId_blockedUserId: { blockerUserId: user.id, blockedUserId: message.senderUserId } },
+      create: { blockerUserId: user.id, blockedUserId: message.senderUserId },
+      update: {},
+    });
+    for (const id of [user.id, message.senderUserId]) this.emitSafetyChanged(id);
+    return { blocked: true };
+  }
+
+  async reportMessage(user: V1AuthUser, roomId: string, messageId: string, dto: ReportChatMessageDto) {
+    const message = await this.safetyMessage(user, roomId, messageId);
+    const inquiry = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.v1Inquiry.create({ data: {
+        userId: user.id, category: 'report', title: '채팅 메시지 신고',
+        // Keep the server-owned message snapshot so later edits cannot rewrite the evidence.
+        body: `채팅방: ${roomId}\n메시지: ${message.id}\n사유: ${dto.reason}\n내용: ${message.body}\n추가 설명: ${dto.detail?.trim() ?? ''}`,
+        relatedType: 'user', relatedId: message.senderUserId, reportReason: dto.reason,
+      } });
+      await tx.v1OutboxEvent.create({ data: {
+        businessKey: `inquiry:${created.id}:slack-created`, aggregateType: 'INQUIRY', aggregateId: created.id,
+        type: INQUIRY_SLACK_NOTIFICATION_TYPE,
+        payload: { inquiryId: created.id, category: created.category, title: created.title, relatedType: created.relatedType, relatedId: created.relatedId, createdAt: created.createdAt.toISOString() },
+      } });
+      return created;
+    });
+    return { inquiryId: inquiry.id };
+  }
 
   async rooms(user: V1AuthUser, query: ChatRoomsQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
@@ -142,7 +207,7 @@ export class ChatService {
     const limit = Math.min(Math.max(query.limit ?? 30, 1), 100);
     const direction = query.direction ?? 'before';
     const messages = await this.prisma.v1ChatMessage.findMany({
-      where: { chatRoomId: roomId, sentAt: { gte: visibleFromAt } },
+      where: { chatRoomId: roomId, sentAt: { gte: visibleFromAt }, senderUser: chatVisibleUserWhere(user.id) },
       include: {
         senderUser: {
           select: {
@@ -161,6 +226,10 @@ export class ChatService {
       where: { chatRoomId: roomId, status: 'active', visibleFromAt: { not: null } },
       include: {
         lastReadMessage: { select: { id: true, sentAt: true } },
+        user: { select: {
+          chatBlocksMade: { select: { blockedUserId: true } },
+          chatBlocksReceived: { select: { blockerUserId: true } },
+        } },
       },
     });
 
@@ -209,6 +278,7 @@ export class ChatService {
           userId: { not: user.id },
           OR: [{ mutedUntil: null }, { mutedUntil: { lte: new Date() } }],
           AND: [currentChatRecipientEntitlementWhere(room)],
+          user: chatVisibleUserWhere(user.id),
         },
         select: { userId: true },
       });
@@ -410,7 +480,7 @@ export class ChatService {
 
   private async assertCanUseMatchChat(userId: string, matchId: string) {
     const participant = await this.prisma.v1MatchParticipant.findFirst({
-      where: { matchId, userId, status: 'active', match: { deletedAt: null } },
+      where: { matchId, userId, status: { in: ['active', 'completed'] }, match: { deletedAt: null } },
       select: { id: true },
     });
     if (!participant) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Match chat requires active participation' });
@@ -586,11 +656,17 @@ export class ChatService {
       userId: string;
       visibleFromAt: Date | null;
       lastReadMessage: { sentAt: Date } | null;
+      user?: {
+        chatBlocksMade: Array<{ blockedUserId: string }>;
+        chatBlocksReceived: Array<{ blockerUserId: string }>;
+      };
     }>,
   ) {
     if (message.messageType !== 'text') return 0;
     return participants.filter((participant) => {
       if (participant.userId === message.senderUserId) return false;
+      if (participant.user?.chatBlocksMade.some((block) => block.blockedUserId === message.senderUserId)
+        || participant.user?.chatBlocksReceived.some((block) => block.blockerUserId === message.senderUserId)) return false;
       if (!participant.visibleFromAt || participant.visibleFromAt > message.sentAt) return false;
       return !participant.lastReadMessage || participant.lastReadMessage.sentAt < message.sentAt;
     }).length;
@@ -629,7 +705,7 @@ export class ChatService {
           user: { select: { id: true, profile: { select: { nickname: true, displayName: true, profileImageUrl: true } } } },
         },
       },
-      messages: { orderBy: { sentAt: 'desc' }, take: 1 },
+      messages: { where: { senderUser: chatVisibleUserWhere(userId) }, orderBy: { sentAt: 'desc' }, take: 1 },
     } satisfies Prisma.V1ChatRoomInclude;
   }
 
@@ -648,6 +724,7 @@ export class ChatService {
         status: 'sent',
         messageType: 'text',
         senderUserId: { not: userId },
+        senderUser: chatVisibleUserWhere(userId),
         ...(visibleFromAt ? { sentAt: { gte: visibleFromAt, ...(lastReadMessage ? { gt: lastReadMessage.sentAt } : {}) } } : { id: '__never__' }),
       },
     });
@@ -781,4 +858,12 @@ function stateConflict(message: string, code = 'STATE_CONFLICT') {
 
 function chatRoomRoute(roomId: string) {
   return `/chat/${roomId}`;
+}
+
+/** A block is bilateral within chat, including list previews and delivery recipients. */
+export function chatVisibleUserWhere(userId: string): Prisma.V1UserWhereInput {
+  return {
+    chatBlocksMade: { none: { blockedUserId: userId } },
+    chatBlocksReceived: { none: { blockerUserId: userId } },
+  };
 }

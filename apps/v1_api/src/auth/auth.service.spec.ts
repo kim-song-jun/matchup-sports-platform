@@ -181,6 +181,13 @@ describe('AuthService', () => {
 
   // ─── register ────────────────────────────────────────────────────────────
 
+  it.each(['20200101', '20990101'])('rejects underage/future birthdays on email and social signup: %s', async (birthDate) => {
+    const input = registerInput({ birthDate });
+    await expect(service.register(input)).rejects.toMatchObject({ response: { code: 'SIGNUP_AGE_RESTRICTED' } });
+    await expect(service.completeSocialProfile('pending-social', input)).rejects.toMatchObject({ response: { code: 'SIGNUP_AGE_RESTRICTED' } });
+    expect(prisma.v1User.findUnique).not.toHaveBeenCalled();
+  });
+
   it('register: requiredTermsAccepted=false → 400 VALIDATION_ERROR (DB에 접근하지 않아야 함)', async () => {
     await expect(
       service.register(registerInput({

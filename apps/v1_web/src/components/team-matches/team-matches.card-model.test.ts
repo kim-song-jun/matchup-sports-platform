@@ -82,6 +82,26 @@ describe('sortTeamMatchesByAvailability', () => {
   });
 });
 
+describe('toTeamMatch — 플랫폼 운영 모집', () => {
+  it('호스트팀이 없는 관리자 모집을 운영 주관 카드로 표시한다', () => {
+    const model = toTeamMatch(
+      {
+        id: 'tm-platform',
+        title: '주말 풋살 팀 모집',
+        status: 'recruiting',
+        displayState: 'recruiting',
+        platformManaged: true,
+        hostTeam: null,
+      } as unknown as V1TeamMatch,
+      base.matches[0],
+    );
+
+    expect(model.hostTeam).toBe('Teameet 운영');
+    expect(model.platformManaged).toBe(true);
+    expect(model.status).toBe('open');
+  });
+});
+
 /**
  * `closed` 는 **보는 사람과 무관하게** API status 만으로 정해진다.
  *

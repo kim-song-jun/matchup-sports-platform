@@ -294,13 +294,13 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
 
   /* Host-team card — rendered in left column (mobile) and right column (desktop).
    * Desktop 우측 컬럼에 이동해 40% 보이드를 채움(T1). 모바일은 기존 위치 유지. */
-  const hostTeamCard = (
-    <Link className="tm-card tm-pressable tm-host-team-card" href={match.hostTeamHref ?? '/teams'} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}>
+  const hostTeamCardContent = (
+    <>
       {/* 팀 로고 아바타 — 원본은 48px였으나 TeamAvatar 표준 사이즈 중 가장 근접한 md(40px)로 통일 */}
       <TeamAvatar seed={match.hostTeamId ?? match.hostTeam} name={match.hostTeam} logoUrl={match.hostTeamLogoUrl} size="md" />
       {/* 팀 정보 */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>홈팀 정보</div>
+        <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>{match.platformManaged ? '운영 주관' : '홈팀 정보'}</div>
         <div className="tm-text-body-lg" style={{ marginTop: 2 }}>{match.hostTeam}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
           <span className="tm-badge tm-badge-blue">{match.sport}</span>
@@ -319,8 +319,16 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
           ) : null}
         </div>
       </div>
-      {/* 팀 보기는 보조 CTA — apply가 단일 primary; 파란 fill 중복 방지(R-K5) */}
-      <span className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flexShrink: 0 }}>팀 보기</span>
+      {!match.platformManaged && <span className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flexShrink: 0 }}>팀 보기</span>}
+    </>
+  );
+  const hostTeamCard = match.platformManaged ? (
+    <div className="tm-card tm-host-team-card" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}>
+      {hostTeamCardContent}
+    </div>
+  ) : (
+    <Link className="tm-card tm-pressable tm-host-team-card" href={match.hostTeamHref ?? '/teams'} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}>
+      {hostTeamCardContent}
     </Link>
   );
 
@@ -379,7 +387,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
               </div>
               <div className="tm-team-vs-row">
                 <div>
-                  <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>홈팀</div>
+                  <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{match.platformManaged ? '운영 주관' : '홈팀'}</div>
                   <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}</div>
                   {/* 매너·승수는 API 가 내려주지만(hostTeam.mannerScore / hostTeam.wins), 공개된
                       팀 후기가 0건이면 매너 점수를 낼 수 없어 null 이 온다 — 모르면 이 줄을 통째로

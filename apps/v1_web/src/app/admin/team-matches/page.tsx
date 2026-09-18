@@ -122,6 +122,16 @@ function AdminTeamMatchesPageContent() {
         eyebrow="플랫폼"
         title="팀매치 관리"
         description="플랫폼 내 모든 팀매치의 상태를 필터링하고 관리해요."
+        action={
+          canWrite ? (
+            <Link
+              href="/admin/team-matches/new"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-blue-500 px-4 text-[length:var(--font-size-body-sm)] font-semibold text-white transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+            >
+              모집 만들기
+            </Link>
+          ) : null
+        }
       />
 
       {/* Filter bar — chip 높이 min-h-[44px] + 페이지 간 리듬 통일 */}
@@ -188,7 +198,7 @@ function AdminTeamMatchesPageContent() {
                   </span>
                 </div>
                 <span className="block truncate text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
-                  {row.league ? `${row.league.title} · ${row.hostTeamName}` : row.hostTeamName}
+                  {row.league ? `${row.league.title} · ${row.hostTeamName ?? '팀 미정'}` : row.hostTeamName ?? '플랫폼 모집'}
                 </span>
               </div>
             ),

@@ -257,8 +257,18 @@ describe('D10 리그 명단 자동 확정', () => {
     expect(await prisma.v1TournamentPlayer.count({ where: { registrationId: registration.id } })).toBe(3);
   });
 
+  /**
+   * #9 (2026-09-19 QA) 이후: 팀원이 대진 생성 시점에 이미 자격을 갖췄으면
+   * `loadLeagueTeamRosters`가 그 자리에서 채운다(D10을 기다리지 않는다). 이 스펙은
+   * "대진이 이미 있는 리그도 D10이 채운다" 를 재현해야 하므로, 대진 생성 시점엔 팀원을
+   * **자격 미달** 상태로 두어 즉시 채움을 건너뛰게 하고, D10이 돌기 전에 자격을 채운다 —
+   * 그래야 대진 생성 당시엔 계정 없는 폴백으로 들어가고, D10이 그걸 실제 계정으로 맞춘다.
+   */
   it('대진이 이미 있는 리그도 채우고, 시작 전 경기 명단을 채운 명단으로 맞춘다 (Task 170 D1′)', async () => {
-    const { league, registration, startsOn, team } = await seedLeague({ members: 2 });
+    const { league, registration, startsOn, team } = await seedLeague({ members: 0, incompleteMembers: 2 });
+    const teamMemberIds = (
+      await prisma.v1TeamMembership.findMany({ where: { teamId: team.id }, select: { userId: true } })
+    ).map((row) => row.userId);
     seq += 1;
     const opponent = await prisma.v1Team.create({
       data: { ownerUserId: adminUserId, sportId, regionId, name: `t164-opp-${suiteId}-${seq}` },
@@ -281,6 +291,18 @@ describe('D10 리그 명단 자동 확정', () => {
         away: teams.get(opponent.id)!,
       });
     });
+    // 대진 생성 뒤(D10 이전)에 팀원이 실명·생년월일·휴대폰 인증을 마쳤다 — 흔한 순서다.
+    for (const userId of teamMemberIds) {
+      seq += 1;
+      await prisma.v1User.update({
+        where: { id: userId },
+        data: {
+          phone: `0109999${String(seq).padStart(4, '0')}`,
+          phoneVerifiedAt: new Date('2026-08-01T00:00:00.000Z'),
+          profile: { update: { realName: `보완선수${seq}`, birthDate: '1995-01-01' } },
+        },
+      });
+    }
 
     await run(league.id, startsOn);
 

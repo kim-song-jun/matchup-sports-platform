@@ -3,6 +3,7 @@ import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.se
 import { createTeamMatchScheduleInTx } from '../team-schedules/team-schedules.service';
 import { scheduleLeagueResultEntryReminder } from '../jobs/league-reminders/league-result-entry-reminder.service';
 import { participantDisplayName } from '../tournaments/participant-display-name';
+import { fillLeagueTeamRoster } from './league-roster-autofill';
 
 /**
  * 리그 대진 **한 경기**를 만드는 단일 경로.
@@ -110,13 +111,26 @@ function fixtureRoster(team: LeagueFixtureTeam, sideKey: V1GameSideKey) {
   return leagueTeamRosterEntries(team).map((entry) => ({ ...entry, sideKey }));
 }
 
-/** 대진 생성·명단 동기화가 읽는 팀 정보 — 활성 멤버십과 이 리그의 참가 명단. */
+/**
+ * 대진 생성·명단 동기화가 읽는 팀 정보 — 활성 멤버십과 이 리그의 참가 명단.
+ *
+ * **명단이 비어 있는 confirmed 등록은 여기서 즉시 채운다** (#9, 2026-09-19 QA). 원래는
+ * D10 크론(`league-roster-autoconfirm.service.ts`)만 채웠는데, 대진 생성이 그보다 먼저
+ * 일어나면(흔한 운영 순서) 명단 없는 팀이 `leagueTeamRosterEntries()`의 계정 없는 폴백을
+ * 타고, 그 경기가 크론 전에 시작·종료되면 영영 못 고친다 — `league-roster-autofill.ts`
+ * 상단 주석 참고.
+ */
 export async function loadLeagueTeamRosters(
   tx: Prisma.TransactionClient,
   leagueId: string,
   teamIds: string[],
 ): Promise<Map<string, LeagueFixtureTeam>> {
   const profile = { select: { profile: { select: { nickname: true, displayName: true } } } } as const;
+  const playerSelect = {
+    where: { removedAt: null },
+    orderBy: { id: 'asc' },
+    select: { id: true, userId: true, user: profile },
+  } as const;
   const teams = await tx.v1Team.findMany({
     where: { id: { in: teamIds }, status: 'active', deletedAt: null },
     select: {
@@ -132,15 +146,24 @@ export async function loadLeagueTeamRosters(
   });
   const registrations = await tx.v1TournamentRegistration.findMany({
     where: { tournamentId: leagueId, teamId: { in: teamIds }, status: 'confirmed' },
-    select: {
-      teamId: true,
-      players: {
-        where: { removedAt: null },
-        orderBy: { id: 'asc' },
-        select: { id: true, userId: true, user: profile },
-      },
-    },
+    select: { id: true, teamId: true, players: playerSelect },
   });
+
+  const emptyRegistrations = registrations.filter((row) => row.players.length === 0);
+  for (const registration of emptyRegistrations) {
+    await fillLeagueTeamRoster(tx, leagueId, registration);
+  }
+  if (emptyRegistrations.length > 0) {
+    const refilled = await tx.v1TournamentRegistration.findMany({
+      where: { id: { in: emptyRegistrations.map((row) => row.id) } },
+      select: { id: true, players: playerSelect },
+    });
+    const refilledById = new Map(refilled.map((row) => [row.id, row.players]));
+    for (const registration of emptyRegistrations) {
+      registration.players = refilledById.get(registration.id) ?? registration.players;
+    }
+  }
+
   const playersByTeam = new Map(registrations.map((row) => [row.teamId, row.players]));
   return new Map(
     teams.map((team) => [team.id, { ...team, registeredPlayers: playersByTeam.get(team.id) ?? [] }]),

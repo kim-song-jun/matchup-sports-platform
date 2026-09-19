@@ -120,18 +120,29 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
   const sync = (leagueId: string, teamId: string) =>
     prisma.$transaction((tx) => syncLeagueRosterLineups(tx, { leagueId, teamId }));
 
+  /**
+   * #9 (2026-09-19 QA) 이후: `seedFixture()`의 팀장·팀원 전부(활성 멤버십엔 역할 구분이 없다 —
+   * `fillLeagueTeamRoster`는 owner 도 후보로 본다)가 자격을 갖췄으므로 대진 생성 시점에
+   * 이미 자동으로 명단에 올라간다(`loadLeagueTeamRosters`가 `fillLeagueTeamRoster`를 즉시
+   * 부른다 — D10 크론을 기다리지 않는다). 그래서 "명단 변경 → 동기화"를 재현하려면
+   * **대진 생성 뒤에** 새로 합류한 팀원을 써야 한다 — 이미 자동으로 올라간 사람을 다시
+   * 추가하면 `PLAYER_ALREADY_REGISTERED` 409 가 난다.
+   */
   it('명단에 선수를 추가하면 시작 전 경기 명단이 그 선수(계정 포함)로 바뀌고, 상대 사이드는 그대로다', async () => {
     const f = await seedFixture();
+    const newMember = await makeMember(f.team.id);
 
-    await app.get(TournamentPlayersService).addPlayer(f.captain, f.league.id, f.registration.id, { userId: f.members[0] } as never);
+    await app.get(TournamentPlayersService).addPlayer(f.captain, f.league.id, f.registration.id, { userId: newMember } as never);
 
     const latest = await latestLineup(f.game.id, f.side.id);
     expect([latest.revision, latest.state]).toEqual([2, 'DRAFT']);
     const rows = await participantsOf(latest.id);
-    expect(rows.map((row) => [row.userId, row.started])).toEqual([[f.members[0], true]]);
-    const links = await prisma.v1ParticipantIdentityLinkCurrent.findMany({ where: { participantId: rows[0].id } });
-    expect(links.map((link) => link.userId)).toEqual([f.members[0]]);
-    const events = await prisma.v1ParticipantIdentityLinkEvent.findMany({ where: { participantId: rows[0].id } });
+    expect(rows.map((row) => row.userId).sort()).toEqual([f.captain.id, f.members[0], f.members[1], newMember].sort());
+    expect(rows.every((row) => row.started)).toBe(true);
+    const newRow = rows.find((row) => row.userId === newMember)!;
+    const links = await prisma.v1ParticipantIdentityLinkCurrent.findMany({ where: { participantId: newRow.id } });
+    expect(links.map((link) => link.userId)).toEqual([newMember]);
+    const events = await prisma.v1ParticipantIdentityLinkEvent.findMany({ where: { participantId: newRow.id } });
     expect(events.map((event) => [event.action, event.systemActor])).toEqual([['ROSTER_ASSERTED', 'LEAGUE_ROSTER_SYNC']]);
     const marker = await prisma.v1OperationAudit.findFirst({
       where: { requestId: `${f.game.id}:${latest.id}`, action: LEAGUE_ROSTER_SYNC_ACTION },
@@ -143,14 +154,18 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
   it('명단에서 선수를 빼면 그 선수가 빠진 리비전으로 다시 맞춘다 — 동기화 리비전 위에서도 이어진다', async () => {
     const f = await seedFixture();
     const players = app.get(TournamentPlayersService);
-    const first = (await players.addPlayer(f.captain, f.league.id, f.registration.id, { userId: f.members[0] } as never)) as { id: string };
-    await players.addPlayer(f.captain, f.league.id, f.registration.id, { userId: f.members[1] } as never);
+    // 팀장·members[0]·[1] 전원이 대진 생성 시점에 이미 자동 등록돼 있다 — members[0]의 행을 찾아서 뺀다.
+    const first = await prisma.v1TournamentPlayer.findFirstOrThrow({
+      where: { registrationId: f.registration.id, userId: f.members[0] },
+    });
 
     await players.removePlayer(f.captain, f.league.id, f.registration.id, first.id);
 
     const latest = await latestLineup(f.game.id, f.side.id);
-    expect(latest.revision).toBe(4);
-    expect((await participantsOf(latest.id)).map((row) => row.userId)).toEqual([f.members[1]]);
+    expect(latest.revision).toBe(2);
+    expect((await participantsOf(latest.id)).map((row) => row.userId).sort()).toEqual(
+      [f.captain.id, f.members[1]].sort(),
+    );
   });
 
   it('팀장이 저장한 라인업은 덮지 않는다', async () => {
@@ -159,7 +174,8 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
     const teamSaved = await prisma.v1GameLineup.create({
       data: { gameId: f.game.id, sideId: f.side.id, revision: 2, supersedesId: generated.id },
     });
-    await prisma.v1TournamentPlayer.create({ data: { registrationId: f.registration.id, userId: f.members[0], realName: '명단 선수' } });
+    const newMember = await makeMember(f.team.id);
+    await prisma.v1TournamentPlayer.create({ data: { registrationId: f.registration.id, userId: newMember, realName: '명단 선수' } });
 
     expect(await sync(f.league.id, f.team.id)).toBe(0);
     expect((await latestLineup(f.game.id, f.side.id)).id).toBe(teamSaved.id);
@@ -172,7 +188,8 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
       where: { id: generated.id },
       data: { state: 'SUBMITTED', submittedAt: new Date(), version: { increment: 1 } },
     });
-    await prisma.v1TournamentPlayer.create({ data: { registrationId: f.registration.id, userId: f.members[0], realName: '명단 선수' } });
+    const newMember = await makeMember(f.team.id);
+    await prisma.v1TournamentPlayer.create({ data: { registrationId: f.registration.id, userId: newMember, realName: '명단 선수' } });
 
     expect(await sync(f.league.id, f.team.id)).toBe(0);
     expect((await latestLineup(f.game.id, f.side.id)).id).toBe(generated.id);
@@ -181,7 +198,8 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
   it('시작 시각이 지난 경기는 맞추지 않는다', async () => {
     const f = await seedFixture();
     await prisma.v1TeamMatch.update({ where: { id: f.teamMatchId }, data: { startAt: new Date(Date.now() - 60_000) } });
-    await prisma.v1TournamentPlayer.create({ data: { registrationId: f.registration.id, userId: f.members[0], realName: '명단 선수' } });
+    const newMember = await makeMember(f.team.id);
+    await prisma.v1TournamentPlayer.create({ data: { registrationId: f.registration.id, userId: newMember, realName: '명단 선수' } });
 
     expect(await sync(f.league.id, f.team.id)).toBe(0);
     expect((await latestLineup(f.game.id, f.side.id)).revision).toBe(1);
@@ -189,7 +207,8 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
 
   it('명단이 이미 같으면 새 리비전을 만들지 않는다', async () => {
     const f = await seedFixture();
-    await prisma.v1TournamentPlayer.create({ data: { registrationId: f.registration.id, userId: f.members[0], realName: '명단 선수' } });
+    const newMember = await makeMember(f.team.id);
+    await prisma.v1TournamentPlayer.create({ data: { registrationId: f.registration.id, userId: newMember, realName: '명단 선수' } });
 
     expect(await sync(f.league.id, f.team.id)).toBe(1);
     expect(await sync(f.league.id, f.team.id)).toBe(0);

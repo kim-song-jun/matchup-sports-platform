@@ -146,22 +146,60 @@ function createFake() {
     // 갈아끼워 "그 사이 팀이 빠졌다" 를 재현한다.
     // BE-5: 로스터 판정이 통합 축의 confirmed 등록으로 옮겨졌다. 같은 `registeredTeamIds`
     // 를 본다 — 두 fake 가 다른 집합을 보면 어느 쪽이 진짜인지 스펙이 못 가른다.
+    // #9 (2026-09-19 QA): `loadLeagueTeamRosters`가 명단 빈 등록을 `fillLeagueTeamRoster`
+    // 로 즉시 채우려고 `v1TeamMembership`/`v1TournamentPlayer` 도 읽는다. 아래 멤버십은
+    // 실명·생년월일·휴대폰을 전부 비워 뒀다 — `evaluateRosterCandidate` 가 항상 막아서
+    // "명단 미제출 팀은 계정 없이 들어간다"는 이 스펙의 기존 전제가 그대로 유지된다.
+    v1TeamMembership: {
+      findMany: track('v1TeamMembership.findMany', async (args: { where: { teamId: string } }) => {
+        const team = KNOWN_TEAMS.get(args.where.teamId);
+        const membershipIds = team
+          ? team.memberships.map((m: { id: string }) => m.id)
+          : [`${args.where.teamId}-m1`, `${args.where.teamId}-m2`];
+        return membershipIds.map((id) => ({
+          userId: id,
+          user: { phone: null, phoneVerifiedAt: null, profile: { realName: null, birthDate: null, gender: null } },
+        }));
+      }),
+    },
+    v1TournamentPlayer: {
+      // 다른 팀 명단과의 중복 판정용 — 이 스펙에서는 중복 시나리오를 다루지 않는다.
+      findMany: track('v1TournamentPlayer.findMany', async () => []),
+      // 위 멤버십이 전부 자격 미달이라 실제로는 호출되지 않지만, 혹시 호출되면
+      // `state.rosterPlayers`에 반영해 재조회 결과가 어긋나지 않게 한다.
+      create: track('v1TournamentPlayer.create', async (args: { data: { registrationId: string; userId: string; realName: string } }) => {
+        const teamId = args.data.registrationId.replace(/^reg-/, '');
+        const list = state.rosterPlayers.get(teamId) ?? [];
+        list.push({ id: `auto-${args.data.userId}`, userId: args.data.userId, nickname: args.data.realName });
+        state.rosterPlayers.set(teamId, list);
+        return {};
+      }),
+    },
     v1TournamentRegistration: {
       upsert: track('v1TournamentRegistration.upsert', async () => ({})),
       findFirst: track('v1TournamentRegistration.findFirst', async (args: { where: { teamId: string } }) =>
         state.registeredTeamIds.has(args.where.teamId) ? { tournamentId: 'league-1' } : null,
       ),
-      findMany: track('v1TournamentRegistration.findMany', async (args: { where: { teamId: { in: string[] } } }) =>
-        args.where.teamId.in
-          .filter((id) => state.registeredTeamIds.has(id))
-          .map((teamId) => ({
+      findMany: track(
+        'v1TournamentRegistration.findMany',
+        async (args: { where: { teamId?: { in: string[] }; id?: { in: string[] } } }) => {
+          const regRow = (teamId: string) => ({
+            id: `reg-${teamId}`,
             teamId,
             players: (state.rosterPlayers.get(teamId) ?? []).map((player) => ({
               id: player.id,
               userId: player.userId,
               user: { profile: { nickname: player.nickname, displayName: null } },
             })),
-          })),
+          });
+          if (args.where.teamId?.in) {
+            return args.where.teamId.in.filter((id) => state.registeredTeamIds.has(id)).map(regRow);
+          }
+          if (args.where.id?.in) {
+            return args.where.id.in.map((id) => regRow(id.replace(/^reg-/, '')));
+          }
+          return [];
+        },
       ),
       count: track('v1TournamentRegistration.count', async (args: { where: { teamId?: string | { not: string } } }) => {
         const teamId = args.where.teamId;

@@ -168,6 +168,42 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
     );
   });
 
+  /**
+   * #9 후속 리뷰 지적(2026-09-19): `loadLeagueTeamRosters`가 "명단 비어 있음" 을 활성
+   * 선수 수로 재던 시절엔, 미래 경기가 있는 등록에서 **마지막 활성 선수를 지우면** 같은
+   * 트랜잭션의 동기화가 활성 0명을 보고 그 팀 멤버십으로 즉시 재채움을 시도했다. 방금
+   * 지운 유저도 여전히 활성 팀원이라 다시 넣으려다 `(registrationId, userId)` 유니크
+   * 제약(soft-delete 와 무관하게 전역)에 걸려 예외가 났고, 같은 트랜잭션 안이라 **삭제
+   * 자체가 롤백됐다.** 지금은 "행이 아예 없는가" 로 재므로(전체 행 수), 소프트 삭제된
+   * 행이 있는 등록은 다시 채우지 않는다 — 삭제가 정상적으로 끝나야 한다.
+   */
+  it('#9 후속: 마지막 참가자를 삭제해도 롤백되지 않고, 다시 채워지지 않는다', async () => {
+    const f = await seedFixture();
+    const players = app.get(TournamentPlayersService);
+    // 대진 생성 시 팀장 + members[0] + members[1] 전원이 이미 자동 등록돼 있다.
+    const rows = await prisma.v1TournamentPlayer.findMany({
+      where: { registrationId: f.registration.id, removedAt: null },
+    });
+    expect(rows).toHaveLength(3);
+
+    for (const row of rows) {
+      await expect(
+        players.removePlayer(f.captain, f.league.id, f.registration.id, row.id),
+      ).resolves.toBeDefined();
+    }
+
+    const active = await prisma.v1TournamentPlayer.count({
+      where: { registrationId: f.registration.id, removedAt: null },
+    });
+    expect(active).toBe(0);
+    // "올렸다가 전원 뺀 팀" 은 자동 채움 대상이 아니다 — 소프트 삭제된 3건 그대로이고
+    // 새로 생기지 않는다.
+    const everRegistered = await prisma.v1TournamentPlayer.count({
+      where: { registrationId: f.registration.id },
+    });
+    expect(everRegistered).toBe(3);
+  });
+
   it('팀장이 저장한 라인업은 덮지 않는다', async () => {
     const f = await seedFixture();
     const generated = await latestLineup(f.game.id, f.side.id);
@@ -243,5 +279,76 @@ describe('리그 참가 명단 → 시작 전 경기 명단 동기화', () => {
     );
 
     expect(await prisma.v1TournamentPlayer.count({ where: { registrationId: registration.id, removedAt: null } })).toBe(1);
+  });
+
+  /**
+   * #9 후속 리뷰 지적(2026-09-19): 대진 생성이 즉시 채우기를 하는데, 그 결과를
+   * `notifyLeagueRosterFillOutcomes` 로 알리지 않으면 팀장은 "명단이 자동으로 채워졌다"는
+   * 것도, "일부는 자격 미달로 빠졌다"는 것도 알 방법이 없다. 게다가 한 번 채워지면 그
+   * 등록은 D10 크론의 대상(`players: { none: {} }`)에서도 빠지므로 **영영 알림을 못 받는다.**
+   */
+  it('#9 후속: 대진 생성이 즉시 채우면 팀장에게 제외 사유가 담긴 알림이 간다', async () => {
+    const captainId = await makeUser();
+    const team = await prisma.v1Team.create({
+      data: { ownerUserId: captainId, sportId, regionId, name: `t170-notify-team-${suiteId}-${seq}` },
+    });
+    await prisma.v1TeamMembership.create({ data: { teamId: team.id, userId: captainId, role: 'owner', status: 'active' } });
+    const eligibleMember = await makeMember(team.id);
+    // 자격 미달 팀원 — 실명·생년월일·휴대폰이 없다.
+    seq += 1;
+    const ineligibleId = `t170-u-${suiteId}-${seq}`;
+    await prisma.v1User.create({
+      data: { id: ineligibleId, email: `${ineligibleId}@integration.test`, accountStatus: 'active', onboardingStatus: 'completed' },
+    });
+    await prisma.v1TeamMembership.create({ data: { teamId: team.id, userId: ineligibleId, role: 'member', status: 'active' } });
+    const opponent = await prisma.v1Team.create({
+      data: { ownerUserId: captainId, sportId, regionId, name: `t170-notify-opp-${suiteId}-${seq}` },
+    });
+    await makeMember(opponent.id);
+    const league = await seedLeagueOnTournamentAxis(prisma, {
+      title: `T170 알림 리그 ${suiteId}-${seq}`,
+      sportId,
+      regionId,
+      state: 'active',
+      teamIds: [team.id, opponent.id],
+      appliedByUserId: captainId,
+    });
+    const registration = await prisma.v1TournamentRegistration.findUniqueOrThrow({
+      where: { tournamentId_teamId: { tournamentId: league.id, teamId: team.id } },
+    });
+    const config = await resolveTeamMatchCompetitionConfig(prisma, sportId);
+
+    await prisma.$transaction(async (tx) => {
+      const teams = await loadLeagueTeamRosters(tx, league.id, [team.id, opponent.id]);
+      return createLeagueFixture(tx, app.get(GamesService), {
+        leagueId: league.id,
+        adminUserId,
+        sportId,
+        regionId,
+        competitionConfigId: config!.id,
+        title: 'T170 알림 대진',
+        placeName: '테스트 구장',
+        startAt: new Date(Date.now() + 7 * 86_400_000),
+        endAt: null,
+        home: teams.get(team.id)!,
+        away: teams.get(opponent.id)!,
+      });
+    });
+
+    // 캡틴(owner) 도 자격을 갖춘 활성 멤버라 함께 채워진다 — 팀원 3명(캡틴+eligible+ineligible)
+    // 중 2명 등록, 1명 제외.
+    expect(
+      await prisma.v1TournamentPlayer.count({ where: { registrationId: registration.id, removedAt: null } }),
+    ).toBe(2);
+    const players = await prisma.v1TournamentPlayer.findMany({ where: { registrationId: registration.id } });
+    expect(players.map((p) => p.userId).sort()).toEqual([captainId, eligibleMember].sort());
+
+    const notifications = await prisma.v1Notification.findMany({
+      where: { recipientUserId: captainId, targetType: 'tournament', targetId: league.id },
+    });
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].title).toBe('리그 명단이 자동 확정됐어요');
+    expect(notifications[0].body).toContain('3명 중 2명이 등록됐어요');
+    expect(notifications[0].body).toContain('제외:');
   });
 });

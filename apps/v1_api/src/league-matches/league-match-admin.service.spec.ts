@@ -150,30 +150,51 @@ function createFake() {
     // 로 즉시 채우려고 `v1TeamMembership`/`v1TournamentPlayer` 도 읽는다. 아래 멤버십은
     // 실명·생년월일·휴대폰을 전부 비워 뒀다 — `evaluateRosterCandidate` 가 항상 막아서
     // "명단 미제출 팀은 계정 없이 들어간다"는 이 스펙의 기존 전제가 그대로 유지된다.
+    //
+    // `where.teamId` 가 문자열 하나(`fillLeagueTeamRoster`)일 수도, `{ in: [...] }`
+    // 배열(자동 채움 알림 `notifyLeagueRosterFillOutcomes`이 팀장을 찾을 때)일 수도 있어
+    // 둘 다 받는다.
     v1TeamMembership: {
-      findMany: track('v1TeamMembership.findMany', async (args: { where: { teamId: string } }) => {
-        const team = KNOWN_TEAMS.get(args.where.teamId);
-        const membershipIds = team
-          ? team.memberships.map((m: { id: string }) => m.id)
-          : [`${args.where.teamId}-m1`, `${args.where.teamId}-m2`];
-        return membershipIds.map((id) => ({
-          userId: id,
-          user: { phone: null, phoneVerifiedAt: null, profile: { realName: null, birthDate: null, gender: null } },
-        }));
-      }),
+      findMany: track(
+        'v1TeamMembership.findMany',
+        async (args: { where: { teamId: string | { in: string[] } } }) => {
+          const teamIds = typeof args.where.teamId === 'string' ? [args.where.teamId] : args.where.teamId.in;
+          return teamIds.flatMap((teamId) => {
+            const team = KNOWN_TEAMS.get(teamId);
+            const membershipIds = team
+              ? team.memberships.map((m: { id: string }) => m.id)
+              : [`${teamId}-m1`, `${teamId}-m2`];
+            return membershipIds.map((id) => ({
+              teamId,
+              userId: id,
+              user: { phone: null, phoneVerifiedAt: null, profile: { realName: null, birthDate: null, gender: null } },
+            }));
+          });
+        },
+      ),
+    },
+    // 자동 채움이 성공했든 실패했든(`no_eligible`) 팀장에게 알린다 — 이 스펙은 알림
+    // 내용을 단언하지 않으므로 호출이 죽지만 않으면 된다.
+    v1Notification: {
+      createMany: track('v1Notification.createMany', async (args: { data: unknown[] }) => ({ count: args.data.length })),
     },
     v1TournamentPlayer: {
       // 다른 팀 명단과의 중복 판정용 — 이 스펙에서는 중복 시나리오를 다루지 않는다.
       findMany: track('v1TournamentPlayer.findMany', async () => []),
       // 위 멤버십이 전부 자격 미달이라 실제로는 호출되지 않지만, 혹시 호출되면
       // `state.rosterPlayers`에 반영해 재조회 결과가 어긋나지 않게 한다.
-      create: track('v1TournamentPlayer.create', async (args: { data: { registrationId: string; userId: string; realName: string } }) => {
-        const teamId = args.data.registrationId.replace(/^reg-/, '');
-        const list = state.rosterPlayers.get(teamId) ?? [];
-        list.push({ id: `auto-${args.data.userId}`, userId: args.data.userId, nickname: args.data.realName });
-        state.rosterPlayers.set(teamId, list);
-        return {};
-      }),
+      createMany: track(
+        'v1TournamentPlayer.createMany',
+        async (args: { data: Array<{ registrationId: string; userId: string; realName: string }> }) => {
+          for (const row of args.data) {
+            const teamId = row.registrationId.replace(/^reg-/, '');
+            const list = state.rosterPlayers.get(teamId) ?? [];
+            list.push({ id: `auto-${row.userId}`, userId: row.userId, nickname: row.realName });
+            state.rosterPlayers.set(teamId, list);
+          }
+          return { count: args.data.length };
+        },
+      ),
     },
     v1TournamentRegistration: {
       upsert: track('v1TournamentRegistration.upsert', async () => ({})),
@@ -191,6 +212,9 @@ function createFake() {
               userId: player.userId,
               user: { profile: { nickname: player.nickname, displayName: null } },
             })),
+            // 이 fake 는 소프트 삭제를 모델링하지 않는다 — "활성 선수 수" 와 "전체 행 수"
+            // 가 항상 같다. 실제 쿼리는 `_count.players` 로 "행이 아예 없다" 를 판정한다.
+            _count: { players: (state.rosterPlayers.get(teamId) ?? []).length },
           });
           if (args.where.teamId?.in) {
             return args.where.teamId.in.filter((id) => state.registeredTeamIds.has(id)).map(regRow);

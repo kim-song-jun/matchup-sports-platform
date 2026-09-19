@@ -4,6 +4,7 @@ import type { GameOperationHandler } from '../v1-game-operations-worker.service'
 import { syncLeagueRosterLineups } from '../../league-matches/league-roster-sync';
 import {
   fillLeagueTeamRoster,
+  notifyLeagueRosterFillOutcomes,
   type LeagueRosterFillOutcome,
 } from '../../league-matches/league-roster-autofill';
 import { findTournamentOnSurface } from '../../tournaments/tournament-surface-lookup';
@@ -111,8 +112,9 @@ export async function scheduleLeagueRosterAutoConfirm(
  * (`V1GameLineup`/`V1GameParticipant`, 등번호가 붙는 그것)과 다른 층이다 — 이 잡이 만드는
  * 것은 "이 팀에서 이 리그를 뛸 수 있는 사람들" 이고, 경기별 명단은 그 안에서 다시 고른다.
  *
- * 실제 채우는 로직(`fillLeagueTeamRoster`)은 `league-roster-autofill.ts`로 옮겨
- * `league-fixture-creation.ts`(대진 생성 경로)와 공유한다 — #9 수정, 2026-09-19 QA 참고.
+ * 실제 채우는 로직(`fillLeagueTeamRoster`)과 알림(`notifyLeagueRosterFillOutcomes`)은
+ * `league-roster-autofill.ts`로 옮겨 `league-fixture-creation.ts`(대진 생성 경로)와
+ * 공유한다 — #9 수정, 2026-09-19 QA 참고.
  */
 export class LeagueRosterAutoConfirmService {
   readonly handler: GameOperationHandler = async (claim, tx) => {
@@ -138,7 +140,7 @@ export class LeagueRosterAutoConfirmService {
       outcomes.push(outcome);
     }
     if (outcomes.length === 0) return;
-    await this.notify(tx, league, outcomes);
+    await notifyLeagueRosterFillOutcomes(tx, league, outcomes);
   };
 
   /**
@@ -161,56 +163,6 @@ export class LeagueRosterAutoConfirmService {
     return rows;
   }
 
-  private async notify(
-    tx: Prisma.TransactionClient,
-    league: { id: string; title: string },
-    outcomes: readonly LeagueRosterFillOutcome[],
-  ): Promise<void> {
-    // 대회가 끝나 아무것도 하지 않은 팀에는 알리지 않는다 — 팀장이 잘못한 것도, 할 수 있는
-    // 일도 없다. (예전엔 이 케이스가 센티널로 섞여 들어와 "1명 제외" 로 잘못 통보됐다.)
-    const notifiable = outcomes.filter((outcome) => outcome.kind !== 'skipped_terminal');
-    if (notifiable.length === 0) return;
-
-    const owners = await tx.v1TeamMembership.findMany({
-      where: { teamId: { in: notifiable.map((o) => o.teamId) }, status: 'active', role: { in: ['owner', 'manager'] } },
-      select: { teamId: true, userId: true },
-    });
-    const ownersByTeam = new Map<string, string[]>();
-    for (const row of owners) {
-      ownersByTeam.set(row.teamId, [...(ownersByTeam.get(row.teamId) ?? []), row.userId]);
-    }
-
-    for (const outcome of notifiable) {
-      const total = outcome.added + outcome.skipped.length;
-      // 통보는 **성공만 말하지 않는다.** 제외된 사람이 있으면 몇 명이 왜 빠졌는지 함께
-      // 준다 — 팀장이 "왜 우리 팀만 인원이 적지" 를 화면 어디에서도 알 수 없으면 안 된다.
-      const reasonSummary = summarizeReasons(outcome.skipped);
-      const body =
-        outcome.added > 0
-          ? `"${league.title}" 명단이 자동으로 확정됐어요. 팀원 ${total}명 중 ${outcome.added}명이 등록됐어요.${reasonSummary}`
-          : `"${league.title}" 명단을 자동으로 확정하지 못했어요. 등록 가능한 팀원이 없어요.${reasonSummary}`;
-      for (const userId of ownersByTeam.get(outcome.teamId) ?? []) {
-        // `V1Notification` 에는 type 컬럼이 없다 — 문구는 여기서 만들어 넣는다
-        // (`team-match-completion-notification.service.ts` 와 같은 방식).
-        // businessKey 가 **재발송을 막는다**: 같은 시즌에 잡이 두 번 돌아도 알림은 1건이다.
-        await tx.v1Notification.createMany({
-          data: [
-            {
-              recipientUserId: userId,
-              targetType: 'tournament' as const,
-              targetId: league.id,
-              title: outcome.added > 0 ? '리그 명단이 자동 확정됐어요' : '리그 명단을 자동 확정하지 못했어요',
-              body,
-              deepLink: `/leagues/${league.id}`,
-              businessKey: `league-roster-autoconfirm:${outcome.registrationId}:${userId}`,
-            },
-          ],
-          skipDuplicates: true,
-        });
-      }
-    }
-  }
-
   private payload(raw: unknown): { leagueId: string; expectedStartsOn: string } {
     const value = raw as { leagueId?: unknown; expectedStartsOn?: unknown } | null;
     if (typeof value?.leagueId !== 'string' || typeof value?.expectedStartsOn !== 'string') {
@@ -218,15 +170,6 @@ export class LeagueRosterAutoConfirmService {
     }
     return { leagueId: value.leagueId, expectedStartsOn: value.expectedStartsOn };
   }
-}
-
-/** 제외 사유를 사람이 읽는 한 문장으로. 개인 식별자는 담지 않는다(팀장에게 가는 알림이다). */
-function summarizeReasons(skipped: ReadonlyArray<{ reason: string }>): string {
-  if (skipped.length === 0) return '';
-  const counts = new Map<string, number>();
-  for (const row of skipped) counts.set(row.reason, (counts.get(row.reason) ?? 0) + 1);
-  const parts = Array.from(counts.entries()).map(([reason, count]) => `${reason} ${count}명`);
-  return ` 제외: ${parts.join(', ')}.`;
 }
 
 /**

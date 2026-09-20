@@ -105,9 +105,8 @@ function presentOfficialResult(
   canSeeRestrictedResult: boolean,
   publicLiveEnabled: boolean,
 ) {
-  // 원시 enum 만 보면 `PUBLIC_LIVE` 킬스위치가 LIVE 를 `status_only` 로 강등시킨 것을
-  // 놓쳐, 같은 경기의 상세(`/tournaments/:id/matches/:id`)는 점수를 가리는데 이 상세는
-  // 그대로 싣는다.
+  // 원시 enum 만 보면 `PUBLIC_LIVE` 킬스위치가 LIVE 를 강등시킨 것을 놓쳐, 같은 경기의
+  // 상세(`/tournaments/:id/matches/:id`)와 이 상세가 서로 다른 점수를 싣는다.
   const mode = effectivePublicVisibilityMode(game?.visibilityPolicy?.mode ?? 'HIDDEN', publicLiveEnabled);
   if (!canSeeRestrictedResult && (mode === 'hidden' || mode === 'status_only')) {
     return null;

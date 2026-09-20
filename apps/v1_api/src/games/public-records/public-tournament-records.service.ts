@@ -718,8 +718,8 @@ export class PublicTournamentRecordsService {
     // this page (both cursor-paginated and unscheduled), never a per-fixture
     // query. See `loadLiveScores` below.
     // PUBLIC_LIVE 가 꺼져 있으면 effectivePublicVisibilityMode() 가 live 를
-    // status_only 로 강등해 이 값이 어차피 화면에 안 나간다 — 그런데도 매 요청마다
-    // 이벤트를 긁어오면 관전자 트래픽만큼 헛일이 쌓인다. 플래그가 켜졌을 때만 읽는다.
+    // official_only 로 강등하고, official_only 는 라이브 점수를 내보내지 않는다 —
+    // 그런데도 매 요청마다 이벤트를 긁어오면 관전자 트래픽만큼 헛일이 쌓인다.
     const liveScoreByGameId = publicLiveEnabled
       ? await this.loadLiveScores([...pageFixtures, ...rawUnscheduled])
       : new Map<string, GameScore>();

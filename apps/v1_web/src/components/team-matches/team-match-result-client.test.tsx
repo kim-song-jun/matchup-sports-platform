@@ -853,12 +853,15 @@ describe('리그 대진 결과 - 확정 영수증', () => {
         [revision({ state: 'SUBMITTED', score: { regulation: { home: 3, away: 2 }, penalty: null, goals: [], incomplete: false }, submittedAt: '2026-08-01T00:00:00.000Z' })],
       );
 
-      expect(screen.getByText('3 : 2')).toBeInTheDocument();
-      expect(screen.getByText('확정 전')).toBeInTheDocument();
+      expect(screen.getAllByText('3 : 2').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('확정 전').length).toBeGreaterThan(0);
       expect(screen.getByText('어드민 확인이 끝나면 공식 기록으로 확정돼요. 순위·전적에는 확정된 뒤에 반영돼요.')).toBeInTheDocument();
       expect(screen.queryByText('아직 결과가 없어요')).not.toBeInTheDocument();
       // 리그엔 상대팀 승인 단계가 없다 — 승인 CTA 가 새어 들어오면 깨진다.
       expect(screen.queryByText('승인하기')).not.toBeInTheDocument();
+      // 같은 리비전을 카드는 "확정 전", 변경 이력은 공용 라벨 "상대팀 승인 대기" 로 부르면
+      // 한 화면이 서로 다른 말을 한다. 리그엔 그 단계가 아예 없다.
+      expect(screen.queryByText('상대팀 승인 대기')).not.toBeInTheDocument();
     },
   );
 

@@ -26,6 +26,7 @@ import type {
 } from '@/types/api';
 import {
   CARD_TYPE_LABEL,
+  LEAGUE_RESULT_REVISION_STATE_LABEL,
   RESULT_REVISION_STATE_LABEL,
   hashResultPayload,
   hydrateResultFormFromRevision,
@@ -362,11 +363,6 @@ function LeagueTeamMatchResultPage({
   const opponentName = teamMatch.approvedOpponentTeam?.name ?? '상대팀';
   const latest = revisions[0] ?? null;
   const participantMember = teamMatch.viewer?.participantMember === true;
-  // 리그 대진일 때만 아는 값(teamMatch.league는 fetch 이후에만 존재) — 이 함수는
-  // TeamMatchResultPageClient/TeamMatchResultApprovalPageClient 양쪽에서 진입하는데
-  // 두 라우트 모두 route-chrome 테이블 기본 제목은 "경기 결과 입력"/"경기 결과 승인"이라
-  // 이 화면에서만 "경기 결과"로 덮어써야 한다(fragments/team-matches.ts 주석 참고).
-  useShellOverride({ title: '경기 결과' });
 
   return (
     <>
@@ -437,7 +433,7 @@ function LeagueTeamMatchResultPage({
           </>
         )}
 
-        <ResultRevisionHistory history={revisions} />
+        <ResultRevisionHistory history={revisions} stateLabel={LEAGUE_RESULT_REVISION_STATE_LABEL} />
       </div>
     </>
   );
@@ -451,6 +447,9 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
   const { teamMatch, game, revisions, lineup, isError, isLoading, gameId } = useResultScreenBase(teamMatchId, {
     needsOwnLineup: true,
   });
+  // 로딩·에러 중에는 리그인지 알 수 없다 — 그때 "입력"을 띄우면 리그 참가팀에게 서버가
+  // 403 으로 막는 행동을 약속하게 된다. 친선으로 확인된 뒤에만 제목을 올린다.
+  useShellOverride({ title: teamMatch.data && !teamMatch.data.league ? '경기 결과 입력' : '경기 결과' });
   const createRevision = useV1CreateGameResultRevision(gameId ?? '', teamMatchId);
   const submitRevision = useV1SubmitGameResultRevision(gameId ?? '', teamMatchId);
   // 점수 먼저 입력 -> 그 개수만큼 득점자 드롭다운이 생기는 흐름(QA 지적으로 재설계) —
@@ -1088,6 +1087,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
   const { teamMatch, game, revisions, isError, isLoading, gameId } = useResultScreenBase(teamMatchId, {
     needsOwnLineup: false,
   });
+  useShellOverride({ title: teamMatch.data && !teamMatch.data.league ? '경기 결과 승인' : '경기 결과' });
   const decideRevision = useV1DecideGameResultRevision(gameId ?? '', teamMatchId);
   const [changeReason, setChangeReason] = useState('');
   const [showChangeForm, setShowChangeForm] = useState(false);
@@ -1287,7 +1287,14 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
   );
 }
 
-function ResultRevisionHistory({ history }: { history: V1GameResultRevision[] }) {
+function ResultRevisionHistory({
+  history,
+  stateLabel = RESULT_REVISION_STATE_LABEL,
+}: {
+  history: V1GameResultRevision[];
+  /** 리그 화면은 자기 라벨을 넘긴다 — 공용 라벨엔 리그에 없는 "상대팀 승인" 단계가 들어 있다. */
+  stateLabel?: Record<V1GameResultRevision['state'], string>;
+}) {
   if (history.length === 0) return null;
   return (
     <Card pad={16}>
@@ -1301,7 +1308,7 @@ function ResultRevisionHistory({ history }: { history: V1GameResultRevision[] })
                 {revision.supersedesId ? <span className="tm-badge tm-badge-grey" style={{ marginLeft: 8 }}>정정</span> : null}
               </span>
               <span className={`tm-badge ${revisionBadgeTone(revision.state)}`}>
-                {RESULT_REVISION_STATE_LABEL[revision.state]}
+                {stateLabel[revision.state]}
               </span>
             </div>
             {revision.reason ? (

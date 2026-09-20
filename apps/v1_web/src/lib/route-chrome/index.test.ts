@@ -168,3 +168,15 @@ describe('titleAsHeading — 상단바 제목이 페이지 헤딩이어야 하�
     });
   }
 });
+
+// 리그 대진은 참가팀이 결과를 제출·승인할 수 없다(정본 §4, games.service.ts 의
+// regularLeagueResultAction). 리그 여부는 fetch 이후에만 아는 값이라, 표가 "입력"을
+// 들고 있으면 로딩·에러 화면이 서버가 403 으로 막는 행동을 안내한다.
+describe('결과 라우트 기본 제목 — 리그 대진에 없는 행동을 약속하지 않는다', () => {
+  for (const pathname of ['/team-matches/tm-1/result', '/team-matches/tm-1/result/approval']) {
+    it(`${pathname} 의 표 기본 제목은 중립이다`, () => {
+      const title = resolveRouteChrome(pathname)?.chrome.title;
+      expect(title).toBe('경기 결과');
+    });
+  }
+});

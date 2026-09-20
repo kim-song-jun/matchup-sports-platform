@@ -81,7 +81,7 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
   return (
     <>
       <h1 className="sr-only">마이페이지</h1>
-      <div className="tm-my-shell tm-content-enter">
+      <div className="tm-my-shell tm-my-home-shell tm-content-enter">
         {/* Mobile layout: flat stack (unchanged) */}
         {/* Desktop layout: 2-column via tm-my-desktop-layout */}
         <div className="tm-my-desktop-layout">

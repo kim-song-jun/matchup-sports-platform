@@ -5440,12 +5440,17 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
    그래서 후손 결합자 + 음수 order 를 쓴다. 나머지 아이템은 기본값 0 이라 자동으로
    뒤에 서므로 "나머지"를 선택할 필요가 없다(선택하려 해도 같은 이유로 못 잡는다).
 
+   스코프는 `.tm-my-home-shell` 이다. `.tm-my-shell` 은 공개 프로필·카드 공유 화면도 쓰는데
+   (public-profile-client, player-card-share-client) 거기에도 `.tm-player-card` 가 있다.
+   지금은 그 화면들에서 카드가 이미 첫 아이템이라 order 를 걸어도 움직이지 않지만(실측),
+   그 앞에 블록이 하나라도 생기면 카드가 조용히 맨 위로 튄다.
+
    왜 필요한가: 실측(2026-09-20, 390) 에서 첫 메뉴 행이 1231px 아래에 있어 첫 화면에
    누를 것이 하나도 없었다 -- 카드·프로필·활동이 한 열에 쌓인 결과다. */
 @media (max-width: 1023px) {
-  .tm-my-shell .tm-player-card,
-  .tm-my-shell .tm-my-card-slot { order: -2; }
-  .tm-my-shell [data-primary='true'] { order: -1; }
+  .tm-my-home-shell .tm-player-card,
+  .tm-my-home-shell .tm-my-card-slot { order: -2; }
+  .tm-my-home-shell [data-primary='true'] { order: -1; }
 }
 
 /* 카드가 도착하기 전의 빈 자리(스켈레톤이 아니라 높이만). 프레임 높이는 카드와 같은

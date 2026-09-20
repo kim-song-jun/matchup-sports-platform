@@ -26,6 +26,9 @@ import type {
   TeamStateViewModel,
 } from './teams.types';
 
+/** 서버 CreateTeamInvitationDto 의 `@MaxLength(200)` 과 같은 값이어야 한다. */
+export const INVITE_MESSAGE_MAX_LENGTH = 200;
+
 const ACTIVITY_DAY_OPTIONS = [
   { value: 'mon', label: '월' },
   { value: 'tue', label: '화' },
@@ -1501,6 +1504,7 @@ function InvitationSection({ invitations }: { invitations: NonNullable<TeamMembe
               value={form.message}
               placeholder="함께 하고 싶은 이유를 적어 보세요."
               rows={2}
+              maxLength={INVITE_MESSAGE_MAX_LENGTH}
               onChange={(event) => form.onMessageChange(event.target.value)}
               disabled={form.submitting}
               style={{ resize: 'none', lineHeight: 1.5 }}

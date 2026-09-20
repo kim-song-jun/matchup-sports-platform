@@ -1,5 +1,5 @@
 import { V1CompetitionKind, V1TeamMatchStatus } from '@prisma/client';
-import { publicFixtureStatus } from '../games/public-records/public-visibility';
+import { effectivePublicVisibilityMode, publicFixtureStatus } from '../games/public-records/public-visibility';
 import {
   resolveParticipantDisplayName,
   type ParticipantNameProfileRow,
@@ -103,8 +103,12 @@ type CanonicalTournamentGame = TournamentDetailRow['tournamentMatchDetails'][num
 function presentOfficialResult(
   game: CanonicalTournamentGame,
   canSeeRestrictedResult: boolean,
+  publicLiveEnabled: boolean,
 ) {
-  if (!canSeeRestrictedResult && (game?.visibilityPolicy?.mode === 'HIDDEN' || game?.visibilityPolicy?.mode === 'STATUS_ONLY')) {
+  // 원시 enum 만 보면 `PUBLIC_LIVE` 킬스위치가 LIVE 를 강등시킨 것을 놓쳐, 같은 경기의
+  // 상세(`/tournaments/:id/matches/:id`)와 이 상세가 서로 다른 점수를 싣는다.
+  const mode = effectivePublicVisibilityMode(game?.visibilityPolicy?.mode ?? 'HIDDEN', publicLiveEnabled);
+  if (!canSeeRestrictedResult && (mode === 'hidden' || mode === 'status_only')) {
     return null;
   }
   const resolved = resolveTournamentFixtureOfficialResult(game);
@@ -169,6 +173,7 @@ function fixtureStatusFromTeamMatch(status: V1TeamMatchStatus): PublicFixtureSta
 function presentCanonicalFixture(
   details: TournamentDetailRow['tournamentMatchDetails'][number],
   staffBypass: boolean,
+  publicLiveEnabled: boolean,
 ): PresentedFixture {
   const match = details.teamMatch;
   const videos = match.videos.map((video) => ({
@@ -195,7 +200,7 @@ function presentCanonicalFixture(
     status: fixtureStatusFromTeamMatch(match.status),
     homeRegistration: details.homeRegistration,
     awayRegistration: details.awayRegistration,
-    result: presentOfficialResult(match.game, staffBypass),
+    result: presentOfficialResult(match.game, staffBypass, publicLiveEnabled),
     game: match.game,
     videos,
     createdAt: details.createdAt,
@@ -204,14 +209,26 @@ function presentCanonicalFixture(
   };
 }
 
-function mergedPublicFixtures(row: TournamentDetailRow, staffBypass: boolean): PresentedFixture[] {
+function mergedPublicFixtures(
+  row: TournamentDetailRow,
+  staffBypass: boolean,
+  publicLiveEnabled: boolean,
+): PresentedFixture[] {
   const byId = new Map<string, PresentedFixture>();
   for (const details of row.tournamentMatchDetails) {
     // A missing policy is fail-closed in the public surface. Staff/admin
     // callers retain the operational view of malformed legacy data.
-    const visibilityMode = details.teamMatch.game?.visibilityPolicy?.mode;
-    if (!staffBypass && visibilityMode !== 'LIVE' && visibilityMode !== 'STATUS_ONLY' && visibilityMode !== 'OFFICIAL_ONLY') continue;
-    byId.set(details.teamMatchId, presentCanonicalFixture(details, staffBypass));
+    //
+    // **`status_only` 행은 여기서 버리지 않는다** — D-06 매트릭스가 그 모드에
+    // "Bracket/status: lifecycle only" 를 요구한다. 점수를 가리는 일은
+    // `presentOfficialResult` 혼자 한다. 이 줄까지 status_only 를 막으면 대진표·일정에서
+    // 경기 자체가 사라진다.
+    const mode = effectivePublicVisibilityMode(
+      details.teamMatch.game?.visibilityPolicy?.mode ?? 'HIDDEN',
+      publicLiveEnabled,
+    );
+    if (!staffBypass && mode === 'hidden') continue;
+    byId.set(details.teamMatchId, presentCanonicalFixture(details, staffBypass, publicLiveEnabled));
   }
   return [...byId.values()].sort((a, b) =>
     a.round.localeCompare(b.round) || a.fixtureNumber - b.fixtureNumber || a.legNumber - b.legNumber,
@@ -231,6 +248,12 @@ export function isPubliclyListedRegistration(status: string): boolean {
 
 export function presentTournamentDetail(
   row: TournamentDetailRow,
+  /**
+   * `PUBLIC_LIVE` 운영 킬스위치의 현재 값. **호출부가 읽어 넘긴다** — presenter 는 순수
+   * 함수를 유지한다. 기본값을 두지 않는 이유: 어느 쪽으로 정해도 틀린다. `true` 면 가려야
+   * 할 점수가 새고, `false` 면 정상 운영에서 점수가 사라진다.
+   */
+  publicLiveEnabled: boolean,
   now: Date = new Date(),
   staffBypass = false,
   /**
@@ -430,7 +453,7 @@ export function presentTournamentDetail(
     })),
     fixtures: !bracketPublished
       ? []
-      : mergedPublicFixtures(row, staffBypass).map((fixture) => ({
+      : mergedPublicFixtures(row, staffBypass, publicLiveEnabled).map((fixture) => ({
       id: fixture.id,
       groupId: fixture.groupId,
       round: fixture.round,
@@ -471,7 +494,7 @@ export function presentTournamentDetail(
       awayTeamLogoUrl: hideIdentity ? null : (fixture.awayRegistration?.team.profile?.logoUrl ?? null),
       // TeamMatch/Game의 현재 OFFICIAL 리비전만 공개한다. VOID 또는 미공식 상태는
       // 결과가 없으며, 과거 fixture result를 재사용하지 않는다.
-      result: presentOfficialResult(fixture.game, staffBypass),
+      result: presentOfficialResult(fixture.game, staffBypass, publicLiveEnabled),
       videos: fixture.videos.map((video) => ({
         id: video.id,
         title: video.title,

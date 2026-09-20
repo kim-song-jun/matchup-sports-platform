@@ -467,8 +467,9 @@ describe('Task 6 L1 game lifecycle', () => {
       }),
     );
     expectHttpCode(stale, 409, 'VERSION_CONFLICT');
+    // 킬스위치는 진행 중 노출만 끈다 — 모드 이름보다 "라이브 점수가 안 나간다" 쪽이 계약이다.
     expect(await service.getVisibility(tournamentGameId)).toEqual(
-      expect.objectContaining({ effectiveMode: 'status_only', score: null }),
+      expect.objectContaining({ effectiveMode: 'official_only', score: null, scoreStatus: 'unavailable' }),
     );
     await prisma.v1GameOperationFlag.update({ where: { key: 'PUBLIC_LIVE' }, data: { value: 'on' } });
     expect(await service.getVisibility(tournamentGameId)).toEqual(

@@ -26,6 +26,23 @@ describe('fixtureResultLabel / isUpcomingFixture', () => {
     vi.useRealTimers();
   });
 
+  it('점수가 가려진 대진은 숫자도 "결과 대기"도 아닌 "점수 비공개"다', () => {
+    // 서버는 가릴 때 점수를 null 로 내리지 않고 값째 보낼 수도 있다(어드민 상세와 같은
+    // 타입을 쓴다) — 플래그가 숫자보다 먼저 판정돼야 확정 점수가 새지 않는다.
+    const f = fixture({ startAt: '2026-08-20T20:00:00.000Z', status: 'completed', homeScore: 1, awayScore: 0, scoreHidden: true });
+    const result = fixtureResultLabel(f);
+    expect(result.text).toBe('점수 비공개');
+    expect(result.text).not.toContain('1');
+    expect(result).toMatchObject({ hasScore: false, isForfeit: false });
+    // '예정' 필터가 이 대진을 주워 담으면 "예정만 보기"에 이미 끝난 경기가 섞인다.
+    expect(isUpcomingFixture(f)).toBe(false);
+  });
+
+  it('scoreHidden 이 없으면 기존 판정 그대로다', () => {
+    const f = fixture({ startAt: '2026-08-20T20:00:00.000Z', status: 'completed', homeScore: 1, awayScore: 0 });
+    expect(fixtureResultLabel(f).text).toBe('1 : 0');
+  });
+
   it('킥오프가 미래인 status="matched" 대진은 "예정"이다', () => {
     const f = fixture({ startAt: '2026-09-01T20:00:00.000Z', status: 'matched' });
     expect(fixtureResultLabel(f).text).toBe('예정');

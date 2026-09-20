@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { isParticipantPubliclyEligible, loadParticipantConsentEligibility } from '../games/public-records/public-consent';
+import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
 import { LEAGUE_STATE_PRIORITY_ORDER, paginateByStatePriority, sortMyLeaguesByState } from './league-lifecycle-rules';
 import { calculateLeagueStandingsWithTieBreakInfo, LeagueTieBreakCriterion, resolveLeagueChampions } from './league-standings';
 import {
@@ -460,6 +461,8 @@ export class LeagueMatchPublicService {
           select: LEAGUE_FIXTURE_FACT_SELECT,
         });
     const factByGameId = new Map(facts.map((fact) => [fact.gameId, fact]));
+    // 요청당 한 번만 읽는다 — 대진마다 읽으면 목록 길이만큼 쿼리가 늘어난다.
+    const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
 
     // 이슈 1(감사 보통) — seriesId 는 응답에 이미 있었지만 "같은 시리즈의 다른 시즌·
     // 티어로 이동"할 링크가 어디에도 없었다. 새 엔드포인트 대신 이 상세 응답을
@@ -523,6 +526,7 @@ export class LeagueMatchPublicService {
           return fixture;
         }),
         factByGameId,
+        publicLiveEnabled,
       ),
     };
   }
@@ -547,6 +551,10 @@ export class LeagueMatchPublicService {
       },
     });
 
+    // **순위는 가시성 게이트를 타지 않는다 — 의도적이다.** 정본 §4 "순위·승점·전적은
+    // OFFICIAL 만 센다" 와 D-06 매트릭스의 `status_only` Records 칸("official historical
+    // records only") 둘 다 집계는 남기라고 말한다. 일정 목록만 가리는 이 비대칭을
+    // "일관성" 으로 맞추면 끝난 리그의 순위표가 통째로 빈다.
     const currentRevisionIds = teamMatches
       .map((tm) => tm.game?.currentOfficialRevisionId ?? null)
       .filter((id): id is string => id !== null);

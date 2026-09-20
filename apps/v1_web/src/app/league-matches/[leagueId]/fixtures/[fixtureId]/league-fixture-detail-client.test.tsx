@@ -198,6 +198,27 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.queryByRole('link', { name: /1 : 0/ })).not.toBeInTheDocument();
   });
 
+  it('점수 비공개 경기에서는 맞대결 목록에도 숫자가 남지 않는다', () => {
+    // 이 화면이 스크린샷의 자기모순이 드러난 자리다 — 본문은 "점수와 선수 기록은
+    // 공개되지 않아요" 를 띄우면서 바로 아래 맞대결 줄에 다른 경기의 확정 스코어를 찍었다.
+    //
+    // 숫자를 **일부러 함께 넣는다**: 화면이 `scoreHidden` 이 아니라 "숫자가 없음" 에
+    // 기대고 있으면 서버가 한 번이라도 숫자를 실어 보내는 날 그대로 샌다.
+    mockLeague({
+      fixtures: FIXTURES.map((fixture) =>
+        fixture.teamMatchId === 'fx-0' ? { ...fixture, scoreHidden: true } : fixture,
+      ),
+    });
+    mockViewer('none');
+    mockRecord('present', { visibilityMode: 'status_only', scoreStatus: 'official', score: null });
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+    expect(screen.getByText(/점수와 선수 기록은 공개되지 않아요/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /점수 비공개/ })).toHaveAttribute('href', '/league-matches/lg-1/fixtures/fx-0');
+    // 스코어 표기는 `N : M`(콜론 양옆 공백) 하나뿐이다 — 시각 표기(`19:00`)와 섞이지 않는다.
+    expect(screen.queryByText(/\d+ : \d+/)).not.toBeInTheDocument();
+  });
+
   it('참가팀(approved)에게는 채팅·라인업 통로가 뜬다', () => {
     mockLeague();
     // 실제 API 응답에서 state='approved'(신청서를 낸 사람)는 항상 신청팀 owner/manager이므로

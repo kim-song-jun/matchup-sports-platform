@@ -371,7 +371,7 @@ describe('Game core contract', () => {
     ).toThrow(expect.objectContaining({ code: 'SCORE_EVENT_MISMATCH' }));
   });
 
-  it('filters hidden, status-only, live-demoted, and official-only public data', () => {
+  it('filters hidden, status-only, kill-switch-demoted, and official-only public data', () => {
     const snapshot = {
       gameId: 'game-1',
       state: V1GameState.LIVE,
@@ -399,6 +399,8 @@ describe('Game core contract', () => {
     ).toEqual(
       expect.objectContaining({ lineup: null, score: null, events: [], records: [{ recordId: 'record-1' }] }),
     );
+    // `PUBLIC_LIVE=off` 는 진행 중 노출만 끊는다 — 확정본은 그대로 나간다.
+    // `public-visibility.ts` 의 짝 구현과 같은 답이어야 하는 자리다.
     expect(
       serializeGameVisibility(snapshot, {
         mode: 'live',
@@ -406,7 +408,12 @@ describe('Game core contract', () => {
         lineupEligible: true,
       }),
     ).toEqual(
-      expect.objectContaining({ effectiveMode: 'status_only', lineup: null, score: null, events: [] }),
+      expect.objectContaining({
+        effectiveMode: 'official_only',
+        lineup: null,
+        score: { home: 2, away: 1 },
+        events: [{ sequence: 2, type: V1GameEventType.GOAL }],
+      }),
     );
     expect(
       serializeGameVisibility(snapshot, {

@@ -163,6 +163,46 @@ describe('TournamentCard — 리그는 정원을 그리지 않는다', () => {
 });
 
 /**
+ * #7 (실사용자 발견 버그, 2026-09-19): 정원이 이미 다 찬 대회는 관리자가 아직 상태를
+ * '마감'으로 바꾸지 않았어도 상단 배지가 하단 정원 표시와 어긋나면 안 된다.
+ */
+describe('TournamentCard — 정원이 다 찼으면 상태가 open이어도 마감 배지를 보여준다', () => {
+  it('정원이 가득 찼는데 status는 아직 open이면 "모집 중"을 보여주지 않는다', () => {
+    const { container } = render(
+      <TournamentCard item={buildItem({ status: 'open', teamCount: 4, confirmedCount: 4 })} />,
+    );
+    const text = (container.textContent ?? '').replace(/\s+/g, ' ');
+    expect(text).not.toContain('모집 중');
+  });
+
+  it('입금대기 팀까지 합쳐 정원이 찼어도 마감으로 본다', () => {
+    const { container } = render(
+      <TournamentCard
+        item={buildItem({ status: 'open', teamCount: 4, confirmedCount: 2, pendingPaymentCount: 2 })}
+      />,
+    );
+    const text = (container.textContent ?? '').replace(/\s+/g, ' ');
+    expect(text).not.toContain('모집 중');
+  });
+
+  it('정원이 남아 있으면 그대로 "모집 중"을 보여준다 — 대조군', () => {
+    const { container } = render(
+      <TournamentCard item={buildItem({ status: 'open', teamCount: 4, confirmedCount: 2 })} />,
+    );
+    const text = (container.textContent ?? '').replace(/\s+/g, ' ');
+    expect(text).toContain('모집 중');
+  });
+
+  it('리그는 정원 개념이 없어 이 분기를 타지 않는다 — status 그대로', () => {
+    const item = buildItem({ kind: 'regular_league', status: 'open', confirmedCount: 2 });
+    delete (item as { teamCount?: number }).teamCount;
+    const { container } = render(<TournamentCard item={item} />);
+    const text = (container.textContent ?? '').replace(/\s+/g, ' ');
+    expect(text).toContain('모집 중');
+  });
+});
+
+/**
  * 한 목록에 대회와 리그가 섞이면 **어느 쪽인지 카드에서 보여야 한다.**
  * 상태 배지(모집중·진행중·종료)는 두 종류가 글자까지 같아서 구분에 못 쓴다.
  */

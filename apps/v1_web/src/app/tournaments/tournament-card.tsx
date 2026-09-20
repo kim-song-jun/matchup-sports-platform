@@ -93,7 +93,6 @@ export function TournamentCard({
    */
   interactive?: boolean;
 }) {
-  const status = getTournamentStatusConfig(item.status);
   const sportAccent = getSportAccent(item.sport.code);
   const pendingPaymentCount = getPendingPaymentCount(item);
   /**
@@ -109,6 +108,18 @@ export function TournamentCard({
      `format` 은 "어떻게 치르나", `kind` 는 "무엇인가"이고 여기 질문은 뒤쪽이다. */
   const isLeague = item.kind === 'regular_league';
   const reservedTeamCount = capacity === null ? 0 : getReservedTeamCount(capacity);
+  /**
+   * #7 (실사용자 발견 버그, 2026-09-19): 정원이 이미 다 찬 대회는 관리자가 아직 상태를
+   * '마감'으로 바꾸지 않았어도(자동 마감 처리 지연 등) 대표 배지가 하단의 정원 표시
+   * ("N/N팀 확정")와 어긋나면 안 된다 — "모집 중" 배지를 보고 상세로 들어갔다가 신청할 수
+   * 없다는 걸 뒤늦게 알게 된다. 하단과 같은 문구·스타일(getTournamentStatusConfig('closed'))
+   * 로 맞춘다. 리그는 `capacity`가 항상 null이라 이 분기를 타지 않는다.
+   */
+  const isCapacityFull = capacity !== null && capacity.teamCount > 0 && reservedTeamCount >= capacity.teamCount;
+  const status =
+    item.status === 'open' && isCapacityFull
+      ? getTournamentStatusConfig('closed')
+      : getTournamentStatusConfig(item.status);
   // 커버가 없는 대회도 홍보용으로 등록한 실사진이 있으면 아이콘 대신 그 사진을 썸네일로
   // 재사용한다 (셋 다 없으면 종목색 그라디언트+아이콘 폴백).
   const thumbnailImageUrl = resolveTournamentImage(item, 'cover');

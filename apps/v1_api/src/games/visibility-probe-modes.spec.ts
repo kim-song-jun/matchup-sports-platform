@@ -31,7 +31,9 @@ function serviceWith(input: {
           mode: input.mode,
           // 이미 지난 시각이라 명단 공개 자격 자체는 충족한다 — 그런데도 명단이
           // 나가면 안 되는 것이 official_only 의 계약이다.
-          lineupAt: new Date('2026-01-01T00:00:00.000Z'),
+          // 라인업 공개 시각이 지난 상태를 만든다 — 이 픽스처는 "모드가 틀리면 라인업이
+          // 실제로 나간다" 를 보이는 것이 목적이라 고정 날짜가 아니라 상대 과거로 둔다.
+          lineupAt: new Date(Date.now() - 60 * 60 * 1000),
           version: 0,
         },
         sides: [

@@ -141,8 +141,7 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
 
   // 셸 승격(U34): 채팅방 제목은 fetch 의존(§1.9 "fetch된 제목" 유형) — 테이블(community.ts)엔
   // 로딩 중 기본값만 있고, 실제 값(model.title — room.data.title 또는 로딩 placeholder)은
-  // 여기서 매 렌더 직접 override로 밀어넣는다. Hooks 규칙: 조건부 return보다 위, 렌더 함수
-  // 본문에서 직접 호출(useEffect 아님 — shell-override.ts 주석 참조).
+  // 여기서 override로 밀어넣는다.
   useShellOverride({ title: model.title });
 
   return (

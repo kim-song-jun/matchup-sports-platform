@@ -42,7 +42,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => searchParams,
 }));
 
-// useShellOverride가 렌더 단계에서 모듈 스코프 store에 밀어넣은 값을 읽어 화면에 텍스트로
+// useShellOverride가 레이아웃 이펙트에서 모듈 스코프 store에 게시한 값을 읽어 화면에 텍스트로
 // 노출한다 — AppShellFrame을 전부 마운트하지 않고도(그건 app-shell-frame.test.tsx가 이미
 // 검증) 실제 컴포넌트가 useShellOverride({ backHref })를 호출하는 값 자체를 검증한다.
 function BackHrefProbe() {
@@ -700,12 +700,8 @@ describe('TournamentApplyPageClient GA events', () => {
   // 팀을 골라 들어온 흐름이므로). 이 분기가 깨지면(예: applyBackHref 계산이 원복되면)
   // 아래 두 단언 중 하나가 red가 된다.
   describe('셸 backHref override', () => {
-    // Probe를 페이지와 형제로 한 트리에 같이 렌더하면 useSyncExternalStore가 "다른 컴포넌트
-    // 렌더 중 setState" React 경고를 낸다(마운트 직후 자체 재확인이 트리거) — 실제 프로덕션
-    // 배선(app-shell-frame.tsx)에서는 AppShellFrame이 항상 페이지의 조상이라 이 문제가 없다.
-    // 테스트에서 같은 순서를 재현하는 대신, 페이지를 먼저 완전히 커밋시킨 뒤(store가 이미
-    // 갱신된 상태) Probe를 별도 act로 마운트해 첫 렌더에서 바로 최신 값을 읽게 한다 — 경고도
-    // 없고 검증 대상(override 값)도 동일하다.
+    // 페이지를 먼저 완전히 커밋시켜 레이아웃 이펙트가 store에 게시하게 한 뒤 Probe를 별도로
+    // 마운트한다 — Probe가 첫 렌더에서 바로 최신 값을 읽는다.
     it('`?team=` 없이 진입하면 override를 밀어넣지 않아 테이블 기본값(대회 상세)이 유지된다', () => {
       tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
       tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });

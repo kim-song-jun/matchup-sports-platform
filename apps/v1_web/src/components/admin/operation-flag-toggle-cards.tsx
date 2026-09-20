@@ -27,7 +27,7 @@ const TOGGLES: readonly ToggleDef[] = [
     key: 'PUBLIC_LIVE',
     label: '실시간 점수 공개',
     onEffect: '관전자 화면(비로그인 포함)에 진행 중인 경기의 점수와 경기 시계를 그대로 보여줘요.',
-    offEffect: '끄면 공개 화면의 실시간 점수가 상태만 보이는 status_only로 강등돼요 — 점수·경기 시계는 더 이상 공개되지 않아요.',
+    offEffect: '끄면 진행 중인 경기의 점수와 경기 시계가 공개 화면에서 사라져요. 이미 확정된 경기 결과는 그대로 보여요 — 결과까지 감추려면 경기별 공개 정책을 따로 지정해야 해요.',
     techNote: 'PUBLIC_LIVE',
   },
   {

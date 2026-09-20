@@ -90,7 +90,15 @@ has a *current* official fact, independent of the request's own `season`/
 Each fixture/game independently resolves `hidden | status_only | live |
 official_only` from `V1GameVisibilityPolicy.mode` + the `PUBLIC_LIVE`
 operation flag (`effectivePublicVisibilityMode` in `public-visibility.ts`,
-D-06: the flag can only ever demote `live` to `status_only`). A `hidden`
+D-06: the flag can only ever demote `live` to `official_only`). The
+kill-switch suppresses live/in-progress exposure; it does **not** retract a
+confirmed official result, so a finished fixture keeps its score while the
+flag is off. Operators who need a competition's results fully non-public set
+`V1GameVisibilityPolicy.mode` to `STATUS_ONLY` or `HIDDEN` instead -- the
+flag is a rollout rollback switch, not a blanket score embargo. This matters
+because the flag has no seed row: a freshly provisioned environment reads it
+as `off`, and demoting to `status_only` there made every confirmed league
+result invisible by default. A `hidden`
 fixture is *never* listed in the schedule and its match route returns the
 exact same `404 TOURNAMENT_MATCH_NOT_FOUND` as a genuinely nonexistent
 fixture or an unpublished bracket -- a caller cannot distinguish "does not
@@ -102,7 +110,8 @@ match detail: the league fixture list (`GET /league-matches/:leagueId` and
 the `leagueFixtures[]` mirror in `GET /tournaments/:id`) resolves it per row
 in `toLeagueFixtureList` and returns `homeScore = awayScore = null`,
 `isForfeit = false` and `scoreHidden = true` under `status_only` (and under a
-missing policy row, which fails closed). The row itself is kept so week
+missing policy row, which fails closed). `official_only` keeps the numbers --
+the list only ever carries official facts, and that is what the mode names. The row itself is kept so week
 labels and the "next match" pointer, which clients derive from the array,
 stay stable. `GET /tournaments/:id` `fixtures[].result` resolves the same
 mode in `tournament-detail.presenter.ts`; `status_only` fixtures keep their

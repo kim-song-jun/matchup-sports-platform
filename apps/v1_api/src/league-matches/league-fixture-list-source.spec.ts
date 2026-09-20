@@ -94,19 +94,20 @@ describe('toLeagueFixtureList', () => {
     expect(item).toMatchObject({ homeTeamId: null, homeAssigned: false, awayTeamId: 'team-b', awayAssigned: true });
   });
 
-  it('PUBLIC_LIVE 가 꺼지면 확정 점수라도 가리고 그 사실을 알린다', () => {
-    // 경기 상세는 이 상태에서 이미 점수를 null 로 내보낸다. 목록만 숫자를 실으면 같은
-    // 화면 안에서 두 lane 이 서로 다른 말을 한다.
+  it('PUBLIC_LIVE 가 꺼져도 확정 점수는 그대로 공개한다', () => {
+    // 킬스위치는 LIVE 를 `official_only` 로 강등시킨다 — 진행 중 숫자만 끊고 확정본은
+    // 남긴다. 플래그 row 가 없는 환경이 전부 off 라, 여기서 가리면 새로 띄운 모든
+    // 환경에서 확정된 리그 결과가 사라진다.
     const [item] = toLeagueFixtureList([row()], new Map([['game-1', fact()]]), false);
-    expect(item).toMatchObject({ homeScore: null, awayScore: null, scoreHidden: true });
+    expect(item).toMatchObject({ homeScore: 3, awayScore: 1, scoreHidden: false });
   });
 
   it('가려진 대진의 몰수 뱃지도 함께 지운다', () => {
     // 몰수 뱃지는 "1:0 으로 확정" 을 그대로 말한다 — 숫자만 가리면 가린 적이 없는 것과 같다.
     const [item] = toLeagueFixtureList(
-      [row()],
+      [row({ game: { id: 'game-1', currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'STATUS_ONLY' } } })],
       new Map([['game-1', fact({ homeScore: 1, awayScore: 0, resultRevision: { reason: null, outcomeReason: 'FORFEIT' } })]]),
-      false,
+      true,
     );
     expect(item).toMatchObject({ isForfeit: false, scoreHidden: true });
   });

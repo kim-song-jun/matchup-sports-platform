@@ -299,10 +299,9 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
     expect(presented.fixtures[0].result).toBeNull();
   });
 
-  it('PUBLIC_LIVE 가 꺼지면 LIVE 정책 경기도 결과를 감춘다 — 대진 행은 남는다', () => {
-    // 이 줄이 없으면 같은 경기의 `/tournaments/:id/matches/:id` 는 점수를 가리는데
-    // `/tournaments/:id` 는 그대로 싣는다. 행까지 지우면 D-06 의 status_only
-    // ("Bracket/status: lifecycle only")를 어긴다 — 대진표에서 경기가 통째로 사라진다.
+  it('PUBLIC_LIVE 가 꺼져도 확정 결과는 그대로 보인다 — 킬스위치는 official_only 까지만 강등한다', () => {
+    // 킬스위치가 끊는 것은 진행 중 노출이지 확정 결과가 아니다. 플래그 row 가 없는
+    // 환경이 전부 off 라, 여기서 감추면 새로 띄운 환경의 대진표가 통째로 숫자를 잃는다.
     const row = baseRow({
       detailSeeds: [
         fixtureRow({
@@ -329,10 +328,10 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
 
     const gated = presentTournamentDetail(row, false);
     expect(gated.fixtures).toHaveLength(1);
-    expect(gated.fixtures[0].result).toBeNull();
-    // 플래그가 켜져 있으면 그대로 보인다 — 이 게이트는 킬스위치에만 반응한다.
+    expect(gated.fixtures[0].result).toMatchObject({ homeScore: 2, awayScore: 1 });
+    // 플래그가 켜진 쪽과 같은 답이어야 한다 — 확정 결과에 대해 킬스위치는 무효다.
     expect(presentTournamentDetail(row, true).fixtures[0].result).toMatchObject({ homeScore: 2, awayScore: 1 });
-    // 운영자는 킬스위치와 무관하게 운영 뷰를 유지한다.
+    // 운영자 뷰도 그대로다.
     expect(presentTournamentDetail(row, false, new Date(), true).fixtures[0].result).toMatchObject({ homeScore: 2 });
   });
 

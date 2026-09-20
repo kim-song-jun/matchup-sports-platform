@@ -197,7 +197,7 @@ function buildFakePrisma(options: {
     },
     v1GameOperationFlag: {
       async findUnique() {
-        return { value: 'on' }; // PUBLIC_LIVE 켜짐 -- LIVE 정책이 'live' 모드로 승격된다.
+        return { value: 'on' }; // PUBLIC_LIVE 켜짐 -- LIVE 정책이 'live' 로 남는다(꺼지면 'official_only').
       },
     },
     v1ParticipantIdentityLinkCurrent: {

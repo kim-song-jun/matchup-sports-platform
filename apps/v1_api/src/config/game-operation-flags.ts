@@ -107,7 +107,8 @@ export function resolveGameOperationEvidencePath(
  *
  * What remains -- `PUBLIC_LIVE`/`DIRECTOR_OFFICIALIZE` -- are ongoing operational rollback
  * switches, not a one-time migration, and are unaffected by this cleanup: `PUBLIC_LIVE=off`
- * demotes the public live scoreboard to `status_only`; `DIRECTOR_OFFICIALIZE=off` blocks a
+ * demotes the public live scoreboard to `official_only` (confirmed results stay public);
+ * `DIRECTOR_OFFICIALIZE=off` blocks a
  * tournament director's result confirmation. Both still go through the same CAS +
  * gate-bundle-verified `patchFlag()` (or the simplified DB-switch `simplifiedPatchFlag()`) path as
  * before.

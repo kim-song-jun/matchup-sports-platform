@@ -12,6 +12,7 @@ import {
 import { TeamRecordsQueryDto } from './dto/public-records-query.dto';
 import { decodeRecordCursor, encodeRecordCursor, type RecordCursor } from './public-cursor';
 import { loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
+import { isPublicLiveEnabled } from './public-live-flag';
 import { effectivePublicVisibilityMode } from './public-visibility';
 import {
   byUnknownLast,
@@ -116,11 +117,7 @@ export class PublicTeamRecordsService {
     const cursor = decodeRecordCursor(query.cursor);
     const seasonRange = seasonBounds(query.season);
 
-    // finding #40: mode 계산은 페이지 쿼리보다 먼저 필요하다 -- `fetchSummary`의
-    // raw SQL 집계가 hidden/status_only 경기를 승-무-패·득실 합산에서 빼야 하므로
-    // (랭킹 필터와 동일 이유, participant-name-gating 문서 참고) 그 쿼리에도
-    // `publicLiveEnabled`를 넘겨야 한다.
-    const publicLiveEnabled = await this.isPublicLiveEnabled();
+    const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
 
     // 집계(summary/byType)는 `type` 필터와 무관하게 항상 전체 기준이다 -- 필터는
     // items 목록에만 적용된다(과제 지시: "페이지네이션과 집계를 섞지 마라"). 종류별
@@ -131,7 +128,7 @@ export class PublicTeamRecordsService {
     // 줄어들면 안 된다(그 시즌만 있는 것처럼 보이는 함정).
     const [rawFacts, summary, availableSeasons] = await Promise.all([
       this.fetchRawFacts(teamId, limit, cursor, seasonRange, query.type),
-      this.fetchSummary(teamId, seasonRange, publicLiveEnabled),
+      this.fetchSummary(teamId, seasonRange),
       this.fetchAvailableSeasons(teamId),
     ]);
 
@@ -558,7 +555,6 @@ export class PublicTeamRecordsService {
   private async fetchSummary(
     teamId: string,
     seasonRange: { readonly gte: Date; readonly lt: Date } | null,
-    publicLiveEnabled: boolean,
   ): Promise<{
     played: number;
     won: number;
@@ -587,14 +583,18 @@ export class PublicTeamRecordsService {
         COALESCE(SUM(trf.goals_against), 0)::int AS "goalsAgainst"
       FROM v1_team_record_facts trf
       INNER JOIN v1_games g ON g.id = trf.game_id AND g.current_official_revision_id = trf.revision_id
-      -- finding #40: 랭킹 필터(getPlayerRecords, 241-250줄)와 동일한 규칙 --
-      -- hidden(정책 row 없음 포함, fail-closed)·status_only 경기는 승-무-패·득실
-      -- 합산에서도 빼야 한다. 그 값 자체가 숨긴 경기의 결과를 간접 노출하기 때문.
+      -- finding #40: 랭킹 필터(getPlayerRecords)와 동일한 규칙 -- hidden(정책 row 없음
+      -- 포함, fail-closed)·status_only 경기는 승-무-패·득실 합산에서도 빼야 한다.
+      -- 그 값 자체가 숨긴 경기의 결과를 간접 노출하기 때문.
+      --
+      -- effectivePublicVisibilityMode 를 SQL 로 옮겨 적은 자리다. LIVE 는 PUBLIC_LIVE 와
+      -- 무관하게 남는다 — 킬스위치가 꺼져도 official_only 로 강등될 뿐 확정 결과는
+      -- 공개이므로, 여기서 빼면 킬스위치가 팀 전적을 0 으로 만든다.
       INNER JOIN v1_game_visibility_policies vp ON vp.game_id = g.id
       LEFT JOIN v1_team_matches tm ON tm.id = g.team_match_id
       WHERE trf.team_id = ${teamId}
       ${seasonSql}
-      AND (vp.mode = 'OFFICIAL_ONLY' OR (vp.mode = 'LIVE' AND ${publicLiveEnabled}))
+      AND vp.mode IN ('LIVE', 'OFFICIAL_ONLY')
       GROUP BY category
     `);
 
@@ -626,22 +626,6 @@ export class PublicTeamRecordsService {
     return { ...overall, byType };
   }
 
-  /**
-   * finding #40: D-06 게이팅의 런타임 축(`PUBLIC_LIVE` 운영 킬스위치) --
-   * `public-tournament-records.service.ts`의 동일 이름 private 메서드와 완전히
-   * 같은 조회다. 플래그 row 가 없으면(마이그레이션에 seed 가 없다) fail-closed 로
-   * off 취급한다 -- `effectivePublicVisibilityMode`가 그 경우 LIVE 를 status_only 로
-   * 강등시킨다. 두 서비스가 공유 가능한 헬퍼로 뽑혀 있지 않은 이유는 이 배치의
-   * 수정 범위가 이 파일 하나로 한정돼 있기 때문(needsOwnerElsewhere 참고) --
-   * `public-visibility.ts`에 옮기는 리팩터는 별도 후속 작업이다.
-   */
-  private async isPublicLiveEnabled(): Promise<boolean> {
-    const flag = await this.prisma.v1GameOperationFlag.findUnique({
-      where: { key: 'PUBLIC_LIVE' },
-      select: { value: true },
-    });
-    return flag?.value === 'on';
-  }
 }
 
 /** `fetchSummary`의 승-무-패-득실 한 구간. 전체 요약과 `byType`의 각 항목이 공유하는 모양. */

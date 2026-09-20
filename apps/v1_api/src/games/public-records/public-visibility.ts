@@ -15,7 +15,14 @@ import type { PublicGameVisibilityMode } from '../games.types';
  * they are separate files.
  */
 
-/** D-06: `PUBLIC_LIVE=off` can only ever demote `live` to `status_only`; it can never promote or hide. */
+/**
+ * D-06: `PUBLIC_LIVE=off` demotes `live` to `official_only`; it can never promote or hide.
+ *
+ * 킬스위치가 막는 것은 **진행 중 노출**이다 — 확정된 공식 결과까지 회수하지 않는다.
+ * 플래그 row 가 없는 환경(새로 띄운 DB 가 전부 그렇다)이 fail-closed 로 off 이므로,
+ * `status_only` 로 강등하면 그런 환경에서는 확정된 리그 결과가 통째로 사라진다.
+ * 전면 비공개가 필요하면 대회별 가시성 정책(`STATUS_ONLY`/`HIDDEN`)으로 지정한다.
+ */
 export function effectivePublicVisibilityMode(
   policyMode: V1VisibilityMode,
   publicLiveEnabled: boolean,
@@ -28,7 +35,7 @@ export function effectivePublicVisibilityMode(
     case 'STATUS_ONLY':
       return 'status_only';
     case 'LIVE':
-      return publicLiveEnabled ? 'live' : 'status_only';
+      return publicLiveEnabled ? 'live' : 'official_only';
     default:
       // Fail closed on any future/unknown enum value rather than leaking a
       // live/official view of an unrecognized policy state.

@@ -5,9 +5,15 @@ import type {
   SerializedGameVisibility,
 } from '../games.types';
 
+/**
+ * D-06 의 런타임 강등. `public-visibility.ts` 의 `effectivePublicVisibilityMode` 와
+ * **같은 답을 내야 하는 두 번째 구현**이다(그쪽 docblock 이 이 쌍을 명시한다) —
+ * 한쪽만 고치면 `/games/:id/visibility` 와 공개 기록 라우트가 같은 경기에 다른 말을 한다.
+ * 킬스위치는 진행 중 노출만 끊고 확정 결과는 남긴다.
+ */
 function effectiveMode(policy: GameVisibilityPolicyInput): PublicGameVisibilityMode {
   if (policy.mode === 'live' && !policy.publicLiveEnabled) {
-    return 'status_only';
+    return 'official_only';
   }
   return policy.mode;
 }

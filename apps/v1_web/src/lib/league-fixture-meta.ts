@@ -39,6 +39,9 @@ export function fixtureStatusMeta(status: string): { label: string; badgeClass: 
   return FIXTURE_STATUS_META[status] ?? { label: status, badgeClass: 'tm-badge-grey' };
 }
 
+/** 점수가 정책상 가려진 대진의 결과 문구. 상세 화면의 "점수와 선수 기록은 공개되지 않아요" 와 같은 사실을 목록 폭에 맞춰 적는다. */
+export const SCORE_HIDDEN_LABEL = '점수 비공개';
+
 /**
  * 점수 필드(homeScore/awayScore)는 값이 없을 수 있다(미확정 대진) — 그때는 0:0으로
  * 오인되지 않게 상태 기반 문구로 대체한다.
@@ -64,6 +67,11 @@ export function fixtureStatusMeta(status: string): { label: string; badgeClass: 
 export function fixtureResultLabel(fixture: V1LeagueFixture): { text: string; hasScore: boolean; isForfeit: boolean } {
   if (fixture.status === 'cancelled') {
     return { text: '집계 제외', hasScore: false, isForfeit: false };
+  }
+  // 가려진 점수는 '결과 대기' 로 떨어뜨리지 않는다 — 결과는 확정돼 있고 공개만 안 되는
+  // 상태라 그 문구는 거짓이다. 경기 상세가 쓰는 "점수는 공개되지 않아요" 와 같은 말을 한다.
+  if (fixture.scoreHidden === true) {
+    return { text: SCORE_HIDDEN_LABEL, hasScore: false, isForfeit: false };
   }
   if (typeof fixture.homeScore === 'number' && typeof fixture.awayScore === 'number') {
     // 몰수는 스코어만 보면 실제 1:0 승리와 똑같이 읽힌다 — 점수는 그대로 두고 별도

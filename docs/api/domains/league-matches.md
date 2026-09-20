@@ -33,6 +33,14 @@ LEAGUE_REGION_INVALID` for an unknown or unsuitable region.
 - `GET /api/v1/league-matches/me` lists leagues for the authenticated user's
   active team memberships and confirmed registrations.
 - `GET /api/v1/league-matches/:leagueId` returns the league schedule summary.
+  Each fixture's score follows the D-06 visibility matrix (see
+  `docs/api/domains/public-records.md`): a gated row carries
+  `homeScore = awayScore = null` with `scoreHidden: true` instead of being
+  dropped. Only `hidden` and `status_only` gate a row -- `official_only`
+  (which is where `PUBLIC_LIVE=off` lands a `live` policy) keeps the
+  confirmed score. `scoreHidden` is `true` only when an official result
+  exists and is being withheld; a fixture that has not been played yet
+  reports `false`. Standings keep counting the official facts.
 - `GET /api/v1/league-matches/:leagueId/standings` returns standings and
   fixtures.
 - `POST /api/v1/admin/league-matches/:leagueId/fixtures/manual` creates one

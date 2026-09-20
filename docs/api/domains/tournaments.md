@@ -13,6 +13,15 @@ Tournament list/detail reads are public. Clients may call them without a stored 
 
 Public list/detail items include `campaignSlug` only while the related campaign is `published`; otherwise the field is `null`. The slug endpoint also requires a published campaign and a non-deleted tournament in `open`, `closed`, `in_progress`, or `completed`. Its tournament projection contains display facts, rules/refund policy, active sponsors, confirmed count, and public confirmed/waitlisted team summaries. It never returns bank account fields, player/contact PII, creator/admin identity, or deleted-row metadata.
 
+Public detail applies the D-06 visibility matrix (see `docs/api/domains/public-records.md`) to both result lanes, but the two lanes drop and keep rows differently:
+
+- `fixtures[]` (tournament lane): a `hidden` fixture **is omitted entirely** -- there is no row with a null result. A `status_only` fixture **keeps its row** ("lifecycle only") with `result: null`.
+- `leagueFixtures[]` (league schedule lane): **no row is ever omitted**, because week labels and the "next match" pointer derive from this array's length and order. A `hidden` or `status_only` fixture keeps its row with null scores and `scoreHidden: true`.
+
+`scoreHidden` means "confirmed but withheld", so it is `true` only when an official result exists. A fixture that has not been played yet reports `scoreHidden: false` -- it is not hidden, it simply has no result.
+
+`PUBLIC_LIVE=off` demotes a `live` policy to `official_only`, which is not a gated state -- confirmed results stay visible while the kill-switch is off. Staff bypass is unchanged. Standings and overall aggregates are not gated.
+
 After bracket publication, each public `groups[].standings[]` row includes nullable `teamLogoUrl` from the registered team's current profile. Tournament detail and bracket clients render it through the shared team-avatar fallback contract, so a missing or failed image remains distinguishable without replacing valid saved logos.
 
 ### Overall standings — two competition kinds, two row shapes

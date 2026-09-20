@@ -233,6 +233,9 @@ describe('TournamentsReadService', () => {
     v1TournamentMatchDetails: {
       findMany: jest.Mock;
     };
+    v1GameOperationFlag: {
+      findUnique: jest.Mock;
+    };
   };
 
   beforeEach(async () => {
@@ -256,6 +259,11 @@ describe('TournamentsReadService', () => {
       },
       v1TournamentMatchDetails: {
         findMany: jest.fn().mockResolvedValue([]),
+      },
+      // PUBLIC_LIVE 켜짐 - 이 스펙의 대진은 전부 `visibilityPolicy.mode = 'LIVE'` 라,
+      // 꺼진 값을 주면 D-06 이 전부 `status_only` 로 강등해 결과가 사라진다.
+      v1GameOperationFlag: {
+        findUnique: jest.fn().mockResolvedValue({ value: 'on' }),
       },
     };
 

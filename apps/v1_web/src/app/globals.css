@@ -1599,7 +1599,6 @@ button:disabled {
   font-weight: 700;
   color: var(--text-strong);
   word-break: keep-all; /* [P2 한글] 카드 제목 음절 단위 줄바꿈 방지 — TDS 패턴 */
-  margin: 0; /* 카드 제목을 h2/h3 로 쓸 때 브라우저 기본 여백이 붙지 않게 */
 }
 
 .tm-text-body {
@@ -5452,6 +5451,13 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   .tm-my-home-shell .tm-my-card-slot { order: -2; }
   .tm-my-home-shell [data-primary='true'] { order: -1; }
 }
+
+/* 카드 제목을 h2 로 올리면서 붙는 브라우저 기본 여백만 끈다. `.tm-text-body-lg` 자체에
+   margin:0 을 걸면 안 된다 -- 그 클래스는 h1~h3·p 로 37곳에 쓰이고, 전용 클래스가 여백을
+   주는 곳(랜딩 feature/step 타이틀의 margin-bottom:8px 등)을 덮어 레이아웃이 어긋난다
+   (실측: 랜딩 카드가 8px 씩, 누적 24px 까지 밀렸다). 그쪽은 별도 파일이라 승패가 로드
+   순서에 달려 있어 더욱 기댈 수 없다. */
+.tm-my-home-shell h2.tm-text-body-lg { margin: 0; }
 
 /* 카드가 도착하기 전의 빈 자리(스켈레톤이 아니라 높이만). 프레임 높이는 카드와 같은
    수를 쓰고, 그 아래 조작줄·캡션 묶음은 390 실측값(124px)이다 -- 도착 전후 높이가

@@ -646,15 +646,25 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
 /**
  * 초대 폼은 이메일과 메시지 두 필드를 보내므로 400 을 이메일 탓으로 싸잡으면 안 된다.
  * 서버 ValidationPipe(main.ts)는 details 에 `{ field, messages }` 배열을 담아 준다.
+ * invitedEmail 의 제약은 DTO 가 한국어 메시지를 달아 두어 그대로 쓸 수 있다(형식·길이가
+ * 서로 다른 안내를 낸다). message 의 @MaxLength 에는 메시지가 없어 영문이 오므로 여기서 쓴다.
  */
 function invitationValidationMessage(err: unknown): string {
   const details = err instanceof V1ApiError ? err.details : undefined;
-  const fields = Array.isArray(details)
-    ? details.map((detail) => (detail as { field?: unknown } | null)?.field)
+  const entries = Array.isArray(details)
+    ? (details as Array<{ field?: unknown; messages?: unknown } | null>)
     : [];
 
-  if (fields.includes('invitedEmail')) return '이메일 형식을 확인해 주세요.';
-  if (fields.includes('message')) return `초대 메시지는 ${INVITE_MESSAGE_MAX_LENGTH}자까지 쓸 수 있어요.`;
+  const emailDetail = entries.find((detail) => detail?.field === 'invitedEmail');
+  if (emailDetail) {
+    const [serverMessage] = Array.isArray(emailDetail.messages) ? emailDetail.messages : [];
+    return typeof serverMessage === 'string' && serverMessage.length > 0
+      ? serverMessage
+      : '이메일 형식을 확인해 주세요.';
+  }
+  if (entries.some((detail) => detail?.field === 'message')) {
+    return `초대 메시지는 ${INVITE_MESSAGE_MAX_LENGTH}자까지 쓸 수 있어요.`;
+  }
   return '초대 내용을 다시 확인해 주세요.';
 }
 

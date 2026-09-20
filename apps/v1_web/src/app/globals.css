@@ -5429,16 +5429,23 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 
 /* ── 모바일 순서: 카드 다음이 곧 메뉴 ───────────────────────────────────────
    모바일에서는 데스크톱 래퍼(.tm-my-desktop-*)가 display:contents 라(desktop/my.css)
-   카드·프로필·메뉴 섹션이 그대로 이 그리드의 아이템이다. 덕분에 DOM 을 바꾸지 않고
-   order 만으로 순서를 돌릴 수 있고, 1024px 이상에서는 래퍼가 진짜 컨테이너가 되어
-   이 규칙이 닿지 않는다(데스크톱 2열 배치는 그대로).
+   카드·프로필·메뉴 섹션이 **레이아웃상** 이 그리드의 아이템이 된다. 그래서 DOM 을
+   바꾸지 않고 order 만으로 순서를 돌릴 수 있고, 1024px 이상에서는 래퍼가 진짜 컨테이너가
+   되어 이 규칙이 닿지 않는다(데스크톱 2열 배치는 그대로).
+
+   ⚠️ 자식 결합자(`.tm-my-shell > .tm-player-card`)로 쓰면 **안 된다.** display:contents 는
+   박스 생성·레이아웃에서만 요소를 자기 자식으로 치환하고, **선택자 매칭은 DOM 트리를
+   그대로 본다**. 카드는 DOM 상 shell 의 증손자(shell > layout > sidebar > card)라
+   자식 결합자에 걸리지 않는다 -- 규칙이 조용히 아무 일도 안 한다.
+   그래서 후손 결합자 + 음수 order 를 쓴다. 나머지 아이템은 기본값 0 이라 자동으로
+   뒤에 서므로 "나머지"를 선택할 필요가 없다(선택하려 해도 같은 이유로 못 잡는다).
+
    왜 필요한가: 실측(2026-09-20, 390) 에서 첫 메뉴 행이 1231px 아래에 있어 첫 화면에
    누를 것이 하나도 없었다 -- 카드·프로필·활동이 한 열에 쌓인 결과다. */
 @media (max-width: 1023px) {
-  .tm-my-shell > * { order: 3; }
-  .tm-my-shell > .tm-player-card,
-  .tm-my-shell > .tm-my-card-slot { order: 1; }
-  .tm-my-shell > [data-primary='true'] { order: 2; }
+  .tm-my-shell .tm-player-card,
+  .tm-my-shell .tm-my-card-slot { order: -2; }
+  .tm-my-shell [data-primary='true'] { order: -1; }
 }
 
 /* 카드가 도착하기 전의 빈 자리(스켈레톤이 아니라 높이만). 프레임 높이는 카드와 같은

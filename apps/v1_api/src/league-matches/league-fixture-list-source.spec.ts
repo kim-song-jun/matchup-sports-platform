@@ -143,6 +143,17 @@ describe('toLeagueFixtureList', () => {
     expect(items[0]).toMatchObject({ homeScore: null, scoreHidden: true, startAt: START });
   });
 
+  it('가리는 정책이어도 확정 사실이 없으면 "가렸다"고 말하지 않는다', () => {
+    // scoreHidden 은 "확정됐는데 공개만 안 한다" 는 뜻이다. 아직 치르지 않은 경기까지
+    // true 로 내보내면 화면이 '예정' 대신 '점수 비공개' 라고 적어 관전자를 오해시킨다.
+    const [item] = toLeagueFixtureList(
+      [row({ game: { id: 'game-1', currentOfficialRevisionId: null, visibilityPolicy: { mode: 'STATUS_ONLY' } } })],
+      new Map(),
+      true,
+    );
+    expect(item).toMatchObject({ scoreHidden: false, homeScore: null, awayScore: null });
+  });
+
   it('게임이 없는 대진은 숨김이 아니라 "아직 시작 전"이다', () => {
     // `?? 'HIDDEN'` 를 게임 없는 행에까지 적용하면 앞으로의 일정이 통째로 가려진다.
     const [item] = toLeagueFixtureList([row({ game: null })], new Map(), false);

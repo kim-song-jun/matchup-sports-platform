@@ -95,7 +95,10 @@ export function toLeagueFixtureList(
   return fixtures.map((fixture) => {
     const game = fixture.game;
     const fact = game === null ? undefined : factByGameId.get(game.id);
-    const scoreHidden = game !== null && hidesScore(game.visibilityPolicy?.mode ?? 'HIDDEN', publicLiveEnabled);
+    // 확정된 사실이 있을 때만 "가렸다" 고 말한다 — 결과가 아직 없는 경기까지 `scoreHidden`
+    // 으로 표시하면 화면이 "예정" 을 "점수 비공개" 로 바꿔 읽는다.
+    const scoreHidden =
+      fact !== undefined && hidesScore(game?.visibilityPolicy?.mode ?? 'HIDDEN', publicLiveEnabled);
     return {
       teamMatchId: fixture.id,
       title: fixture.title,

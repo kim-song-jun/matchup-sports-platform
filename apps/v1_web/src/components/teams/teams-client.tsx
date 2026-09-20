@@ -43,7 +43,7 @@ import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
 import type { V1Sport, V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { JerseyNumberDialog } from './jersey-number-dialog';
-import { TeamDetailPageSkeleton, TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
+import { INVITE_MESSAGE_MAX_LENGTH, TeamDetailPageSkeleton, TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
 import type { TeamDetailViewModel, TeamListViewModel, TeamMembersViewModel, TeamModel } from './teams.types';
 import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel, getTeamStateViewModel } from './teams.view-model';
 import {
@@ -480,9 +480,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
           } else if (responseCode === 'ALREADY_MEMBER') {
             setInviteError('이미 팀 멤버예요.');
           } else if (responseCode === 'VALIDATION_ERROR') {
-            // 서버 VALIDATION_ERROR 는 어떤 필드가 틀렸는지 담지 않는다 — 이 폼에서 검증되는
-            // 값은 이메일뿐이라 여기서 직접 안내한다.
-            setInviteError('이메일 형식을 확인해 주세요.');
+            setInviteError(invitationValidationMessage(err));
           } else {
             const raw = extractErrorMessage(err, '');
             setInviteError(raw || '초대를 보내지 못했어요. 다시 시도해 주세요.');
@@ -645,7 +643,20 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   );
 }
 
+/**
+ * 초대 폼은 이메일과 메시지 두 필드를 보내므로 400 을 이메일 탓으로 싸잡으면 안 된다.
+ * 서버 ValidationPipe(main.ts)는 details 에 `{ field, messages }` 배열을 담아 준다.
+ */
+function invitationValidationMessage(err: unknown): string {
+  const details = err instanceof V1ApiError ? err.details : undefined;
+  const fields = Array.isArray(details)
+    ? details.map((detail) => (detail as { field?: unknown } | null)?.field)
+    : [];
 
+  if (fields.includes('invitedEmail')) return '이메일 형식을 확인해 주세요.';
+  if (fields.includes('message')) return `초대 메시지는 ${INVITE_MESSAGE_MAX_LENGTH}자까지 쓸 수 있어요.`;
+  return '초대 내용을 다시 확인해 주세요.';
+}
 
 function buildTeamFilterSheet(
   params: URLSearchParams,

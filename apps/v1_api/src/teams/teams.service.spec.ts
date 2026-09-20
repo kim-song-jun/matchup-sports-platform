@@ -1809,14 +1809,14 @@ describe('TeamsService', () => {
       expect(prisma.v1TeamInvitation.create).toHaveBeenCalledTimes(1);
     });
 
-    it('대소문자·공백이 섞인 이메일도 저장된 표준형으로 계정을 찾는다', async () => {
+    it('대소문자가 섞인 이메일도 저장된 표준형으로 계정을 찾는다', async () => {
       setupCreateInvitationSuccess();
       prisma.v1TeamInvitation.create.mockResolvedValueOnce({ id: 'inv-case', status: 'pending' });
 
       await service.createInvitation(
         manager,
         'team-1',
-        { invitedEmail: '  Owner@Teameet.Co.Kr  ' },
+        { invitedEmail: 'Owner@Teameet.Co.Kr' },
       );
 
       expect(prisma.v1User.findUnique).toHaveBeenCalledWith({

@@ -987,26 +987,46 @@ describe('TeamMembersPageClient 초대 폼', () => {
     teamApiMocks.useV1LeaveTeam.mockReturnValue({ isPending: false, mutate: vi.fn() });
   });
 
-  it('서버 VALIDATION_ERROR 를 이메일 형식 안내로 바꿔 보여준다', async () => {
+  function rejectWithValidationError(field: string) {
     inviteMutate.mockImplementation((_vars, options) => {
       options?.onError?.(new V1ApiError({
         status: 'error',
         statusCode: 400,
         code: 'VALIDATION_ERROR',
         message: '입력값을 다시 확인해 주세요.',
+        details: [{ field, messages: ['invalid'] }],
         timestamp: '',
       }));
     });
+  }
 
+  function submitInvitation() {
     render(<TeamMembersPageClient teamId="team-1" />);
 
     fireEvent.click(screen.getByRole('button', { name: /^초대/ }));
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'owner@teameet.v1' } });
     fireEvent.click(screen.getByRole('button', { name: '초대 보내기' }));
+  }
+
+  it('이메일 필드가 거절되면 이메일 형식 안내로 바꿔 보여준다', async () => {
+    rejectWithValidationError('invitedEmail');
+
+    submitInvitation();
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('이메일 형식을 확인해 주세요.');
     });
     expect(screen.queryByText('입력값을 다시 확인해 주세요.')).toBeNull();
+  });
+
+  it('메시지 필드가 거절되면 이메일 탓으로 돌리지 않는다', async () => {
+    rejectWithValidationError('message');
+
+    submitInvitation();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('초대 메시지는 200자까지 쓸 수 있어요.');
+    });
+    expect(screen.queryByText('이메일 형식을 확인해 주세요.')).toBeNull();
   });
 });

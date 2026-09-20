@@ -1,3 +1,5 @@
+import type { V1VisibilityMode } from '@prisma/client';
+import { effectivePublicVisibilityMode } from '../games/public-records/public-visibility';
 import { resolveIsForfeit } from './league-forfeit-result';
 
 /**
@@ -31,7 +33,11 @@ export type LeagueFixtureListRow = {
   startAt: Date;
   placeName: string;
   status: string;
-  game: { id: string; currentOfficialRevisionId: string | null } | null;
+  game: {
+    id: string;
+    currentOfficialRevisionId: string | null;
+    visibilityPolicy: { mode: V1VisibilityMode } | null;
+  } | null;
 };
 
 /**
@@ -62,12 +68,20 @@ export type LeagueFixtureListItem = {
   homeScore: number | null;
   awayScore: number | null;
   isForfeit: boolean;
+  /**
+   * 점수가 **정책상 가려진** 상태. `homeScore === null` 만으로는 "아직 결과가 없다" 와
+   * 구분되지 않아 화면이 '결과 대기' 라고 거짓말한다 — 결과는 확정돼 있고 공개만 안 될 뿐이다.
+   */
+  scoreHidden: boolean;
 };
 
 /**
  * 대진 행 + 확정 사실 → 공개 일정 목록. **순수 함수** — 조회는 호출부가 한다.
  *
- * 두 가지를 지킨다:
+ * 세 가지를 지킨다:
+ * - **가시성 정책(D-06)을 경기 상세와 같은 기준으로 적용한다.** `publicLiveEnabled` 는
+ *   호출부가 읽어 넘긴다(순수 함수 유지). 가려진 점수는 `null` + `scoreHidden: true` 로
+ *   나가야 화면이 "아직 결과 없음" 과 구분해 적을 수 있다.
  * - **미확정 대진의 점수는 `null`** 이다. `0` 으로 채우면 화면이 0:0 무승부로 읽는다.
  * - **몰수는 boolean 하나로만** 나간다. 사유 원문은 운영자가 쓴 자유 텍스트라 공개 응답에
  *   싣지 않는다 — 스코어만 보면 실제 1:0 승리와 구분되지 않으니 표식은 필요하고,
@@ -76,9 +90,12 @@ export type LeagueFixtureListItem = {
 export function toLeagueFixtureList(
   fixtures: readonly LeagueFixtureListRow[],
   factByGameId: ReadonlyMap<string, LeagueFixtureFactRow>,
+  publicLiveEnabled: boolean,
 ): LeagueFixtureListItem[] {
   return fixtures.map((fixture) => {
-    const fact = fixture.game === null ? undefined : factByGameId.get(fixture.game.id);
+    const game = fixture.game;
+    const fact = game === null ? undefined : factByGameId.get(game.id);
+    const scoreHidden = game !== null && hidesScore(game.visibilityPolicy?.mode ?? 'HIDDEN', publicLiveEnabled);
     return {
       teamMatchId: fixture.id,
       title: fixture.title,
@@ -89,11 +106,28 @@ export function toLeagueFixtureList(
       startAt: fixture.startAt,
       placeName: fixture.placeName,
       status: fixture.status,
-      homeScore: fact?.homeScore ?? null,
-      awayScore: fact?.awayScore ?? null,
-      isForfeit: fact === undefined ? false : resolveIsForfeit(fact.resultRevision),
+      homeScore: scoreHidden ? null : fact?.homeScore ?? null,
+      awayScore: scoreHidden ? null : fact?.awayScore ?? null,
+      // 몰수 뱃지는 "1:0 으로 확정됐다" 를 그대로 말한다 — 숫자만 가리고 뱃지를 남기면
+      // 가린 적이 없는 것과 같다.
+      isForfeit: scoreHidden || fact === undefined ? false : resolveIsForfeit(fact.resultRevision),
+      scoreHidden,
     };
   });
+}
+
+/**
+ * 실효 가시성 모드가 **확정 점수까지** 가리는가. 경기 상세(`resolvePublicScorePresentation`)가
+ * `showOfficialResult` 에 대해 내리는 판정과 같은 답이어야 한다 — 이 목록은 언제나 확정
+ * 리비전의 사실만 싣기 때문이다. `official_only` 는 확정 전 숫자만 감추므로 여기선 공개다.
+ *
+ * `hidden` 은 경기 상세에서 404 지만 **목록에서는 행을 지우지 않는다**(점수만 가린다).
+ * 주차 라벨과 '다음 경기' 강조가 이 배열의 길이·순서에서 파생되므로, 행을 빼면 같은 경기의
+ * 주차가 보는 사람마다 달라진다.
+ */
+function hidesScore(policyMode: V1VisibilityMode, publicLiveEnabled: boolean): boolean {
+  const mode = effectivePublicVisibilityMode(policyMode, publicLiveEnabled);
+  return mode === 'status_only' || mode === 'hidden';
 }
 
 /**
@@ -145,7 +179,8 @@ export const LEAGUE_FIXTURE_LIST_SELECT = {
   startAt: true,
   placeName: true,
   status: true,
-  game: { select: { id: true, currentOfficialRevisionId: true } },
+  // `visibilityPolicy` 를 빼면 매퍼가 모드를 **볼 수 없어** 가려야 할 점수를 그대로 싣는다.
+  game: { select: { id: true, currentOfficialRevisionId: true, visibilityPolicy: { select: { mode: true } } } },
 } as const;
 
 /**

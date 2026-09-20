@@ -33,6 +33,7 @@ import {
   resolvePublicScorePresentation,
   type PublicScoreValue,
 } from './public-score-presentation';
+import { isPublicLiveEnabled } from './public-live-flag';
 import { effectivePublicVisibilityMode, isLineupPublished, publicFixtureStatus, resolveResultState } from './public-visibility';
 import type { PublicTournamentScheduleQueryDto } from './dto/public-records-query.dto';
 import {
@@ -358,7 +359,7 @@ export class PublicTournamentRecordsService {
     }
     await this.assertCanonicalRecordsReady(tournamentId);
 
-    const publicLiveEnabled = await this.isPublicLiveEnabled();
+    const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
     const games = await this.prisma.v1Game.findMany({
       where: {
         currentOfficialRevisionId: { not: null },
@@ -665,7 +666,7 @@ export class PublicTournamentRecordsService {
     // 이 조회는 특정 fixture 하나가 아니라 대회 전체 일정을 한 번에 내려주므로,
     // 스태프 우회는 fixture/field 단위가 아니라 대회 전체 단위(`{ tournamentId }`)로
     // 판정한다 -- TournamentsReadService.get()과 동일한 스코프 선택.
-    const publicLiveEnabled = await this.isPublicLiveEnabled();
+    const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
     const limit = query.limit ?? 20;
     const cursor = decodeRecordCursor(query.cursor);
 
@@ -963,7 +964,7 @@ export class PublicTournamentRecordsService {
     const pageRows = remaining.slice(0, limit);
     const hasMore = remaining.length > limit;
 
-    const publicLiveEnabled = await this.isPublicLiveEnabled();
+    const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
     const liveScoreByGameId = publicLiveEnabled
       ? await this.loadLiveScores(pageRows)
       : new Map<string, GameScore>();
@@ -1106,7 +1107,7 @@ export class PublicTournamentRecordsService {
       throw new NotFoundException(NOT_FOUND);
     }
 
-    const publicLiveEnabled = await this.isPublicLiveEnabled();
+    const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
     const policyMode: V1VisibilityMode = fixture.game?.visibilityPolicy?.mode ?? 'HIDDEN';
     const mode = effectivePublicVisibilityMode(policyMode, publicLiveEnabled);
     if (mode === 'hidden') {
@@ -1365,14 +1366,6 @@ export class PublicTournamentRecordsService {
       }),
     );
     return new Set(decisions.filter((id): id is string => id !== null));
-  }
-
-  private async isPublicLiveEnabled(): Promise<boolean> {
-    const flag = await this.prisma.v1GameOperationFlag.findUnique({
-      where: { key: 'PUBLIC_LIVE' },
-      select: { value: true },
-    });
-    return flag?.value === 'on';
   }
 
   // 참가자 이름 프로필 배치 조회(`loadParticipantNameProfiles`)는 이제
@@ -1821,7 +1814,7 @@ export class PublicTournamentRecordsService {
     }
     assertLeagueTeamMatchOperationalInvariant(teamMatch, leagueId);
 
-    const publicLiveEnabled = await this.isPublicLiveEnabled();
+    const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
     const policyMode: V1VisibilityMode = teamMatch.game?.visibilityPolicy?.mode ?? 'HIDDEN';
     const mode = effectivePublicVisibilityMode(policyMode, publicLiveEnabled);
     if (mode === 'hidden') {

@@ -97,6 +97,21 @@ fixture or an unpublished bracket -- a caller cannot distinguish "does not
 exist" from "exists but hidden" from "tournament hasn't published its
 bracket yet".
 
+The same effective mode now gates the *list* surfaces too, not just the
+match detail: the league fixture list (`GET /league-matches/:leagueId` and
+the `leagueFixtures[]` mirror in `GET /tournaments/:id`) resolves it per row
+in `toLeagueFixtureList` and returns `homeScore = awayScore = null`,
+`isForfeit = false` and `scoreHidden = true` under `status_only` (and under a
+missing policy row, which fails closed). The row itself is kept so week
+labels and the "next match" pointer, which clients derive from the array,
+stay stable. `GET /tournaments/:id` `fixtures[].result` resolves the same
+mode in `tournament-detail.presenter.ts`; `status_only` fixtures keep their
+row there as well, per the matrix's "lifecycle only".
+
+Standings and aggregates deliberately do **not** take this gate -- the
+matrix's `Records` column for `status_only` is "official historical records
+only".
+
 Lineup gating (D-02): `publicLineupAt` prefers the durable
 `V1GameVisibilityPolicy.lineupAt` pin once the write side sets it, and
 falls back to `fixture.scheduledAt - 60m` before that -- so the public

@@ -34,6 +34,7 @@ import {
 } from '../league-matches/league-standings';
 import { LEAGUE_TIE_BREAK_ORDER } from '../league-matches/league-tie-break';
 import { readPublicRostersForRegistrations, type PublicRosterPlayer } from './public-roster';
+import { isPublicLiveEnabled } from '../games/public-records/public-live-flag';
 
 /** `V1CompetitionConfigVersion.tieBreak`(Json)에 담긴 승리 승점 기본값 — 프리셋 전부가 3이다. */
 const DEFAULT_WIN_POINTS = 3;
@@ -210,9 +211,11 @@ export class TournamentsReadService {
     // `TOURNAMENT_KINDS` 게이트 뒤에 있다. 그래서 대회 축 대진으로는 **빈 일정**이 나오고,
     // 화면은 "대진표 준비 중" 을 띄운다(진행 중인 리그 시즌에 뜨면 틀린 말이다).
     // 리그 축에서 같은 목록을 만들어 별도 필드로 싣는다.
+    // 대진 목록과 `fixtures[].result` 가 **같은 플래그**를 봐야 한 화면 안에서 갈리지 않는다.
+    const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
     const leagueFixtures =
       row.kind === V1CompetitionKind.regular_league
-        ? await this.leagueCompetitionFixtures(tournamentId)
+        ? await this.leagueCompetitionFixtures(tournamentId, publicLiveEnabled)
         : [];
 
     // 공개 명단 — **참가팀 전부를 한 번에** 읽는다(팀마다 물으면 N+1). 명단과 등번호가 같은
@@ -236,6 +239,7 @@ export class TournamentsReadService {
 
     return presentTournamentDetail(
       row,
+      publicLiveEnabled,
       new Date(),
       staffBypass,
       leagueFixtures,
@@ -255,7 +259,7 @@ export class TournamentsReadService {
    * `placeName` 을 버린다 — 일정은 정확히 그 버린 것들이 필요하고, **취소·무효 대진도
    * 목록에는 보여야 한다**(화면이 "취소됨"·"집계 제외" 로 적는다). 같은 테이블, 다른 질문.
    */
-  private async leagueCompetitionFixtures(leagueId: string) {
+  private async leagueCompetitionFixtures(leagueId: string, publicLiveEnabled: boolean) {
     const fixtures = await this.prisma.v1TeamMatch.findMany({
       where: leagueFixtureListWhere(leagueId),
       orderBy: leagueFixtureListOrder(),
@@ -280,6 +284,7 @@ export class TournamentsReadService {
         return fixture;
       }),
       new Map(facts.map((fact) => [fact.gameId, fact])),
+      publicLiveEnabled,
     );
   }
 

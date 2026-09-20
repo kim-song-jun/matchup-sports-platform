@@ -139,6 +139,12 @@ export interface V1LeagueFixture {
    * 모달이 "현재 몰수로 확정돼 있어요"를 보여주려면 어드민 쪽에도 필요했다).
    */
   isForfeit?: boolean;
+  /**
+   * 점수가 **정책상 가려진** 대진(D-06 `status_only`/`hidden`). `homeScore === null` 만으로는
+   * "아직 결과가 없다" 와 구분되지 않아 화면이 '결과 대기' 라고 적게 된다 — 결과는 확정돼
+   * 있고 공개만 안 될 뿐이다. 공개 상세에서만 채워진다.
+   */
+  scoreHidden?: boolean;
 }
 
 export interface V1AdminLeagueDetail {

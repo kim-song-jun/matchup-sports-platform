@@ -232,7 +232,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       ],
     } as never);
 
-    const presented = presentTournamentDetail(row);
+    const presented = presentTournamentDetail(row, true);
 
     expect(presented.fixtures[0].result).toMatchObject({
       homeScore: 3,
@@ -265,8 +265,8 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       ],
     } as never);
 
-    expect(presentTournamentDetail(row).fixtures).toEqual([]);
-    expect(presentTournamentDetail(row, new Date(), true).fixtures).toHaveLength(1);
+    expect(presentTournamentDetail(row, true).fixtures).toEqual([]);
+    expect(presentTournamentDetail(row, true, new Date(), true).fixtures).toHaveLength(1);
   });
 
   it('공개 STATUS_ONLY fixture는 lifecycle은 남기고 결과를 숨긴다', () => {
@@ -294,9 +294,46 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       ],
     } as never);
 
-    const presented = presentTournamentDetail(row);
+    const presented = presentTournamentDetail(row, true);
     expect(presented.fixtures).toHaveLength(1);
     expect(presented.fixtures[0].result).toBeNull();
+  });
+
+  it('PUBLIC_LIVE 가 꺼지면 LIVE 정책 경기도 결과를 감춘다 — 대진 행은 남는다', () => {
+    // 이 줄이 없으면 같은 경기의 `/tournaments/:id/matches/:id` 는 점수를 가리는데
+    // `/tournaments/:id` 는 그대로 싣는다. 행까지 지우면 D-06 의 status_only
+    // ("Bracket/status: lifecycle only")를 어긴다 — 대진표에서 경기가 통째로 사라진다.
+    const row = baseRow({
+      detailSeeds: [
+        fixtureRow({
+          state: 'ENDED',
+          visibilityPolicy: { mode: 'LIVE' },
+          sides: [],
+          participants: [],
+          events: [],
+          currentOfficialRevision: {
+            id: 'revision-kill-switch',
+            state: 'OFFICIAL',
+            outcomeReason: 'NORMAL',
+            outcomeNote: null,
+            score: { home: 2, away: 1 },
+            goalEvents: null,
+            officialAt: new Date('2026-06-15T10:00:00Z'),
+            createdAt: new Date('2026-06-15T10:00:00Z'),
+            updatedAt: new Date('2026-06-15T10:00:00Z'),
+            tournamentResultLineages: [],
+          },
+        }),
+      ],
+    } as never);
+
+    const gated = presentTournamentDetail(row, false);
+    expect(gated.fixtures).toHaveLength(1);
+    expect(gated.fixtures[0].result).toBeNull();
+    // 플래그가 켜져 있으면 그대로 보인다 — 이 게이트는 킬스위치에만 반응한다.
+    expect(presentTournamentDetail(row, true).fixtures[0].result).toMatchObject({ homeScore: 2, awayScore: 1 });
+    // 운영자는 킬스위치와 무관하게 운영 뷰를 유지한다.
+    expect(presentTournamentDetail(row, false, new Date(), true).fixtures[0].result).toMatchObject({ homeScore: 2 });
   });
 
   it('공개 결과는 취소된 계정의 raw user id를 내보내지 않지만 활동 이름과 participant id는 보존한다', () => {
@@ -324,12 +361,12 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       ],
     } as never);
 
-    expect(presentTournamentDetail(row).fixtures[0].result?.goals[0]).toMatchObject({
+    expect(presentTournamentDetail(row, true).fixtures[0].result?.goals[0]).toMatchObject({
       playerId: 'participant-revoked',
       playerName: '활동 선수',
       playerUserId: null,
     });
-    expect(presentTournamentDetail(row, new Date(), true).fixtures[0].result?.goals[0]?.playerUserId).toBeNull();
+    expect(presentTournamentDetail(row, true, new Date(), true).fixtures[0].result?.goals[0]?.playerUserId).toBeNull();
   });
 
   it('정정(CORRECTION)으로 취소된 골은 goals[]에서 빠진다', () => {
@@ -378,14 +415,14 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       ],
     } as never);
 
-    const presented = presentTournamentDetail(row);
+    const presented = presentTournamentDetail(row, true);
 
     expect(presented.fixtures[0].result?.goals).toEqual([]);
   });
 
   it('canonical game이 없으면 public fixture를 내보내지 않는다', () => {
     const row = baseRow({ detailSeeds: [fixtureRow(null)] } as never);
-    const presented = presentTournamentDetail(row);
+    const presented = presentTournamentDetail(row, true);
     expect(presented.fixtures).toEqual([]);
   });
 
@@ -413,7 +450,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       ],
     } as never);
 
-    const presented = presentTournamentDetail(row);
+    const presented = presentTournamentDetail(row, true);
     expect(presented.fixtures[0].result).toBeNull();
   });
 
@@ -443,7 +480,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       ],
     } as never);
 
-    const presented = presentTournamentDetail(row);
+    const presented = presentTournamentDetail(row, true);
     // 원본 컬럼은 손대지 않는다 — 어드민 화면이 이 어휘에 의존한다.
     expect(presented.fixtures[0].status).toBe('scheduled');
     expect(presented.fixtures[0].liveStatus).toBe('live');
@@ -452,7 +489,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
   it('canonical game이 없으면 public fixture를 내보내지 않는다', () => {
     const row = baseRow({ detailSeeds: [fixtureRow(null, 'scheduled')] });
 
-    const presented = presentTournamentDetail(row);
+    const presented = presentTournamentDetail(row, true);
     expect(presented.fixtures).toEqual([]);
   });
 
@@ -507,9 +544,9 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
         ],
       } as never);
       if (gameState === null) {
-        expect(presentTournamentDetail(row).fixtures).toEqual([]);
+        expect(presentTournamentDetail(row, true).fixtures).toEqual([]);
       } else {
-        expect(presentTournamentDetail(row).fixtures[0].liveStatus).toBe(expected);
+        expect(presentTournamentDetail(row, true).fixtures[0].liveStatus).toBe(expected);
       }
     },
   );
@@ -533,7 +570,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
         ),
       ],
     } as never);
-    expect(presentTournamentDetail(row).fixtures[0].liveStatus).toBe('live');
+    expect(presentTournamentDetail(row, true).fixtures[0].liveStatus).toBe('live');
   });
 
   // M-A 감사(2026-09-15): 개인 기록 랭킹 섹션은 이미 같은 화면에서 /users/:id 링크를
@@ -556,7 +593,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       ],
     } as never);
 
-    const presented = presentTournamentDetail(row);
+    const presented = presentTournamentDetail(row, true);
 
     expect(presented.awards[0]).toMatchObject({ awardLabel: 'MVP', recipientName: '김선수', recipientUserId: null });
   });
@@ -587,7 +624,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       ],
     } as never);
 
-    const presented = presentTournamentDetail(row);
+    const presented = presentTournamentDetail(row, true);
 
     expect(presented.awards[0].recipientUserId).toBe('user-1');
     expect(presented.awards[0].recipientProfileImageUrl).toBe('https://cdn.example.com/user-1.jpg');
@@ -623,7 +660,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       ],
     } as never);
 
-    const presented = presentTournamentDetail(row);
+    const presented = presentTournamentDetail(row, true);
 
     expect(presented.awards[0].recipientName).toBe('골넣는홍길동');
   });
@@ -653,7 +690,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       ],
     } as never);
 
-    const presented = presentTournamentDetail(row);
+    const presented = presentTournamentDetail(row, true);
 
     expect(presented.awards[0].recipientName).toBe('홍길동');
   });
@@ -685,7 +722,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       ],
     } as never);
 
-    const presented = presentTournamentDetail(row);
+    const presented = presentTournamentDetail(row, true);
 
     expect(presented.awards[0].recipientName).toBe('탈퇴 회원');
     // 탈퇴 계정은 /users/:id 프로필이 더 이상 존재하지 않으므로 링크 대상에서도 뺀다.
@@ -724,7 +761,7 @@ describe('presentTournamentDetail — fixtures[].result (신규 경로)', () => 
       _count: { registrations: 0, reviews: 45 },
     } as never);
 
-    const presented = presentTournamentDetail(row);
+    const presented = presentTournamentDetail(row, true);
 
     expect(presented.reviews).toHaveLength(2);
     expect(presented.reviewsTotalCount).toBe(45);
@@ -765,7 +802,7 @@ describe('presentTournamentDetail — kind(종류)와 format(방식)은 독립�
   }
 
   it('정규 리그 시즌은 kind=regular_league 로 내려간다', () => {
-    expect(presentTournamentDetail(rowWith('regular_league', 'league')).kind).toBe('regular_league');
+    expect(presentTournamentDetail(rowWith('regular_league', 'league'), true).kind).toBe('regular_league');
   });
 
   it('정규 리그 상세는 tier/seasonNo/seriesId를 보존하고 일반 대회에는 추가하지 않는다', () => {
@@ -774,13 +811,13 @@ describe('presentTournamentDetail — kind(종류)와 format(방식)은 독립�
       tier: 2,
       seasonNo: 4,
       seriesId: 'series-1',
-    });
+    }, true);
     const tournament = presentTournamentDetail({
       ...rowWith('regular_tournament', 'league'),
       tier: 2,
       seasonNo: 4,
       seriesId: 'series-1',
-    });
+    }, true);
 
     expect(league).toMatchObject({ tier: 2, seasonNo: 4, seriesId: 'series-1' });
     expect(tournament).not.toHaveProperty('tier');
@@ -792,7 +829,7 @@ describe('presentTournamentDetail — kind(종류)와 format(방식)은 독립�
   //    치르는 진짜 대회), `format === 'league'` 로 종류를 가르면 이 7건이 신청·참가등록을
   //    잃는다. 두 필드가 **함께 실려야** 소비처가 구분할 수 있다.
   it('리그 방식으로 치르는 대회는 format=league 이지만 kind 는 regular_tournament 다', () => {
-    const presented = presentTournamentDetail(rowWith('regular_tournament', 'league'));
+    const presented = presentTournamentDetail(rowWith('regular_tournament', 'league'), true);
 
     expect(presented.format).toBe('league');
     expect(presented.kind).toBe('regular_tournament');
@@ -801,12 +838,13 @@ describe('presentTournamentDetail — kind(종류)와 format(방식)은 독립�
   // DB 가 아직 nullable 이라(R5 에서 NOT NULL 승격) null 이 실제로 도달할 수 있다.
   // 대회로 메우지 않고 null 그대로 넘긴다 — 메우면 리그가 대회로 그려진다.
   it('kind 가 null 인 행은 regular_tournament 로 메우지 않고 null 로 내려간다', () => {
-    expect(presentTournamentDetail(rowWith(null, 'group_knockout')).kind).toBeNull();
+    expect(presentTournamentDetail(rowWith(null, 'group_knockout'), true).kind).toBeNull();
   });
 
   it('league fixture identity masking preserves assigned-vs-TBD slot state', () => {
     const presented = presentTournamentDetail(
       rowWith('regular_league', 'group_knockout'),
+      true,
       new Date(),
       false,
       [
@@ -823,6 +861,7 @@ describe('presentTournamentDetail — kind(종류)와 format(방식)은 독립�
           homeScore: null,
           awayScore: null,
           isForfeit: false,
+          scoreHidden: false,
         },
       ],
     );
@@ -909,6 +948,7 @@ describe('presentTournamentDetail — 공개 명단', () => {
   it('등번호와 닉네임만 내보낸다 — 실명·생년월일·성별·자격판정은 응답에 없다', () => {
     const result = presentTournamentDetail(
       rowWithRoster(),
+      true,
       new Date('2026-06-10T00:00:00Z'),
       false,
       [],
@@ -937,6 +977,7 @@ describe('presentTournamentDetail — 공개 명단', () => {
   it('닉네임이 없으면 null 이다 — 실명으로 떨어뜨리지 않는다', () => {
     const result = presentTournamentDetail(
       rowWithRoster(),
+      true,
       new Date('2026-06-10T00:00:00Z'),
       false,
       [],
@@ -951,6 +992,7 @@ describe('presentTournamentDetail — 공개 명단', () => {
   it('모집 중에는 명단도 안 보인다 — 팀 식별정보와 같은 게이트를 탄다', () => {
     const result = presentTournamentDetail(
       rowWithRoster({ status: 'open' }),
+      true,
       new Date('2026-06-10T00:00:00Z'),
       false,
       [],
@@ -966,6 +1008,7 @@ describe('presentTournamentDetail — 공개 명단', () => {
   it('운영자는 모집 중에도 본다 — staffBypass 는 기존 정책 그대로', () => {
     const result = presentTournamentDetail(
       rowWithRoster({ status: 'open' }),
+      true,
       new Date('2026-06-10T00:00:00Z'),
       true,
       [],
@@ -981,6 +1024,7 @@ describe('presentTournamentDetail — 공개 명단', () => {
     // 못 잡았다. 맵을 비우면 명단도 비고, 맵에 넣으면 그대로 나오는지를 양쪽으로 본다.
     const withRoster = presentTournamentDetail(
       rowWithRoster(),
+      true,
       new Date('2026-06-10T00:00:00Z'),
       false,
       [],
@@ -990,6 +1034,7 @@ describe('presentTournamentDetail — 공개 명단', () => {
 
     const withoutRoster = presentTournamentDetail(
       rowWithRoster(),
+      true,
       new Date('2026-06-10T00:00:00Z'),
       false,
       [],
@@ -1003,6 +1048,7 @@ describe('presentTournamentDetail — 공개 명단', () => {
     // 맵을 그대로 내보내야 하고, 번호 없음은 `null` 로 표현된다(0 이 아니다).
     const result = presentTournamentDetail(
       rowWithRoster(),
+      true,
       new Date('2026-06-10T00:00:00Z'),
       false,
       [],

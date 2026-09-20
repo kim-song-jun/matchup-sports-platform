@@ -24,7 +24,7 @@ function row(over: Partial<LeagueFixtureListRow> = {}): LeagueFixtureListRow {
     startAt: START,
     placeName: '풋살장 A',
     status: 'matched',
-    game: { id: 'game-1', currentOfficialRevisionId: 'rev-1' },
+    game: { id: 'game-1', currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'LIVE' } },
     ...over,
   };
 }
@@ -36,7 +36,7 @@ function fact(over: Partial<LeagueFixtureFactRow> = {}): LeagueFixtureFactRow {
 describe('toLeagueFixtureList', () => {
   it('확정 사실이 없으면 점수는 0 이 아니라 null 이다', () => {
     // `0` 으로 채우면 아직 안 치른 경기가 0:0 무승부로 보인다 — 순위표와도 어긋난다.
-    const [item] = toLeagueFixtureList([row()], new Map());
+    const [item] = toLeagueFixtureList([row()], new Map(), true);
     expect(item.homeScore).toBeNull();
     expect(item.awayScore).toBeNull();
     expect(item.isForfeit).toBe(false);
@@ -44,13 +44,13 @@ describe('toLeagueFixtureList', () => {
   });
 
   it('게임 자체가 없는 대진도 같은 모양으로 나온다', () => {
-    const [item] = toLeagueFixtureList([row({ game: null })], new Map([['game-1', fact()]]));
+    const [item] = toLeagueFixtureList([row({ game: null })], new Map([['game-1', fact()]]), true);
     expect(item.homeScore).toBeNull();
     expect(item.awayScore).toBeNull();
   });
 
   it('확정 사실이 있으면 그 점수를 그대로 싣는다', () => {
-    const [item] = toLeagueFixtureList([row()], new Map([['game-1', fact()]]));
+    const [item] = toLeagueFixtureList([row()], new Map([['game-1', fact()]]), true);
     expect(item).toMatchObject({ homeScore: 3, awayScore: 1, isForfeit: false });
   });
 
@@ -61,6 +61,7 @@ describe('toLeagueFixtureList', () => {
     const [item] = toLeagueFixtureList(
       [row()],
       new Map([['game-1', fact({ homeScore: 1, awayScore: 0, resultRevision: { reason: secret, outcomeReason: 'FORFEIT' } })]]),
+      true,
     );
     expect(item.isForfeit).toBe(true);
     expect(JSON.stringify(item)).not.toContain('김OO');
@@ -75,6 +76,7 @@ describe('toLeagueFixtureList', () => {
       // 바뀌었을 때 이 테스트가 **틀린 이유로** red 가 되고(실제로 그렇게 한 번 틀렸다),
       // 값이 무엇인지가 아니라 "레거시 경로가 살아 있는가" 가 이 테스트의 질문이다.
       new Map([['game-1', fact({ resultRevision: { reason: `${FORFEIT_REASON_MARKER} 불참`, outcomeReason: 'NORMAL' } })]]),
+      true,
     );
     expect(item.isForfeit).toBe(true);
   });
@@ -82,19 +84,73 @@ describe('toLeagueFixtureList', () => {
   it('상대팀이 없는 대진도 목록에서 빠지지 않는다', () => {
     // 순위 입력(`bucketLeagueFixtures`)은 이런 대진을 pending 으로 접지만, 일정 목록은
     // "상대팀 미정" 으로 보여줘야 한다 — 두 모듈이 다른 질문에 답하는 이유다.
-    const [item] = toLeagueFixtureList([row({ approvedApplicantTeamId: null })], new Map());
+    const [item] = toLeagueFixtureList([row({ approvedApplicantTeamId: null })], new Map(), true);
     expect(item.awayTeamId).toBeNull();
     expect(item.teamMatchId).toBe('tm-1');
   });
 
   it('홈팀이 아직 배정되지 않은 대진은 홈 identity를 가리고 assignment를 false로 둔다', () => {
-    const [item] = toLeagueFixtureList([row({ hostTeamId: null })], new Map());
+    const [item] = toLeagueFixtureList([row({ hostTeamId: null })], new Map(), true);
     expect(item).toMatchObject({ homeTeamId: null, homeAssigned: false, awayTeamId: 'team-b', awayAssigned: true });
+  });
+
+  it('PUBLIC_LIVE 가 꺼지면 확정 점수라도 가리고 그 사실을 알린다', () => {
+    // 경기 상세는 이 상태에서 이미 점수를 null 로 내보낸다. 목록만 숫자를 실으면 같은
+    // 화면 안에서 두 lane 이 서로 다른 말을 한다.
+    const [item] = toLeagueFixtureList([row()], new Map([['game-1', fact()]]), false);
+    expect(item).toMatchObject({ homeScore: null, awayScore: null, scoreHidden: true });
+  });
+
+  it('가려진 대진의 몰수 뱃지도 함께 지운다', () => {
+    // 몰수 뱃지는 "1:0 으로 확정" 을 그대로 말한다 — 숫자만 가리면 가린 적이 없는 것과 같다.
+    const [item] = toLeagueFixtureList(
+      [row()],
+      new Map([['game-1', fact({ homeScore: 1, awayScore: 0, resultRevision: { reason: null, outcomeReason: 'FORFEIT' } })]]),
+      false,
+    );
+    expect(item).toMatchObject({ isForfeit: false, scoreHidden: true });
+  });
+
+  it('STATUS_ONLY 정책은 플래그가 켜져 있어도 점수를 가린다', () => {
+    const [item] = toLeagueFixtureList(
+      [row({ game: { id: 'game-1', currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'STATUS_ONLY' } } })],
+      new Map([['game-1', fact()]]),
+      true,
+    );
+    expect(item).toMatchObject({ homeScore: null, scoreHidden: true });
+  });
+
+  it('OFFICIAL_ONLY 정책은 확정 점수를 그대로 공개한다', () => {
+    // 이 모드가 감추는 것은 **확정 전** 숫자다. 목록은 확정 사실만 싣는다.
+    const [item] = toLeagueFixtureList(
+      [row({ game: { id: 'game-1', currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'OFFICIAL_ONLY' } } })],
+      new Map([['game-1', fact()]]),
+      true,
+    );
+    expect(item).toMatchObject({ homeScore: 3, awayScore: 1, scoreHidden: false });
+  });
+
+  it('정책 row 가 없는 게임은 점수만 가리고 행은 남긴다', () => {
+    // 주차 라벨과 '다음 경기' 강조가 이 배열의 길이·순서에서 파생된다 — 행을 빼면 같은
+    // 경기의 주차가 보는 사람마다 달라진다. fail-closed 는 점수에만 적용한다.
+    const items = toLeagueFixtureList(
+      [row({ game: { id: 'game-1', currentOfficialRevisionId: 'rev-1', visibilityPolicy: null } })],
+      new Map([['game-1', fact()]]),
+      true,
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ homeScore: null, scoreHidden: true, startAt: START });
+  });
+
+  it('게임이 없는 대진은 숨김이 아니라 "아직 시작 전"이다', () => {
+    // `?? 'HIDDEN'` 를 게임 없는 행에까지 적용하면 앞으로의 일정이 통째로 가려진다.
+    const [item] = toLeagueFixtureList([row({ game: null })], new Map(), false);
+    expect(item).toMatchObject({ scoreHidden: false, homeScore: null });
   });
 
   it('취소·무효 대진도 목록에는 남는다', () => {
     // 순위에서는 빠지지만 일정에는 "취소됨"·"집계 제외"로 보여야 한다.
-    const items = toLeagueFixtureList([row({ id: 'a', status: 'cancelled' }), row({ id: 'b' })], new Map());
+    const items = toLeagueFixtureList([row({ id: 'a', status: 'cancelled' }), row({ id: 'b' })], new Map(), true);
     expect(items.map((i) => i.teamMatchId)).toEqual(['a', 'b']);
     expect(items[0].status).toBe('cancelled');
   });

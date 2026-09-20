@@ -227,6 +227,8 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   // 낸 사람 한 명만 통과하는 값이라, 운영자가 대진을 만드는 리그전에서는 상대팀의 누구도
   // 승인 버튼을 보지 못했다. 서버는 이미 팀 멤버십으로 판정하므로 화면도 그것을 쓴다.
   const canManageOpponentTeam = query.data?.viewer?.manageableOpponentTeam === true;
+  // 채팅 게이트의 한 축 — 이 값이 있으면 상대가 확정된 것이다(types/api.ts 참조).
+  const opponentAssigned = Boolean(query.data?.approvedOpponentTeam);
   const viewerState = rawViewerState === 'host_team' && !canManageHostTeam ? 'none' : rawViewerState;
   // 후기 진입점 전용 — 위 `viewerState` 는 관리 권한 기준으로 좁혀진 값이라 쓸 수 없다.
   const isParticipantMember = query.data?.viewer?.participantMember === true;
@@ -271,7 +273,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   const ownTeamId = useMemo(() => resolveOwnTeamId(query.data, myTeamsQuery.data), [query.data, myTeamsQuery.data]);
 
   useEffect(() => {
-    if (!query.data || !canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam) || autoResolvedChatRef.current === teamMatchId) return;
+    if (!query.data || !canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam, opponentAssigned) || autoResolvedChatRef.current === teamMatchId) return;
     autoResolvedChatRef.current = teamMatchId;
     resolveChatRoom.mutate(
       { targetType: 'team_match', targetId: teamMatchId },
@@ -279,7 +281,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       // 페이지 진입만으로 매번 에러가 뜬다) — 그래도 삼키지 않고 로그는 남긴다.
       { onError: (e) => console.warn('team match chat auto-resolve failed', e) },
     );
-  }, [query.data, resolveChatRoom, teamMatchId, canManageHostTeam, canManageOpponentTeam]);
+  }, [query.data, resolveChatRoom, teamMatchId, canManageHostTeam, canManageOpponentTeam, opponentAssigned]);
 
   if (query.isError) return <TeamMatchStatePageView model={{ ...getTeamMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
 
@@ -354,10 +356,10 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     resultAction: seeding ? undefined : buildResultAction(teamMatchId, getStatus(query.data), canManageHostTeam, canManageOpponentTeam, isLeagueFixture),
     reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
     statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data)),
-    chatLabel: chatLabel(canManageHostTeam, canManageOpponentTeam),
+    chatLabel: chatLabel(canManageHostTeam, canManageOpponentTeam, opponentAssigned),
     chatPending: resolveChatRoom.isPending,
     chatError,
-    onChat: !seeding && canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam)
+    onChat: !seeding && canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam, opponentAssigned)
       ? () => {
           setChatError(null);
           resolveChatRoom.mutate(
@@ -550,19 +552,30 @@ function statusLabel(viewerState: V1TeamMatchViewerState, status: V1TeamMatchApi
   return '신청 가능';
 }
 
-function chatLabel(canManageHostTeam: boolean, canManageOpponentTeam: boolean) {
-  return canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam) ? '채팅' : '승인 후 채팅';
+function chatLabel(canManageHostTeam: boolean, canManageOpponentTeam: boolean, opponentAssigned: boolean) {
+  return canOpenTeamMatchChat(canManageHostTeam, canManageOpponentTeam, opponentAssigned) ? '채팅' : '승인 후 채팅';
 }
 
 /**
- * 서버 assertCanUseTeamMatchChat(chat.service.ts)과 정확히 같은 기준 — 양 팀
- * owner/manager. 예전엔 `viewerState === 'approved'` 를 썼는데, 그 값은 "신청서를 낸
- * 사람 한 명"만 통과한다. 리그 대진의 신청서는 운영자가 대신 내기 때문에(원정팀
- * appliedByUserId가 운영자로 남는다) 원정팀 owner/manager는 영원히 이 값을 얻지 못해
- * 채팅 버튼 자체가 안 보였다. manageableHostTeam/manageableOpponentTeam은 팀
- * 멤버십(owner/manager)만으로 판정해 서버 권한과 정확히 일치한다.
+ * 서버 assertCanUseTeamMatchChat(chat.service.ts)의 두 축을 미러링한다.
+ *
+ * ① **상대팀 확정** — 서버는 `hostTeamId`·`approvedApplicantTeamId` 가 둘 다 있어야
+ *    허용한다. 이걸 빼면 상대 승인 전 상세에 들어가는 것만으로 채팅방 생성이 호출돼
+ *    409 가 쌓인다. `approvedOpponentTeam` 이 있다는 것 자체가 상대 확정을 뜻한다.
+ * ② **양 팀 owner/manager** — `viewerState === 'approved'` 는 "신청서를 낸 사람 한 명"만
+ *    통과해서 쓸 수 없다. 리그 대진은 운영자가 신청서를 대신 내므로 원정팀 owner/manager
+ *    가 그 값을 영영 못 얻어 채팅 버튼이 아예 안 보였다.
+ *
+ * 서버의 세 번째 축(`status ∈ {matched, completed}`)은 여기서 보지 않는다 — 프론트의
+ * `getStatus` 는 `displayState` 우선이라 서버가 보는 DB `status` 와 같은 질문에 답하지
+ * 않는다. 취소된 매치에 상대가 배정된 채 남아 있으면 그때는 서버가 막는다.
  */
-function canOpenTeamMatchChat(canManageHostTeam: boolean, canManageOpponentTeam: boolean) {
+function canOpenTeamMatchChat(
+  canManageHostTeam: boolean,
+  canManageOpponentTeam: boolean,
+  opponentAssigned: boolean,
+) {
+  if (!opponentAssigned) return false;
   return canManageHostTeam || canManageOpponentTeam;
 }
 

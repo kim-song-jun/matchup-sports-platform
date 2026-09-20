@@ -39,6 +39,8 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+const resolveChatRoomMutateMock = vi.hoisted(() => vi.fn());
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1TeamMatch: useV1TeamMatchMock,
   useV1TeamMatchEligibility: useV1TeamMatchEligibilityMock,
@@ -51,7 +53,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1CloseTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1ReopenTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useV1CancelTeamMatch: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useV1ResolveChatRoom: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1ResolveChatRoom: () => ({ mutate: resolveChatRoomMutateMock, isPending: false }),
   useV1WithdrawTeamMatchApplication: useV1WithdrawTeamMatchApplicationMock,
   useV1TeamMatches: useV1TeamMatchesMock,
   useV1MasterSports: () => ({ data: [] }),
@@ -347,6 +349,7 @@ describe('TeamMatchDetailPageClient — 채팅 게이트는 팀 멤버십 기준
   function mockTeamMatchForChat(
     viewer: { state: V1TeamMatchViewerState; manageableHostTeam?: boolean; manageableOpponentTeam?: boolean },
     status: string,
+    opponentAssigned = true,
   ) {
     useV1TeamMatchMock.mockReturnValue({
       data: {
@@ -366,6 +369,7 @@ describe('TeamMatchDetailPageClient — 채팅 게이트는 팀 멤버십 기준
           manageableOpponentTeam: viewer.manageableOpponentTeam ?? false,
         },
         hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+        approvedOpponentTeam: opponentAssigned ? { teamId: 'team-away', name: '상대 팀' } : null,
       },
       isError: false,
     });
@@ -416,6 +420,30 @@ describe('TeamMatchDetailPageClient — 채팅 게이트는 팀 멤버십 기준
 
     expect(screen.queryByRole('button', { name: '채팅 열기' })).not.toBeInTheDocument();
     expect(screen.getByTestId('team-match-chat-label')).toHaveTextContent('승인 후 채팅');
+  });
+
+  // 상대팀 확정 전에는 서버가 409(Team match chat is available after both teams are
+  // assigned)를 준다. 게이트가 팀 멤버십만 보면 상세 진입만으로 자동 resolve 가 나가
+  // 콘솔에 409 가 쌓인다.
+  it('상대팀이 확정되기 전에는 채팅방 생성을 호출하지 않는다', () => {
+    mockTeamMatchForChat({ state: 'host_team', manageableHostTeam: true }, 'recruiting', false);
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(resolveChatRoomMutateMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: '채팅 열기' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('team-match-chat-label')).toHaveTextContent('승인 후 채팅');
+  });
+
+  it('상대팀이 확정되면 상세 진입에서 채팅방을 자동으로 연결한다', () => {
+    mockTeamMatchForChat({ state: 'host_team', manageableHostTeam: true }, 'matched');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(resolveChatRoomMutateMock).toHaveBeenCalledWith(
+      { targetType: 'team_match', targetId: 'team-match-1' },
+      expect.anything(),
+    );
   });
 });
 

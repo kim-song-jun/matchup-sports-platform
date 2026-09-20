@@ -12,6 +12,7 @@ import {
   useV1Teams,
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { LEAGUE_TIE_BREAK_ORDER, formatTieBreakRule } from '@/lib/league-tie-break-labels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 
 const inputClass =
@@ -207,7 +208,7 @@ export default function AdminLeagueMatchNewPage() {
         </div>
 
         <div className="tm-on-tint rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] p-3 text-sm text-[var(--text-muted)]">
-          순위 규칙: 승점 → 골득실 → 다득점 → 승자승 (고정값 — 리그별 변경 미지원)
+          순위 규칙: {formatTieBreakRule(LEAGUE_TIE_BREAK_ORDER)} (고정값 — 리그별 변경 미지원)
         </div>
 
         <button

@@ -1709,3 +1709,61 @@ describe('리그 참가 신청 입구', () => {
     expect(screen.queryByText(/신청 마감/)).not.toBeInTheDocument();
   });
 });
+
+/**
+ * 순위 규칙 줄(정본 §5). 서버는 `LEAGUE_TIE_BREAK_ORDER` 5개를 **항상** 내려보내는데
+ * 화면의 라벨 맵에는 4개뿐이라 마지막 기준이 `fewestGoalsAgainst` 라는 식별자 그대로
+ * 보였다. 기존 픽스처가 전부 `tieBreakOrder: ['points']` 라 이 줄은 한 번도 검사된 적이 없다.
+ */
+describe('순위 규칙 줄', () => {
+  const SERVER_ORDER = ['points', 'goalDifference', 'goalsFor', 'headToHead', 'fewestGoalsAgainst'];
+
+  function mockStandings(tieBreakOrder: string[]) {
+    useV1LeagueMatchMock.mockReturnValue({
+      data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1'], fixtures: [] },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1',
+        tieBreakOrder,
+        standings: [{ teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 2, goalsAgainst: 0, points: 3 }],
+        pendingFixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+    useV1AuthMeMock.mockReturnValue({ data: undefined } as never);
+    useV1LeagueClaimableFixturesMock.mockReturnValue({ data: undefined } as never);
+    useV1MyTeamsMock.mockReturnValue({ data: undefined } as never);
+    useV1RecordConsentMock.mockReturnValue({ data: undefined } as never);
+    useV1MyRegistrationsMock.mockReturnValue({ data: [] } as never);
+  }
+
+  it('서버가 보내는 다섯 기준을 모두 한국어로 읽어 준다', async () => {
+    mockStandings(SERVER_ORDER);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    const rule = await screen.findByText(/^순위 규칙:/);
+    expect(rule.textContent).toBe('순위 규칙: 승점 → 골득실 → 다득점 → 승자승 → 최소 실점');
+    // 로마자 금지는 이 줄에만 건다 — 화면 전체에 걸면 무관한 카피까지 걸린다.
+    expect(rule.textContent ?? '').not.toMatch(/[A-Za-z]/);
+  });
+
+  it('라벨을 모르는 기준은 식별자로 찍지 않고 버린다', async () => {
+    mockStandings(['points', 'someFutureCriterion']);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    const rule = await screen.findByText(/^순위 규칙:/);
+    expect(rule.textContent).toBe('순위 규칙: 승점');
+  });
+
+  it('전부 모르는 기준이면 "순위 규칙:" 만 남은 줄을 그리지 않는다', async () => {
+    mockStandings(['someFutureCriterion']);
+
+    render(<LeagueMatchStandingsClient leagueId="league-1" />);
+
+    await screen.findByRole('link', { name: /성수 FC/ });
+    expect(screen.queryByText(/순위 규칙/)).not.toBeInTheDocument();
+  });
+});

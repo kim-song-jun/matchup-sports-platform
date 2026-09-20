@@ -6,10 +6,9 @@ import type {
 } from '../games.types';
 
 /**
- * D-06 의 런타임 강등. `public-visibility.ts` 의 `effectivePublicVisibilityMode` 와
- * **같은 답을 내야 하는 두 번째 구현**이다(그쪽 docblock 이 이 쌍을 명시한다) —
- * 한쪽만 고치면 `/games/:id/visibility` 와 공개 기록 라우트가 같은 경기에 다른 말을 한다.
- * 킬스위치는 진행 중 노출만 끊고 확정 결과는 남긴다.
+ * D-06 킬스위치 강등의 **방어적 사본**이다. 유일한 호출자(`GamesService#getVisibility`)가
+ * 이미 `effectivePublicVisibilityMode` 로 해석한 모드를 넘기므로 지금은 발동하지 않는다 —
+ * 해석 안 된 원시 모드를 넘기는 호출자가 생기면 그때 다시 동작한다.
  */
 function effectiveMode(policy: GameVisibilityPolicyInput): PublicGameVisibilityMode {
   if (policy.mode === 'live' && !policy.publicLiveEnabled) {

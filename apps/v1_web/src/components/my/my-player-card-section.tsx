@@ -19,24 +19,34 @@ import { PlayerCard } from '@/components/users/player-card';
  * ## 조용히 사라지는 경우들
  * - 카드 숨김을 켠 사용자: 서버가 `playerCard: null` 을 준다 → 섹션 자체를 렌더하지
  *   않는다. 숨겼는데 마이페이지에 남아 있으면 숨김이 아니다.
- * - 로딩 중·조회 실패: 마이페이지는 카드가 없어도 온전한 화면이다. 스켈레톤이나
- *   에러 박스를 띄우면 **상단이 깜빡이거나 실패가 눈에 띄어** 본래 정보를 가린다.
+ * - 조회 실패: 마이페이지는 카드가 없어도 온전한 화면이다. 에러 박스를 띄우면
+ *   **실패가 눈에 띄어** 본래 정보를 가린다.
+ * - 로딩 중: 그릴 것은 없지만 **높이는 잡아 둔다**(`slot`). 카드는 프로필보다 한 홉
+ *   늦게 오는데 그때까지 자리가 없으면, 도착 순간 카드가 삽입되며 이미 손을 뻗은
+ *   버튼들이 아래로 밀린다. 스켈레톤 박스를 그리는 것과는 다르다 -- 보이는 것은 없다.
  */
 export function MyPlayerCardSection({
   userId,
   displayName,
   profileImageUrl,
+  slot,
 }: {
   readonly userId: string;
   readonly displayName: string;
   readonly profileImageUrl: string | null;
+  readonly slot?: { hidden: boolean; shape: 'rect' | 'shield' };
 }) {
   const profile = useV1PublicProfile(userId, { enabled: Boolean(userId) });
   const card = profile.data?.playerCard;
 
-  // 카드 숨김·로딩·실패에서는 아무것도 그리지 않는다 -- 신원은 아래 프로필 카드가
-  // 항상 말하므로 여기서 대체물을 세울 필요가 없다(빈 자리도 남기지 않는다).
-  if (!card) return null;
+  if (!card) {
+    // 아직 오는 중이고 숨김도 아니라면 카드가 설 높이만 비워 둔다. 숨김·실패·옛 서버
+    // (slot 없음)에서는 자리도 남기지 않는다 -- 영영 안 채워질 공백이 된다.
+    if (slot && !slot.hidden && profile.isPending) {
+      return <div className="tm-my-card-slot" data-shape={slot.shape} aria-hidden="true" />;
+    }
+    return null;
+  }
 
   // 카드는 상자에 담지 않는다(사용자 선택 A안, 2026-08-26) -- 무대 상자가 페이지 배경과
   // 거의 같은 톤이라 경계에 이유가 없었고, 모바일에서는 좌우 여백이 이중으로 들었다.

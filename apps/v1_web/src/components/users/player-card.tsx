@@ -56,9 +56,11 @@ const STAT_BACK: Record<
   SHO: { icon: Target, source: '골 · 경기당 골이 많을수록 올라가요', tag: '골 결정력' },
   PAS: { icon: Zap, source: '도움 · 경기당 도움이 많을수록 올라가요', tag: '찬스 메이킹' },
   APP: { icon: CalendarCheck, source: '엔트리 · 명단에 오른 경기가 쌓일수록 올라가요', tag: '성실 출석' },
-  SKI: { icon: Sparkles, source: '실력 · 함께 뛴 동료들의 후기 평균이에요', tag: '탄탄한 기본기' },
-  MAN: { icon: HeartHandshake, source: '매너 · 함께 뛴 동료들의 후기 평균이에요', tag: '매너 플레이' },
-  PUN: { icon: Clock, source: '시간약속 · 함께 뛴 동료들의 후기 평균이에요', tag: '시간 약속' },
+  // 후기 세 항목은 5점 만점 평균을 100점으로 환산한 값이다. 척도를 적지 않으면
+  // 마이페이지의 매너 점수(4.7)와 카드의 MAN(94)이 다른 사실처럼 읽힌다.
+  SKI: { icon: Sparkles, source: '실력 · 동료 후기 평균(5점)을 100점으로 환산했어요', tag: '탄탄한 기본기' },
+  MAN: { icon: HeartHandshake, source: '매너 · 동료 후기 평균(5점)을 100점으로 환산했어요', tag: '매너 플레이' },
+  PUN: { icon: Clock, source: '시간약속 · 동료 후기 평균(5점)을 100점으로 환산했어요', tag: '시간 약속' },
 };
 
 function lockReasonText(
@@ -583,12 +585,13 @@ export function PlayerCard({
           ) : null}
         </div>
 
+        {/* 경기 수는 여기서 말하지 않는다 -- 바로 위 카드 얼굴이 이미 말했고(tm-pcard-meta),
+            마이페이지에서는 활동 요약까지 같은 숫자를 또 센다. 카드가 0경기(여정 면)면
+            얼굴에도 없지만, 그 면의 문장이 "아직 기록이 없다"를 이미 말한다. */}
         <div className="tm-player-card-sub">
           {card.position ? POSITION_LABEL[card.position] : '포지션 미정'}
           {' · '}
           <span title="많이 뛸수록 올라가요">{TIER_LABEL[card.tier]}</span>
-          {' · '}
-          {card.appearances}경기
         </div>
 
         {/* 등급의 의미를 못 박는다. 이 문장이 없으면 브론즈가 "실력 하위"로 읽힌다. */}

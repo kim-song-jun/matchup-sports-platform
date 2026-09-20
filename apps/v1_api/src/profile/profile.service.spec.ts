@@ -884,6 +884,96 @@ describe('ProfileService 내 프로필 응답의 bio 왕복', () => {
   });
 });
 
+/**
+ * 선수 카드가 설 **자리**만 내려주는 필드(2026-09-20).
+ *
+ * 마이페이지는 이 응답으로 먼저 그려지고 카드는 `/users/:id/public-profile` 로 한 홉 뒤에
+ * 온다. 그 사이 자리를 비워 두면 카드가 삽입되며 아래 내용을 통째로 민다. 그래서 "카드가
+ * 올 것인가·어떤 모양인가"를 여기서 미리 알려주되, **카드 산식(기록 3~4쿼리)은 타지 않는다**.
+ */
+describe('ProfileService 내 프로필의 선수 카드 자리', () => {
+  const authUser = {
+    id: 'user-1',
+    email: 'a@b.test',
+    accountStatus: 'active',
+    onboardingStatus: 'completed',
+  } as never;
+
+  function buildPrisma(profileOverrides: Record<string, unknown>, reviewCount: number | null) {
+    return {
+      v1User: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'user-1',
+          email: 'a@b.test',
+          phone: null,
+          accountStatus: 'active',
+          onboardingStatus: 'completed',
+          profile: {
+            nickname: '테스트닉',
+            displayName: null,
+            realName: null,
+            profileImageUrl: null,
+            birthDate: null,
+            gender: 'male',
+            bio: null,
+            ...profileOverrides,
+          },
+          regions: [],
+          sportPreferences: [],
+          reputationSummary:
+            reviewCount === null ? null : { trustState: 'estimated', mannerScore: null, reviewCount },
+          authIdentities: [],
+        }),
+      },
+      // 카드 산식이 쓰는 모델은 **일부러 주지 않는다**. me() 가 이것들을 건드리면
+      // TypeError 로 죽으므로, 이 describe 가 통과한다는 것 자체가 "프로필 조회는
+      // 카드를 계산하지 않는다"는 계약의 증거다.
+    };
+  }
+
+  it('숨기지 않은 사용자에게는 카드가 올 자리를 알려준다', async () => {
+    const service = new ProfileService(buildPrisma({ playerCardHidden: false, playerCardShape: 'rect' }, 3) as never);
+
+    const result = await service.me(authUser);
+
+    expect(result.playerCardSlot).toEqual({ hidden: false, shape: 'rect' });
+  });
+
+  it('카드를 숨긴 사용자는 hidden 으로 내려 프론트가 자리를 잡지 않게 한다', async () => {
+    const service = new ProfileService(buildPrisma({ playerCardHidden: true, playerCardShape: 'shield' }, 30) as never);
+
+    const result = await service.me(authUser);
+
+    expect(result.playerCardSlot.hidden).toBe(true);
+  });
+
+  it('저장된 모양이 아니라 **지금 적용되는** 모양을 내려준다', async () => {
+    // 방패는 후기 10건부터 열린다. 조건이 깨졌는데 저장값 그대로 내려주면 프론트가
+    // 488px 를 예약했다가 424px 짜리 카드를 받아, 없애려던 시프트가 반대로 생긴다.
+    const service = new ProfileService(buildPrisma({ playerCardHidden: false, playerCardShape: 'shield' }, 3) as never);
+
+    const result = await service.me(authUser);
+
+    expect(result.playerCardSlot.shape).toBe('rect');
+  });
+
+  it('후기가 충분하면 저장된 방패 모양을 그대로 쓴다', async () => {
+    const service = new ProfileService(buildPrisma({ playerCardHidden: false, playerCardShape: 'shield' }, 10) as never);
+
+    const result = await service.me(authUser);
+
+    expect(result.playerCardSlot.shape).toBe('shield');
+  });
+
+  it('평판 캐시가 아직 없는 계정도 자리를 계산할 수 있다', async () => {
+    const service = new ProfileService(buildPrisma({ playerCardHidden: false, playerCardShape: null }, null) as never);
+
+    const result = await service.me(authUser);
+
+    expect(result.playerCardSlot).toEqual({ hidden: false, shape: 'rect' });
+  });
+});
+
 describe('ProfileService public profile moderation', () => {
   it('queries only publicly available account states', async () => {
     const prisma = {

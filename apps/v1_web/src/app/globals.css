@@ -1599,6 +1599,7 @@ button:disabled {
   font-weight: 700;
   color: var(--text-strong);
   word-break: keep-all; /* [P2 한글] 카드 제목 음절 단위 줄바꿈 방지 — TDS 패턴 */
+  margin: 0; /* 카드 제목을 h2/h3 로 쓸 때 브라우저 기본 여백이 붙지 않게 */
 }
 
 .tm-text-body {
@@ -5425,6 +5426,27 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   gap: 16px;
   padding: 20px var(--v1-shell-page-x) 124px;
 }
+
+/* ── 모바일 순서: 카드 다음이 곧 메뉴 ───────────────────────────────────────
+   모바일에서는 데스크톱 래퍼(.tm-my-desktop-*)가 display:contents 라(desktop/my.css)
+   카드·프로필·메뉴 섹션이 그대로 이 그리드의 아이템이다. 덕분에 DOM 을 바꾸지 않고
+   order 만으로 순서를 돌릴 수 있고, 1024px 이상에서는 래퍼가 진짜 컨테이너가 되어
+   이 규칙이 닿지 않는다(데스크톱 2열 배치는 그대로).
+   왜 필요한가: 실측(2026-09-20, 390) 에서 첫 메뉴 행이 1231px 아래에 있어 첫 화면에
+   누를 것이 하나도 없었다 -- 카드·프로필·활동이 한 열에 쌓인 결과다. */
+@media (max-width: 1023px) {
+  .tm-my-shell > * { order: 3; }
+  .tm-my-shell > .tm-player-card,
+  .tm-my-shell > .tm-my-card-slot { order: 1; }
+  .tm-my-shell > [data-primary='true'] { order: 2; }
+}
+
+/* 카드가 도착하기 전의 빈 자리(스켈레톤이 아니라 높이만). 프레임 높이는 카드와 같은
+   수를 쓰고, 그 아래 조작줄·캡션 묶음은 390 실측값(124px)이다 -- 도착 전후 높이가
+   같아야 카드가 들어오며 아래 내용을 밀지 않는다. */
+.tm-my-card-slot { --tm-card-slot-below: 124px; }
+.tm-my-card-slot[data-shape='rect'] { min-height: calc(424px + var(--tm-card-slot-below)); }
+.tm-my-card-slot[data-shape='shield'] { min-height: calc(488px + var(--tm-card-slot-below)); }
 
 /* 프로필 헤더는 페이지 배경(--bg) 위에 --grey50 한 단계로 얹힌다 — main과 동일.
    2026-08-11에 --card-surface + --border-strong으로 올렸던 것은 그때 페이지 배경이

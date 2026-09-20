@@ -39,6 +39,7 @@ import type {
   MyMatch,
   MyMatchesViewModel,
   MyMenuItem,
+  MyMenuSection,
   MyTeam,
   MyTeamsViewModel,
   NotificationSettingsViewModel,
@@ -97,14 +98,19 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
                 userId={model.user.userId}
                 displayName={model.user.name}
                 profileImageUrl={model.user.profileImageUrl ?? null}
+                slot={model.playerCardSlot}
               />
             ) : null}
             {/* 프로필(계정) -- 카드와 **다른 블록**이다. 카드 유무와 무관하게 항상 선다:
                 카드를 숨긴 사용자에게는 이것이 유일한 신원 표시이고, 카드가 있는
-                사용자에게는 계정 조작이 카드 조작과 섞이지 않는 자리다. */}
-            {model.user.userId !== null ? (
-              <Card pad={16}>
-                <div className="tm-text-body-lg">프로필</div>
+                사용자에게는 계정 조작이 카드 조작과 섞이지 않는 자리다.
+                활동 숫자도 같은 카드 안에 둔다(2026-09-20) -- 상자를 둘로 나눠 봤자
+                가르는 것은 "나"와 "내 숫자"뿐인데, 그 경계에 카드 하나를 더 쓰면
+                모바일에서 메뉴가 그만큼 아래로 밀린다. 안에서는 선 하나로 가른다. */}
+            <Card pad={16}>
+              {model.user.userId !== null ? (
+                <>
+                <h2 className="tm-text-body-lg">프로필</h2>
                 <div className="tm-my-account-block">
                   <div className="tm-my-avatar tm-my-account-avatar" style={avatarStyle}>
                     {model.user.profileImageUrl ? null : model.user.initials}
@@ -143,17 +149,17 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
                     <Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/my/profile/edit">프로필 수정</Link>
                   </div>
                 </div>
-              </Card>
-            ) : null}
-            {model.phoneVerified === false ? <PhoneVerificationCallout /> : null}
-            {/* 활동 -- 전체 활동과 이번 달을 한 카드로 합친다(사용자 확정 2026-08-26).
-                성격이 같은 숫자 묶음이 상자 두 개로 나뉘어 모바일 스크롤만 길었다. */}
-            <Card pad={16}>
-              <div className="tm-text-body-lg">활동</div>
+                <div className="tm-my-activity-divider" />
+                </>
+              ) : null}
+              {/* 활동 -- 전체 활동과 이번 달을 한 묶음으로(사용자 확정 2026-08-26).
+                  둘 사이는 선 없이 간격으로만 가른다: 같은 "내 숫자"인데 선을 그으면
+                  위 계정 블록과의 경계(진짜 성격이 바뀌는 자리)와 무게가 같아진다. */}
+              <h2 className="tm-text-body-lg">활동</h2>
               <div className="tm-my-profile-stats">{model.user.stats.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
-              <div className="tm-my-activity-divider" />
               <div className="tm-my-monthly">{model.user.monthly.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
             </Card>
+            {model.phoneVerified === false ? <PhoneVerificationCallout /> : null}
           </div>
           {/* RIGHT: menu sections */}
           <div className="tm-my-desktop-main">
@@ -484,10 +490,13 @@ export function LegalPageView({ model: _model }: { model: SettingsViewModel }) {
 }
 
 
-function MenuSection({ section }: { section: { title: string; items: MyMenuItem[] } }) {
+function MenuSection({ section }: { section: MyMenuSection }) {
   return (
-    <section>
-      <div className="tm-my-section-label">{section.title}</div>
+    // data-primary 는 모바일에서 이 섹션을 카드 바로 아래로 끌어올리는 CSS 훅이다
+    // (globals.css, order). :nth-child 로 잡을 수 없다 -- 인증 안내·스태프 섹션·후기
+    // 배너가 조건부라 앞선 형제 수가 사용자마다 다르다.
+    <section data-primary={section.primary ? 'true' : undefined}>
+      <h2 className="tm-my-section-label">{section.title}</h2>
       <Card pad={0}>
         {section.items.map((item) => {
           const IconComponent = MENU_ICON_MAP[item.icon];

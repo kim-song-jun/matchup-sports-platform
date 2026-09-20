@@ -19,6 +19,7 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session } from '@/lib/session-storage';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
+import { formatTieBreakRule } from '@/lib/league-tie-break-labels';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { fixtureResultLabel, fixtureStatusMeta, isUpcomingFixture, type TeamLookupEntry } from '@/lib/league-fixture-meta';
 import type { V1LeagueChampionTeam, V1LeagueFixture } from '@/types/league-match';
@@ -36,14 +37,6 @@ const PROMOTION_META: Record<'promoted' | 'relegated' | 'stayed' | 'withdrawn', 
   stayed: { label: '잔류', glyph: '–', className: 'text-[var(--text-muted)]' },
   withdrawn: { label: '불참', glyph: '×', className: 'text-amber-700 dark:text-amber-300' },
 };
-
-const TIE_BREAK_LABELS: Record<string, string> = {
-  points: '승점',
-  goalDifference: '골득실',
-  goalsFor: '다득점',
-  headToHead: '승자승',
-};
-
 
 // FIXTURE_STATUS_META/fixtureStatusMeta/fixtureResultLabel/isUpcomingFixture 는
 // ./league-fixture-meta.ts 로 이동 — 리그 경기 상세(fixtures/[fixtureId])와 같은
@@ -650,6 +643,9 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
   }
 
   const stateMeta = LEAGUE_STATE_META[series.state];
+  // 라벨을 모르는 기준은 formatTieBreakRule 이 버리므로 전부 모르면 빈 문자열이 된다 —
+  // 그때 "순위 규칙: " 만 남은 줄이 뜨지 않도록 여기서 미리 계산해 줄 자체를 감춘다.
+  const tieBreakRule = standings === undefined ? '' : formatTieBreakRule(standings.tieBreakOrder);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
@@ -722,10 +718,8 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
           </ul>
         </nav>
       )}
-      {standings !== undefined && (
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          순위 규칙: {standings.tieBreakOrder.map((c) => TIE_BREAK_LABELS[c] ?? c).join(' → ')}
-        </p>
+      {tieBreakRule !== '' && (
+        <p className="mt-1 text-sm text-[var(--text-muted)]">순위 규칙: {tieBreakRule}</p>
       )}
       {/* 감사 H-2 — 승강 슬롯 규칙 요약. 확정 전(promotionForecast != null)에만 뜨고,
           게임을 아직 안 치른 시즌에도 "규칙 자체"는 이미 정해져 있어 계속 보여준다

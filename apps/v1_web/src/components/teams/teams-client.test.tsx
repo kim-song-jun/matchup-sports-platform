@@ -952,3 +952,102 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
     expect(screen.queryByRole('button', { name: '불러오는 중' })).toBeNull();
   });
 });
+
+describe('TeamMembersPageClient 초대 폼', () => {
+  const inviteMutate = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // 초대 폼은 canManageInvitations(운영진 이상) 뒤에 가려 있다 — owner 로 렌더해야 나온다.
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: {
+        name: '성수 풋살 크루',
+        canViewMembers: true,
+        viewer: { role: 'owner', membershipId: 'membership-owner' },
+      },
+      isError: false,
+    });
+    teamApiMocks.useV1TeamMembers.mockReturnValue({
+      data: {
+        items: [],
+        summary: { ownerCount: 1, managerCount: 0, memberCount: 1 },
+        viewerRole: 'owner',
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isError: false,
+    });
+    teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1ChangeTeamMembershipRole.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    teamApiMocks.useV1RemoveTeamMembership.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    teamApiMocks.useV1ApproveTeamJoinApplication.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    teamApiMocks.useV1RejectTeamJoinApplication.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    teamApiMocks.useV1SendTeamInvitation.mockReturnValue({ isPending: false, mutate: inviteMutate });
+    teamApiMocks.useV1CancelTeamInvitation.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    teamApiMocks.useV1LeaveTeam.mockReturnValue({ isPending: false, mutate: vi.fn() });
+  });
+
+  function rejectWithValidationError(field: string, messages: string[] = []) {
+    inviteMutate.mockImplementation((_vars, options) => {
+      options?.onError?.(new V1ApiError({
+        status: 'error',
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+        message: '입력값을 다시 확인해 주세요.',
+        details: [{ field, messages }],
+        timestamp: '',
+      }));
+    });
+  }
+
+  function submitInvitation() {
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^초대/ }));
+    fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'owner@teameet.v1' } });
+    fireEvent.click(screen.getByRole('button', { name: '초대 보내기' }));
+  }
+
+  it('이메일 필드가 거절되면 서버가 보낸 제약 안내를 그대로 보여준다', async () => {
+    rejectWithValidationError('invitedEmail', ['이메일 형식이 올바르지 않아요.']);
+
+    submitInvitation();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('이메일 형식이 올바르지 않아요.');
+    });
+    expect(screen.queryByText('입력값을 다시 확인해 주세요.')).toBeNull();
+  });
+
+  it('길이 초과는 형식 오류로 바꿔 말하지 않는다', async () => {
+    rejectWithValidationError('invitedEmail', ['이메일이 너무 길어요.']);
+
+    submitInvitation();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('이메일이 너무 길어요.');
+    });
+    expect(screen.queryByText('이메일 형식을 확인해 주세요.')).toBeNull();
+  });
+
+  it('서버가 제약 문구를 주지 않으면 이메일 형식 안내로 떨어진다', async () => {
+    rejectWithValidationError('invitedEmail');
+
+    submitInvitation();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('이메일 형식을 확인해 주세요.');
+    });
+  });
+
+  it('메시지 필드가 거절되면 이메일 탓으로 돌리지 않는다', async () => {
+    rejectWithValidationError('message');
+
+    submitInvitation();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('초대 메시지는 200자까지 쓸 수 있어요.');
+    });
+    expect(screen.queryByText('이메일 형식을 확인해 주세요.')).toBeNull();
+  });
+});

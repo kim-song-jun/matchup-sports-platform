@@ -284,3 +284,31 @@ describe('GameResultSubmittedEscalationService — ASSIST_SYNC supersession (#39
     });
   });
 });
+
+// 정본 §4: 리그 결과는 "결과 보내기 → 어드민 확인" 한 단계다. 어드민 확인을 건너뛰고
+// OFFICIAL 로 올리던 24시간 자동 승인 잡은 지웠고, 이 핸들러가 리그를 아예 안 태운다.
+// 예약 SQL 이 다시 생기면 핸들러 없는 아웃박스 행이 쌓여 POISONED 로 간다.
+describe('GameResultSubmittedEscalationService — 리그 결과는 상대팀 승인 레인에 들어오지 않는다', () => {
+  it('리그 대진 제출은 검토 큐·예약·알림을 하나도 만들지 않는다', async () => {
+    const service = new GameResultSubmittedEscalationService();
+    const tx = fakeTx({
+      revisionRow: supersededRevision({ revisionId: 'rev-league', leagueId: 'lg1', teamMatchId: 'tm1', tournamentId: 'lg1' }),
+      superseded: false,
+    });
+
+    await service.handler(claim('rev-league'), tx as never);
+
+    expect(tx.$executeRaw.mock.calls.map(sqlOf)).toEqual([]);
+  });
+
+  it('자동 승인 아웃박스 행은 어디에서도 예약되지 않는다', async () => {
+    const service = new GameResultSubmittedEscalationService();
+    const friendly = fakeTx({ revisionRow: supersededRevision({ revisionId: 'rev-friendly' }), superseded: false });
+
+    await service.handler(claim('rev-friendly'), friendly as never);
+
+    const scheduled = friendly.$executeRaw.mock.calls.map(sqlOf).join('\n');
+    expect(scheduled).toContain('GAME_RESULT_REVIEW_REMINDER');
+    expect(scheduled).not.toContain('GAME_RESULT_LEAGUE_AUTO_APPROVE');
+  });
+});

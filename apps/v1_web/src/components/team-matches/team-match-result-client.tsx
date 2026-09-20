@@ -26,6 +26,7 @@ import type {
 } from '@/types/api';
 import {
   CARD_TYPE_LABEL,
+  LEAGUE_RESULT_REVISION_STATE_LABEL,
   RESULT_REVISION_STATE_LABEL,
   hashResultPayload,
   hydrateResultFormFromRevision,
@@ -345,8 +346,8 @@ function ResultDraftSummary({
  * U3-A안(2026-08-24 사용자 확정): 리그 대진의 결과 화면은 "확정 영수증"이 최상단이고
  * 이의는 그 아래 D-day 카드다 — "승인" 프레이밍이 없다. 호스트 진입점
  * (`TeamMatchResultPageClient`)과 상대팀 진입점(`TeamMatchResultApprovalPageClient`)
- * 양쪽 다 이 컴포넌트로 합류한다: 리그 결과는 운영자가 입력·즉시 확정하므로(E1) 두
- * 팀이 서로 승인할 대상 자체가 없다.
+ * 양쪽 다 이 컴포넌트로 합류한다: 리그 결과는 운영자가 입력하고 어드민이 확인하므로
+ * (정본 §4) 두 팀이 서로 승인할 대상 자체가 없다.
  */
 function LeagueTeamMatchResultPage({
   teamMatchId,
@@ -362,11 +363,6 @@ function LeagueTeamMatchResultPage({
   const opponentName = teamMatch.approvedOpponentTeam?.name ?? '상대팀';
   const latest = revisions[0] ?? null;
   const participantMember = teamMatch.viewer?.participantMember === true;
-  // 리그 대진일 때만 아는 값(teamMatch.league는 fetch 이후에만 존재) — 이 함수는
-  // TeamMatchResultPageClient/TeamMatchResultApprovalPageClient 양쪽에서 진입하는데
-  // 두 라우트 모두 route-chrome 테이블 기본 제목은 "경기 결과 입력"/"경기 결과 승인"이라
-  // 이 화면에서만 "경기 결과"로 덮어써야 한다(fragments/team-matches.ts 주석 참고).
-  useShellOverride({ title: '경기 결과' });
 
   return (
     <>
@@ -383,6 +379,12 @@ function LeagueTeamMatchResultPage({
           <EmptyState title="참가팀만 볼 수 있어요" sub="이 리그 대진에 참가한 팀의 멤버만 결과를 확인할 수 있어요." />
         ) : (
           <>
+            {/* 정본 §4: 결과를 보내는 주체는 운영팀, 확인하는 주체는 어드민이다 — 참가팀에는
+                제출·승인·이의 경로가 없다(서버가 403 으로 막는다). 상태와 무관하게 늘 보인다. */}
+            <div className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
+              리그 경기 결과는 운영자가 입력하고 어드민이 확인해요. 내용이 다르면 운영자에게 알려 주세요.
+            </div>
+
             {latest?.state === 'OFFICIAL' ? (
               <Card pad={16}>
                 <div className="tm-text-body-lg">공식 결과로 확정됐어요</div>
@@ -392,6 +394,27 @@ function LeagueTeamMatchResultPage({
                   resultParticipants={latest.resultParticipants}
                   mvpParticipantId={latest.mvpParticipantId}
                 />
+                {latest.reason ? (
+                  <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
+                ) : null}
+              </Card>
+            ) : latest?.state === 'SUBMITTED' ? (
+              // 정본 §4 의 pending 계약: SUBMITTED 는 점수 + "확정 전" 으로 보이되 순위엔 안 들어간다.
+              // 공통 SUBMITTED 라벨("상대팀 승인 대기")은 리그에 없는 단계라 여기선 쓰지 않는다.
+              // official_only 가시성 조항은 공개 점수 투영에만 걸리고, 이 화면은 참가팀 전용이다.
+              <Card pad={16}>
+                <div className="tm-text-body-lg">
+                  결과가 도착했어요 <span className="tm-badge tm-badge-grey" style={{ marginLeft: 8 }}>확정 전</span>
+                </div>
+                <div className="tm-text-subhead" style={{ marginTop: 12, fontWeight: 700 }}>{scoreLabel(latest)}</div>
+                <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
+                <ApprovalParticipantSummary
+                  resultParticipants={latest.resultParticipants}
+                  mvpParticipantId={latest.mvpParticipantId}
+                />
+                <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+                  어드민 확인이 끝나면 공식 기록으로 확정돼요. 순위·전적에는 확정된 뒤에 반영돼요.
+                </div>
                 {latest.reason ? (
                   <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>{displayRevisionReason(latest.reason)}</div>
                 ) : null}
@@ -410,7 +433,7 @@ function LeagueTeamMatchResultPage({
           </>
         )}
 
-        <ResultRevisionHistory history={revisions} />
+        <ResultRevisionHistory history={revisions} stateLabel={LEAGUE_RESULT_REVISION_STATE_LABEL} />
       </div>
     </>
   );
@@ -424,6 +447,9 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
   const { teamMatch, game, revisions, lineup, isError, isLoading, gameId } = useResultScreenBase(teamMatchId, {
     needsOwnLineup: true,
   });
+  // 로딩·에러 중에는 리그인지 알 수 없다 — 그때 "입력"을 띄우면 리그 참가팀에게 서버가
+  // 403 으로 막는 행동을 약속하게 된다. 친선으로 확인된 뒤에만 제목을 올린다.
+  useShellOverride({ title: teamMatch.data && !teamMatch.data.league ? '경기 결과 입력' : '경기 결과' });
   const createRevision = useV1CreateGameResultRevision(gameId ?? '', teamMatchId);
   const submitRevision = useV1SubmitGameResultRevision(gameId ?? '', teamMatchId);
   // 점수 먼저 입력 -> 그 개수만큼 득점자 드롭다운이 생기는 흐름(QA 지적으로 재설계) —
@@ -1061,6 +1087,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
   const { teamMatch, game, revisions, isError, isLoading, gameId } = useResultScreenBase(teamMatchId, {
     needsOwnLineup: false,
   });
+  useShellOverride({ title: teamMatch.data && !teamMatch.data.league ? '경기 결과 승인' : '경기 결과' });
   const decideRevision = useV1DecideGameResultRevision(gameId ?? '', teamMatchId);
   const [changeReason, setChangeReason] = useState('');
   const [showChangeForm, setShowChangeForm] = useState(false);
@@ -1260,7 +1287,14 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
   );
 }
 
-function ResultRevisionHistory({ history }: { history: V1GameResultRevision[] }) {
+function ResultRevisionHistory({
+  history,
+  stateLabel = RESULT_REVISION_STATE_LABEL,
+}: {
+  history: V1GameResultRevision[];
+  /** 리그 화면은 자기 라벨을 넘긴다 — 공용 라벨엔 리그에 없는 "상대팀 승인" 단계가 들어 있다. */
+  stateLabel?: Record<V1GameResultRevision['state'], string>;
+}) {
   if (history.length === 0) return null;
   return (
     <Card pad={16}>
@@ -1274,7 +1308,7 @@ function ResultRevisionHistory({ history }: { history: V1GameResultRevision[] })
                 {revision.supersedesId ? <span className="tm-badge tm-badge-grey" style={{ marginLeft: 8 }}>정정</span> : null}
               </span>
               <span className={`tm-badge ${revisionBadgeTone(revision.state)}`}>
-                {RESULT_REVISION_STATE_LABEL[revision.state]}
+                {stateLabel[revision.state]}
               </span>
             </div>
             {revision.reason ? (

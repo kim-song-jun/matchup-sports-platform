@@ -3,16 +3,15 @@ import type { PublicGameVisibilityMode } from '../games.types';
 
 /**
  * Task 24 -- server-enforced "Public visibility output matrix" (frozen in
- * the plan and mirrored in `docs/api/domains/public-records.md`). This is a
- * deliberately separate, purpose-built serializer from
- * `games/core/visibility-serializer.ts` (Task 6's `serializeGameVisibility`,
- * used by the authenticated-or-anonymous single-game `/games/:id/visibility`
- * probe): that helper's output shape has no room for bracket/status,
- * corrected-revision history, MVP, standings, or next-match, which this
- * lane's public schedule/match DTOs need. Both independently implement the
- * same `hidden -> status_only -> live(gated by PUBLIC_LIVE) -> official_only`
- * precedence from D-06, so they cannot drift on the core rule even though
- * they are separate files.
+ * the plan and mirrored in `docs/api/domains/public-records.md`).
+ *
+ * `effectivePublicVisibilityMode` below is the single resolver for the D-06
+ * precedence `hidden -> status_only -> live(gated by PUBLIC_LIVE) -> official_only`.
+ * Both this lane and the `/games/:id/visibility` probe call it, so the rule
+ * exists once. `games/core/visibility-serializer.ts` remains a separate file
+ * because its OUTPUT SHAPE differs -- it has no room for bracket/status,
+ * corrected-revision history, MVP, standings or next-match, which this lane's
+ * public schedule/match DTOs need -- not because it resolves the mode itself.
  */
 
 /**

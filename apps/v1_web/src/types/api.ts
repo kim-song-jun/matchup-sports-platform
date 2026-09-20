@@ -2001,6 +2001,15 @@ export type V1Profile = {
     activityCount: number;
     reviewCount: number;
   };
+  /**
+   * 선수 카드가 설 **자리**. 카드 내용은 `/users/:id/public-profile` 이 한 홉 뒤에 준다 --
+   * 그 사이 자리를 비워 두면 카드가 도착하며 아래 콘텐츠를 통째로 민다. 옛 서버 응답엔
+   * 없으므로 optional 이고, 없으면 예약하지 않는다(지금까지의 동작).
+   */
+  playerCardSlot?: {
+    hidden: boolean;
+    shape: 'rect' | 'shield';
+  };
   displayName?: string;
   trustState?: TrustState;
 };

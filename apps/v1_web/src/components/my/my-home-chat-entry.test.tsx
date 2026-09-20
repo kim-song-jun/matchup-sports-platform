@@ -57,7 +57,7 @@ function mockBaseHooks() {
 
 // "팀 컨택의 채팅 흡수": 채팅으로 가는 상시 입구가 마이 메뉴에 없었다 — 홈 위젯이 유일했다.
 describe('MyHomePageClient — 채팅 진입점', () => {
-  it('커뮤니티 섹션에 "채팅" 행이 /chat 으로 연결되고, 대기 컨택이 없으면 배지가 없다', () => {
+  it('받은 소식 섹션에 "채팅" 행이 /chat 으로 연결되고, 대기 컨택이 없으면 배지가 없다', () => {
     mockBaseHooks();
     apiMocks.useV1TeamContactSummary.mockReturnValue({ data: { pendingInbound: 0, byTeam: [] } });
 

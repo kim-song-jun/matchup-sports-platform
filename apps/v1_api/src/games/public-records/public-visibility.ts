@@ -5,13 +5,17 @@ import type { PublicGameVisibilityMode } from '../games.types';
  * Task 24 -- server-enforced "Public visibility output matrix" (frozen in
  * the plan and mirrored in `docs/api/domains/public-records.md`).
  *
- * `effectivePublicVisibilityMode` below is the single resolver for the D-06
- * precedence `hidden -> status_only -> live(gated by PUBLIC_LIVE) -> official_only`.
- * Both this lane and the `/games/:id/visibility` probe call it, so the rule
- * exists once. `games/core/visibility-serializer.ts` remains a separate file
- * because its OUTPUT SHAPE differs -- it has no room for bracket/status,
- * corrected-revision history, MVP, standings or next-match, which this lane's
- * public schedule/match DTOs need -- not because it resolves the mode itself.
+ * `effectivePublicVisibilityMode` below resolves the D-06 precedence
+ * `hidden -> status_only -> live(gated by PUBLIC_LIVE) -> official_only`. Every
+ * caller routes through it: this lane and the `/games/:id/visibility` probe.
+ *
+ * `games/core/visibility-serializer.ts` keeps a defensive copy of the kill-switch
+ * demotion. It cannot fire while its only caller hands it an already-resolved
+ * mode, but it is deliberately left in place for a future caller that passes a
+ * raw policy mode -- so treat THIS function as the rule and that one as a guard,
+ * not as a second source. That file stays separate because its OUTPUT SHAPE
+ * differs (no bracket/status, corrected-revision history, MVP, standings or
+ * next-match, which this lane's public DTOs need), not because it owns the rule.
  */
 
 /**

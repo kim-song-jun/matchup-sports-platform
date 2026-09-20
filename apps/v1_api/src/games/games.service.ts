@@ -58,6 +58,7 @@ import { GameTakeoverService } from './game-takeover.service';
 import {
   loadParticipantConsentEligibility,
 } from './public-records/public-consent';
+import { isPublicLiveEnabled } from './public-records/public-live-flag';
 import { effectivePublicVisibilityMode } from './public-records/public-visibility';
 import {
   loadParticipantNameProfiles,
@@ -1289,11 +1290,7 @@ export class GamesService {
     if (game === null || game.visibilityPolicy === null) {
       throw this.notFound();
     }
-    const publicLiveFlag = await this.prisma.v1GameOperationFlag.findUnique({
-      where: { key: 'PUBLIC_LIVE' },
-      select: { value: true },
-    });
-    const publicLiveEnabled = publicLiveFlag?.value === 'on';
+    const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
     const serialized = serializeGameVisibility(
       {
         gameId: game.id,

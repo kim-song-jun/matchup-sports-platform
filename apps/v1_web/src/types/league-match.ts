@@ -452,11 +452,23 @@ export interface V1LeagueChampionTeam {
   teamLogoUrl: string | null;
 }
 
+/**
+ * 서버 `LeagueTieBreakCriterion`(apps/v1_api/src/league-matches/league-standings.ts)의 사본.
+ * `string[]` 으로 두면 라벨 맵에 키가 빠져도 tsc 가 모른다 — 라벨은 전수 Record 를 쓰는
+ * `lib/league-tie-break-labels.ts` 한 곳에서만 만든다.
+ */
+export type V1LeagueTieBreakCriterion =
+  | 'points'
+  | 'goalDifference'
+  | 'goalsFor'
+  | 'headToHead'
+  | 'fewestGoalsAgainst';
+
 export interface V1LeagueStandingsResponse {
   leagueId: string;
   tier: number | null;
   tierLabel: string | null;
-  tieBreakOrder: string[];
+  tieBreakOrder: V1LeagueTieBreakCriterion[];
   standings: V1LeagueStandingRow[];
   pendingFixtures: V1LeaguePendingFixture[];
   /**

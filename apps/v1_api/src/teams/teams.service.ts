@@ -13,6 +13,7 @@ import {
   V1TeamMembership,
   V1TeamMembershipRole,
 } from '@prisma/client';
+import { normalizeEmail } from '../auth/normalize-email';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -1367,8 +1368,9 @@ export class TeamsService {
     }
     this.assertTeamHasCapacity(team);
 
+    // 저장된 이메일은 전부 normalizeEmail 표준형이라 조회도 같은 표준형이어야 한다.
     const invitedUser = await this.prisma.v1User.findUnique({
-      where: { email: dto.invitedEmail },
+      where: { email: normalizeEmail(dto.invitedEmail) },
       select: { id: true },
     });
     if (!invitedUser) {

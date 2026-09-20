@@ -29,7 +29,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => searchParams,
 }));
 
-// useShellOverride가 렌더 단계에서 모듈 스코프 store에 밀어넣은 값을 읽어 화면에 텍스트로
+// useShellOverride가 레이아웃 이펙트에서 모듈 스코프 store에 게시한 값을 읽어 화면에 텍스트로
 // 노출한다 — app-shell-frame.test.tsx가 이미 검증한 AppShellFrame 배선은 다시 세우지 않고,
 // 이 컴포넌트가 실제로 어떤 backHref 값을 미는지만 검증한다.
 function BackHrefProbe() {
@@ -185,11 +185,8 @@ describe('MyRegistrationPageClient — 셸 backHref override', () => {
     myRegistrationApiMocks.useV1Team.mockReturnValue({ data: undefined });
   });
 
-  // Probe를 페이지와 형제로 한 트리에 같이 렌더하면 useSyncExternalStore가 마운트 직후
-  // 자체 재확인 과정에서 "다른 컴포넌트 렌더 중 setState" 경고를 낼 수 있다(프로덕션
-  // 배선인 app-shell-frame.tsx는 AppShellFrame이 항상 페이지의 조상이라 이 문제가 없다).
-  // 페이지를 먼저 완전히 커밋시킨 뒤(store가 이미 갱신된 상태) Probe를 별도 act로 마운트해
-  // 첫 렌더에서 바로 최신 값을 읽게 한다.
+  // 페이지를 먼저 완전히 커밋시켜 레이아웃 이펙트가 store에 게시하게 한 뒤 Probe를 별도로
+  // 마운트한다 — Probe가 첫 렌더에서 바로 최신 값을 읽는다.
   it('참가비가 없는 대회의 목록 카드에는 결제 문구가 하나도 없다', () => {
     // 무료 대회인데 카드 메타가 "무료 · 결제 완료" 로 나왔다 — 내지도 않은 돈이 "완료" 됐다는
     // 말이라 참가자에게 의미가 없다(2026-09-04, 결함 #6 후속). 참가 확정 여부는 상태 배지가 말한다.

@@ -43,7 +43,7 @@ import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
 import type { V1Sport, V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { JerseyNumberDialog } from './jersey-number-dialog';
-import { TeamDetailPageSkeleton, TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
+import { INVITE_MESSAGE_MAX_LENGTH, TeamDetailPageSkeleton, TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
 import type { TeamDetailViewModel, TeamListViewModel, TeamMembersViewModel, TeamModel } from './teams.types';
 import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel, getTeamStateViewModel } from './teams.view-model';
 import {
@@ -479,6 +479,8 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             setInviteError('가입된 이메일을 찾을 수 없어요.');
           } else if (responseCode === 'ALREADY_MEMBER') {
             setInviteError('이미 팀 멤버예요.');
+          } else if (responseCode === 'VALIDATION_ERROR') {
+            setInviteError(invitationValidationMessage(err));
           } else {
             const raw = extractErrorMessage(err, '');
             setInviteError(raw || '초대를 보내지 못했어요. 다시 시도해 주세요.');
@@ -641,7 +643,30 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   );
 }
 
+/**
+ * 초대 폼은 이메일과 메시지 두 필드를 보내므로 400 을 이메일 탓으로 싸잡으면 안 된다.
+ * 서버 ValidationPipe(main.ts)는 details 에 `{ field, messages }` 배열을 담아 준다.
+ * invitedEmail 의 제약은 DTO 가 한국어 메시지를 달아 두어 그대로 쓸 수 있다(형식·길이가
+ * 서로 다른 안내를 낸다). message 의 @MaxLength 에는 메시지가 없어 영문이 오므로 여기서 쓴다.
+ */
+function invitationValidationMessage(err: unknown): string {
+  const details = err instanceof V1ApiError ? err.details : undefined;
+  const entries = Array.isArray(details)
+    ? (details as Array<{ field?: unknown; messages?: unknown } | null>)
+    : [];
 
+  const emailDetail = entries.find((detail) => detail?.field === 'invitedEmail');
+  if (emailDetail) {
+    const [serverMessage] = Array.isArray(emailDetail.messages) ? emailDetail.messages : [];
+    return typeof serverMessage === 'string' && serverMessage.length > 0
+      ? serverMessage
+      : '이메일 형식을 확인해 주세요.';
+  }
+  if (entries.some((detail) => detail?.field === 'message')) {
+    return `초대 메시지는 ${INVITE_MESSAGE_MAX_LENGTH}자까지 쓸 수 있어요.`;
+  }
+  return '초대 내용을 다시 확인해 주세요.';
+}
 
 function buildTeamFilterSheet(
   params: URLSearchParams,

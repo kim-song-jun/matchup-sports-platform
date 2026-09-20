@@ -168,4 +168,19 @@ describe('AdminLeagueMatchNewPage', () => {
     // 선택 칩 목록에 축구팀이 추가되지 않아야 한다(클릭이 무시됨).
     expect(screen.queryByLabelText('축구팀 제거')).not.toBeInTheDocument();
   });
+
+  // 이 안내는 원래 4개짜리 문자열을 손으로 적어 둔 것이라 서버가 5번째 기준을 추가한
+  // 뒤에도 그대로였다. 지금은 공용 라벨 모듈에서 만들어 쓴다(정본 §5).
+  it('순위 규칙 안내가 서버의 다섯 기준을 모두 담고 고정값이라는 단서를 유지한다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1CreateLeagueMatchMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never);
+    useV1MasterSportsMock.mockReturnValue({ data: [] } as never);
+    useV1MasterRegionsMock.mockReturnValue({ data: [] } as never);
+    useV1TeamsMock.mockReturnValue({ data: { items: [], nextCursor: null }, isFetching: false } as never);
+
+    renderPage();
+
+    const notice = await screen.findByText(/^순위 규칙:/);
+    expect(notice.textContent).toBe('순위 규칙: 승점 → 골득실 → 다득점 → 승자승 → 최소 실점 (고정값 — 리그별 변경 미지원)');
+  });
 });

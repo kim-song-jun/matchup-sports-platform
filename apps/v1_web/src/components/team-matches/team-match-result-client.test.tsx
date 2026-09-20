@@ -840,6 +840,41 @@ describe('리그 대진 결과 - 확정 영수증', () => {
     expect(screen.queryByText('아직 결과가 없어요')).not.toBeInTheDocument();
   });
 
+  // 정본 §4 의 pending 계약: 운영자가 경기를 종료하면 리비전이 SUBMITTED 로 만들어지고,
+  // 어드민이 확인하기 전까지 사용자 화면에는 **점수 + "확정 전"** 으로 보여야 한다.
+  // 이 arm 이 없으면 결과가 도착했는데도 "아직 결과가 없어요" 로 읽힌다.
+  it.each([['host' as const], ['approval' as const]])(
+    '%s 진입점: 어드민 확인 전(SUBMITTED) 결과는 점수와 "확정 전"으로 보인다',
+    (entry) => {
+      renderReceipt(
+        entry,
+        { manageableHostTeam: entry === 'host', manageableOpponentTeam: entry === 'approval' },
+        {},
+        [revision({ state: 'SUBMITTED', score: { regulation: { home: 3, away: 2 }, penalty: null, goals: [], incomplete: false }, submittedAt: '2026-08-01T00:00:00.000Z' })],
+      );
+
+      expect(screen.getByText('3 : 2')).toBeInTheDocument();
+      expect(screen.getByText('확정 전')).toBeInTheDocument();
+      expect(screen.getByText('어드민 확인이 끝나면 공식 기록으로 확정돼요. 순위·전적에는 확정된 뒤에 반영돼요.')).toBeInTheDocument();
+      expect(screen.queryByText('아직 결과가 없어요')).not.toBeInTheDocument();
+      // 리그엔 상대팀 승인 단계가 없다 — 승인 CTA 가 새어 들어오면 깨진다.
+      expect(screen.queryByText('승인하기')).not.toBeInTheDocument();
+    },
+  );
+
+  // 참가팀이 제출·승인·이의를 할 수 없다는 사실을 화면이 직접 말해야 한다(정본 §4).
+  it.each([
+    ['결과 없음', [] as V1GameResultRevision[]],
+    ['확정 전', [revision({ state: 'SUBMITTED' })]],
+    ['공식 확정', [revision({ state: 'OFFICIAL', officialAt: '2026-08-01T00:00:00.000Z' })]],
+  ])('%s 상태에서도 운영자 입력·어드민 확인 정책 안내가 늘 보인다', (_label, revisions) => {
+    renderReceipt('host', { manageableHostTeam: true }, {}, revisions);
+
+    expect(
+      screen.getByText('리그 경기 결과는 운영자가 입력하고 어드민이 확인해요. 내용이 다르면 운영자에게 알려 주세요.'),
+    ).toBeInTheDocument();
+  });
+
   it('무효 처리된 결과는 무효 안내를 보여준다', () => {
     renderReceipt('host', {}, {}, [revision({ state: 'VOID', reason: '오심 확인' })]);
     expect(screen.getByText('이 결과는 무효 처리됐어요')).toBeInTheDocument();

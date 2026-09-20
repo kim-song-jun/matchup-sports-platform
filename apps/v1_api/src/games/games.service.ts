@@ -6180,6 +6180,10 @@ export class GamesService {
         };
       }
       const tournamentAction = this.tournamentAuthorizationAction(action);
+      // D1(2026-08-24 사용자 확정: 운영자가 기본 입력자, 팀은 확인만) + 정본 §4(결과 제출 =
+      // 콘솔 종료, 확인은 어드민 하나). 참가팀 owner/manager 는 제출도 승인도 못 한다 —
+      // 승인 단계 자체가 없다. 이 403 을 "고치면" 정본이 없앤 상대팀 승인 레인과, 어드민
+      // 확인 없이 OFFICIAL 로 올리는 자동승인 잡이 함께 되살아난다.
       const regularLeagueResultAction =
         isRegularLeague &&
         (action === 'team_result_submit' ||
@@ -6945,8 +6949,8 @@ export class GamesService {
         // `COMMAND_CONCURRENCY_CONFLICT` "reload and retry" 로 번역된다 — **재시도해도
         // 영원히 같은 답이 나오는 거짓 안내**다(원인이 경합이 아니다).
         //
-        // 리그 대진은 호스트 팀장이 `createResultRevision` 으로 DRAFT 를 만들 수 있어
-        // 실제로 그 상태가 된다(그 경로엔 게임 상태 게이트가 없다).
+        // 리그 대진은 어드민의 정정·재제출과 복구 레인이 선행 리비전을 남길 수 있다 —
+        // 참가팀은 `createResultRevision` 을 탈 수 없다(resolveActor 의 regularLeagueResultAction).
         //
         // **대회 레인은 값이 안 바뀐다** — `end` 시점에 대회 픽스처의 리비전은 구조적으로
         // 0건이다: `createResultRevision` 이 `TOURNAMENT_FIXTURE` 를 409

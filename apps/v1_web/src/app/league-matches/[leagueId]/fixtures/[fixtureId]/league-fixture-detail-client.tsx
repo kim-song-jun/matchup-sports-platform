@@ -353,7 +353,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
             </Link>
             {(fixture.status === 'completed' || result.hasScore) && (
               <Link href={`/team-matches/${fixtureId}/result`} className="tm-btn tm-btn-lg tm-btn-neutral">
-                결과 상세·이의 제기
+                경기 결과 보기
               </Link>
             )}
           </div>

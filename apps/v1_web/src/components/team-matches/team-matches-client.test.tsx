@@ -214,13 +214,17 @@ describe('TeamMatchDetailPageClient — GA events', () => {
 // rendered CTA so a regression in buildResultAction's role/viewerState
 // branching trips a real assertion.
 describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', () => {
-  function mockMatchedTeamMatch(viewer: {
-    state: V1TeamMatchViewerState;
-    manageableHostTeam?: boolean;
-    manageableOpponentTeam?: boolean;
-  }) {
+  function mockMatchedTeamMatch(
+    viewer: {
+      state: V1TeamMatchViewerState;
+      manageableHostTeam?: boolean;
+      manageableOpponentTeam?: boolean;
+    },
+    league?: { leagueId: string; title: string },
+  ) {
     useV1TeamMatchMock.mockReturnValue({
       data: {
+        ...(league ? { league } : {}),
         id: 'team-match-1',
         teamMatchId: 'team-match-1',
         title: '풋살 팀매치',
@@ -280,6 +284,38 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
     const link = screen.getByRole('link', { name: '경기 결과 대기' });
     expect(link).toHaveAttribute('href', '/team-matches/team-match-1/result/approval');
     expect(screen.queryByRole('link', { name: '경기 결과 입력' })).not.toBeInTheDocument();
+  });
+
+  // 리그 대진은 참가팀이 결과를 제출·승인할 수 없다 — 서버가 둘 다 403 으로 막는다
+  // (games.service.ts regularLeagueResultAction, 정본 §4). "입력"/"승인"/"대기" 라벨은
+  // 눌러 봐야 실패하는 행동을 약속하므로, 두 역할 모두 열람 CTA 하나만 받아야 한다.
+  it.each([
+    ['호스트 팀장', { manageableHostTeam: true, manageableOpponentTeam: false }],
+    ['상대팀 팀장', { manageableHostTeam: false, manageableOpponentTeam: true }],
+  ])('리그 대진에서는 %s도 입력·승인이 아니라 열람 CTA 하나만 본다', (_role, manageable) => {
+    mockMatchedTeamMatch(
+      { state: 'none', ...manageable },
+      { leagueId: 'league-1', title: '테스트 리그' },
+    );
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    const link = screen.getByRole('link', { name: '경기 결과 보기' });
+    expect(link).toHaveAttribute('href', '/team-matches/team-match-1/result');
+    for (const forbidden of ['입력', '승인', '대기']) {
+      expect(screen.queryByRole('link', { name: new RegExp(forbidden) })).not.toBeInTheDocument();
+    }
+  });
+
+  it('리그 대진이어도 참가팀 팀장이 아니면 결과 CTA 자체가 없다', () => {
+    mockMatchedTeamMatch(
+      { state: 'none', manageableHostTeam: false, manageableOpponentTeam: false },
+      { leagueId: 'league-1', title: '테스트 리그' },
+    );
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.queryByRole('link', { name: '경기 결과 보기' })).not.toBeInTheDocument();
   });
 
   it('shows an unrelated viewer neither the entry nor the approval CTA', () => {

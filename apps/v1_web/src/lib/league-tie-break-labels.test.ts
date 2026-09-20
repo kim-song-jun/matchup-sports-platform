@@ -5,14 +5,9 @@ import type { V1LeagueTieBreakCriterion } from '@/types/league-match';
 import { LEAGUE_TIE_BREAK_LABELS, LEAGUE_TIE_BREAK_ORDER, formatTieBreakRule } from './league-tie-break-labels';
 
 /**
- * 이 파일은 **v1_web 테스트가 v1_api 소스를 직접 읽는 유일한 자리**다(globals.test.ts 는
- * v1_web 안쪽만 읽으므로 선례가 아니다). 서버 enum 과 화면 라벨을 잇는 계약이 패키지
- * 경계를 넘어가 타입으로는 이어지지 않아 의도적으로 건 결합이다.
- *
- * 잡으려는 것 둘 — ① 서버 enum 에 기준이 늘었는데 라벨이 안 붙는 것(2026-09-17
- * `fewestGoalsAgainst` 에서 실제로 발생) ② 화면이 쓰는 기본 순서가 서버 상수와 어긋나는 것.
- * 파싱이 0건이면 두 검사 모두 헛돌기 때문에 개수를 먼저 못 박는다 — length 단언을 지우면
- * 이 파일은 통과만 하고 아무것도 안 잡는다.
+ * v1_web 테스트가 v1_api 소스를 직접 읽는다 — 서버 enum 과 화면 라벨의 계약은 패키지
+ * 경계를 넘어가 타입으로 이어지지 않는다. 파싱이 0건이면 아래 두 검사가 모두 공회전하므로
+ * length 단언이 그 방어막이다 — 지우면 이 파일은 통과만 하고 아무것도 잡지 않는다.
  */
 function readApiSource(fileName: string): string {
   // vitest 의 cwd 는 apps/v1_web 이다(vitest-must-run-from-app-dir).

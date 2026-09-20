@@ -1710,12 +1710,8 @@ describe('리그 참가 신청 입구', () => {
   });
 });
 
-/**
- * 순위 규칙 줄(정본 §5). 서버는 `LEAGUE_TIE_BREAK_ORDER` 5개를 **항상** 내려보내는데
- * 화면의 라벨 맵에는 4개뿐이라 마지막 기준이 `fewestGoalsAgainst` 라는 식별자 그대로
- * 보였다. 기존 픽스처가 전부 `tieBreakOrder: ['points']` 라 이 줄은 한 번도 검사된 적이 없다.
- */
 describe('순위 규칙 줄', () => {
+  // 서버 상수의 사본이다 — 실제 대조는 lib/league-tie-break-labels.test.ts 가 한다.
   const SERVER_ORDER = ['points', 'goalDifference', 'goalsFor', 'headToHead', 'fewestGoalsAgainst'];
 
   function mockStandings(tieBreakOrder: string[]) {

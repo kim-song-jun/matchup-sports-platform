@@ -58,6 +58,7 @@ import { GameTakeoverService } from './game-takeover.service';
 import {
   loadParticipantConsentEligibility,
 } from './public-records/public-consent';
+import { effectivePublicVisibilityMode } from './public-records/public-visibility';
 import {
   loadParticipantNameProfiles,
   resolveParticipantDisplayName,
@@ -1292,7 +1293,8 @@ export class GamesService {
       where: { key: 'PUBLIC_LIVE' },
       select: { value: true },
     });
-    return serializeGameVisibility(
+    const publicLiveEnabled = publicLiveFlag?.value === 'on';
+    const serialized = serializeGameVisibility(
       {
         gameId: game.id,
         state: game.state,
@@ -1308,14 +1310,22 @@ export class GamesService {
         officialRecords: [],
       },
       {
-        mode:
-          game.visibilityPolicy.mode === V1VisibilityMode.STATUS_ONLY ? 'status_only' : 'live',
-        publicLiveEnabled: publicLiveFlag?.value === 'on',
+        // 정책 enum → 공개 모드 변환은 공개 기록 레인과 같은 함수를 쓴다(여기 다시
+        // 옮겨 적으면 같은 규칙의 네 번째 전사본이다). 이 함수가 킬스위치 강등까지
+        // 끝내므로 — LIVE 는 플래그가 켜졌을 때만 살아남는다 — 직렬화기 쪽 강등은 no-op 이다.
+        mode: effectivePublicVisibilityMode(game.visibilityPolicy.mode, publicLiveEnabled),
+        publicLiveEnabled,
         lineupEligible:
           game.visibilityPolicy.lineupAt !== null &&
           game.visibilityPolicy.lineupAt.getTime() <= Date.now(),
       },
     );
+    // D-06 의 hidden 은 절대 거부다 — 공개 기록 레인이 같은 상황에서 404 를 내므로
+    // 존재 자체를 드러내지 않도록 같은 답을 낸다.
+    if (serialized === null) {
+      throw this.notFound();
+    }
+    return serialized;
   }
 
   async executeCommand(

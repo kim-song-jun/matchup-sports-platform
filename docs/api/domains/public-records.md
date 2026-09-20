@@ -110,7 +110,10 @@ match detail: the league fixture list (`GET /league-matches/:leagueId` and
 the `leagueFixtures[]` mirror in `GET /tournaments/:id`) resolves it per row
 in `toLeagueFixtureList` and returns `homeScore = awayScore = null`,
 `isForfeit = false` and `scoreHidden = true` under `status_only` (and under a
-missing policy row, which fails closed). `official_only` keeps the numbers --
+missing policy row, which fails closed). `scoreHidden` states "confirmed but
+withheld", so it is `true` only when an official fact exists for that fixture --
+a not-yet-played row reports `false`, because it is not hidden, it has no result
+yet. `official_only` keeps the numbers --
 the list only ever carries official facts, and that is what the mode names. The row itself is kept so week
 labels and the "next match" pointer, which clients derive from the array,
 stay stable. `GET /tournaments/:id` `fixtures[].result` resolves the same

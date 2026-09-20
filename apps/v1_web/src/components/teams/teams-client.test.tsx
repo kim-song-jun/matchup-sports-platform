@@ -952,3 +952,61 @@ describe('TeamDetailPageClient — 서버 seed 로 그리는 동안 뷰어 의�
     expect(screen.queryByRole('button', { name: '불러오는 중' })).toBeNull();
   });
 });
+
+describe('TeamMembersPageClient 초대 폼', () => {
+  const inviteMutate = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // 초대 폼은 canManageInvitations(운영진 이상) 뒤에 가려 있다 — owner 로 렌더해야 나온다.
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: {
+        name: '성수 풋살 크루',
+        canViewMembers: true,
+        viewer: { role: 'owner', membershipId: 'membership-owner' },
+      },
+      isError: false,
+    });
+    teamApiMocks.useV1TeamMembers.mockReturnValue({
+      data: {
+        items: [],
+        summary: { ownerCount: 1, managerCount: 0, memberCount: 1 },
+        viewerRole: 'owner',
+        pageInfo: { nextCursor: null, hasNext: false },
+      },
+      isError: false,
+    });
+    teamApiMocks.useV1TeamJoinApplications.mockReturnValue({ data: { items: [] } });
+    teamApiMocks.useV1TeamInvitations.mockReturnValue({ data: { items: [] }, isLoading: false });
+    teamApiMocks.useV1ChangeTeamMembershipRole.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    teamApiMocks.useV1RemoveTeamMembership.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    teamApiMocks.useV1ApproveTeamJoinApplication.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    teamApiMocks.useV1RejectTeamJoinApplication.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    teamApiMocks.useV1SendTeamInvitation.mockReturnValue({ isPending: false, mutate: inviteMutate });
+    teamApiMocks.useV1CancelTeamInvitation.mockReturnValue({ isPending: false, mutate: vi.fn() });
+    teamApiMocks.useV1LeaveTeam.mockReturnValue({ isPending: false, mutate: vi.fn() });
+  });
+
+  it('서버 VALIDATION_ERROR 를 이메일 형식 안내로 바꿔 보여준다', async () => {
+    inviteMutate.mockImplementation((_vars, options) => {
+      options?.onError?.(new V1ApiError({
+        status: 'error',
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+        message: '입력값을 다시 확인해 주세요.',
+        timestamp: '',
+      }));
+    });
+
+    render(<TeamMembersPageClient teamId="team-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^초대/ }));
+    fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'owner@teameet.v1' } });
+    fireEvent.click(screen.getByRole('button', { name: '초대 보내기' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('이메일 형식을 확인해 주세요.');
+    });
+    expect(screen.queryByText('입력값을 다시 확인해 주세요.')).toBeNull();
+  });
+});

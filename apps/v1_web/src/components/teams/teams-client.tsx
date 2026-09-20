@@ -479,6 +479,10 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             setInviteError('가입된 이메일을 찾을 수 없어요.');
           } else if (responseCode === 'ALREADY_MEMBER') {
             setInviteError('이미 팀 멤버예요.');
+          } else if (responseCode === 'VALIDATION_ERROR') {
+            // 서버 VALIDATION_ERROR 는 어떤 필드가 틀렸는지 담지 않는다 — 이 폼에서 검증되는
+            // 값은 이메일뿐이라 여기서 직접 안내한다.
+            setInviteError('이메일 형식을 확인해 주세요.');
           } else {
             const raw = extractErrorMessage(err, '');
             setInviteError(raw || '초대를 보내지 못했어요. 다시 시도해 주세요.');

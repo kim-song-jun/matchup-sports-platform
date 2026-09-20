@@ -100,8 +100,8 @@ describe('마이페이지 내 선수 카드', () => {
       expect(container).toBeEmptyDOMElement();
     });
 
-    it('로딩 중에는 자리를 잡지 않는다 -- 마이페이지 상단이 깜빡이면 안 된다', () => {
-      publicProfileMock.mockReturnValue({ data: undefined, isLoading: true });
+    it('카드가 올지 모르는 동안에는(옛 서버 = slot 없음) 자리를 잡지 않는다', () => {
+      publicProfileMock.mockReturnValue({ data: undefined, isPending: true });
 
       const { container } = renderSection();
 
@@ -115,6 +115,59 @@ describe('마이페이지 내 선수 카드', () => {
 
       expect(container).toBeEmptyDOMElement();
     });
+  });
+});
+
+/**
+ * 카드는 프로필보다 한 홉 늦게 온다(`/me/profile` → `/users/:id/public-profile`).
+ * 그 사이 자리를 비워 두면 도착 순간 548px 짜리 카드가 삽입되며 이미 손을 뻗은
+ * 버튼들이 아래로 밀린다 -- 콜드 세션마다 재현되던 결함이다. 그래서 **카드가 올
+ * 것이 확실할 때만** 높이를 잡는다. 여기서 거는 것은 그 "확실할 때만"이다.
+ */
+describe('도착 전 자리 예약 (레이아웃 시프트 방지)', () => {
+  function renderWithSlot(slot: { hidden: boolean; shape: 'rect' | 'shield' }) {
+    return render(
+      <MyPlayerCardSection userId="u-1" displayName="김선준" profileImageUrl={null} slot={slot} />,
+    );
+  }
+
+  it('카드가 오는 중이면 모양에 맞는 높이를 미리 잡는다', () => {
+    publicProfileMock.mockReturnValue({ data: undefined, isPending: true });
+
+    const { container } = renderWithSlot({ hidden: false, shape: 'shield' });
+
+    const reserved = container.querySelector('.tm-my-card-slot');
+    expect(reserved).not.toBeNull();
+    // 모양마다 프레임 높이가 다르다(rect 424 / shield 488) -- 높이를 CSS 가 고르도록 넘긴다.
+    expect(reserved).toHaveAttribute('data-shape', 'shield');
+    // 보이는 것은 없어야 한다. 스켈레톤 박스를 그리면 상단이 깜빡인다.
+    expect(reserved).toHaveAttribute('aria-hidden', 'true');
+    expect(reserved?.textContent).toBe('');
+  });
+
+  it('카드를 숨긴 사용자에게는 자리도 잡지 않는다', () => {
+    publicProfileMock.mockReturnValue({ data: undefined, isPending: true });
+
+    const { container } = renderWithSlot({ hidden: true, shape: 'rect' });
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('조회가 실패로 끝나면 잡아 둔 자리를 놓아준다 -- 영영 안 채워질 공백을 남기지 않는다', () => {
+    publicProfileMock.mockReturnValue({ data: undefined, isPending: false, isError: true });
+
+    const { container } = renderWithSlot({ hidden: false, shape: 'rect' });
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('카드가 도착하면 예약 자리는 사라지고 카드가 그 자리에 선다', () => {
+    publicProfileMock.mockReturnValue({ data: { playerCard: card, teams: [] }, isPending: false });
+
+    const { container } = renderWithSlot({ hidden: false, shape: 'rect' });
+
+    expect(container.querySelector('.tm-my-card-slot')).toBeNull();
+    expect(container.querySelector('.tm-player-card')).not.toBeNull();
   });
 });
 

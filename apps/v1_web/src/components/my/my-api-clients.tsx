@@ -2299,14 +2299,15 @@ function toMyHomeModel(
       icon: 'Award',
     });
   }
-  const communitySection = sections.find((section) => section.title === '커뮤니티');
-  const chatItem = communitySection?.items.find((item) => item.href === '/chat');
+  const inboxSection = sections.find((section) => section.title === '받은 소식');
+  const chatItem = inboxSection?.items.find((item) => item.href === '/chat');
   if (chatItem) {
     chatItem.badge = pendingContactCount > 0 ? pendingContactCount : undefined;
     chatItem.badgeLabel = pendingContactCount > 0 ? `답장을 기다리는 컨택 ${pendingContactCount}건` : undefined;
   }
-  if (communitySection && !communitySection.items.some((item) => item.href === '/my/reviews')) {
-    communitySection.items.push({
+  if (inboxSection && !inboxSection.items.some((item) => item.href === '/my/reviews')) {
+    // '보낸 가입 신청'(결과 대기) 앞에 둔다 -- 배지가 붙을 수 있는 항목끼리 위로 모은다.
+    inboxSection.items.splice(2, 0, {
       label: '리뷰',
       sub: hasPendingReviews ? '작성할 리뷰가 있어요' : '작성한 리뷰와 받은 리뷰를 확인해요',
       href: '/my/reviews',
@@ -2314,8 +2315,8 @@ function toMyHomeModel(
     });
   }
   // 스태프가 아닌 대부분의 사용자에게는 이 섹션 자체가 없어야 한다 — 유효한(만료·해제되지
-  // 않은) 배정이 하나라도 있을 때만 추가한다. "내 활동" 바로 다음에 둬서, 지금 처리해야
-  // 하는 운영 업무가 있다는 신호가 눈에 잘 띄게 한다.
+  // 않은) 배정이 하나라도 있을 때만 추가한다. "받은 소식" 바로 다음(index 1)에 둬서, 지금
+  // 처리해야 하는 운영 업무가 있다는 신호가 눈에 잘 띄게 한다.
   if (staffTournamentCount > 0 && !sections.some((section) => section.title === '대회 운영')) {
     sections.splice(1, 0, {
       title: '대회 운영',
@@ -2329,24 +2330,11 @@ function toMyHomeModel(
       ],
     });
   }
-  if (!sections.some((section) => section.title === '문의')) {
-    sections.push({
-      title: '문의',
-      items: [
-        {
-          label: '문의하기',
-          sub: '계정, 매치, 대회, 결제 문제를 운영팀에 남겨요',
-          href: '/my/inquiries',
-          icon: 'Mail',
-        },
-      ],
-    });
-  }
-
   return {
     ...myHomeModel,
     hasNewNotification,
     phoneVerified,
+    playerCardSlot: profile.playerCardSlot,
     sections,
     user: {
       ...myHomeModel.user,
@@ -2364,18 +2352,20 @@ function toMyHomeModel(
         sport.levelName ? `${sport.sportName} ${sport.levelName}` : sport.sportName,
       ),
       stats: [
-        { label: '활동', value: activityCount, unit: activitySummary ? '회' : undefined },
+        { label: '전체 활동', value: activityCount, unit: activitySummary ? '회' : undefined },
         // teamCount 는 activitySummary 응답의 필수(non-optional) 필드라 activitySummary 가
         // 로딩됐다면 항상 채워져 있다 — 이전엔 activitySummary 로딩 중일 때 아직 못 채운
         // teams(초기값 [])의 length(=0)로 폴백해서, 실제로 팀이 여러 개인 사용자에게도
         // 로딩 중 잠깐(또는 이 쿼리가 느릴 때 계속) "소속 팀: 0팀"으로 보이는 결함이 있었다.
         { label: '소속 팀', value: activitySummary ? activitySummary.totals.teamCount : '—', unit: activitySummary ? '팀' : undefined },
-        { label: '매너 점수', value: formatScore(totalMannerScore) },
+        // 만점을 함께 적는다 -- 선수 카드의 MAN 은 같은 후기를 100점으로 환산해 보여주므로,
+        // 척도가 없으면 "94 인데 4.7" 두 숫자가 다른 사실처럼 읽힌다.
+        { label: '매너 점수', value: formatScore(totalMannerScore), unit: typeof totalMannerScore === 'number' ? '/5' : undefined },
       ],
       // '매너 점수'는 상단 활동 요약(stats)에만 표시. monthly는 경기 수·승률만 — 이중 표기 해소.
       monthly: [
         { label: '이번 달 경기', value: monthlyMatchCount, unit: activitySummary ? '경기' : undefined },
-        { label: '승률', value: formatWinRate(activitySummary?.monthly.winRate) },
+        { label: '이번 달 승률', value: formatWinRate(activitySummary?.monthly.winRate) },
       ],
     },
   };

@@ -34,6 +34,11 @@ export type MyMenuItem = {
 export type MyMenuSection = {
   title: string;
   items: MyMenuItem[];
+  /**
+   * 모바일에서 카드 바로 아래로 끌어올릴 섹션. 한 화면에 하나만 켠다 --
+   * 여럿이면 DOM 순서대로 붙어 결국 아무것도 앞당겨지지 않는다.
+   */
+  primary?: boolean;
 };
 
 export type MyHomeViewModel = {
@@ -45,6 +50,11 @@ export type MyHomeViewModel = {
    * false 일 때만 인증 요청 카드를 띄운다.
    */
   phoneVerified?: boolean;
+  /**
+   * 카드가 설 자리. 카드 내용보다 한 홉 먼저 도착하므로, 그 사이 높이를 잡아 두는 데 쓴다.
+   * undefined = 아직 모름(또는 옛 서버) → 예약하지 않는다.
+   */
+  playerCardSlot?: { hidden: boolean; shape: 'rect' | 'shield' };
 };
 
 export type MyMatchStatus = 'pending' | 'approved' | 'recruiting' | 'ended';

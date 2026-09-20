@@ -1413,6 +1413,15 @@ function toProfileResponse(user: Awaited<ReturnType<ProfileService['getUserSnaps
     })),
     profile: toProfilePayload(user.profile),
     reputation: toReputationPayload(user.reputationSummary),
+    // 카드 **자리**만 알려준다 -- 카드 자체는 `/users/:id/public-profile` 이 준다.
+    // 마이페이지는 이 응답으로 먼저 그려지고 카드는 한 홉 뒤에 도착하는데, 그때까지
+    // 자리를 비워 두면 548px 짜리 카드가 삽입되며 이미 보이던 버튼들을 아래로 민다.
+    // 여기 있는 두 값(숨김 여부·최종 모양)은 이미 읽은 snapshot 에서 나오므로 쿼리가
+    // 늘지 않는다 -- 카드 산식(기록 3~4쿼리)을 프로필 조회에 얹지 않기 위한 선택이다.
+    playerCardSlot: {
+      hidden: user.profile?.playerCardHidden ?? false,
+      shape: resolveCardShape(user.profile?.playerCardShape, user.reputationSummary?.reviewCount ?? 0),
+    },
   };
 }
 

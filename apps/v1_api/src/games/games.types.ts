@@ -15,6 +15,9 @@ export type GameSideKey = V1GameSideKey;
 export type GameActorRole =
   | 'team_manager'
   | 'team_owner'
+  // 정규 리그 결과 열람 전용. 팀에 묶인 액터라 스태프 권한은 하나도 없고, 쓰기 액션은
+  // 저마다 자기 action 으로 resolveActor 를 다시 타므로 여기로는 닿지 않는다.
+  | 'team_member'
   | 'opponent_manager'
   | 'platform_ops'
   | 'tournament_director'

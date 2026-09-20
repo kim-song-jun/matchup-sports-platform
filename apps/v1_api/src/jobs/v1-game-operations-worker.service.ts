@@ -11,7 +11,6 @@ import { TOURNAMENT_CUTOVER_SHARED_LOCK } from '../common/tournament-cutover-loc
 import { GameResultOfficialProjectionService } from '../game-operations/game-result-official-projection.service';
 import { GameResultVoidProjectionService } from '../game-operations/game-result-void-projection.service';
 import { GameResultSubmittedEscalationService } from './result-escalation/game-result-submitted-escalation.service';
-import { GameResultLeagueAutoApproveService } from './result-escalation/game-result-league-auto-approve.service';
 import {
   LEAGUE_RESULT_ENTRY_REMINDER_TYPE,
   LeagueResultEntryReminderService,
@@ -109,10 +108,6 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     this.registerHandler('GAME_RESULT_SUBMITTED', submittedEscalation.handler);
     this.registerHandler('GAME_RESULT_REVIEW_REMINDER', submittedEscalation.reminderHandler);
     this.registerHandler('GAME_RESULT_REVIEW_ESCALATION', submittedEscalation.escalationHandler);
-    // D2 (E2): 리그 팀매치 결과가 24시간 무응답이면 자동 승인. 위 12시간 알림과는
-    // 별개 잡이다 -- 이쪽은 실제 OFFICIAL 전이를 일으킨다.
-    const leagueAutoApprove = new GameResultLeagueAutoApproveService();
-    this.registerHandler('GAME_RESULT_LEAGUE_AUTO_APPROVE', leagueAutoApprove.handler);
     // 사용자 확정: 리그 대진의 경기 시작 +24시간에도 결과 미입력(not_entered)이면
     // active admin(owner/ops, support 제외) 전원에게 1회 알림. 스케줄은
     // league-match-admin.service.ts의 generateFixtures/regenerateFixtures(대진 생성)와

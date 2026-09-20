@@ -14,10 +14,10 @@
 //   제거됐다 — 실제 제출 성공 경로는 항상 /team-matches/:id로 바로 이동해 닿는 진짜 경로가
 //   없는 죽은 라우트였다(2026-09-04 감사).
 // - /team-matches/:id/lineup: 4개 분기(로딩/에러/재로딩/성공) 전부 동일 props, 완전 정적.
-// - /team-matches/:id/result, /result/approval: 리그 대진이면 LeagueTeamMatchResultPage로
-//   합류해 title이 "경기 결과"로 바뀐다(fetch 이후에만 아는 값) — 그 컴포넌트가
-//   useShellOverride로 override한다(team-match-result-client.tsx). 그 외 4개 분기는
-//   각 라우트마다 동일한 제목("경기 결과 입력"/"경기 결과 승인")이라 테이블 값 그대로 쓴다.
+// - /team-matches/:id/result, /result/approval: 표 기본값은 중립("경기 결과")이고, 친선
+//   대진으로 확인된 뒤에만 화면이 "경기 결과 입력"/"경기 결과 승인"으로 올린다
+//   (team-match-result-client.tsx). 리그인지 여부는 fetch 이후에만 알 수 있어서, 표에
+//   "입력"을 두면 리그 참가팀이 로딩·에러 화면에서 할 수 없는 행동을 안내받는다.
 import type { RouteChromeEntry } from '../types';
 
 export const TEAM_MATCHES_ROUTES: RouteChromeEntry[] = [
@@ -75,7 +75,10 @@ export const TEAM_MATCHES_ROUTES: RouteChromeEntry[] = [
   {
     pattern: '/team-matches/:id/result',
     chrome: {
-      title: '경기 결과 입력',
+      // 리그 대진은 참가팀이 결과를 입력·승인할 수 없다(정본 §4). 어느 쪽인지는 fetch
+      // 이후에야 알 수 있으므로 표의 기본값은 중립이고, 친선 대진일 때만 화면이
+      // useShellOverride 로 "입력"/"승인" 제목을 올린다.
+      title: '경기 결과',
       activeTab: 'matches',
       bottomNav: false,
       backHref: (p) => `/team-matches/${p.id}`,
@@ -85,7 +88,7 @@ export const TEAM_MATCHES_ROUTES: RouteChromeEntry[] = [
   {
     pattern: '/team-matches/:id/result/approval',
     chrome: {
-      title: '경기 결과 승인',
+      title: '경기 결과',
       activeTab: 'matches',
       bottomNav: false,
       backHref: (p) => `/team-matches/${p.id}`,

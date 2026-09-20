@@ -293,6 +293,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   // matches-client.tsx 와 같은 처리 — 목록 캐시에서 승계한 표시용 데이터로 그리는 동안은
   // 뷰어 상태·신청 팀 목록이 없으므로 상태 라벨과 행동 버튼을 잠근다.
   const seeding = query.isPlaceholderData;
+  const isLeagueFixture = Boolean(query.data.league);
 
   const model: TeamMatchDetailViewModel = {
     ...fallback,
@@ -343,14 +344,14 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
           // 리그 대진은 서버가 팀 단독 취소를 409 LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN 으로
           // 거부한다(team-matches.service.ts cancel()) — 눌러서 실패를 봐야만 알 수 있게
           // 두지 않고 애초에 버튼을 노출하지 않는다.
-          isLeagueFixture: Boolean(query.data.league),
+          isLeagueFixture,
           closeTeamMatch: () => closeTeamMatch.mutateAsync({ reason: 'host_closed_from_v1_web' }),
           reopenTeamMatch: () => reopenTeamMatch.mutateAsync({ reason: 'host_reopened_from_v1_web' }),
           cancelTeamMatch: () => cancelTeamMatch.mutateAsync({ reason: 'host_cancelled_from_v1_web' }),
           pending: closeTeamMatch.isPending || reopenTeamMatch.isPending || cancelTeamMatch.isPending,
         })
       : undefined,
-    resultAction: seeding ? undefined : buildResultAction(teamMatchId, getStatus(query.data), canManageHostTeam, canManageOpponentTeam),
+    resultAction: seeding ? undefined : buildResultAction(teamMatchId, getStatus(query.data), canManageHostTeam, canManageOpponentTeam, isLeagueFixture),
     reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
     statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data)),
     chatLabel: chatLabel(canManageHostTeam, canManageOpponentTeam),
@@ -615,10 +616,13 @@ function buildHostActions({
   return [];
 }
 
-// Task 17: entry point into /team-matches/:id/result(/approval). Host drafts/submits
-// the result; the opponent manager only ever approves or requests a change — never
-// drafts or submits (see docs/api/domains/games.md's team_result_submit/opponent_result_decide
-// actor split), so the two viewer roles get distinct destinations.
+// Task 17: entry point into /team-matches/:id/result(/approval). 친선 팀매치에서만
+// 호스트가 작성·제출하고 상대팀 매니저는 승인·정정요청만 한다(docs/api/domains/games.md 의
+// team_result_submit/opponent_result_decide 액터 분리) — 그래서 두 역할의 목적지가 갈린다.
+//
+// **리그 대진은 이 분리 자체가 없다.** 결과는 운영자가 콘솔에서 넣고 어드민이 확인한다
+// (정본 §4). 서버는 참가팀의 제출·승인을 둘 다 403 으로 막으므로(games.service.ts
+// regularLeagueResultAction) 두 역할 모두 열람 CTA 하나만 받는다.
 //
 // 두 게이트 모두 **팀 멤버십**(viewer.manageableHostTeam / manageableOpponentTeam)을 본다.
 // 예전엔 상대팀 쪽만 `viewerState === 'approved'` 를 봤는데, 그 값은 신청서를 낸 사람
@@ -631,8 +635,15 @@ function buildResultAction(
   status: V1TeamMatchApiStatus,
   canManageHostTeam: boolean,
   canManageOpponentTeam: boolean,
+  isLeagueFixture: boolean,
 ): TeamMatchDetailViewModel['resultAction'] {
   if (status !== 'matched' && status !== 'completed') return null;
+  if (isLeagueFixture) {
+    if (!canManageHostTeam && !canManageOpponentTeam) return null;
+    // 양쪽 진입점이 같은 읽기 전용 화면으로 합류하므로(/result/approval 도 마찬가지)
+    // 상대팀을 approval 경로로 돌리는 건 의미 없는 우회다.
+    return { label: '경기 결과 보기', href: `/team-matches/${teamMatchId}/result` };
+  }
   if (canManageHostTeam) {
     return {
       label: status === 'completed' ? '경기 결과 보기' : '경기 결과 입력',

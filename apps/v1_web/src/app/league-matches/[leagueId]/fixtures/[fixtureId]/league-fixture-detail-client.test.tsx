@@ -209,7 +209,23 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.getByRole('button', { name: '상대팀과 채팅' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '라인업 관리' })).toHaveAttribute('href', '/team-matches/fx-1/lineup');
     // 아직 스코어 없는 예정 경기라 결과 링크는 뜨지 않는다.
-    expect(screen.queryByText('결과 상세·이의 제기')).not.toBeInTheDocument();
+    expect(screen.queryByText('경기 결과 보기')).not.toBeInTheDocument();
+  });
+
+  // 정본 §4 가 이의 경로를 없앴고 Task 166 이 화면·알림까지 지웠다(api.ts:1100). 예전 라벨
+  // "결과 상세·이의 제기"는 서버에 없는 행동을 약속한다 — 그 어휘가 다시 새는지까지 본다.
+  it('결과가 있는 경기의 링크는 "경기 결과 보기"이고 이의 어휘가 남아 있지 않다', () => {
+    mockLeague({
+      fixtures: [
+        ...FIXTURES.filter((f) => f.teamMatchId !== 'fx-1'),
+        { teamMatchId: 'fx-1', title: '2주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-08T10:00:00.000Z', placeName: '검증장', status: 'completed', homeScore: 3, awayScore: 2 },
+      ],
+    });
+    mockViewer('approved', { manageableOpponentTeam: true });
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+    expect(screen.getByRole('link', { name: '경기 결과 보기' })).toHaveAttribute('href', '/team-matches/fx-1/result');
+    expect(document.body.textContent).not.toContain('이의');
   });
 
   // alpha 실측(2026-08-25) — 리그 대진 신청서는 운영자가 만들어서 away 팀 팀장의

@@ -177,3 +177,13 @@ export const RESULT_REVISION_STATE_LABEL: Record<V1GameResultRevisionState, stri
   OFFICIAL: '공식 확정',
   VOID: '무효 처리됨',
 };
+
+/**
+ * 리그 대진 전용 라벨. 리그에는 상대팀 승인 단계가 없고(정본 §4) SUBMITTED 는
+ * 어드민 확인을 기다리는 상태라, 공용 라벨의 "상대팀 승인 대기"를 그대로 쓰면
+ * 같은 리비전을 두고 화면이 서로 다른 말을 한다.
+ */
+export const LEAGUE_RESULT_REVISION_STATE_LABEL: Record<V1GameResultRevisionState, string> = {
+  ...RESULT_REVISION_STATE_LABEL,
+  SUBMITTED: '확정 전',
+};

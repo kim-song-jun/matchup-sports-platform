@@ -362,6 +362,14 @@ export function gameAuthorizationAction(action: string): GameAuthorizationAction
   }
 }
 
+/**
+ * 팀에 묶인 액터 — 응답은 자기 팀 사이드로만 좁혀지고 스태프 취급을 받지 않는다.
+ * 새 역할을 이 집합에 넣지 않으면 상대팀 라인업까지 보이는 쪽으로 기본값이 기운다.
+ */
+export function isTeamScopedActorRole(role: string): boolean {
+  return role === 'team_manager' || role === 'team_owner' || role === 'team_member';
+}
+
 export function gameOperationAuditActor(actor: GameActorScope): OperationAuditActor {
   if (actor.actorType === 'SYSTEM') {
     return { type: 'SYSTEM', id: actor.systemActor };
@@ -369,11 +377,7 @@ export function gameOperationAuditActor(actor: GameActorScope): OperationAuditAc
   if (actor.role === 'platform_ops') {
     return { type: 'PLATFORM_OPS', id: actor.actorUserId };
   }
-  if (
-    actor.role === 'team_manager' ||
-    actor.role === 'team_owner' ||
-    actor.role === 'opponent_manager'
-  ) {
+  if (isTeamScopedActorRole(actor.role) || actor.role === 'opponent_manager') {
     return { type: 'TEAM_MANAGER', id: actor.actorUserId };
   }
   return { type: 'TOURNAMENT_STAFF', id: actor.actorUserId };
@@ -515,7 +519,7 @@ export function resolveLineupRosterRegistration(params: {
   homeRegistration: { id: string; teamId: string } | null;
   awayRegistration: { id: string; teamId: string } | null;
 }): { registrationId: string } | { denied: 'forbidden' | 'registration_not_found' } {
-  const isTeamActor = params.actorRole === 'team_manager' || params.actorRole === 'team_owner';
+  const isTeamActor = isTeamScopedActorRole(params.actorRole);
   if (isTeamActor && params.actorTeamId !== params.sideTeamId) {
     return { denied: 'forbidden' };
   }
@@ -2559,10 +2563,9 @@ export class GamesService {
     // 참가팀 액터는 상대팀 라인업을 미리 볼 수 없다 — team-match 전용 라인업
     // 서비스(getLineup)가 항상 ownSideId로만 조회하는 것과 동일한 공정성 원칙을
     // 여기서도 지킨다. 스태프/platform_ops는 기존대로 양쪽 다 본다.
-    const ownSideId =
-      actor.role === 'team_manager' || actor.role === 'team_owner'
-        ? (await this.prisma.v1GameSide.findFirst({ where: { gameId, teamId: actor.teamId } }))?.id ?? null
-        : null;
+    const ownSideId = isTeamScopedActorRole(actor.role)
+      ? (await this.prisma.v1GameSide.findFirst({ where: { gameId, teamId: actor.teamId } }))?.id ?? null
+      : null;
     const lineups = await this.prisma.v1GameLineup.findMany({
       where: { gameId, invalidatedAt: null, ...(ownSideId !== null ? { sideId: ownSideId } : {}) },
       orderBy: [{ sideId: 'asc' }, { revision: 'desc' }],
@@ -2592,8 +2595,7 @@ export class GamesService {
       throw this.notFound();
     }
     const ownSideId =
-      game.state === V1GameState.SCHEDULED &&
-      (actor.role === 'team_manager' || actor.role === 'team_owner')
+      game.state === V1GameState.SCHEDULED && isTeamScopedActorRole(actor.role)
         ? (await this.prisma.v1GameSide.findFirst({ where: { gameId, teamId: actor.teamId } }))?.id ?? null
         : null;
     const lineups = await this.prisma.v1GameLineup.findMany({
@@ -3600,10 +3602,9 @@ export class GamesService {
     ) {
       throw this.forbidden();
     }
-    const mySideId =
-      actor.role === 'team_manager' || actor.role === 'team_owner'
-        ? (sides.find((side) => side.teamId === actor.teamId)?.id ?? null)
-        : null;
+    const mySideId = isTeamScopedActorRole(actor.role)
+      ? (sides.find((side) => side.teamId === actor.teamId)?.id ?? null)
+      : null;
     // F61/F62: `isStaff`만으로는 SUPPORT_READONLY(조회 전용)와 실제로 lineup_mutate
     // 권한이 있는 스태프(field_operator/tournament_director/platform_ops)를 구분할 수
     // 없었다 — 그 결과 SUPPORT_READONLY도 매니저와 동일한 편집기를 받고 저장을 눌러야만
@@ -3622,7 +3623,7 @@ export class GamesService {
     return {
       gameId,
       mySideId,
-      isStaff: actor.role !== 'team_manager' && actor.role !== 'team_owner',
+      isStaff: !isTeamScopedActorRole(actor.role),
       // F61/F62 fix: 프론트가 "조회 전용 스태프에게는 편집기를 열지 않는다"를 판단할 수
       // 있도록 실제 lineup_mutate 인가 결과를 노출한다. mySideId가 있는(=팀 매니저/오너)
       // 경우도 true다.
@@ -3694,8 +3695,7 @@ export class GamesService {
     }
     const resolved = resolveLineupRosterRegistration({
       actorRole: actor.role,
-      actorTeamId:
-        actor.role === 'team_manager' || actor.role === 'team_owner' ? (actor.teamId ?? null) : null,
+      actorTeamId: isTeamScopedActorRole(actor.role) ? (actor.teamId ?? null) : null,
       sideTeamId: side.teamId,
       homeRegistration,
       awayRegistration,
@@ -6180,6 +6180,10 @@ export class GamesService {
         };
       }
       const tournamentAction = this.tournamentAuthorizationAction(action);
+      // D1(2026-08-24 사용자 확정: 운영자가 기본 입력자, 팀은 확인만) + 정본 §4(결과 제출 =
+      // 콘솔 종료, 확인은 어드민 하나). 참가팀 owner/manager 는 제출도 승인도 못 한다 —
+      // 승인 단계 자체가 없다. 이 403 을 "고치면" 정본이 없앤 상대팀 승인 레인과, 어드민
+      // 확인 없이 OFFICIAL 로 올리는 자동승인 잡이 함께 되살아난다.
       const regularLeagueResultAction =
         isRegularLeague &&
         (action === 'team_result_submit' ||
@@ -6326,6 +6330,19 @@ export class GamesService {
             tournamentId: fixture.tournamentId,
             fixtureId: fixture.id,
             teamId: teamMembership.teamId,
+          };
+        }
+        // 정규 리그 결과는 참가팀 **전원**이 보는 영수증이다 — 서버의 열람 자격을
+        // team-matches.service.ts 의 participantMember(역할 무관 활성 멤버)와 맞춘다.
+        // 열람만 넓힌다: lineup_mutate 는 위 owner/manager 분기에서만 통과한다.
+        if (isRegularLeague && tournamentAction === 'read' && teamMemberships.length > 0) {
+          return {
+            actorType: 'USER',
+            actorUserId: userId,
+            role: 'team_member',
+            tournamentId: fixture.tournamentId,
+            fixtureId: fixture.id,
+            teamId: teamMemberships[0].teamId,
           };
         }
       }
@@ -6945,8 +6962,8 @@ export class GamesService {
         // `COMMAND_CONCURRENCY_CONFLICT` "reload and retry" 로 번역된다 — **재시도해도
         // 영원히 같은 답이 나오는 거짓 안내**다(원인이 경합이 아니다).
         //
-        // 리그 대진은 호스트 팀장이 `createResultRevision` 으로 DRAFT 를 만들 수 있어
-        // 실제로 그 상태가 된다(그 경로엔 게임 상태 게이트가 없다).
+        // 리그 대진은 어드민의 정정·재제출과 복구 레인이 선행 리비전을 남길 수 있다 —
+        // 참가팀은 `createResultRevision` 을 탈 수 없다(resolveActor 의 regularLeagueResultAction).
         //
         // **대회 레인은 값이 안 바뀐다** — `end` 시점에 대회 픽스처의 리비전은 구조적으로
         // 0건이다: `createResultRevision` 이 `TOURNAMENT_FIXTURE` 를 409

@@ -67,23 +67,25 @@
 
 ## POST /admin/team-matches
 
-플랫폼 운영자가 팀을 미리 지정하지 않고 공개 모집을 여는 별도 생성 경로다. 일반 팀 owner/manager의 `POST /team-matches` 계약과 기존 신청 API는 변경하지 않는다.
+플랫폼 운영자가 팀을 미리 지정하지 않고 공개 모집을 여는 별도 생성 경로다. 일반 팀 owner/manager 생성과 주최/확정 방식은 다르지만 경기 조건과 날짜 검증은 동일하다.
 
 Required body:
 
 - `clientCommandId` (UUID, 재시도 멱등 키)
 - `sportId` (활성 종목)
 - `regionId` (활성 시·군·구)
-- `title`, `startsAt`, `deadlineAt`, `manualPlaceName`
+- `title`, `startsAt`, `manualPlaceName`
 
-Optional body: `description`, `endsAt`, `addressText`, `costNote`, `rulesText`.
+Optional body: `description`, `imageUrl`, `endsAt`, `deadlineAt`, `addressText`, `costNote`, `rulesText`, `minLevelCode`, `maxLevelCode`, `genderRule`, `matchFormat`, `matchStyle`, `uniformColor`.
 
 Rules:
 
 - active `owner` 또는 `ops` admin만 생성할 수 있으며 `support`는 `403 PERMISSION_DENIED`다.
-- 생성된 행은 `hostTeamId=null`, `status=recruiting`인 독립 플랫폼 모집이다.
+- 생성된 행은 `hostTeamId=null`, `platformManaged=true`, `status=recruiting`인 독립 플랫폼 모집이다. `platformManaged`는 홈팀 유무로 계산하지 않고 `v1_team_matches.platform_managed`에 영구 저장한다.
+- 조건 필드는 일반 팀매치 모집과 같은 검증·저장 계약을 사용한다. web은 총 비용/상대팀 비용을 일반 생성 화면과 같은 `총 {금액}원 · 상대팀 {금액}원` 형식의 `costNote`로 보낸다.
+- `deadlineAt`은 일반 모집처럼 선택 사항이며 입력한 경우 현재보다 이후이고 `startsAt`보다 빨라야 한다.
 - 생성 시 Game, team schedule, application을 만들지 않는다.
-- 공개 목록/상세 응답은 `platformManaged=true`, `hostTeam=null`을 반환하며 같은 종목의 관리 팀이 `POST /team-matches/:id/applications`로 신청할 수 있다.
+- 배정 전 공개 목록/상세 응답은 `platformManaged=true`, `hostTeam=null`을 반환하며 같은 종목의 관리 팀이 `POST /team-matches/:id/applications`로 신청할 수 있다.
 - 같은 `clientCommandId`와 같은 payload 재시도는 기존 결과를 반환한다. 같은 키의 다른 payload는 `409 IDEMPOTENCY_CONFLICT`다.
 - 성공 응답은 `teamMatchId`, `status=recruiting`, `detailRoute`(관리자 상세), `replayed`를 포함한다.
 
@@ -101,6 +103,7 @@ Rules:
 - 대상은 `hostTeamId=null`, 리그·토너먼트에 속하지 않은 `recruiting` 플랫폼 모집이어야 한다.
 - 두 신청 팀은 활성 상태이고 모집 종목과 같아야 하며 서로 달라야 한다.
 - 성공 시 홈 팀을 `hostTeamId`, 원정 팀을 `approvedApplicantTeamId`로 연결하고 팀매치를 `matched`로 바꾼다.
+- 배정 뒤에도 저장된 `platformManaged=true`는 유지된다. 공개 목록/상세는 실제 홈·원정 팀과 `플랫폼 주관` 출처를 함께 노출한다.
 - 선택한 두 신청은 `approved`, 나머지 `requested` 신청은 `rejected`로 전환한다.
 - Game HOME/AWAY side, 양 팀 schedule, application/team-match 상태 로그, admin action log를 한 트랜잭션에서 생성한다.
 - 성공 응답은 `teamMatchId`, `gameId`, `homeTeamId`, `awayTeamId`, `detailRoute`, `replayed`를 포함한다.
@@ -128,6 +131,7 @@ Rules:
 - 일반 목록에서는 신청 마감이 지났거나 raw status가 `closed`/`matched`인 항목도 경기 시작 전까지 신청마감으로 노출하고, 경기 시작 시각 이후에는 제외한다.
 - `sort=recommended`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다.
 - `teamId`는 `hostTeamId = teamId` 또는 `applications.some(applicantTeamId = teamId)` 둘 중 하나를 만족하면 포함
+- `platformManaged`는 생성 출처를 뜻하며 팀 배정 후에도 `true`다. `hostTeam`/`approvedOpponentTeam`은 현재 배정된 실제 양 팀을 별도로 반환한다.
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
 - List and detail responses include `hostTeam.mannerScore` and `hostTeam.wins`.
   - `mannerScore` is the live aggregate of publicly revealed team-match reviews and is `null` when no score is publishable.
@@ -163,7 +167,7 @@ Rules:
 - 생성자는 `realName`, `phone`, `gender`가 모두 있는 creator profile을 가져야 한다.
 - `sportId`는 host team의 단일 `sportId`와 같아야 하며, 다르면 `400 VALIDATION_FAILED`를 반환한다.
 - `imageUrl`은 선택 사항이다. web create/edit는 `/uploads`가 반환한 루트 상대 URL만 저장하고, 미선택 상태를 `null`로 보낸다.
-- `deadlineAt`은 선택 사항이며 `startsAt`보다 빨라야 한다. `v1_team_matches.deadline_at`에 저장되고 목록·상세·수정 응답에 동일하게 반환된다.
+- `deadlineAt`은 선택 사항이며 새로 설정할 때 현재보다 이후이고 `startsAt`보다 빨라야 한다. 수정 시에는 저장된 기존 마감 시각을 그대로 유지할 수 있다. `v1_team_matches.deadline_at`에 저장되고 목록·상세·수정 응답에 동일하게 반환된다.
 
 ## PATCH /team-matches/:id
 
@@ -308,3 +312,11 @@ Success:
 - `apps/v1_web/src/types/api.ts`
 
 Task 172 공개 기록은 기존 가시성 정책과 `PUBLIC_LIVE` 플래그를 적용한다. 비참가자의 `sides[].score`는 비공개 시 `null`이며, `HIDDEN`은 404다. `STATUS_ONLY`는 점수를 숨기고, `OFFICIAL_ONLY` 및 플래그가 꺼진 `LIVE`는 최종 확정 후에만 점수를 반환한다. 라인업·이력·팀별 확인 정보는 참가자에게만 반환한다.
+
+### 일반/관리자 날짜·확정 공통 계약 (Task 149)
+
+- 두 생성 API는 `validateTeamMatchDates`를 공유한다. 시작은 미래, 종료는 시작 이후, 새 마감은 현재 이후·시작 이전이어야 한다. 잘못된 종료값을 `null`로 바꾸어 성공시키지 않는다.
+- 일반 생성/수정 폼도 종료 날짜를 지정할 수 있다. 비워두면 시작 날짜를 사용하며, 명시한 종료 날짜에는 종료 시간이 필요하다. 로컬 날짜·시간을 ISO로 변환하고 수정 시 같은 로컬 날짜로 복원한다.
+- 일반/관리자 스타일 입력은 프리셋과 직접 입력을 함께 지원하며 최대 3개다.
+- 신청 마감은 **새 신청 접수**를 닫는다. 기존 `requested` 신청은 raw status가 `recruiting`이고 시작 전이면 일반 승인과 관리자 두 팀 확정 모두 가능하다. `closed`/`cancelled`/`matched` 상태나 시작 이후는 확정 불가다. 일반 신청 목록의 `canApprove`도 이 조건과 같다.
+- `platform_managed` migration과 후속 `20260921141000_v1_platform_recruitment_host_constraint`가 필요하다. 후자는 기존 CHECK를 트랜잭션 안에서 확장해 플랫폼 모집만 host 없이 허용하고 생성자·지역·장소·시작 필수값은 유지한다. 일반 모집은 여전히 host가 필요하다.

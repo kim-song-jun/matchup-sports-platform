@@ -390,14 +390,16 @@ export function MultiPresetChipSelector({
         })}
       </div>
       {allowFreeText ? (
-        <input
-          className="tm-create-native-input"
-          style={{ marginTop: 8, width: '100%' }}
-          aria-label={`${label} 직접입력`}
-          value={customValue}
-          placeholder={freeTextPlaceholder}
-          onChange={(event) => applyCustom(event.target.value)}
-        />
+        <div className="tm-create-input" style={{ marginTop: 8 }}>
+          <input
+            className="tm-create-native-input"
+            style={{ minHeight: 44 }}
+            aria-label={`${label} 직접입력`}
+            value={customValue}
+            placeholder={freeTextPlaceholder}
+            onChange={(event) => applyCustom(event.target.value)}
+          />
+        </div>
       ) : null}
       <FieldErrorText message={limitMessage ?? undefined} />
     </div>

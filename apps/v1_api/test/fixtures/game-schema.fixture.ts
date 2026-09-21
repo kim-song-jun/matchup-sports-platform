@@ -525,10 +525,10 @@ export const gameSchemaSourceManifest = {
   // 교체했다 — 퇴역 5모델·2enum·3연결(`@ignore` 였던 `V1TournamentFixture*`)이 파일에서
   // 완전히 사라졌다. game domain(V1Game*)은 필드 하나 안 바뀌었다(연결 필드 제거만).
   // `schema.stage-a.prisma`는 이제 없다 — 최종 스키마 하나만 남는다.
-  // 2026-09-19 Task 156: additive V1ChatUserBlock and V1User inverse relations only.
+  // 2026-09-21 Task 149: additive V1TeamMatch.platformManaged provenance only.
   // Game models and the bound game-operations migration are unchanged. Re-pinned
-  // normalized full-schema bytes after merging dev; chat migration replay passed.
-  schema: '158eb655609db3136765f043ddb82b71c6b39319bf09aacf8226fdfa29c0bee0',
+  // normalized full-schema bytes after the admin team-match migration.
+  schema: '47787d5dcb991e43e09a8425aae4119011194e7ec2ed3847988417af482ebb57',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

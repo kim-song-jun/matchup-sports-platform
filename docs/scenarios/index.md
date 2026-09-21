@@ -100,7 +100,7 @@
 - [ ] [02-home-and-discovery.md](./02-home-and-discovery.md)
 - [x] [03-match-flows.md](./03-match-flows.md) - `MATCH-001/002/003` verified, restart-persistence follow-up remains
 - [x] [04-team-and-membership.md](./04-team-and-membership.md) - Legacy stack (`apps/api`/`apps/web`): `TEAM-001-A~D`, `TEAM-002-A~C`, `TEAM-004-A`, `TEAM-005-A/B` verified. **v1 stack (Task 26, 2026-08-04)**: `TeamsController` route table documented; `e2e/v1-tests/team-join.spec.ts` + `team-management.spec.ts` cover list/detail/owner-menu render only, deeper apply/role-change round trip unverified
-- [ ] [05-team-match-flows.md](./05-team-match-flows.md) - Legacy stack remains partial. **v1 stack:** `E2E-TEAM-01`/`E2E-TEAM-02` remain pending; Task 149's `E2E-TEAM-03` platform recruitment -> public same-ID listing -> real manager application -> admin persisted receipt is verified in isolated API/DB and headed 3-viewport Chrome evidence.
+- [ ] [05-team-match-flows.md](./05-team-match-flows.md) - Legacy stack remains partial. **v1 stack:** `E2E-TEAM-01`/`E2E-TEAM-02` remain pending; Task 149's `E2E-TEAM-03` platform recruitment -> public same-ID listing -> real manager application -> admin persisted receipt is verified. The 2026-09-21 condition-parity follow-up passed headed Chrome 4/4 and captured empty/filled/detail evidence at desktop/tablet/mobile.
 - [ ] [06-mercenary-flows.md](./06-mercenary-flows.md) - not implemented in active v1: prior checked lifecycle evidence belonged to legacy `apps/api` + `apps/web`; v1 DB/API/list-create-detail flow is gated by the new-page A/B/C decision
 - [ ] [07-chat-and-notifications.md](./07-chat-and-notifications.md) - partial: `NOTI-001` verified, chat realtime/unread scenarios pending
 - [ ] [08-marketplace-and-lessons.md](./08-marketplace-and-lessons.md) - partial: `MKT-003` / `LES-003` verified, lesson user-side purchase/ownership is implemented via Task 42, but live smoke is blocked by current dev runtime and host-side reflection remains follow-up
@@ -435,3 +435,15 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - 양 팀 일반 선수 / 비참가자, 실제 API·격리 PostgreSQL, headed Chromium 390/768/1440 흐름 검증.
 
 - Task 172 [공동 경기 기록 화면별 플로우·42개 스크린샷](team-match-shared-record-gallery.md) — 390/768/1440, 실제 API·양 팀 일반 참가자 검증.
+
+## Task 149 condition parity — 2026-09-21
+
+- Admin platform recruitment now uses the ordinary team-match image, level, format, style, uniform, gender, cost, place, schedule, and optional deadline contract.
+- Focused API tests `6/6`, Web tests `13/13`, API/Web typecheck, and headed Chrome condition-parity E2E `4/4` passed.
+- Canonical evidence: `docs/screenshots/task149-admin-team-match-condition-parity/` (`desktop`/`tablet`/`mobile` × empty form/filled form/detail) and `report.json`.
+- Platform provenance is now persisted independently of team assignment; public list/detail keep the `플랫폼 주관` badge while showing assigned home/away teams. Headed Chrome provenance E2E passed 2/2 and added desktop/tablet/mobile public-list screenshots to the canonical Task 149 evidence directory.
+### 2026-09-21 Task 149 일반/관리자 팀매치 parity 보완
+
+- [TM-149-P](05-team-match-flows.md#tm-149-p-일반관리자-모집-조건-parity): 6/6 viewport/persona journeys PASS; actual API/DB create, elapsed deadline intake vs confirmation, Game/schedules and DB CHECK verified.
+- Before/after screenshot + reports: [Task 149](../../.github/tasks/149-admin-assigned-team-match.md#follow-up-verification-evidence).
+- New migration fixes the hostless platform recruitment 500 reproduced on a fresh migrated DB. Existing ordinary-friendly host/metadata constraints remain enforced.

@@ -22,10 +22,10 @@ WORKDIR /app/apps/v1_api
 # schema (5 legacy models, 2 enums and 3 relations removed). The assert pins
 # the runtime client to that exact schema so a stale builder cache or an
 # accidental schema edit fails the build instead of shipping a silent drift.
-# Task 156 adds V1ChatUserBlock; the frozen StageB builder below retains its own pin.
+# Task 149 adds V1TeamMatch.platformManaged; the frozen StageB builder below retains its own pin.
 RUN npx prisma generate \
-  && test "$(sha256sum prisma/schema.prisma | awk '{print $1}')" = 158eb655609db3136765f043ddb82b71c6b39319bf09aacf8226fdfa29c0bee0 \
-  && printf '{"schemaVersion":1,"stage":"final","schemaSha256":"158eb655609db3136765f043ddb82b71c6b39319bf09aacf8226fdfa29c0bee0","generatedClient":true}\n' > .task168-runtime-client-attestation.json
+  && test "$(sha256sum prisma/schema.prisma | awk '{print $1}')" = 47787d5dcb991e43e09a8425aae4119011194e7ec2ed3847988417af482ebb57 \
+  && printf '{"schemaVersion":1,"stage":"final","schemaSha256":"47787d5dcb991e43e09a8425aae4119011194e7ec2ed3847988417af482ebb57","generatedClient":true}\n' > .task168-runtime-client-attestation.json
 RUN npx nest build
 
 # This image is an executable view of the immutable v7 tar. No retired source

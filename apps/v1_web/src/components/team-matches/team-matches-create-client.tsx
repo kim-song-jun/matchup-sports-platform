@@ -1,5 +1,7 @@
 'use client';
 
+import { localDateInput } from '@/lib/team-match-dates';
+
 import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useRouter } from 'next/navigation';
@@ -323,7 +325,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
 
   // #2: edit 화면은 스텝 구분이 없는 한 화면이라 getTeamMatchMissingFields 를 그대로
   // 평탄화(toFieldErrorMap)해서 각 CreateField 아래 인라인 에러로 붙인다.
-  const editCtx = { hostTeamId: selectedTeamId, sportId: selectedSportId, regionId, draft };
+  const editCtx = { hostTeamId: selectedTeamId, sportId: selectedSportId, regionId, draft, existingDeadlineAt: editQuery.data?.form.deadlineAt };
   const editMissingFields = editAttempted ? getTeamMatchMissingFields(editCtx) : [];
   const editFieldErrors = toFieldErrorMap(editMissingFields);
 
@@ -360,7 +362,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       // 재클릭은 막는다(동시 클릭 방지가 필요하면 ref 락을 따로 둔다).
       if (updateTeamMatch.isPending || cancelTeamMatch.isPending) return;
       setError(null);
-      const payloadResult = buildTeamMatchPayloadResult(draft, selectedTeamId, selectedSportId, regionId);
+      const payloadResult = buildTeamMatchPayloadResult(draft, selectedTeamId, selectedSportId, regionId, editQuery.data?.form.deadlineAt);
       if (payloadResult.missingFields || !version) {
         // #2: 실제 결측 필드만 지목 — 각 CreateField 아래 인라인 에러로 표시되고,
         // 상단 배너는 몇 개가 비어 있는지만 간단히 안내한다(중복 문구 방지).
@@ -552,7 +554,7 @@ function buildDefaultDraft(): TeamMatchDraft {
 
   return {
     ...getTeamMatchCreateViewModel('team').draft,
-    date: start.toISOString().slice(0, 10),
+    date: localDateInput(start),
     startTime: '',
     endTime: '',
   };
@@ -580,6 +582,7 @@ function normalizeDraftDate(draft: TeamMatchDraft): TeamMatchDraft {
     ...draft,
     date: fallback.date,
     startTime: fallback.startTime,
+    endDate: '',
     endTime: fallback.endTime,
   };
 }
@@ -609,10 +612,11 @@ export function draftFromTeamMatchEdit(edit: V1TeamMatchEdit): TeamMatchDraft {
     opponentCost: costs.opponentCost,
     venue: edit.form.manualPlaceName,
     address: edit.form.addressText ?? '',
-    date: start.toISOString().slice(0, 10),
+    date: localDateInput(start),
     startTime: start.toTimeString().slice(0, 5),
-    endTime: end ? end.toTimeString().slice(0, 5) : start.toTimeString().slice(0, 5),
-    deadlineDate: deadline ? deadline.toISOString().slice(0, 10) : '',
+    endDate: end ? localDateInput(end) : '',
+    endTime: end ? end.toTimeString().slice(0, 5) : '',
+    deadlineDate: deadline ? localDateInput(deadline) : '',
     deadlineTime: deadline ? deadline.toTimeString().slice(0, 5) : '',
   };
 }

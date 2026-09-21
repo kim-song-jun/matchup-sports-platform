@@ -42,3 +42,13 @@
 
 - “전부”는 현재 응답 페이지 안의 전부가 아니라 공개 cursor pagination 전체를 의미한다.
 - 종목 필터가 선택되면 대회 목록 캐러셀도 해당 종목의 활성 홍보 대회만 보여준다.
+
+## 2026-09-21 모바일 제목 괄호 핫픽스
+
+- dev와 별도 main 기준 패치. 목록과 홍보 제목의 괄호 묶음을 모바일에서 넘칠 때만 다음 줄로 이동. 긴 괄호 내용의 내부 줄바꿈과 제목 원문 보존.
+- 검증 진행 중. dev 전체 승격 없음.
+- 검증: 관련 Vitest 19/19, `tsc --noEmit --incremental false` 통과.
+- headed Chromium + 실제 Next `/tournaments` + 운영 공개 API: 390/768/1440/320px 모두 제목 가로 넘침 없음. 390px 괄호 전체 다음 줄, 768/1440px 기존 inline 유지.
+- 제목 fixture를 실제 페이지 API 응답에만 주입: 짧은 `컵(초급)` 한 줄, 긴 대회명 뒤 괄호 다음 줄, 폭보다 긴 괄호 내부 4줄, 전각 괄호 모두 통과. 운영 데이터 쓰기 없음.
+- before: 운영 `47e71a07b`, after: 같은 main 기준 로컬 Next + 운영 읽기 API. 이미지: `docs/screenshots/tournament-title-parentheses/`.
+- 콘솔 pageerror/HTTP 4xx·5xx 관찰 없음. 임시 서버·브라우저는 본 세션 PID만 종료.

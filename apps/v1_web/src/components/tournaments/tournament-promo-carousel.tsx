@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { TournamentTitle } from './tournament-title';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TrophyIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
@@ -169,7 +170,7 @@ export function TournamentPromoCarousel({
                       <TrophyIcon size={12} strokeWidth={2} aria-hidden="true" />
                       {badge}
                     </span>
-                    <div className="tm-text-body-lg tm-tournament-promo-card-title">{title}</div>
+                    <div className="tm-text-body-lg tm-tournament-promo-card-title"><TournamentTitle title={title} /></div>
                     {subtitle ? <div className="tm-text-caption tm-tournament-promo-card-meta">{subtitle}</div> : null}
                     {facts ? <div className="tm-text-caption tm-tournament-promo-card-meta">{facts}</div> : null}
                     <div className="tm-tournament-promo-card-footer">

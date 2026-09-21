@@ -214,6 +214,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   const { match, mode } = model;
   const league = match.league;
   const hasAssignedHostTeam = Boolean(match.hostTeamId);
+  const awaitingPlatformTeams = Boolean(match.platformManaged && !hasAssignedHostTeam);
   /* 매치 관리 카드의 "화면당 primary 1개" 규칙(DESIGN.md §14) — 라인업 → 경기 결과 → 후기
    * 순서에서 실제로 보이는(model 에 설정된) 첫 행이 primary, 나머지는 outline이다. */
   const matchManageNextAction: 'lineup' | 'result' | 'review' | null = model.lineupHref
@@ -373,7 +374,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
                 패턴(웨이브4, 2026-09-04). 사진이 있을 때만 teamMatchBackgroundImage 를 호출한다
                 (그 안의 TEAM_MATCH_IMAGE_FALLBACK 층은 "사진이 404" 케이스 전용이라 별개). */}
             <div className={`tm-team-vs-hero${match.imageUrl ? '' : ' tm-team-vs-hero-sport'}`} style={match.imageUrl ? { backgroundImage: teamMatchBackgroundImage(match.imageUrl) } : undefined}>
-              {match.imageUrl ? null : <SportIllustration sport={match.sport} sizes="120px" className="tm-team-vs-hero-illustration" />}
+              {match.imageUrl ? null : <SportIllustration sport={match.sport} sizes="120px" className={`tm-team-vs-hero-illustration${awaitingPlatformTeams ? ' tm-team-vs-hero-illustration-recruiting' : ''}`} />}
               {/* Mobile-only back + action buttons inside hero (hidden on desktop) */}
               <div className="tm-hide-desktop" style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href="/team-matches" aria-label="뒤로가기">
@@ -387,25 +388,44 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
               <div className="tm-team-match-hero-actions tm-show-desktop">
                 <button className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" type="button" aria-label="공유" onClick={() => runHeroAction(model.onShare, '링크를 복사했어요')}><ShareIcon size={20} /></button>
               </div>
-              <div className="tm-team-vs-row">
+              {awaitingPlatformTeams ? (
                 <div>
-                  <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{hasAssignedHostTeam ? '홈팀' : '운영 주관'}</div>
-                  <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}</div>
-                  {/* 매너·승수는 API 가 내려주지만(hostTeam.mannerScore / hostTeam.wins), 공개된
-                      팀 후기가 0건이면 매너 점수를 낼 수 없어 null 이 온다 — 모르면 이 줄을 통째로
-                      감춘다. 0 으로 채워 "매너 0 · 승 0"을 보여주면 실제로 잘하는 팀이 최악으로
-                      보이고, 목업으로 채우면 모든 매치가 같은 숫자를 보여준다(2026-08-23 실사고). */}
-                  {match.manner !== null && match.wins !== null ? (
-                    <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>매너 {match.manner} · 승 {match.wins}</div>
-                  ) : null}
+                  <div className="tm-team-vs-row">
+                    {['홈팀', 'vs', '어웨이팀'].map((side) => side === 'vs' ? (
+                      <div key={side} className="tm-text-label" style={{ color: 'var(--overlay-white-76)' }}>vs</div>
+                    ) : (
+                      <div key={side} style={{ textAlign: side === '홈팀' ? 'left' : 'right' }}>
+                        <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{side}</div>
+                        <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.closed ? '미정' : '모집 중'}</div>
+                        <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>팀 확정 전</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="tm-text-caption" style={{ color: 'var(--overlay-white-86)', textAlign: 'center', marginTop: 20 }}>
+                    {match.closed ? '플랫폼 주관 · 참가팀 미정' : '플랫폼 주관 · 참가할 두 팀을 모집해요'}
+                  </div>
                 </div>
-                <div className="tm-text-label" style={{ color: 'var(--overlay-white-76)' }}>vs</div>
-                <div style={{ textAlign: 'right' }}>
-                  <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>상대팀</div>
-                  <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode, match)}</div>
-                  <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{teamMatchOpponentSub(mode, match, model.statusLabel)}</div>
+              ) : (
+                <div className="tm-team-vs-row">
+                  <div>
+                    <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{hasAssignedHostTeam ? '홈팀' : '운영 주관'}</div>
+                    <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}</div>
+                    {/* 매너·승수는 API 가 내려주지만(hostTeam.mannerScore / hostTeam.wins), 공개된
+                        팀 후기가 0건이면 매너 점수를 낼 수 없어 null 이 온다 — 모르면 이 줄을 통째로
+                        감춘다. 0 으로 채워 "매너 0 · 승 0"을 보여주면 실제로 잘하는 팀이 최악으로
+                        보이고, 목업으로 채우면 모든 매치가 같은 숫자를 보여준다(2026-08-23 실사고). */}
+                    {match.manner !== null && match.wins !== null ? (
+                      <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>매너 {match.manner} · 승 {match.wins}</div>
+                    ) : null}
+                  </div>
+                  <div className="tm-text-label" style={{ color: 'var(--overlay-white-76)' }}>vs</div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>상대팀</div>
+                    <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{teamMatchOpponentLabel(mode, match)}</div>
+                    <div className="tm-text-micro" style={{ color: 'var(--overlay-white-72)' }}>{teamMatchOpponentSub(mode, match, model.statusLabel)}</div>
+                  </div>
                 </div>
-              </div>
+              )}
               {/* P2: 완료 피드백 .tm-complete-check 마이크로인터랙션 */}
               {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--overlay-white-86)', marginTop: 8 }}>{heroMessage}</div> : null}
             </div>

@@ -50,6 +50,21 @@ describe('team match images', () => {
 });
 
 describe('platform-managed team match provenance', () => {
+  it.each([false, true])('미배정 플랫폼 대진은 두 팀 자리를 보여준다 (마감=%s)', (closed) => {
+    const model = getTeamMatchDetailViewModel();
+    model.match = { ...model.match, platformManaged: true, hostTeamId: undefined,
+      hostTeam: 'Teameet 운영', opponentTeam: null, closed, status: closed ? 'closed' : 'open' };
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+    const hero = within(container.querySelector('.tm-team-vs-hero') as HTMLElement);
+    const row = within(container.querySelector('.tm-team-vs-row') as HTMLElement);
+    expect(row.getByText('홈팀')).toBeInTheDocument();
+    expect(row.getByText('어웨이팀')).toBeInTheDocument();
+    expect(row.getAllByText(closed ? '미정' : '모집 중', { exact: true })).toHaveLength(2);
+    expect(row.queryByText('Teameet 운영')).not.toBeInTheDocument();
+    expect(row.queryByText('운영 주관')).not.toBeInTheDocument();
+    expect(hero.getByText(closed ? '플랫폼 주관 · 참가팀 미정' : '플랫폼 주관 · 참가할 두 팀을 모집해요')).toBeInTheDocument();
+  });
+
   it('공개 목록에서 팀 배정 후에도 플랫폼 주관 배지와 양 팀 이름을 함께 보여준다', () => {
     const model = getTeamMatchListViewModel();
     model.matches = [{

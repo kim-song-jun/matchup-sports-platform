@@ -1,10 +1,10 @@
 {
     "task":  149,
     "feature":  "admin-team-match-condition-parity",
-    "capturedAt":  "2026-09-21T06:30:57.4749664Z",
+    "capturedAt":  "2026-09-21T08:38:31Z",
     "runner":  "Playwright headed Chrome",
     "result":  "pass",
-    "tests":  "6/6",
+    "tests":  "8/8 (기존 6/6 + 실제 공개 상세 2/2)",
     "viewports":  [
                       {
                           "name":  "desktop",
@@ -14,7 +14,8 @@
                                         "desktop-form-empty.png",
                                         "desktop-form-filled.png",
                                         "desktop-detail.png",
-                                        "desktop-public-list-provenance.png"
+                                        "desktop-public-list-provenance.png",
+                                        "desktop-public-detail-provenance.png"
                                     ]
                       },
                       {
@@ -25,7 +26,8 @@
                                         "tablet-form-empty.png",
                                         "tablet-form-filled.png",
                                         "tablet-detail.png",
-                                        "tablet-public-list-provenance.png"
+                                        "tablet-public-list-provenance.png",
+                                        "tablet-public-detail-provenance.png"
                                     ]
                       },
                       {
@@ -35,7 +37,8 @@
                                         "mobile-form-empty.png",
                                         "mobile-form-filled.png",
                                         "mobile-detail.png",
-                                        "mobile-public-list-provenance.png"
+                                        "mobile-public-list-provenance.png",
+                                        "mobile-public-detail-provenance.png"
                                     ]
                       }
                   ],
@@ -47,6 +50,8 @@
                    "consoleErrors":  "none",
                    "apiRequestFailures":  "none",
                    "platformProvenanceBeforeAssignment":  "pass",
-                   "platformProvenanceAfterAssignment":  "pass"
+                   "platformProvenanceAfterAssignment":  "pass",
+                   "publicDetailAfterAssignment":  "pass: real create -\u003e two applications -\u003e assign -\u003e list link -\u003e detail",
+                   "publicDetailViewports":  "desktop 1440x900, tablet 834x1112, mobile Pixel 5"
                }
 }

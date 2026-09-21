@@ -374,4 +374,144 @@ test.describe('[admin → team manager] 플랫폼 팀매치 실제 모집·신�
     expect(consoleErrors).toEqual([]);
     expect(failedRequests).toEqual([]);
   });
+  test('팀 배정 완료 공개 목록에서 실제 상세로 진입해 플랫폼 주관과 양 팀 조건을 표시한다', async ({ page }, testInfo) => {
+    const adminEmail = personas.admin.email;
+    const homeOwnerEmail = personas.host.email;
+    const awayOwnerEmail = personas.owner.email;
+    const consoleErrors: string[] = [];
+    const failedRequests: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error') consoleErrors.push(message.text());
+    });
+    page.on('requestfailed', (request) => failedRequests.push(`${request.method()} ${request.url()}`));
+
+    const [homeTeamsResult, sportsResult, regionsResult] = await Promise.all([
+      apiGet(page.request, '/api/v1/me/teams', { email: homeOwnerEmail, params: { permission: 'manage_team' } }),
+      apiGet(page.request, '/api/v1/master/sports', { email: adminEmail }),
+      apiGet(page.request, '/api/v1/master/regions', { email: adminEmail }),
+    ]);
+    expect(homeTeamsResult.status).toBe(200);
+    expect(sportsResult.status).toBe(200);
+    expect(regionsResult.status).toBe(200);
+
+    const homeTeam = unwrap<{ items: ManageableTeam[] }>(homeTeamsResult).items.find(
+      (team) => team.canManage && team.canCreateTeamMatch,
+    );
+    expect(homeTeam, '홈팀으로 배정할 실제 seed 팀이 필요합니다.').toBeTruthy();
+
+    const sports = unwrap<{ sports: Sport[] }>(sportsResult).sports;
+    const regions = unwrap<{ regions: Region[] }>(regionsResult).regions;
+    const sport = sports.find((item) => item.id === homeTeam!.sport.sportId);
+    const district = regions.flatMap((region) => region.children ?? []).find(Boolean);
+    expect(sport).toBeTruthy();
+    expect(district).toBeTruthy();
+
+    const projectOffset = testInfo.project.name === 'desktop' ? 1 : 0;
+    const title = `플랫폼 배정 완료 상세 ${testInfo.project.name} ${Date.now()}`;
+    const awayTeamName = `상세 검증 원정팀 ${testInfo.project.name} ${randomUUID().slice(0, 8)}`;
+    const awayTeamResult = await apiPost(page.request, '/api/v1/teams', {
+      email: awayOwnerEmail,
+      data: {
+        sportId: sport!.id,
+        regionId: district!.id,
+        name: awayTeamName,
+        introduction: '플랫폼 배정 완료 공개 상세 캡처용 원정팀입니다.',
+        activityTypes: ['team_match'],
+        genderRule: '성별 무관',
+        joinPolicy: 'approval_required',
+      },
+    });
+    expect(awayTeamResult.status).toBe(201);
+    const awayTeamId = unwrap<{ teamId: string }>(awayTeamResult).teamId;
+    const awayTeam = { teamId: awayTeamId, name: awayTeamName };
+
+    const createCommandId = randomUUID();
+    const createResult = await apiPost(page.request, '/api/v1/admin/team-matches', {
+      email: adminEmail,
+      data: {
+        clientCommandId: createCommandId,
+        sportId: sport!.id,
+        regionId: district!.id,
+        title,
+        description: '관리자가 두 팀을 배정한 뒤에도 공개 상세에서 플랫폼 주관 출처와 실제 경기 조건을 확인합니다.',
+        startsAt: futureIso(21 + projectOffset, 10),
+        endsAt: futureIso(21 + projectOffset, 12),
+        deadlineAt: futureIso(15 + projectOffset, 10),
+        manualPlaceName: '마포 풋살파크',
+        addressText: '서울 마포구 월드컵로',
+        costNote: '총 120,000원 · 상대팀 60,000원',
+        rulesText: '친선 경기 · 페어플레이 준수',
+        matchFormat: '5:5',
+        matchStyle: ['친선'],
+        uniformColor: '검정',
+        genderRule: '성별 무관',
+      },
+    });
+    expect(createResult.status).toBe(201);
+    const created = unwrap<CreatedRecruitment>(createResult);
+
+    const [homeApplicationResult, awayApplicationResult] = await Promise.all([
+      apiPost(page.request, `/api/v1/team-matches/${created.teamMatchId}/applications`, {
+        email: homeOwnerEmail,
+        data: { applicantTeamId: homeTeam!.teamId, message: '홈팀 배정을 신청합니다.' },
+      }),
+      apiPost(page.request, `/api/v1/team-matches/${created.teamMatchId}/applications`, {
+        email: awayOwnerEmail,
+        data: { applicantTeamId: awayTeam!.teamId, message: '원정팀 배정을 신청합니다.' },
+      }),
+    ]);
+    expect(homeApplicationResult.status).toBe(201);
+    expect(awayApplicationResult.status).toBe(201);
+    const homeApplication = unwrap<Application>(homeApplicationResult);
+    const awayApplication = unwrap<Application>(awayApplicationResult);
+
+    const assignResult = await apiPost(page.request, `/api/v1/admin/team-matches/${created.teamMatchId}/assign`, {
+      email: adminEmail,
+      data: {
+        clientCommandId: randomUUID(),
+        homeApplicationId: homeApplication.applicationId,
+        awayApplicationId: awayApplication.applicationId,
+      },
+    });
+    expect(assignResult.status).toBe(201);
+
+    await loginAs(page, adminEmail);
+    await page.goto(`/team-matches?q=${encodeURIComponent(title)}`, { waitUntil: 'domcontentloaded' });
+    const assignedCard = page.locator(`a[href="/team-matches/${created.teamMatchId}"]`);
+    await expect(assignedCard).toBeVisible();
+    await expect(assignedCard).toContainText('플랫폼 주관');
+    await expect(assignedCard).toContainText(homeTeam!.name);
+    await expect(assignedCard).toContainText(awayTeam!.name);
+    await assignedCard.scrollIntoViewIfNeeded();
+    if (testInfo.project.name === 'mobile') {
+      const detailHref = await assignedCard.getAttribute('href');
+      expect(detailHref).toBe(`/team-matches/${created.teamMatchId}`);
+      await page.goto(detailHref!, { waitUntil: 'domcontentloaded' });
+    } else {
+      await assignedCard.click();
+    }
+
+    await expect(page).toHaveURL(new RegExp(`/team-matches/${created.teamMatchId}$`));
+    if (testInfo.project.name === 'desktop') {
+      await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    }
+    await expect(page.locator('.tm-host-team-card:visible').getByText('플랫폼 주관', { exact: true })).toBeVisible();
+    await expect(page.getByText(homeTeam!.name, { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(awayTeam!.name, { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('120,000', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('60,000', { exact: true }).first()).toBeVisible();
+
+    if (testInfo.project.name === 'desktop') {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.screenshot({ path: screenshotPath('desktop', 'public-detail-provenance'), fullPage: true });
+      await page.setViewportSize({ width: 834, height: 1112 });
+      await page.screenshot({ path: screenshotPath('tablet', 'public-detail-provenance'), fullPage: true });
+    } else {
+      await page.screenshot({ path: screenshotPath('mobile', 'public-detail-provenance'), fullPage: true });
+    }
+
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+    expect(consoleErrors).toEqual([]);
+    expect(failedRequests).toEqual([]);
+  });
 });

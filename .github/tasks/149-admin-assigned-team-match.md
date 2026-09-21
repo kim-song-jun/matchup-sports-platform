@@ -73,12 +73,15 @@ Status: complete
 - 2026-09-21: Admin recruitment condition inputs and persistence were aligned with ordinary team-match recruitment. The deadline is optional, price inputs serialize to the shared `costNote` format, and admin detail now shows the saved image and level. Focused API/Web tests passed.
 - 2026-09-21: `platformManaged` became a persisted team-match source flag. Assignment keeps it true, while public cards and detail show the actual home/away teams plus an explicit platform-managed badge.
 
+- 2026-09-21: Headed Chrome real-runtime capture created a platform recruitment, accepted two real team applications, assigned HOME/AWAY, followed the public list card link, and verified the persisted platform badge, both team names, and 120,000/60,000 cost split on the public detail at desktop, tablet, and mobile viewports.
+
 ## Condition Parity Screenshot Evidence (2026-09-21)
 
 - Desktop: [empty form](../../docs/screenshots/task149-admin-team-match-condition-parity/desktop-form-empty.png) · [filled form](../../docs/screenshots/task149-admin-team-match-condition-parity/desktop-form-filled.png) · [detail](../../docs/screenshots/task149-admin-team-match-condition-parity/desktop-detail.png)
 - Tablet: [empty form](../../docs/screenshots/task149-admin-team-match-condition-parity/tablet-form-empty.png) · [filled form](../../docs/screenshots/task149-admin-team-match-condition-parity/tablet-form-filled.png) · [detail](../../docs/screenshots/task149-admin-team-match-condition-parity/tablet-detail.png)
 - Mobile: [empty form](../../docs/screenshots/task149-admin-team-match-condition-parity/mobile-form-empty.png) · [filled form](../../docs/screenshots/task149-admin-team-match-condition-parity/mobile-form-filled.png) · [detail](../../docs/screenshots/task149-admin-team-match-condition-parity/mobile-detail.png)
 - Public list provenance: [desktop](../../docs/screenshots/task149-admin-team-match-condition-parity/desktop-public-list-provenance.png) · [tablet](../../docs/screenshots/task149-admin-team-match-condition-parity/tablet-public-list-provenance.png) · [mobile](../../docs/screenshots/task149-admin-team-match-condition-parity/mobile-public-list-provenance.png)
+- Public assigned-match detail provenance: [desktop](../../docs/screenshots/task149-admin-team-match-condition-parity/desktop-public-detail-provenance.png) · [tablet](../../docs/screenshots/task149-admin-team-match-condition-parity/tablet-public-detail-provenance.png) · [mobile](../../docs/screenshots/task149-admin-team-match-condition-parity/mobile-public-detail-provenance.png)
 - Machine-readable verdict: [report.json](../../docs/screenshots/task149-admin-team-match-condition-parity/report.json)
 ## Screenshot Evidence
 

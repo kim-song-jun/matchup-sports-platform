@@ -45,6 +45,8 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 
 ### Admin platform recruitment
 
+- 2026-09-21 assigned-detail proof: headed Chrome created a real admin recruitment, submitted two same-sport team applications, assigned HOME/AWAY, followed the public list card link, and verified `platformManaged=true`, both real teams, and the 120,000/60,000 cost split on the public detail. Evidence: `docs/screenshots/task149-admin-team-match-condition-parity/*-public-detail-provenance.png`; focused E2E 2/2 passed.
+
 - active owner/ops admin은 `/admin/team-matches/new`에서 일반 팀매치 모집과 같은 대표 이미지·실력·경기 방식·스타일·유니폼·성별·총 비용/상대팀 비용·지역·장소·일정을 입력해 팀 없는 모집을 연다. 신청 마감은 선택 사항이다.
 - 생성 직후 팀매치는 `recruiting`이며 Game과 팀 일정은 아직 만들지 않는다.
 - 공개 목록과 상세는 생성 직후 `Teameet 운영`과 `플랫폼 주관`을 표시한다.

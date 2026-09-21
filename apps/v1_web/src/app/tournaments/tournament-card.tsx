@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import styles from './tournament-card.module.css';
 import Image from 'next/image';
 import { TournamentTitle } from '@/components/tournaments/tournament-title';
 import { Trophy } from 'lucide-react';
@@ -104,10 +105,16 @@ export function TournamentCard({
    */
   interactive?: boolean;
 }) {
-  const status = getTournamentStatusConfig(item.status);
   const sportAccent = getSportAccent(item.sport.code);
   const pendingPaymentCount = getPendingPaymentCount(item);
   const reservedTeamCount = getReservedTeamCount(item);
+  const isCapacityFull = item.teamCount > 0 && reservedTeamCount >= item.teamCount;
+  const isNearlyFull = item.teamCount > 0 && reservedTeamCount / item.teamCount >= 0.8;
+  const status = item.status === 'closed' || (item.status === 'open' && isCapacityFull)
+    ? { ...getTournamentStatusConfig('closed'), label: '모집 마감' }
+    : item.status === 'open' && isNearlyFull
+      ? { badgeClass: 'tm-badge-orange', label: '거의 마감' }
+      : getTournamentStatusConfig(item.status);
   // 커버가 없는 대회도 홍보용으로 등록한 실사진이 있으면 아이콘 대신 그 사진을 썸네일로
   // 재사용한다 (셋 다 없으면 종목색 그라디언트+아이콘 폴백).
   const thumbnailImageUrl = resolveTournamentImage(item, 'cover');
@@ -279,44 +286,23 @@ export function TournamentCard({
         {/* 카드 간 높이 차(상금 유무 등)를 흡수해 하단 행을 같은 라인에 맞춤 */}
         <div style={{ flex: 1 }} aria-hidden="true" />
 
-        {/* #7: Bottom row: entry fee(강조) + team fill rate(마감 임박 배지) */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginTop: 10,
-            paddingTop: 10,
-            borderTop: '1px solid var(--grey100)',
-          }}
-        >
-          {/* #7: 참가비 — text-strong + weight700로 시각 강도 격상 */}
-          <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
-            참가비 {formatEntryFee(item.entryFee)}
-          </span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
-            {/* #7: 확정 팀 ≥80% 이상이면 '거의 마감' orange 배지 */}
-            {item.teamCount > 0 && reservedTeamCount / item.teamCount >= 0.8
-              ? <span className="tm-badge tm-badge-orange">{reservedTeamCount >= item.teamCount ? '마감' : '거의 마감'}</span>
-              : null}
-            {/* 입금대기 팀도 정원을 점유하므로(서버 CAPACITY_HOLD_STATUSES) "+N 팀 예약"만으론
-                왜 신청을 못 받는지 알 수 없었다 — 대회 상세와 같은 낱말로 명시한다. */}
+        <div className={styles.footer} data-testid="tournament-card-footer">
+          <div className={styles.price}>
+            <span className={`tm-text-caption ${styles.muted}`}>참가비</span>
+            <strong className={`tm-text-body tab-num ${styles.amount}`}>
+              {formatEntryFee(item.entryFee)}
+            </strong>
+          </div>
+          <div className={styles.capacity}>
+            <span className={`tm-text-label tab-num ${styles.summary}`}>
+              {reservedTeamCount}/{item.teamCount}{pendingPaymentCount > 0 ? '팀 예약' : '팀 확정'}
+            </span>
             {pendingPaymentCount > 0 ? (
-              <span className="tm-badge tm-badge-grey" style={{ whiteSpace: 'nowrap' }}>
-                입금대기 {pendingPaymentCount}팀
+              <span className={`tm-text-caption ${styles.muted} ${styles.pending}`}>
+                {item.entryFee === 0 ? '확인대기' : '입금대기'} {pendingPaymentCount}팀
               </span>
             ) : null}
-            <span className="tab-num">{item.confirmedCount}</span>
-            {pendingPaymentCount > 0 ? (
-              <>
-                <span style={{ color: 'var(--orange700)' }}>+</span>
-                <span className="tab-num" style={{ color: 'var(--orange700)' }}>{pendingPaymentCount}</span>
-              </>
-            ) : null}
-            <span>/</span>
-            <span className="tab-num">{item.teamCount}</span>
-            <span>{pendingPaymentCount > 0 ? '팀 예약' : '팀 확정'}</span>
-          </span>
+          </div>
         </div>
       </CardShell>
     </div>

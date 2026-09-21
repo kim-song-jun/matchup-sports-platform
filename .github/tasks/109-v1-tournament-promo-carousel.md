@@ -52,3 +52,13 @@
 - 제목 fixture를 실제 페이지 API 응답에만 주입: 짧은 `컵(초급)` 한 줄, 긴 대회명 뒤 괄호 다음 줄, 폭보다 긴 괄호 내부 4줄, 전각 괄호 모두 통과. 운영 데이터 쓰기 없음.
 - before: 운영 `47e71a07b`, after: 같은 main 기준 로컬 Next + 운영 읽기 API. 이미지: `docs/screenshots/tournament-title-parentheses/`.
 - 콘솔 pageerror/HTTP 4xx·5xx 관찰 없음. 임시 서버·브라우저는 본 세션 PID만 종료.
+
+## 2026-09-22 대회 카드 상태·참가비 배치 핫픽스
+
+- 사용자 스크린샷 확인 후 dev/main 반영 요청. dev PR #1244 머지 완료; main에는 본 UI 수정만 별도 적용.
+- 모집 중 예약률 80% 이상은 상단 `거의 마감`, 정원 충족 또는 closed는 `모집 마감`. 진행·종료·취소 상태는 유지.
+- 기존 정원 막대 하나 유지. 하단은 좌측 참가비/금액, 우측 예약·확정 수/입금대기 두 그룹. 대기 0이면 두 번째 안내 생략.
+- 직접 코드 리뷰 완료. Vitest 18/18 및 TypeScript 통과.
+- headed Chromium 실제 Next 페이지 320/390/768/1440px: overflow·겹침 없음, 막대 1개, 상태별 배지·대기 안내 통과, 콘솔/HTTP 오류 0.
+- 공개 제목 스냅샷에 명시적 상태 fixture와 로컬 예시 사진을 사용. 운영 데이터 변경 없음. before/after: `docs/screenshots/tournament-card-footer/`.
+- 임시 브라우저 종료 완료. main CI·머지·배포 후 라이브 검증 예정.

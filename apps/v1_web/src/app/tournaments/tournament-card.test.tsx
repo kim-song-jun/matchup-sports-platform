@@ -111,3 +111,44 @@ describe('TournamentCard — 커버 이미지 fallback', () => {
     expect(screen.getByLabelText('성별 카테고리: 성별 구분 없음')).toBeInTheDocument();
   });
 });
+
+describe('TournamentCard — 모집 상태와 하단 정보', () => {
+  it.each([
+    { status: 'open', confirmedCount: 14, pendingPaymentCount: 1, expected: '모집 중' },
+    { status: 'open', confirmedCount: 11, pendingPaymentCount: 5, expected: '거의 마감' },
+    { status: 'open', confirmedCount: 16, pendingPaymentCount: 0, expected: '거의 마감' },
+    { status: 'open', confirmedCount: 19, pendingPaymentCount: 0, expected: '거의 마감' },
+    { status: 'open', confirmedCount: 15, pendingPaymentCount: 5, expected: '모집 마감' },
+    { status: 'closed', confirmedCount: 4, pendingPaymentCount: 0, expected: '모집 마감' },
+    { status: 'in_progress', confirmedCount: 18, pendingPaymentCount: 0, expected: '진행 중' },
+    { status: 'completed', confirmedCount: 20, pendingPaymentCount: 0, expected: '종료' },
+    { status: 'cancelled', confirmedCount: 18, pendingPaymentCount: 0, expected: '취소' },
+  ] as const)('$status · 확정 $confirmedCount + 대기 $pendingPaymentCount → $expected', ({ expected, ...values }) => {
+    render(<TournamentCard item={buildItem({ ...values, teamCount: 20 })} />);
+    expect(screen.getByRole('link')).toHaveAccessibleName(expect.stringContaining(`— ${expected}`));
+    expect(screen.getAllByText(expected, { exact: true })).toHaveLength(1);
+    if (expected !== '거의 마감') expect(screen.queryByText('거의 마감')).not.toBeInTheDocument();
+  });
+
+  it('입금 대기를 합산한 예약 수와 금액을 표시하고 막대는 하나만 유지한다', () => {
+    render(<TournamentCard item={buildItem({ entryFee: 300000, confirmedCount: 11, pendingPaymentCount: 5, teamCount: 20 })} />);
+    expect(screen.getByText('참가비', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('300,000원', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('16/20팀 예약', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('입금대기 5팀', { exact: true })).toBeInTheDocument();
+    expect(screen.getAllByRole('progressbar')).toHaveLength(1);
+  });
+
+  it('대기 팀이 없으면 대기 안내 없이 확정 수만 보여준다', () => {
+    render(<TournamentCard item={buildItem({ confirmedCount: 8, pendingPaymentCount: 0, teamCount: 20 })} />);
+    expect(screen.getByText('8/20팀 확정', { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText(/(?:입금|확인)대기/)).not.toBeInTheDocument();
+  });
+
+  it('무료 대회에는 입금대기 대신 확인대기를 표시한다', () => {
+    render(<TournamentCard item={buildItem({ entryFee: 0, confirmedCount: 11, pendingPaymentCount: 5, teamCount: 20 })} />);
+    expect(screen.getByText('무료', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('확인대기 5팀', { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText(/입금대기/)).not.toBeInTheDocument();
+  });
+});

@@ -92,10 +92,9 @@ export class TeamMatchesService {
     const status = query.status ?? 'recruiting';
     const now = new Date();
     const constraints: Prisma.V1TeamMatchWhereInput[] = [
-      // 일반 탐색은 마감 글도 경기 전까지 남기지만, 추천순은 즉시 신청할 수 있는
-      // 모집 글만 보여줘야 하므로 추천에서만 신청 마감 조건을 적용한다.
+      // 추천순의 모집 글에는 신청 마감을 적용한다. 확정 경기는 진행 중에도 찾을 수 있게 남긴다.
       ...(status === 'recruiting' && query.sort === 'recommended'
-        ? [{ OR: [{ deadlineAt: null }, { deadlineAt: { gte: now } }] } satisfies Prisma.V1TeamMatchWhereInput]
+        ? [{ OR: [...(isDefaultDiscovery ? [{ status: 'matched' as const }] : []), { deadlineAt: null }, { deadlineAt: { gte: now } }] } satisfies Prisma.V1TeamMatchWhereInput]
         : []),
       ...(query.query
         ? [{
@@ -115,6 +114,7 @@ export class TeamMatchesService {
         OR: [{ tournamentId: null }, { leagueId: { not: null } }],
         AND: [
           ...constraints,
+          ...(isDefaultDiscovery ? [{ OR: [{ startAt: { gte: now } }, { status: 'matched' as const }] }] : []),
           {
             OR: [
               { hostTeam: { status: 'active', deletedAt: null } },
@@ -126,14 +126,12 @@ export class TeamMatchesService {
           ? { startAt: { lt: now } }
           : isDefaultDiscovery
             ? {
-                // closed와 상대 팀 확정(matched) 글도 경기 전까지 일반 목록에 남겨
-                // 신청마감으로 보여준다. 추천순에서는 raw recruiting만 허용한다.
+                // Matched games remain discoverable during play until the teams finalize them.
                 status: {
                   in: query.sort === 'recommended'
-                    ? ['recruiting']
+                    ? ['recruiting', 'matched']
                     : ['recruiting', 'closed', 'matched'],
                 },
-                startAt: { gte: now },
               }
             : status === 'recruiting'
             ? { status, startAt: { gte: now } }
@@ -210,6 +208,7 @@ export class TeamMatchesService {
       deadlineAt: teamMatch.deadlineAt,
       status: this.getApiStatus(teamMatch),
       displayState: this.getDisplayState(teamMatch),
+      isLive: teamMatch.status === 'matched' && !teamMatch.leagueId && !teamMatch.tournamentId && !!teamMatch.startAt && teamMatch.startAt <= new Date(),
       costNote: teamMatch.costNote,
       // null 이면 일반 팀 매치, 값이 있으면 리그전이다. 프론트는 이 값의 유무로 배지를 건다.
       // Task 166: 여기 함께 싣던 이의 제기 자격 세 필드
@@ -441,6 +440,7 @@ export class TeamMatchesService {
           // 같은 매치를 열어본 상세는 displayState='closed' 라 '신청 마감'이었다
           // (2026-09-07 제보: "밖에서는 모집중으로 뜨고 안에서는 신청 마감").
           displayState: this.getDisplayState(teamMatch),
+          isLive: teamMatch.status === 'matched' && !teamMatch.leagueId && !teamMatch.tournamentId && !!teamMatch.startAt && teamMatch.startAt <= new Date(),
           relation,
           teamId,
           teamName: teamIds.includes(teamMatch.hostTeamId) ? teamMatch.hostTeam.name : application?.applicantTeam.name,
@@ -699,6 +699,13 @@ export class TeamMatchesService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // Share the Game -> TeamMatch lock order with result finalization.
+      await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${teamMatch.id} FOR UPDATE`;
+      const current = await tx.v1TeamMatch.findFirst({ where: { id: teamMatch.id, deletedAt: null } });
+      if (!current || current.status === 'completed' || current.status === 'cancelled') {
+        throw stateConflict('Team match state changed before cancellation');
+      }
+
       await tx.v1TeamMatch.update({
         where: { id: teamMatch.id },
         data: { status: 'cancelled', cancelledAt: new Date() },
@@ -1434,6 +1441,7 @@ export class TeamMatchesService {
       deadlineAt: teamMatch.deadlineAt,
       status: this.getApiStatus(teamMatch),
       displayState: this.getDisplayState(teamMatch),
+      isLive: teamMatch.status === 'matched' && !teamMatch.leagueId && !teamMatch.tournamentId && !!teamMatch.startAt && teamMatch.startAt <= new Date(),
       platformManaged: teamMatch.hostTeamId === null,
       hostTeam: teamMatch.hostTeam
         ? {

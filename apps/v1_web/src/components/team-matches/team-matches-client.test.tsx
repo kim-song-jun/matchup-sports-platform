@@ -156,8 +156,8 @@ describe('TeamMatchDetailPageClient — GA events', () => {
         title: '풋살 팀매치',
         sportName: '풋살',
         placeName: '서울 풋살장',
-        startsAt: '2026-08-10T10:00:00.000Z',
         status: 'matched',
+        startsAt: new Date(Date.now() + 3600_000).toISOString(),
         viewerState: 'rejected',
         hostTeam: { teamId: 'team-host', name: '호스트 팀' },
       },
@@ -260,7 +260,7 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
 
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 
-    const link = screen.getByRole('link', { name: '경기 결과 입력' });
+    const link = screen.getByRole('link', { name: '경기 기록 보기' });
     expect(link).toHaveAttribute('href', '/team-matches/team-match-1/result');
     expect(screen.queryByText('경기 결과 대기')).not.toBeInTheDocument();
     expect(screen.queryByText('경기 결과 확인/승인')).not.toBeInTheDocument();
@@ -271,9 +271,9 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
 
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 
-    const link = screen.getByRole('link', { name: '경기 결과 대기' });
+    const link = screen.getByRole('link', { name: '경기 기록 보기' });
     expect(link).toHaveAttribute('href', '/team-matches/team-match-1/result/approval');
-    expect(screen.queryByRole('link', { name: '경기 결과 입력' })).not.toBeInTheDocument();
+    expect(document.querySelector('a[href="/team-matches/team-match-1/result"]')).toBeNull();
   });
 
   // 리그 대진 회귀: 신청서를 운영자가 대신 만들기 때문에 상대팀 매니저의 viewer.state 는
@@ -284,9 +284,9 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
 
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 
-    const link = screen.getByRole('link', { name: '경기 결과 대기' });
+    const link = screen.getByRole('link', { name: '경기 기록 보기' });
     expect(link).toHaveAttribute('href', '/team-matches/team-match-1/result/approval');
-    expect(screen.queryByRole('link', { name: '경기 결과 입력' })).not.toBeInTheDocument();
+    expect(document.querySelector('a[href="/team-matches/team-match-1/result"]')).toBeNull();
   });
 
   // 리그 대진은 참가팀이 결과를 제출·승인할 수 없다 — 서버가 둘 다 403 으로 막는다
@@ -331,9 +331,9 @@ describe('TeamMatchDetailPageClient — result action routing gate (Task 17)', (
 
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 
-    expect(screen.queryByRole('link', { name: '경기 결과 입력' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: '경기 결과 대기' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: '경기 결과 확인/승인' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '경기 기록 보기' })).not.toBeInTheDocument();
+    expect(document.querySelector('a[href="/team-matches/team-match-1/result/approval"]')).toBeNull();
+    expect(screen.queryByRole('link', { name: '경기 결과 보기' })).not.toBeInTheDocument();
   });
 });
 

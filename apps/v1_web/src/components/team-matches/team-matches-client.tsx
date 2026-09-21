@@ -1,5 +1,7 @@
 'use client';
 
+import { TeamMatchRecordEntry } from './team-match-shared-record';
+
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -221,6 +223,7 @@ export function TeamMatchListPageClient() {
 export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: string; seed?: V1TeamMatch | null }) {
   const router = useRouter();
   const query = useV1TeamMatch(teamMatchId, { seed });
+  const recordParams = useSearchParams();
   const rawViewerState = query.data ? getViewerState(query.data) : 'none';
   const canManageHostTeam = query.data?.viewer?.manageableHostTeam === true;
   // 결과 승인 진입 게이트. `viewerState === 'approved'` 를 쓰면 안 된다 — 그건 신청서를
@@ -234,7 +237,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   const isParticipantMember = query.data?.viewer?.participantMember === true;
   // guest = 비인증 사용자: viewerState가 'guest'이거나 query.data에 viewer.state='guest'로 내려오는 경우
   const isGuest = viewerState === 'guest';
-  const eligibility = useV1TeamMatchEligibility(teamMatchId, undefined, { enabled: Boolean(query.data) && viewerState !== 'host_team' && !isGuest });
+  const eligibility = useV1TeamMatchEligibility(teamMatchId, undefined, { enabled: Boolean(query.data?.viewer) && !query.isPlaceholderData && viewerState !== 'host_team' && !isGuest });
   // Request the server max (50) so applicant teams aren't hidden behind the default
   // page size of 20. One match seeks a single opponent, so applicant teams stay well
   // within a single page — no cursor pagination needed here.
@@ -269,7 +272,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   // 라인업 CTA(Task 15 blocker-3): 호스트팀 매니저뿐 아니라 승인된 상대팀 매니저도 자기
   // 사이드 라인업을 관리하므로, canManageHostTeam 하나만으로는 판단할 수 없다.
   // resolveOwnTeamId가 라인업 페이지 자체의 권한 판정과 동일한 규칙으로 "내 팀"을 고른다.
-  const myTeamsQuery = useV1MyTeams();
+  const myTeamsQuery = useV1MyTeams(undefined, { enabled: canManageHostTeam || canManageOpponentTeam });
   const ownTeamId = useMemo(() => resolveOwnTeamId(query.data, myTeamsQuery.data), [query.data, myTeamsQuery.data]);
 
   useEffect(() => {
@@ -355,7 +358,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       : undefined,
     resultAction: seeding ? undefined : buildResultAction(teamMatchId, getStatus(query.data), canManageHostTeam, canManageOpponentTeam, isLeagueFixture),
     reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
-    statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data)),
+    statusLabel: seeding ? undefined : modelLiveLabel(query.data) ?? statusLabel(viewerState, getStatus(query.data)),
     chatLabel: chatLabel(canManageHostTeam, canManageOpponentTeam, opponentAssigned),
     chatPending: resolveChatRoom.isPending,
     chatError,
@@ -392,7 +395,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     }),
   };
 
-  return <TeamMatchDetailPageView model={model} />;
+  return <TeamMatchDetailPageView model={model} recordEntry={query.data.gameId ? <TeamMatchRecordEntry teamMatchId={teamMatchId} detailOnly={recordParams.get('view') === 'detail'} /> : undefined} />;
 }
 
 
@@ -659,13 +662,13 @@ function buildResultAction(
   }
   if (canManageHostTeam) {
     return {
-      label: status === 'completed' ? '경기 결과 보기' : '경기 결과 입력',
+      label: status === 'completed' ? '경기 결과 보기' : '경기 기록 보기',
       href: `/team-matches/${teamMatchId}/result`,
     };
   }
   if (canManageOpponentTeam) {
     return {
-      label: status === 'completed' ? '경기 결과 확인/승인' : '경기 결과 대기',
+      label: status === 'completed' ? '경기 결과 보기' : '경기 기록 보기',
       href: `/team-matches/${teamMatchId}/result/approval`,
     };
   }
@@ -775,3 +778,7 @@ function reasonLabel(reasonCode?: string) {
 }
 
 
+
+function modelLiveLabel(match: V1TeamMatch) {
+  return getStatus(match) === 'matched' && !match.league && !!match.startsAt && new Date(match.startsAt).getTime() <= Date.now() ? '진행 중' : null;
+}

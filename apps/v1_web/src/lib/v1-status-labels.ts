@@ -117,3 +117,10 @@ const INQUIRY_REPORT_REASON_LABEL: Record<V1InquiryReportReason, string> = INQUI
 export function inquiryReportReasonLabel(reason: V1InquiryReportReason): string {
   return INQUIRY_REPORT_REASON_LABEL[reason];
 }
+
+/** 친선 팀매치 공동 기록 상태와 변경 이력. */
+const phaseLabel: Record<string, string> = { scheduled: '경기 시작 전', live: '진행 중', official: '경기 종료 · 결과 확정', cancelled: '취소된 경기', legacy: '기존 경기 결과', managed: '운영자 기록 경기' };
+const actionLabel: Record<string, string> = { add: '득점 등록', edit: '득점 수정', delete: '득점 삭제', undo: '변경 되돌리기', confirm: '경기 종료 확인', reopen: '종료 확인 취소' };
+
+export function sharedRecordPhaseLabel(phase: string): string { return phaseLabel[phase] ?? "경기 기록"; }
+export function sharedRecordActionLabel(action: string): string { return actionLabel[action] ?? "기록 변경"; }

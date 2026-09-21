@@ -1,0 +1,393 @@
+{
+  "results": [
+    {
+      "width": 390,
+      "step": "01-before-start",
+      "url": "http://127.0.0.1:3016/team-matches/b66a1021-f493-44d1-b2c4-a2b3c55bd1ac",
+      "dimensions": {
+        "viewport": 390,
+        "document": 390
+      }
+    },
+    {
+      "width": 390,
+      "step": "02-live-list",
+      "url": "http://127.0.0.1:3016/team-matches",
+      "dimensions": {
+        "viewport": 390,
+        "document": 390
+      }
+    },
+    {
+      "width": 390,
+      "step": "03-public-detail",
+      "url": "http://127.0.0.1:3016/team-matches/9fc18866-00a0-446d-ac62-48fd651a3916",
+      "dimensions": {
+        "viewport": 390,
+        "document": 390
+      }
+    },
+    {
+      "width": 390,
+      "step": "04-participant-scoreboard",
+      "url": "http://127.0.0.1:3016/team-matches/9fc18866-00a0-446d-ac62-48fd651a3916/record",
+      "dimensions": {
+        "viewport": 390,
+        "document": 390
+      }
+    },
+    {
+      "width": 390,
+      "step": "05-add-goal",
+      "url": "http://127.0.0.1:3016/team-matches/9fc18866-00a0-446d-ac62-48fd651a3916/record",
+      "dimensions": {
+        "viewport": 390,
+        "document": 390
+      }
+    },
+    {
+      "width": 390,
+      "step": "06-other-player-synced",
+      "url": "http://127.0.0.1:3016/team-matches/9fc18866-00a0-446d-ac62-48fd651a3916/record",
+      "dimensions": {
+        "viewport": 390,
+        "document": 390
+      }
+    },
+    {
+      "width": 390,
+      "step": "07-edited-scorer",
+      "url": "http://127.0.0.1:3016/team-matches/9fc18866-00a0-446d-ac62-48fd651a3916/record",
+      "dimensions": {
+        "viewport": 390,
+        "document": 390
+      }
+    },
+    {
+      "width": 390,
+      "step": "08-restored-history",
+      "url": "http://127.0.0.1:3016/team-matches/9fc18866-00a0-446d-ac62-48fd651a3916/record",
+      "dimensions": {
+        "viewport": 390,
+        "document": 390
+      }
+    },
+    {
+      "width": 390,
+      "step": "09-concurrent-edit",
+      "url": "http://127.0.0.1:3016/team-matches/9fc18866-00a0-446d-ac62-48fd651a3916/record",
+      "dimensions": {
+        "viewport": 390,
+        "document": 390
+      }
+    },
+    {
+      "width": 390,
+      "step": "10-end-confirm-dialog",
+      "url": "http://127.0.0.1:3016/team-matches/9fc18866-00a0-446d-ac62-48fd651a3916/record",
+      "dimensions": {
+        "viewport": 390,
+        "document": 390
+      }
+    },
+    {
+      "width": 390,
+      "step": "11-other-team-confirmation",
+      "url": "http://127.0.0.1:3016/team-matches/9fc18866-00a0-446d-ac62-48fd651a3916/record",
+      "dimensions": {
+        "viewport": 390,
+        "document": 390
+      }
+    },
+    {
+      "width": 390,
+      "step": "12-official-locked",
+      "url": "http://127.0.0.1:3016/team-matches/9fc18866-00a0-446d-ac62-48fd651a3916/record",
+      "dimensions": {
+        "viewport": 390,
+        "document": 390
+      }
+    },
+    {
+      "width": 768,
+      "step": "01-before-start",
+      "url": "http://127.0.0.1:3016/team-matches/b66a1021-f493-44d1-b2c4-a2b3c55bd1ac",
+      "dimensions": {
+        "viewport": 768,
+        "document": 768
+      }
+    },
+    {
+      "width": 768,
+      "step": "02-live-list",
+      "url": "http://127.0.0.1:3016/team-matches",
+      "dimensions": {
+        "viewport": 768,
+        "document": 768
+      }
+    },
+    {
+      "width": 768,
+      "step": "03-public-detail",
+      "url": "http://127.0.0.1:3016/team-matches/ab7eb2f0-9f1e-41a4-a9d6-75cfea34959c",
+      "dimensions": {
+        "viewport": 768,
+        "document": 768
+      }
+    },
+    {
+      "width": 768,
+      "step": "04-participant-scoreboard",
+      "url": "http://127.0.0.1:3016/team-matches/ab7eb2f0-9f1e-41a4-a9d6-75cfea34959c/record",
+      "dimensions": {
+        "viewport": 768,
+        "document": 768
+      }
+    },
+    {
+      "width": 768,
+      "step": "05-add-goal",
+      "url": "http://127.0.0.1:3016/team-matches/ab7eb2f0-9f1e-41a4-a9d6-75cfea34959c/record",
+      "dimensions": {
+        "viewport": 768,
+        "document": 768
+      }
+    },
+    {
+      "width": 768,
+      "step": "06-other-player-synced",
+      "url": "http://127.0.0.1:3016/team-matches/ab7eb2f0-9f1e-41a4-a9d6-75cfea34959c/record",
+      "dimensions": {
+        "viewport": 768,
+        "document": 768
+      }
+    },
+    {
+      "width": 768,
+      "step": "07-edited-scorer",
+      "url": "http://127.0.0.1:3016/team-matches/ab7eb2f0-9f1e-41a4-a9d6-75cfea34959c/record",
+      "dimensions": {
+        "viewport": 768,
+        "document": 768
+      }
+    },
+    {
+      "width": 768,
+      "step": "08-restored-history",
+      "url": "http://127.0.0.1:3016/team-matches/ab7eb2f0-9f1e-41a4-a9d6-75cfea34959c/record",
+      "dimensions": {
+        "viewport": 768,
+        "document": 768
+      }
+    },
+    {
+      "width": 768,
+      "step": "09-concurrent-edit",
+      "url": "http://127.0.0.1:3016/team-matches/ab7eb2f0-9f1e-41a4-a9d6-75cfea34959c/record",
+      "dimensions": {
+        "viewport": 768,
+        "document": 768
+      }
+    },
+    {
+      "width": 768,
+      "step": "10-end-confirm-dialog",
+      "url": "http://127.0.0.1:3016/team-matches/ab7eb2f0-9f1e-41a4-a9d6-75cfea34959c/record",
+      "dimensions": {
+        "viewport": 768,
+        "document": 768
+      }
+    },
+    {
+      "width": 768,
+      "step": "11-other-team-confirmation",
+      "url": "http://127.0.0.1:3016/team-matches/ab7eb2f0-9f1e-41a4-a9d6-75cfea34959c/record",
+      "dimensions": {
+        "viewport": 768,
+        "document": 768
+      }
+    },
+    {
+      "width": 768,
+      "step": "12-official-locked",
+      "url": "http://127.0.0.1:3016/team-matches/ab7eb2f0-9f1e-41a4-a9d6-75cfea34959c/record",
+      "dimensions": {
+        "viewport": 768,
+        "document": 768
+      }
+    },
+    {
+      "width": 1440,
+      "step": "01-before-start",
+      "url": "http://127.0.0.1:3016/team-matches/b66a1021-f493-44d1-b2c4-a2b3c55bd1ac",
+      "dimensions": {
+        "viewport": 1440,
+        "document": 1440
+      }
+    },
+    {
+      "width": 1440,
+      "step": "02-live-list",
+      "url": "http://127.0.0.1:3016/team-matches",
+      "dimensions": {
+        "viewport": 1440,
+        "document": 1440
+      }
+    },
+    {
+      "width": 1440,
+      "step": "03-public-detail",
+      "url": "http://127.0.0.1:3016/team-matches/ea542b83-40b8-417a-9c4f-0b6976b23256",
+      "dimensions": {
+        "viewport": 1440,
+        "document": 1440
+      }
+    },
+    {
+      "width": 1440,
+      "step": "04-participant-scoreboard",
+      "url": "http://127.0.0.1:3016/team-matches/ea542b83-40b8-417a-9c4f-0b6976b23256/record",
+      "dimensions": {
+        "viewport": 1440,
+        "document": 1440
+      }
+    },
+    {
+      "width": 1440,
+      "step": "05-add-goal",
+      "url": "http://127.0.0.1:3016/team-matches/ea542b83-40b8-417a-9c4f-0b6976b23256/record",
+      "dimensions": {
+        "viewport": 1440,
+        "document": 1440
+      }
+    },
+    {
+      "width": 1440,
+      "step": "06-other-player-synced",
+      "url": "http://127.0.0.1:3016/team-matches/ea542b83-40b8-417a-9c4f-0b6976b23256/record",
+      "dimensions": {
+        "viewport": 1440,
+        "document": 1440
+      }
+    },
+    {
+      "width": 1440,
+      "step": "07-edited-scorer",
+      "url": "http://127.0.0.1:3016/team-matches/ea542b83-40b8-417a-9c4f-0b6976b23256/record",
+      "dimensions": {
+        "viewport": 1440,
+        "document": 1440
+      }
+    },
+    {
+      "width": 1440,
+      "step": "08-restored-history",
+      "url": "http://127.0.0.1:3016/team-matches/ea542b83-40b8-417a-9c4f-0b6976b23256/record",
+      "dimensions": {
+        "viewport": 1440,
+        "document": 1440
+      }
+    },
+    {
+      "width": 1440,
+      "step": "09-concurrent-edit",
+      "url": "http://127.0.0.1:3016/team-matches/ea542b83-40b8-417a-9c4f-0b6976b23256/record",
+      "dimensions": {
+        "viewport": 1440,
+        "document": 1440
+      }
+    },
+    {
+      "width": 1440,
+      "step": "10-end-confirm-dialog",
+      "url": "http://127.0.0.1:3016/team-matches/ea542b83-40b8-417a-9c4f-0b6976b23256/record",
+      "dimensions": {
+        "viewport": 1440,
+        "document": 1440
+      }
+    },
+    {
+      "width": 1440,
+      "step": "11-other-team-confirmation",
+      "url": "http://127.0.0.1:3016/team-matches/ea542b83-40b8-417a-9c4f-0b6976b23256/record",
+      "dimensions": {
+        "viewport": 1440,
+        "document": 1440
+      }
+    },
+    {
+      "width": 1440,
+      "step": "12-official-locked",
+      "url": "http://127.0.0.1:3016/team-matches/ea542b83-40b8-417a-9c4f-0b6976b23256/record",
+      "dimensions": {
+        "viewport": 1440,
+        "document": 1440
+      }
+    }
+  ],
+  "errors": [],
+  "failedRequests": [],
+  "bootstrapResponses": [
+    {
+      "width": 390,
+      "status": 403,
+      "url": "http://127.0.0.1:3016/api/v1/me/settings"
+    },
+    {
+      "width": 390,
+      "status": 403,
+      "url": "http://127.0.0.1:3016/api/v1/me/settings"
+    },
+    {
+      "width": 390,
+      "status": 403,
+      "url": "http://127.0.0.1:3016/api/v1/me/settings"
+    },
+    {
+      "width": 390,
+      "status": 403,
+      "url": "http://127.0.0.1:3016/api/v1/me/settings"
+    },
+    {
+      "width": 768,
+      "status": 403,
+      "url": "http://127.0.0.1:3016/api/v1/me/settings"
+    },
+    {
+      "width": 768,
+      "status": 403,
+      "url": "http://127.0.0.1:3016/api/v1/me/settings"
+    },
+    {
+      "width": 768,
+      "status": 403,
+      "url": "http://127.0.0.1:3016/api/v1/me/settings"
+    },
+    {
+      "width": 768,
+      "status": 403,
+      "url": "http://127.0.0.1:3016/api/v1/me/settings"
+    },
+    {
+      "width": 1440,
+      "status": 403,
+      "url": "http://127.0.0.1:3016/api/v1/me/settings"
+    },
+    {
+      "width": 1440,
+      "status": 403,
+      "url": "http://127.0.0.1:3016/api/v1/me/settings"
+    },
+    {
+      "width": 1440,
+      "status": 403,
+      "url": "http://127.0.0.1:3016/api/v1/me/settings"
+    },
+    {
+      "width": 1440,
+      "status": 403,
+      "url": "http://127.0.0.1:3016/api/v1/me/settings"
+    }
+  ],
+  "consoleErrors": []
+}

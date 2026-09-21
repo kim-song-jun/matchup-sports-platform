@@ -34,6 +34,7 @@ export function toTeamMatch(match: V1TeamMatch, fallback: TeamMatchModel): TeamM
 
   return {
     ...fallback,
+    live: apiStatus === 'matched' && !match.league && (match.isLive ?? (!!match.startsAt && new Date(match.startsAt).getTime() <= Date.now())),
     id: match.teamMatchId ?? match.id ?? fallback.id,
     title: match.title,
     // image 도 목업의 폴백으로 쓰지 않는다(웨이브4, 2026-09-04) — 예전엔 `fallback.imageUrl`

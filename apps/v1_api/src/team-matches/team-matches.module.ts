@@ -1,3 +1,5 @@
+import { TeamMatchRecordController } from './team-match-record.controller';
+import { TeamMatchRecordService } from './team-match-record.service';
 import { Module } from '@nestjs/common';
 import { AdminContextModule } from '../common/admin-context.module';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
@@ -14,8 +16,9 @@ import { AdminTeamMatchRecruitmentsService } from './admin-team-match-recruitmen
 
 @Module({
   imports: [AdminContextModule, GamesModule, NotificationsModule, OperationAuditModule],
-  controllers: [TeamMatchesController, AdminTeamMatchRecruitmentsController],
+  controllers: [TeamMatchRecordController, TeamMatchesController, AdminTeamMatchRecruitmentsController],
   providers: [
+    TeamMatchRecordService,
     TeamMatchesService,
     AdminTeamMatchRecruitmentsService,
     TeamMatchLineupService,

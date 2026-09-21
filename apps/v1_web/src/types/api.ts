@@ -1083,6 +1083,8 @@ export type V1MySchedulePage = {
 };
 
 export type V1TeamMatch = V1Match & {
+  /** Server-clock derived friendly-match progress; raw matched status remains the permission contract. */
+  isLive?: boolean;
   teamMatchId?: string;
   // Task 17: the Game backing this team match (see docs/api/v1/domains/team-matches.md) —
   // the only client-facing way to reach `/api/v1/games/:gameId/result-revisions*`.

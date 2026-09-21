@@ -209,7 +209,7 @@ export function TeamMatchDetailPageSkeleton() {
   );
 }
 
-export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewModel }) {
+export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMatchDetailViewModel; recordEntry?: React.ReactNode }) {
   const { confirm, ConfirmModal } = useConfirm();
   const { match, mode } = model;
   const league = match.league;
@@ -365,6 +365,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
       <div className="tm-team-match-detail-desktop tm-content-enter">
         {/* LEFT: VS hero + info */}
         <div className="tm-team-match-detail-left">
+          {recordEntry}
           <article className="tm-match-detail">
             {/* 사진이 없으면(match.imageUrl===null) 목업 사진(team-huddle.webp) 대신 종목
                 그래픽을 그린다 — matches-page.tsx MatchDetailPageView 의 -sport 변형과 같은
@@ -881,10 +882,10 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
   // **리그 대진은 제외한다.** 리그엔 신청 개념이 없어 `closed` 가 "모집이 끝났다" 가 아니라
   // 그냥 "상대가 정해져 있다" 는 뜻인데, 그 상태가 원정팀 팀장·선수 전원에게 붙어
   // **자기 팀 경기가 마감·흐림으로** 보였다.
-  const isClosed = match.closed && !isLeagueFixture;
+  const isClosed = match.closed && !isLeagueFixture && !match.live;
   // 관계도 없고 마감도 아니면 "상대가 아직 없다"를 쓴다 — 목록 응답에 상대팀이 없어
   // 화면 어디에도 없던 정보다. 상대 "팀 이름"은 응답에 없으므로 만들어내지 않는다.
-  const openLabel = !relation && !isClosed && !isLeagueFixture ? '상대 모집 중' : null;
+  const openLabel = !relation && !isClosed && !isLeagueFixture && !match.live ? '상대 모집 중' : null;
   return (
     <Link className={`tm-match-row tm-card-interactive tm-pressable${isClosed ? ' tm-card-closed' : ''}`} href={`/team-matches/${match.id}`}>
       {/* 예전엔 카드 위쪽 124px(카드의 44%)이 파란 VS 밴드였다. 그 밴드의 "상대팀" 칸에는
@@ -910,6 +911,7 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
               {relation.label}
             </span>
           ) : null}
+          {match.live && <span className="tm-badge tm-badge-green">진행 중</span>}
           {isClosed ? (
             <span className="tm-badge tm-badge-grey tm-card-closed-badge">
               <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>

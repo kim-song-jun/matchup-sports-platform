@@ -51,6 +51,11 @@ export class TeamMatchesQueryDto {
   @IsOptional()
   @IsIn(['card', 'compact'])
   view?: 'card' | 'compact';
+
+  /** 일반 팀매치(둘 다 null) / 대회·리그 경기(둘 중 하나라도 있음) 구분. 미지정이면 전체. */
+  @IsOptional()
+  @IsIn(['friendly', 'competition'])
+  kind?: 'friendly' | 'competition';
 }
 
 export class TeamMatchEligibilityQueryDto {

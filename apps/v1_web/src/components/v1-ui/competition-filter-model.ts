@@ -64,6 +64,14 @@ export function statusFiltersFor(kind: string | null | undefined) {
     : COMPETITION_STATUS_FILTERS;
 }
 
+/** 대회 성별 카테고리 칩 — 대회 데이터에 이미 있는 `V1TournamentGenderCategory` 3값. */
+export const COMPETITION_GENDER_FILTERS: ReadonlyArray<{ value: string | null; label: string }> = [
+  { value: null, label: '전체' },
+  { value: 'mixed', label: '혼성' },
+  { value: 'male', label: '남성부' },
+  { value: 'female', label: '여성부' },
+];
+
 const FILTER_PARAM = 'filter';
 
 /**
@@ -113,6 +121,7 @@ export function buildCompetitionFilterModel(input: {
      에러다 — 그래서 화면 진입 지점에서 정규화한다. */
   const activeStatus = normalizeParam(params.get('status'));
   const activeSportId = normalizeParam(params.get('sportId'));
+  const activeGenderCategory = normalizeParam(params.get('genderCategory'));
 
   // 시트를 여닫는 것도 URL 이다 — `?filter=1` 이 열림이고, 지우면 닫힌다.
   const openHref = hrefWith(basePath, params, { [FILTER_PARAM]: '1' });
@@ -122,6 +131,7 @@ export function buildCompetitionFilterModel(input: {
   const resetHref = hrefWith(basePath, params, {
     status: null,
     sportId: null,
+    genderCategory: null,
     [FILTER_PARAM]: null,
   });
 
@@ -147,6 +157,13 @@ export function buildCompetitionFilterModel(input: {
     })),
   ];
 
+  const genderOptions: CompetitionFilterOption[] = COMPETITION_GENDER_FILTERS.map((option) => ({
+    label: option.label,
+    value: option.value ?? 'all',
+    href: hrefWith(basePath, params, { genderCategory: option.value }),
+    active: (activeGenderCategory ?? null) === option.value,
+  }));
+
   /* ⚠️ **칩과 같은 목록에서 찾는다.** 전역 목록에서 찾으면 대회 탭에서 칩을 안 그렸는데
      요약 줄엔 '준비 중' 이 남는다 — 그러면 **해제할 칩이 없는 막다른 상태**가 된다
      (URL 로 직접 들어오는 경로가 그 뒷문이다). 입구와 표시가 같은 기준이어야 한다. */
@@ -156,12 +173,18 @@ export function buildCompetitionFilterModel(input: {
   const sportLabel = activeSportId
     ? sports.find((sport) => sport.id === activeSportId)?.label
     : undefined;
+  const genderLabel = COMPETITION_GENDER_FILTERS.find(
+    (option) => option.value === (activeGenderCategory ?? null),
+  )?.label;
 
   // 요약 문구 — 고른 것만 적는다. 둘 다 기본이면 '전체'.
   // ⚠️ `activeStatus` 가 우리가 모르는 값이면 `statusLabel` 이 undefined 다. 그때 그 값을
   // 그대로 적으면 URL 문자열이 화면에 새므로, 라벨이 있는 것만 싣는다.
-  const parts = [statusLabel && statusLabel !== '전체' ? statusLabel : null, sportLabel ?? null]
-    .filter((part): part is string => part !== null && part.length > 0);
+  const parts = [
+    statusLabel && statusLabel !== '전체' ? statusLabel : null,
+    sportLabel ?? null,
+    genderLabel && genderLabel !== '전체' ? genderLabel : null,
+  ].filter((part): part is string => part !== null && part.length > 0);
 
   return {
     openHref,
@@ -169,6 +192,7 @@ export function buildCompetitionFilterModel(input: {
     resetHref,
     statusOptions,
     sportOptions,
+    genderOptions,
     summary: parts.length > 0 ? parts.join(' · ') : '전체',
     activeCount: parts.length,
   };

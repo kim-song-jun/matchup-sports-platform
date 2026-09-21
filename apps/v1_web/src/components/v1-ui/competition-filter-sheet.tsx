@@ -38,6 +38,7 @@ export type CompetitionFilterSheetModel = {
   readonly resetHref: string;
   readonly statusOptions: readonly CompetitionFilterOption[];
   readonly sportOptions: readonly CompetitionFilterOption[];
+  readonly genderOptions: readonly CompetitionFilterOption[];
   /** 요약 줄에 보일 문구. 고른 게 없으면 '전체'. */
   readonly summary: string;
   /** 뱃지 숫자 — 기본값이 아닌 필터 개수. */
@@ -78,7 +79,7 @@ export function CompetitionFilterSheet({ model }: { model: CompetitionFilterShee
           <div>
             <div className="tm-text-subhead">필터</div>
             <div className="tm-text-caption" style={{ marginTop: 2 }}>
-              상태와 종목으로 걸러볼 수 있어요.
+              상태·종목·성별로 걸러볼 수 있어요.
             </div>
           </div>
           <Link
@@ -92,6 +93,7 @@ export function CompetitionFilterSheet({ model }: { model: CompetitionFilterShee
         {[
           ['상태', model.statusOptions],
           ['종목', model.sportOptions],
+          ['성별', model.genderOptions],
         ].map(([title, options]) => (
           <div key={title as string} className="tm-filter-section">
             <div className="tm-text-label">{title as string}</div>

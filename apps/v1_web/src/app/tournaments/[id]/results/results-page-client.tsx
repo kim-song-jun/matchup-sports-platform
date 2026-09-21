@@ -406,9 +406,11 @@ const ROUND_LABEL_MAP: Record<string, string> = {
 function KnockoutResultsTable({
   fixtures,
   kindOf,
+  tournamentId,
 }: {
   fixtures: V1TournamentFixture[];
   kindOf: (fixture: V1TournamentFixture) => KnockoutKind | null;
+  tournamentId: string;
 }) {
   if (fixtures.length === 0) return null;
 
@@ -458,7 +460,7 @@ function KnockoutResultsTable({
     label, labelColor = 'var(--text-caption)',
     home, away, homeScore, awayScore,
     winner, hasPenalty, homePK, awayPK,
-    date, isAccent = false, isAgg = false,
+    date, isAccent = false, isAgg = false, fixtureId,
   }: {
     label: React.ReactNode; labelColor?: string;
     // 참가팀 공개 정책 통일(fix/v1-publish) — 이 페이지는 status==='completed'
@@ -469,11 +471,13 @@ function KnockoutResultsTable({
     winner: 'home' | 'away' | null;
     hasPenalty?: boolean; homePK?: number | null; awayPK?: number | null;
     date?: string; isAccent?: boolean; isAgg?: boolean;
-  }) => (
-    <div style={{
-      padding: '12px 16px',
-      background: 'transparent',
-    }}>
+    /** 결승·4강·3·4위전 개별 경기의 실제 fixture id. 합산(2경기 합계) 행은 단일 경기가
+     * 아니라 상세로 보낼 곳이 없으므로 생략한다 — 그때만 그냥 div로 렌더된다. */
+    fixtureId?: string;
+  }) => {
+    const scoreLabel = `${homeScore} 대 ${awayScore}`;
+    const content = (
+      <>
       {/* 상단: 라벨 + 날짜 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         {/* [R-T2] accent 라운드(10→12로 통일)와 일반 라운드가 같은 12px가 됐다 —
@@ -521,8 +525,24 @@ function KnockoutResultsTable({
           {isAgg && winner === 'away' && <span style={{ fontSize: 12, color: 'var(--text-strong)', marginRight: 4 }}>✓</span>}{away ?? '팀 정보 없음'}
         </span>
       </div>
-    </div>
-  );
+      </>
+    );
+    // 조별리그 GroupFixtureRow(아래 tm-res-match-score 근처)와 같은 패턴 — 실제 fixture가
+    // 있는 행만 상세 기록으로 링크한다. 합산(2경기 합계) 행은 fixtureId가 없어 그냥 div다.
+    const wrapperStyle: React.CSSProperties = { display: 'block', padding: '12px 16px', background: 'transparent', textDecoration: 'none', color: 'inherit' };
+    if (!fixtureId) {
+      return <div style={wrapperStyle}>{content}</div>;
+    }
+    return (
+      <Link
+        href={`/tournaments/${tournamentId}/matches/${fixtureId}`}
+        style={wrapperStyle}
+        aria-label={`${home ?? '팀 정보 없음'} ${scoreLabel} ${away ?? '팀 정보 없음'}, 경기 상세 보기`}
+      >
+        {content}
+      </Link>
+    );
+  };
 
   const divider = <div style={{ height: 1, background: 'var(--grey100)', margin: '0 16px' }} />;
   const cardStyle: React.CSSProperties = { borderRadius: 'var(--radius-control)', overflow: 'hidden', border: '1px solid var(--grey150)' };
@@ -544,6 +564,7 @@ function KnockoutResultsTable({
               winner={winner}
               hasPenalty={hasPenalty} homePK={homePenaltyScore} awayPK={awayPenaltyScore}
               date={fmtDate(f.scheduledAt)} isAccent
+              fixtureId={f.id}
             />
           </div>
         );
@@ -565,6 +586,7 @@ function KnockoutResultsTable({
                 winner={getWinnerSide(leg1.result)}
                 hasPenalty={leg1.result.hasPenalty} homePK={leg1.result.homePenaltyScore} awayPK={leg1.result.awayPenaltyScore}
                 date={fmtDate(leg1.scheduledAt)}
+                fixtureId={leg1.id}
               />
             )}
             {leg2?.result && <>{divider}<MatchRow
@@ -573,6 +595,7 @@ function KnockoutResultsTable({
               winner={getWinnerSide(leg2.result)}
               hasPenalty={leg2.result.hasPenalty} homePK={leg2.result.homePenaltyScore} awayPK={leg2.result.awayPenaltyScore}
               date={fmtDate(leg2.scheduledAt)}
+              fixtureId={leg2.id}
             /></>}
             {/* 합산 */}
             <div style={{ borderTop: '1px solid var(--grey150)' }}>
@@ -601,6 +624,7 @@ function KnockoutResultsTable({
               winner={winner}
               hasPenalty={hasPenalty} homePK={homePenaltyScore} awayPK={awayPenaltyScore}
               date={fmtDate(f.scheduledAt)}
+              fixtureId={f.id}
             />
           </div>
         );
@@ -1134,7 +1158,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
             {knockoutFixtures.length > 0 && (
               <>
                 <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>결선 경기</h3>
-                <KnockoutResultsTable fixtures={knockoutFixtures} kindOf={knockoutKind} />
+                <KnockoutResultsTable fixtures={knockoutFixtures} kindOf={knockoutKind} tournamentId={tournament.id} />
               </>
             )}
             <GroupStageFixtures tournament={tournament} />

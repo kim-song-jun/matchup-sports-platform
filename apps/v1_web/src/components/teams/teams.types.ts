@@ -49,9 +49,11 @@ export type TeamListViewModel = {
     sort: '' | 'recommended' | 'deadline' | 'latest';
     genderRule: '' | '성별 무관' | '남' | '여';
     levels: Array<'beginner' | 'novice' | 'intermediate' | 'advanced'>;
+    regionId: string;
     sortOptions: Array<{ label: string; value: 'recommended' | 'deadline' | 'latest'; href: string; active?: boolean }>;
     genderOptions: Array<{ label: string; value: '성별 무관' | '남' | '여'; href: string; active?: boolean }>;
     levelOptions: Array<{ label: string; value: 'beginner' | 'novice' | 'intermediate' | 'advanced'; href: string; active?: boolean }>;
+    regionOptions: Array<{ label: string; value: string; href: string; active?: boolean }>;
   };
   chips: Array<{ label: string; count?: number; active?: boolean; href?: string }>;
   summary: { scope: string; total: number; recruiting: number; nearby?: number };
@@ -111,7 +113,7 @@ export type TeamDetailViewModel = {
    * R4: 전용 리그 API 없이 GET /team-matches?teamId= 응답의 league 필드만으로 구성한다.
    * 값이 비어 있으면(리그 소속 매치 없음) 섹션 자체를 렌더하지 않는다.
    */
-  myLeagues?: Array<{ leagueId: string; title: string }>;
+  myLeagues?: Array<{ leagueId: string; title: string; href: string }>;
   myLeaguesLoading?: boolean;
   /**
    * 그룹 F 재감사: myLeaguesQuery 가 실패해도 items가 빈 배열이 되어 "참가 리그 0개"와

@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQueries } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useV1ApproveTeamJoinApplication,
@@ -23,17 +22,17 @@ import {
   useV1TeamJoinApplications,
   useV1TeamMatches,
   useV1TeamMembers,
+  useV1TeamPages,
   useV1Teams,
   useV1WithdrawTeamJoinApplication,
 } from '@/hooks/use-v1-api';
 import { usePendingIds } from '@/hooks/use-pending-ids';
 import { extractErrorMessage } from '@/lib/error-message';
 import { trackEvent } from '@/lib/analytics';
-import { V1ApiError, v1Get } from '@/lib/api-client';
+import { V1ApiError } from '@/lib/api-client';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { teamSharePath } from '@/lib/team-share-route';
-import { v1Keys } from '@/lib/query-keys';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
 import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
@@ -72,35 +71,19 @@ export function TeamListPageClient() {
     if (selectedSort === 'recommended') filters.sort = 'recommended';
     return Object.keys(filters).length ? filters : undefined;
   }, [selectedGenderRule, selectedLevels, selectedSort, selectedSportId, submittedQuery]);
-  const listFilters = useMemo(() => ({ ...(teamFilters ?? {}), limit: 50 }), [teamFilters]);
-  const sportCountFilters = useMemo(() => {
-    const { sportId: _sportId, ...filtersWithoutSport } = teamFilters ?? {};
-    return { ...filtersWithoutSport, limit: 50 };
-  }, [teamFilters]);
-  const query = useV1Teams(listFilters);
-  const sportCounts = useV1Teams(sportCountFilters, { enabled: Boolean(selectedSportId) });
+  const listFilters = useMemo(() => ({ ...(teamFilters ?? {}), limit: 20 }), [teamFilters]);
+  const query = useV1TeamPages(listFilters);
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
 
   const base = getTeamListViewModel();
-  const items = query.data?.items;
+  const items = query.data?.pages.flatMap((page) => page.items);
   const visibleItems = filterTeamsByLevels(items, selectedLevels);
-  const activityDetailQueries = useQueries({
-    queries: visibleItems.map((item) => {
-      const teamId = item.teamId ?? item.id;
-      const needsActivityFallback = !item.activitySummary && !item.activityAreaText;
-      return {
-        queryKey: [...v1Keys.team(teamId), 'detail', 'list-activity'] as const,
-        queryFn: () => v1Get<V1TeamDetail>(`/teams/${teamId}`),
-        enabled: Boolean(teamId && needsActivityFallback),
-        staleTime: 30_000,
-      };
-    }),
-  });
-  const visibleTeams = visibleItems.map((item, index) => toTeam(withListActivityFallback(item, activityDetailQueries[index]?.data), base.teams[index] ?? base.teams[0]));
+  const visibleTeams = visibleItems.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0]));
 
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
-  const countItems = selectedSportId ? (sportCounts.data?.items ?? visibleItems) : visibleItems;
+  const firstPage = query.data?.pages[0];
+  const total = firstPage?.pageInfo?.total ?? visibleItems.length;
   const isListLoading = query.isLoading && !items;
   const searchModel: NonNullable<TeamListViewModel['search']> = {
     value: searchValue,
@@ -125,12 +108,16 @@ export function TeamListPageClient() {
     search: searchModel,
     filterHref: buildTeamHref(searchParams, { filter: '1' }),
     filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, filterOpen),
-    chips: buildTeamSportChips(countItems, base, searchParams, selectedSportId, sports.data),
+    chips: buildTeamSportChips(visibleItems, base, searchParams, selectedSportId, sports.data, !selectedSportId && !query.hasNextPage),
     teams: visibleTeams,
     listLoading: isListLoading,
+    hasNextPage: query.hasNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
+    onLoadMore: () => void query.fetchNextPage(),
     summary: {
       ...base.summary,
-      total: visibleTeams.length,
+      total,
+      loaded: visibleTeams.length,
       recruiting: visibleTeams.filter((item) => item.status === 'open').length,
       nearby: undefined,
     },
@@ -530,20 +517,6 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   );
 }
 
-function withListActivityFallback(team: V1Team, detail?: V1TeamDetail): V1Team {
-  if (team.activitySummary || team.activityAreaText || !detail) return team;
-  return {
-    ...team,
-    activityAreaText: detail.profile.activityAreaText ?? null,
-    activityDays: detail.profile.activityDays ?? [],
-    activityFrequency: detail.profile.activityFrequency ?? null,
-    activityTimeSlots: detail.profile.activityTimeSlots ?? [],
-    activityTypes: detail.profile.activityTypes ?? [],
-    activityMemo: detail.profile.activityMemo ?? null,
-    activitySummary: detail.profile.activitySummary ?? detail.profile.activityAreaText ?? null,
-  };
-}
-
 function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
   const id = team.teamId ?? team.id;
   const sportName = team.sport?.name ?? team.sportName;
@@ -589,19 +562,24 @@ function buildTeamSportChips(
   params: URLSearchParams,
   selectedSportId?: string,
   masterSports?: Array<{ id: string; name: string }>,
+  showCounts = true,
 ) {
   const fixedSports = masterSports?.length
     ? masterSports.slice(0, 4)
     : fallback.chips.slice(1, 5).map((chip) => ({ id: chip.label, name: chip.label.replace(/\s+\d+$/, '') }));
 
   return [
-    { label: fallback.chips[0]?.label.replace(/\s+\d+$/, '') ?? '전체', count: items.length, active: !selectedSportId, href: buildTeamHref(params, { sportId: null }) },
+    { label: fallback.chips[0]?.label.replace(/\s+\d+$/, '') ?? '전체', ...(showCounts ? { count: items.length } : {}), active: !selectedSportId, href: buildTeamHref(params, { sportId: null }) },
     ...fixedSports.map((sport) => ({
       label: sport.name,
-      count: items.filter((team) => {
-        const teamSport = team.sport;
-        return teamSport?.sportId === sport.id || teamSport?.name === sport.name || team.sportName === sport.name;
-      }).length,
+      ...(showCounts
+        ? {
+            count: items.filter((team) => {
+              const teamSport = team.sport;
+              return teamSport?.sportId === sport.id || teamSport?.name === sport.name || team.sportName === sport.name;
+            }).length,
+          }
+        : {}),
       active: selectedSportId === sport.id,
       href: buildTeamHref(params, { sportId: sport.id }),
     })),

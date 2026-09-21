@@ -98,7 +98,20 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
         {model.listLoading ? (
           <TeamListSkeleton />
         ) : model.teams.length ? (
-          <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} />)}</div>
+          <>
+            <div className="tm-team-card-stack">{model.teams.map((team) => <TeamCard key={team.id} team={team} />)}</div>
+            {model.hasNextPage ? (
+              <button
+                type="button"
+                className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
+                style={{ marginTop: 16 }}
+                onClick={model.onLoadMore}
+                disabled={model.isFetchingNextPage}
+              >
+                {model.isFetchingNextPage ? '팀을 더 불러오는 중...' : '팀 더 보기'}
+              </button>
+            ) : null}
+          </>
         ) : (
           <EmptyState title="조건에 맞는 팀이 없어요" sub="다른 종목을 선택하거나 필터를 초기화해 다시 확인해 주세요." />
         )}
@@ -109,10 +122,16 @@ export function TeamListPageView({ model }: { model: TeamListViewModel }) {
 }
 
 function TeamSummaryText({ summary }: { summary: TeamListViewModel['summary'] }) {
+  const partiallyLoaded = typeof summary.loaded === 'number' && summary.loaded < summary.total;
   return (
     <>
       <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{summary.total}</span>
-      팀 · 가입 가능 <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{summary.recruiting}</span>
+      팀
+      {partiallyLoaded ? (
+        <> · 현재 <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{summary.loaded}</span>팀 표시</>
+      ) : (
+        <> · 가입 가능 <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{summary.recruiting}</span></>
+      )}
       {typeof summary.nearby === 'number' ? <> · 내 주변 {summary.nearby}</> : null}
     </>
   );

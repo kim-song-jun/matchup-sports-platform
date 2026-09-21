@@ -103,30 +103,17 @@ export class TeamsService {
 
   async list(user: V1AuthUser | null, query: TeamsQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
-    const teams = await this.prisma.v1Team.findMany({
-      where: {
-        status: 'active',
-        deletedAt: null,
-        ...(query.sportId ? { sportId: query.sportId } : {}),
-        ...(query.regionId ? { regionId: query.regionId } : {}),
-        ...(query.genderRule ? { AND: [getTeamGenderRuleWhere(query.genderRule)] } : {}),
-        ...teamLevelCodeWhere(parseLevelCodes(query.levelCodes)),
-        ...(query.joinPolicy ? { joinPolicy: query.joinPolicy } : {}),
-        ...(query.query
-          ? {
-              OR: [
-                { name: { contains: query.query, mode: 'insensitive' } },
-                { profile: { description: { contains: query.query, mode: 'insensitive' } } },
-                { profile: { activityNote: { contains: query.query, mode: 'insensitive' } } },
-              ],
-            }
-          : {}),
-      },
-      include: this.teamInclude(user),
-      orderBy: getTeamOrderBy(query.sort),
-      take: limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-    });
+    const where = this.teamListWhere(query);
+    const [teams, total] = await Promise.all([
+      this.prisma.v1Team.findMany({
+        where,
+        include: this.teamInclude(user),
+        orderBy: getTeamOrderBy(query.sort),
+        take: limit + 1,
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      }),
+      this.prisma.v1Team.count({ where }),
+    ]);
 
     const pageItems = teams.slice(0, limit);
     const hasNext = teams.length > limit;
@@ -144,6 +131,7 @@ export class TeamsService {
       pageInfo: {
         nextCursor: hasNext ? pageItems.at(-1)?.id ?? null : null,
         hasNext,
+        total,
       },
     };
   }
@@ -2106,6 +2094,27 @@ export class TeamsService {
         },
       },
     } satisfies Prisma.V1TeamInclude;
+  }
+
+  private teamListWhere(query: TeamsQueryDto): Prisma.V1TeamWhereInput {
+    return {
+      status: 'active',
+      deletedAt: null,
+      ...(query.sportId ? { sportId: query.sportId } : {}),
+      ...(query.regionId ? { regionId: query.regionId } : {}),
+      ...(query.genderRule ? { AND: [getTeamGenderRuleWhere(query.genderRule)] } : {}),
+      ...teamLevelCodeWhere(parseLevelCodes(query.levelCodes)),
+      ...(query.joinPolicy ? { joinPolicy: query.joinPolicy } : {}),
+      ...(query.query
+        ? {
+            OR: [
+              { name: { contains: query.query, mode: 'insensitive' } },
+              { profile: { description: { contains: query.query, mode: 'insensitive' } } },
+              { profile: { activityNote: { contains: query.query, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
   }
 
   private toListItem(team: TeamWithRelations, user: V1AuthUser | null, liveTrust?: RevealedTeamTrust) {

@@ -78,7 +78,7 @@ export type TeamMatchListViewModel = {
     view: 'card' | 'compact';
     genderRule: '' | '성별 무관' | '남' | '여';
     levels: Array<'beginner' | 'novice' | 'intermediate' | 'advanced'>;
-    /** 일반 팀매치 / 대회·리그 경기 구분. 빈 문자열은 전체. */
+    /** 일반 팀매치 / 정규 리그 경기 구분. 빈 문자열은 전체. */
     kind: '' | 'friendly' | 'competition';
     sortOptions: Array<{ label: string; value: 'recommended' | 'deadline' | 'latest'; href: string; active?: boolean }>;
     genderOptions: Array<{ label: string; value: '성별 무관' | '남' | '여'; href: string; active?: boolean }>;

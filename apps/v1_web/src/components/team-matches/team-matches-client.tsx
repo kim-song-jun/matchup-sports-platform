@@ -427,7 +427,8 @@ function buildTeamMatchFilterSheet(
   const kindOptions: NonNullable<TeamMatchListViewModel['filterSheet']>['kindOptions'] = [
     { label: '전체', value: '', href: buildTeamMatchHref(params, { kind: null, filter: '1' }), active: kind === '' },
     { label: '일반 팀매치', value: 'friendly', href: buildTeamMatchHref(params, { kind: kind === 'friendly' ? null : 'friendly', filter: '1' }), active: kind === 'friendly' },
-    { label: '대회·리그 경기', value: 'competition', href: buildTeamMatchHref(params, { kind: kind === 'competition' ? null : 'competition', filter: '1' }), active: kind === 'competition' },
+    // API의 competition 필터는 leagueId가 있는 경기만 조회한다.
+    { label: '정규 리그 경기', value: 'competition', href: buildTeamMatchHref(params, { kind: kind === 'competition' ? null : 'competition', filter: '1' }), active: kind === 'competition' },
   ];
 
   return {
@@ -790,5 +791,4 @@ function reasonLabel(reasonCode?: string) {
   // 팀이 없는 경우 → 팀 만들기 유도
   return '팀을 만들고 신청할 수 있어요';
 }
-
 

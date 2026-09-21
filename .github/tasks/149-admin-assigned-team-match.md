@@ -119,3 +119,12 @@ Runtime: a fresh PostgreSQL cluster in /tmp on 55439, API 18149, web 3149; no ex
 - Headed Chromium at **390×844, 768×1024, 1440×900**: baseline 6/6 and after 6/6 PASS; no console errors, API failures or horizontal overflow. Both paths persist a 23:00 → next-day 01:00 match and custom style; regular edit preserves both ISO timestamps.
 - [Before report](../../docs/screenshots/task149-parity-validation/before/report.json), [after report](../../docs/screenshots/task149-parity-validation/after/report.json), [API/DB report](../../docs/screenshots/task149-parity-validation/api-report.json).
 - Reproduction: `scripts/qa/capture-task149-parity.mjs` (headed, `QA_PHASE=before|after`) and `scripts/qa/verify-task149-parity.mjs` (restricted to the isolated local fixture DB). Screenshots use real API data; no network interception or mock completion.
+
+## 2026-09-22 two-team hero correction
+
+- User correction: the organizer must not occupy the home-team slot while recruiting both teams.
+- Unassigned platform detail shows equal HOME/AWAY slots, both `모집 중`; organizer provenance is a separate centered caption. Closed recruitment uses `미정`. Assigned and ordinary matches retain their existing team rendering.
+- Reduced the unassigned platform sport illustration opacity so both slots remain readable.
+- RED: two open/closed hero regressions failed before the fix. GREEN: detail/page suite 62/62.
+- Headed Chromium + real isolated API/DB: before/after at 390×844, 768×1024, 1440×900. Zero console/API errors and horizontal overflow.
+- Evidence: `docs/screenshots/task149-two-team-hero/{before,after}/`; reproduction: `scripts/qa/capture-task149-two-team-hero.mjs` with the local fixture match ID supplied through `QA_MATCH_ID`.

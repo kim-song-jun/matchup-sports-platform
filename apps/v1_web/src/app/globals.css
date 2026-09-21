@@ -3990,6 +3990,10 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   pointer-events: none;
 }
 
+.tm-team-vs-hero-illustration-recruiting {
+  opacity: 0.2;
+}
+
 .tm-team-create-preview {
   height: 132px;
   margin-top: 16px;

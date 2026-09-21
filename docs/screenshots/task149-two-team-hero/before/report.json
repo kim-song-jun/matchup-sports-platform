@@ -1,0 +1,32 @@
+[
+  {
+    "name": "mobile",
+    "width": 390,
+    "height": 844,
+    "url": "http://127.0.0.1:3149/team-matches/08f715e8-9ef9-47f2-be2b-d47d3067bdfe",
+    "heroText": "운영 주관\nTeameet 운영\nvs\n상대팀\n모집 중\n신청 후 승인",
+    "errors": [],
+    "failures": [],
+    "overflow": false
+  },
+  {
+    "name": "tablet",
+    "width": 768,
+    "height": 1024,
+    "url": "http://127.0.0.1:3149/team-matches/08f715e8-9ef9-47f2-be2b-d47d3067bdfe",
+    "heroText": "운영 주관\nTeameet 운영\nvs\n상대팀\n모집 중\n신청 후 승인",
+    "errors": [],
+    "failures": [],
+    "overflow": false
+  },
+  {
+    "name": "desktop",
+    "width": 1440,
+    "height": 900,
+    "url": "http://127.0.0.1:3149/team-matches/08f715e8-9ef9-47f2-be2b-d47d3067bdfe",
+    "heroText": "운영 주관\nTeameet 운영\nvs\n상대팀\n모집 중\n신청 후 승인",
+    "errors": [],
+    "failures": [],
+    "overflow": false
+  }
+]

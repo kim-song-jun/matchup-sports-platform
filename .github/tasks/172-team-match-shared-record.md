@@ -10,7 +10,8 @@
 - [x] 공동 기록 API, 라인업 권한, 버전 충돌/재시도, 이력 및 확정 구현
 - [x] 참가자/일반 사용자 진입과 공동 기록 화면 구현
 - [x] 좁은 API/UI 검증 및 실제 브라우저 전 흐름 3폭 검증
-- [ ] 문서/스크린샷/changeset/PR 및 리뷰
+- [x] 문서/스크린샷/changeset/dev 대상 PR
+- [ ] 외부 자동 리뷰: 요청됨. GitHub AI 분석이 지원되지 않는 모델 오류로 실패하여 clean 판정 불가.
 
 ## Acceptance criteria
 - 상대 확정 + 시작 시간 도달 시 진행 중 표시. 미확정·취소·경기 전 편집 금지.
@@ -36,6 +37,10 @@
 
 ## Progress snapshot
 - 2026-09-21: origin/dev a02af4aff 기준 /tmp/teameet-shared-record, feat/team-match-shared-record.
-- 기존 호스트 제출/상대 승인 결과 흐름과 리그 운영 흐름을 확인. 구현 완료. 실제 DB 통합 11/11, API 단위 143/143, 웹 관련 회귀 169/169, 타입/패턴 검사 통과. 3폭 36개 흐름 + 변경 전 6개 화면을 촬영했다.
+- 기존 호스트 제출/상대 승인 결과 흐름과 리그 운영 흐름을 확인. 구현 완료. 실제 DB 통합 11/11, API 단위 144/144, 웹 관련 회귀 172/172, 타입/패턴 검사 통과. 3폭 36개 흐름 + 변경 전 6개 화면을 촬영했다.
 
 - [화면별 전체 갤러리](../../docs/scenarios/team-match-shared-record-gallery.md). PR 생성과 원격 리뷰/CI 확인 진행 중.
+
+- 2026-09-22: [PR #1243](https://github.com/kim-song-jun/matchup-sports-platform/pull/1243) 생성. 최신 dev `a494cde6a` 병합 후 충돌 해결(`8b6dd89dd`), MERGEABLE 확인. 병합 후 API 단위 144/144, 실제 DB 통합 11/11, 웹 회귀 172/172 및 양쪽 tsc 통과.
+- GitHub AI analysis [run 35616360938](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/35616360938) 실패: `400 The requested model is not supported`. Copilot review 요청은 접수 명령이 성공했으나 제출 리뷰가 없어 clean으로 판정하지 않는다. 제품 CI는 별도로 확인한다.
+- 전용 headed 브라우저·API·Web 종료. 병합 후 다시 시작한 전용 PostgreSQL도 검증 완료 후 종료. 원래 공유 작업트리 WIP는 변경하지 않았다.

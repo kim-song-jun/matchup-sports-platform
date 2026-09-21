@@ -24,7 +24,7 @@ flowchart TD
 - 최종 흐름 36/36, 변경 전 비교 6/6. 가로 넘침 0.
 - 시나리오 중 JavaScript 오류·API 실패·콘솔 오류 0. 신규 계정 약관 동의 전 설정 조회 403은 준비 단계로 별도 기록했다.
 - 실제 DB 통합 11/11: 권한, 동시 수정, 요청 재전송, 이력 복구, 공개 정책, 양 팀 확정, 기존 API 경합, 공식 결과 projection의 중복 실행을 검증했다.
-- 관련 API 단위 143/143, 웹 회귀 169/169. API/Web 타입 검사와 패턴 검사 통과. 마이그레이션 적용 후 Prisma schema drift 없음.
+- 관련 API 단위 144/144, 웹 회귀 172/172. API/Web 타입 검사와 패턴 검사 통과. 마이그레이션 적용 후 Prisma schema drift 없음.
 - [최종 브라우저 증거](../screenshots/team-match-shared-record/evidence.json) · [시나리오](05-team-match-flows.md) · [작업 문서](../../.github/tasks/172-team-match-shared-record.md)
 
 ## 변경 전

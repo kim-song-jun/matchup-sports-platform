@@ -320,3 +320,5 @@ Task 172 공개 기록은 기존 가시성 정책과 `PUBLIC_LIVE` 플래그를 
 - 일반/관리자 스타일 입력은 프리셋과 직접 입력을 함께 지원하며 최대 3개다.
 - 신청 마감은 **새 신청 접수**를 닫는다. 기존 `requested` 신청은 raw status가 `recruiting`이고 시작 전이면 일반 승인과 관리자 두 팀 확정 모두 가능하다. `closed`/`cancelled`/`matched` 상태나 시작 이후는 확정 불가다. 일반 신청 목록의 `canApprove`도 이 조건과 같다.
 - `platform_managed` migration과 후속 `20260921141000_v1_platform_recruitment_host_constraint`가 필요하다. 후자는 기존 CHECK를 트랜잭션 안에서 확장해 플랫폼 모집만 host 없이 허용하고 생성자·지역·장소·시작 필수값은 유지한다. 일반 모집은 여전히 host가 필요하다.
+
+MSW 기본 픽스처의 라인업은 DRAFT이므로 공동 기록 조회는 편집 불가 상태이며 POST는 403을 반환한다. 실제 공동 편집 검증은 API 통합 픽스처와 headed 브라우저 흐름을 사용한다. 테스트 성공을 흉내내는 mock 확정 처리는 제공하지 않는다.

@@ -434,3 +434,8 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - Focused API tests `6/6`, Web tests `13/13`, API/Web typecheck, and headed Chrome condition-parity E2E `4/4` passed.
 - Canonical evidence: `docs/screenshots/task149-admin-team-match-condition-parity/` (`desktop`/`tablet`/`mobile` × empty form/filled form/detail) and `report.json`.
 - Platform provenance is now persisted independently of team assignment; public list/detail keep the `플랫폼 주관` badge while showing assigned home/away teams. Headed Chrome provenance E2E passed 2/2 and added desktop/tablet/mobile public-list screenshots to the canonical Task 149 evidence directory.
+### 2026-09-21 Task 149 일반/관리자 팀매치 parity 보완
+
+- [TM-149-P](05-team-match-flows.md#tm-149-p-일반관리자-모집-조건-parity): 6/6 viewport/persona journeys PASS; actual API/DB create, elapsed deadline intake vs confirmation, Game/schedules and DB CHECK verified.
+- Before/after screenshot + reports: [Task 149](../../.github/tasks/149-admin-assigned-team-match.md#follow-up-verification-evidence).
+- New migration fixes the hostless platform recruitment 500 reproduced on a fresh migrated DB. Existing ordinary-friendly host/metadata constraints remain enforced.

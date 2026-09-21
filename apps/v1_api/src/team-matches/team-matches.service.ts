@@ -1,3 +1,4 @@
+import { canConfirmTeamMatch, validateTeamMatchDates } from './team-match-dates';
 import {
   BadRequestException,
   ConflictException,
@@ -478,7 +479,7 @@ export class TeamMatchesService {
       throw validationError('sportId must match the host team sport', 'sportId');
     }
     await this.validateMasterRefs(dto.sportId, dto.regionId);
-    const dates = this.validateDates(dto);
+    const dates = validateTeamMatchDates(dto);
     const payloadHash = canonicalGameCommandPayloadHash({
       actorUserId: user.id,
       dto,
@@ -635,7 +636,7 @@ export class TeamMatchesService {
     }
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const levelRange = await resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
-    const dates = this.validateDates(dto);
+    const dates = validateTeamMatchDates(dto, teamMatch.deadlineAt);
 
     // 매치 ↔ 팀일정 연동(레인 schedule): 매치 제목/시간이 바뀌면 호스트 스케줄도 같은 트랜잭션 안에서
     // 동기화해야 캘린더가 실제와 어긋나지 않는다 — 이 메서드를 트랜잭션으로 승격한다(다른 4개
@@ -1040,7 +1041,7 @@ export class TeamMatchesService {
               '신청자',
             profileImageUrl: application.appliedByUser.profile?.profileImageUrl ?? null,
           },
-          canApprove: application.status === 'requested' && teamMatch.status === 'recruiting',
+          canApprove: application.status === 'requested' && canConfirmTeamMatch(teamMatch),
           canReject: application.status === 'requested',
         };
       }),
@@ -1117,12 +1118,7 @@ export class TeamMatchesService {
     if (application.status !== 'requested') {
       throw stateConflict('Only requested team match applications can be approved');
     }
-    if (
-      application.teamMatch.status !== 'recruiting' ||
-      application.teamMatch.startAt === null ||
-      application.teamMatch.startAt < new Date() ||
-      (application.teamMatch.deadlineAt && application.teamMatch.deadlineAt < new Date())
-    ) {
+    if (!canConfirmTeamMatch(application.teamMatch)) {
       throw stateConflict('Team match is not recruiting');
     }
 
@@ -1134,10 +1130,7 @@ export class TeamMatchesService {
       });
       if (
         !currentTeamMatch ||
-        currentTeamMatch.status !== 'recruiting' ||
-        currentTeamMatch.startAt === null ||
-        currentTeamMatch.startAt < new Date() ||
-        (currentTeamMatch.deadlineAt && currentTeamMatch.deadlineAt < new Date()) ||
+        !canConfirmTeamMatch(currentTeamMatch) ||
         currentTeamMatch.approvedApplicantTeamId
       ) {
         throw stateConflict('Team match is not recruiting');
@@ -1930,16 +1923,6 @@ export class TeamMatchesService {
 
   private assertActiveAccount(user: V1AuthUser) {
     if (user.accountStatus !== 'active') throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Account cannot mutate team matches' });
-  }
-
-  private validateDates(dto: Pick<MutateTeamMatchDto, 'startsAt' | 'endsAt' | 'deadlineAt'>) {
-    const startsAt = new Date(dto.startsAt);
-    const endsAt = dto.endsAt ? new Date(dto.endsAt) : null;
-    const deadlineAt = dto.deadlineAt ? new Date(dto.deadlineAt) : null;
-    if (Number.isNaN(startsAt.getTime()) || startsAt <= new Date()) throw validationError('startsAt must be a future datetime', 'startsAt');
-    if (endsAt && endsAt <= startsAt) throw validationError('endsAt must be after startsAt', 'endsAt');
-    if (deadlineAt && deadlineAt >= startsAt) throw validationError('deadlineAt must be before startsAt', 'deadlineAt');
-    return { startsAt, endsAt, deadlineAt };
   }
 
   private async validateMasterRefs(sportId: string, regionId: string) {

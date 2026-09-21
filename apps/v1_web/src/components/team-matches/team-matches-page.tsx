@@ -1187,8 +1187,10 @@ function PlaceTimeFields({ model }: { model: TeamMatchCreateViewModel }) {
           <CreateField id="field-startTime" error={errors?.startTime} label="시작 시간" value={d.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} />
           <RequiredHint shown={!errors?.startTime && !d.startTime} />
         </div>
-        <CreateField label="종료 시간" value={d.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} />
+        <CreateField id="field-endTime" error={errors?.endTime} label="종료 시간" value={d.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} />
       </div>
+      <CreateField id="field-endDate" error={errors?.endDate} label="종료 날짜 (다음 날 종료 시)" value={d.endDate ?? ''} type="date" onChange={(value) => model.form?.onFieldChange('endDate', value)} />
+      <div className="tm-text-caption" style={{ marginTop: 8 }}>종료 날짜를 비우면 시작 날짜와 같아요. 자정을 넘는 경기는 다음 날을 선택해 주세요.</div>
       <div className="tm-create-two-col">
         <CreateField id="field-deadlineDate" error={errors?.deadlineDate} label="신청 마감일" value={d.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} />
         <CreateField id="field-deadlineTime" error={errors?.deadlineTime} label="신청 마감시간" value={d.deadlineTime} type="time" onChange={(value) => model.form?.onFieldChange('deadlineTime', value)} />
@@ -1256,7 +1258,7 @@ function ConfirmStep({ model }: { model: TeamMatchCreateViewModel }) {
   const styleText = d.style.join(' · ');
   // 종료 시간은 선택 입력이라 비어 있을 수 있다 — 상세 화면(:349 InfoRow label="장소")과
   // 동일하게 분기해야 확인 화면에 하이픈만 매달려 남는 것을 막는다.
-  const timeRangeText = d.endTime ? `${d.date} ${d.startTime}-${d.endTime}` : `${d.date} ${d.startTime}`;
+  const timeRangeText = d.endTime ? `${d.date} ${d.startTime} ~ ${d.endDate && d.endDate !== d.date ? `${d.endDate} ` : ''}${d.endTime}` : `${d.date} ${d.startTime}`;
   return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-team-create-preview" style={{ backgroundImage: cssUrl(d.imageUrl) }}><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{model.selectedTeam} vs 상대팀</div></div><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{d.gender}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format}${styleText ? ` · ${styleText}` : ''}`} sub={`${d.uniform} · ${d.gender}`} /><InfoRow label="비용" value={`총 ${formatAmountNumber(d.cost)}원 · 상대팀 ${formatAmountNumber(d.opponentCost)}원`} /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={d.venue} sub={d.address} /></Card></div>;
 }
 

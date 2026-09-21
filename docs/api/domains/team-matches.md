@@ -29,7 +29,7 @@
 
 ## POST /admin/team-matches
 
-플랫폼 운영자가 팀을 미리 지정하지 않고 공개 모집을 여는 별도 생성 경로다. 일반 팀 owner/manager의 `POST /team-matches` 계약과 기존 신청 API는 변경하지 않는다.
+플랫폼 운영자가 팀을 미리 지정하지 않고 공개 모집을 여는 별도 생성 경로다. 일반 팀 owner/manager 생성과 주최/확정 방식은 다르지만 경기 조건과 날짜 검증은 동일하다.
 
 Required body:
 
@@ -129,7 +129,7 @@ Rules:
 - 생성자는 `realName`, `phone`, `gender`가 모두 있는 creator profile을 가져야 한다.
 - `sportId`는 host team의 단일 `sportId`와 같아야 하며, 다르면 `400 VALIDATION_FAILED`를 반환한다.
 - `imageUrl`은 선택 사항이다. web create/edit는 `/uploads`가 반환한 루트 상대 URL만 저장하고, 미선택 상태를 `null`로 보낸다.
-- `deadlineAt`은 선택 사항이며 `startsAt`보다 빨라야 한다. `v1_team_matches.deadline_at`에 저장되고 목록·상세·수정 응답에 동일하게 반환된다.
+- `deadlineAt`은 선택 사항이며 새로 설정할 때 현재보다 이후이고 `startsAt`보다 빨라야 한다. 수정 시에는 저장된 기존 마감 시각을 그대로 유지할 수 있다. `v1_team_matches.deadline_at`에 저장되고 목록·상세·수정 응답에 동일하게 반환된다.
 
 ## PATCH /team-matches/:id
 
@@ -272,3 +272,11 @@ Success:
 - `apps/v1_api/src/sports/level-range.ts`
 - `apps/v1_web/src/hooks/use-v1-api.ts`
 - `apps/v1_web/src/types/api.ts`
+
+### 일반/관리자 날짜·확정 공통 계약 (Task 149)
+
+- 두 생성 API는 `validateTeamMatchDates`를 공유한다. 시작은 미래, 종료는 시작 이후, 새 마감은 현재 이후·시작 이전이어야 한다. 잘못된 종료값을 `null`로 바꾸어 성공시키지 않는다.
+- 일반 생성/수정 폼도 종료 날짜를 지정할 수 있다. 비워두면 시작 날짜를 사용하며, 명시한 종료 날짜에는 종료 시간이 필요하다. 로컬 날짜·시간을 ISO로 변환하고 수정 시 같은 로컬 날짜로 복원한다.
+- 일반/관리자 스타일 입력은 프리셋과 직접 입력을 함께 지원하며 최대 3개다.
+- 신청 마감은 **새 신청 접수**를 닫는다. 기존 `requested` 신청은 raw status가 `recruiting`이고 시작 전이면 일반 승인과 관리자 두 팀 확정 모두 가능하다. `closed`/`cancelled`/`matched` 상태나 시작 이후는 확정 불가다. 일반 신청 목록의 `canApprove`도 이 조건과 같다.
+- `platform_managed` migration과 후속 `20260921141000_v1_platform_recruitment_host_constraint`가 필요하다. 후자는 기존 CHECK를 트랜잭션 안에서 확장해 플랫폼 모집만 host 없이 허용하고 생성자·지역·장소·시작 필수값은 유지한다. 일반 모집은 여전히 host가 필요하다.

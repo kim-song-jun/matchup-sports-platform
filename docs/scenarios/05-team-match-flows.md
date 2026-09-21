@@ -169,3 +169,13 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 - 2026-04-11: `TM-004` 운영 화면 계약은 실제 `team-match` detail 기반으로 정렬되었고, arrival 재제출도 backend에서 차단되도록 닫았다. 전용 Playwright spec(`e2e/tests/team-match-operations.spec.ts`)은 `/team-matches` warmup으로 조정했고, live API `health`/`dev-login`도 다시 통과했다. 다만 현재 host Next dev runtime에서 `/team-matches` 계열이 간헐적으로 `ERR_CONNECTION_RESET` 또는 generic `Internal Server Error`를 반환해 browser green은 아직 별도 런타임 정리 후 다시 확인해야 한다.
 - 2026-04-23: team-match 관리 follow-up으로 `PATCH /team-matches/:id` 수정/취소와 history 조회 status list 계약을 추가했다. `/my/team-matches`, `/teams/:id/matches`는 기본 `recruiting`만 보지 않고 history status를 명시적으로 조회해야 한다.
 - 2026-08-04 (Todo 26): added the `## v1 stack (Tasks 12-24)` section above after verifying the actual v1 `TeamMatchesController` route table and cross-checking result entry against `docs/api/domains/games.md`. The legacy `TM-004` scenario's `check-in`/`evaluate`/`referee-schedule` steps have no v1 route today (confirmed by reading the controller, not inferred) — this is recorded as a real gap, not silently dropped. `E2E-TEAM-01`/`E2E-TEAM-02` are named per Todo 26's acceptance criteria and pointed at `e2e/v1-tests/team-match.spec.ts`, which does not yet implement them.
+
+## TM-149-P 일반/관리자 모집 조건 parity
+
+- [x] 두 폼에서 경기 스타일 직접 입력을 포함한 조건이 저장된다(최대 3개).
+- [x] 과거 신청 마감은 생성 전에 차단되고 직접 API 요청도 400으로 거절된다.
+- [x] 시작 전 종료 시각은 일반 폼에서도 오류로 표시되며 입력이 사라지지 않는다.
+- [x] 23:00 시작 → 다음 날 01:00 종료가 양쪽에서 저장되고 일반 수정에서도 유지된다.
+- [x] 접수 후 마감 경과: 새 신청은 거절되지만 기존 신청 승인/관리자 두 팀 확정은 시작 전까지 가능하다.
+- [x] 명시적 모집 종료/경기 시작 이후에는 확정이 거절된다.
+- [x] 390/768/1440에서 before/after, console/network, 수평 overflow를 확인한다.

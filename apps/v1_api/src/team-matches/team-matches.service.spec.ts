@@ -818,18 +818,16 @@ describe('TeamMatchesService', () => {
     ).rejects.toMatchObject({ status: 409 });
   });
 
-  it('approveApplication: 신청 마감시간이 지난 팀매치는 승인하지 않는다', async () => {
-    const app = applicationWithTeamMatch(
-      { status: 'requested' },
-      { status: 'recruiting', startAt: FUTURE, deadlineAt: PAST },
-    );
+  it('approveApplication: 마감 후에도 시작 전에는 접수된 신청을 확정한다', async () => {
+    const app = applicationWithTeamMatch({ status: 'requested' }, { status: 'recruiting', startAt: FUTURE, deadlineAt: PAST });
     prisma.v1TeamMatchApplication.findFirst.mockResolvedValue(app);
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1' });
-
-    await expect(service.approveApplication(manager, 'app-1', {})).rejects.toMatchObject({
-      response: { code: 'STATE_CONFLICT' },
-    });
-    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatchRow({ deadlineAt: PAST }));
+    prisma.v1TeamMatchApplication.updateMany.mockResolvedValue({ count: 1 });
+    prisma.v1TeamMatch.update.mockResolvedValue(teamMatchRow({ status: 'matched', approvedApplicantTeamId: 'team-applicant' }));
+    const result = await service.approveApplication(manager, 'app-1', {});
+    expect(result.status).toBe('approved');
+    expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'matched' }) }));
   });
 
   it('approveApplication: 다른 대기 신청을 자동 거절하면 상태 로그와 알림을 남긴다', async () => {

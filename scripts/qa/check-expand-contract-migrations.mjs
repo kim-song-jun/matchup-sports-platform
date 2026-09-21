@@ -43,6 +43,16 @@ class UnparsableSqlError extends Error {}
 // weakens the gate for exactly one (file, statement) pair and nothing else.
 const REVIEWED_NON_ADDITIVE = [
   {
+    file: "apps/v1_api/prisma/migrations/20260921141000_v1_platform_recruitment_host_constraint/migration.sql",
+    statement: "ALTER TABLE \"v1_team_matches\" DROP CONSTRAINT \"v1_team_matches_friendly_required_ck\"",
+    reason: "Task 149 review 2026-09-21: transactional CHECK replacement strictly expands the existing constraint only for explicitly platform-managed recruitment. Every previously valid row stays valid; ordinary friendlies still require a host, and actor/region/place/start requirements remain for both. BEGIN/COMMIT and the table DDL lock prevent writers from observing a constraint-free interval. Real API/DB validation covers hostless admin creation and rejection of hostless ordinary rows.",
+  },
+  {
+    file: "apps/v1_api/prisma/migrations/20260921141000_v1_platform_recruitment_host_constraint/migration.sql",
+    statement: "ALTER TABLE \"v1_team_matches\" ADD CONSTRAINT \"v1_team_matches_friendly_required_ck\" CHECK ( COALESCE(\"tournament_id\", \"league_id\") IS NOT NULL OR ( (\"host_team_id\" IS NOT NULL OR \"platform_managed\" = true) AND \"created_by_user_id\" IS NOT NULL AND \"region_id\" IS NOT NULL AND \"place_name\" IS NOT NULL AND \"start_at\" IS NOT NULL ) )",
+    reason: "Task 149 review 2026-09-21: transactional CHECK replacement strictly expands the existing constraint only for explicitly platform-managed recruitment. Every previously valid row stays valid; ordinary friendlies still require a host, and actor/region/place/start requirements remain for both. BEGIN/COMMIT and the table DDL lock prevent writers from observing a constraint-free interval. Real API/DB validation covers hostless admin creation and rejection of hostless ordinary rows.",
+  },
+  {
     file: "apps/v1_api/prisma/migrations/20260921060000_v1_team_match_platform_managed/migration.sql",
     statement: "UPDATE \"v1_team_matches\" SET \"platform_managed\" = true WHERE \"host_team_id\" IS NULL AND \"league_id\" IS NULL AND \"tournament_id\" IS NULL",
     reason: "Task 149 review 2026-09-21: backfills only the newly added platform_managed column for legacy hostless friendly recruitments. Existing ownership, pricing, schedule, participation, and competition links are unchanged; league and tournament rows are excluded. Old API instances ignore the additive column, new instances preserve the provenance after real teams are assigned, and rerunning the statement is idempotent.",

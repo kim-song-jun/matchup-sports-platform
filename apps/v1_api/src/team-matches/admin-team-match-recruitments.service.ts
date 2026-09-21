@@ -1,3 +1,4 @@
+import { canConfirmTeamMatch, validateTeamMatchDates } from './team-match-dates';
 import {
   BadRequestException,
   ConflictException,
@@ -45,7 +46,7 @@ export class AdminTeamMatchRecruitmentsService {
 
   async create(user: V1AuthUser, dto: CreateAdminTeamMatchRecruitmentDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const dates = this.validateDates(dto);
+    const dates = validateTeamMatchDates(dto);
     if (!dto.title.trim() || !dto.manualPlaceName.trim()) {
       throw new BadRequestException({ code: 'VALIDATION_FAILED', message: '매치 제목과 경기 장소를 입력해 주세요.' });
     }
@@ -233,7 +234,7 @@ export class AdminTeamMatchRecruitmentsService {
       ) {
         throw new ConflictException({ code: 'TEAM_MATCH_NOT_PLATFORM_RECRUITING', message: '신청을 받는 플랫폼 팀매치만 배정할 수 있어요.' });
       }
-      if (teamMatch.startAt === null || teamMatch.startAt <= new Date()) {
+      if (!canConfirmTeamMatch(teamMatch)) {
         throw new ConflictException({ code: 'TEAM_MATCH_ASSIGNMENT_NOT_READY', message: '경기 시작 전에 두 팀을 확정해 주세요.' });
       }
       if (!teamMatch.competitionConfigVersionId) {
@@ -367,18 +368,6 @@ export class AdminTeamMatchRecruitmentsService {
       );
     }
     return { ...assigned, detailRoute: `/team-matches/${teamMatchId}` };
-  }
-
-  private validateDates(dto: Pick<CreateAdminTeamMatchRecruitmentDto, 'startsAt' | 'endsAt' | 'deadlineAt'>) {
-    const startsAt = new Date(dto.startsAt);
-    const endsAt = dto.endsAt ? new Date(dto.endsAt) : null;
-    const deadlineAt = dto.deadlineAt ? new Date(dto.deadlineAt) : null;
-    if (startsAt <= new Date()) throw this.validationError('경기 시작 시간은 현재보다 이후여야 해요.', 'startsAt');
-    if (endsAt && endsAt <= startsAt) throw this.validationError('경기 종료 시간은 시작 시간보다 이후여야 해요.', 'endsAt');
-    if (deadlineAt && (deadlineAt <= new Date() || deadlineAt >= startsAt)) {
-      throw this.validationError('신청 마감은 현재보다 이후이며 경기 시작 전이어야 해요.', 'deadlineAt');
-    }
-    return { startsAt, endsAt, deadlineAt };
   }
 
   private validationError(message: string, field: string) {

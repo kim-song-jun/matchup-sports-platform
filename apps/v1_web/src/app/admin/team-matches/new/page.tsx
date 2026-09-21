@@ -12,6 +12,8 @@ import {
 } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
+import { MultiPresetChipSelector } from '@/components/v1-ui/create-form-fields';
+import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { V1_LEVELS } from '@/lib/v1-levels';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 
@@ -71,11 +73,8 @@ export default function AdminTeamMatchNewPage() {
   const startDate = startsAt ? new Date(startsAt) : null;
   const deadlineDate = deadlineAt ? new Date(deadlineAt) : null;
   const endDate = endsAt ? new Date(endsAt) : null;
-  const datesValid =
-    startDate !== null &&
-    startDate > new Date() &&
-    (!deadlineDate || deadlineDate < startDate) &&
-    (!endDate || endDate > startDate);
+  const dateErrors = teamMatchDateErrors({ startsAt, endsAt, deadlineAt });
+  const datesValid = startsAt !== '' && Object.keys(dateErrors).length === 0;
   const canSubmit =
     canWrite &&
     sportId !== '' &&
@@ -97,17 +96,6 @@ export default function AdminTeamMatchNewPage() {
     } finally {
       setUploadingImage(false);
     }
-  };
-
-  const toggleStyle = (style: string) => {
-    setMatchStyle((current) => {
-      if (current.includes(style)) return current.filter((item) => item !== style);
-      if (current.length >= 3) {
-        showToast('경기 스타일은 최대 3개까지 선택할 수 있어요.', 'error');
-        return current;
-      }
-      return [...current, style];
-    });
   };
 
   const submit = async () => {
@@ -237,17 +225,15 @@ export default function AdminTeamMatchNewPage() {
                 </select>
               </label>
             </div>
-            <fieldset>
-              <legend className="text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">경기 스타일 (최대 3개)</legend>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {MATCH_STYLE_OPTIONS.map((style) => (
-                  <label key={style} className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl border border-[var(--border)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-body)]">
-                    <input type="checkbox" aria-label={style} checked={matchStyle.includes(style)} onChange={() => toggleStyle(style)} />
-                    {style}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
+            <MultiPresetChipSelector
+              label="경기 스타일"
+              options={MATCH_STYLE_OPTIONS}
+              values={matchStyle}
+              allowFreeText
+              freeTextPlaceholder="목록에 없으면 직접 입력해 주세요"
+              maxItems={3}
+              onChange={setMatchStyle}
+            />
             <div className="grid gap-4 md:grid-cols-2">
               <label className="text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
                 총비용
@@ -292,7 +278,7 @@ export default function AdminTeamMatchNewPage() {
               <input aria-label="신청 마감" type="datetime-local" value={deadlineAt} onChange={(event) => setDeadlineAt(event.target.value)} max={startsAt || undefined} className={"mt-1 " + inputClass} />
               <span className="mt-1 block text-[length:var(--font-size-caption)] font-normal text-[var(--text-muted)]">비워두면 경기 시작 전까지 신청을 받아요.</span>
             </label>
-            {startsAt && !datesValid ? <p role="alert" className="text-[length:var(--font-size-body-sm)] text-red-500">신청 마감은 경기 시작 전, 경기 종료는 시작 후로 설정해 주세요.</p> : null}
+            {Object.entries(dateErrors).map(([field, message]) => <p key={field} role="alert" className="text-[length:var(--font-size-body-sm)] text-red-500">{message}</p>)}
           </section>
 
           <div className="rounded-xl bg-[var(--surface-soft)] p-4 text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">

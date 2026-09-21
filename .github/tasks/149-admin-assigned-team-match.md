@@ -93,3 +93,29 @@ Status: complete
 - Real public/application flow — Tablet: [public list](../../docs/screenshots/task149-admin-team-match/real-tablet-public-list.png) · [applied](../../docs/screenshots/task149-admin-team-match/real-tablet-detail-applied.png) · [admin received](../../docs/screenshots/task149-admin-team-match/real-tablet-admin-application.png)
 - Real public/application flow — Mobile: [public list](../../docs/screenshots/task149-admin-team-match/real-mobile-public-list.png) · [applied](../../docs/screenshots/task149-admin-team-match/real-mobile-detail-applied.png) · [admin received](../../docs/screenshots/task149-admin-team-match/real-mobile-admin-application.png)
 - Real-flow machine-readable verdict: [real-flow-report.json](../../docs/screenshots/task149-admin-team-match/real-flow-report.json)
+
+## 2026-09-21 parity follow-up
+
+Scope: existing PR #1237, isolated worktree; preserve the shared dirty tree.
+
+- [x] Compare ordinary creation with admin creation and committed API contracts.
+- [x] RED evidence: four frontend payload regressions (past deadline, discarded end, overnight end, incomplete end).
+- [x] Share API date/confirmation rules; intake closes at deadline, received applications remain confirmable until kickoff.
+- [x] Allow admin custom styles and ordinary explicit end dates; preserve edit datetime round trips.
+- [x] Run focused API/Web tests and one typecheck per package.
+- [x] Capture real runtime before/after at 390/768/1440, verify console/network and stored conditions.
+- [ ] Update API/scenario docs, push scoped changes and screenshot gallery to PR #1237; review/CI.
+
+Decisions: creation/new deadlines must be in the future. Edits may keep the exact existing elapsed deadline. Explicitly closed/cancelled/matched records remain non-confirmable. Admin still recruits two teams; ordinary creation keeps its host team.
+
+Runtime: a fresh PostgreSQL cluster in /tmp on 55439, API 18149, web 3149; no existing database is changed. Browser is headed WSLg Chromium. Cleanup only this task's processes.
+
+### Follow-up verification evidence
+
+- A fresh 171-migration database reproduced admin create HTTP 500: `v1_team_matches_friendly_required_ck` still required a host. Follow-up migration `20260921141000_v1_platform_recruitment_host_constraint` fixes only the platform-host exception inside one transaction.
+- API focused suite: **80/80 PASS**. Web affected suites: **40/40 PASS** across final runs (18 date/payload, 10 create/edit, 4 admin form, 8 shared selector). Initial four regressions failed before implementation.
+- API and Web `tsc --noEmit`: PASS. Web pattern check: PASS (the sandbox disallowed process spawning; rerun with normal process permissions passed).
+- Real API/DB: ordinary + admin create, requested applications, elapsed deadline rejection of new applicants, confirmation before kickoff, rejection of explicitly closed/already started matches, matched Game + two schedules: PASS. Five invalid metadata/ordinary-host mutations still rejected by DB CHECK.
+- Headed Chromium at **390×844, 768×1024, 1440×900**: baseline 6/6 and after 6/6 PASS; no console errors, API failures or horizontal overflow. Both paths persist a 23:00 → next-day 01:00 match and custom style; regular edit preserves both ISO timestamps.
+- [Before report](../../docs/screenshots/task149-parity-validation/before/report.json), [after report](../../docs/screenshots/task149-parity-validation/after/report.json), [API/DB report](../../docs/screenshots/task149-parity-validation/api-report.json).
+- Reproduction: `scripts/qa/capture-task149-parity.mjs` (headed, `QA_PHASE=before|after`) and `scripts/qa/verify-task149-parity.mjs` (restricted to the isolated local fixture DB). Screenshots use real API data; no network interception or mock completion.

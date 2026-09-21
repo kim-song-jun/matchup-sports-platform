@@ -27,7 +27,7 @@ import {
   useV1TeamJoinApplications,
   useV1TeamMatches,
   useV1TeamMembers,
-  useV1Teams,
+  useV1TeamPages,
   useV1WithdrawTeamJoinApplication,
 } from '@/hooks/use-v1-api';
 import { usePendingIds } from '@/hooks/use-pending-ids';
@@ -41,7 +41,7 @@ import { getLoginPathForRedirect } from '@/lib/session-storage';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
-import type { V1Sport, V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import type { CursorPage, V1Sport, V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { JerseyNumberDialog } from './jersey-number-dialog';
 import { INVITE_MESSAGE_MAX_LENGTH, TeamDetailPageSkeleton, TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
@@ -57,7 +57,7 @@ import {
   toTeam,
 } from './teams.card-model';
 
-export function TeamListPageClient({ seed }: { seed?: { teams: V1Team[]; sports: V1Sport[] } } = {}) {
+export function TeamListPageClient({ seed }: { seed?: { page: CursorPage<V1Team>; sports: V1Sport[] } } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedSportId = searchParams.get('sportId') ?? undefined;
@@ -89,22 +89,17 @@ export function TeamListPageClient({ seed }: { seed?: { teams: V1Team[]; sports:
     if (selectedSort === 'recommended') filters.sort = 'recommended';
     return Object.keys(filters).length ? filters : undefined;
   }, [selectedGenderRule, selectedLevels, selectedRegionId, selectedSort, selectedSportId, submittedQuery]);
-  const listFilters = useMemo(() => ({ ...(teamFilters ?? {}), limit: 50 }), [teamFilters]);
-  const sportCountFilters = useMemo(() => {
-    const { sportId: _sportId, ...filtersWithoutSport } = teamFilters ?? {};
-    return { ...filtersWithoutSport, limit: 50 };
-  }, [teamFilters]);
+  const listFilters = useMemo(() => ({ ...(teamFilters ?? {}), limit: 20 }), [teamFilters]);
   // /teams가 서버(SEO 프리렌더)에서 이미 받아 둔 무필터 목록을 첫 표시값으로 쓴다 — 필터가
   // 걸려 있으면 그 목록이 이 화면과 다른 결과를 뜻하므로 seed를 넘기지 않는다(기존 로딩
   // 스켈레톤 그대로 유지).
-  const query = useV1Teams(listFilters, { seed: !teamFilters && seed ? { items: seed.teams, nextCursor: null } : undefined });
-  const sportCounts = useV1Teams(sportCountFilters, { enabled: Boolean(selectedSportId) });
+  const query = useV1TeamPages(listFilters, { seed: !teamFilters ? seed?.page : undefined });
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
   const selectedSportName = selectedSportId ? sports.data?.find((sport) => sport.id === selectedSportId)?.name : undefined;
 
   const base = getTeamListViewModel();
-  const items = query.data?.items;
+  const items = query.data?.pages.flatMap((page) => page.items);
   const visibleItems = filterTeamsByLevels(items, selectedLevels);
   // 예전에는 목록 항목에 활동 정보가 없으면 **팀마다** `/teams/:id` 를 불러 채우려 했다.
   // 그 폴백은 구조적으로 성립할 수 없어서 지웠다 — 목록과 상세가 **같은 표현식으로 같은 값**을
@@ -122,7 +117,8 @@ export function TeamListPageClient({ seed }: { seed?: { teams: V1Team[]; sports:
   const visibleTeams = visibleItems.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0]));
 
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
-  const countItems = selectedSportId ? (sportCounts.data?.items ?? visibleItems) : visibleItems;
+  const firstPage = query.data?.pages[0];
+  const total = firstPage?.pageInfo?.total ?? visibleItems.length;
   const isListLoading = query.isLoading && !items;
   const searchModel: NonNullable<TeamListViewModel['search']> = {
     value: searchValue,
@@ -147,13 +143,17 @@ export function TeamListPageClient({ seed }: { seed?: { teams: V1Team[]; sports:
     search: searchModel,
     filterHref: buildTeamHref(searchParams, { filter: '1' }),
     filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], filterOpen),
-    chips: buildTeamSportChips(countItems, base, searchParams, selectedSportId, sports.data),
+    chips: buildTeamSportChips(visibleItems, base, searchParams, selectedSportId, sports.data, !selectedSportId && !query.hasNextPage),
     teams: visibleTeams,
     listLoading: isListLoading,
+    hasNextPage: query.hasNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
+    onLoadMore: () => void query.fetchNextPage(),
     summary: {
       ...base.summary,
       scope: deriveTeamScope(selectedSportName),
-      total: visibleTeams.length,
+      total,
+      loaded: visibleTeams.length,
       recruiting: visibleTeams.filter((item) => item.status === 'open').length,
       nearby: undefined,
     },

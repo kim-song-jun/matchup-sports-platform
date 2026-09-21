@@ -52,10 +52,11 @@ Query:
 | `joinPolicy` | string | No | `approval_required`, `closed` |
 | `sort` | recommended/latest/member_count | No | 기본 recommended |
 | `cursor` | string | No | cursor |
-| `limit` | number | No | 1~100 clamp |
+| `limit` | number | No | 1~50 clamp (default 20) |
 
 CAUTION:
 
+- 응답 `pageInfo`는 `nextCursor`, `hasNext`, `total`을 포함한다. `total`은 cursor/limit을 제외하고 현재 검색·종목·지역·성별·레벨·가입정책 필터를 모두 적용한 전체 팀 수다.
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
 - Team list/detail/my-teams region fields include `region.parentName` when the selected region has a parent; `regionName` is the display label (`parentName + name` for district regions, `{city} 전체` for city-level regions).
 

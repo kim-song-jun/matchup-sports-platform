@@ -12,7 +12,7 @@ vi.mock('@/lib/seo', async () => {
   return { ...actual, fetchPublicV1: (path: string) => fetchPublicV1(path) };
 });
 
-const { SEO_LIST_PAGE_SIZE, fetchSeoListPage, fetchSeoMasterSports } = await import('./seo-list');
+const { SEO_LIST_PAGE_SIZE, fetchSeoCursorPage, fetchSeoListPage, fetchSeoMasterSports } = await import('./seo-list');
 
 beforeEach(() => {
   fetchPublicV1.mockReset();
@@ -32,6 +32,19 @@ describe('fetchSeoListPage', () => {
     await expect(fetchSeoListPage('/matches', 'matches')).resolves.toEqual([{ id: 'a' }]);
     expect(fetchPublicV1).toHaveBeenCalledTimes(1);
     expect(fetchPublicV1).toHaveBeenCalledWith(`/matches?limit=${SEO_LIST_PAGE_SIZE}`);
+  });
+
+  it('커서 페이지 helper는 전체 건수와 다음 커서를 보존한다', async () => {
+    fetchPublicV1.mockResolvedValue({
+      items: [{ id: 'a' }],
+      pageInfo: { hasNext: true, nextCursor: 'c', total: 52 },
+    });
+
+    await expect(fetchSeoCursorPage('/teams', 'teams')).resolves.toMatchObject({
+      items: [{ id: 'a' }],
+      nextCursor: 'c',
+      pageInfo: { hasNext: true, nextCursor: 'c', total: 52 },
+    });
   });
 
   it('업스트림이 죽어도 던지지 않고 빈 목록을 준다', async () => {

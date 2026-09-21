@@ -56,8 +56,11 @@ export type TeamListViewModel = {
     regionOptions: Array<{ label: string; value: string; href: string; active?: boolean }>;
   };
   chips: Array<{ label: string; count?: number; active?: boolean; href?: string }>;
-  summary: { scope: string; total: number; recruiting: number; nearby?: number };
+  summary: { scope: string; total: number; loaded?: number; recruiting: number; nearby?: number };
   listLoading?: boolean;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
   teams: TeamModel[];
 };
 

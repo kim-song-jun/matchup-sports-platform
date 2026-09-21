@@ -90,4 +90,11 @@ describe('TeamListSsrView', () => {
     expect(screen.queryByText('강남 유나이티드')).not.toBeInTheDocument();
     expect(detailHrefs()).toEqual([]);
   });
+
+  it('첫 페이지보다 전체 팀이 많으면 서버 total과 현재 표시 건수를 구분한다', () => {
+    render(<TeamListSsrView teams={[team(), team({ id: 't2', teamId: 't2' })]} total={52} sports={[FUTSAL]} />);
+
+    expect(screen.getByText('52')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+  });
 });

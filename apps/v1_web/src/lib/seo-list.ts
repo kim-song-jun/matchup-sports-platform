@@ -13,13 +13,22 @@ export const SEO_LIST_PAGE_SIZE = 20;
  * 서버 로그에 남겨 "크롤러에게 빈 목록이 나간" 사실이 추적되게 한다.
  */
 export async function fetchSeoListPage<T>(path: string, label: string): Promise<T[]> {
+  return (await fetchSeoCursorPage<T>(path, label)).items;
+}
+
+export async function fetchSeoCursorPage<T>(path: string, label: string): Promise<CursorPage<T>> {
   try {
     const query = new URLSearchParams({ limit: String(SEO_LIST_PAGE_SIZE) });
     const page = await fetchPublicV1<CursorPage<T>>(`${path}?${query.toString()}`);
-    return page?.items ?? [];
+    return page
+      ? {
+          ...page,
+          nextCursor: page.nextCursor ?? page.pageInfo?.nextCursor ?? null,
+        }
+      : { items: [], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false, total: 0 } };
   } catch (error) {
     console.error(`[seo] ${label} 목록 서버 프리렌더 실패 — 크롤러에 빈 목록이 나간다`, error);
-    return [];
+    return { items: [], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false, total: 0 } };
   }
 }
 

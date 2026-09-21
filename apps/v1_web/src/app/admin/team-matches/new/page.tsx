@@ -196,12 +196,12 @@ export default function AdminTeamMatchNewPage() {
                 accept="image/png,image/jpeg,image/webp"
                 disabled={uploadingImage}
                 onChange={(event) => void uploadImage(event.target.files?.[0])}
-                className="mt-1 block min-h-[44px] w-full text-sm text-[var(--text-muted)] file:mr-3 file:min-h-[44px] file:rounded-xl file:border-0 file:bg-[var(--surface-soft)] file:px-4 file:font-semibold file:text-[var(--text-body)]"
+                className="mt-1 block min-h-[44px] w-full text-[length:var(--font-size-body-sm)] text-[var(--text-muted)] file:mr-3 file:min-h-[44px] file:rounded-xl file:border-0 file:bg-[var(--surface-soft)] file:px-4 file:font-semibold file:text-[var(--text-body)]"
               />
               {imageUrl ? (
                 <div className="mt-3 overflow-hidden rounded-xl border border-[var(--border)]">
                   <div role="img" aria-label="대표 이미지 미리보기" className="h-40 bg-cover bg-center" style={{ backgroundImage: `url("${imageUrl.replaceAll('"', '%22')}")` }} />
-                  <button type="button" onClick={() => setImageUrl('')} className="min-h-[44px] w-full text-sm font-semibold text-[var(--text-muted)]">이미지 제거</button>
+                  <button type="button" onClick={() => setImageUrl('')} className="min-h-[44px] w-full text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-muted)]">이미지 제거</button>
                 </div>
               ) : null}
             </div>
@@ -241,7 +241,7 @@ export default function AdminTeamMatchNewPage() {
               <legend className="text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">경기 스타일 (최대 3개)</legend>
               <div className="mt-2 flex flex-wrap gap-2">
                 {MATCH_STYLE_OPTIONS.map((style) => (
-                  <label key={style} className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl border border-[var(--border)] px-3 text-sm text-[var(--text-body)]">
+                  <label key={style} className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl border border-[var(--border)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-body)]">
                     <input type="checkbox" aria-label={style} checked={matchStyle.includes(style)} onChange={() => toggleStyle(style)} />
                     {style}
                   </label>
@@ -253,18 +253,18 @@ export default function AdminTeamMatchNewPage() {
                 총비용
                 <div className="relative mt-1">
                   <input aria-label="총비용" type="number" min="0" step="1000" value={totalCost} onChange={(event) => setTotalCost(event.target.value)} className={inputClass + " pr-10"} />
-                  <span className="pointer-events-none absolute right-3 top-3 text-sm text-[var(--text-muted)]">원</span>
+                  <span className="pointer-events-none absolute right-3 top-3 text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">원</span>
                 </div>
               </label>
               <label className="text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
                 상대팀 부담금
                 <div className="relative mt-1">
                   <input aria-label="상대팀 부담금" type="number" min="0" step="1000" value={opponentCost} onChange={(event) => setOpponentCost(event.target.value)} className={inputClass + " pr-10"} />
-                  <span className="pointer-events-none absolute right-3 top-3 text-sm text-[var(--text-muted)]">원</span>
+                  <span className="pointer-events-none absolute right-3 top-3 text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">원</span>
                 </div>
               </label>
             </div>
-            <p className="text-xs text-[var(--text-muted)]">상대팀 부담금이 0원이면 무료 초청으로 안내돼요.</p>
+            <p className="text-[length:var(--font-size-caption)] text-[var(--text-muted)]">상대팀 부담금이 0원이면 무료 초청으로 안내돼요.</p>
           </section>
 
           <section className="space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-4 md:p-5">
@@ -290,9 +290,9 @@ export default function AdminTeamMatchNewPage() {
             <label className="block text-[length:var(--font-size-body-sm)] font-medium text-[var(--text-strong)]">
               신청 마감 (선택)
               <input aria-label="신청 마감" type="datetime-local" value={deadlineAt} onChange={(event) => setDeadlineAt(event.target.value)} max={startsAt || undefined} className={"mt-1 " + inputClass} />
-              <span className="mt-1 block text-xs font-normal text-[var(--text-muted)]">비워두면 경기 시작 전까지 신청을 받아요.</span>
+              <span className="mt-1 block text-[length:var(--font-size-caption)] font-normal text-[var(--text-muted)]">비워두면 경기 시작 전까지 신청을 받아요.</span>
             </label>
-            {startsAt && !datesValid ? <p role="alert" className="text-sm text-red-500">신청 마감은 경기 시작 전, 경기 종료는 시작 후로 설정해 주세요.</p> : null}
+            {startsAt && !datesValid ? <p role="alert" className="text-[length:var(--font-size-body-sm)] text-red-500">신청 마감은 경기 시작 전, 경기 종료는 시작 후로 설정해 주세요.</p> : null}
           </section>
 
           <div className="rounded-xl bg-[var(--surface-soft)] p-4 text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">

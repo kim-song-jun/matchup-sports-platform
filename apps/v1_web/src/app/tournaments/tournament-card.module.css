@@ -1,0 +1,36 @@
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--grey100);
+}
+
+.price,
+.capacity {
+  display: grid;
+  gap: 4px;
+}
+
+.capacity {
+  margin-inline-start: auto;
+  text-align: right;
+}
+
+.amount {
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+.amount,
+.summary,
+.pending {
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--text-muted);
+}

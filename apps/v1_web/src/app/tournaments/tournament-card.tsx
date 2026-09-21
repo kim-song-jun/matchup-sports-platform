@@ -12,6 +12,7 @@ import {
   CompetitionCardShell,
 } from '@/components/v1-ui/competition-card';
 import type { V1TournamentListItem } from '@/types/api';
+import styles from './tournament-card.module.css';
 
 /**
  * Split out of page.tsx (2026-07) — Next.js App Router restricts `page.tsx`
@@ -97,18 +98,15 @@ export function TournamentCard({
      `format` 은 "어떻게 치르나", `kind` 는 "무엇인가"이고 여기 질문은 뒤쪽이다. */
   const isLeague = item.kind === 'regular_league';
   const reservedTeamCount = capacity === null ? 0 : getReservedTeamCount(capacity);
-  /**
-   * #7 (실사용자 발견 버그, 2026-09-19): 정원이 이미 다 찬 대회는 관리자가 아직 상태를
-   * '마감'으로 바꾸지 않았어도(자동 마감 처리 지연 등) 대표 배지가 하단의 정원 표시
-   * ("N/N팀 확정")와 어긋나면 안 된다 — "모집 중" 배지를 보고 상세로 들어갔다가 신청할 수
-   * 없다는 걸 뒤늦게 알게 된다. 하단과 같은 문구·스타일(getTournamentStatusConfig('closed'))
-   * 로 맞춘다. 리그는 `capacity`가 항상 null이라 이 분기를 타지 않는다.
-   */
+  // 예약에는 정원을 점유하는 입금/확인 대기도 포함한다. 실제 진행·종료 상태는 덮지 않는다.
   const isCapacityFull = capacity !== null && capacity.teamCount > 0 && reservedTeamCount >= capacity.teamCount;
-  const status =
-    item.status === 'open' && isCapacityFull
-      ? getTournamentStatusConfig('closed')
+  const isNearlyFull = capacity !== null && capacity.teamCount > 0 && reservedTeamCount / capacity.teamCount >= 0.8;
+  const status = item.status === 'closed' || (item.status === 'open' && isCapacityFull)
+    ? { ...getTournamentStatusConfig('closed'), label: '모집 마감' }
+    : item.status === 'open' && isNearlyFull
+      ? { badgeClass: 'tm-badge-orange', label: '거의 마감' }
       : getTournamentStatusConfig(item.status);
+  const displayedTeamCount = capacity ? reservedTeamCount : item.confirmedCount + pendingPaymentCount;
   // 커버가 없는 대회도 홍보용으로 등록한 실사진이 있으면 아이콘 대신 그 사진을 썸네일로
   // 재사용한다 (셋 다 없으면 종목색 그라디언트+아이콘 폴백).
   const thumbnailImageUrl = resolveTournamentImage(item, 'cover');
@@ -206,51 +204,24 @@ export function TournamentCard({
         {/* 카드 간 높이 차(상금 유무 등)를 흡수해 하단 행을 같은 라인에 맞춤 */}
         <div style={{ flex: 1 }} aria-hidden="true" />
 
-        {/* #7: Bottom row: entry fee(강조) + team fill rate(마감 임박 배지) */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginTop: 12,
-            paddingTop: 12,
-            borderTop: '1px solid var(--grey100)',
-          }}
-        >
-          {/* #7: 참가비 — text-strong + weight700로 시각 강도 격상 */}
-          <span className="tm-text-label" style={{ color: 'var(--text-strong)', fontWeight: 700 }}>
-            참가비 {formatEntryFee(item.entryFee)}
-          </span>
-          <span className="tm-text-caption" style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* #7: 확정 팀 ≥80% 이상이면 '거의 마감' orange 배지 */}
-            {capacity && capacity.teamCount > 0 && reservedTeamCount / capacity.teamCount >= 0.8
-              ? <span className="tm-badge tm-badge-orange">{reservedTeamCount >= capacity.teamCount ? '마감' : '거의 마감'}</span>
-              : null}
-            {/* 입금대기 팀도 정원을 점유하므로(서버 CAPACITY_HOLD_STATUSES) "+N 팀 예약"만으론
-                왜 신청을 못 받는지 알 수 없었다 — 대회 상세와 같은 낱말로 명시한다. */}
+        <div className={styles.footer} data-testid="tournament-card-footer">
+          <div className={styles.price}>
+            <span className={`tm-text-caption ${styles.muted}`}>참가비</span>
+            <strong className={`tm-text-body tab-num ${styles.amount}`}>
+              {formatEntryFee(item.entryFee)}
+            </strong>
+          </div>
+          <div className={styles.capacity}>
+            <span className={`tm-text-label tab-num ${styles.summary}`}>
+              {capacity ? `${displayedTeamCount}/${capacity.teamCount}` : displayedTeamCount}
+              {capacity ? (pendingPaymentCount > 0 ? '팀 예약' : '팀 확정') : '팀 참가'}
+            </span>
             {pendingPaymentCount > 0 ? (
-              <span className="tm-badge tm-badge-grey" style={{ whiteSpace: 'nowrap' }}>
+              <span className={`tm-text-caption ${styles.muted} ${styles.pending}`}>
                 {pendingCapacityLabel(item.entryFee === 0)} {pendingPaymentCount}팀
               </span>
             ) : null}
-            <span className="tab-num">{item.confirmedCount}</span>
-            {pendingPaymentCount > 0 ? (
-              <>
-                <span style={{ color: 'var(--orange700)' }}>+</span>
-                <span className="tab-num" style={{ color: 'var(--orange700)' }}>{pendingPaymentCount}</span>
-              </>
-            ) : null}
-            {capacity ? (
-              <>
-                <span>/</span>
-                <span className="tab-num">{capacity.teamCount}</span>
-              </>
-            ) : null}
-            {/* 리그는 정원이 없어 비율이 성립하지 않는다 — 수를 그대로 적는다
-                (리그 전용 목록도 같은 이유로 같은 선택을 했었다 — 그 화면은 통합 목록으로
-                    흡수돼 사라졌지만, **판단의 근거는 진행률을 신뢰할 수 없다는 것**이었다). */}
-            <span>{capacity ? (pendingPaymentCount > 0 ? '팀 예약' : '팀 확정') : '팀 참가'}</span>
-          </span>
+          </div>
         </div>
       </CompetitionCardShell>
     </div>

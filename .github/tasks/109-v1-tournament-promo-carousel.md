@@ -58,3 +58,34 @@
 - dev before 증거는 같은 화면에서 새 qualifier CSS를 inline으로 비활성화하여 기존 줄바꿈을 재현한 비교이다. main before는 실제 운영 화면이며 별도 main 작업 트리에 보관.
 - 실제 dev 페이지의 API 응답에 제목 fixture를 주입해 짧은 괄호 한 줄 / 긴 제목 뒤 괄호 전체 다음 줄 / 긴 괄호 내부 줄바꿈 / 전각 괄호를 치수 검사로 통과. 서버 데이터 변경 없음.
 - main 로컬 커밋 `04c89fafd` 검증 완료. 자동 승인 검토가 저장소 main 승격 금지 규칙을 근거로 main 브랜치 push·PR 생성을 거부하여 원격 반영은 보류.
+
+## 2026-09-22 카드 상태 배지·하단 레이아웃 후속 PR
+
+### Context / Scope
+- 사용자 요청: 제목 옆 모집 중 배지를 거의 마감/모집 마감으로 전환하고, 기존 정원 막대 아래 가격과 예약 정보를 좌우로 분리. PR과 스크린샷까지만 준비하고 머지하지 않는다.
+- Frontend only: `tournament-card.tsx`, 전용 CSS module, 관련 tests, changeset, 이 task, 시각 증거.
+- 지난 제목 핫픽스는 dev #1241 / main #1242 및 양 환경 배포·실제 페이지 검증까지 완료됐다. 위 보류 기록은 당시 상태이며 현재는 해소됐다.
+- 최신 dev `a494cde6a` 기준 격리 작업 트리. Backend/API/전역 status helper/다른 카드 레이아웃은 범위 밖.
+
+### Acceptance criteria
+- [x] 예약 수(확정+대기)가 정원의 80% 이상이고 모집 중이면 제목 옆 `거의 마감` 하나만 노출.
+- [x] 정원 충족 또는 closed는 `모집 마감`. 진행/종료/취소 상태는 보존.
+- [x] 기존 막대 1개 유지. 가격은 왼쪽 라벨+금액, 예약 현황은 오른쪽 합산 수+대기 안내.
+- [x] 대기 0팀은 대기 문구 숨김, 무료 대회는 확인대기 유지, 리그는 가짜 정원 없음.
+- [x] 320/390/768/1440px before/after 및 겹침·가로 넘침 검증.
+- [x] 상태 경계 테스트 31/31, 타입 검사 통과.
+- [ ] PR 생성·스크린샷 갤러리 첨부.
+
+### Progress snapshot
+- 변경 전 4폭 캡처 완료. 새 상태/요약 텍스트 계약 테스트 RED 확인 후 구현.
+- 실제 Next route + 운영 공개 제목 snapshot에 상태별 fixture를 명시적으로 적용하여 검증. 서버 데이터 쓰기 없음. 썸네일은 기존 로컬 샘플 사진으로 고정.
+- 보안: API/권한/데이터 저장 변경 없음. PR만 생성하며 이전 main 핫픽스 예외는 이번 변경에 적용하지 않는다.
+
+- RED: 새 계약 12개 중 10개 실패 → GREEN: 기존 포함 31/31 통과. 모집 중 75%/80%/95%/100%, closed, 진행/종료/취소, 유료/무료 대기 안내, 리그 회귀 포함.
+- `tsc --noEmit --incremental false` 통과. 헤더 상태와 하단 숫자만 변경하며 API contract 변화 없음.
+- 실제 Next `/tournaments` + 상태 fixture 4종(마감 임박/일반 모집/마감/무료), 320/390/768/1440px에서 막대 1개·금액/예약 영역 비겹침·카드 overflow 없음. console/pageerror/HTTP 오류 0.
+- 390px 마감 임박 카드: 274px → 258px. 일반 카드: 238px → 258px(좌우 두 줄 구성으로 정렬 통일). 고정 높이는 없으며 극단적인 좁은 폭은 정보 묶음 단위로 wrapping 가능.
+- canonical screenshots: `docs/screenshots/tournament-card-footer/`; raw 상태별/폭별 결과: `output/playwright/visual-audit/tournament-card-footer/`.
+- PR까지만 요청받았으므로 main 반영·dev 머지·배포는 하지 않는다.
+
+- 검증 종료: 소유 Next PID 57162/57179 및 각 headed browser server를 종료. 생성된 next-env 변경과 의존성 symlink는 제거.

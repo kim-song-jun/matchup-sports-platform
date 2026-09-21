@@ -267,4 +267,111 @@ test.describe('[admin → team manager] 플랫폼 팀매치 실제 모집·신�
     const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     expect(hasHorizontalOverflow).toBe(false);
   });
+  test('팀 배정 뒤에도 공개 목록에 플랫폼 주관 출처와 실제 양 팀을 표시한다', async ({ page }, testInfo) => {
+    const consoleErrors: string[] = [];
+    const failedRequests: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error') consoleErrors.push(message.text());
+    });
+    page.on('requestfailed', (request) => failedRequests.push(`${request.method()} ${request.url()}`));
+
+    const items = [
+      {
+        id: 'platform-open',
+        teamMatchId: 'platform-open',
+        title: 'Teameet 주말 풋살 모집',
+        descriptionPreview: '플랫폼이 두 팀의 신청을 받아 연결하는 팀매치입니다.',
+        imageUrl: '/mock/generated/futsal-rooftop.webp',
+        sportName: '풋살',
+        sport: { sportId: 'sport-futsal', name: '풋살' },
+        levelLabel: '중급',
+        regionName: '서울 송파구',
+        region: { regionId: 'region-songpa', name: '서울 송파구' },
+        placeName: '잠실 풋살장',
+        place: { name: '잠실 풋살장', addressText: '서울 송파구 올림픽로' },
+        startsAt: '2026-10-10T10:00:00.000Z',
+        deadlineAt: '2026-10-06T10:00:00.000Z',
+        capacityText: '상대 0/2팀',
+        status: 'recruiting',
+        displayState: 'recruiting',
+        platformManaged: true,
+        hostTeam: null,
+        approvedOpponentTeam: null,
+        costNote: '총 90,000원 · 상대팀 30,000원',
+        matchFormat: '5:5',
+        matchStyle: ['친선', '매너 중시'],
+        uniformColor: '파랑',
+        genderRule: '성별 무관',
+        viewerState: 'none',
+      },
+      {
+        id: 'platform-assigned',
+        teamMatchId: 'platform-assigned',
+        title: 'Teameet 배정 완료 팀매치',
+        descriptionPreview: '두 팀 배정 후에도 플랫폼 주관 출처가 유지됩니다.',
+        imageUrl: '/mock/generated/team-huddle.webp',
+        sportName: '풋살',
+        sport: { sportId: 'sport-futsal', name: '풋살' },
+        levelLabel: '중급',
+        regionName: '서울 마포구',
+        region: { regionId: 'region-mapo', name: '서울 마포구' },
+        placeName: '마포 풋살파크',
+        place: { name: '마포 풋살파크', addressText: '서울 마포구 월드컵로' },
+        startsAt: '2026-10-11T10:00:00.000Z',
+        deadlineAt: '2026-10-07T10:00:00.000Z',
+        capacityText: '2/2팀',
+        status: 'matched',
+        displayState: 'matched',
+        platformManaged: true,
+        hostTeam: { teamId: 'team-home', name: '홈 유나이티드', logoUrl: null, trustState: 'none', mannerScore: null, wins: 0 },
+        approvedOpponentTeam: { teamId: 'team-away', name: '어웨이 FC' },
+        costNote: '총 120,000원 · 상대팀 60,000원',
+        matchFormat: '5:5',
+        matchStyle: ['친선'],
+        uniformColor: '검정',
+        genderRule: '성별 무관',
+        viewerState: 'none',
+      },
+    ];
+
+    await page.route('**/api/v1/team-matches**', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        json: {
+          status: 'success',
+          data: { items, pageInfo: { nextCursor: null, hasNext: false } },
+          timestamp: new Date().toISOString(),
+        },
+      });
+    });
+
+    await loginAs(page, personas.admin.email);
+    await page.goto('/team-matches', { waitUntil: 'networkidle' });
+    const interceptedPayload = await page.evaluate(async () => (await fetch('/api/v1/team-matches')).json());
+    expect(interceptedPayload.data.items).toEqual(expect.arrayContaining([expect.objectContaining({ teamMatchId: 'platform-open', platformManaged: true })]));
+
+    const openCard = page.locator('a[href="/team-matches/platform-open"]');
+    const assignedCard = page.locator('a[href="/team-matches/platform-assigned"]');
+    await expect(openCard).toContainText('플랫폼 주관');
+    await expect(openCard).toContainText('Teameet 운영');
+    await expect(openCard).toContainText('상대 모집 중');
+    await expect(assignedCard).toContainText('플랫폼 주관');
+    await expect(assignedCard).toContainText('홈 유나이티드 vs 어웨이 FC');
+    await expect(assignedCard).toContainText('신청 마감');
+
+    if (testInfo.project.name === 'desktop') {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.screenshot({ path: screenshotPath('desktop', 'public-list-provenance'), fullPage: true });
+      await page.setViewportSize({ width: 834, height: 1112 });
+      await page.screenshot({ path: screenshotPath('tablet', 'public-list-provenance'), fullPage: true });
+    } else {
+      await page.screenshot({ path: screenshotPath('mobile', 'public-list-provenance'), fullPage: true });
+    }
+
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+    expect(consoleErrors).toEqual([]);
+    expect(failedRequests).toEqual([]);
+  });
 });

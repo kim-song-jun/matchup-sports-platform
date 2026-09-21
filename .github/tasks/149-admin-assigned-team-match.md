@@ -21,6 +21,7 @@ Status: complete
 - [x] Existing team-owner recruitment/application flow remains unchanged.
 - [x] The admin recruitment uses the ordinary team-match condition contract: representative image, level, format, styles, uniform, gender, total/opponent cost, place, schedule, and optional deadline.
 - [x] Admin detail exposes the saved representative image and level alongside the existing format/style/gender/uniform/cost fields.
+- [x] Platform-managed provenance is persisted independently of `hostTeamId` and remains visible after home/away assignment.
 
 ## Acceptance Criteria
 
@@ -37,6 +38,9 @@ Status: complete
   When finalization is attempted
   Then the API rejects the request without partial writes.
 - Given successful finalization
+  When the public list or detail is opened
+  Then the platform-managed badge remains visible beside the assigned home and away teams.
+- Given successful finalization
   When either team views its schedule/lineup flow
   Then the same team match and Game aggregate are available to both sides.
 
@@ -52,6 +56,7 @@ Status: complete
 - [x] Touched-path debt grep and diff checks
 - [x] 2026-09-21 condition-parity focused tests: API 6/6, Web 13/13
 - [x] 2026-09-21 condition-parity API/Web typecheck and headed visual QA: desktop + mobile 4/4, no console/API errors or horizontal overflow
+- [x] 2026-09-21 provenance regression tests: API 71/71, Web 75/75
 
 ## Ambiguity Log
 
@@ -66,12 +71,14 @@ Status: complete
 - 2026-09-19: Headed Windows Chrome visual QA passed at 1440×900, 768×1024, and 390×844 for empty/filled recruitment creation and two-application finalization. The isolated QA worktree used deterministic API fixtures without loading repository secrets; focused backend tests cover the server contract. Evidence is committed under `docs/screenshots/task149-admin-team-match/`.
 - 2026-09-19: A fresh isolated PostgreSQL runtime proved the real public journey with `host@teameet.v1` managing `송파 풋살 모임`: admin recruitment create `201`, public list same-ID lookup, browser application `201 requested`, and admin persisted count `1`. `e2e/v1-tests/admin-platform-team-match-flow.spec.ts` passed 1/1 in the official Playwright QA container. Headed Chrome reported zero console, page, request, or API errors; 40 cancelled Next RSC prefetches were classified separately as expected navigation aborts.
 - 2026-09-21: Admin recruitment condition inputs and persistence were aligned with ordinary team-match recruitment. The deadline is optional, price inputs serialize to the shared `costNote` format, and admin detail now shows the saved image and level. Focused API/Web tests passed.
+- 2026-09-21: `platformManaged` became a persisted team-match source flag. Assignment keeps it true, while public cards and detail show the actual home/away teams plus an explicit platform-managed badge.
 
 ## Condition Parity Screenshot Evidence (2026-09-21)
 
 - Desktop: [empty form](../../docs/screenshots/task149-admin-team-match-condition-parity/desktop-form-empty.png) · [filled form](../../docs/screenshots/task149-admin-team-match-condition-parity/desktop-form-filled.png) · [detail](../../docs/screenshots/task149-admin-team-match-condition-parity/desktop-detail.png)
 - Tablet: [empty form](../../docs/screenshots/task149-admin-team-match-condition-parity/tablet-form-empty.png) · [filled form](../../docs/screenshots/task149-admin-team-match-condition-parity/tablet-form-filled.png) · [detail](../../docs/screenshots/task149-admin-team-match-condition-parity/tablet-detail.png)
 - Mobile: [empty form](../../docs/screenshots/task149-admin-team-match-condition-parity/mobile-form-empty.png) · [filled form](../../docs/screenshots/task149-admin-team-match-condition-parity/mobile-form-filled.png) · [detail](../../docs/screenshots/task149-admin-team-match-condition-parity/mobile-detail.png)
+- Public list provenance: [desktop](../../docs/screenshots/task149-admin-team-match-condition-parity/desktop-public-list-provenance.png) · [tablet](../../docs/screenshots/task149-admin-team-match-condition-parity/tablet-public-list-provenance.png) · [mobile](../../docs/screenshots/task149-admin-team-match-condition-parity/mobile-public-list-provenance.png)
 - Machine-readable verdict: [report.json](../../docs/screenshots/task149-admin-team-match-condition-parity/report.json)
 ## Screenshot Evidence
 

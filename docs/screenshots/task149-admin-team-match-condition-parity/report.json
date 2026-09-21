@@ -1,10 +1,10 @@
 {
     "task":  149,
     "feature":  "admin-team-match-condition-parity",
-    "capturedAt":  "2026-09-21T04:44:49.1805620Z",
+    "capturedAt":  "2026-09-21T06:30:57.4749664Z",
     "runner":  "Playwright headed Chrome",
     "result":  "pass",
-    "tests":  "4/4",
+    "tests":  "6/6",
     "viewports":  [
                       {
                           "name":  "desktop",
@@ -13,7 +13,8 @@
                           "files":  [
                                         "desktop-form-empty.png",
                                         "desktop-form-filled.png",
-                                        "desktop-detail.png"
+                                        "desktop-detail.png",
+                                        "desktop-public-list-provenance.png"
                                     ]
                       },
                       {
@@ -23,7 +24,8 @@
                           "files":  [
                                         "tablet-form-empty.png",
                                         "tablet-form-filled.png",
-                                        "tablet-detail.png"
+                                        "tablet-detail.png",
+                                        "tablet-public-list-provenance.png"
                                     ]
                       },
                       {
@@ -32,7 +34,8 @@
                           "files":  [
                                         "mobile-form-empty.png",
                                         "mobile-form-filled.png",
-                                        "mobile-detail.png"
+                                        "mobile-detail.png",
+                                        "mobile-public-list-provenance.png"
                                     ]
                       }
                   ],
@@ -42,6 +45,8 @@
                    "detailConditionParity":  "pass",
                    "horizontalOverflow":  "none",
                    "consoleErrors":  "none",
-                   "apiRequestFailures":  "none"
+                   "apiRequestFailures":  "none",
+                   "platformProvenanceBeforeAssignment":  "pass",
+                   "platformProvenanceAfterAssignment":  "pass"
                }
 }

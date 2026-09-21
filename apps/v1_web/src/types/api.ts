@@ -405,7 +405,7 @@ export type V1Match = {
   displayState?: string;
   approvalRequired?: boolean;
   paymentRequired?: boolean;
-  /** 팀이 아닌 플랫폼 운영자가 개설해 두 팀의 신청을 받는 모집인지 여부. */
+  /** 플랫폼 운영자가 개설한 모집인지 여부. 팀 배정 뒤에도 true로 유지되는 생성 출처다. */
   platformManaged?: boolean;
   viewerState?: V1ViewerState;
   viewer?: {

@@ -81,6 +81,7 @@ describe('AdminTeamMatchRecruitmentsService', () => {
           sportId,
           status: 'recruiting',
           hostTeamId: null,
+          platformManaged: true,
           approvedApplicantTeamId: null,
           startAt: FUTURE,
           endAt: null,
@@ -126,6 +127,7 @@ describe('AdminTeamMatchRecruitmentsService', () => {
     expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         hostTeamId: null,
+        platformManaged: true,
         approvedApplicantTeamId: null,
         status: 'recruiting',
         imageUrl: '/uploads/admin-team-match.webp',
@@ -168,6 +170,18 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       data: { hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', status: 'matched' },
     });
     expect(prisma.v1TeamSchedule.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects assigning a hostless match that was not created by the platform flow', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValueOnce({
+      ...await prisma.v1TeamMatch.findFirst(),
+      platformManaged: false,
+    });
+
+    await expect(service.assign(adminUser, 'team-match-1', assignDto)).rejects.toMatchObject({
+      response: { code: 'TEAM_MATCH_NOT_PLATFORM_RECRUITING' },
+    });
+    expect(games.createFromSourceInTransaction).not.toHaveBeenCalled();
   });
 
   it('rejects selecting the same application before opening a transaction', async () => {

@@ -100,6 +100,26 @@ describe('toTeamMatch — 플랫폼 운영 모집', () => {
     expect(model.platformManaged).toBe(true);
     expect(model.status).toBe('open');
   });
+
+  it('팀 배정 뒤에도 플랫폼 주관 출처와 실제 홈팀을 함께 유지한다', () => {
+    const model = toTeamMatch(
+      {
+        id: 'tm-platform-assigned',
+        title: '플랫폼 배정 완료 매치',
+        status: 'matched',
+        displayState: 'matched',
+        platformManaged: true,
+        hostTeam: { teamId: 'team-home', name: '홈 유나이티드' },
+        approvedOpponentTeam: { teamId: 'team-away', name: '어웨이 FC' },
+      } as unknown as V1TeamMatch,
+      base.matches[0],
+    );
+
+    expect(model.hostTeam).toBe('홈 유나이티드');
+    expect(model.opponentTeam).toBe('어웨이 FC');
+    expect(model.platformManaged).toBe(true);
+    expect(model.closed).toBe(true);
+  });
 });
 
 /**

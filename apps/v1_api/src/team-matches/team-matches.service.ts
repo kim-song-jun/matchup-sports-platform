@@ -229,7 +229,7 @@ export class TeamMatchesService {
       matchStyle: teamMatch.matchStyle,
       uniformColor: teamMatch.uniformColor,
       paymentRequired: false,
-      platformManaged: teamMatch.hostTeamId === null,
+      platformManaged: teamMatch.platformManaged,
       hostTeam: teamMatch.hostTeam && teamMatch.hostTeamId
         ? {
             teamId: teamMatch.hostTeam.id,
@@ -1434,7 +1434,7 @@ export class TeamMatchesService {
       deadlineAt: teamMatch.deadlineAt,
       status: this.getApiStatus(teamMatch),
       displayState: this.getDisplayState(teamMatch),
-      platformManaged: teamMatch.hostTeamId === null,
+      platformManaged: teamMatch.platformManaged,
       hostTeam: teamMatch.hostTeam
         ? {
             teamId: teamMatch.hostTeam.id,

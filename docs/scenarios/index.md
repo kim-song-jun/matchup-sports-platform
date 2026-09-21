@@ -433,3 +433,4 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - Admin platform recruitment now uses the ordinary team-match image, level, format, style, uniform, gender, cost, place, schedule, and optional deadline contract.
 - Focused API tests `6/6`, Web tests `13/13`, API/Web typecheck, and headed Chrome condition-parity E2E `4/4` passed.
 - Canonical evidence: `docs/screenshots/task149-admin-team-match-condition-parity/` (`desktop`/`tablet`/`mobile` × empty form/filled form/detail) and `report.json`.
+- Platform provenance is now persisted independently of team assignment; public list/detail keep the `플랫폼 주관` badge while showing assigned home/away teams. Headed Chrome provenance E2E passed 2/2 and added desktop/tablet/mobile public-list screenshots to the canonical Task 149 evidence directory.

@@ -49,6 +49,46 @@ describe('team match images', () => {
   });
 });
 
+describe('platform-managed team match provenance', () => {
+  it('공개 목록에서 팀 배정 후에도 플랫폼 주관 배지와 양 팀 이름을 함께 보여준다', () => {
+    const model = getTeamMatchListViewModel();
+    model.matches = [{
+      ...model.matches[0],
+      platformManaged: true,
+      hostTeam: '홈 유나이티드',
+      opponentTeam: '어웨이 FC',
+      status: 'closed',
+      closed: true,
+    }];
+
+    const { container } = renderPage(<TeamMatchListPageView model={model} />);
+    const card = container.querySelector('.tm-match-row');
+
+    expect(within(card as HTMLElement).getByText('플랫폼 주관')).toBeInTheDocument();
+    expect(card).toHaveTextContent('홈 유나이티드 vs 어웨이 FC');
+  });
+
+  it('플랫폼 주관 매치에 팀이 배정되면 실제 홈팀 카드와 팀 링크를 보여준다', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.match = {
+      ...model.match,
+      platformManaged: true,
+      hostTeam: '홈 유나이티드',
+      hostTeamId: 'team-home',
+      hostTeamHref: '/teams/team-home',
+    };
+
+    const { container } = renderPage(<TeamMatchDetailPageView model={model} />);
+    const hostCard = container.querySelector('.tm-host-team-card');
+
+    expect(hostCard?.tagName).toBe('A');
+    expect(hostCard).toHaveAttribute('href', '/teams/team-home');
+    expect(hostCard).toHaveTextContent('홈팀 정보');
+    expect(hostCard).toHaveTextContent('플랫폼 주관');
+    expect(hostCard).toHaveTextContent('팀 보기');
+  });
+});
+
 // 20건 컷오프 페이지네이션 결함 회귀 방지(2026-08-27 감사) — matches-page.test.tsx의
 // 동일 계열 테스트와 짝을 이룬다.
 describe('TeamMatchListPageView — 더 보기 (20건 컷오프 페이지네이션)', () => {

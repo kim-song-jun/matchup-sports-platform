@@ -47,10 +47,12 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 
 - active owner/ops admin은 `/admin/team-matches/new`에서 일반 팀매치 모집과 같은 대표 이미지·실력·경기 방식·스타일·유니폼·성별·총 비용/상대팀 비용·지역·장소·일정을 입력해 팀 없는 모집을 연다. 신청 마감은 선택 사항이다.
 - 생성 직후 팀매치는 `recruiting`이며 Game과 팀 일정은 아직 만들지 않는다.
+- 공개 목록과 상세는 생성 직후 `Teameet 운영`과 `플랫폼 주관`을 표시한다.
 - 관리자 상세는 저장된 대표 이미지와 실력 등급을 기존 형식·스타일·성별·유니폼·비용 조건과 함께 보여준다.
 - 같은 종목의 활성 팀 manager 이상이 공개 상세에서 기존 신청 API로 참가를 요청한다.
 - 관리자는 `/admin/team-matches/:id`의 신청 목록에서 서로 다른 두 신청을 홈·원정으로 선택한다.
 - 확정 시 서버는 팀 상태와 종목을 다시 검증한 뒤 팀매치를 `matched`로 바꾸고 Game의 HOME/AWAY side, 양 팀 일정, 선택 신청 승인, 나머지 신청 거절, 감사 로그를 같은 트랜잭션에서 기록한다.
+- 확정 뒤 공개 목록과 상세는 `플랫폼 주관` 출처를 유지하면서 실제 `홈팀 vs 원정팀` 이름과 홈팀 상세 링크를 보여준다.
 - support admin은 생성·확정 UI 대신 권한 안내를 보고, API 직접 호출도 `403`으로 거절된다.
 - 기존 팀 관리자용 모집/신청/승인 시나리오는 그대로 유지된다.
 - 2026-09-19 actual-runtime proof: isolated v1 PostgreSQL/API/Web + headed Chrome에서 관리자 생성 `201`, 공개 목록 same-ID 노출, `송파 풋살 모임` 브라우저 신청 `201 requested`, 관리자 상세 신청 1건 영속 조회를 확인했다. 데스크톱·태블릿·모바일 증거와 JSON verdict는 `docs/screenshots/task149-admin-team-match/real-*`에 있다. 재현 스펙은 공식 Playwright QA 컨테이너 desktop 1/1 통과했다.

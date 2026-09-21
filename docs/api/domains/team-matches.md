@@ -43,11 +43,11 @@ Optional body: `description`, `imageUrl`, `endsAt`, `deadlineAt`, `addressText`,
 Rules:
 
 - active `owner` 또는 `ops` admin만 생성할 수 있으며 `support`는 `403 PERMISSION_DENIED`다.
-- 생성된 행은 `hostTeamId=null`, `status=recruiting`인 독립 플랫폼 모집이다.
+- 생성된 행은 `hostTeamId=null`, `platformManaged=true`, `status=recruiting`인 독립 플랫폼 모집이다. `platformManaged`는 홈팀 유무로 계산하지 않고 `v1_team_matches.platform_managed`에 영구 저장한다.
 - 조건 필드는 일반 팀매치 모집과 같은 검증·저장 계약을 사용한다. web은 총 비용/상대팀 비용을 일반 생성 화면과 같은 `총 {금액}원 · 상대팀 {금액}원` 형식의 `costNote`로 보낸다.
 - `deadlineAt`은 일반 모집처럼 선택 사항이며 입력한 경우 현재보다 이후이고 `startsAt`보다 빨라야 한다.
 - 생성 시 Game, team schedule, application을 만들지 않는다.
-- 공개 목록/상세 응답은 `platformManaged=true`, `hostTeam=null`을 반환하며 같은 종목의 관리 팀이 `POST /team-matches/:id/applications`로 신청할 수 있다.
+- 배정 전 공개 목록/상세 응답은 `platformManaged=true`, `hostTeam=null`을 반환하며 같은 종목의 관리 팀이 `POST /team-matches/:id/applications`로 신청할 수 있다.
 - 같은 `clientCommandId`와 같은 payload 재시도는 기존 결과를 반환한다. 같은 키의 다른 payload는 `409 IDEMPOTENCY_CONFLICT`다.
 - 성공 응답은 `teamMatchId`, `status=recruiting`, `detailRoute`(관리자 상세), `replayed`를 포함한다.
 
@@ -65,6 +65,7 @@ Rules:
 - 대상은 `hostTeamId=null`, 리그·토너먼트에 속하지 않은 `recruiting` 플랫폼 모집이어야 한다.
 - 두 신청 팀은 활성 상태이고 모집 종목과 같아야 하며 서로 달라야 한다.
 - 성공 시 홈 팀을 `hostTeamId`, 원정 팀을 `approvedApplicantTeamId`로 연결하고 팀매치를 `matched`로 바꾼다.
+- 배정 뒤에도 저장된 `platformManaged=true`는 유지된다. 공개 목록/상세는 실제 홈·원정 팀과 `플랫폼 주관` 출처를 함께 노출한다.
 - 선택한 두 신청은 `approved`, 나머지 `requested` 신청은 `rejected`로 전환한다.
 - Game HOME/AWAY side, 양 팀 schedule, application/team-match 상태 로그, admin action log를 한 트랜잭션에서 생성한다.
 - 성공 응답은 `teamMatchId`, `gameId`, `homeTeamId`, `awayTeamId`, `detailRoute`, `replayed`를 포함한다.
@@ -92,6 +93,7 @@ Rules:
 - 일반 목록에서는 신청 마감이 지났거나 raw status가 `closed`/`matched`인 항목도 경기 시작 전까지 신청마감으로 노출하고, 경기 시작 시각 이후에는 제외한다.
 - `sort=recommended`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다.
 - `teamId`는 `hostTeamId = teamId` 또는 `applications.some(applicantTeamId = teamId)` 둘 중 하나를 만족하면 포함
+- `platformManaged`는 생성 출처를 뜻하며 팀 배정 후에도 `true`다. `hostTeam`/`approvedOpponentTeam`은 현재 배정된 실제 양 팀을 별도로 반환한다.
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
 - List and detail responses include `hostTeam.mannerScore` and `hostTeam.wins`.
   - `mannerScore` is the live aggregate of publicly revealed team-match reviews and is `null` when no score is publishable.

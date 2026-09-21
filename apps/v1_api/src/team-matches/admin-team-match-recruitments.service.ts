@@ -93,6 +93,7 @@ export class AdminTeamMatchRecruitmentsService {
       const teamMatch = await tx.v1TeamMatch.create({
         data: {
           hostTeamId: null,
+          platformManaged: true,
           approvedApplicantTeamId: null,
           createdByUserId: admin.userId,
           sportId: dto.sportId,
@@ -164,6 +165,7 @@ export class AdminTeamMatchRecruitmentsService {
           sportId: true,
           status: true,
           hostTeamId: true,
+          platformManaged: true,
           approvedApplicantTeamId: true,
           startAt: true,
           endAt: true,
@@ -201,6 +203,9 @@ export class AdminTeamMatchRecruitmentsService {
         },
       });
       if (!teamMatch) throw new NotFoundException({ code: 'NOT_FOUND', message: '팀매치 모집을 찾을 수 없어요.' });
+      if (!teamMatch.platformManaged) {
+        throw new ConflictException({ code: 'TEAM_MATCH_NOT_PLATFORM_RECRUITING', message: '신청을 받는 플랫폼 팀매치만 배정할 수 있어요.' });
+      }
 
       const replayByApplicationId = new Map(teamMatch.applications.map((application) => [application.id, application.applicantTeam.id]));
       if (

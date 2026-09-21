@@ -13,9 +13,11 @@ import type { V1Sport, V1Team } from '@/types/api';
  */
 export function TeamListSsrView({
   teams,
+  total,
   sports = [],
 }: {
   readonly teams: readonly V1Team[];
+  readonly total?: number;
   readonly sports?: readonly V1Sport[];
 }) {
   const base = getTeamListViewModel();
@@ -29,12 +31,13 @@ export function TeamListSsrView({
         query: '',
         filterCount: 0,
         teams: cards,
-        chips: buildTeamSportChips(items, base, new URLSearchParams(), undefined, [...sports]),
+        chips: buildTeamSportChips(items, base, new URLSearchParams(), undefined, [...sports], total == null || items.length >= total),
         summary: {
           ...base.summary,
           // SSR 목록은 종목 필터를 받지 않는다(searchParams 미사용) — 항상 미필터 scope.
           scope: deriveTeamScope(),
-          total: cards.length,
+          total: total ?? cards.length,
+          loaded: cards.length,
           recruiting: cards.filter((item) => item.status === 'open').length,
           nearby: undefined,
         },

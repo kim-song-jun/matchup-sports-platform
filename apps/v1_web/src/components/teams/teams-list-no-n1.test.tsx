@@ -35,7 +35,7 @@ vi.mock('@/lib/api-client', async (importOriginal) => ({
 }));
 
 const hookMocks = vi.hoisted(() => ({
-  useV1Teams: vi.fn(),
+  useV1TeamPages: vi.fn(),
   useV1MasterSports: vi.fn(() => ({ data: { items: [] }, isLoading: false })),
   useV1RecentSearches: vi.fn(() => ({ data: { items: [] }, isLoading: false })),
   useV1RecordSearch: vi.fn(() => ({ mutate: vi.fn() })),
@@ -81,7 +81,14 @@ describe('팀 목록 N+1 방지', () => {
   beforeEach(() => {
     apiClientMocks.v1Get.mockClear();
     const items = Array.from({ length: 12 }, (_, i) => teamWithoutActivity(i));
-    hookMocks.useV1Teams.mockReturnValue({ data: { items }, isLoading: false, isError: false });
+    hookMocks.useV1TeamPages.mockReturnValue({
+      data: { pages: [{ items, pageInfo: { nextCursor: null, hasNext: false, total: items.length } }] },
+      isLoading: false,
+      isError: false,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      fetchNextPage: vi.fn(),
+    });
   });
 
   it('활동 정보가 없는 팀이 12개여도 팀 상세를 한 번도 부르지 않는다', async () => {
@@ -101,7 +108,14 @@ describe('팀 목록 N+1 방지', () => {
 
   it('팀 수가 늘어도 상세 호출은 여전히 0이다 (N 에 비례하지 않는다)', async () => {
     const items = Array.from({ length: 44 }, (_, i) => teamWithoutActivity(i));
-    hookMocks.useV1Teams.mockReturnValue({ data: { items }, isLoading: false, isError: false });
+    hookMocks.useV1TeamPages.mockReturnValue({
+      data: { pages: [{ items, pageInfo: { nextCursor: null, hasNext: false, total: items.length } }] },
+      isLoading: false,
+      isError: false,
+      hasNextPage: false,
+      isFetchingNextPage: false,
+      fetchNextPage: vi.fn(),
+    });
 
     render(<TeamListPageClient />);
     await waitFor(() => expect(screen.getByText('활동정보없는팀 43')).toBeInTheDocument());

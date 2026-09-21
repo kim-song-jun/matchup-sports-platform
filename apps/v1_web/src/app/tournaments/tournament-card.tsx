@@ -1,5 +1,6 @@
 'use client';
 
+import { TournamentTitle } from '@/components/tournaments/tournament-title';
 import { Trophy } from 'lucide-react';
 import { pendingCapacityLabel } from '@/lib/tournament-registration-availability';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
@@ -41,18 +42,6 @@ function getGenderCategoryLabel(category: V1TournamentListItem['genderCategory']
   if (category === 'female') return '여성부';
   if (category === 'mixed') return '혼성';
   return '성별 구분 없음';
-}
-
-function renderTitleWithBoundStatusPhrases(title: string) {
-  return title.split(/((?:경기|모집)\s+중)/g).map((part, index) =>
-    /^(?:경기|모집)\s+중$/.test(part) ? (
-      <span key={`${part}-${index}`} style={{ whiteSpace: 'nowrap' }}>
-        {part}
-      </span>
-    ) : (
-      part
-    ),
-  );
 }
 
 /**
@@ -134,7 +123,7 @@ export function TournamentCard({
         <CompetitionCardHeader
           sportCode={item.sport.code}
           imageUrl={thumbnailImageUrl}
-          title={renderTitleWithBoundStatusPhrases(item.title)}
+          title={<TournamentTitle title={item.title} />}
           statusBadge={{ label: status.label, badgeClass: status.badgeClass }}
           meta={
             <>

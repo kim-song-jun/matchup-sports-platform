@@ -115,7 +115,7 @@ function invitationRow(overrides: Record<string, unknown> = {}) {
 describe('TeamsService', () => {
   let service: TeamsService;
   let prisma: {
-    v1Team: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
+    v1Team: { findFirst: jest.Mock; findMany: jest.Mock; count: jest.Mock; update: jest.Mock; create: jest.Mock; updateMany: jest.Mock; findUniqueOrThrow: jest.Mock };
     v1TeamProfile: { upsert: jest.Mock };
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock; upsert: jest.Mock; findUnique: jest.Mock; findUniqueOrThrow: jest.Mock; updateMany: jest.Mock; count: jest.Mock };
     v1TeamJoinApplication: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock; create: jest.Mock };
@@ -137,7 +137,7 @@ describe('TeamsService', () => {
 
   beforeEach(async () => {
     prisma = {
-      v1Team: { findFirst: jest.fn(), findMany: jest.fn(), update: jest.fn(), create: jest.fn(), updateMany: jest.fn(), findUniqueOrThrow: jest.fn() },
+      v1Team: { findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn().mockResolvedValue(1), update: jest.fn(), create: jest.fn(), updateMany: jest.fn(), findUniqueOrThrow: jest.fn() },
       v1TeamProfile: { upsert: jest.fn() },
       v1TeamMembership: {
         findFirst: jest.fn(),
@@ -482,6 +482,10 @@ describe('TeamsService', () => {
       expect(result.items[0].manager).toEqual({
         userId: manager.id,
         displayName: 'manager-nick',
+      });
+      expect(result.pageInfo.total).toBe(1);
+      expect(prisma.v1Team.count).toHaveBeenCalledWith({
+        where: expect.objectContaining({ status: 'active', deletedAt: null }),
       });
     });
 

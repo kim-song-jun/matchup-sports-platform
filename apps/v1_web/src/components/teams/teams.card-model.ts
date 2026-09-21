@@ -85,6 +85,7 @@ export function buildTeamSportChips(
   params: URLSearchParams,
   selectedSportId?: string,
   masterSports?: Array<{ id: string; name: string }>,
+  showCounts = true,
 ) {
   // 마스터 종목 목록이 있으면 그것이 정답이다 — 링크에 실을 **종목 ID** 가 거기에만 있다.
   //
@@ -97,13 +98,17 @@ export function buildTeamSportChips(
     : topSportNames(items).map((name) => ({ name }));
 
   return [
-    { label: fallback.chips[0]?.label.replace(/\s+\d+$/, '') ?? '전체', count: items.length, active: !selectedSportId, href: buildTeamHref(params, { sportId: null }) },
+    { label: fallback.chips[0]?.label.replace(/\s+\d+$/, '') ?? '전체', ...(showCounts ? { count: items.length } : {}), active: !selectedSportId, href: buildTeamHref(params, { sportId: null }) },
     ...fixedSports.map((sport) => ({
       label: sport.name,
-      count: items.filter((team) => {
-        const teamSport = team.sport;
-        return (sport.id !== undefined && teamSport?.sportId === sport.id) || teamSport?.name === sport.name || team.sportName === sport.name;
-      }).length,
+      ...(showCounts
+        ? {
+            count: items.filter((team) => {
+              const teamSport = team.sport;
+              return (sport.id !== undefined && teamSport?.sportId === sport.id) || teamSport?.name === sport.name || team.sportName === sport.name;
+            }).length,
+          }
+        : {}),
       active: sport.id !== undefined && selectedSportId === sport.id,
       ...(sport.id === undefined ? {} : { href: buildTeamHref(params, { sportId: sport.id }) }),
     })),

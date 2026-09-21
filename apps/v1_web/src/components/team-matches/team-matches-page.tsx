@@ -213,6 +213,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
   const { confirm, ConfirmModal } = useConfirm();
   const { match, mode } = model;
   const league = match.league;
+  const hasAssignedHostTeam = Boolean(match.hostTeamId);
   /* 매치 관리 카드의 "화면당 primary 1개" 규칙(DESIGN.md §14) — 라인업 → 경기 결과 → 후기
    * 순서에서 실제로 보이는(model 에 설정된) 첫 행이 primary, 나머지는 outline이다. */
   const matchManageNextAction: 'lineup' | 'result' | 'review' | null = model.lineupHref
@@ -300,10 +301,11 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
       <TeamAvatar seed={match.hostTeamId ?? match.hostTeam} name={match.hostTeam} logoUrl={match.hostTeamLogoUrl} size="md" />
       {/* 팀 정보 */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>{match.platformManaged ? '운영 주관' : '홈팀 정보'}</div>
+        <div className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>{hasAssignedHostTeam ? '홈팀 정보' : '운영 주관'}</div>
         <div className="tm-text-body-lg" style={{ marginTop: 2 }}>{match.hostTeam}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
           <span className="tm-badge tm-badge-blue">{match.sport}</span>
+          {match.platformManaged ? <span className="tm-badge tm-badge-grey">플랫폼 주관</span> : null}
           {/* 등급 미입력(리그 대진 등 levelLabel 없음)이면 값 없는 "등급" 배지가 뜬다 — 숨긴다. */}
           {match.grade ? <span className="tm-badge tm-badge-grey">{match.grade}등급</span> : null}
           {match.hostTeamTrustState && trustStateLabel(match.hostTeamTrustState) ? (
@@ -319,10 +321,10 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
           ) : null}
         </div>
       </div>
-      {!match.platformManaged && <span className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flexShrink: 0 }}>팀 보기</span>}
+      {hasAssignedHostTeam ? <span className="tm-btn tm-btn-sm tm-btn-neutral" style={{ flexShrink: 0 }}>팀 보기</span> : null}
     </>
   );
-  const hostTeamCard = match.platformManaged ? (
+  const hostTeamCard = !hasAssignedHostTeam ? (
     <div className="tm-card tm-host-team-card" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: 16 }}>
       {hostTeamCardContent}
     </div>
@@ -387,7 +389,7 @@ export function TeamMatchDetailPageView({ model }: { model: TeamMatchDetailViewM
               </div>
               <div className="tm-team-vs-row">
                 <div>
-                  <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{match.platformManaged ? '운영 주관' : '홈팀'}</div>
+                  <div className="tm-text-caption" style={{ color: 'var(--overlay-white-68)' }}>{hasAssignedHostTeam ? '홈팀' : '운영 주관'}</div>
                   <div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{match.hostTeam}</div>
                   {/* 매너·승수는 API 가 내려주지만(hostTeam.mannerScore / hostTeam.wins), 공개된
                       팀 후기가 0건이면 매너 점수를 낼 수 없어 null 이 온다 — 모르면 이 줄을 통째로
@@ -904,6 +906,7 @@ function TeamMatchCard({ match }: { match: TeamMatchModel }) {
             카드에 배지가 붙어(모집 중·신청 마감·승인 완료…), 제목 줄에 인라인으로 두면 매 카드에서
             제목이 그만큼 잘린다 — 데스크톱 실측(2026-09-07)에서 본문 191px 중 제목이 111px 였다. */}
         <div className="tm-text-caption tm-match-row-meta tm-team-match-row-id">
+          {match.platformManaged ? <span className="tm-badge tm-badge-grey">플랫폼 주관</span> : null}
           {relation ? (
             <span className={`tm-badge ${relation.className}`}>
               <svg width="7" height="7" viewBox="0 0 7 7" aria-hidden="true" style={{ flexShrink: 0 }}><circle cx="3.5" cy="3.5" r="3.5" fill="currentColor" /></svg>
@@ -1184,8 +1187,10 @@ function PlaceTimeFields({ model }: { model: TeamMatchCreateViewModel }) {
           <CreateField id="field-startTime" error={errors?.startTime} label="시작 시간" value={d.startTime} type="time" onChange={(value) => model.form?.onFieldChange('startTime', value)} />
           <RequiredHint shown={!errors?.startTime && !d.startTime} />
         </div>
-        <CreateField label="종료 시간" value={d.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} />
+        <CreateField id="field-endTime" error={errors?.endTime} label="종료 시간" value={d.endTime} type="time" onChange={(value) => model.form?.onFieldChange('endTime', value)} />
       </div>
+      <CreateField id="field-endDate" error={errors?.endDate} label="종료 날짜 (다음 날 종료 시)" value={d.endDate ?? ''} type="date" onChange={(value) => model.form?.onFieldChange('endDate', value)} />
+      <div className="tm-text-caption" style={{ marginTop: 8 }}>종료 날짜를 비우면 시작 날짜와 같아요. 자정을 넘는 경기는 다음 날을 선택해 주세요.</div>
       <div className="tm-create-two-col">
         <CreateField id="field-deadlineDate" error={errors?.deadlineDate} label="신청 마감일" value={d.deadlineDate} type="date" onChange={(value) => model.form?.onFieldChange('deadlineDate', value)} />
         <CreateField id="field-deadlineTime" error={errors?.deadlineTime} label="신청 마감시간" value={d.deadlineTime} type="time" onChange={(value) => model.form?.onFieldChange('deadlineTime', value)} />
@@ -1253,7 +1258,7 @@ function ConfirmStep({ model }: { model: TeamMatchCreateViewModel }) {
   const styleText = d.style.join(' · ');
   // 종료 시간은 선택 입력이라 비어 있을 수 있다 — 상세 화면(:349 InfoRow label="장소")과
   // 동일하게 분기해야 확인 화면에 하이픈만 매달려 남는 것을 막는다.
-  const timeRangeText = d.endTime ? `${d.date} ${d.startTime}-${d.endTime}` : `${d.date} ${d.startTime}`;
+  const timeRangeText = d.endTime ? `${d.date} ${d.startTime} ~ ${d.endDate && d.endDate !== d.date ? `${d.endDate} ` : ''}${d.endTime}` : `${d.date} ${d.startTime}`;
   return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-team-create-preview" style={{ backgroundImage: cssUrl(d.imageUrl) }}><div className="tm-text-subhead" style={{ color: 'var(--static-white)' }}>{model.selectedTeam} vs 상대팀</div></div><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{d.grade}</span><span className="tm-badge tm-badge-grey">{d.format}</span><span className="tm-badge tm-badge-grey">{d.gender}</span>{isFreeInvite ? <span className="tm-badge tm-badge-blue">무료초청</span> : null}</div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{d.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{d.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색과 추천에 사용돼요" /><InfoRow label="경기조건" value={`${d.grade} · ${d.format}${styleText ? ` · ${styleText}` : ''}`} sub={`${d.uniform} · ${d.gender}`} /><InfoRow label="비용" value={`총 ${formatAmountNumber(d.cost)}원 · 상대팀 ${formatAmountNumber(d.opponentCost)}원`} /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={d.venue} sub={d.address} /></Card></div>;
 }
 

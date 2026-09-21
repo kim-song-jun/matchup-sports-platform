@@ -45,11 +45,16 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 
 ### Admin platform recruitment
 
-- active owner/ops admin은 `/admin/team-matches/new`에서 종목·지역·장소·일정을 입력해 팀 없는 모집을 연다.
+- 2026-09-21 assigned-detail proof: headed Chrome created a real admin recruitment, submitted two same-sport team applications, assigned HOME/AWAY, followed the public list card link, and verified `platformManaged=true`, both real teams, and the 120,000/60,000 cost split on the public detail. Evidence: `docs/screenshots/task149-admin-team-match-condition-parity/*-public-detail-provenance.png`; focused E2E 2/2 passed.
+
+- active owner/ops admin은 `/admin/team-matches/new`에서 일반 팀매치 모집과 같은 대표 이미지·실력·경기 방식·스타일·유니폼·성별·총 비용/상대팀 비용·지역·장소·일정을 입력해 팀 없는 모집을 연다. 신청 마감은 선택 사항이다.
 - 생성 직후 팀매치는 `recruiting`이며 Game과 팀 일정은 아직 만들지 않는다.
+- 공개 목록과 상세는 생성 직후 `Teameet 운영`과 `플랫폼 주관`을 표시한다.
+- 관리자 상세는 저장된 대표 이미지와 실력 등급을 기존 형식·스타일·성별·유니폼·비용 조건과 함께 보여준다.
 - 같은 종목의 활성 팀 manager 이상이 공개 상세에서 기존 신청 API로 참가를 요청한다.
 - 관리자는 `/admin/team-matches/:id`의 신청 목록에서 서로 다른 두 신청을 홈·원정으로 선택한다.
 - 확정 시 서버는 팀 상태와 종목을 다시 검증한 뒤 팀매치를 `matched`로 바꾸고 Game의 HOME/AWAY side, 양 팀 일정, 선택 신청 승인, 나머지 신청 거절, 감사 로그를 같은 트랜잭션에서 기록한다.
+- 확정 뒤 공개 목록과 상세는 `플랫폼 주관` 출처를 유지하면서 실제 `홈팀 vs 원정팀` 이름과 홈팀 상세 링크를 보여준다.
 - support admin은 생성·확정 UI 대신 권한 안내를 보고, API 직접 호출도 `403`으로 거절된다.
 - 기존 팀 관리자용 모집/신청/승인 시나리오는 그대로 유지된다.
 - 2026-09-19 actual-runtime proof: isolated v1 PostgreSQL/API/Web + headed Chrome에서 관리자 생성 `201`, 공개 목록 same-ID 노출, `송파 풋살 모임` 브라우저 신청 `201 requested`, 관리자 상세 신청 1건 영속 조회를 확인했다. 데스크톱·태블릿·모바일 증거와 JSON verdict는 `docs/screenshots/task149-admin-team-match/real-*`에 있다. 재현 스펙은 공식 Playwright QA 컨테이너 desktop 1/1 통과했다.
@@ -164,3 +169,13 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 - 2026-04-11: `TM-004` 운영 화면 계약은 실제 `team-match` detail 기반으로 정렬되었고, arrival 재제출도 backend에서 차단되도록 닫았다. 전용 Playwright spec(`e2e/tests/team-match-operations.spec.ts`)은 `/team-matches` warmup으로 조정했고, live API `health`/`dev-login`도 다시 통과했다. 다만 현재 host Next dev runtime에서 `/team-matches` 계열이 간헐적으로 `ERR_CONNECTION_RESET` 또는 generic `Internal Server Error`를 반환해 browser green은 아직 별도 런타임 정리 후 다시 확인해야 한다.
 - 2026-04-23: team-match 관리 follow-up으로 `PATCH /team-matches/:id` 수정/취소와 history 조회 status list 계약을 추가했다. `/my/team-matches`, `/teams/:id/matches`는 기본 `recruiting`만 보지 않고 history status를 명시적으로 조회해야 한다.
 - 2026-08-04 (Todo 26): added the `## v1 stack (Tasks 12-24)` section above after verifying the actual v1 `TeamMatchesController` route table and cross-checking result entry against `docs/api/domains/games.md`. The legacy `TM-004` scenario's `check-in`/`evaluate`/`referee-schedule` steps have no v1 route today (confirmed by reading the controller, not inferred) — this is recorded as a real gap, not silently dropped. `E2E-TEAM-01`/`E2E-TEAM-02` are named per Todo 26's acceptance criteria and pointed at `e2e/v1-tests/team-match.spec.ts`, which does not yet implement them.
+
+## TM-149-P 일반/관리자 모집 조건 parity
+
+- [x] 두 폼에서 경기 스타일 직접 입력을 포함한 조건이 저장된다(최대 3개).
+- [x] 과거 신청 마감은 생성 전에 차단되고 직접 API 요청도 400으로 거절된다.
+- [x] 시작 전 종료 시각은 일반 폼에서도 오류로 표시되며 입력이 사라지지 않는다.
+- [x] 23:00 시작 → 다음 날 01:00 종료가 양쪽에서 저장되고 일반 수정에서도 유지된다.
+- [x] 접수 후 마감 경과: 새 신청은 거절되지만 기존 신청 승인/관리자 두 팀 확정은 시작 전까지 가능하다.
+- [x] 명시적 모집 종료/경기 시작 이후에는 확정이 거절된다.
+- [x] 390/768/1440에서 before/after, console/network, 수평 overflow를 확인한다.

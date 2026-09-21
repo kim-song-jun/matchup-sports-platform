@@ -19,6 +19,14 @@ const createDto = {
   startsAt: FUTURE.toISOString(),
   deadlineAt: DEADLINE.toISOString(),
   manualPlaceName: '잠실 풋살장',
+  imageUrl: '/uploads/admin-team-match.webp',
+  costNote: '총 90,000원 · 상대팀 30,000원',
+  minLevelCode: 'intermediate',
+  maxLevelCode: 'intermediate',
+  genderRule: '성별 무관',
+  matchFormat: '5:5',
+  matchStyle: ['친선', '매너 중시'],
+  uniformColor: '파랑',
 };
 const assignDto = {
   clientCommandId: '00000000-0000-4000-8000-000000000002',
@@ -58,6 +66,11 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       v1Sport: { findFirst: jest.fn().mockResolvedValue({ id: sportId, code: 'futsal' }) },
       v1Region: { findFirst: jest.fn().mockResolvedValue({ id: regionId }) },
       v1CompetitionConfigVersion: { findFirst: jest.fn().mockResolvedValue({ id: 'config-1' }) },
+      v1SportLevel: {
+        findMany: jest.fn().mockResolvedValue([
+          { id: 'level-intermediate', code: 'intermediate', sortOrder: 3 },
+        ]),
+      },
       v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({}) },
       v1TeamMatch: {
         create: jest.fn().mockResolvedValue({ id: 'team-match-1', status: 'recruiting' }),
@@ -68,6 +81,7 @@ describe('AdminTeamMatchRecruitmentsService', () => {
           sportId,
           status: 'recruiting',
           hostTeamId: null,
+          platformManaged: true,
           approvedApplicantTeamId: null,
           startAt: FUTURE,
           endAt: null,
@@ -111,12 +125,32 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       replayed: false,
     });
     expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ hostTeamId: null, approvedApplicantTeamId: null, status: 'recruiting' }),
+      data: expect.objectContaining({
+        hostTeamId: null,
+        platformManaged: true,
+        approvedApplicantTeamId: null,
+        status: 'recruiting',
+        imageUrl: '/uploads/admin-team-match.webp',
+        costNote: '총 90,000원 · 상대팀 30,000원',
+        minSportLevelId: 'level-intermediate',
+        maxSportLevelId: 'level-intermediate',
+        genderRule: '성별 무관',
+        matchFormat: '5:5',
+        matchStyle: ['친선', '매너 중시'],
+        uniformColor: '파랑',
+      }),
     });
     expect(games.createFromSourceInTransaction).not.toHaveBeenCalled();
     expect(prisma.v1TeamSchedule.create).not.toHaveBeenCalled();
   });
 
+  it('keeps the deadline optional like regular team match recruitment', async () => {
+    await service.create(adminUser, { ...createDto, deadlineAt: undefined });
+
+    expect(prisma.v1TeamMatch.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ deadlineAt: null }),
+    });
+  });
   it('assigns two requested teams and only then creates the game and both schedules', async () => {
     await expect(service.assign(adminUser, 'team-match-1', assignDto)).resolves.toEqual(expect.objectContaining({
       teamMatchId: 'team-match-1',
@@ -136,6 +170,18 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       data: { hostTeamId: 'team-home', approvedApplicantTeamId: 'team-away', status: 'matched' },
     });
     expect(prisma.v1TeamSchedule.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects assigning a hostless match that was not created by the platform flow', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValueOnce({
+      ...await prisma.v1TeamMatch.findFirst(),
+      platformManaged: false,
+    });
+
+    await expect(service.assign(adminUser, 'team-match-1', assignDto)).rejects.toMatchObject({
+      response: { code: 'TEAM_MATCH_NOT_PLATFORM_RECRUITING' },
+    });
+    expect(games.createFromSourceInTransaction).not.toHaveBeenCalled();
   });
 
   it('rejects selecting the same application before opening a transaction', async () => {

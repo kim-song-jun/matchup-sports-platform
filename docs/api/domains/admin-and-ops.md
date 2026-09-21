@@ -37,7 +37,7 @@
 | `GET` | `/api/v1/admin/teams/:teamId` | - | active admin | 팀 상세·활성 팀원 연락처/역할 목록 |
 | `POST` | `/api/v1/admin/teams/:teamId/status` | `ChangeTeamStatusDto` | owner/ops | 팀 상태 변경 |
 | `GET` | `/api/v1/admin/team-matches` | `AdminTeamMatchListQueryDto` | active admin | 팀 매치 목록 |
-| `GET` | `/api/v1/admin/team-matches/:teamMatchId` | — | active admin | 팀 매치 상세 — 상대팀 신청(최근 50건)·확정 상대팀·소속 리그·경기 조건 포함. 라이브 경기 상태는 현장 콘솔 소관이라 `hasGame` 여부만 준다 |
+| `GET` | `/api/v1/admin/team-matches/:teamMatchId` | — | active admin | 팀 매치 상세 — 상대팀 신청(최근 50건)·확정 상대팀·소속 리그·대표 이미지·실력·경기 조건 포함. 라이브 경기 상태는 현장 콘솔 소관이라 `hasGame` 여부만 준다 |
 | `POST` | `/api/v1/admin/team-matches` | `CreateAdminTeamMatchRecruitmentDto` | owner/ops | 팀을 지정하지 않은 플랫폼 팀매치 모집 생성 |
 | `POST` | `/api/v1/admin/team-matches/:teamMatchId/assign` | `AssignAdminTeamMatchApplicationsDto` | owner/ops | 신청 목록에서 홈·원정 두 팀을 선택해 경기 확정 |
 | `POST` | `/api/v1/admin/team-matches/:teamMatchId/status` | `ChangeTeamMatchStatusDto` | owner/ops | 팀 매치 상태 변경 |
@@ -260,3 +260,7 @@ type AdminListSummary = {
 ## 대시보드 신청 집계
 
 `GET /api/v1/admin/hub/inbox`의 `pendingRegistrations`는 삭제되지 않은 대회(`regular_tournament` 또는 기존 `kind=null`)의 `awaiting_payment`, `payment_checking`, `paid`, `cancel_requested` 신청만 포함한다. 정규 리그 시즌은 `/admin/tournaments/:id/registrations`에서 조회할 수 없으므로 이 대회 전용 집계에 포함하지 않는다. 리그 신청은 `/admin/league-matches/:leagueId/registrations`에서 관리한다. 응답 필드와 관리자 권한 계약은 유지한다.
+
+#### Task 149 — 팀매치 모집 조건 일치
+
+`POST /admin/team-matches`는 일반 생성과 같은 미래 시작/선택 종료/선택 마감 검증을 사용한다. 경기 스타일은 직접 입력을 포함해 최대 3개다. 신청 마감 뒤에도 접수된 두 팀은 경기 시작 전까지 확정할 수 있다(raw `recruiting`에 한함). 자세한 계약은 [팀매치](team-matches.md#일반관리자-날짜확정-공통-계약-task-149)를 따른다.

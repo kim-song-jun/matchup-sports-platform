@@ -21,6 +21,7 @@ import { computeRevealedTeamTrustBatch } from '../reviews/team-trust-aggregation
 import { normalizeRichContent } from '../content/rich-content';
 import { UploadedFile, UploadsService } from '../uploads/uploads.service';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
+import { formatLevelRange } from '../sports/level-range';
 import { TOURNAMENT_SURFACE_KIND } from '../tournaments/tournament-surface';
 import {
   AdminListQueryDto,
@@ -1040,6 +1041,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         id: true,
         title: true,
         description: true,
+        imageUrl: true,
         placeName: true,
         placeAddress: true,
         startAt: true,
@@ -1058,6 +1060,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         approvedApplicantTeamId: true,
         approvedApplicantTeam: { select: { name: true } },
         sport: { select: { name: true, code: true } },
+        minSportLevel: { select: { name: true } },
+        maxSportLevel: { select: { name: true } },
         region: { select: { name: true } },
         createdByUser: { select: { id: true, profile: { select: { nickname: true } } } },
         league: { select: { id: true, title: true } },
@@ -1087,8 +1091,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       teamMatchId: row.id,
       title: row.title,
       description: row.description ?? null,
+      imageUrl: row.imageUrl ?? null,
       sportName: row.sport.name,
       sportCode: row.sport.code,
+      levelLabel: formatLevelRange(row.minSportLevel, row.maxSportLevel, null),
       regionName: row.region?.name ?? null,
       placeName: row.placeName,
       placeAddress: row.placeAddress ?? null,

@@ -168,3 +168,48 @@ describe('buildTeamMatchPayloadResult — payload | missingFields 분기', () =>
     expect(fields).toContain('startTime');
   });
 });
+
+describe('regular/admin date parity', () => {
+  it('rejects a past deadline instead of creating an already closed recruitment', () => {
+    const ctx = baseCtx();
+    ctx.draft.deadlineDate = '2000-01-01';
+    ctx.draft.deadlineTime = '12:00';
+    expect(buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId).missingFields)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ field: 'deadlineTime' })]));
+  });
+
+  it('rejects an earlier end time instead of silently discarding it', () => {
+    const ctx = baseCtx();
+    ctx.draft.startTime = '20:00';
+    ctx.draft.endTime = '19:00';
+    const result = buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId);
+    expect(result.payload).toBeUndefined();
+    expect(result.missingFields).toEqual(expect.arrayContaining([expect.objectContaining({ field: 'endTime' })]));
+  });
+
+  it('preserves an explicit next-day end date', () => {
+    const ctx = baseCtx();
+    const end = futureIso(8);
+    Object.assign(ctx.draft, { startTime: '23:00', endDate: end.toISOString().slice(0, 10), endTime: '01:00' });
+    const result = buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId);
+    expect(result.payload?.endsAt).toBe(new Date(`${end.toISOString().slice(0, 10)}T01:00:00`).toISOString());
+  });
+
+  it('requires an end time when an end date is supplied', () => {
+    const ctx = baseCtx();
+    Object.assign(ctx.draft, { endDate: ctx.draft.date, endTime: '' });
+    expect(buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId).missingFields)
+      .toEqual(expect.arrayContaining([expect.objectContaining({ field: 'endTime' })]));
+  });
+});
+
+
+it('preserves the existing elapsed deadline on edit but rejects changing it to another elapsed time', () => {
+  const ctx = baseCtx();
+  ctx.draft.deadlineDate = '2000-01-01';
+  ctx.draft.deadlineTime = '12:00';
+  const saved = new Date('2000-01-01T12:00:00').toISOString();
+  expect(buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId, saved).payload?.deadlineAt).toBe(saved);
+  ctx.draft.deadlineTime = '11:00';
+  expect(buildTeamMatchPayloadResult(ctx.draft, ctx.hostTeamId, ctx.sportId, ctx.regionId, saved).payload).toBeUndefined();
+});

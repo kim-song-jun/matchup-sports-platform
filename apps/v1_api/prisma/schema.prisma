@@ -1744,6 +1744,7 @@ model V1PostEventReviewRiskFlag {
 model V1TeamMatch {
   id                         String            @id @default(uuid())
   hostTeamId                 String?           @map("host_team_id")
+  platformManaged            Boolean           @default(false) @map("platform_managed")
   createdByUserId            String?           @map("created_by_user_id")
   sportId                    String            @map("sport_id")
   regionId                   String?           @map("region_id")

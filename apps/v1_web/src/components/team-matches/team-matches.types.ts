@@ -192,6 +192,7 @@ export type TeamMatchCreateViewModel = {
     address: string;
     date: string;
     startTime: string;
+    endDate?: string;
     endTime: string;
     deadlineDate: string;
     deadlineTime: string;

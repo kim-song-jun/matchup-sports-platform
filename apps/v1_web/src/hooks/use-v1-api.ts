@@ -884,6 +884,24 @@ export function useV1Teams(filters?: ListFilters, options?: QueryOptions & { see
   });
 }
 
+export function useV1TeamPages(filters?: ListFilters, options?: QueryOptions & { seed?: CursorPage<V1Team> }) {
+  return useInfiniteQuery({
+    queryKey: [...v1Keys.teams(filters), 'infinite'] as const,
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) =>
+      v1Get<CursorPage<V1Team>>('/teams', {
+        ...(filters ?? {}),
+        ...(pageParam ? { cursor: pageParam } : {}),
+      }),
+    getNextPageParam: (lastPage) =>
+      lastPage.pageInfo?.hasNext ? lastPage.pageInfo.nextCursor ?? undefined : undefined,
+    enabled: options?.enabled,
+    initialData: options?.seed
+      ? { pages: [options.seed], pageParams: [undefined] }
+      : undefined,
+  });
+}
+
 /**
  * #3 1단계: 팀매치 위저드의 장소 입력창 포커스 시 보여줄, 이 팀이 호스트로 과거에
  * 실제로 입력했던 장소 칩. team 스텝에서 팀을 고르기 전에는 teamId가 비어 있어

@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { TeamListPageClient } from '@/components/teams/teams-client';
 import { TeamListSsrView } from '@/components/teams/teams-ssr-list';
 import { buildPublicMetadata } from '@/lib/seo';
-import { fetchSeoListPage, fetchSeoMasterSports } from '@/lib/seo-list';
+import { fetchSeoCursorPage, fetchSeoMasterSports } from '@/lib/seo-list';
 import type { V1Team } from '@/types/api';
 
 export const metadata = buildPublicMetadata({
@@ -14,14 +14,14 @@ export const metadata = buildPublicMetadata({
 export const revalidate = 300;
 
 export default async function TeamsPage() {
-  const [teams, sports] = await Promise.all([
-    fetchSeoListPage<V1Team>('/teams', 'teams'),
+  const [page, sports] = await Promise.all([
+    fetchSeoCursorPage<V1Team>('/teams', 'teams'),
     fetchSeoMasterSports(),
   ]);
 
   return (
-    <Suspense fallback={<TeamListSsrView teams={teams} sports={sports} />}>
-      <TeamListPageClient seed={{ teams, sports }} />
+    <Suspense fallback={<TeamListSsrView teams={page.items} total={page.pageInfo?.total} sports={sports} />}>
+      <TeamListPageClient seed={{ page, sports }} />
     </Suspense>
   );
 }

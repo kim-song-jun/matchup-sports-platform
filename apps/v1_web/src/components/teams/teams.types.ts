@@ -54,8 +54,11 @@ export type TeamListViewModel = {
     levelOptions: Array<{ label: string; value: 'beginner' | 'novice' | 'intermediate' | 'advanced'; href: string; active?: boolean }>;
   };
   chips: Array<{ label: string; count?: number; active?: boolean; href?: string }>;
-  summary: { scope: string; total: number; recruiting: number; nearby?: number };
+  summary: { scope: string; total: number; loaded?: number; recruiting: number; nearby?: number };
   listLoading?: boolean;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
   teams: TeamModel[];
 };
 

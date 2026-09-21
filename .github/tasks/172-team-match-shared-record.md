@@ -44,3 +44,5 @@
 - 2026-09-22: [PR #1243](https://github.com/kim-song-jun/matchup-sports-platform/pull/1243) 생성. 최신 dev `a494cde6a` 병합 후 충돌 해결(`8b6dd89dd`), MERGEABLE 확인. 병합 후 API 단위 144/144, 실제 DB 통합 11/11, 웹 회귀 172/172 및 양쪽 tsc 통과.
 - GitHub AI analysis [run 35616360938](https://github.com/kim-song-jun/matchup-sports-platform/actions/runs/35616360938) 실패: `400 The requested model is not supported`. Copilot review 요청은 접수 명령이 성공했으나 제출 리뷰가 없어 clean으로 판정하지 않는다. 제품 CI는 별도로 확인한다.
 - 전용 headed 브라우저·API·Web 종료. 병합 후 다시 시작한 전용 PostgreSQL도 검증 완료 후 종료. 원래 공유 작업트리 WIP는 변경하지 않았다.
+
+- CI follow-up: schema bytes changed but the release/client attestation and game-schema fixture pins still referenced Task 149. Rebound current schema `58b05adaedc4e53461167c4efa1c101e1297297b122db6a173b06f899fb2e7d9`, preserving historical manifest pins and immutable M11. Binding gate 7/7 and the previously failing source-snapshot integration test pass. No runtime source changed after the 42-screen gallery.

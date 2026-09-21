@@ -2680,6 +2680,8 @@ export type V1AdminTeamMatchApplicationRow = {
 
 export type V1AdminTeamMatchDetail = V1AdminTeamMatchRow & {
   description: string | null;
+  imageUrl: string | null;
+  levelLabel: string | null;
   sportCode: string;
   regionName: string | null;
   placeName: string;
@@ -2708,13 +2710,20 @@ export type V1AdminTeamMatchRecruitmentPayload = {
   regionId: string;
   title: string;
   description?: string | null;
+  imageUrl?: string | null;
   startsAt: string;
   endsAt?: string | null;
-  deadlineAt: string;
+  deadlineAt?: string | null;
   manualPlaceName: string;
   addressText?: string | null;
   costNote?: string | null;
   rulesText?: string | null;
+  minLevelCode?: string | null;
+  maxLevelCode?: string | null;
+  genderRule?: string | null;
+  matchFormat?: string | null;
+  matchStyle?: string[];
+  uniformColor?: string | null;
 };
 
 export type V1AdminTeamMatchRecruitmentResult = {

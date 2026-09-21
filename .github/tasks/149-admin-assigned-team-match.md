@@ -19,6 +19,8 @@ Status: complete
 - [x] Finalization atomically creates the Game and both schedules, approves the selected applications, rejects the remaining applications, and writes audit/status logs.
 - [x] Support admins and non-admin users cannot create or finalize platform recruitment.
 - [x] Existing team-owner recruitment/application flow remains unchanged.
+- [x] The admin recruitment uses the ordinary team-match condition contract: representative image, level, format, styles, uniform, gender, total/opponent cost, place, schedule, and optional deadline.
+- [x] Admin detail exposes the saved representative image and level alongside the existing format/style/gender/uniform/cost fields.
 
 ## Acceptance Criteria
 
@@ -48,6 +50,8 @@ Status: complete
 - [x] Real API/DB E2E: admin create `201` -> public list exposes the same platform-managed ID -> team manager applies through the browser with `201 requested` -> admin API/UI shows the persisted application.
 - [x] Reproducible Playwright spec passed in the repository QA container (`desktop`, 1/1); headed Chrome evidence captured at 1440×900, 834×1112, and 390×844.
 - [x] Touched-path debt grep and diff checks
+- [x] 2026-09-21 condition-parity focused tests: API 6/6, Web 13/13
+- [x] 2026-09-21 condition-parity API/Web typecheck and headed visual QA: desktop + mobile 4/4, no console/API errors or horizontal overflow
 
 ## Ambiguity Log
 
@@ -61,7 +65,14 @@ Status: complete
 - 2026-09-19: Platform recruitment creation, public team application, and admin two-application finalization implemented; focused backend/frontend tests passed.
 - 2026-09-19: Headed Windows Chrome visual QA passed at 1440×900, 768×1024, and 390×844 for empty/filled recruitment creation and two-application finalization. The isolated QA worktree used deterministic API fixtures without loading repository secrets; focused backend tests cover the server contract. Evidence is committed under `docs/screenshots/task149-admin-team-match/`.
 - 2026-09-19: A fresh isolated PostgreSQL runtime proved the real public journey with `host@teameet.v1` managing `송파 풋살 모임`: admin recruitment create `201`, public list same-ID lookup, browser application `201 requested`, and admin persisted count `1`. `e2e/v1-tests/admin-platform-team-match-flow.spec.ts` passed 1/1 in the official Playwright QA container. Headed Chrome reported zero console, page, request, or API errors; 40 cancelled Next RSC prefetches were classified separately as expected navigation aborts.
+- 2026-09-21: Admin recruitment condition inputs and persistence were aligned with ordinary team-match recruitment. The deadline is optional, price inputs serialize to the shared `costNote` format, and admin detail now shows the saved image and level. Focused API/Web tests passed.
 
+## Condition Parity Screenshot Evidence (2026-09-21)
+
+- Desktop: [empty form](../../docs/screenshots/task149-admin-team-match-condition-parity/desktop-form-empty.png) · [filled form](../../docs/screenshots/task149-admin-team-match-condition-parity/desktop-form-filled.png) · [detail](../../docs/screenshots/task149-admin-team-match-condition-parity/desktop-detail.png)
+- Tablet: [empty form](../../docs/screenshots/task149-admin-team-match-condition-parity/tablet-form-empty.png) · [filled form](../../docs/screenshots/task149-admin-team-match-condition-parity/tablet-form-filled.png) · [detail](../../docs/screenshots/task149-admin-team-match-condition-parity/tablet-detail.png)
+- Mobile: [empty form](../../docs/screenshots/task149-admin-team-match-condition-parity/mobile-form-empty.png) · [filled form](../../docs/screenshots/task149-admin-team-match-condition-parity/mobile-form-filled.png) · [detail](../../docs/screenshots/task149-admin-team-match-condition-parity/mobile-detail.png)
+- Machine-readable verdict: [report.json](../../docs/screenshots/task149-admin-team-match-condition-parity/report.json)
 ## Screenshot Evidence
 
 - Desktop: [empty](../../docs/screenshots/task149-admin-team-match/desktop-empty.png) · [completed](../../docs/screenshots/task149-admin-team-match/desktop-filled.png) · [applications](../../docs/screenshots/task149-admin-team-match/desktop-applications.png)

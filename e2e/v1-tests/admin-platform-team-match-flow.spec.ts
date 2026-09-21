@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { loginAs } from './helpers/auth';
 import { apiGet, apiPost, unwrap, type SuccessEnvelope } from './helpers/v1-http';
 import { personas } from './personas';
@@ -16,6 +18,13 @@ type ManageableTeam = {
 type CreatedRecruitment = { teamMatchId: string; status: string };
 type TeamMatchList = { items: Array<{ teamMatchId: string; title: string; platformManaged: boolean }> };
 type Application = { applicationId: string; status: string; applicantTeamId: string };
+
+const SCREENSHOT_DIR = path.resolve(process.cwd(), 'docs/screenshots/task149-admin-team-match-condition-parity');
+
+function screenshotPath(viewport: string, state: string) {
+  fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+  return path.join(SCREENSHOT_DIR, `${viewport}-${state}.png`);
+}
 
 function futureIso(days: number, hour: number) {
   const date = new Date();
@@ -114,5 +123,148 @@ test.describe('[admin → team manager] 플랫폼 팀매치 실제 모집·신�
     await expect(applications).toContainText(applicantTeam!.name);
     await expect(applications).toContainText('1건');
     await expect(applications).toContainText('신청');
+  });
+  test('관리자 모집 폼이 일반 팀매치 조건을 같은 입력 구조로 제공한다', async ({ page }, testInfo) => {
+    const consoleErrors: string[] = [];
+    const failedApiRequests: string[] = [];
+    const projectName = testInfo.project.name;
+    const capture = async (state: 'empty' | 'filled') => {
+      if (projectName === 'desktop') {
+        await page.setViewportSize({ width: 1440, height: 900 });
+        await page.screenshot({ path: screenshotPath('desktop', `form-${state}`), fullPage: true });
+        await page.setViewportSize({ width: 834, height: 1112 });
+        await page.screenshot({ path: screenshotPath('tablet', `form-${state}`), fullPage: true });
+        await page.setViewportSize({ width: 1440, height: 900 });
+      } else {
+        await page.screenshot({ path: screenshotPath('mobile', `form-${state}`), fullPage: true });
+      }
+    };
+    page.on('console', (message) => {
+      if (message.type() === 'error') consoleErrors.push(message.text());
+    });
+    page.on('requestfailed', (request) => {
+      if (request.url().includes('/api/')) failedApiRequests.push(`${request.method()} ${request.url()}`);
+    });
+    await page.route('**/api/v1/uploads', async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        json: { status: 'success', data: { urls: ['/mock/generated/futsal-rooftop.webp'] }, timestamp: new Date().toISOString() },
+      });
+    });
+
+    await loginAs(page, personas.admin.email);
+    await page.goto('/admin/team-matches/new', { waitUntil: 'networkidle' });
+    await expect(page.getByRole('heading', { name: '팀매치 모집 만들기' })).toBeVisible();
+
+    await expect(page.getByLabel('대표 이미지')).toHaveAttribute('type', 'file');
+    await expect(page.getByLabel('실력등급')).toBeVisible();
+    await expect(page.getByLabel('경기방식')).toBeVisible();
+    await expect(page.getByLabel('유니폼 색상')).toBeVisible();
+    await expect(page.getByLabel('성별 조건')).toBeVisible();
+    await expect(page.getByLabel('총비용')).toBeVisible();
+    await expect(page.getByLabel('상대팀 부담금')).toBeVisible();
+    await expect(page.getByText('비워두면 경기 시작 전까지 신청을 받아요.')).toBeVisible();
+    await capture('empty');
+
+    await expect.poll(() => page.getByLabel('종목').locator('option').count()).toBeGreaterThan(1);
+    await expect.poll(() => page.getByLabel('지역').locator('option').count()).toBeGreaterThan(1);
+    await page.getByLabel('종목').selectOption({ index: 1 });
+    await page.getByLabel('지역').selectOption({ index: 1 });
+    await page.getByLabel('매치 제목').fill('관리자 조건 동등성 검증');
+    await page.getByLabel('모집 안내 (선택)').fill('일반 팀매치와 같은 조건으로 두 참가팀을 모집합니다.');
+    await page.getByLabel('대표 이미지').setInputFiles(path.resolve(process.cwd(), 'apps/v1_web/public/mock/generated/futsal-rooftop.webp'));
+    await expect(page.getByRole('img', { name: '대표 이미지 미리보기' })).toBeVisible();
+    await page.getByLabel('실력등급').selectOption('intermediate');
+    await page.getByLabel('경기방식').fill('5:5');
+    await page.getByLabel('유니폼 색상').fill('파랑');
+    await page.getByLabel('총비용').fill('90000');
+    await page.getByLabel('상대팀 부담금').fill('30000');
+    await page.getByLabel('친선').check();
+    await page.getByLabel('매너 중시').check();
+    await page.getByLabel('경기 장소').fill('Teameet 검증 구장');
+    await page.getByLabel('상세 주소 (선택)').fill('서울특별시 송파구 올림픽로 25');
+    const start = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+    const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+    const deadline = new Date(start.getTime() - 4 * 24 * 60 * 60 * 1000);
+    const localDateTime = (date: Date) => new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+    await page.getByLabel('경기 시작').fill(localDateTime(start));
+    await page.getByLabel('경기 종료 (선택)').fill(localDateTime(end));
+    await page.getByLabel('신청 마감').fill(localDateTime(deadline));
+    await expect(page.getByRole('button', { name: '팀 신청 모집 시작하기' })).toBeEnabled();
+    await capture('filled');
+
+    const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    expect(hasHorizontalOverflow).toBe(false);
+    expect(consoleErrors).toEqual([]);
+    expect(failedApiRequests).toEqual([]);
+  });
+
+  test('관리자 상세에서 저장된 전체 경기 조건을 확인한다', async ({ page }, testInfo) => {
+    const projectName = testInfo.project.name;
+    await page.route('**/api/v1/admin/team-matches/visual-condition-parity', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        json: {
+          status: 'success',
+          timestamp: new Date().toISOString(),
+          data: {
+            teamMatchId: 'visual-condition-parity',
+            title: '잠실 주말 친선전',
+            hostTeamId: null,
+            hostTeamName: null,
+            league: null,
+            tournament: null,
+            sportName: '풋살',
+            sportCode: 'futsal',
+            startAt: '2026-10-10T10:00:00.000Z',
+            endAt: '2026-10-10T12:00:00.000Z',
+            deadlineAt: '2026-10-06T10:00:00.000Z',
+            status: 'recruiting',
+            createdAt: '2026-09-21T00:00:00.000Z',
+            description: '일반 팀매치와 같은 조건으로 참가할 두 팀을 모집합니다.',
+            imageUrl: '/mock/generated/futsal-rooftop.webp',
+            levelLabel: '중급',
+            regionName: '서울 송파구',
+            placeName: 'Teameet 검증 구장',
+            placeAddress: '서울특별시 송파구 올림픽로 25',
+            approvedApplicantTeamId: null,
+            approvedApplicantTeamName: null,
+            createdByUserId: 'admin-user',
+            createdByName: '운영자',
+            hasGame: false,
+            matchFormat: '5:5',
+            formatNote: null,
+            matchStyle: ['친선', '매너 중시'],
+            genderRule: '성별 무관',
+            uniformColor: '파랑',
+            costNote: '총 90,000원 · 상대팀 30,000원',
+            applicationCount: 0,
+            applications: [],
+          },
+        },
+      });
+    });
+
+    await loginAs(page, personas.admin.email);
+    await page.goto('/admin/team-matches/visual-condition-parity', { waitUntil: 'networkidle' });
+    const conditions = page.getByRole('region', { name: '경기 조건' });
+    await expect(conditions).toContainText('중급');
+    await expect(conditions).toContainText('5:5');
+    await expect(conditions).toContainText('총 90,000원 · 상대팀 30,000원');
+    await expect(page.getByRole('img', { name: '잠실 주말 친선전 대표 이미지' })).toBeVisible();
+
+    if (projectName === 'desktop') {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.screenshot({ path: screenshotPath('desktop', 'detail'), fullPage: true });
+      await page.setViewportSize({ width: 834, height: 1112 });
+      await page.screenshot({ path: screenshotPath('tablet', 'detail'), fullPage: true });
+    } else {
+      await page.screenshot({ path: screenshotPath('mobile', 'detail'), fullPage: true });
+    }
+
+    const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+    expect(hasHorizontalOverflow).toBe(false);
   });
 });

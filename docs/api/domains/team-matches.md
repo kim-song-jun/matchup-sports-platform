@@ -36,14 +36,16 @@ Required body:
 - `clientCommandId` (UUID, 재시도 멱등 키)
 - `sportId` (활성 종목)
 - `regionId` (활성 시·군·구)
-- `title`, `startsAt`, `deadlineAt`, `manualPlaceName`
+- `title`, `startsAt`, `manualPlaceName`
 
-Optional body: `description`, `endsAt`, `addressText`, `costNote`, `rulesText`.
+Optional body: `description`, `imageUrl`, `endsAt`, `deadlineAt`, `addressText`, `costNote`, `rulesText`, `minLevelCode`, `maxLevelCode`, `genderRule`, `matchFormat`, `matchStyle`, `uniformColor`.
 
 Rules:
 
 - active `owner` 또는 `ops` admin만 생성할 수 있으며 `support`는 `403 PERMISSION_DENIED`다.
 - 생성된 행은 `hostTeamId=null`, `status=recruiting`인 독립 플랫폼 모집이다.
+- 조건 필드는 일반 팀매치 모집과 같은 검증·저장 계약을 사용한다. web은 총 비용/상대팀 비용을 일반 생성 화면과 같은 `총 {금액}원 · 상대팀 {금액}원` 형식의 `costNote`로 보낸다.
+- `deadlineAt`은 일반 모집처럼 선택 사항이며 입력한 경우 현재보다 이후이고 `startsAt`보다 빨라야 한다.
 - 생성 시 Game, team schedule, application을 만들지 않는다.
 - 공개 목록/상세 응답은 `platformManaged=true`, `hostTeam=null`을 반환하며 같은 종목의 관리 팀이 `POST /team-matches/:id/applications`로 신청할 수 있다.
 - 같은 `clientCommandId`와 같은 payload 재시도는 기존 결과를 반환한다. 같은 키의 다른 payload는 `409 IDEMPOTENCY_CONFLICT`다.

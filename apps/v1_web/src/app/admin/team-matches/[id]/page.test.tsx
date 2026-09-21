@@ -33,6 +33,8 @@ const DETAIL: V1AdminTeamMatchDetail = {
   status: 'recruiting',
   createdAt: '2026-08-01T00:00:00.000Z',
   description: '매너 있는 경기 부탁드려요.',
+  imageUrl: '/uploads/team-match.webp',
+  levelLabel: '중급',
   regionName: '서울 성동구',
   placeName: '성수 실내풋살장',
   placeAddress: '서울 성동구 어딘가 1',
@@ -91,7 +93,9 @@ describe('AdminTeamMatchDetailPage', () => {
   it('경기 조건을 목록에 없던 값까지 보여준다', () => {
     renderWith(OK);
     const conditions = screen.getByRole('region', { name: '경기 조건' });
+    expect(within(conditions).getByText('중급')).toBeInTheDocument();
     expect(within(conditions).getByText('5v5')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '주말 정기전 대표 이미지' })).toHaveStyle({ backgroundImage: 'url(/uploads/team-match.webp)' });
     expect(within(conditions).getByText('친선, 리그전')).toBeInTheDocument();
     expect(within(conditions).getByText('남녀 혼성')).toBeInTheDocument();
   });

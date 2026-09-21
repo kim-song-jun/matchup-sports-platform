@@ -11,6 +11,7 @@ import { AdminContextService } from '../common/admin-context.service';
 import { canonicalGameCommandPayloadHash, GamesService } from '../games/games.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { resolveSportLevelRange } from '../sports/level-range';
 import { createTeamMatchScheduleInTx } from '../team-schedules/team-schedules.service';
 import {
   AssignAdminTeamMatchApplicationsDto,
@@ -80,6 +81,15 @@ export class AdminTeamMatchRecruitmentsService {
         return this.createResponse(teamMatch.id, teamMatch.status, true);
       }
 
+      const levelRange = await resolveSportLevelRange(
+        tx,
+        dto.sportId,
+        dto.minLevelCode,
+        dto.maxLevelCode,
+      );
+      const matchFormat = dto.matchFormat?.trim() || null;
+      const matchStyle = (dto.matchStyle ?? []).map((item) => item.trim()).filter(Boolean);
+      const uniformColor = dto.uniformColor?.trim() || null;
       const teamMatch = await tx.v1TeamMatch.create({
         data: {
           hostTeamId: null,
@@ -89,6 +99,7 @@ export class AdminTeamMatchRecruitmentsService {
           regionId: dto.regionId,
           title: dto.title.trim(),
           description: dto.description?.trim() || null,
+          imageUrl: dto.imageUrl?.trim() || null,
           placeName: dto.manualPlaceName.trim(),
           placeAddress: dto.addressText?.trim() || null,
           startAt: dates.startsAt,
@@ -96,6 +107,12 @@ export class AdminTeamMatchRecruitmentsService {
           deadlineAt: dates.deadlineAt,
           formatNote: dto.rulesText?.trim() || null,
           costNote: dto.costNote?.trim() || null,
+          minSportLevelId: levelRange.minSportLevelId,
+          maxSportLevelId: levelRange.maxSportLevelId,
+          genderRule: dto.genderRule?.trim() || null,
+          matchFormat,
+          matchStyle,
+          uniformColor,
           status: 'recruiting',
           competitionConfigVersionId: competitionConfig.id,
         },
@@ -121,7 +138,7 @@ export class AdminTeamMatchRecruitmentsService {
           targetType: 'team_match',
           targetId: teamMatch.id,
           reason: '플랫폼 운영자 팀 모집 개설',
-          afterJson: { sportId: dto.sportId, deadlineAt: dates.deadlineAt.toISOString() } as Prisma.InputJsonValue,
+          afterJson: { sportId: dto.sportId, deadlineAt: dates.deadlineAt?.toISOString() ?? null } as Prisma.InputJsonValue,
           fromStatus: null,
           toStatus: 'recruiting',
         },
@@ -350,10 +367,10 @@ export class AdminTeamMatchRecruitmentsService {
   private validateDates(dto: Pick<CreateAdminTeamMatchRecruitmentDto, 'startsAt' | 'endsAt' | 'deadlineAt'>) {
     const startsAt = new Date(dto.startsAt);
     const endsAt = dto.endsAt ? new Date(dto.endsAt) : null;
-    const deadlineAt = new Date(dto.deadlineAt);
+    const deadlineAt = dto.deadlineAt ? new Date(dto.deadlineAt) : null;
     if (startsAt <= new Date()) throw this.validationError('경기 시작 시간은 현재보다 이후여야 해요.', 'startsAt');
     if (endsAt && endsAt <= startsAt) throw this.validationError('경기 종료 시간은 시작 시간보다 이후여야 해요.', 'endsAt');
-    if (deadlineAt <= new Date() || deadlineAt >= startsAt) {
+    if (deadlineAt && (deadlineAt <= new Date() || deadlineAt >= startsAt)) {
       throw this.validationError('신청 마감은 현재보다 이후이며 경기 시작 전이어야 해요.', 'deadlineAt');
     }
     return { startsAt, endsAt, deadlineAt };

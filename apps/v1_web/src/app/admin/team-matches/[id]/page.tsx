@@ -224,6 +224,15 @@ export default function AdminTeamMatchDetailPage() {
               </Link>
             )}
 
+            {teamMatch.imageUrl && (
+              <div
+                role="img"
+                aria-label={`${teamMatch.title} 대표 이미지`}
+                className="mt-5 aspect-[16/7] w-full rounded-2xl bg-[var(--surface-soft)] bg-cover bg-center"
+                style={{ backgroundImage: `url("${teamMatch.imageUrl.replaceAll('"', '%22')}")` }}
+              />
+            )}
+
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
               <AdminDetailRow label="팀매치 ID" value={teamMatch.teamMatchId} />
               <AdminDetailRow label="종목" value={teamMatch.sportName} />
@@ -243,6 +252,7 @@ export default function AdminTeamMatchDetailPage() {
           <section className="rounded-2xl border border-[var(--border)] bg-[var(--card-surface)] p-5" aria-label="경기 조건">
             <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">경기 조건</h2>
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+              <AdminDetailRow label="실력 등급" value={teamMatch.levelLabel} />
               <AdminDetailRow label="경기 형식" value={teamMatch.matchFormat} />
               <AdminDetailRow label="형식 메모" value={teamMatch.formatNote} />
               <AdminDetailRow label="경기 성격" value={teamMatch.matchStyle.length > 0 ? teamMatch.matchStyle.join(', ') : null} />

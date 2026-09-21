@@ -1,4 +1,10 @@
-import { IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import {
+  MATCH_FORMAT_MAX_LENGTH,
+  MATCH_STYLE_ITEM_MAX_LENGTH,
+  MATCH_STYLE_MAX_ITEMS,
+  UNIFORM_COLOR_MAX_LENGTH,
+} from '../team-match-conditions.constants';
 
 export class CreateAdminTeamMatchRecruitmentDto {
   @IsUUID()
@@ -7,7 +13,8 @@ export class CreateAdminTeamMatchRecruitmentDto {
   @IsUUID()
   sportId!: string;
 
-  @IsUUID()
+  @IsString()
+  @IsNotEmpty()
   regionId!: string;
 
   @IsString()
@@ -20,6 +27,10 @@ export class CreateAdminTeamMatchRecruitmentDto {
   @MaxLength(2000)
   description?: string | null;
 
+  @IsOptional()
+  @IsString()
+  imageUrl?: string | null;
+
   @IsDateString()
   startsAt!: string;
 
@@ -27,8 +38,9 @@ export class CreateAdminTeamMatchRecruitmentDto {
   @IsDateString()
   endsAt?: string | null;
 
+  @IsOptional()
   @IsDateString()
-  deadlineAt!: string;
+  deadlineAt?: string | null;
 
   @IsString()
   @IsNotEmpty()
@@ -49,6 +61,38 @@ export class CreateAdminTeamMatchRecruitmentDto {
   @IsString()
   @MaxLength(2000)
   rulesText?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  minLevelCode?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  maxLevelCode?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  genderRule?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(MATCH_FORMAT_MAX_LENGTH)
+  matchFormat?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MATCH_STYLE_MAX_ITEMS)
+  @IsString({ each: true })
+  @MaxLength(MATCH_STYLE_ITEM_MAX_LENGTH, { each: true })
+  matchStyle?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(UNIFORM_COLOR_MAX_LENGTH)
+  uniformColor?: string | null;
 }
 
 export class AssignAdminTeamMatchApplicationsDto {

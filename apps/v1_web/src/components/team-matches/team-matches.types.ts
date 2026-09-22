@@ -221,6 +221,9 @@ export type TeamMatchCreateViewModel = {
     onCancel?: () => void;
     submitLabel?: string;
     submitting?: boolean;
+    /** 이미지 업로드가 끝나기 전에 이동하거나 저장하면 빈 URL이 저장될 수 있으므로
+     * 업로드 중에는 화면의 주 행동을 잠근다. */
+    imageUploading?: boolean;
     error?: string | null;
     lockedReason?: string | null;
     /** 현재 스텝(또는 edit 화면 전체)에서 "다음"/"저장"을 시도한 뒤에만 채워지는 필드별 에러 문구. */

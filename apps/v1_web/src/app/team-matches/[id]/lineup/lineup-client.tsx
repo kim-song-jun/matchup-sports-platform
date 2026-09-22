@@ -843,8 +843,13 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '4px 0 8px' }}>
               {isLeagueFixture
                 ? '리그 경기는 참석 응답과 상관없이 팀원을 명단에 넣을 수 있어요. 실제로 뛸 선수만 골라 주세요.'
-                : '참석으로 확정된 팀원만 추가할 수 있어요. 아직 확정되지 않은 팀원은 참석 응답 후 다시 보여드려요.'}
+                : '상대팀 승인 전에도 호스트팀 참석명단을 작성할 수 있어요. 참석으로 확정된 팀원만 추가됩니다.'}
             </p>
+            {!isLeagueFixture && ownTeamId ? (
+              <p className="tm-text-caption" style={{ margin: '0 0 12px' }}>
+                팀원이 보이지 않으면 <Link className="tm-link" href={`/teams/${encodeURIComponent(ownTeamId)}/schedules`}>팀 일정에서 참석을 먼저 확인해 주세요</Link>.
+              </p>
+            ) : null}
             {rosterQuery.isLoading ? (
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
                 팀원 목록을 불러오는 중이에요…

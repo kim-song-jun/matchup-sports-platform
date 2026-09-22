@@ -57,6 +57,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   const regions = useV1MasterRegions();
   const createTeamMatch = useV1CreateTeamMatch();
   const uploadImages = useV1UploadImages();
+  const [imageUploading, setImageUploading] = useState(false);
   const [draft, setDraft] = usePersistedDraft();
   // 위저드 step이 각각 별도 라우트라 step 이동 시 재마운트된다. 팀/종목/지역 선택을 로컬
   // useState에만 두면 매 step 첫 항목으로 리셋돼(팀 B·풋살 선택→첫 creatable팀·축구로 소실)
@@ -190,12 +191,18 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     missingFields: missingFields.length > 0 ? missingFields : undefined,
     completeSteps,
     recentVenues: recentVenues.data?.items,
-    submitting: createTeamMatch.isPending,
+    submitting: createTeamMatch.isPending || imageUploading,
+    imageUploading,
     uploadImage: async (file) => {
-      const result = await uploadImages.mutateAsync([file]);
-      const url = result.urls[0];
-      if (!url) throw new Error('이미지를 업로드하지 못했어요.');
-      return url;
+      setImageUploading(true);
+      try {
+        const result = await uploadImages.mutateAsync([file]);
+        const url = result.urls[0];
+        if (!url) throw new Error('이미지를 업로드하지 못했어요.');
+        return url;
+      } finally {
+        setImageUploading(false);
+      }
     },
     onSelectTeam: (teamName) => {
       const team = myTeams?.find((item) => item.name === teamName);
@@ -284,6 +291,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
   const updateTeamMatch = useV1UpdateTeamMatch(teamMatchId);
   const cancelTeamMatch = useV1CancelTeamMatch(teamMatchId);
   const uploadImages = useV1UploadImages();
+  const [imageUploading, setImageUploading] = useState(false);
   const [draft, setDraft] = useState<TeamMatchDraft>(() => buildDefaultDraft());
   const [selectedTeamId, setSelectedTeamId] = useState('');
   const [selectedSportId, setSelectedSportId] = useState('');
@@ -342,13 +350,19 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
     lockedReason: editQuery.data?.editable === false
       ? lockedReasonLabel(editQuery.data.lockedReason ?? '')
       : null,
-    submitting: editQuery.isLoading || updateTeamMatch.isPending || cancelTeamMatch.isPending,
+    submitting: editQuery.isLoading || updateTeamMatch.isPending || cancelTeamMatch.isPending || imageUploading,
+    imageUploading,
     fieldErrors: editFieldErrors,
     uploadImage: async (file) => {
-      const result = await uploadImages.mutateAsync([file]);
-      const url = result.urls[0];
-      if (!url) throw new Error('이미지를 업로드하지 못했어요.');
-      return url;
+      setImageUploading(true);
+      try {
+        const result = await uploadImages.mutateAsync([file]);
+        const url = result.urls[0];
+        if (!url) throw new Error('이미지를 업로드하지 못했어요.');
+        return url;
+      } finally {
+        setImageUploading(false);
+      }
     },
     onSelectTeam: () => undefined,
     onSelectSport: () => undefined,
@@ -428,6 +442,7 @@ function buildCreateModel({
   error,
   lockedReason,
   submitting,
+  imageUploading,
   uploadImage,
   onSelectTeam,
   onSelectSport,
@@ -459,6 +474,7 @@ function buildCreateModel({
   error?: string | null;
   lockedReason?: string | null;
   submitting?: boolean;
+  imageUploading?: boolean;
   uploadImage?: (file: File) => Promise<string>;
   onSelectTeam: (teamName: string) => void;
   onSelectSport: (sportName: string) => void;
@@ -510,6 +526,7 @@ function buildCreateModel({
       onCancel,
       submitLabel,
       submitting,
+      imageUploading,
       uploadImage,
       error,
       lockedReason,

@@ -893,7 +893,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
 
             {roster.length === 0 ? (
               <div className="tm-text-caption" style={{ marginTop: 20, color: 'var(--text-muted)' }}>
-                제출된 라인업이 없어요. 라인업을 먼저 등록하면 득점자·카드를 기록할 수 있어요.
+                제출된 참석명단이 없어요. 참석명단을 먼저 등록하면 득점자·카드를 기록할 수 있어요.
               </div>
             ) : (
               <>

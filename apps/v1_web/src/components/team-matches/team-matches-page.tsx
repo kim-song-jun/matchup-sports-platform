@@ -517,13 +517,13 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
                     {model.lineupHref ? (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                         <div style={{ minWidth: 0 }}>
-                          <div className="tm-text-label" style={{ fontWeight: 600 }}>라인업</div>
+                          <div className="tm-text-label" style={{ fontWeight: 600 }}>참석명단</div>
                           <div className="tm-text-caption" style={{ marginTop: 2, color: 'var(--text-muted)' }}>
-                            선발·후보 명단을 작성하고 제출하세요.
+                            경기에 참석할 선수 명단을 작성하고 제출하세요.
                           </div>
                         </div>
                         <Link className={`tm-btn tm-btn-sm ${matchManageNextAction === 'lineup' ? 'tm-btn-primary' : 'tm-btn-outline'}`} href={model.lineupHref} style={{ flexShrink: 0, minHeight: 44, display: 'inline-flex', alignItems: 'center' }}>
-                          라인업 관리
+                          참석명단 관리
                         </Link>
                       </div>
                     ) : null}

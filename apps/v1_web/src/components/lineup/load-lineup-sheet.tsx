@@ -27,6 +27,8 @@ type LoadLineupSheetProps = {
   /** 지금 이 화면의 종목. 다른 종목의 라인업에는 경고 배지를 붙인다(막지는 않는다). */
   currentSportName: string | null;
   loading?: boolean;
+  /** 화면별 사용자 용어. 기본값은 대회·리그가 사용하는 기존 문구를 보존한다. */
+  subjectLabel?: string;
   onSelect: (lineup: LoadableLineup) => void;
 };
 
@@ -44,6 +46,7 @@ export function LoadLineupSheet({
   presets,
   currentSportName,
   loading = false,
+  subjectLabel = '라인업',
   onSelect,
 }: LoadLineupSheetProps) {
   const idPrefix = useId();
@@ -146,7 +149,7 @@ export function LoadLineupSheet({
           }}
         >
           <span id={titleId} className="tm-text-body-lg" style={{ fontWeight: 700 }}>
-            이전 라인업 불러오기
+            이전 {subjectLabel} 불러오기
           </span>
           <button
             ref={closeButtonRef}
@@ -165,7 +168,7 @@ export function LoadLineupSheet({
         <div style={{ padding: '12px 20px 0' }}>
           <SegmentedTabs
             activeId={tab}
-            ariaLabel="불러올 라인업 종류"
+            ariaLabel={`불러올 ${subjectLabel} 종류`}
             items={[
               { id: 'history', label: `최근 경기 (${history.length})` },
               { id: 'preset', label: `저장한 프리셋 (${presets.length})` },
@@ -183,10 +186,10 @@ export function LoadLineupSheet({
             </p>
           ) : items.length === 0 ? (
             <EmptyState
-              title={tab === 'history' ? '아직 저장된 라인업이 없어요' : '저장한 프리셋이 없어요'}
+              title={tab === 'history' ? `아직 저장된 ${subjectLabel}이 없어요` : '저장한 프리셋이 없어요'}
               sub={
                 tab === 'history'
-                  ? '경기 라인업을 한 번 제출하면 다음부터 여기서 그대로 불러올 수 있어요.'
+                  ? `경기 ${subjectLabel}을 한 번 제출하면 다음부터 여기서 그대로 불러올 수 있어요.`
                   : '자주 쓰는 명단을 프리셋으로 저장해 두면 여기서 바로 불러올 수 있어요.'
               }
             />
@@ -222,7 +225,7 @@ export function LoadLineupSheet({
                       <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
                         <Badge>선발 {item.starterCount}명</Badge>
                         {item.formation !== null ? <Badge>{item.formation}</Badge> : null}
-                        {sportMismatch ? <Badge tone="warn">{item.sportName} 라인업</Badge> : null}
+                        {sportMismatch ? <Badge tone="warn">{item.sportName} {subjectLabel}</Badge> : null}
                       </span>
                     </button>
                   </li>

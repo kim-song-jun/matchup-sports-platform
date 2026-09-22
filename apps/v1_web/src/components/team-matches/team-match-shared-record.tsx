@@ -107,7 +107,7 @@ export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) 
       {subMatches.length > 0 && <p className={styles.aggregateNote}>서브매치의 모든 골을 합산한 팀매치 최종 점수예요.</p>}
       {data.canEdit && subMatches.length === 0 && <Button block onClick={() => { mutation.reset(); setEditing({ goal: null, version: data.version, subMatchId: null }); }} disabled={disabled || controlsOpen}>득점 추가</Button>}
       {data.phase === 'official' && <p className={styles.confirmed}>결과가 확정되어 기록이 잠겼어요.</p>}
-      {!data.participant && <p className={styles.muted}>기록 편집은 양 팀의 제출된 라인업 참가자에게 열려 있어요.</p>}
+      {!data.participant && <p className={styles.muted}>기록 편집은 양 팀의 제출된 참석명단에 등록된 참가자에게 열려 있어요.</p>}
       {data.phase === 'scheduled' && <p className={styles.muted}>상대팀 확정 후 경기 시작 시간이 되면 기록할 수 있어요.</p>}
     </section>
 
@@ -401,7 +401,7 @@ export function TeamMatchRecordEntry({
           공동 경기 기록 열기
         </Link>
       ) : (
-        <p className={styles.notice}>라인업 참가자는 경기 시작 뒤 공동 기록에 참여할 수 있어요.</p>
+        <p className={styles.notice}>참석명단에 등록된 참가자는 경기 시작 뒤 공동 기록에 참여할 수 있어요.</p>
       )}
     </section>
   );

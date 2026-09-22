@@ -160,7 +160,7 @@ function SubMatchBreakdown({
             alignItems: 'center',
             padding: '10px 12px',
             border: '1px solid var(--border-subtle)',
-            borderRadius: 12,
+            borderRadius: 'var(--radius-field)',
           }}
         >
           <div style={{ minWidth: 0 }}>
@@ -989,7 +989,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                   marginTop: 12,
                   padding: '14px 16px',
                   border: '1px solid var(--border-subtle)',
-                  borderRadius: 14,
+                  borderRadius: 'var(--radius-field)',
                 }}
               >
                 <div>
@@ -1023,7 +1023,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
                 {subMatches.map((subMatch, index) => (
                   <div
                     key={subMatch.id}
-                    style={{ padding: 12, border: '1px solid var(--border-subtle)', borderRadius: 14 }}
+                    style={{ padding: 12, border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-field)' }}
                   >
                     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, alignItems: 'end' }}>
                       <TextField

@@ -374,7 +374,15 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
                 그래픽을 그린다 — matches-page.tsx MatchDetailPageView 의 -sport 변형과 같은
                 패턴(웨이브4, 2026-09-04). 사진이 있을 때만 teamMatchBackgroundImage 를 호출한다
                 (그 안의 TEAM_MATCH_IMAGE_FALLBACK 층은 "사진이 404" 케이스 전용이라 별개). */}
-            <div className={`tm-team-vs-hero${match.imageUrl ? '' : ' tm-team-vs-hero-sport'}`} style={match.imageUrl ? { backgroundImage: teamMatchBackgroundImage(match.imageUrl) } : undefined}>
+            <div
+              className={`tm-team-vs-hero${match.imageUrl ? '' : ' tm-team-vs-hero-sport'}`}
+              style={match.imageUrl ? {
+                backgroundImage: teamMatchBackgroundImage(match.imageUrl),
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: 'cover',
+              } : undefined}
+            >
               {match.imageUrl ? null : <SportIllustration sport={match.sport} sizes="120px" className={`tm-team-vs-hero-illustration${awaitingPlatformTeams ? ' tm-team-vs-hero-illustration-recruiting' : ''}`} />}
               {/* Mobile-only back + action buttons inside hero (hidden on desktop) */}
               <div className="tm-hide-desktop" style={{ display: 'flex', justifyContent: 'space-between' }}>

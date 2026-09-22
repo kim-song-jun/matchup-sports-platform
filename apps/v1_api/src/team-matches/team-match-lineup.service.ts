@@ -655,14 +655,10 @@ export class TeamMatchLineupService {
         message: '팀 매칭을 찾을 수 없어요.',
       });
     }
-    if (
-      teamMatch.hostTeamId === null ||
-      teamMatch.approvedApplicantTeamId === null ||
-      teamMatch.startAt === null
-    ) {
+    if (teamMatch.hostTeamId === null || teamMatch.startAt === null) {
       throw new ConflictException({
         code: 'TEAM_MATCH_OPERATIONAL_DATA_INVALID',
-        message: '팀 매치의 양 팀 또는 경기 시작 시간이 없습니다.',
+        message: '팀 매치의 호스트 팀 또는 경기 시작 시간이 없습니다.',
       });
     }
     const game = await tx.v1Game.findUnique({

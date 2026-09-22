@@ -46,6 +46,9 @@ describe('team match images', () => {
 
     expect(hero?.style.backgroundImage).toContain('/uploads/team-match-cover.webp');
     expect(hero?.style.backgroundImage).toContain('/mock/generated/team-huddle.webp');
+    expect(hero?.style.backgroundPosition).toBe('center');
+    expect(hero?.style.backgroundRepeat).toBe('no-repeat');
+    expect(hero?.style.backgroundSize).toBe('cover');
   });
 });
 

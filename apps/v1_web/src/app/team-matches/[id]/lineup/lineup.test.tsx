@@ -528,7 +528,34 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    expect(screen.getByText(/참석으로 확정된 팀원만/)).toBeInTheDocument();
+    expect(screen.getByText(/상대팀 승인 전에도 호스트팀 참석명단을 작성할 수 있어요/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /팀 일정에서 참석을 먼저 확인/ })).toHaveAttribute(
+      'href',
+      '/teams/team-host/schedules',
+    );
+  });
+
+  it('상대팀 승인 전에도 호스트 매니저는 참석명단을 작성할 수 있다', () => {
+    hoisted.useV1TeamMatchMock.mockReturnValue({
+      data: { ...baseTeamMatch(), status: 'recruiting', approvedOpponentTeam: null },
+      isLoading: false,
+      isError: false,
+    });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({
+        eligibleMembers: [
+          { userId: 'user-1', displayName: '홍길동', jerseyNumber: 7, attending: true },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: hoisted.refetchLineup,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(screen.getByRole('button', { name: '명단 추가' })).toBeEnabled();
+    expect(screen.getByText(/상대팀 승인 전에도 호스트팀 참석명단을 작성할 수 있어요/)).toBeInTheDocument();
   });
 
   it('owner/manager: lets a manager add a waiting roster member to the appearance roster', async () => {

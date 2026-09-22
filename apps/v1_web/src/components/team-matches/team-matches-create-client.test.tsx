@@ -124,8 +124,8 @@ vi.mock('./team-matches-page', () => ({
             if (file && form.uploadImage) form.onFieldChange('imageUrl', await form.uploadImage(file));
           }}
         />
-        <button type="button" onClick={form.onSubmit}>
-          팀매치 만들기
+        <button type="button" disabled={form.submitting} onClick={form.onSubmit}>
+          {form.imageUploading ? '이미지 업로드 중' : '팀매치 만들기'}
         </button>
         {form.onCancel ? (
           <button type="button" onClick={form.onCancel}>
@@ -209,6 +209,23 @@ describe('TeamMatchCreatePageClient — GA events', () => {
         expect.any(Object),
       );
     });
+  });
+
+  it('does not create with an empty image URL while the selected image is still uploading', async () => {
+    let finishUpload!: (value: { urls: string[] }) => void;
+    uploadImagesMutateAsync.mockImplementation(() => new Promise((resolve) => { finishUpload = resolve; }));
+    render(<TeamMatchCreatePageClient step="confirm" />);
+
+    fireEvent.change(screen.getByLabelText('대표 이미지'), {
+      target: { files: [new File(['image'], 'slow-cover.webp', { type: 'image/webp' })] },
+    });
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '이미지 업로드 중' })).toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: '이미지 업로드 중' }));
+    expect(createTeamMatchMutate).not.toHaveBeenCalled();
+
+    await act(async () => finishUpload({ urls: ['/uploads/slow-cover.webp'] }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '팀매치 만들기' })).toBeEnabled());
   });
 });
 

@@ -758,7 +758,7 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
         {primaryDisabledReason ? <div role="status" className="tm-text-caption" style={{ marginBottom: 8, textAlign: 'center' }}>{primaryDisabledReason}</div> : null}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
           {secondaryAction ? <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" onClick={secondaryAction}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</button> : <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={prevHref(model.step)}>{edit ? '변경 취소' : model.step === 'team' ? '취소' : '이전'}</Link>}
-          {primaryAction ? <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={primaryDisabled} onClick={() => { if (!primaryDisabled) primaryAction(); }}>{model.form?.submitting ? '저장 중' : primaryLabel}</button> : <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextHref(model.step)}>{primaryLabel}</Link>}
+          {primaryAction ? <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={primaryDisabled} onClick={() => { if (!primaryDisabled) primaryAction(); }}>{model.form?.imageUploading ? '이미지 업로드 중' : model.form?.submitting ? '저장 중' : primaryLabel}</button> : <Link className="tm-btn tm-btn-lg tm-btn-primary" href={nextHref(model.step)}>{primaryLabel}</Link>}
         </div>
         {edit && model.form?.onCancel ? <button className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" type="button" style={{ marginTop: 8 }} disabled={model.form.submitting} onClick={model.form.onCancel}>팀매치 취소</button> : null}
       </div>

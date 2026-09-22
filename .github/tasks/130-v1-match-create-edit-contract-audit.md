@@ -78,6 +78,12 @@ upload persistence, and the absence of hard-coded production form values.
 - 2026-08-07: Host detail now separates `매치 수정` from `신청자 관리`, and edit exposes
   sport, region, content, image, capacity, level/gender/rules, place/address, match time,
   and application deadline. Focused release verification passed before the dev push.
+- 2026-09-22: Team-match follow-up fixed an upload race that allowed navigation/create
+  before the selected cover image finished uploading, which persisted `imageUrl=null` and
+  made the image disappear on detail. The create/edit primary action now stays locked
+  through upload completion. Friendly lineup guidance now states that the host may prepare
+  attendance before opponent approval and links directly to the team schedule where member
+  attendance is confirmed.
 
 ## 2026-09-18 개인 매치 참여 중심 기능 확장
 

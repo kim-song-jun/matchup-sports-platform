@@ -213,7 +213,9 @@ export class MatchesService {
       levelLabel: formatLevelRange(match.minSportLevel, match.maxSportLevel, match.levelNote),
       minLevel: match.minSportLevel ? { code: match.minSportLevel.code, name: match.minSportLevel.name } : null,
       maxLevel: match.maxSportLevel ? { code: match.maxSportLevel.code, name: match.maxSportLevel.name } : null,
-      rulesText: [match.levelNote, match.genderRule, match.costNote].filter(Boolean).join(' · ') || null,
+      // genderRule·costNote는 각각 성별 조건/참가비로 이미 구조화 필드가 있다 — 여기 합쳐
+      // 보내면 상세 화면의 "규칙" 카드에 참가비·성별이 한 번 더 찍힌다(2026-09-22 리뷰).
+      rulesText: match.levelNote,
       genderRule: match.genderRule,
       costNote: match.costNote,
       approvalRequired: true,
@@ -1157,7 +1159,9 @@ export class MatchesService {
       levelLabel: formatLevelRange(match.minSportLevel, match.maxSportLevel, match.levelNote),
       minLevel: match.minSportLevel ? { code: match.minSportLevel.code, name: match.minSportLevel.name } : null,
       maxLevel: match.maxSportLevel ? { code: match.maxSportLevel.code, name: match.maxSportLevel.name } : null,
-      rulesText: [match.levelNote, match.genderRule, match.costNote].filter(Boolean).join(' · ') || null,
+      // genderRule·costNote는 각각 성별 조건/참가비로 이미 구조화 필드가 있다 — 여기 합쳐
+      // 보내면 상세 화면의 "규칙" 카드에 참가비·성별이 한 번 더 찍힌다(2026-09-22 리뷰).
+      rulesText: match.levelNote,
       genderRule: match.genderRule,
       costNote: match.costNote,
       approvalRequired: true,

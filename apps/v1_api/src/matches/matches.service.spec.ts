@@ -552,6 +552,131 @@ describe('MatchesService', () => {
     expect(where.startAt).toBeUndefined();
   });
 
+  // ─── 개인매치 참가비 노출 (2026-09-22 리뷰 대응) ───────────────────────────
+  // 리뷰에서 실제로 발견된 회귀: rulesText가 levelNote·genderRule·costNote를 합쳐 내려보내
+  // 상세 화면의 "규칙" 카드와 "참가비"·"성별 조건" 행에 같은 값이 중복 노출됐다. rulesText는
+  // levelNote만 담아야 하고, genderRule·costNote는 그 자체로 별도 필드에 유지돼야 한다.
+
+  it('list/detail: rulesText에는 levelNote만 담고, genderRule·costNote는 별도 필드로 유지한다 (규칙 카드 중복 노출 방지)', async () => {
+    const row = matchRow({
+      hostUserId: 'host-1',
+      levelNote: '풋살화 착용, 지각 시 미리 연락',
+      genderRule: '남',
+      costNote: '10,000원/1인',
+      sport: { id: 'sport-1', name: '풋살' },
+      region: null,
+      participants: [],
+      hostUser: {
+        id: 'host-1',
+        profile: { nickname: '박지훈', displayName: null, profileImageUrl: null },
+        reputationSummary: { trustState: 'verified' },
+      },
+    });
+
+    prisma.v1Match.findMany.mockResolvedValue([row]);
+    const listResult = await service.list(null, {});
+    expect(listResult.items[0].rulesText).toBe('풋살화 착용, 지각 시 미리 연락');
+    expect(listResult.items[0].genderRule).toBe('남');
+    expect(listResult.items[0].costNote).toBe('10,000원/1인');
+
+    prisma.v1Match.findFirst.mockResolvedValue(row);
+    const detailResult = await service.detail(null, 'match-1');
+    expect(detailResult.rulesText).toBe('풋살화 착용, 지각 시 미리 연락');
+    expect(detailResult.genderRule).toBe('남');
+    expect(detailResult.costNote).toBe('10,000원/1인');
+  });
+
+  it('list/detail: levelNote가 없으면 rulesText는 genderRule·costNote를 대신 채우지 않고 null이다', async () => {
+    const row = matchRow({
+      hostUserId: 'host-1',
+      levelNote: null,
+      genderRule: '남',
+      costNote: '10,000원/1인',
+      sport: { id: 'sport-1', name: '풋살' },
+      region: null,
+      participants: [],
+      hostUser: { id: 'host-1', profile: null, reputationSummary: null },
+    });
+
+    prisma.v1Match.findMany.mockResolvedValue([row]);
+    expect((await service.list(null, {})).items[0].rulesText).toBeNull();
+
+    prisma.v1Match.findFirst.mockResolvedValue(row);
+    expect((await service.detail(null, 'match-1')).rulesText).toBeNull();
+  });
+
+  it('edit: costNote를 폼에 포함해 반환한다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({ costNote: '5,000원/1인' }));
+
+    const result = await service.edit(host, 'match-1');
+
+    expect(result.form.costNote).toBe('5,000원/1인');
+  });
+
+  it('create: costNote를 그대로 저장한다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Match.create.mockResolvedValue(matchRow({ costNote: '10,000원/1인' }));
+    prisma.v1MatchParticipant.create.mockResolvedValue({ id: 'participant-1' });
+
+    await service.create(host, {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '테스트 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 10,
+      manualPlaceName: '강남역',
+      costNote: '10,000원/1인',
+    });
+
+    expect(prisma.v1Match.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ costNote: '10,000원/1인' }) }),
+    );
+  });
+
+  it('create: costNote 미입력 시 null로 저장한다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Match.create.mockResolvedValue(matchRow());
+    prisma.v1MatchParticipant.create.mockResolvedValue({ id: 'participant-1' });
+
+    await service.create(host, {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '테스트 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 10,
+      manualPlaceName: '강남역',
+    });
+
+    expect(prisma.v1Match.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ costNote: null }) }),
+    );
+  });
+
+  it('update: costNote를 갱신한다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    const current = matchRow({ costNote: null, status: 'recruiting', startAt: FUTURE });
+    prisma.v1Match.findFirst.mockResolvedValue(current);
+    prisma.v1Match.update.mockResolvedValue(matchRow({ costNote: '5,000원' }));
+
+    await service.update(host, 'match-1', {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '테스트 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 10,
+      manualPlaceName: '강남역',
+      costNote: '5,000원',
+      version: current.updatedAt.toISOString(),
+    });
+
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ costNote: '5,000원' }) }),
+    );
+  });
+
   // ─── 모집 마감 / 다시 열기 (2026-09-07 제보 대응) ─────────────────────────
 
   it('close: 대기 중이던 신청서를 expired로 넘기고 그 신청자에게만 알린다', async () => {

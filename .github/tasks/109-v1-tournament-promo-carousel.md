@@ -62,3 +62,13 @@
 - headed Chromium 실제 Next 페이지 320/390/768/1440px: overflow·겹침 없음, 막대 1개, 상태별 배지·대기 안내 통과, 콘솔/HTTP 오류 0.
 - 공개 제목 스냅샷에 명시적 상태 fixture와 로컬 예시 사진을 사용. 운영 데이터 변경 없음. before/after: `docs/screenshots/tournament-card-footer/`.
 - 임시 브라우저 종료 완료. main CI·머지·배포 후 라이브 검증 예정.
+
+## 2026-09-22 예약 수 표기 후속 핫픽스
+
+- 사용자 요청으로 합산형 `16/20팀 예약`을 명시형 `11 + 5 / 20 팀 예약`으로 되돌린다.
+- `팀 예약` 앞에 공백 하나를 보장하며, 하단 `입금대기 N팀` 안내와 상단 마감 상태 계산은 유지한다.
+- 대기가 없는 `8/20팀 확정`, 무료 대회의 `확인대기` 계약은 변경하지 않는다.
+- `제2회 팀밋 풋살컵(비선출 남성부)`처럼 제목이 긴 경우 괄호 묶음을 모바일에서만 보호하던 media query를 제거하고, 데스크톱에서도 카드 폭을 넘으면 괄호 전체가 다음 줄로 내려가게 한다.
+- main 별도 구현 검증: 관련 Vitest 28/28, `tsc --noEmit --incremental false` 통과.
+- headed Chrome의 실제 `/tournaments` + API fixture: 390px에서 괄호 묶음이 전체로 다음 줄, 1440px에서 공간이 있어 한 줄에 전체 표시. 두 폭 모두 `11 + 5 / 20 팀 예약`, qualifier overflow/clipping 0, console error 0, failed request 0.
+- QA 종료 후 본 세션이 시작한 Next 3022 서버와 전용 Chrome 9224 세션을 종료했다.

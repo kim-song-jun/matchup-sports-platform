@@ -295,7 +295,9 @@ export function TournamentCard({
           </div>
           <div className={styles.capacity}>
             <span className={`tm-text-label tab-num ${styles.summary}`}>
-              {reservedTeamCount}/{item.teamCount}{pendingPaymentCount > 0 ? '팀 예약' : '팀 확정'}
+              {pendingPaymentCount > 0
+                ? `${item.confirmedCount} + ${pendingPaymentCount} / ${item.teamCount} 팀 예약`
+                : `${item.confirmedCount}/${item.teamCount}팀 확정`}
             </span>
             {pendingPaymentCount > 0 ? (
               <span className={`tm-text-caption ${styles.muted} ${styles.pending}`}>

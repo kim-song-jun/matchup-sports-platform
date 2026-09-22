@@ -3080,6 +3080,7 @@ model V1Game {
   updatedAt                  DateTime                    @updatedAt @map("updated_at")
   teamMatch                  V1TeamMatch?                @relation("V1GameTeamMatch", fields: [teamMatchId], references: [id], onDelete: Restrict)
   currentOfficialRevision    V1GameResultRevision?       @relation("V1CurrentOfficialRevision", fields: [id, currentOfficialRevisionId], references: [gameId, id], onDelete: Restrict, map: "v1_games_current_revision_fk")
+  sharedRecord               V1TeamMatchRecord?
   sides                      V1GameSide[]
   periods                    V1GamePeriod[]
   lineups                    V1GameLineup[]
@@ -3803,4 +3804,38 @@ model V1ChatUserBlock {
   @@id([blockerUserId, blockedUserId])
   @@index([blockedUserId])
   @@map("v1_chat_user_blocks")
+}
+
+/// One shared score sheet per friendly team match. Game lock serializes it with legacy result commands.
+model V1TeamMatchRecord {
+  gameId        String @id @map("game_id")
+  version       Int @default(0)
+  goals         Json @default("[]")
+  subMatches    Json @default("[]") @map("sub_matches")
+  confirmations Json @default("[]")
+  officialAt    DateTime? @map("official_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  game          V1Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  changes       V1TeamMatchRecordChange[]
+  @@map("v1_team_match_records")
+}
+
+model V1TeamMatchRecordChange {
+  id          String @id @default(uuid())
+  gameId      String @map("game_id")
+  version     Int
+  commandId   String @map("command_id")
+  payloadHash String @map("payload_hash")
+  actorUserId String @map("actor_user_id")
+  actorName   String @map("actor_name")
+  action      String
+  goalId      String? @map("goal_id")
+  subMatchId  String? @map("sub_match_id")
+  before      Json?
+  after       Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  record      V1TeamMatchRecord @relation(fields: [gameId], references: [gameId], onDelete: Cascade)
+  @@unique([gameId, version])
+  @@unique([gameId, commandId])
+  @@map("v1_team_match_record_changes")
 }

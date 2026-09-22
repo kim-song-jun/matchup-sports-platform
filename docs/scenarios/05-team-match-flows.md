@@ -170,6 +170,46 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 - 2026-04-23: team-match 관리 follow-up으로 `PATCH /team-matches/:id` 수정/취소와 history 조회 status list 계약을 추가했다. `/my/team-matches`, `/teams/:id/matches`는 기본 `recruiting`만 보지 않고 history status를 명시적으로 조회해야 한다.
 - 2026-08-04 (Todo 26): added the `## v1 stack (Tasks 12-24)` section above after verifying the actual v1 `TeamMatchesController` route table and cross-checking result entry against `docs/api/domains/games.md`. The legacy `TM-004` scenario's `check-in`/`evaluate`/`referee-schedule` steps have no v1 route today (confirmed by reading the controller, not inferred) — this is recorded as a real gap, not silently dropped. `E2E-TEAM-01`/`E2E-TEAM-02` are named per Todo 26's acceptance criteria and pointed at `e2e/v1-tests/team-match.spec.ts`, which does not yet implement them.
 
+## V1 공동 경기 기록 — Task 172
+
+정본: `.github/tasks/172-team-match-shared-record.md`. 친선 팀매치만 대상이며 대회/리그 운영 권한은 유지한다.
+
+| ID | 페르소나 / 조건 | 액션 | 기대 결과 |
+|---|---|---|---|
+| TM-SHARED-01 | 경기 전 / 일반 사용자 | 상세 조회 | 기존 매치 정보, 기록 편집 없음 |
+| TM-SHARED-02 | 시작 시간 경과 / 상대 확정 | 목록 조회 | 진행 중 표시, 목록에서 유지 |
+| TM-SHARED-03 | 일반 사용자 | 진행 중 상세 | 점수 조회만 가능, 참가자·이력 비공개 |
+| TM-SHARED-04 | 양 팀 일반 선수 | 상세 클릭 | 공동 기록 화면 진입 |
+| TM-SHARED-05 | 홈 선수 | 팀·득점자·시간 등록 | 득점 수로 점수 계산, 상대 화면 반영 |
+| TM-SHARED-06 | 원정 선수 | 홈 선수가 등록한 골 수정 | 득점자 수정·작성자 이력 공유 |
+| TM-SHARED-07 | 양 팀 선수 | 삭제 → 이력에서 복구 | 점수 감소·복원, 새 변경 이력 |
+| TM-SHARED-08 | 동시 작성 | 다른 참가자가 먼저 저장 | 작성 중 값 보존·충돌 안내, stale overwrite 금지 |
+| TM-SHARED-09 | 첫 팀 | 종료 확인 | 상대팀 확인 대기, 아직 결과 미확정 |
+| TM-SHARED-10 | 상대팀 | 같은 기록 종료 확인 | 공식 결과·전적 outbox·편집 잠금 |
+| TM-SHARED-11 | 비참가자/경기 전/취소/확정 | API 수정 시도 | 서버 403/409, DB 변경 없음 |
+| TM-SHARED-12 | 서버 응답 유실 | 같은 commandId 재시도 | 중복 득점 없이 최신 상태 반환 |
+
+브라우저: `scripts/qa/team-match-shared-record-flow.cjs` (headed), 실제 API와 격리 DB 사용.
+스크린샷: `output/playwright/visual-audit/team-match-shared-record/` → PR용 선정본은 `docs/screenshots/team-match-shared-record/`.
+증거·실측 결과·프로세스 cleanup은 Task 172에 기록한다.
+
+## V1 공동 경기 기록 서브매치 — Task 173
+
+정본: `.github/tasks/173-team-match-shared-record-submatches.md`. Task 172의 양 팀 참가자 공동 기록과 공식 결과 한 경기 계약을 유지한다.
+
+| ID | 페르소나 / 조건 | 액션 | 기대 결과 |
+|---|---|---|---|
+| TM-SUB-01 | 서브매치 없음 / 양 팀 라인업 참가자 | 득점 추가 | 기존 공동 점수판에서 직접 기록 |
+| TM-SUB-02 | 기존 직접 득점 있음 | 첫 서브매치 생성 | 기존 득점이 첫 서브매치로 이동하고 합계 유지 |
+| TM-SUB-03 | 서브매치 있음 | 득점 선수 선택 | 해당 팀 최신 제출 라인업의 사진·이니셜·등번호·이름 표시 |
+| TM-SUB-04 | 데스크톱 / 모바일 | 이름 수정 | 카드 제목이 입력 폼으로 교체되고 제목·버튼·입력 겹침 없음 |
+| TM-SUB-05 | 서브매치 2개 | 각 카드에 득점 추가 | 카드별 점수와 최상단 합계가 함께 갱신 |
+| TM-SUB-06 | 상대 팀 참가자 | 같은 경기 진입 | 같은 서브매치·득점·합계가 동기화 |
+| TM-SUB-07 | 양 팀 참가자 | 팀매치 종료 확인 | 모든 서브매치 합계를 공식 결과 한 경기로 확정하고 편집 잠금 |
+
+브라우저: `scripts/qa/team-match-shared-submatches-flow.cjs` (headed), 실제 API와 격리 DB 사용.
+스크린샷과 기계 판독 결과: `docs/screenshots/team-match-shared-record-submatches/` 및 `docs/scenarios/team-match-shared-submatches-gallery.md`.
+
 ## TM-149-P 일반/관리자 모집 조건 parity
 
 - [x] 두 폼에서 경기 스타일 직접 입력을 포함한 조건이 저장된다(최대 3개).
@@ -179,3 +219,9 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 - [x] 접수 후 마감 경과: 새 신청은 거절되지만 기존 신청 승인/관리자 두 팀 확정은 시작 전까지 가능하다.
 - [x] 명시적 모집 종료/경기 시작 이후에는 확정이 거절된다.
 - [x] 390/768/1440에서 before/after, console/network, 수평 overflow를 확인한다.
+### TM-172 verification evidence (2026-09-22)
+
+- Headed Playwright: mobile + desktop `2/2` passed; desktop run also captured the 834×1112 tablet viewport.
+- Actual persisted flow: `전반전 2:1` + `후반전 1:3` → aggregate `3:4`, then host submission and submitted-history readback.
+- Console errors `0`, failed API requests `0`, horizontal overflow `0`.
+- Screenshots and machine-readable report: [`docs/screenshots/task172-team-match-submatches/`](../screenshots/task172-team-match-submatches/).

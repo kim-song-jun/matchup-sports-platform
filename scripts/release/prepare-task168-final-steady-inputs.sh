@@ -10,14 +10,14 @@ set -Eeuo pipefail
 # (see its L1-L4 check), so migrations after M11 do not require touching
 # this binder.
 
-# Task 156 adds only V1ChatUserBlock and its user relations; M11 remains immutable.
+# Task 172 adds shared match record/history tables; M11 remains immutable.
 schema=apps/v1_api/prisma/schema.prisma
 m11=apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql
 [[ -f "$schema" && -f "$m11" ]] || { echo 'Task168 final-policy source inputs missing' >&2; exit 1; }
 
 schema_sha="$(sha256sum "$schema" | awk '{print $1}')"
 m11_sha="$(sha256sum "$m11" | awk '{print $1}')"
-[[ "$schema_sha" == 47787d5dcb991e43e09a8425aae4119011194e7ec2ed3847988417af482ebb57 \
+[[ "$schema_sha" == 8f732248e1e0bf1882184dd35cec3d5a48a65ce5556c250de486c7e5955ebade \
   && "$m11_sha" == 08eac7347cbb10fcc4ef87d31d63bd9516d5bfda281dcf5730c4f0a1985d9323 ]] \
   || { echo 'Task168 final-policy schema/M11 digest mismatch' >&2; exit 1; }
 

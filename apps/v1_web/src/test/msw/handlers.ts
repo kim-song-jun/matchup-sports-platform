@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import type { SharedRecord } from '@/hooks/use-team-match-record';
 import {
   getSignupProfileIssue,
   SIGNUP_PROFILE_ERROR_MESSAGES,
@@ -1102,6 +1103,23 @@ export const v1MswHandlers = [
     ],
     nextCursor: null,
   })),
+
+  // The stock mock lineup is a draft: do not simulate successful shared writes.
+  // Interactive shared-record tests override these handlers with their own contract fixtures.
+  http.get(`${api}/team-matches/:teamMatchId/record`, ({ params }) => {
+    const match = v1TeamMatchesFixture.find((item) => item.id === params.teamMatchId);
+    if (!match || params.teamMatchId !== 'team-match-1') return HttpResponse.json({ message: '경기를 찾을 수 없어요.' }, { status: 404 });
+    return ok({
+      teamMatchId: match.id, title: match.title, startsAt: match.startsAt ?? null,
+      phase: v1GameResultRevisions.length ? 'legacy' : 'scheduled', version: 0,
+      serverTime: new Date().toISOString(), canEdit: false, participant: false, ownSideId: null,
+      sides: v1GameFixture.sides.map((side) => ({ id: side.id, key: side.sideKey, name: side.displayNameSnapshot, score: null })),
+      participants: [], subMatches: [], goals: [], history: [], confirmations: [], officialAt: null,
+    } satisfies SharedRecord);
+  }),
+  http.post(`${api}/team-matches/:teamMatchId/record`, () => HttpResponse.json({
+    code: 'RECORD_PARTICIPANT_REQUIRED', message: '양 팀의 제출된 라인업 참가자만 기록할 수 있어요.',
+  }, { status: 403 })),
 
   // ── Task 17: games / result revisions / team-match lineup ─────────────────
   http.get(`${api}/games/:gameId`, () => ok(v1GameFixture)),

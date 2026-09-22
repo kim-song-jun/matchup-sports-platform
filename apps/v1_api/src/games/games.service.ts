@@ -5711,6 +5711,7 @@ export class GamesService {
           select: {
             id: true,
             sourceType: true,
+            sharedRecord: { select: { gameId: true } },
             teamMatchId: true,
             state: true,
             version: true,
@@ -5731,6 +5732,12 @@ export class GamesService {
                 gameAuthorizationAction(input.action),
                 input.actor.authorizationSubject,
               );
+        // Serialize legacy writers with the shared score sheet on the Game lock.
+        if ((input.action.startsWith('result_') || input.action.startsWith('event_') ||
+            ['game_start', 'game_end', 'game_pause', 'game_resume', 'game_next_period', 'game_end_period', 'game_start_period', 'game_revert_period'].includes(input.action)) &&
+            game.sharedRecord) {
+          throw new ConflictException({ code: 'SHARED_RECORD_REQUIRED', message: '공동 경기 기록 화면에서 수정해 주세요.' });
+        }
         const payloadHash = canonicalGameCommandPayloadHash(input.payload);
         let preliminary: GameCommandContext;
         try {

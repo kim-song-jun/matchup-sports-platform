@@ -11,7 +11,7 @@ import type { PrismaService } from '../../prisma/prisma.service';
  * (`public-team-records.service.ts` 의 주석이 이 추출을 후속 작업으로 명시했다).
  * 리그 일정 목록·대회 상세까지 같은 플래그를 읽어야 해서 복제본이 넷이 되기 전에 뽑는다.
  */
-export async function isPublicLiveEnabled(prisma: PrismaService): Promise<boolean> {
+export async function isPublicLiveEnabled(prisma: Pick<PrismaService, 'v1GameOperationFlag'>): Promise<boolean> {
   const flag = await prisma.v1GameOperationFlag.findUnique({
     where: { key: 'PUBLIC_LIVE' },
     select: { value: true },

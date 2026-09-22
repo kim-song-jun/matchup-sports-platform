@@ -171,3 +171,12 @@ describe('toTeamMatch — 마감 여부는 관계와 독립이다', () => {
     expect(statusToCardStatus('recruiting')).toBe('open');
   });
 });
+
+describe('friendly match live card', () => {
+  it('shows a matched game as live after kickoff but never a cancelled one', () => {
+    const base = getTeamMatchListViewModel();
+    const match = { id: 'live', title: 'Live', status: 'matched', startsAt: new Date(Date.now() - 60_000).toISOString() } as unknown as V1TeamMatch;
+    expect(toTeamMatch(match, base.matches[0]).live).toBe(true);
+    expect(toTeamMatch({ ...match, status: 'cancelled' } as unknown as V1TeamMatch, base.matches[0]).live).toBe(false);
+  });
+});

@@ -528,7 +528,9 @@ export const gameSchemaSourceManifest = {
   // 2026-09-21 Task 149: additive V1TeamMatch.platformManaged provenance only.
   // Game models and the bound game-operations migration are unchanged. Re-pinned
   // normalized full-schema bytes after the admin team-match migration.
-  schema: '47787d5dcb991e43e09a8425aae4119011194e7ec2ed3847988417af482ebb57',
+  // 2026-09-22 Task 172: additive shared record/history tables + V1Game relation.
+  // The historical game-operations migration is unchanged; migration replay has no schema drift.
+  schema: '8f732248e1e0bf1882184dd35cec3d5a48a65ce5556c250de486c7e5955ebade',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

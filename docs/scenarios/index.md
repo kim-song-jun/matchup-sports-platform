@@ -428,6 +428,14 @@ dev 머지와 alpha 최종 검증은 필수 리뷰 게이트 미충족으로 아
 Task 156 continuation: [scenario](./android-play-readiness.md). Organization D-U-N-S pending.
 Implementation and isolated API/browser evidence tracked in Task 156; production and Play/device gates remain separate.
 
+### 2026-09-21 — Task 172 친선 팀매치 공동 경기 기록
+
+- 대상: [팀매치 시나리오](./05-team-match-flows.md#v1-공동-경기-기록--task-172) TM-SHARED-01..12.
+- 구현/검증 상태: [Task 172](../../.github/tasks/172-team-match-shared-record.md)의 Progress Snapshot과 PR 갤러리가 현재 결과의 정본.
+- 양 팀 일반 선수 / 비참가자, 실제 API·격리 PostgreSQL, headed Chromium 390/768/1440 흐름 검증.
+
+- Task 172 [공동 경기 기록 화면별 플로우·42개 스크린샷](team-match-shared-record-gallery.md) — 390/768/1440, 실제 API·양 팀 일반 참가자 검증.
+
 ## Task 149 condition parity — 2026-09-21
 
 - Admin platform recruitment now uses the ordinary team-match image, level, format, style, uniform, gender, cost, place, schedule, and optional deadline contract.
@@ -439,3 +447,9 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - [TM-149-P](05-team-match-flows.md#tm-149-p-일반관리자-모집-조건-parity): 6/6 viewport/persona journeys PASS; actual API/DB create, elapsed deadline intake vs confirmation, Game/schedules and DB CHECK verified.
 - Before/after screenshot + reports: [Task 149](../../.github/tasks/149-admin-assigned-team-match.md#follow-up-verification-evidence).
 - New migration fixes the hostless platform recruitment 500 reproduced on a fresh migrated DB. Existing ordinary-friendly host/metadata constraints remain enforced.
+
+## Task 173 — 팀매치 공동 기록 서브매치 (PR #1249)
+
+- PR #1243의 양 팀 라인업 참가자 공동 기록에 선택적인 서브매치를 추가한다.
+- 최상단 점수와 공식 결과는 모든 서브매치 득점의 합이며 팀매치 한 경기로 한 번만 집계한다.
+- [시나리오](05-team-match-flows.md#v1-공동-경기-기록-서브매치--task-173) · [선수 사진·이름 변경 포함 30장 갤러리](team-match-shared-submatches-gallery.md)

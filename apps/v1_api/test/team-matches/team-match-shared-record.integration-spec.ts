@@ -20,8 +20,10 @@ describe('friendly match shared score sheet (real DB)', () => {
   afterAll(() => prisma.$disconnect());
   it('ordinary players from both lineups add, edit each other, delete and restore the same goal; public view hides identities', async () => {
     const f = await createSharedRecordFixture(prisma);
+    await prisma.v1UserProfile.update({ where: { userId: f.userIds[0] }, data: { profileImageUrl: 'https://cdn.example.test/players/minsu.jpg' } });
     const host = user(f.userIds[1]); const away = user(f.userIds[3]);
     const first = await records.mutate(host, f.match.id, cmd('add', 0, { sideId: f.sides[0].id, participantId: f.participants[0].id, minute: 12 }));
+    expect(first.participants.find((participant) => participant.id === f.participants[0].id)?.profileImageUrl).toBe('https://cdn.example.test/players/minsu.jpg');
     expect(first.sides.find((s) => s.key === 'HOME')?.score).toBe(1);
     const edited = await records.mutate(away, f.match.id, cmd('edit', 1, { goalId: first.goals[0].id, sideId: f.sides[0].id, participantId: f.participants[1].id }));
     expect(edited.goals[0].participantId).toBe(f.participants[1].id);

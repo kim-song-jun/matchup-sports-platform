@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/v1-ui/button';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
+import { ProfileAvatar } from '@/components/users/public-profile-client';
 import {
   useTeamMatchRecord,
   useMutateTeamMatchRecord,
@@ -30,6 +31,10 @@ function goalLabel(data: SharedRecord, goal: SharedGoal | null) {
 function subMatchScore(data: SharedRecord, subMatch: SharedSubMatch, sideKey: 'HOME' | 'AWAY') {
   const sideId = data.sides.find((side) => side.key === sideKey)?.id;
   return subMatch.scores.find((score) => score.sideId === sideId)?.score ?? null;
+}
+
+function playerInitials(name: string) {
+  return Array.from(name.trim()).slice(0, 2).join('') || '?';
 }
 
 export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) {
@@ -124,7 +129,7 @@ export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) 
             </Button>}
           </div>
 
-          {subMatchForm && <form className={styles.inlineForm} onSubmit={(event) => {
+          {subMatchForm && !subMatchForm.subMatch && <form className={styles.inlineForm} onSubmit={(event) => {
             event.preventDefault();
             if (!subMatchForm.title.trim() || subMatchForm.version !== data.version) return;
             void command({
@@ -155,8 +160,22 @@ export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) 
               {subMatches.map((subMatch) => {
                 const subGoals = data.goals.filter((goal) => goal.subMatchId === subMatch.id);
                 return <article className={styles.subMatchCard} key={subMatch.id}>
-                  <div className={styles.subMatchHead}>
-                    <div>
+                  {subMatchForm?.subMatch?.id === subMatch.id ? <form className={styles.cardRenameForm} aria-label={`${subMatch.title} 이름 변경`} onSubmit={(event) => {
+                    event.preventDefault();
+                    if (!subMatchForm.title.trim() || subMatchForm.version !== data.version) return;
+                    void command({ action: 'submatch_edit', subMatchId: subMatch.id, title: subMatchForm.title.trim() }, subMatchForm.version);
+                  }}>
+                    <label className={styles.field}>
+                      서브매치 이름
+                      <input value={subMatchForm.title} maxLength={40} autoFocus onChange={(event) => setSubMatchForm({ ...subMatchForm, title: event.target.value })} />
+                    </label>
+                    {subMatchForm.version !== data.version && <p className={styles.error}>다른 참가자가 기록을 바꿨어요. 최신 내용을 확인하고 다시 시도해 주세요.</p>}
+                    <div className={styles.actions}>
+                      <Button type="submit" disabled={disabled || !subMatchForm.title.trim() || subMatchForm.version !== data.version}>이름 저장</Button>
+                      <Button type="button" variant="ghost" onClick={() => setSubMatchForm(null)} disabled={disabled}>취소</Button>
+                    </div>
+                  </form> : <div className={styles.subMatchHead}>
+                    <div className={styles.subMatchSummary}>
                       <div className={styles.subMatchTitle}>{subMatch.title}</div>
                       <div className={styles.subScore} aria-label={`${subMatch.title} 점수 ${subMatchScore(data, subMatch, 'HOME') ?? '?'} 대 ${subMatchScore(data, subMatch, 'AWAY') ?? '?'}`}>
                         <span>{home?.name}</span>
@@ -168,7 +187,7 @@ export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) 
                       <Button size="sm" variant="ghost" disabled={disabled || controlsOpen} onClick={() => { mutation.reset(); setSubMatchForm({ subMatch, version: data.version, title: subMatch.title }); }}>이름 수정</Button>
                       <Button size="sm" variant="ghost" disabled={disabled || controlsOpen} onClick={() => void command({ action: 'submatch_delete', subMatchId: subMatch.id })}>삭제</Button>
                     </div>}
-                  </div>
+                  </div>}
                   {data.canEdit && <Button block size="sm" variant="outline" disabled={disabled || controlsOpen} onClick={() => { mutation.reset(); setEditing({ goal: null, version: data.version, subMatchId: subMatch.id }); }}>이 서브매치에 득점 추가</Button>}
                   {editing && editing.subMatchId === subMatch.id && data.canEdit && <GoalForm
                     key={editing.goal?.id ?? `new-${subMatch.id}`}
@@ -252,16 +271,21 @@ function GoalRows({ data, goals, disabled, canEdit, onEdit, onDelete }: {
   onDelete: (goal: SharedGoal) => void;
 }) {
   if (goals.length === 0) return <p className={styles.muted}>{data.participant ? '아직 등록된 득점이 없어요.' : '참가자들의 공동 기록으로 점수가 갱신돼요.'}</p>;
-  return <div className={styles.goalList}>{goals.map((goal) => <div className={styles.row} key={goal.id}>
-    <div>
-      <strong>{data.participants.find((p) => p.id === goal.participantId)?.name ?? '득점자 미상'}{goal.ownGoal ? ' · 자책골' : ''}</strong>
-      <p className={styles.muted}>{data.sides.find((s) => s.id === goal.sideId)?.name}{goal.minute !== null ? ` · ${goal.minute}분` : ' · 시간 미입력'}</p>
+  return <div className={styles.goalList}>{goals.map((goal) => {
+    const participant = data.participants.find((row) => row.id === goal.participantId);
+    return <div className={styles.row} key={goal.id}>
+    <div className={styles.goalPlayer}>
+      <ProfileAvatar imageUrl={participant?.profileImageUrl} initials={playerInitials(participant?.name ?? '?')} size={40} />
+      <div>
+        <strong>{participant?.name ?? '득점자 미상'}{goal.ownGoal ? ' · 자책골' : ''}</strong>
+        <p className={styles.muted}>{data.sides.find((s) => s.id === goal.sideId)?.name}{goal.minute !== null ? ` · ${goal.minute}분` : ' · 시간 미입력'}</p>
+      </div>
     </div>
     {canEdit && <div className={styles.actions}>
       <Button size="sm" variant="ghost" disabled={disabled} aria-label={`${goalLabel(data, goal)} 수정`} onClick={() => onEdit(goal)}>수정</Button>
       <Button size="sm" variant="ghost" disabled={disabled} aria-label={`${goalLabel(data, goal)} 삭제`} onClick={() => onDelete(goal)}>삭제</Button>
     </div>}
-  </div>)}</div>;
+  </div>})}</div>;
 }
 
 function GoalForm({ data, goal, subMatchId, disabled, stale, onCancel, onRefresh, onSave }: {
@@ -289,7 +313,21 @@ function GoalForm({ data, goal, subMatchId, disabled, stale, onCancel, onRefresh
   }}>
     <label className={styles.field}>득점 팀<select value={sideId} onChange={(event) => { setSideId(event.target.value); setParticipantId(''); }}>{data.sides.map((side) => <option key={side.id} value={side.id}>{side.name}</option>)}</select></label>
     <label><input type="checkbox" checked={ownGoal} onChange={(event) => { setOwnGoal(event.target.checked); setParticipantId(''); }} /> 자책골 (선수의 상대팀 점수로 반영)</label>
-    <label className={styles.field}>{ownGoal ? '자책골 선수' : '득점 선수'}<select value={participantId} onChange={(event) => setParticipantId(event.target.value)}><option value="">득점자 미상 · 나중에 지정</option>{candidates.map((participant) => <option key={participant.id} value={participant.id}>{participant.jerseyNumber !== null ? `#${participant.jerseyNumber} ` : ''}{participant.name}</option>)}</select></label>
+    <fieldset className={styles.playerField}>
+      <legend>{ownGoal ? '자책골 선수' : '득점 선수'}</legend>
+      <div className={styles.playerChoices}>
+        <label className={styles.playerChoice} data-selected={participantId === ''}>
+          <input type="radio" name="scorer" value="" checked={participantId === ''} onChange={(event) => setParticipantId(event.target.value)} />
+          <ProfileAvatar imageUrl={null} initials="?" size={40} />
+          <span><strong>득점자 미상</strong><small>나중에 지정</small></span>
+        </label>
+        {candidates.map((participant) => <label className={styles.playerChoice} data-selected={participantId === participant.id} key={participant.id}>
+          <input type="radio" name="scorer" value={participant.id} checked={participantId === participant.id} onChange={(event) => setParticipantId(event.target.value)} />
+          <ProfileAvatar imageUrl={participant.profileImageUrl} initials={playerInitials(participant.name)} size={40} />
+          <span><strong>{participant.jerseyNumber !== null ? `#${participant.jerseyNumber} ` : ''}{participant.name}</strong><small>{data.sides.find((side) => side.id === participant.sideId)?.name}</small></span>
+        </label>)}
+      </div>
+    </fieldset>
     <label className={styles.field}>득점 시간 (선택)<input type="number" min="0" max="999" step="1" inputMode="numeric" placeholder="예: 12분" value={minute} onChange={(event) => setMinute(event.target.value)} /></label>
     {duplicate && <label className={styles.notice}><input type="checkbox" checked={duplicateConfirmed} onChange={(event) => setDuplicateConfirmed(event.target.checked)} /> 같은 선수·시간의 기록이 있어요. 별개의 득점이 맞아요.</label>}
     {stale && <div role="alert" className={styles.notice}>작성 중 다른 참가자가 기록을 바꿨어요. 입력 내용은 유지했어요. 최신 기록을 확인하고 다시 입력해 주세요. <Button type="button" variant="ghost" onClick={onRefresh}>최신 기록 확인</Button></div>}

@@ -170,17 +170,6 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 - 2026-04-23: team-match 관리 follow-up으로 `PATCH /team-matches/:id` 수정/취소와 history 조회 status list 계약을 추가했다. `/my/team-matches`, `/teams/:id/matches`는 기본 `recruiting`만 보지 않고 history status를 명시적으로 조회해야 한다.
 - 2026-08-04 (Todo 26): added the `## v1 stack (Tasks 12-24)` section above after verifying the actual v1 `TeamMatchesController` route table and cross-checking result entry against `docs/api/domains/games.md`. The legacy `TM-004` scenario's `check-in`/`evaluate`/`referee-schedule` steps have no v1 route today (confirmed by reading the controller, not inferred) — this is recorded as a real gap, not silently dropped. `E2E-TEAM-01`/`E2E-TEAM-02` are named per Todo 26's acceptance criteria and pointed at `e2e/v1-tests/team-match.spec.ts`, which does not yet implement them.
 
-<<<<<<< HEAD
-## TM-172 선택형 서브 매치와 합산 점수판
-
-- 서브 매치가 없으면 호스트는 기존과 같이 전체 홈/원정 점수를 직접 입력한다.
-- 호스트는 결과 작성 중 최대 20개의 서브 매치를 추가하고 이름과 양 팀 점수를 입력할 수 있다.
-- 서브 매치가 하나라도 있으면 최상단 전체 점수는 읽기 전용이며 모든 서브 매치 점수의 합으로 즉시 갱신된다.
-- 제출 API는 최상단 점수와 서브 매치 합계를 다시 검증하며 다르면 `422 SCORE_INVALID`로 거부한다.
-- 제출 대기, 상대팀 승인, 공식 확정, 변경 이력에서 같은 순서와 점수를 보여준다.
-- 정정 요청 뒤 폼을 다시 열면 저장한 서브 매치 전체가 복원된다.
-- 공식 결과·팀 전적·개인 출전 기록·상대팀 승인은 팀매치 전체 기준으로 한 번만 생성된다.
-=======
 ## V1 공동 경기 기록 — Task 172
 
 정본: `.github/tasks/172-team-match-shared-record.md`. 친선 팀매치만 대상이며 대회/리그 운영 권한은 유지한다.
@@ -204,7 +193,23 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 스크린샷: `output/playwright/visual-audit/team-match-shared-record/` → PR용 선정본은 `docs/screenshots/team-match-shared-record/`.
 증거·실측 결과·프로세스 cleanup은 Task 172에 기록한다.
 
->>>>>>> origin/pr-1243
+## V1 공동 경기 기록 서브매치 — Task 173
+
+정본: `.github/tasks/173-team-match-shared-record-submatches.md`. Task 172의 양 팀 참가자 공동 기록과 공식 결과 한 경기 계약을 유지한다.
+
+| ID | 페르소나 / 조건 | 액션 | 기대 결과 |
+|---|---|---|---|
+| TM-SUB-01 | 서브매치 없음 / 양 팀 라인업 참가자 | 득점 추가 | 기존 공동 점수판에서 직접 기록 |
+| TM-SUB-02 | 기존 직접 득점 있음 | 첫 서브매치 생성 | 기존 득점이 첫 서브매치로 이동하고 합계 유지 |
+| TM-SUB-03 | 서브매치 있음 | 득점 선수 선택 | 해당 팀 최신 제출 라인업의 사진·이니셜·등번호·이름 표시 |
+| TM-SUB-04 | 데스크톱 / 모바일 | 이름 수정 | 카드 제목이 입력 폼으로 교체되고 제목·버튼·입력 겹침 없음 |
+| TM-SUB-05 | 서브매치 2개 | 각 카드에 득점 추가 | 카드별 점수와 최상단 합계가 함께 갱신 |
+| TM-SUB-06 | 상대 팀 참가자 | 같은 경기 진입 | 같은 서브매치·득점·합계가 동기화 |
+| TM-SUB-07 | 양 팀 참가자 | 팀매치 종료 확인 | 모든 서브매치 합계를 공식 결과 한 경기로 확정하고 편집 잠금 |
+
+브라우저: `scripts/qa/team-match-shared-submatches-flow.cjs` (headed), 실제 API와 격리 DB 사용.
+스크린샷과 기계 판독 결과: `docs/screenshots/team-match-shared-record-submatches/` 및 `docs/scenarios/team-match-shared-submatches-gallery.md`.
+
 ## TM-149-P 일반/관리자 모집 조건 parity
 
 - [x] 두 폼에서 경기 스타일 직접 입력을 포함한 조건이 저장된다(최대 3개).

@@ -3,7 +3,7 @@
     {
       "width": 390,
       "step": "01-shared-scoreboard-without-submatches",
-      "url": "http://127.0.0.1:13014/team-matches/19d992df-1379-46b1-b110-8f4f1223d10a/record",
+      "url": "http://127.0.0.1:13013/team-matches/eee162ce-0998-4856-b13c-98755b875113/record",
       "dimensions": {
         "viewport": 390,
         "document": 390
@@ -13,7 +13,7 @@
     {
       "width": 390,
       "step": "02-first-submatch-created",
-      "url": "http://127.0.0.1:13014/team-matches/19d992df-1379-46b1-b110-8f4f1223d10a/record",
+      "url": "http://127.0.0.1:13013/team-matches/eee162ce-0998-4856-b13c-98755b875113/record",
       "dimensions": {
         "viewport": 390,
         "document": 390
@@ -22,68 +22,88 @@
     },
     {
       "width": 390,
-      "step": "03-aggregate-and-submatch-scores",
-      "url": "http://127.0.0.1:13014/team-matches/19d992df-1379-46b1-b110-8f4f1223d10a/record",
+      "step": "03-player-photo-scorer-picker",
+      "url": "http://127.0.0.1:13013/team-matches/eee162ce-0998-4856-b13c-98755b875113/record",
       "dimensions": {
         "viewport": 390,
         "document": 390
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/390-03-aggregate-and-submatch-scores.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/390-03-player-photo-scorer-picker.png"
     },
     {
       "width": 390,
-      "step": "04-other-team-participant-synced",
-      "url": "http://127.0.0.1:13014/team-matches/19d992df-1379-46b1-b110-8f4f1223d10a/record",
+      "step": "04-inline-submatch-rename",
+      "url": "http://127.0.0.1:13013/team-matches/eee162ce-0998-4856-b13c-98755b875113/record",
       "dimensions": {
         "viewport": 390,
         "document": 390
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/390-04-other-team-participant-synced.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/390-04-inline-submatch-rename.png"
     },
     {
       "width": 390,
-      "step": "05-public-detail-breakdown",
-      "url": "http://127.0.0.1:13014/team-matches/19d992df-1379-46b1-b110-8f4f1223d10a",
+      "step": "05-aggregate-and-submatch-scores",
+      "url": "http://127.0.0.1:13013/team-matches/eee162ce-0998-4856-b13c-98755b875113/record",
       "dimensions": {
         "viewport": 390,
         "document": 390
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/390-05-public-detail-breakdown.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/390-05-aggregate-and-submatch-scores.png"
     },
     {
       "width": 390,
-      "step": "06-one-game-confirmation",
-      "url": "http://127.0.0.1:13014/team-matches/19d992df-1379-46b1-b110-8f4f1223d10a/record",
+      "step": "06-other-team-participant-synced",
+      "url": "http://127.0.0.1:13013/team-matches/eee162ce-0998-4856-b13c-98755b875113/record",
       "dimensions": {
         "viewport": 390,
         "document": 390
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/390-06-one-game-confirmation.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/390-06-other-team-participant-synced.png"
     },
     {
       "width": 390,
-      "step": "07-official-one-game-locked",
-      "url": "http://127.0.0.1:13014/team-matches/19d992df-1379-46b1-b110-8f4f1223d10a/record",
+      "step": "07-public-detail-breakdown",
+      "url": "http://127.0.0.1:13013/team-matches/eee162ce-0998-4856-b13c-98755b875113",
       "dimensions": {
         "viewport": 390,
         "document": 390
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/390-07-official-one-game-locked.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/390-07-public-detail-breakdown.png"
     },
     {
       "width": 390,
-      "step": "08-team-match-list-after-official",
-      "url": "http://127.0.0.1:13014/team-matches",
+      "step": "08-one-game-confirmation",
+      "url": "http://127.0.0.1:13013/team-matches/eee162ce-0998-4856-b13c-98755b875113/record",
       "dimensions": {
         "viewport": 390,
         "document": 390
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/390-08-team-match-list-after-official.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/390-08-one-game-confirmation.png"
+    },
+    {
+      "width": 390,
+      "step": "09-official-one-game-locked",
+      "url": "http://127.0.0.1:13013/team-matches/eee162ce-0998-4856-b13c-98755b875113/record",
+      "dimensions": {
+        "viewport": 390,
+        "document": 390
+      },
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/390-09-official-one-game-locked.png"
+    },
+    {
+      "width": 390,
+      "step": "10-team-match-list-after-official",
+      "url": "http://127.0.0.1:13013/team-matches",
+      "dimensions": {
+        "viewport": 390,
+        "document": 390
+      },
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/390-10-team-match-list-after-official.png"
     },
     {
       "width": 768,
       "step": "01-shared-scoreboard-without-submatches",
-      "url": "http://127.0.0.1:13014/team-matches/6559d041-e79a-4f2a-90d8-e3a3199f7587/record",
+      "url": "http://127.0.0.1:13013/team-matches/c8be6841-7aa2-401c-ab3a-f66bdbd3e302/record",
       "dimensions": {
         "viewport": 768,
         "document": 768
@@ -93,7 +113,7 @@
     {
       "width": 768,
       "step": "02-first-submatch-created",
-      "url": "http://127.0.0.1:13014/team-matches/6559d041-e79a-4f2a-90d8-e3a3199f7587/record",
+      "url": "http://127.0.0.1:13013/team-matches/c8be6841-7aa2-401c-ab3a-f66bdbd3e302/record",
       "dimensions": {
         "viewport": 768,
         "document": 768
@@ -102,68 +122,88 @@
     },
     {
       "width": 768,
-      "step": "03-aggregate-and-submatch-scores",
-      "url": "http://127.0.0.1:13014/team-matches/6559d041-e79a-4f2a-90d8-e3a3199f7587/record",
+      "step": "03-player-photo-scorer-picker",
+      "url": "http://127.0.0.1:13013/team-matches/c8be6841-7aa2-401c-ab3a-f66bdbd3e302/record",
       "dimensions": {
         "viewport": 768,
         "document": 768
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/768-03-aggregate-and-submatch-scores.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/768-03-player-photo-scorer-picker.png"
     },
     {
       "width": 768,
-      "step": "04-other-team-participant-synced",
-      "url": "http://127.0.0.1:13014/team-matches/6559d041-e79a-4f2a-90d8-e3a3199f7587/record",
+      "step": "04-inline-submatch-rename",
+      "url": "http://127.0.0.1:13013/team-matches/c8be6841-7aa2-401c-ab3a-f66bdbd3e302/record",
       "dimensions": {
         "viewport": 768,
         "document": 768
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/768-04-other-team-participant-synced.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/768-04-inline-submatch-rename.png"
     },
     {
       "width": 768,
-      "step": "05-public-detail-breakdown",
-      "url": "http://127.0.0.1:13014/team-matches/6559d041-e79a-4f2a-90d8-e3a3199f7587",
+      "step": "05-aggregate-and-submatch-scores",
+      "url": "http://127.0.0.1:13013/team-matches/c8be6841-7aa2-401c-ab3a-f66bdbd3e302/record",
       "dimensions": {
         "viewport": 768,
         "document": 768
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/768-05-public-detail-breakdown.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/768-05-aggregate-and-submatch-scores.png"
     },
     {
       "width": 768,
-      "step": "06-one-game-confirmation",
-      "url": "http://127.0.0.1:13014/team-matches/6559d041-e79a-4f2a-90d8-e3a3199f7587/record",
+      "step": "06-other-team-participant-synced",
+      "url": "http://127.0.0.1:13013/team-matches/c8be6841-7aa2-401c-ab3a-f66bdbd3e302/record",
       "dimensions": {
         "viewport": 768,
         "document": 768
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/768-06-one-game-confirmation.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/768-06-other-team-participant-synced.png"
     },
     {
       "width": 768,
-      "step": "07-official-one-game-locked",
-      "url": "http://127.0.0.1:13014/team-matches/6559d041-e79a-4f2a-90d8-e3a3199f7587/record",
+      "step": "07-public-detail-breakdown",
+      "url": "http://127.0.0.1:13013/team-matches/c8be6841-7aa2-401c-ab3a-f66bdbd3e302",
       "dimensions": {
         "viewport": 768,
         "document": 768
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/768-07-official-one-game-locked.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/768-07-public-detail-breakdown.png"
     },
     {
       "width": 768,
-      "step": "08-team-match-list-after-official",
-      "url": "http://127.0.0.1:13014/team-matches",
+      "step": "08-one-game-confirmation",
+      "url": "http://127.0.0.1:13013/team-matches/c8be6841-7aa2-401c-ab3a-f66bdbd3e302/record",
       "dimensions": {
         "viewport": 768,
         "document": 768
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/768-08-team-match-list-after-official.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/768-08-one-game-confirmation.png"
+    },
+    {
+      "width": 768,
+      "step": "09-official-one-game-locked",
+      "url": "http://127.0.0.1:13013/team-matches/c8be6841-7aa2-401c-ab3a-f66bdbd3e302/record",
+      "dimensions": {
+        "viewport": 768,
+        "document": 768
+      },
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/768-09-official-one-game-locked.png"
+    },
+    {
+      "width": 768,
+      "step": "10-team-match-list-after-official",
+      "url": "http://127.0.0.1:13013/team-matches",
+      "dimensions": {
+        "viewport": 768,
+        "document": 768
+      },
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/768-10-team-match-list-after-official.png"
     },
     {
       "width": 1440,
       "step": "01-shared-scoreboard-without-submatches",
-      "url": "http://127.0.0.1:13014/team-matches/a79f48e4-cf55-4901-8867-d0a092116086/record",
+      "url": "http://127.0.0.1:13013/team-matches/372e6ee8-8559-4a1b-b18c-81e38537bf06/record",
       "dimensions": {
         "viewport": 1440,
         "document": 1440
@@ -173,7 +213,7 @@
     {
       "width": 1440,
       "step": "02-first-submatch-created",
-      "url": "http://127.0.0.1:13014/team-matches/a79f48e4-cf55-4901-8867-d0a092116086/record",
+      "url": "http://127.0.0.1:13013/team-matches/372e6ee8-8559-4a1b-b18c-81e38537bf06/record",
       "dimensions": {
         "viewport": 1440,
         "document": 1440
@@ -182,63 +222,83 @@
     },
     {
       "width": 1440,
-      "step": "03-aggregate-and-submatch-scores",
-      "url": "http://127.0.0.1:13014/team-matches/a79f48e4-cf55-4901-8867-d0a092116086/record",
+      "step": "03-player-photo-scorer-picker",
+      "url": "http://127.0.0.1:13013/team-matches/372e6ee8-8559-4a1b-b18c-81e38537bf06/record",
       "dimensions": {
         "viewport": 1440,
         "document": 1440
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/1440-03-aggregate-and-submatch-scores.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/1440-03-player-photo-scorer-picker.png"
     },
     {
       "width": 1440,
-      "step": "04-other-team-participant-synced",
-      "url": "http://127.0.0.1:13014/team-matches/a79f48e4-cf55-4901-8867-d0a092116086/record",
+      "step": "04-inline-submatch-rename",
+      "url": "http://127.0.0.1:13013/team-matches/372e6ee8-8559-4a1b-b18c-81e38537bf06/record",
       "dimensions": {
         "viewport": 1440,
         "document": 1440
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/1440-04-other-team-participant-synced.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/1440-04-inline-submatch-rename.png"
     },
     {
       "width": 1440,
-      "step": "05-public-detail-breakdown",
-      "url": "http://127.0.0.1:13014/team-matches/a79f48e4-cf55-4901-8867-d0a092116086",
+      "step": "05-aggregate-and-submatch-scores",
+      "url": "http://127.0.0.1:13013/team-matches/372e6ee8-8559-4a1b-b18c-81e38537bf06/record",
       "dimensions": {
         "viewport": 1440,
         "document": 1440
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/1440-05-public-detail-breakdown.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/1440-05-aggregate-and-submatch-scores.png"
     },
     {
       "width": 1440,
-      "step": "06-one-game-confirmation",
-      "url": "http://127.0.0.1:13014/team-matches/a79f48e4-cf55-4901-8867-d0a092116086/record",
+      "step": "06-other-team-participant-synced",
+      "url": "http://127.0.0.1:13013/team-matches/372e6ee8-8559-4a1b-b18c-81e38537bf06/record",
       "dimensions": {
         "viewport": 1440,
         "document": 1440
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/1440-06-one-game-confirmation.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/1440-06-other-team-participant-synced.png"
     },
     {
       "width": 1440,
-      "step": "07-official-one-game-locked",
-      "url": "http://127.0.0.1:13014/team-matches/a79f48e4-cf55-4901-8867-d0a092116086/record",
+      "step": "07-public-detail-breakdown",
+      "url": "http://127.0.0.1:13013/team-matches/372e6ee8-8559-4a1b-b18c-81e38537bf06",
       "dimensions": {
         "viewport": 1440,
         "document": 1440
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/1440-07-official-one-game-locked.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/1440-07-public-detail-breakdown.png"
     },
     {
       "width": 1440,
-      "step": "08-team-match-list-after-official",
-      "url": "http://127.0.0.1:13014/team-matches",
+      "step": "08-one-game-confirmation",
+      "url": "http://127.0.0.1:13013/team-matches/372e6ee8-8559-4a1b-b18c-81e38537bf06/record",
       "dimensions": {
         "viewport": 1440,
         "document": 1440
       },
-      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/1440-08-team-match-list-after-official.png"
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/1440-08-one-game-confirmation.png"
+    },
+    {
+      "width": 1440,
+      "step": "09-official-one-game-locked",
+      "url": "http://127.0.0.1:13013/team-matches/372e6ee8-8559-4a1b-b18c-81e38537bf06/record",
+      "dimensions": {
+        "viewport": 1440,
+        "document": 1440
+      },
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/1440-09-official-one-game-locked.png"
+    },
+    {
+      "width": 1440,
+      "step": "10-team-match-list-after-official",
+      "url": "http://127.0.0.1:13013/team-matches",
+      "dimensions": {
+        "viewport": 1440,
+        "document": 1440
+      },
+      "file": "D:/sm/matchup-sports/matchup-sports-platform/output/worktrees/team-match-submatches-20260922/docs/screenshots/team-match-shared-record-submatches/after/1440-10-team-match-list-after-official.png"
     }
   ],
   "pageErrors": [],

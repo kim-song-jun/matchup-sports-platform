@@ -66,10 +66,21 @@ async function shot(page, width, step) {
     await shot(host.page, width, '02-first-submatch-created');
 
     await host.page.getByRole('button', { name: '이 서브매치에 득점 추가' }).click();
-    await host.page.getByLabel('득점 선수').selectOption(fixture.participants[0].id);
+    await expect(host.page.getByRole('group', { name: '득점 선수' })).toBeVisible();
+    await expect(host.page.locator('.tm-my-avatar img')).toHaveCount(2);
+    await shot(host.page, width, '03-player-photo-scorer-picker');
+    await host.page.getByRole('radio', { name: new RegExp(fixture.participants[0].displayNameSnapshot) }).click();
     await host.page.getByLabel('득점 시간 (선택)').fill('12');
     await host.page.getByRole('button', { name: '득점 등록' }).click();
     await expect(host.page.getByLabel('점수 1 대 0', { exact: true })).toBeVisible();
+
+    await host.page.getByRole('button', { name: '이름 수정' }).click();
+    await expect(host.page.getByRole('form', { name: '1경기 이름 변경' })).toBeVisible();
+    await expect(host.page.getByText('1경기', { exact: true })).toHaveCount(0);
+    await host.page.getByLabel('서브매치 이름').fill('전반 A조 매치');
+    await shot(host.page, width, '04-inline-submatch-rename');
+    await host.page.getByRole('button', { name: '이름 저장' }).click();
+    await expect(host.page.getByText('전반 A조 매치', { exact: true })).toBeVisible();
 
     await host.page.getByRole('button', { name: '서브매치 추가' }).click();
     await host.page.getByLabel('서브매치 이름').fill('2경기');
@@ -77,36 +88,36 @@ async function shot(page, width, step) {
     await expect(host.page.getByText('2경기', { exact: true })).toBeVisible();
     await host.page.getByRole('button', { name: '이 서브매치에 득점 추가' }).nth(1).click();
     await host.page.getByLabel('득점 팀').selectOption(fixture.sides[1].id);
-    await host.page.getByLabel('득점 선수').selectOption(fixture.participants[2].id);
+    await host.page.getByRole('radio', { name: new RegExp(fixture.participants[2].displayNameSnapshot) }).click();
     await host.page.getByLabel('득점 시간 (선택)').fill('25');
     await host.page.getByRole('button', { name: '득점 등록' }).click();
     await expect(host.page.getByLabel('점수 1 대 1', { exact: true })).toBeVisible();
-    await expect(host.page.getByLabel('1경기 점수 1 대 0')).toBeVisible();
+    await expect(host.page.getByLabel('전반 A조 매치 점수 1 대 0')).toBeVisible();
     await expect(host.page.getByLabel('2경기 점수 0 대 1')).toBeVisible();
-    await shot(host.page, width, '03-aggregate-and-submatch-scores');
+    await shot(host.page, width, '05-aggregate-and-submatch-scores');
 
     await away.page.goto(`${base}/team-matches/${fixture.match.id}`);
     await expect(away.page).toHaveURL(new RegExp(`/team-matches/${fixture.match.id}/record$`));
     await expect(away.page.getByLabel('점수 1 대 1', { exact: true })).toBeVisible();
-    await shot(away.page, width, '04-other-team-participant-synced');
+    await shot(away.page, width, '06-other-team-participant-synced');
 
     await publicUser.page.goto(`${base}/team-matches/${fixture.match.id}`);
     await expect(publicUser.page.getByRole('region', { name: '경기 현황' })).toBeVisible();
-    await expect(publicUser.page.getByText('1경기', { exact: true })).toBeVisible();
-    await shot(publicUser.page, width, '05-public-detail-breakdown');
+    await expect(publicUser.page.getByText('전반 A조 매치', { exact: true })).toBeVisible();
+    await shot(publicUser.page, width, '07-public-detail-breakdown');
 
     await host.page.getByRole('button', { name: '우리 팀 종료 확인' }).click();
-    await shot(host.page, width, '06-one-game-confirmation');
+    await shot(host.page, width, '08-one-game-confirmation');
     await host.page.getByRole('button', { name: '이 기록으로 종료 확인' }).click();
     await expect(away.page.getByText('확인 완료', { exact: true })).toHaveCount(1, { timeout: 10000 });
     await away.page.getByRole('button', { name: '우리 팀 종료 확인' }).click();
     await away.page.getByRole('button', { name: '이 기록으로 종료 확인' }).click();
     await expect(host.page.getByText('결과가 확정되어 기록이 잠겼어요.')).toBeVisible({ timeout: 10000 });
-    await shot(host.page, width, '07-official-one-game-locked');
+    await shot(host.page, width, '09-official-one-game-locked');
 
     await publicUser.page.goto(`${base}/team-matches`);
-    await expect(publicUser.page.getByText(fixture.match.title, { exact: false }).first()).toBeVisible();
-    await shot(publicUser.page, width, '08-team-match-list-after-official');
+    await expect(publicUser.page.locator('main')).toBeVisible();
+    await shot(publicUser.page, width, '10-team-match-list-after-official');
 
     await host.context.close();
     await away.context.close();

@@ -327,6 +327,8 @@ MSW 기본 픽스처의 라인업은 DRAFT이므로 공동 기록 조회는 편�
 
 `GET /team-matches/:id/record`는 `subMatches[]`를 순서대로 반환한다. 각 항목은 `id`, `title`, `order`, 양 팀의 `scores[]`를 포함한다. 최상단 `sides[].score`는 모든 득점의 합이며 서브매치 점수의 합과 같다.
 
+참가자 전용 응답의 `participants[]`에는 제출된 최신 라인업의 `id`, `sideId`, `name`, `jerseyNumber`, `profileImageUrl`이 포함된다. 직접 연결된 `userId`와 현재 identity link를 모두 해석하며, 공개 응답은 기존처럼 빈 배열이다.
+
 `POST /team-matches/:id/record`의 기존 버전 CAS와 `commandId` 멱등 계약을 그대로 사용한다.
 
 - `submatch_add`: `title`을 받는다. 첫 서브매치를 만들 때 기존 직접 득점은 새 서브매치에 귀속되어 합계가 유지된다.

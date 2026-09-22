@@ -51,6 +51,31 @@ export class TeamMatchRecordService {
     return game.participants.filter((p) => latest.get(p.sideId) === p.lineupId && game.sides.some((s) => s.id === p.sideId));
   }
 
+  private async participantViews(tx: Tx, game: Loaded) {
+    const roster = this.roster(game);
+    const links = await tx.v1ParticipantIdentityLinkCurrent.findMany({
+      where: { participantId: { in: roster.filter((participant) => !participant.userId).map((participant) => participant.id) } },
+      select: { participantId: true, userId: true },
+    });
+    const userIdByParticipant = new Map<string, string>();
+    for (const participant of roster) {
+      if (participant.userId) userIdByParticipant.set(participant.id, participant.userId);
+    }
+    for (const link of links) userIdByParticipant.set(link.participantId, link.userId);
+    const profiles = await tx.v1UserProfile.findMany({
+      where: { userId: { in: [...new Set(userIdByParticipant.values())] }, deletedAt: null },
+      select: { userId: true, profileImageUrl: true },
+    });
+    const imageByUserId = new Map(profiles.map((profile) => [profile.userId, profile.profileImageUrl]));
+    return roster.map((participant) => ({
+      id: participant.id,
+      sideId: participant.sideId,
+      name: participant.displayNameSnapshot,
+      jerseyNumber: participant.jerseyNumber,
+      profileImageUrl: imageByUserId.get(userIdByParticipant.get(participant.id) ?? '') ?? null,
+    }));
+  }
+
   private subMatches(game: Loaded): SharedSubMatch[] {
     const stored = (game.sharedRecord?.subMatches ?? []) as unknown;
     if (!Array.isArray(stored)) return [];
@@ -102,13 +127,14 @@ export class TeamMatchRecordService {
     if (visibility === 'hidden') throw new NotFoundException({ code: 'TEAM_MATCH_NOT_FOUND', message: '경기를 찾을 수 없어요.' });
     const showScore = privateView || visibility === 'live' || (visibility === 'official_only' && phase === 'official');
     const changes = privateView ? await tx.v1TeamMatchRecordChange.findMany({ where: { gameId: game.id }, orderBy: { version: 'desc' }, take: 100 }) : [];
+    const participants = privateView ? await this.participantViews(tx, game) : [];
     return {
       teamMatchId: game.teamMatchId, title: game.teamMatch!.title, startsAt: game.teamMatch!.startAt,
       phase, version: record?.version ?? 0, serverTime: new Date().toISOString(),
       canEdit: !!actor && phase === 'live', participant: !!actor, ownSideId: actor?.sideId ?? null,
       sides: game.sides.map((s) => ({ id: s.id, key: s.sideKey, name: s.displayNameSnapshot, score: showScore ? goals.filter((g) => g.sideId === s.id).length : null })),
       subMatches: subMatches.map((subMatch) => ({ ...subMatch, scores: game.sides.map((side) => ({ sideId: side.id, score: showScore ? goals.filter((goal) => goal.subMatchId === subMatch.id && goal.sideId === side.id).length : null })) })),
-      participants: privateView ? this.roster(game).map((p) => ({ id: p.id, sideId: p.sideId, name: p.displayNameSnapshot, jerseyNumber: p.jerseyNumber })) : [],
+      participants,
       goals: privateView ? goals : [],
       confirmations: privateView ? ((record?.confirmations ?? []) as Confirmation[]).map((c) => ({ sideId: c.sideId, name: c.name, at: c.at })) : [],
       history: changes.map((c) => ({ id: c.id, version: c.version, action: c.action, actorName: c.actorName, goalId: c.goalId, subMatchId: c.subMatchId, before: c.before, after: c.after, at: c.createdAt })),

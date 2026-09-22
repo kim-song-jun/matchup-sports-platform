@@ -38,7 +38,9 @@
 .inlineForm .actions { align-items: center; }
 .subMatchList { display: grid; gap: 16px; }
 .subMatchCard { border: 1px solid var(--border); border-radius: var(--radius-container); padding: 20px; display: grid; gap: 16px; }
-.subMatchHead { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; }
+.subMatchHead { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; min-width: 0; }
+.subMatchSummary { min-width: 0; }
+.subMatchHead > .actions { flex: 0 0 auto; justify-content: flex-end; }
 .subMatchTitle { min-width: 0; font-size: var(--font-size-body-lg); font-weight: 750; overflow-wrap: anywhere; }
 .subScore { font-size: var(--font-size-subhead); font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .goalList { display: grid; }
@@ -46,4 +48,15 @@
 .detailSubMatches > div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .detailSubMatches > div:last-child { border-bottom: 0; }
 .openLink { display: inline-flex; min-height: var(--size-touch-min); align-items: center; color: var(--blue700); font-weight: 700; }
-@media(max-width: 767px) { .sectionHead { align-items: stretch; flex-direction: column; } .inlineForm { grid-template-columns: 1fr; } .subMatchHead { grid-template-columns: minmax(0, 1fr) auto; } .subMatchHead .actions { grid-column: 1 / -1; } }
+.cardRenameForm { display: grid; gap: 12px; }
+.goalPlayer { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.playerField { border: 0; padding: 0; margin: 0; min-width: 0; }
+.playerField legend { font-size: var(--font-size-body-sm); font-weight: 600; margin-bottom: 8px; }
+.playerChoices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.playerChoice { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 10px; min-height: 60px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-control); cursor: pointer; background: var(--surface); }
+.playerChoice[data-selected='true'] { border-color: var(--blue500); background: var(--blue50); }
+.playerChoice input { width: 18px; height: 18px; margin: 0; accent-color: var(--blue600); }
+.playerChoice span { display: grid; gap: 2px; min-width: 0; }
+.playerChoice strong { overflow-wrap: anywhere; }
+.playerChoice small { color: var(--text-caption); font-size: var(--font-size-caption); }
+@media(max-width: 767px) { .sectionHead { align-items: stretch; flex-direction: column; } .inlineForm { grid-template-columns: 1fr; } .subMatchHead { flex-direction: column; } .subMatchHead > .actions { justify-content: flex-start; } .playerChoices { grid-template-columns: 1fr; } }

@@ -452,4 +452,4 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 
 - PR #1243의 양 팀 라인업 참가자 공동 기록에 선택적인 서브매치를 추가한다.
 - 최상단 점수와 공식 결과는 모든 서브매치 득점의 합이며 팀매치 한 경기로 한 번만 집계한다.
-- [시나리오](05-team-match-flows.md#v1-공동-경기-기록-서브매치--task-173) · [24장 갤러리](team-match-shared-submatches-gallery.md)
+- [시나리오](05-team-match-flows.md#v1-공동-경기-기록-서브매치--task-173) · [선수 사진·이름 변경 포함 30장 갤러리](team-match-shared-submatches-gallery.md)

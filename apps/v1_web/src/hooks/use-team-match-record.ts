@@ -11,7 +11,7 @@ export type SharedRecord = {
   version: number; serverTime: string; canEdit: boolean; participant: boolean; ownSideId: string | null;
   sides: { id: string; key: 'HOME' | 'AWAY'; name: string; score: number | null }[];
   subMatches: SharedSubMatch[];
-  participants: { id: string; sideId: string; name: string; jerseyNumber: number | null }[];
+  participants: { id: string; sideId: string; name: string; jerseyNumber: number | null; profileImageUrl: string | null }[];
   goals: SharedGoal[]; history: RecordChange[]; confirmations: { sideId: string; name: string | null; at: string }[]; officialAt: string | null;
 };
 export type RecordCommand = {

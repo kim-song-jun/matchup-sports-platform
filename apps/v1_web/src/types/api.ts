@@ -2666,6 +2666,8 @@ export type V1AdminTeamMatchRow = {
   league: { leagueId: string; title: string } | null;
   tournament?: { tournamentId: string; title: string } | null;
   sportName: string;
+  platformManaged: boolean;
+  pendingApplicationCount: number;
   startAt: string;
   status: 'recruiting' | 'closed' | 'matched' | 'cancelled' | 'completed' | 'archived';
   createdAt: string;
@@ -2680,7 +2682,7 @@ export type V1AdminTeamMatchApplicationRow = {
   createdAt: string;
 };
 
-export type V1AdminTeamMatchDetail = V1AdminTeamMatchRow & {
+export type V1AdminTeamMatchDetail = Omit<V1AdminTeamMatchRow, 'pendingApplicationCount'> & {
   platformManaged: boolean;
   description: string | null;
   imageUrl: string | null;

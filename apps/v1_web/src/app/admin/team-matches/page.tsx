@@ -218,24 +218,33 @@ function AdminTeamMatchesPageContent() {
             ),
           },
         ]}
-        renderActions={
-          canWrite
-            ? (row) => (
-                <button
-                  type="button"
-                  onClick={() => setModalRow(row)}
-                  aria-label={`${row.title} 상태 변경`}
-                  className={[
-                    'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
-                    'tm-on-tint text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors whitespace-nowrap',
-                    'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
-                  ].join(' ')}
-                >
-                  상태 변경
-                </button>
-              )
-            : undefined
-        }
+        renderActions={(row) => (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {row.platformManaged && row.status === 'recruiting' && row.pendingApplicationCount > 0 && (
+              <Link
+                href={`/admin/team-matches/${encodeURIComponent(row.teamMatchId)}`}
+                aria-label={`${row.title} 대기 신청 ${row.pendingApplicationCount}건 관리`}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-blue-500 px-3 text-[length:var(--font-size-label)] font-semibold text-white transition-colors hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                신청 {row.pendingApplicationCount}건 관리
+              </Link>
+            )}
+            {canWrite && (
+              <button
+                type="button"
+                onClick={() => setModalRow(row)}
+                aria-label={`${row.title} 상태 변경`}
+                className={[
+                  'inline-flex items-center justify-center min-h-[44px] px-3 rounded-lg text-[length:var(--font-size-label)] font-medium',
+                  'tm-on-tint text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors whitespace-nowrap',
+                  'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
+                ].join(' ')}
+              >
+                상태 변경
+              </button>
+            )}
+          </div>
+        )}
         loading={isInitialLoad}
         pagination={buildPagination(pageInfo, isFetching)}
         empty={

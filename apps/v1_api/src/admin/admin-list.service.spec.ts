@@ -105,10 +105,12 @@ function makeTeamMatchRow(overrides: Record<string, unknown> = {}) {
     title: '토요일 풋살 상대팀 모집',
     startAt: new Date('2026-05-23T05:00:00.000Z'),
     status: 'recruiting',
+    platformManaged: false,
     createdAt: new Date('2026-05-18T00:00:00.000Z'),
     hostTeamId: 't-1',
     hostTeam: { name: '강남 러닝 크루' },
     sport: { name: '풋살' },
+    _count: { applications: 0 },
     ...overrides,
   };
 }
@@ -760,6 +762,8 @@ describe('AdminService — list/detail endpoints', () => {
         hostTeamId: 't-1',
         hostTeamName: '강남 러닝 크루',
         sportName: '풋살',
+        platformManaged: false,
+        pendingApplicationCount: 0,
         status: 'recruiting',
       });
       expect(result.summary).toEqual({

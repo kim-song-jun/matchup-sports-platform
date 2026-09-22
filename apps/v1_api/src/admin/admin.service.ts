@@ -2402,6 +2402,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         title: true,
         startAt: true,
         status: true,
+        platformManaged: true,
         createdAt: true,
         hostTeamId: true,
         hostTeam: { select: { name: true } },
@@ -2409,6 +2410,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         // 리그전 표시(사용자 결정 3-C) -- 운영자도 목록에서 리그 경기를 바로 구분한다.
         league: { select: { id: true, title: true } },
         tournament: { select: { id: true, title: true } },
+        _count: { select: { applications: { where: { status: 'requested' } } } },
       },
     }), this.prisma.v1TeamMatch.groupBy({
       by: ['status'],
@@ -2433,6 +2435,8 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         league: row.league ? { leagueId: row.league.id, title: row.league.title } : null,
         tournament: row.tournament ? { tournamentId: row.tournament.id, title: row.tournament.title } : null,
         sportName: row.sport.name,
+        platformManaged: row.platformManaged,
+        pendingApplicationCount: row._count.applications,
         startAt: row.startAt,
         status: row.status,
         createdAt: row.createdAt,

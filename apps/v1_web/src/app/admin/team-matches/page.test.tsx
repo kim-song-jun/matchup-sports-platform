@@ -41,6 +41,8 @@ const BASE: V1AdminTeamMatchRow = {
   hostTeamName: '성수 FC',
   league: null,
   sportName: '풋살',
+  platformManaged: false,
+  pendingApplicationCount: 0,
   startAt: '2026-09-01T11:00:00.000Z',
   status: 'recruiting',
   createdAt: '2026-08-01T00:00:00.000Z',
@@ -77,5 +79,14 @@ describe('AdminTeamMatchesPage 리그 표시', () => {
     // 상세 라우트가 생기기 전에는 행을 눌러도 아무 일이 없었다(⌘K 로만 도달).
     await user.click(screen.getAllByRole('button', { name: '주말 정기전 상세 보기' })[0]);
     expect(routerPush).toHaveBeenCalledWith('/admin/team-matches/tm-1');
+  });
+
+  it('플랫폼 모집에 신청 한 건만 있어도 신청 관리 버튼을 바로 보여준다', () => {
+    renderWith([{ ...BASE, platformManaged: true, hostTeamId: null, hostTeamName: null, pendingApplicationCount: 1 }]);
+
+    const links = screen.getAllByRole('link', { name: '주말 정기전 대기 신청 1건 관리' });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) expect(link).toHaveAttribute('href', '/admin/team-matches/tm-1');
+    expect(screen.getAllByText('신청 1건 관리').length).toBeGreaterThan(0);
   });
 });

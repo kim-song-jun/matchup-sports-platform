@@ -23,6 +23,7 @@ Status: complete
 - [x] Admin detail exposes the saved representative image and level alongside the existing format/style/gender/uniform/cost fields.
 - [x] Platform-managed provenance is persisted independently of `hostTeamId` and remains visible after home/away assignment.
 - [x] Admins approve applicant teams one at a time; the first approval stays recruiting and the second approval finalizes the match.
+- [x] The admin list exposes a visible application-management action as soon as one requested application exists.
 
 ## Acceptance Criteria
 
@@ -60,6 +61,7 @@ Status: complete
 - [x] 2026-09-21 provenance regression tests: API 71/71, Web 75/75
 - [x] 2026-09-22 incremental approval focused tests: API 7/7, Web 11/11
 - [x] 2026-09-22 API/Web typecheck and API/Web pattern gates
+- [x] 2026-09-22 visible-entry follow-up: admin list service 53/53, team-match list page 4/4, API/Web typecheck and pattern gates
 - [ ] 2026-09-22 headed visual QA: local API/Web runtime was unavailable on ports 8121/3013, so runtime screenshots and console/network evidence remain for alpha verification.
 
 ## Ambiguity Log
@@ -70,6 +72,7 @@ Status: complete
 ## Progress Snapshot
 
 - 2026-09-22: Replaced the two-application batch selector with per-application approval. The first approved team reserves HOME without creating a Game or schedule; the second approved team becomes AWAY and atomically finalizes the match.
+- 2026-09-22: Added `pendingApplicationCount` and a visible `신청 1건 관리` list action so operators do not need to discover the row-click detail route before approving the first team.
 - 2026-09-19: Existing v1 flow and admin permissions verified. Implementation started.
 - 2026-09-19: Initial direct-assignment interpretation was corrected after user clarification.
 - 2026-09-19: Platform recruitment creation, public team application, and admin two-application finalization implemented; focused backend/frontend tests passed.

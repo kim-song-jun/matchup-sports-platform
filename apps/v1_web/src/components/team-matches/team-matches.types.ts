@@ -50,6 +50,7 @@ export type TeamMatchModel = {
   status: 'open' | 'pending' | 'approved' | 'closed' | 'mine';
   /** API status 만으로 판정한 "더는 신청받지 않는다" — 관계와 무관하다. */
   closed: boolean;
+  live?: boolean;
 };
 
 export type TeamMatchListViewModel = {

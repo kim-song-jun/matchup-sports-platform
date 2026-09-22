@@ -1,3 +1,5 @@
+> Task 172: 신규 친선 팀매치의 참가자 공동 기록은 [team-matches 공동 기록 계약](./team-matches.md#v1-친선-팀매치-공동-경기-기록-task-172)을 따른다. 공유 기록이 시작된 Game에서 기존 결과 제출·event·경기 진행 command는 `SHARED_RECORD_REQUIRED`로 차단된다. 리그/대회·기존 결과 revision 흐름은 유지한다. 공동 기록 확정도 기존 `GAME_RESULT_OFFICIAL` projection을 사용한다.
+
 # Game aggregate contract
 
 ## Public fixture detail compatibility

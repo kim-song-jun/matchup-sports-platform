@@ -1,5 +1,43 @@
 # Domain Contract - Team Matches
 
+## V1 친선 팀매치 공동 경기 기록 (Task 172)
+
+이 절은 `apps/v1_api/src/team-matches/team-match-record.controller.ts` / service / DTO와
+`apps/v1_web/src/hooks/use-team-match-record.ts` 기준의 신규 계약이다. 기존 리그·대회 운영 경로와
+이미 결과 revision이 있는 친선 경기의 기존 제출·승인 경로는 보존한다.
+
+| Method | Path | 권한 | 동작 |
+|---|---|---|---|
+| GET | `/api/v1/team-matches/:id/record` | OptionalV1AuthGuard | 공동 기록·서버 시각·편집 가능 여부 조회 |
+| POST | `/api/v1/team-matches/:id/record` | V1AuthGuard + 최신 유효 제출 라인업 참가자 | 득점 추가/수정/삭제/복구, 종료 확인/취소 |
+
+- 응답은 공통 `{ status, data, timestamp }`. `phase`: scheduled/live/official/cancelled/legacy/managed.
+- GET은 일반 사용자에게 점수·팀·확정 여부만 반환한다. 선수 명단·득점 상세·이력·확인자 이름은 참가자에게만 반환한다.
+- 편집자는 최신 제출/잠금 라인업의 `userId` 또는 검증된 현재 identity link로 판정한다. 팀 owner/manager 역할만으로 권한을 부여하지 않는다. 양쪽 라인업에 동시에 있는 계정은 확인자로 인정하지 않는다.
+- `commandId` UUID와 `expectedVersion` 정수 필수. `action`: add/edit/delete/undo/confirm/reopen.
+- add/edit: `sideId`는 점수를 얻는 팀. `participantId`는 선택(null=미상), `ownGoal` 기본 false,
+  `minute` 선택(null 또는 0..999 정수). 자책골 선수는 점수를 얻는 팀의 상대편 라인업에서 고른다.
+- edit/delete는 `goalId`, undo는 `changeId`. undo는 대상 변경 이후 해당 골이 다시 바뀌었으면 409로 거부한다.
+- 점수는 현재 득점 기록 개수로만 계산한다. 이력에는 주체·시각·전후 값이 영속되며 GET은 최근 100건을 반환한다.
+- 같은 commandId/사용자/payload 재전송은 재실행 없이 최신 상태를 반환한다. 다른 payload/사용자의 키 재사용은 409.
+- Game row lock + record version으로 동시 수정 유실을 방지한다. stale version은 409 `VERSION_CONFLICT`.
+- 득점 변경/복구/reopen은 기존 양 팀 확인을 초기화한다. 같은 팀의 중복 confirm은 409.
+- 두 팀의 서로 다른 라인업 참가자가 확인하면 같은 트랜잭션에서 Game 결과 DRAFT→SUBMITTED→OFFICIAL,
+  result participants/goalEvents/decisions, TeamMatch 완료·팀 일정 cascade, `GAME_RESULT_OFFICIAL` outbox를 기록한다.
+- 확정 후 일반 편집은 409. 기존 관리자 정정으로 새로운 결과 revision이 생기면 기존 결과 화면을 사용한다.
+- 공동 기록이 생성된 경기에서 이전 host-only 결과/event/진행 command를 호출하면 `SHARED_RECORD_REQUIRED`.
+- 주요 오류: 403 RECORD_PARTICIPANT_REQUIRED; 404 TEAM_MATCH_NOT_FOUND;
+  409 RECORD_NOT_EDITABLE/VERSION_CONFLICT/COMMAND_REUSED/ALREADY_CONFIRMED/GOAL_NOT_FOUND;
+  422 PARTICIPANT_INVALID. DTO 이외 필드는 ValidationPipe에서 거부한다.
+- 상대 확정 + 시작 시각 경과는 조회 시 서버 시각으로 판단한다. API 목록/상세 `isLive`는 표시용 파생값이며
+  DB status `matched`의 신청/권한 의미는 바꾸지 않는다. 종료 예정 시각만으로 결과를 확정하지 않는다.
+- 기본/추천 목록은 진행 중인 matched 경기까지 유지한다. 명시적 recruiting 필터는 기존 모집 조건을 유지한다.
+- UI는 진행 중 2초, 경기 전 15초 polling 및 창 focus 시 재조회. 자동 저장 성공을 시뮬레이션하지 않는다.
+- 참가자는 상세 진입 시 `/team-matches/:id/record`로 이동. `?view=detail`로 장소/라인업 상세 복귀.
+  기존 `/result`, `/result/approval`도 신규 친선 경기에서는 공동 기록을 연다.
+- 신규 테이블: `V1TeamMatchRecord`, `V1TeamMatchRecordChange`; migration `20260921160000_v1_team_match_shared_record`.
+
+
 
 ## Task 168 Phase 3 canonical source addendum (candidate)
 
@@ -273,6 +311,8 @@ Success:
 - `apps/v1_web/src/hooks/use-v1-api.ts`
 - `apps/v1_web/src/types/api.ts`
 
+Task 172 공개 기록은 기존 가시성 정책과 `PUBLIC_LIVE` 플래그를 적용한다. 비참가자의 `sides[].score`는 비공개 시 `null`이며, `HIDDEN`은 404다. `STATUS_ONLY`는 점수를 숨기고, `OFFICIAL_ONLY` 및 플래그가 꺼진 `LIVE`는 최종 확정 후에만 점수를 반환한다. 라인업·이력·팀별 확인 정보는 참가자에게만 반환한다.
+
 ### 일반/관리자 날짜·확정 공통 계약 (Task 149)
 
 - 두 생성 API는 `validateTeamMatchDates`를 공유한다. 시작은 미래, 종료는 시작 이후, 새 마감은 현재 이후·시작 이전이어야 한다. 잘못된 종료값을 `null`로 바꾸어 성공시키지 않는다.
@@ -280,3 +320,5 @@ Success:
 - 일반/관리자 스타일 입력은 프리셋과 직접 입력을 함께 지원하며 최대 3개다.
 - 신청 마감은 **새 신청 접수**를 닫는다. 기존 `requested` 신청은 raw status가 `recruiting`이고 시작 전이면 일반 승인과 관리자 두 팀 확정 모두 가능하다. `closed`/`cancelled`/`matched` 상태나 시작 이후는 확정 불가다. 일반 신청 목록의 `canApprove`도 이 조건과 같다.
 - `platform_managed` migration과 후속 `20260921141000_v1_platform_recruitment_host_constraint`가 필요하다. 후자는 기존 CHECK를 트랜잭션 안에서 확장해 플랫폼 모집만 host 없이 허용하고 생성자·지역·장소·시작 필수값은 유지한다. 일반 모집은 여전히 host가 필요하다.
+
+MSW 기본 픽스처의 라인업은 DRAFT이므로 공동 기록 조회는 편집 불가 상태이며 POST는 403을 반환한다. 실제 공동 편집 검증은 API 통합 픽스처와 headed 브라우저 흐름을 사용한다. 테스트 성공을 흉내내는 mock 확정 처리는 제공하지 않는다.

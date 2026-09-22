@@ -428,6 +428,14 @@ dev 머지와 alpha 최종 검증은 필수 리뷰 게이트 미충족으로 아
 Task 156 continuation: [scenario](./android-play-readiness.md). Organization D-U-N-S pending.
 Implementation and isolated API/browser evidence tracked in Task 156; production and Play/device gates remain separate.
 
+### 2026-09-21 — Task 172 친선 팀매치 공동 경기 기록
+
+- 대상: [팀매치 시나리오](./05-team-match-flows.md#v1-공동-경기-기록--task-172) TM-SHARED-01..12.
+- 구현/검증 상태: [Task 172](../../.github/tasks/172-team-match-shared-record.md)의 Progress Snapshot과 PR 갤러리가 현재 결과의 정본.
+- 양 팀 일반 선수 / 비참가자, 실제 API·격리 PostgreSQL, headed Chromium 390/768/1440 흐름 검증.
+
+- Task 172 [공동 경기 기록 화면별 플로우·42개 스크린샷](team-match-shared-record-gallery.md) — 390/768/1440, 실제 API·양 팀 일반 참가자 검증.
+
 ## Task 149 condition parity — 2026-09-21
 
 - Admin platform recruitment now uses the ordinary team-match image, level, format, style, uniform, gender, cost, place, schedule, and optional deadline contract.

@@ -1551,6 +1551,7 @@ export function useV1TeamMatches(filters?: ListFilters, options?: QueryOptions) 
   return useQuery({
     queryKey: v1Keys.teamMatches(filters),
     queryFn: () => v1Get<CursorPage<V1TeamMatch>>('/team-matches', filters),
+    refetchInterval: 15000,
     enabled: options?.enabled,
     // useV1Matches와 동일한 이유 — cursor로 쿼리키가 바뀌는 "더 보기" 중 목록이 비지 않게 한다.
     placeholderData: keepPreviousData,

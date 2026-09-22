@@ -215,6 +215,7 @@ export class MatchesService {
       maxLevel: match.maxSportLevel ? { code: match.maxSportLevel.code, name: match.maxSportLevel.name } : null,
       rulesText: [match.levelNote, match.genderRule, match.costNote].filter(Boolean).join(' · ') || null,
       genderRule: match.genderRule,
+      costNote: match.costNote,
       approvalRequired: true,
       paymentRequired: false,
       host: {
@@ -322,6 +323,7 @@ export class MatchesService {
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
+          costNote: dto.costNote ?? null,
           status: 'recruiting',
         },
       });
@@ -414,6 +416,7 @@ export class MatchesService {
         minLevelCode: match.minSportLevel?.code ?? null,
         maxLevelCode: match.maxSportLevel?.code ?? null,
         genderRule: match.genderRule,
+        costNote: match.costNote,
       },
       status: this.getApiStatus(match),
       participantCount,
@@ -463,6 +466,7 @@ export class MatchesService {
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
+          costNote: dto.costNote ?? null,
         },
       });
     });
@@ -1155,6 +1159,7 @@ export class MatchesService {
       maxLevel: match.maxSportLevel ? { code: match.maxSportLevel.code, name: match.maxSportLevel.name } : null,
       rulesText: [match.levelNote, match.genderRule, match.costNote].filter(Boolean).join(' · ') || null,
       genderRule: match.genderRule,
+      costNote: match.costNote,
       approvalRequired: true,
       paymentRequired: false,
       // detail()과 같은 hostUser include(matchInclude())를 이미 공유하므로 추가 쿼리 없이

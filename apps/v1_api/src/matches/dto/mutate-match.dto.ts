@@ -75,6 +75,12 @@ export class MutateMatchDto {
   @IsString()
   @MaxLength(20)
   genderRule?: string | null;
+
+  /** 참가비 자유 입력(예: "10,000원/1인", "무료"). team-matches의 costNote와 같은 계약. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  costNote?: string | null;
 }
 
 export class UpdateMatchDto extends MutateMatchDto {

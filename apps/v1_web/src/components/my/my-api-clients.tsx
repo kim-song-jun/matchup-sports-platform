@@ -1003,15 +1003,26 @@ export function SportsSettingsPageClient() {
                   <div key={sportId}>
                     <SportLevelPicker levelId={levelId} onSelect={(nextLevelId) => setSportLevel(sportId, nextLevelId)} sport={sport} />
                     {positionOptions.length > 0 ? (
-                      <div style={{ marginTop: 12 }}>
-                        <PreferredPositionPicker
-                          formations={positionFormations}
-                          onChange={(next) => setSportPositions(sportId, next)}
-                          options={positionOptions}
-                          primary={preferredPosition}
-                          secondary={secondaryPreferredPosition}
-                          sportName={sport.name}
-                        />
+                      <div style={{ marginTop: 20 }}>
+                        {/* 이 종목 한정으로 등장하는 [D14] 위젯이 바로 위 "난이도" 섹션의 하위
+                            요소처럼 보였다 — 자체 제목이 없어 사용자가 난이도 선택 UI의 일부로
+                            오인했다(실사고). 이 선택이 실제로 무엇에 쓰이는지(전 대회·리그 자동
+                            적용, 기록·선수 카드 반영)도 위젯 자체 캡션(조작법만 설명)엔 없어 여기서
+                            보강한다. */}
+                        <div className="tm-text-body-lg">선호 포지션</div>
+                        <div className="tm-text-caption" style={{ marginTop: 4 }}>
+                          선택하면 이 종목의 모든 대회·리그에 자동 적용돼요. 경기 기록과 선수 카드에도 반영돼요.
+                        </div>
+                        <div style={{ marginTop: 12 }}>
+                          <PreferredPositionPicker
+                            formations={positionFormations}
+                            onChange={(next) => setSportPositions(sportId, next)}
+                            options={positionOptions}
+                            primary={preferredPosition}
+                            secondary={secondaryPreferredPosition}
+                            sportName={sport.name}
+                          />
+                        </div>
                       </div>
                     ) : null}
                   </div>

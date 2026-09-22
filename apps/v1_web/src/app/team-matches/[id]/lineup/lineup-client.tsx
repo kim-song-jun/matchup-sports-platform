@@ -76,9 +76,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const createPreset = useV1CreateLineupPreset(ownTeamId);
   const updatePreset = useV1UpdateLineupPreset(ownTeamId);
 
-  /** 지금 이 라인업에 실제로 넣을 수 있는 사람 — 서버가 저장 시 강제하는 조건(팀 소속 +
-   * 참석 응답)을 그대로 계산해 내려준 목록이다. 이게 없으면 화면은 팀원 전체만 알아서,
-   * 참석하지 않은 사람을 넣고 저장을 눌러야 비로소 422를 만난다. */
+  /** 지금 이 참석명단에 넣을 수 있는 활성 팀원. 참석 응답 여부와 무관하다. */
   const eligibleMembers = lineupQuery.data?.eligibleMembers ?? [];
   // 전술보드 링크에 쓴다 — 배치는 그 화면이 담당한다(정본 §3).
   const gameId = lineupQuery.data?.gameId ?? null;
@@ -118,15 +116,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   // 쓴다(아래 sportName 필터). 코트 배치·포메이션 선택은 Task 163 에서 전술보드로 옮겨
   // 이 화면에서 사라졌다 — 그래서 종목별 코트 allowlist 도 여기 남지 않는다.
   const formationSupportedSportName = teamMatchQuery.data?.sport?.name ?? null;
-  /**
-   * 정규 리그의 대진인가. **참석 응답 게이트가 리그에는 걸리지 않으므로** 안내 문구가
-   * 달라야 한다 — 서버가 리그에서는 `eligibleMembers` 를 전원 `attending: true` 로 내려준다
-   * (`team-match-lineup.service.ts` 의 그 자리 주석: 리그 대진에는 참석을 묻는 입구가 없어
-   * 게이트를 걸면 아무도 명단에 못 든다).
-   *
-   * 새 조회를 붙이지 않는다 — 이 화면이 이미 부르는 팀매치 상세가 `league` 를 싣고 있다.
-   */
-  const isLeagueFixture = teamMatchQuery.data?.league != null;
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
   const saveMutation = useV1SaveTeamMatchLineup(teamMatchId);
@@ -393,23 +382,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
   const counts = deriveLineupCounts(state, rosterPool);
   const waitingMembers = rosterPool.filter((member) => !isRosterMemberPlaced(state, member));
-  /** 서버가 저장 시 강제하는 것과 동일한 조건(팀 일정에 '참석'으로 응답)을 화면에서도
-   * 미리 반영한다 — eligibleMembers는 이미 이 판정을 담아 내려온다(위 :94 선언 참조).
-   * `attending`은 이 매치에 팀 일정이 없으면 전원 true다.
-   *
-   * 필드 자체가 없는 응답(구버전 캐시 등)에서는 판정할 근거가 없으므로 걸러내지 않는다
-   * — `eligibleMembers?:`가 optional인 이유가 이것이다. 실제 서버는 항상 이 필드를
-   * 채워 보낸다(team-match-lineup.service.ts loadEligibleMembers). */
-  const hasEligibilityData = lineupQuery.data?.eligibleMembers !== undefined;
-  const attendingUserIds = new Set(
-    eligibleMembers.filter((member) => member.attending).map((member) => member.userId),
-  );
-  const addableWaitingMembers = hasEligibilityData
-    ? waitingMembers.filter((member) => attendingUserIds.has(member.userId))
-    : waitingMembers;
-  const blockedWaitingMembers = hasEligibilityData
-    ? waitingMembers.filter((member) => !attendingUserIds.has(member.userId))
-    : [];
+  const addableWaitingMembers = waitingMembers;
 
   const loadableHistory: LoadableLineup[] = (historyQuery.data?.items ?? []).map((item) => ({
     key: `history:${item.lineupId}`,
@@ -440,21 +413,14 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   /**
    * 고른 라인업으로 명단을 채운다.
    *
-   * 자격 목록은 **참석으로 응답한 팀원**이다. 서버가 저장 때 그 조건을 강제하므로, 여기서
-   * 미리 걸러야 "불러왔는데 저장이 422로 막히는" 일이 없다. 참석하지 않은 사람은 그냥
-   * 빠지는 게 아니라 "참석 응답이 없어요"라는 이유와 함께 배너에 뜬다 — 조용히 사라지면
-   * 팀장은 명단이 왜 달라졌는지 모른다.
+   * 활성 팀원은 참석 응답과 무관하게 모두 불러올 수 있다. 현재 팀에서 빠진 사람만
+   * `not_in_team`으로 제외하고, 비연동 게스트는 그대로 허용한다.
    */
   function handleSelectLineup(lineup: LoadableLineup) {
-    const attending = eligibleMembers.filter((member) => member.attending);
-    const ineligibleReasonByUserId: Record<string, 'not_attending'> = {};
-    for (const member of eligibleMembers) {
-      if (!member.attending) ineligibleReasonByUserId[member.userId] = 'not_attending';
-    }
     const recentJersey = buildRecentJerseyMap(historyQuery.data?.items ?? []);
     const resolved = resolveLoadableEntries({
       entries: lineup.entries,
-      eligible: attending.map((member) => ({
+      eligible: eligibleMembers.map((member) => ({
         userId: member.userId,
         displayName: member.displayName,
         jerseyNumber: member.jerseyNumber,
@@ -462,7 +428,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
       // 팀 매치는 비연동 게스트(용병 등)를 명단에 둘 수 있다.
       allowGuests: true,
       missingReason: 'not_in_team',
-      ineligibleReasonByUserId,
     });
     const keepPlacement =
       lineup.sportName === null ||
@@ -830,26 +795,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         {editable ? (
           <section aria-labelledby="lineup-roster-heading" style={{ marginBottom: 16 }}>
             <SectionTitle id="lineup-roster-heading" title={`추가 가능한 팀원 (${addableWaitingMembers.length})`} />
-            {/* eligibleMembers(:94)가 서버 저장 검증과 동일한 조건(팀 일정에 '참석'으로
-                응답)을 이미 담아 내려주므로, 여기서도 그 조건으로 걸러서 보여준다 — 이
-                일정에 딸린 참석 조건은 "불참을 명시적으로 누른 사람"만이 아니라 무응답·
-                대기(WAITLISTED)까지 전부 포함한다(팀 일정이 없는 매치는 전원 통과).
-
-                **리그 대진에는 그 조건이 없다.** 대진을 운영자가 일괄 생성하면서 팀 일정이
-                함께 깔리지만 그 일정의 참석을 묻는 입구가 없어, 게이트를 걸면 아무도 명단에
-                못 든다 — 서버가 그래서 리그에서는 전원 통과시킨다. 문구가 그대로면 화면이
-                자기모순이 된다: "참석으로 확정된 팀원만" 이라고 적어 놓고 바로 아래에
-                **응답한 적 없는 팀원 전원**을 나열한다(alpha 실측). */}
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '4px 0 8px' }}>
-              {isLeagueFixture
-                ? '리그 경기는 참석 응답과 상관없이 팀원을 명단에 넣을 수 있어요. 실제로 뛸 선수만 골라 주세요.'
-                : '상대팀 승인 전에도 호스트팀 참석명단을 작성할 수 있어요. 참석으로 확정된 팀원만 추가돼요.'}
+              팀장·운영진이 활성 팀원을 참석명단에 바로 넣을 수 있어요. 별도의 참석 초대나 응답은 필요하지 않아요.
             </p>
-            {!isLeagueFixture && ownTeamId ? (
-              <p className="tm-text-caption" style={{ margin: '0 0 12px' }}>
-                팀원이 보이지 않으면 <Link className="tm-link" href={`/teams/${encodeURIComponent(ownTeamId)}/schedules`}>팀 일정에서 참석을 먼저 확인해 주세요</Link>.
-              </p>
-            ) : null}
             {rosterQuery.isLoading ? (
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
                 팀원 목록을 불러오는 중이에요…
@@ -863,63 +811,23 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                {addableWaitingMembers.length === 0 ? (
-                  <p className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-                    지금 추가할 수 있는 팀원이 없어요. 아래 팀원들의 참석 확정을 기다리고 있어요.
-                  </p>
-                ) : (
-                  addableWaitingMembers.map((member) => (
-                    <Card key={member.userId} pad={12}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{member.displayName}</span>
-                        {/* Task 163: "선발 추가"/"후보 추가" 두 버튼을 하나로 — 명단에
-                            선발 구분이 없다(정본 §3). 행마다 반복되는 버튼이라 primary 가 아니라
-                            outline 이다 — 목록 전체가 파랗게 차면 주 행동(명단 제출)이 묻힌다. */}
-                        <button
-                          type="button"
-                          className="tm-btn tm-btn-sm tm-btn-outline"
-                          onClick={() => setState((prev) => (prev ? addRosterMemberToLineup(prev, member) : prev))}
-                        >
-                          명단 추가
-                        </button>
-                      </div>
-                    </Card>
-                  ))
-                )}
-                {blockedWaitingMembers.length > 0 ? (
-                  <>
-                    <p
-                      className="tm-text-caption"
-                      style={{ color: 'var(--text-muted)', margin: '12px 0 4px' }}
-                    >
-                      참석 미확정 팀원 ({blockedWaitingMembers.length})
-                    </p>
-                    {blockedWaitingMembers.map((member) => (
-                      // opacity 로 카드를 통째로 흐리면 이름과 '참석 미확정' 배지의 대비가
-                      // 라이트 2.27:1 / 다크 3.20:1 로 떨어져 WCAG AA(4.5:1) 미달이 된다. 이 둘은
-                      // disabled 컨트롤이 아니라 a11y-decisions.md 의 disabled 예외 대상도 아니다.
-                      // '지금은 추가할 수 없다'는 신호는 이미 배지 텍스트 + disabled 버튼 두 개가
-                      // 전달하므로 opacity 는 정보를 더하지 않고 대비만 깎는다.
-                      <Card key={member.userId} pad={12}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{member.displayName}</span>
-                          <span className="tm-badge tm-badge-grey" aria-label={`${member.displayName}, 참석 미확정이라 지금은 추가할 수 없어요`}>
-                            참석 미확정
-                          </span>
-                          {/* Task 163: 추가 버튼도 하나다 — 명단에 선발 구분이 없다(정본 §3). */}
-                          <button
-                            type="button"
-                            className="tm-btn tm-btn-sm tm-btn-outline"
-                            disabled
-                            aria-label={`${member.displayName} 명단 추가 — 참석 확정 전이라 비활성화됨`}
-                          >
-                            명단 추가
-                          </button>
-                        </div>
-                      </Card>
-                    ))}
-                  </>
-                ) : null}
+                {addableWaitingMembers.map((member) => (
+                  <Card key={member.userId} pad={12}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span className="tm-text-label" style={{ flex: 1, fontWeight: 600 }}>{member.displayName}</span>
+                      {/* Task 163: "선발 추가"/"후보 추가" 두 버튼을 하나로 — 명단에
+                          선발 구분이 없다(정본 §3). 행마다 반복되는 버튼이라 primary 가 아니라
+                          outline 이다 — 목록 전체가 파랗게 차면 주 행동(명단 제출)이 묻힌다. */}
+                      <button
+                        type="button"
+                        className="tm-btn tm-btn-sm tm-btn-outline"
+                        onClick={() => setState((prev) => (prev ? addRosterMemberToLineup(prev, member) : prev))}
+                      >
+                        명단 추가
+                      </button>
+                    </div>
+                  </Card>
+                ))}
               </div>
             )}
 

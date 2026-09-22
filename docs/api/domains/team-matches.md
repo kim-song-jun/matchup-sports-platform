@@ -299,6 +299,7 @@ Success:
 - `GET /team-matches/:teamMatchId/lineup` reads the viewer's team lineup.
 - `PUT /team-matches/:teamMatchId/lineup` saves a draft through `TeamMatchLineupService`.
 - Host team owners/managers may read and save the HOME lineup while the match is still recruiting and no opponent has been approved. The Game's AWAY side remains a teamless placeholder until approval.
+- Team owners/managers select active team members directly for the attendance roster. Team-schedule RSVP (`GOING`, declined, or no response) does not gate lineup eligibility; active membership is the server-enforced requirement.
 - Opponent-side lineup access and change requests require an approved opponent team.
 
 ## Frontend Mapping Notes

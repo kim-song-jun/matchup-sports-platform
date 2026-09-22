@@ -96,7 +96,21 @@ function createFake(options: { managerTeamId?: string; approvedApplicantTeamId?:
         return { userId, user: { profile: { nickname: `${userId} 님`, displayName: null } } };
       },
     },
-    v1TeamSchedule: { findFirst: async () => null },
+    // 참석명단 자격은 활성 멤버십만 본다. 일정/RSVP를 다시 조회하면 모든 저장 스펙이
+    // 즉시 실패해 회귀를 드러낸다.
+    v1TeamSchedule: {
+      findFirst: async () => {
+        throw new Error('참석명단 저장은 팀 일정 RSVP를 조회하면 안 됩니다.');
+      },
+    },
+    v1ScheduleAttendance: {
+      findMany: async () => {
+        throw new Error('참석명단 조회는 참석 응답을 조회하면 안 됩니다.');
+      },
+      findUnique: async () => {
+        throw new Error('참석명단 저장은 참석 응답을 조회하면 안 됩니다.');
+      },
+    },
     v1CompetitionConfigVersion: {
       findUnique: async () => ({
         lineup: { minPlayers: 3, maxPlayers: 5, substitutions: 'rolling', maxSubstitutions: null },
@@ -742,6 +756,18 @@ describe('TeamMatchLineupService.saveLineup host-only recruitment', () => {
 
     await expect(
       service.saveLineup(manager, 'team-match-1', 'host-only-lineup', lineupDto(0)),
+    ).resolves.toMatchObject({
+      sideId: 'side-home',
+      revision: 1,
+    });
+  });
+
+  it('allows active team members without an attendance invitation or RSVP', async () => {
+    const { prisma } = createFake();
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(
+      service.saveLineup(manager, 'team-match-1', 'direct-attendance-roster', lineupDto(0)),
     ).resolves.toMatchObject({
       sideId: 'side-home',
       revision: 1,

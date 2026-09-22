@@ -88,6 +88,9 @@ upload persistence, and the absence of hard-coded production form values.
   lineup context, allowing HOME lineup saves while AWAY remains a placeholder. Detail heroes
   now center uploaded images with cover sizing instead of exposing only the source image's
   top-left area.
+- 2026-09-22: Attendance-roster follow-up removed the team-schedule RSVP gate. Owners and
+  managers can now add any active team member directly, including before opponent approval;
+  no attendance invitation or member response is required.
 
 ## 2026-09-18 개인 매치 참여 중심 기능 확장
 

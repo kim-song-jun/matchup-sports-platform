@@ -85,20 +85,9 @@ interface TeamMatchLineupContext {
    * `null`. 이 저장소가 이미 쓰는 리그/친선 판별자와 같은 값이다
    * (`team-record-category.ts`).
    *
-   * **불리언이 아니라 id 를 싣는다** — 참석 응답 게이트는 "리그인가" 만 물으면 되지만
-   * 출전정지 집계는 **그 리그의 id 로** 규정을 읽고 경기 목록을 만든다. 두 필드를 나란히
-   * 두면 같은 사실의 출처가 둘이 되므로, 값을 하나만 두고 불리언은 쓰는 자리에서 파생시킨다.
-   * (같은 `select` 라 추가 쿼리는 없다.)
+   * 출전정지 집계는 이 id로 해당 리그의 규정과 경기 목록을 읽는다.
    */
   leagueId: string | null;
-}
-
-/**
- * 참석 응답 게이트를 가르는 판정 — 근거는 `resolveEntry` 의 그 자리 주석.
- * `leagueId` 하나에서 파생시켜 두 사실이 어긋날 수 없게 한다.
- */
-function isLeagueFixture(context: TeamMatchLineupContext): boolean {
-  return context.leagueId !== null;
 }
 
 function assertLineupMutationAllowed(context: TeamMatchLineupContext): void {
@@ -726,14 +715,8 @@ export class TeamMatchLineupService {
   /**
    * 지금 이 라인업에 등록할 수 있는 팀원 목록.
    *
-   * 저장 시점의 자격 판정(resolveEntry)과 **완전히 같은 조건**을 화면에 미리 알려주기
-   * 위한 읽기 경로다. 화면은 지금껏 팀원 전체만 알고 있어서, 참석 응답을 하지 않은
-   * 팀원을 명단에 넣고 저장 버튼을 눌러야 비로소 422를 만났다. 판정 규칙을 프론트에
-   * 복제하면 서버와 갈라지므로, 규칙을 이미 소유한 이쪽이 결과만 내려준다.
-   *
-   * `attending`은 이 팀 매치에 연결된 팀 일정이 있을 때만 의미가 있다 — 일정이 없으면
-   * resolveEntry도 참석 검증을 건너뛰므로 여기서도 전원 true다. **리그 대진도 전원
-   * true다** — 참석을 묻는 입구가 없어 게이트를 걸지 않기 때문이다(resolveEntry 참조).
+   * 팀장·운영진이 별도의 참석 초대나 응답 없이 활성 팀원을 직접 참석명단에 넣는다.
+   * `attending`은 기존 클라이언트와의 응답 호환을 위해 유지하되 항상 true다.
    *
    * `jerseyNumber`는 팀 고정 등번호로, 라인업 화면의 등번호 자동 채움이 2순위 소스로
    * 쓴다(1순위는 불러온 라인업의 값, 3순위는 그 선수가 직전에 달았던 번호).
@@ -747,29 +730,12 @@ export class TeamMatchLineupService {
         user: { select: { profile: { select: { nickname: true, displayName: true } } } },
       },
     });
-    // 저장 시점 규칙(resolveEntry)과 **같은 조건**을 화면에 미리 알려주는 것이 이 함수의
-    // 존재 이유다 -- 리그 예외도 같이 따라와야 한다. 안 따라오면 화면은 전원을 "참석 안 함"
-    // 으로 흐려 놓는데 저장은 통과하는, 더 나쁜 어긋남이 된다.
-    const schedule = isLeagueFixture(context)
-      ? null
-      : await tx.v1TeamSchedule.findFirst({
-          where: { teamMatchId: context.teamMatchId, teamId: context.ownTeamId },
-          select: { id: true },
-        });
-    const goingUserIds = new Set<string>();
-    if (schedule !== null) {
-      const attendances = await tx.v1ScheduleAttendance.findMany({
-        where: { scheduleId: schedule.id, status: 'GOING' },
-        select: { userId: true },
-      });
-      for (const attendance of attendances) goingUserIds.add(attendance.userId);
-    }
     return memberships.map((membership) => ({
       userId: membership.userId,
       displayName:
         membership.user.profile?.nickname || membership.user.profile?.displayName || '팀원',
       jerseyNumber: membership.jerseyNumber,
-      attending: schedule === null ? true : goingUserIds.has(membership.userId),
+      attending: true,
     }));
   }
 
@@ -961,39 +927,8 @@ export class TeamMatchLineupService {
         message: '현재 팀 소속이 아닌 사용자는 라인업에 등록할 수 없어요.',
       });
     }
-    // 참석 응답 게이트는 **팀이 스스로 만든 친선 매치에만** 건다.
-    //
-    // 리그 대진에는 이 게이트가 구조적으로 맞지 않는다. 대진은 운영자가 일괄 생성하고
-    // (`league-fixture-creation.ts`) 그때 양 팀에 `V1TeamSchedule` 이 함께 깔리는데,
-    // 선수들에게 그 일정의 참석을 묻는 입구가 없다. 그래서 `GOING` 인 사람이 0명이고,
-    // 팀장이 연동된 팀원을 넣으려 하면 전원이 422 로 튕긴다. 팀장에게 남는 유일한 길은
-    // **이름만 적어 넣는 것**이고, 그렇게 저장된 행은 `userId` 가 없다 -- alpha 실측에서
-    // 제출된 리그 라인업 참가자 14명이 **전원** userId null 이었던 이유가 이것이다.
-    //
-    // 그 결과가 조용히 번진다: 신원 연결이 안 만들어져 개인 기록·상호평가·징계(정지)
-    // 추적이 전부 그 사람을 못 찾는다. 정본 §3 도 리그 명단을 "팀이 제출하는 출전자
-    // 목록"으로 정의하지, 참석 투표의 결과로 정의하지 않는다.
-    //
-    // 친선 쪽은 그대로 둔다 -- 거기서는 팀이 직접 일정을 만들고 참석을 받으므로 이
-    // 게이트가 실제 의미를 갖는다.
-    if (!isLeagueFixture(context)) {
-      const schedule = await tx.v1TeamSchedule.findFirst({
-        where: { teamMatchId: context.teamMatchId, teamId: context.ownTeamId },
-        select: { id: true },
-      });
-      if (schedule !== null) {
-        const attendance = await tx.v1ScheduleAttendance.findUnique({
-          where: { scheduleId_userId: { scheduleId: schedule.id, userId: entry.userId } },
-          select: { status: true },
-        });
-        if (attendance === undefined || attendance === null || attendance.status !== 'GOING') {
-          throw new UnprocessableEntityException({
-            code: 'LINEUP_PARTICIPANT_INELIGIBLE',
-            message: '참석으로 응답한 팀원만 라인업에 등록할 수 있어요.',
-          });
-        }
-      }
-    }
+    // 참석명단은 팀장·운영진이 직접 확정한다. 팀 일정 RSVP는 참고 정보일 뿐 저장 자격을
+    // 제한하지 않으며, 현재 팀의 활성 멤버십만 서버에서 강제한다.
     const displayNameSnapshot =
       entry.displayName?.trim() ||
       membership.user.profile?.nickname ||

@@ -451,15 +451,6 @@ describe('TeamMatchLineupPageClient', () => {
   });
 
   /**
-   * **화면이 자기모순이던 자리다.**
-   *
-   * 리그 대진에는 참석 응답 게이트가 걸리지 않는다 — 대진을 운영자가 일괄 생성하면서 팀
-   * 일정이 함께 깔리지만 그 일정의 참석을 묻는 입구가 없어, 게이트를 걸면 아무도 명단에
-   * 못 든다. 서버는 그래서 리그에서 `eligibleMembers` 를 전원 통과시키는데, 안내 문구만
-   * 친선 규칙을 그대로 말하고 있었다 — *"참석으로 확정된 팀원만 추가할 수 있어요"* 라고
-   * 적어 놓고 바로 아래에 **응답한 적 없는 팀원 전원**을 나열했다(alpha 실측).
-   */
-  /**
    * **라벨을 지우면 못 찾고, 항상 띄우면 값으로 읽힌다.**
    *
    * 처음엔 선택됐을 때만 "GK" 가 보이는 네이티브 라디오였는데 "뭘 누르는 버튼인지 모르겠다"
@@ -497,7 +488,7 @@ describe('TeamMatchLineupPageClient', () => {
     expect(notDesignated).toBeEnabled();
   });
 
-  it('리그 대진에서는 참석 안내 문구가 리그 규칙으로 바뀐다', () => {
+  it('리그 대진에서도 팀장·운영진 직접 등록을 안내한다', () => {
     hoisted.useV1TeamMatchMock.mockReturnValue({
       data: { ...baseTeamMatch(), league: { leagueId: 'league-1', title: '테스트 리그' } },
       isLoading: false,
@@ -512,13 +503,11 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    expect(
-      screen.getByText('리그 경기는 참석 응답과 상관없이 팀원을 명단에 넣을 수 있어요. 실제로 뛸 선수만 골라 주세요.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/별도의 참석 초대나 응답은 필요하지 않아요/)).toBeInTheDocument();
     expect(screen.queryByText(/참석으로 확정된 팀원만/)).not.toBeInTheDocument();
   });
 
-  it('친선 매치에서는 참석 안내 문구가 그대로다 — 게이트가 살아 있는 쪽이다', () => {
+  it('친선 매치도 참석 응답 없이 직접 등록한다고 안내한다', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup(),
       isLoading: false,
@@ -528,11 +517,8 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    expect(screen.getByText(/상대팀 승인 전에도 호스트팀 참석명단을 작성할 수 있어요/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /팀 일정에서 참석을 먼저 확인/ })).toHaveAttribute(
-      'href',
-      '/teams/team-host/schedules',
-    );
+    expect(screen.getByText(/팀장·운영진이 활성 팀원을 참석명단에 바로 넣을 수 있어요/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /팀 일정에서 참석을 먼저 확인/ })).not.toBeInTheDocument();
   });
 
   it('상대팀 승인 전에도 호스트 매니저는 참석명단을 작성할 수 있다', () => {
@@ -555,7 +541,7 @@ describe('TeamMatchLineupPageClient', () => {
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
     expect(screen.getByRole('button', { name: '명단 추가' })).toBeEnabled();
-    expect(screen.getByText(/상대팀 승인 전에도 호스트팀 참석명단을 작성할 수 있어요/)).toBeInTheDocument();
+    expect(screen.getByText(/별도의 참석 초대나 응답은 필요하지 않아요/)).toBeInTheDocument();
   });
 
   it('owner/manager: lets a manager add a waiting roster member to the appearance roster', async () => {
@@ -581,12 +567,7 @@ describe('TeamMatchLineupPageClient', () => {
     expect(screen.getByText('추가할 수 있는 팀원이 없어요')).toBeInTheDocument();
   });
 
-  // 회귀 방지: "추가 가능한 팀원" 목록이 서버가 이미 내려주는 eligibleMembers[].attending을
-  // 무시하고 활성 팀원 전체를 addable로 보여주던 결함(참석 미확정 팀원을 선발/후보로 넣고
-  // 저장하면 서버가 422 LINEUP_PARTICIPANT_INELIGIBLE로 전체 저장을 막는데, 화면은 누가
-  // 문제인지 전혀 알려주지 않았다). eligibleMembers가 있을 때는 attending===true인 사람만
-  // 추가 버튼이 살아 있어야 하고, 나머지는 분리된 섹션에 배지 + 비활성 버튼으로 보여야 한다.
-  it('participants who have not confirmed attendance are separated from the addable list and cannot be added', () => {
+  it('팀장·운영진은 참석 응답이 없는 활성 팀원도 참석명단에 직접 추가할 수 있다', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({
         eligibleMembers: [
@@ -611,23 +592,15 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    // 대기 2명 중 참석 확정자(1명)만 "추가 가능한 팀원" 카운트에 잡힌다.
-    expect(screen.getByText('추가 가능한 팀원 (1)')).toBeInTheDocument();
-    expect(screen.getByText('참석 미확정 팀원 (1)')).toBeInTheDocument();
-    expect(screen.getByText('참석 미확정')).toBeInTheDocument();
+    expect(screen.getByText('추가 가능한 팀원 (2)')).toBeInTheDocument();
+    expect(screen.getByText(/별도의 참석 초대나 응답은 필요하지 않아요/)).toBeInTheDocument();
+    expect(screen.queryByText(/참석 미확정/)).not.toBeInTheDocument();
 
-    // 참석 확정자는 그대로 추가할 수 있다.
-    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+    const addButtons = screen.getAllByRole('button', { name: '명단 추가' });
+    expect(addButtons).toHaveLength(2);
+    fireEvent.click(addButtons[1]);
     expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
-
-    // 참석 미확정자의 버튼은 비활성 상태라 눌러도 아무 일도 일어나지 않는다 — 저장을 시도한
-    // 뒤 422로 처음 알게 되는 대신, 애초에 추가할 수 없다는 것을 화면이 미리 말해준다.
-    const blockedAddButton = screen.getByRole('button', {
-      name: '김철수 명단 추가 — 참석 확정 전이라 비활성화됨',
-    });
-    expect(blockedAddButton).toBeDisabled();
-    fireEvent.click(blockedAddButton);
-    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
+    expect(screen.getByText('김철수')).toBeInTheDocument();
   });
 
   it('member (non-manager): shows a permission-denied state instead of the editor', () => {

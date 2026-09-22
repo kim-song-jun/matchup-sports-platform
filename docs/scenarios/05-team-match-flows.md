@@ -28,6 +28,7 @@ v1 team-match lives in `apps/v1_api/src/team-matches/team-matches.controller.ts`
 | `POST` | `/team-matches/:teamMatchId/lineup/change-request` | opponent requests a lineup change |
 
 - 상대팀이 아직 승인되지 않은 모집 상태에서도 호스트 팀 owner/manager는 HOME 라인업을 조회하고 저장할 수 있어야 한다.
+- 팀 owner/manager는 팀 일정 참석 응답이나 초대 없이 활성 팀원을 참석명단에 직접 추가할 수 있어야 한다.
 - 등록 이미지가 있는 상세 hero는 원본 비율과 무관하게 `cover`/`center`로 표시해야 한다.
 
 There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this controller — the legacy section below's `TM-004` "도착 인증 / 경기 후 평가" scenario has no v1 equivalent today; it is not implemented, not merely undocumented.

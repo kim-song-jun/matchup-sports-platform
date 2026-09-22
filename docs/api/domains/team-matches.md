@@ -294,6 +294,13 @@ Success:
 - evaluator / evaluated가 같은 team이면 불가
 - evaluator team 기준 중복 평가 불가
 
+## Team-match lineup
+
+- `GET /team-matches/:teamMatchId/lineup` reads the viewer's team lineup.
+- `PUT /team-matches/:teamMatchId/lineup` saves a draft through `TeamMatchLineupService`.
+- Host team owners/managers may read and save the HOME lineup while the match is still recruiting and no opponent has been approved. The Game's AWAY side remains a teamless placeholder until approval.
+- Opponent-side lineup access and change requests require an approved opponent team.
+
 ## Frontend Mapping Notes
 
 - user-facing status vocabulary는 `recruiting`, `scheduled`, `checking_in`, `in_progress`, `completed`, `cancelled` 기준으로 맞춘다

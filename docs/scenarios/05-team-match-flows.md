@@ -27,6 +27,9 @@ v1 team-match lives in `apps/v1_api/src/team-matches/team-matches.controller.ts`
 | `POST` | `/team-matches/:teamMatchId/lineup/submit` | lineup submit |
 | `POST` | `/team-matches/:teamMatchId/lineup/change-request` | opponent requests a lineup change |
 
+- 상대팀이 아직 승인되지 않은 모집 상태에서도 호스트 팀 owner/manager는 HOME 라인업을 조회하고 저장할 수 있어야 한다.
+- 등록 이미지가 있는 상세 hero는 원본 비율과 무관하게 `cover`/`center`로 표시해야 한다.
+
 There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this controller — the legacy section below's `TM-004` "도착 인증 / 경기 후 평가" scenario has no v1 equivalent today; it is not implemented, not merely undocumented.
 
 **Result entry is a Game aggregate concern, not a `team-matches` route at all.** Per `docs/api/domains/games.md` (Task 16), a team match's result is drafted and submitted through `POST /games/:gameId/result-revisions` and `POST /games/:gameId/result-revisions/:revisionId/submit` (host team owner/manager only), and decided by the opposing team through `POST /games/:gameId/result-revisions/:revisionId/decision` (`approve`/`change_request`). The old `POST /api/v1/team-matches/:teamMatchId/complete` shortcut this replaced no longer exists (Task 16 removed it — see `games.md`'s route table). Web screens: `apps/v1_web/src/app/team-matches/[id]/result/page.tsx` (host draft/submit) and `apps/v1_web/src/app/team-matches/[id]/result/approval/page.tsx` (opponent decision) — these call the Game result-revision routes above, not a `team-matches`-namespaced result route.

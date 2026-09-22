@@ -48,7 +48,7 @@ interface FakeState {
   userConsents: Array<{ userId: string; state: V1ConsentState }>;
 }
 
-function createFake(options: { managerTeamId?: string } = {}) {
+function createFake(options: { managerTeamId?: string; approvedApplicantTeamId?: string | null } = {}) {
   /** 이 팀장이 어느 팀 소속인가. 홈이면 own=HOME, 원정이면 own=AWAY 로 갈린다.
    *  테스트 도중 바꿀 수 있게 객체로 들고 있는다 — "홈팀이 정정을 요청하고 원정팀이
    *  다시 저장한다"는 실제 흐름은 서로 다른 팀의 권한을 차례로 태워야 재현된다. */
@@ -70,7 +70,8 @@ function createFake(options: { managerTeamId?: string } = {}) {
       findUnique: async () => ({
         id: 'team-match-1',
         hostTeamId: 'team-home',
-        approvedApplicantTeamId: 'team-away',
+        approvedApplicantTeamId:
+          options.approvedApplicantTeamId === undefined ? 'team-away' : options.approvedApplicantTeamId,
         // 마감(startAt) 이전이어야 저장이 허용된다.
         startAt: new Date(Date.now() + 60 * 60 * 1000),
       }),
@@ -731,5 +732,19 @@ describe('TeamMatchLineupService.saveLineup — 동시 충돌 에러 코드', ()
     await expect(
       new TeamMatchLineupService(viaLineup.prisma, audit).saveLineup(manager, 'team-match-1', 'key-1', lineupDto(0)),
     ).rejects.toMatchObject({ response: { code: 'COMMAND_CONCURRENCY_CONFLICT' } });
+  });
+});
+
+describe('TeamMatchLineupService.saveLineup host-only recruitment', () => {
+  it('allows the host manager to save a HOME lineup before an opponent is approved', async () => {
+    const { prisma } = createFake({ approvedApplicantTeamId: null });
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(
+      service.saveLineup(manager, 'team-match-1', 'host-only-lineup', lineupDto(0)),
+    ).resolves.toMatchObject({
+      sideId: 'side-home',
+      revision: 1,
+    });
   });
 });

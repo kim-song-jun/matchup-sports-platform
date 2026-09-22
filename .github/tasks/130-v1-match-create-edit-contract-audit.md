@@ -84,6 +84,10 @@ upload persistence, and the absence of hard-coded production form values.
   through upload completion. Friendly lineup guidance now states that the host may prepare
   attendance before opponent approval and links directly to the team schedule where member
   attendance is confirmed.
+- 2026-09-22: Alpha follow-up removed the approved-opponent prerequisite from the host's
+  lineup context, allowing HOME lineup saves while AWAY remains a placeholder. Detail heroes
+  now center uploaded images with cover sizing instead of exposing only the source image's
+  top-left area.
 
 ## 2026-09-18 개인 매치 참여 중심 기능 확장
 

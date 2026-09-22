@@ -63,7 +63,7 @@
 | POST | `/team-matches/:id/evaluate` | Yes | 상대 팀 평가 |
 | GET | `/team-matches/:id/referee-schedule` | Yes | 심판 배정 조회 |
 | POST | `/admin/team-matches` | Admin owner/ops | 플랫폼 팀매치 모집 생성 |
-| POST | `/admin/team-matches/:id/assign` | Admin owner/ops | 신청한 두 팀을 홈·원정으로 확정 |
+| POST | `/admin/team-matches/:id/applications/:applicationId/approve` | Admin owner/ops | 신청 팀을 한 팀씩 승인하고 두 번째 승인에서 경기 확정 |
 
 ## POST /admin/team-matches
 
@@ -89,24 +89,24 @@ Rules:
 - 같은 `clientCommandId`와 같은 payload 재시도는 기존 결과를 반환한다. 같은 키의 다른 payload는 `409 IDEMPOTENCY_CONFLICT`다.
 - 성공 응답은 `teamMatchId`, `status=recruiting`, `detailRoute`(관리자 상세), `replayed`를 포함한다.
 
-## POST /admin/team-matches/:id/assign
+## POST /admin/team-matches/:id/applications/:applicationId/approve
 
-플랫폼 모집에 접수된 신청 중 두 개를 홈·원정으로 선택해 경기를 확정한다.
+플랫폼 모집에 접수된 신청을 한 팀씩 승인한다. 첫 승인 팀은 HOME으로 예약되고, 두 번째 승인 팀은 AWAY로 배정되면서 경기가 확정된다.
 
 Required body:
 
 - `clientCommandId` (UUID, 재시도 멱등 키)
-- `homeApplicationId`, `awayApplicationId` (서로 다른 `requested` 신청)
 
 Rules:
 
-- 대상은 `hostTeamId=null`, 리그·토너먼트에 속하지 않은 `recruiting` 플랫폼 모집이어야 한다.
-- 두 신청 팀은 활성 상태이고 모집 종목과 같아야 하며 서로 달라야 한다.
-- 성공 시 홈 팀을 `hostTeamId`, 원정 팀을 `approvedApplicantTeamId`로 연결하고 팀매치를 `matched`로 바꾼다.
+- 대상은 리그·토너먼트에 속하지 않은 `recruiting` 플랫폼 모집이어야 한다.
+- 선택 신청은 `requested` 상태여야 하고 신청 팀은 활성 상태이며 모집 종목과 같아야 한다.
+- 첫 번째 승인에서는 해당 신청만 `approved`로 바꾸고 팀매치는 `recruiting`을 유지한다. Game과 team schedule은 아직 만들지 않는다.
+- 두 번째 승인에서는 먼저 승인한 팀을 HOME(`hostTeamId`), 새 승인 팀을 AWAY(`approvedApplicantTeamId`)로 연결하고 팀매치를 `matched`로 바꾼다.
 - 배정 뒤에도 저장된 `platformManaged=true`는 유지된다. 공개 목록/상세는 실제 홈·원정 팀과 `플랫폼 주관` 출처를 함께 노출한다.
-- 선택한 두 신청은 `approved`, 나머지 `requested` 신청은 `rejected`로 전환한다.
-- Game HOME/AWAY side, 양 팀 schedule, application/team-match 상태 로그, admin action log를 한 트랜잭션에서 생성한다.
-- 성공 응답은 `teamMatchId`, `gameId`, `homeTeamId`, `awayTeamId`, `detailRoute`, `replayed`를 포함한다.
+- 두 번째 승인 때 나머지 `requested` 신청을 `rejected`로 전환한다.
+- 두 번째 승인과 Game HOME/AWAY side, 양 팀 schedule, application/team-match 상태 로그, admin action log를 한 트랜잭션에서 생성한다.
+- 성공 응답은 `applicationId`, `applicantTeamId`, `applicationStatus`, `teamMatchId`, `teamMatchStatus`, `approvedCount`, nullable `gameId`/`homeTeamId`/`awayTeamId`, `detailRoute`, `replayed`를 포함한다.
 
 ## GET /team-matches
 
@@ -325,7 +325,7 @@ Task 172 공개 기록은 기존 가시성 정책과 `PUBLIC_LIVE` 플래그를 
 - 두 생성 API는 `validateTeamMatchDates`를 공유한다. 시작은 미래, 종료는 시작 이후, 새 마감은 현재 이후·시작 이전이어야 한다. 잘못된 종료값을 `null`로 바꾸어 성공시키지 않는다.
 - 일반 생성/수정 폼도 종료 날짜를 지정할 수 있다. 비워두면 시작 날짜를 사용하며, 명시한 종료 날짜에는 종료 시간이 필요하다. 로컬 날짜·시간을 ISO로 변환하고 수정 시 같은 로컬 날짜로 복원한다.
 - 일반/관리자 스타일 입력은 프리셋과 직접 입력을 함께 지원하며 최대 3개다.
-- 신청 마감은 **새 신청 접수**를 닫는다. 기존 `requested` 신청은 raw status가 `recruiting`이고 시작 전이면 일반 승인과 관리자 두 팀 확정 모두 가능하다. `closed`/`cancelled`/`matched` 상태나 시작 이후는 확정 불가다. 일반 신청 목록의 `canApprove`도 이 조건과 같다.
+- 신청 마감은 **새 신청 접수**를 닫는다. 기존 `requested` 신청은 raw status가 `recruiting`이고 시작 전이면 일반 승인과 관리자 개별 승인이 가능하다. `closed`/`cancelled`/`matched` 상태나 시작 이후는 승인 불가다. 일반 신청 목록의 `canApprove`도 이 조건과 같다.
 - `platform_managed` migration과 후속 `20260921141000_v1_platform_recruitment_host_constraint`가 필요하다. 후자는 기존 CHECK를 트랜잭션 안에서 확장해 플랫폼 모집만 host 없이 허용하고 생성자·지역·장소·시작 필수값은 유지한다. 일반 모집은 여전히 host가 필요하다.
 
 MSW 기본 픽스처의 라인업은 DRAFT이므로 공동 기록 조회는 편집 불가 상태이며 POST는 403을 반환한다. 실제 공동 편집 검증은 API 통합 픽스처와 headed 브라우저 흐름을 사용한다. 테스트 성공을 흉내내는 mock 확정 처리는 제공하지 않는다.

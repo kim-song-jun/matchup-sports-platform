@@ -12,7 +12,7 @@ import {
   AdminSummaryItem,
   AdminTableSkeleton,
 } from '@/components/admin';
-import { useV1AdminMe, useV1AdminTeamMatch, useV1AssignAdminTeamMatchApplications } from '@/hooks/use-v1-api';
+import { useV1AdminMe, useV1AdminTeamMatch, useV1ApproveAdminTeamMatchApplication } from '@/hooks/use-v1-api';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
@@ -47,30 +47,29 @@ function BackLink() {
 
 function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
   const truncated = teamMatch.applications.length < teamMatch.applicationCount;
-  const isPlatformRecruitment = teamMatch.hostTeamId === null && !teamMatch.league && !teamMatch.tournament;
+  const isPlatformRecruitment = teamMatch.platformManaged && !teamMatch.league && !teamMatch.tournament;
   const { data: adminMe } = useV1AdminMe();
   const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
-  const requested = teamMatch.applications.filter((application) => application.status === 'requested');
-  const [homeApplicationId, setHomeApplicationId] = useState('');
-  const [awayApplicationId, setAwayApplicationId] = useState('');
+  const approvedCount = teamMatch.applications.filter((application) => application.status === 'approved').length;
+  const [pendingApplicationId, setPendingApplicationId] = useState('');
   const [message, setMessage] = useState('');
-  const assign = useV1AssignAdminTeamMatchApplications(teamMatch.teamMatchId);
-  const canAssign =
-    canWrite &&
-    isPlatformRecruitment &&
-    teamMatch.status === 'recruiting' &&
-    homeApplicationId !== '' &&
-    awayApplicationId !== '' &&
-    homeApplicationId !== awayApplicationId;
+  const approval = useV1ApproveAdminTeamMatchApplication(teamMatch.teamMatchId);
 
-  const submitAssignment = async () => {
-    if (!canAssign) return;
+  const approveApplication = async (applicationId: string) => {
+    if (!canWrite || !isPlatformRecruitment || teamMatch.status !== 'recruiting') return;
+    setPendingApplicationId(applicationId);
     setMessage('');
     try {
-      await assign.mutateAsync({ clientCommandId: randomUuid(), homeApplicationId, awayApplicationId });
-      setMessage('두 팀을 확정했어요. 경기와 양 팀 일정이 생성됐어요.');
+      const result = await approval.mutateAsync({ applicationId, body: { clientCommandId: randomUuid() } });
+      setMessage(
+        result.teamMatchStatus === 'matched'
+          ? '두 번째 팀을 승인해 매치를 확정했어요. 경기와 양 팀 일정이 생성됐어요.'
+          : '첫 번째 팀을 승인했어요. 두 번째 참가팀을 승인하면 매치가 확정돼요.',
+      );
     } catch (error) {
-      setMessage(extractErrorMessage(error, '두 팀을 확정하지 못했어요.'));
+      setMessage(extractErrorMessage(error, '참가팀을 승인하지 못했어요.'));
+    } finally {
+      setPendingApplicationId('');
     }
   };
   return (
@@ -102,9 +101,25 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
                     <p className="mt-2 whitespace-pre-wrap break-words text-xs text-[var(--text-body)]">{application.message}</p>
                   )}
                 </div>
-                <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--card-surface)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)]">
-                  {APPLICATION_STATUS_LABEL[application.status] ?? application.status}
-                </span>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className="rounded-full border border-[var(--border)] bg-[var(--card-surface)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)]">
+                    {APPLICATION_STATUS_LABEL[application.status] ?? application.status}
+                  </span>
+                  {isPlatformRecruitment && teamMatch.status === 'recruiting' && canWrite && application.status === 'requested' && (
+                    <button
+                      type="button"
+                      disabled={approval.isPending}
+                      onClick={() => void approveApplication(application.applicationId)}
+                      className="min-h-[40px] rounded-lg bg-blue-500 px-3 text-[length:var(--font-size-caption)] font-semibold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {pendingApplicationId === application.applicationId
+                        ? '승인 중…'
+                        : approvedCount === 0
+                          ? '승인'
+                          : '승인하고 매치 확정'}
+                    </button>
+                  )}
+                </div>
               </div>
             </li>
           ))}
@@ -117,44 +132,13 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
 
       {isPlatformRecruitment && teamMatch.status === 'recruiting' && canWrite && (
         <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-4">
-          <h3 className="text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)]">참가팀 확정</h3>
-          <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">신청한 팀 중 홈팀과 상대팀을 각각 선택하세요. 확정하면 나머지 신청은 거절 처리돼요.</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)]">
-              홈팀
-              <select
-                aria-label="홈팀 신청"
-                value={homeApplicationId}
-                onChange={(event) => setHomeApplicationId(event.target.value)}
-                className="mt-1 h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]"
-              >
-                <option value="">신청 선택</option>
-                {requested.map((application) => <option key={application.applicationId} value={application.applicationId} disabled={application.applicationId === awayApplicationId}>{application.applicantTeamName}</option>)}
-              </select>
-            </label>
-            <label className="text-[length:var(--font-size-caption)] font-semibold text-[var(--text-muted)]">
-              상대팀
-              <select
-                aria-label="상대팀 신청"
-                value={awayApplicationId}
-                onChange={(event) => setAwayApplicationId(event.target.value)}
-                className="mt-1 h-[44px] w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)]"
-              >
-                <option value="">신청 선택</option>
-                {requested.map((application) => <option key={application.applicationId} value={application.applicationId} disabled={application.applicationId === homeApplicationId}>{application.applicantTeamName}</option>)}
-              </select>
-            </label>
-          </div>
-          {requested.length < 2 && <p className="mt-3 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">대기 중인 신청이 두 건 이상 모이면 확정할 수 있어요.</p>}
+          <h3 className="text-[length:var(--font-size-body-sm)] font-bold text-[var(--text-strong)]">참가팀 승인</h3>
+          <p className="mt-1 text-[length:var(--font-size-caption)] text-[var(--text-muted)]">
+            {approvedCount === 0
+              ? '각 신청의 승인 버튼으로 첫 번째 참가팀을 확정하세요. 첫 승인 팀이 HOME이 돼요.'
+              : '첫 번째 참가팀이 승인됐어요. 다음 팀을 승인하면 AWAY로 배정되고 나머지 신청은 거절돼요.'}
+          </p>
           {message && <p role="status" className="mt-3 text-[length:var(--font-size-caption)] text-[var(--text-body)]">{message}</p>}
-          <button
-            type="button"
-            disabled={!canAssign || assign.isPending}
-            onClick={() => void submitAssignment()}
-            className="mt-4 min-h-[44px] w-full rounded-xl bg-blue-500 px-4 text-[length:var(--font-size-body-sm)] font-semibold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {assign.isPending ? '두 팀 확정 중…' : '선택한 두 팀 매치 확정'}
-          </button>
         </div>
       )}
     </section>

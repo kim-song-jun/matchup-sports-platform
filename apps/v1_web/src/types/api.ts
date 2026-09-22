@@ -2681,6 +2681,7 @@ export type V1AdminTeamMatchApplicationRow = {
 };
 
 export type V1AdminTeamMatchDetail = V1AdminTeamMatchRow & {
+  platformManaged: boolean;
   description: string | null;
   imageUrl: string | null;
   levelLabel: string | null;
@@ -2735,18 +2736,20 @@ export type V1AdminTeamMatchRecruitmentResult = {
   replayed: boolean;
 };
 
-export type V1AdminTeamMatchAssignmentPayload = {
+export type V1AdminTeamMatchApprovalPayload = {
   clientCommandId: string;
-  homeApplicationId: string;
-  awayApplicationId: string;
 };
 
-export type V1AdminTeamMatchAssignmentResult = {
+export type V1AdminTeamMatchApprovalResult = {
+  applicationId: string;
+  applicantTeamId: string;
+  applicationStatus: 'approved';
   teamMatchId: string;
-  gameId: string;
-  status: 'matched';
-  homeTeamId: string;
-  awayTeamId: string;
+  gameId: string | null;
+  teamMatchStatus: 'recruiting' | 'matched';
+  approvedCount: 1 | 2;
+  homeTeamId: string | null;
+  awayTeamId: string | null;
   detailRoute: string;
   replayed: boolean;
 };

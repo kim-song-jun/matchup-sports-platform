@@ -20,7 +20,7 @@ v1 team-match lives in `apps/v1_api/src/team-matches/team-matches.controller.ts`
 | `POST` / `GET` | `/team-matches/:teamMatchId/applications` | apply / list applications (host view) |
 | `POST` | `/team-match-applications/:applicationId/withdraw\|approve\|reject` | application lifecycle (own top-level path, not nested under `/team-matches`) |
 | `POST` | `/admin/team-matches` | owner/ops 플랫폼 운영자가 팀을 지정하지 않은 `recruiting` 팀매치 생성 |
-| `POST` | `/admin/team-matches/:teamMatchId/assign` | owner/ops 플랫폼 운영자가 신청 목록에서 홈·원정 두 팀을 골라 `matched`로 확정 |
+| `POST` | `/admin/team-matches/:teamMatchId/applications/:applicationId/approve` | owner/ops 플랫폼 운영자가 신청 팀을 한 팀씩 승인. 두 번째 승인에서 `matched`로 확정 |
 | `GET` | `/me/team-matches` | my team matches |
 | `GET` | `/team-matches/:teamMatchId/lineup` | lineup read |
 | `PUT` | `/team-matches/:teamMatchId/lineup` | lineup save, via `TeamMatchLineupService` — **not** the generic `PUT /games/:gameId/lineups/:sideId` route, which returns `409 TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN` for a team-match-sourced game (Task 14 deviation, see `docs/api/domains/games.md`) |
@@ -219,7 +219,7 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 - [x] 과거 신청 마감은 생성 전에 차단되고 직접 API 요청도 400으로 거절된다.
 - [x] 시작 전 종료 시각은 일반 폼에서도 오류로 표시되며 입력이 사라지지 않는다.
 - [x] 23:00 시작 → 다음 날 01:00 종료가 양쪽에서 저장되고 일반 수정에서도 유지된다.
-- [x] 접수 후 마감 경과: 새 신청은 거절되지만 기존 신청 승인/관리자 두 팀 확정은 시작 전까지 가능하다.
+- [x] 접수 후 마감 경과: 새 신청은 거절되지만 기존 신청의 관리자 개별 승인은 시작 전까지 가능하다.
 - [x] 명시적 모집 종료/경기 시작 이후에는 확정이 거절된다.
 - [x] 390/768/1440에서 before/after, console/network, 수평 overflow를 확인한다.
 ### TM-172 verification evidence (2026-09-22)

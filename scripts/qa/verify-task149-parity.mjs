@@ -39,8 +39,8 @@ try {
   await prisma.v1TeamMatch.update({where:{id},data:{deadlineAt:past}});
   const rejected=await api(late.email,`/team-matches/${id}/applications`,{applicantTeamId:extra.id},409);
   assert.equal(rejected.code,'NOT_RECRUITING');
-  const confirmRoute=kind==='admin'?`/admin/team-matches/${id}/assign`:`/team-match-applications/${apps[0].applicationId}/approve`;
-  const confirmBody=kind==='admin'?{clientCommandId:randomUUID(),homeApplicationId:apps[0].applicationId,awayApplicationId:apps[1].applicationId}:{};
+  const confirmRoute=kind==='admin'?`/admin/team-matches/${id}/applications/${apps[0].applicationId}/approve`:`/team-match-applications/${apps[0].applicationId}/approve`;
+  const confirmBody=kind==='admin'?{clientCommandId:randomUUID()}:{};
   // Future + closed, and elapsed kickoff + recruiting, are both non-confirmable.
   await prisma.v1TeamMatch.update({where:{id},data:{status:'closed'}});
   await api(email,confirmRoute,confirmBody,409);
@@ -52,6 +52,11 @@ try {
     assert.equal(applications.items[0].canApprove,true);
   }
   await api(email,confirmRoute,confirmBody);
+  if(kind==='admin') {
+    const firstApproved=await prisma.v1TeamMatch.findUniqueOrThrow({where:{id},include:{game:true}});
+    assert.equal(firstApproved.status,'recruiting');assert.equal(firstApproved.game,null);
+    await api(email,`/admin/team-matches/${id}/applications/${apps[1].applicationId}/approve`,{clientCommandId:randomUUID()});
+  }
   const saved=await prisma.v1TeamMatch.findUniqueOrThrow({where:{id},include:{game:true}});
   assert.equal(saved.status,'matched');assert.equal(saved.hostTeamId,home.id);assert.equal(saved.approvedApplicantTeamId,away.id);assert.ok(saved.game);
   assert.equal(await prisma.v1TeamSchedule.count({where:{teamMatchId:id}}),2);

@@ -15,7 +15,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { resolveSportLevelRange } from '../sports/level-range';
 import { createTeamMatchScheduleInTx } from '../team-schedules/team-schedules.service';
 import {
-  AssignAdminTeamMatchApplicationsDto,
+  ApproveAdminTeamMatchApplicationDto,
   CreateAdminTeamMatchRecruitmentDto,
 } from './dto/admin-team-match-recruitment.dto';
 import { resolveTeamMatchCompetitionConfig } from './resolve-team-match-competition-config';
@@ -150,13 +150,15 @@ export class AdminTeamMatchRecruitmentsService {
     });
   }
 
-  async assign(user: V1AuthUser, teamMatchId: string, dto: AssignAdminTeamMatchApplicationsDto) {
+  async approveApplication(
+    user: V1AuthUser,
+    teamMatchId: string,
+    applicationId: string,
+    dto: ApproveAdminTeamMatchApplicationDto,
+  ) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    if (dto.homeApplicationId === dto.awayApplicationId) {
-      throw new UnprocessableEntityException({ code: 'TEAM_MATCH_APPLICATIONS_INVALID', message: '서로 다른 두 팀의 신청을 선택해 주세요.' });
-    }
-    const payloadHash = canonicalGameCommandPayloadHash({ actorUserId: user.id, teamMatchId, dto });
-    const assigned = await this.prisma.$transaction(async (tx) => {
+    const payloadHash = canonicalGameCommandPayloadHash({ actorUserId: user.id, teamMatchId, applicationId, dto });
+    const result = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "v1_team_matches" WHERE id = ${teamMatchId} FOR UPDATE`;
       const teamMatch = await tx.v1TeamMatch.findFirst({
         where: { id: teamMatchId, deletedAt: null },
@@ -176,7 +178,8 @@ export class AdminTeamMatchRecruitmentsService {
           competitionConfigVersionId: true,
           game: { select: { id: true } },
           applications: {
-            where: { id: { in: [dto.homeApplicationId, dto.awayApplicationId] } },
+            where: { OR: [{ id: applicationId }, { status: 'approved' }] },
+            orderBy: [{ reviewedAt: 'asc' }, { createdAt: 'asc' }],
             select: {
               id: true,
               status: true,
@@ -205,20 +208,28 @@ export class AdminTeamMatchRecruitmentsService {
       });
       if (!teamMatch) throw new NotFoundException({ code: 'NOT_FOUND', message: '팀매치 모집을 찾을 수 없어요.' });
       if (!teamMatch.platformManaged) {
-        throw new ConflictException({ code: 'TEAM_MATCH_NOT_PLATFORM_RECRUITING', message: '신청을 받는 플랫폼 팀매치만 배정할 수 있어요.' });
+        throw new ConflictException({ code: 'TEAM_MATCH_NOT_PLATFORM_RECRUITING', message: '신청을 받는 플랫폼 팀매치만 승인할 수 있어요.' });
       }
 
-      const replayByApplicationId = new Map(teamMatch.applications.map((application) => [application.id, application.applicantTeam.id]));
+      const targetApplication = teamMatch.applications.find((application) => application.id === applicationId);
+      if (!targetApplication) {
+        throw new NotFoundException({ code: 'NOT_FOUND', message: '팀매치 신청을 찾을 수 없어요.' });
+      }
       if (
         teamMatch.status === 'matched' &&
         teamMatch.game &&
-        teamMatch.hostTeamId === replayByApplicationId.get(dto.homeApplicationId) &&
-        teamMatch.approvedApplicantTeamId === replayByApplicationId.get(dto.awayApplicationId)
+        teamMatch.hostTeamId !== null &&
+        teamMatch.approvedApplicantTeamId !== null &&
+        targetApplication.status === 'approved'
       ) {
         return {
+          applicationId,
+          applicantTeamId: targetApplication.applicantTeam.id,
+          applicationStatus: 'approved' as const,
           teamMatchId,
           gameId: teamMatch.game.id,
-          status: 'matched' as const,
+          teamMatchStatus: 'matched' as const,
+          approvedCount: 2 as const,
           homeTeamId: teamMatch.hostTeamId,
           awayTeamId: teamMatch.approvedApplicantTeamId,
           replayed: true,
@@ -226,41 +237,100 @@ export class AdminTeamMatchRecruitmentsService {
         };
       }
       if (
-        teamMatch.hostTeamId !== null ||
-        teamMatch.approvedApplicantTeamId !== null ||
         teamMatch.leagueId !== null ||
         teamMatch.tournamentId !== null ||
         teamMatch.status !== 'recruiting'
       ) {
-        throw new ConflictException({ code: 'TEAM_MATCH_NOT_PLATFORM_RECRUITING', message: '신청을 받는 플랫폼 팀매치만 배정할 수 있어요.' });
+        throw new ConflictException({ code: 'TEAM_MATCH_NOT_PLATFORM_RECRUITING', message: '신청을 받는 플랫폼 팀매치만 승인할 수 있어요.' });
       }
       if (!canConfirmTeamMatch(teamMatch)) {
-        throw new ConflictException({ code: 'TEAM_MATCH_ASSIGNMENT_NOT_READY', message: '경기 시작 전에 두 팀을 확정해 주세요.' });
+        throw new ConflictException({ code: 'TEAM_MATCH_ASSIGNMENT_NOT_READY', message: '경기 시작 전에 참가팀을 승인해 주세요.' });
       }
       if (!teamMatch.competitionConfigVersionId) {
         throw new ConflictException({ code: 'COMPETITION_CONFIG_REQUIRED', message: '경기 설정이 없어 팀을 확정할 수 없어요.' });
       }
-      if (teamMatch.applications.length !== 2 || teamMatch.applications.some((application) => application.status !== 'requested')) {
-        throw new UnprocessableEntityException({ code: 'TEAM_MATCH_APPLICATIONS_INVALID', message: '대기 중인 신청 두 건을 선택해 주세요.' });
+      const approvedApplications = teamMatch.applications.filter((application) => application.status === 'approved');
+      if (targetApplication.status === 'approved' && approvedApplications.length === 1) {
+        return {
+          applicationId,
+          applicantTeamId: targetApplication.applicantTeam.id,
+          applicationStatus: 'approved' as const,
+          teamMatchId,
+          gameId: null,
+          teamMatchStatus: 'recruiting' as const,
+          approvedCount: 1 as const,
+          homeTeamId: null,
+          awayTeamId: null,
+          replayed: true,
+          rejectedTeamIds: [] as string[],
+        };
+      }
+      if (targetApplication.status !== 'requested' || approvedApplications.length > 1) {
+        throw new ConflictException({
+          code: 'TEAM_MATCH_APPLICATIONS_CHANGED',
+          message: '신청 상태가 변경됐어요. 신청 목록을 새로고침한 뒤 다시 확인해 주세요.',
+        });
       }
 
-      const byApplicationId = new Map(teamMatch.applications.map((application) => [application.id, application]));
-      const homeApplication = byApplicationId.get(dto.homeApplicationId)!;
-      const awayApplication = byApplicationId.get(dto.awayApplicationId)!;
+      const targetTeam = targetApplication.applicantTeam as AssignableTeam & { status: string; deletedAt: Date | null };
+      if (
+        targetTeam.status !== 'active' ||
+        targetTeam.deletedAt !== null ||
+        targetTeam.sportId !== teamMatch.sportId
+      ) {
+        throw new UnprocessableEntityException({ code: 'TEAM_MATCH_TEAMS_INVALID', message: '활성 상태의 동일 종목 팀만 승인할 수 있어요.' });
+      }
+
+      if (approvedApplications.length === 0) {
+        const approved = await tx.v1TeamMatchApplication.updateMany({
+          where: { id: applicationId, teamMatchId, status: 'requested' },
+          data: { status: 'approved', reviewedByUserId: admin.userId, reviewedAt: new Date() },
+        });
+        if (approved.count !== 1) {
+          throw new ConflictException({
+            code: 'TEAM_MATCH_APPLICATIONS_CHANGED',
+            message: '신청 상태가 변경됐어요. 신청 목록을 새로고침한 뒤 다시 확인해 주세요.',
+          });
+        }
+        await this.adminContext.logAdminAction(
+          admin,
+          {
+            action: 'team_match.application.approve',
+            targetType: 'team_match_application',
+            targetId: applicationId,
+            reason: '플랫폼 운영자 첫 참가팀 승인',
+            afterJson: { teamMatchId, applicantTeamId: targetTeam.id, approvedCount: 1 } as Prisma.InputJsonValue,
+            fromStatus: 'requested',
+            toStatus: 'approved',
+          },
+          tx,
+        );
+        return {
+          applicationId,
+          applicantTeamId: targetTeam.id,
+          applicationStatus: 'approved' as const,
+          teamMatchId,
+          gameId: null,
+          teamMatchStatus: 'recruiting' as const,
+          approvedCount: 1 as const,
+          homeTeamId: null,
+          awayTeamId: null,
+          replayed: false,
+          rejectedTeamIds: [] as string[],
+        };
+      }
+
+      const homeApplication = approvedApplications[0];
       const home = homeApplication.applicantTeam as AssignableTeam & { status: string; deletedAt: Date | null };
-      const away = awayApplication.applicantTeam as AssignableTeam & { status: string; deletedAt: Date | null };
+      const away = targetTeam;
       if (
         home.id === away.id ||
         home.status !== 'active' ||
-        away.status !== 'active' ||
         home.deletedAt !== null ||
-        away.deletedAt !== null ||
-        home.sportId !== teamMatch.sportId ||
-        away.sportId !== teamMatch.sportId
+        home.sportId !== teamMatch.sportId
       ) {
-        throw new UnprocessableEntityException({ code: 'TEAM_MATCH_TEAMS_INVALID', message: '활성 상태의 동일 종목 두 팀만 확정할 수 있어요.' });
+        throw new UnprocessableEntityException({ code: 'TEAM_MATCH_TEAMS_INVALID', message: '먼저 승인한 팀의 상태를 확인해 주세요.' });
       }
-
       const game = await this.games.createFromSourceInTransaction(
         tx,
         {
@@ -288,17 +358,17 @@ export class AdminTeamMatchRecruitmentsService {
         data: { hostTeamId: home.id, approvedApplicantTeamId: away.id, status: 'matched' },
       });
       const approved = await tx.v1TeamMatchApplication.updateMany({
-        where: { id: { in: [homeApplication.id, awayApplication.id] }, status: 'requested' },
+        where: { id: applicationId, teamMatchId, status: 'requested' },
         data: { status: 'approved', reviewedByUserId: admin.userId, reviewedAt: new Date() },
       });
-      if (approved.count !== 2) {
+      if (approved.count !== 1) {
         throw new ConflictException({
           code: 'TEAM_MATCH_APPLICATIONS_CHANGED',
-          message: '선택한 신청 상태가 변경됐어요. 신청 목록을 새로고침한 뒤 다시 선택해 주세요.',
+          message: '신청 상태가 변경됐어요. 신청 목록을 새로고침한 뒤 다시 확인해 주세요.',
         });
       }
       const rejected = await tx.v1TeamMatchApplication.findMany({
-        where: { teamMatchId, status: 'requested', id: { notIn: [homeApplication.id, awayApplication.id] } },
+        where: { teamMatchId, status: 'requested', id: { not: applicationId } },
         select: { id: true, applicantTeamId: true },
       });
       await tx.v1TeamMatchApplication.updateMany({
@@ -309,15 +379,15 @@ export class AdminTeamMatchRecruitmentsService {
       await createTeamMatchScheduleInTx(tx, away.id, teamMatch.id, teamMatch.title, teamMatch.startAt, teamMatch.endAt);
       await tx.v1StatusChangeLog.createMany({
         data: [
-          ...[homeApplication, awayApplication].map((application) => ({
+          {
             targetType: 'team_match_application',
-            targetId: application.id,
+            targetId: applicationId,
             fromStatus: 'requested',
             toStatus: 'approved',
             actorType: 'admin' as const,
             adminUserId: admin.id,
             reason: 'platform_team_match_assignment',
-          })),
+          },
           ...rejected.map((application) => ({
             targetType: 'team_match_application',
             targetId: application.id,
@@ -343,9 +413,13 @@ export class AdminTeamMatchRecruitmentsService {
         tx,
       );
       return {
+        applicationId,
+        applicantTeamId: away.id,
+        applicationStatus: 'approved' as const,
         teamMatchId,
         gameId: game.gameId,
-        status: 'matched' as const,
+        teamMatchStatus: 'matched' as const,
+        approvedCount: 2 as const,
         homeTeamId: home.id,
         awayTeamId: away.id,
         replayed: false,
@@ -353,21 +427,32 @@ export class AdminTeamMatchRecruitmentsService {
       };
     });
 
-    if (!assigned.replayed) {
+    if (!result.replayed && result.teamMatchStatus === 'recruiting') {
       this.emitTeamNotifications(
-        [assigned.homeTeamId, assigned.awayTeamId],
+        [result.applicantTeamId],
+        'team_match_application_approved',
+        teamMatchId,
+        '신청한 팀매치의 참가가 승인됐어요. 상대팀 확정을 기다리고 있어요.',
+      );
+    }
+    if (!result.replayed && result.teamMatchStatus === 'matched') {
+      const confirmedTeamIds = [result.homeTeamId, result.awayTeamId].filter(
+        (teamId): teamId is string => teamId !== null,
+      );
+      this.emitTeamNotifications(
+        confirmedTeamIds,
         'team_match_application_approved',
         teamMatchId,
         '신청한 팀매치의 대진이 확정됐어요.',
       );
       this.emitTeamNotifications(
-        assigned.rejectedTeamIds,
+        result.rejectedTeamIds,
         'team_match_application_rejected',
         teamMatchId,
         '신청한 팀매치의 참가팀이 확정되어 모집이 종료됐어요.',
       );
     }
-    return { ...assigned, detailRoute: `/team-matches/${teamMatchId}` };
+    return { ...result, detailRoute: `/admin/team-matches/${teamMatchId}` };
   }
 
   private validationError(message: string, field: string) {

@@ -1048,6 +1048,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         endAt: true,
         deadlineAt: true,
         status: true,
+        platformManaged: true,
         matchFormat: true,
         formatNote: true,
         matchStyle: true,
@@ -1087,6 +1088,27 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException({ code: 'NOT_FOUND', message: 'Team match was not found' });
     }
 
+    const approvedApplication =
+      row.platformManaged &&
+      row.status === 'recruiting' &&
+      !row.applications.some((application) => application.status === 'approved')
+        ? await this.prisma.v1TeamMatchApplication.findFirst({
+            where: { teamMatchId: row.id, status: 'approved' },
+            orderBy: { reviewedAt: 'asc' },
+            select: {
+              id: true,
+              status: true,
+              message: true,
+              createdAt: true,
+              applicantTeamId: true,
+              applicantTeam: { select: { name: true } },
+            },
+          })
+        : null;
+    const visibleApplications = approvedApplication
+      ? [approvedApplication, ...row.applications.slice(0, 49)]
+      : row.applications;
+
     return {
       teamMatchId: row.id,
       title: row.title,
@@ -1102,6 +1124,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       endAt: row.endAt ?? null,
       deadlineAt: row.deadlineAt ?? null,
       status: row.status,
+      platformManaged: row.platformManaged,
       hostTeamId: row.hostTeamId,
       hostTeamName: row.hostTeam?.name ?? null,
       approvedApplicantTeamId: row.approvedApplicantTeamId ?? null,
@@ -1119,7 +1142,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       uniformColor: row.uniformColor ?? null,
       costNote: row.costNote ?? null,
       applicationCount: row._count.applications,
-      applications: row.applications.map((application) => ({
+      applications: visibleApplications.map((application) => ({
         applicationId: application.id,
         status: application.status,
         message: application.message ?? null,

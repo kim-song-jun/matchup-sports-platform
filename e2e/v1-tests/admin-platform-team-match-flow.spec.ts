@@ -465,17 +465,23 @@ test.describe('[admin → team manager] 플랫폼 팀매치 실제 모집·신�
     const homeApplication = unwrap<Application>(homeApplicationResult);
     const awayApplication = unwrap<Application>(awayApplicationResult);
 
-    const assignResult = await apiPost(page.request, `/api/v1/admin/team-matches/${created.teamMatchId}/assign`, {
-      email: adminEmail,
-      data: {
-        clientCommandId: randomUUID(),
-        homeApplicationId: homeApplication.applicationId,
-        awayApplicationId: awayApplication.applicationId,
-      },
-    });
-    expect(assignResult.status).toBe(201);
-
     await loginAs(page, adminEmail);
+    await page.goto(`/admin/team-matches/${created.teamMatchId}`, { waitUntil: 'domcontentloaded' });
+    const homeApplicationRow = page.getByRole('listitem').filter({ hasText: homeTeam!.name });
+    const awayApplicationRow = page.getByRole('listitem').filter({ hasText: awayTeam!.name });
+    const firstApprovalResponse = page.waitForResponse((response) =>
+      response.url().includes(`/api/v1/admin/team-matches/${created.teamMatchId}/applications/${homeApplication.applicationId}/approve`),
+    );
+    await homeApplicationRow.getByRole('button', { name: '승인', exact: true }).click();
+    expect((await firstApprovalResponse).status()).toBe(201);
+    await expect(homeApplicationRow.getByText('승인', { exact: true })).toBeVisible();
+    const secondApprovalResponse = page.waitForResponse((response) =>
+      response.url().includes(`/api/v1/admin/team-matches/${created.teamMatchId}/applications/${awayApplication.applicationId}/approve`),
+    );
+    await awayApplicationRow.getByRole('button', { name: '승인하고 매치 확정' }).click();
+    expect((await secondApprovalResponse).status()).toBe(201);
+    await expect(page.getByRole('status')).toContainText('두 번째 팀을 승인해 매치를 확정했어요.');
+
     await page.goto(`/team-matches?q=${encodeURIComponent(title)}`, { waitUntil: 'domcontentloaded' });
     const assignedCard = page.locator(`a[href="/team-matches/${created.teamMatchId}"]`);
     await expect(assignedCard).toBeVisible();

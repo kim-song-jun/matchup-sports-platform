@@ -22,6 +22,7 @@ Status: complete
 - [x] The admin recruitment uses the ordinary team-match condition contract: representative image, level, format, styles, uniform, gender, total/opponent cost, place, schedule, and optional deadline.
 - [x] Admin detail exposes the saved representative image and level alongside the existing format/style/gender/uniform/cost fields.
 - [x] Platform-managed provenance is persisted independently of `hostTeamId` and remains visible after home/away assignment.
+- [x] Admins approve applicant teams one at a time; the first approval stays recruiting and the second approval finalizes the match.
 
 ## Acceptance Criteria
 
@@ -32,8 +33,8 @@ Status: complete
   When the manager applies to the platform recruitment
   Then the application is stored as `requested` without requiring a host team.
 - Given at least two valid requested applications
-  When the admin chooses home and away and confirms them
-  Then the team match becomes `matched`, the two applications are approved, remaining applications are rejected, and the detail route is returned.
+  When the admin approves the first application and later approves the second
+  Then the first response remains `recruiting`, the second makes the team match `matched`, remaining applications are rejected, and the detail route is returned.
 - Given the same application twice, a cross-sport/inactive team, or a support admin
   When finalization is attempted
   Then the API rejects the request without partial writes.
@@ -57,6 +58,9 @@ Status: complete
 - [x] 2026-09-21 condition-parity focused tests: API 6/6, Web 13/13
 - [x] 2026-09-21 condition-parity API/Web typecheck and headed visual QA: desktop + mobile 4/4, no console/API errors or horizontal overflow
 - [x] 2026-09-21 provenance regression tests: API 71/71, Web 75/75
+- [x] 2026-09-22 incremental approval focused tests: API 7/7, Web 11/11
+- [x] 2026-09-22 API/Web typecheck and API/Web pattern gates
+- [ ] 2026-09-22 headed visual QA: local API/Web runtime was unavailable on ports 8121/3013, so runtime screenshots and console/network evidence remain for alpha verification.
 
 ## Ambiguity Log
 
@@ -65,6 +69,7 @@ Status: complete
 
 ## Progress Snapshot
 
+- 2026-09-22: Replaced the two-application batch selector with per-application approval. The first approved team reserves HOME without creating a Game or schedule; the second approved team becomes AWAY and atomically finalizes the match.
 - 2026-09-19: Existing v1 flow and admin permissions verified. Implementation started.
 - 2026-09-19: Initial direct-assignment interpretation was corrected after user clarification.
 - 2026-09-19: Platform recruitment creation, public team application, and admin two-application finalization implemented; focused backend/frontend tests passed.

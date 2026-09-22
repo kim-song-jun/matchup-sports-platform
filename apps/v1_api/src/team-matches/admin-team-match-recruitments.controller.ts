@@ -4,7 +4,7 @@ import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { AdminTeamMatchRecruitmentsService } from './admin-team-match-recruitments.service';
 import {
-  AssignAdminTeamMatchApplicationsDto,
+  ApproveAdminTeamMatchApplicationDto,
   CreateAdminTeamMatchRecruitmentDto,
 } from './dto/admin-team-match-recruitment.dto';
 
@@ -18,12 +18,13 @@ export class AdminTeamMatchRecruitmentsController {
     return this.service.create(user, dto);
   }
 
-  @Post(':teamMatchId/assign')
-  assign(
+  @Post(':teamMatchId/applications/:applicationId/approve')
+  approveApplication(
     @CurrentUser() user: V1AuthUser,
     @Param('teamMatchId', ParseUUIDPipe) teamMatchId: string,
-    @Body() dto: AssignAdminTeamMatchApplicationsDto,
+    @Param('applicationId', ParseUUIDPipe) applicationId: string,
+    @Body() dto: ApproveAdminTeamMatchApplicationDto,
   ) {
-    return this.service.assign(user, teamMatchId, dto);
+    return this.service.approveApplication(user, teamMatchId, applicationId, dto);
   }
 }

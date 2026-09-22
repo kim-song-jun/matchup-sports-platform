@@ -95,13 +95,7 @@ export class CreateAdminTeamMatchRecruitmentDto {
   uniformColor?: string | null;
 }
 
-export class AssignAdminTeamMatchApplicationsDto {
+export class ApproveAdminTeamMatchApplicationDto {
   @IsUUID()
   clientCommandId!: string;
-
-  @IsUUID()
-  homeApplicationId!: string;
-
-  @IsUUID()
-  awayApplicationId!: string;
 }

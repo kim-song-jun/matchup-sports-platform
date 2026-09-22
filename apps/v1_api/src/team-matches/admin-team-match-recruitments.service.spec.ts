@@ -1,4 +1,4 @@
-import { ForbiddenException, UnprocessableEntityException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { AdminTeamMatchRecruitmentsService } from './admin-team-match-recruitments.service';
 
 const adminUser = {
@@ -28,16 +28,18 @@ const createDto = {
   matchStyle: ['친선', '매너 중시'],
   uniformColor: '파랑',
 };
-const assignDto = {
+const approveDto = {
   clientCommandId: '00000000-0000-4000-8000-000000000002',
-  homeApplicationId: '00000000-0000-4000-8000-000000000401',
-  awayApplicationId: '00000000-0000-4000-8000-000000000402',
 };
+const homeApplicationId = '00000000-0000-4000-8000-000000000401';
+const awayApplicationId = '00000000-0000-4000-8000-000000000402';
 
-function application(id: string, teamId: string, name: string) {
+function application(id: string, teamId: string, name: string, status = 'requested') {
   return {
     id,
-    status: 'requested',
+    status,
+    reviewedAt: status === 'approved' ? new Date('2026-08-01T00:00:00.000Z') : null,
+    createdAt: new Date('2026-07-01T00:00:00.000Z'),
     applicantTeam: {
       id: teamId,
       name,
@@ -91,14 +93,14 @@ describe('AdminTeamMatchRecruitmentsService', () => {
           competitionConfigVersionId: 'config-1',
           game: null,
           applications: [
-            application(assignDto.homeApplicationId, 'team-home', '홈 FC'),
-            application(assignDto.awayApplicationId, 'team-away', '원정 FC'),
+            application(homeApplicationId, 'team-home', '홈 FC'),
+            application(awayApplicationId, 'team-away', '원정 FC'),
           ],
         }),
         update: jest.fn().mockResolvedValue({}),
       },
       v1TeamMatchApplication: {
-        updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findMany: jest.fn().mockResolvedValue([]),
       },
       v1TeamSchedule: { create: jest.fn().mockResolvedValue({}) },
@@ -151,11 +153,41 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       data: expect.objectContaining({ deadlineAt: null }),
     });
   });
-  it('assigns two requested teams and only then creates the game and both schedules', async () => {
-    await expect(service.assign(adminUser, 'team-match-1', assignDto)).resolves.toEqual(expect.objectContaining({
+  it('approves the first application without creating a game or schedules', async () => {
+    await expect(service.approveApplication(adminUser, 'team-match-1', homeApplicationId, approveDto)).resolves.toEqual(expect.objectContaining({
       teamMatchId: 'team-match-1',
+      applicationId: homeApplicationId,
+      applicantTeamId: 'team-home',
+      gameId: null,
+      teamMatchStatus: 'recruiting',
+      approvedCount: 1,
+      replayed: false,
+    }));
+    expect(games.createFromSourceInTransaction).not.toHaveBeenCalled();
+    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+    expect(prisma.v1TeamSchedule.create).not.toHaveBeenCalled();
+    expect(adminContext.logAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: 'team_match.application.approve', targetId: homeApplicationId }),
+      prisma,
+    );
+  });
+
+  it('approves the second application and then creates the game and both schedules', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValueOnce({
+      ...await prisma.v1TeamMatch.findFirst(),
+      applications: [
+        application(homeApplicationId, 'team-home', '홈 FC', 'approved'),
+        application(awayApplicationId, 'team-away', '원정 FC'),
+      ],
+    });
+
+    await expect(service.approveApplication(adminUser, 'team-match-1', awayApplicationId, approveDto)).resolves.toEqual(expect.objectContaining({
+      teamMatchId: 'team-match-1',
+      applicationId: awayApplicationId,
       gameId: 'game-1',
-      status: 'matched',
+      teamMatchStatus: 'matched',
+      approvedCount: 2,
       homeTeamId: 'team-home',
       awayTeamId: 'team-away',
       replayed: false,
@@ -172,28 +204,22 @@ describe('AdminTeamMatchRecruitmentsService', () => {
     expect(prisma.v1TeamSchedule.create).toHaveBeenCalledTimes(2);
   });
 
-  it('rejects assigning a hostless match that was not created by the platform flow', async () => {
+  it('rejects approving an application for a match outside the platform flow', async () => {
     prisma.v1TeamMatch.findFirst.mockResolvedValueOnce({
       ...await prisma.v1TeamMatch.findFirst(),
       platformManaged: false,
     });
 
-    await expect(service.assign(adminUser, 'team-match-1', assignDto)).rejects.toMatchObject({
+    await expect(service.approveApplication(adminUser, 'team-match-1', homeApplicationId, approveDto)).rejects.toMatchObject({
       response: { code: 'TEAM_MATCH_NOT_PLATFORM_RECRUITING' },
     });
     expect(games.createFromSourceInTransaction).not.toHaveBeenCalled();
   });
 
-  it('rejects selecting the same application before opening a transaction', async () => {
-    await expect(service.assign(adminUser, 'team-match-1', { ...assignDto, awayApplicationId: assignDto.homeApplicationId }))
-      .rejects.toBeInstanceOf(UnprocessableEntityException);
-    expect(prisma.$transaction).not.toHaveBeenCalled();
-  });
+  it('rolls back approval when the selected application changes concurrently', async () => {
+    prisma.v1TeamMatchApplication.updateMany.mockResolvedValueOnce({ count: 0 });
 
-  it('rolls back finalization when a selected application changes concurrently', async () => {
-    prisma.v1TeamMatchApplication.updateMany.mockResolvedValueOnce({ count: 1 });
-
-    await expect(service.assign(adminUser, 'team-match-1', assignDto)).rejects.toMatchObject({
+    await expect(service.approveApplication(adminUser, 'team-match-1', homeApplicationId, approveDto)).rejects.toMatchObject({
       response: { code: 'TEAM_MATCH_APPLICATIONS_CHANGED' },
     });
     expect(prisma.v1TeamSchedule.create).not.toHaveBeenCalled();

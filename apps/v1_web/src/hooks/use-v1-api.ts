@@ -71,8 +71,8 @@ import type {
   V1AdminStatusChangeLog,
   V1AdminStatusChangeResult,
   V1AdminTeamDetail,
-  V1AdminTeamMatchAssignmentPayload,
-  V1AdminTeamMatchAssignmentResult,
+  V1AdminTeamMatchApprovalPayload,
+  V1AdminTeamMatchApprovalResult,
   V1AdminTeamMatchRecruitmentPayload,
   V1AdminTeamMatchRecruitmentResult,
   V1AdminTeamMatchRow,
@@ -3140,11 +3140,14 @@ export function useV1CreateAdminTeamMatchRecruitment() {
   });
 }
 
-export function useV1AssignAdminTeamMatchApplications(teamMatchId: string) {
+export function useV1ApproveAdminTeamMatchApplication(teamMatchId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: V1AdminTeamMatchAssignmentPayload) =>
-      v1Post<V1AdminTeamMatchAssignmentResult>(`/admin/team-matches/${teamMatchId}/assign`, body),
+    mutationFn: ({ applicationId, body }: { applicationId: string; body: V1AdminTeamMatchApprovalPayload }) =>
+      v1Post<V1AdminTeamMatchApprovalResult>(
+        `/admin/team-matches/${teamMatchId}/applications/${applicationId}/approve`,
+        body,
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatch(teamMatchId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'team-matches'] });

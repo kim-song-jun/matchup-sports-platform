@@ -53,7 +53,7 @@
 .playerField { border: 0; padding: 0; margin: 0; min-width: 0; }
 .playerField legend { font-size: var(--font-size-body-sm); font-weight: 600; margin-bottom: 8px; }
 .playerChoices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.playerChoice { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 10px; min-height: 60px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-control); cursor: pointer; background: var(--surface); }
+.playerChoice { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 12px; min-height: 60px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-control); cursor: pointer; background: var(--surface); }
 .playerChoice[data-selected='true'] { border-color: var(--blue500); background: var(--blue50); }
 .playerChoice input { width: 18px; height: 18px; margin: 0; accent-color: var(--blue600); }
 .playerChoice span { display: grid; gap: 2px; min-width: 0; }

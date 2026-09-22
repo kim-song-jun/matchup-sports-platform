@@ -1,0 +1,297 @@
+{
+  "teamMatchId": "8dbee6b7-2e43-4462-bff8-fab6f57ecf82",
+  "title": "ALPHA QA 참석명단 경기 전 09221721",
+  "startsAt": "2026-09-23T10:00:00.000Z",
+  "hostTeam": "마포 레인저스",
+  "awayTeam": "송파 유나이티드",
+  "hostRosterCount": 6,
+  "awayRosterCount": 6,
+  "hostLineupState": "SUBMITTED",
+  "awayLineupState": "SUBMITTED",
+  "matchStatus": "matched",
+  "screenshotCount": 20,
+  "runtimeIssueCount": 0,
+  "screenshots": [
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/01-desktop-recruiting-detail.png",
+      "stage": "상대팀 모집 상세",
+      "actor": "away",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82",
+      "overflow": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/02-mobile-recruiting-detail.png",
+      "stage": "상대팀 모집 상세",
+      "actor": "away",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82",
+      "overflow": {
+        "scrollWidth": 390,
+        "clientWidth": 390
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/03-desktop-application-requested.png",
+      "stage": "상대팀 신청 및 승인 대기",
+      "actor": "away",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82",
+      "overflow": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/03-mobile-application-requested.png",
+      "stage": "상대팀 신청 및 승인 대기",
+      "actor": "away",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82",
+      "overflow": {
+        "scrollWidth": 390,
+        "clientWidth": 390
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/04-desktop-host-application-review.png",
+      "stage": "호스트 신청팀 확인",
+      "actor": "host",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82",
+      "overflow": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/04-mobile-host-application-review.png",
+      "stage": "호스트 신청팀 확인",
+      "actor": "host",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82",
+      "overflow": {
+        "scrollWidth": 390,
+        "clientWidth": 390
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/05-desktop-matched-detail.png",
+      "stage": "매칭 완료 및 참석명단 진입",
+      "actor": "host",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82",
+      "overflow": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/05-mobile-matched-detail.png",
+      "stage": "매칭 완료 및 참석명단 진입",
+      "actor": "host",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82",
+      "overflow": {
+        "scrollWidth": 390,
+        "clientWidth": 390
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/06-host-roster-desktop-empty.png",
+      "stage": "참석명단 비어 있음",
+      "actor": "host",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82/lineup",
+      "overflow": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/06-host-roster-mobile-empty.png",
+      "stage": "참석명단 비어 있음",
+      "actor": "host",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82/lineup",
+      "overflow": {
+        "scrollWidth": 390,
+        "clientWidth": 390
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/06-host-roster-desktop-filled.png",
+      "stage": "참석명단 선수 등록 및 GK 지정",
+      "actor": "host",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82/lineup",
+      "overflow": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/06-host-roster-mobile-filled.png",
+      "stage": "참석명단 선수 등록 및 GK 지정",
+      "actor": "host",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82/lineup",
+      "overflow": {
+        "scrollWidth": 390,
+        "clientWidth": 390
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/06-host-roster-desktop-submitted.png",
+      "stage": "참석명단 제출 완료",
+      "actor": "host",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82/lineup",
+      "overflow": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/06-host-roster-mobile-submitted.png",
+      "stage": "참석명단 제출 완료",
+      "actor": "host",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82/lineup",
+      "overflow": {
+        "scrollWidth": 390,
+        "clientWidth": 390
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/07-away-roster-desktop-empty.png",
+      "stage": "참석명단 비어 있음",
+      "actor": "away",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82/lineup",
+      "overflow": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/07-away-roster-mobile-empty.png",
+      "stage": "참석명단 비어 있음",
+      "actor": "away",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82/lineup",
+      "overflow": {
+        "scrollWidth": 390,
+        "clientWidth": 390
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/07-away-roster-desktop-filled.png",
+      "stage": "참석명단 선수 등록 및 GK 지정",
+      "actor": "away",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82/lineup",
+      "overflow": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/07-away-roster-mobile-filled.png",
+      "stage": "참석명단 선수 등록 및 GK 지정",
+      "actor": "away",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82/lineup",
+      "overflow": {
+        "scrollWidth": 390,
+        "clientWidth": 390
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/07-away-roster-desktop-submitted.png",
+      "stage": "참석명단 제출 완료",
+      "actor": "away",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82/lineup",
+      "overflow": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440
+      }
+    },
+    {
+      "file": "docs/screenshots/task173-team-match-attendance-roster-pre-match/07-away-roster-mobile-submitted.png",
+      "stage": "참석명단 제출 완료",
+      "actor": "away",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "url": "https://alpha.teameet.co.kr/team-matches/8dbee6b7-2e43-4462-bff8-fab6f57ecf82/lineup",
+      "overflow": {
+        "scrollWidth": 390,
+        "clientWidth": 390
+      }
+    }
+  ],
+  "runtimeIssues": []
+}

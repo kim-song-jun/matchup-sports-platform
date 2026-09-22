@@ -1,5 +1,9 @@
 # Teameet QA Scenario Index
 
+## 2026-09-22 — 팀매치 참석명단 경기 전 Alpha QA
+
+[팀매치 참석명단 경기 전 갤러리](./team-match-attendance-roster-pre-match-gallery.md): 마포 레인저스 모집 → 송파 유나이티드 신청·승인 → 양 팀 6명 참석 확정 → 양 팀 참석명단 등록·GK 지정·제출을 실제 Alpha에서 완료했다. 1440×900/390×844 스크린샷 20장, console/page/API 오류와 가로 넘침 0건. 팀매치 전용 문구만 `참석명단`으로 바뀌며 대회·리그의 `라인업`은 유지된다.
+
 ## 2026-09-19 — Android 실기기 전체 화면 감사
 
 [Android UI 감사](./android-device-ui-audit.md): Task 156, 180/180 경로 처리. 일반/관리자 계정 실기기 캡처와 390/768/1440 비교. 캡처·권한 차단·데이터 부재 및 배포 상태는 해당 문서와 Task 156에서 구분한다.

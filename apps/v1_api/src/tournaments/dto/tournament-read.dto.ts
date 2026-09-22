@@ -72,6 +72,10 @@ export class TournamentListQueryDto {
   kind?: CompetitionListKind;
 
   @IsOptional()
+  @IsIn(['mixed', 'male', 'female'])
+  genderCategory?: 'mixed' | 'male' | 'female';
+
+  @IsOptional()
   @IsString()
   cursor?: string;
 

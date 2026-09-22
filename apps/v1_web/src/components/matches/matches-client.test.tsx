@@ -39,6 +39,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1ResolveChatRoom: () => ({ mutate: vi.fn(), isPending: false }),
   useV1Matches: useV1MatchesMock,
   useV1MasterSports: () => ({ data: [] }),
+  useV1MasterRegions: () => ({ data: [] }),
   useV1RecentSearches: () => ({ data: { items: [] }, isLoading: false }),
   useV1RecordSearch: () => ({ mutate: vi.fn() }),
 }));

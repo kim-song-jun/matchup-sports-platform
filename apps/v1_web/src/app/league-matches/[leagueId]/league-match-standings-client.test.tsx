@@ -21,6 +21,16 @@ vi.mock('@/components/auth/pending-social-signup-gate', () => ({
   PendingSocialSignupGate: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+// 팀 상세 "내 리그"에서 들어왔을 때 뒤로가기를 되돌리는 `?from=` 배선(QA 피드백 #1)이
+// useSearchParams를 쓴다 — 이 테스트는 실제 Next 라우터 컨텍스트 밖이라 직접 목한다.
+// 기본값은 빈 파라미터라 기존 테스트 동작(뒤로가기 배선을 보지 않는 테스트들)은 그대로다.
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+  // app-shell-frame.tsx의 usePathname()은 라우터 컨텍스트 밖(null)을 이미 방어하므로
+  // 이 화면과 무관한 셸 렌더를 위해 최소한으로만 채운다.
+  usePathname: () => null,
+}));
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1ActivePopup: vi.fn(),
   useV1MyRegistrations: vi.fn(() => ({ data: [] })),

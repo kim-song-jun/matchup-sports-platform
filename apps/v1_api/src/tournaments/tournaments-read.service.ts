@@ -135,6 +135,7 @@ export class TournamentsReadService {
           : { status: query.status }
         : { AND: [PUBLIC_COMPETITION_STATUS_WHERE] }),
       ...(query.sportId ? { sportId: query.sportId } : {}),
+      ...(query.genderCategory ? { genderCategory: query.genderCategory } : {}),
     };
 
     // 전체 건수는 페이지 번호를 그릴 때만 센다 — 무한 스크롤은 "다음이 있는지"만 알면

@@ -90,7 +90,12 @@ export class MatchesService {
           ? { status, startAt: { gte: now } }
           : { status }),
       ...(query.sportId ? { sportId: query.sportId } : {}),
-      ...(query.regionId ? { regionId: query.regionId } : {}),
+      // regionId로 시/도(레벨1)를 고르면 그 하위 구/군(레벨2)도 함께 담는다 — 매치의
+      // regionId는 실제로는 항상 구/군 단위라(validateMasterRefs level:2), 시/도 id로 단순
+      // 동등비교하면 결과가 0건이 된다. 관계 필터라 별도 조회 없이 한 번의 JOIN으로 끝난다.
+      ...(query.regionId
+        ? { region: { OR: [{ id: query.regionId }, { parentId: query.regionId }] } }
+        : {}),
       ...(query.genderRule ? { genderRule: getGenderRuleWhere(query.genderRule) } : {}),
       ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
       ...(constraints.length ? { AND: constraints } : {}),

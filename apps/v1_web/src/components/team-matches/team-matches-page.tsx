@@ -840,6 +840,14 @@ function TeamMatchFilterSheet({ model }: { model: TeamMatchListViewModel }) {
           <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={sheet.resetHref} style={{ color: 'var(--text-caption)' }}>초기화</Link>
         </div>
         <div className="tm-filter-section">
+          <div className="tm-text-label">구분</div>
+          <div className="tm-filter-chip-wrap">
+            {sheet.kindOptions.map((option) => (
+              <Link key={option.value} className={`tm-chip ${option.active ? 'tm-chip-active' : ''}`} href={option.href} aria-current={option.active ? 'page' : undefined}>{option.label}</Link>
+            ))}
+          </div>
+        </div>
+        <div className="tm-filter-section">
           <div className="tm-text-label">정렬</div>
           <div className="tm-filter-chip-wrap">
             {sheet.sortOptions.map((option) => (

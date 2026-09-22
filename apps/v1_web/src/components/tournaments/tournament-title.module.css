@@ -1,10 +1,8 @@
-@media (max-width: 767px) {
-  .qualifier {
-    display: inline-block;
-    max-width: 100%;
-    vertical-align: top;
-    white-space: normal;
-    word-break: keep-all;
-    overflow-wrap: anywhere;
-  }
+.qualifier {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: top;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }

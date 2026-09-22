@@ -3607,6 +3607,7 @@ type TournamentListFilters = {
   limit?: number;
   /** 목록 표면(전체/정규 대회/정규 리그). 서버 `COMPETITION_LIST_SURFACE` 의 키와 같다. */
   kind?: CompetitionKind;
+  genderCategory?: 'mixed' | 'male' | 'female';
 };
 
 export function useV1Tournaments(params?: TournamentListFilters) {

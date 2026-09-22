@@ -166,6 +166,12 @@ function TournamentsListContent() {
   const activeStatus = rawStatus === '' ? null : rawStatus;
   const rawSportId = searchParams.get('sportId');
   const activeSportId = rawSportId === '' ? null : rawSportId;
+  const rawGenderCategory = searchParams.get('genderCategory');
+  const activeGenderCategory = rawGenderCategory === '' ? null : rawGenderCategory;
+  const knownGenderCategory =
+    activeGenderCategory === 'mixed' || activeGenderCategory === 'male' || activeGenderCategory === 'female'
+      ? activeGenderCategory
+      : undefined;
 
   /* URL 은 사용자가 직접 편집할 수 있다 — 모르는 값을 서버로 넘기면 400 이 나고, 그때는
      원인이 주소인지 화면인지 구분이 안 된다. **아는 값만 통과시킨다.**
@@ -193,7 +199,7 @@ function TournamentsListContent() {
     setAllItems([]);
     // 상태·종목이 바뀌어도 같은 이유로 리셋한다 — 목록 내용이 갈리므로 누적분이 남으면
     // 이전 필터의 카드가 섞인 채로 보인다.
-  }, [activeKind, activeStatus, activeSportId]);
+  }, [activeKind, activeStatus, activeSportId, activeGenderCategory]);
 
   /* D3: 데이터드리븐 종목 필터 — DB seed 기준 유효한 종목만 노출 (하드코딩 제거) */
   const { data: sportsData } = useV1MasterSports();
@@ -216,6 +222,7 @@ function TournamentsListContent() {
     sportId: querySportId,
     status: knownStatus,
     kind: activeKind,
+    genderCategory: knownGenderCategory,
   });
   const promoTournaments = useV1AllTournaments({
     status: 'open',

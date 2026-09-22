@@ -7,6 +7,7 @@ import {
   useV1Match,
   useV1MatchApplicationEligibility,
   useV1Matches,
+  useV1MasterRegions,
   useV1MasterSports,
   useV1RecentSearches,
   useV1RecordSearch,
@@ -52,6 +53,7 @@ export function MatchListPageClient() {
   const selectedView = toMatchView(searchParams.get('view'));
   const selectedGenderRule = toGenderRuleFilter(searchParams.get('genderRule'));
   const selectedLevels = toLevelCodes(searchParams.get('levelCodes') ?? searchParams.get('levels'));
+  const selectedRegionId = searchParams.get('regionId') ?? undefined;
   const filterOpen = searchParams.get('filter') === '1';
   const initialQuery = searchParams.get('q') ?? '';
   const [searchValue, setSearchValue] = useState(initialQuery);
@@ -61,17 +63,18 @@ export function MatchListPageClient() {
     setSearchValue(initialQuery);
     setSubmittedQuery(initialQuery);
   }, [initialQuery]);
-  const activeFilterCount = countMatchFilters(selectedSort, selectedGenderRule, selectedLevels);
+  const activeFilterCount = countMatchFilters(selectedSort, selectedGenderRule, selectedLevels, selectedRegionId);
   const matchFilters = useMemo(() => {
-    const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'latest' | 'deadline'; view?: 'card' | 'compact'; genderRule?: string; levelCodes?: string } = {};
+    const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'latest' | 'deadline'; view?: 'card' | 'compact'; genderRule?: string; levelCodes?: string; regionId?: string } = {};
     if (selectedSportId) filters.sportId = selectedSportId;
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
     if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
+    if (selectedRegionId) filters.regionId = selectedRegionId;
     if (submittedQuery.trim()) filters.query = submittedQuery.trim();
     if (selectedSort) filters.sort = selectedSort;
     if (selectedView !== 'card') filters.view = selectedView;
     return Object.keys(filters).length ? filters : undefined;
-  }, [selectedGenderRule, selectedLevels, selectedSportId, selectedSort, selectedView, submittedQuery]);
+  }, [selectedGenderRule, selectedLevels, selectedRegionId, selectedSportId, selectedSort, selectedView, submittedQuery]);
   // 서버는 20건씩 커서 페이지네이션으로 자르는데(matches.service.ts list()) 예전엔 이 화면이
   // 단발 useQuery로 첫 페이지만 받아 21번째 매치부터는 볼 방법이 아예 없었다(감사 결함).
   // 대회 목록(tournaments/page.tsx)과 같은 "더 보기" 누적 방식 — 다만 그 화면 수준의
@@ -98,17 +101,19 @@ export function MatchListPageClient() {
   );
   const allMatches = useV1Matches(allMatchesFilters);
   const countFilters = useMemo(() => {
-    const filters: { query?: string; genderRule?: string; levelCodes?: string } = {};
+    const filters: { query?: string; genderRule?: string; levelCodes?: string; regionId?: string } = {};
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
     if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
+    if (selectedRegionId) filters.regionId = selectedRegionId;
     if (submittedQuery.trim()) filters.query = submittedQuery.trim();
     return Object.keys(filters).length ? filters : undefined;
-  }, [selectedGenderRule, selectedLevels, submittedQuery]);
+  }, [selectedGenderRule, selectedLevels, selectedRegionId, submittedQuery]);
   const filteredMatches = useV1Matches(filteredMatchesFilters, { enabled: Boolean(matchFilters) });
   const countMatches = useV1Matches(countFilters, { enabled: Boolean(countFilters) });
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
   const sports = useV1MasterSports();
+  const regions = useV1MasterRegions();
   const query = matchFilters ? filteredMatches : allMatches;
 
   if (query.isError) return <MatchStatePageView model={{ ...getMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
@@ -171,7 +176,7 @@ export function MatchListPageClient() {
         filterCount: activeFilterCount,
         search: searchModel,
         filterHref: buildMatchHref(searchParams, { filter: '1' }),
-        filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
+        filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], filterOpen),
         matches: visibleItems.map((item, index) => toMatchCard(item, base.matches[index] ?? base.matches[0])),
         nearbyMatches: nearbyItems.map((item, index) => toMatchCard(item, base.matches[index] ?? base.matches[0])),
         sports: buildSportSummary(searchParams, countItems, base, selectedSportId, sports.data),
@@ -191,7 +196,7 @@ export function MatchListPageClient() {
         filterCount: activeFilterCount,
         search: searchModel,
         filterHref: buildMatchHref(searchParams, { filter: '1' }),
-        filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
+        filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], filterOpen),
         matches: [],
         sports: buildSportSummary(searchParams, countItems, base, selectedSportId, sports.data),
         summary: {
@@ -371,6 +376,8 @@ function buildMatchFilterSheet(
   view: NonNullable<MatchListViewModel['filterSheet']>['view'],
   genderRule: NonNullable<MatchListViewModel['filterSheet']>['genderRule'],
   levels: NonNullable<MatchListViewModel['filterSheet']>['levels'],
+  regionId: string | undefined,
+  regions: ReadonlyArray<{ id: string; name: string; parentId: string | null }>,
   open: boolean,
 ): NonNullable<MatchListViewModel['filterSheet']> {
   const sortOptions: NonNullable<MatchListViewModel['filterSheet']>['sortOptions'] = [
@@ -389,19 +396,34 @@ function buildMatchFilterSheet(
     href: buildMatchHref(params, { levelCodes: toggleLevelCode(levels, code), levels: null, filter: '1' }),
     active: levels.includes(code),
   }));
+  // 시/도(레벨1)만 칩으로 보여준다 — 구/군까지 펼치면 100개 넘게 쏟아진다. 선택한 시/도의
+  // 하위 구/군은 서버가 관계 필터로 함께 담는다(matches.service.ts list()).
+  const regionOptions: NonNullable<MatchListViewModel['filterSheet']>['regionOptions'] = [
+    { label: '전체', value: 'all', href: buildMatchHref(params, { regionId: null, filter: '1' }), active: !regionId },
+    ...regions
+      .filter((region) => region.parentId === null)
+      .map((region) => ({
+        label: region.name,
+        value: region.id,
+        href: buildMatchHref(params, { regionId: regionId === region.id ? null : region.id, filter: '1' }),
+        active: regionId === region.id,
+      })),
+  ];
 
   return {
     open,
     closeHref: buildMatchHref(params, { filter: null }),
-    resetHref: buildMatchHref(params, { sort: null, view: null, genderRule: null, levelCodes: null, levels: null, filter: '1' }),
+    resetHref: buildMatchHref(params, { sort: null, view: null, genderRule: null, levelCodes: null, levels: null, regionId: null, filter: '1' }),
     applyHref: buildMatchHref(params, { filter: null }),
     sort,
     view,
     genderRule,
     levels,
+    regionId: regionId ?? '',
     sortOptions,
     genderOptions,
     levelOptions,
+    regionOptions,
   };
 }
 
@@ -429,8 +451,9 @@ function countMatchFilters(
   sort: '' | 'recommended' | 'deadline' | 'latest',
   genderRule: '' | '성별 무관' | '남' | '여',
   levels: NonNullable<MatchListViewModel['filterSheet']>['levels'],
+  regionId: string | undefined,
 ) {
-  return Number(Boolean(sort)) + Number(Boolean(genderRule)) + levels.length;
+  return Number(Boolean(sort)) + Number(Boolean(genderRule)) + levels.length + Number(Boolean(regionId));
 }
 
 

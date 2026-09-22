@@ -667,6 +667,14 @@ function MatchFilterSheet({ model }: { model: MatchListViewModel }) {
           <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={sheet.resetHref} style={{ color: 'var(--text-caption)' }}>초기화</Link>
         </div>
         <div className="tm-filter-section">
+          <div className="tm-text-label">지역</div>
+          <div className="tm-filter-chip-wrap">
+            {sheet.regionOptions.map((option) => (
+              <Link key={option.value} className={`tm-chip ${option.active ? 'tm-chip-active' : ''}`} href={option.href} aria-current={option.active ? true : undefined}>{option.label}</Link>
+            ))}
+          </div>
+        </div>
+        <div className="tm-filter-section">
           <div className="tm-text-label">정렬</div>
           <div className="tm-filter-chip-wrap">
             {sheet.sortOptions.map((option) => (

@@ -140,6 +140,14 @@ export class TeamMatchesService {
         ...(query.sportId ? { sportId: query.sportId } : {}),
         ...(query.regionId ? { regionId: query.regionId } : {}),
         ...(query.teamId ? { hostTeamId: query.teamId } : {}),
+        // 이 목록은 위 OR(tournamentId:null 이거나 leagueId 있음)에서 이미 tournamentId
+        // 있는 행을 뺀다 — 그래서 여기서 구분해야 할 건 사실상 "일반(둘 다 null)" 대
+        // "리그 경기(leagueId 있음)" 둘뿐이다.
+        ...(query.kind === 'friendly'
+          ? { leagueId: null }
+          : query.kind === 'competition'
+            ? { leagueId: { not: null } }
+            : {}),
         ...(query.genderRule ? { genderRule: getGenderRuleWhere(query.genderRule) } : {}),
         ...levelCodeWhere(parseLevelCodes(query.levelCodes)),
         // 검색창 placeholder 가 "지역, 팀 이름, 경기조건"을 약속하므로 그 셋을 모두 훑는다.

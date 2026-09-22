@@ -1,8 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { formatTournamentDateShort } from '@/lib/date-utils';
+import { sanitizeRedirectPath } from '@/lib/session-storage';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { useV1AuthMe, useV1PublicProfile } from '@/hooks/use-v1-api';
@@ -44,6 +47,12 @@ function trustConfig(trustState: TrustState) {
 
 export function PublicProfilePageClient({ userId }: { userId: string }) {
   const profile = useV1PublicProfile(userId);
+  // 팀 상세 등 특정 화면에서 들어왔으면 뒤로가기를 그 화면으로 되돌린다(`?from=`).
+  // route-chrome 테이블의 backHref는 라우트 파라미터만 받고 검색 파라미터를 못 받아
+  // (lib/route-chrome/types.ts) 기본값 '/teams'로 고정돼 있었다 — 캠페인 페이지가 쓰는
+  // 것과 같은 ShellOverride.backHref로 그 간극을 메운다.
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  useShellOverride(fromPath ? { backHref: fromPath } : {});
   /**
    * 본인 여부. 적대 검증(2026-08-25)에서 isOwner=false 하드코딩이 확정됐다 -- 주인이
    * '내 프로필'로 자기 공개 프로필에 와도 남의 시점으로 렌더돼 진행도·해금 안내가

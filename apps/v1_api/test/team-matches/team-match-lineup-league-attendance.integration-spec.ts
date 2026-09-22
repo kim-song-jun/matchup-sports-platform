@@ -8,7 +8,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup.service';
 
 /**
- * 리그 대진의 라인업 저장에는 **참석 응답 게이트를 걸지 않는다.**
+ * 팀매치 참석명단 저장에는 리그·친선 구분 없이 **참석 응답 게이트를 걸지 않는다.**
  *
  * ## 무엇이 결함이었나
  *
@@ -93,7 +93,7 @@ async function currentVersion(teamMatchId: string): Promise<number> {
   return view.version;
 }
 
-describe('리그 대진 라인업 — 참석 응답 게이트 예외', () => {
+describe('팀매치 참석명단 — 팀장·운영진 직접 등록', () => {
   beforeAll(async () => {
     if (!process.env.DATABASE_URL) {
       throw new Error('DATABASE_URL is required for the league lineup attendance spec');
@@ -257,7 +257,7 @@ describe('리그 대진 라인업 — 참석 응답 게이트 예외', () => {
         starters: [
           { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
           { userId: ids.hostP2, jerseyNumber: 2 },
-          // 친선이었다면 이 사람 때문에 422 였다(아래 대조 테스트가 그 자리를 못박는다).
+          // 일정에는 NOT_GOING이지만 활성 팀원이므로 직접 등록할 수 있다.
           { userId: ids.hostNotAttending, jerseyNumber: 3 },
         ],
         bench: [],
@@ -277,11 +277,14 @@ describe('리그 대진 라인업 — 참석 응답 게이트 예외', () => {
     ]);
   });
 
-  it('친선 매치는 그대로 참석 응답을 요구한다 (게이트가 통째로 죽지 않았다)', async () => {
+  it('친선 매치도 참석 응답 없이 활성 팀원을 직접 저장한다', async () => {
     const version = await currentVersion(ids.friendlyMatch);
 
-    const rejected = await captureFailure(() =>
-      service.saveLineup(authUser(ids.hostOwner), ids.friendlyMatch, 'friendly-lineup-attendance-save', {
+    const saved = await service.saveLineup(
+      authUser(ids.hostOwner),
+      ids.friendlyMatch,
+      'friendly-lineup-attendance-save',
+      {
         expectedVersion: version,
         starters: [
           { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
@@ -289,9 +292,14 @@ describe('리그 대진 라인업 — 참석 응답 게이트 예외', () => {
           { userId: ids.hostNotAttending, jerseyNumber: 3 },
         ],
         bench: [],
-      }),
+      },
     );
-    expectHttpCode(rejected, 422, 'LINEUP_PARTICIPANT_INELIGIBLE');
+    expect(saved.version).toBe(version + 1);
+    const participant = await prisma.v1GameParticipant.findFirst({
+      where: { lineupId: saved.lineupId, userId: ids.hostNotAttending },
+      select: { userId: true },
+    });
+    expect(participant).toEqual({ userId: ids.hostNotAttending });
   });
 
   it('리그 대진에서도 팀 소속이 아닌 사용자는 여전히 거부된다 (자격 판정 전체를 끈 것이 아니다)', async () => {
@@ -313,13 +321,12 @@ describe('리그 대진 라인업 — 참석 응답 게이트 예외', () => {
     expect(await currentVersion(ids.leagueMatch)).toBe(version);
   });
 
-  it('eligibleMembers 도 같은 규칙을 따른다 — 리그는 전원 attending=true, 친선은 참석 응답 그대로', async () => {
+  it('eligibleMembers는 리그와 친선 모두 활성 팀원을 직접 등록 가능하게 반환한다', async () => {
     const league = await service.getLineup(authUser(ids.hostOwner), ids.leagueMatch);
     expect(league.eligibleMembers?.find((m) => m.userId === ids.hostNotAttending)?.attending).toBe(true);
     expect(league.eligibleMembers?.every((m) => m.attending)).toBe(true);
 
     const friendly = await service.getLineup(authUser(ids.hostOwner), ids.friendlyMatch);
-    expect(friendly.eligibleMembers?.find((m) => m.userId === ids.hostNotAttending)?.attending).toBe(false);
-    expect(friendly.eligibleMembers?.find((m) => m.userId === ids.hostP2)?.attending).toBe(true);
+    expect(friendly.eligibleMembers?.every((m) => m.attending)).toBe(true);
   });
 });

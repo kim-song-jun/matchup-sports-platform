@@ -332,7 +332,7 @@ describe('Task 14 team-match lineup builder', () => {
     expect(await currentVersion(ids.hostOwner, ids.futureMatch)).toBe(version);
   });
 
-  it('rejects a non-member and a non-attending member, but allows an unlinked guest', async () => {
+  it('rejects a non-member, but allows an active member without RSVP and an unlinked guest', async () => {
     const version = await currentVersion(ids.hostOwner, ids.futureMatch);
 
     const nonMember = await captureFailure(() =>
@@ -348,8 +348,11 @@ describe('Task 14 team-match lineup builder', () => {
     );
     expectHttpCode(nonMember, 422, 'LINEUP_PARTICIPANT_INELIGIBLE');
 
-    const notAttending = await captureFailure(() =>
-      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-not-attending', {
+    const notAttending = await service.saveLineup(
+      authUser(ids.hostOwner),
+      ids.futureMatch,
+      'idem-host-not-attending',
+      {
         expectedVersion: version,
         starters: [
           { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
@@ -357,12 +360,13 @@ describe('Task 14 team-match lineup builder', () => {
           { userId: ids.hostNotAttending, jerseyNumber: 3 },
         ],
         bench: [],
-      }),
+      },
     );
-    expectHttpCode(notAttending, 422, 'LINEUP_PARTICIPANT_INELIGIBLE');
+    expect(notAttending.state).toBe('DRAFT');
+    expect(notAttending.version).toBe(version + 1);
 
     const withGuest = await service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-guest-draft', {
-      expectedVersion: version,
+      expectedVersion: notAttending.version,
       starters: [
         { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
         { userId: ids.hostP2, jerseyNumber: 2 },
@@ -371,7 +375,7 @@ describe('Task 14 team-match lineup builder', () => {
       bench: [],
     });
     expect(withGuest.state).toBe('DRAFT');
-    expect(withGuest.version).toBe(version + 1);
+    expect(withGuest.version).toBe(version + 2);
 
     const view = await service.getLineup(authUser(ids.hostOwner), ids.futureMatch);
     expect(view.starters.map((starter) => starter.displayName)).toContain('용병 게스트');

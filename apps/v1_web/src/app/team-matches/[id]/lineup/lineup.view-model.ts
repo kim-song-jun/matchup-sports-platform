@@ -356,7 +356,7 @@ export function deriveLineupCounts(state: LineupEditorState, rosterPool: RosterO
 export function validateLineupForSubmit(state: LineupEditorState): string[] {
   const errors: string[] = [];
   if (state.participants.length === 0) {
-    errors.push('출전 명단을 최소 한 명 이상 등록해 주세요.');
+    errors.push('참석명단을 최소 한 명 이상 등록해 주세요.');
   }
   // **골키퍼 개수는 검증하지 않는다.** 예전엔 "선발에 반드시 한 명" 이었는데, 163 BE-1 이
   // 서버에서 인원·GK 검증을 지웠다(정본 §3 — 어느 경로든 검증하지 않는다). 여기에만
@@ -439,20 +439,20 @@ export function describeLineupPhase(
   deadlinePassed: boolean,
 ): { label: string; editable: boolean; helperText: string } {
   if (state === 'LOCKED') {
-    return { label: '잠김', editable: false, helperText: '경기가 시작되어 라인업이 잠겼어요.' };
+    return { label: '잠김', editable: false, helperText: '경기가 시작되어 참석명단이 잠겼어요.' };
   }
   if (state === 'SUBMITTED') {
     return {
       label: '제출됨',
       editable: false,
-      helperText: '라인업을 제출했어요. 다시 편집하려면 상대팀의 정정 요청이 필요해요.',
+      helperText: '참석명단을 제출했어요. 다시 편집하려면 상대팀의 정정 요청이 필요해요.',
     };
   }
   if (deadlinePassed) {
     return {
       label: '수정 마감',
       editable: false,
-      helperText: '경기 시작 이후에는 라인업을 직접 수정할 수 없어요.',
+      helperText: '경기 시작 이후에는 참석명단을 직접 수정할 수 없어요.',
     };
   }
   return { label: '초안', editable: true, helperText: '' };
@@ -463,7 +463,7 @@ export function describePublicationCountdown(publicLineupAt: string | null, now:
   const target = new Date(publicLineupAt).getTime();
   if (Number.isNaN(target)) return null;
   const diffMs = target - now;
-  if (diffMs <= 0) return '라인업이 공개됐어요.';
+  if (diffMs <= 0) return '참석명단이 공개됐어요.';
   const totalMinutes = Math.ceil(diffMs / 60_000);
   if (totalMinutes < 60) return `${totalMinutes}분 후 공개돼요.`;
   const hours = Math.floor(totalMinutes / 60);

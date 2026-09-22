@@ -202,7 +202,7 @@ describe('lineup.view-model', () => {
 
   it('빈 명단·중복 등번호·빈 이름만 막는다 — 인원수와 GK 개수는 검사하지 않는다', () => {
     expect(validateLineupForSubmit(createEmptyLineupEditorState(0))).toContain(
-      '출전 명단을 최소 한 명 이상 등록해 주세요.',
+      '참석명단을 최소 한 명 이상 등록해 주세요.',
     );
 
     let state = createEmptyLineupEditorState(0);
@@ -293,7 +293,7 @@ describe('lineup.view-model', () => {
     const now = new Date('2026-08-10T10:00:00.000Z').getTime();
     expect(describePublicationCountdown(null, now)).toBeNull();
     expect(describePublicationCountdown('2026-08-10T10:30:00.000Z', now)).toBe('30분 후 공개돼요.');
-    expect(describePublicationCountdown('2026-08-10T09:00:00.000Z', now)).toBe('라인업이 공개됐어요.');
+    expect(describePublicationCountdown('2026-08-10T09:00:00.000Z', now)).toBe('참석명단이 공개됐어요.');
   });
 
   it('gates editability by lineup state and kickoff deadline', () => {
@@ -543,12 +543,13 @@ describe('TeamMatchLineupPageClient', () => {
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
     expect(screen.getByText('초안')).toBeInTheDocument();
-    expect(screen.getByText('출전 명단 (0)')).toBeInTheDocument();
+    expect(screen.getByText('참석명단 (0)')).toBeInTheDocument();
     expect(screen.getByText('추가 가능한 팀원 (1)')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
 
-    expect(screen.getByText('출전 명단 (1)')).toBeInTheDocument();
+    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '이전 참석명단 불러오기' })).toBeInTheDocument();
     // 배치되고 나면 대기 목록에서 사라진다 — 같은 사람을 두 번 추가할 방법 자체가 없다.
     expect(screen.getByText('추가할 수 있는 팀원이 없어요')).toBeInTheDocument();
   });
@@ -590,7 +591,7 @@ describe('TeamMatchLineupPageClient', () => {
 
     // 참석 확정자는 그대로 추가할 수 있다.
     fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
-    expect(screen.getByText('출전 명단 (1)')).toBeInTheDocument();
+    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
 
     // 참석 미확정자의 버튼은 비활성 상태라 눌러도 아무 일도 일어나지 않는다 — 저장을 시도한
     // 뒤 422로 처음 알게 되는 대신, 애초에 추가할 수 없다는 것을 화면이 미리 말해준다.
@@ -599,7 +600,7 @@ describe('TeamMatchLineupPageClient', () => {
     });
     expect(blockedAddButton).toBeDisabled();
     fireEvent.click(blockedAddButton);
-    expect(screen.getByText('출전 명단 (1)')).toBeInTheDocument();
+    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
   });
 
   it('member (non-manager): shows a permission-denied state instead of the editor', () => {
@@ -619,7 +620,7 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    expect(screen.getByText('팀장 또는 매니저만 라인업을 관리할 수 있어요.')).toBeInTheDocument();
+    expect(screen.getByText('팀장 또는 매니저만 참석명단을 관리할 수 있어요.')).toBeInTheDocument();
     expect(screen.queryByLabelText('게스트 이름')).not.toBeInTheDocument();
   });
 
@@ -637,7 +638,7 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '라인업 제출하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
     expect(hoisted.submitMutate).toHaveBeenCalledTimes(1);
 
     const onError = hoisted.submitMutate.mock.calls[0][1].onError;
@@ -647,19 +648,19 @@ describe('TeamMatchLineupPageClient', () => {
           status: 'error',
           statusCode: 409,
           code: 'VERSION_CONFLICT',
-          message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
+          message: '참석명단이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
           details: { expectedVersion: 0, currentVersion: 2 },
           timestamp: '2026-08-01T00:00:00.000Z',
         }),
       );
     });
 
-    expect(screen.getByText('라인업이 그새 변경됐어요.')).toBeInTheDocument();
+    expect(screen.getByText('참석명단이 그새 변경됐어요.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '새로고침' }));
 
     await waitFor(() => expect(hoisted.refetchLineup).toHaveBeenCalled());
-    expect(screen.queryByText('라인업이 그새 변경됐어요.')).not.toBeInTheDocument();
+    expect(screen.queryByText('참석명단이 그새 변경됐어요.')).not.toBeInTheDocument();
   });
 
   it('network loss: going offline blocks editing and surfaces an offline banner', async () => {
@@ -685,7 +686,7 @@ describe('TeamMatchLineupPageClient', () => {
       screen.getByText('오프라인 상태예요. 연결이 끊긴 동안 변경사항은 저장되지 않아요.'),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('게스트 이름')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '라인업 제출하기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '참석명단 제출하기' })).not.toBeInTheDocument();
 
     // 이 스위트의 다음 테스트가 온라인 상태를 전제하므로 복원한다 — navigator.onLine은
     // jsdom 전역이라 defineProperty로 false를 박아두면 테스트 간에 그대로 새어나간다.
@@ -785,7 +786,7 @@ describe('TeamMatchLineupPageClient', () => {
   });
 
   // ── P0-1 regression (insane review, 2026-08 GPT Pro): flush-then-submit ──
-  // Before this fix, clicking "라인업 제출하기" always submitted with state.baseRevision
+  // Before this fix, clicking "참석명단 제출하기" always submitted with state.baseRevision
   // regardless of dirty — a jersey number entered right before the click could be submitted
   // as the stale server revision because autosave only fires 900ms after the last edit. The
   // fix makes handleSubmit a serial state machine: while dirty, a click flushes a save
@@ -815,7 +816,7 @@ describe('TeamMatchLineupPageClient', () => {
     fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
 
     // 곧바로 제출 버튼을 누른다 — 디바운스를 기다리지 않고 저장이 먼저 나가야 한다.
-    fireEvent.click(screen.getByRole('button', { name: '라인업 제출하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
     expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
     // 저장이 아직 ack되지 않았다 — 옛 revision(3)이 실린 채 제출이 나가면 안 된다.
     expect(hoisted.submitMutate).not.toHaveBeenCalled();
@@ -851,7 +852,7 @@ describe('TeamMatchLineupPageClient', () => {
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
     fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
-    fireEvent.click(screen.getByRole('button', { name: '라인업 제출하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
     expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
 
     act(() => {
@@ -868,10 +869,10 @@ describe('TeamMatchLineupPageClient', () => {
 
     expect(hoisted.submitMutate).not.toHaveBeenCalled();
     expect(
-      screen.getByText('변경사항을 저장하지 못해 라인업을 제출할 수 없어요. 다시 시도해 주세요.'),
+      screen.getByText('변경사항을 저장하지 못해 참석명단을 제출할 수 없어요. 다시 시도해 주세요.'),
     ).toBeInTheDocument();
     // 버튼이 다시 눌러볼 수 있는 상태로 돌아온다(제출 대기 상태에 갇히지 않는다).
-    expect(screen.getByRole('button', { name: '라인업 제출하기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '참석명단 제출하기' })).toBeInTheDocument();
   });
 
   // ── P1-3 regression (insane review, 2026-08 GPT Pro): 제외 == 완전 삭제, undo 필요 ──
@@ -893,16 +894,16 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    expect(screen.getByText('출전 명단 (1)')).toBeInTheDocument();
+    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '홍길동 출전 명단에서 제거' }));
+    fireEvent.click(screen.getByRole('button', { name: '홍길동 참석명단에서 제거' }));
 
-    expect(screen.getByText('출전 명단 (0)')).toBeInTheDocument();
+    expect(screen.getByText('참석명단 (0)')).toBeInTheDocument();
     expect(screen.getByText('홍길동 선수를 명단에서 제거했어요.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '실행 취소' }));
 
-    expect(screen.getByText('출전 명단 (1)')).toBeInTheDocument();
+    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
     expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(9);
     expect(screen.getByRole('button', { name: '홍길동, 골키퍼로 지정됨' })).toBeInTheDocument();
     expect(screen.queryByText('홍길동 선수를 명단에서 제거했어요.')).not.toBeInTheDocument();

@@ -114,7 +114,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   }, []);
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  // 종목 이름은 "이전 라인업 불러오기"가 **다른 종목의 명단을 끌어오지 않도록** 거르는 데
+  // 종목 이름은 "이전 참석명단 불러오기"가 **다른 종목의 명단을 끌어오지 않도록** 거르는 데
   // 쓴다(아래 sportName 필터). 코트 배치·포메이션 선택은 Task 163 에서 전술보드로 옮겨
   // 이 화면에서 사라졌다 — 그래서 종목별 코트 allowlist 도 여기 남지 않는다.
   const formationSupportedSportName = teamMatchQuery.data?.sport?.name ?? null;
@@ -214,7 +214,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           if (pendingSubmitRef.current) {
             pendingSubmitRef.current = false;
             setSubmitFlowPending(false);
-            setSaveErrorMessage('변경사항을 저장하지 못해 라인업을 제출할 수 없어요. 다시 시도해 주세요.');
+            setSaveErrorMessage('변경사항을 저장하지 못해 참석명단을 제출할 수 없어요. 다시 시도해 주세요.');
           } else {
             setSaveErrorMessage(extractErrorMessage(error, '변경사항을 저장하지 못했어요.'));
           }
@@ -240,7 +240,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           if (error instanceof V1ApiError && error.code === 'VERSION_CONFLICT') {
             setConflict(true);
           }
-          setSaveErrorMessage(extractErrorMessage(error, '라인업을 제출하지 못했어요.'));
+          setSaveErrorMessage(extractErrorMessage(error, '참석명단을 제출하지 못했어요.'));
         },
       },
     );
@@ -371,12 +371,12 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     const code = lineupQuery.error instanceof V1ApiError ? lineupQuery.error.code : null;
     const message =
       code === 'PERMISSION_DENIED'
-        ? '팀장 또는 매니저만 라인업을 관리할 수 있어요.'
+        ? '팀장 또는 매니저만 참석명단을 관리할 수 있어요.'
         : code === 'TEAM_MATCH_NOT_FOUND'
           ? '팀매치를 찾을 수 없어요.'
           : code === 'TEAM_MATCH_GAME_REQUIRED'
             ? '경기 정보가 아직 준비되지 않았어요. 잠시 후 다시 시도해 주세요.'
-            : extractErrorMessage(lineupQuery.error, '라인업을 불러오지 못했어요.');
+            : extractErrorMessage(lineupQuery.error, '참석명단을 불러오지 못했어요.');
     return (
       <div style={{ padding: '40px 20px' }}>
         <ErrorState
@@ -569,10 +569,10 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           <div style={{ marginBottom: 12 }}>
             <Card pad={16} style={{ background: 'var(--red50)' }}>
               <p className="tm-text-label" style={{ color: 'var(--red700)', fontWeight: 700, marginBottom: 8 }}>
-                라인업이 그새 변경됐어요.
+                참석명단이 그새 변경됐어요.
               </p>
               <p className="tm-text-caption" style={{ color: 'var(--text-muted)', marginBottom: 12 }}>
-                다른 곳에서 이미 저장된 내용이 있어요. 새로고침하면 최신 라인업을 다시 불러와요(직접 만든 변경사항은 사라져요).
+                다른 곳에서 이미 저장된 내용이 있어요. 새로고침하면 최신 참석명단을 다시 불러와요(직접 만든 변경사항은 사라져요).
               </p>
               <button type="button" className="tm-btn tm-btn-sm tm-btn-primary" onClick={handleConflictReload}>
                 새로고침
@@ -666,7 +666,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
               onClick={() => setLoadSheetOpen(true)}
               style={{ minHeight: 44 }}
             >
-              이전 라인업 불러오기
+              이전 참석명단 불러오기
             </button>
             {state.participants.length > 0 ? (
               <button
@@ -691,10 +691,10 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
         {/* Task 163: 선발/후보 두 섹션을 **하나**로 합쳤다 — 명단 = 출전자(정본 §3). */}
         <section aria-labelledby="lineup-roster-list-heading" style={{ marginBottom: 16 }}>
-          <SectionTitle id="lineup-roster-list-heading" title={`출전 명단 (${counts.participantCount})`} />
+          <SectionTitle id="lineup-roster-list-heading" title={`참석명단 (${counts.participantCount})`} />
           {state.participants.length === 0 ? (
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', padding: '8px 0' }}>
-              출전 명단이 비어 있어요.
+              참석명단이 비어 있어요.
             </p>
           ) : (
             <>
@@ -812,7 +812,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                         <button
                           type="button"
                           className="tm-btn tm-btn-sm tm-btn-ghost"
-                          aria-label={`${entry.displayName} 출전 명단에서 제거`}
+                          aria-label={`${entry.displayName} 참석명단에서 제거`}
                           onClick={() => handleRemoveEntry(entry, index)}
                         >
                           명단에서 제거
@@ -951,10 +951,10 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         </div>
 
         <section aria-labelledby="lineup-change-request-heading" style={{ marginBottom: 16 }}>
-          <SectionTitle id="lineup-change-request-heading" title="상대팀 라인업 정정 요청" />
+          <SectionTitle id="lineup-change-request-heading" title="상대팀 참석명단 정정 요청" />
           <Card pad={16} style={{ marginTop: 8 }}>
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 12 }}>
-              상대팀이 제출한 라인업에 문제가 있다면 재작성을 요청할 수 있어요. 상대팀 라인업 내용은 직접 볼 수 없고, 사유만 남겨 다시 작성해 달라고 요청하는 기능이에요.
+              상대팀이 제출한 참석명단에 문제가 있다면 재작성을 요청할 수 있어요. 상대팀 참석명단 내용은 직접 볼 수 없고, 사유만 남겨 다시 작성해 달라고 요청하는 기능이에요.
             </p>
             <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" onClick={() => setChangeRequestOpen(true)}>
               정정 요청 보내기
@@ -1005,7 +1005,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                 ? '제출 중…'
                 : submitFlowPending
                   ? '변경사항 저장 중…'
-                  : '라인업 제출하기'}
+                  : '참석명단 제출하기'}
             </button>
           </div>
         </div>
@@ -1070,6 +1070,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         currentSportName={formationSupportedSportName}
         loading={historyQuery.isLoading || presetsQuery.isLoading}
         onSelect={handleSelectLineup}
+        subjectLabel="참석명단"
       />
 
       <SavePresetDialog

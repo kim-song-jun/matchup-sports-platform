@@ -439,3 +439,8 @@ Implementation and isolated API/browser evidence tracked in Task 156; production
 - [TM-149-P](05-team-match-flows.md#tm-149-p-일반관리자-모집-조건-parity): 6/6 viewport/persona journeys PASS; actual API/DB create, elapsed deadline intake vs confirmation, Game/schedules and DB CHECK verified.
 - Before/after screenshot + reports: [Task 149](../../.github/tasks/149-admin-assigned-team-match.md#follow-up-verification-evidence).
 - New migration fixes the hostless platform recruitment 500 reproduced on a fresh migrated DB. Existing ordinary-friendly host/metadata constraints remain enforced.
+### 2026-09-22 Task 172 팀매치 서브 매치 합산 점수판
+
+- 친선 팀매치 결과에 선택형 서브 매치를 추가한다. 서브 매치가 없으면 기존 직접 점수 입력을 유지하고, 있으면 최상단 점수는 세부 점수 합계로만 결정한다.
+- 서버 합산 불변식, 정정 재수화, 제출·승인·공식 확정·변경 이력 표시와 실제 브라우저 증거는 `.github/tasks/172-team-match-submatches.md`에서 추적한다.
+- Headed Playwright persisted-result evidence passed `2/2` across mobile and desktop, with tablet captures; canonical screenshots and `report.json` are in [`docs/screenshots/task172-team-match-submatches/`](../screenshots/task172-team-match-submatches/).

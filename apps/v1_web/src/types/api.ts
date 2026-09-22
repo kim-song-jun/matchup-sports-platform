@@ -1346,6 +1346,12 @@ export type V1Game = {
  *
  * 읽는 쪽은 반드시 `'regulation' in score` 로 분기해야 한다(`scoreLabel`/`GoalTimeline` 참고).
  */
+export type V1GameResultSubMatchScore = {
+  id: string;
+  title: string;
+  home: number;
+  away: number;
+};
 export type V1GameResultScore =
   | {
       regulation: { home: number; away: number } | null;
@@ -1362,6 +1368,8 @@ export type V1GameResultScore =
   | {
       home: number;
       away: number;
+      /** Ordered optional score breakdown. The top score is the server-validated sum. */
+      subMatches?: V1GameResultSubMatchScore[];
       /** `firstKickSideKey`(선축)는 평평한 형태에만 있다 — 중첩 백필 형태는 이 필드가
        *  생기기 전 데이터라 담고 있지 않다. 이 필드가 생기기 전에 저장된 평평한 리비전도
        *  마찬가지로 없으므로 optional 이다. */
@@ -1466,6 +1474,7 @@ export type V1GameResultParticipantInput = {
 export type V1GameResultScoreInput = {
   home: number;
   away: number;
+  subMatches?: V1GameResultSubMatchScore[];
   /**
    * `firstKickSideKey`(선축)도 여분 키가 아니라 **허용 키**다 — 서버
    * `PenaltyScoreDto`(`apps/v1_api/src/games/dto/game-result.dto.ts`)에 선언돼 있고,

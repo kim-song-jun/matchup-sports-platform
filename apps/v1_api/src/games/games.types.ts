@@ -216,6 +216,13 @@ export interface GameRevisionMutationResult extends GameMutationResult {
 export interface GameScore {
   home: number;
   away: number;
+  /** Ordered score breakdown inside one official team-match result. */
+  subMatches?: readonly {
+    id: string;
+    title: string;
+    home: number;
+    away: number;
+  }[];
   penalties?: {
     home: number;
     away: number;

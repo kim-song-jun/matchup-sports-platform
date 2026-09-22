@@ -170,6 +170,15 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 - 2026-04-23: team-match 관리 follow-up으로 `PATCH /team-matches/:id` 수정/취소와 history 조회 status list 계약을 추가했다. `/my/team-matches`, `/teams/:id/matches`는 기본 `recruiting`만 보지 않고 history status를 명시적으로 조회해야 한다.
 - 2026-08-04 (Todo 26): added the `## v1 stack (Tasks 12-24)` section above after verifying the actual v1 `TeamMatchesController` route table and cross-checking result entry against `docs/api/domains/games.md`. The legacy `TM-004` scenario's `check-in`/`evaluate`/`referee-schedule` steps have no v1 route today (confirmed by reading the controller, not inferred) — this is recorded as a real gap, not silently dropped. `E2E-TEAM-01`/`E2E-TEAM-02` are named per Todo 26's acceptance criteria and pointed at `e2e/v1-tests/team-match.spec.ts`, which does not yet implement them.
 
+## TM-172 선택형 서브 매치와 합산 점수판
+
+- 서브 매치가 없으면 호스트는 기존과 같이 전체 홈/원정 점수를 직접 입력한다.
+- 호스트는 결과 작성 중 최대 20개의 서브 매치를 추가하고 이름과 양 팀 점수를 입력할 수 있다.
+- 서브 매치가 하나라도 있으면 최상단 전체 점수는 읽기 전용이며 모든 서브 매치 점수의 합으로 즉시 갱신된다.
+- 제출 API는 최상단 점수와 서브 매치 합계를 다시 검증하며 다르면 `422 SCORE_INVALID`로 거부한다.
+- 제출 대기, 상대팀 승인, 공식 확정, 변경 이력에서 같은 순서와 점수를 보여준다.
+- 정정 요청 뒤 폼을 다시 열면 저장한 서브 매치 전체가 복원된다.
+- 공식 결과·팀 전적·개인 출전 기록·상대팀 승인은 팀매치 전체 기준으로 한 번만 생성된다.
 ## TM-149-P 일반/관리자 모집 조건 parity
 
 - [x] 두 폼에서 경기 스타일 직접 입력을 포함한 조건이 저장된다(최대 3개).
@@ -179,3 +188,9 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 - [x] 접수 후 마감 경과: 새 신청은 거절되지만 기존 신청 승인/관리자 두 팀 확정은 시작 전까지 가능하다.
 - [x] 명시적 모집 종료/경기 시작 이후에는 확정이 거절된다.
 - [x] 390/768/1440에서 before/after, console/network, 수평 overflow를 확인한다.
+### TM-172 verification evidence (2026-09-22)
+
+- Headed Playwright: mobile + desktop `2/2` passed; desktop run also captured the 834×1112 tablet viewport.
+- Actual persisted flow: `전반전 2:1` + `후반전 1:3` → aggregate `3:4`, then host submission and submitted-history readback.
+- Console errors `0`, failed API requests `0`, horizontal overflow `0`.
+- Screenshots and machine-readable report: [`docs/screenshots/task172-team-match-submatches/`](../screenshots/task172-team-match-submatches/).

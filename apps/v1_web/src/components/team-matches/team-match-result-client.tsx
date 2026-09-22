@@ -30,10 +30,11 @@ import {
   RESULT_REVISION_STATE_LABEL,
   hashResultPayload,
   hydrateResultFormFromRevision,
+  revisionSubMatches,
   toResultRosterRows,
   displayRevisionReason,
 } from './team-match-result.types';
-import type { CardDraft, GoalDraft, ResultRosterRow } from './team-match-result.types';
+import type { CardDraft, GoalDraft, ResultRosterRow, SubMatchDraft } from './team-match-result.types';
 
 // team-matches-client.tsx의 getStatus()와 동일한 캐스팅 관례 — 백엔드 detail()은
 // 실제로 V1TeamMatchApiStatus 값을 내려주지만, 공용 V1Match.status는 개인 매치용
@@ -136,6 +137,48 @@ export function scoreLabel(revision: V1GameResultRevision): string {
   return `${score.home} : ${score.away}`;
 }
 
+function SubMatchBreakdown({
+  subMatches,
+  homeName,
+  awayName,
+}: {
+  subMatches: SubMatchDraft[];
+  homeName: string;
+  awayName: string;
+}) {
+  if (subMatches.length === 0) return null;
+  return (
+    <div data-testid="submatch-breakdown" style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+      <div className="tm-text-label">서브 매치</div>
+      {subMatches.map((subMatch) => (
+        <div
+          key={subMatch.id}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1fr) auto',
+            gap: 12,
+            alignItems: 'center',
+            padding: '10px 12px',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 12,
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <div className="tm-text-label" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {subMatch.title}
+            </div>
+            <div className="tm-text-micro" style={{ marginTop: 2, color: 'var(--text-caption)' }}>
+              {homeName} · {awayName}
+            </div>
+          </div>
+          <div className="tm-text-body-lg" style={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+            {subMatch.home} : {subMatch.away}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 function formatDateTime(value: string | null): string {
   if (!value) return '-';
   const date = new Date(value);
@@ -269,6 +312,7 @@ function ResultDraftSummary({
   hostName,
   awayGoals,
   opponentName,
+  subMatches,
 }: {
   roster: ResultRosterRow[];
   homeGoals: GoalDraft[];
@@ -278,6 +322,7 @@ function ResultDraftSummary({
   hostName: string;
   awayGoals: number;
   opponentName: string;
+  subMatches: SubMatchDraft[];
 }) {
   function nameFor(participantId: string | null): string {
     if (!participantId) return '익명';
@@ -294,6 +339,7 @@ function ResultDraftSummary({
           {hostName} {homeGoals.length} : {Math.max(0, awayGoals)} {opponentName}
         </div>
       </div>
+      <SubMatchBreakdown subMatches={subMatches} homeName={hostName} awayName={opponentName} />
       {homeGoals.length > 0 ? (
         <div>
           <div className="tm-text-label">득점자</div>
@@ -480,6 +526,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
   // 그래야 입력 도중(백스페이스로 잠깐 ''가 되는 순간 등) 배열이 즉시 잘려나가지 않는다.
   const [homeGoalsInput, setHomeGoalsInput] = useState('0');
   const [awayGoalsInput, setAwayGoalsInput] = useState('0');
+  const [subMatches, setSubMatches] = useState<SubMatchDraft[]>([]);
   // 골 수를 줄였다가 다시 늘리는 흔한 케이스(오타 정정 등)에서 방금 지운 득점자 선택이
   // 그대로 복원되도록 하는 버퍼. 완벽한 undo는 아니고, "줄였다 다시 늘리면 원래대로"만 보장한다.
   const removedGoalsRef = useRef<GoalDraft[]>([]);
@@ -503,6 +550,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
     setHomeGoalsInput(String(hydrated.homeGoals.length));
     setAwayGoals(hydrated.awayGoals);
     setAwayGoalsInput(String(hydrated.awayGoals));
+    setSubMatches(hydrated.subMatches);
     setCardDrafts(hydrated.cardDrafts);
     setMvpParticipantId(hydrated.mvpParticipantId);
     setReason(hydrated.reason);
@@ -558,6 +606,39 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
     setAwayGoalsInput(String(safe));
   }
 
+  function applySubMatches(next: SubMatchDraft[]) {
+    setSubMatches(next);
+    if (next.length === 0) return;
+    const totals = next.reduce(
+      (sum, subMatch) => ({ home: sum.home + subMatch.home, away: sum.away + subMatch.away }),
+      { home: 0, away: 0 },
+    );
+    commitHomeGoalCount(totals.home);
+    setAwayGoals(totals.away);
+    setAwayGoalsInput(String(totals.away));
+  }
+
+  function addSubMatch() {
+    if (subMatches.length >= 20) return;
+    const next = [
+      ...subMatches,
+      {
+        id: randomUuid(),
+        title: `${subMatches.length + 1}경기`,
+        home: subMatches.length === 0 ? homeGoals.length : 0,
+        away: subMatches.length === 0 ? awayGoals : 0,
+      },
+    ];
+    applySubMatches(next);
+  }
+
+  function updateSubMatch(id: string, patch: Partial<Omit<SubMatchDraft, 'id'>>) {
+    applySubMatches(subMatches.map((subMatch) => (subMatch.id === id ? { ...subMatch, ...patch } : subMatch)));
+  }
+
+  function removeSubMatch(id: string) {
+    applySubMatches(subMatches.filter((subMatch) => subMatch.id !== id));
+  }
   function setGoalScorer(key: string, participantId: string | null) {
     setHomeGoals((prev) => prev.map((goal) => (goal.key === key ? { ...goal, participantId } : goal)));
   }
@@ -664,7 +745,13 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
     if (!homeSide || !awaySide || !game.data) return;
     setFormError(null);
     try {
-      const score = { home: homeGoals.length, away: Math.max(0, awayGoals) };
+      const score = {
+        home: homeGoals.length,
+        away: Math.max(0, awayGoals),
+        ...(subMatches.length > 0
+          ? { subMatches: subMatches.map((subMatch) => ({ ...subMatch, title: subMatch.title.trim() })) }
+          : {}),
+      };
       const goalsByParticipant = new Map<string, number>();
       for (const goal of homeGoals) {
         if (goal.participantId === null) continue;
@@ -737,6 +824,8 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
               </span>
               <span className="tm-text-label">{scoreLabel(latest)}</span>
             </div>
+          ) : null}          {latest ? (
+            <SubMatchBreakdown subMatches={revisionSubMatches(latest)} homeName={hostName} awayName={opponentName} />
           ) : null}
         </Card>
 
@@ -828,6 +917,7 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
               hostName={hostName}
               awayGoals={awayGoals}
               opponentName={opponentName}
+              subMatches={subMatches}
             />
             <div className="tm-text-caption" style={{ marginTop: 12, color: 'var(--text-caption)' }}>
               제출하면 되돌릴 수 없어요. {opponentName}이(가) 확인 후 승인하거나 정정을 요청할 수 있어요.
@@ -865,31 +955,119 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
             <div className="tm-text-body-lg" style={{ marginTop: latest?.state === 'CHANGE_REQUESTED' ? 12 : 0 }}>
               1. 스코어
             </div>
-            <div style={{ display: 'flex', gap: 12, marginTop: 8, alignItems: 'flex-end' }}>
-              <TextField
-                label={`${hostName} (홈)`}
-                type="number"
-                min={0}
-                inputMode="numeric"
-                value={homeGoalsInput}
-                onChange={(event) => handleHomeGoalsInputChange(event.target.value)}
-                onBlur={handleHomeGoalsBlur}
-                fieldId="result-home-score"
-              />
-              <TextField
-                label={`${opponentName} (원정)`}
-                type="number"
-                min={0}
-                inputMode="numeric"
-                value={awayGoalsInput}
-                onChange={(event) => handleAwayGoalsInputChange(event.target.value)}
-                onBlur={handleAwayGoalsBlur}
-                fieldId="result-away-score"
-              />
-            </div>
+            {subMatches.length === 0 ? (
+              <div style={{ display: 'flex', gap: 12, marginTop: 8, alignItems: 'flex-end' }}>
+                <TextField
+                  label={`${hostName} (홈)`}
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={homeGoalsInput}
+                  onChange={(event) => handleHomeGoalsInputChange(event.target.value)}
+                  onBlur={handleHomeGoalsBlur}
+                  fieldId="result-home-score"
+                />
+                <TextField
+                  label={`${opponentName} (원정)`}
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={awayGoalsInput}
+                  onChange={(event) => handleAwayGoalsInputChange(event.target.value)}
+                  onBlur={handleAwayGoalsBlur}
+                  fieldId="result-away-score"
+                />
+              </div>
+            ) : (
+              <div
+                data-testid="submatch-total-score"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 16,
+                  marginTop: 12,
+                  padding: '14px 16px',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 14,
+                }}
+              >
+                <div>
+                  <div className="tm-text-label">전체 스코어</div>
+                  <div className="tm-text-micro" style={{ marginTop: 2, color: 'var(--text-caption)' }}>
+                    서브 매치 점수를 자동으로 합산해요
+                  </div>
+                </div>
+                <div className="tm-text-title" style={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                  {homeGoals.length} : {Math.max(0, awayGoals)}
+                </div>
+              </div>
+            )}
             <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-caption)' }}>
               {opponentName}의 득점은 선수 지정 없이 합계로만 기록돼요.
             </div>
+
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginTop: 20 }}>
+              <div>
+                <div className="tm-text-body-lg">서브 매치</div>
+                <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
+                  팀을 나눠 여러 경기를 했다면 추가하세요. 없으면 지금처럼 전체 점수만 입력하면 돼요.
+                </div>
+              </div>
+              <Button variant="outline" size="sm" disabled={subMatches.length >= 20} onClick={addSubMatch}>
+                추가
+              </Button>
+            </div>
+            {subMatches.length > 0 ? (
+              <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+                {subMatches.map((subMatch, index) => (
+                  <div
+                    key={subMatch.id}
+                    style={{ padding: 12, border: '1px solid var(--border-subtle)', borderRadius: 14 }}
+                  >
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, alignItems: 'end' }}>
+                      <TextField
+                        label={`서브 매치 ${index + 1}`}
+                        value={subMatch.title}
+                        maxLength={40}
+                        onChange={(event) => updateSubMatch(subMatch.id, { title: event.target.value })}
+                        fieldId={`submatch-title-${subMatch.id}`}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`${subMatch.title || `서브 매치 ${index + 1}`} 삭제`}
+                        onClick={() => removeSubMatch(subMatch.id)}
+                      >
+                        삭제
+                      </Button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>
+                      <TextField
+                        label={`${hostName} 점수`}
+                        type="number"
+                        min={0}
+                        max={99}
+                        inputMode="numeric"
+                        value={String(subMatch.home)}
+                        onChange={(event) => updateSubMatch(subMatch.id, { home: Math.max(0, Math.min(99, Math.floor(Number(event.target.value) || 0))) })}
+                        fieldId={`submatch-home-${subMatch.id}`}
+                      />
+                      <TextField
+                        label={`${opponentName} 점수`}
+                        type="number"
+                        min={0}
+                        max={99}
+                        inputMode="numeric"
+                        value={String(subMatch.away)}
+                        onChange={(event) => updateSubMatch(subMatch.id, { away: Math.max(0, Math.min(99, Math.floor(Number(event.target.value) || 0))) })}
+                        fieldId={`submatch-away-${subMatch.id}`}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
             {roster.length === 0 ? (
               <div className="tm-text-caption" style={{ marginTop: 20, color: 'var(--text-muted)' }}>
@@ -1060,6 +1238,10 @@ export function TeamMatchResultPageClient({ teamMatchId }: { teamMatchId: string
               block
               style={{ marginTop: 16 }}
               onClick={() => {
+                if (subMatches.some((subMatch) => subMatch.title.trim().length === 0)) {
+                  setFormError('서브 매치 이름을 입력해 주세요.');
+                  return;
+                }
                 if (cardDrafts.some((card) => card.participantId === '')) {
                   setFormError('카드 기록에 아직 선수를 선택하지 않은 항목이 있어요.');
                   return;
@@ -1187,6 +1369,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
           <Card pad={16}>
             <div className="tm-text-body-lg">제출된 결과예요. 확인 후 승인해 주세요</div>
             <div className="tm-text-subhead" style={{ marginTop: 12, fontWeight: 700 }}>{scoreLabel(latest)}</div>
+            <SubMatchBreakdown subMatches={revisionSubMatches(latest)} homeName={hostName} awayName={opponentName} />
             <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
             <ApprovalParticipantSummary resultParticipants={latest.resultParticipants} mvpParticipantId={latest.mvpParticipantId} />
             {latest.missingScorer ? (
@@ -1254,6 +1437,7 @@ export function TeamMatchResultApprovalPageClient({ teamMatchId }: { teamMatchId
           <Card pad={16}>
             <div className="tm-text-body-lg">공식 결과로 확정됐어요</div>
             <div className="tm-text-subhead" style={{ marginTop: 12, fontWeight: 700 }}>{scoreLabel(latest)}</div>
+            <SubMatchBreakdown subMatches={revisionSubMatches(latest)} homeName={hostName} awayName={opponentName} />
             <GoalTimeline revision={latest} homeName={hostName} awayName={opponentName} />
             {/* 감사 백로그 M-E: 승인 전(SUBMITTED)에는 보이던 득점자·카드·MVP 요약이 승인 버튼을
                 누른 순간(OFFICIAL) 사라지고 있었다 — 상대팀은 호스트 라인업이 없어 roster 없이
@@ -1311,8 +1495,8 @@ function ResultRevisionHistory({
                 {stateLabel[revision.state]}
               </span>
             </div>
-            {revision.reason ? (
-              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>{displayRevisionReason(revision.reason)}</div>
+            <SubMatchBreakdown subMatches={revisionSubMatches(revision)} homeName="홈팀" awayName="원정팀" />
+            {revision.reason ? (              <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--text-muted)' }}>{displayRevisionReason(revision.reason)}</div>
             ) : null}
             <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>
               제출 {formatDateTime(revision.submittedAt)}

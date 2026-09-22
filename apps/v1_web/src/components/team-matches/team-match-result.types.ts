@@ -10,6 +10,7 @@ import type {
 export type GoalDraft = { key: string; participantId: string | null };
 /** 카드 이벤트 한 건. participantId가 ''이면 아직 선수를 고르지 않은 상태(제출 차단 대상). */
 export type CardDraft = { key: string; participantId: string; type: 'yellow' | 'red' };
+export type SubMatchDraft = { id: string; title: string; home: number; away: number };
 
 /** One roster row the host can attribute goals/cards to on the result form. */
 export type ResultRosterRow = {
@@ -101,6 +102,11 @@ export function revisionScoreAway(revision: V1GameResultRevision): number {
   if ('regulation' in score) return score.regulation?.away ?? 0;
   return score.away;
 }
+export function revisionSubMatches(revision: V1GameResultRevision): SubMatchDraft[] {
+  const score = revision.score;
+  if (!score || 'regulation' in score || !score.subMatches) return [];
+  return score.subMatches.map((subMatch) => ({ ...subMatch }));
+}
 
 /**
  * "수정하기" 클릭 시 로컬 폼을 서버에 이미 존재하는 DRAFT/SUBMITTED revision 내용으로
@@ -121,6 +127,7 @@ export function hydrateResultFormFromRevision(revision: V1GameResultRevision): {
   mvpParticipantId: string;
   reason: string;
   substituteIds: string[];
+  subMatches: SubMatchDraft[];
 } {
   const homeGoals: GoalDraft[] = [];
   const cardDrafts: CardDraft[] = [];
@@ -160,6 +167,7 @@ export function hydrateResultFormFromRevision(revision: V1GameResultRevision): {
     mvpParticipantId: revision.mvpParticipantId ?? '',
     reason: revision.reason ?? '',
     substituteIds,
+    subMatches: revisionSubMatches(revision),
   };
 }
 

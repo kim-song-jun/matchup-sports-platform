@@ -365,7 +365,14 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
         revision({
           state: 'CHANGE_REQUESTED',
           reason: '점수가 달라요',
-          score: { home: 1, away: 2 },
+          score: {
+            home: 3,
+            away: 4,
+            subMatches: [
+              { id: 'sub-1', title: '전반전', home: 2, away: 1 },
+              { id: 'sub-2', title: '후반전', home: 1, away: 3 },
+            ],
+          },
           mvpParticipantId: 'p-1',
           resultParticipants: [
             {
@@ -387,8 +394,16 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
     );
     render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
 
-    expect(screen.getByLabelText('호스트팀 (홈)')).toHaveValue(1);
-    expect(screen.getByLabelText('상대팀 (원정)')).toHaveValue(2);
+    expect(screen.getByTestId('submatch-total-score')).toHaveTextContent('3 : 4');
+    expect(
+      Array.from(document.querySelectorAll<HTMLInputElement>('input[id^="submatch-title-"]')).map((input) => input.value),
+    ).toEqual(['전반전', '후반전']);
+    expect(
+      Array.from(document.querySelectorAll<HTMLInputElement>('input[id^="submatch-home-"]')).map((input) => input.value),
+    ).toEqual(['2', '1']);
+    expect(
+      Array.from(document.querySelectorAll<HTMLInputElement>('input[id^="submatch-away-"]')).map((input) => input.value),
+    ).toEqual(['1', '3']);
     expect(screen.getAllByLabelText(/번 골$/)[0]).toHaveValue('p-1');
     expect(screen.getByLabelText('5. MVP')).toHaveValue('p-1');
   });
@@ -565,6 +580,39 @@ describe('TeamMatchResultPageClient — 호스트 결과 입력', () => {
     fireEvent.click(screen.getByText('결과 작성 완료'));
     expect(screen.getByText('작성한 결과를 확인해 주세요')).toBeInTheDocument();
   });
+  it('서브 매치를 추가하면 최상단 점수를 자동 합산하고 같은 내역을 결과 payload에 저장한다', async () => {
+    createMutateAsync.mockResolvedValue({ revisionId: 'rev-new', version: 4 });
+    submitMutateAsync.mockResolvedValue({});
+    render(<TeamMatchResultPageClient teamMatchId="tm-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^추가$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^추가$/ }));
+    const homeInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[id^="submatch-home-"]'));
+    const awayInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input[id^="submatch-away-"]'));
+    fireEvent.change(homeInputs[0], { target: { value: '2' } });
+    fireEvent.change(awayInputs[0], { target: { value: '1' } });
+    fireEvent.change(homeInputs[1], { target: { value: '1' } });
+    fireEvent.change(awayInputs[1], { target: { value: '3' } });
+
+    expect(screen.getByTestId('submatch-total-score')).toHaveTextContent('3 : 4');
+    expect(document.querySelector('#result-home-score')).not.toBeInTheDocument();
+    expect(document.querySelector('#result-away-score')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^결과 작성 완료$/ }));
+    expect(screen.getByTestId('submatch-breakdown')).toHaveTextContent('2 : 1');
+    expect(screen.getByTestId('submatch-breakdown')).toHaveTextContent('1 : 3');
+    fireEvent.click(screen.getByRole('button', { name: /^제출하기$/ }));
+
+    await waitFor(() => expect(createMutateAsync).toHaveBeenCalled());
+    expect(createMutateAsync.mock.calls[0][0].score).toEqual({
+      home: 3,
+      away: 4,
+      subMatches: [
+        expect.objectContaining({ home: 2, away: 1 }),
+        expect.objectContaining({ home: 1, away: 3 }),
+      ],
+    });
+  });
 });
 
 describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청', () => {
@@ -584,12 +632,25 @@ describe('TeamMatchResultApprovalPageClient — 상대팀 승인/정정 요청',
   it('제출된 결과가 있으면 승인/정정 요청 버튼을 보여준다', () => {
     useV1GameResultRevisionsMock.mockReturnValue(
       settledQuery<V1GameResultRevision[]>([
-        revision({ state: 'SUBMITTED', score: { regulation: { home: 2, away: 1 }, penalty: null, goals: [], incomplete: false }, submittedAt: '2026-08-01T00:00:00.000Z' }),
+        revision({
+          state: 'SUBMITTED',
+          score: {
+            home: 3,
+            away: 4,
+            subMatches: [
+              { id: 'sub-1', title: '전반전', home: 2, away: 1 },
+              { id: 'sub-2', title: '후반전', home: 1, away: 3 },
+            ],
+          },
+          submittedAt: '2026-08-01T00:00:00.000Z',
+        }),
       ]),
     );
     render(<TeamMatchResultApprovalPageClient teamMatchId="tm-1" />);
     expect(screen.getByText('승인하기')).toBeInTheDocument();
     expect(screen.getByText('정정 요청')).toBeInTheDocument();
+    expect(screen.getAllByTestId('submatch-breakdown')[0]).toHaveTextContent('전반전');
+    expect(screen.getAllByTestId('submatch-breakdown')[0]).toHaveTextContent('후반전');
   });
 
   it('아직 제출된 결과가 없으면 빈 상태를 보여준다', () => {

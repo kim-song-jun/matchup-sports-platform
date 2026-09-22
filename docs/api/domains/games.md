@@ -48,7 +48,7 @@ raw roster identity fields.
 | `PUT` | `/api/v1/games/:gameId/lineups/:sideId` | authenticated lineup actor | `SaveGameLineupDto`; creates a new lineup revision and participant snapshots. `expectedVersion` is the target side's latest lineup revision (`0` when absent), not the shared Game version, so an opponent-side save cannot stale this editor. A stale same-side revision is `409 VERSION_CONFLICT`. Exactly one started participant must use the pinned config's goalkeeper position code (`422 LINEUP_GOALKEEPER_INVALID` otherwise). Team-match use is `409 TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN` (Task 14) — team matches manage lineups only through `/api/v1/team-matches/:teamMatchId/lineup`. |
 | `POST` | `/api/v1/games/:gameId/lineups/:lineupId/submit` | authenticated lineup actor | `SubmitGameLineupDto`; only a `DRAFT` lineup submits. Team-match use is `409 TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN` (Task 14) for the same reason as the save route above; tournament submission additionally needs takeover authority (Task 20). The two guards are exclusive by `sourceType` and both apply — see `GamesService.submitLineup`. |
 | `GET` | `/api/v1/games/:gameId/result-revisions` | authenticated; source-scoped reader | Returns newest-first revision history with result participants. **Regular league**: any *active* member of either registered team may read, not just owners/managers — the result screen is the whole squad's receipt (canonical flow §4). Lineup mutation stays owner/manager-only. |
-| `POST` | `/api/v1/games/:gameId/result-revisions` | authenticated **host** team owner/manager only (Task 16) | `CreateGameResultRevisionDto`; team-match only. Tournament sources return `409 TOURNAMENT_RESULT_DERIVED_ONLY` before creating a draft. The opposing team's manager/owner gets `403 PERMISSION_DENIED` — their sole authority over the result is the decision route below, never drafting or submitting it. A team match whose status is neither `matched` nor `completed`, or that has no approved applicant team, returns `409 TEAM_MATCH_NOT_MATCHED` (Task 16) — its Game row exists from creation with a placeholder, teamId-less AWAY side, so there is no real opponent to draft a result against yet. `completed` is accepted alongside `matched` specifically so the correction loop stays reachable: the first submit below atomically completes the `V1TeamMatch`, and a later opponent change-request must still let the host draft a superseding revision against that now-`completed` match. **Regular league**: a match whose competition kind is `regular_league` is an operations-admin lane — every team actor, host or opponent, receives `403 PERMISSION_DENIED`. The result is produced by the live console's `end` command and confirmed by an admin (canonical flow §4; `GamesService#resolveActor`'s `regularLeagueResultAction`). |
+| `POST` | `/api/v1/games/:gameId/result-revisions` | authenticated **host** team owner/manager only (Task 16) | `CreateGameResultRevisionDto`; team-match only. `score.subMatches?` stores an ordered optional breakdown inside the same official result; when present, the server requires the top `home`/`away` to equal its sum. Tournament sources return `409 TOURNAMENT_RESULT_DERIVED_ONLY` before creating a draft. The opposing team's manager/owner gets `403 PERMISSION_DENIED` — their sole authority over the result is the decision route below, never drafting or submitting it. A team match whose status is neither `matched` nor `completed`, or that has no approved applicant team, returns `409 TEAM_MATCH_NOT_MATCHED` (Task 16) — its Game row exists from creation with a placeholder, teamId-less AWAY side, so there is no real opponent to draft a result against yet. `completed` is accepted alongside `matched` specifically so the correction loop stays reachable: the first submit below atomically completes the `V1TeamMatch`, and a later opponent change-request must still let the host draft a superseding revision against that now-`completed` match. **Regular league**: a match whose competition kind is `regular_league` is an operations-admin lane — every team actor, host or opponent, receives `403 PERMISSION_DENIED`. The result is produced by the live console's `end` command and confirmed by an admin (canonical flow §4; `GamesService#resolveActor`'s `regularLeagueResultAction`). |
 | `POST` | `/api/v1/games/:gameId/result-revisions/:revisionId/submit` | authenticated **host** team owner/manager only (Task 16) | `SubmitGameResultRevisionDto`; team-match only. Same `409 TEAM_MATCH_NOT_MATCHED` precondition as the draft route above. It atomically validates/submits the revision and moves `SCHEDULED`, `LIVE`, or `PAUSED` to `ENDED`; the same transaction also completes the linked `V1TeamMatch` (`status=completed`, `completedAt`) — idempotently, via a `status != completed` guard so a correction-loop resubmit is a no-op — and, on the first real transition only, writes a matching `V1StatusChangeLog` row (`team_match`, `matched → completed`) so review eligibility keeps working and the status history stays complete now that the old `POST /api/v1/team-matches/:teamMatchId/complete` shortcut is removed (Task 16 — that route bypassed all result validation and opponent approval and never was part of this frozen contract). **Regular league**: a match whose competition kind is `regular_league` is an operations-admin lane — every team actor, host or opponent, receives `403 PERMISSION_DENIED`. The result is produced by the live console's `end` command and confirmed by an admin (canonical flow §4; `GamesService#resolveActor`'s `regularLeagueResultAction`). |
 | `POST` | `/api/v1/games/:gameId/result-revisions/:revisionId/decision` | authenticated opposing team result decider | `DecideGameResultRevisionDto`; `approve` or `change_request` for a team-match revision. **Regular league**: a match whose competition kind is `regular_league` is an operations-admin lane — every team actor, host or opponent, receives `403 PERMISSION_DENIED`. The result is produced by the live console's `end` command and confirmed by an admin (canonical flow §4; `GamesService#resolveActor`'s `regularLeagueResultAction`). |
 
@@ -123,6 +123,29 @@ own integration suite only ever submits `{home:0, away:0}`, so this was never ex
 Closing this gap is a deliberate scope decision (team-match event-append allowance, or an
 invariant carve-out for `TEAM_MATCH` sources with zero events) that a future task must make.
 
+### Optional team-match submatches (Task 172)
+
+A friendly team match still owns exactly one `V1Game` and produces one official result revision. The
+flat team-match score accepts an optional ordered `subMatches` array:
+
+```json
+{
+  "home": 3,
+  "away": 4,
+  "subMatches": [
+    { "id": "uuid", "title": "1경기", "home": 2, "away": 1 },
+    { "id": "uuid", "title": "2경기", "home": 1, "away": 3 }
+  ]
+}
+```
+
+With no `subMatches`, the existing direct `home`/`away` score contract is unchanged. With one or
+more entries, `home` and `away` are derived by the client and independently validated by
+`validateGameResultInvariants`; a mismatch returns `422 SCORE_INVALID`. The DTO accepts at most 20
+entries, each with a UUID, a non-empty title of at most 40 characters, and non-negative integer
+scores. Array order is display order. Submatches do not create extra games, schedules, team
+win/loss rows, appearances, approvals, or result revisions. Team and participant projections run
+once from the aggregate result.
 This is a real v1 persistence contract, not a mock-success flow. Fixture data is deterministic
 test data only and must not be rendered as verified player, score, or standings evidence.
 

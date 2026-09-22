@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsIn,
@@ -9,11 +10,31 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
 
+export class GameSubMatchScoreDto {
+  @IsUUID()
+  id!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(40)
+  title!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  home!: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  away!: number;
+}
 export class PenaltyScoreDto {
   @Type(() => Number)
   @IsInt()
@@ -118,6 +139,14 @@ export class GameScoreDto {
   @ValidateNested()
   @Type(() => PenaltyScoreDto)
   penalties?: PenaltyScoreDto;
+
+  /** Ordered optional score breakdown inside one official team-match result. */
+  @ValidateIf((score: GameScoreDto) => score.subMatches !== undefined)
+  @IsArray()
+  @ArrayMaxSize(20)
+  @ValidateNested({ each: true })
+  @Type(() => GameSubMatchScoreDto)
+  subMatches?: GameSubMatchScoreDto[];
 }
 
 export class GameResultParticipantDto {
@@ -278,4 +307,5 @@ export class GameResultRecoveryDto {
   @ValidateNested()
   @Type(() => PenaltyScoreDto)
   penalties?: PenaltyScoreDto;
+
 }

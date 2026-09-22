@@ -1,0 +1,35 @@
+{
+  "task": 172,
+  "feature": "team-match-submatches",
+  "capturedAt": "2026-09-22T11:03:00+09:00",
+  "route": "/team-matches/:teamMatchId/result",
+  "persona": "owner@teameet.v1 (host team owner)",
+  "flow": "create team match -> opponent applies -> host approves -> attendance and lineup submit -> add two submatches -> review -> submit result",
+  "score": {
+    "aggregate": "3:4",
+    "subMatches": [
+      { "title": "전반전", "home": 2, "away": 1 },
+      { "title": "후반전", "home": 1, "away": 3 }
+    ]
+  },
+  "viewports": [
+    { "name": "desktop", "width": 1440, "height": 900 },
+    { "name": "tablet", "width": 834, "height": 1112 },
+    { "name": "mobile", "device": "Pixel 5" }
+  ],
+  "screenshots": [
+    "desktop-submatches-editing.png",
+    "desktop-submatches-submitted.png",
+    "tablet-submatches-editing.png",
+    "tablet-submatches-submitted.png",
+    "mobile-submatches-editing.png",
+    "mobile-submatches-submitted.png"
+  ],
+  "verification": {
+    "playwright": "2/2 passed (headed)",
+    "horizontalOverflow": false,
+    "consoleErrors": 0,
+    "failedApiRequests": 0,
+    "visualVerdict": "PASS"
+  }
+}

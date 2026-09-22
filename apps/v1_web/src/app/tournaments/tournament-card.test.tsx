@@ -279,11 +279,12 @@ describe('TournamentCard — 모집 상태와 하단 정보', () => {
     if (expected !== '거의 마감') expect(screen.queryByText('거의 마감')).not.toBeInTheDocument();
   });
 
-  it('입금 대기를 합산한 예약 수와 금액을 표시하고 막대는 하나만 유지한다', () => {
+  it('확정과 입금 대기 수를 나눈 예약 현황과 금액을 표시하고 막대는 하나만 유지한다', () => {
     render(<TournamentCard item={buildItem({ entryFee: 300000, confirmedCount: 11, pendingPaymentCount: 5, teamCount: 20 })} />);
     expect(screen.getByText('참가비', { exact: true })).toBeInTheDocument();
     expect(screen.getByText('300,000원', { exact: true })).toBeInTheDocument();
-    expect(screen.getByText('16/20팀 예약', { exact: true })).toBeInTheDocument();
+    expect(screen.getByText('11 + 5 / 20 팀 예약', { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText('16/20팀 예약', { exact: true })).not.toBeInTheDocument();
     expect(screen.getByText('입금대기 5팀', { exact: true })).toBeInTheDocument();
     expect(screen.getAllByRole('progressbar')).toHaveLength(1);
   });

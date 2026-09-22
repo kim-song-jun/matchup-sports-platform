@@ -843,7 +843,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             <p className="tm-text-caption" style={{ color: 'var(--text-muted)', margin: '4px 0 8px' }}>
               {isLeagueFixture
                 ? '리그 경기는 참석 응답과 상관없이 팀원을 명단에 넣을 수 있어요. 실제로 뛸 선수만 골라 주세요.'
-                : '상대팀 승인 전에도 호스트팀 참석명단을 작성할 수 있어요. 참석으로 확정된 팀원만 추가됩니다.'}
+                : '상대팀 승인 전에도 호스트팀 참석명단을 작성할 수 있어요. 참석으로 확정된 팀원만 추가돼요.'}
             </p>
             {!isLeagueFixture && ownTeamId ? (
               <p className="tm-text-caption" style={{ margin: '0 0 12px' }}>

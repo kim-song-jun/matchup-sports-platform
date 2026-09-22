@@ -59,38 +59,31 @@ export type TeamMatchScenario = {
   readonly awayParticipantIds: readonly string[];
 };
 
-type MyTeamItem = { teamId: string; role: string; memberCount: number; sport: { sportId: string } | null };
+type MyTeamItem = { teamId: string; role: string };
 type MyTeamsResponse = { items: MyTeamItem[] };
 type MasterSport = { id: string; code: string };
-type MasterSportsResponse = { sports: MasterSport[] };
+type MasterSportsResponse = { items: MasterSport[] };
 type MasterRegion = { id: string; children?: readonly { id: string }[] };
-type MasterRegionsResponse = { regions: MasterRegion[] };
+type MasterRegionsResponse = { items: MasterRegion[] };
 type TeamMembersResponse = { items: { userId: string; role: string }[] };
-type TeamSchedulesResponse = { items: { id: string; teamMatchId: string | null }[] };
 
-async function myManagedTeamId(
-  request: APIRequestContext,
-  email: string,
-  sportId: string,
-  preferredMemberCount?: number,
-): Promise<string> {
+async function myManagedTeamId(request: APIRequestContext, email: string): Promise<string> {
   const result = await apiGet<MyTeamsResponse>(request, '/api/v1/me/teams', {
     email,
     params: { permission: 'manage_team' },
   });
   const { items } = unwrap<MyTeamsResponse>(result);
-  const matchingTeams = items.filter((team) => team.sport?.sportId === sportId);
-  const team = matchingTeams.find((candidate) => candidate.memberCount === preferredMemberCount) ?? matchingTeams[0];
+  const team = items[0];
   if (team === undefined) {
-    throw new Error(`Persona ${email} has no managed team for sport ${sportId}`);
+    throw new Error(`Persona ${email} has no owner/manager team membership; seed data assumption changed`);
   }
   return team.teamId;
 }
 
 async function futsalSportId(request: APIRequestContext): Promise<string> {
   const result = await apiGet<MasterSportsResponse>(request, '/api/v1/master/sports');
-  const { sports } = unwrap<MasterSportsResponse>(result);
-  const futsal = sports.find((sport) => sport.code.toLowerCase() === 'futsal');
+  const { items } = unwrap<MasterSportsResponse>(result);
+  const futsal = items.find((sport) => sport.code.toLowerCase() === 'futsal');
   if (futsal === undefined) {
     throw new Error('master/sports has no futsal entry; cannot satisfy team-match creation config gate');
   }
@@ -100,8 +93,8 @@ async function futsalSportId(request: APIRequestContext): Promise<string> {
 /** `validateMasterRefs` requires `level: 2` (a leaf/child region), not a top-level parent. */
 async function leafRegionId(request: APIRequestContext): Promise<string> {
   const result = await apiGet<MasterRegionsResponse>(request, '/api/v1/master/regions');
-  const { regions } = unwrap<MasterRegionsResponse>(result);
-  for (const region of regions) {
+  const { items } = unwrap<MasterRegionsResponse>(result);
+  for (const region of items) {
     const child = region.children?.[0];
     if (child !== undefined) {
       return child.id;
@@ -125,38 +118,17 @@ async function activeMemberIds(request: APIRequestContext, teamId: string, email
  * (which flips the match to `completed`, a terminal state `cancel()`
  * rejects — see that helper's doc).
  */
-async function ensureHostLineupMembers(request: APIRequestContext, teamId: string): Promise<void> {
-  const existing = await activeMemberIds(request, teamId, HOST_EMAIL);
-  const invitees = ['manager@teameet.v1', 'member@teameet.v1'];
-  for (const invitedEmail of invitees.slice(0, Math.max(0, 3 - existing.length))) {
-    const invitation = await apiPost(request, `/api/v1/teams/${teamId}/invitations`, {
-      email: HOST_EMAIL,
-      data: { invitedEmail },
-    });
-    if (invitation.status !== 200 && invitation.status !== 201) {
-      throw new Error(`POST .../invitations failed: ${invitation.status} ${JSON.stringify(invitation.body)}`);
-    }
-    const invitationId = unwrap<{ invitationId: string }>(invitation).invitationId;
-    const accepted = await apiPost(request, `/api/v1/team-invitations/${invitationId}/accept`, {
-      email: invitedEmail,
-    });
-    if (accepted.status !== 200 && accepted.status !== 201) {
-      throw new Error(`POST .../accept failed: ${accepted.status} ${JSON.stringify(accepted.body)}`);
-    }
-  }
-}
 export async function createApprovedTeamMatchWithHomeLineup(
   request: APIRequestContext,
 ): Promise<TeamMatchScenario> {
-  const [sportId, regionId] = await Promise.all([futsalSportId(request), leafRegionId(request)]);
-  const [hostTeamId, opponentTeamId] = await Promise.all([
-    myManagedTeamId(request, HOST_EMAIL, sportId, 1),
-    myManagedTeamId(request, OPPONENT_EMAIL, sportId),
+  const [sportId, regionId, hostTeamId, opponentTeamId] = await Promise.all([
+    futsalSportId(request),
+    leafRegionId(request),
+    myManagedTeamId(request, HOST_EMAIL),
+    myManagedTeamId(request, OPPONENT_EMAIL),
   ]);
-  await ensureHostLineupMembers(request, hostTeamId);
 
-  const randomHours = 7 * 24 + Math.floor(Math.random() * 720);
-  const startsAt = new Date(Date.now() + randomHours * 60 * 60 * 1000).toISOString();
+  const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   const created = await apiPost(request, '/api/v1/team-matches', {
     email: HOST_EMAIL,
     data: {
@@ -171,8 +143,8 @@ export async function createApprovedTeamMatchWithHomeLineup(
   if (created.status !== 200 && created.status !== 201) {
     throw new Error(`POST /team-matches failed: ${created.status} ${JSON.stringify(created.body)}`);
   }
-  const teamMatch = unwrap<{ teamMatchId: string }>(created);
-  const teamMatchId = teamMatch.teamMatchId;
+  const teamMatch = unwrap<{ id: string }>(created);
+  const teamMatchId = teamMatch.id;
 
   const application = await apiPost(request, `/api/v1/team-matches/${teamMatchId}/applications`, {
     email: OPPONENT_EMAIL,
@@ -181,7 +153,7 @@ export async function createApprovedTeamMatchWithHomeLineup(
   if (application.status !== 200 && application.status !== 201) {
     throw new Error(`POST .../applications failed: ${application.status} ${JSON.stringify(application.body)}`);
   }
-  const applicationId = unwrap<{ applicationId: string }>(application).applicationId;
+  const applicationId = unwrap<{ id: string }>(application).id;
 
   const approved = await apiPost(request, `/api/v1/team-match-applications/${applicationId}/approve`, {
     email: HOST_EMAIL,
@@ -191,39 +163,15 @@ export async function createApprovedTeamMatchWithHomeLineup(
   }
 
   const homeMemberIds = await activeMemberIds(request, hostTeamId, HOST_EMAIL);
-  const schedules = unwrap<TeamSchedulesResponse>(
-    await apiGet(request, `/api/v1/teams/${hostTeamId}/schedules`, { email: HOST_EMAIL }),
-  );
-  const matchSchedule = schedules.items.find((schedule) => schedule.teamMatchId === teamMatchId);
-  if (matchSchedule === undefined) {
-    throw new Error(`No host schedule was created for team match ${teamMatchId}`);
-  }
-  for (const userId of homeMemberIds) {
-    const attendance = await apiPut(
-      request,
-      `/api/v1/teams/${hostTeamId}/schedules/${matchSchedule.id}/attendance/${userId}`,
-      {
-        email: HOST_EMAIL,
-        idempotencyKey: commandId(),
-        data: { status: 'GOING', expectedVersion: 0 },
-      },
-    );
-    if (attendance.status !== 200 && attendance.status !== 201) {
-      throw new Error(`PUT .../attendance failed: ${attendance.status} ${JSON.stringify(attendance.body)}`);
-    }
-  }
   if (homeMemberIds.length < 3) {
     throw new Error(`HOST team has ${homeMemberIds.length} active members; futsal-v1 needs >= 3`);
   }
   const [gk, p2, p3] = homeMemberIds;
-  const initialHomeLineup = unwrap<{ revision: number }>(
-    await apiGet(request, `/api/v1/team-matches/${teamMatchId}/lineup`, { email: HOST_EMAIL }),
-  );
   const saved = await apiPut(request, `/api/v1/team-matches/${teamMatchId}/lineup`, {
     email: HOST_EMAIL,
     idempotencyKey: commandId(),
     data: {
-      expectedVersion: initialHomeLineup.revision,
+      expectedVersion: 0,
       starters: [
         { userId: gk, goalkeeper: true },
         { userId: p2, goalkeeper: false },

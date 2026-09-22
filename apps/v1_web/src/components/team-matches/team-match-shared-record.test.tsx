@@ -16,7 +16,7 @@ beforeEach(() => {
     serverTime: '2026-09-21T01:00:00Z', canEdit: true, participant: true, ownSideId: 'home',
     sides: [{ id: 'home', key: 'HOME', name: '한강', score: 0 }, { id: 'away', key: 'AWAY', name: '마포', score: 0 }],
     participants: [{ id: 'h1', sideId: 'home', name: '김민수', jerseyNumber: 7 }, { id: 'a1', sideId: 'away', name: '박지훈', jerseyNumber: 10 }],
-    goals: [], confirmations: [], history: [], officialAt: null,
+    subMatches: [], goals: [], confirmations: [], history: [], officialAt: null,
   };
 });
 describe('shared record participant flow', () => {
@@ -64,11 +64,38 @@ describe('shared record participant flow', () => {
     expect(screen.queryByRole('button', { name: '우리 팀 종료 확인' })).toBeNull();
   });
   it('flags a potentially duplicate goal instead of blindly adding it', () => {
-    state.data.goals = [{ id: 'g1', sideId: 'home', participantId: null, ownGoal: false, minute: null }];
+    state.data.goals = [{ id: 'g1', sideId: 'home', participantId: null, ownGoal: false, minute: null, subMatchId: null }];
     render(<TeamMatchSharedRecord teamMatchId="match" />);
     fireEvent.click(screen.getByRole('button', { name: '득점 추가' }));
     expect(screen.getByRole('button', { name: '득점 등록' })).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox', { name: /별개의 득점/ }));
     expect(screen.getByRole('button', { name: '득점 등록' })).toBeEnabled();
+  });
+  it('shows the aggregate and assigns a new goal to the selected submatch', async () => {
+    state.data = {
+      ...state.data,
+      sides: [{ id: 'home', key: 'HOME', name: '서강', score: 3 }, { id: 'away', key: 'AWAY', name: '마포', score: 2 }],
+      subMatches: [
+        { id: '11111111-1111-4111-8111-111111111111', title: '1경기', order: 0, scores: [{ sideId: 'home', score: 2 }, { sideId: 'away', score: 1 }] },
+        { id: '22222222-2222-4222-8222-222222222222', title: '2경기', order: 1, scores: [{ sideId: 'home', score: 1 }, { sideId: 'away', score: 1 }] },
+      ],
+    };
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(screen.getByLabelText('점수 3 대 2')).toBeInTheDocument();
+    expect(screen.getByLabelText('1경기 점수 2 대 1')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: '이 서브매치에 득점 추가' })[1]);
+    fireEvent.click(screen.getByRole('button', { name: '득점 등록' }));
+    await waitFor(() => expect(state.mutate).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'add', subMatchId: '22222222-2222-4222-8222-222222222222', expectedVersion: 3,
+    })));
+  });
+
+  it('creates an optional submatch without removing the shared participant controls', async () => {
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    fireEvent.click(screen.getByRole('button', { name: '서브매치 추가' }));
+    fireEvent.change(screen.getByLabelText('서브매치 이름'), { target: { value: '전반전' } });
+    fireEvent.click(screen.getByRole('button', { name: '서브매치 만들기' }));
+    await waitFor(() => expect(state.mutate).toHaveBeenCalledWith(expect.objectContaining({ action: 'submatch_add', title: '전반전', expectedVersion: 3 })));
+    expect(screen.getByRole('button', { name: '우리 팀 종료 확인' })).toBeInTheDocument();
   });
 });

@@ -3811,6 +3811,7 @@ model V1TeamMatchRecord {
   gameId        String @id @map("game_id")
   version       Int @default(0)
   goals         Json @default("[]")
+  subMatches    Json @default("[]") @map("sub_matches")
   confirmations Json @default("[]")
   officialAt    DateTime? @map("official_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
@@ -3829,6 +3830,7 @@ model V1TeamMatchRecordChange {
   actorName   String @map("actor_name")
   action      String
   goalId      String? @map("goal_id")
+  subMatchId  String? @map("sub_match_id")
   before      Json?
   after       Json?
   createdAt   DateTime @default(now()) @map("created_at")

@@ -24,34 +24,6 @@ function assertNonNegativeInteger(value: number, label: string): void {
 function validateScore(score: GameScore): void {
   assertNonNegativeInteger(score.home, 'home score');
   assertNonNegativeInteger(score.away, 'away score');
-  if (score.subMatches !== undefined) {
-    if (score.subMatches.length > 20) {
-      throw new GameContractError('SCORE_INVALID', 'A result can contain at most 20 submatches');
-    }
-    const ids = new Set<string>();
-    let home = 0;
-    let away = 0;
-    for (const [index, subMatch] of score.subMatches.entries()) {
-      if (subMatch.id.trim().length === 0 || ids.has(subMatch.id)) {
-        throw new GameContractError('SCORE_INVALID', 'Submatch IDs must be non-empty and unique');
-      }
-      if (subMatch.title.trim().length === 0 || subMatch.title.trim().length > 40) {
-        throw new GameContractError('SCORE_INVALID', `Submatch ${index + 1} title is invalid`);
-      }
-      assertNonNegativeInteger(subMatch.home, `submatch ${index + 1} home score`);
-      assertNonNegativeInteger(subMatch.away, `submatch ${index + 1} away score`);
-      ids.add(subMatch.id);
-      home += subMatch.home;
-      away += subMatch.away;
-    }
-    if (score.subMatches.length > 0 && (score.home !== home || score.away !== away)) {
-      throw new GameContractError(
-        'SCORE_INVALID',
-        'Top score must equal the sum of every submatch score',
-        { expectedHome: home, expectedAway: away, actualHome: score.home, actualAway: score.away },
-      );
-    }
-  }
   if (score.penalties !== undefined) {
     assertNonNegativeInteger(score.penalties.home, 'home penalty score');
     assertNonNegativeInteger(score.penalties.away, 'away penalty score');

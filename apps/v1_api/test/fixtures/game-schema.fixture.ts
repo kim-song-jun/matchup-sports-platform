@@ -530,7 +530,7 @@ export const gameSchemaSourceManifest = {
   // normalized full-schema bytes after the admin team-match migration.
   // 2026-09-22 Task 172: additive shared record/history tables + V1Game relation.
   // The historical game-operations migration is unchanged; migration replay has no schema drift.
-  schema: '58b05adaedc4e53461167c4efa1c101e1297297b122db6a173b06f899fb2e7d9',
+  schema: '8f732248e1e0bf1882184dd35cec3d5a48a65ce5556c250de486c7e5955ebade',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

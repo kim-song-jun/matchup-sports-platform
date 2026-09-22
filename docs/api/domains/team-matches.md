@@ -322,3 +322,16 @@ Task 172 공개 기록은 기존 가시성 정책과 `PUBLIC_LIVE` 플래그를 
 - `platform_managed` migration과 후속 `20260921141000_v1_platform_recruitment_host_constraint`가 필요하다. 후자는 기존 CHECK를 트랜잭션 안에서 확장해 플랫폼 모집만 host 없이 허용하고 생성자·지역·장소·시작 필수값은 유지한다. 일반 모집은 여전히 host가 필요하다.
 
 MSW 기본 픽스처의 라인업은 DRAFT이므로 공동 기록 조회는 편집 불가 상태이며 POST는 403을 반환한다. 실제 공동 편집 검증은 API 통합 픽스처와 headed 브라우저 흐름을 사용한다. 테스트 성공을 흉내내는 mock 확정 처리는 제공하지 않는다.
+
+## 공동 경기 기록 서브매치 (Task 173)
+
+`GET /team-matches/:id/record`는 `subMatches[]`를 순서대로 반환한다. 각 항목은 `id`, `title`, `order`, 양 팀의 `scores[]`를 포함한다. 최상단 `sides[].score`는 모든 득점의 합이며 서브매치 점수의 합과 같다.
+
+`POST /team-matches/:id/record`의 기존 버전 CAS와 `commandId` 멱등 계약을 그대로 사용한다.
+
+- `submatch_add`: `title`을 받는다. 첫 서브매치를 만들 때 기존 직접 득점은 새 서브매치에 귀속되어 합계가 유지된다.
+- `submatch_edit`: `subMatchId`, `title`을 받는다.
+- `submatch_delete`: `subMatchId`를 받는다. 득점이 있으면 `SUBMATCH_HAS_GOALS` 409를 반환한다.
+- `add` / `edit`: 서브매치가 있으면 유효한 `subMatchId`가 필수다.
+
+서브매치 또는 득점 변경은 기존 종료 확인을 취소한다. 양 팀 라인업 참가자가 같은 버전을 확인하면 `score.home`, `score.away`, 선택적인 `score.subMatches[]`를 가진 공식 결과 revision 하나를 만든다. 팀 전적과 참가자 출전·득점은 팀매치 전체에서 한 번만 집계한다.

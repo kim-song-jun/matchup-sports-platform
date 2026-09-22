@@ -142,4 +142,27 @@ describe('friendly match shared score sheet (real DB)', () => {
     }
   });
 
+  it('groups shared goals into optional submatches and finalizes one aggregate game result', async () => {
+    const f = await createSharedRecordFixture(prisma);
+    const host = user(f.userIds[1]); const away = user(f.userIds[3]);
+    const direct = await records.mutate(host, f.match.id, cmd('add', 0, { sideId: f.sides[0].id, participantId: f.participants[0].id }));
+    const first = await records.mutate(away, f.match.id, cmd('submatch_add', 1, { title: '1경기' }));
+    expect(first.goals[0]).toMatchObject({ id: direct.goals[0].id, subMatchId: first.subMatches[0].id });
+    expect(first.sides.map((side) => side.score)).toEqual([1, 0]);
+    expect(first.subMatches[0].scores.map((score) => score.score)).toEqual([1, 0]);
+    const second = await records.mutate(host, f.match.id, cmd('submatch_add', 2, { title: '2경기' }));
+    const scored = await records.mutate(away, f.match.id, cmd('add', 3, { sideId: f.sides[1].id, participantId: f.participants[2].id, subMatchId: second.subMatches[1].id }));
+    expect(scored.sides.map((side) => side.score)).toEqual([1, 1]);
+    expect(scored.subMatches.map((row) => row.scores.map((score) => score.score))).toEqual([[1, 0], [0, 1]]);
+    await expect(records.mutate(host, f.match.id, cmd('submatch_delete', 4, { subMatchId: second.subMatches[1].id }))).rejects.toMatchObject({ status: 409 });
+    await records.mutate(host, f.match.id, cmd('confirm', 4));
+    await records.mutate(away, f.match.id, cmd('confirm', 5));
+    const revision = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId: f.game.id }, include: { resultParticipants: true } });
+    expect(revision.score).toEqual({ home: 1, away: 1, subMatches: [
+      { id: first.subMatches[0].id, title: '1경기', home: 1, away: 0 },
+      { id: second.subMatches[1].id, title: '2경기', home: 0, away: 1 },
+    ] });
+    expect(revision.resultParticipants).toHaveLength(4);
+    expect(revision.resultParticipants.reduce((sum, row) => sum + row.goals, 0)).toBe(2);
+  });
 });

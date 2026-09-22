@@ -1114,7 +1114,7 @@ export const v1MswHandlers = [
       phase: v1GameResultRevisions.length ? 'legacy' : 'scheduled', version: 0,
       serverTime: new Date().toISOString(), canEdit: false, participant: false, ownSideId: null,
       sides: v1GameFixture.sides.map((side) => ({ id: side.id, key: side.sideKey, name: side.displayNameSnapshot, score: null })),
-      participants: [], goals: [], history: [], confirmations: [], officialAt: null,
+      participants: [], subMatches: [], goals: [], history: [], confirmations: [], officialAt: null,
     } satisfies SharedRecord);
   }),
   http.post(`${api}/team-matches/:teamMatchId/record`, () => HttpResponse.json({

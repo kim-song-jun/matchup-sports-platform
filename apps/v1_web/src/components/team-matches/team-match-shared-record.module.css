@@ -30,3 +30,20 @@
 .header a { display: inline-flex; align-items: center; }
 .form > label:not(.field) { min-height: var(--size-touch-min); display: flex; gap: 8px; align-items: center; }
 .page :is(a, button, input, select, summary):focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; }
+
+.aggregateNote { margin: 0; text-align: center; color: var(--text-caption); font-size: var(--font-size-body-sm); }
+.sectionHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.sectionHead h2 { margin-bottom: 4px; }
+.inlineForm { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; padding: 16px 0; }
+.inlineForm .actions { align-items: center; }
+.subMatchList { display: grid; gap: 16px; }
+.subMatchCard { border: 1px solid var(--border); border-radius: var(--radius-container); padding: 20px; display: grid; gap: 16px; }
+.subMatchHead { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; }
+.subMatchTitle { min-width: 0; font-size: var(--font-size-body-lg); font-weight: 750; overflow-wrap: anywhere; }
+.subScore { font-size: var(--font-size-subhead); font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.goalList { display: grid; }
+.detailSubMatches { display: grid; gap: 8px; margin: 16px 0; }
+.detailSubMatches > div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.detailSubMatches > div:last-child { border-bottom: 0; }
+.openLink { display: inline-flex; min-height: var(--size-touch-min); align-items: center; color: var(--blue700); font-weight: 700; }
+@media(max-width: 767px) { .sectionHead { align-items: stretch; flex-direction: column; } .inlineForm { grid-template-columns: 1fr; } .subMatchHead { grid-template-columns: minmax(0, 1fr) auto; } .subMatchHead .actions { grid-column: 1 / -1; } }

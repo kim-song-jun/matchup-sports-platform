@@ -10,4 +10,10 @@ describe('shared record command validation', () => {
   it.each([{ minute: -1 }, { minute: 1.5 }, { minute: 1000 }, { expectedVersion: -1 }, { commandId: 'bad' }, { action: 'officialize' }, { ownGoal: 'yes' }])('rejects invalid command %j', async (patch) => {
     expect((await validate(plainToInstance(MutateTeamMatchRecordDto, { ...valid, ...patch }))).length).toBeGreaterThan(0);
   });
+  it('validates submatch commands and their identifiers', async () => {
+    const add = plainToInstance(MutateTeamMatchRecordDto, { ...valid, action: 'submatch_add', title: '1경기' });
+    expect(await validate(add)).toHaveLength(0);
+    const invalid = plainToInstance(MutateTeamMatchRecordDto, { ...valid, action: 'submatch_edit', title: '', subMatchId: 'bad' });
+    expect((await validate(invalid)).length).toBeGreaterThan(0);
+  });
 });

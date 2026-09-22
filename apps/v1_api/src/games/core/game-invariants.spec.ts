@@ -43,47 +43,6 @@ describe('validateGameResultInvariants — Task 17 TEAM_MATCH event-vs-score exe
     ).not.toThrow();
   });
 
-  it('accepts ordered submatches when their sum equals the official top score', () => {
-    expect(() =>
-      validateGameResultInvariants({
-        sourceType: V1GameSourceType.TEAM_MATCH,
-        score: {
-          home: 3,
-          away: 4,
-          subMatches: [
-            { id: 'sub-1', title: '1경기', home: 2, away: 1 },
-            { id: 'sub-2', title: '2경기', home: 1, away: 3 },
-          ],
-        },
-        sides: twoSides,
-        participants: [],
-        events: [],
-        scorerPolicy: 'optional_with_warning',
-        missingScorer: true,
-      }),
-    ).not.toThrow();
-  });
-
-  it('rejects a top score that does not equal the submatch sum', () => {
-    expect(() =>
-      validateGameResultInvariants({
-        sourceType: V1GameSourceType.TEAM_MATCH,
-        score: {
-          home: 9,
-          away: 4,
-          subMatches: [
-            { id: 'sub-1', title: '1경기', home: 2, away: 1 },
-            { id: 'sub-2', title: '2경기', home: 1, away: 3 },
-          ],
-        },
-        sides: twoSides,
-        participants: [],
-        events: [],
-        scorerPolicy: 'optional_with_warning',
-        missingScorer: true,
-      }),
-    ).toThrow(expect.objectContaining({ code: 'SCORE_INVALID' }));
-  });
   it('accepts per-participant goals that sum to the submitted non-zero score with zero events', () => {
     // Isolates the participant-goal-vs-event branch specifically: each
     // participant's goals total (2 + 1 + 1 = 4 goals, split 3:1 by side)

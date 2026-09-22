@@ -693,8 +693,8 @@ describe('TeamDetailPageView — 내 리그 섹션', () => {
     render(
       <TeamDetailPageView
         model={modelWithLeagues([
-          { leagueId: 'lg-1', title: '가을 리그' },
-          { leagueId: 'lg-2', title: '겨울 리그' },
+          { leagueId: 'lg-1', title: '가을 리그', href: '/league-matches/lg-1' },
+          { leagueId: 'lg-2', title: '겨울 리그', href: '/league-matches/lg-2' },
         ])}
       />,
     );

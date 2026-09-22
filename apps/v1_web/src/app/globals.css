@@ -3486,6 +3486,10 @@ label.tm-btn:focus-within {
   transition: transform .22s ease-out;
   will-change: transform;
   pointer-events: auto;
+  /* 가로 모드처럼 화면 높이가 낮은 환경에서도 상단이 잘리지 않도록 내부 스크롤을 쓴다. */
+  max-height: min(78dvh, 620px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* 드래그 중에는 transition 을 꺼야 손가락을 정확히 따라온다 — 켜 둔 채로 매 pointermove
@@ -5260,12 +5264,6 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
     min-width: 0;
     white-space: normal;
     text-align: center;
-  }
-
-  .tm-filter-sheet {
-    max-height: min(78dvh, 620px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
   }
 
   .tm-filter-actions {

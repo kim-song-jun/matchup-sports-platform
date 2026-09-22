@@ -11,6 +11,7 @@ import {
   useV1CreateTeamJoinApplication,
   useV1LeagueMatches,
   useV1LeaveTeam,
+  useV1MasterRegions,
   useV1MasterSports,
   useV1MyTeams,
   useV1RecentSearches,
@@ -63,8 +64,9 @@ export function TeamListPageClient({ seed }: { seed?: { page: CursorPage<V1Team>
   const selectedSort = toTeamSort(searchParams.get('sort'));
   const selectedGenderRule = toGenderRuleFilter(searchParams.get('genderRule'));
   const selectedLevels = toLevelCodes(searchParams.get('levelCodes') ?? searchParams.get('levels'));
+  const selectedRegionId = searchParams.get('regionId') ?? undefined;
   const filterOpen = searchParams.get('filter') === '1';
-  const activeFilterCount = countTeamFilters(selectedSort, selectedGenderRule, selectedLevels);
+  const activeFilterCount = countTeamFilters(selectedSort, selectedGenderRule, selectedLevels, selectedRegionId);
   const initialQuery = searchParams.get('q') ?? '';
   const [searchValue, setSearchValue] = useState(initialQuery);
   const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
@@ -74,17 +76,19 @@ export function TeamListPageClient({ seed }: { seed?: { page: CursorPage<V1Team>
     setSubmittedQuery(initialQuery);
   }, [initialQuery]);
   const sports = useV1MasterSports({ seed: seed?.sports });
+  const regions = useV1MasterRegions();
   const teamFilters = useMemo(() => {
-    const filters: { sportId?: string; query?: string; joinPolicy?: 'approval_required'; sort?: 'recommended' | 'latest'; genderRule?: string; levelCodes?: string } = {};
+    const filters: { sportId?: string; query?: string; joinPolicy?: 'approval_required'; sort?: 'recommended' | 'latest'; genderRule?: string; levelCodes?: string; regionId?: string } = {};
     if (selectedSportId) filters.sportId = selectedSportId;
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
     if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
+    if (selectedRegionId) filters.regionId = selectedRegionId;
     if (submittedQuery.trim()) filters.query = submittedQuery.trim();
     if (selectedSort === 'deadline') filters.joinPolicy = 'approval_required';
     if (selectedSort === 'latest') filters.sort = 'latest';
     if (selectedSort === 'recommended') filters.sort = 'recommended';
     return Object.keys(filters).length ? filters : undefined;
-  }, [selectedGenderRule, selectedLevels, selectedSort, selectedSportId, submittedQuery]);
+  }, [selectedGenderRule, selectedLevels, selectedRegionId, selectedSort, selectedSportId, submittedQuery]);
   const listFilters = useMemo(() => ({ ...(teamFilters ?? {}), limit: 20 }), [teamFilters]);
   // /teams가 서버(SEO 프리렌더)에서 이미 받아 둔 무필터 목록을 첫 표시값으로 쓴다 — 필터가
   // 걸려 있으면 그 목록이 이 화면과 다른 결과를 뜻하므로 seed를 넘기지 않는다(기존 로딩
@@ -138,7 +142,7 @@ export function TeamListPageClient({ seed }: { seed?: { page: CursorPage<V1Team>
     filterCount: activeFilterCount,
     search: searchModel,
     filterHref: buildTeamHref(searchParams, { filter: '1' }),
-    filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, filterOpen),
+    filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], filterOpen),
     chips: buildTeamSportChips(visibleItems, base, searchParams, selectedSportId, sports.data, !selectedSportId && !query.hasNextPage),
     teams: visibleTeams,
     listLoading: isListLoading,
@@ -237,6 +241,8 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
   const myLeagues = (myLeaguesQuery.data?.items ?? []).map((item) => ({
     leagueId: item.leagueId,
     title: item.title,
+    // profileHref와 같은 이유로 출처를 넘긴다 — 뒤로가기가 리그 목록이 아니라 이 팀으로.
+    href: `/league-matches/${item.leagueId}?from=${encodeURIComponent(`/teams/${teamId}`)}`,
   }));
   const fallback = getTeamDetailViewModel();
 
@@ -286,7 +292,9 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
         name: member.displayName,
         role: roleLabel(member.role),
         // 834행 TeamMembersPageClient의 프로필 링크 패턴과 동일 — 새 규칙을 만들지 않는다.
-        profileHref: `/users/${member.userId}`,
+        // 뒤로가기가 팀 목록이 아니라 이 팀 상세로 돌아오도록 출처를 함께 넘긴다
+        // (public-profile-client.tsx가 `?from=`을 읽어 ShellOverride.backHref로 되돌린다).
+        profileHref: `/users/${member.userId}?from=${encodeURIComponent(`/teams/${teamId}`)}`,
       })),
       memberAccess: {
         canView: canViewMembers,
@@ -673,6 +681,8 @@ function buildTeamFilterSheet(
   sort: NonNullable<TeamListViewModel['filterSheet']>['sort'],
   genderRule: NonNullable<TeamListViewModel['filterSheet']>['genderRule'],
   levels: NonNullable<TeamListViewModel['filterSheet']>['levels'],
+  regionId: string | undefined,
+  regions: ReadonlyArray<{ id: string; name: string; parentId: string | null }>,
   open: boolean,
 ): NonNullable<TeamListViewModel['filterSheet']> {
   const sortOptions: NonNullable<TeamListViewModel['filterSheet']>['sortOptions'] = [
@@ -691,18 +701,32 @@ function buildTeamFilterSheet(
     href: buildTeamHref(params, { levelCodes: toggleLevelCode(levels, code), levels: null, filter: '1' }),
     active: levels.includes(code),
   }));
+  // matches-client.tsx buildMatchFilterSheet()와 동일 이유로 시/도(레벨1)만 칩으로 노출한다.
+  const regionOptions: NonNullable<TeamListViewModel['filterSheet']>['regionOptions'] = [
+    { label: '전체', value: 'all', href: buildTeamHref(params, { regionId: null, filter: '1' }), active: !regionId },
+    ...regions
+      .filter((region) => region.parentId === null)
+      .map((region) => ({
+        label: region.name,
+        value: region.id,
+        href: buildTeamHref(params, { regionId: regionId === region.id ? null : region.id, filter: '1' }),
+        active: regionId === region.id,
+      })),
+  ];
 
   return {
     open,
     closeHref: buildTeamHref(params, { filter: null }),
-    resetHref: buildTeamHref(params, { sort: null, genderRule: null, levelCodes: null, levels: null, filter: '1' }),
+    resetHref: buildTeamHref(params, { sort: null, genderRule: null, levelCodes: null, levels: null, regionId: null, filter: '1' }),
     applyHref: buildTeamHref(params, { filter: null }),
     sort,
     genderRule,
     levels,
+    regionId: regionId ?? '',
     sortOptions,
     genderOptions,
     levelOptions,
+    regionOptions,
   };
 }
 
@@ -726,8 +750,9 @@ function countTeamFilters(
   sort: NonNullable<TeamListViewModel['filterSheet']>['sort'],
   genderRule: NonNullable<TeamListViewModel['filterSheet']>['genderRule'],
   levels: NonNullable<TeamListViewModel['filterSheet']>['levels'],
+  regionId: string | undefined,
 ) {
-  return (sort ? 1 : 0) + (genderRule ? 1 : 0) + levels.length;
+  return (sort ? 1 : 0) + (genderRule ? 1 : 0) + levels.length + (regionId ? 1 : 0);
 }
 
 // 목업 없이 API 값만으로 모델을 만든다 — fallback 인자를 받지 않는 것이 그 계약이다.

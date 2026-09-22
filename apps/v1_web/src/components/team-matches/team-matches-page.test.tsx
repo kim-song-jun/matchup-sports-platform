@@ -1019,9 +1019,11 @@ describe('팀매치 목록 필터 시트 — BottomSheet 배선(A안)', () => {
       view: 'card',
       genderRule: '',
       levels: [],
+      kind: '',
       sortOptions: [{ label: '추천순', value: 'recommended', href: '/team-matches?sort=recommended', active: true }],
       genderOptions: [{ label: '성별 무관', value: '성별 무관', href: '/team-matches?gender=all', active: true }],
       levelOptions: [{ label: '초급', value: 'beginner', href: '/team-matches?level=beginner' }],
+      kindOptions: [{ label: '전체', value: '', href: '/team-matches?kind=all', active: true }],
     };
     return model;
   }

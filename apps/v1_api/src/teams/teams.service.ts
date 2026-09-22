@@ -2114,7 +2114,11 @@ export class TeamsService {
       status: 'active',
       deletedAt: null,
       ...(query.sportId ? { sportId: query.sportId } : {}),
-      ...(query.regionId ? { regionId: query.regionId } : {}),
+      // 시/도(레벨1) regionId를 고르면 하위 구/군(레벨2)도 함께 담는다 — matches.service.ts
+      // list()와 동일한 이유(팀의 regionId도 실제로는 구/군 단위).
+      ...(query.regionId
+        ? { region: { OR: [{ id: query.regionId }, { parentId: query.regionId }] } }
+        : {}),
       ...(query.genderRule ? { AND: [getTeamGenderRuleWhere(query.genderRule)] } : {}),
       ...teamLevelCodeWhere(parseLevelCodes(query.levelCodes)),
       ...(query.joinPolicy ? { joinPolicy: query.joinPolicy } : {}),

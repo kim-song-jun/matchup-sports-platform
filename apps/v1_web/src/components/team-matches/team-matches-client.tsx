@@ -55,8 +55,9 @@ export function TeamMatchListPageClient() {
   const selectedView = toTeamMatchView(searchParams.get('view'));
   const selectedGenderRule = toGenderRuleFilter(searchParams.get('genderRule'));
   const selectedLevels = toLevelCodes(searchParams.get('levelCodes') ?? searchParams.get('levels'));
+  const selectedKind = toTeamMatchKind(searchParams.get('kind'));
   const filterOpen = searchParams.get('filter') === '1';
-  const activeFilterCount = countTeamMatchFilters(selectedSort, selectedGenderRule, selectedLevels);
+  const activeFilterCount = countTeamMatchFilters(selectedSort, selectedGenderRule, selectedLevels, selectedKind);
   const initialQuery = searchParams.get('q') ?? '';
   const [searchValue, setSearchValue] = useState(initialQuery);
   const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
@@ -67,15 +68,16 @@ export function TeamMatchListPageClient() {
   }, [initialQuery]);
   const sportsQuery = useV1MasterSports();
   const teamMatchFilters = useMemo(() => {
-    const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'deadline' | 'latest'; view?: 'card' | 'compact'; genderRule?: string; levelCodes?: string } = {};
+    const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'deadline' | 'latest'; view?: 'card' | 'compact'; genderRule?: string; levelCodes?: string; kind?: 'friendly' | 'competition' } = {};
     if (selectedSportId) filters.sportId = selectedSportId;
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
     if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
+    if (selectedKind) filters.kind = selectedKind;
     if (submittedQuery.trim()) filters.query = submittedQuery.trim();
     if (selectedSort) filters.sort = selectedSort;
     if (selectedView !== 'card') filters.view = selectedView;
     return Object.keys(filters).length ? filters : undefined;
-  }, [selectedGenderRule, selectedLevels, selectedSportId, selectedSort, selectedView, submittedQuery]);
+  }, [selectedGenderRule, selectedLevels, selectedKind, selectedSportId, selectedSort, selectedView, submittedQuery]);
   // 서버는 20건씩 커서 페이지네이션인데(team-matches.service.ts) 예전엔 이 화면이 단발
   // useQuery로 첫 페이지만 받아 21번째부터는 볼 방법이 없었다(감사 결함 — matches-client.tsx의
   // 같은 수정과 동일 패턴, tournaments/page.tsx 의 "더 보기" 누적 방식을 따른다).
@@ -97,12 +99,13 @@ export function TeamMatchListPageClient() {
   );
   const allQuery = useV1TeamMatches(allQueryFilters);
   const countFilters = useMemo(() => {
-    const filters: { query?: string; genderRule?: string; levelCodes?: string } = {};
+    const filters: { query?: string; genderRule?: string; levelCodes?: string; kind?: 'friendly' | 'competition' } = {};
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
     if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
+    if (selectedKind) filters.kind = selectedKind;
     if (submittedQuery.trim()) filters.query = submittedQuery.trim();
     return Object.keys(filters).length ? filters : undefined;
-  }, [selectedGenderRule, selectedLevels, submittedQuery]);
+  }, [selectedGenderRule, selectedLevels, selectedKind, submittedQuery]);
   const filteredQuery = useV1TeamMatches(
     filteredQueryFilters,
     { enabled: Boolean(teamMatchFilters) },
@@ -159,7 +162,7 @@ export function TeamMatchListPageClient() {
         filterCount: activeFilterCount,
         search: searchModel,
         filterHref: buildTeamMatchHref(searchParams, { filter: '1' }),
-        filterSheet: buildTeamMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
+        filterSheet: buildTeamMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, selectedKind, filterOpen),
         sports: buildSportChips({
           base,
           params: searchParams,
@@ -179,7 +182,7 @@ export function TeamMatchListPageClient() {
         filterCount: activeFilterCount,
         search: searchModel,
         filterHref: buildTeamMatchHref(searchParams, { filter: '1' }),
-        filterSheet: buildTeamMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
+        filterSheet: buildTeamMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, selectedKind, filterOpen),
         sports: buildSportChips({
           base,
           params: searchParams,
@@ -402,6 +405,7 @@ function buildTeamMatchFilterSheet(
   view: NonNullable<TeamMatchListViewModel['filterSheet']>['view'],
   genderRule: NonNullable<TeamMatchListViewModel['filterSheet']>['genderRule'],
   levels: NonNullable<TeamMatchListViewModel['filterSheet']>['levels'],
+  kind: NonNullable<TeamMatchListViewModel['filterSheet']>['kind'],
   open: boolean,
 ): NonNullable<TeamMatchListViewModel['filterSheet']> {
   const sortOptions: NonNullable<TeamMatchListViewModel['filterSheet']>['sortOptions'] = [
@@ -420,19 +424,27 @@ function buildTeamMatchFilterSheet(
     href: buildTeamMatchHref(params, { levelCodes: toggleLevelCode(levels, code), levels: null, filter: '1' }),
     active: levels.includes(code),
   }));
+  const kindOptions: NonNullable<TeamMatchListViewModel['filterSheet']>['kindOptions'] = [
+    { label: '전체', value: '', href: buildTeamMatchHref(params, { kind: null, filter: '1' }), active: kind === '' },
+    { label: '일반 팀매치', value: 'friendly', href: buildTeamMatchHref(params, { kind: kind === 'friendly' ? null : 'friendly', filter: '1' }), active: kind === 'friendly' },
+    // API의 competition 필터는 leagueId가 있는 경기만 조회한다.
+    { label: '정규 리그 경기', value: 'competition', href: buildTeamMatchHref(params, { kind: kind === 'competition' ? null : 'competition', filter: '1' }), active: kind === 'competition' },
+  ];
 
   return {
     open,
     closeHref: buildTeamMatchHref(params, { filter: null }),
-    resetHref: buildTeamMatchHref(params, { sort: null, view: null, genderRule: null, levelCodes: null, levels: null, filter: '1' }),
+    resetHref: buildTeamMatchHref(params, { sort: null, view: null, genderRule: null, levelCodes: null, levels: null, kind: null, filter: '1' }),
     applyHref: buildTeamMatchHref(params, { filter: null }),
     sort,
     view,
     genderRule,
     levels,
+    kind,
     sortOptions,
     genderOptions,
     levelOptions,
+    kindOptions,
   };
 }
 
@@ -451,6 +463,11 @@ function toGenderRuleFilter(value: string | null): '' | '성별 무관' | '남' 
   return '';
 }
 
+function toTeamMatchKind(value: string | null): '' | 'friendly' | 'competition' {
+  if (value === 'friendly' || value === 'competition') return value;
+  return '';
+}
+
 function filterTeamMatchesByLevels(matches: V1TeamMatch[] | undefined, levels: NonNullable<TeamMatchListViewModel['filterSheet']>['levels']) {
   if (!matches || levels.length === 0) return matches ?? [];
   return matches.filter((match) => levelRangeMatches(levels, match.minLevel?.code, match.maxLevel?.code, match.levelLabel));
@@ -460,8 +477,9 @@ function countTeamMatchFilters(
   sort: NonNullable<TeamMatchListViewModel['filterSheet']>['sort'],
   genderRule: NonNullable<TeamMatchListViewModel['filterSheet']>['genderRule'],
   levels: NonNullable<TeamMatchListViewModel['filterSheet']>['levels'],
+  kind: NonNullable<TeamMatchListViewModel['filterSheet']>['kind'],
 ) {
-  return (sort ? 1 : 0) + (genderRule ? 1 : 0) + levels.length;
+  return (sort ? 1 : 0) + (genderRule ? 1 : 0) + levels.length + (kind ? 1 : 0);
 }
 
 function toApplicantTeamsWithActions(
@@ -773,5 +791,4 @@ function reasonLabel(reasonCode?: string) {
   // 팀이 없는 경우 → 팀 만들기 유도
   return '팀을 만들고 신청할 수 있어요';
 }
-
 

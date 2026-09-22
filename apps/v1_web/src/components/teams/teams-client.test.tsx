@@ -470,7 +470,8 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
 
     const memberLinks = screen.getAllByRole('link', { name: /박서준/ });
     expect(memberLinks.length).toBeGreaterThanOrEqual(2);
-    memberLinks.forEach((link) => expect(link).toHaveAttribute('href', '/users/user-owner-42'));
+    // 뒤로가기가 이 팀 상세로 돌아오도록 `?from=`을 함께 실어 보낸다(QA 피드백 #1).
+    memberLinks.forEach((link) => expect(link).toHaveAttribute('href', '/users/user-owner-42?from=%2Fteams%2Fteam-1'));
   });
 
   it('멤버 목록이 비공개인 팀에서는 미리보기도 더보기 CTA도 노출되지 않는다', () => {
@@ -570,7 +571,8 @@ describe('TeamDetailPageClient — 내 리그', () => {
     // 데스크톱·모바일 레이아웃당 1개씩 = 2개.
     const leagueLinks = screen.getAllByRole('link', { name: /가을 리그/ });
     expect(leagueLinks).toHaveLength(2);
-    leagueLinks.forEach((link) => expect(link).toHaveAttribute('href', '/league-matches/lg-1'));
+    // 뒤로가기가 이 팀 상세로 돌아오도록 `?from=`을 함께 실어 보낸다(QA 피드백 #1).
+    leagueLinks.forEach((link) => expect(link).toHaveAttribute('href', '/league-matches/lg-1?from=%2Fteams%2Fteam-1'));
   });
 
   it('참가 중인 리그가 없으면 "내 리그" 섹션 자체가 없다', () => {

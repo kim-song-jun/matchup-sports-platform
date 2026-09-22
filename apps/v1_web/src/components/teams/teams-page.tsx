@@ -307,7 +307,7 @@ function TeamMyLeaguesSection({
             <Link
               key={league.leagueId}
               className="tm-pressable"
-              href={`/league-matches/${league.leagueId}`}
+              href={league.href}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -637,6 +637,10 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               나왔다 — alpha 실화면 캡처로 확인했다. 팀장이 우리 팀에 들어와 가장 먼저 하는
               일이 다음 경기 준비이므로 모집 공고보다 앞이 맞다. 경기가 없으면 이 섹션은
               스스로 사라지므로(컴포넌트가 null 반환) 없는 팀의 화면은 그대로다. */}
+          {/* 비회원·가입 희망자는 매치·리그보다 팀 소개·가입 조건을 먼저 봐야 한다(QA
+              피드백) — 팀장이 다음 경기를 준비하는 mode==='mine' 에서만 아래쪽 원래
+              자리(경기 정보 다음)에 남기고, 그 외에는 히어로 바로 다음으로 끌어올린다. */}
+          {mode !== 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
           {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} /> : null}
           <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
           <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
@@ -683,7 +687,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               <ChevronRightIcon size={18} aria-hidden="true" />
             </Link>
           ) : null}
-          <TeamBasicInfoCard team={team} capacity={capacity} />
+          {mode === 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
           <TeamOperationsSection operations={model.operations} />
           {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
           <TeamDetailMembersCard team={team} />
@@ -783,6 +787,9 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             데스크톱 쪽에만 넣어서 **모바일에서는 진입점이 아예 없었다** — 이 앱의 본무대가
             모바일인데도. alpha 390/768 캡처가 그 섹션을 못 찾아 드러났다(데스크톱 1440
             에서만 찍혔다). 두 블록을 함께 고치는 것이 이 파일의 규약이다. */}
+        {/* 비회원·가입 희망자는 매치·리그보다 팀 소개·가입 조건을 먼저 봐야 한다(QA
+            피드백) — mode==='mine' 에서만 아래쪽 원래 자리(경기 정보 다음)에 남긴다. */}
+        {mode !== 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
         {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} /> : null}
         <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
         <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
@@ -816,7 +823,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             />
           ) : null}
         </div>
-          <TeamBasicInfoCard team={team} capacity={capacity} />
+        {mode === 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
         <TeamOperationsSection operations={model.operations} />
         {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
         <TeamDetailMembersCard team={team} />
@@ -1702,6 +1709,7 @@ function TeamFilterSheet({ model }: { model: TeamListViewModel }) {
           <Link className="tm-btn tm-btn-sm tm-btn-ghost" href={sheet.resetHref} style={{ color: 'var(--text-caption)' }}>초기화</Link>
         </div>
         {[
+          ['지역', sheet.regionOptions],
           ['정렬', sheet.sortOptions],
           ['성별 조건', sheet.genderOptions],
           ['레벨', sheet.levelOptions],

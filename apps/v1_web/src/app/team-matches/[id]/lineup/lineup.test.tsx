@@ -477,7 +477,7 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    const designated = screen.getByRole('button', { name: '홍길동, 골키퍼로 지정됨' });
+    const designated = screen.getByRole('button', { name: '홍길동, 골키퍼 지정 해제' });
     // 조사는 받침을 따른다 — '김철수' 는 받침이 없으니 '를' 이다(`josa`).
     const notDesignated = screen.getByRole('button', { name: '김철수를 골키퍼로 지정' });
 
@@ -908,7 +908,7 @@ describe('TeamMatchLineupPageClient', () => {
 
     expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
     expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(9);
-    expect(screen.getByRole('button', { name: '홍길동, 골키퍼로 지정됨' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '홍길동, 골키퍼 지정 해제' })).toBeInTheDocument();
     expect(screen.queryByText('홍길동 선수를 명단에서 제거했어요.')).not.toBeInTheDocument();
   });
 });
@@ -925,7 +925,7 @@ describe('TeamMatchLineupPageClient — 배치는 이 화면에 없다 (Task 163
     hoisted.refetchLineup.mockResolvedValue({ data: baseLineup() });
   });
 
-  it('피치 배치 탭이 사라지고 전술보드 링크만 남는다', () => {
+  it('피치 배치 탭과 전술보드 안내를 모두 노출하지 않는다', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({
         gameId: 'game-1',
@@ -955,9 +955,7 @@ describe('TeamMatchLineupPageClient — 배치는 이 화면에 없다 (Task 163
     expect(screen.queryAllByRole('tab')).toHaveLength(0);
     expect(screen.queryByText('피치 배치')).not.toBeInTheDocument();
 
-    // 대신 배치를 하러 갈 곳을 한 줄로 알려준다. href 까지 본다 — 문구만 남고 링크가
-    // 끊기면 사용자는 배치를 편집할 방법을 영영 못 찾는다.
-    const link = screen.getByRole('link', { name: /전술보드/ });
-    expect(link).toHaveAttribute('href', '/teams/team-host/tactics/game-1');
+    expect(screen.queryByRole('link', { name: /전술보드/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/선발·배치는 전술보드에서/)).not.toBeInTheDocument();
   });
 });

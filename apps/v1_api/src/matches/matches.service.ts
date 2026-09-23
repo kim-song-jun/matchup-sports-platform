@@ -377,8 +377,7 @@ export class MatchesService {
         where: { id: matchId, deletedAt: null },
         include: {
           participants: {
-            where: { status: 'active' },
-            select: { id: true, userId: true, role: true },
+            select: { id: true, userId: true, role: true, status: true },
             orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
           },
         },
@@ -389,6 +388,28 @@ export class MatchesService {
       if (match.hostUserId !== user.id) {
         throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Only the match host can complete this match' });
       }
+      if (match.status === 'completed') {
+        if (!match.completedAt) {
+          throw stateConflict('Completed match is missing its completion timestamp', 'MATCH_COMPLETION_INCONSISTENT');
+        }
+        const finalizedGuests = match.participants.filter((participant) =>
+          participant.role === 'participant' &&
+          (participant.status === 'completed' || participant.status === 'no_show'),
+        );
+        const finalizedById = new Map(finalizedGuests.map((participant) => [participant.id, participant.status]));
+        if ([...requestedStatuses].some(([participantId, status]) => finalizedById.get(participantId) !== status)) {
+          throw stateConflict('Match was already completed with different attendance', 'ALREADY_PROCESSED');
+        }
+        return {
+          completedAt: match.completedAt,
+          expiredApplications: 0,
+          completedUserIds: [] as string[],
+          expiredUserIds: [] as string[],
+          completedParticipants: match.participants.filter((participant) => participant.status === 'completed').length,
+          noShowParticipants: finalizedGuests.filter((participant) => participant.status === 'no_show').length,
+          shouldNotify: false,
+        };
+      }
       if (match.status !== 'recruiting' && match.status !== 'closed') {
         throw stateConflict('Match cannot be completed in current status');
       }
@@ -396,11 +417,20 @@ export class MatchesService {
         throw stateConflict('Match cannot be completed before it starts', 'MATCH_NOT_STARTED');
       }
 
-      const guests = match.participants.filter((participant) => participant.role === 'participant');
+      const guests = match.participants.filter(
+        (participant) => participant.role === 'participant' && participant.status === 'active',
+      );
       const activeGuestIds = new Set(guests.map((participant) => participant.id));
+      const alreadyNoShowGuestIds = new Set(
+        match.participants
+          .filter((participant) => participant.role === 'participant' && participant.status === 'no_show')
+          .map((participant) => participant.id),
+      );
       if (
-        requestedStatuses.size !== activeGuestIds.size ||
-        [...requestedStatuses.keys()].some((participantId) => !activeGuestIds.has(participantId))
+        [...activeGuestIds].some((participantId) => !requestedStatuses.has(participantId)) ||
+        [...requestedStatuses.keys()].some(
+          (participantId) => !activeGuestIds.has(participantId) && !alreadyNoShowGuestIds.has(participantId),
+        )
       ) {
         throw validationError('Every active participant must be marked completed or no_show', 'participants');
       }
@@ -477,22 +507,27 @@ export class MatchesService {
           .map((participant) => participant.userId),
         expiredUserIds: pending.map((application) => application.applicantUserId),
         completedParticipants: 1 + guests.filter((participant) => requestedStatuses.get(participant.id) === 'completed').length,
-        noShowParticipants: guests.filter((participant) => requestedStatuses.get(participant.id) === 'no_show').length,
+        noShowParticipants:
+          alreadyNoShowGuestIds.size +
+          guests.filter((participant) => requestedStatuses.get(participant.id) === 'no_show').length,
+        shouldNotify: true,
       };
     });
 
-    void this.notifications.emitNotificationToMany(
-      result.completedUserIds,
-      'match_completed',
-      matchId,
-      '참여한 개인 매치가 완료됐어요. 함께한 참가자에게 후기를 남겨보세요.',
-    );
-    void this.notifications.emitNotificationToMany(
-      result.expiredUserIds,
-      'match_closed',
-      matchId,
-      '매치가 완료되어 대기 중이던 신청이 종료됐어요.',
-    );
+    if (result.shouldNotify) {
+      void this.notifications.emitNotificationToMany(
+        result.completedUserIds,
+        'match_completed',
+        matchId,
+        '참여한 개인 매치가 완료됐어요. 함께한 참가자에게 후기를 남겨보세요.',
+      );
+      void this.notifications.emitNotificationToMany(
+        result.expiredUserIds,
+        'match_closed',
+        matchId,
+        '매치가 완료되어 대기 중이던 신청이 종료됐어요.',
+      );
+    }
 
     return {
       matchId,

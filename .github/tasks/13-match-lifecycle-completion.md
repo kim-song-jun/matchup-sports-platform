@@ -16,6 +16,13 @@
 
 Acceptance: 81/81 screenshots, console/pageerror/HTTP 5xx 0건. Evidence: `docs/visual-qa/individual-friendly-match-lifecycle-20260918/README.md`
 
+### Deployment follow-up — 2026-09-23
+
+- [x] `POST /matches/:id/complete` 통합 테스트를 필수 참가자별 참석 payload 계약과 동기화했다.
+- [x] 관리자 직접 완료 금지 계약을 통합 테스트에서도 고정했다.
+- [x] 동일한 호스트 완료 재시도는 저장 상태로 수렴하고 알림·집계를 중복 생성하지 않도록 보강했다.
+- [ ] GitHub CI API integration 및 Alpha deploy 재검증.
+
 ## Context
 
 `MATCH-001`과 `MATCH-002`는 실제 생성/참가 흐름까지 검증됐지만, 호스트가 본인 매치를 수정하고 모집 상태를 마감하거나 취소/완료하는 흐름은 구조적으로 비어 있다. 프론트는 이미 `/matches/:id/edit`와 `/my/matches` 취소 버튼에서 `PATCH /matches/:id`를 기대하지만 backend `matches` controller/service에는 해당 route가 없어서 실제 저장이 보장되지 않는다. 이 상태는 호스트 액션이 보여도 저장되지 않거나, 화면마다 상태 표현이 달라지는 false affordance를 만든다.

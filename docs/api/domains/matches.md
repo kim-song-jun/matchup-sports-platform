@@ -148,7 +148,7 @@
 ## Idempotency / Duplicate Behavior
 
 - `applications`: 활성 신청 중복은 실패; 취소 후 재신청은 기존 신청/참가자를 재사용한다.
-- `cancel`: 이미 종료 상태면 실패. `complete`: 동일 완료 요청은 성공으로 수렴하며 중복 집계하지 않음
+- `cancel`: 이미 종료 상태면 실패. `complete`: 호스트의 동일 완료 요청은 저장된 참석 상태와 일치할 때 성공으로 수렴하며, 알림과 참여 집계를 중복 생성하지 않는다. 이미 확정된 참가자의 상태와 다른 재요청은 `409 ALREADY_PROCESSED`다.
 - `close`: 이미 마감이면 `409 ALREADY_PROCESSED` / `reopen`: 이미 모집 중이면 `409 ALREADY_PROCESSED`
 
 ## Task 6 Game source boundary

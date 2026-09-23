@@ -23,9 +23,7 @@ const ids = {
   futureMatch: '69000000-0000-4000-8000-000000000030',
   pastMatch: '69000000-0000-4000-8000-000000000031',
   futureSchedule: '69000000-0000-4000-8000-000000000040',
-  // 재생(idempotent replay) 전용 팀매치. 앞선 테스트들이 `futureMatch` 의 라인업을
-  // SUBMITTED 까지 올려 두므로, 같은 매치에서 다시 저장하면 계약이 아니라 순서 때문에
-  // `LINEUP_LOCKED_FOR_DIRECT_EDIT` 가 난다 — 재생 계약만 격리해서 보려고 따로 둔다.
+  // 재생(idempotent replay) 계약을 다른 라인업 상태 전이와 격리해서 검증하는 전용 팀매치.
   replayMatch: '69000000-0000-4000-8000-000000000050',
 } as const;
 
@@ -381,7 +379,7 @@ describe('Task 14 team-match lineup builder', () => {
     expect(view.starters.map((starter) => starter.displayName)).toContain('용병 게스트');
   });
 
-  it('saves a valid draft, rejects a stale-version resave, submits it, and blocks direct re-edit afterward', async () => {
+  it('saves a valid draft, rejects a stale-version resave, submits it, and allows direct re-edit before kickoff', async () => {
     const version = await currentVersion(ids.hostOwner, ids.futureMatch);
 
     const saved = await service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-draft-1', {
@@ -442,14 +440,19 @@ describe('Task 14 team-match lineup builder', () => {
     if (teamMatch.startAt === null) throw new Error('lineup visibility test requires persisted startAt');
     expect(policy.lineupAt?.getTime()).toBe(teamMatch.startAt.getTime() - 60 * 60 * 1000);
 
-    const editAfterSubmit = await captureFailure(() =>
-      service.saveLineup(authUser(ids.hostOwner), ids.futureMatch, 'idem-host-draft-after-submit', {
+    const editAfterSubmit = await service.saveLineup(
+      authUser(ids.hostOwner),
+      ids.futureMatch,
+      'idem-host-draft-after-submit',
+      {
         expectedVersion: submitted.version,
         starters: validHostStarters,
         bench: [],
-      }),
+      },
     );
-    expectHttpCode(editAfterSubmit, 409, 'LINEUP_LOCKED_FOR_DIRECT_EDIT');
+    expect(editAfterSubmit).toEqual(
+      expect.objectContaining({ state: 'DRAFT', version: submitted.version + 1 }),
+    );
   });
 
   it('lets the opponent manager request a change on the other side before lock, but not on their own side', async () => {
@@ -552,11 +555,7 @@ describe('Task 14 team-match lineup builder', () => {
     expectHttpCode(submitPastDeadline, 409, 'LINEUP_DEADLINE_PASSED');
   });
 
-  /**
-   * **전용 팀매치를 쓴다.** 앞선 테스트들이 `futureMatch` 의 라인업을 SUBMITTED 까지
-   * 올려 두므로, 거기서 다시 저장하면 재생 계약이 아니라 실행 순서 때문에
-   * `LINEUP_LOCKED_FOR_DIRECT_EDIT` 가 먼저 난다 — 재는 것과 다른 이유로 실패하는 자리다.
-   */
+  /** 재생 계약을 다른 테스트의 라인업 revision과 격리하기 위해 전용 팀매치를 쓴다. */
   it('replays an identical idempotent save exactly once instead of creating a second revision', async () => {
     const version = await currentVersion(ids.hostOwner, ids.replayMatch);
     const dto = { expectedVersion: version, starters: validHostStarters, bench: [] };

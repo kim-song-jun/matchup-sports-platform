@@ -75,6 +75,17 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     } });
   }
 
+  async function completionBody(matchId: string) {
+    const participants = await db.v1MatchParticipant.findMany({
+      where: { matchId, role: 'participant', status: 'active' },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return {
+      participants: participants.map(({ id }) => ({ participantId: id, status: 'completed' as const })),
+    };
+  }
+
   it('승인 후 취소는 DB 명단·인원·이력에 반영되고 재신청할 수 있다', async () => {
     const id = await createMatch();
     const applicationId = await join(id);
@@ -91,10 +102,14 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
   it('호스트 완료는 참여·후기 자격을 저장하고 재시도해도 중복 집계하지 않는다', async () => {
     const id = await createMatch();
     await join(id);
-    await post(outsider, `/matches/${id}/complete`).expect(403);
-    await post(host, `/matches/${id}/complete`).expect(409);
+    const body = await completionBody(id);
+    await post(outsider, `/matches/${id}/complete`, body).expect(403);
+    await post(host, `/matches/${id}/complete`, body).expect(409);
     await end(id);
-    const [a, b] = await Promise.all([post(host, `/matches/${id}/complete`), post(host, `/matches/${id}/complete`)]);
+    const [a, b] = await Promise.all([
+      post(host, `/matches/${id}/complete`, body),
+      post(host, `/matches/${id}/complete`, body),
+    ]);
     expect([a.status, b.status]).toEqual([201, 201]);
     expect(await db.v1MatchParticipant.count({ where: { matchId: id, status: 'completed' } })).toBe(2);
     expect(await db.v1StatusChangeLog.count({ where: { targetId: id, toStatus: 'completed' } })).toBe(1);
@@ -112,11 +127,13 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     expect(await db.v1MatchApplication.findUnique({ where: { id: applicationId } })).toMatchObject({ status: 'approved' });
   });
 
-  it('관리자 완료도 같은 참가자 완료 상태를 저장한다', async () => {
+  it('관리자는 개인 매치를 직접 완료할 수 없고 호스트 완료만 참가 상태를 저장한다', async () => {
     const id = await createMatch();
     await join(id);
     await end(id);
-    await post(host, `/admin/matches/${id}/status`, { status: 'completed', reason: '참여 확인' }).expect(201);
+    await post(host, `/admin/matches/${id}/status`, { status: 'completed', reason: '참여 확인' }).expect(409);
+    expect(await db.v1MatchParticipant.count({ where: { matchId: id, status: 'completed' } })).toBe(0);
+    await post(host, `/matches/${id}/complete`, await completionBody(id)).expect(201);
     expect(await db.v1MatchParticipant.count({ where: { matchId: id, status: 'completed' } })).toBe(2);
     expect((await db.v1Match.findUniqueOrThrow({ where: { id } })).completedAt).not.toBeNull();
   });
@@ -152,7 +169,7 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     await post(host, `/match-participants/${participant.id}/cancel-approval`, { reason: '늦은 승인 취소' }).expect(409);
     expect((await get(host, `/matches/${id}/applications?status=approved`)).body.data.items[0]).toMatchObject({ canCancelApproval: false, canMarkCancelled: true });
     await post(host, `/match-participants/${participant.id}/mark-cancelled`, { reason: '경기에 참석하지 않음' }).expect(201);
-    await post(host, `/matches/${id}/complete`).expect(201);
+    await post(host, `/matches/${id}/complete`, await completionBody(id)).expect(201);
     expect(await db.v1MatchParticipant.findUnique({ where: { id: participant.id } })).toMatchObject({ status: 'no_show', completedAt: null });
     expect(await db.v1MatchParticipant.count({ where: { matchId: id, status: 'completed' } })).toBe(1);
     await get(member, `/reviews/sources/match/${id}`).expect(403);
@@ -165,7 +182,7 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     const hostParticipant = await db.v1MatchParticipant.findUniqueOrThrow({ where: { matchId_userId: { matchId: id, userId: host } } });
     await post(host, `/match-participants/${hostParticipant.id}/cancel-approval`, { reason: '자기 취소' }).expect(409);
     await end(id);
-    await post(host, `/matches/${id}/complete`).expect(201);
+    await post(host, `/matches/${id}/complete`, await completionBody(id)).expect(201);
     const memberParticipant = await db.v1MatchParticipant.findUniqueOrThrow({ where: { applicationId } });
     await post(host, `/match-participants/${memberParticipant.id}/mark-cancelled`, { reason: '확정 후 변경' }).expect(409);
     expect(await db.v1MatchParticipant.findUnique({ where: { id: memberParticipant.id } })).toMatchObject({ status: 'completed' });
@@ -176,8 +193,9 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     const applicationId = await join(id);
     const participant = await db.v1MatchParticipant.findUniqueOrThrow({ where: { applicationId } });
     await end(id);
+    const body = await completionBody(id);
     const [complete, absence] = await Promise.all([
-      post(host, `/matches/${id}/complete`),
+      post(host, `/matches/${id}/complete`, body),
       post(host, `/match-participants/${participant.id}/mark-cancelled`, { reason: '현장 불참 확인' }),
     ]);
     expect(complete.status).toBe(201);
@@ -279,7 +297,7 @@ describe('개인 매치 참여 이력 HTTP/DB 계약', () => {
     const applicationId = await join(id);
     await post(member, `/match-applications/${applicationId}/withdraw`).expect(201);
     await end(id);
-    await post(host, `/matches/${id}/complete`).expect(201);
+    await post(host, `/matches/${id}/complete`, await completionBody(id)).expect(201);
     expect(await db.v1MatchParticipant.findUnique({ where: { matchId_userId: { matchId: id, userId: member } } })).toMatchObject({ status: 'cancelled', completedAt: null });
     await get(member, `/reviews/sources/match/${id}`).expect(403);
   });

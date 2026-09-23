@@ -287,6 +287,49 @@ describe('MatchesService', () => {
     expect(prisma.v1Match.update).not.toHaveBeenCalled();
   });
 
+  it('complete: 동일 참석 payload 재시도는 저장된 완료 결과로 수렴하고 알림을 중복 발송하지 않는다', async () => {
+    const completedAt = new Date('2026-09-23T05:00:00.000Z');
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({
+      status: 'completed',
+      completedAt,
+      participants: [
+        { id: 'host-participant', userId: host.id, role: 'host', status: 'completed' },
+        { id: 'guest-participant', userId: otherUser.id, role: 'participant', status: 'completed' },
+      ],
+    }));
+
+    await expect(service.complete(host, 'match-1', {
+      participants: [{ participantId: 'guest-participant', status: 'completed' }],
+    })).resolves.toMatchObject({
+      matchId: 'match-1',
+      status: 'completed',
+      completedAt,
+      completedParticipants: 2,
+      noShowParticipants: 0,
+      expiredApplications: 0,
+    });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+    expect(prisma.v1MatchParticipant.update).not.toHaveBeenCalled();
+    expect(notifications.emitNotificationToMany).not.toHaveBeenCalled();
+  });
+
+  it('complete: 이미 확정된 참석 상태와 다른 재시도는 성공으로 위장하지 않는다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({
+      status: 'completed',
+      completedAt: new Date('2026-09-23T05:00:00.000Z'),
+      participants: [
+        { id: 'host-participant', userId: host.id, role: 'host', status: 'completed' },
+        { id: 'guest-participant', userId: otherUser.id, role: 'participant', status: 'no_show' },
+      ],
+    }));
+
+    await expect(service.complete(host, 'match-1', {
+      participants: [{ participantId: 'guest-participant', status: 'completed' }],
+    })).rejects.toMatchObject({ response: { code: 'ALREADY_PROCESSED' } });
+    expect(prisma.v1Match.update).not.toHaveBeenCalled();
+    expect(notifications.emitNotificationToMany).not.toHaveBeenCalled();
+  });
+
   it('cancel: 호스트가 아닌 사용자가 취소하면 403 PERMISSION_DENIED를 던진다', async () => {
     // getHostMatch 내부 v1Match.findFirst → 매치 존재, but hostUserId != otherUser.id
     prisma.v1Match.findFirst.mockResolvedValue(matchRow({ hostUserId: host.id }));

@@ -8,7 +8,7 @@ import type { MyMatch, MyMatchesViewModel, MyMatchStatus } from './my.types';
 export function MyMatchesPageClient({ mode }: { mode: 'joined' | 'created' }) {
   const query = useV1MyMatchesInfinite(mode);
   // Only show real data. Mock fallback matches must never appear in place of real data.
-  const matches = query.data ? query.data.pages.flatMap((page) => page.items).filter((item, index, items) => items.findIndex((other) => (other.matchId ?? other.id) === (item.matchId ?? item.id)) === index).map(toMyMatch) : [];
+  const matches = query.data ? query.data.pages.flatMap((page) => page.items).filter((item, index, items) => items.findIndex((other) => (other.matchId ?? other.id) === (item.matchId ?? item.id)) === index).map((match) => toMyMatch(match, mode)) : [];
 
   const model: MyMatchesViewModel = {
     mode,
@@ -27,7 +27,7 @@ export function MyMatchesPageClient({ mode }: { mode: 'joined' | 'created' }) {
 }
 
 
-function toMyMatch(match: V1Match): MyMatch {
+function toMyMatch(match: V1Match, mode: 'joined' | 'created'): MyMatch {
   const status = toMyStatus(match);
   const id = match.matchId ?? match.id;
   const canReview = isReviewableMatch(match);
@@ -39,7 +39,8 @@ function toMyMatch(match: V1Match): MyMatch {
     status,
     statusLabel: statusLabel(status, match),
     note: buildNote(match, status),
-    href: `/matches/${id}`,
+    // 뒤로가기가 이 목록으로 돌아오도록 출처를 함께 넘긴다(matches-client.tsx가 `?from=`을 읽는다).
+    href: `/matches/${id}?from=${encodeURIComponent(`/my/matches/${mode}`)}`,
     reviewHref: canReview ? `/my/reviews/match/${id}` : undefined,
   };
 }

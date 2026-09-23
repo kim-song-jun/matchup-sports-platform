@@ -27,7 +27,7 @@ import { chatRoomHref } from '@/lib/chat-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { getCurrentRedirectPath, getLoginPathForRedirect } from '@/lib/session-storage';
+import { getCurrentRedirectPath, getLoginPathForRedirect, sanitizeRedirectPath } from '@/lib/session-storage';
 // 호스트팀뿐 아니라 승인된 상대팀 매니저도 자기 사이드 라인업을 관리할 수 있다 — 이 판단은
 // team-match-lineup.service.ts의 loadContext()와 완전히 동일한 규칙이라 그 규칙을 그대로
 // 재현해둔 순수 함수를 라인업 모듈에서 재사용한다(새로 만들지 않음).
@@ -227,6 +227,9 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   const router = useRouter();
   const query = useV1TeamMatch(teamMatchId, { seed });
   const recordParams = useSearchParams();
+  // topBar:false라 셸 뒤로가기가 없다 — 페이지가 직접 그리는 모바일·데스크톱 링크
+  // (team-matches-page.tsx)가 이 값을 쓴다. public-profile-client.tsx와 같은 `?from=` 패턴.
+  const fromPath = sanitizeRedirectPath(recordParams.get('from'));
   const rawViewerState = query.data ? getViewerState(query.data) : 'none';
   const canManageHostTeam = query.data?.viewer?.manageableHostTeam === true;
   // 플랫폼이 생성한 모집은 HOME/AWAY 배정 뒤에도 운영 주체가 플랫폼이다.
@@ -353,6 +356,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       ),
     },
     mode: toDetailMode(viewerState, getStatus(query.data)),
+    detailBackHref: fromPath ?? '/team-matches',
     applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess),
     // matches-client.tsx 와 같은 이유 — '처리 중' 이 '불러오는 중' 을 덮어쓴다.
     applyPending: applyTeamMatch.isPending || withdrawTeamMatch.isPending,

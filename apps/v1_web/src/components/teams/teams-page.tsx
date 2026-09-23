@@ -202,9 +202,11 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
  * Clean v1 card style + 해요체 copy.
  */
 function TeamOpenMatchesSection({
+  teamId,
   matches,
   loading,
 }: {
+  teamId: string;
   matches?: TeamDetailViewModel['openMatches'];
   loading?: boolean;
 }) {
@@ -224,7 +226,8 @@ function TeamOpenMatchesSection({
             <Link
               key={match.id}
               className="tm-pressable"
-              href={`/team-matches/${match.id}`}
+              // 뒤로가기가 이 팀 상세로 돌아오도록 출처를 함께 넘긴다(team-matches-client.tsx가 `?from=`을 읽는다).
+              href={`/team-matches/${match.id}?from=${encodeURIComponent(`/teams/${teamId}`)}`}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -642,7 +645,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               자리(경기 정보 다음)에 남기고, 그 외에는 히어로 바로 다음으로 끌어올린다. */}
           {mode !== 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
           {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} /> : null}
-          <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
+          <TeamOpenMatchesSection teamId={model.team.id} matches={model.openMatches} loading={model.openMatchesLoading} />
           <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
           <TeamRecordLinkCard
             href={`/teams/${team.id}/records`}
@@ -791,7 +794,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             피드백) — mode==='mine' 에서만 아래쪽 원래 자리(경기 정보 다음)에 남긴다. */}
         {mode !== 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
         {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} /> : null}
-        <TeamOpenMatchesSection matches={model.openMatches} loading={model.openMatchesLoading} />
+        <TeamOpenMatchesSection teamId={model.team.id} matches={model.openMatches} loading={model.openMatchesLoading} />
         <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
 
         {/* 기록으로 가는 링크 묶음. 예전에는 "팀 전적" 링크 하나가 위 매치 섹션과 **간격 0px

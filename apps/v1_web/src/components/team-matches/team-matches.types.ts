@@ -129,6 +129,12 @@ export type TeamMatchDetailViewModel = {
     }>;
   };
   mode: 'default' | 'pending' | 'approved' | 'mine';
+  /**
+   * 뒤로가기 목적지. `/team-matches/:id`는 topBar:false라 셸 뒤로가기가 없고 페이지가
+   * 직접 모바일·데스크톱 링크를 그린다 — 계산 위치: `TeamMatchDetailPageClient`
+   * (team-matches-client.tsx). 없으면 '/team-matches'로 고정.
+   */
+  detailBackHref?: string;
   applyLabel?: string;
   applyPending?: boolean;
   onApply?: () => void;

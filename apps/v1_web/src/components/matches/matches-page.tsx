@@ -309,7 +309,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
     <>
       {/* Desktop: back link + match title (mobile topbar is hidden on desktop) */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href="/matches" aria-label="매치 목록으로 돌아가기">
+        <Link className="tm-desktop-back" href={model.backHref ?? '/matches'} aria-label="뒤로가기">
           <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
         </Link>
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{match.title}</h1>
@@ -330,7 +330,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           <div className="tm-match-detail-overlay">
             <div className="tm-match-hero-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               {/* Mobile back button — hidden on desktop (desktop back is in the page head above) */}
-              <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button tm-hide-desktop" href="/matches" aria-label="뒤로가기">
+              <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button tm-hide-desktop" href={model.backHref ?? '/matches'} aria-label="뒤로가기">
                 <ChevronLeftIcon size={22} strokeWidth={2.2} />
               </Link>
               <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>

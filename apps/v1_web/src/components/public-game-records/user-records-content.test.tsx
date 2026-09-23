@@ -89,11 +89,12 @@ describe('UserRecordsContent match links', () => {
       />,
     );
 
+    // 뒤로가기가 이 활동 기록으로 돌아오도록 `?from=`을 함께 실어 보낸다(MD-QA #15 후속).
     expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
-      '/tournaments/tournament-1/matches/team-match-1',
-      '/league-matches/league-1/fixtures/team-match-league',
-      '/team-matches/team-match-friendly',
-      '/tournaments/tournament-1',
+      '/tournaments/tournament-1/matches/team-match-1?from=%2Fusers%2Fuser-1%2Frecords',
+      '/league-matches/league-1/fixtures/team-match-league?from=%2Fusers%2Fuser-1%2Frecords',
+      '/team-matches/team-match-friendly?from=%2Fusers%2Fuser-1%2Frecords',
+      '/tournaments/tournament-1?from=%2Fusers%2Fuser-1%2Frecords',
     ]);
   });
 });

@@ -14,7 +14,8 @@ describe('내 개인 매치 이력', () => {
     mock.query.mockReturnValue({ data: { pages: [{ items: [item] }, { items: [{ ...item, id: 'm51', title: '51번째 매치' }] }] }, hasNextPage: false });
     rerender(<MyMatchesPageClient mode="joined" />);
     expect(screen.getByText('51번째 매치')).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: '상세' }).at(-1)).toHaveAttribute('href', '/matches/m51');
+    // 뒤로가기가 이 목록으로 돌아오도록 `?from=`을 함께 실어 보낸다(MD-QA #15 후속).
+    expect(screen.getAllByRole('link', { name: '상세' }).at(-1)).toHaveAttribute('href', '/matches/m51?from=%2Fmy%2Fmatches%2Fjoined');
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });
 });

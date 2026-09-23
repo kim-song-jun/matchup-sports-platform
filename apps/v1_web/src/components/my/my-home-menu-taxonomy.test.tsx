@@ -70,7 +70,8 @@ const DESTINATIONS = [
   '/my/join-applications',
   '/my/matches/joined',
   '/my/matches/created',
-  '/users/user-1/records',
+  // 뒤로가기가 마이페이지로 돌아오도록 `?from=`을 함께 실어 보낸다(MD-QA #15).
+  '/users/user-1/records?from=%2Fmy',
   '/my/teams',
   '/my/leagues',
   '/my/schedule',

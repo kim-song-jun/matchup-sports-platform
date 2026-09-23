@@ -198,8 +198,8 @@ export function buildDailyMessages(
       targetId: first.teamId,
       title: isTournament
         ? `${first.tournamentTitle ?? '대회'} 라인업을 확인해 주세요`
-        : '팀 매치 라인업을 확인해 주세요',
-      body: describeDailyBody(group, soonest),
+        : '팀 매치 참석명단을 확인해 주세요',
+      body: describeDailyBody(group, soonest, isTournament),
       deepLink: soonest.deepLink,
       keyPrefix: `lineup-daily:${scope}:${first.teamId}:${dateKey}`,
     });
@@ -207,13 +207,15 @@ export function buildDailyMessages(
   return messages;
 }
 
-function describeDailyBody(group: LineupTodo[], soonest: LineupTodo): string {
+function describeDailyBody(group: LineupTodo[], soonest: LineupTodo, isTournament: boolean): string {
+  // 대회 경기는 '라인업', 팀 매치는 '참석명단' — 용어는 competitionKind로 갈린다(MD-QA #14).
+  const term = isTournament ? '라인업' : '참석명단';
   const missing = group.filter((todo) => todo.state === 'MISSING').length;
   const draft = group.length - missing;
   const parts: string[] = [];
-  if (missing > 0) parts.push(`${missing}경기는 라인업이 비어 있고`);
+  if (missing > 0) parts.push(`${missing}경기는 ${term}이 비어 있고`);
   if (draft > 0) parts.push(`${draft}경기는 아직 제출 전이에요`);
-  const status = parts.length > 0 ? parts.join(' ') : '아직 라인업이 준비되지 않았어요';
+  const status = parts.length > 0 ? parts.join(' ') : `아직 ${term}이 준비되지 않았어요`;
   const opponent = soonest.opponentName !== null ? ` vs ${soonest.opponentName}` : '';
   return `${soonest.teamName} · ${status}. 가장 가까운 경기는 ${soonest.title}${opponent}예요.`;
 }
@@ -232,18 +234,22 @@ export function buildFinalMessages(
       const remaining = todo.scheduledAt.getTime() - now.getTime();
       return remaining > 0 && remaining <= FINAL_REMINDER_WINDOW_MS;
     })
-    .map((todo) => ({
-      teamId: todo.teamId,
-      targetId: todo.teamId,
-      title: '곧 경기가 시작돼요 — 라인업을 확인해 주세요',
-      body:
-        todo.state === 'MISSING'
-          ? `${todo.title} 라인업이 아직 비어 있어요.`
-          : `${todo.title} 라인업이 아직 제출 전이에요.`,
-      deepLink: todo.deepLink,
-      // 날짜를 넣지 않는다 — 이 알림은 그 경기에 딱 한 번만 가야 한다.
-      keyPrefix: `lineup-final:${todo.gameId}:${todo.teamId}`,
-    }));
+    .map((todo) => {
+      // 대회 경기는 '라인업', 팀 매치는 '참석명단' — 용어는 competitionKind로 갈린다(MD-QA #14).
+      const term = todo.competitionKind === 'TOURNAMENT' ? '라인업' : '참석명단';
+      return {
+        teamId: todo.teamId,
+        targetId: todo.teamId,
+        title: `곧 경기가 시작돼요 — ${term}을 확인해 주세요`,
+        body:
+          todo.state === 'MISSING'
+            ? `${todo.title} ${term}이 아직 비어 있어요.`
+            : `${todo.title} ${term}이 아직 제출 전이에요.`,
+        deepLink: todo.deepLink,
+        // 날짜를 넣지 않는다 — 이 알림은 그 경기에 딱 한 번만 가야 한다.
+        keyPrefix: `lineup-final:${todo.gameId}:${todo.teamId}`,
+      };
+    });
 }
 
 /**

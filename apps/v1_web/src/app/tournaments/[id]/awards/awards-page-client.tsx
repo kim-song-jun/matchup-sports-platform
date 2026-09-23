@@ -329,11 +329,13 @@ function PlayerRecordsSection({ tournamentId, isRegularLeague }: { tournamentId:
   const tournamentRecords = usePublicTournamentPlayerRecords(tournamentId, { enabled: !isRegularLeague });
   const leagueRecords = useV1LeagueMatchPlayerRecords(isRegularLeague ? tournamentId : '');
   const records = isRegularLeague ? leagueRecords : tournamentRecords;
+  // 뒤로가기가 이 어워드 화면으로 돌아오도록 출처를 함께 넘긴다(public-profile-client.tsx가 `?from=`을 읽는다).
+  const fromHref = `/tournaments/${tournamentId}/awards`;
   const goals = isRegularLeague
-    ? (leagueRecords.data?.goals ?? []).map((row) => ({ ...row, profileHref: `/users/${row.userId}` }))
+    ? (leagueRecords.data?.goals ?? []).map((row) => ({ ...row, profileHref: `/users/${row.userId}?from=${encodeURIComponent(fromHref)}` }))
     : tournamentRecords.data?.goals;
   const assists = isRegularLeague
-    ? (leagueRecords.data?.assists ?? []).map((row) => ({ ...row, profileHref: `/users/${row.userId}` }))
+    ? (leagueRecords.data?.assists ?? []).map((row) => ({ ...row, profileHref: `/users/${row.userId}?from=${encodeURIComponent(fromHref)}` }))
     : tournamentRecords.data?.assists;
   return (
     <TournamentPlayerRecordsSections
@@ -375,7 +377,9 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
           // M-A 감사: 바로 위 개인 기록 섹션은 이미 같은 화면에서 /users/:id 링크를
           // 공개한다 — recipientUserId가 있을 때만(탈퇴 계정 제외, presenter가 걸러줌)
           // 같은 방식으로 아바타+링크를 붙인다. 없으면 기존 아이콘·일반 텍스트 그대로.
-          const profileHref = award.recipientUserId ? `/users/${award.recipientUserId}` : null;
+          const profileHref = award.recipientUserId
+            ? `/users/${award.recipientUserId}?from=${encodeURIComponent(`/tournaments/${tournament.id}/awards`)}`
+            : null;
           const content = (
             <>
               {profileHref ? (

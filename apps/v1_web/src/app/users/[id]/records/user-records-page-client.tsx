@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
+import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { usePublicUserRecords } from '@/components/public-game-records/use-public-game-records';
 import { UserRecordsContent } from '@/components/public-game-records/user-records-content';
 import type { RecordTypeFilter } from '@/components/public-game-records/record-category-tabs';
@@ -32,8 +34,13 @@ export function UserRecordsPageClient({ userId }: { userId: string }) {
   // Hooks 규칙: loading/error 조기 return보다 위에서 항상 호출한다(fetch된 제목 패턴,
   // app-shell-promotion.md §1.9). 로딩/에러 중엔 firstPage가 없어 fragment의 기본값
   // ('활동 기록')이 그대로 유지된다.
+  // 마이페이지 등 프로필을 거치지 않고 바로 들어오는 진입점을 위한 `?from=`
+  // 오버라이드 — public-profile-client.tsx와 동일 패턴(route-chrome backHref는
+  // 검색 파라미터를 못 받는다).
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   useShellOverride({
     title: firstPage?.nickname ? `${firstPage.nickname} 님의 활동 기록` : '활동 기록',
+    ...(fromPath ? { backHref: fromPath } : {}),
   });
 
   if (isLoading) {

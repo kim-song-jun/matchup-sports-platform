@@ -66,7 +66,7 @@ export const TEAM_MATCHES_ROUTES: RouteChromeEntry[] = [
   {
     pattern: '/team-matches/:id/lineup',
     chrome: {
-      title: '라인업',
+      title: '참석명단',
       bottomNav: false,
       backHref: (p) => `/team-matches/${p.id}`,
       desktopHead: true,

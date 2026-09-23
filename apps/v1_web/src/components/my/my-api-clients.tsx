@@ -2302,11 +2302,14 @@ function toMyHomeModel(
   // F3: 마이페이지에서 내 활동 기록(/users/:id/records)으로 가는 동선이 아예 없었다 —
   // 정적 myHomeModel엔 내 userId를 미리 넣을 수 없어 여기서 프로필 응답으로 동적으로 붙인다.
   const myActivitySection = sections.find((section) => section.title === '내 활동');
-  if (myActivitySection && !myActivitySection.items.some((item) => item.href === `/users/${profile.userId}/records`)) {
+  // 뒤로가기가 마이페이지로 돌아오도록 출처를 함께 넘긴다(teams-client.tsx의 팀 상세
+  // profileHref와 동일 패턴 — user-records-page-client.tsx가 `?from=`을 읽는다).
+  const activityRecordsHref = `/users/${profile.userId}/records?from=${encodeURIComponent('/my')}`;
+  if (myActivitySection && !myActivitySection.items.some((item) => item.href === activityRecordsHref)) {
     myActivitySection.items.push({
       label: '내 활동 기록',
       sub: '팀 라인업에 연결된 경기 기록을 확인해요',
-      href: `/users/${profile.userId}/records`,
+      href: activityRecordsHref,
       icon: 'Award',
     });
   }

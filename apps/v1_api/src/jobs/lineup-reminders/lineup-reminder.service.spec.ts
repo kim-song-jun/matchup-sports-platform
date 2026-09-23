@@ -67,6 +67,25 @@ describe('LineupReminderService', () => {
     ]);
   });
 
+  // MD-QA #14: 팀 매치 알림이 대회용 "라인업" 문구를 그대로 쓰고 있었다 — 대회는 라인업,
+  // 팀 매치는 참석명단으로 갈려야 한다.
+  it('uses "참석명단" wording for team-match (non-tournament) daily reminders, "라인업" for tournaments', () => {
+    const messages = buildDailyMessages([
+      fakeTodo({ competitionKind: 'FRIENDLY', gameId: 'friendly-1', state: 'MISSING' }),
+      fakeTodo({ competitionKind: 'TOURNAMENT', tournamentId: 'cup', tournamentTitle: '대회', gameId: 'tournament-1' }),
+    ], '2026-08-27');
+
+    const friendlyMessage = messages.find((message) => message.keyPrefix === 'lineup-daily:game:friendly-1:team-1:2026-08-27');
+    const tournamentMessage = messages.find((message) => message.keyPrefix.startsWith('lineup-daily:tournament:cup:'));
+
+    expect(friendlyMessage?.title).toBe('팀 매치 참석명단을 확인해 주세요');
+    expect(friendlyMessage?.body).toContain('참석명단이 비어 있고');
+    expect(friendlyMessage?.body).not.toContain('라인업');
+
+    expect(tournamentMessage?.title).toBe('대회 라인업을 확인해 주세요');
+    expect(tournamentMessage?.body).toContain('라인업이 비어 있고');
+  });
+
   function fakeClaim(overrides: { id?: string; afterCommit?: Array<() => void | Promise<void>> } = {}) {
     return {
       id: overrides.id ?? 'outbox-1',

@@ -142,7 +142,7 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
                   <div className="tm-my-account-actions">
                     <Link
                       className="tm-btn tm-btn-sm tm-btn-neutral"
-                      href={`/users/${encodeURIComponent(model.user.userId)}`}
+                      href={`/users/${encodeURIComponent(model.user.userId)}?from=${encodeURIComponent('/my')}`}
                     >
                       내 프로필
                     </Link>
@@ -555,7 +555,7 @@ function MyTeamCard({ team }: { team: MyTeam }) {
   const isManager = team.role === 'manager' || team.role === 'admin';
   const badgeClass = isOwner || isManager ? 'tm-badge tm-badge-blue' : 'tm-badge tm-badge-grey';
   return (
-    <Link className="tm-my-team-card tm-pressable" href={`/teams/${team.id}`}>
+    <Link className="tm-my-team-card tm-pressable" href={`/teams/${team.id}?from=${encodeURIComponent('/my/teams')}`}>
       <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-my-card-head">

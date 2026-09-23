@@ -153,7 +153,13 @@ function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: T
     const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
     return approvedOpponent?.name ?? '승인 완료';
   }
-  if (mode === 'mine') return '신청팀';
+  if (mode === 'mine') {
+    // 생성팀 뷰도 승인 완료 후에는 'approved'/'closed' 분기와 같은 근거(applicantTeams의
+    // '승인 완료' 항목)로 실제 상대팀 이름을 보여줘야 한다 — 그 전까지는 '신청팀'
+    // placeholder다(MD-QA #16: 승인 완료 후에도 상단이 계속 '신청팀'으로 고정돼 있었다).
+    const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
+    return approvedOpponent?.name ?? '신청팀';
+  }
   if (match.status === 'closed') {
     // approvedOpponentTeam이 있으면 applicantTeams에 그 팀 하나만 '승인 완료' 상태로 담겨
     // 온다(team-matches-client.tsx toApplicantTeamsWithActions) — guest에게도 이 필드는
@@ -167,7 +173,10 @@ function teamMatchOpponentLabel(mode: TeamMatchDetailViewModel['mode'], match: T
 function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: TeamMatchDetailViewModel['match'], statusLabel?: string) {
   if (mode === 'pending') return '홈팀 검토 중';
   if (mode === 'approved') return '참가 확정';
-  if (mode === 'mine') return '승인 후 확정';
+  if (mode === 'mine') {
+    const approvedOpponent = match.applicantTeams.find((team) => team.status === '승인 완료');
+    return approvedOpponent ? '참가 확정' : '승인 후 확정';
+  }
   // statusLabel(모델에서 이미 계산돼 온 문구)이 matched/completed/cancelled를
   // 구분해 정확한 상태를 준다 — team-matches-client.tsx statusLabel() 참고.
   if (match.status === 'closed') return statusLabel ?? '신청 마감';

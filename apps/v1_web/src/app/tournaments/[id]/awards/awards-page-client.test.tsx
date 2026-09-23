@@ -495,7 +495,8 @@ describe('AwardsPageClient — 개인 어워드 수상자 프로필 링크(M-A)'
     render(<AwardsPageClient tournamentId="tournament-1" />);
 
     const link = screen.getByRole('link', { name: 'MVP 수상자 tester 프로필 보기' });
-    expect(link).toHaveAttribute('href', '/users/user-59050e8a');
+    // 뒤로가기가 이 어워드 화면으로 돌아오도록 `?from=`을 함께 실어 보낸다(MD-QA #15).
+    expect(link).toHaveAttribute('href', '/users/user-59050e8a?from=%2Ftournaments%2Ftournament-1%2Fawards');
     expect(link).toHaveTextContent('tester');
   });
 

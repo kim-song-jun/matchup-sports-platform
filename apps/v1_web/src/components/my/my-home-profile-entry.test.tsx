@@ -72,7 +72,8 @@ describe('MyHomePageClient — 공개 프로필 진입점', () => {
 
     render(<MyHomePageClient />);
 
-    expect(screen.getByRole('link', { name: '내 프로필' })).toHaveAttribute('href', '/users/user-42');
+    // 뒤로가기가 마이페이지로 돌아오도록 `?from=`을 함께 실어 보낸다(MD-QA #15).
+    expect(screen.getByRole('link', { name: '내 프로필' })).toHaveAttribute('href', '/users/user-42?from=%2Fmy');
   });
 
   it('프로필 수정 진입은 그대로 남는다 (기존 경로를 대체하지 않는다)', () => {

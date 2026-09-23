@@ -101,6 +101,7 @@ describe('선수 카드 공유 화면', () => {
     renderShare();
 
     expect(screen.queryByRole('link', { name: '카드 공유하기' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '프로필 전체 보기' })).toHaveAttribute('href', '/users/u-1');
+    // 뒤로가기가 이 카드 화면으로 돌아오도록 `?from=`을 함께 실어 보낸다(MD-QA #15).
+    expect(screen.getByRole('link', { name: '프로필 전체 보기' })).toHaveAttribute('href', '/users/u-1?from=%2Fusers%2Fu-1%2Fcard');
   });
 });

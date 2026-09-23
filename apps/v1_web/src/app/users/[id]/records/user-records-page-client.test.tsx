@@ -31,6 +31,12 @@ vi.mock('@/components/v1-ui/shell-override', () => ({
   useShellOverride: shellOverride.useShellOverride,
 }));
 
+const navigation = vi.hoisted(() => ({ searchParams: new URLSearchParams() }));
+
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => navigation.searchParams,
+}));
+
 const mocks = vi.hoisted(() => ({ usePublicUserRecords: vi.fn() }));
 
 vi.mock('@/components/public-game-records/use-public-game-records', () => ({
@@ -70,10 +76,16 @@ function lastOverrideTitle() {
   return calls[calls.length - 1]?.[0]?.title as string | undefined;
 }
 
+function lastOverrideBackHref() {
+  const calls = shellOverride.useShellOverride.mock.calls;
+  return calls[calls.length - 1]?.[0]?.backHref as string | undefined;
+}
+
 describe('UserRecordsPageClient', () => {
   beforeEach(() => {
     mocks.usePublicUserRecords.mockReset();
     shellOverride.useShellOverride.mockReset();
+    navigation.searchParams = new URLSearchParams();
   });
 
   it('names whose records these are so a deep-linked visitor can tell', () => {
@@ -92,5 +104,25 @@ describe('UserRecordsPageClient', () => {
 
     expect(lastOverrideTitle()).toBe('활동 기록');
     expect(screen.queryByText(/user-1/)).toBeNull();
+  });
+
+  // MD-QA #15: 마이페이지 등 프로필을 거치지 않고 바로 들어온 진입점에서도 뒤로가기가
+  // 그 화면으로 돌아와야 한다 — 이 페이지는 종전에 `?from=`을 전혀 읽지 않았다.
+  it('honors ?from= so back-navigation returns to the actual entry point', () => {
+    mocks.usePublicUserRecords.mockReturnValue(loaded('멤버현'));
+    navigation.searchParams = new URLSearchParams('from=%2Fmy');
+
+    render(<UserRecordsPageClient userId="user-1" />);
+
+    expect(lastOverrideBackHref()).toBe('/my');
+  });
+
+  it('ignores an unsafe ?from= value and leaves the default backHref untouched', () => {
+    mocks.usePublicUserRecords.mockReturnValue(loaded('멤버현'));
+    navigation.searchParams = new URLSearchParams('from=https%3A%2F%2Fevil.example');
+
+    render(<UserRecordsPageClient userId="user-1" />);
+
+    expect(lastOverrideBackHref()).toBeUndefined();
   });
 });

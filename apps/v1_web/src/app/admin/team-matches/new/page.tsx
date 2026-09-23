@@ -282,7 +282,7 @@ export default function AdminTeamMatchNewPage() {
           </section>
 
           <div className="rounded-xl bg-[var(--surface-soft)] p-4 text-[length:var(--font-size-body-sm)] text-[var(--text-muted)]">
-            생성 후 팀매치 목록에 모집 중으로 공개돼요. 신청이 모이면 관리자 상세에서 홈팀과 상대팀을 선택해 확정할 수 있어요.
+            생성 후 팀매치 목록에 모집 중으로 공개돼요. 신청팀을 한 팀씩 승인할 수 있고, 두 번째 팀을 승인하면 매치가 자동으로 확정돼요.
           </div>
 
           <button

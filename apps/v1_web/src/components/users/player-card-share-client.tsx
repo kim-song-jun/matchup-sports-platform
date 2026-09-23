@@ -79,7 +79,8 @@ export function PlayerCardShareClient({
         </div>
       ) : null}
 
-      <Link href={`/users/${userId}`} className="tm-player-card-share-secondary">
+      {/* 뒤로가기가 이 카드 화면으로 돌아오도록 출처를 함께 넘긴다(public-profile-client.tsx가 `?from=`을 읽는다). */}
+      <Link href={`/users/${userId}?from=${encodeURIComponent(`/users/${userId}/card`)}`} className="tm-player-card-share-secondary">
         프로필 전체 보기
       </Link>
     </div>

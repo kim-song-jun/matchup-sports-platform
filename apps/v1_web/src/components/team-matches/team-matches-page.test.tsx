@@ -849,6 +849,24 @@ describe('TeamMatchDetailPageView — 신청팀 후속 행동', () => {
     expect(screen.getByText('아직 신청한 팀이 없어요.')).toBeInTheDocument();
   });
 
+  // MD-QA #16: 생성팀 계정에서 상대팀 승인 완료 후에도 상세 상단이 실제 팀명 대신
+  // '신청팀 / 승인 후 확정' placeholder에 고정돼 있었다.
+  it('생성팀 뷰에서 상대팀 승인 완료 후에는 상단에 실제 상대팀 이름과 참가 확정 상태를 보여준다', () => {
+    const model = getTeamMatchDetailViewModel('mine');
+    model.match.applicantTeams = [{
+      name: '한강 로버스',
+      meta: '승인된 상대팀',
+      status: '승인 완료',
+      href: '/teams/team-hangang',
+      applicationId: 'application-1',
+    }];
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getByText('참가 확정')).toBeInTheDocument();
+    expect(screen.queryByText('승인 후 확정')).not.toBeInTheDocument();
+  });
+
   it('상세의 팀매치 취소는 확인 전에는 실행하지 않는다', async () => {
     const onCancel = vi.fn();
     const model = getTeamMatchDetailViewModel('mine');

@@ -37,7 +37,8 @@ import { isUnauthenticatedError, retryTransientFailure, V1ApiError } from '@/lib
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
-import { getLoginPathForRedirect } from '@/lib/session-storage';
+import { getLoginPathForRedirect, sanitizeRedirectPath } from '@/lib/session-storage';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
@@ -196,6 +197,11 @@ export function TeamListPageClient({ seed }: { seed?: { page: CursorPage<V1Team>
  */
 export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V1TeamDetail | null }) {
   const router = useRouter();
+  // 내 팀 목록 등 특정 화면에서 들어왔으면 뒤로가기를 그 화면으로 되돌린다(`?from=`).
+  // route-chrome 테이블의 backHref(fragments/teams.ts)는 검색 파라미터를 못 받아
+  // 기본값 '/teams'로 고정돼 있었다 — public-profile-client.tsx와 동일한 ShellOverride로 메운다.
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  useShellOverride(fromPath ? { backHref: fromPath } : {});
   // The current /auth/me result is the only authority for protected actions. A
   // local hint can be stale, while a cold HttpOnly cookie has no local hint.
   const authMe = useV1AuthMe({ enabled: true, retry: retryTransientFailure });
@@ -523,7 +529,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
     },
     members: memberItems.length
       ? memberItems.map((member) =>
-          toMemberModel(member, {
+          toMemberModel(member, teamId, {
             actionPending,
             canManageMembers,
             canDelegateOwner,
@@ -560,7 +566,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
         )
       : fallback.members,
     requests: requestItems.map((application) =>
-      toRequestModel(application, {
+      toRequestModel(application, teamId, {
         actionPending,
         approve: () => confirmAction(confirm, { title: '가입 신청 승인', message: `${application.applicant.displayName}님의 가입 신청을 승인할까요?`, confirmLabel: '승인' }, () => approveApplication.mutate(
           { applicationId: application.applicationId, note: null },
@@ -973,6 +979,7 @@ function isTeamMemberRole(role?: string | null) {
 
 function toMemberModel(
   member: V1TeamMember,
+  teamId: string,
   actions: {
     actionPending: boolean;
     canManageMembers: boolean;
@@ -1016,7 +1023,9 @@ function toMemberModel(
       member.jerseyNumber === null || member.jerseyNumber === undefined
         ? `가입 ${formatDate(member.joinedAt)}`
         : `${member.jerseyNumber}번 · 가입 ${formatDate(member.joinedAt)}`,
-    profileHref: `/users/${member.userId}`,
+    // 뒤로가기가 팀원 목록으로 돌아오도록 출처를 함께 넘긴다(팀 상세 "주요 멤버"
+    // 미리보기와 동일 패턴 — public-profile-client.tsx가 `?from=`을 읽는다).
+    profileHref: `/users/${member.userId}?from=${encodeURIComponent(`/teams/${teamId}/members`)}`,
     locked: member.role === 'owner',
     actions: itemActions,
     actionPending: actions.actionPending,
@@ -1053,6 +1062,7 @@ async function shareTeam(team: V1TeamDetail) {
 
 function toRequestModel(
   application: V1TeamJoinApplication,
+  teamId: string,
   actions: {
     actionPending: boolean;
     approve: () => void;
@@ -1063,7 +1073,8 @@ function toRequestModel(
     name: application.applicant.displayName,
     meta: application.message ?? `신청 ${formatDate(application.createdAt)}`,
     status: teamJoinApplicationStatusLabel(application.status),
-    profileHref: `/users/${application.applicant.userId}`,
+    // 뒤로가기가 가입 신청 목록으로 돌아오도록 출처를 함께 넘긴다(toMemberModel과 동일 패턴).
+    profileHref: `/users/${application.applicant.userId}?from=${encodeURIComponent(`/teams/${teamId}/members`)}`,
     actions: [
       { label: '승인', onSelect: actions.approve },
       { label: '거절', tone: 'danger', onSelect: actions.reject },

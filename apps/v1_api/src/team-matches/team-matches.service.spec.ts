@@ -1005,6 +1005,49 @@ describe('TeamMatchesService', () => {
     expect(result.viewer.manageableHostTeam).toBe(false);
   });
 
+  it('detail: 플랫폼 HOME 팀 운영진은 참가 권한만 있고 모집 운영자 상태를 얻지 않는다', async () => {
+    const teamMatch = {
+      ...teamMatchRow({
+        status: 'matched',
+        startAt: FUTURE,
+        platformManaged: true,
+        approvedApplicantTeamId: 'team-away',
+        createdByUserId: 'admin-user',
+      }),
+      sport: { id: 'sport-1', name: '풋살' },
+      region: { id: 'region-1', name: '서울' },
+      minSportLevel: null,
+      maxSportLevel: null,
+      hostTeam: {
+        id: 'team-host',
+        name: 'HOME 참가팀',
+        ownerUserId: manager.id,
+        status: 'active',
+        profile: null,
+        trustScore: null,
+        memberships: [{ id: 'mem-home', userId: manager.id, role: 'owner', status: 'active' }],
+      },
+      approvedApplicantTeam: {
+        id: 'team-away',
+        name: 'AWAY 참가팀',
+        memberships: [],
+      },
+      applications: [],
+      game: { id: 'game-platform' },
+    };
+    prisma.v1TeamMatch.findFirst.mockResolvedValue(teamMatch);
+    prisma.v1Team.findMany.mockResolvedValue([]);
+
+    const result = await service.detail(manager, 'tm-1');
+
+    expect(result.viewer).toMatchObject({
+      state: 'none',
+      manageableHostTeam: true,
+      participantMember: true,
+      manageRoute: null,
+    });
+  });
+
   // 후기 자격은 역할을 안 가린다(reviews.service.ts resolveReviewerTeams: 두 팀의 active 멤버
   // 전원). 그런데 `viewer.state` 는 host 팀 owner/manager 에게만 'host_team' 을, 신청서를 낸
   // 한 사람에게만 'approved' 를 준다 — 바로 위 테스트가 그 사실을 고정하고 있다. 그래서 화면이

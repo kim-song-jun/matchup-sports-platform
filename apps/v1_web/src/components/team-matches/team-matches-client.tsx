@@ -239,7 +239,13 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   const canManageOpponentTeam = query.data?.viewer?.manageableOpponentTeam === true;
   // 채팅 게이트의 한 축 — 이 값이 있으면 상대가 확정된 것이다(types/api.ts 참조).
   const opponentAssigned = Boolean(query.data?.approvedOpponentTeam);
-  const viewerState = rawViewerState === 'host_team' && !canManageHostTeam ? 'none' : rawViewerState;
+  // platformManaged의 hostTeam은 경기 HOME 사이드일 뿐 모집 운영자가 아니다. 서버가
+  // host_team을 내리지 않는 것이 정본이지만, API/Web 롤링 배포 중 구 응답이 남아도
+  // "내가 만든 팀매치"/"매치 관리"가 다시 노출되지 않도록 화면에서도 방어한다.
+  const viewerState =
+    rawViewerState === 'host_team' && (!canManageHostTeam || query.data?.platformManaged === true)
+      ? 'none'
+      : rawViewerState;
   // 후기 진입점 전용 — 위 `viewerState` 는 관리 권한 기준으로 좁혀진 값이라 쓸 수 없다.
   const isParticipantMember = query.data?.viewer?.participantMember === true;
   // guest = 비인증 사용자: viewerState가 'guest'이거나 query.data에 viewer.state='guest'로 내려오는 경우

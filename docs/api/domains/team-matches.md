@@ -104,7 +104,7 @@ Rules:
 - 첫 번째 승인에서는 해당 신청만 `approved`로 바꾸고 팀매치는 `recruiting`을 유지한다. Game과 team schedule은 아직 만들지 않는다.
 - 두 번째 승인에서는 먼저 승인한 팀을 HOME(`hostTeamId`), 새 승인 팀을 AWAY(`approvedApplicantTeamId`)로 연결하고 팀매치를 `matched`로 바꾼다.
 - 배정 뒤에도 저장된 `platformManaged=true`는 유지된다. 공개 목록/상세는 실제 홈·원정 팀과 `플랫폼 주관` 출처를 함께 노출한다.
-- 플랫폼 모집의 HOME/AWAY는 경기 사이드 식별자다. HOME 팀 owner/manager도 참석명단·채팅·경기 기록에는 참여하지만 모집 수정·마감·취소, 신청 승인/거절 권한은 얻지 않으며 이 운영 권한은 관리자에게 남는다.
+- 플랫폼 모집의 HOME/AWAY는 경기 사이드 식별자다. HOME 팀 owner/manager도 참석명단·채팅·경기 기록에는 참여하지만 모집 수정·마감·취소, 신청 승인/거절 권한은 얻지 않으며 이 운영 권한은 관리자에게 남는다. 따라서 공개 목록/상세의 `viewerState`/`viewer.state`도 플랫폼 HOME 팀에 `host_team`을 부여하지 않고 `viewer.manageRoute`는 `null`이다. `viewer.manageableHostTeam`은 HOME 사이드의 참가 기능 판정일 뿐 모집 관리 권한이 아니다.
 - 두 번째 승인 때 나머지 `requested` 신청을 `rejected`로 전환한다.
 - 두 번째 승인과 Game HOME/AWAY side, 양 팀 schedule, application/team-match 상태 로그, admin action log를 한 트랜잭션에서 생성한다.
 - 성공 응답은 `applicationId`, `applicantTeamId`, `applicationStatus`, `teamMatchId`, `teamMatchStatus`, `approvedCount`, nullable `gameId`/`homeTeamId`/`awayTeamId`, `detailRoute`, `replayed`를 포함한다.

@@ -1144,6 +1144,7 @@ export type V1TeamMatch = V1Match & {
   viewerState?: V1TeamMatchViewerState;
   viewer?: {
     state: V1TeamMatchViewerState;
+    /** HOME 사이드 팀의 owner/manager 여부. 플랫폼 모집의 운영·수정 권한을 뜻하지 않는다. */
     manageableHostTeam?: boolean;
     /** 승인된 신청팀(상대팀)의 owner/manager 인가 — 결과 승인 진입 게이트. */
     manageableOpponentTeam?: boolean;

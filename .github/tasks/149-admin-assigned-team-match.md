@@ -24,6 +24,7 @@ Status: complete
 - [x] Platform-managed provenance is persisted independently of `hostTeamId` and remains visible after home/away assignment.
 - [x] Admins approve applicant teams one at a time; the first approval stays recruiting and the second approval finalizes the match.
 - [x] The admin list exposes a visible application-management action as soon as one requested application exists.
+- [x] HOME/AWAY assignment never promotes either participant team into the platform recruitment operator; platform HOME viewers receive no `host_team` state or recruitment-management CTA.
 
 ## Acceptance Criteria
 
@@ -80,6 +81,7 @@ Status: complete
 - 2026-09-19: A fresh isolated PostgreSQL runtime proved the real public journey with `host@teameet.v1` managing `송파 풋살 모임`: admin recruitment create `201`, public list same-ID lookup, browser application `201 requested`, and admin persisted count `1`. `e2e/v1-tests/admin-platform-team-match-flow.spec.ts` passed 1/1 in the official Playwright QA container. Headed Chrome reported zero console, page, request, or API errors; 40 cancelled Next RSC prefetches were classified separately as expected navigation aborts.
 - 2026-09-21: Admin recruitment condition inputs and persistence were aligned with ordinary team-match recruitment. The deadline is optional, price inputs serialize to the shared `costNote` format, and admin detail now shows the saved image and level. Focused API/Web tests passed.
 - 2026-09-21: `platformManaged` became a persisted team-match source flag. Assignment keeps it true, while public cards and detail show the actual home/away teams plus an explicit platform-managed badge.
+- 2026-09-23: Separated HOME-side participation from recruitment ownership. Platform-managed matches no longer return `host_team` or render “내가 만든 팀매치 / 매치 관리” for the first approved team; server mutation guards remain admin-only.
 
 - 2026-09-21: Headed Chrome real-runtime capture created a platform recruitment, accepted two real team applications, assigned HOME/AWAY, followed the public list card link, and verified the persisted platform badge, both team names, and 120,000/60,000 cost split on the public detail at desktop, tablet, and mobile viewports.
 

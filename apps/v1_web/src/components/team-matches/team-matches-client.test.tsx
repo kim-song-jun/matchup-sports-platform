@@ -183,6 +183,44 @@ describe('TeamMatchDetailPageClient — GA events', () => {
     expect(screen.queryByText('승인 완료')).not.toBeInTheDocument();
   });
 
+  it('플랫폼 HOME 팀을 모집 운영자로 표시하지 않는다', () => {
+    // 롤링 배포 중 구 API가 host_team을 내려도 Web이 관리 CTA를 복구하지 않아야 한다.
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-1',
+        teamMatchId: 'team-match-1',
+        title: '플랫폼 풋살 매치',
+        sportName: '풋살',
+        placeName: '서울 풋살장',
+        status: 'matched',
+        platformManaged: true,
+        startsAt: new Date(Date.now() + 3600_000).toISOString(),
+        viewerState: 'host_team',
+        viewer: {
+          state: 'host_team',
+          manageableHostTeam: true,
+          manageableOpponentTeam: false,
+          participantMember: true,
+          eligibleTeams: [],
+          manageRoute: null,
+        },
+        hostTeam: { teamId: 'team-home', name: 'HOME 참가팀' },
+        approvedOpponentTeam: { teamId: 'team-away', name: 'AWAY 참가팀' },
+      },
+      isError: false,
+      isPlaceholderData: false,
+    });
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByTestId('team-match-mode')).toHaveTextContent('default');
+    expect(screen.getByTestId('team-match-status-label')).toHaveTextContent('상대팀 확정');
+    expect(screen.getByTestId('team-match-apply-label')).toHaveTextContent('신청 불가');
+    expect(screen.getByTestId('team-match-host-actions')).toBeEmptyDOMElement();
+    expect(screen.queryByText('매치 관리')).not.toBeInTheDocument();
+    expect(screen.queryByText('내가 만든 팀매치')).not.toBeInTheDocument();
+  });
+
   it('종목이 다른 팀만 있으면 "팀 만들기" 유도 대신 종목이 다르다는 사유를 보여준다', () => {
     // status는 beforeEach 기준 'recruiting'이라 신청 마감 분기(status !== 'recruiting')를
     // 타지 않고 reasonLabel(reasonCode)까지 도달한다. eligible:false + SPORT_MISMATCH인

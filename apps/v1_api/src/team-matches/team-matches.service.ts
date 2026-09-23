@@ -1605,7 +1605,11 @@ export class TeamMatchesService {
 
   private getViewerState(teamMatch: TeamMatchWithRelations, user: V1AuthUser | null) {
     if (!user) return 'none';
+    // 플랫폼 모집의 hostTeamId는 두 참가팀 중 HOME 사이드를 가리킬 뿐, 모집 운영자를
+    // 뜻하지 않는다. 여기서 host_team을 부여하면 목록/상세가 "내가 만든 팀매치"와
+    // "매치 관리"를 노출해 첫 승인 팀이 플랫폼 모집의 운영권을 얻은 것처럼 보인다.
     if (
+      !teamMatch.platformManaged &&
       teamMatch.hostTeam?.memberships.some(
         (membership) =>
           membership.userId === user.id &&

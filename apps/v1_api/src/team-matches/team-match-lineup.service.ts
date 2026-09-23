@@ -94,7 +94,7 @@ function assertLineupMutationAllowed(context: TeamMatchLineupContext): void {
   if (context.status !== 'completed' && context.status !== 'cancelled' && context.status !== 'archived') return;
   throw new ConflictException({
     code: 'LINEUP_MATCH_TERMINAL',
-    message: '종료되거나 취소된 경기의 라인업은 수정할 수 없어요.',
+    message: '종료되거나 취소된 경기의 참석명단은 수정할 수 없어요.',
   });
 }
 
@@ -156,7 +156,7 @@ export class TeamMatchLineupService {
           if (Date.now() >= context.startAt.getTime()) {
             throw new ConflictException({
               code: 'LINEUP_DEADLINE_PASSED',
-              message: '경기 시작 이후에는 라인업을 직접 수정할 수 없어요. 상대팀에 정정을 요청해 주세요.',
+              message: '경기 시작 이후에는 참석명단을 직접 수정할 수 없어요. 상대팀에 정정을 요청해 주세요.',
             });
           }
           const previous = await this.lazyLock(
@@ -164,10 +164,10 @@ export class TeamMatchLineupService {
             await this.latestLineup(tx, context.gameId, context.ownSideId),
             context.startAt,
           );
-          if (previous !== null && previous.state !== V1GameLineupState.DRAFT) {
+          if (previous?.state === V1GameLineupState.LOCKED) {
             throw new ConflictException({
               code: 'LINEUP_LOCKED_FOR_DIRECT_EDIT',
-              message: '제출된 라인업은 직접 수정할 수 없어요. 상대팀의 정정 요청이 있어야 다시 작성할 수 있어요.',
+              message: '경기가 시작된 후에는 참석명단을 수정할 수 없어요.',
             });
           }
           // The CAS token is the lineup chain's `revision`, not the raw
@@ -180,7 +180,7 @@ export class TeamMatchLineupService {
             // team-schedules.service.ts 등 다른 VERSION_CONFLICT 던지는 곳과 동일한 계약으로 맞춘다.
             throw new ConflictException({
               code: 'VERSION_CONFLICT',
-              message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
+              message: '참석명단이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
               details: { expectedVersion: dto.expectedVersion, currentVersion: previous?.revision ?? 0 },
             });
           }
@@ -298,7 +298,7 @@ export class TeamMatchLineupService {
           if (Date.now() >= context.startAt.getTime()) {
             throw new ConflictException({
               code: 'LINEUP_DEADLINE_PASSED',
-              message: '경기 시작 이후에는 라인업을 제출할 수 없어요.',
+              message: '경기 시작 이후에는 참석명단을 제출할 수 없어요.',
             });
           }
           const lineup = await this.lazyLock(
@@ -309,19 +309,19 @@ export class TeamMatchLineupService {
           if (lineup === null) {
             throw new NotFoundException({
               code: 'LINEUP_DRAFT_NOT_FOUND',
-              message: '제출할 라인업 초안이 없어요. 먼저 라인업을 작성해 주세요.',
+              message: '제출할 참석명단 초안이 없어요. 먼저 참석명단을 작성해 주세요.',
             });
           }
           if (lineup.state !== V1GameLineupState.DRAFT) {
             throw new ConflictException({
               code: 'LINEUP_ALREADY_SUBMITTED',
-              message: '이미 제출된 라인업이에요.',
+              message: '이미 제출된 참석명단이에요.',
             });
           }
           if (lineup.revision !== dto.expectedVersion) {
             throw new ConflictException({
               code: 'VERSION_CONFLICT',
-              message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
+              message: '참석명단이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
               details: { expectedVersion: dto.expectedVersion, currentVersion: lineup.revision },
             });
           }
@@ -403,7 +403,7 @@ export class TeamMatchLineupService {
           if (target === null || target.state === V1GameLineupState.DRAFT) {
             throw new NotFoundException({
               code: 'LINEUP_SUBMISSION_NOT_FOUND',
-              message: '아직 제출된 상대팀 라인업이 없어요.',
+              message: '아직 제출된 상대팀 참석명단이 없어요.',
             });
           }
           if (target.state === V1GameLineupState.LOCKED) {
@@ -418,7 +418,7 @@ export class TeamMatchLineupService {
             // details.currentVersion으로 정확한 값을 알아내 한 번 더 재시도한다.
             throw new ConflictException({
               code: 'VERSION_CONFLICT',
-              message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
+              message: '참석명단이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
               details: { expectedVersion: dto.expectedVersion, currentVersion: target.revision },
             });
           }
@@ -678,7 +678,7 @@ export class TeamMatchLineupService {
     if (membership === null) {
       throw new ForbiddenException({
         code: 'PERMISSION_DENIED',
-        message: '팀장 또는 매니저만 라인업을 관리할 수 있어요.',
+        message: '팀장 또는 매니저만 참석명단을 관리할 수 있어요.',
       });
     }
     const role = membership.role === 'owner' ? ('team_owner' as const) : ('team_manager' as const);
@@ -864,7 +864,7 @@ export class TeamMatchLineupService {
     if (new Set(userIds).size !== userIds.length) {
       throw new UnprocessableEntityException({
         code: 'LINEUP_DUPLICATE_PARTICIPANT',
-        message: '같은 선수가 라인업에 두 번 등록되어 있어요.',
+        message: '같은 선수가 참석명단에 두 번 등록되어 있어요.',
       });
     }
 
@@ -924,7 +924,7 @@ export class TeamMatchLineupService {
     if (membership === null) {
       throw new UnprocessableEntityException({
         code: 'LINEUP_PARTICIPANT_INELIGIBLE',
-        message: '현재 팀 소속이 아닌 사용자는 라인업에 등록할 수 없어요.',
+        message: '현재 팀 소속이 아닌 사용자는 참석명단에 등록할 수 없어요.',
       });
     }
     // 참석명단은 팀장·운영진이 직접 확정한다. 팀 일정 RSVP는 참고 정보일 뿐 저장 자격을

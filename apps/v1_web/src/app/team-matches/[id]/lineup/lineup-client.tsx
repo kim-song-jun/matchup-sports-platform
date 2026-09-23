@@ -26,7 +26,6 @@ import {
 import { V1ApiError } from '@/lib/api-client';
 import { extractErrorMessage } from '@/lib/error-message';
 import { formatMonthDay, formatTournamentDateTimeLong } from '@/lib/date-utils';
-import Link from 'next/link';
 import { josa } from '@/lib/korean';
 import { randomUuid } from '@/lib/uuid';
 import type { LineupEditorState, LineupEntryDraft, RosterOption } from './lineup.view-model';
@@ -78,9 +77,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
 
   /** 지금 이 참석명단에 넣을 수 있는 활성 팀원. 참석 응답 여부와 무관하다. */
   const eligibleMembers = lineupQuery.data?.eligibleMembers ?? [];
-  // 전술보드 링크에 쓴다 — 배치는 그 화면이 담당한다(정본 §3).
-  const gameId = lineupQuery.data?.gameId ?? null;
-
   const [state, setState] = useState<LineupEditorState | null>(null);
   const hydratedRevisionRef = useRef<number | null>(null);
   useEffect(() => {
@@ -121,6 +117,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const saveMutation = useV1SaveTeamMatchLineup(teamMatchId);
   const submitMutation = useV1SubmitTeamMatchLineup(teamMatchId);
   const changeRequestMutation = useV1RequestTeamMatchLineupChange(teamMatchId);
+  const [lastSubmittedRevision, setLastSubmittedRevision] = useState<number | null>(null);
 
   const kickoffAt = teamMatchQuery.data?.startsAt;
   const deadlinePassed = Boolean(kickoffAt) && now >= new Date(kickoffAt as string).getTime();
@@ -225,6 +222,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
     submitMutation.mutate(
       { idempotencyKey: randomUuid(), expectedVersion },
       {
+        onSuccess: () => setLastSubmittedRevision(expectedVersion),
         onError: (error) => {
           if (error instanceof V1ApiError && error.code === 'VERSION_CONFLICT') {
             setConflict(true);
@@ -497,7 +495,9 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   }
   const validationErrors = validateLineupForSubmit(state);
   const publicationLabel = describePublicationCountdown(lineupQuery.data.publicLineupAt, now);
-
+  const submittedWithoutChanges =
+    !state.dirty &&
+    (lineupQuery.data.state === 'SUBMITTED' || lastSubmittedRevision === state.baseRevision);
 
   // insane review(P0-1, 2026-08 GPT Pro): 제출은 항상 서버에 마지막 저장된 revision만 실어
   // 보내야 한다. 자동저장은 900ms 디바운스 뒤에야 실행되므로, 방금 입력을 마치자마자 제출을
@@ -607,20 +607,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
           ) : null}
         </div>
 
-        {/* Task 163: 선발/후보 구분과 피치 배치를 여기서 뺐다(정본 §3 — 명단 = 출전자).
-            배치는 팀 내부 도구인 전술보드가 담당하고, 이 화면은 **누가 뛰는가**만 정한다.
-            좌표·포메이션은 저장 페이로드에 그대로 실려 보존된다(편집만 여기서 안 한다). */}
-        {editable && ownTeamId !== null && gameId !== null ? (
-          <p className="tm-text-body-sm" style={{ marginBottom: 16 }}>
-            <Link
-              href={`/teams/${encodeURIComponent(ownTeamId)}/tactics/${encodeURIComponent(gameId)}`}
-              className="tm-link"
-            >
-              선발·배치는 전술보드에서 →
-            </Link>
-          </p>
-        ) : null}
-
         {/* 지난 경기와 같은 명단을 매번 처음부터 다시 채우지 않도록. 팀 매치는 명단 자체를
             팀장이 정하므로, 대회 경기와 달리 불러오기가 명단을 통째로 대신 채운다. */}
         {editable && ownTeamId !== null ? (
@@ -723,7 +709,7 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                       // 스크린리더로 읽힌다. 화면엔 글자가 없으니 이 라벨이 유일한 안내다.
                       aria-label={
                         entry.goalkeeper
-                          ? `${entry.displayName}, 골키퍼로 지정됨`
+                          ? `${entry.displayName}, 골키퍼 지정 해제`
                           : `${josa(entry.displayName, ['을', '를'])} 골키퍼로 지정`
                       }
                       style={{
@@ -911,14 +897,21 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
             <button
               type="button"
               className="tm-btn tm-btn-lg tm-btn-primary"
-              disabled={validationErrors.length > 0 || submitMutation.isPending || submitFlowPending}
+              disabled={
+                validationErrors.length > 0 ||
+                submitMutation.isPending ||
+                submitFlowPending ||
+                submittedWithoutChanges
+              }
               onClick={handleSubmit}
             >
               {submitMutation.isPending
                 ? '제출 중…'
                 : submitFlowPending
                   ? '변경사항 저장 중…'
-                  : '참석명단 제출하기'}
+                  : submittedWithoutChanges
+                    ? '제출 완료'
+                    : '참석명단 제출하기'}
             </button>
           </div>
         </div>

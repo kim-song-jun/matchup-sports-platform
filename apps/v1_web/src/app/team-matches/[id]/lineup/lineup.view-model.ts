@@ -326,14 +326,14 @@ export function setJerseyNumber(
   };
 }
 
-/** 골키퍼 지정은 **한 번에 한 명**이다 — 지정한 key 를 켜면서 나머지는 전부 끈다(라디오
- * 버튼과 같은 의미론). "정확히 한 명" 이 아니다: 아무도 지정하지 않은 상태(전원 false)가
- * 정상이고 제출도 통과한다 — 163 BE-1 이 서버에서 GK 검증을 지웠기 때문이다(정본 §3).
- * 이 함수는 상한만 강제하고 하한은 강제하지 않는다. */
+/** 참석자 한 명의 GK 여부를 독립적으로 토글한다. 복수 GK 선택을 허용하며,
+ * 아무도 지정하지 않은 상태도 제출할 수 있다(정본 §3). */
 export function setGoalkeeper(state: LineupEditorState, key: string): LineupEditorState {
   return {
     ...state,
-    participants: state.participants.map((entry) => ({ ...entry, goalkeeper: entry.key === key })),
+    participants: state.participants.map((entry) =>
+      entry.key === key ? { ...entry, goalkeeper: !entry.goalkeeper } : entry,
+    ),
     dirty: true,
   };
 }
@@ -430,8 +430,7 @@ export function extractConflictCurrentVersion(details: unknown): number | null {
  * - DRAFT: 킥오프 전이면 편집 가능. 킥오프가 지났는데도 DRAFT라면(한 번도 제출하지 않은 채
  *   시간이 지난 경우) 서버가 saveLineup에서 LINEUP_DEADLINE_PASSED로 막으므로 프론트도 미리
  *   막아 헛된 라운드트립을 없앤다.
- * - SUBMITTED: 내 쪽은 직접 재수정할 수 없다 — 상대팀의 정정 요청이 있어야 다시 DRAFT로
- *   열린다(team-match-lineup.service.ts saveLineup의 LINEUP_LOCKED_FOR_DIRECT_EDIT).
+ * - SUBMITTED: 킥오프 전이면 다시 편집·저장해 새 DRAFT 리비전을 만든 뒤 재제출할 수 있다.
  * - LOCKED: 킥오프 이후 자동 잠김. 어느 쪽도 더 이상 바꿀 수 없다.
  */
 export function describeLineupPhase(
@@ -441,18 +440,18 @@ export function describeLineupPhase(
   if (state === 'LOCKED') {
     return { label: '잠김', editable: false, helperText: '경기가 시작되어 참석명단이 잠겼어요.' };
   }
-  if (state === 'SUBMITTED') {
-    return {
-      label: '제출됨',
-      editable: false,
-      helperText: '참석명단을 제출했어요. 다시 편집하려면 상대팀의 정정 요청이 필요해요.',
-    };
-  }
   if (deadlinePassed) {
     return {
       label: '수정 마감',
       editable: false,
       helperText: '경기 시작 이후에는 참석명단을 직접 수정할 수 없어요.',
+    };
+  }
+  if (state === 'SUBMITTED') {
+    return {
+      label: '제출됨 · 수정 가능',
+      editable: true,
+      helperText: '제출 후에도 경기 시작 전까지 참석명단을 수정하고 다시 제출할 수 있어요.',
     };
   }
   return { label: '초안', editable: true, helperText: '' };

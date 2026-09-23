@@ -183,12 +183,15 @@ describe('lineup.view-model', () => {
     expect(state.participants.map((entry) => entry.displayName)).toEqual(['홍길동', '김철수']);
   });
 
-  it('keeps exactly one goalkeeper (radio semantics)', () => {
+  it('allows multiple goalkeepers and toggles each independently', () => {
     let state = createEmptyLineupEditorState(0);
     state = addRosterMemberToLineup(state, rosterMember);
     state = addRosterMemberToLineup(state, rosterMember2);
     state = setGoalkeeper(state, state.participants[0].key);
     state = setGoalkeeper(state, state.participants[1].key);
+    expect(state.participants[0].goalkeeper).toBe(true);
+    expect(state.participants[1].goalkeeper).toBe(true);
+    state = setGoalkeeper(state, state.participants[0].key);
     expect(state.participants[0].goalkeeper).toBe(false);
     expect(state.participants[1].goalkeeper).toBe(true);
   });
@@ -299,7 +302,7 @@ describe('lineup.view-model', () => {
   it('gates editability by lineup state and kickoff deadline', () => {
     expect(describeLineupPhase('DRAFT', false).editable).toBe(true);
     expect(describeLineupPhase('DRAFT', true).editable).toBe(false);
-    expect(describeLineupPhase('SUBMITTED', false).editable).toBe(false);
+    expect(describeLineupPhase('SUBMITTED', false).editable).toBe(true);
     expect(describeLineupPhase('LOCKED', false).editable).toBe(false);
   });
 
@@ -612,7 +615,7 @@ describe('TeamMatchLineupPageClient', () => {
         status: 'error',
         statusCode: 403,
         code: 'PERMISSION_DENIED',
-        message: '팀장 또는 매니저만 라인업을 관리할 수 있어요.',
+        message: '팀장 또는 매니저만 참석명단을 관리할 수 있어요.',
         timestamp: '2026-08-01T00:00:00.000Z',
       }),
       refetch: hoisted.refetchLineup,

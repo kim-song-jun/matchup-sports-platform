@@ -2659,6 +2659,8 @@ export type V1AdminTeamMatchRow = {
   title: string;
   hostTeamId: string | null;
   hostTeamName: string | null;
+  approvedApplicantTeamId: string | null;
+  approvedApplicantTeamName: string | null;
   /**
    * 이 팀매치를 담고 있는 리그. 단발 팀매치면 null.
    *

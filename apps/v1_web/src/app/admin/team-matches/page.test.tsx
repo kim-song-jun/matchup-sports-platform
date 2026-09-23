@@ -39,6 +39,8 @@ const BASE: V1AdminTeamMatchRow = {
   title: '주말 정기전',
   hostTeamId: 'team-1',
   hostTeamName: '성수 FC',
+  approvedApplicantTeamId: null,
+  approvedApplicantTeamName: null,
   league: null,
   sportName: '풋살',
   platformManaged: false,
@@ -88,5 +90,20 @@ describe('AdminTeamMatchesPage 리그 표시', () => {
     expect(links.length).toBeGreaterThan(0);
     for (const link of links) expect(link).toHaveAttribute('href', '/admin/team-matches/tm-1');
     expect(screen.getAllByText('신청 1건 관리').length).toBeGreaterThan(0);
+  });
+
+  it('플랫폼 모집에서 한 팀만 승인된 단계에도 승인 팀명을 보여준다', () => {
+    renderWith([
+      {
+        ...BASE,
+        platformManaged: true,
+        hostTeamId: null,
+        hostTeamName: null,
+        approvedApplicantTeamId: 'team-approved',
+        approvedApplicantTeamName: '첫 승인 팀',
+      },
+    ]);
+
+    expect(screen.getAllByText('첫 승인 팀').length).toBeGreaterThan(0);
   });
 });

@@ -2379,12 +2379,21 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     await this.getActiveAdmin(user.id);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
 
-    // 경기 제목 또는 호스트 팀명으로 찾는다 — listMatches의 q 계약과 동일한 방식.
+    // 경기 제목이나 확정된 양 팀 이름으로 찾는다.
     const statusFacetWhere: Prisma.V1TeamMatchWhereInput = query.q
       ? {
           OR: [
             { title: { contains: query.q, mode: 'insensitive' as const } },
             { hostTeam: { name: { contains: query.q, mode: 'insensitive' as const } } },
+            { approvedApplicantTeam: { name: { contains: query.q, mode: 'insensitive' as const } } },
+            {
+              applications: {
+                some: {
+                  status: 'approved',
+                  applicantTeam: { name: { contains: query.q, mode: 'insensitive' as const } },
+                },
+              },
+            },
           ],
         }
       : {};
@@ -2406,6 +2415,14 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         createdAt: true,
         hostTeamId: true,
         hostTeam: { select: { name: true } },
+        approvedApplicantTeamId: true,
+        approvedApplicantTeam: { select: { name: true } },
+        applications: {
+          where: { status: 'approved' },
+          orderBy: { reviewedAt: 'asc' },
+          take: 1,
+          select: { applicantTeam: { select: { id: true, name: true } } },
+        },
         sport: { select: { name: true } },
         // 리그전 표시(사용자 결정 3-C) -- 운영자도 목록에서 리그 경기를 바로 구분한다.
         league: { select: { id: true, title: true } },
@@ -2432,6 +2449,10 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         title: row.title,
         hostTeamId: row.hostTeamId,
         hostTeamName: row.hostTeam?.name ?? null,
+        approvedApplicantTeamId:
+          row.approvedApplicantTeamId ?? row.applications[0]?.applicantTeam.id ?? null,
+        approvedApplicantTeamName:
+          row.approvedApplicantTeam?.name ?? row.applications[0]?.applicantTeam.name ?? null,
         league: row.league ? { leagueId: row.league.id, title: row.league.title } : null,
         tournament: row.tournament ? { tournamentId: row.tournament.id, title: row.tournament.title } : null,
         sportName: row.sport.name,

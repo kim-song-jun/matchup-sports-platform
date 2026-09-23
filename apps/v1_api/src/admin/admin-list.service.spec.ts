@@ -109,6 +109,9 @@ function makeTeamMatchRow(overrides: Record<string, unknown> = {}) {
     createdAt: new Date('2026-05-18T00:00:00.000Z'),
     hostTeamId: 't-1',
     hostTeam: { name: '강남 러닝 크루' },
+    approvedApplicantTeamId: null,
+    approvedApplicantTeam: null,
+    applications: [],
     sport: { name: '풋살' },
     _count: { applications: 0 },
     ...overrides,
@@ -761,6 +764,8 @@ describe('AdminService — list/detail endpoints', () => {
         title: '토요일 풋살 상대팀 모집',
         hostTeamId: 't-1',
         hostTeamName: '강남 러닝 크루',
+        approvedApplicantTeamId: null,
+        approvedApplicantTeamName: null,
         sportName: '풋살',
         platformManaged: false,
         pendingApplicationCount: 0,
@@ -772,6 +777,25 @@ describe('AdminService — list/detail endpoints', () => {
       });
     });
 
+    it('shows the first approved team before the second team confirms the match', async () => {
+      prisma.v1TeamMatch.findMany.mockResolvedValue([
+        makeTeamMatchRow({
+          platformManaged: true,
+          hostTeamId: null,
+          hostTeam: null,
+          applications: [{ applicantTeam: { id: 'approved-team', name: '첫 승인 팀' } }],
+        }),
+      ]);
+
+      const result = await service.listTeamMatches(adminAuthUser, {});
+
+      expect(result.items[0]).toMatchObject({
+        hostTeamId: null,
+        approvedApplicantTeamId: 'approved-team',
+        approvedApplicantTeamName: '첫 승인 팀',
+      });
+    });
+
     it('passes status filter to where', async () => {
       prisma.v1TeamMatch.findMany.mockResolvedValue([]);
       await service.listTeamMatches(adminAuthUser, { status: 'matched' });
@@ -780,13 +804,22 @@ describe('AdminService — list/detail endpoints', () => {
       expect(call.where).toMatchObject({ status: 'matched' });
     });
 
-    it('passes q as title/hostTeam.name OR to both findMany and the status facet groupBy', async () => {
+    it('passes q as title and participant-team OR filters to findMany and the status facet groupBy', async () => {
       prisma.v1TeamMatch.findMany.mockResolvedValue([]);
       await service.listTeamMatches(adminAuthUser, { q: '풋살' });
 
       const expectedOr = [
         { title: { contains: '풋살', mode: 'insensitive' } },
         { hostTeam: { name: { contains: '풋살', mode: 'insensitive' } } },
+        { approvedApplicantTeam: { name: { contains: '풋살', mode: 'insensitive' } } },
+        {
+          applications: {
+            some: {
+              status: 'approved',
+              applicantTeam: { name: { contains: '풋살', mode: 'insensitive' } },
+            },
+          },
+        },
       ];
       const findCall = prisma.v1TeamMatch.findMany.mock.calls[0][0] as { where: { OR?: unknown[] } };
       expect(findCall.where.OR).toEqual(expectedOr);

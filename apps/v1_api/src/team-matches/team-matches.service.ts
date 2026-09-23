@@ -1127,6 +1127,12 @@ export class TeamMatchesService {
   ) {
     this.assertActiveAccount(user);
     const application = await this.getApplicationWithTeamMatch(applicationId);
+    if (application.teamMatch.platformManaged) {
+      throw new ForbiddenException({
+        code: 'ADMIN_MANAGED_TEAM_MATCH',
+        message: '플랫폼이 생성한 팀매치는 관리자만 관리할 수 있어요.',
+      });
+    }
     assertTeamMatchHasHostAndStart(application.teamMatch);
     await this.assertCanManageTeam(user.id, application.teamMatch.hostTeamId);
 
@@ -1273,6 +1279,12 @@ export class TeamMatchesService {
   ) {
     this.assertActiveAccount(user);
     const application = await this.getApplicationWithTeamMatch(applicationId);
+    if (application.teamMatch.platformManaged) {
+      throw new ForbiddenException({
+        code: 'ADMIN_MANAGED_TEAM_MATCH',
+        message: '플랫폼이 생성한 팀매치는 관리자만 관리할 수 있어요.',
+      });
+    }
     assertTeamMatchHasHostAndStart(application.teamMatch);
     await this.assertCanManageTeam(user.id, application.teamMatch.hostTeamId);
 
@@ -1584,7 +1596,10 @@ export class TeamMatchesService {
         const { reasonCode } = judgeApplicationAttempt(teamMatch, ledger, user.id, team.id, team.sportId);
         return { teamId: team.id, name: team.name, role: team.memberships[0]?.role ?? 'member', eligible: reasonCode === 'OK', reasonCode };
       }),
-      manageRoute: manageableHostTeam ? `/team-matches/${teamMatch.id}/manage` : null,
+      manageRoute:
+        manageableHostTeam && !teamMatch.platformManaged
+          ? `/team-matches/${teamMatch.id}/manage`
+          : null,
     };
   }
 
@@ -1619,6 +1634,12 @@ export class TeamMatchesService {
       },
     });
     if (!teamMatch) throw new NotFoundException({ code: 'NOT_FOUND_OR_ARCHIVED', message: 'Team match was not found' });
+    if (teamMatch.platformManaged) {
+      throw new ForbiddenException({
+        code: 'ADMIN_MANAGED_TEAM_MATCH',
+        message: '플랫폼이 생성한 팀매치는 관리자만 관리할 수 있어요.',
+      });
+    }
     assertTeamMatchHasHostAndStart(teamMatch);
     assertTeamMatchHasHostRelation(teamMatch);
     await this.assertCanManageTeam(user.id, teamMatch.hostTeamId);

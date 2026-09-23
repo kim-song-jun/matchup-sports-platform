@@ -137,8 +137,8 @@ function AdminTeamMatchesPageContent() {
       {/* Filter bar — chip 높이 min-h-[44px] + 페이지 간 리듬 통일 */}
       <div className="tm-content-enter mb-4">
         <AdminFilterBar
-          searchLabel="경기 제목·호스트 팀명 검색"
-          searchPlaceholder="경기 제목·호스트 팀명 검색"
+          searchLabel="경기 제목·참가 팀명 검색"
+          searchPlaceholder="경기 제목·참가 팀명 검색"
           searchValue={search}
           onSearchChange={setSearch}
           statusOptions={statusOptions}
@@ -198,7 +198,10 @@ function AdminTeamMatchesPageContent() {
                   </span>
                 </div>
                 <span className="block truncate text-[length:var(--font-size-micro)] text-[var(--text-muted)]">
-                  {row.league ? `${row.league.title} · ${row.hostTeamName ?? '팀 미정'}` : row.hostTeamName ?? '플랫폼 모집'}
+                  {row.league ? `${row.league.title} · ` : ''}
+                  {row.hostTeamName && row.approvedApplicantTeamName
+                    ? `${row.hostTeamName} vs ${row.approvedApplicantTeamName}`
+                    : row.hostTeamName ?? row.approvedApplicantTeamName ?? '플랫폼 모집'}
                 </span>
               </div>
             ),

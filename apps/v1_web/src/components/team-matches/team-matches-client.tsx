@@ -229,6 +229,10 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   const recordParams = useSearchParams();
   const rawViewerState = query.data ? getViewerState(query.data) : 'none';
   const canManageHostTeam = query.data?.viewer?.manageableHostTeam === true;
+  // 플랫폼이 생성한 모집은 HOME/AWAY 배정 뒤에도 운영 주체가 플랫폼이다.
+  // HOME 팀 관리자는 참석명단·채팅·경기 기록에는 참여하지만 모집 수정/마감/취소와
+  // 지원팀 승인 권한을 얻지 않는다.
+  const canManageMatchListing = canManageHostTeam && query.data?.platformManaged !== true;
   // 결과 승인 진입 게이트. `viewerState === 'approved'` 를 쓰면 안 된다 — 그건 신청서를
   // 낸 사람 한 명만 통과하는 값이라, 운영자가 대진을 만드는 리그전에서는 상대팀의 누구도
   // 승인 버튼을 보지 못했다. 서버는 이미 팀 멤버십으로 판정하므로 화면도 그것을 쓴다.
@@ -244,7 +248,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   // Request the server max (50) so applicant teams aren't hidden behind the default
   // page size of 20. One match seeks a single opponent, so applicant teams stay well
   // within a single page — no cursor pagination needed here.
-  const applications = useV1TeamMatchApplications(teamMatchId, { limit: 50 }, { enabled: Boolean(query.data) && canManageHostTeam });
+  const applications = useV1TeamMatchApplications(teamMatchId, { limit: 50 }, { enabled: Boolean(query.data) && canManageMatchListing });
   const applyTeamMatch = useV1ApplyTeamMatch(teamMatchId);
   const approveApplication = useV1ApproveTeamMatchApplication(teamMatchId);
   const rejectApplication = useV1RejectTeamMatchApplication(teamMatchId);
@@ -321,7 +325,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       hostTeamTrustState: query.data.hostTeam?.trustState ?? null,
       league: query.data.league ?? null,
       applicantActionError: actionError,
-      manageHref: canManageHostTeam ? `/team-matches/${teamMatchId}/edit` : undefined,
+      manageHref: canManageMatchListing ? `/team-matches/${teamMatchId}/edit` : undefined,
       applicantTeams: toApplicantTeamsWithActions(
         query.data,
         applications.data,
@@ -346,7 +350,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), selectedEligibility, isGuest, hasNoTeam, eligibility.isSuccess),
     // matches-client.tsx 와 같은 이유 — '처리 중' 이 '불러오는 중' 을 덮어쓴다.
     applyPending: applyTeamMatch.isPending || withdrawTeamMatch.isPending,
-    hostActions: !seeding && canManageHostTeam
+    hostActions: !seeding && canManageMatchListing
       ? buildHostActions({
           status: getStatus(query.data),
           // 리그 대진은 서버가 팀 단독 취소를 409 LEAGUE_FIXTURE_HOST_CANCEL_FORBIDDEN 으로

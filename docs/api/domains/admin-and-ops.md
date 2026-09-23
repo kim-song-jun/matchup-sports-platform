@@ -36,7 +36,7 @@
 | `GET` | `/api/v1/admin/teams` | `AdminTeamListQueryDto` | active admin | 팀 목록 |
 | `GET` | `/api/v1/admin/teams/:teamId` | - | active admin | 팀 상세·활성 팀원 연락처/역할 목록 |
 | `POST` | `/api/v1/admin/teams/:teamId/status` | `ChangeTeamStatusDto` | owner/ops | 팀 상태 변경 |
-| `GET` | `/api/v1/admin/team-matches` | `AdminTeamMatchListQueryDto` | active admin | 팀 매치 목록. 각 행에 `platformManaged`, `pendingApplicationCount` 포함 |
+| `GET` | `/api/v1/admin/team-matches` | `AdminTeamMatchListQueryDto` | active admin | 팀 매치 목록. 각 행에 `platformManaged`, HOME/승인 팀 ID·이름, `pendingApplicationCount` 포함. 플랫폼 모집은 첫 팀만 승인된 단계에서도 그 팀을 승인 팀 필드에 반환하며, 검색은 제목과 참가·승인 팀명에 적용 |
 | `GET` | `/api/v1/admin/team-matches/:teamMatchId` | — | active admin | 팀 매치 상세 — 상대팀 신청(최근 50건)·확정 상대팀·소속 리그·대표 이미지·실력·경기 조건 포함. 라이브 경기 상태는 현장 콘솔 소관이라 `hasGame` 여부만 준다 |
 | `POST` | `/api/v1/admin/team-matches` | `CreateAdminTeamMatchRecruitmentDto` | owner/ops | 팀을 지정하지 않은 플랫폼 팀매치 모집 생성 |
 | `POST` | `/api/v1/admin/team-matches/:teamMatchId/applications/:applicationId/approve` | `ApproveAdminTeamMatchApplicationDto` | owner/ops | 신청 팀을 한 팀씩 승인. 두 번째 승인에서 경기 확정 |

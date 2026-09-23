@@ -379,6 +379,9 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 헬퍼가 있는데 쓰지 않는다). 라벨이 있는 자리에서는 "모른다" 를 말로 해야
                 한다. */}
             <InfoRow label="성별 조건" value={match.gender} />
+            {/* 참가비는 자유 입력(costNote) — 호스트가 안 적었으면 행 자체를 감춘다(비용을
+                0원으로 단정하지 않는다, team-matches의 '비용 미정' 관례와 같은 이유). */}
+            {match.costNote ? <InfoRow label="참가비" value={match.costNote} /> : null}
             {mode === 'pending' ? (
               <>
                 <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." />
@@ -455,6 +458,7 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
           <InfoRow label="레벨" value={match.level} />
           {/* 위 상세와 같은 이유 — 공유 InfoRow 는 빈 값을 그대로 그린다. */}
           <InfoRow label="성별 조건" value={match.gender} />
+          {match.costNote ? <InfoRow label="참가비" value={match.costNote} /> : null}
           {mode === 'pending' ? (
             <>
               <StateCard tone="orange" title="승인 대기" body="호스트가 신청을 확인하고 있어요." />
@@ -755,7 +759,7 @@ function MatchRowItem({ match }: { match: MatchCardModel }) {
       </div>
       <div className="tm-match-row-main">
         {/* 빈 값을 그대로 이으면 "풋살 · 3-5 · " 처럼 구분점만 남는다 — 있는 것만 잇는다. */}
-        <div className="tm-text-caption tm-match-row-meta">{[match.sport, match.level, match.gender].filter(Boolean).join(' · ')}</div>
+        <div className="tm-text-caption tm-match-row-meta">{[match.sport, match.level, match.gender, match.costNote].filter(Boolean).join(' · ')}</div>
         <div className="tm-match-row-headline">
           {closedLabel ? <span className="tm-badge tm-badge-grey tm-card-closed-badge">{closedLabel}</span> : null}
           <div className="tm-text-body-lg tm-match-row-title">{match.title}</div>
@@ -849,7 +853,7 @@ function MatchCardItem({ match }: { match: MatchCardModel }) {
         {/* [격상1] 종목 배지 제거 — 미디어 상단 badge에 이미 표시됨(중복).
             [격상2] 마감 orange 배지 제거 — footer actionLabel로 통합.
             레벨·성별은 pill 배지 → caption 인라인 텍스트로 강등(메타 배지 동등경쟁 해소). */}
-        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 2 }}>{[match.level, match.gender].filter(Boolean).join(' · ')}</div>
+        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', marginTop: 2 }}>{[match.level, match.gender, match.costNote].filter(Boolean).join(' · ')}</div>
         <div className="tm-match-row-headline" style={{ marginTop: 8 }}>
           {closedLabel ? <span className="tm-badge tm-badge-grey tm-card-closed-badge">{closedLabel}</span> : null}
           <div className="tm-text-body-lg">{match.title}</div>
@@ -985,6 +989,7 @@ function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean 
       <CapacityField value={draft.capacity} onChange={(value) => model.form?.onFieldChange('capacity', value)} />
       <LevelRangeField levels={model.levels} minLevel={draft.minLevel} maxLevel={draft.maxLevel} onChange={(field, value) => model.form?.onFieldChange(field, value)} />
       <GenderRuleSelector value={draft.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} />
+      <CreateField label="참가비" value={draft.costNote} placeholder="예: 10,000원/1인, 무료" onChange={(value) => model.form?.onFieldChange('costNote', value)} />
       <CreateField label="규칙" value={draft.rules} placeholder="예: 풋살화 착용, 지각 시 미리 연락" multiline onChange={(value) => model.form?.onFieldChange('rules', value)} />
       {edit ? (
         <>
@@ -1191,7 +1196,7 @@ function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
   const regionName = model.form?.regions.find((region) => region.id === model.form?.regionId)?.name ?? '지역 선택 필요';
   const deadlineText = draft.deadlineDate && draft.deadlineTime ? `${draft.deadlineDate} ${draft.deadlineTime}` : '경기 시작 전까지';
   const timeRangeText = draft.endTime ? `${draft.date} ${draft.startTime}-${draft.endTime}` : `${draft.date} ${draft.startTime}`;
-  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
+  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} />{draft.costNote ? <InfoRow label="참가비" value={draft.costNote} /> : null}<InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
 }
 
 function stepToNumber(step: MatchCreateViewModel['step']) {

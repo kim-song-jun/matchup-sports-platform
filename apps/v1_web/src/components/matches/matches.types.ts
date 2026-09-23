@@ -15,6 +15,8 @@ export type MatchCardModel = {
   host: string;
   /** 업로드된 대표 사진. 없으면 null — 목업 사진으로 메우지 않는다(2026-09-04 감사). */
   image: string | null;
+  /** 참가비 자유 입력. 호스트가 안 적었으면 null — 화면에서 행 자체를 감춘다. */
+  costNote: string | null;
   deadline: string;
   deadlineDetail?: string;
   status: 'open' | 'pending' | 'approved' | 'full' | 'mine';
@@ -138,6 +140,7 @@ export type MatchCreateViewModel = {
     maxLevel: string;
     gender: string;
     rules: string;
+    costNote: string;
     venue: string;
     address: string;
     date: string;

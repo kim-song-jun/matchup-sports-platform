@@ -44,6 +44,8 @@
 - Each list item includes `host.userId`, `host.displayName`, `host.profileImageUrl`, and `host.trustState`.
   `host.displayName` resolves the creator profile nickname first, then the profile display name, then the semantic `호스트` fallback.
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
+- 참가비: `costNote?: string | null` (목록·상세·수정 폼 응답 공통, 최대 200자). 호스트가 입력하지
+  않았으면 `null`이며, 프론트는 `null`이면 참가비 행 자체를 숨긴다(0원으로 단정하지 않는다).
 
 ## POST /matches (CreateMatchDto)
 
@@ -66,6 +68,7 @@
 | `minLevelCode` | level code | No | - |
 | `maxLevelCode` | level code | No | - |
 | `genderRule` | string | No | 성별 무관 |
+| `costNote` | string(≤200) | No | 참가비 자유 입력(예: "10,000원/1인", "무료") — team-matches의 costNote와 같은 계약 |
 
 - Level codes는 `beginner`, `novice`, `intermediate`, `advanced`만 허용한다.
 - `minLevelCode === maxLevelCode`는 단일 레벨 조건으로 유효하다.
@@ -85,6 +88,7 @@
 - 시작된 매치는 raw status가 `closed`여도 edit 응답 `editable=false`, 저장은 409다.
 - `imageUrl`은 `null` 전달로 제거 가능
 - `minLevelCode`, `maxLevelCode`는 create와 동일 계약이며 미전달 시 레벨 FK를 비운다.
+- `costNote`도 create와 동일 계약(선택, ≤200자, 미전달/빈 문자열은 `null`로 저장).
 
 ## Host participant actions
 
@@ -171,6 +175,9 @@ revision flow has produced the applicable persisted result state.
 - 프론트 `UpdateMatchInput`에 `location`, `status`가 있으나 backend `UpdateMatchDto`에는 없음
 - submit 전에 DTO 필드로 정제하지 않으면 `400` 가능
 - 레벨 표시 텍스트는 `rulesText`가 아니라 `minSportLevelId`, `maxSportLevelId` FK에서 계산한 `levelLabel`을 사용한다.
+- `rulesText`(상세 화면의 "규칙" 카드)는 `levelNote` 원문만 담는다. `genderRule`·`costNote`는 이미
+  각각 별도 구조화 필드로 내려가므로 `rulesText`에 합쳐 보내지 않는다 — 합치면 상세 화면에
+  성별·참가비가 규칙 카드에 한 번 더 찍힌다(2026-09-22 리뷰에서 실제로 발견된 회귀).
 
 ## Source References
 

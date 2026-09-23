@@ -432,6 +432,7 @@ export type V1Match = {
   }>;
   rulesText?: string | null;
   genderRule?: string | null;
+  costNote?: string | null;
   ctaState?: string;
 };
 
@@ -458,6 +459,7 @@ export type V1MatchEdit = {
     minLevelCode?: string | null;
     maxLevelCode?: string | null;
     genderRule?: string | null;
+    costNote?: string | null;
   };
   status: V1MatchApiStatus;
   participantCount: number;
@@ -500,6 +502,7 @@ export type V1MatchMutationPayload = {
   minLevelCode?: string | null;
   maxLevelCode?: string | null;
   genderRule?: string | null;
+  costNote?: string | null;
 };
 
 export type V1MatchUpdatePayload = V1MatchMutationPayload & {

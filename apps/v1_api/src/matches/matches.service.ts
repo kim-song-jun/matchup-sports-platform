@@ -213,8 +213,11 @@ export class MatchesService {
       levelLabel: formatLevelRange(match.minSportLevel, match.maxSportLevel, match.levelNote),
       minLevel: match.minSportLevel ? { code: match.minSportLevel.code, name: match.minSportLevel.name } : null,
       maxLevel: match.maxSportLevel ? { code: match.maxSportLevel.code, name: match.maxSportLevel.name } : null,
-      rulesText: [match.levelNote, match.genderRule, match.costNote].filter(Boolean).join(' · ') || null,
+      // genderRule·costNote는 각각 성별 조건/참가비로 이미 구조화 필드가 있다 — 여기 합쳐
+      // 보내면 상세 화면의 "규칙" 카드에 참가비·성별이 한 번 더 찍힌다(2026-09-22 리뷰).
+      rulesText: match.levelNote,
       genderRule: match.genderRule,
+      costNote: match.costNote,
       approvalRequired: true,
       paymentRequired: false,
       host: {
@@ -322,6 +325,7 @@ export class MatchesService {
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
+          costNote: dto.costNote ?? null,
           status: 'recruiting',
         },
       });
@@ -414,6 +418,7 @@ export class MatchesService {
         minLevelCode: match.minSportLevel?.code ?? null,
         maxLevelCode: match.maxSportLevel?.code ?? null,
         genderRule: match.genderRule,
+        costNote: match.costNote,
       },
       status: this.getApiStatus(match),
       participantCount,
@@ -463,6 +468,7 @@ export class MatchesService {
           minSportLevelId: levelRange.minSportLevelId,
           maxSportLevelId: levelRange.maxSportLevelId,
           genderRule: dto.genderRule ?? null,
+          costNote: dto.costNote ?? null,
         },
       });
     });
@@ -1153,8 +1159,11 @@ export class MatchesService {
       levelLabel: formatLevelRange(match.minSportLevel, match.maxSportLevel, match.levelNote),
       minLevel: match.minSportLevel ? { code: match.minSportLevel.code, name: match.minSportLevel.name } : null,
       maxLevel: match.maxSportLevel ? { code: match.maxSportLevel.code, name: match.maxSportLevel.name } : null,
-      rulesText: [match.levelNote, match.genderRule, match.costNote].filter(Boolean).join(' · ') || null,
+      // genderRule·costNote는 각각 성별 조건/참가비로 이미 구조화 필드가 있다 — 여기 합쳐
+      // 보내면 상세 화면의 "규칙" 카드에 참가비·성별이 한 번 더 찍힌다(2026-09-22 리뷰).
+      rulesText: match.levelNote,
       genderRule: match.genderRule,
+      costNote: match.costNote,
       approvalRequired: true,
       paymentRequired: false,
       // detail()과 같은 hostUser include(matchInclude())를 이미 공유하므로 추가 쿼리 없이

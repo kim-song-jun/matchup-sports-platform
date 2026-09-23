@@ -560,6 +560,7 @@ export function draftFromMatchEdit(edit: V1MatchEdit): MatchDraft {
     image: edit.form.imageUrl ?? buildDefaultDraft().image,
     capacity: edit.form.capacity,
     rules: edit.form.rulesText ?? '',
+    costNote: edit.form.costNote ?? '',
     gender: normalizeGenderRule(edit.form.genderRule),
     minLevel: levelCodeToDraftLabel(edit.form.minLevelCode) ?? buildDefaultDraft().minLevel,
     maxLevel: levelCodeToDraftLabel(edit.form.maxLevelCode) ?? buildDefaultDraft().maxLevel,

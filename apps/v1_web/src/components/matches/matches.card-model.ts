@@ -44,6 +44,7 @@ export function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCard
     gender: match.genderRule ?? '',
     host: match.host?.displayName ?? '호스트',
     image: match.imageUrl ?? null,
+    costNote: match.costNote ?? null,
     status,
     deadline: formatDeadline(match.deadlineAt, status),
     deadlineDetail: formatDeadlineDetail(match.deadlineAt, status),

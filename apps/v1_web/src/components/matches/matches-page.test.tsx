@@ -58,6 +58,42 @@ describe('MatchDetailPageView — approved mode (실제 참가 확정자)', () =
   });
 });
 
+describe('MatchDetailPageView — 참가비(costNote)', () => {
+  it('참가비를 적지 않았으면 참가비 행을 아예 숨긴다 (0원으로 단정하지 않는다)', () => {
+    const model = getMatchDetailViewModel('default');
+    expect(model.match.costNote).toBeNull();
+    render(<MatchDetailPageView model={model} />);
+
+    expect(screen.queryByText('참가비')).not.toBeInTheDocument();
+  });
+
+  it('참가비를 적었으면 참가비 행에 값을 보여준다', () => {
+    const model = getMatchDetailViewModel('default');
+    model.match.costNote = '10,000원/1인';
+    render(<MatchDetailPageView model={model} />);
+
+    expect(screen.getAllByText('참가비').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('10,000원/1인').length).toBeGreaterThan(0);
+  });
+
+  /**
+   * 리뷰에서 발견된 회귀: 상세 응답의 rulesText가 levelNote·genderRule·costNote를 합쳐
+   * 내려오던 시절엔 "규칙" 카드가 참가비 텍스트를 그대로 다시 그렸다(참가비 행과 중복).
+   * 백엔드를 rulesText=levelNote로 고친 뒤에는 규칙 카드와 참가비 행이 서로 다른 값을
+   * 담아야 하고, 참가비 텍스트가 규칙 카드 쪽에 새어 나오면 안 된다.
+   */
+  it('참가비와 규칙이 둘 다 있어도 서로 다른 텍스트로 각자 한 번씩만 노출된다 (중복 노출 방지)', () => {
+    const model = getMatchDetailViewModel('default');
+    model.match.costNote = '10,000원/1인';
+    model.match.rules = ['풋살화 착용, 지각 시 미리 연락'];
+    render(<MatchDetailPageView model={model} />);
+
+    // 참가비 행: 데스크톱·모바일 각 1회 = 2회. 규칙 카드에 새어 나왔다면 3회 이상이 된다.
+    expect(screen.getAllByText('10,000원/1인').length).toBe(2);
+    expect(screen.getAllByText('풋살화 착용, 지각 시 미리 연락').length).toBeGreaterThan(0);
+  });
+});
+
 describe('MatchDetailPageView — 히어로 액션', () => {
   it('이미지 우측 상단에는 공유만 노출한다', () => {
     render(<MatchDetailPageView model={getMatchDetailViewModel('default')} />);

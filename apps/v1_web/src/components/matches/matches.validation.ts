@@ -160,6 +160,7 @@ export function buildMatchPayloadResult(draft: MatchDraft, sportId: string, regi
       minLevelCode: labelToLevelCode(draft.minLevel),
       maxLevelCode: labelToLevelCode(draft.maxLevel),
       genderRule: normalizeGenderRule(draft.gender),
+      costNote: draft.costNote.trim() || null,
     },
   };
 }

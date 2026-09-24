@@ -17,8 +17,7 @@ export const TEAMS_ROUTES: RouteChromeEntry[] = [
     chrome: { title: '팀 만들기', activeTab: 'teams', bottomNav: false, backHref: '/teams' },
   },
   {
-    // TeamDetailPageView는 로딩·에러·성공 3분기 없이 fallback 모델로 항상 렌더되므로
-    // (teams-client.tsx:320 TeamDetailPageClient) title/backHref 전부 고정.
+    // 기본값. `?from=` 이 있으면 TeamDetailPageClient가 ShellOverride.backHref로 덮는다.
     pattern: '/teams/:id',
     chrome: { title: '팀 상세', activeTab: 'teams', bottomNav: false, backHref: '/teams' },
   },
@@ -27,11 +26,8 @@ export const TEAMS_ROUTES: RouteChromeEntry[] = [
     // '/teams'|`/teams/${id}` 로 갈리지만(teams-form-client.tsx:122-123), 실제로
     // `/teams/:id/edit?from=my` 를 생성하는 링크가 저장소 전체에 0건이라(teams-client.tsx:857의
     // 유일한 편집 링크가 쿼리 없이 연결) 이 분기는 현재 도달 불가능한 죽은 경로다.
-    // 또한 ShellOverride엔 backHref 필드 자체가 없어(shell-override.ts) 셸의 backHref는
-    // route-chrome 테이블의 정적 값으로만 정해진다 — 그래서 실측상 유일하게 관찰되는 값인
-    // '/teams'를 그대로 등록한다. 콘텐츠 영역의 데스크톱 뒤로가기 링크(teams-page.tsx의
-    // tm-desktop-back)는 여전히 cancelHref를 그대로 쓰므로 그 부분만은 from=my가 살아있어도
-    // 정확하다 — 셸 topbar back 버튼만 이 근사값의 영향을 받는다.
+    // 그래서 실측상 유일하게 관찰되는 값인 '/teams'를 그대로 등록한다. 콘텐츠 영역의
+    // 데스크톱 뒤로가기 링크(teams-page.tsx의 tm-desktop-back)는 cancelHref를 그대로 쓴다.
     pattern: '/teams/:id/edit',
     chrome: { title: '팀 수정', activeTab: 'teams', bottomNav: false, backHref: '/teams' },
   },

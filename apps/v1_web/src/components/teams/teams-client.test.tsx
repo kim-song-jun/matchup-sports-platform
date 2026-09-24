@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import { V1ApiError } from '@/lib/api-client';
 import type { V1AuthMe } from '@/types/api';
+import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import { TeamDetailPageClient, TeamMembersPageClient } from './teams-client';
 
 type AuthProbeFixture = Partial<Pick<ReturnType<typeof import('@/hooks/use-v1-api').useV1AuthMe>,
@@ -479,21 +480,37 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
   // alpha 실측(2026-09-23): 모바일 셸의 ShellOverride.backHref는 `?from=`을 따라갔지만
   // 데스크톱 "팀 목록으로" 헤더 링크는 별도 하드코딩(`href="/teams"`)이라 안 따라갔다 —
   // 두 UI 요소가 같은 `fromPath`를 쓰도록 model.backHref로 통일했다(MD-QA #15 후속).
-  it('내 팀 목록에서 들어오면 데스크톱 "팀 목록으로" 링크도 그 화면으로 돌아간다', () => {
+  it('내 팀 목록에서 들어오면 데스크톱 뒤로가기 링크도 그 화면으로 돌아간다', () => {
     navigationMocks.searchParams = new URLSearchParams('from=%2Fmy%2Fteams');
     teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
 
     render(<TeamDetailPageClient teamId="team-1" />);
 
-    expect(screen.getByRole('link', { name: '팀 목록으로' })).toHaveAttribute('href', '/my/teams');
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/my/teams');
   });
 
-  it('출처가 없으면 데스크톱 "팀 목록으로" 링크는 전체 팀 목록으로 돌아간다', () => {
+  it('출처가 없으면 데스크톱 뒤로가기 링크는 전체 팀 목록으로 돌아간다', () => {
     teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
 
     render(<TeamDetailPageClient teamId="team-1" />);
 
-    expect(screen.getByRole('link', { name: '팀 목록으로' })).toHaveAttribute('href', '/teams');
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/teams');
+  });
+
+  // override store는 한 칸이라, 부모(TeamDetailPageClient)가 게시한 backHref가 자식
+  // 에러 뷰의 제목을 덮어쓰면 셸 제목이 route-chrome 기본값('팀 상세')으로 돌아간다.
+  it('상세를 못 불러오면 셸에 에러 제목과 출처 뒤로가기를 함께 게시한다', () => {
+    navigationMocks.searchParams = new URLSearchParams('from=%2Fmy%2Fteams');
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: undefined, isError: true });
+    let published: ReturnType<typeof useShellOverrideForRoute> = {};
+    function ShellProbe() {
+      published = useShellOverrideForRoute('/teams/team-1');
+      return null;
+    }
+
+    render(<><ShellProbe /><TeamDetailPageClient teamId="team-1" /></>);
+
+    expect(published).toEqual({ title: '팀 목록을 불러오지 못했어요', backHref: '/my/teams' });
   });
 
   it('멤버 목록이 비공개인 팀에서는 미리보기도 더보기 CTA도 노출되지 않는다', () => {

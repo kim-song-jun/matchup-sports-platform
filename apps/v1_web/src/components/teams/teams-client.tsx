@@ -37,7 +37,7 @@ import { isUnauthenticatedError, retryTransientFailure, V1ApiError } from '@/lib
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
-import { getLoginPathForRedirect, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
+import { getLoginPathForRedirect, withFromPath, readBackFrom } from '@/lib/session-storage';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
@@ -200,7 +200,7 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
   // 내 팀 목록 등 특정 화면에서 들어왔으면 뒤로가기를 그 화면으로 되돌린다(`?from=`).
   // route-chrome 테이블의 backHref(fragments/teams.ts)는 검색 파라미터를 못 받아
   // 기본값 '/teams'로 고정돼 있었다 — public-profile-client.tsx와 동일한 ShellOverride로 메운다.
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const fromPath = readBackFrom(useSearchParams().get('from'));
   // 이 화면에서 나가는 링크의 출처 — 받은 출처까지 담아야 하위 화면에서 돌아와도 처음 출처가 남는다.
   const selfHref = withFromPath(`/teams/${teamId}`, fromPath);
   // The current /auth/me result is the only authority for protected actions. A
@@ -420,7 +420,7 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
 export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const router = useRouter();
   // 팀 상세가 받은 출처를 이어받아 왔으면 뒤로가기를 그 팀 상세(출처 포함)로 돌린다.
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const fromPath = readBackFrom(useSearchParams().get('from'));
   const membersHref = withFromPath(`/teams/${teamId}/members`, fromPath);
   const [activeTab, setActiveTab] = useState<TeamMembersViewModel['activeTab']>('members');
   const team = useV1TeamDetail(teamId);

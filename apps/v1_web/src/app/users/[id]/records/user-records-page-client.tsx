@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
-import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
+import { withFromPath, readBackFrom } from '@/lib/session-storage';
 import { usePublicUserRecords } from '@/components/public-game-records/use-public-game-records';
 import { UserRecordsContent } from '@/components/public-game-records/user-records-content';
 import type { RecordTypeFilter } from '@/components/public-game-records/record-category-tabs';
@@ -37,7 +37,7 @@ export function UserRecordsPageClient({ userId }: { userId: string }) {
   // 마이페이지 등 프로필을 거치지 않고 바로 들어오는 진입점을 위한 `?from=`
   // 오버라이드 — public-profile-client.tsx와 동일 패턴(route-chrome backHref는
   // 검색 파라미터를 못 받는다).
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const fromPath = readBackFrom(useSearchParams().get('from'));
   useShellOverride({
     title: firstPage?.nickname ? `${firstPage.nickname} 님의 활동 기록` : '활동 기록',
     ...(fromPath ? { backHref: fromPath } : {}),

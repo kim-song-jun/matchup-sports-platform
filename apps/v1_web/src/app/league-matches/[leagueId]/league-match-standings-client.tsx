@@ -19,7 +19,7 @@ import {
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
-import { hasStoredV1Session, sanitizeRedirectPath } from '@/lib/session-storage';
+import { hasStoredV1Session, readBackFrom } from '@/lib/session-storage';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTieBreakRule } from '@/lib/league-tie-break-labels';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
@@ -543,7 +543,7 @@ function LeagueRegistrationCta({
 export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: string }) {
   // 팀 상세의 "내 리그"에서 들어왔으면 뒤로가기를 그 팀으로 되돌린다 — public-profile-client.tsx
   // 와 동일 패턴(route-chrome 테이블의 backHref는 '/tournaments?kind=league'로 고정돼 있다).
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const fromPath = readBackFrom(useSearchParams().get('from'));
   useShellOverride(fromPath ? { backHref: fromPath } : {});
   const seriesQuery = useV1LeagueMatch(leagueId);
   const standingsQuery = useV1LeagueMatchStandings(leagueId);

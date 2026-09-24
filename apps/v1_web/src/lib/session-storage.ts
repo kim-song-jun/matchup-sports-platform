@@ -99,6 +99,15 @@ export function sanitizeRedirectPath(value: string | null | undefined) {
  * `path` 에 `?from=` 을 붙인다. `from` 이 없으면 `path` 그대로.
  * 받은 `from` 까지 담은 자기 URL 을 다음 화면의 출처로 넘기면 여러 단계를 거쳐도 처음 출처가 남는다.
  */
+/**
+ * `?from=` 값을 뒤로가기 목적지로 푼다. 알림 딥링크는 경로가 아니라 `notifications` 표식을 싣는다
+ * (notification-route.ts) — 표식을 경로로 바꾼 뒤 나머지는 sanitizeRedirectPath 규칙을 그대로 따른다.
+ */
+export function readBackFrom(value: string | null | undefined) {
+  if (value === 'notifications') return '/notifications';
+  return sanitizeRedirectPath(value);
+}
+
 export function withFromPath(path: string, from: string | null | undefined) {
   if (!from) return path;
   const hashAt = path.indexOf('#');

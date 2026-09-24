@@ -17,7 +17,7 @@ import {
 } from '@/components/tournaments/league-standings-table';
 import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
-import { hasStoredV1Session, sanitizeRedirectPath } from '@/lib/session-storage';
+import { hasStoredV1Session, readBackFrom } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
@@ -517,7 +517,7 @@ function useIsInViewport(ref: React.RefObject<HTMLElement | null>): boolean {
 export function TournamentDetailPageClient({ tournamentId }: { tournamentId: string }) {
   // route-chrome 테이블의 backHref(fragments/tournaments-core.ts)는 검색 파라미터를 못 받아
   // '/tournaments'로 고정돼 있었다 — public-profile-client.tsx와 같은 `?from=` 패턴으로 메운다.
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const fromPath = readBackFrom(useSearchParams().get('from'));
   const [hasSessionHint, setHasSessionHint] = useState(false);
   const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
   const { data: myRegistrations = [] } = useV1MyRegistrations(tournamentId, {

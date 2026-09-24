@@ -8,6 +8,7 @@ import {
   hasStoredV1Session,
   sanitizeRedirectPath,
   withFromPath,
+  readBackFrom,
   saveStoredV1Session,
   saveTournamentOpsOrigin,
   shouldProbeV1Session,
@@ -189,5 +190,15 @@ describe('withFromPath', () => {
     const received = sanitizeRedirectPath(new URLSearchParams(members.split('?')[1]).get('from'));
     expect(received).toBe(detail);
     expect(sanitizeRedirectPath(new URLSearchParams(received!.split('?')[1]).get('from'))).toBe('/my/teams');
+  });
+});
+
+describe('readBackFrom', () => {
+  it('알림 표식은 알림 화면 경로로, 경로는 그대로, 외부·표식이 아닌 값은 버린다', () => {
+    expect(readBackFrom('notifications')).toBe('/notifications');
+    expect(readBackFrom('/my/teams')).toBe('/my/teams');
+    expect(readBackFrom('tournament')).toBeNull();
+    expect(readBackFrom('//evil.example')).toBeNull();
+    expect(readBackFrom(null)).toBeNull();
   });
 });

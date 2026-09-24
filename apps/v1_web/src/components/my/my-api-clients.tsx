@@ -1621,8 +1621,9 @@ export function NotificationSettingsPageClient() {
  */
 function RecordConsentTournamentContext() {
   const params = useSearchParams();
-  const fromTournament = params.get('from') === 'tournament';
+  // 알림을 거쳐 오면 `from` 이 notifications 로 바뀌므로 대회 맥락은 tournamentId 로 판단한다.
   const tournamentId = params.get('tournamentId') ?? '';
+  const fromTournament = Boolean(tournamentId);
   const tournament = useV1Tournament(fromTournament ? tournamentId : '');
   if (!fromTournament) return null;
   const title = tournament.data?.title;

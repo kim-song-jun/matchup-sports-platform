@@ -21,7 +21,7 @@ describe('chat safety controls',()=>{
  it('links the receipt to the inquiry with this room as the back target',()=>{
   (state.report as { data: unknown }).data={inquiryId:'inq-1'};
   render(<ChatSafetyDialog roomId="room" target={{id:'message',label:'상대'}} onClose={()=>{}}/>);
-  expect(screen.getByRole('link',{name:'처리 내역 보기'})).toHaveAttribute('href',`/my/inquiries/inq-1?from=${encodeURIComponent('/chat/room?from=notifications')}`);
+  expect(screen.getByRole('link',{name:'처리 내역 보기'})).toHaveAttribute('href',`/my/inquiries/inq-1?from=${encodeURIComponent('/chat/room?from=%2Fnotifications')}`);
   (state.report as { data: unknown }).data=undefined;
  });
  it('keeps a failed report open and never shows a fake receipt',()=>{

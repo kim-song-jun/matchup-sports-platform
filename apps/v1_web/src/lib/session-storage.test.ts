@@ -201,6 +201,16 @@ describe('withFromPath 체인 상한', () => {
     expect(withFromPath('/teams/t1', league)).toBe(team);
   });
 
+  // 중첩 from 은 URL 을 직접 고쳐 넣을 수 있다 — 렌더가 터지거나 표식·외부 주소가 경로로 섞이면 안 된다.
+  it('조작된 중첩 출처는 그 단계에서 끊고 예외를 내지 않는다', () => {
+    const crafted = `/teams/t1?from=${encodeURIComponent('http://[')}`;
+    expect(() => withFromPath('/users/u1', crafted)).not.toThrow();
+    expect(withFromPath('/users/u1', crafted)).toBe('/users/u1?from=%2Fteams%2Ft1');
+    expect(withFromPath('/users/u1', '/teams/t1?from=tournament')).toBe('/users/u1?from=%2Fteams%2Ft1');
+    expect(withFromPath('/users/u1', `/teams/t1?from=${encodeURIComponent('//evil.example')}`)).toBe('/users/u1?from=%2Fteams%2Ft1');
+    expect(withFromPath('/users/u1', 'https://evil.example')).toBe('/users/u1');
+  });
+
   it('체인을 줄여 다시 엮어도 각 단계의 hash 는 남는다', () => {
     let href = '/home#rail';
     for (let index = 0; index < 8; index += 1) href = withFromPath(`/teams/t${index}`, index === 0 ? href : `${href}#s${index}`);

@@ -19,10 +19,11 @@ import type { PublicTeamRecordsResponse, TeamRecordTypeFilter } from '@/componen
  * 테스트 파일에서는 검증할 수 없다(user-records-page-client.test.tsx의 동일 마이그레이션과 같은 판단).
  */
 
+const navigation = vi.hoisted(() => ({ searchParams: new URLSearchParams() }));
 vi.mock('next/navigation', () => ({
   usePathname: () => '/teams/team-1/records',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => navigation.searchParams,
 }));
 
 const shellOverride = vi.hoisted(() => ({ useShellOverride: vi.fn() }));
@@ -47,11 +48,13 @@ vi.mock('@/components/public-game-records/team-records-content', () => ({
   TeamRecordsContent: ({
     onChangeType,
     onChangeSeason,
+    selfHref,
   }: {
     onChangeType?: (type: TeamRecordTypeFilter) => void;
     onChangeSeason?: (season: string | undefined) => void;
+    selfHref?: string;
   }) => (
-    <div data-testid="records-content">
+    <div data-testid="records-content" data-self-href={selfHref}>
       <button type="button" onClick={() => onChangeType?.('league')}>정규 리그</button>
       <button type="button" onClick={() => onChangeType?.('tournament')}>대회</button>
       <button type="button" onClick={() => onChangeSeason?.('2025')}>2025시즌</button>
@@ -100,6 +103,22 @@ describe('TeamRecordsPageClient', () => {
   beforeEach(() => {
     mocks.usePublicTeamRecords.mockReset();
     shellOverride.useShellOverride.mockReset();
+    navigation.searchParams = new URLSearchParams();
+  });
+
+  // 팀 상세(출처 포함) → 팀 전적 → 경기 상세로 가도 뒤로가기 체인이 처음 출처까지 이어져야 한다.
+  it('받은 출처를 뒤로가기로 쓰고, 경기 링크에 넘길 출처에도 이어 싣는다', () => {
+    mocks.usePublicTeamRecords.mockReturnValue(loaded('강남 러닝 크루'));
+    navigation.searchParams = new URLSearchParams({ from: '/teams/team-1?from=%2Fmy%2Fteams' });
+
+    render(<TeamRecordsPageClient teamId="team-1" />);
+
+    const calls = shellOverride.useShellOverride.mock.calls;
+    expect(calls[calls.length - 1]?.[0]).toEqual({ title: '강남 러닝 크루 전적', backHref: '/teams/team-1?from=%2Fmy%2Fteams' });
+    expect(screen.getByTestId('records-content')).toHaveAttribute(
+      'data-self-href',
+      `/teams/team-1/records?from=${encodeURIComponent('/teams/team-1?from=%2Fmy%2Fteams')}`,
+    );
   });
 
   it('names which team these records belong to so a deep-linked visitor can tell', () => {

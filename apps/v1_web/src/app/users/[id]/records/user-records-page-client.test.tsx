@@ -44,7 +44,7 @@ vi.mock('@/components/public-game-records/use-public-game-records', () => ({
 }));
 
 vi.mock('@/components/public-game-records/user-records-content', () => ({
-  UserRecordsContent: () => <div data-testid="records-content" />,
+  UserRecordsContent: ({ selfHref }: { selfHref?: string }) => <div data-testid="records-content" data-self-href={selfHref} />,
 }));
 
 function page(nickname: string | null): PublicUserRecordsResponse {
@@ -115,6 +115,8 @@ describe('UserRecordsPageClient', () => {
     render(<UserRecordsPageClient userId="user-1" />);
 
     expect(lastOverrideBackHref()).toBe('/my');
+    // 경기 상세로 넘길 출처에도 받은 출처를 담아, 거기서 두 번 돌아와도 마이페이지에 닿는다.
+    expect(screen.getByTestId('records-content')).toHaveAttribute('data-self-href', '/users/user-1/records?from=%2Fmy');
   });
 
   it('ignores an unsafe ?from= value and leaves the default backHref untouched', () => {

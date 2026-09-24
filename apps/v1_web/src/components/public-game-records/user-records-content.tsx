@@ -146,6 +146,7 @@ export function UserRecordsContent({
   onLoadMore,
   activeType,
   onChangeType,
+  selfHref,
 }: {
   data: PublicUserRecordsResponse;
   hasNextPage?: boolean;
@@ -155,7 +156,10 @@ export function UserRecordsContent({
    *  화면이 있을 수 있어 팀 전적(`onChangeType`)과 같은 방식으로 optional 이다. */
   activeType?: RecordTypeFilter;
   onChangeType?: (next: RecordTypeFilter) => void;
+  /** 상세로 넘길 출처. 이 화면이 받은 `?from=` 까지 담아야 여러 단계 뒤에도 처음 출처가 남는다. */
+  selfHref?: string;
 }) {
+  const fromHref = selfHref ?? `/users/${data.userId}/records`;
   // 기록이 0건이면(대회 라인업에 아직 연결된 적 없음) 배너의 "이 기록은 아직 나에게만
   // 보여요" 문구가 바로 아래 EmptyState("아직 등록된 경기 기록이 없어요")와 모순된다 —
   // 숨겨진 기록이 실제로 있을 때만 보여준다.
@@ -215,7 +219,7 @@ export function UserRecordsContent({
             {data.tournamentAwards.map((award) => (
               <Link
                 key={award.id}
-                href={`/tournaments/${award.tournamentId}?from=${encodeURIComponent(`/users/${data.userId}/records`)}`}
+                href={`/tournaments/${award.tournamentId}?from=${encodeURIComponent(fromHref)}`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -299,7 +303,7 @@ export function UserRecordsContent({
         ) : (
           <Card pad={0}>
             {data.items.map((item) => {
-              const href = userRecordHref(item, `/users/${data.userId}/records`);
+              const href = userRecordHref(item, fromHref);
               return href ? (
                 <Link
                   key={item.id}

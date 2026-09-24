@@ -218,6 +218,59 @@ describe('TeamMembersPageClient GA events', () => {
     teamApiMocks.useV1LeaveTeam.mockReturnValue({ isPending: false, mutate: vi.fn() });
   });
 
+  // 팀 상세(내 팀에서 들어옴) → 멤버 목록 → 뒤로 → 팀 상세 → 뒤로가 내 팀으로 이어져야 한다.
+  it('팀 상세가 넘긴 출처를 뒤로가기와 멤버 프로필 링크에 이어 싣는다', () => {
+    const detailHref = '/teams/team-1?from=%2Fmy%2Fteams';
+    navigationMocks.searchParams = new URLSearchParams({ from: detailHref });
+    let published: ReturnType<typeof useShellOverrideForRoute> = {};
+    function ShellProbe() {
+      published = useShellOverrideForRoute('/teams/team-1');
+      return null;
+    }
+
+    render(<><ShellProbe /><TeamMembersPageClient teamId="team-1" /></>);
+
+    expect(published).toEqual({ backHref: detailHref });
+    expect(screen.getByRole('link', { name: '팀으로 돌아가기' })).toHaveAttribute('href', detailHref);
+    const membersHref = `/teams/team-1/members?from=${encodeURIComponent(detailHref)}`;
+    screen.getAllByRole('link', { name: /김도윤/ }).forEach((link) =>
+      expect(link).toHaveAttribute('href', `/users/user-owner?from=${encodeURIComponent(membersHref)}`),
+    );
+  });
+
+  it('비공개 팀이면 상태 제목과 받은 출처를 함께 게시한다', () => {
+    navigationMocks.searchParams = new URLSearchParams({ from: '/teams/team-1?from=%2Fmy%2Fteams' });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: { name: '성수 풋살 크루', canViewMembers: false, viewer: { role: null, membershipId: null } },
+      isError: false,
+    });
+    let published: ReturnType<typeof useShellOverrideForRoute> = {};
+    function ShellProbe() {
+      published = useShellOverrideForRoute('/teams/team-1');
+      return null;
+    }
+
+    render(<><ShellProbe /><TeamMembersPageClient teamId="team-1" /></>);
+
+    expect(published).toEqual({ title: '멤버 목록이 비공개예요', backHref: '/teams/team-1?from=%2Fmy%2Fteams' });
+  });
+
+  it('출처 없이 들어오면 팀 상세로 돌아가는 기본값을 그대로 쓴다', () => {
+    let published: ReturnType<typeof useShellOverrideForRoute> = {};
+    function ShellProbe() {
+      published = useShellOverrideForRoute('/teams/team-1');
+      return null;
+    }
+
+    render(<><ShellProbe /><TeamMembersPageClient teamId="team-1" /></>);
+
+    expect(published).toEqual({});
+    expect(screen.getByRole('link', { name: '팀으로 돌아가기' })).toHaveAttribute('href', '/teams/team-1');
+    screen.getAllByRole('link', { name: /김도윤/ }).forEach((link) =>
+      expect(link).toHaveAttribute('href', '/users/user-owner?from=%2Fteams%2Fteam-1%2Fmembers'),
+    );
+  });
+
   it('tracks team_application_accept once the approval mutation succeeds', async () => {
     approveMutate.mockImplementation((_vars, options) => {
       options?.onSuccess?.();
@@ -487,6 +540,27 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     render(<TeamDetailPageClient teamId="team-1" />);
 
     expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/my/teams');
+  });
+
+  it('받은 출처를 하위 화면(멤버 목록·팀 전적)과 프로필 링크에 이어 싣는다', () => {
+    navigationMocks.searchParams = new URLSearchParams('from=%2Fmy%2Fteams');
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({ memberCount: 2, membersPreview: [{ membershipId: 'mem-owner', userId: 'user-owner-42', displayName: '박서준', role: 'owner' }, member(1)] }),
+      isError: false,
+    });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    const selfFrom = encodeURIComponent('/teams/team-1?from=%2Fmy%2Fteams');
+    screen.getAllByRole('link', { name: '멤버 목록 보기' }).forEach((link) =>
+      expect(link).toHaveAttribute('href', `/teams/team-1/members?from=${selfFrom}`),
+    );
+    screen.getAllByRole('link', { name: /박서준/ }).forEach((link) =>
+      expect(link).toHaveAttribute('href', `/users/user-owner-42?from=${selfFrom}`),
+    );
+    const recordLinks = screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('/teams/team-1/records'));
+    expect(recordLinks.length).toBeGreaterThan(0);
+    recordLinks.forEach((link) => expect(link).toHaveAttribute('href', `/teams/team-1/records?from=${selfFrom}`));
   });
 
   it('출처가 없으면 데스크톱 뒤로가기 링크는 전체 팀 목록으로 돌아간다', () => {

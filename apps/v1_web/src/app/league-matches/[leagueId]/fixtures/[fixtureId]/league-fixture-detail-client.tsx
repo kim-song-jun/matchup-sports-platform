@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useV1LeagueMatch, useV1LeagueMatchStandings, useV1ResolveChatRoom, useV1TeamMatch } from '@/hooks/use-v1-api';
 import { usePublicLeagueFixtureRecord } from '@/components/public-game-records/use-public-game-records';
@@ -11,6 +11,8 @@ import { LeagueClaimMyRecordSection } from '@/components/public-game-records/cla
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { V1ApiError } from '@/lib/api-client';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTournamentDateTimeLong, formatTournamentDateTimeShort } from '@/lib/date-utils';
@@ -87,6 +89,9 @@ function getViewerState(match: V1TeamMatch | undefined): V1TeamMatchViewerState 
 }
 
 export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { leagueId: string; fixtureId: string }) {
+  // 활동 기록·팀 전적처럼 리그 화면이 아닌 곳에서 들어왔으면 그 화면으로 돌아간다.
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  useShellOverride(fromPath ? { backHref: fromPath } : {});
   const router = useRouter();
   const seriesQuery = useV1LeagueMatch(leagueId);
   const standingsQuery = useV1LeagueMatchStandings(leagueId);

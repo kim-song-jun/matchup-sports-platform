@@ -135,4 +135,18 @@ describe('TeamRecordsContent — 행 캡션의 대회·리그 이름', () => {
       '/tournaments/tournament-1?from=%2Fteams%2Fteam-1%2Frecords',
     ]);
   });
+
+  it('selfHref 를 받으면 그 값을 경기 링크의 출처로 쓴다', () => {
+    render(
+      <TeamRecordsContent
+        selfHref="/teams/team-1/records?from=%2Fmy"
+        data={makeTeamRecords([makeItem({ gameId: 'game-canonical', teamMatchId: 'team-match-1' })])}
+      />,
+    );
+
+    expect(screen.getByRole('link')).toHaveAttribute(
+      'href',
+      '/tournaments/tournament-1/matches/team-match-1?from=%2Fteams%2Fteam-1%2Frecords%3Ffrom%3D%252Fmy',
+    );
+  });
 });

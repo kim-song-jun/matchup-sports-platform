@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
-import { sanitizeRedirectPath } from '@/lib/session-storage';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { usePublicUserRecords } from '@/components/public-game-records/use-public-game-records';
 import { UserRecordsContent } from '@/components/public-game-records/user-records-content';
 import type { RecordTypeFilter } from '@/components/public-game-records/record-category-tabs';
@@ -64,6 +64,7 @@ export function UserRecordsPageClient({ userId }: { userId: string }) {
   return (
     <UserRecordsContent
       data={combined}
+      selfHref={withFromPath(`/users/${userId}/records`, fromPath)}
       hasNextPage={hasNextPage}
       isFetchingNextPage={isFetchingNextPage}
       onLoadMore={() => void fetchNextPage()}

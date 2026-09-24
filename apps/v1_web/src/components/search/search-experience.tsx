@@ -46,15 +46,17 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
         (item.seriesTitle?.toLowerCase().includes(normalizedQuery) ?? false),
     );
   }, [leagueMatchesQuery.data?.items, normalizedQuery, shouldSearch]);
+  // 상세에서 돌아왔을 때 같은 결과를 다시 보도록 검색어를 출처에 담는다(getInitialQuery 가 q 를 읽는다).
+  const resultFrom = `/search?q=${encodeURIComponent(submittedQuery.trim())}`;
   const apiResults = useMemo(() => {
     if (!shouldSearch) return [];
     return [
-      ...(matchesQuery.data?.items ?? []).map(toMatchResult),
-      ...(teamMatchesQuery.data?.items ?? []).map(toTeamMatchResult),
-      ...(teamsQuery.data?.items ?? []).map(toTeamResult),
-      ...leagueResults.map(toLeagueResult),
+      ...(matchesQuery.data?.items ?? []).map((item) => toMatchResult(item, resultFrom)),
+      ...(teamMatchesQuery.data?.items ?? []).map((item) => toTeamMatchResult(item, resultFrom)),
+      ...(teamsQuery.data?.items ?? []).map((item) => toTeamResult(item, resultFrom)),
+      ...leagueResults.map((item) => toLeagueResult(item, resultFrom)),
     ];
-  }, [leagueResults, matchesQuery.data?.items, shouldSearch, teamMatchesQuery.data?.items, teamsQuery.data?.items]);
+  }, [leagueResults, matchesQuery.data?.items, resultFrom, shouldSearch, teamMatchesQuery.data?.items, teamsQuery.data?.items]);
   const loading = shouldSearch && (matchesQuery.isLoading || teamMatchesQuery.isLoading || teamsQuery.isLoading || leagueMatchesQuery.isLoading);
   const errored = shouldSearch && (matchesQuery.isError || teamMatchesQuery.isError || teamsQuery.isError || leagueMatchesQuery.isError);
 
@@ -280,26 +282,26 @@ function getInitialQuery(state: SearchState) {
   return new URLSearchParams(window.location.search).get('q') ?? '';
 }
 
-function toMatchResult(item: V1Match) {
+function toMatchResult(item: V1Match, from: string) {
   return {
     type: '매치',
     title: item.title,
     meta: [item.sport?.name ?? item.sportName, item.place?.name ?? item.placeName, formatDateTime(item.startsAt), item.capacityText].filter(Boolean).join(' · '),
-    // 뒤로가기가 검색 화면으로 돌아오도록 출처를 함께 넘긴다(matches-client.tsx가 `?from=`을 읽는다).
-    href: `/matches/${item.matchId ?? item.id}?from=${encodeURIComponent('/search')}`,
+    // 뒤로가기가 검색 결과로 돌아오도록 출처를 함께 넘긴다(각 상세 화면이 `?from=`을 읽는다).
+    href: `/matches/${item.matchId ?? item.id}?from=${encodeURIComponent(from)}`,
   };
 }
 
-function toTeamMatchResult(item: V1TeamMatch) {
+function toTeamMatchResult(item: V1TeamMatch, from: string) {
   return {
     type: '팀매치',
     title: item.title,
     meta: [item.sport?.name ?? item.sportName, item.hostTeam?.name ?? item.hostTeamName, item.place?.name ?? item.placeName, formatDateTime(item.startsAt)].filter(Boolean).join(' · '),
-    href: `/team-matches/${item.teamMatchId ?? item.id}?from=${encodeURIComponent('/search')}`,
+    href: `/team-matches/${item.teamMatchId ?? item.id}?from=${encodeURIComponent(from)}`,
   };
 }
 
-function toLeagueResult(item: V1PublicLeagueListItem) {
+function toLeagueResult(item: V1PublicLeagueListItem, from: string) {
   const dateLabel = formatTournamentDateRangeShort(item.startsOn, item.endsOn);
   return {
     type: '정규 리그',
@@ -307,16 +309,16 @@ function toLeagueResult(item: V1PublicLeagueListItem) {
     meta: [item.sport.name, item.region.name, item.tierLabel, dateLabel ?? '일정 미정', `${item.teamCount}팀 참가`]
       .filter(Boolean)
       .join(' · '),
-    href: `/league-matches/${item.leagueId}`,
+    href: `/league-matches/${item.leagueId}?from=${encodeURIComponent(from)}`,
   };
 }
 
-function toTeamResult(item: V1Team) {
+function toTeamResult(item: V1Team, from: string) {
   return {
     type: '팀',
     title: item.name,
     meta: [item.sport?.name ?? item.sportName, item.region?.name ?? item.regionName, `${item.memberCount}명`, item.joinPolicy === 'approval_required' ? '신입 환영' : '모집 마감'].filter(Boolean).join(' · '),
-    href: `/teams/${item.teamId ?? item.id}`,
+    href: `/teams/${item.teamId ?? item.id}?from=${encodeURIComponent(from)}`,
   };
 }
 

@@ -91,11 +91,15 @@ export type TeamDetailViewModel = {
   };
   mode: 'default' | 'pending' | 'mine' | 'closed';
   /**
-   * 데스크톱 "팀 목록으로" 헤더 링크(`tm-desktop-back`)가 쓰는 뒤로가기 목적지.
+   * 데스크톱 뒤로가기 헤더 링크(`tm-desktop-back`)가 쓰는 뒤로가기 목적지.
    * ShellOverride.backHref(모바일 셸)와 같은 `?from=` 기반 값 — 계산 위치:
    * `TeamDetailPageClient`(teams-client.tsx). 없으면 '/teams'로 고정.
    */
   backHref?: string;
+  /** 이 팀 상세에서 나가는 링크가 쓸 출처(받은 `?from=` 포함). 없으면 `/teams/:id`. */
+  selfHref?: string;
+  /** 멤버 목록·팀 전적처럼 이 팀으로 돌아오는 하위 화면에 넘길 출처. 받은 출처가 없으면 null. */
+  subPageFrom?: string | null;
   ctaLabel?: string;
   ctaPending?: boolean;
   onCta?: () => void | Promise<unknown>;

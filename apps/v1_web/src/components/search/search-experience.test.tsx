@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SearchExperience } from './search-experience';
 
@@ -149,6 +149,18 @@ describe('SearchExperience GA events', () => {
     await waitFor(() =>
       expect(analytics.trackEvent).toHaveBeenCalledWith('search', { queryLength: 6, resultCount: 1, domain: 'league' }),
     );
+  });
+
+  // 상세에서 뒤로가기로 돌아왔을 때 빈 검색 화면이 아니라 같은 결과가 떠야 한다.
+  it('결과를 누르면 검색어를 담은 출처로 상세에 간다', async () => {
+    apiMocks.teams = { items: [{ id: 'team-1', name: '성수 FC' }] };
+    render(<SearchExperience state="results" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /성수 저녁 풋살/ }));
+    fireEvent.click(screen.getByRole('button', { name: /성수 FC/ }));
+
+    expect(router.push).toHaveBeenCalledWith('/matches/match-1?from=%2Fsearch%3Fq%3Dfutsal');
+    expect(router.push).toHaveBeenCalledWith('/teams/team-1?from=%2Fsearch%3Fq%3Dfutsal');
   });
 });
 

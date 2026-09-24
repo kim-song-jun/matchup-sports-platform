@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
 import { usePublicMatch } from '@/components/public-game-records/use-public-game-records';
@@ -7,6 +8,8 @@ import { MatchDetailContent } from '@/components/public-game-records/match-detai
 import { AttestRequestsSection } from '@/components/public-game-records/attest-requests';
 import { ClaimMyRecordSection } from '@/components/public-game-records/claim-my-record';
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { sanitizeRedirectPath } from '@/lib/session-storage';
 
 function MatchSkeleton() {
   return (
@@ -21,6 +24,9 @@ function MatchSkeleton() {
  * 부모 page.tsx 의 notFound() 가 지고, public-game-records.test.tsx 가 고정한다. */
 export function MatchPageClient({ tournamentId, fixtureId }: { tournamentId: string; fixtureId: string }) {
   const { data, isLoading, isError, error, refetch } = usePublicMatch(tournamentId, fixtureId);
+  // 활동 기록·팀 전적처럼 대진표가 아닌 곳에서 들어왔으면 그 화면으로 돌아간다.
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  useShellOverride(fromPath ? { backHref: fromPath } : {});
 
   if (isLoading) {
     return (

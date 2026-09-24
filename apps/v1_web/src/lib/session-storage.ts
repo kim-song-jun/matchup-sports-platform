@@ -95,6 +95,15 @@ export function sanitizeRedirectPath(value: string | null | undefined) {
   return `${resolved.pathname}${resolved.search}${resolved.hash}`;
 }
 
+/**
+ * `path` 에 `?from=` 을 붙인다. `from` 이 없으면 `path` 그대로.
+ * 받은 `from` 까지 담은 자기 URL 을 다음 화면의 출처로 넘기면 여러 단계를 거쳐도 처음 출처가 남는다.
+ */
+export function withFromPath(path: string, from: string | null | undefined) {
+  if (!from) return path;
+  return `${path}${path.includes('?') ? '&' : '?'}from=${encodeURIComponent(from)}`;
+}
+
 export function getCurrentRedirectPath() {
   if (typeof window === 'undefined') return '/home';
   return `${window.location.pathname}${window.location.search}${window.location.hash}`;

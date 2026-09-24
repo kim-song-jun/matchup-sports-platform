@@ -16,6 +16,7 @@ import { useV1PublicTeamReviewSummary } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { isTeamLogoPreset, TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import { isTeamOperatorRole } from '@/lib/team-role';
+import { withFromPath } from '@/lib/session-storage';
 import { TeamUpcomingGamesCard } from './team-upcoming-games-card';
 import type {
   TeamDetailViewModel,
@@ -202,11 +203,11 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
  * Clean v1 card style + 해요체 copy.
  */
 function TeamOpenMatchesSection({
-  teamId,
+  fromHref,
   matches,
   loading,
 }: {
-  teamId: string;
+  fromHref: string;
   matches?: TeamDetailViewModel['openMatches'];
   loading?: boolean;
 }) {
@@ -227,7 +228,7 @@ function TeamOpenMatchesSection({
               key={match.id}
               className="tm-pressable"
               // 뒤로가기가 이 팀 상세로 돌아오도록 출처를 함께 넘긴다(team-matches-client.tsx가 `?from=`을 읽는다).
-              href={`/team-matches/${match.id}?from=${encodeURIComponent(`/teams/${teamId}`)}`}
+              href={`/team-matches/${match.id}?from=${encodeURIComponent(fromHref)}`}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -387,10 +388,10 @@ function TeamOperationsSection({
  * 기존 수량 라벨을 유지하고, 전원을 미리 보여주는 작은 팀에도 명시적인 진입점을 둔다.
  * 화면의 주요 CTA(가입/채팅 버튼)와 겹치지 않도록 tm-list-row 안의 텍스트 링크로만 표현한다.
  */
-function TeamMembersMoreLink({ teamId, count }: { teamId: string; count: number }) {
+function TeamMembersMoreLink({ teamId, count, from }: { teamId: string; count: number; from?: string | null }) {
   return (
     <Link
-      href={`/teams/${teamId}/members`}
+      href={withFromPath(`/teams/${teamId}/members`, from)}
       className="tm-list-row tm-pressable"
       style={{ justifyContent: 'center', gap: 4, minHeight: 44, textDecoration: 'none' }}
     >
@@ -402,7 +403,7 @@ function TeamMembersMoreLink({ teamId, count }: { teamId: string; count: number 
   );
 }
 
-function TeamDetailMembersCard({ team }: { team: TeamDetailViewModel['team'] }) {
+function TeamDetailMembersCard({ team, subPageFrom }: { team: TeamDetailViewModel['team']; subPageFrom?: string | null }) {
   return (
     <section className="tm-team-detail-members-section">
       <div className="tm-section-row tm-team-detail-members-head" style={{ alignItems: 'flex-start', gap: 12, marginTop: 0 }}>
@@ -420,7 +421,7 @@ function TeamDetailMembersCard({ team }: { team: TeamDetailViewModel['team'] }) 
               return member.profileHref ? <Link key={member.membershipId} className="tm-list-row tm-pressable" href={member.profileHref}>{content}</Link> : <div key={member.membershipId} className="tm-list-row">{content}</div>;
             })
           ) : <div className="tm-text-caption" style={{ lineHeight: 1.55 }}>공개된 멤버가 아직 없어요.</div>}
-          <TeamMembersMoreLink teamId={team.id} count={team.memberAccess.moreCount} />
+          <TeamMembersMoreLink teamId={team.id} count={team.memberAccess.moreCount} from={subPageFrom} />
         </div>
       ) : <div className="tm-text-caption" style={{ lineHeight: 1.55 }}>멤버 목록은 비공개예요. 팀에 속한 멤버만 볼 수 있어요.</div>}
     </section>
@@ -645,10 +646,10 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               자리(경기 정보 다음)에 남기고, 그 외에는 히어로 바로 다음으로 끌어올린다. */}
           {mode !== 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
           {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} /> : null}
-          <TeamOpenMatchesSection teamId={model.team.id} matches={model.openMatches} loading={model.openMatchesLoading} />
+          <TeamOpenMatchesSection fromHref={model.selfHref ?? `/teams/${model.team.id}`} matches={model.openMatches} loading={model.openMatchesLoading} />
           <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
           <TeamRecordLinkCard
-            href={`/teams/${team.id}/records`}
+            href={withFromPath(`/teams/${team.id}/records`, model.subPageFrom)}
             title="팀 전적"
             description="승·무·패와 경기별 기록을 확인해요."
           />
@@ -693,7 +694,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           {mode === 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
           <TeamOperationsSection operations={model.operations} />
           {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
-          <TeamDetailMembersCard team={team} />
+          <TeamDetailMembersCard team={team} subPageFrom={model.subPageFrom} />
         </div>
 
         {/* RIGHT: sticky sidebar
@@ -794,7 +795,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             피드백) — mode==='mine' 에서만 아래쪽 원래 자리(경기 정보 다음)에 남긴다. */}
         {mode !== 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
         {mode === 'mine' ? <TeamUpcomingGamesCard teamId={team.id} /> : null}
-        <TeamOpenMatchesSection teamId={model.team.id} matches={model.openMatches} loading={model.openMatchesLoading} />
+        <TeamOpenMatchesSection fromHref={model.selfHref ?? `/teams/${model.team.id}`} matches={model.openMatches} loading={model.openMatchesLoading} />
         <TeamMyLeaguesSection leagues={model.myLeagues} loading={model.myLeaguesLoading} error={model.myLeaguesError} onRetry={model.onRetryMyLeagues} />
 
         {/* 기록으로 가는 링크 묶음. 예전에는 "팀 전적" 링크 하나가 위 매치 섹션과 **간격 0px
@@ -804,7 +805,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         <div style={{ display: 'grid', gap: 12 }}>
           {/* 데스크톱 레이아웃에만 있던 링크 — 모바일에서 팀 전적으로 갈 방법이 아예 없었다. */}
           <TeamRecordLinkCard
-            href={`/teams/${team.id}/records`}
+            href={withFromPath(`/teams/${team.id}/records`, model.subPageFrom)}
             title="팀 전적"
             description="승·무·패와 경기별 기록을 확인해요."
           />
@@ -829,7 +830,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
         {mode === 'mine' ? <TeamBasicInfoCard team={team} capacity={capacity} /> : null}
         <TeamOperationsSection operations={model.operations} />
         {/* (3) 비공개 카드: opacity dim 제거(텍스트 대비 정상화). disabled 회색 pill → Lock 아이콘 + tm-badge-grey 정적 라벨. */}
-        <TeamDetailMembersCard team={team} />
+        <TeamDetailMembersCard team={team} subPageFrom={model.subPageFrom} />
       </article>
       <div ref={mobileCtaRef} className="tm-fixed-cta tm-hide-desktop">
         {/* 승인 대기 중에는 본문의 안내 카드가 상태를 이미 설명하므로 같은 말을 반복하지 않는다. */}

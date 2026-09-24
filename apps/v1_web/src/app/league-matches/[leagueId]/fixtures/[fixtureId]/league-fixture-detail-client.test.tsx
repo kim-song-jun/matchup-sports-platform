@@ -3,10 +3,14 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { useV1LeagueMatch, useV1LeagueMatchStandings, useV1ResolveChatRoom, useV1TeamMatch } from '@/hooks/use-v1-api';
 import { usePublicLeagueFixtureRecord } from '@/components/public-game-records/use-public-game-records';
 import { V1ApiError } from '@/lib/api-client';
+import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
 import LeagueFixtureDetailClient from './league-fixture-detail-client';
 
+const navigation = vi.hoisted(() => ({ searchParams: new URLSearchParams() }));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  usePathname: () => '/league-matches/lg-1/fixtures/fx-1',
+  useSearchParams: () => navigation.searchParams,
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -171,6 +175,24 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.getByText('2주차')).toBeInTheDocument();
     // 관전자에게는 참가팀 통로가 뜨지 않는다.
     expect(screen.queryByText('상대팀과 채팅')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['활동 기록에서 들어오면 그 화면으로', 'from=%2Fusers%2Fu1%2Frecords%3Ffrom%3D%252Fmy', { backHref: '/users/u1/records?from=%2Fmy' }],
+    ['출처가 없으면 셸 기본값(리그 화면)을 그대로', '', {}],
+    ['외부 주소는 무시하고 기본값을', 'from=%2F..%2F%2Fevil.example', {}],
+  ])('뒤로가기: %s 게시한다', (_label, query, expected) => {
+    navigation.searchParams = new URLSearchParams(query);
+    mockLeague();
+    mockViewer('none');
+    let published: ReturnType<typeof useShellOverrideForRoute> = {};
+    function ShellProbe() {
+      published = useShellOverrideForRoute('/league-matches/lg-1/fixtures/fx-1');
+      return null;
+    }
+    render(<><ShellProbe /><LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" /></>);
+    expect(published).toEqual(expected);
+    navigation.searchParams = new URLSearchParams();
   });
 
   it('완료 경기: 스코어를 보여주고 몰수 결과에는 몰수 뱃지를 함께 싣는다', () => {

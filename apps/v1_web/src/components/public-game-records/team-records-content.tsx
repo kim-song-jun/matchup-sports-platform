@@ -292,6 +292,7 @@ export function TeamRecordsContent({
   onChangeType,
   activeSeason,
   onChangeSeason,
+  selfHref,
 }: {
   data: PublicTeamRecordsResponse;
   hasNextPage?: boolean;
@@ -303,7 +304,10 @@ export function TeamRecordsContent({
   /** 미전달(`undefined`) = '전체 시즌'. 드롭다운 자체는 미전달 시 렌더하지 않는다(optional). */
   activeSeason?: string;
   onChangeSeason?: (season: string | undefined) => void;
+  /** 상세로 넘길 출처. 이 화면이 받은 `?from=` 까지 담아야 여러 단계 뒤에도 처음 출처가 남는다. */
+  selfHref?: string;
 }) {
+  const fromHref = selfHref ?? `/teams/${data.teamId}/records`;
   // 여러 행을 동시에 펼칠 수 있게 Set으로 관리한다 -- 아코디언끼리 서로 배타적이어야
   // 할 이유가 없고(다른 경기 두 개를 나란히 비교해 보고 싶을 수 있다), gameId는
   // 행마다 고유하다.
@@ -388,7 +392,7 @@ export function TeamRecordsContent({
         ) : (
           <Card pad={0}>
             {data.items.map((item) => {
-              const href = recordHref(item, `/teams/${data.teamId}/records`);
+              const href = recordHref(item, fromHref);
               const hasEvents = item.events.length > 0;
               const isExpanded = hasEvents && expandedGameIds.has(item.gameId);
               const panelId = `team-record-events-${item.gameId}`;

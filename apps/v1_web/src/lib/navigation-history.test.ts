@@ -10,8 +10,10 @@ import {
   bindSoftNavigator,
   decideBackAction,
   ensureColdStartParent,
+  addPopInterceptor,
   hasPreviousInAppEntry,
   installNavigationHistory,
+  isAppBackPending,
   isAppNavigationPop,
   markAppInitiatedBack,
   subscribeAppPop,
@@ -204,5 +206,100 @@ describe('콜드스타트 부모 항목', () => {
     expect(ensureColdStartParent('/matches')).toBe(false);
     expect(window.history.length).toBe(lengthBefore);
     expect(idx()).toBe(2);
+  });
+});
+
+describe('도장 없는 항목(해시 앵커 등)', () => {
+  it('도장 없는 항목에 도착하면 위치를 모른다고 보고 replace 로 간다 — 도장 있는 항목으로 돌아오면 다시 맞춘다', async () => {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/teams/1?from=%2Fhome');
+    expect(decideBackAction('/home')).toBe('back');
+
+    // 앵커 이동은 브라우저가 직접 만드는 state=null 항목이다(추적기 패치를 거치지 않는다).
+    await traverse(() => {
+      window.location.hash = 'league-schedule';
+    });
+    expect(idx()).toBeUndefined();
+    expect(decideBackAction('/home')).toBe('replace');
+    expect(hasPreviousInAppEntry()).toBe(false);
+
+    await back();
+    expect(window.location.pathname).toBe('/teams/1');
+    expect(decideBackAction('/home')).toBe('back');
+  });
+});
+
+describe('앱이 부른 뒤로가기 대기 표식', () => {
+  it('pop 이 오면 풀린다', async () => {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/teams');
+    markAppInitiatedBack();
+    expect(isAppBackPending()).toBe(true);
+    await back();
+    expect(isAppBackPending()).toBe(false);
+  });
+
+  it('pop 이 안 와도(앱 밖으로 나감·취소) 시간이 지나면, bfcache 복귀(pageshow)면 바로 풀린다', () => {
+    vi.useFakeTimers();
+    try {
+      installNavigationHistory();
+      markAppInitiatedBack();
+      vi.advanceTimersByTime(999);
+      expect(isAppBackPending()).toBe(true);
+      vi.advanceTimersByTime(1);
+      expect(isAppBackPending()).toBe(false);
+
+      markAppInitiatedBack();
+      window.dispatchEvent(new Event('pageshow'));
+      expect(isAppBackPending()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('pop 가로채기는 한 pop 에 하나만', () => {
+  it('priority 가 높은 것부터 묻고, 처음 true 를 돌려준 것 뒤로는 부르지 않는다', async () => {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/teams');
+    const calls: string[] = [];
+    addPopInterceptor(() => {
+      calls.push('overlay');
+      return true;
+    });
+    addPopInterceptor(
+      () => {
+        calls.push('guard');
+        return true;
+      },
+      { priority: 10 },
+    );
+    await back();
+    expect(calls).toEqual(['guard']);
+  });
+});
+
+describe('다시 평가된 모듈(HMR)의 재설치', () => {
+  it('이전 설치를 걷고 한 벌만 감싼다 — 리스너도 하나만 남는다', async () => {
+    const nativePush = History.prototype.pushState;
+    installNavigationHistory();
+    const staleListener = vi.fn();
+    subscribeAppPop(staleListener);
+
+    vi.resetModules();
+    const fresh = await import('./navigation-history');
+    fresh.installNavigationHistory();
+    const freshListener = vi.fn();
+    fresh.subscribeAppPop(freshListener);
+    try {
+      window.history.pushState({}, '', '/teams');
+      await back();
+      expect(freshListener).toHaveBeenCalledTimes(1);
+      expect(staleListener).not.toHaveBeenCalled();
+    } finally {
+      fresh.__resetNavigationHistoryForTests();
+    }
+    // 새 설치가 이전 래퍼를 원본으로 착각했다면 여기서 래퍼가 남는다.
+    expect(History.prototype.pushState).toBe(nativePush);
   });
 });

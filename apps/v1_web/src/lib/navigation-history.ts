@@ -18,6 +18,10 @@ export const OVERLAY_STATE_KEY = '__tmOverlay';
 const STORAGE_KEY = 'teameet.v1.navHistory';
 const PARENT_DONE_KEY = 'teameet.v1.navHistory.parentInserted';
 const KEEP_AROUND = 50;
+// 앱이 부른 back 의 pop 이 이 안에 안 오면(앱 밖으로 나감·취소) 대기 표식을 버린다.
+const APP_BACK_PENDING_MS = 1000;
+// 모듈이 다시 평가돼도(HMR) 이전 설치를 걷어 낼 수 있게 window 에 남기는 설치 기록.
+const INSTALL_MARKER = '__teameetNavHistoryInstall';
 const URL_BASE = 'https://nav-history.invalid';
 
 type Entry = { url: string; overlay?: boolean; parent?: boolean };
@@ -29,13 +33,18 @@ let mirror: Mirror | null = null;
 let coldStart = false;
 let originals: { push: HistoryMethod; replace: HistoryMethod } | null = null;
 let pendingAppBack = false;
+let pendingAppBackTimer: ReturnType<typeof setTimeout> | null = null;
+/** 도장 없는 항목(예: `#앵커` 이동)에 있다 — 위치를 모르니 헤더 뒤로가기는 replace 로 간다. */
+let untracked = false;
 let suppressedPops = 0;
 let pushCount = 0;
 let softNavigate: ((url: string) => void) | null = null;
 const popListeners = new Set<(pop: AppPop) => void>();
 /** true 를 돌려주면 그 pop 을 여기서 끝낸다(Next·다른 리스너에 전달하지 않음). */
 export type PopInterceptor = (event: PopStateEvent) => boolean;
-const popInterceptors = new Set<PopInterceptor>();
+type InterceptorEntry = { intercept: PopInterceptor; priority: number };
+// 한 pop 은 한 가로채기만 처리한다 — priority 가 높은 것부터 묻고, 처음 true 를 돌려준 것에서 끝낸다.
+let popInterceptors: InterceptorEntry[] = [];
 const appPopEvents = new WeakSet<Event>();
 
 type StateRecord = Record<string, unknown>;
@@ -45,6 +54,15 @@ const readIdx = (state: unknown) => {
   const value = asRecord(state)?.[IDX_KEY];
   return typeof value === 'number' ? value : null;
 };
+type InstallRecord = { originals: { push: HistoryMethod; replace: HistoryMethod }; listener: (event: PopStateEvent) => void; pageshow: () => void };
+type MarkedWindow = Window & { [INSTALL_MARKER]?: InstallRecord };
+
+function clearPendingAppBack() {
+  pendingAppBack = false;
+  if (pendingAppBackTimer) clearTimeout(pendingAppBackTimer);
+  pendingAppBackTimer = null;
+}
+
 const currentUrl = () => `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
 /** 비교용 정규화 — 쿼리 인코딩 차이(`from=/a` vs `from=%2Fa`)와 hash 는 같은 화면으로 본다. */
@@ -108,18 +126,23 @@ function onPopState(event: PopStateEvent) {
   const leaving = mirror.entries[mirror.index];
   const arriving = target === null ? undefined : mirror.entries[target];
   const appInitiated = pendingAppBack;
-  pendingAppBack = false;
+  clearPendingAppBack();
   const direction: AppPop['direction'] =
     target === null || target === mirror.index ? 'unknown' : target < mirror.index ? 'back' : 'forward';
+  // 도장 없는 항목이면 거울을 믿지 않는다 — 다음 도장 있는 pop·push 에서 다시 맞춘다.
+  untracked = target === null;
   if (target !== null) {
     mirror.index = target;
     mirror.entries[target] = { ...arriving, url: currentUrl() };
     persist();
   }
-  const overlayPop = suppressedPops > 0 || Boolean(leaving?.overlay) || Boolean(arriving?.overlay);
+  // 오버레이 표식을 지나도 화면(URL)이 바뀌었으면 페이지 이동이다 — 닫기 back 과 사용자 back 이 합쳐진 경우 등.
+  const touchesOverlay = Boolean(leaving?.overlay) || Boolean(arriving?.overlay);
+  const samePage = leaving !== undefined && sameUrl(leaving.url, currentUrl());
+  const overlayPop = suppressedPops > 0 || (touchesOverlay && samePage);
   if (overlayPop) suppressedPops = Math.max(0, suppressedPops - 1);
   // Next 보다 먼저 등록된 리스너라, 여기서 멈추면 Next 는 이 pop 을 모른다(오버레이 닫기·이탈 막기).
-  for (const intercept of popInterceptors) {
+  for (const { intercept } of popInterceptors) {
     if (intercept(event)) {
       event.stopImmediatePropagation();
       return;
@@ -135,8 +158,21 @@ function onPopState(event: PopStateEvent) {
   popListeners.forEach((listener) => listener({ direction, appInitiated }));
 }
 
+/** 이전 모듈 인스턴스(HMR)의 설치를 걷는다 — 겹쳐 감싸면 도장·리스너가 두 벌이 된다. */
+function removePreviousInstall() {
+  const win = window as MarkedWindow;
+  const previous = win[INSTALL_MARKER];
+  if (!previous) return;
+  History.prototype.pushState = previous.originals.push;
+  History.prototype.replaceState = previous.originals.replace;
+  window.removeEventListener('popstate', previous.listener);
+  window.removeEventListener('pageshow', previous.pageshow);
+  delete win[INSTALL_MARKER];
+}
+
 export function installNavigationHistory(): void {
   if (typeof window === 'undefined' || mirror) return;
+  removePreviousInstall();
   const stored = readStored();
   const stamped = readIdx(window.history.state);
   if (stamped !== null) {
@@ -160,6 +196,7 @@ export function installNavigationHistory(): void {
     const stampedState = withIdx(data, (mirror?.index ?? -1) + 1);
     push.call(this, stampedState, unused, url);
     pushCount += 1;
+    untracked = false;
     recordPush(stampedState);
   };
   proto.replaceState = function replaceState(this: History, data, unused, url) {
@@ -171,11 +208,15 @@ export function installNavigationHistory(): void {
   };
   replace.call(window.history, withIdx(window.history.state, mirror.index), '');
   window.addEventListener('popstate', onPopState);
+  // bfcache 복귀엔 popstate 가 없다 — 떠나기 직전의 대기 표식이 다음 클릭을 막지 않게 지운다.
+  window.addEventListener('pageshow', clearPendingAppBack);
+  (window as MarkedWindow)[INSTALL_MARKER] = { originals, listener: onPopState, pageshow: clearPendingAppBack };
   persist();
 }
 
 /** 헤더 뒤로가기의 방법. 목적지가 바로 앞 앱 항목이면 back(스크롤도 복원), 아니면 replace(앞 중복 없음). */
 export function decideBackAction(target: string): 'back' | 'replace' {
+  if (untracked) return 'replace';
   const previous = mirror?.entries[mirror.index - 1];
   if (!previous || previous.overlay) return 'replace';
   return sameUrl(previous.url, target) ? 'back' : 'replace';
@@ -183,12 +224,19 @@ export function decideBackAction(target: string): 'back' | 'replace' {
 
 /** 이 탭에서 앱 안의 이전 항목으로 돌아갈 수 있는가(router.back() 이 앱 밖으로 나가지 않는가). */
 export function hasPreviousInAppEntry(): boolean {
-  return Boolean(mirror?.entries[mirror.index - 1]);
+  return !untracked && Boolean(mirror?.entries[mirror.index - 1]);
 }
 
 /** 곧 일어날 popstate 가 앱이 부른 뒤로가기임을 알린다 — iOS 셸도 네이티브 애니메이션이 없다. */
 export function markAppInitiatedBack(): void {
+  clearPendingAppBack();
   pendingAppBack = true;
+  pendingAppBackTimer = setTimeout(clearPendingAppBack, APP_BACK_PENDING_MS);
+}
+
+/** 앱이 부른 back 의 pop 을 기다리는 중인가 — 헤더 뒤로가기 연타가 두 칸 가지 않게. */
+export function isAppBackPending(): boolean {
+  return pendingAppBack;
 }
 
 /** 앱 페이지 이동인 popstate 만 알린다(오버레이 pop 제외). 해지 함수를 돌려준다. */
@@ -205,11 +253,12 @@ export function isAppNavigationPop(event: Event): boolean {
 }
 
 /** popstate 를 Next 보다 먼저 볼 가로채기를 건다. 해지 함수를 돌려준다. */
-export function addPopInterceptor(intercept: PopInterceptor): () => void {
+export function addPopInterceptor(intercept: PopInterceptor, { priority = 0 }: { priority?: number } = {}): () => void {
   installNavigationHistory();
-  popInterceptors.add(intercept);
+  const entry = { intercept, priority };
+  popInterceptors = [...popInterceptors, entry].sort((a, b) => b.priority - a.priority);
   return () => {
-    popInterceptors.delete(intercept);
+    popInterceptors = popInterceptors.filter((item) => item !== entry);
   };
 }
 
@@ -261,13 +310,18 @@ export function __resetNavigationHistoryForTests(): void {
     History.prototype.pushState = originals.push;
     History.prototype.replaceState = originals.replace;
   }
-  if (typeof window !== 'undefined') window.removeEventListener('popstate', onPopState);
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('popstate', onPopState);
+    window.removeEventListener('pageshow', clearPendingAppBack);
+    delete (window as MarkedWindow)[INSTALL_MARKER];
+  }
   mirror = null;
   originals = null;
   coldStart = false;
-  pendingAppBack = false;
+  clearPendingAppBack();
+  untracked = false;
   suppressedPops = 0;
   softNavigate = null;
   popListeners.clear();
-  popInterceptors.clear();
+  popInterceptors = [];
 }

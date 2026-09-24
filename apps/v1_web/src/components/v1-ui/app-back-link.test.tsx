@@ -50,6 +50,21 @@ describe('AppBackLink 클릭 — 핑퐁 없는 뒤로가기', () => {
     expect(navigation.router.replace).not.toHaveBeenCalled();
   });
 
+  it('연타해도 뒤로는 한 번만 — 앞 back 의 pop 이 오기 전의 클릭은 무시한다', () => {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/teams');
+    window.history.pushState({}, '', '/teams/1?from=%2Fteams');
+    navigation.searchParams = new URLSearchParams('from=%2Fteams');
+    render(<AppBackLink fallbackHref="/teams">뒤로</AppBackLink>);
+
+    const link = screen.getByRole('link', { name: '뒤로가기' });
+    fireEvent.click(link);
+    fireEvent.click(link);
+
+    expect(navigation.router.back).toHaveBeenCalledTimes(1);
+    expect(navigation.router.replace).not.toHaveBeenCalled();
+  });
+
   it('바로 앞 항목이 목적지가 아니면 router.replace(목적지) — 앞으로 중복 항목을 남기지 않는다', () => {
     installNavigationHistory();
     window.history.pushState({}, '', '/tournaments');

@@ -40,6 +40,8 @@ interface ConfirmState extends ConfirmOptions {
 export function useConfirm() {
   const [state, setState] = useState<ConfirmState | null>(null);
   const settledRef = useRef<(() => void) | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const confirm = useCallback((opts: ConfirmOptions): Promise<boolean> => {
     return new Promise<boolean>((resolve) => {
@@ -64,6 +66,17 @@ export function useConfirm() {
     settledRef.current = null;
     void waitForOverlayHistory().then(settled);
   }, [state]);
+
+  // 호스트가 먼저 사라지면(같은 커밋의 언마운트 포함) 기다리는 쪽이 영원히 멈추지 않게 끝낸다.
+  useEffect(
+    () => () => {
+      const settled = settledRef.current;
+      settledRef.current = null;
+      if (settled) settled();
+      else stateRef.current?.resolve(false);
+    },
+    [],
+  );
 
   const modal = (
     <ConfirmModal

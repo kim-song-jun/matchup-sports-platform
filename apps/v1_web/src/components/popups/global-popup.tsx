@@ -17,6 +17,7 @@ export function GlobalPopup() {
 
   return (
     <HomePopupDialog
+      pathname={pathname}
       popup={popup ? {
         id: popup.popupId,
         title: popup.title,

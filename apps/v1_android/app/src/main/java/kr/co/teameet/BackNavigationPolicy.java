@@ -22,7 +22,7 @@ final class BackNavigationPolicy {
         return withinExitWindow ? Action.EXIT : Action.SHOW_EXIT_HINT;
     }
 
-    private static boolean isHome(String currentUrl) {
+    static boolean isHome(String currentUrl) {
         if (currentUrl == null || currentUrl.isBlank()) return false;
         try {
             return HOME_PATH.equals(URI.create(currentUrl).getPath());

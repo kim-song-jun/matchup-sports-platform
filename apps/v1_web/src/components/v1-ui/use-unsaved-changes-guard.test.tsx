@@ -6,7 +6,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __resetNavigationHistoryForTests, installNavigationHistory } from '@/lib/navigation-history';
-import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
+import { __resetOverlayHistoryForTests, openOverlay, overlayMarkerOf, releaseOverlay } from '@/lib/overlay-history';
 import { createHistoryRouter, currentPath, settleHistory } from '@/test/history-router';
 import { AppBackLink } from './app-back-link';
 import { useUnsavedChangesGuard } from './use-unsaved-changes-guard';
@@ -86,6 +86,31 @@ describe('입력 중인 폼 — 뒤로가기(popstate)', () => {
     expect(leaveDialog()).toBeNull();
     expect(currentPath()).toBe('/teams');
     expect(nextRouterPop).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('입력 중인 폼 — 닫힌 오버레이의 남은 표식', () => {
+  // [목록, 목록-표식(모달 안 링크로 폼에 옴), 폼(입력 중)] 에서 뒤로 — 표식 건너뛰기와 폼 되돌리기가
+  // 한 pop 에서 둘 다 움직이면 폼이 사라지거나 확인창이 뜬 채 목록으로 밀려난다.
+  it('한 번만 묻고 폼에 머문다 — 나가기를 고르면 표식을 건너 목록에 닿는다', async () => {
+    await run(() => window.history.back());
+    expect(currentPath()).toBe('/teams');
+    const id = openOverlay({ close: () => {} });
+    window.history.pushState({}, '', '/teams/new');
+    releaseOverlay(id); // URL 이 바뀐 뒤의 닫기 — 표식은 남는다
+    nextRouterPop.mockClear();
+
+    render(<Form dirty />);
+    await run(() => window.history.back(), 10);
+
+    expect(currentPath()).toBe('/teams/new');
+    expect(screen.queryAllByRole('dialog', { name: LEAVE_TITLE })).toHaveLength(1);
+    expect(nextRouterPop).not.toHaveBeenCalled();
+
+    await run(() => fireEvent.click(screen.getByRole('button', { name: '나가기' })), 15);
+    expect(currentPath()).toBe('/teams');
+    expect(overlayMarkerOf(window.history.state)).toBeNull();
+    expect(leaveDialog()).toBeNull();
   });
 });
 

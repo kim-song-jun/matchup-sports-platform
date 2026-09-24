@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { MouseEvent, ReactNode } from 'react';
 import { Suspense } from 'react';
-import { decideBackAction, markAppInitiatedBack } from '@/lib/navigation-history';
+import { decideBackAction, isAppBackPending, markAppInitiatedBack } from '@/lib/navigation-history';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
 
 /**
@@ -53,6 +53,7 @@ function BackAnchor({ href, className, children }: { href: string; className?: s
     if (event.defaultPrevented || event.button !== 0) return;
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
+    if (isAppBackPending()) return; // 연타 — 앞 back 의 pop 이 오기 전 두 번째 back 은 한 칸 더 간다.
     if (decideBackAction(href) === 'back') {
       markAppInitiatedBack();
       router.back();

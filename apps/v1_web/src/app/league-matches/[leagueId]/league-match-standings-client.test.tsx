@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import {
   useV1ActivePopup,
@@ -1193,10 +1193,20 @@ describe('LeagueMatchStandingsClient', () => {
     expect(screen.queryByText('도움 기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 순위가 공개돼요.')).not.toBeInTheDocument();
     const recordsSection = screen.getByRole('heading', { name: '득점·도움 순위' }).closest('section');
     expect(recordsSection).not.toBeNull();
-    expect(within(recordsSection as HTMLElement).getByRole('link', { name: '경기 일정 보기' })).toHaveAttribute(
-      'href',
-      '#league-schedule',
-    );
+    // 해시 앵커(#league-schedule)는 추적기 도장이 없는 히스토리 항목을 만든다 — 스크롤만 하고 히스토리는 그대로.
+    const scrollIntoView = vi.fn();
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scrollIntoView;
+    onTestFinished(() => {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+    });
+    const historyLength = window.history.length;
+    const urlBefore = window.location.href;
+    fireEvent.click(within(recordsSection as HTMLElement).getByRole('button', { name: '경기 일정 보기' }));
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView.mock.contexts[0]).toBe(document.getElementById('league-schedule'));
+    expect(window.history.length).toBe(historyLength);
+    expect(window.location.href).toBe(urlBefore);
   });
 
   it('한쪽 기록만 비면 populated 순위와 다른 쪽 빈 상태를 각각 유지한다', async () => {

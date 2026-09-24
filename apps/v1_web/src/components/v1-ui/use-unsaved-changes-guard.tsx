@@ -14,6 +14,9 @@ export const LEAVE_CONFIRM_OPTIONS: ConfirmOptions = {
 };
 
 const hereUrl = () => `${window.location.pathname}${window.location.search}`;
+// 오버레이 가로채기보다 먼저 묻는다 — 폼을 떠나는 pop 이 닫힌 오버레이의 남은 표식에 닿아도
+// 표식 건너뛰기(back 예약)와 폼 되돌리기(push)가 한 pop 에서 겹치지 않게.
+const GUARD_POP_PRIORITY = 10;
 const withinScope = (pathname: string, scope: string) => pathname === scope || pathname.startsWith(`${scope}/`);
 
 /**
@@ -44,8 +47,12 @@ export function useUnsavedChangesGuard(isDirty: boolean, { scope }: { scope?: st
   const ask = useCallback(async () => {
     if (askingRef.current) return false;
     askingRef.current = true;
-    const leave = await confirm(LEAVE_CONFIRM_OPTIONS);
-    askingRef.current = false;
+    let leave = false;
+    try {
+      leave = await confirm(LEAVE_CONFIRM_OPTIONS);
+    } finally {
+      askingRef.current = false;
+    }
     if (leave) releasedRef.current = true;
     return leave;
   }, [confirm]);
@@ -88,7 +95,7 @@ export function useUnsavedChangesGuard(isDirty: boolean, { scope }: { scope?: st
         window.history.back();
       });
       return true;
-    });
+    }, { priority: GUARD_POP_PRIORITY });
 
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
       if (!guarded()) return;

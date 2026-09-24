@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Fragment, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { useV1AdminInquiriesPendingCount } from '@/hooks/use-v1-api';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
+import { closeIfCurrentPage } from '@/lib/overlay-history';
 import { CommandPalette } from './command-palette';
 import {
   LayoutDashboard,
@@ -428,7 +429,7 @@ function Drawer({
                     href={item.href}
                     aria-current={active ? 'page' : undefined}
                     aria-label={hasBadge && item.badgeAriaLabel ? `${item.label} (${item.badgeAriaLabel})` : undefined}
-                    onClick={onClose}
+                    onClick={closeIfCurrentPage(item.href, pathname, onClose)}
                     className={[
                       'tm-admin-sidebar-link',
                       'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
@@ -461,7 +462,6 @@ function Drawer({
           )}
           <Link
             href="/home"
-            onClick={onClose}
             className="flex items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-strong)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />

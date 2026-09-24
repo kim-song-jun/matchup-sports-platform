@@ -1,6 +1,12 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { __resetNavigationHistoryForTests } from '@/lib/navigation-history';
+import { __resetOverlayHistoryForTests } from '@/lib/overlay-history';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CommandPalette } from './command-palette';
+
+const flushNavigation = () => act(async () => {
+  await Promise.resolve();
+});
 
 const pushMock = vi.fn();
 const searchMock = vi.fn();
@@ -42,10 +48,14 @@ describe('CommandPalette', () => {
   });
 
   afterEach(() => {
+    cleanup();
+    // 언마운트한 팔레트의 닫기 back 이 다음 테스트의 이동 대기에 남지 않게.
+    __resetOverlayHistoryForTests();
+    __resetNavigationHistoryForTests();
     vi.useRealTimers();
   });
 
-  it('shows grouped hits after the debounce and deep-links a user on click', () => {
+  it('shows grouped hits after the debounce and deep-links a user on click', async () => {
     const onClose = vi.fn();
     render(<CommandPalette open onClose={onClose} />);
 
@@ -60,11 +70,13 @@ describe('CommandPalette', () => {
     expect(screen.getByText('— 목록으로 이동')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('option', { name: /호스트민/ }));
+    // 이동은 닫기(오버레이 항목 걷기)가 끝난 뒤에 한다.
+    await flushNavigation();
     expect(pushMock).toHaveBeenCalledWith('/admin/users/u-1');
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('navigates with arrow keys and Enter, clamping at both ends', () => {
+  it('navigates with arrow keys and Enter, clamping at both ends', async () => {
     render(<CommandPalette open onClose={vi.fn()} />);
     typeAndDebounce('민');
 
@@ -73,6 +85,7 @@ describe('CommandPalette', () => {
     fireEvent.keyDown(input, { key: 'ArrowUp' });
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'Enter' });
+    await flushNavigation();
     // 두 번째 항목(팀 민FC)으로 이동
     expect(pushMock).toHaveBeenCalledWith('/admin/teams/t-1');
 
@@ -80,6 +93,7 @@ describe('CommandPalette', () => {
     pushMock.mockClear();
     for (let i = 0; i < 5; i += 1) fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'Enter' });
+    await flushNavigation();
     expect(pushMock).toHaveBeenCalledWith('/admin/matches');
   });
 

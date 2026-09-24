@@ -32,18 +32,35 @@ describe('resolveColdStartParent', () => {
   });
 });
 
+function setNativeShell(shell: 'android' | 'ios' | null) {
+  const win = window as unknown as Record<string, unknown>;
+  delete win.TeameetNative;
+  delete win.webkit;
+  if (shell === 'android') win.TeameetNative = { postMessage: vi.fn() };
+  if (shell === 'ios') win.webkit = { messageHandlers: { TeameetNative: { postMessage: vi.fn() } } };
+}
+afterEach(() => setNativeShell(null));
+
 describe('NavigationHistoryTracker — 콜드스타트', () => {
-  it('상세로 바로 열린 탭엔 부모 항목을 한 번 끼운다', () => {
-    openFreshTab('/teams/1');
+  it.each([
+    ['앱 셸(Android) · 출처 없음', 'android', '/teams/1', true],
+    ['앱 셸(iOS) · 출처 없음', 'ios', '/teams/1', true],
+    ['웹 · 앱·알림이 붙인 출처', null, '/teams/1?from=%2Fmy%2Fteams', true],
+    ['웹 · 출처 없음(검색 등 외부 진입) — 브라우저 뒤로를 빼앗지 않는다', null, '/teams/1', false],
+    ['웹 · 외부 주소 출처는 출처로 치지 않는다', null, '/teams/1?from=%2F..%2F%2Fevil.example', false],
+  ] as const)('%s', (_label, shell, url, inserts) => {
+    setNativeShell(shell);
+    openFreshTab(url);
     const lengthBefore = window.history.length;
 
     render(<NavigationHistoryTracker />);
 
-    expect(window.history.length).toBe(lengthBefore + 1);
-    expect(window.location.pathname).toBe('/teams/1');
+    expect(window.history.length).toBe(lengthBefore + (inserts ? 1 : 0));
+    expect(`${window.location.pathname}${window.location.search}`).toBe(url);
   });
 
   it('하단 탭 루트로 열린 탭엔 끼우지 않는다', () => {
+    setNativeShell('android');
     openFreshTab('/home?from=%2Fteams');
     const lengthBefore = window.history.length;
 
@@ -51,16 +68,53 @@ describe('NavigationHistoryTracker — 콜드스타트', () => {
 
     expect(window.history.length).toBe(lengthBefore);
   });
+});
 
-  it('부모 항목에 도착하면 router.replace 로 부모를 그린다', async () => {
+/**
+ * Next app-router 흉내 — 추적기보다 늦게 붙는 popstate 리스너(state 에 __NA 가 없으면 전체 새로고침)와
+ * 인스턴스 pushState/replaceState 패치(state 에 __NA·트리를 채운다). 실제 Next 와 같은 순서로 붙인다.
+ */
+function installNextAppRouterStub(reload: () => void) {
+  const history = window.history as History & Record<string, unknown>;
+  const push = history.pushState.bind(history);
+  const replace = history.replaceState.bind(history);
+  const withTree = (data: unknown) => ({ ...(data as object), __NA: true, __PRIVATE_NEXTJS_INTERNALS_TREE: 'tree' });
+  history.pushState = (data: unknown, unused: string, url?: string | URL | null) => push(withTree(data), unused, url);
+  history.replaceState = (data: unknown, unused: string, url?: string | URL | null) => replace(withTree(data), unused, url);
+  history.replaceState(history.state, '');
+  const onPop = (event: PopStateEvent) => {
+    if (!event.state) return;
+    if (!event.state.__NA) reload();
+  };
+  window.addEventListener('popstate', onPop);
+  return () => {
+    const own = history as unknown as Record<string, unknown>;
+    delete own.pushState;
+    delete own.replaceState;
+    window.removeEventListener('popstate', onPop);
+  };
+}
+
+describe('콜드스타트 부모 항목 — Next app-router 와 함께', () => {
+  it('부모 항목 pop 은 Next 에 닿기 전에 가로채 router.replace(부모) 로 그린다 — 새로고침 없음', async () => {
+    setNativeShell('android');
     openFreshTab('/teams/1');
     render(<NavigationHistoryTracker />);
+    const reload = vi.fn();
+    const uninstall = installNextAppRouterStub(reload);
+    try {
+      expect(window.history.state).toMatchObject({ __NA: true, __tmIdx: 1 });
 
-    await new Promise((resolve) => {
-      window.addEventListener('popstate', resolve, { once: true, capture: true });
-      window.history.back();
-    });
+      await new Promise((resolve) => {
+        window.addEventListener('popstate', resolve, { once: true, capture: true });
+        window.history.back();
+      });
 
-    expect(router.replace).toHaveBeenCalledWith('/teams');
+      expect(window.location.pathname).toBe('/teams');
+      expect(reload).not.toHaveBeenCalled();
+      expect(router.replace).toHaveBeenCalledWith('/teams');
+    } finally {
+      uninstall();
+    }
   });
 });

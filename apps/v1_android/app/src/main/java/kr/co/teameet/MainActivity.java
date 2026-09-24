@@ -74,6 +74,7 @@ public final class MainActivity extends AppCompatActivity {
     private boolean keyboardVisible;
     private String lastRecoverableUrl = BuildConfig.WEB_ORIGIN + "/home";
     private long lastBackPressAtMillis = BackNavigationPolicy.NO_PREVIOUS_PRESS_MILLIS;
+    private final HomeRootReset homeRootReset = new HomeRootReset();
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -258,6 +259,7 @@ public final class MainActivity extends AppCompatActivity {
             }
             @Override public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                if (homeRootReset.onPageFinished(url)) view.clearHistory();
                 if (AllowedNavigation.isInternal(Uri.parse(url))) {
                     lastRecoverableUrl = url;
                     publishSystemInsets();
@@ -699,11 +701,15 @@ public final class MainActivity extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() {
                 long now = SystemClock.elapsedRealtime();
+                homeRootReset.onBackPressed();
                 BackNavigationPolicy.Action action = BackNavigationPolicy.decide(
                     webView.canGoBack(), webView.getUrl(), lastBackPressAtMillis, now);
                 switch (action) {
                     case GO_BACK -> webView.goBack();
-                    case NAVIGATE_HOME -> webView.loadUrl(BuildConfig.WEB_ORIGIN + "/home");
+                    case NAVIGATE_HOME -> {
+                        homeRootReset.onNavigateHome();
+                        webView.loadUrl(BuildConfig.WEB_ORIGIN + "/home");
+                    }
                     case SHOW_EXIT_HINT -> {
                         lastBackPressAtMillis = now;
                         Toast.makeText(MainActivity.this, R.string.exit_confirmation_hint, Toast.LENGTH_SHORT)

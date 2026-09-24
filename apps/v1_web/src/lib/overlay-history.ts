@@ -7,6 +7,8 @@
  *   URL 이 바뀐 뒤(모달 안 링크로 이동)면 걷지 않는다 — 남은 표식은 다음 뒤로가기가 건너뛴다.
  * 스스로 부른 back/forward 의 pop 은 Next·페이지 전환에 전달하지 않는다(addPopInterceptor).
  */
+import type { MouseEvent as ReactMouseEvent } from 'react';
+import { flushSync } from 'react-dom';
 import { OVERLAY_STATE_KEY, addPopInterceptor, historyPushCount } from './navigation-history';
 
 type Overlay = {
@@ -138,6 +140,29 @@ export function releaseOverlay(id: string): void {
 export function waitForOverlayHistory(): Promise<void> {
   if (selfPops.length === 0) return Promise.resolve();
   return new Promise((resolve) => settleWaiters.push(resolve));
+}
+
+/**
+ * 오버레이를 닫고 이동하는 핸들러의 단일 경로. 닫기 back 과 이동 push 가 겹치면 브라우저가 back 을
+ * 취소하거나 새 페이지를 걷는다 — 닫기를 곧바로 커밋해 back 을 예약시키고, 그 pop 이 끝난 뒤 이동한다.
+ * 이동하는 링크는 이 대신 경로 변경으로 닫히게 둔다(URL 이 바뀐 뒤의 release 는 back 하지 않는다).
+ */
+export async function closeOverlayThenNavigate(close: () => void, navigate: () => void): Promise<void> {
+  flushSync(close);
+  await waitForOverlayHistory();
+  navigate();
+}
+
+/**
+ * 오버레이 안 내비게이션 링크의 onClick. 다른 화면으로 가는 링크는 그대로 두어 경로 변경이 오버레이를
+ * 닫게 한다(URL 이 바뀐 뒤라 back 하지 않는다). 지금 화면으로 가는 링크는 경로가 안 바뀌니 이동 없이 닫는다.
+ */
+export function closeIfCurrentPage(href: string, pathname: string, close: () => void) {
+  return (event: ReactMouseEvent) => {
+    if (href !== pathname || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    close();
+  };
 }
 
 export function __resetOverlayHistoryForTests(): void {

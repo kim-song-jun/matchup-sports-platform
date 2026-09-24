@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { RichContentRenderer } from '@/components/content/rich-content-renderer';
 import type { HomePopup } from './home.types';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
+import { closeIfCurrentPage } from '@/lib/overlay-history';
 
 const HIDE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const STORAGE_KEY_PREFIX = 'teameet:v1:home-popup:hidden-until:';
@@ -17,12 +18,24 @@ export function getHomePopupStorageKey(popupId: string) {
 
 export const getPopupStorageKey = getHomePopupStorageKey;
 
-export function HomePopupDialog({ popup }: { popup: HomePopup | null }) {
+/**
+ * pathname 을 주면(전역 팝업) 화면이 바뀔 때 닫는다 — 팝업 링크는 이동만 하고, 닫기는 URL 이 바뀐 뒤라
+ * 오버레이 항목을 back 으로 걷지 않는다(닫기 back 과 이동 push 가 엇갈리지 않게).
+ */
+export function HomePopupDialog({ popup, pathname }: { popup: HomePopup | null; pathname?: string | null }) {
   const [open, setOpen] = useState(false);
+  const shownPathRef = useRef(pathname);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const bodyId = useId();
+
+  // 새 화면의 팝업(id 변경) 효과보다 먼저 돌아야 그 팝업을 덮어 닫지 않는다.
+  useEffect(() => {
+    if (shownPathRef.current === pathname) return;
+    shownPathRef.current = pathname;
+    setOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!popup) {
@@ -148,7 +161,7 @@ export function HomePopupDialog({ popup }: { popup: HomePopup | null }) {
                 {linkLabel}
               </a>
             ) : (
-              <Link className="tm-btn tm-btn-md tm-btn-primary" href={popup.linkUrl} onClick={closePopup}>
+              <Link className="tm-btn tm-btn-md tm-btn-primary" href={popup.linkUrl} onClick={closeIfCurrentPage(popup.linkUrl, pathname ?? '', closePopup)}>
                 {linkLabel}
               </Link>
             )

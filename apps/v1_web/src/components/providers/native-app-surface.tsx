@@ -1,13 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-
-type NativeWindow = Window & {
-  /** Android 셸 — `@JavascriptInterface` 로 window 에 직접 붙는다. */
-  TeameetNative?: { postMessage(message: string): void };
-  /** iOS 셸 — WKUserContentController 가 `window.webkit.messageHandlers` 아래에 붙인다. */
-  webkit?: { messageHandlers?: { TeameetNative?: { postMessage(message: unknown): void } } };
-};
+import { detectNativeShell } from '@/lib/native-bridge';
 
 /**
  * 어느 네이티브 셸 안인지를 `<html data-teameet-native-app>` 로 알린다.
@@ -20,12 +14,10 @@ type NativeWindow = Window & {
  */
 export function NativeAppSurface() {
   useEffect(() => {
-    const win = window as NativeWindow;
-    const android = typeof win.TeameetNative?.postMessage === 'function';
-    const ios = typeof win.webkit?.messageHandlers?.TeameetNative?.postMessage === 'function';
-    if (!android && !ios) return;
+    const shell = detectNativeShell();
+    if (!shell) return;
 
-    document.documentElement.dataset.teameetNativeApp = android ? 'android' : 'ios';
+    document.documentElement.dataset.teameetNativeApp = shell;
     return () => {
       delete document.documentElement.dataset.teameetNativeApp;
     };

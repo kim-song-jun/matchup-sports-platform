@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { detectNativeShell } from '@/lib/native-bridge';
 import { bindSoftNavigator, ensureColdStartParent, installNavigationHistory } from '@/lib/navigation-history';
 import { resolveRouteChrome } from '@/lib/route-chrome';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
@@ -18,6 +19,14 @@ export function resolveColdStartParent(pathname: string, search: string): string
   return typeof backHref === 'function' ? backHref(resolved.params) : backHref;
 }
 
+/**
+ * 부모를 끼울 진입인가 — 앱 셸 안이거나, 앱·알림이 붙인 출처(`?from=`)가 있을 때만.
+ * 검색 결과 등 외부에서 곧장 들어온 웹 방문자는 끼우지 않는다(브라우저 뒤로가 원래 사이트로 가야 한다).
+ */
+export function isAppColdStartEntry(search: string): boolean {
+  return detectNativeShell() !== null || sanitizeRedirectPath(new URLSearchParams(search).get('from')) !== null;
+}
+
 /** 루트 레이아웃 전용 부수효과 — 히스토리 추적 설치, 콜드스타트 부모 삽입. 항상 null. */
 export function NavigationHistoryTracker() {
   const router = useRouter();
@@ -25,7 +34,8 @@ export function NavigationHistoryTracker() {
   useEffect(() => {
     installNavigationHistory();
     const unbind = bindSoftNavigator((url) => router.replace(url));
-    ensureColdStartParent(resolveColdStartParent(window.location.pathname, window.location.search));
+    const { pathname, search } = window.location;
+    if (isAppColdStartEntry(search)) ensureColdStartParent(resolveColdStartParent(pathname, search));
     return unbind;
   }, [router]);
 

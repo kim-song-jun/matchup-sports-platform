@@ -11,7 +11,7 @@ import {
   installNavigationHistory,
   subscribeAppPop,
 } from '@/lib/navigation-history';
-import { __resetOverlayHistoryForTests, overlayMarkerOf } from '@/lib/overlay-history';
+import { __resetOverlayHistoryForTests, closeOverlayThenNavigate, overlayMarkerOf } from '@/lib/overlay-history';
 import { currentPath, settleHistory } from '@/test/history-router';
 import { useConfirm } from './confirm-modal';
 import { useModalA11y } from './use-modal-a11y';
@@ -177,5 +177,126 @@ describe('ConfirmModal — 뒤로가기', () => {
     expect(onResult).toHaveBeenCalledWith(true);
     expect(markerAtResult).toBeNull();
     expect(currentPath()).toBe('/teams/1');
+  });
+});
+
+describe('ESC — 겹친 모달', () => {
+  it('맨 위 모달 하나만 닫는다', () => {
+    render(<TwoModals />);
+    fireEvent.click(screen.getByRole('button', { name: 'A 열기' }));
+    fireEvent.click(screen.getByRole('button', { name: 'B 열기' }));
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(dialogs()).toEqual(['A']);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(dialogs()).toEqual([]);
+  });
+});
+
+describe('ConfirmModal — 호스트가 먼저 사라질 때', () => {
+  it('열린 채 언마운트되면 false 로 끝난다(기다리는 쪽이 멈추지 않는다)', async () => {
+    const onResult = vi.fn();
+    const { unmount } = render(<ConfirmHarness onResult={onResult} />);
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+    unmount();
+    await act(async () => {
+      await settleHistory();
+    });
+    expect(onResult).toHaveBeenCalledWith(false);
+  });
+
+  it('확인과 같은 커밋에 언마운트돼도 결과가 온다', async () => {
+    const onResult = vi.fn();
+    function Host() {
+      const [show, setShow] = useState(true);
+      // 확인 클릭과 같은 이벤트에서 호스트를 걷는다(패널이 버블링을 막아 캡처로 듣는다).
+      return <div onClickCapture={(event) => (event.target as HTMLElement).textContent === '확인' && setShow(false)}>{show ? <ConfirmHarness onResult={onResult} /> : null}</div>;
+    }
+    render(<Host />);
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '확인' }));
+      await settleHistory();
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(onResult).toHaveBeenCalledWith(true);
+  });
+});
+
+describe('닫고 이동하기 — 닫기 back 과 이동 push 가 엇갈리지 않는다', () => {
+  function ModalWithLink({ navigate }: { navigate: () => void }) {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>열기</button>
+        {open ? (
+          <button type="button" onClick={() => void closeOverlayThenNavigate(() => setOpen(false), navigate)}>
+            이동
+          </button>
+        ) : null}
+        <Modal name="M" open={open} onClose={() => setOpen(false)} />
+      </>
+    );
+  }
+
+  it('back 이 100ms 넘게 늦어도 push 는 닫기 pop 이 끝난 뒤에 한다 — 새 페이지에 머물고 뒤로가기는 한 번에 이전 화면', async () => {
+    const order: string[] = [];
+    const realBack = window.history.back.bind(window.history);
+    vi.spyOn(window.history, 'back').mockImplementation(() => {
+      order.push('back');
+      setTimeout(realBack, 150);
+    });
+    window.addEventListener('popstate', () => order.push('pop'), { capture: true });
+    render(<ModalWithLink navigate={() => { order.push('push'); window.history.pushState({}, '', '/teams/2'); }} />);
+    fireEvent.click(screen.getByRole('button', { name: '열기' }));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '이동' }));
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await settleHistory();
+    });
+    vi.mocked(window.history.back).mockRestore();
+
+    expect(order).toEqual(['back', 'pop', 'push']);
+    expect(currentPath()).toBe('/teams/2');
+    expect(dialogs()).toEqual([]);
+    await back();
+    expect(currentPath()).toBe('/teams/1');
+    expect(overlayMarkerOf(window.history.state)).toBeNull();
+    await back();
+    expect(currentPath()).toBe('/home');
+  });
+
+  it('닫기 back 이 표식 앞 항목(이전 화면)까지 한 번에 가도 그 pop 은 페이지 이동으로 흘리고 대기열을 남기지 않는다', async () => {
+    const realGo = window.history.go.bind(window.history);
+    vi.spyOn(window.history, 'back').mockImplementationOnce(() => realGo(-2)); // 닫기 back + 사용자 back 이 합쳐진 경우
+    render(<TwoModals />);
+    fireEvent.click(screen.getByRole('button', { name: 'A 열기' }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'A 닫기' }));
+      await settleHistory();
+    });
+
+    expect(currentPath()).toBe('/home');
+    expect(nextRouterPop).toHaveBeenCalledTimes(1);
+    expect(appPop).toHaveBeenCalledTimes(1);
+
+    // 남은 대기열이 없다 — 다음 이동의 pop 을 삼키지 않는다.
+    window.history.pushState({}, '', '/teams/3');
+    await back();
+    expect(currentPath()).toBe('/home');
+    expect(appPop).toHaveBeenCalledTimes(2);
+  });
+
+  it('경로가 바뀐 뒤 닫히는 오버레이(모달 안 링크 이동)는 back 하지 않는다', async () => {
+    const historyBack = vi.spyOn(window.history, 'back');
+    const { rerender } = render(<Modal name="M" open onClose={() => {}} />);
+    window.history.pushState({}, '', '/teams/2');
+    rerender(<Modal name="M" open={false} onClose={() => {}} />);
+    await act(async () => {
+      await settleHistory();
+    });
+    expect(historyBack).not.toHaveBeenCalled();
+    expect(currentPath()).toBe('/teams/2');
   });
 });

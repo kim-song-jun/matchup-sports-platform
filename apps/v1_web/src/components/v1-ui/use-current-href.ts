@@ -14,7 +14,8 @@ export function useCurrentHref() {
     sync();
     window.addEventListener('hashchange', sync);
     return () => window.removeEventListener('hashchange', sync);
-  }, []);
+    // 다른 경로로 옮겨 가면(pushState) hashchange 가 없으니 경로·쿼리가 바뀔 때도 다시 읽는다.
+  }, [pathname, search]);
   // 라우터 밖(셸 없이 렌더하는 테스트 등)에선 경로를 모른다 — 출처를 싣지 않는다(app-shell-frame 과 같은 방어).
   if (!pathname) return null;
   return `${pathname}${search ? `?${search}` : ''}${hash}`;

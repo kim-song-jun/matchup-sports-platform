@@ -33,4 +33,15 @@ describe('useCurrentHref', () => {
     expect(result.current).toBeNull();
     navigation.pathname = '/league-matches/l1';
   });
+
+  it('다른 경로로 옮겨 가면 이전 화면의 hash 를 남기지 않는다', () => {
+    window.history.replaceState(null, '', '/league-matches/l1#league-schedule');
+    const { result, rerender } = renderHook(() => useCurrentHref());
+    expect(result.current).toBe('/league-matches/l1?from=%2Fhome#league-schedule');
+    navigation.pathname = '/teams/t1';
+    window.history.replaceState(null, '', '/teams/t1');
+    rerender();
+    expect(result.current).toBe('/teams/t1?from=%2Fhome');
+    navigation.pathname = '/league-matches/l1';
+  });
 });

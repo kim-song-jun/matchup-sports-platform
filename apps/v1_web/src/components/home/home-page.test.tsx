@@ -6,6 +6,7 @@ import type { HomeMatchCard, HomeViewModel } from './home.types';
 vi.mock('next/navigation', () => ({
   usePathname: () => '/home',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => {

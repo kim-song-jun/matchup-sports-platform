@@ -201,6 +201,12 @@ describe('withFromPath 체인 상한', () => {
     expect(withFromPath('/teams/t1', league)).toBe(team);
   });
 
+  it('체인을 줄여 다시 엮어도 각 단계의 hash 는 남는다', () => {
+    let href = '/home#rail';
+    for (let index = 0; index < 8; index += 1) href = withFromPath(`/teams/t${index}`, index === 0 ? href : `${href}#s${index}`);
+    expect(decodeURIComponent(href)).toContain('#s');
+  });
+
   it('서로 다른 화면을 계속 거쳐도 체인 깊이가 상한을 넘지 않는다', () => {
     let href = '/home';
     for (let index = 0; index < 20; index += 1) href = withFromPath(`/teams/t${index}`, href);

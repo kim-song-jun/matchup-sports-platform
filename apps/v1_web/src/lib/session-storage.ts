@@ -118,7 +118,7 @@ function splitFrom(url: string) {
   const parsed = new URL(url, REDIRECT_BASE);
   const from = parsed.searchParams.get('from');
   parsed.searchParams.delete('from');
-  return { base: `${parsed.pathname}${parsed.search}`, from };
+  return { base: `${parsed.pathname}${parsed.search}`, hash: parsed.hash, from };
 }
 
 /**
@@ -136,7 +136,8 @@ export function withFromPath(path: string, from: string | null | undefined) {
     const level = splitFrom(cursor);
     if (level.base === target) return cursor;
     if (bases.length === FROM_CHAIN_MAX_DEPTH) break;
-    bases.push(level.base);
+    // 같은 화면인지는 hash 없이 가리고, 다시 엮을 때는 hash 를 되살린다.
+    bases.push(`${level.base}${level.hash}`);
     cursor = level.from;
   }
   if (!cursor) return appendFrom(path, from);

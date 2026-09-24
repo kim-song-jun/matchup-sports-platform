@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { trackEvent } from '@/lib/analytics';
 import { normalizeNotificationHref } from '@/lib/notification-route';
 import { withFromPath } from '@/lib/session-storage';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { ChatSafetyDialog, type ChatSafetyTarget } from './chat-safety-dialog';
 import { useV1ChatRoomSocket } from '@/hooks/use-v1-realtime-socket';
 import {
@@ -134,6 +135,7 @@ function useChatListPageModel(): ChatListViewModel {
 }
 
 export function ChatRoomPageClient({ roomId }: { roomId: string }) {
+  const currentHref = useCurrentHref();
   const [safety, setSafety] = useState<ChatSafetyTarget | 'manage' | null>(null);
   // 실시간 수신. 이 훅은 만들어져 있었지만 **어디에도 마운트되지 않아** 열어 둔 채팅방에
   // 새 메시지가 실시간으로 들어오지 않았다 -- 30초 stale 이 지난 뒤 창 포커스가 바뀔 때만
@@ -178,7 +180,7 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
           title: room.data.linkedTarget.title,
           sub: `${chatRoomTypeLabel(room.data.roomType)} 채팅`,
           // 연결된 화면에서 뒤로가면 이 채팅방으로 돌아온다.
-          href: room.data.linkedTarget.route ? withFromPath(room.data.linkedTarget.route, `/chat/${roomId}`) : '/chat',
+          href: room.data.linkedTarget.route ? withFromPath(room.data.linkedTarget.route, currentHref) : '/chat',
         }
       : isLoading
         ? fallback.context

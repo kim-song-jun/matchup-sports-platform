@@ -4,6 +4,12 @@ import { Providers } from '@/app/providers';
 import { useV1ActivePopup, useV1LeagueMatch, useV1LeagueMatchPlayerRecords, useV1LeagueMatchStandings } from '@/hooks/use-v1-api';
 import { LeagueAwardsPageClient } from './league-awards-page-client';
 
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  usePathname: () => '/league-matches/league-1/awards',
+  useSearchParams: () => new URLSearchParams('from=%2Fhome'),
+}));
+
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({
   PendingSocialSignupGate: ({ children }: { children: React.ReactNode }) => children,
 }));
@@ -17,6 +23,8 @@ vi.mock('@/hooks/use-v1-api', () => ({
   // 동일한 이유로 필요하다(<Providers>로 렌더하는 모든 테스트가 이 두 훅을 mocking해야 한다).
   useV1Settings: vi.fn(() => ({ data: undefined, isError: false, refetch: vi.fn() })),
   useV1UpdateSettings: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  // 경로가 있으면 Providers 안의 알림 배지가 이 훅을 부른다.
+  useV1NotificationUnreadSummary: vi.fn(() => ({ data: undefined })),
 }));
 
 const useV1ActivePopupMock = vi.mocked(useV1ActivePopup, { partial: true });
@@ -131,8 +139,9 @@ describe('LeagueAwardsPageClient', () => {
       .getAllByRole('link')
       .map((link) => link.getAttribute('href') ?? '')
       .filter((href) => href.startsWith('/teams/'));
-    expect(teamHrefs).toEqual(expect.arrayContaining(['/teams/t1?from=%2Fleague-matches%2Fleague-1%2Fawards', '/teams/t3?from=%2Fleague-matches%2Fleague-1%2Fawards']));
-    expect(teamHrefs.every((href) => href.includes('?from=%2Fleague-matches%2Fleague-1%2Fawards'))).toBe(true);
+    const from = encodeURIComponent('/league-matches/league-1/awards?from=%2Fhome');
+    expect(teamHrefs).toEqual(expect.arrayContaining([`/teams/t1?from=${from}`, `/teams/t3?from=${from}`]));
+    expect(teamHrefs.every((href) => href.endsWith(`?from=${from}`))).toBe(true);
   });
 
   it('리그 조회가 실패하면 에러 상태와 재시도 버튼을 보여준다', async () => {

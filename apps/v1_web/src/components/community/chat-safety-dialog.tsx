@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { useChatSafety } from '@/hooks/use-chat-safety';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { extractErrorMessage } from '@/lib/error-message';
@@ -14,8 +14,8 @@ export type ChatSafetyTarget = { id: string; label: string };
 export function ChatSafetyDialog({ roomId, target, onClose }: {
   roomId: string; target: ChatSafetyTarget | null; onClose: () => void;
 }) {
-  // 신고 처리 내역에서 뒤로가면 이 채팅방으로 돌아온다.
-  const pathname = usePathname();
+  // 신고 처리 내역에서 뒤로가면 이 채팅방(받은 출처 포함)으로 돌아온다.
+  const pathname = useCurrentHref();
   const { blocked, block, unblock, report } = useChatSafety(roomId, !target);
   const [reason, setReason] = useState<V1InquiryReportReason>('harassment');
   const [detail, setDetail] = useState('');

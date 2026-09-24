@@ -278,7 +278,7 @@ describe('ChatRoomPageClient', () => {
     expect(screen.getAllByText('18:03')).toHaveLength(1);
     expect(screen.getAllByText('18:04')).toHaveLength(1);
     // 채팅방 상단의 연결 화면 카드는 거기서 뒤로가면 이 채팅방으로 돌아오게 출처를 싣는다.
-    expect(screen.getAllByRole('link').some((link) => link.getAttribute('href') === '/teams/team-1?from=%2Fchat%2Froom-times')).toBe(true);
+    expect(screen.getAllByRole('link').some((link) => link.getAttribute('href') === '/teams/team-1?from=%2Fchat%2Froom-1')).toBe(true);
   });
 
   it('still shows the placeholder conversation while the room is loading (documented loading-only behavior)', () => {

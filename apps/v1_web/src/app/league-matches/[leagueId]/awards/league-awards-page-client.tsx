@@ -9,6 +9,7 @@ import { useV1LeagueMatch, useV1LeagueMatchPlayerRecords, useV1LeagueMatchStandi
 import { extractErrorMessage } from '@/lib/error-message';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { withFromPath } from '@/lib/session-storage';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 // tournaments/[id]/awards/awards-page-client.tsx 의 구조(포디움 히어로 → 개인 어워드 →
 // 하단 네비)와 카피 관례("○○, 우승을 축하드려요! 🎉")를 그대로 따른다 — 그 파일은 읽기만
 // 하고 수정하지 않는다(그룹 C 배정 범위 밖). PromotionBadge/competitionRanks는 순위표
@@ -49,9 +50,9 @@ function NotCompletedNotice({ leagueId, state }: { leagueId: string; state: 'dra
  * 낸다. champions가 빈 배열(이론상 발생하지 않아야 하지만 방어적으로) 이면 아무것도
  * 그리지 않는다 — 아래 최종 순위 섹션이 그 정보를 대신 담는다.
  */
-function ChampionsHero({ champions, leagueId }: { champions: V1LeagueChampionTeam[]; leagueId: string }) {
-  // 팀 상세에서 뒤로가면 이 시상 화면으로 돌아온다.
-  const from = `/league-matches/${leagueId}/awards`;
+function ChampionsHero({ champions }: { champions: V1LeagueChampionTeam[] }) {
+  // 팀 상세에서 뒤로가면 이 시상 화면(받은 출처 포함)으로 돌아온다.
+  const from = useCurrentHref();
   if (champions.length === 0) return null;
   const isCoChampion = champions.length > 1;
   return (
@@ -108,6 +109,7 @@ function FinalStandingsSection({
   championTeamIds: Set<string>;
   hasConfirmedPromotion: boolean;
 }) {
+  const from = useCurrentHref();
   if (standings.length === 0) {
     return (
       <section className="mb-5">
@@ -130,7 +132,7 @@ function FinalStandingsSection({
           {standings.map((row) => (
             <li key={row.teamId} className="text-sm">
               <Link
-                href={withFromPath(`/teams/${row.teamId}`, `/league-matches/${leagueId}/awards`)}
+                href={withFromPath(`/teams/${row.teamId}`, from)}
                 className="tm-pressable tm-list-row-interactive flex min-h-[44px] items-center gap-2 px-3 py-2"
               >
               <span className="w-5 shrink-0 text-[var(--text-muted)]">{row.position}</span>
@@ -275,7 +277,7 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
         <AwardsPageSkeleton />
       ) : (
         <>
-          <ChampionsHero champions={standings.champions} leagueId={leagueId} />
+          <ChampionsHero champions={standings.champions} />
           <FinalStandingsSection
             leagueId={leagueId}
             standings={standings.standings}

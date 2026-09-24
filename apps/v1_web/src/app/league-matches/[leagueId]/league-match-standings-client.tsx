@@ -20,6 +20,7 @@ import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session, readBackFrom, withFromPath } from '@/lib/session-storage';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTieBreakRule } from '@/lib/league-tie-break-labels';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
@@ -208,6 +209,8 @@ function SeasonSummaryCard({
   recordsError: boolean;
   topScorerNames: string[];
 }) {
+  // 시즌 결산에서 뒤로가면 이 순위 화면(받은 출처 포함)으로 돌아온다.
+  const currentHref = useCurrentHref();
   const isCoChampion = champions.length > 1;
   return (
     <Card pad={16} className="mb-4">
@@ -249,7 +252,7 @@ function SeasonSummaryCard({
         </div>
       )}
       <Link
-        href={`/league-matches/${leagueId}/awards`}
+        href={withFromPath(`/league-matches/${leagueId}/awards`, currentHref)}
         className="tm-btn tm-btn-sm tm-btn-outline mt-3"
       >
         시즌 결산 자세히 보기 →

@@ -8,9 +8,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1AdminTeamMatchDetail } from '@/types/api';
 import AdminTeamMatchDetailPage from './page';
 
-const { hooks, approval } = vi.hoisted(() => ({
+const { hooks, approval, rejection } = vi.hoisted(() => ({
   hooks: { query: {} as Record<string, unknown> },
   approval: { mutateAsync: vi.fn(), isPending: false },
+  rejection: { mutateAsync: vi.fn(), isPending: false },
 }));
 
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'tm-1' }) }));
@@ -18,6 +19,7 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminTeamMatch: () => hooks.query,
   useV1AdminMe: () => ({ data: { capabilities: ['status:write'] } }),
   useV1ApproveAdminTeamMatchApplication: () => approval,
+  useV1RejectAdminTeamMatchApplication: () => rejection,
 }));
 vi.mock('@/lib/uuid', () => ({ randomUuid: () => '00000000-0000-4000-8000-000000000099' }));
 
@@ -30,6 +32,11 @@ const DETAIL: V1AdminTeamMatchDetail = {
   league: { leagueId: 'lg-7', title: '가을 리그' },
   sportName: '풋살',
   sportCode: 'futsal',
+  sportId: 'sport-1',
+  regionId: 'region-1',
+  minLevelCode: 'intermediate',
+  maxLevelCode: 'intermediate',
+  version: '2026-08-01T00:00:00.000Z',
   startAt: '2026-09-01T11:00:00.000Z',
   status: 'recruiting',
   createdAt: '2026-08-01T00:00:00.000Z',
@@ -70,6 +77,8 @@ describe('AdminTeamMatchDetailPage', () => {
   beforeEach(() => {
     approval.mutateAsync.mockReset();
     approval.isPending = false;
+    rejection.mutateAsync.mockReset();
+    rejection.isPending = false;
   });
 
   it('상대팀 신청을 상태·팀 링크와 함께 보여준다', () => {
@@ -190,6 +199,44 @@ describe('AdminTeamMatchDetailPage', () => {
       body: { clientCommandId: '00000000-0000-4000-8000-000000000099' },
     }));
     expect(screen.getByRole('status')).toHaveTextContent('두 번째 팀을 승인해 매치를 확정했어요');
+  });
+
+  it('플랫폼 모집 신청을 사유와 함께 거절한다', async () => {
+    rejection.mutateAsync.mockResolvedValue({ applicationStatus: 'rejected' });
+    renderWith({
+      ...OK,
+      data: {
+        ...DETAIL,
+        platformManaged: true,
+        hostTeamId: null,
+        hostTeamName: null,
+        league: null,
+        approvedApplicantTeamId: null,
+        approvedApplicantTeamName: null,
+        applications: [
+          { ...DETAIL.applications[0], applicationId: 'app-requested', status: 'requested', applicantTeamName: '성수 FC' },
+        ],
+        applicationCount: 1,
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '거절' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '성수 FC 거절 사유' }), { target: { value: '참가 조건이 맞지 않아요.' } });
+    fireEvent.click(screen.getByRole('button', { name: '거절 확정' }));
+
+    await waitFor(() => expect(rejection.mutateAsync).toHaveBeenCalledWith({
+      applicationId: 'app-requested',
+      body: {
+        clientCommandId: '00000000-0000-4000-8000-000000000099',
+        reason: '참가 조건이 맞지 않아요.',
+      },
+    }));
+    expect(screen.getByRole('status')).toHaveTextContent('참가 신청을 거절했어요');
+  });
+
+  it('모집 중인 플랫폼 팀매치에는 수정 경로를 제공한다', () => {
+    renderWith({ ...OK, data: { ...DETAIL, platformManaged: true, league: null, tournament: null } });
+    expect(screen.getByRole('link', { name: '모집 수정' })).toHaveAttribute('href', '/admin/team-matches/tm-1/edit');
   });
 
   it('불러오지 못하면 재시도 경로를 준다', () => {

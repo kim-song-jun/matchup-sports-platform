@@ -2710,6 +2710,11 @@ export type V1AdminTeamMatchApplicationRow = {
 
 export type V1AdminTeamMatchDetail = Omit<V1AdminTeamMatchRow, 'pendingApplicationCount'> & {
   platformManaged: boolean;
+  sportId: string;
+  regionId: string;
+  minLevelCode: string | null;
+  maxLevelCode: string | null;
+  version: string;
   description: string | null;
   imageUrl: string | null;
   levelLabel: string | null;
@@ -2780,6 +2785,32 @@ export type V1AdminTeamMatchApprovalResult = {
   awayTeamId: string | null;
   detailRoute: string;
   replayed: boolean;
+};
+
+export type V1AdminTeamMatchRejectionPayload = {
+  clientCommandId: string;
+  reason: string;
+};
+
+export type V1AdminTeamMatchRejectionResult = {
+  applicationId: string;
+  applicantTeamId: string;
+  applicationStatus: 'rejected';
+  teamMatchId: string;
+  teamMatchStatus: 'recruiting';
+  detailRoute: string;
+  replayed: boolean;
+};
+
+export type V1AdminTeamMatchRecruitmentUpdatePayload = V1AdminTeamMatchRecruitmentPayload & {
+  version: string;
+};
+
+export type V1AdminTeamMatchRecruitmentUpdateResult = {
+  teamMatchId: string;
+  status: 'recruiting';
+  version: string;
+  detailRoute: string;
 };
 
 export type V1AdminStatusChangeResult = {

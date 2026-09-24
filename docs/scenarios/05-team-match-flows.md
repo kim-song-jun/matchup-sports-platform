@@ -21,6 +21,8 @@ v1 team-match lives in `apps/v1_api/src/team-matches/team-matches.controller.ts`
 | `POST` | `/team-match-applications/:applicationId/withdraw\|approve\|reject` | application lifecycle (own top-level path, not nested under `/team-matches`) |
 | `POST` | `/admin/team-matches` | owner/ops 플랫폼 운영자가 팀을 지정하지 않은 `recruiting` 팀매치 생성 |
 | `POST` | `/admin/team-matches/:teamMatchId/applications/:applicationId/approve` | owner/ops 플랫폼 운영자가 신청 팀을 한 팀씩 승인. 두 번째 승인에서 `matched`로 확정 |
+| `POST` | `/admin/team-matches/:teamMatchId/applications/:applicationId/reject` | owner/ops 플랫폼 운영자가 대기 신청을 사유와 함께 거절 |
+| `PATCH` | `/admin/team-matches/:teamMatchId` | owner/ops 플랫폼 운영자가 모집 중인 플랫폼 단발 팀매치를 수정 |
 | `GET` | `/me/team-matches` | my team matches |
 | `GET` | `/team-matches/:teamMatchId/lineup` | lineup read |
 | `PUT` | `/team-matches/:teamMatchId/lineup` | lineup save, via `TeamMatchLineupService` — **not** the generic `PUT /games/:gameId/lineups/:sideId` route, which returns `409 TEAM_MATCH_GENERIC_LINEUP_FORBIDDEN` for a team-match-sourced game (Task 14 deviation, see `docs/api/domains/games.md`) |
@@ -56,7 +58,8 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 - 공개 목록과 상세는 생성 직후 `Teameet 운영`과 `플랫폼 주관`을 표시한다.
 - 관리자 상세는 저장된 대표 이미지와 실력 등급을 기존 형식·스타일·성별·유니폼·비용 조건과 함께 보여준다.
 - 같은 종목의 활성 팀 manager 이상이 공개 상세에서 기존 신청 API로 참가를 요청한다.
-- 관리자는 `/admin/team-matches/:id`의 신청 목록에서 서로 다른 두 신청을 홈·원정으로 선택한다.
+- 관리자는 `/admin/team-matches/:id`의 신청 목록에서 신청을 한 팀씩 승인하거나 사유를 입력해 거절한다. 첫 승인은 HOME을 예약하고 두 번째 승인은 AWAY를 확정한다.
+- 관리자는 같은 상세 화면의 `모집 수정`으로 들어가 신청 확정 전 제목·장소·일정·모집 조건을 수정한다. 종목 변경, 오래된 상세 버전 저장, 확정 뒤 수정은 차단한다.
 - 확정 시 서버는 팀 상태와 종목을 다시 검증한 뒤 팀매치를 `matched`로 바꾸고 Game의 HOME/AWAY side, 양 팀 일정, 선택 신청 승인, 나머지 신청 거절, 감사 로그를 같은 트랜잭션에서 기록한다.
 - 확정 뒤 공개 목록과 상세는 `플랫폼 주관` 출처를 유지하면서 실제 `홈팀 vs 원정팀` 이름과 홈팀 상세 링크를 보여준다.
 - 확정 뒤 HOME 팀 owner/manager에게도 `host_team`, `내가 만든 팀매치`, 모집 관리 CTA를 부여하지 않는다. HOME/AWAY는 참가 사이드이며 모집 수정·마감·취소·신청 관리는 계속 플랫폼 관리자 전용이다.

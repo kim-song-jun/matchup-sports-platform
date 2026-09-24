@@ -19,7 +19,7 @@ import { usePublicTournamentPlayerRecords } from '@/components/public-game-recor
 import { ProfileAvatar } from '@/components/users/public-profile-client';
 import { TournamentPlayerRecordsSections } from '@/components/public-game-records/player-records-sections';
 import { extractErrorMessage } from '@/lib/error-message';
-import { hasStoredV1Session } from '@/lib/session-storage';
+import { hasStoredV1Session, withFromPath } from '@/lib/session-storage';
 import { trackEvent } from '@/lib/analytics';
 import { V1ApiError, v1Get } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
@@ -335,7 +335,7 @@ function PlayerRecordsSection({ tournamentId, isRegularLeague }: { tournamentId:
   // 뒤로가기가 이 어워드 화면으로 돌아오도록 출처를 함께 넘긴다(public-profile-client.tsx가 `?from=`을 읽는다).
   // 일반 대회 행의 profileHref는 서버가 bare `/users/:id`로 준다 — 두 분기 모두 여기서 붙인다.
   const profileHref = (userId: string) =>
-    `/users/${userId}?from=${encodeURIComponent(currentHref)}`;
+    withFromPath(`/users/${userId}`, currentHref);
   const withProfileHref = <T extends { userId: string }>(rows: readonly T[] | undefined) =>
     rows?.map((row) => ({ ...row, profileHref: profileHref(row.userId) }));
   const goals = isRegularLeague
@@ -387,7 +387,7 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
           // 공개한다 — recipientUserId가 있을 때만(탈퇴 계정 제외, presenter가 걸러줌)
           // 같은 방식으로 아바타+링크를 붙인다. 없으면 기존 아이콘·일반 텍스트 그대로.
           const profileHref = award.recipientUserId
-            ? `/users/${award.recipientUserId}?from=${encodeURIComponent(currentHref)}`
+            ? withFromPath(`/users/${award.recipientUserId}`, currentHref)
             : null;
           const content = (
             <>

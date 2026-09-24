@@ -663,7 +663,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                       />
                     )
                   ) : (
-                    <LeagueStandingsSection rows={allLeagueRows} label={leagueStandingsHeading} fromHref={bracketSelfHref} />
+                    <LeagueStandingsSection rows={allLeagueRows} label={leagueStandingsHeading} fromHref={bracketSelfHref ?? undefined} />
                   )}
                 </section>
               )}
@@ -674,7 +674,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                     조별 순위
                   </h3>
                   {groupPhaseGroups.map((g) => (
-                    <GroupStandingsSection key={g.id} group={g} fixtures={fixtures} fromHref={bracketSelfHref} />
+                    <GroupStandingsSection key={g.id} group={g} fixtures={fixtures} fromHref={bracketSelfHref ?? undefined} />
                   ))}
                 </section>
               )}

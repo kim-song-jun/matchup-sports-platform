@@ -84,6 +84,10 @@ export function sanitizeRedirectPath(value: string | null | undefined) {
   // 로그인 화면으로 되돌리면 로그인 → 로그인 고리가 된다.
   if (resolved.pathname.startsWith('/login')) return null;
 
+  // 정규화가 새 외부 주소를 만들 수 있다: `/..//evil.com` 은 위 origin 검사를 통과한 뒤
+  // pathname 이 `//evil.com`(프로토콜 상대 URL)이 된다. 돌려줄 값 자체를 다시 검사한다.
+  if (resolved.pathname.startsWith('//')) return null;
+
   // **검증한 값을 그대로 돌려준다.** 원본 문자열을 돌려주면 호출부(router.replace 등)가
   // 그 문자열을 다시 파싱하므로, 내가 본 것과 실제로 쓰이는 것이 두 번의 파싱으로
   // 갈릴 여지가 남는다. 파서가 이미 정규화한 경로를 돌려주면 "검증한 값 == 쓰는 값"이

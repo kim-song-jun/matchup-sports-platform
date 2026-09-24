@@ -7,6 +7,12 @@ import {
 } from '@/components/tournaments/tournament-venue-retention-sections';
 import { v1Get } from '@/lib/api-client';
 import { getTournamentSponsorCards } from '@/components/tournaments/tournament-sponsor-section';
+
+// 데스크톱 뒤로가기(AppBackLink)가 ?from= 을 읽는다 — 라우터 없이 뷰만 렌더하므로 빈 쿼리를 준다.
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  useSearchParams: () => new URLSearchParams(),
+}));
 import {
   getCompletedChampionName,
   getParticipantTeamBuckets,

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { FormattedText } from '@/components/v1-ui/formatted-text';
 import { BlockedAction } from '@/components/v1-ui/blocked-action';
@@ -1398,13 +1399,9 @@ export function TournamentDetailView({
     <article className={detailArticleClassName}>
       {/* ── Desktop back navigation (hidden on mobile via .tm-show-desktop) ── */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link
-          className="tm-desktop-back"
-          href={backHref}
-          aria-label="뒤로가기"
-        >
+        <AppBackLink className="tm-desktop-back" fallbackHref={backHref}>
           <ChevronLeft size={20} strokeWidth={2.2} aria-hidden="true" />
-        </Link>
+        </AppBackLink>
         <div className="tm-text-heading" style={{ margin: 0 }} aria-hidden="true">대회 상세</div>
       </div>
 

@@ -9,7 +9,7 @@ import { AttestRequestsSection } from '@/components/public-game-records/attest-r
 import { ClaimMyRecordSection } from '@/components/public-game-records/claim-my-record';
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
-import { sanitizeRedirectPath } from '@/lib/session-storage';
+import { readBackFrom } from '@/lib/session-storage';
 
 function MatchSkeleton() {
   return (
@@ -25,7 +25,7 @@ function MatchSkeleton() {
 export function MatchPageClient({ tournamentId, fixtureId }: { tournamentId: string; fixtureId: string }) {
   const { data, isLoading, isError, error, refetch } = usePublicMatch(tournamentId, fixtureId);
   // 활동 기록·팀 전적처럼 대진표가 아닌 곳에서 들어왔으면 그 화면으로 돌아간다.
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const fromPath = readBackFrom(useSearchParams().get('from'));
   useShellOverride(fromPath ? { backHref: fromPath } : {});
 
   if (isLoading) {

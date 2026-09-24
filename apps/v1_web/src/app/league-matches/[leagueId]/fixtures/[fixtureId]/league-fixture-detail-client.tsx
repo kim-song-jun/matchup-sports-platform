@@ -12,7 +12,7 @@ import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
-import { sanitizeRedirectPath } from '@/lib/session-storage';
+import { readBackFrom, withFromPath } from '@/lib/session-storage';
 import { V1ApiError } from '@/lib/api-client';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTournamentDateTimeLong, formatTournamentDateTimeShort } from '@/lib/date-utils';
@@ -54,8 +54,9 @@ function recordLine(row: V1LeagueStandingRow | undefined): string | null {
   return `${row.position}위 · ${row.wins}승 ${row.draws}무 ${row.losses}패`;
 }
 
-function TeamSide({ teamId, name, logoUrl, record, align }: {
+function TeamSide({ teamId, name, logoUrl, record, align, from }: {
   teamId: string | null;
+  from: string;
   name: string;
   logoUrl: string | null;
   record: string | null;
@@ -72,7 +73,7 @@ function TeamSide({ teamId, name, logoUrl, record, align }: {
   // (standings 화면 TeamNameLink와 같은 규칙).
   if (teamId === null) return body;
   return (
-    <Link href={`/teams/${teamId}`} className="tm-pressable flex min-h-[44px] flex-1" aria-label={`${name} 팀 상세로 이동`}>
+    <Link href={withFromPath(`/teams/${teamId}`, from)} className="tm-pressable flex min-h-[44px] flex-1" aria-label={`${name} 팀 상세로 이동`}>
       {body}
     </Link>
   );
@@ -90,8 +91,10 @@ function getViewerState(match: V1TeamMatch | undefined): V1TeamMatchViewerState 
 
 export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { leagueId: string; fixtureId: string }) {
   // 활동 기록·팀 전적처럼 리그 화면이 아닌 곳에서 들어왔으면 그 화면으로 돌아간다.
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const fromPath = readBackFrom(useSearchParams().get('from'));
   useShellOverride(fromPath ? { backHref: fromPath } : {});
+  // 팀 상세로 넘길 출처 — 이 경기 화면이 받은 출처까지 담는다.
+  const selfHref = withFromPath(`/league-matches/${leagueId}/fixtures/${fixtureId}`, fromPath);
   const router = useRouter();
   const seriesQuery = useV1LeagueMatch(leagueId);
   const standingsQuery = useV1LeagueMatchStandings(leagueId);
@@ -264,7 +267,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
                   side.teamId === null || !recordLine(side.row) ? null : (
                     <li key={side.teamId}>
                       <Link
-                        href={`/teams/${side.teamId}`}
+                        href={withFromPath(`/teams/${side.teamId}`, selfHref)}
                         className="tm-pressable tm-list-row-interactive flex min-h-[44px] items-center justify-between gap-2 rounded-lg px-2 text-sm"
                       >
                         <span className="inline-flex items-center gap-2">
@@ -295,7 +298,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
            양팀 실명·스코어/상태·일시·장소는 리그 공개 상세만으로도 보여줄 수 있다. */
         <Card pad={20}>
           <div className="flex items-start justify-between gap-3">
-            <TeamSide teamId={fixture.homeTeamId} name={homeName} logoUrl={homeRow?.teamLogoUrl ?? null} record={recordLine(homeRow)} align="left" />
+            <TeamSide teamId={fixture.homeTeamId} name={homeName} logoUrl={homeRow?.teamLogoUrl ?? null} record={recordLine(homeRow)} align="left" from={selfHref} />
             <div className="flex min-w-[96px] flex-col items-center gap-1 pt-1">
               {result.hasScore ? (
                 <span className="text-2xl font-bold text-[var(--text-strong)]">{result.text}</span>
@@ -305,7 +308,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
               {result.isForfeit ? <span className="tm-badge tm-badge-sm tm-badge-orange">몰수</span> : null}
               <span className={`tm-badge tm-badge-sm ${statusMeta.badgeClass}`}>{statusMeta.label}</span>
             </div>
-            <TeamSide teamId={fixture.awayTeamId} name={awayName} logoUrl={awayRow?.teamLogoUrl ?? null} record={recordLine(awayRow)} align="right" />
+            <TeamSide teamId={fixture.awayTeamId} name={awayName} logoUrl={awayRow?.teamLogoUrl ?? null} record={recordLine(awayRow)} align="right" from={selfHref} />
           </div>
           <div className="mt-4 space-y-1 border-t border-[var(--border)] pt-3 text-sm text-[var(--text-muted)]">
             <p>{formatTournamentDateTimeLong(fixture.startAt) ?? '일정 미정'}</p>

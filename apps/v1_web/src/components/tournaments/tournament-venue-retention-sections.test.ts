@@ -12,6 +12,11 @@ import type { V1ReviewListItem, V1TournamentFixture } from '@/types/api';
 // TournamentVenueMap fetches the Kakao Maps JS key via this hook — 이 스위트에서는
 // "키가 없다"는 (그래서 지도 임베드가 스킵되는) 상태를 고정해 규약대로 검증한다.
 // 키가 있는 경로(실제 지도 렌더)는 tournament-venue-map.test.tsx에서 별도로 검증.
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/tournaments/t1',
+  useSearchParams: () => new URLSearchParams('from=%2Fhome'),
+}));
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1PublicKakaoMapsKey: () => ({ data: { kakaoMapsJsKey: null }, isLoading: false }),
 }));
@@ -349,7 +354,7 @@ describe('TournamentFixtureReviewEntrySection', () => {
     expect(screen.getByText('리뷰할 수 있는 경기')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /팀A 대 팀B/ })).toHaveAttribute(
       'href',
-      '/my/reviews/tournament_fixture/fixture-9',
+      `/my/reviews/tournament_fixture/fixture-9?from=${encodeURIComponent('/tournaments/t1?from=%2Fhome')}`,
     );
     expect(screen.getByText('남은 리뷰 5개')).toBeInTheDocument();
   });

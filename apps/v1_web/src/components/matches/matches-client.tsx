@@ -16,7 +16,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
 import { chatRoomHref } from '@/lib/chat-route';
-import { sanitizeRedirectPath } from '@/lib/session-storage';
+import { readBackFrom, withFromPath } from '@/lib/session-storage';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
 import { toDetailMode } from './matches.mode';
@@ -247,7 +247,7 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
   const router = useRouter();
   // topBar:false라 셸 뒤로가기가 없다 — 페이지가 직접 그리는 모바일·데스크톱 링크(matches-page.tsx)
   // 둘 다 이 값을 쓴다. public-profile-client.tsx와 같은 `?from=` 패턴.
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const fromPath = readBackFrom(useSearchParams().get('from'));
   const query = useV1Match(matchId, { seed });
   const eligibility = useV1MatchApplicationEligibility(matchId, { enabled: Boolean(query.data) });
   const viewerState = query.data ? getViewerState(query.data, eligibility.data?.viewerState) : 'none';
@@ -268,7 +268,7 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
   }, [matchId, query.data, matchSportType]);
 
   if (query.isError) {
-    return <MatchStatePageView model={{ ...getMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
+    return <MatchStatePageView model={{ ...getMatchStateViewModel('error'), retry: () => void query.refetch(), backHref: fromPath ?? undefined }} />;
   }
 
   // 데이터가 오기 전에는 하드코딩 목업(`fallback`)을 화면 전체로 렌더하지 않는다 —
@@ -282,6 +282,10 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
   // 상태·참가자는 아직 없다 — 이 동안 상태 라벨과 행동 버튼을 잠가, 이미 신청한 매치에
   // "참가 신청"이 뜨는 식의 잘못된 안내를 막는다.
   const seeding = query.isPlaceholderData;
+  // 하위 화면(수정/신청자 관리)에서 다시 뒤로가면 이 상세로, 그 뒤엔 원래 출처로 이어지도록
+  // 이 상세 페이지 자신의 URL(자기 ?from= 포함)을 다음 from으로 싣는다. fromPath가 없으면
+  // undefined — 기존 하위 링크(?from= 없음)를 그대로 유지한다.
+  const selfHref = fromPath ? withFromPath(`/matches/${matchId}`, fromPath) : undefined;
 
   const model: MatchDetailViewModel = {
     ...fallback,
@@ -301,12 +305,12 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
       // API가 규칙을 안 주면 빈 배열 — 목업 규칙('풋살화 착용' 등)을 남의 매치에
       // 붙이지 않는다. 렌더 쪽(matches-page.tsx)이 `.length` 로 섹션을 숨긴다.
       rules: query.data.rulesText ? [query.data.rulesText] : [],
-      editHref: viewerState === 'host' ? `/matches/${matchId}/edit` : undefined,
-      applicationsHref: viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,
+      editHref: viewerState === 'host' ? withFromPath(`/matches/${matchId}/edit`, selfHref) : undefined,
+      applicationsHref: viewerState === 'host' ? withFromPath(`/matches/${matchId}/applications`, selfHref) : undefined,
       lifecycleStatus: getStatus(query.data),
       participants: toParticipants(
         query.data,
-        viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,
+        viewerState === 'host' ? withFromPath(`/matches/${matchId}/applications`, selfHref) : undefined,
       ),
     },
     mode: toDetailMode(viewerState, getStatus(query.data)),

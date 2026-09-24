@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { readBackFrom, withFromPath } from '@/lib/session-storage';
 import {
   useV1CancelMatch,
   useV1CloseMatch,
@@ -43,6 +44,8 @@ type MatchSelection = { sportId: string; regionId: string };
 
 export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep, 'edit'> }) {
   const router = useRouter();
+  // 마법사에 들어온 출처를 단계 사이에 실어 나른다 — 첫 단계 취소가 그 출처로 돌아간다.
+  const from = readBackFrom(useSearchParams().get('from'));
   const { confirm, ConfirmModal } = useConfirm();
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();
@@ -132,7 +135,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
     },
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
     onRegionChange: (value) => updateSelection((current) => ({ ...current, regionId: value })),
-    onBack: () => router.push(previousCreateHref(step)),
+    onBack: () => router.push(step === 'sport' ? from ?? previousCreateHref(step) : withFromPath(previousCreateHref(step), from)),
     onNext: () => {
       // #1: "다음"은 절대 disabled 처리하지 않는다 — 대신 클릭 시 이 스텝의 필수 필드만 로컬
       // 검증해 비어 있으면 이동을 막고, 인라인 에러 + 첫 invalid 필드로 focus를 옮긴다.
@@ -143,7 +146,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
         setPendingFocusField(firstInvalidField);
         return;
       }
-      router.push(nextCreateHref(step));
+      router.push(withFromPath(nextCreateHref(step), from));
     },
     uploadImage: async (file: File) => {
       const result = await uploadImages.mutateAsync([file]);
@@ -203,6 +206,8 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
 
 export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const router = useRouter();
+  // 상세가 넘긴 출처(자기 ?from= 포함)가 있으면 취소·저장 뒤 그 상세로 돌아가 체인을 잇는다.
+  const detailHref = readBackFrom(useSearchParams().get('from')) ?? `/matches/${matchId}`;
   const { confirm, ConfirmModal } = useConfirm();
   const editQuery = useV1MatchEdit(matchId);
   const sports = useV1MasterSports();
@@ -292,7 +297,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
               closeMatch.mutate(
                 { reason: 'host_closed_from_v1_web' },
                 {
-                  onSuccess: () => router.push(`/matches/${matchId}`),
+                  onSuccess: () => router.push(detailHref),
                   onError: (err) => setError(err instanceof Error ? err.message : '모집을 마감하지 못했어요. 다시 시도해 주세요.'),
                 },
               );
@@ -301,7 +306,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
             reopenMatch.mutate(
               { reason: 'host_reopened_from_v1_web' },
               {
-                onSuccess: () => router.push(`/matches/${matchId}`),
+                onSuccess: () => router.push(detailHref),
                 onError: (err) => setError(err instanceof Error ? err.message : '모집을 다시 열지 못했어요. 다시 시도해 주세요.'),
               },
             );
@@ -314,7 +319,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     },
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
     onRegionChange: setRegionId,
-    onBack: () => router.push(`/matches/${matchId}`),
+    onBack: () => router.push(detailHref),
     onNext: () => undefined,
     uploadImage: async (file: File) => {
       const result = await uploadImages.mutateAsync([file]);
@@ -364,7 +369,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
       cancelMatch.mutate(
         { reason: 'host_cancelled_from_v1_web' },
         {
-          onSuccess: () => router.push(`/matches/${matchId}`),
+          onSuccess: () => router.push(detailHref),
           onError: (err) => setError(err instanceof Error ? err.message : '매치를 취소하지 못했어요. 다시 시도해 주세요.'),
         },
       );

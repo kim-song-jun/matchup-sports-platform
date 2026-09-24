@@ -1102,4 +1102,12 @@ describe('TeamMatchDetailPageClient — 뒤로가기 출처(?from=)', () => {
 
     expect(screen.getByTestId('team-match-detail-back-href')).toHaveTextContent('/team-matches');
   });
+
+  it('알림에서 들어오면 알림 화면으로 돌아간다', () => {
+    searchParamsRef.current = new URLSearchParams('from=notifications');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByTestId('team-match-detail-back-href')).toHaveTextContent('/notifications');
+  });
 });

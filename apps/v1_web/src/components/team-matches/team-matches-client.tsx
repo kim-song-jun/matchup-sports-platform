@@ -27,7 +27,7 @@ import { chatRoomHref } from '@/lib/chat-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { getCurrentRedirectPath, getLoginPathForRedirect, sanitizeRedirectPath } from '@/lib/session-storage';
+import { getCurrentRedirectPath, getLoginPathForRedirect, readBackFrom, withFromPath } from '@/lib/session-storage';
 // 호스트팀뿐 아니라 승인된 상대팀 매니저도 자기 사이드 라인업을 관리할 수 있다 — 이 판단은
 // team-match-lineup.service.ts의 loadContext()와 완전히 동일한 규칙이라 그 규칙을 그대로
 // 재현해둔 순수 함수를 라인업 모듈에서 재사용한다(새로 만들지 않음).
@@ -229,7 +229,9 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
   const recordParams = useSearchParams();
   // topBar:false라 셸 뒤로가기가 없다 — 페이지가 직접 그리는 모바일·데스크톱 링크
   // (team-matches-page.tsx)가 이 값을 쓴다. public-profile-client.tsx와 같은 `?from=` 패턴.
-  const fromPath = sanitizeRedirectPath(recordParams.get('from'));
+  const fromPath = readBackFrom(recordParams.get('from'));
+  // 하위 화면(수정·참석명단·결과)에서 돌아와도 처음 출처가 남도록, 받은 출처가 있을 때만 자기 URL 을 싣는다.
+  const chainFrom = fromPath ? withFromPath(`/team-matches/${teamMatchId}`, fromPath) : null;
   const rawViewerState = query.data ? getViewerState(query.data) : 'none';
   const canManageHostTeam = query.data?.viewer?.manageableHostTeam === true;
   // 플랫폼이 생성한 모집은 HOME/AWAY 배정 뒤에도 운영 주체가 플랫폼이다.
@@ -302,7 +304,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     );
   }, [query.data, resolveChatRoom, teamMatchId, canManageHostTeam, canManageOpponentTeam, opponentAssigned]);
 
-  if (query.isError) return <TeamMatchStatePageView model={{ ...getTeamMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
+  if (query.isError) return <TeamMatchStatePageView model={{ ...getTeamMatchStateViewModel('error'), retry: () => void query.refetch(), backHref: fromPath ?? undefined }} />;
 
   // 데이터가 오기 전에는 하드코딩 목업(`fallback`)을 화면 전체로 렌더하지 않는다 —
   // 목업 제목·주소·참가자가 실제 값처럼 보여 사용자가 잘못 읽던 결함이었다.
@@ -334,7 +336,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
       hostTeamTrustState: query.data.hostTeam?.trustState ?? null,
       league: query.data.league ?? null,
       applicantActionError: actionError,
-      manageHref: canManageMatchListing ? `/team-matches/${teamMatchId}/edit` : undefined,
+      manageHref: canManageMatchListing ? withFromPath(`/team-matches/${teamMatchId}/edit`, chainFrom) : undefined,
       applicantTeams: toApplicantTeamsWithActions(
         query.data,
         applications.data,
@@ -373,7 +375,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
           pending: closeTeamMatch.isPending || reopenTeamMatch.isPending || cancelTeamMatch.isPending,
         })
       : undefined,
-    resultAction: seeding ? undefined : buildResultAction(teamMatchId, getStatus(query.data), canManageHostTeam, canManageOpponentTeam, isLeagueFixture),
+    resultAction: seeding ? undefined : buildResultAction(teamMatchId, getStatus(query.data), canManageHostTeam, canManageOpponentTeam, isLeagueFixture, chainFrom),
     reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
     statusLabel: seeding ? undefined : modelLiveLabel(query.data) ?? statusLabel(viewerState, getStatus(query.data)),
     chatLabel: chatLabel(canManageHostTeam, canManageOpponentTeam, opponentAssigned),
@@ -392,7 +394,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
         }
       : undefined,
     onShare: () => shareTeamMatch(query.data),
-    lineupHref: ownTeamId ? `/team-matches/${teamMatchId}/lineup` : undefined,
+    lineupHref: ownTeamId ? withFromPath(`/team-matches/${teamMatchId}/lineup`, chainFrom) : undefined,
     onApply: seeding ? undefined : getApplyAction({
       viewerState,
       status: getStatus(query.data),
@@ -684,24 +686,25 @@ function buildResultAction(
   canManageHostTeam: boolean,
   canManageOpponentTeam: boolean,
   isLeagueFixture: boolean,
+  chainFrom: string | null = null,
 ): TeamMatchDetailViewModel['resultAction'] {
   if (status !== 'matched' && status !== 'completed') return null;
   if (isLeagueFixture) {
     if (!canManageHostTeam && !canManageOpponentTeam) return null;
     // 양쪽 진입점이 같은 읽기 전용 화면으로 합류하므로(/result/approval 도 마찬가지)
     // 상대팀을 approval 경로로 돌리는 건 의미 없는 우회다.
-    return { label: '경기 결과 보기', href: `/team-matches/${teamMatchId}/result` };
+    return { label: '경기 결과 보기', href: withFromPath(`/team-matches/${teamMatchId}/result`, chainFrom) };
   }
   if (canManageHostTeam) {
     return {
       label: status === 'completed' ? '경기 결과 보기' : '경기 기록 보기',
-      href: `/team-matches/${teamMatchId}/result`,
+      href: withFromPath(`/team-matches/${teamMatchId}/result`, chainFrom),
     };
   }
   if (canManageOpponentTeam) {
     return {
       label: status === 'completed' ? '경기 결과 보기' : '경기 기록 보기',
-      href: `/team-matches/${teamMatchId}/result/approval`,
+      href: withFromPath(`/team-matches/${teamMatchId}/result/approval`, chainFrom),
     };
   }
   return null;

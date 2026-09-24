@@ -96,15 +96,62 @@ export function sanitizeRedirectPath(value: string | null | undefined) {
 }
 
 /**
- * `path` 에 `?from=` 을 붙인다. `from` 이 없으면 `path` 그대로.
- * 받은 `from` 까지 담은 자기 URL 을 다음 화면의 출처로 넘기면 여러 단계를 거쳐도 처음 출처가 남는다.
+ * `?from=` 값을 뒤로가기 목적지로 푼다. 알림 딥링크는 경로가 아니라 `notifications` 표식을 싣는다
+ * (notification-route.ts) — 표식을 경로로 바꾼 뒤 나머지는 sanitizeRedirectPath 규칙을 그대로 따른다.
  */
-export function withFromPath(path: string, from: string | null | undefined) {
+export function readBackFrom(value: string | null | undefined) {
+  if (value === 'notifications') return '/notifications';
+  return sanitizeRedirectPath(value);
+}
+
+const FROM_CHAIN_MAX_DEPTH = 4;
+
+function appendFrom(path: string, from: string | null) {
   if (!from) return path;
   const hashAt = path.indexOf('#');
   const base = hashAt === -1 ? path : path.slice(0, hashAt);
   const hash = hashAt === -1 ? '' : path.slice(hashAt);
   return `${base}${base.includes('?') ? '&' : '?'}from=${encodeURIComponent(from)}${hash}`;
+}
+
+function splitFrom(url: string) {
+  const parsed = new URL(url, REDIRECT_BASE);
+  const from = parsed.searchParams.get('from');
+  parsed.searchParams.delete('from');
+  return { base: `${parsed.pathname}${parsed.search}`, hash: parsed.hash, from };
+}
+
+/**
+ * `path` 에 `?from=` 을 붙인다. `from` 이 없으면 `path` 그대로.
+ * 받은 `from` 까지 담은 자기 URL 을 다음 화면의 출처로 넘기면 여러 단계를 거쳐도 처음 출처가 남는다.
+ * 이미 지나온 화면으로 가면(팀 → 리그 → 팀) 새로 감싸지 않고 그때의 URL 을 돌려주고,
+ * 체인은 FROM_CHAIN_MAX_DEPTH 단계까지만 남긴다 — 안 그러면 오갈 때마다 URL 이 끝없이 길어진다.
+ */
+export function withFromPath(path: string, from: string | null | undefined) {
+  // 체인의 각 단계는 사용자가 조작할 수 있는 값이다 — 매 단계 readBackFrom 으로 거르고,
+  // 통과하지 못하면 그 아래는 버린다(파싱할 수 없는 값·표식이 경로처럼 섞이지 않게).
+  const first = readBackFrom(from);
+  if (!first) return path;
+  let target: string;
+  try {
+    target = splitFrom(path).base;
+  } catch {
+    // 서버가 준 경로(채팅 연결 화면 등)가 URL 로 읽히지 않으면 출처를 붙이지 않고 원래 경로 그대로 둔다.
+    return path;
+  }
+  const bases: string[] = [];
+  let cursor: string | null = first;
+  while (cursor) {
+    const level = splitFrom(cursor);
+    if (level.base === target) return cursor;
+    if (bases.length === FROM_CHAIN_MAX_DEPTH) break;
+    // 같은 화면인지는 hash 없이 가리고, 다시 엮을 때는 hash 를 되살린다.
+    bases.push(`${level.base}${level.hash}`);
+    cursor = readBackFrom(level.from);
+  }
+  let rebuilt: string | null = null;
+  for (let index = bases.length - 1; index >= 0; index -= 1) rebuilt = appendFrom(bases[index], rebuilt);
+  return appendFrom(path, rebuilt);
 }
 
 export function getCurrentRedirectPath() {

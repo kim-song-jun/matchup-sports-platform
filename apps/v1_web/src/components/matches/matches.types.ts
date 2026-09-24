@@ -86,6 +86,8 @@ export type MatchStateViewModel = MatchListViewModel & {
   retry?: () => void;
   title: string;
   description: string;
+  /** 뒤로가기 목적지(`?from=`). 없으면 '/matches'로 고정(MatchDetailViewModel.backHref와 동일 패턴). */
+  backHref?: string;
 };
 
 export type MatchDetailViewModel = {

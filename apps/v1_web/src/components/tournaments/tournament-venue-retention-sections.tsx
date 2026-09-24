@@ -1,7 +1,11 @@
+'use client';
+
 import Link from 'next/link';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import type { ReactNode } from 'react';
 import { Trophy, LayoutGrid, Star, ChevronRight, ClipboardList, Video, Gift, Search } from 'lucide-react';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
+import { withFromPath } from '@/lib/session-storage';
 import type {
   V1ReviewListItem,
   V1TournamentFixture,
@@ -251,6 +255,8 @@ function TournamentFixtureReviewEntryList({
 }: {
   entries: Array<{ fixture: V1TournamentFixture; remainingCount: number }>;
 }) {
+  // 리뷰 작성 화면에서 뒤로가면 이 대회 화면(받은 출처 포함)으로 돌아온다.
+  const from = useCurrentHref();
   return (
     <section aria-labelledby="fixture-review-heading" style={{ marginTop: 24 }}>
       <div id="fixture-review-heading" className="tm-text-body-lg" style={{ marginBottom: 4 }}>
@@ -271,7 +277,7 @@ function TournamentFixtureReviewEntryList({
           return (
             <Link
               key={fixture.id}
-              href={`/my/reviews/tournament_fixture/${fixture.id}`}
+              href={withFromPath(`/my/reviews/tournament_fixture/${fixture.id}`, from)}
               className="tm-list-row-interactive tm-pressable"
               aria-label={`${homeTeamName} 대 ${awayTeamName} 경기 남은 리뷰 ${remainingCount}개 작성`}
               style={{

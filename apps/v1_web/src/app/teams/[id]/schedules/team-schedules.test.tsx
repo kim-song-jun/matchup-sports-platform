@@ -343,7 +343,7 @@ describe('TeamScheduleDetailPage — 상세 라우트 권한 게이팅', () => {
 
     expect(screen.getByText('E2E 알파 B팀')).toBeInTheDocument();
     expect(screen.getByText('(테스트) 알파 구장')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /경기 상세 보기/ })).toHaveAttribute('href', '/team-matches/tm-1');
+    expect(screen.getByRole('link', { name: /경기 상세 보기/ })).toHaveAttribute('href', '/team-matches/tm-1?from=%2Fteams%2Fteam-1%2Fschedules%2Fsched-1');
   });
 
   it('상대팀 모집 중(matchConfirmed=false)이면 상대팀 요약을 보여주지 않는다', async () => {

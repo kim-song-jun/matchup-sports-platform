@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { Card } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { withFromPath } from '@/lib/session-storage';
 import type { V1TournamentParticipantTeam, V1TournamentStatus } from '@/types/api';
 
 type ParticipantTeamBuckets = {
@@ -107,6 +108,7 @@ export function TournamentParticipantSection({
   teamCount,
   status,
   confirmedCount,
+  fromHref,
 }: {
   teams: V1TournamentParticipantTeam[];
   /**
@@ -120,6 +122,8 @@ export function TournamentParticipantSection({
   /** 'open'(모집 중)에는 참가팀 명단(팀명·로고)을 숨긴다 — 확정 인원수는 계속 노출. */
   status: V1TournamentStatus;
   confirmedCount: number;
+  /** 참가팀 → 팀 상세 링크의 뒤로가기 출처(이 대회 상세 self href). */
+  fromHref?: string | null;
 }) {
   const { confirmed, waitlisted, hasAny } = getParticipantTeamBuckets(teams);
   const isRecruiting = status === 'open';
@@ -142,10 +146,10 @@ export function TournamentParticipantSection({
 
       {showList ? (
         <Card pad={16} style={{ marginTop: 4 }}>
-          <ParticipantTeamList teams={confirmed} label="참가 확정" badgeClass="tm-badge-blue" />
+          <ParticipantTeamList teams={confirmed} label="참가 확정" badgeClass="tm-badge-blue" fromHref={fromHref} />
           {waitlisted.length > 0 ? (
             <div style={{ marginTop: confirmed.length > 0 ? 14 : 0, paddingTop: confirmed.length > 0 ? 14 : 0, borderTop: confirmed.length > 0 ? '1px solid var(--border)' : undefined }}>
-              <ParticipantTeamList teams={waitlisted} label="대기" badgeClass="tm-badge-grey" />
+              <ParticipantTeamList teams={waitlisted} label="대기" badgeClass="tm-badge-grey" fromHref={fromHref} />
             </div>
           ) : null}
         </Card>
@@ -174,10 +178,12 @@ function ParticipantTeamList({
   teams,
   label,
   badgeClass,
+  fromHref,
 }: {
   teams: V1TournamentParticipantTeam[];
   label: string;
   badgeClass: string;
+  fromHref?: string | null;
 }) {
   if (teams.length === 0) {
     return null;
@@ -186,7 +192,7 @@ function ParticipantTeamList({
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       {teams.map((team) => (
-        <ParticipantTeamRow key={team.registrationId} team={team} label={label} badgeClass={badgeClass} />
+        <ParticipantTeamRow key={team.registrationId} team={team} label={label} badgeClass={badgeClass} fromHref={fromHref} />
       ))}
     </div>
   );
@@ -206,10 +212,12 @@ function ParticipantTeamRow({
   team,
   label,
   badgeClass,
+  fromHref,
 }: {
   team: V1TournamentParticipantTeam;
   label: string;
   badgeClass: string;
+  fromHref?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const rosterId = `roster-${team.registrationId}`;
@@ -218,7 +226,7 @@ function ParticipantTeamRow({
     <div style={{ display: 'grid', gap: 4 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 8 }}>
         <Link
-          href={`/teams/${team.teamId}`}
+          href={withFromPath(`/teams/${team.teamId}`, fromHref)}
           className="tm-list-row-interactive tm-pressable"
           style={{
             display: 'grid',

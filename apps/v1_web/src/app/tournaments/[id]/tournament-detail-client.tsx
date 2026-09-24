@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { FormattedText } from '@/components/v1-ui/formatted-text';
@@ -17,7 +17,7 @@ import {
 } from '@/components/tournaments/league-standings-table';
 import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
-import { hasStoredV1Session, sanitizeRedirectPath } from '@/lib/session-storage';
+import { hasStoredV1Session, readBackFrom, withFromPath } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
@@ -73,6 +73,13 @@ export { getParticipantTeamBuckets } from '@/components/tournaments/tournament-e
  * 거울 행의 `format` 은 사실이 아니므로(백필이 안 채워 기본값 `group_knockout` 이 남는다)
  * **리그 판정을 먼저** 한다 — 안 그러면 정규 리그 배지에 "조별리그 후 토너먼트"라고 적힌다.
  */
+// 이 대회 상세가 받은 출처까지 담은 자기 URL. 하위 화면(대진·결과·내 신청)으로 넘겨 두 단계 뒤에도 처음 출처가 남게 한다.
+const DetailChainFromContext = createContext<string | null>(null);
+function useChildHref() {
+  const chainFrom = useContext(DetailChainFromContext);
+  return (path: string) => withFromPath(path, chainFrom);
+}
+
 function getFormatLabel(competition: V1TournamentDetail): string {
   if (isLeagueCompetition(competition)) return '리그';
   return competition.format === 'knockout' ? '토너먼트' : '조별리그 후 토너먼트';
@@ -348,6 +355,7 @@ function ApplyCTAButtons({
   blockReason: TournamentRegistrationBlockReason | null;
   myRegistration: V1TournamentRegistration | null;
 }) {
+  const childHref = useChildHref();
   const primaryButtonClass = `tm-btn tm-btn-lg tm-btn-primary tm-btn-block${
     tournament.kind === 'regular_league'
       ? ' [--button-fill-primary:var(--static-blue)] [--button-fill-primary-hover:color-mix(in_srgb,var(--static-blue)_88%,var(--static-black))]'
@@ -359,7 +367,7 @@ function ApplyCTAButtons({
   if (hasActiveRegistration) {
     return (
       <Link
-        href={`/tournaments/${tournament.id}/my`}
+        href={childHref(`/tournaments/${tournament.id}/my`)}
         className={primaryButtonClass}
         style={{ fontSize: 'var(--font-size-body-lg)' }}
         aria-label="내 신청 내역 보기"
@@ -390,7 +398,7 @@ function ApplyCTAButtons({
 
   return (
     <Link
-      href={`/tournaments/${tournament.id}/my`}
+      href={childHref(`/tournaments/${tournament.id}/my`)}
       className={primaryButtonClass}
       style={{ fontSize: 'var(--font-size-body-lg)' }}
       aria-label={applyAriaLabel}
@@ -427,13 +435,14 @@ function ApplyCTA({
    uses the always-visible sticky rail below) ── */
 
 function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail }) {
+  const childHref = useChildHref();
   const label = getBracketEntryCtaLabel(tournament.status, tournament.kind === 'regular_league');
   if (!label) return null;
   const isLive = tournament.status === 'in_progress';
 
   return (
     <Link
-      href={`/tournaments/${tournament.id}/bracket`}
+      href={childHref(`/tournaments/${tournament.id}/bracket`)}
       className="tm-pressable"
       aria-label={label}
       style={{
@@ -517,7 +526,8 @@ function useIsInViewport(ref: React.RefObject<HTMLElement | null>): boolean {
 export function TournamentDetailPageClient({ tournamentId }: { tournamentId: string }) {
   // route-chrome 테이블의 backHref(fragments/tournaments-core.ts)는 검색 파라미터를 못 받아
   // '/tournaments'로 고정돼 있었다 — public-profile-client.tsx와 같은 `?from=` 패턴으로 메운다.
-  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const fromPath = readBackFrom(useSearchParams().get('from'));
+  const chainFrom = fromPath ? withFromPath(`/tournaments/${tournamentId}`, fromPath) : null;
   const [hasSessionHint, setHasSessionHint] = useState(false);
   const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
   const { data: myRegistrations = [] } = useV1MyRegistrations(tournamentId, {
@@ -550,7 +560,12 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
       ? {
           title: data.title,
           desktopHead: false,
-          floatingSlot: <ApplyCTA tournament={data} myRegistration={myRegistration} />,
+          // 셸이 이 슬롯을 페이지 트리 밖에 그리므로 체인 출처를 따로 감싼다.
+          floatingSlot: (
+            <DetailChainFromContext.Provider value={chainFrom}>
+              <ApplyCTA tournament={data} myRegistration={myRegistration} />
+            </DetailChainFromContext.Provider>
+          ),
           ...(fromPath ? { backHref: fromPath } : {}),
         }
       : {},
@@ -573,11 +588,13 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
   }
 
   return (
-    <TournamentDetailView
-      tournament={data}
-      myRegistration={myRegistration}
-      backHref={fromPath ?? '/tournaments'}
-    />
+    <DetailChainFromContext.Provider value={chainFrom}>
+      <TournamentDetailView
+        tournament={data}
+        myRegistration={myRegistration}
+        backHref={fromPath ?? '/tournaments'}
+      />
+    </DetailChainFromContext.Provider>
   );
 }
 
@@ -595,6 +612,8 @@ export function TournamentDetailView({
   myRegistration: V1TournamentRegistration | null;
   backHref?: string;
 }) {
+  const childHref = useChildHref();
+  const participantFrom = useContext(DetailChainFromContext) ?? `/tournaments/${tournament.id}`;
   const status = getTournamentStatusConfig(tournament.status);
   const sportAccent = getSportAccent(tournament.sport.code);
   const isOpen = tournament.kind === 'regular_league'
@@ -916,6 +935,7 @@ export function TournamentDetailView({
 
       <TournamentParticipantSection
         teams={tournament.participantTeams}
+        fromHref={participantFrom}
         teamCount={showsCapacity ? tournament.teamCount : null}
         status={tournament.status}
         confirmedCount={tournament.confirmedCount}
@@ -998,6 +1018,7 @@ export function TournamentDetailView({
 
       <TournamentParticipantSection
         teams={tournament.participantTeams}
+        fromHref={participantFrom}
         teamCount={showsCapacity ? tournament.teamCount : null}
         status={tournament.status}
         confirmedCount={tournament.confirmedCount}
@@ -1255,7 +1276,7 @@ export function TournamentDetailView({
     <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="대회 진행 상태">
       {/* Live CTA */}
       <Link
-        href={`/tournaments/${tournament.id}/bracket`}
+        href={childHref(`/tournaments/${tournament.id}/bracket`)}
         style={{
           display: 'flex', alignItems: 'center', gap: 12,
           padding: '16px 16px',
@@ -1307,7 +1328,7 @@ export function TournamentDetailView({
        채운다). in_progress 레일과 동일 구조에서 LIVE 배지·강조색만 뺀 중립 톤. */
     <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="대진표·일정">
       <Link
-        href={`/tournaments/${tournament.id}/bracket`}
+        href={childHref(`/tournaments/${tournament.id}/bracket`)}
         style={{
           display: 'flex', alignItems: 'center', gap: 12,
           padding: '16px 16px',
@@ -1342,7 +1363,7 @@ export function TournamentDetailView({
   ) : tournament.status === 'completed' ? (
     <aside className="tm-tournament-rail tm-show-desktop" role="complementary" aria-label="대회 결과">
       <Link
-        href={`/tournaments/${tournament.id}/results`}
+        href={childHref(`/tournaments/${tournament.id}/results`)}
         style={{
           display: 'flex', alignItems: 'center', gap: 12,
           padding: '16px 16px',
@@ -1459,13 +1480,14 @@ export function TournamentDetailView({
  * 브레이크포인트별로 나뉘지 않음 — leftContent는 두 화면 모두에서 렌더되는 영역).
  */
 function CompletedResultHero({ tournament }: { tournament: V1TournamentDetail }) {
+  const childHref = useChildHref();
   const championName = getCompletedChampionName(tournament);
   const title = championName ? `${championName} 우승!` : '대회가 끝났어요';
 
   return (
     <section style={{ marginTop: 16 }}>
       <Link
-        href={`/tournaments/${tournament.id}/results`}
+        href={childHref(`/tournaments/${tournament.id}/results`)}
         className="tm-pressable"
         style={{
           display: 'flex',
@@ -1719,10 +1741,11 @@ function TournamentFlowSection({ tournament }: { tournament: V1TournamentDetail 
  * 바로 봐야 하기 때문이다.
  */
 function StandingsMovedNotice({ tournamentId }: { tournamentId: string }) {
+  const childHref = useChildHref();
   return (
     <section aria-label="순위표 안내" style={{ marginTop: 24 }}>
       <Link
-        href={`/tournaments/${tournamentId}/bracket`}
+        href={childHref(`/tournaments/${tournamentId}/bracket`)}
         className="tm-pressable tm-on-tint"
         style={{
           display: 'flex',

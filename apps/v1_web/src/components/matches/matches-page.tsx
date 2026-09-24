@@ -23,6 +23,7 @@ import type {
   MatchListViewModel,
   MatchStateViewModel,
 } from './matches.types';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 
 /**
  * 종목 한국어 레이블 → 인디케이터 dot CSS 색상.
@@ -162,13 +163,15 @@ export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
   // 재사용은 override 메커니즘엔 영향 없음). title은 에러 상태에 따라 달라지는 런타임 값이라
   // override로 밀어넣는다.
   useShellOverride({ title: model.title });
+  // /matches/:id에서 ?from=으로 들어왔다면 그 출처로, 없으면 전체 목록으로(MD-QA #15 후속).
+  const backHref = model.backHref ?? '/matches';
   return (
     <>
       {/* 데스크톱: 기존 자체 헤더(뒤로가기+제목) 유지 */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href="/matches" aria-label="매치 목록으로 돌아가기">
+        <AppBackLink className="tm-desktop-back" fallbackHref={backHref}>
           <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
-        </Link>
+        </AppBackLink>
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{model.title}</h1>
       </div>
       {/* 모바일: 두 라우트 모두 이 화면의 "성공" 짝(MatchListPageView/MatchDetailPageView)
@@ -176,7 +179,7 @@ export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
           토픽바의 뒤로가기가 뜨지 않는다 — 이 화면이 원래 거기에 기대고 있던 유일한 곳이라
           직접 그려 넣는다(데스크톱은 위 자체 헤더가 이미 대신함). */}
       <div className="tm-hide-desktop" style={{ padding: '12px 16px 0' }}>
-        <Link className="tm-btn tm-btn-icon tm-btn-ghost" href="/matches" aria-label="매치 목록으로 돌아가기">
+        <Link className="tm-btn tm-btn-icon tm-btn-ghost" href={backHref} aria-label="뒤로가기">
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
         </Link>
       </div>
@@ -186,7 +189,7 @@ export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
         {model.state === 'error' ? (
           <>
             <ErrorState title={model.title} message={model.description} onRetry={model.retry} retryLabel="다시 불러오기" />
-            <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/matches" style={{ marginTop: 12 }}>목록으로 돌아가기</Link>
+            <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href={backHref} style={{ marginTop: 12 }}>{model.backHref ? '돌아가기' : '목록으로 돌아가기'}</Link>
           </>
         ) : (
           <EmptyState title={model.title} sub={model.description} />
@@ -309,9 +312,9 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
     <>
       {/* Desktop: back link + match title (mobile topbar is hidden on desktop) */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href={model.backHref ?? '/matches'} aria-label="뒤로가기">
+        <AppBackLink className="tm-desktop-back" fallbackHref={model.backHref ?? '/matches'}>
           <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
-        </Link>
+        </AppBackLink>
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{match.title}</h1>
       </div>
 
@@ -537,9 +540,9 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
     <>
       {/* Desktop page head */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href={edit ? (model.matchId ? `/matches/${model.matchId}` : '/matches') : '/matches'} aria-label={edit ? '매치 상세로 돌아가기' : '매치 목록으로 돌아가기'}>
+        <AppBackLink className="tm-desktop-back" fallbackHref={edit ? (model.matchId ? `/matches/${model.matchId}` : '/matches') : '/matches'}>
           <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
-        </Link>
+        </AppBackLink>
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{edit ? '매치 수정' : '매치 만들기'}</h1>
       </div>
       <div className="tm-create-shell tm-match-create-shell tm-content-enter">

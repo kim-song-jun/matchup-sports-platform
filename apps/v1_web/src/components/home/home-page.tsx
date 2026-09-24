@@ -18,6 +18,7 @@ import { Card, EmptyState, ErrorState, KPIStat, ListItem, NumberDisplay, Section
 import { cssUrl } from '@/lib/assets';
 import { SportIllustration } from '@/components/v1-ui/sport-illustration';
 import { formatTournamentDateRangeShort } from '@/lib/date-utils';
+import { withFromPath } from '@/lib/session-storage';
 import { useV1AllTournaments, useV1LeagueMatches } from '@/hooks/use-v1-api';
 import type { V1TournamentListItem } from '@/types/api';
 import type { V1PublicLeagueListItem } from '@/types/league-match';
@@ -492,7 +493,7 @@ function RecordConsentNudgeBanner({
         {/* 무엇이 공개되는지 확인할 경로를 항상 함께 둔다 -- 개인정보 공개를 "보지 않고
             버튼 한 번"으로 켜게 만들지 않기 위한 것이다. */}
         <Link
-          href="/my/settings/record-consent"
+          href={withFromPath('/my/settings/record-consent', '/home')}
           className="tm-btn tm-btn-sm tm-btn-neutral"
           style={{ flex: 1, minHeight: 44 }}
         >
@@ -704,7 +705,7 @@ function FeaturedMatchCard({
   );
 
   return network ? card : (
-    <Link className="tm-featured-link tm-pressable" href={`/matches/${match.id}`}>
+    <Link className="tm-featured-link tm-pressable" href={withFromPath(`/matches/${match.id}`, '/home')}>
       {card}
     </Link>
   );
@@ -869,7 +870,7 @@ function SidebarLeaguesWidget({ items, loading }: { items: V1PublicLeagueListIte
             return (
               <Link
                 key={l.leagueId}
-                href={`/league-matches/${l.leagueId}`}
+                href={withFromPath(`/league-matches/${l.leagueId}`, '/home')}
                 className="tm-pressable"
                 aria-label={`정규 리그 상세 보기 — ${l.title}`}
                 style={{
@@ -933,7 +934,7 @@ function RecommendedMatchRail({ matches }: { matches: HomeMatchCard[] }) {
         const capacity = homeCapacity(match.currentParticipants, match.maxParticipants);
 
         return (
-        <Link key={match.id} className="tm-pressable tm-match-card" href={`/matches/${match.id}`}>
+        <Link key={match.id} className="tm-pressable tm-match-card" href={withFromPath(`/matches/${match.id}`, '/home')}>
           <div
             className={`tm-match-card-media${match.imageUrl ? '' : ' tm-match-media-sport'}`}
             style={match.imageUrl ? { background: `${cssUrl(match.imageUrl)} center/cover` } : undefined}

@@ -30,6 +30,7 @@ import {
   toStandingsRows as publicStandingsToRows,
 } from '@/components/public-game-records/schedule-content';
 import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import type {
   V1TournamentDetail,
   V1TournamentFixture,
@@ -180,7 +181,15 @@ function TeamFixturesDetail({ teamId, fixtures }: { teamId: string | null; fixtu
  * 아래 순위표 하이라이트(tm-standings-row-highlight)·StandingRankBadge의 승격 강조도
  * 같은 기준으로 자동 꺼지게 한다(별도 분기 없이 하나의 변수로 gate).
  */
-function GroupStandingsSection({ group, fixtures }: { group: V1TournamentGroup; fixtures: V1TournamentFixture[] }) {
+function GroupStandingsSection({
+  group,
+  fixtures,
+  fromHref,
+}: {
+  group: V1TournamentGroup;
+  fixtures: V1TournamentFixture[];
+  fromHref?: string;
+}) {
   const stageComplete = isGroupStageComplete(group.id, fixtures);
   const advance = stageComplete ? group.advanceCount : null;
   /* #381 — 펼침 상세는 "이 조에서 치른 경기"만 보여준다. 예전엔 대회 전체 픽스처를
@@ -218,6 +227,7 @@ function GroupStandingsSection({ group, fixtures }: { group: V1TournamentGroup; 
         advance={advance}
         ariaLabel={`${group.name} 순위표`}
         renderDetail={(row) => <TeamFixturesDetail teamId={row.teamId} fixtures={groupFixtures} />}
+        fromHref={fromHref}
       />
     </section>
   );
@@ -227,14 +237,16 @@ function GroupStandingsSection({ group, fixtures }: { group: V1TournamentGroup; 
 function LeagueStandingsSection({
   rows,
   label = '리그 순위',
+  fromHref,
 }: {
   rows: readonly TournamentStandingsRow[];
   /** 티어가 있으면 `'1부'`·`'2부'` — 아래 `leagueStandingsHeading` 참조. */
   label?: string;
+  fromHref?: string;
 }) {
   return (
     <section aria-label={standingsAriaLabel(label)} style={{ marginBottom: 16 }}>
-      <TournamentStandingsTable rows={rows} advance={null} ariaLabel={standingsAriaLabel(label, '표')} />
+      <TournamentStandingsTable rows={rows} advance={null} ariaLabel={standingsAriaLabel(label, '표')} fromHref={fromHref} />
     </section>
   );
 }
@@ -451,6 +463,8 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
     : 0;
   const stages = buildTournamentStages(tournament);
   const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>('schedule');
+  // 순위표에서 팀 전적으로 나갔다 돌아오면 이 화면(대진표·순위, 받은 출처 포함)으로 되돌아온다.
+  const bracketSelfHref = useCurrentHref();
 
   const { groupPhaseGroups, knockoutFixtures, hasGroupStandings, hasKnockoutFixtures } =
     partitionTournamentSections(format, fixtures, groups);
@@ -649,7 +663,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                       />
                     )
                   ) : (
-                    <LeagueStandingsSection rows={allLeagueRows} label={leagueStandingsHeading} />
+                    <LeagueStandingsSection rows={allLeagueRows} label={leagueStandingsHeading} fromHref={bracketSelfHref ?? undefined} />
                   )}
                 </section>
               )}
@@ -660,7 +674,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                     조별 순위
                   </h3>
                   {groupPhaseGroups.map((g) => (
-                    <GroupStandingsSection key={g.id} group={g} fixtures={fixtures} />
+                    <GroupStandingsSection key={g.id} group={g} fixtures={fixtures} fromHref={bracketSelfHref ?? undefined} />
                   ))}
                 </section>
               )}

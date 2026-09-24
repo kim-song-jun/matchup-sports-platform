@@ -5,6 +5,7 @@ import { Fragment, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { withFromPath } from '@/lib/session-storage';
 
 /**
  * §순위표 지표 통일 — 같은 대회 `/bracket` 화면의 두 탭(순위·대진표 탭의
@@ -104,12 +105,15 @@ export function TournamentStandingsTable({
   ariaLabel,
   emptyMessage = '순위 집계 전이에요',
   renderDetail,
+  fromHref,
 }: {
   rows: readonly TournamentStandingsRow[];
   advance: number | null;
   ariaLabel: string;
   emptyMessage?: string;
   renderDetail?: (row: TournamentStandingsRow) => ReactNode;
+  /** 팀 전적(`/records`) 링크의 뒤로가기 출처 — 없으면 기존처럼 쿼리 없는 링크. */
+  fromHref?: string | null;
 }) {
   const sorted = [...rows].sort((a, b) => a.position - b.position);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
@@ -228,7 +232,7 @@ export function TournamentStandingsTable({
                             />
                           </button>
                         ) : (
-                          <Link href={`/teams/${row.teamId}/records`} className="tm-pressable" style={cellStyle}>
+                          <Link href={withFromPath(`/teams/${row.teamId}/records`, fromHref)} className="tm-pressable" style={cellStyle}>
                             {teamCell}
                           </Link>
                         )}

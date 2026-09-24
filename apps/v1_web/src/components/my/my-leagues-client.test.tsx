@@ -119,7 +119,8 @@ describe('MyLeaguesPageClient — 팀별 순위·다음 경기 노출', () => {
     render(<MyLeaguesPageClient />);
 
     const link = screen.getByRole('link', { name: '성수 러너스 FC 다음 경기 상세로 이동' });
-    expect(link).toHaveAttribute('href', '/league-matches/league-1/fixtures/tm-42');
+    // 뒤로가기 출처(from=/my/leagues)를 담아야 상세에서 돌아왔을 때 이 목록으로 되돌아온다.
+    expect(link).toHaveAttribute('href', '/league-matches/league-1/fixtures/tm-42?from=%2Fmy%2Fleagues');
     expect(link).toHaveTextContent('마포 유나이티드');
   });
 
@@ -148,5 +149,21 @@ describe('MyLeaguesPageClient — 팀별 순위·다음 경기 노출', () => {
     render(<MyLeaguesPageClient />);
 
     expect(screen.queryByText(/다음 경기/)).not.toBeInTheDocument();
+  });
+
+  it('카드 헤드 링크(리그 상세)도 뒤로가기 출처(from=/my/leagues)를 담는다', () => {
+    apiMocks.useV1MyLeagues.mockReturnValue({
+      data: { items: [baseItem()] },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    render(<MyLeaguesPageClient />);
+
+    const link = screen.getByRole('link', { name: '성수 풋살 리그 상세로 이동' });
+    expect(link).toHaveAttribute('href', '/league-matches/league-1?from=%2Fmy%2Fleagues');
+    // 회귀 방지: from 파라미터가 조용히 빠지면 뒤로가기가 홈으로 튄다.
+    expect(link.getAttribute('href')).not.toBe('/league-matches/league-1');
   });
 });

@@ -2,8 +2,13 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { MyInvitationsPageView, MyJoinApplicationsPageView } from './my-page';
-import type { MyInvitationsViewModel, MyJoinApplicationItem, MyJoinApplicationsViewModel } from './my.types';
+import { MyInvitationsPageView, MyJoinApplicationsPageView, MyMatchesPageView } from './my-page';
+import type {
+  MyInvitationsViewModel,
+  MyJoinApplicationItem,
+  MyJoinApplicationsViewModel,
+  MyMatchesViewModel,
+} from './my.types';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/my/invitations',
@@ -167,5 +172,45 @@ describe('MyJoinApplicationsPageView — 보낸 가입 신청 상태 표시', ()
 
     expect(screen.getByRole('button', { name: '성수 러너스 FC 가입 신청 취소' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '마포 농구 클럽 가입 신청 취소' })).not.toBeDisabled();
+  });
+
+  it('팀 링크에 뒤로가기 출처(from=/my/join-applications)를 담는다', () => {
+    const model = applicationsModel({ applications: [joinApplication()] });
+
+    render(<MyJoinApplicationsPageView model={model} />);
+
+    expect(screen.getByRole('link', { name: '성수 러너스 FC' })).toHaveAttribute(
+      'href',
+      '/teams/team-a?from=%2Fmy%2Fjoin-applications',
+    );
+  });
+});
+
+describe('MyMatchesPageView — 빈 상태 CTA 출처', () => {
+  function matchesModel(overrides: Partial<MyMatchesViewModel> = {}): MyMatchesViewModel {
+    return {
+      mode: 'created',
+      summary: [],
+      matches: [],
+      loading: false,
+      error: false,
+      onRetry: vi.fn(),
+      ...overrides,
+    };
+  }
+
+  it('생성한 매치가 없으면 "매치 만들기" CTA에 from=/my/matches/created 를 담는다', () => {
+    render(<MyMatchesPageView model={matchesModel({ mode: 'created' })} />);
+
+    expect(screen.getByRole('link', { name: '매치 만들기' })).toHaveAttribute(
+      'href',
+      '/matches/new/sport?from=%2Fmy%2Fmatches%2Fcreated',
+    );
+  });
+
+  it('회귀 방지: 참여 매치 빈 상태의 "매치 둘러보기" CTA는 from 없이 /matches 그대로다', () => {
+    render(<MyMatchesPageView model={matchesModel({ mode: 'joined' })} />);
+
+    expect(screen.getByRole('link', { name: '매치 둘러보기' })).toHaveAttribute('href', '/matches');
   });
 });

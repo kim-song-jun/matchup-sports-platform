@@ -30,6 +30,7 @@ import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1
 import { MyPlayerCardSection } from './my-player-card-section';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { cssUrl } from '@/lib/assets';
+import { withFromPath } from '@/lib/session-storage';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import type {
   MyHomeViewModel,
@@ -46,6 +47,7 @@ import type {
   ProfileEditViewModel,
   SettingsViewModel,
 } from './my.types';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 
 /** Lucide 아이콘 이름 → 컴포넌트 매핑. view-model의 icon 문자열을 참조함. */
 const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
@@ -192,9 +194,9 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
       <div className="tm-my-shell tm-my-matches-desktop tm-content-enter">
         {/* Desktop page head — hidden on mobile via tm-show-desktop */}
         <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+          <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
+          </AppBackLink>
           <h1 className="tm-text-heading">내 매치</h1>
         </div>
         {/* 선택 상태를 primary 로 칠하면 "이 화면의 주요 행동"으로 읽힌다(§14) — 칩으로 표현한다. */}
@@ -220,7 +222,7 @@ export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
               title="표시할 매치가 없어요"
               sub={model.mode === 'joined' ? '신청하거나 참여한 개인 매치가 여기에 표시돼요.' : '매치를 만들면 여기에 표시돼요.'}
               cta={model.mode === 'joined' ? '매치 둘러보기' : '매치 만들기'}
-              ctaHref={model.mode === 'joined' ? '/matches' : '/matches/new/sport'}
+              ctaHref={model.mode === 'joined' ? '/matches' : withFromPath('/matches/new/sport', '/my/matches/created')}
             />
           ) : (
             model.matches.map((match) => <MyMatchCard key={match.id} match={match} manage={model.mode === 'created'} />)
@@ -238,9 +240,9 @@ export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
       <div className="tm-my-shell tm-my-teams-desktop tm-content-enter">
         {/* Desktop page head */}
         <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+          <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
+          </AppBackLink>
           <h1 className="tm-text-heading">내 팀</h1>
         </div>
         <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
@@ -262,9 +264,9 @@ export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel
       <div className="tm-my-shell">
         {/* Desktop page head */}
         <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+          <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
+          </AppBackLink>
           <h1 className="tm-text-heading">받은 초대</h1>
         </div>
         {/* 오류는 EmptyState 가 아니라 ErrorState 로 — 회색 인박스 아이콘은 "없음"으로 읽힌다(2026-09-04 감사). */}
@@ -347,9 +349,9 @@ export function MyJoinApplicationsPageView({ model }: { model: MyJoinApplication
       <div className="tm-my-shell">
         {/* Desktop page head */}
         <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+          <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
+          </AppBackLink>
           <h1 className="tm-text-heading">보낸 가입 신청</h1>
         </div>
         {model.error ? (
@@ -377,7 +379,7 @@ export function MyJoinApplicationsPageView({ model }: { model: MyJoinApplication
                 <div className="tm-invitation-card-head">
                   <TeamAvatar seed={application.teamId} name={application.teamName} logoUrl={application.logoUrl} size="lg" />
                   <div className="tm-invitation-meta">
-                    <Link className="tm-invitation-meta-name tm-join-application-team-link" href={`/teams/${application.teamId}`}>
+                    <Link className="tm-invitation-meta-name tm-join-application-team-link" href={withFromPath(`/teams/${application.teamId}`, '/my/join-applications')}>
                       {application.teamName}
                     </Link>
                     <div className="tm-invitation-meta-date">{application.dateLabel} 신청</div>
@@ -427,9 +429,9 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
         <div className="tm-my-settings-desktop">
           {/* Desktop page head */}
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">{model.title}</h1>
           </div>
           {model.account ? (
@@ -473,9 +475,9 @@ export function LegalPageView({ model: _model }: { model: SettingsViewModel }) {
       <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">약관 및 정책</h1>
           </div>
           <Card pad={16}>

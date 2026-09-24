@@ -6,6 +6,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, InfoCircleIcon } from '@/components/v1-ui/icons';
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
@@ -15,7 +16,7 @@ import { useTheme } from '@/components/providers/theme-provider';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { cssUrl } from '@/lib/assets';
 import { extractErrorMessage } from '@/lib/error-message';
-import { clearStoredV1Session } from '@/lib/session-storage';
+import { clearStoredV1Session, withFromPath } from '@/lib/session-storage';
 import { isTeamOperatorRole } from '@/lib/team-role';
 import type { ThemePreference } from '@/lib/theme';
 import { myJoinApplicationStatusLabel, teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
@@ -207,7 +208,7 @@ export function MyInvitationsPageClient() {
     accept.mutate({ invitationId }, {
       onSuccess: (result) => {
         if (result.teamId) {
-          router.push(`/teams/${result.teamId}`);
+          router.push(withFromPath(`/teams/${result.teamId}`, '/my/invitations'));
         } else {
           void query.refetch();
         }
@@ -580,9 +581,9 @@ export function ProfileEditPageClient() {
       <form className="tm-create-shell tm-profile-edit-shell tm-my-profile-edit-desktop tm-content-enter" id="v1-profile-edit-form" onSubmit={submit}>
         {/* Desktop page head */}
         <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+          <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
+          </AppBackLink>
           <h1 className="tm-text-heading">프로필 수정</h1>
         </div>
         <section className="tm-my-profile-head">
@@ -954,9 +955,9 @@ export function SportsSettingsPageClient() {
     <>
       <form className="tm-create-shell tm-profile-edit-shell tm-my-sports-desktop tm-content-enter" id="v1-sports-settings-form" onSubmit={submit}>
         <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+          <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
+          </AppBackLink>
           <h1 className="tm-text-heading">운동 정보</h1>
         </div>
         <Card pad={16}>
@@ -1315,9 +1316,9 @@ export function LocationSettingsPageClient() {
       <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-location-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">위치 및 활동 지역</h1>
           </div>
           <Card pad={16}>
@@ -1477,9 +1478,9 @@ export function NotificationSettingsPageClient() {
       <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">알림 설정</h1>
           </div>
           {pushRegistration.permission !== 'unsupported' ? (
@@ -1621,8 +1622,9 @@ export function NotificationSettingsPageClient() {
  */
 function RecordConsentTournamentContext() {
   const params = useSearchParams();
-  const fromTournament = params.get('from') === 'tournament';
+  // 알림을 거쳐 오면 `from` 이 notifications 로 바뀌므로 대회 맥락은 tournamentId 로 판단한다.
   const tournamentId = params.get('tournamentId') ?? '';
+  const fromTournament = Boolean(tournamentId);
   const tournament = useV1Tournament(fromTournament ? tournamentId : '');
   if (!fromTournament) return null;
   const title = tournament.data?.title;
@@ -1665,9 +1667,9 @@ export function RecordConsentSettingsPageClient() {
       <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref="/my/settings">
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">경기 기록 공개</h1>
           </div>
           <RecordConsentTournamentContext />
@@ -1775,9 +1777,9 @@ export function TournamentRealNameVisibilitySettingsPageClient() {
       <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">대회 기록 실명 표시</h1>
           </div>
           <Card pad={16} style={{ marginBottom: 8 }}>
@@ -1862,9 +1864,9 @@ export function PlayerCardHiddenSettingsPageClient() {
       <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">선수 카드</h1>
           </div>
           <Card pad={16} style={{ marginBottom: 8 }}>
@@ -2125,9 +2127,9 @@ export function ThemeSettingsPageClient() {
       <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">화면 테마</h1>
           </div>
           <Card pad={16} style={{ marginBottom: 8 }}>
@@ -2215,9 +2217,9 @@ export function WithdrawalPageClient() {
       <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-withdrawal-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">회원 탈퇴</h1>
           </div>
           <section className="tm-danger-panel">

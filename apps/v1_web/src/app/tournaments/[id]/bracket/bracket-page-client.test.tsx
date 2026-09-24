@@ -1,8 +1,15 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderBracketPage, renderBracketStandingsTab } from './bracket-test-utils';
 import type { V1TournamentDetail, V1TournamentFixture, V1TournamentGroup } from '@/types/api';
+
+// 순위표 링크의 출처는 현재 URL(받은 from 포함)이다 — 받은 출처가 있는 상태를 고정한다.
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  usePathname: () => '/tournaments/tour-1/bracket',
+  useSearchParams: () => new URLSearchParams(),
+}));
 
 /**
  * 조별/리그 순위표에서 팀명을 누르면 **그 자리에서** 그 팀의 경기 상세가 펼쳐져야
@@ -264,7 +271,11 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
     renderBracketStandingsTab(tournament);
 
     const link = screen.getByRole('link', { name: /성수 FC/ });
-    expect(link).toHaveAttribute('href', '/teams/team-42/records');
+    // 뒤로가기가 이 대진표 화면으로 돌아오도록 ?from=이 함께 실린다.
+    expect(link).toHaveAttribute(
+      'href',
+      `/teams/team-42/records?from=${encodeURIComponent('/tournaments/tour-1/bracket')}`,
+    );
   });
 
   it('조별리그 포맷: 조별 순위표의 팀명을 누르면 /teams/:teamId/records 로 이동한다', () => {

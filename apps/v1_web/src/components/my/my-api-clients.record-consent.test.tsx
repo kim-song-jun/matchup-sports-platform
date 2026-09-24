@@ -11,11 +11,12 @@ import { RecordConsentSettingsPageClient } from './my-api-clients';
 const hooks = vi.hoisted(() => ({
   consent: vi.fn(),
   updateConsent: vi.fn(),
+  searchParams: vi.fn(() => new URLSearchParams()),
 }));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => hooks.searchParams(),
 }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
@@ -106,5 +107,37 @@ describe('RecordConsentSettingsPageClient', () => {
 
     expect(screen.getByText('설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: '경기 기록 공개' })).not.toBeInTheDocument();
+  });
+
+  it('데스크톱 뒤로가기는 ?from= 이 없으면 /my/settings 로 떨어진다', () => {
+    hooks.consent.mockReturnValue({ data: { granted: false, effectiveAt: null }, isLoading: false, isError: false, refetch: vi.fn() });
+    hooks.updateConsent.mockReturnValue({ mutate: vi.fn(), isPending: false });
+
+    renderWithClient(<RecordConsentSettingsPageClient />);
+
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/my/settings');
+  });
+
+  it('데스크톱 뒤로가기는 ?from= 이 있으면 그 출처를 따라간다', () => {
+    hooks.consent.mockReturnValue({ data: { granted: false, effectiveAt: null }, isLoading: false, isError: false, refetch: vi.fn() });
+    hooks.updateConsent.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    hooks.searchParams.mockReturnValueOnce(new URLSearchParams('from=%2Fhome'));
+
+    renderWithClient(<RecordConsentSettingsPageClient />);
+
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/home');
+  });
+
+  // 알림을 거치면 딥링크의 from=tournament 가 from=notifications 로 바뀐다 — 대회 맥락은 tournamentId 로 남아야 한다.
+  it('알림에서 들어오면 대회 맥락을 유지하고 뒤로가기는 알림으로 간다', () => {
+    hooks.consent.mockReturnValue({ data: { granted: false, effectiveAt: null }, isLoading: false, isError: false, refetch: vi.fn() });
+    hooks.updateConsent.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    hooks.searchParams.mockReturnValue(new URLSearchParams('from=notifications&tournamentId=t1'));
+
+    renderWithClient(<RecordConsentSettingsPageClient />);
+
+    expect(screen.getByText(/명단에 올랐어요/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/notifications');
+    hooks.searchParams.mockReturnValue(new URLSearchParams());
   });
 });

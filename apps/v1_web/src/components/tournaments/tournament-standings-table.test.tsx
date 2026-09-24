@@ -1,10 +1,16 @@
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TournamentStandingsTable, type TournamentStandingsRow } from './tournament-standings-table';
 import { renderBracketStandingsTab } from '@/app/tournaments/[id]/bracket/bracket-test-utils';
 import { ScheduleContent } from '@/components/public-game-records/schedule-content';
 import type { V1TournamentDetail, V1TournamentGroup } from '@/types/api';
 import type { PublicTournamentScheduleResponse } from '@/components/public-game-records/types';
+
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  usePathname: () => '/tournaments/t1/bracket',
+  useSearchParams: () => new URLSearchParams(),
+}));
 
 const ROW: TournamentStandingsRow = {
   key: 'reg-1',
@@ -57,6 +63,21 @@ describe('TournamentStandingsTable', () => {
   it('팀명을 누르면 /teams/:teamId/records 로 이동한다', () => {
     render(<TournamentStandingsTable rows={[ROW]} advance={null} ariaLabel="테스트 순위표" />);
     expect(screen.getByRole('link', { name: /성수 FC/ })).toHaveAttribute('href', '/teams/team-1/records');
+  });
+
+  it('fromHref가 있으면 팀 전적 링크에 ?from=이 붙는다', () => {
+    render(
+      <TournamentStandingsTable
+        rows={[ROW]}
+        advance={null}
+        ariaLabel="테스트 순위표"
+        fromHref="/tournaments/tour-1/bracket"
+      />,
+    );
+    expect(screen.getByRole('link', { name: /성수 FC/ })).toHaveAttribute(
+      'href',
+      `/teams/team-1/records?from=${encodeURIComponent('/tournaments/tour-1/bracket')}`,
+    );
   });
 
   it('advance가 null이 아니고 순위<=advance면 하이라이트 행을 렌더한다', () => {

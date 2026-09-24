@@ -4,6 +4,7 @@ import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { RichContentRenderer } from '@/components/content/rich-content-renderer';
 import type { NoticeDetailViewModel, NoticeListViewModel, NoticeModel } from './notices.types';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 
 export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
   return (
@@ -11,9 +12,9 @@ export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
       <h1 className="sr-only">공지사항</h1>
       {/* Desktop: inline page heading replaces hidden mobile topbar */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href="/home" aria-label="홈으로 돌아가기">
+        <AppBackLink className="tm-desktop-back" fallbackHref={"/home"}>
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
-        </Link>
+        </AppBackLink>
         <div className="tm-text-heading" style={{ margin: '0.67em 0' }} aria-hidden="true">공지사항</div>
       </div>
       <div className="tm-text-heading tm-hide-desktop" style={{ margin: '0.67em 0' }} aria-hidden="true">공지사항</div>
@@ -68,9 +69,9 @@ export function NoticeDetailPageView({ model }: { model: NoticeDetailViewModel }
     <article className="tm-notice-page tm-content-enter">
       {/* Desktop: inline page heading replaces hidden mobile topbar */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href="/notices" aria-label="공지사항 목록으로 돌아가기">
+        <AppBackLink className="tm-desktop-back" fallbackHref={"/notices"}>
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
-        </Link>
+        </AppBackLink>
         {/* breadcrumb-style label, not a section heading — keep the notice title as the sole h1 */}
         <p className="tm-text-heading" aria-hidden="true">공지 상세</p>
       </div>

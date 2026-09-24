@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useV1ApplyGuestRecruitment,
@@ -28,6 +28,7 @@ import {
 import { v1Get, v1Patch } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
+import { readBackFrom, withFromPath } from '@/lib/session-storage';
 import { extractErrorCode } from '@/lib/error-message';
 import { formatTournamentDateRangeWithTime, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import type {
@@ -173,6 +174,8 @@ export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
 
 export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: string; scheduleId: string }) {
   const queryClient = useQueryClient();
+  // 내 일정·알림처럼 팀 일정 목록이 아닌 곳에서 들어왔으면 그 화면으로 돌아간다.
+  const fromPath = readBackFrom(useSearchParams().get('from'));
   const team = useV1TeamDetail(teamId);
   const detail = useV1TeamSchedule(teamId, scheduleId);
   // M-M 감사: 상태 배지가 "상대팀 확정"이라 말하면서도 화면 어디에도 그 상대팀 이름·
@@ -214,7 +217,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   const [pendingApplicationId, setPendingApplicationId] = useState<string | null>(null);
 
   const schedule = detail.data;
-  const backHref = `/teams/${teamId}/schedules`;
+  const backHref = fromPath ?? `/teams/${teamId}/schedules`;
   const viewerRole = team.data?.viewer.role;
   const canManage = isScheduleManagerRole(viewerRole);
   const canRsvp = isScheduleMemberRole(viewerRole);
@@ -408,7 +411,7 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
       ? {
           teamName: opponentTeamName,
           placeName: opponentMatch.data?.place?.name ?? null,
-          teamMatchHref: `/team-matches/${linkedTeamMatchId}`,
+          teamMatchHref: withFromPath(`/team-matches/${linkedTeamMatchId}`, withFromPath(`/teams/${teamId}/schedules/${scheduleId}`, fromPath)),
         }
       : null;
 
@@ -769,7 +772,7 @@ export function MySchedulePageClient() {
         isTentative: display.isTentative,
         dateTimeLabel: formatTournamentDateRangeWithTime(item.startAt, item.endAt) ?? '일정 미정',
         myAttendanceLabel: item.myAttendanceStatus ? attendanceStatusLabel(item.myAttendanceStatus) : null,
-        href: `/teams/${item.teamId}/schedules/${item.id}`,
+        href: withFromPath(`/teams/${item.teamId}/schedules/${item.id}`, '/my/schedule'),
       };
     }),
     loading: query.isLoading,

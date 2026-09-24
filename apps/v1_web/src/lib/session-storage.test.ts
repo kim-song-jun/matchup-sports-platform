@@ -8,6 +8,7 @@ import {
   hasStoredV1Session,
   sanitizeRedirectPath,
   withFromPath,
+  readBackFrom,
   saveStoredV1Session,
   saveTournamentOpsOrigin,
   shouldProbeV1Session,
@@ -189,5 +190,56 @@ describe('withFromPath', () => {
     const received = sanitizeRedirectPath(new URLSearchParams(members.split('?')[1]).get('from'));
     expect(received).toBe(detail);
     expect(sanitizeRedirectPath(new URLSearchParams(received!.split('?')[1]).get('from'))).toBe('/my/teams');
+  });
+});
+
+describe('withFromPath 체인 상한', () => {
+  // 팀 → 리그 → 팀으로 돌아오면 새로 감싸지 않고 처음 팀 방문 URL(원래 출처 포함)을 쓴다.
+  it('이미 지나온 화면으로 가면 그때의 URL 로 접는다', () => {
+    const team = withFromPath('/teams/t1', '/my/teams');
+    const league = withFromPath('/league-matches/l1', team);
+    expect(withFromPath('/teams/t1', league)).toBe(team);
+  });
+
+  // 중첩 from 은 URL 을 직접 고쳐 넣을 수 있다 — 렌더가 터지거나 표식·외부 주소가 경로로 섞이면 안 된다.
+  it('조작된 중첩 출처는 그 단계에서 끊고 예외를 내지 않는다', () => {
+    const crafted = `/teams/t1?from=${encodeURIComponent('http://[')}`;
+    expect(() => withFromPath('/users/u1', crafted)).not.toThrow();
+    expect(withFromPath('/users/u1', crafted)).toBe('/users/u1?from=%2Fteams%2Ft1');
+    expect(withFromPath('/users/u1', '/teams/t1?from=tournament')).toBe('/users/u1?from=%2Fteams%2Ft1');
+    expect(withFromPath('/users/u1', `/teams/t1?from=${encodeURIComponent('//evil.example')}`)).toBe('/users/u1?from=%2Fteams%2Ft1');
+    expect(withFromPath('/users/u1', 'https://evil.example')).toBe('/users/u1');
+    // 대상 경로가 URL 로 읽히지 않아도 렌더를 깨지 않고 그대로 돌려준다.
+    expect(() => withFromPath('http://[', '/my')).not.toThrow();
+    expect(withFromPath('http://[', '/my')).toBe('http://[');
+  });
+
+  it('체인을 줄여 다시 엮어도 각 단계의 hash 는 남는다', () => {
+    let href = '/home#rail';
+    for (let index = 0; index < 8; index += 1) href = withFromPath(`/teams/t${index}`, index === 0 ? href : `${href}#s${index}`);
+    expect(decodeURIComponent(href)).toContain('#s');
+  });
+
+  it('서로 다른 화면을 계속 거쳐도 체인 깊이가 상한을 넘지 않는다', () => {
+    let href = '/home';
+    for (let index = 0; index < 20; index += 1) href = withFromPath(`/teams/t${index}`, href);
+    let depth = 0;
+    let cursor: string | null = href;
+    while (cursor) {
+      depth += 1;
+      cursor = new URL(cursor, 'https://x.invalid').searchParams.get('from');
+    }
+    expect(depth).toBeLessThanOrEqual(6);
+    expect(href.length).toBeLessThan(600);
+  });
+});
+
+describe('readBackFrom', () => {
+  it('알림 표식은 알림 화면 경로로, 경로는 그대로, 외부·표식이 아닌 값은 버린다', () => {
+    expect(readBackFrom('notifications')).toBe('/notifications');
+    expect(readBackFrom('/my/teams')).toBe('/my/teams');
+    expect(readBackFrom('tournament')).toBeNull();
+    expect(readBackFrom('//evil.example')).toBeNull();
+    expect(readBackFrom(null)).toBeNull();
   });
 });

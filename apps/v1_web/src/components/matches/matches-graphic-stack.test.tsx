@@ -12,7 +12,7 @@ import { getMatchDetailViewModel } from './matches.view-model';
 import { MatchDetailPageView } from './matches-page';
 
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => <a href={href} {...rest}>{children}</a> }));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }), usePathname: () => '/matches/m1' }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }), usePathname: () => '/matches/m1', useSearchParams: () => new URLSearchParams() }));
 vi.mock('@/components/v1-ui/shell-override', () => ({ useShellOverride: () => undefined }));
 
 function detail(image: string | null) {

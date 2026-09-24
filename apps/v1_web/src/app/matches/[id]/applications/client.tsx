@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -15,6 +14,7 @@ import {
 import { AlertBanner, Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { ChevronLeftIcon } from '@/components/v1-ui/icons';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { extractErrorMessage } from '@/lib/error-message';
 import { cssUrl } from '@/lib/assets';
 import type { V1MatchApplication } from '@/types/api';
@@ -308,13 +308,9 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
 function DesktopPageHead({ matchId }: { matchId: string }) {
   return (
     <div className="tm-desktop-page-head tm-show-desktop">
-      <Link
-        className="tm-desktop-back"
-        href={`/matches/${matchId}`}
-        aria-label="매치 상세로 돌아가기"
-      >
+      <AppBackLink className="tm-desktop-back" fallbackHref={`/matches/${matchId}`}>
         <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
-      </Link>
+      </AppBackLink>
       <h1 className="tm-text-heading" style={{ margin: 0 }}>신청자 관리</h1>
     </div>
   );

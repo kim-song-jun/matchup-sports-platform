@@ -2,7 +2,11 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MatchApplicationsPageClient } from './client';
 const mocks = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), query: vi.fn(), applications: vi.fn(), changeParticipant: vi.fn(), completeMatch: vi.fn() }));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: mocks.replace, push: mocks.push }) }));
+const navigation = vi.hoisted(() => ({ search: '' }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: mocks.replace, push: mocks.push }),
+  useSearchParams: () => new URLSearchParams(navigation.search),
+}));
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1Match: mocks.query,
   useV1MatchApplicationEligibility: () => ({ data: { requiresApproval: true } }),
@@ -18,6 +22,21 @@ beforeEach(() => {
   mocks.applications.mockReturnValue({ data: { pages: [{ items: [] }] } });
 });
 describe('개인 매치 신청 관리', () => {
+  // 상세가 받은 출처까지 담아 넘긴 from 을 데스크톱 뒤로가기도 따라야 상세 → 뒤로가 처음 출처로 이어진다.
+  it('데스크톱 뒤로가기가 상세가 넘긴 출처를 따른다', () => {
+    navigation.search = `from=${encodeURIComponent('/matches/m1?from=%2Fmy%2Fmatches%2Fcreated')}`;
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/matches/m1?from=%2Fmy%2Fmatches%2Fcreated');
+    navigation.search = '';
+  });
+
+  it('출처가 없으면 매치 상세로 돌아간다', () => {
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/matches/m1');
+  });
+
   function confirmedApplication(overrides = {}) {
     mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
     mocks.applications.mockReturnValue({ data: { pages: [{ items: [{

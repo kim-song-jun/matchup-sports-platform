@@ -67,6 +67,7 @@ export type MyMatch = {
   statusLabel: string;
   note: string;
   href: string;
+  manageHref: string;
   reviewHref?: string;
 };
 

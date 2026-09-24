@@ -165,7 +165,7 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
               </div>
               {rejectingApplicationId === application.applicationId && (
                 <div className="mt-3 rounded-xl border border-red-100 bg-[var(--card-surface)] p-3">
-                  <label className="block text-xs font-semibold text-[var(--text-strong)]">
+                  <label className="block text-[length:var(--font-size-caption)] font-semibold text-[var(--text-strong)]">
                     거절 사유
                     <textarea
                       aria-label={`${application.applicantTeamName} 거절 사유`}
@@ -173,7 +173,7 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
                       onChange={(event) => setRejectReason(event.target.value)}
                       maxLength={500}
                       rows={3}
-                      className="mt-2 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 py-2 text-sm text-[var(--text-strong)] focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400/20"
+                      className="mt-2 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 py-2 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400/20"
                       placeholder="신청 팀에 안내할 사유를 입력하세요"
                     />
                   </label>
@@ -182,7 +182,7 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
                       type="button"
                       disabled={rejection.isPending}
                       onClick={() => { setRejectingApplicationId(''); setRejectReason(''); }}
-                      className="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-[var(--text-muted)]"
+                      className="min-h-[44px] rounded-lg px-3 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--text-muted)]"
                     >
                       취소
                     </button>
@@ -190,7 +190,7 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
                       type="button"
                       disabled={!rejectReason.trim() || rejection.isPending}
                       onClick={() => void rejectApplication(application.applicationId)}
-                      className="min-h-[44px] rounded-lg bg-red-500 px-3 text-sm font-semibold text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="min-h-[44px] rounded-lg bg-red-500 px-3 text-[length:var(--font-size-body-sm)] font-semibold text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {pendingApplicationId === application.applicationId ? '거절 중…' : '거절 확정'}
                     </button>
@@ -261,7 +261,7 @@ export default function AdminTeamMatchDetailPage() {
             {teamMatch.platformManaged && teamMatch.status === 'recruiting' && adminMe?.capabilities.includes('status:write') && (
               <Link
                 href={`/admin/team-matches/${encodeURIComponent(teamMatch.teamMatchId)}/edit`}
-                className="inline-flex h-[44px] items-center rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+                className="inline-flex h-[44px] items-center rounded-xl bg-blue-500 px-4 text-[length:var(--font-size-body-sm)] font-semibold text-white hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 모집 수정
               </Link>

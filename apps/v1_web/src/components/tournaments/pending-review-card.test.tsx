@@ -17,7 +17,11 @@ vi.mock('@/lib/session-storage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/session-storage')>()),
   hasStoredV1Session: hasStoredV1SessionMock,
 }));
-vi.mock('next/navigation', () => ({ usePathname: () => '/home', useSearchParams: () => new URLSearchParams() }));
+const navigation = vi.hoisted(() => ({ pathname: '/home', search: '' }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => navigation.pathname,
+  useSearchParams: () => new URLSearchParams(navigation.search),
+}));
 
 function setup({
   tournaments = [] as Array<{ tournamentId: string; tournamentTitle: string }>,
@@ -76,6 +80,19 @@ describe('PendingReviewsCard — 남은 후기 통합 배너', () => {
       'href',
       '/tournaments/tour-9/awards?from=%2Fhome',
     );
+  });
+
+  // 시상 화면에 놓인 카드가 같은 시상 화면을 가리키면, 받은 출처를 떨어뜨리지 않고 현재 URL 그대로 둔다.
+  it('지금 화면을 가리키는 링크는 받은 출처를 유지한다', () => {
+    navigation.pathname = '/tournaments/tour-2/awards';
+    navigation.search = 'from=%2Fhome';
+    setup({ tournaments: [{ tournamentId: 'tour-2', tournamentTitle: '봄 챔피언십' }] });
+
+    render(<PendingReviewsCard />);
+
+    expect(screen.getByRole('link', { name: '대회 후기 쓰기' })).toHaveAttribute('href', '/tournaments/tour-2/awards?from=%2Fhome');
+    navigation.pathname = '/home';
+    navigation.search = '';
   });
 
   it('대회 후기만 남으면 그 CTA 하나만, 대회명을 함께 보여준다', () => {

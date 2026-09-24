@@ -55,8 +55,8 @@ export function PendingReviewsCard() {
   // 홈·마이·시상 어디에 놓여도 도착 화면의 뒤로가기가 이 화면(받은 출처 포함)으로 돌아오게 한다.
   const pathname = usePathname();
   const here = useCurrentHref();
-  // 지금 보고 있는 화면으로 가는 링크엔 자기 자신을 출처로 싣지 않는다.
-  const linkFrom = (target: string) => (target === pathname ? target : withFromPath(target, here));
+  // 지금 보고 있는 화면으로 가는 링크는 받은 출처를 잃지 않도록 현재 URL 그대로 둔다.
+  const linkFrom = (target: string) => (target === pathname ? here ?? target : withFromPath(target, here));
   if (total === 0) return null;
 
   const firstTournament = tournamentItems[0];

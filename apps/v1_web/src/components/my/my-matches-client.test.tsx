@@ -18,4 +18,13 @@ describe('내 개인 매치 이력', () => {
     expect(screen.getAllByRole('link', { name: '상세' }).at(-1)).toHaveAttribute('href', '/matches/m51?from=%2Fmy%2Fmatches%2Fjoined');
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });
+
+  // 상세 href 가 `?from=` 을 달게 되면서 `${href}/applications` 가 쿼리 뒤에 경로를 붙여 깨졌다.
+  it('만든 매치의 참가 관리 링크는 쿼리 없는 관리 경로로 간다', () => {
+    const item = { id: 'm1', title: '만든 매치', startsAt: '2026-09-18T01:00:00Z', status: 'recruiting', viewerState: 'host' };
+    mock.query.mockReturnValue({ data: { pages: [{ items: [item] }] }, hasNextPage: false });
+    render(<MyMatchesPageClient mode="created" />);
+    expect(screen.getByRole('link', { name: '상세' })).toHaveAttribute('href', '/matches/m1?from=%2Fmy%2Fmatches%2Fcreated');
+    expect(screen.getByRole('link', { name: '참가 관리' })).toHaveAttribute('href', '/matches/m1/applications');
+  });
 });

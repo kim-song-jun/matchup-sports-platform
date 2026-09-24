@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { Trophy, Medal } from 'lucide-react';
 import { useMemo } from 'react';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -50,9 +49,9 @@ function NotCompletedNotice({ leagueId, state }: { leagueId: string; state: 'dra
  * 낸다. champions가 빈 배열(이론상 발생하지 않아야 하지만 방어적으로) 이면 아무것도
  * 그리지 않는다 — 아래 최종 순위 섹션이 그 정보를 대신 담는다.
  */
-function ChampionsHero({ champions }: { champions: V1LeagueChampionTeam[] }) {
+function ChampionsHero({ champions, leagueId }: { champions: V1LeagueChampionTeam[]; leagueId: string }) {
   // 팀 상세에서 뒤로가면 이 시상 화면으로 돌아온다.
-  const from = usePathname();
+  const from = `/league-matches/${leagueId}/awards`;
   if (champions.length === 0) return null;
   const isCoChampion = champions.length > 1;
   return (
@@ -276,7 +275,7 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
         <AwardsPageSkeleton />
       ) : (
         <>
-          <ChampionsHero champions={standings.champions} />
+          <ChampionsHero champions={standings.champions} leagueId={leagueId} />
           <FinalStandingsSection
             leagueId={leagueId}
             standings={standings.standings}

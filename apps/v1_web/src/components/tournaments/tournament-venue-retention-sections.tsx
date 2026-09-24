@@ -1,5 +1,7 @@
+'use client';
+
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { Trophy, LayoutGrid, Star, ChevronRight, ClipboardList, Video, Gift, Search } from 'lucide-react';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
@@ -253,8 +255,10 @@ function TournamentFixtureReviewEntryList({
 }: {
   entries: Array<{ fixture: V1TournamentFixture; remainingCount: number }>;
 }) {
-  // 리뷰 작성 화면에서 뒤로가면 이 대회 화면으로 돌아온다.
-  const from = usePathname();
+  // 리뷰 작성 화면에서 뒤로가면 이 대회 화면(받은 출처 포함)으로 돌아온다.
+  const pathname = usePathname();
+  const search = useSearchParams().toString();
+  const from = search ? `${pathname}?${search}` : pathname;
   return (
     <section aria-labelledby="fixture-review-heading" style={{ marginTop: 24 }}>
       <div id="fixture-review-heading" className="tm-text-body-lg" style={{ marginBottom: 4 }}>

@@ -125,6 +125,14 @@ describe('LeagueAwardsPageClient', () => {
     const scorerSection = screen.getByText('득점왕').closest('section');
     expect(within(scorerSection as HTMLElement).getByText(/김민준/)).toBeInTheDocument();
     expect(within(scorerSection as HTMLElement).getByText(/이서준/)).toBeInTheDocument();
+
+    // 우승팀·최종 순위의 팀 링크는 팀 상세에서 뒤로가면 이 시상 화면으로 돌아오게 출처를 싣는다.
+    const teamHrefs = screen
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href') ?? '')
+      .filter((href) => href.startsWith('/teams/'));
+    expect(teamHrefs).toEqual(expect.arrayContaining(['/teams/t1?from=%2Fleague-matches%2Fleague-1%2Fawards', '/teams/t3?from=%2Fleague-matches%2Fleague-1%2Fawards']));
+    expect(teamHrefs.every((href) => href.includes('?from=%2Fleague-matches%2Fleague-1%2Fawards'))).toBe(true);
   });
 
   it('리그 조회가 실패하면 에러 상태와 재시도 버튼을 보여준다', async () => {

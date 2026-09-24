@@ -22,7 +22,7 @@ const notification: NotificationModel = {
   body: LONG_BODY,
   time: '7월 26일 02:10',
   unread: true,
-  href: '/my/inquiries/inquiry-1?from=notifications',
+  href: '/my/inquiries/inquiry-1?from=%2Fnotifications',
   actionLabel: '보기',
 };
 

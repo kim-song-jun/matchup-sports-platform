@@ -28,7 +28,7 @@ import {
 import { v1Get, v1Patch } from '@/lib/api-client';
 import { v1Keys } from '@/lib/query-keys';
 import { randomUuid } from '@/lib/uuid';
-import { readBackFrom, withFromPath } from '@/lib/session-storage';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { extractErrorCode } from '@/lib/error-message';
 import { formatTournamentDateRangeWithTime, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import type {
@@ -175,7 +175,7 @@ export function TeamScheduleListPageClient({ teamId }: { teamId: string }) {
 export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: string; scheduleId: string }) {
   const queryClient = useQueryClient();
   // 내 일정·알림처럼 팀 일정 목록이 아닌 곳에서 들어왔으면 그 화면으로 돌아간다.
-  const fromPath = readBackFrom(useSearchParams().get('from'));
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   const team = useV1TeamDetail(teamId);
   const detail = useV1TeamSchedule(teamId, scheduleId);
   // M-M 감사: 상태 배지가 "상대팀 확정"이라 말하면서도 화면 어디에도 그 상대팀 이름·

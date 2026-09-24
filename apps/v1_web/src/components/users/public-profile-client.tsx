@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { formatTournamentDateShort } from '@/lib/date-utils';
-import { readBackFrom } from '@/lib/session-storage';
+import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -51,7 +51,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
   // route-chrome 테이블의 backHref는 라우트 파라미터만 받고 검색 파라미터를 못 받아
   // (lib/route-chrome/types.ts) 기본값 '/teams'로 고정돼 있었다 — 캠페인 페이지가 쓰는
   // 것과 같은 ShellOverride.backHref로 그 간극을 메운다.
-  const fromPath = readBackFrom(useSearchParams().get('from'));
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   useShellOverride(fromPath ? { backHref: fromPath } : {});
   /**
    * 본인 여부. 적대 검증(2026-08-25)에서 isOwner=false 하드코딩이 확정됐다 -- 주인이

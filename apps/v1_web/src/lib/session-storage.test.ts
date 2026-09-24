@@ -8,7 +8,6 @@ import {
   hasStoredV1Session,
   sanitizeRedirectPath,
   withFromPath,
-  readBackFrom,
   saveStoredV1Session,
   saveTournamentOpsOrigin,
   shouldProbeV1Session,
@@ -234,12 +233,12 @@ describe('withFromPath 체인 상한', () => {
   });
 });
 
-describe('readBackFrom', () => {
-  it('알림 표식은 알림 화면 경로로, 경로는 그대로, 외부·표식이 아닌 값은 버린다', () => {
-    expect(readBackFrom('notifications')).toBe('/notifications');
-    expect(readBackFrom('/my/teams')).toBe('/my/teams');
-    expect(readBackFrom('tournament')).toBeNull();
-    expect(readBackFrom('//evil.example')).toBeNull();
-    expect(readBackFrom(null)).toBeNull();
+describe('sanitizeRedirectPath', () => {
+  it('경로는 그대로, 외부 주소·경로가 아닌 표식은 버린다', () => {
+    expect(sanitizeRedirectPath('notifications')).toBeNull();
+    expect(sanitizeRedirectPath('/my/teams')).toBe('/my/teams');
+    expect(sanitizeRedirectPath('tournament')).toBeNull();
+    expect(sanitizeRedirectPath('//evil.example')).toBeNull();
+    expect(sanitizeRedirectPath(null)).toBeNull();
   });
 });

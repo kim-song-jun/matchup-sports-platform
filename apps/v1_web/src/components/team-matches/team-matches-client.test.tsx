@@ -1104,7 +1104,7 @@ describe('TeamMatchDetailPageClient — 뒤로가기 출처(?from=)', () => {
   });
 
   it('알림에서 들어오면 알림 화면으로 돌아간다', () => {
-    searchParamsRef.current = new URLSearchParams('from=notifications');
+    searchParamsRef.current = new URLSearchParams('from=%2Fnotifications');
 
     render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
 

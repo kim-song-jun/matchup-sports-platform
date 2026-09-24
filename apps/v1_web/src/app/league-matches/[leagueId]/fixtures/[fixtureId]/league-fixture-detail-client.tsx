@@ -12,7 +12,7 @@ import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
-import { readBackFrom, withFromPath } from '@/lib/session-storage';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { V1ApiError } from '@/lib/api-client';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTournamentDateTimeLong, formatTournamentDateTimeShort } from '@/lib/date-utils';
@@ -91,7 +91,7 @@ function getViewerState(match: V1TeamMatch | undefined): V1TeamMatchViewerState 
 
 export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { leagueId: string; fixtureId: string }) {
   // 활동 기록·팀 전적처럼 리그 화면이 아닌 곳에서 들어왔으면 그 화면으로 돌아간다.
-  const fromPath = readBackFrom(useSearchParams().get('from'));
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   useShellOverride(fromPath ? { backHref: fromPath } : {});
   // 팀 상세로 넘길 출처 — 이 경기 화면이 받은 출처까지 담는다.
   const selfHref = withFromPath(`/league-matches/${leagueId}/fixtures/${fixtureId}`, fromPath);

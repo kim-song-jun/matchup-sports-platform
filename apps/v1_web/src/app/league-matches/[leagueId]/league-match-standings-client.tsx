@@ -19,7 +19,7 @@ import {
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
-import { hasStoredV1Session, readBackFrom, withFromPath } from '@/lib/session-storage';
+import { hasStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTieBreakRule } from '@/lib/league-tie-break-labels';
@@ -556,7 +556,7 @@ function LeagueRegistrationCta({
 export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: string }) {
   // 팀 상세의 "내 리그"에서 들어왔으면 뒤로가기를 그 팀으로 되돌린다 — public-profile-client.tsx
   // 와 동일 패턴(route-chrome 테이블의 backHref는 '/tournaments?kind=league'로 고정돼 있다).
-  const fromPath = readBackFrom(useSearchParams().get('from'));
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   useShellOverride(fromPath ? { backHref: fromPath } : {});
   // 팀 이름 링크의 뒤로가기 출처 — 이 화면 자기 자신(상위에서 받은 from까지 포함해서 이어 붙인다).
   const selfHref = withFromPath(`/league-matches/${leagueId}`, fromPath);

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { readBackFrom, withFromPath } from '@/lib/session-storage';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import {
   useV1CancelMatch,
   useV1CloseMatch,
@@ -45,7 +45,7 @@ type MatchSelection = { sportId: string; regionId: string };
 export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep, 'edit'> }) {
   const router = useRouter();
   // 마법사에 들어온 출처를 단계 사이에 실어 나른다 — 첫 단계 취소가 그 출처로 돌아간다.
-  const from = readBackFrom(useSearchParams().get('from'));
+  const from = sanitizeRedirectPath(useSearchParams().get('from'));
   const { confirm, ConfirmModal } = useConfirm();
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();
@@ -207,7 +207,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
 export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const router = useRouter();
   // 상세가 넘긴 출처(자기 ?from= 포함)가 있으면 취소·저장 뒤 그 상세로 돌아가 체인을 잇는다.
-  const detailHref = readBackFrom(useSearchParams().get('from')) ?? `/matches/${matchId}`;
+  const detailHref = sanitizeRedirectPath(useSearchParams().get('from')) ?? `/matches/${matchId}`;
   const { confirm, ConfirmModal } = useConfirm();
   const editQuery = useV1MatchEdit(matchId);
   const sports = useV1MasterSports();

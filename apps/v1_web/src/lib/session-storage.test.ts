@@ -7,6 +7,7 @@ import {
   getTournamentOpsOrigin,
   hasStoredV1Session,
   sanitizeRedirectPath,
+  withFromPath,
   saveStoredV1Session,
   saveTournamentOpsOrigin,
   shouldProbeV1Session,
@@ -168,5 +169,25 @@ describe('recordConsentNudge 노출 횟수', () => {
   it('음수가 들어 있어도 보여주지 않는다', () => {
     window.localStorage.setItem(V1_RECORD_CONSENT_NUDGE_SEEN_KEY, '-5');
     expect(shouldShowRecordConsentNudge()).toBe(false);
+  });
+});
+
+describe('withFromPath', () => {
+  it('출처가 없으면 경로를 그대로 둔다', () => {
+    expect(withFromPath('/teams/t1/members', null)).toBe('/teams/t1/members');
+  });
+
+  it('기존 쿼리 뒤에 이어 붙이고 hash 는 맨 뒤에 남긴다', () => {
+    expect(withFromPath('/search?q=a', '/my')).toBe('/search?q=a&from=%2Fmy');
+    expect(withFromPath('/teams/t1#members', '/my')).toBe('/teams/t1?from=%2Fmy#members');
+  });
+
+  // 받은 출처까지 담긴 URL 을 다시 출처로 넘겨도, 받는 쪽이 한 단계씩 원래 값으로 되돌릴 수 있어야 한다.
+  it('중첩된 출처가 sanitizeRedirectPath 를 거쳐 한 단계씩 복원된다', () => {
+    const detail = withFromPath('/teams/t1', '/my/teams');
+    const members = withFromPath('/teams/t1/members', detail);
+    const received = sanitizeRedirectPath(new URLSearchParams(members.split('?')[1]).get('from'));
+    expect(received).toBe(detail);
+    expect(sanitizeRedirectPath(new URLSearchParams(received!.split('?')[1]).get('from'))).toBe('/my/teams');
   });
 });

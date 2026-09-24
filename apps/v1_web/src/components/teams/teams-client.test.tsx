@@ -238,6 +238,23 @@ describe('TeamMembersPageClient GA events', () => {
     );
   });
 
+  it('비공개 팀이면 상태 제목과 받은 출처를 함께 게시한다', () => {
+    navigationMocks.searchParams = new URLSearchParams({ from: '/teams/team-1?from=%2Fmy%2Fteams' });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: { name: '성수 풋살 크루', canViewMembers: false, viewer: { role: null, membershipId: null } },
+      isError: false,
+    });
+    let published: ReturnType<typeof useShellOverrideForRoute> = {};
+    function ShellProbe() {
+      published = useShellOverrideForRoute('/teams/team-1');
+      return null;
+    }
+
+    render(<><ShellProbe /><TeamMembersPageClient teamId="team-1" /></>);
+
+    expect(published).toEqual({ title: '멤버 목록이 비공개예요', backHref: '/teams/team-1?from=%2Fmy%2Fteams' });
+  });
+
   it('출처 없이 들어오면 팀 상세로 돌아가는 기본값을 그대로 쓴다', () => {
     let published: ReturnType<typeof useShellOverrideForRoute> = {};
     function ShellProbe() {

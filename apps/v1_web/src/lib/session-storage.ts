@@ -101,7 +101,10 @@ export function sanitizeRedirectPath(value: string | null | undefined) {
  */
 export function withFromPath(path: string, from: string | null | undefined) {
   if (!from) return path;
-  return `${path}${path.includes('?') ? '&' : '?'}from=${encodeURIComponent(from)}`;
+  const hashAt = path.indexOf('#');
+  const base = hashAt === -1 ? path : path.slice(0, hashAt);
+  const hash = hashAt === -1 ? '' : path.slice(hashAt);
+  return `${base}${base.includes('?') ? '&' : '?'}from=${encodeURIComponent(from)}${hash}`;
 }
 
 export function getCurrentRedirectPath() {

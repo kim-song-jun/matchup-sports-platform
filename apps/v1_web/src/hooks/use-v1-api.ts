@@ -3512,23 +3512,39 @@ export function useV1UnpublishTournamentBracket(id: string) {
   });
 }
 
-type AdminRegistrationListFilters = {
-  status?: string;
-  cursor?: string;
-  limit?: number;
+export type V1AdminRegistrationsAll = {
+  items: V1AdminTournamentRegistration[];
+  /** 안전 상한(1,000건)에 걸려 일부만 모았을 때 true — 소비 UI는 반드시 알린다. */
+  truncated: boolean;
 };
 
-export function useV1AdminTournamentRegistrations(
-  tournamentId: string,
-  params?: AdminRegistrationListFilters,
-) {
+/**
+ * 신청 관리·어워드·대진 스테이징은 전체 신청을 기준으로 집계하므로 페이지 일부만
+ * 반환하면 안 된다. 서버 상한인 50건씩 커서를 끝까지 순회하되 1,000건에서 멈춘다.
+ */
+export function useV1AdminTournamentRegistrations(tournamentId: string) {
   return useQuery({
-    queryKey: v1Keys.adminTournamentRegistrations(tournamentId, params as Record<string, unknown>),
-    queryFn: () =>
-      v1Get<V1AdminRegistrationListPage>(
-        `/admin/tournaments/${tournamentId}/registrations`,
-        params,
-      ),
+    queryKey: v1Keys.adminTournamentRegistrations(tournamentId),
+    queryFn: async (): Promise<V1AdminRegistrationsAll> => {
+      const items: V1AdminTournamentRegistration[] = [];
+      let cursor: string | undefined;
+      const maxPages = 20;
+
+      for (let page = 0; page < maxPages; page += 1) {
+        const result = await v1Get<V1AdminRegistrationListPage>(
+          `/admin/tournaments/${tournamentId}/registrations`,
+          cursor ? { limit: 50, cursor } : { limit: 50 },
+        );
+        items.push(...result.items);
+
+        if (!result.pageInfo.hasNext || !result.pageInfo.nextCursor) {
+          return { items, truncated: false };
+        }
+        cursor = result.pageInfo.nextCursor;
+      }
+
+      return { items, truncated: true };
+    },
     enabled: !!tournamentId,
   });
 }

@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
@@ -1693,18 +1692,15 @@ function TeamSearchBar({ model }: { model: TeamListViewModel }) {
 }
 
 function TeamFilterSheet({ model }: { model: TeamListViewModel }) {
-  const router = useRouter();
   const sheet = model.filterSheet;
   if (!sheet) return null;
 
   // BottomSheet 는 URL 로 열림·닫힘을 소유하는 controlled 컴포넌트(A안) — 이 함수 자체가
   // 이미 `model.filterSheet?.open` 게이트(호출부 line 109) 뒤에서만 렌더되므로 open 은 항상
-  // true 로 고정한다. 드래그·ESC 로 닫힐 때는 이 컴포넌트가 상태를 바꾸는 게 아니라
-  // 기존과 동일하게 closeHref 로 네비게이션해 URL 이 실제 권위를 유지하게 한다.
+  // true 로 고정한다. 닫기는 BottomSheet 가 closeHref 로 네비게이션해 URL 이 권위를 유지한다.
   return (
     <>
-      <Link className="tm-filter-scrim" href={sheet.closeHref} aria-label="필터 닫기" />
-      <BottomSheet open ariaLabel="팀 필터" onRequestClose={() => router.push(sheet.closeHref)}>
+      <BottomSheet open ariaLabel="팀 필터" closeHref={sheet.closeHref}>
         <div className="tm-filter-sheet-handle" />
         <div className="tm-filter-sheet-head">
           <div>

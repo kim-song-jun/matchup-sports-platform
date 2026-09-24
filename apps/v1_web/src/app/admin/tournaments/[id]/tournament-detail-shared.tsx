@@ -4,6 +4,7 @@ import { useRef, useEffect, useId } from 'react';
 import { X } from 'lucide-react';
 import { formatEntryFee } from '@/lib/date-utils';
 import type { V1AdminTournamentRegistration } from '@/types/api';
+import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -211,6 +212,7 @@ export function SimpleModal({ open, title, onClose, pending = false, children }:
     }
   }, [open]);
 
+  useOverlayHistory({ open, onClose, locked: pending });
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {

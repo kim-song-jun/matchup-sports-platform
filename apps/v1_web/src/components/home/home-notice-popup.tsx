@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { RichContentRenderer } from '@/components/content/rich-content-renderer';
 import type { HomePopup } from './home.types';
+import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 
 const HIDE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const STORAGE_KEY_PREFIX = 'teameet:v1:home-popup:hidden-until:';
@@ -37,6 +38,7 @@ export function HomePopupDialog({ popup }: { popup: HomePopup | null }) {
     }
   }, [popup?.id]);
 
+  useOverlayHistory({ open, onClose: () => setOpen(false) });
   useEffect(() => {
     if (!open) return;
 

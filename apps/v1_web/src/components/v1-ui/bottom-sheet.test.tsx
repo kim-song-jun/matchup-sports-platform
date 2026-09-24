@@ -5,8 +5,31 @@
  * mock, CLAUDE.md 품질 규칙 3의 예외) — 이 파일에서만 최소 폴리필을 둔다.
  */
 import { fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import type { MouseEvent, ReactNode } from 'react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { __resetNavigationHistoryForTests, decideBackAction, installNavigationHistory } from '@/lib/navigation-history';
+import { createHistoryRouter, currentPath, settleHistory } from '@/test/history-router';
 import { BottomSheet } from './bottom-sheet';
+
+const router = createHistoryRouter();
+vi.mock('next/navigation', () => ({ useRouter: () => router }));
+// Next Link 처럼 기본 동작은 push — 가로채는 쪽이 preventDefault 하면 아무것도 안 한다.
+vi.mock('next/link', () => ({
+  default: ({ href, children, onClick, ...rest }: { href: string; children?: ReactNode; onClick?: (e: MouseEvent<HTMLAnchorElement>) => void }) => (
+    <a
+      href={href}
+      {...rest}
+      onClick={(event) => {
+        onClick?.(event);
+        if (event.defaultPrevented) return;
+        event.preventDefault();
+        router.push(href);
+      }}
+    >
+      {children}
+    </a>
+  ),
+}));
 
 const SHEET_HEIGHT = 200;
 // DRAG_CLOSE_RATIO(0.32) 와 동일한 값을 여기서도 써야 임계치 위/아래 케이스를 정확히
@@ -56,8 +79,15 @@ beforeAll(() => {
   } as DOMRect);
 });
 
+beforeEach(() => {
+  __resetNavigationHistoryForTests();
+  window.sessionStorage.clear();
+  window.history.replaceState(null, '', '/home');
+});
+
 afterEach(() => {
   vi.clearAllMocks();
+  __resetNavigationHistoryForTests();
 });
 
 function drag(dialog: HTMLElement, offset: number) {
@@ -66,49 +96,76 @@ function drag(dialog: HTMLElement, offset: number) {
   fireEvent.pointerUp(dialog, { clientY: offset, pointerId: 1 });
 }
 
+const renderSheet = (children: ReactNode = <p>내용</p>) =>
+  render(
+    <BottomSheet open closeHref="/matches" ariaLabel="필터">
+      {children}
+    </BottomSheet>,
+  );
+
 describe('BottomSheet 드래그-닫기', () => {
-  it('임계치(시트 높이의 32%) 미만으로 끌고 놓으면 onRequestClose 가 불리지 않는다', () => {
-    // 오작동 방지: 살짝 스친 정도로 시트가 닫혀 버리면 사용자가 필터를 훑어보다가
-    // 실수로 다 잃는다.
-    const onRequestClose = vi.fn();
-    render(
-      <BottomSheet open onRequestClose={onRequestClose} ariaLabel="필터">
-        <p>내용</p>
-      </BottomSheet>,
-    );
+  it('임계치(시트 높이의 32%) 미만으로 끌고 놓으면 닫히지 않는다', () => {
+    // 오작동 방지: 살짝 스친 정도로 시트가 닫혀 버리면 사용자가 필터를 훑어보다가 실수로 다 잃는다.
+    window.history.replaceState(null, '', '/matches?filter=open');
+    renderSheet();
     drag(screen.getByRole('dialog'), BELOW_THRESHOLD_OFFSET);
-    expect(onRequestClose).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
-  it('임계치를 초과해 끌고 놓으면 onRequestClose 가 정확히 한 번 불린다', () => {
-    const onRequestClose = vi.fn();
-    render(
-      <BottomSheet open onRequestClose={onRequestClose} ariaLabel="필터">
-        <p>내용</p>
-      </BottomSheet>,
-    );
+  it('임계치를 넘기면 닫는다 — 시트를 연 항목이 없으면(딥링크) closeHref 로 replace', () => {
+    window.history.replaceState(null, '', '/matches?filter=open');
+    renderSheet();
     drag(screen.getByRole('dialog'), ABOVE_THRESHOLD_OFFSET);
-    expect(onRequestClose).toHaveBeenCalledTimes(1);
+    expect(router.replace).toHaveBeenCalledTimes(1);
+    expect(router.replace).toHaveBeenCalledWith('/matches');
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it('시트 안 버튼 위에서 시작한 포인터는 드래그를 시작하지 않는다', () => {
-    // 회귀 방지: 이 가드가 없으면 버튼을 누르려는 손가락의 미세한 움직임마다 시트가
-    // 따라 흔들리고, 실기기에서는 그 버튼의 탭 인식 자체가 씹힌다.
-    const onRequestClose = vi.fn();
+    // 회귀 방지: 이 가드가 없으면 버튼을 누르려는 손가락의 미세한 움직임마다 시트가 따라 흔들린다.
     const setCaptureSpy = vi.spyOn(HTMLElement.prototype, 'setPointerCapture');
-    render(
-      <BottomSheet open onRequestClose={onRequestClose} ariaLabel="필터">
-        <button type="button">적용하기</button>
-      </BottomSheet>,
-    );
+    renderSheet(<button type="button">적용하기</button>);
     const button = screen.getByRole('button', { name: '적용하기' });
     fireEvent.pointerDown(button, { clientY: 0, pointerId: 1 });
     expect(setCaptureSpy).not.toHaveBeenCalled();
-
-    // 드래그 세션이 아예 시작되지 않았으므로, 임계치를 넘는 move/up 이 뒤따라도
-    // 드래그로 처리되어선 안 된다.
     fireEvent.pointerMove(button, { clientY: ABOVE_THRESHOLD_OFFSET, pointerId: 1 });
     fireEvent.pointerUp(button, { clientY: ABOVE_THRESHOLD_OFFSET, pointerId: 1 });
-    expect(onRequestClose).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+});
+
+describe('BottomSheet 닫기와 히스토리', () => {
+  /** /home → /matches → (필터 열기 push) /matches?filter=open */
+  function openFromList() {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/matches');
+    window.history.pushState({}, '', '/matches?filter=open');
+  }
+
+  it.each([
+    ['닫기 링크', () => screen.getByRole('link', { name: '닫기' })],
+    ['scrim', () => screen.getByRole('link', { name: '필터 닫기' })],
+  ])('%s 로 닫으면 연 항목을 걷는다 — 다음 뒤로가기가 시트를 다시 열지 않는다', async (_, target) => {
+    openFromList();
+    renderSheet(<a href="/matches">닫기</a>);
+    fireEvent.click(target());
+    await settleHistory();
+
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(router.push).not.toHaveBeenCalled();
+    expect(currentPath()).toBe('/matches');
+    // 바로 앞 항목이 /home 이다 — 한 번 더 뒤로 가면 목록을 떠난다(시트로 돌아가지 않는다).
+    expect(decideBackAction('/home')).toBe('back');
+  });
+
+  it('시트 안의 칩 이동은 쌓지 않고 replace 한다', async () => {
+    openFromList();
+    renderSheet(<a href="/matches?filter=open&region=seoul">서울</a>);
+    fireEvent.click(screen.getByRole('link', { name: '서울' }));
+
+    expect(router.replace).toHaveBeenCalledWith('/matches?filter=open&region=seoul');
+    expect(router.push).not.toHaveBeenCalled();
+    expect(decideBackAction('/matches')).toBe('back');
   });
 });

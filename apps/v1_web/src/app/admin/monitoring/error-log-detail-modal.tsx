@@ -7,6 +7,7 @@ import { extractErrorMessage } from '@/lib/error-message';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { useAdminToast, AdminToasts } from '@/components/admin';
 import type { V1AdminErrorLogDetail } from '@/types/api';
+import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 
 // ── Props ─────────────────────────────────────────────────────────────────
 interface ErrorLogDetailModalProps {
@@ -129,6 +130,7 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
     }
   }, [open]);
 
+  useOverlayHistory({ open, onClose });
   // ESC로 닫기
   useEffect(() => {
     if (!open) return;

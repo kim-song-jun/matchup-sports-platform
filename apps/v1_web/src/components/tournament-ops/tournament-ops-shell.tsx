@@ -17,6 +17,7 @@ import type { V1TournamentStaffRole } from '@/types/api';
 import type { TournamentOpsOrigin } from '@/lib/session-storage';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { staffRoleLabel } from './badges';
+import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 
 // ── 대회 아이덴티티 배지 ──────────────────────────────────────────────────
 /**
@@ -233,6 +234,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
     else panel.setAttribute('inert', '');
   }, [open]);
 
+  useOverlayHistory({ open, onClose });
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {

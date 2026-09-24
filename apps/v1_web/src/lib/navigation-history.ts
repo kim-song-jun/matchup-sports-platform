@@ -13,7 +13,7 @@
 
 const IDX_KEY = '__tmIdx';
 const PARENT_KEY = '__tmParent';
-/** 오버레이가 URL 을 바꾸지 않고 쌓는 항목의 state 표식(후속 오버레이 작업용). */
+/** 오버레이가 URL 을 바꾸지 않고 쌓는 항목의 state 표식(값 = 오버레이 id). */
 export const OVERLAY_STATE_KEY = '__tmOverlay';
 const STORAGE_KEY = 'teameet.v1.navHistory';
 const PARENT_DONE_KEY = 'teameet.v1.navHistory.parentInserted';
@@ -30,8 +30,12 @@ let coldStart = false;
 let originals: { push: HistoryMethod; replace: HistoryMethod } | null = null;
 let pendingAppBack = false;
 let suppressedPops = 0;
+let pushCount = 0;
 let softNavigate: ((url: string) => void) | null = null;
 const popListeners = new Set<(pop: AppPop) => void>();
+/** true 를 돌려주면 그 pop 을 여기서 끝낸다(Next·다른 리스너에 전달하지 않음). */
+export type PopInterceptor = (event: PopStateEvent) => boolean;
+const popInterceptors = new Set<PopInterceptor>();
 const appPopEvents = new WeakSet<Event>();
 
 type StateRecord = Record<string, unknown>;
@@ -112,10 +116,16 @@ function onPopState(event: PopStateEvent) {
     mirror.entries[target] = { ...arriving, url: currentUrl() };
     persist();
   }
-  if (suppressedPops > 0 || leaving?.overlay || arriving?.overlay) {
-    suppressedPops = Math.max(0, suppressedPops - 1);
-    return; // 오버레이만 닫힌 pop — 페이지 전환·스크롤 초기화 대상이 아니다.
+  const overlayPop = suppressedPops > 0 || Boolean(leaving?.overlay) || Boolean(arriving?.overlay);
+  if (overlayPop) suppressedPops = Math.max(0, suppressedPops - 1);
+  // Next 보다 먼저 등록된 리스너라, 여기서 멈추면 Next 는 이 pop 을 모른다(오버레이 닫기·이탈 막기).
+  for (const intercept of popInterceptors) {
+    if (intercept(event)) {
+      event.stopImmediatePropagation();
+      return;
+    }
   }
+  if (overlayPop) return; // 오버레이만 닫힌 pop — 페이지 전환·스크롤 초기화 대상이 아니다.
   appPopEvents.add(event);
   // 콜드스타트 부모 항목엔 Next 트리가 없다(__NA 없음) — 그대로 두면 Next 가 전체 새로고침한다.
   if (state?.[PARENT_KEY] && !state.__NA && softNavigate) {
@@ -149,6 +159,7 @@ export function installNavigationHistory(): void {
   proto.pushState = function pushState(this: History, data, unused, url) {
     const stampedState = withIdx(data, (mirror?.index ?? -1) + 1);
     push.call(this, stampedState, unused, url);
+    pushCount += 1;
     recordPush(stampedState);
   };
   proto.replaceState = function replaceState(this: History, data, unused, url) {
@@ -191,6 +202,20 @@ export function subscribeAppPop(listener: (pop: AppPop) => void): () => void {
 /** 직접 popstate 를 듣는 코드용 — 이 이벤트가 페이지 이동이었는지(오버레이 pop 이 아닌지). */
 export function isAppNavigationPop(event: Event): boolean {
   return appPopEvents.has(event);
+}
+
+/** popstate 를 Next 보다 먼저 볼 가로채기를 건다. 해지 함수를 돌려준다. */
+export function addPopInterceptor(intercept: PopInterceptor): () => void {
+  installNavigationHistory();
+  popInterceptors.add(intercept);
+  return () => {
+    popInterceptors.delete(intercept);
+  };
+}
+
+/** 지금까지의 pushState 횟수 — 예약한 back 뒤에 push 가 끼었는지(그 back 은 취소된다) 판단용. */
+export function historyPushCount(): number {
+  return pushCount;
 }
 
 /** 오버레이가 자기 항목을 history.back() 으로 걷을 때, 그 pop 하나를 페이지 이동에서 뺀다. */
@@ -244,4 +269,5 @@ export function __resetNavigationHistoryForTests(): void {
   suppressedPops = 0;
   softNavigate = null;
   popListeners.clear();
+  popInterceptors.clear();
 }

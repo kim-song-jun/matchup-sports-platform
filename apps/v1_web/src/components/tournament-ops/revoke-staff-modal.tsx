@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
+import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 
 interface RevokeStaffModalProps {
   open: boolean;
@@ -48,6 +49,7 @@ export function RevokeStaffModal({
     }
   }, [open]);
 
+  useOverlayHistory({ open, onClose, locked: pending });
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {

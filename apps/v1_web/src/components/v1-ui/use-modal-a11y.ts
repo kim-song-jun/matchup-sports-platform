@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react';
+import { useOverlayHistory } from './use-overlay-history';
 
 /**
  * 모달 접근성 스캐폴딩 단일 소스 — focus 저장·복원(WCAG 2.4.3), 첫 컨트롤 포커스,
@@ -23,6 +24,8 @@ export interface ModalA11yOptions {
    * 그 값을 넘긴다(필터 시트 = 220ms).
    */
   exitMs?: number;
+  /** 뒤로가기로 닫기. 기본 true — URL 이 열림을 소유하는 시트(BottomSheet)만 끈다. */
+  closeOnBack?: boolean;
 }
 
 export interface ModalA11yHandles<
@@ -99,7 +102,14 @@ function tabbableElements(dialog: HTMLElement): HTMLElement[] {
 export function useModalA11y<
   TInitial extends HTMLElement = HTMLElement,
   TDialog extends HTMLElement = HTMLDivElement,
->({ open, onClose, pending = false, exitMs = MODAL_EXIT_MS }: ModalA11yOptions): ModalA11yHandles<TInitial, TDialog> {
+>({
+  open,
+  onClose,
+  pending = false,
+  exitMs = MODAL_EXIT_MS,
+  closeOnBack = true,
+}: ModalA11yOptions): ModalA11yHandles<TInitial, TDialog> {
+  useOverlayHistory({ open, onClose, locked: pending, enabled: closeOnBack });
   const dialogRef = useRef<TDialog | null>(null);
   const initialFocusRef = useRef<TInitial | null>(null);
 

@@ -2,8 +2,9 @@
 
 import { localDateInput } from '@/lib/team-match-dates';
 
-import { useEffect, useRef, useState, type SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-guard';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import {
@@ -71,6 +72,13 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     regionId: '',
   });
   const [selectionHydrated, setSelectionHydrated] = useState(false);
+  const [selectionTouched, setSelectionTouched] = useState(false);
+  const defaultDraftJson = useMemo(() => JSON.stringify(buildDefaultDraft()), []);
+  // 마법사 단계는 모두 /team-matches/new 아래 — 단계 사이 이동은 묻지 않는다.
+  const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(
+    selectionTouched || JSON.stringify(draft) !== defaultDraftJson,
+    { scope: '/team-matches/new' },
+  );
   const [error, setError] = useState<string | null>(null);
   // "다음"/"팀매치 만들기"를 한 번이라도 눌러본 뒤에만 인라인 에러를 보여준다 — 진입하자마자
   // 빈 칸을 전부 orange로 물들이지 않기 위함(스텝별로 별도 라우트라 매 스텝 마운트 시 초기화됨).
@@ -210,6 +218,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     onSelectTeam: (teamName) => {
       const team = myTeams?.find((item) => item.name === teamName);
       if (team?.canCreateTeamMatch) {
+        setSelectionTouched(true);
         updateSelection((current) => ({
           ...current,
           teamId: team.teamId,
@@ -219,11 +228,24 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     },
     onSelectSport: (sportName) => {
       const sport = sports.data?.find((item) => item.name === sportName);
-      if (sport) updateSelection((current) => ({ ...current, sportId: sport.id }));
+      if (!sport) return;
+      setSelectionTouched(true);
+      updateSelection((current) => ({ ...current, sportId: sport.id }));
     },
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
-    onRegionChange: (value) => updateSelection((current) => ({ ...current, regionId: value })),
-    onBack: () => router.push(step === 'team' ? from ?? previousHref(step) : withFromPath(previousHref(step), from)),
+    onRegionChange: (value) => {
+      setSelectionTouched(true);
+      updateSelection((current) => ({ ...current, regionId: value }));
+    },
+    onBack: () => {
+      if (step !== 'team') {
+        router.push(withFromPath(previousHref(step), from));
+        return;
+      }
+      void confirmLeave().then((leave) => {
+        if (leave) router.push(from ?? previousHref(step));
+      });
+    },
     onGoToStep: handleGoToStep,
     onNext: () => {
       // 팀 스텝의 데이터 준비·권한 게이트는 TeamMatchCreatePageView의 disabled CTA와
@@ -280,6 +302,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     <>
       <TeamMatchCreatePageView model={model} />
       {ConfirmModal}
+      {UnsavedChangesModal}
     </>
   );
 }
@@ -306,6 +329,8 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
   const [error, setError] = useState<string | null>(null);
   // "변경사항 저장"을 한 번이라도 눌러본 뒤에만 인라인 에러를 보여준다(#1과 동일한 UX 원칙).
   const [editAttempted, setEditAttempted] = useState(false);
+  const [editTouched, setEditTouched] = useState(false);
+  const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(editTouched);
   const myTeams = normalizeMyTeams(teams.data) ?? [];
   const currentTeam = myTeams.find((team) => team.teamId === editQuery.data?.form.hostTeamId);
   const teamOptions = editQuery.data
@@ -372,9 +397,19 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
     },
     onSelectTeam: () => undefined,
     onSelectSport: () => undefined,
-    onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
-    onRegionChange: setRegionId,
-    onBack: () => router.push(detailHref),
+    onFieldChange: (field, value) => {
+      setEditTouched(true);
+      setDraft((current) => ({ ...current, [field]: value }));
+    },
+    onRegionChange: (value) => {
+      setEditTouched(true);
+      setRegionId(value);
+    },
+    onBack: () => {
+      void confirmLeave().then((leave) => {
+        if (leave) router.push(detailHref);
+      });
+    },
     onNext: () => undefined,
     onSubmit: () => {
       // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
@@ -431,6 +466,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
     <>
       <TeamMatchCreatePageView model={model} />
       {ConfirmModal}
+      {UnsavedChangesModal}
     </>
   );
 }

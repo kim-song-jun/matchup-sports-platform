@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Fragment, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { useV1AdminInquiriesPendingCount } from '@/hooks/use-v1-api';
+import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 import { CommandPalette } from './command-palette';
 import {
   LayoutDashboard,
@@ -271,6 +272,7 @@ function Drawer({
   pendingInquiryCount,
   triggerRef,
 }: DrawerProps) {
+  useOverlayHistory({ open, onClose });
   const isActive = useIsActive(pathname);
   const navGroups = buildNavGroups(canManageAdmins, pendingInquiryCount);
   const panelRef = useRef<HTMLDivElement>(null);

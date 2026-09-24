@@ -4,6 +4,7 @@ import { ErrorState } from '@/components/v1-ui/primitives';
 
 import { useEffect, useRef, useState } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-guard';
 import { useRouter } from 'next/navigation';
 import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1TeamDetail, useV1UpdateTeam, useV1UploadImages } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
@@ -71,6 +72,9 @@ export function TeamCreatePageClient() {
   const submitLockRef = useRef(false);
   const regionOptions = toTeamRegionOptions(regions.data ?? []);
   const selectedSportId = sportId || sports.data?.[0]?.id || '';
+  const [touched, setTouched] = useState(false);
+  const { UnsavedChangesModal } = useUnsavedChangesGuard(touched);
+  const edited = userEdits(() => setTouched(true), { setDraft, setSportId, setRegionId, setJoinPolicy });
 
   const createTeamWithActivityCompatibility = async (payload: V1TeamMutationPayload, draft: TeamDraft) => {
     try {
@@ -96,10 +100,7 @@ export function TeamCreatePageClient() {
     regions: regionOptions,
     error,
     submitting: createTeam.isPending,
-    setDraft,
-    setSportId,
-    setRegionId,
-    setJoinPolicy,
+    ...edited,
     onSubmit: () => {
       if (submitLockRef.current || createTeam.isPending) return;
       setError(null);
@@ -140,6 +141,7 @@ export function TeamCreatePageClient() {
     <>
       <TeamFormPageView model={sports.isPending && sports.data === undefined ? { ...model, form: undefined } : model} />
       {ConfirmModal}
+      {UnsavedChangesModal}
     </>
   );
 }
@@ -166,6 +168,15 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
   const [membersVisibilityEnabled, setMembersVisibilityEnabled] = useState(false);
   const [version, setVersion] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [touched, setTouched] = useState(false);
+  const { UnsavedChangesModal } = useUnsavedChangesGuard(touched);
+  const edited = userEdits(() => setTouched(true), {
+    setDraft,
+    setSportId,
+    setRegionId,
+    setJoinPolicy,
+    setMembersVisibilityEnabled,
+  });
   const submitLockRef = useRef(false);
   const regionOptions = toTeamRegionOptions(regions.data ?? []);
   const updateTeamWithActivityCompatibility = async (
@@ -244,11 +255,7 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
         : [],
     error: query.isError ? '팀 정보를 불러오지 못했어요.' : error,
     submitting: query.isLoading || updateTeam.isPending,
-    setDraft,
-    setSportId,
-    setRegionId,
-    setJoinPolicy,
-    setMembersVisibilityEnabled,
+    ...edited,
     onSubmit: () => {
       if (submitLockRef.current || updateTeam.isPending) return;
       setError(null);
@@ -269,11 +276,28 @@ export function TeamEditPageClient({ teamId }: { teamId: string }) {
   });
 
   return (
-    <TeamFormPageView
-      model={sports.isPending && sports.data === undefined ? { ...model, form: undefined } : model}
-      cancelHref={cancelHref}
-    />
+    <>
+      <TeamFormPageView
+        model={sports.isPending && sports.data === undefined ? { ...model, form: undefined } : model}
+        cancelHref={cancelHref}
+      />
+      {UnsavedChangesModal}
+    </>
   );
+}
+
+/** 사용자가 바꾼 입력만 표시한다 — 서버 값·기본값을 채우는 effect 는 원래 setter 를 쓴다. */
+function userEdits<T extends Record<string, ((...args: never[]) => void) | undefined>>(markTouched: () => void, setters: T): T {
+  const wrapped: Record<string, unknown> = {};
+  for (const [key, setter] of Object.entries(setters)) {
+    wrapped[key] = setter
+      ? (...args: never[]) => {
+          markTouched();
+          setter(...args);
+        }
+      : undefined;
+  }
+  return wrapped as T;
 }
 
 function buildModel({

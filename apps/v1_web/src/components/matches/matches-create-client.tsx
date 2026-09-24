@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState, type SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
+import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-guard';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import {
@@ -63,6 +64,13 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
   // 빈 칸을 전부 orange로 물들이지 않기 위함(스텝별로 별도 라우트라 매 스텝 마운트 시 초기화됨).
   const [attempted, setAttempted] = useState(false);
   const [pendingFocusField, setPendingFocusField] = useState<string | null>(null);
+  const [selectionTouched, setSelectionTouched] = useState(false);
+  const defaultDraftJson = useMemo(() => JSON.stringify(buildDefaultDraft()), []);
+  // 마법사 단계는 모두 /matches/new 아래 — 단계 사이 이동은 묻지 않는다.
+  const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(
+    selectionTouched || JSON.stringify(draft) !== defaultDraftJson,
+    { scope: '/matches/new' },
+  );
 
   const regionOptions = toDistrictRegionOptions(regions.data ?? []);
 
@@ -131,11 +139,24 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
     submitting: createMatch.isPending,
     onSelectSport: (sportName) => {
       const sport = sports.data?.find((item) => item.name === sportName);
-      if (sport) updateSelection((current) => ({ ...current, sportId: sport.id }));
+      if (!sport) return;
+      setSelectionTouched(true);
+      updateSelection((current) => ({ ...current, sportId: sport.id }));
     },
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
-    onRegionChange: (value) => updateSelection((current) => ({ ...current, regionId: value })),
-    onBack: () => router.push(step === 'sport' ? from ?? previousCreateHref(step) : withFromPath(previousCreateHref(step), from)),
+    onRegionChange: (value) => {
+      setSelectionTouched(true);
+      updateSelection((current) => ({ ...current, regionId: value }));
+    },
+    onBack: () => {
+      if (step !== 'sport') {
+        router.push(withFromPath(previousCreateHref(step), from));
+        return;
+      }
+      void confirmLeave().then((leave) => {
+        if (leave) router.push(from ?? previousCreateHref(step));
+      });
+    },
     onNext: () => {
       // #1: "다음"은 절대 disabled 처리하지 않는다 — 대신 클릭 시 이 스텝의 필수 필드만 로컬
       // 검증해 비어 있으면 이동을 막고, 인라인 에러 + 첫 invalid 필드로 focus를 옮긴다.
@@ -200,6 +221,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
     <>
       <MatchCreatePageView model={model} />
       {ConfirmModal}
+      {UnsavedChangesModal}
     </>
   );
 }
@@ -224,6 +246,8 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const [error, setError] = useState<string | null>(null);
   // "변경사항 저장"을 한 번이라도 눌러본 뒤에만 인라인 에러를 보여준다(#1과 동일한 UX 원칙).
   const [editAttempted, setEditAttempted] = useState(false);
+  const [editTouched, setEditTouched] = useState(false);
+  const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(editTouched);
   const sportOptions = sports.data?.map((sport) => ({ id: sport.id, name: sport.name }))
     ?? (editQuery.data ? [{ id: editQuery.data.form.sportId, name: '현재 종목' }] : []);
   const regionOptions = toDistrictRegionOptions(regions.data ?? []);
@@ -315,11 +339,23 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
       : undefined,
     onSelectSport: (sportName) => {
       const sport = sportOptions.find((item) => item.name === sportName);
-      if (sport) setSelectedSportId(sport.id);
+      if (!sport) return;
+      setEditTouched(true);
+      setSelectedSportId(sport.id);
     },
-    onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
-    onRegionChange: setRegionId,
-    onBack: () => router.push(detailHref),
+    onFieldChange: (field, value) => {
+      setEditTouched(true);
+      setDraft((current) => ({ ...current, [field]: value }));
+    },
+    onRegionChange: (value) => {
+      setEditTouched(true);
+      setRegionId(value);
+    },
+    onBack: () => {
+      void confirmLeave().then((leave) => {
+        if (leave) router.push(detailHref);
+      });
+    },
     onNext: () => undefined,
     uploadImage: async (file: File) => {
       const result = await uploadImages.mutateAsync([file]);
@@ -381,6 +417,7 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     <>
       <MatchCreatePageView model={model} />
       {ConfirmModal}
+      {UnsavedChangesModal}
     </>
   );
 }

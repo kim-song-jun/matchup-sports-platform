@@ -12,6 +12,7 @@ import type {
 import type { GameLineup } from '@/types/game-operations';
 import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/game-result-score';
 import { periodLabel } from '@/components/tournament-live/operate/period-label';
+import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 
 /**
  * `score` 는 서버가 돌려주는 스냅샷(`GameResultScore`, 두 형태의 union -- `base.score`가
@@ -357,6 +358,7 @@ export function ResultEditModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useOverlayHistory({ open, onClose: onCancel, enabled: presentation !== 'inline' });
   useEffect(() => {
     if (!open || presentation === 'inline') return;
     const handler = (event: KeyboardEvent) => {

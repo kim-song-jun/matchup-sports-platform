@@ -2,7 +2,6 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import type { ChangeEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
@@ -840,16 +839,13 @@ function TeamMatchSearchBar({ filterCount, search, query, filterHref = '/team-ma
 
 function TeamMatchFilterSheet({ model }: { model: TeamMatchListViewModel }) {
   const sheet = model.filterSheet;
-  const router = useRouter();
   if (!sheet) return null;
 
   // 열림·닫힘의 권위는 URL이다(A안 계약 1) — open은 부모가 이미 URL에서 유도해 둔
-  // sheet.open을 그대로 넘긴다. 닫기는 기존 Link/DraggableFilterSheet와 동일하게
-  // router.push(closeHref)로 네비게이션한다(뒤로가기·URL 공유 성질 보존, A안 계약 2).
+  // sheet.open을 그대로 넘긴다. 닫기 경로는 BottomSheet 가 closeHref 로 처리한다.
   return (
     <>
-      <Link className="tm-filter-scrim" href={sheet.closeHref} aria-label="필터 닫기" />
-      <BottomSheet open={sheet.open} onRequestClose={() => router.push(sheet.closeHref)} ariaLabel="팀매치 필터">
+      <BottomSheet open={sheet.open} closeHref={sheet.closeHref} ariaLabel="팀매치 필터">
         <div className="tm-filter-sheet-handle" />
         <div className="tm-filter-sheet-head">
           <div>

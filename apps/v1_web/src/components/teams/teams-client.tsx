@@ -315,6 +315,10 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
       },
     },
     mode: detailMode,
+    // 데스크톱 "팀 목록으로" 헤더 링크용 — ShellOverride.backHref(모바일 셸)와 같은
+    // `fromPath`를 쓴다. 이 둘은 서로 다른 두 UI 요소라 하나만 고치면 나머지가 계속
+    // '/teams'로 고정된 채 남는다(MD-QA #15 후속: alpha 실측에서 데스크톱 뷰만 재현됨).
+    backHref: fromPath ?? '/teams',
     ctaLabel: seeding
       ? '불러오는 중'
       : teamDetailCtaLabel(query.data, eligibility.data, {

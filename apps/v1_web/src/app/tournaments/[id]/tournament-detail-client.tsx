@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -16,7 +17,7 @@ import {
 } from '@/components/tournaments/league-standings-table';
 import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
-import { hasStoredV1Session } from '@/lib/session-storage';
+import { hasStoredV1Session, sanitizeRedirectPath } from '@/lib/session-storage';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { splitPrizeSegments, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
@@ -514,6 +515,9 @@ function useIsInViewport(ref: React.RefObject<HTMLElement | null>): boolean {
 /* ── Entry point ── */
 
 export function TournamentDetailPageClient({ tournamentId }: { tournamentId: string }) {
+  // route-chrome 테이블의 backHref(fragments/tournaments-core.ts)는 검색 파라미터를 못 받아
+  // '/tournaments'로 고정돼 있었다 — public-profile-client.tsx와 같은 `?from=` 패턴으로 메운다.
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   const [hasSessionHint, setHasSessionHint] = useState(false);
   const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
   const { data: myRegistrations = [] } = useV1MyRegistrations(tournamentId, {
@@ -547,6 +551,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
           title: data.title,
           desktopHead: false,
           floatingSlot: <ApplyCTA tournament={data} myRegistration={myRegistration} />,
+          ...(fromPath ? { backHref: fromPath } : {}),
         }
       : {},
   );
@@ -571,6 +576,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
     <TournamentDetailView
       tournament={data}
       myRegistration={myRegistration}
+      backHref={fromPath ?? '/tournaments'}
     />
   );
 }
@@ -583,9 +589,11 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
 export function TournamentDetailView({
   tournament,
   myRegistration,
+  backHref = '/tournaments',
 }: {
   tournament: V1TournamentDetail;
   myRegistration: V1TournamentRegistration | null;
+  backHref?: string;
 }) {
   const status = getTournamentStatusConfig(tournament.status);
   const sportAccent = getSportAccent(tournament.sport.code);
@@ -1371,8 +1379,8 @@ export function TournamentDetailView({
       <div className="tm-desktop-page-head tm-show-desktop">
         <Link
           className="tm-desktop-back"
-          href="/tournaments"
-          aria-label="대회 목록으로 돌아가기"
+          href={backHref}
+          aria-label="뒤로가기"
         >
           <ChevronLeft size={20} strokeWidth={2.2} aria-hidden="true" />
         </Link>

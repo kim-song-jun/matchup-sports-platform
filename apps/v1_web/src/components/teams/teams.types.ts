@@ -90,6 +90,12 @@ export type TeamDetailViewModel = {
     };
   };
   mode: 'default' | 'pending' | 'mine' | 'closed';
+  /**
+   * 데스크톱 "팀 목록으로" 헤더 링크(`tm-desktop-back`)가 쓰는 뒤로가기 목적지.
+   * ShellOverride.backHref(모바일 셸)와 같은 `?from=` 기반 값 — 계산 위치:
+   * `TeamDetailPageClient`(teams-client.tsx). 없으면 '/teams'로 고정.
+   */
+  backHref?: string;
   ctaLabel?: string;
   ctaPending?: boolean;
   onCta?: () => void | Promise<unknown>;

@@ -367,7 +367,7 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
     <>
       {/* Desktop page header: back link + title (mobile topbar is hidden on desktop) */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href="/team-matches" aria-label="팀매치 목록으로 돌아가기">
+        <Link className="tm-desktop-back" href={model.detailBackHref ?? '/team-matches'} aria-label="뒤로가기">
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
         </Link>
         <h1 className="tm-text-heading">{match.title || '팀매치 상세'}</h1>
@@ -395,7 +395,7 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
               {match.imageUrl ? null : <SportIllustration sport={match.sport} sizes="120px" className={`tm-team-vs-hero-illustration${awaitingPlatformTeams ? ' tm-team-vs-hero-illustration-recruiting' : ''}`} />}
               {/* Mobile-only back + action buttons inside hero (hidden on desktop) */}
               <div className="tm-hide-desktop" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href="/team-matches" aria-label="뒤로가기">
+                <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href={model.detailBackHref ?? '/team-matches'} aria-label="뒤로가기">
                   <ChevronLeftIcon size={22} strokeWidth={2.2} />
                 </Link>
                 <div style={{ display: 'flex', gap: 4 }}>

@@ -55,6 +55,7 @@ vi.mock('./matches-page', () => ({
       <div data-testid="address">{model.match.address}</div>
       <div data-testid="description">{model.match.description}</div>
       <div data-testid="title">{model.match.title}</div>
+      <div data-testid="back-href">{model.backHref}</div>
       <div data-testid="status-label">{model.statusLabel}</div>
       <div data-testid="apply-label">{model.applyLabel}</div>
       <div data-testid="apply-pending">{String(model.applyPending)}</div>
@@ -143,6 +144,35 @@ describe('MatchDetailPageClient — GA events', () => {
       expect(withdrawMatchMutateAsync).toHaveBeenCalledWith({ reason: 'applicant_withdrawn_from_v1_web' });
     });
     expect(trackEvent).toHaveBeenCalledWith('match_leave', { matchId: 'match-1' });
+  });
+});
+
+// alpha 실측(2026-09-24): /matches/:id는 topBar:false라 셸 뒤로가기가 없고 페이지가 직접
+// 모바일·데스크톱 링크를 그린다 — 둘 다 "/matches"로 하드코딩돼 있어서, 마이페이지의
+// "참여한 매치"에서 들어와도 뒤로가기가 항상 전체 매치 목록으로 나갔다(MD-QA #15 후속).
+describe('MatchDetailPageClient — 뒤로가기 출처(?from=)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1MatchMock.mockReturnValue({ data: { ...baseMatch, viewerState: 'none' }, isError: false });
+    useV1MatchApplicationEligibilityMock.mockReturnValue({ data: { eligible: true, applicationId: null } });
+  });
+
+  afterEach(() => {
+    searchParamsRef.current = new URLSearchParams();
+  });
+
+  it('?from=이 있으면 그 화면으로 돌아가도록 model.backHref에 실어 보낸다', () => {
+    searchParamsRef.current = new URLSearchParams('from=%2Fmy%2Fmatches%2Fjoined');
+
+    render(<MatchDetailPageClient matchId="match-1" />);
+
+    expect(screen.getByTestId('back-href')).toHaveTextContent('/my/matches/joined');
+  });
+
+  it('?from=이 없으면 전체 매치 목록으로 돌아간다', () => {
+    render(<MatchDetailPageClient matchId="match-1" />);
+
+    expect(screen.getByTestId('back-href')).toHaveTextContent('/matches');
   });
 });
 

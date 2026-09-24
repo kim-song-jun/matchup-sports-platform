@@ -129,9 +129,10 @@ describe('TeamRecordsContent — 행 캡션의 대회·리그 이름', () => {
       />,
     );
 
+    // 뒤로가기가 이 팀 전적으로 돌아오도록 `?from=`을 함께 실어 보낸다(MD-QA #15 후속).
     expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
-      '/tournaments/tournament-1/matches/team-match-1',
-      '/tournaments/tournament-1',
+      '/tournaments/tournament-1/matches/team-match-1?from=%2Fteams%2Fteam-1%2Frecords',
+      '/tournaments/tournament-1?from=%2Fteams%2Fteam-1%2Frecords',
     ]);
   });
 });

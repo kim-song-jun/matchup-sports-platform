@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { V1TeamMatch, V1TeamMatchViewerState } from '@/types/api';
 import type { TeamMatchDetailViewModel, TeamMatchListViewModel, TeamMatchModel } from './team-matches.types';
@@ -16,6 +16,7 @@ const {
   useV1TeamMatchMock,
   useV1TeamMatchEligibilityMock,
   useV1TeamMatchesMock,
+  searchParamsRef,
 } = vi.hoisted(() => {
   const withdrawTeamMatchMutateAsync = vi.fn();
   return {
@@ -31,12 +32,14 @@ const {
     useV1TeamMatchMock: vi.fn(),
     useV1TeamMatchEligibilityMock: vi.fn(),
     useV1TeamMatchesMock: vi.fn(),
+    // 기본값은 빈 파라미터라 기존 테스트 동작은 그대로다 — `?from=` 테스트만 갈아끼운다.
+    searchParamsRef: { current: new URLSearchParams() },
   };
 });
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParamsRef.current,
 }));
 
 const resolveChatRoomMutateMock = vi.hoisted(() => vi.fn());
@@ -67,6 +70,7 @@ vi.mock('./team-matches-page', () => ({
     <div>
       <span data-testid="team-match-image">{model.match.imageUrl}</span>
       <span data-testid="team-match-mode">{model.mode}</span>
+      <span data-testid="team-match-detail-back-href">{model.detailBackHref}</span>
       <span data-testid="team-match-status-label">{model.statusLabel}</span>
       <span data-testid="team-match-apply-label">{model.applyLabel}</span>
       <span data-testid="team-match-description">{model.match.description}</span>
@@ -1052,5 +1056,50 @@ describe('TeamMatchDetailPageClient — 로딩 중 목업 노출 방지', () => 
     // 목업 팀매치(team-matches.view-model.ts)의 어떤 필드도 화면에 닿지 않아야 한다.
     expect(screen.queryByTestId('team-match-address')).toBeNull();
     expect(screen.queryByTestId('team-match-manner')).toBeNull();
+  });
+});
+
+// alpha 실측(2026-09-24): /team-matches/:id는 topBar:false라 셸 뒤로가기가 없고 페이지가
+// 직접 모바일·데스크톱 링크를 그린다 — 둘 다 "/team-matches"로 하드코딩돼 있었고, 셸의
+// ?from= 읽기 로직 자체도 없었다(MD-QA #15 후속).
+describe('TeamMatchDetailPageClient — 뒤로가기 출처(?from=)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useV1TeamMatchMock.mockReturnValue({
+      data: {
+        id: 'team-match-1',
+        teamMatchId: 'team-match-1',
+        title: '풋살 팀매치',
+        sportName: '풋살',
+        sport: { sportId: 'sport-futsal', name: '풋살' },
+        placeName: '서울 풋살장',
+        startsAt: '2026-08-01T10:00:00.000Z',
+        capacityText: '2/2',
+        displayState: 'recruiting',
+        status: 'recruiting',
+        viewer: { state: 'none', manageableHostTeam: false, participantMember: false },
+        hostTeam: { teamId: 'team-host', name: '호스트 팀' },
+      },
+      isError: false,
+    });
+    useV1TeamMatchEligibilityMock.mockReturnValue({ data: undefined, isSuccess: false });
+  });
+
+  afterEach(() => {
+    searchParamsRef.current = new URLSearchParams();
+  });
+
+  it('?from=이 있으면 그 화면으로 돌아가도록 model.detailBackHref에 실어 보낸다', () => {
+    searchParamsRef.current = new URLSearchParams('from=%2Fteams%2Fteam-host');
+
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByTestId('team-match-detail-back-href')).toHaveTextContent('/teams/team-host');
+  });
+
+  it('?from=이 없으면 전체 팀매치 목록으로 돌아간다', () => {
+    render(<TeamMatchDetailPageClient teamMatchId="team-match-1" />);
+
+    expect(screen.getByTestId('team-match-detail-back-href')).toHaveTextContent('/team-matches');
   });
 });

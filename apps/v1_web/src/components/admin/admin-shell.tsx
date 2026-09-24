@@ -5,7 +5,8 @@ import { usePathname } from 'next/navigation';
 import { Fragment, useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { useV1AdminInquiriesPendingCount } from '@/hooks/use-v1-api';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
-import { closeIfCurrentPage } from '@/lib/overlay-history';
+import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
+import { overlayLinkClick } from '@/lib/overlay-history';
 import { CommandPalette } from './command-palette';
 import {
   LayoutDashboard,
@@ -302,15 +303,7 @@ function Drawer({
     }
   }, [open]);
 
-  // ESC to close
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose]);
+  useTopmostEscape({ open, onEscape: onClose });
 
   // Focus trap
   useEffect(() => {
@@ -429,7 +422,7 @@ function Drawer({
                     href={item.href}
                     aria-current={active ? 'page' : undefined}
                     aria-label={hasBadge && item.badgeAriaLabel ? `${item.label} (${item.badgeAriaLabel})` : undefined}
-                    onClick={closeIfCurrentPage(item.href, pathname, onClose)}
+                    onClick={overlayLinkClick(item.href, pathname, onClose)}
                     className={[
                       'tm-admin-sidebar-link',
                       'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',

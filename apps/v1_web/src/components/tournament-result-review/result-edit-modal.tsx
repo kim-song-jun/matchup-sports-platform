@@ -13,6 +13,7 @@ import type { GameLineup } from '@/types/game-operations';
 import { formatGameResultScoreWithPenalties, readGameResultScore } from '@/lib/game-result-score';
 import { periodLabel } from '@/components/tournament-live/operate/period-label';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
+import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 
 /**
  * `score` 는 서버가 돌려주는 스냅샷(`GameResultScore`, 두 형태의 union -- `base.score`가
@@ -359,14 +360,7 @@ export function ResultEditModal({
   }, []);
 
   useOverlayHistory({ open, onClose: onCancel, enabled: presentation !== 'inline' });
-  useEffect(() => {
-    if (!open || presentation === 'inline') return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCancel();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onCancel, presentation]);
+  useTopmostEscape({ open: open && presentation !== 'inline', onEscape: onCancel });
 
   useEffect(() => {
     if (!open || presentation === 'inline') return;

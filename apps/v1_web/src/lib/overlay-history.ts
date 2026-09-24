@@ -9,7 +9,7 @@
  */
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { flushSync } from 'react-dom';
-import { OVERLAY_STATE_KEY, addPopInterceptor, historyPushCount, type PopInfo } from './navigation-history';
+import { OVERLAY_STATE_KEY, addPopInterceptor, historyPushCount, replaceInApp, type PopInfo } from './navigation-history';
 
 type Overlay = {
   id: string;
@@ -115,9 +115,17 @@ function onPop(event: PopStateEvent, { direction, samePage }: PopInfo): boolean 
   return handled;
 }
 
+/**
+ * Installs the pop interceptor. The app shell calls this on every document load: a document reloaded after a
+ * cross-document back/forward has no open overlay yet, but its history can still hold stale markers to skip.
+ */
+export function installOverlayHistory(): void {
+  if (!removeInterceptor) removeInterceptor = addPopInterceptor(onPop);
+}
+
 /** 오버레이를 연다 — 히스토리 항목을 쌓고 id 를 돌려준다. 닫을 땐 반드시 releaseOverlay(id). */
 export function openOverlay(handlers: { close: () => void; locked?: () => boolean }): string {
-  if (!removeInterceptor) removeInterceptor = addPopInterceptor(onPop);
+  installOverlayHistory();
   seq += 1;
   const overlay: Overlay = {
     id: `${Date.now().toString(36)}-${seq}`,
@@ -142,6 +150,11 @@ export function releaseOverlay(id: string): void {
   runSelf({ kind: 'consume', id: overlay.id, url: overlay.url }, () => window.history.back());
 }
 
+/** No overlay is open and none of our own back/forward pops is in flight. */
+export function overlayHistoryIdle(): boolean {
+  return stack.length === 0 && selfPops.length === 0;
+}
+
 /** 오버레이가 스스로 부른 back/forward 가 모두 끝나면 풀린다. 닫힘 뒤에 이동할 코드가 기다린다. */
 export function waitForOverlayHistory(): Promise<void> {
   if (selfPops.length === 0) return Promise.resolve();
@@ -151,7 +164,7 @@ export function waitForOverlayHistory(): Promise<void> {
 /**
  * 오버레이를 닫고 이동하는 핸들러의 단일 경로. 닫기 back 과 이동 push 가 겹치면 브라우저가 back 을
  * 취소하거나 새 페이지를 걷는다 — 닫기를 곧바로 커밋해 back 을 예약시키고, 그 pop 이 끝난 뒤 이동한다.
- * 이동하는 링크는 이 대신 경로 변경으로 닫히게 둔다(URL 이 바뀐 뒤의 release 는 back 하지 않는다).
+ * Nav links inside an overlay use overlayLinkClick instead.
  */
 export async function closeOverlayThenNavigate(close: () => void, navigate: () => void): Promise<void> {
   flushSync(close);
@@ -159,15 +172,31 @@ export async function closeOverlayThenNavigate(close: () => void, navigate: () =
   navigate();
 }
 
+/** The current history entry is the marker of an overlay that is still open (and nothing of ours is in flight). */
+function currentEntryIsOpenOverlay(): boolean {
+  const marker = overlayMarkerOf(window.history.state);
+  return marker !== null && selfPops.length === 0 && stack.some((overlay) => overlay.id === marker && overlay.pushed);
+}
+
 /**
- * 오버레이 안 내비게이션 링크의 onClick. 다른 화면으로 가는 링크는 그대로 두어 경로 변경이 오버레이를
- * 닫게 한다(URL 이 바뀐 뒤라 back 하지 않는다). 지금 화면으로 가는 링크는 경로가 안 바뀌니 이동 없이 닫는다.
+ * onClick for a nav link inside an overlay (drawer, popup).
+ * - Link to the current page: the path does not change, so just close.
+ * - Link to another page while the overlay's marker is the current entry: navigate with replace so the
+ *   marker entry becomes the destination. A plain push would leave the marker behind, and Next's
+ *   restore replaceState on a later pop wipes its flag, turning it into a dead back/forward stop.
+ *   Replacing needs no history.back(), so there is no back/push race either.
  */
-export function closeIfCurrentPage(href: string, pathname: string, close: () => void) {
+export function overlayLinkClick(href: string, pathname: string, close: () => void) {
   return (event: ReactMouseEvent) => {
-    if (href !== pathname || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (href === pathname) {
+      event.preventDefault();
+      close();
+      return;
+    }
+    if (!currentEntryIsOpenOverlay()) return; // let the link push as usual
     event.preventDefault();
-    close();
+    replaceInApp(href);
   };
 }
 

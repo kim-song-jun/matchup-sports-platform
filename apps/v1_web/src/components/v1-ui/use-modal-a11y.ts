@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react';
 import { useOverlayHistory } from './use-overlay-history';
+import { useTopmostEscape } from './use-topmost-escape';
 
 /**
  * 모달 접근성 스캐폴딩 단일 소스 — focus 저장·복원(WCAG 2.4.3), 첫 컨트롤 포커스,
@@ -99,11 +100,6 @@ function tabbableElements(dialog: HTMLElement): HTMLElement[] {
   });
 }
 
-// 열린 순서대로 쌓인 모달 — ESC 는 맨 위 하나만 닫는다(한 번에 겹친 모달이 다 닫히지 않게).
-const escapeStack: object[] = [];
-// 리스너 사이에 React 가 커밋하면 스택이 바뀐다 — 한 키 입력은 한 모달만 닫게 이벤트에 표시한다.
-const handledEscapes = new WeakSet<Event>();
-
 export function useModalA11y<
   TInitial extends HTMLElement = HTMLElement,
   TDialog extends HTMLElement = HTMLDivElement,
@@ -116,7 +112,6 @@ export function useModalA11y<
 }: ModalA11yOptions): ModalA11yHandles<TInitial, TDialog> {
   useOverlayHistory({ open, onClose, locked: pending, enabled: closeOnBack });
   const dialogRef = useRef<TDialog | null>(null);
-  const escapeTokenRef = useRef<object>({});
   const initialFocusRef = useRef<TInitial | null>(null);
 
   // ── 퇴장 지연 ───────────────────────────────────────────────────────
@@ -212,28 +207,7 @@ export function useModalA11y<
 
   // ESC·focus trap·스크롤 잠금은 모달이 **화면에 있는 동안**(mounted) 유지한다.
   // 닫히는 중에 풀리면 그 사이 키 입력이 뒤 화면으로 새고 배경이 스크롤된다.
-  useEffect(() => {
-    if (!open) return;
-    const token = escapeTokenRef.current;
-    escapeStack.push(token);
-    return () => {
-      const index = escapeStack.lastIndexOf(token);
-      if (index !== -1) escapeStack.splice(index, 1);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || pending || handledEscapes.has(e)) return;
-      // 닫히는 중(퇴장 애니메이션)인 모달은 스택에 없다 — 그 사이 ESC 는 아래 모달 몫이다.
-      if (escapeStack[escapeStack.length - 1] !== escapeTokenRef.current) return;
-      handledEscapes.add(e);
-      onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [mounted, onClose, pending]);
+  useTopmostEscape({ open, listening: mounted, onEscape: onClose, disabled: pending });
 
   // Tab focus trap
   useEffect(() => {

@@ -18,7 +18,8 @@ import type { TournamentOpsOrigin } from '@/lib/session-storage';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { staffRoleLabel } from './badges';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
-import { closeIfCurrentPage } from '@/lib/overlay-history';
+import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
+import { overlayLinkClick } from '@/lib/overlay-history';
 
 // ── 대회 아이덴티티 배지 ──────────────────────────────────────────────────
 /**
@@ -236,14 +237,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
   }, [open]);
 
   useOverlayHistory({ open, onClose });
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose]);
+  useTopmostEscape({ open, onEscape: onClose });
 
   useEffect(() => {
     if (!open) return;
@@ -340,7 +334,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
                 key={item.href}
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
-                onClick={closeIfCurrentPage(item.href, pathname, onClose)}
+                onClick={overlayLinkClick(item.href, pathname, onClose)}
                 className={[
                   'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { detectNativeShell } from '@/lib/native-bridge';
 import { bindSoftNavigator, ensureColdStartParent, installNavigationHistory } from '@/lib/navigation-history';
+import { installOverlayHistory } from '@/lib/overlay-history';
 import { resolveRouteChrome } from '@/lib/route-chrome';
 import { sanitizeRedirectPath } from '@/lib/session-storage';
 import { ROOT_TAB_HREFS } from './shell';
@@ -27,12 +28,13 @@ export function isAppColdStartEntry(search: string): boolean {
   return detectNativeShell() !== null || sanitizeRedirectPath(new URLSearchParams(search).get('from')) !== null;
 }
 
-/** 루트 레이아웃 전용 부수효과 — 히스토리 추적 설치, 콜드스타트 부모 삽입. 항상 null. */
+/** 루트 레이아웃 전용 부수효과 — 히스토리 추적·오버레이 표식 건너뛰기 설치, 콜드스타트 부모 삽입. 항상 null. */
 export function NavigationHistoryTracker() {
   const router = useRouter();
 
   useEffect(() => {
     installNavigationHistory();
+    installOverlayHistory();
     const unbind = bindSoftNavigator((url) => router.replace(url));
     const { pathname, search } = window.location;
     if (isAppColdStartEntry(search)) ensureColdStartParent(resolveColdStartParent(pathname, search));

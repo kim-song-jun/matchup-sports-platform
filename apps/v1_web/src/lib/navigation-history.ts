@@ -24,13 +24,17 @@ const APP_BACK_PENDING_MS = 1000;
 const INSTALL_MARKER = '__teameetNavHistoryInstall';
 const URL_BASE = 'https://nav-history.invalid';
 
-type Entry = { url: string; overlay?: boolean; parent?: boolean };
+// buffer: a same-URL entry the unsaved-changes guard pushes so a cold-entry back stays in this document.
+type Entry = { url: string; overlay?: boolean; parent?: boolean; buffer?: boolean };
 type Mirror = { index: number; entries: Record<number, Entry> };
 export type AppPop = { direction: 'back' | 'forward' | 'unknown'; appInitiated: boolean };
 type HistoryMethod = History['pushState'];
 
 let mirror: Mirror | null = null;
 let coldStart = false;
+// Mirror index of this document's first entry — entries below it belong to earlier documents (cross-document pops).
+let documentStartIndex = 0;
+let pushingBuffer = false;
 let originals: { push: HistoryMethod; replace: HistoryMethod } | null = null;
 let pendingAppBack = false;
 let pendingAppBackTimer: ReturnType<typeof setTimeout> | null = null;
@@ -41,7 +45,7 @@ let pushCount = 0;
 let softNavigate: ((url: string) => void) | null = null;
 const popListeners = new Set<(pop: AppPop) => void>();
 /** 추적기가 본 이 pop — 방향(도장 순번 비교)과 떠난 항목과 URL 이 같은지. */
-export type PopInfo = { direction: AppPop['direction']; samePage: boolean };
+export type PopInfo = { direction: AppPop['direction']; samePage: boolean; leftBuffer: boolean };
 /** true 를 돌려주면 그 pop 을 여기서 끝낸다(Next·다른 리스너에 전달하지 않음). */
 export type PopInterceptor = (event: PopStateEvent, pop: PopInfo) => boolean;
 type InterceptorEntry = { intercept: PopInterceptor; priority: number };
@@ -117,7 +121,9 @@ function recordPush(state: unknown) {
   const next = mirror.index + 1;
   for (const key of Object.keys(mirror.entries)) if (Number(key) >= next) delete mirror.entries[Number(key)];
   mirror.index = next;
-  mirror.entries[next] = { url: currentUrl(), overlay: Boolean(asRecord(state)?.[OVERLAY_STATE_KEY]) };
+  mirror.entries[next] = pushingBuffer
+    ? { url: currentUrl(), buffer: true }
+    : { url: currentUrl(), overlay: Boolean(asRecord(state)?.[OVERLAY_STATE_KEY]) };
   persist();
 }
 
@@ -145,7 +151,7 @@ function onPopState(event: PopStateEvent) {
   if (overlayPop) suppressedPops = Math.max(0, suppressedPops - 1);
   // Next 보다 먼저 등록된 리스너라, 여기서 멈추면 Next 는 이 pop 을 모른다(오버레이 닫기·이탈 막기).
   for (const { intercept } of popInterceptors) {
-    if (intercept(event, { direction, samePage })) {
+    if (intercept(event, { direction, samePage, leftBuffer: Boolean(leaving?.buffer) })) {
       event.stopImmediatePropagation();
       return;
     }
@@ -189,12 +195,22 @@ export function installNavigationHistory(): void {
     coldStart = true;
   }
   mirror.entries[mirror.index] = { url: currentUrl() };
+  documentStartIndex = mirror.index;
 
   const proto = History.prototype;
   const push = proto.pushState;
   const replace = proto.replaceState;
   originals = { push, replace };
   proto.pushState = function pushState(this: History, data, unused, url) {
+    const here = mirror?.entries[mirror.index];
+    if (mirror && here?.buffer && !pushingBuffer && url != null && !sameUrl(String(url), currentUrl())) {
+      // Leaving the buffer: the destination takes its place, so no duplicate form entry stays behind it.
+      replace.call(this, withIdx(data, mirror.index), unused, url);
+      untracked = false;
+      mirror.entries[mirror.index] = { url: currentUrl() };
+      persist();
+      return;
+    }
     const stampedState = withIdx(data, (mirror?.index ?? -1) + 1);
     push.call(this, stampedState, unused, url);
     pushCount += 1;
@@ -205,7 +221,9 @@ export function installNavigationHistory(): void {
     const stampedState = withIdx(data, mirror?.index ?? 0);
     replace.call(this, stampedState, unused, url);
     if (!mirror) return;
-    mirror.entries[mirror.index] = { url: currentUrl(), overlay: Boolean(stampedState[OVERLAY_STATE_KEY]) };
+    const previous = mirror.entries[mirror.index];
+    const keepBuffer = Boolean(previous?.buffer) && sameUrl(previous.url, currentUrl());
+    mirror.entries[mirror.index] = { url: currentUrl(), overlay: Boolean(stampedState[OVERLAY_STATE_KEY]), ...(keepBuffer ? { buffer: true } : {}) };
     persist();
   };
   replace.call(window.history, withIdx(window.history.state, mirror.index), '');
@@ -227,6 +245,32 @@ export function decideBackAction(target: string): 'back' | 'replace' {
 /** 이 탭에서 앱 안의 이전 항목으로 돌아갈 수 있는가(router.back() 이 앱 밖으로 나가지 않는가). */
 export function hasPreviousInAppEntry(): boolean {
   return !untracked && Boolean(mirror?.entries[mirror.index - 1]);
+}
+
+/** Is there an earlier entry created by this document (a back to it is a same-document popstate)? */
+export function hasPreviousSameDocumentEntry(): boolean {
+  return !untracked && mirror !== null && mirror.index > documentStartIndex && Boolean(mirror.entries[mirror.index - 1]);
+}
+
+/** Pushes a same-URL buffer entry. A later push to another URL replaces it instead of stacking on it. */
+export function pushBufferEntry(): void {
+  if (!mirror) return;
+  pushingBuffer = true;
+  try {
+    window.history.pushState(window.history.state, '', currentUrl());
+  } finally {
+    pushingBuffer = false;
+  }
+}
+
+export function currentEntryIsBuffer(): boolean {
+  return Boolean(mirror?.entries[mirror.index]?.buffer);
+}
+
+/** Replace the current entry with an in-app URL — soft (router.replace) when bound, otherwise a full load. */
+export function replaceInApp(url: string): void {
+  if (softNavigate) softNavigate(url);
+  else window.location.replace(url);
 }
 
 /** 곧 일어날 popstate 가 앱이 부른 뒤로가기임을 알린다 — iOS 셸도 네이티브 애니메이션이 없다. */
@@ -302,6 +346,7 @@ export function ensureColdStartParent(parentUrl: string | null): boolean {
   originals.push.call(window.history, withIdx(detailState, 1), '', here);
   mirror.entries = { 0: { url: parentUrl, parent: true }, 1: { url: here } };
   mirror.index = 1;
+  documentStartIndex = 0;
   coldStart = false;
   persist();
   return true;
@@ -320,6 +365,8 @@ export function __resetNavigationHistoryForTests(): void {
   mirror = null;
   originals = null;
   coldStart = false;
+  documentStartIndex = 0;
+  pushingBuffer = false;
   clearPendingAppBack();
   untracked = false;
   suppressedPops = 0;

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { V1LeagueOverallStandingsResponse, V1TournamentDetail } from '@/types/api';
 import type { V1LeaguePlayerRecordRow } from '@/types/league-match';
+import type { PublicTournamentPlayerRecordRow } from '@/components/public-game-records/types';
 import { AwardsPageClient, ReviewFormModal } from './awards-page-client';
 
 const { v1GetMock } = vi.hoisted(() => ({ v1GetMock: vi.fn() }));
@@ -39,7 +40,7 @@ const awardsApiMocks = vi.hoisted(() => ({
     refetch: vi.fn(),
   })),
   usePublicTournamentPlayerRecords: vi.fn((_tournamentId: string, _options?: { enabled?: boolean }) => ({
-    data: { goals: [], assists: [] },
+    data: { goals: [] as PublicTournamentPlayerRecordRow[], assists: [] as PublicTournamentPlayerRecordRow[] },
     isLoading: false,
     isPending: false,
     isError: false,
@@ -261,6 +262,58 @@ describe('AwardsPageClient — regular league player records endpoint', () => {
     expect(awardsApiMocks.usePublicTournamentPlayerRecords).toHaveBeenCalledWith('tournament-1', { enabled: false });
     expect(screen.getByText('리그 득점자')).toBeInTheDocument();
     expect(screen.getByText('리그 도움자')).toBeInTheDocument();
+  });
+});
+
+describe('AwardsPageClient — 개인 기록 프로필 링크의 뒤로가기 출처(MD-QA #15)', () => {
+  const FROM = '?from=%2Ftournaments%2Ftournament-1%2Fawards';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    awardsApiMocks.useV1LeagueMatchPlayerRecords.mockReturnValue({
+      data: {
+        leagueId: 'tournament-1',
+        goals: [{ userId: 'league-scorer', nickname: '리그 득점자', goals: 3, assists: 0 }],
+        assists: [{ userId: 'league-assister', nickname: '리그 도움자', goals: 0, assists: 2 }],
+      },
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    // 일반 대회 행은 서버가 profileHref를 출처 없이 내려준다.
+    awardsApiMocks.usePublicTournamentPlayerRecords.mockReturnValue({
+      data: {
+        goals: [{ userId: 'cup-scorer', nickname: '대회 득점자', profileHref: '/users/cup-scorer', goals: 4, assists: 0 }] as PublicTournamentPlayerRecordRow[],
+        assists: [{ userId: 'cup-assister', nickname: '대회 도움자', profileHref: '/users/cup-assister', goals: 0, assists: 1 }] as PublicTournamentPlayerRecordRow[],
+      },
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  it.each([
+    ['일반 대회', undefined, ['cup-scorer', 'cup-assister']],
+    ['정규 리그', 'regular_league', ['league-scorer', 'league-assister']],
+  ] as const)('%s 득점·도움 랭킹 링크가 시상 화면을 출처로 싣는다', (_label, kind, userIds) => {
+    awardsApiMocks.useV1Tournament.mockReturnValue({
+      data: makeCompletedTournament(kind ? { kind } : {}),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    render(<AwardsPageClient tournamentId="tournament-1" />);
+
+    const hrefs = screen
+      .getAllByRole('link', { name: /공개 프로필 보기/ })
+      .map((link) => link.getAttribute('href'));
+    expect(hrefs).toEqual(expect.arrayContaining(userIds.map((id) => `/users/${id}${FROM}`)));
+    expect(hrefs.filter((href) => href?.startsWith('/users/') && !href.includes('?from='))).toEqual([]);
   });
 });
 

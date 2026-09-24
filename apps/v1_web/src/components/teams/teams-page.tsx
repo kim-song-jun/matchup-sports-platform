@@ -603,7 +603,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
       <h1 className="sr-only">{team.name}</h1>
       {/* Desktop back header */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href={model.backHref ?? '/teams'} aria-label="팀 목록으로">
+        <Link className="tm-desktop-back" href={model.backHref ?? '/teams'} aria-label="뒤로가기">
           <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
         </Link>
         <div className="tm-text-heading" style={{ margin: '0.67em 0' }} aria-hidden="true">{team.name}</div>

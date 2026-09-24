@@ -55,6 +55,15 @@ describe('sanitizeRedirectPath', () => {
     }
   });
 
+  // 입력은 사이트 안이지만 정규화 결과가 `//evil.com` 이 되는 dot-segment 형태.
+  // 돌려준 값을 브라우저가 다시 해석하면 외부 origin 으로 떠난다.
+  it('rejects dot-segment forms that normalize into a protocol-relative path', () => {
+    for (const form of ['/..//example.com', '/.//example.com', '/%2e%2e//example.com', '/a/../..//example.com', '/./\\example.com']) {
+      expect(sanitizeRedirectPath(form)).toBeNull();
+    }
+    expect(sanitizeRedirectPath('/teams/../my')).toBe('/my');
+  });
+
   // 원본 문자열을 돌려주면 호출부가 그 문자열을 다시 파싱하므로, 내가 검증한 것과
   // 실제로 쓰이는 것이 두 번의 파싱으로 갈릴 여지가 남는다. 정규화된 경로를 돌려줘
   // 그 틈 자체를 없앤다.

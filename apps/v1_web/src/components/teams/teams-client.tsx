@@ -201,7 +201,6 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
   // route-chrome 테이블의 backHref(fragments/teams.ts)는 검색 파라미터를 못 받아
   // 기본값 '/teams'로 고정돼 있었다 — public-profile-client.tsx와 동일한 ShellOverride로 메운다.
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
-  useShellOverride(fromPath ? { backHref: fromPath } : {});
   // The current /auth/me result is the only authority for protected actions. A
   // local hint can be stale, while a cold HttpOnly cookie has no local hint.
   const authMe = useV1AuthMe({ enabled: true, retry: retryTransientFailure });
@@ -211,6 +210,10 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
   const authVerified = Boolean(authMe.data?.user?.id) && !authPending && !authMe.isError && !authUnauthorized;
   const authError = Boolean(authMe.isError && !authUnauthorized);
   const query = useV1TeamDetail(teamId, { seed });
+  // override store는 한 칸이고 부모 effect가 자식(TeamStatePageView)보다 늦게 돈다 —
+  // 에러 뷰의 제목까지 여기서 함께 게시하지 않으면 부모 값이 그 제목을 덮어쓴다.
+  const stateTitle = query.isError ? getTeamStateViewModel('error').title : undefined;
+  useShellOverride({ ...(stateTitle ? { title: stateTitle } : {}), ...(fromPath ? { backHref: fromPath } : {}) });
   const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) && authVerified });
   const join = useV1CreateTeamJoinApplication(teamId);
   const withdraw = useV1WithdrawTeamJoinApplication(teamId, eligibility.data?.applicationId);

@@ -330,13 +330,17 @@ function PlayerRecordsSection({ tournamentId, isRegularLeague }: { tournamentId:
   const leagueRecords = useV1LeagueMatchPlayerRecords(isRegularLeague ? tournamentId : '');
   const records = isRegularLeague ? leagueRecords : tournamentRecords;
   // 뒤로가기가 이 어워드 화면으로 돌아오도록 출처를 함께 넘긴다(public-profile-client.tsx가 `?from=`을 읽는다).
-  const fromHref = `/tournaments/${tournamentId}/awards`;
+  // 일반 대회 행의 profileHref는 서버가 bare `/users/:id`로 준다 — 두 분기 모두 여기서 붙인다.
+  const profileHref = (userId: string) =>
+    `/users/${userId}?from=${encodeURIComponent(`/tournaments/${tournamentId}/awards`)}`;
+  const withProfileHref = <T extends { userId: string }>(rows: readonly T[] | undefined) =>
+    rows?.map((row) => ({ ...row, profileHref: profileHref(row.userId) }));
   const goals = isRegularLeague
-    ? (leagueRecords.data?.goals ?? []).map((row) => ({ ...row, profileHref: `/users/${row.userId}?from=${encodeURIComponent(fromHref)}` }))
-    : tournamentRecords.data?.goals;
+    ? withProfileHref(leagueRecords.data?.goals ?? [])
+    : withProfileHref(tournamentRecords.data?.goals);
   const assists = isRegularLeague
-    ? (leagueRecords.data?.assists ?? []).map((row) => ({ ...row, profileHref: `/users/${row.userId}?from=${encodeURIComponent(fromHref)}` }))
-    : tournamentRecords.data?.assists;
+    ? withProfileHref(leagueRecords.data?.assists ?? [])
+    : withProfileHref(tournamentRecords.data?.assists);
   return (
     <TournamentPlayerRecordsSections
       goals={goals}

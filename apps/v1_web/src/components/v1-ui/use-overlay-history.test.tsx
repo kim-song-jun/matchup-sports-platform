@@ -300,3 +300,39 @@ describe('닫고 이동하기 — 닫기 back 과 이동 push 가 엇갈리지 �
     expect(currentPath()).toBe('/teams/2');
   });
 });
+
+// 드로어·팝업 링크는 표식을 걷지 않고 이동한다 — 남은 표식을 도착한 방향으로 건너뛰어야 한다.
+describe('남은 표식 — 뒤로·앞으로 모두 건너뛴다', () => {
+  const forward = async () => {
+    await act(async () => {
+      window.history.forward();
+      await settleHistory();
+    });
+  };
+
+  async function leaveThroughModalLink() {
+    const { rerender } = render(<Modal name="M" open onClose={() => {}} />);
+    window.history.pushState({}, '', '/teams/2');
+    rerender(<Modal name="M" open={false} onClose={() => {}} />);
+    await act(async () => {
+      await settleHistory();
+    });
+  }
+
+  it('뒤로는 이전 화면, 앞으로는 링크로 갔던 화면에 닿는다(표식 도착 pop 은 Next 에 안 간다)', async () => {
+    await leaveThroughModalLink();
+    await back();
+    expect(currentPath()).toBe('/teams/1');
+    expect(nextRouterPop).toHaveBeenCalledTimes(1); // 화면이 바뀐 pop 하나만
+    nextRouterPop.mockClear();
+
+    await forward();
+
+    expect(currentPath()).toBe('/teams/2');
+    expect(nextRouterPop).toHaveBeenCalledTimes(1);
+
+    await back();
+    expect(currentPath()).toBe('/teams/1');
+    expect(overlayMarkerOf(window.history.state)).toBeNull();
+  });
+});

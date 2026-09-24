@@ -6,6 +6,7 @@ import { HomePageClient } from './home-client';
 vi.mock('next/navigation', () => ({
   usePathname: () => '/home',
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('@/lib/analytics', () => ({

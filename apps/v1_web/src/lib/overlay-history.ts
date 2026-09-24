@@ -9,7 +9,7 @@
  */
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { flushSync } from 'react-dom';
-import { OVERLAY_STATE_KEY, addPopInterceptor, historyPushCount } from './navigation-history';
+import { OVERLAY_STATE_KEY, addPopInterceptor, historyPushCount, type PopInfo } from './navigation-history';
 
 type Overlay = {
   id: string;
@@ -68,9 +68,13 @@ function runSelf(pop: SelfPopKind, go: () => void) {
   go();
 }
 
-const skipStale = () => runSelf({ kind: 'skip', url: hereUrl() }, () => window.history.back());
+// 남은 표식은 도착한 방향으로 건너뛴다 — 앞으로가기에서 back 으로 건너뛰면 앞으로가기가 영영 막힌다.
+const skipStale = (direction: PopInfo['direction']) =>
+  runSelf({ kind: 'skip', url: hereUrl() }, () =>
+    direction === 'forward' ? window.history.forward() : window.history.back(),
+  );
 
-function onPop(event: PopStateEvent): boolean {
+function onPop(event: PopStateEvent, { direction, samePage }: PopInfo): boolean {
   const arriving = overlayMarkerOf(event.state);
   const pending = selfPops[0];
   if (pending && historyPushCount() !== pending.pushCount && Date.now() - pending.at > SELF_POP_GRACE_MS) {
@@ -86,14 +90,16 @@ function onPop(event: PopStateEvent): boolean {
       return true;
     }
     const sameUrl = self.kind === 'forward' || self.url === hereUrl();
-    if (sameUrl && arriving !== null && !stack.some((overlay) => overlay.id === arriving)) skipStale();
+    if (sameUrl && arriving !== null && !stack.some((overlay) => overlay.id === arriving)) skipStale(direction);
     else settle();
     return sameUrl;
   }
 
   if (stack.length === 0) {
-    if (arriving !== null) skipStale(); // 닫힌 오버레이의 남은 표식 — 빈 뒤로가기가 되지 않게 건너뛴다.
-    return false;
+    if (arriving === null) return false;
+    skipStale(direction); // 닫힌 오버레이의 남은 표식 — 빈 이동이 되지 않게 건너뛴다.
+    // 화면이 그대로면 Next 에 알릴 이동이 없다. 바뀌었으면 Next 가 그 화면을 그리게 흘린다.
+    return samePage;
   }
   const index = arriving === null ? -1 : stack.findIndex((overlay) => overlay.id === arriving);
   const top = stack[stack.length - 1];
@@ -105,7 +111,7 @@ function onPop(event: PopStateEvent): boolean {
   const closing = stack.splice(index + 1).reverse();
   const handled = closing[0].url === hereUrl();
   closing.forEach((overlay) => overlay.close());
-  if (arriving !== null && index === -1) skipStale();
+  if (arriving !== null && index === -1) skipStale(direction);
   return handled;
 }
 

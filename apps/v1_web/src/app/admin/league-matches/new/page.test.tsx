@@ -13,6 +13,7 @@ import AdminLeagueMatchNewPage from './page';
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => '/admin/league-matches/new',
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({

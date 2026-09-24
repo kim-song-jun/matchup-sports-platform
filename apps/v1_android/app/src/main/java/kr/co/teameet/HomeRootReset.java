@@ -19,10 +19,13 @@ final class HomeRootReset {
         pending = false;
     }
 
-    /** Returns true when the caller must call clearHistory() for this finished load. */
+    /**
+     * Returns true when the caller must call clearHistory() for this finished load. Any finished
+     * load ends the pending reset: a redirected home load must not wipe history on a later /home.
+     */
     boolean onPageFinished(String url) {
-        if (!pending || !BackNavigationPolicy.isHome(url)) return false;
+        boolean clear = pending && BackNavigationPolicy.isHome(url);
         pending = false;
-        return true;
+        return clear;
     }
 }

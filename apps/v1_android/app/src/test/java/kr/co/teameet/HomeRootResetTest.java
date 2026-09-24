@@ -72,13 +72,20 @@ public final class HomeRootResetTest {
         assertEquals(List.of(ORIGIN + "/home"), web.entries);
     }
 
-    @Test public void clearsOnlyForTheHomeLoadThatFollowsANavigateHome() {
+    @Test public void clearsOnlyWhenTheLoadRightAfterANavigateHomeIsHome() {
         HomeRootReset reset = new HomeRootReset();
         assertFalse(reset.onPageFinished(ORIGIN + "/home"));
 
         reset.onNavigateHome();
-        assertFalse(reset.onPageFinished(ORIGIN + "/teams/1"));
         assertTrue(reset.onPageFinished(ORIGIN + "/home?from=%2Fteams"));
+        assertFalse(reset.onPageFinished(ORIGIN + "/home"));
+    }
+
+    @Test public void aNavigateHomeRedirectedAwayDoesNotClearALaterUnrelatedHomeLoad() {
+        HomeRootReset reset = new HomeRootReset();
+        reset.onNavigateHome();
+        assertFalse(reset.onPageFinished(ORIGIN + "/login?redirect=%2Fhome"));
+        // e.g. a notification intent's loadUrl or a reload that later lands on /home
         assertFalse(reset.onPageFinished(ORIGIN + "/home"));
     }
 

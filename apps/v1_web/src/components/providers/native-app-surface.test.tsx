@@ -20,6 +20,14 @@ describe('NativeAppSurface — 어느 셸 안인지 <html> 에 알린다', () =>
     expect(document.documentElement.dataset.teameetNativeApp).toBe('ios');
   });
 
+  it('iOS 셸은 window.TeameetNative shim 도 있지만 android 가 아니라 ios', () => {
+    win.webkit = { messageHandlers: { TeameetNative: { postMessage() {} } } };
+    win.TeameetNative = { postMessage() {}, supports: [] };
+    render(<NativeAppSurface />);
+
+    expect(document.documentElement.dataset.teameetNativeApp).toBe('ios');
+  });
+
   it('Android 브릿지(window.TeameetNative)가 있으면 android', () => {
     win.TeameetNative = { postMessage() {} };
     render(<NativeAppSurface />);

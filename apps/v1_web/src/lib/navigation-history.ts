@@ -40,8 +40,10 @@ let suppressedPops = 0;
 let pushCount = 0;
 let softNavigate: ((url: string) => void) | null = null;
 const popListeners = new Set<(pop: AppPop) => void>();
+/** 추적기가 본 이 pop — 방향(도장 순번 비교)과 떠난 항목과 URL 이 같은지. */
+export type PopInfo = { direction: AppPop['direction']; samePage: boolean };
 /** true 를 돌려주면 그 pop 을 여기서 끝낸다(Next·다른 리스너에 전달하지 않음). */
-export type PopInterceptor = (event: PopStateEvent) => boolean;
+export type PopInterceptor = (event: PopStateEvent, pop: PopInfo) => boolean;
 type InterceptorEntry = { intercept: PopInterceptor; priority: number };
 // 한 pop 은 한 가로채기만 처리한다 — priority 가 높은 것부터 묻고, 처음 true 를 돌려준 것에서 끝낸다.
 let popInterceptors: InterceptorEntry[] = [];
@@ -143,7 +145,7 @@ function onPopState(event: PopStateEvent) {
   if (overlayPop) suppressedPops = Math.max(0, suppressedPops - 1);
   // Next 보다 먼저 등록된 리스너라, 여기서 멈추면 Next 는 이 pop 을 모른다(오버레이 닫기·이탈 막기).
   for (const { intercept } of popInterceptors) {
-    if (intercept(event)) {
+    if (intercept(event, { direction, samePage })) {
       event.stopImmediatePropagation();
       return;
     }

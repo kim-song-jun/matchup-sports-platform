@@ -11,7 +11,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react';
-import { decideBackAction, suppressNextPop } from '@/lib/navigation-history';
+import { decideBackAction, markAppInitiatedBack, suppressNextPop } from '@/lib/navigation-history';
 import { useModalA11y } from './use-modal-a11y';
 
 interface BottomSheetBaseProps {
@@ -76,6 +76,7 @@ export function BottomSheet(props: BottomSheetProps) {
     (href: string) => {
       if (decideBackAction(href) === 'back') {
         suppressNextPop(); // 같은 목록으로 돌아가는 닫기 — 페이지 전환·스크롤 복원 대상이 아니다.
+        markAppInitiatedBack(); // iOS 에서 네이티브 스와이프로 오분류되지 않게.
         router.back();
         return;
       }

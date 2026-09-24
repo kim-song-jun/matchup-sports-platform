@@ -704,6 +704,8 @@ public final class MainActivity extends AppCompatActivity {
                 homeRootReset.onBackPressed();
                 BackNavigationPolicy.Action action = BackNavigationPolicy.decide(
                     webView.canGoBack(), webView.getUrl(), lastBackPressAtMillis, now);
+                // 종료 힌트 뒤 다른 동작이 끼면 두 번째 누름으로 치지 않는다.
+                if (action != BackNavigationPolicy.Action.SHOW_EXIT_HINT) lastBackPressAtMillis = BackNavigationPolicy.NO_PREVIOUS_PRESS_MILLIS;
                 switch (action) {
                     case GO_BACK -> webView.goBack();
                     case NAVIGATE_HOME -> {

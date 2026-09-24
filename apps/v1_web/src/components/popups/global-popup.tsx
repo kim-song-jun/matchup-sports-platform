@@ -1,12 +1,22 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { Suspense } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { HomePopupDialog } from '@/components/home/home-notice-popup';
 import { useV1ActivePopup } from '@/hooks/use-v1-api';
 import { isSafePopupTargetPath, resolvePopupTargetScreen } from '@/lib/popup-targets';
 
 export function GlobalPopup() {
+  return (
+    <Suspense fallback={null}>
+      <GlobalPopupForLocation />
+    </Suspense>
+  );
+}
+
+function GlobalPopupForLocation() {
   const pathname = usePathname();
+  const search = useSearchParams()?.toString() ?? '';
   const screen = resolvePopupTargetScreen(pathname);
   // 정확 경로 타겟(V1Popup.targetPaths)은 화면 단위 타겟보다 우선한다(PopupsService.findActive).
   // 경로를 안 넘기면 같은 화면(예: 대회)에 걸린 팝업 여러 개 중 아무거나 하나가 뜬다.
@@ -17,7 +27,7 @@ export function GlobalPopup() {
 
   return (
     <HomePopupDialog
-      pathname={pathname}
+      location={pathname ? `${pathname}${search ? `?${search}` : ''}` : pathname}
       popup={popup ? {
         id: popup.popupId,
         title: popup.title,

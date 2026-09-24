@@ -19,12 +19,12 @@ export function getHomePopupStorageKey(popupId: string) {
 export const getPopupStorageKey = getHomePopupStorageKey;
 
 /**
- * pathname 을 주면(전역 팝업) 화면이 바뀔 때 닫는다 — 팝업 링크는 이동만 하고, 닫기는 URL 이 바뀐 뒤라
- * 오버레이 항목을 back 으로 걷지 않는다(닫기 back 과 이동 push 가 엇갈리지 않게).
+ * location(경로+쿼리)을 주면(전역 팝업) URL 이 바뀔 때 닫는다 — 팝업 링크는 이동만 하고, 닫기는 URL 이
+ * 바뀐 뒤라 오버레이 항목을 back 으로 걷지 않는다(닫기 back 과 이동 push 가 엇갈리지 않게).
  */
-export function HomePopupDialog({ popup, pathname }: { popup: HomePopup | null; pathname?: string | null }) {
+export function HomePopupDialog({ popup, location }: { popup: HomePopup | null; location?: string | null }) {
   const [open, setOpen] = useState(false);
-  const shownPathRef = useRef(pathname);
+  const shownLocationRef = useRef(location);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
@@ -32,10 +32,10 @@ export function HomePopupDialog({ popup, pathname }: { popup: HomePopup | null; 
 
   // 새 화면의 팝업(id 변경) 효과보다 먼저 돌아야 그 팝업을 덮어 닫지 않는다.
   useEffect(() => {
-    if (shownPathRef.current === pathname) return;
-    shownPathRef.current = pathname;
+    if (shownLocationRef.current === location) return;
+    shownLocationRef.current = location;
     setOpen(false);
-  }, [pathname]);
+  }, [location]);
 
   useEffect(() => {
     if (!popup) {
@@ -103,7 +103,8 @@ export function HomePopupDialog({ popup, pathname }: { popup: HomePopup | null; 
 
   const closePopup = () => setOpen(false);
   const linkLabel = popup.linkLabel?.trim() || '자세히 보기';
-  const externalLink = popup.linkUrl?.startsWith('https://') ?? false;
+  // 앱 밖으로 나가는 링크는 앱 안 이동이 없어 클릭 즉시 닫아도 닫기 back 과 엇갈리지 않는다.
+  const externalLink = popup.linkUrl ? !popup.linkUrl.startsWith('/') : false;
 
   return createPortal(
     <div
@@ -161,7 +162,7 @@ export function HomePopupDialog({ popup, pathname }: { popup: HomePopup | null; 
                 {linkLabel}
               </a>
             ) : (
-              <Link className="tm-btn tm-btn-md tm-btn-primary" href={popup.linkUrl} onClick={closeIfCurrentPage(popup.linkUrl, pathname ?? '', closePopup)}>
+              <Link className="tm-btn tm-btn-md tm-btn-primary" href={popup.linkUrl} onClick={closeIfCurrentPage(popup.linkUrl, location ?? '', closePopup)}>
                 {linkLabel}
               </Link>
             )

@@ -138,7 +138,7 @@ export function ConfirmModal({
   const confirmationMatched =
     confirmationPhrase === undefined || confirmationInput === confirmationPhrase;
   // 초기 포커스는 패널의 첫 컨트롤 — 입력 확인이 있으면 입력창, 없으면 취소 버튼(실수로 확인하지 않게).
-  const { dialogRef, onBackdropClick } = useModalA11y({ open, onClose: onCancel });
+  const { dialogRef, onBackdropClick } = useModalA11y({ open, onClose: onCancel, exitMs: 0 }); // 닫히면 즉시 렌더를 떼므로 잠금·포커스 복원도 즉시.
 
   useEffect(() => {
     if (open) setConfirmationInput('');

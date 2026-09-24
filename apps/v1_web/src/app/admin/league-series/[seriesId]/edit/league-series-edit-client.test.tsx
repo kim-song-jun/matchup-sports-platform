@@ -14,6 +14,7 @@ const routerPush = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush, replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => '/admin/league-series/series-1/edit',
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({

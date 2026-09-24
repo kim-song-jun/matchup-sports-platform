@@ -30,6 +30,7 @@ import {
   toStandingsRows as publicStandingsToRows,
 } from '@/components/public-game-records/schedule-content';
 import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import type {
   V1TournamentDetail,
   V1TournamentFixture,
@@ -462,8 +463,8 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
     : 0;
   const stages = buildTournamentStages(tournament);
   const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>('schedule');
-  // 순위표에서 팀 전적으로 나갔다 돌아오면 이 화면(대진표·순위)으로 되돌아온다.
-  const bracketSelfHref = `/tournaments/${tournament.id}/bracket`;
+  // 순위표에서 팀 전적으로 나갔다 돌아오면 이 화면(대진표·순위, 받은 출처 포함)으로 되돌아온다.
+  const bracketSelfHref = useCurrentHref();
 
   const { groupPhaseGroups, knockoutFixtures, hasGroupStandings, hasKnockoutFixtures } =
     partitionTournamentSections(format, fixtures, groups);

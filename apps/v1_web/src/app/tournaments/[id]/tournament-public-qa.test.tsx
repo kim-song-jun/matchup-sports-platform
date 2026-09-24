@@ -1,10 +1,17 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { V1TournamentDetail } from '@/types/api';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { renderBracketStandingsTab } from './bracket/bracket-test-utils';
 import { ResultsPageContent } from './results/results-page-client';
 import { queryImageBySrc } from '@/test/next-image';
+
+// 순위표 링크의 출처는 현재 URL(받은 from 포함)이다 — 받은 출처가 있는 상태를 고정한다.
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  usePathname: () => '/tournaments/t1/bracket',
+  useSearchParams: () => new URLSearchParams(),
+}));
 
 function makeTournament(
   overrides: Partial<V1TournamentDetail> & Pick<V1TournamentDetail, 'format' | 'status'>,

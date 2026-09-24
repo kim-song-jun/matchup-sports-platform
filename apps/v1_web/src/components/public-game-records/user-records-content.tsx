@@ -65,15 +65,17 @@ function competitionLabel(item: PublicUserRecordItem): string | null {
   return item.tournamentTitle ?? item.leagueTitle ?? null;
 }
 
-function userRecordHref(item: PublicUserRecordItem): string | null {
+function userRecordHref(item: PublicUserRecordItem, fromHref: string): string | null {
+  // 뒤로가기가 이 활동 기록으로 돌아오도록 출처를 함께 넘긴다(각 상세 화면이 `?from=`을 읽는다).
+  const from = `?from=${encodeURIComponent(fromHref)}`;
   if (item.leagueId && item.teamMatchId) {
-    return `/league-matches/${item.leagueId}/fixtures/${item.teamMatchId}`;
+    return `/league-matches/${item.leagueId}/fixtures/${item.teamMatchId}${from}`;
   }
   if (item.tournamentId && item.teamMatchId) {
-    return `/tournaments/${item.tournamentId}/matches/${item.teamMatchId}`;
+    return `/tournaments/${item.tournamentId}/matches/${item.teamMatchId}${from}`;
   }
-  if (item.teamMatchId) return `/team-matches/${item.teamMatchId}`;
-  if (item.tournamentId) return `/tournaments/${item.tournamentId}`;
+  if (item.teamMatchId) return `/team-matches/${item.teamMatchId}${from}`;
+  if (item.tournamentId) return `/tournaments/${item.tournamentId}${from}`;
   return null;
 }
 
@@ -213,7 +215,7 @@ export function UserRecordsContent({
             {data.tournamentAwards.map((award) => (
               <Link
                 key={award.id}
-                href={`/tournaments/${award.tournamentId}`}
+                href={`/tournaments/${award.tournamentId}?from=${encodeURIComponent(`/users/${data.userId}/records`)}`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -297,7 +299,7 @@ export function UserRecordsContent({
         ) : (
           <Card pad={0}>
             {data.items.map((item) => {
-              const href = userRecordHref(item);
+              const href = userRecordHref(item, `/users/${data.userId}/records`);
               return href ? (
                 <Link
                   key={item.id}

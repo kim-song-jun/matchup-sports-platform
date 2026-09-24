@@ -285,7 +285,8 @@ function toMatchResult(item: V1Match) {
     type: '매치',
     title: item.title,
     meta: [item.sport?.name ?? item.sportName, item.place?.name ?? item.placeName, formatDateTime(item.startsAt), item.capacityText].filter(Boolean).join(' · '),
-    href: `/matches/${item.matchId ?? item.id}`,
+    // 뒤로가기가 검색 화면으로 돌아오도록 출처를 함께 넘긴다(matches-client.tsx가 `?from=`을 읽는다).
+    href: `/matches/${item.matchId ?? item.id}?from=${encodeURIComponent('/search')}`,
   };
 }
 
@@ -294,7 +295,7 @@ function toTeamMatchResult(item: V1TeamMatch) {
     type: '팀매치',
     title: item.title,
     meta: [item.sport?.name ?? item.sportName, item.hostTeam?.name ?? item.hostTeamName, item.place?.name ?? item.placeName, formatDateTime(item.startsAt)].filter(Boolean).join(' · '),
-    href: `/team-matches/${item.teamMatchId ?? item.id}`,
+    href: `/team-matches/${item.teamMatchId ?? item.id}?from=${encodeURIComponent('/search')}`,
   };
 }
 

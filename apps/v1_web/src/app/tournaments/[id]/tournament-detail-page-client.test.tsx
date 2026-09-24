@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackEvent } from '@/lib/analytics';
 import type { V1TournamentDetail } from '@/types/api';
 import { TournamentDetailPageClient } from './tournament-detail-client';
@@ -23,6 +23,9 @@ const tournamentApiMocks = vi.hoisted(() => ({
   useV1Reviews: vi.fn(),
 }));
 
+// 기본값은 빈 파라미터라 기존 테스트 동작은 그대로다 — `?from=` 테스트만 갈아끼운다.
+const searchParamsRef = vi.hoisted(() => ({ current: new URLSearchParams() }));
+
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/hooks/use-v1-api')>()),
   ...tournamentApiMocks,
@@ -38,7 +41,7 @@ vi.mock('next/navigation', () => ({
     push: vi.fn(),
     replace: vi.fn(),
   }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParamsRef.current,
 }));
 
 function makeTournament(overrides: Partial<V1TournamentDetail> = {}): V1TournamentDetail {
@@ -241,5 +244,49 @@ describe('TournamentDetailPageClient — 참가 전 유의사항과 환불 정�
     expect(screen.getAllByText('환불 불가').length).toBeGreaterThan(0);
     expect(screen.getAllByText('주최 취소').length).toBeGreaterThan(0);
     expect(screen.getAllByText('대회 연기').length).toBeGreaterThan(0);
+  });
+});
+
+// alpha 실측(2026-09-24): 데스크톱 "대회 목록으로" 헤더 링크가 항상 href="/tournaments"로
+// 고정돼 있었다 — 홈/활동기록 등 어디서 들어왔든 뒤로가기가 전체 대회 목록으로만
+// 나갔다(MD-QA #15 후속).
+describe('TournamentDetailPageClient — 뒤로가기 출처(?from=)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tournamentApiMocks.useV1MyRegistrations.mockReturnValue({ data: [] });
+    tournamentApiMocks.useV1Reviews.mockReturnValue({
+      data: undefined,
+      isError: false,
+      isPending: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+    tournamentApiMocks.useV1Tournament.mockReturnValue({
+      data: makeTournament(),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    searchParamsRef.current = new URLSearchParams();
+  });
+
+  it('?from=이 있으면 그 화면으로 돌아간다', async () => {
+    searchParamsRef.current = new URLSearchParams('from=%2Fhome');
+
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/home');
+  });
+
+  it('?from=이 없으면 전체 대회 목록으로 돌아간다', async () => {
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/tournaments');
   });
 });

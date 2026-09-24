@@ -92,6 +92,12 @@ export type MatchDetailViewModel = {
   completed?: boolean;
   canComplete?: boolean;
   withdrawApplicationId?: string | null;
+  /**
+   * 뒤로가기 목적지. `/matches/:id`는 topBar:false라 셸 뒤로가기가 없고 페이지가 직접
+   * 모바일·데스크톱 링크를 그린다 — 계산 위치: `MatchDetailPageClient`(matches-client.tsx).
+   * 없으면 '/matches'로 고정.
+   */
+  backHref?: string;
   match: MatchCardModel & {
     lifecycleStatus?: V1MatchApiStatus;
     description: string;

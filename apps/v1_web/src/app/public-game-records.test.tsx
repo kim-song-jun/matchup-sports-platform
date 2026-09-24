@@ -515,7 +515,11 @@ describe('TeamRecordsContent — 경기 기록 아코디언', () => {
       items: [{ ...makeTeamRecords().items[0], events: [makeTeamRecordEvent()] }],
     });
     const { container } = render(<TeamRecordsContent data={data} />);
-    const link = container.querySelector('a[href="/tournaments/tournament-1"]');
+    // 뒤로가기가 이 팀 전적으로 돌아오도록 `?from=`을 함께 실어 보낸다(MD-QA #15 후속).
+    // CSS 속성 선택자는 href 값의 `?`를 못 다뤄 항상 null을 준다 — 배열에서 직접 찾는다.
+    const link = Array.from(container.querySelectorAll('a')).find(
+      (a) => a.getAttribute('href') === '/tournaments/tournament-1?from=%2Fteams%2Fteam-1%2Frecords',
+    );
     expect(link).toBeInTheDocument();
     // 버튼은 <a> 안이 아니라 형제 요소여야 한다(a 안에 button 중첩 금지).
     expect(link?.querySelector('button')).toBeNull();

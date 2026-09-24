@@ -80,9 +80,10 @@ describe('TournamentHeroCard', () => {
       'href',
       '/tournaments/campaigns/summer-futsal-cup',
     );
+    // 뒤로가기가 홈으로 돌아오도록 `?from=`을 함께 실어 보낸다(MD-QA #15 후속).
     expect(screen.getByRole('link', { name: /홈 detail-tournament/ })).toHaveAttribute(
       'href',
-      '/tournaments/detail-tournament',
+      '/tournaments/detail-tournament?from=%2Fhome',
     );
   });
 });

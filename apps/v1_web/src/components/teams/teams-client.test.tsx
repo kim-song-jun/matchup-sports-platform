@@ -39,6 +39,7 @@ const teamApiMocks = vi.hoisted(() => ({
 }));
 
 const routerMocks = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
+const navigationMocks = vi.hoisted(() => ({ searchParams: new URLSearchParams() }));
 
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/hooks/use-v1-api')>()),
@@ -52,7 +53,7 @@ vi.mock('@/lib/analytics', () => ({
 vi.mock('next/navigation', () => ({
   usePathname: () => '/teams/team-1',
   useRouter: () => routerMocks,
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => navigationMocks.searchParams,
 }));
 
 function render(ui: ReactElement) {
@@ -75,6 +76,7 @@ function render(ui: ReactElement) {
 // 한 번만 기본값을 준다. 값이 필요한 테스트는 각자 mockReturnValue 로 덮어쓴다.
 beforeEach(() => {
   teamApiMocks.useV1LeagueMatches.mockReturnValue({ data: undefined, isLoading: false });
+  navigationMocks.searchParams = new URLSearchParams();
 });
 
 describe('TeamDetailPageClient GA events', () => {
@@ -472,6 +474,26 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     expect(memberLinks.length).toBeGreaterThanOrEqual(2);
     // 뒤로가기가 이 팀 상세로 돌아오도록 `?from=`을 함께 실어 보낸다(QA 피드백 #1).
     memberLinks.forEach((link) => expect(link).toHaveAttribute('href', '/users/user-owner-42?from=%2Fteams%2Fteam-1'));
+  });
+
+  // alpha 실측(2026-09-23): 모바일 셸의 ShellOverride.backHref는 `?from=`을 따라갔지만
+  // 데스크톱 "팀 목록으로" 헤더 링크는 별도 하드코딩(`href="/teams"`)이라 안 따라갔다 —
+  // 두 UI 요소가 같은 `fromPath`를 쓰도록 model.backHref로 통일했다(MD-QA #15 후속).
+  it('내 팀 목록에서 들어오면 데스크톱 "팀 목록으로" 링크도 그 화면으로 돌아간다', () => {
+    navigationMocks.searchParams = new URLSearchParams('from=%2Fmy%2Fteams');
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.getByRole('link', { name: '팀 목록으로' })).toHaveAttribute('href', '/my/teams');
+  });
+
+  it('출처가 없으면 데스크톱 "팀 목록으로" 링크는 전체 팀 목록으로 돌아간다', () => {
+    teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    expect(screen.getByRole('link', { name: '팀 목록으로' })).toHaveAttribute('href', '/teams');
   });
 
   it('멤버 목록이 비공개인 팀에서는 미리보기도 더보기 CTA도 노출되지 않는다', () => {

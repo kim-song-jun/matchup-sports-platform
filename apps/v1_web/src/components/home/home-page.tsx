@@ -755,7 +755,7 @@ function SidebarTournamentsWidget({ items, loading }: { items: V1TournamentListI
             return (
               <Link
                 key={t.id}
-                href={`/tournaments/${t.id}`}
+                href={`/tournaments/${t.id}?from=${encodeURIComponent('/home')}`}
                 className="tm-pressable"
                 aria-label={`대회 상세 보기 — ${t.title}`}
                 style={{

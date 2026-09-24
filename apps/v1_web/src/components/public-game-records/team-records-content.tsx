@@ -49,12 +49,14 @@ function competitionLabel(item: PublicTeamRecordItem): string | null {
 /** 대회 축이면 대회 상세로, 팀매치 축이면 팀매치 상세로 이동한다. canonical tournament
  * 행은 두 식별자를 모두 가지므로 실제 경기 상세 route를 사용하고, legacy fixture는
  * tournament 상세를 유지한다. */
-function recordHref(item: PublicTeamRecordItem): string | null {
+function recordHref(item: PublicTeamRecordItem, fromHref: string): string | null {
+  // 뒤로가기가 이 팀 전적으로 돌아오도록 출처를 함께 넘긴다(각 상세 화면이 `?from=`을 읽는다).
+  const from = `?from=${encodeURIComponent(fromHref)}`;
   if (item.tournamentId && item.teamMatchId) {
-    return `/tournaments/${item.tournamentId}/matches/${item.teamMatchId}`;
+    return `/tournaments/${item.tournamentId}/matches/${item.teamMatchId}${from}`;
   }
-  if (item.tournamentId) return `/tournaments/${item.tournamentId}`;
-  if (item.teamMatchId) return `/team-matches/${item.teamMatchId}`;
+  if (item.tournamentId) return `/tournaments/${item.tournamentId}${from}`;
+  if (item.teamMatchId) return `/team-matches/${item.teamMatchId}${from}`;
   return null;
 }
 
@@ -386,7 +388,7 @@ export function TeamRecordsContent({
         ) : (
           <Card pad={0}>
             {data.items.map((item) => {
-              const href = recordHref(item);
+              const href = recordHref(item, `/teams/${data.teamId}/records`);
               const hasEvents = item.events.length > 0;
               const isExpanded = hasEvents && expandedGameIds.has(item.gameId);
               const panelId = `team-record-events-${item.gameId}`;

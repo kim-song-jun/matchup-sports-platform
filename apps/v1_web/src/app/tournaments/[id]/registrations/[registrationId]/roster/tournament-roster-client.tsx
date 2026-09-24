@@ -1131,7 +1131,11 @@ export function TournamentRosterPageClient({
   const { data: registration } = useV1Registration(tournamentId, registrationId);
   // '내 신청' 화면이 이 화면에 실어 보낸 from 을 그대로 이어 돌아간다.
   const searchParams = useSearchParams();
-  const myRegistrationHref = withFromPath(`/tournaments/${tournamentId}/my`, searchParams.get('from'));
+  // 이 명단의 부모는 그 신청 상세(?reg=)다 — 받은 출처가 그 화면이면 선택 상태·출처째로 접힌다.
+  const myRegistrationHref = withFromPath(
+    `/tournaments/${tournamentId}/my?reg=${encodeURIComponent(registrationId)}`,
+    searchParams.get('from'),
+  );
   // M-T 감사: member 역할에게도 '+ 추가'·'수정'·'삭제'가 전부 활성 상태로 노출됐다 —
   // 이 화면은 신청 목록을 거치지 않고 URL로 바로 올 수 있어 팀장/매니저 권한을 여기서
   // 직접 확인해야 한다(내 신청 카드는 useMyTeams()로 이미 아는 role을 prop으로 받지만,

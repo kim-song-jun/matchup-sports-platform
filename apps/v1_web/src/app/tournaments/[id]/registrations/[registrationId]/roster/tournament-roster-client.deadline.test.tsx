@@ -645,16 +645,26 @@ describe('TournamentRosterPageClient — "내 신청으로 돌아가기" 는 받
 
     expect(screen.getByRole('link', { name: '내 신청으로 돌아가기' })).toHaveAttribute(
       'href',
-      `/tournaments/tournament-1/my?from=${encodeURIComponent('/home')}`,
+      `/tournaments/tournament-1/my?reg=reg-1&from=${encodeURIComponent('/home')}`,
     );
   });
 
-  it('대조군: from 이 없으면 "내 신청" 경로만 쓴다', () => {
+  // 내 신청 상세(?reg=)에서 들어왔으면 그 URL(선택 상태·원래 출처)째로 돌아간다.
+  it('받은 from 이 그 신청 상세면 선택 상태와 원래 출처를 그대로 쓴다', () => {
+    const detail = `/tournaments/tournament-1/my?reg=reg-1&from=${encodeURIComponent('/home')}`;
+    rosterSearchParams = new URLSearchParams({ from: detail });
+
+    render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
+
+    expect(screen.getByRole('link', { name: '내 신청으로 돌아가기' })).toHaveAttribute('href', detail);
+  });
+
+  it('대조군: from 이 없으면 그 신청 상세(?reg=)로 돌아간다', () => {
     render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
 
     expect(screen.getByRole('link', { name: '내 신청으로 돌아가기' })).toHaveAttribute(
       'href',
-      '/tournaments/tournament-1/my',
+      '/tournaments/tournament-1/my?reg=reg-1',
     );
   });
 });

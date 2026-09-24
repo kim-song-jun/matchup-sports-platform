@@ -22,7 +22,6 @@ import type { V1MatchApplication } from '@/types/api';
 
 type Attendance = Record<string, 'completed' | 'no_show'>;
 
-/** `path` 의 pathname 부분만 — `?`·`#` 앞까지. */
 export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
   const router = useRouter();
   const matchDetailPath = `/matches/${matchId}`;

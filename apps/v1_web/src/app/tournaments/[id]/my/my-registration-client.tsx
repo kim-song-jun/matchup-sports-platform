@@ -280,7 +280,9 @@ function RegistrationPass({
   isRosterLocked: boolean;
   belowMinimum: boolean;
 }) {
-  const rosterHref = appRoute(`/tournaments/${tournamentId}/registrations/${registrationId}/roster`);
+  // 명단에서 돌아올 때 이 화면(받은 출처 포함)으로 오도록 출처를 싣는다.
+  const currentHref = useCurrentHref();
+  const rosterHref = withFromPath(appRoute(`/tournaments/${tournamentId}/registrations/${registrationId}/roster`), currentHref);
 
   /* #24: awaiting_payment도 동등 강도로 렌더 — orange accent + 계좌 정보 안내 카드 */
   if (status === 'awaiting_payment') {
@@ -649,7 +651,9 @@ function RegistrationDetailView({
   registration: V1TournamentRegistration;
   canManageRegistration: boolean;
 }) {
-  const rosterHref = appRoute(`/tournaments/${tournamentId}/registrations/${registration.id}/roster`);
+  // 명단에서 돌아올 때 이 화면(받은 출처 포함)으로 오도록 출처를 싣는다.
+  const currentHref = useCurrentHref();
+  const rosterHref = withFromPath(appRoute(`/tournaments/${tournamentId}/registrations/${registration.id}/roster`), currentHref);
   const { data: rosterData } = useV1TournamentPlayers(tournamentId, registration.id);
   const cancelRequest = useV1CancelRegistrationRequest(tournamentId, registration.id);
   const withdrawCancelRequest = useV1WithdrawCancelRegistrationRequest(tournamentId, registration.id);

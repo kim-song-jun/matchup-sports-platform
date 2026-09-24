@@ -388,6 +388,27 @@ describe('MyRegistrationPageClient — 대회 상세·재신청 CTA 는 from 을
     }
   });
 
+  // 명단에서 돌아올 때 받은 출처까지 담은 이 화면으로 오도록, 명단 링크가 현재 URL 을 출처로 싣는다.
+  it('명단 링크는 받은 출처까지 담은 이 화면을 출처로 싣는다', () => {
+    searchParams = new URLSearchParams({ reg: 'registration-1', from: '/home' });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration()],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    const rosterLinks = screen
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href') ?? '')
+      .filter((href) => href.includes('/roster'));
+    expect(rosterLinks.length).toBeGreaterThan(0);
+    const expectedFrom = encodeURIComponent(`/tournaments/tournament-1/my?${new URLSearchParams({ reg: 'registration-1', from: '/home' }).toString()}`);
+    for (const href of rosterLinks) expect(href.endsWith(`?from=${expectedFrom}`)).toBe(true);
+  });
+
   it('대조군: from 이 없으면 "대회 상세 보기" 는 상세 경로만 쓴다', () => {
     searchParams = new URLSearchParams({ reg: 'registration-1' });
     myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({

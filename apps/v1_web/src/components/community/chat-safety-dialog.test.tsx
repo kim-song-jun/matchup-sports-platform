@@ -8,7 +8,7 @@ const state = vi.hoisted(() => ({
   report: { mutate:vi.fn(),isPending:false,error:null as Error|null,data:undefined },
 }));
 vi.mock('@/hooks/use-chat-safety',()=>({useChatSafety:()=>state}));
-vi.mock('next/navigation',()=>({usePathname:()=>'/chat/room',useSearchParams:()=>new URLSearchParams('from=notifications')}));
+vi.mock('next/navigation',()=>({usePathname:()=>'/chat/room',useSearchParams:()=>new URLSearchParams('from=%2Fnotifications')}));
 describe('chat safety controls',()=>{
  beforeEach(()=>{vi.clearAllMocks();state.block.error=null;state.report.error=null;state.blocked.isError=false;});
  it('requires an explicit second confirmation before blocking',()=>{

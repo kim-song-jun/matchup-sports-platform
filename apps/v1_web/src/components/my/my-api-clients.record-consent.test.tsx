@@ -128,11 +128,11 @@ describe('RecordConsentSettingsPageClient', () => {
     expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/home');
   });
 
-  // 알림을 거치면 딥링크의 from=tournament 가 from=notifications 로 바뀐다 — 대회 맥락은 tournamentId 로 남아야 한다.
+  // 알림을 거치면 딥링크의 from=tournament 가 from=/notifications 로 바뀐다 — 대회 맥락은 tournamentId 로 남아야 한다.
   it('알림에서 들어오면 대회 맥락을 유지하고 뒤로가기는 알림으로 간다', () => {
     hooks.consent.mockReturnValue({ data: { granted: false, effectiveAt: null }, isLoading: false, isError: false, refetch: vi.fn() });
     hooks.updateConsent.mockReturnValue({ mutate: vi.fn(), isPending: false });
-    hooks.searchParams.mockReturnValue(new URLSearchParams('from=notifications&tournamentId=t1'));
+    hooks.searchParams.mockReturnValue(new URLSearchParams('from=%2Fnotifications&tournamentId=t1'));
 
     renderWithClient(<RecordConsentSettingsPageClient />);
 

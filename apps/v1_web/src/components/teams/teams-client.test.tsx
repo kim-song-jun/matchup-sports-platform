@@ -230,7 +230,8 @@ describe('TeamMembersPageClient GA events', () => {
 
     render(<><ShellProbe /><TeamMembersPageClient teamId="team-1" /></>);
 
-    expect(published).toEqual({ backHref: detailHref });
+    // backHref는 더 이상 게시하지 않는다 — AppBackLink가 `?from=`을 직접 읽는다.
+    expect(published).toEqual({});
     expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', detailHref);
     const membersHref = `/teams/team-1/members?from=${encodeURIComponent(detailHref)}`;
     screen.getAllByRole('link', { name: /김도윤/ }).forEach((link) =>
@@ -252,7 +253,8 @@ describe('TeamMembersPageClient GA events', () => {
 
     render(<><ShellProbe /><TeamMembersPageClient teamId="team-1" /></>);
 
-    expect(published).toEqual({ title: '멤버 목록이 비공개예요', backHref: '/teams/team-1?from=%2Fmy%2Fteams' });
+    // backHref는 더 이상 게시하지 않는다 — AppBackLink가 `?from=`을 직접 읽는다.
+    expect(published).toEqual({ title: '멤버 목록이 비공개예요' });
   });
 
   it('출처 없이 들어오면 팀 상세로 돌아가는 기본값을 그대로 쓴다', () => {
@@ -563,9 +565,7 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     memberLinks.forEach((link) => expect(link).toHaveAttribute('href', '/users/user-owner-42?from=%2Fteams%2Fteam-1'));
   });
 
-  // alpha 실측(2026-09-23): 모바일 셸의 ShellOverride.backHref는 `?from=`을 따라갔지만
-  // 데스크톱 "팀 목록으로" 헤더 링크는 별도 하드코딩(`href="/teams"`)이라 안 따라갔다 —
-  // 두 UI 요소가 같은 `fromPath`를 쓰도록 model.backHref로 통일했다(MD-QA #15 후속).
+  // 데스크톱 "팀 목록으로" 헤더 링크(AppBackLink)도 모바일 셸과 마찬가지로 `?from=`을 직접 읽는다.
   it('내 팀 목록에서 들어오면 데스크톱 뒤로가기 링크도 그 화면으로 돌아간다', () => {
     navigationMocks.searchParams = new URLSearchParams('from=%2Fmy%2Fteams');
     teamApiMocks.useV1TeamDetail.mockReturnValue({ data: baseTeamDetail(), isError: false });
@@ -617,7 +617,8 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
 
     render(<><ShellProbe /><TeamDetailPageClient teamId="team-1" /></>);
 
-    expect(published).toEqual({ title: '팀 목록을 불러오지 못했어요', backHref: '/my/teams' });
+    // backHref는 더 이상 게시하지 않는다 — AppBackLink가 `?from=`을 직접 읽는다.
+    expect(published).toEqual({ title: '팀 목록을 불러오지 못했어요' });
   });
 
   it('멤버 목록이 비공개인 팀에서는 미리보기도 더보기 CTA도 노출되지 않는다', () => {

@@ -167,9 +167,10 @@ export function MatchStatePageView({ model }: { model: MatchStateViewModel }) {
   const backHref = model.backHref ?? '/matches';
   return (
     <>
-      {/* 데스크톱: 기존 자체 헤더(뒤로가기+제목) 유지 */}
+      {/* 데스크톱: 기존 자체 헤더(뒤로가기+제목) 유지. AppBackLink는 `?from=`을 직접 읽으므로
+          fallback은 출처 없을 때의 고정 목적지만 준다. */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <AppBackLink className="tm-desktop-back" fallbackHref={backHref}>
+        <AppBackLink className="tm-desktop-back" fallbackHref="/matches">
           <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
         </AppBackLink>
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{model.title}</h1>
@@ -310,9 +311,10 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
 
   return (
     <>
-      {/* Desktop: back link + match title (mobile topbar is hidden on desktop) */}
+      {/* Desktop: back link + match title (mobile topbar is hidden on desktop). AppBackLink
+          reads `?from=` itself, so the fallback is only the no-from default. */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <AppBackLink className="tm-desktop-back" fallbackHref={model.backHref ?? '/matches'}>
+        <AppBackLink className="tm-desktop-back" fallbackHref="/matches">
           <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
         </AppBackLink>
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{match.title}</h1>

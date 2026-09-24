@@ -95,15 +95,6 @@ export function sanitizeRedirectPath(value: string | null | undefined) {
   return `${resolved.pathname}${resolved.search}${resolved.hash}`;
 }
 
-/**
- * `?from=` 값을 뒤로가기 목적지로 푼다. 알림 딥링크는 경로가 아니라 `notifications` 표식을 싣는다
- * (notification-route.ts) — 표식을 경로로 바꾼 뒤 나머지는 sanitizeRedirectPath 규칙을 그대로 따른다.
- */
-export function readBackFrom(value: string | null | undefined) {
-  if (value === 'notifications') return '/notifications';
-  return sanitizeRedirectPath(value);
-}
-
 const FROM_CHAIN_MAX_DEPTH = 4;
 
 function appendFrom(path: string, from: string | null) {
@@ -128,9 +119,9 @@ function splitFrom(url: string) {
  * 체인은 FROM_CHAIN_MAX_DEPTH 단계까지만 남긴다 — 안 그러면 오갈 때마다 URL 이 끝없이 길어진다.
  */
 export function withFromPath(path: string, from: string | null | undefined) {
-  // 체인의 각 단계는 사용자가 조작할 수 있는 값이다 — 매 단계 readBackFrom 으로 거르고,
+  // 체인의 각 단계는 사용자가 조작할 수 있는 값이다 — 매 단계 sanitizeRedirectPath 으로 거르고,
   // 통과하지 못하면 그 아래는 버린다(파싱할 수 없는 값·표식이 경로처럼 섞이지 않게).
-  const first = readBackFrom(from);
+  const first = sanitizeRedirectPath(from);
   if (!first) return path;
   let target: string;
   try {
@@ -147,7 +138,7 @@ export function withFromPath(path: string, from: string | null | undefined) {
     if (bases.length === FROM_CHAIN_MAX_DEPTH) break;
     // 같은 화면인지는 hash 없이 가리고, 다시 엮을 때는 hash 를 되살린다.
     bases.push(`${level.base}${level.hash}`);
-    cursor = readBackFrom(level.from);
+    cursor = sanitizeRedirectPath(level.from);
   }
   let rebuilt: string | null = null;
   for (let index = bases.length - 1; index >= 0; index -= 1) rebuilt = appendFrom(bases[index], rebuilt);

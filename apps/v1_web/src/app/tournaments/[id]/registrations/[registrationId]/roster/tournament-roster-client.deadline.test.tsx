@@ -21,6 +21,13 @@ vi.mock('@/components/v1-ui/shell', () => ({
   AppChrome: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
+// '내 신청으로 돌아가기' 링크의 from 을 검증하는 테스트만 override 한다.
+let rosterSearchParams = new URLSearchParams();
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  useSearchParams: () => rosterSearchParams,
+}));
+
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1Tournament: vi.fn(),
   useV1Registration: vi.fn(),
@@ -596,5 +603,68 @@ describe('TournamentRosterPageClient — 명단 수정 권한(M-T)', () => {
     expect(screen.queryByText('팀장에게 요청')).not.toBeInTheDocument();
     // 팀 권한과 무관한 마감 정보는 조회 실패와 상관없이 그대로 보인다.
     expect(screen.getByText('대회 신청 마감')).toBeInTheDocument();
+  });
+});
+
+describe('TournamentRosterPageClient — "내 신청으로 돌아가기" 는 받은 from 을 잇는다', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    rosterSearchParams = new URLSearchParams();
+  });
+
+  beforeEach(() => {
+    useV1TournamentMock.mockReturnValue({
+      data: { minPlayers: 5, maxPlayers: 20, rosterDeadlineAt: null, status: 'open' },
+    } as unknown as ReturnType<typeof useV1Tournament>);
+    useV1RegistrationMock.mockReturnValue({
+      data: { id: 'reg-1', teamId: 'team-1', status: 'confirmed', rosterLockedAt: null, rosterDeadlineOverrideAt: null },
+    } as unknown as ReturnType<typeof useV1Registration>);
+    useV1TeamDetailMock.mockReturnValue({
+      data: { viewer: { role: 'owner' } },
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TeamDetail>);
+    useV1TournamentPlayersMock.mockReturnValue({
+      data: { players: [], belowMinimum: false },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useV1TournamentPlayers>);
+    useV1AddPlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1AddPlayer>);
+    useV1UpdatePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1UpdatePlayer>);
+    useV1RemovePlayerMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as unknown as ReturnType<typeof useV1RemovePlayer>);
+  });
+
+  it('받은 from 을 "내 신청" URL 에 그대로 싣는다', () => {
+    rosterSearchParams = new URLSearchParams({ from: '/home' });
+
+    render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
+
+    expect(screen.getByRole('link', { name: '내 신청으로 돌아가기' })).toHaveAttribute(
+      'href',
+      `/tournaments/tournament-1/my?reg=reg-1&from=${encodeURIComponent('/home')}`,
+    );
+  });
+
+  // 내 신청 상세(?reg=)에서 들어왔으면 그 URL(선택 상태·원래 출처)째로 돌아간다.
+  it('받은 from 이 그 신청 상세면 선택 상태와 원래 출처를 그대로 쓴다', () => {
+    const detail = `/tournaments/tournament-1/my?reg=reg-1&from=${encodeURIComponent('/home')}`;
+    rosterSearchParams = new URLSearchParams({ from: detail });
+
+    render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
+
+    expect(screen.getByRole('link', { name: '내 신청으로 돌아가기' })).toHaveAttribute('href', detail);
+  });
+
+  it('대조군: from 이 없으면 그 신청 상세(?reg=)로 돌아간다', () => {
+    render(<TournamentRosterPageClient tournamentId="tournament-1" registrationId="reg-1" />);
+
+    expect(screen.getByRole('link', { name: '내 신청으로 돌아가기' })).toHaveAttribute(
+      'href',
+      '/tournaments/tournament-1/my?reg=reg-1',
+    );
   });
 });

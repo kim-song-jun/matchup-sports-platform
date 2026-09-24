@@ -1,6 +1,5 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
 import { usePublicMatch } from '@/components/public-game-records/use-public-game-records';
@@ -8,8 +7,7 @@ import { MatchDetailContent } from '@/components/public-game-records/match-detai
 import { AttestRequestsSection } from '@/components/public-game-records/attest-requests';
 import { ClaimMyRecordSection } from '@/components/public-game-records/claim-my-record';
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
-import { useShellOverride } from '@/components/v1-ui/shell-override';
-import { readBackFrom } from '@/lib/session-storage';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 
 function MatchSkeleton() {
   return (
@@ -24,9 +22,8 @@ function MatchSkeleton() {
  * 부모 page.tsx 의 notFound() 가 지고, public-game-records.test.tsx 가 고정한다. */
 export function MatchPageClient({ tournamentId, fixtureId }: { tournamentId: string; fixtureId: string }) {
   const { data, isLoading, isError, error, refetch } = usePublicMatch(tournamentId, fixtureId);
-  // 활동 기록·팀 전적처럼 대진표가 아닌 곳에서 들어왔으면 그 화면으로 돌아간다.
-  const fromPath = readBackFrom(useSearchParams().get('from'));
-  useShellOverride(fromPath ? { backHref: fromPath } : {});
+  // 경기 기록의 팀·다음 경기 링크가 이 화면(받은 출처 포함)으로 돌아오게 한다.
+  const currentHref = useCurrentHref();
 
   if (isLoading) {
     return (
@@ -45,7 +42,7 @@ export function MatchPageClient({ tournamentId, fixtureId }: { tournamentId: str
 
   return (
     <>
-      <MatchDetailContent data={data} />
+      <MatchDetailContent data={data} from={currentHref ?? undefined} />
       <div style={{ padding: '0 16px' }}>
         {/* 기록 연결 승인함 (attest UI C안): 다른 참가자의 연결 신청을 확인·승인하는
             반대쪽 절반. 신청 알림의 착지 화면이기도 하다 — 요청이 있을 때만 보인다. */}

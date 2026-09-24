@@ -162,6 +162,30 @@ describe('SearchExperience GA events', () => {
     expect(router.push).toHaveBeenCalledWith('/matches/match-1?from=%2Fsearch%3Fq%3Dfutsal');
     expect(router.push).toHaveBeenCalledWith('/teams/team-1?from=%2Fsearch%3Fq%3Dfutsal');
   });
+
+  it('리그·팀매치 결과도 검색어를 담은 출처로 상세에 간다', async () => {
+    apiMocks.matches = { items: [] };
+    apiMocks.teamMatches = {
+      items: [{ id: 'tm-1', teamMatchId: 'tm-1', title: '성수 친선매치', sportName: '풋살', hostTeamName: '성수 FC', placeName: '성수 풋살장', startsAt: '2026-09-01T10:00:00.000Z' }],
+    };
+    apiMocks.leagues = {
+      items: [
+        {
+          leagueId: 'league-1', title: '성수 Futsal 리그', state: 'active',
+          startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-11-30T00:00:00.000Z',
+          sport: { sportId: 's1', code: 'futsal', name: '풋살' }, region: { regionId: 'r1', name: '성동구' },
+          seriesId: null, tier: null, tierLabel: null, seasonNo: null, seriesTitle: null, teamCount: 8,
+        },
+      ],
+    };
+    render(<SearchExperience state="results" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /성수 친선매치/ }));
+    fireEvent.click(screen.getByRole('button', { name: /성수 Futsal 리그/ }));
+
+    expect(router.push).toHaveBeenCalledWith('/team-matches/tm-1?from=%2Fsearch%3Fq%3Dfutsal');
+    expect(router.push).toHaveBeenCalledWith('/league-matches/league-1?from=%2Fsearch%3Fq%3Dfutsal');
+  });
 });
 
 // 2026-09-07 alpha 실측: 이 화면엔 헤딩이 하나도 없어 스크린리더의 헤딩 이동으로 잡히지

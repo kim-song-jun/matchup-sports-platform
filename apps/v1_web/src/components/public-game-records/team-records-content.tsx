@@ -19,6 +19,7 @@ import {
   teamRecordResultLabel,
 } from './format';
 import { resultChipStyle } from './result-emphasis';
+import { withFromPath } from '@/lib/session-storage';
 import type {
   PublicTeamRecordEvent,
   PublicTeamRecordItem,
@@ -51,12 +52,11 @@ function competitionLabel(item: PublicTeamRecordItem): string | null {
  * tournament 상세를 유지한다. */
 function recordHref(item: PublicTeamRecordItem, fromHref: string): string | null {
   // 뒤로가기가 이 팀 전적으로 돌아오도록 출처를 함께 넘긴다(각 상세 화면이 `?from=`을 읽는다).
-  const from = `?from=${encodeURIComponent(fromHref)}`;
   if (item.tournamentId && item.teamMatchId) {
-    return `/tournaments/${item.tournamentId}/matches/${item.teamMatchId}${from}`;
+    return withFromPath(`/tournaments/${item.tournamentId}/matches/${item.teamMatchId}`, fromHref);
   }
-  if (item.tournamentId) return `/tournaments/${item.tournamentId}${from}`;
-  if (item.teamMatchId) return `/team-matches/${item.teamMatchId}${from}`;
+  if (item.tournamentId) return withFromPath(`/tournaments/${item.tournamentId}`, fromHref);
+  if (item.teamMatchId) return withFromPath(`/team-matches/${item.teamMatchId}`, fromHref);
   return null;
 }
 

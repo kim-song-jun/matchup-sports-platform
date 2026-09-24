@@ -1,11 +1,18 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type {
   V1TournamentDetail,
   V1TournamentFixture,
   V1TournamentGroup,
 } from '@/types/api';
 import { ResultsPageContent } from './results-page-client';
+
+// 경기 상세 링크는 이 화면 자신의 URL 을 from 으로 싣는다 — 이 파일의 고정 경로.
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  usePathname: () => '/tournaments/tournament-1/results',
+  useSearchParams: () => new URLSearchParams(),
+}));
 
 /**
  * 최종결과 화면의 조별리그 블록 회귀 테스트.
@@ -196,7 +203,11 @@ describe('최종결과 — 조별리그 경기 블록', () => {
     expandGroupBlock();
 
     const link = screen.getByRole('link', { name: /성수 FC 3 대 1 왕십리 유나이티드/ });
-    expect(link).toHaveAttribute('href', '/tournaments/tournament-1/matches/fixture-a1');
+    // 뒤로가기가 이 결과 화면으로 돌아오도록 이 화면 자신의 경로가 from 으로 실린다.
+    expect(link).toHaveAttribute(
+      'href',
+      `/tournaments/tournament-1/matches/fixture-a1?from=${encodeURIComponent('/tournaments/tournament-1/results')}`,
+    );
   });
 
   it('같은 화면에 조별 경기 목록이 두 벌 생기지 않는다', () => {
@@ -228,7 +239,7 @@ describe('최종결과 — 조별리그 경기 블록', () => {
 
     expect(screen.getByRole('link', { name: /연남 스포츠 경기 결과 미정 망원 FC/ })).toHaveAttribute(
       'href',
-      '/tournaments/tournament-1/matches/fixture-b1',
+      `/tournaments/tournament-1/matches/fixture-b1?from=${encodeURIComponent('/tournaments/tournament-1/results')}`,
     );
     expect(screen.getByText('경기 예정')).toBeInTheDocument();
   });

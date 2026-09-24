@@ -11,10 +11,10 @@ export function normalizeNotificationHref(route?: string | null, type?: string |
 
   if (normalized === '/notifications') return normalized;
 
-  // 딥링크가 이미 `from` 을 싣고 있어도(예: 기록 동의 `from=tournament`) 뒤로가기 출처는 알림이다 —
-  // 키를 하나 더 붙이면 get('from') 이 앞의 값을 읽는다.
+  // 딥링크에 이미 `from` 이 있어도(예: 기록 동의 `from=tournament`) 알림 출처로 덮어써 하나만 남긴다 —
+  // append 로 두 개가 되면 get('from') 이 앞의 값을 읽어 알림으로 돌아가지 못한다.
   const url = new URL(normalized, 'https://teameet.internal');
-  url.searchParams.set('from', 'notifications');
+  url.searchParams.set('from', '/notifications');
   return `${url.pathname}${url.search}${url.hash}`;
 }
 

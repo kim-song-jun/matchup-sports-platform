@@ -284,10 +284,37 @@ describe('MatchDetailContent — 팀 이름 진입점', () => {
     expect(screen.getByRole('link', { name: '원정팀' })).toHaveAttribute('href', '/teams/team-away');
   });
 
+  // 공유 기록 페이지 등 from을 받은 자리에서는 팀 상세에서 뒤로가면 이 기록 화면으로 돌아온다.
+  it('from을 받으면 팀 링크에 출처를 이어 싣는다', () => {
+    render(<MatchDetailContent data={makeDetail()} from="/league-matches/lg-1/fixtures/fx-1" />);
+
+    const from = encodeURIComponent('/league-matches/lg-1/fixtures/fx-1');
+    expect(screen.getByRole('link', { name: '홈팀' })).toHaveAttribute('href', `/teams/team-home?from=${from}`);
+    expect(screen.getByRole('link', { name: '원정팀' })).toHaveAttribute('href', `/teams/team-away?from=${from}`);
+  });
+
   /**
    * `registrationId` 가 있으면 참가팀은 존재하지만 이름만 가려진 상태다. 이 경우 실제
    * TBD인 `side: null`과 같은 '미정'으로 표시하면 공개 상태를 오해하게 만든다.
    */
+  it('"다음 경기" 카드는 from을 받으면 출처를 이어 싣고, 없으면 그대로 둔다', () => {
+    const nextMatch = {
+      fixtureId: 'fixture-2',
+      round: '2라운드',
+      scheduledAt: null,
+      home: { teamId: 'team-home', teamName: '홈팀' },
+      away: { teamId: 'team-away', teamName: '원정팀' },
+    };
+    const { rerender } = render(<MatchDetailContent data={makeDetail({ nextMatch })} />);
+    expect(screen.getByRole('link', { name: /다음 경기/ })).toHaveAttribute('href', '/tournaments/tour-1/matches/fixture-2');
+
+    rerender(<MatchDetailContent data={makeDetail({ nextMatch })} from="/league-matches/lg-1/fixtures/fx-1" />);
+    expect(screen.getByRole('link', { name: /다음 경기/ })).toHaveAttribute(
+      'href',
+      `/tournaments/tour-1/matches/fixture-2?from=${encodeURIComponent('/league-matches/lg-1/fixtures/fx-1')}`,
+    );
+  });
+
   it.each([null, 'team-id'])('이름이 가려졌으면 팀 ID %s와 무관하게 참가팀 비공개로 표시한다', (teamId) => {
     const data = makeDetail({
       home: { registrationId: 'reg-home', teamId, teamName: null },

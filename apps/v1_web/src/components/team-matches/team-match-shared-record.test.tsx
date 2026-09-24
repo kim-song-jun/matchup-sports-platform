@@ -4,12 +4,17 @@ import { TeamMatchSharedRecord } from './team-match-shared-record';
 import type { SharedRecord } from '@/hooks/use-team-match-record';
 
 const state = vi.hoisted(() => ({ data: {} as SharedRecord, mutate: vi.fn(), refetch: vi.fn() }));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn() }) }));
+const navigation = vi.hoisted(() => ({ search: '' }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(navigation.search),
+}));
 vi.mock('@/hooks/use-team-match-record', () => ({
   useTeamMatchRecord: () => ({ data: state.data, isError: false, refetch: state.refetch }),
   useMutateTeamMatchRecord: () => ({ mutateAsync: state.mutate, isPending: false, isError: false, reset: vi.fn() }),
 }));
 beforeEach(() => {
+  navigation.search = '';
   state.mutate.mockReset().mockResolvedValue({});
   state.data = {
     teamMatchId: 'match', title: '한강 vs 마포', startsAt: '2026-09-21T00:00:00Z', phase: 'live', version: 3,
@@ -23,6 +28,21 @@ beforeEach(() => {
   };
 });
 describe('shared record participant flow', () => {
+  // "← 매치 상세" 는 `?view=detail` 은 항상 유지하면서, 이 화면이 받은 출처가 있으면 그 출처까지 이어 싣는다.
+  it('받은 출처가 있으면 매치 상세 링크가 view=detail 과 그 출처를 함께 싣는다', () => {
+    navigation.search = `from=${encodeURIComponent('/my/team-matches')}`;
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(screen.getByRole('link', { name: '← 매치 상세' })).toHaveAttribute(
+      'href',
+      `/team-matches/match?view=detail&from=${encodeURIComponent('/my/team-matches')}`,
+    );
+  });
+
+  it('출처가 없으면 매치 상세 링크는 view=detail 만 싣는다', () => {
+    render(<TeamMatchSharedRecord teamMatchId="match" />);
+    expect(screen.getByRole('link', { name: '← 매치 상세' })).toHaveAttribute('href', '/team-matches/match?view=detail');
+  });
+
   it('selects scorer from the credited team and sends the opened version with the goal', async () => {
     render(<TeamMatchSharedRecord teamMatchId="match" />);
     fireEvent.click(screen.getByRole('button', { name: '득점 추가' }));

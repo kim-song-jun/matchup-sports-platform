@@ -358,3 +358,105 @@ describe('MyRegistrationPageClient — 명단 수정 가능 배지', () => {
     expect(container.textContent).toContain('수정 가능');
   });
 });
+
+// 대회 상세·재신청으로 이동하는 CTA 들이 from 을 어떻게 잇는지.
+describe('MyRegistrationPageClient — 대회 상세·재신청 CTA 는 from 을 잇는다', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    myRegistrationApiMocks.useV1MyTeams.mockReturnValue({ data: { items: [makeTeam()] }, isLoading: false });
+    myRegistrationApiMocks.useV1TournamentPlayers.mockReturnValue({ data: { players: [], belowMinimum: false } });
+    myRegistrationApiMocks.useV1CancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1WithdrawCancelRegistrationRequest.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+    myRegistrationApiMocks.useV1Team.mockReturnValue({ data: undefined });
+    myRegistrationApiMocks.useV1Tournament.mockReturnValue({ data: makeTournament(), isLoading: false });
+  });
+
+  it('신청 상세의 "대회 상세 보기" 는 받은 from 을 상세 URL 에 그대로 싣는다', () => {
+    searchParams = new URLSearchParams({ reg: 'registration-1', from: '/home' });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration()],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    const expectedHref = `/tournaments/tournament-1?from=${encodeURIComponent('/home')}`;
+    for (const link of screen.getAllByRole('link', { name: '대회 상세 보기' })) {
+      expect(link).toHaveAttribute('href', expectedHref);
+    }
+  });
+
+  // 명단에서 돌아올 때 받은 출처까지 담은 이 화면으로 오도록, 명단 링크가 현재 URL 을 출처로 싣는다.
+  it('명단 링크는 받은 출처까지 담은 이 화면을 출처로 싣는다', () => {
+    searchParams = new URLSearchParams({ reg: 'registration-1', from: '/home' });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration()],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    const rosterLinks = screen
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href') ?? '')
+      .filter((href) => href.includes('/roster'));
+    expect(rosterLinks.length).toBeGreaterThan(0);
+    const expectedFrom = encodeURIComponent(`/tournaments/tournament-1/my?${new URLSearchParams({ reg: 'registration-1', from: '/home' }).toString()}`);
+    for (const href of rosterLinks) expect(href.endsWith(`?from=${expectedFrom}`)).toBe(true);
+  });
+
+  it('대조군: from 이 없으면 "대회 상세 보기" 는 상세 경로만 쓴다', () => {
+    searchParams = new URLSearchParams({ reg: 'registration-1' });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration()],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    for (const link of screen.getAllByRole('link', { name: '대회 상세 보기' })) {
+      expect(link).toHaveAttribute('href', '/tournaments/tournament-1');
+    }
+  });
+
+  it('"다시 신청하기" 는 이 화면 자신(쿼리 포함)을 apply 의 from 으로 싣는다', () => {
+    searchParams = new URLSearchParams({ reg: 'registration-1' });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [makeRegistration({ status: 'draft' })],
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    const expectedHref = `/tournaments/tournament-1/apply?from=${encodeURIComponent('/tournaments/tournament-1/my?reg=registration-1')}`;
+    for (const link of screen.getAllByRole('link', { name: '다시 신청하기' })) {
+      expect(link).toHaveAttribute('href', expectedHref);
+    }
+  });
+
+  it('신청 목록을 못 불러왔을 때의 "대회 상세로 돌아가기" 도 받은 from 을 싣는다', () => {
+    searchParams = new URLSearchParams({ from: '/home' });
+    myRegistrationApiMocks.useV1MyRegistrations.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: true,
+      error: new Error('network'),
+      refetch: vi.fn(),
+    });
+
+    render(<MyRegistrationPageClient tournamentId="tournament-1" />);
+
+    expect(screen.getByRole('link', { name: '대회 상세로 돌아가기' })).toHaveAttribute(
+      'href',
+      `/tournaments/tournament-1?from=${encodeURIComponent('/home')}`,
+    );
+  });
+});

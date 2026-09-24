@@ -714,7 +714,7 @@ describe('TeamStatePageView — 데스크톱 뒤로가기', () => {
   });
 
   it('?from= 이 있으면 그 출처를 따라간다(알림 진입은 /notifications)', () => {
-    navMocks.searchParams.mockReturnValueOnce(new URLSearchParams('from=notifications'));
+    navMocks.searchParams.mockReturnValueOnce(new URLSearchParams('from=%2Fnotifications'));
 
     render(<TeamStatePageView model={stateModel()} />);
 

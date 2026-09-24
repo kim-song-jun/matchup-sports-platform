@@ -8,7 +8,7 @@ vi.mock('next/navigation', () => ({ useSearchParams: () => navigation.searchPara
 describe('AppBackLink', () => {
   it.each([
     ['경로 출처를 따른다', 'from=%2Fmy%2Freviews', '/my/reviews'],
-    ['알림 표식은 알림 화면으로 간다', 'from=notifications', '/notifications'],
+    ['알림 화면 출처를 따른다', 'from=%2Fnotifications', '/notifications'],
     ['출처가 없으면 기본값', '', '/teams'],
     ['외부 주소는 무시하고 기본값', 'from=%2F..%2F%2Fevil.example', '/teams'],
     ['경로가 아닌 표식은 무시하고 기본값', 'from=tournament', '/teams'],

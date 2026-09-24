@@ -366,9 +366,10 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
 
   return (
     <>
-      {/* Desktop page header: back link + title (mobile topbar is hidden on desktop) */}
+      {/* Desktop page header: back link + title (mobile topbar is hidden on desktop). AppBackLink
+          reads `?from=` itself, so the fallback is only the no-from default. */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <AppBackLink className="tm-desktop-back" fallbackHref={model.detailBackHref ?? '/team-matches'}>
+        <AppBackLink className="tm-desktop-back" fallbackHref="/team-matches">
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
         </AppBackLink>
         <h1 className="tm-text-heading">{match.title || '팀매치 상세'}</h1>

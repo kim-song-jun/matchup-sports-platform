@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { AlertBanner, Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import {
@@ -21,6 +22,7 @@ import { v1Keys } from '@/lib/query-keys';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
+import { withFromPath } from '@/lib/session-storage';
 import type {
   V1TournamentPlayer,
   V1PlayerEligibilityStatus,
@@ -1127,6 +1129,13 @@ export function TournamentRosterPageClient({
 }) {
   const { data: tournament } = useV1Tournament(tournamentId);
   const { data: registration } = useV1Registration(tournamentId, registrationId);
+  // '내 신청' 화면이 이 화면에 실어 보낸 from 을 그대로 이어 돌아간다.
+  const searchParams = useSearchParams();
+  // 이 명단의 부모는 그 신청 상세(?reg=)다 — 받은 출처가 그 화면이면 선택 상태·출처째로 접힌다.
+  const myRegistrationHref = withFromPath(
+    `/tournaments/${tournamentId}/my?reg=${encodeURIComponent(registrationId)}`,
+    searchParams.get('from'),
+  );
   // M-T 감사: member 역할에게도 '+ 추가'·'수정'·'삭제'가 전부 활성 상태로 노출됐다 —
   // 이 화면은 신청 목록을 거치지 않고 URL로 바로 올 수 있어 팀장/매니저 권한을 여기서
   // 직접 확인해야 한다(내 신청 카드는 useMyTeams()로 이미 아는 role을 prop으로 받지만,
@@ -1612,7 +1621,7 @@ export function TournamentRosterPageClient({
         {/* Back to my registration */}
         <div style={{ marginTop: 20 }}>
           <Link
-            href={`/tournaments/${tournamentId}/my`}
+            href={myRegistrationHref}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
           >
             내 신청으로 돌아가기

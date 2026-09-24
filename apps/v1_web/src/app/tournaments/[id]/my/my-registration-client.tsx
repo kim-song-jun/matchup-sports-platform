@@ -9,6 +9,8 @@ import { AlertBanner, Card, EmptyState, ErrorState, SectionTitle } from '@/compo
 import { ChevronRight, UsersRound } from 'lucide-react';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { appRoute } from '@/lib/app-route';
+import { withFromPath } from '@/lib/session-storage';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import {
   useV1Tournament,
   useV1MyRegistrations,
@@ -278,7 +280,9 @@ function RegistrationPass({
   isRosterLocked: boolean;
   belowMinimum: boolean;
 }) {
-  const rosterHref = appRoute(`/tournaments/${tournamentId}/registrations/${registrationId}/roster`);
+  // 명단에서 돌아올 때 이 화면(받은 출처 포함)으로 오도록 출처를 싣는다.
+  const currentHref = useCurrentHref();
+  const rosterHref = withFromPath(appRoute(`/tournaments/${tournamentId}/registrations/${registrationId}/roster`), currentHref);
 
   /* #24: awaiting_payment도 동등 강도로 렌더 — orange accent + 계좌 정보 안내 카드 */
   if (status === 'awaiting_payment') {
@@ -622,8 +626,14 @@ function RegistrationDetailView({
   tournament,
   registration,
   canManageRegistration,
+  detailHref,
+  applyHref,
 }: {
   tournamentId: string;
+  /** 대회 상세로 돌아가는 CTA href — 받은 from 을 이미 싣고 있다. */
+  detailHref: string;
+  /** '다시 신청하기' CTA href — 이 화면 자신을 apply 의 from 으로 싣고 있다. */
+  applyHref: string;
   tournament: {
     sportCode: string;
     title: string;
@@ -641,8 +651,9 @@ function RegistrationDetailView({
   registration: V1TournamentRegistration;
   canManageRegistration: boolean;
 }) {
-  const tournamentHref = appRoute(`/tournaments/${tournamentId}`);
-  const rosterHref = appRoute(`/tournaments/${tournamentId}/registrations/${registration.id}/roster`);
+  // 명단에서 돌아올 때 이 화면(받은 출처 포함)으로 오도록 출처를 싣는다.
+  const currentHref = useCurrentHref();
+  const rosterHref = withFromPath(appRoute(`/tournaments/${tournamentId}/registrations/${registration.id}/roster`), currentHref);
   const { data: rosterData } = useV1TournamentPlayers(tournamentId, registration.id);
   const cancelRequest = useV1CancelRegistrationRequest(tournamentId, registration.id);
   const withdrawCancelRequest = useV1WithdrawCancelRegistrationRequest(tournamentId, registration.id);
@@ -835,7 +846,7 @@ function RegistrationDetailView({
 
       {/* Secondary CTAs */}
       <Link
-        href={tournamentHref}
+        href={detailHref}
         className="tm-btn tm-btn-lg tm-btn-neutral tm-btn-block"
         style={{ marginBottom: 8 }}
       >
@@ -844,7 +855,7 @@ function RegistrationDetailView({
 
       {canManageRegistration && (registration.status === 'cancelled' || registration.status === 'draft') ? (
         <Link
-          href={`/tournaments/${tournamentId}/apply`}
+          href={applyHref}
           className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
           style={{ marginBottom: 8 }}
         >
@@ -1109,7 +1120,7 @@ function RegistrationDetailView({
             <div className="tm-hide-desktop" style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
               {canManageRegistration && (registration.status === 'cancelled' || registration.status === 'draft') ? (
                 <Link
-                  href={`/tournaments/${tournamentId}/apply`}
+                  href={applyHref}
                   className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
                 >
                   다시 신청하기
@@ -1147,7 +1158,7 @@ function RegistrationDetailView({
 
             <div className="tm-hide-desktop" style={{ marginTop: 12, marginBottom: 32 }}>
               <Link
-                href={`/tournaments/${tournamentId}`}
+                href={detailHref}
                 className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
               >
                 대회 상세 보기
@@ -1428,6 +1439,11 @@ function TeamRegistrationHub({
 export function MyRegistrationPageClient({ tournamentId }: { tournamentId: string }) {
   const searchParams = useSearchParams();
   const selectedRegistrationId = searchParams.get('reg');
+  // 대회 상세로 돌아가는 CTA는 받은 from 을 잇고, '다시 신청하기'는 이 화면 자신을
+  // apply 의 from 으로 실어 apply → 이 화면 → 상세 순으로 돌아오게 한다.
+  const detailHref = withFromPath(`/tournaments/${tournamentId}`, searchParams.get('from'));
+  const selfHref = useCurrentHref();
+  const applyHref = withFromPath(`/tournaments/${tournamentId}/apply`, selfHref);
   const { data: tournament, isLoading: loadingTournament } = useV1Tournament(tournamentId);
   const { data: myTeamsData, isLoading: loadingTeams } = useV1MyTeams();
   const {
@@ -1471,7 +1487,7 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
               <div style={{ padding: '0 20px', marginTop: 24 }}>
           <ErrorState message={msg} onRetry={() => void refetchRegistrations()} />
           <Link
-            href={`/tournaments/${tournamentId}`}
+            href={detailHref}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
             style={{ marginTop: 16 }}
           >
@@ -1524,6 +1540,8 @@ export function MyRegistrationPageClient({ tournamentId }: { tournamentId: strin
   return (
           <RegistrationDetailView
         tournamentId={tournamentId}
+        detailHref={detailHref}
+        applyHref={applyHref}
         tournament={{
           sportCode: tournament.sport.code,
           title: tournament.title,

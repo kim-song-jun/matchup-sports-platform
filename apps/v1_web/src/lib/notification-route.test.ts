@@ -12,12 +12,12 @@ describe('normalizeNotificationHref', () => {
   });
 
   it('normalizes supported internal routes and keeps navigation on the app origin', () => {
-    expect(normalizeNotificationHref('/chat/rooms/room-1', 'chat')).toBe('/chat/room-1?from=notifications');
+    expect(normalizeNotificationHref('/chat/rooms/room-1', 'chat')).toBe('/chat/room-1?from=%2Fnotifications');
     expect(normalizeNotificationHref('/reviews?status=pending', 'review_received')).toBe(
-      '/my/reviews?status=pending&from=notifications',
+      '/my/reviews?status=pending&from=%2Fnotifications',
     );
-    expect(normalizeNotificationHref('/teams/team-1?from=notifications')).toBe(
-      '/teams/team-1?from=notifications',
+    expect(normalizeNotificationHref('/teams/team-1?from=%2Fnotifications')).toBe(
+      '/teams/team-1?from=%2Fnotifications',
     );
   });
 
@@ -26,7 +26,7 @@ describe('normalizeNotificationHref', () => {
   it('딥링크에 from 이 이미 있으면 알림 출처로 바꿔 하나만 남긴다', () => {
     const href = normalizeNotificationHref('/my/settings/record-consent?from=tournament&tournamentId=t1', 'tournament_record_consent_invite');
     const params = new URLSearchParams(href.split('?')[1]);
-    expect(params.getAll('from')).toEqual(['notifications']);
+    expect(params.getAll('from')).toEqual(['/notifications']);
     expect(params.get('tournamentId')).toBe('t1');
   });
 });

@@ -149,4 +149,21 @@ describe('TeamRecordsContent — 행 캡션의 대회·리그 이름', () => {
       '/tournaments/tournament-1/matches/team-match-1?from=%2Fteams%2Fteam-1%2Frecords%3Ffrom%3D%252Fmy',
     );
   });
+
+  // D2: withFromPath 로 바꾼 뒤에만 드러나는 차이 — 받은 출처가 지금 누르는 행과 같은
+  // 화면을 가리키면(이미 지나온 화면) 새로 감싸지 않고 그 값을 그대로 재사용한다.
+  // 수동 문자열 접합이던 예전 코드는 이 경우도 무조건 다시 감싸 URL이 계속 길어졌다.
+  it('받은 출처가 지금 누르는 경기 화면 자신이면 다시 감싸지 않고 그대로 재사용한다', () => {
+    const selfHref = '/team-matches/team-match-9?from=%2Fteams%2Fteam-1%2Frecords';
+    render(
+      <TeamRecordsContent
+        selfHref={selfHref}
+        data={makeTeamRecords([
+          makeItem({ gameId: 'game-friendly', tournamentId: null, teamMatchId: 'team-match-9' }),
+        ])}
+      />,
+    );
+
+    expect(screen.getByRole('link')).toHaveAttribute('href', selfHref);
+  });
 });

@@ -11,8 +11,7 @@ import { LeagueClaimMyRecordSection } from '@/components/public-game-records/cla
 import { Card, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
-import { useShellOverride } from '@/components/v1-ui/shell-override';
-import { readBackFrom, withFromPath } from '@/lib/session-storage';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { V1ApiError } from '@/lib/api-client';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTournamentDateTimeLong, formatTournamentDateTimeShort } from '@/lib/date-utils';
@@ -91,10 +90,11 @@ function getViewerState(match: V1TeamMatch | undefined): V1TeamMatchViewerState 
 
 export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { leagueId: string; fixtureId: string }) {
   // 활동 기록·팀 전적처럼 리그 화면이 아닌 곳에서 들어왔으면 그 화면으로 돌아간다.
-  const fromPath = readBackFrom(useSearchParams().get('from'));
-  useShellOverride(fromPath ? { backHref: fromPath } : {});
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   // 팀 상세로 넘길 출처 — 이 경기 화면이 받은 출처까지 담는다.
   const selfHref = withFromPath(`/league-matches/${leagueId}/fixtures/${fixtureId}`, fromPath);
+  // 리그로 돌아가는 버튼은 받은 출처를 잇는다(받은 출처가 그 리그면 그대로 접힌다).
+  const parentHref = withFromPath(`/league-matches/${leagueId}`, fromPath);
   const router = useRouter();
   const seriesQuery = useV1LeagueMatch(leagueId);
   const standingsQuery = useV1LeagueMatchStandings(leagueId);
@@ -167,7 +167,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
           message="이 리그에서 해당 경기를 찾을 수 없어요. 대진이 재생성되었을 수 있어요."
           onRetry={() => void seriesQuery.refetch()}
         />
-        <Link href={`/league-matches/${leagueId}`} className="tm-btn tm-btn-lg tm-btn-neutral mt-4 w-full">
+        <Link href={parentHref} className="tm-btn tm-btn-lg tm-btn-neutral mt-4 w-full">
           리그 순위표·일정으로 이동
         </Link>
       </div>
@@ -231,7 +231,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
           상세의 말줄임 배지가 "이상한 글씨"로 읽히던 문제의 반대 방향). */}
       <div className="flex flex-wrap items-center gap-2">
         <span className={`tm-badge ${stateMeta.badgeClass}`}>{stateMeta.label}</span>
-        <Link href={`/league-matches/${leagueId}`} className="tm-pressable text-sm font-semibold text-[var(--text-strong)] underline underline-offset-2">
+        <Link href={parentHref} className="tm-pressable text-sm font-semibold text-[var(--text-strong)] underline underline-offset-2">
           {series.title}
         </Link>
         {/* 기록 본문(MatchDetailContent)이 뜨면 그 헤더가 주차를 이미 보여준다 — 중복 표기 방지. */}
@@ -246,7 +246,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
               MatchDetailContent 는 자체 좌우 패딩(20px)을 가진다 — 이 컨테이너의 px-4 와
               겹쳐 본문만 안으로 밀리지 않게 음수 마진으로 상쇄한다. */}
           <div className="-mx-4">
-            <MatchDetailContent data={recordQuery.data} />
+            <MatchDetailContent data={recordQuery.data} from={selfHref} />
           </div>
           {/* 기록 연결 승인함 (attest UI C안): 다른 참가자의 연결 신청을 확인·승인하는
               반대쪽 절반. 신청 알림의 착지 화면이기도 하다 — 요청이 있을 때만 보인다. */}
@@ -356,11 +356,11 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
               </button>
             ) : null}
             {chatError ? <p role="alert" className="text-sm text-red-700 dark:text-red-300">{chatError}</p> : null}
-            <Link href={`/team-matches/${fixtureId}/lineup`} className="tm-btn tm-btn-lg tm-btn-neutral">
+            <Link href={withFromPath(`/team-matches/${fixtureId}/lineup`, selfHref)} className="tm-btn tm-btn-lg tm-btn-neutral">
               라인업 관리
             </Link>
             {(fixture.status === 'completed' || result.hasScore) && (
-              <Link href={`/team-matches/${fixtureId}/result`} className="tm-btn tm-btn-lg tm-btn-neutral">
+              <Link href={withFromPath(`/team-matches/${fixtureId}/result`, selfHref)} className="tm-btn tm-btn-lg tm-btn-neutral">
                 경기 결과 보기
               </Link>
             )}
@@ -368,7 +368,7 @@ export default function LeagueFixtureDetailClient({ leagueId, fixtureId }: { lea
         </Card>
       )}
 
-      <Link href={`/league-matches/${leagueId}`} className="tm-btn tm-btn-lg tm-btn-primary w-full">
+      <Link href={parentHref} className="tm-btn tm-btn-lg tm-btn-primary w-full">
         전체 순위표·일정 보기
       </Link>
     </div>

@@ -229,7 +229,7 @@ function TeamOpenMatchesSection({
               key={match.id}
               className="tm-pressable"
               // 뒤로가기가 이 팀 상세로 돌아오도록 출처를 함께 넘긴다(team-matches-client.tsx가 `?from=`을 읽는다).
-              href={`/team-matches/${match.id}?from=${encodeURIComponent(fromHref)}`}
+              href={withFromPath(`/team-matches/${match.id}`, fromHref)}
               style={{
                 display: 'flex',
                 alignItems: 'center',

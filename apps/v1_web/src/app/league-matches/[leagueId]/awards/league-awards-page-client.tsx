@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Trophy, Medal } from 'lucide-react';
 import { useMemo } from 'react';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -8,7 +9,7 @@ import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { useV1LeagueMatch, useV1LeagueMatchPlayerRecords, useV1LeagueMatchStandings } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
-import { withFromPath } from '@/lib/session-storage';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 // tournaments/[id]/awards/awards-page-client.tsx 의 구조(포디움 히어로 → 개인 어워드 →
 // 하단 네비)와 카피 관례("○○, 우승을 축하드려요! 🎉")를 그대로 따른다 — 그 파일은 읽기만
@@ -25,7 +26,7 @@ import type {
 import { leagueRecordEmptySub } from '../league-record-empty-copy';
 
 /** 아직 종료되지 않은 리그로 딥링크했을 때 — 빈 화면 대신 안내 + 되돌아갈 동선. */
-function NotCompletedNotice({ leagueId, state }: { leagueId: string; state: 'draft' | 'active' }) {
+function NotCompletedNotice({ parentHref, state }: { parentHref: string; state: 'draft' | 'active' }) {
   const msg =
     state === 'draft'
       ? '리그가 아직 시작되지 않았어요. 시즌이 끝나면 시상 결과를 볼 수 있어요.'
@@ -36,7 +37,7 @@ function NotCompletedNotice({ leagueId, state }: { leagueId: string; state: 'dra
         <Medal size={32} className="tm-medal-gold" strokeWidth={1.8} />
       </div>
       <p className="text-sm leading-relaxed text-[var(--text-muted)]">{msg}</p>
-      <Link href={`/league-matches/${leagueId}`} className="tm-btn tm-btn-sm tm-btn-outline mt-4">
+      <Link href={parentHref} className="tm-btn tm-btn-sm tm-btn-outline mt-4">
         리그 순위표 보러가기
       </Link>
     </Card>
@@ -99,12 +100,12 @@ function ChampionsHero({ champions }: { champions: V1LeagueChampionTeam[] }) {
  * 이 리스트가 "같은 팀 이야기"임을 스크롤해도 계속 알 수 있게 한다.
  */
 function FinalStandingsSection({
-  leagueId,
+  parentHref,
   standings,
   championTeamIds,
   hasConfirmedPromotion,
 }: {
-  leagueId: string;
+  parentHref: string;
   standings: V1LeagueStandingRow[];
   championTeamIds: Set<string>;
   hasConfirmedPromotion: boolean;
@@ -119,7 +120,7 @@ function FinalStandingsSection({
           sub="리그 경기 결과가 확정되면 최종 순위가 나타나요."
           illustration={{ name: 'journey-done' }}
           cta="리그 순위표 보러가기"
-          ctaHref={`/league-matches/${leagueId}`}
+          ctaHref={parentHref}
         />
       </section>
     );
@@ -164,13 +165,13 @@ function FinalStandingsSection({
 
 /** 득점왕 / 도움왕 공용 섹션 — 공동 1위(동점) 전원을 트로피로 함께 강조한다. */
 function LeaderboardSection({
-  leagueId,
+  parentHref,
   title,
   rows,
   unit,
   emptySub,
 }: {
-  leagueId: string;
+  parentHref: string;
   title: string;
   rows: V1LeaguePlayerRecordRow[];
   unit: (row: V1LeaguePlayerRecordRow) => number;
@@ -186,7 +187,7 @@ function LeaderboardSection({
           sub={emptySub}
           illustration={{ name: 'journey-done' }}
           cta="리그 순위표 보러가기"
-          ctaHref={`/league-matches/${leagueId}`}
+          ctaHref={parentHref}
         />
       </section>
     );
@@ -227,6 +228,9 @@ function AwardsPageSkeleton() {
 }
 
 export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  // 순위표로 돌아가는 버튼은 받은 출처를 잇는다(받은 출처가 그 순위표면 그대로 접힌다).
+  const parentHref = withFromPath(`/league-matches/${leagueId}`, fromPath);
   const seriesQuery = useV1LeagueMatch(leagueId);
   const standingsQuery = useV1LeagueMatchStandings(leagueId);
   const recordsQuery = useV1LeagueMatchPlayerRecords(leagueId);
@@ -249,7 +253,7 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
   if (series.state !== 'completed') {
     return (
       <div className="mx-auto max-w-4xl px-4 py-6">
-        <NotCompletedNotice leagueId={leagueId} state={series.state} />
+        <NotCompletedNotice parentHref={parentHref} state={series.state} />
       </div>
     );
   }
@@ -279,7 +283,7 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
         <>
           <ChampionsHero champions={standings.champions} />
           <FinalStandingsSection
-            leagueId={leagueId}
+            parentHref={parentHref}
             standings={standings.standings}
             championTeamIds={new Set(standings.champions.map((c) => c.teamId))}
             hasConfirmedPromotion={standings.promotionDecided}
@@ -302,14 +306,14 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
             (leagueRecordEmptySub)를 거친다.
           */}
           <LeaderboardSection
-            leagueId={leagueId}
+            parentHref={parentHref}
             title="득점왕"
             rows={records.goals}
             unit={(row) => row.goals}
             emptySub={leagueRecordEmptySub('goals', records.hiddenByEligibility)}
           />
           <LeaderboardSection
-            leagueId={leagueId}
+            parentHref={parentHref}
             title="도움왕"
             rows={records.assists}
             unit={(row) => row.assists}
@@ -319,7 +323,7 @@ export function LeagueAwardsPageClient({ leagueId }: { leagueId: string }) {
       )}
 
       <nav aria-label="리그 페이지 이동" className="mt-2 border-t border-[var(--border)] pt-4">
-        <Link href={`/league-matches/${leagueId}`} className="tm-btn tm-btn-md tm-btn-ghost">
+        <Link href={parentHref} className="tm-btn tm-btn-md tm-btn-ghost">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="m15 6-6 6 6 6" />
           </svg>

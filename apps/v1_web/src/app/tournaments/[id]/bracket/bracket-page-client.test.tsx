@@ -1,14 +1,25 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderBracketPage, renderBracketStandingsTab } from './bracket-test-utils';
 import type { V1TournamentDetail, V1TournamentFixture, V1TournamentGroup } from '@/types/api';
 
-// 순위표 링크의 출처는 현재 URL(받은 from 포함)이다 — 받은 출처가 있는 상태를 고정한다.
+// 순위표 링크의 출처는 현재 URL(받은 from 포함)이다 — 기본은 출처 없음으로 고정하고,
+// from 을 검증하는 테스트만 setMockSearchParams 로 override 한다.
+const { getMockSearchParams, setMockSearchParams } = vi.hoisted(() => {
+  let params = new URLSearchParams();
+  return {
+    getMockSearchParams: () => params,
+    setMockSearchParams: (next: URLSearchParams) => {
+      params = next;
+    },
+  };
+});
+
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   usePathname: () => '/tournaments/tour-1/bracket',
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => getMockSearchParams(),
 }));
 
 /**
@@ -880,5 +891,41 @@ describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout,
     renderBracketPage(mirrorLeague());
 
     expect(screen.getByText('경기 일정과 순위를 확인하세요.')).toBeInTheDocument();
+  });
+});
+
+// 대회 상세로 되돌아가는 in-page 링크(flownav 이전 pill · 빈 대진표 CTA)는
+// 이 화면이 받은 from 을 그대로 실어야 한다.
+describe('BracketPageContent — 대회 상세로 돌아가는 링크는 받은 from 을 싣는다', () => {
+  afterEach(() => {
+    setMockSearchParams(new URLSearchParams());
+  });
+
+  function emptyBracketTournament(): V1TournamentDetail {
+    return makeTournament({
+      id: 'tour-1',
+      status: 'in_progress',
+      format: 'group_knockout',
+      groups: [],
+      fixtures: [],
+    });
+  }
+
+  it('from 이 상세 페이지의 자기 URL이면 그대로 붙는다', () => {
+    const detailWithFrom = `/tournaments/tour-1?from=${encodeURIComponent('/home')}`;
+    setMockSearchParams(new URLSearchParams({ from: detailWithFrom }));
+
+    renderBracketStandingsTab(emptyBracketTournament());
+
+    const expectedHref = `/tournaments/tour-1?from=${encodeURIComponent('/home')}`;
+    expect(screen.getByRole('link', { name: '대회 정보 보기' })).toHaveAttribute('href', expectedHref);
+    expect(screen.getByRole('link', { name: '대회 정보로 이동' })).toHaveAttribute('href', expectedHref);
+  });
+
+  it('대조군: from 이 없으면 상세 경로만 쓴다', () => {
+    renderBracketStandingsTab(emptyBracketTournament());
+
+    expect(screen.getByRole('link', { name: '대회 정보 보기' })).toHaveAttribute('href', '/tournaments/tour-1');
+    expect(screen.getByRole('link', { name: '대회 정보로 이동' })).toHaveAttribute('href', '/tournaments/tour-1');
   });
 });

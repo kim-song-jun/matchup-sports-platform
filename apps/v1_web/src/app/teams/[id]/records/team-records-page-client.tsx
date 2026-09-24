@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { extractErrorMessage } from '@/lib/error-message';
-import { withFromPath, readBackFrom } from '@/lib/session-storage';
+import { withFromPath, sanitizeRedirectPath } from '@/lib/session-storage';
 import { usePublicTeamRecords } from '@/components/public-game-records/use-public-game-records';
 import { TeamRecordsContent } from '@/components/public-game-records/team-records-content';
 import type { TeamRecordTypeFilter } from '@/components/public-game-records/types';
@@ -33,10 +33,9 @@ export function TeamRecordsPageClient({ teamId }: { teamId: string }) {
   // 로딩·에러 중(firstPage 없음)엔 아직 팀명이 없으므로 테이블의 "팀 전적" 기본값이
   // 그대로 쓰인다(route-chrome/fragments/teams.ts, §1.9 "결합 제목" 하위유형).
   // 팀 상세가 받은 출처를 이어받아 왔으면 뒤로가기를 그 팀 상세(출처 포함)로 돌린다.
-  const fromPath = readBackFrom(useSearchParams().get('from'));
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   useShellOverride({
     ...(firstPage?.teamName ? { title: `${firstPage.teamName} 전적` } : {}),
-    ...(fromPath ? { backHref: fromPath } : {}),
   });
 
   if (isLoading) {

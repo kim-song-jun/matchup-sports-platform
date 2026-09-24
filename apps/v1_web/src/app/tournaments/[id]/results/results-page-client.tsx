@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useId, useRef } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { ChevronRight, Trophy } from 'lucide-react';
 import { MatchVideos } from '@/components/tournaments/match-videos';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
@@ -11,6 +12,8 @@ import { v1Get } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
 import { formatTournamentDateRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { isLeagueCompetition } from '@/lib/competition-kind';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
+import { withFromPath } from '@/lib/session-storage';
 import type {
   V1LeagueOverallStandingsResponse,
   V1TournamentDetail,
@@ -407,10 +410,12 @@ function KnockoutResultsTable({
   fixtures,
   kindOf,
   tournamentId,
+  fromHref,
 }: {
   fixtures: V1TournamentFixture[];
   kindOf: (fixture: V1TournamentFixture) => KnockoutKind | null;
   tournamentId: string;
+  fromHref?: string;
 }) {
   if (fixtures.length === 0) return null;
 
@@ -535,7 +540,7 @@ function KnockoutResultsTable({
     }
     return (
       <Link
-        href={`/tournaments/${tournamentId}/matches/${fixtureId}`}
+        href={withFromPath(`/tournaments/${tournamentId}/matches/${fixtureId}`, fromHref)}
         style={wrapperStyle}
         aria-label={`${home ?? '팀 정보 없음'} ${scoreLabel} ${away ?? '팀 정보 없음'}, 경기 상세 보기`}
       >
@@ -693,7 +698,7 @@ function FinalStandingsTable({ rows, fixtures }: { rows: FinalRankRow[]; fixture
 }
 
 /* ── 대회 요약 카드 — 상세 페이지의 정보 카드 언어를 그대로 사용 ── */
-function TournamentSummaryCard({ tournament }: { tournament: V1TournamentDetail }) {
+function TournamentSummaryCard({ tournament, detailHref }: { tournament: V1TournamentDetail; detailHref: string }) {
   const rows: Array<{ label: string; value: string }> = [
     { label: '종목', value: tournament.sport?.name ?? '-' },
     { label: '일정', value: formatTournamentDateRangeShort(tournament.scheduledAt, tournament.scheduledEndAt) ?? '미정' },
@@ -712,7 +717,7 @@ function TournamentSummaryCard({ tournament }: { tournament: V1TournamentDetail 
         </div>
       ))}
       <Link
-        href={`/tournaments/${tournament.id}`}
+        href={detailHref}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
           minHeight: 44, borderTop: '1px solid var(--grey100)',
@@ -894,9 +899,11 @@ function GroupFixtureStatusChip({ fixture }: { fixture: V1TournamentFixture }) {
 function GroupFixtureRow({
   tournamentId,
   fixture,
+  fromHref,
 }: {
   tournamentId: string;
   fixture: V1TournamentFixture;
+  fromHref?: string;
 }) {
   const result = fixture.result;
   const winner = result ? getWinnerSide(result) : null;
@@ -910,7 +917,7 @@ function GroupFixtureRow({
 
   return (
     <Link
-      href={`/tournaments/${tournamentId}/matches/${fixture.id}`}
+      href={withFromPath(`/tournaments/${tournamentId}/matches/${fixture.id}`, fromHref)}
       className="tm-res-match-row"
       style={{ minHeight: 44, textDecoration: 'none', color: 'inherit' }}
       aria-label={`${home} ${scoreLabel} ${away}, 경기 상세 보기`}
@@ -949,7 +956,7 @@ function GroupFixtureRow({
   );
 }
 
-export function GroupStageFixtures({ tournament }: { tournament: V1TournamentDetail }) {
+export function GroupStageFixtures({ tournament, fromHref }: { tournament: V1TournamentDetail; fromHref?: string }) {
   const panelId = useId();
   const [expanded, setExpanded] = useState(false);
 
@@ -1002,7 +1009,7 @@ export function GroupStageFixtures({ tournament }: { tournament: V1TournamentDet
                 <div className="tm-res-group-label">{section.name} · {section.fixtures.length}경기</div>
                 <div className="tm-res-matches-block">
                   {section.fixtures.map((fixture) => (
-                    <GroupFixtureRow key={fixture.id} tournamentId={tournament.id} fixture={fixture} />
+                    <GroupFixtureRow key={fixture.id} tournamentId={tournament.id} fixture={fixture} fromHref={fromHref} />
                   ))}
                 </div>
               </div>
@@ -1018,6 +1025,11 @@ export function GroupStageFixtures({ tournament }: { tournament: V1TournamentDet
 export function ResultsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   // 결과(순위·결선·조별)와 경기 영상을 세그먼트 탭으로 분리
   const [activeTab, setActiveTab] = useState<'results' | 'videos'>('results');
+  // 대회 상세로 돌아가는 링크는 이 화면이 받은 from 을 그대로 잇는다.
+  const searchParams = useSearchParams();
+  const detailHref = withFromPath(`/tournaments/${tournament.id}`, searchParams.get('from'));
+  // 경기 상세로 들어가는 링크는 이 화면(받은 from 포함) 자신을 다음 출처로 넘긴다.
+  const resultsSelfHref = useCurrentHref();
   const videosTotal = tournament.fixtures.reduce(
     (sum, f) => sum + (f.status === 'completed' ? f.videos.length : 0), 0,
   );
@@ -1070,7 +1082,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
         <div style={{ padding: '16px 20px 0' }}>
           <CoChampionBanner names={coChampionNames} />
           <div style={{ marginTop: 16 }}>
-            <TournamentSummaryCard tournament={tournament} />
+            <TournamentSummaryCard tournament={tournament} detailHref={detailHref} />
           </div>
         </div>
       )}
@@ -1082,7 +1094,7 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
           <MobileChampionBanner champion={championName} tournament={tournament} record={championRow?.record} />
           {/* 대회 요약 — 데스크탑에서는 최종 순위 아래(좌측 컬럼)로 이동 */}
           <div className="tm-hide-desktop" style={{ marginTop: 16 }}>
-            <TournamentSummaryCard tournament={tournament} />
+            <TournamentSummaryCard tournament={tournament} detailHref={detailHref} />
           </div>
         </div>
       )}
@@ -1151,17 +1163,17 @@ export function ResultsPageContent({ tournament }: { tournament: V1TournamentDet
             )}
             {/* 데스크탑: 순위표가 짧아 비는 좌측 컬럼을 대회 요약으로 채우고 sticky로 고정 */}
             <div className="tm-show-desktop" style={{ marginTop: 16 }}>
-              <TournamentSummaryCard tournament={tournament} />
+              <TournamentSummaryCard tournament={tournament} detailHref={detailHref} />
             </div>
           </div>
           <div className="tm-tourn-sub-col" style={{ padding: '16px 20px 0' }}>
             {knockoutFixtures.length > 0 && (
               <>
                 <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>결선 경기</h3>
-                <KnockoutResultsTable fixtures={knockoutFixtures} kindOf={knockoutKind} tournamentId={tournament.id} />
+                <KnockoutResultsTable fixtures={knockoutFixtures} kindOf={knockoutKind} tournamentId={tournament.id} fromHref={resultsSelfHref ?? undefined} />
               </>
             )}
-            <GroupStageFixtures tournament={tournament} />
+            <GroupStageFixtures tournament={tournament} fromHref={resultsSelfHref ?? undefined} />
           </div>
         </div>
       )}

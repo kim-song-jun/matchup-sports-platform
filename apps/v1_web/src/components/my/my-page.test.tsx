@@ -2,12 +2,13 @@ import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { MyInvitationsPageView, MyJoinApplicationsPageView, MyMatchesPageView } from './my-page';
+import { MyInvitationsPageView, MyJoinApplicationsPageView, MyMatchesPageView, MyTeamsPageView } from './my-page';
 import type {
   MyInvitationsViewModel,
   MyJoinApplicationItem,
   MyJoinApplicationsViewModel,
   MyMatchesViewModel,
+  MyTeam,
 } from './my.types';
 
 vi.mock('next/navigation', () => ({
@@ -212,5 +213,31 @@ describe('MyMatchesPageView — 빈 상태 CTA 출처', () => {
     render(<MyMatchesPageView model={matchesModel({ mode: 'joined' })} />);
 
     expect(screen.getByRole('link', { name: '매치 둘러보기' })).toHaveAttribute('href', '/matches');
+  });
+});
+
+describe('MyTeamsPageView — 팀 카드 출처', () => {
+  function team(overrides: Partial<MyTeam> = {}): MyTeam {
+    return {
+      id: 'team-1',
+      name: '성수 FC',
+      logo: '',
+      logoUrl: null,
+      sport: '풋살',
+      region: '성동구',
+      role: 'member',
+      roleLabel: '멤버',
+      members: 12,
+      manner: '4.5',
+      next: '다음 경기 없음',
+      description: '',
+      ...overrides,
+    };
+  }
+
+  it('팀 카드는 뒤로가기가 내 팀 목록으로 돌아오도록 출처를 담는다', () => {
+    render(<MyTeamsPageView model={{ teams: [team()], summary: [] }} />);
+
+    expect(screen.getByRole('link', { name: /성수 FC/ })).toHaveAttribute('href', '/teams/team-1?from=%2Fmy%2Fteams');
   });
 });

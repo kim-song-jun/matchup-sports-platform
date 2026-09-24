@@ -16,7 +16,7 @@ import {
 } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
 import { chatRoomHref } from '@/lib/chat-route';
-import { readBackFrom, withFromPath } from '@/lib/session-storage';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
 import { toDetailMode } from './matches.mode';
@@ -247,7 +247,7 @@ export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed
   const router = useRouter();
   // topBar:false라 셸 뒤로가기가 없다 — 페이지가 직접 그리는 모바일·데스크톱 링크(matches-page.tsx)
   // 둘 다 이 값을 쓴다. public-profile-client.tsx와 같은 `?from=` 패턴.
-  const fromPath = readBackFrom(useSearchParams().get('from'));
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   const query = useV1Match(matchId, { seed });
   const eligibility = useV1MatchApplicationEligibility(matchId, { enabled: Boolean(query.data) });
   const viewerState = query.data ? getViewerState(query.data, eligibility.data?.viewerState) : 'none';

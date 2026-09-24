@@ -209,6 +209,9 @@ describe('withFromPath 체인 상한', () => {
     expect(withFromPath('/users/u1', '/teams/t1?from=tournament')).toBe('/users/u1?from=%2Fteams%2Ft1');
     expect(withFromPath('/users/u1', `/teams/t1?from=${encodeURIComponent('//evil.example')}`)).toBe('/users/u1?from=%2Fteams%2Ft1');
     expect(withFromPath('/users/u1', 'https://evil.example')).toBe('/users/u1');
+    // 대상 경로가 URL 로 읽히지 않아도 렌더를 깨지 않고 그대로 돌려준다.
+    expect(() => withFromPath('http://[', '/my')).not.toThrow();
+    expect(withFromPath('http://[', '/my')).toBe('http://[');
   });
 
   it('체인을 줄여 다시 엮어도 각 단계의 hash 는 남는다', () => {

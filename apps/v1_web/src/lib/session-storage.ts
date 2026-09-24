@@ -132,7 +132,13 @@ export function withFromPath(path: string, from: string | null | undefined) {
   // 통과하지 못하면 그 아래는 버린다(파싱할 수 없는 값·표식이 경로처럼 섞이지 않게).
   const first = readBackFrom(from);
   if (!first) return path;
-  const target = splitFrom(path).base;
+  let target: string;
+  try {
+    target = splitFrom(path).base;
+  } catch {
+    // 서버가 준 경로(채팅 연결 화면 등)가 URL 로 읽히지 않으면 출처를 붙이지 않고 원래 경로 그대로 둔다.
+    return path;
+  }
   const bases: string[] = [];
   let cursor: string | null = first;
   while (cursor) {

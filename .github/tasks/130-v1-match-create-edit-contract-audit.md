@@ -192,6 +192,21 @@ DB: `V1Match`/`v1_matches`, `V1MatchParticipant`/`v1_match_participants`,
 이번 변경의 잔여 외부 게이트: Copilot 요청 CLI와 정식 GraphQL botLogins API가 모두
 빈 reviewRequests를 반환한다. 리뷰 clean 판정 불가이므로 사용자 확인 없이 dev 머지하지 않는다.
 
+## Follow-up — 개인 매치 주최자 참가 선택 (2026-09-24)
+
+- [x] 생성·수정 DTO에 `hostParticipates`를 추가하고 미전달은 기존 호환을 위해 `true`로 처리
+- [x] 생성 화면에 `나도 참가해요` 스위치와 확인 단계의 용병 모집 문구 추가
+- [x] 제외 시 host participant를 만들지 않거나 기존 active 이력을 `cancelled`로 전환
+- [x] 재참가 시 같은 참가 이력을 `active`로 복구하고 정원 계산을 수정 후 상태 기준으로 검증
+- [x] 목록·상세·수정 응답에 `hostParticipates`를 노출하고 완료 처리에서 제외 호스트를 재생성하지 않음
+- [x] Prisma 스키마 변경 없이 기존 participant status를 사용하고 API 문서·시나리오 동기화
+- [ ] 집중 테스트, 타입 검사, PR CI, dev 머지와 alpha 배포 확인
+
+호스트 권한은 `V1Match.hostUserId`, 참가 인원은 active/completed participant로 분리한다.
+따라서 주최자가 뛰지 않아도 신청자 관리·마감·완료 같은 운영 권한은 유지되며, 정원과 완료 인원에는
+실제 참가자만 포함된다. 사용자가 이번 follow-up의 배포를 명시적으로 요청했으므로 기존 리뷰 대기
+메모와 별개로 CI 통과 후 `dev`에 병합해 alpha에 반영한다.
+
 ![모바일 승인 취소 메뉴](../../docs/screenshots/personal-match-participation/host-actions-removed-menu-390.png)
 ![모바일 불참 확인](../../docs/screenshots/personal-match-participation/host-actions-no_show-confirm-390.png)
 ![태블릿 승인 취소 메뉴](../../docs/screenshots/personal-match-participation/host-actions-removed-menu-768.png)

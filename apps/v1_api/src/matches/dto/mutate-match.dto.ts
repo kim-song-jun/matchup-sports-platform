@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsDateString,
   IsInt,
   IsOptional,
@@ -46,6 +47,10 @@ export class MutateMatchDto {
   @Min(2)
   @Max(100)
   capacity!: number;
+
+  @IsOptional()
+  @IsBoolean()
+  hostParticipates?: boolean;
 
   @IsString()
   @MaxLength(120)

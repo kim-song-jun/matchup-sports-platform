@@ -272,6 +272,29 @@ describe('MatchesService', () => {
     );
   });
 
+  it('complete: 참가하지 않는 호스트를 참가자로 다시 만들거나 완료 인원에 포함하지 않는다', async () => {
+    prisma.v1Match.findFirst.mockResolvedValue(matchRow({
+      startAt: PAST,
+      participants: [
+        { id: 'host-participant', userId: host.id, role: 'host', status: 'cancelled' },
+        { id: 'guest-participant', userId: otherUser.id, role: 'participant', status: 'active' },
+      ],
+    }));
+    prisma.v1Match.update.mockResolvedValue(matchRow({ status: 'completed', completedAt: new Date() }));
+    prisma.v1MatchParticipant.update.mockResolvedValue({});
+
+    const result = await service.complete(host, 'match-1', {
+      participants: [{ participantId: 'guest-participant', status: 'completed' }],
+    });
+
+    expect(result.completedParticipants).toBe(1);
+    expect(prisma.v1MatchParticipant.update).toHaveBeenCalledTimes(1);
+    expect(prisma.v1MatchParticipant.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'guest-participant' },
+    }));
+    expect(prisma.v1MatchParticipant.upsert).not.toHaveBeenCalled();
+  });
+
   it('complete: 활성 참가자를 빠뜨리면 완료하지 않는다', async () => {
     prisma.v1Match.findFirst.mockResolvedValue(matchRow({
       startAt: PAST,
@@ -752,6 +775,77 @@ describe('MatchesService', () => {
     expect(prisma.v1Match.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ costNote: null }) }),
     );
+  });
+
+  it('create: hostParticipates=false면 호스트 참가자를 만들지 않는다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Match.create.mockResolvedValue(matchRow());
+
+    const result = await service.create(host, {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '용병 모집 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 10,
+      hostParticipates: false,
+      manualPlaceName: '강남 풋살장',
+    });
+
+    expect(prisma.v1MatchParticipant.create).not.toHaveBeenCalled();
+    expect(result.hostParticipantId).toBeUndefined();
+  });
+
+  it('create: hostParticipates를 생략하면 기존처럼 호스트 참가자를 만든다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    prisma.v1Match.create.mockResolvedValue(matchRow());
+    prisma.v1MatchParticipant.create.mockResolvedValue({ id: 'host-participant' });
+
+    const result = await service.create(host, {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '함께 뛰는 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 10,
+      manualPlaceName: '강남 풋살장',
+    });
+
+    expect(prisma.v1MatchParticipant.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ userId: host.id, role: 'host', status: 'active' }),
+    }));
+    expect(result.hostParticipantId).toBe('host-participant');
+  });
+
+  it('update: hostParticipates=false면 활성 호스트를 취소하고 정원 계산에서도 제외한다', async () => {
+    prisma.v1Sport.findFirst.mockResolvedValue({ id: 'sport-1' });
+    prisma.v1Region.findFirst.mockResolvedValue({ id: 'region-1' });
+    const current = matchRow({ status: 'recruiting', startAt: FUTURE });
+    prisma.v1Match.findFirst.mockResolvedValue(current);
+    prisma.v1MatchParticipant.count
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(1);
+    prisma.v1Match.update.mockResolvedValue(matchRow({ maxParticipants: 2 }));
+
+    await service.update(host, 'match-1', {
+      sportId: 'sport-1',
+      regionId: 'region-1',
+      title: '용병만 모집하는 매치',
+      startsAt: FUTURE.toISOString(),
+      capacity: 2,
+      hostParticipates: false,
+      manualPlaceName: '강남 풋살장',
+      version: current.updatedAt.toISOString(),
+    });
+
+    expect(prisma.v1MatchParticipant.upsert).not.toHaveBeenCalled();
+    expect(prisma.v1MatchParticipant.updateMany).toHaveBeenCalledWith({
+      where: { matchId: 'match-1', userId: host.id, role: 'host', status: 'active' },
+      data: { status: 'cancelled', cancelledAt: expect.any(Date) },
+    });
+    expect(prisma.v1Match.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ maxParticipants: 2 }),
+    }));
   });
 
   it('update: costNote를 갱신한다', async () => {

@@ -99,7 +99,16 @@ describe('buildMatchPayloadResult — payload | missingFields 분기', () => {
       regionId: 'region-gangnam',
       title: '주말 풋살 매치',
       manualPlaceName: '한강 풋살장',
+      hostParticipates: true,
     });
+  });
+
+  it('주최자 참가를 끄면 payload에 hostParticipates=false를 보존한다', () => {
+    const ctx = baseCtx({ draft: { ...baseCtx().draft, hostParticipates: false } });
+
+    const result = buildMatchPayloadResult(ctx.draft, ctx.sportId, ctx.regionId);
+
+    expect(result.payload).toMatchObject({ hostParticipates: false });
   });
 
   it('date가 빈 문자열은 아니지만 파싱 불가능한 값(손상된 draft)이면 크래시 대신 missingFields를 반환한다', () => {

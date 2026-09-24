@@ -62,6 +62,7 @@
 | `endsAt` | ISO datetime | No | - |
 | `deadlineAt` | ISO datetime | No | - |
 | `capacity` | int(2~100) | Yes | - |
+| `hostParticipates` | boolean | No | `true` |
 | `manualPlaceName` | string | Yes | - |
 | `addressText` | string | No | - |
 | `rulesText` | string | No | 안내/규칙 표시용 |
@@ -75,20 +76,24 @@
 - `minLevelCode`가 `maxLevelCode`보다 높은 단계면 `400 VALIDATION_FAILED`.
 
 - 부가 동작
-- host는 자동 participant 생성
-- 호스트는 active 참가자로 정원에 포함된다. 개인 모집 매치의 결제·도착 인증·팀 자동 배정 API는 없다.
+- `hostParticipates=true`(기본값)이면 host participant를 만들고 호스트를 정원에 포함한다.
+  `false`이면 호스트는 매치 운영 권한만 유지하고 참가자·현재 인원에서는 제외된다.
+- 개인 모집 매치의 결제·도착 인증·팀 자동 배정 API는 없다.
 
 ## PATCH /matches/:id
 
 - host만 가능
 - `cancelled`, `completed`, `expired` 상태에서는 수정 불가
-- `capacity`를 현재 참가자 수보다 낮게 수정 불가. `version` 필수.
+- `capacity`를 수정 후의 활성 참가자 수보다 낮게 수정 불가. `version` 필수.
 - 수정은 매치 행 잠금 후 최신 상태·버전·참가 인원을 재확인한다. 같은 버전의 동시 수정은
   하나만 저장되며 나머지는 `409 VERSION_CONFLICT`. 승인과 정원 축소가 겹쳐도 정원 초과를 허용하지 않는다.
 - 시작된 매치는 raw status가 `closed`여도 edit 응답 `editable=false`, 저장은 409다.
 - `imageUrl`은 `null` 전달로 제거 가능
 - `minLevelCode`, `maxLevelCode`는 create와 동일 계약이며 미전달 시 레벨 FK를 비운다.
 - `costNote`도 create와 동일 계약(선택, ≤200자, 미전달/빈 문자열은 `null`로 저장).
+- `hostParticipates`를 `false`로 바꾸면 활성 host participant를 `cancelled`로 전환하고,
+  `true`로 바꾸면 같은 사용자 참가 이력을 `active`로 생성·복구한다. 호스트의 운영 권한은
+  `hostUserId`를 기준으로 하므로 두 상태 모두 유지된다.
 
 ## Host participant actions
 
@@ -126,7 +131,7 @@
 - 호스트만 경기 시작 이후의 raw `recruiting` 또는 `closed` 개인 매치를 완료할 수 있다.
 - 현재 `active`인 일반 참가자를 정확히 한 번씩 전부 지정해야 한다. 중복 ID, 누락, 매치에 속하지 않은
   ID는 `400 VALIDATION_FAILED`다.
-- 완료 트랜잭션은 매치 행을 잠근 뒤 호스트와 매치를 `completed`로, 각 참가자를 제출한
+- 완료 트랜잭션은 매치 행을 잠근 뒤 참가 중인 호스트가 있을 때만 그 호스트와 매치를 `completed`로, 각 참가자를 제출한
   `completed` 또는 `no_show`로 갱신하고 남은 `requested` 신청을 `expired`로 닫는다.
 - 오래된 데이터에 호스트 참가자 행이 없으면 같은 트랜잭션 안에서 복구한다.
 - `completed` 참가자는 참여 기록과 후기 자격을 유지하고, `no_show` 참가자는 불참 기록으로 표시되며

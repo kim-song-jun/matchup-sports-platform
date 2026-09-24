@@ -138,6 +138,7 @@ export type MatchCreateViewModel = {
     description: string;
     image: string;
     capacity: number;
+    hostParticipates: boolean;
     actionLabel: string;
     minLevel: string;
     maxLevel: string;
@@ -157,7 +158,7 @@ export type MatchCreateViewModel = {
     regionId: string;
     regions: Array<{ id: string; name: string }>;
     onSelectSport: (sportName: string) => void;
-    onFieldChange: (field: keyof MatchCreateViewModel['draft'], value: string | number) => void;
+    onFieldChange: (field: keyof MatchCreateViewModel['draft'], value: string | number | boolean) => void;
     onRegionChange: (regionId: string) => void;
     onBack: () => void;
     onNext: () => void;

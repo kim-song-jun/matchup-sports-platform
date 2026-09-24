@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render as rtlRender, screen } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MatchCreatePageView, MatchDetailPageView, MatchListPageView } from './matches-page';
 import { getMatchCreateViewModel, getMatchDetailViewModel, getMatchListViewModel } from './matches.view-model';
@@ -275,6 +275,41 @@ describe('MatchCreatePageView — 장소와 시간 단계', () => {
     expect(screen.getByLabelText('종료 시간')).toHaveAttribute('type', 'time');
     expect(screen.getByLabelText('신청 마감일')).toHaveAttribute('type', 'date');
     expect(screen.getByLabelText('신청 마감시간')).toHaveAttribute('type', 'time');
+  });
+});
+
+describe('MatchCreatePageView — 주최자 참가 선택', () => {
+  it('기본값은 참가이며 스위치를 끄면 hostParticipates=false를 전달한다', () => {
+    const model = getMatchCreateViewModel('info');
+    const onFieldChange = vi.fn();
+    model.form = {
+      selectedSportId: 'sport-futsal',
+      regionId: 'region-gangnam',
+      regions: [],
+      onSelectSport: vi.fn(),
+      onFieldChange,
+      onRegionChange: vi.fn(),
+      onBack: vi.fn(),
+      onNext: vi.fn(),
+      onSubmit: vi.fn(),
+    };
+
+    render(<MatchCreatePageView model={model} />);
+
+    const toggle = screen.getByRole('switch', { name: '나도 참가해요' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(toggle);
+    expect(onFieldChange).toHaveBeenCalledWith('hostParticipates', false);
+  });
+
+  it('확인 단계에서 주최자 제외 상태를 용병 모집 문구로 보여준다', () => {
+    const model = getMatchCreateViewModel('confirm');
+    model.draft = { ...model.draft, hostParticipates: false };
+
+    render(<MatchCreatePageView model={model} />);
+
+    expect(screen.getByText('참가하지 않아요')).toBeInTheDocument();
+    expect(screen.getByText('용병만 모집하고 주최자는 운영만 해요')).toBeInTheDocument();
   });
 });
 

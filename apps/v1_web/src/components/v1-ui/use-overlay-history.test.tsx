@@ -15,6 +15,9 @@ import { __resetOverlayHistoryForTests, closeOverlayThenNavigate, overlayMarkerO
 import { currentPath, settleHistory } from '@/test/history-router';
 import { useConfirm } from './confirm-modal';
 import { useModalA11y } from './use-modal-a11y';
+import { NavigationHistoryTracker } from './navigation-history-tracker';
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn() }) }));
 
 // Next 라우터는 추적기보다 뒤에 popstate 를 듣는다 — 그 자리를 흉내 내 무엇이 새는지 본다.
 const nextRouterPop = vi.fn();
@@ -334,5 +337,21 @@ describe('남은 표식 — 뒤로·앞으로 모두 건너뛴다', () => {
     await back();
     expect(currentPath()).toBe('/teams/1');
     expect(overlayMarkerOf(window.history.state)).toBeNull();
+  });
+
+  it('a document reloaded before any overlay opens still skips the stale marker on forward', async () => {
+    const tracker = render(<NavigationHistoryTracker />);
+    await leaveThroughModalLink();
+    await back();
+    expect(currentPath()).toBe('/teams/1');
+
+    // Cross-document return: fresh modules, only the app shell's tracker runs.
+    tracker.unmount();
+    __resetOverlayHistoryForTests();
+    __resetNavigationHistoryForTests();
+    render(<NavigationHistoryTracker />);
+
+    await forward();
+    expect(currentPath()).toBe('/teams/2');
   });
 });

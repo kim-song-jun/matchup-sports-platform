@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getHomePopupStorageKey, HomePopupDialog } from './home-notice-popup';
 import type { HomePopup } from './home.types';
+import { bindSoftNavigator } from '@/lib/navigation-history';
 
 const popup: HomePopup = {
   id: 'popup-main',
@@ -49,16 +50,21 @@ describe('HomePopupDialog', () => {
   it('closes when only the query string changes', async () => {
     const historyBack = vi.spyOn(window.history, 'back');
     const linked = { ...popup, linkUrl: '/matches?sport=futsal', linkLabel: '풋살 매치' };
+    const routerReplace = vi.fn();
+    const unbind = bindSoftNavigator(routerReplace);
     const { rerender } = render(<HomePopupDialog popup={linked} location="/matches" />);
     const link = await screen.findByRole('link', { name: '풋살 매치' });
 
+    // The popup's own history entry is open, so the link replaces it instead of pushing past it.
     const notPrevented = link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
-    expect(notPrevented).toBe(true);
-    window.history.pushState({}, '', '/matches?sport=futsal');
+    expect(notPrevented).toBe(false);
+    expect(routerReplace).toHaveBeenCalledWith('/matches?sport=futsal');
+    window.history.replaceState({}, '', '/matches?sport=futsal');
     rerender(<HomePopupDialog popup={linked} location="/matches?sport=futsal" />);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(historyBack).not.toHaveBeenCalled();
     historyBack.mockRestore();
+    unbind();
   });
 
   it('closes on click for a link that leaves the app, whatever the scheme case', async () => {

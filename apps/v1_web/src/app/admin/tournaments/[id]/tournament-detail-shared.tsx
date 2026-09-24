@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { formatEntryFee } from '@/lib/date-utils';
 import type { V1AdminTournamentRegistration } from '@/types/api';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
+import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -213,14 +214,7 @@ export function SimpleModal({ open, title, onClose, pending = false, children }:
   }, [open]);
 
   useOverlayHistory({ open, onClose, locked: pending });
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !pending) onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose, pending]);
+  useTopmostEscape({ open, onEscape: onClose, disabled: pending });
 
   useEffect(() => {
     if (!open) return;

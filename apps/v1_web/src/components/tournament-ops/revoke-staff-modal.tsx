@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
+import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 
 interface RevokeStaffModalProps {
   open: boolean;
@@ -50,14 +51,7 @@ export function RevokeStaffModal({
   }, [open]);
 
   useOverlayHistory({ open, onClose, locked: pending });
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !pending) onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose, pending]);
+  useTopmostEscape({ open, onEscape: onClose, disabled: pending });
 
   useEffect(() => {
     if (!open) return;

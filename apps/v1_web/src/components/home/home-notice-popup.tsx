@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { RichContentRenderer } from '@/components/content/rich-content-renderer';
 import type { HomePopup } from './home.types';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
-import { closeIfCurrentPage } from '@/lib/overlay-history';
+import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
+import { overlayLinkClick } from '@/lib/overlay-history';
 
 const HIDE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const STORAGE_KEY_PREFIX = 'teameet:v1:home-popup:hidden-until:';
@@ -20,7 +21,7 @@ export const getPopupStorageKey = getHomePopupStorageKey;
 
 /**
  * location(경로+쿼리)을 주면(전역 팝업) URL 이 바뀔 때 닫는다 — 팝업 링크는 이동만 하고, 닫기는 URL 이
- * 바뀐 뒤라 오버레이 항목을 back 으로 걷지 않는다(닫기 back 과 이동 push 가 엇갈리지 않게).
+ * 바뀐 뒤라 오버레이 항목을 back 으로 걷지 않는다. 링크는 표식 항목을 replace 로 목적지로 바꾼다.
  */
 export function HomePopupDialog({ popup, location }: { popup: HomePopup | null; location?: string | null }) {
   const [open, setOpen] = useState(false);
@@ -52,6 +53,7 @@ export function HomePopupDialog({ popup, location }: { popup: HomePopup | null; 
   }, [popup?.id]);
 
   useOverlayHistory({ open, onClose: () => setOpen(false) });
+  useTopmostEscape({ open, onEscape: () => setOpen(false) });
   useEffect(() => {
     if (!open) return;
 
@@ -61,10 +63,6 @@ export function HomePopupDialog({ popup, location }: { popup: HomePopup | null; 
     const focusTimer = window.setTimeout(() => closeButtonRef.current?.focus(), 0);
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-        return;
-      }
       if (event.key !== 'Tab' || !dialogRef.current) return;
 
       const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
@@ -162,7 +160,7 @@ export function HomePopupDialog({ popup, location }: { popup: HomePopup | null; 
                 {linkLabel}
               </a>
             ) : (
-              <Link className="tm-btn tm-btn-md tm-btn-primary" href={popup.linkUrl} onClick={closeIfCurrentPage(popup.linkUrl, location ?? '', closePopup)}>
+              <Link className="tm-btn tm-btn-md tm-btn-primary" href={popup.linkUrl} onClick={overlayLinkClick(popup.linkUrl, location ?? '', closePopup)}>
                 {linkLabel}
               </Link>
             )

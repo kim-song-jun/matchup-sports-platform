@@ -10,6 +10,7 @@ import type {
   V1TournamentStaffRole,
 } from '@/types/api';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
+import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 
 export interface GrantableRoleOption {
   value: Exclude<V1TournamentStaffRole, 'PLATFORM_OPS'>;
@@ -130,14 +131,7 @@ export function GrantStaffModal({
   }, [open, selected]);
 
   useOverlayHistory({ open, onClose, locked: pending });
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !pending) onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose, pending]);
+  useTopmostEscape({ open, onEscape: onClose, disabled: pending });
 
   useEffect(() => {
     if (!open) return;

@@ -8,6 +8,7 @@ import { formatAdminDateTime } from '@/lib/date-utils';
 import { useAdminToast, AdminToasts } from '@/components/admin';
 import type { V1AdminErrorLogDetail } from '@/types/api';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
+import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 
 // ── Props ─────────────────────────────────────────────────────────────────
 interface ErrorLogDetailModalProps {
@@ -131,15 +132,7 @@ export function ErrorLogDetailModal({ id, open, onClose }: ErrorLogDetailModalPr
   }, [open]);
 
   useOverlayHistory({ open, onClose });
-  // ESC로 닫기
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose]);
+  useTopmostEscape({ open, onEscape: onClose });
 
   // focus trap
   useEffect(() => {

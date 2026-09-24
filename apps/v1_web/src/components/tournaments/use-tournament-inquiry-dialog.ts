@@ -1,18 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
+import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 
 export function useTournamentInquiryDialog(onClose: () => void) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<Element | null>(null);
 
   useOverlayHistory({ open: true, onClose });
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [onClose]);
+  useTopmostEscape({ open: true, onEscape: onClose });
 
   useEffect(() => {
     const dialog = dialogRef.current;

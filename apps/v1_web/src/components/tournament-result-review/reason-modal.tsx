@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
+import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 
 export type ReasonModalTone = 'default' | 'danger';
 
@@ -68,14 +69,7 @@ export function ReasonModal({
   }, [open]);
 
   useOverlayHistory({ open, onClose: onCancel });
-  useEffect(() => {
-    if (!open) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCancel();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onCancel]);
+  useTopmostEscape({ open, onEscape: onCancel });
 
   useEffect(() => {
     if (!open) return;

@@ -36,6 +36,8 @@ const navigation = vi.hoisted(() => ({ searchParams: new URLSearchParams() }));
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => navigation.searchParams,
+  // AppBackLink 가 클릭 때 router.back/replace 를 쓴다 — 렌더만 하는 테스트라 빈 라우터면 된다.
+  useRouter: () => ({ back: vi.fn(), forward: vi.fn(), push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
 }));
 
 const mocks = vi.hoisted(() => ({ usePublicUserRecords: vi.fn() }));

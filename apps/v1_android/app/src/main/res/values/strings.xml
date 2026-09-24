@@ -10,4 +10,5 @@
     <string name="web_error_retry">다시 시도</string>
     <string name="file_chooser_failed">파일 선택기를 열 수 없어요.</string>
     <string name="external_app_unavailable">연결할 앱을 열 수 없어요.</string>
+    <string name="exit_confirmation_hint">한 번 더 누르면 종료돼요</string>
 </resources>

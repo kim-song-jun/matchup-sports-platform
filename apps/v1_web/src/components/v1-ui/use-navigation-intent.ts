@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { decideBackAction, installNavigationHistory, subscribeAppPop } from '@/lib/navigation-history';
 import { TAB_CONTAINER_SELECTOR } from './navigation-tab-selectors';
 
 export type NavigationIntentKind = 'push' | 'pop' | 'tab' | 'native' | 'search';
@@ -9,9 +10,8 @@ export type NavigationIntentKind = 'push' | 'pop' | 'tab' | 'native' | 'search';
  * iOS 셸의 popstate 는 엣지 스와이프가 대부분이고, 그 스와이프는 **네이티브가 이미
  * 슬라이드를 그린 뒤**다(WKWebView allowsBackForwardNavigationGestures). 여기서 다시
  * 'pop' 을 주면 웹 전환이 그 위에 한 번 더 겹친다. 그래서 'native' — "셸이 이미
- * 애니메이션했다, 웹은 그리지 말라" — 로 분류한다. 프로그램적 뒤로가기(router.back)도
- * 같은 popstate 라 함께 애니메이션이 없어지는데, iOS 에서 그 경로는 드물고 두 겹보다 낫다.
- * 클릭으로 누르는 뒤로가기(‹, data-nav-back)는 popstate 가 아니라 클릭이라 영향 없다.
+ * 애니메이션했다, 웹은 그리지 말라" — 로 분류한다. 헤더 뒤로가기(‹)가 부른 history back 은
+ * 네이티브가 그리지 않으므로 추적기의 appInitiated 로 가려 iOS 에서도 'pop' 을 준다.
  */
 function isIosShell(): boolean {
   return document.documentElement.dataset.teameetNativeApp === 'ios';
@@ -31,22 +31,20 @@ export interface NavigationIntentHandlers {
  * kind 판별 순서:
  *  1. `TAB_CONTAINER_SELECTOR`(하단 탭·데스크톱 상단 탭·화면 안 세부 탭) 안의 앵커 클릭
  *     → 'tab' (동위 전환, 슬라이드 없음)
- *  2. `data-nav-back="true"` 앵커 클릭 → 'pop' (AppBackLink — 실제로는 history push지만
- *     사용자 멘탈모델은 "뒤로"이므로 시각적으로 pop 취급. app-back-link.tsx가 이 속성을 단다)
+ *  2. `data-nav-back="true"` 앵커 클릭 → 'pop' (AppBackLink). 단 AppBackLink 가 history back 으로
+ *     갈 클릭이면(decideBackAction) 여기선 알리지 않는다 — 뒤따르는 popstate 가 한 번만 알린다.
  *  3. 그 외 내부 앵커 클릭 → 'push', 단 pathname 이 그대로고 search 만 바뀌면 'search'로
  *     재분류(FS-1) — 이 재분류는 **반드시 1·2번 뒤에** 온다. 세부 탭(`.tm-segmented-tabs`)도
  *     "쿼리만 바뀌는" 이동이라, pathname 동일 여부를 먼저 보면 세부 탭까지 'search'로
  *     잘못 삼켜 그 탭의 'tab' 분류(콘텐츠 VT 없음)가 깨진다 — 순서를 반드시 지킨다.
  *     필터 시트(칩 선택·열기/닫기)처럼 시트 자체 애니메이션을 이미 갖고 있어 페이지
  *     VT(슬라이드+페이드)가 그 위에 겹치면 안 되는 이동이 'search'의 실제 대상이다.
- *  4. popstate 이벤트(하드웨어 백버튼·엣지 스와이프·브라우저 뒤로) → 'pop'
- *     단 iOS 셸 안이면 'native' — 엣지 스와이프를 네이티브가 이미 그렸으므로 웹은 안 그린다
+ *  4. 앱 페이지 이동인 popstate(하드웨어 백버튼·엣지 스와이프·브라우저 뒤로) → 'pop'
+ *     단 iOS 셸 안이면 'native' — 엣지 스와이프를 네이티브가 이미 그렸으므로 웹은 안 그린다.
+ *     오버레이만 닫히는 pop 은 추적기(subscribeAppPop)가 걸러 여기까지 오지 않는다.
  *
- * popstate가 forward 버튼에서도 발생하는 것(브라우저 앞으로가기)은 알려진 한계다 — 이
- * 경우도 'pop'으로 분류된다. 모바일 WebView에서 forward 버튼 사용은 극히 드물어(하드웨어
- * 버튼 자체가 없는 경우가 대부분) 실사용 영향이 적다고 판단해 별도 history-index 추적을
- * 추가하지 않았다. 사용자 리포트가 쌓이면 `history.state.idx`를 우리가 직접 증가시켜
- * 비교하는 방식으로 보강할 수 있다.
+ * 앞으로가기 popstate 도 'pop' 이다. 추적기가 방향(direction)을 알려 주지만, 모바일 WebView 에는
+ * 앞으로 버튼이 사실상 없어 전환을 따로 두지 않았다.
  */
 export function useNavigationIntent({ onIntent }: NavigationIntentHandlers) {
   const handlersRef = useRef({ onIntent });
@@ -70,9 +68,11 @@ export function useNavigationIntent({ onIntent }: NavigationIntentHandlers) {
       if (url.origin !== window.location.origin) return;
       if (url.pathname === window.location.pathname && url.search === window.location.search) return;
 
+      const isBack = anchor.dataset.navBack === 'true';
+      if (isBack && decideBackAction(`${url.pathname}${url.search}`) === 'back') return;
       const baseKind: NavigationIntentKind = anchor.closest(TAB_CONTAINER_SELECTOR)
         ? 'tab'
-        : anchor.dataset.navBack === 'true'
+        : isBack
           ? 'pop'
           : 'push';
       // 'search' 는 'push'의 하위분류다 — 반드시 tab/pop 판별 뒤에 온다(위 docstring 3번).
@@ -82,13 +82,15 @@ export function useNavigationIntent({ onIntent }: NavigationIntentHandlers) {
       handlersRef.current.onIntent(kind);
     };
 
-    const onPopState = () => handlersRef.current.onIntent(isIosShell() ? 'native' : 'pop');
+    installNavigationHistory();
+    const unsubscribe = subscribeAppPop(({ appInitiated }) =>
+      handlersRef.current.onIntent(isIosShell() && !appInitiated ? 'native' : 'pop'),
+    );
 
     document.addEventListener('click', onClick, true);
-    window.addEventListener('popstate', onPopState);
     return () => {
       document.removeEventListener('click', onClick, true);
-      window.removeEventListener('popstate', onPopState);
+      unsubscribe();
     };
   }, []);
 }

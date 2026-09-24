@@ -127,8 +127,10 @@ describe('RouteProgressBar navigation lifecycle', () => {
 
   it('cleans up pending navigation timers when unmounted', () => {
     const result = render(view());
+    // 마운트 때 히스토리 추적기가 sessionStorage 에 쓰면 jsdom 이 storage 이벤트 타이머를 건다 — 진행바 것이 아니다.
+    const baseline = vi.getTimerCount();
     fireEvent.click(result.getByText('Change sport'));
     result.unmount();
-    expect(vi.getTimerCount()).toBe(0);
+    expect(vi.getTimerCount()).toBe(baseline);
   });
 });

@@ -6,6 +6,7 @@ import { PageTransitionController } from '@/components/v1-ui/page-transition-con
 import { ReleaseVersionWatcher } from '@/components/v1-ui/release-version-watcher';
 import { RouteProgressBar } from '@/components/v1-ui/route-progress';
 import { ScrollRestoration } from '@/components/v1-ui/scroll-restoration';
+import { NavigationHistoryTracker } from '@/components/v1-ui/navigation-history-tracker';
 import { StaticCacheBootstrap } from '@/components/v1-ui/static-cache-bootstrap';
 import { publicAssetPath } from '@/lib/assets';
 import { getSiteOrigin } from '@/lib/seo';
@@ -58,6 +59,7 @@ export default function RootLayout({
         <JsonLd data={buildSiteIdentityLd()} />
       </head>
       <body>
+        <NavigationHistoryTracker />
         <RouteProgressBar />
         <PageTransitionController />
         <ReleaseVersionWatcher />

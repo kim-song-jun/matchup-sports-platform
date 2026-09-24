@@ -13,6 +13,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.webkit.CookieManager;
 import android.webkit.GeolocationPermissions;
@@ -32,6 +33,7 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -71,6 +73,7 @@ public final class MainActivity extends AppCompatActivity {
     private int keyboardInsetCssPixels;
     private boolean keyboardVisible;
     private String lastRecoverableUrl = BuildConfig.WEB_ORIGIN + "/home";
+    private long lastBackPressAtMillis = BackNavigationPolicy.NO_PREVIOUS_PRESS_MILLIS;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -695,7 +698,19 @@ public final class MainActivity extends AppCompatActivity {
     private void registerBackHandler() {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() {
-                if (webView.canGoBack()) webView.goBack(); else finish();
+                long now = SystemClock.elapsedRealtime();
+                BackNavigationPolicy.Action action = BackNavigationPolicy.decide(
+                    webView.canGoBack(), webView.getUrl(), lastBackPressAtMillis, now);
+                switch (action) {
+                    case GO_BACK -> webView.goBack();
+                    case NAVIGATE_HOME -> webView.loadUrl(BuildConfig.WEB_ORIGIN + "/home");
+                    case SHOW_EXIT_HINT -> {
+                        lastBackPressAtMillis = now;
+                        Toast.makeText(MainActivity.this, R.string.exit_confirmation_hint, Toast.LENGTH_SHORT)
+                            .show();
+                    }
+                    case EXIT -> finish();
+                }
             }
         });
     }

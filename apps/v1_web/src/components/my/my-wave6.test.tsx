@@ -15,6 +15,8 @@ import { resolveRouteChrome } from '@/lib/route-chrome';
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useSearchParams: () => new URLSearchParams(),
+  // AppBackLink 가 클릭 때 router.back/replace 를 쓴다 — 렌더만 하는 테스트라 빈 라우터면 된다.
+  useRouter: () => ({ back: vi.fn(), forward: vi.fn(), push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
 }));
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => <a href={href} {...rest}>{children}</a>,

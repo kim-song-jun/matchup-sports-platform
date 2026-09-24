@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { getCurrentRedirectPath } from '@/lib/session-storage';
 import { readScrollPosition, saveScrollPosition } from '@/lib/scroll-positions';
+import { installNavigationHistory, subscribeAppPop } from '@/lib/navigation-history';
 import { TAB_LINK_SELECTOR } from './navigation-tab-selectors';
 
 const DESKTOP_QUERY = '(min-width: 1024px)'; // desktop/_shell.css 의 breakpoint 와 동일해야
@@ -15,7 +16,8 @@ const SAVE_DEBOUNCE_MS = 150;
  * 이동의 종류. 'tab' 이 'push' 와 갈리는 것이 핵심이다.
  *
  * - push : 새 화면으로 들어간다(카드 클릭, CTA). 맨 위에서 시작하는 게 맞다.
- * - pop  : 뒤로/앞으로. 보던 자리로 돌아가야 한다.
+ * - pop  : 뒤로/앞으로, 헤더 뒤로가기(data-nav-back). 보던 자리로 돌아가야 한다 —
+ *          헤더 뒤로가기가 replace 로 가도 사용자에겐 "뒤로"다(전환 쪽 분류와 같게 둔다).
  * - tab  : 하단 탭·데스크톱 상단 탭. **뒤로가기는 아니지만 "돌아가기"다.**
  *
  * 처음에는 tab 을 push 로 뭉뚱그렸다가, 실측에서 그게 정확히 "새로고침당한" 체감의
@@ -122,9 +124,10 @@ export function ScrollRestoration() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  // ② 방향 감지 — popstate 만 "뒤로/앞으로"다. RouteProgressBar 와 동일한 클릭 캡처 패턴.
+  // ② 방향 감지 — 앱 페이지 이동인 popstate(오버레이 pop 제외)와 헤더 뒤로가기 클릭이 "뒤로"다.
   useEffect(() => {
-    const onPopState = () => { navTypeRef.current = 'pop'; };
+    installNavigationHistory();
+    const unsubscribe = subscribeAppPop(() => { navTypeRef.current = 'pop'; });
     const onClick = (event: MouseEvent) => {
       if (event.defaultPrevented || event.button !== 0) return;
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -133,12 +136,15 @@ export function ScrollRestoration() {
       const href = anchor.getAttribute('href');
       if (!href || anchor.getAttribute('target') === '_blank' || anchor.hasAttribute('download')) return;
       if (href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
-      navTypeRef.current = anchor.closest(TAB_LINK_SELECTOR) ? 'tab' : 'push';
+      navTypeRef.current = anchor.closest(TAB_LINK_SELECTOR)
+        ? 'tab'
+        : anchor.dataset.navBack === 'true'
+          ? 'pop'
+          : 'push';
     };
-    window.addEventListener('popstate', onPopState);
     document.addEventListener('click', onClick, true);
     return () => {
-      window.removeEventListener('popstate', onPopState);
+      unsubscribe();
       document.removeEventListener('click', onClick, true);
     };
   }, []);

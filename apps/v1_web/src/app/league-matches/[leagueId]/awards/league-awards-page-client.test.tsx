@@ -9,6 +9,8 @@ vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   usePathname: () => '/league-matches/league-1/awards',
   useSearchParams: vi.fn(() => new URLSearchParams('from=%2Fhome')),
+  // AppBackLink 가 클릭 때 router.back/replace 를 쓴다 — 렌더만 하는 테스트라 빈 라우터면 된다.
+  useRouter: () => ({ back: vi.fn(), forward: vi.fn(), push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
 }));
 
 const useSearchParamsMock = vi.mocked(useSearchParams);

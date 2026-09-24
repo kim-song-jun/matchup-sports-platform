@@ -48,6 +48,9 @@ const tabs: Array<{
   { id: 'my', label: '마이', href: '/my', Icon: MyIcon },
 ];
 
+/** 하단 탭 루트 — 콜드스타트 부모 항목을 끼우지 않는 화면. */
+export const ROOT_TAB_HREFS: readonly string[] = tabs.map((tab) => tab.href);
+
 type AppChromeProps = {
   title: ReactNode;
   children: ReactNode;

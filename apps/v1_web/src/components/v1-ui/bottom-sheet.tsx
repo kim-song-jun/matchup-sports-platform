@@ -1,6 +1,17 @@
 'use client';
 
-import { useCallback, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import {
+  useCallback,
+  useId,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
+import { decideBackAction, markAppInitiatedBack, suppressNextPop } from '@/lib/navigation-history';
 import { useModalA11y } from './use-modal-a11y';
 
 interface BottomSheetBaseProps {
@@ -15,12 +26,11 @@ interface BottomSheetBaseProps {
    */
   open: boolean;
   /**
-   * 드래그가 임계치(시트 높이의 32%)를 넘겨 놓인 채 손을 뗐을 때, 또는 ESC 를 눌렀을 때
-   * 불린다(A안 계약 2·4). **이 컴포넌트는 네비게이션을 하지 않는다** — 호출자가
-   * `() => router.push(closeHref)` 처럼 URL 이동으로 구현해야 닫힘이 뒤로가기로 되돌아가고
-   * 필터 상태가 담긴 URL 을 공유할 수 있는 성질이 유지된다.
+   * 시트를 닫은 목록 URL. 시트가 scrim 을 직접 그리고, 드래그·ESC·scrim·시트 안 링크 이동을 모두
+   * 여기서 처리한다 — 목적지가 시트를 열기 전 항목이면 history back, 아니면 replace.
+   * push 로 닫으면 항목이 하나 더 쌓여 다음 뒤로가기가 시트를 다시 연다.
    */
-  onRequestClose: () => void;
+  closeHref: string;
   children: ReactNode;
 }
 
@@ -51,17 +61,45 @@ const INTERACTIVE_SELECTOR = 'button, a, input, select, textarea, [role="button"
  * controlled 컴포넌트(A안). `.tm-filter-sheet` 의 기존 치수·모서리·그림자·진입 애니메이션은
  * 그대로 두고(globals.css), 드래그 중 손가락을 따라가는 동작과 임계치 판정만 더한다.
  *
- * scrim 은 이 컴포넌트가 그리지 않는다(A안 계약 4) — 호출자가
- * `<Link className="tm-filter-scrim" href={closeHref} aria-label="필터 닫기" />` 를
- * 이 컴포넌트와 형제로 직접 배치해야 한다. 그래야 backdrop 클릭 닫기도 JS 없이·뒤로가기로
- * 동작한다. 드래그 손잡이(`.tm-filter-sheet-handle`)도 마찬가지로 children 쪽에서 그린다 —
- * 5개 실사용처가 전부 그렇게 하고 있어 그 관행을 유지한다.
+ * scrim(`<Link href={closeHref}>`)은 이 컴포넌트가 그린다 — JS 없이도 닫히고, JS 가 있으면
+ * 시트 안 링크와 같은 규칙(back 또는 replace)으로 닫는다. 드래그 손잡이(`.tm-filter-sheet-handle`)는
+ * children 쪽에서 그린다.
  *
  * 스냅 포인트(중간 정지)는 만들지 않는다(A안 계약 3) — 중간 상태는 URL 로 표현할 수
  * 없으므로 임계치 미만이면 무조건 원위치, 초과면 무조건 닫는다.
  */
 export function BottomSheet(props: BottomSheetProps) {
-  const { open, onRequestClose, children, title, ariaLabel } = props;
+  const { open, closeHref, children, title, ariaLabel } = props;
+  const router = useRouter();
+
+  const navigate = useCallback(
+    (href: string) => {
+      if (decideBackAction(href) === 'back') {
+        suppressNextPop(); // 같은 목록으로 돌아가는 닫기 — 페이지 전환·스크롤 복원 대상이 아니다.
+        markAppInitiatedBack(); // iOS 에서 네이티브 스와이프로 오분류되지 않게.
+        router.back();
+        return;
+      }
+      router.replace(href);
+    },
+    [router],
+  );
+  const onRequestClose = useCallback(() => navigate(closeHref), [closeHref, navigate]);
+
+  // 시트 안의 링크(칩·초기화·적용·닫기)는 push 대신 navigate 로 — 시트 항목을 쌓지 않는다.
+  const onLinkClick = useCallback(
+    (event: ReactMouseEvent<HTMLElement>) => {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const anchor = (event.target as Element | null)?.closest?.('a');
+      if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return;
+      const url = new URL(anchor.href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+      event.preventDefault();
+      navigate(`${url.pathname}${url.search}`);
+    },
+    [navigate],
+  );
   const idPrefix = useId();
   const titleId = title ? `${idPrefix}-bottom-sheet-title` : undefined;
 
@@ -78,6 +116,7 @@ export function BottomSheet(props: BottomSheetProps) {
   const { dialogRef, initialFocusRef } = useModalA11y<HTMLButtonElement, HTMLElement>({
     open: true,
     onClose: onRequestClose,
+    closeOnBack: false, // 열림이 URL 항목이라 뒤로가기가 이미 닫는다.
   });
 
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
@@ -122,7 +161,9 @@ export function BottomSheet(props: BottomSheetProps) {
   if (!open) return null;
 
   return (
-    <div className="tm-filter-layer">
+    <>
+    <Link className="tm-filter-scrim" href={closeHref} aria-label="필터 닫기" onClick={onLinkClick} />
+    <div className="tm-filter-layer" onClickCapture={onLinkClick}>
       <section
         ref={dialogRef}
         className={`tm-filter-sheet${isDragging ? ' is-dragging' : ''}`}
@@ -155,5 +196,6 @@ export function BottomSheet(props: BottomSheetProps) {
         {children}
       </section>
     </div>
+    </>
   );
 }

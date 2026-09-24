@@ -6,6 +6,7 @@ import { AdminPageHeader, AdminToasts, useAdminToast } from '@/components/admin'
 import { PromotionRuleForm } from '@/components/admin/promotion-rule-form';
 import { useV1CreateLeagueSeries, useV1MasterRegions, useV1MasterSports } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
+import { hasPreviousInAppEntry } from '@/lib/navigation-history';
 import { V1_DEFAULT_PROMOTION_RULE, type V1PromotionRule } from '@/types/league-series';
 
 const inputClass =
@@ -125,7 +126,8 @@ export default function AdminLeagueSeriesNewPage() {
         <div className="flex justify-end gap-2">
           <button
             type="button"
-            onClick={() => router.back()}
+            // 새 탭·북마크로 바로 열었으면 돌아갈 앱 항목이 없다 — 목록으로 교체한다.
+            onClick={() => (hasPreviousInAppEntry() ? router.back() : router.replace('/admin/league-series'))}
             className="inline-flex min-h-[44px] items-center rounded-xl border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--text-strong)]"
           >
             취소

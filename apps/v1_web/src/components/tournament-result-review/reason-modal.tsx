@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 
 export type ReasonModalTone = 'default' | 'danger';
 
@@ -66,6 +67,7 @@ export function ReasonModal({
     previousFocusRef.current = null;
   }, [open]);
 
+  useOverlayHistory({ open, onClose: onCancel });
   useEffect(() => {
     if (!open) return;
     const handler = (event: KeyboardEvent) => {

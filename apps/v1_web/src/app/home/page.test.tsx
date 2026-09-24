@@ -13,6 +13,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/home',
   // 홈 배너(PendingReviewsCard)와 하위 컴포넌트들이 next/navigation 훅을 사용한다
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('@/lib/analytics', () => ({

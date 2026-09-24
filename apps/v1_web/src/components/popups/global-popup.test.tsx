@@ -14,9 +14,12 @@ import { setupServer } from 'msw/node';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GlobalPopup } from './global-popup';
 
-const { pathnameMock } = vi.hoisted(() => ({ pathnameMock: vi.fn<() => string>() }));
+const { pathnameMock, searchMock } = vi.hoisted(() => ({
+  pathnameMock: vi.fn<() => string>(),
+  searchMock: vi.fn<() => URLSearchParams>(() => new URLSearchParams()),
+}));
 
-vi.mock('next/navigation', () => ({ usePathname: pathnameMock }));
+vi.mock('next/navigation', () => ({ usePathname: pathnameMock, useSearchParams: searchMock }));
 
 const requestedUrls: URL[] = [];
 
@@ -84,6 +87,7 @@ describe('GlobalPopup', () => {
     server.close();
     vi.unstubAllEnvs();
     vi.clearAllMocks();
+    searchMock.mockReturnValue(new URLSearchParams());
   });
 
   it('현재 경로를 넘겨 그 경로 전용 팝업을 띄운다', async () => {
@@ -117,6 +121,20 @@ describe('GlobalPopup', () => {
 
     expect(await screen.findByText('대회 화면 공통 팝업')).toBeInTheDocument();
     expect(requestedUrls[0].searchParams.has('path')).toBe(false);
+  });
+
+  it('쿼리만 바뀌어도(같은 경로의 필터 링크) 팝업을 닫는다', async () => {
+    const client = createClient();
+    const view = renderAt('/tournaments/tournament-1', client);
+    expect(await screen.findByRole('dialog', { name: '대회 1 전용 팝업' })).toBeInTheDocument();
+
+    searchMock.mockReturnValue(new URLSearchParams('tab=schedule'));
+    view.rerender(
+      <QueryClientProvider client={client}>
+        <GlobalPopup />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
   it('팝업 대상 화면이 아니면 요청 자체를 하지 않는다', async () => {

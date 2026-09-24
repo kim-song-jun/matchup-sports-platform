@@ -8,16 +8,17 @@ import type { TeamMatchModel } from './team-matches.types';
 
 // routerPush를 vi.hoisted로 모듈 스코프에 고정 — useRouter()가 매 렌더 새 vi.fn()을
 // 반환하면 클릭 핸들러가 실제로 호출한 push를 테스트에서 단언할 방법이 없다.
-const { routerPush } = vi.hoisted(() => ({ routerPush: vi.fn() }));
+const { routerPush, routerReplace } = vi.hoisted(() => ({ routerPush: vi.fn(), routerReplace: vi.fn() }));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/team-matches/team-match-1/edit',
-  useRouter: () => ({ push: routerPush, replace: vi.fn() }),
+  useRouter: () => ({ push: routerPush, replace: routerReplace, back: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }));
 
 beforeEach(() => {
   routerPush.mockClear();
+  routerReplace.mockClear();
 });
 
 function renderPage(ui: ReactElement) {
@@ -1068,14 +1069,16 @@ describe('팀매치 목록 필터 시트 — BottomSheet 배선(A안)', () => {
     expect(screen.queryByRole('dialog', { name: '팀매치 필터' })).not.toBeInTheDocument();
   });
 
-  it('ESC로 닫으면 로컬 상태가 아니라 router.push(closeHref)로 네비게이션한다', () => {
+  // 시트를 연 항목이 없는 진입(딥링크)이라 push 가 아니라 replace — 닫기가 항목을 더 쌓지 않는다.
+  it('ESC로 닫으면 로컬 상태가 아니라 closeHref 로 네비게이션한다(replace)', () => {
     const model = buildFilterSheetModel();
     renderPage(<TeamMatchListPageView model={model} />);
 
     expect(screen.getByRole('dialog', { name: '팀매치 필터' })).toBeInTheDocument();
     fireEvent.keyDown(document, { key: 'Escape' });
 
-    expect(routerPush).toHaveBeenCalledTimes(1);
-    expect(routerPush).toHaveBeenCalledWith('/team-matches?filterOpen=false');
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+    expect(routerReplace).toHaveBeenCalledWith('/team-matches?filterOpen=false');
+    expect(routerPush).not.toHaveBeenCalled();
   });
 });

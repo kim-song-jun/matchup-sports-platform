@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { FilterIcon } from '@/components/v1-ui/icons';
 
@@ -66,14 +65,12 @@ export function CompetitionFilterSummary({ model }: { model: CompetitionFilterSh
 }
 
 export function CompetitionFilterSheet({ model }: { model: CompetitionFilterSheetModel }) {
-  const router = useRouter();
 
   // 호출부가 열림 여부를 이미 가르고 렌더하므로 `open` 은 고정 true 다 — 세 선례와 같다.
   // 닫힘은 상태가 아니라 **URL 이동**으로 처리해야 뒤로가기가 통하고 링크 공유가 유지된다.
   return (
     <>
-      <Link className="tm-filter-scrim" href={model.closeHref} aria-label="필터 닫기" />
-      <BottomSheet open ariaLabel="대회 필터" onRequestClose={() => router.push(model.closeHref)}>
+      <BottomSheet open ariaLabel="대회 필터" closeHref={model.closeHref}>
         <div className="tm-filter-sheet-handle" />
         <div className="tm-filter-sheet-head">
           <div>

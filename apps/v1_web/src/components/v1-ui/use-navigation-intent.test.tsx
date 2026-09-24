@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { __resetNavigationHistoryForTests, installNavigationHistory, markAppInitiatedBack } from '@/lib/navigation-history';
 import { useNavigationIntent, type NavigationIntentKind } from './use-navigation-intent';
 
 // 이 파일이 지키는 것은 하나다 — **어떤 클릭이 'tab' 으로 분류되는가**.
@@ -150,3 +151,47 @@ describe('useNavigationIntent — popstate 는 셸에 따라 갈린다', () => {
   });
 });
 
+// 헤더 뒤로가기가 history back 으로 가면 popstate 가 따라온다 — 클릭에서도 알리면 전환이 두 번 시작된다.
+describe('useNavigationIntent — 헤더 뒤로가기가 history back 일 때', () => {
+  beforeEach(() => {
+    __resetNavigationHistoryForTests();
+    window.sessionStorage.clear();
+    window.history.replaceState(null, '', '/home');
+    installNavigationHistory();
+    window.history.pushState({}, '', '/teams/1?from=%2Fhome');
+  });
+  afterEach(() => {
+    __resetNavigationHistoryForTests();
+    delete document.documentElement.dataset.teameetNativeApp;
+  });
+
+  it('클릭에서는 알리지 않고, 뒤따르는 popstate 에서 pop 을 한 번만 알린다', async () => {
+    const onIntent = vi.fn();
+    render(<Harness onIntent={onIntent} />);
+
+    clickAnchor('<div><a href="/home" data-nav-back="true">뒤로</a></div>', '/home');
+    expect(onIntent).not.toHaveBeenCalled();
+
+    markAppInitiatedBack();
+    await new Promise((resolve) => {
+      window.addEventListener('popstate', resolve, { once: true });
+      window.history.back();
+    });
+    expect(onIntent).toHaveBeenCalledTimes(1);
+    expect(onIntent).toHaveBeenCalledWith('pop');
+  });
+
+  it('iOS 셸이어도 앱이 부른 뒤로가기의 popstate 는 pop — 네이티브는 이 이동을 그리지 않는다', async () => {
+    document.documentElement.dataset.teameetNativeApp = 'ios';
+    const onIntent = vi.fn();
+    render(<Harness onIntent={onIntent} />);
+
+    markAppInitiatedBack();
+    await new Promise((resolve) => {
+      window.addEventListener('popstate', resolve, { once: true });
+      window.history.back();
+    });
+    expect(onIntent).toHaveBeenCalledWith('pop');
+    expect(onIntent).not.toHaveBeenCalledWith('native');
+  });
+});

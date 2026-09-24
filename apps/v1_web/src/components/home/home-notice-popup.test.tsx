@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getHomePopupStorageKey, HomePopupDialog } from './home-notice-popup';
 import type { HomePopup } from './home.types';
 
@@ -24,6 +24,52 @@ describe('HomePopupDialog', () => {
     const link = await screen.findByRole('link', { name: '매치 보기' });
     expect(link).toHaveAttribute('href', '/matches');
     expect(screen.queryByRole('button', { name: '닫기' })).not.toBeInTheDocument();
+  });
+
+  // 팝업 링크를 눌러 이동하면 닫기는 URL 이 바뀐 뒤에 온다 — 닫기 back 이 이동 push 와 엇갈리지 않는다.
+  it('closes on route change without walking history back', async () => {
+    const historyBack = vi.spyOn(window.history, 'back');
+    const linked = { ...popup, linkUrl: '/matches', linkLabel: '매치 보기' };
+    const { rerender } = render(<HomePopupDialog popup={linked} location="/home" />);
+    const link = await screen.findByRole('link', { name: '매치 보기' });
+
+    const notPrevented = link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    expect(notPrevented).toBe(true); // 링크가 그대로 이동한다
+    await act(async () => {}); // 이동(push)은 클릭 처리보다 늦게 커밋된다
+    expect(screen.getByRole('dialog', { name: popup.title })).toBeInTheDocument();
+    expect(historyBack).not.toHaveBeenCalled();
+
+    window.history.pushState({}, '', '/matches');
+    rerender(<HomePopupDialog popup={linked} location="/matches" />);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(historyBack).not.toHaveBeenCalled();
+    historyBack.mockRestore();
+  });
+
+  it('closes when only the query string changes', async () => {
+    const historyBack = vi.spyOn(window.history, 'back');
+    const linked = { ...popup, linkUrl: '/matches?sport=futsal', linkLabel: '풋살 매치' };
+    const { rerender } = render(<HomePopupDialog popup={linked} location="/matches" />);
+    const link = await screen.findByRole('link', { name: '풋살 매치' });
+
+    const notPrevented = link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    expect(notPrevented).toBe(true);
+    window.history.pushState({}, '', '/matches?sport=futsal');
+    rerender(<HomePopupDialog popup={linked} location="/matches?sport=futsal" />);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(historyBack).not.toHaveBeenCalled();
+    historyBack.mockRestore();
+  });
+
+  it('closes on click for a link that leaves the app, whatever the scheme case', async () => {
+    const linked = { ...popup, linkUrl: 'HTTPS://example.com/event', linkLabel: '이벤트 보기' };
+    render(<HomePopupDialog popup={linked} location="/home" />);
+    const link = await screen.findByRole('link', { name: '이벤트 보기' });
+    expect(link).toHaveAttribute('target', '_blank');
+
+    link.addEventListener('click', (event) => event.preventDefault()); // jsdom 은 새 창을 열지 못한다
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
   it('shows independent popup content with close actions', async () => {

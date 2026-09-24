@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { CalendarDays, Search, Shield, User } from 'lucide-react';
 import { useV1AdminGlobalSearch } from '@/hooks/use-v1-api';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { closeOverlayThenNavigate } from '@/lib/overlay-history';
 import { AdminStatusPill } from './admin-status-pill';
 
 /**
@@ -103,8 +104,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   }, [items.length, query]);
 
   const navigate = (item: PaletteItem) => {
-    onClose();
-    router.push(item.href);
+    void closeOverlayThenNavigate(onClose, () => router.push(item.href));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

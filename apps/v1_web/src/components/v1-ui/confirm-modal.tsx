@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { waitForOverlayHistory } from '@/lib/overlay-history';
+import { useModalA11y } from './use-modal-a11y';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -37,6 +39,9 @@ interface ConfirmState extends ConfirmOptions {
  */
 export function useConfirm() {
   const [state, setState] = useState<ConfirmState | null>(null);
+  const settledRef = useRef<(() => void) | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const confirm = useCallback((opts: ConfirmOptions): Promise<boolean> => {
     return new Promise<boolean>((resolve) => {
@@ -46,10 +51,31 @@ export function useConfirm() {
 
   const handleResolve = useCallback(
     (value: boolean) => {
-      state?.resolve(value);
+      if (!state) return;
+      const { resolve } = state;
+      settledRef.current = () => resolve(value);
       setState(null);
     },
     [state],
+  );
+
+  // 모달의 히스토리 항목이 걷힌 뒤에 알린다 — 곧바로 router.push·back 하는 호출자와 엇갈리지 않게.
+  useEffect(() => {
+    if (state !== null || !settledRef.current) return;
+    const settled = settledRef.current;
+    settledRef.current = null;
+    void waitForOverlayHistory().then(settled);
+  }, [state]);
+
+  // 호스트가 먼저 사라지면(같은 커밋의 언마운트 포함) 기다리는 쪽이 영원히 멈추지 않게 끝낸다.
+  useEffect(
+    () => () => {
+      const settled = settledRef.current;
+      settledRef.current = null;
+      if (settled) settled();
+      else stateRef.current?.resolve(false);
+    },
+    [],
   );
 
   const modal = (
@@ -91,12 +117,7 @@ interface ConfirmModalProps {
 /**
  * ConfirmModal — 토스 스타일 확인/취소 모달.
  *
- * - role="dialog" + aria-modal="true"
- * - ESC 키로 취소 처리
- * - focus trap (Tab/Shift-Tab)
- * - 열릴 때 취소 버튼에 포커스, 닫힐 때 이전 포커스 복원
- * - body 스크롤 잠금
- * - backdrop 클릭 시 취소
+ * 접근성·ESC·backdrop·뒤로가기 닫기는 useModalA11y 가 맡는다(닫힘 = onCancel).
  */
 export function ConfirmModal({
   open,
@@ -113,94 +134,14 @@ export function ConfirmModal({
   const titleId = `${idPrefix}-confirm-title`;
   const messageId = `${idPrefix}-confirm-message`;
   const phraseId = `${idPrefix}-confirm-phrase`;
-  const dialogRef = useRef<HTMLDivElement>(null);
-  // 취소 버튼에 초기 포커스를 줘서 실수로 확인 누르는 것을 방지한다
-  const cancelBtnRef = useRef<HTMLButtonElement>(null);
-  const confirmationInputRef = useRef<HTMLInputElement>(null);
-  const previousFocusRef = useRef<Element | null>(null);
   const [confirmationInput, setConfirmationInput] = useState('');
   const confirmationMatched =
     confirmationPhrase === undefined || confirmationInput === confirmationPhrase;
+  // 초기 포커스는 패널의 첫 컨트롤 — 입력 확인이 있으면 입력창, 없으면 취소 버튼(실수로 확인하지 않게).
+  const { dialogRef, onBackdropClick } = useModalA11y({ open, onClose: onCancel, exitMs: 0 }); // 닫히면 즉시 렌더를 떼므로 잠금·포커스 복원도 즉시.
 
-  // 열릴 때 이전 포커스 저장, 닫힐 때 복원 (WCAG 2.4.3)
   useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
-    } else {
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') {
-        (el as HTMLElement).focus();
-      }
-      previousFocusRef.current = null;
-    }
-  }, [open]);
-
-  // 입력 확인이 필요한 작업은 입력창, 일반 작업은 취소 버튼에 초기 포커스
-  useEffect(() => {
-    if (open) {
-      setConfirmationInput('');
-      const id = setTimeout(() => {
-        if (confirmationPhrase) {
-          confirmationInputRef.current?.focus();
-        } else {
-          cancelBtnRef.current?.focus();
-        }
-      }, 60);
-      return () => clearTimeout(id);
-    }
-  }, [open, confirmationPhrase]);
-
-  // ESC 키로 취소
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onCancel]);
-
-  // focus trap
-  useEffect(() => {
-    if (!open) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const FOCUSABLE =
-      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-
-    const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
-  }, [open]);
-
-  // body 스크롤 잠금
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
+    if (open) setConfirmationInput('');
   }, [open]);
 
   if (!open) return null;
@@ -212,10 +153,7 @@ export function ConfirmModal({
     <div
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4"
       style={{ background: 'rgba(25,31,40,0.45)' }}
-      onClick={(e) => {
-        // backdrop 클릭 시 취소 (패널 클릭은 전파 차단)
-        if (e.target === e.currentTarget) onCancel();
-      }}
+      onClick={onBackdropClick}
     >
       {/* Panel */}
       <div
@@ -257,7 +195,6 @@ export function ConfirmModal({
                 계속하려면 <strong>{confirmationPhrase}</strong>를 입력해 주세요.
               </label>
               <input
-                ref={confirmationInputRef}
                 id={phraseId}
                 type="text"
                 value={confirmationInput}
@@ -274,7 +211,6 @@ export function ConfirmModal({
         {/* Footer */}
         <div style={{ display: 'flex', gap: 8, padding: '0 24px 24px' }}>
           <button
-            ref={cancelBtnRef}
             type="button"
             className="tm-btn tm-btn-md tm-btn-neutral"
             style={{ flex: 1, minHeight: 44 }}

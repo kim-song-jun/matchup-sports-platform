@@ -265,6 +265,14 @@ function SeasonSummaryCard({
  * 늘어놓으면 배너가 순위표를 화면 밖으로 밀어낸다. 나머지는 건수만 알리고 바로 위
  * "경기 일정" 목록으로 보낸다.
  */
+function scrollToSchedule() {
+  const target = document.getElementById('league-schedule');
+  if (!target) return;
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  target.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+  target.focus({ preventScroll: true });
+}
+
 const CLAIM_FIXTURE_PREVIEW_LIMIT = 3;
 
 /** 기록 공개 동의 토글이 이미 살고 있는 화면. 여기서 새로 만들지 않고 그리로 보낸다. */
@@ -929,7 +937,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
         )}
       </section>
 
-      <section className="mt-8" id="league-schedule">
+      <section className="mt-8" id="league-schedule" tabIndex={-1}>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)]">경기 일정</h2>
           {/* 이슈 3 — 대진은 항상 오래된 순으로 오므로 시즌 중반 리그는 "다음 경기"가
@@ -1028,9 +1036,14 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
               ? '기록은 있지만, 선수가 신원 연동과 경기 기록 공개에 동의하면 득점·도움 순위가 공개돼요.'
               : '확정된 경기 결과가 쌓이면 득점·도움 순위가 나타나요.'}
           </p>
-          <a href="#league-schedule" className="mt-3 inline-flex min-h-[44px] items-center rounded-lg px-3 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)]">
+          {/* 해시 앵커는 도장 없는 히스토리 항목을 만든다 — 히스토리를 건드리지 않고 스크롤만 한다. */}
+          <button
+            type="button"
+            onClick={scrollToSchedule}
+            className="mt-3 inline-flex min-h-[44px] items-center rounded-lg px-3 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)]"
+          >
             경기 일정 보기
-          </a>
+          </button>
         </section>
       ) : (
         <>

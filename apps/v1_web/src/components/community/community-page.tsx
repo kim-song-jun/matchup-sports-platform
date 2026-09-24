@@ -10,6 +10,7 @@ import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChatIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
 import { cssUrl } from '@/lib/assets';
+import { closeOverlayThenNavigate } from '@/lib/overlay-history';
 import { formatChatDate, formatChatTime, shouldShowChatDate } from './chat-message-time';
 import { NotificationDetailSheet } from './notification-detail-sheet';
 import { NotificationTypeIcon, notificationTypeLabel } from './notification-visual';
@@ -410,8 +411,7 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
         notification={detail}
         onClose={() => setDetail(null)}
         onNavigate={(notification) => {
-          setDetail(null);
-          model.onNavigate?.(notification);
+          void closeOverlayThenNavigate(() => setDetail(null), () => model.onNavigate?.(notification));
         }}
       />
       {model.readAllToastVisible ? <div className="tm-notification-toast" role="status">모든 알림을 읽었어요</div> : null}

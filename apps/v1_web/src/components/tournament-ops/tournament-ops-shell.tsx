@@ -17,6 +17,8 @@ import type { V1TournamentStaffRole } from '@/types/api';
 import type { TournamentOpsOrigin } from '@/lib/session-storage';
 import { resolveTournamentLiveBase } from '@/lib/tournament-live-routes';
 import { staffRoleLabel } from './badges';
+import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
+import { closeIfCurrentPage } from '@/lib/overlay-history';
 
 // ── 대회 아이덴티티 배지 ──────────────────────────────────────────────────
 /**
@@ -233,6 +235,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
     else panel.setAttribute('inert', '');
   }, [open]);
 
+  useOverlayHistory({ open, onClose });
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -337,7 +340,7 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
                 key={item.href}
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
-                onClick={onClose}
+                onClick={closeIfCurrentPage(item.href, pathname, onClose)}
                 className={[
                   'flex items-center gap-3 px-4 py-3 min-h-[44px] text-sm transition-colors border-l-2',
                   'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-[-2px]',
@@ -358,7 +361,6 @@ function Drawer({ open, onClose, tournamentId, tournamentTitle, tournamentCoverI
         <div className="px-4 py-4 border-t border-[var(--border)] shrink-0">
           <Link
             href={returnHref}
-            onClick={onClose}
             className="flex items-center gap-2 text-[length:var(--font-size-label)] text-[var(--text-muted)] hover:text-[var(--text-muted)] transition-colors min-h-[44px] focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 rounded"
           >
             <ChevronLeft size={14} aria-hidden="true" />

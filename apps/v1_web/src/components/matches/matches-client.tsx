@@ -37,6 +37,7 @@ import {
   sortMatchesByAvailability,
   toMatchCard,
 } from './matches.card-model';
+import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 
 
 /** 이 개수 이하로 결과가 남으면 "희소" 로 보고 인접 매치 레일을 붙인다(디자인 검수 W-3).
@@ -391,6 +392,7 @@ function MatchApplyDialog({ open, message, error, pending, onMessageChange, onCl
   onClose: () => void;
   onSubmit: () => void;
 }) {
+  useOverlayHistory({ open, onClose, locked: pending });
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {

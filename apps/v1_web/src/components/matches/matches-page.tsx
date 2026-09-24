@@ -3,7 +3,6 @@
 import Image from 'next/image';
 import { MatchParticipationActions } from './match-participation-actions';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import type { ChangeEvent } from 'react';
 import { useRef, useState } from 'react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
@@ -660,13 +659,11 @@ function MatchSearchBar({ query, filterCount, search, filterHref = '/matches?fil
 
 function MatchFilterSheet({ model }: { model: MatchListViewModel }) {
   const sheet = model.filterSheet;
-  const router = useRouter();
   if (!sheet) return null;
 
   return (
     <>
-      <Link className="tm-filter-scrim" href={sheet.closeHref} aria-label="필터 닫기" />
-      <BottomSheet open={sheet.open} onRequestClose={() => router.push(sheet.closeHref)} ariaLabel="매치 필터">
+      <BottomSheet open={sheet.open} closeHref={sheet.closeHref} ariaLabel="매치 필터">
         <div className="tm-filter-sheet-handle" />
         <div className="tm-filter-sheet-head">
           <div>

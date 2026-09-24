@@ -113,3 +113,45 @@ describe('ScrollRestoration — 탭으로 돌아오면 보던 자리로', () => 
     expect(area.scrollTop).toBe(0);
   });
 });
+
+// 헤더 뒤로가기(‹)와 하드웨어 뒤로가 같은 "뒤로"로 분류돼야 보던 자리로 돌아간다.
+// 전에는 이 클릭이 'push' 로 잡혀 목록이 매번 맨 위에서 시작했다.
+describe('ScrollRestoration — 뒤로가기는 보던 자리로', () => {
+  beforeEach(() => {
+    nav.pathname = '/tournaments';
+    window.sessionStorage.clear();
+    document.body.innerHTML = '';
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} }));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+  });
+
+  it('헤더 뒤로가기(data-nav-back) 클릭은 저장된 위치로 복원한다', () => {
+    const area = mountScrollArea(5000);
+    saveScrollPosition('/tournaments', 640);
+    nav.pathname = '/tournaments/7';
+    const view = render(<ScrollRestoration />);
+
+    const backLink = anchor('tm-btn', '/tournaments');
+    backLink.dataset.navBack = 'true';
+    clickThen(backLink, '/tournaments', () => view.rerender(<ScrollRestoration />));
+
+    expect(area.scrollTop).toBe(640);
+  });
+
+  it('앱 페이지 이동인 popstate(하드웨어 뒤로)도 복원한다', () => {
+    const area = mountScrollArea(5000);
+    saveScrollPosition('/tournaments', 410);
+    nav.pathname = '/tournaments/7';
+    const view = render(<ScrollRestoration />);
+
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    nav.pathname = '/tournaments';
+    view.rerender(<ScrollRestoration />);
+
+    expect(area.scrollTop).toBe(410);
+  });
+});

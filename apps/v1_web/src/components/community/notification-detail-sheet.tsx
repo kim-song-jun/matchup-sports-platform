@@ -4,6 +4,7 @@ import { useEffect, useId, useRef } from 'react';
 import { useDelayedUnmount } from '@/components/v1-ui/use-delayed-unmount';
 import type { NotificationModel } from './community.types';
 import { NotificationTypeIcon, notificationTypeLabel } from './notification-visual';
+import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
 
 interface NotificationDetailSheetProps {
   /** null이면 닫힌 상태 — 열려 있는 동안에만 알림 모델을 넘긴다. */
@@ -55,6 +56,7 @@ export function NotificationDetailSheet({ notification, onClose, onNavigate }: N
     return () => clearTimeout(id);
   }, [open]);
 
+  useOverlayHistory({ open, onClose });
   // ESC·focus trap 은 시트가 화면에 있는 동안(mounted) 유지한다 — 닫히는 중에
   // 풀리면 그 사이 키 입력이 뒤 화면으로 샌다.
   useEffect(() => {

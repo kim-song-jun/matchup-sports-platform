@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitForElementToBeRemoved } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { NotificationsPageView } from './community-page';
 import type { NotificationModel, NotificationsViewModel } from './community.types';
@@ -69,7 +69,8 @@ describe('NotificationsPageView — 상세 시트', () => {
     fireEvent.click(screen.getByRole('button', { name: /문의에 답변이 등록됐어요/ }));
     fireEvent.click(screen.getByRole('button', { name: '보기' }));
 
-    expect(onNavigate).toHaveBeenCalledWith(notification);
+    // 이동은 시트의 히스토리 항목을 걷은 뒤에 한다(닫기 back 과 이동 push 가 엇갈리지 않게).
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith(notification));
     // 시트는 퇴장 애니메이션이 끝난 뒤 사라진다(useDelayedUnmount 220ms) — 닫히는
     // 동안에는 .is-closing 으로 DOM 에 남아 있는 것이 의도된 동작이다.
     expect(screen.getByRole('dialog')).toHaveClass('is-closing');

@@ -99,3 +99,19 @@ export class ApproveAdminTeamMatchApplicationDto {
   @IsUUID()
   clientCommandId!: string;
 }
+
+export class RejectAdminTeamMatchApplicationDto {
+  @IsUUID()
+  clientCommandId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason!: string;
+}
+
+export class UpdateAdminTeamMatchRecruitmentDto extends CreateAdminTeamMatchRecruitmentDto {
+  @IsString()
+  @IsNotEmpty()
+  version!: string;
+}

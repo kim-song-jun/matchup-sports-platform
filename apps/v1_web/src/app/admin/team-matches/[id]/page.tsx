@@ -12,7 +12,12 @@ import {
   AdminSummaryItem,
   AdminTableSkeleton,
 } from '@/components/admin';
-import { useV1AdminMe, useV1AdminTeamMatch, useV1ApproveAdminTeamMatchApplication } from '@/hooks/use-v1-api';
+import {
+  useV1AdminMe,
+  useV1AdminTeamMatch,
+  useV1ApproveAdminTeamMatchApplication,
+  useV1RejectAdminTeamMatchApplication,
+} from '@/hooks/use-v1-api';
 import { formatAdminDateTime } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { randomUuid } from '@/lib/uuid';
@@ -52,8 +57,11 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
   const canWrite = adminMe?.capabilities.includes('status:write') ?? false;
   const approvedCount = teamMatch.applications.filter((application) => application.status === 'approved').length;
   const [pendingApplicationId, setPendingApplicationId] = useState('');
+  const [rejectingApplicationId, setRejectingApplicationId] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
   const [message, setMessage] = useState('');
   const approval = useV1ApproveAdminTeamMatchApplication(teamMatch.teamMatchId);
+  const rejection = useV1RejectAdminTeamMatchApplication(teamMatch.teamMatchId);
 
   const approveApplication = async (applicationId: string) => {
     if (!canWrite || !isPlatformRecruitment || teamMatch.status !== 'recruiting') return;
@@ -68,6 +76,26 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
       );
     } catch (error) {
       setMessage(extractErrorMessage(error, '참가팀을 승인하지 못했어요.'));
+    } finally {
+      setPendingApplicationId('');
+    }
+  };
+
+  const rejectApplication = async (applicationId: string) => {
+    const reason = rejectReason.trim();
+    if (!canWrite || !isPlatformRecruitment || teamMatch.status !== 'recruiting' || !reason) return;
+    setPendingApplicationId(applicationId);
+    setMessage('');
+    try {
+      await rejection.mutateAsync({
+        applicationId,
+        body: { clientCommandId: randomUuid(), reason },
+      });
+      setMessage('참가 신청을 거절했어요. 신청 팀에 사유가 안내돼요.');
+      setRejectingApplicationId('');
+      setRejectReason('');
+    } catch (error) {
+      setMessage(extractErrorMessage(error, '참가 신청을 거절하지 못했어요.'));
     } finally {
       setPendingApplicationId('');
     }
@@ -106,21 +134,69 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
                     {APPLICATION_STATUS_LABEL[application.status] ?? application.status}
                   </span>
                   {isPlatformRecruitment && teamMatch.status === 'recruiting' && canWrite && application.status === 'requested' && (
-                    <button
-                      type="button"
-                      disabled={approval.isPending}
-                      onClick={() => void approveApplication(application.applicationId)}
-                      className="min-h-[40px] rounded-lg bg-blue-500 px-3 text-[length:var(--font-size-caption)] font-semibold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {pendingApplicationId === application.applicationId
-                        ? '승인 중…'
-                        : approvedCount === 0
-                          ? '승인'
-                          : '승인하고 매치 확정'}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        disabled={approval.isPending || rejection.isPending}
+                        onClick={() => {
+                          setRejectingApplicationId(application.applicationId);
+                          setRejectReason('');
+                          setMessage('');
+                        }}
+                        className="min-h-[44px] rounded-lg border border-red-200 bg-[var(--card-surface)] px-3 text-[length:var(--font-size-caption)] font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        거절
+                      </button>
+                      <button
+                        type="button"
+                        disabled={approval.isPending || rejection.isPending}
+                        onClick={() => void approveApplication(application.applicationId)}
+                        className="min-h-[44px] rounded-lg bg-blue-500 px-3 text-[length:var(--font-size-caption)] font-semibold text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {pendingApplicationId === application.applicationId
+                          ? '처리 중…'
+                          : approvedCount === 0
+                            ? '승인'
+                            : '승인하고 매치 확정'}
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
+              {rejectingApplicationId === application.applicationId && (
+                <div className="mt-3 rounded-xl border border-red-100 bg-[var(--card-surface)] p-3">
+                  <label className="block text-xs font-semibold text-[var(--text-strong)]">
+                    거절 사유
+                    <textarea
+                      aria-label={`${application.applicantTeamName} 거절 사유`}
+                      value={rejectReason}
+                      onChange={(event) => setRejectReason(event.target.value)}
+                      maxLength={500}
+                      rows={3}
+                      className="mt-2 w-full rounded-xl border border-[var(--border-strong)] bg-[var(--card-surface)] px-3 py-2 text-sm text-[var(--text-strong)] focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400/20"
+                      placeholder="신청 팀에 안내할 사유를 입력하세요"
+                    />
+                  </label>
+                  <div className="mt-2 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      disabled={rejection.isPending}
+                      onClick={() => { setRejectingApplicationId(''); setRejectReason(''); }}
+                      className="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-[var(--text-muted)]"
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!rejectReason.trim() || rejection.isPending}
+                      onClick={() => void rejectApplication(application.applicationId)}
+                      className="min-h-[44px] rounded-lg bg-red-500 px-3 text-sm font-semibold text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {pendingApplicationId === application.applicationId ? '거절 중…' : '거절 확정'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </li>
           ))}
         </ol>
@@ -148,6 +224,7 @@ function Applications({ teamMatch }: { teamMatch: V1AdminTeamMatchDetail }) {
 export default function AdminTeamMatchDetailPage() {
   const params = useParams<{ id: string }>();
   const teamMatchId = params.id;
+  const { data: adminMe } = useV1AdminMe();
   const { data: teamMatch, isPending, isError, error, refetch } = useV1AdminTeamMatch(teamMatchId);
 
   if (isPending) return <AdminTableSkeleton rows={6} />;
@@ -179,7 +256,19 @@ export default function AdminTeamMatchDetailPage() {
         eyebrow="플랫폼 · 팀매치"
         title="팀매치 상세"
         description={teamMatch.title}
-        action={<BackLink />}
+        action={
+          <div className="flex items-center gap-2">
+            {teamMatch.platformManaged && teamMatch.status === 'recruiting' && adminMe?.capabilities.includes('status:write') && (
+              <Link
+                href={`/admin/team-matches/${encodeURIComponent(teamMatch.teamMatchId)}/edit`}
+                className="inline-flex h-[44px] items-center rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white hover:bg-blue-600 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
+              >
+                모집 수정
+              </Link>
+            )}
+            <BackLink />
+          </div>
+        }
       />
 
       <div className="tm-content-enter grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">

@@ -64,6 +64,8 @@
 | GET | `/team-matches/:id/referee-schedule` | Yes | 심판 배정 조회 |
 | POST | `/admin/team-matches` | Admin owner/ops | 플랫폼 팀매치 모집 생성 |
 | POST | `/admin/team-matches/:id/applications/:applicationId/approve` | Admin owner/ops | 신청 팀을 한 팀씩 승인하고 두 번째 승인에서 경기 확정 |
+| POST | `/admin/team-matches/:id/applications/:applicationId/reject` | Admin owner/ops | 대기 신청을 사유와 함께 거절 |
+| PATCH | `/admin/team-matches/:id` | Admin owner/ops | 모집 중인 플랫폼 단발 팀매치 수정 |
 
 ## POST /admin/team-matches
 
@@ -103,6 +105,18 @@ Rules:
 - 선택 신청은 `requested` 상태여야 하고 신청 팀은 활성 상태이며 모집 종목과 같아야 한다.
 - 첫 번째 승인에서는 해당 신청만 `approved`로 바꾸고 팀매치는 `recruiting`을 유지한다. Game과 team schedule은 아직 만들지 않는다.
 - 두 번째 승인에서는 먼저 승인한 팀을 HOME(`hostTeamId`), 새 승인 팀을 AWAY(`approvedApplicantTeamId`)로 연결하고 팀매치를 `matched`로 바꾼다.
+
+## POST /admin/team-matches/:id/applications/:applicationId/reject
+
+- body는 UUID `clientCommandId`와 1~500자의 `reason`을 받는다.
+- 플랫폼이 운영하는 단발 `recruiting` 팀매치의 `requested` 신청만 거절한다. 승인·철회된 신청은 변경하지 않는다.
+- 신청을 `rejected`로 바꾸고 검토 관리자/시각, 거절 사유가 포함된 관리자 감사 로그를 기록한 뒤 신청 팀 owner/manager에게 알린다. Game이나 팀 일정은 만들지 않는다.
+
+## PATCH /admin/team-matches/:id
+
+- 생성 DTO의 모집 필드와 상세 조회에서 받은 `version`을 전송한다. 현재 구현에서는 종목을 바꿀 수 없다.
+- 플랫폼이 운영하는 단발 `recruiting` 팀매치만 수정할 수 있다. `version`이 최신 `updatedAt`과 다르면 `VERSION_CONFLICT`로 거절한다.
+- 제목, 소개, 이미지, 지역, 장소/주소, 시작·종료·마감, 비용·규칙, 등급, 성별, 경기 형식·성격, 유니폼을 갱신하고 관리자 감사 로그를 남긴다.
 - 배정 뒤에도 저장된 `platformManaged=true`는 유지된다. 공개 목록/상세는 실제 홈·원정 팀과 `플랫폼 주관` 출처를 함께 노출한다.
 - 플랫폼 모집의 HOME/AWAY는 경기 사이드 식별자다. HOME 팀 owner/manager도 참석명단·채팅·경기 기록에는 참여하지만 모집 수정·마감·취소, 신청 승인/거절 권한은 얻지 않으며 이 운영 권한은 관리자에게 남는다. 따라서 공개 목록/상세의 `viewerState`/`viewer.state`도 플랫폼 HOME 팀에 `host_team`을 부여하지 않고 `viewer.manageRoute`는 `null`이다. `viewer.manageableHostTeam`은 HOME 사이드의 참가 기능 판정일 뿐 모집 관리 권한이 아니다.
 - 두 번째 승인 때 나머지 `requested` 신청을 `rejected`로 전환한다.

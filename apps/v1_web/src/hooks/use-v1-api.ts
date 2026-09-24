@@ -73,8 +73,12 @@ import type {
   V1AdminTeamDetail,
   V1AdminTeamMatchApprovalPayload,
   V1AdminTeamMatchApprovalResult,
+  V1AdminTeamMatchRejectionPayload,
+  V1AdminTeamMatchRejectionResult,
   V1AdminTeamMatchRecruitmentPayload,
   V1AdminTeamMatchRecruitmentResult,
+  V1AdminTeamMatchRecruitmentUpdatePayload,
+  V1AdminTeamMatchRecruitmentUpdateResult,
   V1AdminTeamMatchRow,
   V1AdminTeamRow,
   V1AdminDeleteUserPayload,
@@ -3155,6 +3159,35 @@ export function useV1ApproveAdminTeamMatchApplication(teamMatchId: string) {
         `/admin/team-matches/${teamMatchId}/applications/${applicationId}/approve`,
         body,
       ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatch(teamMatchId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'team-matches'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'team-matches'] });
+    },
+  });
+}
+
+export function useV1RejectAdminTeamMatchApplication(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ applicationId, body }: { applicationId: string; body: V1AdminTeamMatchRejectionPayload }) =>
+      v1Post<V1AdminTeamMatchRejectionResult>(
+        `/admin/team-matches/${teamMatchId}/applications/${applicationId}/reject`,
+        body,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatch(teamMatchId) });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'team-matches'] });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'team-matches'] });
+    },
+  });
+}
+
+export function useV1UpdateAdminTeamMatchRecruitment(teamMatchId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1AdminTeamMatchRecruitmentUpdatePayload) =>
+      v1Patch<V1AdminTeamMatchRecruitmentUpdateResult>(`/admin/team-matches/${teamMatchId}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminTeamMatch(teamMatchId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'team-matches'] });

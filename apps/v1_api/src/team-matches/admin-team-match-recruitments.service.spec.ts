@@ -37,6 +37,7 @@ const awayApplicationId = '00000000-0000-4000-8000-000000000402';
 function application(id: string, teamId: string, name: string, status = 'requested') {
   return {
     id,
+    applicantTeamId: teamId,
     status,
     reviewedAt: status === 'approved' ? new Date('2026-08-01T00:00:00.000Z') : null,
     createdAt: new Date('2026-07-01T00:00:00.000Z'),
@@ -76,7 +77,7 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       v1IdempotencyRecord: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({}) },
       v1TeamMatch: {
         create: jest.fn().mockResolvedValue({ id: 'team-match-1', status: 'recruiting' }),
-        findUniqueOrThrow: jest.fn(),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ updatedAt: new Date('2026-08-02T00:00:00.000Z') }),
         findFirst: jest.fn().mockResolvedValue({
           id: 'team-match-1',
           title: createDto.title,
@@ -91,6 +92,7 @@ describe('AdminTeamMatchRecruitmentsService', () => {
           leagueId: null,
           tournamentId: null,
           competitionConfigVersionId: 'config-1',
+          updatedAt: new Date('2026-08-01T00:00:00.000Z'),
           game: null,
           applications: [
             application(homeApplicationId, 'team-home', '홈 FC'),
@@ -98,6 +100,7 @@ describe('AdminTeamMatchRecruitmentsService', () => {
           ],
         }),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       v1TeamMatchApplication: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -223,6 +226,78 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       response: { code: 'TEAM_MATCH_APPLICATIONS_CHANGED' },
     });
     expect(prisma.v1TeamSchedule.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a requested application with an audit trail and team notification', async () => {
+    await expect(service.rejectApplication(adminUser, 'team-match-1', homeApplicationId, {
+      clientCommandId: '00000000-0000-4000-8000-000000000003',
+      reason: '참가 조건이 맞지 않아요.',
+    })).resolves.toEqual(expect.objectContaining({
+      applicationId: homeApplicationId,
+      applicantTeamId: 'team-home',
+      applicationStatus: 'rejected',
+      teamMatchStatus: 'recruiting',
+      replayed: false,
+    }));
+    expect(prisma.v1TeamMatchApplication.updateMany).toHaveBeenCalledWith({
+      where: { id: homeApplicationId, teamMatchId: 'team-match-1', status: 'requested' },
+      data: expect.objectContaining({ status: 'rejected', reviewedByUserId: adminUser.id }),
+    });
+    expect(adminContext.logAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: 'team_match.application.reject', reason: '참가 조건이 맞지 않아요.' }),
+      prisma,
+    );
+    expect(notifications.emitToManyDeferred).toHaveBeenCalledWith(
+      expect.any(Function),
+      'team_match_application_rejected',
+      'team-match-1',
+      expect.stringContaining('참가 조건이 맞지 않아요.'),
+    );
+    expect(games.createFromSourceInTransaction).not.toHaveBeenCalled();
+  });
+
+  it('does not reject an already approved application', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValueOnce({
+      ...await prisma.v1TeamMatch.findFirst(),
+      applications: [application(homeApplicationId, 'team-home', '홈 FC', 'approved')],
+    });
+    await expect(service.rejectApplication(adminUser, 'team-match-1', homeApplicationId, {
+      clientCommandId: '00000000-0000-4000-8000-000000000003',
+      reason: '거절 사유',
+    })).rejects.toMatchObject({ response: { code: 'TEAM_MATCH_APPLICATIONS_CHANGED' } });
+  });
+
+  it('updates a recruiting platform match with optimistic concurrency', async () => {
+    await expect(service.update(adminUser, 'team-match-1', {
+      ...createDto,
+      clientCommandId: '00000000-0000-4000-8000-000000000004',
+      version: '2026-08-01T00:00:00.000Z',
+      title: '수정한 관리자 모집 친선전',
+    })).resolves.toEqual({
+      teamMatchId: 'team-match-1',
+      status: 'recruiting',
+      version: '2026-08-02T00:00:00.000Z',
+      detailRoute: '/admin/team-matches/team-match-1',
+    });
+    expect(prisma.v1TeamMatch.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: 'team-match-1', updatedAt: new Date('2026-08-01T00:00:00.000Z') }),
+      data: expect.objectContaining({ title: '수정한 관리자 모집 친선전', regionId }),
+    }));
+    expect(adminContext.logAdminAction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: 'team_match.recruitment.update' }),
+      prisma,
+    );
+  });
+
+  it('rejects an update made from a stale detail version', async () => {
+    await expect(service.update(adminUser, 'team-match-1', {
+      ...createDto,
+      clientCommandId: '00000000-0000-4000-8000-000000000004',
+      version: '2026-07-31T00:00:00.000Z',
+    })).rejects.toMatchObject({ response: { code: 'VERSION_CONFLICT' } });
+    expect(prisma.v1TeamMatch.updateMany).not.toHaveBeenCalled();
   });
 
   it('propagates the support-admin permission denial before domain writes', async () => {

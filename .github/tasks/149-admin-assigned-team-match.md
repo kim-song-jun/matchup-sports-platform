@@ -2,7 +2,7 @@
 
 Date: 2026-09-19
 Owner: codex
-Status: complete
+Status: in_progress
 
 ## Scope
 
@@ -25,6 +25,8 @@ Status: complete
 - [x] Admins approve applicant teams one at a time; the first approval stays recruiting and the second approval finalizes the match.
 - [x] The admin list exposes a visible application-management action as soon as one requested application exists.
 - [x] HOME/AWAY assignment never promotes either participant team into the platform recruitment operator; platform HOME viewers receive no `host_team` state or recruitment-management CTA.
+- [x] Owner/ops admins can reject an individual requested application with a required reason, audit log, and applicant-team notification.
+- [x] Owner/ops admins can edit a still-recruiting platform match from admin detail; finalized/non-platform matches and stale versions are rejected.
 
 ## Acceptance Criteria
 
@@ -46,6 +48,12 @@ Status: complete
 - Given successful finalization
   When either team views its schedule/lineup flow
   Then the same team match and Game aggregate are available to both sides.
+- Given a requested application on a recruiting platform match
+  When an owner/ops admin submits a rejection reason
+  Then only that application becomes `rejected`, the reason is audited and notified, and no Game or schedule is created.
+- Given a recruiting platform match
+  When an owner/ops admin opens the edit route and saves a current version
+  Then the public recruitment fields change; sport remains immutable and a stale version returns `VERSION_CONFLICT`.
 
 ## Validation
 
@@ -64,6 +72,10 @@ Status: complete
 - [x] 2026-09-22 API/Web typecheck and API/Web pattern gates
 - [x] 2026-09-22 visible-entry follow-up: admin list service 53/53, team-match list page 4/4, API/Web typecheck and pattern gates
 - [ ] 2026-09-22 headed visual QA: local API/Web runtime was unavailable on ports 8121/3013, so runtime screenshots and console/network evidence remain for alpha verification.
+- [x] 2026-09-24 rejection/edit focused backend service tests: 11/11
+- [x] 2026-09-24 rejection/edit focused frontend detail/edit tests: 15/15
+- [x] 2026-09-24 API/Web `tsc --noEmit` and `git diff --check`
+- [ ] 2026-09-24 rejection/edit headed visual QA: local API/Web runtime was unavailable on ports 8121/3013; verify detail rejection form and edit page on alpha after deployment.
 
 ## Ambiguity Log
 
@@ -71,6 +83,8 @@ Status: complete
 - The administrator does not designate teams at creation. Teams apply first, and the administrator selects two requested applications later.
 
 ## Progress Snapshot
+
+- 2026-09-24: Added the missing explicit rejection action and a platform-recruitment edit route. Rejection requires a reason and preserves the recruiting aggregate; editing is limited to admin-managed standalone matches in `recruiting` state and uses optimistic concurrency.
 
 - 2026-09-22: Replaced the two-application batch selector with per-application approval. The first approved team reserves HOME without creating a Game or schedule; the second approved team becomes AWAY and atomically finalizes the match.
 - 2026-09-22: Added `pendingApplicationCount` and a visible `신청 1건 관리` list action so operators do not need to discover the row-click detail route before approving the first team.

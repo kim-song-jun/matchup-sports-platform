@@ -40,6 +40,8 @@
 | `GET` | `/api/v1/admin/team-matches/:teamMatchId` | — | active admin | 팀 매치 상세 — 상대팀 신청(최근 50건)·확정 상대팀·소속 리그·대표 이미지·실력·경기 조건 포함. 라이브 경기 상태는 현장 콘솔 소관이라 `hasGame` 여부만 준다 |
 | `POST` | `/api/v1/admin/team-matches` | `CreateAdminTeamMatchRecruitmentDto` | owner/ops | 팀을 지정하지 않은 플랫폼 팀매치 모집 생성 |
 | `POST` | `/api/v1/admin/team-matches/:teamMatchId/applications/:applicationId/approve` | `ApproveAdminTeamMatchApplicationDto` | owner/ops | 신청 팀을 한 팀씩 승인. 두 번째 승인에서 경기 확정 |
+| `POST` | `/api/v1/admin/team-matches/:teamMatchId/applications/:applicationId/reject` | `RejectAdminTeamMatchApplicationDto` | owner/ops | 대기 신청을 필수 사유와 함께 거절하고 감사 로그·팀 알림 기록 |
+| `PATCH` | `/api/v1/admin/team-matches/:teamMatchId` | `UpdateAdminTeamMatchRecruitmentDto` | owner/ops | 모집 중인 플랫폼 단발 팀매치를 버전 검사 후 수정 |
 | `POST` | `/api/v1/admin/team-matches/:teamMatchId/status` | `ChangeTeamMatchStatusDto` | owner/ops | 팀 매치 상태 변경 |
 | `GET` | `/api/v1/admin/popups` | `AdminPopupListQueryDto` | active admin | 팝업 목록 |
 | `GET` | `/api/v1/admin/popups/:popupId` | - | active admin | 팝업 상세 |

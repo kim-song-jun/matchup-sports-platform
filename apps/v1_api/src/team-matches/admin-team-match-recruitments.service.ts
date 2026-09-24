@@ -17,6 +17,8 @@ import { createTeamMatchScheduleInTx } from '../team-schedules/team-schedules.se
 import {
   ApproveAdminTeamMatchApplicationDto,
   CreateAdminTeamMatchRecruitmentDto,
+  RejectAdminTeamMatchApplicationDto,
+  UpdateAdminTeamMatchRecruitmentDto,
 } from './dto/admin-team-match-recruitment.dto';
 import { resolveTeamMatchCompetitionConfig } from './resolve-team-match-competition-config';
 
@@ -453,6 +455,192 @@ export class AdminTeamMatchRecruitmentsService {
       );
     }
     return { ...result, detailRoute: `/admin/team-matches/${teamMatchId}` };
+  }
+
+  async rejectApplication(
+    user: V1AuthUser,
+    teamMatchId: string,
+    applicationId: string,
+    dto: RejectAdminTeamMatchApplicationDto,
+  ) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    const reason = dto.reason.trim();
+    if (!reason) {
+      throw new BadRequestException({ code: 'VALIDATION_FAILED', message: '거절 사유를 입력해 주세요.', details: { field: 'reason' } });
+    }
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "v1_team_matches" WHERE id = ${teamMatchId} FOR UPDATE`;
+      const teamMatch = await tx.v1TeamMatch.findFirst({
+        where: { id: teamMatchId, deletedAt: null },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          platformManaged: true,
+          leagueId: true,
+          tournamentId: true,
+          applications: {
+            where: { id: applicationId },
+            select: { id: true, status: true, applicantTeamId: true },
+          },
+        },
+      });
+      if (!teamMatch) {
+        throw new NotFoundException({ code: 'NOT_FOUND', message: '팀매치 모집을 찾을 수 없어요.' });
+      }
+      if (
+        !teamMatch.platformManaged ||
+        teamMatch.leagueId !== null ||
+        teamMatch.tournamentId !== null ||
+        teamMatch.status !== 'recruiting'
+      ) {
+        throw new ConflictException({
+          code: 'TEAM_MATCH_NOT_PLATFORM_RECRUITING',
+          message: '신청을 받는 플랫폼 팀매치만 거절할 수 있어요.',
+        });
+      }
+      const application = teamMatch.applications[0];
+      if (!application) {
+        throw new NotFoundException({ code: 'NOT_FOUND', message: '팀매치 신청을 찾을 수 없어요.' });
+      }
+      if (application.status === 'rejected') {
+        return { application, title: teamMatch.title, replayed: true };
+      }
+      if (application.status !== 'requested') {
+        throw new ConflictException({
+          code: 'TEAM_MATCH_APPLICATIONS_CHANGED',
+          message: '대기 중인 신청만 거절할 수 있어요. 신청 목록을 새로고침해 주세요.',
+        });
+      }
+      const transition = await tx.v1TeamMatchApplication.updateMany({
+        where: { id: applicationId, teamMatchId, status: 'requested' },
+        data: { status: 'rejected', reviewedByUserId: admin.userId, reviewedAt: new Date() },
+      });
+      if (transition.count !== 1) {
+        throw new ConflictException({
+          code: 'TEAM_MATCH_APPLICATIONS_CHANGED',
+          message: '신청 상태가 변경됐어요. 신청 목록을 새로고침해 주세요.',
+        });
+      }
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'team_match.application.reject',
+          targetType: 'team_match_application',
+          targetId: applicationId,
+          reason,
+          beforeJson: { teamMatchId, applicantTeamId: application.applicantTeamId, status: 'requested' } as Prisma.InputJsonValue,
+          afterJson: { teamMatchId, applicantTeamId: application.applicantTeamId, status: 'rejected' } as Prisma.InputJsonValue,
+          fromStatus: 'requested',
+          toStatus: 'rejected',
+        },
+        tx,
+      );
+      return { application, title: teamMatch.title, replayed: false };
+    });
+
+    if (!result.replayed) {
+      this.emitTeamNotifications(
+        [result.application.applicantTeamId],
+        'team_match_application_rejected',
+        teamMatchId,
+        `"${result.title}" 팀매치 신청이 거절됐어요. 사유: ${reason}`,
+      );
+    }
+    return {
+      applicationId,
+      applicantTeamId: result.application.applicantTeamId,
+      applicationStatus: 'rejected' as const,
+      teamMatchId,
+      teamMatchStatus: 'recruiting' as const,
+      detailRoute: `/admin/team-matches/${teamMatchId}`,
+      replayed: result.replayed,
+    };
+  }
+
+  async update(user: V1AuthUser, teamMatchId: string, dto: UpdateAdminTeamMatchRecruitmentDto) {
+    const admin = await this.adminContext.getMutationAdmin(user.id);
+    if (!dto.title.trim() || !dto.manualPlaceName.trim()) {
+      throw new BadRequestException({ code: 'VALIDATION_FAILED', message: '매치 제목과 경기 장소를 입력해 주세요.' });
+    }
+    const existing = await this.prisma.v1TeamMatch.findFirst({
+      where: { id: teamMatchId, deletedAt: null },
+      select: {
+        id: true,
+        sportId: true,
+        status: true,
+        platformManaged: true,
+        leagueId: true,
+        tournamentId: true,
+        updatedAt: true,
+        deadlineAt: true,
+        title: true,
+      },
+    });
+    if (!existing) throw new NotFoundException({ code: 'NOT_FOUND', message: '팀매치 모집을 찾을 수 없어요.' });
+    if (!existing.platformManaged || existing.leagueId !== null || existing.tournamentId !== null || existing.status !== 'recruiting') {
+      throw new ConflictException({ code: 'TEAM_MATCH_NOT_PLATFORM_RECRUITING', message: '모집 중인 플랫폼 팀매치만 수정할 수 있어요.' });
+    }
+    if (existing.updatedAt.toISOString() !== dto.version) {
+      throw new ConflictException({ code: 'VERSION_CONFLICT', message: '다른 관리자가 먼저 수정했어요. 최신 내용을 다시 불러와 주세요.' });
+    }
+    if (dto.sportId !== existing.sportId) {
+      throw new ConflictException({ code: 'TEAM_MATCH_SPORT_IMMUTABLE', message: '모집을 만든 뒤에는 종목을 변경할 수 없어요.' });
+    }
+    const dates = validateTeamMatchDates(dto, existing.deadlineAt);
+    const [region, levelRange] = await Promise.all([
+      this.prisma.v1Region.findFirst({ where: { id: dto.regionId, isActive: true, level: 2 }, select: { id: true } }),
+      resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode),
+    ]);
+    if (!region) throw this.validationError('활성화된 시·군·구 지역을 선택해 주세요.', 'regionId');
+    const matchStyle = (dto.matchStyle ?? []).map((item) => item.trim()).filter(Boolean);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const transition = await tx.v1TeamMatch.updateMany({
+        where: { id: teamMatchId, updatedAt: existing.updatedAt, status: 'recruiting', platformManaged: true },
+        data: {
+          regionId: dto.regionId,
+          title: dto.title.trim(),
+          description: dto.description?.trim() || null,
+          imageUrl: dto.imageUrl?.trim() || null,
+          placeName: dto.manualPlaceName.trim(),
+          placeAddress: dto.addressText?.trim() || null,
+          startAt: dates.startsAt,
+          endAt: dates.endsAt,
+          deadlineAt: dates.deadlineAt,
+          formatNote: dto.rulesText?.trim() || null,
+          costNote: dto.costNote?.trim() || null,
+          minSportLevelId: levelRange.minSportLevelId,
+          maxSportLevelId: levelRange.maxSportLevelId,
+          genderRule: dto.genderRule?.trim() || null,
+          matchFormat: dto.matchFormat?.trim() || null,
+          matchStyle,
+          uniformColor: dto.uniformColor?.trim() || null,
+        },
+      });
+      if (transition.count !== 1) {
+        throw new ConflictException({ code: 'VERSION_CONFLICT', message: '다른 관리자가 먼저 수정했어요. 최신 내용을 다시 불러와 주세요.' });
+      }
+      const row = await tx.v1TeamMatch.findUniqueOrThrow({ where: { id: teamMatchId }, select: { updatedAt: true } });
+      await this.adminContext.logAdminAction(
+        admin,
+        {
+          action: 'team_match.recruitment.update',
+          targetType: 'team_match',
+          targetId: teamMatchId,
+          reason: '플랫폼 운영자 팀 모집 수정',
+          beforeJson: { title: existing.title, version: dto.version } as Prisma.InputJsonValue,
+          afterJson: { title: dto.title.trim(), version: row.updatedAt.toISOString() } as Prisma.InputJsonValue,
+        },
+        tx,
+      );
+      return row;
+    });
+    return {
+      teamMatchId,
+      status: 'recruiting' as const,
+      version: updated.updatedAt.toISOString(),
+      detailRoute: `/admin/team-matches/${teamMatchId}`,
+    };
   }
 
   private validationError(message: string, field: string) {

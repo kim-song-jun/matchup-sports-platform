@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { useV1MyTournamentFixtures, useV1Tournament } from '@/hooks/use-v1-api';
@@ -31,6 +32,7 @@ import {
 } from '@/components/public-game-records/schedule-content';
 import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
+import { withFromPath } from '@/lib/session-storage';
 import type {
   V1TournamentDetail,
   V1TournamentFixture,
@@ -267,7 +269,7 @@ function LeagueStandingsSection({
  * 없으면(스케줄 미정) 그 줄 자체를 렌더하지 않는다.
  */
 function BracketEmpty({
-  tournamentId,
+  detailHref,
   format,
   status,
   teamCount,
@@ -275,7 +277,7 @@ function BracketEmpty({
   registrationDeadlineAt,
   bracketPublishScheduledAt,
 }: {
-  tournamentId: string;
+  detailHref: string;
   format: 'knockout' | 'group_knockout';
   status: V1TournamentDetail['status'];
   teamCount: number;
@@ -326,7 +328,7 @@ function BracketEmpty({
         title="대진표가 아직 공개되지 않았어요"
         sub={sub}
         cta="대회 정보 보기"
-        ctaHref={`/tournaments/${tournamentId}`}
+        ctaHref={detailHref}
       />
     </div>
   );
@@ -465,6 +467,9 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
   const [activeTab, setActiveTab] = useState<'standings' | 'schedule'>('schedule');
   // 순위표에서 팀 전적으로 나갔다 돌아오면 이 화면(대진표·순위, 받은 출처 포함)으로 되돌아온다.
   const bracketSelfHref = useCurrentHref();
+  // 이 화면으로 들어올 때 받은 from(대회 상세의 자기 URL)을 그대로 붙여 상세로 되돌아간다.
+  const searchParams = useSearchParams();
+  const detailHref = withFromPath(`/tournaments/${tournament.id}`, searchParams.get('from'));
 
   const { groupPhaseGroups, knockoutFixtures, hasGroupStandings, hasKnockoutFixtures } =
     partitionTournamentSections(format, fixtures, groups);
@@ -705,7 +710,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
                     </div>
                   ) : (
                     <BracketEmpty
-                      tournamentId={tournament.id}
+                      detailHref={detailHref}
                       format={format}
                       status={tournament.status}
                       teamCount={tournament.teamCount}
@@ -727,7 +732,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
           붙는다(§빈 상태 재균형, 이 함수 상단 주석 참고). */}
       <div className="tm-tourn-sub-flownav tm-bracket-page-flownav" style={{ marginTop: 'auto' }}>
         <TournamentFlowNav
-          prev={{ href: `/tournaments/${tournament.id}`, label: '대회 정보' }}
+          prev={{ href: detailHref, label: '대회 정보' }}
           next={{
             href: `/tournaments/${tournament.id}/results`,
             label: '최종결과',

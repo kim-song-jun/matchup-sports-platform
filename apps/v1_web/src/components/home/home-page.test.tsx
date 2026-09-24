@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomePageView } from './home-page';
+import type { V1TournamentListItem } from '@/types/api';
 import type { HomeMatchCard, HomeViewModel } from './home.types';
 
 vi.mock('next/navigation', () => ({
@@ -9,11 +10,15 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+const useV1AllTournamentsMock = vi.hoisted(() =>
+  vi.fn(() => ({ data: [] as V1TournamentListItem[], isPending: false, isError: false, isLoading: false, refetch: vi.fn() })),
+);
+
 vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/use-v1-api')>();
   return {
     ...actual,
-    useV1AllTournaments: () => ({ data: [], isPending: false, isError: false, isLoading: false, refetch: vi.fn() }),
+    useV1AllTournaments: useV1AllTournamentsMock,
     useV1LeagueMatches: () => ({
       data: {
         items: [
@@ -118,5 +123,30 @@ describe('HomePageView back-navigation from=/home', () => {
     render(<HomePageView model={buildModel()} />);
     const link = screen.getByRole('link', { name: /매치 featured-1/ });
     expect(link.getAttribute('href')).not.toBe('/matches/featured-1');
+  });
+
+  it('carries from=/home on the sidebar tournament widget link', () => {
+    useV1AllTournamentsMock.mockReturnValueOnce({
+      data: [
+        {
+          id: 'tour-1',
+          title: '테스트 대회',
+          scheduledAt: null,
+          scheduledEndAt: null,
+          sport: { code: 'futsal', name: '풋살' },
+          confirmedCount: 4,
+          teamCount: 8,
+        } as V1TournamentListItem,
+      ],
+      isPending: false,
+      isError: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<HomePageView model={buildModel()} />);
+
+    const link = screen.getByRole('link', { name: /테스트 대회/ });
+    expect(link).toHaveAttribute('href', '/tournaments/tour-1?from=%2Fhome');
   });
 });

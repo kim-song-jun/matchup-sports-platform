@@ -97,4 +97,36 @@ describe('UserRecordsContent match links', () => {
       '/tournaments/tournament-1?from=%2Fusers%2Fuser-1%2Frecords',
     ]);
   });
+
+  it('대회 수상 링크도 뒤로가기가 이 활동 기록으로 돌아오도록 출처를 함께 싣는다', () => {
+    render(
+      <UserRecordsContent
+        data={{
+          ...data([]),
+          tournamentAwards: [
+            { id: 'award-1', tournamentId: 'tournament-9', tournamentTitle: '겨울 리그컵', awardType: 'mvp', awardLabel: 'MVP', iconKey: 'trophy', teamName: null, note: null, awardedAt: '2026-08-10T00:00:00.000Z' },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: /MVP/ })).toHaveAttribute(
+      'href',
+      '/tournaments/tournament-9?from=%2Fusers%2Fuser-1%2Frecords',
+    );
+  });
+
+  // D2: withFromPath 로 바꾼 뒤에만 드러나는 차이 — 받은 출처가 지금 누르는 행과 같은
+  // 화면을 가리키면 다시 감싸지 않고 그 값을 그대로 재사용한다.
+  it('받은 출처가 지금 누르는 경기 화면 자신이면 다시 감싸지 않고 그대로 재사용한다', () => {
+    const selfHref = '/team-matches/team-match-9?from=%2Fusers%2Fuser-1%2Frecords';
+    render(
+      <UserRecordsContent
+        selfHref={selfHref}
+        data={data([item({ id: 'record-friendly', gameId: 'game-friendly', teamMatchId: 'team-match-9', type: 'friendly', matchType: 'team_match', tournamentId: null, tournamentTitle: null })])}
+      />,
+    );
+
+    expect(screen.getByRole('link')).toHaveAttribute('href', selfHref);
+  });
 });

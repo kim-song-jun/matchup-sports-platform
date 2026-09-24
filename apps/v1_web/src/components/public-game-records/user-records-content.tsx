@@ -9,6 +9,7 @@ import { userRecordResultLabel } from './format';
 import { resultChipStyle } from './result-emphasis';
 import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { RECORD_TYPE_TABS, recordEmptyCopy, type RecordTypeFilter } from './record-category-tabs';
+import { withFromPath } from '@/lib/session-storage';
 import type { PublicUserRecordItem, PublicUserRecordsResponse } from './types';
 
 /**
@@ -67,15 +68,14 @@ function competitionLabel(item: PublicUserRecordItem): string | null {
 
 function userRecordHref(item: PublicUserRecordItem, fromHref: string): string | null {
   // 뒤로가기가 이 활동 기록으로 돌아오도록 출처를 함께 넘긴다(각 상세 화면이 `?from=`을 읽는다).
-  const from = `?from=${encodeURIComponent(fromHref)}`;
   if (item.leagueId && item.teamMatchId) {
-    return `/league-matches/${item.leagueId}/fixtures/${item.teamMatchId}${from}`;
+    return withFromPath(`/league-matches/${item.leagueId}/fixtures/${item.teamMatchId}`, fromHref);
   }
   if (item.tournamentId && item.teamMatchId) {
-    return `/tournaments/${item.tournamentId}/matches/${item.teamMatchId}${from}`;
+    return withFromPath(`/tournaments/${item.tournamentId}/matches/${item.teamMatchId}`, fromHref);
   }
-  if (item.teamMatchId) return `/team-matches/${item.teamMatchId}${from}`;
-  if (item.tournamentId) return `/tournaments/${item.tournamentId}${from}`;
+  if (item.teamMatchId) return withFromPath(`/team-matches/${item.teamMatchId}`, fromHref);
+  if (item.tournamentId) return withFromPath(`/tournaments/${item.tournamentId}`, fromHref);
   return null;
 }
 
@@ -219,7 +219,7 @@ export function UserRecordsContent({
             {data.tournamentAwards.map((award) => (
               <Link
                 key={award.id}
-                href={`/tournaments/${award.tournamentId}?from=${encodeURIComponent(fromHref)}`}
+                href={withFromPath(`/tournaments/${award.tournamentId}`, fromHref)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { useV1LeagueMatch, useV1LeagueMatchStandings, useV1ResolveChatRoom, useV1TeamMatch } from '@/hooks/use-v1-api';
 import { usePublicLeagueFixtureRecord } from '@/components/public-game-records/use-public-game-records';
 import { V1ApiError } from '@/lib/api-client';
-import { useShellOverrideForRoute } from '@/components/v1-ui/shell-override';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import LeagueFixtureDetailClient from './league-fixture-detail-client';
 
 const navigation = vi.hoisted(() => ({ searchParams: new URLSearchParams() }));
@@ -177,21 +177,17 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.queryByText('상대팀과 채팅')).not.toBeInTheDocument();
   });
 
+  // D1: 이 화면은 더 이상 useShellOverride로 backHref를 게시하지 않는다 — 셸 뒤로가기의
+  // 단일 경로인 AppBackLink가 ?from=을 직접 읽는다(app-back-link.tsx). 그래서 여기서는
+  // 이 화면이 받는 것과 같은 ?from=을 AppBackLink에 직접 먹여 실제 뒤로가기 href를 본다.
   it.each([
-    ['활동 기록에서 들어오면 그 화면으로', 'from=%2Fusers%2Fu1%2Frecords%3Ffrom%3D%252Fmy', { backHref: '/users/u1/records?from=%2Fmy' }],
-    ['출처가 없으면 셸 기본값(리그 화면)을 그대로', '', {}],
-    ['외부 주소는 무시하고 기본값을', 'from=%2F..%2F%2Fevil.example', {}],
-  ])('뒤로가기: %s 게시한다', (_label, query, expected) => {
+    ['활동 기록에서 들어오면 그 화면으로', 'from=%2Fusers%2Fu1%2Frecords%3Ffrom%3D%252Fmy', '/users/u1/records?from=%2Fmy'],
+    ['출처가 없으면 셸 기본값(리그 화면)을 그대로', '', '/league-matches/lg-1'],
+    ['외부 주소는 무시하고 기본값을', 'from=%2F..%2F%2Fevil.example', '/league-matches/lg-1'],
+  ])('뒤로가기: %s 쓴다', async (_label, query, expectedHref) => {
     navigation.searchParams = new URLSearchParams(query);
-    mockLeague();
-    mockViewer('none');
-    let published: ReturnType<typeof useShellOverrideForRoute> = {};
-    function ShellProbe() {
-      published = useShellOverrideForRoute('/league-matches/lg-1/fixtures/fx-1');
-      return null;
-    }
-    render(<><ShellProbe /><LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" /></>);
-    expect(published).toEqual(expected);
+    render(<AppBackLink fallbackHref="/league-matches/lg-1">뒤로가기</AppBackLink>);
+    expect(await screen.findByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', expectedHref);
     navigation.searchParams = new URLSearchParams();
   });
 
@@ -250,9 +246,30 @@ describe('LeagueFixtureDetailClient', () => {
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
     expect(screen.getByRole('button', { name: '상대팀과 채팅' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '라인업 관리' })).toHaveAttribute('href', '/team-matches/fx-1/lineup');
+    // 라인업 화면에서 뒤로가면 이 경기 화면(리그 문맥)으로 돌아오도록 출처를 싣는다.
+    expect(screen.getByRole('link', { name: '라인업 관리' })).toHaveAttribute(
+      'href',
+      '/team-matches/fx-1/lineup?from=%2Fleague-matches%2Flg-1%2Ffixtures%2Ffx-1',
+    );
     // 아직 스코어 없는 예정 경기라 결과 링크는 뜨지 않는다.
     expect(screen.queryByText('경기 결과 보기')).not.toBeInTheDocument();
+  });
+
+  it('활동 기록에서 들어온 경우 라인업·결과 CTA 는 받은 출처까지 이어 붙인다', () => {
+    navigation.searchParams = new URLSearchParams('from=%2Fusers%2Fu1%2Frecords');
+    mockLeague({
+      fixtures: [
+        ...FIXTURES.filter((f) => f.teamMatchId !== 'fx-1'),
+        { teamMatchId: 'fx-1', title: '2주차', homeTeamId: 't1', awayTeamId: 't2', startAt: '2026-09-08T10:00:00.000Z', placeName: '검증장', status: 'completed', homeScore: 3, awayScore: 2 },
+      ],
+    });
+    mockViewer('approved', { manageableOpponentTeam: true });
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+    const selfHref = '/league-matches/lg-1/fixtures/fx-1?from=%2Fusers%2Fu1%2Frecords';
+    expect(screen.getByRole('link', { name: '라인업 관리' })).toHaveAttribute('href', `/team-matches/fx-1/lineup?from=${encodeURIComponent(selfHref)}`);
+    expect(screen.getByRole('link', { name: '경기 결과 보기' })).toHaveAttribute('href', `/team-matches/fx-1/result?from=${encodeURIComponent(selfHref)}`);
+    navigation.searchParams = new URLSearchParams();
   });
 
   // 정본 §4 가 이의 경로를 없앴고 Task 166 이 화면·알림까지 지웠다(api.ts:1100). 예전 라벨
@@ -267,7 +284,10 @@ describe('LeagueFixtureDetailClient', () => {
     mockViewer('approved', { manageableOpponentTeam: true });
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
-    expect(screen.getByRole('link', { name: '경기 결과 보기' })).toHaveAttribute('href', '/team-matches/fx-1/result');
+    expect(screen.getByRole('link', { name: '경기 결과 보기' })).toHaveAttribute(
+      'href',
+      '/team-matches/fx-1/result?from=%2Fleague-matches%2Flg-1%2Ffixtures%2Ffx-1',
+    );
     expect(document.body.textContent).not.toContain('이의');
   });
 
@@ -423,5 +443,26 @@ describe('LeagueFixtureDetailClient', () => {
     expect(screen.getByRole('link', { name: '리그 순위표·일정으로 이동' })).toHaveAttribute('href', '/league-matches/lg-1');
     // Wave 5 — 대진이 방금 재생성돼 목록이 갱신됐을 수 있으니 재시도 버튼도 함께 준다.
     expect(screen.getByRole('button', { name: '다시 시도하기' })).toBeInTheDocument();
+  });
+
+  it('받은 from 이 리그 상세를 가리키면(자기 위 체인 포함) 그 값으로 돌아간다', () => {
+    navigation.searchParams = new URLSearchParams('from=%2Fleague-matches%2Flg-1%3Ffrom%3D%252Fhome');
+    mockLeague();
+    mockViewer('none');
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+    const parentWithChain = '/league-matches/lg-1?from=%2Fhome';
+    expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', parentWithChain);
+    navigation.searchParams = new URLSearchParams();
+  });
+
+  it('받은 from 이 리그 상세가 아니면 리그 상세로 가면서 그 출처를 잇는다', () => {
+    navigation.searchParams = new URLSearchParams('from=%2Fusers%2Fu1%2Frecords');
+    mockLeague();
+    mockViewer('none');
+    render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
+
+    expect(screen.getByRole('link', { name: '전체 순위표·일정 보기' })).toHaveAttribute('href', '/league-matches/lg-1?from=%2Fusers%2Fu1%2Frecords');
+    navigation.searchParams = new URLSearchParams();
   });
 });

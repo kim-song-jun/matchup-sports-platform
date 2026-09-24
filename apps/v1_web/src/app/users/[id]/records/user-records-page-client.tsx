@@ -40,7 +40,6 @@ export function UserRecordsPageClient({ userId }: { userId: string }) {
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   useShellOverride({
     title: firstPage?.nickname ? `${firstPage.nickname} 님의 활동 기록` : '활동 기록',
-    ...(fromPath ? { backHref: fromPath } : {}),
   });
 
   if (isLoading) {

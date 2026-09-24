@@ -1,6 +1,7 @@
 'use client';
 
 import { useV1MyMatchesInfinite } from '@/hooks/use-v1-api';
+import { withFromPath } from '@/lib/session-storage';
 import type { V1Match } from '@/types/api';
 import { MyMatchesPageView } from './my-page';
 import type { MyMatch, MyMatchesViewModel, MyMatchStatus } from './my.types';
@@ -40,7 +41,7 @@ function toMyMatch(match: V1Match, mode: 'joined' | 'created'): MyMatch {
     statusLabel: statusLabel(status, match),
     note: buildNote(match, status),
     // 뒤로가기가 이 목록으로 돌아오도록 출처를 함께 넘긴다(matches-client.tsx가 `?from=`을 읽는다).
-    href: `/matches/${id}?from=${encodeURIComponent(`/my/matches/${mode}`)}`,
+    href: withFromPath(`/matches/${id}`, `/my/matches/${mode}`),
     // href 는 쿼리를 달고 있어 경로를 이어 붙일 수 없다 — 관리 경로는 따로 만든다.
     manageHref: `/matches/${id}/applications`,
     reviewHref: canReview ? `/my/reviews/match/${id}` : undefined,

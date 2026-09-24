@@ -5,6 +5,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1ChatRoomTeamContact } from '@/types/api';
 import { TeamContactStatusCard, formatExpiresIn } from './team-contact-status-card';
 
+// 상대팀 링크는 이 컨택 채팅방 자기 자신(useCurrentHref)을 출처로 이어 붙인다. 라우터
+// 밖(기본값 pathname=null)에서는 useCurrentHref 가 null 을 돌려주므로 나머지 테스트는
+// 기존과 동일하게 출처 없는 bare href 를 본다.
+const navigation = vi.hoisted(() => ({ pathname: null as string | null, search: '' }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => navigation.pathname,
+  useSearchParams: () => new URLSearchParams(navigation.search),
+}));
+
 const mutations = vi.hoisted(() => ({
   accept: vi.fn(),
   decline: vi.fn(),
@@ -41,7 +50,11 @@ function renderCard(ui: ReactElement) {
 }
 
 describe('TeamContactStatusCard', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    navigation.pathname = null;
+    navigation.search = '';
+  });
 
   it('받는 팀 운영진: 수락 클릭 → accept mutate', () => {
     renderCard(<TeamContactStatusCard contact={contact()} />);
@@ -64,6 +77,18 @@ describe('TeamContactStatusCard', () => {
     expect(mutations.withdraw).toHaveBeenCalledTimes(1);
     // 상대 팀은 받는 팀(나팀)이고 링크는 그 팀 상세로 간다
     expect(screen.getByRole('link', { name: '나팀' })).toHaveAttribute('href', '/teams/team-b');
+  });
+
+  it('상대팀 링크는 이 컨택 채팅방을 출처로 이어 붙인다', () => {
+    navigation.pathname = '/chat/room-1';
+    navigation.search = 'from=%2Fmy%2Fteams';
+    renderCard(<TeamContactStatusCard contact={contact({ mySide: 'from' })} />);
+
+    const selfHref = `/chat/room-1?from=${encodeURIComponent('/my/teams')}`;
+    expect(screen.getByRole('link', { name: '나팀' })).toHaveAttribute(
+      'href',
+      `/teams/team-b?from=${encodeURIComponent(selfHref)}`,
+    );
   });
 
   it('수락된 컨택: 액션 없음, 배지 "수락됨", 만료 안내 없음', () => {

@@ -22,12 +22,8 @@ export const TEAMS_ROUTES: RouteChromeEntry[] = [
     chrome: { title: '팀 상세', activeTab: 'teams', bottomNav: false, backHref: '/teams' },
   },
   {
-    // TeamEditPageClient의 cancelHref는 원래 `?from=my` 쿼리 파라미터에 따라
-    // '/teams'|`/teams/${id}` 로 갈리지만(teams-form-client.tsx:122-123), 실제로
-    // `/teams/:id/edit?from=my` 를 생성하는 링크가 저장소 전체에 0건이라(teams-client.tsx:857의
-    // 유일한 편집 링크가 쿼리 없이 연결) 이 분기는 현재 도달 불가능한 죽은 경로다.
-    // 그래서 실측상 유일하게 관찰되는 값인 '/teams'를 그대로 등록한다. 콘텐츠 영역의
-    // 데스크톱 뒤로가기 링크(teams-page.tsx의 tm-desktop-back)는 cancelHref를 그대로 쓴다.
+    // TeamEditPageClient의 cancelHref는 항상 '/teams'다(teams-form-client.tsx). 콘텐츠
+    // 영역의 데스크톱 뒤로가기 링크(teams-page.tsx의 tm-desktop-back)는 이 값을 그대로 쓴다.
     pattern: '/teams/:id/edit',
     chrome: { title: '팀 수정', activeTab: 'teams', bottomNav: false, backHref: '/teams' },
   },

@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as rtlRender, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TeamRecordsPageClient } from './team-records-page-client';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import type { PublicTeamRecordsResponse, TeamRecordTypeFilter } from '@/components/public-game-records/types';
 
 /**
@@ -107,14 +108,22 @@ describe('TeamRecordsPageClient', () => {
   });
 
   // 팀 상세(출처 포함) → 팀 전적 → 경기 상세로 가도 뒤로가기 체인이 처음 출처까지 이어져야 한다.
+  // D1: 이 화면은 더 이상 useShellOverride로 backHref를 게시하지 않는다 — AppBackLink가
+  // ?from=을 직접 읽으므로 그 컴포넌트로 실제 뒤로가기 href를 본다.
   it('받은 출처를 뒤로가기로 쓰고, 경기 링크에 넘길 출처에도 이어 싣는다', () => {
     mocks.usePublicTeamRecords.mockReturnValue(loaded('강남 러닝 크루'));
     navigation.searchParams = new URLSearchParams({ from: '/teams/team-1?from=%2Fmy%2Fteams' });
 
-    render(<TeamRecordsPageClient teamId="team-1" />);
+    render(
+      <>
+        <AppBackLink fallbackHref="/teams/team-1">뒤로가기</AppBackLink>
+        <TeamRecordsPageClient teamId="team-1" />
+      </>,
+    );
 
     const calls = shellOverride.useShellOverride.mock.calls;
-    expect(calls[calls.length - 1]?.[0]).toEqual({ title: '강남 러닝 크루 전적', backHref: '/teams/team-1?from=%2Fmy%2Fteams' });
+    expect(calls[calls.length - 1]?.[0]).toEqual({ title: '강남 러닝 크루 전적' });
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/teams/team-1?from=%2Fmy%2Fteams');
     expect(screen.getByTestId('records-content')).toHaveAttribute(
       'data-self-href',
       `/teams/team-1/records?from=${encodeURIComponent('/teams/team-1?from=%2Fmy%2Fteams')}`,

@@ -4,6 +4,8 @@ import { useEffect, useId, useState } from 'react';
 import Link from 'next/link';
 import { Ban, CheckCircle2, Clock3, MinusCircle, XCircle } from 'lucide-react';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
+import { withFromPath } from '@/lib/session-storage';
 import {
   useV1AcceptTeamContact,
   useV1CreateInquiry,
@@ -72,6 +74,8 @@ export function TeamContactStatusCard({ contact }: { contact: V1ChatRoomTeamCont
   const counterpart = mySide === 'to' ? contact.fromTeam : contact.toTeam;
   const myTeam = mySide === 'to' ? contact.toTeam : contact.fromTeam;
   const visual = STATUS_VISUAL[status];
+  // 상대팀 링크의 뒤로가기 출처 — 이 컨택 채팅방 자기 자신.
+  const selfHref = useCurrentHref();
 
   const acceptContact = useV1AcceptTeamContact(contactId);
   const declineContact = useV1DeclineTeamContact(contactId);
@@ -169,7 +173,7 @@ export function TeamContactStatusCard({ contact }: { contact: V1ChatRoomTeamCont
         </div>
 
         <div className="tm-text-body">
-          <Link href={`/teams/${counterpart.id}`} className="tm-chat-contact-team-link" style={{ fontWeight: 700 }}>
+          <Link href={withFromPath(`/teams/${counterpart.id}`, selfHref)} className="tm-chat-contact-team-link" style={{ fontWeight: 700 }}>
             {counterpart.name}
           </Link>
           <span style={{ color: 'var(--text-muted)' }}>

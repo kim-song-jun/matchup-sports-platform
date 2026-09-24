@@ -24,6 +24,7 @@ import {
 import { trackEvent } from '@/lib/analytics';
 import { extractErrorMessage } from '@/lib/error-message';
 import { appRoute } from '@/lib/app-route';
+import { withFromPath } from '@/lib/session-storage';
 import { formatEntryFee } from '@/lib/date-utils';
 import {
   filterTournamentTeamsBySport,
@@ -1521,6 +1522,9 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
   const hubHref = `/tournaments/${tournamentId}/my`;
   const detailHref = `/tournaments/${tournamentId}`;
   const applyBackHref = requestedTeamId ? hubHref : detailHref;
+  // 셸 뒤로가기(위 applyBackHref)와 달리, 화면 안의 '대회 상세로 돌아가기' CTA 는
+  // 받은 from 을 그대로 이어 붙인다.
+  const detailHrefWithFrom = withFromPath(detailHref, searchParams.get('from'));
   // route-chrome 테이블(fragments/tournaments-extra.ts)의 backHref는 항상 detailHref로
   // 고정돼 있다 — `?team=` 딥링크(내 신청 페이지에서 팀을 골라 들어온 경우, my-registration-
   // client.tsx의 apply?team= 링크 참조)로 들어온 경우엔 셸 topbar 뒤로가기도 hubHref로
@@ -1778,7 +1782,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
               <div style={{ padding: '0 20px', marginTop: 24 }}>
           <ErrorState message={msg} onRetry={() => void refetchTournament()} />
           <Link
-            href={`/tournaments/${tournamentId}`}
+            href={detailHrefWithFrom}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
             style={{ marginTop: 16 }}
           >
@@ -1806,7 +1810,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             본인인증 하러 가기
           </Link>
           <Link
-            href={`/tournaments/${tournamentId}`}
+            href={detailHrefWithFrom}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
             style={{ marginTop: 12 }}
           >
@@ -1828,7 +1832,7 @@ export function TournamentApplyPageClient({ tournamentId }: { tournamentId: stri
             tone="info"
           />
           <Link
-            href={`/tournaments/${tournamentId}`}
+            href={detailHrefWithFrom}
             className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
             style={{ marginTop: 16 }}
           >

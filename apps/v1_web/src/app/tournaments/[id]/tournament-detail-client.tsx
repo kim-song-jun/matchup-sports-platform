@@ -525,8 +525,8 @@ function useIsInViewport(ref: React.RefObject<HTMLElement | null>): boolean {
 /* ── Entry point ── */
 
 export function TournamentDetailPageClient({ tournamentId }: { tournamentId: string }) {
-  // route-chrome 테이블의 backHref(fragments/tournaments-core.ts)는 검색 파라미터를 못 받아
-  // '/tournaments'로 고정돼 있었다 — public-profile-client.tsx와 같은 `?from=` 패턴으로 메운다.
+  // 뒤로가기 자체는 AppBackLink가 `?from=`을 직접 읽는다 — fromPath는 하위 화면(apply·
+  // bracket 등) 링크에 실어 보낼 체인 출처(chainFrom)를 만드는 데만 쓴다.
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   const chainFrom = fromPath ? withFromPath(`/tournaments/${tournamentId}`, fromPath) : null;
   const [hasSessionHint, setHasSessionHint] = useState(false);
@@ -567,7 +567,6 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
               <ApplyCTA tournament={data} myRegistration={myRegistration} />
             </DetailChainFromContext.Provider>
           ),
-          ...(fromPath ? { backHref: fromPath } : {}),
         }
       : {},
   );
@@ -593,7 +592,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
       <TournamentDetailView
         tournament={data}
         myRegistration={myRegistration}
-        backHref={fromPath ?? '/tournaments'}
+        backHref="/tournaments"
       />
     </DetailChainFromContext.Provider>
   );

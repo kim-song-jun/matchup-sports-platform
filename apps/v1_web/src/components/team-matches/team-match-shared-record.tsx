@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/v1-ui/button';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ProfileAvatar } from '@/components/users/public-profile-client';
@@ -17,6 +17,7 @@ import {
 import { extractErrorMessage } from '@/lib/error-message';
 import { V1ApiError } from '@/lib/api-client';
 import { randomUuid } from '@/lib/uuid';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { sharedRecordPhaseLabel, sharedRecordActionLabel } from '@/lib/v1-status-labels';
 import styles from './team-match-shared-record.module.css';
 
@@ -40,6 +41,10 @@ function playerInitials(name: string) {
 export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) {
   const query = useTeamMatchRecord(teamMatchId);
   const mutation = useMutateTeamMatchRecord(teamMatchId);
+  // 이 화면 자신이 받은 출처를 "매치 상세" 링크에도 이어 싣는다 — 공유 링크로 바로 들어오면
+  // 출처가 없어 `?view=detail` 만 남는다.
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const matchDetailHref = withFromPath(`/team-matches/${teamMatchId}?view=detail`, fromPath);
   const [editing, setEditing] = useState<{ goal: SharedGoal | null; version: number; subMatchId: string | null } | null>(null);
   const [subMatchForm, setSubMatchForm] = useState<{ subMatch: SharedSubMatch | null; version: number; title: string } | null>(null);
   const [endPrompt, setEndPrompt] = useState<number | null>(null);
@@ -83,7 +88,7 @@ export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) 
   return <main className={styles.page}>
     <header className={styles.header}>
       <div>
-        <Link href={`/team-matches/${teamMatchId}?view=detail`} className={styles.muted}>← 매치 상세</Link>
+        <Link href={matchDetailHref} className={styles.muted}>← 매치 상세</Link>
         <h1>함께 쓰는 경기 기록</h1>
         <p className={styles.muted}>{data.title}</p>
       </div>

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
 import { MatchVideos } from '@/components/tournaments/match-videos';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
+import { withFromPath } from '@/lib/session-storage';
 import { matchOutcomeReasonLabel, toDisplayableOutcomeReason } from '@/lib/match-outcome';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
 import { LiveBadge } from './live-badge';
@@ -51,14 +52,14 @@ function sideLabel(side: PublicMatchDetail['home']): string {
  * 모집 마감 전에는 서버가 신원을 가려 `teamId` 가 없다. 그때는 `ProfileLink` 와 같은
  * 규칙으로 평문이 된다 — 없는 팀 페이지로 보내지 않는다.
  */
-function SideName({ side }: { side: PublicMatchDetail['home'] }) {
+function SideName({ side, from }: { side: PublicMatchDetail['home']; from?: string }) {
   const label = sideLabel(side);
   // `teamId` 만 보면 **`'미정'` 이라는 글자가 팀 페이지로 링크된다** — 두 필드가 각각
   // nullable 이라 id 는 있고 이름만 가려진 조합이 나올 수 있다. 이름이 없으면 링크도 없다.
   if (!side?.teamId || !side.teamName) return <>{label}</>;
   return (
     <Link
-      href={`/teams/${encodeURIComponent(side.teamId)}`}
+      href={from ? withFromPath(`/teams/${encodeURIComponent(side.teamId)}`, from) : `/teams/${encodeURIComponent(side.teamId)}`}
       style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}
     >
       {label}
@@ -319,7 +320,7 @@ function HistorySection({ history, isStatusOnly }: { history: PublicMatchDetail[
   );
 }
 
-export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
+export function MatchDetailContent({ data, from }: { data: PublicMatchDetail; from?: string }) {
   const isStatusOnly = data.visibilityMode === 'status_only';
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -334,7 +335,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
         <Card pad={16}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ flex: 1, textAlign: 'right', fontSize: 16, fontWeight: 700, color: 'var(--text-strong)' }}>
-              <SideName side={data.home} />
+              <SideName side={data.home} from={from} />
             </span>
             <span
               className="tab-num"
@@ -352,7 +353,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
               {formatScoreline(data.score, data.scoreStatus)}
             </span>
             <span style={{ flex: 1, textAlign: 'left', fontSize: 16, fontWeight: 700, color: 'var(--text-strong)' }}>
-              <SideName side={data.away} />
+              <SideName side={data.away} from={from} />
             </span>
           </div>
           {/* 스코어 아래 보조 표기 — 승부차기가 없으면 렌더 없음. */}
@@ -463,7 +464,11 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
 
       {data.nextMatch ? (
         <Link
-          href={`/tournaments/${data.tournamentId}/matches/${data.nextMatch.fixtureId}`}
+          href={
+            from
+              ? withFromPath(`/tournaments/${data.tournamentId}/matches/${data.nextMatch.fixtureId}`, from)
+              : `/tournaments/${data.tournamentId}/matches/${data.nextMatch.fixtureId}`
+          }
           className="tm-pressable"
           style={{ textDecoration: 'none' }}
         >

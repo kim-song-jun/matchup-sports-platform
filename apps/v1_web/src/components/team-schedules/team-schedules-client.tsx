@@ -217,7 +217,8 @@ export function TeamScheduleDetailPageClient({ teamId, scheduleId }: { teamId: s
   const [pendingApplicationId, setPendingApplicationId] = useState<string | null>(null);
 
   const schedule = detail.data;
-  const backHref = fromPath ?? `/teams/${teamId}/schedules`;
+  // 데스크톱 뒤로가기(AppBackLink)의 fallback — `?from=`이 있으면 AppBackLink가 직접 읽는다.
+  const backHref = `/teams/${teamId}/schedules`;
   const viewerRole = team.data?.viewer.role;
   const canManage = isScheduleManagerRole(viewerRole);
   const canRsvp = isScheduleMemberRole(viewerRole);

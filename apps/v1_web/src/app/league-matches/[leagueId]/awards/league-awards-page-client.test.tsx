@@ -2,13 +2,16 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Providers } from '@/app/providers';
 import { useV1ActivePopup, useV1LeagueMatch, useV1LeagueMatchPlayerRecords, useV1LeagueMatchStandings } from '@/hooks/use-v1-api';
+import { useSearchParams } from 'next/navigation';
 import { LeagueAwardsPageClient } from './league-awards-page-client';
 
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   usePathname: () => '/league-matches/league-1/awards',
-  useSearchParams: () => new URLSearchParams('from=%2Fhome'),
+  useSearchParams: vi.fn(() => new URLSearchParams('from=%2Fhome')),
 }));
+
+const useSearchParamsMock = vi.mocked(useSearchParams);
 
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({
   PendingSocialSignupGate: ({ children }: { children: React.ReactNode }) => children,
@@ -58,7 +61,8 @@ describe('LeagueAwardsPageClient', () => {
     expect(await screen.findByText(/리그가 진행 중이에요/)).toBeInTheDocument();
     // 종료 전이므로 우승·순위 콘텐츠는 전혀 그려지지 않는다.
     expect(screen.queryByText('시상 결과')).not.toBeInTheDocument();
-    expect(container.querySelector('a[href="/league-matches/league-1"]')).toBeInTheDocument();
+    // 받은 출처(from=/home)를 이어서 리그 상세로 돌아간다.
+    expect([...container.querySelectorAll('a')].some((a) => a.getAttribute('href') === '/league-matches/league-1?from=%2Fhome')).toBe(true);
   });
 
   it('준비 중(draft) 리그도 종료 전과 같은 안내로 처리한다', async () => {
@@ -156,5 +160,68 @@ describe('LeagueAwardsPageClient', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
     screen.getByRole('button', { name: '다시 시도하기' }).click();
     await waitFor(() => expect(refetch).toHaveBeenCalled());
+  });
+
+  it('받은 from 이 리그 상세가 아니면(홈 등) 하단 "리그 상세로" 링크는 리그 상세로 가면서 그 출처를 잇는다', async () => {
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'completed',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1'], fixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: { leagueId: 'league-1', tieBreakOrder: ['points'], standings: [], pendingFixtures: [], champions: [], promotionDecided: false },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    renderAwards();
+
+    expect(await screen.findByRole('link', { name: /리그 상세로/ })).toHaveAttribute('href', '/league-matches/league-1?from=%2Fhome');
+  });
+
+  it('받은 from 이 리그 상세를 가리키면(자기 위 체인 포함) CTA·하단 링크 모두 그 값으로 돌아간다', async () => {
+    useSearchParamsMock.mockReturnValue(new URLSearchParams('from=%2Fleague-matches%2Fleague-1%3Ffrom%3D%252Ftournaments') as never);
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'completed',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1'], fixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: { leagueId: 'league-1', tieBreakOrder: ['points'], standings: [], pendingFixtures: [], champions: [], promotionDecided: false },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    renderAwards();
+
+    const parentWithChain = '/league-matches/league-1?from=%2Ftournaments';
+    expect(await screen.findByRole('link', { name: /리그 상세로/ })).toHaveAttribute('href', parentWithChain);
+    useSearchParamsMock.mockReturnValue(new URLSearchParams('from=%2Fhome') as never);
+  });
+
+  it('종료 전 리그도 받은 from 이 리그 상세를 가리키면 "리그 순위표 보러가기" CTA 가 그 값으로 돌아간다', async () => {
+    useSearchParamsMock.mockReturnValue(new URLSearchParams('from=%2Fleague-matches%2Fleague-1%3Ffrom%3D%252Ftournaments') as never);
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그', state: 'active',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1'], fixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({ data: undefined } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: undefined } as never);
+
+    renderAwards();
+
+    expect(await screen.findByRole('link', { name: '리그 순위표 보러가기' })).toHaveAttribute(
+      'href',
+      '/league-matches/league-1?from=%2Ftournaments',
+    );
+    useSearchParamsMock.mockReturnValue(new URLSearchParams('from=%2Fhome') as never);
   });
 });

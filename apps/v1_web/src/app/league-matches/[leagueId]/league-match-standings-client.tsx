@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Trophy } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useShellOverride } from '@/components/v1-ui/shell-override';
 import {
   useV1AuthMe,
   useV1LeagueClaimableFixtures,
@@ -554,10 +553,7 @@ function LeagueRegistrationCta({
 }
 
 export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: string }) {
-  // 팀 상세의 "내 리그"에서 들어왔으면 뒤로가기를 그 팀으로 되돌린다 — public-profile-client.tsx
-  // 와 동일 패턴(route-chrome 테이블의 backHref는 '/tournaments?kind=league'로 고정돼 있다).
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
-  useShellOverride(fromPath ? { backHref: fromPath } : {});
   // 팀 이름 링크의 뒤로가기 출처 — 이 화면 자기 자신(상위에서 받은 from까지 포함해서 이어 붙인다).
   const selfHref = withFromPath(`/league-matches/${leagueId}`, fromPath);
   const seriesQuery = useV1LeagueMatch(leagueId);
@@ -728,7 +724,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
               const siblingStateMeta = LEAGUE_STATE_META[sibling.state];
               return (
                 <li key={sibling.leagueId}>
-                  <Link href={`/league-matches/${sibling.leagueId}`} className="tm-chip">
+                  <Link href={withFromPath(`/league-matches/${sibling.leagueId}`, selfHref)} className="tm-chip">
                     {sibling.seasonNo}시즌 · {sibling.tierLabel}
                     {/* 상태를 컬러 뱃지 + 텍스트로 함께 표기 — 컬러만으로 진행 여부를 전달하지 않는다. */}
                     <span className={`tm-badge tm-badge-sm ${siblingStateMeta.badgeClass}`}>{siblingStateMeta.label}</span>

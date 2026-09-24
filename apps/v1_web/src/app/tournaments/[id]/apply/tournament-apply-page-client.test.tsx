@@ -723,4 +723,58 @@ describe('TournamentApplyPageClient GA events', () => {
       expect(probe.getByTestId('probe-backhref')).toHaveTextContent('/tournaments/tournament-1/my');
     });
   });
+
+  describe('"대회 상세로 돌아가기" CTA는 받은 from 을 잇는다', () => {
+    it('대회 정보를 못 불러왔을 때의 CTA가 받은 from 을 싣는다', async () => {
+      searchParams = new URLSearchParams({ from: '/home' });
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: new Error('network'),
+        refetch: vi.fn(),
+      });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      const cta = await screen.findByRole('link', { name: '대회 상세로 돌아가기' });
+      expect(cta).toHaveAttribute(
+        'href',
+        `/tournaments/tournament-1?from=${encodeURIComponent('/home')}`,
+      );
+    });
+
+    it('본인인증 게이트의 CTA도 받은 from 을 싣는다', async () => {
+      searchParams = new URLSearchParams({ from: '/home' });
+      tournamentApplyApiMocks.useV1AuthMe.mockReturnValue({
+        data: { verification: { phoneVerified: false } },
+      });
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      const cta = await screen.findByRole('link', { name: '대회 상세로 돌아가기' });
+      expect(cta).toHaveAttribute(
+        'href',
+        `/tournaments/tournament-1?from=${encodeURIComponent('/home')}`,
+      );
+    });
+
+    it('대조군: from 없이 신청을 받지 않는 대회에 들어오면 CTA는 상세 경로만 쓴다', async () => {
+      tournamentApplyApiMocks.useV1Tournament.mockReturnValue({
+        data: makeTournament({ status: 'in_progress' }),
+        isLoading: false,
+        isError: false,
+        error: null,
+      });
+      tournamentApplyApiMocks.useV1CreateRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+      tournamentApplyApiMocks.useV1SubmitRegistration.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+
+      render(<TournamentApplyPageClient tournamentId="tournament-1" />);
+
+      const cta = await screen.findByRole('link', { name: '대회 상세로 돌아가기' });
+      expect(cta).toHaveAttribute('href', '/tournaments/tournament-1');
+    });
+  });
 });

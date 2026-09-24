@@ -2306,7 +2306,7 @@ function toMyHomeModel(
   const myActivitySection = sections.find((section) => section.title === '내 활동');
   // 뒤로가기가 마이페이지로 돌아오도록 출처를 함께 넘긴다(teams-client.tsx의 팀 상세
   // profileHref와 동일 패턴 — user-records-page-client.tsx가 `?from=`을 읽는다).
-  const activityRecordsHref = `/users/${profile.userId}/records?from=${encodeURIComponent('/my')}`;
+  const activityRecordsHref = withFromPath(`/users/${profile.userId}/records`, '/my');
   if (myActivitySection && !myActivitySection.items.some((item) => item.href === activityRecordsHref)) {
     myActivitySection.items.push({
       label: '내 활동 기록',

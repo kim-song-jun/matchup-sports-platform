@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ResultsPageContent } from './results-page-client';
 import type {
   V1LeagueOverallStandingsResponse,
@@ -11,6 +11,22 @@ import type {
 
 const { v1GetMock } = vi.hoisted(() => ({ v1GetMock: vi.fn() }));
 vi.mock('@/lib/api-client', () => ({ v1Get: v1GetMock }));
+
+// 대회 상세·경기 상세로 돌아가는 링크의 출처(from)를 검증하는 테스트만 override 한다.
+const { getMockSearchParams, setMockSearchParams } = vi.hoisted(() => {
+  let params = new URLSearchParams();
+  return {
+    getMockSearchParams: () => params,
+    setMockSearchParams: (next: URLSearchParams) => {
+      params = next;
+    },
+  };
+});
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  usePathname: () => '/tournaments/tour-1/results',
+  useSearchParams: () => getMockSearchParams(),
+}));
 
 /**
  * 우승팀을 못 뽑는 완료 대회(리그전, 또는 결승 무승부)에서 등록된 경기 영상에
@@ -375,5 +391,56 @@ describe('ResultsPageContent — 정규 리그 거울 행(kind=regular_league)�
     // 그대로 쓴다 — 184행 테스트와 같은 경로.
     expect(v1GetMock).not.toHaveBeenCalled();
     expect(screen.getAllByText('A조 1위팀').length).toBeGreaterThan(0);
+  });
+});
+
+describe('ResultsPageContent — 대회 상세·경기 상세로 돌아가는 링크는 from 을 잇는다', () => {
+  afterEach(() => {
+    setMockSearchParams(new URLSearchParams());
+  });
+
+  function singleChampionTournament(overrides: Partial<V1TournamentDetail> = {}): V1TournamentDetail {
+    return baseTournament({
+      groups: [
+        leagueGroup({
+          id: 'group-1',
+          name: '통합조',
+          standings: [standing({ registrationId: 'r-1', teamName: '성수 FC', position: 1 })],
+        }),
+      ],
+      ...overrides,
+    });
+  }
+
+  it('대회 상세 보기 링크는 받은 from 을 상세 URL 에 그대로 싣는다', () => {
+    const detailWithFrom = `/tournaments/tour-1?from=${encodeURIComponent('/home')}`;
+    setMockSearchParams(new URLSearchParams({ from: detailWithFrom }));
+
+    render(<ResultsPageContent tournament={singleChampionTournament()} />);
+
+    const expectedHref = `/tournaments/tour-1?from=${encodeURIComponent('/home')}`;
+    for (const link of screen.getAllByRole('link', { name: '대회 상세 보기' })) {
+      expect(link).toHaveAttribute('href', expectedHref);
+    }
+  });
+
+  it('대조군: from 이 없으면 상세 경로만 쓴다', () => {
+    render(<ResultsPageContent tournament={singleChampionTournament()} />);
+
+    for (const link of screen.getAllByRole('link', { name: '대회 상세 보기' })) {
+      expect(link).toHaveAttribute('href', '/tournaments/tour-1');
+    }
+  });
+
+  it('결선 경기 스코어 링크는 from 이 없던 자리에 이 화면 자신을 from 으로 싣는다', () => {
+    const tournament = baseTournament({
+      format: 'knockout',
+      fixtures: [{ ...leagueFixtureWithVideo(), id: 'fx-final', round: 'final', videos: [] }],
+    });
+
+    render(<ResultsPageContent tournament={tournament} />);
+
+    const expectedHref = `/tournaments/tour-1/matches/fx-final?from=${encodeURIComponent('/tournaments/tour-1/results')}`;
+    expect(screen.getByRole('link', { name: /성수 FC 3 대 1 한강 유나이티드/ })).toHaveAttribute('href', expectedHref);
   });
 });

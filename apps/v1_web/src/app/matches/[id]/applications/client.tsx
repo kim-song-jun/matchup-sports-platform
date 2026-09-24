@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
   useV1ApproveMatchApplication,
@@ -17,12 +17,17 @@ import { ChevronLeftIcon } from '@/components/v1-ui/icons';
 import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { extractErrorMessage } from '@/lib/error-message';
 import { cssUrl } from '@/lib/assets';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import type { V1MatchApplication } from '@/types/api';
 
 type Attendance = Record<string, 'completed' | 'no_show'>;
 
+/** `path` 의 pathname 부분만 — `?`·`#` 앞까지. */
 export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
   const router = useRouter();
+  const matchDetailPath = `/matches/${matchId}`;
+  // 상세로 돌아가는 버튼은 받은 출처를 잇는다(상세가 넘긴 출처면 그대로 접힌다).
+  const matchDetailHref = withFromPath(matchDetailPath, sanitizeRedirectPath(useSearchParams().get('from')));
   const matchQuery = useV1Match(matchId);
   const eligibility = useV1MatchApplicationEligibility(matchId, { enabled: Boolean(matchQuery.data) });
   const viewerState = matchQuery.data?.viewer?.state ?? matchQuery.data?.viewerState ?? 'none';
@@ -237,7 +242,7 @@ export function MatchApplicationsPageClient({ matchId }: { matchId: string }) {
               title={tab === 'approved' ? '확정된 참가자가 없어요' : tab === 'all' ? '신청 이력이 없어요' : '대기 중인 신청자가 없어요'}
               sub={tab === 'approved' ? '신청을 승인하면 확정 명단에 표시돼요.' : tab === 'all' ? '신청·승인·취소 이력을 여기서 확인할 수 있어요.' : '새 신청이 들어오면 여기서 승인하거나 거절할 수 있어요.'}
               cta="매치 상세 보기"
-              ctaHref={`/matches/${matchId}`}
+              ctaHref={matchDetailHref}
             />
           </div>
         ) : (

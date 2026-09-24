@@ -13,8 +13,9 @@ import {
   useV1RecordConsent,
   useV1MyRegistrations,
 } from '@/hooks/use-v1-api';
-import { clearStoredV1Session, saveStoredV1Session } from '@/lib/session-storage';
+import { clearStoredV1Session, saveStoredV1Session, withFromPath } from '@/lib/session-storage';
 import { queryImageBySrc } from '@/test/next-image';
+import { useSearchParams } from 'next/navigation';
 import LeagueMatchStandingsClient from './league-match-standings-client';
 
 vi.mock('@/components/auth/pending-social-signup-gate', () => ({
@@ -25,11 +26,13 @@ vi.mock('@/components/auth/pending-social-signup-gate', () => ({
 // useSearchParams를 쓴다 — 이 테스트는 실제 Next 라우터 컨텍스트 밖이라 직접 목한다.
 // 기본값은 빈 파라미터라 기존 테스트 동작(뒤로가기 배선을 보지 않는 테스트들)은 그대로다.
 vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: vi.fn(() => new URLSearchParams()),
   // app-shell-frame.tsx의 usePathname()은 라우터 컨텍스트 밖(null)을 이미 방어하므로
   // 이 화면과 무관한 셸 렌더를 위해 최소한으로만 채운다.
   usePathname: () => null,
 }));
+
+const useSearchParamsMock = vi.mocked(useSearchParams);
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1ActivePopup: vi.fn(),
@@ -876,19 +879,53 @@ describe('LeagueMatchStandingsClient', () => {
     } as never);
     useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
 
-    const { container } = render(
+    render(
       <Providers>
         <LeagueMatchStandingsClient leagueId="league-1" />
       </Providers>,
     );
 
     await waitFor(() => expect(screen.getByRole('navigation', { name: '같은 시리즈의 다른 리그' })).toBeInTheDocument());
-    const siblingLink = container.querySelector('a[href="/league-matches/league-2"]');
-    expect(siblingLink?.textContent).toContain('2시즌');
-    expect(siblingLink?.textContent).toContain('2부');
-    expect(container.querySelector('a[href="/league-matches/league-3"]')).toBeInTheDocument();
+    // 받은 from 이 없어도 형제 리그 링크는 "지금 이 리그"를 출처로 담아야 여기로 돌아온다.
+    const selfHref = '/league-matches/league-1';
+    const siblingLink = screen.getByRole('link', { name: /2시즌/ });
+    expect(siblingLink.textContent).toContain('2부');
+    expect(siblingLink).toHaveAttribute('href', withFromPath('/league-matches/league-2', selfHref));
+    expect(screen.getByRole('link', { name: /1시즌/ })).toHaveAttribute('href', withFromPath('/league-matches/league-3', selfHref));
     // 지금 보고 있는 리그 자기 자신으로 가는 링크는 없다.
-    expect(container.querySelector('a[href="/league-matches/league-1"]')).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('link').map((link) => link.getAttribute('href'))).not.toContain('/league-matches/league-1');
+  });
+
+  it('이슈 1: 받은 from 을 형제 리그 링크에도 이어 붙인다', async () => {
+    useSearchParamsMock.mockReturnValue(new URLSearchParams('from=%2Fteams%2Ft9') as never);
+    useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
+    useV1LeagueMatchMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', title: '가을 리그 1부', state: 'active',
+        startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z',
+        teamIds: ['t1'], fixtures: [], seriesId: 'series-1', tier: 1, tierLabel: '1부', seasonNo: 2,
+        seriesSiblings: [{ leagueId: 'league-2', tier: 2, tierLabel: '2부', seasonNo: 2, state: 'active' }],
+      },
+    } as never);
+    useV1LeagueMatchStandingsMock.mockReturnValue({
+      data: {
+        leagueId: 'league-1', tieBreakOrder: ['points'],
+        standings: [{ teamId: 't1', teamName: '성수 FC', teamLogoUrl: null, position: 1, played: 1, wins: 1, draws: 0, losses: 0, goalsFor: 2, goalsAgainst: 0, points: 3 }],
+        pendingFixtures: [],
+      },
+    } as never);
+    useV1LeagueMatchPlayerRecordsMock.mockReturnValue({ data: { leagueId: 'league-1', goals: [], assists: [] } } as never);
+
+    render(
+      <Providers>
+        <LeagueMatchStandingsClient leagueId="league-1" />
+      </Providers>,
+    );
+
+    await waitFor(() => expect(screen.getByRole('navigation', { name: '같은 시리즈의 다른 리그' })).toBeInTheDocument());
+    const selfHref = withFromPath('/league-matches/league-1', '/teams/t9');
+    expect(screen.getByRole('link', { name: /2시즌/ })).toHaveAttribute('href', withFromPath('/league-matches/league-2', selfHref));
+    useSearchParamsMock.mockReturnValue(new URLSearchParams() as never);
   });
 
   it('이슈 1: 단발 리그(seriesSiblings 빈 배열)는 탐색 링크를 그리지 않는다', async () => {

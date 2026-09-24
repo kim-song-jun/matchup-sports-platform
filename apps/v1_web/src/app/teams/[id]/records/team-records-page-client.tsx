@@ -36,7 +36,6 @@ export function TeamRecordsPageClient({ teamId }: { teamId: string }) {
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   useShellOverride({
     ...(firstPage?.teamName ? { title: `${firstPage.teamName} 전적` } : {}),
-    ...(fromPath ? { backHref: fromPath } : {}),
   });
 
   if (isLoading) {

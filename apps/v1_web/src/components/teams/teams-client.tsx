@@ -215,7 +215,8 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
   // override store는 한 칸이고 부모 effect가 자식(TeamStatePageView)보다 늦게 돈다 —
   // 에러 뷰의 제목까지 여기서 함께 게시하지 않으면 부모 값이 그 제목을 덮어쓴다.
   const stateTitle = query.isError ? getTeamStateViewModel('error').title : undefined;
-  useShellOverride({ ...(stateTitle ? { title: stateTitle } : {}), ...(fromPath ? { backHref: fromPath } : {}) });
+  // 뒤로가기는 AppBackLink 가 `?from=` 을 직접 읽으므로 여기서 backHref 로 따로 넘기지 않는다.
+  useShellOverride(stateTitle ? { title: stateTitle } : {});
   const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) && authVerified });
   const join = useV1CreateTeamJoinApplication(teamId);
   const withdraw = useV1WithdrawTeamJoinApplication(teamId, eligibility.data?.applicationId);
@@ -253,7 +254,7 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
     leagueId: item.leagueId,
     title: item.title,
     // profileHref와 같은 이유로 출처를 넘긴다 — 뒤로가기가 리그 목록이 아니라 이 팀으로.
-    href: `/league-matches/${item.leagueId}?from=${encodeURIComponent(selfHref)}`,
+    href: withFromPath(`/league-matches/${item.leagueId}`, selfHref),
   }));
   const fallback = getTeamDetailViewModel();
 
@@ -303,9 +304,8 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
         name: member.displayName,
         role: roleLabel(member.role),
         // 834행 TeamMembersPageClient의 프로필 링크 패턴과 동일 — 새 규칙을 만들지 않는다.
-        // 뒤로가기가 팀 목록이 아니라 이 팀 상세로 돌아오도록 출처를 함께 넘긴다
-        // (public-profile-client.tsx가 `?from=`을 읽어 ShellOverride.backHref로 되돌린다).
-        profileHref: `/users/${member.userId}?from=${encodeURIComponent(selfHref)}`,
+        // 뒤로가기가 팀 목록이 아니라 이 팀 상세로 돌아오도록 출처를 함께 넘긴다.
+        profileHref: withFromPath(`/users/${member.userId}`, selfHref),
       })),
       memberAccess: {
         canView: canViewMembers,
@@ -320,10 +320,9 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
       },
     },
     mode: detailMode,
-    // 데스크톱 뒤로가기 헤더 링크용 — ShellOverride.backHref(모바일 셸)와 같은
-    // `fromPath`를 쓴다. 이 둘은 서로 다른 두 UI 요소라 하나만 고치면 나머지가 계속
-    // '/teams'로 고정된 채 남는다(MD-QA #15 후속: alpha 실측에서 데스크톱 뷰만 재현됨).
-    backHref: fromPath ?? '/teams',
+    // 데스크톱 뒤로가기 헤더(AppBackLink)의 fallback — `?from=` 이 있을 때는 AppBackLink가
+    // 직접 읽어 쓰므로 여기엔 출처 없을 때의 고정 목적지만 둔다.
+    backHref: '/teams',
     selfHref,
     subPageFrom: fromPath ? selfHref : null,
     ctaLabel: seeding
@@ -429,7 +428,8 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   // 상태 뷰(TeamStatePageView)의 제목도 여기서 함께 게시한다 — 부모 override가 자식 것을 덮는다.
   const pageState = team.isError || members.isError ? 'error' : team.data && !team.data.canViewMembers ? 'restricted' : null;
   const stateTitle = pageState ? getTeamStateViewModel(pageState).title : undefined;
-  useShellOverride({ ...(stateTitle ? { title: stateTitle } : {}), ...(fromPath ? { backHref: fromPath } : {}) });
+  // 뒤로가기는 AppBackLink 가 `?from=` 을 직접 읽으므로 여기서 backHref 로 따로 넘기지 않는다.
+  useShellOverride(stateTitle ? { title: stateTitle } : {});
   const viewerRole = team.data?.viewer.role;
   const viewerMembershipId = team.data?.viewer.membershipId ?? null;
   /** 등번호를 고칠 대상. null이면 다이얼로그가 닫혀 있다. */
@@ -646,7 +646,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
     <>
       {/* 확인 모달 — window.confirm 대체 */}
       {ConfirmModal}
-      <TeamMembersPageView model={model} backHref={fromPath ?? `/teams/${teamId}`} />
+      <TeamMembersPageView model={model} backHref={`/teams/${teamId}`} />
       <JerseyNumberDialog
         open={jerseyTarget !== null}
         memberName={jerseyTarget?.name ?? ''}
@@ -1048,8 +1048,8 @@ function toMemberModel(
         ? `가입 ${formatDate(member.joinedAt)}`
         : `${member.jerseyNumber}번 · 가입 ${formatDate(member.joinedAt)}`,
     // 뒤로가기가 팀원 목록으로 돌아오도록 출처를 함께 넘긴다(팀 상세 "주요 멤버"
-    // 미리보기와 동일 패턴 — public-profile-client.tsx가 `?from=`을 읽는다).
-    profileHref: `/users/${member.userId}?from=${encodeURIComponent(membersHref)}`,
+    // 미리보기와 동일 패턴).
+    profileHref: withFromPath(`/users/${member.userId}`, membersHref),
     locked: member.role === 'owner',
     actions: itemActions,
     actionPending: actions.actionPending,
@@ -1098,7 +1098,7 @@ function toRequestModel(
     meta: application.message ?? `신청 ${formatDate(application.createdAt)}`,
     status: teamJoinApplicationStatusLabel(application.status),
     // 뒤로가기가 가입 신청 목록으로 돌아오도록 출처를 함께 넘긴다(toMemberModel과 동일 패턴).
-    profileHref: `/users/${application.applicant.userId}?from=${encodeURIComponent(membersHref)}`,
+    profileHref: withFromPath(`/users/${application.applicant.userId}`, membersHref),
     actions: [
       { label: '승인', onSelect: actions.approve },
       { label: '거절', tone: 'danger', onSelect: actions.reject },

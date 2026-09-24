@@ -11,6 +11,7 @@ import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { trackEvent } from '@/lib/analytics';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { AUTH_NOTICE_STAGE } from '@/components/auth/auth-page';
+import { withFromPath } from '@/lib/session-storage';
 
 type SearchState = 'results' | 'new' | 'empty' | 'error' | 'stale';
 
@@ -288,7 +289,7 @@ function toMatchResult(item: V1Match, from: string) {
     title: item.title,
     meta: [item.sport?.name ?? item.sportName, item.place?.name ?? item.placeName, formatDateTime(item.startsAt), item.capacityText].filter(Boolean).join(' · '),
     // 뒤로가기가 검색 결과로 돌아오도록 출처를 함께 넘긴다(각 상세 화면이 `?from=`을 읽는다).
-    href: `/matches/${item.matchId ?? item.id}?from=${encodeURIComponent(from)}`,
+    href: withFromPath(`/matches/${item.matchId ?? item.id}`, from),
   };
 }
 
@@ -297,7 +298,7 @@ function toTeamMatchResult(item: V1TeamMatch, from: string) {
     type: '팀매치',
     title: item.title,
     meta: [item.sport?.name ?? item.sportName, item.hostTeam?.name ?? item.hostTeamName, item.place?.name ?? item.placeName, formatDateTime(item.startsAt)].filter(Boolean).join(' · '),
-    href: `/team-matches/${item.teamMatchId ?? item.id}?from=${encodeURIComponent(from)}`,
+    href: withFromPath(`/team-matches/${item.teamMatchId ?? item.id}`, from),
   };
 }
 
@@ -309,7 +310,7 @@ function toLeagueResult(item: V1PublicLeagueListItem, from: string) {
     meta: [item.sport.name, item.region.name, item.tierLabel, dateLabel ?? '일정 미정', `${item.teamCount}팀 참가`]
       .filter(Boolean)
       .join(' · '),
-    href: `/league-matches/${item.leagueId}?from=${encodeURIComponent(from)}`,
+    href: withFromPath(`/league-matches/${item.leagueId}`, from),
   };
 }
 
@@ -318,7 +319,7 @@ function toTeamResult(item: V1Team, from: string) {
     type: '팀',
     title: item.name,
     meta: [item.sport?.name ?? item.sportName, item.region?.name ?? item.regionName, `${item.memberCount}명`, item.joinPolicy === 'approval_required' ? '신입 환영' : '모집 마감'].filter(Boolean).join(' · '),
-    href: `/teams/${item.teamId ?? item.id}?from=${encodeURIComponent(from)}`,
+    href: withFromPath(`/teams/${item.teamId ?? item.id}`, from),
   };
 }
 

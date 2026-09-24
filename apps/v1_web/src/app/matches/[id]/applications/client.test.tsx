@@ -37,6 +37,29 @@ describe('개인 매치 신청 관리', () => {
     expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/matches/m1');
   });
 
+  // EmptyState CTA도 상세가 받은 출처를 이어 실어야 상세 → 뒤로가 처음 출처로 이어진다.
+  it('받은 출처가 이 매치 상세를 가리키면 매치 상세 보기 CTA가 그 출처까지 그대로 쓴다', () => {
+    navigation.search = `from=${encodeURIComponent('/matches/m1?from=%2Fmy%2Fmatches%2Fcreated')}`;
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    expect(screen.getByRole('link', { name: '매치 상세 보기' })).toHaveAttribute('href', '/matches/m1?from=%2Fmy%2Fmatches%2Fcreated');
+    navigation.search = '';
+  });
+
+  it('받은 출처가 다른 화면이면 매치 상세로 가면서 그 출처를 잇는다', () => {
+    navigation.search = `from=${encodeURIComponent('/my/matches/created')}`;
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    expect(screen.getByRole('link', { name: '매치 상세 보기' })).toHaveAttribute('href', '/matches/m1?from=%2Fmy%2Fmatches%2Fcreated');
+    navigation.search = '';
+  });
+
+  it('출처가 없으면 매치 상세 보기 CTA도 매치 상세 기본 경로로 간다', () => {
+    mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
+    render(<MatchApplicationsPageClient matchId="m1" />);
+    expect(screen.getByRole('link', { name: '매치 상세 보기' })).toHaveAttribute('href', '/matches/m1');
+  });
+
   function confirmedApplication(overrides = {}) {
     mocks.query.mockReturnValue({ data: { title: '매치', viewer: { state: 'host' } } });
     mocks.applications.mockReturnValue({ data: { pages: [{ items: [{

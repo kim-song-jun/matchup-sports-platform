@@ -4,7 +4,7 @@ import { ErrorState } from '@/components/v1-ui/primitives';
 
 import { useEffect, useRef, useState } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useV1CreateTeam, useV1MasterRegions, useV1MasterSports, useV1TeamDetail, useV1UpdateTeam, useV1UploadImages } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
 import { V1ApiError } from '@/lib/api-client';
@@ -146,12 +146,8 @@ export function TeamCreatePageClient() {
 
 export function TeamEditPageClient({ teamId }: { teamId: string }) {
   const router = useRouter();
-  // #16: my 컨텍스트 경유 진입 여부 판별
-  // from=my 파라미터가 있으면 취소·저장 후 canonical /teams/[id]로 복귀
-  const searchParams = useSearchParams();
-  const fromMy = searchParams.get('from') === 'my';
-  const cancelHref = fromMy && teamId ? `/teams/${teamId}` : '/teams';
-  const successHref = fromMy && teamId ? `/teams/${teamId}` : undefined; // undefined이면 API 응답 detailRoute 사용
+  const cancelHref = '/teams';
+  const successHref = undefined; // API 응답 detailRoute 사용
   const query = useV1TeamDetail(teamId);
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();

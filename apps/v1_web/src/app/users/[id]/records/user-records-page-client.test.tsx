@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render as rtlRender, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UserRecordsPageClient } from './user-records-page-client';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import type { PublicUserRecordsResponse } from '@/components/public-game-records/types';
 
 function render(ui: ReactElement) {
@@ -107,24 +108,37 @@ describe('UserRecordsPageClient', () => {
   });
 
   // MD-QA #15: 마이페이지 등 프로필을 거치지 않고 바로 들어온 진입점에서도 뒤로가기가
-  // 그 화면으로 돌아와야 한다 — 이 페이지는 종전에 `?from=`을 전혀 읽지 않았다.
+  // 그 화면으로 돌아와야 한다. D1: 이 화면은 더 이상 useShellOverride로 backHref를
+  // 게시하지 않는다 — AppBackLink가 ?from=을 직접 읽으므로 그 컴포넌트로 실제 href를 본다.
   it('honors ?from= so back-navigation returns to the actual entry point', () => {
     mocks.usePublicUserRecords.mockReturnValue(loaded('멤버현'));
     navigation.searchParams = new URLSearchParams('from=%2Fmy');
 
-    render(<UserRecordsPageClient userId="user-1" />);
+    render(
+      <>
+        <AppBackLink fallbackHref="/users/user-1">뒤로가기</AppBackLink>
+        <UserRecordsPageClient userId="user-1" />
+      </>,
+    );
 
-    expect(lastOverrideBackHref()).toBe('/my');
+    expect(lastOverrideBackHref()).toBeUndefined();
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/my');
     // 경기 상세로 넘길 출처에도 받은 출처를 담아, 거기서 두 번 돌아와도 마이페이지에 닿는다.
     expect(screen.getByTestId('records-content')).toHaveAttribute('data-self-href', '/users/user-1/records?from=%2Fmy');
   });
 
-  it('ignores an unsafe ?from= value and leaves the default backHref untouched', () => {
+  it('ignores an unsafe ?from= value and falls back to the default back target', () => {
     mocks.usePublicUserRecords.mockReturnValue(loaded('멤버현'));
     navigation.searchParams = new URLSearchParams('from=https%3A%2F%2Fevil.example');
 
-    render(<UserRecordsPageClient userId="user-1" />);
+    render(
+      <>
+        <AppBackLink fallbackHref="/users/user-1">뒤로가기</AppBackLink>
+        <UserRecordsPageClient userId="user-1" />
+      </>,
+    );
 
     expect(lastOverrideBackHref()).toBeUndefined();
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/users/user-1');
   });
 });

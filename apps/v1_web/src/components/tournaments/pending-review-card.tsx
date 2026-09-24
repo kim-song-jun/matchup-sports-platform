@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { withFromPath } from '@/lib/session-storage';
 import { Star } from 'lucide-react';
 import { Card } from '@/components/v1-ui/primitives';
@@ -51,8 +51,12 @@ export function usePendingReviewsSummary() {
 
 export function PendingReviewsCard() {
   const { total, eventRemaining, tournamentItems } = usePendingReviewsSummary();
-  // 홈·마이·시상 어디에 놓여도 도착 화면의 뒤로가기가 이 화면으로 돌아오게 한다.
-  const from = usePathname();
+  // 홈·마이·시상 어디에 놓여도 도착 화면의 뒤로가기가 이 화면(받은 출처 포함)으로 돌아오게 한다.
+  const pathname = usePathname();
+  const search = useSearchParams().toString();
+  const here = search ? `${pathname}?${search}` : pathname;
+  // 지금 보고 있는 화면으로 가는 링크엔 자기 자신을 출처로 싣지 않는다.
+  const linkFrom = (target: string) => (target === pathname ? target : withFromPath(target, here));
   if (total === 0) return null;
 
   const firstTournament = tournamentItems[0];
@@ -93,7 +97,7 @@ export function PendingReviewsCard() {
       <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
         {eventRemaining > 0 ? (
           <Link
-            href={withFromPath('/my/reviews', from)}
+            href={linkFrom('/my/reviews')}
             className="tm-btn tm-btn-sm tm-btn-primary tm-btn-block"
             style={{ minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
           >
@@ -102,7 +106,7 @@ export function PendingReviewsCard() {
         ) : null}
         {firstTournament ? (
           <Link
-            href={withFromPath(`/tournaments/${firstTournament.tournamentId}/awards`, from)}
+            href={linkFrom(`/tournaments/${firstTournament.tournamentId}/awards`)}
             // 배너 배경이 blue500 8% 라 tm-btn-neutral(grey100)은 배경에 묻혀 버튼으로 안 읽힌다.
             // 두 번째 CTA 는 위계를 낮추되 형태는 남아야 하므로 흰 배경 + 테두리로 분리한다.
             className={`tm-btn tm-btn-sm tm-btn-block ${eventRemaining > 0 ? 'tm-btn-outline' : 'tm-btn-primary'}`}

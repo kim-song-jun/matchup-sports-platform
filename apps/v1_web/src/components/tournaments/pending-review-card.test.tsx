@@ -17,7 +17,7 @@ vi.mock('@/lib/session-storage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/session-storage')>()),
   hasStoredV1Session: hasStoredV1SessionMock,
 }));
-vi.mock('next/navigation', () => ({ usePathname: () => '/home' }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/home', useSearchParams: () => new URLSearchParams() }));
 
 function setup({
   tournaments = [] as Array<{ tournamentId: string; tournamentTitle: string }>,

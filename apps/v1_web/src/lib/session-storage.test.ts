@@ -193,6 +193,28 @@ describe('withFromPath', () => {
   });
 });
 
+describe('withFromPath 체인 상한', () => {
+  // 팀 → 리그 → 팀으로 돌아오면 새로 감싸지 않고 처음 팀 방문 URL(원래 출처 포함)을 쓴다.
+  it('이미 지나온 화면으로 가면 그때의 URL 로 접는다', () => {
+    const team = withFromPath('/teams/t1', '/my/teams');
+    const league = withFromPath('/league-matches/l1', team);
+    expect(withFromPath('/teams/t1', league)).toBe(team);
+  });
+
+  it('서로 다른 화면을 계속 거쳐도 체인 깊이가 상한을 넘지 않는다', () => {
+    let href = '/home';
+    for (let index = 0; index < 20; index += 1) href = withFromPath(`/teams/t${index}`, href);
+    let depth = 0;
+    let cursor: string | null = href;
+    while (cursor) {
+      depth += 1;
+      cursor = new URL(cursor, 'https://x.invalid').searchParams.get('from');
+    }
+    expect(depth).toBeLessThanOrEqual(6);
+    expect(href.length).toBeLessThan(600);
+  });
+});
+
 describe('readBackFrom', () => {
   it('알림 표식은 알림 화면 경로로, 경로는 그대로, 외부·표식이 아닌 값은 버린다', () => {
     expect(readBackFrom('notifications')).toBe('/notifications');

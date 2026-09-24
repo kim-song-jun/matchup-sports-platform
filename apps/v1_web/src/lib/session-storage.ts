@@ -96,10 +96,6 @@ export function sanitizeRedirectPath(value: string | null | undefined) {
 }
 
 /**
- * `path` 에 `?from=` 을 붙인다. `from` 이 없으면 `path` 그대로.
- * 받은 `from` 까지 담은 자기 URL 을 다음 화면의 출처로 넘기면 여러 단계를 거쳐도 처음 출처가 남는다.
- */
-/**
  * `?from=` 값을 뒤로가기 목적지로 푼다. 알림 딥링크는 경로가 아니라 `notifications` 표식을 싣는다
  * (notification-route.ts) — 표식을 경로로 바꾼 뒤 나머지는 sanitizeRedirectPath 규칙을 그대로 따른다.
  */
@@ -108,12 +104,45 @@ export function readBackFrom(value: string | null | undefined) {
   return sanitizeRedirectPath(value);
 }
 
-export function withFromPath(path: string, from: string | null | undefined) {
+const FROM_CHAIN_MAX_DEPTH = 4;
+
+function appendFrom(path: string, from: string | null) {
   if (!from) return path;
   const hashAt = path.indexOf('#');
   const base = hashAt === -1 ? path : path.slice(0, hashAt);
   const hash = hashAt === -1 ? '' : path.slice(hashAt);
   return `${base}${base.includes('?') ? '&' : '?'}from=${encodeURIComponent(from)}${hash}`;
+}
+
+function splitFrom(url: string) {
+  const parsed = new URL(url, REDIRECT_BASE);
+  const from = parsed.searchParams.get('from');
+  parsed.searchParams.delete('from');
+  return { base: `${parsed.pathname}${parsed.search}`, from };
+}
+
+/**
+ * `path` 에 `?from=` 을 붙인다. `from` 이 없으면 `path` 그대로.
+ * 받은 `from` 까지 담은 자기 URL 을 다음 화면의 출처로 넘기면 여러 단계를 거쳐도 처음 출처가 남는다.
+ * 이미 지나온 화면으로 가면(팀 → 리그 → 팀) 새로 감싸지 않고 그때의 URL 을 돌려주고,
+ * 체인은 FROM_CHAIN_MAX_DEPTH 단계까지만 남긴다 — 안 그러면 오갈 때마다 URL 이 끝없이 길어진다.
+ */
+export function withFromPath(path: string, from: string | null | undefined) {
+  if (!from) return path;
+  const target = splitFrom(path).base;
+  const bases: string[] = [];
+  let cursor: string | null = from;
+  while (cursor) {
+    const level = splitFrom(cursor);
+    if (level.base === target) return cursor;
+    if (bases.length === FROM_CHAIN_MAX_DEPTH) break;
+    bases.push(level.base);
+    cursor = level.from;
+  }
+  if (!cursor) return appendFrom(path, from);
+  let trimmed: string | null = null;
+  for (let index = bases.length - 1; index >= 0; index -= 1) trimmed = appendFrom(bases[index], trimmed);
+  return appendFrom(path, trimmed);
 }
 
 export function getCurrentRedirectPath() {

@@ -527,6 +527,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
   // route-chrome 테이블의 backHref(fragments/tournaments-core.ts)는 검색 파라미터를 못 받아
   // '/tournaments'로 고정돼 있었다 — public-profile-client.tsx와 같은 `?from=` 패턴으로 메운다.
   const fromPath = readBackFrom(useSearchParams().get('from'));
+  const chainFrom = fromPath ? withFromPath(`/tournaments/${tournamentId}`, fromPath) : null;
   const [hasSessionHint, setHasSessionHint] = useState(false);
   const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
   const { data: myRegistrations = [] } = useV1MyRegistrations(tournamentId, {
@@ -559,7 +560,12 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
       ? {
           title: data.title,
           desktopHead: false,
-          floatingSlot: <ApplyCTA tournament={data} myRegistration={myRegistration} />,
+          // 셸이 이 슬롯을 페이지 트리 밖에 그리므로 체인 출처를 따로 감싼다.
+          floatingSlot: (
+            <DetailChainFromContext.Provider value={chainFrom}>
+              <ApplyCTA tournament={data} myRegistration={myRegistration} />
+            </DetailChainFromContext.Provider>
+          ),
           ...(fromPath ? { backHref: fromPath } : {}),
         }
       : {},
@@ -582,7 +588,7 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
   }
 
   return (
-    <DetailChainFromContext.Provider value={fromPath ? withFromPath(`/tournaments/${tournamentId}`, fromPath) : null}>
+    <DetailChainFromContext.Provider value={chainFrom}>
       <TournamentDetailView
         tournament={data}
         myRegistration={myRegistration}

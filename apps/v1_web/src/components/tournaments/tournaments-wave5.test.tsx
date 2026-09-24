@@ -15,6 +15,12 @@ import { TournamentReviewsPageClient } from '@/app/tournaments/[id]/reviews/revi
 import { TournamentRosterPageClient } from '@/app/tournaments/[id]/registrations/[registrationId]/roster/tournament-roster-client';
 import type { V1TournamentDetail } from '@/types/api';
 
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  usePathname: () => '/tournaments/t1/bracket',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 vi.mock('@/components/v1-ui/shell', () => ({
   AppChrome: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));

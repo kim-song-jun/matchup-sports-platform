@@ -116,6 +116,52 @@ describe('ScrollRestoration — 탭으로 돌아오면 보던 자리로', () => 
 
 // 헤더 뒤로가기(‹)와 하드웨어 뒤로가 같은 "뒤로"로 분류돼야 보던 자리로 돌아간다.
 // 전에는 이 클릭이 'push' 로 잡혀 목록이 매번 맨 위에서 시작했다.
+describe('ScrollRestoration — 예전 방문의 위치가 남지 않는다', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+    document.body.innerHTML = '';
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} }));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+  });
+
+  // alpha 실측: 목록을 새로 열어 맨 위에서 상세로 갔다 헤더 뒤로가기로 오면 예전 방문의 1500 으로 튀었다.
+  it('새로 들어와 맨 위에서 떠난 목록은 뒤로 돌아와도 맨 위다', () => {
+    const area = mountScrollArea(5000);
+    saveScrollPosition('/teams', 1500);
+    nav.pathname = '/home';
+    const view = render(<ScrollRestoration />);
+    const rerender = () => view.rerender(<ScrollRestoration />);
+
+    clickThen(anchor('tm-card-link', '/teams'), '/teams', rerender);
+    expect(area.scrollTop).toBe(0);
+    clickThen(anchor('tm-card-link', '/teams/t1'), '/teams/t1', rerender);
+    const back = anchor('tm-btn', '/teams');
+    back.dataset.navBack = 'true';
+    clickThen(back, '/teams', rerender);
+
+    expect(area.scrollTop).toBe(0);
+  });
+
+  it('처음 연 화면도 지금 위치를 기록해 예전 값을 덮는다', () => {
+    const area = mountScrollArea(5000);
+    saveScrollPosition('/teams', 1500);
+    nav.pathname = '/teams';
+    const view = render(<ScrollRestoration />);
+    const rerender = () => view.rerender(<ScrollRestoration />);
+
+    clickThen(anchor('tm-card-link', '/teams/t1'), '/teams/t1', rerender);
+    const back = anchor('tm-btn', '/teams');
+    back.dataset.navBack = 'true';
+    clickThen(back, '/teams', rerender);
+
+    expect(area.scrollTop).toBe(0);
+  });
+});
+
 describe('ScrollRestoration — 뒤로가기는 보던 자리로', () => {
   beforeEach(() => {
     nav.pathname = '/tournaments';

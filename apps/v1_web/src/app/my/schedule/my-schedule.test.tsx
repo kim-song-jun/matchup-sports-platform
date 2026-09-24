@@ -86,7 +86,7 @@ describe('MySchedulePage — 빈 상태 / 데이터 렌더링', () => {
     render(MySchedulePage());
 
     const link = screen.getByRole('link', { name: /정기 훈련/ });
-    expect(link).toHaveAttribute('href', '/teams/team-1/schedules/sched-1');
+    expect(link).toHaveAttribute('href', '/teams/team-1/schedules/sched-1?from=%2Fmy%2Fschedule');
     expect(link).toHaveTextContent('성수 풋살 크루');
     expect(link).toHaveTextContent('훈련');
     expect(link).toHaveTextContent('참석');

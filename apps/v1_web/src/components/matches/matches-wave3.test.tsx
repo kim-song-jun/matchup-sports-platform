@@ -13,7 +13,7 @@ import { resolveRouteChrome } from '@/lib/route-chrome';
 import type { V1Match } from '@/types/api';
 
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => <a href={href} {...rest}>{children}</a> }));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }), usePathname: () => '/matches' }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }), usePathname: () => '/matches', useSearchParams: () => new URLSearchParams() }));
 vi.mock('@/components/v1-ui/shell-override', () => ({ useShellOverride: () => undefined }));
 
 const base = getMatchListViewModel();

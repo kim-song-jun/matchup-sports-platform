@@ -13,7 +13,11 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1Reviews: useV1ReviewsMock,
 }));
 
-vi.mock('@/lib/session-storage', () => ({ hasStoredV1Session: hasStoredV1SessionMock }));
+vi.mock('@/lib/session-storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/session-storage')>()),
+  hasStoredV1Session: hasStoredV1SessionMock,
+}));
+vi.mock('next/navigation', () => ({ usePathname: () => '/home' }));
 
 function setup({
   tournaments = [] as Array<{ tournamentId: string; tournamentTitle: string }>,
@@ -56,7 +60,7 @@ describe('PendingReviewsCard — 남은 후기 통합 배너', () => {
     render(<PendingReviewsCard />);
 
     expect(screen.getByText('6')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '경기 후기 6건 쓰기' })).toHaveAttribute('href', '/my/reviews');
+    expect(screen.getByRole('link', { name: '경기 후기 6건 쓰기' })).toHaveAttribute('href', '/my/reviews?from=%2Fhome');
   });
 
   it('두 소스의 작성 화면이 달라 CTA도 따로 나간다', () => {
@@ -67,10 +71,10 @@ describe('PendingReviewsCard — 남은 후기 통합 배너', () => {
 
     render(<PendingReviewsCard />);
 
-    expect(screen.getByRole('link', { name: '경기 후기 1건 쓰기' })).toHaveAttribute('href', '/my/reviews');
+    expect(screen.getByRole('link', { name: '경기 후기 1건 쓰기' })).toHaveAttribute('href', '/my/reviews?from=%2Fhome');
     expect(screen.getByRole('link', { name: '대회 후기 쓰기' })).toHaveAttribute(
       'href',
-      '/tournaments/tour-9/awards',
+      '/tournaments/tour-9/awards?from=%2Fhome',
     );
   });
 

@@ -166,8 +166,8 @@ describe('LeagueFixtureDetailClient', () => {
     mockViewer('none');
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
-    expect(screen.getByRole('link', { name: /성수 FC 팀 상세로 이동/ })).toHaveAttribute('href', '/teams/t1');
-    expect(screen.getByRole('link', { name: /왕십리 유나이티드 팀 상세로 이동/ })).toHaveAttribute('href', '/teams/t2');
+    expect(screen.getByRole('link', { name: /성수 FC 팀 상세로 이동/ })).toHaveAttribute('href', '/teams/t1?from=%2Fleague-matches%2Flg-1%2Ffixtures%2Ffx-1');
+    expect(screen.getByRole('link', { name: /왕십리 유나이티드 팀 상세로 이동/ })).toHaveAttribute('href', '/teams/t2?from=%2Fleague-matches%2Flg-1%2Ffixtures%2Ffx-1');
     expect(screen.getByText('1위 · 1승 1무 0패')).toBeInTheDocument();
     expect(screen.getByText('예정')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '가을 리그' })).toHaveAttribute('href', '/league-matches/lg-1');

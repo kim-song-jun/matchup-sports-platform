@@ -19,7 +19,7 @@ import {
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
-import { hasStoredV1Session, readBackFrom } from '@/lib/session-storage';
+import { hasStoredV1Session, readBackFrom, withFromPath } from '@/lib/session-storage';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTieBreakRule } from '@/lib/league-tie-break-labels';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
@@ -127,16 +127,19 @@ function TeamNameLink({
   teamId,
   className,
   children,
+  from,
 }: {
   teamId: string | null;
   className?: string;
   children: React.ReactNode;
+  /** 뒤로가기 출처 — 이 리그 화면의 self href(상위에서 받은 from까지 포함). */
+  from?: string | null;
 }) {
   if (teamId === null) {
     return <span className={className}>{children}</span>;
   }
   return (
-    <Link href={`/teams/${teamId}`} className={`tm-pressable ${className ?? ''}`.trim()}>
+    <Link href={withFromPath(`/teams/${teamId}`, from)} className={`tm-pressable ${className ?? ''}`.trim()}>
       {children}
     </Link>
   );
@@ -147,7 +150,13 @@ function TeamNameLink({
  * 팀 목록을 보여준다. 순위(position)는 전부 동점자 사전순 폴백이라 정렬 근거가 없으므로
  * 팀 이름 가나다순으로 다시 정렬한다.
  */
-function ParticipantTeamList({ teams }: { teams: Array<{ teamId: string; teamName: string; teamLogoUrl: string | null }> }) {
+function ParticipantTeamList({
+  teams,
+  from,
+}: {
+  teams: Array<{ teamId: string; teamName: string; teamLogoUrl: string | null }>;
+  from?: string | null;
+}) {
   const sorted = [...teams].sort((a, b) => a.teamName.localeCompare(b.teamName, 'ko'));
   return (
     <ul className="divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)]">
@@ -156,6 +165,7 @@ function ParticipantTeamList({ teams }: { teams: Array<{ teamId: string; teamNam
           <TeamNameLink
             teamId={team.teamId}
             className="tm-list-row-interactive flex min-h-[44px] items-center gap-2 px-3 py-2"
+            from={from}
           >
             <TeamAvatar seed={team.teamId} name={team.teamName} logoUrl={team.teamLogoUrl} size="sm" />
             <span className="text-[var(--text-strong)]">{team.teamName}</span>
@@ -545,6 +555,8 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
   // 와 동일 패턴(route-chrome 테이블의 backHref는 '/tournaments?kind=league'로 고정돼 있다).
   const fromPath = readBackFrom(useSearchParams().get('from'));
   useShellOverride(fromPath ? { backHref: fromPath } : {});
+  // 팀 이름 링크의 뒤로가기 출처 — 이 화면 자기 자신(상위에서 받은 from까지 포함해서 이어 붙인다).
+  const selfHref = withFromPath(`/league-matches/${leagueId}`, fromPath);
   const seriesQuery = useV1LeagueMatch(leagueId);
   const standingsQuery = useV1LeagueMatchStandings(leagueId);
   const recordsQuery = useV1LeagueMatchPlayerRecords(leagueId);
@@ -772,7 +784,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
             ctaHref="#league-schedule"
           />
         ) : preparingNoGames ? (
-          <ParticipantTeamList teams={standings.standings} />
+          <ParticipantTeamList teams={standings.standings} from={selfHref} />
         ) : (
           <>
           <div className="overflow-x-auto">
@@ -812,7 +824,7 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
                   <tr key={row.teamId} className="border-t border-[var(--border)]">
                     <td className="py-2 text-[var(--text-strong)]">{row.position}</td>
                     <th scope="row" className="text-left font-normal text-[var(--text-strong)]">
-                      <TeamNameLink teamId={row.teamId} className="flex items-center gap-2">
+                      <TeamNameLink teamId={row.teamId} className="flex items-center gap-2" from={selfHref}>
                         <TeamAvatar seed={row.teamId} name={row.teamName} logoUrl={row.teamLogoUrl} size="sm" />
                         <span className="flex flex-col">
                           <span>{row.teamName}</span>

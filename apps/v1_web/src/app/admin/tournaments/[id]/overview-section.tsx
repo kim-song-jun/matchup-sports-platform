@@ -103,7 +103,7 @@ export function TournamentOverviewSection() {
       <ChecklistCard checks={checks} basePath={basePath} />
 
       <Link
-        href={`/tournaments/${tournamentId}`}
+        href={`/tournaments/${tournamentId}?from=${encodeURIComponent(`/admin/tournaments/${tournamentId}`)}`}
         className="inline-flex items-center gap-2 self-start min-h-[44px] px-3 rounded-xl text-[length:var(--font-size-label)] font-medium text-[var(--blue700)] bg-[var(--blue50)] hover:bg-[var(--tint-blue)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
       >
         참가자에게 보이는 화면 열기

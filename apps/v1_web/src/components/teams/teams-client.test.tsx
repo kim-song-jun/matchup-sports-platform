@@ -231,7 +231,7 @@ describe('TeamMembersPageClient GA events', () => {
     render(<><ShellProbe /><TeamMembersPageClient teamId="team-1" /></>);
 
     expect(published).toEqual({ backHref: detailHref });
-    expect(screen.getByRole('link', { name: '팀으로 돌아가기' })).toHaveAttribute('href', detailHref);
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', detailHref);
     const membersHref = `/teams/team-1/members?from=${encodeURIComponent(detailHref)}`;
     screen.getAllByRole('link', { name: /김도윤/ }).forEach((link) =>
       expect(link).toHaveAttribute('href', `/users/user-owner?from=${encodeURIComponent(membersHref)}`),
@@ -265,7 +265,7 @@ describe('TeamMembersPageClient GA events', () => {
     render(<><ShellProbe /><TeamMembersPageClient teamId="team-1" /></>);
 
     expect(published).toEqual({});
-    expect(screen.getByRole('link', { name: '팀으로 돌아가기' })).toHaveAttribute('href', '/teams/team-1');
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/teams/team-1');
     screen.getAllByRole('link', { name: /김도윤/ }).forEach((link) =>
       expect(link).toHaveAttribute('href', '/users/user-owner?from=%2Fteams%2Fteam-1%2Fmembers'),
     );
@@ -446,6 +446,39 @@ describe('TeamDetailPageClient — 주요 멤버 미리보기', () => {
     // 이 팀(team-1)의 대기 건수만 배지로 — 다른 팀 건은 섞지 않는다.
     expect(screen.getAllByLabelText('답장을 기다리는 컨택 2건').length).toBeGreaterThan(0);
     expect(screen.queryByLabelText('답장을 기다리는 컨택 3건')).not.toBeInTheDocument();
+  });
+
+  it('"팀매치 만들기" 는 이 팀 상세로 돌아오도록 항상 from= 을 담는다 (받은 출처가 없어도)', () => {
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } }, isPending: false, isFetching: false, isError: false });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({ viewer: { role: 'owner', membershipId: 'mem-owner', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null } }),
+      isError: false,
+    });
+    teamApiMocks.useV1TeamContactSummary.mockReturnValue({ data: { pendingInbound: 0, byTeam: [] } });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    const links = screen.getAllByRole('link', { name: /팀매치 만들기/ });
+    expect(links.length).toBeGreaterThan(0);
+    // 자연스러운 뒤로가기는 (외부에서 받은 출처가 아니라) 이 팀 상세 자신이다.
+    links.forEach((link) => expect(link).toHaveAttribute('href', '/team-matches/new/team?from=%2Fteams%2Fteam-1'));
+    // 회귀 방지: from 이 빠지면 팀매치 생성 완료 후 팀 상세로 못 돌아온다.
+    links.forEach((link) => expect(link.getAttribute('href')).not.toBe('/team-matches/new/team'));
+  });
+
+  it('"팀매치 만들기" 는 팀 상세 자체가 받은 출처(selfHref 의 from)도 함께 실어 나른다', () => {
+    navigationMocks.searchParams = new URLSearchParams('from=%2Fmy%2Fteams');
+    teamApiMocks.useV1AuthMe.mockReturnValue({ data: { user: { id: 'owner-user', email: null, onboardingStatus: 'complete' }, profile: { displayName: '운영자' } }, isPending: false, isFetching: false, isError: false });
+    teamApiMocks.useV1TeamDetail.mockReturnValue({
+      data: baseTeamDetail({ viewer: { role: 'owner', membershipId: 'mem-owner', joinState: 'member', canRequestJoin: false, disabledReason: null, manageRoute: null } }),
+      isError: false,
+    });
+    teamApiMocks.useV1TeamContactSummary.mockReturnValue({ data: { pendingInbound: 0, byTeam: [] } });
+
+    render(<TeamDetailPageClient teamId="team-1" />);
+
+    const [link] = screen.getAllByRole('link', { name: /팀매치 만들기/ });
+    expect(link).toHaveAttribute('href', '/team-matches/new/team?from=%2Fteams%2Fteam-1%3Ffrom%3D%252Fmy%252Fteams');
   });
 
   it('cached verified owner keeps management, member CTA, and protected queries during auth background fetching', () => {

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { Card, EmptyState, ErrorState, KPIStat, ListItem, SectionTitle } from '@/components/v1-ui/primitives';
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
@@ -175,9 +176,9 @@ export function TeamStatePageView({ model }: { model: TeamStateViewModel }) {
     <>
       {/* Desktop back header for search/empty/error states */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href="/teams" aria-label="팀 목록으로">
+        <AppBackLink className="tm-desktop-back" fallbackHref="/teams">
           <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
-        </Link>
+        </AppBackLink>
         <h1 className="tm-text-heading">{model.title}</h1>
       </div>
       {model.state === 'restricted' ? null : <TeamSearchBar model={model} />}
@@ -604,9 +605,9 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
       <h1 className="sr-only">{team.name}</h1>
       {/* Desktop back header */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href={model.backHref ?? '/teams'} aria-label="뒤로가기">
+        <AppBackLink className="tm-desktop-back" fallbackHref={model.backHref ?? '/teams'}>
           <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
-        </Link>
+        </AppBackLink>
         <div className="tm-text-heading" style={{ margin: '0.67em 0' }} aria-hidden="true">{team.name}</div>
       </div>
 
@@ -655,7 +656,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
           />
           {isMyTeam || teamReviewCount > 0 ? (
             <TeamRecordLinkCard
-              href={isMyTeam ? '/my/reviews?tab=received' : undefined}
+              href={isMyTeam ? withFromPath('/my/reviews?tab=received', model.selfHref ?? `/teams/${model.team.id}`) : undefined}
               title="받은 후기"
               description={
                 teamReviewCount === 0
@@ -813,7 +814,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
               받은 후기가 있을 때만 보여준다 — 빈 카드는 방문자에게 알려줄 게 없다. */}
           {isMyTeam || teamReviewCount > 0 ? (
             <TeamRecordLinkCard
-              href={isMyTeam ? '/my/reviews?tab=received' : undefined}
+              href={isMyTeam ? withFromPath('/my/reviews?tab=received', model.selfHref ?? `/teams/${model.team.id}`) : undefined}
               title="받은 후기"
               description={
                 teamReviewCount === 0
@@ -928,9 +929,9 @@ export function TeamFormPageView({
     <>
       {/* Desktop back header */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href={cancelHref} aria-label={edit ? '팀으로 돌아가기' : '팀 목록으로'}>
+        <AppBackLink className="tm-desktop-back" fallbackHref={cancelHref}>
           <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
-        </Link>
+        </AppBackLink>
         <h1 className="tm-text-heading">{edit ? '팀 수정' : '팀 만들기'}</h1>
       </div>
       <div className="tm-team-form-grid tm-content-enter">
@@ -1445,9 +1446,9 @@ export function TeamMembersPageView({ model, backHref = '/teams' }: { model: Tea
     <>
       {/* Desktop back header */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href={backHref} aria-label="팀으로 돌아가기">
+        <AppBackLink className="tm-desktop-back" fallbackHref={backHref}>
           <ChevronLeftIcon size={22} strokeWidth={2.2} aria-hidden="true" />
-        </Link>
+        </AppBackLink>
         <h1 className="tm-text-heading">{model.teamName} · {canManageMembers ? '멤버 관리' : '멤버 목록'}</h1>
       </div>
       <div className="tm-team-list tm-team-members-list tm-content-enter">

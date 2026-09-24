@@ -102,7 +102,8 @@ describe('LeagueMatchStandingsClient', () => {
     render(<LeagueMatchStandingsClient leagueId="league-1" />);
 
     const link = await screen.findByRole('link', { name: /성수 FC/ });
-    expect(link).toHaveAttribute('href', '/teams/t1');
+    // 팀 상세에서 뒤로가기를 누르면 이 리그 화면으로 돌아오도록 ?from=이 함께 실린다.
+    expect(link).toHaveAttribute('href', `/teams/t1?from=${encodeURIComponent('/league-matches/league-1')}`);
   });
 
   // 한 경기도 안 치른 리그는 순위표 대신 참가팀 목록을 보여준다 — 거기서도 팀으로 갈 수
@@ -126,7 +127,10 @@ describe('LeagueMatchStandingsClient', () => {
 
     render(<LeagueMatchStandingsClient leagueId="league-1" />);
 
-    expect(await screen.findByRole('link', { name: /망원 FC/ })).toHaveAttribute('href', '/teams/t2');
+    expect(await screen.findByRole('link', { name: /망원 FC/ })).toHaveAttribute(
+      'href',
+      `/teams/t2?from=${encodeURIComponent('/league-matches/league-1')}`,
+    );
   });
 
   it('순위표에서 저장된 팀 로고를 표시한다', async () => {

@@ -100,7 +100,7 @@ describe('TournamentOverviewSection', () => {
 
     expect(screen.getByRole('link', { name: /참가자에게 보이는 화면 열기/ })).toHaveAttribute(
       'href',
-      '/tournaments/tournament-1',
+      '/tournaments/tournament-1?from=%2Fadmin%2Ftournaments%2Ftournament-1',
     );
   });
 });

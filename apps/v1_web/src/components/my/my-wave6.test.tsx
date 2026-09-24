@@ -12,6 +12,10 @@ import { MyInvitationsPageView, MyMatchesPageView } from './my-page';
 import { myHomeModel } from './my.view-model';
 import { resolveRouteChrome } from '@/lib/route-chrome';
 
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  useSearchParams: () => new URLSearchParams(),
+}));
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => <a href={href} {...rest}>{children}</a>,
 }));

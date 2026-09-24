@@ -264,7 +264,11 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
     renderBracketStandingsTab(tournament);
 
     const link = screen.getByRole('link', { name: /성수 FC/ });
-    expect(link).toHaveAttribute('href', '/teams/team-42/records');
+    // 뒤로가기가 이 대진표 화면으로 돌아오도록 ?from=이 함께 실린다.
+    expect(link).toHaveAttribute(
+      'href',
+      `/teams/team-42/records?from=${encodeURIComponent('/tournaments/tour-1/bracket')}`,
+    );
   });
 
   it('조별리그 포맷: 조별 순위표의 팀명을 누르면 /teams/:teamId/records 로 이동한다', () => {

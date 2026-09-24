@@ -46,6 +46,7 @@ const {
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('@/components/v1-ui/confirm-modal', () => ({

@@ -103,6 +103,8 @@ export type TeamMatchStateViewModel = TeamMatchListViewModel & {
   description: string;
   /** matches.types.ts 의 MatchStateViewModel 과 동일 — ErrorState 재시도 버튼이 호출한다. */
   retry?: () => void;
+  /** 뒤로가기 목적지(`?from=`). 없으면 '/team-matches'로 고정. */
+  backHref?: string;
 };
 
 export type TeamMatchDetailViewModel = {

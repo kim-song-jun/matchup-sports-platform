@@ -6,9 +6,9 @@ import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@t
 import { describe, expect, it, vi } from 'vitest';
 import { TEAM_LOGO_PRESETS } from '@/lib/team-logo-presets';
 import { TeamMembersPageClient } from './teams-client';
-import { TeamDetailPageView, TeamFormPageView, TeamListPageView, TeamMembersPageView } from './teams-page';
+import { TeamDetailPageView, TeamFormPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
 import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel } from './teams.view-model';
-import type { TeamDetailViewModel, TeamFormViewModel, TeamListViewModel, TeamMembersViewModel } from './teams.types';
+import type { TeamDetailViewModel, TeamFormViewModel, TeamListViewModel, TeamMembersViewModel, TeamStateViewModel } from './teams.types';
 
 const teamApiMocks = vi.hoisted(() => ({
   useV1TeamDetail: vi.fn(),
@@ -32,13 +32,17 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => ({
   ...teamApiMocks,
 }));
 
+const navMocks = vi.hoisted(() => ({
+  searchParams: vi.fn(() => new URLSearchParams()),
+}));
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/teams/team-1/edit',
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
   }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => navMocks.searchParams(),
 }));
 
 function render(ui: ReactElement) {
@@ -636,7 +640,9 @@ describe('TeamDetailPageView — 팀 기록 섹션', () => {
     const reviewLinks = screen.getAllByRole('link', { name: /받은 후기/ });
     expect(reviewLinks).toHaveLength(2);
     const reviewLink = reviewLinks[0];
-    expect(reviewLink).toHaveAttribute('href', '/my/reviews?tab=received');
+    // 뒤로가기 출처(from=팀 상세 selfHref)를 담아야 후기 화면에서 이 팀으로 돌아온다.
+    // modelWithMode('mine')는 mode만 바꾸고 team 데이터는 'default'(team-1) 그대로다.
+    expect(reviewLink).toHaveAttribute('href', '/my/reviews?tab=received&from=%2Fteams%2Fteam-1');
     // 종목별 가중 평균: (5×3 + 4×1) / 4 = 4.75 → 4.8.
     // 단위는 후기 건수가 아니라 **평가한 팀 수**다 — 팀 평점이 팀당 1표로 계산되므로
     // 가중치도 팀 수여야 하고, 배지도 같은 단위로 적어야 숫자가 거짓말을 하지 않는다.
@@ -671,6 +677,48 @@ describe('TeamDetailPageView — 팀 기록 섹션', () => {
     render(<TeamDetailPageView model={modelWithMode('mine')} />);
 
     expect(screen.getAllByRole('link', { name: /받은 후기/ })[0]).toHaveTextContent('아직 받은 후기가 없어요');
+  });
+
+  it('model.selfHref 가 있으면 그 값을 뒤로가기 출처로 우선 사용한다', () => {
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({
+      data: { bySport: [{ sportId: 's1', sportCode: 'futsal', ratingAvg: 4, ratingCount: 1, tagRates: [] }], availableMonths: [] },
+    });
+
+    render(<TeamDetailPageView model={{ ...modelWithMode('mine'), selfHref: '/teams/team-4?from=%2Fmy%2Fteams' }} />);
+
+    const reviewLink = screen.getAllByRole('link', { name: /받은 후기/ })[0];
+    expect(reviewLink).toHaveAttribute(
+      'href',
+      '/my/reviews?tab=received&from=%2Fteams%2Fteam-4%3Ffrom%3D%252Fmy%252Fteams',
+    );
+    // 회귀 방지: from 이 조용히 빠지면 후기 화면에서 이 팀으로 못 돌아온다.
+    expect(reviewLink.getAttribute('href')).not.toBe('/my/reviews?tab=received');
+  });
+});
+
+describe('TeamStatePageView — 데스크톱 뒤로가기', () => {
+  function stateModel(overrides: Partial<TeamStateViewModel> = {}): TeamStateViewModel {
+    return {
+      ...getTeamListViewModel(),
+      state: 'empty',
+      title: '검색 결과가 없어요',
+      description: '다른 검색어로 다시 시도해 보세요.',
+      ...overrides,
+    };
+  }
+
+  it('?from= 이 없으면 /teams 로 떨어진다', () => {
+    render(<TeamStatePageView model={stateModel()} />);
+
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/teams');
+  });
+
+  it('?from= 이 있으면 그 출처를 따라간다(알림 진입은 /notifications)', () => {
+    navMocks.searchParams.mockReturnValueOnce(new URLSearchParams('from=notifications'));
+
+    render(<TeamStatePageView model={stateModel()} />);
+
+    expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/notifications');
   });
 });
 

@@ -13,6 +13,7 @@ import type {
   ScheduleFormViewModel,
   ScheduleListViewModel,
 } from './team-schedules.types';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 
 // ── 목록 (calendar/list 토글 + type/state 필터) ───────────────────────────────
 
@@ -30,9 +31,9 @@ export function ScheduleListPageView({ model }: { model: ScheduleListViewModel }
   return (
     <>
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href={`/teams/${model.teamId}`} aria-label="팀으로 돌아가기">
+        <AppBackLink className="tm-desktop-back" fallbackHref={`/teams/${model.teamId}`}>
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
-        </Link>
+        </AppBackLink>
         <h1 className="tm-text-heading">{model.teamName} · 일정</h1>
         {model.canManage ? (
           <Link className="tm-btn tm-btn-sm tm-btn-primary" href={model.createHref} style={{ marginLeft: 'auto' }}>
@@ -235,9 +236,9 @@ export function ScheduleDetailPageView({ model }: { model: ScheduleDetailViewMod
   return (
     <>
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href={model.backHref} aria-label="일정 목록으로 돌아가기">
+        <AppBackLink className="tm-desktop-back" fallbackHref={model.backHref}>
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
-        </Link>
+        </AppBackLink>
         <h1 className="tm-text-heading">{model.title}</h1>
       </div>
 
@@ -907,9 +908,9 @@ export function MySchedulePageView({ model }: { model: MyScheduleViewModel }) {
   return (
     <div className="tm-my-shell">
         <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+          <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
+          </AppBackLink>
           <h1 className="tm-text-heading">내 일정</h1>
         </div>
 

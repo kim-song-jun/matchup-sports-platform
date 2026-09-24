@@ -4,7 +4,8 @@ import { localDateInput } from '@/lib/team-match-dates';
 
 import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { readBackFrom, withFromPath } from '@/lib/session-storage';
 import {
   useV1CancelTeamMatch,
   useV1CreateTeamMatch,
@@ -51,6 +52,8 @@ type TeamMatchSelection = { teamId: string; sportId: string; regionId: string };
 
 export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCreateStep, 'edit'> }) {
   const router = useRouter();
+  // 마법사에 들어온 출처(예: 팀 상세)를 단계 사이에 실어 나른다 — 첫 단계 취소가 그 출처로 돌아간다.
+  const from = readBackFrom(useSearchParams().get('from'));
   const { confirm, ConfirmModal } = useConfirm();
   const teams = useV1MyTeams();
   const sports = useV1MasterSports();
@@ -155,12 +158,12 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     const targetIndex = FULL_STEP_ORDER.indexOf(target);
     const currentIndex = FULL_STEP_ORDER.indexOf(step);
     if (targetIndex <= currentIndex) {
-      router.push(teamMatchStepHref(target));
+      router.push(withFromPath(teamMatchStepHref(target), from));
       return;
     }
     const stepsBeforeTarget = CREATE_STEP_ORDER.slice(0, targetIndex);
     const blockedStep = firstIncompleteTeamMatchStep(validationCtx, stepsBeforeTarget);
-    router.push(teamMatchStepHref(blockedStep ?? target));
+    router.push(withFromPath(teamMatchStepHref(blockedStep ?? target), from));
   };
 
   const model = buildCreateModel({
@@ -220,7 +223,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
     },
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
     onRegionChange: (value) => updateSelection((current) => ({ ...current, regionId: value })),
-    onBack: () => router.push(previousHref(step)),
+    onBack: () => router.push(step === 'team' ? from ?? previousHref(step) : withFromPath(previousHref(step), from)),
     onGoToStep: handleGoToStep,
     onNext: () => {
       // 팀 스텝의 데이터 준비·권한 게이트는 TeamMatchCreatePageView의 disabled CTA와
@@ -232,7 +235,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
         setPendingFocusField(firstInvalidField);
         return;
       }
-      router.push(nextHref(step));
+      router.push(withFromPath(nextHref(step), from));
     },
     onSubmit: () => {
       // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
@@ -283,6 +286,9 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
 
 export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }) {
   const router = useRouter();
+  // 상세가 넘긴 출처(자기 ?from= 포함)가 있으면 취소·저장 뒤 그 상세로 돌아가 체인을 잇는다.
+  const fromDetail = readBackFrom(useSearchParams().get('from'));
+  const detailHref = fromDetail ?? `/team-matches/${teamMatchId}`;
   const { confirm, ConfirmModal } = useConfirm();
   const editQuery = useV1TeamMatchEdit(teamMatchId);
   const teams = useV1MyTeams();
@@ -368,7 +374,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
     onSelectSport: () => undefined,
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
     onRegionChange: setRegionId,
-    onBack: () => router.push(`/team-matches/${teamMatchId}`),
+    onBack: () => router.push(detailHref),
     onNext: () => undefined,
     onSubmit: () => {
       // 로딩 중 재클릭 시 중복 제출 방지 — isPending 은 disabled 속성과 동일하게 리렌더
@@ -391,7 +397,7 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       updateTeamMatch.mutate(
         { ...payloadResult.payload, version },
         {
-          onSuccess: (result) => router.push(result.detailRoute || `/team-matches/${teamMatchId}`),
+          onSuccess: (result) => router.push(fromDetail ?? (result.detailRoute || `/team-matches/${teamMatchId}`)),
           onError: (err) => setError(extractErrorMessage(err, '팀매치를 수정할 수 없어요. 다시 시도해 주세요.')),
         },
       );
@@ -412,13 +418,13 @@ export function TeamMatchEditPageClient({ teamMatchId }: { teamMatchId: string }
       cancelTeamMatch.mutate(
         { reason: 'host_cancelled_from_v1_web' },
         {
-          onSuccess: () => router.push(`/team-matches/${teamMatchId}`),
+          onSuccess: () => router.push(detailHref),
           onError: (err) => setError(extractErrorMessage(err, '팀매치를 취소할 수 없어요. 다시 시도해 주세요.')),
         },
       );
     },
     submitLabel: '변경사항 저장',
-    backHref: `/team-matches/${teamMatchId}`,
+    backHref: detailHref,
   });
 
   return (

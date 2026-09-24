@@ -2,9 +2,11 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useChatSafety } from '@/hooks/use-chat-safety';
 import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import { extractErrorMessage } from '@/lib/error-message';
+import { withFromPath } from '@/lib/session-storage';
 import { INQUIRY_REPORT_REASON_OPTIONS } from '@/lib/v1-status-labels';
 import type { V1InquiryReportReason } from '@/types/api';
 
@@ -12,6 +14,8 @@ export type ChatSafetyTarget = { id: string; label: string };
 export function ChatSafetyDialog({ roomId, target, onClose }: {
   roomId: string; target: ChatSafetyTarget | null; onClose: () => void;
 }) {
+  // 신고 처리 내역에서 뒤로가면 이 채팅방으로 돌아온다.
+  const pathname = usePathname();
   const { blocked, block, unblock, report } = useChatSafety(roomId, !target);
   const [reason, setReason] = useState<V1InquiryReportReason>('harassment');
   const [detail, setDetail] = useState('');
@@ -30,7 +34,7 @@ export function ChatSafetyDialog({ roomId, target, onClose }: {
         </div>
         {target ? <div className="grid gap-3 mt-4">
           <p className="tm-text-body">{target.label}님의 메시지</p>
-          {report.data ? <div role="status" className="tm-text-body">신고가 접수됐어요. <Link className="underline" href={`/my/inquiries/${report.data.inquiryId}`}>처리 내역 보기</Link></div> : <>
+          {report.data ? <div role="status" className="tm-text-body">신고가 접수됐어요. <Link className="underline" href={withFromPath(`/my/inquiries/${report.data.inquiryId}`, pathname)}>처리 내역 보기</Link></div> : <>
             <label className="tm-text-label" htmlFor="chat-report-reason">신고 사유</label>
             <select id="chat-report-reason" className="tm-input" value={reason} onChange={(e) => setReason(e.target.value as V1InquiryReportReason)} disabled={pending}>
               {INQUIRY_REPORT_REASON_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}

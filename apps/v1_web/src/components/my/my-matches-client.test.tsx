@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MyMatchesPageClient } from './my-matches-client';
 const mock = vi.hoisted(() => ({ query: vi.fn(), fetchNextPage: vi.fn() }));
 vi.mock('@/hooks/use-v1-api', () => ({ useV1MyMatchesInfinite: mock.query }));
-vi.mock('next/navigation', () => ({ usePathname: () => '/my/matches/joined', useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/my/matches/joined', useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
 describe('내 개인 매치 이력', () => {
   it('더 보기로 다음 페이지를 요청하고 추가 기록을 상세 링크로 보여준다', () => {
     const item = { id: 'm1', title: '첫 매치', startsAt: '2026-09-18T01:00:00Z', status: 'completed', viewerState: 'participant' };

@@ -22,6 +22,7 @@ vi.mock('next/link', () => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
   usePathname: () => '/matches/m1',
+  useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock('@/components/v1-ui/shell-override', () => ({ useShellOverride: () => undefined }));
 

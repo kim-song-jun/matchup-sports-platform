@@ -56,6 +56,8 @@ vi.mock('./matches-page', () => ({
       <div data-testid="description">{model.match.description}</div>
       <div data-testid="title">{model.match.title}</div>
       <div data-testid="back-href">{model.backHref}</div>
+      <div data-testid="edit-href">{model.match.editHref}</div>
+      <div data-testid="applications-href">{model.match.applicationsHref}</div>
       <div data-testid="status-label">{model.statusLabel}</div>
       <div data-testid="apply-label">{model.applyLabel}</div>
       <div data-testid="apply-pending">{String(model.applyPending)}</div>
@@ -173,6 +175,35 @@ describe('MatchDetailPageClient — 뒤로가기 출처(?from=)', () => {
     render(<MatchDetailPageClient matchId="match-1" />);
 
     expect(screen.getByTestId('back-href')).toHaveTextContent('/matches');
+  });
+
+  it('알림에서 들어오면 알림 화면으로 돌아간다', () => {
+    searchParamsRef.current = new URLSearchParams('from=notifications');
+
+    render(<MatchDetailPageClient matchId="match-1" />);
+
+    expect(screen.getByTestId('back-href')).toHaveTextContent('/notifications');
+  });
+
+  // 상세 → 수정·신청 관리 → 뒤로 → 상세 → 뒤로가 처음 출처까지 이어져야 한다.
+  it('호스트의 수정·신청 관리 링크에 받은 출처까지 담은 상세 URL 을 싣는다', () => {
+    searchParamsRef.current = new URLSearchParams('from=%2Fmy%2Fmatches%2Fcreated');
+    useV1MatchMock.mockReturnValue({ data: { ...baseMatch, viewer: { state: 'host' } }, isError: false });
+
+    render(<MatchDetailPageClient matchId="match-1" />);
+
+    const from = encodeURIComponent('/matches/match-1?from=%2Fmy%2Fmatches%2Fcreated');
+    expect(screen.getByTestId('edit-href')).toHaveTextContent(`/matches/match-1/edit?from=${from}`);
+    expect(screen.getByTestId('applications-href')).toHaveTextContent(`/matches/match-1/applications?from=${from}`);
+  });
+
+  it('출처 없이 들어오면 하위 링크는 기존 그대로다', () => {
+    useV1MatchMock.mockReturnValue({ data: { ...baseMatch, viewer: { state: 'host' } }, isError: false });
+
+    render(<MatchDetailPageClient matchId="match-1" />);
+
+    expect(screen.getByTestId('edit-href').textContent).toBe('/matches/match-1/edit');
+    expect(screen.getByTestId('applications-href').textContent).toBe('/matches/match-1/applications');
   });
 });
 

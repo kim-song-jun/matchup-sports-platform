@@ -289,4 +289,31 @@ describe('TournamentDetailPageClient — 뒤로가기 출처(?from=)', () => {
     await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
     expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/tournaments');
   });
+
+  // 상세 → 대진·결과 → 뒤로 → 상세 → 뒤로가 처음 출처(홈)까지 이어져야 한다.
+  it('받은 출처가 있으면 대진·결과 링크에 그 출처까지 담은 상세 URL 을 싣는다', async () => {
+    searchParamsRef.current = new URLSearchParams('from=%2Fhome');
+
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    const childLinks = screen
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href') ?? '')
+      .filter((href) => /^\/tournaments\/tournament-1\/(bracket|results|my)/.test(href));
+    expect(childLinks.length).toBeGreaterThan(0);
+    childLinks.forEach((href) => expect(href).toContain(`?from=${encodeURIComponent('/tournaments/tournament-1?from=%2Fhome')}`));
+  });
+
+  it('출처 없이 들어오면 대진·결과 링크는 기존 그대로다', async () => {
+    render(<TournamentDetailPageClient tournamentId="tournament-1" />);
+
+    await screen.findByRole('heading', { level: 1, name: '테스트 대회' });
+    const childLinks = screen
+      .getAllByRole('link')
+      .map((link) => link.getAttribute('href') ?? '')
+      .filter((href) => /^\/tournaments\/tournament-1\/(bracket|results|my)/.test(href));
+    expect(childLinks.length).toBeGreaterThan(0);
+    childLinks.forEach((href) => expect(href).not.toContain('from='));
+  });
 });

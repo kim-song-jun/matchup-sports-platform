@@ -59,6 +59,21 @@ describe('TournamentStandingsTable', () => {
     expect(screen.getByRole('link', { name: /성수 FC/ })).toHaveAttribute('href', '/teams/team-1/records');
   });
 
+  it('fromHref가 있으면 팀 전적 링크에 ?from=이 붙는다', () => {
+    render(
+      <TournamentStandingsTable
+        rows={[ROW]}
+        advance={null}
+        ariaLabel="테스트 순위표"
+        fromHref="/tournaments/tour-1/bracket"
+      />,
+    );
+    expect(screen.getByRole('link', { name: /성수 FC/ })).toHaveAttribute(
+      'href',
+      `/teams/team-1/records?from=${encodeURIComponent('/tournaments/tour-1/bracket')}`,
+    );
+  });
+
   it('advance가 null이 아니고 순위<=advance면 하이라이트 행을 렌더한다', () => {
     const { container } = render(
       <TournamentStandingsTable rows={[ROW]} advance={2} ariaLabel="테스트 순위표" />,

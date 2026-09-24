@@ -28,6 +28,7 @@ import type {
 } from './team-matches.types';
 import { buildTeamMatchSummaryLabel } from './team-matches.card-model';
 import { teamMatchStepHref } from './team-matches.routes';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 
 const TEAM_MATCH_IMAGE_FALLBACK = '/mock/generated/team-huddle.webp';
 
@@ -105,12 +106,12 @@ export function TeamMatchListPageView({ model }: { model: TeamMatchListViewModel
 
 // /team-matches와 /team-matches/:id 양쪽의 error 분기가 공유하는 컴포넌트 — usePathname()
 // 기반 useShellOverride가 현재 라우트를 알아서 타깃하므로 어느 쪽에서 렌더돼도 정확히
-// 그 라우트의 override만 남긴다. backHref="/team-matches"·topBar 기본값(true)은 원래
-// 성공 분기(topBar:false)와 달랐지만 ShellOverride가 지원하지 않는 필드라 테이블 값을
-// 그대로 따른다 — "목록으로 돌아가기" Link가 이미 있어 내비게이션은 안전하게 유지된다
-// (fragments/team-matches.ts 주석 참고).
+// 그 라우트의 override만 남긴다. topBar:false(fragments/team-matches.ts)라 셸 뒤로가기가
+// 없고, 이 "목록으로 돌아가기" Link가 유일한 내비다 — model.backHref(?from= 유래)가 있으면
+// 그 출처로, 없으면 '/team-matches'로 돌아간다.
 export function TeamMatchStatePageView({ model }: { model: TeamMatchStateViewModel }) {
   useShellOverride({ title: model.title, desktopHead: true });
+  const backHref = model.backHref ?? '/team-matches';
   return (
     <div className="tm-match-list">
       {/* 오류는 ErrorState + 재시도(DESIGN.md §13, matches-page.tsx MatchStatePageView 와 동일
@@ -119,7 +120,7 @@ export function TeamMatchStatePageView({ model }: { model: TeamMatchStateViewMod
       {model.state === 'error' ? (
         <>
           <ErrorState title={model.title} message={model.description} onRetry={model.retry} retryLabel="다시 불러오기" />
-          <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href="/team-matches" style={{ marginTop: 12 }}>목록으로 돌아가기</Link>
+          <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href={backHref} style={{ marginTop: 12 }}>{model.backHref ? '돌아가기' : '목록으로 돌아가기'}</Link>
         </>
       ) : (
         <EmptyState title={model.title} sub={model.description} />
@@ -367,9 +368,9 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
     <>
       {/* Desktop page header: back link + title (mobile topbar is hidden on desktop) */}
       <div className="tm-desktop-page-head tm-show-desktop">
-        <Link className="tm-desktop-back" href={model.detailBackHref ?? '/team-matches'} aria-label="뒤로가기">
+        <AppBackLink className="tm-desktop-back" fallbackHref={model.detailBackHref ?? '/team-matches'}>
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
-        </Link>
+        </AppBackLink>
         <h1 className="tm-text-heading">{match.title || '팀매치 상세'}</h1>
       </div>
 

@@ -8,6 +8,7 @@ import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { extractErrorMessage } from '@/lib/error-message';
 import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
+import { withFromPath } from '@/lib/session-storage';
 
 /**
  * R4 — 마이 화면 "내 리그".
@@ -67,7 +68,7 @@ export function MyLeaguesPageClient() {
               return (
                 <li key={item.leagueId} className="tm-card tm-my-league-card">
                   <Link
-                    href={`/league-matches/${item.leagueId}`}
+                    href={withFromPath(`/league-matches/${item.leagueId}`, '/my/leagues')}
                     className="tm-pressable tm-list-row-interactive tm-my-league-head"
                     aria-label={`${item.title} 상세로 이동`}
                   >
@@ -123,7 +124,7 @@ export function MyLeaguesPageClient() {
                           <Link
                             // 리그 대진 클릭의 착지는 리그 경기 상세다 — /team-matches/:id 로 보내도
                             // 서버가 같은 곳으로 리다이렉트하지만, 한 번의 왕복을 아끼려 직접 잇는다.
-                            href={`/league-matches/${item.leagueId}/fixtures/${team.nextFixture.teamMatchId}`}
+                            href={withFromPath(`/league-matches/${item.leagueId}/fixtures/${team.nextFixture.teamMatchId}`, '/my/leagues')}
                             className="tm-pressable tm-list-row-interactive tm-my-league-next"
                             aria-label={`${team.name} 다음 경기 상세로 이동`}
                           >

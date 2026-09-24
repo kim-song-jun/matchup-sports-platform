@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { trackEvent } from '@/lib/analytics';
 import { normalizeNotificationHref } from '@/lib/notification-route';
+import { withFromPath } from '@/lib/session-storage';
 import { ChatSafetyDialog, type ChatSafetyTarget } from './chat-safety-dialog';
 import { useV1ChatRoomSocket } from '@/hooks/use-v1-realtime-socket';
 import {
@@ -176,7 +177,8 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
       ? {
           title: room.data.linkedTarget.title,
           sub: `${chatRoomTypeLabel(room.data.roomType)} 채팅`,
-          href: room.data.linkedTarget.route ?? '/chat',
+          // 연결된 화면에서 뒤로가면 이 채팅방으로 돌아온다.
+          href: room.data.linkedTarget.route ? withFromPath(room.data.linkedTarget.route, `/chat/${roomId}`) : '/chat',
         }
       : isLoading
         ? fallback.context

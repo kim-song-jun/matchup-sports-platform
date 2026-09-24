@@ -397,7 +397,7 @@ export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: 
       detailMode === 'pending'
         ? { requestedAtLabel: formatJoinRequestedAt(eligibility.data?.requestedAt) }
         : undefined,
-    operations: authVerified ? buildTeamOperations(query.data, pendingInboundContacts, fromPath ? selfHref : null) : undefined,
+    operations: authVerified ? buildTeamOperations(query.data, pendingInboundContacts, fromPath ? selfHref : null, selfHref) : undefined,
     onShare: () => shareTeam(query.data),
     openMatches,
     openMatchesLoading: openMatchesQuery.isLoading,
@@ -951,7 +951,13 @@ function teamDetailCtaAction({
   return undefined;
 }
 
-function buildTeamOperations(team: V1TeamDetail, pendingInboundContacts = 0, subPageFrom: string | null = null): TeamDetailViewModel['operations'] {
+function buildTeamOperations(
+  team: V1TeamDetail,
+  pendingInboundContacts = 0,
+  subPageFrom: string | null = null,
+  // 팀매치 만들기의 자연스러운 뒤로가기는 (팀 상세로 들어온 출처가 아니라) 이 팀 상세 자신이다.
+  selfHref?: string,
+): TeamDetailViewModel['operations'] {
   if (!isTeamOperatorRole(team.viewer.role)) return undefined;
   return [
     {
@@ -980,7 +986,7 @@ function buildTeamOperations(team: V1TeamDetail, pendingInboundContacts = 0, sub
     {
       label: '팀매치 만들기',
       sub: '이 팀 명의로 새 팀매치를 모집해요.',
-      href: '/team-matches/new/team',
+      href: selfHref ? withFromPath('/team-matches/new/team', selfHref) : '/team-matches/new/team',
     },
   ];
 }

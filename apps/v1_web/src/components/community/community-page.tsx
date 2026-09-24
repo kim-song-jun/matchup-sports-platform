@@ -5,6 +5,7 @@ import type { MouseEvent, PointerEvent, ReactNode } from 'react';
 import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Check, Pin, Send } from 'lucide-react';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChatIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/v1-ui/icons';
@@ -161,9 +162,9 @@ export function ChatRoomPageView({ model, listModel, roomId }: { model: ChatRoom
        * display:contents on mobile → no layout impact; block flex on desktop.
        */}
       <div className="tm-chat-room-desktop-head tm-show-desktop">
-        <Link className="tm-desktop-back" href="/chat" aria-label="채팅 목록으로 돌아가기">
+        <AppBackLink className="tm-desktop-back" fallbackHref="/chat">
           <ChevronLeftIcon size={22} strokeWidth={2.2} />
-        </Link>
+        </AppBackLink>
         <h1 className="tm-text-heading" style={{ margin: 0 }}>{model.title}</h1>
       </div>
       <div className="tm-chat-room">
@@ -334,9 +335,9 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
       <div className="tm-notifications-desktop-wrap tm-content-enter">
         {/* Desktop page head: only visible on desktop (tm-show-desktop) */}
         <div className="tm-notifications-desktop-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/home" aria-label="홈으로 돌아가기">
+          <AppBackLink className="tm-desktop-back" fallbackHref={"/home"}>
             <ChevronLeftIcon size={22} strokeWidth={2.2} />
-          </Link>
+          </AppBackLink>
           <div className="tm-notifications-desktop-head-title">
             <h1 className="tm-text-heading" style={{ margin: 0 }}>
               알림{' '}

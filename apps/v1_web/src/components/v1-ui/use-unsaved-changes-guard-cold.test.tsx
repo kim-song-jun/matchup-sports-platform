@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __resetNavigationHistoryForTests,
   bindSoftNavigator,
+  currentEntryIsBuffer,
   hasPreviousSameDocumentEntry,
   installNavigationHistory,
 } from '@/lib/navigation-history';
@@ -103,24 +104,41 @@ describe('cold entry — dirty form + back', () => {
     expect(currentPath()).toBe('/landing');
   });
 
-  it('나가기 with nothing before the form (new tab, Android cold start) exits to /home, not onto the buffer', async () => {
+  it('나가기 with the form as the tab\'s first entry (new tab, Android cold start) exits to /home without go(-2)', async () => {
+    // jsdom's one history outlives each test, so make "first entry of the tab" explicit at install time.
+    const length = vi.spyOn(History.prototype, 'length', 'get').mockReturnValue(1);
     bootAt({ previousDocument: false });
-    // jsdom's one history outlives each test, so make "nothing before the form" explicit: go(-2) is out of range.
-    vi.spyOn(window.history, 'go').mockImplementation(() => {});
+    length.mockRestore();
+    const go = vi.spyOn(window.history, 'go');
+    render(<Form />);
+    await type('풋살팀');
+
+    await run(() => window.history.back());
+    await run(() => fireEvent.click(screen.getByRole('button', { name: '나가기' })));
+
+    expect(go).not.toHaveBeenCalled();
+    expect(currentPath()).toBe('/home');
+    expect(leaveDialog()).toBeNull();
+    // The exit replaced the form entry itself — neither the form nor the buffer sits behind /home.
+    expect(hasPreviousSameDocumentEntry()).toBe(false);
+  });
+
+  it('나가기 with something before the form arms no fallback — a slow cross-document go(-2) is not overtaken', async () => {
+    bootAt({ previousDocument: true });
+    // The traversal is still loading (slow network, non-bfcache page): nothing has moved yet.
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => {});
     render(<Form />);
     await type('풋살팀');
 
     await run(() => window.history.back());
     await run(() => fireEvent.click(screen.getByRole('button', { name: '나가기' })));
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      await new Promise((resolve) => setTimeout(resolve, 700));
       await settleHistory(10);
     });
 
-    expect(currentPath()).toBe('/home');
-    expect(leaveDialog()).toBeNull();
-    // The exit replaced the form entry itself — neither the form nor the buffer sits behind /home.
-    expect(hasPreviousSameDocumentEntry()).toBe(false);
+    expect(go).toHaveBeenCalledWith(-2);
+    expect(currentPath()).toBe(FORM);
   });
 
   it('after a reload the earlier entries are another document — still exactly one buffer', async () => {
@@ -152,6 +170,54 @@ describe('cold entry — dirty, then clean again', () => {
     expect(nextRouterPop).not.toHaveBeenCalled();
     await run(() => window.history.back());
     expect(leaveDialog()).toBeNull();
+    expect(currentPath()).toBe('/landing');
+  });
+});
+
+describe('reload while on the buffer', () => {
+  /** Reload at the current entry: the tracker restarts from history.state + the sessionStorage mirror. */
+  function reload() {
+    __resetOverlayHistoryForTests();
+    __resetNavigationHistoryForTests();
+    installNavigationHistory();
+    bindSoftNavigator((url) => window.history.replaceState({}, '', url));
+  }
+
+  async function reloadOnBuffer() {
+    bootAt({ previousDocument: true });
+    const view = render(<Form />);
+    await type('풋살팀');
+    expect(currentEntryIsBuffer()).toBe(true);
+    view.unmount();
+    reload();
+  }
+
+  it('dirty again: one live buffer, and 나가기 leaves past the dead same-URL form entry too', async () => {
+    await reloadOnBuffer();
+    const go = vi.spyOn(window.history, 'go');
+    render(<Form />);
+    await type('풋');
+
+    await run(() => window.history.back());
+    expect(leaveDialog()).not.toBeNull();
+    await run(() => fireEvent.click(screen.getByRole('button', { name: '나가기' })));
+
+    expect(go).toHaveBeenCalledWith(-3);
+    expect(currentPath()).toBe('/landing');
+  });
+
+  it('clean: the old buffer is neutralized and a back onto the dead copy keeps going', async () => {
+    await reloadOnBuffer();
+    expect(currentEntryIsBuffer()).toBe(false);
+    render(<Form />);
+    await settleHistory(10);
+    expect(currentPath()).toBe(FORM); // no consume back() off a buffer of another document
+
+    // Back from here is cross-document: no popstate reaches this document, and the dead copy loads fresh.
+    __resetNavigationHistoryForTests();
+    await run(() => window.history.back());
+    expect(currentPath()).toBe(FORM);
+    await run(() => reload());
     expect(currentPath()).toBe('/landing');
   });
 });

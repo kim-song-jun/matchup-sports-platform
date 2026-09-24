@@ -41,6 +41,8 @@ export function TournamentVenueNavigationButton({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        // Capture phase + preventDefault: this ESC closes only the popover, not an overlay beneath it.
+        event.preventDefault();
         setOpen(false);
         triggerRef.current?.focus();
       }
@@ -51,10 +53,10 @@ export function TournamentVenueNavigationButton({
       setOpen(false);
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown, true);
     document.addEventListener('mousedown', handlePointerDown);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('mousedown', handlePointerDown);
     };
   }, [open]);

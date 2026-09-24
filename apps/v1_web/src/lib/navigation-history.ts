@@ -25,8 +25,10 @@ const INSTALL_MARKER = '__teameetNavHistoryInstall';
 const URL_BASE = 'https://nav-history.invalid';
 
 // buffer: a same-URL entry the unsaved-changes guard pushes so a cold-entry back stays in this document.
-type Entry = { url: string; overlay?: boolean; parent?: boolean; buffer?: boolean };
-type Mirror = { index: number; entries: Record<number, Entry> };
+// stale: the form entry under a buffer that was reloaded — a dead same-URL copy that traversal skips.
+type Entry = { url: string; overlay?: boolean; parent?: boolean; buffer?: boolean; stale?: boolean };
+// tabStart: mirror index of the tab's very first history entry (nothing, not even another site, is before it).
+type Mirror = { index: number; entries: Record<number, Entry>; tabStart?: number };
 export type AppPop = { direction: 'back' | 'forward' | 'unknown'; appInitiated: boolean };
 type HistoryMethod = History['pushState'];
 
@@ -183,18 +185,26 @@ export function installNavigationHistory(): void {
   removePreviousInstall();
   const stored = readStored();
   const stamped = readIdx(window.history.state);
+  let skipStale: -1 | 1 | null = null;
   if (stamped !== null) {
-    mirror = { index: stamped, entries: stored?.entries ?? {} }; // 새로고침·bfcache 복귀
+    mirror = { index: stamped, entries: stored?.entries ?? {}, tabStart: stored?.tabStart }; // 새로고침·bfcache 복귀
+    const here = mirror.entries[stamped];
+    const below = mirror.entries[stamped - 1];
+    if (here?.buffer && below && sameUrl(here.url, currentUrl()) && sameUrl(below.url, here.url)) {
+      // Reloaded on a buffer: this entry becomes the form entry; the old one below is now another document.
+      mirror.entries[stamped - 1] = { ...below, stale: true };
+    }
+    if (here?.stale && stored && stored.index !== stamped) skipStale = stamped < stored.index ? -1 : 1;
   } else if (stored) {
     // 같은 탭의 전체 문서 이동(외부 복귀·네이티브 loadUrl) — 새 항목이 쌓인 것이다.
     mirror = stored;
     for (const key of Object.keys(mirror.entries)) if (Number(key) > stored.index) delete mirror.entries[Number(key)];
     mirror.index = stored.index + 1;
   } else {
-    mirror = { index: 0, entries: {} };
+    mirror = { index: 0, entries: {}, ...(window.history.length === 1 ? { tabStart: 0 } : {}) };
     coldStart = true;
   }
-  mirror.entries[mirror.index] = { url: currentUrl() };
+  mirror.entries[mirror.index] = { url: currentUrl(), ...(skipStale ? { stale: true } : {}) };
   documentStartIndex = mirror.index;
 
   const proto = History.prototype;
@@ -232,6 +242,7 @@ export function installNavigationHistory(): void {
   window.addEventListener('pageshow', clearPendingAppBack);
   (window as MarkedWindow)[INSTALL_MARKER] = { originals, listener: onPopState, pageshow: clearPendingAppBack };
   persist();
+  if (skipStale) window.history.go(skipStale); // traversal landed on a dead same-URL copy — keep going
 }
 
 /** 헤더 뒤로가기의 방법. 목적지가 바로 앞 앱 항목이면 back(스크롤도 복원), 아니면 replace(앞 중복 없음). */
@@ -261,6 +272,18 @@ export function pushBufferEntry(): void {
   } finally {
     pushingBuffer = false;
   }
+}
+
+/**
+ * How far back a real leave from the buffer goes: past the buffer, the form entry and any dead same-URL copies
+ * under it. null when nothing is before them in this tab (go() would do nothing).
+ */
+export function bufferLeaveSteps(): number | null {
+  if (!mirror) return 2;
+  let bottom = mirror.index - 1;
+  while (mirror.entries[bottom - 1]?.stale && sameUrl(mirror.entries[bottom - 1].url, currentUrl())) bottom -= 1;
+  if (mirror.tabStart !== undefined && bottom <= mirror.tabStart) return null;
+  return mirror.index - bottom + 1;
 }
 
 export function currentEntryIsBuffer(): boolean {

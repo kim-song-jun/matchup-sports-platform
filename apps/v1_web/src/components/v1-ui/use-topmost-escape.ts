@@ -38,7 +38,8 @@ export function useTopmostEscape({ open, listening = open, onEscape, disabled = 
   useEffect(() => {
     if (!listening) return;
     const handler = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || disabledRef.current || handledEscapes.has(event)) return;
+      // A nested control (e.g. a dropdown) that consumed this ESC calls preventDefault — leave the overlay open.
+      if (event.key !== 'Escape' || event.defaultPrevented || disabledRef.current || handledEscapes.has(event)) return;
       // A closing overlay (exit animation) is already off the stack — this ESC belongs to the one below.
       if (escapeStack[escapeStack.length - 1] !== tokenRef.current) return;
       handledEscapes.add(event);

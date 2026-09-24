@@ -25,6 +25,20 @@ function pick(labelText: string, teamLabel: string) {
 }
 
 describe('LeagueManualFixtureModal', () => {
+  it('ESC on an open team dropdown closes only the dropdown, not the modal', () => {
+    const { onClose } = setup();
+    const input = screen.getByLabelText('홈 팀');
+    fireEvent.change(input, { target: { value: 'A' } });
+    expect(screen.getAllByRole('option').length).toBeGreaterThan(0);
+
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('두 팀과 시작 일시를 채우면 그대로 보낸다', async () => {
     const { onSubmit } = setup();
     pick('홈 팀', 'A팀');

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import {
   addPopInterceptor,
+  bufferLeaveSteps,
   currentEntryIsBuffer,
   hasPreviousSameDocumentEntry,
   markAppInitiatedBack,
@@ -24,8 +25,6 @@ const hereUrl = () => `${window.location.pathname}${window.location.search}`;
 // 오버레이 가로채기보다 먼저 묻는다 — 폼을 떠나는 pop 이 닫힌 오버레이의 남은 표식에 닿아도
 // 표식 건너뛰기(back 예약)와 폼 되돌리기(push)가 한 pop 에서 겹치지 않게.
 const GUARD_POP_PRIORITY = 10;
-// go(-2) past the buffer that does nothing within this long means there was nothing before the form (new tab, app cold start).
-const LEAVE_FALLBACK_MS = 500;
 // Our own buffer back() whose pop never arrives is given up after this long.
 const CONSUME_TIMEOUT_MS = 1000;
 const EXIT_URL = '/home';
@@ -42,8 +41,8 @@ const withinScope = (pathname: string, scope: string) => pathname === scope || p
  *
  * Cold entry (no earlier entry in this document — deep link, refresh, new tab, app cold start): a back would
  * leave the document where no popstate can be intercepted. While dirty, one same-URL buffer entry is pushed so
- * that back becomes an interceptable pop. Leaving goes past it (go(-2), or /home when nothing is before the
- * form); getting clean again takes it off with a swallowed back(); a push to another URL replaces it.
+ * that back becomes an interceptable pop. Leaving goes past it (go(-2), or /home when the form is the tab's
+ * first entry); getting clean again takes it off with a swallowed back(); a push to another URL replaces it.
  */
 export function useUnsavedChangesGuard(isDirty: boolean, { scope }: { scope?: string } = {}) {
   const { confirm, ConfirmModal } = useConfirm();
@@ -55,7 +54,7 @@ export function useUnsavedChangesGuard(isDirty: boolean, { scope }: { scope?: st
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
   const consumingRef = useRef<{ timer: ReturnType<typeof setTimeout>; waiters: Array<() => void> } | null>(null);
-  const leavingRef = useRef<{ timer: ReturnType<typeof setTimeout>; onPageHide: () => void } | null>(null);
+  const leavingRef = useRef(false);
   const exitAfterPopRef = useRef(false);
 
   // 되돌릴 폼 항목(URL + Next state). 매 커밋 뒤 갱신 — 오버레이 표식 항목은 폼 항목이 아니다.
@@ -82,26 +81,17 @@ export function useUnsavedChangesGuard(isDirty: boolean, { scope }: { scope?: st
     });
   }, [finishConsume]);
 
-  const clearLeaving = useCallback(() => {
-    const leaving = leavingRef.current;
-    if (!leaving) return;
-    leavingRef.current = null;
-    clearTimeout(leaving.timer);
-    window.removeEventListener('pagehide', leaving.onPageHide);
-  }, []);
-
   /** Leave for real from the buffer: past the buffer and the form entry, or to /home when nothing is before them. */
   const leaveThroughBuffer = useCallback(() => {
-    const onPageHide = () => clearLeaving();
-    const timer = setTimeout(() => {
-      clearLeaving();
+    const steps = bufferLeaveSteps();
+    if (steps === null) {
       exitAfterPopRef.current = true;
       window.history.back(); // off the buffer first, so the exit replaces the form entry itself
-    }, LEAVE_FALLBACK_MS);
-    leavingRef.current = { timer, onPageHide };
-    window.addEventListener('pagehide', onPageHide);
-    window.history.go(-2);
-  }, [clearLeaving]);
+      return;
+    }
+    leavingRef.current = true;
+    window.history.go(-steps);
+  }, []);
 
   // Keep exactly one buffer while dirty on a cold entry; take it off once clean. Never on top of an overlay.
   useEffect(() => {
@@ -143,7 +133,7 @@ export function useUnsavedChangesGuard(isDirty: boolean, { scope }: { scope?: st
     const inScope = (pathname: string) => withinScope(pathname, scopeRef.current ?? formPathname);
     const removeInterceptor = addPopInterceptor((_event, pop) => {
       if (leavingRef.current) {
-        clearLeaving(); // go(-2) moved within this document — an ordinary navigation
+        leavingRef.current = false; // the leave moved within this document — an ordinary navigation
         return false;
       }
       if (pop.leftBuffer && consumingRef.current) {
@@ -181,10 +171,9 @@ export function useUnsavedChangesGuard(isDirty: boolean, { scope }: { scope?: st
     }, { priority: GUARD_POP_PRIORITY });
     return () => {
       removeInterceptor();
-      clearLeaving();
       finishConsume();
     };
-  }, [clearLeaving, consumeBuffer, finishConsume, leaveThroughBuffer]);
+  }, [consumeBuffer, finishConsume, leaveThroughBuffer]);
 
   useEffect(() => {
     if (!isDirty) return;

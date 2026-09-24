@@ -987,6 +987,24 @@ function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean 
       <CreateField label="설명" value={draft.description} placeholder="예: 초보도 편하게 참여할 수 있는 친선 매치예요." multiline onChange={(value) => model.form?.onFieldChange('description', value)} />
       <ImageUploadField image={draft.image} onChange={(value) => model.form?.onFieldChange('image', value)} onUpload={model.form?.uploadImage} />
       <CapacityField value={draft.capacity} onChange={(value) => model.form?.onFieldChange('capacity', value)} />
+      <Card pad={16} style={{ marginTop: 12 }}>
+        <div className="tm-my-toggle-row">
+          <div>
+            <div className="tm-text-body-lg">나도 참가해요</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+              끄면 주최자는 운영만 하고, 본인은 모집 인원에서 제외돼요.
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={draft.hostParticipates}
+            aria-label="나도 참가해요"
+            className={`tm-toggle ${draft.hostParticipates ? 'tm-toggle-on' : ''}`}
+            onClick={() => model.form?.onFieldChange('hostParticipates', !draft.hostParticipates)}
+          />
+        </div>
+      </Card>
       <LevelRangeField levels={model.levels} minLevel={draft.minLevel} maxLevel={draft.maxLevel} onChange={(field, value) => model.form?.onFieldChange(field, value)} />
       <GenderRuleSelector value={draft.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} />
       <CreateField label="참가비" value={draft.costNote} placeholder="예: 10,000원/1인, 무료" onChange={(value) => model.form?.onFieldChange('costNote', value)} />
@@ -1196,7 +1214,7 @@ function ConfirmStep({ model }: { model: MatchCreateViewModel }) {
   const regionName = model.form?.regions.find((region) => region.id === model.form?.regionId)?.name ?? '지역 선택 필요';
   const deadlineText = draft.deadlineDate && draft.deadlineTime ? `${draft.deadlineDate} ${draft.deadlineTime}` : '경기 시작 전까지';
   const timeRangeText = draft.endTime ? `${draft.date} ${draft.startTime}-${draft.endTime}` : `${draft.date} ${draft.startTime}`;
-  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} />{draft.costNote ? <InfoRow label="참가비" value={draft.costNote} /> : null}<InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
+  return <div><h1 className="tm-text-heading">입력한 내용을 확인해 주세요</h1><Card pad={0} style={{ marginTop: 16, overflow: 'hidden' }}><div className="tm-create-image-preview" style={{ backgroundImage: cssUrl(draft.image) }} /><div style={{ padding: 16 }}><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className="tm-badge tm-badge-blue">{model.selectedSport}</span><span className="tm-badge tm-badge-grey">{draft.minLevel}-{draft.maxLevel}</span><span className="tm-badge tm-badge-grey">{draft.gender}</span></div><div className="tm-text-subhead" style={{ marginTop: 12 }}>{draft.title}</div><div className="tm-text-caption" style={{ marginTop: 8 }}>{draft.description}</div></div></Card><Card pad={16} style={{ marginTop: 12 }}><InfoRow label="지역" value={regionName} sub="검색·추천에 사용돼요" /><InfoRow label="일시" value={timeRangeText} /><InfoRow label="신청 마감" value={deadlineText} /><InfoRow label="장소" value={draft.venue} sub={draft.address} /><InfoRow label="인원" value={`최대 ${draft.capacity}명`} /><InfoRow label="주최자 참가" value={draft.hostParticipates ? '참가해요' : '참가하지 않아요'} sub={draft.hostParticipates ? '주최자도 모집 인원에 포함돼요' : '용병만 모집하고 주최자는 운영만 해요'} />{draft.costNote ? <InfoRow label="참가비" value={draft.costNote} /> : null}<InfoRow label="이미지" value="대표 이미지" sub="목록과 상세 화면에 표시돼요" /></Card></div>;
 }
 
 function stepToNumber(step: MatchCreateViewModel['step']) {

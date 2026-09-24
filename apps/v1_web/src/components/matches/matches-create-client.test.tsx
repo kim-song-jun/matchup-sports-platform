@@ -250,6 +250,30 @@ describe('match edit hydration', () => {
     expect(draft.image).toBe('');
   });
 
+  it('서버에서 주최자 참가를 끈 매치는 수정 draft에서도 제외 상태를 유지한다', () => {
+    const startsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const draft = draftFromMatchEdit({
+      matchId: 'match-mercenary-only',
+      editable: true,
+      lockedReason: null,
+      form: {
+        sportId: 'sport-futsal',
+        regionId: 'region-gangnam',
+        title: '용병 모집 매치',
+        imageUrl: null,
+        startsAt,
+        capacity: 10,
+        hostParticipates: false,
+        manualPlaceName: '강남 풋살장',
+      },
+      status: 'recruiting',
+      participantCount: 0,
+      version: new Date().toISOString(),
+    });
+
+    expect(draft.hostParticipates).toBe(false);
+  });
+
   // 2026-08-27 감사 M-A-personal-match-state: toDateInput()이 toISOString()(UTC)을,
   // toTimeInput()이 toTimeString()(로컬)을 섞어 써서, UTC 자정을 넘어가는 시각(예: KST
   // 00:00~08:59 시작 매치)을 수정 화면에서 열면 날짜만 하루 앞으로 밀렸다. 날짜·시간이

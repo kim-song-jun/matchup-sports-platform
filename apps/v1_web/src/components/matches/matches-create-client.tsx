@@ -417,7 +417,7 @@ function buildCreateModel({
   lockedReason?: string | null;
   submitting?: boolean;
   onSelectSport: (sportName: string) => void;
-  onFieldChange: (field: keyof MatchDraft, value: string | number) => void;
+  onFieldChange: (field: keyof MatchDraft, value: string | number | boolean) => void;
   onRegionChange: (regionId: string) => void;
   onBack: () => void;
   onNext: () => void;
@@ -559,6 +559,7 @@ export function draftFromMatchEdit(edit: V1MatchEdit): MatchDraft {
     description: edit.form.description ?? '',
     image: edit.form.imageUrl ?? buildDefaultDraft().image,
     capacity: edit.form.capacity,
+    hostParticipates: edit.form.hostParticipates !== false,
     rules: edit.form.rulesText ?? '',
     costNote: edit.form.costNote ?? '',
     gender: normalizeGenderRule(edit.form.genderRule),

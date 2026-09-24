@@ -195,6 +195,7 @@ const draft = {
   description: '',
   image: '',
   capacity: 10,
+  hostParticipates: true,
   actionLabel: '승인제 신청',
   minLevel: '입문',
   maxLevel: '고수',

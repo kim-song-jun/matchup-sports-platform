@@ -401,6 +401,7 @@ export type V1Match = {
   capacityText: string;
   capacity?: number;
   participantCount?: number;
+  hostParticipates?: boolean;
   status: V1Status;
   displayState?: string;
   approvalRequired?: boolean;
@@ -454,6 +455,7 @@ export type V1MatchEdit = {
     endsAt?: string | null;
     deadlineAt?: string | null;
     capacity: number;
+    hostParticipates?: boolean;
     manualPlaceName: string;
     addressText?: string | null;
     rulesText?: string | null;
@@ -512,6 +514,7 @@ export type V1MatchMutationPayload = {
   endsAt?: string | null;
   deadlineAt?: string | null;
   capacity: number;
+  hostParticipates: boolean;
   manualPlaceName: string;
   addressText?: string | null;
   rulesText?: string | null;

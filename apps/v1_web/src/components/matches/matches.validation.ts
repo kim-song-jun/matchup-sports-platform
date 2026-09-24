@@ -154,6 +154,7 @@ export function buildMatchPayloadResult(draft: MatchDraft, sportId: string, regi
       endsAt: endsAt && endsAt > startsAt ? endsAt.toISOString() : null,
       deadlineAt: deadlineAt ? deadlineAt.toISOString() : null,
       capacity: Math.max(Number(draft.capacity) || 2, 2),
+      hostParticipates: draft.hostParticipates,
       manualPlaceName: draft.venue.trim(),
       addressText: draft.address.trim() || null,
       rulesText: draft.rules.trim() || null,

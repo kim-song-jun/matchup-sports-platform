@@ -208,6 +208,7 @@ export class MatchesService {
       deadlineAt: match.deadlineAt,
       capacity: match.maxParticipants,
       participantCount: this.getParticipantCount(match),
+      hostParticipates: this.getHostParticipates(match),
       status: this.getApiStatus(match),
       displayState: this.getDisplayState(match),
       levelLabel: formatLevelRange(match.minSportLevel, match.maxSportLevel, match.levelNote),
@@ -330,15 +331,17 @@ export class MatchesService {
         },
       });
 
-      const participant = await tx.v1MatchParticipant.create({
-        data: {
-          matchId: match.id,
-          userId: user.id,
-          role: 'host',
-          status: 'active',
-          approvedAt: new Date(),
-        },
-      });
+      const participant = dto.hostParticipates === false
+        ? null
+        : await tx.v1MatchParticipant.create({
+            data: {
+              matchId: match.id,
+              userId: user.id,
+              role: 'host',
+              status: 'active',
+              approvedAt: new Date(),
+            },
+          });
 
       await tx.v1StatusChangeLog.create({
         data: {
@@ -358,7 +361,7 @@ export class MatchesService {
     return {
       matchId: result.match.id,
       status: result.match.status,
-      hostParticipantId: result.participant.id,
+      hostParticipantId: result.participant?.id,
       detailRoute: `/matches/${result.match.id}`,
       manageRoute: `/matches/${result.match.id}/applications`,
     };
@@ -440,23 +443,13 @@ export class MatchesService {
         where: { id: match.id },
         data: { status: 'completed', completedAt },
       });
-      const host = match.participants.find((participant) => participant.role === 'host');
+      const host = match.participants.find(
+        (participant) => participant.role === 'host' && participant.status === 'active',
+      );
       if (host) {
         await tx.v1MatchParticipant.update({
           where: { id: host.id },
           data: { status: 'completed', completedAt },
-        });
-      } else {
-        await tx.v1MatchParticipant.upsert({
-          where: { matchId_userId: { matchId: match.id, userId: match.hostUserId } },
-          update: { role: 'host', status: 'completed', completedAt },
-          create: {
-            matchId: match.id,
-            userId: match.hostUserId,
-            role: 'host',
-            status: 'completed',
-            completedAt,
-          },
         });
       }
 
@@ -506,7 +499,9 @@ export class MatchesService {
           .filter((participant) => requestedStatuses.get(participant.id) === 'completed')
           .map((participant) => participant.userId),
         expiredUserIds: pending.map((application) => application.applicantUserId),
-        completedParticipants: 1 + guests.filter((participant) => requestedStatuses.get(participant.id) === 'completed').length,
+        completedParticipants:
+          (host ? 1 : 0) +
+          guests.filter((participant) => requestedStatuses.get(participant.id) === 'completed').length,
         noShowParticipants:
           alreadyNoShowGuestIds.size +
           guests.filter((participant) => requestedStatuses.get(participant.id) === 'no_show').length,
@@ -542,7 +537,10 @@ export class MatchesService {
 
   async edit(user: V1AuthUser, matchId: string) {
     const match = await this.getHostMatch(user, matchId);
-    const participantCount = await this.getActiveParticipantCount(match.id);
+    const [participantCount, activeHostParticipantCount] = await Promise.all([
+      this.getActiveParticipantCount(match.id),
+      this.getActiveHostParticipantCount(match.id, user.id),
+    ]);
     // update()/cancel()은 raw status뿐 아니라 getApiStatus(match)==='expired'(recruiting +
     // startAt이 지남)도 막는다 — edit()이 raw status만 봤을 때는 이 판정이 어긋나 수정 화면이
     // editable:true로 열리고, 저장 시점에야 서버가 영문 'Terminal match cannot be updated' 409로
@@ -569,6 +567,7 @@ export class MatchesService {
         endsAt: match.endAt,
         deadlineAt: match.deadlineAt,
         capacity: match.maxParticipants,
+        hostParticipates: activeHostParticipantCount > 0,
         manualPlaceName: match.placeName,
         addressText: match.placeAddress,
         rulesText: match.levelNote,
@@ -597,17 +596,24 @@ export class MatchesService {
     const dates = this.validateMatchDates(dto);
     await this.validateMasterRefs(dto.sportId, dto.regionId);
     const levelRange = await resolveSportLevelRange(this.prisma, dto.sportId, dto.minLevelCode, dto.maxLevelCode);
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const hostParticipates = dto.hostParticipates !== false;
+    const { updated, hostParticipant } = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "v1_matches" WHERE id = ${match.id} FOR UPDATE`;
       const current = await tx.v1Match.findFirst({ where: { id: match.id, deletedAt: null } });
       if (!current || current.hostUserId !== user.id || !['recruiting', 'closed'].includes(current.status) || current.startAt <= new Date()) {
         throw stateConflict('매치 상태가 바뀌었어요. 다시 확인해 주세요.');
       }
       if (current.updatedAt.toISOString() !== dto.version) throw stateConflict('Match version is stale', 'VERSION_CONFLICT');
-      if (dto.capacity < await this.getActiveParticipantCount(match.id, tx)) {
+      const [participantCount, activeHostParticipantCount] = await Promise.all([
+        this.getActiveParticipantCount(match.id, tx),
+        this.getActiveHostParticipantCount(match.id, user.id, tx),
+      ]);
+      const nextParticipantCount =
+        participantCount - activeHostParticipantCount + (hostParticipates ? 1 : 0);
+      if (dto.capacity < nextParticipantCount) {
         throw stateConflict('Capacity cannot be lower than active participants');
       }
-      return tx.v1Match.update({
+      const updated = await tx.v1Match.update({
         where: { id: match.id },
         data: {
           sportId: dto.sportId,
@@ -628,6 +634,40 @@ export class MatchesService {
           costNote: dto.costNote ?? null,
         },
       });
+
+      const hostParticipant = hostParticipates
+        ? await tx.v1MatchParticipant.upsert({
+            where: { matchId_userId: { matchId: match.id, userId: user.id } },
+            create: {
+              matchId: match.id,
+              userId: user.id,
+              role: 'host',
+              status: 'active',
+              approvedAt: new Date(),
+            },
+            update: {
+              role: 'host',
+              status: 'active',
+              approvedAt: new Date(),
+              cancelledAt: null,
+              completedAt: null,
+            },
+          })
+        : null;
+
+      if (!hostParticipates) {
+        await tx.v1MatchParticipant.updateMany({
+          where: {
+            matchId: match.id,
+            userId: user.id,
+            role: 'host',
+            status: 'active',
+          },
+          data: { status: 'cancelled', cancelledAt: new Date() },
+        });
+      }
+
+      return { updated, hostParticipant };
     });
 
     return {
@@ -636,6 +676,7 @@ export class MatchesService {
       updatedAt: updated.updatedAt,
       detailRoute: `/matches/${updated.id}`,
       version: updated.updatedAt.toISOString(),
+      hostParticipantId: hostParticipant?.id,
     };
   }
 
@@ -1311,6 +1352,7 @@ export class MatchesService {
       deadlineAt: match.deadlineAt,
       capacity: match.maxParticipants,
       participantCount: this.getParticipantCount(match),
+      hostParticipates: this.getHostParticipates(match),
       status: this.getApiStatus(match),
       displayState: this.getDisplayState(match),
       levelLabel: formatLevelRange(match.minSportLevel, match.maxSportLevel, match.levelNote),
@@ -1418,6 +1460,13 @@ export class MatchesService {
 
   private getParticipantCount(match: Pick<MatchWithRelations, 'participants'>) {
     return match.participants.filter((participant) => participant.status === 'active' || participant.status === 'completed').length;
+  }
+
+  private getHostParticipates(match: Pick<MatchWithRelations, 'participants'>) {
+    return match.participants.some(
+      (participant) => participant.role === 'host' &&
+        (participant.status === 'active' || participant.status === 'completed'),
+    );
   }
 
   private getApiStatus(match: V1Match) {
@@ -1543,6 +1592,16 @@ export class MatchesService {
   ) {
     return client.v1MatchParticipant.count({
       where: { matchId, status: 'active' },
+    });
+  }
+
+  private getActiveHostParticipantCount(
+    matchId: string,
+    userId: string,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    return client.v1MatchParticipant.count({
+      where: { matchId, userId, role: 'host', status: 'active' },
     });
   }
 }

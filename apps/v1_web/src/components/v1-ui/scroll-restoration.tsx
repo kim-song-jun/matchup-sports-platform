@@ -151,11 +151,13 @@ export function ScrollRestoration() {
 
   // ③ 적용 — pathname 이 실제로 바뀌면 방향에 따라 top=0 또는 복원.
   useEffect(() => {
+    const el = getScrollElement();
     if (firstRenderRef.current) {
       firstRenderRef.current = false; // 최초 마운트(새로고침/콜드스타트)는 브라우저 기본에 맡긴다.
+      // 스크롤해야만 저장되므로, 지금 위치를 적어 두지 않으면 예전 방문의 값이 남아 나중에 그리로 복원된다.
+      if (el) saveScrollPosition(getCurrentRedirectPath(), getScrollTop(el));
       return;
     }
-    const el = getScrollElement();
     if (!el) return;
 
     if (navTypeRef.current === 'pop' || navTypeRef.current === 'tab') {
@@ -165,6 +167,7 @@ export function ScrollRestoration() {
       // 하지 않는다 — 이미 0이다.
     } else {
       setScrollTop(el, 0);
+      saveScrollPosition(getCurrentRedirectPath(), 0); // 새로 들어온 화면이 예전 위치를 덮어쓴다.
     }
     navTypeRef.current = 'push'; // 소비했으니 기본값으로 되돌린다 — 다음 pathname 변경이
       // popstate 없이 일어나면(프로그램적 router.push 등) push 로 취급한다.

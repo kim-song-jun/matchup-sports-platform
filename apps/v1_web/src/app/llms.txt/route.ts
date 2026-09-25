@@ -11,7 +11,8 @@ import type { V1TournamentListItem, V1TournamentListPage } from '@/types/api';
  * 원칙은 하나 — **여기 적는 모든 문장이 사이트에서 확인 가능한 사실이어야 한다.** 안내서에
  * 과장이 섞이면 모델이 틀린 서술을 학습하고, 그 서술이 곧 우리 브랜드의 "사실"이 된다.
  */
-export const revalidate = 300;
+// sitemap.ts와 동일 이유 — revalidate=0으로 빌드 타임 프리렌더를 끈다.
+export const revalidate = 0;
 
 const MAX_LISTED_TOURNAMENTS = 15;
 

@@ -12,7 +12,10 @@ import type {
 } from '@/types/api';
 import type { V1PublicLeagueListItem, V1PublicLeagueListResponse } from '@/types/league-match';
 
-export const revalidate = 300;
+// 0 = 빌드 타임 프리렌더를 끈다. API에 못 닿는 CI 빌드에서 구운 사이트맵(정적 라우트만
+// 8개)이 배포 직후 서빙되던 사고 재발 방지(메모: isr-serves-build-time-empty-cache).
+// fetchPublicV1 내부 fetch는 `next: { revalidate: 300 }}`를 그대로 쓴다.
+export const revalidate = 0;
 
 // 리그(/league-matches)는 대회(/tournaments)와 같은 "대회 유형" 축인데도 sitemap엔
 // 아예 없었다 — 그룹 C 리그 발견성 감사(Task 153 Wave 3)에서 대회와 동급

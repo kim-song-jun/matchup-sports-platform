@@ -11,9 +11,11 @@ export const metadata = buildPublicMetadata({
   path: '/matches',
 });
 
-// 첫 페이지를 서버에서 미리 받아 크롤러에게 내보낸다. 목록은 자주 바뀌므로 5분 ISR —
-// sitemap.ts 와 같은 주기를 쓴다.
-export const revalidate = 300;
+// 첫 페이지를 서버에서 미리 받아 크롤러에게 내보낸다. revalidate=0으로 정적/ISR 프리렌더를
+// 끈다 — 켜 두면 API에 못 닿는 빌드(next build, CI)에서 구운 빈 목록이 배포 직후 그대로
+// 나간다(teams/page.tsx와 동일 이유). fetchPublicV1 내부 fetch는 `next: { revalidate: 300 }`를
+// 그대로 쓰므로 5분 캐시는 유지된다.
+export const revalidate = 0;
 
 export default async function MatchesPage() {
   const [matches, sports] = await Promise.all([

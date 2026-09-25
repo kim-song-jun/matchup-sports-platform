@@ -487,7 +487,10 @@ extension WebShellViewController: WKNavigationDelegate {
 
     private func openExternally(_ url: URL?) {
         guard let url, AllowedNavigation.isAllowedExternal(url) else { return }
-        UIApplication.shared.open(url)
+        UIApplication.shared.open(url) { opened in
+            guard !opened, let fallback = AllowedNavigation.externalAppStoreFallback(url) else { return }
+            UIApplication.shared.open(fallback)
+        }
     }
 }
 

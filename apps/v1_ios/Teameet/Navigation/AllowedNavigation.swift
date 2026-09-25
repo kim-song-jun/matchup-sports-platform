@@ -308,9 +308,11 @@ enum AllowedNavigation {
     ///
     /// This mirrors Android's reviewed list with two platform substitutions: `market:` is
     /// Play-only and becomes `itms-apps:`, and `intent:` has no iOS counterpart at all, so
-    /// it is left out rather than carried over as a dead entry.
+    /// it is left out rather than carried over as a dead entry. The three map schemes are
+    /// the web's venue directions buttons (tournament-venue-retention-model.ts).
     private static let allowedExternalSchemes: Set<String> = [
         "http", "https", "mailto", "tel", "sms", "geo", "itms-apps",
+        "kakaomap", "nmap", "tmap",
     ]
 
     static func isAllowedExternal(_ url: URL?) -> Bool {
@@ -320,5 +322,17 @@ enum AllowedNavigation {
     static func isAllowedExternalScheme(_ scheme: String?) -> Bool {
         guard let scheme else { return false }
         return allowedExternalSchemes.contains(scheme.lowercased())
+    }
+
+    /// App Store page to open when a map app scheme has no installed handler — the iOS
+    /// counterpart of Android's Play fallback.
+    static func externalAppStoreFallback(_ url: URL?) -> URL? {
+        let appStoreId: String? = switch url?.scheme?.lowercased() {
+        case "kakaomap": "304608425"
+        case "nmap": "311867728"
+        case "tmap": "431589174"
+        default: nil
+        }
+        return appStoreId.flatMap { URL(string: "https://apps.apple.com/kr/app/id\($0)") }
     }
 }

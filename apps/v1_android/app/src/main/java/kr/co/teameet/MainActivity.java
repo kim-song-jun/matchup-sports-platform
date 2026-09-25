@@ -280,7 +280,10 @@ public final class MainActivity extends AppCompatActivity {
                 WebView view, WebResourceRequest request, WebResourceResponse response
             ) {
                 super.onReceivedHttpError(view, request, response);
-                if (request.isForMainFrame() && response.getStatusCode() >= 400) showWebError();
+                if (WebErrorPolicy.shouldShowErrorForHttpStatus(
+                    response.getStatusCode(), request.isForMainFrame())) {
+                    showWebError();
+                }
             }
             @Override public boolean onRenderProcessGone(
                 WebView view, RenderProcessGoneDetail detail

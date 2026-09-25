@@ -80,6 +80,32 @@ describe('알림 목록 "더 보기"', () => {
     expect(screen.getByRole('button', { name: '다시 불러오기' })).toBeTruthy();
   });
 
+  it('배경 새로고침 중에도 더 보기 탭은 무시되지 않는다', () => {
+    mock.fetchNextPage.mockClear();
+    mock.query.mockReturnValue(baseQuery({
+      data: { pages: [{ unreadCount: 1, items: [notif()] }] },
+      hasNextPage: true,
+      isFetching: true,
+    }));
+    render(<NotificationsPageClient />);
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+    expect(mock.fetchNextPage).toHaveBeenCalledOnce();
+  });
+
+  it('페이지 경계에서 겹친 알림은 한 번만 보인다', () => {
+    mock.query.mockReturnValue(baseQuery({
+      data: {
+        pages: [
+          { unreadCount: 0, items: [notif({ notificationId: 'dup', title: '겹친 알림' })] },
+          { unreadCount: 0, items: [notif({ notificationId: 'dup', title: '겹친 알림' }), notif({ notificationId: 'n2', title: '다른 알림' })] },
+        ],
+      },
+    }));
+    render(<NotificationsPageClient />);
+    expect(screen.getAllByText('겹친 알림')).toHaveLength(1);
+    expect(screen.getByText('다른 알림')).toBeInTheDocument();
+  });
+
   it('다음 페이지가 없으면 버튼을 숨긴다', () => {
     mock.query.mockReturnValue(baseQuery({
       data: { pages: [{ unreadCount: 0, items: [notif()] }] },

@@ -8136,9 +8136,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   z-index: 0;
 }
 
-/* [토큰 충돌 fix, thumb 한 곳에서만] 위 .tm-seg-tab/.tm-review-tab 과 같은 원인
-   (다크모드에서 --grey100 == --surface)이지만, 활성 표시가 thumb 하나뿐이라 고칠
-   곳도 하나뿐이다 — 이 통합이 얻는 실질 이득 중 하나. */
+/* 다크에서 트랙(--surface-soft, 위 .tm-segmented-tabs)보다 밝아야 선택 표시가 보인다. */
 :root.dark .tm-segmented-thumb {
   background: var(--grey300);
 }

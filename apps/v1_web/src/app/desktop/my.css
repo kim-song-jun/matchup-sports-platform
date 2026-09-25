@@ -571,3 +571,26 @@
   gap: 12px;
   margin-bottom: 16px;
 }
+
+/* ─── /users/:id 공개 프로필: 카드 왼쪽 고정, 정보 오른쪽 ─────────────────────
+ * 모바일은 .tm-public-profile-main 이 display:contents 라 한 열 그대로다(globals.css).
+ * 카드(380px)는 스크롤해도 옆에 남아, 아래 정보를 읽는 동안 누구의 프로필인지 놓치지 않는다. */
+@media (min-width: 1024px) {
+  .tm-my-shell.tm-public-profile {
+    grid-template-columns: 380px minmax(0, 1fr);
+    column-gap: 32px;
+    align-items: start;
+  }
+
+  .tm-public-profile > .tm-player-card,
+  .tm-public-profile > .tm-my-profile-head {
+    position: sticky;
+    top: 24px;
+  }
+
+  .tm-public-profile-main {
+    display: grid;
+    gap: 20px;
+    min-width: 0;
+  }
+}

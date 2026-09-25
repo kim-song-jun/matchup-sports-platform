@@ -29,6 +29,7 @@ import {
   validatePreferredPositions,
 } from '../users/preferred-position';
 import { isReviewRevealed } from '../reviews/review-visibility';
+import { pickReviewHighlight, type ReviewHighlight } from '../reviews/review-highlight';
 import { removeUserFromActiveRosters } from '../tournaments/roster-cleanup';
 import { verifyPhoneProofToken } from '../verification/phone-proof-token';
 import { isPhoneVerificationEnforced } from '../verification/phone-verification-access';
@@ -370,6 +371,8 @@ export class ProfileService {
         mannerScore: liveReputation.mannerScore,
         activityCount: liveReputation.reviewCount,
         reviewCount: liveReputation.reviewCount,
+        // Same revealed reviews as the manner score above, so the sentence and the score never disagree.
+        highlight: liveReputation.highlight,
       },
       activitySummary,
     };
@@ -421,7 +424,7 @@ export class ProfileService {
     });
   }
 
-  private async getPublicActivitySummary(userId: string, precomputedReputation?: { reviewCount: number; mannerScore: number | null }) {
+  private async getPublicActivitySummary(userId: string, precomputedReputation?: { reviewCount: number; mannerScore: number | null; highlight: ReviewHighlight | null }) {
     const now = new Date();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
@@ -621,7 +624,9 @@ export class ProfileService {
    * 팀 신뢰점수(V1TeamTrustScore)를 여러 팀 한 번에 렌더링하는 목록형 화면(팀 신청자 목록, admin 팀 목록 등)에는
    * 적용하지 않는다 — 항목마다 live 재계산하면 N+1 쿼리 문제가 생기고, 이는 이번 요청 범위(단일 유저 GET) 밖이다.
    */
-  private async computeRevealedUserReputation(userId: string): Promise<{ reviewCount: number; mannerScore: number | null }> {
+  private async computeRevealedUserReputation(
+    userId: string,
+  ): Promise<{ reviewCount: number; mannerScore: number | null; highlight: ReviewHighlight | null }> {
     const candidates = await this.prisma.v1PostEventReview.findMany({
       // 레거시 개인 매치와 공식 팀 매치의 개인 후기는 같은 사용자 평판으로 묶는다.
       // 대회 개인 후기(tournament_fixture · targetType=user)는 tournament_* 컬럼에 별도 집계되며,
@@ -632,9 +637,16 @@ export class ProfileService {
         status: 'submitted',
         sourceType: { in: ['match', 'team_match'] },
       },
-      select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
+      select: {
+        sourceId: true,
+        reviewerUserId: true,
+        targetUserId: true,
+        rating: true,
+        submittedAt: true,
+        tags: { select: { tagCode: true, labelSnapshot: true } },
+      },
     });
-    if (candidates.length === 0) return { reviewCount: 0, mannerScore: null };
+    if (candidates.length === 0) return { reviewCount: 0, mannerScore: null, highlight: null };
 
     const sourceIds = [...new Set(candidates.map((review) => review.sourceId))];
     const reverseReviews = await this.prisma.v1PostEventReview.findMany({
@@ -654,7 +666,7 @@ export class ProfileService {
       ? Number((revealed.reduce((sum, review) => sum + review.rating, 0) / reviewCount).toFixed(2))
       : null;
 
-    return { reviewCount, mannerScore };
+    return { reviewCount, mannerScore, highlight: pickReviewHighlight(revealed) };
   }
 
   /**

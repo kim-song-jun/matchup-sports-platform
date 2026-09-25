@@ -663,6 +663,26 @@ describe('TeamDetailPageView — 팀 기록 섹션', () => {
     expect(screen.queryAllByRole('link', { name: /받은 후기/ })).toHaveLength(0);
   });
 
+  // 설명 문장 대신 가장 많이 받은 태그를 문장으로 보여준다 — 누구의 평가인지(내 팀/남의 팀)에 맞춘 주어로.
+  it('공개된 후기가 충분하면 가장 많이 받은 태그를 한 문장으로, 모자라면 기존 안내를 보여준다', () => {
+    const highlight = { tagCode: 'manner', label: '매너가 좋아요', rate: 0.68, reviewCount: 12 };
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({
+      data: { bySport: [{ sportId: 's1', sportCode: 'futsal', ratingAvg: 4.6, ratingCount: 12, tagRates: [] }], availableMonths: [], highlight },
+    });
+    const { unmount } = render(<TeamDetailPageView model={modelWithMode('default')} />);
+    const card = screen.getAllByText('받은 후기')[0].closest('.tm-team-detail-record-card');
+    expect(card).toHaveTextContent('이 팀과 뛴 팀들이 ‘매너가 좋아요’를 가장 많이 꼽았어요 (68%)');
+    unmount();
+
+    teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({
+      data: { bySport: [{ sportId: 's1', sportCode: 'futsal', ratingAvg: 4.6, ratingCount: 2, tagRates: [] }], availableMonths: [], highlight: null },
+    });
+    render(<TeamDetailPageView model={modelWithMode('default')} />);
+    const plain = screen.getAllByText('받은 후기')[0].closest('.tm-team-detail-record-card');
+    expect(plain).toHaveTextContent('이 팀과 뛴 팀들이 남긴 평가예요.');
+    expect(plain).not.toHaveTextContent('가장 많이 꼽았어요');
+  });
+
   it('남의 팀이고 받은 후기가 0건이면 카드 자체를 두지 않는다', () => {
     teamApiMocks.useV1PublicTeamReviewSummary.mockReturnValue({ data: { bySport: [], availableMonths: [] } });
 

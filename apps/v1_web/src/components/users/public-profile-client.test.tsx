@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PublicProfilePageClient } from './public-profile-client';
 import { useV1AuthMe, useV1PublicProfile } from '@/hooks/use-v1-api';
@@ -30,7 +30,7 @@ function profile(overrides: Partial<V1PublicProfile> = {}): V1PublicProfile {
     bio: null,
     teams: [{ id: 'team-9', name: '성수 FC' }],
     recentActivity: null,
-    reputation: { trustState: 'estimated', mannerScore: null, activityCount: 3, reviewCount: 0 },
+    reputation: { trustState: 'estimated', mannerScore: null, activityCount: 3, reviewCount: 0, highlight: null },
     playerCard: null,
     activitySummary: null,
     ...overrides,
@@ -108,5 +108,61 @@ describe('PublicProfilePageClient — 카드 공유 링크 출처', () => {
       'href',
       `/users/user-1/card?from=${encodeURIComponent(selfHref)}`,
     );
+  });
+});
+
+describe('PublicProfilePageClient — 받은 후기 요약 · 활동 카드', () => {
+  beforeEach(() => {
+    navigation.pathname = '/users/user-1';
+    navigation.search = '';
+    useV1AuthMeMock.mockReturnValue({ data: undefined } as never);
+  });
+
+  const activitySummary = {
+    totals: { matchCount: 4, tournamentCount: 2, teamCount: 3, reviewCount: 5 },
+    monthly: { matchCount: 1, tournamentCount: 1, teamJoinCount: 1, reviewCount: 0 },
+  } as V1PublicProfile['activitySummary'];
+
+  it('공개 후기의 대표 태그가 있으면 신뢰 신호 카드에 한 문장으로 보이고, 없으면 문장이 없다', () => {
+    const highlight = { tagCode: 'manner', label: '매너가 좋아요', rate: 0.68, reviewCount: 12 };
+    useV1PublicProfileMock.mockReturnValue({
+      isLoading: false, isError: false,
+      data: profile({ reputation: { trustState: 'verified', mannerScore: 4.6, activityCount: 12, reviewCount: 12, highlight } }),
+    } as never);
+    const { unmount } = render(<PublicProfilePageClient userId="user-1" />);
+    expect(screen.getByText(/가장 많이 꼽았어요/).closest('p')).toHaveTextContent('함께 뛴 사람들이 ‘매너가 좋아요’를 가장 많이 꼽았어요 (68%)');
+    unmount();
+
+    useV1PublicProfileMock.mockReturnValue({ isLoading: false, isError: false, data: profile() } as never);
+    render(<PublicProfilePageClient userId="user-1" />);
+    expect(screen.queryByText(/가장 많이 꼽았어요/)).not.toBeInTheDocument();
+  });
+
+  it('활동은 한 카드에서 전체와 이번 달을 탭으로 바꿔 본다 — 이번 달의 세 번째 칸은 팀 가입', async () => {
+    useV1PublicProfileMock.mockReturnValue({ isLoading: false, isError: false, data: profile({ activitySummary }) } as never);
+    render(<PublicProfilePageClient userId="user-1" />);
+
+    expect(screen.getByLabelText('팀 3개')).toBeInTheDocument();
+    expect(screen.queryByText('이번 달 활동')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: '이번 달' }));
+    expect(screen.getByLabelText('팀 가입 1회')).toBeInTheDocument();
+    expect(screen.queryByLabelText('팀 3개')).not.toBeInTheDocument();
+  });
+
+  it('최근 경기와 기록 전체 보기가 활동 카드 안에 있고, 기록 링크는 이 프로필을 출처로 싣는다', () => {
+    navigation.search = 'from=%2Fteams%2Fteam-9';
+    useV1PublicProfileMock.mockReturnValue({
+      isLoading: false, isError: false,
+      data: profile({ activitySummary, recentActivity: { teamName: '성수 FC', jerseyNumber: 7, position: null, playedAt: '2026-09-17T10:00:00.000Z' } as V1PublicProfile['recentActivity'] }),
+    } as never);
+    render(<PublicProfilePageClient userId="user-1" />);
+
+    const link = screen.getByRole('link', { name: /활동 기록 전체 보기/ });
+    const card = link.closest('.tm-card');
+    expect(card).toHaveTextContent('최근 경기');
+    expect(card).toHaveTextContent('성수 FC · 7번');
+    const selfHref = `/users/user-1?from=${encodeURIComponent('/teams/team-9')}`;
+    expect(link).toHaveAttribute('href', `/users/user-1/records?from=${encodeURIComponent(selfHref)}`);
   });
 });

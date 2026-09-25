@@ -26,6 +26,7 @@ import { aggregatePersonalMetricScores, REVIEW_METRICS, type MetricScoreRow } fr
 import { average, revealGroupKey, trustStateForReviewCount } from './team-trust-aggregation';
 import { TournamentFixtureReviewsService } from './tournament-fixture-reviews.service';
 import { AdminContextService } from '../common/admin-context.service';
+import { pickReviewHighlight } from './review-highlight';
 import { HidePostEventReviewDto } from './dto/moderate-review.dto';
 import { recalculateTournamentUserReputation } from './tournament-fixture-review-reputation';
 import { recalculateTournamentFixtureTeamTrust } from './tournament-fixture-review-trust';
@@ -357,6 +358,7 @@ export class ReviewsService {
     return {
       bySport: bySport.map((entry) => ({ ...entry, sportCode: codeById.get(entry.sportId) ?? null })),
       availableMonths,
+      highlight: pickReviewHighlight(filtered),
     };
   }
 

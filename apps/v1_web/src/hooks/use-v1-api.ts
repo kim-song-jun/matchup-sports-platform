@@ -2536,6 +2536,17 @@ export function useV1Notifications(filters?: ListFilters) {
   });
 }
 
+/** "더 보기" 무한 목록 — useV1MyMatchesInfinite 와 같은 cursor 패턴(pageInfo.hasNext/nextCursor). */
+export function useV1NotificationsInfinite() {
+  return useInfiniteQuery({
+    queryKey: v1Keys.notificationsInfinite(),
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) =>
+      v1Get<V1NotificationsPage>('/notifications', { limit: 50, ...(pageParam ? { cursor: pageParam } : {}) }),
+    getNextPageParam: (last) => (last.pageInfo?.hasNext ? last.pageInfo.nextCursor ?? undefined : undefined),
+  });
+}
+
 export function useV1NotificationUnreadSummary(options?: QueryOptions) {
   return useQuery({
     queryKey: v1Keys.notificationUnreadSummary(),

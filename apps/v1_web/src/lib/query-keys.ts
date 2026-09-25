@@ -68,6 +68,8 @@ export const v1Keys = {
   chatMessages: (roomId: string) => [...v1Keys.chatRoom(roomId), 'messages'] as const,
   notificationsRoot: () => [...v1Keys.all, 'notifications'] as const,
   notifications: (filters?: Record<string, unknown>) => [...v1Keys.notificationsRoot(), filters ?? {}] as const,
+  /** "더 보기" 무한 목록 — notificationsRoot() 하위라 read/readAll 무효화가 그대로 덮는다. */
+  notificationsInfinite: () => [...v1Keys.notificationsRoot(), 'infinite'] as const,
   notificationUnreadSummary: () => [...v1Keys.notificationsRoot(), 'unread-summary'] as const,
   notificationPreferences: () => [...v1Keys.all, 'notification-preferences'] as const,
   recordConsent: () => [...v1Keys.all, 'me', 'record-consent'] as const,

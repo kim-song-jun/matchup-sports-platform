@@ -406,6 +406,18 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
             })
           )}
         </div>
+        {model.loadMoreError ? <p role="alert" className="tm-text-caption">이전 알림을 불러오지 못했어요. 다시 시도해 주세요.</p> : null}
+        {model.hasNext ? (
+          <button
+            type="button"
+            className="tm-btn tm-btn-neutral tm-btn-block"
+            style={{ marginTop: 16 }}
+            disabled={model.loadMorePending}
+            onClick={model.onLoadMore}
+          >
+            {model.loadMorePending ? '불러오는 중' : model.loadMoreError ? '다시 불러오기' : '더 보기'}
+          </button>
+        ) : null}
       </div>
       <NotificationDetailSheet
         notification={detail}

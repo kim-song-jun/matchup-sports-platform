@@ -12,7 +12,7 @@ import {
   useV1ChatMessages,
   useV1ChatRoom,
   useV1ChatRooms,
-  useV1Notifications,
+  useV1NotificationsInfinite,
   useV1ReadAllNotifications,
   useV1ReadNotification,
   useV1SendChatMessage,
@@ -226,7 +226,8 @@ export function ChatRoomPageClient({ roomId }: { roomId: string }) {
 export function NotificationsPageClient() {
   const router = useRouter();
   const [readAllToastVisible, setReadAllToastVisible] = useState(false);
-  const query = useV1Notifications({ limit: 50 });
+  // "더 보기" 무한 목록 — useV1MyMatchesInfinite/MyMatchesPageClient 와 동일한 패턴.
+  const query = useV1NotificationsInfinite();
   const read = useV1ReadNotification();
   const readAll = useV1ReadAllNotifications();
 
@@ -237,15 +238,21 @@ export function NotificationsPageClient() {
       : 'ready';
 
   // 로딩·에러 중에는 빈 배열을 유지하되 EmptyState를 노출하지 않는다.
-  // ready 상태에서만 실제 알림이 없는지 판정한다.
-  const notifications = status === 'ready' && Array.isArray(query.data?.items)
-    ? query.data.items.map(toNotificationModel)
+  // ready 상태에서만 실제 알림이 없는지 판정한다. 페이지 경계에서 항목이 겹쳐 올 수 있어
+  // (invalidate 후 재조회 등) notificationId 기준으로 중복을 제거한다(my-matches-client.tsx 선례).
+  const notifications = status === 'ready' && query.data
+    ? query.data.pages
+        .flatMap((page) => page.items)
+        .filter((item, index, items) => items.findIndex((other) => other.notificationId === item.notificationId) === index)
+        .map(toNotificationModel)
     : [];
 
   const model: NotificationsViewModel = {
     status,
     onRetry: query.isError ? () => query.refetch() : undefined,
-    unreadCount: typeof query.data?.unreadCount === 'number' ? query.data.unreadCount : 0,
+    // unreadCount는 페이지네이션과 무관한 전체 미읽음 수 — 서버가 매 페이지 응답에 동일하게
+    // 채워 준다(첫 페이지 값을 쓴다. "모두 읽음" 후에는 무효화로 모든 페이지가 다시 조회돼 0이 된다).
+    unreadCount: typeof query.data?.pages[0]?.unreadCount === 'number' ? query.data.pages[0].unreadCount : 0,
     notifications,
     readAllPending: readAll.isPending,
     readAllToastVisible,
@@ -265,6 +272,10 @@ export function NotificationsPageClient() {
       if (notification.unread) read.mutate(notification.id);
     },
     onNavigate: (notification) => router.push(notification.href),
+    hasNext: query.hasNextPage,
+    loadMorePending: query.isFetchingNextPage,
+    loadMoreError: query.isFetchNextPageError,
+    onLoadMore: () => { if (!query.isFetching) void query.fetchNextPage(); },
   };
 
   return <NotificationsPageView model={model} />;

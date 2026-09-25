@@ -241,13 +241,13 @@ export function NotificationsPageClient() {
   // 로딩·에러 중에는 빈 배열을 유지하되 EmptyState를 노출하지 않는다.
   // ready 상태에서만 실제 알림이 없는지 판정한다. 페이지 경계에서 항목이 겹쳐 올 수 있어
   // (invalidate 후 재조회 등) notificationId 기준으로 중복을 제거한다(my-matches-client.tsx 선례).
-  const seen = new Set<string>();
-  const notifications = status === 'ready' && query.data
-    ? query.data.pages
-        .flatMap((page) => page.items)
-        .filter((item) => !seen.has(item.notificationId) && Boolean(seen.add(item.notificationId)))
-        .map(toNotificationModel)
-    : [];
+  const byId = new Map<string, V1Notification>();
+  if (status === 'ready' && query.data) {
+    for (const item of query.data.pages.flatMap((page) => page.items)) {
+      if (!byId.has(item.notificationId)) byId.set(item.notificationId, item);
+    }
+  }
+  const notifications = [...byId.values()].map(toNotificationModel);
 
   const model: NotificationsViewModel = {
     status,

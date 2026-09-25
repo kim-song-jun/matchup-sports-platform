@@ -83,7 +83,7 @@ describe('선수 카드', () => {
   it('등급이 실력이 아니라 출전 수라는 것을 화면에 적는다', () => {
     renderCard(card({ tier: 'bronze', appearances: 2 }));
 
-    expect(screen.getByText('등급은 실력이 아니라 뛴 경기 수로 올라가요')).toBeInTheDocument();
+    expect(document.querySelector('.tm-player-card-sub')).toHaveTextContent('브론즈 등급 · 경기 수로 올라가요');
     // 티어 한글 이름은 카드 아래 요약 줄과 뒷면 성향 태그 양쪽에 나온다.
     expect(screen.getAllByText(/브론즈/).length).toBeGreaterThan(0);
   });

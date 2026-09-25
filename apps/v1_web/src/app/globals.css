@@ -5735,6 +5735,12 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   background: var(--border);
 }
 
+@media (hover: hover) {
+  :root.dark .tm-public-profile .tm-card .tm-btn-neutral:hover:not(:disabled) {
+    background: var(--grey200);
+  }
+}
+
 .tm-review-highlight-tag {
   color: var(--text-strong);
   font-weight: 700;

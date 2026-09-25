@@ -19,7 +19,7 @@ import {
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
-import { clearExpiringDraft, readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
+import { clearExpiringDraft, draftStorageAvailable, readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { labelToLevelCode, levelCodeToLabel, V1_LEVELS, type V1LevelCode } from '@/lib/v1-levels';
@@ -288,9 +288,8 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
               message: prompt,
               confirmLabel: '프로필 수정',
             }).then(async (ok) => {
-              // Leaving the form for the profile — the unsaved-changes guard still asks.
-              // 작성 내용은 임시 저장돼 돌아와 이어 쓸 수 있다 — 따로 묻지 않는다.
-              if (ok) router.push(profileEditHref('/team-matches/new/confirm'));
+              // A saved draft survives the trip to the profile; without storage it would be lost, so ask then.
+              if (ok && (draftStorageAvailable() || (await confirmLeave()))) router.push(profileEditHref('/team-matches/new/confirm'));
             });
             return;
           }

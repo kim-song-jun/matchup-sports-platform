@@ -5,11 +5,13 @@ import {
   addPopInterceptor,
   bufferLeavePlan,
   currentEntryIsBuffer,
+  goBackLeaving,
   hasPreviousSameDocumentEntry,
   markAppInitiatedBack,
   pushBufferEntry,
   replaceInApp,
 } from '@/lib/navigation-history';
+import { draftStorageAvailable } from '@/lib/expiring-draft';
 import { overlayHistoryIdle, overlayMarkerOf } from '@/lib/overlay-history';
 import { useConfirm, type ConfirmOptions } from './confirm-modal';
 import { resolveColdStartParent } from './navigation-history-tracker';
@@ -101,7 +103,7 @@ export function useUnsavedChangesGuard(
     // exit: down to the bottom form entry first, so the exit replaces it and no form copy stays behind
     if (exit) exitAfterPopRef.current = true;
     else leavingRef.current = true;
-    window.history.go(-steps);
+    goBackLeaving(steps);
   }, []);
 
   // Keep exactly one buffer while dirty on a cold entry; take it off once clean. Never on top of an overlay.
@@ -120,7 +122,7 @@ export function useUnsavedChangesGuard(
     askingRef.current = true;
     let leave = false;
     try {
-      leave = await confirm(draftSaved ? LEAVE_CONFIRM_OPTIONS_DRAFT_SAVED : LEAVE_CONFIRM_OPTIONS);
+      leave = await confirm(draftSaved && draftStorageAvailable() ? LEAVE_CONFIRM_OPTIONS_DRAFT_SAVED : LEAVE_CONFIRM_OPTIONS);
     } finally {
       askingRef.current = false;
     }

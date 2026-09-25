@@ -8,7 +8,9 @@ import {
   __resetNavigationHistoryForTests,
   OVERLAY_STATE_KEY,
   bindSoftNavigator,
+  bufferLeavePlan,
   decideBackAction,
+  goBackLeaving,
   ensureColdStartParent,
   addPopInterceptor,
   hasPreviousInAppEntry,
@@ -16,6 +18,7 @@ import {
   isAppBackPending,
   isAppNavigationPop,
   markAppInitiatedBack,
+  pushBufferEntry,
   subscribeAppPop,
   suppressNextPop,
   type AppPop,
@@ -323,5 +326,47 @@ describe('reload with a modal open', () => {
     installNavigationHistory();
     await settle();
     expect(window.location.pathname).toBe('/home');
+  });
+});
+
+describe('same-URL copies left by reloads under a dirty form', () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+  const reload = () => {
+    __resetNavigationHistoryForTests();
+    installNavigationHistory();
+  };
+
+  it('a reload on a modal over the buffer skips both form copies — leaving lands before the form', async () => {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/teams/new'); // form
+    pushBufferEntry();
+    window.history.pushState({ [OVERLAY_STATE_KEY]: 'modal-1' }, '', '/teams/new');
+    reload();
+    pushBufferEntry(); // the restored draft is dirty again
+
+    const { steps, exit } = bufferLeavePlan();
+    expect(exit).toBe(false);
+    await traverse(() => window.history.go(-steps));
+    expect(window.location.pathname).toBe('/home');
+  });
+
+  it('forward from a page outside the app onto a skipped copy keeps going forward, not back out', async () => {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/teams/new');
+    pushBufferEntry();
+    reload(); // reloaded on the buffer: the entry under it is now a skipped copy
+    pushBufferEntry();
+
+    const { steps } = bufferLeavePlan();
+    goBackLeaving(steps);
+    __resetNavigationHistoryForTests(); // the leave lands in another document — this one never sees the pop
+    await settle();
+    expect(window.location.pathname).toBe('/home');
+
+    await forward(); // back into the tab: the first entry forward is the skipped copy
+    installNavigationHistory();
+    await settle();
+    expect(window.location.pathname).toBe('/teams/new');
+    expect(idx()).toBe(2);
   });
 });

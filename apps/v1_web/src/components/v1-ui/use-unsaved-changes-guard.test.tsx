@@ -99,6 +99,19 @@ describe('입력 중인 폼 — 임시 저장되는 폼의 문구', () => {
     expect(leaveDialog()).toBeNull();
     unmount();
   });
+
+  it('저장소가 막힌 기기에서는 임시 저장 폼이어도 사라진다고 말한다', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    try {
+      render(<Form dirty draftSaved />);
+      await run(() => window.history.back());
+      expect(leaveDialog()).toBeTruthy();
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
 });
 
 describe('입력 중인 폼 — 닫힌 오버레이의 남은 표식', () => {

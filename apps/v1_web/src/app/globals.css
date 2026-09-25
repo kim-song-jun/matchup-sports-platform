@@ -5720,6 +5720,25 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   text-decoration: none;
 }
 
+.tm-inline-action {
+  position: relative;
+  margin-left: 8px;
+  padding: 2px 8px;
+  min-height: 0;
+  font-size: inherit;
+}
+
+/* 문장 안에 끼는 작은 액션이라 모양은 글자 높이로 두고, 누르는 영역만 44px 로 넓힌다. */
+.tm-inline-action::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: 50%;
+  height: 44px;
+  transform: translateY(-50%);
+}
+
 .tm-review-highlight {
   color: var(--text-body);
 }

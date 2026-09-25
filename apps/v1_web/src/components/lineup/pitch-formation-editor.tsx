@@ -491,8 +491,7 @@ export function PitchFormationEditor({
             <button
               type="button"
               onClick={() => setSelectedWaitingKey(null)}
-              className="tm-btn tm-btn-ghost"
-              style={{ marginLeft: 8, padding: '2px 8px', minHeight: 'auto', fontSize: 'inherit' }}
+              className="tm-btn tm-btn-ghost tm-inline-action"
             >
               선택 취소
             </button>

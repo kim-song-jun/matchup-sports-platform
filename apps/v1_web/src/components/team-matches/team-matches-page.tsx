@@ -1373,7 +1373,7 @@ function ImageUploadField({ image, onChange, onUpload }: { image: string; onChan
         <span className="tm-badge tm-badge-grey">배경 이미지</span>
       </div>
       <div style={{ padding: 16 }}>
-        <label className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" style={{ opacity: uploading ? 0.6 : 1 }}>
+        <label className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" style={uploading ? { opacity: 0.6 } : undefined}>
           {uploading ? '업로드 중...' : fileName || image ? '이미지 변경' : '배경 이미지 선택'}
           <input className="sr-only" type="file" accept="image/*" disabled={uploading} onChange={handleChange} />
         </label>

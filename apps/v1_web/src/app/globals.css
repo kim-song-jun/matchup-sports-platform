@@ -3673,6 +3673,16 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   cursor: not-allowed;
 }
 
+.tm-create-fieldset:disabled .tm-create-input {
+  background: var(--grey100);
+}
+
+.tm-create-fieldset:disabled .tm-create-native-input,
+.tm-create-fieldset:disabled .tm-create-select-control {
+  color: var(--text-caption);
+  cursor: not-allowed;
+}
+
 .tm-create-shell {
   padding: 12px 20px 124px;
 }

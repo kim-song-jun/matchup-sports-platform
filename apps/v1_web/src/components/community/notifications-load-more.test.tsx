@@ -80,6 +80,19 @@ describe('알림 목록 "더 보기"', () => {
     expect(screen.getByRole('button', { name: '다시 불러오기' })).toBeTruthy();
   });
 
+  // 목록 밖에 두면 페이지 여백(좌우)과 하단 내비 여백 계산에서 빠져, 폭 전체·높이 24px 버튼이 된다(alpha 실측).
+  it('더 보기는 목록 안에서 크기 클래스를 갖고 렌더된다', () => {
+    mock.query.mockReturnValue(baseQuery({
+      data: { pages: [{ unreadCount: 1, items: [notif()] }] },
+      hasNext: true,
+      hasNextPage: true,
+    }));
+    render(<NotificationsPageClient />);
+    const button = screen.getByRole('button', { name: '더 보기' });
+    expect(button.closest('.tm-notification-list')).not.toBeNull();
+    expect(button).toHaveClass('tm-btn-md');
+  });
+
   it('배경 새로고침 중에도 더 보기 탭은 무시되지 않는다', () => {
     mock.fetchNextPage.mockClear();
     mock.query.mockReturnValue(baseQuery({

@@ -3,6 +3,12 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { PlayerCardShareClient } from './player-card-share-client';
 import type { V1PlayerCard } from '@/types/api';
 
+const nav = vi.hoisted(() => ({ search: '' }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/users/u-1/card',
+  useSearchParams: () => new URLSearchParams(nav.search),
+}));
+
 /**
  * 공유 버튼이 **아무 말 없이 실패하지 않는지**를 건다.
  *
@@ -103,5 +109,24 @@ describe('선수 카드 공유 화면', () => {
     expect(screen.queryByRole('link', { name: '카드 공유하기' })).not.toBeInTheDocument();
     // 뒤로가기가 이 카드 화면으로 돌아오도록 `?from=`을 함께 실어 보낸다(MD-QA #15).
     expect(screen.getByRole('link', { name: '프로필 전체 보기' })).toHaveAttribute('href', '/users/u-1?from=%2Fusers%2Fu-1%2Fcard');
+  });
+
+  // 마이페이지 → 카드 → 프로필 → 뒤로 → 카드 → 뒤로 가 마이페이지에 닿으려면 카드가 받은 출처가 이어져야 한다.
+  it('카드가 받은 출처까지 프로필 링크에 이어 붙이고, 공유 주소에는 싣지 않는다', async () => {
+    nav.search = 'from=%2Fmy';
+    window.history.replaceState(null, '', '/users/u-1/card?from=%2Fmy');
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+    try {
+      renderShare();
+      const href = screen.getByRole('link', { name: '프로필 전체 보기' }).getAttribute('href') ?? '';
+      expect(new URL(href, 'http://x').searchParams.get('from')).toBe('/users/u-1/card?from=%2Fmy');
+
+      fireEvent.click(screen.getByRole('button', { name: '카드 공유하기' }));
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/users/u-1/card`));
+    } finally {
+      nav.search = '';
+      window.history.replaceState(null, '', '/');
+    }
   });
 });

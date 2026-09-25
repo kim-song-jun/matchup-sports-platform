@@ -53,7 +53,7 @@ describe('마이페이지 내 선수 카드', () => {
 
     renderSection();
 
-    expect(screen.getByRole('link', { name: '카드 공유하기' })).toHaveAttribute('href', '/users/u-1/card');
+    expect(screen.getByRole('link', { name: '카드 공유하기' })).toHaveAttribute('href', '/users/u-1/card?from=%2Fmy');
     expect(screen.getByLabelText('등번호 1번')).toBeInTheDocument();
     // 카드 설정(숨김·모양) 입구도 카드 곁에 -- 메뉴 2클릭 뒤에만 있으면 발견 불가능하다.
     expect(screen.getByRole('link', { name: '카드 설정' })).toHaveAttribute('href', '/my/settings/player-card');
@@ -191,7 +191,7 @@ describe('카드 독립 배치 (사용자 선택 A안)', () => {
     renderStage();
 
     expect(screen.getByRole('button', { name: /카드 뒤집기/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '카드 공유하기' })).toHaveAttribute('href', '/users/u-1/card');
+    expect(screen.getByRole('link', { name: '카드 공유하기' })).toHaveAttribute('href', '/users/u-1/card?from=%2Fmy');
     expect(screen.getByRole('link', { name: '카드 설정' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '프로필 수정' })).not.toBeInTheDocument();
   });

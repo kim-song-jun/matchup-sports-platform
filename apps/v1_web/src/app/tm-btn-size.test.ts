@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
  */
 const SRC = resolve(process.cwd(), 'src');
 // tm-inline-action: text-height action inside a sentence, with a 44px hit area of its own.
-const SIZE = /tm-btn-(sm|md|lg|icon)\b|tm-inline-action|sizeClass/;
+const SIZE = /tm-btn-(sm|md|lg|icon)\b|(?<![\w-])tm-inline-action(?![\w-])|sizeClass/;
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

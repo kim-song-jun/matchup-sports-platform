@@ -3666,8 +3666,9 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   min-width: 0;
 }
 
-/* Inputs carry their own disabled token; chips, toggles and upload buttons do not. */
-.tm-create-fieldset:disabled button {
+/* Inputs carry their own disabled token; chips, toggles and the label-styled upload button do not. */
+.tm-create-fieldset:disabled button,
+.tm-create-fieldset:disabled label.tm-btn {
   opacity: 0.5;
   cursor: not-allowed;
 }

@@ -5642,6 +5642,97 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   gap: 12px;
 }
 
+/* 공개 프로필(/users/:id) — 모바일에서는 래퍼가 투명해 카드들이 셸 그리드의 간격을 그대로 받는다.
+   데스크톱 2열은 desktop/my.css. */
+.tm-public-profile-main {
+  display: contents;
+}
+
+.tm-profile-activity-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tm-profile-activity-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-body);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.tm-profile-activity-title svg {
+  color: var(--text-muted);
+}
+
+.tm-profile-activity-tabs {
+  flex: 0 0 auto;
+  width: 168px;
+}
+
+.tm-profile-activity-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.tm-profile-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tm-profile-stat-value {
+  font-size: var(--font-size-subhead);
+  font-weight: 800;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.tm-profile-activity-recent {
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  line-height: 1.5;
+}
+
+.tm-profile-activity-recent-team {
+  color: var(--text-body);
+  font-weight: 700;
+}
+
+.tm-profile-activity-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  margin-top: 4px;
+  font-size: var(--font-size-body);
+  font-weight: 700;
+  color: var(--text-body);
+  text-decoration: none;
+}
+
+.tm-review-highlight {
+  color: var(--text-body);
+}
+
+.tm-review-highlight-tag {
+  color: var(--text-strong);
+  font-weight: 700;
+}
+
+.tm-review-highlight-rate {
+  color: var(--text-muted);
+}
+
 .tm-my-monthly {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

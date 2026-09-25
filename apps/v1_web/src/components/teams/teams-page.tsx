@@ -10,6 +10,7 @@ import { Card, EmptyState, ErrorState, KPIStat, ListItem, SectionTitle } from '@
 import { ChevronLeftIcon, ChevronRightIcon, FilterIcon, PlusIcon, SearchIcon, ShareIcon } from '@/components/v1-ui/icons';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { ReviewHighlightLine } from '@/components/v1-ui/review-highlight-line';
 import { BottomSheet } from '@/components/v1-ui/bottom-sheet';
 import { cssUrl } from '@/lib/assets';
 import { useV1PublicTeamReviewSummary } from '@/hooks/use-v1-api';
@@ -473,7 +474,7 @@ function TeamRecordLinkCard({
   /** 없으면 링크가 아니라 표시 전용 카드로 그린다 — 갈 곳이 없는데 눌리는 것처럼 보이면 안 된다. */
   href?: string;
   title: string;
-  description: string;
+  description: ReactNode;
   badge?: string | null;
 }) {
   const body = (
@@ -572,6 +573,15 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
       ? null
       : (reviewSummary.data?.bySport ?? []).reduce((sum, row) => sum + (row.ratingAvg ?? 0) * row.ratingCount, 0) /
         teamReviewCount;
+  const teamReviewHighlight = reviewSummary.data?.highlight ?? null;
+  const teamReviewDescription: ReactNode =
+    teamReviewCount === 0
+      ? '아직 받은 후기가 없어요. 경기를 마치면 쌓여요.'
+      : teamReviewHighlight
+        ? <ReviewHighlightLine subject={isMyTeam ? '함께 뛴 팀들이' : '이 팀과 뛴 팀들이'} highlight={teamReviewHighlight} />
+        : isMyTeam
+          ? '함께 뛴 팀들이 남긴 평가를 확인해요.'
+          : '이 팀과 뛴 팀들이 남긴 평가예요.';
 
   const heroActionBusyRef = useRef(false);
   const runHeroAction = (action: (() => void | Promise<unknown>) | undefined, successMessage: string, failureMessage = '잠시 후 다시 시도해 주세요.') => {
@@ -657,13 +667,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <TeamRecordLinkCard
               href={isMyTeam ? withFromPath('/my/reviews?tab=received', model.selfHref ?? `/teams/${model.team.id}`) : undefined}
               title="받은 후기"
-              description={
-                teamReviewCount === 0
-                  ? '아직 받은 후기가 없어요. 경기를 마치면 쌓여요.'
-                  : isMyTeam
-                    ? '함께 뛴 팀들이 남긴 평가를 확인해요.'
-                    : '이 팀과 뛴 팀들이 남긴 평가예요.'
-              }
+              description={teamReviewDescription}
               badge={teamReviewCount > 0 && teamReviewAvg !== null ? `${teamReviewAvg.toFixed(1)} · ${teamReviewCount}팀` : null}
             />
           ) : null}
@@ -815,13 +819,7 @@ export function TeamDetailPageView({ model }: { model: TeamDetailViewModel }) {
             <TeamRecordLinkCard
               href={isMyTeam ? withFromPath('/my/reviews?tab=received', model.selfHref ?? `/teams/${model.team.id}`) : undefined}
               title="받은 후기"
-              description={
-                teamReviewCount === 0
-                  ? '아직 받은 후기가 없어요. 경기를 마치면 쌓여요.'
-                  : isMyTeam
-                    ? '함께 뛴 팀들이 남긴 평가를 확인해요.'
-                    : '이 팀과 뛴 팀들이 남긴 평가예요.'
-              }
+              description={teamReviewDescription}
               // 별점만 두면 몇 명이 준 점수인지 알 수 없다 — 개수를 함께 적는다.
               badge={teamReviewCount > 0 && teamReviewAvg !== null ? `${teamReviewAvg.toFixed(1)} · ${teamReviewCount}팀` : null}
             />

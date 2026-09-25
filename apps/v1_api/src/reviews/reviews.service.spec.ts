@@ -2088,4 +2088,35 @@ describe('publicTeamSummary — 공개 팀 후기 요약', () => {
       jest.useRealTimers();
     }
   });
+
+  // The team card's sentence reads this — it must follow the same reveal rule as the scores beside it.
+  it('highlight 는 공개된 후기의 태그로만 정하고, 3건 미만이면 비운다', async () => {
+    const old = new Date('2026-07-01T00:00:00Z');
+    const fresh = new Date('2026-08-01T00:00:00Z');
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-01T01:00:00Z'));
+    const row = (id: string, submittedAt: Date, tagCode: string) => ({
+      sourceId: id, reviewerUserId: `user-${id}`, reviewerTeamId: `team-${id}`, targetUserId: null, targetTeamId: 'team-x',
+      rating: 5, sportId: 'futsal', submittedAt, tags: [{ tagCode, labelSnapshot: `label:${tagCode}` }],
+    });
+    const run = async (rows: unknown[]) => {
+      const prisma = {
+        v1PostEventReview: { findMany: jest.fn().mockResolvedValueOnce(rows).mockResolvedValueOnce([]) },
+        v1TeamMembership: { findMany: jest.fn() },
+        v1Sport: { findMany: jest.fn().mockResolvedValue([{ id: 'futsal', code: 'futsal' }]) },
+      };
+      return new ReviewsService(prisma as never, stubs().tournamentFixtureReviews as never, adminContextStub(), reviewPolicyStub())
+        .publicTeamSummary('team-x');
+    };
+    try {
+      const revealed = [row('a', old, 'manner'), row('b', old, 'manner'), row('c', old, 'teamwork')];
+      const unrevealed = [row('d', fresh, 'teamwork'), row('e', fresh, 'teamwork')];
+      expect((await run([...revealed, ...unrevealed])).highlight).toEqual({ tagCode: 'manner', label: 'label:manner', rate: 0.67, reviewCount: 3 });
+      expect((await run(revealed.slice(0, 2))).highlight).toBeNull();
+      // 한 상대 팀의 멤버 셋이 한 경기 뒤 각자 쓴 후기는 "팀들"의 평가가 아니다.
+      const oneTeam = revealed.map((review) => ({ ...review, reviewerTeamId: 'team-roster' }));
+      expect((await run(oneTeam)).highlight).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

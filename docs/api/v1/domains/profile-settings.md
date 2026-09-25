@@ -79,6 +79,7 @@ Application, invitation, chat, review, inquiry, profile update, and existing-ent
 - Private fields such as real name, email, phone, birth date, gender, and profile bio are never returned.
 - Returned identity fields: `userId`, `displayName`, `nickname`, `profileImageUrl`; `displayName` is derived from public nickname and never from `realName`.
 - Returned trust field: `reputation.mannerScore`, `reputation.reviewCount`, `reputation.trustState`.
+- `reputation.highlight`: the tag on the most revealed reviews (`tagCode`, `label`, `rate` 0-1, `reviewCount`) from the same reviews as `mannerScore`; `null` until three distinct reviewers (users for a person, reviewing teams for a team) stand behind the reviews, so a rate never points at one or two reviewers. `GET /teams/:teamId/reviews` returns the same `highlight` for a team.
 - Returned public activity summary:
   - `totals.matchCount`: completed match participation count
   - `totals.teamCount`: active team membership count

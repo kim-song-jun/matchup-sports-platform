@@ -35,7 +35,7 @@ function renderView(tab: ReviewsPageModel['tab']) {
       onTeamPeriodChange={vi.fn()}
       period={null}
       receivedModel={emptyReceived}
-      summary={{ bySport: [], availableMonths: [] }}
+      summary={{ bySport: [], availableMonths: [], highlight: null }}
       summaryLoading={false}
       teamPeriod={null}
       teamSummary={undefined}

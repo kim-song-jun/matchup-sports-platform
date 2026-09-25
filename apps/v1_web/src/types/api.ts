@@ -1848,9 +1848,19 @@ export type V1ReviewSportSummary = {
   tagRates: V1ReviewTagRate[];
 };
 
+/** The single most-given tag across revealed reviews. The server sends null until three distinct reviewers (users, or reviewing teams for a team) stand behind them. */
+export type V1ReviewHighlight = {
+  tagCode: string;
+  label: string;
+  /** Share of the reviews carrying this tag, 0-1. */
+  rate: number;
+  reviewCount: number;
+};
+
 export type V1ReviewReceivedSummaryResponse = {
   bySport: V1ReviewSportSummary[];
   availableMonths: string[];
+  highlight: V1ReviewHighlight | null;
 };
 
 /**
@@ -2102,6 +2112,7 @@ export type V1PublicProfile = {
     mannerScore: number | null;
     activityCount: number;
     reviewCount: number;
+    highlight: V1ReviewHighlight | null;
   };
   /** 선수 카드. 사용자가 카드를 숨겼으면 null 이 오고, 프론트는 섹션을 렌더하지 않는다. */
   playerCard?: V1PlayerCard | null;

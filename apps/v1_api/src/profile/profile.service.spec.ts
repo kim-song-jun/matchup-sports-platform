@@ -367,7 +367,14 @@ describe('ProfileService activitySummary', () => {
       // 대회 개인 후기(tournament_fixture)는 별도 tournament_* 집계이므로 포함하지 않는다.
       expect(findMany).toHaveBeenNthCalledWith(1, {
         where: { targetUserId: user.id, targetType: 'user', status: 'submitted', sourceType: { in: ['match', 'team_match'] } },
-        select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
+        select: {
+          sourceId: true,
+          reviewerUserId: true,
+          targetUserId: true,
+          rating: true,
+          submittedAt: true,
+          tags: { select: { tagCode: true, labelSnapshot: true } },
+        },
       });
       expect(findMany).toHaveBeenNthCalledWith(2, {
         where: { reviewerUserId: user.id, sourceType: { in: ['match', 'team_match'] }, sourceId: { in: ['source-a', 'source-b'] }, status: 'submitted' },
@@ -1070,6 +1077,30 @@ describe('ProfileService public profile activity summary (reveal filtering)', ()
       const result = await service.publicProfile(null, targetUserId);
 
       expect(result.activitySummary.totals.reviewCount).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  // The public sentence must come from the same revealed reviews as the manner score — a review the
+  // target can't see yet must not surface to strangers through its tag.
+  it('reputation.highlight counts only revealed reviews, and stays empty below three', async () => {
+    const now = new Date('2026-08-15T12:00:00Z');
+    const old = new Date('2026-08-01T00:00:00Z');
+    jest.useFakeTimers().setSystemTime(now);
+    const tag = (tagCode: string) => [{ tagCode, labelSnapshot: `label:${tagCode}` }];
+    const review = (id: string, submittedAt: Date, tags: unknown[]) => ({
+      sourceId: `source-${id}`, reviewerUserId: `reviewer-${id}`, targetUserId, rating: 5, submittedAt, tags,
+    });
+    try {
+      const revealed = [review('a', old, tag('manner')), review('b', old, tag('manner')), review('c', old, tag('punctual'))];
+      const hidden = [review('d', now, tag('punctual')), review('e', now, tag('punctual'))];
+      const service = new ProfileService(buildPrisma({ allTimeCandidates: [...revealed, ...hidden] }) as never);
+      const result = await service.publicProfile(null, targetUserId);
+      expect(result.reputation.highlight).toEqual({ tagCode: 'manner', label: 'label:manner', rate: 0.67, reviewCount: 3 });
+
+      const few = new ProfileService(buildPrisma({ allTimeCandidates: revealed.slice(0, 2) }) as never);
+      expect((await few.publicProfile(null, targetUserId)).reputation.highlight).toBeNull();
     } finally {
       jest.useRealTimers();
     }

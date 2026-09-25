@@ -6,7 +6,7 @@ const summary = {
   bySport: [
     { sportId: 'sport-uuid-1', sportCode: 'futsal', ratingAvg: 4.8, ratingCount: 12, tagRates: [{ tagCode: 'manner', label: '매너가 좋아요', rate: 0.68, count: 8 }] },
   ],
-  availableMonths: ['2026-07', '2026-06'],
+  availableMonths: ['2026-07', '2026-06'], highlight: null,
 };
 
 describe('ReviewsSummaryDashboard', () => {
@@ -75,7 +75,7 @@ describe('ReviewsSummaryDashboard', () => {
   // 걸 대상이 없는 필터를 남겨둘 이유가 없으므로 섹션째 사라져야 한다.
   it('집계 결과가 비어 있으면 아무것도 렌더하지 않는다', () => {
     const { container } = render(
-      <ReviewsSummaryDashboard summary={{ bySport: [], availableMonths: [] }} period={null} onPeriodChange={vi.fn()} loading={false} title="내가 받은 리뷰 요약" />,
+      <ReviewsSummaryDashboard summary={{ bySport: [], availableMonths: [], highlight: null }} period={null} onPeriodChange={vi.fn()} loading={false} title="내가 받은 리뷰 요약" />,
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -84,7 +84,7 @@ describe('ReviewsSummaryDashboard', () => {
   it('선택 가능한 기간이 없으면 기간 드롭다운을 숨긴다', () => {
     render(
       <ReviewsSummaryDashboard
-        summary={{ ...summary, availableMonths: [] }}
+        summary={{ ...summary, availableMonths: [], highlight: null }}
         period={null}
         onPeriodChange={vi.fn()}
         loading={false}

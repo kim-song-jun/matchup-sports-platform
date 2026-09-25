@@ -558,7 +558,12 @@ export function MatchCreatePageView({ model }: { model: MatchCreateViewModel }) 
         {missingFields.length > 0 ? <MissingFieldsBanner missingFields={missingFields} stepHref={matchStepHref} /> : null}
         {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 매치예요" body={model.form.lockedReason} /> : null}
         {model.step === 'sport' ? <SportStep model={model} /> : null}
-        {model.step === 'info' || model.step === 'edit' ? <InfoStep model={model} edit={edit} /> : null}
+        {model.step === 'info' || model.step === 'edit' ? (
+          // The server rejects every field of a locked match, so every control is locked with it.
+          <fieldset className="tm-create-fieldset" disabled={Boolean(model.form?.lockedReason)}>
+            <InfoStep model={model} edit={edit} />
+          </fieldset>
+        ) : null}
         {model.step === 'place-time' ? <PlaceTimeStep model={model} /> : null}
         {model.step === 'confirm' ? <ConfirmStep model={model} /> : null}
       </div>

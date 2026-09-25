@@ -312,6 +312,37 @@ describe('team match full edit', () => {
     expect(screen.getByText('성별 조건')).toBeInTheDocument();
     expect(screen.getByText('지역')).toBeInTheDocument();
   });
+
+  // 서버 update()는 모집 중이 아닌 팀매치의 어떤 필드도 받지 않는다 — 입력도 같이 잠근다.
+  it.each([
+    ['잠긴 팀매치는 입력·이미지 선택을 전부 잠근다', '만료된 팀매치는 수정할 수 없어요.', true],
+    ['모집 중인 팀매치는 그대로 연다', null, false],
+  ])('%s', (_name, lockedReason, locked) => {
+    const model = getTeamMatchCreateViewModel('edit');
+    model.form = {
+      selectedTeamId: 'team-1',
+      selectedSportId: 'sport-futsal',
+      regionId: 'region-gangnam',
+      regions: [{ id: 'region-gangnam', name: '서울 강남구' }],
+      onSelectTeam: () => undefined,
+      onSelectSport: () => undefined,
+      onFieldChange: () => undefined,
+      onRegionChange: () => undefined,
+      onBack: () => undefined,
+      onNext: () => undefined,
+      onSubmit: () => undefined,
+      lockedReason,
+    };
+
+    renderPage(<TeamMatchCreatePageView model={model} />);
+
+    for (const label of ['매치 제목', '설명', '상세 주소', '날짜']) {
+      if (locked) expect(screen.getByLabelText(label)).toBeDisabled();
+      else expect(screen.getByLabelText(label)).not.toBeDisabled();
+    }
+    if (locked) expect(screen.getByLabelText(/배경 이미지 선택/)).toBeDisabled();
+    else expect(screen.getByLabelText(/배경 이미지 선택/)).not.toBeDisabled();
+  });
 });
 
 describe('팀매치 만들기 진행 표시줄 — 클릭 이동', () => {

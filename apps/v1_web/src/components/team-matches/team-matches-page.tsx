@@ -767,7 +767,12 @@ export function TeamMatchCreatePageView({ model }: { model: TeamMatchCreateViewM
         {model.form?.lockedReason ? <StateCard tone="orange" title="수정이 제한된 팀매치예요" body={model.form.lockedReason} /> : null}
         {model.step === 'team' ? <TeamStep model={model} /> : null}
         {model.step === 'sport' ? <SportStep model={model} /> : null}
-        {model.step === 'info' || edit ? <InfoStep model={model} edit={edit} /> : null}
+        {model.step === 'info' || edit ? (
+          // The server rejects every field of a locked team match, so every control is locked with it.
+          <fieldset className="tm-create-fieldset" disabled={Boolean(model.form?.lockedReason)}>
+            <InfoStep model={model} edit={edit} />
+          </fieldset>
+        ) : null}
         {model.step === 'condition' ? <ConditionStep model={model} /> : null}
         {model.step === 'place-time' ? <PlaceTimeStep model={model} /> : null}
         {model.step === 'confirm' ? <ConfirmStep model={model} /> : null}

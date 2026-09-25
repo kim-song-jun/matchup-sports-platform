@@ -77,7 +77,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   // 마법사 단계는 모두 /team-matches/new 아래 — 단계 사이 이동은 묻지 않는다.
   const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(
     selectionTouched || JSON.stringify(draft) !== defaultDraftJson,
-    { scope: '/team-matches/new' },
+    { scope: '/team-matches/new', draftSaved: true },
   );
   const [error, setError] = useState<string | null>(null);
   // "다음"/"팀매치 만들기"를 한 번이라도 눌러본 뒤에만 인라인 에러를 보여준다 — 진입하자마자
@@ -287,7 +287,9 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
               title: '프로필 정보가 필요해요',
               message: prompt,
               confirmLabel: '프로필 수정',
-            }).then((ok) => {
+            }).then(async (ok) => {
+              // Leaving the form for the profile — the unsaved-changes guard still asks.
+              // 작성 내용은 임시 저장돼 돌아와 이어 쓸 수 있다 — 따로 묻지 않는다.
               if (ok) router.push(profileEditHref('/team-matches/new/confirm'));
             });
             return;

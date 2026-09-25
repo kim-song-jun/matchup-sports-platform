@@ -73,7 +73,7 @@ export function TeamCreatePageClient() {
   const regionOptions = toTeamRegionOptions(regions.data ?? []);
   const selectedSportId = sportId || sports.data?.[0]?.id || '';
   const [touched, setTouched] = useState(false);
-  const { UnsavedChangesModal } = useUnsavedChangesGuard(touched);
+  const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(touched);
   const edited = userEdits(() => setTouched(true), { setDraft, setSportId, setRegionId, setJoinPolicy });
 
   const createTeamWithActivityCompatibility = async (payload: V1TeamMutationPayload, draft: TeamDraft) => {
@@ -124,8 +124,9 @@ export function TeamCreatePageClient() {
               title: '프로필 정보가 필요해요',
               message: prompt,
               confirmLabel: '프로필 수정',
-            }).then((ok) => {
-              if (ok) router.push(profileEditHref('/teams/new'));
+            }).then(async (ok) => {
+              // Leaving the form for the profile — the unsaved-changes guard still asks.
+              if (ok && (await confirmLeave())) router.push(profileEditHref('/teams/new'));
             });
             return;
           }

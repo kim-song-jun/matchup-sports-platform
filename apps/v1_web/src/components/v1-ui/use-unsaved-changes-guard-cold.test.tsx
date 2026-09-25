@@ -40,6 +40,16 @@ function bootAt({ previousDocument }: { previousDocument: boolean }) {
   window.addEventListener('popstate', nextRouterPop); // after the tracker, like Next's router
 }
 
+/** The form as the tab's very first entry. jsdom's one history outlives each test, so fake the length at install. */
+function bootTabFirst(url: string) {
+  const length = vi.spyOn(History.prototype, 'length', 'get').mockReturnValue(1);
+  window.history.replaceState(null, '', url);
+  installNavigationHistory();
+  length.mockRestore();
+  bindSoftNavigator((next) => window.history.replaceState({}, '', next));
+  window.addEventListener('popstate', nextRouterPop);
+}
+
 beforeEach(() => {
   reset();
 });
@@ -49,15 +59,31 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function Form() {
+function Form({ onSubmit }: { onSubmit?: () => void }) {
   const [name, setName] = useState('');
   const { UnsavedChangesModal } = useUnsavedChangesGuard(name !== '');
   return (
     <>
       <label htmlFor="name">팀 이름</label>
       <input id="name" value={name} onChange={(event) => setName(event.target.value)} />
+      {onSubmit ? <button type="button" onClick={onSubmit}>만들기</button> : null}
       {UnsavedChangesModal}
     </>
+  );
+}
+
+const DETAIL = '/team-matches/77';
+/** Submit = router.push(detail), then the form unmounts like the route change does. */
+function FormThenDetail() {
+  const [submitted, setSubmitted] = useState(false);
+  if (submitted) return <p>상세</p>;
+  return (
+    <Form
+      onSubmit={() => {
+        window.history.pushState({}, '', DETAIL);
+        setSubmitted(true);
+      }}
+    />
   );
 }
 
@@ -100,15 +126,16 @@ describe('cold entry — dirty form + back', () => {
     await run(() => window.history.back());
     await run(() => fireEvent.click(screen.getByRole('button', { name: '나가기' })));
 
-    expect(go).toHaveBeenCalledWith(-2);
+    expect(go).toHaveBeenCalledWith(-3);
     expect(currentPath()).toBe('/landing');
   });
 
-  it('나가기 with the form as the tab\'s first entry (new tab, Android cold start) exits to /home without go(-2)', async () => {
-    // jsdom's one history outlives each test, so make "first entry of the tab" explicit at install time.
-    const length = vi.spyOn(History.prototype, 'length', 'get').mockReturnValue(1);
-    bootAt({ previousDocument: false });
-    length.mockRestore();
+  it.each([
+    ['the route chrome parent', FORM, '/team-matches'],
+    ['the sanitized ?from=', `${FORM}?from=%2Fteams%2F7`, '/teams/7'],
+    ['/home when the form has no parent', '/zz-no-chrome/new', '/home'],
+  ])('나가기 with the form as the tab\'s first entry (new tab, Android cold start) exits to %s', async (_label, url, exit) => {
+    bootTabFirst(url);
     const go = vi.spyOn(window.history, 'go');
     render(<Form />);
     await type('풋살팀');
@@ -116,14 +143,14 @@ describe('cold entry — dirty form + back', () => {
     await run(() => window.history.back());
     await run(() => fireEvent.click(screen.getByRole('button', { name: '나가기' })));
 
-    expect(go).not.toHaveBeenCalled();
-    expect(currentPath()).toBe('/home');
+    expect(go).toHaveBeenCalledWith(-2); // down to the form entry at the tab start, never past it
+    expect(currentPath()).toBe(exit);
     expect(leaveDialog()).toBeNull();
-    // The exit replaced the form entry itself — neither the form nor the buffer sits behind /home.
+    // The exit replaced the form entry itself — neither the form nor the buffer sits behind it.
     expect(hasPreviousSameDocumentEntry()).toBe(false);
   });
 
-  it('나가기 with something before the form arms no fallback — a slow cross-document go(-2) is not overtaken', async () => {
+  it('나가기 with something before the form arms no fallback — a slow cross-document leave is not overtaken', async () => {
     bootAt({ previousDocument: true });
     // The traversal is still loading (slow network, non-bfcache page): nothing has moved yet.
     const go = vi.spyOn(window.history, 'go').mockImplementation(() => {});
@@ -137,7 +164,7 @@ describe('cold entry — dirty form + back', () => {
       await settleHistory(10);
     });
 
-    expect(go).toHaveBeenCalledWith(-2);
+    expect(go).toHaveBeenCalledWith(-3);
     expect(currentPath()).toBe(FORM);
   });
 
@@ -202,7 +229,7 @@ describe('reload while on the buffer', () => {
     expect(leaveDialog()).not.toBeNull();
     await run(() => fireEvent.click(screen.getByRole('button', { name: '나가기' })));
 
-    expect(go).toHaveBeenCalledWith(-3);
+    expect(go).toHaveBeenCalledWith(-4);
     expect(currentPath()).toBe('/landing');
   });
 
@@ -218,6 +245,42 @@ describe('reload while on the buffer', () => {
     await run(() => window.history.back());
     expect(currentPath()).toBe(FORM);
     await run(() => reload());
+    expect(currentPath()).toBe('/landing');
+  });
+});
+
+describe('계속 작성 on the buffer, then submit', () => {
+  async function continueThenSubmit() {
+    bootAt({ previousDocument: true });
+    render(<FormThenDetail />);
+    await type('풋살팀');
+    await run(() => window.history.back());
+    await run(() => fireEvent.click(screen.getByRole('button', { name: '계속 작성' })));
+    expect(currentPath()).toBe(FORM);
+    await run(() => fireEvent.click(screen.getByRole('button', { name: '만들기' })));
+    expect(currentPath()).toBe(DETAIL);
+  }
+
+  it('leaves no forward entry: forward from the detail page stays there', async () => {
+    await continueThenSubmit();
+    await run(() => window.history.forward());
+    expect(currentPath()).toBe(DETAIL);
+  });
+
+  it('back → forward lands on the detail page, not on the form', async () => {
+    await continueThenSubmit();
+    await run(() => window.history.back());
+    expect(currentPath()).toBe(FORM);
+    await run(() => window.history.forward());
+    expect(currentPath()).toBe(DETAIL);
+    await run(() => window.history.forward());
+    expect(currentPath()).toBe(DETAIL);
+  });
+
+  it('a second back skips the superseded form copy and reaches the page before the form', async () => {
+    await continueThenSubmit();
+    await run(() => window.history.back());
+    await run(() => window.history.back());
     expect(currentPath()).toBe('/landing');
   });
 });

@@ -303,3 +303,25 @@ describe('다시 평가된 모듈(HMR)의 재설치', () => {
     expect(History.prototype.pushState).toBe(nativePush);
   });
 });
+
+describe('reload with a modal open', () => {
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+
+  it('turns the leftover overlay marker into the page entry, so one back reaches the previous page', async () => {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/teams/new');
+    window.history.pushState({ [OVERLAY_STATE_KEY]: 'modal-1' }, '', '/teams/new');
+    // Reload: the fresh document restarts from history.state + the sessionStorage mirror. No overlay is open.
+    __resetNavigationHistoryForTests();
+    installNavigationHistory();
+    expect((window.history.state as Record<string, unknown>)[OVERLAY_STATE_KEY]).toBeUndefined();
+
+    // Back is cross-document after a reload: no popstate here, the same-URL page entry loads fresh.
+    __resetNavigationHistoryForTests();
+    await back();
+    expect(window.location.pathname).toBe('/teams/new');
+    installNavigationHistory();
+    await settle();
+    expect(window.location.pathname).toBe('/home');
+  });
+});

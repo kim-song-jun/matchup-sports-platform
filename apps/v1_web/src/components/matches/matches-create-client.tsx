@@ -69,7 +69,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
   // 마법사 단계는 모두 /matches/new 아래 — 단계 사이 이동은 묻지 않는다.
   const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(
     selectionTouched || JSON.stringify(draft) !== defaultDraftJson,
-    { scope: '/matches/new' },
+    { scope: '/matches/new', draftSaved: true },
   );
 
   const regionOptions = toDistrictRegionOptions(regions.data ?? []);
@@ -206,7 +206,9 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
               title: '프로필 정보가 필요해요',
               message: prompt,
               confirmLabel: '프로필 수정',
-            }).then((ok) => {
+            }).then(async (ok) => {
+              // Leaving the form for the profile — the unsaved-changes guard still asks.
+              // 작성 내용은 임시 저장돼 돌아와 이어 쓸 수 있다 — 따로 묻지 않는다.
               if (ok) router.push(profileEditHref('/matches/new/confirm'));
             });
             return;

@@ -37,8 +37,8 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function Form({ dirty }: { dirty: boolean }) {
-  const { UnsavedChangesModal } = useUnsavedChangesGuard(dirty);
+function Form({ dirty, draftSaved = false }: { dirty: boolean; draftSaved?: boolean }) {
+  const { UnsavedChangesModal } = useUnsavedChangesGuard(dirty, { draftSaved });
   return (
     <>
       <AppBackLink fallbackHref="/teams">뒤로</AppBackLink>
@@ -86,6 +86,31 @@ describe('입력 중인 폼 — 뒤로가기(popstate)', () => {
     expect(leaveDialog()).toBeNull();
     expect(currentPath()).toBe('/teams');
     expect(nextRouterPop).toHaveBeenCalledTimes(1);
+  });
+});
+
+// 임시 저장되는 폼은 나가도 내용이 남는다 — "사라져요"라고 말하면 사실과 다르다.
+describe('입력 중인 폼 — 임시 저장되는 폼의 문구', () => {
+  it('임시 저장 폼은 이어 쓸 수 있다고 말하고, 저장되지 않는 폼은 사라진다고 말한다', async () => {
+    const { unmount } = render(<Form dirty draftSaved />);
+    await run(() => window.history.back());
+    expect(screen.getByRole('dialog', { name: '작성을 멈추고 나갈까요?' })).toBeTruthy();
+    expect(screen.getByText(/다음에 이어서 쓸 수 있어요/)).toBeTruthy();
+    expect(leaveDialog()).toBeNull();
+    unmount();
+  });
+
+  it('저장소가 막힌 기기에서는 임시 저장 폼이어도 사라진다고 말한다', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    try {
+      render(<Form dirty draftSaved />);
+      await run(() => window.history.back());
+      expect(leaveDialog()).toBeTruthy();
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 });
 

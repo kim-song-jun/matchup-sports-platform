@@ -9,7 +9,14 @@
  */
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { flushSync } from 'react-dom';
-import { OVERLAY_STATE_KEY, addPopInterceptor, historyPushCount, replaceInApp, type PopInfo } from './navigation-history';
+import {
+  OVERLAY_STATE_KEY,
+  addPopInterceptor,
+  collapseOverlayOntoBuffer,
+  historyPushCount,
+  replaceInApp,
+  type PopInfo,
+} from './navigation-history';
 
 type Overlay = {
   id: string;
@@ -147,6 +154,7 @@ export function releaseOverlay(id: string): void {
   if (!overlay.pushed) return;
   const wasTop = index === stack.length;
   if (!wasTop || overlay.url !== hereUrl() || overlayMarkerOf(window.history.state) !== overlay.id) return;
+  if (stack.length === 0 && collapseOverlayOntoBuffer()) return;
   runSelf({ kind: 'consume', id: overlay.id, url: overlay.url }, () => window.history.back());
 }
 

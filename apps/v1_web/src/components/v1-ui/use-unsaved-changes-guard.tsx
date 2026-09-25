@@ -3,15 +3,18 @@
 import { useCallback, useEffect, useRef } from 'react';
 import {
   addPopInterceptor,
-  bufferLeaveSteps,
+  bufferLeavePlan,
   currentEntryIsBuffer,
+  goBackLeaving,
   hasPreviousSameDocumentEntry,
   markAppInitiatedBack,
   pushBufferEntry,
   replaceInApp,
 } from '@/lib/navigation-history';
+import { draftStorageAvailable } from '@/lib/expiring-draft';
 import { overlayHistoryIdle, overlayMarkerOf } from '@/lib/overlay-history';
 import { useConfirm, type ConfirmOptions } from './confirm-modal';
+import { resolveColdStartParent } from './navigation-history-tracker';
 
 export const LEAVE_CONFIRM_OPTIONS: ConfirmOptions = {
   title: '작성 중인 내용이 사라져요. 나갈까요?',
@@ -21,6 +24,14 @@ export const LEAVE_CONFIRM_OPTIONS: ConfirmOptions = {
   tone: 'danger',
 };
 
+/** 작성 내용을 기기에 임시 저장하는 폼용 — 나가도 사라지지 않으므로 사실대로 말한다. */
+export const LEAVE_CONFIRM_OPTIONS_DRAFT_SAVED: ConfirmOptions = {
+  title: '작성을 멈추고 나갈까요?',
+  message: '작성 중인 내용은 이 기기에 잠시 저장돼 다음에 이어서 쓸 수 있어요.',
+  confirmLabel: '나가기',
+  cancelLabel: '계속 작성',
+};
+
 const hereUrl = () => `${window.location.pathname}${window.location.search}`;
 // 오버레이 가로채기보다 먼저 묻는다 — 폼을 떠나는 pop 이 닫힌 오버레이의 남은 표식에 닿아도
 // 표식 건너뛰기(back 예약)와 폼 되돌리기(push)가 한 pop 에서 겹치지 않게.
@@ -28,6 +39,8 @@ const GUARD_POP_PRIORITY = 10;
 // Our own buffer back() whose pop never arrives is given up after this long.
 const CONSUME_TIMEOUT_MS = 1000;
 const EXIT_URL = '/home';
+// Where a leave goes when the form is the tab's first entry: its parent (`?from=` → route chrome), else home.
+const exitUrl = () => resolveColdStartParent(window.location.pathname, window.location.search) ?? EXIT_URL;
 const withinScope = (pathname: string, scope: string) => pathname === scope || pathname.startsWith(`${scope}/`);
 
 /**
@@ -41,10 +54,13 @@ const withinScope = (pathname: string, scope: string) => pathname === scope || p
  *
  * Cold entry (no earlier entry in this document — deep link, refresh, new tab, app cold start): a back would
  * leave the document where no popstate can be intercepted. While dirty, one same-URL buffer entry is pushed so
- * that back becomes an interceptable pop. Leaving goes past it (go(-2), or /home when the form is the tab's
- * first entry); getting clean again takes it off with a swallowed back(); a push to another URL replaces it.
+ * that back becomes an interceptable pop. Leaving goes past it (go(-2), or the form's parent when the form is the
+ * tab's first entry); getting clean again takes it off with a swallowed back(); a push to another URL replaces it.
  */
-export function useUnsavedChangesGuard(isDirty: boolean, { scope }: { scope?: string } = {}) {
+export function useUnsavedChangesGuard(
+  isDirty: boolean,
+  { scope, draftSaved = false }: { scope?: string; draftSaved?: boolean } = {},
+) {
   const { confirm, ConfirmModal } = useConfirm();
   const dirtyRef = useRef(isDirty);
   dirtyRef.current = isDirty;
@@ -81,16 +97,13 @@ export function useUnsavedChangesGuard(isDirty: boolean, { scope }: { scope?: st
     });
   }, [finishConsume]);
 
-  /** Leave for real from the buffer: past the buffer and the form entry, or to /home when nothing is before them. */
+  /** Leave for real from the buffer: past the buffer and the form entry, or to the form's parent when nothing is before them. */
   const leaveThroughBuffer = useCallback(() => {
-    const steps = bufferLeaveSteps();
-    if (steps === null) {
-      exitAfterPopRef.current = true;
-      window.history.back(); // off the buffer first, so the exit replaces the form entry itself
-      return;
-    }
-    leavingRef.current = true;
-    window.history.go(-steps);
+    const { steps, exit } = bufferLeavePlan();
+    // exit: down to the bottom form entry first, so the exit replaces it and no form copy stays behind
+    if (exit) exitAfterPopRef.current = true;
+    else leavingRef.current = true;
+    goBackLeaving(steps);
   }, []);
 
   // Keep exactly one buffer while dirty on a cold entry; take it off once clean. Never on top of an overlay.
@@ -109,13 +122,13 @@ export function useUnsavedChangesGuard(isDirty: boolean, { scope }: { scope?: st
     askingRef.current = true;
     let leave = false;
     try {
-      leave = await confirm(LEAVE_CONFIRM_OPTIONS);
+      leave = await confirm(draftSaved && draftStorageAvailable() ? LEAVE_CONFIRM_OPTIONS_DRAFT_SAVED : LEAVE_CONFIRM_OPTIONS);
     } finally {
       askingRef.current = false;
     }
     if (leave) releasedRef.current = true;
     return leave;
-  }, [confirm]);
+  }, [confirm, draftSaved]);
   const askRef = useRef(ask);
   askRef.current = ask;
 
@@ -142,7 +155,7 @@ export function useUnsavedChangesGuard(isDirty: boolean, { scope }: { scope?: st
       }
       if (pop.leftBuffer && exitAfterPopRef.current) {
         exitAfterPopRef.current = false;
-        replaceInApp(EXIT_URL);
+        replaceInApp(exitUrl());
         return true;
       }
       if (!guarded()) {

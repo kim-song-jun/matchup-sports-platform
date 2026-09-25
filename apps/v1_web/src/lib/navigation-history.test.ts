@@ -8,7 +8,9 @@ import {
   __resetNavigationHistoryForTests,
   OVERLAY_STATE_KEY,
   bindSoftNavigator,
+  bufferLeavePlan,
   decideBackAction,
+  goBackLeaving,
   ensureColdStartParent,
   addPopInterceptor,
   hasPreviousInAppEntry,
@@ -16,6 +18,7 @@ import {
   isAppBackPending,
   isAppNavigationPop,
   markAppInitiatedBack,
+  pushBufferEntry,
   subscribeAppPop,
   suppressNextPop,
   type AppPop,
@@ -301,5 +304,65 @@ describe('다시 평가된 모듈(HMR)의 재설치', () => {
     }
     // 새 설치가 이전 래퍼를 원본으로 착각했다면 여기서 래퍼가 남는다.
     expect(History.prototype.pushState).toBe(nativePush);
+  });
+});
+
+describe('reload with a modal open', () => {
+  it('turns the leftover overlay marker into the page entry, so one back reaches the previous page', async () => {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/teams/new');
+    window.history.pushState({ [OVERLAY_STATE_KEY]: 'modal-1' }, '', '/teams/new');
+    // Reload: the fresh document restarts from history.state + the sessionStorage mirror. No overlay is open.
+    __resetNavigationHistoryForTests();
+    installNavigationHistory();
+    expect((window.history.state as Record<string, unknown>)[OVERLAY_STATE_KEY]).toBeUndefined();
+
+    // Back is cross-document after a reload: no popstate here, the same-URL page entry loads fresh.
+    __resetNavigationHistoryForTests();
+    await back();
+    expect(window.location.pathname).toBe('/teams/new');
+    await traverse(() => installNavigationHistory()); // install hops over the skipped copy with go()
+    expect(window.location.pathname).toBe('/home');
+  });
+});
+
+describe('same-URL copies left by reloads under a dirty form', () => {
+  const reload = () => {
+    __resetNavigationHistoryForTests();
+    installNavigationHistory();
+  };
+
+  it('a reload on a modal over the buffer skips both form copies — leaving lands before the form', async () => {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/teams/new'); // form
+    pushBufferEntry();
+    window.history.pushState({ [OVERLAY_STATE_KEY]: 'modal-1' }, '', '/teams/new');
+    reload();
+    pushBufferEntry(); // the restored draft is dirty again
+
+    const { steps, exit } = bufferLeavePlan();
+    expect(exit).toBe(false);
+    await traverse(() => window.history.go(-steps));
+    expect(window.location.pathname).toBe('/home');
+  });
+
+  it('forward from a page outside the app onto a skipped copy keeps going forward, not back out', async () => {
+    installNavigationHistory();
+    window.history.pushState({}, '', '/teams/new');
+    pushBufferEntry();
+    reload(); // reloaded on the buffer: the entry under it is now a skipped copy
+    pushBufferEntry();
+
+    const { steps } = bufferLeavePlan();
+    await traverse(() => {
+      goBackLeaving(steps);
+      __resetNavigationHistoryForTests(); // the leave lands in another document — this one never sees the pop
+    });
+    expect(window.location.pathname).toBe('/home');
+
+    await forward(); // back into the tab: the first entry forward is the skipped copy
+    await traverse(() => installNavigationHistory()); // install hops over the skipped copy with go()
+    expect(window.location.pathname).toBe('/teams/new');
+    expect(idx()).toBe(2);
   });
 });

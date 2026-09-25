@@ -7,12 +7,14 @@ import type { TeamFormViewModel } from './teams.types';
 import { TeamCreatePageClient, TeamEditPageClient } from './teams-form-client';
 
 const {
+  confirmMock,
   createTeamMutateAsync,
   routerPush,
   updateTeamMutateAsync,
   useV1MasterSportsMock,
   useV1TeamDetailMock,
 } = vi.hoisted(() => ({
+  confirmMock: vi.fn(),
   createTeamMutateAsync: vi.fn(),
   routerPush: vi.fn(),
   updateTeamMutateAsync: vi.fn(),
@@ -31,7 +33,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/components/v1-ui/confirm-modal', () => ({
   useConfirm: () => ({
-    confirm: vi.fn(),
+    confirm: confirmMock,
     ConfirmModal: null,
   }),
 }));
@@ -236,5 +238,46 @@ describe('Team form client contracts', () => {
     fireEvent.click(submit);
 
     expect(updateTeamMutateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  describe('profile-completion leave', () => {
+    const LEAVE_TITLE = '작성 중인 내용이 사라져요. 나갈까요?';
+    const profileRequired = () => new V1ApiError({
+      status: 'error',
+      statusCode: 400,
+      code: 'PROFILE_COMPLETION_REQUIRED',
+      message: '프로필 필요',
+      details: { missingFields: ['nickname'] },
+      timestamp: '2026-09-25T00:00:00.000Z',
+    });
+
+    async function submitDirtyWithoutProfile(answers: boolean[]) {
+      answers.forEach((answer) => confirmMock.mockResolvedValueOnce(answer));
+      createTeamMutateAsync.mockRejectedValueOnce(profileRequired());
+      render(<TeamCreatePageClient />);
+      fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '작성 중인 팀' } });
+      fireEvent.click(screen.getByRole('button', { name: '팀 만들기' }));
+      await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(answers.length));
+    }
+
+    it('프로필 수정 on a dirty form still asks the unsaved-changes guard, and 계속 작성 stays', async () => {
+      await submitDirtyWithoutProfile([true, false]);
+      expect(confirmMock.mock.calls[1][0]).toMatchObject({ title: LEAVE_TITLE });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(routerPush).not.toHaveBeenCalled();
+    });
+
+    it('a successful submit on a dirty form navigates to the detail page without asking', async () => {
+      render(<TeamCreatePageClient />);
+      fireEvent.change(screen.getByLabelText('팀 이름'), { target: { value: '작성 중인 팀' } });
+      fireEvent.click(screen.getByRole('button', { name: '팀 만들기' }));
+      await waitFor(() => expect(routerPush).toHaveBeenCalledWith('/teams/team-futsal'));
+      expect(confirmMock).not.toHaveBeenCalled();
+    });
+
+    it('나가기 then goes to the profile edit page', async () => {
+      await submitDirtyWithoutProfile([true, true]);
+      await waitFor(() => expect(routerPush).toHaveBeenCalledWith('/my/profile/edit?returnTo=%2Fteams%2Fnew'));
+    });
   });
 });

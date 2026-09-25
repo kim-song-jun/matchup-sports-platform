@@ -18,7 +18,7 @@ import {
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
-import { clearExpiringDraft, readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
+import { clearExpiringDraft, draftStorageAvailable, readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { lockedReasonLabel } from '@/lib/v1-status-labels';
@@ -69,7 +69,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
   // 마법사 단계는 모두 /matches/new 아래 — 단계 사이 이동은 묻지 않는다.
   const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(
     selectionTouched || JSON.stringify(draft) !== defaultDraftJson,
-    { scope: '/matches/new' },
+    { scope: '/matches/new', draftSaved: true },
   );
 
   const regionOptions = toDistrictRegionOptions(regions.data ?? []);
@@ -206,8 +206,9 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
               title: '프로필 정보가 필요해요',
               message: prompt,
               confirmLabel: '프로필 수정',
-            }).then((ok) => {
-              if (ok) router.push(profileEditHref('/matches/new/confirm'));
+            }).then(async (ok) => {
+              // A saved draft survives the trip to the profile; without storage it would be lost, so ask then.
+              if (ok && (draftStorageAvailable() || (await confirmLeave()))) router.push(profileEditHref('/matches/new/confirm'));
             });
             return;
           }

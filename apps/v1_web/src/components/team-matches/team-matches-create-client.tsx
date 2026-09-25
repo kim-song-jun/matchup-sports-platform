@@ -19,7 +19,7 @@ import {
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
-import { clearExpiringDraft, readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
+import { clearExpiringDraft, draftStorageAvailable, readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { labelToLevelCode, levelCodeToLabel, V1_LEVELS, type V1LevelCode } from '@/lib/v1-levels';
@@ -77,7 +77,7 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
   // 마법사 단계는 모두 /team-matches/new 아래 — 단계 사이 이동은 묻지 않는다.
   const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(
     selectionTouched || JSON.stringify(draft) !== defaultDraftJson,
-    { scope: '/team-matches/new' },
+    { scope: '/team-matches/new', draftSaved: true },
   );
   const [error, setError] = useState<string | null>(null);
   // "다음"/"팀매치 만들기"를 한 번이라도 눌러본 뒤에만 인라인 에러를 보여준다 — 진입하자마자
@@ -287,8 +287,9 @@ export function TeamMatchCreatePageClient({ step }: { step: Exclude<TeamMatchCre
               title: '프로필 정보가 필요해요',
               message: prompt,
               confirmLabel: '프로필 수정',
-            }).then((ok) => {
-              if (ok) router.push(profileEditHref('/team-matches/new/confirm'));
+            }).then(async (ok) => {
+              // A saved draft survives the trip to the profile; without storage it would be lost, so ask then.
+              if (ok && (draftStorageAvailable() || (await confirmLeave()))) router.push(profileEditHref('/team-matches/new/confirm'));
             });
             return;
           }

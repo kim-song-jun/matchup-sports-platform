@@ -28,7 +28,9 @@ const URL_BASE = 'https://nav-history.invalid';
 // stale: the form entry under a buffer that was reloaded — a dead same-URL copy that traversal skips.
 type Entry = { url: string; overlay?: boolean; parent?: boolean; buffer?: boolean; stale?: boolean };
 // tabStart: mirror index of the tab's very first history entry (nothing, not even another site, is before it).
-type Mirror = { index: number; entries: Record<number, Entry>; tabStart?: number };
+// leaveTarget: where a leave traversal was headed. A leave out of the app never pops here, so a later forward
+// back into this tab must compare against it, not the index the leave started from.
+type Mirror = { index: number; entries: Record<number, Entry>; tabStart?: number; leaveTarget?: number };
 export type AppPop = { direction: 'back' | 'forward' | 'unknown'; appInitiated: boolean };
 type HistoryMethod = History['pushState'];
 
@@ -96,6 +98,12 @@ function withIdx(data: unknown, index: number): StateRecord {
   return next;
 }
 
+function withoutOverlay(data: unknown): StateRecord {
+  const next: StateRecord = { ...(asRecord(data) ?? {}) };
+  delete next[OVERLAY_STATE_KEY];
+  return next;
+}
+
 function readStored(): Mirror | null {
   try {
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
@@ -142,6 +150,7 @@ function onPopState(event: PopStateEvent) {
   // 도장 없는 항목이면 거울을 믿지 않는다 — 다음 도장 있는 pop·push 에서 다시 맞춘다.
   untracked = target === null;
   if (target !== null) {
+    delete mirror.leaveTarget;
     mirror.index = target;
     mirror.entries[target] = { ...arriving, url: currentUrl() };
     persist();
@@ -154,6 +163,14 @@ function onPopState(event: PopStateEvent) {
   // Next 보다 먼저 등록된 리스너라, 여기서 멈추면 Next 는 이 pop 을 모른다(오버레이 닫기·이탈 막기).
   for (const { intercept } of popInterceptors) {
     if (intercept(event, { direction, samePage, leftBuffer: Boolean(leaving?.buffer) })) {
+      event.stopImmediatePropagation();
+      return;
+    }
+  }
+  if (arriving?.stale && direction !== 'unknown') {
+    // A superseded same-URL copy — keep going the same way. From another page, let Next draw it first.
+    window.history.go(direction === 'back' ? -1 : 1);
+    if (samePage) {
       event.stopImmediatePropagation();
       return;
     }
@@ -180,21 +197,37 @@ function removePreviousInstall() {
   delete win[INSTALL_MARKER];
 }
 
+/** Marks every contiguous entry from `start` down that shows this URL — all are copies the loaded entry replaces. */
+function markSameUrlRunStale(start: number) {
+  if (!mirror) return;
+  for (let i = start; mirror.entries[i] && sameUrl(mirror.entries[i].url, currentUrl()); i -= 1) {
+    mirror.entries[i] = { ...mirror.entries[i], stale: true };
+  }
+}
+
 export function installNavigationHistory(): void {
   if (typeof window === 'undefined' || mirror) return;
   removePreviousInstall();
   const stored = readStored();
   const stamped = readIdx(window.history.state);
   let skipStale: -1 | 1 | null = null;
+  let leftoverMarker = false;
   if (stamped !== null) {
     mirror = { index: stamped, entries: stored?.entries ?? {}, tabStart: stored?.tabStart }; // 새로고침·bfcache 복귀
     const here = mirror.entries[stamped];
-    const below = mirror.entries[stamped - 1];
-    if (here?.buffer && below && sameUrl(here.url, currentUrl()) && sameUrl(below.url, here.url)) {
+    if (here?.buffer && sameUrl(here.url, currentUrl())) {
       // Reloaded on a buffer: this entry becomes the form entry; the old one below is now another document.
-      mirror.entries[stamped - 1] = { ...below, stale: true };
+      markSameUrlRunStale(stamped - 1);
     }
-    if (here?.stale && stored && stored.index !== stamped) skipStale = stamped < stored.index ? -1 : 1;
+    const from = stored?.leaveTarget ?? stored?.index;
+    if (here?.stale && from !== undefined && from !== stamped) skipStale = stamped < from ? -1 : 1;
+    delete mirror.leaveTarget;
+    // Loaded onto an overlay marker (reload with a modal open): no overlay is open in a fresh document.
+    // The entry turns into the page entry, and the same-URL page entry under it becomes a skipped copy.
+    if (!skipStale && asRecord(window.history.state)?.[OVERLAY_STATE_KEY]) {
+      leftoverMarker = true;
+      markSameUrlRunStale(stamped - 1);
+    }
   } else if (stored) {
     // 같은 탭의 전체 문서 이동(외부 복귀·네이티브 loadUrl) — 새 항목이 쌓인 것이다.
     mirror = stored;
@@ -236,7 +269,7 @@ export function installNavigationHistory(): void {
     mirror.entries[mirror.index] = { url: currentUrl(), overlay: Boolean(stampedState[OVERLAY_STATE_KEY]), ...(keepBuffer ? { buffer: true } : {}) };
     persist();
   };
-  replace.call(window.history, withIdx(window.history.state, mirror.index), '');
+  replace.call(window.history, withIdx(leftoverMarker ? withoutOverlay(window.history.state) : window.history.state, mirror.index), '');
   window.addEventListener('popstate', onPopState);
   // bfcache 복귀엔 popstate 가 없다 — 떠나기 직전의 대기 표식이 다음 클릭을 막지 않게 지운다.
   window.addEventListener('pageshow', clearPendingAppBack);
@@ -260,7 +293,10 @@ export function hasPreviousInAppEntry(): boolean {
 
 /** Is there an earlier entry created by this document (a back to it is a same-document popstate)? */
 export function hasPreviousSameDocumentEntry(): boolean {
-  return !untracked && mirror !== null && mirror.index > documentStartIndex && Boolean(mirror.entries[mirror.index - 1]);
+  if (untracked || !mirror) return false;
+  let below = mirror.index - 1;
+  while (mirror.entries[below]?.stale) below -= 1; // a back skips over superseded copies
+  return below >= documentStartIndex && Boolean(mirror.entries[below]);
 }
 
 /** Pushes a same-URL buffer entry. A later push to another URL replaces it instead of stacking on it. */
@@ -275,15 +311,42 @@ export function pushBufferEntry(): void {
 }
 
 /**
- * How far back a real leave from the buffer goes: past the buffer, the form entry and any dead same-URL copies
- * under it. null when nothing is before them in this tab (go() would do nothing).
+ * How a real leave from the buffer goes back past the buffer, the form entry and any dead same-URL copies under it.
+ * exit: nothing is before them in this tab — `steps` then only reaches the bottom form entry, which the caller replaces.
  */
-export function bufferLeaveSteps(): number | null {
-  if (!mirror) return 2;
+export function bufferLeavePlan(): { steps: number; exit: boolean } {
+  if (!mirror) return { steps: 2, exit: false };
   let bottom = mirror.index - 1;
   while (mirror.entries[bottom - 1]?.stale && sameUrl(mirror.entries[bottom - 1].url, currentUrl())) bottom -= 1;
-  if (mirror.tabStart !== undefined && bottom <= mirror.tabStart) return null;
-  return mirror.index - bottom + 1;
+  const exit = mirror.tabStart !== undefined && bottom <= mirror.tabStart;
+  return { steps: mirror.index - bottom + (exit ? 0 : 1), exit };
+}
+
+/**
+ * Closes an overlay whose marker sits right on the buffer without a back(): the marker entry becomes the buffer,
+ * the old buffer becomes the form entry and the form entry under it a skipped copy. A back() here would leave the
+ * marker as a forward entry that the buffer's push-as-replace never truncates.
+ */
+export function collapseOverlayOntoBuffer(): boolean {
+  if (!mirror || !originals || untracked) return false;
+  const below = mirror.entries[mirror.index - 1];
+  if (!below?.buffer || !sameUrl(below.url, currentUrl())) return false;
+  originals.replace.call(window.history, withIdx(withoutOverlay(window.history.state), mirror.index), '');
+  mirror.entries[mirror.index] = { url: currentUrl(), buffer: true };
+  mirror.entries[mirror.index - 1] = { url: below.url };
+  const form = mirror.entries[mirror.index - 2];
+  if (form && sameUrl(form.url, below.url)) mirror.entries[mirror.index - 2] = { ...form, stale: true };
+  persist();
+  return true;
+}
+
+/** go(-steps) for a leave, remembering the target in case it lands outside the app. */
+export function goBackLeaving(steps: number): void {
+  if (mirror) {
+    mirror.leaveTarget = mirror.index - steps;
+    persist();
+  }
+  window.history.go(-steps);
 }
 
 export function currentEntryIsBuffer(): boolean {

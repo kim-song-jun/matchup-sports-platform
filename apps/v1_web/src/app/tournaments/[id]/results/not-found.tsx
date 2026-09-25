@@ -19,7 +19,7 @@ export default function TournamentResultsNotFound() {
       <p className="tm-text-body" style={{ margin: '0 0 12px', color: 'var(--text-muted)' }}>
         주소가 바뀌었거나 아직 공개 전인 대회예요.
       </p>
-      <Link className="tm-btn tm-btn-primary" href="/tournaments">
+      <Link className="tm-btn tm-btn-md tm-btn-primary" href="/tournaments">
         대회 목록으로
       </Link>
     </section>

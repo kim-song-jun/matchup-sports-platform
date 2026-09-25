@@ -57,7 +57,7 @@
   "src/app/matches/[id]/applications/client.tsx": 1,
   "src/app/team-matches/[id]/lineup/lineup-client.tsx": 1,
   "src/app/tournaments/[id]/apply/tournament-apply-client.tsx": 1,
-  "src/app/tournaments/[id]/awards/awards-page-client.tsx": 24,
+  "src/app/tournaments/[id]/awards/awards-page-client.tsx": 23,
   "src/app/tournaments/[id]/bracket/bracket-page-client.tsx": 2,
   "src/app/tournaments/[id]/results/results-page-client.tsx": 33,
   "src/app/tournaments/[id]/reviews/reviews-page-client.tsx": 1,

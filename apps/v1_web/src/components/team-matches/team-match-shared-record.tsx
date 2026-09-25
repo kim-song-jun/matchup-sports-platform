@@ -75,7 +75,7 @@ export function TeamMatchSharedRecord({ teamMatchId }: { teamMatchId: string }) 
       : <PageSkeleton />;
   }
   if (data.phase === 'legacy' || data.phase === 'managed') {
-    return <main className={styles.page}><h1>경기 결과</h1><p>이 경기는 기존 경기 기록 화면에서 확인할 수 있어요.</p><Link className="tm-btn tm-btn-primary" href={`/team-matches/${teamMatchId}/result`}>경기 결과 보기</Link></main>;
+    return <main className={styles.page}><h1>경기 결과</h1><p>이 경기는 기존 경기 기록 화면에서 확인할 수 있어요.</p><Link className="tm-btn tm-btn-md tm-btn-primary" href={`/team-matches/${teamMatchId}/result`}>경기 결과 보기</Link></main>;
   }
 
   const home = data.sides.find((s) => s.key === 'HOME');

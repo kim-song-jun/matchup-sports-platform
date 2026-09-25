@@ -733,8 +733,7 @@ export function ReviewFormModal({
         <button
           type="button" onClick={handleSubmit}
           disabled={isPending || rating === 0 || (!!teamOptions && !selectedTeamId)}
-          className="tm-btn tm-btn-primary"
-          style={{ width: '100%', justifyContent: 'center', padding: '16px', fontSize: 14, fontWeight: 700 }}
+          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
         >
           {isPending ? '저장 중...' : teamOptions ? '선택한 팀으로 등록' : '후기 등록'}
         </button>

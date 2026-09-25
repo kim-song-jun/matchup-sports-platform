@@ -369,6 +369,8 @@
   --line: var(--border);
   --card-surface: #1c1e24;
   --card-surface-muted: #15171c;
+  /* --grey100 equals --card-surface here, so a grey100 fill vanishes on cards. */
+  --button-fill-neutral: var(--surface-soft);
   --list-row-bg: var(--grey150);
   --list-row-border: #262932;
   --input-surface: var(--surface);
@@ -1825,6 +1827,10 @@ button:disabled {
 
   .tm-btn-neutral:hover:not(:disabled) {
     background: var(--grey150); /* grey100 → grey150 한 단계 진하게 */
+  }
+
+  :root.dark .tm-btn-neutral:hover:not(:disabled) {
+    background: var(--grey300);
   }
 
   .tm-btn-outline:hover:not(:disabled) {
@@ -5724,23 +5730,6 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   color: var(--text-body);
 }
 
-/* 다크에서 --grey100(중립 버튼 채움·세그먼트 트랙)이 카드 면(--card-surface)과 같은 값이라
-   카드 안 소속팀 칩과 기간 탭 트랙의 모양이 사라진다. 이 화면에서만 한 단계 띄운다. */
-:root.dark .tm-public-profile .tm-card .tm-btn-neutral,
-:root.dark .tm-public-profile .tm-card .tm-segmented-tabs {
-  background: var(--surface-soft);
-}
-
-:root.dark .tm-public-profile .tm-card .tm-segmented-thumb {
-  background: var(--border);
-}
-
-@media (hover: hover) {
-  :root.dark .tm-public-profile .tm-card .tm-btn-neutral:hover:not(:disabled) {
-    background: var(--grey200);
-  }
-}
-
 .tm-review-highlight-tag {
   color: var(--text-strong);
   font-weight: 700;
@@ -8118,6 +8107,10 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   background: var(--grey100);
 }
 
+:root.dark .tm-segmented-tabs {
+  background: var(--surface-soft);
+}
+
 .tm-segmented-thumb {
   position: absolute;
   top: 4px;
@@ -8147,7 +8140,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
    (다크모드에서 --grey100 == --surface)이지만, 활성 표시가 thumb 하나뿐이라 고칠
    곳도 하나뿐이다 — 이 통합이 얻는 실질 이득 중 하나. */
 :root.dark .tm-segmented-thumb {
-  background: var(--grey150);
+  background: var(--grey300);
 }
 
 .tm-segmented-tab {

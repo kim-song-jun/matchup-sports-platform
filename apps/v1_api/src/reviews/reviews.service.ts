@@ -358,7 +358,9 @@ export class ReviewsService {
     return {
       bySport: bySport.map((entry) => ({ ...entry, sportCode: codeById.get(entry.sportId) ?? null })),
       availableMonths,
-      highlight: pickReviewHighlight(filtered),
+      highlight: pickReviewHighlight(filtered, (review) =>
+        targetType === 'team' ? review.reviewerTeamId : review.reviewerUserId,
+      ),
     };
   }
 

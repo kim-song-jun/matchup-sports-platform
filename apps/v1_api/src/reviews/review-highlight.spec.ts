@@ -1,11 +1,22 @@
-import { pickReviewHighlight, REVIEW_HIGHLIGHT_MIN_REVIEWS } from './review-highlight';
+import { pickReviewHighlight, REVIEW_HIGHLIGHT_MIN_REVIEWERS } from './review-highlight';
 
-const review = (...codes: string[]) => ({ tags: codes.map((tagCode) => ({ tagCode, labelSnapshot: `label:${tagCode}` })) });
+let seq = 0;
+const review = (...codes: string[]) => ({
+  reviewer: `reviewer-${(seq += 1)}`,
+  tags: codes.map((tagCode) => ({ tagCode, labelSnapshot: `label:${tagCode}` })),
+});
+const by = (r: { reviewer: string }) => r.reviewer;
 
 describe('pickReviewHighlight', () => {
-  it('shows nothing below the minimum — a rate over one or two reviews points at who wrote them', () => {
-    const reviews = Array.from({ length: REVIEW_HIGHLIGHT_MIN_REVIEWS - 1 }, () => review('manner'));
-    expect(pickReviewHighlight(reviews)).toBeNull();
+  it('shows nothing below the minimum — a rate over one or two reviewers points at who wrote them', () => {
+    const reviews = Array.from({ length: REVIEW_HIGHLIGHT_MIN_REVIEWERS - 1 }, () => review('manner'));
+    expect(pickReviewHighlight(reviews, by)).toBeNull();
+  });
+
+  it('counts reviewers, not reviews — one reviewer across three matches is still one person', () => {
+    const same = [review('manner'), review('manner'), review('manner')].map((r) => ({ ...r, reviewer: 'same-team' }));
+    expect(pickReviewHighlight(same, by)).toBeNull();
+    expect(pickReviewHighlight([...same, review('punctual'), review('punctual')], by)?.tagCode).toBe('manner');
   });
 
   it('picks the tag on the most reviews and reports its share of all reviews', () => {
@@ -14,23 +25,23 @@ describe('pickReviewHighlight', () => {
       review('manner'),
       review('teamwork'),
       review(),
-    ]);
+    ], by);
     expect(highlight).toEqual({ tagCode: 'manner', label: 'label:manner', rate: 0.5, reviewCount: 4 });
   });
 
   it('counts a tag once per review even when a review repeats it', () => {
-    const highlight = pickReviewHighlight([review('manner', 'manner'), review('punctual'), review('punctual')]);
+    const highlight = pickReviewHighlight([review('manner', 'manner'), review('punctual'), review('punctual')], by);
     expect(highlight?.tagCode).toBe('punctual');
     expect(highlight?.rate).toBe(0.67);
   });
 
   it('breaks ties the same way every time', () => {
     const reviews = [review('teamwork'), review('manner'), review()];
-    expect(pickReviewHighlight(reviews)?.tagCode).toBe('manner');
-    expect(pickReviewHighlight([...reviews].reverse())?.tagCode).toBe('manner');
+    expect(pickReviewHighlight(reviews, by)?.tagCode).toBe('manner');
+    expect(pickReviewHighlight([...reviews].reverse(), by)?.tagCode).toBe('manner');
   });
 
   it('shows nothing when enough reviews carry no tag at all', () => {
-    expect(pickReviewHighlight([review(), review(), review()])).toBeNull();
+    expect(pickReviewHighlight([review(), review(), review()], by)).toBeNull();
   });
 });

@@ -1,11 +1,12 @@
 /**
  * The one tag a public card may show: the tag attached to the most revealed reviews.
  *
- * Below `REVIEW_HIGHLIGHT_MIN_REVIEWS` reviews a tag rate points at the one or two people who wrote
- * them, so nothing is returned. Ties go to the lower tag code so the same reviews always give the
- * same sentence.
+ * Nothing is returned until `REVIEW_HIGHLIGHT_MIN_REVIEWERS` distinct reviewers stand behind the
+ * reviews — one person across three matches, or one team's roster after one match, would otherwise
+ * be exposed as "what people say". Ties go to the lower tag code so the same reviews always give
+ * the same sentence.
  */
-export const REVIEW_HIGHLIGHT_MIN_REVIEWS = 3;
+export const REVIEW_HIGHLIGHT_MIN_REVIEWERS = 3;
 
 export type ReviewHighlight = {
   tagCode: string;
@@ -15,10 +16,13 @@ export type ReviewHighlight = {
   reviewCount: number;
 };
 
-export function pickReviewHighlight(
-  reviews: ReadonlyArray<{ tags: ReadonlyArray<{ tagCode: string; labelSnapshot: string }> }>,
+export function pickReviewHighlight<T extends { tags: ReadonlyArray<{ tagCode: string; labelSnapshot: string }> }>(
+  reviews: readonly T[],
+  /** Who stands behind a review: the reviewing user for a person, the reviewing team for a team. */
+  reviewerOf: (review: T) => string | null,
 ): ReviewHighlight | null {
-  if (reviews.length < REVIEW_HIGHLIGHT_MIN_REVIEWS) return null;
+  const reviewers = new Set(reviews.map(reviewerOf).filter((id): id is string => Boolean(id)));
+  if (reviewers.size < REVIEW_HIGHLIGHT_MIN_REVIEWERS) return null;
   const counts = new Map<string, { label: string; count: number }>();
   for (const review of reviews) {
     // A tag repeated inside one review still counts that review once.

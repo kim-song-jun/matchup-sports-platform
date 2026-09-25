@@ -2112,6 +2112,9 @@ describe('publicTeamSummary — 공개 팀 후기 요약', () => {
       const unrevealed = [row('d', fresh, 'teamwork'), row('e', fresh, 'teamwork')];
       expect((await run([...revealed, ...unrevealed])).highlight).toEqual({ tagCode: 'manner', label: 'label:manner', rate: 0.67, reviewCount: 3 });
       expect((await run(revealed.slice(0, 2))).highlight).toBeNull();
+      // 한 상대 팀의 멤버 셋이 한 경기 뒤 각자 쓴 후기는 "팀들"의 평가가 아니다.
+      const oneTeam = revealed.map((review) => ({ ...review, reviewerTeamId: 'team-roster' }));
+      expect((await run(oneTeam)).highlight).toBeNull();
     } finally {
       jest.useRealTimers();
     }

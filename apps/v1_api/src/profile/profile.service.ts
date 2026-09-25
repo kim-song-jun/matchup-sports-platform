@@ -666,7 +666,7 @@ export class ProfileService {
       ? Number((revealed.reduce((sum, review) => sum + review.rating, 0) / reviewCount).toFixed(2))
       : null;
 
-    return { reviewCount, mannerScore, highlight: pickReviewHighlight(revealed) };
+    return { reviewCount, mannerScore, highlight: pickReviewHighlight(revealed, (review) => review.reviewerUserId) };
   }
 
   /**

@@ -268,7 +268,6 @@ function ProfileActivityCard({
         {summary ? (
           <SegmentedTabs
             className="tm-profile-activity-tabs"
-            size="sm"
             role="tablist"
             ariaLabel="활동 기간"
             activeId={period}

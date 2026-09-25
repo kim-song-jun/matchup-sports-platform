@@ -585,7 +585,7 @@
   .tm-public-profile > .tm-player-card,
   .tm-public-profile > .tm-my-profile-head {
     position: sticky;
-    top: 24px;
+    top: 80px; /* 64px 고정 nav + 16px — 데스크톱은 창이 스크롤한다(.tm-my-desktop-sidebar 와 같은 값) */
   }
 
   .tm-public-profile-main {

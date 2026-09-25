@@ -98,7 +98,10 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
           belowCardSlot={
             <div className="tm-pcard-identity">
               <h1 className="tm-pcard-identity-name">{data.displayName}</h1>
-              {data.nickname ? <div className="tm-pcard-identity-meta">@{data.nickname}</div> : null}
+              {/* displayName 이 닉네임에서 나오므로 같을 때 @핸들은 이름을 한 번 더 말할 뿐이다. */}
+              {data.nickname && data.nickname !== data.displayName ? (
+                <div className="tm-pcard-identity-meta">@{data.nickname}</div>
+              ) : null}
             </div>
           }
         />

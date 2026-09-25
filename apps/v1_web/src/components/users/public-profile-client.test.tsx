@@ -166,3 +166,39 @@ describe('PublicProfilePageClient — 받은 후기 요약 · 활동 카드', ()
     expect(link).toHaveAttribute('href', `/users/user-1/records?from=${encodeURIComponent(selfHref)}`);
   });
 });
+
+describe('PublicProfilePageClient — 카드 아래 신원', () => {
+  beforeEach(() => {
+    navigation.pathname = '/users/user-1';
+    navigation.search = '';
+    useV1AuthMeMock.mockReturnValue({ data: undefined } as never);
+  });
+  const playerCard = {
+    formulaVersion: 1, position: null, jerseyNumber: 7, overall: 48, tier: 'bronze', shape: 'rect', appearances: 4,
+    stats: [
+      { code: 'SHO', label: '골', value: 44, unlocked: true, lockedBy: null },
+      { code: 'PAS', label: '도움', value: 30, unlocked: true, lockedBy: null },
+      { code: 'APP', label: '출전', value: 59, unlocked: true, lockedBy: null },
+      { code: 'SKI', label: '실력', value: null, unlocked: false, lockedBy: { type: 'reviews', remaining: 3 } },
+      { code: 'MAN', label: '매너', value: null, unlocked: false, lockedBy: { type: 'reviews', remaining: 3 } },
+      { code: 'PUN', label: '시간약속', value: null, unlocked: false, lockedBy: { type: 'reviews', remaining: 3 } },
+    ],
+    unlockedCount: 3, nextUnlock: { code: 'SKI', reason: { type: 'reviews', remaining: 3 } },
+  } as unknown as V1PublicProfile['playerCard'];
+
+  // 이름이 카드 이름판·카드 아래 이름·@핸들로 세 번 나오던 것 — 핸들이 이름과 같으면 뺀다.
+  it('닉네임이 표시 이름과 같으면 @핸들 줄을 두지 않고, 다르면 둔다', () => {
+    useV1PublicProfileMock.mockReturnValue({
+      isLoading: false, isError: false, data: profile({ displayName: '스트라이커', nickname: '스트라이커', playerCard }),
+    } as never);
+    const { container, unmount } = render(<PublicProfilePageClient userId="user-1" />);
+    expect(container.querySelector('.tm-pcard-identity-meta')).toBeNull();
+    unmount();
+
+    useV1PublicProfileMock.mockReturnValue({
+      isLoading: false, isError: false, data: profile({ displayName: '성수 스트라이커', nickname: 'striker', playerCard }),
+    } as never);
+    const second = render(<PublicProfilePageClient userId="user-1" />);
+    expect(second.container.querySelector('.tm-pcard-identity-meta')).toHaveTextContent('@striker');
+  });
+});

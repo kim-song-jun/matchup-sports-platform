@@ -588,14 +588,12 @@ export function PlayerCard({
         {/* 경기 수는 여기서 말하지 않는다 -- 바로 위 카드 얼굴이 이미 말했고(tm-pcard-meta),
             마이페이지에서는 활동 요약까지 같은 숫자를 또 센다. 카드가 0경기(여정 면)면
             얼굴에도 없지만, 그 면의 문장이 "아직 기록이 없다"를 이미 말한다. */}
+        {/* 등급의 의미를 같은 줄에서 못 박는다 — 없으면 브론즈가 "실력 하위"로 읽힌다. */}
         <div className="tm-player-card-sub">
           {card.position ? POSITION_LABEL[card.position] : '포지션 미정'}
           {' · '}
-          <span title="많이 뛸수록 올라가요">{TIER_LABEL[card.tier]}</span>
+          {TIER_LABEL[card.tier]} 등급 · 경기 수로 올라가요
         </div>
-
-        {/* 등급의 의미를 못 박는다. 이 문장이 없으면 브론즈가 "실력 하위"로 읽힌다. */}
-        <div className="tm-player-card-tier-note">등급은 실력이 아니라 뛴 경기 수로 올라가요</div>
 
         {/* 진행도·해금 안내는 카드 주인에게 하는 말이다 -- 남의 프로필에서 보이면
             소음이고, 잠긴 이유가 궁금한 사람은 뒷면이 말해 준다. */}

@@ -91,7 +91,7 @@ export function PublicProfilePageClient({ userId }: { userId: string }) {
           profileImageUrl={data.profileImageUrl}
           teamName={data.teams?.[0]?.name ?? null}
           isOwner={authMe.data?.user?.id === userId}
-          shareHref={`/users/${userId}/card`}
+          shareHref={withFromPath(`/users/${userId}/card`, selfHref)}
           belowCardSlot={
             <div className="tm-pcard-identity">
               <h1 className="tm-pcard-identity-name">{data.displayName}</h1>

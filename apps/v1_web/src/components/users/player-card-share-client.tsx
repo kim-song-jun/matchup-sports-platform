@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { PlayerCard } from './player-card';
 import { withFromPath } from '@/lib/session-storage';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 import type { V1PlayerCard } from '@/types/api';
 
 /**
@@ -32,8 +33,10 @@ export function PlayerCardShareClient({
   readonly teamName: string | null;
 }) {
   const [notice, setNotice] = useState<string | null>(null);
+  const selfHref = useCurrentHref();
 
-  const shareUrl = typeof window === 'undefined' ? '' : window.location.href;
+  // The card's own address only — the `?from=` this screen received is navigation state, not part of the card.
+  const shareUrl = typeof window === 'undefined' ? '' : `${window.location.origin}${window.location.pathname}`;
   const shareText =
     card.overall != null
       ? `${displayName} · 종합 ${card.overall} — Teameet 선수 카드`
@@ -80,8 +83,8 @@ export function PlayerCardShareClient({
         </div>
       ) : null}
 
-      {/* 뒤로가기가 이 카드 화면으로 돌아오도록 출처를 함께 넘긴다(public-profile-client.tsx가 `?from=`을 읽는다). */}
-      <Link href={withFromPath(`/users/${userId}`, `/users/${userId}/card`)} className="tm-player-card-share-secondary">
+      {/* 뒤로가기가 이 카드 화면으로, 그다음엔 카드로 들어온 곳으로 돌아오도록 받은 출처까지 넘긴다. */}
+      <Link href={withFromPath(`/users/${userId}`, selfHref ?? `/users/${userId}/card`)} className="tm-player-card-share-secondary">
         프로필 전체 보기
       </Link>
     </div>

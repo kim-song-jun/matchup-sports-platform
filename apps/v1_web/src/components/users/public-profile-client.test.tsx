@@ -76,3 +76,37 @@ describe('PublicProfilePageClient — 소속팀 칩 출처', () => {
     expect(screen.queryByText('소속팀')).not.toBeInTheDocument();
   });
 });
+
+describe('PublicProfilePageClient — 카드 공유 링크 출처', () => {
+  const playerCard = {
+    formulaVersion: 1, position: 'GK', jerseyNumber: 1, overall: 48, tier: 'bronze', shape: 'rect', appearances: 4,
+    stats: [
+      { code: 'SHO', label: '골', value: 44, unlocked: true, lockedBy: null },
+      { code: 'PAS', label: '도움', value: 30, unlocked: true, lockedBy: null },
+      { code: 'APP', label: '출전', value: 59, unlocked: true, lockedBy: null },
+      { code: 'SKI', label: '실력', value: null, unlocked: false, lockedBy: { type: 'reviews', remaining: 3 } },
+      { code: 'MAN', label: '매너', value: null, unlocked: false, lockedBy: { type: 'reviews', remaining: 3 } },
+      { code: 'PUN', label: '시간약속', value: null, unlocked: false, lockedBy: { type: 'reviews', remaining: 3 } },
+    ],
+    unlockedCount: 3, nextUnlock: { code: 'SKI', reason: { type: 'reviews', remaining: 3 } },
+  } as unknown as V1PublicProfile['playerCard'];
+
+  beforeEach(() => {
+    navigation.pathname = '/users/user-1';
+    useV1AuthMeMock.mockReturnValue({ data: undefined } as never);
+  });
+
+  // 프로필 → 카드 → 뒤로 → 프로필 → 뒤로 가 처음 화면에 닿으려면 카드 링크에 프로필이 받은 출처까지 실려야 한다.
+  it('프로필이 받은 from 까지 카드 링크에 이어 붙인다', () => {
+    navigation.search = 'from=%2Fmatches%2Fm-1';
+    useV1PublicProfileMock.mockReturnValue({ isLoading: false, isError: false, data: profile({ playerCard }) } as never);
+
+    render(<PublicProfilePageClient userId="user-1" />);
+
+    const selfHref = `/users/user-1?from=${encodeURIComponent('/matches/m-1')}`;
+    expect(screen.getByRole('link', { name: '카드 공유하기' })).toHaveAttribute(
+      'href',
+      `/users/user-1/card?from=${encodeURIComponent(selfHref)}`,
+    );
+  });
+});

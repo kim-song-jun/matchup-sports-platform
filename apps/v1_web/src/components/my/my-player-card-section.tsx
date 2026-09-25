@@ -2,6 +2,7 @@
 
 import { useV1PublicProfile } from '@/hooks/use-v1-api';
 import { PlayerCard } from '@/components/users/player-card';
+import { withFromPath } from '@/lib/session-storage';
 
 /**
  * 마이페이지 상단의 내 선수 카드 (Task 155).
@@ -59,7 +60,7 @@ export function MyPlayerCardSection({
       teamName={profile.data?.teams?.[0]?.name ?? null}
       // 내 카드이므로 기록 공개 유도를 띄운다 -- 남의 카드에서는 권하지 않는다.
       isOwner
-      shareHref={`/users/${userId}/card`}
+      shareHref={withFromPath(`/users/${userId}/card`, '/my')}
       // 카드 설정(숨김·모양)은 내 카드에서 바로 -- 메뉴 2클릭 뒤에 숨기지 않는다.
       settingsHref="/my/settings/player-card"
     />

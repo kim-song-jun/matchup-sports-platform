@@ -308,8 +308,6 @@ describe('다시 평가된 모듈(HMR)의 재설치', () => {
 });
 
 describe('reload with a modal open', () => {
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
-
   it('turns the leftover overlay marker into the page entry, so one back reaches the previous page', async () => {
     installNavigationHistory();
     window.history.pushState({}, '', '/teams/new');
@@ -323,14 +321,12 @@ describe('reload with a modal open', () => {
     __resetNavigationHistoryForTests();
     await back();
     expect(window.location.pathname).toBe('/teams/new');
-    installNavigationHistory();
-    await settle();
+    await traverse(() => installNavigationHistory()); // install hops over the skipped copy with go()
     expect(window.location.pathname).toBe('/home');
   });
 });
 
 describe('same-URL copies left by reloads under a dirty form', () => {
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
   const reload = () => {
     __resetNavigationHistoryForTests();
     installNavigationHistory();
@@ -358,14 +354,14 @@ describe('same-URL copies left by reloads under a dirty form', () => {
     pushBufferEntry();
 
     const { steps } = bufferLeavePlan();
-    goBackLeaving(steps);
-    __resetNavigationHistoryForTests(); // the leave lands in another document — this one never sees the pop
-    await settle();
+    await traverse(() => {
+      goBackLeaving(steps);
+      __resetNavigationHistoryForTests(); // the leave lands in another document — this one never sees the pop
+    });
     expect(window.location.pathname).toBe('/home');
 
     await forward(); // back into the tab: the first entry forward is the skipped copy
-    installNavigationHistory();
-    await settle();
+    await traverse(() => installNavigationHistory()); // install hops over the skipped copy with go()
     expect(window.location.pathname).toBe('/teams/new');
     expect(idx()).toBe(2);
   });

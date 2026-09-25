@@ -11,17 +11,18 @@ import { createElement, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { CursorPage, V1Team } from '@/types/api';
 
-const realPage: CursorPage<V1Team> = {
-  items: [{ id: 'real-1', teamId: 'real-1', name: '실제 팀' } as unknown as V1Team],
-  nextCursor: null,
-  pageInfo: { nextCursor: null, hasNext: false, total: 1 },
-};
-
-const v1GetMock = vi.fn().mockResolvedValue(realPage);
+const { v1GetMock } = vi.hoisted(() => {
+  const realPage: CursorPage<V1Team> = {
+    items: [{ id: 'real-1', teamId: 'real-1', name: '실제 팀' } as unknown as V1Team],
+    nextCursor: null,
+    pageInfo: { nextCursor: null, hasNext: false, total: 1 },
+  };
+  return { v1GetMock: vi.fn().mockResolvedValue(realPage) };
+});
 
 vi.mock('@/lib/api-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api-client')>();
-  return { ...actual, v1Get: (...args: unknown[]) => v1GetMock(...args) };
+  return { ...actual, v1Get: v1GetMock };
 });
 
 import { useV1TeamPages } from './use-v1-api';

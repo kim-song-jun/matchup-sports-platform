@@ -62,7 +62,7 @@
 
 현재 파이프라인은 1·2·(대회 목록)·4·10 에 해당하는 5장을 찍는다. 3·6·8 은 테스트 케이스
 (`apps/v1_ios/TeameetUITests/StoreScreenshotUITests.swift`)에 장면을 추가해야 한다. 3번은 LIVE 상태 경기가
-있어야 하므로 운영 API 로 상태를 만드는 절차가 필요하다. 저장소에 있는 가장 가까운 하네스는 팀매치용 `scripts/verify-alpha-team-match-review-flow.mjs`(start → end-period → end)이고, 대회 픽스처는 Socket.IO takeover 토큰이 추가로 필요하다(루트 `CLAUDE.md` "Alpha 실측 검증" 3절).
+있어야 하므로 운영 API 로 상태를 만드는 절차가 필요하다. 저장소에 있는 가장 가까운 하네스는 팀매치용 `scripts/verify-alpha-team-match-review-flow.mjs`(팀매치 생성 → 상대팀 신청 → 승인 → 양 팀 라인업 저장·제출 → start → end-period → start-period → end-period → end → 결과 제출 → 상대 승인)이고, 대회 픽스처는 Socket.IO takeover 토큰이 추가로 필요하다(루트 `CLAUDE.md` "Alpha 실측 검증" 3절).
 
 ## 3. 앱 미리보기 영상 (선택)
 

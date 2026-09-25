@@ -39,7 +39,7 @@
 - [x] **[#1280에서 해결] `NSCameraUsageDescription` 추가** — 웹의 `<input type="file" accept="image/*">`
   (`apps/v1_web/src/components/auth/signup-client.tsx:642` 등)를 WKWebView 가 띄우면 iOS 가 "사진 찍기"를
   함께 보여준다. 이 키가 없으면 그 항목을 누르는 순간 앱이 **강제 종료**된다(심사 2.1 크래시 거절 사유).
-  `apps/v1_ios/project.yml` 의 `info.properties` 에 없음을 확인했다.
+  #1280 이 `apps/v1_ios/project.yml` 의 `info.properties` 에 추가했다.
 - [x] **[#1280에서 해결] `NSLocationWhenInUseUsageDescription` 추가** — 웹이 `navigator.geolocation` 을
   쓴다(`home-client.tsx:217`, `onboarding-client.tsx:255`, `my-api-clients.tsx:1250`). 키가 없으면 iOS
   WKWebView 에서 위치 요청이 항상 실패한다.

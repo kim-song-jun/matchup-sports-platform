@@ -16,7 +16,7 @@ export default function TournamentCampaignNotFound() {
       <p className="tm-text-body" style={{ margin: '8px 0 20px', color: 'var(--text-muted)' }}>
         주소가 바뀌었거나 아직 공개 전인 캠페인이에요.
       </p>
-      <Link className={`tm-btn tm-btn-primary ${styles.notFoundAction}`} href="/tournaments">
+      <Link className={`tm-btn tm-btn-md tm-btn-primary ${styles.notFoundAction}`} href="/tournaments">
         대회 목록으로
       </Link>
     </section>

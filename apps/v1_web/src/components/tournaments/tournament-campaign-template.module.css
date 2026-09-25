@@ -162,13 +162,6 @@
   padding: 80px 24px;
 }
 
-.notFoundAction {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-}
-
 .notFoundAction:focus-visible {
   outline: 2px solid var(--blue500);
   outline-offset: 2px;

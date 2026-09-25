@@ -35,22 +35,24 @@ const emptyBuildTimeSeed: CursorPage<V1Team> = {
 // providers.tsx(apps/v1_web/src/app/providers.tsx)의 실제 staleTime과 맞춘다 — 기본값
 // staleTime:0인 QueryClient로는 initialData든 placeholderData든 어차피 즉시 stale이라
 // 이 회귀를 재현하지 못한다.
-function wrapper({ children }: { children: ReactNode }) {
+function makeWrapper() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60_000 } } });
-  return createElement(QueryClientProvider, { client }, children);
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(QueryClientProvider, { client }, children);
+  };
 }
 
 describe('useV1TeamPages — 빌드 타임 빈 seed가 refetch를 막지 않는다', () => {
   it('seed가 있어도 마운트 시 실제 목록 fetch를 건다', async () => {
     v1GetMock.mockClear();
-    renderHook(() => useV1TeamPages(undefined, { seed: emptyBuildTimeSeed }), { wrapper });
+    renderHook(() => useV1TeamPages(undefined, { seed: emptyBuildTimeSeed }), { wrapper: makeWrapper() });
 
     await waitFor(() => expect(v1GetMock).toHaveBeenCalled());
   });
 
   it('빈 seed를 보여주다가 실제 fetch가 오면 진짜 목록으로 바뀐다', async () => {
     v1GetMock.mockClear();
-    const { result } = renderHook(() => useV1TeamPages(undefined, { seed: emptyBuildTimeSeed }), { wrapper });
+    const { result } = renderHook(() => useV1TeamPages(undefined, { seed: emptyBuildTimeSeed }), { wrapper: makeWrapper() });
 
     expect(result.current.data?.pages[0]?.items).toHaveLength(0);
     await waitFor(() => expect(result.current.data?.pages[0]?.items).toHaveLength(1));
@@ -58,7 +60,7 @@ describe('useV1TeamPages — 빌드 타임 빈 seed가 refetch를 막지 않는�
   });
 
   it('seed가 없으면 지금처럼 로딩부터 시작한다', () => {
-    renderHook(() => useV1TeamPages(undefined, {}), { wrapper });
+    renderHook(() => useV1TeamPages(undefined, {}), { wrapper: makeWrapper() });
     // 회귀 없음을 표시하는 스모크 — seed 없는 기존 경로는 그대로 undefined data에서 시작한다.
   });
 });

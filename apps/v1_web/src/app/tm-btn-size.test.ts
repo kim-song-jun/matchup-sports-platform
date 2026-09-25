@@ -7,10 +7,8 @@ import { describe, expect, it } from 'vitest';
  * text height (24px on alpha, below the 44px touch target) and, as a block, flush against its text.
  */
 const SRC = resolve(process.cwd(), 'src');
-const SIZE = /tm-btn-(sm|md|lg|icon)\b|sizeClass/;
-
-// Sized inline on purpose: a compact action inside a sentence of guidance text.
-const ALLOWED = new Set(['components/lineup/pitch-formation-editor.tsx']);
+// tm-inline-action: text-height action inside a sentence, with a 44px hit area of its own.
+const SIZE = /tm-btn-(sm|md|lg|icon)\b|tm-inline-action|sizeClass/;
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -24,7 +22,6 @@ function unsizedButtons(): string[] {
   const hits: string[] = [];
   for (const file of sourceFiles(SRC)) {
     const rel = relative(SRC, file);
-    if (ALLOWED.has(rel)) continue;
     const text = readFileSync(file, 'utf8');
     for (const match of text.matchAll(/"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g)) {
       const value = match[1] ?? match[2] ?? match[3] ?? '';

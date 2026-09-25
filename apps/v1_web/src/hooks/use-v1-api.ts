@@ -907,7 +907,12 @@ export function useV1TeamPages(filters?: ListFilters, options?: QueryOptions & {
     getNextPageParam: (lastPage) =>
       lastPage.pageInfo?.hasNext ? lastPage.pageInfo.nextCursor ?? undefined : undefined,
     enabled: options?.enabled,
-    initialData: options?.seed
+    // initialData가 아니라 placeholderData를 쓴다. initialData는 dataUpdatedAt을 "지금"으로
+    // 찍어 seed를 진짜 성공 데이터로 취급하므로, staleTime(providers.tsx: 60_000ms) 동안은
+    // 배경 refetch조차 안 돈다 — seed가 빌드 타임에 빈 목록으로 구워졌으면(위 revalidate=0
+    // 참고) 그 빈 상태가 최대 1분간 그대로 보인다. placeholderData는 항상 실제 fetch를
+    // 트리거하면서 그 결과가 올 때까지만 seed를 보여준다(useV1TeamDetail·useV1Match와 동일 패턴).
+    placeholderData: options?.seed
       ? { pages: [options.seed], pageParams: [undefined] }
       : undefined,
   });

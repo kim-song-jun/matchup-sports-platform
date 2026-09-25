@@ -11,7 +11,8 @@ export const metadata = buildPublicMetadata({
   path: '/team-matches',
 });
 
-export const revalidate = 300;
+// matches/page.tsx와 동일 이유 — revalidate=0으로 빌드 타임 프리렌더를 끈다.
+export const revalidate = 0;
 
 export default async function TeamMatchesPage() {
   const [matches, sports] = await Promise.all([

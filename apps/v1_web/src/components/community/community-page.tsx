@@ -382,7 +382,8 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
               ctaHref="/matches"
             />
           ) : (
-            groups.map((group) => {
+            <>
+            {groups.map((group) => {
               const items = model.notifications.filter((notification) => notification.group === group);
               if (items.length === 0) return null;
               const headingId = `notif-group-${group.replace(/\s+/g, '-')}`;
@@ -403,21 +404,22 @@ export function NotificationsPageView({ model }: { model: NotificationsViewModel
                   </div>
                 </section>
               );
-            })
+            })}
+            {/* Inside the list so it shares the page gutter and sits above the bottom-nav padding. */}
+            {model.loadMoreError ? <p role="alert" className="tm-text-caption" style={{ marginBottom: 8 }}>이전 알림을 불러오지 못했어요. 다시 시도해 주세요.</p> : null}
+            {model.hasNext ? (
+              <button
+                type="button"
+                className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block"
+                disabled={model.loadMorePending}
+                onClick={model.onLoadMore}
+              >
+                {model.loadMorePending ? '불러오는 중' : model.loadMoreError ? '다시 불러오기' : '더 보기'}
+              </button>
+            ) : null}
+            </>
           )}
         </div>
-        {model.loadMoreError ? <p role="alert" className="tm-text-caption">이전 알림을 불러오지 못했어요. 다시 시도해 주세요.</p> : null}
-        {model.hasNext ? (
-          <button
-            type="button"
-            className="tm-btn tm-btn-neutral tm-btn-block"
-            style={{ marginTop: 16 }}
-            disabled={model.loadMorePending}
-            onClick={model.onLoadMore}
-          >
-            {model.loadMorePending ? '불러오는 중' : model.loadMoreError ? '다시 불러오기' : '더 보기'}
-          </button>
-        ) : null}
       </div>
       <NotificationDetailSheet
         notification={detail}

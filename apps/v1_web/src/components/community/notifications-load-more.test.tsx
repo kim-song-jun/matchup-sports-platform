@@ -84,7 +84,6 @@ describe('알림 목록 "더 보기"', () => {
   it('더 보기는 목록 안에서 크기 클래스를 갖고 렌더된다', () => {
     mock.query.mockReturnValue(baseQuery({
       data: { pages: [{ unreadCount: 1, items: [notif()] }] },
-      hasNext: true,
       hasNextPage: true,
     }));
     render(<NotificationsPageClient />);

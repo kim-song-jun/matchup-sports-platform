@@ -62,7 +62,7 @@ vi.mock('@/hooks/use-v1-api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/use-v1-api')>();
   return {
     ...actual,
-    useV1Notifications: hooks.notifications,
+    useV1NotificationsInfinite: hooks.notifications,
     useV1ReadNotification: hooks.readNotification,
     useV1ReadAllNotifications: hooks.readAllNotifications,
     useV1ChatRooms: hooks.chatRooms,
@@ -119,17 +119,21 @@ describe('NotificationsPageClient', () => {
       isPending: false,
       isError: false,
       data: {
-        unreadCount: 1,
-        items: [
+        pages: [
           {
-            notificationId: 'notif-1',
-            type: 'team_application_accepted',
-            title: '팀 가입 신청이 수락됐어요',
-            body: null,
-            target: { type: 'team', id: 'team-1', route: '/teams/team-1' },
-            status: 'created',
-            readAt: null,
-            createdAt: '2026-07-18T00:00:00.000Z',
+            unreadCount: 1,
+            items: [
+              {
+                notificationId: 'notif-1',
+                type: 'team_application_accepted',
+                title: '팀 가입 신청이 수락됐어요',
+                body: null,
+                target: { type: 'team', id: 'team-1', route: '/teams/team-1' },
+                status: 'created',
+                readAt: null,
+                createdAt: '2026-07-18T00:00:00.000Z',
+              },
+            ],
           },
         ],
       },

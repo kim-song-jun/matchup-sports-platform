@@ -68,6 +68,16 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
+        # WKWebView asks the OS on the page's behalf: <input type="file" accept="image/*"> offers
+        # "Take Photo", a video input also records sound, a long-pressed image offers "Save to
+        # Photos", and the home/onboarding screens call navigator.geolocation. Without a purpose
+        # string the camera, microphone and photo-save paths terminate the app, and location
+        # silently fails.
+        NSCameraUsageDescription: 프로필·팀·경기 사진을 촬영해 올리려면 카메라 접근이 필요해요.
+        NSMicrophoneUsageDescription: 경기 영상을 촬영할 때 소리를 함께 녹음하려면 마이크 접근이 필요해요.
+        NSPhotoLibraryUsageDescription: 프로필·팀·경기 사진을 사진 보관함에서 골라 올리려면 접근이 필요해요.
+        NSPhotoLibraryAddUsageDescription: 팀밋에서 본 이미지를 사진 보관함에 저장하려면 접근이 필요해요.
+        NSLocationWhenInUseUsageDescription: 내 주변 경기와 활동 지역을 찾으려면 현재 위치가 필요해요.
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         # Export compliance, declared once in the build rather than answered per upload.

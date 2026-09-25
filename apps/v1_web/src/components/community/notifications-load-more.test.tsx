@@ -66,6 +66,20 @@ describe('알림 목록 "더 보기"', () => {
     expect(mock.fetchNextPage).toHaveBeenCalledOnce();
   });
 
+  // 더 보기 실패로 isError 가 켜져도 이미 받은 알림은 그대로 두고, 다시 불러오기만 안내한다.
+  it('다음 페이지를 불러오다 실패해도 기존 목록을 지우지 않는다', () => {
+    mock.query.mockReturnValue(baseQuery({
+      data: { pages: [{ unreadCount: 1, items: [notif({ title: '남아 있어야 할 알림' })] }] },
+      hasNextPage: true,
+      isError: true,
+      isFetchNextPageError: true,
+    }));
+    render(<NotificationsPageClient />);
+    expect(screen.getByText('남아 있어야 할 알림')).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain('이전 알림을 불러오지 못했어요');
+    expect(screen.getByRole('button', { name: '다시 불러오기' })).toBeTruthy();
+  });
+
   it('다음 페이지가 없으면 버튼을 숨긴다', () => {
     mock.query.mockReturnValue(baseQuery({
       data: { pages: [{ unreadCount: 0, items: [notif()] }] },

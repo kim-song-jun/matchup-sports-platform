@@ -231,9 +231,10 @@ export function NotificationsPageClient() {
   const read = useV1ReadNotification();
   const readAll = useV1ReadAllNotifications();
 
+  // 더 보기 실패는 이미 받은 목록을 지우지 않는다 — 전체 에러는 첫 페이지 실패일 때만.
   const status: NotificationsViewModel['status'] = query.isPending
     ? 'loading'
-    : query.isError
+    : query.isError && !query.data
       ? 'error'
       : 'ready';
 

@@ -400,6 +400,22 @@ describe('MatchCreatePageView — 매치 취소 버튼 잠금', () => {
 
     expect(screen.getByRole('button', { name: '매치 취소' })).not.toBeDisabled();
   });
+
+  // 서버 update()는 잠긴 매치의 어떤 필드도 받지 않는다 — 입력이 열려 있으면 고친 뒤에야 409를 본다.
+  it('lockedReason이 있으면 입력·토글도 잠그고, 변경 취소로는 나갈 수 있다', () => {
+    render(<MatchCreatePageView model={editModel('완료·취소·종료된 매치는 수정할 수 없어요.')} />);
+
+    expect(screen.getByRole('textbox', { name: '제목' })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: '나도 참가해요' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '변경 취소' })).not.toBeDisabled();
+  });
+
+  it('lockedReason이 없으면 입력·토글은 열려 있다', () => {
+    render(<MatchCreatePageView model={editModel(null)} />);
+
+    expect(screen.getByRole('textbox', { name: '제목' })).not.toBeDisabled();
+    expect(screen.getByRole('switch', { name: '나도 참가해요' })).not.toBeDisabled();
+  });
 });
 
 describe('MatchListPageView — 빈 목록의 세로 정렬', () => {

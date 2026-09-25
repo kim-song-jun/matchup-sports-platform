@@ -3659,6 +3659,30 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   margin-top: 20px;
 }
 
+.tm-create-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+/* Inputs carry their own disabled token; chips, toggles and the label-styled upload button do not. */
+.tm-create-fieldset:disabled button,
+.tm-create-fieldset:disabled label.tm-btn {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tm-create-fieldset:disabled .tm-create-input {
+  background: var(--grey100);
+}
+
+.tm-create-fieldset:disabled .tm-create-native-input,
+.tm-create-fieldset:disabled .tm-create-select-control {
+  color: var(--text-caption);
+  cursor: not-allowed;
+}
+
 .tm-create-shell {
   padding: 12px 20px 124px;
 }

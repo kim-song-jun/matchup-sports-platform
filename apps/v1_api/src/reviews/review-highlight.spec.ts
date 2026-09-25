@@ -41,6 +41,13 @@ describe('pickReviewHighlight', () => {
     expect(pickReviewHighlight([...reviews].reverse(), by)?.tagCode).toBe('manner');
   });
 
+  it('uses the most common label snapshot whatever order the rows arrive in', () => {
+    const labelled = (label: string) => ({ ...review(), tags: [{ tagCode: 'manner', labelSnapshot: label }] });
+    const rows = [labelled('옛 문구'), labelled('매너가 좋아요'), labelled('매너가 좋아요')];
+    expect(pickReviewHighlight(rows, by)?.label).toBe('매너가 좋아요');
+    expect(pickReviewHighlight([...rows].reverse(), by)?.label).toBe('매너가 좋아요');
+  });
+
   it('shows nothing when enough reviews carry no tag at all', () => {
     expect(pickReviewHighlight([review(), review(), review()], by)).toBeNull();
   });

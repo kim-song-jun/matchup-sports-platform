@@ -23,24 +23,28 @@ export function pickReviewHighlight<T extends { tags: ReadonlyArray<{ tagCode: s
 ): ReviewHighlight | null {
   const reviewers = new Set(reviews.map(reviewerOf).filter((id): id is string => Boolean(id)));
   if (reviewers.size < REVIEW_HIGHLIGHT_MIN_REVIEWERS) return null;
-  const counts = new Map<string, { label: string; count: number }>();
+  const counts = new Map<string, { count: number; labels: Map<string, number> }>();
   for (const review of reviews) {
     // A tag repeated inside one review still counts that review once.
     for (const tagCode of new Set(review.tags.map((tag) => tag.tagCode))) {
       const label = review.tags.find((tag) => tag.tagCode === tagCode)?.labelSnapshot ?? tagCode;
-      const current = counts.get(tagCode) ?? { label, count: 0 };
+      const current = counts.get(tagCode) ?? { count: 0, labels: new Map<string, number>() };
       current.count += 1;
+      current.labels.set(label, (current.labels.get(label) ?? 0) + 1);
       counts.set(tagCode, current);
     }
   }
-  let best: { tagCode: string; label: string; count: number } | null = null;
-  for (const [tagCode, { label, count }] of counts) {
-    if (!best || count > best.count || (count === best.count && tagCode < best.tagCode)) best = { tagCode, label, count };
+  let best: { tagCode: string; count: number; labels: Map<string, number> } | null = null;
+  for (const [tagCode, { count, labels }] of counts) {
+    if (!best || count > best.count || (count === best.count && tagCode < best.tagCode)) best = { tagCode, count, labels };
   }
   if (!best) return null;
+  // Labels are snapshots and the copy may have changed over time; row order is not stable, so take
+  // the most used wording (then the lowest) instead of whichever row came first.
+  const label = [...best.labels.entries()].sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1))[0][0];
   return {
     tagCode: best.tagCode,
-    label: best.label,
+    label,
     rate: Number((best.count / reviews.length).toFixed(2)),
     reviewCount: reviews.length,
   };

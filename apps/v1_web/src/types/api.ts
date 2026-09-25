@@ -1848,7 +1848,7 @@ export type V1ReviewSportSummary = {
   tagRates: V1ReviewTagRate[];
 };
 
-/** The single most-given tag across revealed reviews. The server sends null below three reviews. */
+/** The single most-given tag across revealed reviews. The server sends null until three distinct reviewers (users, or reviewing teams for a team) stand behind them. */
 export type V1ReviewHighlight = {
   tagCode: string;
   label: string;

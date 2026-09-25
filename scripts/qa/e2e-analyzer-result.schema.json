@@ -5,36 +5,49 @@
   "properties": {
     "status": {
       "type": "string",
-      "enum": ["completed", "blocked", "no-action"]
+      "enum": [
+        "completed",
+        "blocked",
+        "no-action"
+      ],
+      "description": "completed: 분석(과 agent-all 수정)을 끝냄. blocked: 진행할 수 없음 — 이유를 notes 에. no-action: 고칠 것이 없음."
     },
     "set_id": {
-      "type": "string"
+      "type": "string",
+      "description": "작업 문서(task.md)의 Set ID 를 그대로."
     },
     "images_analyzed": {
       "type": "integer",
-      "minimum": 0
+      "minimum": 0,
+      "description": "실제로 열어서 분석한 이미지 수. 셋의 이미지 수와 다르면 notes 에 이유."
     },
     "issues_found": {
       "type": "integer",
-      "minimum": 0
+      "minimum": 0,
+      "description": "조치가 필요한(actionable) 이슈 수."
     },
     "agent_all_ran": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "이번 실행에서 agent-all 수정 파이프라인을 돌렸는지."
     },
     "changed_files": {
       "type": "array",
       "items": {
         "type": "string"
-      }
+      },
+      "description": "변경한 코드·문서의 저장소 기준 상대 경로. 변경이 없으면 빈 배열."
     },
     "report_path": {
-      "type": "string"
+      "type": "string",
+      "description": "갱신한 analysis.md 의 경로."
     },
     "remediation_path": {
-      "type": "string"
+      "type": "string",
+      "description": "갱신한 remediation.md 의 경로."
     },
     "notes": {
-      "type": "string"
+      "type": "string",
+      "description": "짧은 요약."
     }
   },
   "required": [

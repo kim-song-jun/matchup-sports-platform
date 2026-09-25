@@ -58,7 +58,7 @@ Contact for review: <연락처 — 저장소 밖에서 전달>
 | 주장 | 근거 |
 |---|---|
 | Apple 로그인은 iOS 앱 로그인 화면에만 나타남 | `apps/v1_web/src/components/auth/apple-login-button.tsx` (`isNativeAppleSignInAvailable`), 배치 `auth-page.tsx:42` · 셸 `Auth/AppleSignInController.swift` |
-| 앱 안 탈퇴 | `/my/settings/withdrawal` → `WithdrawalPageClient` → `POST /profile/me/withdrawal-request` (`profile.controller.ts:142`), 상태 `withdrawal_pending` 후 모든 인증 요청 차단(`v1-auth.guard.ts:89`) |
+| 앱 안 탈퇴 | `/my/settings/withdrawal` → `WithdrawalPageClient` → `POST /api/v1/me/withdrawal-request` (`profile.controller.ts:142`), 상태 `withdrawal_pending` 후 모든 인증 요청 차단(`v1-auth.guard.ts:89`) |
 | 웹 탈퇴 안내 | `apps/v1_web/src/app/account-deletion/page.tsx` — **프로덕션 404, 승격 필요** |
 | 채팅 신고·차단 | API `chat.controller.ts` `POST rooms/:roomId/messages/:messageId/report`·`/block`, `GET/DELETE blocked-users`; UI `components/community/chat-safety-dialog.tsx` |
 | 신고 → 운영자 즉시 알림 | `chat.service.ts` 신고 시 `V1Inquiry(category='report')` + Slack 알림 outbox 이벤트 |

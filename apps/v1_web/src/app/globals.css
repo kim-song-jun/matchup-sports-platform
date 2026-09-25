@@ -5720,8 +5720,44 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   text-decoration: none;
 }
 
+.tm-inline-action {
+  position: relative;
+  margin-left: 8px;
+  padding: 2px 8px;
+  min-height: 0;
+  font-size: inherit;
+}
+
+/* 문장 안에 끼는 작은 액션이라 모양은 글자 높이로 두고, 누르는 영역만 44px 로 넓힌다. */
+.tm-inline-action::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: 50%;
+  height: 44px;
+  transform: translateY(-50%);
+}
+
 .tm-review-highlight {
   color: var(--text-body);
+}
+
+/* 다크에서 --grey100(중립 버튼 채움·세그먼트 트랙)이 카드 면(--card-surface)과 같은 값이라
+   카드 안 소속팀 칩과 기간 탭 트랙의 모양이 사라진다. 이 화면에서만 한 단계 띄운다. */
+:root.dark .tm-public-profile .tm-card .tm-btn-neutral,
+:root.dark .tm-public-profile .tm-card .tm-segmented-tabs {
+  background: var(--surface-soft);
+}
+
+:root.dark .tm-public-profile .tm-card .tm-segmented-thumb {
+  background: var(--border);
+}
+
+@media (hover: hover) {
+  :root.dark .tm-public-profile .tm-card .tm-btn-neutral:hover:not(:disabled) {
+    background: var(--grey200);
+  }
 }
 
 .tm-review-highlight-tag {
@@ -8458,7 +8494,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   background: var(--tm-ink);
   -webkit-mask: url('/brand/teameet-mark.png') center / contain no-repeat;
   mask: url('/brand/teameet-mark.png') center / contain no-repeat;
-  opacity: 0.1; pointer-events: none; z-index: 0;
+  /* 0.1 이면 카드 모서리 밖으로 나간 마크의 두 원이 흠집처럼 보였다(2026-09-25 alpha). */
+  opacity: 0.05; pointer-events: none; z-index: 0;
 }
 .tm-pcard-fx { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
 
@@ -8542,18 +8579,18 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
      모두 사라지게 한다 -- 실물 FUT 카드의 배경 제거된 선수 컷아웃에 가장 가까운 근사다.
      mask-composite 는 표준(intersect)과 WebKit(source-in) 문법이 달라 둘 다 적는다.
 
-     가로 마스크는 8%~92% (예전 16%~84%): 업로드 입구에서 얼굴 중심 정사각으로 잘라
-     저장하므로(2026-09-02, profile-photo-cropper) 사진 가장자리가 곧 얼굴 옆 여백이다.
-     좁게 지우면 얼굴 양옆이 잘려 보이고, 넓게 남기면 배경 사각형이 비친다 -- 정사각
-     전제에서 8% 가 그 사이다. */
+     가로 14%~86%, 위 14%: 바탕이 밝은 사진은 8% 로는 배경 사각형이 어두운 카드 위에 떠 보였다
+     (2026-09-25 alpha 실측, 사용자 선택). 얼굴 중심 정사각 저장본이라 이 폭까지는 얼굴이 안 잘린다. */
   -webkit-mask-image:
-    linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 8%, #000 58%, rgba(0, 0, 0, 0) 100%),
-    linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 8%, #000 92%, rgba(0, 0, 0, 0) 100%);
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 14%, #000 54%, rgba(0, 0, 0, 0) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 14%, #000 86%, rgba(0, 0, 0, 0) 100%);
   -webkit-mask-composite: source-in;
   mask-image:
-    linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 8%, #000 58%, rgba(0, 0, 0, 0) 100%),
-    linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 8%, #000 92%, rgba(0, 0, 0, 0) 100%);
+    linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, #000 14%, #000 54%, rgba(0, 0, 0, 0) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 14%, #000 86%, rgba(0, 0, 0, 0) 100%);
   mask-composite: intersect;
+  /* 밝은 바탕이 카드 재질보다 튀지 않게 한 톤만 누른다 — 얼굴 색은 거의 그대로다. */
+  filter: brightness(0.92) saturate(0.92);
 }
 /* next/image(fill) 가 그리는 실제 <img>. 도착하기 전엔 투명 -- 배경 div 시절엔 사진이
    한 박자 늦게 "툭" 나타났다. 정사각 저장본을 위쪽 기준으로 덮는다(얼굴은 위에 있다). */
@@ -8586,7 +8623,8 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 
 /* 능력치 -- gitfut/FUT 실물은 값 + 3글자 코드뿐이다. 한글 뜻은 뒷면에서 푼다. */
 .tm-player-card-stats {
-  margin-top: 12px; position: relative; z-index: 1;
+  /* 능력치와 발치(margin-top:auto) 사이에 빈 띠가 67px 남던 것을 위아래로 나눈다. */
+  margin-top: 24px; position: relative; z-index: 1;
   display: grid; grid-template-columns: 1fr 1px 1fr;
   column-gap: 12px; row-gap: 4px; align-items: center;
 }
@@ -8803,10 +8841,11 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   clip-path: var(--tm-silhouette);
   background: linear-gradient(168deg, #1a1f2a 0%, #12161e 58%, #0b0e14 100%);
   color: #a9b3c2;
-  display: flex; flex-direction: column; gap: 8px;
+  display: flex; flex-direction: column; gap: 4px;
 }
+/* rect 는 424px 안에 내용이 446px 이라 마지막 산식 줄이 잘렸다(2026-09-25 alpha) — 간격·위 여백으로 되찾는다. */
 .tm-player-card[data-shape='shield'] .tm-pcard-backface { padding: 48px 24px 64px; }
-.tm-player-card[data-shape='rect'] .tm-pcard-backface { padding: 32px 20px 24px; }
+.tm-player-card[data-shape='rect'] .tm-pcard-backface { padding: 28px 20px 20px; }
 .tm-pcard-back-h {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   font-family: var(--tm-num); font-size: 10px; font-weight: 700;
@@ -8869,7 +8908,6 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 .tm-pcard-flipbtn:focus-visible { outline: 2px solid var(--blue500); outline-offset: 2px; }
 .tm-player-card-sub { margin-top: 12px; font-size: 13px; color: var(--text-muted); text-align: center; }
-.tm-player-card-tier-note { margin-top: 4px; font-size: 11px; color: var(--text-caption); text-align: center; }
 .tm-player-card-progress {
   margin-top: 12px; padding: 12px 12px; border-radius: var(--radius-control);
   background: var(--surface-soft); border: 1px solid var(--border);

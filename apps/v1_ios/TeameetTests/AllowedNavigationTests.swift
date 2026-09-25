@@ -239,7 +239,9 @@ final class AllowedNavigationTests: XCTestCase {
     // `intent:` is dropped because iOS has no such scheme to hand off to.
 
     func testAllowsOnlyReviewedExternalSchemes() {
-        for scheme in ["http", "https", "mailto", "tel", "sms", "geo", "itms-apps"] {
+        for scheme in [
+            "http", "https", "mailto", "tel", "sms", "geo", "itms-apps", "kakaomap", "nmap", "tmap",
+        ] {
             XCTAssertTrue(AllowedNavigation.isAllowedExternalScheme(scheme), "expected \(scheme) to be allowed")
         }
         for scheme in ["HTTPS", "Tel", "ITMS-Apps"] {
@@ -261,5 +263,20 @@ final class AllowedNavigationTests: XCTestCase {
         XCTAssertFalse(AllowedNavigation.isAllowedExternalScheme(nil))
         XCTAssertFalse(AllowedNavigation.isAllowedExternal(URL(string: "file:///etc/passwd")))
         XCTAssertTrue(AllowedNavigation.isAllowedExternal(URL(string: "mailto:help@teameet.co.kr")))
+    }
+
+    func testMapSchemesFallBackToTheirAppStorePages() {
+        XCTAssertEqual(
+            AllowedNavigation.externalAppStoreFallback(URL(string: "kakaomap://route?ep=37.5,127.0"))?
+                .absoluteString,
+            "https://apps.apple.com/kr/app/id304608425")
+        XCTAssertEqual(
+            AllowedNavigation.externalAppStoreFallback(URL(string: "NMAP://route/car"))?.absoluteString,
+            "https://apps.apple.com/kr/app/id311867728")
+        XCTAssertEqual(
+            AllowedNavigation.externalAppStoreFallback(URL(string: "tmap://route"))?.absoluteString,
+            "https://apps.apple.com/kr/app/id431589174")
+        XCTAssertNil(AllowedNavigation.externalAppStoreFallback(URL(string: "tel:010")))
+        XCTAssertNil(AllowedNavigation.externalAppStoreFallback(nil))
     }
 }

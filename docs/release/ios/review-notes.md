@@ -79,7 +79,7 @@ Contact for review: <연락처 — 저장소 밖에서 전달>
 
 1. **[거절 가능성 높음] 프로덕션 미승격** — 프로덕션에 Apple 로그인 API(`/api/v1/auth/apple/nonce` 404)·계정 삭제 안내(404)·AASA(404)가 없다.
    이 상태면 4.8(Apple 로그인 버튼이 동작 안 함)·5.1.1(v)(삭제 경로 누락)로 거절된다. → `dev → main` 승격(사용자).
-2. **[크래시] `NSCameraUsageDescription` 없음** — 사진 업로드 입력에서 "사진 찍기"를 고르면 강제 종료(2.1). README 1절.
+2. **[크래시 — #1280에서 해결] `NSCameraUsageDescription` 없음** — 사진 업로드 입력에서 "사진 찍기"를 고르면 강제 종료(2.1). README 1절.
 3. **[5.1.1(v)] Apple 로그인 토큰 폐기 미구현** — Apple 은 Sign in with Apple 사용자의 계정 삭제 시 REST API 로 토큰을
    폐기하라고 요구한다. 셸은 `identityToken` 만 전달하고(`AppleSignInController.swift:94`) 서버에 폐기 호출이 없다.
    구현하려면 ① 셸이 `authorizationCode` 도 전달 ② 서버가 Sign in with Apple 키(.p8)로 client secret 을 만들어 토큰 교환·보관
@@ -93,7 +93,7 @@ Contact for review: <연락처 — 저장소 밖에서 전달>
    경로를 강조하고, 후속으로 프로필·팀 화면 신고 버튼과 금칙어 필터를 추가한다.
 6. **[4.2] 최소 기능** — 위 "NATIVE FEATURES" 가 방어 재료다. 기존 분석은 `docs/ops/ios-release.md` "심사지침 4.2" 절.
 7. **[2.1] 본인인증 벽** — 신규 가입자는 한국 휴대폰 인증 없이 쓰기 기능을 못 쓴다. 데모 계정으로 우회하도록 메모에 적었다.
-8. **[5.1.1] 위치 권한 문구 없음** — `NSLocationWhenInUseUsageDescription` 이 없어 위치 버튼이 iOS 에서 항상 실패한다. 거절 사유는 아니나 기능 결함.
+8. **[#1280에서 해결] 위치 권한 문구 없음** — `NSLocationWhenInUseUsageDescription` 이 없어 위치 버튼이 iOS 에서 항상 실패한다. 거절 사유는 아니나 기능 결함.
 
 ## 연령 등급 설문 제안
 

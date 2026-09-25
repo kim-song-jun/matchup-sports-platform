@@ -36,14 +36,14 @@
 
 이 문서 작업은 Swift·Info.plist 를 건드리지 않았다(병렬 작업과 충돌 방지). 아래는 별도 변경으로 넣어야 한다.
 
-- [ ] **[준비됨·미적용] `NSCameraUsageDescription` 추가** — 웹의 `<input type="file" accept="image/*">`
+- [x] **[#1280에서 해결] `NSCameraUsageDescription` 추가** — 웹의 `<input type="file" accept="image/*">`
   (`apps/v1_web/src/components/auth/signup-client.tsx:642` 등)를 WKWebView 가 띄우면 iOS 가 "사진 찍기"를
   함께 보여준다. 이 키가 없으면 그 항목을 누르는 순간 앱이 **강제 종료**된다(심사 2.1 크래시 거절 사유).
   `apps/v1_ios/project.yml` 의 `info.properties` 에 없음을 확인했다.
-- [ ] **[준비됨·미적용] `NSLocationWhenInUseUsageDescription` 추가** — 웹이 `navigator.geolocation` 을
+- [x] **[#1280에서 해결] `NSLocationWhenInUseUsageDescription` 추가** — 웹이 `navigator.geolocation` 을
   쓴다(`home-client.tsx:217`, `onboarding-client.tsx:255`, `my-api-clients.tsx:1250`). 키가 없으면 iOS
   WKWebView 에서 위치 요청이 항상 실패한다.
-- [ ] 동영상 업로드 입력(`fixture-video-add-form.tsx`)이 카메라 녹화를 허용하면 `NSMicrophoneUsageDescription` 도 필요 — 확인 후 결정.
+- [x] **[#1280에서 해결]** 마이크·사진 권한 문구(`NSMicrophoneUsageDescription` 등)와 `PrivacyInfo.xcprivacy` — PR #1280(fix/native-audit)이 추가한다. 머지 후 빌드의 Info.plist 에 들어갔는지 확인.
 - [ ] 개인정보처리방침에 **iOS 앱 절**(APNs 토큰·기기 정보, Apple 로그인으로 받는 이름·이메일, 카메라·위치
   권한 사용 조건) 추가 — 현재는 Android 절(11항)만 있다. `apps/v1_web/src/components/auth/terms-client.tsx`.
 - [ ] Apple 로그인 계정 삭제 시 **Apple 토큰 폐기(REST `/auth/revoke`)** — 심사 5.1.1(v) 요구. 현재 셸은
@@ -77,9 +77,9 @@
    curl -s -o /dev/null -w '%{http_code}\n' -X POST https://teameet.co.kr/api/v1/auth/apple/nonce  # 200 (503 이면 env 미설정)
    curl -sI https://teameet.co.kr/.well-known/apple-app-site-association | grep -i content-type  # application/json
    ```
-2. **[준비됨]** APNs 환경변수 — `deploy.yml`(dev)이 `APNS_KEY_ID`·`APNS_TEAM_ID`·`APNS_PRIVATE_KEY` secret 을
-   읽고 `APNS_BUNDLE_ID=kr.co.teameet` 으로 넣는다. production environment 에 네 secret 이 **존재함**을 확인했다(값은 미확인).
-   `main` 의 `deploy.yml` 에는 이 배선이 아직 없다 → 1번 승격으로 들어간다.
+2. **[준비됨]** APNs 환경변수 — 프로덕션 워크플로 `deploy.yml` 은 dev 브랜치 사본에 이미 `SECRET_APNS_KEY_ID`·`SECRET_APNS_TEAM_ID`·`SECRET_APNS_PRIVATE_KEY`
+   주입과 `SECRET_APNS_BUNDLE_ID: kr.co.teameet` 이 있다(`deploy.yml:879-882`). alpha 는 별도 워크플로 `deploy-alpha.yml:516-519` 가 같은 secret 을 쓴다. production environment 에 네 secret 이 **존재함**을 확인했다(값은 미확인).
+   **`main` 브랜치의 `deploy.yml` 사본에는 이 주입이 아직 없다**(`APNS` 0건) — 프로덕션 배포는 main 사본으로 돈다 → 1번 승격으로 들어간다.
 3. **[준비됨]** `APPLE_SIGN_IN_AUDIENCES` — `deploy/docker-compose.prod.yml` 기본값 `kr.co.teameet`.
 4. **[준비됨]** AASA — `deploy/aasa/apple-app-site-association` 에 `U9J95Q6XD3.kr.co.teameet` 등록(dev 기준).
 5. **[사용자]** 승격 후 프로덕션에서 **심사용 데모 계정** 생성: 휴대폰 인증·약관 동의 완료, 팀 1개 소속,
@@ -116,7 +116,7 @@
 ## 의존 순서 요약
 
 ```
-1 바이너리 보완(Info.plist 키·개인정보처리방침 iOS 절) ─┐
+1 바이너리 보완(권한 문구=#1280, 개인정보처리방침 iOS 절) ─┐
 3.1 dev→main 승격 ─ 3.5 데모 계정 ─────────────────────┼─ 4 아카이브·업로드 ─ 5 TestFlight ─ 6 제출
 2 ASC 정보·개인정보·연령 등급 (병렬 가능) ───────────────┘
 ```

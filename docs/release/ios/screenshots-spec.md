@@ -19,7 +19,7 @@
 
 | 항목 | 규격 |
 |---|---|
-| 크기 (6.9", 세로) | **1320 × 2868** (권장 — iPhone 16 Pro Max 시뮬레이터 원본 크기) · 1290 × 2796 · 1260 × 2736 중 하나 |
+| 크기 (6.9", 세로) | **1320 × 2868** (권장 — iPhone 16 Pro Max 시뮬레이터 원본 크기) 또는 1290 × 2796. Apple 은 1260 × 2736 도 받지만 `capture-store-screenshots.sh`(머리 주석)와 `compose-store-captions.mjs` 의 `ACCEPTED_SIZES` 가 앞의 두 크기만 통과시키므로 이 파이프라인 기준으로는 두 크기만 쓴다 |
 | 개수 | 1~10장 (현지화별). 스토어 첫 화면에 보통 앞 3장이 보인다 |
 | 형식 | `.png` / `.jpg` / `.jpeg` |
 | 알파 채널 | **금지** — 투명도가 있으면 업로드가 거부된다 |
@@ -34,7 +34,7 @@
 
 ### 제출 전 검수 체크리스트
 
-- [ ] 크기가 허용 세 가지 중 하나와 **정확히** 일치 (`sips -g pixelWidth -g pixelHeight *.png`)
+- [ ] 크기가 1320 × 2868 또는 1290 × 2796 과 **정확히** 일치 (`sips -g pixelWidth -g pixelHeight *.png`)
 - [ ] 알파 없음 (`sips -g hasAlpha *.png` → `no`)
 - [ ] **캡처 대상 서버** — 캡처 스크립트의 기본 스킴은 `TeameetAlphaUITests`(알파 서버)다. 알파 데이터에는 `(테스트)` 로
   시작하는 대회명 등 시험용 이름이 보인다. 스토어용은 ① 프로덕션 데이터로 찍거나 ② 알파에서 찍되 화면에
@@ -62,7 +62,7 @@
 
 현재 파이프라인은 1·2·(대회 목록)·4·10 에 해당하는 5장을 찍는다. 3·6·8 은 테스트 케이스
 (`apps/v1_ios/TeameetUITests/StoreScreenshotUITests.swift`)에 장면을 추가해야 한다. 3번은 LIVE 상태 경기가
-있어야 하므로 운영 API 로 상태를 만드는 절차(`scripts/verify-alpha-period-break.mjs`)가 필요하다.
+있어야 하므로 운영 API 로 상태를 만드는 절차가 필요하다. 저장소에 있는 가장 가까운 하네스는 팀매치용 `scripts/verify-alpha-team-match-review-flow.mjs`(start → end-period → end)이고, 대회 픽스처는 Socket.IO takeover 토큰이 추가로 필요하다(루트 `CLAUDE.md` "Alpha 실측 검증" 3절).
 
 ## 3. 앱 미리보기 영상 (선택)
 

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getHomePopupStorageKey, HomePopupDialog } from './home-notice-popup';
 import type { HomePopup } from './home.types';
 import { bindSoftNavigator } from '@/lib/navigation-history';
+import { overlayMarkerOf } from '@/lib/overlay-history';
 
 const popup: HomePopup = {
   id: 'popup-main',
@@ -54,6 +55,8 @@ describe('HomePopupDialog', () => {
     const unbind = bindSoftNavigator(routerReplace);
     const { rerender } = render(<HomePopupDialog popup={linked} location="/matches" />);
     const link = await screen.findByRole('link', { name: '풋살 매치' });
+    // The marker entry is pushed from an effect — under CI load the link can render first.
+    await waitFor(() => expect(overlayMarkerOf(window.history.state)).not.toBeNull());
 
     // The popup's own history entry is open, so the link replaces it instead of pushing past it.
     const notPrevented = link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));

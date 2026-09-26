@@ -47,4 +47,13 @@ describe('collectLlmsFullSnapshot', () => {
 
     expect(snapshot.teams?.map((team) => team.id)).toEqual(['a', 'b']);
   });
+
+  it('목록 엔드포인트가 404 면 빈 목록이 아니라 조회 실패(null)로 본다', async () => {
+    fetchPublicV1.mockImplementation(async (path: string) => (path.startsWith('/league-matches') ? null : page([])));
+
+    const snapshot = await collectLlmsFullSnapshot();
+
+    expect(snapshot.leagues).toBeNull();
+    expect(snapshot.teams).toEqual([]);
+  });
 });

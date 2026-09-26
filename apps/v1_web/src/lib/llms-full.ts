@@ -32,7 +32,8 @@ async function fetchAllPages<T>(path: string): Promise<T[]> {
     const query = new URLSearchParams({ limit: String(PAGE_SIZE) });
     if (cursor) query.set('cursor', cursor);
     const result: Paged<T> | null = await fetchPublicV1<Paged<T>>(`${path}?${query.toString()}`);
-    if (!result) break;
+    // 목록 엔드포인트의 404 는 "0건"이 아니라 경로가 없다는 뜻이다(예: API 가 아직 옛 버전) — 실패로 올린다.
+    if (!result) throw new Error(`목록 엔드포인트 404: ${path}`);
     items.push(...result.items);
     // 목록마다 커서 위치가 다르다: pageInfo 가 있으면 그쪽이 정본이고 최상위 nextCursor 는 null 이다.
     cursor = result.pageInfo

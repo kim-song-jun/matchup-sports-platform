@@ -1,4 +1,4 @@
-import { formatTournamentDateLong, formatTournamentDateTimeLong } from '@/lib/date-utils';
+import { formatEntryFee, formatTournamentDateLong, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import type { LlmsFullSnapshot } from '@/lib/llms-full';
 import { absoluteSiteUrl } from '@/lib/seo';
 import { resolveTournamentRegistrationBlock } from '@/lib/tournament-registration-availability';
@@ -36,11 +36,6 @@ function inline(value: string | null | undefined, max = 80): string {
 
 function link(title: string, path: string): string {
   return `[${inline(title)}](${absoluteSiteUrl(path)})`;
-}
-
-function fee(amount: number | null | undefined): string | null {
-  if (amount == null) return null;
-  return amount === 0 ? '참가비 무료' : `참가비 ${amount.toLocaleString('ko-KR')}원`;
 }
 
 function row(head: string, parts: Array<string | null | undefined | false>): string {
@@ -128,7 +123,7 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
       tournamentState(t, now),
       t.scheduledAt && formatTournamentDateLong(t.scheduledAt),
       t.venue && `장소 ${inline(t.venue, 60)}`,
-      fee(t.entryFee),
+      t.entryFee != null && `참가비 ${formatEntryFee(t.entryFee)}`,
       t.status === 'open' && t.registrationDeadlineAt && `신청 마감 ${formatTournamentDateTimeLong(t.registrationDeadlineAt)}`,
       t.status === 'completed' && `결과 ${absoluteSiteUrl(`/tournaments/${t.id}/results`)}`,
     ]);

@@ -297,7 +297,7 @@ describe('alpha tournament QA campaign content', () => {
       expect(participantCall.where.resultRevisionId.in).toEqual(['rev-visible']);
     });
 
-    it('동의를 철회한(GRANTED 아닌) 최다 득점자는 제외하고 그다음 순위를 고른다', async () => {
+    it('사용자 단위 동의 행이 아예 없는(GRANTED 아닌) 최다 득점자는 제외하고 그다음 순위를 고른다', async () => {
       const tx = buildTx({
         games: [{ currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'OFFICIAL_ONLY' } }],
         participants: [

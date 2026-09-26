@@ -19,6 +19,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { V1AuthProvider } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppleIdentityService } from './apple-identity.service';
+import { AppleTokenService } from './apple-token.service';
 import { AuthService } from './auth.service';
 import type { RegisterDto } from './dto/register.dto';
 import { hashPassword } from './password-hash';
@@ -171,6 +172,7 @@ describe('AuthService', () => {
         { provide: ManagedTermsRuntimeService, useValue: managedTerms },
         { provide: PhoneVerificationService, useValue: phoneVerification },
         { provide: AppleIdentityService, useValue: appleIdentity },
+        { provide: AppleTokenService, useValue: { storeFromAuthorizationCode: jest.fn() } },
       ],
     }).compile();
 

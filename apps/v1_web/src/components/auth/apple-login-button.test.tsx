@@ -41,7 +41,7 @@ describe('AppleLoginButton', () => {
   });
 
   it('signs in and lands on the route the server chose', async () => {
-    reply = { ok: true, identityToken: 'identity.token', fullName: '김선준' };
+    reply = { ok: true, identityToken: 'identity.token', authorizationCode: 'auth.code', fullName: '김선준' };
     render(<AppleLoginButton />);
 
     await userEvent.click(screen.getByRole('button', { name: 'Apple로 계속하기' }));
@@ -50,7 +50,22 @@ describe('AppleLoginButton', () => {
     expect(api.v1Post).toHaveBeenCalledWith('/auth/apple', {
       identityToken: 'identity.token',
       nonce: 'server-nonce',
+      authorizationCode: 'auth.code',
       fullName: '김선준',
+    });
+  });
+
+  /** A shell built before the code was forwarded still signs in; the field is simply absent. */
+  it('omits the authorization code when the shell did not send one', async () => {
+    reply = { ok: true, identityToken: 'identity.token' };
+    render(<AppleLoginButton />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Apple로 계속하기' }));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/home'));
+    expect(api.v1Post).toHaveBeenCalledWith('/auth/apple', {
+      identityToken: 'identity.token',
+      nonce: 'server-nonce',
     });
   });
 

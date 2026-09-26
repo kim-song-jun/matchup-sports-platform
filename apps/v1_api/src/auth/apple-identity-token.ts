@@ -26,6 +26,11 @@ export type AppleJsonWebKey = {
 export type AppleIdentityClaims = {
   /** Apple's stable identifier for this person **within our team** — the account key. */
   readonly subject: string;
+  /**
+   * The bundle id the token was minted for — one of our configured audiences. Apple's token
+   * endpoint only accepts the authorization code under this same `client_id`.
+   */
+  readonly audience: string;
   /** Present on most tokens; absent when the person hid it and Apple sent no relay address. */
   readonly email: string | null;
   readonly emailVerified: boolean;
@@ -150,7 +155,10 @@ export function verifyAppleIdentityToken(input: {
   // ours — or anyone else's — is signed by the same Apple key and would otherwise pass.
   const audience = payload.aud;
   const audiences = Array.isArray(audience) ? audience : [audience];
-  if (!audiences.some((value) => typeof value === 'string' && input.audiences.includes(value))) {
+  const matchedAudience = audiences.find(
+    (value): value is string => typeof value === 'string' && input.audiences.includes(value),
+  );
+  if (matchedAudience === undefined) {
     return { ok: false, reason: 'wrong_audience' };
   }
 
@@ -174,6 +182,7 @@ export function verifyAppleIdentityToken(input: {
     ok: true,
     claims: {
       subject: payload.sub,
+      audience: matchedAudience,
       email: typeof payload.email === 'string' && payload.email.length > 0 ? payload.email : null,
       emailVerified: readAppleBoolean(payload.email_verified),
       isPrivateEmail: readAppleBoolean(payload.is_private_email),

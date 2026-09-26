@@ -9,6 +9,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { AppleTokenService } from '../auth/apple-token.service';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
@@ -29,7 +30,10 @@ import { ProfileService } from './profile.service';
 
 @Controller()
 export class ProfileController {
-  constructor(private readonly profileService: ProfileService) {}
+  constructor(
+    private readonly profileService: ProfileService,
+    private readonly appleTokens: AppleTokenService,
+  ) {}
 
   @Get('me/profile')
   @UseGuards(V1AuthGuard)
@@ -141,7 +145,11 @@ export class ProfileController {
 
   @Post('me/withdrawal-request')
   @UseGuards(V1AuthGuard)
-  withdrawalRequest(@CurrentUser() user: V1AuthUser, @Body() dto: WithdrawalRequestDto) {
-    return this.profileService.withdrawalRequest(user, dto);
+  async withdrawalRequest(@CurrentUser() user: V1AuthUser, @Body() dto: WithdrawalRequestDto) {
+    const result = await this.profileService.withdrawalRequest(user, dto);
+    // App Store 5.1.1(v): Apple 로그인 계정은 삭제 요청 시점에 토큰을 폐기한다. 운영자 최종 삭제는
+    // 기한이 없고 거치지 않는 경로도 있어 여기서 한다. 커밋 후에 부르고, 실패해도 탈퇴는 성공이다.
+    await this.appleTokens.revokeForUser(user.id);
+    return result;
   }
 }

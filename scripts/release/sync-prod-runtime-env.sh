@@ -42,7 +42,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/private-key-pem.sh"
 # stay as they were.
 # An explicit list, not a *_PRIVATE_KEY glob: VAPID_PRIVATE_KEY is a base64url string, not a
 # PEM, and a glob would have "normalised" it into a warning and dropped the web-push key.
-for var_name in SECRET_APNS_PRIVATE_KEY SECRET_FIREBASE_PRIVATE_KEY; do
+for var_name in SECRET_APNS_PRIVATE_KEY SECRET_FIREBASE_PRIVATE_KEY SECRET_APPLE_SIGN_IN_PRIVATE_KEY; do
   raw="${!var_name-}"
   [[ -n "${raw}" ]] || continue
   if pem="$(normalize_private_key "${raw}")"; then
@@ -52,7 +52,7 @@ for var_name in SECRET_APNS_PRIVATE_KEY SECRET_FIREBASE_PRIVATE_KEY; do
     unset "${var_name}"
   fi
 done
-for group in APNS_KEY_ID:APNS_TEAM_ID:APNS_BUNDLE_ID:APNS_PRIVATE_KEY FIREBASE_PROJECT_ID:FIREBASE_CLIENT_EMAIL:FIREBASE_PRIVATE_KEY; do
+for group in APNS_KEY_ID:APNS_TEAM_ID:APNS_BUNDLE_ID:APNS_PRIVATE_KEY FIREBASE_PROJECT_ID:FIREBASE_CLIENT_EMAIL:FIREBASE_PRIVATE_KEY APPLE_SIGN_IN_KEY_ID:APPLE_SIGN_IN_TEAM_ID:APPLE_SIGN_IN_PRIVATE_KEY:APPLE_SIGN_IN_TOKEN_ENCRYPTION_KEY; do
   IFS=: read -r -a members <<<"${group}"
   present=0
   for member in "${members[@]}"; do

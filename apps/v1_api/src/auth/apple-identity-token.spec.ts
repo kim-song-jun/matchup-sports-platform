@@ -70,6 +70,7 @@ describe('verifyAppleIdentityToken', () => {
       ok: true,
       claims: {
         subject: '001234.abcdef.0000',
+        audience: AUDIENCE,
         email: 'someone@privaterelay.appleid.com',
         emailVerified: true,
         isPrivateEmail: true,

@@ -384,6 +384,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
               providerUserKey: buildDeletedProviderUserKey(userId, identity.id),
               email: null,
               passwordHash: null,
+              providerRefreshTokenCiphertext: null,
               unlinkedAt: deletedAt,
             },
           }),

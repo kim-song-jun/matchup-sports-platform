@@ -880,6 +880,12 @@ jobs:
           SECRET_APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
           SECRET_APNS_BUNDLE_ID: kr.co.teameet
           SECRET_APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
+          # Sign in with Apple token revoke on withdrawal. Same Apple team as APNs, so the team
+          # id reuses that secret; the key is a separate "Sign in with Apple" key.
+          SECRET_APPLE_SIGN_IN_KEY_ID: ${{ secrets.APPLE_SIGN_IN_KEY_ID }}
+          SECRET_APPLE_SIGN_IN_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+          SECRET_APPLE_SIGN_IN_PRIVATE_KEY: ${{ secrets.APPLE_SIGN_IN_PRIVATE_KEY }}
+          SECRET_APPLE_SIGN_IN_TOKEN_ENCRYPTION_KEY: ${{ secrets.APPLE_SIGN_IN_TOKEN_ENCRYPTION_KEY }}
           SECRET_SMS_PROVIDER: ${{ secrets.SMS_PROVIDER }}
           SECRET_SOLAPI_API_KEY: ${{ secrets.SOLAPI_API_KEY }}
           SECRET_SOLAPI_API_SECRET: ${{ secrets.SOLAPI_API_SECRET }}

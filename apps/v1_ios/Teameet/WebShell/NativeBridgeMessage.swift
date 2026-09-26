@@ -100,10 +100,15 @@ enum NativeBridge {
     /// The identity token is passed straight through: it is a signed JWT the server verifies,
     /// and nothing here is in a position to judge it.
     static func appleResultScript(
-        requestId: String, identityToken: String?, fullName: String?, error: String?
+        requestId: String,
+        identityToken: String?,
+        authorizationCode: String? = nil,
+        fullName: String?,
+        error: String?
     ) -> String {
         var detail: [String: Any] = ["requestId": requestId, "ok": identityToken != nil]
         if let identityToken { detail["identityToken"] = identityToken }
+        if let authorizationCode, !authorizationCode.isEmpty { detail["authorizationCode"] = authorizationCode }
         if let fullName, !fullName.isEmpty { detail["fullName"] = fullName }
         if let error { detail["error"] = error }
         guard let data = try? JSONSerialization.data(withJSONObject: detail),

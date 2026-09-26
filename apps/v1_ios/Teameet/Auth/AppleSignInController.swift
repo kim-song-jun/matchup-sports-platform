@@ -21,6 +21,9 @@ final class AppleSignInController: NSObject {
 
     struct Credential {
         let identityToken: String
+        /// Single-use, valid for minutes. The server trades it for the refresh token that
+        /// account deletion must revoke (App Store Review Guideline 5.1.1(v)).
+        let authorizationCode: String?
         /// Nil on every authorization after the first. See the note above.
         let fullName: String?
     }
@@ -80,6 +83,7 @@ extension AppleSignInController: ASAuthorizationControllerDelegate {
         // may cross into the actor.
         let credential = authorization.credential as? ASAuthorizationAppleIDCredential
         let token = credential?.identityToken.flatMap { String(data: $0, encoding: .utf8) }
+        let code = credential?.authorizationCode.flatMap { String(data: $0, encoding: .utf8) }
         let name = credential?.fullName.flatMap { components -> String? in
             let formatter = PersonNameComponentsFormatter()
             let formatted = formatter.string(from: components)
@@ -91,7 +95,7 @@ extension AppleSignInController: ASAuthorizationControllerDelegate {
                 self.finish(.failure(Failure.missingIdentityToken))
                 return
             }
-            self.finish(.success(Credential(identityToken: token, fullName: name)))
+            self.finish(.success(Credential(identityToken: token, authorizationCode: code, fullName: name)))
         }
     }
 

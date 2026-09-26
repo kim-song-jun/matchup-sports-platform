@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { MatchDetailPageClient } from '@/components/matches/matches-client';
+import { JsonLd } from '@/components/seo/json-ld';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, metadataDescription } from '@/lib/seo';
+import { buildMatchEventLd } from '@/lib/structured-data';
 import type { V1Match } from '@/types/api';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -27,5 +29,11 @@ export default async function MatchDetailPage({ params }: { params: Promise<{ id
   // 비어 있던 구간이 사라진다.
   const match = await fetchPublicV1<V1Match>(`/matches/${encodeURIComponent(id)}`);
   if (!match) notFound();
-  return <MatchDetailPageClient matchId={id} seed={match} />;
+  const eventLd = buildMatchEventLd(match, id);
+  return (
+    <>
+      {eventLd ? <JsonLd data={eventLd} /> : null}
+      <MatchDetailPageClient matchId={id} seed={match} />
+    </>
+  );
 }

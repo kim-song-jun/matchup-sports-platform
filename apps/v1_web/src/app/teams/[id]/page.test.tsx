@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchPublicV1 } from '@/lib/seo';
-import TeamDetailPage from './page';
+import { buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import TeamDetailPage, { generateMetadata } from './page';
 
 vi.mock('next/navigation', () => ({
   notFound: vi.fn(() => {
@@ -53,6 +53,25 @@ describe('TeamDetailPage (server)', () => {
 
     expect(props?.teamId).toBe('t1');
     expect(props?.seed).toEqual(team);
+  });
+
+  it('커버 없이 로고만 있으면 정사각 이미지로 알려 큰 카드로 잘리지 않게 한다', async () => {
+    const params = Promise.resolve({ id: 't1' });
+    fetchPublicV1Mock.mockResolvedValue({ id: 't1', name: '성수 러너스', profile: { logoUrl: '/uploads/logo.png' } } as never);
+    await generateMetadata({ params });
+    expect(vi.mocked(buildPublicMetadata)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ image: '/uploads/logo.png', squareImage: true }),
+    );
+
+    fetchPublicV1Mock.mockResolvedValue({
+      id: 't1',
+      name: '성수 러너스',
+      profile: { logoUrl: '/uploads/logo.png', coverImageUrl: '/uploads/cover.png' },
+    } as never);
+    await generateMetadata({ params });
+    expect(vi.mocked(buildPublicMetadata)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ image: '/uploads/cover.png', squareImage: false }),
+    );
   });
 
   it('없는 팀은 notFound 로 끝난다', async () => {

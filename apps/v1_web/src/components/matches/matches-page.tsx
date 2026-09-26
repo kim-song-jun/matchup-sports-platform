@@ -258,6 +258,11 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
   const canRunAction = Boolean(model.onApply);
   const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : mode === 'closed' || match.status === 'full' ? '신청 마감' : '참가 신청');
   const ctaTone = mode === 'pending' ? 'tm-btn-warning' : mode === 'approved' ? 'tm-btn-success' : locked ? 'tm-btn-neutral' : 'tm-btn-primary';
+  // [P2] 마감 시각이 지나 닫힌 매치(lifecycleStatus==='closed')만 정확히 구분한다 — 정원이
+  // 찬 경우(full)·취소·완료·만료는 이 시안에서 검토하지 않은 별개 사유라 기존 문구를 유지한다.
+  // 이 하나의 신호로 히어로 배지·상태 카드·하단 바 캡션 3곳의 "같은 상태 반복"을 한 자리
+  // (본문 상태 카드)로 모은다(P2 A안).
+  const isDeadlinePassedClosed = mode === 'closed' && match.lifecycleStatus === 'closed';
   const showChat = Boolean(model.onChat);
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
   // 경기가 끝난 뒤 후기로 가는 유일한 상세 화면 진입점. 완료 알림도 후기 화면으로 보내지만,
@@ -357,10 +362,14 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
                 {/* 성별을 안 정한 매치에는 배지를 붙이지 않는다 — 카드 모델이 빈 값을
                     문자열로 채우지 않게 바뀌면서 이 가드가 비로소 의미를 갖는다. */}
                 {match.gender ? <span className="tm-badge tm-badge-grey">{match.gender}</span> : null}
-                <span className={`tm-badge ${matchStatusBadgeClass(mode, match.status)}`}>{matchStatusBadgeLabel(mode, match.status, model.completed)}</span>
+                {/* 마감 시각이 지난 경우 상태는 본문 상태 카드가 유일한 자리다 — 여기서 또
+                    말하면 "모집 완료" 배지 · 상태 카드 · 하단 바가 같은 뜻을 세 번 반복한다. */}
+                {isDeadlinePassedClosed ? null : (
+                  <span className={`tm-badge ${matchStatusBadgeClass(mode, match.status)}`}>{matchStatusBadgeLabel(mode, match.status, model.completed)}</span>
+                )}
               </div>
               <h2 className="tm-match-detail-title">{match.title}</h2>
-              <div className="tm-text-caption tm-match-detail-meta" style={{ marginTop: 8 }}>{match.host} 호스트 · {match.deadline}</div>
+              <div className="tm-text-caption tm-match-detail-meta" style={{ marginTop: 8 }}>{match.host} 호스트</div>
               {heroMessage ? <div className="tm-text-caption tm-match-detail-heromsg" role="status" style={{ marginTop: 8 }}>{heroMessage}</div> : null}
             </div>
           </div>
@@ -396,7 +405,13 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
               </>
             ) : null}
             {mode === 'approved' ? <StateCard tone="green" title={model.completed ? "참여 완료" : "승인 완료"} body={model.completed ? "함께한 참여 이력이 저장됐어요. 후기를 남겨 보세요." : "참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요."} /> : null}
-            {mode === 'closed' ? <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." /> : null}
+            {/* [P2] 마감 사유를 아는 만큼만 정확히 말한다 — 시각이 지났으면 그 이유를,
+                아니면(정원 마감·취소·완료·만료) 기존 중립 문구를 유지한다. */}
+            {mode === 'closed' ? (
+              isDeadlinePassedClosed
+                ? <StateCard tone="grey" title="신청이 마감됐어요" body="마감 시각이 지나 더 이상 신청할 수 없어요. 다른 매치를 둘러봐 주세요." />
+                : <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
+            ) : null}
             {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
             <Card pad={16} style={{ marginTop: 12 }}>
               <div className="tm-text-body-lg">참가자</div>
@@ -420,10 +435,15 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
 
           {/* Right column: sticky summary + CTA */}
           <div className="tm-match-detail-desktop-cta" role="complementary" aria-label="매치 신청">
-            <div className="tm-match-detail-desktop-cta-label">
-              <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
-              <span className="tm-text-label">{model.completed ? '참여 완료' : model.statusLabel ?? match.actionLabel}</span>
-            </div>
+            {/* [P2] 마감 시각이 지난 경우 상태는 본문 상태 카드가 이미 말했다 — 여기서
+                캡션으로 다시 말하지 않는다. 버튼 문구(cta)가 상태와 같은 말이라 그 자체로
+                충분하다. */}
+            {isDeadlinePassedClosed ? null : (
+              <div className="tm-match-detail-desktop-cta-label">
+                <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
+                <span className="tm-text-label">{model.completed ? '참여 완료' : model.statusLabel ?? match.actionLabel}</span>
+              </div>
+            )}
             <div className="tm-match-detail-desktop-cta-actions">
               {showChat ? (
                 <Button loading={model.chatPending} disabled={!model.onChat} onClick={model.onChat} size="lg" type="button" variant="neutral">
@@ -473,7 +493,11 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
             </>
           ) : null}
           {mode === 'approved' ? <StateCard tone="green" title={model.completed ? "참여 완료" : "승인 완료"} body={model.completed ? "함께한 참여 이력이 저장됐어요. 후기를 남겨 보세요." : "참가를 확정했어요. 경기 당일 늦지 않게 도착해 주세요."} /> : null}
-          {mode === 'closed' ? <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." /> : null}
+          {mode === 'closed' ? (
+            isDeadlinePassedClosed
+              ? <StateCard tone="grey" title="신청이 마감됐어요" body="마감 시각이 지나 더 이상 신청할 수 없어요. 다른 매치를 둘러봐 주세요." />
+              : <StateCard tone="grey" title="모집 완료" body="이 매치는 신청이 마감됐어요. 다른 매치를 둘러봐 주세요." />
+          ) : null}
           {match.rules.length ? <Card pad={16} style={{ marginTop: 12 }}><div className="tm-text-body-lg">규칙</div><div style={{ display: 'grid', gap: 8, marginTop: 12 }}>{match.rules.map((rule) => <div key={rule} className="tm-text-body" style={{ color: 'var(--text-muted)' }}>{rule}</div>)}</div></Card> : null}
           <Card pad={16} style={{ marginTop: 12 }}>
             <div className="tm-text-body-lg">참가자</div>
@@ -498,10 +522,12 @@ export function MatchDetailPageView({ model }: { model: MatchDetailViewModel }) 
 
       {/* Mobile-only fixed CTA — hidden on desktop (CSS: .tm-match-detail + .tm-fixed-cta) */}
       <div className="tm-fixed-cta tm-hide-desktop">
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-          <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
-          <span className="tm-text-label">{model.completed ? '참여 완료' : model.statusLabel ?? match.actionLabel}</span>
-        </div>
+        {isDeadlinePassedClosed ? null : (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 매치' : '신청 상태'}</span>
+            <span className="tm-text-label">{model.completed ? '참여 완료' : model.statusLabel ?? match.actionLabel}</span>
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: showChat || mode === 'mine' ? '1fr 1fr' : '1fr', gap: 8 }}>
           {showChat ? (
             <Button loading={model.chatPending} disabled={!model.onChat} onClick={model.onChat} size="lg" type="button" variant="neutral">
@@ -794,7 +820,9 @@ function MatchRowItem({ match }: { match: MatchCardModel }) {
             <strong style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{match.current}</strong>
             /{match.capacity}명 · {match.host}
           </span>
-          <span className="tm-text-label tm-match-row-act">{match.actionLabel}</span>
+          {/* [P2] closedLabel 이 있으면 배지가 이미 상태를 말했다 — 여기서 같은 상태
+              단어(actionLabel)를 또 붙이지 않고 실제 마감 시각(사실)으로 바꾼다. */}
+          <span className="tm-text-label tm-match-row-act">{closedLabel ? match.deadlineDetail : match.actionLabel}</span>
         </div>
       </div>
     </Link>
@@ -872,7 +900,8 @@ function MatchCardItem({ match }: { match: MatchCardModel }) {
         </div>
         <div className="tm-match-list-footer">
           <span className="tm-text-caption">{match.region} · {match.host}</span>
-          <span className="tm-text-label">{match.actionLabel}</span>
+          {/* [P2] MatchRowItem과 동일 원칙 — 배지가 상태를 이미 말했으면 실제 마감 시각으로. */}
+          <span className="tm-text-label">{closedLabel ? match.deadlineDetail : match.actionLabel}</span>
         </div>
       </div>
     </Link>
@@ -988,7 +1017,9 @@ function InfoStep({ model, edit }: { model: MatchCreateViewModel; edit: boolean 
   const draft = model.draft;
   return (
     <div>
-      <h1 className="tm-text-heading">매치 정보</h1>
+      {/* [P3] 캡션(우상단 "매치 정보")과 h1 이 같은 문구였다 — 1·4단계처럼 h1 은 질문형,
+          캡션은 단계 이름으로 역할을 가른다. */}
+      <h1 className="tm-text-heading">어떤 매치인가요?</h1>
       {edit ? <CreateSelect label="종목" value={model.selectedSport} options={model.sports} onChange={model.form?.onSelectSport} /> : null}
       <CreateField id="field-title" error={model.form?.fieldErrors?.title} label="제목" value={draft.title} placeholder="예: 주말 저녁 풋살 멤버 모집" onChange={(value) => model.form?.onFieldChange('title', value)} />
       <CreateField label="설명" value={draft.description} placeholder="예: 초보도 편하게 참여할 수 있는 친선 매치예요." multiline onChange={(value) => model.form?.onFieldChange('description', value)} />
@@ -1148,7 +1179,9 @@ function CreateSelect({ label, value, options, onChange }: { label: string; valu
 function PlaceTimeStep({ model }: { model: MatchCreateViewModel }) {
   return (
     <div>
-      <h1 className="tm-text-heading">장소와 시간</h1>
+      {/* [P3] 위 InfoStep 과 동일 — 캡션은 '장소와 시간'(단계 이름)으로 그대로 두고
+          h1 만 질문형으로 바꾼다. */}
+      <h1 className="tm-text-heading">언제, 어디서 하나요?</h1>
       <PlaceTimeFields model={model} />
     </div>
   );

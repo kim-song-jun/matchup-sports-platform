@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
+import { AppleIdentityService } from '../auth/apple-identity.service';
 import { sealAppleToken } from '../auth/apple-token-cipher';
 import { APPLE_REVOKE_URL, APPLE_TOKEN_ENV, AppleTokenService } from '../auth/apple-token.service';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
@@ -40,6 +41,8 @@ describe('ProfileController', () => {
       providers: [
         { provide: ProfileService, useValue: profileService },
         AppleTokenService,
+        // Only sign-in verifies Apple tokens; withdrawal never reaches it.
+        { provide: AppleIdentityService, useValue: {} },
         { provide: PrismaService, useValue: prisma },
         { provide: V1AuthGuard, useValue: { canActivate: jest.fn(() => true) } },
         { provide: OptionalV1AuthGuard, useValue: { canActivate: jest.fn(() => true) } },

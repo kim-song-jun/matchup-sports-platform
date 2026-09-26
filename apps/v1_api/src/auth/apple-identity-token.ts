@@ -114,8 +114,12 @@ export function verifyAppleIdentityToken(input: {
   readonly keys: readonly AppleJsonWebKey[];
   /** Bundle identifiers this deployment accepts — alpha and production are different apps. */
   readonly audiences: readonly string[];
-  /** The nonce this deployment issued for this sign-in, unhashed. */
-  readonly expectedNonce: string;
+  /**
+   * The nonce this deployment issued for this sign-in, unhashed. `null` only for an id_token
+   * this server received from Apple's token endpoint itself: that one never passed through a
+   * client, so there is nothing to replay and Apple does not promise to echo a nonce in it.
+   */
+  readonly expectedNonce: string | null;
   readonly nowSeconds: number;
 }): AppleTokenVerification {
   const parts = input.token.split('.');
@@ -169,8 +173,8 @@ export function verifyAppleIdentityToken(input: {
     return { ok: false, reason: 'issued_in_future' };
   }
 
-  if (typeof payload.nonce !== 'string'
-      || !equalsConstantTime(payload.nonce, hashAppleNonce(input.expectedNonce))) {
+  if (input.expectedNonce !== null && (typeof payload.nonce !== 'string'
+      || !equalsConstantTime(payload.nonce, hashAppleNonce(input.expectedNonce)))) {
     return { ok: false, reason: 'nonce_mismatch' };
   }
 

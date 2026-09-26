@@ -3,6 +3,7 @@ import { createPrivateKey, KeyObject } from 'node:crypto';
 import { V1AuthProvider } from '@prisma/client';
 import { signEs256Jwt } from '../common/security/es256-jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { AppleIdentityService } from './apple-identity.service';
 import { openAppleToken, parseAppleTokenKey, sealAppleToken } from './apple-token-cipher';
 
 /**
@@ -43,7 +44,10 @@ export class AppleTokenService {
   /** `undefined` = not read yet; `null` = read and disabled. */
   private config: AppleTokenConfig | null | undefined;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly appleIdentity: AppleIdentityService,
+  ) {}
 
   /**
    * Exchanges the sheet's authorization code and stores the refresh token on the Apple
@@ -101,11 +105,23 @@ export class AppleTokenService {
         grant_type: 'authorization_code',
       });
       const body = (await response.json().catch(() => null)) as
-        | { refresh_token?: unknown; error?: unknown }
+        | { refresh_token?: unknown; id_token?: unknown; error?: unknown }
         | null;
       if (!response.ok || typeof body?.refresh_token !== 'string') {
         this.logger.error(
           `Apple token exchange refused identity=${identity.id} status=${response.status} error=${String(body?.error ?? 'none')}`,
+        );
+        return;
+      }
+      // The code and the identity token arrive in the same request but nothing ties them
+      // together: a code minted for another Apple account would otherwise attach that
+      // account's refresh token to this row, and this user's withdrawal would revoke theirs.
+      const exchanged = typeof body.id_token === 'string'
+        ? await this.appleIdentity.verifyExchangedIdToken(body.id_token)
+        : null;
+      if (!exchanged?.ok || exchanged.claims.subject !== input.subject || exchanged.claims.audience !== input.clientId) {
+        this.logger.error(
+          `Apple token exchange returned a token for a different account or app; not stored identity=${identity.id} reason=${exchanged === null ? 'missing_id_token' : exchanged.ok ? 'subject_or_audience_mismatch' : exchanged.reason}`,
         );
         return;
       }

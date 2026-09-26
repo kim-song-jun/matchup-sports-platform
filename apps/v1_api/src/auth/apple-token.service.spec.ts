@@ -1,6 +1,9 @@
 import { Logger } from '@nestjs/common';
-import { generateKeyPairSync, randomBytes, verify as verifySignature } from 'node:crypto';
+import { createSign, generateKeyPairSync, KeyObject, randomBytes, verify as verifySignature } from 'node:crypto';
+import type { PinoLogger } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service';
+import { APPLE_ISSUER } from './apple-identity-token';
+import { APPLE_AUDIENCES_VARIABLE, AppleIdentityService } from './apple-identity.service';
 import { openAppleToken, sealAppleToken } from './apple-token-cipher';
 import { APPLE_REVOKE_URL, APPLE_TOKEN_ENV, APPLE_TOKEN_URL, AppleTokenService } from './apple-token.service';
 
@@ -9,6 +12,31 @@ describe('AppleTokenService', () => {
   const privateKeyPem = privateKey.export({ format: 'pem', type: 'pkcs8' }).toString();
   const encryptionKey = randomBytes(32);
   const CLIENT_ID = 'kr.co.teameet.alpha';
+  const SUBJECT = '001234.abc';
+
+  // Apple's id_token signing key, as in apple-identity-token.spec.ts.
+  const appleSigning = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const impostor = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const APPLE_KID = 'apple-key-1';
+  const appleJwk = appleSigning.publicKey.export({ format: 'jwk' }) as { kty: string; n: string; e: string };
+
+  /** The real verifier; only Apple's key endpoint is replaced. */
+  class KeyedAppleIdentityService extends AppleIdentityService {
+    protected override fetchKeys(): Promise<Response> {
+      return Promise.resolve(new Response(JSON.stringify({
+        keys: [{ kid: APPLE_KID, kty: appleJwk.kty, n: appleJwk.n, e: appleJwk.e, alg: 'RS256', use: 'sig' }],
+      })));
+    }
+  }
+
+  function appleIdToken(payload: Record<string, unknown> = {}, key: KeyObject = appleSigning.privateKey) {
+    const now = Math.floor(Date.now() / 1000);
+    const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+    const body = `${encode({ alg: 'RS256', kid: APPLE_KID })}.${encode({
+      iss: APPLE_ISSUER, aud: CLIENT_ID, sub: SUBJECT, iat: now - 5, exp: now + 600, ...payload,
+    })}`;
+    return `${body}.${createSign('RSA-SHA256').update(body).sign(key).toString('base64url')}`;
+  }
 
   let prisma: {
     v1AuthIdentity: { findUnique: jest.Mock; findMany: jest.Mock; update: jest.Mock };
@@ -25,7 +53,11 @@ describe('AppleTokenService', () => {
   }
 
   function service() {
-    return new AppleTokenService(prisma as unknown as PrismaService);
+    const pino = { warn: jest.fn(), info: jest.fn(), error: jest.fn(), debug: jest.fn() };
+    return new AppleTokenService(
+      prisma as unknown as PrismaService,
+      new KeyedAppleIdentityService(pino as unknown as PinoLogger),
+    );
   }
 
   function jsonResponse(status: number, body: unknown) {
@@ -55,6 +87,7 @@ describe('AppleTokenService', () => {
 
   beforeEach(() => {
     for (const name of Object.values(APPLE_TOKEN_ENV)) delete process.env[name];
+    process.env[APPLE_AUDIENCES_VARIABLE] = CLIENT_ID;
     prisma = {
       v1AuthIdentity: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
     };
@@ -110,10 +143,12 @@ describe('AppleTokenService', () => {
     });
 
     it('posts the code to Apple with a signed client secret and seals the refresh token', async () => {
-      fetchSpy.mockResolvedValue(jsonResponse(200, { refresh_token: 'r.apple.token', access_token: 'a' }));
+      fetchSpy.mockResolvedValue(jsonResponse(200, {
+        refresh_token: 'r.apple.token', access_token: 'a', id_token: appleIdToken(),
+      }));
 
       await service().storeFromAuthorizationCode({
-        subject: '001234.abc',
+        subject: SUBJECT,
         clientId: CLIENT_ID,
         authorizationCode: 'code-123456',
       });
@@ -134,7 +169,7 @@ describe('AppleTokenService', () => {
       expect(secret.claims.exp - secret.claims.iat).toBeLessThanOrEqual(15_777_000);
 
       expect(prisma.v1AuthIdentity.findUnique).toHaveBeenCalledWith(expect.objectContaining({
-        where: { provider_providerUserKey: { provider: 'apple', providerUserKey: '001234.abc' } },
+        where: { provider_providerUserKey: { provider: 'apple', providerUserKey: SUBJECT } },
       }));
       const [{ where, data }] = prisma.v1AuthIdentity.update.mock.calls[0];
       expect(where).toEqual({ id: 'identity-1' });
@@ -145,11 +180,33 @@ describe('AppleTokenService', () => {
       });
     });
 
+    /**
+     * The code and the identity token come in one request but are independent values: a code
+     * from another Apple account must not put that account's token on this row, or this
+     * user's withdrawal would revoke the other person's Teameet link.
+     */
+    it.each([
+      ['a different Apple account', () => appleIdToken({ sub: '009999.other' })],
+      ['a different app', () => appleIdToken({ aud: 'kr.co.teameet' })],
+      ['a forged id_token', () => appleIdToken({}, impostor.privateKey)],
+      ['no id_token', () => undefined],
+    ])('stores nothing when the exchanged token belongs to %s', async (_label, idToken) => {
+      process.env[APPLE_AUDIENCES_VARIABLE] = `${CLIENT_ID},kr.co.teameet`;
+      fetchSpy.mockResolvedValue(jsonResponse(200, { refresh_token: 'r.other', id_token: idToken() }));
+
+      await expect(service().storeFromAuthorizationCode({
+        subject: SUBJECT, clientId: CLIENT_ID, authorizationCode: 'code-123456',
+      })).resolves.toBeUndefined();
+
+      expect(prisma.v1AuthIdentity.update).not.toHaveBeenCalled();
+      expect((Logger.prototype.error as jest.Mock).mock.calls[0][0]).toContain('not stored');
+    });
+
     it('stores nothing when Apple refuses the code, and does not throw', async () => {
       fetchSpy.mockResolvedValue(jsonResponse(400, { error: 'invalid_grant' }));
 
       await expect(service().storeFromAuthorizationCode({
-        subject: '001234.abc', clientId: CLIENT_ID, authorizationCode: 'code-123456',
+        subject: SUBJECT, clientId: CLIENT_ID, authorizationCode: 'code-123456',
       })).resolves.toBeUndefined();
 
       expect(prisma.v1AuthIdentity.update).not.toHaveBeenCalled();
@@ -160,7 +217,7 @@ describe('AppleTokenService', () => {
       fetchSpy.mockRejectedValue(new TypeError('fetch failed'));
 
       await expect(service().storeFromAuthorizationCode({
-        subject: '001234.abc', clientId: CLIENT_ID, authorizationCode: 'code-123456',
+        subject: SUBJECT, clientId: CLIENT_ID, authorizationCode: 'code-123456',
       })).resolves.toBeUndefined();
 
       expect(prisma.v1AuthIdentity.update).not.toHaveBeenCalled();

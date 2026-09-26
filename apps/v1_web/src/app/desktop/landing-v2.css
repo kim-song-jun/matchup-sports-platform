@@ -1,0 +1,984 @@
+/*
+ * 랜딩 v2(/landing/v2, B안 "불편 → 해결 이야기"). 앱 셸 밖 독립 페이지라 모바일 기본 스타일도 여기 둔다.
+ * A안(landing.css)의 내비·섹션 헤더·폰 목업(lpm-*)·푸터·모바일 CTA 바 클래스는 그대로 빌려 쓰고,
+ * 이 파일은 tm-landing-v2-* 만 정의한다. 루트가 .tm-landing 이 아니라서 A안의 숨김·재생 규칙은 걸리지 않는다.
+ *
+ * 모션 규약(A안과 같다): 서버 HTML 은 모션이 끝난 최종 상태다. 숨김·반복 모션은
+ * .tm-landing-v2[data-motion='on'](JS 준비 + 모션 감소 아님) 아래에서만 건다.
+ * 반복 모션은 [data-loop='off'](뷰포트 밖·가려진 면)나 [data-paused='true'](움직임 멈추기)면 멈춘다.
+ */
+
+.tm-landing-v2 {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  word-break: keep-all;
+  overflow-x: clip;
+}
+
+.tm-landing-v2 :focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+html:has(.tm-landing-v2) {
+  scroll-padding-top: 72px;
+}
+
+/* 하단 고정 CTA 바(<768)가 키보드 포커스·챕터 앵커 도착 지점을 가리지 않게 */
+@media (max-width: 767px) {
+  html:has(.tm-landing-v2) {
+    scroll-padding-bottom: calc(88px + var(--v1-shell-safe-bottom));
+  }
+}
+
+/* ── 히어로(기: 공감) ── */
+.tm-landing-v2-hero {
+  position: relative;
+  overflow: clip;
+  padding: 28px 0 56px;
+}
+
+.tm-landing-v2-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 72%;
+  background: linear-gradient(180deg, var(--blue50), var(--bg));
+  pointer-events: none;
+}
+
+.tm-landing-v2-hero-grid {
+  position: relative;
+  display: grid;
+  gap: 32px;
+}
+
+.tm-landing-v2-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--blue100);
+  background: var(--card-surface);
+  font-size: var(--font-size-label);
+  font-weight: 700;
+  color: var(--blue700);
+}
+
+.tm-landing-v2-eyebrow-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-circle);
+  background: var(--blue500);
+}
+
+/* 타입 스케일 상한(heading 24px)을 넘는 디스플레이 크기는 랜딩 타이틀에만 쓴다(A안과 같은 예외) */
+.tm-landing-v2-h1 {
+  margin: 16px 0 0;
+  font-size: 34px;
+  line-height: 1.25;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-strong);
+}
+
+.tm-landing-v2-h1-line {
+  display: block;
+}
+
+/* 형광펜 — 글자색은 그대로, 뒤에 반투명 파랑 띠를 깐다(두 테마 모두 본문 대비 유지) */
+.tm-landing-v2-mark {
+  position: relative;
+  z-index: 0;
+  background: none;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.tm-landing-v2-mark::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  bottom: 0.06em;
+  height: 0.38em;
+  z-index: -1;
+  border-radius: var(--radius-tight);
+  background: color-mix(in srgb, var(--blue500) 28%, transparent);
+  transform-origin: 0 50%;
+}
+
+.tm-landing-v2-hero-sub {
+  margin: 16px 0 0;
+  max-width: 30em;
+  font-size: var(--font-size-body-lg);
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.tm-landing-v2-hero-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.tm-landing-cta-banner .tm-landing-v2-hero-actions {
+  justify-content: center;
+}
+
+.tm-landing-v2-hero-note {
+  margin: 12px 0 0;
+  font-size: var(--font-size-label);
+  color: var(--text);
+}
+
+/* 무대: 왼쪽에 예전 방식 메모, 오른쪽에 팀밋 화면. 메모가 폰 모서리 위에 얹힌다 */
+.tm-landing-v2-stage {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 440px;
+}
+
+.tm-landing-v2-stage-illust {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 120px;
+  height: auto;
+  pointer-events: none;
+}
+
+.tm-landing-v2-stage-device {
+  position: relative;
+  z-index: 1;
+}
+
+.tm-landing-v2-stage .tm-landing-device[data-size='hero'] {
+  --dw: 220;
+  --dh: 404;
+}
+
+.tm-landing-v2-oldway {
+  position: absolute;
+  left: 0;
+  bottom: 24px;
+  z-index: 2;
+  width: min(176px, 48%);
+  padding: 16px;
+  border-radius: var(--radius-container);
+  border: 1px solid var(--border);
+  background: var(--card-surface);
+  box-shadow: var(--shadow-card);
+  transform: rotate(-4deg);
+  font-size: var(--font-size-label);
+  line-height: 1.45;
+  color: var(--text);
+}
+
+/* 카드 위 칩(태그·아이콘·번호·막대 트랙)은 --grey100 대신 글자색 8% 를 깐다 — --grey100 은
+   다크에서 카드 지면과 같은 색이라 칩이 사라진다 */
+.tm-landing-v2-oldway-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-strong) 8%, transparent);
+  font-size: var(--font-size-caption);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-landing-v2-oldway ul {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 여러 줄로 감겨도 이어서 그어지도록 인라인 배경으로 취소선을 긋는다 */
+.tm-landing-v2-oldway-strike {
+  background: linear-gradient(var(--red500), var(--red500)) 0 58% / 100% 2px no-repeat;
+}
+
+/* ── 공감: 불편 넷 ── */
+.tm-landing-v2-pains {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-landing-v2-pain {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
+  column-gap: 16px;
+  row-gap: 4px;
+  padding: 20px;
+  border-radius: var(--radius-container);
+  border: 1px solid var(--border);
+  background: var(--card-surface);
+}
+
+.tm-landing-v2-pain-icon {
+  grid-row: 1 / span 3;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-field);
+  background: color-mix(in srgb, var(--text-strong) 8%, transparent);
+  color: var(--text-strong);
+}
+
+.tm-landing-v2-pain h3 {
+  margin: 0;
+  font-size: var(--font-size-body-lg);
+  line-height: 1.4;
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-landing-v2-pain p {
+  margin: 0;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.tm-landing-v2-pain-fix {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  font-size: var(--font-size-label);
+  font-weight: 700;
+  color: var(--blue700);
+  border-radius: var(--radius-chip);
+}
+
+/* ── 역할별 목적지 — 탭 없이 서버가 그리는 링크 셋 ── */
+.tm-landing-v2-roles {
+  margin-top: 32px;
+}
+
+.tm-landing-v2-roles-title {
+  margin: 0 0 12px;
+  font-size: var(--font-size-body);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.tm-landing-v2-role-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-landing-v2-role-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 64px;
+  padding: 12px 16px 12px 20px;
+  border-radius: var(--radius-field);
+  border: 1px solid var(--border);
+  background: var(--card-surface);
+  transition: background-color var(--duration-fast) ease, border-color var(--duration-fast) ease;
+}
+
+.tm-landing-v2-role-who {
+  grid-column: 1;
+  font-size: var(--font-size-label);
+  color: var(--text);
+}
+
+.tm-landing-v2-role-label {
+  grid-column: 1;
+  font-size: var(--font-size-body-lg);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-landing-v2-role-arrow {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  color: var(--blue500);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .tm-landing-v2-role-link:hover {
+    border-color: var(--blue500);
+    background: var(--blue50);
+  }
+
+  .tm-landing-v2-role-link:hover .tm-landing-v2-role-arrow {
+    transform: translateX(3px);
+  }
+
+  .tm-landing-v2-pain-fix:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
+/* ── 전환점 띠 — 페이지에서 유일한 강조 배경. 흰 글씨라 --blue500(3.71:1) 대신 --static-blue(5.41:1) ── */
+.tm-landing-v2-pivot {
+  padding: 56px 0;
+  overflow: clip;
+  background: var(--static-blue);
+  color: var(--static-white);
+}
+
+.tm-landing-v2-pivot-kicker {
+  margin: 0 0 8px;
+  font-size: var(--font-size-body);
+  font-weight: 700;
+  color: var(--static-white);
+}
+
+.tm-landing-v2-pivot-title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.3;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--static-white);
+}
+
+/* 기본(JS 없음·모션 감소)은 멈춘 채 줄바꿈된 칩 목록. 흐르는 띠는 모션 절에서 켠다 */
+.tm-landing-v2-marquee {
+  display: flex;
+  justify-content: center;
+  margin-top: 28px;
+  padding: 0 20px;
+  overflow: hidden;
+}
+
+.tm-landing-v2-marquee-track {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-landing-v2-marquee-track[aria-hidden='true'] {
+  display: none;
+}
+
+/* 칩은 채우지 않고 테두리만 — 흰 글씨가 --static-blue 위 5.41:1 을 그대로 유지한다 */
+.tm-landing-v2-marquee-track li {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--overlay-white-35);
+  font-size: var(--font-size-body-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--static-white);
+}
+
+/* ── 해결: 챕터 넷 ── */
+.tm-landing-v2-chapters {
+  display: grid;
+  gap: 64px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-landing-v2-chapter {
+  display: grid;
+  gap: 24px;
+}
+
+.tm-landing-v2-chapter-num {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--font-size-label);
+  font-weight: 800;
+  color: var(--text);
+}
+
+.tm-landing-v2-chapter-num b {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-circle);
+  background: var(--text-strong);
+  font-size: var(--font-size-caption);
+  color: var(--bg);
+}
+
+.tm-landing-v2-chapter-pain {
+  margin: 12px 0 0;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.tm-landing-v2-chapter-title {
+  margin: 4px 0 0;
+  font-size: var(--font-size-heading);
+  line-height: 1.35;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+}
+
+.tm-landing-v2-chapter-body {
+  margin: 12px 0 0;
+  font-size: var(--font-size-body);
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.tm-landing-v2-chapter-points {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-landing-v2-chapter-points li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.tm-landing-v2-chapter-points svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--blue500);
+}
+
+/* 챕터마다 그 불편이 풀리는 목적지로 — 긴 이야기 중간에도 전환 지점을 둔다 */
+.tm-landing-v2-chapter-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  margin-top: 20px;
+  padding: 0 16px;
+  border-radius: var(--radius-control);
+  background: var(--tint-blue);
+  font-size: var(--font-size-body-sm);
+  font-weight: 800;
+  color: var(--blue700);
+  transition: background-color var(--duration-fast) ease;
+}
+
+@media (hover: hover) {
+  .tm-landing-v2-chapter-cta:hover {
+    background: var(--blue100);
+  }
+}
+
+/* ── 예전엔 / 이제는 ── */
+.tm-landing-v2-compare {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+}
+
+.tm-landing-v2-switch {
+  display: inline-grid;
+  grid-auto-flow: column;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-field);
+  background: var(--grey100);
+}
+
+.tm-landing-v2-switch-option {
+  min-width: 96px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  font-size: var(--font-size-body-sm);
+  font-weight: 700;
+  color: var(--text);
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+
+/* 눌린 칸은 채움(--bg)만으론 트랙과 1.1:1 이라 테두리로 상태를 보인다(WCAG 1.4.11) */
+.tm-landing-v2-switch-option[aria-pressed='true'] {
+  background: var(--bg);
+  color: var(--text-strong);
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px var(--text-strong), var(--shadow-card);
+}
+
+.tm-landing-v2-switch-option[data-option='after'][aria-pressed='true'] {
+  background: var(--static-blue);
+  color: var(--static-white);
+  box-shadow: var(--shadow-card);
+}
+
+/* 두 면을 같은 칸에 겹쳐 높이를 고정한다 — 바꿔 봐도 아래 내용이 튀지 않는다 */
+.tm-landing-v2-faces {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 440px;
+  padding: 20px 16px;
+  border-radius: var(--radius-hero);
+  background: var(--grey100);
+  transition: background-color var(--duration-slow) var(--ease-standard);
+}
+
+.tm-landing-v2-compare[data-view='after'] .tm-landing-v2-faces {
+  background: var(--tint-blue);
+}
+
+.tm-landing-v2-face {
+  grid-area: 1 / 1;
+  width: 100%;
+}
+
+.tm-landing-v2-faces .tm-landing-device[data-size='mini'] {
+  --dw: 260;
+  --dh: 380;
+}
+
+/* 가리기는 미디어 쿼리 밖에 둔다 — (scripting) 을 모르는 브라우저(iOS 16 Safari 등)에선
+   @media (scripting: enabled) 가 거짓이라 두 면이 한 칸에 겹친다. 스크립트가 없을 때만
+   아래 (scripting: none) 이 토글을 숨기고 두 면을 차례로 보여 준다. */
+.tm-landing-v2-compare[data-view='after'] [data-face='before'],
+.tm-landing-v2-compare[data-view='before'] [data-face='after'] {
+  display: none;
+}
+
+@media (scripting: none) {
+  .tm-landing-v2-switch {
+    display: none;
+  }
+
+  .tm-landing-v2-faces {
+    gap: 16px;
+  }
+
+  .tm-landing-v2-compare[data-view] [data-face] {
+    display: block;
+    grid-area: auto;
+  }
+}
+
+/* "예전엔" 면 — 가짜 화면 대신 예전 방식을 순서대로 적은 담백한 설명 카드 */
+.tm-landing-v2-before {
+  width: min(100%, 320px);
+  margin: 0 auto;
+  padding: 24px 20px;
+  border-radius: var(--radius-container);
+  border: 1px solid var(--border);
+  background: var(--card-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.tm-landing-v2-before-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-strong) 8%, transparent);
+  font-size: var(--font-size-caption);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-landing-v2-before-title {
+  margin: 12px 0 0;
+  font-size: var(--font-size-body-lg);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-landing-v2-before-steps {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: tm-landing-v2-step;
+}
+
+.tm-landing-v2-before-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.5;
+  color: var(--text);
+  counter-increment: tm-landing-v2-step;
+}
+
+.tm-landing-v2-before-steps li::before {
+  content: counter(tm-landing-v2-step);
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-circle);
+  background: color-mix(in srgb, var(--text-strong) 8%, transparent);
+  font-size: var(--font-size-caption);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-landing-v2-before-foot {
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* 선수 카드 목업 — A안의 .tm-landing .lpm-pcard 와 같은 값. 전역 .tm-player-card 보다 앞서야 한다 */
+.tm-landing-v2 .lpm-pcard {
+  display: block;
+  width: 252px;
+  margin: 4px auto 0;
+  padding: 3px;
+  clip-path: var(--tm-silhouette);
+  background: var(--tm-rim);
+}
+
+/* ── 신뢰: 상호평가 ── */
+.tm-landing-v2-trust {
+  display: grid;
+  gap: 16px;
+}
+
+.tm-landing-v2-trust > .tm-landing-section-header {
+  margin-bottom: 8px;
+}
+
+.tm-landing-v2-trust-card {
+  padding: 24px 20px;
+  border-radius: var(--radius-container);
+  border: 1px solid var(--border);
+  background: var(--card-surface);
+}
+
+.tm-landing-v2-trust-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tm-landing-v2-trust-head h3 {
+  margin: 0;
+  font-size: var(--font-size-body-lg);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-landing-v2-example {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-strong) 8%, transparent);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tm-landing-v2-rate,
+.tm-landing-v2-policy {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-landing-v2-rate li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  font-size: var(--font-size-body-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tm-landing-v2-rate-track {
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-strong) 8%, transparent);
+}
+
+.tm-landing-v2-rate-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--blue500);
+  transform-origin: 0 50%;
+  transform: scaleX(var(--fill, 1));
+}
+
+.tm-landing-v2-policy li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.tm-landing-v2-policy-icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-field);
+  background: var(--tint-blue);
+  color: var(--blue700);
+}
+
+/* ── 모션 ── 떠오름·부유·맥박·깜빡임·골 튐 키프레임은 landing.css(A안) 것을 같이 쓴다 */
+@keyframes tmLandingV2Marquee {
+  to { transform: translateX(-100%); }
+}
+@keyframes tmLandingV2FaceIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tmLandingV2NoteIn {
+  from { opacity: 0; transform: translate(-16px, 24px) rotate(-10deg); }
+  to { opacity: 1; transform: rotate(-4deg); }
+}
+@keyframes tmLandingV2Strike {
+  from { background-size: 0% 2px; }
+  to { background-size: 100% 2px; }
+}
+@keyframes tmLandingV2Mark {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* 히어로 첫 등장 — JS 가 켜진 환경에서만. 예전 방식 메모가 놓이고, 한 줄씩 지워지고, 팀밋 화면이 올라온다 */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  .tm-landing-v2-eyebrow,
+  .tm-landing-v2-h1-line,
+  .tm-landing-v2-hero-sub,
+  .tm-landing-v2-hero-copy .tm-landing-v2-hero-actions,
+  .tm-landing-v2-hero-note {
+    animation: tmLandingRise 800ms var(--ease-out) both;
+  }
+  .tm-landing-v2-h1-line:nth-child(1) { animation-delay: 80ms; }
+  .tm-landing-v2-h1-line:nth-child(2) { animation-delay: 180ms; }
+  .tm-landing-v2-hero-sub { animation-delay: 320ms; }
+  .tm-landing-v2-hero-copy .tm-landing-v2-hero-actions { animation-delay: 420ms; }
+  .tm-landing-v2-hero-note { animation-delay: 500ms; }
+  .tm-landing-v2-mark::after { animation: tmLandingV2Mark 700ms var(--ease-out) 700ms both; }
+  .tm-landing-v2-oldway { animation: tmLandingV2NoteIn 700ms var(--ease-out) 300ms both; }
+  .tm-landing-v2-oldway-strike { animation: tmLandingV2Strike 500ms var(--ease-out) 700ms both; }
+  .tm-landing-v2-oldway li:nth-child(2) .tm-landing-v2-oldway-strike { animation-delay: 900ms; }
+  .tm-landing-v2-oldway li:nth-child(3) .tm-landing-v2-oldway-strike { animation-delay: 1100ms; }
+  .tm-landing-v2-stage-device { animation: tmLandingDeviceIn 1000ms var(--ease-out) 1000ms both; }
+}
+
+/* 반복 모션 — 5초를 넘으므로 멈추기 버튼과 뷰포트 밖 정지를 함께 건다.
+ * 정지는 상속되는 --tm-landing-v2-play 로만 건다: `animation` 단축 속성이 play-state 를 running 으로
+ * 되돌리므로 정지를 별도 셀렉터로 걸면 특이도 싸움에서 진다. 새 infinite 애니메이션을 더하면
+ * 같은 규칙에 animation-play-state 도 반드시 붙인다(landing-v2-css.test.ts 가 확인한다). */
+.tm-landing-v2[data-paused='true'],
+.tm-landing-v2 [data-loop='off'],
+.tm-landing-v2-marquee:hover,
+.tm-landing-v2-marquee:focus-within {
+  --tm-landing-v2-play: paused;
+}
+
+.tm-landing-v2[data-motion='on'] .tm-landing-v2-stage-illust { animation: tmLandingFloat 6s ease-in-out infinite; animation-play-state: var(--tm-landing-v2-play, running); }
+.tm-landing-v2[data-motion='on'] .tm-landing-v2-eyebrow-dot { animation: tmLandingPulse 2.4s var(--ease-standard) infinite; animation-play-state: var(--tm-landing-v2-play, running); }
+.tm-landing-v2[data-motion='on'] .tm-landing-v2-marquee-track { animation: tmLandingV2Marquee 40s linear infinite; animation-play-state: var(--tm-landing-v2-play, running); }
+.tm-landing-v2[data-motion='on'] .lpm-badge[data-tone='live']::before { animation: tmLandingBlink 1.2s steps(2, jump-none) infinite; animation-play-state: var(--tm-landing-v2-play, running); }
+.tm-landing-v2[data-motion='on'] .lpm-pcard-face::after { animation: tmCardSweep 5.6s ease-in-out infinite; animation-play-state: var(--tm-landing-v2-play, running); }
+
+/* 흐르는 띠: 한 줄로 펴고 복제 트랙을 이어 붙인다(복제는 aria-hidden) */
+.tm-landing-v2[data-motion='on'] .tm-landing-v2-marquee {
+  justify-content: flex-start;
+  padding: 0;
+  mask-image: linear-gradient(90deg, transparent, var(--static-black) 8%, var(--static-black) 92%, transparent);
+}
+
+.tm-landing-v2[data-motion='on'] .tm-landing-v2-marquee-track {
+  flex: none;
+  flex-wrap: nowrap;
+  padding-right: 8px;
+}
+
+.tm-landing-v2[data-motion='on'] .tm-landing-v2-marquee-track[aria-hidden='true'] {
+  display: flex;
+}
+
+/* 스크롤 reveal — 컨트롤러가 보이는 순간 .is-in 을 붙인다(1회) */
+.tm-landing-v2[data-motion='on'] [data-reveal] {
+  transition: opacity 600ms var(--ease-standard), transform 800ms var(--ease-out);
+  transition-delay: calc(var(--i, 0) * 120ms);
+}
+
+.tm-landing-v2[data-motion='on'] [data-reveal]:not(.is-in) {
+  opacity: 0;
+  transform: translateY(24px);
+}
+
+.tm-landing-v2[data-motion='on'] [data-reveal='scale']:not(.is-in) {
+  transform: translateY(16px) scale(0.96);
+}
+
+/* 토글로 면이 바뀔 때 새 면이 살짝 떠오른다(display 가 바뀌면 애니메이션이 다시 돈다) */
+.tm-landing-v2[data-motion='on'] .tm-landing-v2-face {
+  animation: tmLandingV2FaceIn 420ms var(--ease-out);
+}
+
+/* 신뢰: 평가 막대가 채워진다 */
+.tm-landing-v2[data-motion='on'] .tm-landing-v2-rate-track i {
+  transition: transform 1000ms var(--ease-out) 300ms;
+}
+
+.tm-landing-v2[data-motion='on'] .tm-landing-v2-trust-card:not(.is-in) .tm-landing-v2-rate-track i {
+  transform: scaleX(0);
+}
+
+.tm-landing-v2[data-motion='on'] .tm-landing-v2-rate li:nth-child(2) .tm-landing-v2-rate-track i { transition-delay: 450ms; }
+.tm-landing-v2[data-motion='on'] .tm-landing-v2-rate li:nth-child(3) .tm-landing-v2-rate-track i { transition-delay: 600ms; }
+.tm-landing-v2[data-motion='on'] .tm-landing-v2-rate li:nth-child(4) .tm-landing-v2-rate-track i { transition-delay: 750ms; }
+
+/* 목업 화면 장면 — 그 면이 보일 때 재생된다(다시 보이면 다시 재생) */
+.tm-landing-v2[data-motion='on'] [data-loop='on'] .lpm-screen[data-on='true'] .lpm-bar i {
+  animation: tmLandingGrow 900ms var(--ease-out) 200ms both;
+}
+
+.tm-landing-v2[data-motion='on'] .lpm-bracket .win {
+  stroke-dashoffset: 220;
+  transition: stroke-dashoffset 1100ms var(--ease-out) 350ms;
+}
+
+.tm-landing-v2[data-motion='on'] [data-loop='on'] .lpm-screen[data-on='true'] .lpm-bracket .win {
+  stroke-dashoffset: 0;
+}
+
+.tm-landing-v2[data-motion='on'] .lpm-live-score b.is-bump {
+  color: var(--blue500);
+  animation: tmLandingBump 600ms var(--ease-spring);
+}
+
+.tm-landing-v2[data-motion='on'] .lpm-event[data-state='shown'] {
+  animation: tmLandingRowIn 520ms var(--ease-out) both;
+}
+
+/* ─── 태블릿 (768+) — 히어로·챕터를 좌우로 나눠 768 에서도 오른쪽이 비지 않게 ─── */
+@media (min-width: 768px) {
+  .tm-landing-v2-hero { padding: 48px 0 80px; }
+  .tm-landing-v2-hero-grid {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 32px;
+  }
+  .tm-landing-v2-h1 { font-size: 40px; }
+  .tm-landing-v2-hero-actions { grid-auto-flow: column; justify-content: start; }
+  .tm-landing-v2-stage { min-height: 480px; }
+  .tm-landing-v2-stage .tm-landing-device[data-size='hero'] { --dw: 232; --dh: 456; }
+  .tm-landing-v2-oldway { width: min(184px, 56%); }
+
+  .tm-landing-v2-pains { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tm-landing-v2-role-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+  .tm-landing-v2-pivot { padding: 80px 0; }
+  .tm-landing-v2-pivot-title { font-size: 36px; }
+
+  .tm-landing-v2-chapters { gap: 96px; }
+  .tm-landing-v2-chapter {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 40px;
+  }
+  .tm-landing-v2-chapter:nth-child(even) .tm-landing-v2-chapter-text { order: 2; }
+  .tm-landing-v2-chapter-title { font-size: 28px; }
+
+  .tm-landing-v2-trust { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .tm-landing-v2-trust > .tm-landing-section-header { grid-column: 1 / -1; }
+  .tm-landing-v2-trust-card { height: 100%; padding: 28px 24px; }
+}
+
+/* ─── 데스크톱 (1024+) ─── */
+@media (min-width: 1024px) {
+  .tm-landing-v2-hero { padding: 64px 0 80px; }
+  .tm-landing-v2-hero-grid { grid-template-columns: minmax(0, 1fr) 480px; gap: 56px; }
+  .tm-landing-v2-h1 { font-size: 52px; line-height: 1.16; }
+  .tm-landing-v2-hero-sub { font-size: var(--font-size-subhead); }
+  .tm-landing-v2-stage { min-height: 580px; }
+  .tm-landing-v2-stage .tm-landing-device[data-size='hero'] { --dw: 272; --dh: 548; }
+  .tm-landing-v2-stage-illust { width: 184px; }
+  .tm-landing-v2-oldway { bottom: 56px; width: 212px; padding: 20px; font-size: var(--font-size-body-sm); }
+
+  .tm-landing-v2-pains { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .tm-landing-v2-pain { grid-template-columns: minmax(0, 1fr); padding: 24px; }
+  .tm-landing-v2-pain-icon { grid-row: auto; margin-bottom: 12px; }
+
+  .tm-landing-v2-pivot { padding: 96px 0; }
+  .tm-landing-v2-pivot-title { font-size: 44px; line-height: 1.24; }
+
+  .tm-landing-v2-chapters { gap: 120px; }
+  .tm-landing-v2-chapter { grid-template-columns: minmax(0, 1fr) 440px; gap: 80px; }
+  .tm-landing-v2-chapter:nth-child(even) { grid-template-columns: 440px minmax(0, 1fr); }
+  .tm-landing-v2-chapter-title { font-size: 32px; line-height: 1.3; }
+  .tm-landing-v2-chapter-body { font-size: var(--font-size-body-lg); }
+  .tm-landing-v2-chapter-points li { font-size: var(--font-size-body); }
+  .tm-landing-v2-faces { min-height: 492px; padding: 24px; }
+  .tm-landing-v2-faces .tm-landing-device[data-size='mini'] { --dw: 280; --dh: 428; }
+
+  .tm-landing-v2-trust { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+  .tm-landing-v2-trust > .tm-landing-section-header { grid-column: auto; margin: 0; }
+}
+
+/* ─── 와이드 (1440+) ─── */
+@media (min-width: 1440px) {
+  .tm-landing-v2-hero-grid { grid-template-columns: minmax(0, 1fr) 520px; }
+  .tm-landing-v2-h1 { font-size: 60px; }
+  .tm-landing-v2-chapter { grid-template-columns: minmax(0, 1fr) 480px; }
+  .tm-landing-v2-chapter:nth-child(even) { grid-template-columns: 480px minmax(0, 1fr); }
+}

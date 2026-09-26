@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { resolveNextImageSrc } from '@/test/next-image';
 import { PlayerCard } from './player-card';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
@@ -289,6 +289,21 @@ describe('선수 카드', () => {
     expect(screen.getByText('실력')).toBeInTheDocument();
     expect(screen.getByText('매너')).toBeInTheDocument();
     expect(screen.getByText('시간약속')).toBeInTheDocument();
+  });
+
+  it('lockedBy 없이 잠긴(value===null) 능력치도 빈칸이 아니라 잠김(—)으로 그린다', () => {
+    // Copilot 리뷰(2026-09-26): 묶음 로직(backRowItems)이 lockedBy 가 없는 낱개 행은
+    // 그대로 통과시키는데, 그 값을 검증 없이 그리면 value===null 인 경우 숫자 자리가
+    // 빈칸이 된다. lockedBy:null 이지만 value 가 없는 조합을 직접 만들어 못박는다.
+    renderCard(card({ stats: [stat('SHO', '골', null), ...card().stats.slice(1)] }));
+
+    fireEvent.click(screen.getByRole('button', { name: /카드 뒤집기/ }));
+    const back = document.querySelector('.tm-pcard-side[data-side="back"]');
+    const row = within(back as HTMLElement).getByText('골 · 경기당 골이 많을수록 올라가요');
+    const valueCell = row.parentElement?.querySelector('b');
+
+    expect(valueCell?.textContent).toBe('—');
+    expect(valueCell).toHaveAttribute('data-locked', 'true');
   });
 
   it('뒷면 성향 칩은 가운데 정렬 줄바꿈 컨테이너에 담긴다 (P4 B안 -- 외톨이 칩 방지)', () => {

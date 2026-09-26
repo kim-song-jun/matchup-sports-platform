@@ -516,10 +516,13 @@ export function PlayerCard({
           if (item.kind === 'stat') {
             const meta = STAT_BACK[item.stat.code];
             const Icon = meta.icon;
+            // 묶지 않은 낱개 행에도 lockedBy 없이 잠긴 경우(value===null)가 있을 수
+            // 있다 -- 그 값을 그대로 그리면 숫자 자리가 빈칸이 된다(Copilot 리뷰).
+            const locked = !item.stat.unlocked || item.stat.value === null;
             return (
               <div key={item.stat.code} className="tm-pcard-brow">
                 <Icon aria-hidden="true" />
-                <b>{item.stat.value}</b>
+                <b data-locked={locked ? 'true' : undefined}>{locked ? '—' : item.stat.value}</b>
                 <span>{meta.source}</span>
               </div>
             );

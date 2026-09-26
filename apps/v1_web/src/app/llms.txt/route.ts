@@ -22,7 +22,7 @@ export async function GET(): Promise<Response> {
   const body = [
     '# Teameet (팀밋)',
     '',
-    '> 풋살·농구·배드민턴 등 생활체육 아마추어 대회를 열고, 팀과 선수를 매칭하고,',
+    '> 축구·풋살·러닝·수영 생활체육 아마추어 대회를 열고, 팀과 선수를 매칭하고,',
     '> 경기 결과·기록을 남기는 한국의 멀티스포츠 플랫폼이에요. 이 사이트는 여기서 운영되는',
     '> 대회의 일정·대진·결과·순위에 대한 1차 소스(원출처)예요.',
     '',
@@ -44,7 +44,7 @@ export async function GET(): Promise<Response> {
     `- [개인 매치](${absoluteSiteUrl('/matches')}): 개인 단위로 참가하는 매치 모집`,
     `- [이벤트](${absoluteSiteUrl('/events')}): 진행 중인 이벤트`,
     `- [공지사항](${absoluteSiteUrl('/notices')}): 서비스 공지`,
-    `- [서비스 소개](${absoluteSiteUrl('/landing')}): 팀밋이 무엇이고 어떻게 쓰는지`,
+    `- [서비스 소개](${absoluteSiteUrl('/landing')}): 매치부터 대회까지 한 앱에서 — 매치·팀·대회·리그 신청, 라이브 스코어, 기록·선수 카드를 실제 화면 구성으로 소개`,
     '',
     ...(tournaments.length > 0
       ? [

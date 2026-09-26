@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     default: 'Teameet',
     template: '%s | Teameet',
   },
-  description: '같이 뛸 사람을 한 번에 — AI 기반 멀티스포츠 소셜 매칭 플랫폼',
+  description: '같이 뛸 사람을 한 번에 — 축구·풋살·러닝·수영 매치·팀·대회 플랫폼',
   category: 'sports',
   formatDetection: { email: false, address: false, telephone: false },
   icons: {

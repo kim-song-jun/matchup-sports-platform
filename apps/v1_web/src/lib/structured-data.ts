@@ -60,7 +60,7 @@ export function buildSiteIdentityLd(): JsonLdNode {
         url: absoluteSiteUrl('/'),
         logo: absoluteSiteUrl('/brand/icon-512.png'),
         description:
-          '풋살·농구·배드민턴 등 생활체육 종목의 아마추어 대회와 팀·매치를 운영하는 멀티스포츠 매칭 플랫폼.',
+          '축구·풋살·러닝·수영 생활체육의 아마추어 대회와 팀·매치를 운영하는 멀티스포츠 매칭 플랫폼.',
         sameAs: [...OFFICIAL_SURFACES],
         contactPoint: {
           '@type': 'ContactPoint',

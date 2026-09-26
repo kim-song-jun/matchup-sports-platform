@@ -591,10 +591,11 @@ export function useV1ActivePopup(screen: V1PopupTargetScreen | null, path?: stri
   });
 }
 
-export function useV1Notices(filters?: ListFilters) {
+export function useV1Notices(filters?: ListFilters, options?: { seed?: V1NoticesResponse }) {
   return useQuery({
     queryKey: v1Keys.notices(filters),
     queryFn: () => v1Get<V1NoticesResponse>('/notices', filters),
+    placeholderData: options?.seed,
   });
 }
 
@@ -636,7 +637,8 @@ export function useV1CreateInquiry() {
   });
 }
 
-export function useV1Matches(filters?: ListFilters, options?: QueryOptions) {
+export function useV1Matches(filters?: ListFilters, options?: QueryOptions & { seed?: CursorPage<V1Match> }) {
+  const seed = options?.seed;
   return useQuery({
     queryKey: v1Keys.matches(filters),
     queryFn: () => v1Get<CursorPage<V1Match>>('/matches', filters),
@@ -644,7 +646,8 @@ export function useV1Matches(filters?: ListFilters, options?: QueryOptions) {
     // "더 보기"로 cursor가 바뀌면 filters가 달라져 쿼리키가 바뀐다 — 이게 없으면 다음
     // 페이지를 받는 동안 query.data가 undefined로 잠깐 비어, 이미 쌓아둔 카드까지 통째로
     // 로딩 스켈레톤으로 되돌아간다(감사 결함 — 20건 컷오프 페이지네이션 추가분).
-    placeholderData: keepPreviousData,
+    // 직전 페이지가 없는 첫 진입에만 서버 seed 를 쓴다(useV1Tournaments 와 같다).
+    placeholderData: (previous) => previous ?? seed,
   });
 }
 
@@ -1563,14 +1566,16 @@ export function useV1MySchedule(filters?: ListFilters) {
   });
 }
 
-export function useV1TeamMatches(filters?: ListFilters, options?: QueryOptions) {
+export function useV1TeamMatches(filters?: ListFilters, options?: QueryOptions & { seed?: CursorPage<V1TeamMatch> }) {
+  const seed = options?.seed;
   return useQuery({
     queryKey: v1Keys.teamMatches(filters),
     queryFn: () => v1Get<CursorPage<V1TeamMatch>>('/team-matches', filters),
     refetchInterval: 15000,
     enabled: options?.enabled,
-    // useV1Matches와 동일한 이유 — cursor로 쿼리키가 바뀌는 "더 보기" 중 목록이 비지 않게 한다.
-    placeholderData: keepPreviousData,
+    // useV1Matches와 동일한 이유 — cursor로 쿼리키가 바뀌는 "더 보기" 중 목록이 비지 않게 하고,
+    // 첫 진입에만 서버 seed 를 쓴다.
+    placeholderData: (previous) => previous ?? seed,
   });
 }
 
@@ -3669,13 +3674,15 @@ type TournamentListFilters = {
   genderCategory?: 'mixed' | 'male' | 'female';
 };
 
-export function useV1Tournaments(params?: TournamentListFilters) {
+export function useV1Tournaments(params?: TournamentListFilters, options?: { seed?: V1TournamentListPage }) {
+  const seed = options?.seed;
   return useQuery({
     queryKey: v1Keys.tournaments(params as Record<string, unknown>),
     queryFn: () => v1Get<V1TournamentListPage>('/tournaments', params),
     // 페이지를 넘기는 동안 직전 페이지를 그대로 보여준다 — 목록이 빈 화면으로 깜빡이면
-    // 스크롤 위치와 읽던 자리를 잃는다(어드민 목록과 같은 처리).
-    placeholderData: keepPreviousData,
+    // 스크롤 위치와 읽던 자리를 잃는다(어드민 목록과 같은 처리). 직전 페이지가 없는 첫
+    // 진입에만 서버 seed 를 쓴다 — initialData 가 아니라 placeholder 라 실제 요청은 그대로 돈다.
+    placeholderData: (previous) => previous ?? seed,
   });
 }
 

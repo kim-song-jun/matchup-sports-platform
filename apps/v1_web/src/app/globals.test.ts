@@ -580,7 +580,7 @@ describe('인라인으로 지면 색을 까는 곳의 보조 텍스트 (.tm-on-t
 
   it.each([
     ['src/components/tournaments/pending-review-card.tsx', 'Card', /var\(--tint-blue\)/, 1],
-    ['src/app/tournaments/page.tsx', 'Link', /var\(--blue50\)/, 1],
+    ['src/app/tournaments/tournaments-list-client.tsx', 'Link', /var\(--blue50\)/, 1],
     // 이 파일은 blue50/red50 을 조건부로 까는 Card 가 셋이다. 하나만 붙이면 나머지
     // 둘은 그대로 미달로 남는다 — red50 은 4.02:1 로 blue50(4.11)보다 더 낮다.
     ['src/components/my/my-api-clients.tsx', 'Card', /var\(--blue50\)/, 3],

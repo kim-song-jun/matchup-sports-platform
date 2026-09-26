@@ -97,5 +97,5 @@ function formatRegistrationDeadline(
   const days = Math.ceil((deadline.getTime() - Date.now()) / 86_400_000);
   if (days <= 0) return '오늘 신청 마감';
   if (days <= 14) return `신청 마감 D-${days}`;
-  return `${deadline.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })} 신청 마감`;
+  return `${deadline.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Seoul' })} 신청 마감`;
 }

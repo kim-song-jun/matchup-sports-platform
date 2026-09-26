@@ -83,7 +83,7 @@ describe('팀 목록 N+1 방지', () => {
     const items = Array.from({ length: 12 }, (_, i) => teamWithoutActivity(i));
     hookMocks.useV1TeamPages.mockReturnValue({
       data: { pages: [{ items, pageInfo: { nextCursor: null, hasNext: false, total: items.length } }] },
-      isLoading: false,
+      isPending: false,
       isError: false,
       hasNextPage: false,
       isFetchingNextPage: false,
@@ -110,7 +110,7 @@ describe('팀 목록 N+1 방지', () => {
     const items = Array.from({ length: 44 }, (_, i) => teamWithoutActivity(i));
     hookMocks.useV1TeamPages.mockReturnValue({
       data: { pages: [{ items, pageInfo: { nextCursor: null, hasNext: false, total: items.length } }] },
-      isLoading: false,
+      isPending: false,
       isError: false,
       hasNextPage: false,
       isFetchingNextPage: false,

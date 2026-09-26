@@ -1017,7 +1017,7 @@ describe('TeamMatchListPageClient — 커서 페이지네이션 누적', () => {
       },
       isError: false,
       isFetching: false,
-      isLoading: false,
+      isPending: false,
     };
   }
 
@@ -1025,7 +1025,7 @@ describe('TeamMatchListPageClient — 커서 페이지네이션 누적', () => {
     vi.clearAllMocks();
     useV1TeamMatchesMock.mockImplementation((filters?: { cursor?: string }, options?: { enabled?: boolean }) => {
       if (options && options.enabled === false) {
-        return { data: undefined, isError: false, isFetching: false, isLoading: false };
+        return { data: undefined, isError: false, isFetching: false, isPending: true };
       }
       if (!filters?.cursor) {
         return page([{ id: 'tm1', title: '팀매치 1', status: 'closed' }], 'cursor-page-2');

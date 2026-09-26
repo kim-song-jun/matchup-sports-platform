@@ -16,7 +16,6 @@ import { ScheduleListPageView } from '../team-schedules/team-schedules-page';
 import type { ScheduleListViewModel } from '../team-schedules/team-schedules.types';
 import { MyTeamsPageClient } from '../my/my-api-clients';
 import { TeamListPageView } from './teams-page';
-import { TeamListSsrView } from './teams-ssr-list';
 import { TeamEditPageClient } from './teams-form-client';
 import { deriveTeamScope } from './teams.card-model';
 import { getTeamListViewModel } from './teams.view-model';
@@ -148,13 +147,6 @@ describe('팀 목록 scope — mock 문자열("서울 전체 · 팀 둘러보기
     expect(deriveTeamScope(undefined)).toBe('전체 · 팀 둘러보기');
     expect(deriveTeamScope('풋살')).toBe('풋살 · 팀 둘러보기');
     expect(deriveTeamScope()).not.toBe('서울 전체 · 팀 둘러보기');
-  });
-
-  it('SSR 목록은 mock scope("서울 전체 · 팀 둘러보기")를 렌더하지 않는다', () => {
-    rtlRender(<TeamListSsrView teams={[]} sports={[]} />);
-
-    expect(screen.queryByText('서울 전체 · 팀 둘러보기')).not.toBeInTheDocument();
-    expect(screen.getAllByText('전체 · 팀 둘러보기').length).toBeGreaterThan(0);
   });
 });
 

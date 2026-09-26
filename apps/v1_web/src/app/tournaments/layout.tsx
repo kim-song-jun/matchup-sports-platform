@@ -1,14 +1,9 @@
 import type { ReactNode } from 'react';
-import { buildPublicMetadata } from '@/lib/seo';
+import { buildTournamentListMetadata } from './tournament-list-metadata';
 
-const tournamentMetadata = buildPublicMetadata({
-  title: '스포츠 대회',
-  description: '모집 중인 스포츠 대회를 찾고 일정, 참가 조건, 경기 결과를 한곳에서 확인하세요.',
-  path: '/tournaments',
-});
-
+// 하위 라우트(상세·캠페인)의 기본값과 제목 템플릿. 목록 자체의 메타는 page.tsx 가 유형별로 정한다.
 export const metadata = {
-  ...tournamentMetadata,
+  ...buildTournamentListMetadata('all'),
   title: {
     default: '스포츠 대회',
     template: '%s | Teameet',

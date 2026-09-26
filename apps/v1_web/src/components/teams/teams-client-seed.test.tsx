@@ -1,15 +1,6 @@
 /**
  * /teams는 서버(SEO 프리렌더)가 이미 받아 둔 무필터 목록을 seed로 클라이언트에 넘긴다.
  *
- * seed 연결 전에는 TeamListPageClient가 자신의 로딩 스켈레톤(0건 상태)부터 그리고,
- * 서버가 이미 그려 둔 실제 목록은 버려졌다 — alpha 실측(2026-09-13): 팀 탭 진입 시
- * /api/v1/teams fetch만 인위적으로 2.5초 지연시켜 재현하면 "전체 0 · 회색 스켈레톤"이
- * 지연 시간만큼 그대로 떠 있다가 지연이 풀리는 순간에야 실제 목록으로 바뀌었다. 원인은
- * teams/page.tsx의 <Suspense fallback={<TeamListSsrView>}>가 실제로는 절대 보이지
- * 않는다는 것 — TeamListPageClient가 useSearchParams()를 쓰는 일반 클라이언트 컴포넌트라
- * 서버 렌더 시 실제로 suspend하지 않으므로, fallback이 아니라 클라이언트 자신의 빈 로딩
- * 상태가 항상 먼저 그려진다.
- *
  * useV1TeamDetail의 seed(placeholderData) 패턴을 그대로 재사용해 이 화면도 서버가 이미
  * 가진 값을 첫 화면부터 보여주게 한다. 단, URL에 필터(종목/성별/레벨/검색어/정렬)가
  * 걸려 있으면 seed(무필터 스냅샷)를 넘기지 않는다 — 필터링 안 된 결과를 필터링된
@@ -69,7 +60,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
     searchParamsMock.value = new URLSearchParams('');
     hookMocks.useV1TeamPages.mockReturnValue({
       data: { pages: [{ items: [], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false, total: 0 } }] },
-      isLoading: true,
+      isPending: false,
       isError: false,
       hasNextPage: false,
       isFetchingNextPage: false,
@@ -121,7 +112,7 @@ describe('TeamListPageClient — 서버 seed 연결', () => {
           pageInfo: { nextCursor: 'seed-1', hasNext: true, total: 52 },
         }],
       },
-      isLoading: false,
+      isPending: false,
       isError: false,
       hasNextPage: true,
       isFetchingNextPage: false,

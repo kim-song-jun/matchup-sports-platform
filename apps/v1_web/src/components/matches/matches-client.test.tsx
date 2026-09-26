@@ -338,7 +338,7 @@ describe('MatchListPageClient — 커서 페이지네이션 누적', () => {
       },
       isError: false,
       isFetching: false,
-      isLoading: false,
+      isPending: false,
     };
   }
 
@@ -348,7 +348,7 @@ describe('MatchListPageClient — 커서 페이지네이션 누적', () => {
       // countMatches/filteredMatches는 필터가 없을 때 enabled:false로 호출된다 — 목록에
       // 쓰이는 allMatches 호출(옵션 없음)만 페이지 데이터를 흉내낸다.
       if (options && options.enabled === false) {
-        return { data: undefined, isError: false, isFetching: false, isLoading: false };
+        return { data: undefined, isError: false, isFetching: false, isPending: true };
       }
       if (!filters?.cursor) {
         return page([{ id: 'm1', title: '매치 1', status: 'closed' }], 'cursor-page-2');
@@ -386,7 +386,7 @@ describe('MatchListPageClient — 희소 결과 인접 매치 레일', () => {
       data: { items, nextCursor: null, pageInfo: { nextCursor: null, hasNext: false } },
       isError: false,
       isFetching: false,
-      isLoading: false,
+      isPending: false,
     };
   }
   // 종목 필터가 걸린 상태를 만든다 — 그래야 결과(filteredMatches)와 무필터 풀(allMatches)이
@@ -394,7 +394,7 @@ describe('MatchListPageClient — 희소 결과 인접 매치 레일', () => {
   function mockLists(filtered: ReturnType<typeof item>[], pool: ReturnType<typeof item>[]) {
     useV1MatchesMock.mockImplementation((filters?: { sportId?: string }, options?: { enabled?: boolean }) => {
       if (options && options.enabled === false) {
-        return { data: undefined, isError: false, isFetching: false, isLoading: false };
+        return { data: undefined, isError: false, isFetching: false, isPending: true };
       }
       if (filters?.sportId) return ok(filtered);
       return ok(pool);

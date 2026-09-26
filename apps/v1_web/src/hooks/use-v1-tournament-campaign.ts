@@ -42,8 +42,10 @@ export function useV1TournamentCampaignsInfinite(params?: {
   limit?: number;
   sportCode?: string;
   enabled?: boolean;
+  /** 서버가 같은 조건으로 받아 둔 첫 페이지. 실제 요청은 그대로 돌고 그동안만 보인다. */
+  seed?: V1TournamentCampaignList;
 }) {
-  const { enabled, ...queryParams } = params ?? {};
+  const { enabled, seed, ...queryParams } = params ?? {};
   return useInfiniteQuery({
     queryKey: [...v1Keys.tournamentCampaigns(queryParams), 'infinite'] as const,
     queryFn: ({ pageParam }) =>
@@ -54,6 +56,7 @@ export function useV1TournamentCampaignsInfinite(params?: {
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     staleTime: 60_000,
+    placeholderData: seed ? { pages: [seed], pageParams: [null] } : undefined,
   });
 }
 

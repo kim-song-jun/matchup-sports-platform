@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import TournamentsPage from './page';
+import { TournamentsListPageClient as TournamentsPage } from './tournaments-list-client';
 
 /**
  * 대회 목록의 페이지 이동은 **화면 폭에 따라 서버에 다른 것을 묻는다** — 데스크톱은
@@ -21,7 +21,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1Tournaments: (...args: unknown[]) => tournamentsMock(...args),
-  useV1AllTournaments: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
+  useV1AllTournaments: () => ({ data: [], isPending: false, isError: false, refetch: vi.fn() }),
   useV1MasterSports: () => ({ data: [] }),
 }));
 
@@ -48,7 +48,7 @@ function listResult(over: {
 }) {
   return {
     data: { items: over.items, pageInfo: over.pageInfo },
-    isLoading: false,
+    isPending: false,
     isError: false,
     error: null,
     isFetching: over.isFetching ?? false,

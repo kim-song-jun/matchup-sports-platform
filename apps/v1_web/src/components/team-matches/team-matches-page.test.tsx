@@ -814,6 +814,35 @@ describe('상세 히어로 — 상대가 정해졌거나 끝난 매치는 "모�
 });
 
 /**
+ * 2026-09-26 alpha 감사 — CTA 상태줄 캡션이 항상 "신청 상태"였는데, 경기가 실제로 시작되면
+ * model.statusLabel 값이 modelLiveLabel()의 "진행 중"으로 바뀐다(경기 자체의 실시간 상태 —
+ * 신청 흐름과 무관한 축). 캡션은 값의 의미 축(statusLabelKind)을 따라야 한다.
+ */
+describe('상세 CTA 상태줄 캡션 — 값의 의미 축(신청/경기)에 따라 바뀐다', () => {
+  it('경기가 진행 중이면(statusLabelKind=match) 캡션이 "경기 상태"다', () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.statusLabel = '진행 중';
+    model.statusLabelKind = 'match';
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getAllByText('경기 상태').length).toBeGreaterThan(0);
+    expect(screen.queryByText('신청 상태')).not.toBeInTheDocument();
+  });
+
+  it('신청 흐름 상태(statusLabelKind 미지정)는 예전처럼 "신청 상태"를 보여준다(회귀 방지)', () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.match.status = 'closed';
+    model.statusLabel = '신청 마감';
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getAllByText('신청 상태').length).toBeGreaterThan(0);
+    expect(screen.queryByText('경기 상태')).not.toBeInTheDocument();
+  });
+});
+
+/**
  * 2026-08-25 사용자 보고 — 상세 우측 홈팀 카드의 "이상한 글씨들":
  * ① trustState 영문 원문("estimated")이 배지에 그대로 떴다 — API에 존재하지 않는
  *    gold/silver/bronze만 매핑하고 나머지를 원문 fall-through 하던 죽은 테이블이 원인.

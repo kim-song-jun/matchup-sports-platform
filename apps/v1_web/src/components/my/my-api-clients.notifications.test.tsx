@@ -354,4 +354,21 @@ describe('NotificationSettingsPageClient push toggle', () => {
 
     expect(screen.queryByRole('switch', { name: '푸시 알림 받기' })).not.toBeInTheDocument();
   });
+
+  it('설명 전용 카드 없이 분류 라벨 + 조작 카드 하나 + 각주로 보여준다 (P1 C안)', () => {
+    vi.mocked(useV1PushRegistration).mockReturnValue({
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+      permission: 'default',
+      isSubscribed: false,
+      isPending: false,
+    });
+    const { container } = renderWithClient(<NotificationSettingsPageClient />);
+
+    // 예전 설명 전용 카드 제목("받을 알림 고르기")은 사라지고 분류 라벨로 대체됐다.
+    expect(screen.queryByText('받을 알림 고르기')).not.toBeInTheDocument();
+    expect(screen.getByText('받을 알림')).toBeInTheDocument();
+    // 알림 종류 카드는 하나뿐이다(위 푸시 토글 카드와 합쳐 전체 tm-card 는 둘).
+    expect(container.querySelectorAll('.tm-card').length).toBe(2);
+  });
 });

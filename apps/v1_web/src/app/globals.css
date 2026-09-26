@@ -1644,6 +1644,13 @@ button:disabled {
   color: var(--text-caption);
 }
 
+/* [P1 C안 설정 각주] 설명 전용 카드를 조작 카드 하나로 접으며 밀려난 안내 문구의 착지 자리.
+   /my/settings/{player-card,tournament-real-name,notifications,record-consent,theme} 5개
+   화면이 전부 이 클래스 하나를 공유한다 -- 화면마다 마진을 따로 정하면 다시 갈린다. */
+.tm-my-settings-footnote {
+  margin: 8px 4px 0;
+}
+
 /* [대진표 12px 인라인 정리] 캡션(400)보다 한 단 강조가 필요하지만 3단계 라벨
    (tm-text-label, 13px)까지는 안 가는 짧은 굵은 보조 라벨(조 이름, "대진표 준비
    중" 같은 상태 타이틀)용. 크기·줄높이는 tm-text-caption과 동일하고 굵기·색만
@@ -8883,8 +8890,10 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 .tm-pcard-back-sec::before, .tm-pcard-back-sec::after {
   content: ''; flex: 1; height: 1px; background: rgba(255, 255, 255, 0.1);
 }
-/* 성향 태그 -- 2열 고정. 흘려 넣으면 줄바꿈이 들쭉날쭉해진다. */
-.tm-pcard-back-tags { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+/* 성향 태그 -- 가운데 정렬 줄바꿈(P4 B안, 2026-09-26). 2열 고정 그리드는 개수가 홀수면
+   마지막 칩이 왼쪽 칸에 혼자 남는 외톨이가 됐다 -- flex-wrap + 가운데 정렬은 칩이 제 폭만큼만
+   차지해 홀짝 어느 쪽이든 외톨이 칸이 생기지 않는다. */
+.tm-pcard-back-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
 .tm-pcard-tag {
   display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 0;
   padding: 4px 8px; border-radius: var(--radius-chip);
@@ -8905,6 +8914,15 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   font-variant-numeric: tabular-nums;
 }
 .tm-pcard-brow b[data-locked='true'] { color: #6f7a8a; }
+/* [P4 B안] 같은 해제 조건(예: "첫 경기 명단에 오르면 열려요")을 공유하는 잠긴 능력치를
+   한 묶음으로 접는다 -- 조건 문구는 묶음 머리에서 한 번만 말하고, 묶음 안 각 행은
+   아이콘 + 잠김 표시 + 지표 이름만 남긴다(색·폰트크기는 위 .tm-pcard-back-sec 과
+   같은 회색 -- 이미 선수 카드 9~11.5px 전용 디자인 언어 예외에 있는 색이라 새 대비
+   문제를 만들지 않는다, docs/design/a11y-decisions.md). */
+.tm-pcard-brow-group { display: grid; gap: 2px; }
+.tm-pcard-brow-group-head {
+  font-size: 9.5px; font-weight: 700; color: #6f7a8a; padding: 3px 0 1px 24px;
+}
 .tm-pcard-back-eq {
   margin: 4px auto 0; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 10px; color: #a9b3c2; line-height: 1.5; text-align: center; width: 72%;

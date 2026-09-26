@@ -10,10 +10,10 @@ import { KeyObject, sign as signPayload } from 'node:crypto';
  */
 export function signEs256Jwt(
   key: KeyObject,
-  header: Record<string, unknown>,
+  header: { kid: string },
   claims: Record<string, unknown>,
 ): string {
-  const signingInput = `${base64UrlJson({ alg: 'ES256', ...header })}.${base64UrlJson(claims)}`;
+  const signingInput = `${base64UrlJson({ alg: 'ES256', kid: header.kid })}.${base64UrlJson(claims)}`;
   const signature = signPayload('sha256', Buffer.from(signingInput), {
     key,
     dsaEncoding: 'ieee-p1363',

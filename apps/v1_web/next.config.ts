@@ -1,6 +1,9 @@
 import path from 'path';
 import type { NextConfig } from 'next';
 import bundleAnalyzer from '@next/bundle-analyzer';
+// 공개 export 가 없는 Next 내부 경로다. 업그레이드로 옮겨지면 config 로드가 실패해 빌드가 멈춘다(조용히 기본 봇을 잃지 않는다).
+import { HTML_LIMITED_BOT_UA_RE } from 'next/dist/shared/lib/router/utils/html-bots';
+import { buildHtmlLimitedBotsPattern } from './src/lib/crawler-agents';
 
 const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === 'true' });
 const isProd = process.env.NODE_ENV === 'production';
@@ -53,6 +56,9 @@ const nextConfig: NextConfig = {
   // matches the `/socket.io/:path*` rewrite below — so every realtime connection
   // 404s. Skipping the redirect lets the rewrite match the original request as-is.
   skipTrailingSlashRedirect: true,
+  // 여기 걸리는 UA 에는 메타데이터를 스트리밍하지 않고 <head> 를 완성해서 보낸다. 빠지면 콜드 렌더에서
+  // title·canonical·OG·JSON-LD 가 body 끝 스크립트로만 가서, JS 를 안 돌리는 AI 크롤러는 빈 head 를 본다.
+  htmlLimitedBots: buildHtmlLimitedBotsPattern(HTML_LIMITED_BOT_UA_RE),
   experimental: {
     // lucide-react는 134곳 전부 named import — 이 옵션 하나로 Next가 빌드 시점에
     // 개별 아이콘 딥 임포트로 자동 변환한다(호출부 수정 불필요).

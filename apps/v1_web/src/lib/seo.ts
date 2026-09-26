@@ -4,6 +4,34 @@ import type { ApiEnvelope } from '@/types/api';
 const DEFAULT_SITE_ORIGIN = 'https://teameet.co.kr';
 const DEFAULT_SOCIAL_IMAGE = '/brand/icon-512.png';
 
+export const NOTICES_FEED_PATH = '/notices/feed.xml';
+
+/**
+ * RSS 자동 발견 링크. Next 는 `alternates` 를 세그먼트마다 **통째로 교체**하므로, 레이아웃에만 두면
+ * canonical 을 선언하는 공개 페이지에서 사라진다 — 레이아웃과 buildPublicMetadata 가 같이 쓴다.
+ */
+export const SITE_FEED_ALTERNATE_TYPES = {
+  'application/rss+xml': [{ url: NOTICES_FEED_PATH, title: 'Teameet 공지사항' }],
+};
+
+/**
+ * 검색엔진 소유확인 메타(네이버·구글·빙). 정적 프리렌더 페이지(루트 `/` 포함)는 빌드 시점 값을 구워 두므로
+ * 이 변수들은 Docker build-arg 로도 넘겨야 한다(deploy/Dockerfile.v1-web). 빈 값은 태그를 내보내지 않는다.
+ */
+export function buildSiteVerification(): Metadata['verification'] | undefined {
+  const naver = process.env.NAVER_SITE_VERIFICATION?.trim();
+  const google = process.env.GOOGLE_SITE_VERIFICATION?.trim();
+  const bing = process.env.BING_SITE_VERIFICATION?.trim();
+  const other: Record<string, string> = {};
+  if (naver) other['naver-site-verification'] = naver;
+  if (bing) other['msvalidate.01'] = bing;
+  if (!google && Object.keys(other).length === 0) return undefined;
+  return {
+    ...(google ? { google } : {}),
+    ...(Object.keys(other).length > 0 ? { other } : {}),
+  };
+}
+
 type PublicMetadataInput = {
   title: string;
   description: string;
@@ -45,7 +73,7 @@ export function buildPublicMetadata({
   return {
     title,
     description,
-    alternates: { canonical: path },
+    alternates: { canonical: path, types: SITE_FEED_ALTERNATE_TYPES },
     robots: { index: true, follow: true },
     openGraph: {
       type,

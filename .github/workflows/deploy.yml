@@ -715,6 +715,9 @@ jobs:
             NEXT_PUBLIC_KAKAO_REDIRECT_URI=${{ secrets.KAKAO_REDIRECT_URI }}
             NEXT_PUBLIC_KAKAO_SCOPE=${{ vars.KAKAO_SCOPE }}
             NEXT_PUBLIC_GA_MEASUREMENT_ID=${{ secrets.GA_PROD }}
+            NAVER_SITE_VERIFICATION=${{ vars.NAVER_SITE_VERIFICATION }}
+            GOOGLE_SITE_VERIFICATION=${{ vars.GOOGLE_SITE_VERIFICATION }}
+            BING_SITE_VERIFICATION=${{ vars.BING_SITE_VERIFICATION }}
           cache-from: type=gha,scope=prod-v1-web
           cache-to: type=gha,mode=max,scope=prod-v1-web
           provenance: false

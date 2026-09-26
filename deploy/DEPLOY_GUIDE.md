@@ -72,6 +72,7 @@ test "$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:3013/v1/home)" 
 | `KAKAO_REDIRECT_URI` | Kakao OAuth callback, 선택 |
 | `V1_HOST_ADMIN_PASSWORD` | v1 host admin password |
 | `GA_PROD` | production GA4 Measurement ID, 선택 |
+| `NAVER_SITE_VERIFICATION` · `GOOGLE_SITE_VERIFICATION` · `BING_SITE_VERIFICATION` (repository **variable**) | 네이버 서치어드바이저·구글 서치콘솔·빙 웹마스터 소유확인 코드, 각각 선택. Web 이미지 build-arg 로만 들어가므로 값을 바꾼 뒤 **새 커밋의 이미지가 빌드돼야** 반영된다. alpha 에는 넘기지 않는다(다른 호스트) |
 | `VAPID_PUBLIC_KEY` | Web Push VAPID public key, 선택 (미설정 시 `WebPushService`가 graceful disable) |
 | `VAPID_PRIVATE_KEY` | Web Push VAPID private key, 선택 (미설정 시 `WebPushService`가 graceful disable) |
 | `VAPID_SUBJECT` | Web Push VAPID subject (`mailto:` 또는 `https:` URI), 선택 |

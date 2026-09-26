@@ -26,11 +26,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!fixture.data) return buildNoIndexMetadata('경기를 찾을 수 없어요');
 
   const { title, league, startsAt, place } = fixture.data;
+  // 주소의 leagueId 가 틀려도(깨진 링크) canonical 은 경기가 실제로 속한 리그를 가리킨다.
+  const canonical = league ? fixturePath(league.leagueId, fixtureId) : path;
   const parts = [league?.title ?? '정규 리그', formatTournamentDateTimeLong(startsAt), place?.name].filter(Boolean);
   return buildPublicMetadata({
     title,
     description: `${parts.join(' · ')}. 리그 경기의 일정과 결과를 확인해 보세요.`,
-    path,
+    path: canonical,
   });
 }
 
@@ -41,23 +43,24 @@ export default async function LeagueFixturePage({ params }: Props) {
   const { leagueId, fixtureId } = await params;
   const fixture = await loadPublic<V1TeamMatch>(fixtureApiPath(fixtureId));
   const detail = fixture.ok ? fixture.data : null;
+  // LD 는 주소가 아니라 경기가 실제로 속한 리그로 잇는다 — 리그가 아닌 경기면 리그 연결을 만들지 않는다.
+  const league = detail?.league ?? null;
   const eventLd = detail
-    ? buildTeamMatchEventLd(detail, fixtureId, {
-        path: fixturePath(leagueId, fixtureId),
-        superEventPath: leaguePath(leagueId),
-      })
+    ? buildTeamMatchEventLd(detail, fixtureId, league
+        ? { path: fixturePath(league.leagueId, fixtureId), superEventPath: leaguePath(league.leagueId) }
+        : { path: fixturePath(leagueId, fixtureId) })
     : null;
 
   return (
     <>
       {eventLd ? <JsonLd data={eventLd} /> : null}
-      {detail ? (
+      {detail && league ? (
         <JsonLd
           data={buildBreadcrumbLd([
             { name: '대회', path: '/tournaments' },
             { name: '정규 리그', path: '/tournaments?kind=league' },
-            { name: detail.league?.title ?? '리그', path: leaguePath(leagueId) },
-            { name: detail.title, path: fixturePath(leagueId, fixtureId) },
+            { name: league.title, path: leaguePath(league.leagueId) },
+            { name: detail.title, path: fixturePath(league.leagueId, fixtureId) },
           ])}
         />
       ) : null}

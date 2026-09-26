@@ -530,7 +530,9 @@ export const gameSchemaSourceManifest = {
   // normalized full-schema bytes after the admin team-match migration.
   // 2026-09-22 Task 172: additive shared record/history tables + V1Game relation.
   // The historical game-operations migration is unchanged; migration replay has no schema drift.
-  schema: '8f732248e1e0bf1882184dd35cec3d5a48a65ce5556c250de486c7e5955ebade',
+  // 2026-09-26: additive nullable V1AuthIdentity.providerRefreshTokenCiphertext (Apple token
+  // revoke), backed by 20260926090000_v1_auth_identity_apple_refresh_token. No game model changed.
+  schema: '46e4129e4e03b1d74a07bcd7411427b5826114fa2c97ee232db0d9fd8ee207a9',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

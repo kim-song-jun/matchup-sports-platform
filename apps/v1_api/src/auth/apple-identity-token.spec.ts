@@ -70,6 +70,7 @@ describe('verifyAppleIdentityToken', () => {
       ok: true,
       claims: {
         subject: '001234.abcdef.0000',
+        audience: AUDIENCE,
         email: 'someone@privaterelay.appleid.com',
         emailVerified: true,
         isPrivateEmail: true,
@@ -169,6 +170,18 @@ describe('verifyAppleIdentityToken', () => {
   it('does not accept the unhashed nonce', () => {
     expect(verify(sign({ ...validPayload(), nonce: NONCE })))
       .toEqual({ ok: false, reason: 'nonce_mismatch' });
+  });
+
+  /** The token-endpoint id_token skips only the nonce; every other check still applies. */
+  it('checks everything but the nonce for an id_token this server fetched itself', () => {
+    const { nonce, ...withoutNonce } = validPayload();
+    void nonce;
+
+    expect(verify(sign(withoutNonce), { expectedNonce: null })).toMatchObject({ ok: true });
+    expect(verify(sign(withoutNonce, { key: impostor.privateKey }), { expectedNonce: null }))
+      .toEqual({ ok: false, reason: 'bad_signature' });
+    expect(verify(sign({ ...withoutNonce, aud: 'com.someone.else' }), { expectedNonce: null }))
+      .toEqual({ ok: false, reason: 'wrong_audience' });
   });
 
   it('refuses a token with no subject to key the account on', () => {

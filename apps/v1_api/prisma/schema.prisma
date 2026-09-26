@@ -666,17 +666,19 @@ model V1UploadAsset {
 }
 
 model V1AuthIdentity {
-  id              String               @id @default(uuid())
-  userId          String               @map("user_id")
-  provider        V1AuthProvider
-  providerUserKey String               @map("provider_user_key")
-  email           String?
-  passwordHash    String?              @map("password_hash")
-  status          V1AuthIdentityStatus @default(active)
-  lastLoginAt     DateTime?            @map("last_login_at")
-  unlinkedAt      DateTime?            @map("unlinked_at")
-  createdAt       DateTime             @default(now()) @map("created_at")
-  updatedAt       DateTime             @updatedAt @map("updated_at")
+  id                             String               @id @default(uuid())
+  userId                         String               @map("user_id")
+  provider                       V1AuthProvider
+  providerUserKey                String               @map("provider_user_key")
+  email                          String?
+  passwordHash                   String?              @map("password_hash")
+  /// Sign in with Apple refresh token, AES-256-GCM sealed (apple-token-cipher.ts). Kept only to revoke on withdrawal.
+  providerRefreshTokenCiphertext String?              @map("provider_refresh_token_ciphertext")
+  status                         V1AuthIdentityStatus @default(active)
+  lastLoginAt                    DateTime?            @map("last_login_at")
+  unlinkedAt                     DateTime?            @map("unlinked_at")
+  createdAt                      DateTime             @default(now()) @map("created_at")
+  updatedAt                      DateTime             @updatedAt @map("updated_at")
 
   user V1User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

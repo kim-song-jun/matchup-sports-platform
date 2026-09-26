@@ -9,6 +9,7 @@ import {
   verifyAppleIdentityToken,
   type AppleIdentityClaims,
   type AppleJsonWebKey,
+  type AppleTokenVerification,
 } from './apple-identity-token';
 
 /**
@@ -117,9 +118,28 @@ export class AppleIdentityService {
       throw this.unauthorized();
     }
 
+    const result = await this.verifyAgainstAppleKeys(identityToken, nonce);
+    if (!result.ok) {
+      this.logger.warn({ reason: result.reason }, 'Apple identity token refused');
+      throw this.unauthorized();
+    }
+    return result.claims;
+  }
+
+  /**
+   * Verifies the id_token Apple's token endpoint returned alongside a refresh token — same
+   * signature, issuer, audience and lifetime checks, minus the nonce (see `expectedNonce`).
+   * Returns the rejection instead of throwing: the caller only decides whether to store.
+   */
+  async verifyExchangedIdToken(idToken: string): Promise<AppleTokenVerification> {
+    if (this.audiences.length === 0) return { ok: false, reason: 'wrong_audience' };
+    return this.verifyAgainstAppleKeys(idToken, null);
+  }
+
+  private async verifyAgainstAppleKeys(token: string, nonce: string | null): Promise<AppleTokenVerification> {
     const attempt = async (keys: readonly AppleJsonWebKey[]) =>
       verifyAppleIdentityToken({
-        token: identityToken,
+        token,
         keys,
         audiences: this.audiences,
         expectedNonce: nonce,
@@ -134,12 +154,7 @@ export class AppleIdentityService {
     if (!result.ok && result.reason === 'unknown_key') {
       result = await attempt(await this.signingKeys({ force: true }));
     }
-
-    if (!result.ok) {
-      this.logger.warn({ reason: result.reason }, 'Apple identity token refused');
-      throw this.unauthorized();
-    }
-    return result.claims;
+    return result;
   }
 
   private unauthorized(): UnauthorizedException {

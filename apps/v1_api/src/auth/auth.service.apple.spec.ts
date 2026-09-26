@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { V1AuthProvider } from '@prisma/client';
 import { AppleIdentityService } from './apple-identity.service';
+import { AppleTokenService } from './apple-token.service';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ManagedTermsRuntimeService } from '../terms/managed-terms-runtime.service';
@@ -21,6 +22,7 @@ describe('AuthService.appleSignIn', () => {
   let service: AuthService;
   let prisma: ReturnType<typeof buildPrismaMock>;
   const appleIdentity = { verifyIdentityToken: jest.fn(), issueNonce: jest.fn() };
+  const appleTokens = { storeFromAuthorizationCode: jest.fn() };
 
   function buildPrismaMock() {
     return {
@@ -33,6 +35,7 @@ describe('AuthService.appleSignIn', () => {
 
   const claims = (overrides: Partial<{ subject: string; email: string | null; emailVerified: boolean; isPrivateEmail: boolean }> = {}) => ({
     subject: SUBJECT,
+    audience: 'kr.co.teameet.alpha',
     email: 'zzz@privaterelay.appleid.com',
     emailVerified: true,
     isPrivateEmail: true,
@@ -58,6 +61,7 @@ describe('AuthService.appleSignIn', () => {
         },
         { provide: PhoneVerificationService, useValue: { enabled: false } },
         { provide: AppleIdentityService, useValue: appleIdentity },
+        { provide: AppleTokenService, useValue: appleTokens },
       ],
     }).compile();
 
@@ -250,5 +254,49 @@ describe('AuthService.appleSignIn', () => {
     await expect(signIn()).rejects.toThrow('refused');
     expect(prisma.v1AuthIdentity.findUnique).not.toHaveBeenCalled();
     expect(prisma.v1User.create).not.toHaveBeenCalled();
+  });
+
+  describe('authorization code', () => {
+    const signInWithCode = () =>
+      service.appleSignIn({ identityToken: 'token', nonce: 'nonce', authorizationCode: 'code-123456' });
+
+    it('is exchanged under the audience the token was minted for, after the session exists', async () => {
+      appleIdentity.verifyIdentityToken.mockResolvedValue(claims());
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.findUnique.mockResolvedValue(null);
+      prisma.v1User.create.mockResolvedValue({ id: 'user-1', email: null });
+
+      await signInWithCode();
+
+      expect(appleTokens.storeFromAuthorizationCode).toHaveBeenCalledWith({
+        subject: SUBJECT,
+        clientId: 'kr.co.teameet.alpha',
+        authorizationCode: 'code-123456',
+      });
+      expect(prisma.v1User.create.mock.invocationCallOrder[0])
+        .toBeLessThan(appleTokens.storeFromAuthorizationCode.mock.invocationCallOrder[0]);
+    });
+
+    it('is not exchanged when the sign-in itself is refused', async () => {
+      appleIdentity.verifyIdentityToken.mockResolvedValue(claims());
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue({
+        id: 'identity-1',
+        status: 'active',
+        user: { id: 'user-1', email: null, accountStatus: 'withdrawal_pending' },
+      });
+
+      await expect(signInWithCode()).rejects.toBeInstanceOf(ForbiddenException);
+      expect(appleTokens.storeFromAuthorizationCode).not.toHaveBeenCalled();
+    });
+
+    it('is optional: an older shell that sends no code still signs in', async () => {
+      appleIdentity.verifyIdentityToken.mockResolvedValue(claims());
+      prisma.v1AuthIdentity.findUnique.mockResolvedValue(null);
+      prisma.v1User.findUnique.mockResolvedValue(null);
+      prisma.v1User.create.mockResolvedValue({ id: 'user-1', email: null });
+
+      await expect(signIn()).resolves.toBeDefined();
+      expect(appleTokens.storeFromAuthorizationCode).not.toHaveBeenCalled();
+    });
   });
 });

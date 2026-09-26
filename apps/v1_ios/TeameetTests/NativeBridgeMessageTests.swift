@@ -70,6 +70,24 @@ final class NativeBridgeMessageTests: XCTestCase {
         XCTAssertTrue(script.contains("jwt.value.here"))
     }
 
+    /// The server exchanges the code for the refresh token it revokes when the account is deleted.
+    func testAppleReplyForwardsTheAuthorizationCode() {
+        let script = NativeBridge.appleResultScript(
+            requestId: "r1", identityToken: "jwt.value.here", authorizationCode: "c0de.value",
+            fullName: nil, error: nil)
+
+        XCTAssertTrue(script.contains("\"authorizationCode\":\"c0de.value\""))
+    }
+
+    /// Without a code the key is left out entirely rather than sent empty.
+    func testAppleReplyOmitsAMissingAuthorizationCode() {
+        let script = NativeBridge.appleResultScript(
+            requestId: "r1", identityToken: "jwt.value.here", authorizationCode: nil,
+            fullName: nil, error: nil)
+
+        XCTAssertFalse(script.contains("authorizationCode"))
+    }
+
     /// A cancelled sheet is reported as "nothing happened", not as a failure to show someone.
     func testAppleReplyReportsCancellationWithoutAnError() {
         let script = NativeBridge.appleResultScript(

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { AccountRecoveryController } from './account-recovery.controller';
 import { AccountRecoveryService } from './account-recovery.service';
 import { AuthController } from './auth.controller';
-import { AppleIdentityService } from './apple-identity.service';
+import { AppleTokenModule } from './apple-token.module';
 import { AuthService } from './auth.service';
 import { OptionalV1AuthGuard } from './optional-v1-auth.guard';
 import { PhoneVerificationPublicController } from './phone-verification-public.controller';
@@ -12,11 +12,10 @@ import { TermsModule } from '../terms/terms.module';
 import { VerificationModule } from '../verification/verification.module';
 
 @Module({
-  imports: [TermsModule, VerificationModule],
+  imports: [TermsModule, VerificationModule, AppleTokenModule],
   controllers: [AuthController, PhoneVerificationPublicController, AccountRecoveryController],
   providers: [
     AuthService,
-    AppleIdentityService,
     AccountRecoveryService,
     V1AuthGuard,
     OptionalV1AuthGuard,

@@ -378,7 +378,6 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
       <div className="tm-team-match-detail-desktop tm-content-enter">
         {/* LEFT: VS hero + info */}
         <div className="tm-team-match-detail-left">
-          {recordEntry}
           <article className="tm-match-detail">
             {/* 사진이 없으면(match.imageUrl===null) 목업 사진(team-huddle.webp) 대신 종목
                 그래픽을 그린다 — matches-page.tsx MatchDetailPageView 의 -sport 변형과 같은
@@ -393,7 +392,7 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
                 backgroundSize: 'cover',
               } : undefined}
             >
-              {match.imageUrl ? null : <SportIllustration sport={match.sport} sizes="120px" className={`tm-team-vs-hero-illustration${awaitingPlatformTeams ? ' tm-team-vs-hero-illustration-recruiting' : ''}`} />}
+              {match.imageUrl ? null : <SportIllustration sport={match.sport} sizes="120px" className="tm-team-vs-hero-illustration" />}
               {/* Mobile-only back + action buttons inside hero (hidden on desktop) */}
               <div className="tm-hide-desktop" style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Link className="tm-btn tm-btn-icon tm-btn-ghost tm-hero-button" href={model.detailBackHref ?? '/team-matches'} aria-label="뒤로가기">
@@ -448,6 +447,9 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
               {/* P2: 완료 피드백 .tm-complete-check 마이크로인터랙션 */}
               {heroMessage ? <div className="tm-text-caption tm-complete-check" role="status" style={{ color: 'var(--overlay-white-86)', marginTop: 8 }}>{heroMessage}</div> : null}
             </div>
+            {/* 히어로(뒤로가기 포함) 바로 다음 — 예전엔 article 앞(뒤로가기 줄보다 먼저)에 있어
+                모바일에서 진행 상황 카드가 내비게이션보다 먼저 나왔다(alpha 실측 2026-09-26). */}
+            {recordEntry}
             <div className="tm-match-detail-body">
               {/* ── 그룹 1: 일정 · 장소 ── */}
               <div className="tm-info-group">

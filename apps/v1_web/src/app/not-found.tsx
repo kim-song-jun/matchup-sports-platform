@@ -1,9 +1,13 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AppChrome } from '@/components/v1-ui/shell';
+import { buildNoIndexMetadata } from '@/lib/seo';
 
 // 전역 404. 이 파일이 없으면 Next.js 기본 화면(영문 "This page could not be found",
 // 링크 0개)이 떠서 만료·삭제된 링크로 들어온 사용자가 완전히 갇힌다.
 // activeTab 은 지정하지 않는다 — 404 는 5개 탭 어디에도 속하지 않으므로 활성 탭이 없어야 한다.
+export const metadata: Metadata = buildNoIndexMetadata('페이지를 찾을 수 없어요');
+
 export default function NotFound() {
   return (
     <AppChrome title="" showNotifications={false}>

@@ -105,7 +105,10 @@ describe('선수 카드 숨김 설정', () => {
 
     expect(screen.getByText(/켜면 어디에도 표시되지 않아요/)).toBeInTheDocument();
     expect(screen.getByText(/마이페이지·공개 프로필·공유 화면/)).toBeInTheDocument();
-    expect(screen.queryByText(/숨기면.*카드가 보이지 않아요/)).not.toBeInTheDocument();
+    // [\s\S]* — JSX 멀티라인 텍스트가 실제 개행 문자를 담을 가능성까지 대비한다.
+    // `.`는 기본적으로 개행을 매칭하지 않아, 그 경우 이 부정 단언이 실제로는 아무것도
+    // 검증하지 못한 채 항상 통과할 수 있다(Copilot 리뷰).
+    expect(screen.queryByText(/숨기면[\s\S]*카드가 보이지 않아요/)).not.toBeInTheDocument();
   });
 
   it('저장에 실패하면 조용히 넘어가지 않고 화면에 말한다', async () => {

@@ -220,6 +220,29 @@ describe('startLandingMotion — 투어 동기화(sticky 폰이 보일 때)', ()
     expect(clock.textContent).toBe('27:10'); // 다른 스텝으로 넘어가면 멈춘다
   });
 
+  it('addEventListener 가 없는 MediaQueryList(Safari < 14)에서도 addListener 로 폭 변화를 따라간다', () => {
+    let stage = false;
+    const listeners = new Set<() => void>();
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      get matches() { return query === TOUR_STAGE_QUERY ? stage : false; },
+      media: query,
+      addListener: (fn: () => void) => listeners.add(fn),
+      removeListener: (fn: () => void) => listeners.delete(fn),
+    }));
+    const root = mount(html);
+    const stop = startLandingMotion(root);
+    const tour = root.querySelector<HTMLElement>('[data-tour]')!;
+    expect(tour.dataset.sync).toBeUndefined();
+
+    stage = true;
+    listeners.forEach((fn) => fn());
+    fire(root.querySelector('#s1')!, true);
+    expect(root.querySelector<HTMLElement>('#s1')!.dataset.on).toBe('true');
+
+    stop();
+    expect(listeners.size).toBe(0);
+  });
+
   it('sticky 폰이 없는 창에서는 스텝을 동기화하지 않는다', () => {
     stubMedia(false, false);
     const root = mount(html);

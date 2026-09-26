@@ -190,10 +190,18 @@ export function startLandingMotion(root: HTMLElement): () => void {
       tourIO = io;
     };
     sync();
-    stageQuery.addEventListener('change', sync);
+    // Safari < 14 MediaQueryList has only the legacy addListener/removeListener.
+    const legacyStageQuery = stageQuery as MediaQueryList & {
+      addListener?: (listener: () => void) => void;
+      removeListener?: (listener: () => void) => void;
+    };
+    const modernListeners = typeof stageQuery.addEventListener === 'function';
+    if (modernListeners) stageQuery.addEventListener('change', sync);
+    else legacyStageQuery.addListener?.(sync);
     cleanups.push(() => {
       tourIO?.disconnect();
-      stageQuery.removeEventListener('change', sync);
+      if (modernListeners) stageQuery.removeEventListener('change', sync);
+      else legacyStageQuery.removeListener?.(sync);
     });
   }
 

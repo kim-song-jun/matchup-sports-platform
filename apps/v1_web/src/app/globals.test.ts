@@ -12,7 +12,7 @@ describe('mobile floating action button layout', () => {
 
     expect(rule).toBeDefined();
     expect(rule).toMatch(
-      /bottom:\s*calc\(var\(--v1-shell-bottom-nav-height\)\s*\+\s*var\(--v1-shell-safe-bottom\)\s*\+\s*18px\)/,
+      /bottom:\s*calc\(var\(--v1-shell-bottom-nav-height\)\s*\+\s*var\(--v1-shell-safe-bottom\)\s*\+\s*var\(--v1-shell-fab-gap\)\)/,
     );
   });
 });

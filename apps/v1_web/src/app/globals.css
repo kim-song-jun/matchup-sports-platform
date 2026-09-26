@@ -3271,6 +3271,12 @@ label.tm-btn:focus-within {
   color: var(--text-muted);
 }
 
+/* .tm-badge-grey 다크 오버라이드(grey100=카드 표면과 같아지는 값이라 grey150으로 올림)를
+   그대로 반복한다 — 위 규칙만 두면 라이트만 형제 배지와 같고 다크는 어긋난다. */
+:root.dark .tm-match-detail-hero-stack .tm-match-detail-sport-badge {
+  background: var(--grey150);
+}
+
 @media (min-width: 1024px) {
   .tm-match-hero-graphic {
     padding: 16px;

@@ -230,6 +230,24 @@ describe('MatchListPageView — 신청 마감 카드 구분', () => {
     expect(screen.queryByText('모집 완료')).not.toBeInTheDocument();
     expect(container.querySelector('.tm-card-closed')).toBeNull();
   });
+
+  /**
+   * [P2 Copilot 리뷰 회귀 방지] deadlineAt 자체가 없는 매치(예: 정원 마감이지 마감
+   * 시각이 없는 경우)는 formatDeadlineDetail이 '경기 시작 전까지'로 떨어진다 — 닫힌
+   * 카드 우하단에 그 문구를 그대로 노출하면 "닫혔다"는 배지와 "경기 시작 전까지"
+   * (아직 열려 있다는 뜻)가 서로 모순된다. deadline 캡션이 비어 있으면(=deadlineAt
+   * 없음) 실제 시각으로 바꾸지 않고 기존 actionLabel을 유지한다.
+   */
+  it('마감 시각 자체가 없는 닫힌 카드는 우하단에 "경기 시작 전까지"를 보여주지 않고 actionLabel을 유지한다', () => {
+    render(
+      <MatchListPageView
+        model={modelWithSingleCard({ status: 'full', current: 6, capacity: 6, deadline: '', deadlineDetail: '경기 시작 전까지', actionLabel: '모집 완료' })}
+      />,
+    );
+
+    expect(screen.queryByText('경기 시작 전까지')).not.toBeInTheDocument();
+    expect(screen.getAllByText('모집 완료').length).toBeGreaterThan(0);
+  });
 });
 
 // motion-audit 그룹6(F1 desktop card hover) — 데스크톱 매치 리스트 카드는 tm-pressable

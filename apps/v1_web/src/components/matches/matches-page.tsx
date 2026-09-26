@@ -821,8 +821,11 @@ function MatchRowItem({ match }: { match: MatchCardModel }) {
             /{match.capacity}명 · {match.host}
           </span>
           {/* [P2] closedLabel 이 있으면 배지가 이미 상태를 말했다 — 여기서 같은 상태
-              단어(actionLabel)를 또 붙이지 않고 실제 마감 시각(사실)으로 바꾼다. */}
-          <span className="tm-text-label tm-match-row-act">{closedLabel ? match.deadlineDetail : match.actionLabel}</span>
+              단어(actionLabel)를 또 붙이지 않고 실제 마감 시각(사실)으로 바꾼다.
+              단, deadlineAt 자체가 없는 매치(match.deadline==='')는 deadlineDetail이
+              '경기 시작 전까지'로 떨어져 "닫힘"과 모순되는 문구가 되므로 그때는
+              actionLabel을 그대로 둔다(Copilot 리뷰 지적). */}
+          <span className="tm-text-label tm-match-row-act">{closedLabel && match.deadline ? match.deadlineDetail : match.actionLabel}</span>
         </div>
       </div>
     </Link>
@@ -900,8 +903,8 @@ function MatchCardItem({ match }: { match: MatchCardModel }) {
         </div>
         <div className="tm-match-list-footer">
           <span className="tm-text-caption">{match.region} · {match.host}</span>
-          {/* [P2] MatchRowItem과 동일 원칙 — 배지가 상태를 이미 말했으면 실제 마감 시각으로. */}
-          <span className="tm-text-label">{closedLabel ? match.deadlineDetail : match.actionLabel}</span>
+          {/* [P2] MatchRowItem과 동일 원칙(deadlineAt 없는 매치는 actionLabel 유지, Copilot 리뷰 지적). */}
+          <span className="tm-text-label">{closedLabel && match.deadline ? match.deadlineDetail : match.actionLabel}</span>
         </div>
       </div>
     </Link>

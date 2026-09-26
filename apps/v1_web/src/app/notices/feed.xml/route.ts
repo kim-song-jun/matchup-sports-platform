@@ -10,7 +10,9 @@ export const revalidate = 0;
 
 export async function GET(): Promise<Response> {
   const page = await fetchPublicV1<V1NoticesResponse>('/notices');
-  const items = (page?.notices ?? []).flatMap(renderItem);
+  // fetchPublicV1 은 404 를 null 로 돌려준다 — 목록 엔드포인트의 404 는 "공지 0건"이 아니라 경로 오류다.
+  if (!page) throw new Error('SEO metadata request failed: /notices (404)');
+  const items = page.notices.flatMap(renderItem);
 
   const xml = [
     '<?xml version="1.0" encoding="UTF-8"?>',

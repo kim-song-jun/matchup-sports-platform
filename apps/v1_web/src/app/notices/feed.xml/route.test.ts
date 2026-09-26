@@ -64,4 +64,9 @@ describe('GET /notices/feed.xml', () => {
     fetchPublicV1.mockRejectedValue(new Error('SEO metadata request failed: /notices (503)'));
     await expect(GET()).rejects.toThrow('/notices (503)');
   });
+
+  it('목록 API 가 404(null)면 빈 피드가 아니라 오류로 끝난다', async () => {
+    fetchPublicV1.mockResolvedValue(null);
+    await expect(GET()).rejects.toThrow('/notices (404)');
+  });
 });

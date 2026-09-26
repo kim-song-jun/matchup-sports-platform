@@ -89,6 +89,18 @@ describe('tournament campaign proxy', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('does not turn the notices RSS feed into a 404 just because it sits under /notices/:id', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(config.matcher).toContain('/notices/:id');
+    const response = await proxy(detailRequest('/notices/feed.xml'));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('rejects malformed public detail ids without calling the API', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

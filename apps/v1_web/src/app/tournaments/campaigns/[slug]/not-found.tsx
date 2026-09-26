@@ -1,4 +1,6 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { buildNoIndexMetadata } from '@/lib/seo';
 import styles from '@/components/tournaments/tournament-campaign-template.module.css';
 
 // campaigns/page.tsx와 짝을 이루는 not-found. notFound()가 던져진 그 URL 그대로
@@ -9,6 +11,8 @@ import styles from '@/components/tournaments/tournament-campaign-template.module
 // 완전히 같다. 이 화면엔 검색 파라미터 의존 backHref가 없으므로(notFound()는 페이지
 // 렌더가 실패한 시점에 던져지고, 그 시점의 backHref 계산은 이미 버려진다) page.tsx와
 // 달리 CampaignChromeBridge/override 없이도 회귀가 없다 — 셀프 AppChrome은 걷어낸다.
+export const metadata: Metadata = buildNoIndexMetadata('공개된 대회 캠페인을 찾을 수 없어요');
+
 export default function TournamentCampaignNotFound() {
   return (
     <section className={styles.notFound} aria-labelledby="campaign-not-found-title">

@@ -323,7 +323,12 @@ describe('LeagueMatchStandingsClient', () => {
     expect(screen.getByText('최종 순위')).toBeInTheDocument();
   });
 
-  it('미확정 경기 목록의 각 항목이 리그 경기 상세 링크로 연결된다', async () => {
+  /**
+   * [P2] "확인 중" 배너가 21경기를 팀명·날짜로 다시 나열하던 것(바로 아래 "경기 일정"
+   * 섹션과 완전히 중복)을 없앤다 — 배너는 한 줄 요약 + "경기 일정에서 보기" 링크만 남고,
+   * 개별 대진 링크(a[href=".../fixtures/:id"])는 배너 안에서 더 이상 만들어지지 않는다.
+   */
+  it('미확정 경기 배너는 팀명·날짜를 다시 나열하지 않고 "경기 일정에서 보기" 한 줄로 요약한다', async () => {
     useV1ActivePopupMock.mockReturnValue({ data: undefined, isPending: false } as never);
     useV1LeagueMatchMock.mockReturnValue({
       data: { leagueId: 'league-1', title: '가을 리그', state: 'active', startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-10-20T00:00:00.000Z', teamIds: ['t1', 't2'], fixtures: [] },
@@ -348,10 +353,9 @@ describe('LeagueMatchStandingsClient', () => {
     );
 
     await waitFor(() => expect(screen.getByText('확인 중')).toBeInTheDocument());
-    const pendingLink = container.querySelector('a[href="/league-matches/league-1/fixtures/tm-1"]');
-    expect(pendingLink).toBeInTheDocument();
-    expect(pendingLink?.textContent).toContain('성수 FC');
-    expect(pendingLink?.textContent).toContain('망원 FC');
+    // 배너 안에는 더 이상 개별 대진 링크가 없다 — 목록의 주인 자리는 "경기 일정" 섹션 하나다.
+    expect(container.querySelector('a[href="/league-matches/league-1/fixtures/tm-1"]')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '경기 일정에서 보기' })).toBeInTheDocument();
   });
 
   it('취소된 대진은 점수 대신 "집계 제외"로 표시한다', async () => {

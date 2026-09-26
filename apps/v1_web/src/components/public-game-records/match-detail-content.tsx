@@ -252,7 +252,7 @@ function EventsSection({
   const periodNumbers = Array.from(byPeriod.keys()).sort((a, b) => a - b);
 
   return (
-    <div role="list" aria-label="경기 기록" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div role="list" aria-label="득점·카드" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {periodNumbers.map((period) => {
         const headingId = `match-events-period-${period}`;
         return (
@@ -444,8 +444,10 @@ export function MatchDetailContent({ data, from }: { data: PublicMatchDetail; fr
         </section>
       ) : null}
 
+      {/* [P2] 페이지 제목이 이미 "경기 기록"이다 — 섹션 제목은 실제 내용(골·자책골·
+          카드, eventPresentation 참고)을 그대로 말한다. */}
       <section>
-        <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>경기 기록</h3>
+        <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>득점·카드</h3>
         <Card pad={16}>
           <EventsSection events={data.events} isStatusOnly={isStatusOnly} />
         </Card>

@@ -16,6 +16,7 @@ import {
   useV1MyRegistrations,
 } from '@/hooks/use-v1-api';
 import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
+import { ChevronRightIcon } from '@/components/v1-ui/icons';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { extractErrorMessage } from '@/lib/error-message';
 import { hasStoredV1Session, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
@@ -914,25 +915,18 @@ export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: str
               <span className="font-medium text-[var(--text-strong)]">확인 중</span>
               <span>— {standings.pendingFixtures.length}경기가 아직 결과 확정 전이에요</span>
             </div>
-            <ul className="mt-2 space-y-1">
-              {standings.pendingFixtures.map((fixture) => (
-                <li key={fixture.teamMatchId}>
-                  <Link
-                    href={`/league-matches/${leagueId}/fixtures/${fixture.teamMatchId}`}
-                    className="tm-pressable flex min-h-[44px] flex-wrap items-center justify-between gap-2 rounded-lg px-2 text-sm text-[var(--text-strong)] hover:bg-[var(--grey100)]"
-                  >
-                    <span className="inline-flex flex-wrap items-center gap-2">
-                      <FixtureTeamLabel teamId={fixture.homeTeamId} lookup={teamLookup} fallback="홈팀 정보 없음" />
-                      <span aria-hidden="true" className="text-[var(--text-muted)]">vs</span>
-                      <FixtureTeamLabel teamId={fixture.awayTeamId} lookup={teamLookup} fallback="상대팀 미정" />
-                    </span>
-                    <span className="text-[var(--text-muted)]">
-                      {formatTournamentDateTimeShort(fixture.startAt) ?? '일정 미정'}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {/* [P2] 미확정 경기를 팀명·날짜로 다시 나열하지 않는다 — 그 목록의 주인 자리는
+                바로 아래 "경기 일정" 섹션 하나다. 여기는 요약 한 줄 + 그 목록으로 보내는
+                링크만 남긴다. 해시 앵커(<a href="#...">)는 히스토리 항목을 남기므로 위
+                scrollToSchedule과 같은 스크롤 전용 button을 쓴다. */}
+            <button
+              type="button"
+              onClick={scrollToSchedule}
+              className="tm-pressable mt-2 flex min-h-[44px] w-full items-center justify-between rounded-lg px-2 text-sm font-semibold text-[var(--blue700)] hover:bg-[var(--blue50)]"
+            >
+              경기 일정에서 보기
+              <ChevronRightIcon size={16} strokeWidth={2} aria-hidden="true" />
+            </button>
           </div>
         )}
       </section>

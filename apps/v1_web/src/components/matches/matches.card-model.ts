@@ -46,8 +46,8 @@ export function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCard
     image: match.imageUrl ?? null,
     costNote: match.costNote ?? null,
     status,
-    deadline: formatDeadline(match.deadlineAt, status),
-    deadlineDetail: formatDeadlineDetail(match.deadlineAt, status),
+    deadline: formatDeadline(match.deadlineAt),
+    deadlineDetail: formatDeadlineDetail(match.deadlineAt),
     actionLabel: actionLabel(status),
   };
 }
@@ -160,28 +160,27 @@ export function actionLabel(status: MatchCardModel['status']) {
   return '참가 신청';
 }
 
-export function formatDeadline(value: string | null | undefined, status: MatchCardModel['status']) {
-  if (status === 'pending') return '승인 대기';
-  if (status === 'approved') return '승인 완료';
-  if (status === 'full') return '신청 마감';
-  if (status === 'mine') return '내 매치';
-  if (!value) return '신청 가능';
-
+/**
+ * [P2] 신청 마감까지 남은 시간(캡션용) — 뷰어 상태(status)로 갈아치우지 않는다. 예전에는
+ * status==='full' 이면 마감 시각과 무관하게 '신청 마감'을 그대로 반환해, 정작 언제 마감됐는지
+ * 보여주는 자리(InfoRow의 value=formatDeadlineDetail)까지 같은 캔드 문구로 덮여 있었다
+ * (알린 시각을 어디에서도 알 수 없었다). 값이 없으면 빈 문자열 — InfoRow의 sub는 falsy면
+ * 렌더하지 않으므로 캡션 없이 label+value(경기 시작 전까지)만 남는다.
+ */
+export function formatDeadline(value: string | null | undefined): string {
+  if (!value) return '';
   const deadline = new Date(value);
-  if (Number.isNaN(deadline.getTime())) return '신청 가능';
+  if (Number.isNaN(deadline.getTime())) return '';
   const diffMs = deadline.getTime() - Date.now();
-  if (diffMs <= 0) return '신청 마감';
+  if (diffMs <= 0) return '지났어요';
   const diffHours = Math.ceil(diffMs / 3_600_000);
   if (diffHours < 24) return `마감 ${diffHours}시간 전`;
   const diffDays = Math.ceil(diffHours / 24);
   return `마감 ${diffDays}일 전`;
 }
 
-export function formatDeadlineDetail(value: string | null | undefined, status: MatchCardModel['status']) {
-  if (status === 'pending') return '승인 대기';
-  if (status === 'approved') return '승인 완료';
-  if (status === 'full') return '신청 마감';
-  if (status === 'mine') return '내 매치';
+/** [P2] 신청 마감 실제 시각(값 슬롯) — 지났든 남았든 항상 실제 날짜·시각을 보여준다. */
+export function formatDeadlineDetail(value: string | null | undefined): string {
   if (!value) return '경기 시작 전까지';
 
   const deadline = new Date(value);

@@ -500,28 +500,6 @@ function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail 
   );
 }
 
-/**
- * 하단 CTA가 실제로 뷰포트에 들어왔는지 감지 — 상단 스티키 CTA와 하단 CTA가 동시에
- * 화면에 보이지 않게 하려는 용도(오너 요구: "CTA 가 화면에 동시에 2개 보이면 안 된다").
- * 방향을 "하단이 보이면 상단을 끈다"로 잡은 이유: position:sticky는 자기 컨테이너가
- * 끝나기 전까지 계속 화면에 붙어 있는 게 정상 동작이라, 실행 가능한 유일한 신호는
- * "하단 CTA가 실제로 뷰포트에 들어왔다"는 이벤트뿐이다. IntersectionObserver로
- * 하단 CTA 엘리먼트의 실제 노출 여부를 관찰한다(스크롤 리스너 + getBoundingClientRect
- * 폴링보다 가볍고, 스크롤 컨테이너가 `.tm-scroll-area`(모바일)든 문서(데스크톱)든
- * root 를 명시하지 않아도 실제 클리핑을 그대로 따라간다).
- */
-function useIsInViewport(ref: React.RefObject<HTMLElement | null>): boolean {
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [ref]);
-  return visible;
-}
-
 /* ── Entry point ── */
 
 export function TournamentDetailPageClient({ tournamentId }: { tournamentId: string }) {
@@ -717,11 +695,11 @@ export function TournamentDetailView({
   })();
   const hasAnnouncements = allAnnouncements.length > 0;
 
-  /* ── 통합 진입 CTA(상단 스티키 + 하단, §A-3·4·5) — 모바일/태블릿 전용.
-     데스크탑은 railCTA가 이미 항상 보이는 sticky 패널이라 별도 처리가 필요 없다. */
+  /* ── 통합 진입 CTA(상단 스티키 하나, §A-3·4·5) — 모바일/태블릿 전용, 데스크탑은
+     railCTA가 대신한다. [P2] 페이지 맨 끝에 같은 CTA(같은 href /bracket)를 하나 더
+     두고 IntersectionObserver로 서로 안 겹치게 껐었는데, 하단 CTA를 없애 그 관측
+     로직째로 지운다 — 오너 요구("CTA 동시 노출 금지")는 하나만 있으면 자동으로 지켜진다. */
   const bracketCtaLabel = getBracketEntryCtaLabel(tournament.status, isLeagueMirror);
-  const bottomCtaRef = useRef<HTMLDivElement | null>(null);
-  const bottomCtaVisible = useIsInViewport(bottomCtaRef);
 
   /* ── Prize card — rendered in left column just after metric strip ── */
   // 상금 칩 분리: '/'·개행·콤마 구분 지원. 단 "600,000" 같은 천단위 콤마(양옆이 숫자)는
@@ -985,14 +963,6 @@ export function TournamentDetailView({
       </div>
 
       <TournamentInquirySection tournamentId={tournament.id} tournamentTitle={tournament.title} />
-
-      {/* ── 하단 통합 진입 CTA — 페이지를 끝까지 읽은 사람이 다시 위로 스크롤하지
-          않아도 되게(§A-5). ref는 상단 스티키 CTA와의 동시 노출을 막는 신호로 쓰인다. */}
-      {bracketCtaLabel ? (
-        <div ref={bottomCtaRef} className="tm-hide-desktop" style={{ marginTop: 24 }}>
-          <BracketEntryCtaButton tournament={tournament} />
-        </div>
-      ) : null}
     </>
   );
 
@@ -1106,13 +1076,6 @@ export function TournamentDetailView({
       </div>
 
       <TournamentInquirySection tournamentId={tournament.id} tournamentTitle={tournament.title} />
-
-      {/* ── 하단 통합 진입 CTA — completed 도 leftContent와 동일하게 페이지 끝에 둔다. ── */}
-      {bracketCtaLabel ? (
-        <div ref={bottomCtaRef} className="tm-hide-desktop" style={{ marginTop: 24 }}>
-          <BracketEntryCtaButton tournament={tournament} />
-        </div>
-      ) : null}
     </>
   );
 
@@ -1407,16 +1370,15 @@ export function TournamentDetailView({
       {/* ── Desktop 2-column layout: left=body, right=sticky CTA rail ──
           .tm-tournament-detail-grid: minmax(0,1fr) 340px (≥1440: 360px), gap 32px.
           Mobile: single-column, no grid applied. */}
-      {/* ── 상단 통합 진입 CTA(§A-1~5) — 예전엔 in_progress 전용 "순위표 · 대진표
+      {/* ── 통합 진입 CTA(§A-1~5·P2) — 예전엔 in_progress 전용 "순위표 · 대진표
           보기"(topCTA)와 상태 무관 "전체 경기 일정 보기" 링크가 따로 있었다. 이제
-          하나로 합쳐 /bracket(순위·대진표·일정 통합 허브, §B-6)으로 보낸다.
-          position:sticky — `.tm-scroll-area`가 모바일/태블릿(<1024px)의 실제 스크롤
-          컨테이너라 top:0만으로 헤더(56px, .tm-scroll-area 바깥) 바로 아래에 붙고
-          겹치지 않는다. 데스크탑(≥1024px)은 .tm-scroll-area가 static이 되며 이 CTA도
-          .tm-hide-desktop으로 숨겨지고, 항상 보이는 railCTA(우측 sticky 레일)가
-          같은 역할을 대신한다 — 그래서 desktop에서 top 오프셋을 따로 계산할 필요가
-          없다. 하단 CTA(leftContent/completedLeftContent 맨 끝)와 동시에 화면에
-          보이지 않도록 bottomCtaVisible이 true면 display:none 처리한다(§A-4·5).
+          하나로 합쳐 /bracket(순위·대진표·일정 통합 허브, §B-6)으로 보내고, 페이지 끝에
+          두던 같은 CTA도 없앴다(P2 — 같은 href를 2회 보여주던 자리, 아래 §isOpen 분기
+          제외 항상 이 자리 하나만 남는다). position:sticky — `.tm-scroll-area`가
+          모바일/태블릿(<1024px)의 실제 스크롤 컨테이너라 top:0만으로 헤더(56px,
+          .tm-scroll-area 바깥) 바로 아래에 붙고 겹치지 않는다. 데스크탑(≥1024px)은
+          .tm-scroll-area가 static이 되며 이 CTA도 .tm-hide-desktop으로 숨겨지고, 항상
+          보이는 railCTA(우측 sticky 레일)가 같은 역할을 대신한다.
           isOpen(모집 중)은 ApplyCTA가 스크롤 내내 화면 하단에 고정(.tm-fixed-cta)돼
           있어 이 스티키 CTA를 숨길 스크롤 위치가 존재하지 않는다 — 데스크탑 rail도
           isOpen일 땐 ApplyCTAButtons만 두고 대진표 링크를 넣지 않으므로(railCTA 위,
@@ -1431,7 +1393,6 @@ export function TournamentDetailView({
             zIndex: 15,
             background: 'var(--bg)',
             padding: '8px 20px 12px',
-            display: bottomCtaVisible ? 'none' : 'block',
           }}
         >
           <BracketEntryCtaButton tournament={tournament} />

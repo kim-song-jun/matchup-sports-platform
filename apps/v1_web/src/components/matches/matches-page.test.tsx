@@ -49,6 +49,58 @@ describe('MatchDetailPageView — closed mode (참가한 적 없는 뷰어가 �
   });
 });
 
+/**
+ * [P2] 대표 시나리오 — 마감 시각이 지나 닫힌 매치(lifecycleStatus==='closed', 정원 마감이
+ * 아님)는 상태를 본문 상태 카드 한 곳에서만 말한다. 히어로 배지·부제의 마감 문구·하단 바
+ * 캡션까지 7군데가 같은 뜻을 반복하던 것을 2군데(상태 카드 · 비활성 버튼 '신청 마감')로 줄인다.
+ */
+describe('MatchDetailPageView — 마감 시각이 지나 닫힌 매치 (P2 대표 시나리오)', () => {
+  function closedByDeadlineModel() {
+    const model = getMatchDetailViewModel('closed');
+    model.match.lifecycleStatus = 'closed';
+    model.match.current = 1;
+    model.match.capacity = 5;
+    // 기본 목업(match-4)은 정원 마감 시나리오라 deadline/deadlineDetail 이 캔드 문구
+    // '모집 완료'다 — 마감 시각이 지난 시나리오를 격리해서 보려면 실제 포맷터가 주는
+    // 값(9월 26일 (토) 16:40 / 지났어요)으로 갈아 끼운다.
+    model.match.deadlineDetail = '9월 26일 (토) 16:40';
+    model.match.deadline = '지났어요';
+    return model;
+  }
+
+  it('부제는 호스트만 말하고 마감 문구를 반복하지 않는다', () => {
+    const model = closedByDeadlineModel();
+    render(<MatchDetailPageView model={model} />);
+
+    const metas = document.querySelectorAll('.tm-match-detail-meta');
+    expect(metas.length).toBeGreaterThan(0);
+    for (const meta of metas) {
+      expect(meta.textContent).toBe(`${model.match.host} 호스트`);
+    }
+  });
+
+  it('히어로 배지에는 상태를 반복하지 않는다 (종목·레벨·성별만 남는다)', () => {
+    const model = closedByDeadlineModel();
+    render(<MatchDetailPageView model={model} />);
+
+    expect(screen.queryByText('모집 완료')).not.toBeInTheDocument();
+  });
+
+  it('상태는 본문 상태 카드 한 곳에서만, 마감 사유(마감 시각이 지남)를 정확히 말한다', () => {
+    render(<MatchDetailPageView model={closedByDeadlineModel()} />);
+
+    expect(screen.getAllByText('신청이 마감됐어요').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('마감 시각이 지나 더 이상 신청할 수 없어요. 다른 매치를 둘러봐 주세요.').length).toBeGreaterThan(0);
+  });
+
+  it('하단 바에는 상태 캡션("신청 상태")을 반복하지 않고 버튼만 남는다', () => {
+    render(<MatchDetailPageView model={closedByDeadlineModel()} />);
+
+    expect(screen.queryByText('신청 상태')).not.toBeInTheDocument();
+    expect(screen.getAllByText('신청 마감').length).toBeGreaterThan(0);
+  });
+});
+
 describe('MatchDetailPageView — approved mode (실제 참가 확정자)', () => {
   it('참가 확정 배너를 정상적으로 보여준다', () => {
     const model = getMatchDetailViewModel('approved');
@@ -178,6 +230,24 @@ describe('MatchListPageView — 신청 마감 카드 구분', () => {
     expect(screen.queryByText('모집 완료')).not.toBeInTheDocument();
     expect(container.querySelector('.tm-card-closed')).toBeNull();
   });
+
+  /**
+   * [P2 Copilot 리뷰 회귀 방지] deadlineAt 자체가 없는 매치(예: 정원 마감이지 마감
+   * 시각이 없는 경우)는 formatDeadlineDetail이 '경기 시작 전까지'로 떨어진다 — 닫힌
+   * 카드 우하단에 그 문구를 그대로 노출하면 "닫혔다"는 배지와 "경기 시작 전까지"
+   * (아직 열려 있다는 뜻)가 서로 모순된다. deadline 캡션이 비어 있으면(=deadlineAt
+   * 없음) 실제 시각으로 바꾸지 않고 기존 actionLabel을 유지한다.
+   */
+  it('마감 시각 자체가 없는 닫힌 카드는 우하단에 "경기 시작 전까지"를 보여주지 않고 actionLabel을 유지한다', () => {
+    render(
+      <MatchListPageView
+        model={modelWithSingleCard({ status: 'full', current: 6, capacity: 6, deadline: '', deadlineDetail: '경기 시작 전까지', actionLabel: '모집 완료' })}
+      />,
+    );
+
+    expect(screen.queryByText('경기 시작 전까지')).not.toBeInTheDocument();
+    expect(screen.getAllByText('모집 완료').length).toBeGreaterThan(0);
+  });
 });
 
 // motion-audit 그룹6(F1 desktop card hover) — 데스크톱 매치 리스트 카드는 tm-pressable
@@ -250,6 +320,34 @@ describe('MatchListPageView — 더 보기 (20건 컷오프 페이지네이션)'
     render(<MatchListPageView model={model} />);
 
     expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * [P3] 캡션(우상단 단계 이름)과 h1 이 같은 문구였다(2·3단계 "매치 정보"/"장소와 시간"이
+ * 캡션과 그대로 겹쳤다) — 이미 역할이 갈려 있던 1·4단계 문법으로 통일한다: 캡션은 단계
+ * 이름 그대로, h1 은 질문형.
+ */
+describe('MatchCreatePageView — 단계 h1(질문형)과 캡션(단계 이름) 분리', () => {
+  it('2단계(정보): 캡션은 "매치 정보", h1 은 질문형 "어떤 매치인가요?"', () => {
+    render(<MatchCreatePageView model={getMatchCreateViewModel('info')} />);
+
+    expect(screen.getByRole('heading', { level: 1, name: '어떤 매치인가요?' })).toBeInTheDocument();
+    expect(screen.getByText('매치 정보')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: '매치 정보' })).not.toBeInTheDocument();
+  });
+
+  it('3단계(장소·시간): 캡션은 "장소와 시간", h1 은 질문형 "언제, 어디서 하나요?"', () => {
+    render(<MatchCreatePageView model={getMatchCreateViewModel('place-time')} />);
+
+    expect(screen.getByRole('heading', { level: 1, name: '언제, 어디서 하나요?' })).toBeInTheDocument();
+    expect(screen.getByText('장소와 시간')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: '장소와 시간' })).not.toBeInTheDocument();
+  });
+
+  it('1·4단계는 기존 문법(질문형 h1) 그대로 유지된다 — 회귀 가드', () => {
+    render(<MatchCreatePageView model={getMatchCreateViewModel('sport')} />);
+    expect(screen.getByRole('heading', { level: 1, name: '어떤 종목인가요?' })).toBeInTheDocument();
   });
 });
 

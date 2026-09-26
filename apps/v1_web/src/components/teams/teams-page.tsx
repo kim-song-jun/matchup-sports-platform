@@ -1759,9 +1759,11 @@ function TeamCard({ team }: { team: TeamModel }) {
           ) : null}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
             {/* 레벨 태그는 서버가 자유 텍스트로 준다 — 길면 형제 배지를 다음 줄로 밀어낼 수
-                있다(flexWrap:'wrap'). 폭 상한으로 잘라 한 줄을 지키던 예전 방식은 카드 폭이
-                좁아지는 768(2열 그리드)에서 "입문-고수" 같은 짧은 값까지 잘랐다(2026-09-26
-                alpha 감사) — 잘리는 대신 배지 자체가 줄바꿈된다. */}
+                있다(flexWrap:'wrap'). 형제와 나눈 고정 %(예전 62%)로 잘라 한 줄을 지키던
+                예전 방식은 카드 폭이 좁아지는 768(2열 그리드)에서 "입문-고수" 같은 짧은 값까지
+                잘랐다(2026-09-26 alpha 감사). 이제는 형제가 있어도 각 배지가 자기 줄 전체 폭
+                (max-width:100%, globals.css .tm-team-tag)까지 쓸 수 있다 — 자유 텍스트 하나가
+                혼자로도 그 폭을 넘길 만큼 길 때만 ellipsis 로 잘린다(카드 밖 가로 스크롤 방지). */}
             {dedupeTags([...team.tags, team.genderRule]).map((tag) => (
               <span key={tag} className="tm-badge tm-badge-grey tm-team-tag">
                 <span className="tm-team-tag-text">{tag}</span>

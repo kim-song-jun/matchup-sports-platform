@@ -900,15 +900,17 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     tags.forEach((t) => expect(t.querySelector('.tm-team-tag-text')).not.toBeNull());
   });
 
-  it('태그에 폭 상한(잘림)을 걸지 않는다 — 좁은 카드에서도 짧은 값이 잘리지 않는다', () => {
+  it('태그 폭 상한은 형제와 나눈 고정 %가 아니라 자기 줄 전체(100%)다 — 좁은 카드에서도 짧은 값이 잘리지 않는다', () => {
+    // 2026-09-26 alpha 감사: 예전 62%(형제와 나눈 몫)는 768(카드 272px)에서 "입문-고수" 같은
+    // 짧은 값까지 잘랐다. 100%(.tm-league-badge 와 같은 관례)로 바꾸면 형제가 있어도 각
+    // 배지가 자기 줄 폭까지 온전히 쓸 수 있다 — ellipsis 자체는 남겨 자유 텍스트 하나가
+    // 혼자로도 카드 폭을 넘길 만큼 길 때 카드 밖 가로 스크롤을 막는다(Copilot 리뷰 지적).
     const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
     const tagRule = css.match(/\.tm-team-tag\s*\{([^}]*)\}/)?.[1];
-    const textRule = css.match(/\.tm-team-tag-text\s*\{([^}]*)\}/)?.[1];
 
     expect(tagRule).toBeDefined();
-    expect(textRule).toBeDefined();
-    expect(tagRule).not.toMatch(/max-width/);
-    expect(textRule).not.toContain('ellipsis');
+    expect(tagRule).toMatch(/max-width:\s*100%/);
+    expect(tagRule).not.toMatch(/max-width:\s*62%/);
   });
 
   it('소개가 없으면 소개 상자를 그리지 않는다 — 지역·종목을 문장으로 되풀이하지 않는다', () => {

@@ -1,10 +1,14 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-guard';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
+import { ChevronLeftIcon } from '@/components/v1-ui/icons';
+import { ErrorState } from '@/components/v1-ui/primitives';
 import {
   useV1CancelMatch,
   useV1CloseMatch,
@@ -413,6 +417,33 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     },
     submitLabel: '변경사항 저장',
   });
+
+  // 수정 대상을 못 불러오면(권한 없음·매치 없음 등) draft/selectedSportId/regionId가 전부
+  // 초기값(빈 문자열)에 머무른다 — 위 StateCard 배너만 얹고 InfoStep을 그대로 렌더하면
+  // 실제 매치 값 대신 빈 폼과, lockedReason 기준으로만 잠기는 저장/취소 버튼이 활성 상태로
+  // 남는다(2026-09-26 alpha 감사). 채울 데이터 자체가 없으니 폼을 그리지 않는다.
+  if (editQuery.isError) {
+    return (
+      <>
+        <div className="tm-desktop-page-head tm-show-desktop">
+          <AppBackLink className="tm-desktop-back" fallbackHref={detailHref}>
+            <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
+          </AppBackLink>
+          <h1 className="tm-text-heading" style={{ margin: 0 }}>매치 수정</h1>
+        </div>
+        <div className="tm-create-shell tm-match-create-shell">
+          <ErrorState
+            message="수정 권한이 없거나 매치를 불러오지 못했어요."
+            onRetry={() => void editQuery.refetch()}
+            retryLabel="다시 불러오기"
+          />
+          <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href={detailHref} style={{ marginTop: 12 }}>
+            매치 상세로 돌아가기
+          </Link>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

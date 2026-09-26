@@ -322,7 +322,7 @@ describe('LeagueFixtureDetailClient', () => {
 
   // 2026-08-25 사용자 지시 — 대회 경기 상세의 UI/UX(득점 기록·영상·라인업 등)가 리그
   // 경기에도 모두 있어야 한다. 기록 API 가 응답하면 대회와 같은 본문을 임베드한다.
-  it('기록이 있으면 대회 경기 상세와 같은 본문(주차 헤더·경기 기록 섹션)과 리그 순위·전적 카드가 뜬다', () => {
+  it('기록이 있으면 대회 경기 상세와 같은 본문(주차 헤더·득점·카드 섹션)과 리그 순위·전적 카드가 뜬다', () => {
     mockLeague();
     mockViewer('none', { participantMember: true });
     mockRecord('present');
@@ -330,7 +330,8 @@ describe('LeagueFixtureDetailClient', () => {
 
     // MatchDetailContent 헤더의 주차(칩의 주차 표기는 이때 숨는다 — 중복 방지).
     expect(screen.getAllByText('2주차')).toHaveLength(1);
-    expect(screen.getByText('경기 기록')).toBeInTheDocument();
+    // [P2] 섹션 제목이 페이지 제목("경기 기록")과 겹치던 것을 실제 내용 이름으로 바꿨다.
+    expect(screen.getByText('득점·카드')).toBeInTheDocument();
     expect(screen.getByText('기록된 이벤트가 없어요')).toBeInTheDocument();
     // 리그 고유 문맥 — 순위·전적 카드는 기록 본문과 함께 유지된다.
     expect(screen.getByText('리그 순위·전적')).toBeInTheDocument();
@@ -348,7 +349,7 @@ describe('LeagueFixtureDetailClient', () => {
     mockRecord('present');
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
-    expect(screen.getByText('경기 기록')).toBeInTheDocument();
+    expect(screen.getByText('득점·카드')).toBeInTheDocument();
     expect(screen.queryByTestId('league-claim-section')).not.toBeInTheDocument();
   });
 
@@ -359,7 +360,7 @@ describe('LeagueFixtureDetailClient', () => {
     render(<LeagueFixtureDetailClient leagueId="lg-1" fixtureId="fx-1" />);
 
     // 공개 기록은 유지하지만, 서버가 403으로 거부할 claim affordance는 숨긴다.
-    expect(screen.getByText('경기 기록')).toBeInTheDocument();
+    expect(screen.getByText('득점·카드')).toBeInTheDocument();
     expect(screen.queryByTestId('league-claim-section')).not.toBeInTheDocument();
   });
 

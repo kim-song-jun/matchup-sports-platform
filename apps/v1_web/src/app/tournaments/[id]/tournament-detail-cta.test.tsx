@@ -193,6 +193,26 @@ describe('TournamentDetailView — 통합 CTA가 실제 화면에 상태별로 �
   });
 });
 
+/**
+ * [P2] 같은 통합 진입 CTA(BracketEntryCtaButton, 같은 href /bracket)가 상단 스티키와
+ * 페이지 맨 끝에 2회 렌더돼 완전히 중복됐다 — 페이지 끝 인스턴스를 없애 상단 스티키
+ * 하나만 남긴다. `aria-label`은 BracketEntryCtaButton만 붙이므로(데스크탑 레일·
+ * StandingsMovedNotice 등 같은 href를 쓰는 다른 안내 링크와 구분된다) 그 속성으로 좁혀 센다.
+ */
+describe('TournamentDetailView — 통합 진입 CTA 중복 제거(P2)', () => {
+  it.each<V1TournamentStatus>(['closed', 'in_progress', 'completed'])(
+    '%s 상태에서 BracketEntryCtaButton 인스턴스가 정확히 한 번만 렌더된다(상단 스티키 하나, 페이지 끝 없음)',
+    (status) => {
+      const tournament = makeTournament({ id: 't-cta-dedupe', status, format: 'knockout' });
+      const { container } = render(<TournamentDetailView tournament={tournament} myRegistration={null} />);
+
+      const label = getBracketEntryCtaLabel(status, false);
+      expect(label).not.toBeNull();
+      expect(container.querySelectorAll(`a[aria-label="${label}"]`).length).toBe(1);
+    },
+  );
+});
+
 describe('TournamentDetailView — 신청 차단 사유 표시', () => {
   it('신청 마감 사유를 disabled CTA의 설명으로 이어 붙이고 화면에도 보여준다', () => {
     const tournament = makeTournament({

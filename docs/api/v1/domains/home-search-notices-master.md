@@ -9,7 +9,7 @@
 | GET | /api/v1/home/recommendations | optional user | sportId?, regionId?, limit? max 20 | recommendation list |
 | GET | /api/v1/popups/active | public | screen (supported target screen) | { popup: active popup or null } |
 | GET | /api/v1/notices | public | service-defined list filters | published notice list |
-| GET | /api/v1/notices/:noticeId | visibility-dependent | path id | notice detail |
+| GET | /api/v1/notices/:noticeId | visibility-dependent | path id | notice detail (includes `updatedAt` — last edit time, used as Article `dateModified`) |
 | GET | /api/v1/admin/notices | active admin | status?, category?, audience?, q?, cursor?, limit? | notice cursor page |
 | POST | /api/v1/admin/content-assets | owner/ops | multipart file (JPEG/PNG/WebP, max 5MB) | temporary managed asset |
 | DELETE | /api/v1/admin/content-assets/:assetId | owner/ops | temporary asset id | { assetId, deleted: true } |

@@ -248,6 +248,8 @@ export type V1Notice = {
   title: string;
   category?: string;
   publishedAt: string;
+  /** 상세 응답에만 있다. */
+  updatedAt?: string;
   body?: string | null;
   content?: V1RichContentDocument | null;
   contentVersion?: number;

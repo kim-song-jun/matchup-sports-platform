@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
+import { JsonLd } from '@/components/seo/json-ld';
 import { TeamMatchDetailPageClient } from '@/components/team-matches/team-matches-client';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, metadataDescription } from '@/lib/seo';
+import { buildTeamMatchEventLd } from '@/lib/structured-data';
 import type { V1TeamMatch } from '@/types/api';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -31,5 +33,11 @@ export default async function TeamMatchDetailPage({ params }: { params: Promise<
   // 별도 경로라 영향이 없다.
   if (teamMatch.league) redirect(`/league-matches/${teamMatch.league.leagueId}/fixtures/${id}`);
   // matches/[id] 와 같은 이유 — 리다이렉트 판정을 위해 이미 받은 응답을 첫 표시값으로 넘긴다.
-  return <TeamMatchDetailPageClient teamMatchId={id} seed={teamMatch} />;
+  const eventLd = buildTeamMatchEventLd(teamMatch, id);
+  return (
+    <>
+      {eventLd ? <JsonLd data={eventLd} /> : null}
+      <TeamMatchDetailPageClient teamMatchId={id} seed={teamMatch} />
+    </>
+  );
 }

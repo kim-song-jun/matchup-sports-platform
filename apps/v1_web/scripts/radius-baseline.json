@@ -1,6 +1,7 @@
 {
   "_설명": "borderRadius 에 px 를 직접 적은 곳의 파일별 개수. 스케일(4/8/12/14/16/24/999/50%)과 값이 같던 곳은 이미 토큰으로 바꿨고, 여기 남은 것은 스케일에 아예 없는 값이라 바꾸면 실제로 모양이 달라진다 — 그 파일을 손댈 때 디자인 판단과 함께 정리한다. 게이트는 이 수를 넘지 않는지만 본다.",
   "src/app/league-matches/[leagueId]/league-match-standings-client.tsx": 1,
+  "src/app/opengraph-image.tsx": 1,
   "src/app/team-matches/[id]/lineup/lineup-client.tsx": 1,
   "src/app/teams/[id]/contact/settings/team-contact-settings-client.tsx": 1,
   "src/app/tournaments/[id]/apply/tournament-apply-client.tsx": 2,

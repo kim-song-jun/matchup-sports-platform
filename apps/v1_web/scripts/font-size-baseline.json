@@ -55,6 +55,7 @@
   "src/app/league-matches/[leagueId]/fixtures/[fixtureId]/league-fixture-detail-client.tsx": 13,
   "src/app/league-matches/[leagueId]/league-match-standings-client.tsx": 24,
   "src/app/matches/[id]/applications/client.tsx": 1,
+  "src/app/opengraph-image.tsx": 3,
   "src/app/team-matches/[id]/lineup/lineup-client.tsx": 1,
   "src/app/tournaments/[id]/apply/tournament-apply-client.tsx": 1,
   "src/app/tournaments/[id]/awards/awards-page-client.tsx": 23,

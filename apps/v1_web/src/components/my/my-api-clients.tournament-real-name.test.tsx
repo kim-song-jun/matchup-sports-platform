@@ -99,4 +99,16 @@ describe('TournamentRealNameVisibilitySettingsPageClient', () => {
     expect(screen.getByText('설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')).toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: '대회 기록 실명 표시' })).not.toBeInTheDocument();
   });
+
+  it('설명 전용 카드 없이 분류 라벨 + 조작 카드 하나 + 각주로 보여준다 (P1 C안)', () => {
+    hooks.visibility.mockReturnValue({ data: { visible: false }, isLoading: false, isError: false, refetch: vi.fn() });
+    hooks.updateVisibility.mockReturnValue({ mutate: vi.fn(), isPending: false });
+
+    const { container } = renderWithClient(<TournamentRealNameVisibilitySettingsPageClient />);
+
+    // 예전 설명 전용 카드 제목("대회 경기 기록에 실명 표시")은 사라지고 분류 라벨로 대체됐다.
+    expect(screen.queryByText('대회 경기 기록에 실명 표시')).not.toBeInTheDocument();
+    expect(screen.getByText('공개')).toBeInTheDocument();
+    expect(container.querySelectorAll('.tm-card').length).toBe(1);
+  });
 });

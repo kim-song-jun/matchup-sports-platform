@@ -1646,6 +1646,13 @@ button:disabled {
   color: var(--text-caption);
 }
 
+/* [P1 C안 설정 각주] 설명 전용 카드를 조작 카드 하나로 접으며 밀려난 안내 문구의 착지 자리.
+   /my/settings/{player-card,tournament-real-name,notifications,record-consent,theme} 5개
+   화면이 전부 이 클래스 하나를 공유한다 -- 화면마다 마진을 따로 정하면 다시 갈린다. */
+.tm-my-settings-footnote {
+  margin: 8px 4px 0;
+}
+
 /* [대진표 12px 인라인 정리] 캡션(400)보다 한 단 강조가 필요하지만 3단계 라벨
    (tm-text-label, 13px)까지는 안 가는 짧은 굵은 보조 라벨(조 이름, "대진표 준비
    중" 같은 상태 타이틀)용. 크기·줄높이는 tm-text-caption과 동일하고 굵기·색만
@@ -4315,10 +4322,13 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 /* 팀 카드 조건 태그 — 레벨은 서버 자유 텍스트라 길이가 보장되지 않는다.
-   태그 행 폭 232px(390 실측) 안에서 형제 배지(`성별 미설정` 최대 ~73px = 31%)와 gap(8px = 3%)
-   자리를 남기도록 62% 로 묶는다. 상한은 넘칠 때만 걸리므로 짧은 태그는 그대로다. */
+   고정 %폭 상한(예전 62%)은 390 카드(232px 태그 행) 기준으로 잡혀 있어, 형제 배지가 있으면
+   짧고 의미 있는 값("입문-고수")까지 좁게 나눈 몫에 맞춰 잘렸다(768 2열, 카드 272px에서
+   실측, 2026-09-26 alpha 감사). .tm-league-badge 와 같은 관례로 100%(자기 줄 전체 폭)까지만
+   막는다 — 형제와 나눠 쓸 필요가 없는 한 잘리지 않고, 자유 텍스트 하나가 혼자로도 카드 폭을
+   넘길 만큼 길 때만(Copilot 리뷰 지적) ellipsis 로 막아 카드 밖 가로 스크롤을 막는다. */
 .tm-team-tag {
-  max-width: 62%;
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -8853,8 +8863,10 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 .tm-pcard-back-sec::before, .tm-pcard-back-sec::after {
   content: ''; flex: 1; height: 1px; background: rgba(255, 255, 255, 0.1);
 }
-/* 성향 태그 -- 2열 고정. 흘려 넣으면 줄바꿈이 들쭉날쭉해진다. */
-.tm-pcard-back-tags { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+/* 성향 태그 -- 가운데 정렬 줄바꿈(P4 B안, 2026-09-26). 2열 고정 그리드는 개수가 홀수면
+   마지막 칩이 왼쪽 칸에 혼자 남는 외톨이가 됐다 -- flex-wrap + 가운데 정렬은 칩이 제 폭만큼만
+   차지해 홀짝 어느 쪽이든 외톨이 칸이 생기지 않는다. */
+.tm-pcard-back-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
 .tm-pcard-tag {
   display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 0;
   padding: 4px 8px; border-radius: var(--radius-chip);
@@ -8875,6 +8887,15 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   font-variant-numeric: tabular-nums;
 }
 .tm-pcard-brow b[data-locked='true'] { color: #6f7a8a; }
+/* [P4 B안] 같은 해제 조건(예: "첫 경기 명단에 오르면 열려요")을 공유하는 잠긴 능력치를
+   한 묶음으로 접는다 -- 조건 문구는 묶음 머리에서 한 번만 말하고, 묶음 안 각 행은
+   아이콘 + 잠김 표시 + 지표 이름만 남긴다(색·폰트크기는 위 .tm-pcard-back-sec 과
+   같은 회색 -- 이미 선수 카드 9~11.5px 전용 디자인 언어 예외에 있는 색이라 새 대비
+   문제를 만들지 않는다, docs/design/a11y-decisions.md). */
+.tm-pcard-brow-group { display: grid; gap: 2px; }
+.tm-pcard-brow-group-head {
+  font-size: 9.5px; font-weight: 700; color: #6f7a8a; padding: 3px 0 1px 24px;
+}
 .tm-pcard-back-eq {
   margin: 4px auto 0; padding-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 10px; color: #a9b3c2; line-height: 1.5; text-align: center; width: 72%;
@@ -8884,7 +8905,14 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 /* ── 카드 아래 동반 UI -- 카드는 소장품이라 앞면을 깨끗하게 두고, 안내·행동은 밖에 둔다. ── */
 /* 카드 아래 영역. 카드가 drop-shadow 를 깔고 있어 버튼이 바짝 붙으면 그림자 위에
    올라탄 것처럼 보인다 -- 그림자가 앉을 자리를 여백으로 비운다(사용자 지적 2026-08-26). */
-.tm-pcard-below { width: 100%; max-width: 320px; display: flex; flex-direction: column; margin-top: 16px; }
+/* max-width 캡은 <1024 에서 형제 섹션(.tm-my-desktop-main 카드)과 좌우 가장자리가
+   어긋나게 만든다(390 에서 35px vs 20px) — 모바일/태블릿은 캡 없이 100% 유지하고,
+   ≥1024 데스크톱 2열(.tm-my-desktop-sidebar 360/380px 고정폭, 공유 프로필 380px)에서만
+   기존 320px 폭을 복원한다(아래 미디어쿼리). */
+.tm-pcard-below { width: 100%; display: flex; flex-direction: column; margin-top: 16px; }
+@media (min-width: 1024px) {
+  .tm-pcard-below { max-width: 320px; }
+}
 .tm-pcard-flipbtn {
   margin-top: 4px; width: 100%; min-height: 44px; border-radius: var(--radius-control);
   background: var(--surface-soft); border: 1px solid var(--border);

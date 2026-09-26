@@ -10,7 +10,7 @@ import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, InfoCircleIcon } from '@/components/v1-ui/icons';
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
-import { Check } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import { useTheme } from '@/components/providers/theme-provider';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
@@ -1550,54 +1550,54 @@ export function NotificationSettingsPageClient() {
               <div className="tm-text-caption" style={{ marginTop: 4 }} role="status">{pushError}</div>
             </Card>
           ) : null}
-          <Card pad={16} style={{ marginBottom: 8 }}>
-            <div className="tm-text-label">받을 알림 고르기</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+          <section style={{ marginTop: 16 }}>
+            <div className="tm-my-section-label">받을 알림</div>
+            {toggleError ? (
+              <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+                <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+              </Card>
+            ) : null}
+            {/* 저장 필드를 사용자가 이해하는 4개 발송 축으로 묶는다. */}
+            <div className="tm-card" style={{ padding: 0 }}>
+              {items.map((setting) => {
+                const enabled = Boolean(notifications && setting.keys.every((key) => notifications[key]));
+                return (
+                  <button
+                    key={setting.key}
+                    className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+                    onClick={() => toggle(setting.keys)}
+                    type="button"
+                    disabled={!notifications || update.isPending}
+                    role="switch"
+                    aria-checked={enabled}
+                    aria-label={setting.label}
+                    style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="tm-text-body">{setting.label}</div>
+                      <div className="tm-text-caption" style={{ marginTop: 3 }}>{setting.sub}</div>
+                    </div>
+                    <span
+                      className="tm-text-caption"
+                      style={{ minWidth: 24, textAlign: 'right', color: enabled ? 'var(--blue500)' : 'var(--text-caption)' }}
+                      aria-hidden="true"
+                    >
+                      {enabled ? 'ON' : 'OFF'}
+                    </span>
+                    <span className={`tm-toggle ${enabled ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+                  </button>
+                );
+              })}
+            </div>
+            <div className="tm-text-caption tm-my-settings-footnote">
               {/* 위 푸시 토글과의 관계를 명시한다 — 예전에는 두 영역이 무관해 보여서,
                   푸시를 켜지 않은 사용자가 왜 폰으로 알림이 안 오는지 알 수 없었다. */}
               {deviceSubscribed
                 ? '여기서 끈 종류는 알림함과 푸시 알림 모두에서 빠져요.'
                 : '지금은 앱 안 알림함에서만 볼 수 있어요. 위에서 푸시 알림을 켜면 같은 종류를 폰으로도 받아요.'}
             </div>
-          </Card>
-          {toggleError ? (
-            <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
-            </Card>
-          ) : null}
-          {/* 저장 필드를 사용자가 이해하는 4개 발송 축으로 묶는다. */}
-          <div className="tm-card" style={{ padding: 0 }}>
-            {items.map((setting) => {
-              const enabled = Boolean(notifications && setting.keys.every((key) => notifications[key]));
-              return (
-                <button
-                  key={setting.key}
-                  className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
-                  onClick={() => toggle(setting.keys)}
-                  type="button"
-                  disabled={!notifications || update.isPending}
-                  role="switch"
-                  aria-checked={enabled}
-                  aria-label={setting.label}
-                  style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="tm-text-body">{setting.label}</div>
-                    <div className="tm-text-caption" style={{ marginTop: 3 }}>{setting.sub}</div>
-                  </div>
-                  <span
-                    className="tm-text-caption"
-                    style={{ minWidth: 24, textAlign: 'right', color: enabled ? 'var(--blue500)' : 'var(--text-caption)' }}
-                    aria-hidden="true"
-                  >
-                    {enabled ? 'ON' : 'OFF'}
-                  </span>
-                  <span className={`tm-toggle ${enabled ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
-                </button>
-              );
-            })}
-          </div>
+          </section>
         </div>
       </div>
   );
@@ -1674,61 +1674,57 @@ export function RecordConsentSettingsPageClient() {
             <h1 className="tm-text-heading">경기 기록 공개</h1>
           </div>
           <RecordConsentTournamentContext />
-          <Card pad={16} style={{ marginBottom: 8 }}>
-            {/* 이 카드는 **무엇이** 공개되는지만 답한다. "왜 지금 이 화면인지"는 위 대회
-                맥락 배너가, "지금 켜져 있는지 / 켜면 어떻게 되는지"는 아래 토글의
-                서브텍스트가 각각 맡는다 -- 셋이 같은 말을 반복하면(실측: 알림에서 들어온
-                화면에 "켜면 공개돼요"가 세 번 나왔다) 정작 무엇이 공개되는지는 아무도
-                말해주지 않는다.
-                경로(/users/:id/records)를 그대로 쓰던 문구는 지웠다. 사용자가 그 URL 을
-                직접 입력하는 일이 없으므로 화면 이름으로 말한다. */}
-            <div className="tm-text-label">공개되는 정보</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+          <section>
+            <div className="tm-my-section-label">공개</div>
+            {toggleError ? (
+              <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+                <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+              </Card>
+            ) : null}
+            <div className="tm-card" style={{ padding: 0 }}>
+              <button
+                className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+                onClick={toggle}
+                type="button"
+                disabled={consent.isLoading || update.isPending}
+                role="switch"
+                aria-checked={granted}
+                aria-label="경기 기록 공개"
+                style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="tm-text-body">경기 기록 공개</div>
+                  <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                    {update.isPending
+                      ? '저장하는 중이에요…'
+                      : granted
+                        ? '지금 공개돼 있어요. 끄면 새 경기부터 다시 비공개예요.'
+                        : '지금은 비공개예요.'}
+                  </div>
+                </div>
+                <span
+                  className="tm-text-caption"
+                  style={{ minWidth: 24, textAlign: 'right', color: granted ? 'var(--blue500)' : 'var(--text-caption)' }}
+                  aria-hidden="true"
+                >
+                  {granted ? 'ON' : 'OFF'}
+                </span>
+                <span className={`tm-toggle ${granted ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+              </button>
+            </div>
+            {/* 이 각주는 **무엇이** 공개되는지만 답한다. "왜 지금 이 화면인지"는 위 대회
+                맥락 배너가, "지금 켜져 있는지"는 위 토글 서브텍스트가 각각 맡는다 --
+                셋이 같은 말을 반복하면(실측: 알림에서 들어온 화면에 "켜면 공개돼요"가
+                세 번 나왔다) 정작 무엇이 공개되는지는 아무도 말해주지 않는다. */}
+            <div className="tm-text-caption tm-my-settings-footnote">
               내 프로필의 활동 기록에 출전 경기, 득점, 경고·퇴장, MVP 가 표시돼요.
               팀 라인업에 내 계정으로 연결된 경기만 해당돼요.
-              {/* 소급 공개는 "무엇이 공개되는가"의 일부다(앞으로 것만이 아니라 과거 것도).
-                  켜기 전에 반드시 알아야 하는 조건이라(사용자 명시 결정) 여기 둔다 --
-                  아래 토글 서브텍스트에 있던 같은 말은 지웠다. 토글은 현재 상태만 말한다. */}
+              {/* 소급 공개는 켜기 전에 반드시 알아야 하는 조건(사용자 명시 결정)이라
+                  여기 둔다 -- 토글 서브텍스트는 현재 상태만 말한다. */}
               {' '}켜면 지금까지 참가한 경기 기록도 함께 공개돼요.
             </div>
-          </Card>
-          {toggleError ? (
-            <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
-            </Card>
-          ) : null}
-          <div className="tm-card" style={{ padding: 0 }}>
-            <button
-              className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
-              onClick={toggle}
-              type="button"
-              disabled={consent.isLoading || update.isPending}
-              role="switch"
-              aria-checked={granted}
-              aria-label="경기 기록 공개"
-              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="tm-text-body">경기 기록 공개</div>
-                <div className="tm-text-caption" style={{ marginTop: 3 }}>
-                  {update.isPending
-                    ? '저장하는 중이에요…'
-                    : granted
-                      ? '지금 공개돼 있어요. 끄면 새 경기부터 다시 비공개예요.'
-                      : '지금은 비공개예요.'}
-                </div>
-              </div>
-              <span
-                className="tm-text-caption"
-                style={{ minWidth: 24, textAlign: 'right', color: granted ? 'var(--blue500)' : 'var(--text-caption)' }}
-                aria-hidden="true"
-              >
-                {granted ? 'ON' : 'OFF'}
-              </span>
-              <span className={`tm-toggle ${granted ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
-            </button>
-          </div>
+          </section>
           {granted && consent.data?.effectiveAt ? (
             <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
               {formatTournamentDateTimeLong(consent.data.effectiveAt)}부터 공개하고 있어요.
@@ -1783,51 +1779,51 @@ export function TournamentRealNameVisibilitySettingsPageClient() {
             </AppBackLink>
             <h1 className="tm-text-heading">대회 기록 실명 표시</h1>
           </div>
-          <Card pad={16} style={{ marginBottom: 8 }}>
-            <div className="tm-text-label">대회 경기 기록에 실명 표시</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+          <section>
+            <div className="tm-my-section-label">공개</div>
+            {toggleError ? (
+              <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+                <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+              </Card>
+            ) : null}
+            <div className="tm-card" style={{ padding: 0 }}>
+              <button
+                className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+                onClick={toggle}
+                type="button"
+                disabled={visibility.isLoading || update.isPending}
+                role="switch"
+                aria-checked={visible}
+                aria-label="대회 기록 실명 표시"
+                style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="tm-text-body">대회 기록 실명 표시</div>
+                  <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                    {update.isPending
+                      ? '저장하는 중이에요…'
+                      : visible
+                        ? '지금 실명으로 표시돼요. 끄면 닉네임으로 바뀌어요.'
+                        : '지금은 닉네임으로 표시돼요. 켜면 실명으로 바뀌어요.'}
+                  </div>
+                </div>
+                <span
+                  className="tm-text-caption"
+                  style={{ minWidth: 24, textAlign: 'right', color: visible ? 'var(--blue500)' : 'var(--text-caption)' }}
+                  aria-hidden="true"
+                >
+                  {visible ? 'ON' : 'OFF'}
+                </span>
+                <span className={`tm-toggle ${visible ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="tm-text-caption tm-my-settings-footnote">
               대회 라인업·득점자·MVP에 붙는 이름이에요. 끄면 닉네임으로 표시되고, 대회
               신청할 때마다 다시 묻지 않아요 — 여기서 한 번 켜면 계속 적용되고, 언제든
               다시 끌 수 있어요.
             </div>
-          </Card>
-          {toggleError ? (
-            <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
-            </Card>
-          ) : null}
-          <div className="tm-card" style={{ padding: 0 }}>
-            <button
-              className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
-              onClick={toggle}
-              type="button"
-              disabled={visibility.isLoading || update.isPending}
-              role="switch"
-              aria-checked={visible}
-              aria-label="대회 기록 실명 표시"
-              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="tm-text-body">대회 기록 실명 표시</div>
-                <div className="tm-text-caption" style={{ marginTop: 3 }}>
-                  {update.isPending
-                    ? '저장하는 중이에요…'
-                    : visible
-                      ? '지금 실명으로 표시돼요. 끄면 닉네임으로 바뀌어요.'
-                      : '지금은 닉네임으로 표시돼요. 켜면 실명으로 바뀌어요.'}
-                </div>
-              </div>
-              <span
-                className="tm-text-caption"
-                style={{ minWidth: 24, textAlign: 'right', color: visible ? 'var(--blue500)' : 'var(--text-caption)' }}
-                aria-hidden="true"
-              >
-                {visible ? 'ON' : 'OFF'}
-              </span>
-              <span className={`tm-toggle ${visible ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
-            </button>
-          </div>
+          </section>
         </div>
       </div>
   );
@@ -1870,50 +1866,50 @@ export function PlayerCardHiddenSettingsPageClient() {
             </AppBackLink>
             <h1 className="tm-text-heading">선수 카드</h1>
           </div>
-          <Card pad={16} style={{ marginBottom: 8 }}>
-            <div className="tm-text-label">선수 카드 숨기기</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+          <section>
+            <div className="tm-my-section-label">공개</div>
+            {toggleError ? (
+              <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+                <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+              </Card>
+            ) : null}
+            <div className="tm-card" style={{ padding: 0 }}>
+              <button
+                className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+                onClick={toggle}
+                type="button"
+                disabled={state.isLoading || update.isPending}
+                role="switch"
+                aria-checked={hidden}
+                aria-label="선수 카드 숨기기"
+                style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="tm-text-body">선수 카드 숨기기</div>
+                  <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                    {update.isPending
+                      ? '저장하는 중이에요…'
+                      : hidden
+                        ? '지금은 카드가 보이지 않아요. 끄면 다시 보여요.'
+                        : '지금은 카드가 보여요. 켜면 어디에도 표시되지 않아요.'}
+                  </div>
+                </div>
+                <span
+                  className="tm-text-caption"
+                  style={{ minWidth: 24, textAlign: 'right', color: hidden ? 'var(--blue500)' : 'var(--text-caption)' }}
+                  aria-hidden="true"
+                >
+                  {hidden ? 'ON' : 'OFF'}
+                </span>
+                <span className={`tm-toggle ${hidden ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="tm-text-caption tm-my-settings-footnote">
               경기 기록으로 만든 카드예요. 숨기면 마이페이지·공개 프로필·공유 화면에서
               카드가 보이지 않아요. 활동 기록과 프로필은 그대로 남아요 — 카드만 끄는 거예요.
             </div>
-          </Card>
-          {toggleError ? (
-            <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
-            </Card>
-          ) : null}
-          <div className="tm-card" style={{ padding: 0 }}>
-            <button
-              className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
-              onClick={toggle}
-              type="button"
-              disabled={state.isLoading || update.isPending}
-              role="switch"
-              aria-checked={hidden}
-              aria-label="선수 카드 숨기기"
-              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="tm-text-body">선수 카드 숨기기</div>
-                <div className="tm-text-caption" style={{ marginTop: 3 }}>
-                  {update.isPending
-                    ? '저장하는 중이에요…'
-                    : hidden
-                      ? '지금은 카드가 보이지 않아요. 끄면 다시 보여요.'
-                      : '지금은 카드가 보여요. 켜면 어디에도 표시되지 않아요.'}
-                </div>
-              </div>
-              <span
-                className="tm-text-caption"
-                style={{ minWidth: 24, textAlign: 'right', color: hidden ? 'var(--blue500)' : 'var(--text-caption)' }}
-                aria-hidden="true"
-              >
-                {hidden ? 'ON' : 'OFF'}
-              </span>
-              <span className={`tm-toggle ${hidden ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
-            </button>
-          </div>
+          </section>
 
           <PlayerCardShapePicker />
           <PlayerCardPhotoAdjust />
@@ -1976,13 +1972,8 @@ function PlayerCardPhotoAdjust() {
   };
 
   return (
-    <>
-      <Card pad={16} style={{ marginTop: 16, marginBottom: 8 }}>
-        <div className="tm-text-label">카드 사진</div>
-        <div className="tm-text-caption" style={{ marginTop: 4 }}>
-          카드에는 사진의 위쪽 가운데가 들어가요. 얼굴이 어긋나 보이면 위치를 다시 맞출 수 있어요.
-        </div>
-      </Card>
+    <section style={{ marginTop: 16 }}>
+      <div className="tm-my-section-label">사진</div>
       {error ? (
         <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
           <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
@@ -2019,6 +2010,9 @@ function PlayerCardPhotoAdjust() {
           </Link>
         )}
       </div>
+      <div className="tm-text-caption tm-my-settings-footnote">
+        카드에는 사진의 위쪽 가운데가 들어가요. 얼굴이 어긋나 보이면 위치를 다시 맞출 수 있어요.
+      </div>
       {open && current ? (
         <ProfilePhotoCropper
           source={current}
@@ -2028,7 +2022,7 @@ function PlayerCardPhotoAdjust() {
           onCropped={save}
         />
       ) : null}
-    </>
+    </section>
   );
 }
 
@@ -2063,13 +2057,8 @@ function PlayerCardShapePicker() {
   ];
 
   return (
-    <>
-      <Card pad={16} style={{ marginTop: 16, marginBottom: 8 }}>
-        <div className="tm-text-label">카드 모양</div>
-        <div className="tm-text-caption" style={{ marginTop: 4 }}>
-          모양은 꾸미기예요 — 능력치나 등급은 바뀌지 않아요.
-        </div>
-      </Card>
+    <section style={{ marginTop: 16 }}>
+      <div className="tm-my-section-label">모양</div>
       {saveError ? (
         <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
           <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
@@ -2095,8 +2084,13 @@ function PlayerCardShapePicker() {
               style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: locked ? 'default' : 'pointer' }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="tm-text-body">
-                  {locked ? '🔒 ' : ''}{opt.label}
+                <div className="tm-text-body" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {/* 아이콘만으로 잠김을 전달하지 않는다 — 옆에 "잠김" 텍스트를 병행한다
+                      (teams-page.tsx의 <Lock/>비공개 배지와 같은 관례). 버튼 aria-label에
+                      이미 "(잠김)"이 있어 스크린리더에는 중복이지만 그쪽은 aria-hidden으로
+                      가려 두 번 읽히지 않는다. */}
+                  {locked ? <Lock size={13} aria-hidden="true" style={{ flexShrink: 0 }} /> : null}
+                  {locked ? '잠김 · ' : ''}{opt.label}
                 </div>
                 <div className="tm-text-caption" style={{ marginTop: 3 }}>{opt.sub}</div>
               </div>
@@ -2111,7 +2105,10 @@ function PlayerCardShapePicker() {
           );
         })}
       </div>
-    </>
+      <div className="tm-text-caption tm-my-settings-footnote">
+        모양은 꾸미기예요 — 능력치나 등급은 바뀌지 않아요.
+      </div>
+    </section>
   );
 }
 
@@ -2133,52 +2130,52 @@ export function ThemeSettingsPageClient() {
             </AppBackLink>
             <h1 className="tm-text-heading">화면 테마</h1>
           </div>
-          <Card pad={16} style={{ marginBottom: 8 }}>
-            <div className="tm-text-label">화면 밝기 고르기</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+          <section>
+            <div className="tm-my-section-label">화면 밝기</div>
+            {saveError ? (
+              <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+                <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요. 이 화면에서는 그대로 적용돼요.</div>
+              </Card>
+            ) : null}
+            <div className="tm-card" style={{ padding: 0 }} role="radiogroup" aria-label="화면 테마 선택">
+              {THEME_OPTIONS.map((option) => {
+                const selected = preference === option.key;
+                return (
+                  <button
+                    key={option.key}
+                    className="tm-my-menu-row tm-pressable"
+                    onClick={() => setPreference(option.key)}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    // 저장 중엔 다른 옵션도 함께 막는다 — 선택된 행만 막으면 저장 대기 중에
+                    // 다른 옵션을 눌러 PATCH 두 개가 동시에 날아갈 수 있고, 응답이 뒤바뀌어
+                    // 도착하면 서버에 최종 저장되는 값이 마지막 클릭과 달라질 수 있다.
+                    disabled={isSaving}
+                    style={{
+                      width: '100%',
+                      border: 'none',
+                      cursor: isSaving ? 'default' : 'pointer',
+                      textAlign: 'left',
+                      background: selected ? 'var(--tint-blue)' : 'none',
+                      opacity: isSaving && !selected ? 0.6 : 1,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="tm-text-body" style={{ color: selected ? 'var(--blue700)' : undefined }}>{option.label}</div>
+                      <div className="tm-text-caption" style={{ marginTop: 3 }}>{option.sub}</div>
+                    </div>
+                    {/* 컬러만으로 선택 상태를 전달하지 않도록 체크 아이콘 + 배경색을 함께 사용 */}
+                    {selected ? <Check size={18} strokeWidth={2.5} color="var(--blue500)" aria-hidden="true" /> : null}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="tm-text-caption tm-my-settings-footnote">
               기본값은 라이트예요. 로그인하면 이 기기뿐 아니라 다른 기기에서도 같은 설정으로 보여요.
             </div>
-          </Card>
-          {saveError ? (
-            <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요. 이 화면에서는 그대로 적용돼요.</div>
-            </Card>
-          ) : null}
-          <div className="tm-card" style={{ padding: 0 }} role="radiogroup" aria-label="화면 테마 선택">
-            {THEME_OPTIONS.map((option) => {
-              const selected = preference === option.key;
-              return (
-                <button
-                  key={option.key}
-                  className="tm-my-menu-row tm-pressable"
-                  onClick={() => setPreference(option.key)}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  // 저장 중엔 다른 옵션도 함께 막는다 — 선택된 행만 막으면 저장 대기 중에
-                  // 다른 옵션을 눌러 PATCH 두 개가 동시에 날아갈 수 있고, 응답이 뒤바뀌어
-                  // 도착하면 서버에 최종 저장되는 값이 마지막 클릭과 달라질 수 있다.
-                  disabled={isSaving}
-                  style={{
-                    width: '100%',
-                    border: 'none',
-                    cursor: isSaving ? 'default' : 'pointer',
-                    textAlign: 'left',
-                    background: selected ? 'var(--tint-blue)' : 'none',
-                    opacity: isSaving && !selected ? 0.6 : 1,
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="tm-text-body" style={{ color: selected ? 'var(--blue700)' : undefined }}>{option.label}</div>
-                    <div className="tm-text-caption" style={{ marginTop: 3 }}>{option.sub}</div>
-                  </div>
-                  {/* 컬러만으로 선택 상태를 전달하지 않도록 체크 아이콘 + 배경색을 함께 사용 */}
-                  {selected ? <Check size={18} strokeWidth={2.5} color="var(--blue500)" aria-hidden="true" /> : null}
-                </button>
-              );
-            })}
-          </div>
+          </section>
         </div>
       </div>
   );

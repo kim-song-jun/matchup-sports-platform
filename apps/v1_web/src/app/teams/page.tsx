@@ -22,13 +22,13 @@ export const revalidate = 0;
 
 export default async function TeamsPage({ searchParams }: { searchParams: SearchParams }) {
   const filtered = hasListFilter(await searchParams, TEAM_LIST_FILTER_PARAMS);
+  // 필터가 걸리면 클라이언트가 목록 seed 를 버리므로 받지도 않는다(LD 도 없음).
   const [page, sports] = await Promise.all([
-    fetchSeoSeed<CursorPage<V1Team>>(TEAM_LIST_SEED_PATH, 'teams'),
+    filtered ? Promise.resolve(null) : fetchSeoSeed<CursorPage<V1Team>>(TEAM_LIST_SEED_PATH, 'teams'),
     fetchSeoMasterSports(),
   ]);
 
-  // 필터가 걸리면 클라이언트가 seed 를 버리므로 LD 도 내지 않는다.
-  const ldItems = page && !filtered ? page.items : [];
+  const ldItems = page ? page.items : [];
 
   return (
     <>

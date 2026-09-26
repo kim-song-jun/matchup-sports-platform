@@ -166,6 +166,17 @@ describe('공개 목록 첫 HTML — seed 성공', () => {
 
     expect(html).not.toContain('application/ld+json');
   });
+
+  // 팀 목록은 필터가 걸리면 클라이언트가 seed 를 버린다 — 매치·팀매치는 무필터 전체 목록 쿼리가 seed 를 계속 쓴다.
+  it('/teams 는 필터가 걸린 주소에서 버려질 목록 seed 를 요청하지 않는다', async () => {
+    await serverHtml(TeamsPage, 'sportId=sport-futsal-uuid');
+    expect(requested).not.toContain('/teams?limit=20');
+  });
+
+  it('/matches 는 필터가 걸려도 전체 목록 쿼리용 seed 를 받는다', async () => {
+    await serverHtml(MatchesPage, 'regionId=region-1');
+    expect(requested).toContain('/matches');
+  });
 });
 
 describe('공개 목록 첫 HTML — API 실패', () => {

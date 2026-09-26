@@ -26,6 +26,8 @@
   color-scheme: light;
   --static-white: #ffffff;
   --static-black: #000000;
+  /* 테마와 무관하게 늘 어두운 지면(랜딩 CTA 배너·푸터·폰 목업 베젤). --grey900 은 다크에서 밝아진다. */
+  --static-ink: #191f28;
   /* 테마가 뒤집혀도 값이 고정되는 파랑. --static-white 배경 위에 얹는 텍스트처럼
    * "배경이 테마를 따라가지 않는" 자리에 쓴다 — 그런 곳에 --blue700 을 쓰면 다크에서
    * 파랑만 밝게 반전(#6ba8ff)해 흰 배경 위 2.42:1 로 무너진다.
@@ -6481,35 +6483,6 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   width: 0;
   height: 0;
   display: none;
-}
-
-/* ── 랜딩 종목 칩 — 준비중 상태 ────────────────────────────────────────────
- * .tm-landing-sport-chip (활성) 스타일과 시각 일관성 유지.
- * 컬러만으로 구분하지 않음 — '준비중' 텍스트 배지가 비색상 지표(a11y).
- * 하드코딩 색 없음 — 전부 토큰 참조. ─────────────────────────────────────*/
-
-/* 준비중 칩 컨테이너 — 활성 칩 대비 opacity로 muted 처리 */
-.tm-landing-sport-chip-soon {
-  opacity: 0.55;
-  cursor: default;
-  position: relative;
-}
-
-/* '준비중' 텍스트 배지 — 칩 우상단 인라인 뱃지 */
-.tm-landing-sport-soon {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 4px;
-  border-radius: var(--radius-tight);
-  /* [공개 화면 R-T2 정리] '준비 중' 실텍스트 배지 — 고정폭 없이 padding만 있어
-     캡션 토큰으로 올려도 넘치지 않는다. */
-  font-size: var(--font-size-caption);
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: 0;
-  background: var(--grey150);
-  color: var(--grey600);
-  /* 비색상 지표: 텍스트 '준비중'이 상태를 전달 */
 }
 
 /* ── Team Invitation UI ───────────────────────────────────────────────────────

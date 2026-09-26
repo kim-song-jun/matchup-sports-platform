@@ -53,6 +53,23 @@ describe('team match images', () => {
   });
 });
 
+describe('team match detail — recordEntry 렌더 순서', () => {
+  // recordEntry가 히어로(.tm-team-vs-hero, 뒤로가기 포함) 앞으로 되돌아가면 모바일에서
+  // 뒤로가기보다 진행 상황 카드가 먼저 보인다 — DOM 순서를 직접 비교해 그 회귀를 잡는다.
+  it('recordEntry가 .tm-team-vs-hero 다음에 렌더된다', () => {
+    const model = getTeamMatchDetailViewModel();
+    const { container } = renderPage(
+      <TeamMatchDetailPageView model={model} recordEntry={<div data-testid="record-entry-marker">진행 중</div>} />,
+    );
+
+    const hero = container.querySelector('.tm-team-vs-hero');
+    const marker = screen.getByTestId('record-entry-marker');
+
+    expect(hero).toBeInTheDocument();
+    expect(hero!.compareDocumentPosition(marker) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
 describe('platform-managed team match provenance', () => {
   it.each([false, true])('미배정 플랫폼 대진은 두 팀 자리를 보여준다 (마감=%s)', (closed) => {
     const model = getTeamMatchDetailViewModel();

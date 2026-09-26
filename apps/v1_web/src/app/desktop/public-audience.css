@@ -1,0 +1,209 @@
+/*
+ * 대상별 안내(/for/players · /for/teams · /for/organizers). 공용 셸·섹션은 public-site.css 것을 쓰고,
+ * 여기에는 이 세 페이지에만 있는 블록(사실 줄·카드 목록·단계·FAQ 요약·교차 링크)만 둔다.
+ */
+
+/* 히어로는 이동 경로 바로 아래라 윗 여백을 줄인다 */
+.tm-ps-aud > #intro {
+  padding-top: 16px;
+}
+
+.tm-ps-aud-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.tm-ps-aud-ctas .tm-btn {
+  flex: 1 1 160px;
+  min-height: 48px;
+}
+
+.tm-ps-aud-note {
+  margin: 12px 0 0;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.tm-ps-aud-facts {
+  display: grid;
+  gap: 1px;
+  margin: 24px 0 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--border);
+  overflow: hidden;
+}
+
+.tm-ps-aud-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--card-surface);
+}
+
+.tm-ps-aud-fact dt {
+  font-size: var(--font-size-label);
+  color: var(--text-muted);
+}
+
+.tm-ps-aud-fact dd {
+  margin: 0;
+  font-size: var(--font-size-body-sm);
+  font-weight: 700;
+  color: var(--text-strong);
+  text-align: right;
+}
+
+.tm-ps-aud-points,
+.tm-ps-aud-steps,
+.tm-ps-aud-faq,
+.tm-ps-aud-more,
+.tm-ps-aud-others {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-ps-aud-points {
+  display: grid;
+  gap: 12px;
+}
+
+.tm-ps-aud-point {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card-surface);
+}
+
+.tm-ps-aud-point-title {
+  margin: 0 0 8px;
+  font-size: var(--font-size-body-lg);
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text-strong);
+}
+
+.tm-ps-aud-point p,
+.tm-ps-aud-step p,
+.tm-ps-aud-faq p {
+  margin: 0;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.tm-ps-aud-steps {
+  display: grid;
+  gap: 16px;
+}
+
+.tm-ps-aud-step {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.tm-ps-aud-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-circle);
+  border: 1.5px solid var(--blue500);
+  background: var(--card-surface);
+  color: var(--blue700);
+  font-size: var(--font-size-body-sm);
+  font-weight: 800;
+}
+
+.tm-ps-aud-faq {
+  border-top: 1px solid var(--border);
+}
+
+.tm-ps-aud-faq li {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tm-ps-aud-faq .tm-ps-aud-point-title {
+  margin-bottom: 4px;
+}
+
+.tm-ps-aud-faq-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--text-strong);
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 4px;
+}
+
+.tm-ps-aud-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin-top: 16px;
+}
+
+.tm-ps-aud-others {
+  display: grid;
+  gap: 12px;
+}
+
+.tm-ps-aud-other {
+  display: grid;
+  gap: 4px;
+  min-height: 44px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card-surface);
+  font-size: var(--font-size-body);
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--text-strong);
+  transition: border-color var(--duration-fast) ease;
+}
+
+.tm-ps-aud-other-label {
+  font-size: var(--font-size-label);
+  font-weight: 700;
+  color: var(--blue700);
+}
+
+@media (hover: hover) {
+  .tm-ps-aud-other:hover { border-color: var(--blue500); }
+  .tm-ps-aud-faq-link:hover { text-decoration-color: currentColor; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-ps-aud-other { transition: none; }
+}
+
+/* ─── 태블릿 (768+) ─── */
+@media (min-width: 768px) {
+  .tm-ps-aud > #intro { padding-top: 24px; }
+  .tm-ps-aud-ctas .tm-btn { flex: 0 0 auto; padding-inline: 28px; }
+  .tm-ps-aud-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tm-ps-aud-fact { flex-direction: column; justify-content: flex-start; gap: 4px; }
+  .tm-ps-aud-fact dd { text-align: left; font-size: var(--font-size-body); }
+  .tm-ps-aud-points { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tm-ps-aud-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+  .tm-ps-aud-step { grid-template-columns: minmax(0, 1fr); }
+  .tm-ps-aud-others { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ─── 데스크톱 (1024+) ─── */
+@media (min-width: 1024px) {
+  .tm-ps-aud > #intro { padding-top: 32px; }
+  .tm-ps-aud-points { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tm-ps-aud-faq { max-width: 880px; }
+}

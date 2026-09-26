@@ -817,7 +817,7 @@ export const v1MswHandlers = [
       summary: {
         total: statusSource.length,
         byStatus: countFacet(statusSource, ['received', 'reviewing', 'answered', 'closed'], (inquiry) => inquiry.status),
-        byCategory: countFacet(categorySource, ['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other'], (inquiry) => inquiry.category),
+        byCategory: countFacet(categorySource, ['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other', 'tournament_hosting', 'partnership'], (inquiry) => inquiry.category),
         byReportReason: countFacet(reportReasonSource, ['spam', 'harassment', 'impersonation', 'inappropriate', 'other'], (inquiry) => inquiry.reportReason ?? ''),
       },
     });

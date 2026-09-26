@@ -1,3 +1,4 @@
+import type { V1InquiryCategory } from '@prisma/client';
 import type { GameOperationClaim, GameOperationHandler } from '../jobs/v1-game-operations-worker.service';
 
 export const INQUIRY_SLACK_NOTIFICATION_TYPE = 'INQUIRY_SLACK_NOTIFICATION';
@@ -18,7 +19,8 @@ type InquirySlackNotifierOptions = {
   timeoutMs?: number;
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
+// 분류 전수를 키로 강제해 새 분류의 라벨 누락을 tsc 가 잡게 한다.
+const CATEGORY_LABELS: Record<V1InquiryCategory, string> = {
   account: '계정',
   match: '매치',
   team: '팀',
@@ -26,6 +28,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   payment_refund: '결제·환불',
   report: '신고',
   other: '기타',
+  tournament_hosting: '대회 개설',
+  partnership: '제휴',
 };
 
 const SLACK_WEBHOOK_PATTERN = /^https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/;
@@ -130,7 +134,7 @@ function nullableString(value: unknown, field: string): string | null {
 }
 
 function buildSlackMessage(payload: InquirySlackNotificationPayload, adminUrl: string) {
-  const category = CATEGORY_LABELS[payload.category] ?? payload.category;
+  const category = CATEGORY_LABELS[payload.category as V1InquiryCategory] ?? payload.category;
   const related = payload.relatedType && payload.relatedId
     ? `${payload.relatedType} / ${payload.relatedId}`
     : '없음';

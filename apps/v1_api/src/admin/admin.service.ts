@@ -84,7 +84,17 @@ const NOTICE_LIST_STATUSES = ['published', 'draft', 'archived'] as const;
 const NOTICE_AUDIENCES = ['public', 'users', 'admins'] as const;
 const POPUP_LIST_STATUSES = ['published', 'archived', 'draft'] as const;
 const INQUIRY_LIST_STATUSES = ['received', 'reviewing', 'answered', 'closed'] as const;
-const INQUIRY_CATEGORIES = ['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other'] as const;
+const INQUIRY_CATEGORIES = [
+  'account',
+  'match',
+  'team',
+  'tournament',
+  'payment_refund',
+  'report',
+  'other',
+  'tournament_hosting',
+  'partnership',
+] as const;
 const INQUIRY_REPORT_REASONS = ['spam', 'harassment', 'impersonation', 'inappropriate', 'other'] as const;
 const ADMIN_LIST_STATUSES = ['active', 'suspended', 'revoked'] as const;
 // 신고 롤업 집계 윈도우 — 신고 상세 요약과 신고 누적 팀 목록의 "최근" 이 이 값을 공유한다.

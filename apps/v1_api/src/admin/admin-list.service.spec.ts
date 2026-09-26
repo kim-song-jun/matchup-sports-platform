@@ -873,6 +873,8 @@ describe('AdminService — list/detail endpoints', () => {
           payment_refund: 0,
           report: 2,
           other: 0,
+          tournament_hosting: 0,
+          partnership: 0,
         },
         // null 그룹(신고 아닌 문의 11건)은 버려야 한다 — 사유 칩에 넣을 자리가 없고,
         // 넣으면 "사유 미상 11건" 처럼 보여 실제 신고 건수를 오해하게 만든다.

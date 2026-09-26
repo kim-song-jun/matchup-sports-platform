@@ -16,4 +16,7 @@
 @import "./notifications.css";
 @import "./notices.css";
 @import "./landing.css";
+@import "./public-site.css";
+@import "./public-audience.css";
+@import "./public-help.css";
 @import "./tournaments.css";

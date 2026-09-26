@@ -1,8 +1,6 @@
 import type { CSSProperties } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
-import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { LandingCtaLink } from './landing-cta-link';
 
 /* 운영 종목은 v1_api seed 의 활성 4종뿐이다. 준비 중 종목·일정은 근거가 없어 싣지 않는다. */
@@ -17,15 +15,6 @@ const HOW_STEPS = [
   { title: '간편하게 가입하기', desc: '소셜 계정이나 이메일로 가입하고, 휴대폰 인증까지 한 번에 마쳐요.' },
   { title: '매치 찾거나 직접 열기', desc: '종목과 지역으로 매치를 찾아 신청하거나, 원하는 시간·장소로 매치를 직접 열어요.' },
   { title: '모여서 함께 뛰기', desc: '모집이 차면 약속한 시간과 장소에서 만나 경기만 즐기면 돼요.' },
-] as const;
-
-const FOOTER_LINKS = [
-  { href: '/notices', label: '공지사항' },
-  { href: '/terms?document=terms', label: '서비스 이용약관' },
-  { href: '/terms?document=privacy', label: '개인정보처리방침' },
-  { href: '/terms?document=location', label: '위치기반서비스 이용약관' },
-  { href: '/terms?document=tournament-policy', label: '대회 운영정책' },
-  { href: '/terms?document=support', label: '고객센터' },
 ] as const;
 
 const stagger = (i: number) => ({ '--i': i }) as CSSProperties;
@@ -106,27 +95,5 @@ export function LandingCtaBanner() {
         </div>
       </div>
     </section>
-  );
-}
-
-export function LandingFooter() {
-  return (
-    <footer className="tm-landing-footer" data-mobile-cta-hide>
-      <div className="tm-landing-section-inner">
-        <div className="tm-landing-footer-inner">
-          <div className="tm-landing-footer-brand">
-            <BrandMark size={24} />
-            <span className="tm-landing-footer-name">teameet</span>
-            <span>생활체육 매치·팀·대회 플랫폼</span>
-          </div>
-          <nav className="tm-landing-footer-links" aria-label="약관 및 고객 지원">
-            {FOOTER_LINKS.map((link) => (
-              <Link key={link.href} className="tm-landing-footer-link" href={link.href}>{link.label}</Link>
-            ))}
-          </nav>
-        </div>
-        <p className="tm-landing-footer-copy">© 2026 teameet. All rights reserved.</p>
-      </div>
-    </footer>
   );
 }

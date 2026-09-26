@@ -3,11 +3,9 @@ import Link from 'next/link';
 import { AuthFrame } from '@/components/auth/auth-page';
 import { WITHDRAWAL_GRACE_NOTICE } from '@/components/my/withdrawal-guidance';
 import { Card } from '@/components/v1-ui/primitives';
+import { fetchPublicSiteInfo } from '@/lib/public-site/site-info';
 
-const ACCOUNT_DELETION_EMAIL = 'teameetsports@naver.com';
-const ACCOUNT_DELETION_MAILTO = `mailto:${ACCOUNT_DELETION_EMAIL}?subject=${encodeURIComponent(
-  '[Teameet] 계정 삭제 요청',
-)}`;
+const ACCOUNT_DELETION_SUBJECT = encodeURIComponent('[Teameet] 계정 삭제 요청');
 
 export const metadata: Metadata = {
   title: '계정 삭제 요청',
@@ -15,7 +13,9 @@ export const metadata: Metadata = {
   alternates: { canonical: '/account-deletion' },
 };
 
-export default function AccountDeletionPage() {
+export default async function AccountDeletionPage() {
+  // 문의 이메일은 푸터·문의 페이지와 같은 어드민 설정 값을 쓴다.
+  const { contactEmail } = await fetchPublicSiteInfo();
   return (
     <AuthFrame topTitle="계정 삭제 안내" backHref="/landing">
       <div className="tm-auth-body">
@@ -40,11 +40,11 @@ export default function AccountDeletionPage() {
             <p className="tm-text-caption" style={{ margin: '8px 0 16px', lineHeight: 1.6 }}>
               가입 이메일 또는 닉네임과 함께 삭제 요청을 보내 주세요. 계정 보호를 위해 운영팀이 본인 확인을 추가로 요청할 수 있어요.
             </p>
-            <a className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={ACCOUNT_DELETION_MAILTO}>
+            <a className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" href={`mailto:${contactEmail}?subject=${ACCOUNT_DELETION_SUBJECT}`}>
               이메일로 삭제 요청하기
             </a>
             <p className="tm-text-caption" style={{ margin: '10px 0 0', textAlign: 'center' }}>
-              {ACCOUNT_DELETION_EMAIL}
+              {contactEmail}
             </p>
           </Card>
 

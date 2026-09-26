@@ -195,8 +195,17 @@ export class AdminInquiryListQueryDto {
   status?: 'received' | 'reviewing' | 'answered' | 'closed';
 
   @IsOptional()
-  @IsIn(['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other'])
-  category?: 'account' | 'match' | 'team' | 'tournament' | 'payment_refund' | 'report' | 'other';
+  @IsIn(['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other', 'tournament_hosting', 'partnership'])
+  category?:
+    | 'account'
+    | 'match'
+    | 'team'
+    | 'tournament'
+    | 'payment_refund'
+    | 'report'
+    | 'other'
+    | 'tournament_hosting'
+    | 'partnership';
 
   @IsOptional()
   @IsIn(['spam', 'harassment', 'impersonation', 'inappropriate', 'other'])

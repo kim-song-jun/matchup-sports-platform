@@ -3,6 +3,7 @@
  * **script 태그를 깨뜨리지 않는 것**. 아래는 그 둘만 지킨다.
  */
 import { describe, expect, it } from 'vitest';
+import { expectNoNonFootballCompetitionClaim } from '@/test/public-claims';
 import {
   buildBreadcrumbLd,
   buildSiteIdentityLd,
@@ -205,11 +206,21 @@ describe('buildSportsTeamLd', () => {
 
 describe('buildSiteIdentityLd', () => {
   it('Organization 과 WebSite 를 각각 한 번씩만 선언하고 서로 잇는다', () => {
-    const graph = buildSiteIdentityLd()['@graph'] as Array<Record<string, unknown>>;
+    const graph = buildSiteIdentityLd({ contactEmail: 'help@example.com' })['@graph'] as Array<Record<string, unknown>>;
     const types = graph.map((node) => node['@type']);
 
     expect(types).toEqual(['Organization', 'WebSite']);
     expect(graph[1].publisher).toEqual({ '@id': organizationId() });
+  });
+
+  it('contactPoint 이메일은 넘겨받은 사업자 정보 값이다', () => {
+    const graph = buildSiteIdentityLd({ contactEmail: 'help@example.com' })['@graph'] as Array<Record<string, unknown>>;
+    expect(graph[0].contactPoint).toMatchObject({ '@type': 'ContactPoint', email: 'help@example.com' });
+  });
+
+  it('Organization 설명이 대회 종목을 축구·풋살 밖으로 약속하지 않는다', () => {
+    const graph = buildSiteIdentityLd({ contactEmail: 'help@example.com' })['@graph'] as Array<Record<string, unknown>>;
+    expectNoNonFootballCompetitionClaim(String(graph[0].description));
   });
 });
 

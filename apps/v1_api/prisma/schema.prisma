@@ -321,6 +321,8 @@ enum V1InquiryCategory {
   payment_refund
   report
   other
+  tournament_hosting
+  partnership
 }
 
 enum V1InquiryReportReason {
@@ -3067,6 +3069,24 @@ model V1ReviewPolicySettings {
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   @@map("v1_review_policy_settings")
+}
+
+/// 공개 페이지 푸터·문의 폼에 노출하는 사업자 정보. 어드민이 런타임에 편집한다.
+model V1SiteInfoSettings {
+  id                         String   @id @default("singleton")
+  companyName                String?  @map("company_name")
+  representativeName         String?  @map("representative_name")
+  businessRegistrationNumber String?  @map("business_registration_number")
+  address                    String?
+  mailOrderSalesNumber       String?  @map("mail_order_sales_number")
+  contactEmail               String?  @map("contact_email")
+  /// null 이면 서비스가 기본 문구("문의 처리 완료 후 1년")로 읽는다.
+  guestInquiryRetention      String?  @map("guest_inquiry_retention")
+  // 감사 추적용 참조 문자열 — FK 관계는 두지 않는다(V1IntegrationSettings와 같은 규칙).
+  updatedByAdminUserId       String?  @map("updated_by_admin_user_id")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  @@map("v1_site_info_settings")
 }
 
 model V1Game {

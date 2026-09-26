@@ -10,6 +10,7 @@ import { NavigationHistoryTracker } from '@/components/v1-ui/navigation-history-
 import { StaticCacheBootstrap } from '@/components/v1-ui/static-cache-bootstrap';
 import { publicAssetPath } from '@/lib/assets';
 import { buildSiteVerification, getSiteOrigin, SITE_FEED_ALTERNATE_TYPES } from '@/lib/seo';
+import { fetchPublicSiteInfo } from '@/lib/public-site/site-info';
 import { buildSiteIdentityLd } from '@/lib/structured-data';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 import './globals.css';
@@ -22,7 +23,7 @@ export const metadata: Metadata = {
     default: 'Teameet',
     template: '%s | Teameet',
   },
-  description: '같이 뛸 사람을 한 번에 — 축구·풋살·러닝·수영 매치·팀·대회 플랫폼',
+  description: '같이 뛸 사람을 한 번에 — 축구·풋살·러닝·수영 매치·팀 플랫폼. 축구·풋살 대회도 열려요.',
   category: 'sports',
   formatDetection: { email: false, address: false, telephone: false },
   alternates: { types: SITE_FEED_ALTERNATE_TYPES },
@@ -37,11 +38,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: ReactNode;
 }>) {
+  const siteInfo = await fetchPublicSiteInfo();
   return (
     <html lang="ko" suppressHydrationWarning>
       <head>
@@ -58,7 +60,7 @@ export default function RootLayout({
         {/* Organization·WebSite 엔티티는 사이트 전체에서 여기 한 번만 선언한다 —
             페이지마다 다시 선언하면 같은 실체가 검색엔진 안에서 쪼개진다. 개별 페이지의
             구조화 데이터는 @id로 이 선언을 참조한다(src/lib/structured-data.ts 참고). */}
-        <JsonLd data={buildSiteIdentityLd()} />
+        <JsonLd data={buildSiteIdentityLd(siteInfo)} />
       </head>
       <body>
         <NavigationHistoryTracker />

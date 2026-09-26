@@ -43,6 +43,8 @@ const CATEGORY_OPTIONS: Array<{ value: '' | V1InquiryCategory; label: string }> 
   { value: 'payment_refund', label: '결제/환불' },
   { value: 'report', label: '신고' },
   { value: 'other', label: '기타' },
+  { value: 'tournament_hosting', label: '대회 개설' },
+  { value: 'partnership', label: '제휴' },
 ];
 
 const STATUS_LABEL: Record<V1InquiryStatus, string> = {
@@ -60,6 +62,8 @@ const CATEGORY_LABEL: Record<V1InquiryCategory, string> = {
   payment_refund: '결제/환불',
   report: '신고',
   other: '기타',
+  tournament_hosting: '대회 개설',
+  partnership: '제휴',
 };
 
 // 신고 사유는 분류가 'report'일 때만 의미가 있다 — 다른 분류에서는 항상 null이라 보여줄 게 없다.

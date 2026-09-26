@@ -1,5 +1,7 @@
 import { formatTournamentDateLong } from '@/lib/date-utils';
 import { absoluteSiteUrl, fetchPublicV1 } from '@/lib/seo';
+import { PUBLIC_SITE_ROUTES, type PublicSiteRoute } from '@/lib/public-site/routes';
+import { fetchPublicSiteInfo } from '@/lib/public-site/site-info';
 import type { V1TournamentListItem, V1TournamentListPage } from '@/types/api';
 
 /**
@@ -17,13 +19,13 @@ export const revalidate = 0;
 const MAX_LISTED_TOURNAMENTS = 15;
 
 export async function GET(): Promise<Response> {
-  const tournaments = await fetchOpenTournaments();
+  const [tournaments, siteInfo] = await Promise.all([fetchOpenTournaments(), fetchPublicSiteInfo()]);
 
   const body = [
     '# Teameet (팀밋)',
     '',
-    '> 축구·풋살·러닝·수영 생활체육 아마추어 대회를 열고, 팀과 선수를 매칭하고,',
-    '> 경기 결과·기록을 남기는 한국의 멀티스포츠 플랫폼이에요. 이 사이트는 여기서 운영되는',
+    '> 축구·풋살·러닝·수영 생활체육의 팀과 선수를 매칭하는 한국의 멀티스포츠 플랫폼이에요.',
+    '> 축구·풋살 아마추어 대회를 열고 경기 결과·기록을 남겨요. 이 사이트는 여기서 운영되는',
     '> 대회의 일정·대진·결과·순위에 대한 1차 소스(원출처)예요.',
     '',
     '## 무엇의 원출처인가',
@@ -45,6 +47,11 @@ export async function GET(): Promise<Response> {
     `- [이벤트](${absoluteSiteUrl('/events')}): 진행 중인 이벤트`,
     `- [공지사항](${absoluteSiteUrl('/notices')}): 서비스 공지`,
     `- [서비스 소개](${absoluteSiteUrl('/landing')}): 매치부터 대회까지 한 앱에서 — 매치·팀·대회·리그 신청, 라이브 스코어, 기록·선수 카드를 실제 화면 구성으로 소개`,
+    ...PUBLIC_SITE_ROUTES.filter((route) => !isHelpDetail(route)).map(routeLine),
+    '',
+    '## 이용 가이드와 용어',
+    '',
+    ...PUBLIC_SITE_ROUTES.filter(isHelpDetail).map(routeLine),
     '',
     ...(tournaments.length > 0
       ? [
@@ -75,7 +82,8 @@ export async function GET(): Promise<Response> {
     '',
     '## 문의',
     '',
-    '- 이메일: teameetsports@naver.com',
+    `- 이메일: ${siteInfo.contactEmail}`,
+    `- 문의 창구 안내: ${absoluteSiteUrl('/contact')}`,
     '- 인스타그램: https://www.instagram.com/teameet_official/',
     '',
   ].join('\n');
@@ -86,6 +94,15 @@ export async function GET(): Promise<Response> {
       'cache-control': 'public, max-age=0, s-maxage=300, stale-while-revalidate=600',
     },
   });
+}
+
+/** 도움말 허브 아래 세부 페이지(가이드·용어집)는 핵심 페이지 목록과 따로 싣는다. */
+function isHelpDetail(route: PublicSiteRoute): boolean {
+  return route.path.startsWith('/help/');
+}
+
+function routeLine(route: PublicSiteRoute): string {
+  return `- [${route.title}](${absoluteSiteUrl(route.path)}): ${route.summary}`;
 }
 
 /**

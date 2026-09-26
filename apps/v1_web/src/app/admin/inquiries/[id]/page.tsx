@@ -42,6 +42,8 @@ const CATEGORY_LABEL: Record<V1InquiryCategory, string> = {
   payment_refund: '결제/환불',
   report: '신고',
   other: '기타',
+  tournament_hosting: '대회 개설',
+  partnership: '제휴',
 };
 
 const STATUS_OPTIONS: Array<{ value: V1InquiryStatus; label: string }> = [

@@ -253,6 +253,8 @@ import type {
   V1UpdateIntegrationSettingsPayload,
   V1ReviewPolicySettings,
   V1UpdateReviewPolicySettingsPayload,
+  V1AdminSiteInfo,
+  V1UpdateSiteInfoPayload,
   V1PublicKakaoMapsKeyResponse,
   V1TournamentOperationsBoardFilters,
   V1TournamentOperationsBoardPage,
@@ -5018,6 +5020,25 @@ export function useV1UpdateReviewPolicySettings() {
     onSuccess: (data) => {
       queryClient.setQueryData(v1Keys.adminReviewPolicySettings(), data);
       void queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'reviews'] });
+    },
+  });
+}
+
+/** GET /admin/site-info — 공개 페이지 사업자 정보·비회원 문의 보관 기간 */
+export function useV1AdminSiteInfo() {
+  return useQuery({
+    queryKey: v1Keys.adminSiteInfo(),
+    queryFn: () => v1Get<V1AdminSiteInfo>('/admin/site-info'),
+  });
+}
+
+/** PUT /admin/site-info — 바꾼 필드만 보낸다(부분 갱신). 공개 페이지에는 ISR 주기(300초) 뒤 반영된다. */
+export function useV1UpdateSiteInfo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: V1UpdateSiteInfoPayload) => v1Put<V1AdminSiteInfo>('/admin/site-info', payload),
+    onSuccess: (data) => {
+      queryClient.setQueryData(v1Keys.adminSiteInfo(), data);
     },
   });
 }

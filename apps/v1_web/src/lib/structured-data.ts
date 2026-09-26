@@ -27,7 +27,6 @@ export const ORGANIZATION_ALTERNATE_NAME = '팀밋';
 
 /** 실제로 운영 중인 공식 표면만 넣는다 — 없는 계정을 적으면 엔티티 신뢰가 깨진다. */
 const OFFICIAL_SURFACES = ['https://www.instagram.com/teameet_official/'] as const;
-const CONTACT_EMAIL = 'teameetsports@naver.com';
 
 export function organizationId(): string {
   return `${getSiteOrigin()}/#organization`;
@@ -55,8 +54,9 @@ function absoluteImageUrl(value: string): string {
 /**
  * 루트 레이아웃에서 1회만 렌더한다. Organization과 WebSite를 `@graph`로 묶어
  * "이 사이트를 운영하는 조직"과 "사이트" 사이의 관계를 명시한다.
+ * 연락 이메일은 공개 페이지 푸터·문의 페이지와 같은 어드민 설정(`fetchPublicSiteInfo`)에서 받는다.
  */
-export function buildSiteIdentityLd(): JsonLdNode {
+export function buildSiteIdentityLd({ contactEmail }: { readonly contactEmail: string }): JsonLdNode {
   return {
     '@context': 'https://schema.org',
     '@graph': [
@@ -68,12 +68,12 @@ export function buildSiteIdentityLd(): JsonLdNode {
         url: absoluteSiteUrl('/'),
         logo: absoluteSiteUrl('/brand/icon-512.png'),
         description:
-          '축구·풋살·러닝·수영 생활체육의 아마추어 대회와 팀·매치를 운영하는 멀티스포츠 매칭 플랫폼.',
+          '축구·풋살·러닝·수영 생활체육의 팀·매치를 잇는 멀티스포츠 매칭 플랫폼. 축구·풋살 아마추어 대회도 함께 운영.',
         sameAs: [...OFFICIAL_SURFACES],
         contactPoint: {
           '@type': 'ContactPoint',
           contactType: 'customer support',
-          email: CONTACT_EMAIL,
+          email: contactEmail,
           availableLanguage: ['ko'],
         },
       },

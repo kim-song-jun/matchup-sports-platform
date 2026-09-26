@@ -318,7 +318,10 @@ export type V1InquiryCategory =
   | 'tournament'
   | 'payment_refund'
   | 'report'
-  | 'other';
+  | 'other'
+  // 비회원 공개 문의(POST /public/inquiries) 전용 — 회원 문의 폼에는 없다.
+  | 'tournament_hosting'
+  | 'partnership';
 
 export type V1InquiryStatus = 'received' | 'reviewing' | 'answered' | 'closed';
 
@@ -4358,6 +4361,47 @@ export type V1UpdateReviewPolicySettingsPayload = {
 export type V1UpdateIntegrationSettingsPayload = {
   kakaoRestApiKey?: string;
   kakaoMapsJsKey?: string;
+};
+
+/** GET/PUT /admin/site-info 응답. 공개 페이지 푸터·문의 페이지가 `GET /public/site-info` 로 읽는 값의 원본. */
+export type V1AdminSiteInfo = {
+  companyName: string | null;
+  representativeName: string | null;
+  businessRegistrationNumber: string | null;
+  address: string | null;
+  mailOrderSalesNumber: string | null;
+  contactEmail: string | null;
+  /** 저장값이 없으면 서버 기본 문구가 채워진다(`guestInquiryRetentionIsDefault` 로 구분). */
+  guestInquiryRetention: string;
+  guestInquiryRetentionIsDefault: boolean;
+  updatedByAdminUserId: string | null;
+  updatedAt: string | null;
+};
+
+export type V1SiteInfoField =
+  | 'companyName'
+  | 'representativeName'
+  | 'businessRegistrationNumber'
+  | 'address'
+  | 'mailOrderSalesNumber'
+  | 'contactEmail'
+  | 'guestInquiryRetention';
+
+/** PUT /admin/site-info 바디 — 필드 없음=유지, ""=지우기, 값=저장(서버가 앞뒤 공백 제거). */
+export type V1UpdateSiteInfoPayload = Partial<Record<V1SiteInfoField, string>>;
+
+/** POST /public/inquiries 바디 — 비회원 대회 개설·제휴 문의. `website` 는 숨긴 honeypot 칸 값 그대로다. */
+export type V1PublicInquiryPayload = {
+  category: 'tournament_hosting' | 'partnership';
+  organization: string;
+  name: string;
+  email: string;
+  message: string;
+  sportType: '' | 'soccer' | 'futsal' | 'other';
+  expectedSchedule: string;
+  consent: true;
+  website: string;
+  formStartedAt: number;
 };
 
 /** GET /public/integrations/kakao-maps-key — 인증 불필요, 카카오맵 JS SDK 로드용 공개 키. */

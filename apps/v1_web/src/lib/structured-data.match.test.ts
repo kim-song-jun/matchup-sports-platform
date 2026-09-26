@@ -89,6 +89,12 @@ describe('buildMatchEventLd', () => {
     expect(buildMatchEventLd(match({ displayState: 'expired' }), 'match-1')).not.toHaveProperty('eventStatus');
   });
 
+  it('끝난 경기는 EventScheduled — schema.org 에 없는 EventCompleted 를 만들지 않는다', () => {
+    expect(buildMatchEventLd(match({ displayState: 'completed' }), 'match-1')).toMatchObject({
+      eventStatus: 'https://schema.org/EventScheduled',
+    });
+  });
+
   it('지역을 모르면 구장 이름만 싣고, 지역 미정 문구를 주소로 만들지 않는다', () => {
     const ld = buildMatchEventLd(match({ region: null, regionName: null }), 'match-1');
 

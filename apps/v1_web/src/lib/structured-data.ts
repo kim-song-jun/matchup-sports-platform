@@ -176,6 +176,8 @@ export function buildSportsEventLd(
 /**
  * 매치·팀매치 상태 → eventStatus. 모집 실패로 열리지 않은 경기(`expired`)는 schema.org 에
  * 맞는 값이 없어 필드를 비운다 — "예정대로"라고 단정하면 틀린 사실이 된다.
+ * 끝난 경기(`completed`)도 EventScheduled 다: EventStatusType 에 "완료" 값은 없고(EventCompleted 는
+ * 존재하지 않는 값), 예정대로 열렸다는 뜻이라 맞다. 종료 여부는 endDate 가 전한다.
  */
 function matchEventStatusOf(status: string): string | null {
   if (status === 'cancelled') return 'https://schema.org/EventCancelled';

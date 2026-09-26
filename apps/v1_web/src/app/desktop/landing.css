@@ -350,7 +350,7 @@ html:has(.tm-landing) {
 
 .tm-landing-float[data-pos='b'] {
   right: 0;
-  top: 8%;
+  top: 0;
 }
 
 .tm-landing-float-card {
@@ -1717,6 +1717,10 @@ html:has(.tm-landing) {
   box-shadow: var(--shadow-card);
 }
 
+.tm-landing-noti li[data-extra] {
+  display: none;
+}
+
 .tm-landing-noti-app {
   flex: none;
   overflow: hidden;
@@ -2236,6 +2240,8 @@ html:has(.tm-landing) {
 
 .tm-landing[data-motion='on'] .tm-landing-noti li:nth-child(2) { transition-delay: 350ms; }
 .tm-landing[data-motion='on'] .tm-landing-noti li:nth-child(3) { transition-delay: 700ms; }
+.tm-landing[data-motion='on'] .tm-landing-noti li:nth-child(4) { transition-delay: 1050ms; }
+.tm-landing[data-motion='on'] .tm-landing-noti li:nth-child(5) { transition-delay: 1400ms; }
 
 .tm-landing[data-motion='on'] .tm-landing-rate-track i {
   transition: transform 1000ms var(--ease-out) 200ms;
@@ -2349,6 +2355,23 @@ html:has(.tm-landing) {
   .tm-landing-mobile-cta { display: none; }
 }
 
+/* 768–1023: aside 칸이 좁아 사실 스트립을 세 칸 대신 행으로 쌓는다 */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tm-landing-hero-facts { grid-template-columns: 1fr; }
+  .tm-landing-fact {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 12px 16px;
+    text-align: left;
+  }
+  .tm-landing-fact + .tm-landing-fact {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+}
+
 /* ─── 투어 sticky 폰(768+ 이면서 폰이 세로로 다 들어갈 때) ───
  * 폰(464+16px)이 top 84 에서 잘리지 않는 높이만 sticky 로 둔다. 그보다 낮은 창(가로 폰 등)은
  * 모바일처럼 스텝별 미니 화면을 쓴다. 이 조건은 landing-motion.ts TOUR_STAGE_QUERY 와 같아야 한다. */
@@ -2411,6 +2434,7 @@ html:has(.tm-landing) {
   }
   .tm-landing-bento-card { padding: 28px; }
   .tm-landing-bento-card[data-size='tall'] { grid-column: 1; grid-row: span 2; }
+  .tm-landing-noti li[data-extra] { display: flex; }
   .tm-landing-bento-card[data-size='wide'] { grid-column: 2 / span 2; }
 
   .tm-landing-sport { padding: 16px 16px 24px; }

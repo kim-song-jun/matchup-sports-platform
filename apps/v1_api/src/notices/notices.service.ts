@@ -12,6 +12,7 @@ type PublicNotice = {
   content: Prisma.JsonValue | null;
   contentVersion: number;
   publishedAt: Date | null;
+  updatedAt?: Date;
 };
 
 @Injectable()
@@ -77,6 +78,7 @@ export class NoticesService {
         contentJson: true,
         contentVersion: true,
         publishedAt: true,
+        updatedAt: true,
       },
     });
 
@@ -94,6 +96,7 @@ export class NoticesService {
         content: notice.contentJson,
         contentVersion: notice.contentVersion,
         publishedAt: notice.publishedAt,
+        updatedAt: notice.updatedAt,
       },
     };
   }

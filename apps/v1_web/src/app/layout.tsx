@@ -9,7 +9,7 @@ import { ScrollRestoration } from '@/components/v1-ui/scroll-restoration';
 import { NavigationHistoryTracker } from '@/components/v1-ui/navigation-history-tracker';
 import { StaticCacheBootstrap } from '@/components/v1-ui/static-cache-bootstrap';
 import { publicAssetPath } from '@/lib/assets';
-import { getSiteOrigin } from '@/lib/seo';
+import { buildSiteVerification, getSiteOrigin, SITE_FEED_ALTERNATE_TYPES } from '@/lib/seo';
 import { fetchPublicSiteInfo } from '@/lib/public-site/site-info';
 import { buildSiteIdentityLd } from '@/lib/structured-data';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
@@ -26,6 +26,8 @@ export const metadata: Metadata = {
   description: '같이 뛸 사람을 한 번에 — 축구·풋살·러닝·수영 매치·팀 플랫폼. 축구·풋살 대회도 열려요.',
   category: 'sports',
   formatDetection: { email: false, address: false, telephone: false },
+  alternates: { types: SITE_FEED_ALTERNATE_TYPES },
+  verification: buildSiteVerification(),
   icons: {
     icon: [
       { url: publicAssetPath('/favicon.png'), type: 'image/png', sizes: '32x32' },

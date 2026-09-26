@@ -62,10 +62,24 @@ function isGroupStage(entry: PublicScheduleEntry): boolean {
   return name.endsWith('조');
 }
 
+/**
+ * 어드민 자동생성이 `round` 에 넣는 영문 키 → 한국어 표시. 조별리그는 항상 `groupName`
+ * ('A조' 등)이 있어 이 맵을 거치지 않고, 결선(4강·결승·3·4위전)은 `groupName` 이 없어
+ * (alpha 실측: `groupId: null`) 아래 `groupLabelOf` 의 fallback 으로 이 맵을 탄다.
+ * 한국어 라벨이 이미 들어온 경우(수동 입력)는 키가 안 맞아 그대로 통과한다.
+ */
+const ROUND_CODE_LABEL: Readonly<Record<string, string>> = {
+  group: '조별리그',
+  semi: '4강',
+  final: '결승',
+  third_place: '3·4위전',
+};
+
 /** 같은 라벨끼리 묶을 때 쓰는 키 — 이름이 없으면 라운드로 떨어진다(빈 제목을 만들지 않는다). */
 function groupLabelOf(entry: PublicScheduleEntry): string {
   const name = entry.groupName?.trim();
-  return name !== undefined && name !== '' ? name : entry.round;
+  if (name !== undefined && name !== '') return name;
+  return ROUND_CODE_LABEL[entry.round] ?? entry.round;
 }
 
 /**

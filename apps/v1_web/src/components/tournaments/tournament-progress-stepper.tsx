@@ -200,9 +200,15 @@ function isFinalRound(round: string): boolean {
 }
 
 /**
- * 결선 라운드들을 **진행 순서대로** 세운다. `fixtureNumber` 가 그 순서를 이미 갖고 있다
- * (alpha 실측: 조별 1,2 → 4강 3,4 → 결승 5 → 3·4위전 6). 라운드 이름 사전순이나
- * 서버 배열 순서로 정렬하면 결승이 4강 앞에 오는 대회가 나온다.
+ * 결선 라운드들을 **진행 순서대로** 세운다.
+ *
+ * `fixtureNumber` 만으로는 못 정한다 — 대회마다 그 값이 **라운드별로 1부터 다시
+ * 시작한다**(alpha 실측: 4강 1,2 · 결승 1 · 3·4위전 1, 전역 연번이 아니다). 그래서
+ * 동률이 흔하고, 동률일 때 이전 코드는 입력 배열 순서에 기대는 안정 정렬로 떨어졌는데
+ * `tournament.fixtures` 는 `round asc` 로 오는 조회라 문자열 알파벳 순('final' <
+ * 'group' < 'semi')을 타 **결승이 4강보다 먼저 오는 배열**을 그대로 물려받았다
+ * (alpha #ab100000... 실측). 결승은 항상 결선의 마지막이라는 사실(`isFinalRound`)을
+ * 1차 기준으로 쓰고, fixtureNumber 는 결승이 아닌 라운드가 여럿일 때의 2차 기준으로만 쓴다.
  */
 function knockoutStageDrafts(fixtures: V1TournamentFixture[]): StageDraft[] {
   const byRound = new Map<string, V1TournamentFixture[]>();
@@ -215,11 +221,14 @@ function knockoutStageDrafts(fixtures: V1TournamentFixture[]): StageDraft[] {
 
   return [...byRound.entries()]
     .map(([round, list]) => ({ key: round, label: roundLabel(round), fixtures: list }))
-    .sort(
-      (a, b) =>
+    .sort((a, b) => {
+      const finalRank = Number(isFinalRound(a.key)) - Number(isFinalRound(b.key));
+      if (finalRank !== 0) return finalRank;
+      return (
         Math.min(...a.fixtures.map((f) => f.fixtureNumber)) -
-        Math.min(...b.fixtures.map((f) => f.fixtureNumber)),
-    );
+        Math.min(...b.fixtures.map((f) => f.fixtureNumber))
+      );
+    });
 }
 
 /**

@@ -670,8 +670,9 @@ type OfficialTopScorer = {
  * (`PublicTournamentRecordsService.getPlayerRecords`,
  * apps/v1_api/src/games/public-records/public-tournament-records.service.ts)
  * 와 같은 소스(공식 리비전의 V1GameResultParticipant)·동의 게이팅
- * (`isParticipantPubliclyEligible`)·정렬(goals desc, tie-break 없음)을 그대로
- * 복제한다. **여기서 `../src/...`를 import할 수 없어서**(위 파일 상단 경고 참고 —
+ * (`isParticipantPubliclyEligible`)·1차 정렬(goals desc)을 그대로 복제한다(동점 처리는
+ * 시드가 재현성을 위해 원본과 다르게 결정적으로 만든다 — 아래 최종 정렬 지점 주석 참고).
+ * **여기서 `../src/...`를 import할 수 없어서**(위 파일 상단 경고 참고 —
  * alpha 배포 이미지엔 `src/`가 없다) 그 서비스 메서드를 직접 재사용하지 못하고
  * 최소 쿼리로 복제했다 — 저 서비스의 필터·정렬이 바뀌면 이 함수도 함께 갱신해야 한다.
  */
@@ -692,14 +693,13 @@ export async function computeOfficialTopScorer(
     },
     select: { currentOfficialRevisionId: true, visibilityPolicy: { select: { mode: true } } },
   });
-  // HIDDEN/STATUS_ONLY 는 공개 랭킹에서 제외한다(effectivePublicVisibilityMode).
-  // LIVE 는 PUBLIC_LIVE 플래그로 'live'/'official_only' 어느 쪽이 되어도 이 필터를
-  // 그대로 통과하므로 그 플래그 조회는 여기서 필요 없다.
+  // effectivePublicVisibilityMode 와 같은 fail-closed 규칙: 허용 목록(OFFICIAL_ONLY/LIVE)
+  // 으로 판정한다. 제외 목록(!== HIDDEN && !== STATUS_ONLY)이었다면 앞으로 enum 값이
+  // 늘거나 예상 밖 값이 들어와도 자동으로 공개(fail-open) 처리돼 버린다(Copilot 리뷰).
+  // LIVE 는 PUBLIC_LIVE 플래그로 'live'/'official_only' 어느 쪽이 되어도 포함 대상이므로
+  // 그 플래그 조회는 여기서 필요 없다.
   const revisionIds = games
-    .filter((game) => {
-      const mode = game.visibilityPolicy?.mode ?? 'HIDDEN';
-      return mode !== 'HIDDEN' && mode !== 'STATUS_ONLY';
-    })
+    .filter((game) => game.visibilityPolicy?.mode === 'OFFICIAL_ONLY' || game.visibilityPolicy?.mode === 'LIVE')
     .map((game) => game.currentOfficialRevisionId)
     .filter((id): id is string => id !== null);
   if (revisionIds.length === 0) return null;
@@ -760,7 +760,10 @@ export async function computeOfficialTopScorer(
   }
   if (totalsByUserId.size === 0) return null;
 
-  // player-records 와 동일한 정렬: goals desc, 명시적 tie-break 없음(원본 순서 유지).
+  // player-records 와 동일한 1차 정렬: goals desc. **동점 처리는 원본과 다르다** — 저쪽은
+  // findMany 반환 순서(무보장)에 그대로 기댄다. 여기 이 순서는 위 scoringRows 정렬
+  // (officialAt asc + participantId)이 만든 totalsByUserId 삽입 순서이므로, 시드는
+  // 재현 가능한 결정적 동점 처리를 갖는다(Copilot 리뷰 — 원본 주석이 이 사실을 가렸었다).
   const [top] = [...totalsByUserId.entries()]
     .map(([userId, goals]) => ({ userId, goals }))
     .sort((a, b) => b.goals - a.goals);

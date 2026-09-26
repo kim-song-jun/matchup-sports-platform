@@ -192,7 +192,7 @@ describe('alpha tournament QA campaign content', () => {
     };
     type LinkRow = { participantId: string; linkId: string; userId: string };
     type ConsentRow = { userId: string; state: string };
-    type SnapshotRow = { linkId: string; state: string };
+    type SnapshotRow = { linkId: string; consentVersion: number; state: string };
 
     function buildTx(fixture: {
       games: readonly GameRow[];
@@ -224,8 +224,27 @@ describe('alpha tournament QA campaign content', () => {
           ),
         },
         v1ParticipantConsentSnapshot: {
-          findMany: jest.fn(({ where }: { where: { linkId: { in: readonly string[] } } }) =>
-            Promise.resolve(fixture.snapshots.filter((snapshot) => where.linkId.in.includes(snapshot.linkId))),
+          // orderBy 를 실제로 적용해서(무시하지 않고) "최신 스냅샷이 이긴다" 로직이
+          // 구현의 orderBy: { consentVersion: 'desc' } 에 실제로 의존하는지 검증한다
+          // (Copilot 리뷰) — orderBy 가 없으면 fixture 순서(일부러 오름차순으로 구성)를
+          // 그대로 보존해, 구현이 정렬을 빠뜨리면 "최신"이 아니라 "가장 먼저 만든" 스냅샷을
+          // 집도록 만들어 그 회귀를 테스트가 실제로 잡게 한다.
+          findMany: jest.fn(
+            ({
+              where,
+              orderBy,
+            }: {
+              where: { linkId: { in: readonly string[] } };
+              orderBy?: { consentVersion?: 'asc' | 'desc' };
+            }) => {
+              const matched = fixture.snapshots.filter((snapshot) => where.linkId.in.includes(snapshot.linkId));
+              if (orderBy?.consentVersion === 'desc') {
+                matched.sort((a, b) => b.consentVersion - a.consentVersion);
+              } else if (orderBy?.consentVersion === 'asc') {
+                matched.sort((a, b) => a.consentVersion - b.consentVersion);
+              }
+              return Promise.resolve(matched);
+            },
           ),
         },
         v1User: {
@@ -302,6 +321,42 @@ describe('alpha tournament QA campaign content', () => {
       const result = await computeOfficialTopScorer(tx, 'tournament-1');
 
       expect(result).toEqual({ userId: 'u-park', recipientName: '박도윤', teamName: '용산 시티', goals: 7 });
+    });
+
+    it('participant 단위 최신 스냅샷이 REVOKED면 사용자 단위 GRANTED 여도 제외한다(orderBy: consentVersion desc 계약)', async () => {
+      const tx = buildTx({
+        games: [{ currentOfficialRevisionId: 'rev-1', visibilityPolicy: { mode: 'OFFICIAL_ONLY' } }],
+        participants: [
+          { resultRevisionId: 'rev-1', participantId: 'p-kim', sideId: 's-home', goals: 12, resultRevision: { officialAt } },
+          { resultRevisionId: 'rev-1', participantId: 'p-park', sideId: 's-away', goals: 7, resultRevision: { officialAt } },
+        ],
+        links: [
+          { participantId: 'p-kim', linkId: 'l-kim', userId: 'u-kim' },
+          { participantId: 'p-park', linkId: 'l-park', userId: 'u-park' },
+        ],
+        consents: [
+          { userId: 'u-kim', state: 'GRANTED' },
+          { userId: 'u-park', state: 'GRANTED' },
+        ],
+        // 일부러 오름차순(과거 -> 최신)으로 fixture 를 구성한다. 구현이
+        // orderBy: { consentVersion: 'desc' } 를 요청해야만 "최신(v2=REVOKED)이
+        // 이긴다"가 성립한다 — 정렬을 빠뜨리면 mock 이 이 순서를 그대로 돌려주므로
+        // "첫 번째로 본 스냅샷(v1=GRANTED)이 이긴다"로 뒤집혀 아래 기대값이 깨진다.
+        snapshots: [
+          { linkId: 'l-kim', consentVersion: 1, state: 'GRANTED' },
+          { linkId: 'l-kim', consentVersion: 2, state: 'REVOKED' },
+        ],
+        users: { 'u-park': { profile: { nickname: '박도윤', displayName: null, deletedAt: null } } },
+        sides: { 's-away': { teamId: 't-yongsan' } },
+        teams: { 't-yongsan': { name: '용산 시티' } },
+      });
+
+      const result = await computeOfficialTopScorer(tx, 'tournament-1');
+
+      expect(result).toEqual({ userId: 'u-park', recipientName: '박도윤', teamName: '용산 시티', goals: 7 });
+      const snapshotCall = (tx as { v1ParticipantConsentSnapshot: { findMany: jest.Mock } }).v1ParticipantConsentSnapshot
+        .findMany.mock.calls[0][0];
+      expect(snapshotCall.orderBy).toEqual({ consentVersion: 'desc' });
     });
 
     it('공식 득점 기록이 0건이면 득점왕을 만들지 않는다(null)', async () => {

@@ -26,6 +26,18 @@ import { withFromPath } from '@/lib/session-storage';
  *   늦게 오는데 그때까지 자리가 없으면, 도착 순간 카드가 삽입되며 이미 손을 뻗은
  *   버튼들이 아래로 밀린다. 스켈레톤 박스를 그리는 것과는 다르다 -- 보이는 것은 없다.
  */
+type CardSlot = { hidden: boolean; shape: 'rect' | 'shield' };
+
+/**
+ * 카드가 서지 않는다고 확정된 상태(숨김·조회 실패·카드 없음). 오는 중에는 false -- 신원 블록이
+ * 먼저 섰다가 카드 도착과 함께 사라지면 그 아래가 통째로 들썩인다. 같은 쿼리를 쓰므로 요청은 하나다.
+ */
+export function useMyPlayerCardAbsent(userId: string | null, slot?: CardSlot) {
+  const profile = useV1PublicProfile(userId ?? '', { enabled: Boolean(userId) });
+  if (profile.data?.playerCard) return false;
+  return slot?.hidden === true || !profile.isPending;
+}
+
 export function MyPlayerCardSection({
   userId,
   displayName,
@@ -35,7 +47,7 @@ export function MyPlayerCardSection({
   readonly userId: string;
   readonly displayName: string;
   readonly profileImageUrl: string | null;
-  readonly slot?: { hidden: boolean; shape: 'rect' | 'shield' };
+  readonly slot?: CardSlot;
 }) {
   const profile = useV1PublicProfile(userId, { enabled: Boolean(userId) });
   const card = profile.data?.playerCard;
@@ -60,6 +72,7 @@ export function MyPlayerCardSection({
       teamName={profile.data?.teams?.[0]?.name ?? null}
       // 내 카드이므로 기록 공개 유도를 띄운다 -- 남의 카드에서는 권하지 않는다.
       isOwner
+      profileHref={withFromPath(`/users/${userId}`, '/my')}
       shareHref={withFromPath(`/users/${userId}/card`, '/my')}
       // 카드 설정(숨김·모양)은 내 카드에서 바로 -- 메뉴 2클릭 뒤에 숨기지 않는다.
       settingsHref="/my/settings/player-card"

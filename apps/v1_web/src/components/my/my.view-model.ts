@@ -76,6 +76,7 @@ export const myHomeModel: MyHomeViewModel = {
       // 설정과 한 서랍에 넣는다. 둘 다 "쓰다가 막혔을 때 여는 것"이다.
       title: '설정·문의',
       items: [
+        { label: '프로필 수정', sub: '사진·이름·지역·성별을 바꿔요', href: '/my/profile/edit', icon: 'Pencil' },
         { label: '운동 정보', sub: '종목, 난이도, 기본 활동 지역을 관리해요', href: '/my/settings/sports', icon: 'Dumbbell' },
         { label: '계정 설정', sub: '계정 보안과 알림을 관리해요', href: '/my/settings', icon: 'Settings' },
         { label: '문의하기', sub: '계정, 매치, 대회, 결제 문제를 운영팀에 남겨요', href: '/my/inquiries', icon: 'Mail' },

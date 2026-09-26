@@ -2317,6 +2317,13 @@ function toMyHomeModel(
       icon: 'Award',
     });
   }
+  // 카드 아래 프로필 박스를 없애며(2026-09-26 B안) 로그인 방식·본인인증은 계정 설정 행이 말한다.
+  const loginMethod = formatLoginProvider(profile.authProvider);
+  const accountItem = sections.find((section) => section.title === '설정·문의')?.items.find((item) => item.href === '/my/settings');
+  if (accountItem) {
+    if (loginMethod) accountItem.sub = `${loginMethod} · ${accountItem.sub}`;
+    accountItem.tag = phoneVerified === true ? { label: '본인인증 완료', icon: 'ShieldCheck' } : undefined;
+  }
   const inboxSection = sections.find((section) => section.title === '받은 소식');
   const chatItem = inboxSection?.items.find((item) => item.href === '/chat');
   if (chatItem) {
@@ -2363,7 +2370,7 @@ function toMyHomeModel(
       genderLabel: formatGender(profile.profile.gender),
       initials: initials(nickname),
       profileImageUrl: profile.profile.profileImageUrl ?? null,
-      loginMethod: formatLoginProvider(profile.authProvider) ?? undefined,
+      loginMethod: loginMethod ?? undefined,
       loginMethodProvider: profile.authProvider,
       intro: '',
       sports: (profile.sports ?? []).map((sport) =>

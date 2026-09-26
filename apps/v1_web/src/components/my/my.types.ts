@@ -29,6 +29,8 @@ export type MyMenuItem = {
   badge?: number;
   /** 배지의 스크린리더 문구. badge 를 넣는 쪽이 의미를 함께 넣는다. */
   badgeLabel?: string;
+  /** 라벨 옆 상태 표시(예: 본인인증 완료). 숫자 배지와 달리 할 일이 아니라 상태라 회색으로 그린다. */
+  tag?: { label: string; icon: string };
 };
 
 export type MyMenuSection = {

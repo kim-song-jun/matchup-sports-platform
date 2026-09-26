@@ -8969,10 +8969,10 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
    거의 같은 톤이라 경계에 이유가 없었고, 모바일에서는 좌우 여백이 이중으로 들었으며,
    무엇보다 그 안에 계정 버튼까지 들어 있어 "카드 조작"과 "계정 조작"이 한 덩어리로
    섞였다. 카드는 자기 림·그림자를 갖고 있어 배경 위에 그냥 놓아도 소장품으로 선다.
-   계정은 아래 별도 프로필 카드로 내려갔다(my-page.tsx).
+   마이페이지의 계정 조작은 '설정·문의' 메뉴가 맡는다(2026-09-26 B안, my-page.tsx).
 
-   카드 아래 신원 블록 -- 공개 프로필에서만 쓴다(이름·핸들). 마이페이지는 프로필 카드가
-   같은 정보를 더 자세히 말하므로 여기에 넣지 않는다. */
+   카드 아래 신원 블록 -- 공개 프로필에서만 쓴다(이름·핸들). 마이페이지는 카드가 곧 프로필이라
+   여기에 넣지 않는다. */
 .tm-pcard-identity {
   padding: 2px 0 12px;
   border-bottom: 1px solid var(--border);
@@ -9048,10 +9048,14 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 /* ── 카드 안 사진 추가 슬롯 (사용자 선택 A안, 2026-08-26) ──
    사진이 없는 본인 카드에서 렌더 자리를 그대로 버튼으로 바꾼다. 업로드는 이미
    동작하는데 권하는 화면이 없어 카드가 전부 이니셜로 남아 있었다 -- 결핍이 있는
-   자리에서 해결한다. 사진이 생기면 이 슬롯은 사라지고 렌더가 그 자리를 채운다. */
+   자리에서 해결한다. 사진이 생기면 이 슬롯은 사라지고 렌더가 그 자리를 채운다.
+   렌더와 달리 아래가 페이드되지 않는 점선 상자라 이름 줄 위에서 끝나야 한다 -- 이름 줄의
+   높이는 총점·포지션 유무와 여정 면 여백으로 달라지므로 위쪽 줄 안에서 왼쪽 열 높이로
+   늘린다(stretch). 위·오른쪽 끝은 렌더와 같다: 위 = 면 패딩, 오른쪽 = 면 가장자리에서 8px. */
 .tm-pcard-photo-slot {
-  position: absolute; right: 8px; top: 26px; width: 138px; height: 140px;
-  z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  flex: none; align-self: stretch; width: 138px;
+  margin: 0 -8px 8px auto;
+  position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   border: 1.5px dashed var(--tm-rule);
   border-radius: var(--radius-field);
   background: rgba(255, 255, 255, 0.07);
@@ -9059,7 +9063,6 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
   text-decoration: none;
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
-.tm-player-card[data-shape='shield'] .tm-pcard-photo-slot { top: 48px; }
 .tm-pcard-photo-slot span {
   font-family: var(--tm-num);
   font-size: 12px; font-weight: 800; letter-spacing: 0.04em;
@@ -9122,8 +9125,8 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 .tm-photo-crop-confirm { width: calc(100% - 32px); margin-top: 12px; }
 
 
-/* ── 프로필(계정) 블록 · 활동 병합 (사용자 선택 A안, 2026-08-26) ──
-   카드 조작과 계정 조작이 한 상자에 섞여 있던 것을 갈랐다. 여기는 계정 쪽이다. */
+/* ── 신원 블록 · 활동 병합 ──
+   카드가 없는 사용자(숨김·조회 실패)에게만 활동 카드 머리에 선다(2026-09-26 B안). */
 .tm-my-account-block { margin-top: 12px; text-align: center; }
 /* 계정 아바타 -- 카드를 숨긴 사용자에게는 이것이 유일한 얼굴이다. */
 .tm-my-account-avatar {

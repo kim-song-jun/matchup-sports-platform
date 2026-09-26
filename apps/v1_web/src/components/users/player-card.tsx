@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CalendarCheck, Camera, Clock, HeartHandshake, Lock, Settings, Share2, Sparkles, Target, Zap } from 'lucide-react';
+import { CalendarCheck, Camera, Clock, HeartHandshake, Lock, Settings, Share2, Sparkles, Target, UserRound, Zap } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
 import { josa } from '@/lib/korean';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
@@ -246,6 +246,7 @@ export function PlayerCard({
   profileImageUrl,
   teamName,
   isOwner,
+  profileHref,
   shareHref,
   settingsHref,
   belowCardSlot,
@@ -256,6 +257,8 @@ export function PlayerCard({
   readonly teamName: string | null;
   /** 본인이 보는 경우에만 "공개하기" 같은 행동을 권한다 -- 남의 카드에서 권하면 이상하다. */
   readonly isOwner: boolean;
+  /** 공개 프로필 경로. 마이페이지 카드만 넘긴다 -- 공개 프로필 화면 자신에서는 자기 자신으로 가는 버튼이 된다. */
+  readonly profileHref?: string;
   /**
    * 공유 화면 경로. 주면 카드 아래에 공유 입구가 붙는다.
    * 공유 화면 자신은 이 값을 주지 않는다 -- 자기 자신으로 가는 버튼은 의미가 없다.
@@ -350,21 +353,9 @@ export function PlayerCard({
       <div className="tm-pcard-fx" aria-hidden="true" />
       <div className="tm-pcard-crest-bg" aria-hidden="true" />
 
-      {/* 선수 렌더 -- 원형 아바타가 아니라 아래로 잘려 사라지는 큰 컷아웃.
-          사진이 없고 **본인**이면 이 자리를 사진 추가 슬롯으로 바꾼다(사용자 선택 A안,
-          2026-08-26). 업로드 경로는 이미 동작하는데 올리라고 권하는 화면이 없어 카드가
-          전부 이니셜로 남아 있었다 -- 카드에서 가장 큰 자리가 비어 있으면서 아무 말도
-          하지 않던 것이 문제였다. 남이 보는 카드와 공유 이미지는 그대로 이니셜이다. */}
-      {photoSlotHref ? (
-        <Link
-          href={photoSlotHref}
-          className="tm-pcard-photo-slot"
-          aria-label="사진 추가하기 -- 프로필 사진을 올리면 카드에 들어가요"
-        >
-          <Camera size={22} strokeWidth={2.1} aria-hidden="true" />
-          <span aria-hidden="true">사진 추가</span>
-        </Link>
-      ) : (
+      {/* 선수 렌더 -- 원형 아바타가 아니라 아래로 잘려 사라지는 큰 컷아웃. 사진이 없는 본인 카드는
+          렌더 대신 위쪽 줄 안의 사진 추가 슬롯을 쓴다(아래 .tm-player-card-top). */}
+      {photoSlotHref ? null : (
         <div className="tm-pcard-render" aria-hidden="true">
           {profileImageUrl ? (
             /* background-image div 가 아니라 next/image: 900×1200 원본 JPEG 를 138px 상자에
@@ -409,6 +400,19 @@ export function PlayerCard({
             </span>
           </div>
         </div>
+        {/* 사진이 없는 **본인** 카드: 렌더 자리를 사진 추가 슬롯으로 바꾼다(사용자 선택 A안, 2026-08-26).
+            절대 위치가 아니라 이 줄 안에 두어 높이가 왼쪽 열을 따라간다 -- 총점·포지션 유무에 따라
+            이름 줄이 오르내려서 고정 높이로는 슬롯이 이름을 덮었다. */}
+        {photoSlotHref ? (
+          <Link
+            href={photoSlotHref}
+            className="tm-pcard-photo-slot"
+            aria-label="사진 추가하기 -- 프로필 사진을 올리면 카드에 들어가요"
+          >
+            <Camera size={22} strokeWidth={2.1} aria-hidden="true" />
+            <span aria-hidden="true">사진 추가</span>
+          </Link>
+        ) : null}
       </div>
 
       <div className="tm-player-card-name">
@@ -573,6 +577,11 @@ export function PlayerCard({
           >
             {flipped ? '앞면 보기 ↺' : '카드 뒤집기 ↻'}
           </button>
+          {profileHref ? (
+            <Link href={profileHref} className="tm-pcard-icon-link" aria-label="공개 프로필 보기">
+              <UserRound size={19} strokeWidth={2.2} aria-hidden="true" />
+            </Link>
+          ) : null}
           {shareHref ? (
             <Link href={shareHref} className="tm-pcard-icon-link" aria-label="카드 공유하기">
               <Share2 size={18} strokeWidth={2.2} aria-hidden="true" />

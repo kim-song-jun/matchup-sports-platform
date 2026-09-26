@@ -21,7 +21,10 @@ export function applyLabel(
   if (viewerState === 'host') return '매치 관리';
   if (viewerState === 'requested') return '신청 취소';
   if (viewerState === 'approved' || viewerState === 'participant') return '승인 완료';
-  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return '신청 불가';
+  // [P2] 마감 시각이 지난 경우(status==='closed')만 본문 상태 카드와 같은 말('신청 마감')로
+  // 통일한다 — 정원 마감·취소·완료·만료는 이유가 다르므로 기존 '신청 불가'를 유지한다.
+  if (status === 'closed') return '신청 마감';
+  if (status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return '신청 불가';
   return !eligible && message ? message : '참가 신청';
 }
 

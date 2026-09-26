@@ -95,6 +95,22 @@ describe('선수 카드 숨김 설정', () => {
     expect(screen.getByText(/활동 기록과 프로필은 그대로 남아요/)).toBeInTheDocument();
   });
 
+  it('각주는 행 설명이 이미 말한 상태를 반복하지 않고 범위·안심만 더한다 (alpha 감사, 2026-09-26)', () => {
+    // before: 토글 서브텍스트 "켜면 어디에도 표시되지 않아요"와 각주 "숨기면 ... 카드가
+    // 보이지 않아요"가 같은 뜻(숨기면 안 보임)을 두 번 말했다. 각주는 이제 어디에 적용되는지
+    // (범위)만 말하고, 상태 문장은 반복하지 않는다.
+    stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
+
+    renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+
+    expect(screen.getByText(/켜면 어디에도 표시되지 않아요/)).toBeInTheDocument();
+    expect(screen.getByText(/마이페이지·공개 프로필·공유 화면/)).toBeInTheDocument();
+    // [\s\S]* — JSX 멀티라인 텍스트가 실제 개행 문자를 담을 가능성까지 대비한다.
+    // `.`는 기본적으로 개행을 매칭하지 않아, 그 경우 이 부정 단언이 실제로는 아무것도
+    // 검증하지 못한 채 항상 통과할 수 있다(Copilot 리뷰).
+    expect(screen.queryByText(/숨기면[\s\S]*카드가 보이지 않아요/)).not.toBeInTheDocument();
+  });
+
   it('저장에 실패하면 조용히 넘어가지 않고 화면에 말한다', async () => {
     stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
     mutateMock.mockImplementation((_body, options) => options?.onError?.(new Error('boom')));
@@ -124,6 +140,11 @@ describe('선수 카드 숨김 설정', () => {
       const shield = screen.getByRole('button', { name: '카드 모양 방패 (잠김)' });
       expect(shield).toBeDisabled();
       expect(screen.getByText(/후기 10개를 받으면 열려요 \(지금 3개\)/)).toBeInTheDocument();
+      // 2026-09-26 alpha 감사: 잠금 이모지(🔒) 대신 aria-hidden 아이콘 + "잠김" 텍스트를 쓴다
+      // — 아이콘만으로 정보를 전달하지 않는다(teams-page.tsx의 <Lock/>비공개 배지와 같은 관례).
+      expect(shield.textContent).not.toContain('🔒');
+      expect(shield.textContent).toContain('잠김');
+      expect(shield.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
     });
 
     it('열려 있으면 눌러서 바꿀 수 있다', async () => {
@@ -146,5 +167,20 @@ describe('선수 카드 숨김 설정', () => {
 
       expect(screen.getByText(/능력치나 등급은 바뀌지 않아요/)).toBeInTheDocument();
     });
+  });
+
+  it('설명 전용 카드 없이 분류 라벨(공개·모양·사진) + 조작 카드 하나씩 + 각주로 보여준다 (P1 C안)', () => {
+    stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
+
+    const { container } = renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+
+    // 예전엔 "선수 카드 숨기기"가 설명 카드 제목과 토글 제목으로 2번 나왔다 --
+    // 이제 행 제목은 하나, 그 위 분류 라벨은 다른 낱말("공개")이라 반복이 없다.
+    expect(screen.getAllByText('선수 카드 숨기기')).toHaveLength(1);
+    expect(screen.getByText('공개')).toBeInTheDocument();
+    expect(screen.getByText('모양')).toBeInTheDocument();
+    expect(screen.getByText('사진')).toBeInTheDocument();
+    // 숨김·모양·사진 세 섹션이 각각 조작 카드 하나씩(설명 전용 카드는 없다).
+    expect(container.querySelectorAll('.tm-card').length).toBe(3);
   });
 });

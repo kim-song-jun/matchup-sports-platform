@@ -163,6 +163,11 @@ export type TeamMatchDetailViewModel = {
    * 이 링크가 없던 동안 팀매치 후기는 /my/reviews 목록에 뜨기를 기다리는 수밖에 없었다. */
   reviewAction?: { label: string; href: string } | null;
   statusLabel?: string;
+  /** statusLabel의 의미 축. 기본은 'application'(신청 흐름 — 승인 대기/완료, 신청 마감 등)이고,
+   * modelLiveLabel()이 '진행 중'을 준 경우에만 'match'(경기 자체의 실시간 진행 상태)다.
+   * 두 축은 캡션이 다르다 — '신청 상태' 캡션 아래 경기 진행 상태를 보여주면 신청 관련
+   * 정보로 오인된다(team-matches-page.tsx statusLabel 캡션 참고). */
+  statusLabelKind?: 'application' | 'match';
   chatLabel?: string;
   chatPending?: boolean;
   /** 채팅방 열기 실패 사유(409/403 등). onChat 버튼이 조용히 죽지 않도록 클릭 결과를 보여준다. */

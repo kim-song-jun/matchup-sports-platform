@@ -25,7 +25,7 @@ export function LineupTodoCard({ enabled = true }: { enabled?: boolean }) {
 
   if (query.isError) {
     return (
-      <section aria-labelledby="lineup-todo-heading">
+      <section className="tm-home-lineup-block" aria-labelledby="lineup-todo-heading">
         <Card pad={16}>
           <div role="alert" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div>
@@ -48,7 +48,7 @@ export function LineupTodoCard({ enabled = true }: { enabled?: boolean }) {
   if (items.length === 0) return null;
 
   return (
-    <section aria-labelledby="lineup-todo-heading">
+    <section className="tm-home-lineup-block" aria-labelledby="lineup-todo-heading">
       <Card pad={16}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}>
           <h2 id="lineup-todo-heading" className="tm-text-body-lg" style={{ fontWeight: 700, margin: 0 }}>

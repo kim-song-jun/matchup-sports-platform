@@ -140,4 +140,16 @@ describe('RecordConsentSettingsPageClient', () => {
     expect(screen.getByRole('link', { name: '뒤로가기' })).toHaveAttribute('href', '/notifications');
     hooks.searchParams.mockReturnValue(new URLSearchParams());
   });
+
+  it('설명 전용 카드 없이 분류 라벨 + 조작 카드 하나 + 각주로 보여준다 (P1 C안)', () => {
+    hooks.consent.mockReturnValue({ data: { granted: false, effectiveAt: null }, isLoading: false, isError: false, refetch: vi.fn() });
+    hooks.updateConsent.mockReturnValue({ mutate: vi.fn(), isPending: false });
+
+    const { container } = renderWithClient(<RecordConsentSettingsPageClient />);
+
+    // 예전 설명 전용 카드 제목("공개되는 정보")은 사라지고 분류 라벨로 대체됐다.
+    expect(screen.queryByText('공개되는 정보')).not.toBeInTheDocument();
+    expect(screen.getByText('공개')).toBeInTheDocument();
+    expect(container.querySelectorAll('.tm-card').length).toBe(1);
+  });
 });

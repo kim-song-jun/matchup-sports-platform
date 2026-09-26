@@ -195,8 +195,12 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
           <div className="tm-search-panel-col">
             <div className="tm-text-label">최근 검색</div>
             <div className="tm-search-recent-chips" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-              {(recentSearches.data?.items ?? []).map((item, index) => (
-                <button key={item.id} type="button" onClick={() => useChip(item.query)} className={`tm-chip ${index === 0 ? 'tm-chip-active' : ''}`}>
+              {/* 최근 검색어 칩엔 "선택된" 상태가 없다 — 눌러서 그 검색어로 재검색할 뿐,
+                  다른 칩과 구분되는 활성 상태를 유지하지 않는다. index===0 이라는 이유만으로
+                  tm-chip-active(앱 전역에서 "선택된 필터"를 뜻하는 클래스)를 주면 실제로는
+                  아무것도 선택되지 않았는데 첫 칩만 선택된 것처럼 보인다. */}
+              {(recentSearches.data?.items ?? []).map((item) => (
+                <button key={item.id} type="button" onClick={() => useChip(item.query)} className="tm-chip">
                   {item.query}
                 </button>
               ))}

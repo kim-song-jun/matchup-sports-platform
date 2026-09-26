@@ -17,7 +17,9 @@ export function NoticeListPageView({ model }: { model: NoticeListViewModel }) {
         </AppBackLink>
         <div className="tm-text-heading" style={{ margin: '0.67em 0' }} aria-hidden="true">공지사항</div>
       </div>
-      <div className="tm-text-heading tm-hide-desktop" style={{ margin: '0.67em 0' }} aria-hidden="true">공지사항</div>
+      {/* Mobile: topbar already shows "공지사항" (route-chrome) and the sr-only h1 above
+          covers accessibility — a second visible heading here only duplicated the topbar
+          title (notices-detail 의 breadcrumb 패턴과 동일하게 mobile 전용 큰 제목을 두지 않는다). */}
       <p className="tm-text-caption tm-notice-lead">
         팀밋의 주요 소식과 서비스 운영 안내를 확인할 수 있어요.
       </p>

@@ -877,22 +877,22 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
   });
 
   /**
-   * 레벨 태그는 서버 자유 텍스트라 길이가 보장되지 않는다. alpha 실측(2026-09-07):
-   * `중급 · 빌드업과 패스 플레이 중심`(170px)이 태그 행 232px 안에서 형제(`성별 무관` 62px
-   * + gap 8)를 둘째 줄로 밀어내 카드가 32px 커졌다(50팀 중 4팀). 폭 상한으로 칩 한 줄을 지킨다.
+   * 레벨 태그는 서버 자유 텍스트라 길이가 보장되지 않는다. 폭 상한(예전 62%)으로 잘라
+   * 형제 배지 자리를 지키던 방식은 768(2열 그리드, 카드 폭이 좁아짐)에서 "입문-고수" 같은
+   * 짧고 의미 있는 값까지 잘랐다(2026-09-26 alpha 감사) — 이제는 잘리지 않고 DOM/화면 둘 다
+   * 전문이 남으며, 자리가 부족하면 배지 자체가 다음 줄로 내려간다(flexWrap:'wrap').
    */
-  it('긴 태그도 잘릴 뿐 DOM 에는 전문이 남는다 — 스크린리더는 다 읽는다', () => {
+  it('긴 태그도 잘리지 않고 DOM 에 전문이 남는다', () => {
     const long = '중급 · 빌드업과 패스 플레이 중심';
     const { container } = render(<TeamListPageView model={listWith({ tags: [long], genderRule: '성별 무관' })} />);
 
     const tag = [...container.querySelectorAll('.tm-team-tag-text')].find((el) => el.textContent === long);
     expect(tag).toBeDefined();
-    // 잘림은 CSS 가 하지 텍스트를 지우지 않는다 — 지우면 접근성이 함께 깎인다.
     expect(tag!.textContent).toBe(long);
     expect(tag!.closest('.tm-team-tag')).not.toBeNull();
   });
 
-  it('태그마다 폭 상한 훅이 붙는다 — 레벨만이 아니라 전부 서버 문자열이다', () => {
+  it('태그마다 배지 래퍼가 붙는다 — 레벨만이 아니라 전부 서버 문자열이다', () => {
     const { container } = render(<TeamListPageView model={listWith({ tags: ['입문-고수'], genderRule: '성별 무관' })} />);
 
     const tags = [...container.querySelectorAll('.tm-team-tag')];
@@ -900,15 +900,17 @@ describe('TeamListPageView — 팀 카드 밀도', () => {
     tags.forEach((t) => expect(t.querySelector('.tm-team-tag-text')).not.toBeNull());
   });
 
-  it('상한은 형제 배지 자리를 남긴다 — 62% 이하여야 한 줄이 유지된다', () => {
+  it('태그 폭 상한은 형제와 나눈 고정 %가 아니라 자기 줄 전체(100%)다 — 좁은 카드에서도 짧은 값이 잘리지 않는다', () => {
+    // 2026-09-26 alpha 감사: 예전 62%(형제와 나눈 몫)는 768(카드 272px)에서 "입문-고수" 같은
+    // 짧은 값까지 잘랐다. 100%(.tm-league-badge 와 같은 관례)로 바꾸면 형제가 있어도 각
+    // 배지가 자기 줄 폭까지 온전히 쓸 수 있다 — ellipsis 자체는 남겨 자유 텍스트 하나가
+    // 혼자로도 카드 폭을 넘길 만큼 길 때 카드 밖 가로 스크롤을 막는다(Copilot 리뷰 지적).
     const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
-    const rule = css.match(/\.tm-team-tag\s*\{([^}]*)\}/)?.[1];
+    const tagRule = css.match(/\.tm-team-tag\s*\{([^}]*)\}/)?.[1];
 
-    expect(rule).toBeDefined();
-    const pct = Number(rule!.match(/max-width:\s*(\d+)%/)?.[1]);
-    // 232px 행에서 형제(~73px = 31%) + gap(8px = 3%) 자리를 남기려면 66% 아래여야 한다.
-    expect(pct).toBeGreaterThan(0);
-    expect(pct).toBeLessThanOrEqual(66);
+    expect(tagRule).toBeDefined();
+    expect(tagRule).toMatch(/max-width:\s*100%/);
+    expect(tagRule).not.toMatch(/max-width:\s*62%/);
   });
 
   it('소개가 없으면 소개 상자를 그리지 않는다 — 지역·종목을 문장으로 되풀이하지 않는다', () => {

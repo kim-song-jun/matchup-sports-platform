@@ -22,6 +22,12 @@
   margin: 0 20px 28px;
 }
 
+/* "라인업을 기다리는 경기" 카드 — 다른 홈 섹션과 동일한 좌우 20px 인셋을 이 클래스로만
+   받는다(390 실측: 인셋 없이 카드가 화면 끝까지 늘어나 형제 섹션과 어긋났다). */
+.tm-home-lineup-block {
+  margin: 0 20px 28px;
+}
+
 .tm-home-matches-error-wrap {
   padding: 0 20px 8px;
 }
@@ -251,6 +257,10 @@
   }
 
   .tm-home-chat-block {
+    margin: 0;
+  }
+
+  .tm-home-lineup-block {
     margin: 0;
   }
 }

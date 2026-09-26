@@ -25,10 +25,11 @@ const apiMocks = vi.hoisted(() => ({
   teamMatches: { items: [] } as { items: unknown[] },
   teams: { items: [] } as { items: unknown[] },
   leagues: { items: [] } as { items: unknown[] },
+  recentSearches: { items: [] } as { items: unknown[] },
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
-  useV1RecentSearches: () => ({ data: { items: [] }, isLoading: false }),
+  useV1RecentSearches: () => ({ data: apiMocks.recentSearches, isLoading: false }),
   useV1RecordSearch: () => ({ mutate: vi.fn() }),
   useV1Matches: () => ({ data: apiMocks.matches, isLoading: false, isError: false }),
   useV1TeamMatches: () => ({ data: apiMocks.teamMatches, isLoading: false, isError: false }),
@@ -44,6 +45,7 @@ describe('SearchExperience GA events', () => {
     apiMocks.teamMatches = { items: [] };
     apiMocks.teams = { items: [] };
     apiMocks.leagues = { items: [] };
+    apiMocks.recentSearches = { items: [] };
   });
 
   it('tracks a search event with the query length (not raw text) and the domain that actually returned results', async () => {
@@ -195,5 +197,19 @@ describe('SearchExperience 접근성', () => {
   it('화면에 보이지 않아도 페이지 제목 heading 을 제공한다', () => {
     render(<SearchExperience state="results" />);
     expect(screen.getByRole('heading', { name: '검색', level: 1 })).toBeInTheDocument();
+  });
+});
+
+// 2026-09-26 alpha 감사 — 최근 검색어 칩엔 "선택된" 상태가 없는데, index===0 이라는 이유만으로
+// 첫 칩이 항상 tm-chip-active(앱 전역 "선택된 필터" 스타일)로 렌더돼 실제로 선택된 것처럼 보였다.
+describe('SearchExperience 최근 검색어 칩', () => {
+  it('어떤 칩도 tm-chip-active 를 갖지 않는다(선택 상태가 없다)', () => {
+    apiMocks.recentSearches = { items: [{ id: 'r1', query: 'E2E' }, { id: 'r2', query: '풋살' }] };
+    render(<SearchExperience state="results" />);
+
+    const e2eChip = screen.getByRole('button', { name: 'E2E' });
+    const futsalChip = screen.getByRole('button', { name: '풋살' });
+    expect(e2eChip.className).not.toMatch(/tm-chip-active/);
+    expect(futsalChip.className).not.toMatch(/tm-chip-active/);
   });
 });

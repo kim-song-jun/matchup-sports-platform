@@ -658,6 +658,132 @@ export async function createCompetitionData(
   return rows;
 }
 
+type OfficialTopScorer = {
+  readonly userId: string;
+  readonly recipientName: string;
+  readonly teamName: string | null;
+  readonly goals: number;
+};
+
+/**
+ * 득점왕 집계 — 공개 `GET /tournaments/:id/player-records`
+ * (`PublicTournamentRecordsService.getPlayerRecords`,
+ * apps/v1_api/src/games/public-records/public-tournament-records.service.ts)
+ * 와 같은 소스(공식 리비전의 V1GameResultParticipant)·동의 게이팅
+ * (`isParticipantPubliclyEligible`)·정렬(goals desc, tie-break 없음)을 그대로
+ * 복제한다. **여기서 `../src/...`를 import할 수 없어서**(위 파일 상단 경고 참고 —
+ * alpha 배포 이미지엔 `src/`가 없다) 그 서비스 메서드를 직접 재사용하지 못하고
+ * 최소 쿼리로 복제했다 — 저 서비스의 필터·정렬이 바뀌면 이 함수도 함께 갱신해야 한다.
+ */
+export async function computeOfficialTopScorer(
+  tx: Prisma.TransactionClient,
+  tournamentId: string,
+): Promise<OfficialTopScorer | null> {
+  const games = await tx.v1Game.findMany({
+    where: {
+      currentOfficialRevisionId: { not: null },
+      sourceType: 'TEAM_MATCH',
+      teamMatch: {
+        tournamentId,
+        leagueId: null,
+        deletedAt: null,
+        tournamentDetails: { is: { tournamentId } },
+      },
+    },
+    select: { currentOfficialRevisionId: true, visibilityPolicy: { select: { mode: true } } },
+  });
+  // HIDDEN/STATUS_ONLY 는 공개 랭킹에서 제외한다(effectivePublicVisibilityMode).
+  // LIVE 는 PUBLIC_LIVE 플래그로 'live'/'official_only' 어느 쪽이 되어도 이 필터를
+  // 그대로 통과하므로 그 플래그 조회는 여기서 필요 없다.
+  const revisionIds = games
+    .filter((game) => {
+      const mode = game.visibilityPolicy?.mode ?? 'HIDDEN';
+      return mode !== 'HIDDEN' && mode !== 'STATUS_ONLY';
+    })
+    .map((game) => game.currentOfficialRevisionId)
+    .filter((id): id is string => id !== null);
+  if (revisionIds.length === 0) return null;
+
+  const participantRows = await tx.v1GameResultParticipant.findMany({
+    where: { resultRevisionId: { in: revisionIds } },
+    select: {
+      participantId: true,
+      sideId: true,
+      goals: true,
+      resultRevision: { select: { officialAt: true } },
+    },
+  });
+  // officialAt 오름차순(+ participantId tie-break)으로 정렬해 마지막 소속 팀
+  // 판정이 결정적이 되게 한다(getPlayerRecordsForAdmin의 "마지막 스냅샷이 이긴다"
+  // 패턴과 동일한 이유 — findMany 순서는 무보장이라 그대로 두면 흔들린다).
+  const scoringRows = participantRows
+    .filter((row) => row.goals > 0 && row.resultRevision.officialAt !== null)
+    .sort(
+      (a, b) =>
+        a.resultRevision.officialAt!.getTime() - b.resultRevision.officialAt!.getTime() ||
+        a.participantId.localeCompare(b.participantId),
+    );
+  if (scoringRows.length === 0) return null;
+
+  const links = await tx.v1ParticipantIdentityLinkCurrent.findMany({
+    where: { participantId: { in: scoringRows.map((row) => row.participantId) } },
+    select: { participantId: true, linkId: true, userId: true },
+  });
+  const linkByParticipantId = new Map(links.map((link) => [link.participantId, link] as const));
+  const userIds = [...new Set(links.map((link) => link.userId))];
+  const userConsents = userIds.length === 0
+    ? []
+    : await tx.v1UserRecordConsent.findMany({ where: { userId: { in: userIds } }, select: { userId: true, state: true } });
+  const consentByUserId = new Map(userConsents.map((consent) => [consent.userId, consent.state] as const));
+  const linkIds = links.map((link) => link.linkId);
+  const snapshots = linkIds.length === 0
+    ? []
+    : await tx.v1ParticipantConsentSnapshot.findMany({
+        where: { linkId: { in: linkIds } },
+        orderBy: { consentVersion: 'desc' },
+        select: { linkId: true, state: true },
+      });
+  const latestSnapshotByLinkId = new Map<string, string>();
+  for (const snapshot of snapshots) {
+    if (!latestSnapshotByLinkId.has(snapshot.linkId)) latestSnapshotByLinkId.set(snapshot.linkId, snapshot.state);
+  }
+
+  const totalsByUserId = new Map<string, number>();
+  const lastSideIdByUserId = new Map<string, string>();
+  for (const row of scoringRows) {
+    const link = linkByParticipantId.get(row.participantId);
+    if (link === undefined) continue;
+    if (consentByUserId.get(link.userId) !== 'GRANTED') continue;
+    if (latestSnapshotByLinkId.get(link.linkId) === 'REVOKED') continue;
+    totalsByUserId.set(link.userId, (totalsByUserId.get(link.userId) ?? 0) + row.goals);
+    lastSideIdByUserId.set(link.userId, row.sideId);
+  }
+  if (totalsByUserId.size === 0) return null;
+
+  // player-records 와 동일한 정렬: goals desc, 명시적 tie-break 없음(원본 순서 유지).
+  const [top] = [...totalsByUserId.entries()]
+    .map(([userId, goals]) => ({ userId, goals }))
+    .sort((a, b) => b.goals - a.goals);
+
+  const [user, side] = await Promise.all([
+    tx.v1User.findUnique({
+      where: { id: top.userId },
+      select: { profile: { select: { nickname: true, displayName: true, deletedAt: true } } },
+    }),
+    tx.v1GameSide.findUnique({ where: { id: lastSideIdByUserId.get(top.userId)! }, select: { teamId: true } }),
+  ]);
+  const team = side?.teamId ? await tx.v1Team.findUnique({ where: { id: side.teamId }, select: { name: true } }) : null;
+  // getPlayerRecords 의 nicknameByUserId 규칙과 동일: 탈퇴 계정만 displayName 폴백.
+  const recipientName =
+    user?.profile === null || user?.profile === undefined
+      ? '(알 수 없음)'
+      : user.profile.deletedAt !== null
+        ? user.profile.displayName ?? user.profile.nickname
+        : user.profile.nickname;
+
+  return { userId: top.userId, recipientName, teamName: team?.name ?? null, goals: top.goals };
+}
+
 export async function createScenario(
   tx: Prisma.TransactionClient,
   scenario: TournamentScenario,
@@ -824,10 +950,28 @@ export async function createScenario(
     ],
     skipDuplicates: true,
   });
+  // 득점왕은 고정 페르소나가 아니라 이 대회의 실제 공식 결과 집계 1위를 쓴다
+  // (computeOfficialTopScorer 위 doc comment 참고) — 그래야 alpha 재배포로 시드가
+  // 다시 돌아도 실제 경기 기록과 어긋난 값으로 되돌아가지 않는다. 득점 기록이
+  // 0건이면(예: 이 시드가 만든 결과만 있고 아직 아무도 골을 넣지 않은 경우) 득점왕
+  // 항목 자체를 만들지 않는다. MVP·베스트 골키퍼는 이번 범위 밖 — 그대로 둔다.
+  const topScorer = await computeOfficialTopScorer(tx, scenario.id);
   await tx.v1TournamentAward.createMany({
     data: [
       { tournamentId: scenario.id, awardType: 'mvp', awardLabel: 'MVP', iconKey: 'crown', recipientName: teams[0].persona.realName, teamName: teams[0].team.name, note: '결승 2골 1도움', sortOrder: 0 },
-      { tournamentId: scenario.id, awardType: 'top_scorer', awardLabel: '득점왕', iconKey: 'goal', recipientName: teams[2].persona.realName, teamName: teams[2].team.name, note: '대회 6골', sortOrder: 1 },
+      ...(topScorer === null
+        ? []
+        : [{
+            tournamentId: scenario.id,
+            awardType: 'top_scorer',
+            awardLabel: '득점왕',
+            iconKey: 'goal',
+            recipientName: topScorer.recipientName,
+            recipientUserId: topScorer.userId,
+            teamName: topScorer.teamName,
+            note: `대회 ${topScorer.goals}골`,
+            sortOrder: 1,
+          }]),
       { tournamentId: scenario.id, awardType: 'best_keeper', awardLabel: '베스트 골키퍼', iconKey: 'glove', recipientName: teams[1].persona.realName, teamName: teams[1].team.name, note: '선방률 82%', sortOrder: 2 },
     ],
   });

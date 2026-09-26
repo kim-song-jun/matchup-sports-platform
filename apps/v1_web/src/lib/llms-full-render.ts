@@ -118,7 +118,8 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
     if (name) venueEvents.push({ venue: name, line });
   };
 
-  const tournaments = s.tournaments?.filter((t) => t.kind !== 'regular_league' && t.status !== 'draft') ?? null;
+  // 구장별 묶음이 "위 목록"과 같은 항목만 가리키도록, 상한은 구장 수집 전에 자른다.
+  const tournaments = s.tournaments?.filter((t) => t.kind !== 'regular_league' && t.status !== 'draft').slice(0, MAX_ROWS) ?? null;
   const tournamentRows = tournaments?.map((t) => {
     const head = link(t.title, `/tournaments/${t.id}`);
     noteVenue(t.venue, head);
@@ -149,7 +150,7 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
   ])) ?? null;
 
   // 목록 API 의 `status` 는 마감이 지나도 recruiting 으로 남는다 — 화면이 쓰는 displayState 로 거른다.
-  const openMatches = s.matches?.filter((m) => m.displayState === 'recruiting' && matchId(m)) ?? null;
+  const openMatches = s.matches?.filter((m) => m.displayState === 'recruiting' && matchId(m)).slice(0, MAX_ROWS) ?? null;
   const matchRows = openMatches?.map((m) => {
     const head = link(m.title, `/matches/${matchId(m)}`);
     noteVenue(m.place?.name, head);
@@ -162,7 +163,7 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
     ]);
   }) ?? null;
 
-  const openTeamMatches = s.teamMatches?.filter((m) => m.displayState === 'recruiting' && (m.teamMatchId ?? m.id)) ?? null;
+  const openTeamMatches = s.teamMatches?.filter((m) => m.displayState === 'recruiting' && (m.teamMatchId ?? m.id)).slice(0, MAX_ROWS) ?? null;
   const teamMatchRows = openTeamMatches?.map((m) => {
     const head = link(m.title, `/team-matches/${m.teamMatchId ?? m.id}`);
     noteVenue(m.place?.name, head);

@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { MatchPageClient } from './match-page-client';
+import { JsonLd } from '@/components/seo/json-ld';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1 } from '@/lib/seo';
+import { buildBreadcrumbLd } from '@/lib/structured-data';
+import { buildFixtureEventLd } from '@/lib/structured-data-competition';
 import type { PublicMatchDetail } from '@/components/public-game-records/types';
 
 async function loadMatch(tournamentId: string, fixtureId: string) {
@@ -44,6 +47,20 @@ export default async function TournamentMatchPage({
   // 경기 전 준비는 이제 **팀 전술보드**에서 하고, 그 진입점은 이 공개 페이지가 아니라
   // 팀 상세의 「다가오는 경기」다. 즉 이 route 는 **공개 기록 전용**이고, 404 계약만
   // 지키면 된다 — 팀장의 사전 준비 동선과 더 이상 얽히지 않는다.
-  if (!(await loadMatch(id, fixtureId))) notFound();
-  return <MatchPageClient tournamentId={id} fixtureId={fixtureId} />;
+  const match = await loadMatch(id, fixtureId);
+  if (!match) notFound();
+  const eventLd = buildFixtureEventLd(match);
+  return (
+    <>
+      {eventLd ? <JsonLd data={eventLd} /> : null}
+      <JsonLd
+        data={buildBreadcrumbLd([
+          { name: '대회', path: '/tournaments' },
+          { name: match.tournamentTitle, path: `/tournaments/${id}` },
+          { name: `${match.home?.teamName ?? '미정'} vs ${match.away?.teamName ?? '미정'}`, path: `/tournaments/${id}/matches/${fixtureId}` },
+        ])}
+      />
+      <MatchPageClient tournamentId={id} fixtureId={fixtureId} />
+    </>
+  );
 }

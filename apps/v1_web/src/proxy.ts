@@ -4,7 +4,7 @@ import { NOTICES_FEED_PATH } from '@/lib/seo';
 
 const CAMPAIGN_PATH_PREFIX = '/tournaments/campaigns/';
 const PUBLIC_DETAIL_PATH =
-  /^\/(matches|teams|team-matches|tournaments|notices)\/([^/]+)(?:\/(bracket|results|awards|reviews))?$/;
+  /^\/(matches|teams|team-matches|tournaments|notices|league-matches)\/([^/]+)(?:\/(bracket|results|awards|reviews))?$/;
 const UUID_PATH_SEGMENT = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
@@ -55,6 +55,7 @@ export const config = {
     '/tournaments/:id/reviews',
     '/tournaments/campaigns/:slug',
     '/notices/:id',
+    '/league-matches/:id',
   ],
 };
 

@@ -32,6 +32,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     ),
     path: `/teams/${id}`,
     image: team.profile?.coverImageUrl || team.profile?.logoUrl,
+    squareImage: !team.profile?.coverImageUrl && Boolean(team.profile?.logoUrl),
   });
 }
 

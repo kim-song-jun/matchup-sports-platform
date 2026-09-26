@@ -2,7 +2,11 @@ import type { Metadata } from 'next';
 import type { ApiEnvelope } from '@/types/api';
 
 const DEFAULT_SITE_ORIGIN = 'https://teameet.co.kr';
-const DEFAULT_SOCIAL_IMAGE = '/brand/icon-512.png';
+/**
+ * 커버가 없는 페이지의 링크 미리보기. `app/opengraph-image.tsx` 가 이 경로·크기로 그린다.
+ * 카카오톡·페이스북·X 의 큰 카드 규격(1.91:1)이라 정사각 앱 아이콘처럼 잘리지 않는다.
+ */
+export const DEFAULT_SOCIAL_IMAGE = { path: '/opengraph-image', width: 1200, height: 630 } as const;
 
 export const NOTICES_FEED_PATH = '/notices/feed.xml';
 
@@ -37,6 +41,8 @@ type PublicMetadataInput = {
   description: string;
   path: string;
   image?: string | null;
+  /** 정사각 이미지(팀 로고 등). X 의 큰 카드는 1.91:1 로 잘라 위아래가 잘리므로 작은 카드로 보낸다. */
+  squareImage?: boolean;
   type?: 'website' | 'article';
 };
 
@@ -65,10 +71,15 @@ export function buildPublicMetadata({
   description,
   path,
   image,
+  squareImage = false,
   type = 'website',
 }: PublicMetadataInput): Metadata {
   const socialTitle = `${title} | Teameet`;
-  const imageUrl = image || DEFAULT_SOCIAL_IMAGE;
+  const imageUrl = image || DEFAULT_SOCIAL_IMAGE.path;
+  // 크기를 아는 건 기본 이미지뿐이다 — 업로드 커버는 비율이 제각각이라 추측해 적지 않는다.
+  const ogImage = image
+    ? { url: image, alt: title }
+    : { url: DEFAULT_SOCIAL_IMAGE.path, width: DEFAULT_SOCIAL_IMAGE.width, height: DEFAULT_SOCIAL_IMAGE.height, alt: title };
 
   return {
     title,
@@ -82,10 +93,10 @@ export function buildPublicMetadata({
       title: socialTitle,
       description,
       url: path,
-      images: [{ url: imageUrl, alt: title }],
+      images: [ogImage],
     },
     twitter: {
-      card: 'summary',
+      card: image && squareImage ? 'summary' : 'summary_large_image',
       title: socialTitle,
       description,
       images: [imageUrl],

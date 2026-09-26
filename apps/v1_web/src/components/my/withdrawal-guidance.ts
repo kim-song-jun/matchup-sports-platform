@@ -1,5 +1,9 @@
 import { extractErrorCode, extractErrorMessage } from '@/lib/error-message';
 
+/** 개인정보처리방침 3·7절의 탈퇴 유예기간과 같은 값이어야 한다. */
+export const WITHDRAWAL_GRACE_NOTICE =
+  '탈퇴를 요청하면 30일 뒤 계정과 개인정보가 삭제돼요. 그 전에는 고객센터로 복구를 요청할 수 있어요.';
+
 export type WithdrawalErrorGuidance = {
   title: string;
   message: string;

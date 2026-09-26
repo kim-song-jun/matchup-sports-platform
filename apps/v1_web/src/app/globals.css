@@ -9048,10 +9048,14 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 /* ── 카드 안 사진 추가 슬롯 (사용자 선택 A안, 2026-08-26) ──
    사진이 없는 본인 카드에서 렌더 자리를 그대로 버튼으로 바꾼다. 업로드는 이미
    동작하는데 권하는 화면이 없어 카드가 전부 이니셜로 남아 있었다 -- 결핍이 있는
-   자리에서 해결한다. 사진이 생기면 이 슬롯은 사라지고 렌더가 그 자리를 채운다. */
+   자리에서 해결한다. 사진이 생기면 이 슬롯은 사라지고 렌더가 그 자리를 채운다.
+   렌더와 달리 아래가 페이드되지 않는 점선 상자라 이름 줄 위에서 끝나야 한다 -- 이름 줄의
+   높이는 총점·포지션 유무와 여정 면 여백으로 달라지므로 위쪽 줄 안에서 왼쪽 열 높이로
+   늘린다(stretch). 위·오른쪽 끝은 렌더와 같다: 위 = 면 패딩, 오른쪽 = 면 가장자리에서 8px. */
 .tm-pcard-photo-slot {
-  position: absolute; right: 8px; top: 26px; width: 138px; height: 140px;
-  z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  flex: none; align-self: stretch; width: 138px;
+  margin: 0 -8px 8px auto;
+  position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   border: 1.5px dashed var(--tm-rule);
   border-radius: var(--radius-field);
   background: rgba(255, 255, 255, 0.07);
@@ -9059,7 +9063,6 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
   text-decoration: none;
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
-.tm-player-card[data-shape='shield'] .tm-pcard-photo-slot { top: 48px; }
 .tm-pcard-photo-slot span {
   font-family: var(--tm-num);
   font-size: 12px; font-weight: 800; letter-spacing: 0.04em;

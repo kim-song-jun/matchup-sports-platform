@@ -2865,7 +2865,7 @@ label.tm-btn:focus-within {
   align-items: center;
   gap: 4px;
   min-width: 0;
-  word-break: keep-all; /* [P2 한글] TDS 패턴 — "성별 무관"이 "무 / 관"으로 음절 단위로 쪼개지던 것(alpha 실측) */
+  word-break: keep-all; /* [P2 한글] TDS 패턴 — 음절 단위 줄바꿈 방지 */
 }
 
 /* 리그명은 첫 줄의 남는 폭을 차지해 말줄임한다(flex-basis 0). 남는 폭이 48px 도 안 되면
@@ -3256,9 +3256,8 @@ label.tm-btn:focus-within {
   color: var(--text-muted);
 }
 
-/* .tm-match-detail-sport-badge(app/desktop/matches.css)는 사진 히어로 전용 오버레이 배색이라
-   위 되돌림 목록에서 빠져 있었다 — 흰 바탕에서 거의 안 보여 배지 속 파랑 점만 떠 보였다.
-   같은 줄 .tm-badge-grey 형제와 맞춘다. */
+/* .tm-match-detail-sport-badge(app/desktop/matches.css)는 사진 히어로 전용 오버레이 배색 —
+   흰 바탕(hero-stack)에서는 .tm-badge-grey 형제와 같은 배색으로 맞춘다. */
 .tm-match-detail-hero-stack .tm-match-detail-sport-badge {
   background: var(--grey100);
   border: 1px solid var(--border-strong);
@@ -4024,8 +4023,7 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 /* 팀 이름이 좌우에 있는 VS 레이아웃이라 그래픽은 하단 우측 안쪽에 두고(잘리지 않게) 텍스트 뒤(z-index:-1)에 깐다.
-   z-index는 페인트 순서만 정할 뿐 같은 흰색끼리는 대비가 안 나 텍스트가 지워져 보였다(예:
-   "마포 레인저스"). opacity 0.2로 항상 낮춘다 — 팀 미배정 상태(-recruiting)에서만 쓰던 값을 전체로 확장. */
+   z-index는 페인트 순서만 정할 뿐 색 대비는 보장하지 않으므로 opacity로 항상 낮춘다(팀 미배정 상태와 동일 값). */
 .tm-team-vs-hero-illustration {
   position: absolute;
   z-index: -1;

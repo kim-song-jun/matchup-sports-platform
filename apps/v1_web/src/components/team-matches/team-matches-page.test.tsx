@@ -362,6 +362,42 @@ describe('team match full edit', () => {
   });
 });
 
+/**
+ * [P3] 캡션(우상단 단계 이름)과 h1 이 같은 문구였다(3·4·5단계 "매치 정보"/"경기조건"/
+ * "장소와 시간"이 캡션과 그대로 겹쳤다) — 이미 역할이 갈려 있던 1·2·6단계 문법(캡션은 단계
+ * 이름, h1은 질문형)으로 통일한다.
+ */
+describe('TeamMatchCreatePageView — 단계 h1(질문형)과 캡션(단계 이름) 분리', () => {
+  it('3단계(매치 정보): 캡션은 "매치 정보", h1 은 질문형 "어떤 매치인가요?"', () => {
+    renderPage(<TeamMatchCreatePageView model={getTeamMatchCreateViewModel('info')} />);
+
+    expect(screen.getByRole('heading', { level: 1, name: '어떤 매치인가요?' })).toBeInTheDocument();
+    expect(screen.getByText('매치 정보')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: '매치 정보' })).not.toBeInTheDocument();
+  });
+
+  it('4단계(경기조건): 캡션은 "경기조건", h1 은 질문형 "어떤 조건으로 경기하나요?"', () => {
+    renderPage(<TeamMatchCreatePageView model={getTeamMatchCreateViewModel('condition')} />);
+
+    expect(screen.getByRole('heading', { level: 1, name: '어떤 조건으로 경기하나요?' })).toBeInTheDocument();
+    expect(screen.getByText('경기조건')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: '경기조건' })).not.toBeInTheDocument();
+  });
+
+  it('5단계(장소와 시간): 캡션은 "장소와 시간", h1 은 질문형 "언제, 어디서 하나요?"', () => {
+    renderPage(<TeamMatchCreatePageView model={getTeamMatchCreateViewModel('place-time')} />);
+
+    expect(screen.getByRole('heading', { level: 1, name: '언제, 어디서 하나요?' })).toBeInTheDocument();
+    expect(screen.getByText('장소와 시간')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: '장소와 시간' })).not.toBeInTheDocument();
+  });
+
+  it('1·2단계는 기존 문법(질문형 h1) 그대로 유지된다 — 회귀 가드', () => {
+    renderPage(<TeamMatchCreatePageView model={getTeamMatchCreateViewModel('team')} />);
+    expect(screen.getByRole('heading', { level: 1, name: '어떤 팀의 매치인가요?' })).toBeInTheDocument();
+  });
+});
+
 describe('팀매치 만들기 진행 표시줄 — 클릭 이동', () => {
   it('각 단계가 클릭 가능한 버튼이고, 조사(으로/로)가 올바르게 붙는다', () => {
     const onGoToStep = vi.fn();
@@ -831,14 +867,48 @@ describe('상세 CTA 상태줄 캡션 — 값의 의미 축(신청/경기)에 �
   });
 
   it('신청 흐름 상태(statusLabelKind 미지정)는 예전처럼 "신청 상태"를 보여준다(회귀 방지)', () => {
+    // match.status는 기본 목업값(open)을 그대로 둔다 — 'closed'로 바꾸면 [P2] 중복 제거
+    // 조건(mode==='default' && status==='closed')에 걸려 캡션 자체가 안 그려진다(아래
+    // 별도 describe에서 그 경로를 검증한다). 이 테스트는 순수하게 캡션의 의미 축(신청/경기)
+    // 판정만 본다.
     const model = getTeamMatchDetailViewModel('default');
-    model.match.status = 'closed';
-    model.statusLabel = '신청 마감';
+    model.statusLabel = '신청 가능';
 
     renderPage(<TeamMatchDetailPageView model={model} />);
 
     expect(screen.getAllByText('신청 상태').length).toBeGreaterThan(0);
     expect(screen.queryByText('경기 상태')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * [P2] 신청한 적 없는 뷰어(mode==='default')가 이미 닫힌 팀매치를 볼 때, 하단 바가
+ * 히어로의 상대팀 sub 문구(model.statusLabel)를 그대로 반복하던 것을 없앤다 — 히어로가
+ * 이미 상대(사실)와 사유를 말했으니 하단 바에는 캡션+값 없이 버튼만 남는다.
+ */
+describe('상세 CTA 상태줄 — 신청한 적 없는 뷰어의 닫힌 매치는 하단 바 캡션을 반복하지 않는다', () => {
+  it('히어로 상대팀 sub와 하단 바가 같은 문구를 두 번 반복하지 않는다', () => {
+    const model = getTeamMatchDetailViewModel('default');
+    model.match.status = 'closed';
+    model.match.applicantTeams = [];
+    model.statusLabel = '신청 마감';
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    // 히어로 sub(상대팀 없음 → '모집 마감' 라벨 + statusLabel sub)는 그대로 보여야 한다.
+    expect(screen.getByText('모집 마감')).toBeInTheDocument();
+    // 하단 바 캡션("신청 상태")은 사라지고, statusLabel 값도 딱 한 번만(히어로에서만) 보인다.
+    expect(screen.queryByText('신청 상태')).not.toBeInTheDocument();
+    expect(screen.getAllByText('신청 마감').length).toBe(1);
+  });
+
+  it('신청한 적 있는 뷰어(mode!=="default")는 기존처럼 하단 바 캡션을 그대로 보여준다(회귀 방지)', () => {
+    const model = getTeamMatchDetailViewModel('pending');
+    model.match.status = 'closed';
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getAllByText('신청 상태').length).toBeGreaterThan(0);
   });
 });
 

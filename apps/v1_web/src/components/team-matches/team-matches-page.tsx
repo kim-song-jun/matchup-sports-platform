@@ -244,6 +244,11 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
         : null;
   const locked = mode === 'pending' || mode === 'approved';
   const cta = model.applyLabel ?? (mode === 'mine' ? '매치 관리' : mode === 'approved' ? '승인 완료' : mode === 'pending' ? '신청 취소' : '신청하기');
+  // [P2] 신청한 적 없는 뷰어(mode==='default')가 이미 닫힌(상대 확정·종료·취소·마감) 팀매치를
+  // 볼 때 model.statusLabel 이 히어로의 상대팀 sub 문구(teamMatchOpponentSub)와 하단 바
+  // 값에 그대로 두 번 나온다 — 히어로가 이미 상대(사실)와 사유를 함께 말했으니 하단 바
+  // 캡션+값은 다시 말하지 않는다(버튼만 남는다).
+  const isClosedGuestStatusDuplicate = mode === 'default' && match.status === 'closed';
   const canRunAction = Boolean(model.onApply);
   /* ctaTone: 행동 불가(신청 불가 등 onApply=undefined + 리다이렉트도 없는 상태)는
    * neutral+disabled 조합으로 표시 — primary 파란 버튼처럼 보여 클릭 오인 방지(T1). */
@@ -716,11 +721,13 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
           {/* 홈팀 카드: 데스크톱 우측 컬럼 상단 — 40% 보이드 채움(T1) */}
           <div className="tm-team-match-right-host">{hostTeamCard}</div>
           <div className="tm-team-match-cta-card">
-            <div className="tm-team-match-cta-meta">
-              <span className="tm-text-caption">{teamMatchStatusCaption(mode, model.statusLabelKind)}</span>
-              {/* 비용을 모르면(costNote 미기재) 금액 대신 '비용 미정' — 0원으로 단정하지 않는다. */}
-              <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${formatAmountNumber(match.opponentCost)}원` : '비용 미정')}</span>
-            </div>
+            {isClosedGuestStatusDuplicate ? null : (
+              <div className="tm-team-match-cta-meta">
+                <span className="tm-text-caption">{teamMatchStatusCaption(mode, model.statusLabelKind)}</span>
+                {/* 비용을 모르면(costNote 미기재) 금액 대신 '비용 미정' — 0원으로 단정하지 않는다. */}
+                <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${formatAmountNumber(match.opponentCost)}원` : '비용 미정')}</span>
+              </div>
+            )}
             <div className="tm-team-match-cta-actions">
               {ctaButtons}
             </div>
@@ -730,11 +737,13 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
 
       {/* Mobile fixed CTA — hidden on desktop (desktop card above replaces it) */}
       <div className="tm-fixed-cta tm-team-match-mobile-cta">
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-          <span className="tm-text-caption">{teamMatchStatusCaption(mode, model.statusLabelKind)}</span>
-          {/* 비용을 모르면(costNote 미기재) 금액 대신 '비용 미정' — 0원으로 단정하지 않는다. */}
-          <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${formatAmountNumber(match.opponentCost)}원` : '비용 미정')}</span>
-        </div>
+        {isClosedGuestStatusDuplicate ? null : (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span className="tm-text-caption">{teamMatchStatusCaption(mode, model.statusLabelKind)}</span>
+            {/* 비용을 모르면(costNote 미기재) 금액 대신 '비용 미정' — 0원으로 단정하지 않는다. */}
+            <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${formatAmountNumber(match.opponentCost)}원` : '비용 미정')}</span>
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: showChat ? '120px 1fr' : '1fr', gap: 8 }}>
           {ctaButtons}
         </div>
@@ -1131,7 +1140,9 @@ function InfoStep({ model, edit }: { model: TeamMatchCreateViewModel; edit: bool
   const d = model.draft;
   return (
     <div>
-      <h1 className="tm-text-heading">매치 정보</h1>
+      {/* [P3] 캡션(우상단 "매치 정보")과 h1 이 같은 문구였다 — 1·2·6단계처럼 h1 은 질문형,
+          캡션은 단계 이름으로 역할을 가른다. */}
+      <h1 className="tm-text-heading">어떤 매치인가요?</h1>
       {edit ? <ImmutableMatchContext team={model.selectedTeam} sport={model.selectedSport} /> : null}
       <CreateField id="field-title" error={model.form?.fieldErrors?.title} label="매치 제목" value={d.title} placeholder="예: 토요일 저녁 풋살 상대팀 구합니다" onChange={(value) => model.form?.onFieldChange('title', value)} />
       <RequiredHint shown={!model.form?.fieldErrors?.title && !d.title.trim()} />
@@ -1192,8 +1203,9 @@ function matchFormatOptionsForSport(sportNameOrId: string): readonly string[] {
   return [];
 }
 
+// [P3] 위 InfoStep 과 동일 원칙 — 캡션은 '경기조건'(단계 이름) 그대로, h1 만 질문형으로.
 function ConditionStep({ model }: { model: TeamMatchCreateViewModel }) {
-  return <div><h1 className="tm-text-heading">경기조건</h1><p className="tm-text-body" style={{ marginTop: 8 }}>상대팀이 신청 전에 확인할 등급, 방식, 비용 조건을 입력해 주세요.</p><ConditionFields model={model} /><Card pad={16} className="tm-on-tint" style={{ marginTop: 16, background: 'var(--grey50)' }}><div className="tm-text-label">무료초청 표시</div><div className="tm-text-caption" style={{ marginTop: 4 }}>상대팀 부담금이 0원이면 목록과 상세에 '무료초청' 배지가 표시돼요.</div></Card></div>;
+  return <div><h1 className="tm-text-heading">어떤 조건으로 경기하나요?</h1><p className="tm-text-body" style={{ marginTop: 8 }}>상대팀이 신청 전에 확인할 등급, 방식, 비용 조건을 입력해 주세요.</p><ConditionFields model={model} /><Card pad={16} className="tm-on-tint" style={{ marginTop: 16, background: 'var(--grey50)' }}><div className="tm-text-label">무료초청 표시</div><div className="tm-text-caption" style={{ marginTop: 4 }}>상대팀 부담금이 0원이면 목록과 상세에 '무료초청' 배지가 표시돼요.</div></Card></div>;
 }
 
 function ConditionFields({ model }: { model: TeamMatchCreateViewModel }) {
@@ -1202,8 +1214,9 @@ function ConditionFields({ model }: { model: TeamMatchCreateViewModel }) {
   return <><PresetChipSelector label="실력등급" options={GRADE_OPTIONS} value={d.grade} onChange={(value) => model.form?.onFieldChange('grade', value)} /><PresetChipSelector label="경기방식" options={formatOptions} value={d.format} allowFreeText freeTextPlaceholder="예: 10:10, 3:3" onChange={(value) => model.form?.onFieldChange('format', value)} /><MultiPresetChipSelector label="경기 스타일" options={MATCH_STYLE_OPTIONS} values={d.style} allowFreeText freeTextPlaceholder="목록에 없으면 직접 입력해 주세요" maxItems={MATCH_STYLE_MAX_ITEMS} onChange={(value) => model.form?.onFieldChange('style', value)} /><PresetChipSelector label="유니폼 색상" options={UNIFORM_COLOR_OPTIONS} value={d.uniform} allowFreeText freeTextPlaceholder="예: 줄무늬 상의" onChange={(value) => model.form?.onFieldChange('uniform', value)} /><GenderRuleSelector value={d.gender} onChange={(value) => model.form?.onFieldChange('gender', value)} /><div className="tm-create-two-col"><CreateField label="총비용" value={`${d.cost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('cost', Number(value))} /><CreateField label="상대팀 부담금" value={`${d.opponentCost}`} suffix="원" type="number" onChange={(value) => model.form?.onFieldChange('opponentCost', Number(value))} /></div></>;
 }
 
+// [P3] 위와 동일 원칙 — 캡션은 '장소와 시간'(단계 이름) 그대로, h1 만 질문형으로.
 function PlaceTimeStep({ model }: { model: TeamMatchCreateViewModel }) {
-  return <div><h1 className="tm-text-heading">장소와 시간</h1><PlaceTimeFields model={model} /></div>;
+  return <div><h1 className="tm-text-heading">언제, 어디서 하나요?</h1><PlaceTimeFields model={model} /></div>;
 }
 
 function PlaceTimeFields({ model }: { model: TeamMatchCreateViewModel }) {

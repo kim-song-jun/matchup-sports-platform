@@ -69,7 +69,7 @@ export function TournamentApplicationGuideSection() {
               <span
                 aria-hidden="true"
                 className="tab-num tm-guide-step-num"
-                // 2026-08-11: "대회는 이렇게 진행돼요" 스텝 가이드(tournaments/page.tsx)와
+                // 2026-08-11: "대회는 이렇게 진행돼요" 스텝 가이드(tournaments/tournaments-list-client.tsx)와
                 // 동일한 순수 안내용 번호 배지 — 무채색으로 통일
                 // 2026-08-12: [인라인 style 우선순위 fix] 배경을 인라인으로 두면 다크모드
                 // 전용 클래스 오버라이드(.tm-guide-step-num, globals.css)가 절대 못 이겨서

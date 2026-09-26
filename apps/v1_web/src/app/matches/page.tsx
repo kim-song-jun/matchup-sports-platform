@@ -1,9 +1,13 @@
-import { Suspense } from 'react';
 import { MatchListPageClient } from '@/components/matches/matches-client';
-import { MatchListSsrView } from '@/components/matches/matches-ssr-list';
+import { sortMatchesByAvailability } from '@/components/matches/matches.card-model';
+import { JsonLd } from '@/components/seo/json-ld';
+import { hasListFilter, MATCH_LIST_FILTER_PARAMS, MATCH_LIST_SEED_PATH } from '@/lib/public-list-seed';
 import { buildPublicMetadata } from '@/lib/seo';
-import { fetchSeoListPage, fetchSeoMasterSports } from '@/lib/seo-list';
-import type { V1Match } from '@/types/api';
+import { fetchSeoMasterSports, fetchSeoSeed } from '@/lib/seo-list';
+import { buildItemListLd } from '@/lib/structured-data';
+import type { CursorPage, V1Match } from '@/types/api';
+
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export const metadata = buildPublicMetadata({
   title: '개인 매치 찾기',
@@ -17,15 +21,28 @@ export const metadata = buildPublicMetadata({
 // 그대로 쓰므로 5분 캐시는 유지된다.
 export const revalidate = 0;
 
-export default async function MatchesPage() {
-  const [matches, sports] = await Promise.all([
-    fetchSeoListPage<V1Match>('/matches', 'matches'),
+export default async function MatchesPage({ searchParams }: { searchParams: SearchParams }) {
+  const filtered = hasListFilter(await searchParams, MATCH_LIST_FILTER_PARAMS);
+  const [page, sports] = await Promise.all([
+    fetchSeoSeed<CursorPage<V1Match>>(MATCH_LIST_SEED_PATH, 'matches'),
     fetchSeoMasterSports(),
   ]);
 
+  // 카드와 같은 순서(클라이언트가 가용성순으로 다시 정렬한다)·같은 이름. 필터가 걸리면 화면이 seed 와 달라 내지 않는다.
+  const ldItems = page && !filtered ? sortMatchesByAvailability([...page.items]) : [];
+
   return (
-    <Suspense fallback={<MatchListSsrView matches={matches} sports={sports} />}>
-      <MatchListPageClient />
-    </Suspense>
+    <>
+      {ldItems.length > 0 ? (
+        <JsonLd
+          data={buildItemListLd(
+            '개인 매치',
+            '/matches',
+            ldItems.map((item) => ({ name: item.title, path: `/matches/${item.matchId ?? item.id}` })),
+          )}
+        />
+      ) : null}
+      <MatchListPageClient seed={page ? { page, sports } : undefined} />
+    </>
   );
 }

@@ -240,6 +240,28 @@ export function buildBreadcrumbLd(items: readonly BreadcrumbItem[]): JsonLdNode 
   };
 }
 
+export type ItemListEntry = { readonly name: string; readonly path: string };
+
+/**
+ * 목록 페이지의 ItemList. 항목은 **서버 첫 화면에 실제로 그려진 카드와 같은 순서·같은 이름**
+ * 이어야 한다(규약 1) — 전체 건수가 아니라 화면에 보이는 항목 수를 `numberOfItems` 로 쓴다.
+ */
+export function buildItemListLd(name: string, path: string, items: readonly ItemListEntry[]): JsonLdNode {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name,
+    url: absoluteSiteUrl(path),
+    numberOfItems: items.length,
+    itemListElement: items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.name,
+      url: absoluteSiteUrl(item.path),
+    })),
+  };
+}
+
 /**
  * `</script>`로 스크립트 태그를 조기 종료시키는 XSS를 막는다. JSON-LD는 script 태그
  * 안에 원문 그대로 들어가야 하므로(HTML 엔티티 이스케이프 불가) `<`를 유니코드

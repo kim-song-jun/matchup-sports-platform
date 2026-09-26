@@ -26,6 +26,7 @@ import { trackEvent } from '@/lib/analytics';
 import { chatRoomHref } from '@/lib/chat-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1TeamMatch, V1TeamMatchApiStatus, V1TeamMatchViewerState } from '@/types/api';
+import type { CursorListSeed } from '@/lib/public-list-seed';
 import { extractErrorMessage } from '@/lib/error-message';
 import { getCurrentRedirectPath, getLoginPathForRedirect, sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 // 호스트팀뿐 아니라 승인된 상대팀 매니저도 자기 사이드 라인업을 관리할 수 있다 — 이 판단은
@@ -49,7 +50,7 @@ import {
   toTeamMatch,
 } from './team-matches.card-model';
 
-export function TeamMatchListPageClient() {
+export function TeamMatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V1TeamMatch> } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedSportId = searchParams.get('sportId') ?? undefined;
@@ -68,7 +69,7 @@ export function TeamMatchListPageClient() {
     setSearchValue(initialQuery);
     setSubmittedQuery(initialQuery);
   }, [initialQuery]);
-  const sportsQuery = useV1MasterSports();
+  const sportsQuery = useV1MasterSports({ seed: seed?.sports });
   const teamMatchFilters = useMemo(() => {
     const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'deadline' | 'latest'; view?: 'card' | 'compact'; genderRule?: string; levelCodes?: string; kind?: 'friendly' | 'competition' } = {};
     if (selectedSportId) filters.sportId = selectedSportId;
@@ -82,7 +83,7 @@ export function TeamMatchListPageClient() {
   }, [selectedGenderRule, selectedLevels, selectedKind, selectedSportId, selectedSort, selectedView, submittedQuery]);
   // 서버는 20건씩 커서 페이지네이션인데(team-matches.service.ts) 예전엔 이 화면이 단발
   // useQuery로 첫 페이지만 받아 21번째부터는 볼 방법이 없었다(감사 결함 — matches-client.tsx의
-  // 같은 수정과 동일 패턴, tournaments/page.tsx 의 "더 보기" 누적 방식을 따른다).
+  // 같은 수정과 동일 패턴, tournaments/tournaments-list-client.tsx 의 "더 보기" 누적 방식을 따른다).
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [accumulated, setAccumulated] = useState<V1TeamMatch[]>([]);
   // matches-client.tsx와 동일한 이유로 useEffect가 아니라 렌더 중에 되감는다 — 안 그러면
@@ -99,7 +100,8 @@ export function TeamMatchListPageClient() {
     () => (teamMatchFilters ? (cursor ? { ...teamMatchFilters, cursor } : teamMatchFilters) : undefined),
     [teamMatchFilters, cursor],
   );
-  const allQuery = useV1TeamMatches(allQueryFilters);
+  // matches-client.tsx 와 같다 — seed 는 cursor 없는 무필터 키에만 맞는다.
+  const allQuery = useV1TeamMatches(allQueryFilters, { seed: allQueryFilters ? undefined : seed?.page });
   const countFilters = useMemo(() => {
     const filters: { query?: string; genderRule?: string; levelCodes?: string; kind?: 'friendly' | 'competition' } = {};
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
@@ -193,8 +195,8 @@ export function TeamMatchListPageClient() {
           selectedSportId,
         }),
         matches: [],
-        // #5: 로딩 중임을 명시 — 빈/로딩 구분
-        isLoading: query.isLoading,
+        // #5: 로딩 중임을 명시 — 빈/로딩 구분. isPending 인 이유는 matches-client.tsx 같은 자리.
+        isLoading: query.isPending,
       };
 
   return <TeamMatchListPageView model={model} />;

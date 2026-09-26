@@ -1,6 +1,6 @@
 /**
  * `next build`는 v1_api 컨테이너에 못 닿는 CI 러너에서 돈다. `export const revalidate`가
- * 양수(예: 300)면 Next가 이 라우트를 빌드 타임에 정적/ISR 프리렌더하고, fetchSeoCursorPage /
+ * 양수(예: 300)면 Next가 이 라우트를 빌드 타임에 정적/ISR 프리렌더하고, fetchSeoSeed /
  * fetchSeoMasterSports / fetchPublicV1이 실패해 빈 목록을 그 정적 HTML에 구워 버린다 —
  * 배포 직후 첫 ISR 캐시 HIT까지 실제 유저·크롤러가 그 빈 결과를 본다
  * (메모: isr-serves-build-time-empty-cache).
@@ -24,6 +24,21 @@ describe('목록/사이트맵 라우트는 빌드 타임 정적 프리렌더 대
 
   it('team-matches/page.tsx: revalidate === 0', async () => {
     const mod = await import('./team-matches/page');
+    expect(mod.revalidate).toBe(0);
+  });
+
+  it('tournaments/page.tsx: revalidate === 0', async () => {
+    const mod = await import('./tournaments/page');
+    expect(mod.revalidate).toBe(0);
+  });
+
+  it('events/page.tsx: revalidate === 0', async () => {
+    const mod = await import('./events/page');
+    expect(mod.revalidate).toBe(0);
+  });
+
+  it('notices/page.tsx: revalidate === 0', async () => {
+    const mod = await import('./notices/page');
     expect(mod.revalidate).toBe(0);
   });
 

@@ -12,7 +12,7 @@ vi.mock('@/lib/seo', async () => {
   return { ...actual, fetchPublicV1: (path: string) => fetchPublicV1(path) };
 });
 
-const { SEO_LIST_PAGE_SIZE, fetchSeoCursorPage, fetchSeoListPage, fetchSeoMasterSports } = await import('./seo-list');
+const { fetchSeoMasterSports, fetchSeoSeed } = await import('./seo-list');
 
 beforeEach(() => {
   fetchPublicV1.mockReset();
@@ -25,38 +25,24 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('fetchSeoListPage', () => {
-  it('서버 기본 페이지 크기로 첫 페이지만 가져온다', async () => {
+describe('fetchSeoSeed', () => {
+  it('받은 경로를 그대로 요청하고 응답을 돌려준다', async () => {
     fetchPublicV1.mockResolvedValue({ items: [{ id: 'a' }], pageInfo: { hasNext: true, nextCursor: 'c' } });
 
-    await expect(fetchSeoListPage('/matches', 'matches')).resolves.toEqual([{ id: 'a' }]);
-    expect(fetchPublicV1).toHaveBeenCalledTimes(1);
-    expect(fetchPublicV1).toHaveBeenCalledWith(`/matches?limit=${SEO_LIST_PAGE_SIZE}`);
+    await expect(fetchSeoSeed('/matches', 'matches')).resolves.toEqual({ items: [{ id: 'a' }], pageInfo: { hasNext: true, nextCursor: 'c' } });
+    expect(fetchPublicV1).toHaveBeenCalledWith('/matches');
   });
 
-  it('커서 페이지 helper는 전체 건수와 다음 커서를 보존한다', async () => {
-    fetchPublicV1.mockResolvedValue({
-      items: [{ id: 'a' }],
-      pageInfo: { hasNext: true, nextCursor: 'c', total: 52 },
-    });
-
-    await expect(fetchSeoCursorPage('/teams', 'teams')).resolves.toMatchObject({
-      items: [{ id: 'a' }],
-      nextCursor: 'c',
-      pageInfo: { hasNext: true, nextCursor: 'c', total: 52 },
-    });
-  });
-
-  it('업스트림이 죽어도 던지지 않고 빈 목록을 준다', async () => {
+  it('업스트림이 죽어도 던지지 않고 null 을 준다 — 빈 목록을 사실처럼 넘기지 않는다', async () => {
     fetchPublicV1.mockRejectedValue(new Error('upstream down'));
 
-    await expect(fetchSeoListPage('/teams', 'teams')).resolves.toEqual([]);
+    await expect(fetchSeoSeed('/teams?limit=20', 'teams')).resolves.toBeNull();
   });
 
   it('실패를 조용히 삼키지 않고 서버 로그에 남긴다', async () => {
     fetchPublicV1.mockRejectedValue(new Error('boom'));
 
-    await fetchSeoListPage('/teams', 'teams');
+    await fetchSeoSeed('/teams?limit=20', 'teams');
 
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining('teams'),
@@ -64,10 +50,10 @@ describe('fetchSeoListPage', () => {
     );
   });
 
-  it('응답이 없으면(404) 빈 목록', async () => {
+  it('응답이 없으면(404) null', async () => {
     fetchPublicV1.mockResolvedValue(null);
 
-    await expect(fetchSeoListPage('/team-matches', 'team-matches')).resolves.toEqual([]);
+    await expect(fetchSeoSeed('/team-matches', 'team-matches')).resolves.toBeNull();
   });
 });
 

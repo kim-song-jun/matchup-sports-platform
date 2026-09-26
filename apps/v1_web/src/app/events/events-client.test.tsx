@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useV1TournamentCampaignsInfinite } from '@/hooks/use-v1-tournament-campaign';
 import { queryImageBySrc } from '@/test/next-image';
-import EventsPage from './page';
+import { EventsPageClient as EventsPage } from './events-client';
 
 const refetch = vi.hoisted(() => vi.fn());
 const fetchNextPage = vi.hoisted(() => vi.fn());
@@ -40,7 +40,7 @@ describe('EventsPage', () => {
 
   it('syncs a same-mounted URL sport change and validates the master sport list', () => {
     useV1TournamentCampaignsInfiniteMock.mockReturnValue({
-      data: { pages: [{ items: [] }] }, isLoading: false, isError: false, error: null,
+      data: { pages: [{ items: [] }] }, isPending: false, isError: false, error: null,
       fetchNextPage, hasNextPage: false, isFetchingNextPage: false, isFetchNextPageError: false, refetch,
     } as never);
     const { rerender } = render(<EventsPage />);
@@ -59,7 +59,7 @@ describe('EventsPage', () => {
 
   it('waits for master sports before applying a URL sport filter', () => {
     useV1TournamentCampaignsInfiniteMock.mockReturnValue({
-      data: { pages: [{ items: [] }] }, isLoading: false, isError: false, error: null,
+      data: { pages: [{ items: [] }] }, isPending: false, isError: false, error: null,
       fetchNextPage, hasNextPage: false, isFetchingNextPage: false, isFetchNextPageError: false, refetch,
     } as never);
     searchParamsState.value = new URLSearchParams('sport=futsal');
@@ -87,7 +87,7 @@ describe('EventsPage', () => {
     ];
     searchParamsState.value = new URLSearchParams('sport=futsal');
     useV1TournamentCampaignsInfiniteMock.mockReturnValue({
-      data: { pages: [{ items: [] }] }, isLoading: false, isError: false, error: null,
+      data: { pages: [{ items: [] }] }, isPending: false, isError: false, error: null,
       fetchNextPage, hasNextPage: false, isFetchingNextPage: false, isFetchNextPageError: false, refetch,
     } as never);
     render(<EventsPage />);
@@ -108,7 +108,7 @@ describe('EventsPage', () => {
     ];
     searchParamsState.value = new URLSearchParams('sport=futsal');
     useV1TournamentCampaignsInfiniteMock.mockReturnValue({
-      data: { pages: [{ items: [] }] }, isLoading: false, isError: false, error: null,
+      data: { pages: [{ items: [] }] }, isPending: false, isError: false, error: null,
       fetchNextPage, hasNextPage: false, isFetchingNextPage: false, isFetchNextPageError: false, refetch,
     } as never);
     const { rerender } = render(<EventsPage />);
@@ -134,7 +134,7 @@ describe('EventsPage', () => {
     sportsState.value = undefined;
     sportsErrorState.value = true;
     useV1TournamentCampaignsInfiniteMock.mockReturnValue({
-      data: undefined, isLoading: false, isError: true, error: new Error('campaign unavailable'),
+      data: undefined, isPending: false, isError: true, error: new Error('campaign unavailable'),
       fetchNextPage, hasNextPage: false, isFetchingNextPage: false, isFetchNextPageError: false, refetch,
     } as never);
     render(<EventsPage />);
@@ -151,7 +151,7 @@ describe('EventsPage', () => {
   it('offers an in-page retry after the initial campaign request fails', () => {
     useV1TournamentCampaignsInfiniteMock.mockReturnValue({
       data: undefined,
-      isLoading: false,
+      isPending: false,
       isError: true,
       error: new Error('network unavailable'),
       fetchNextPage,
@@ -177,7 +177,7 @@ describe('EventsPage', () => {
   it('빈 이벤트 목록은 그래픽과 함께 대회 목록으로 가는 CTA 를 보여준다', () => {
     useV1TournamentCampaignsInfiniteMock.mockReturnValue({
       data: { pages: [{ items: [] }] },
-      isLoading: false,
+      isPending: false,
       isError: false,
       error: null,
       fetchNextPage,
@@ -229,7 +229,7 @@ describe('EventsPage', () => {
     };
     useV1TournamentCampaignsInfiniteMock.mockReturnValue({
       data: { pages: [{ items: [item] }] },
-      isLoading: false,
+      isPending: false,
       isError: false,
       error: new Error('network unavailable'),
       fetchNextPage,

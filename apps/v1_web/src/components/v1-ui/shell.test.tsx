@@ -295,3 +295,46 @@ describe('AppChrome 이중 마운트 가드 (§2.2 마이그레이션 안전망)
     expect(screen.getByTestId('leaf')).toBeInTheDocument();
   });
 });
+
+describe('AppChrome 스크롤 영역 — floatingSlot(FAB) 유무에 따른 하단 안전 여백', () => {
+  // 이 테스트가 이 변경의 계약이다: .tm-floating-fab은 .tm-scroll-area 밖(형제, {floatingSlot})에
+  // 앵커되어 콘텐츠 위로 떠 있다 — floatingSlot이 있는데도 이 padding-bottom이 기존
+  // --v1-shell-scroll-bottom-pad(FAB 클리어런스 없는 값)로 되돌아가면 목록 마지막 행이
+  // 다시 FAB에 가려진다. floatingSlot이 없는 화면은 이 값이 그대로여야 한다(불필요한 여백 금지).
+  it('floatingSlot이 있으면 fab-clear-pad, 없으면 기존 scroll-bottom-pad를 쓴다', () => {
+    const { container: withFab } = render(
+      <AppChrome title="테스트" showNotifications={false} floatingSlot={<button type="button">FAB</button>}>
+        <div>본문</div>
+      </AppChrome>,
+    );
+    const { container: withoutFab } = render(
+      <AppChrome title="테스트" showNotifications={false}>
+        <div>본문</div>
+      </AppChrome>,
+    );
+
+    const scrollWithFab = withFab.querySelector<HTMLElement>('.tm-scroll-area');
+    const scrollWithoutFab = withoutFab.querySelector<HTMLElement>('.tm-scroll-area');
+
+    expect(scrollWithFab?.style.paddingBottom).toBe('var(--v1-shell-fab-clear-pad)');
+    expect(scrollWithoutFab?.style.paddingBottom).toBe('var(--v1-shell-scroll-bottom-pad)');
+  });
+
+  // bottomNav 자체가 없는 화면(상세·폼)은 FAB 클리어런스를 계산할 기준(하단 탭 높이)이
+  // 없으므로, floatingSlot이 딸려 와도 이 화면에 새 여백을 만들지 않는다.
+  it('bottomNav가 없으면 floatingSlot이 있어도 여백을 주지 않는다', () => {
+    const { container } = render(
+      <AppChrome
+        title="테스트"
+        showNotifications={false}
+        bottomNav={false}
+        floatingSlot={<button type="button">FAB</button>}
+      >
+        <div>본문</div>
+      </AppChrome>,
+    );
+
+    const scroll = container.querySelector<HTMLElement>('.tm-scroll-area');
+    expect(scroll?.style.paddingBottom).toBe('0px');
+  });
+});

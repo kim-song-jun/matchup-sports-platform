@@ -134,6 +134,16 @@ describe('ROUTE_CHROME_TABLE — 골든 샘플(전 세그먼트 통합, U39)', (
     expect(campaign?.params).toEqual({ slug: 'summer-cup' });
   });
 
+  it('/team-matches/:id/record — 엔트리 누락 시 세그먼트 수가 달라 어떤 행에도 안 걸려 null이 된다', () => {
+    // 2026-09-26 alpha 감사: 이 pattern이 테이블에 없으면 3세그먼트 경로가 2세그먼트
+    // '/team-matches/:id'와도 세그먼트 수가 달라 매치되지 않아 resolveRouteChrome이 null을
+    // 반환했다 — 앱 셸(뒤로가기·홈·알림·하단 내비) 전체가 빠지는 원인이었다.
+    const record = resolveRouteChrome('/team-matches/tm-1/record');
+    expect(record).not.toBeNull();
+    expect(record?.chrome.title).toBe('경기 기록');
+    expect(record?.params).toEqual({ id: 'tm-1' });
+  });
+
   it('패턴 충돌 쌍: /my/schedule(U30) vs /my/settings류(U37) — 서로 다른 title로 겹치지 않는다', () => {
     expect(resolveRouteChrome('/my/schedule')?.chrome.title).toBe('내 일정');
     expect(resolveRouteChrome('/my/settings')?.chrome.title).toBe('설정');

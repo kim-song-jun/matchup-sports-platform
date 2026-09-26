@@ -75,6 +75,17 @@ describe('groupScheduleEntries', () => {
 
     expect(phases[0].groups[0].label).toBe('8강');
   });
+
+  it('그룹 이름이 없는 결선 픽스처는 영문 round 키를 번역해 묶는다 (alpha #ab100000 실측: semi/final/third_place)', () => {
+    const phases = groupScheduleEntries([
+      entry({ fixtureId: 'semi1', round: 'semi', groupName: null, fixtureNumber: 1 }),
+      entry({ fixtureId: 'semi2', round: 'semi', groupName: null, fixtureNumber: 2 }),
+      entry({ fixtureId: 'final', round: 'final', groupName: null, fixtureNumber: 1 }),
+      entry({ fixtureId: 'third', round: 'third_place', groupName: null, fixtureNumber: 1 }),
+    ]);
+
+    expect(phases[0].groups.map((group) => group.label)).toEqual(['4강', '결승', '3·4위전']);
+  });
 });
 
 describe('buildScheduleFilters', () => {

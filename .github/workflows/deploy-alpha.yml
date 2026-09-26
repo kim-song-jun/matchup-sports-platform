@@ -533,6 +533,28 @@ jobs:
           bash scripts/release/sync-alpha-apns-env.sh \
             || echo "::warning::APNs env sync did not complete; the host's APNs env may be unchanged from before"
 
+      # Same policy as APNs: skipped with a warning until the secrets exist, never blocks a deploy.
+      # The team id is the APNs one (same Apple team); the key is a separate Sign in with Apple key.
+      - name: Sync Sign in with Apple runtime env
+        env:
+          INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
+          AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
+          SECRET_APPLE_SIGN_IN_KEY_ID: ${{ secrets.APPLE_SIGN_IN_KEY_ID }}
+          SECRET_APPLE_SIGN_IN_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+          SECRET_APPLE_SIGN_IN_PRIVATE_KEY: ${{ secrets.APPLE_SIGN_IN_PRIVATE_KEY }}
+          SECRET_APPLE_SIGN_IN_TOKEN_ENCRYPTION_KEY: ${{ secrets.APPLE_SIGN_IN_TOKEN_ENCRYPTION_KEY }}
+        run: |
+          missing=()
+          for name in SECRET_APPLE_SIGN_IN_KEY_ID SECRET_APPLE_SIGN_IN_TEAM_ID SECRET_APPLE_SIGN_IN_PRIVATE_KEY SECRET_APPLE_SIGN_IN_TOKEN_ENCRYPTION_KEY; do
+            [ -n "${!name:-}" ] || missing+=("${name#SECRET_}")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::warning::Sign in with Apple secrets are not set, so Apple token revoke stays disabled on alpha — missing: ${missing[*]}"
+            exit 0
+          fi
+          bash scripts/release/sync-alpha-apple-sign-in-env.sh \
+            || echo "::warning::Sign in with Apple env sync did not complete; the host's env may be unchanged from before"
+
       - name: Deploy through AWS Systems Manager
         timeout-minutes: ${{ fromJSON(steps.task168.outputs.stepTimeoutMinutes) }}
         env:

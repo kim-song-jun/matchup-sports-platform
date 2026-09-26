@@ -615,7 +615,11 @@ extension WebShellViewController: WKScriptMessageHandler {
         do {
             let credential = try await appleSignIn.signIn(rawNonce: nonce, anchor: view.window)
             await replyToApple(
-                request, identityToken: credential.identityToken, fullName: credential.fullName, error: nil)
+                request,
+                identityToken: credential.identityToken,
+                authorizationCode: credential.authorizationCode,
+                fullName: credential.fullName,
+                error: nil)
         } catch AppleSignInController.Failure.cancelled {
             // Backing out of the sheet is a decision, not a failure. The page shows nothing.
             await replyToApple(request, identityToken: nil, fullName: nil, error: nil)
@@ -628,12 +632,14 @@ extension WebShellViewController: WKScriptMessageHandler {
     private func replyToApple(
         _ request: NativeBridge.Message,
         identityToken: String?,
+        authorizationCode: String? = nil,
         fullName: String?,
         error: String?
     ) async {
         let script = NativeBridge.appleResultScript(
             requestId: request.requestId,
             identityToken: identityToken,
+            authorizationCode: authorizationCode,
             fullName: fullName,
             error: error)
         guard !script.isEmpty else { return }

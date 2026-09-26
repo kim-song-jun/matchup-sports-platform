@@ -26,6 +26,11 @@ export type AppleJsonWebKey = {
 export type AppleIdentityClaims = {
   /** Apple's stable identifier for this person **within our team** — the account key. */
   readonly subject: string;
+  /**
+   * The bundle id the token was minted for — one of our configured audiences. Apple's token
+   * endpoint only accepts the authorization code under this same `client_id`.
+   */
+  readonly audience: string;
   /** Present on most tokens; absent when the person hid it and Apple sent no relay address. */
   readonly email: string | null;
   readonly emailVerified: boolean;
@@ -109,8 +114,12 @@ export function verifyAppleIdentityToken(input: {
   readonly keys: readonly AppleJsonWebKey[];
   /** Bundle identifiers this deployment accepts — alpha and production are different apps. */
   readonly audiences: readonly string[];
-  /** The nonce this deployment issued for this sign-in, unhashed. */
-  readonly expectedNonce: string;
+  /**
+   * The nonce this deployment issued for this sign-in, unhashed. `null` only for an id_token
+   * this server received from Apple's token endpoint itself: that one never passed through a
+   * client, so there is nothing to replay and Apple does not promise to echo a nonce in it.
+   */
+  readonly expectedNonce: string | null;
   readonly nowSeconds: number;
 }): AppleTokenVerification {
   const parts = input.token.split('.');
@@ -150,7 +159,10 @@ export function verifyAppleIdentityToken(input: {
   // ours — or anyone else's — is signed by the same Apple key and would otherwise pass.
   const audience = payload.aud;
   const audiences = Array.isArray(audience) ? audience : [audience];
-  if (!audiences.some((value) => typeof value === 'string' && input.audiences.includes(value))) {
+  const matchedAudience = audiences.find(
+    (value): value is string => typeof value === 'string' && input.audiences.includes(value),
+  );
+  if (matchedAudience === undefined) {
     return { ok: false, reason: 'wrong_audience' };
   }
 
@@ -161,8 +173,8 @@ export function verifyAppleIdentityToken(input: {
     return { ok: false, reason: 'issued_in_future' };
   }
 
-  if (typeof payload.nonce !== 'string'
-      || !equalsConstantTime(payload.nonce, hashAppleNonce(input.expectedNonce))) {
+  if (input.expectedNonce !== null && (typeof payload.nonce !== 'string'
+      || !equalsConstantTime(payload.nonce, hashAppleNonce(input.expectedNonce)))) {
     return { ok: false, reason: 'nonce_mismatch' };
   }
 
@@ -174,6 +186,7 @@ export function verifyAppleIdentityToken(input: {
     ok: true,
     claims: {
       subject: payload.sub,
+      audience: matchedAudience,
       email: typeof payload.email === 'string' && payload.email.length > 0 ? payload.email : null,
       emailVerified: readAppleBoolean(payload.email_verified),
       isPrivateEmail: readAppleBoolean(payload.is_private_email),

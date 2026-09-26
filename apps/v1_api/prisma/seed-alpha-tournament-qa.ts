@@ -617,8 +617,11 @@ export async function createCompetitionData(
       homeRegistrationId: home.id,
       awayRegistrationId: away.id,
       matchId: deterministicCanonicalMatchId(`${scenario.id}:${round}:${fixtureNumber}:1`),
-      homePlayers: homeRoster.map((player) => ({ userId: player.userId, displayName: player.realName, jerseyNumber: player.jerseyNumber ?? 0 })),
-      awayPlayers: awayRoster.map((player) => ({ userId: player.userId, displayName: player.realName, jerseyNumber: player.jerseyNumber ?? 0 })),
+      // 등번호 미배정 로스터(jerseyNumber: null)를 그대로 참가자 행에 옮긴다. 예전엔
+      // `?? 0`으로 채워 넣었는데, 0은 이 앱에서 실제로 쓰이는 등번호라(선수 카드가
+      // null과 동일하게 취급하지 않는다) 그 값이 "등번호 없음"이 아니라 "0번"으로 보였다.
+      homePlayers: homeRoster.map((player) => ({ userId: player.userId, displayName: player.realName, jerseyNumber: player.jerseyNumber })),
+      awayPlayers: awayRoster.map((player) => ({ userId: player.userId, displayName: player.realName, jerseyNumber: player.jerseyNumber })),
     });
     if (scenario.status === V1TournamentStatus.in_progress && round === 'group' && fixtureNumber === 2 && match.isPristineGame) {
       await tx.v1Game.update({ where: { id: match.gameId }, data: { state: V1GameState.LIVE } });

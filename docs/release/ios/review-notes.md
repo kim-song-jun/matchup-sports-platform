@@ -58,7 +58,7 @@ Contact for review: <연락처 — 저장소 밖에서 전달>
 | 주장 | 근거 |
 |---|---|
 | Apple 로그인은 iOS 앱 로그인 화면에만 나타남 | `apps/v1_web/src/components/auth/apple-login-button.tsx` (`isNativeAppleSignInAvailable`), 배치 `auth-page.tsx:42` · 셸 `Auth/AppleSignInController.swift` |
-| 앱 안 탈퇴 | `/my/settings/withdrawal` → `WithdrawalPageClient` → `POST /api/v1/me/withdrawal-request` (`profile.controller.ts:142`), 상태 `withdrawal_pending` 후 모든 인증 요청 차단(`v1-auth.guard.ts:89`) |
+| 앱 안 탈퇴 | `/my/settings/withdrawal` → `WithdrawalPageClient` → `POST /api/v1/me/withdrawal-request` (`profile.controller.ts:146`), 상태 `withdrawal_pending` 후 모든 인증 요청 차단 + Apple 토큰 해지(`v1-auth.guard.ts:89`) |
 | 웹 탈퇴 안내 | `apps/v1_web/src/app/account-deletion/page.tsx` — **프로덕션 404, 승격 필요** |
 | 채팅 신고·차단 | API `chat.controller.ts` `POST rooms/:roomId/messages/:messageId/report`·`/block`, `GET/DELETE blocked-users`; UI `components/community/chat-safety-dialog.tsx` |
 | 신고 → 운영자 즉시 알림 | `chat.service.ts` 신고 시 `V1Inquiry(category='report')` + Slack 알림 outbox 이벤트 |
@@ -80,12 +80,19 @@ Contact for review: <연락처 — 저장소 밖에서 전달>
 1. **[거절 가능성 높음] 프로덕션 미승격** — 프로덕션에 Apple 로그인 API(`/api/v1/auth/apple/nonce` 404)·계정 삭제 안내(404)·AASA(404)가 없다.
    이 상태면 4.8(Apple 로그인 버튼이 동작 안 함)·5.1.1(v)(삭제 경로 누락)로 거절된다. → `dev → main` 승격(사용자).
 2. **[크래시 — #1280에서 해결] `NSCameraUsageDescription` 없음** — 사진 업로드 입력에서 "사진 찍기"를 고르면 강제 종료(2.1). README 1절.
-3. **[5.1.1(v)] Apple 로그인 토큰 폐기 미구현** — Apple 은 Sign in with Apple 사용자의 계정 삭제 시 REST API 로 토큰을
-   폐기하라고 요구한다. 셸은 `identityToken` 만 전달하고(`AppleSignInController.swift:94`) 서버에 폐기 호출이 없다.
-   구현하려면 ① 셸이 `authorizationCode` 도 전달 ② 서버가 Sign in with Apple 키(.p8)로 client secret 을 만들어 토큰 교환·보관
-   ③ 탈퇴 시 `/auth/revoke` 호출. 키 발급은 **사용자**(Apple Developer > Keys). 심사에서 늘 검사되지는 않지만 규정상 필수다.
-4. **[5.1.1(v)] 삭제가 "요청 → 운영자 확인" 2단계이고 처리 기한 안내가 없다** — Apple 은 수동 절차를 허용하되
-   "소요 시간을 알릴 것"을 요구한다. 탈퇴 화면·`/account-deletion` 에 "N일 이내 삭제" 문구 추가를 권한다(웹 변경).
+3. **[5.1.1(v)] Apple 로그인 토큰 폐기 — 코드 준비됨, 키 등록 대기** — 셸이 `authorizationCode` 를 함께 넘기고
+   (`AppleSignInController.swift`), 서버가 로그인 성공 직후 `/auth/token` 으로 교환해 refresh token 을 AES-256-GCM
+   으로 봉인 저장한다(`apple-token.service.ts`). **탈퇴 요청 시점**(`POST /api/v1/me/withdrawal-request` 커밋 직후)에
+   `/auth/revoke` 를 호출한다 — 운영자 최종 삭제는 기한이 없고 거치지 않는 경로도 있어서다. 해지 실패는 탈퇴를 막지
+   않고 로그로 남는다. **키가 등록되기 전까지는 교환·해지가 꺼진 채로 동작**한다: 사용자가 Apple Developer >
+   Keys 에서 Sign in with Apple 키(.p8)를 발급하고 GitHub secrets `APPLE_SIGN_IN_KEY_ID`·`APPLE_SIGN_IN_PRIVATE_KEY`·
+   `APPLE_SIGN_IN_TOKEN_ENCRYPTION_KEY`(`openssl rand -base64 32`)를 등록해야 한다(팀 ID 는 `APNS_TEAM_ID` 재사용).
+   키 등록 전에 로그인한 사용자는 저장된 토큰이 없어 해지 대상이 아니다 — 등록 후 다시 로그인해야 저장된다.
+4. **[5.1.1(v)] 삭제는 "요청 → 30일 유예 → 삭제"** — Apple 은 수동 절차를 허용하되 "소요 시간을 알릴 것"을 요구한다.
+   탈퇴 화면에 "탈퇴를 요청하면 30일 뒤 계정과 개인정보가 삭제돼요. 그 전에는 고객센터로 복구를 요청할 수 있어요."를
+   보여 주고, 개인정보처리방침 v1.4 7절에 같은 30일 유예를 적었다(2026-09-26 사용자 결정). 유예 중 복구는 어드민이
+   계정 상태를 `active` 로 되돌리는 경로다. 30일 뒤 삭제는 아직 자동 잡이 없어 **운영자가 어드민 삭제로 처리**해야 한다.
+   공개 `/account-deletion` 페이지에도 같은 문장을 보여 준다.
    또한 팀장·운영진은 탈퇴가 막힌다(`assertWithdrawable`) — 권한 이전 방법 안내가 화면에 있는지 확인.
 5. **[1.2] 자동 필터 없음, 신고 버튼이 채팅·팀 컨택에만 있음** — 1.2 는 "부적절한 콘텐츠를 걸러내는 방법"을 요구한다.
    금칙어 필터가 코드에 없고(`v1_api/src` 검색 0건), 공개 프로필(`/users/[id]`)·매치 상세(`/matches/[id]`)·팀 소개에는

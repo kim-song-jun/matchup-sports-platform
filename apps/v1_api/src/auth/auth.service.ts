@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { buildOnboardingSummary, hasAcceptedRequiredTerms } from '../onboarding/onboarding-summary';
 import { AppleLoginDto } from './dto/apple-login.dto';
 import { AppleIdentityService } from './apple-identity.service';
+import type { AppleIdentityClaims } from './apple-identity-token';
+import { AppleTokenService } from './apple-token.service';
 import { KakaoLoginDto } from './dto/kakao-login.dto';
 import { buildKakaoSignupPrefill, readKakaoSignupPrefill, type KakaoSignupPrefill } from './kakao-profile';
 import { isPendingSocialSignup } from './social-signup-access';
@@ -75,6 +77,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly managedTerms: ManagedTermsRuntimeService,
     private readonly phoneVerification: PhoneVerificationService,
+    private readonly appleTokens: AppleTokenService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -487,6 +490,20 @@ export class AuthService {
    */
   async appleSignIn(dto: AppleLoginDto) {
     const claims = await this.appleIdentity.verifyIdentityToken(dto.identityToken, dto.nonce);
+    const session = await this.appleSession(dto, claims);
+    // Only after the sign-in succeeded: a refused sign-in must not leave a token behind, and
+    // the code is single-use and expires in minutes, so it cannot be exchanged later.
+    if (dto.authorizationCode) {
+      await this.appleTokens.storeFromAuthorizationCode({
+        subject: claims.subject,
+        clientId: claims.audience,
+        authorizationCode: dto.authorizationCode,
+      });
+    }
+    return session;
+  }
+
+  private async appleSession(dto: AppleLoginDto, claims: AppleIdentityClaims) {
     const now = new Date();
     // Only a verified address may match an existing account. Linking on an unverified one
     // would hand the account that owns the mailbox to whoever can mint that claim.

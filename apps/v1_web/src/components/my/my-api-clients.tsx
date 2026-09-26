@@ -82,6 +82,7 @@ import { myHomeModel, settingsModel } from './my.view-model';
 import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
 import { isNativePushAvailable, requestNativePush } from '@/lib/native-push';
 import { WithdrawalErrorCard } from './withdrawal-error-card';
+import { WITHDRAWAL_GRACE_NOTICE } from './withdrawal-guidance';
 
 type ProfileEditErrors = Partial<Record<'realName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
 type DuplicateCheckState = {
@@ -2230,6 +2231,7 @@ export function WithdrawalPageClient() {
               <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
             </div>
             <p className="tm-text-body" style={{ margin: '12px 0 0', lineHeight: 1.6 }}>진행 중인 매치가 있거나 팀 운영 권한(팀장·운영진)을 갖고 있으면 탈퇴가 제한돼요.</p>
+            <p className="tm-text-body" style={{ margin: '8px 0 0', lineHeight: 1.6 }}>{WITHDRAWAL_GRACE_NOTICE}</p>
           </section>
           <Card pad={16}>
             <button

@@ -168,6 +168,28 @@ describe('buildTournamentStages — 한국어 라운드 라벨', () => {
     expect(shape(stages).map(([label]) => label)).toEqual(['8강', '4강', '결승']);
   });
 
+  it('라운드별로 fixtureNumber 가 1부터 다시 시작해도(동률) 결승은 항상 마지막이다 (alpha #ab100000 실측)', () => {
+    const stages = buildTournamentStages(
+      tournament({
+        format: 'group_knockout',
+        status: 'completed',
+        // `/tournaments/:id` 는 `round asc` 로 정렬해 내려주므로 알파벳순('final' < 'group'
+        // < 'semi')에 따라 결승이 배열 맨 앞에 온다 — 그리고 각 라운드의 fixtureNumber 는
+        // 1부터 다시 시작해 semi(1,2)와 final(1)이 동률이다. 둘 다 실제 alpha 응답 그대로다.
+        fixtures: [
+          fixture({ round: 'final', fixtureNumber: 1, liveStatus: 'ended', status: 'completed' }),
+          fixture({ round: 'group', fixtureNumber: 1, liveStatus: 'ended', status: 'completed' }),
+          fixture({ round: 'group', fixtureNumber: 2, liveStatus: 'ended', status: 'completed' }),
+          fixture({ round: 'group', fixtureNumber: 3, liveStatus: 'ended', status: 'completed' }),
+          fixture({ round: 'semi', fixtureNumber: 1, liveStatus: 'ended', status: 'completed' }),
+          fixture({ round: 'semi', fixtureNumber: 2, liveStatus: 'ended', status: 'completed' }),
+        ],
+      }),
+    );
+
+    expect(shape(stages).map(([label]) => label)).toEqual(['조별리그', '4강', '결승']);
+  });
+
   it('결승 픽스처가 아직 없어도 결승 칸을 세운다 (alpha 실측: 라운드가 조별·4강뿐인 진행 중 대회)', () => {
     const stages = buildTournamentStages(
       tournament({

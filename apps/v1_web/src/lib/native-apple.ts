@@ -17,6 +17,8 @@ export interface NativeAppleSignInResult {
   /** False when the reader cancelled the sheet or Apple refused — not an error to report. */
   ok: boolean;
   identityToken?: string;
+  /** Single-use and valid for minutes; the server exchanges it for the token it revokes on withdrawal. */
+  authorizationCode?: string;
   /** Apple sends this on the **first** authorization only, never again. */
   fullName?: string;
   /** Present when `ok` is false; for logs, not for the reader. */

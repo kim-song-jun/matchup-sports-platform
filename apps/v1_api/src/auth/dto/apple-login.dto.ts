@@ -25,4 +25,14 @@ export class AppleLoginDto {
   @IsString()
   @MaxLength(80)
   fullName?: string;
+
+  /**
+   * One-time code from the same authorization, exchanged for the refresh token that account
+   * withdrawal must revoke. Optional: shells built before it was forwarded still sign in.
+   */
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  @MaxLength(2048)
+  authorizationCode?: string;
 }

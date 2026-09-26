@@ -40,8 +40,8 @@ export type CanonicalTournamentSeedMatch = {
   readonly homeRegistrationId: string;
   readonly awayRegistrationId: string;
   readonly matchId: string;
-  readonly homePlayers?: readonly { userId: string; displayName: string; jerseyNumber: number }[];
-  readonly awayPlayers?: readonly { userId: string; displayName: string; jerseyNumber: number }[];
+  readonly homePlayers?: readonly { userId: string; displayName: string; jerseyNumber: number | null }[];
+  readonly awayPlayers?: readonly { userId: string; displayName: string; jerseyNumber: number | null }[];
 };
 
 function resultFor(goalsFor: number, goalsAgainst: number): 'WON' | 'LOST' | 'DRAWN' {

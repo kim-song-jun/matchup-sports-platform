@@ -1,4 +1,5 @@
-import { createPrivateKey, KeyObject, sign as signPayload } from 'node:crypto';
+import { createPrivateKey, KeyObject } from 'node:crypto';
+import { signEs256Jwt } from '../common/security/es256-jwt';
 
 /**
  * APNs provider authentication token (ES256 JWT).
@@ -8,10 +9,6 @@ import { createPrivateKey, KeyObject, sign as signPayload } from 'node:crypto';
  * `TooManyProviderTokenUpdates`. So the token is cached and refreshed inside a window
  * rather than signed per request — and a forced refresh (after a 403) still respects the
  * lower bound, because otherwise recovering from one rejection would earn another.
- *
- * 서명 형식이 특히 조용한 함정이다. `node:crypto` 의 기본 ECDSA 출력은 DER 인데 JOSE 의
- * ES256 은 r‖s 를 이어 붙인 64바이트 raw 를 요구한다. DER 로 보내면 Apple 이 403 만 돌려주고
- * 이유를 말해 주지 않는다. 그래서 `dsaEncoding: 'ieee-p1363'` 을 명시한다.
  */
 export class ApnsProviderToken {
   /** Apple rejects tokens older than an hour; refresh with margin. */
@@ -61,21 +58,12 @@ export class ApnsProviderToken {
   }
 
   private issue(nowMs: number): string {
-    const issuedAtSeconds = Math.floor(nowMs / 1000);
-    const header = base64Url(JSON.stringify({ alg: 'ES256', kid: this.keyId }));
-    const claims = base64Url(JSON.stringify({ iss: this.teamId, iat: issuedAtSeconds }));
-    const signingInput = `${header}.${claims}`;
-    const signature = signPayload('sha256', Buffer.from(signingInput), {
-      key: this.key,
-      // JOSE wants raw r‖s, not the DER that node emits by default.
-      dsaEncoding: 'ieee-p1363',
-    });
-    const token = `${signingInput}.${signature.toString('base64url')}`;
+    const token = signEs256Jwt(
+      this.key,
+      { kid: this.keyId },
+      { iss: this.teamId, iat: Math.floor(nowMs / 1000) },
+    );
     this.cached = { token, issuedAtMs: nowMs };
     return token;
   }
-}
-
-function base64Url(value: string): string {
-  return Buffer.from(value, 'utf8').toString('base64url');
 }

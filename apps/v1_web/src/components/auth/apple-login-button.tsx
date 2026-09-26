@@ -48,6 +48,7 @@ export function AppleLoginButton({ className, style }: { className?: string; sty
       const session = await v1Post<V1AuthSessionResponse>('/auth/apple', {
         identityToken: result.identityToken,
         nonce,
+        ...(result.authorizationCode ? { authorizationCode: result.authorizationCode } : {}),
         ...(result.fullName ? { fullName: result.fullName } : {}),
       });
       // 신규 가입이면 약관 단계로, 기존 회원이면 홈으로. 경로는 서버가 정한다.

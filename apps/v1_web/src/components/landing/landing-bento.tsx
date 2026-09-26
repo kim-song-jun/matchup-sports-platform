@@ -6,6 +6,8 @@ const NOTIFICATIONS = [
   { title: '매치 신청이 승인됐어요', detail: '성수 저녁 풋살', time: '방금' },
   { title: '리그 경기 결과가 확정됐어요', detail: '성동 풋살 리그', time: '5분 전' },
   { title: '팀 가입 신청이 수락됐어요', detail: 'FC 한강', time: '1시간 전' },
+  { title: '대회 참가가 확정됐어요', detail: '가을 풋살 챔피언십', time: '어제', extra: true },
+  { title: '리그 대진이 확정됐어요', detail: '성동 풋살 리그', time: '2일 전', extra: true },
 ] as const;
 
 /* 실제 상호평가는 네 항목을 함께 제출한다(v1_api reviews/dto/submit-review.dto.ts). */
@@ -34,7 +36,7 @@ export function LandingBento() {
             <div className="tm-landing-bento-vis">
               <ul className="tm-landing-noti" aria-label="알림 예시">
                 {NOTIFICATIONS.map((item) => (
-                  <li key={item.title}>
+                  <li key={item.title} data-extra={'extra' in item ? true : undefined}>
                     <span className="tm-landing-noti-app" aria-hidden="true"><BrandMark size={36} /></span>
                     <span className="tm-landing-noti-text">{item.title}<small>{item.detail}</small></span>
                     <span className="tm-landing-noti-time">{item.time}</span>

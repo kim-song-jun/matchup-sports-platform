@@ -4313,10 +4313,13 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 /* 팀 카드 조건 태그 — 레벨은 서버 자유 텍스트라 길이가 보장되지 않는다.
-   태그 행 폭 232px(390 실측) 안에서 형제 배지(`성별 미설정` 최대 ~73px = 31%)와 gap(8px = 3%)
-   자리를 남기도록 62% 로 묶는다. 상한은 넘칠 때만 걸리므로 짧은 태그는 그대로다. */
+   고정 %폭 상한(예전 62%)은 390 카드(232px 태그 행) 기준으로 잡혀 있어, 형제 배지가 있으면
+   짧고 의미 있는 값("입문-고수")까지 좁게 나눈 몫에 맞춰 잘렸다(768 2열, 카드 272px에서
+   실측, 2026-09-26 alpha 감사). .tm-league-badge 와 같은 관례로 100%(자기 줄 전체 폭)까지만
+   막는다 — 형제와 나눠 쓸 필요가 없는 한 잘리지 않고, 자유 텍스트 하나가 혼자로도 카드 폭을
+   넘길 만큼 길 때만(Copilot 리뷰 지적) ellipsis 로 막아 카드 밖 가로 스크롤을 막는다. */
 .tm-team-tag {
-  max-width: 62%;
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -8911,7 +8914,14 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 /* ── 카드 아래 동반 UI -- 카드는 소장품이라 앞면을 깨끗하게 두고, 안내·행동은 밖에 둔다. ── */
 /* 카드 아래 영역. 카드가 drop-shadow 를 깔고 있어 버튼이 바짝 붙으면 그림자 위에
    올라탄 것처럼 보인다 -- 그림자가 앉을 자리를 여백으로 비운다(사용자 지적 2026-08-26). */
-.tm-pcard-below { width: 100%; max-width: 320px; display: flex; flex-direction: column; margin-top: 16px; }
+/* max-width 캡은 <1024 에서 형제 섹션(.tm-my-desktop-main 카드)과 좌우 가장자리가
+   어긋나게 만든다(390 에서 35px vs 20px) — 모바일/태블릿은 캡 없이 100% 유지하고,
+   ≥1024 데스크톱 2열(.tm-my-desktop-sidebar 360/380px 고정폭, 공유 프로필 380px)에서만
+   기존 320px 폭을 복원한다(아래 미디어쿼리). */
+.tm-pcard-below { width: 100%; display: flex; flex-direction: column; margin-top: 16px; }
+@media (min-width: 1024px) {
+  .tm-pcard-below { max-width: 320px; }
+}
 .tm-pcard-flipbtn {
   margin-top: 4px; width: 100%; min-height: 44px; border-radius: var(--radius-control);
   background: var(--surface-soft); border: 1px solid var(--border);

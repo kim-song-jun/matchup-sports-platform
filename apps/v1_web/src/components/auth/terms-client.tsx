@@ -184,7 +184,12 @@ export function TermsClient() {
     );
 
     return (
-      <AuthFrame topTitle={managedDocument?.title ?? legalDocument.title} backHref="/login">
+      // topTitle is a static breadcrumb-style label (every other AuthFrame consumer follows
+      // this — "이메일 로그인", "계정 찾기", "회원가입" — distinct from the h1 below). Reusing
+      // the document's own title here duplicated it: AuthFrame renders topTitle in both the
+      // mobile topbar and the desktop nav, and the h1 (unlike topTitle) is never hidden at
+      // either width, so a matching value doubled the same text on screen.
+      <AuthFrame topTitle="약관" backHref="/login">
         <div className="tm-auth-body">
           <h1 className="tm-text-heading tm-auth-heading">{managedDocument?.title ?? legalDocument.title}</h1>
           {footerTerms.isPending ? <p className="tm-text-body tm-auth-sub">약관을 불러오고 있어요.</p> : null}

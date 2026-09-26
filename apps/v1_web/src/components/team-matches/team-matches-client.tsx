@@ -378,6 +378,7 @@ export function TeamMatchDetailPageClient({ teamMatchId, seed }: { teamMatchId: 
     resultAction: seeding ? undefined : buildResultAction(teamMatchId, getStatus(query.data), canManageHostTeam, canManageOpponentTeam, isLeagueFixture, chainFrom),
     reviewAction: buildReviewAction(teamMatchId, getStatus(query.data), isParticipantMember),
     statusLabel: seeding ? undefined : modelLiveLabel(query.data) ?? statusLabel(viewerState, getStatus(query.data)),
+    statusLabelKind: !seeding && modelLiveLabel(query.data) ? 'match' : 'application',
     chatLabel: chatLabel(canManageHostTeam, canManageOpponentTeam, opponentAssigned),
     chatPending: resolveChatRoom.isPending,
     chatError,

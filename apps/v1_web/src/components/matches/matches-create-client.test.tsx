@@ -7,7 +7,7 @@ import { draftFromMatchEdit, MatchCreatePageClient, MatchEditPageClient } from '
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
-const { createMatchMutate, routerPush, uploadImagesMutateAsync, confirmMock, updateMatchMutate, cancelMatchMutate, closeMatchMutate, reopenMatchMutate, matchEditData } = vi.hoisted(() => ({
+const { createMatchMutate, routerPush, uploadImagesMutateAsync, confirmMock, updateMatchMutate, cancelMatchMutate, closeMatchMutate, reopenMatchMutate, matchEditData, matchEditQueryState, matchEditRefetch } = vi.hoisted(() => ({
   createMatchMutate: vi.fn(),
   routerPush: vi.fn(),
   uploadImagesMutateAsync: vi.fn(),
@@ -16,6 +16,10 @@ const { createMatchMutate, routerPush, uploadImagesMutateAsync, confirmMock, upd
   cancelMatchMutate: vi.fn(),
   closeMatchMutate: vi.fn(),
   reopenMatchMutate: vi.fn(),
+  // 로드 실패(권한 없음 등) 케이스를 개별 테스트에서 켰다 끄는 스위치. 객체 프로퍼티만
+  // 바꾸면 되므로(재대입 아님) 아래 vi.mock 팩토리가 참조하는 값도 그대로 갱신된다.
+  matchEditQueryState: { isError: false },
+  matchEditRefetch: vi.fn(),
   // useEffect(..., [editQuery.data])가 참조로 비교하므로, 매 렌더마다 새 객체를 돌려주면
   // 훅이 재실행 → setDraft → 리렌더 → 훅 재실행의 무한 루프에 빠진다. 안정적인 참조 하나를
   // 모듈 스코프에 고정해 실제 React Query의 캐시된 참조 안정성을 흉내낸다.
@@ -72,9 +76,10 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1UploadImages: () => ({ mutateAsync: uploadImagesMutateAsync, isPending: false }),
   useV1MyRecentVenues: () => ({ data: undefined }),
   useV1MatchEdit: () => ({
-    data: matchEditData,
-    isError: false,
+    data: matchEditQueryState.isError ? undefined : matchEditData,
+    isError: matchEditQueryState.isError,
     isLoading: false,
+    refetch: matchEditRefetch,
   }),
   useV1UpdateMatch: () => ({ mutate: updateMatchMutate, isPending: false }),
   useV1CancelMatch: () => ({ mutate: cancelMatchMutate, isPending: false }),
@@ -413,5 +418,36 @@ describe('MatchEditPageClient — 모집 마감 / 다시 열기', () => {
 
     expect(await screen.findByRole('button', { name: '모집 다시 열기' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: '모집 마감' })).toBeNull();
+  });
+});
+
+/**
+ * 2026-09-26 alpha 감사 — 수정 대상을 못 불러오면(권한 없음 등) draft가 초기값에
+ * 머무른 채로 빈 폼과 활성 저장/취소 버튼이 그대로 노출됐다. 폼 자체를 그리지 않고
+ * ErrorState로 대체해야 한다.
+ */
+describe('MatchEditPageClient — 수정 대상 로드 실패', () => {
+  afterEach(() => {
+    matchEditQueryState.isError = false;
+    cleanup();
+  });
+
+  it('폼 대신 ErrorState를 보여주고, 저장/취소 버튼과 입력 필드를 렌더하지 않는다', async () => {
+    matchEditQueryState.isError = true;
+    render(<MatchEditPageClient matchId="match-edit-1" />);
+
+    expect(await screen.findByText('수정 권한이 없거나 매치를 불러오지 못했어요.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '매치 만들기' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '매치 취소' })).toBeNull();
+    expect(screen.queryByLabelText('제목')).toBeNull();
+  });
+
+  it('다시 불러오기를 누르면 refetch를 호출한다', async () => {
+    matchEditQueryState.isError = true;
+    render(<MatchEditPageClient matchId="match-edit-1" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '다시 불러오기' }));
+
+    expect(matchEditRefetch).toHaveBeenCalled();
   });
 });

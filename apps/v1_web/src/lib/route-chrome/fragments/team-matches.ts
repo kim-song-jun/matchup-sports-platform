@@ -72,6 +72,20 @@ export const TEAM_MATCHES_ROUTES: RouteChromeEntry[] = [
       desktopHead: true,
     },
   },
+  // 공동 경기 기록 — team-match-shared-record.tsx. 이 엔트리가 없으면 세그먼트 수가 같은
+  // /team-matches/:id/lineup 등에 걸리지 않고 아예 매치되는 표 행이 없어 resolveRouteChrome이
+  // null을 반환한다 — 앱 셸(뒤로가기·홈·알림·하단 내비) 전체가 빠지는 것도 그래서다
+  // (2026-09-26 alpha 감사, /team-matches/new/team·/matches/new와 같은 결함 클래스).
+  {
+    pattern: '/team-matches/:id/record',
+    chrome: {
+      title: '경기 기록',
+      activeTab: 'matches',
+      bottomNav: false,
+      backHref: (p) => `/team-matches/${p.id}`,
+      desktopHead: true,
+    },
+  },
   {
     pattern: '/team-matches/:id/result',
     chrome: {

@@ -183,6 +183,15 @@ function teamMatchOpponentSub(mode: TeamMatchDetailViewModel['mode'], match: Tea
   return '신청 후 승인';
 }
 
+// CTA 카드의 값(model.statusLabel)은 대부분 신청 흐름 상태(승인 대기/완료·신청 마감 등)지만,
+// 경기가 실제로 시작되면 modelLiveLabel()이 '진행 중'을 덮어써 값의 의미 축이 바뀐다
+// (team-matches-client.tsx statusLabelKind 참고) — 그때는 캡션도 '신청 상태'가 아니라
+// '경기 상태'라고 해야 값과 뜻이 맞는다.
+function teamMatchStatusCaption(mode: TeamMatchDetailViewModel['mode'], statusLabelKind: TeamMatchDetailViewModel['statusLabelKind']) {
+  if (mode === 'mine') return '내가 만든 팀매치';
+  return statusLabelKind === 'match' ? '경기 상태' : '신청 상태';
+}
+
 /**
  * 히어로 CTA 성공 안내는 `mode`가 아니라 **서버가 확정한 결과 상태**에서 뽑는다.
  *
@@ -708,7 +717,7 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
           <div className="tm-team-match-right-host">{hostTeamCard}</div>
           <div className="tm-team-match-cta-card">
             <div className="tm-team-match-cta-meta">
-              <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : '신청 상태'}</span>
+              <span className="tm-text-caption">{teamMatchStatusCaption(mode, model.statusLabelKind)}</span>
               {/* 비용을 모르면(costNote 미기재) 금액 대신 '비용 미정' — 0원으로 단정하지 않는다. */}
               <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${formatAmountNumber(match.opponentCost)}원` : '비용 미정')}</span>
             </div>
@@ -722,7 +731,7 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
       {/* Mobile fixed CTA — hidden on desktop (desktop card above replaces it) */}
       <div className="tm-fixed-cta tm-team-match-mobile-cta">
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-          <span className="tm-text-caption">{mode === 'mine' ? '내가 만든 팀매치' : '신청 상태'}</span>
+          <span className="tm-text-caption">{teamMatchStatusCaption(mode, model.statusLabelKind)}</span>
           {/* 비용을 모르면(costNote 미기재) 금액 대신 '비용 미정' — 0원으로 단정하지 않는다. */}
           <span className="tm-text-label">{model.statusLabel ?? (match.opponentCost !== null ? `${formatAmountNumber(match.opponentCost)}원` : '비용 미정')}</span>
         </div>

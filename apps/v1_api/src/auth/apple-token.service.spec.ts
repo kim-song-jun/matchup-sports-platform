@@ -165,8 +165,7 @@ describe('AppleTokenService', () => {
       expect(secret.signatureValid).toBe(true);
       expect(secret.header).toEqual({ alg: 'ES256', kid: 'ABC123DEFG' });
       expect(secret.claims).toMatchObject({ iss: 'TEAM123456', aud: 'https://appleid.apple.com', sub: CLIENT_ID });
-      expect(secret.claims.exp - secret.claims.iat).toBeGreaterThan(0);
-      expect(secret.claims.exp - secret.claims.iat).toBeLessThanOrEqual(15_777_000);
+      expect(secret.claims.exp - secret.claims.iat).toBe(300);
 
       expect(prisma.v1AuthIdentity.findUnique).toHaveBeenCalledWith(expect.objectContaining({
         where: { provider_providerUserKey: { provider: 'apple', providerUserKey: SUBJECT } },

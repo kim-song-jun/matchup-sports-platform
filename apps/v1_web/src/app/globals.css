@@ -8969,10 +8969,10 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
    거의 같은 톤이라 경계에 이유가 없었고, 모바일에서는 좌우 여백이 이중으로 들었으며,
    무엇보다 그 안에 계정 버튼까지 들어 있어 "카드 조작"과 "계정 조작"이 한 덩어리로
    섞였다. 카드는 자기 림·그림자를 갖고 있어 배경 위에 그냥 놓아도 소장품으로 선다.
-   계정은 아래 별도 프로필 카드로 내려갔다(my-page.tsx).
+   마이페이지의 계정 조작은 '설정·문의' 메뉴가 맡는다(2026-09-26 B안, my-page.tsx).
 
-   카드 아래 신원 블록 -- 공개 프로필에서만 쓴다(이름·핸들). 마이페이지는 프로필 카드가
-   같은 정보를 더 자세히 말하므로 여기에 넣지 않는다. */
+   카드 아래 신원 블록 -- 공개 프로필에서만 쓴다(이름·핸들). 마이페이지는 카드가 곧 프로필이라
+   여기에 넣지 않는다. */
 .tm-pcard-identity {
   padding: 2px 0 12px;
   border-bottom: 1px solid var(--border);
@@ -9125,8 +9125,8 @@ h1.tm-pcard-identity-name { margin: 0; font-size: 16px; }
 .tm-photo-crop-confirm { width: calc(100% - 32px); margin-top: 12px; }
 
 
-/* ── 프로필(계정) 블록 · 활동 병합 (사용자 선택 A안, 2026-08-26) ──
-   카드 조작과 계정 조작이 한 상자에 섞여 있던 것을 갈랐다. 여기는 계정 쪽이다. */
+/* ── 신원 블록 · 활동 병합 ──
+   카드가 없는 사용자(숨김·조회 실패)에게만 활동 카드 머리에 선다(2026-09-26 B안). */
 .tm-my-account-block { margin-top: 12px; text-align: center; }
 /* 계정 아바타 -- 카드를 숨긴 사용자에게는 이것이 유일한 얼굴이다. */
 .tm-my-account-avatar {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { MyPlayerCardSection } from './my-player-card-section';
+import { render, renderHook, screen } from '@testing-library/react';
+import { MyPlayerCardSection, useMyPlayerCardAbsent } from './my-player-card-section';
 import type { V1PlayerCard } from '@/types/api';
 
 /**
@@ -183,8 +183,8 @@ describe('카드 독립 배치 (사용자 선택 A안)', () => {
     expect(container.querySelector('.tm-player-card')).not.toBeNull();
   });
 
-  it('카드 아래에는 카드 조작만 둔다 -- 계정 버튼은 여기 없다', () => {
-    // 계정 조작(내 프로필·프로필 수정)은 아래 프로필 카드로 내려갔다. 카드 곁에 남으면
+  it('카드 아래에는 카드 조작과 공개 프로필 보기만 둔다 -- 계정 조작은 여기 없다', () => {
+    // 프로필 수정·계정은 '설정·문의' 메뉴가 맡는다(2026-09-26 B안). 카드 곁에 남으면
     // "카드 이야기"와 "계정 이야기"가 다시 한 덩어리가 된다.
     publicProfileMock.mockReturnValue({ data: { playerCard: card, teams: [] } });
 
@@ -193,17 +193,47 @@ describe('카드 독립 배치 (사용자 선택 A안)', () => {
     expect(screen.getByRole('button', { name: /카드 뒤집기/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '카드 공유하기' })).toHaveAttribute('href', '/users/u-1/card?from=%2Fmy');
     expect(screen.getByRole('link', { name: '카드 설정' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '공개 프로필 보기' })).toHaveAttribute('href', '/users/u-1?from=%2Fmy');
     expect(screen.queryByRole('link', { name: '프로필 수정' })).not.toBeInTheDocument();
   });
 
-  it('카드가 없으면(숨김·로딩·실패) 아무것도 그리지 않는다 -- 신원은 프로필 카드가 말한다', () => {
-    // 예전에는 여기서 신원 박스를 대신 세웠는데, 그러면 아래 프로필 카드와 같은 버튼이
-    // 두 번 나온다(실제로 '내 프로필'·'프로필 수정'이 중복 렌더돼 테스트가 잡았다).
+  it('카드가 없으면(숨김·로딩·실패) 아무것도 그리지 않는다 -- 신원은 활동 카드 머리가 말한다', () => {
+    // 신원 블록은 my-page 가 useMyPlayerCardAbsent 로 한 곳에만 세운다. 여기서도 세우면
+    // 같은 버튼이 두 번 나온다(실제로 '내 프로필'·'프로필 수정'이 중복 렌더돼 테스트가 잡았다).
     publicProfileMock.mockReturnValue({ data: { playerCard: null } });
 
     const { container } = renderStage();
 
     expect(container.querySelector('.tm-player-card')).toBeNull();
     expect(container.textContent).toBe('');
+  });
+});
+
+/** my-page 가 카드 없는 사용자에게만 신원 블록을 세우는 판정. 틀리면 신원이 두 번 나오거나 아예 없어진다. */
+describe('useMyPlayerCardAbsent', () => {
+  const absent = (slot?: { hidden: boolean; shape: 'rect' | 'shield' }) =>
+    renderHook(() => useMyPlayerCardAbsent('u-1', slot)).result.current;
+
+  it('카드가 있으면 false', () => {
+    publicProfileMock.mockReturnValue({ data: { playerCard: card, teams: [] }, isPending: false });
+    expect(absent({ hidden: false, shape: 'rect' })).toBe(false);
+  });
+
+  it('숨김이면 조회가 끝나기 전에도 true -- 카드가 올 일이 없다', () => {
+    publicProfileMock.mockReturnValue({ data: undefined, isPending: true });
+    expect(absent({ hidden: true, shape: 'rect' })).toBe(true);
+  });
+
+  it('오는 중이면 false', () => {
+    publicProfileMock.mockReturnValue({ data: undefined, isPending: true });
+    expect(absent({ hidden: false, shape: 'rect' })).toBe(false);
+    expect(absent(undefined)).toBe(false);
+  });
+
+  it('조회 실패·카드 없음으로 끝나면 true', () => {
+    publicProfileMock.mockReturnValue({ data: undefined, isPending: false, isError: true });
+    expect(absent({ hidden: false, shape: 'rect' })).toBe(true);
+    publicProfileMock.mockReturnValue({ data: { playerCard: null }, isPending: false });
+    expect(absent(undefined)).toBe(true);
   });
 });

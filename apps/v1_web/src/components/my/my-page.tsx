@@ -11,6 +11,7 @@ import { CalendarDays, Award,
   MapPin,
   MessageCircle,
   Moon,
+  Pencil,
   Plus,
   Send,
   Settings,
@@ -27,7 +28,7 @@ import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
 import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
-import { MyPlayerCardSection } from './my-player-card-section';
+import { MyPlayerCardSection, useMyPlayerCardAbsent } from './my-player-card-section';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { cssUrl } from '@/lib/assets';
 import { withFromPath } from '@/lib/session-storage';
@@ -67,6 +68,7 @@ const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
   FileText,
   LogOut,
   Mail,
+  Pencil,
   Send,
   ShieldCheck,
   UserCheck,
@@ -79,6 +81,7 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
   // 테이블로 옮겼다. hasNewNotification만 model(런타임 상태) 의존이라 여기서 override로
   // 밀어넣는다(§0.4-3).
   useShellOverride({ hasNewNotification: model.hasNewNotification });
+  const cardAbsent = useMyPlayerCardAbsent(model.user.userId, model.playerCardSlot);
 
   return (
     <>
@@ -89,12 +92,9 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
         <div className="tm-my-desktop-layout">
           {/* LEFT sticky: profile identity */}
           <div className="tm-my-desktop-sidebar">
-            {/* 내 선수 카드 (Task 155, 사용자 선택 A안 -- 카드 독립, 2026-08-26).
-                카드를 상자에서 꺼내 페이지 위에 직접 놓는다. 이전에는 카드가 무대 상자
-                안에 있고 그 안에 계정 버튼(내 프로필·프로필 수정)까지 함께 있어,
-                모바일에서 상자 속 상자 + 카드 조작과 계정 조작이 한 덩어리로 섞였다.
-                카드 아래에는 **카드 조작만** 남고(뒤집기·공유·설정), 계정은 아래 프로필
-                카드로 내려간다. 카드가 없으면(숨김·로딩·실패) 기존 신원 박스가 그 자리에 선다. */}
+            {/* 내 선수 카드 (Task 155). 카드가 곧 프로필이라 카드 아래 프로필 박스를 두지 않는다
+                (2026-09-26 B안): 공개 프로필 보기는 카드 버튼 줄, 프로필 수정·로그인 방식·본인인증은
+                '설정·문의' 메뉴가 맡는다. */}
             {model.user.userId !== null ? (
               <MyPlayerCardSection
                 userId={model.user.userId}
@@ -103,14 +103,10 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
                 slot={model.playerCardSlot}
               />
             ) : null}
-            {/* 프로필(계정) -- 카드와 **다른 블록**이다. 카드 유무와 무관하게 항상 선다:
-                카드를 숨긴 사용자에게는 이것이 유일한 신원 표시이고, 카드가 있는
-                사용자에게는 계정 조작이 카드 조작과 섞이지 않는 자리다.
-                활동 숫자도 같은 카드 안에 둔다(2026-09-20) -- 상자를 둘로 나눠 봤자
-                가르는 것은 "나"와 "내 숫자"뿐인데, 그 경계에 카드 하나를 더 쓰면
-                모바일에서 메뉴가 그만큼 아래로 밀린다. 안에서는 선 하나로 가른다. */}
+            {/* 활동 1카드. 카드가 없는 사용자(숨김·조회 실패)에게만 신원 블록을 앞에 둔다 --
+                그때는 이것이 유일한 신원 표시다. */}
             <Card pad={16}>
-              {model.user.userId !== null ? (
+              {model.user.userId !== null && cardAbsent ? (
                 <>
                 <h2 className="tm-text-body-lg">프로필</h2>
                 <div className="tm-my-account-block">
@@ -520,6 +516,7 @@ function MenuSection({ section }: { section: MyMenuSection }) {
                   {item.badge ? (
                     <span className="tm-badge tm-badge-blue" aria-label={item.badgeLabel ?? `${item.badge}건`}>{item.badge}</span>
                   ) : null}
+                  {item.tag ? <MenuItemTag tag={item.tag} /> : null}
                 </span>
                 <span className="tm-text-caption" style={{ marginTop: 2, display: 'block' }}>{item.sub}</span>
               </span>
@@ -529,6 +526,16 @@ function MenuSection({ section }: { section: MyMenuSection }) {
         })}
       </Card>
     </section>
+  );
+}
+
+function MenuItemTag({ tag }: { tag: NonNullable<MyMenuItem['tag']> }) {
+  const Icon = MENU_ICON_MAP[tag.icon];
+  return (
+    <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      {Icon ? <Icon size={12} strokeWidth={2.5} aria-hidden="true" /> : null}
+      {tag.label}
+    </span>
   );
 }
 

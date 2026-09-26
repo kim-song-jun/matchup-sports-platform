@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CalendarCheck, Camera, Clock, HeartHandshake, Lock, Settings, Share2, Sparkles, Target, Zap } from 'lucide-react';
+import { CalendarCheck, Camera, Clock, HeartHandshake, Lock, Settings, Share2, Sparkles, Target, UserRound, Zap } from 'lucide-react';
 import { publicAssetPath } from '@/lib/assets';
 import { josa } from '@/lib/korean';
 import type { V1PlayerCard, V1PlayerCardStat } from '@/types/api';
@@ -246,6 +246,7 @@ export function PlayerCard({
   profileImageUrl,
   teamName,
   isOwner,
+  profileHref,
   shareHref,
   settingsHref,
   belowCardSlot,
@@ -256,6 +257,8 @@ export function PlayerCard({
   readonly teamName: string | null;
   /** 본인이 보는 경우에만 "공개하기" 같은 행동을 권한다 -- 남의 카드에서 권하면 이상하다. */
   readonly isOwner: boolean;
+  /** 공개 프로필 경로. 마이페이지 카드만 넘긴다 -- 공개 프로필 화면 자신에서는 자기 자신으로 가는 버튼이 된다. */
+  readonly profileHref?: string;
   /**
    * 공유 화면 경로. 주면 카드 아래에 공유 입구가 붙는다.
    * 공유 화면 자신은 이 값을 주지 않는다 -- 자기 자신으로 가는 버튼은 의미가 없다.
@@ -574,6 +577,11 @@ export function PlayerCard({
           >
             {flipped ? '앞면 보기 ↺' : '카드 뒤집기 ↻'}
           </button>
+          {profileHref ? (
+            <Link href={profileHref} className="tm-pcard-icon-link" aria-label="공개 프로필 보기">
+              <UserRound size={19} strokeWidth={2.2} aria-hidden="true" />
+            </Link>
+          ) : null}
           {shareHref ? (
             <Link href={shareHref} className="tm-pcard-icon-link" aria-label="카드 공유하기">
               <Share2 size={18} strokeWidth={2.2} aria-hidden="true" />

@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
+import { useModalA11y } from '../v1-ui/use-modal-a11y';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 export interface GateConfirmModalProps {
@@ -62,9 +63,14 @@ export function GateConfirmModal({
 }: GateConfirmModalProps) {
   const [reason, setReason] = useState('');
   const [typedInput, setTypedInput] = useState('');
-  const panelRef = useRef<HTMLDivElement>(null);
-  const firstFocusableRef = useRef<HTMLTextAreaElement>(null);
-  const previousFocusRef = useRef<Element | null>(null);
+  // "포커스 되채감 방지" 가드까지 포함해 공용 훅으로 — 이 모달의 가드가 훅에 흡수됐다.
+  const {
+    dialogRef: panelRef,
+    initialFocusRef,
+    onBackdropClick,
+    mounted,
+    closing,
+  } = useModalA11y<HTMLTextAreaElement>({ open, onClose, pending });
 
   useEffect(() => {
     if (open) {
@@ -73,74 +79,7 @@ export function GateConfirmModal({
     }
   }, [open]);
 
-  useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement;
-    } else {
-      const el = previousFocusRef.current;
-      if (el && typeof (el as HTMLElement).focus === 'function') (el as HTMLElement).focus();
-      previousFocusRef.current = null;
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (open) {
-      // 60ms 지연은 모달 마운트 트랜지션이 끝난 뒤 포커스를 옮기기 위한 것. panelRef 안에
-      // 이미 포커스가 있으면(사용자가 그 사이 다른 필드를 먼저 클릭/입력하기 시작했으면)
-      // 강제로 되채가지 않는다 — 안 그러면 빠르게 타이핑을 시작한 사용자의 입력이 중간에
-      // 엉뚱한 필드(사유 textarea)로 튀는 버그가 생긴다.
-      const t = setTimeout(() => {
-        if (!panelRef.current?.contains(document.activeElement)) {
-          firstFocusableRef.current?.focus();
-        }
-      }, 60);
-      return () => clearTimeout(t);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !pending) onClose();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onClose, pending]);
-
-  useEffect(() => {
-    if (!open) return;
-    const panel = panelRef.current;
-    if (!panel) return;
-    const sel = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-    const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const items = Array.from(panel.querySelectorAll<HTMLElement>(sel));
-      if (items.length === 0) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else if (document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', trap);
-  }, [open]);
-
-  useEffect(() => {
-    if (open) document.body.style.overflow = 'hidden';
-    else document.body.style.overflow = '';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [open]);
-
-  if (!open) return null;
+  if (!mounted) return null;
 
   const trimmedReason = reason.trim();
   const typedOk = !typedChallenge || typedInput.trim() === typedChallenge;
@@ -148,10 +87,8 @@ export function GateConfirmModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px]"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !pending) onClose();
-      }}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-[2px] tm-modal-scrim${closing ? ' is-closing' : ''}`}
+      onClick={onBackdropClick}
     >
       <div
         ref={panelRef}
@@ -159,10 +96,10 @@ export function GateConfirmModal({
         aria-modal="true"
         aria-labelledby="gate-confirm-title"
         aria-describedby="gate-confirm-desc"
-        className="bg-[var(--card-surface)] rounded-2xl shadow-[var(--shadow-modal)] w-full max-w-[440px] overflow-hidden"
+        className={`bg-[var(--card-surface)] rounded-2xl shadow-[var(--shadow-modal)] w-full max-w-[440px] overflow-hidden tm-modal-panel${closing ? ' is-closing' : ''}`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-          <h2 id="gate-confirm-title" className="text-[16px] font-bold text-[var(--text-strong)] flex items-center gap-1.5">
+          <h2 id="gate-confirm-title" className="text-[length:var(--font-size-body-lg)] font-bold text-[var(--text-strong)] flex items-center gap-2">
             {tone === 'amber' && <AlertTriangle size={17} className="text-[var(--orange700)]" aria-hidden="true" />}
             {title}
           </h2>
@@ -171,7 +108,7 @@ export function GateConfirmModal({
             onClick={() => !pending && onClose()}
             disabled={pending}
             aria-label="모달 닫기"
-            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-gray-400 hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
+            className="flex items-center justify-center w-[44px] h-[44px] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-muted)] hover:bg-[var(--surface-soft)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-40"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -184,25 +121,25 @@ export function GateConfirmModal({
           }}
           noValidate
         >
-          <div className="px-5 py-5 flex flex-col gap-3.5">
+          <div className="px-5 py-5 flex flex-col gap-4">
             <p
               id="gate-confirm-desc"
               className={[
-                'text-[13px] leading-relaxed rounded-xl border px-3.5 py-3',
+                'text-[length:var(--font-size-label)] leading-relaxed rounded-xl border px-4 py-3',
                 tone === 'amber' ? 'text-[var(--orange700)] bg-[var(--tint-orange)] border-[var(--tint-orange-border)]' : 'text-[var(--blue700)] bg-[var(--blue50)] border-[var(--tint-blue-border)]',
               ].join(' ')}
             >
               {description}
             </p>
 
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="gate-confirm-reason" className="text-[13px] font-semibold text-[var(--text-body)]">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="gate-confirm-reason" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                 사유 <span className="text-[var(--red700)]" aria-hidden="true">*</span>
                 <span className="sr-only">(필수)</span>
               </label>
               <textarea
                 id="gate-confirm-reason"
-                ref={firstFocusableRef}
+                ref={initialFocusRef}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 maxLength={REASON_MAX}
@@ -210,21 +147,21 @@ export function GateConfirmModal({
                 disabled={pending}
                 placeholder="이 작업이 왜 필요한지 남겨 주세요. 감사 로그에 그대로 기록돼요."
                 className={[
-                  'px-3 py-2.5 text-[13px] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
-                  'placeholder:text-gray-400',
+                  'px-3 py-3 text-[length:var(--font-size-label)] bg-[var(--card-surface)] border border-[var(--border)] rounded-xl text-[var(--text-strong)] resize-none',
+                  'placeholder:text-[var(--text-muted)]',
                   'focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
                   'transition-colors disabled:opacity-50',
                 ].join(' ')}
                 aria-required="true"
               />
-              <p className="text-[var(--font-size-caption)] text-right text-gray-400 tabular-nums">
+              <p className="text-[length:var(--font-size-caption)] text-right text-[var(--text-muted)] tabular-nums">
                 {reason.length} / {REASON_MAX}
               </p>
             </div>
 
             {typedChallenge && (
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="gate-confirm-typed" className="text-[13px] font-semibold text-[var(--text-body)]">
+              <div className="flex flex-col gap-2">
+                <label htmlFor="gate-confirm-typed" className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
                   확인을 위해 <span className="text-[var(--orange700)]">&ldquo;{typedChallenge}&rdquo;</span>
                   {objectParticle(typedChallenge)} 그대로 입력해 주세요{' '}
                   <span className="text-[var(--red700)]" aria-hidden="true">*</span>
@@ -239,7 +176,7 @@ export function GateConfirmModal({
                   autoComplete="off"
                   placeholder={typedChallenge}
                   className={[
-                    'h-[44px] px-3 text-[13px] bg-[var(--card-surface)] border rounded-xl text-[var(--text-strong)]',
+                    'h-[44px] px-3 text-[length:var(--font-size-label)] bg-[var(--card-surface)] border rounded-xl text-[var(--text-strong)]',
                     'placeholder:text-[var(--text-caption)]',
                     'focus:outline-none focus:ring-2 focus:ring-[var(--orange500)]/20',
                     'transition-colors disabled:opacity-50',
@@ -257,7 +194,7 @@ export function GateConfirmModal({
               type="button"
               onClick={() => !pending && onClose()}
               disabled={pending}
-              className="flex-1 h-[48px] rounded-xl text-[13px] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
+              className="tm-on-tint flex-1 h-[48px] rounded-xl text-[length:var(--font-size-label)] font-semibold text-[var(--text-muted)] bg-[var(--surface-soft)] hover:bg-[var(--border)] transition-colors focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2 disabled:opacity-50"
             >
               취소
             </button>
@@ -265,13 +202,13 @@ export function GateConfirmModal({
               type="submit"
               disabled={!canSubmit}
               className={[
-                'flex-1 h-[48px] rounded-xl text-[13px] font-semibold transition-colors',
+                'flex-1 h-[48px] rounded-xl text-[length:var(--font-size-label)] font-semibold transition-colors',
                 'focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2',
                 canSubmit
                   ? tone === 'amber'
                     ? 'bg-[var(--button-fill-warning)] text-white hover:bg-[var(--button-fill-warning-hover)]'
                     : 'bg-blue-500 text-white hover:bg-blue-600'
-                  : 'bg-gray-200 text-white cursor-not-allowed',
+                  : 'bg-[var(--grey100)] text-[var(--text-caption)] cursor-not-allowed',
               ].join(' ')}
               aria-disabled={!canSubmit}
             >

@@ -1,0 +1,132 @@
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { UserRecordsContent } from './user-records-content';
+import type { PublicUserRecordItem, PublicUserRecordsResponse } from './types';
+
+function item(overrides: Partial<PublicUserRecordItem> = {}): PublicUserRecordItem {
+  return {
+    id: 'record-1',
+    gameId: 'game-1',
+    teamMatchId: 'team-match-1',
+    type: 'tournament',
+    matchType: 'tournament',
+    tournamentId: 'tournament-1',
+    tournamentTitle: '여름 챔피언십',
+    leagueId: null,
+    leagueTitle: null,
+    round: '결승',
+    teamId: 'team-home',
+    teamName: '서울 유나이티드',
+    opponentTeamId: 'team-away',
+    opponentTeamName: '부산 FC',
+    result: 'WON',
+    goals: 1,
+    cards: { yellow: 0, red: 0 },
+    minutesPlayed: 90,
+    started: true,
+    goalkeeper: false,
+    mvp: false,
+    officialAt: '2026-08-10T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function data(items: readonly PublicUserRecordItem[]): PublicUserRecordsResponse {
+  return {
+    userId: 'user-1',
+    nickname: '테스트 유저',
+    viewerIsOwner: false,
+    consentGranted: true,
+    summary: {
+      appearances: items.length,
+      goals: items.reduce((sum, record) => sum + record.goals, 0),
+      assists: 0,
+      yellowCards: 0,
+      redCards: 0,
+      mvpCount: 0,
+      matchMvpCount: 0,
+      tournamentAwardCount: 0,
+      byType: {
+        league: { appearances: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 0 },
+        tournament: { appearances: items.length, goals: 1, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 0 },
+        friendly: { appearances: 0, goals: 0, assists: 0, yellowCards: 0, redCards: 0, mvpCount: 0 },
+      },
+    },
+    tournamentAwards: [],
+    items,
+    nextCursor: null,
+  };
+}
+
+describe('UserRecordsContent match links', () => {
+  it('canonical records link to the category-specific exact match while records without an ID keep the tournament route', () => {
+    render(
+      <UserRecordsContent
+        data={data([
+          item(),
+          item({
+            id: 'record-league',
+            gameId: 'game-league',
+            teamMatchId: 'team-match-league',
+            type: 'league',
+            matchType: 'team_match',
+            tournamentId: null,
+            tournamentTitle: null,
+            leagueId: 'league-1',
+            leagueTitle: '2026 가을 정규 리그',
+          }),
+          item({
+            id: 'record-friendly',
+            gameId: 'game-friendly',
+            teamMatchId: 'team-match-friendly',
+            type: 'friendly',
+            matchType: 'team_match',
+            tournamentId: null,
+            tournamentTitle: null,
+          }),
+          item({ id: 'record-legacy', gameId: 'game-legacy', teamMatchId: null }),
+        ])}
+      />,
+    );
+
+    // 뒤로가기가 이 활동 기록으로 돌아오도록 `?from=`을 함께 실어 보낸다(MD-QA #15 후속).
+    expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+      '/tournaments/tournament-1/matches/team-match-1?from=%2Fusers%2Fuser-1%2Frecords',
+      '/league-matches/league-1/fixtures/team-match-league?from=%2Fusers%2Fuser-1%2Frecords',
+      '/team-matches/team-match-friendly?from=%2Fusers%2Fuser-1%2Frecords',
+      '/tournaments/tournament-1?from=%2Fusers%2Fuser-1%2Frecords',
+    ]);
+  });
+
+  it('대회 수상 링크도 뒤로가기가 이 활동 기록으로 돌아오도록 출처를 함께 싣는다', () => {
+    render(
+      <UserRecordsContent
+        data={{
+          ...data([]),
+          tournamentAwards: [
+            { id: 'award-1', tournamentId: 'tournament-9', tournamentTitle: '겨울 리그컵', awardType: 'mvp', awardLabel: 'MVP', iconKey: 'trophy', teamName: null, note: null, awardedAt: '2026-08-10T00:00:00.000Z' },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: /MVP/ })).toHaveAttribute(
+      'href',
+      '/tournaments/tournament-9?from=%2Fusers%2Fuser-1%2Frecords',
+    );
+  });
+
+  // D2: withFromPath 로 바꾼 뒤에만 드러나는 차이 — 받은 출처가 지금 누르는 행과 같은
+  // 화면을 가리키면 다시 감싸지 않고 그 값을 그대로 재사용한다.
+  it('받은 출처가 지금 누르는 경기 화면 자신이면 다시 감싸지 않고 그대로 재사용한다', () => {
+    const selfHref = '/team-matches/team-match-9?from=%2Fusers%2Fuser-1%2Frecords';
+    render(
+      <UserRecordsContent
+        selfHref={selfHref}
+        data={data([item({ id: 'record-friendly', gameId: 'game-friendly', teamMatchId: 'team-match-9', type: 'friendly', matchType: 'team_match', tournamentId: null, tournamentTitle: null })])}
+      />,
+    );
+
+    expect(screen.getByRole('link')).toHaveAttribute('href', selfHref);
+  });
+});

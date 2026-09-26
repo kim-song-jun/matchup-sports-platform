@@ -16,7 +16,7 @@ export class GameResultOfficialFactsService {
         events_hash, official_at, recorded_at
       ) VALUES (
         ${randomUUID()}, ${revision.revisionId}, ${revision.gameId}, ${revision.revision},
-        ${revision.sourceType}::"V1GameSourceType", ${revision.tournamentId},
+        ${revision.sourceType}::"V1GameOfficialFactSourceType", ${revision.tournamentId},
         ${revision.homeTeamId}, ${revision.awayTeamId}, ${score.home}, ${score.away},
         ${JSON.stringify(revision.score)}::jsonb, ${revision.sourceHash},
         ${revision.officialAt}, CURRENT_TIMESTAMP

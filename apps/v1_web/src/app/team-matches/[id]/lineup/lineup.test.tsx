@@ -4,14 +4,11 @@ import { V1ApiError } from '@/lib/api-client';
 import type { V1TeamMatchLineup } from '@/types/api';
 import type { FormationSlot } from '@/components/lineup/formation-slots';
 import {
-  addGuestToBench,
-  addGuestToStarters,
-  addRosterMemberToBench,
-  addRosterMemberToStarters,
+  addGuestToLineup,
+  addRosterMemberToLineup,
   applySaveResult,
   applyVersionConflictReload,
   buildSavePayload,
-  clearPlayerPosition,
   createEmptyLineupEditorState,
   deriveLineupCounts,
   describeLineupPhase,
@@ -19,17 +16,11 @@ import {
   extractConflictCurrentVersion,
   hydrateLineupEditorState,
   isRosterMemberPlaced,
-  matchSlotsToEntries,
-  moveEntry,
-  placeInSlot,
   removeEntry,
   resolveOwnTeamId,
-  seatStartersInEmptySlots,
-  selectFormation,
+  restoreEntry,
   setGoalkeeper,
   setJerseyNumber,
-  setPlayerPosition,
-  unplaceFromSlot,
   validateLineupForSubmit,
 } from './lineup.view-model';
 
@@ -40,150 +31,257 @@ import {
 const rosterMember = { userId: 'user-1', displayName: '홍길동', role: 'member' as const };
 const rosterMember2 = { userId: 'user-2', displayName: '김철수', role: 'member' as const };
 
+function serverLineup(overrides: Partial<V1TeamMatchLineup> = {}): V1TeamMatchLineup {
+  return {
+    teamMatchId: 'tm-1',
+    gameId: 'game-1',
+    sideId: 'side-1',
+    role: 'team_manager',
+    lineupId: 'lineup-1',
+    revision: 2,
+    state: 'DRAFT',
+    version: 2,
+    publicLineupAt: null,
+    formation: null,
+    starters: [],
+    bench: [],
+    ...overrides,
+  };
+}
+
 describe('lineup.view-model', () => {
   it('creates an empty editable state pinned to the given base revision', () => {
     const state = createEmptyLineupEditorState(3);
-    expect(state).toEqual({ starters: [], bench: [], baseRevision: 3, formation: null, dirty: false });
+    expect(state).toEqual({ participants: [], baseRevision: 3, formation: null, dirty: false });
   });
 
-  it('hydrates from a server lineup without leaking a userId (server never echoes it back)', () => {
-    const lineup: V1TeamMatchLineup = {
-      teamMatchId: 'tm-1',
-      gameId: 'game-1',
-      sideId: 'side-1',
-      role: 'team_manager',
-      lineupId: 'lineup-1',
-      revision: 2,
-      state: 'DRAFT',
-      version: 2,
-      publicLineupAt: null,
-      formation: null,
-      starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
-      bench: [{ id: 'participant-bench-1', displayName: '게스트', jerseyNumber: null }],
-    };
-    const state = hydrateLineupEditorState(lineup);
+  /**
+   * 재수화가 **사람 연결(`userId`)을 이어받는다.**
+   *
+   * 이 테스트는 예전에 정반대를 못박고 있었다("server never echoes it back") — 그런데
+   * 서버는 예전부터 `userId` 를 실어 보냈고, 응답 **타입**에만 그 칸이 없었다. 그래서
+   * 화면이 값을 못 읽고 연동 선수를 전부 게스트로 재수화했고, 그대로 저장하면 연결이
+   * 조용히 끊겨 개인 기록·상호평가·징계 추적이 그 사람을 못 찾았다.
+   *
+   * `null` 은 이제 **실제 게스트**만을 뜻한다 — 두 경우를 한 배열에서 함께 잰다.
+   */
+  it('hydrates a server lineup carrying each participant\'s userId, and keeps null only for a real guest', () => {
+    const state = hydrateLineupEditorState(
+      serverLineup({
+        starters: [
+          { id: 'participant-1', userId: 'user-hong', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null },
+        ],
+        bench: [{ id: 'participant-bench-1', displayName: '게스트', jerseyNumber: null }],
+      }),
+    );
     expect(state.baseRevision).toBe(2);
     expect(state.dirty).toBe(false);
-    expect(state.starters).toEqual([
-      expect.objectContaining({ userId: null, displayName: '홍길동', jerseyNumber: 1, goalkeeper: true }),
+    // 명단은 하나다 — 서버가 아직 두 배열로 내려줘도 화면은 한 줄로 합쳐 읽는다(정본 §3).
+    expect(state.participants).toEqual([
+      expect.objectContaining({ userId: 'user-hong', displayName: '홍길동', jerseyNumber: 1, goalkeeper: true }),
+      expect.objectContaining({ userId: null, displayName: '게스트' }),
     ]);
-    expect(state.bench).toEqual([expect.objectContaining({ userId: null, displayName: '게스트' })]);
+  });
+
+  /**
+   * **결함이 실제로 터지던 자리는 여기다.** 재수화만 고쳐도 저장 payload 가 `userId` 를
+   * 안 실으면 아무것도 안 바뀐다 — 다시 열어 저장할 때마다 연동 선수가 게스트로
+   * 내려앉는다. 불러오기 → 저장 payload 를 한 번에 잰다.
+   */
+  it('재수화한 라인업을 그대로 저장하면 payload 가 사람 연결을 그대로 실어 보낸다', () => {
+    const state = hydrateLineupEditorState(
+      serverLineup({
+        revision: 4,
+        starters: [
+          { id: 'p-1', userId: 'user-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null },
+          { id: 'p-2', userId: 'user-2', displayName: '김철수', jerseyNumber: 4, position: null, goalkeeper: false, positionX: null, positionY: null },
+          { id: 'p-3', userId: null, displayName: '용병 게스트', jerseyNumber: 9, position: null, goalkeeper: false, positionX: null, positionY: null },
+        ],
+        bench: [],
+      }),
+    );
+
+    const payload = buildSavePayload(state);
+    expect(payload.expectedVersion).toBe(4);
+    expect(payload.participants).toEqual([
+      expect.objectContaining({ userId: 'user-1', displayName: '홍길동' }),
+      expect.objectContaining({ userId: 'user-2', displayName: '김철수' }),
+      // 게스트는 계정이 없으므로 `userId` 키 자체가 실리지 않는다(서버 DTO 계약).
+      { displayName: '용병 게스트', jerseyNumber: 9 },
+    ]);
+  });
+
+  /**
+   * `revision === 1` 은 경기 생성 때 자동으로 깔린 **미편집 스냅샷**이다 — 참가자는 대진
+   * 생성 시점의 팀 전체 활성 멤버이고, 일부러 `userId` 를 붙이지 않는다(한 경기도 안 뛴
+   * 팀원에게 신원 연결을 만들면 개인 기록·상호평가가 거짓이 된다).
+   *
+   * 이걸 편집기 시작 상태로 쓰면 팀장은 자기가 짜지 않은 명단을 보고, 그대로 저장하는
+   * 순간 **팀 전원이 이름뿐인 게스트로 박제된다.** alpha 실측에서 제출된 리그 라인업
+   * 참가자가 전원 `userId` 없이 저장돼 있던 마지막 고리가 여기다.
+   *
+   * 같은 참가자 목록을 `revision: 2` 로 주면 그대로 불러온다 — 규칙이 **내용이 아니라
+   * 리비전**이라는 것을 함께 잰다(내용으로 판정하면 진짜 게스트 명단까지 지워진다).
+   */
+  it('자동으로 깔린 미편집 스냅샷(revision 1)은 불러오지 않는다 — 팀이 저장한 리비전은 그대로 불러온다', () => {
+    const autoRoster = [
+      { id: 'auto-1', userId: null, displayName: '팀원A', jerseyNumber: null, position: null, goalkeeper: false, positionX: null, positionY: null },
+      { id: 'auto-2', userId: null, displayName: '팀원B', jerseyNumber: null, position: null, goalkeeper: false, positionX: null, positionY: null },
+    ];
+
+    const auto = hydrateLineupEditorState(serverLineup({ revision: 1, version: 1, starters: autoRoster, bench: [] }));
+    expect(auto.participants).toEqual([]);
+    // CAS 토큰은 그대로여야 한다 — 저장할 때 서버가 기대하는 값이 1 이다.
+    expect(auto.baseRevision).toBe(1);
+    expect(auto.dirty).toBe(false);
+
+    const saved = hydrateLineupEditorState(serverLineup({ revision: 2, version: 2, starters: autoRoster, bench: [] }));
+    expect(saved.participants.map((entry) => entry.displayName)).toEqual(['팀원A', '팀원B']);
+  });
+
+  it('이 변경 전에 후보로 저장된 사람도 명단에 남는다 — bench 를 안 읽으면 조용히 사라진다', () => {
+    // 서버 응답 계약은 이 태스크가 바꾸지 않았다. 옛 저장본에는 `bench` 에만 있는 사람이
+    // 실제로 존재하므로, `starters` 만 읽으면 그 사람이 화면에서 사라진 채 저장돼 삭제된다.
+    const state = hydrateLineupEditorState(
+      serverLineup({ bench: [{ id: 'p-9', displayName: '후보만', jerseyNumber: 12 }] }),
+    );
+    expect(state.participants.map((entry) => entry.displayName)).toEqual(['후보만']);
   });
 
   it('prevents placing the same roster member twice — a duplicate add is a structural no-op', () => {
     let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
-    expect(state.starters).toHaveLength(1);
+    state = addRosterMemberToLineup(state, rosterMember);
+    expect(state.participants).toHaveLength(1);
 
-    const again = addRosterMemberToStarters(state, rosterMember);
+    const again = addRosterMemberToLineup(state, rosterMember);
     expect(again).toBe(state); // 참조 동일 — 아무 것도 바뀌지 않았다
-    expect(again.starters).toHaveLength(1);
-
-    // 이미 선발에 있으면 후보로도 추가되지 않는다 (같은 사람이 두 슬롯에 동시에 있을 수 없다)
-    const benchAttempt = addRosterMemberToBench(state, rosterMember);
-    expect(benchAttempt).toBe(state);
+    expect(again.participants).toHaveLength(1);
   });
 
   it('ignores a blank guest name and adds a trimmed one', () => {
     let state = createEmptyLineupEditorState(0);
-    expect(addGuestToBench(state, '   ')).toBe(state);
-    state = addGuestToStarters(state, '  게스트A  ');
-    expect(state.starters[0]).toEqual(expect.objectContaining({ userId: null, displayName: '게스트A' }));
+    expect(addGuestToLineup(state, '   ')).toBe(state);
+    state = addGuestToLineup(state, '  게스트A  ');
+    expect(state.participants[0]).toEqual(expect.objectContaining({ userId: null, displayName: '게스트A' }));
   });
 
   it('removes an entry by its stable key', () => {
     let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
-    const key = state.starters[0].key;
-    state = removeEntry(state, 'starter', key);
-    expect(state.starters).toHaveLength(0);
+    state = addRosterMemberToLineup(state, rosterMember);
+    const key = state.participants[0].key;
+    state = removeEntry(state, key);
+    expect(state.participants).toHaveLength(0);
   });
 
-  it('moves an entry between starters and bench, clearing goalkeeper on demotion', () => {
+  it('restoreEntry puts the removed entry back at its original index', () => {
     let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
-    state = setGoalkeeper(state, state.starters[0].key);
-    expect(state.starters[0].goalkeeper).toBe(true);
-
-    state = moveEntry(state, 'starter', state.starters[0].key, 'bench');
-    expect(state.starters).toHaveLength(0);
-    expect(state.bench).toHaveLength(1);
-    expect(state.bench[0].goalkeeper).toBe(false);
+    state = addRosterMemberToLineup(state, rosterMember);
+    state = addRosterMemberToLineup(state, rosterMember2);
+    const removed = state.participants[0];
+    state = removeEntry(state, removed.key);
+    state = restoreEntry(state, removed, 0);
+    expect(state.participants.map((entry) => entry.displayName)).toEqual(['홍길동', '김철수']);
   });
 
-  it('keeps exactly one goalkeeper among starters (radio semantics)', () => {
+  it('allows multiple goalkeepers and toggles each independently', () => {
     let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
-    state = addRosterMemberToStarters(state, rosterMember2);
-    state = setGoalkeeper(state, state.starters[0].key);
-    state = setGoalkeeper(state, state.starters[1].key);
-    expect(state.starters[0].goalkeeper).toBe(false);
-    expect(state.starters[1].goalkeeper).toBe(true);
+    state = addRosterMemberToLineup(state, rosterMember);
+    state = addRosterMemberToLineup(state, rosterMember2);
+    state = setGoalkeeper(state, state.participants[0].key);
+    state = setGoalkeeper(state, state.participants[1].key);
+    expect(state.participants[0].goalkeeper).toBe(true);
+    expect(state.participants[1].goalkeeper).toBe(true);
+    state = setGoalkeeper(state, state.participants[0].key);
+    expect(state.participants[0].goalkeeper).toBe(false);
+    expect(state.participants[1].goalkeeper).toBe(true);
   });
 
-  it('derives starter/bench/waiting counts from one merged view', () => {
+  it('derives participant/waiting counts from one merged view', () => {
     let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
+    state = addRosterMemberToLineup(state, rosterMember);
     const counts = deriveLineupCounts(state, [rosterMember, rosterMember2]);
-    expect(counts).toEqual({ starterCount: 1, benchCount: 0, waitingCount: 1, totalRoster: 2 });
+    expect(counts).toEqual({ participantCount: 1, waitingCount: 1, totalRoster: 2 });
   });
 
-  it('flags a lineup with no goalkeeper, duplicate jersey numbers, or an empty roster', () => {
-    expect(validateLineupForSubmit(createEmptyLineupEditorState(0), null)).toContain(
-      '선발 명단을 최소 한 명 이상 등록해 주세요.',
+  it('빈 명단·중복 등번호·빈 이름만 막는다 — 인원수와 GK 개수는 검사하지 않는다', () => {
+    expect(validateLineupForSubmit(createEmptyLineupEditorState(0))).toContain(
+      '참석명단을 최소 한 명 이상 등록해 주세요.',
     );
 
     let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
-    state = addRosterMemberToStarters(state, rosterMember2);
-    state = setJerseyNumber(state, 'starter', state.starters[0].key, 7);
-    state = setJerseyNumber(state, 'starter', state.starters[1].key, 7);
-    const errors = validateLineupForSubmit(state, null);
-    expect(errors).toContain('선발 라인업에 골키퍼를 한 명 지정해 주세요.');
-    expect(errors).toContain('등번호가 중복돼요. 등번호는 서로 달라야 해요.');
+    state = addRosterMemberToLineup(state, rosterMember);
+    state = addRosterMemberToLineup(state, rosterMember2);
+    state = setJerseyNumber(state, state.participants[0].key, 7);
+    state = setJerseyNumber(state, state.participants[1].key, 7);
+    expect(validateLineupForSubmit(state)).toContain('등번호가 중복돼요. 등번호는 서로 달라야 해요.');
 
-    state = setGoalkeeper(state, state.starters[0].key);
-    expect(validateLineupForSubmit(state, null)).not.toContain('선발 라인업에 골키퍼를 한 명 지정해 주세요.');
+    state = setJerseyNumber(state, state.participants[1].key, 9);
+    // **GK 가 아무도 없어도 통과해야 한다.** 163 BE-1 이 서버에서 인원·GK 검증을 지웠으므로
+    // (정본 §3), 여기 남기면 서버가 받아 주는 입력을 화면만 막는 규칙이 된다.
+    expect(state.participants.every((entry) => !entry.goalkeeper)).toBe(true);
+    expect(validateLineupForSubmit(state)).toEqual([]);
+
+    // 인원이 적어도 통과한다 — 최소 인원 검증은 이 화면의 책임이 아니다.
+    let tiny = createEmptyLineupEditorState(0);
+    tiny = addRosterMemberToLineup(tiny, rosterMember);
+    expect(validateLineupForSubmit(tiny)).toEqual([]);
+  });
+
+  it('빈 이름은 막는다', () => {
+    let state = createEmptyLineupEditorState(0);
+    state = addRosterMemberToLineup(state, { ...rosterMember, displayName: '홍길동' });
+    state.participants[0].displayName = '   ';
+    expect(validateLineupForSubmit(state)).toContain('이름이 비어 있는 선수가 있어요.');
   });
 
   it('builds a save payload carrying userId only for linked entries', () => {
     let state = createEmptyLineupEditorState(4);
-    state = addRosterMemberToStarters(state, rosterMember);
-    state = addGuestToBench(state, '게스트A');
-    state = setGoalkeeper(state, state.starters[0].key);
-    const payload = buildSavePayload(state);
-    expect(payload).toEqual({
+    state = addRosterMemberToLineup(state, rosterMember);
+    state = addGuestToLineup(state, '게스트A');
+    state = setGoalkeeper(state, state.participants[0].key);
+    expect(buildSavePayload(state)).toEqual({
       expectedVersion: 4,
-      starters: [{ userId: 'user-1', displayName: '홍길동', goalkeeper: true }],
-      bench: [{ displayName: '게스트A' }],
+      participants: [{ userId: 'user-1', displayName: '홍길동', goalkeeper: true }, { displayName: '게스트A' }],
     });
+  });
+
+  it('명단만 바꿔 저장해도 전술보드의 좌표·포메이션은 그대로 되돌아간다', () => {
+    // 이 화면은 배치를 편집하지 않는다(정본 §3 — 좌표는 전술보드 소관). 그런데 저장은
+    // **명단 전체를 덮어쓴다** — 그래서 읽어온 좌표를 payload 에 다시 실어 보내지 않으면
+    // 전술보드가 잡아 둔 배치가 명단 한 줄 고칠 때마다 지워진다.
+    const loaded = hydrateLineupEditorState(
+      serverLineup({
+        formation: '1-2-1',
+        starters: [
+          { id: 'p-1', userId: null, displayName: '홍길동', jerseyNumber: 1, position: 'GK', goalkeeper: true, positionX: 50, positionY: 6 },
+          { id: 'p-2', userId: null, displayName: '김철수', jerseyNumber: 4, position: 'FIXO', goalkeeper: false, positionX: 33, positionY: 43 },
+        ],
+      }),
+    );
+    // 명단만 바꾼다 — 한 명 추가.
+    const edited = addGuestToLineup(loaded, '새 게스트');
+    const payload = buildSavePayload(edited);
+
+    expect(payload.formation).toBe('1-2-1');
+    expect(payload.participants.slice(0, 2)).toEqual([
+      { displayName: '홍길동', jerseyNumber: 1, goalkeeper: true, position: 'GK', positionX: 50, positionY: 6 },
+      { displayName: '김철수', jerseyNumber: 4, position: 'FIXO', positionX: 33, positionY: 43 },
+    ]);
+    // 새로 추가한 사람에게는 좌표가 없다 — 없는 값을 지어내지 않는다.
+    expect(payload.participants[2]).toEqual({ displayName: '새 게스트' });
   });
 
   it('advances the CAS token after a save ack without touching local edits', () => {
     let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
+    state = addRosterMemberToLineup(state, rosterMember);
     const saved = applySaveResult(state, { revision: 1 });
     expect(saved.baseRevision).toBe(1);
     expect(saved.dirty).toBe(false);
-    expect(saved.starters).toBe(state.starters);
+    expect(saved.participants).toBe(state.participants);
   });
 
   it('reloads from the server on a version conflict (full rehydrate, not a partial merge)', () => {
-    const lineup: V1TeamMatchLineup = {
-      teamMatchId: 'tm-1',
-      gameId: 'game-1',
-      sideId: 'side-1',
-      role: 'team_manager',
-      lineupId: 'lineup-2',
-      revision: 5,
-      state: 'DRAFT',
-      version: 5,
-      publicLineupAt: null,
-      formation: null,
-      starters: [],
-      bench: [],
-    };
-    const reloaded = applyVersionConflictReload(lineup);
+    const reloaded = applyVersionConflictReload(serverLineup({ revision: 5, version: 5 }));
     expect(reloaded.baseRevision).toBe(5);
     expect(reloaded.dirty).toBe(false);
   });
@@ -198,21 +296,19 @@ describe('lineup.view-model', () => {
     const now = new Date('2026-08-10T10:00:00.000Z').getTime();
     expect(describePublicationCountdown(null, now)).toBeNull();
     expect(describePublicationCountdown('2026-08-10T10:30:00.000Z', now)).toBe('30분 후 공개돼요.');
-    expect(describePublicationCountdown('2026-08-10T09:00:00.000Z', now)).toBe('라인업이 공개됐어요.');
+    expect(describePublicationCountdown('2026-08-10T09:00:00.000Z', now)).toBe('참석명단이 공개됐어요.');
   });
 
   it('gates editability by lineup state and kickoff deadline', () => {
     expect(describeLineupPhase('DRAFT', false).editable).toBe(true);
     expect(describeLineupPhase('DRAFT', true).editable).toBe(false);
-    expect(describeLineupPhase('SUBMITTED', false).editable).toBe(false);
+    expect(describeLineupPhase('SUBMITTED', false).editable).toBe(true);
     expect(describeLineupPhase('LOCKED', false).editable).toBe(false);
   });
 
   it('resolves which team is "mine" for this match from host/opponent + my memberships', () => {
     const teamMatch = { hostTeamId: 'team-host', approvedOpponentTeam: { teamId: 'team-away' } };
-    expect(
-      resolveOwnTeamId(teamMatch, [{ teamId: 'team-away', role: 'manager' }]),
-    ).toBe('team-away');
+    expect(resolveOwnTeamId(teamMatch, [{ teamId: 'team-away', role: 'manager' }])).toBe('team-away');
     expect(resolveOwnTeamId(teamMatch, [{ teamId: 'team-away', role: 'member' }])).toBeNull();
     expect(resolveOwnTeamId(teamMatch, undefined)).toBeNull();
   });
@@ -221,205 +317,48 @@ describe('lineup.view-model', () => {
     // GET /me/teams 는 배열이 아니라 { items: [...] } 를 돌려준다. 이걸 언랩하지 않고 넘기면
     // 예전 구현은 `myTeams.find is not a function` 으로 라인업/팀매치 화면 전체를 죽였다.
     const teamMatch = { hostTeamId: 'team-host', approvedOpponentTeam: { teamId: 'team-away' } };
-    expect(
-      resolveOwnTeamId(teamMatch, { items: [{ teamId: 'team-host', role: 'owner' }] }),
-    ).toBe('team-host');
+    expect(resolveOwnTeamId(teamMatch, { items: [{ teamId: 'team-host', role: 'owner' }] })).toBe('team-host');
     expect(resolveOwnTeamId(teamMatch, { items: [] })).toBeNull();
   });
 
   it('isRosterMemberPlaced matches deriveLineupCounts waiting logic', () => {
     let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
+    state = addRosterMemberToLineup(state, rosterMember);
     expect(isRosterMemberPlaced(state, rosterMember)).toBe(true);
     expect(isRosterMemberPlaced(state, rosterMember2)).toBe(false);
   });
 
   // ── Blocker 1 regression: reopen-a-saved-draft must not allow duplicate placement ──
   // GET .../lineup never echoes userId back (Task 14 stores only displayName snapshots),
-  // so hydrateLineupEditorState() always produces userId: null starters/bench. Before this
-  // fix, isPlaced()/addRosterMemberToStarters()/addRosterMemberToBench() compared strictly by
-  // entry.userId === member.userId — which is never true post-hydrate — so a previously
-  // placed roster member reappeared in the addable list and could be added a second time as
-  // a distinct row. Reverting the entry.displayName fallback in matchesRosterMember (i.e.
-  // going back to a strict userId-only comparison) makes every assertion below fail.
+  // so hydrateLineupEditorState() always produces userId: null entries. Before this fix,
+  // isPlaced()/addRosterMemberToLineup() compared strictly by entry.userId === member.userId
+  // — which is never true post-hydrate — so a previously placed roster member reappeared in
+  // the addable list and could be added a second time as a distinct row. Reverting the
+  // entry.displayName fallback in matchesRosterMember makes every assertion below fail.
   it('hydrate-then-add: a roster member already present in a rehydrated (reopened) draft cannot be re-added as a duplicate', () => {
-    const lineup: V1TeamMatchLineup = {
-      teamMatchId: 'tm-1',
-      gameId: 'game-1',
-      sideId: 'side-1',
-      role: 'team_manager',
-      lineupId: 'lineup-1',
-      revision: 3,
-      state: 'DRAFT',
-      version: 3,
-      publicLineupAt: null,
-      formation: null,
-      starters: [{ id: 'participant-2', displayName: rosterMember.displayName, jerseyNumber: 7, position: null, goalkeeper: true, positionX: null, positionY: null }],
-      bench: [],
-    };
-    let state = hydrateLineupEditorState(lineup);
-    // Sanity: the rehydrated starter really did lose its userId (server contract).
-    expect(state.starters[0].userId).toBeNull();
+    let state = hydrateLineupEditorState(
+      serverLineup({
+        revision: 3,
+        version: 3,
+        starters: [
+          { id: 'participant-2', userId: rosterMember.userId, displayName: rosterMember.displayName, jerseyNumber: 7, position: null, goalkeeper: true, positionX: null, positionY: null },
+        ],
+      }),
+    );
+    // Sanity: 재수화된 엔트리는 이제 **사람 연결을 갖고 있다** — 중복 판정이 이름
+    // 휴리스틱이 아니라 userId 로 이뤄진다는 뜻이다.
+    expect(state.participants[0].userId).toBe(rosterMember.userId);
 
-    // The waiting/addable pool must already exclude this roster member post-hydrate...
     expect(isRosterMemberPlaced(state, rosterMember)).toBe(true);
-    const counts = deriveLineupCounts(state, [rosterMember, rosterMember2]);
-    expect(counts.waitingCount).toBe(1);
+    expect(deriveLineupCounts(state, [rosterMember, rosterMember2]).waitingCount).toBe(1);
 
-    // ...and attempting to add them again is a structural no-op on both the starting XI
-    // and the bench — the exact scenario that used to create a second V1GameParticipant row.
-    const afterStarterAttempt = addRosterMemberToStarters(state, rosterMember);
-    expect(afterStarterAttempt).toBe(state);
-    expect(afterStarterAttempt.starters).toHaveLength(1);
-
-    const afterBenchAttempt = addRosterMemberToBench(state, rosterMember);
-    expect(afterBenchAttempt).toBe(state);
-    expect(afterBenchAttempt.bench).toHaveLength(0);
+    const afterAttempt = addRosterMemberToLineup(state, rosterMember);
+    expect(afterAttempt).toBe(state);
+    expect(afterAttempt.participants).toHaveLength(1);
 
     // A genuinely different roster member is unaffected and can still be added.
-    state = addRosterMemberToStarters(state, rosterMember2);
-    expect(state.starters).toHaveLength(2);
-  });
-
-  it('selectFormation only relabels the formation — it never moves an already-placed starter', () => {
-    let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
-    state = setPlayerPosition(state, state.starters[0].key, 42, 63);
-    const next = selectFormation(state, '2-2');
-    expect(next.formation).toBe('2-2');
-    expect(next.starters[0]).toMatchObject({ positionX: 42, positionY: 63 });
-  });
-
-  it('placeInSlot assigns the slot coordinates and positionCode, and enforces one goalkeeper (radio semantics)', () => {
-    let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
-    state = addRosterMemberToStarters(state, rosterMember2);
-    state = setGoalkeeper(state, state.starters[0].key);
-    const gkSlot: FormationSlot = { positionCode: 'GK', label: 'GK', x: 50, y: 6 };
-    const next = placeInSlot(state, state.starters[1].key, gkSlot);
-    expect(next.starters[0].goalkeeper).toBe(false);
-    expect(next.starters[1]).toMatchObject({ goalkeeper: true, positionX: 50, positionY: 6, position: null });
-
-    const fixoSlot: FormationSlot = { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 };
-    const withOutfield = placeInSlot(next, next.starters[0].key, fixoSlot);
-    expect(withOutfield.starters[0]).toMatchObject({ position: 'FIXO', positionX: 33, positionY: 43, goalkeeper: false });
-  });
-
-  it('unplaceFromSlot clears coordinates, positionCode, and goalkeeper together (not just coordinates)', () => {
-    let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
-    const fixoSlot: FormationSlot = { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 };
-    state = placeInSlot(state, state.starters[0].key, fixoSlot);
-    const cleared = unplaceFromSlot(state, state.starters[0].key);
-    expect(cleared.starters[0]).toMatchObject({ position: null, positionX: null, positionY: null, goalkeeper: false });
-  });
-
-  it('matchSlotsToEntries matches by positionCode (not coordinates) so a dragged token still counts its slot as filled', () => {
-    let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
-    const fixoSlot: FormationSlot = { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 };
-    state = placeInSlot(state, state.starters[0].key, fixoSlot);
-    state = setPlayerPosition(state, state.starters[0].key, 61, 12); // 배치 후 드래그로 좌표만 변경
-    const matched = matchSlotsToEntries([fixoSlot], state.starters);
-    expect(matched[0].entry?.key).toBe(state.starters[0].key);
-  });
-
-  it('seatStartersInEmptySlots seats a newly registered starter in the first empty outfield slot', () => {
-    let state = createEmptyLineupEditorState(0);
-    state = addGuestToStarters(state, '새선수');
-    const slots: FormationSlot[] = [
-      { positionCode: 'GK', label: 'GK', x: 50, y: 6 },
-      { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 },
-      { positionCode: 'PIVO', label: '피보', x: 50, y: 80 },
-    ];
-    const seated = seatStartersInEmptySlots(state.starters, slots, [state.starters[0].key]);
-    expect(seated[0]).toMatchObject({ position: 'FIXO', positionX: 33, positionY: 43, goalkeeper: false });
-  });
-
-  it('seatStartersInEmptySlots never puts a non-goalkeeper in the goalkeeper slot, even when that is the only empty one', () => {
-    let state = createEmptyLineupEditorState(0);
-    state = addGuestToStarters(state, '필드선수');
-    const gkOnly: FormationSlot[] = [{ positionCode: 'GK', label: 'GK', x: 50, y: 6 }];
-    expect(seatStartersInEmptySlots(state.starters, gkOnly, [state.starters[0].key])).toBe(state.starters);
-  });
-
-  it('seatStartersInEmptySlots puts a just-designated goalkeeper on the goal line — designating GK alone used to leave them waiting', () => {
-    let state = createEmptyLineupEditorState(0);
-    state = addGuestToStarters(state, '골키퍼');
-    state = setGoalkeeper(state, state.starters[0].key);
-    const slots: FormationSlot[] = [
-      { positionCode: 'GK', label: 'GK', x: 50, y: 6 },
-      { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 },
-    ];
-    const seated = seatStartersInEmptySlots(state.starters, slots, [state.starters[0].key]);
-    expect(seated[0]).toMatchObject({ goalkeeper: true, position: null, positionX: 50, positionY: 6 });
-  });
-
-  it('seatStartersInEmptySlots touches only the keys it was given — a starter left waiting on purpose stays waiting', () => {
-    let state = createEmptyLineupEditorState(0);
-    state = addGuestToStarters(state, '남겨둔선수');
-    state = addGuestToStarters(state, '새선수');
-    const slots: FormationSlot[] = [
-      { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 },
-      { positionCode: 'PIVO', label: '피보', x: 50, y: 80 },
-    ];
-    const seated = seatStartersInEmptySlots(state.starters, slots, [state.starters[1].key]);
-    expect(seated[0]).toMatchObject({ displayName: '남겨둔선수', positionX: null, positionY: null });
-    expect(seated[1]).toMatchObject({ displayName: '새선수', position: 'FIXO' });
-  });
-
-  it('seatStartersInEmptySlots returns the same array reference when every slot is already taken', () => {
-    let state = createEmptyLineupEditorState(0);
-    state = addGuestToStarters(state, '먼저온선수');
-    const fixoSlot: FormationSlot = { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 };
-    state = placeInSlot(state, state.starters[0].key, fixoSlot);
-    state = addGuestToStarters(state, '늦게온선수');
-    expect(seatStartersInEmptySlots(state.starters, [fixoSlot], [state.starters[1].key])).toBe(state.starters);
-  });
-
-  it('validateLineupForSubmit reports unfilled slots only when a slot preset is active', () => {
-    let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
-    const slots: FormationSlot[] = [
-      { positionCode: 'GK', label: 'GK', x: 50, y: 6 },
-      { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 },
-    ];
-    expect(validateLineupForSubmit(state, null)).not.toContain('아직 채우지 않은 포지션 자리가 2개 있어요.');
-    expect(validateLineupForSubmit(state, slots)).toContain('아직 채우지 않은 포지션 자리가 2개 있어요.');
-  });
-
-  it("buildSavePayload includes each starter's positionCode — a real bug where it was silently dropped from the save request", () => {
-    let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
-    const fixoSlot: FormationSlot = { positionCode: 'FIXO', label: '픽소', x: 33, y: 43 };
-    state = placeInSlot(state, state.starters[0].key, fixoSlot);
-    const payload = buildSavePayload(state);
-    expect(payload.starters[0]).toMatchObject({ position: 'FIXO', positionX: 33, positionY: 43 });
-  });
-
-  it('setPlayerPosition/clearPlayerPosition edit one starter without touching the rest', () => {
-    let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
-    state = addRosterMemberToStarters(state, rosterMember2);
-    const [first, second] = state.starters;
-
-    const placed = setPlayerPosition(state, first.key, 42, 63);
-    expect(placed.starters.find((entry) => entry.key === first.key)).toMatchObject({ positionX: 42, positionY: 63 });
-    expect(placed.starters.find((entry) => entry.key === second.key)!.positionX).toBeNull();
-
-    const cleared = clearPlayerPosition(placed, first.key);
-    expect(cleared.starters.find((entry) => entry.key === first.key)).toMatchObject({
-      positionX: null,
-      positionY: null,
-    });
-  });
-
-  it('moving a positioned starter to the bench clears its pitch coordinates', () => {
-    let state = createEmptyLineupEditorState(0);
-    state = addRosterMemberToStarters(state, rosterMember);
-    state = setPlayerPosition(state, state.starters[0].key, 30, 70);
-    state = moveEntry(state, 'starter', state.starters[0].key, 'bench');
-    expect(state.bench[0]).toMatchObject({ positionX: null, positionY: null });
+    state = addRosterMemberToLineup(state, rosterMember2);
+    expect(state.participants).toHaveLength(2);
   });
 });
 
@@ -514,7 +453,101 @@ describe('TeamMatchLineupPageClient', () => {
     hoisted.refetchLineup.mockResolvedValue({ data: baseLineup() });
   });
 
-  it('owner/manager: lets a manager place a waiting roster member into the starting lineup', async () => {
+  /**
+   * **라벨을 지우면 못 찾고, 항상 띄우면 값으로 읽힌다.**
+   *
+   * 처음엔 선택됐을 때만 "GK" 가 보이는 네이티브 라디오였는데 "뭘 누르는 버튼인지 모르겠다"
+   * 는 지적을 받아 **항상** GK 를 띄우게 바꿨다. 그랬더니 이번엔 QA 가 두 라운드 연속
+   * **"전원이 GK 로 보인다"** 고 보고했다 — 글자가 상태가 아니라 값으로 읽힌 것이다.
+   * 미지정을 **빈 컨트롤**로 두면 둘 다 피한다. 이 열이 무엇인지는 열 헤더가 말하고,
+   * 스크린리더는 각 버튼의 aria-label 에서 같은 문맥을 얻는다(2026-09-08 사용자 확정).
+   */
+  it('GK 글자는 지정된 행에만 있다 — 미지정 행은 빈 컨트롤이다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({
+        starters: [
+          { id: 'p-1', userId: null, displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null },
+          { id: 'p-2', userId: null, displayName: '김철수', jerseyNumber: 2, position: null, goalkeeper: false, positionX: null, positionY: null },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: hoisted.refetchLineup,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    const designated = screen.getByRole('button', { name: '홍길동, 골키퍼 지정 해제' });
+    // 조사는 받침을 따른다 — '김철수' 는 받침이 없으니 '를' 이다(`josa`).
+    const notDesignated = screen.getByRole('button', { name: '김철수를 골키퍼로 지정' });
+
+    expect(designated).toHaveTextContent('GK');
+    // 여기가 계약이다 — 미지정 행에 글자가 있으면 그게 "이 선수는 GK" 로 읽힌다.
+    // `toHaveTextContent('')` 는 쓰지 않는다: **포함 검사**라 빈 문자열이 무엇에나 매치돼
+    // 단언이 무력해진다. `toBeEmptyDOMElement()` 는 자식 노드가 없어야 통과하므로
+    // 공백 문자에도 걸리지 않으면서 계약을 그대로 지킨다.
+    expect(notDesignated).toBeEmptyDOMElement();
+    // 그래도 누를 수 있어야 한다(빈 컨트롤이지 사라진 컨트롤이 아니다).
+    expect(notDesignated).toBeEnabled();
+  });
+
+  it('리그 대진에서도 팀장·운영진 직접 등록을 안내한다', () => {
+    hoisted.useV1TeamMatchMock.mockReturnValue({
+      data: { ...baseTeamMatch(), league: { leagueId: 'league-1', title: '테스트 리그' } },
+      isLoading: false,
+      isError: false,
+    });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup(),
+      isLoading: false,
+      isError: false,
+      refetch: hoisted.refetchLineup,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(screen.getByText(/별도의 참석 초대나 응답은 필요하지 않아요/)).toBeInTheDocument();
+    expect(screen.queryByText(/참석으로 확정된 팀원만/)).not.toBeInTheDocument();
+  });
+
+  it('친선 매치도 참석 응답 없이 직접 등록한다고 안내한다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup(),
+      isLoading: false,
+      isError: false,
+      refetch: hoisted.refetchLineup,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(screen.getByText(/팀장·운영진이 활성 팀원을 참석명단에 바로 넣을 수 있어요/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /팀 일정에서 참석을 먼저 확인/ })).not.toBeInTheDocument();
+  });
+
+  it('상대팀 승인 전에도 호스트 매니저는 참석명단을 작성할 수 있다', () => {
+    hoisted.useV1TeamMatchMock.mockReturnValue({
+      data: { ...baseTeamMatch(), status: 'recruiting', approvedOpponentTeam: null },
+      isLoading: false,
+      isError: false,
+    });
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({
+        eligibleMembers: [
+          { userId: 'user-1', displayName: '홍길동', jerseyNumber: 7, attending: true },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: hoisted.refetchLineup,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(screen.getByRole('button', { name: '명단 추가' })).toBeEnabled();
+    expect(screen.getByText(/별도의 참석 초대나 응답은 필요하지 않아요/)).toBeInTheDocument();
+  });
+
+  it('owner/manager: lets a manager add a waiting roster member to the appearance roster', async () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup(),
       isLoading: false,
@@ -526,14 +559,51 @@ describe('TeamMatchLineupPageClient', () => {
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
     expect(screen.getByText('초안')).toBeInTheDocument();
-    expect(screen.getByText('선발 (0)')).toBeInTheDocument();
+    expect(screen.getByText('참석명단 (0)')).toBeInTheDocument();
     expect(screen.getByText('추가 가능한 팀원 (1)')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '선발 추가' }));
+    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
 
-    expect(screen.getByText('선발 (1)')).toBeInTheDocument();
+    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '이전 참석명단 불러오기' })).toBeInTheDocument();
     // 배치되고 나면 대기 목록에서 사라진다 — 같은 사람을 두 번 추가할 방법 자체가 없다.
     expect(screen.getByText('추가할 수 있는 팀원이 없어요')).toBeInTheDocument();
+  });
+
+  it('팀장·운영진은 참석 응답이 없는 활성 팀원도 참석명단에 직접 추가할 수 있다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({
+        eligibleMembers: [
+          { userId: 'user-1', displayName: '홍길동', jerseyNumber: null, attending: true },
+          { userId: 'user-2', displayName: '김철수', jerseyNumber: null, attending: false },
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
+    });
+    hoisted.useV1TeamMembersMock.mockReturnValue({
+      data: {
+        items: [
+          { membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active' },
+          { membershipId: 'm-2', userId: 'user-2', displayName: '김철수', role: 'member', status: 'active' },
+        ],
+      },
+      isLoading: false,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(screen.getByText('추가 가능한 팀원 (2)')).toBeInTheDocument();
+    expect(screen.getByText(/별도의 참석 초대나 응답은 필요하지 않아요/)).toBeInTheDocument();
+    expect(screen.queryByText(/참석 미확정/)).not.toBeInTheDocument();
+
+    const addButtons = screen.getAllByRole('button', { name: '명단 추가' });
+    expect(addButtons).toHaveLength(2);
+    fireEvent.click(addButtons[1]);
+    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
+    expect(screen.getByText('김철수')).toBeInTheDocument();
   });
 
   it('member (non-manager): shows a permission-denied state instead of the editor', () => {
@@ -545,7 +615,7 @@ describe('TeamMatchLineupPageClient', () => {
         status: 'error',
         statusCode: 403,
         code: 'PERMISSION_DENIED',
-        message: '팀장 또는 매니저만 라인업을 관리할 수 있어요.',
+        message: '팀장 또는 매니저만 참석명단을 관리할 수 있어요.',
         timestamp: '2026-08-01T00:00:00.000Z',
       }),
       refetch: hoisted.refetchLineup,
@@ -553,7 +623,7 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    expect(screen.getByText('팀장 또는 매니저만 라인업을 관리할 수 있어요.')).toBeInTheDocument();
+    expect(screen.getByText('팀장 또는 매니저만 참석명단을 관리할 수 있어요.')).toBeInTheDocument();
     expect(screen.queryByLabelText('게스트 이름')).not.toBeInTheDocument();
   });
 
@@ -561,7 +631,7 @@ describe('TeamMatchLineupPageClient', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({
         revision: 0,
-        starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
+        starters: [{ id: 'participant-1', userId: null, displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
       }),
       isLoading: false,
       isError: false,
@@ -571,7 +641,7 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '라인업 제출하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
     expect(hoisted.submitMutate).toHaveBeenCalledTimes(1);
 
     const onError = hoisted.submitMutate.mock.calls[0][1].onError;
@@ -581,19 +651,19 @@ describe('TeamMatchLineupPageClient', () => {
           status: 'error',
           statusCode: 409,
           code: 'VERSION_CONFLICT',
-          message: '라인업이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
+          message: '참석명단이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
           details: { expectedVersion: 0, currentVersion: 2 },
           timestamp: '2026-08-01T00:00:00.000Z',
         }),
       );
     });
 
-    expect(screen.getByText('라인업이 그새 변경됐어요.')).toBeInTheDocument();
+    expect(screen.getByText('참석명단이 그새 변경됐어요.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '새로고침' }));
 
     await waitFor(() => expect(hoisted.refetchLineup).toHaveBeenCalled());
-    expect(screen.queryByText('라인업이 그새 변경됐어요.')).not.toBeInTheDocument();
+    expect(screen.queryByText('참석명단이 그새 변경됐어요.')).not.toBeInTheDocument();
   });
 
   it('network loss: going offline blocks editing and surfaces an offline banner', async () => {
@@ -619,7 +689,7 @@ describe('TeamMatchLineupPageClient', () => {
       screen.getByText('오프라인 상태예요. 연결이 끊긴 동안 변경사항은 저장되지 않아요.'),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('게스트 이름')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '라인업 제출하기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '참석명단 제출하기' })).not.toBeInTheDocument();
 
     // 이 스위트의 다음 테스트가 온라인 상태를 전제하므로 복원한다 — navigator.onLine은
     // jsdom 전역이라 defineProperty로 false를 박아두면 테스트 간에 그대로 새어나간다.
@@ -658,7 +728,7 @@ describe('TeamMatchLineupPageClient', () => {
 
       render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-      fireEvent.click(screen.getAllByRole('button', { name: '선발 추가' })[0]);
+      fireEvent.click(screen.getAllByRole('button', { name: '명단 추가' })[0]);
       // 예전 자동저장 디바운스(900ms)를 훌쩍 넘겨도 아무것도 나가지 않아야 한다.
       act(() => {
         vi.advanceTimersByTime(5_000);
@@ -694,14 +764,14 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    fireEvent.click(screen.getAllByRole('button', { name: '선발 추가' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: '명단 추가' })[0]);
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: '저장 중…' })).toBeDisabled();
 
     // 저장이 서버에 나가 있는 동안 편집을 이어가도, 사용자가 누르지 않은 저장이 자동으로
     // 뒤따라 나가지는 않는다 — 명시적 저장 정책의 핵심.
-    fireEvent.click(screen.getByRole('button', { name: '선발 추가' }));
+    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
     expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
 
     act(() => {
@@ -719,7 +789,7 @@ describe('TeamMatchLineupPageClient', () => {
   });
 
   // ── P0-1 regression (insane review, 2026-08 GPT Pro): flush-then-submit ──
-  // Before this fix, clicking "라인업 제출하기" always submitted with state.baseRevision
+  // Before this fix, clicking "참석명단 제출하기" always submitted with state.baseRevision
   // regardless of dirty — a jersey number entered right before the click could be submitted
   // as the stale server revision because autosave only fires 900ms after the last edit. The
   // fix makes handleSubmit a serial state machine: while dirty, a click flushes a save
@@ -731,7 +801,7 @@ describe('TeamMatchLineupPageClient', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({
         revision: 3,
-        starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
+        starters: [{ id: 'participant-1', userId: null, displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
       }),
       isLoading: false,
       isError: false,
@@ -746,10 +816,10 @@ describe('TeamMatchLineupPageClient', () => {
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
     // 대기 팀원을 선발로 추가 → dirty=true. 자동저장 디바운스(900ms)는 아직 돌지 않았다.
-    fireEvent.click(screen.getByRole('button', { name: '선발 추가' }));
+    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
 
     // 곧바로 제출 버튼을 누른다 — 디바운스를 기다리지 않고 저장이 먼저 나가야 한다.
-    fireEvent.click(screen.getByRole('button', { name: '라인업 제출하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
     expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
     // 저장이 아직 ack되지 않았다 — 옛 revision(3)이 실린 채 제출이 나가면 안 된다.
     expect(hoisted.submitMutate).not.toHaveBeenCalled();
@@ -770,7 +840,7 @@ describe('TeamMatchLineupPageClient', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({
         revision: 3,
-        starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
+        starters: [{ id: 'participant-1', userId: null, displayName: '홍길동', jerseyNumber: 1, position: null, goalkeeper: true, positionX: null, positionY: null }],
       }),
       isLoading: false,
       isError: false,
@@ -784,8 +854,8 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    fireEvent.click(screen.getByRole('button', { name: '선발 추가' }));
-    fireEvent.click(screen.getByRole('button', { name: '라인업 제출하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '명단 추가' }));
+    fireEvent.click(screen.getByRole('button', { name: '참석명단 제출하기' }));
     expect(hoisted.saveMutate).toHaveBeenCalledTimes(1);
 
     act(() => {
@@ -802,22 +872,22 @@ describe('TeamMatchLineupPageClient', () => {
 
     expect(hoisted.submitMutate).not.toHaveBeenCalled();
     expect(
-      screen.getByText('변경사항을 저장하지 못해 라인업을 제출할 수 없어요. 다시 시도해 주세요.'),
+      screen.getByText('변경사항을 저장하지 못해 참석명단을 제출할 수 없어요. 다시 시도해 주세요.'),
     ).toBeInTheDocument();
     // 버튼이 다시 눌러볼 수 있는 상태로 돌아온다(제출 대기 상태에 갇히지 않는다).
-    expect(screen.getByRole('button', { name: '라인업 제출하기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '참석명단 제출하기' })).toBeInTheDocument();
   });
 
   // ── P1-3 regression (insane review, 2026-08 GPT Pro): 제외 == 완전 삭제, undo 필요 ──
   // "제외"(현재 "명단에서 제거")는 moveEntry(선발↔후보)와 달리 완전 삭제라 등번호·GK
   // 지정이 통째로 사라졌었다. 5초 실행취소 토스트가 원래 자리에 원래 값 그대로 복원하는지
   // 검증한다.
-  it('undo removal: restores the removed entry (jersey number + GK flag) at its original slot', () => {
+  it('undo removal: restores the removed entry (jersey number + GK flag) at its original position', () => {
     Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
       data: baseLineup({
         revision: 0,
-        starters: [{ id: 'participant-1', displayName: '홍길동', jerseyNumber: 9, position: null, goalkeeper: true, positionX: null, positionY: null }],
+        starters: [{ id: 'participant-1', userId: null, displayName: '홍길동', jerseyNumber: 9, position: null, goalkeeper: true, positionX: null, positionY: null }],
       }),
       isLoading: false,
       isError: false,
@@ -827,144 +897,65 @@ describe('TeamMatchLineupPageClient', () => {
 
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    expect(screen.getByText('선발 (1)')).toBeInTheDocument();
+    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '홍길동 선발 명단에서 제거' }));
+    fireEvent.click(screen.getByRole('button', { name: '홍길동 참석명단에서 제거' }));
 
-    expect(screen.getByText('선발 (0)')).toBeInTheDocument();
+    expect(screen.getByText('참석명단 (0)')).toBeInTheDocument();
     expect(screen.getByText('홍길동 선수를 명단에서 제거했어요.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '실행 취소' }));
 
-    expect(screen.getByText('선발 (1)')).toBeInTheDocument();
+    expect(screen.getByText('참석명단 (1)')).toBeInTheDocument();
     expect(screen.getByLabelText('홍길동 등번호')).toHaveValue(9);
-    expect(screen.getByRole('button', { name: '홍길동, 골키퍼로 지정됨' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '홍길동, 골키퍼 지정 해제' })).toBeInTheDocument();
     expect(screen.queryByText('홍길동 선수를 명단에서 제거했어요.')).not.toBeInTheDocument();
   });
 });
 
-describe('TeamMatchLineupPageClient — pitch tab wiring (D-17: consumes server lineupConfig, no hardcoded catalog)', () => {
-  it('passes formationOptions/slots built from lineupQuery.data.lineupConfig', async () => {
-    hoisted.useV1TeamMatchMock.mockReturnValue({ data: { ...baseTeamMatch(), sport: { name: '풋살' } }, isLoading: false, isError: false });
-    hoisted.useV1MyTeamsMock.mockReturnValue({ data: { items: [{ teamId: 'team-1', role: 'owner' }] }, isLoading: false });
-    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
-      data: {
-        teamMatchId: 'tm-1', gameId: 'game-1', sideId: 'side-1', role: 'team_manager', lineupId: 'lineup-1',
-        revision: 1, state: 'DRAFT', version: 1, publicLineupAt: null, formation: null,
-        // outfield: 4 프리셋은 GK 슬롯까지 합쳐 자리가 5개다 — 그래서 선발도 5명이어야
-        // 전부 채워진다. 예전에는 이 목록이 "선발 − 골키퍼로 지정된 선수"로 계산돼 4명
-        // 전원 비-골키퍼인 이 픽스처가 2-2를 추천받았는데, 그 조합은 GK 자리가 영원히 비어
-        // 제출이 불가능했다. 이제 골키퍼 지정 여부와 무관하게 "선발 총원 − 1"로 세므로
-        // 5명일 때 outfield 4 프리셋이 뜬다(GK 지정은 아직 안 한 상태 그대로 둔다 —
-        // 그래도 목록이 흔들리지 않는다는 것이 이 변경의 핵심이다).
-        starters: [
-          { id: 'p1', displayName: '선수1', jerseyNumber: 1, position: null, goalkeeper: false, positionX: null, positionY: null },
-          { id: 'p2', displayName: '선수2', jerseyNumber: 2, position: null, goalkeeper: false, positionX: null, positionY: null },
-          { id: 'p3', displayName: '선수3', jerseyNumber: 3, position: null, goalkeeper: false, positionX: null, positionY: null },
-          { id: 'p4', displayName: '선수4', jerseyNumber: 4, position: null, goalkeeper: false, positionX: null, positionY: null },
-          { id: 'p5', displayName: '선수5', jerseyNumber: 5, position: null, goalkeeper: false, positionX: null, positionY: null },
-        ],
-        bench: [],
-        lineupConfig: {
-          minPlayers: 3, maxPlayers: 5, substitutions: 'rolling', maxSubstitutions: null,
-          positions: [
-            { code: 'GOLEIRO', label: '골레이로', short: 'GK', goalkeeper: true },
-            { code: 'FIXO', label: '픽소', short: 'FX' },
-            { code: 'ALA', label: '아라', short: 'AL' },
-            { code: 'PIVO', label: '피보', short: 'PV' },
-          ],
-          formations: [
-            { code: '2-2', label: '박스', outfield: 4, slots: [
-              { position: 'FIXO', x: 28, y: 38 }, { position: 'FIXO', x: 72, y: 38 },
-              { position: 'PIVO', x: 28, y: 76 }, { position: 'PIVO', x: 72, y: 76 },
-            ] },
-            { code: '1-2-1', label: '다이아몬드', outfield: 4, slots: [
-              { position: 'FIXO', x: 50, y: 35 }, { position: 'ALA', x: 20, y: 58 },
-              { position: 'ALA', x: 80, y: 58 }, { position: 'PIVO', x: 50, y: 83 },
-            ] },
-          ],
-        },
-      },
-      isLoading: false, isError: false, refetch: hoisted.refetchLineup,
-    });
+describe('TeamMatchLineupPageClient — 배치는 이 화면에 없다 (Task 163, 정본 §3)', () => {
+  // 셋업을 여기서 다시 한다 — 앞 describe 의 beforeEach 는 이 블록에 걸리지 않으므로,
+  // 없으면 앞 테스트가 남긴 mock 값에 얹혀 **실행 순서에 따라 결과가 달라진다**(`-t` 로
+  // 이 테스트만 돌리면 통과하지 않는다).
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.useV1TeamMatchMock.mockReturnValue({ data: baseTeamMatch(), isLoading: false, isError: false });
+    hoisted.useV1MyTeamsMock.mockReturnValue({ data: [{ teamId: 'team-host', role: 'manager' }], isLoading: false });
     hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: [] }, isLoading: false });
-    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
-    fireEvent.click(screen.getByRole('tab', { name: '피치 배치' }));
-    expect(screen.getAllByRole('button', { name: '2-2 박스 · 필드 4명' })[0]).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: '1-2-1 다이아몬드 · 필드 4명' })[0]).toBeInTheDocument();
+    hoisted.refetchLineup.mockResolvedValue({ data: baseLineup() });
   });
 
-  it('선발로 추가한 선수는 곧바로 피치의 빈 자리에 앉는다 — 자동 배치 배선이 빠지면 이 테스트가 깨진다', async () => {
-    hoisted.useV1TeamMatchMock.mockReturnValue({ data: { ...baseTeamMatch(), sport: { name: '풋살' } }, isLoading: false, isError: false });
-    hoisted.useV1MyTeamsMock.mockReturnValue({ data: { items: [{ teamId: 'team-host', role: 'manager' }] }, isLoading: false });
+  it('피치 배치 탭과 전술보드 안내를 모두 노출하지 않는다', () => {
     hoisted.useV1TeamMatchLineupMock.mockReturnValue({
-      data: {
-        teamMatchId: 'tm-1', gameId: 'game-1', sideId: 'side-1', role: 'team_manager', lineupId: 'lineup-1',
-        revision: 1, state: 'DRAFT', version: 1, publicLineupAt: null, formation: '2-2',
-        // 이미 저장돼 있던 선발 한 명 — 좌표가 없으니 대기 상태다. 자동 배치는 등록하는
-        // 순간에만 도는 것이므로, 이 선수는 화면을 열었다는 이유만으로 앉지 않아야 한다.
-        starters: [
-          { id: 'p0', displayName: '기존선수', jerseyNumber: 7, position: null, goalkeeper: false, positionX: null, positionY: null },
-        ],
-        bench: [],
+      data: baseLineup({
+        gameId: 'game-1',
+        // 서버가 배치 카탈로그를 내려줘도 이 화면은 그걸로 아무것도 그리지 않는다 —
+        // 탭이 남아 있으면 이 단언이 깨진다.
         lineupConfig: {
-          minPlayers: 3, maxPlayers: 5, substitutions: 'rolling', maxSubstitutions: null,
           positions: [
             { code: 'GOLEIRO', label: '골레이로', short: 'GK', goalkeeper: true },
             { code: 'FIXO', label: '픽소', short: 'FX' },
-            { code: 'PIVO', label: '피보', short: 'PV' },
           ],
           formations: [
-            { code: '2-2', label: '박스', outfield: 4, slots: [
-              { position: 'FIXO', x: 28, y: 38 }, { position: 'FIXO', x: 72, y: 38 },
-              { position: 'PIVO', x: 28, y: 76 }, { position: 'PIVO', x: 72, y: 76 },
-            ] },
+            { code: '1-2-1', label: '1-2-1', outfield: 3, slots: [{ position: 'FIXO', x: 33, y: 43 }] },
           ],
+          minPlayers: 3,
+          maxPlayers: 6,
         },
-      },
-      isLoading: false, isError: false, refetch: hoisted.refetchLineup,
-    });
-    hoisted.useV1TeamMembersMock.mockReturnValue({
-      data: { items: [{ membershipId: 'm-1', userId: 'user-1', displayName: '홍길동', role: 'member', status: 'active' }] },
+      }),
       isLoading: false,
+      isError: false,
+      error: null,
+      refetch: hoisted.refetchLineup,
     });
+
     render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
 
-    // 화면을 연 시점: 2-2의 다섯 자리(GK + 필드 4)가 모두 비어 있고, 기존 선발은 대기다.
-    fireEvent.click(screen.getByRole('tab', { name: '피치 배치' }));
-    expect(screen.getAllByRole('button', { name: /자리, 비어 있음/ })).toHaveLength(5);
+    // 탭 자체가 없다 — "명단/피치 배치" 두 탭 구조를 통째로 걷어냈다.
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    expect(screen.queryByText('피치 배치')).not.toBeInTheDocument();
 
-    // 명단 탭에서 팀원 한 명을 선발로 추가하면, 피치로 돌아왔을 때 그 사람 몫으로 한 자리가
-    // 이미 차 있어야 한다 — 예전에는 대기 목록에 들어간 뒤 빈 자리를 직접 탭해야 했다.
-    // 반대로 '기존선수'는 이번에 등록한 사람이 아니므로 여전히 대기로 남는다(자리는 4개).
-    fireEvent.click(screen.getByRole('tab', { name: '명단' }));
-    fireEvent.click(screen.getByRole('button', { name: '선발 추가' }));
-    fireEvent.click(screen.getByRole('tab', { name: '피치 배치' }));
-    expect(screen.getAllByRole('button', { name: /자리, 비어 있음/ })).toHaveLength(4);
-  });
-
-  it('offers only 자유 배치 when lineupConfig is absent — proves there is no hardcoded fallback catalog', async () => {
-    hoisted.useV1TeamMatchMock.mockReturnValue({ data: { ...baseTeamMatch(), sport: { name: '풋살' } }, isLoading: false, isError: false });
-    hoisted.useV1MyTeamsMock.mockReturnValue({ data: { items: [{ teamId: 'team-1', role: 'owner' }] }, isLoading: false });
-    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
-      data: {
-        teamMatchId: 'tm-1', gameId: 'game-1', sideId: 'side-1', role: 'team_manager', lineupId: 'lineup-1',
-        revision: 1, state: 'DRAFT', version: 1, publicLineupAt: null, formation: null,
-        starters: [{ id: 'p1', displayName: '선수1', jerseyNumber: 1, position: null, goalkeeper: false, positionX: null, positionY: null }],
-        bench: [],
-        // lineupConfig 없음(구버전 응답 흉내) — 이전 초안이라면 FUTSAL_FORMATION_PRESETS로
-        // 폴백해 이 상황에서도 "2-2 · 박스" 선택지가 보였을 것이다.
-      },
-      isLoading: false, isError: false, refetch: hoisted.refetchLineup,
-    });
-    hoisted.useV1TeamMembersMock.mockReturnValue({ data: { items: [] }, isLoading: false });
-    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
-    fireEvent.click(screen.getByRole('tab', { name: '피치 배치' }));
-    // 칩 그룹 안만 좁혀서 본다 — 페이지 전체를 대상으로 하면 모바일 드로어 토글
-    // 버튼("배치 설정 · 대기 1명")도 " · "를 포함해 오탐을 낼 수 있다.
-    const group = screen.getAllByRole('group', { name: '포메이션' })[0];
-    expect(within(group).getAllByRole('button')).toHaveLength(1);
-    expect(within(group).getByRole('button', { name: /^자유 배치/ })).toBeInTheDocument();
-    expect(screen.getAllByText('이 종목은 등록된 포지션 대형이 없어요. 자유 배치로 직접 배치해 주세요.')[0]).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /전술보드/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/선발·배치는 전술보드에서/)).not.toBeInTheDocument();
   });
 });

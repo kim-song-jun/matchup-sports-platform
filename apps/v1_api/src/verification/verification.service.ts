@@ -1,4 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, V1AuthProvider, V1VerificationChannel } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,6 +18,26 @@ const CODE_TTL_MS = 5 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 // 동일 번호로 유료 SMS 를 반복 발송하지 못하게 막는 재발송 쿨다운(대상 번호 기준).
 const RESEND_COOLDOWN_MS = 30 * 1000;
+
+/**
+ * 발송 총량 상한(24시간 이동 창).
+ *
+ * 쿨다운은 **간격**만 벌릴 뿐 **총량**을 막지 못한다 -- 30초마다 계속 부르면 하루
+ * 2,800건이 나간다. `requestPhone` 은 대상 번호가 요청자 소유인지 확인하지 않으므로
+ * (소유 증명은 코드 입력 단계에서만 이뤄진다) 계정 하나로 임의의 제3자 번호에 유료
+ * SMS 를 무제한 보낼 수 있었다.
+ *
+ * 컨트롤러의 `@Throttle` 만으로는 부족하다: IP 기준이라 회선을 바꾸면 우회되고,
+ * `V1ThrottlerGuard` 가 NODE_ENV !== 'production' 이면 통째로 스킵한다. 그래서 실제
+ * 방어선은 발송 기록(v1_verification_tokens) 을 세는 이 상한이고, `@Throttle` 은
+ * 같은 형제 경로(auth/phone/issue)와 맞춘 1차 방어일 뿐이다.
+ *
+ * 값의 근거: 정상 사용자는 오타 정정·수신 실패를 감안해도 하루 몇 건이면 충분하다.
+ * 번호를 바꿔 가며 뿌리는 것을 막으려면 요청자 기준 상한도 함께 있어야 한다.
+ */
+const SEND_QUOTA_WINDOW_MS = 24 * 60 * 60 * 1000;
+const MAX_SENDS_PER_TARGET = 5;
+const MAX_SENDS_PER_USER = 10;
 
 @Injectable()
 export class VerificationService {
@@ -31,6 +58,8 @@ export class VerificationService {
     if (user.emailVerifiedAt) {
       return { sent: false, alreadyVerified: true, channel: 'email' as const };
     }
+    // 상한은 issue() 안에서 잠금 아래 확인한다 — 이메일도 같은 상한을 쓴다(유료는
+    // 아니지만 발신 도메인 평판을 태우고, 남의 주소로 반복 발송하는 괴롭힘 경로는 동일).
     return this.issue('email', user.id, user.email);
   }
 
@@ -68,6 +97,43 @@ export class VerificationService {
       });
     }
     return this.issue('phone', user.id, phone);
+  }
+
+  /**
+   * 24시간 이동 창 기준 발송 총량 확인. 대상(피해자가 될 수 있는 번호)과 요청자
+   * 양쪽을 본다 -- 대상만 세면 번호를 바꿔 가며 뿌리는 것을 못 막고, 요청자만 세면
+   * 여러 계정으로 한 번호를 때리는 것을 못 막는다.
+   *
+   * 세는 대상은 실제로 나간 발송이다: `issue()` 는 발송이 실패하면 방금 만든 토큰을
+   * 지우므로(같은 파일), 남아 있는 행 = 실제로 보낸 건이다.
+   */
+  private async assertSendQuota(
+    tx: Prisma.TransactionClient,
+    channel: V1VerificationChannel,
+    userId: string,
+    target: string,
+  ) {
+    const since = new Date(Date.now() - SEND_QUOTA_WINDOW_MS);
+    const [targetSends, userSends] = await Promise.all([
+      tx.v1VerificationToken.count({ where: { channel, target, createdAt: { gte: since } } }),
+      tx.v1VerificationToken.count({ where: { channel, userId, createdAt: { gte: since } } }),
+    ]);
+    if (targetSends < MAX_SENDS_PER_TARGET && userSends < MAX_SENDS_PER_USER) return;
+
+    await this.smsEventLog.record({
+      eventType: SMS_EVENT_TYPE.SEND_QUOTA_EXCEEDED,
+      phone: target,
+      detail: `channel=${channel} 24시간 발송 상한 도달 (대상 ${targetSends}/${MAX_SENDS_PER_TARGET}, 요청자 ${userSends}/${MAX_SENDS_PER_USER})`,
+    });
+    throw new HttpException(
+      {
+        code: 'VERIFICATION_SEND_QUOTA_EXCEEDED',
+        // 24시간 "이동 창"이라 실제 대기는 가장 오래된 발송이 창에서 빠질 때까지다 —
+        // 항상 24시간을 기다려야 하는 것처럼 적으면 사실과 다르다.
+        message: '인증번호를 너무 많이 요청했어요. 최대 24시간 뒤에 다시 시도할 수 있어요.',
+      },
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
   }
 
   async confirm(authUser: V1AuthUser, channel: V1VerificationChannel, code: string) {
@@ -177,15 +243,29 @@ export class VerificationService {
     const codeHash = await hashPassword(code);
 
     const expiresAt = new Date(Date.now() + CODE_TTL_MS);
-    const [, created] = await this.prisma.$transaction([
-      this.prisma.v1VerificationToken.updateMany({
+    const created = await this.prisma.$transaction(async (tx) => {
+      // 상한 확인과 토큰 생성 사이에 다른 요청이 끼어들면 상한이 무의미해진다 --
+      // 병렬로 N 개를 던지면 전부 "아직 여유 있음"을 읽고 통과한다. 확인과 기록을 한
+      // 트랜잭션에 묶고 advisory lock 으로 직렬화한다(형제 레인들과 같은 방식:
+      // attendance.service.ts / guest-recruitment.service.ts 의 lockIdempotencyScope).
+      //
+      // 상한이 둘(대상 번호 / 요청자)이므로 잠금도 둘이다. 대상 하나만 잠그면 같은
+      // 사용자가 **서로 다른 번호로** 병렬 요청할 때 요청자 상한이 그대로 레이스로
+      // 뚫린다. 순서는 항상 요청자 → 대상으로 고정한다 -- 모든 호출부가 같은 순서로
+      // 잡으면 서로를 기다리는 고리(교착)가 생기지 않는다.
+      const userScope = JSON.stringify(['verification-send-user', channel, userId]);
+      const targetScope = JSON.stringify(['verification-send-target', channel, target]);
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userScope}, 0))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${targetScope}, 0))`;
+      await this.assertSendQuota(tx, channel, userId, target);
+      await tx.v1VerificationToken.updateMany({
         where: { userId, channel, consumedAt: null },
         data: { consumedAt: new Date() },
-      }),
-      this.prisma.v1VerificationToken.create({
+      });
+      return tx.v1VerificationToken.create({
         data: { userId, channel, target, codeHash, expiresAt },
-      }),
-    ]);
+      });
+    });
 
     try {
       await this.dispatcher.send(channel, target, code);

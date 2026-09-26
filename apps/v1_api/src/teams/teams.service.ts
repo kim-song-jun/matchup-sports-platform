@@ -13,6 +13,7 @@ import {
   V1TeamMembership,
   V1TeamMembershipRole,
 } from '@prisma/client';
+import { normalizeEmail } from '../auth/normalize-email';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -152,6 +153,17 @@ export class TeamsService {
       regionName: formatRegionDisplayName(team.region),
       region: team.region ? { regionId: team.region.id, name: team.region.name, parentName: team.region.parent?.name ?? null } : null,
       joinPolicy: team.joinPolicy,
+      // 컨택 수신 정책. 팀 컨택 설정 화면이 "현재 정책이 선택된 상태로" 렌더하려면 현재 값을
+      // 읽을 GET 경로가 필요한데, PATCH teams/:teamId/contact-policy 는 { id, contactPolicy }
+      // 만 반환하고 팀 상세를 되돌려주지 않는다(team-contacts.service.ts 의 updateContactPolicy).
+      //
+      // **운영진에게만 노출한다.** 이 값을 공개하면 스펙 §8 의 핵심 성질이 깨진다 — 컨택 거절은
+      // 차단당함 / closed / recruiting_only 세 사유가 발신자 입장에서 구분되지 않아야 하는데,
+      // 상대 팀 정책이 'open' 인 것이 보이는 상태에서 TEAM_CONTACT_NOT_ACCEPTING 을 받으면
+      // "우리가 차단당했다" 가 곧바로 역산된다. 설정 화면은 owner/manager 전용이므로
+      // 운영진 한정 노출로 화면 요구사항은 그대로 충족된다.
+      contactPolicy:
+        viewer.role === 'owner' || viewer.role === 'manager' ? team.contactPolicy : undefined,
       trustState: team.trustScore?.trustState ?? 'none',
       version: team.updatedAt.toISOString(),
       profile: {
@@ -1344,8 +1356,9 @@ export class TeamsService {
     }
     this.assertTeamHasCapacity(team);
 
+    // 저장된 이메일은 전부 normalizeEmail 표준형이라 조회도 같은 표준형이어야 한다.
     const invitedUser = await this.prisma.v1User.findUnique({
-      where: { email: dto.invitedEmail },
+      where: { email: normalizeEmail(dto.invitedEmail) },
       select: { id: true },
     });
     if (!invitedUser) {
@@ -2101,7 +2114,11 @@ export class TeamsService {
       status: 'active',
       deletedAt: null,
       ...(query.sportId ? { sportId: query.sportId } : {}),
-      ...(query.regionId ? { regionId: query.regionId } : {}),
+      // 시/도(레벨1) regionId를 고르면 하위 구/군(레벨2)도 함께 담는다 — matches.service.ts
+      // list()와 동일한 이유(팀의 regionId도 실제로는 구/군 단위).
+      ...(query.regionId
+        ? { region: { OR: [{ id: query.regionId }, { parentId: query.regionId }] } }
+        : {}),
       ...(query.genderRule ? { AND: [getTeamGenderRuleWhere(query.genderRule)] } : {}),
       ...teamLevelCodeWhere(parseLevelCodes(query.levelCodes)),
       ...(query.joinPolicy ? { joinPolicy: query.joinPolicy } : {}),
@@ -2275,19 +2292,53 @@ const ACTIVITY_TYPE_LABELS: Record<string, string> = {
   competitive: '실력 중심',
 };
 
+/**
+ * 팀 카드 한 줄 요약 — 구조화된 활동 값(요일·시간대·빈도·유형) + 팀이 직접 쓴 메모.
+ *
+ * 메모가 구조화된 값을 다시 말하는 경우가 흔하다. alpha 실측(2026-09-07) 결과 활동 줄
+ * 7개 중 4개가 그랬다:
+ *
+ *   요일 '수·일' + 시간대 '저녁' + 메모 '매주 수·일 저녁 · 서울 송파구'
+ *   → "수·일 · 저녁 · 매주 수·일 저녁 · 서울 송파구"
+ *
+ * 같은 정보를 두 번 말하면서 카드 한 줄을 통째로 더 먹는다. 그래서 **메모가 이미 담고 있는
+ * 구조화된 조각은 빼고** 메모 쪽을 남긴다 — 메모가 더 구체적이기 때문이다(위 예에서 '매주',
+ * '서울 송파구'는 구조화된 값에 없다).
+ *
+ * 임의 문자열의 모양을 짐작하지 않는다는 점이 중요하다 — 비교 대상은 **우리가 만든 라벨**이고,
+ * 그것이 메모 안에 그대로 들어 있는지만 본다.
+ */
 function formatTeamActivitySummary(profile: ActivityProfileLike) {
   if (!profile) return null;
 
-  const parts = [
+  const note = profile.activityNote?.trim() || null;
+  const structured = [
     formatActivityDays(profile.activityDays ?? []),
     formatActivityTimeSlots(profile.activityTimeSlots ?? []),
     profile.activityFrequency ? ACTIVITY_FREQUENCY_LABELS[profile.activityFrequency] : null,
     formatActivityTypes(profile.activityTypes ?? []),
-    profile.activityNote?.trim() || null,
   ].filter(Boolean) as string[];
+
+  const parts = [...structured.filter((part) => !noteRepeats(note, part)), ...(note ? [note] : [])];
 
   if (parts.length > 0) return parts.join(' · ');
   return null;
+}
+
+/**
+ * 메모가 이 라벨을 이미 말하고 있는가. 공백 차이는 무시한다('수·일 저녁' vs '수·일 · 저녁').
+ *
+ * **한 글자 라벨은 절대 제외하지 않는다.** 요일은 하루만 고르면 '금' 처럼 한 글자가 되는데,
+ * `금액 협의` 같은 메모에 우연히 걸려 **진짜 요일 정보가 사라진다**(#1123 Copilot).
+ * 한글은 단어 경계가 없어 정규식으로도 이 우연을 가르기 어려우므로, 그럴 땐 중복을
+ * 그대로 두는 쪽을 택한다 — 중복은 보기 나쁠 뿐이지만 삭제는 정보를 잃는다.
+ */
+function noteRepeats(note: string | null, label: string) {
+  if (!note) return false;
+  const squash = (value: string) => value.replace(/\s+/g, '');
+  const needle = squash(label);
+  if (needle.length < 2) return false;
+  return squash(note).includes(needle);
 }
 
 function formatActivityDays(days: string[]) {

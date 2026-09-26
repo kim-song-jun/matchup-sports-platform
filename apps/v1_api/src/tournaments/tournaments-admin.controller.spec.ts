@@ -118,7 +118,7 @@ describe('TournamentsAdminController (service stub)', () => {
   });
 
   it('update: delegates to service and returns result', async () => {
-    const dto = { title: '수정된 대회' };
+    const dto = { expectedVersion: '2026-06-14T00:00:00.000Z', title: '수정된 대회' };
     const payload = tournamentSummary({ title: '수정된 대회' });
     tournamentsAdminService.update.mockResolvedValue(payload);
     await expect(controller.update(ownerAuthUser, 'tournament-1', dto)).resolves.toEqual(payload);
@@ -185,7 +185,7 @@ describe('TournamentsAdminController (real V1AuthGuard)', () => {
     v1User: { findFirst: jest.fn() },
     v1AdminUser: { findUnique: jest.fn() },
     v1Sport: { findUnique: jest.fn() },
-    v1Tournament: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
+    v1Tournament: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     v1AdminActionLog: { create: jest.fn() },
     v1StatusChangeLog: { create: jest.fn() },
     $transaction: jest.fn(),
@@ -475,14 +475,18 @@ describe('TournamentsAdminController (real V1AuthGuard)', () => {
       status: 'draft',
       minPlayers: 6,
       maxPlayers: 10,
+      updatedAt: new Date('2026-06-14T00:00:00.000Z'),
       deletedAt: null,
     });
 
     const controller = app.get(TournamentsAdminController);
     await expect(
-      controller.update(ownerAuthUser, 'tournament-1', { minPlayers: 15 }),
+      controller.update(ownerAuthUser, 'tournament-1', {
+        expectedVersion: '2026-06-14T00:00:00.000Z',
+        minPlayers: 15,
+      }),
     ).rejects.toThrow(BadRequestException);
 
-    expect(prismaMock.v1Tournament.update).not.toHaveBeenCalled();
+    expect(prismaMock.v1Tournament.updateMany).not.toHaveBeenCalled();
   });
 });

@@ -28,6 +28,8 @@ import {
   CreateCompetitionConfigVersionDto,
   LineupSizeOptionsQueryDto,
 } from './competition-config/competition-config.dto';
+import { GenerateLeagueFixturesDto } from './dto/admin-league.dto';
+import { LeagueFixtureGeneratorService } from './league-fixture-generator.service';
 
 /**
  * 대진(조/픽스처/결과/순위) 어드민 컨트롤러.
@@ -38,7 +40,10 @@ import {
 @Controller()
 @UseGuards(V1AuthGuard)
 export class TournamentBracketController {
-  constructor(private readonly bracketService: TournamentBracketService) {}
+  constructor(
+    private readonly bracketService: TournamentBracketService,
+    private readonly leagueFixtureGenerator: LeagueFixtureGeneratorService,
+  ) {}
 
   @Get('admin/competition-configs')
   listCompetitionConfigs(
@@ -130,6 +135,19 @@ export class TournamentBracketController {
     @Body() dto: CreateFixtureDto,
   ) {
     return this.bracketService.createFixture(user, tournamentId, dto);
+  }
+
+  /**
+   * POST /admin/tournaments/:tournamentId/league/fixtures/generate — 리그 대진 자동 생성
+   * 리그(format=league) 대회의 조별 라운드로빈 대진을 일괄 생성한다.
+   */
+  @Post('admin/tournaments/:tournamentId/league/fixtures/generate')
+  generateLeagueFixtures(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+    @Body() dto: GenerateLeagueFixturesDto,
+  ) {
+    return this.leagueFixtureGenerator.generate(user, tournamentId, dto);
   }
 
   /** PATCH /admin/fixtures/:fixtureId — 경기 일정·장소·대진 수정 (결과 있으면 팀 변경 409) */

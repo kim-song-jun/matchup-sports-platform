@@ -60,7 +60,8 @@ The profile edit route renders a loading skeleton while `GET /me/profile` is pen
 Application, invitation, chat, review, inquiry, profile update, and existing-entity management endpoints do not use this gate.
 `UpdateSettingsDto`:
 
-- `notifications?: { matchEnabled?, teamEnabled?, teamMatchEnabled?, chatEnabled?, noticeEnabled?, marketingEnabled? }`
+- `notifications?: { activityEnabled?, matchEnabled?, teamEnabled?, teamMatchEnabled?, chatEnabled?, noticeEnabled?, marketingEnabled? }`
+- The user-facing notification settings group `matchEnabled`, `teamMatchEnabled`, and `activityEnabled` as 경기·대회. `activityEnabled` gates tournament events.
 
 `GET /me/activity-summary` response:
 
@@ -78,6 +79,7 @@ Application, invitation, chat, review, inquiry, profile update, and existing-ent
 - Private fields such as real name, email, phone, birth date, gender, and profile bio are never returned.
 - Returned identity fields: `userId`, `displayName`, `nickname`, `profileImageUrl`; `displayName` is derived from public nickname and never from `realName`.
 - Returned trust field: `reputation.mannerScore`, `reputation.reviewCount`, `reputation.trustState`.
+- `reputation.highlight`: the tag on the most revealed reviews (`tagCode`, `label`, `rate` 0-1, `reviewCount`) from the same reviews as `mannerScore`; `null` until three distinct reviewers (users for a person, reviewing teams for a team) stand behind the reviews, so a rate never points at one or two reviewers. `GET /teams/:teamId/reviews` returns the same `highlight` for a team.
 - Returned public activity summary:
   - `totals.matchCount`: completed match participation count
   - `totals.teamCount`: active team membership count
@@ -90,7 +92,8 @@ Application, invitation, chat, review, inquiry, profile update, and existing-ent
 ## State And Copy
 
 - Logout clears the signed `/api/v1` HttpOnly session cookie; frontend also clears local persona/display state. Account-status checks remain server-side on every authenticated request.
-- Withdrawal request moves the account toward `withdrawal_pending` and writes status evidence. It is not immediate hard delete.
+- Withdrawal request moves the account toward `withdrawal_pending`, writes status evidence, removes browser push subscriptions, and revokes every active native push device in the same transaction. It is not immediate hard delete.
+- Final admin deletion permanently removes web/native push identifiers and clears account-only profile PII, regions, sport preferences, search history, and verification targets. Completed-game, transaction, dispute, and audit records follow their documented retention basis.
 - `GET /me/profile` returns nullable `profile.gender` for legacy compatibility, plus `authProvider`, `authProviders`, and `hasPassword`. `GET /me/settings.account` returns `providers` and `hasPassword`. Clients use these fields to separate common profile editing from login-method-specific account controls.
 - Notification preference switches configure the in-app Teameet notification inbox only. Browser/OS push permission and subscriptions are not part of the current v1 contract, so the UI must not present these switches as push-notification controls.
 - Current-location actions disclose that exact coordinates are transmitted once for region/weather resolution and send `locationConsentAccepted: true`; coordinates are not persisted. Permission denied, unavailable position, and timeout states use distinct user-facing messages, and manual region selection remains available.

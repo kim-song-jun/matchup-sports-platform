@@ -24,6 +24,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminContextService } from '../common/admin-context.service';
 import { TournamentPlayersService } from './tournament-players.service';
+import { kindAwareFindFirst } from '../../test/helpers/kind-aware-find-first';
 
 // ─── 테스트 픽스처 ───────────────────────────────────────────────────────────────
 
@@ -130,7 +131,7 @@ describe('TournamentPlayersService', () => {
   let prisma: {
     v1TeamMembership: { findFirst: jest.Mock; findMany: jest.Mock };
     v1Tournament: { findFirst: jest.Mock };
-    v1TournamentRegistration: { findFirst: jest.Mock; findUnique: jest.Mock };
+    v1TournamentRegistration: { findFirst: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
     v1TournamentPlayer: {
       findMany: jest.Mock;
       findFirst: jest.Mock;
@@ -145,15 +146,17 @@ describe('TournamentPlayersService', () => {
     v1AdminUser: { findUnique: jest.Mock };
     v1AdminActionLog: { create: jest.Mock; findFirst: jest.Mock };
     v1StatusChangeLog: { create: jest.Mock };
+    v1Game: { findMany: jest.Mock };
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
+    $executeRaw: jest.Mock;
   };
 
   beforeEach(async () => {
     prisma = {
       v1TeamMembership: { findFirst: jest.fn(), findMany: jest.fn() },
       v1Tournament: { findFirst: jest.fn() },
-      v1TournamentRegistration: { findFirst: jest.fn(), findUnique: jest.fn() },
+      v1TournamentRegistration: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       v1TournamentPlayer: {
         findMany: jest.fn(),
         // Prisma 는 못 찾으면 null 을 준다. 기본값을 undefined 로 두면 "찾았다" 로 읽히는
@@ -175,8 +178,16 @@ describe('TournamentPlayersService', () => {
         findFirst: jest.fn().mockResolvedValue(null),
       },
       v1StatusChangeLog: { create: jest.fn().mockResolvedValue({ id: 'status-log-1' }) },
+      // 리그 경기 명단 동기화(league-roster-sync)가 시작 전 경기를 찾는 조회. 기본은 "대상 경기 없음".
+      v1Game: { findMany: jest.fn().mockResolvedValue([]) },
       $transaction: jest.fn(),
-      $queryRaw: jest.fn().mockResolvedValue(undefined),
+      // Prisma 의 `$queryRaw` 는 **행 배열**을 준다. `undefined` 로 두면 결과를 순회하는
+      // 코드가 mock 에서만 터진다 — 등번호 조회(raw)가 실제로 그랬다.
+      // `FOR UPDATE` 잠금처럼 결과를 안 쓰는 호출도 빈 배열이면 그대로 통과한다.
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      // 등번호 쓰기는 raw UPDATE 다(생성된 클라이언트에 아직 컬럼이 없다). 영향 행 수를
+      // 돌려주므로 기본값을 숫자로 둔다.
+      $executeRaw: jest.fn().mockResolvedValue(1),
     };
 
     const p = prisma;
@@ -219,6 +230,80 @@ describe('TournamentPlayersService', () => {
     await expect(service.listPlayers(nonManager, 'tournament-1', 'reg-1')).rejects.toThrow(
       ForbiddenException,
     );
+  });
+
+  // 2026-08-31 커밋 `817e17eea` 는 이 자리에 **"리그 id 로는 선수를 추가할 수 없다"** 를 박았다
+  // (대회 표면 봉쇄 — 리그 id 로 대회 API 를 때리지 못하게). 그 판단은 그때 맞았다.
+  //
+  // **2026-09-02 정본 §3 이 "리그 명단은 대회와 같음" 으로 확정하면서 전제가 바뀌었다.**
+  // 명단 컨트롤러는 하나뿐이고 프론트는 리그 참가 등록에도 같은 링크를 그리는데, 봉쇄가
+  // 남아 있는 동안 **리그는 어느 경로로도 명단을 만들 수 없었다** — 수동은 404, 자동 확정
+  // 잡(`isLeagueRosterAutoConfirmEnabled`)은 기본이 꺼짐이다. 2026-09-04 alpha 실측에서
+  // 팀장 명단 화면이 통째로 `TOURNAMENT_NOT_FOUND` 로 떴다.
+  //
+  // 그래서 봉쇄를 **명단 표면에서만** 걷는다. bracket·admin-registrations 의 표면 봉쇄는
+  // 그대로 두므로, 이 파일의 변경이 그쪽까지 여는 것으로 읽히면 안 된다.
+  //
+  // 아래 세 테스트는 전부 **"404 가 아니다"가 아니라 "리그 행의 값을 실제로 썼다"** 를 단언한다.
+  // 단순히 통과 여부만 보면 게이트를 되돌려도 다른 이유로 던져 초록일 수 있다.
+  it('addPlayer: 리그도 대회와 같은 명단 규칙을 탄다 — 봉쇄가 아니라 리그의 정원에서 막힌다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(teamPlayerMembershipRow());
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(tournamentRow({ id: 'league-1', kind: 'regular_league', maxPlayers: 3 })),
+    );
+    prisma.v1TournamentPlayer.count.mockResolvedValue(3); // 리그의 maxPlayers 에 도달
+
+    // `ROSTER_FULL` 이어야 한다 — 그 코드가 나왔다는 것은 조회가 리그 행을 찾았고(게이트 통과)
+    // **그 행의 maxPlayers 를 읽었다**는 뜻이다. 게이트를 되돌리면 `TOURNAMENT_NOT_FOUND` 다.
+    await expect(
+      service.addPlayer(manager, 'league-1', 'reg-1', {
+        userId: 'player-user-id',
+        realName: '홍길동',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'ROSTER_FULL' } });
+  });
+
+  it('listPlayers: 리그 명단을 조회할 수 있다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ role: 'manager', status: 'active' });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(tournamentRow({ id: 'league-1', kind: 'regular_league', minPlayers: 6 })),
+    );
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([playerRow()]);
+
+    const result = await service.listPlayers(manager, 'league-1', 'reg-1');
+    expect(result.players).toHaveLength(1);
+    // 리그 행의 minPlayers 로 최소 인원 판정이 돈다 — 1명이라 아직 미달이다.
+    expect(result.belowMinimum).toBe(true);
+  });
+
+  it.each([
+    ['removePlayer', (s: TournamentPlayersService) => s.removePlayer(manager, 'league-1', 'reg-1', 'player-1')],
+    [
+      'updatePlayer',
+      (s: TournamentPlayersService) =>
+        s.updatePlayer(manager, 'league-1', 'reg-1', 'player-1', { eligibilityStatus: 'non_pro' }),
+    ],
+  ])('%s: 리그의 명단 마감 시각을 실제로 읽는다', async (_name, call) => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(
+        tournamentRow({
+          id: 'league-1',
+          kind: 'regular_league',
+          rosterDeadlineAt: new Date('2020-01-01T00:00:00.000Z'), // 이미 지난 마감
+        }),
+      ),
+    );
+
+    // 마감 초과로 막히는 것이 곧 "리그 행을 찾아 그 rosterDeadlineAt 을 읽었다" 는 증거다.
+    await expect(call(service)).rejects.toMatchObject({
+      response: { code: 'ROSTER_DEADLINE_PASSED' },
+    });
   });
 
   // ─── 2. 등록 미발견 ─────────────────────────────────────────────────────────
@@ -513,6 +598,30 @@ describe('TournamentPlayersService', () => {
     expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
   });
 
+  // 감사 finding #50: 중복 판정이 registrationId 단위뿐이라, 같은 대회의 다른 팀 명단에 이미
+  // active 등록돼 있어도 자기 registration만 보면 "중복 없음"으로 통과해 두 팀에 동시 등재됐다.
+  it('addPlayer: userId already active on a DIFFERENT team roster in the same tournament → 409 PLAYER_ALREADY_ON_ANOTHER_TEAM', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' }) // manager 체크
+      .mockResolvedValueOnce(teamPlayerMembershipRow()); // 팀 멤버 체크
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow());
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+    // 첫 호출(existingActive, 자기 registration) → 없음. 두 번째 호출(existingOnOtherTeam,
+    // 대회 내 다른 registration) → 있음.
+    prisma.v1TournamentPlayer.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(playerRow({ id: 'player-2', registrationId: 'reg-2' }));
+
+    await expect(
+      service.addPlayer(manager, 'tournament-1', 'reg-1', {
+        userId: 'player-user-id',
+        realName: '홍길동',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'PLAYER_ALREADY_ON_ANOTHER_TEAM' } });
+    expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
+  });
+
   // ─── 7. 선수 추가 happy path ──────────────────────────────────────────────
 
   it('addPlayer: manager + valid input → player created with needs_review default', async () => {
@@ -546,6 +655,15 @@ describe('TournamentPlayersService', () => {
           birthDateSnapshot: '1995-03-15',
           genderSnapshot: 'male',
           eligibilityStatus: 'needs_review',
+        }),
+      }),
+    );
+    // 리그면 시작 전 경기 명단을 새 참가 명단에 맞춘다 — 같은 리그·같은 팀으로 찾는다.
+    expect(prisma.v1Game.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          teamMatch: expect.objectContaining({ leagueId: 'tournament-1' }),
+          sides: { some: { teamId: registrationRow().teamId } },
         }),
       }),
     );
@@ -698,6 +816,14 @@ describe('TournamentPlayersService', () => {
       expect.objectContaining({
         where: { id: 'player-1' },
         data: expect.objectContaining({ removedAt: expect.any(Date) }),
+      }),
+    );
+    expect(prisma.v1Game.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          teamMatch: expect.objectContaining({ leagueId: 'tournament-1' }),
+          sides: { some: { teamId: registrationRow().teamId } },
+        }),
       }),
     );
   });
@@ -1234,6 +1360,33 @@ describe('TournamentPlayersService', () => {
     },
   );
 
+  // Task 170: 정규 리그는 초안에서 신청이 확정되고 명단도 그때 받는다(정본 §3).
+  it('addPlayer: 정규 리그는 초안(draft)에서도 명단에 선수를 넣을 수 있다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst
+      .mockResolvedValueOnce({ id: 'mem-1', role: 'manager' })
+      .mockResolvedValueOnce(teamPlayerMembershipRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'draft', kind: 'regular_league' }));
+    prisma.v1TournamentPlayer.upsert.mockResolvedValue(playerRow());
+
+    await service.addPlayer(manager, 'tournament-1', 'reg-1', { userId: 'player-user-id', realName: '홍길동', birthDate: '1995-03-15' });
+
+    expect(prisma.v1TournamentPlayer.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('addPlayer: 대회 초안은 여전히 막고, "종료·취소"가 아니라 공개 전이라고 말한다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockResolvedValue(tournamentRow({ status: 'draft', kind: 'regular_tournament' }));
+
+    await expect(
+      service.addPlayer(manager, 'tournament-1', 'reg-1', { userId: 'player-user-id', realName: '홍길동' }),
+    ).rejects.toMatchObject({
+      response: { code: 'TOURNAMENT_ROSTER_NOT_MUTABLE', message: '대회가 아직 공개되지 않아 선수 명단을 수정할 수 없어요.' },
+    });
+    expect(prisma.v1TournamentPlayer.upsert).not.toHaveBeenCalled();
+  });
+
   it('removePlayer: 완료된 대회는 명단에서 선수를 뺄 수 없다', async () => {
     prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
     prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
@@ -1392,6 +1545,126 @@ describe('TournamentPlayersService', () => {
     expect(prisma.v1AdminActionLog.create).not.toHaveBeenCalled();
   });
 
+  // ─── 어드민 추가·제거 후 성별 쿼터 재검증 (finding #53) ─────────────────────────
+  // 잠금(rosterLockedAt)은 "이 시점 기준 성별 인원 조건을 충족했다"는 확정 표시인데, 어드민
+  // 추가·제거는 잠금·마감을 넘기면서도 쿼터를 재검증하지 않아 위반 상태인데도 '확정'으로 남았다.
+
+  it('addPlayerForAdmin: 잠긴 명단에 추가해 성별 쿼터(남 최대 1명)를 벗어나면 잠금을 자동 해제한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique
+      .mockResolvedValueOnce({ tournamentId: 'tournament-1' }) // addPlayerForAdmin 진입부: tournamentId 조회
+      .mockResolvedValueOnce({ rosterLockedAt: new Date('2026-08-01T00:00:00Z') }); // reconcile: 잠금 여부 재조회
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({
+        genderCategory: 'mixed',
+        genderMinMale: 1,
+        genderMaxMale: 1,
+        genderMinFemale: 1,
+        genderMaxFemale: 1,
+      }),
+    );
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+    prisma.v1TeamMembership.findFirst.mockResolvedValue(teamPlayerMembershipRow()); // gender: male
+    prisma.v1TournamentPlayer.upsert.mockResolvedValue(playerRow({ genderSnapshot: 'male' }));
+    // 추가 후 현재 활성 명단 = 남2 · 여1 → genderMaxMale=1 위반
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'female' },
+    ]);
+
+    const result = await service.addPlayerForAdmin(adminUser, 'reg-1', {
+      userId: 'player-user-id',
+      realName: '홍길동',
+    });
+
+    expect(result.id).toBe('player-1');
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith({
+      where: { id: 'reg-1' },
+      data: { rosterLockedAt: null },
+    });
+  });
+
+  it('addPlayerForAdmin: 추가해도 성별 쿼터를 여전히 충족하면 잠금을 건드리지 않는다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentRegistration.findUnique
+      .mockResolvedValueOnce({ tournamentId: 'tournament-1' })
+      .mockResolvedValueOnce({ rosterLockedAt: new Date('2026-08-01T00:00:00Z') });
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({
+        genderCategory: 'mixed',
+        genderMinMale: 1,
+        genderMaxMale: 3,
+        genderMinFemale: 1,
+        genderMaxFemale: 3,
+      }),
+    );
+    prisma.v1TournamentPlayer.count.mockResolvedValue(2);
+    prisma.v1TeamMembership.findFirst.mockResolvedValue(teamPlayerMembershipRow());
+    prisma.v1TournamentPlayer.upsert.mockResolvedValue(playerRow({ genderSnapshot: 'male' }));
+    // 남2 · 여1 — max 3 이내라 조건을 여전히 충족.
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'male' },
+      { genderSnapshot: 'female' },
+    ]);
+
+    await service.addPlayerForAdmin(adminUser, 'reg-1', {
+      userId: 'player-user-id',
+      realName: '홍길동',
+    });
+
+    expect(prisma.v1TournamentRegistration.update).not.toHaveBeenCalled();
+  });
+
+  it('removePlayerForAdmin: 제거로 성별 최소 인원(여 최소 1명) 미달이 되면 잠금을 자동 해제한다', async () => {
+    prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue({
+      id: 'player-1',
+      registrationId: 'reg-1',
+      userId: 'player-user-id',
+      realName: '홍길동',
+      registration: { tournamentId: 'tournament-1', teamId: 'team-removed-from' },
+    });
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1Tournament.findFirst.mockResolvedValue(
+      tournamentRow({
+        genderCategory: 'mixed',
+        genderMinMale: 1,
+        genderMaxMale: 5,
+        genderMinFemale: 1,
+        genderMaxFemale: 5,
+      }),
+    );
+    prisma.v1TournamentPlayer.updateMany.mockResolvedValue({ count: 1 });
+    prisma.v1TournamentPlayer.findUniqueOrThrow.mockResolvedValue(
+      playerRow({ removedAt: new Date('2026-08-10T00:00:00Z') }),
+    );
+    // reconcile: 잠긴 상태 + 제거 후 남은 명단 = 남1 · 여0 → genderMinFemale=1 위반
+    prisma.v1TournamentRegistration.findUnique.mockResolvedValue({
+      rosterLockedAt: new Date('2026-08-01T00:00:00Z'),
+    });
+    prisma.v1TournamentPlayer.findMany.mockResolvedValue([{ genderSnapshot: 'male' }]);
+
+    await service.removePlayerForAdmin(adminUser, 'player-1');
+
+    expect(prisma.v1TournamentRegistration.update).toHaveBeenCalledWith({
+      where: { id: 'reg-1' },
+      data: { rosterLockedAt: null },
+    });
+    // 어드민 제거도 선수의 신청 팀 기준으로 시작 전 경기 명단을 맞춘다.
+    expect(prisma.v1Game.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          teamMatch: expect.objectContaining({ leagueId: 'tournament-1' }),
+          sides: { some: { teamId: 'team-removed-from' } },
+        }),
+      }),
+    );
+  });
+
   it('listEligiblePlayersForAdmin: 없는 신청이면 404', async () => {
     prisma.v1AdminUser.findUnique.mockResolvedValue(opsAdminRecord);
     prisma.v1TournamentRegistration.findUnique.mockResolvedValue(null);
@@ -1423,5 +1696,128 @@ describe('TournamentPlayersService', () => {
       realName: null,
       eligible: false,
     });
+  });
+
+  // ─── 등번호 수정 (`PATCH :playerId/jersey-number`) ────────────────────────────
+  //
+  // 등번호는 **자격과 다른 엔드포인트**다. 자격 수정에 얹으면 팀장이 어드민 판정을
+  // 덮어쓸 수 있어서 갈랐다. 그래서 이 경로의 가드는 여기서 따로 증명해야 한다.
+
+  it('updatePlayerJersey: 번호를 저장하고, 자격은 건드리지 않는다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ kind: 'regular_tournament' })));
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+
+    const result = await service.updatePlayerJersey(manager, 'tournament-1', 'reg-1', 'player-1', 10);
+
+    expect(result).toMatchObject({ id: 'player-1', jerseyNumber: 10 });
+    // 자격은 `v1TournamentPlayer.update` 경로다 — 여기서 불리면 두 관심사가 섞인 것이다.
+    expect(prisma.v1TournamentPlayer.update).not.toHaveBeenCalled();
+    expect(prisma.$executeRaw).toHaveBeenCalled();
+  });
+
+  it('updatePlayerJersey: null 이면 번호를 지운다 — 중복 검사도 건너뛴다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ kind: 'regular_tournament' })));
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+    // 같은 팀에 이미 번호가 있어도(아래 행) "번호 없음" 은 그것과 부딪히지 않는다.
+    prisma.$queryRaw.mockResolvedValue([{ id: 'player-2' }]);
+
+    const result = await service.updatePlayerJersey(manager, 'tournament-1', 'reg-1', 'player-1', null);
+
+    expect(result).toMatchObject({ id: 'player-1', jerseyNumber: null });
+  });
+
+  it('updatePlayerJersey: 같은 번호로 다시 저장해도 통과한다 — 자기 자신은 중복이 아니다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ kind: 'regular_tournament' })));
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+    prisma.$queryRaw.mockResolvedValue([]);
+
+    await expect(
+      service.updatePlayerJersey(manager, 'tournament-1', 'reg-1', 'player-1', 7),
+    ).resolves.toMatchObject({ jerseyNumber: 7 });
+
+    // **통과했다는 것만으로는 부족하다.** 제외는 SQL 에서 하므로(`id <> $playerId`),
+    // mock 이 빈 배열을 주는 한 **제외 인자를 빼도 이 테스트는 통과한다** — 실제로 변이로
+    // 확인했다(자기 자신 제외 인자를 빼도 red 0). 그래서 **어떤 값으로 물었는지**를 본다.
+    const jerseyLookup = prisma.$queryRaw.mock.calls.find((call) =>
+      (call[0] as string[]).join('').includes('jersey_number'),
+    );
+    expect(jerseyLookup).toBeDefined();
+    // 값 순서: registrationId, jerseyNumber, excludePlayerId
+    expect((jerseyLookup as unknown[]).slice(1)).toEqual(['reg-1', 7, 'player-1']);
+  });
+
+  it('updatePlayerJersey: 같은 팀의 다른 선수가 쓰는 번호면 409 ROSTER_DUPLICATE_JERSEY_NUMBER', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ kind: 'regular_tournament' })));
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+    prisma.$queryRaw.mockResolvedValue([{ id: 'player-2' }]);
+
+    await expect(
+      service.updatePlayerJersey(manager, 'tournament-1', 'reg-1', 'player-1', 7),
+    ).rejects.toMatchObject({ response: { code: 'ROSTER_DUPLICATE_JERSEY_NUMBER' } });
+    // 막혔으면 쓰기도 없어야 한다 — 던지기 전에 UPDATE 가 나가면 롤백에 기대게 된다.
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('updatePlayerJersey: 팀 매니저가 아니면 403 — 번호만 바꾸는 경로도 같은 문이다', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.updatePlayerJersey(nonManager, 'tournament-1', 'reg-1', 'player-1', 10),
+    ).rejects.toThrow(ForbiddenException);
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('updatePlayerJersey: 명단 제출 마감이 지났으면 409 — 인쇄된 명단과 어긋나지 않게', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(tournamentRow({ kind: 'regular_tournament', rosterDeadlineAt: pastDeadline })),
+    );
+
+    await expect(
+      service.updatePlayerJersey(manager, 'tournament-1', 'reg-1', 'player-1', 10),
+    ).rejects.toMatchObject({ response: { code: 'ROSTER_DEADLINE_PASSED' } });
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+    // **에러 코드만 보면 이 단언은 아무것도 안 지킨다** — 트랜잭션 안쪽 재검증
+    // (`lockAndLoadMutableRegistration`)이 같은 코드를 던지므로, 바깥 가드를 지워도
+    // 결과가 똑같다(변이로 확인: red 0). 바깥 가드가 실제로 사는 값은 **트랜잭션을 아예
+    // 열지 않는 것**이라, 그것을 단언한다.
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('updatePlayerJersey: 리그 명단에서도 번호를 고칠 수 있다 — 표면을 넓힌 이유', async () => {
+    // 이 경로가 `ALL_COMPETITION_KINDS` 로 여는 **6번째 리그 허용 지점**이다(래칫 baseline).
+    // 대회만 열어 두면 리그 팀장은 번호를 고칠 방법이 없어 **선수를 지우고 다시 넣는**
+    // 우회를 쓰게 되고, 그 우회는 되살린 행의 자격을 `needs_review` 로 되돌린다.
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(
+      kindAwareFindFirst(tournamentRow({ kind: 'regular_league' })),
+    );
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(playerRow());
+
+    await expect(
+      service.updatePlayerJersey(manager, 'tournament-1', 'reg-1', 'player-1', 10),
+    ).resolves.toMatchObject({ jerseyNumber: 10 });
+  });
+
+  it('updatePlayerJersey: 없는 선수면 404 PLAYER_NOT_FOUND', async () => {
+    prisma.v1TournamentRegistration.findFirst.mockResolvedValue(registrationRow());
+    prisma.v1TeamMembership.findFirst.mockResolvedValue({ id: 'mem-1', role: 'manager' });
+    prisma.v1Tournament.findFirst.mockImplementation(kindAwareFindFirst(tournamentRow({ kind: 'regular_tournament' })));
+    prisma.v1TournamentPlayer.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.updatePlayerJersey(manager, 'tournament-1', 'reg-1', 'ghost', 10),
+    ).rejects.toMatchObject({ response: { code: 'PLAYER_NOT_FOUND' } });
   });
 });

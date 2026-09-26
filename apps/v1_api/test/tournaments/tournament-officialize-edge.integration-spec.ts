@@ -27,6 +27,8 @@ const ids = {
   hostTeam: '86000000-0000-4000-8000-000000000020',
   opponentTeam: '86000000-0000-4000-8000-000000000021',
   tournament: '86000000-0000-4000-8000-000000000030',
+  hostRegistration: '86000000-0000-4000-8000-000000000031',
+  opponentRegistration: '86000000-0000-4000-8000-000000000032',
   denialFixture: '86000000-0000-4000-8000-000000000040',
   successFixture: '86000000-0000-4000-8000-000000000041',
   directorAssignment: '86000000-0000-4000-8000-000000000060',
@@ -83,7 +85,7 @@ async function buildTournamentGame(fixtureId: string): Promise<string> {
     orderBy: { version: 'desc' },
   });
   const input: GameSourceCreationInput = {
-    sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+    sourceType: V1GameSourceType.TEAM_MATCH,
     sourceId: fixtureId,
     competitionConfigVersionId: config.id,
     sides: [
@@ -186,7 +188,7 @@ describe('Task 22 G-3: DIRECTOR_OFFICIALIZE denial audit + flag snapshot', () =>
     await prisma.v1AdminUser.create({
       data: { userId: ids.platformOps, adminRole: 'ops', status: 'active' },
     });
-    await prisma.v1Sport.upsert({
+    const sport = await prisma.v1Sport.upsert({
       where: { code: 'football' },
       create: { id: ids.sport, code: 'football', name: 'Task 22 G-3 Football' },
       update: {},
@@ -196,21 +198,33 @@ describe('Task 22 G-3: DIRECTOR_OFFICIALIZE denial audit + flag snapshot', () =>
     });
     await prisma.v1Team.createMany({
       data: [
-        { id: ids.hostTeam, ownerUserId: ids.platformOps, sportId: ids.sport, regionId: ids.region, name: 'Task 22 G-3 Host' },
-        { id: ids.opponentTeam, ownerUserId: ids.platformOps, sportId: ids.sport, regionId: ids.region, name: 'Task 22 G-3 Opponent' },
+        { id: ids.hostTeam, ownerUserId: ids.platformOps, sportId: sport.id, regionId: ids.region, name: 'Task 22 G-3 Host' },
+        { id: ids.opponentTeam, ownerUserId: ids.platformOps, sportId: sport.id, regionId: ids.region, name: 'Task 22 G-3 Opponent' },
       ],
     });
     await prisma.v1Tournament.create({
-      data: { id: ids.tournament, sportId: ids.sport, title: 'Task 22 G-3 tournament' },
+      data: { id: ids.tournament, sportId: sport.id, title: 'Task 22 G-3 tournament' },
+    });
+    await prisma.v1TournamentRegistration.createMany({
+      data: [
+        { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
+        { id: ids.opponentRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
+      ],
     });
     const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({
       where: { name: 'football-v1', status: 'ACTIVE' },
       orderBy: { version: 'desc' },
     });
-    await prisma.v1TournamentFixture.createMany({
+    await prisma.v1TeamMatch.createMany({
       data: [
-        { id: ids.denialFixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, competitionConfigVersionId: config.id },
-        { id: ids.successFixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, competitionConfigVersionId: config.id },
+        { id: ids.denialFixture, tournamentId: ids.tournament, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, sportId: sport.id, title: 'Task 22 G-3 denial match', status: 'matched', competitionConfigVersionId: config.id },
+        { id: ids.successFixture, tournamentId: ids.tournament, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, sportId: sport.id, title: 'Task 22 G-3 success match', status: 'matched', competitionConfigVersionId: config.id },
+      ],
+    });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: [
+        { teamMatchId: ids.denialFixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration },
+        { teamMatchId: ids.successFixture, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration },
       ],
     });
     await prisma.v1TournamentStaffAssignment.create({
@@ -268,7 +282,7 @@ describe('Task 22 G-3: DIRECTOR_OFFICIALIZE denial audit + flag snapshot', () =>
     expect(audit.actorType).toBe('USER');
     expect(audit.actorUserId).toBe(ids.director);
     expect(audit.tournamentId).toBe(ids.tournament);
-    expect(audit.fixtureId).toBe(ids.denialFixture);
+    expect(audit.teamMatchId).toBe(ids.denialFixture);
     expect(audit.after).toMatchObject({
       denied: true,
       code: 'DIRECTOR_OFFICIALIZE_DISABLED',
@@ -305,7 +319,7 @@ describe('Task 22 G-3: DIRECTOR_OFFICIALIZE denial audit + flag snapshot', () =>
     expect(audit.actorType).toBe('USER');
     expect(audit.actorUserId).toBe(ids.director);
     expect(audit.tournamentId).toBe(ids.tournament);
-    expect(audit.fixtureId).toBe(ids.successFixture);
+    expect(audit.teamMatchId).toBe(ids.successFixture);
     expect(audit.after).toMatchObject({
       revisionId: voided.revisionId,
       revisionState: 'VOID',
@@ -341,10 +355,12 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     hostTeam: '86000000-0000-4000-8000-000000000103',
     opponentTeam: '86000000-0000-4000-8000-000000000104',
     tournament: '86000000-0000-4000-8000-000000000105',
+    hostRegistration: '86000000-0000-4000-8000-000000000106',
+    opponentRegistration: '86000000-0000-4000-8000-000000000107',
     fixtureQ02: '86000000-0000-4000-8000-000000000110',
     fixtureQ04: '86000000-0000-4000-8000-000000000111',
-    fixtureQ07: '86000000-0000-4000-8000-000000000112',
     fixtureQ08: '86000000-0000-4000-8000-000000000113',
+    fixtureQ10: '86000000-0000-4000-8000-000000000112',
     fixtureQ11A: '86000000-0000-4000-8000-000000000114',
     fixtureQ11B: '86000000-0000-4000-8000-000000000115',
     fixtureQ13: '86000000-0000-4000-8000-000000000116',
@@ -365,7 +381,7 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
       orderBy: { version: 'desc' },
     });
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: fixtureId,
       competitionConfigVersionId: config.id,
       sides: [
@@ -473,20 +489,25 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     await prisma.v1Tournament.create({
       data: { id: ids.tournament, sportId: sport.id, title: 'Task 22 T-B tournament' },
     });
+    await prisma.v1TournamentRegistration.createMany({
+      data: [
+        { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
+        { id: ids.opponentRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
+      ],
+    });
     const config = await prisma.v1CompetitionConfigVersion.findFirstOrThrow({
       where: { name: 'football-v1', status: 'ACTIVE' },
       orderBy: { version: 'desc' },
     });
-    await prisma.v1TournamentFixture.createMany({
-      data: [
-        { id: ids.fixtureQ02, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, competitionConfigVersionId: config.id },
-        { id: ids.fixtureQ04, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, competitionConfigVersionId: config.id },
-        { id: ids.fixtureQ07, tournamentId: ids.tournament, round: 'group', fixtureNumber: 3, competitionConfigVersionId: config.id },
-        { id: ids.fixtureQ08, tournamentId: ids.tournament, round: 'group', fixtureNumber: 4, competitionConfigVersionId: config.id },
-        { id: ids.fixtureQ11A, tournamentId: ids.tournament, round: 'group', fixtureNumber: 5, competitionConfigVersionId: config.id },
-        { id: ids.fixtureQ11B, tournamentId: ids.tournament, round: 'group', fixtureNumber: 6, competitionConfigVersionId: config.id },
-        { id: ids.fixtureQ13, tournamentId: ids.tournament, round: 'group', fixtureNumber: 7, competitionConfigVersionId: config.id },
-      ],
+    const canonicalFixtures = [
+      [ids.fixtureQ02, 1], [ids.fixtureQ04, 2], [ids.fixtureQ08, 4], [ids.fixtureQ10, 3],
+      [ids.fixtureQ11A, 5], [ids.fixtureQ11B, 6], [ids.fixtureQ13, 7],
+    ] as const;
+    await prisma.v1TeamMatch.createMany({
+      data: canonicalFixtures.map(([id]) => ({ id, tournamentId: ids.tournament, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, createdByUserId: ids.platformOps, sportId: sport.id, title: `Task 22 T-B match ${id}`, status: 'matched' as const, competitionConfigVersionId: config.id })),
+    });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: canonicalFixtures.map(([teamMatchId, fixtureNumber]) => ({ teamMatchId, tournamentId: ids.tournament, round: 'group', fixtureNumber, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration })),
     });
     await prisma.v1GameOperationFlag.upsert({
       where: { key: 'DIRECTOR_OFFICIALIZE' },
@@ -499,33 +520,21 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     await prisma.$disconnect();
   });
 
-  it('Q-02: resubmits successfully from a SUPPLEMENT_REQUESTED base, not just a REJECTED one', async () => {
+  it('Q-02: SUBMITTED base 를 곧바로 재제출로 대체하고 supersedesId 가 그 base 를 가리킨다', async () => {
+    // Task 166: 예전엔 base 가 SUPPLEMENT_REQUESTED/REJECTED 였다 — 즉 "어드민이 팀에게
+    // 되돌려 보냈다" 를 전제했다. 정본 §4 가 그 왕복을 없애 base 가 SUBMITTED 다.
     const gameId = await buildTournamentGame(ids.fixtureQ02);
     const { homeSideId, scorerId } = await endGameWithHomeGoal(gameId);
     const submitted = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId } });
     expect(submitted.state).toBe(V1GameResultRevisionState.SUBMITTED);
 
-    const supplementRequested = await resultReview.reviewDecision(
-      authUser(ids.platformOps),
-      gameId,
-      submitted.id,
-      'task22tb-q02-supplement',
-      {
-        expectedVersion: 3,
-        clientCommandId: 'task22tb-q02-supplement',
-        decision: 'request_supplement',
-        reason: 'need a lineup card photo before this can be reviewed',
-      },
-    );
-    expect(supplementRequested.revisionState).toBe(V1GameResultRevisionState.SUPPLEMENT_REQUESTED);
-
     const successor = await resultReview.supersedeAndSubmit(
       authUser(ids.platformOps),
       gameId,
-      supplementRequested.revisionId,
+      submitted.id,
       'task22tb-q02-resubmit',
       {
-        expectedVersion: 4,
+        expectedVersion: 3,
         clientCommandId: 'task22tb-q02-resubmit',
         score: { home: 1, away: 0 },
         actualParticipants: [
@@ -544,7 +553,12 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     );
     expect(successor.revisionState).toBe(V1GameResultRevisionState.SUBMITTED);
     const successorRow = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: successor.revisionId } });
-    expect(successorRow.supersedesId).toBe(supplementRequested.revisionId);
+    expect(successorRow.supersedesId).toBe(submitted.id);
+    // base 는 그대로 SUBMITTED 다 — supersede 는 predecessor 를 건드리지 않는다.
+    // 그래서 "대체됐다" 는 사실은 `state` 가 아니라 `supersedesId` 로만 알 수 있고,
+    // officialize 가 그것으로 stale 확정을 막는다(tournament-officialize 스펙).
+    const baseAfter = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: submitted.id } });
+    expect(baseAfter.state).toBe(V1GameResultRevisionState.SUBMITTED);
   });
 
   it('Q-04: an outbox unique-key collision deep inside a successful-looking mutate() rolls the whole successor back atomically', async () => {
@@ -552,17 +566,12 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     const { homeSideId, scorerId } = await endGameWithHomeGoal(gameId);
     const submitted = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId } });
 
-    const rejected = await resultReview.reviewDecision(authUser(ids.platformOps), gameId, submitted.id, 'task22tb-q04-reject', {
-      expectedVersion: 3,
-      clientCommandId: 'task22tb-q04-reject',
-      decision: 'reject',
-      reason: 'lineup mismatch',
-    });
-    expect(rejected.revisionState).toBe(V1GameResultRevisionState.REJECTED);
+    expect(submitted.state).toBe(V1GameResultRevisionState.SUBMITTED);
 
     // Pre-occupy the exact `v1_outbox_events.business_key` the successor's
-    // GAME_RESULT_SUBMITTED write will try to insert (revision 2 -- reject()
-    // mutated revision 1 in place, so the next revision number is 2). This
+    // GAME_RESULT_SUBMITTED write will try to insert (revision 2 -- the base
+    // stays revision 1 because supersede never mutates it, so the successor
+    // is revision 2 just as before Task 166 removed the reject step). This
     // is the *last* statement `supersedeAndSubmit`'s mutate() callback runs,
     // deep inside the same interactive transaction that already created the
     // successor DRAFT row, attached its participant, and bumped it to
@@ -583,8 +592,8 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     const gameBefore = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
 
     const collided = await captureFailure(() =>
-      resultReview.supersedeAndSubmit(authUser(ids.platformOps), gameId, rejected.revisionId, 'task22tb-q04-resubmit', {
-        expectedVersion: 4,
+      resultReview.supersedeAndSubmit(authUser(ids.platformOps), gameId, submitted.id, 'task22tb-q04-resubmit', {
+        expectedVersion: 3,
         clientCommandId: 'task22tb-q04-resubmit',
         score: { home: 1, away: 0 },
         actualParticipants: [
@@ -623,50 +632,13 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     });
   });
 
-  it('Q-07: a SUPPLEMENT_REQUESTED revision is terminal -- both reviewDecision and officialize retries are rejected', async () => {
-    const gameId = await buildTournamentGame(ids.fixtureQ07);
-    await endGameWithHomeGoal(gameId);
-    const submitted = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId } });
-
-    const supplementRequested = await resultReview.reviewDecision(
-      authUser(ids.platformOps),
-      gameId,
-      submitted.id,
-      'task22tb-q07-supplement',
-      {
-        expectedVersion: 3,
-        clientCommandId: 'task22tb-q07-supplement',
-        decision: 'request_supplement',
-        reason: 'need a lineup card photo',
-      },
-    );
-    expect(supplementRequested.revisionState).toBe(V1GameResultRevisionState.SUPPLEMENT_REQUESTED);
-
-    const reviewRetry = await captureFailure(() =>
-      resultReview.reviewDecision(authUser(ids.platformOps), gameId, submitted.id, 'task22tb-q07-review-retry', {
-        expectedVersion: 4,
-        clientCommandId: 'task22tb-q07-review-retry',
-        decision: 'reject',
-        reason: 'retried on a terminal supplement-requested revision',
-      }),
-    );
-    expectHttpCode(reviewRetry, 409, 'TERMINAL_REVISION_IMMUTABLE');
-
-    const revision = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: submitted.id } });
-    const officializeRetry = await captureFailure(() =>
-      resultReview.officializeResultRevision(authUser(ids.platformOps), gameId, submitted.id, 'task22tb-q07-officialize-retry', {
-        expectedVersion: 4,
-        clientCommandId: 'task22tb-q07-officialize-retry',
-        projectionPreviewHash: previewHash(revision),
-      }),
-    );
-    expectHttpCode(officializeRetry, 409, 'TERMINAL_REVISION_IMMUTABLE');
-
-    const game = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
-    expect(game.version).toBe(4);
-    expect(game.currentOfficialRevisionId).toBeNull();
-  });
-
+  // Q-07 은 여기 있었다: "레거시 SUPPLEMENT_REQUESTED 행은 고칠 수는 있고 확정할 수는
+  // 없다". contract 마이그레이션(20260903150000)이 그 값을 없애면서 **시드할 대상 자체가
+  // 사라져** 삭제했다. 그 마이그레이션이 옛 행을 두 갈래로 나눠 보내고, 각 갈래의 계약은
+  // 이미 다른 케이스가 잡고 있다:
+  //   · 되살린 갈래(SUBMITTED)  → Q-02 (SUBMITTED base 재제출이 성공한다)
+  //   · 얼린 갈래(CHANGE_REQUESTED) → Q-08 (재제출 409·확정 409)
+  // 갈래를 나누는 판정 자체는 SQL 이라 여기서 못 잰다 — 시드 DB 실행 증거는 PR 본문에 있다.
   it('Q-08: a directly-seeded CHANGE_REQUESTED revision (a team-match-only state in real traffic) is still rejected as terminal on the tournament route', async () => {
     const gameId = await buildTournamentGame(ids.fixtureQ08);
     // CHANGE_REQUESTED is only ever produced by GamesService.decideResultRevision
@@ -690,15 +662,20 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
       },
     });
 
-    const reviewAttempt = await captureFailure(() =>
-      resultReview.reviewDecision(authUser(ids.platformOps), gameId, seeded.id, 'task22tb-q08-review', {
+    // Task 166 이 반려·보완 요청 명령을 없애 review 레인에 남은 명령은 재제출이다.
+    // CHANGE_REQUESTED 는 base 가 될 수 없으므로 409 로 막힌다 — 이 코드는
+    // TERMINAL_REVISION_IMMUTABLE 이 아니라 재제출 전용 코드다(그 구분이 계약이다).
+    const resubmitAttempt = await captureFailure(() =>
+      resultReview.supersedeAndSubmit(authUser(ids.platformOps), gameId, seeded.id, 'task22tb-q08-resubmit', {
         expectedVersion: 0,
-        clientCommandId: 'task22tb-q08-review',
-        decision: 'reject',
-        reason: 'attempted review of a CHANGE_REQUESTED row',
+        clientCommandId: 'task22tb-q08-resubmit',
+        score: { home: 1, away: 0 },
+        actualParticipants: [],
+        eventsHash: 'task22tb-q08-resubmit-hash',
+        reason: 'attempted resubmission from a CHANGE_REQUESTED row',
       }),
     );
-    expectHttpCode(reviewAttempt, 409, 'TERMINAL_REVISION_IMMUTABLE');
+    expectHttpCode(resubmitAttempt, 409, 'RESULT_RESUBMISSION_NOT_ALLOWED');
 
     const officializeAttempt = await captureFailure(() =>
       resultReview.officializeResultRevision(authUser(ids.platformOps), gameId, seeded.id, 'task22tb-q08-officialize', {
@@ -714,6 +691,56 @@ describe('Task 22 T-B: QA scenario gap coverage (Q-02/04/07/08/11/13)', () => {
     expect(game.currentOfficialRevisionId).toBeNull();
     const revisionAfter = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: seeded.id } });
     expect(revisionAfter.state).toBe(V1GameResultRevisionState.CHANGE_REQUESTED);
+  });
+
+  it('Q-10: 이미 공식 결과가 있는 경기는 옛 SUBMITTED 행으로 다시 확정할 수 없다', async () => {
+    // Task 166 contract 가 발견한 구멍이다. STANDARD 흐름의 승계 검사는 "더 새 리비전이
+    // 이 행을 대체했나" 만 본다 — 그래서 **승계되지 않은** 옛 SUBMITTED 행은 경기에 이미
+    // 공식 결과가 있어도 확정을 통과했고, `currentOfficialRevisionId` 를 빼앗았다.
+    // (contract 마이그레이션이 옛 반려 행을 되살릴 때 이 구멍을 피해 조건을 걸었지만,
+    //  코드가 스스로 닫혀야 한다 — 이 케이스가 그 가드를 잡는다.)
+    const gameId = await buildTournamentGame(ids.fixtureQ10);
+    await endGameWithHomeGoal(gameId);
+    const submitted = await prisma.v1GameResultRevision.findFirstOrThrow({ where: { gameId } });
+
+    // ① 정상 확정 — 가드가 첫 확정을 막으면 안 된다.
+    await resultReview.officializeResultRevision(authUser(ids.platformOps), gameId, submitted.id, 'task166-q10-official', {
+      expectedVersion: 3,
+      clientCommandId: 'task166-q10-official',
+      projectionPreviewHash: previewHash(submitted),
+    });
+    const afterOfficial = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
+    expect(afterOfficial.currentOfficialRevisionId).toBe(submitted.id);
+
+    // ② 승계되지 않은 옛 SUBMITTED 행을 직접 심는다 — contract 마이그레이션이 옛 반려
+    //    행을 SUBMITTED 로 되살렸을 때 만들어질 수 있었던 바로 그 모양이다.
+    const stale = await prisma.v1GameResultRevision.create({
+      data: {
+        gameId,
+        revision: 99,
+        state: V1GameResultRevisionState.SUBMITTED,
+        score: { home: 9, away: 9 },
+        eventsHash: 'task166-q10-stale-hash',
+        createdByActorType: 'USER',
+        createdByUserId: ids.platformOps,
+        reason: 'seeded: an un-superseded SUBMITTED row on a game that already has an official result',
+      },
+    });
+
+    // ③ 이걸 확정하려 하면 막혀야 한다 — 막히지 않으면 9:9 가 공식 결과가 된다.
+    const attempt = await captureFailure(() =>
+      resultReview.officializeResultRevision(authUser(ids.platformOps), gameId, stale.id, 'task166-q10-steal', {
+        expectedVersion: afterOfficial.version,
+        clientCommandId: 'task166-q10-steal',
+        projectionPreviewHash: previewHash(stale),
+      }),
+    );
+    expectHttpCode(attempt, 409, 'RESULT_ALREADY_OFFICIAL');
+
+    const afterAttempt = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
+    expect(afterAttempt.currentOfficialRevisionId).toBe(submitted.id);
+    const staleAfter = await prisma.v1GameResultRevision.findUniqueOrThrow({ where: { id: stale.id } });
+    expect(staleAfter.state).toBe(V1GameResultRevisionState.SUBMITTED);
   });
 
   it('Q-11: cross-game current-pointer and supersedes corruption is rejected by the composite FKs at the database layer', async () => {

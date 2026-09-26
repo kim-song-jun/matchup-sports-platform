@@ -27,4 +27,19 @@ describe('LandingCtaLink GA events', () => {
     expect(analytics.trackEvent).toHaveBeenCalledWith('landing_cta_click', { cta: 'hero_signup' });
     expect(link).toHaveAttribute('href', '/login');
   });
+
+  it('v2 랜딩은 같은 cta 에 variant 를 붙여 A안 클릭과 섞이지 않게 보낸다', () => {
+    render(
+      <LandingCtaLink href="/matches" cta="story_find_match" variant="v2">
+        매치 둘러보기
+      </LandingCtaLink>,
+    );
+
+    fireEvent.click(screen.getByRole('link', { name: '매치 둘러보기' }));
+
+    expect(analytics.trackEvent).toHaveBeenLastCalledWith('landing_cta_click', {
+      cta: 'story_find_match',
+      variant: 'v2',
+    });
+  });
 });

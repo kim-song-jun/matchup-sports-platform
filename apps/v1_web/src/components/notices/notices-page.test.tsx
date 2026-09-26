@@ -5,9 +5,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { NoticeDetailPageView, NoticeListPageView } from './notices-page';
 import type { NoticeDetailViewModel, NoticeListViewModel } from './notices.types';
 
-vi.mock('next/navigation', () => ({
-  usePathname: () => '/notices/notice-1',
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
   useSearchParams: () => new URLSearchParams(),
+  // AppBackLink 가 클릭 때 router.back/replace 를 쓴다 — 렌더만 하는 테스트라 빈 라우터면 된다.
+  useRouter: () => ({ back: vi.fn(), forward: vi.fn(), push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
 }));
 
 const baseModel: NoticeDetailViewModel = {

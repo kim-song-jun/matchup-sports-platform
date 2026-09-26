@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { NotificationsPageView } from './community-page';
 import type { NotificationModel, NotificationsViewModel } from './community.types';
@@ -22,7 +22,7 @@ const notification: NotificationModel = {
   body: LONG_BODY,
   time: '7월 26일 02:10',
   unread: true,
-  href: '/my/inquiries/inquiry-1?from=notifications',
+  href: '/my/inquiries/inquiry-1?from=%2Fnotifications',
   actionLabel: '보기',
 };
 
@@ -62,25 +62,32 @@ describe('NotificationsPageView — 상세 시트', () => {
     expect(onNavigate).not.toHaveBeenCalled();
   });
 
-  it('시트의 CTA를 눌러야 대상 화면으로 이동한다', () => {
+  it('시트의 CTA를 눌러야 대상 화면으로 이동한다', async () => {
     const onNavigate = vi.fn();
 
     renderWithClient(<NotificationsPageView model={makeModel({ onOpen: vi.fn(), onNavigate })} />);
     fireEvent.click(screen.getByRole('button', { name: /문의에 답변이 등록됐어요/ }));
     fireEvent.click(screen.getByRole('button', { name: '보기' }));
 
-    expect(onNavigate).toHaveBeenCalledWith(notification);
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // 이동은 시트의 히스토리 항목을 걷은 뒤에 한다(닫기 back 과 이동 push 가 엇갈리지 않게).
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith(notification));
+    // 시트는 퇴장 애니메이션이 끝난 뒤 사라진다(useDelayedUnmount 220ms) — 닫히는
+    // 동안에는 .is-closing 으로 DOM 에 남아 있는 것이 의도된 동작이다.
+    expect(screen.getByRole('dialog')).toHaveClass('is-closing');
+    await waitForElementToBeRemoved(() => screen.queryByRole('dialog'));
   });
 
-  it('ESC로 시트를 닫으면 이동하지 않는다', () => {
+  it('ESC로 시트를 닫으면 이동하지 않는다', async () => {
     const onNavigate = vi.fn();
 
     renderWithClient(<NotificationsPageView model={makeModel({ onOpen: vi.fn(), onNavigate })} />);
     fireEvent.click(screen.getByRole('button', { name: /문의에 답변이 등록됐어요/ }));
     fireEvent.keyDown(document, { key: 'Escape' });
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // 위와 같은 이유로 즉시 사라지지 않는다. 이 테스트의 계약은 "ESC 로 닫으면
+    // 이동하지 않는다" 이므로, 시트가 실제로 제거되는 것까지 확인한 뒤 단언한다.
+    expect(screen.getByRole('dialog')).toHaveClass('is-closing');
+    await waitForElementToBeRemoved(() => screen.queryByRole('dialog'));
     expect(onNavigate).not.toHaveBeenCalled();
   });
 

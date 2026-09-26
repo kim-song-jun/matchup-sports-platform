@@ -4,18 +4,23 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   useV1ApproveTeamJoinApplication,
+  useV1AuthMe,
   useV1CancelTeamInvitation,
   useV1ChangeMembershipJersey,
   useV1ChangeTeamMembershipRole,
   useV1CreateTeamJoinApplication,
+  useV1LeagueMatches,
   useV1LeaveTeam,
+  useV1MasterRegions,
   useV1MasterSports,
+  useV1MyTeams,
   useV1RecentSearches,
   useV1RecordSearch,
   useV1RejectTeamJoinApplication,
   useV1RemoveTeamMembership,
   useV1ResolveChatRoom,
   useV1SendTeamInvitation,
+  useV1TeamContactSummary,
   useV1TeamDetail,
   useV1TeamInvitations,
   useV1TeamJoinEligibility,
@@ -23,34 +28,46 @@ import {
   useV1TeamMatches,
   useV1TeamMembers,
   useV1TeamPages,
-  useV1Teams,
   useV1WithdrawTeamJoinApplication,
 } from '@/hooks/use-v1-api';
 import { usePendingIds } from '@/hooks/use-pending-ids';
 import { extractErrorMessage } from '@/lib/error-message';
 import { trackEvent } from '@/lib/analytics';
-import { V1ApiError } from '@/lib/api-client';
+import { isUnauthenticatedError, retryTransientFailure, V1ApiError } from '@/lib/api-client';
 import { chatRoomHref } from '@/lib/chat-route';
 import { formatTournamentDateShort } from '@/lib/date-utils';
+import { isTeamOperatorRole, normalizeMyTeamsResponse } from '@/lib/team-role';
+import { getLoginPathForRedirect, withFromPath, sanitizeRedirectPath } from '@/lib/session-storage';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
-import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import type { CursorPage, V1Sport, V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { JerseyNumberDialog } from './jersey-number-dialog';
-import { TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
+import { INVITE_MESSAGE_MAX_LENGTH, TeamDetailPageSkeleton, TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
 import type { TeamDetailViewModel, TeamListViewModel, TeamMembersViewModel, TeamModel } from './teams.types';
 import { getTeamDetailViewModel, getTeamListViewModel, getTeamMembersViewModel, getTeamStateViewModel } from './teams.view-model';
+import {
+  buildTeamHref,
+  buildTeamSportChips,
+  deriveTeamScope,
+  formatTeamRegion,
+  isTeamAtCapacity,
+  splitTeamRegion,
+  toTeam,
+} from './teams.card-model';
 
-export function TeamListPageClient() {
+export function TeamListPageClient({ seed }: { seed?: { page: CursorPage<V1Team>; sports: V1Sport[] } } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedSportId = searchParams.get('sportId') ?? undefined;
   const selectedSort = toTeamSort(searchParams.get('sort'));
   const selectedGenderRule = toGenderRuleFilter(searchParams.get('genderRule'));
   const selectedLevels = toLevelCodes(searchParams.get('levelCodes') ?? searchParams.get('levels'));
+  const selectedRegionId = searchParams.get('regionId') ?? undefined;
   const filterOpen = searchParams.get('filter') === '1';
-  const activeFilterCount = countTeamFilters(selectedSort, selectedGenderRule, selectedLevels);
+  const activeFilterCount = countTeamFilters(selectedSort, selectedGenderRule, selectedLevels, selectedRegionId);
   const initialQuery = searchParams.get('q') ?? '';
   const [searchValue, setSearchValue] = useState(initialQuery);
   const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
@@ -59,26 +76,45 @@ export function TeamListPageClient() {
     setSearchValue(initialQuery);
     setSubmittedQuery(initialQuery);
   }, [initialQuery]);
-  const sports = useV1MasterSports();
+  const sports = useV1MasterSports({ seed: seed?.sports });
+  const regions = useV1MasterRegions();
   const teamFilters = useMemo(() => {
-    const filters: { sportId?: string; query?: string; joinPolicy?: 'approval_required'; sort?: 'recommended' | 'latest'; genderRule?: string; levelCodes?: string } = {};
+    const filters: { sportId?: string; query?: string; joinPolicy?: 'approval_required'; sort?: 'recommended' | 'latest'; genderRule?: string; levelCodes?: string; regionId?: string } = {};
     if (selectedSportId) filters.sportId = selectedSportId;
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
     if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
+    if (selectedRegionId) filters.regionId = selectedRegionId;
     if (submittedQuery.trim()) filters.query = submittedQuery.trim();
     if (selectedSort === 'deadline') filters.joinPolicy = 'approval_required';
     if (selectedSort === 'latest') filters.sort = 'latest';
     if (selectedSort === 'recommended') filters.sort = 'recommended';
     return Object.keys(filters).length ? filters : undefined;
-  }, [selectedGenderRule, selectedLevels, selectedSort, selectedSportId, submittedQuery]);
+  }, [selectedGenderRule, selectedLevels, selectedRegionId, selectedSort, selectedSportId, submittedQuery]);
   const listFilters = useMemo(() => ({ ...(teamFilters ?? {}), limit: 20 }), [teamFilters]);
-  const query = useV1TeamPages(listFilters);
+  // /teams가 서버(SEO 프리렌더)에서 이미 받아 둔 무필터 목록을 첫 표시값으로 쓴다 — 필터가
+  // 걸려 있으면 그 목록이 이 화면과 다른 결과를 뜻하므로 seed를 넘기지 않는다(기존 로딩
+  // 스켈레톤 그대로 유지).
+  const query = useV1TeamPages(listFilters, { seed: !teamFilters ? seed?.page : undefined });
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
+  const selectedSportName = selectedSportId ? sports.data?.find((sport) => sport.id === selectedSportId)?.name : undefined;
 
   const base = getTeamListViewModel();
   const items = query.data?.pages.flatMap((page) => page.items);
   const visibleItems = filterTeamsByLevels(items, selectedLevels);
+  // 예전에는 목록 항목에 활동 정보가 없으면 **팀마다** `/teams/:id` 를 불러 채우려 했다.
+  // 그 폴백은 구조적으로 성립할 수 없어서 지웠다 — 목록과 상세가 **같은 표현식으로 같은 값**을
+  // 만들기 때문이다(apps/v1_api/src/teams/teams.service.ts 의 목록 190행·상세 2141행이
+  // 둘 다 `formatTeamActivitySummary(team.profile)`). 목록에서 비어 있다는 건 team.profile 에
+  // 활동 데이터가 없다는 뜻이고, 그러면 상세를 불러도 비어 있다.
+  //
+  // 실측(alpha, 2026-09-01): 팀 탭 진입 시 `/teams/:id` 가 **44회** 나갔고 개별 응답이 980ms,
+  // 응답시간 합 32.8초였다. 그 44회가 화면에 더해 준 값은 **없었다**(표본 5팀 전부 상세의
+  // profile.activity* 가 null/[]).
+  //
+  // 다만 이 폴백은 **렌더를 막지는 않았다** — 카드는 목록 응답만으로 그려지므로 탭 전환은
+  // MutationObserver 기준 346ms 로 이미 빨랐다. 지우는 이유는 체감 속도가 아니라 아무 값도
+  // 얻지 못하는 요청 44회 자체다(서버 부하·모바일 데이터·배터리).
   const visibleTeams = visibleItems.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0]));
 
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
@@ -107,7 +143,7 @@ export function TeamListPageClient() {
     filterCount: activeFilterCount,
     search: searchModel,
     filterHref: buildTeamHref(searchParams, { filter: '1' }),
-    filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, filterOpen),
+    filterSheet: buildTeamFilterSheet(searchParams, selectedSort, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], filterOpen),
     chips: buildTeamSportChips(visibleItems, base, searchParams, selectedSportId, sports.data, !selectedSportId && !query.hasNextPage),
     teams: visibleTeams,
     listLoading: isListLoading,
@@ -116,6 +152,7 @@ export function TeamListPageClient() {
     onLoadMore: () => void query.fetchNextPage(),
     summary: {
       ...base.summary,
+      scope: deriveTeamScope(selectedSportName),
       total,
       loaded: visibleTeams.length,
       recruiting: visibleTeams.filter((item) => item.status === 'open').length,
@@ -148,32 +185,39 @@ export function TeamListPageClient() {
   }
 }
 
-export function TeamFilterPageClient() {
-  const query = useV1Teams({ joinPolicy: 'approval_required', sort: 'recommended', limit: 20 });
-  const base = getTeamStateViewModel('filter');
-
-  if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
-
-  const items = query.data?.items;
-  const model = items
-    ? {
-        ...base,
-        teams: items.map((item, index) => toTeam(item, base.teams[index] ?? base.teams[0])),
-        summary: {
-          ...base.summary,
-          total: items.length,
-          recruiting: items.filter((item) => item.joinPolicy === 'approval_required').length,
-        },
-      }
-    : base;
-
-  return <TeamStatePageView model={model} />;
-}
-
-export function TeamDetailPageClient({ teamId }: { teamId: string }) {
+/**
+ * `seed` 는 서버 컴포넌트(app/teams/[id]/page.tsx)가 구조화 데이터·메타데이터를 위해 이미
+ * 받아 둔 팀 상세 응답이다. 추가 요청 없이 첫 화면을 채운다.
+ *
+ * 단, 그 응답은 **비인증**이라 `viewer` 가 `{ role: 'none', canRequestJoin: false,
+ * disabledReason: 'LOGIN_REQUIRED' }` 로 채워져 온다(alpha 실측). 매치와 달리 `viewer` 는
+ * required 필드라 지울 수도 없다 — 그대로 쓰면 로그인한 owner 에게 잠깐 "가입 신청"이나
+ * "로그인이 필요해요"가 뜬다. 그래서 seed 로 그리는 동안(`isPlaceholderData`) 뷰어에
+ * 의존하는 것(가입 CTA·컨택 CTA)만 잠그고, 팀 이름·로고·소개·지역·멤버는 바로 보여준다.
+ */
+export function TeamDetailPageClient({ teamId, seed }: { teamId: string; seed?: V1TeamDetail | null }) {
   const router = useRouter();
-  const query = useV1TeamDetail(teamId);
-  const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) });
+  // 내 팀 목록 등 특정 화면에서 들어왔으면 뒤로가기를 그 화면으로 되돌린다(`?from=`).
+  // route-chrome 테이블의 backHref(fragments/teams.ts)는 검색 파라미터를 못 받아
+  // 기본값 '/teams'로 고정돼 있었다 — public-profile-client.tsx와 동일한 ShellOverride로 메운다.
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  // 이 화면에서 나가는 링크의 출처 — 받은 출처까지 담아야 하위 화면에서 돌아와도 처음 출처가 남는다.
+  const selfHref = withFromPath(`/teams/${teamId}`, fromPath);
+  // The current /auth/me result is the only authority for protected actions. A
+  // local hint can be stale, while a cold HttpOnly cookie has no local hint.
+  const authMe = useV1AuthMe({ enabled: true, retry: retryTransientFailure });
+  const authUnauthorized = isUnauthenticatedError(authMe.error);
+  const authRetryable = authMe.isError && retryTransientFailure(0, authMe.error);
+  const authPending = Boolean(authMe.isPending || (authMe.isFetching && !authMe.data?.user?.id));
+  const authVerified = Boolean(authMe.data?.user?.id) && !authPending && !authMe.isError && !authUnauthorized;
+  const authError = Boolean(authMe.isError && !authUnauthorized);
+  const query = useV1TeamDetail(teamId, { seed });
+  // override store는 한 칸이고 부모 effect가 자식(TeamStatePageView)보다 늦게 돈다 —
+  // 에러 뷰의 제목까지 여기서 함께 게시하지 않으면 부모 값이 그 제목을 덮어쓴다.
+  const stateTitle = query.isError ? getTeamStateViewModel('error').title : undefined;
+  // 뒤로가기는 AppBackLink 가 `?from=` 을 직접 읽으므로 여기서 backHref 로 따로 넘기지 않는다.
+  useShellOverride(stateTitle ? { title: stateTitle } : {});
+  const eligibility = useV1TeamJoinEligibility(teamId, { enabled: Boolean(query.data) && authVerified });
   const join = useV1CreateTeamJoinApplication(teamId);
   const withdraw = useV1WithdrawTeamJoinApplication(teamId, eligibility.data?.applicationId);
   const resolveChat = useV1ResolveChatRoom();
@@ -188,95 +232,204 @@ export function TeamDetailPageClient({ teamId }: { teamId: string }) {
     dateLabel: formatTournamentDateShort(match.startsAt) ?? '',
     venue: match.place?.name ?? match.placeName ?? '',
   }));
+  // 공개 팀 정보와 달리 내 팀·컨택은 현재 세션 확인이 끝난 뒤에만 조회한다.
+  const myTeamsQuery = useV1MyTeams(undefined, { enabled: authVerified });
+  const operatorTeamCount = authVerified
+    ? normalizeMyTeamsResponse(myTeamsQuery.data).filter((team) => isTeamOperatorRole(team.role)).length
+    : 0;
+  // 운영 메뉴 "받은 컨택 N" 배지 — 이 팀의 운영진일 때만 조회한다(다른 사용자에겐 메뉴 자체가 없다).
+  const contactSummary = useV1TeamContactSummary({ enabled: authVerified && isTeamOperatorRole(query.data?.viewer.role) });
+  const pendingInboundContacts =
+    contactSummary.data?.byTeam.find((row) => row.teamId === teamId)?.pendingInbound ?? 0;
+  /* R4: "내 리그" — 리그 목록 API 의 teamId 필터로 직접 가져온다.
+   * 원래는 이 팀의 팀매치 목록에서 league 필드를 distinct 로 역산했는데, 그러면
+   * **대진이 생기기 전에는 아무것도 안 뜬다** — 운영자가 팀을 리그에 넣은 시점부터
+   * 대진을 만들 때까지 팀은 자기 참가 사실을 알 수 없었다(2026-08-21 재감사, alpha 의
+   * draft 티어 리그 참가팀이 team-matches 0건인 것으로 확인). D-2 가 "참가 인지는
+   * 노출로 푼다"고 한 이상 이 경로는 참가 테이블을 봐야 한다. */
+  const myLeaguesQuery = useV1LeagueMatches(
+    { teamId, limit: 50 },
+  );
+  const myLeagues = (myLeaguesQuery.data?.items ?? []).map((item) => ({
+    leagueId: item.leagueId,
+    title: item.title,
+    // profileHref와 같은 이유로 출처를 넘긴다 — 뒤로가기가 리그 목록이 아니라 이 팀으로.
+    href: withFromPath(`/league-matches/${item.leagueId}`, selfHref),
+  }));
   const fallback = getTeamDetailViewModel();
 
   useEffect(() => {
-    if (!query.data || !isTeamMemberRole(query.data.viewer.role) || autoResolvedChatRef.current === teamId) return;
+    if (!authVerified || !query.data || !isTeamMemberRole(query.data.viewer.role) || autoResolvedChatRef.current === teamId) return;
     autoResolvedChatRef.current = teamId;
     resolveChat.mutate({ targetType: 'team', targetId: teamId });
-  }, [query.data, resolveChat, teamId]);
+  }, [authVerified, query.data, resolveChat, teamId]);
 
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
 
   const regionParts = splitTeamRegion(query.data?.region);
-  const model: TeamDetailViewModel = query.data
-    ? {
-        ...fallback,
-        team: {
-          // `...fallback.team` 스프레드를 걷어냈다 — 아래에서 모든 칸을 실제 값으로 채우므로
-          // 목업이 남을 자리가 없다(남아 있으면 새 필드를 추가할 때 조용히 다시 샌다).
-          ...toTeamDetail(query.data),
-          description: query.data.profile.introduction ?? '',
-          activity: query.data.profile.activitySummary ?? query.data.profile.activityAreaText ?? '',
-          condition: formatTeamDetailLevel(query.data),
-          // 목업(teams.view-model.ts)의 '성별 무관'·'초보-중수'로 메우지 않는다 —
-          // 설정하지 않은 팀에 있지도 않은 조건이 붙어 보였다.
-          genderRule: query.data.profile.genderRule ?? '',
-          schedule: '',
-          city: regionParts.city,
-          county: regionParts.county,
-          level: formatTeamDetailLevel(query.data) || '레벨 미설정',
-          membersList: query.data.membersPreview.map((member) => ({
-            name: member.displayName,
-            role: roleLabel(member.role),
-            meta: member.role,
-            status: member.role === 'owner' || member.role === 'manager' ? '관리자' : '활동중',
-            visibility: query.data.membersVisibilityEnabled ? '공개' : '비공개',
-            // 834행 TeamMembersPageClient의 프로필 링크 패턴과 동일 — 새 규칙을 만들지 않는다.
-            profileHref: `/users/${member.userId}`,
-          })),
-          memberAccess: {
-            canView: query.data.canViewMembers,
-            enabled: query.data.membersVisibilityEnabled,
-            message: '',
-            // memberCount는 활성 멤버만 세는 캐시 필드지만 비동기 드리프트 가능성을 배제할 수
-            // 없으므로(예: standings-wrong-check-fixture-status-first 류 캐시 불일치) 음수로
-            // 내려가지 않게 0으로 floor한다 — "+ -2명 더보기" 같은 값을 절대 렌더하지 않기 위함.
-            moreCount: query.data.canViewMembers
-              ? Math.max(0, query.data.memberCount - query.data.membersPreview.length)
-              : 0,
-          },
-        },
-        mode: toDetailMode(query.data, eligibility.data),
-        ctaLabel: teamDetailCtaLabel(query.data, eligibility.data),
-        ctaPending: join.isPending || withdraw.isPending || resolveChat.isPending,
-        onCta: teamDetailCtaAction({
-          team: query.data,
-          eligibility: eligibility.data,
-          chat: async () => {
-            const result = await resolveChat.mutateAsync({ targetType: 'team', targetId: teamId });
-            router.push(chatRoomHref(result.roomId, result.route));
-          },
-          join: () => join.mutateAsync({ message: null }).then((result) => {
-            trackEvent('team_apply_complete', { teamId });
-            return result;
-          }),
-          withdraw: () => withdraw.mutateAsync({ reason: 'team_join_withdrawn_from_v1_web' }),
-        }),
-        // CTA는 상태에 따라 채팅·신청·취소 세 갈래라 안내 문구도 갈래마다 달라야 한다.
-        // 특히 신청 성공은 "승인이 남았다"는 사실을 반드시 알려야 사용자가 기다릴 대상을 안다.
-        ctaSuccessMessage: teamDetailCtaSuccessMessage(query.data, eligibility.data),
-        ctaFailureMessage: teamDetailCtaFailureMessage(query.data, eligibility.data),
-        joinRequest:
-          toDetailMode(query.data, eligibility.data) === 'pending'
-            ? { requestedAtLabel: formatJoinRequestedAt(eligibility.data?.requestedAt) }
-            : undefined,
-        operations: buildTeamOperations(query.data),
-        onShare: () => shareTeam(query.data),
-        openMatches,
-        openMatchesLoading: openMatchesQuery.isLoading,
-      }
-    : fallback;
+  // 데이터가 오기 전에는 하드코딩 목업(`fallback`)을 화면 전체로 렌더하지 않는다 —
+  // 목업 제목·주소·참가자가 실제 값처럼 보여 사용자가 잘못 읽던 결함이었다.
+  // `fallback` 은 아래에서 필드 단위 기본값으로만 쓴다.
+  if (!query.data) {
+    return <TeamDetailPageSkeleton />;
+  }
+
+  // 서버 seed 로 그리는 중. 비인증 응답이라 viewer 판정이 "비로그인"으로 고정돼 있으므로
+  // 뷰어에 의존하는 것만 잠근다(matches-client.tsx 와 같은 패턴).
+  const seeding = query.isPlaceholderData;
+  const detailMode = authVerified
+    ? toDetailMode(query.data, eligibility.data)
+    : query.data.profile.joinPolicy === 'closed' ? 'closed' : 'default';
+  const canViewMembers = query.data.canViewMembers && (query.data.membersVisibilityEnabled || authVerified);
+
+  const model: TeamDetailViewModel = {
+    ...fallback,
+    team: {
+      // `...fallback.team` 스프레드를 걷어냈다 — 아래에서 모든 칸을 실제 값으로 채우므로
+      // 목업이 남을 자리가 없다(남아 있으면 새 필드를 추가할 때 조용히 다시 샌다).
+      ...toTeamDetail(query.data),
+      description: query.data.profile.introduction ?? '',
+      activity: query.data.profile.activitySummary ?? query.data.profile.activityAreaText ?? '',
+      condition: formatTeamDetailLevel(query.data),
+      // 목업('성별 무관'·'초보-중수')으로 메우지 않는다 — 설정하지 않은 팀에 있지도 않은
+      // 조건이 붙어 보였다.
+      genderRule: query.data.profile.genderRule ?? '',
+      schedule: '',
+      city: regionParts.city,
+      county: regionParts.county,
+      level: formatTeamDetailLevel(query.data) || '레벨 미설정',
+      membersList: (canViewMembers ? query.data.membersPreview : []).map((member) => ({
+        membershipId: member.membershipId,
+        userId: member.userId,
+        name: member.displayName,
+        role: roleLabel(member.role),
+        // 834행 TeamMembersPageClient의 프로필 링크 패턴과 동일 — 새 규칙을 만들지 않는다.
+        // 뒤로가기가 팀 목록이 아니라 이 팀 상세로 돌아오도록 출처를 함께 넘긴다.
+        profileHref: withFromPath(`/users/${member.userId}`, selfHref),
+      })),
+      memberAccess: {
+        canView: canViewMembers,
+        enabled: query.data.membersVisibilityEnabled,
+        message: '',
+        // memberCount는 활성 멤버만 세는 캐시 필드지만 비동기 드리프트 가능성을 배제할 수
+        // 없으므로(예: standings-wrong-check-fixture-status-first 류 캐시 불일치) 음수로
+        // 내려가지 않게 0으로 floor한다 — "+ -2명 더보기" 같은 값을 절대 렌더하지 않기 위함.
+        moreCount: canViewMembers
+          ? Math.max(0, query.data.memberCount - query.data.membersPreview.length)
+          : 0,
+      },
+    },
+    mode: detailMode,
+    // 데스크톱 뒤로가기 헤더(AppBackLink)의 fallback — `?from=` 이 있을 때는 AppBackLink가
+    // 직접 읽어 쓰므로 여기엔 출처 없을 때의 고정 목적지만 둔다.
+    backHref: '/teams',
+    selfHref,
+    subPageFrom: fromPath ? selfHref : null,
+    ctaLabel: seeding
+      ? '불러오는 중'
+      : teamDetailCtaLabel(query.data, eligibility.data, {
+        authPending,
+        authUnauthorized,
+        authError,
+        authRetryable,
+        eligibilityError: eligibility.isError,
+        eligibilityUnauthorized: isUnauthenticatedError(eligibility.error),
+      }),
+    ctaPending: join.isPending || withdraw.isPending || resolveChat.isPending,
+    // ctaPending 에 seeding·authPending 을 넣지 않는다 — 렌더 쪽이 그걸 '처리 중'(= 내
+    // 신청 처리 중)으로 읽어 ctaLabel 을 덮는다. 둘 다 onCta 를 비워 이미 disabled 다.
+    onCta: seeding ? undefined : teamDetailCtaAction({
+      team: query.data,
+      eligibility: eligibility.data,
+      chat: async () => {
+        const result = await resolveChat.mutateAsync({ targetType: 'team', targetId: teamId });
+        router.push(chatRoomHref(result.roomId, result.route));
+      },
+      join: () => join.mutateAsync({ message: null }).then((result) => {
+        trackEvent('team_apply_complete', { teamId });
+        return result;
+      }),
+      login: () => router.push(getLoginPathForRedirect(`/teams/${teamId}`)),
+      retryAuth: async () => {
+        const result = await authMe.refetch();
+        if (result.error && !isUnauthenticatedError(result.error)) throw result.error;
+      },
+      retryEligibility: async () => {
+        const result = await eligibility.refetch();
+        if (result.error) {
+          if (isUnauthenticatedError(result.error)) {
+            router.push(getLoginPathForRedirect(`/teams/${teamId}`));
+            return;
+          }
+          throw result.error;
+        }
+      },
+      withdraw: () => withdraw.mutateAsync({ reason: 'team_join_withdrawn_from_v1_web' }),
+      state: {
+        authPending,
+        authUnauthorized,
+        authError,
+        authRetryable,
+        eligibilityError: eligibility.isError,
+        eligibilityUnauthorized: isUnauthenticatedError(eligibility.error),
+      },
+    }),
+    // CTA는 상태에 따라 채팅·신청·취소 세 갈래라 안내 문구도 갈래마다 달라야 한다.
+    // 특히 신청 성공은 "승인이 남았다"는 사실을 반드시 알려야 사용자가 기다릴 대상을 안다.
+    ctaSuccessMessage: teamDetailCtaSuccessMessage(query.data, eligibility.data, {
+      authPending,
+      authUnauthorized,
+      authError,
+      authRetryable,
+      eligibilityError: eligibility.isError,
+      eligibilityUnauthorized: isUnauthenticatedError(eligibility.error),
+    }),
+    ctaFailureMessage: teamDetailCtaFailureMessage(query.data, eligibility.data, {
+      authPending,
+      authUnauthorized,
+      authError,
+      authRetryable,
+      eligibilityError: eligibility.isError,
+      eligibilityUnauthorized: isUnauthenticatedError(eligibility.error),
+    }),
+    joinRequest:
+      detailMode === 'pending'
+        ? { requestedAtLabel: formatJoinRequestedAt(eligibility.data?.requestedAt) }
+        : undefined,
+    operations: authVerified ? buildTeamOperations(query.data, pendingInboundContacts, fromPath ? selfHref : null, selfHref) : undefined,
+    onShare: () => shareTeam(query.data),
+    openMatches,
+    openMatchesLoading: openMatchesQuery.isLoading,
+    contactHref:
+      authVerified && !seeding && detailMode !== 'mine' && operatorTeamCount > 0
+        ? `/teams/${teamId}/contact/new`
+        : undefined,
+    myLeagues,
+    myLeaguesLoading: myLeaguesQuery.isLoading,
+    // 통신 오류를 "리그 0개"로 위장시키지 않기 위한 3번째 상태 — TeamMyLeaguesSection이
+    // 이 플래그로 EmptyState(재시도)를 렌더한다. refetch를 그대로 넘겨 재시도 버튼이
+    // 같은 쿼리를 다시 부르게 한다.
+    myLeaguesError: myLeaguesQuery.isError,
+    onRetryMyLeagues: () => void myLeaguesQuery.refetch(),
+  };
 
   return <TeamDetailPageView model={model} />;
 }
 
 export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   const router = useRouter();
+  // 팀 상세가 받은 출처를 이어받아 왔으면 뒤로가기를 그 팀 상세(출처 포함)로 돌린다.
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const membersHref = withFromPath(`/teams/${teamId}/members`, fromPath);
   const [activeTab, setActiveTab] = useState<TeamMembersViewModel['activeTab']>('members');
   const team = useV1TeamDetail(teamId);
   const canViewMembers = Boolean(team.data?.canViewMembers);
   const members = useV1TeamMembers(teamId, { limit: 50 }, { enabled: canViewMembers });
+  // 상태 뷰(TeamStatePageView)의 제목도 여기서 함께 게시한다 — 부모 override가 자식 것을 덮는다.
+  const pageState = team.isError || members.isError ? 'error' : team.data && !team.data.canViewMembers ? 'restricted' : null;
+  const stateTitle = pageState ? getTeamStateViewModel(pageState).title : undefined;
+  // 뒤로가기는 AppBackLink 가 `?from=` 을 직접 읽으므로 여기서 backHref 로 따로 넘기지 않는다.
+  useShellOverride(stateTitle ? { title: stateTitle } : {});
   const viewerRole = team.data?.viewer.role;
   const viewerMembershipId = team.data?.viewer.membershipId ?? null;
   /** 등번호를 고칠 대상. null이면 다이얼로그가 닫혀 있다. */
@@ -358,6 +511,8 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
             setInviteError('가입된 이메일을 찾을 수 없어요.');
           } else if (responseCode === 'ALREADY_MEMBER') {
             setInviteError('이미 팀 멤버예요.');
+          } else if (responseCode === 'VALIDATION_ERROR') {
+            setInviteError(invitationValidationMessage(err));
           } else {
             const raw = extractErrorMessage(err, '');
             setInviteError(raw || '초대를 보내지 못했어요. 다시 시도해 주세요.');
@@ -369,7 +524,9 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
 
   const tabs: TeamMembersViewModel['tabs'] = [
     { key: 'members', label: '멤버', count: members.data?.summary.memberCount ?? memberItems.length, onSelect: () => setActiveTab('members') },
-    { key: 'requests', label: '가입 신청', count: requestItems.length, onSelect: () => setActiveTab('requests') },
+    ...(canReviewApplications
+      ? [{ key: 'requests' as const, label: '가입 신청', count: requestItems.length, onSelect: () => setActiveTab('requests') }]
+      : []),
     ...(canManageInvitations
       ? [{ key: 'invitations' as const, label: '초대', count: invitationItems.length, onSelect: () => setActiveTab('invitations') }]
       : []),
@@ -379,6 +536,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
     ...fallback,
     activeTab,
     tabs,
+    viewerRole: viewerRole ?? null,
     // 팀 정보가 아직 안 왔을 때 목업 팀('성수 러너스 FC')·목업 인원(운영진 2명)을 보여주지
     // 않는다 — 다른 팀의 이름과 숫자를 이 팀의 것처럼 읽게 만든다.
     teamName: team.data?.name ?? '',
@@ -389,7 +547,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
     },
     members: memberItems.length
       ? memberItems.map((member) =>
-          toMemberModel(member, {
+          toMemberModel(member, membersHref, {
             actionPending,
             canManageMembers,
             canDelegateOwner,
@@ -426,7 +584,7 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
         )
       : fallback.members,
     requests: requestItems.map((application) =>
-      toRequestModel(application, {
+      toRequestModel(application, membersHref, {
         actionPending,
         approve: () => confirmAction(confirm, { title: '가입 신청 승인', message: `${application.applicant.displayName}님의 가입 신청을 승인할까요?`, confirmLabel: '승인' }, () => approveApplication.mutate(
           { applicationId: application.applicationId, note: null },
@@ -517,73 +675,29 @@ export function TeamMembersPageClient({ teamId }: { teamId: string }) {
   );
 }
 
-function toTeam(team: V1Team, fallback: TeamModel): TeamModel {
-  const id = team.teamId ?? team.id;
-  const sportName = team.sport?.name ?? team.sportName;
-  const regionName = formatTeamRegion(team.region, team.regionName);
-  const levelTag = formatTeamLevelTag(team);
-  const genderRule = team.genderRule ?? '';
-  const full = isTeamAtCapacity(team.memberCount, team.memberGoalCount);
+/**
+ * 초대 폼은 이메일과 메시지 두 필드를 보내므로 400 을 이메일 탓으로 싸잡으면 안 된다.
+ * 서버 ValidationPipe(main.ts)는 details 에 `{ field, messages }` 배열을 담아 준다.
+ * invitedEmail 의 제약은 DTO 가 한국어 메시지를 달아 두어 그대로 쓸 수 있다(형식·길이가
+ * 서로 다른 안내를 낸다). message 의 @MaxLength 에는 메시지가 없어 영문이 오므로 여기서 쓴다.
+ */
+function invitationValidationMessage(err: unknown): string {
+  const details = err instanceof V1ApiError ? err.details : undefined;
+  const entries = Array.isArray(details)
+    ? (details as Array<{ field?: unknown; messages?: unknown } | null>)
+    : [];
 
-  return {
-    id,
-    name: team.name,
-    logo: team.name.slice(0, 1),
-    logoUrl: team.logoUrl ?? null,
-    coverImageUrl: team.coverImageUrl ?? null,
-    sport: sportName,
-    sports: [sportName],
-    region: regionName,
-    members: team.memberCount,
-    capacity: team.memberGoalCount ?? 0,
-    status: team.joinPolicy === 'closed' || full ? 'closed' : 'open',
-    statusLabel: team.joinPolicy === 'closed' ? '가입 닫힘' : full ? '정원 마감' : '가입 신청 가능',
-    tags: [levelTag, genderRule].filter(Boolean),
-    genderRule,
-    ownerName: team.owner?.displayName,
-    managerName: team.manager?.displayName ?? null,
-    intro: team.introductionPreview ?? `${regionName}에서 활동하는 ${sportName} 팀이에요.`,
-    next: team.activitySummary ?? team.activityAreaText ?? '',
-  };
-}
-
-function formatTeamLevelTag(team: V1Team) {
-  const explicitLabel = team.levelLabel?.trim() || team.skillLevelText?.trim();
-  if (explicitLabel) return explicitLabel;
-  const minName = team.minLevel?.name?.trim();
-  const maxName = team.maxLevel?.name?.trim();
-  if (minName && maxName) return minName === maxName ? minName : `${minName}-${maxName}`;
-  return minName ?? maxName ?? '레벨 미설정';
-}
-
-function buildTeamSportChips(
-  items: V1Team[],
-  fallback: TeamListViewModel,
-  params: URLSearchParams,
-  selectedSportId?: string,
-  masterSports?: Array<{ id: string; name: string }>,
-  showCounts = true,
-) {
-  const fixedSports = masterSports?.length
-    ? masterSports.slice(0, 4)
-    : fallback.chips.slice(1, 5).map((chip) => ({ id: chip.label, name: chip.label.replace(/\s+\d+$/, '') }));
-
-  return [
-    { label: fallback.chips[0]?.label.replace(/\s+\d+$/, '') ?? '전체', ...(showCounts ? { count: items.length } : {}), active: !selectedSportId, href: buildTeamHref(params, { sportId: null }) },
-    ...fixedSports.map((sport) => ({
-      label: sport.name,
-      ...(showCounts
-        ? {
-            count: items.filter((team) => {
-              const teamSport = team.sport;
-              return teamSport?.sportId === sport.id || teamSport?.name === sport.name || team.sportName === sport.name;
-            }).length,
-          }
-        : {}),
-      active: selectedSportId === sport.id,
-      href: buildTeamHref(params, { sportId: sport.id }),
-    })),
-  ];
+  const emailDetail = entries.find((detail) => detail?.field === 'invitedEmail');
+  if (emailDetail) {
+    const [serverMessage] = Array.isArray(emailDetail.messages) ? emailDetail.messages : [];
+    return typeof serverMessage === 'string' && serverMessage.length > 0
+      ? serverMessage
+      : '이메일 형식을 확인해 주세요.';
+  }
+  if (entries.some((detail) => detail?.field === 'message')) {
+    return `초대 메시지는 ${INVITE_MESSAGE_MAX_LENGTH}자까지 쓸 수 있어요.`;
+  }
+  return '초대 내용을 다시 확인해 주세요.';
 }
 
 function buildTeamFilterSheet(
@@ -591,6 +705,8 @@ function buildTeamFilterSheet(
   sort: NonNullable<TeamListViewModel['filterSheet']>['sort'],
   genderRule: NonNullable<TeamListViewModel['filterSheet']>['genderRule'],
   levels: NonNullable<TeamListViewModel['filterSheet']>['levels'],
+  regionId: string | undefined,
+  regions: ReadonlyArray<{ id: string; name: string; parentId: string | null }>,
   open: boolean,
 ): NonNullable<TeamListViewModel['filterSheet']> {
   const sortOptions: NonNullable<TeamListViewModel['filterSheet']>['sortOptions'] = [
@@ -609,30 +725,35 @@ function buildTeamFilterSheet(
     href: buildTeamHref(params, { levelCodes: toggleLevelCode(levels, code), levels: null, filter: '1' }),
     active: levels.includes(code),
   }));
+  // matches-client.tsx buildMatchFilterSheet()와 동일 이유로 시/도(레벨1)만 칩으로 노출한다.
+  const regionOptions: NonNullable<TeamListViewModel['filterSheet']>['regionOptions'] = [
+    { label: '전체', value: 'all', href: buildTeamHref(params, { regionId: null, filter: '1' }), active: !regionId },
+    ...regions
+      .filter((region) => region.parentId === null)
+      .map((region) => ({
+        label: region.name,
+        value: region.id,
+        href: buildTeamHref(params, { regionId: regionId === region.id ? null : region.id, filter: '1' }),
+        active: regionId === region.id,
+      })),
+  ];
 
   return {
     open,
     closeHref: buildTeamHref(params, { filter: null }),
-    resetHref: buildTeamHref(params, { sort: null, genderRule: null, levelCodes: null, levels: null, filter: '1' }),
+    resetHref: buildTeamHref(params, { sort: null, genderRule: null, levelCodes: null, levels: null, regionId: null, filter: '1' }),
     applyHref: buildTeamHref(params, { filter: null }),
     sort,
     genderRule,
     levels,
+    regionId: regionId ?? '',
     sortOptions,
     genderOptions,
     levelOptions,
+    regionOptions,
   };
 }
 
-function buildTeamHref(params: URLSearchParams, overrides: Record<string, string | null>) {
-  const next = new URLSearchParams(params.toString());
-  Object.entries(overrides).forEach(([key, value]) => {
-    if (value === null || value === '') next.delete(key);
-    else next.set(key, value);
-  });
-  const queryString = next.toString();
-  return queryString ? `/teams?${queryString}` : '/teams';
-}
 
 function toTeamSort(value: string | null): NonNullable<TeamListViewModel['filterSheet']>['sort'] {
   if (value === 'recommended' || value === 'deadline' || value === 'latest') return value;
@@ -653,12 +774,13 @@ function countTeamFilters(
   sort: NonNullable<TeamListViewModel['filterSheet']>['sort'],
   genderRule: NonNullable<TeamListViewModel['filterSheet']>['genderRule'],
   levels: NonNullable<TeamListViewModel['filterSheet']>['levels'],
+  regionId: string | undefined,
 ) {
-  return (sort ? 1 : 0) + (genderRule ? 1 : 0) + levels.length;
+  return (sort ? 1 : 0) + (genderRule ? 1 : 0) + levels.length + (regionId ? 1 : 0);
 }
 
 // 목업 없이 API 값만으로 모델을 만든다 — fallback 인자를 받지 않는 것이 그 계약이다.
-// 직접 유닛 커버리지를 붙이려고 export 한다(team-matches 의 toTeamMatch 와 같은 관행).
+// 직접 유닛 커버리지를 붙이려고 export 한다(card-model 의 toTeamMatch 와 같은 관행).
 export function toTeamDetail(team: V1TeamDetail): TeamModel {
   const levelLabel = formatTeamDetailLevel(team);
   const full = isTeamAtCapacity(team.memberCount, team.profile.memberGoalCount);
@@ -692,9 +814,6 @@ export function toTeamDetail(team: V1TeamDetail): TeamModel {
   };
 }
 
-function isTeamAtCapacity(memberCount: number, memberGoalCount?: number | null) {
-  return memberGoalCount != null && memberCount >= memberGoalCount;
-}
 
 function formatTeamDetailLevel(team: V1TeamDetail) {
   const explicitLabel = team.profile.levelLabel?.trim() || team.profile.skillLevelText?.trim();
@@ -705,19 +824,6 @@ function formatTeamDetailLevel(team: V1TeamDetail) {
   return minName ?? maxName ?? '';
 }
 
-function formatTeamRegion(region?: { name: string; parentName?: string | null } | null, fallback?: string | null) {
-  if (region?.parentName) return `${region.parentName} ${region.name}`;
-  return region?.name ? `${region.name} 전체` : fallback ?? '지역 미정';
-}
-
-function splitTeamRegion(region?: { name: string; parentName?: string | null } | null) {
-  if (region?.parentName) return { city: region.parentName, county: region.name };
-  const trimmed = region?.name?.trim();
-  if (!trimmed) return { city: '', county: '지역 미정' };
-  const [city, ...countyParts] = trimmed.split(/\s+/);
-  if (countyParts.length === 0) return { city, county: '전체' };
-  return { city, county: countyParts.join(' ') };
-}
 
 /**
  * 화면 전체가 참조하는 가입 상태 단일 소스.
@@ -744,9 +850,31 @@ function toDetailMode(
   return 'default';
 }
 
-function teamDetailCtaLabel(team: V1TeamDetail, eligibility?: { message: string; joinState: string; eligible: boolean }) {
+type TeamJoinAuthState = {
+  authPending: boolean;
+  authUnauthorized: boolean;
+  authError: boolean;
+  authRetryable: boolean;
+  eligibilityError: boolean;
+  eligibilityUnauthorized: boolean;
+};
+
+// 취소 요청은 eligibility 의 applicationId 로만 보낼 수 있다. 팀 상세 viewer 에는 신청 id 가
+// 없어서, 상세 joinState 폴백만으로 취소를 열면 `/team-join-applications/undefined/withdraw` 가 된다.
+function canWithdrawJoin(team: V1TeamDetail, eligibility?: { joinState: string; applicationId?: string | null }) {
+  return resolveJoinState(team, eligibility) === 'requested' && Boolean(eligibility?.applicationId);
+}
+
+function teamDetailCtaLabel(team: V1TeamDetail, eligibility: { message: string; joinState: string; eligible: boolean; applicationId?: string | null } | undefined, state: TeamJoinAuthState) {
+  if (state.authPending) return '로그인 상태 확인 중';
+  if (state.authError && state.authRetryable) return '로그인 상태 다시 확인';
+  if (state.authError) return '로그인 상태를 확인할 수 없어요';
+  if (state.authUnauthorized) return '로그인 후 가입 신청';
   if (isTeamMemberRole(team.viewer.role)) return '팀 채팅';
-  if (resolveJoinState(team, eligibility) === 'requested') return '신청 취소';
+  if (canWithdrawJoin(team, eligibility)) return '신청 취소';
+  if (state.eligibilityError && !state.eligibilityUnauthorized) return '다시 시도';
+  if (team.viewer.disabledReason === 'LOGIN_REQUIRED' || state.eligibilityUnauthorized) return '로그인 후 가입 신청';
+  if (resolveJoinState(team, eligibility) === 'requested') return '신청 상태 확인 중';
   if (eligibility?.eligible) return '가입 신청';
   return eligibility?.message ?? '가입 불가';
 }
@@ -757,20 +885,26 @@ function teamDetailCtaLabel(team: V1TeamDetail, eligibility?: { message: string;
  */
 function teamDetailCtaSuccessMessage(
   team: V1TeamDetail,
-  eligibility?: { joinState: string; eligible: boolean },
+  eligibility: { joinState: string; eligible: boolean; applicationId?: string | null } | undefined,
+  state: TeamJoinAuthState,
 ): string | undefined {
+  if (state.authPending || state.authError || state.authUnauthorized) return '';
   if (isTeamMemberRole(team.viewer.role)) return '팀 채팅으로 이동해요.';
-  if (resolveJoinState(team, eligibility) === 'requested') return '가입 신청을 취소했어요.';
+  if (canWithdrawJoin(team, eligibility)) return '가입 신청을 취소했어요.';
+  if (state.eligibilityError || state.eligibilityUnauthorized || team.viewer.disabledReason === 'LOGIN_REQUIRED') return '';
   if (eligibility?.eligible) return '가입 신청을 보냈어요. 관리자가 승인하면 알림으로 알려드려요.';
   return undefined;
 }
 
 function teamDetailCtaFailureMessage(
   team: V1TeamDetail,
-  eligibility?: { joinState: string; eligible: boolean },
+  eligibility: { joinState: string; eligible: boolean; applicationId?: string | null } | undefined,
+  state: TeamJoinAuthState,
 ): string | undefined {
+  if (state.authPending || state.authError || state.authUnauthorized) return '';
   if (isTeamMemberRole(team.viewer.role)) return '팀 채팅을 열지 못했어요. 잠시 후 다시 시도해 주세요.';
-  if (resolveJoinState(team, eligibility) === 'requested') return '가입 신청을 취소하지 못했어요. 잠시 후 다시 시도해 주세요.';
+  if (canWithdrawJoin(team, eligibility)) return '가입 신청을 취소하지 못했어요. 잠시 후 다시 시도해 주세요.';
+  if (state.eligibilityError || state.eligibilityUnauthorized || team.viewer.disabledReason === 'LOGIN_REQUIRED') return '';
   if (eligibility?.eligible) return '가입 신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.';
   return undefined;
 }
@@ -788,21 +922,42 @@ function teamDetailCtaAction({
   eligibility,
   chat,
   join,
+  login,
+  retryAuth,
+  retryEligibility,
   withdraw,
+  state,
 }: {
   team: V1TeamDetail;
-  eligibility?: { eligible: boolean; joinState: string };
+  eligibility?: { eligible: boolean; joinState: string; applicationId?: string | null };
   chat: () => Promise<unknown>;
   join: () => Promise<unknown>;
+  login: () => void;
+  retryAuth: () => Promise<void>;
+  retryEligibility: () => Promise<unknown>;
   withdraw: () => Promise<unknown>;
+  state: TeamJoinAuthState;
 }): (() => void | Promise<unknown>) | undefined {
+  if (state.authPending) return undefined;
+  if (state.authError && state.authRetryable) return retryAuth;
+  if (state.authError) return undefined;
+  if (state.authUnauthorized) return login;
   if (isTeamMemberRole(team.viewer.role)) return chat;
-  if (resolveJoinState(team, eligibility) === 'requested') return withdraw;
+  if (canWithdrawJoin(team, eligibility)) return withdraw;
+  if (state.eligibilityError && !state.eligibilityUnauthorized) return retryEligibility;
+  if (team.viewer.disabledReason === 'LOGIN_REQUIRED' || state.eligibilityUnauthorized) return login;
+  if (resolveJoinState(team, eligibility) === 'requested') return undefined;
   if (eligibility?.eligible) return join;
   return undefined;
 }
 
-function buildTeamOperations(team: V1TeamDetail): TeamDetailViewModel['operations'] {
+function buildTeamOperations(
+  team: V1TeamDetail,
+  pendingInboundContacts = 0,
+  subPageFrom: string | null = null,
+  // 팀매치 만들기의 자연스러운 뒤로가기는 (팀 상세로 들어온 출처가 아니라) 이 팀 상세 자신이다.
+  selfHref?: string,
+): TeamDetailViewModel['operations'] {
   if (!isTeamOperatorRole(team.viewer.role)) return undefined;
   return [
     {
@@ -813,12 +968,25 @@ function buildTeamOperations(team: V1TeamDetail): TeamDetailViewModel['operation
     {
       label: '멤버 관리',
       sub: '멤버 역할, 가입 신청, 초대를 관리해요.',
-      href: `/teams/${team.teamId}/members`,
+      href: withFromPath(`/teams/${team.teamId}/members`, subPageFrom),
+    },
+    {
+      // 컨택은 채팅방으로 흡수됐다 — 팀컨택 필터가 걸린 채팅 목록으로 보낸다.
+      label: '받은 컨택',
+      sub: '다른 팀이 보낸 컨택을 확인하고 답해요.',
+      href: '/chat?category=team_contact',
+      badge: pendingInboundContacts,
+      badgeLabel: pendingInboundContacts > 0 ? `답장을 기다리는 컨택 ${pendingInboundContacts}건` : undefined,
+    },
+    {
+      label: '컨택 설정',
+      sub: '다른 팀의 컨택을 받을 조건과 차단 목록을 관리해요.',
+      href: `/teams/${team.teamId}/contact/settings`,
     },
     {
       label: '팀매치 만들기',
       sub: '이 팀 명의로 새 팀매치를 모집해요.',
-      href: '/team-matches/new/team',
+      href: selfHref ? withFromPath('/team-matches/new/team', selfHref) : '/team-matches/new/team',
     },
   ];
 }
@@ -829,16 +997,13 @@ function roleLabel(role: string) {
   return '멤버';
 }
 
-function isTeamOperatorRole(role?: string | null) {
-  return role === 'owner' || role === 'manager' || role === 'admin';
-}
-
 function isTeamMemberRole(role?: string | null) {
   return isTeamOperatorRole(role) || role === 'member';
 }
 
 function toMemberModel(
   member: V1TeamMember,
+  membersHref: string,
   actions: {
     actionPending: boolean;
     canManageMembers: boolean;
@@ -882,7 +1047,9 @@ function toMemberModel(
       member.jerseyNumber === null || member.jerseyNumber === undefined
         ? `가입 ${formatDate(member.joinedAt)}`
         : `${member.jerseyNumber}번 · 가입 ${formatDate(member.joinedAt)}`,
-    profileHref: `/users/${member.userId}`,
+    // 뒤로가기가 팀원 목록으로 돌아오도록 출처를 함께 넘긴다(팀 상세 "주요 멤버"
+    // 미리보기와 동일 패턴).
+    profileHref: withFromPath(`/users/${member.userId}`, membersHref),
     locked: member.role === 'owner',
     actions: itemActions,
     actionPending: actions.actionPending,
@@ -919,6 +1086,7 @@ async function shareTeam(team: V1TeamDetail) {
 
 function toRequestModel(
   application: V1TeamJoinApplication,
+  membersHref: string,
   actions: {
     actionPending: boolean;
     approve: () => void;
@@ -929,7 +1097,8 @@ function toRequestModel(
     name: application.applicant.displayName,
     meta: application.message ?? `신청 ${formatDate(application.createdAt)}`,
     status: teamJoinApplicationStatusLabel(application.status),
-    profileHref: `/users/${application.applicant.userId}`,
+    // 뒤로가기가 가입 신청 목록으로 돌아오도록 출처를 함께 넘긴다(toMemberModel과 동일 패턴).
+    profileHref: withFromPath(`/users/${application.applicant.userId}`, membersHref),
     actions: [
       { label: '승인', onSelect: actions.approve },
       { label: '거절', tone: 'danger', onSelect: actions.reject },

@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Card, EmptyState, KPIStat } from '@/components/v1-ui/primitives';
+import { RECORD_TYPE_TABS, recordEmptyCopy } from './record-category-tabs';
+import { SegmentedTabs } from '@/components/v1-ui/segmented-tabs';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { formatTournamentDateShort } from '@/lib/date-utils';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
@@ -16,14 +18,45 @@ import {
   presentParticipantName,
   teamRecordResultLabel,
 } from './format';
-import { resultChipStyle, resultStripeStyle } from './result-emphasis';
-import type { PublicTeamRecordEvent, PublicTeamRecordItem, PublicTeamRecordsResponse } from './types';
+import { resultChipStyle } from './result-emphasis';
+import { withFromPath } from '@/lib/session-storage';
+import type {
+  PublicTeamRecordEvent,
+  PublicTeamRecordItem,
+  PublicTeamRecordsResponse,
+  TeamRecordCategory,
+  TeamRecordSummaryTotals,
+  TeamRecordTypeFilter,
+} from './types';
 
-/** 대회 소스면 대회 상세로, 팀매치 소스면 팀매치 상세로 — exactly-one-source라 항상 둘 중
- * 하나만 있다(V1Game의 CHECK 제약, public-team-records.service.ts 주석 참고). */
-function recordHref(item: PublicTeamRecordItem): string | null {
-  if (item.tournamentId) return `/tournaments/${item.tournamentId}`;
-  if (item.teamMatchId) return `/team-matches/${item.teamMatchId}`;
+// U2 의 탭·라벨은 개인 기록도 같은 4탭을 쓰게 되면서 `record-category-tabs.ts` 로
+// 끌어올렸다(Task 166 BE-4) — 두 화면이 같은 경기를 다른 이름으로 부르지 않게 한다.
+
+/**
+ * F6 -- 행 상단 캡션에 붙일 대회/리그 이름. 대회 경기는 대회명을, 정규 리그 대진은 리그명을
+ * 같은 자리에 같은 표기(` · 이름`)로 보여준다. 개인 전적 화면(`user-records-content.tsx`의
+ * `competitionLabel`)과 **같은 규칙**이다 -- 같은 경기를 두 화면이 다르게 부르면 안 된다.
+ * 전에는 대회명만 붙어서 '전체' 탭의 리그 경기와 친선 팀매치가 둘 다 날짜 한 줄로 끝나
+ * 서로 구분되지 않았다. 리그가 아닌 친선 팀매치는 예전 그대로 아무것도 붙지 않는다(회귀 금지).
+ *
+ * canonical tournament 경기에는 `tournamentId`와 운영 `teamMatchId`가 함께 있을 수
+ * 있고, `leagueId`는 정규 리그 축에만 해당한다. 우선순위는 백엔드 판정 함수와
+ * 같은 순서로 고정해 둔다.
+ */
+function competitionLabel(item: PublicTeamRecordItem): string | null {
+  return item.tournamentTitle ?? item.leagueTitle ?? null;
+}
+
+/** 대회 축이면 대회 상세로, 팀매치 축이면 팀매치 상세로 이동한다. canonical tournament
+ * 행은 두 식별자를 모두 가지므로 실제 경기 상세 route를 사용하고, legacy fixture는
+ * tournament 상세를 유지한다. */
+function recordHref(item: PublicTeamRecordItem, fromHref: string): string | null {
+  // 뒤로가기가 이 팀 전적으로 돌아오도록 출처를 함께 넘긴다(각 상세 화면이 `?from=`을 읽는다).
+  if (item.tournamentId && item.teamMatchId) {
+    return withFromPath(`/tournaments/${item.tournamentId}/matches/${item.teamMatchId}`, fromHref);
+  }
+  if (item.tournamentId) return withFromPath(`/tournaments/${item.tournamentId}`, fromHref);
+  if (item.teamMatchId) return withFromPath(`/team-matches/${item.teamMatchId}`, fromHref);
   return null;
 }
 
@@ -46,7 +79,15 @@ function TeamRecordEventRow({ event }: { event: PublicTeamRecordEvent }) {
         <span className="tab-num" style={{ color: 'var(--text-caption)', fontSize: 12 }}>{event.jerseyNumber}</span>
       ) : null}
       <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-strong)' }}>
-        {presentGameEventParticipantName(event.type, event.participantName)}
+        {/* 열어도 되는지는 서버가 `profileHref` 로 판단해 내려준다 — 여기서 동의·계정
+            유무를 다시 따지지 않는다(경기 상세의 ProfileLink 와 같은 규칙). */}
+        {event.profileHref !== null ? (
+          <Link href={event.profileHref} style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+            {presentGameEventParticipantName(event.type, event.participantName)}
+          </Link>
+        ) : (
+          presentGameEventParticipantName(event.type, event.participantName)
+        )}
       </span>
     </span>
   );
@@ -62,10 +103,10 @@ function TeamRecordEventRow({ event }: { event: PublicTeamRecordEvent }) {
              관전자에게는 원정 열에 홈 선수 이름이 뜬 일반 골로만 보였다). */
           <span
             style={{
-              fontSize: 10,
+              fontSize: 'var(--font-size-micro)',
               lineHeight: 1.4,
               padding: '0 4px',
-              borderRadius: 4,
+              borderRadius: 'var(--radius-tight)',
               fontWeight: 700,
               // 실제 팔레트 토큰을 쓴다 — `--danger-*` 는 이 코드베이스에 없어서
               // 하드코딩 fallback 이 항상 적용되고 있었다(다크모드도 따라오지 않는다).
@@ -105,7 +146,7 @@ function TeamRecordEventsPanel({
       id={id}
       role="list"
       aria-label={`${teamName} 대 ${item.opponentTeamName ?? '상대 미상'} 경기 기록`}
-      style={{ padding: '0 16px 14px', borderTop: '1px solid var(--grey100)' }}
+      style={{ padding: '0 16px 16px', borderTop: '1px solid var(--grey100)' }}
     >
       {/* 이벤트 행(`TeamRecordEventRow`)과 **같은 grid·gap·가운데 폭**을 쓴다 — 머리글만
        * gap 없이 두면 두 팀명이 `…01팀(테스트) QA 스쿼드 02팀` 처럼 맞붙어 한 덩어리로
@@ -115,9 +156,9 @@ function TeamRecordEventsPanel({
           display: 'grid',
           gridTemplateColumns: '1fr auto 1fr',
           gap: 8,
-          fontSize: 11,
+          fontSize: 'var(--font-size-micro)',
           color: 'var(--text-caption)',
-          margin: '10px 0 8px',
+          margin: '12px 0 8px',
         }}
       >
         <span style={{ textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -128,7 +169,7 @@ function TeamRecordEventsPanel({
           {item.opponentTeamName ?? '상대 미상'}
         </span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {item.events.map((event) => (
           <TeamRecordEventRow key={event.id} event={event} />
         ))}
@@ -159,20 +200,20 @@ function TeamRecordRow({
   reserveToggleSpace: boolean;
 }) {
   const penaltyLabel = formatTeamRecordPenaltyScoreline(item.penalties);
+  const competition = competitionLabel(item);
   return (
     <div
       style={{
-        padding: '14px 16px 14px 12px',
+        padding: 16,
         borderTop: '1px solid var(--grey100)',
-        ...resultStripeStyle(item.result),
       }}
     >
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 6,
-          marginBottom: 10,
+          gap: 8,
+          marginBottom: 12,
           // '정정됨' 배지가 빠진 자리 재균형: 배지가 있던 시절엔 우측 여백이 배지
           // 폭만큼만 확보됐는데, 배지를 완전히 없앤 지금은 (1) 아코디언 토글 버튼이
           // 있는 행엔 그 버튼(44px)과 안 겹치도록 동일한 폭을 계속 남기고, (2) 토글이
@@ -181,7 +222,12 @@ function TeamRecordRow({
           paddingRight: reserveToggleSpace ? 40 : 0,
         }}
       >
-        <span style={resultChipStyle(item.result)}>{teamRecordResultLabel(item.result)}</span>
+        {/* `status_only` 경기는 승패도 감춘다 — 점수와 같은 이유로 "경기가 있었다"만 남긴다. */}
+        {item.result === null ? (
+          <span style={resultChipStyle('PENDING')}>결과 비공개</span>
+        ) : (
+          <span style={resultChipStyle(item.result)}>{teamRecordResultLabel(item.result)}</span>
+        )}
         <span
           style={{
             fontSize: 12,
@@ -194,11 +240,11 @@ function TeamRecordRow({
           }}
         >
           {formatTournamentDateShort(item.playedAt) ?? ''}
-          {item.tournamentTitle ? ` · ${item.tournamentTitle}` : ''}
+          {competition ? ` · ${competition}` : ''}
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 0 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <TeamAvatar seed={teamId} name={teamName} logoUrl={teamLogoUrl} size="sm" />
           <span
             className="tm-text-caption"
@@ -209,17 +255,21 @@ function TeamRecordRow({
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, gap: 2 }}>
           <span className="tab-num" style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-strong)' }}>
-            {item.goalsFor} : {item.goalsAgainst}
+            {/* 공개 가시성이 `status_only` 인 경기는 점수를 감춘다 — 빈칸으로 두면 "0:0 인가?"
+                로 읽히므로 감춰졌다는 사실 자체를 글자로 말한다(색만으로 전달하지 않는다). */}
+            {item.goalsFor === null || item.goalsAgainst === null
+              ? '비공개'
+              : `${item.goalsFor} : ${item.goalsAgainst}`}
           </span>
           {/* 정규시간 스코어 그대로 두고, 승부차기는 아래 보조 표기로만 덧붙인다 --
               대회 화면(PenaltyScoreline)과 동일한 "승부차기 N-M" 문구. */}
           {penaltyLabel ? (
-            <span className="tab-num" style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-caption)' }}>
+            <span className="tab-num" style={{ fontSize: 'var(--font-size-micro)', fontWeight: 600, color: 'var(--text-caption)' }}>
               {penaltyLabel}
             </span>
           ) : null}
         </div>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 0 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <TeamAvatar seed={item.opponentTeamId ?? item.gameId} name={item.opponentTeamName ?? '상대 미상'} logoUrl={item.opponentTeamLogoUrl} size="sm" />
           <span
             className="tm-text-caption"
@@ -238,12 +288,26 @@ export function TeamRecordsContent({
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
+  activeType,
+  onChangeType,
+  activeSeason,
+  onChangeSeason,
+  selfHref,
 }: {
   data: PublicTeamRecordsResponse;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
+  /** U2 -- 미전달 시 '전체' 고정(다른 화면이 아직 탭 없이 이 컴포넌트를 쓸 수 있어 optional). */
+  activeType?: TeamRecordTypeFilter;
+  onChangeType?: (type: TeamRecordTypeFilter) => void;
+  /** 미전달(`undefined`) = '전체 시즌'. 드롭다운 자체는 미전달 시 렌더하지 않는다(optional). */
+  activeSeason?: string;
+  onChangeSeason?: (season: string | undefined) => void;
+  /** 상세로 넘길 출처. 이 화면이 받은 `?from=` 까지 담아야 여러 단계 뒤에도 처음 출처가 남는다. */
+  selfHref?: string;
 }) {
+  const fromHref = selfHref ?? `/teams/${data.teamId}/records`;
   // 여러 행을 동시에 펼칠 수 있게 Set으로 관리한다 -- 아코디언끼리 서로 배타적이어야
   // 할 이유가 없고(다른 경기 두 개를 나란히 비교해 보고 싶을 수 있다), gameId는
   // 행마다 고유하다.
@@ -258,26 +322,78 @@ export function TeamRecordsContent({
     });
   }
 
+  const resolvedActiveType: TeamRecordTypeFilter = activeType ?? 'all';
+  // U2 -- '전체'가 아닌 탭이면 KPI를 서버가 이미 계산해 보낸 `summary.byType[종류]`로
+  // 교체한다. 새 계산 없이 그대로 꺼내 쓴다(과제 지시: "새 계산 없이 이미 온 값 그대로").
+  const activeSummary: TeamRecordSummaryTotals =
+    resolvedActiveType === 'all'
+      ? data.summary
+      : // 개인 기록과 같은 이유의 폴백 — 배포 롤링 창에서 옛 응답(byType 없음)을 받으면
+        // 첨자 접근이 undefined 를 주고 KPI 렌더가 크래시한다.
+        (data.summary.byType?.[resolvedActiveType] ?? data.summary);
+  const emptyStateCopy =
+    recordEmptyCopy(resolvedActiveType, {
+      title: '아직 공식 경기 기록이 없어요',
+      sub: '대회·팀매치 결과가 확정되면 이곳에 표시돼요.',
+    });
+
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {onChangeType ? (
+        <SegmentedTabs
+          items={RECORD_TYPE_TABS.map((tab) => ({ id: tab.key, label: tab.label }))}
+          activeId={resolvedActiveType}
+          onSelect={(id) => onChangeType(id as TeamRecordTypeFilter)}
+          ariaLabel="경기 종류"
+          role="tablist"
+        />
+      ) : null}
+
+      {onChangeSeason ? (
+        // 시즌 데이터가 1개뿐이어도 숨기지 않는다 -- 자기 위치를 학습하게 그대로
+        // 보여준다(과제 지시). 선택지는 서버 `availableSeasons`(하드코딩 연도 없음).
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <label
+            htmlFor="team-records-season"
+            className="tm-text-caption"
+            style={{ color: 'var(--text-muted)', flexShrink: 0 }}
+          >
+            시즌
+          </label>
+          <select
+            id="team-records-season"
+            className="tm-input tm-input-select"
+            style={{ flex: 1, minHeight: 44 }}
+            value={activeSeason ?? 'all'}
+            onChange={(event) => onChangeSeason(event.target.value === 'all' ? undefined : event.target.value)}
+          >
+            <option value="all">전체 시즌</option>
+            {data.availableSeasons.map((season) => (
+              <option key={season} value={season}>
+                {season}시즌
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+
       <Card>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-          <KPIStat label="경기" value={data.summary.played} unit="경기" />
-          <KPIStat label="승·무·패" value={`${data.summary.won}·${data.summary.drawn}·${data.summary.lost}`} />
-          <KPIStat label="득실차" value={data.summary.goalsFor - data.summary.goalsAgainst} />
+          <KPIStat label="경기" value={activeSummary.played} unit="경기" />
+          <KPIStat label="승·무·패" value={`${activeSummary.won}·${activeSummary.drawn}·${activeSummary.lost}`} />
+          <KPIStat label="득실차" value={activeSummary.goalsFor - activeSummary.goalsAgainst} />
         </div>
       </Card>
 
       <section>
-        <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>경기 기록</h3>
+        <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>경기 기록</h3>
         {data.items.length === 0 ? (
-          <EmptyState title="아직 공식 경기 기록이 없어요" sub="대회·팀매치 결과가 확정되면 이곳에 표시돼요." />
+          <EmptyState title={emptyStateCopy.title} sub={emptyStateCopy.sub} />
         ) : (
           <Card pad={0}>
             {data.items.map((item) => {
-              const href = recordHref(item);
-              // Rolling deploy 중 구 API 응답에는 events 필드가 없을 수 있다.
-              const hasEvents = (item.events?.length ?? 0) > 0;
+              const href = recordHref(item, fromHref);
+              const hasEvents = item.events.length > 0;
               const isExpanded = hasEvents && expandedGameIds.has(item.gameId);
               const panelId = `team-record-events-${item.gameId}`;
               const row = (

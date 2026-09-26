@@ -22,6 +22,12 @@
   margin: 0 20px 28px;
 }
 
+/* "라인업을 기다리는 경기" 카드 — 다른 홈 섹션과 동일한 좌우 20px 인셋을 이 클래스로만
+   받는다(390 실측: 인셋 없이 카드가 화면 끝까지 늘어나 형제 섹션과 어긋났다). */
+.tm-home-lineup-block {
+  margin: 0 20px 28px;
+}
+
 .tm-home-matches-error-wrap {
   padding: 0 20px 8px;
 }
@@ -35,8 +41,14 @@
  * with both its own chat rows below (20px) and sibling section titles (20px).
  * Zeroing it here (unconditionally, not just at the desktop breakpoint) makes the
  * title rely solely on the block's own margin, matching every other home section.
+ *
+ * .tm-home-featured-block is the same case (`margin: 0 20px 28px` above) and joined
+ * this override on 2026-09-07 when "오늘의 추천" moved from an inline
+ * `<div class="tm-text-label">`(13px) to the shared SectionTitle(17px) — without it
+ * the new title would have doubled to 40px exactly as "최근 채팅" once did.
  */
-.tm-home-chat-block .tm-section-title {
+.tm-home-chat-block .tm-section-title,
+.tm-home-featured-block .tm-section-title {
   padding-left: 0;
   padding-right: 0;
 }
@@ -51,9 +63,9 @@
   align-items: center;
   gap: 12px;
   min-height: 72px;
-  padding: 12px 14px;
+  padding: 12px 16px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-field);
   background: var(--surface);
 }
 
@@ -68,7 +80,7 @@
   width: 38px;
   height: 38px;
   place-items: center;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--grey50);
   color: var(--blue500);
 }
@@ -81,11 +93,14 @@
 .tm-home-chat-title-line {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
-.tm-home-chat-title-line > .tm-text-label {
+/* 2026-09-07: 채팅 행 제목이 tm-text-label(13px) -> tm-text-card-title(15px) 로 바뀌면서
+   셀렉터도 함께 옮긴다. 클래스명에 걸린 규칙이라 안 옮기면 min-width:0 이 풀려
+   line-clamp 대신 제목이 flex 항목을 밀어내며 넘친다. */
+.tm-home-chat-title-line > .tm-text-card-title {
   min-width: 0;
 }
 
@@ -99,15 +114,15 @@
   flex: 0 0 auto;
   flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  gap: 8px;
   color: var(--text-muted);
 }
 
 .tm-home-chat-row-count {
   min-width: 20px;
   height: 20px;
-  border-radius: 999px;
-  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  padding: 0 8px;
   background: var(--red500);
   color: var(--static-white);
   display: inline-flex;
@@ -222,7 +237,7 @@
 
   /* Widen the stats strip — give each side more breathing room */
   .tm-home-greeting-block .tm-home-stats {
-    margin-top: 6px;
+    margin-top: 8px;
     gap: 24px;
   }
 }
@@ -242,6 +257,10 @@
   }
 
   .tm-home-chat-block {
+    margin: 0;
+  }
+
+  .tm-home-lineup-block {
     margin: 0;
   }
 }
@@ -264,7 +283,7 @@
   .tm-match-rail {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    gap: 16px;
     overflow-x: visible;
     padding-left: 0;
     padding-right: 0;
@@ -312,7 +331,7 @@
   /* Quick-grid keeps its 4-column layout but shrinks icon size to fit 360px */
   .tm-home-sidebar .tm-quick-grid {
     padding: 16px 12px;
-    border-radius: 14px;
+    border-radius: var(--radius-field);
     /* Override the 480px responsive override that makes it 2-col */
     grid-template-columns: repeat(4, 1fr) !important;
   }
@@ -320,7 +339,7 @@
   .tm-home-sidebar .tm-quick-icon {
     width: 40px;
     height: 40px;
-    border-radius: 12px;
+    border-radius: var(--radius-control);
   }
 }
 
@@ -330,13 +349,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 8px;
 }
 
 @media (min-width: 1024px) {
   .tm-home-sidebar .tm-weather-strip {
-    border-radius: 14px;
+    border-radius: var(--radius-field);
   }
 
   /* 데스크톱: margin-bottom은 그대로 유지 */
@@ -348,19 +367,19 @@
 /* ─── Sidebar: notices panel ──────────────────────────────────────────────── */
 @media (min-width: 1024px) {
   .tm-home-sidebar .tm-notice-head {
-    padding: 0 0 10px;
+    padding: 0 0 12px;
   }
 
   /* Notices card surface */
   .tm-home-sidebar-notices {
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: var(--radius-container);
     padding: 16px;
   }
 
   .tm-home-sidebar-notices .tm-notice-head {
-    padding: 0 0 10px;
+    padding: 0 0 12px;
   }
 }
 
@@ -388,20 +407,12 @@
     padding: 0;
   }
 
-  .tm-home-matches-block .tm-empty-state {
-    min-height: 176px;
+  /* 채팅 빈 상태(EmptyState + chat-empty 그래픽)를 사이드 컬럼 폭에 맞춘 패널로.
+     예전 `.tm-home-matches-block .tm-empty-state` 는 매칭되는 마크업이 없던 dead 규칙이었다. */
+  .tm-home-chat-block .tm-empty-state {
     padding: 28px 24px;
     border: 1px solid var(--border);
-    border-radius: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .tm-home-matches-block .tm-empty-icon {
-    width: 56px;
-    height: 56px;
-    margin-bottom: 12px;
+    border-radius: var(--radius-field);
   }
 }
 

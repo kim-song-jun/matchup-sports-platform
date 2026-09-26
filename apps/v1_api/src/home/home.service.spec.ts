@@ -103,4 +103,32 @@ describe('HomeService', () => {
       },
     ]);
   });
+
+  // 2026-09-07: 취소한 매치가 "이번 달 활동"에 계속 잡혔다. cancel() 이 참가자 row 를
+  // `role: 'participant'` 인 것만 cancelled 로 바꿔 **호스트 자신의 row 는 active 로 남는데**,
+  // 이 집계가 참가자 상태만 보고 매치 상태를 안 봤기 때문이다.
+  it('이번 달 활동 집계는 취소·삭제된 매치를 빼고 센다', async () => {
+    const prisma = {
+      v1MatchParticipant: { count: jest.fn().mockResolvedValue(0) },
+      v1UserReputationSummary: { findUnique: jest.fn().mockResolvedValue(null) },
+      v1MatchApplication: { count: jest.fn().mockResolvedValue(0) },
+      v1Match: { findMany: jest.fn().mockResolvedValue([]) },
+      v1Notice: { findMany: jest.fn().mockResolvedValue([]) },
+      v1Notification: { count: jest.fn().mockResolvedValue(0) },
+      v1TeamMembership: { findFirst: jest.fn().mockResolvedValue(null) },
+      v1UserProfile: { findUnique: jest.fn().mockResolvedValue(null) },
+    };
+    const popupsService = { findActive: jest.fn().mockResolvedValue(null) };
+    const service = new HomeService(prisma as never, popupsService as never);
+
+    await service.getHome({ id: 'user-1' } as never, {} as never);
+
+    const where = prisma.v1MatchParticipant.count.mock.calls[0][0].where;
+    expect(where.match).toEqual(
+      expect.objectContaining({
+        status: { not: 'cancelled' },
+        deletedAt: null,
+      }),
+    );
+  });
 });

@@ -1,0 +1,13 @@
+-- Sign in with Apple — 인증 제공자 값 추가.
+--
+-- 값 추가만 한다. 기존 값의 개명도, 데이터 이동도 없다: 롤링 배포 중 구 인스턴스는
+-- 이 값을 모른 채로도 정상 동작하고(자기가 쓰지 않는 enum 값이다), 신 인스턴스만
+-- 새 값을 쓴다. 되돌리기는 "이 값을 쓰는 행이 없으면 아무것도 하지 않아도 되는" 형태다.
+--
+-- IF NOT EXISTS 를 쓰는 이유: 이 값이 수동 SQL 로 먼저 들어간 환경에서도 replay 가
+-- 깨지지 않아야 한다(저장소 규약 — DB 마이그레이션 규율).
+--
+-- PostgreSQL 12+ 는 ALTER TYPE ... ADD VALUE 를 트랜잭션 안에서 허용한다. Prisma 는 각
+-- 마이그레이션을 트랜잭션으로 감싸므로 그보다 낮은 버전에서는 실패한다 — 이 배포의
+-- PostgreSQL 은 16 이다.
+ALTER TYPE "V1AuthProvider" ADD VALUE IF NOT EXISTS 'apple';

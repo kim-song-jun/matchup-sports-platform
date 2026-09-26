@@ -53,6 +53,8 @@ const ids = {
   hostTeam: '67000000-0000-4000-8000-000000000020',
   opponentTeam: '67000000-0000-4000-8000-000000000021',
   tournament: '67000000-0000-4000-8000-000000000030',
+  hostRegistration: '67000000-0000-4000-8000-000000000050',
+  awayRegistration: '67000000-0000-4000-8000-000000000051',
   fixtureLiveEligible: '67000000-0000-4000-8000-000000000040',
   fixtureScheduled: '67000000-0000-4000-8000-000000000041',
   fixtureAlreadyLive: '67000000-0000-4000-8000-000000000042',
@@ -84,7 +86,7 @@ describe('D-21 period-live backfill migration — one-time repair for games left
 
   async function createGame(fixtureId: string): Promise<string> {
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: fixtureId,
       competitionConfigVersionId: configId,
       sides: [
@@ -158,14 +160,31 @@ describe('D-21 period-live backfill migration — one-time repair for games left
         competitionConfigVersionId: configId,
       },
     });
-    await prisma.v1TournamentFixture.createMany({
+    await prisma.v1TournamentRegistration.createMany({
       data: [
-        { id: ids.fixtureLiveEligible, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, competitionConfigVersionId: configId },
-        { id: ids.fixtureScheduled, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, competitionConfigVersionId: configId },
-        { id: ids.fixtureAlreadyLive, tournamentId: ids.tournament, round: 'group', fixtureNumber: 3, competitionConfigVersionId: configId },
-        { id: ids.fixturePausedEligible, tournamentId: ids.tournament, round: 'group', fixtureNumber: 4, competitionConfigVersionId: configId },
-        { id: ids.fixtureLiveWithPriorEvents, tournamentId: ids.tournament, round: 'group', fixtureNumber: 5, competitionConfigVersionId: configId },
+        { id: ids.hostRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.director, status: 'confirmed' },
+        { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.director, status: 'confirmed' },
       ],
+    });
+    await prisma.v1TeamMatch.createMany({
+      data: [
+        { id: ids.fixtureLiveEligible, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, title: 'T1-0 live eligible', status: 'matched', startAt: new Date(Date.now() - 60_000), competitionConfigVersionId: configId },
+        { id: ids.fixtureScheduled, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, title: 'T1-0 scheduled', status: 'matched', startAt: new Date(Date.now() + 60_000), competitionConfigVersionId: configId },
+        { id: ids.fixtureAlreadyLive, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, title: 'T1-0 already live', status: 'matched', startAt: new Date(Date.now() - 60_000), competitionConfigVersionId: configId },
+        { id: ids.fixturePausedEligible, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, title: 'T1-0 paused eligible', status: 'matched', startAt: new Date(Date.now() - 60_000), competitionConfigVersionId: configId },
+        { id: ids.fixtureLiveWithPriorEvents, tournamentId: ids.tournament, sportId: ids.sport, hostTeamId: ids.hostTeam, approvedApplicantTeamId: ids.opponentTeam, title: 'T1-0 prior events', status: 'matched', startAt: new Date(Date.now() - 60_000), competitionConfigVersionId: configId },
+      ],
+    });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: [1, 2, 3, 4, 5].map((fixtureNumber, index) => ({
+        teamMatchId: [ids.fixtureLiveEligible, ids.fixtureScheduled, ids.fixtureAlreadyLive, ids.fixturePausedEligible, ids.fixtureLiveWithPriorEvents][index],
+        tournamentId: ids.tournament,
+        round: 'group',
+        fixtureNumber,
+        legNumber: 1,
+        homeRegistrationId: ids.hostRegistration,
+        awayRegistrationId: ids.awayRegistration,
+      })),
     });
     await prisma.v1TournamentStaffAssignment.create({
       data: {

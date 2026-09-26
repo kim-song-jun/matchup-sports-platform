@@ -1,13 +1,16 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { Film } from 'lucide-react';
+import { Film, MapPin } from 'lucide-react';
 import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import {
   TournamentStandingsTable,
   type TournamentStandingsRow,
 } from '@/components/tournaments/tournament-standings-table';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
+import { fixtureDetailHref } from '@/lib/fixture-detail-route';
+import { matchOutcomeReasonLabel, toDisplayableOutcomeReason } from '@/lib/match-outcome';
 import type { V1MyTournamentFixtures } from '@/hooks/use-v1-api';
 import type { GameLineupState } from '@/types/game-operations';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
@@ -23,6 +26,16 @@ import {
   resultStateLabel,
 } from './format';
 import { PenaltyScoreline } from './penalty-scoreline';
+import {
+  buildScheduleFilters,
+  groupScheduleEntries,
+  groupUnscheduledEntries,
+  LEAGUE_PHASE_LABELS,
+  phaseKeyOf,
+  TOURNAMENT_PHASE_LABELS,
+  type ScheduleFilter,
+  type SchedulePhaseLabels,
+} from './schedule-grouping';
 import type { PublicScheduleEntry, PublicStandingRow, PublicTournamentScheduleResponse } from './types';
 
 /**
@@ -34,6 +47,15 @@ import type { PublicScheduleEntry, PublicStandingRow, PublicTournamentScheduleRe
 function sideLabel(side: PublicScheduleEntry['home']): string {
   if (side === null) return '미정';
   return side.teamName ?? '비공개';
+}
+
+/**
+ * 대진이 아직 안 잡힌 자리인가. **양쪽 다** 미정이고 보여줄 스코어도 없을 때만 참이다 —
+ * 한쪽이라도 팀이 정해졌거나 결과가 나온 경기는 그대로 스코어 행으로 그린다(이상한
+ * 데이터라도 실제 기록을 숨기지 않는다).
+ */
+function matchupUndecided(entry: PublicScheduleEntry): boolean {
+  return entry.home === null && entry.away === null && entry.score === null;
 }
 
 function ScheduleResultBadge({ entry }: { entry: PublicScheduleEntry }) {
@@ -48,12 +70,45 @@ function ScheduleResultBadge({ entry }: { entry: PublicScheduleEntry }) {
         fontWeight: 700,
         color: tone,
         background: bg,
-        borderRadius: 6,
-        padding: '2px 6px',
+        borderRadius: 'var(--radius-chip)',
+        padding: '2px 8px',
       }}
     >
       {resultStateLabel(entry.resultState)}
     </span>
+  );
+}
+
+/**
+ * 몰수·중단 배지. 이게 없으면 목록에서 몰수 0:0 과 실제 0:0 무승부가 같아 보이고,
+ * 순위표에 무승부로 집계된 이유를 관전자가 목록에서 추적할 수 없다(alpha 실측).
+ *
+ * 사유 본문은 넣지 않는다 — 일정 카드는 한 줄 요약이 계약이고, 사유는 길이 제한이 없어
+ * 카드 높이를 예측할 수 없게 만든다. 사유는 경기 상세에서 읽는다.
+ * 컬러만으로 구분하지 않는다(WCAG) — 라벨 텍스트가 항상 함께 나온다.
+ */
+function ScheduleOutcomeBadge({ outcome }: { outcome: PublicScheduleEntry['outcome'] }) {
+  const reason = toDisplayableOutcomeReason(outcome?.reason);
+  if (reason === null) return null;
+  return (
+    // role="status" 를 쓰지 않는다 — live region 은 값이 실시간으로 바뀌는 곳(LiveBadge 의
+    // 경기 시계)에 쓰는 것이고, 이렇게 렌더 후 변하지 않는 배지에 붙이면 스크린리더가
+    // 상태 변경으로 오인해 불필요하게 공지한다. 문맥 안 정적 텍스트로 충분하다.
+    <p
+      style={{
+        margin: '4px 0 0',
+        textAlign: 'center',
+        fontSize: 'var(--font-size-micro)',
+        fontWeight: 700,
+        // --orange500 은 텍스트로 쓰면 흰 카드 위 2.16:1 로 WCAG AA 에 한참 못 미친다
+        // (큰 글씨 기준 3:1 도 못 넘긴다). --orange700 은 정확히 그 결함 때문에 도입된
+        // 토큰이고 흰 배경 5.94:1 · 틴트 배경 5.42:1 을 보장하며, 다크모드에서는
+        // 밝은 값으로 재정의돼 양쪽이 함께 해결된다(globals.css 주석 참조).
+        color: 'var(--orange700)',
+      }}
+    >
+      {matchOutcomeReasonLabel(reason)}
+    </p>
   );
 }
 
@@ -80,19 +135,26 @@ const SCORE_AXIS_COLUMNS = 'minmax(0, 1fr) 64px minmax(0, 1fr)';
 const SCORE_AXIS_COLUMN_GAP = 10;
 
 /**
- * 득점자 요약 -- 골이 하나도 없으면 이 함수 자체가 `null`을 반환해 빈 줄을
- * 아예 렌더하지 않는다(요구사항: "골이 없으면 그 줄 자체를 렌더하지 마라").
+ * 경기 이벤트 요약 -- 골과 카드(경고/퇴장)를 **한 축 위에 시간순으로** 쌓는다.
+ * 이벤트가 하나도 없으면 이 함수 자체가 `null`을 반환해 빈 줄을 아예 렌더하지 않는다.
+ *
+ * 한때 이 요약은 골만 실었다 -- 그래서 같은 경기의 같은 경고/퇴장이 경기 상세
+ * 타임라인에는 나오는데 대회 일정 카드에서는 통째로 사라졌다(오너 지적). 이제
+ * 아이콘 표현은 상세와 같은 `eventPresentation`을 공유한다.
  *
  * 홈/원정 분리: 스코어 행이 이미 "홈은 오른쪽 정렬, 원정은 왼쪽 정렬"로 좌우를
- * 확립해 뒀으므로, 득점자도 **그 행과 같은 3열 축**(`SCORE_AXIS_COLUMNS`)을
- * 문자 그대로 공유한다 — 비슷한 패턴을 다시 적는 게 아니라 같은 상수를 쓴다.
- * 예시 문구("⚽ 10' 김골키 · 45' 김골키")처럼 한 줄로 이어붙이는 방식은
- * 390px 폭에서 "어느 팀 골인지"를 시간순 나열만으로는 알 수 없다는 문제가 있다
- * (2:0 같은 스코어에서 이게 실제 정보 손실이다) -- 이미 검증된 좌우분리 패턴을
- * 그대로 재사용해 폭 문제와 팀 귀속 모호성을 동시에 해결한다. 이름이 null(동의
- * 없음)인 골은 이름을 지어내지 않고 시간만 남긴다. jerseyNumber는 DTO에는 있지만
- * 좁은 카드에 다 욱여넣으면 오히려 안 읽히므로 이 컴포넌트는 의도적으로 쓰지
- * 않는다(상세 페이지 타임라인에서는 등번호까지 보여준다).
+ * 확립해 뒀으므로, 이벤트도 **그 행과 같은 3열 축**(`SCORE_AXIS_COLUMNS`)을
+ * 문자 그대로 공유한다 -- 비슷한 패턴을 다시 적는 게 아니라 같은 상수를 쓴다.
+ * 한 줄로 시간순 나열만 하면 390px 폭에서 "어느 팀 기록인지"를 알 수 없다.
+ *
+ * **한 이벤트 = 한 행**이고 아이콘은 그 행 가운데에 놓인다. 예전에는 한 구간의
+ * 모든 골이 좌우 칸에 여러 줄로 쌓이는데 가운데 ⚽는 하나뿐이어서, 홈 2골 :
+ * 원정 1골 같은 경우 어느 줄이 어느 아이콘에 걸리는지 읽을 수 없었다 -- 카드가
+ * 섞이면(골·경고·퇴장 아이콘이 서로 다르다) 그 모호함이 곧장 오독이 된다.
+ *
+ * 이름이 null(동의 없음)인 이벤트는 이름을 지어내지 않고 시간만 남긴다.
+ * jerseyNumber는 DTO에는 있지만 좁은 카드에 다 욱여넣으면 오히려 안 읽히므로 이
+ * 컴포넌트는 의도적으로 쓰지 않는다(상세 페이지 타임라인에서는 등번호까지 보여준다).
  */
 type ScheduleEventItem = {
   key: string;
@@ -214,10 +276,10 @@ function ScheduleEventRow({ item }: { item: ScheduleEventItem }) {
              관전자에게는 원정 열에 홈 선수 이름이 뜬 일반 골로만 보였다). */
           <span
             style={{
-              fontSize: 10,
+              fontSize: 'var(--font-size-micro)',
               lineHeight: 1.4,
               padding: '0 4px',
-              borderRadius: 4,
+              borderRadius: 'var(--radius-tight)',
               fontWeight: 700,
               // 실제 팔레트 토큰을 쓴다 — `--danger-*` 는 이 코드베이스에 없어서
               // 하드코딩 fallback 이 항상 적용되고 있었다(다크모드도 따라오지 않는다).
@@ -233,7 +295,6 @@ function ScheduleEventRow({ item }: { item: ScheduleEventItem }) {
     </div>
   );
 }
-
 
 function VideoBadge({ hasVideo }: { hasVideo: boolean }) {
   if (!hasVideo) return null;
@@ -262,58 +323,9 @@ function LineupStatusBadge({ lineupState }: { lineupState: GameLineupState | nul
         ? { label: '라인업 작성 중', color: 'var(--orange700)', background: 'var(--orange50)' }
         : { label: '라인업 제출 완료', color: 'var(--blue700)', background: 'var(--blue50)' };
   return (
-    <span style={{ fontSize: 12, fontWeight: 700, color, background, borderRadius: 6, padding: '2px 6px' }}>
+    <span style={{ fontSize: 12, fontWeight: 700, color, background, borderRadius: 'var(--radius-chip)', padding: '2px 8px' }}>
       {label}
     </span>
-  );
-}
-
-/**
- * 화면 맨 위의 "우리 팀" 요약 — 팀장이 들어오자마자 **무엇이 남았는지**를 보고, 가장
- * 급한 경기로 바로 갈 수 있게 한다. 아래 목록에서 내 경기를 찾아 훑는 일 자체를 없애는 게
- * 목적이라 미제출 건수와 바로가기가 핵심이고, 할 일이 없으면(전부 제출) 그 사실만 알린다.
- */
-function MyTeamLineupSummary({
-  tournamentId,
-  team,
-}: {
-  tournamentId: string;
-  team: V1MyTournamentFixtures['teams'][number];
-}) {
-  const pending = team.fixtures.filter(
-    (fixture) => fixture.lineupState === null || fixture.lineupState === 'DRAFT',
-  );
-  // 가장 임박한 경기부터 처리하게 한다 — 일정 미정(scheduledAt=null)은 맨 뒤로.
-  const next = [...pending].sort((a, b) => {
-    if (a.scheduledAt === null) return 1;
-    if (b.scheduledAt === null) return -1;
-    return a.scheduledAt.localeCompare(b.scheduledAt);
-  })[0];
-  return (
-    <Card pad={16}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>{team.teamName}</span>
-        <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>우리 팀 경기 {team.fixtures.length}</span>
-      </div>
-      <div style={{ marginTop: 6, fontSize: 13, color: 'var(--text-strong)' }}>
-        {team.fixtures.length === 0
-          ? '아직 배정된 경기가 없어요.'
-          : pending.length === 0
-            ? '모든 경기의 라인업을 제출했어요.'
-            : `라인업이 아직 정해지지 않은 경기가 ${pending.length}경기 있어요.`}
-      </div>
-      {next !== undefined ? (
-        <div style={{ marginTop: 10 }}>
-          <Link
-            href={`/tournaments/${tournamentId}/matches/${next.fixtureId}/lineup`}
-            className="tm-btn tm-btn-sm tm-btn-primary"
-            style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
-          >
-            {next.opponentTeamName !== null ? `${next.opponentTeamName}전 라인업 준비하기` : '라인업 준비하기'}
-          </Link>
-        </div>
-      ) : null}
-    </Card>
   );
 }
 
@@ -321,52 +333,83 @@ function ScheduleRow({
   tournamentId,
   entry,
   myFixture,
+  showGroupLabel = true,
+  isRegularLeague,
 }: {
   tournamentId: string;
   entry: PublicScheduleEntry;
   /** 이 경기가 로그인한 팀장의 팀 경기라면 그 정보 — 아니면 undefined(공개 방문자 포함). */
   myFixture?: MyFixtureRowInfo;
+  /** 그룹 제목("A조")이 바로 위에 있으면 카드 안에서 같은 말을 되풀이하지 않는다. */
+  showGroupLabel?: boolean;
+  /** 정규 리그 시즌인가 — 경기 상세 라우트를 가른다(`fixtureDetailHref`). */
+  isRegularLeague: boolean;
 }) {
   const dateLabel = formatTournamentDateTimeShort(entry.scheduledAt);
   const venue = venueLabel(entry);
   const row = (
     <Link
-      href={`/tournaments/${tournamentId}/matches/${entry.fixtureId}`}
-      className="tm-pressable"
+      // **리그는 라우트가 다르다.** 이 화면은 대회와 리그가 같은 일정 응답을 쓰는데,
+      // 리그 행의 `fixtureId` 에는 팀 매치 id 가 들어 있어 대회 패턴으로 링크하면
+      // 경기 카드 전부가 404 로 떨어진다(근거는 `fixtureDetailHref`).
+      href={fixtureDetailHref({ isRegularLeague, competitionId: tournamentId, fixtureId: entry.fixtureId })}
+      // 구분선을 인라인이 아니라 클래스로 그린다 — 인라인 style 은 미디어쿼리가 이길 수
+      // 없어서, 데스크톱에서 목록을 2열로 펼 때 격자선을 다시 그릴 방법이 없어진다.
+      // 내 팀 경기는 바깥 컨테이너가 테두리를 그린다(액센트 바와 한 겹으로 맞추기 위해).
+      className={`tm-pressable${myFixture ? '' : ' tm-schedule-card'}`}
       style={{
         display: 'block',
         padding: '12px 16px',
         minHeight: 44,
-        // 내 팀 경기는 바깥 컨테이너가 테두리를 그린다(액센트 바와 한 겹으로 맞추기 위해).
-        ...(myFixture ? {} : { borderTop: '1px solid var(--grey100)' }),
         textDecoration: 'none',
       }}
     >
       {myFixture ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
-          <span
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+          <span className="tm-on-tint"
             style={{
               fontSize: 12,
               fontWeight: 800,
               color: 'var(--blue700)',
-              background: 'var(--card-surface)',
-              borderRadius: 6,
-              padding: '2px 6px',
+              // 행 배경이 중립(grey50)으로 바뀌면서 파란색이 남은 자리는 이 배지와
+              // 왼쪽 액센트 바 둘뿐이다 — 배지가 파랗게 떠야 "우리 팀"이 눈에 걸린다.
+              // 예전처럼 카드 표면색(흰색)으로 두면 중립 배경 위에서 배지 윤곽이 사라진다.
+              background: 'var(--blue50)',
+              borderRadius: 'var(--radius-chip)',
+              padding: '2px 8px',
             }}
           >
             우리 팀
           </span>
-          <LineupStatusBadge lineupState={myFixture.lineupState} />
+          {/* 라인업 제출은 리그·팀매치 축의 단계다(`/team-matches/:id/lineup`). 대회 축은
+              대진 생성 때 등록 명단을 참가자로 복사하므로 제출할 화면 자체가 없다 —
+              거기서 "라인업 미작성"은 팀장에게 **할 수 없는 일을 안 했다고** 말하는 것이고,
+              이미 끝난 경기 위에도 그대로 떴다(alpha 실측). */}
+          {isRegularLeague ? <LineupStatusBadge lineupState={myFixture.lineupState} /> : null}
         </div>
       ) : null}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center' }}>
-          {entry.groupName ?? entry.round}
+      {/* 카드 머리줄 — 왼쪽에 "어디서"(조·장소), 오른쪽에 "언제"(날짜·상태).
+          장소는 원래 카드 맨 아래에 있었는데, 조로 묶은 뒤로는 카드 안에서 조 이름을
+          되풀이하지 않게 되면서 이 왼쪽 자리가 통째로 비었다(오너 지적: "여기서 장소를
+          좌상단으로 올려도 될것같아 카드에서"). 빈 자리를 채우면서 스코어 아래 줄도
+          한 줄 짧아진다. 긴 구장명은 말줄임으로 접고 날짜 쪽은 줄이지 않는다 —
+          경기 시각은 목록에서 가장 자주 찾는 값이라 잘리면 안 된다. */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
+          {showGroupLabel ? entry.groupName ?? entry.round : ''}
           {entry.legNumber > 1 ? ` ${entry.legNumber}차` : ''}
           <VideoBadge hasVideo={entry.hasVideo} />
+          {venue ? (
+            // 아이콘을 함께 둔다 — 경기장 이름이 "1 (1)" 처럼 짧으면 맨 텍스트만으로는
+            // 그게 장소인지 번호인지 알 수 없다(오너 지적: "1(1)은 뭔지 모르겠고").
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0, fontWeight: 400 }}>
+              <MapPin size={12} aria-hidden="true" style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{venue}</span>
+            </span>
+          ) : null}
         </span>
         {/* [R-T2] 고정폭 없는 flex 텍스트 — 12로 상향. */}
-        <span style={{ fontSize: 12, color: 'var(--text-caption)', display: 'flex', gap: 6, alignItems: 'center' }}>
+        <span style={{ fontSize: 12, color: 'var(--text-caption)', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
           {dateLabel ?? '일정 미정'}
           {entry.status === 'live' ? (
             <LiveBadge clock={entry.clock} periodBreak={entry.periodBreak} />
@@ -376,6 +419,24 @@ function ScheduleRow({
           <ScheduleResultBadge entry={entry} />
         </span>
       </div>
+      {matchupUndecided(entry) ? (
+        // 양쪽이 다 미정인 자리에 `미정  - : -  미정` 을 그리면, 같은 말이 세 번 반복되면서
+        // 스코어 pill 까지 빈 채로 남아 "고장난 카드"로 읽힌다(오너 지적: "미정 vs 미정").
+        // 대진이 아직 안 나온 것은 결함이 아니라 정상 상태이므로, 그 사실만 한 줄로 적는다.
+        // 한쪽만 미정인 경우(4강 한 자리가 먼저 확정된 상태)는 그대로 둔다 — 그때는
+        // "우리 팀 vs 미정" 이 실제로 알려주는 정보다.
+        <div
+          style={{
+            textAlign: 'center',
+            fontSize: 14,
+            fontWeight: 600,
+            color: 'var(--text-caption)',
+            padding: '4px 0',
+          }}
+        >
+          대진 확정 전
+        </div>
+      ) : (
       <div
         style={{
           display: 'grid',
@@ -395,7 +456,7 @@ function ScheduleRow({
             fontWeight: 800,
             color: 'var(--text-strong)',
             background: 'var(--grey50)',
-            borderRadius: 8,
+            borderRadius: 'var(--radius-chip)',
             padding: '4px 0',
           }}
         >
@@ -405,41 +466,43 @@ function ScheduleRow({
           {sideLabel(entry.away)}
         </span>
       </div>
+      )}
       {/* 스코어 아래 보조 표기 — 스코어 칸(가운데 64px)이 행 정중앙이라 행 전체를
           가운데 정렬하면 그대로 스코어 밑에 놓인다. 승부차기가 없으면 렌더 없음. */}
       <PenaltyScoreline score={entry.score} scoreStatus={entry.scoreStatus} />
+      {/* 몰수·중단 배지. 스코어 바로 아래 — 목록만 훑는 관전자에게 이 점수가 정상 경기
+          결과가 아니라는 것을 알리는 유일한 자리다. 사유 본문은 길어서 카드에 넣지 않고
+          경기 상세에 둔다(카드는 한 줄 요약이 계약이다). */}
+      <ScheduleOutcomeBadge outcome={entry.outcome} />
       <MatchEventSummary entry={entry} />
-      {venue ? (
-        // [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향.
-        <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-caption)' }}>{venue}</div>
-      ) : null}
     </Link>
   );
 
   if (myFixture === undefined) return row;
 
-  // 내 팀 경기는 왼쪽 액센트 바 + 옅은 배경으로 목록에서 즉시 떠오르게 하고, 라인업으로
+  // 내 팀 경기는 배지 + 옅은 배경으로 목록에서 즉시 떠오르게 하고, 라인업으로
   // 가는 길을 행 안에 둔다 — 예전에는 경기 상세로 한 번 더 들어가야 라인업 진입점을 만날
   // 수 있었고, 그마저 경기가 공개된 뒤에만 나타났다. 라인업 링크는 행 링크(경기 상세)와
   // 형제로 둔다: 링크 안에 링크를 넣으면 유효하지 않은 마크업이 되고 클릭 대상도 모호해진다.
   return (
     <div
+      className="tm-schedule-card tm-schedule-card-mine"
       style={{
-        borderTop: '1px solid var(--grey100)',
-        borderLeft: '3px solid var(--blue500)',
-        background: 'var(--blue50)',
+        // 예전에는 행 전체를 `--blue50`(#e8f3ff)로 칠했다 — 내 팀 경기가 연달아 있으면
+        // 목록의 절반이 통째로 파랗게 덮여, 강조가 아니라 배경 자체가 바뀐 것처럼 보였다
+        // (오너 지적: "하이라이트 색상도 그렇고"). 파랑은 "우리 팀" 배지에만 남기고
+        // 면(面)은 중립 톤으로 되돌린다 — 이 저장소의 절제 원칙대로
+        // 강조는 넓은 색면 대신 배지와 텍스트 계층으로 준다.
+        //
+        // `--grey50`이 아니라 `--grey100`인 이유: 스코어 칸이 `--grey50` pill이라,
+        // 행 배경까지 `--grey50`으로 두면 **두 색이 정확히 같아져 스코어 pill이 배경에
+        // 통째로 녹는다**(alpha 실측: rowBg === pillBg === rgb(249,250,251)). 한 단계
+        // 진한 톤을 써서 pill이 그 위로 떠오르게 한다 — 라이트/다크 양쪽 모두에서
+        // 두 토큰이 서로 다른 값이라 대비가 유지된다.
+        background: 'var(--grey100)',
       }}
     >
       {row}
-      <div style={{ padding: '0 16px 12px' }}>
-        <Link
-          href={`/tournaments/${tournamentId}/matches/${entry.fixtureId}/lineup`}
-          className="tm-btn tm-btn-sm tm-btn-primary"
-          style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }}
-        >
-          {myFixture.lineupState === null ? '라인업 짜기' : '라인업 보기'}
-        </Link>
-      </div>
     </div>
   );
 }
@@ -450,9 +513,11 @@ function ScheduleRow({
  * teamId를 key로 쓰면 React key가 전부 충돌한다(registrationId는 비공개 상태에도
  * 항상 채워지는 안정 식별자).
  */
-function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentStandingsRow[] {
+export function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentStandingsRow[] {
   return rows.map((row) => ({
-    key: row.registrationId,
+    // 대회는 registrationId(비공개 상태에도 유일), 리그는 teamId(가리지 않으므로 항상 있고
+    // 팀당 한 행이라 유일하다). 유니온이 둘 중 하나를 보장한다 — `types.ts` 참조.
+    key: row.registrationId ?? row.teamId,
     teamId: row.teamId,
     teamName: row.teamName,
     teamLogoUrl: row.teamLogoUrl,
@@ -475,7 +540,28 @@ function toStandingsRows(rows: readonly PublicStandingRow[]): TournamentStanding
  * 정보가 없으므로 진출선 하이라이트는 항상 없음(advance=null) — 원래도 이
  * 탭엔 진출 배지가 없었으니 동작 변화 없음.
  */
-function StandingsTable({ rows }: { rows: readonly PublicStandingRow[] }) {
+/**
+ * 순위표 접근성 라벨. **그룹명이 이미 "…순위" 로 끝나면 또 붙이지 않는다** — 티어가 없는
+ * 단발 리그의 `groupName` 이 "리그 순위" 라, 그대로 조합하면 스크린리더가
+ * *"리그 순위 순위표"* 로 읽는다(눈으로는 안 보이는 자리라 캡처로도 안 잡힌다).
+ */
+export function standingsAriaLabel(groupName: string, suffix: '' | '표' = ''): string {
+  const base = groupName.endsWith('순위') ? groupName : `${groupName} 순위`;
+  return `${base}${suffix}`;
+}
+
+function StandingsTable({
+  rows,
+  showGroupLabel = true,
+}: {
+  rows: readonly PublicStandingRow[];
+  /**
+   * 그룹 이름을 표 위에 적을지. 대회는 조가 여럿이라 항상 필요한데(`A조`·`B조`),
+   * **티어가 없는 단발 리그는 그룹이 하나뿐이고 그 이름이 바깥 제목과 같은 말**이라
+   * ("리그 순위" / "리그 순위") 두 번 적힌다. 그 경우만 끈다.
+   */
+  showGroupLabel?: boolean;
+}) {
   const groups = new Map<string, { groupName: string; rows: PublicStandingRow[] }>();
   for (const row of rows) {
     const bucket = groups.get(row.groupId) ?? { groupName: row.groupName, rows: [] };
@@ -486,26 +572,163 @@ function StandingsTable({ rows }: { rows: readonly PublicStandingRow[] }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {Array.from(groups.entries()).map(([groupId, group]) => (
-        <section key={groupId} aria-label={`${group.groupName} 순위`}>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: 'var(--text-muted)',
-              marginBottom: 8,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {group.groupName}
-          </div>
+        <section key={groupId} aria-label={standingsAriaLabel(group.groupName)}>
+          {showGroupLabel ? (
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: 'var(--text-muted)',
+                marginBottom: 8,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {group.groupName}
+            </div>
+          ) : null}
           <TournamentStandingsTable
             rows={toStandingsRows(group.rows)}
             advance={null}
-            ariaLabel={`${group.groupName} 순위표`}
+            ariaLabel={standingsAriaLabel(group.groupName, '표')}
           />
         </section>
       ))}
+    </div>
+  );
+}
+
+/** 한 그룹(A조·4강 …)의 경기 묶음. 그룹 제목을 실제로 그렸으면 카드 안의 같은 라벨은 지운다. */
+function ScheduleGroupBlock({
+  tournamentId,
+  group,
+  showGroupHeading,
+  myFixtureById,
+  isRegularLeague,
+}: {
+  tournamentId: string;
+  group: { key: string; label: string; entries: PublicScheduleEntry[] };
+  showGroupHeading: boolean;
+  myFixtureById: Map<string, MyFixtureRowInfo>;
+  isRegularLeague: boolean;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {showGroupHeading ? (
+        <div className="tm-text-caption" style={{ color: 'var(--text-caption)', fontWeight: 700 }}>
+          {group.label}
+        </div>
+      ) : null}
+      {/* 예전엔 `Card` 하나를 grid 로 쪼갰다 — 화면에는 한 장을 반으로 자른 것처럼 보이고
+          경기마다 테두리가 없어 카드로 읽히지 않았다(오너 지적). 이제 경기 하나가 카드 하나다. */}
+      <div className="tm-schedule-list">
+        {group.entries.map((entry) => (
+          <ScheduleRow
+            key={entry.fixtureId}
+            tournamentId={tournamentId}
+            entry={entry}
+            myFixture={myFixtureById.get(entry.fixtureId)}
+            showGroupLabel={!showGroupHeading}
+            isRegularLeague={isRegularLeague}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 단계(조별리그/결선) → 조·라운드 두 겹으로 묶어 보여준다. 예전에는 서버 순서대로 한
+ * 목록에 쏟아부었고, 데스크톱 2열에서 A조·B조·결승·4강이 좌우로 뒤섞였다(오너 지적).
+ *
+ * 필터는 **지금 일정에 실제로 있는 것만** 칩으로 만든다 — 고를 게 없는 칩은 눌러도 빈
+ * 화면이라, 있는 척하는 버튼이 된다.
+ *
+ * F4 fix: 필터 state(`activeFilter`)와 칩 목록(`filters`)은 더 이상 이 컴포넌트가
+ * 스스로 갖지 않는다 — `ScheduleContent`가 소유하고 "시간 미정 경기" 섹션과 공유한다.
+ * 예전엔 이 컴포넌트 안에만 있어서, 칩을 눌러도 시간 미정 섹션은 필터 state에 접근할
+ * 경로 자체가 없어 항상 전체를 그렸다.
+ */
+function ScheduleSections({
+  tournamentId,
+  entries,
+  myFixtureById,
+  filters,
+  activeFilter,
+  onSelectFilter,
+  phaseLabels,
+  isRegularLeague,
+}: {
+  tournamentId: string;
+  entries: readonly PublicScheduleEntry[];
+  myFixtureById: Map<string, MyFixtureRowInfo>;
+  filters: ScheduleFilter[];
+  activeFilter: string;
+  onSelectFilter: (key: string) => void;
+  phaseLabels: SchedulePhaseLabels;
+  /** 정규 리그 시즌인가 — 경기 상세 라우트를 가른다(`fixtureDetailHref`). */
+  isRegularLeague: boolean;
+}) {
+  const phases = groupScheduleEntries(entries, phaseLabels);
+
+  const visiblePhases = phases
+    .filter((phase) => activeFilter === 'all' || activeFilter === 'mine' || activeFilter === phase.key)
+    .map((phase) => ({
+      ...phase,
+      groups: phase.groups
+        .map((group) => ({
+          ...group,
+          entries:
+            activeFilter === 'mine'
+              ? group.entries.filter((entry) => myFixtureById.has(entry.fixtureId))
+              : group.entries,
+        }))
+        .filter((group) => group.entries.length > 0),
+    }))
+    .filter((phase) => phase.groups.length > 0);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {filters.length > 1 ? (
+        <div role="tablist" aria-label="경기 일정 보기" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {filters.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              role="tab"
+              aria-selected={activeFilter === option.key}
+              className={`tm-chip${activeFilter === option.key ? ' tm-chip-active' : ''}`}
+              onClick={() => onSelectFilter(option.key)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {visiblePhases.length === 0 ? (
+        <EmptyState title="해당하는 경기가 없어요" sub="다른 보기를 선택해 주세요." />
+      ) : (
+        visiblePhases.map((phase) => (
+          <section key={phase.key} aria-label={phase.label} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* 단계가 하나뿐이면(순수 토너먼트 등) 제목이 목록 전체를 되풀이할 뿐이라 숨긴다. */}
+            {phases.length > 1 ? (
+              <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>{phase.label}</div>
+            ) : null}
+            {phase.groups.map((group) => (
+              <ScheduleGroupBlock
+                key={group.key}
+                tournamentId={tournamentId}
+                group={group}
+                // 그룹 제목이 단계 제목과 같은 말이면(4강 안의 "4강") 한 번만 적는다.
+                showGroupHeading={group.label !== phase.label || phase.groups.length > 1}
+                myFixtureById={myFixtureById}
+                isRegularLeague={isRegularLeague}
+              />
+            ))}
+          </section>
+        ))
+      )}
     </div>
   );
 }
@@ -525,6 +748,7 @@ export function ScheduleContent({
   onLoadMore,
   showStandings = true,
   myFixtures,
+  isRegularLeague = false,
 }: {
   tournamentId: string;
   data: PublicTournamentScheduleResponse;
@@ -533,11 +757,25 @@ export function ScheduleContent({
   onLoadMore?: () => void;
   showStandings?: boolean;
   /**
+   * 정규 리그 시즌인가. **단계 이름만 바꾼다**(칩·`section aria-label`) — 리그 대진은
+   * `round` 가 'N주차' 라 전부 `knockout` 으로 분류되는데 그 자리에 대회 말인 '결선' 이
+   * 그대로 보였다. 분류 규칙과 나머지 화면은 그대로다.
+   *
+   * `kind === 'regular_league'` 로만 켠다 — `isLeagueCompetition` 은 `format === 'league'`
+   * 인 **리그 방식 대회**도 true 라(alpha 62건 중 7건) 그 대회들의 '결선' 까지 바꿔 버린다.
+   */
+  isRegularLeague?: boolean;
+  /**
    * 로그인한 팀장이 이 대회에서 이끄는 팀의 경기 — 공개 일정 위에 겹쳐 "우리 팀 경기"를
    * 짚어준다. 비로그인 방문자·참가하지 않은 사용자에게는 undefined라 화면이 종전 그대로다.
    */
   myFixtures?: V1MyTournamentFixtures;
 }) {
+  // F4 fix: 필터는 "경기 일정"과 "시간 미정 경기" 두 섹션이 공유해야 한다 — 컴포넌트
+  // 최상단(이른 return보다 앞)에서 훅을 선언해 두 섹션 모두 같은 값을 본다. early
+  // return(!data.bracketPublished) 뒤에 두면 훅 순서가 렌더마다 달라질 수 있어 여기에 둔다.
+  const [filter, setFilter] = useState('all');
+
   if (!data.bracketPublished) {
     return (
       <div style={{ padding: '40px 20px' }}>
@@ -567,20 +805,47 @@ export function ScheduleContent({
   }
   const myTeams = (myFixtures?.teams ?? []).filter((team) => team.fixtures.length > 0);
 
+  // F4 fix: 칩(전체/내 팀/조별리그/결선)은 "경기 일정" 섹션(data.items)만 보고 만들던 걸
+  // 그대로 두되(단계 칩은 일정이 잡힌 경기 기준이 자연스럽다), "내 팀" 칩은 내 경기가
+  // 전부 시간 미정이어도 뜨도록 unscheduled까지 함께 본다 — 예전엔 data.items만 봐서
+  // 그 경우 칩 자체가 안 떴다.
+  const phaseLabels = isRegularLeague ? LEAGUE_PHASE_LABELS : TOURNAMENT_PHASE_LABELS;
+  const standingsHeading = isRegularLeague ? '리그 순위' : '조별 순위';
+  /**
+   * 안쪽 그룹 라벨을 숨길지. **개수가 아니라 값으로 판정한다.**
+   *
+   * 처음엔 `groupId` 종류가 1개면 숨겼는데, **한 리그의 순위는 groupId 가 언제나 하나**다
+   * (서버가 `groupId: leagueId` 를 넣는다 — `1부`·`2부` 는 애초에 **다른 리그**다). 그래서
+   * 그 조건은 티어 리그에서도 참이 되어 사용자가 확정한 `'1부'` 라벨을 숨겼다.
+   *
+   * 숨겨야 하는 건 *"바깥 제목과 같은 말이 두 번 적히는"* 경우뿐이다 — 그건 값을 봐야 안다.
+   */
+  const standingsGroupNames = new Set(data.standings.map((row) => row.groupName));
+  const hideStandingsGroupLabel =
+    isRegularLeague && standingsGroupNames.size === 1 && standingsGroupNames.has(standingsHeading);
+  const phases = groupScheduleEntries(data.items, phaseLabels);
+  const hasMyFixtures =
+    data.items.some((entry) => myFixtureById.has(entry.fixtureId)) ||
+    data.unscheduled.some((entry) => myFixtureById.has(entry.fixtureId));
+  const filters = buildScheduleFilters(phases, hasMyFixtures);
+  // 고른 칩이 사라진 경우(내 경기가 없어졌다거나) 전체로 되돌린다 — 빈 화면에 갇히지 않게.
+  const activeFilter = filters.some((option) => option.key === filter) ? filter : 'all';
+
+  // "시간 미정 경기" 섹션도 위 칩과 같은 기준으로 거른다 — 예전엔 필터 state에 접근할
+  // 경로 자체가 없어 어떤 칩을 눌러도 이 섹션은 항상 전체를 그렸다.
+  const filteredUnscheduled = data.unscheduled.filter((entry) => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'mine') return myFixtureById.has(entry.fixtureId);
+    return phaseKeyOf(entry) === activeFilter;
+  });
+
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {myTeams.length > 0 ? (
-        <section aria-label="우리 팀 라인업" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {myTeams.map((team) => (
-            <MyTeamLineupSummary key={team.registrationId} tournamentId={tournamentId} team={team} />
-          ))}
-        </section>
-      ) : null}
       {hasHiddenIdentity ? (
         <div
           style={{
-            padding: '10px 14px',
-            borderRadius: 10,
+            padding: '12px 16px',
+            borderRadius: 'var(--radius-control)',
             background: 'var(--grey50)',
             fontSize: 12,
             color: 'var(--text-caption)',
@@ -592,30 +857,62 @@ export function ScheduleContent({
       ) : null}
       {showStandings && data.standings.length > 0 ? (
         <section>
-          <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>
-            조별 순위
+          {/* 리그엔 조가 없다 — 대회 말인 "조별 순위" 가 그대로 뜨던 자리다(alpha 실측).
+              안쪽 그룹 라벨은 티어가 있을 때만 켠다: 단발 리그는 그룹이 하나뿐이고 그
+              이름이 이 제목과 같은 말이라("리그 순위") 두 번 적힌다. */}
+          <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
+            {standingsHeading}
           </h3>
-          <StandingsTable rows={data.standings} />
+          <StandingsTable
+            rows={data.standings}
+            showGroupLabel={!hideStandingsGroupLabel}
+          />
         </section>
       ) : null}
 
       <section>
-        <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>
+        <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
           경기 일정
         </h3>
+        {/* `items` 는 서버가 `scheduledAt: { not: null }` 로 거른 것이고, 시간 미정 경기는
+            바로 아래 "시간 미정 경기" 섹션이 그린다. 그래서 전부 시간 미정이면 두 문장이
+            나란히 놓여 모순으로 읽혔다 — "아직 확정된 일정이 없어요" 바로 밑에 경기 2건
+            (alpha 실측). 정말 아무 경기도 없을 때만 빈 상태를 그린다. */}
         {data.items.length === 0 ? (
-          <EmptyState title="아직 확정된 일정이 없어요" sub="경기 시간이 정해지면 여기에 표시돼요." />
+          data.unscheduled.length === 0 ? (
+            <EmptyState title="아직 확정된 일정이 없어요" sub="경기 시간이 정해지면 여기에 표시돼요." />
+          ) : (
+            <div
+              role="status"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+                padding: '12px 14px',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-control)',
+                background: 'var(--grey50)',
+              }}
+            >
+              <strong className="tm-text-label" style={{ color: 'var(--text-strong)' }}>
+                아직 경기 시간이 정해지지 않았어요
+              </strong>
+              <span className="tm-text-caption" style={{ color: 'var(--text-caption)' }}>
+                아래 '시간 미정 경기'에서 대진을 확인할 수 있어요.
+              </span>
+            </div>
+          )
         ) : (
-          <Card pad={0}>
-            {data.items.map((entry) => (
-              <ScheduleRow
-                key={entry.fixtureId}
-                tournamentId={tournamentId}
-                entry={entry}
-                myFixture={myFixtureById.get(entry.fixtureId)}
-              />
-            ))}
-          </Card>
+          <ScheduleSections
+            tournamentId={tournamentId}
+            entries={data.items}
+            myFixtureById={myFixtureById}
+            filters={filters}
+            activeFilter={activeFilter}
+            onSelectFilter={setFilter}
+            phaseLabels={phaseLabels}
+            isRegularLeague={isRegularLeague}
+          />
         )}
         {hasNextPage ? (
           <button
@@ -632,19 +929,32 @@ export function ScheduleContent({
 
       {data.unscheduled.length > 0 ? (
         <section>
-          <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>
+          <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>
             시간 미정 경기
           </h3>
-          <Card pad={0}>
-            {data.unscheduled.map((entry) => (
-              <ScheduleRow
-                key={entry.fixtureId}
-                tournamentId={tournamentId}
-                entry={entry}
-                myFixture={myFixtureById.get(entry.fixtureId)}
-              />
-            ))}
-          </Card>
+          {/* 일정이 잡힌 목록과 같은 모양으로 묶는다 — 예전엔 한 줄로 흘려보내서 같은 조의
+              경기가 여러 개면 카드마다 `A조`·`4강` 이 반복됐다(오너 지적: "조도 중복되고").
+              컨테이너도 `Card` 가 아니라 그룹 목록과 같은 `tm-schedule-list` 다: 행 자체가
+              이미 `tm-schedule-card` 라 바깥 카드는 이중 크롬이고, 경기가 1건일 때는 테두리
+              안 우측이 "액자 속 빈 공간"으로 남았다. */}
+          {filteredUnscheduled.length === 0 ? (
+            // 필터가 걸려 시간 미정 경기 전부가 걸러진 경우 — 섹션 제목만 남고 내용이
+            // 사라지면 "칩이 먹통인가" 오해를 산다. ScheduleSections의 빈 상태와 같은 문구.
+            <EmptyState title="해당하는 경기가 없어요" sub="다른 보기를 선택해 주세요." />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {groupUnscheduledEntries(filteredUnscheduled).map((group) => (
+                <ScheduleGroupBlock
+                  key={group.key}
+                  tournamentId={tournamentId}
+                  group={group}
+                  showGroupHeading
+                  myFixtureById={myFixtureById}
+                  isRegularLeague={isRegularLeague}
+                />
+              ))}
+            </div>
+          )}
         </section>
       ) : null}
     </div>

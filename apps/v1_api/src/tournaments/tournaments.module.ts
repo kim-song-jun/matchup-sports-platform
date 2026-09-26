@@ -6,6 +6,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { OptionalV1AuthGuard } from '../auth/optional-v1-auth.guard';
 import { V1AuthGuard } from '../auth/v1-auth.guard';
 import { TournamentsAdminController } from './tournaments-admin.controller';
+import { MockTournamentSeedController } from './mock-seed/mock-tournament-seed.controller';
+import { MockTournamentSeedService } from './mock-seed/mock-tournament-seed.service';
 import { TournamentsAdminService } from './tournaments-admin.service';
 import { TournamentRegistrationsController } from './tournament-registrations.controller';
 import { TournamentRegistrationsService } from './tournament-registrations.service';
@@ -13,6 +15,7 @@ import { AdminRegistrationsController } from './admin-registrations.controller';
 import { AdminRegistrationsService } from './admin-registrations.service';
 import { TournamentBracketController } from './tournament-bracket.controller';
 import { TournamentBracketService } from './tournament-bracket.service';
+import { LeagueFixtureGeneratorService } from './league-fixture-generator.service';
 import { TournamentPlayersController, TournamentPlayersAdminController } from './tournament-players.controller';
 import { TournamentPlayersService } from './tournament-players.service';
 import { TournamentsReadController } from './tournaments-read.controller';
@@ -21,8 +24,6 @@ import { TournamentAnnouncementsController } from './tournament-announcements.co
 import { TournamentAnnouncementsService } from './tournament-announcements.service';
 import { TournamentSponsorsController } from './tournament-sponsors.controller';
 import { TournamentSponsorsService } from './tournament-sponsors.service';
-import { TournamentPopupController } from './tournament-popup.controller';
-import { TournamentPopupService } from './tournament-popup.service';
 import { TournamentReviewsController } from './tournament-reviews.controller';
 import { TournamentReviewsService } from './tournament-reviews.service';
 import { KakaoGeocodingService } from './kakao-geocoding.service';
@@ -52,6 +53,8 @@ import { TournamentResultReviewService } from '../tournament-operations/results/
 // above (also wired into this same unowned file, not into a todo-owned
 // one). No other file in this module is touched.
 import { PublicRecordsModule } from '../games/public-records/public-records.module';
+import { TournamentPeriodSettingsController } from './competition-config/tournament-period-settings.controller';
+import { TournamentPeriodSettingsService } from './competition-config/tournament-period-settings.service';
 
 /**
  * 대회(풋살 토너먼트) 도메인 모듈 — Wave 2-3.
@@ -75,6 +78,7 @@ import { PublicRecordsModule } from '../games/public-records/public-records.modu
     TournamentCampaignsPublicController,
     TournamentCampaignsAdminController,
     TournamentsAdminController,
+    MockTournamentSeedController,
     AdminRegistrationsController,
     TournamentBracketController,
     TournamentPlayersController,
@@ -82,21 +86,22 @@ import { PublicRecordsModule } from '../games/public-records/public-records.modu
     TournamentRegistrationsController,
     TournamentAnnouncementsController,
     TournamentSponsorsController,
-    TournamentPopupController,
     TournamentReviewsController,
     TournamentsReadController,
     TournamentResultReviewController,
+    TournamentPeriodSettingsController,
   ],
   providers: [
+    MockTournamentSeedService,
     TournamentsAdminService,
     TournamentRegistrationsService,
     AdminRegistrationsService,
     TournamentBracketService,
+    LeagueFixtureGeneratorService,
     TournamentPlayersService,
     TournamentsReadService,
     TournamentAnnouncementsService,
     TournamentSponsorsService,
-    TournamentPopupService,
     TournamentReviewsService,
     KakaoGeocodingService,
     TournamentCampaignReadService,
@@ -108,6 +113,7 @@ import { PublicRecordsModule } from '../games/public-records/public-records.modu
     TournamentStaffGuard,
     TournamentStaffService,
     TournamentResultReviewService,
+    TournamentPeriodSettingsService,
   ],
 })
 export class TournamentsModule {}

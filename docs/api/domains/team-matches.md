@@ -1,5 +1,50 @@
 # Domain Contract - Team Matches
 
+## V1 친선 팀매치 공동 경기 기록 (Task 172)
+
+이 절은 `apps/v1_api/src/team-matches/team-match-record.controller.ts` / service / DTO와
+`apps/v1_web/src/hooks/use-team-match-record.ts` 기준의 신규 계약이다. 기존 리그·대회 운영 경로와
+이미 결과 revision이 있는 친선 경기의 기존 제출·승인 경로는 보존한다.
+
+| Method | Path | 권한 | 동작 |
+|---|---|---|---|
+| GET | `/api/v1/team-matches/:id/record` | OptionalV1AuthGuard | 공동 기록·서버 시각·편집 가능 여부 조회 |
+| POST | `/api/v1/team-matches/:id/record` | V1AuthGuard + 최신 유효 제출 라인업 참가자 | 득점 추가/수정/삭제/복구, 종료 확인/취소 |
+
+- 응답은 공통 `{ status, data, timestamp }`. `phase`: scheduled/live/official/cancelled/legacy/managed.
+- GET은 일반 사용자에게 점수·팀·확정 여부만 반환한다. 선수 명단·득점 상세·이력·확인자 이름은 참가자에게만 반환한다.
+- 편집자는 최신 제출/잠금 라인업의 `userId` 또는 검증된 현재 identity link로 판정한다. 팀 owner/manager 역할만으로 권한을 부여하지 않는다. 양쪽 라인업에 동시에 있는 계정은 확인자로 인정하지 않는다.
+- `commandId` UUID와 `expectedVersion` 정수 필수. `action`: add/edit/delete/undo/confirm/reopen.
+- add/edit: `sideId`는 점수를 얻는 팀. `participantId`는 선택(null=미상), `ownGoal` 기본 false,
+  `minute` 선택(null 또는 0..999 정수). 자책골 선수는 점수를 얻는 팀의 상대편 라인업에서 고른다.
+- edit/delete는 `goalId`, undo는 `changeId`. undo는 대상 변경 이후 해당 골이 다시 바뀌었으면 409로 거부한다.
+- 점수는 현재 득점 기록 개수로만 계산한다. 이력에는 주체·시각·전후 값이 영속되며 GET은 최근 100건을 반환한다.
+- 같은 commandId/사용자/payload 재전송은 재실행 없이 최신 상태를 반환한다. 다른 payload/사용자의 키 재사용은 409.
+- Game row lock + record version으로 동시 수정 유실을 방지한다. stale version은 409 `VERSION_CONFLICT`.
+- 득점 변경/복구/reopen은 기존 양 팀 확인을 초기화한다. 같은 팀의 중복 confirm은 409.
+- 두 팀의 서로 다른 라인업 참가자가 확인하면 같은 트랜잭션에서 Game 결과 DRAFT→SUBMITTED→OFFICIAL,
+  result participants/goalEvents/decisions, TeamMatch 완료·팀 일정 cascade, `GAME_RESULT_OFFICIAL` outbox를 기록한다.
+- 확정 후 일반 편집은 409. 기존 관리자 정정으로 새로운 결과 revision이 생기면 기존 결과 화면을 사용한다.
+- 공동 기록이 생성된 경기에서 이전 host-only 결과/event/진행 command를 호출하면 `SHARED_RECORD_REQUIRED`.
+- 주요 오류: 403 RECORD_PARTICIPANT_REQUIRED; 404 TEAM_MATCH_NOT_FOUND;
+  409 RECORD_NOT_EDITABLE/VERSION_CONFLICT/COMMAND_REUSED/ALREADY_CONFIRMED/GOAL_NOT_FOUND;
+  422 PARTICIPANT_INVALID. DTO 이외 필드는 ValidationPipe에서 거부한다.
+- 상대 확정 + 시작 시각 경과는 조회 시 서버 시각으로 판단한다. API 목록/상세 `isLive`는 표시용 파생값이며
+  DB status `matched`의 신청/권한 의미는 바꾸지 않는다. 종료 예정 시각만으로 결과를 확정하지 않는다.
+- 기본/추천 목록은 진행 중인 matched 경기까지 유지한다. 명시적 recruiting 필터는 기존 모집 조건을 유지한다.
+- UI는 진행 중 2초, 경기 전 15초 polling 및 창 focus 시 재조회. 자동 저장 성공을 시뮬레이션하지 않는다.
+- 참가자는 상세 진입 시 `/team-matches/:id/record`로 이동. `?view=detail`로 장소/라인업 상세 복귀.
+  기존 `/result`, `/result/approval`도 신규 친선 경기에서는 공동 기록을 연다.
+- 신규 테이블: `V1TeamMatchRecord`, `V1TeamMatchRecordChange`; migration `20260921160000_v1_team_match_shared_record`.
+
+
+
+## Task 168 Phase 3 canonical source addendum (candidate)
+
+- A TeamMatch owns the canonical Game identity for tournament, regular-league, and friendly flows. Existing fixture-shaped URLs and `fixtureId` response fields continue to carry the same TeamMatch UUID for compatibility.
+- Result correction and public record projections follow the Game current official revision; a correction does not change the TeamMatch start time or create a second appearance.
+- This is a contract candidate pending the selected API overlay review; it does not claim Alpha migration completion.
+
 ## Endpoint Matrix
 
 | Method | Path | Auth | Description |
@@ -10,13 +55,73 @@
 | POST | `/team-matches` | Yes | 모집글 생성 |
 | PATCH | `/team-matches/:id` | Yes | 모집글 수정 또는 취소 |
 | GET | `/team-matches/:id/applications` | Yes | 신청 목록 조회 (호스트 team manager+) |
-| POST | `/team-matches/:id/apply` | Yes | 다른 팀이 모집글에 신청 |
+| POST | `/team-matches/:id/applications` | Yes | 다른 팀이 모집글에 신청 |
 | PATCH | `/team-matches/:id/applications/:appId/approve` | Yes | 신청 승인 |
 | PATCH | `/team-matches/:id/applications/:appId/reject` | Yes | 신청 거절 |
 | POST | `/team-matches/:id/check-in` | Yes | 도착 인증 |
 | POST | `/team-matches/:id/result` | Yes | 결과 입력 |
 | POST | `/team-matches/:id/evaluate` | Yes | 상대 팀 평가 |
 | GET | `/team-matches/:id/referee-schedule` | Yes | 심판 배정 조회 |
+| POST | `/admin/team-matches` | Admin owner/ops | 플랫폼 팀매치 모집 생성 |
+| POST | `/admin/team-matches/:id/applications/:applicationId/approve` | Admin owner/ops | 신청 팀을 한 팀씩 승인하고 두 번째 승인에서 경기 확정 |
+| POST | `/admin/team-matches/:id/applications/:applicationId/reject` | Admin owner/ops | 대기 신청을 사유와 함께 거절 |
+| PATCH | `/admin/team-matches/:id` | Admin owner/ops | 모집 중인 플랫폼 단발 팀매치 수정 |
+
+## POST /admin/team-matches
+
+플랫폼 운영자가 팀을 미리 지정하지 않고 공개 모집을 여는 별도 생성 경로다. 일반 팀 owner/manager 생성과 주최/확정 방식은 다르지만 경기 조건과 날짜 검증은 동일하다.
+
+Required body:
+
+- `clientCommandId` (UUID, 재시도 멱등 키)
+- `sportId` (활성 종목)
+- `regionId` (활성 시·군·구)
+- `title`, `startsAt`, `manualPlaceName`
+
+Optional body: `description`, `imageUrl`, `endsAt`, `deadlineAt`, `addressText`, `costNote`, `rulesText`, `minLevelCode`, `maxLevelCode`, `genderRule`, `matchFormat`, `matchStyle`, `uniformColor`.
+
+Rules:
+
+- active `owner` 또는 `ops` admin만 생성할 수 있으며 `support`는 `403 PERMISSION_DENIED`다.
+- 생성된 행은 `hostTeamId=null`, `platformManaged=true`, `status=recruiting`인 독립 플랫폼 모집이다. `platformManaged`는 홈팀 유무로 계산하지 않고 `v1_team_matches.platform_managed`에 영구 저장한다.
+- 조건 필드는 일반 팀매치 모집과 같은 검증·저장 계약을 사용한다. web은 총 비용/상대팀 비용을 일반 생성 화면과 같은 `총 {금액}원 · 상대팀 {금액}원` 형식의 `costNote`로 보낸다.
+- `deadlineAt`은 일반 모집처럼 선택 사항이며 입력한 경우 현재보다 이후이고 `startsAt`보다 빨라야 한다.
+- 생성 시 Game, team schedule, application을 만들지 않는다.
+- 배정 전 공개 목록/상세 응답은 `platformManaged=true`, `hostTeam=null`을 반환하며 같은 종목의 관리 팀이 `POST /team-matches/:id/applications`로 신청할 수 있다.
+- 같은 `clientCommandId`와 같은 payload 재시도는 기존 결과를 반환한다. 같은 키의 다른 payload는 `409 IDEMPOTENCY_CONFLICT`다.
+- 성공 응답은 `teamMatchId`, `status=recruiting`, `detailRoute`(관리자 상세), `replayed`를 포함한다.
+
+## POST /admin/team-matches/:id/applications/:applicationId/approve
+
+플랫폼 모집에 접수된 신청을 한 팀씩 승인한다. 첫 승인 팀은 HOME으로 예약되고, 두 번째 승인 팀은 AWAY로 배정되면서 경기가 확정된다.
+
+Required body:
+
+- `clientCommandId` (UUID, 재시도 멱등 키)
+
+Rules:
+
+- 대상은 리그·토너먼트에 속하지 않은 `recruiting` 플랫폼 모집이어야 한다.
+- 선택 신청은 `requested` 상태여야 하고 신청 팀은 활성 상태이며 모집 종목과 같아야 한다.
+- 첫 번째 승인에서는 해당 신청만 `approved`로 바꾸고 팀매치는 `recruiting`을 유지한다. Game과 team schedule은 아직 만들지 않는다.
+- 두 번째 승인에서는 먼저 승인한 팀을 HOME(`hostTeamId`), 새 승인 팀을 AWAY(`approvedApplicantTeamId`)로 연결하고 팀매치를 `matched`로 바꾼다.
+
+## POST /admin/team-matches/:id/applications/:applicationId/reject
+
+- body는 UUID `clientCommandId`와 1~500자의 `reason`을 받는다.
+- 플랫폼이 운영하는 단발 `recruiting` 팀매치의 `requested` 신청만 거절한다. 승인·철회된 신청은 변경하지 않는다.
+- 신청을 `rejected`로 바꾸고 검토 관리자/시각, 거절 사유가 포함된 관리자 감사 로그를 기록한 뒤 신청 팀 owner/manager에게 알린다. Game이나 팀 일정은 만들지 않는다.
+
+## PATCH /admin/team-matches/:id
+
+- 생성 DTO의 모집 필드와 상세 조회에서 받은 `version`을 전송한다. 현재 구현에서는 종목을 바꿀 수 없다.
+- 플랫폼이 운영하는 단발 `recruiting` 팀매치만 수정할 수 있다. `version`이 최신 `updatedAt`과 다르면 `VERSION_CONFLICT`로 거절한다.
+- 제목, 소개, 이미지, 지역, 장소/주소, 시작·종료·마감, 비용·규칙, 등급, 성별, 경기 형식·성격, 유니폼을 갱신하고 관리자 감사 로그를 남긴다.
+- 배정 뒤에도 저장된 `platformManaged=true`는 유지된다. 공개 목록/상세는 실제 홈·원정 팀과 `플랫폼 주관` 출처를 함께 노출한다.
+- 플랫폼 모집의 HOME/AWAY는 경기 사이드 식별자다. HOME 팀 owner/manager도 참석명단·채팅·경기 기록에는 참여하지만 모집 수정·마감·취소, 신청 승인/거절 권한은 얻지 않으며 이 운영 권한은 관리자에게 남는다. 따라서 공개 목록/상세의 `viewerState`/`viewer.state`도 플랫폼 HOME 팀에 `host_team`을 부여하지 않고 `viewer.manageRoute`는 `null`이다. `viewer.manageableHostTeam`은 HOME 사이드의 참가 기능 판정일 뿐 모집 관리 권한이 아니다.
+- 두 번째 승인 때 나머지 `requested` 신청을 `rejected`로 전환한다.
+- 두 번째 승인과 Game HOME/AWAY side, 양 팀 schedule, application/team-match 상태 로그, admin action log를 한 트랜잭션에서 생성한다.
+- 성공 응답은 `applicationId`, `applicantTeamId`, `applicationStatus`, `teamMatchId`, `teamMatchStatus`, `approvedCount`, nullable `gameId`/`homeTeamId`/`awayTeamId`, `detailRoute`, `replayed`를 포함한다.
 
 ## GET /team-matches
 
@@ -41,6 +146,7 @@ Rules:
 - 일반 목록에서는 신청 마감이 지났거나 raw status가 `closed`/`matched`인 항목도 경기 시작 전까지 신청마감으로 노출하고, 경기 시작 시각 이후에는 제외한다.
 - `sort=recommended`는 경기 시작 전인 raw `recruiting` 중 신청 마감이 없거나 아직 지나지 않은 항목만 포함한다.
 - `teamId`는 `hostTeamId = teamId` 또는 `applications.some(applicantTeamId = teamId)` 둘 중 하나를 만족하면 포함
+- `platformManaged`는 생성 출처를 뜻하며 팀 배정 후에도 `true`다. `hostTeam`/`approvedOpponentTeam`은 현재 배정된 실제 양 팀을 별도로 반환한다.
 - Level response fields: `levelLabel`, `minLevel`, `maxLevel`
 - List and detail responses include `hostTeam.mannerScore` and `hostTeam.wins`.
   - `mannerScore` is the live aggregate of publicly revealed team-match reviews and is `null` when no score is publishable.
@@ -55,6 +161,7 @@ Required:
 - `hostTeamId`
 - `sportId`
 - `regionId`
+  - Required non-empty string; accepts stable catalog slugs such as `region-seoul-jongno`.
 - `title`
 - `startsAt`
 - `manualPlaceName`
@@ -75,7 +182,7 @@ Rules:
 - 생성자는 `realName`, `phone`, `gender`가 모두 있는 creator profile을 가져야 한다.
 - `sportId`는 host team의 단일 `sportId`와 같아야 하며, 다르면 `400 VALIDATION_FAILED`를 반환한다.
 - `imageUrl`은 선택 사항이다. web create/edit는 `/uploads`가 반환한 루트 상대 URL만 저장하고, 미선택 상태를 `null`로 보낸다.
-- `deadlineAt`은 선택 사항이며 `startsAt`보다 빨라야 한다. `v1_team_matches.deadline_at`에 저장되고 목록·상세·수정 응답에 동일하게 반환된다.
+- `deadlineAt`은 선택 사항이며 새로 설정할 때 현재보다 이후이고 `startsAt`보다 빨라야 한다. 수정 시에는 저장된 기존 마감 시각을 그대로 유지할 수 있다. `v1_team_matches.deadline_at`에 저장되고 목록·상세·수정 응답에 동일하게 반환된다.
 
 ## PATCH /team-matches/:id
 
@@ -202,6 +309,16 @@ Success:
 - evaluator / evaluated가 같은 team이면 불가
 - evaluator team 기준 중복 평가 불가
 
+## Team-match lineup
+
+- `GET /team-matches/:teamMatchId/lineup` reads the viewer's team lineup.
+- `PUT /team-matches/:teamMatchId/lineup` saves a draft through `TeamMatchLineupService`.
+- Host team owners/managers may read and save the HOME lineup while the match is still recruiting and no opponent has been approved. The Game's AWAY side remains a teamless placeholder until approval.
+- Team owners/managers select active team members directly for the attendance roster. Team-schedule RSVP (`GOING`, declined, or no response) does not gate lineup eligibility; active membership is the server-enforced requirement.
+- Opponent-side lineup access and change requests require an approved opponent team.
+- A submitted attendance roster remains editable until the game starts. Saving an edit creates a new draft revision, which can be submitted again without mutating the previous submitted revision.
+- Goalkeeper is an independent per-participant designation: multiple participants or no participant may be marked as goalkeeper.
+
 ## Frontend Mapping Notes
 
 - user-facing status vocabulary는 `recruiting`, `scheduled`, `checking_in`, `in_progress`, `completed`, `cancelled` 기준으로 맞춘다
@@ -218,3 +335,30 @@ Success:
 - `apps/v1_api/src/sports/level-range.ts`
 - `apps/v1_web/src/hooks/use-v1-api.ts`
 - `apps/v1_web/src/types/api.ts`
+
+Task 172 공개 기록은 기존 가시성 정책과 `PUBLIC_LIVE` 플래그를 적용한다. 비참가자의 `sides[].score`는 비공개 시 `null`이며, `HIDDEN`은 404다. `STATUS_ONLY`는 점수를 숨기고, `OFFICIAL_ONLY` 및 플래그가 꺼진 `LIVE`는 최종 확정 후에만 점수를 반환한다. 라인업·이력·팀별 확인 정보는 참가자에게만 반환한다.
+
+### 일반/관리자 날짜·확정 공통 계약 (Task 149)
+
+- 두 생성 API는 `validateTeamMatchDates`를 공유한다. 시작은 미래, 종료는 시작 이후, 새 마감은 현재 이후·시작 이전이어야 한다. 잘못된 종료값을 `null`로 바꾸어 성공시키지 않는다.
+- 일반 생성/수정 폼도 종료 날짜를 지정할 수 있다. 비워두면 시작 날짜를 사용하며, 명시한 종료 날짜에는 종료 시간이 필요하다. 로컬 날짜·시간을 ISO로 변환하고 수정 시 같은 로컬 날짜로 복원한다.
+- 일반/관리자 스타일 입력은 프리셋과 직접 입력을 함께 지원하며 최대 3개다.
+- 신청 마감은 **새 신청 접수**를 닫는다. 기존 `requested` 신청은 raw status가 `recruiting`이고 시작 전이면 일반 승인과 관리자 개별 승인이 가능하다. `closed`/`cancelled`/`matched` 상태나 시작 이후는 승인 불가다. 일반 신청 목록의 `canApprove`도 이 조건과 같다.
+- `platform_managed` migration과 후속 `20260921141000_v1_platform_recruitment_host_constraint`가 필요하다. 후자는 기존 CHECK를 트랜잭션 안에서 확장해 플랫폼 모집만 host 없이 허용하고 생성자·지역·장소·시작 필수값은 유지한다. 일반 모집은 여전히 host가 필요하다.
+
+MSW 기본 픽스처의 라인업은 DRAFT이므로 공동 기록 조회는 편집 불가 상태이며 POST는 403을 반환한다. 실제 공동 편집 검증은 API 통합 픽스처와 headed 브라우저 흐름을 사용한다. 테스트 성공을 흉내내는 mock 확정 처리는 제공하지 않는다.
+
+## 공동 경기 기록 서브매치 (Task 173)
+
+`GET /team-matches/:id/record`는 `subMatches[]`를 순서대로 반환한다. 각 항목은 `id`, `title`, `order`, 양 팀의 `scores[]`를 포함한다. 최상단 `sides[].score`는 모든 득점의 합이며 서브매치 점수의 합과 같다.
+
+참가자 전용 응답의 `participants[]`에는 제출된 최신 라인업의 `id`, `sideId`, `name`, `jerseyNumber`, `profileImageUrl`이 포함된다. 직접 연결된 `userId`와 현재 identity link를 모두 해석하며, 공개 응답은 기존처럼 빈 배열이다.
+
+`POST /team-matches/:id/record`의 기존 버전 CAS와 `commandId` 멱등 계약을 그대로 사용한다.
+
+- `submatch_add`: `title`을 받는다. 첫 서브매치를 만들 때 기존 직접 득점은 새 서브매치에 귀속되어 합계가 유지된다.
+- `submatch_edit`: `subMatchId`, `title`을 받는다.
+- `submatch_delete`: `subMatchId`를 받는다. 득점이 있으면 `SUBMATCH_HAS_GOALS` 409를 반환한다.
+- `add` / `edit`: 서브매치가 있으면 유효한 `subMatchId`가 필수다.
+
+서브매치 또는 득점 변경은 기존 종료 확인을 취소한다. 양 팀 라인업 참가자가 같은 버전을 확인하면 `score.home`, `score.away`, 선택적인 `score.subMatches[]`를 가진 공식 결과 revision 하나를 만든다. 팀 전적과 참가자 출전·득점은 팀매치 전체에서 한 번만 집계한다.

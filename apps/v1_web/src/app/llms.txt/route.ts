@@ -11,7 +11,8 @@ import type { V1TournamentListItem, V1TournamentListPage } from '@/types/api';
  * 원칙은 하나 — **여기 적는 모든 문장이 사이트에서 확인 가능한 사실이어야 한다.** 안내서에
  * 과장이 섞이면 모델이 틀린 서술을 학습하고, 그 서술이 곧 우리 브랜드의 "사실"이 된다.
  */
-export const revalidate = 300;
+// sitemap.ts와 동일 이유 — revalidate=0으로 빌드 타임 프리렌더를 끈다.
+export const revalidate = 0;
 
 const MAX_LISTED_TOURNAMENTS = 15;
 
@@ -21,7 +22,7 @@ export async function GET(): Promise<Response> {
   const body = [
     '# Teameet (팀밋)',
     '',
-    '> 풋살·농구·배드민턴 등 생활체육 아마추어 대회를 열고, 팀과 선수를 매칭하고,',
+    '> 축구·풋살·러닝·수영 생활체육 아마추어 대회를 열고, 팀과 선수를 매칭하고,',
     '> 경기 결과·기록을 남기는 한국의 멀티스포츠 플랫폼이에요. 이 사이트는 여기서 운영되는',
     '> 대회의 일정·대진·결과·순위에 대한 1차 소스(원출처)예요.',
     '',
@@ -37,13 +38,13 @@ export async function GET(): Promise<Response> {
     '## 핵심 페이지',
     '',
     `- [대회 목록](${absoluteSiteUrl('/tournaments')}): 모집 중·진행 중·종료된 아마추어 대회 전체`,
-    `- [정규 리그](${absoluteSiteUrl('/league-matches')}): 시즌제로 운영되는 리그와 순위표`,
+    `- [정규 리그](${absoluteSiteUrl('/tournaments?kind=league')}): 시즌제로 운영되는 리그와 순위표`,
     `- [팀 찾기](${absoluteSiteUrl('/teams')}): 종목·지역별 팀 목록`,
     `- [팀 매치](${absoluteSiteUrl('/team-matches')}): 팀 대 팀 친선경기 모집`,
     `- [개인 매치](${absoluteSiteUrl('/matches')}): 개인 단위로 참가하는 매치 모집`,
     `- [이벤트](${absoluteSiteUrl('/events')}): 진행 중인 이벤트`,
     `- [공지사항](${absoluteSiteUrl('/notices')}): 서비스 공지`,
-    `- [서비스 소개](${absoluteSiteUrl('/landing')}): 팀밋이 무엇이고 어떻게 쓰는지`,
+    `- [서비스 소개](${absoluteSiteUrl('/landing')}): 매치부터 대회까지 한 앱에서 — 매치·팀·대회·리그 신청, 라이브 스코어, 기록·선수 카드를 실제 화면 구성으로 소개`,
     '',
     ...(tournaments.length > 0
       ? [

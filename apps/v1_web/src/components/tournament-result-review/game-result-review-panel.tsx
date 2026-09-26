@@ -5,23 +5,22 @@ import Link from 'next/link';
 import {
   useGameResultRevisions,
   useOfficializeResultRevision,
-  useReviewResultDecision,
   useSupersedeAndSubmitResult,
   useTournamentGame,
   type GameResultRevision,
 } from '@/hooks/use-tournament-result-review';
 import { useV1GameLineups } from '@/hooks/use-v1-api';
 import { useV1GameEventsBackfill } from '@/hooks/use-v1-game-operations';
-import { RecordedEventList } from '@/app/tournament-ops/tournaments/[id]/fixtures/[fixtureId]/operate/recorded-event-list';
+import { RecordedEventList } from '@/components/tournament-live/operate/recorded-event-list';
 import { AlertBanner, ErrorState } from '@/components/v1-ui/primitives';
 import { countMissingAssists } from '@/lib/result-review-warnings';
 import { formatGameResultScoreWithPenalties } from '@/lib/game-result-score';
+import { matchOutcomeReasonLabel, toDisplayableOutcomeReason } from '@/lib/match-outcome';
 import { deriveEditableGoalEvents } from '@/lib/result-goal-events';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { Button } from '@/components/v1-ui/button';
 import { RevisionTimeline } from './revision-timeline';
 import { GameSummaryHeader } from './game-summary-header';
-import { ReasonModal } from './reason-modal';
 import { ResultEditModal, type ResultEditSubmitInput } from './result-edit-modal';
 import {
   canActOnResultReview,
@@ -29,8 +28,8 @@ import {
   isDirectorOfficializeDisabledError,
   officializeAlwaysAllowed,
 } from './result-review-copy';
+import { AdminListSkeleton } from '@/components/admin/admin-skeleton';
 
-type ReasonAction = 'reject' | 'request_supplement';
 
 type DirectorGateStatus = 'unknown' | 'enabled' | 'disabled';
 
@@ -48,10 +47,14 @@ export function GameResultReviewPanel({
   gameId,
   tournamentId,
   correctionsHref,
+  inline = false,
+  onSaved,
 }: {
   gameId: string;
   tournamentId?: string;
   correctionsHref?: string;
+  inline?: boolean;
+  onSaved?: () => void;
 }) {
   const gameQuery = useTournamentGame(gameId);
   const revisionsQuery = useGameResultRevisions(gameId);
@@ -64,20 +67,18 @@ export function GameResultReviewPanel({
   // 이 조회는 이미 성공 중인 `useTournamentGame`(GET /games/:id)과 서버에서
   // 동일한 'read' 권한을 쓰므로 새 권한 리스크가 없다.
   const eventsQuery = useV1GameEventsBackfill(gameId, 0);
-  const reviewDecision = useReviewResultDecision(gameId, tournamentId);
   const supersedeAndSubmit = useSupersedeAndSubmitResult(gameId, tournamentId);
   const officialize = useOfficializeResultRevision(gameId, tournamentId);
   const { confirm, ConfirmModal: officializeConfirmModal } = useConfirm();
 
-  const [reasonAction, setReasonAction] = useState<{
-    type: ReasonAction;
-    revision: GameResultRevision;
-  } | null>(null);
   const [resubmitTarget, setResubmitTarget] = useState<GameResultRevision | null>(null);
+  const [resubmitExpectedVersion, setResubmitExpectedVersion] = useState<number | null>(null);
   const [directorGateStatus, setDirectorGateStatus] = useState<DirectorGateStatus>('unknown');
 
   if (gameQuery.isPending || revisionsQuery.isPending) {
-    return <p className="tm-text-label">불러오는 중…</p>;
+    // 텍스트 한 줄이면 로드가 끝나는 순간 레이아웃이 통째로 튀어나온다 — 같은 화면의
+    // 다른 패널과 같이 스켈레톤으로 자리를 먼저 잡는다.
+    return <AdminListSkeleton rows={4} />;
   }
   if (gameQuery.isError) {
     return (
@@ -135,6 +136,7 @@ export function GameResultReviewPanel({
       freshRevisions?.data?.[0] ??
       revision;
     const freshGame = freshGameResult?.data ?? game;
+    const freshOutcome = toDisplayableOutcomeReason(freshRevision.outcomeReason);
     const ok = await confirm({
       title: '결과를 확정할까요?',
       // `.home`/`.away` 를 직접 읽으면 백필된 경기(중첩 `{regulation:{…}}` 형태)에서
@@ -142,7 +144,13 @@ export function GameResultReviewPanel({
       // 승부차기까지 넣어 읽어준다: 결선 무승부를 확정하는 자리인데 "0:0 결과를
       // 공식 결과로 확정해요"만 뜨면, 되돌릴 수 없는 확정 직전에 정작 승자를 가른
       // 값이 문구에서 빠진다.
-      message: `${formatGameResultScoreWithPenalties(freshRevision.score)} 결과를 공식 결과로 확정해요. 확정 후에는 정정 절차로만 바꿀 수 있어요.`,
+      // 몰수·중단으로 끝난 경기는 그 사실을 확정 문구에 반드시 넣는다. 넣지 않으면
+      // "0:0 결과를 공식 결과로 확정해요"만 뜨는데, 몰수 0:0 과 실제 0:0 무승부는
+      // 되돌릴 수 없는 확정 직전에 반드시 구분돼야 하는 서로 다른 결과다 — 위의
+      // 승부차기 누락 사고와 같은 종류의 결함이다.
+      message: `${formatGameResultScoreWithPenalties(freshRevision.score)}${
+        freshOutcome !== null ? ` (${matchOutcomeReasonLabel(freshOutcome)})` : ''
+      } 결과를 공식 결과로 확정해요. 확정 후에는 정정 절차로만 바꿀 수 있어요.`,
       confirmLabel: '확정',
     });
     if (!ok) return;
@@ -156,7 +164,7 @@ export function GameResultReviewPanel({
         mvpParticipantId: freshRevision.mvpParticipantId,
       },
       {
-        onSuccess: () => setDirectorGateStatus('enabled'),
+        onSuccess: () => { setDirectorGateStatus('enabled'); onSaved?.(); },
         onError: (error) => {
           if (isDirectorOfficializeDisabledError(error)) setDirectorGateStatus('disabled');
         },
@@ -165,6 +173,18 @@ export function GameResultReviewPanel({
   }
 
   const missingAssists = latest ? countMissingAssists(latest.resultParticipants) : 0;
+  // 이 배너는 **지금 승인 버튼을 누를 대상**의 사유를 보여줘야 한다. 검토 대기 리비전이
+  // 있으면(latest.state === 'SUBMITTED') 그게 승인 대상이므로 그것을, 없으면 지금 유효한
+  // 공식 결과의 사유를 보여준다.
+  //
+  // `currentOfficial ?? latest` 로 쓰면 정반대가 된다(Copilot 리뷰 지적): 몰수로 확정된
+  // 경기에 정정 리비전이 올라와 그걸 검토하는 동안, 배너는 **정정안이 아니라 이전 공식
+  // 결과**의 사유를 보여준다 — 검토자가 승인 직전에 보는 근거가 승인 대상과 다른 것이라
+  // 이 배너를 둔 이유 자체가 무너진다.
+  const outcomeSource = latest !== null && latest.state === 'SUBMITTED' ? latest : (currentOfficial ?? null);
+  const outcomeReason = toDisplayableOutcomeReason(outcomeSource?.outcomeReason);
+  const outcomeNotice =
+    outcomeReason !== null ? { reason: outcomeReason, note: outcomeSource?.outcomeNote?.trim() ?? '' } : null;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <GameSummaryHeader game={game} currentRevision={currentOfficial ?? null} />
@@ -177,6 +197,18 @@ export function GameResultReviewPanel({
         <AlertBanner tone="info" message="이 화면에서는 결과를 볼 수만 있어요. 검토·확정 권한이 없어요." />
       ) : null}
 
+      {/* 몰수·중단 사유. 운영자가 승인 버튼을 누르기 전에 "왜 이 점수인지"를 봐야 하므로
+          세부 기록·승인 CTA보다 위에 둔다. 서버는 사유 없는 몰수 종료를 422 로 막지만,
+          그 규칙 이전에 종료된 경기는 사유가 없을 수 있어 문구를 분기한다. */}
+      {outcomeNotice !== null ? (
+        <AlertBanner
+          tone="warning"
+          message={`${matchOutcomeReasonLabel(outcomeNotice.reason)}으로 종료된 경기예요.${
+            outcomeNotice.note.length > 0 ? ` 사유: ${outcomeNotice.note}` : ''
+          }`}
+        />
+      ) : null}
+
       {/* 경기 세부 기록 — 종류·시점·팀·선수·도움. 승인 버튼보다 위에 둔다(근거를
           먼저 보고 결정하게). "아직 기록된 이벤트가 없어요"(RecordedEventList의
           빈 상태)와 "불러오지 못했어요"(아래 ErrorState + 다시 시도)를 절대 같은
@@ -185,7 +217,7 @@ export function GameResultReviewPanel({
       <div>
         <p className="tm-text-label" style={{ fontWeight: 600, marginBottom: 8 }}>경기 세부 기록</p>
         {eventsQuery.isPending ? (
-          <p className="tm-text-label">불러오는 중…</p>
+          <AdminListSkeleton rows={3} />
         ) : eventsQuery.isError ? (
           <ErrorState
             title="세부 기록을 불러오지 못했어요"
@@ -202,8 +234,11 @@ export function GameResultReviewPanel({
       </div>
 
       {latest && latest.state === 'SUBMITTED' && !readOnly ? (
-        <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <p className="tm-text-label" style={{ fontWeight: 600 }}>이 결과를 검토해 주세요</p>
+        <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Task 166: 반려·보완 요청 버튼을 없앴다 — 그 두 명령의 백엔드가 사라졌다
+              (정본 §4: 결과는 보내기 → 확인 한 단계, 팀에게 되돌려 보내는 왕복 없음).
+              틀린 결과는 되돌려 보내지 않고 **이 카드 안에서 고쳐서 확인**한다. */}
+          <p className="tm-text-label" style={{ fontWeight: 600 }}>이 결과를 확인해 주세요</p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {showOfficializeCta ? (
               <Button
@@ -212,22 +247,20 @@ export function GameResultReviewPanel({
                 loading={officialize.isPending}
                 onClick={() => void handleOfficialize(latest)}
               >
-                결과 승인(확정)
+                확인
               </Button>
             ) : null}
+            {/* 재제출 모달을 그대로 재사용한다(신규 컴포넌트 없음) — 저장하면 새 SUBMITTED
+                리비전이 서고 이 카드가 다시 떠서 "확인" 을 누르게 된다. */}
             <Button
               variant="outline"
               size="md"
-              onClick={() => setReasonAction({ type: 'request_supplement', revision: latest })}
+              onClick={() => {
+                setResubmitTarget(latest);
+                setResubmitExpectedVersion(game.version);
+              }}
             >
-              보완 요청
-            </Button>
-            <Button
-              variant="danger"
-              size="md"
-              onClick={() => setReasonAction({ type: 'reject', revision: latest })}
-            >
-              반려
+              고치고 확인
             </Button>
           </div>
           {!officializeAlwaysVisible && directorGateStatus === 'disabled' ? (
@@ -247,17 +280,6 @@ export function GameResultReviewPanel({
         </div>
       ) : null}
 
-      {latest && (latest.state === 'REJECTED' || latest.state === 'SUPPLEMENT_REQUESTED') && !readOnly ? (
-        <div className="tm-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <p className="tm-text-label" style={{ fontWeight: 600 }}>
-            {latest.state === 'REJECTED' ? '반려된 결과예요' : '보완이 필요한 결과예요'}
-          </p>
-          <Button variant="primary" size="md" onClick={() => setResubmitTarget(latest)}>
-            다시 제출
-          </Button>
-        </div>
-      ) : null}
-
       {latest && latest.state === 'OFFICIAL' ? (
         <AlertBanner
           tone="info"
@@ -268,6 +290,10 @@ export function GameResultReviewPanel({
           }
         />
       ) : null}
+      {/* **공개 화면 링크는 여기 두지 않는다.** 한 번 뒀다가 도달 불가로 걷어냈다 — 확정
+          한 번에 `revisions`(링크를 띄운다)와 `board`(이 패널을 걷어낸다) 무효화가 같은
+          콜백에서 나가, 링크의 수명이 두 refetch 사이 간격이었다. 확정된 결과가 사라지지
+          않는 정정 화면(`corrections-page-client.tsx`)으로 옮겼다. */}
       {latest && latest.state === 'OFFICIAL' && correctionsHref ? (
         <Link href={correctionsHref} className="tm-section-action">
           정정 화면으로 이동
@@ -284,37 +310,6 @@ export function GameResultReviewPanel({
       </div>
 
       {officializeConfirmModal}
-
-      <ReasonModal
-        open={reasonAction !== null}
-        title={reasonAction?.type === 'reject' ? '결과를 반려할까요?' : '보완을 요청할까요?'}
-        message={
-          reasonAction?.type === 'reject'
-            ? '반려하면 이 결과는 종료 처리되고, 담당자가 다시 제출해야 해요.'
-            : '보완 요청하면 이 결과는 종료 처리되고, 담당자가 보완 후 다시 제출해야 해요.'
-        }
-        reasonLabel="반려/보완 사유"
-        confirmLabel={reasonAction?.type === 'reject' ? '반려' : '보완 요청'}
-        tone={reasonAction?.type === 'reject' ? 'danger' : 'default'}
-        submitting={reviewDecision.isPending}
-        errorMessage={reviewDecision.isError ? describeResultReviewError(reviewDecision.error) : null}
-        onCancel={() => {
-          setReasonAction(null);
-          reviewDecision.reset();
-        }}
-        onConfirm={(reason) => {
-          if (!reasonAction) return;
-          reviewDecision.mutate(
-            {
-              revisionId: reasonAction.revision.id,
-              expectedVersion: game.version,
-              decision: reasonAction.type,
-              reason,
-            },
-            { onSuccess: () => setReasonAction(null) },
-          );
-        }}
-      />
 
       {resubmitTarget ? (
         <ResultEditModal
@@ -334,23 +329,27 @@ export function GameResultReviewPanel({
           }}
           sides={game.sides}
           lineups={lineupsQuery.data ?? []}
+          periods={game.periods}
           // 재제출도 정정과 **같은** 서버 승부차기 가드(`applyPenalties`)를 통과한다 --
           // 그래서 같은 값을 내려준다: 폼이 기존 승부차기 점수를 이어서 보낼지 판정하고,
           // 못 보내는 상태를 저장 전에 알린다(`game-result-correction-panel.tsx` 주석 참고).
           isKnockoutFixture={game.isKnockoutFixture}
+          presentation={inline ? 'inline' : 'modal'}
           submitting={supersedeAndSubmit.isPending}
           errorMessage={
             supersedeAndSubmit.isError ? describeResultReviewError(supersedeAndSubmit.error) : null
           }
           onCancel={() => {
             setResubmitTarget(null);
+            setResubmitExpectedVersion(null);
             supersedeAndSubmit.reset();
           }}
           onConfirm={(input: ResultEditSubmitInput) => {
+            if (resubmitExpectedVersion === null) return;
             supersedeAndSubmit.mutate(
               {
                 revisionId: resubmitTarget.id,
-                expectedVersion: game.version,
+                expectedVersion: resubmitExpectedVersion,
                 score: input.score,
                 goalEvents: input.goalEvents,
                 actualParticipants: input.actualParticipants,
@@ -358,7 +357,13 @@ export function GameResultReviewPanel({
                 mvpParticipantId: input.mvpParticipantId,
                 reason: input.reason,
               },
-              { onSuccess: () => setResubmitTarget(null) },
+              {
+                onSuccess: () => {
+                  setResubmitTarget(null);
+                  setResubmitExpectedVersion(null);
+                  onSaved?.();
+                },
+              },
             );
           }}
         />

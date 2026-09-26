@@ -79,7 +79,7 @@ describe('OperationFlagTogglePanel', () => {
     expect(screen.getByRole('button', { name: '결과 확정 권한 켜기' })).toBeDisabled();
   });
 
-  it('PUBLIC_LIVE를 켜면 status_only 강등과 무관한 "켜짐" 효과 설명이 확인 모달에 뜨고, 확인 시 simplifiedPatchFlag가 off->on으로 호출된다', async () => {
+  it('PUBLIC_LIVE를 켜면 "켜짐" 효과 설명이 확인 모달에 뜨고, 확인 시 simplifiedPatchFlag가 off->on으로 호출된다', async () => {
     const user = userEvent.setup();
     render(<OperationFlagTogglePanel />);
 

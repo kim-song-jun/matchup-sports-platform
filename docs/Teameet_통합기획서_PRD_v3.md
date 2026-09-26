@@ -749,7 +749,7 @@ GPS 위치 확인        → 구장 반경 500m 이내 확인
 | OAuth 실제 연동 | 카카오/네이버/애플 소셜 로그인 | 진행 중 |
 | 토스페이먼츠 연동 | 실제 결제 + 웹훅 처리 | 진행 중 |
 | 이미지 업로드 | AWS S3 + CloudFront CDN | 예정 |
-| FCM 푸시 알림 | Firebase Admin SDK | 예정 |
+| Android 푸시 알림 | Teameet API → FCM HTTP v1 직접 호출(OAuth service account) | 구현 |
 | Socket.IO 실시간 | 채팅 실시간 연결 완성 | 예정 |
 | GPS 위치 API | Geolocation + 반경 계산 | 예정 |
 | EC2 + Docker 배포 | 프로덕션 환경 구축 | 예정 |

@@ -1,8 +1,10 @@
 import Link from 'next/link';
-import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, KPIStat } from '@/components/v1-ui/primitives';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { Card, EmptyState, ErrorState, KPIStat } from '@/components/v1-ui/primitives';
 import { ChevronRightIcon } from '@/components/v1-ui/icons';
+import { SegmentedTabs, type SegmentedTabsItem } from '@/components/v1-ui/segmented-tabs';
 import { cssUrl } from '@/lib/assets';
+import { DEFAULT_REVIEW_RATING, REVIEW_METRIC_FIELDS } from './reviews.types';
 import type { ReviewSourcePageModel, ReviewsPageModel, ReviewsReceivedPageModel, ReviewsTab, ReviewTargetDraft, ReviewTargetViewModel } from './reviews.types';
 import { REVIEW_TAG_OPTIONS, toTargetViewModel } from './reviews.view-model';
 import { ReviewsSummaryDashboard } from './reviews-summary-dashboard';
@@ -50,19 +52,20 @@ export function ReviewsPageView({
   const hasReceivedContent = receivedModel.userGroups.length > 0 || receivedModel.teamGroups.length > 0;
 
   return (
-    <AppChrome title="리뷰" activeTab="my" backHref="/my" desktopHead>
-      <div className="tm-review-shell">
+    <>
+      <div className="tm-review-shell tm-content-enter">
         <ReviewTabs active={model.tab} onChange={onTabChange} />
         {isReceivedTab ? (
           <>
             {loading ? <ReviewSkeleton count={2} /> : null}
             {!loading && errorMessage ? (
-              <ReviewNotice title="리뷰를 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} />
+              <ErrorState title="리뷰를 불러오지 못했어요" message={errorMessage} onRetry={onRetry} />
             ) : null}
             {/* 요약 카드는 집계 0건이면 스스로 렌더하지 않는다 — 개별 리뷰까지 0건이면 화면에
                 아무것도 남지 않으므로(실측: 완전 빈 화면) 여기서 빈 상태를 책임진다. */}
             {!loading && !errorMessage && !hasReceivedContent ? (
-              <ReviewEmpty
+              <EmptyState
+                illustration={{ name: 'journey-done' }}
                 title="아직 받은 리뷰가 없어요"
                 sub="경기가 끝나고 함께 뛴 사람들이 리뷰를 남기면 여기에 모여요."
               />
@@ -84,6 +87,11 @@ export function ReviewsPageView({
                   onPeriodChange={onTeamPeriodChange}
                   loading={teamSummaryLoading}
                   title="내 팀이 받은 리뷰 요약"
+                  // 팀 요약의 개수는 **리뷰 수가 아니라 리뷰를 남긴 팀 수**다(팀 단위 평균).
+                  countUnit="팀"
+                  // 태그 비율의 분모는 원시 리뷰 수라, 문장으로 갈라 주지 않으면
+                  // "1개 팀" 옆의 "33%" 가 서로를 부정하는 것처럼 보인다.
+                  countNote="숫자는 리뷰를 남긴 팀 수예요. 아래 태그 비율은 리뷰 하나하나를 세요."
                 />
               ) : null}
             </div>
@@ -91,12 +99,19 @@ export function ReviewsPageView({
         ) : (
           <>
             <ReviewStats stats={model.stats} />
-            <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'grid', gap: 12 }}>
               {loading ? <ReviewSkeleton count={2} /> : null}
-              {!loading && errorMessage ? <ReviewNotice title="리뷰를 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} /> : null}
-              {!loading && !errorMessage && model.cards.length === 0 ? <ReviewEmpty title={model.emptyTitle} sub={model.emptySub} /> : null}
+              {!loading && errorMessage ? <ErrorState title="리뷰를 불러오지 못했어요" message={errorMessage} onRetry={onRetry} /> : null}
+              {!loading && !errorMessage && model.cards.length === 0 ? (
+                <EmptyState
+                  illustration={{ name: 'journey-done' }}
+                  title={model.emptyTitle}
+                  sub={model.emptySub}
+                  {...(model.tab === 'pending' ? { cta: '매치 둘러보기', ctaHref: '/matches' } : {})}
+                />
+              ) : null}
               {!loading && !errorMessage ? model.cards.map((card) => (
-                <Link key={`${card.sourceType}:${card.sourceId}`} className="tm-review-schedule-card tm-pressable" href={card.href}>
+                <Link key={`${card.sourceType}:${card.sourceId}:${card.reviewerTeam?.teamId ?? card.targetType}`} className="tm-review-schedule-card tm-pressable" href={card.href}>
                   <div className="tm-review-card-head">
                     <div style={{ minWidth: 0 }}>
                       <div className="tm-text-body-lg line-clamp-2">{card.title}</div>
@@ -107,11 +122,6 @@ export function ReviewsPageView({
                   {/* #17: CTA 영역에 ChevronRight 추가 — 탭 가능한 카드임을 명시적으로 전달 */}
                   <div className="tm-review-card-foot">
                     <span className="tm-badge tm-badge-grey">{card.kindLabel}</span>
-                    {card.targetLabel ? (
-                      <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
-                        {card.targetLabel}
-                      </span>
-                    ) : null}
                     <span className="tm-text-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: 'var(--blue700)' }}>
                       {card.ctaLabel}
                       <ChevronRightIcon size={14} strokeWidth={2.2} aria-hidden="true" />
@@ -123,7 +133,7 @@ export function ReviewsPageView({
           </>
         )}
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -132,7 +142,7 @@ function AnonymousReceivedContent({ model }: { model: ReviewsReceivedPageModel }
     <div style={{ marginTop: 24 }}>
       {/* 제도 전/후를 나누지 않는다 — "이전 리뷰" 섹션은 제거했다. 작성자도 공개한다. */}
       <div className="tm-my-section-label">경기에서 받은 리뷰</div>
-      <div className="tm-text-caption" style={{ marginBottom: 10 }}>상호 작성이 끝나거나 72시간이 지나면 보여요.</div>
+      <div className="tm-text-caption" style={{ marginBottom: 12 }}>상호 작성이 끝나거나 72시간이 지나면 보여요.</div>
       {model.userGroups.length > 0 ? <ReceivedGroupSection groups={model.userGroups} title="내가 받은 리뷰" /> : null}
       {model.teamGroups.length > 0 ? (
         <div style={{ marginTop: 16 }}><ReceivedGroupSection groups={model.teamGroups} title="내 팀이 받은 리뷰" /></div>
@@ -140,6 +150,8 @@ function AnonymousReceivedContent({ model }: { model: ReviewsReceivedPageModel }
     </div>
   );
 }
+
+const SUBMIT_HINT_ID = 'review-submit-hint';
 
 export function ReviewSourcePageView({
   drafts,
@@ -150,6 +162,7 @@ export function ReviewSourcePageView({
   onRetry,
   onSubmit,
   onToggleTag,
+  onUpdateMetricScore,
   onUpdateRating,
   submitting,
 }: QueryStateProps & {
@@ -158,17 +171,21 @@ export function ReviewSourcePageView({
   model: ReviewSourcePageModel | null;
   onSubmit: () => void;
   onToggleTag: (key: string, tagCode: string) => void;
+  onUpdateMetricScore: (key: string, metric: 'skill' | 'manner' | 'punctuality' | 'safety', score: number) => void;
   onUpdateRating: (key: string, rating: number) => void;
   submitting: boolean;
 }) {
   const pendingTargets = model?.targets.filter((target) => !target.locked && !target.alreadySubmitted && !target.review) ?? [];
   const canSubmit = pendingTargets.some((target) => drafts[targetKey(target.targetType, target.targetUserId, target.targetTeamId)]?.tagCodes.length > 0);
+  // 아직 쓸 대상이 남아 있는데 태그를 하나도 안 골라 버튼이 잠긴 상태에서만 안내한다 —
+  // 로딩·에러·전송 중이거나 남은 대상이 없으면 버튼이 회색인 이유가 다르므로 띄우지 않는다.
+  const showSubmitHint = !loading && !errorMessage && !submitting && pendingTargets.length > 0 && !canSubmit;
 
   return (
-    <AppChrome title="리뷰 남기기" activeTab="my" bottomNav={false} backHref="/my/reviews" desktopHead>
-      <div className="tm-review-shell tm-review-compose-shell">
+    <>
+      <div className="tm-review-shell tm-review-compose-shell tm-content-enter">
         {loading ? <ReviewSkeleton count={3} /> : null}
-        {!loading && errorMessage ? <ReviewNotice title="리뷰 대상을 불러오지 못했어요" sub={errorMessage} onRetry={onRetry} /> : null}
+        {!loading && errorMessage ? <ErrorState title="리뷰 대상을 불러오지 못했어요" message={errorMessage} onRetry={onRetry} /> : null}
         {!loading && !errorMessage && model ? (
           <>
             <Card pad={16}>
@@ -185,92 +202,59 @@ export function ReviewSourcePageView({
               drafts={drafts}
               model={model}
               onToggleTag={onToggleTag}
+              onUpdateMetricScore={onUpdateMetricScore}
               onUpdateRating={onUpdateRating}
             />
-            <Card className={message ? 'tm-review-notice-error' : ''} pad={14} style={message ? undefined : { background: 'var(--grey50)' }}>
+            <Card className={message ? 'tm-review-notice-error' : ''} pad={16} style={message ? undefined : { background: 'var(--grey50)' }}>
               <div className="tm-text-label">{message ?? '작성 현황'}</div>
-              <div className="tm-text-caption" style={{ marginTop: 5 }}>{message ? '선택 상태를 확인한 뒤 다시 시도해 주세요.' : model.progressLabel}</div>
+              <div className="tm-text-caption" style={{ marginTop: 4 }}>{message ? '선택 상태를 확인한 뒤 다시 시도해 주세요.' : model.progressLabel}</div>
             </Card>
           </>
         ) : null}
       </div>
       <div className="tm-fixed-cta">
-        <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" disabled={!canSubmit || submitting || loading || Boolean(errorMessage)} onClick={onSubmit} type="button">
+        {/* 별점은 기본값(5)으로 이미 채워져 있어서, 태그를 안 고른 사용자 눈에는 "다 했는데
+            버튼만 회색"으로 보인다 — 태그 1개 이상은 서버 계약(SubmitReviewDto 의
+            `@ArrayMinSize(1)`)이라 버튼을 풀어줄 수는 없으니, 왜 못 보내는지를 말해준다.
+            `aria-describedby` 로 버튼에 묶어 스크린리더도 비활성 이유를 읽게 한다. */}
+        {showSubmitHint ? (
+          <p
+            id={SUBMIT_HINT_ID}
+            className="tm-text-caption"
+            style={{ margin: '0 0 8px', textAlign: 'center', color: 'var(--text-caption)' }}
+          >
+            태그를 하나 이상 골라야 리뷰를 보낼 수 있어요
+          </p>
+        ) : null}
+        <button
+          aria-describedby={showSubmitHint ? SUBMIT_HINT_ID : undefined}
+          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
+          disabled={!canSubmit || submitting || loading || Boolean(errorMessage)}
+          onClick={onSubmit}
+          type="button"
+        >
           {submitting ? '전송 중' : '리뷰 보내기'}
         </button>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
-export function ReviewsReceivedPageView({
-  errorMessage,
-  hasManagedTeam,
-  loading,
-  model,
-  onPeriodChange,
-  onRetry,
-  onTeamPeriodChange,
-  period,
-  summary,
-  summaryLoading,
-  teamPeriod,
-  teamSummary,
-  teamSummaryLoading,
-}: QueryStateProps & {
-  hasManagedTeam: boolean;
-  model: ReviewsReceivedPageModel;
-  onPeriodChange: (period: string | null) => void;
-  onTeamPeriodChange: (period: string | null) => void;
-  period: string | null;
-  summary: V1ReviewReceivedSummaryResponse | undefined;
-  summaryLoading: boolean;
-  teamPeriod: string | null;
-  teamSummary: V1ReviewReceivedSummaryResponse | undefined;
-  teamSummaryLoading: boolean;
-}) {
-  // 로딩·에러 중엔 아직 "레거시 리뷰가 없다"고 단정할 수 없으므로 섹션을 숨기지 않는다.
-  // (모델이 비어있는 것과 로딩/에러로 아직 모르는 것을 구분 — 그렇지 않으면 에러 상태가 조용히 사라진다.)
-  const hasReceivedContent = model.userGroups.length > 0 || model.teamGroups.length > 0;
-  return (
-    // #24: 뒤로가기는 received 탭으로 이동한다 (/my/reviews?tab=received 는 page.tsx에서 파싱됨).
-    <AppChrome title="받은 리뷰" activeTab="my" bottomNav={false} backHref="/my/reviews?tab=received" desktopHead>
-      <div className="tm-review-shell">
-        {/* 개별 리뷰가 주인공이고 요약은 보조다 — 예전엔 순서가 반대라 큰 대시보드 두 개를
-            지나야 정작 받은 리뷰 내용이 나왔다. 요약은 집계가 0건이면 스스로 렌더하지 않는다. */}
-        {hasReceivedContent ? <AnonymousReceivedContent model={model} /> : null}
-        <div style={{ display: 'grid', gap: 12, marginTop: hasReceivedContent ? 24 : 0 }}>
-          <ReviewsSummaryDashboard
-            summary={summary}
-            period={period}
-            onPeriodChange={onPeriodChange}
-            loading={summaryLoading}
-            title="내가 받은 리뷰 요약"
-          />
-          {hasManagedTeam ? (
-            <ReviewsSummaryDashboard
-              summary={teamSummary}
-              period={teamPeriod}
-              onPeriodChange={onTeamPeriodChange}
-              loading={teamSummaryLoading}
-              title="내 팀이 받은 리뷰 요약"
-            />
-          ) : null}
-        </div>
-      </div>
-    </AppChrome>
-  );
-}
 
 export function ReviewSubmitCompleteView({ model, onConfirm }: { model: ReviewSourcePageModel; onConfirm: () => void }) {
   const reviewed = model.targets.filter((target) => target.alreadySubmitted || target.review).length;
   const remaining = Math.max(0, model.targets.length - reviewed);
+  // 이 뷰가 렌더되는 순간엔 항상 title=""(제출 완료 화면 — fragments/reviews.ts의 정적
+  // "리뷰 남기기"를 덮어씀). 같은 라우트(/my/reviews/:sourceType/:sourceId)에서 폼/완료 두
+  // 분기 중 어느 게 렌더될지가 런타임(complete 쿼리 + fetch 완료 여부) 의존이라 override로
+  // 처리한다(app-shell-promotion.md §1.9 R7).
+  useShellOverride({ title: '' });
 
   return (
-    <AppChrome title="" activeTab="my" bottomNav={false} backHref="/my/reviews" desktopHead>
+    <>
       <div className="tm-review-complete">
         <div className="tm-review-complete-icon">✓</div>
-        <div className="tm-text-heading" style={{ marginTop: 22 }}>리뷰를 보냈어요</div>
+        <div className="tm-text-heading" style={{ marginTop: 24 }}>리뷰를 보냈어요</div>
         <Card pad={16} style={{ marginTop: 24, textAlign: 'left' }}>
           <div className="tm-text-label">{model.source.title}</div>
           {/* "별점 선택됨"·"태그 선택됨"은 무엇을 보냈든 항상 같은 문구라 아무것도 알려주지
@@ -284,7 +268,7 @@ export function ReviewSubmitCompleteView({ model, onConfirm }: { model: ReviewSo
       <div className="tm-fixed-cta">
         <button className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block" onClick={onConfirm} type="button">확인</button>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -299,11 +283,13 @@ function ReviewTargetSections({
   drafts,
   model,
   onToggleTag,
+  onUpdateMetricScore,
   onUpdateRating,
 }: {
   drafts: Record<string, ReviewTargetDraft>;
   model: ReviewSourcePageModel;
   onToggleTag: (key: string, tagCode: string) => void;
+  onUpdateMetricScore: (key: string, metric: 'skill' | 'manner' | 'punctuality' | 'safety', score: number) => void;
   onUpdateRating: (key: string, rating: number) => void;
 }) {
   const teamTargets = model.targets.filter((target) => target.targetType === 'team');
@@ -321,8 +307,9 @@ function ReviewTargetSections({
     return (
       <ReviewTargetCard
         key={key}
-        draft={drafts[key] ?? { rating: target.review?.rating ?? 4, tagCodes: target.review?.tags.map((tag) => tag.tagCode) ?? [] }}
+        draft={drafts[key] ?? { rating: target.review?.rating ?? DEFAULT_REVIEW_RATING, tagCodes: target.review?.tags.map((tag) => tag.tagCode) ?? [] }}
         onToggleTag={(tagCode) => onToggleTag(key, tagCode)}
+        onUpdateMetricScore={(metric, score) => onUpdateMetricScore(key, metric, score)}
         onUpdateRating={(rating) => onUpdateRating(key, rating)}
         target={targetModel}
       />
@@ -331,40 +318,57 @@ function ReviewTargetSections({
 
   return (
     <>
-      {teamTargets.length > 0 ? <div className="tm-review-target-stack">{teamTargets.map(renderCard)}</div> : null}
+      {teamTargets.length > 0 ? (
+        <div
+          className="tm-review-target-stack"
+          style={{ gridTemplateColumns: teamTargets.length === 1 ? 'minmax(0, 1fr)' : undefined }}
+        >
+          {teamTargets.map(renderCard)}
+        </div>
+      ) : null}
 
       {playerTargets.length > 0 ? (
         <details className="tm-review-player-details" open={playersOpen} style={{ marginTop: teamTargets.length > 0 ? 16 : 0 }}>
           <summary className="tm-review-player-summary">
             선수 개별 평가 <span className="tab-num">{playerTargets.length}</span>명
           </summary>
-          <div className="tm-text-caption" style={{ margin: '6px 0 10px' }}>
+          <div className="tm-text-caption" style={{ margin: '8px 0 12px' }}>
             남기고 싶은 선수만 골라 주세요. 비워 두면 팀 후기만 전송돼요.
           </div>
-          <div className="tm-review-target-stack">{playerTargets.map(renderCard)}</div>
+          <div
+            className="tm-review-target-stack"
+            style={{ gridTemplateColumns: playerTargets.length === 1 ? 'minmax(0, 1fr)' : undefined }}
+          >
+            {playerTargets.map(renderCard)}
+          </div>
         </details>
       ) : null}
     </>
   );
 }
 
+// href 기반 라우팅 링크 3개 — 활성 표시는 미끄러지는 thumb 하나가 담당한다(항목별
+// background on/off 방식이던 예전 .tm-review-tab 은 제거). id 는 항상 고정 3개라
+// 렌더 밖 상수로 뺀다(불필요한 배열 재생성 방지).
+const REVIEW_TAB_ITEMS: SegmentedTabsItem[] = [
+  { id: 'pending', label: '작성할 리뷰', href: '/my/reviews?tab=pending' },
+  { id: 'written', label: '작성된 리뷰', href: '/my/reviews?tab=written' },
+  { id: 'received', label: '받은 리뷰', href: '/my/reviews?tab=received' },
+];
+
+// 세 항목 모두 `/my/reviews?tab=<id>` 로 **주소를 바꾸는 라우팅 링크**다. 따라서
+// role="tablist"(→ 각 항목 role="tab" + aria-selected)를 주지 않는다 — tab 역할은
+// "같은 페이지 안에서 패널을 갈아끼우는 위젯"을 뜻해서, 보조기기에 링크라는 사실과
+// 뒤 이동이 일어난다는 예고가 사라진다. role 을 비우면 SegmentedTabs 가 <nav> +
+// 링크 + aria-current="page" 로 렌더한다(라우팅 하위 내비게이션의 표준 형태).
 function ReviewTabs({ active, onChange }: { active: ReviewsTab; onChange: (tab: ReviewsTab) => void }) {
-  const tabs: Array<[ReviewsTab, string]> = [['pending', '작성할 리뷰'], ['written', '작성된 리뷰'], ['received', '받은 리뷰']];
   return (
-    <div className="tm-review-tabs" role="tablist">
-      {tabs.map(([id, label]) => (
-        <Link
-          key={id}
-          aria-current={active === id ? 'page' : undefined}
-          className="tm-review-tab"
-          data-active={active === id}
-          href={`/my/reviews?tab=${id}`}
-          onClick={() => onChange(id)}
-        >
-          {label}
-        </Link>
-      ))}
-    </div>
+    <SegmentedTabs
+      items={REVIEW_TAB_ITEMS}
+      activeId={active}
+      onSelect={(id) => onChange(id as ReviewsTab)}
+      ariaLabel="리뷰 탭"
+    />
   );
 }
 
@@ -372,7 +376,7 @@ function ReviewStats({ stats }: { stats: Array<{ label: string; value: string }>
   return (
     <div className="tm-review-stat-grid">
       {stats.map((stat) => (
-        <Card key={stat.label} pad={10}>
+        <Card key={stat.label} pad={12}>
           <KPIStat label={stat.label} value={stat.value} />
         </Card>
       ))}
@@ -383,11 +387,13 @@ function ReviewStats({ stats }: { stats: Array<{ label: string; value: string }>
 function ReviewTargetCard({
   draft,
   onToggleTag,
+  onUpdateMetricScore,
   onUpdateRating,
   target,
 }: {
   draft: ReviewTargetDraft;
   onToggleTag: (tagCode: string) => void;
+  onUpdateMetricScore: (metric: 'skill' | 'manner' | 'punctuality' | 'safety', score: number) => void;
   onUpdateRating: (rating: number) => void;
   target: ReviewTargetViewModel;
 }) {
@@ -395,12 +401,16 @@ function ReviewTargetCard({
   const active = !locked && draft.tagCodes.length > 0;
 
   return (
-    <Card className={active ? 'tm-review-target-card tm-review-target-active' : 'tm-review-target-card'} pad={14}>
+    <Card
+      className={active ? 'tm-review-target-card tm-review-target-active' : 'tm-review-target-card'}
+      pad={16}
+      style={{ width: '100%', minWidth: 0 }}
+    >
       <div className="tm-review-target-head">
         <Avatar imageUrl={target.imageUrl} initials={target.initials} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="tm-review-card-head">
-            <div style={{ minWidth: 0 }}>
+          <div className="tm-review-card-head" style={{ flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
               <div className="tm-text-body-lg">{target.name}</div>
               <div className="tm-text-caption" style={{ marginTop: 2 }}>{target.subtitle || targetTypeLabel(target.targetType)}</div>
               {target.reviewerTeamLabel ? (
@@ -411,35 +421,66 @@ function ReviewTargetCard({
               {target.statusLabel === '대기' && active ? '작성 중' : target.statusLabel}
             </span>
           </div>
-          {target.lockReasonLabel ? <div className="tm-text-caption" style={{ marginTop: 8 }}>{target.lockReasonLabel}</div> : null}
-          <StarRating disabled={locked} rating={draft.rating} onChange={onUpdateRating} />
-          <div className="tm-review-chip-row">
-            {REVIEW_TAG_OPTIONS.map((tag) => {
-              const selected = draft.tagCodes.includes(tag.code);
-              return (
-                <button
-                  key={tag.code}
-                  aria-pressed={selected}
-                  className="tm-review-tag-chip"
-                  data-active={selected}
-                  disabled={locked}
-                  onClick={() => onToggleTag(tag.code)}
-                  type="button"
-                >
-                  {tag.label}
-                </button>
-              );
-            })}
-          </div>
         </div>
+      </div>
+      {target.lockReasonLabel ? <div className="tm-text-caption" style={{ marginTop: 8, overflowWrap: 'anywhere' }}>{target.lockReasonLabel}</div> : null}
+      <StarRating disabled={locked} rating={draft.rating} onChange={onUpdateRating} />
+      {/* 4항목 채점 -- 사람 대상에만. 이 값이 상대 선수 카드의 실력·매너·시간약속을
+          만들고, 후기 3개로 능력치가·10개로 카드 모양이 열린다(Task 155 해금의 원천).
+          기본값은 종합 별점과 같아 세부를 안 만져도 제출 마찰이 늘지 않는다. */}
+      {target.targetType === 'user' && draft.metricScores ? (
+        <div className="tm-review-metric-rows">
+          {REVIEW_METRIC_FIELDS.map((field) => (
+            <div key={field.key} className="tm-review-metric-row" style={{ flexWrap: 'wrap' }}>
+              <span className="tm-review-metric-label">{field.label}</span>
+              <StarRating
+                compact
+                disabled={locked}
+                rating={draft.metricScores?.[field.key] ?? draft.rating}
+                onChange={(score) => onUpdateMetricScore(field.key, score)}
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <div className="tm-review-chip-row">
+        {REVIEW_TAG_OPTIONS.map((tag) => {
+          const selected = draft.tagCodes.includes(tag.code);
+          return (
+            <button
+              key={tag.code}
+              aria-pressed={selected}
+              className="tm-review-tag-chip"
+              data-active={selected}
+              disabled={locked}
+              onClick={() => onToggleTag(tag.code)}
+              type="button"
+            >
+              {tag.label}
+            </button>
+          );
+        })}
       </div>
     </Card>
   );
 }
 
-function StarRating({ disabled, onChange, rating }: { disabled?: boolean; onChange: (rating: number) => void; rating: number }) {
+function StarRating({ compact, disabled, onChange, rating }: { compact?: boolean; disabled?: boolean; onChange: (rating: number) => void; rating: number }) {
   return (
-    <div className="tm-review-stars" aria-label={`${rating}점`}>
+    <div
+      className="tm-review-stars"
+      style={{
+        width: '100%',
+        minWidth: compact ? 220 : 0,
+        maxWidth: compact ? 220 : 284,
+        flex: compact ? '1 1 220px' : '0 1 284px',
+        justifyContent: 'space-between',
+        gap: 0,
+        padding: 0,
+      }}
+      data-compact={compact ? 'true' : undefined}
+      aria-label={`${rating}점`}
+    >
       {[1, 2, 3, 4, 5].map((value) => (
         <button
           key={value}
@@ -450,7 +491,7 @@ function StarRating({ disabled, onChange, rating }: { disabled?: boolean; onChan
           onClick={() => onChange(value)}
           type="button"
         >
-          ★
+          {value <= rating ? '★' : '☆'}
         </button>
       ))}
     </div>
@@ -507,24 +548,7 @@ function ReviewSkeleton({ count }: { count: number }) {
   return Array.from({ length: count }, (_, index) => <div key={index} className="tm-review-skeleton" />);
 }
 
-function ReviewNotice({ onRetry, sub, title }: { onRetry: () => void; sub: string; title: string }) {
-  return (
-    <Card className="tm-review-notice-error" pad={16}>
-      <div className="tm-text-body-lg">{title}</div>
-      <div className="tm-text-caption" style={{ marginTop: 5 }}>{sub}</div>
-      <button className="tm-btn tm-btn-sm tm-btn-neutral" onClick={onRetry} style={{ marginTop: 12 }} type="button">다시 시도</button>
-    </Card>
-  );
-}
 
-function ReviewEmpty({ sub, title }: { sub: string; title: string }) {
-  return (
-    <Card pad={18} style={{ textAlign: 'center' }}>
-      <div className="tm-text-body-lg">{title}</div>
-      <div className="tm-text-caption" style={{ marginTop: 6 }}>{sub}</div>
-    </Card>
-  );
-}
 
 function targetKey(targetType: V1ReviewTargetType, targetUserId: string | null, targetTeamId: string | null) {
   return targetType === 'team' ? `team:${targetTeamId ?? 'unknown'}` : `user:${targetUserId ?? 'unknown'}`;

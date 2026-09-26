@@ -1,47 +1,34 @@
 'use client';
 
-import { useV1MyMatches } from '@/hooks/use-v1-api';
+import { useV1MyMatchesInfinite } from '@/hooks/use-v1-api';
+import { withFromPath } from '@/lib/session-storage';
 import type { V1Match } from '@/types/api';
 import { MyMatchesPageView } from './my-page';
 import type { MyMatch, MyMatchesViewModel, MyMatchStatus } from './my.types';
 
 export function MyMatchesPageClient({ mode }: { mode: 'joined' | 'created' }) {
-  const query = useV1MyMatches({ mode, limit: 50 });
+  const query = useV1MyMatchesInfinite(mode);
   // Only show real data. Mock fallback matches must never appear in place of real data.
-  const matches = query.data ? query.data.items.map(toMyMatch) : [];
+  const matches = query.data ? query.data.pages.flatMap((page) => page.items).filter((item, index, items) => items.findIndex((other) => (other.matchId ?? other.id) === (item.matchId ?? item.id)) === index).map((match) => toMyMatch(match, mode)) : [];
 
   const model: MyMatchesViewModel = {
     mode,
-    title: mode === 'joined' ? '참여한 매치' : '내가 만든 매치',
     matches,
     summary: buildSummary(mode, matches),
-    apiNotice: getApiNotice(query.isLoading, query.isError),
+    loading: query.isLoading,
+    error: query.isError && !query.data,
+    onRetry: () => void query.refetch(),
+    hasNext: query.hasNextPage,
+    loadMorePending: query.isFetchingNextPage,
+    loadMoreError: query.isFetchNextPageError,
+    onLoadMore: () => { if (!query.isFetching) void query.fetchNextPage(); },
   };
 
   return <MyMatchesPageView model={model} />;
 }
 
-function getApiNotice(isLoading: boolean, isError: boolean): MyMatchesViewModel['apiNotice'] {
-  if (isLoading) {
-    return {
-      title: '내 매치를 불러오고 있어요',
-      body: '잠깐만 기다려 주세요.',
-      tone: 'info',
-    };
-  }
 
-  if (isError) {
-    return {
-      title: '매치 목록을 불러오지 못했어요',
-      body: '잠시 후 다시 시도해 주세요. 계속되면 새로고침해 보세요.',
-      tone: 'warning',
-    };
-  }
-
-  return undefined;
-}
-
-function toMyMatch(match: V1Match): MyMatch {
+function toMyMatch(match: V1Match, mode: 'joined' | 'created'): MyMatch {
   const status = toMyStatus(match);
   const id = match.matchId ?? match.id;
   const canReview = isReviewableMatch(match);
@@ -51,9 +38,12 @@ function toMyMatch(match: V1Match): MyMatch {
     title: match.title,
     meta: `${formatDateTime(match.startsAt)} · ${match.place?.name ?? match.placeName ?? '장소 미정'}`,
     status,
-    statusLabel: statusLabel(status),
+    statusLabel: statusLabel(status, match),
     note: buildNote(match, status),
-    href: `/matches/${id}`,
+    // 뒤로가기가 이 목록으로 돌아오도록 출처를 함께 넘긴다(matches-client.tsx가 `?from=`을 읽는다).
+    href: withFromPath(`/matches/${id}`, `/my/matches/${mode}`),
+    // href 는 쿼리를 달고 있어 경로를 이어 붙일 수 없다 — 관리 경로는 따로 만든다.
+    manageHref: `/matches/${id}/applications`,
     reviewHref: canReview ? `/my/reviews/match/${id}` : undefined,
   };
 }
@@ -62,7 +52,7 @@ function buildSummary(mode: 'joined' | 'created', matches: MyMatch[]) {
   return [
     { label: '전체', value: matches.length, unit: '건' },
     { label: mode === 'joined' ? '승인 대기' : '모집 중', value: matches.filter((item) => item.status === 'pending' || item.status === 'recruiting').length, unit: '건' },
-    { label: '확정', value: matches.filter((item) => item.status === 'approved').length, unit: '건' },
+    { label: mode === 'joined' ? '참가 확정' : '완료', value: matches.filter((item) => item.status === 'approved' || item.statusLabel === '참여 완료').length, unit: '건' },
   ];
 }
 
@@ -80,10 +70,13 @@ function toMyStatus(match: V1Match): MyMatchStatus {
 }
 
 function isReviewableMatch(match: V1Match) {
-  return (match.displayState ?? match.status) === 'completed';
+  return (match.displayState ?? match.status) === 'completed' && match.viewer?.participantStatus !== 'no_show';
 }
 
-function statusLabel(status: MyMatchStatus) {
+function statusLabel(status: MyMatchStatus, match: V1Match) {
+  if ((match.displayState ?? match.status) === 'completed') {
+    return match.viewer?.participantStatus === 'no_show' ? '불참' : '참여 완료';
+  }
   if (status === 'pending') return '승인 대기';
   if (status === 'approved') return '승인 완료';
   if (status === 'ended') return '종료';
@@ -91,9 +84,10 @@ function statusLabel(status: MyMatchStatus) {
 }
 
 function buildNote(match: V1Match, status: MyMatchStatus) {
+  if ((match.displayState ?? match.status) === 'completed' && match.viewer?.participantStatus === 'no_show') return '불참으로 확인된 경기예요. 개인 경기 점수는 기록되지 않아요.';
   if (status === 'pending') return '호스트가 신청을 검토 중이에요.';
   if (status === 'approved') return '참가가 확정됐어요. 장소와 시간을 확인해 보세요.';
-  if (status === 'ended' && isReviewableMatch(match)) return '상대 평가와 리뷰를 남길 수 있어요.';
+  if (status === 'ended' && isReviewableMatch(match)) return '참여한 경기로 기록됐어요. 함께한 참가자에게 후기를 남길 수 있어요.';
   if (status === 'ended') return '경기가 종료됐거나 모집이 마감된 상태예요.';
   return `${match.participantCount ?? 0}/${match.capacity ?? 0}명이 참가 확정했어요.`;
 }

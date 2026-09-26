@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  How the archive is exported for App Store Connect / TestFlight.
+	  Used by scripts/ios/archive-and-export.sh.
+	-->
+	<key>method</key>
+	<string>app-store-connect</string>
+
+	<!-- Apple Team ID. Public — it appears in App Store metadata. -->
+	<key>teamID</key>
+	<string>U9J95Q6XD3</string>
+
+	<!--
+	  Manual, matching the archive. Automatic signing here re-mints an Xcode-managed profile
+	  rather than reusing the one the archive was signed with, and an Xcode-managed profile
+	  cannot then be named by a manually signed build — the two styles have to agree.
+
+	  Pinning the profile name is the cost. It is a name we choose, not one Apple generates,
+	  so regenerating the profile keeps it as long as the name is reused; the profile itself
+	  is created by scripts/ios/asc-profile.mjs and never lives in the repository.
+	-->
+	<key>signingStyle</key>
+	<string>manual</string>
+
+	<key>signingCertificate</key>
+	<string>Apple Distribution</string>
+
+	<!--
+	  Both bundles are listed. Export only reads the entry for the bundle it is exporting, so
+	  carrying both is free — and the alternative was worse: with only the alpha entry here,
+	  a correctly configured production archive still failed at export, which made the
+	  production path unreachable no matter what the runbook said.
+	-->
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>kr.co.teameet.alpha</key>
+		<string>Teameet Alpha App Store</string>
+		<key>kr.co.teameet</key>
+		<string>Teameet Production App Store</string>
+	</dict>
+
+	<!-- Symbols let App Store Connect symbolicate crash reports from testers. -->
+	<key>uploadSymbols</key>
+	<true/>
+
+	<!--
+	  Bitcode has been removed from the toolchain; leaving this true makes newer Xcode
+	  versions warn on every export.
+	-->
+	<key>uploadBitcode</key>
+	<false/>
+
+	<!-- Thinning is decided at download time by App Store Connect, not here. -->
+	<key>destination</key>
+	<string>export</string>
+</dict>
+</plist>

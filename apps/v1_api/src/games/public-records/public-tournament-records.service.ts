@@ -1,9 +1,17 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma, V1GameEventType, V1GameResultRevisionState, V1VisibilityMode } from '@prisma/client';
+import { ConflictException, ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import type { Prisma, V1GameEventType, V1GameLineupState, V1GameResultRevisionState, V1GameState, V1TeamMatchStatus, V1VisibilityMode } from '@prisma/client';
 import type { GameScore } from '../games.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { V1AuthUser } from '../../auth/v1-auth-user';
 import { isBracketPublished, shouldHideParticipantIdentity } from '../../tournaments/tournament-detail.presenter';
+import {
+  ALL_COMPETITION_KINDS,
+  findTournamentOnSurface,
+  TOURNAMENT_KINDS,
+} from '../../tournaments/tournament-surface-lookup';
+import { bucketLeagueFixtures } from '../../league-matches/league-standings-source';
+import { calculateLeagueStandings } from '../../league-matches/league-standings';
+import type { LeagueTieBreakCriterion } from '../../league-matches/league-standings';
 // 골 이벤트 백필이 복원한 골의 "모르는 값" 판정 -- 대진표 쪽
 // (`deriveTournamentFixtureOfficialGoals`)과 공개 기록 쪽이 같은 규칙을 써야 같은 골이
 // 화면마다 다르게(0분 vs 표시 없음 / 전반 vs 기타) 보이지 않는다.
@@ -18,9 +26,14 @@ import {
   type TournamentStaffResource,
 } from '../../tournaments/staff/tournament-staff-access.service';
 import { decodeRecordCursor, encodeRecordCursor } from './public-cursor';
-import { loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
+import { isParticipantPubliclyEligible, loadParticipantConsentEligibility, type ParticipantConsentEligibility } from './public-consent';
 import { resolveLiveClock, resolvePeriodBreak, type PublicGameClock, type PublicPeriodBreak } from './public-clock';
 import { tallyLiveScore } from './public-live-score';
+import {
+  resolvePublicScorePresentation,
+  type PublicScoreValue,
+} from './public-score-presentation';
+import { isPublicLiveEnabled } from './public-live-flag';
 import { effectivePublicVisibilityMode, isLineupPublished, publicFixtureStatus, resolveResultState } from './public-visibility';
 import type { PublicTournamentScheduleQueryDto } from './dto/public-records-query.dto';
 import {
@@ -30,8 +43,15 @@ import {
   parseCardColor,
   resolveParticipantDisplayName,
   resolveParticipantNameEligible,
+  resolveParticipantProfileHref,
   type ParticipantNameProfileRow,
 } from './participant-name-gating';
+import {
+  leagueFixtureListOrder,
+  leagueFixtureListWhere,
+} from '../../league-matches/league-fixture-list-source';
+import { LEAGUE_TIE_BREAK_ORDER } from '../../league-matches/league-tie-break';
+import { PUBLIC_COMPETITION_STATUS_WHERE } from '../../tournaments/tournaments-read.query';
 
 /**
  * A fixture/match this route never returns individually and never lists in
@@ -41,101 +61,246 @@ import {
  * from "exists but hidden" -- the fail-closed default the todo requires.
  */
 const NOT_FOUND = { code: 'TOURNAMENT_MATCH_NOT_FOUND', message: '경기 정보를 찾을 수 없어요.' } as const;
+// 리그 대진 공개 기록(getLeagueFixtureRecord)의 404 — 위 NOT_FOUND 와 같은 fail-closed
+// 원칙(존재하지 않는 것과 숨겨진 것을 구분해 주지 않는다)을 리그 도메인 코드로 낸다.
+const LEAGUE_FIXTURE_NOT_FOUND = { code: 'LEAGUE_FIXTURE_NOT_FOUND', message: '경기 정보를 찾을 수 없어요.' } as const;
+// getLeagueFixtureRecord 전용 — league-match-forfeit.service.ts 가 export 하는
+// `FORFEIT_REASON_MARKER`(값: '[LEAGUE_FORFEIT]')와 **의도적으로 동일한 리터럴을
+// 여기 복제**한다. import 로 그 상수를 끌어오면 이 파일(비인증 공개 read 경로)이
+// `league-match-forfeit.service.ts → GamesService → team-schedules.service.ts` 로
+// 이어지는 거대한 어드민/게임 엔진 mutation 모듈 그래프를 전부 끌고 들어온다 —
+// 문자열 하나 때문에 이 read-only 프로젝션의 컴파일 단위가 그 그래프의 아무 파일
+// (심지어 무관한 팀 일정 모듈)에도 깨질 수 있게 된다(실측: 이 값을 정정 중이던
+// 세션이 team-schedules.service.ts 를 동시에 고치고 있어 그 경유로 ts-jest 컴파일이
+// 막혔다). 값이 바뀌면 두 파일이 갈릴 수 있으나, 그 리스크보다 이 파일의 격리가
+// 더 크다 — 몰수 판정 로직 자체는 다른 파일(league-match-public.service.ts 의
+// isForfeit)도 같은 리터럴을 재사용하는 기존 패턴이다.
+const LEAGUE_FORFEIT_REASON_MARKER = '[LEAGUE_FORFEIT]';
+// 리그 도메인(league-match-public.service.ts)과 같은 상한 — 회고 STATS-1은 그 패턴의 복제다.
+const PLAYER_RECORDS_LIMIT = 30;
+// 어드민 추천 근거는 상위 후보만 필요하다 — chip 3개 + 여유분.
+const ADMIN_PLAYER_RECORDS_LIMIT = 10;
+type TournamentFixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
-const FIXTURE_SCHEDULE_SELECT = {
+/**
+ * 경기 상세 프로젝션이 게임(V1Game)에서 읽는 부분 — 대회 픽스처(getMatch)와 리그 대진
+ * (getLeagueFixtureRecord)이 같은 셀렉트를 공유한다. 게임 엔진은 소스 종류
+ * (TOURNAMENT_FIXTURE/TEAM_MATCH)와 무관하게 동일한 구조라, 여기서 갈리면 같은 골이
+ * 화면마다 다르게 보인다.
+ */
+const GAME_MATCH_SELECT = {
   id: true,
-  round: true,
-  fixtureNumber: true,
-  legNumber: true,
-  groupId: true,
-  scheduledAt: true,
-  venue: true,
-  status: true,
-  homeRegistrationId: true,
-  awayRegistrationId: true,
-  homeRegistration: { select: { team: { select: { id: true, name: true } } } },
-  awayRegistration: { select: { team: { select: { id: true, name: true } } } },
-  group: { select: { name: true } },
-  field: { select: { name: true } },
-  videos: { select: { id: true } },
-  game: {
+  state: true,
+  visibilityPolicy: { select: { mode: true, lineupAt: true } },
+  sides: { select: { id: true, sideKey: true } },
+  lineups: {
+    select: { id: true, sideId: true, revision: true, state: true, invalidatedAt: true },
+  },
+  // `userId`는 표시 이름 해석(resolveParticipantDisplayName)이 V1UserProfile을
+  // 조인하는 키다 -- 대회 등록 명단 연결용 신원(주석 위 V1GameParticipant.userId
+  // 참고)과 동일한 컬럼을 재사용한다.
+  participants: {
     select: {
       id: true,
-      state: true,
-      visibilityPolicy: { select: { mode: true, lineupAt: true } },
-      currentOfficialRevision: { select: { state: true, supersedesId: true, officialAt: true, score: true, goalEvents: true } },
-      // Lane 1 addition -- `sides`/`periods` back the live-score tally and the
-      // elapsed-clock projection for a fixture that is genuinely LIVE and has
-      // no official revision yet (see `public-live-score.ts`/`public-clock.ts`).
-      sides: { select: { id: true, sideKey: true } },
-      periods: { select: { number: true, state: true, startedAt: true, pausedTotalMs: true, pausedAt: true } },
-      // 일정 카드 이벤트 요약(loadScheduleEvents)이 이름/등번호를 붙이는 데 쓴다 --
-      // getMatch의 buildEvents/buildLineup과 동일한 원본 필드. `userId`는 표시 이름
-      // 해석(resolveParticipantDisplayName)이 V1UserProfile을 조인하는 키다 --
-      // getMatch의 FIXTURE_MATCH_SELECT와 동일한 이유로 추가했다.
-      participants: { select: { id: true, sideId: true, userId: true, displayNameSnapshot: true, jerseyNumber: true } },
+      sideId: true,
+      lineupId: true,
+      userId: true,
+      displayNameSnapshot: true,
+      jerseyNumber: true,
+      // [P1-d] `position` 은 더 이상 읽지 않는다 — 공개 응답에서 뺐으므로(D4) 여기서
+      // 계속 select 하면 안 쓰는 값을 나르는 셈이고, 다음 사람이 "이미 있으니 써도
+      // 되겠지" 하고 다시 노출시킬 여지를 남긴다.
     },
   },
-} satisfies Prisma.V1TournamentFixtureSelect;
+  // Task 166: **확정 전(SUBMITTED) 점수**를 관전자에게 보여주려면 확정 포인터만으로는
+  // 부족하다 — SUBMITTED 리비전에는 포인터가 없다. 최신 1건만 가져와 그 상태가
+  // SUBMITTED 일 때 점수를 쓴다(`resolvePublicScorePresentation`).
+  resultRevisions: {
+    select: { state: true, score: true },
+    orderBy: { revision: 'desc' },
+    take: 1,
+  },
+  currentOfficialRevision: {
+    // outcomeReason/outcomeNote — 몰수·중단으로 끝난 경기를 관전자 화면에서 정상 종료와
+    // 구분해 보여주기 위한 것. 점수만 내보내면 "왜 그 점수인지"가 공개 기록 어디에도
+    // 없어서, 1차 대회에서 문제가 됐던 그 상태가 그대로 남는다.
+    select: {
+      state: true,
+      supersedesId: true,
+      officialAt: true,
+      score: true,
+      goalEvents: true,
+      mvpParticipantId: true,
+      outcomeReason: true,
+      outcomeNote: true,
+      // 리그 몰수(getLeagueFixtureRecord) 전용 — `[LEAGUE_FORFEIT]` 마커 감지에만
+      // 쓴다(값 자체를 응답에 그대로 내보내지 않는다). getMatch(대회 경로)는 이 필드를
+      // 읽지 않는다 — outcomeReason/outcomeNote 만으로 충분하다(L-F-forfeit-public-exposure).
+      reason: true,
+    },
+  },
+  // Lane 1 addition -- see GAME_MATCH_SELECT above.
+  periods: { select: { number: true, state: true, startedAt: true, pausedTotalMs: true, pausedAt: true } },
+} satisfies Prisma.V1GameSelect;
 
-type FixtureScheduleRow = Prisma.V1TournamentFixtureGetPayload<{ select: typeof FIXTURE_SCHEDULE_SELECT }>;
+type GameMatchRow = Prisma.V1GameGetPayload<{ select: typeof GAME_MATCH_SELECT }>;
 
-const FIXTURE_MATCH_SELECT = {
-  id: true,
+const CANONICAL_SCHEDULE_SELECT = {
+  teamMatchId: true,
   tournamentId: true,
+  groupId: true,
   round: true,
   fixtureNumber: true,
   legNumber: true,
-  groupId: true,
-  scheduledAt: true,
-  venue: true,
-  status: true,
   homeRegistrationId: true,
   awayRegistrationId: true,
+  group: { select: { name: true } },
   homeRegistration: { select: { team: { select: { id: true, name: true } } } },
   awayRegistration: { select: { team: { select: { id: true, name: true } } } },
-  group: { select: { name: true } },
-  // `fieldId` (issue #377) -- the scalar FK, not just the display-only
-  // `field` relation below. Needed to build the same
-  // `{ tournamentId, fixtureId, fieldId }` resource shape
-  // `TournamentFixtureLineupService.authorizeAndResolveGameId` already uses,
-  // so a field_operator's staff bypass here is scoped to their own field.
-  fieldId: true,
-  field: { select: { name: true } },
-  videos: { select: { id: true, title: true, url: true }, orderBy: { sortOrder: 'asc' } },
-  game: {
+  teamMatch: {
     select: {
-      id: true,
-      state: true,
-      visibilityPolicy: { select: { mode: true, lineupAt: true } },
-      sides: { select: { id: true, sideKey: true } },
-      lineups: {
-        select: { id: true, sideId: true, revision: true },
-      },
-      // `userId`는 표시 이름 해석(resolveParticipantDisplayName)이 V1UserProfile을
-      // 조인하는 키다 -- 대회 등록 명단 연결용 신원(주석 위 V1GameParticipant.userId
-      // 참고)과 동일한 컬럼을 재사용한다.
-      participants: {
-        select: {
-          id: true,
-          sideId: true,
-          lineupId: true,
-          userId: true,
-          displayNameSnapshot: true,
-          jerseyNumber: true,
-          position: true,
-        },
-      },
-      currentOfficialRevision: {
-        select: { state: true, supersedesId: true, officialAt: true, score: true, goalEvents: true, mvpParticipantId: true },
-      },
-      // Lane 1 addition -- see FIXTURE_SCHEDULE_SELECT above.
-      periods: { select: { number: true, state: true, startedAt: true, pausedTotalMs: true, pausedAt: true } },
+      startAt: true,
+      placeName: true,
+      status: true,
+      fieldId: true,
+      field: { select: { id: true, name: true } },
+      videos: { select: { id: true } },
+      game: { select: GAME_MATCH_SELECT },
     },
   },
-} satisfies Prisma.V1TournamentFixtureSelect;
+} satisfies Prisma.V1TournamentMatchDetailsSelect;
 
-type FixtureMatchRow = Prisma.V1TournamentFixtureGetPayload<{ select: typeof FIXTURE_MATCH_SELECT }>;
+type CanonicalScheduleRow = Prisma.V1TournamentMatchDetailsGetPayload<{ select: typeof CANONICAL_SCHEDULE_SELECT }>;
+
+/**
+ * Normalized schedule row consumed by the public presenter. This is deliberately
+ * independent of the retired V1TournamentFixture Prisma payload: tournament
+ * schedules are read from MatchDetails → TeamMatch → Game only.
+ */
+type FixtureScheduleRow = {
+  id: string;
+  round: string;
+  fixtureNumber: number;
+  legNumber: number;
+  groupId: string | null;
+  scheduledAt: Date | null;
+  venue: string | null;
+  status: TournamentFixtureStatus;
+  homeRegistrationId: string | null;
+  awayRegistrationId: string | null;
+  homeRegistration: CanonicalScheduleRow['homeRegistration'];
+  awayRegistration: CanonicalScheduleRow['awayRegistration'];
+  group: CanonicalScheduleRow['group'];
+  field: CanonicalScheduleRow['teamMatch']['field'];
+  videos: CanonicalScheduleRow['teamMatch']['videos'];
+  game: CanonicalScheduleRow['teamMatch']['game'];
+};
+
+function presentCanonicalSchedule(row: CanonicalScheduleRow): FixtureScheduleRow {
+  return {
+    id: row.teamMatchId,
+    round: row.round,
+    fixtureNumber: row.fixtureNumber,
+    legNumber: row.legNumber,
+    groupId: row.groupId,
+    scheduledAt: row.teamMatch.startAt,
+    venue: row.teamMatch.placeName,
+    status: canonicalFixtureStatus(row.teamMatch.status),
+    homeRegistrationId: row.homeRegistrationId,
+    awayRegistrationId: row.awayRegistrationId,
+    homeRegistration: row.homeRegistration,
+    awayRegistration: row.awayRegistration,
+    group: row.group,
+    field: row.teamMatch.field,
+    videos: row.teamMatch.videos,
+    game: row.teamMatch.game,
+  };
+}
+
+type PublicFixtureMatchRow = {
+  id: string;
+  tournamentId: string;
+  round: string;
+  fixtureNumber: number;
+  legNumber: number;
+  groupId: string | null;
+  scheduledAt: Date | null;
+  venue: string | null;
+  status: TournamentFixtureStatus;
+  homeRegistrationId: string | null;
+  awayRegistrationId: string | null;
+  homeRegistration: { team: { id: string; name: string } } | null;
+  awayRegistration: { team: { id: string; name: string } } | null;
+  group: { name: string } | null;
+  fieldId: string | null;
+  field: { name: string } | null;
+  videos: Array<{ id: string; title: string | null; url: string }>;
+  game: GameMatchRow | null;
+};
+
+type FixtureMatchRow = PublicFixtureMatchRow;
+
+const CANONICAL_MATCH_SELECT = {
+  teamMatchId: true,
+  tournamentId: true,
+  groupId: true,
+  round: true,
+  fixtureNumber: true,
+  legNumber: true,
+  homeRegistrationId: true,
+  awayRegistrationId: true,
+  group: { select: { name: true } },
+  homeRegistration: { select: { team: { select: { id: true, name: true } } } },
+  awayRegistration: { select: { team: { select: { id: true, name: true } } } },
+  teamMatch: {
+    select: {
+      startAt: true,
+      placeName: true,
+      status: true,
+      fieldId: true,
+      field: { select: { name: true } },
+      videos: { select: { id: true, title: true, url: true }, orderBy: { sortOrder: 'asc' } },
+      game: { select: GAME_MATCH_SELECT },
+    },
+  },
+} satisfies Prisma.V1TournamentMatchDetailsSelect;
+
+type CanonicalMatchRow = Prisma.V1TournamentMatchDetailsGetPayload<{ select: typeof CANONICAL_MATCH_SELECT }>;
+
+function canonicalFixtureStatus(status: V1TeamMatchStatus): TournamentFixtureStatus {
+  switch (status) {
+    case 'completed':
+      return 'completed';
+    case 'cancelled':
+    case 'archived':
+      return 'cancelled';
+    default:
+      return 'scheduled';
+  }
+}
+
+function presentCanonicalMatch(row: CanonicalMatchRow): FixtureMatchRow {
+  return {
+    id: row.teamMatchId,
+    tournamentId: row.tournamentId,
+    round: row.round,
+    fixtureNumber: row.fixtureNumber,
+    legNumber: row.legNumber,
+    groupId: row.groupId,
+    scheduledAt: row.teamMatch.startAt,
+    venue: row.teamMatch.placeName,
+    status: canonicalFixtureStatus(row.teamMatch.status),
+    homeRegistrationId: row.homeRegistrationId,
+    awayRegistrationId: row.awayRegistrationId,
+    homeRegistration: row.homeRegistration,
+    awayRegistration: row.awayRegistration,
+    group: row.group,
+    fieldId: row.teamMatch.fieldId,
+    field: row.teamMatch.field,
+    videos: row.teamMatch.videos,
+    game: row.teamMatch.game,
+  };
+}
 
 type EffectiveMode = 'status_only' | 'live' | 'official_only';
 
@@ -150,6 +315,7 @@ type ScheduleEventRow = {
   cardColor: 'YELLOW' | 'RED' | null;
   side: 'home' | 'away';
   participantId: string | null;
+  playerNameSnapshot: string | null;
   period: number | null;
   clockMs: number | null;
 };
@@ -165,13 +331,321 @@ export class PublicTournamentRecordsService {
     private readonly access: TournamentStaffAccessService,
   ) {}
 
-  async getSchedule(tournamentId: string, query: PublicTournamentScheduleQueryDto, user?: V1AuthUser) {
-    const tournament = await this.prisma.v1Tournament.findUnique({
+  /**
+   * 회고 STATS-1: 대회 단위 개인 득점·도움 랭킹. 리그의
+   * `league-match-public.service.ts#playerRecords`를 대회 도메인으로 복제한 것 —
+   * 공식 리비전의 `V1GameResultParticipant` 집계, 공개동의 게이팅
+   * (`isParticipantPubliclyEligible`), 0 기록 제외, 내림차순 LIMIT까지 같은 규칙이다.
+   * 다른 점 두 가지만 기록한다:
+   * - 대진 미공개(`isBracketPublished` false)면 목록을 비워 내린다 — 이 컨트롤러의
+   *   다른 라우트들이 미공개 대진을 숨기는 정책과 같은 축.
+   * - 랭킹 행은 정의상 전원이 동의+계정 연결이므로 `profileHref`를 함께 내린다
+   *   (#707/#714에서 확립한 "열어도 되는지는 서버가 판단해 내린다" 관례).
+   * 몰수·중단 경기는 별도 제외하지 않는다: 운영자가 스코어만 입력한 경기는
+   * 참가자 스탯 행 자체가 없어 자연히 집계되지 않는다.
+   */
+  async getPlayerRecords(tournamentId: string) {
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId },
-      select: { id: true, title: true, status: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
+      select: { id: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
     });
     if (tournament === null) {
       throw new NotFoundException(NOT_FOUND);
+    }
+
+    const empty = { tournamentId: tournament.id, goals: [], assists: [] };
+    if (!isBracketPublished(tournament.bracketPublishedAt, tournament.bracketPublishScheduledAt)) {
+      return empty;
+    }
+    await this.assertCanonicalRecordsReady(tournamentId);
+
+    const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
+    const games = await this.prisma.v1Game.findMany({
+      where: {
+        currentOfficialRevisionId: { not: null },
+        sourceType: 'TEAM_MATCH',
+        teamMatch: {
+          tournamentId,
+          leagueId: null,
+          deletedAt: null,
+          tournamentDetails: { is: { tournamentId } },
+        },
+      },
+      select: { currentOfficialRevisionId: true, visibilityPolicy: { select: { mode: true } } },
+    });
+    // Lane 가시성 정책을 그대로 적용한다(리뷰 지적) — hidden 경기는 존재 자체가
+    // 비공개(fail-closed: 정책 row 없음 = HIDDEN)이고, status_only는 점수도
+    // 가리는 모드다(getMatch/presentScheduleEntry의 `mode === 'status_only'
+    // ? null` 참조). 어느 쪽이든 그 경기의 득점·도움이 공개 랭킹에 실리면
+    // 숨긴 결과가 간접 노출된다.
+    const revisionIds = games
+      .filter((game) => {
+        const mode = effectivePublicVisibilityMode(game.visibilityPolicy?.mode ?? 'HIDDEN', publicLiveEnabled);
+        return mode !== 'hidden' && mode !== 'status_only';
+      })
+      .map((game) => game.currentOfficialRevisionId)
+      .filter((id): id is string => id !== null);
+    if (revisionIds.length === 0) return empty;
+
+    const allParticipantRows = await this.prisma.v1GameResultParticipant.findMany({
+      where: { resultRevisionId: { in: revisionIds } },
+      select: {
+        participantId: true,
+        goals: true,
+        assists: true,
+        resultRevision: { select: { officialAt: true } },
+      },
+    });
+    // 0골·0도움 행은 최종 응답에서 전부 걸러진다 — 동의 3쿼리·프로필 조회 대상에
+    // 넣을 이유가 없다(리뷰 지적). 합산에 0을 더하는 행이라 결과도 동일하다.
+    const participantRows = allParticipantRows.filter((row) => row.goals > 0 || row.assists > 0);
+
+    const eligibility = await loadParticipantConsentEligibility(
+      this.prisma,
+      participantRows.map((row) => row.participantId),
+    );
+    const totalsByUserId = new Map<string, { goals: number; assists: number }>();
+    const profileHrefByUserId = new Map<string, string>();
+    for (const row of participantRows) {
+      const eligibilityRow = eligibility.get(row.participantId);
+      if (eligibilityRow === undefined) continue;
+      // officialAt null(공식 확정 안 됨)은 동의 판정과 무관한 별개 게이트 — 리그와 동일.
+      if (row.resultRevision.officialAt === null || !isParticipantPubliclyEligible(eligibilityRow)) continue;
+      const userId = eligibilityRow.linkedUserId!;
+      // href는 lane 단일 소스 헬퍼로 생성한다 — 여기서 문자열을 직접 만들면
+      // 동의 게이팅·인코딩 규칙이 두 곳으로 갈라진다(리뷰 지적). 이 지점은
+      // eligibility를 이미 통과했으므로 반환은 항상 non-null이다.
+      profileHrefByUserId.set(userId, resolveParticipantProfileHref(userId, eligibilityRow)!);
+      const current = totalsByUserId.get(userId) ?? { goals: 0, assists: 0 };
+      current.goals += row.goals;
+      current.assists += row.assists;
+      totalsByUserId.set(userId, current);
+    }
+
+    const userIds = [...totalsByUserId.keys()];
+    const users = userIds.length === 0
+      ? []
+      : await this.prisma.v1User.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, profile: { select: { nickname: true, displayName: true, deletedAt: true } } },
+        });
+    // 탈퇴 처리(admin.service.ts)는 nickname을 `deleted_<8자>` 내부 식별자로 덮고
+    // displayName에만 '탈퇴 회원'을 남긴다 — nickname만 쓰면 공개 응답에 식별자가
+    // 그대로 노출된다. resolveParticipantDisplayName(participant-name-gating.ts)의
+    // 탈퇴 방어와 같은 규칙이다(실명 공개 규칙은 랭킹 표면에 적용하지 않는다 —
+    // 리그 랭킹도 nickname 표면이다).
+    const nicknameByUserId = new Map(users.map((user) => [
+      user.id,
+      user.profile === null
+        ? null
+        : user.profile.deletedAt !== null
+          ? user.profile.displayName ?? user.profile.nickname ?? null
+          : user.profile.nickname ?? null,
+    ]));
+
+    const rows = userIds.map((userId) => ({
+      userId,
+      nickname: nicknameByUserId.get(userId) ?? null,
+      profileHref: profileHrefByUserId.get(userId)!,
+      ...totalsByUserId.get(userId)!,
+    }));
+    return {
+      tournamentId: tournament.id,
+      goals: rows.filter((row) => row.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, PLAYER_RECORDS_LIMIT),
+      assists: rows.filter((row) => row.assists > 0).sort((a, b) => b.assists - a.assists).slice(0, PLAYER_RECORDS_LIMIT),
+    };
+  }
+
+  /**
+   * 회고 STATS-3: 수상 추천 근거용 **어드민 비게이팅** 랭킹. 위 공개 랭킹과 같은
+   * 집계(공식 리비전의 V1GameResultParticipant)를 쓰되 공개동의 게이팅을 걸지
+   * 않는다 — 동의 게이팅된 공개 랭킹으로 수상자를 고르면 미동의 1위가 조용히
+   * 빠져 **틀린 추천**이 되기 때문이다(2026-08-25 A안 확정). 컨트롤러
+   * (`AdminTournamentPlayerRecordsController`)가 활성 어드민만 통과시킨다.
+   *
+   * 공개 랭킹과 달리 **가시성 정책(hidden·status_only) 필터도 걸지 않는다** —
+   * 숨김은 관중에 대한 정책이지 운영자에 대한 정책이 아니고, 수상 판단은 실제로
+   * 치러진 모든 공식 결과를 근거로 해야 한다.
+   *
+   * 집계 키: 참가자의 `userId`가 있으면 사용자 단위(경기 간 합산), 없으면
+   * 대회 안 정규화 이름 단위 — 계정 미연결 참가자는 이름 스냅샷 외에 게임 간
+   * 동일인 판단 근거가 없다(어드민 통계 탭이 이미 같은 폴백을 쓴다). 이름·팀은
+   * 마지막으로 본 스냅샷을 쓴다.
+   */
+  async getPlayerRecordsForAdmin(tournamentId: string) {
+    // 없는 대회 id에 빈 200을 주면 클라이언트 오배선이 "데이터 없음"으로 위장된다
+    // (리뷰 지적) — 공개 라우트와 달리 어드민 표면이라 명시적 코드를 쓴다.
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
+      where: { id: tournamentId },
+      select: { id: true },
+    });
+    if (tournament === null) {
+      throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+    const empty = { tournamentId, goals: [], assists: [] };
+    await this.assertCanonicalRecordsReady(tournamentId);
+    const games = await this.prisma.v1Game.findMany({
+      where: {
+        currentOfficialRevisionId: { not: null },
+        sourceType: 'TEAM_MATCH',
+        teamMatch: {
+          tournamentId,
+          leagueId: null,
+          deletedAt: null,
+          tournamentDetails: { is: { tournamentId } },
+        },
+      },
+      select: { currentOfficialRevisionId: true },
+    });
+    const revisionIds = games
+      .map((game) => game.currentOfficialRevisionId)
+      .filter((id): id is string => id !== null);
+    if (revisionIds.length === 0) return empty;
+
+    const participantRows = await this.prisma.v1GameResultParticipant.findMany({
+      where: { resultRevisionId: { in: revisionIds } },
+      select: {
+        participantId: true,
+        goals: true,
+        assists: true,
+        resultRevision: { select: { officialAt: true } },
+      },
+    });
+    // 0골·0도움 행은 응답에서 전부 걸러진다 — 공개 랭킹과 같은 사전 필터(비용 패리티).
+    // "마지막 스냅샷" 갱신이 결정적이 되도록 officialAt(동률이면 participantId)로
+    // 정렬한다 — findMany 순서는 무보장이라 그대로 두면 name/team이 실행마다
+    // 흔들릴 수 있다(리뷰 지적).
+    const officialRows = participantRows
+      .filter((row) => row.resultRevision.officialAt !== null && (row.goals > 0 || row.assists > 0))
+      .sort(
+        (a, b) =>
+          a.resultRevision.officialAt!.getTime() - b.resultRevision.officialAt!.getTime() ||
+          a.participantId.localeCompare(b.participantId),
+      );
+    if (officialRows.length === 0) return empty;
+
+    const participants = await this.prisma.v1GameParticipant.findMany({
+      where: { id: { in: officialRows.map((row) => row.participantId) } },
+      select: { id: true, userId: true, displayNameSnapshot: true, sideId: true },
+    });
+    const participantById = new Map(participants.map((participant) => [participant.id, participant]));
+    const sideIds = [...new Set(participants.map((participant) => participant.sideId))];
+    const sides = sideIds.length === 0
+      ? []
+      : await this.prisma.v1GameSide.findMany({
+          where: { id: { in: sideIds } },
+          select: { id: true, teamId: true },
+        });
+    const teamIdBySideId = new Map(sides.map((side) => [side.id, side.teamId]));
+    const teamIds = [...new Set(sides.map((side) => side.teamId).filter((id): id is string => id !== null))];
+    const teams = teamIds.length === 0
+      ? []
+      : await this.prisma.v1Team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true } });
+    const teamNameById = new Map(teams.map((team) => [team.id, team.name]));
+
+    type AdminRecordRow = {
+      userId: string | null;
+      name: string;
+      teamName: string | null;
+      goals: number;
+      assists: number;
+    };
+    const totalsByKey = new Map<string, AdminRecordRow>();
+    for (const row of officialRows) {
+      const participant = participantById.get(row.participantId);
+      if (participant === undefined) continue;
+      const key = participant.userId !== null
+        ? `user:${participant.userId}`
+        : `named:${participant.displayNameSnapshot.trim().normalize('NFKC').toLocaleLowerCase('ko-KR')}`;
+      const teamId = teamIdBySideId.get(participant.sideId) ?? null;
+      const teamName = teamId !== null ? teamNameById.get(teamId) ?? null : null;
+      const current = totalsByKey.get(key) ?? {
+        userId: participant.userId,
+        name: participant.displayNameSnapshot,
+        teamName,
+        goals: 0,
+        assists: 0,
+      };
+      current.goals += row.goals;
+      current.assists += row.assists;
+      // 마지막으로 본 스냅샷으로 갱신 — 개명·이적 시 최신 표기를 따른다.
+      // teamName도 이름과 똑같이 무조건 대입한다: null 가드를 두면 "마지막
+      // 스냅샷이 무팀"인 사실이 이전 팀명으로 가려진다(리뷰 지적).
+      current.name = participant.displayNameSnapshot;
+      current.teamName = teamName;
+      totalsByKey.set(key, current);
+    }
+
+    const rows = [...totalsByKey.values()];
+    return {
+      tournamentId,
+      goals: rows.filter((row) => row.goals > 0).sort((a, b) => b.goals - a.goals).slice(0, ADMIN_PLAYER_RECORDS_LIMIT),
+      assists: rows.filter((row) => row.assists > 0).sort((a, b) => b.assists - a.assists).slice(0, ADMIN_PLAYER_RECORDS_LIMIT),
+    };
+  }
+
+  private async assertCanonicalRecordsReady(tournamentId: string): Promise<void> {
+    const teamMatches = await this.prisma.v1TeamMatch.findMany({
+      where: { tournamentId, leagueId: null, deletedAt: null },
+      select: {
+        id: true,
+        game: { select: { sourceType: true } },
+        tournamentDetails: { select: { tournamentId: true } },
+      },
+    });
+    const invalidTeamMatchIds = teamMatches
+      .filter((teamMatch) =>
+        teamMatch.game?.sourceType !== 'TEAM_MATCH' ||
+        (teamMatch.tournamentDetails === null || teamMatch.tournamentDetails.tournamentId !== tournamentId),
+      )
+      .map((teamMatch) => teamMatch.id)
+      .sort();
+    if (invalidTeamMatchIds.length > 0) {
+      throw new ConflictException({
+        code: 'TOURNAMENT_MATCH_GAME_MISSING',
+        message: '이 대회의 정본 경기 상세 정보를 확인할 수 없어요.',
+        details: { teamMatchIds: invalidTeamMatchIds },
+      });
+    }
+  }
+
+  async getSchedule(tournamentId: string, query: PublicTournamentScheduleQueryDto, user?: V1AuthUser) {
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
+      where: {
+        id: tournamentId,
+        deletedAt: null,
+        AND: [PUBLIC_COMPETITION_STATUS_WHERE],
+      },
+      select: {
+        id: true,
+        title: true,
+        kind: true,
+        status: true,
+        bracketPublishedAt: true,
+        bracketPublishScheduledAt: true,
+      },
+    });
+    if (tournament === null) {
+      throw new NotFoundException(NOT_FOUND);
+    }
+
+    const staffBypass = await this.resolveTournamentStaffBypass(user, tournamentId);
+    const hideIdentity = shouldHideParticipantIdentity(tournament.status, staffBypass);
+
+    // 거울 행(정규 리그 시즌)은 대회 축 대진(`V1TournamentFixture`)이 **하나도 없다** -- 그
+    // 행을 만드는 코드가 전부 `TOURNAMENT_KINDS` 게이트 뒤에 있기 때문이다. 그래서 예전엔
+    // 이 조회가 리그를 404 로 막았고, 그 404 하나 때문에 `/tournaments/:id/schedule` 과
+    // `/tournaments/:id/bracket` 이 **함께** 죽어 있었다(두 화면이 같은 `ScheduleContent` +
+    // `usePublicTournamentSchedule` 을 쓴다).
+    //
+    // `getOverallStandings` 가 먼저 같은 모양으로 갈렸다 -- 종류로 갈라 **리그 축에서 계산해
+    // 대회 축 응답 모양으로** 돌려준다. 여기도 그 패턴을 그대로 따른다.
+    //
+    // ⚠️ `isLeagueCompetition` 을 쓰지 않는다. 그 헬퍼는 `format === 'league'` 인 **리그 방식
+    // 대회**도 true 로 주는데(alpha 실측 62건 중 7건) 그건 진짜 대회고 대회 축 대진을 갖고
+    // 있어 기존 경로가 정상 동작한다. 여기서 묻는 것은 *"무엇인가"* 이므로 `kind` 만 본다.
+    if (tournament.kind === 'regular_league') {
+      return this.leagueSchedule(tournament.id, tournament.title, query, hideIdentity);
     }
     const bracketPublished = isBracketPublished(tournament.bracketPublishedAt, tournament.bracketPublishScheduledAt);
     if (!bracketPublished) {
@@ -192,52 +666,60 @@ export class PublicTournamentRecordsService {
     // 이 조회는 특정 fixture 하나가 아니라 대회 전체 일정을 한 번에 내려주므로,
     // 스태프 우회는 fixture/field 단위가 아니라 대회 전체 단위(`{ tournamentId }`)로
     // 판정한다 -- TournamentsReadService.get()과 동일한 스코프 선택.
-    const staffBypass = await this.resolveTournamentStaffBypass(user, tournamentId);
-    const hideIdentity = shouldHideParticipantIdentity(tournament.status, staffBypass);
-
-    const publicLiveEnabled = await this.isPublicLiveEnabled();
+    const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
     const limit = query.limit ?? 20;
     const cursor = decodeRecordCursor(query.cursor);
 
-    const rawFixtures = await this.prisma.v1TournamentFixture.findMany({
+    const canonicalRows = await this.prisma.v1TournamentMatchDetails.findMany({
       where: {
         tournamentId,
-        scheduledAt: { not: null },
-        ...(query.round ? { round: query.round } : {}),
-        ...(query.groupId ? { groupId: query.groupId } : {}),
-        ...(cursor
-          ? {
-              OR: [
-                { scheduledAt: { gt: new Date(cursor.key) } },
-                { scheduledAt: new Date(cursor.key), id: { gt: cursor.id } },
-              ],
-            }
-          : {}),
+        teamMatch: { deletedAt: null, game: { sourceType: 'TEAM_MATCH' } },
       },
-      orderBy: [{ scheduledAt: 'asc' }, { id: 'asc' }],
-      take: limit + 1,
-      select: FIXTURE_SCHEDULE_SELECT,
+      select: CANONICAL_SCHEDULE_SELECT,
     });
-    const hasMore = rawFixtures.length > limit;
-    const pageFixtures = rawFixtures.slice(0, limit);
-
-    const rawUnscheduled = await this.prisma.v1TournamentFixture.findMany({
-      where: {
-        tournamentId,
-        scheduledAt: null,
-        ...(query.round ? { round: query.round } : {}),
-        ...(query.groupId ? { groupId: query.groupId } : {}),
-      },
-      orderBy: [{ round: 'asc' }, { fixtureNumber: 'asc' }],
-      select: FIXTURE_SCHEDULE_SELECT,
-    });
+    const allRows = canonicalRows.map((row) => presentCanonicalSchedule(row)).filter((row) =>
+      (!query.round || row.round === query.round) &&
+      (!query.groupId || row.groupId === query.groupId),
+    ).filter((row) =>
+      effectivePublicVisibilityMode(row.game?.visibilityPolicy?.mode ?? 'HIDDEN', publicLiveEnabled) !== 'hidden',
+    );
+    // A field operator is intentionally denied the tournament-wide staff bypass above, but
+    // still needs the names for the exact matches in their field/fixture scope. Resolve that
+    // narrower permission per canonical row so the schedule cannot disclose other fixtures.
+    const scopedIdentityFixtureIds = await this.resolveTournamentFixtureBypassIds(
+      user,
+      tournamentId,
+      allRows,
+      hideIdentity,
+    );
+    const cursorDate = cursor === null ? null : new Date(cursor.key);
+    const scheduledRows = allRows
+      .filter((row) => row.scheduledAt !== null)
+      .filter((row) =>
+        cursorDate === null ||
+        row.scheduledAt!.getTime() > cursorDate.getTime() ||
+        (row.scheduledAt!.getTime() === cursorDate.getTime() && row.id > cursor!.id),
+      )
+      .sort((left, right) =>
+        left.scheduledAt!.getTime() - right.scheduledAt!.getTime() || left.id.localeCompare(right.id),
+      );
+    const hasMore = scheduledRows.length > limit;
+    const pageFixtures = scheduledRows.slice(0, limit);
+    const rawUnscheduled = allRows
+      .filter((row) => row.scheduledAt === null)
+      .sort((left, right) =>
+        left.round.localeCompare(right.round) ||
+        left.fixtureNumber - right.fixtureNumber ||
+        left.legNumber - right.legNumber ||
+        left.id.localeCompare(right.id),
+      );
 
     // Lane 1 fix -- one batched query for every currently-LIVE/PAUSED game on
     // this page (both cursor-paginated and unscheduled), never a per-fixture
     // query. See `loadLiveScores` below.
     // PUBLIC_LIVE 가 꺼져 있으면 effectivePublicVisibilityMode() 가 live 를
-    // status_only 로 강등해 이 값이 어차피 화면에 안 나간다 — 그런데도 매 요청마다
-    // 이벤트를 긁어오면 관전자 트래픽만큼 헛일이 쌓인다. 플래그가 켜졌을 때만 읽는다.
+    // official_only 로 강등하고, official_only 는 라이브 점수를 내보내지 않는다 —
+    // 그런데도 매 요청마다 이벤트를 긁어오면 관전자 트래픽만큼 헛일이 쌓인다.
     const liveScoreByGameId = publicLiveEnabled
       ? await this.loadLiveScores([...pageFixtures, ...rawUnscheduled])
       : new Map<string, GameScore>();
@@ -276,7 +758,7 @@ export class PublicTournamentRecordsService {
           consentMap,
           nameProfileByUserId,
           now,
-          hideIdentity,
+          hideIdentity && !scopedIdentityFixtureIds.has(fixture.id),
         ),
       )
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
@@ -291,7 +773,7 @@ export class PublicTournamentRecordsService {
           consentMap,
           nameProfileByUserId,
           now,
-          hideIdentity,
+          hideIdentity && !scopedIdentityFixtureIds.has(fixture.id),
         ),
       )
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
@@ -397,27 +879,235 @@ export class PublicTournamentRecordsService {
     };
   }
 
-  async getMatch(tournamentId: string, fixtureId: string, user: V1AuthUser | undefined) {
-    const tournament = await this.prisma.v1Tournament.findUnique({
-      where: { id: tournamentId },
-      select: { id: true, title: true, status: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
+  /**
+   * 정규 리그 시즌(거울 행)의 일정·순위를 **대회 축 응답 모양으로** 돌려준다.
+   *
+   * `getOverallStandings` 의 `leagueOverallStandings` 와 같은 갈래다 -- 거울에는 대회 축
+   * 대진이 없으므로 리그 축에서 만들어 같은 모양에 담는다. 그래야 화면
+   * (`ScheduleContent`)이 분기 없이 두 축을 다 그린다.
+   *
+   * ## 대회 경로와 의도적으로 다른 것 넷
+   * - **`bracketPublished: true`.** 리그엔 대진표 공개 개념이 없다. `false` 를 주면
+   *   화면이 *"대진표가 아직 공개되지 않았어요"* 를 **영원히** 그린다(`schedule-content.tsx:725`).
+   *   여기서 `true` 의 뜻은 *"이 게이트는 리그에 해당 없다"* 다. 이 응답 필드의 소비처는
+   *   그 한 곳뿐이고, 어드민 축의 `bracketPublishedAt` 은 **다른 필드**라 영향받지 않는다.
+   * - **`unscheduled: []` 는 항상 빈 배열.** `V1TeamMatch.startAt` 이 non-null 이라 리그엔
+   *   "시간 미정" 상태가 존재하지 않는다. 빈 배열은 누락이 아니라 **없는 개념** 이다.
+   * - **팀명을 가리지 않는다.** `hideIdentity` 는 대회의 모집 중 정책인데 리그 참가팀은
+   *   순위표에 항상 공개된다(`getLeagueFixtureRecord` 가 같은 판단을 먼저 했다).
+   * - **`standings[]` 에 `registrationId` 를 싣지 않고 `teamId` 를 싣는다.** 리그엔 참가
+   *   등록이 없다. 이름과 내용이 갈린 값을 만들지 않는 쪽을 택한 `leagueOverallStandings`
+   *   선례를 따른다 -- 프론트는 `#896` 과 같은 유니온으로 받는다.
+   *   (대진의 `home`/`away` 는 반대로 `teamId` 를 `registrationId` 자리에 넣는다. 그쪽은
+   *   소비처가 **행 식별자** 로만 쓰기 때문이다 -- `toLeagueScheduleRow` 주석 참조.)
+   *
+   * ## 페이지네이션을 메모리에서 하는 이유
+   * 주차 번호는 **리그 전체의 경기일 집합**을 알아야 정해진다(N번째 경기일 = N주차).
+   * DB 에서 페이지만 잘라 오면 그 집합을 모르므로 2페이지의 첫 경기가 1주차가 된다.
+   * 리그 한 시즌의 대진 수는 팀 수의 제곱 규모(수십 건)라 전량 조회가 문제되지 않는다.
+   */
+  private async leagueSchedule(
+    leagueId: string,
+    leagueTitle: string,
+    query: PublicTournamentScheduleQueryDto,
+    hideIdentity: boolean,
+  ) {
+    const leagueRow = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: {
+        tier: true,
+        // 로스터 = confirmed 등록.
+        registrations: {
+          where: { status: 'confirmed' },
+          select: {
+            id: true,
+            teamId: true,
+            team: { select: { name: true, profile: { select: { logoUrl: true } } } },
+          },
+        },
+      },
     });
-    if (
-      tournament === null ||
-      !isBracketPublished(tournament.bracketPublishedAt, tournament.bracketPublishScheduledAt)
-    ) {
+    const league = leagueRow === null ? null : { tier: leagueRow.tier, teams: leagueRow.registrations };
+    if (league === null) {
       throw new NotFoundException(NOT_FOUND);
     }
 
-    const fixture = await this.prisma.v1TournamentFixture.findFirst({
-      where: { id: fixtureId, tournamentId },
-      select: FIXTURE_MATCH_SELECT,
+    const teamMatches = await this.prisma.v1TeamMatch.findMany({
+      // 술어는 손으로 적지 않는다 — 같은 질문("이 리그의 대진은 무엇인가")에 답하는
+      // 조회가 세 벌이었고 서로 달랐다. 이 파일의 것이 가장 옳아서 그것이 정본이 됐다.
+      where: leagueFixtureListWhere(leagueId),
+      orderBy: leagueFixtureListOrder(),
+      select: LEAGUE_SCHEDULE_SELECT,
     });
+
+    const resolvedTeamMatches = teamMatches.map((fixture) => {
+      assertLeagueTeamMatchOperationalInvariant(fixture, leagueId);
+      return fixture;
+    });
+
+    const weekNumbers = leagueWeekNumbers(resolvedTeamMatches);
+    const allRows = resolvedTeamMatches.map((fixture, index) =>
+      toLeagueScheduleRow(fixture, weekNumbers[index], index + 1),
+    );
+
+    // 커서 의미는 대회 경로와 같다(정렬 키 + id 로 동점 처리). 전량이 메모리에 있으므로
+    // 같은 비교를 그대로 적용한다.
+    const cursor = decodeRecordCursor(query.cursor);
+    const remaining =
+      cursor === null
+        ? allRows
+        : allRows.filter((row) => {
+            const key = row.scheduledAt.toISOString();
+            return key > cursor.key || (key === cursor.key && row.id > cursor.id);
+          });
+    const limit = query.limit ?? 20;
+    const pageRows = remaining.slice(0, limit);
+    const hasMore = remaining.length > limit;
+
+    const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
+    const liveScoreByGameId = publicLiveEnabled
+      ? await this.loadLiveScores(pageRows)
+      : new Map<string, GameScore>();
+    const eventsByGameId = await this.loadScheduleEvents(pageRows);
+    const scorerParticipantIds = pageRows.flatMap((row) =>
+      (row.game?.participants ?? []).map((participant) => participant.id),
+    );
+    const consentMap = isTournamentParticipantNameGatingReverted()
+      ? await loadParticipantConsentEligibility(this.prisma, scorerParticipantIds)
+      : new Map<string, ParticipantConsentEligibility>();
+    const nameProfileByUserId = await loadParticipantNameProfiles(
+      this.prisma,
+      pageRows.flatMap((row) => (row.game?.participants ?? []).map((participant) => participant.userId)),
+    );
+    const now = new Date();
+
+    const items = pageRows
+      .map((row) =>
+        presentScheduleEntry(
+          row,
+          publicLiveEnabled,
+          liveScoreByGameId,
+          eventsByGameId,
+          consentMap,
+          nameProfileByUserId,
+          now,
+          hideIdentity,
+        ),
+      )
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+    // ── 순위 ────────────────────────────────────────────────────────────────
+    // 대진 분류(취소·무효·미확정)는 `bucketLeagueFixtures` 가 한다 -- 리그 자기 순위표와
+    // **같은 규칙**이어야 같은 리그가 두 화면에서 다른 순위로 보이지 않는다.
+    const revisionIds = teamMatches
+      .map((fixture) => fixture.game?.currentOfficialRevisionId ?? null)
+      .filter((id): id is string => id !== null);
+    const facts =
+      revisionIds.length === 0
+        ? []
+        : await this.prisma.v1GameOfficialFact.findMany({
+            where: { revisionId: { in: revisionIds } },
+            select: { gameId: true, homeScore: true, awayScore: true },
+          });
+    const { confirmed } = bucketLeagueFixtures(
+      resolvedTeamMatches,
+      new Map(facts.map((fact) => [fact.gameId, fact])),
+    );
+    const tieBreakOrder = LEAGUE_TIE_BREAK_ORDER;
+    const teamNameById = new Map(league.teams.map((entry) => [entry.teamId, entry.team.name]));
+    const registrationIdByTeamId = new Map(league.teams.map((entry) => [entry.teamId, entry.id]));
+    const teamLogoById = new Map(
+      league.teams.map((entry) => [entry.teamId, entry.team.profile?.logoUrl ?? null]),
+    );
+    // 순위표 섹션 제목. 티어가 있으면 그것이 가장 정확한 이름이고(1부/2부), 시리즈에 속하지
+    // 않은 단발 리그는 티어가 없어 일반 명칭으로 떨어진다. **빈 문자열을 두지 않는다** --
+    // 화면이 제목을 항상 그리므로(`schedule-content.tsx`) 빈 값이면 제목 자리만 남는다.
+    const standingsGroupName = league.tier === null ? '리그 순위' : `${league.tier}부`;
+
+    return {
+      tournamentId: leagueId,
+      tournamentTitle: leagueTitle,
+      bracketPublished: true,
+      items,
+      unscheduled: [],
+      standings: calculateLeagueStandings({
+        teamIds: league.teams.map((entry) => entry.teamId),
+        fixtures: confirmed,
+        tieBreakOrder,
+      }).map((standing) => ({
+        groupId: leagueId,
+        groupName: standingsGroupName,
+        registrationId: hideIdentity ? registrationIdByTeamId.get(standing.teamId) ?? null : undefined,
+        teamId: hideIdentity ? null : standing.teamId,
+        teamName: hideIdentity ? null : teamNameById.get(standing.teamId) ?? null,
+        teamLogoUrl: hideIdentity ? null : teamLogoById.get(standing.teamId) ?? null,
+        position: standing.position,
+        points: standing.points,
+        wins: standing.wins,
+        draws: standing.draws,
+        losses: standing.losses,
+        goalsFor: standing.goalsFor,
+        goalsAgainst: standing.goalsAgainst,
+      })),
+      nextCursor:
+        hasMore && pageRows.length > 0
+          ? encodeRecordCursor({
+              key: pageRows[pageRows.length - 1].scheduledAt.toISOString(),
+              id: pageRows[pageRows.length - 1].id,
+            })
+          : null,
+    };
+  }
+
+  async getMatch(tournamentId: string, fixtureId: string, user: V1AuthUser | undefined) {
+    const tournament = await findTournamentOnSurface(this.prisma, ALL_COMPETITION_KINDS, {
+      where: {
+        id: tournamentId,
+        deletedAt: null,
+        AND: [PUBLIC_COMPETITION_STATUS_WHERE],
+      },
+      select: { id: true, title: true, kind: true, status: true, bracketPublishedAt: true, bracketPublishScheduledAt: true },
+    });
+    if (tournament === null) {
+      throw new NotFoundException(NOT_FOUND);
+    }
+    // The schedule surface intentionally supports regular leagues through the
+    // league-shaped branch. The shared detail URL must use the same branch;
+    // restricting this lookup to TOURNAMENT_KINDS made every schedule link
+    // for a regular league fail closed before its fixture was queried.
+    if (tournament.kind === 'regular_league') {
+      try {
+        return await this.getLeagueFixtureRecord(tournamentId, fixtureId);
+      } catch (error) {
+        // Both competition families share this URL's public error contract.
+        // Normalize only the league projection's not-found result; operational
+        // failures must remain visible to the controller/error pipeline.
+        if (error instanceof NotFoundException) {
+          throw new NotFoundException(NOT_FOUND);
+        }
+        throw error;
+      }
+    }
+    if (!isBracketPublished(tournament.bracketPublishedAt, tournament.bracketPublishScheduledAt)) {
+      throw new NotFoundException(NOT_FOUND);
+    }
+
+    const canonicalFixture = await this.prisma.v1TournamentMatchDetails.findFirst({
+      where: {
+        teamMatchId: fixtureId,
+        tournamentId,
+        teamMatch: { deletedAt: null, game: { sourceType: 'TEAM_MATCH' } },
+      },
+      select: CANONICAL_MATCH_SELECT,
+    });
+    const fixture: FixtureMatchRow | null = canonicalFixture === null
+      ? null
+      : presentCanonicalMatch(canonicalFixture);
     if (fixture === null) {
       throw new NotFoundException(NOT_FOUND);
     }
 
-    const publicLiveEnabled = await this.isPublicLiveEnabled();
+    const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
     const policyMode: V1VisibilityMode = fixture.game?.visibilityPolicy?.mode ?? 'HIDDEN';
     const mode = effectivePublicVisibilityMode(policyMode, publicLiveEnabled);
     if (mode === 'hidden') {
@@ -441,13 +1131,21 @@ export class PublicTournamentRecordsService {
       !showOfficialResult && mode === 'live' && status === 'live' && fixture.game !== null
         ? await this.computeLiveScore(fixture.game.id, fixture.game.sides)
         : null;
-    const scoreStatus: 'unavailable' | 'live' | 'official' = showOfficialResult
-      ? 'official'
-      : liveScore !== null
-        ? 'live'
-        : 'unavailable';
-    const score: PublicScoreValue | null =
-      mode === 'status_only' ? null : showOfficialResult ? officialScore : liveScoreToPublicScore(liveScore);
+    // Task 166: 세 자리(대회 상세·리그 경기·일정 카드)가 같은 삼항식을 복사해 두고
+    // 있었다 — 한 곳만 고치면 나머지가 조용히 갈린다. 규칙은
+    // `public-score-presentation.ts` 한 곳이 갖는다.
+    const submittedScore = parseScore(
+      fixture.game?.resultRevisions?.[0]?.state === 'SUBMITTED'
+        ? fixture.game.resultRevisions[0].score
+        : null,
+    );
+    const { scoreStatus, score } = resolvePublicScorePresentation({
+      mode,
+      showOfficialResult,
+      officialScore,
+      liveScore: liveScoreToPublicScore(liveScore),
+      submittedScore,
+    });
     const clock: PublicGameClock | null =
       mode === 'live' && !showOfficialResult ? resolveLiveClock(fixture.game?.periods ?? [], new Date()) : null;
     // `clock`과 달리 `status === 'live'` 게이트가 하나 더 필요하다: `resolveLiveClock`은
@@ -461,11 +1159,12 @@ export class PublicTournamentRecordsService {
         : null;
 
     const participantIds = (fixture.game?.participants ?? []).map((participant) => participant.id);
-    // 정책 공개(기본값)에서는 이 맵이 쓰이지 않는다 -- 위 getSchedule과 동일한 이유로
-    // 되돌린 상태(V1_TOURNAMENT_PARTICIPANT_NAMES_CONSENT_GATE=true)일 때만 조회한다.
-    const consentMap = isTournamentParticipantNameGatingReverted()
-      ? await loadParticipantConsentEligibility(this.prisma, participantIds)
-      : new Map<string, ParticipantConsentEligibility>();
+    // **항상 조회한다.** 이름 게이팅(되돌린 상태에서만 동작)에는 안 쓰이지만, 프로필 링크
+    // (`resolveParticipantProfileHref`)는 정책 공개 기본값에서도 동의를 확인해야 하기
+    // 때문이다 -- 예전처럼 게이팅 플래그로 감싸 두면 기본 운영 설정에서 이 맵이 비어
+    // `profileHref` 가 **항상 null** 이 되어 링크가 하나도 생기지 않는다(Copilot 리뷰가
+    // 잡은 결함). 배치 조회 1회라 N+1 이 아니고, getMatch 는 단일 경기라 대상도 적다.
+    const consentMap = await loadParticipantConsentEligibility(this.prisma, participantIds);
     // 위 consentMap과 달리 이건 게이팅하지 않는다 -- getSchedule과 동일한 이유
     // (resolveParticipantDisplayName 위 doc comment 참고).
     const nameProfileByUserId = await loadParticipantNameProfiles(
@@ -479,8 +1178,14 @@ export class PublicTournamentRecordsService {
     const hideIdentity = shouldHideParticipantIdentity(tournament.status, isStaffBypass);
 
     const lineup = buildLineup(fixture, mode, consentMap, nameProfileByUserId, isStaffBypass);
+    // finding #60: 종료(ended) 직후~공식 확정(officialize) 전 창에서는 위 714-717줄의
+    // `liveScore` 게이트가 이미 닫혀 score=null("- : -")을 보여준다. 이벤트 타임라인이
+    // status_only 만 게이팅하면 이 창에서 score는 비어 있는데 골 타임라인은 그대로 남아
+    // 같은 화면이 서로 모순된 사실을 말한다 — pendingProjection이 식별하는 것과 같은
+    // 창이므로 그 조건을 재사용해 이벤트도 함께 가린다.
+    const hidePendingOfficialEvents = status === 'ended' && !showOfficialResult;
     const events =
-      mode === 'status_only'
+      mode === 'status_only' || hidePendingOfficialEvents
         ? []
         : await this.buildEvents(
             fixture.game?.id ?? null,
@@ -504,7 +1209,10 @@ export class PublicTournamentRecordsService {
             select: { revision: true, state: true, officialAt: true, reason: true, supersedesId: true },
           });
 
-    const nextMatch = await this.findNextMatch(fixture);
+    // finding #57: hideIdentity를 넘기지 않으면 이 경기의 home/away는 가려도
+    // findNextMatch가 실명을 그대로 돌려줘, 두 팀 중 정의상 하나(이 경기 참가팀)가
+    // 즉시 재식별된다 — home/away presentSide(아래 797-798줄)와 같은 스코프를 쓴다.
+    const nextMatch = await this.findNextMatch(fixture, hideIdentity, publicLiveEnabled);
 
     return {
       tournamentId: tournament.id,
@@ -531,12 +1239,31 @@ export class PublicTournamentRecordsService {
       lineup,
       events,
       mvp,
+      // 몰수·중단 종결 표시. 정상 종료(NORMAL)면 null 이라 기존 화면 계약은 그대로다 —
+      // 관전자에게 매번 "정상 종료"라고 말할 이유는 없다. 공식 결과가 공개된 경우에만
+      // 내보낸다(showOfficialResult) — 아직 공개 전인 결과의 사유를 미리 흘리면 안 된다.
+      // finding #58: `mode !== 'status_only'`를 함께 요구한다 — status_only는 위 723줄
+      // `score`를 이미 null로 가리므로(docs/api/domains/public-records.md:285-291의
+      // "점수와 사유는 함께 나가거나 함께 빠져야 한다" 불변식), 이 필드만 게이트가
+      // 없으면 "- : -"인데 "몰수으로 종료된 경기예요"가 함께 뜨는 자기모순이 생긴다.
+      outcome:
+        mode !== 'status_only' &&
+        showOfficialResult &&
+        fixture.game?.currentOfficialRevision != null &&
+        fixture.game.currentOfficialRevision.outcomeReason !== 'NORMAL'
+          ? {
+              reason: fixture.game.currentOfficialRevision.outcomeReason,
+              note: fixture.game.currentOfficialRevision.outcomeNote,
+            }
+          : null,
       pendingProjection: mode === 'live' && resultState === 'pending' && (status === 'live' || status === 'ended'),
       history: history.map((revision) => ({
         revision: revision.revision,
         state: revision.state,
         officialAt: revision.officialAt?.toISOString() ?? null,
-        reason: revision.reason,
+        // status_only 공개는 진행 여부·시점만 알린다. correction reason은 운영자 자유
+        // 텍스트일 수 있어 점수/선수 기록을 가리는 이 모드에서 함께 공개하면 안 된다.
+        reason: mode === 'status_only' ? null : revision.reason,
         isCorrection: revision.supersedesId !== null,
       })),
       videos: fixture.videos.map((video) => ({ id: video.id, title: video.title, url: video.url })),
@@ -596,14 +1323,9 @@ export class PublicTournamentRecordsService {
   }
 
   /**
-   * 참가팀 공개 정책 통일(fix/v1-publish) -- `getSchedule`용 대회 전체 단위
-   * 스태프 우회. 위 `resolveStaffBypass`와 달리 fixture/field로 좁히지 않는다
-   * (`{ tournamentId }`만) -- 이 조회 자체가 특정 경기 하나가 아니라 대회 전체
-   * 일정을 한 번에 내려주기 때문에, 그 응답 전체를 우회할 권한도 대회 전체
-   * 단위로 판정하는 것이 맞다(TournamentsReadService.get()의 동일 이름 메서드와
-   * 같은 스코프 선택 -- decideTournamentStaffAccess의 기존 정책을 그대로 따르는
-   * 결과이지 새로 발명한 로직이 아니다: 특정 fixture/field로만 좁게 배정된
-   * FIELD_OPERATOR는 자연히 이 우회 대상에서 제외된다).
+   * 참가팀 공개 정책 통일(fix/v1-publish) -- `getSchedule`용 대회 전역 staff 우회.
+   * 특정 fixture/field로만 배정된 FIELD_OPERATOR는 여기서 제외하고, 일정 행별 권한은
+   * `resolveTournamentFixtureBypassIds`가 자기 담당 경기만 판정한다.
    */
   private async resolveTournamentStaffBypass(user: V1AuthUser | undefined, tournamentId: string): Promise<boolean> {
     if (user === undefined) return false;
@@ -616,12 +1338,34 @@ export class PublicTournamentRecordsService {
     }
   }
 
-  private async isPublicLiveEnabled(): Promise<boolean> {
-    const flag = await this.prisma.v1GameOperationFlag.findUnique({
-      where: { key: 'PUBLIC_LIVE' },
-      select: { value: true },
-    });
-    return flag?.value === 'on';
+  private async resolveTournamentFixtureBypassIds(
+    user: V1AuthUser | undefined,
+    tournamentId: string,
+    rows: readonly FixtureScheduleRow[],
+    hideIdentity: boolean,
+  ): Promise<ReadonlySet<string>> {
+    if (!hideIdentity || user === undefined || rows.length === 0) return new Set();
+
+    const decisions = await Promise.all(
+      rows.map(async (row) => {
+        try {
+          await this.access.assertAccess({
+            userId: user.id,
+            action: 'read',
+            resource: {
+              tournamentId,
+              fixtureId: row.id,
+              ...(row.field?.id === undefined ? {} : { fieldId: row.field.id }),
+            },
+          });
+          return row.id;
+        } catch (error) {
+          if (error instanceof ForbiddenException) return null;
+          throw error;
+        }
+      }),
+    );
+    return new Set(decisions.filter((id): id is string => id !== null));
   }
 
   // 참가자 이름 프로필 배치 조회(`loadParticipantNameProfiles`)는 이제
@@ -763,8 +1507,13 @@ export class PublicTournamentRecordsService {
           // 그래도 타입 안전을 위해 null이면 'away'로 접지(fail-safe)한다.
           side: sideKeyById.get(displaySideId) === 'HOME' ? ('home' as const) : ('away' as const),
           participantId: eligible ? event.participantId : null,
-          participantName: eligible ? resolveParticipantDisplayName(participant, nameProfileByUserId) : null,
+          participantName: eligible
+            ? event.participantId === null
+              ? null
+              : resolveParticipantDisplayName(participant, nameProfileByUserId)
+            : null,
           jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
+          profileHref: eligible ? resolveParticipantProfileHref(participant?.userId ?? null, consent) : null,
           // 백필로 복원된 골은 `period: 1`로 저장돼 있지만 그건 컬럼이 non-null이라
           // 어쩔 수 없이 넣은 값이고 레거시 원본엔 전/후반 자체가 없었다 -- 그대로
           // 내보내면 이 타임라인이 `periodLabel(1)`="전반" 헤딩을 붙여 없던 사실을
@@ -797,9 +1546,12 @@ export class PublicTournamentRecordsService {
         side: sideKeyById.get(displaySideId) === 'HOME' ? ('home' as const) : ('away' as const),
         participantId: eligible ? event.participantId : null,
         participantName: eligible
-          ? resolveParticipantDisplayName(participant, nameProfileByUserId)
+          ? event.participantId === null
+            ? (event.playerNameSnapshot ?? '선수 정보 없음')
+            : resolveParticipantDisplayName(participant, nameProfileByUserId)
           : null,
         jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
+        profileHref: eligible ? resolveParticipantProfileHref(participant?.userId ?? null, consent) : null,
         period: event.period,
         clockMs: event.minute === null ? null : event.minute * 60000,
       };
@@ -888,6 +1640,7 @@ export class PublicTournamentRecordsService {
           ),
         ) === 'HOME' ? 'home' : 'away') as 'home' | 'away',
         participantId: event.participantId,
+        playerNameSnapshot: null,
         // buildEvents와 동일한 규칙 -- 백필 복원 골은 전/후반을 모른다.
         period: isPeriodUnknown(event.payload) ? null : event.period,
         // buildEvents와 동일한 규칙 -- 분 미상 골은 시각을 내리지 않는다.
@@ -910,6 +1663,7 @@ export class PublicTournamentRecordsService {
                 ? ('home' as const)
                 : ('away' as const),
             participantId: event.participantId,
+            playerNameSnapshot: event.playerNameSnapshot,
             period: event.period,
             clockMs: event.minute === null ? null : event.minute * 60000,
           })),
@@ -925,41 +1679,394 @@ export class PublicTournamentRecordsService {
     return result;
   }
 
-  private async findNextMatch(fixture: FixtureMatchRow) {
+  /**
+   * `hideIdentity`(finding #57) -- 이 경기의 home/away를 가릴 때(모집 중 대회)는
+   * 다음 경기의 팀명도 함께 가려야 한다. 쿼리 조건이 이 경기의 registrationId 중
+   * 하나를 요구하므로, 반환되는 `next.home`/`next.away` 중 한쪽은 정의상 방금
+   * 가린 두 팀 중 하나와 같은 팀이다 -- 가리지 않으면 재식별 경로가 된다.
+   */
+  private async findNextMatch(fixture: FixtureMatchRow, hideIdentity: boolean, publicLiveEnabled: boolean) {
     if (fixture.scheduledAt === null) return null;
     const registrationIds = [fixture.homeRegistrationId, fixture.awayRegistrationId].filter(
       (id): id is string => id !== null,
     );
     if (registrationIds.length === 0) return null;
-    const next = await this.prisma.v1TournamentFixture.findFirst({
+    const canonical = await this.prisma.v1TournamentMatchDetails.findMany({
       where: {
         tournamentId: fixture.tournamentId,
-        id: { not: fixture.id },
-        scheduledAt: { gt: fixture.scheduledAt },
+        teamMatchId: { not: fixture.id },
+        teamMatch: {
+          deletedAt: null,
+          startAt: { gt: fixture.scheduledAt },
+          status: { notIn: ['cancelled', 'archived'] },
+          game: { sourceType: 'TEAM_MATCH' },
+        },
         OR: [{ homeRegistrationId: { in: registrationIds } }, { awayRegistrationId: { in: registrationIds } }],
       },
-      orderBy: { scheduledAt: 'asc' },
       select: {
-        id: true,
+        teamMatchId: true,
         round: true,
-        scheduledAt: true,
+        homeRegistrationId: true,
+        awayRegistrationId: true,
         homeRegistration: { select: { team: { select: { id: true, name: true } } } },
         awayRegistration: { select: { team: { select: { id: true, name: true } } } },
+        teamMatch: {
+          select: {
+            startAt: true,
+            status: true,
+            game: { select: { visibilityPolicy: { select: { mode: true } } } },
+          },
+        },
       },
     });
+    type NextCandidate = {
+      id: string;
+      round: string;
+      scheduledAt: Date;
+      homeRegistration: { team: { id: string; name: string } } | null;
+      awayRegistration: { team: { id: string; name: string } } | null;
+      visibilityMode: V1VisibilityMode;
+    };
+    const candidates = new Map<string, NextCandidate>();
+    for (const row of canonical) {
+      if (row.teamMatch.startAt === null) continue;
+      if (row.teamMatch.startAt <= fixture.scheduledAt) continue;
+      if (row.teamMatch.status === 'cancelled' || row.teamMatch.status === 'archived') continue;
+      if (!registrationIds.includes(row.homeRegistrationId ?? '') && !registrationIds.includes(row.awayRegistrationId ?? '')) continue;
+      candidates.set(row.teamMatchId, {
+        id: row.teamMatchId,
+        round: row.round,
+        scheduledAt: row.teamMatch.startAt,
+        homeRegistration: row.homeRegistration,
+        awayRegistration: row.awayRegistration,
+        visibilityMode: row.teamMatch.game?.visibilityPolicy?.mode ?? 'HIDDEN',
+      });
+    }
+    const visibleCandidates = [...candidates.values()].filter(
+      (candidate) => candidate.visibilityMode !== 'HIDDEN' &&
+        effectivePublicVisibilityMode(candidate.visibilityMode, publicLiveEnabled) !== 'hidden',
+    );
+    const next = visibleCandidates.sort(
+      (left, right) => left.scheduledAt.getTime() - right.scheduledAt.getTime() || left.id.localeCompare(right.id),
+    )[0] ?? null;
     if (next === null) return null;
     return {
       fixtureId: next.id,
       round: next.round,
       scheduledAt: next.scheduledAt?.toISOString() ?? null,
       home: next.homeRegistration
-        ? { teamId: next.homeRegistration.team.id, teamName: next.homeRegistration.team.name }
+        ? { teamId: hideIdentity ? null : next.homeRegistration.team.id, teamName: hideIdentity ? null : next.homeRegistration.team.name }
         : null,
       away: next.awayRegistration
-        ? { teamId: next.awayRegistration.team.id, teamName: next.awayRegistration.team.name }
+        ? { teamId: hideIdentity ? null : next.awayRegistration.team.id, teamName: hideIdentity ? null : next.awayRegistration.team.name }
         : null,
     };
   }
+
+  /**
+   * 리그 경기 공개 기록 — `GET /league-matches/:leagueId/fixtures/:teamMatchId/record`.
+   *
+   * 리그 대진은 생성 즉시 TEAM_MATCH 소스의 V1Game 이 붙는다
+   * (league-match-admin.service.ts generateFixtures) — 즉 골·카드 타임라인, 라인업,
+   * 공식 리비전, 몰수 사유, MVP 가 대회 픽스처와 **같은 엔진에 이미 저장돼 있다**.
+   * 이 메서드는 getMatch 와 동일한 게임 프로젝션을 리그 대진에 적용한다.
+   *
+   * **응답 필드명은 getMatch(프론트 PublicMatchDetail)와 동일하게 유지한다** — 프론트
+   * MatchDetailContent 컴포넌트를 분기 없이 재사용하기 위해서다. 그래서 리그 값이
+   * 대회 이름의 자리에 실린다:
+   *   - `tournamentId`/`tournamentTitle` ← 리그 id/제목 (컴포넌트는 tournamentId 를
+   *     nextMatch 링크에만 쓰는데 리그는 nextMatch=null 이라 잘못된 링크가 생길 수 없다)
+   *   - `round` ← 'N주차' 라벨(string 계약 — 대회의 'group'/'semi' 자리),
+   *     `groupName` ← null (헤더가 `groupName ?? round` 를 찍으므로 round 가 그대로 보인다)
+   * 대회 전용 개념은 리그에 없는 값으로 고정한다: 스태프 실명 우회 없음(리그 운영자는
+   * 어드민 화면에서 본다 — 여기 공개 화면은 동의 게이팅 그대로), 참가팀 가리기 없음
+   * (리그 참가팀은 순위표에 항상 공개), `nextMatch`/`fieldName` 은 null.
+   * `videos` 는 리그 대진 영상 저장소(V1TeamMatchVideo — 어드민이
+   * /admin/league-matches/:leagueId/videos 에서 등록)에서 내린다.
+   */
+  async getLeagueFixtureRecord(leagueId: string, teamMatchId: string) {
+    const league = await findTournamentOnSurface(this.prisma, ['regular_league'], {
+      where: { id: leagueId, deletedAt: null },
+      select: { id: true, title: true },
+    });
+    if (league === null) {
+      throw new NotFoundException(LEAGUE_FIXTURE_NOT_FOUND);
+    }
+
+    const teamMatch = await this.prisma.v1TeamMatch.findFirst({
+      where: { id: teamMatchId, leagueId, deletedAt: null },
+      select: {
+        id: true,
+        leagueId: true,
+        hostTeamId: true,
+        approvedApplicantTeamId: true,
+        startAt: true,
+        placeName: true,
+        status: true,
+        hostTeam: { select: { id: true, name: true } },
+        approvedApplicantTeam: { select: { id: true, name: true } },
+        videos: { select: { id: true, title: true, url: true }, orderBy: { sortOrder: 'asc' } },
+        game: { select: GAME_MATCH_SELECT },
+      },
+    });
+    if (teamMatch === null) {
+      throw new NotFoundException(LEAGUE_FIXTURE_NOT_FOUND);
+    }
+    assertLeagueTeamMatchOperationalInvariant(teamMatch, leagueId);
+
+    const publicLiveEnabled = await isPublicLiveEnabled(this.prisma);
+    const policyMode: V1VisibilityMode = teamMatch.game?.visibilityPolicy?.mode ?? 'HIDDEN';
+    const mode = effectivePublicVisibilityMode(policyMode, publicLiveEnabled);
+    if (mode === 'hidden') {
+      throw new NotFoundException(LEAGUE_FIXTURE_NOT_FOUND);
+    }
+
+    const currentRevisionState = normalizeRevisionState(teamMatch.game?.currentOfficialRevision?.state);
+    const resultState = resolveResultState({
+      currentRevisionState,
+      supersedesId: teamMatch.game?.currentOfficialRevision?.supersedesId ?? null,
+    });
+    const status = publicTeamMatchStatus(teamMatch.game?.state ?? null, teamMatch.status);
+
+    const officialScore = parseScore(teamMatch.game?.currentOfficialRevision?.score);
+    const officialAt = teamMatch.game?.currentOfficialRevision?.officialAt ?? null;
+    const showOfficialResult = currentRevisionState === 'OFFICIAL' && officialScore !== null && officialAt !== null;
+    // getMatch 의 Lane 1 트윈 — 진행 중(라이브)인 리그 경기의 관중 스코어.
+    const liveScore =
+      !showOfficialResult && mode === 'live' && status === 'live' && teamMatch.game !== null
+        ? await this.computeLiveScore(teamMatch.game.id, teamMatch.game.sides)
+        : null;
+    // Task 166: 세 자리(대회 상세·리그 경기·일정 카드)가 같은 삼항식을 복사해 두고
+    // 있었다 — 한 곳만 고치면 나머지가 조용히 갈린다. 규칙은
+    // `public-score-presentation.ts` 한 곳이 갖는다.
+    const submittedScore = parseScore(
+      teamMatch.game?.resultRevisions?.[0]?.state === 'SUBMITTED'
+        ? teamMatch.game.resultRevisions[0].score
+        : null,
+    );
+    const { scoreStatus, score } = resolvePublicScorePresentation({
+      mode,
+      showOfficialResult,
+      officialScore,
+      liveScore: liveScoreToPublicScore(liveScore),
+      submittedScore,
+    });
+    const clock: PublicGameClock | null =
+      mode === 'live' && !showOfficialResult ? resolveLiveClock(teamMatch.game?.periods ?? [], new Date()) : null;
+    // getMatch 와 같은 이유로 status === 'live' 게이트가 하나 더 필요하다 — 그 주석 참고.
+    const periodBreak: PublicPeriodBreak | null =
+      mode === 'live' && !showOfficialResult && status === 'live'
+        ? resolvePeriodBreak(teamMatch.game?.periods ?? [])
+        : null;
+
+    const participantIds = (teamMatch.game?.participants ?? []).map((participant) => participant.id);
+    // getMatch 와 동일: 프로필 링크의 동의 확인 때문에 항상 조회한다(그쪽 주석 참고).
+    const consentMap = await loadParticipantConsentEligibility(this.prisma, participantIds);
+    const nameProfileByUserId = await loadParticipantNameProfiles(
+      this.prisma,
+      (teamMatch.game?.participants ?? []).map((participant) => participant.userId),
+    );
+
+    const lineup = buildLineup(
+      { game: teamMatch.game, scheduledAt: teamMatch.startAt },
+      mode,
+      consentMap,
+      nameProfileByUserId,
+      false,
+    );
+    // finding #60: getMatch 와 동일한 창(종료~공식 확정 전)에 대한 트윈 게이트.
+    const hidePendingOfficialEvents = status === 'ended' && !showOfficialResult;
+    const events =
+      mode === 'status_only' || hidePendingOfficialEvents
+        ? []
+        : await this.buildEvents(
+            teamMatch.game?.id ?? null,
+            teamMatch.game?.sides ?? [],
+            teamMatch.game?.participants ?? [],
+            teamMatch.game?.currentOfficialRevision?.state === 'OFFICIAL'
+              ? teamMatch.game.currentOfficialRevision.goalEvents
+              : null,
+            consentMap,
+            nameProfileByUserId,
+            false,
+          );
+    const mvp = buildMvp({ game: teamMatch.game }, mode, currentRevisionState, consentMap, nameProfileByUserId, false);
+
+    const history =
+      teamMatch.game === null
+        ? []
+        : await this.prisma.v1GameResultRevision.findMany({
+            where: { gameId: teamMatch.game.id, state: { in: ['OFFICIAL', 'VOID'] } },
+            orderBy: { revision: 'asc' },
+            select: { revision: true, state: true, officialAt: true, reason: true, supersedesId: true },
+          });
+
+    const weekNumber = await this.resolveLeagueWeekNumber(leagueId, teamMatch.startAt);
+
+    return {
+      tournamentId: league.id,
+      tournamentTitle: league.title,
+      fixtureId: teamMatch.id,
+      gameId: teamMatch.game?.id ?? null,
+      // PublicMatchDetail.round 는 string 계약(대회는 'group'/'semi' 같은 라벨) —
+      // 숫자를 그대로 내리면 소비처의 문자열 처리에서 깨진다(Copilot 리뷰 #747).
+      round: `${weekNumber}주차`,
+      fixtureNumber: 1,
+      legNumber: 1,
+      groupId: null,
+      groupName: null,
+      scheduledAt: teamMatch.startAt.toISOString(),
+      venue: teamMatch.placeName,
+      fieldName: null,
+      // 리그 대진은 등록(registration) 개념이 없다 — teamId 를 그대로 안정적 id 로 쓴다.
+      home: { registrationId: teamMatch.hostTeam.id, teamId: teamMatch.hostTeam.id, teamName: teamMatch.hostTeam.name },
+      away: teamMatch.approvedApplicantTeam
+        ? {
+            registrationId: teamMatch.approvedApplicantTeam.id,
+            teamId: teamMatch.approvedApplicantTeam.id,
+            teamName: teamMatch.approvedApplicantTeam.name,
+          }
+        : null,
+      visibilityMode: mode,
+      status,
+      resultState,
+      scoreStatus,
+      score,
+      clock,
+      periodBreak,
+      lineup,
+      events,
+      mvp,
+      // getMatch 와 동일한 게이트 — 공식 결과가 공개된 몰수·중단만 사유를 내보낸다.
+      // finding #58: mode !== 'status_only' 도 같은 이유로 함께 요구한다(getMatch 참고).
+      //
+      // getMatch(대회 경로)와 달리 이 리그 경로는 outcomeNote 를 절대 그대로 내보내지
+      // 않는다. 대회의 outcomeReason/outcomeNote 는 처음부터 공개용으로 설계된 채널이지만,
+      // 리그 대진의 이 컬럼을 채우는 유일한 writer 는 league-match-forfeit.service 이고
+      // 그 서비스의 명시 계약은 정반대다: "사유 원문은 공개하지 않는다 — 운영자가 쓴
+      // 자유 텍스트라 그대로 노출하면 내부 메모가 새어 나간다. 읽는 쪽은 boolean 만
+      // 만들고 문자열은 버려야 한다." 그 서비스는 컬럼(outcomeReason='FORFEIT' +
+      // outcomeNote=사유 원문)과 레거시 `[LEAGUE_FORFEIT]` reason 마커 두 채널을 함께
+      // 쓰므로(과거 리비전 호환), 몰수 감지도 두 채널을 모두 인정하되 응답에는 boolean
+      // 만 싣는다 — note 는 항상 null. 사유 원문은 아래 history 매핑에서도 걸러낸다
+      // (같은 발견의 두 증상, 한 커밋으로 함께 해결).
+      //
+      // `.includes` (not `.startsWith`, reason 마커 판정): 몰수 결과가 정정되면 reason 이
+      // `[LEAGUE_RESULT_CORRECTION] [LEAGUE_FORFEIT] ...` 로 마커가 앞이 아니게
+      // 바뀐다(league-match-result-entry.service.ts:707-709, 몰수 표식을 정정 후에도
+      // 잃지 않으려는 의도적 설계). isForfeit 배지(league-match-public.service.ts:348)도
+      // 같은 `.includes` 판정을 쓰므로, 순위표·대진 목록의 "몰수" 배지와 이 상세 화면의
+      // 안내가 정정 이후에도 계속 같은 결론을 내야 한다.
+      outcome:
+        mode !== 'status_only' && showOfficialResult && teamMatch.game?.currentOfficialRevision != null
+          ? teamMatch.game.currentOfficialRevision.outcomeReason !== 'NORMAL' ||
+            (teamMatch.game.currentOfficialRevision.reason?.includes(LEAGUE_FORFEIT_REASON_MARKER) ?? false)
+            ? {
+                reason:
+                  teamMatch.game.currentOfficialRevision.outcomeReason !== 'NORMAL'
+                    ? teamMatch.game.currentOfficialRevision.outcomeReason
+                    : ('FORFEIT' as const),
+                note: null,
+              }
+            : null
+          : null,
+      pendingProjection: mode === 'live' && resultState === 'pending' && (status === 'live' || status === 'ended'),
+      history: history.map((revision) => {
+        // 몰수 사유는 운영자가 쓴 자유 텍스트라 공개하지 않는다 — league-match-forfeit.service
+        // 의 명시 계약("읽는 쪽은 boolean 만 만들고 문자열은 버려야 한다"). 마커만 벗겨
+        // 원문을 그대로 내보내던 것이 결함이었다: 위 outcome 필드가 몰수 사실(boolean)을
+        // 이미 전달하므로, history 에서는 이 리비전의 사유를 통째로 null 로 만든다.
+        //
+        // `.includes` 여야 한다(`.startsWith` 아님). 정상 결과를 나중에 몰수로 '정정'하면
+        // reason 이 `[LEAGUE_RESULT_CORRECTION] [LEAGUE_FORFEIT] <운영자 자유 텍스트>` 가
+        // 되어 마커가 맨 앞이 아니다 — startsWith 로는 이 경우가 아래 분기로 떨어져
+        // 마커만 벗겨진 운영자 원문이 그대로 공개됐다. 바로 위 outcome.isForfeit 판정이
+        // 이미 `.includes` 를 쓰고 있어서 같은 파일 안에서 판정 기준이 어긋나 있었다.
+        if (revision.reason?.includes(LEAGUE_FORFEIT_REASON_MARKER)) {
+          return {
+            revision: revision.revision,
+            state: revision.state,
+            officialAt: revision.officialAt?.toISOString() ?? null,
+            reason: null,
+            isCorrection: revision.supersedesId !== null,
+          };
+        }
+        return {
+          revision: revision.revision,
+          state: revision.state,
+          officialAt: revision.officialAt?.toISOString() ?? null,
+          // 리그 결과 입력·정정 경로는 감사용 코드 마커("[LEAGUE_RESULT_ENTRY] ...",
+          // league-match-result-entry.service.ts)를 reason 앞에 붙여 저장한다 — 관전자
+          // 화면(결과 변경 이력)에 그대로 나가면 기술 문구다(alpha 실측 2026-08-25).
+          // 표시에서만 마커를 벗긴다 — DB 의 감사 기록 원문은 그대로다.
+          //
+          // 마커를 하나가 아니라 **연속으로 전부** 벗긴다: 리그 결과 경로는 마커를 겹쳐
+          // 붙일 수 있어서(`[LEAGUE_RESULT_ENTRY] [X] ...`) 하나만 벗기면 남은 마커가
+          // 그대로 노출된다. 몰수 마커가 섞인 리비전은 위 분기에서 이미 통째로 null 이
+          // 되므로 여기 오는 것은 공개해도 되는 사유뿐이다 — 원문은 유지하고 마커만 뗀다.
+          reason: revision.reason === null ? null : revision.reason.replace(/^(\[[A-Z0-9_]+\]\s*)+/, ''),
+          isCorrection: revision.supersedesId !== null,
+        };
+      }),
+      videos: teamMatch.videos.map((video) => ({ id: video.id, title: video.title, url: video.url })),
+      nextMatch: null,
+    };
+  }
+
+  /**
+   * 주차 라벨 — 리그 대진은 주 단위 템플릿으로 일괄 생성되므로(weeksCount) KST 기준
+   * "몇 번째 경기 날짜인가"가 곧 주차다. 리그 상세 화면(league-fixture-detail-client)의
+   * 클라이언트 파생과 같은 규칙을 쓴다 — 같은 경기가 화면마다 다른 주차로 불리면 안 된다.
+   */
+  private async resolveLeagueWeekNumber(leagueId: string, startAt: Date): Promise<number> {
+    const fixtures = await this.prisma.v1TeamMatch.findMany({
+      // 이후 주차의 대진은 이 경기의 순번에 영향을 주지 않는다 — 더 이른 KST 날짜의
+      // 대진은 전부 startAt 이 더 작고, 같은 날짜의 늦은 대진은 잘려도 그 날짜 자체가
+      // 이 경기로 이미 세어진다. 라이브 폴링(10초)마다 리그 전체를 훑지 않기 위한
+      // 범위 축소다(Copilot 리뷰 #747).
+      where: { leagueId, deletedAt: null, startAt: { lte: startAt } },
+      select: { startAt: true },
+    });
+    const scheduledFixtures = fixtures.map((fixture): { startAt: Date } => {
+      if (fixture.startAt === null) {
+        throw new InternalServerErrorException({
+          code: 'LEAGUE_FIXTURE_INVALID',
+          message: '리그 경기의 시작 시간이 없습니다.',
+          leagueId,
+        });
+      }
+      return { startAt: fixture.startAt };
+    });
+    const days = Array.from(new Set(scheduledFixtures.map((fixture) => KST_DAY.format(fixture.startAt)))).sort();
+    const index = days.indexOf(KST_DAY.format(startAt));
+    return index >= 0 ? index + 1 : 1;
+  }
+}
+
+const KST_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' });
+
+/**
+ * 팀매치(리그 대진)의 공개 진행 상태 — `publicFixtureStatus` 와 같은 "게임 상태 우선"
+ * 규칙이되, 폴백 축이 TournamentFixtureStatus 가 아니라 V1TeamMatchStatus 다.
+ * 리그 대진은 생성 즉시 V1Game 이 붙으므로 이 폴백은 방어용이다(pre-Task-6 행 등).
+ */
+const TEAM_MATCH_STATUS_TO_PUBLIC_STATUS: Record<V1TeamMatchStatus, 'scheduled' | 'live' | 'ended' | 'cancelled'> = {
+  recruiting: 'scheduled',
+  closed: 'scheduled',
+  matched: 'scheduled',
+  completed: 'ended',
+  cancelled: 'cancelled',
+  // 보관(archived)은 끝난 경기의 정리 상태다 — 취소로 보이면 치러진 기록과 모순된다.
+  archived: 'ended',
+};
+
+function publicTeamMatchStatus(gameState: V1GameState | null, teamMatchStatus: V1TeamMatchStatus) {
+  if (gameState !== null) {
+    // 게임이 있으면 publicFixtureStatus 와 완전히 같은 매핑을 탄다 — fixtureStatus
+    // 인자는 gameState 가 null 이 아닌 한 읽히지 않는다(public-visibility.ts).
+    return publicFixtureStatus({ gameState, fixtureStatus: 'scheduled' });
+  }
+  return TEAM_MATCH_STATUS_TO_PUBLIC_STATUS[teamMatchStatus] ?? 'scheduled';
 }
 
 function normalizeRevisionState(state: V1GameResultRevisionState | undefined): 'OFFICIAL' | 'VOID' | null {
@@ -992,6 +2099,160 @@ function presentSide(
   };
 }
 
+/**
+ * 리그 대진 상태 -> 대회 픽스처 상태. **두 enum 을 전부 적는다**(부분 매핑 + 폴백 금지) --
+ * 리그 상태가 늘어나면 여기서 컴파일이 깨져야 한다. 폴백을 두면 새 상태가 조용히
+ * `scheduled` 로 흘러 화면이 끝난 경기를 예정으로 그린다.
+ *
+ * `archived` 는 **끝난 경기의 보관** 이므로 `completed` 다 -- `cancelled` 로 보내면 순위에서
+ * 빠진 것처럼 읽힌다.
+ *
+ * ⚠️ 이 매핑이 실제로 쓰이는 경우는 드물다: `publicFixtureStatus` 는 게임이 있으면
+ * `gameState` 를 먼저 보고, 리그 대진은 **생성 즉시 게임이 붙는다**. 그래도 정확해야 한다 --
+ * 게임 생성 전 창이 존재하고, 그 창의 화면이 틀리면 원인을 찾기 어렵다.
+ */
+const LEAGUE_STATUS_TO_FIXTURE_STATUS: Record<V1TeamMatchStatus, TournamentFixtureStatus> = {
+  recruiting: 'scheduled',
+  closed: 'scheduled',
+  matched: 'scheduled',
+  cancelled: 'cancelled',
+  completed: 'completed',
+  archived: 'completed',
+};
+
+/**
+ * 리그 대진 조회 select. **게임 부분은 대회와 같은 것을 그대로 쓴다**
+ * (`GAME_MATCH_SELECT`) -- 점수/시계/득점자/몰수 표시가 대회와 리그에서
+ * 갈리지 않게 하려면 **같은 필드를 읽어 같은 함수에 넣는** 수밖에 없다. 여기서 필드를
+ * 손으로 다시 적으면 한쪽만 고쳐지는 날이 온다.
+ */
+const LEAGUE_SCHEDULE_SELECT = {
+  id: true,
+  leagueId: true,
+  startAt: true,
+  placeName: true,
+  status: true,
+  hostTeamId: true,
+  approvedApplicantTeamId: true,
+  hostTeam: { select: { id: true, name: true } },
+  approvedApplicantTeam: { select: { id: true, name: true } },
+  videos: { select: { id: true } },
+  game: {
+    select: {
+      ...GAME_MATCH_SELECT,
+      // `bucketLeagueFixtures` 가 확정 사실을 찾을 때 쓴다(순위 계산 입력).
+      currentOfficialRevisionId: true,
+    },
+  },
+} as const;
+
+type LeagueScheduleRow = Prisma.V1TeamMatchGetPayload<{ select: typeof LEAGUE_SCHEDULE_SELECT }>;
+
+/**
+ * 대진마다 주차 번호를 매긴다. **한 번에 계산한다** -- `resolveLeagueWeekNumber` 는 대진
+ * 하나마다 쿼리를 던지므로 목록에 쓰면 N+1 이 된다. 규칙은 그것과 같다(KST 날짜를 모아
+ * 정렬하고 인덱스+1).
+ *
+ * 같은 규칙을 쓰는 곳이 셋이다 -- 이 목록, `resolveLeagueFixtureRecord`, 그리고 프론트의
+ * 리그 상세. 규칙이 갈리면 **같은 경기가 화면마다 다른 주차로 불린다.**
+ */
+function leagueWeekNumbers(fixtures: readonly { startAt: Date }[]): number[] {
+  const days = [...new Set(fixtures.map((fixture) => KST_DAY.format(fixture.startAt)))].sort();
+  const indexByDay = new Map(days.map((day, index) => [day, index + 1]));
+  return fixtures.map((fixture) => indexByDay.get(KST_DAY.format(fixture.startAt)) ?? 1);
+}
+
+/**
+ * 리그 대진 -> 대회 일정 행. **어댑터다** -- 변환만 하고 표현은 `presentScheduleEntry` 가
+ * 그대로 한다. 점수 공개 게이트, 라이브 스코어 집계, 몰수 표시, 득점자 동의 게이팅이
+ * 100 줄쯤 되는데 그걸 리그용으로 복제하면 두 벌이 되고 한쪽만 고쳐진다.
+ *
+ * 리그에 없는 대회 개념은 값으로 고정한다:
+ * - `round` <- 'N주차'. **비울 수 없다** -- `schedule-grouping.ts` 가 `round.startsWith('조별')`
+ *   로 단계를 가르고(null 이면 던진다), `groupName` 이 없으면 이 값이 **그룹 제목으로 보인다.**
+ * - `groupName`/`groupId` <- null. 그래서 위 `round` 가 제목이 되어 **주차별로 묶인 일정**이
+ *   된다 -- 리그에 자연스러운 구획이고, `getLeagueFixtureRecord` 가 이미 쓰는 규약이다.
+ * - `legNumber` <- 1, `field` <- null(리그 대진에 필드 개념이 없다).
+ * - `homeRegistrationId` <- **teamId**. 리그엔 참가 등록이 없어 팀 id 를 안정 식별자로 쓴다 --
+ *   `getLeagueFixtureRecord` 의 선례와 같다. 여기서 `registrationId` 는 소비처가 **행을
+ *   식별하는 값** 으로만 쓰므로 이름과 내용이 갈리지 않는다(통합 순위 행은 그 값을 나중에
+ *   등록 조회에 쓸 수 있어 반대로 판단한다 -- `leagueOverallStandings` 주석).
+ *
+ * ⚠️ **팀명을 null 로 두지 않는다.** 화면(`schedule-content.tsx:736`)이 팀명 null 을 보고
+ * *"팀명이 가려졌다"* 배너를 띄우는데, 대회의 null 은 **가림** 이고 리그의 null 은 **미정**
+ * 이라 화면이 둘을 구분하지 못한다. 상대가 아직 없는 대진은 팀명이 null 인 side 가 아니라
+ * **side 자체가 null** 이 되므로(아래 `approvedApplicantTeamId === null`) 그 배너를 밟지 않는다.
+ */
+function toLeagueScheduleRow(
+  fixture: ResolvedLeagueTeamMatchOperationalRow<LeagueScheduleRow>,
+  weekNumber: number,
+  fixtureNumber: number,
+) {
+  return {
+    id: fixture.id,
+    round: `${weekNumber}주차`,
+    fixtureNumber,
+    legNumber: 1,
+    groupId: null,
+    scheduledAt: fixture.startAt,
+    venue: fixture.placeName,
+    status: LEAGUE_STATUS_TO_FIXTURE_STATUS[fixture.status],
+    homeRegistrationId: fixture.hostTeamId,
+    awayRegistrationId: fixture.approvedApplicantTeamId,
+    homeRegistration: { team: fixture.hostTeam },
+    awayRegistration: fixture.approvedApplicantTeam === null ? null : { team: fixture.approvedApplicantTeam },
+    group: null,
+    field: null,
+    videos: fixture.videos,
+    game: fixture.game,
+  };
+}
+
+type LeagueTeamMatchOperationalRow = {
+  leagueId: string | null;
+  startAt: Date | null;
+  hostTeamId: string | null;
+  hostTeam: { id: string; name: string } | null;
+  approvedApplicantTeamId: string | null;
+  approvedApplicantTeam: { id: string; name: string } | null;
+};
+
+type ResolvedLeagueTeamMatchOperationalRow<T extends LeagueTeamMatchOperationalRow> = T & {
+  leagueId: string;
+  startAt: Date;
+  hostTeamId: string;
+  hostTeam: { id: string; name: string };
+};
+
+/**
+ * A TeamMatch is nullable because tournament/TBD matches share the table. A regular-league
+ * public row has a stronger persisted contract, however: it must be scheduled and have a home
+ * team. Prisma cannot infer those facts from the league predicate, so prove them immediately
+ * after every league query instead of using assertions or silently dropping malformed rows.
+ */
+function assertLeagueTeamMatchOperationalInvariant<T extends LeagueTeamMatchOperationalRow>(
+  row: T,
+  leagueId: string,
+): asserts row is ResolvedLeagueTeamMatchOperationalRow<T> {
+  if (
+    row.leagueId !== leagueId ||
+    row.startAt === null ||
+    row.hostTeamId === null ||
+    row.hostTeam === null ||
+    row.hostTeam.id !== row.hostTeamId ||
+    (row.approvedApplicantTeamId === null
+      ? row.approvedApplicantTeam !== null
+      : row.approvedApplicantTeam?.id !== row.approvedApplicantTeamId)
+  ) {
+    throw new InternalServerErrorException({
+      code: 'LEAGUE_FIXTURE_INVALID',
+      message: '리그 경기의 필수 운영 정보가 없습니다.',
+      leagueId,
+      matchId: 'id' in row && typeof row.id === 'string' ? row.id : undefined,
+    });
+  }
+}
+
 function presentScheduleEntry(
   fixture: FixtureScheduleRow,
   publicLiveEnabled: boolean,
@@ -1020,11 +2281,17 @@ function presentScheduleEntry(
     !showOfficialResult && mode === 'live' && status === 'live' && fixture.game !== null
       ? (liveScoreByGameId.get(fixture.game.id) ?? null)
       : null;
-  const scoreStatus: 'unavailable' | 'live' | 'official' = showOfficialResult
-    ? 'official'
-    : liveScore !== null
-      ? 'live'
-      : 'unavailable';
+  // getMatch 의 트윈 — 규칙은 `public-score-presentation.ts` 한 곳이 갖는다(Task 166).
+  const submittedScore = parseScore(
+    fixture.game?.resultRevisions?.[0]?.state === 'SUBMITTED' ? fixture.game.resultRevisions[0].score : null,
+  );
+  const { scoreStatus, score } = resolvePublicScorePresentation({
+    mode,
+    showOfficialResult,
+    officialScore,
+    liveScore: liveScoreToPublicScore(liveScore),
+    submittedScore,
+  });
   const clock: PublicGameClock | null =
     mode === 'live' && !showOfficialResult ? resolveLiveClock(fixture.game?.periods ?? [], now) : null;
   // `status === 'live'` 게이트가 `clock`보다 하나 더 필요한 이유는 getMatch의 쌍둥이
@@ -1040,9 +2307,13 @@ function presentScheduleEntry(
   // (consent)가 eligible일 때만 이름을 채우고, 아니면 시간만 남긴다. "보이면 어떤
   // 이름인가"는 resolveParticipantDisplayName(2026-08-18 닉네임 기본 + 프로필 토글)이
   // 정한다.
+  // finding #60: getMatch/getLeagueFixtureRecord와 동일한 트윈 게이트 — 종료됐지만
+  // 아직 공식 확정 전인 경기는 score가 이미 null(위 clock 게이트 참고)이므로 득점자
+  // 요약도 함께 비운다.
+  const hidePendingOfficialEvents = status === 'ended' && !showOfficialResult;
   const participantById = new Map((fixture.game?.participants ?? []).map((p) => [p.id, p] as const));
   const summarizedEvents =
-    mode === 'status_only' || fixture.game === null
+    mode === 'status_only' || hidePendingOfficialEvents || fixture.game === null
       ? []
       : (eventsByGameId.get(fixture.game.id) ?? []).map((raw) => {
           const consent = raw.participantId === null ? undefined : consentMap.get(raw.participantId);
@@ -1054,7 +2325,11 @@ function presentScheduleEntry(
             type: raw.type,
             cardColor: raw.cardColor,
             side: raw.side,
-            participantName: eligible ? resolveParticipantDisplayName(participant, nameProfileByUserId) : null,
+            participantName: eligible
+              ? raw.participantId === null
+                ? (raw.playerNameSnapshot ?? '선수 정보 없음')
+                : resolveParticipantDisplayName(participant, nameProfileByUserId)
+              : null,
             jerseyNumber: eligible ? (participant?.jerseyNumber ?? null) : null,
             period: raw.period,
             clockMs: raw.clockMs,
@@ -1080,6 +2355,10 @@ function presentScheduleEntry(
     groupName: fixture.group?.name ?? null,
     scheduledAt: fixture.scheduledAt?.toISOString() ?? null,
     venue: fixture.venue,
+    // finding #76: fieldId도 함께 내려준다 -- 위 canonical schedule select의 field.id 참고.
+    // 소비처(my-staff-fixtures-client.tsx)가 이제 이 값으로 담당 경기를 매칭한다
+    // (이름은 유일하지 않아 동명 필드가 생기면 오배정된다).
+    fieldId: fixture.field?.id ?? null,
     fieldName: fixture.field?.name ?? null,
     home: presentSide(fixture.homeRegistrationId, fixture.homeRegistration, hideIdentity),
     away: presentSide(fixture.awayRegistrationId, fixture.awayRegistration, hideIdentity),
@@ -1090,17 +2369,42 @@ function presentScheduleEntry(
       supersedesId: fixture.game?.currentOfficialRevision?.supersedesId ?? null,
     }),
     scoreStatus,
-    score: mode === 'status_only' ? null : showOfficialResult ? officialScore : liveScoreToPublicScore(liveScore),
+    score,
     clock,
     periodBreak,
     scorers,
     cards,
+    // **이 뷰의 점수 공개 게이트를 그대로 따른다.** outcome 전용 조건을 따로 만들지
+    // 않는 이유: 목록이 `0:0` 은 보여주면서 그게 몰수라는 사실만 감추면, 이 필드를
+    // 추가한 목적 자체가 무너진다 — 점수와 사유는 함께 나가거나 함께 빠져야 한다.
+    // finding #58: 그 "점수 공개 게이트"는 `showOfficialResult` 단독이 아니라 위 1630줄
+    // `score`가 실제로 쓰는 `mode === 'status_only' ? null : ...`까지 포함해야 이
+    // 주석의 의도가 실제로 지켜진다 — `showOfficialResult`만 보면 status_only 모드에서
+    // score=null인데 outcome은 그대로 새는 자기모순이 생겼었다.
+    //
+    // 알려진 차이: 상세(`getMatch`)의 `showOfficialResult` 는 `officialAt !== null` 까지
+    // 요구하지만 이 목록은 요구하지 않는다(이 PR 이전부터 **점수**에 대해 그랬다). 따라서
+    // `officialAt` 이 빈 레거시 OFFICIAL 리비전은 목록에만 점수와 사유가 함께 뜬다. 그
+    // 게이트 차이를 좁히는 것은 기존 점수 노출 동작을 바꾸는 별개 변경이라 여기서 하지
+    // 않는다(`schedule-scorers.spec.ts` 가 현재 동작을 고정한다).
+    outcome:
+      mode !== 'status_only' &&
+      showOfficialResult &&
+      fixture.game?.currentOfficialRevision != null &&
+      fixture.game.currentOfficialRevision.outcomeReason !== 'NORMAL'
+        ? {
+            reason: fixture.game.currentOfficialRevision.outcomeReason,
+            note: fixture.game.currentOfficialRevision.outcomeNote,
+          }
+        : null,
     hasVideo: fixture.videos.length > 0,
   };
 }
 
+// 대회 픽스처(FixtureMatchRow)와 리그 대진 행이 구조적으로 공유하는 최소 형태 —
+// 이 두 빌더는 게임(V1Game) 필드와 킥오프 시각만 읽는다.
 function buildLineup(
-  fixture: FixtureMatchRow,
+  fixture: { game: GameMatchRow | null; scheduledAt: Date | null },
   mode: EffectiveMode,
   consentMap: Map<string, ParticipantConsentEligibility>,
   nameProfileByUserId: ReadonlyMap<string, ParticipantNameProfileRow>,
@@ -1118,13 +2422,25 @@ function buildLineup(
     return null;
   }
 
-  type ParticipantRow = NonNullable<FixtureMatchRow['game']>['participants'][number];
+  type ParticipantRow = GameMatchRow['participants'][number];
   // 저장할 때마다 immutable lineup revision과 participant snapshot이 새로
   // 생긴다. 전체 participant를 side로만 묶으면 과거 저장본까지 합쳐지므로,
   // lineups에서 side별 가장 큰 revision의 id 하나만 선택한다. DB 반환 순서에
   // 기대지 않아 조회 옵션이 바뀌어도 최신 저장본 계약을 유지한다.
+  //
+  // `state`도 함께 걸러야 한다 — 대진이 생성되면 등록 명단 전원을 담은
+  // revision 1 DRAFT가 자동으로 깔리고, 팀이 제출을 마치기 전까지는 그게 항상
+  // "가장 큰 revision"이다. state를 안 보면 관중에게는 아직 제출되지 않은
+  // 초안(등록 선수 전원, 전원 '선발')이 공개 라인업으로 보이고, 팀이 제출 후
+  // 라인업을 다시 편집만 하고(저장 → 새 DRAFT) 제출은 누르지 않은 경우에는
+  // 그 미제출 편집본이 공식 명단을 덮어써 버린다. 프론트의 "지금 운영 중인
+  // 라인업" 정의(operate/lineup-grid.tsx의 latestOperableLineup — SUBMITTED/
+  // LOCKED 중 최고 revision)와 동일한 규칙을 여기서도 써야 관중·현장 운영
+  // 콘솔이 같은 명단을 본다.
+  const OPERABLE_LINEUP_STATES: readonly V1GameLineupState[] = ['SUBMITTED', 'LOCKED'];
   const latestLineupBySide = new Map<string, { id: string; revision: number }>();
   for (const lineup of fixture.game.lineups) {
+    if (lineup.invalidatedAt !== null || !OPERABLE_LINEUP_STATES.includes(lineup.state)) continue;
     const current = latestLineupBySide.get(lineup.sideId);
     if (current === undefined || lineup.revision > current.revision) {
       latestLineupBySide.set(lineup.sideId, { id: lineup.id, revision: lineup.revision });
@@ -1149,7 +2465,22 @@ function buildLineup(
         participantId: participant.id,
         displayName: eligible ? resolveParticipantDisplayName(participant, nameProfileByUserId) : null,
         jerseyNumber: participant.jerseyNumber,
-        position: participant.position,
+        // [P1-d] `position` 을 공개 응답에서 뺐다. D4: 상대 팀과 관중에게는 **등번호와
+        // 이름만** 나가고 선발/후보·포지션·좌표는 팀 전술보드 안에 머문다 -- 포지션은
+        // 팀이 짜 넣은 전술 정보이지 관전자에게 공개할 사실이 아니다.
+        //
+        // 새 데이터만으로는 충분하지 않아서 계약에서 뺀다: P1-d 이후 경기는 로스터
+        // 스냅샷이 포지션을 안 넣어 저절로 null 이지만, **과거 데이터는 실제 값을 들고
+        // 있어 계속 공개된다.** 그리고 필드를 계약에 남겨 두면 나중에 누가 채웠을 때
+        // 조용히 새어 나간다.
+        //
+        // 이 자리에 포지션을 보여주려면 **선수 본인이 선언한 선호 포지션**(D14)을 쓴다 --
+        // 그건 공개를 전제로 본인이 정한 값이라 팀의 전술 배치와 성격이 다르다.
+        // 두 조건을 **모두** 만족할 때만 링크가 걸린다.
+        //   eligible          — 이름이 가려진 사람("비공개 선수")에게 링크를 걸면 안 된다
+        //   profileHref !== null — 프로필은 이름보다 강한 노출이라 동의를 직접 본다
+        // 이름 게이팅 롤백 스위치가 켜져도 동의 없는 사람의 프로필은 열리지 않는다.
+        profileHref: eligible ? resolveParticipantProfileHref(participant.userId, consent) : null,
       };
     });
 
@@ -1157,7 +2488,7 @@ function buildLineup(
 }
 
 function buildMvp(
-  fixture: FixtureMatchRow,
+  fixture: { game: GameMatchRow | null },
   mode: EffectiveMode,
   currentRevisionState: 'OFFICIAL' | 'VOID' | null,
   consentMap: Map<string, ParticipantConsentEligibility>,
@@ -1176,7 +2507,11 @@ function buildMvp(
   // 않는다(undefined 참가자일 때만 null) -- displayNameSnapshot 폴백은 그 계약을
   // 타입에도 그대로 반영하기 위한 방어일 뿐, 실질적으로는 항상 함수 반환값을 쓴다.
   const displayName = resolveParticipantDisplayName(participant, nameProfileByUserId) ?? participant.displayNameSnapshot;
-  return { participantId: participant.id, displayName };
+  return {
+    participantId: participant.id,
+    displayName,
+    profileHref: resolveParticipantProfileHref(participant.userId, consent),
+  };
 }
 
 /**
@@ -1185,12 +2520,6 @@ function buildMvp(
  * `null` 이라 소비처가 "필드가 있는데 값이 null" 하나만 보면 된다(키 자체가 사라지는
  * 경우는 없다).
  */
-type PublicScoreValue = {
-  home: number;
-  away: number;
-  penalties: { home: number; away: number } | null;
-};
-
 /**
  * 라이브 집계 스코어(`tallyLiveScore`)는 정규시간 GOAL 이벤트만 센다 — 승부차기 킥은
  * `V1GameEvent` 로 아예 기록되지 않으므로(옵션 B, `apps/v1_web/src/lib/penalty-shootout.ts`

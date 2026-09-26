@@ -11,7 +11,7 @@ import {
  * apps/v1_api/prisma/migrations/20260729000200_v1_competition_config used to
  * seed these two rows, guard-check every existing v1_tournaments/
  * v1_team_matches row's sport, and backfill competition_config_version_id on
- * v1_tournaments/v1_team_matches/v1_tournament_fixtures inline as part of the
+ * canonical v1_tournaments/v1_team_matches inline as part of the
  * migration itself. scripts/qa/check-expand-contract-migrations.mjs (the
  * alpha rollback compatibility gate) never treats DML as additive regardless
  * of whether the target table is new or pre-existing — the self-test
@@ -41,7 +41,6 @@ export type CompetitionConfigBackfillCounts = {
   seededConfigVersions: number;
   tournamentsBackfilled: number;
   teamMatchesBackfilled: number;
-  tournamentFixturesBackfilled: number;
   operationAuditSourceIpsMasked: number;
 };
 
@@ -78,7 +77,7 @@ export class CompetitionConfigSeedDriftError extends Error {
  * meant to be re-run immediately before the contract-phase migration, and a
  * drifted row that passes silently would let that migration pin NOT NULL/FK
  * constraints onto a config nobody intended. It deliberately does not
- * overwrite — v1_tournaments/v1_team_matches/v1_tournament_fixtures already
+ * overwrite — v1_tournaments/v1_team_matches already
  * reference these ids, so rewriting their content in place would
  * retroactively change the scoring rules of finished competitions.
  *
@@ -186,12 +185,11 @@ async function driftIsResolvedBySuccessor(
   });
   if (!successor) return false;
 
-  const [activeTournaments, activeTeamMatches, activeFixtures] = await Promise.all([
+  const [activeTournaments, activeTeamMatches] = await Promise.all([
     prisma.v1Tournament.count({ where: { competitionConfigVersionId: row.id, deletedAt: null } }),
     prisma.v1TeamMatch.count({ where: { competitionConfigVersionId: row.id, status: { not: 'completed' } } }),
-    prisma.v1TournamentFixture.count({ where: { competitionConfigVersionId: row.id, status: { not: 'completed' } } }),
   ]);
-  return activeTournaments === 0 && activeTeamMatches === 0 && activeFixtures === 0;
+  return activeTournaments === 0 && activeTeamMatches === 0;
 }
 
 export class CompetitionConfigSourceUnsupportedError extends Error {
@@ -234,14 +232,14 @@ export async function assertAllSourcesHaveSupportedSport(prisma: PrismaClient): 
 }
 
 /**
- * Backfills competition_config_version_id on v1_tournaments/v1_team_matches
- * (by the row's own sport) and v1_tournament_fixtures (copied from its
- * parent tournament), only touching rows that are still NULL — safe to
- * call repeatedly.
+ * Backfills competition_config_version_id on canonical v1_tournaments and
+ * v1_team_matches (by each row's own sport), only touching rows that are
+ * still NULL — safe to call repeatedly. Retired fixture-table history is
+ * handled only by the explicit historical helper below.
  */
 export async function backfillCompetitionConfigVersionIds(
   prisma: PrismaClient,
-): Promise<{ tournaments: number; teamMatches: number; tournamentFixtures: number }> {
+): Promise<{ tournaments: number; teamMatches: number }> {
   const tournaments = await prisma.$executeRaw`
     UPDATE v1_tournaments tournament
     SET competition_config_version_id = CASE
@@ -262,15 +260,7 @@ export async function backfillCompetitionConfigVersionIds(
     WHERE sport.id = team_match.sport_id
       AND team_match.competition_config_version_id IS NULL
   `;
-  const tournamentFixtures = await prisma.$executeRaw`
-    UPDATE v1_tournament_fixtures fixture
-    SET competition_config_version_id = tournament.competition_config_version_id
-    FROM v1_tournaments tournament
-    WHERE tournament.id = fixture.tournament_id
-      AND fixture.competition_config_version_id IS NULL
-      AND tournament.competition_config_version_id IS NOT NULL
-  `;
-  return { tournaments, teamMatches, tournamentFixtures };
+  return { tournaments, teamMatches };
 }
 
 /**
@@ -304,7 +294,6 @@ export async function runCompetitionConfigContractPhaseBackfill(
     seededConfigVersions,
     tournamentsBackfilled: backfilled.tournaments,
     teamMatchesBackfilled: backfilled.teamMatches,
-    tournamentFixturesBackfilled: backfilled.tournamentFixtures,
     operationAuditSourceIpsMasked,
   };
 }

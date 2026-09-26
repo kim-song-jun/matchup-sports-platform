@@ -33,5 +33,7 @@ describe('resolvePopupTargetScreen', () => {
     expect(isSafePopupTargetPath('/tournaments/tournament-1?tab=results')).toBe(false);
     expect(isSafePopupTargetPath('/tournaments/tournament-1#results')).toBe(false);
     expect(isSafePopupTargetPath('//evil.example')).toBe(false);
+    // 백엔드 DTO 의 @MaxLength(500) 과 같은 상한 — 어긋나면 저장 시 400 이 난다.
+    expect(isSafePopupTargetPath(`/tournaments/${'a'.repeat(500)}`)).toBe(false);
   });
 });

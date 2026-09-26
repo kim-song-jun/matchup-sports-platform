@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsDateString,
   IsInt,
   IsOptional,
@@ -47,6 +48,10 @@ export class MutateMatchDto {
   @Max(100)
   capacity!: number;
 
+  @IsOptional()
+  @IsBoolean()
+  hostParticipates?: boolean;
+
   @IsString()
   @MaxLength(120)
   manualPlaceName!: string;
@@ -75,6 +80,12 @@ export class MutateMatchDto {
   @IsString()
   @MaxLength(20)
   genderRule?: string | null;
+
+  /** 참가비 자유 입력(예: "10,000원/1인", "무료"). team-matches의 costNote와 같은 계약. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  costNote?: string | null;
 }
 
 export class UpdateMatchDto extends MutateMatchDto {
@@ -87,4 +98,28 @@ export class CancelMatchDto {
   @IsString()
   @MaxLength(500)
   reason?: string | null;
+}
+
+export class CloseMatchDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string | null;
+}
+
+export class ReopenMatchDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string | null;
+
+  /**
+   * 다시 열면서 새로 잡는 신청 마감 시각(ISO). 생략하면 서비스가 정한다 —
+   * 이미 지난 마감은 지우고(= 경기 시작 전까지 받는다), 아직 남은 마감은 그대로 둔다.
+   * 지난 마감을 그대로 두면 "다시 열기"를 눌러도 곧바로 다시 마감으로 보여 아무 일도
+   * 안 일어난 것처럼 된다(reopen 이 실제로는 성공하는데도).
+   */
+  @IsOptional()
+  @IsString()
+  deadlineAt?: string | null;
 }

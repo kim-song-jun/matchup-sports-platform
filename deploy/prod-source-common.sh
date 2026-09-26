@@ -77,7 +77,7 @@ prepare_prod_release_source() {
       printf '%s\n' "${drift}" >&2
       return 1
     fi
-    return
+    return 0
   fi
 
   install -d -m 700 "${target_tmp}"
@@ -98,6 +98,7 @@ prepare_prod_release_source() {
 }
 
 activate_prod_release_source() {
+  # 인자 없는 `return` 금지 — ERR trap 안에서는 trap 을 일으킨 종료코드가 돌아온다(scripts/qa/test-release-restore-in-trap.sh).
   local release_sha="$1"
   local target_dir="${PROD_SOURCE_RELEASES_DIR}/${release_sha}"
   local next_link="${PROD_HOME_DIR}/.teameet-prod-live.$$"
@@ -110,8 +111,8 @@ activate_prod_release_source() {
     else
       mv -fh "${next_link}" "${PROD_LIVE_DIR}"
     fi
-    [[ "$(cd -P "${PROD_LIVE_DIR}" && pwd)" == "$(cd -P "${target_dir}" && pwd)" ]]
-    return
+    [[ "$(cd -P "${PROD_LIVE_DIR}" && pwd)" == "$(cd -P "${target_dir}" && pwd)" ]] || return 1
+    return 0
   fi
   if [[ -e "${PROD_LEGACY_SOURCE_DIR}" ]]; then
     rm -f "${next_link}"

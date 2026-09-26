@@ -1,17 +1,18 @@
 'use client';
 
-import Link from 'next/link';
-import styles from './tournament-card.module.css';
-import Image from 'next/image';
 import { TournamentTitle } from '@/components/tournaments/tournament-title';
 import { Trophy } from 'lucide-react';
+import { pendingCapacityLabel } from '@/lib/tournament-registration-availability';
 import { getTournamentStatusConfig } from '@/lib/v1-tournament-status';
 import { getSportAccent } from '@/lib/v1-sport-accent';
 import { formatTournamentDateRangeShort, formatEntryFee } from '@/lib/date-utils';
-import { publicAssetPath } from '@/lib/assets';
 import { resolveTournamentImage } from '@/lib/tournament-promo';
-import { SportGlyph } from '@/components/v1-ui/sport-glyph';
+import {
+  CompetitionCardHeader,
+  CompetitionCardShell,
+} from '@/components/v1-ui/competition-card';
 import type { V1TournamentListItem } from '@/types/api';
+import styles from './tournament-card.module.css';
 
 /**
  * Split out of page.tsx (2026-07) — Next.js App Router restricts `page.tsx`
@@ -24,7 +25,16 @@ function getPendingPaymentCount(item: Pick<V1TournamentListItem, 'pendingPayment
   return Math.max(0, item.pendingPaymentCount ?? 0);
 }
 
-function getReservedTeamCount(item: Pick<V1TournamentListItem, 'confirmedCount' | 'pendingPaymentCount' | 'teamCount'>): number {
+/**
+ * 정원 관련 계산은 **`teamCount` 가 있는 것을 전제로 한다.** 리그에는 정원 개념이 없어
+ * 서버가 그 필드를 생략하므로, optional 을 여기서 풀지 않고 **호출부가 대회임을 확인한
+ * 뒤 넘기게** 한다 — 여기서 `?? 0` 으로 메우면 리그가 "정원 0" 으로 조용히 흘러든다.
+ */
+type WithCapacity = Pick<V1TournamentListItem, 'confirmedCount' | 'pendingPaymentCount' | 'entryFee'> & {
+  teamCount: number;
+};
+
+function getReservedTeamCount(item: WithCapacity): number {
   return Math.min(item.teamCount, item.confirmedCount + getPendingPaymentCount(item));
 }
 
@@ -40,39 +50,7 @@ function getGenderCategoryLabel(category: V1TournamentListItem['genderCategory']
  * <div>(관리자 위저드의 "공개 화면 확인" 단계처럼 클릭·포커스를 막아야 하는 곳)로 렌더한다.
  * 두 분기 모두 같은 className/style/aria-label을 써서 시각적으로는 완전히 동일하게 보인다.
  */
-function CardShell({
-  interactive,
-  href,
-  ariaLabel,
-  children,
-}: {
-  interactive: boolean;
-  href: string;
-  ariaLabel: string;
-  children: React.ReactNode;
-}) {
-  const shellStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    padding: '16px 16px 14px',
-    textDecoration: 'none',
-  };
-  if (interactive) {
-    return (
-      <Link className="tm-card tm-pressable" href={href} style={shellStyle} aria-label={ariaLabel}>
-        {children}
-      </Link>
-    );
-  }
-  return (
-    <div className="tm-card tm-pressable" style={shellStyle} aria-label={ariaLabel}>
-      {children}
-    </div>
-  );
-}
-
-function CapacityMiniBar({ item }: { item: V1TournamentListItem }) {
+function CapacityMiniBar({ item }: { item: WithCapacity }) {
   const pendingPaymentCount = getPendingPaymentCount(item);
   const max = Math.max(item.teamCount, 1);
   const confirmedPct = Math.min(100, (item.confirmedCount / max) * 100);
@@ -84,7 +62,7 @@ function CapacityMiniBar({ item }: { item: V1TournamentListItem }) {
       aria-valuenow={getReservedTeamCount(item)}
       aria-valuemin={0}
       aria-valuemax={item.teamCount}
-      aria-label={`정원 ${item.confirmedCount}팀 확정, ${pendingPaymentCount}팀 입금 대기, 총 ${item.teamCount}팀`}
+      aria-label={`정원 ${item.confirmedCount}팀 확정, ${pendingPaymentCount}팀 ${pendingCapacityLabel(item.entryFee === 0)}, 총 ${item.teamCount}팀`}
       style={{ height: 5, background: 'var(--grey100)', borderRadius: 5, overflow: 'hidden', display: 'flex' }}
     >
       <div aria-hidden="true" style={{ width: `${confirmedPct}%`, background: 'var(--blue500)' }} />
@@ -107,129 +85,67 @@ export function TournamentCard({
 }) {
   const sportAccent = getSportAccent(item.sport.code);
   const pendingPaymentCount = getPendingPaymentCount(item);
-  const reservedTeamCount = getReservedTeamCount(item);
-  const isCapacityFull = item.teamCount > 0 && reservedTeamCount >= item.teamCount;
-  const isNearlyFull = item.teamCount > 0 && reservedTeamCount / item.teamCount >= 0.8;
+  /**
+   * **정원은 대회에만 있다.** `teamCount` 가 있으면 대회, 없으면 리그다 — 서버가 리그에서
+   * 그 필드를 생략한다(정원 개념이 없다). `isLeagueCompetition` 대신 **필드 유무로** 좁히는
+   * 이유는 그래야 타입이 아래 계산을 실제로 막아 주기 때문이다: `kind` 로 분기하면 TS 는
+   * `teamCount` 가 여전히 `undefined` 일 수 있다고 본다.
+   */
+  const capacity = item.teamCount === undefined ? null : { ...item, teamCount: item.teamCount };
+  /* 배지·메타는 **`kind` 로만** 고른다. `isLeagueCompetition` 은 `format==='league'` 인
+     **리그 방식 대회**(alpha 실측 7건)도 true 로 주는데, 그건 진짜 대회라 성별부도 정원도
+     있다 — 거기에 "리그" 배지를 붙이면 대회를 리그라고 말하는 것이 된다.
+     `format` 은 "어떻게 치르나", `kind` 는 "무엇인가"이고 여기 질문은 뒤쪽이다. */
+  const isLeague = item.kind === 'regular_league';
+  const reservedTeamCount = capacity === null ? 0 : getReservedTeamCount(capacity);
+  // 예약에는 정원을 점유하는 입금/확인 대기도 포함한다. 실제 진행·종료 상태는 덮지 않는다.
+  const isCapacityFull = capacity !== null && capacity.teamCount > 0 && reservedTeamCount >= capacity.teamCount;
+  const isNearlyFull = capacity !== null && capacity.teamCount > 0 && reservedTeamCount / capacity.teamCount >= 0.8;
   const status = item.status === 'closed' || (item.status === 'open' && isCapacityFull)
     ? { ...getTournamentStatusConfig('closed'), label: '모집 마감' }
     : item.status === 'open' && isNearlyFull
       ? { badgeClass: 'tm-badge-orange', label: '거의 마감' }
       : getTournamentStatusConfig(item.status);
+  const displayedTeamCount = capacity ? reservedTeamCount : item.confirmedCount + pendingPaymentCount;
   // 커버가 없는 대회도 홍보용으로 등록한 실사진이 있으면 아이콘 대신 그 사진을 썸네일로
   // 재사용한다 (셋 다 없으면 종목색 그라디언트+아이콘 폴백).
   const thumbnailImageUrl = resolveTournamentImage(item, 'cover');
 
   return (
     <div role="listitem" style={{ height: '100%' }}>
-      <CardShell
+      <CompetitionCardShell
         interactive={interactive}
         href={`/tournaments/${item.id}`}
         ariaLabel={`${item.title} — ${sportAccent.label} — ${status.label}`}
       >
-        {/* Top row: (선택) 커버 이미지 썸네일 + [제목·배지 / 종목·일정·장소] 세로 스택 */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-          {thumbnailImageUrl ? (
-            <div
-              aria-hidden="true"
-              style={{ width: 56, height: 56, borderRadius: 12, overflow: 'hidden', flexShrink: 0, background: 'var(--grey100)' }}
-            >
-              <Image
-                src={publicAssetPath(thumbnailImageUrl)}
-                alt=""
-                width={56}
-                height={56}
-                sizes="56px"
-                unoptimized
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            </div>
-          ) : (
-            // 커버 이미지도 홈 프로모션 사진(promoHomeImageUrl)도 없는 대회는 종목색
-            // 그라디언트 배지로 대체한다 — 대회 상세 헤더의 트로피 배지(linear-gradient
-            // 135deg, 500→600 + 흰 아이콘)와 동일한 시각 언어.
-            // 이전의 옅은 pastel bg(badgeBg)+톤온톤 아이콘(badgeText) 조합은 카드 목록에서
-            // 밋밋하고 흐릿하게 보였다(사용자 피드백: "아이콘도 촌스러워").
-            <div
-              aria-hidden="true"
-              style={{
-                width: 56,
-                height: 56,
-                borderRadius: 12,
-                overflow: 'hidden',
-                flexShrink: 0,
-                background: `linear-gradient(135deg, ${sportAccent.dot} 0%, ${sportAccent.gradientTo} 100%)`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <SportGlyph code={item.sport.code} size={28} style={{ color: 'var(--static-white)' }} />
-            </div>
-          )}
-          {/* 제목·배지 행 + 종목·일정·장소 메타 행을 같은 컬럼에 묶어 아이콘이 아닌
-              제목과 같은 x축에 메타 행이 정렬되도록 한다(이전엔 형제 div라 아이콘 밑에
-              깔려 제목과 어긋나 보였다 — 사용자 피드백: "align도 안맞네"). */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, justifyContent: 'space-between' }}>
-              <div
-                className="tm-text-body-lg"
-                style={{
-                  color: 'var(--text-strong)',
-                  flex: 1,
-                  minWidth: 0,
-                  lineHeight: 1.35,
-                  overflowWrap: 'break-word',
-                  wordBreak: 'keep-all',
-                }}
-              >
-                <TournamentTitle title={item.title} />
-              </div>
-              <span className={`tm-badge ${status.badgeClass}`} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-                {status.label}
-              </span>
-            </div>
-
-            {/* Sport identity chip + meta row */}
-            <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 10px' }}>
-              {/* Sport chip: colored dot + Korean label */}
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  padding: '2px 8px',
-                  borderRadius: 999,
-                  background: sportAccent.badgeBg,
-                  flexShrink: 0,
-                }}
-                aria-label={`종목: ${sportAccent.label}`}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background: sportAccent.dot,
-                    flexShrink: 0,
-                  }}
-                />
-                <span
-                  className="tm-text-caption"
-                  style={{ color: sportAccent.badgeText, fontWeight: 600, lineHeight: 1 }}
-                >
-                  {sportAccent.label}
+        <CompetitionCardHeader
+          sportCode={item.sport.code}
+          imageUrl={thumbnailImageUrl}
+          title={<TournamentTitle title={item.title} />}
+          statusBadge={{ label: status.label, badgeClass: status.badgeClass }}
+          meta={
+            <>
+              {isLeague ? (
+                /* 한 목록에 두 종류가 섞이므로 "이건 리그다" 를 카드에서 알려야 한다.
+                   상태 배지(진행중 등)는 대회와 글자가 같아서 구분이 안 된다.
+                   티어("1부")도 함께 띄우고 싶지만 **지금은 못 만든다** — 통합 목록 API 는
+                   `tier` 숫자만 주고, 표시 라벨은 시리즈마다 다른 커스텀 값(`tierLabels`)이라
+                   `${tier}부` 로 지어내면 커스텀 라벨을 쓰는 시리즈에서 틀린 이름이 뜬다.
+                   서버가 `tierLabel` 을 이 목록에 실어주면 그때 붙인다. */
+                <span className="tm-badge tm-badge-grey" aria-label="정규 리그">
+                  리그
                 </span>
-              </span>
-
-              <span
-                className="tm-badge tm-badge-grey"
-                aria-label={`성별 카테고리: ${getGenderCategoryLabel(item.genderCategory)}`}
-              >
-                {getGenderCategoryLabel(item.genderCategory)}
-              </span>
-
-              {/* Date + venue */}
+              ) : (
+                /* 성별 배지는 대회에만 그린다. 리그 거울은 `genderCategory` 를 채우는 경로가
+                   아예 없어 항상 null 이고, 그러면 모든 리그 카드에 "성별 구분 없음" 이 붙는다
+                   — 정보가 아니라 소음이다(`teamCount` 를 리그에서 뺀 것과 같은 이유). */
+                <span
+                  className="tm-badge tm-badge-grey"
+                  aria-label={`성별 카테고리: ${getGenderCategoryLabel(item.genderCategory)}`}
+                >
+                  {getGenderCategoryLabel(item.genderCategory)}
+                </span>
+              )}
               {item.scheduledAt ? (
                 <span className="tm-text-caption" style={{ color: 'var(--text-muted)' }}>
                   {formatTournamentDateRangeShort(item.scheduledAt, item.scheduledEndAt) ?? '날짜 미정'}
@@ -249,9 +165,9 @@ export function TournamentCard({
                   {item.venue}
                 </span>
               ) : null}
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        />
 
         {/* Prize line — admin-entered text is shown as-is. */}
         {item.prizeSummary?.trim() ? (
@@ -263,7 +179,7 @@ export function TournamentCard({
               gap: 4,
               marginTop: 8,
               padding: '3px 8px',
-              borderRadius: 999,
+              borderRadius: 'var(--radius-pill)',
               background: 'var(--orange50)',
               whiteSpace: 'normal',
             }}
@@ -279,9 +195,11 @@ export function TournamentCard({
           </div>
         ) : null}
 
-        <div style={{ marginTop: 10 }}>
-          <CapacityMiniBar item={item} />
-        </div>
+        {capacity ? (
+          <div style={{ marginTop: 12 }}>
+            <CapacityMiniBar item={capacity} />
+          </div>
+        ) : null}
 
         {/* 카드 간 높이 차(상금 유무 등)를 흡수해 하단 행을 같은 라인에 맞춤 */}
         <div style={{ flex: 1 }} aria-hidden="true" />
@@ -295,18 +213,20 @@ export function TournamentCard({
           </div>
           <div className={styles.capacity}>
             <span className={`tm-text-label tab-num ${styles.summary}`}>
-              {pendingPaymentCount > 0
-                ? `${item.confirmedCount} + ${pendingPaymentCount} / ${item.teamCount} 팀 예약`
-                : `${item.confirmedCount}/${item.teamCount}팀 확정`}
+              {capacity
+                ? pendingPaymentCount > 0
+                  ? `${item.confirmedCount} + ${pendingPaymentCount} / ${capacity.teamCount} 팀 예약`
+                  : `${item.confirmedCount}/${capacity.teamCount}팀 확정`
+                : `${displayedTeamCount}팀 참가`}
             </span>
             {pendingPaymentCount > 0 ? (
               <span className={`tm-text-caption ${styles.muted} ${styles.pending}`}>
-                {item.entryFee === 0 ? '확인대기' : '입금대기'} {pendingPaymentCount}팀
+                {pendingCapacityLabel(item.entryFee === 0)} {pendingPaymentCount}팀
               </span>
             ) : null}
           </div>
         </div>
-      </CardShell>
+      </CompetitionCardShell>
     </div>
   );
 }

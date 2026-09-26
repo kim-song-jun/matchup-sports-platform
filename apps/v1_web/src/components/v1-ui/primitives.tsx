@@ -1,7 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
-import type { CSSProperties, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
+import type { CSSProperties, InputHTMLAttributes, PointerEvent, ReactNode, TextareaHTMLAttributes } from 'react';
 import { useRef } from 'react';
 import { ChevronRightIcon } from './icons';
 import {
@@ -210,8 +211,8 @@ export function AlertBanner({
       role={isError ? 'alert' : 'status'}
       aria-live={isError ? 'assertive' : 'polite'}
       style={{
-        padding: '10px 14px',
-        borderRadius: 12,
+        padding: '12px 16px',
+        borderRadius: 'var(--radius-control)',
         background: s.bg,
         color: s.color,
         lineHeight: 1.55,
@@ -230,11 +231,38 @@ type CardProps = {
   pad?: number;
   className?: string;
   style?: CSSProperties;
+  /** 카드를 드래그 손잡이로 쓰는 화면(라인업 명단 → 피치)에서만 넘긴다. 카드는 기본적으로
+   * 표시용 컨테이너라 클릭 핸들러를 두지 않는다 — 누를 수 있는 것은 카드 안 버튼·링크가
+   * 맡는다. 포인터 제스처는 그 규칙을 깨지 않으면서 필요한 최소 확장이다. */
+  onPointerDown?: (event: PointerEvent<HTMLDivElement>) => void;
+  onPointerUp?: (event: PointerEvent<HTMLDivElement>) => void;
+  onPointerCancel?: (event: PointerEvent<HTMLDivElement>) => void;
+  /** 로딩 중인 영역임을 보조기기에 알린다. **명시적으로 받아서 넘겨야 한다** —
+   * JSX 는 하이픈이 든 속성명(aria-, data- 계열)을 초과 프로퍼티 검사에서 면제하므로,
+   * 이 선언이 없으면 `<Card aria-busy>` 가 tsc 를 통과하고도 DOM 에 닿지 않는다.
+   * 실제로 두 곳(홈 채팅 로딩 카드·대회 히어로 스켈레톤)이 그렇게 죽어 있었다. */
+  'aria-busy'?: boolean | 'true' | 'false';
 };
 
-export function Card({ children, pad = 20, className = '', style }: CardProps) {
+export function Card({
+  children,
+  pad = 20,
+  className = '',
+  style,
+  onPointerDown,
+  onPointerUp,
+  onPointerCancel,
+  'aria-busy': ariaBusy,
+}: CardProps) {
   return (
-    <div className={`tm-card ${className}`.trim()} style={{ padding: pad, ...style }}>
+    <div
+      className={`tm-card ${className}`.trim()}
+      style={{ padding: pad, ...style }}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      aria-busy={ariaBusy}
+    >
       {children}
     </div>
   );
@@ -372,21 +400,54 @@ type EmptyStateProps = {
   sub: string;
   cta?: string;
   onCta?: () => void;
+  /**
+   * 링크형 CTA. 서버 컴포넌트에서도 렌더되는 빈 상태(매치 목록 SSR 등)는 useRouter 를 쓸 수 없어
+   * 이동은 href 로 준다. onCta 와 함께 오면 href 가 우선(링크로 그린다).
+   */
+  ctaHref?: string;
   /** Lucide icon node rendered inside the blue circle. Defaults to InboxIcon. */
   icon?: ReactNode;
+  /**
+   * 이 빈 상태가 화면을 혼자 차지할 때 켠다 — 흐름대로 놓여 상단에 붙는 대신 남은 세로
+   * 공간의 중앙에 놓인다. 부모 컨테이너에 `tm-list-empty` 를 함께 붙여야 한다(globals.css).
+   * 카드·탭 안에 다른 내용과 섞여 나오는 빈 상태에는 쓰지 않는다.
+   */
+  fill?: boolean;
+  /**
+   * `agy-3d-graphic` 스킬로 만든 그래픽(`public/illustrations/<name>-640.webp`)을 아이콘 원
+   * 대신 보여준다. 그래픽은 장식이라 alt 없이 aria-hidden — 의미는 title/sub 가 전달한다.
+   * 표시 크기는 `.tm-empty-illustration`(globals.css) 한 곳에서 정한다.
+   */
+  illustration?: { name: string };
 };
 
-export function EmptyState({ title, sub, cta, onCta, icon }: EmptyStateProps) {
+export function EmptyState({ title, sub, cta, onCta, ctaHref, icon, fill, illustration }: EmptyStateProps) {
   return (
-    <div className="tm-empty-state">
-      <div className="tm-empty-icon" aria-hidden="true">
-        {icon ?? <InboxIcon size={36} strokeWidth={1.5} />}
-      </div>
+    <div className={`tm-empty-state${fill ? ' tm-empty-state-fill' : ''}`}>
+      {illustration ? (
+        <Image
+          className="tm-empty-illustration"
+          src={`/illustrations/${illustration.name}-640.webp`}
+          alt=""
+          aria-hidden="true"
+          width={640}
+          height={640}
+          sizes="(max-width: 360px) 136px, 160px"
+        />
+      ) : (
+        <div className="tm-empty-icon" aria-hidden="true">
+          {icon ?? <InboxIcon size={36} strokeWidth={1.5} />}
+        </div>
+      )}
       <div className="tm-text-body-lg">{title}</div>
       <div className="tm-text-label" style={{ color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
         {sub}
       </div>
-      {cta ? (
+      {cta && ctaHref ? (
+        <Link className="tm-btn tm-btn-sm tm-btn-primary" href={ctaHref} style={{ marginTop: 24 }}>
+          {cta}
+        </Link>
+      ) : cta ? (
         <button className="tm-btn tm-btn-sm tm-btn-primary" type="button" style={{ marginTop: 24 }} onClick={onCta}>
           {cta}
         </button>
@@ -457,7 +518,31 @@ type InfoRowProps = {
   badge?: React.ReactNode;
 };
 
+/**
+ * **라벨이 있는 자리에서 "모른다"는 말로 해야 한다.**
+ *
+ * 예전엔 `{value}` 를 그대로 그려서, 값이 빈 문자열이면 **라벨만 남고 값 칸이 통째로
+ * 비었다** — 사용자는 그걸 "정보가 없다"가 아니라 **화면이 깨졌다**로 읽는다. 실제로
+ * 개인 매치 상세의 "성별 조건" 이 그렇게 비어 나갔다.
+ *
+ * 소비처 24곳을 전수로 봤을 때 **값 없음이 정상 상태인 자리는 하나도 없었다** — 없어도
+ * 되는 값들은 이미 소스에서 자기 어휘로 채워져 있고(`'지역 미정'`·`'레벨 미설정'`),
+ * 남는 자리는 없으면 **사용자가 행동할 수 없는** 값이다(장소·은행·예금주). 그래서
+ * 폴백이 덮어쓸 "의도된 빈칸"이 없다.
+ *
+ * 어휘는 `'미정'` — `team-matches-page` 의 로컬 `InfoRow` 가 이미 쓰는 말이라 새로 만들지
+ * 않는다. **다른 어휘를 쓰는 화면은 호출부에서 폴백을 명시한다**(대회 신청 화면은 `'—'`).
+ *
+ * 공백만 있는 값도 빈 값으로 본다 — 서버가 `' '` 를 주면 `''` 만 보는 판정은 반만 막는다.
+ *
+ * ⚠️ **소비처는 클래스가 아니라 import 로 세라.** `.tm-info-row` 는 이 컴포넌트 말고
+ * 손조립 행도 쓴다(예: 매치 상세의 `인원` — 배지·서브텍스트를 직접 붙인다). 클래스로
+ * 세면 이 컴포넌트의 영향권보다 큰 수가 나온다.
+ */
 export function InfoRow({ label, value, valueColor, isLast, sub, badge }: InfoRowProps) {
+  // 판정한 값과 그리는 값을 **같게** 둔다 — `trim()` 으로 판정하고 원본을 그리면
+  // 서버가 `"  값  "` 을 줬을 때 화면에 공백이 그대로 남는다.
+  const trimmed = value.trim();
   return (
     <div
       className="tm-info-row"
@@ -471,9 +556,9 @@ export function InfoRow({ label, value, valueColor, isLast, sub, badge }: InfoRo
       <div style={{ textAlign: 'right', minWidth: 0 }}>
         <div
           className="tm-text-body"
-          style={{ fontWeight: 600, color: valueColor ?? 'var(--text-strong)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}
+          style={{ fontWeight: 600, color: valueColor ?? 'var(--text-strong)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}
         >
-          {value}
+          {trimmed.length > 0 ? trimmed : '미정'}
           {/* #2: 희소성/마감 인라인 배지 */}
           {badge}
         </div>

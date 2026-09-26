@@ -19,9 +19,11 @@ vi.mock('@/components/v1-ui/confirm-modal', () => ({
   useConfirm: () => ({ confirm: () => Promise.resolve(true), ConfirmModal: null }),
 }));
 
+const routerPush = vi.fn();
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/my/invitations',
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ push: routerPush, replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
 }));
 
@@ -105,5 +107,25 @@ describe('MyInvitationsPageClient — 동시 처리 시 아이템별 pending 추
 
     expect(screen.getByRole('button', { name: '성수 러너스 FC 초대 수락' })).not.toBeDisabled();
     expect(screen.getByRole('button', { name: '마포 농구 클럽 초대 수락' })).toBeDisabled();
+  });
+
+  it('초대 수락 후 팀 상세로 이동할 때 뒤로가기 출처(from=/my/invitations)를 담는다', async () => {
+    routerPush.mockClear();
+    apiMocks.useV1ReceivedInvitations.mockReturnValue({
+      data: { items: [invitation('inv-a', 'team-a', '성수 러너스 FC')] },
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const accept = vi.fn((_vars, options) => options?.onSuccess?.({ teamId: 'team-a' }));
+    apiMocks.useV1AcceptTeamInvitation.mockReturnValue({ mutate: accept });
+    apiMocks.useV1DeclineTeamInvitation.mockReturnValue({ mutate: vi.fn() });
+
+    render(<MyInvitationsPageClient />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '성수 러너스 FC 초대 수락' }));
+    });
+
+    expect(routerPush).toHaveBeenCalledWith('/teams/team-a?from=%2Fmy%2Finvitations');
   });
 });

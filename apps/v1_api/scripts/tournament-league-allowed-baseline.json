@@ -1,0 +1,59 @@
+{
+  "_comment": "`ALL_COMPETITION_KINDS` 를 넘겨 **리그를 대회 표면에 허용하는** 자리. 원시 호출을 0 으로 만든 뒤 남는 구멍은 이것뿐이라, 정당하더라도 언제나 리뷰를 거치게 개수를 묶는다. 늘리려면 why 를 함께 적어라. (2026-09-01 KST: 설정 축 1곳 + read-swap 준비로 넓힌 3곳 + 통합 순위 리그 경로 1 + 공개 상세(문) 1 + 공개 일정(리그 대진) 1 = 7곳. 2026-09-03 KST: D7 참가 신청이 리그를 등록 스택에 올리며 신청자 경로 4 + 어드민 경로 4 = 8곳 추가, 합계 16곳. 2026-09-04 KST: 명단 표면 5곳 추가(호출부 단위) — 리그가 명단을 만들 방법이 아예 없던 것을 연다, 합계 21곳)",
+  "src/tournaments/competition-config/competition-config-version-repoint.ts": {
+    "allowed": 1,
+    "why": "설정 축 — 설정은 대회와 리그가 이미 공유하므로 여기서 종류를 가르면 리그만 옛 설정에 남거나 설정 없는 상태로 방치된다(tournament-surface.ts 의 '여기 걸지 않는 곳' 참조)."
+  },
+  "src/tournaments/tournament-standings-recalculation.ts": {
+    "allowed": 0,
+    "why": "순위 재계산 — 행이 없으면 `continue` 로 조용히 건너뛴다. 좁혀 두면 리그 순위가 에러 없이 갱신되지 않는다(read-swap-preflight.md §1-2)."
+  },
+  "src/game-operations/tournament-fixture-completion-notification.service.ts": {
+    "allowed": 0,
+    "why": "결과 확정 알림 — 행이 없으면 대회명이 `?? '대회'` 로 폴백된다. 기능이 아니라 라벨이 어긋나는 급이지만 조용히 틀리는 것은 같다(read-swap-preflight.md §1-3)."
+  },
+  "src/games/public-records/public-tournament-records.service.ts": {
+    "allowed": 2,
+    "why": "공개 일정 조회(getSchedule)와 공개 상세 조회(getMatch) — 일정이 이미 정규 리그를 공개하고, 상세도 기존 리그 fixture projection을 통해 같은 `/tournaments/:id/matches/:fixtureId` 표면을 지원한다. 기존 1은 일정 호출만 계수했으므로 상세의 정당한 리그 허용 지점을 명시적으로 2로 올린다. 두 경로 모두 공개 대회 상태·삭제 게이트와 `TOURNAMENT_MATCH_NOT_FOUND` 오류 계약을 유지한다."
+  },
+  "src/tournaments/tournaments-read.service.ts": {
+    "allowed": 2,
+    "why": "통합 순위 조회(getOverallStandings)와 공개 상세 조회(get) 두 곳. 거울 행에는 조도 대진도 없어 대회 축 계산으로는 **빈 순위표·빈 일정**이 나온다 — 404 보다 나쁘다(에러가 아니라 \"아직 없다\"로 읽힌다). 그래서 종류로 갈라 리그 축에서 같은 모양을 만든다. 상세는 `leagueFixtures` 를 따로 싣고 대진표 공개 게이트를 리그에 적용하지 않는다."
+  },
+  "src/tournaments/tournament-registrations.service.ts": {
+    "allowed": 4,
+    "why": "참가 신청 신청자 경로(진입 조회 · 제출 TOCTOU 재검증 · 취소요청 철회 · 결제 안내 조회) — 정본 §참가는 신청제이고 D7 이 정규 리그도 같은 신청 스택을 쓰기로 확정했다. 좁혀 두면 리그 거울이 이 스택에 **보이지 않아** 신청이 정원에 닿기도 전에 404 `TOURNAMENT_NOT_FOUND` 로 끝난다 — 화면엔 '대회를 찾을 수 없어요' 만 뜨고, 리그가 신청을 받을 수 없다는 사실이 에러 모양으로는 드러나지 않는다. 정원은 리그에서 꺼진다(`registration-capacity.ts` — 거울의 `teamCount` 는 운영자가 정한 값이 아니라 스키마 기본값 8 이다)."
+  },
+  "src/tournaments/admin-registrations.service.ts": {
+    "allowed": 4,
+    "why": "참가 신청 어드민 경로(목록 · 확정 · 취소요청 잔류 · 명단 잠금) — 신청자 경로만 넓히면 팀은 신청할 수 있는데 **운영자가 그 신청을 볼 수도 확정할 수도 없다.** 확정이 곧 참가 성립이라 반쪽만 열면 신청이 영원히 미확정으로 쌓인다. 확정 훅이 `V1LeagueTeam` 역방향 dual-write 를 하므로(contract 전까지) 이 자리가 리그 축 참가팀의 유일한 생성 경로이기도 하다."
+  },
+  "src/tournament-operations/board/tournament-operations-board.service.ts": {
+    "allowed": 1,
+    "why": "운영 콘솔 목록이 **이 대회가 리그 거울인지** 묻는 한 곳 — 정본 §4 가 '리그도 대회와 같은 콘솔' 로 확정했다. 좁혀 두면 이 조회가 `null` 을 돌려주고 콘솔은 리그를 **대회 대진으로 읽는다**. 거울엔 `V1TournamentFixture` 행이 하나도 없으므로 결과는 에러가 아니라 **빈 목록**이다 — 운영자는 '경기가 없다' 로 읽고, 실제로는 콘솔이 리그를 볼 줄 모르는 것이다. `public-tournament-records.getSchedule` 이 같은 이유로 같은 형태를 쓴다(묻는 것이 '무엇인가' 라 두 종류를 다 허용하고 `kind` 로 가른다)."
+  },
+  "src/tournaments/tournament-players.service.ts": {
+    "allowed": 6,
+    "why": "명단 표면 — 정본 §3 이 \"리그 명단은 대회와 같음\" 으로 확정(2026-09-02)했고, 리그 전용 명단 화면·엔드포인트는 없다(명단 컨트롤러가 하나뿐이고 프론트도 리그 참가 등록에 같은 링크를 그린다). 2026-08-31 봉쇄(커밋 817e17eea)는 그보다 앞선 표면 분리 결정이었고, 그게 남아 있는 동안 리그는 **어느 경로로도 명단을 만들 수 없었다** — 수동은 404, 자동 확정 잡은 기본 꺼짐(2026-09-04 alpha 실측). 명단 CRUD 6개 경로(목록·추가·삭제·자격수정·등번호수정·트랜잭션 재검증)에서만 열었고 bracket·admin-registrations 봉쇄는 그대로다. 별칭 상수로 묶지 않는다 — 묶으면 이 카운터가 파일을 1건으로 세어 래칫이 무력해진다."
+  },
+  "src/tournaments/discipline/suspension-verdicts.ts": {
+    "allowed": 1,
+    "why": "징계 규정 조회 — 행이 없으면 `?? null` 로 suspensionRulesEnabled 가 false 가 되어 경고 누적·퇴장 정지가 **에러 없이 통째로 꺼진다**. 좁혀 두면 read-swap 이 리그 경기를 보내는 순간 리그 징계 규정이 조용히 사라진다(read-swap-preflight.md §1-1). (2026-09-07: 같은 조회가 games.service.ts 에서 이 공유 함수로 옮겨졌다 — 대회·리그 두 축이 같은 판정을 쓰게 하려는 추출이고, 허용 개수는 그대로 1 이다.)"
+  },
+  "src/tournaments/staff/tournament-staff.service.ts": {
+    "allowed": 1,
+    "why": "Staff fixture and tournament operations intentionally share the tournament surface; the service enforces the caller role and then branches on the resolved competition kind."
+  },
+  "src/tournaments/competition-config/tournament-competition-config.ts": {
+    "allowed": 1,
+    "why": "Competition configuration is a shared tournament/league axis; the resolved kind selects the canonical TeamMatch ownership predicate before mutation."
+  },
+  "src/tournaments/competition-config/tournament-period-settings.service.ts": {
+    "allowed": 2,
+    "why": "Period settings are an explicitly shared tournament/league contract; both read and serializable update paths resolve the kind-gated surface before checking the active admin."
+  },
+  "src/tournament-operations/fields/tournament-operations-fields.service.ts": {
+    "allowed": 1,
+    "why": "Field operations support both canonical tournament and league fixtures; the service resolves the kind-gated tournament before field scope and fixture ownership checks."
+  }
+}

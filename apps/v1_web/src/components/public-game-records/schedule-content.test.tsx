@@ -105,6 +105,7 @@ function fixtureEntry(overrides: Partial<import('./types').PublicScheduleEntry> 
     groupName: null,
     scheduledAt: '2026-08-01T10:00:00.000Z',
     venue: null,
+    fieldId: null,
     fieldName: null,
     home: { registrationId: 'reg-home', teamId: 'team-home', teamName: '홈팀' },
     away: { registrationId: 'reg-away', teamId: 'team-away', teamName: '원정팀' },
@@ -117,6 +118,7 @@ function fixtureEntry(overrides: Partial<import('./types').PublicScheduleEntry> 
     periodBreak: null,
     scorers: [],
     cards: [],
+    outcome: null,
     hasVideo: false,
     ...overrides,
   };
@@ -256,6 +258,38 @@ describe('ScheduleContent — 득점 기록 전·후반 구분', () => {
     expect(screen.queryByRole('group', { name: '기타 기록' })).not.toBeInTheDocument();
   });
 
+  /**
+   * **리그 일정·대진표의 경기 카드가 죽은 링크였다.**
+   *
+   * 이 화면은 대회와 정규 리그가 **같은 일정 응답**을 쓴다 — 서버가 리그 대진을 대회
+   * 일정 행으로 변환해 내려주기 때문에(`toLeagueScheduleRow`) `fixtureId` 에는 **팀 매치
+   * id** 가 들어 있다. 그런데 링크는 분기 없이 대회 패턴으로 만들어져서,
+   * `/tournaments/<리그id>/matches/<팀매치id>` 가 **두 겹으로 404** 였다(그 조회가
+   * `TOURNAMENT_KINDS` 로 리그를 배제하고, 통과해도 리그 거울엔 `V1TournamentFixture` 가
+   * 0행이다).
+   *
+   * 헬퍼 유닛 테스트만으로는 부족하다 — **배선되지 않으면 헬퍼는 green 인데 화면은 그대로
+   * 404 다.** 그래서 실제 렌더에서 href 를 잰다. 대회 쪽도 같은 자리에서 함께 잰다.
+   */
+  it('정규 리그의 경기 카드는 리그 경기 상세로, 대회는 대회 경기 상세로 링크한다', () => {
+    const data = { ...makeData(), items: [fixtureEntry({ fixtureId: 'team-match-9' })] };
+
+    const league = render(
+      <ScheduleContent tournamentId="league-1" data={data} isRegularLeague />,
+    );
+    expect(screen.getByRole('link', { name: /홈팀/ })).toHaveAttribute(
+      'href',
+      '/league-matches/league-1/fixtures/team-match-9',
+    );
+    league.unmount();
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+    expect(screen.getByRole('link', { name: /홈팀/ })).toHaveAttribute(
+      'href',
+      '/tournaments/tour-1/matches/team-match-9',
+    );
+  });
+
   it('득점이 없으면 득점 영역과 구분선을 모두 표시하지 않는다', () => {
     render(<ScheduleContent tournamentId="tour-1" data={{ ...makeData(), items: [fixtureEntry()] }} />);
 
@@ -269,7 +303,112 @@ describe('ScheduleContent — 득점 기록 전·후반 구분', () => {
  * 알아야 한다. 예전에는 공개 일정만 있어서, 자기 팀 경기를 눈으로 찾아 하나씩 눌러
  * 들어가야 라인업 진입점을 만날 수 있었다.
  */
+describe('ScheduleContent — 우리 팀 경기 강조', () => {
+  const myFixtures = {
+    teams: [
+      {
+        registrationId: 'reg-home',
+        teamId: 'team-home',
+        teamName: '홈팀',
+        fixtures: [
+          {
+            fixtureId: 'fixture-1',
+            gameId: 'game-1',
+            sideId: 'side-1',
+            round: '조별리그',
+            legNumber: 1,
+            groupName: null,
+            scheduledAt: '2026-08-01T10:00:00.000Z',
+            status: 'scheduled',
+            isHome: true,
+            opponentTeamName: '원정팀',
+            lineupState: null,
+          },
+        ],
+      },
+    ],
+  };
 
+  it('내 팀 경기 행에 "우리 팀" 표시와 라인업 상태가 붙는다 (리그)', () => {
+    const data = { ...makeData(), items: [fixtureEntry()] };
+
+    render(<ScheduleContent tournamentId="lg-1" data={data} myFixtures={myFixtures} isRegularLeague />);
+
+    expect(screen.getByText('우리 팀')).toBeInTheDocument();
+    // 색만으로 상태를 전달하지 않는다 — 문구가 함께 있어야 한다.
+    expect(screen.getAllByText('라인업 미작성').length).toBeGreaterThan(0);
+    // [P1-d] '라인업 짜기' 링크 단언은 뺐다(경기별 라인업 화면 제거). **강조와 상태
+    // 표시 계약은 그대로 남긴다** — 링크가 사라졌다고 함께 지우면 "우리 팀 경기가
+    // 눈에 띄어야 한다"는 별개의 계약까지 커버리지가 없어진다.
+    expect(screen.queryByRole('link', { name: '라인업 짜기' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 대회 축엔 라인업 제출 단계가 없다 — 대진 생성 때 등록 명단이 참가자로 복사된다.
+   * 그런데도 이 뱃지가 떠서 팀장에게 **할 수 없는 일을 안 했다고** 말했고, 이미 끝난
+   * 경기 위에도 그대로 남았다(alpha 실측). "우리 팀" 강조는 대회에서도 그대로 둔다.
+   */
+  it('대회 경기에는 라인업 상태 뱃지를 붙이지 않는다', () => {
+    const data = { ...makeData(), items: [fixtureEntry()] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} myFixtures={myFixtures} />);
+
+    expect(screen.getByText('우리 팀')).toBeInTheDocument();
+    expect(screen.queryByText('라인업 미작성')).not.toBeInTheDocument();
+    expect(screen.queryByText('라인업 제출 완료')).not.toBeInTheDocument();
+    expect(screen.queryByText('라인업 작성 중')).not.toBeInTheDocument();
+  });
+
+  /**
+   * [P1-d] 여기 있던 두 테스트('요약이 남은 라인업 수를 보여준다', '제출을 마쳤으면
+   * CTA 를 안 띄운다')는 화면 상단 **'우리 팀 라인업' 요약 패널** 전용이었다. 그 패널을
+   * 통째로 걷어냈으므로 함께 지운다.
+   *
+   * 패널을 지운 이유(링크만 떼지 않은 이유): 경기별 라인업 화면이 사라지면 아무도 제출을
+   * 할 수 없으므로 "라인업이 아직 정해지지 않은 경기가 N경기 있어요" 가 **영원히 해소되지
+   * 않는 알림**이 된다. 갈 곳 없는 할 일을 계속 띄우는 것이 링크만 없는 것보다 나쁘다.
+   */
+
+  it('로그인하지 않았거나 참가팀이 아니면 화면이 종전 그대로다', () => {
+    const data = { ...makeData(), items: [fixtureEntry()] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.queryByText('우리 팀')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /라인업/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('ScheduleContent — 스코어 아래 승부차기 보조 표기', () => {
+  it('승부차기가 있으면 정규시간 스코어는 그대로 두고 아래에 "승부차기 4-3"을 붙인다', () => {
+    const data = {
+      ...makeData(),
+      items: [fixtureEntry({ score: { home: 1, away: 1, penalties: { home: 4, away: 3 } } })],
+    };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    // 큰 스코어가 승부차기 숫자로 덮이지 않는다 -- 승부차기는 보조 표기로만 나온다.
+    expect(screen.getByText('1 : 1')).toBeInTheDocument();
+    expect(screen.getByText('승부차기 4-3')).toBeInTheDocument();
+    expect(screen.queryByText('4 : 3')).not.toBeInTheDocument();
+  });
+
+  it('승부차기가 없는 경기에는 보조 표기를 아예 렌더하지 않는다', () => {
+    const data = { ...makeData(), items: [fixtureEntry({})] };
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByText('1 : 0')).toBeInTheDocument();
+    expect(screen.queryByText(/승부차기/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 오너 지적(2026-08-18): "경기기록에서는 이 카드랑 아이콘이 다 나오는데, 대회 상세에서는
+ * 내용이 안나오네." 경기 상세 타임라인에는 경고/퇴장이 나오는데 대회 일정 카드 요약은
+ * 골만 실어서, 같은 경기의 같은 카드가 화면에 따라 있다가 없다가 했다.
+ */
 describe('ScheduleContent — 일정 카드에 경고·퇴장도 함께 표시한다', () => {
   it('카드 이벤트를 골과 같은 구간 안에 시간순으로 놓고, 색을 텍스트로도 알린다', () => {
     const data = { ...makeData(), items: [fixtureEntry({
@@ -323,108 +462,343 @@ describe('ScheduleContent — 일정 카드에 경고·퇴장도 함께 표시�
  * 지운 것이다. 색 값 자체를 단언하지 않고(그건 구현 되읊기다) **두 배경이 서로
  * 달라야 한다는 불변식**만 본다.
  */
-
-describe('ScheduleContent — 우리 팀 경기 강조', () => {
-  const myFixtures = {
-    teams: [
-      {
-        registrationId: 'reg-home',
-        teamId: 'team-home',
-        teamName: '홈팀',
-        fixtures: [
-          {
-            fixtureId: 'fixture-1',
-            gameId: 'game-1',
-            sideId: 'side-1',
-            round: '조별리그',
-            legNumber: 1,
-            groupName: null,
-            scheduledAt: '2026-08-01T10:00:00.000Z',
-            status: 'scheduled',
-            isHome: true,
-            opponentTeamName: '원정팀',
-            lineupState: null,
-          },
-        ],
-      },
-    ],
-  };
-
-  it('내 팀 경기 행에 "우리 팀" 표시와 라인업 상태, 라인업 링크가 붙는다', () => {
-    const data = { ...makeData(), items: [fixtureEntry()] };
-
-    render(<ScheduleContent tournamentId="tour-1" data={data} myFixtures={myFixtures} />);
-
-    expect(screen.getByText('우리 팀')).toBeInTheDocument();
-    // 색만으로 상태를 전달하지 않는다 — 문구가 함께 있어야 한다.
-    expect(screen.getAllByText('라인업 미작성').length).toBeGreaterThan(0);
-    expect(screen.getByRole('link', { name: '라인업 짜기' })).toHaveAttribute(
-      'href',
-      '/tournaments/tour-1/matches/fixture-1/lineup',
-    );
-  });
-
-  it('화면 위 요약이 남은 라인업 수와 가장 임박한 경기로 가는 길을 보여준다', () => {
-    const data = { ...makeData(), items: [fixtureEntry()] };
-
-    render(<ScheduleContent tournamentId="tour-1" data={data} myFixtures={myFixtures} />);
-
-    expect(screen.getByText('라인업이 아직 정해지지 않은 경기가 1경기 있어요.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '원정팀전 라인업 준비하기' })).toHaveAttribute(
-      'href',
-      '/tournaments/tour-1/matches/fixture-1/lineup',
-    );
-  });
-
-  it('제출을 마쳤으면 남은 일이 없다고 알리고 준비하기 CTA를 띄우지 않는다', () => {
-    const data = { ...makeData(), items: [fixtureEntry()] };
-    const submitted = {
+describe('ScheduleContent — 우리 팀 행에서도 스코어가 배경에 묻히지 않는다', () => {
+  it('내 팀 경기 행의 배경과 스코어 칸 배경이 같은 색이 아니다', () => {
+    const myFixtures = {
       teams: [
         {
-          ...myFixtures.teams[0],
-          fixtures: [{ ...myFixtures.teams[0].fixtures[0], lineupState: 'SUBMITTED' as const }],
+          registrationId: 'reg-1',
+          teamId: 'team-1',
+          teamName: '우리팀',
+          fixtures: [
+            { fixtureId: 'fixture-1', lineupState: 'SUBMITTED', scheduledAt: null, opponentTeamName: '상대팀' },
+          ],
         },
       ],
-    };
+    } as unknown as Parameters<typeof ScheduleContent>[0]['myFixtures'];
 
-    render(<ScheduleContent tournamentId="tour-1" data={data} myFixtures={submitted} />);
+    render(
+      <ScheduleContent
+        tournamentId="tour-1"
+        data={{ ...makeData(), items: [fixtureEntry()] }}
+        myFixtures={myFixtures}
+      />,
+    );
 
-    expect(screen.getByText('모든 경기의 라인업을 제출했어요.')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /라인업 준비하기/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '라인업 보기' })).toBeInTheDocument();
-  });
+    const scorePill = screen.getByText('1 : 0');
+    const row = scorePill.closest('a');
+    const highlighted = row?.parentElement;
 
-  it('로그인하지 않았거나 참가팀이 아니면 화면이 종전 그대로다', () => {
-    const data = { ...makeData(), items: [fixtureEntry()] };
-
-    render(<ScheduleContent tournamentId="tour-1" data={data} />);
-
-    expect(screen.queryByText('우리 팀')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /라인업/ })).not.toBeInTheDocument();
+    // 양쪽 모두 실제로 배경을 갖고 있어야 한다 — 둘 다 빈 문자열이면 아래 단언이 공허하게 통과한다.
+    expect(highlighted?.style.background).not.toBe('');
+    expect(scorePill.style.background).not.toBe('');
+    expect(highlighted?.style.background).not.toBe(scorePill.style.background);
   });
 });
 
-describe('ScheduleContent — 스코어 아래 승부차기 보조 표기', () => {
-  it('승부차기가 있으면 정규시간 스코어는 그대로 두고 아래에 "승부차기 4-3"을 붙인다', () => {
-    const data = {
-      ...makeData(),
-      items: [fixtureEntry({ score: { home: 1, away: 1, penalties: { home: 4, away: 3 } } })],
-    };
+/**
+ * **경기 하나가 카드 하나**다. 예전엔 카드 한 장을 grid 로 쪼개서 화면에는 한 장을 반으로
+ * 자른 것처럼 보였고 경기마다 테두리가 없었다(오너 지적: "각각 카드로 나눠져야하는데
+ * 지금은 하나의 카드를 2개로 나눈거잖아"). 테두리는 **클래스**로 그린다 — 인라인 style 로
+ * 되돌아가면 데스크톱 열 배치를 다루는 미디어쿼리가 특이도에서 진다.
+ */
+describe('ScheduleContent — 경기 하나가 카드 하나다', () => {
+  it('경기마다 카드 클래스를 갖고, 인라인 border 를 직접 들고 있지 않다', () => {
+    render(
+      <ScheduleContent
+        tournamentId="tour-1"
+        data={{ ...makeData(), items: [fixtureEntry(), fixtureEntry({ fixtureId: 'fixture-2' })] }}
+      />,
+    );
+
+    const rows = screen.getAllByRole('link').filter((a) => /\/matches\//.test(a.getAttribute('href') ?? ''));
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row).toHaveClass('tm-schedule-card');
+      expect(row.style.borderTop).toBe('');
+      expect(row.style.border).toBe('');
+    }
+  });
+});
+
+describe('ScheduleContent — 시간 미정 경기', () => {
+  /**
+   * 오너 지적("조도 중복되고"): 예전엔 이 목록을 한 줄로 흘려보내서, 같은 조의 경기가
+   * 여러 개면 카드마다 `A조` 가 그대로 반복됐다. 일정이 잡힌 목록은 이미 제목 한 번 +
+   * 카드 라벨 생략으로 처리하고 있었다 — 여기도 같은 모양이어야 한다.
+   */
+  it('같은 조의 미정 경기가 여러 개여도 조 이름은 한 번만 나온다', () => {
+    const data = makeData({
+      unscheduled: [
+        fixtureEntry({ fixtureId: 'u-1', scheduledAt: null, groupName: 'A조', fixtureNumber: 1 }),
+        fixtureEntry({ fixtureId: 'u-2', scheduledAt: null, groupName: 'A조', fixtureNumber: 2 }),
+      ],
+    });
 
     render(<ScheduleContent tournamentId="tour-1" data={data} />);
 
-    // 큰 스코어가 승부차기 숫자로 덮이지 않는다 -- 승부차기는 보조 표기로만 나온다.
-    expect(screen.getByText('1 : 1')).toBeInTheDocument();
-    expect(screen.getByText('승부차기 4-3')).toBeInTheDocument();
-    expect(screen.queryByText('4 : 3')).not.toBeInTheDocument();
+    expect(screen.getAllByText('A조')).toHaveLength(1);
   });
 
-  it('승부차기가 없는 경기에는 보조 표기를 아예 렌더하지 않는다', () => {
-    const data = { ...makeData(), items: [fixtureEntry({})] };
+  /**
+   * `items` 는 서버가 `scheduledAt: { not: null }` 로 거른 것이라, 전부 시간 미정이면
+   * `items` 가 0이 된다. 예전엔 그것만 보고 "아직 확정된 일정이 없어요" 를 그렸고,
+   * **바로 아래에 실제 경기 2건**이 있었다(alpha 실측). 두 문장 각각은 참인데 나란히
+   * 놓여 모순으로 읽히고, 사용자는 위에서 읽기를 멈춘다.
+   */
+  it('시간 미정 경기가 있으면 "일정이 없어요" 로 말하지 않는다', () => {
+    const data = makeData({
+      unscheduled: [fixtureEntry({ fixtureId: 'u-1', scheduledAt: null })],
+    });
 
     render(<ScheduleContent tournamentId="tour-1" data={data} />);
 
-    expect(screen.getByText('1 : 0')).toBeInTheDocument();
-    expect(screen.queryByText(/승부차기/)).not.toBeInTheDocument();
+    expect(screen.queryByText('아직 확정된 일정이 없어요')).not.toBeInTheDocument();
+    expect(screen.getByText('아직 경기 시간이 정해지지 않았어요')).toBeInTheDocument();
+    expect(screen.getByText('시간 미정 경기')).toBeInTheDocument();
+  });
+
+  it('일정이 잡힌 경기도 미정 경기도 없으면 그때는 일정이 없다고 말한다', () => {
+    render(<ScheduleContent tournamentId="tour-1" data={makeData()} />);
+
+    expect(screen.getByText('아직 확정된 일정이 없어요')).toBeInTheDocument();
+  });
+
+  it('조가 다르면 각각 제목이 선다', () => {
+    const data = makeData({
+      unscheduled: [
+        fixtureEntry({ fixtureId: 'u-1', scheduledAt: null, groupName: 'A조', fixtureNumber: 1 }),
+        fixtureEntry({ fixtureId: 'u-2', scheduledAt: null, groupName: 'B조', fixtureNumber: 2 }),
+      ],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getAllByText('A조')).toHaveLength(1);
+    expect(screen.getAllByText('B조')).toHaveLength(1);
+  });
+
+  /**
+   * 오너 지적("미정 vs 미정"): 양쪽이 다 미정인 자리에 `미정  - : -  미정` 을 그리면
+   * 같은 말이 반복되고 스코어 pill 도 빈 채로 남아 고장난 카드처럼 읽힌다.
+   */
+  it('양쪽 팀이 다 미정이면 가짜 스코어라인 대신 "대진 확정 전" 한 줄만 보여준다', () => {
+    const data = makeData({
+      unscheduled: [
+        fixtureEntry({
+          fixtureId: 'u-1',
+          scheduledAt: null,
+          groupName: null,
+          round: '4강',
+          home: null,
+          away: null,
+          score: null,
+          scoreStatus: 'unavailable',
+          status: 'scheduled',
+          resultState: 'pending',
+        }),
+      ],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByText('대진 확정 전')).toBeInTheDocument();
+    expect(screen.queryByText('미정')).not.toBeInTheDocument();
+    expect(screen.queryByText('- : -')).not.toBeInTheDocument();
+  });
+
+  /** 한쪽만 미정인 경우는 실제로 알려주는 정보다 — 접지 않는다. */
+  it('한쪽 팀만 미정이면 상대 팀명과 함께 그대로 보여준다', () => {
+    const data = makeData({
+      unscheduled: [
+        fixtureEntry({
+          fixtureId: 'u-1',
+          scheduledAt: null,
+          round: '4강',
+          groupName: null,
+          away: null,
+          score: null,
+          scoreStatus: 'unavailable',
+          status: 'scheduled',
+          resultState: 'pending',
+        }),
+      ],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByText('홈팀')).toBeInTheDocument();
+    expect(screen.getByText('미정')).toBeInTheDocument();
+    expect(screen.queryByText('대진 확정 전')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 일정 목록에서 몰수 0:0 과 실제 0:0 무승부가 같아 보이면, 순위표에 무승부로 집계된
+ * 이유를 관전자가 목록에서 추적할 수 없다(alpha 실측: 세 팀이 나란히 2점인데 그중 두
+ * 경기가 몰수라는 사실이 목록 어디에도 없었다).
+ */
+describe('ScheduleContent — 몰수·중단 배지', () => {
+  it('몰수로 끝난 경기 카드에 사유 라벨을 붙인다', () => {
+    const data = makeData({
+      items: [fixtureEntry({ score: { home: 0, away: 0, penalties: null }, outcome: { reason: 'FORFEIT', note: '원정팀 미출석' } })],
+    });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByText('몰수·기권')).toBeInTheDocument();
+  });
+
+  it('경기 중단은 몰수와 다른 라벨로 구분한다', () => {
+    const data = makeData({ items: [fixtureEntry({ outcome: { reason: 'ABANDONED', note: null } })] });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.getByText('경기 중단')).toBeInTheDocument();
+    expect(screen.queryByText('몰수·기권')).not.toBeInTheDocument();
+  });
+
+  it('정상 종료 경기에는 배지를 붙이지 않는다', () => {
+    const data = makeData({ items: [fixtureEntry({ outcome: null })] });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.queryByText('몰수·기권')).not.toBeInTheDocument();
+    expect(screen.queryByText('경기 중단')).not.toBeInTheDocument();
+  });
+
+  it('사유 본문은 카드에 넣지 않는다 — 카드는 한 줄 요약이 계약이다', () => {
+    const data = makeData({ items: [fixtureEntry({ outcome: { reason: 'FORFEIT', note: '원정팀이 킥오프 15분 경과까지 미출석' } })] });
+
+    render(<ScheduleContent tournamentId="tour-1" data={data} />);
+
+    expect(screen.queryByText(/킥오프 15분 경과까지 미출석/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * **리그 어휘(2026-09-01 사용자 확정 — B안).**
+ *
+ * 리그 대진은 `round` 가 'N주차' 라 `isGroupStage` 가 false 가 되어 **전부 `knockout` 단계로
+ * 분류된다.** 그 단계 이름이 필터 칩과 `section aria-label` 로 **보이는데**, 대회 어휘인
+ * '결선' 은 리그에 존재하지 않는 단계다.
+ *
+ * ⚠️ 이 describe 는 **변이로 구멍을 확인하고 나서** 썼다: `LEAGUE_PHASE_LABELS.knockout` 을
+ * '결선' 으로 되돌려도 프론트 308개가 전부 통과했다. 사용자가 고른 바로 그 문구를 아무도
+ * 지키지 않고 있었다.
+ *
+ * 상수만 보는 순수 함수 테스트로는 부족하다 — `ScheduleContent` 가 `phaseLabels` 를 넘기지
+ * 않으면 상수가 맞아도 화면엔 '결선' 이 뜬다. 그래서 **렌더해서 본다.**
+ */
+describe('ScheduleContent — 정규 리그 단계 어휘', () => {
+  const leagueData = () =>
+    makeData({ items: [fixtureEntry({ round: '1주차', groupName: null })] });
+
+  it('리그면 단계 칩을 "정규 라운드" 로 부른다 — 리그엔 결선이 없다', () => {
+    render(<ScheduleContent tournamentId="league-1" data={leagueData()} isRegularLeague />);
+
+    expect(screen.getByRole('tab', { name: '정규 라운드' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '결선' })).not.toBeInTheDocument();
+  });
+
+  it('대조군: 대회는 "결선" 그대로 — 리그 방식 대회 7건의 문구를 바꾸지 않는다', () => {
+    render(<ScheduleContent tournamentId="tour-1" data={leagueData()} />);
+
+    expect(screen.getByRole('tab', { name: '결선' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '정규 라운드' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 칩만 보면 놓치는 자리 — 단계 제목은 `phases.length > 1` 이라 화면에서 숨겨지는데
+   * `section aria-label` 로는 **항상** 나간다. 스크린리더 사용자에게만 '결선' 이 들린다.
+   */
+  it('section aria-label 에도 리그 어휘가 들어간다 — 눈에 안 보이는 자리', () => {
+    render(<ScheduleContent tournamentId="league-1" data={leagueData()} isRegularLeague />);
+
+    expect(screen.getByRole('region', { name: '정규 라운드' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * **alpha 실측으로 잡힌 어휘 결함(2026-09-01).** 리그 화면의 순위 제목이 대회 말인
+ * **"조별 순위"** 로 떠 있었다 — B안 어휘 정리에서 빠진 자리다.
+ *
+ * 그리고 그냥 "리그 순위" 로 바꾸면 **두 번 적힌다**: 바깥 제목과 안쪽 그룹 라벨이 같은
+ * 말이 된다(티어가 없는 단발 리그의 `groupName` 이 "리그 순위" 다). 그래서 그룹이 하나뿐일
+ * 때는 안쪽 라벨을 끈다 — 티어가 있으면(1부·2부) 그건 다른 말이라 그대로 둔다.
+ */
+describe('ScheduleContent — 정규 리그 순위 제목', () => {
+  const leagueStandings = (groupName: string, groupId: string, teamName: string) => ({
+    groupId,
+    groupName,
+    teamId: `team-${groupId}`,
+    teamName,
+    teamLogoUrl: null,
+    position: 1,
+    points: 3,
+    wins: 1,
+    draws: 0,
+    losses: 0,
+    goalsFor: 2,
+    goalsAgainst: 1,
+  });
+
+  it('리그에는 "조별 순위" 라고 쓰지 않는다 — 리그엔 조가 없다', () => {
+    const data = makeData({ standings: [leagueStandings('리그 순위', 'lg-1', '성수 FC')] as never });
+    render(<ScheduleContent tournamentId="lg-1" data={data} isRegularLeague />);
+
+    expect(screen.getByRole('heading', { name: '리그 순위' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '조별 순위' })).not.toBeInTheDocument();
+  });
+
+  it('대조군: 대회는 "조별 순위" 그대로', () => {
+    const data = makeData({ standings: [leagueStandings('A조', 'g-1', '망원 FC')] as never });
+    render(<ScheduleContent tournamentId="t-1" data={data} />);
+
+    expect(screen.getByRole('heading', { name: '조별 순위' })).toBeInTheDocument();
+  });
+
+  it('단발 리그는 안쪽 그룹 라벨을 숨긴다 — 제목과 같은 말이 두 번 적힌다', () => {
+    const data = makeData({ standings: [leagueStandings('리그 순위', 'lg-1', '성수 FC')] as never });
+    render(<ScheduleContent tournamentId="lg-1" data={data} isRegularLeague />);
+
+    // 제목(h3) 하나만 남고 그룹 라벨 div 는 안 그려진다 — 라벨을 켜면 2가 된다.
+    expect(screen.getAllByText('리그 순위')).toHaveLength(1);
+  });
+
+  /**
+   * **눈으로는 안 보이는 자리다.** 그룹명이 이미 "리그 순위" 인데 라벨 조합이 "순위" 를 또
+   * 붙여 스크린리더가 *"리그 순위 순위표"* 로 읽었다. 캡처로도 안 잡힌다.
+   */
+  it('그룹명이 이미 "순위" 로 끝나면 접근성 라벨에 또 붙이지 않는다', () => {
+    const data = makeData({ standings: [leagueStandings('리그 순위', 'lg-1', '성수 FC')] as never });
+    render(<ScheduleContent tournamentId="lg-1" data={data} isRegularLeague />);
+
+    expect(screen.getByRole('region', { name: '리그 순위' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '리그 순위 순위' })).not.toBeInTheDocument();
+  });
+
+  it('대조군: "A조" 처럼 안 끝나면 "순위" 를 붙인다 — 규칙을 통째로 없앤 게 아니다', () => {
+    const data = makeData({ standings: [leagueStandings('A조', 'g-1', '망원 FC')] as never });
+    render(<ScheduleContent tournamentId="t-1" data={data} />);
+
+    expect(screen.getByRole('region', { name: 'A조 순위' })).toBeInTheDocument();
+  });
+
+  /**
+   * ⚠️ **처음엔 이 테스트가 통과하면서도 실물은 숨기고 있었다.** 픽스처에 `groupId` 를 둘
+   * (`lg-1`·`lg-2`) 넣었는데 **그런 응답은 존재할 수 없다** — 서버가 `groupId: leagueId` 를
+   * 넣으므로 한 리그의 순위는 언제나 groupId 가 **하나**고, `1부`·`2부` 는 애초에 **다른
+   * 리그**다. 개수로 판정하던 가드가 그래서 티어 리그에서도 라벨을 숨겼다.
+   *
+   * 픽스처를 실물 모양(groupId 하나 · groupName `'1부'`)으로 고쳤다. **테스트가 통과한다는
+   * 것과 실물에서 동작한다는 것은 픽스처가 실물을 닮았을 때만 같은 말이다.**
+   */
+  it('티어 리그는 안쪽 라벨을 그린다 — "1부" 는 제목("리그 순위")과 다른 말이다', () => {
+    const data = makeData({ standings: [leagueStandings('1부', 'lg-1', '성수 FC')] as never });
+    render(<ScheduleContent tournamentId="lg-1" data={data} isRegularLeague />);
+
+    expect(screen.getByText('1부')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '리그 순위' })).toBeInTheDocument();
   });
 });

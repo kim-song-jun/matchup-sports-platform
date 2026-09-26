@@ -73,6 +73,21 @@ const RULES: Array<{
       return deadlineAt < startsAt;
     },
   },
+  // 마감일·마감시간은 "둘 다 비움(마감 없음)" 또는 "둘 다 채움" 두 상태만 유효하다.
+  // 한쪽만 채우면 parseDeadlineAt이 null을 반환해 deadlineAt=null(마감 없음)로 조용히
+  // 저장되는데, 호스트는 방금 고른 날짜/시간이 반영됐다고 믿는다 — 결측 필드로 명시 안내한다.
+  {
+    field: 'deadlineDate',
+    label: '신청 마감일도 입력해 주세요',
+    step: 'place-time',
+    isSatisfied: (ctx) => !(ctx.draft.deadlineTime && !ctx.draft.deadlineDate),
+  },
+  {
+    field: 'deadlineTime',
+    label: '신청 마감시간도 입력해 주세요',
+    step: 'place-time',
+    isSatisfied: (ctx) => !(ctx.draft.deadlineDate && !ctx.draft.deadlineTime),
+  },
 ];
 
 export function getMatchMissingFields(ctx: MatchValidationContext): MatchMissingField[] {
@@ -139,12 +154,14 @@ export function buildMatchPayloadResult(draft: MatchDraft, sportId: string, regi
       endsAt: endsAt && endsAt > startsAt ? endsAt.toISOString() : null,
       deadlineAt: deadlineAt ? deadlineAt.toISOString() : null,
       capacity: Math.max(Number(draft.capacity) || 2, 2),
+      hostParticipates: draft.hostParticipates,
       manualPlaceName: draft.venue.trim(),
       addressText: draft.address.trim() || null,
       rulesText: draft.rules.trim() || null,
       minLevelCode: labelToLevelCode(draft.minLevel),
       maxLevelCode: labelToLevelCode(draft.maxLevel),
       genderRule: normalizeGenderRule(draft.gender),
+      costNote: draft.costNote.trim() || null,
     },
   };
 }

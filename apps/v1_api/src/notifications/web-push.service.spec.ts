@@ -3,6 +3,9 @@ import { Prisma } from '@prisma/client';
 import { getLoggerToken } from 'nestjs-pino';
 import { PrismaService } from '../prisma/prisma.service';
 import { WebPushService } from './web-push.service';
+import { FcmPushService } from './fcm-push.service';
+import { ApnsPushService } from './apns-push.service';
+import { PushDeviceService } from './push-device.service';
 
 function uniqueConstraintError(target: string) {
   return new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
@@ -39,6 +42,10 @@ describe('WebPushService', () => {
     v1WebPushFailureLog: { create: jest.fn() },
   };
   const logger = { warn: jest.fn(), error: jest.fn() };
+  const nativeSummary = { devices: 0, delivered: 0, failed: 0, disabled: false };
+  const fcmPushService = { platform: 'android', isConfigured: true, send: jest.fn().mockResolvedValue(nativeSummary) };
+  const apnsPushService = { platform: 'ios', isConfigured: true, send: jest.fn().mockResolvedValue(nativeSummary) };
+  const pushDevices = { activeTokens: jest.fn().mockResolvedValue([]) };
 
   async function build(env: Record<string, string | undefined>) {
     const originalEnv = { ...process.env };
@@ -51,20 +58,57 @@ describe('WebPushService', () => {
         process.env[key] = value;
       }
     }
+    // The push environment is read when a notification is sent, not at startup — the
+    // startup read made delivery depend on which provider Nest initialised first. So it has
+    // to survive the env restore below, unlike the VAPID keys this helper is juggling.
+    process.env.V1_PUSH_ENVIRONMENT ??= 'alpha';
+    const pushEnvironment = process.env.V1_PUSH_ENVIRONMENT;
     const moduleRef = await Test.createTestingModule({
       providers: [
         WebPushService,
         { provide: PrismaService, useValue: prisma },
         { provide: getLoggerToken(WebPushService.name), useValue: logger },
+        { provide: FcmPushService, useValue: fcmPushService },
+        { provide: ApnsPushService, useValue: apnsPushService },
+        { provide: PushDeviceService, useValue: pushDevices },
       ],
     }).compile();
     const service = moduleRef.get(WebPushService);
     service.onModuleInit();
-    process.env = originalEnv;
+    process.env = { ...originalEnv, V1_PUSH_ENVIRONMENT: pushEnvironment };
     return service;
   }
 
   beforeEach(() => jest.clearAllMocks());
+
+  it('still reaches native devices when browser Web Push is disabled', async () => {
+    pushDevices.activeTokens.mockResolvedValueOnce([
+      { id: 'a1', token: 'android-token-1', platform: 'android' },
+    ]);
+    const service = await build({
+      VAPID_PUBLIC_KEY: undefined,
+      VAPID_PRIVATE_KEY: undefined,
+      VAPID_SUBJECT: undefined,
+    });
+
+    await service.sendToUser('user-1', {
+      notificationId: 'notification-1',
+      title: '문의 답변',
+      body: '답변을 확인해 주세요.',
+      url: '/my/inquiries/inquiry-1',
+    });
+
+    // The web `url` becomes the native `route`; the rest of the payload is shared verbatim.
+    expect(fcmPushService.send).toHaveBeenCalledWith(
+      [{ id: 'a1', token: 'android-token-1', platform: 'android' }],
+      {
+        notificationId: 'notification-1',
+        title: '문의 답변',
+        body: '답변을 확인해 주세요.',
+        route: '/my/inquiries/inquiry-1',
+      },
+    );
+  });
 
   it('stays disabled and returns a null public key when VAPID env vars are missing', async () => {
     const service = await build({ VAPID_PUBLIC_KEY: undefined, VAPID_PRIVATE_KEY: undefined, VAPID_SUBJECT: undefined });
@@ -75,7 +119,10 @@ describe('WebPushService', () => {
     expect(prisma.v1PushSubscription.findMany).not.toHaveBeenCalled();
     // 꺼져 있다는 사실을 호출부가 알 수 있어야 한다 — 그래야 운영 화면이 "보냈다"고
     // 표시하지 않는다.
-    expect(summary).toEqual({ subscriptions: 0, delivered: 0, failed: 0, disabled: true });
+    expect(summary).toEqual({
+      subscriptions: 0, delivered: 0, failed: 0, disabled: true,
+      native: { devices: 0, delivered: 0, failed: 0, disabled: false },
+    });
   });
 
   /**
@@ -92,7 +139,10 @@ describe('WebPushService', () => {
 
     const summary = await service.sendToUser('user-1', { title: 'hi' });
 
-    expect(summary).toEqual({ subscriptions: 0, delivered: 0, failed: 0, disabled: false });
+    expect(summary).toEqual({
+      subscriptions: 0, delivered: 0, failed: 0, disabled: false,
+      native: { devices: 0, delivered: 0, failed: 0, disabled: false },
+    });
     expect(webpush.sendNotification).not.toHaveBeenCalled();
   });
 
@@ -112,7 +162,10 @@ describe('WebPushService', () => {
 
     const summary = await service.sendToUser('user-1', { title: 'hi' });
 
-    expect(summary).toEqual({ subscriptions: 2, delivered: 1, failed: 1, disabled: false });
+    expect(summary).toEqual({
+      subscriptions: 2, delivered: 1, failed: 1, disabled: false,
+      native: { devices: 0, delivered: 0, failed: 0, disabled: false },
+    });
   });
 
   it('enables and returns the configured public key when all three VAPID vars are set', async () => {
@@ -306,5 +359,224 @@ describe('WebPushService', () => {
 
     await expect(service.subscribe('user-1', dto)).rejects.toThrow('db down');
     expect(prisma.v1PushSubscription.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Platform routing.
+ *
+ * The dispatcher, not the adapters, decides which service a device goes to. That placement
+ * is what makes an unrouted platform visible: if each adapter queried for its own devices,
+ * a platform nobody handles would look exactly like "nobody was subscribed".
+ */
+describe('WebPushService native fan-out', () => {
+  const prisma = {
+    v1PushSubscription: { findMany: jest.fn().mockResolvedValue([]) },
+    v1WebPushFailureLog: { create: jest.fn() },
+  };
+  const logger = { warn: jest.fn(), error: jest.fn() };
+  const summary = { devices: 1, delivered: 1, failed: 0, disabled: false };
+  const fcm = { platform: 'android', isConfigured: true, send: jest.fn().mockResolvedValue(summary) };
+  const apns = { platform: 'ios', isConfigured: true, send: jest.fn().mockResolvedValue(summary) };
+  const pushDevices = { activeTokens: jest.fn() };
+  let previousEnvironment: string | undefined;
+
+  async function build() {
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        WebPushService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: getLoggerToken(WebPushService.name), useValue: logger },
+        { provide: FcmPushService, useValue: fcm },
+        { provide: ApnsPushService, useValue: apns },
+        { provide: PushDeviceService, useValue: pushDevices },
+      ],
+    }).compile();
+    const service = moduleRef.get(WebPushService);
+    // Resolves the push environment, as it does in the running app.
+    service.onModuleInit();
+    return service;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    previousEnvironment = process.env.V1_PUSH_ENVIRONMENT;
+    process.env.V1_PUSH_ENVIRONMENT = 'alpha';
+  });
+
+  afterEach(() => {
+    if (previousEnvironment === undefined) delete process.env.V1_PUSH_ENVIRONMENT;
+    else process.env.V1_PUSH_ENVIRONMENT = previousEnvironment;
+  });
+
+  /**
+   * Nest promises no order between one provider's `onModuleInit` and another's, and an
+   * adapter only reports `isConfigured` from inside its own. Reading that flag while
+   * deciding the push environment therefore made delivery depend on which ran first: if
+   * this service went first it saw two unconfigured adapters, kept a null environment, and
+   * every later send returned without a word. Nothing in a log, nothing on a device.
+   */
+  it('delivers even when its own onModuleInit runs before the adapters', async () => {
+    const lateApns = {
+      platform: 'ios',
+      isConfigured: false,
+      configure() {
+        this.isConfigured = true;
+      },
+      send: jest.fn().mockResolvedValue(summary),
+    };
+    const lateFcm = { platform: 'android', isConfigured: false, send: jest.fn() };
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        WebPushService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: getLoggerToken(WebPushService.name), useValue: logger },
+        { provide: FcmPushService, useValue: lateFcm },
+        { provide: ApnsPushService, useValue: lateApns },
+        { provide: PushDeviceService, useValue: pushDevices },
+      ],
+    }).compile();
+    const service = moduleRef.get(WebPushService);
+
+    service.onModuleInit();
+    lateApns.configure();
+
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'i1', token: 'ios-token-1', platform: 'ios' },
+    ]);
+    await service.sendToUser('user-1', { notificationId: 'n-late', title: '문의 답변' });
+
+    expect(lateApns.send).toHaveBeenCalledWith(
+      [{ id: 'i1', token: 'ios-token-1', platform: 'ios' }],
+      expect.objectContaining({ notificationId: 'n-late' }),
+    );
+  });
+
+  /**
+   * The one state that must never be silent: something can deliver, but the environment
+   * that says *where* is missing. Returning without a word here is how a deployment ends up
+   * sending nothing for days.
+   */
+  it('says so when an adapter is configured but the environment is not', async () => {
+    delete process.env.V1_PUSH_ENVIRONMENT;
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'i1', token: 'ios-token-1', platform: 'ios' },
+    ]);
+    const service = await build();
+
+    await service.sendToUser('user-1', { notificationId: 'n-2', title: '문의 답변' });
+
+    expect(apns.send).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('V1_PUSH_ENVIRONMENT'),
+    );
+  });
+
+  /**
+   * The summary is what an operator sees. `admin-ops.service.ts` returns it straight from
+   * the manual-push endpoint, so a user with only app devices and no browser subscription
+   * used to read as "0 sent" on screen even though the notification had gone out — which
+   * invites sending it again, or filing an outage.
+   */
+  it('reports app deliveries for a user with no browser subscription', async () => {
+    prisma.v1PushSubscription.findMany.mockResolvedValue([]);
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'i1', token: 'ios-token-1', platform: 'ios' },
+    ]);
+    const service = await build();
+
+    const result = await service.sendToUser('user-1', { notificationId: 'n-3', title: '문의 답변' });
+
+    expect(result.native).toEqual({ devices: 1, delivered: 1, failed: 0, disabled: false });
+    // The web half stays its own number: nothing was sent there, and saying otherwise would
+    // hide a broken browser subscription behind a working phone.
+    expect(result.subscriptions).toBe(0);
+    expect(result.delivered).toBe(0);
+  });
+
+  it('sends each device to the service that owns its platform', async () => {
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'a1', token: 'android-token-1', platform: 'android' },
+      { id: 'i1', token: 'ios-token-1', platform: 'ios' },
+      { id: 'a2', token: 'android-token-2', platform: 'android' },
+    ]);
+    const service = await build();
+
+    await service.sendToUser('user-1', { notificationId: 'n-1', title: '문의 답변' });
+
+    expect(fcm.send).toHaveBeenCalledWith(
+      [
+        { id: 'a1', token: 'android-token-1', platform: 'android' },
+        { id: 'a2', token: 'android-token-2', platform: 'android' },
+      ],
+      expect.objectContaining({ notificationId: 'n-1', title: '문의 답변' }),
+    );
+    expect(apns.send).toHaveBeenCalledWith(
+      [{ id: 'i1', token: 'ios-token-1', platform: 'ios' }],
+      expect.objectContaining({ notificationId: 'n-1' }),
+    );
+  });
+
+  it('never hands an iOS token to the Firebase adapter', async () => {
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'i1', token: 'ios-token-1', platform: 'ios' },
+    ]);
+    const service = await build();
+
+    await service.sendToUser('user-1', { notificationId: 'n-1', title: '문의 답변' });
+
+    // An APNs token accepted by Firebase does not error — it silently never arrives.
+    expect(fcm.send).not.toHaveBeenCalled();
+    expect(apns.send).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * The failure this routing exists to prevent. A platform added to the enum with no
+   * adapter behind it would otherwise deliver nothing and report the same "0 devices" a
+   * user with no registrations reports.
+   */
+  it('logs an error rather than silently dropping a platform nothing routes', async () => {
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'x1', token: 'future-platform-token', platform: 'web_unsupported' },
+    ]);
+    const service = await build();
+
+    await service.sendToUser('user-1', { notificationId: 'n-1', title: '문의 답변' });
+
+    expect(fcm.send).not.toHaveBeenCalled();
+    expect(apns.send).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ platform: 'web_unsupported', deviceCount: 1 }),
+      expect.stringContaining('no push adapter'),
+    );
+  });
+
+  it('lets one platform fail without cancelling the other', async () => {
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'a1', token: 'android-token-1', platform: 'android' },
+      { id: 'i1', token: 'ios-token-1', platform: 'ios' },
+    ]);
+    fcm.send.mockRejectedValueOnce(new Error('firebase unavailable'));
+    const service = await build();
+
+    await expect(
+      service.sendToUser('user-1', { notificationId: 'n-1', title: '문의 답변' }),
+    ).resolves.toEqual(expect.objectContaining({ disabled: expect.any(Boolean) }));
+
+    expect(apns.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks for devices once, not once per adapter', async () => {
+    pushDevices.activeTokens.mockResolvedValue([
+      { id: 'a1', token: 'android-token-1', platform: 'android' },
+      { id: 'i1', token: 'ios-token-1', platform: 'ios' },
+    ]);
+    const service = await build();
+
+    await service.sendToUser('user-1', { notificationId: 'n-1', title: '문의 답변' });
+
+    expect(pushDevices.activeTokens).toHaveBeenCalledTimes(1);
+    expect(pushDevices.activeTokens).toHaveBeenCalledWith('user-1', 'alpha');
   });
 });

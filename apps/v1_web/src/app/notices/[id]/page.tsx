@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { NoticeDetailPageClient } from '@/components/notices/notices-client';
+import { JsonLd } from '@/components/seo/json-ld';
 import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, metadataDescription } from '@/lib/seo';
+import { buildNoticeArticleLd } from '@/lib/structured-data';
 import type { V1NoticeResponse } from '@/types/api';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -19,6 +21,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function NoticeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!await fetchPublicV1<V1NoticeResponse>(`/notices/${encodeURIComponent(id)}`)) notFound();
-  return <NoticeDetailPageClient noticeId={id} />;
+  // 존재 확인을 위해 어차피 기다리는 응답이다 — 버리지 않고 첫 표시값으로 넘긴다.
+  const notice = await fetchPublicV1<V1NoticeResponse>(`/notices/${encodeURIComponent(id)}`);
+  if (!notice) notFound();
+  const articleLd = buildNoticeArticleLd(notice.notice, id);
+  return (
+    <>
+      {articleLd ? <JsonLd data={articleLd} /> : null}
+      <NoticeDetailPageClient noticeId={id} seed={notice} />
+    </>
+  );
 }

@@ -21,7 +21,10 @@ export function applyLabel(
   if (viewerState === 'host') return '매치 관리';
   if (viewerState === 'requested') return '신청 취소';
   if (viewerState === 'approved' || viewerState === 'participant') return '승인 완료';
-  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return '신청 불가';
+  // [P2] 마감 시각이 지난 경우(status==='closed')만 본문 상태 카드와 같은 말('신청 마감')로
+  // 통일한다 — 정원 마감·취소·완료·만료는 이유가 다르므로 기존 '신청 불가'를 유지한다.
+  if (status === 'closed') return '신청 마감';
+  if (status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return '신청 불가';
   return !eligible && message ? message : '참가 신청';
 }
 
@@ -42,6 +45,7 @@ const matches = [
     gender: '성별 무관',
     host: '김정민',
     image: '/mock/generated/futsal-rooftop.webp',
+    costNote: null,
     deadline: '마감 18시간 전',
     deadlineDetail: '5월 15일 24:00',
     status: 'open' as const,
@@ -62,6 +66,7 @@ const matches = [
     gender: '남',
     host: '박서준',
     image: '/mock/generated/team-huddle.webp',
+    costNote: null,
     deadline: '호스트 검토 중',
     deadlineDetail: '호스트 검토 중',
     status: 'pending' as const,
@@ -82,6 +87,7 @@ const matches = [
     gender: '여',
     host: '이하나',
     image: '/mock/generated/team-huddle.webp',
+    costNote: null,
     deadline: '참가 확정',
     deadlineDetail: '참가 확정',
     status: 'approved' as const,
@@ -102,6 +108,7 @@ const matches = [
     gender: '성별 무관',
     host: '윤현우',
     image: '/mock/generated/team-huddle.webp',
+    costNote: null,
     deadline: '모집 완료',
     deadlineDetail: '모집 완료',
     status: 'full' as const,
@@ -122,6 +129,7 @@ const matches = [
     gender: '성별 무관',
     host: '나',
     image: '/mock/generated/team-huddle.webp',
+    costNote: null,
     deadline: '신청 3명 검토중',
     deadlineDetail: '신청 3명 검토중',
     status: 'mine' as const,
@@ -190,11 +198,13 @@ const draft = {
   description: '',
   image: '',
   capacity: 10,
+  hostParticipates: true,
   actionLabel: '승인제 신청',
   minLevel: '입문',
   maxLevel: '고수',
   gender: '성별 무관',
   rules: '',
+  costNote: '',
   venue: '',
   address: '',
   date: '',

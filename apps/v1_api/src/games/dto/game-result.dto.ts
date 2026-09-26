@@ -127,8 +127,14 @@ export class GameResultParticipantDto {
   @IsUUID()
   sideId!: string;
 
+  /**
+   * @deprecated **더 이상 읽지 않는다**(정본 §3). 명단 = 출전자이므로 결과 리비전은
+   * 출전자를 전부 `started: true` 로 기록한다. optional 로 남긴 이유는 옛 클라이언트가
+   * 보내도 400 을 내지 않기 위해서다 — 값은 저장 경로에서 무시된다.
+   */
+  @IsOptional()
   @IsBoolean()
-  started!: boolean;
+  started?: boolean;
 
   @IsOptional()
   @Type(() => Number)
@@ -212,6 +218,18 @@ export class DecideGameResultRevisionDto extends SubmitGameResultRevisionDto {
   @IsString()
   @IsNotEmpty()
   reason?: string;
+}
+
+/**
+ * TEAM_MATCH 전용 결과 무효화(void) 요청 -- 운영자가
+ * 정정(correction) 대신 고를 수 있는 두 번째 경로. 대회 픽스처의
+ * `VoidGameResultRevisionDto`(tournament-result-review.dto.ts)와 같은 모양이지만,
+ * 대회 모듈에 대한 games 모듈의 역방향 의존을 만들지 않기 위해 여기 별도로 둔다.
+ */
+export class VoidTeamMatchResultDto extends SubmitGameResultRevisionDto {
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
 }
 
 export class GameResultRecoveryDto {

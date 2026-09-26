@@ -8,6 +8,8 @@ import type {
   PublicTeamRecordsResponse,
   PublicTournamentScheduleResponse,
   PublicUserRecordsResponse,
+  TeamRecordCategory,
+  PublicTournamentPlayerRecordsResponse,
 } from './types';
 
 /**
@@ -22,10 +24,12 @@ export const publicGameRecordsKeys = {
     [...publicGameRecordsKeys.all, 'schedule', tournamentId, filters] as const,
   match: (tournamentId: string, fixtureId: string) =>
     [...publicGameRecordsKeys.all, 'match', tournamentId, fixtureId] as const,
-  teamRecords: (teamId: string, season: string | undefined) =>
-    [...publicGameRecordsKeys.all, 'team-records', teamId, season ?? null] as const,
-  userRecords: (userId: string, season: string | undefined) =>
-    [...publicGameRecordsKeys.all, 'user-records', userId, season ?? null] as const,
+  teamRecords: (teamId: string, season: string | undefined, type: TeamRecordCategory | null) =>
+    [...publicGameRecordsKeys.all, 'team-records', teamId, season ?? null, type] as const,
+  userRecords: (userId: string, season: string | undefined, type: TeamRecordCategory | null) =>
+    [...publicGameRecordsKeys.all, 'user-records', userId, season ?? null, type] as const,
+  playerRecords: (tournamentId: string) =>
+    [...publicGameRecordsKeys.all, 'player-records', tournamentId] as const,
 };
 
 export interface ScheduleFilters {
@@ -60,7 +64,11 @@ const LIVE_POLL_INTERVAL_MS = PUBLIC_LIVE_POLL_INTERVAL_MS;
  * callers should read those off `data.pages[0]` and flatten only `items`
  * across pages.
  */
-export function usePublicTournamentSchedule(tournamentId: string, filters: ScheduleFilters = {}) {
+export function usePublicTournamentSchedule(
+  tournamentId: string,
+  filters: ScheduleFilters = {},
+  options: { enabled?: boolean } = {},
+) {
   return useInfiniteQuery({
     queryKey: publicGameRecordsKeys.schedule(tournamentId, filters),
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
@@ -70,7 +78,7 @@ export function usePublicTournamentSchedule(tournamentId: string, filters: Sched
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: Boolean(tournamentId),
+    enabled: Boolean(tournamentId) && (options.enabled ?? true),
     retry: false,
     refetchInterval: (query) => {
       const hasLive = query.state.data?.pages.some((page) => page.items.some((item) => item.status === 'live'));
@@ -95,13 +103,39 @@ export function usePublicMatch(tournamentId: string, fixtureId: string) {
   });
 }
 
-/** `GET /teams/:id/records` -- cursor-paginated team result history + summary. */
-export function usePublicTeamRecords(teamId: string, season?: string) {
+/**
+ * `GET /league-matches/:leagueId/fixtures/:teamMatchId/record` -- 리그 대진의
+ * 경기 기록 프로젝션. 서버가 `usePublicMatch`와 **같은 PublicMatchDetail 필드명**으로
+ * 내려준다(tournamentId/tournamentTitle 자리에 리그 id/제목, round 에 'N주차' 라벨,
+ * groupName 은 null — `getLeagueFixtureRecord` 주석 참고). 게임이 아직 없거나 숨김
+ * 정책인 대진은 404 로 접힌다 -- 소비처(리그 경기 상세)는 그때 자체 요약 카드로
+ * 폴백하므로 retry 하지 않는다.
+ */
+export function usePublicLeagueFixtureRecord(leagueId: string, teamMatchId: string) {
+  return useQuery({
+    queryKey: [...publicGameRecordsKeys.all, 'league-fixture-record', leagueId, teamMatchId] as const,
+    queryFn: () => v1Get<PublicMatchDetail>(`/league-matches/${leagueId}/fixtures/${teamMatchId}/record`),
+    enabled: Boolean(leagueId) && Boolean(teamMatchId),
+    retry: false,
+    refetchInterval: (query) => (query.state.data?.status === 'live' ? LIVE_POLL_INTERVAL_MS : false),
+  });
+}
+
+/**
+ * `GET /teams/:id/records` -- cursor-paginated team result history + summary.
+ *
+ * `type`(U2, 리그/대회/친선 필터)은 커서 페이지네이션이 걸린 `items` 목록에만
+ * 적용된다 -- `summary.byType`는 서버가 항상 전체 기준으로 내려주므로 여기서
+ * 다시 필터링하지 않는다. `type`을 쿼리키에 포함해 탭을 바꾸면 캐시가 갈리고
+ * (클라이언트 필터가 아니라) 서버로 새로 요청한다.
+ */
+export function usePublicTeamRecords(teamId: string, season?: string, type?: TeamRecordCategory) {
   return useInfiniteQuery({
-    queryKey: publicGameRecordsKeys.teamRecords(teamId, season),
+    queryKey: publicGameRecordsKeys.teamRecords(teamId, season, type ?? null),
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       v1Get<PublicTeamRecordsResponse>(`/teams/${teamId}/records`, {
         ...(season ? { season } : {}),
+        ...(type ? { type } : {}),
         ...(pageParam ? { cursor: pageParam } : {}),
       }),
     initialPageParam: null as string | null,
@@ -112,17 +146,47 @@ export function usePublicTeamRecords(teamId: string, season?: string) {
 }
 
 /** `GET /users/:id/records` -- cursor-paginated consent-gated career record + summary. */
-export function usePublicUserRecords(userId: string, season?: string) {
+export function usePublicUserRecords(userId: string, season?: string, type?: TeamRecordCategory) {
   return useInfiniteQuery({
-    queryKey: publicGameRecordsKeys.userRecords(userId, season),
+    // `type` 이 키에 들어가야 탭을 바꿀 때 캐시가 갈린다 — 빠지면 다른 탭의 페이지가
+    // 그대로 재사용된다(팀 전적 키와 같은 이유·같은 모양).
+    queryKey: publicGameRecordsKeys.userRecords(userId, season, type ?? null),
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       v1Get<PublicUserRecordsResponse>(`/users/${userId}/records`, {
         ...(season ? { season } : {}),
+        ...(type ? { type } : {}),
         ...(pageParam ? { cursor: pageParam } : {}),
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: Boolean(userId),
+    retry: false,
+  });
+}
+
+/**
+ * 회고 STATS-1 — 대회 단위 개인 득점·도움 랭킹(공개, 동의 게이팅은 서버가 판정).
+ * 일정 화면은 10초 폴링을 돌지만 이 쿼리는 그 폴링과 무관한 별도 키다 — 랭킹은
+ * 공식 확정 때만 바뀌므로 staleTime을 넉넉히 둬 폴링 화면에 편승 재조회하지 않는다.
+ */
+/**
+ * 대회 개인 득점·도움 랭킹.
+ *
+ * `options.enabled` 로 조회 자체를 끌 수 있다 — **정규 리그가 그 경우다.** 리그 참가자는
+ * `userId` 로 이어져 있지 않아 사람 단위 집계 근거가 없고, 서버도 같은 이유로 이 표면에서
+ * 리그를 다루지 않는다. 빈 응답을 받아 "기록 없음" 으로 그리면 *"아직 기록이 없다"* 로
+ * 읽히는데 사실은 **집계 자체가 불가능**한 것이라, 호출도 하지 않는 편이 정직하다.
+ */
+export function usePublicTournamentPlayerRecords(
+  tournamentId: string,
+  options: { enabled?: boolean } = {},
+) {
+  return useQuery({
+    queryKey: publicGameRecordsKeys.playerRecords(tournamentId),
+    queryFn: () =>
+      v1Get<PublicTournamentPlayerRecordsResponse>(`/tournaments/${tournamentId}/player-records`),
+    enabled: Boolean(tournamentId) && (options.enabled ?? true),
+    staleTime: 60_000,
     retry: false,
   });
 }

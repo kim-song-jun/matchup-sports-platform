@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import {
-  Award,
+import { CalendarDays, Award,
   Bell,
   ClipboardList,
   Crown,
@@ -10,7 +9,9 @@ import {
   LogOut,
   Mail,
   MapPin,
+  MessageCircle,
   Moon,
+  Pencil,
   Plus,
   Send,
   Settings,
@@ -19,17 +20,19 @@ import {
   Star,
   UserCheck,
   Users,
+  ListOrdered,
 } from 'lucide-react';
 import { LogoutButton } from '@/components/auth/logout-button';
 import { buildPhoneVerifyHref } from '@/components/auth/phone-verification/phone-verify-route';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/v1-ui/icons';
-import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, EmptyState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { Card, EmptyState, ErrorState, KPIStat, ListItem } from '@/components/v1-ui/primitives';
+import { MyPlayerCardSection, useMyPlayerCardAbsent } from './my-player-card-section';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
 import { cssUrl } from '@/lib/assets';
+import { withFromPath } from '@/lib/session-storage';
 import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
-import { MyMemberCard } from './my-member-card';
 import type {
   MyHomeViewModel,
   MyInvitationsViewModel,
@@ -37,20 +40,22 @@ import type {
   MyJoinApplicationsViewModel,
   MyMatch,
   MyMatchesViewModel,
-  MyMember,
   MyMenuItem,
+  MyMenuSection,
   MyTeam,
-  MyTeamDetailViewModel,
-  MyTeamMembersViewModel,
   MyTeamsViewModel,
   NotificationSettingsViewModel,
   ProfileEditViewModel,
   SettingsViewModel,
 } from './my.types';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 
 /** Lucide 아이콘 이름 → 컴포넌트 매핑. view-model의 icon 문자열을 참조함. */
 const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
+  MessageCircle,
+  CalendarDays,
   Award,
+  ListOrdered,
   ClipboardList,
   Plus,
   Users,
@@ -63,6 +68,7 @@ const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
   FileText,
   LogOut,
   Mail,
+  Pencil,
   Send,
   ShieldCheck,
   UserCheck,
@@ -71,65 +77,87 @@ const MENU_ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
 export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
   const avatarStyle = model.user.profileImageUrl ? { backgroundImage: cssUrl(model.user.profileImageUrl) } : undefined;
 
+  // 셸 승격(U36): title/activeTab/centerTitle은 route-chrome/fragments/my-home.ts의 정적
+  // 테이블로 옮겼다. hasNewNotification만 model(런타임 상태) 의존이라 여기서 override로
+  // 밀어넣는다(§0.4-3).
+  useShellOverride({ hasNewNotification: model.hasNewNotification });
+  const cardAbsent = useMyPlayerCardAbsent(model.user.userId, model.playerCardSlot);
+
   return (
-    <AppChrome title="마이페이지" activeTab="my" hasNewNotification={model.hasNewNotification} centerTitle>
+    <>
       <h1 className="sr-only">마이페이지</h1>
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-my-home-shell tm-content-enter">
         {/* Mobile layout: flat stack (unchanged) */}
         {/* Desktop layout: 2-column via tm-my-desktop-layout */}
         <div className="tm-my-desktop-layout">
           {/* LEFT sticky: profile identity */}
           <div className="tm-my-desktop-sidebar">
-            <section className="tm-my-profile-head tm-my-home-profile-head">
-              <div className="tm-my-avatar" style={avatarStyle}>{model.user.profileImageUrl ? null : model.user.initials}</div>
-              <div className="tm-my-profile-copy">
-                <div className="tm-text-heading tm-my-profile-name">{model.user.name}</div>
-                <div className="tm-text-caption tm-my-profile-meta">{model.user.handle} · {model.user.region} · {model.user.genderLabel}</div>
-                {model.user.loginMethod || model.phoneVerified ? (
-                  <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {model.user.loginMethod ? (
-                      <span
-                        className="tm-badge tm-badge-grey"
-                        style={model.user.loginMethodProvider === 'kakao'
-                          ? { background: 'var(--kakao-yellow)', color: 'var(--static-black)' }
-                          : undefined}
-                      >
-                        {model.user.loginMethod}
-                      </span>
-                    ) : null}
-                    {/* 컬러만으로 상태를 전달하지 않도록 아이콘 + 텍스트를 함께 쓴다. */}
-                    {model.phoneVerified ? (
-                      <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <ShieldCheck size={12} strokeWidth={2.5} aria-hidden="true" />
-                        본인인증 완료
-                      </span>
-                    ) : null}
+            {/* 내 선수 카드 (Task 155). 카드가 곧 프로필이라 카드 아래 프로필 박스를 두지 않는다
+                (2026-09-26 B안): 공개 프로필 보기는 카드 버튼 줄, 프로필 수정·로그인 방식·본인인증은
+                '설정·문의' 메뉴가 맡는다. */}
+            {model.user.userId !== null ? (
+              <MyPlayerCardSection
+                userId={model.user.userId}
+                displayName={model.user.name}
+                profileImageUrl={model.user.profileImageUrl ?? null}
+                slot={model.playerCardSlot}
+              />
+            ) : null}
+            {/* 활동 1카드. 카드가 없는 사용자(숨김·조회 실패)에게만 신원 블록을 앞에 둔다 --
+                그때는 이것이 유일한 신원 표시다. */}
+            <Card pad={16}>
+              {model.user.userId !== null && cardAbsent ? (
+                <>
+                <h2 className="tm-text-body-lg">프로필</h2>
+                <div className="tm-my-account-block">
+                  <div className="tm-my-avatar tm-my-account-avatar" style={avatarStyle}>
+                    {model.user.profileImageUrl ? null : model.user.initials}
                   </div>
-                ) : null}
-                <div
-                  className="tm-text-caption"
-                  style={{
-                    marginTop: 6,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {model.user.intro}
+                  <div className="tm-my-account-name">{model.user.name}</div>
+                  <div className="tm-my-account-meta">
+                    {model.user.handle} · {model.user.region} · {model.user.genderLabel}
+                  </div>
+                  {model.user.loginMethod || model.phoneVerified ? (
+                    <div className="tm-my-account-badges">
+                      {model.user.loginMethod ? (
+                        <span
+                          className="tm-badge tm-badge-grey"
+                          style={model.user.loginMethodProvider === 'kakao'
+                            ? { background: 'var(--kakao-yellow)', color: 'var(--static-black)' }
+                            : undefined}
+                        >
+                          {model.user.loginMethod}
+                        </span>
+                      ) : null}
+                      {model.phoneVerified ? (
+                        <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <ShieldCheck size={12} strokeWidth={2.5} aria-hidden="true" />
+                          본인인증 완료
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <div className="tm-my-account-actions">
+                    <Link
+                      className="tm-btn tm-btn-sm tm-btn-neutral"
+                      href={withFromPath(`/users/${encodeURIComponent(model.user.userId)}`, '/my')}
+                    >
+                      내 프로필
+                    </Link>
+                    <Link className="tm-btn tm-btn-sm tm-btn-neutral" href="/my/profile/edit">프로필 수정</Link>
+                  </div>
                 </div>
-              </div>
-              <Link className="tm-btn tm-btn-sm tm-btn-neutral tm-my-profile-edit-link" href="/my/profile/edit">프로필 수정</Link>
-            </section>
-            {model.phoneVerified === false ? <PhoneVerificationCallout /> : null}
-            {/* 활동 요약: stats strip을 Card로 감싸 섹션 라벨과 border/radius/padding 정합 */}
-            <Card pad={16}>
-              <div className="tm-text-body-lg">활동 요약</div>
+                <div className="tm-my-activity-divider" />
+                </>
+              ) : null}
+              {/* 활동 -- 전체 활동과 이번 달을 한 묶음으로(사용자 확정 2026-08-26).
+                  둘 사이는 선 없이 간격으로만 가른다: 같은 "내 숫자"인데 선을 그으면
+                  위 계정 블록과의 경계(진짜 성격이 바뀌는 자리)와 무게가 같아진다. */}
+              <h2 className="tm-text-body-lg">활동</h2>
               <div className="tm-my-profile-stats">{model.user.stats.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
-            </Card>
-            <Card pad={16}>
-              <div className="tm-text-body-lg">이번 달 활동</div>
               <div className="tm-my-monthly">{model.user.monthly.map((stat) => <KPIStat key={stat.label} {...stat} />)}</div>
             </Card>
+            {model.phoneVerified === false ? <PhoneVerificationCallout /> : null}
           </div>
           {/* RIGHT: menu sections */}
           <div className="tm-my-desktop-main">
@@ -150,57 +178,67 @@ export function MyHomePageView({ model }: { model: MyHomeViewModel }) {
           </div>
         </div>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
 export function MyMatchesPageView({ model }: { model: MyMatchesViewModel }) {
   const joined = model.mode === 'joined';
+  // 셸 승격(U36): title/activeTab/bottomNav/backHref는 route-chrome/fragments/my-home.ts로
+  // 옮겼다(정적).
   return (
-    <AppChrome title="내 매치" activeTab="my" bottomNav={false} backHref="/my">
-      <div className="tm-my-shell tm-my-matches-desktop">
+      <div className="tm-my-shell tm-my-matches-desktop tm-content-enter">
         {/* Desktop page head — hidden on mobile via tm-show-desktop */}
         <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+          <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
+          </AppBackLink>
           <h1 className="tm-text-heading">내 매치</h1>
         </div>
+        {/* 선택 상태를 primary 로 칠하면 "이 화면의 주요 행동"으로 읽힌다(§14) — 칩으로 표현한다. */}
         <div className="tm-segment-row">
-          <Link className={`tm-btn tm-btn-md ${joined ? 'tm-btn-primary' : 'tm-btn-neutral'}`} href="/my/matches/joined" aria-current={joined ? 'page' : undefined}>참여한 매치</Link>
-          <Link className={`tm-btn tm-btn-md ${!joined ? 'tm-btn-primary' : 'tm-btn-neutral'}`} href="/my/matches/created" aria-current={!joined ? 'page' : undefined}>생성한 매치</Link>
+          <Link className={`tm-chip ${joined ? 'tm-chip-active' : ''}`} href="/my/matches/joined" aria-current={joined ? 'page' : undefined}>신청·참여 매치</Link>
+          <Link className={`tm-chip ${!joined ? 'tm-chip-active' : ''}`} href="/my/matches/created" aria-current={!joined ? 'page' : undefined}>생성한 매치</Link>
         </div>
-        {model.apiNotice ? (
-          <Card pad={14} className={model.apiNotice.tone === 'warning' ? 'tm-auth-soft-card-warning' : undefined}>
-            <div className="tm-text-body-lg">{model.apiNotice.title}</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.apiNotice.body}</div>
-          </Card>
+        {model.loading ? <PageSkeleton variant="list" /> : null}
+        {model.error ? (
+          <ErrorState
+            title="매치 목록을 불러오지 못했어요"
+            message="잠시 후 다시 시도해 주세요."
+            onRetry={model.onRetry}
+            retryLabel="다시 불러오기"
+          />
         ) : null}
         <div className="tm-my-list-stack">
-          {/* 로딩/에러 중(apiNotice 노출)에는 '매치 없어요' 빈상태를 띄우지 않는다 — 알림 카드와 모순 방지 (Copilot) */}
-          {!model.apiNotice && model.matches.length === 0 ? (
+          {/* 로딩·오류 중에는 '매치 없어요' 빈 상태를 띄우지 않는다 — 스켈레톤·오류 화면과 모순 방지. */}
+          {!model.loading && !model.error && model.matches.length === 0 ? (
             <EmptyState
+              fill
+              illustration={{ name: 'matches-empty' }}
               title="표시할 매치가 없어요"
-              sub={model.mode === 'joined' ? '매치에 참여하면 여기에 표시돼요.' : '매치를 만들면 여기에 표시돼요.'}
+              sub={model.mode === 'joined' ? '신청하거나 참여한 개인 매치가 여기에 표시돼요.' : '매치를 만들면 여기에 표시돼요.'}
+              cta={model.mode === 'joined' ? '매치 둘러보기' : '매치 만들기'}
+              ctaHref={model.mode === 'joined' ? '/matches' : withFromPath('/matches/new/sport', '/my/matches/created')}
             />
           ) : (
             model.matches.map((match) => <MyMatchCard key={match.id} match={match} manage={model.mode === 'created'} />)
           )}
         </div>
+        {model.loadMoreError ? <p role="alert" className="tm-text-caption">이전 참여 이력을 불러오지 못했어요. 다시 시도해 주세요.</p> : null}
+        {model.hasNext ? <button type="button" className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" style={{ marginTop: 16 }} disabled={model.loadMorePending} onClick={model.onLoadMore}>{model.loadMorePending ? '불러오는 중' : model.loadMoreError ? '다시 불러오기' : '더 보기'}</button> : null}
       </div>
-    </AppChrome>
   );
 }
 
 export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
+  // 셸 승격(U36): title/activeTab/bottomNav/backHref는 route-chrome/fragments/my-home.ts로 옮겼다(정적).
   return (
-    <AppChrome title="내 팀" activeTab="my" bottomNav={false} backHref="/my">
-      <div className="tm-my-shell tm-my-teams-desktop">
+      <div className="tm-my-shell tm-my-teams-desktop tm-content-enter">
         {/* Desktop page head */}
         <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+          <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
+          </AppBackLink>
           <h1 className="tm-text-heading">내 팀</h1>
         </div>
         <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
@@ -209,34 +247,41 @@ export function MyTeamsPageView({ model }: { model: MyTeamsViewModel }) {
         <div className="tm-my-list-stack">
           {/* #14: 소속 팀이 없을 때 빈 상태 안내 */}
           {model.teams.length === 0
-            ? <EmptyState title="소속 팀이 없어요" sub="팀을 만들거나 가입 신청해서 함께 뛰어 보세요." cta="팀 찾기" onCta={() => { window.location.href = '/teams'; }} />
+            ? <EmptyState illustration={{ name: 'auth-welcome' }} title="소속 팀이 없어요" sub="팀을 만들거나 가입 신청해서 함께 뛰어 보세요." cta="팀 찾기" onCta={() => { window.location.href = '/teams'; }} />
             : model.teams.map((team) => <MyTeamCard key={team.id} team={team} />)}
         </div>
       </div>
-    </AppChrome>
   );
 }
 
 export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel }) {
+  // 셸 승격(U36): title/activeTab/bottomNav/backHref는 route-chrome/fragments/my-home.ts로 옮겼다(정적).
   return (
-    <AppChrome title="받은 초대" activeTab="my" bottomNav={false} backHref="/my">
       <div className="tm-my-shell">
         {/* Desktop page head */}
         <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+          <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
+          </AppBackLink>
           <h1 className="tm-text-heading">받은 초대</h1>
         </div>
+        {/* 오류는 EmptyState 가 아니라 ErrorState 로 — 회색 인박스 아이콘은 "없음"으로 읽힌다(2026-09-04 감사). */}
         {model.error ? (
-          <EmptyState
+          <ErrorState
             title="초대 목록을 불러오지 못했어요"
-            sub="잠시 후 다시 시도해 주세요."
-            cta="다시 시도"
-            onCta={model.onRetry}
+            message="잠시 후 다시 시도해 주세요."
+            onRetry={model.onRetry}
+            retryLabel="다시 불러오기"
           />
         ) : model.invitations.length === 0 ? (
-          <EmptyState title="받은 초대가 없어요" sub="팀에서 초대를 받으면 여기에 표시돼요." />
+          <EmptyState
+            fill
+            illustration={{ name: 'auth-welcome' }}
+            title="받은 초대가 없어요"
+            sub="팀에서 초대를 받으면 여기에 표시돼요. 먼저 팀을 둘러볼 수도 있어요."
+            cta="팀 둘러보기"
+            ctaHref="/teams"
+          />
         ) : (
           <div className="tm-my-list-stack">
             {model.invitations.map((invitation) => (
@@ -254,7 +299,8 @@ export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel
                 ) : null}
                 <div className="tm-invitation-actions">
                   <button
-                    className="tm-btn tm-btn-sm tm-btn-primary"
+                    /* 카드마다 primary 가 하나씩 생겨 화면에 주요 CTA 가 N개였다(§14) — outline 으로 낮춘다. */
+                    className="tm-btn tm-btn-sm tm-btn-outline"
                     type="button"
                     disabled={invitation.actionPending}
                     onClick={() => model.onAccept(invitation.invitationId)}
@@ -273,7 +319,7 @@ export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel
                   </button>
                 </div>
                 {invitation.actionPending ? (
-                  <div className="tm-text-caption" role="status" aria-live="polite" style={{ marginTop: 6 }}>
+                  <div className="tm-text-caption" role="status" aria-live="polite" style={{ marginTop: 8 }}>
                     처리 중…
                   </div>
                 ) : null}
@@ -282,7 +328,6 @@ export function MyInvitationsPageView({ model }: { model: MyInvitationsViewModel
           </div>
         )}
       </div>
-    </AppChrome>
   );
 }
 
@@ -295,27 +340,34 @@ const JOIN_APPLICATION_BADGE_CLASS: Record<MyJoinApplicationItem['statusTone'], 
 };
 
 export function MyJoinApplicationsPageView({ model }: { model: MyJoinApplicationsViewModel }) {
+  // 셸 승격(U36): title/activeTab/bottomNav/backHref는 route-chrome/fragments/my-home.ts로 옮겼다(정적).
   return (
-    <AppChrome title="보낸 가입 신청" activeTab="my" bottomNav={false} backHref="/my">
       <div className="tm-my-shell">
         {/* Desktop page head */}
         <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+          <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
+          </AppBackLink>
           <h1 className="tm-text-heading">보낸 가입 신청</h1>
         </div>
         {model.error ? (
-          <EmptyState
+          <ErrorState
             title="가입 신청 목록을 불러오지 못했어요"
-            sub="잠시 후 다시 시도해 주세요."
-            cta="다시 시도"
-            onCta={model.onRetry}
+            message="잠시 후 다시 시도해 주세요."
+            onRetry={model.onRetry}
+            retryLabel="다시 불러오기"
           />
         ) : model.loading ? (
-          <PageSkeleton />
+          <PageSkeleton variant="list" />
         ) : model.applications.length === 0 ? (
-          <EmptyState title="보낸 가입 신청이 없어요" sub="팀에 가입 신청하면 진행 상태를 여기에서 확인할 수 있어요." />
+          <EmptyState
+            fill
+            illustration={{ name: 'auth-welcome' }}
+            title="보낸 가입 신청이 없어요"
+            sub="팀에 가입 신청하면 진행 상태를 여기에서 확인할 수 있어요."
+            cta="팀 둘러보기"
+            ctaHref="/teams"
+          />
         ) : (
           <div className="tm-my-list-stack">
             {model.applications.map((application) => (
@@ -323,7 +375,7 @@ export function MyJoinApplicationsPageView({ model }: { model: MyJoinApplication
                 <div className="tm-invitation-card-head">
                   <TeamAvatar seed={application.teamId} name={application.teamName} logoUrl={application.logoUrl} size="lg" />
                   <div className="tm-invitation-meta">
-                    <Link className="tm-invitation-meta-name tm-join-application-team-link" href={`/teams/${application.teamId}`}>
+                    <Link className="tm-invitation-meta-name tm-join-application-team-link" href={withFromPath(`/teams/${application.teamId}`, '/my/join-applications')}>
                       {application.teamName}
                     </Link>
                     <div className="tm-invitation-meta-date">{application.dateLabel} 신청</div>
@@ -359,107 +411,23 @@ export function MyJoinApplicationsPageView({ model }: { model: MyJoinApplication
           </div>
         )}
       </div>
-    </AppChrome>
   );
 }
 
-export function MyTeamDetailPageView({ model }: { model: MyTeamDetailViewModel }) {
-  return (
-    <AppChrome title="팀 정보" activeTab="my" bottomNav={false} backHref="/my/teams">
-      <div className="tm-my-shell">
-        {/* Desktop page head */}
-        <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my/teams" aria-label="내 팀 목록으로 돌아가기">
-            <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
-          <h1 className="tm-text-heading">{model.team.name}</h1>
-        </div>
-        {/* Desktop 2-column layout */}
-        <div className="tm-my-team-detail-desktop">
-          {/* LEFT: hero + info + recent matches */}
-          <div className="tm-my-team-detail-left">
-            <section className="tm-my-team-hero">
-              <TeamAvatar seed={model.team.id} name={model.team.name} logoUrl={model.team.logoUrl} size="xl" />
-              <div>
-                <h2 className="tm-text-heading">{model.team.name}</h2>
-                <div className="tm-text-caption" style={{ marginTop: 4 }}>{model.team.sport} · {model.team.region} · {model.team.roleLabel}</div>
-              </div>
-              <p className="tm-text-body" style={{ margin: 0, lineHeight: 1.55 }}>{model.team.description}</p>
-            </section>
-            <Card pad={16}>
-              <InfoRow label="멤버" value={`${model.team.members}명`} />
-              <InfoRow label="매너" value={model.team.manner} />
-              <InfoRow label="다음 일정" value={model.team.next} />
-            </Card>
-            {model.recentMatches.length > 0 ? (
-              <>
-                <div className="tm-my-section-label">최근 팀매치</div>
-                <div className="tm-my-list-stack">{model.recentMatches.map((match) => <MyMatchCard key={match.id} match={match} manage />)}</div>
-              </>
-            ) : null}
-          </div>
-          {/* RIGHT sticky: action menu + CTA */}
-          <div className="tm-my-team-detail-right">
-            <MenuSection section={{ title: '운영 메뉴', items: model.actions }} />
-            {/* Desktop inline CTA (replaces fixed bottom bar) */}
-            <div className="tm-my-team-detail-cta tm-show-desktop">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <Link className="tm-btn tm-btn-lg tm-btn-primary" href={model.chatHref ?? '/chat'}>팀 채팅</Link>
-                <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={`/teams/${model.team.id}`}>팀 정보</Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      {/* Mobile fixed CTA — hidden on desktop */}
-      <div className="tm-fixed-cta tm-hide-desktop">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <Link className="tm-btn tm-btn-lg tm-btn-primary" href={model.chatHref ?? '/chat'}>팀 채팅</Link>
-          <Link className="tm-btn tm-btn-lg tm-btn-neutral" href={`/teams/${model.team.id}`}>팀 정보</Link>
-        </div>
-      </div>
-    </AppChrome>
-  );
-}
-
-export function MyTeamMembersPageView({ model, backHref = '/my/teams/team-1' }: { model: MyTeamMembersViewModel; backHref?: string }) {
-  return (
-    <AppChrome title="멤버 관리" activeTab="my" bottomNav={false} backHref={backHref}>
-      <div className="tm-my-shell tm-my-members-desktop">
-        {/* Desktop page head */}
-        <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href={backHref} aria-label="팀 정보로 돌아가기">
-            <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
-          <h1 className="tm-text-heading">{model.teamName} · 멤버 관리</h1>
-        </div>
-        <div className="tm-my-stat-grid" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
-          {model.summary.map((stat) => <Card key={stat.label} pad={16}><KPIStat {...stat} /></Card>)}
-        </div>
-        <div className="tm-team-form-chip-row" role="group" aria-label="멤버 목록 탭" style={{ marginTop: 14 }}>
-          {model.tabs.map((tab) => (
-            <button key={tab.key} className={`tm-chip ${model.activeTab === tab.key ? 'tm-chip-active' : ''}`} type="button" onClick={tab.onSelect} aria-pressed={model.activeTab === tab.key}>
-              {tab.label} <span className="tab-num">{tab.count}</span>
-            </button>
-          ))}
-        </div>
-        {model.activeTab === 'members' ? <MemberGroup title="멤버" members={model.members} /> : <MemberGroup title="가입 신청" members={model.requests} />}
-      </div>
-    </AppChrome>
-  );
-}
 
 
 export function SettingsPageView({ model }: { model: SettingsViewModel }) {
+  // 셸 승격(U36): title은 model.title로 넘어오지만 유일한 호출부(my-api-clients.tsx의
+  // SettingsPageClient)가 항상 settingsModel.title='설정' 상수를 그대로 spread하므로
+  // 사실상 정적이다 — route-chrome/fragments/my-home.ts에 title:'설정'로 등록했다.
   return (
-    <AppChrome title={model.title} activeTab="my" bottomNav={false} backHref="/my">
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           {/* Desktop page head */}
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">{model.title}</h1>
           </div>
           {model.account ? (
@@ -490,7 +458,6 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
           </div>
         </div>
       </div>
-    </AppChrome>
   );
 }
 
@@ -499,32 +466,35 @@ export function SettingsPageView({ model }: { model: SettingsViewModel }) {
 // The prop is kept for backward compatibility with the existing page.tsx caller.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function LegalPageView({ model: _model }: { model: SettingsViewModel }) {
+  // 셸 승격(U36): title/activeTab/bottomNav/backHref는 route-chrome/fragments/my-home.ts로 옮겼다(정적).
   return (
-    <AppChrome title="약관 및 정책" activeTab="my" bottomNav={false} backHref="/my/settings">
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">약관 및 정책</h1>
           </div>
           <Card pad={16}>
             <ListItem title="이용약관" sub="서비스 이용 전 꼭 확인해야 하는 약관이에요" trailing="2026.05" href="/terms?document=terms" chev />
             <ListItem title="개인정보 처리방침" sub="개인정보를 어떻게 수집하고 보관하는지 안내해요" trailing="2026.05" href="/terms?document=privacy" chev />
-            <ListItem title="위치기반 서비스 약관" sub="장소 추천과 거리 계산에 위치 정보를 사용해요" trailing="선택" chev />
+            {/* chevron 만 있고 href 가 없어 눌러도 아무 데도 가지 않았다(2026-09-04 감사). */}
+            <ListItem title="위치기반 서비스 약관" sub="장소 추천과 거리 계산에 위치 정보를 사용해요" trailing="선택" href="/terms?document=location" chev />
           </Card>
         </div>
       </div>
-    </AppChrome>
   );
 }
 
 
-function MenuSection({ section }: { section: { title: string; items: MyMenuItem[] } }) {
+function MenuSection({ section }: { section: MyMenuSection }) {
   return (
-    <section>
-      <div className="tm-my-section-label">{section.title}</div>
+    // data-primary 는 모바일에서 이 섹션을 카드 바로 아래로 끌어올리는 CSS 훅이다
+    // (globals.css, order). :nth-child 로 잡을 수 없다 -- 인증 안내·스태프 섹션·후기
+    // 배너가 조건부라 앞선 형제 수가 사용자마다 다르다.
+    <section data-primary={section.primary ? 'true' : undefined}>
+      <h2 className="tm-my-section-label">{section.title}</h2>
       <Card pad={0}>
         {section.items.map((item) => {
           const IconComponent = MENU_ICON_MAP[item.icon];
@@ -541,7 +511,13 @@ function MenuSection({ section }: { section: { title: string; items: MyMenuItem[
                 ) : item.icon}
               </span>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span className="tm-text-body" style={{ color: 'var(--text-strong)', display: 'block' }}>{item.label}</span>
+                <span className="tm-text-body" style={{ color: 'var(--text-strong)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {item.label}
+                  {item.badge ? (
+                    <span className="tm-badge tm-badge-blue" aria-label={item.badgeLabel ?? `${item.badge}건`}>{item.badge}</span>
+                  ) : null}
+                  {item.tag ? <MenuItemTag tag={item.tag} /> : null}
+                </span>
                 <span className="tm-text-caption" style={{ marginTop: 2, display: 'block' }}>{item.sub}</span>
               </span>
               <ChevronRightIcon size={17} stroke="var(--text-caption)" strokeWidth={2} />
@@ -550,6 +526,16 @@ function MenuSection({ section }: { section: { title: string; items: MyMenuItem[
         })}
       </Card>
     </section>
+  );
+}
+
+function MenuItemTag({ tag }: { tag: NonNullable<MyMenuItem['tag']> }) {
+  const Icon = MENU_ICON_MAP[tag.icon];
+  return (
+    <span className="tm-badge tm-badge-grey" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      {Icon ? <Icon size={12} strokeWidth={2.5} aria-hidden="true" /> : null}
+      {tag.label}
+    </span>
   );
 }
 
@@ -564,10 +550,10 @@ function MyMatchCard({ match, manage }: { match: MyMatch; manage?: boolean }) {
         </div>
         <span className={`tm-badge ${match.status === 'pending' ? 'tm-badge-orange' : match.status === 'ended' ? 'tm-badge-grey' : 'tm-badge-blue'}`}>{match.statusLabel}</span>
       </div>
-      <p className="tm-text-caption" style={{ margin: '10px 0 0', lineHeight: 1.5 }}>{match.note}</p>
+      <p className="tm-text-caption" style={{ margin: '12px 0 0', lineHeight: 1.5 }}>{match.note}</p>
       <div className="tm-my-card-actions">
         <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={match.href}>상세</Link>
-        {manage ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={`${match.href}/applications`}>참가 관리</Link> : canReview ? <Link className="tm-btn tm-btn-sm tm-btn-primary" href={match.reviewHref ?? '/my/reviews'}>리뷰</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>{match.status === 'ended' ? '리뷰 불가' : '리뷰 대기'}</button>}
+        {manage ? <Link className="tm-btn tm-btn-sm tm-btn-neutral" href={match.manageHref}>참가 관리</Link> : canReview ? <Link className="tm-btn tm-btn-sm tm-btn-primary" href={match.reviewHref ?? '/my/reviews'}>리뷰</Link> : <button className="tm-btn tm-btn-sm tm-btn-neutral" type="button" disabled>{match.status === 'ended' ? '리뷰 불가' : '리뷰 대기'}</button>}
       </div>
     </Card>
   );
@@ -578,7 +564,7 @@ function MyTeamCard({ team }: { team: MyTeam }) {
   const isManager = team.role === 'manager' || team.role === 'admin';
   const badgeClass = isOwner || isManager ? 'tm-badge tm-badge-blue' : 'tm-badge tm-badge-grey';
   return (
-    <Link className="tm-my-team-card tm-pressable" href={`/teams/${team.id}`}>
+    <Link className="tm-my-team-card tm-pressable" href={withFromPath(`/teams/${team.id}`, '/my/teams')}>
       <TeamAvatar seed={team.id} name={team.name} logoUrl={team.logoUrl} size="lg" />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="tm-my-card-head">
@@ -600,21 +586,6 @@ function MyTeamCard({ team }: { team: MyTeam }) {
   );
 }
 
-function MemberGroup({ title, members }: { title: string; members: MyMember[] }) {
-  return (
-    <section>
-      <div className="tm-my-section-label">{title}</div>
-      {/* #14: 멤버/요청이 없을 때 빈 상태 안내 */}
-      {members.length === 0
-        ? <EmptyState title={`${title}이 없어요`} sub="아직 표시할 항목이 없어요." />
-        : (
-          <div className="tm-my-list-stack">
-            {members.map((member) => <MyMemberCard key={member.id} member={member} />)}
-          </div>
-        )}
-    </section>
-  );
-}
 
 /**
  * 마이페이지의 본인인증 진입점.
@@ -623,7 +594,7 @@ function MemberGroup({ title, members }: { title: string; members: MyMember[] })
  */
 function PhoneVerificationCallout() {
   return (
-    <Card pad={14} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <Card pad={16} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <span
         aria-hidden="true"
         style={{

@@ -22,6 +22,7 @@
 | Method | Path | DTO / Query | 권한 | 용도 |
 |---|---|---|---|---|
 | `GET` | `/api/v1/admin/me` | - | active admin | 내 운영자 역할·capability |
+| `GET` | `/api/v1/admin/hub/inbox` | - | active admin | 처리할 대회 신청·결과 검토·문의·진행 중 대회 집계 |
 | `GET` | `/api/v1/admin/overview` | `AdminOverviewQueryDto` | active admin | 운영 현황 요약 |
 | `GET` | `/api/v1/admin/action-logs` | `AdminLogsQueryDto` | active admin | 관리자 액션 로그 |
 | `GET` | `/api/v1/admin/status-change-logs` | `AdminLogsQueryDto` | active admin | 상태 변경 로그 |
@@ -35,7 +36,12 @@
 | `GET` | `/api/v1/admin/teams` | `AdminTeamListQueryDto` | active admin | 팀 목록 |
 | `GET` | `/api/v1/admin/teams/:teamId` | - | active admin | 팀 상세·활성 팀원 연락처/역할 목록 |
 | `POST` | `/api/v1/admin/teams/:teamId/status` | `ChangeTeamStatusDto` | owner/ops | 팀 상태 변경 |
-| `GET` | `/api/v1/admin/team-matches` | `AdminTeamMatchListQueryDto` | active admin | 팀 매치 목록 |
+| `GET` | `/api/v1/admin/team-matches` | `AdminTeamMatchListQueryDto` | active admin | 팀 매치 목록. 각 행에 `platformManaged`, HOME/승인 팀 ID·이름, `pendingApplicationCount` 포함. 플랫폼 모집은 첫 팀만 승인된 단계에서도 그 팀을 승인 팀 필드에 반환하며, 검색은 제목과 참가·승인 팀명에 적용 |
+| `GET` | `/api/v1/admin/team-matches/:teamMatchId` | — | active admin | 팀 매치 상세 — 상대팀 신청(최근 50건)·확정 상대팀·소속 리그·대표 이미지·실력·경기 조건 포함. 라이브 경기 상태는 현장 콘솔 소관이라 `hasGame` 여부만 준다 |
+| `POST` | `/api/v1/admin/team-matches` | `CreateAdminTeamMatchRecruitmentDto` | owner/ops | 팀을 지정하지 않은 플랫폼 팀매치 모집 생성 |
+| `POST` | `/api/v1/admin/team-matches/:teamMatchId/applications/:applicationId/approve` | `ApproveAdminTeamMatchApplicationDto` | owner/ops | 신청 팀을 한 팀씩 승인. 두 번째 승인에서 경기 확정 |
+| `POST` | `/api/v1/admin/team-matches/:teamMatchId/applications/:applicationId/reject` | `RejectAdminTeamMatchApplicationDto` | owner/ops | 대기 신청을 필수 사유와 함께 거절하고 감사 로그·팀 알림 기록 |
+| `PATCH` | `/api/v1/admin/team-matches/:teamMatchId` | `UpdateAdminTeamMatchRecruitmentDto` | owner/ops | 모집 중인 플랫폼 단발 팀매치를 버전 검사 후 수정 |
 | `POST` | `/api/v1/admin/team-matches/:teamMatchId/status` | `ChangeTeamMatchStatusDto` | owner/ops | 팀 매치 상태 변경 |
 | `GET` | `/api/v1/admin/popups` | `AdminPopupListQueryDto` | active admin | 팝업 목록 |
 | `GET` | `/api/v1/admin/popups/:popupId` | - | active admin | 팝업 상세 |
@@ -169,6 +175,8 @@ type AdminListSummary = {
 ## 상태 변경 DTO
 
 - 매치 `ChangeMatchStatusDto`: `status=recruiting|closed|cancelled|completed|archived`, `reason` 필수(max 500).
+- 개인 매치를 `completed`로 바꾸면 일반 호스트 완료 API와 같은 트랜잭션 계약으로 현재 `active`
+  참가자도 `completed` 처리한다. 완료된 매치는 `archived` 외의 비종료 상태로 되돌릴 수 없다.
 - 팀 `ChangeTeamStatusDto`: `status=active|suspended|archived`, `reason` 필수(max 500).
 - 팀 매치 `ChangeTeamMatchStatusDto`: `status=recruiting|closed|matched|cancelled|completed|archived`, `reason` 필수(max 500).
 - 성공 시 대상 ID, 이전/신규 상태, action/status-change log ID를 반환한다.
@@ -250,3 +258,11 @@ type AdminListSummary = {
 - `apps/v1_api/src/admin/dto/admin-terms.dto.ts`
 - `apps/v1_api/prisma/migrations/20260719043000_v1_admin_active_account_invariant/migration.sql`
 - `apps/v1_web/src/hooks/use-v1-api.ts`
+
+## 대시보드 신청 집계
+
+`GET /api/v1/admin/hub/inbox`의 `pendingRegistrations`는 삭제되지 않은 대회(`regular_tournament` 또는 기존 `kind=null`)의 `awaiting_payment`, `payment_checking`, `paid`, `cancel_requested` 신청만 포함한다. 정규 리그 시즌은 `/admin/tournaments/:id/registrations`에서 조회할 수 없으므로 이 대회 전용 집계에 포함하지 않는다. 리그 신청은 `/admin/league-matches/:leagueId/registrations`에서 관리한다. 응답 필드와 관리자 권한 계약은 유지한다.
+
+#### Task 149 — 팀매치 모집 조건 일치
+
+`POST /admin/team-matches`는 일반 생성과 같은 미래 시작/선택 종료/선택 마감 검증을 사용한다. 경기 스타일은 직접 입력을 포함해 최대 3개다. 신청 마감 뒤에도 접수된 두 팀은 경기 시작 전까지 확정할 수 있다(raw `recruiting`에 한함). 자세한 계약은 [팀매치](team-matches.md#일반관리자-날짜확정-공통-계약-task-149)를 따른다.

@@ -95,11 +95,36 @@ async function grantTakeover(gameId: string, seed: string): Promise<string> {
 
 async function drainOutbox(): Promise<void> {
   const worker = new V1GameOperationsWorkerService(prisma);
-  let guard = 0;
-  // eslint-disable-next-line no-await-in-loop
-  while (await worker.processOne()) {
-    guard += 1;
-    if (guard > 50) throw new Error('Task 24 outbox drain guard exceeded');
+  const ownedGames = await prisma.v1Game.findMany({
+    where: { teamMatchId: { in: [ids.fixtureHidden, ids.fixtureStatusOnly, ids.fixtureMain] } },
+    select: { id: true },
+  });
+  const deadline = Date.now() + 5_000;
+  let processed = 0;
+  for (;;) {
+    // An empty claim means no job is due now, not that projection is complete.
+    while (await worker.processOne()) {
+      processed += 1;
+      if (processed > 50) throw new Error('Task 24 outbox drain guard exceeded');
+    }
+    const unfinished = await prisma.v1OutboxEvent.findMany({
+      where: {
+        aggregateId: { in: ownedGames.map((game) => game.id) },
+        type: { in: ['GAME_RESULT_OFFICIAL', 'GAME_RESULT_VOIDED'] },
+        status: { not: 'COMPLETED' },
+      },
+      select: { type: true, status: true, lastError: true, availableAt: true },
+    });
+    if (unfinished.length === 0) return;
+    // Fail on handler errors rather than silently retrying a broken projection.
+    expect(unfinished.filter((event) => event.status !== 'PENDING' || event.lastError !== null)).toEqual([]);
+    if (unfinished.some((event) => event.availableAt.getTime() > Date.now() + 25)) {
+      throw new Error(`Task 24 immediate projection is scheduled in the future: ${JSON.stringify(unfinished)}`);
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(`Task 24 projections did not complete: ${JSON.stringify(unfinished)}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
   }
 }
 
@@ -121,7 +146,7 @@ async function buildGame(
     orderBy: { version: 'desc' },
   });
   const input: GameSourceCreationInput = {
-    sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+    sourceType: V1GameSourceType.TEAM_MATCH,
     sourceId: fixtureId,
     competitionConfigVersionId: config.id,
     sides: [
@@ -187,7 +212,11 @@ describe('Task 24 public tournament schedule/match and team/player record projec
       data: {
         id: ids.tournament,
         sportId: ids.sport,
+        regionId: ids.region,
         title: 'Task 24 Cup',
+        kind: 'regular_tournament',
+        status: 'in_progress',
+        format: 'league',
         bracketPublishedAt: new Date(),
       },
     });
@@ -201,42 +230,55 @@ describe('Task 24 public tournament schedule/match and team/player record projec
         { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.awayTeam, appliedByUserId: ids.platformOps, status: 'confirmed' },
       ],
     });
-    await prisma.v1TournamentFixture.createMany({
+    await prisma.v1TeamMatch.createMany({
       data: [
         {
           id: ids.fixtureHidden,
           tournamentId: ids.tournament,
-          round: 'group',
-          fixtureNumber: 1,
+          hostTeamId: ids.hostTeam,
+          approvedApplicantTeamId: ids.awayTeam,
+          sportId: ids.sport,
+          regionId: ids.region,
+          title: 'Task 24 Hidden Match',
+          status: 'matched',
+          startAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
           competitionConfigVersionId: config.id,
-          scheduledAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
-          homeRegistrationId: ids.hostRegistration,
-          awayRegistrationId: ids.awayRegistration,
         },
         {
           id: ids.fixtureStatusOnly,
           tournamentId: ids.tournament,
-          round: 'group',
-          fixtureNumber: 2,
+          hostTeamId: ids.hostTeam,
+          approvedApplicantTeamId: ids.awayTeam,
+          sportId: ids.sport,
+          regionId: ids.region,
+          title: 'Task 24 Status Only Match',
+          status: 'matched',
+          startAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
           competitionConfigVersionId: config.id,
-          scheduledAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-          homeRegistrationId: ids.hostRegistration,
-          awayRegistrationId: ids.awayRegistration,
         },
         {
           id: ids.fixtureMain,
           tournamentId: ids.tournament,
-          round: 'group',
-          fixtureNumber: 3,
+          hostTeamId: ids.hostTeam,
+          approvedApplicantTeamId: ids.awayTeam,
+          sportId: ids.sport,
+          regionId: ids.region,
+          title: 'Task 24 Main Match',
+          status: 'matched',
+          startAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
           // Well past scheduledAt-60m so D-02's fallback publishes the
           // lineup even though `V1GameVisibilityPolicy.lineupAt` itself is
           // never written by anything in this worktree yet (Task 14 gap;
           // see the report).
-          scheduledAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-          homeRegistrationId: ids.hostRegistration,
-          awayRegistrationId: ids.awayRegistration,
           competitionConfigVersionId: config.id,
         },
+      ],
+    });
+    await prisma.v1TournamentMatchDetails.createMany({
+      data: [
+        { teamMatchId: ids.fixtureHidden, tournamentId: ids.tournament, round: 'group', fixtureNumber: 1, legNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.awayRegistration },
+        { teamMatchId: ids.fixtureStatusOnly, tournamentId: ids.tournament, round: 'group', fixtureNumber: 2, legNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.awayRegistration },
+        { teamMatchId: ids.fixtureMain, tournamentId: ids.tournament, round: 'group', fixtureNumber: 3, legNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.awayRegistration },
       ],
     });
     await prisma.v1GameOperationFlag.upsert({
@@ -455,6 +497,24 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     expectHttpCode(nonexistent, 404, 'TOURNAMENT_MATCH_NOT_FOUND');
   });
 
+  it('draft and soft-deleted tournaments are indistinguishable from a nonexistent direct match URL', async () => {
+    try {
+      await prisma.v1Tournament.update({ where: { id: ids.tournament }, data: { status: 'draft' } });
+      const draft = await captureFailure(() => tournamentRecords.getMatch(ids.tournament, ids.fixtureMain, undefined));
+      expectHttpCode(draft, 404, 'TOURNAMENT_MATCH_NOT_FOUND');
+
+      await prisma.v1Tournament.update({ where: { id: ids.tournament }, data: { status: 'in_progress' } });
+      await prisma.v1Tournament.update({ where: { id: ids.tournament }, data: { deletedAt: new Date() } });
+      const deleted = await captureFailure(() => tournamentRecords.getMatch(ids.tournament, ids.fixtureMain, undefined));
+      expectHttpCode(deleted, 404, 'TOURNAMENT_MATCH_NOT_FOUND');
+    } finally {
+      await prisma.v1Tournament.update({
+        where: { id: ids.tournament },
+        data: { status: 'in_progress', deletedAt: null },
+      });
+    }
+  });
+
   it('status_only: schedule/match expose lifecycle and the official record but never the numeric score, lineup, or events', async () => {
     const schedule = await tournamentRecords.getSchedule(ids.tournament, {});
     const entry = schedule.items.find((item) => item.fixtureId === ids.fixtureStatusOnly);
@@ -496,6 +556,32 @@ describe('Task 24 public tournament schedule/match and team/player record projec
     expect(consentedEntry?.displayName).toBe('Consented Scorer');
     expect(revokedEntry?.displayName).toBe('Revoked Scorer');
     expect(guestEntry?.displayName).toBe('Guest Scorer');
+  });
+
+  /**
+   * [P1-d · D4] **공개 라인업은 등번호와 이름까지다.** 포지션·선발/후보·좌표는 팀이 짜
+   * 넣은 전술 정보라 팀 전술보드 안에 머물고, 상대 팀과 관중에게는 나가지 않는다.
+   *
+   * 이 테스트가 없으면 회귀를 못 잡는다. 실제로 `position` 이 공개 응답으로 나가고 화면에
+   * 그려지고 있었는데(match-detail-content.tsx), 어느 스펙도 그걸 보고 있지 않았다.
+   * 파일 단위로 훑으면 놓친다 -- 같은 파일에 participants select 가 여러 개이고, 그중
+   * 하나만 `position: true` 였다. **필드가 응답에 나가는지**를 직접 단언한다.
+   */
+  it('공개 라인업에는 포지션·선발여부·좌표가 실리지 않는다 (D4 — 등번호와 이름까지)', async () => {
+    const match = await tournamentRecords.getMatch(ids.tournament, ids.fixtureMain, undefined);
+    const entries = [...(match.lineup?.home ?? []), ...(match.lineup?.away ?? [])];
+    expect(entries.length).toBeGreaterThan(0);
+    for (const entry of entries) {
+      // 있어야 하는 것
+      expect(entry).toHaveProperty('displayName');
+      expect(entry).toHaveProperty('jerseyNumber');
+      // 나가면 안 되는 것
+      expect(entry).not.toHaveProperty('position');
+      expect(entry).not.toHaveProperty('started');
+      expect(entry).not.toHaveProperty('positionX');
+      expect(entry).not.toHaveProperty('positionY');
+      expect(entry).not.toHaveProperty('goalkeeper');
+    }
   });
 
   it('official: the current revision names every scorer in events/lineup regardless of consent (participant-name-public policy), while team goal counts and personal user records stay independent of any scorer\'s consent state', async () => {

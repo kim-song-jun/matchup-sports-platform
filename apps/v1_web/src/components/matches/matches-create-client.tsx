@@ -1,20 +1,28 @@
 'use client';
 
-import { useEffect, useRef, useState, type SetStateAction } from 'react';
+import Link from 'next/link';
+import { useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
-import { useRouter } from 'next/navigation';
+import { useUnsavedChangesGuard } from '@/components/v1-ui/use-unsaved-changes-guard';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
+import { ChevronLeftIcon } from '@/components/v1-ui/icons';
+import { ErrorState } from '@/components/v1-ui/primitives';
 import {
   useV1CancelMatch,
+  useV1CloseMatch,
   useV1CreateMatch,
   useV1MasterRegions,
   useV1MasterSports,
   useV1MatchEdit,
   useV1MyRecentVenues,
+  useV1ReopenMatch,
   useV1UpdateMatch,
   useV1UploadImages,
 } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
-import { clearExpiringDraft, readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
+import { clearExpiringDraft, draftStorageAvailable, readExpiringDraft, writeExpiringDraft } from '@/lib/expiring-draft';
 import { getCreatorProfilePrompt, profileEditHref } from '@/lib/creator-profile';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
 import { lockedReasonLabel } from '@/lib/v1-status-labels';
@@ -41,6 +49,8 @@ type MatchSelection = { sportId: string; regionId: string };
 
 export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep, 'edit'> }) {
   const router = useRouter();
+  // 마법사에 들어온 출처를 단계 사이에 실어 나른다 — 첫 단계 취소가 그 출처로 돌아간다.
+  const from = sanitizeRedirectPath(useSearchParams().get('from'));
   const { confirm, ConfirmModal } = useConfirm();
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();
@@ -58,6 +68,13 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
   // 빈 칸을 전부 orange로 물들이지 않기 위함(스텝별로 별도 라우트라 매 스텝 마운트 시 초기화됨).
   const [attempted, setAttempted] = useState(false);
   const [pendingFocusField, setPendingFocusField] = useState<string | null>(null);
+  const [selectionTouched, setSelectionTouched] = useState(false);
+  const defaultDraftJson = useMemo(() => JSON.stringify(buildDefaultDraft()), []);
+  // 마법사 단계는 모두 /matches/new 아래 — 단계 사이 이동은 묻지 않는다.
+  const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(
+    selectionTouched || JSON.stringify(draft) !== defaultDraftJson,
+    { scope: '/matches/new', draftSaved: true },
+  );
 
   const regionOptions = toDistrictRegionOptions(regions.data ?? []);
 
@@ -126,11 +143,24 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
     submitting: createMatch.isPending,
     onSelectSport: (sportName) => {
       const sport = sports.data?.find((item) => item.name === sportName);
-      if (sport) updateSelection((current) => ({ ...current, sportId: sport.id }));
+      if (!sport) return;
+      setSelectionTouched(true);
+      updateSelection((current) => ({ ...current, sportId: sport.id }));
     },
     onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
-    onRegionChange: (value) => updateSelection((current) => ({ ...current, regionId: value })),
-    onBack: () => router.push(previousCreateHref(step)),
+    onRegionChange: (value) => {
+      setSelectionTouched(true);
+      updateSelection((current) => ({ ...current, regionId: value }));
+    },
+    onBack: () => {
+      if (step !== 'sport') {
+        router.push(withFromPath(previousCreateHref(step), from));
+        return;
+      }
+      void confirmLeave().then((leave) => {
+        if (leave) router.push(from ?? previousCreateHref(step));
+      });
+    },
     onNext: () => {
       // #1: "다음"은 절대 disabled 처리하지 않는다 — 대신 클릭 시 이 스텝의 필수 필드만 로컬
       // 검증해 비어 있으면 이동을 막고, 인라인 에러 + 첫 invalid 필드로 focus를 옮긴다.
@@ -141,7 +171,7 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
         setPendingFocusField(firstInvalidField);
         return;
       }
-      router.push(nextCreateHref(step));
+      router.push(withFromPath(nextCreateHref(step), from));
     },
     uploadImage: async (file: File) => {
       const result = await uploadImages.mutateAsync([file]);
@@ -180,8 +210,9 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
               title: '프로필 정보가 필요해요',
               message: prompt,
               confirmLabel: '프로필 수정',
-            }).then((ok) => {
-              if (ok) router.push(profileEditHref('/matches/new/confirm'));
+            }).then(async (ok) => {
+              // A saved draft survives the trip to the profile; without storage it would be lost, so ask then.
+              if (ok && (draftStorageAvailable() || (await confirmLeave()))) router.push(profileEditHref('/matches/new/confirm'));
             });
             return;
           }
@@ -195,17 +226,23 @@ export function MatchCreatePageClient({ step }: { step: Exclude<MatchCreateStep,
     <>
       <MatchCreatePageView model={model} />
       {ConfirmModal}
+      {UnsavedChangesModal}
     </>
   );
 }
 
 export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const router = useRouter();
+  // 상세가 넘긴 출처(자기 ?from= 포함)가 있으면 취소·저장 뒤 그 상세로 돌아가 체인을 잇는다.
+  const detailHref = sanitizeRedirectPath(useSearchParams().get('from')) ?? `/matches/${matchId}`;
+  const { confirm, ConfirmModal } = useConfirm();
   const editQuery = useV1MatchEdit(matchId);
   const sports = useV1MasterSports();
   const regions = useV1MasterRegions();
   const updateMatch = useV1UpdateMatch(matchId);
   const cancelMatch = useV1CancelMatch(matchId);
+  const closeMatch = useV1CloseMatch(matchId);
+  const reopenMatch = useV1ReopenMatch(matchId);
   const uploadImages = useV1UploadImages();
   const [draft, setDraft] = useState<MatchDraft>(() => buildDefaultDraft());
   const [selectedSportId, setSelectedSportId] = useState('');
@@ -214,6 +251,8 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const [error, setError] = useState<string | null>(null);
   // "변경사항 저장"을 한 번이라도 눌러본 뒤에만 인라인 에러를 보여준다(#1과 동일한 UX 원칙).
   const [editAttempted, setEditAttempted] = useState(false);
+  const [editTouched, setEditTouched] = useState(false);
+  const { UnsavedChangesModal, confirmLeave } = useUnsavedChangesGuard(editTouched);
   const sportOptions = sports.data?.map((sport) => ({ id: sport.id, name: sport.name }))
     ?? (editQuery.data ? [{ id: editQuery.data.form.sportId, name: '현재 종목' }] : []);
   const regionOptions = toDistrictRegionOptions(regions.data ?? []);
@@ -238,6 +277,21 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
   const editMissingFields = editAttempted ? getMatchMissingFields(editCtx) : [];
   const editFieldErrors = toFieldErrorMap(editMissingFields);
 
+  // 모집 마감 / 다시 열기 — 서버 close()/reopen() 이 받아주는 상태와 정확히 같은 조건으로
+  // 버튼을 고른다. 마감은 두 갈래(호스트가 닫은 status='closed' · 마감 시각 경과)라
+  // 둘 다 "다시 열기"로 모은다 — 화면에는 똑같이 "신청 마감"으로 보이기 때문이다.
+  const editStatus = editQuery.data?.status ?? null;
+  const editDeadlineAt = editQuery.data?.form.deadlineAt ?? null;
+  const deadlinePassed = Boolean(editDeadlineAt && new Date(editDeadlineAt).getTime() < Date.now());
+  const recruitingToggleKind = !editQuery.data || editQuery.data.editable === false
+    ? null
+    : editStatus === 'closed' || (editStatus === 'recruiting' && deadlinePassed)
+      ? 'reopen'
+      : editStatus === 'recruiting'
+        ? 'close'
+        : null;
+  const togglePending = closeMatch.isPending || reopenMatch.isPending;
+
   const model = buildCreateModel({
     step: 'edit',
     matchId,
@@ -250,13 +304,63 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     lockedReason: editQuery.data?.editable === false ? lockedReasonLabel(editQuery.data.lockedReason ?? '') : null,
     submitting: updateMatch.isPending || cancelMatch.isPending || editQuery.isLoading,
     fieldErrors: editFieldErrors,
+    recruitingToggle: recruitingToggleKind
+      ? {
+          label: recruitingToggleKind === 'close' ? '모집 마감' : '모집 다시 열기',
+          hint: recruitingToggleKind === 'close'
+            ? '매치는 그대로 두고 새 신청만 받지 않아요. 언제든 다시 열 수 있어요.'
+            : deadlinePassed
+              ? '신청 마감 시각을 지우고 경기 시작 전까지 다시 받아요.'
+              : '다시 신청을 받아요.',
+          pending: togglePending,
+          onClick: async () => {
+            if (togglePending || updateMatch.isPending || cancelMatch.isPending) return;
+            setError(null);
+            if (recruitingToggleKind === 'close') {
+              const ok = await confirm({
+                title: '모집을 마감할까요?',
+                message: '새 신청을 받지 않고, 대기 중인 신청은 종료돼요. 확정된 참가자는 그대로예요 — 나중에 다시 열 수 있어요.',
+                confirmLabel: '모집 마감',
+              });
+              if (!ok) return;
+              closeMatch.mutate(
+                { reason: 'host_closed_from_v1_web' },
+                {
+                  onSuccess: () => router.push(detailHref),
+                  onError: (err) => setError(err instanceof Error ? err.message : '모집을 마감하지 못했어요. 다시 시도해 주세요.'),
+                },
+              );
+              return;
+            }
+            reopenMatch.mutate(
+              { reason: 'host_reopened_from_v1_web' },
+              {
+                onSuccess: () => router.push(detailHref),
+                onError: (err) => setError(err instanceof Error ? err.message : '모집을 다시 열지 못했어요. 다시 시도해 주세요.'),
+              },
+            );
+          },
+        }
+      : undefined,
     onSelectSport: (sportName) => {
       const sport = sportOptions.find((item) => item.name === sportName);
-      if (sport) setSelectedSportId(sport.id);
+      if (!sport) return;
+      setEditTouched(true);
+      setSelectedSportId(sport.id);
     },
-    onFieldChange: (field, value) => setDraft((current) => ({ ...current, [field]: value })),
-    onRegionChange: setRegionId,
-    onBack: () => router.push(`/matches/${matchId}`),
+    onFieldChange: (field, value) => {
+      setEditTouched(true);
+      setDraft((current) => ({ ...current, [field]: value }));
+    },
+    onRegionChange: (value) => {
+      setEditTouched(true);
+      setRegionId(value);
+    },
+    onBack: () => {
+      void confirmLeave().then((leave) => {
+        if (leave) router.push(detailHref);
+      });
+    },
     onNext: () => undefined,
     uploadImage: async (file: File) => {
       const result = await uploadImages.mutateAsync([file]);
@@ -290,13 +394,23 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
         },
       );
     },
-    onCancel: () => {
+    onCancel: async () => {
       if (updateMatch.isPending || cancelMatch.isPending) return;
+      // 되돌리는 API가 없는 파괴적 동작 — 신청자 전원이 cancelled_by_host로 넘어가고
+      // 알림도 나간다. '변경사항 저장' 바로 아래 붙은 버튼이라 오탭 가능성이 높으므로
+      // 확인 없이 즉시 실행하지 않는다.
+      const ok = await confirm({
+        title: '매치를 취소할까요?',
+        message: '취소하면 되돌릴 수 없어요. 신청자 전원의 참가가 취소되고 취소 알림이 발송돼요.',
+        confirmLabel: '매치 취소',
+        tone: 'danger',
+      });
+      if (!ok) return;
       setError(null);
       cancelMatch.mutate(
         { reason: 'host_cancelled_from_v1_web' },
         {
-          onSuccess: () => router.push(`/matches/${matchId}`),
+          onSuccess: () => router.push(detailHref),
           onError: (err) => setError(err instanceof Error ? err.message : '매치를 취소하지 못했어요. 다시 시도해 주세요.'),
         },
       );
@@ -304,7 +418,40 @@ export function MatchEditPageClient({ matchId }: { matchId: string }) {
     submitLabel: '변경사항 저장',
   });
 
-  return <MatchCreatePageView model={model} />;
+  // 수정 대상을 못 불러오면(권한 없음·매치 없음 등) draft/selectedSportId/regionId가 전부
+  // 초기값(빈 문자열)에 머무른다 — 위 StateCard 배너만 얹고 InfoStep을 그대로 렌더하면
+  // 실제 매치 값 대신 빈 폼과, lockedReason 기준으로만 잠기는 저장/취소 버튼이 활성 상태로
+  // 남는다(2026-09-26 alpha 감사). 채울 데이터 자체가 없으니 폼을 그리지 않는다.
+  if (editQuery.isError) {
+    return (
+      <>
+        <div className="tm-desktop-page-head tm-show-desktop">
+          <AppBackLink className="tm-desktop-back" fallbackHref={detailHref}>
+            <ChevronLeftIcon size={20} strokeWidth={2.2} aria-hidden="true" />
+          </AppBackLink>
+          <h1 className="tm-text-heading" style={{ margin: 0 }}>매치 수정</h1>
+        </div>
+        <div className="tm-create-shell tm-match-create-shell">
+          <ErrorState
+            message="수정 권한이 없거나 매치를 불러오지 못했어요."
+            onRetry={() => void editQuery.refetch()}
+            retryLabel="다시 불러오기"
+          />
+          <Link className="tm-btn tm-btn-md tm-btn-neutral tm-btn-block" href={detailHref} style={{ marginTop: 12 }}>
+            매치 상세로 돌아가기
+          </Link>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <MatchCreatePageView model={model} />
+      {ConfirmModal}
+      {UnsavedChangesModal}
+    </>
+  );
 }
 
 function buildCreateModel({
@@ -325,6 +472,7 @@ function buildCreateModel({
   onNext,
   onSubmit,
   onCancel,
+  recruitingToggle,
   uploadImage,
   submitLabel,
   fieldErrors,
@@ -343,12 +491,13 @@ function buildCreateModel({
   lockedReason?: string | null;
   submitting?: boolean;
   onSelectSport: (sportName: string) => void;
-  onFieldChange: (field: keyof MatchDraft, value: string | number) => void;
+  onFieldChange: (field: keyof MatchDraft, value: string | number | boolean) => void;
   onRegionChange: (regionId: string) => void;
   onBack: () => void;
   onNext: () => void;
   onSubmit: () => void;
   onCancel?: () => void;
+  recruitingToggle?: NonNullable<MatchCreateViewModel['form']>['recruitingToggle'];
   uploadImage?: (file: File) => Promise<string>;
   submitLabel?: string;
   /** #1·#2: 스텝별 즉시 검증(create)과 결측 필드 안내(create/edit)가 공유하는 필드 → 문구 맵. */
@@ -381,6 +530,7 @@ function buildCreateModel({
       onNext,
       onSubmit,
       onCancel,
+      recruitingToggle,
       uploadImage,
       submitLabel,
       submitting,
@@ -483,7 +633,9 @@ export function draftFromMatchEdit(edit: V1MatchEdit): MatchDraft {
     description: edit.form.description ?? '',
     image: edit.form.imageUrl ?? buildDefaultDraft().image,
     capacity: edit.form.capacity,
+    hostParticipates: edit.form.hostParticipates !== false,
     rules: edit.form.rulesText ?? '',
+    costNote: edit.form.costNote ?? '',
     gender: normalizeGenderRule(edit.form.genderRule),
     minLevel: levelCodeToDraftLabel(edit.form.minLevelCode) ?? buildDefaultDraft().minLevel,
     maxLevel: levelCodeToDraftLabel(edit.form.maxLevelCode) ?? buildDefaultDraft().maxLevel,
@@ -518,8 +670,14 @@ function nextCreateHref(step: MatchCreateStep) {
   return '/matches/new/confirm';
 }
 
+// toISOString()은 UTC 기준이라 toTimeInput()(로컬 기준)과 섞어 쓰면 KST 00:00~08:59 시작
+// 매치를 수정 화면에서 열 때 날짜만 하루 앞으로 밀린다(2026-08-27 감사
+// M-A-personal-match-state) — 날짜도 로컬 기준으로 뽑아 시간과 같은 기준시를 쓰게 한다.
 function toDateInput(date: Date) {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function toTimeInput(date: Date) {

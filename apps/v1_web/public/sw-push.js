@@ -1,3 +1,87 @@
+// ── 정적 에셋 캐싱 (Wave 3 추가) ──────────────────────────────────────────
+// 이 SW 는 원래 푸시 전용이었다. 캐싱을 별도 SW 파일로 추가하면 같은 origin·
+// scope('/')에 두 번째 controller 를 등록하려는 시도가 되어 **나중 등록이 이
+// 파일을 통째로 교체**한다 — 한 scope 에는 활성 SW 가 하나뿐인 것이 스펙이다.
+// 그래서 캐싱 핸들러를 이 파일 자체에 얹는다(app-persistence-optimization.md §3.1).
+const STATIC_CACHE_NAME = 'teameet-static-v1'; // 파일명이 안정적인 에셋(폰트·브랜드
+  // 이미지 등)을 교체 배포했는데 URL 로는 무효화가 안 될 때, 이 문자열을 수동으로
+  // 올리면(v1→v2) 아래 activate 핸들러가 구 캐시를 지운다.
+const STATIC_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7일 — x-teameet-release
+  // 헤더가 없는(=아래 message 무효화가 오지 않는) 환경(production)을 위한 backstop.
+
+const PRECACHE_URLS = [
+  '/fonts/PretendardVariable.woff2',
+  '/brand/icon-192.png',
+  '/brand/icon-512.png',
+  '/brand/apple-touch-icon.png',
+  '/favicon.png',
+]; // public/ 전체가 아니라 실제로 자주 쓰이는 것만 명시적으로 고른다 — mock/ 등 개발용
+   // 픽스처는 애초에 포함하지 않는다.
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(STATIC_CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)));
+  // skipWaiting()은 부르지 않는다 — 기존 탭이 갑자기 새 SW 로 전환되면 그 탭의 진행
+  // 중이던 fetch 가로채기가 순간 바뀔 수 있다. 새 SW 는 다음 탐색부터 자연스럽게 activate.
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((names) =>
+      Promise.all(
+        names
+          .filter((name) => name.startsWith('teameet-static-') && name !== STATIC_CACHE_NAME)
+          .map((name) => caches.delete(name)),
+      ),
+    ),
+  );
+});
+
+function isStaticAssetRequest(url) {
+  return (
+    url.pathname.startsWith('/_next/static/') ||
+    url.pathname.startsWith('/fonts/') ||
+    url.pathname.startsWith('/brand/') ||
+    url.pathname === '/favicon.png'
+  );
+}
+
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  if (request.method !== 'GET') return; // 뮤테이션은 절대 가로채지 않는다.
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return; // 외부 요청(유튜브 썸네일 등) 불간섭.
+  if (request.mode === 'navigate') return; // HTML — 배포마다 청크 파일명이 바뀌므로
+    // 캐시하면 하드 404 위험(app-persistence-optimization.md §3.2 표 근거).
+  if (url.pathname.startsWith('/api/')) return;
+  if (!isStaticAssetRequest(url)) return; // /uploads/* 등 나머지는 그대로 network.
+
+  event.respondWith(
+    caches.open(STATIC_CACHE_NAME).then(async (cache) => {
+      const cached = await cache.match(request);
+      if (cached) {
+        const cachedAt = Number(cached.headers.get('x-teameet-cached-at') ?? 0);
+        if (Date.now() - cachedAt < STATIC_CACHE_MAX_AGE_MS) return cached;
+      }
+      try {
+        const response = await fetch(request);
+        if (response.ok) {
+          const stamped = new Response(response.clone().body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: new Headers(response.headers),
+          });
+          stamped.headers.set('x-teameet-cached-at', String(Date.now()));
+          cache.put(request, stamped);
+        }
+        return response;
+      } catch (err) {
+        if (cached) return cached; // 네트워크 실패(오프라인 등) — 낡아도 캐시가 최선.
+        throw err;
+      }
+    }),
+  );
+});
+
 self.addEventListener('push', (event) => {
   let data = {};
   try {
@@ -111,6 +195,12 @@ self.addEventListener('pushsubscriptionchange', (event) => {
       }
     })(),
   );
+});
+
+// ── 배포 시 캐시 무효화 (release-version-watcher.tsx 연계, §3.3) ─────────
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'TEAMEET_RELEASE_CHANGED') return;
+  event.waitUntil(caches.delete(STATIC_CACHE_NAME));
 });
 
 /** VAPID 공개키(base64url)를 pushManager.subscribe 가 요구하는 Uint8Array 로 바꾼다. */

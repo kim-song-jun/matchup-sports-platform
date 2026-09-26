@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, V1Tournament } from '@prisma/client';
+import { Prisma, V1GameSourceType, V1Tournament } from '@prisma/client';
 import { AdminContextService } from '../common/admin-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,6 +13,8 @@ import { buildPageInfo, paginationArgs } from '../common/pagination/page-args';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { GeocodedCoordinates, KakaoGeocodingService } from './kakao-geocoding.service';
 import { isBracketPublished } from './tournament-detail.presenter';
+import { TOURNAMENT_SURFACE_KIND } from './tournament-surface';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 import {
   AdminTournamentListQueryDto,
   ChangeTournamentStatusDto,
@@ -48,6 +50,40 @@ function nullableText(value: string | null | undefined): string | null | undefin
   return trimmed.length > 0 ? trimmed : null;
 }
 
+/**
+ * 잠금 메시지 끝에 붙이는 **해결 경로** 안내.
+ *
+ * 이 잠금은 영구 불가가 아니다 — `PATCH /admin/tournaments/:id/competition-config` 는
+ * 소급 영향(impact)을 먼저 돌려주고, 운영자가 `confirmRecalculation` + `previewHash` 로
+ * 확인 의사를 밝히면 그때 바꿔 준다(`TournamentCompetitionConfig.change`). 이 update 폼은
+ * 그 확인을 넘길 방법이 없어서 막는 것이지, 규칙이 바꿀 수 없다고 말하는 게 아니다.
+ *
+ * 안내를 붙이는 이유: 문구가 "변경할 수 없어요"로 끝나면 운영자는 영구 불가로 읽고
+ * 엉뚱한 우회를 시도한다 — alpha 실측에서 실제로 **경기 결과를 void 해도 풀리지 않는다**
+ * (게이트가 보는 `startedGameCount` 는 결과뿐 아니라 라인업·이벤트·경기 상태까지 세므로
+ * void 로는 구조적으로 0이 되지 않는다). 되돌릴 방법이 있는데 없다고 믿게 두면 안 된다.
+ */
+const LINEUP_LOCK_ESCAPE_HINT =
+  '꼭 바꿔야 하면 대회 설정 변경에서 소급 영향을 확인한 뒤 진행할 수 있어요.';
+
+/**
+ * 출전 인원·교체 설정 잠금 메시지에 쓸 라벨. 두 필드군은 같은 competition config 버전에
+ * 함께 pin 되어 하나의 게이트를 공유하지만, **거부 메시지는 운영자가 실제로 바꾸려던 것**을
+ * 말해야 한다. 늘 "출전 인원"이라고 하면 교체 방식만 건드린 운영자는 자기가 손대지도 않은
+ * 필드를 고치려 들고, 반대로 늘 둘 다 나열하면 무엇이 막혔는지가 흐려진다.
+ */
+export function lineupLockedFieldLabel(dto: {
+  lineupMaxPlayers?: unknown;
+  substitutionMode?: unknown;
+  maxSubstitutions?: unknown;
+}): string {
+  const sizeRequested = dto.lineupMaxPlayers !== undefined;
+  const substitutionRequested = dto.substitutionMode !== undefined || dto.maxSubstitutions !== undefined;
+  if (sizeRequested && substitutionRequested) return '출전 인원·교체 설정';
+  if (substitutionRequested) return '교체 설정';
+  return '출전 인원';
+}
+
 @Injectable()
 export class TournamentsAdminService {
   private readonly logger = new Logger(TournamentsAdminService.name);
@@ -69,6 +105,9 @@ export class TournamentsAdminService {
     const limit = query.limit ?? 20;
 
     const statusFacetWhere: Prisma.V1TournamentWhereInput = {
+      // 목록과 상태 탭 카운트가 **같은 조건**을 봐야 한다 — 한쪽만 거르면 탭 숫자가
+      // 목록 행 수와 어긋난다. 아래 `where` 가 이 객체를 spread 하므로 둘 다 적용된다.
+      ...TOURNAMENT_SURFACE_KIND,
       deletedAt: null,
       ...(query.sportId ? { sportId: query.sportId } : {}),
       ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
@@ -124,16 +163,26 @@ export class TournamentsAdminService {
 
   async get(user: V1AuthUser, tournamentId: string) {
     await this.adminContext.getActiveAdmin(user.id);
-    const row = await this.prisma.v1Tournament.findFirst({
+    const row = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       include: {
-        _count: { select: { registrations: true, fixtures: true, announcements: true } },
+        _count: { select: { registrations: true, announcements: true } },
         sport: { select: { code: true } },
       },
     });
     if (!row) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
     }
+    const fixtureCount = await this.prisma.v1TournamentMatchDetails.count({
+      where: {
+        tournamentId,
+        teamMatch: {
+          deletedAt: null,
+          tournamentId,
+          game: { sourceType: V1GameSourceType.TEAM_MATCH },
+        },
+      },
+    });
     // row.sport는 스키마상 항상 존재해야 하는 필수 relation(V1Tournament.sportId가
     // required)이지만, 옵셔널 체이닝으로 방어해 둔다 — 이 relation을 모르는(추가 전부터
     // 있던) 다른 테스트의 얕은 목이 undefined를 줘도 loadLineupInfo가 "종목 정보 없음"으로
@@ -144,7 +193,7 @@ export class TournamentsAdminService {
       row._count.registrations,
       {
         registrations: row._count.registrations,
-        fixtures: row._count.fixtures,
+        fixtures: fixtureCount,
         announcements: row._count.announcements,
       },
       lineup,
@@ -259,6 +308,7 @@ export class TournamentsAdminService {
           title: dto.title,
           competitionConfigVersionId,
           format: dto.format ?? 'group_knockout',
+          minMatchesPerTeam: dto.minMatchesPerTeam ?? null,
           registrationDeadlineAt: dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null,
           rosterDeadlineAt: dto.rosterDeadlineAt ? new Date(dto.rosterDeadlineAt) : null,
           scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
@@ -276,6 +326,10 @@ export class TournamentsAdminService {
           bankName: dto.bankName ?? null,
           bankAccount: dto.bankAccount ?? null,
           bankHolder: dto.bankHolder ?? null,
+          // 카드 정지 규정 — 생략하면 null(미적용)이 그대로 저장된다. 기본값을
+          // 넣지 않는 것이 소급 적용 사고를 막는 안전장치다.
+          yellowAccumulationLimit: dto.yellowAccumulationLimit ?? null,
+          redCardSuspensionMatches: dto.redCardSuspensionMatches ?? null,
           rulesText: dto.rulesText ?? null,
           refundPolicyText: dto.refundPolicyText ?? null,
           prizePool: dto.prizePool ?? null,
@@ -323,11 +377,20 @@ export class TournamentsAdminService {
 
   async update(user: V1AuthUser, tournamentId: string, dto: UpdateTournamentDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const existing = await this.prisma.v1Tournament.findFirst({
+    const existing = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!existing) {
       throw new NotFoundException({ code: 'TOURNAMENT_NOT_FOUND', message: '대회를 찾을 수 없어요.' });
+    }
+    // 동시 편집 CAS — 빠른 실패. 실제 방어는 아래 트랜잭션의 updateMany where절이 원자적으로
+    // 한다(이 사이 다른 요청이 끼어들 수 있으므로); 여기서는 흔한 경우를 조기에 걸러낸다.
+    // 같은 관례는 tournament-competition-config.ts:162, tournament-period-settings.service.ts:85.
+    if (existing.updatedAt.toISOString() !== dto.expectedVersion) {
+      throw new ConflictException({
+        code: 'TOURNAMENT_VERSION_CONFLICT',
+        message: '대회 정보가 다른 곳에서 이미 수정됐어요. 새로고침 후 다시 시도해 주세요.',
+      });
     }
 
     // "출전 인원"과 "교체 방식/횟수"는 같은 V1CompetitionConfigVersion.lineup에 함께
@@ -337,6 +400,11 @@ export class TournamentsAdminService {
       dto.lineupMaxPlayers !== undefined ||
       dto.substitutionMode !== undefined ||
       dto.maxSubstitutions !== undefined;
+    // 잠금 메시지는 **운영자가 실제로 바꾸려던 것**을 말해야 한다. 출전 인원과 교체 설정은
+    // 같은 config 버전에 함께 pin 되어 한 게이트를 공유하는데, 메시지가 늘 "출전 인원"이라고
+    // 하면 교체 방식만 건드린 운영자는 자기가 손대지도 않은 필드 얘기를 듣는다
+    // (alpha 실측: 교체 방식만 보낸 PATCH 가 "출전 인원을 변경할 수 없어요"로 거부됐다).
+    const lockedFieldLabel = lineupLockedFieldLabel(dto);
     this.assertSubstitutionPolicyPair(dto.substitutionMode, dto.maxSubstitutions);
     if (lineupConfigChangeRequested) {
       // 종목과 출전 인원/교체 정책을 한 번에 바꾸면 어느 종목 기준으로 후보를 검증해야
@@ -356,7 +424,7 @@ export class TournamentsAdminService {
       if (existing.status === 'in_progress' || existing.status === 'completed') {
         throw new ConflictException({
           code: 'TOURNAMENT_LINEUP_SIZE_LOCKED',
-          message: '대회가 시작된 이후에는 출전 인원·교체 설정을 변경할 수 없어요.',
+          message: `대회가 시작된 이후에는 ${lockedFieldLabel}을 변경할 수 없어요. ${LINEUP_LOCK_ESCAPE_HINT}`,
         });
       }
     }
@@ -434,6 +502,7 @@ export class TournamentsAdminService {
     if (dto.sportId !== undefined) data.sport = { connect: { id: dto.sportId } };
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.format !== undefined) data.format = dto.format;
+    if (dto.minMatchesPerTeam !== undefined) data.minMatchesPerTeam = dto.minMatchesPerTeam ?? null;
     if (dto.registrationDeadlineAt !== undefined) {
       data.registrationDeadlineAt = dto.registrationDeadlineAt ? new Date(dto.registrationDeadlineAt) : null;
     }
@@ -463,6 +532,14 @@ export class TournamentsAdminService {
     if (dto.bankName !== undefined) data.bankName = dto.bankName;
     if (dto.bankAccount !== undefined) data.bankAccount = dto.bankAccount;
     if (dto.bankHolder !== undefined) data.bankHolder = dto.bankHolder;
+    // undefined = 안 보냄(유지), null = 명시적으로 규정 끄기. 둘을 구분해야
+    // "한 번 켜면 못 끄는" 상태가 안 된다.
+    if (dto.yellowAccumulationLimit !== undefined) {
+      data.yellowAccumulationLimit = dto.yellowAccumulationLimit;
+    }
+    if (dto.redCardSuspensionMatches !== undefined) {
+      data.redCardSuspensionMatches = dto.redCardSuspensionMatches;
+    }
     if (dto.rulesText !== undefined) data.rulesText = dto.rulesText;
     if (dto.refundPolicyText !== undefined) data.refundPolicyText = dto.refundPolicyText;
     if (dto.prizePool !== undefined) data.prizePool = dto.prizePool;
@@ -488,6 +565,14 @@ export class TournamentsAdminService {
     if (dto.promoListLocationText !== undefined) data.promoListLocationText = nullableText(dto.promoListLocationText);
     if (dto.promoListPrizeText !== undefined) data.promoListPrizeText = nullableText(dto.promoListPrizeText);
     if (dto.promoListPriority !== undefined) data.promoListPriority = dto.promoListPriority;
+
+    // 아래 최종 업데이트의 CAS 기준값. 기본은 이 메서드가 시작할 때 읽은 existing.updatedAt
+    // 이지만, 바로 아래 lineupConfigChangeRequested 분기가 실제로 TournamentCompetitionConfig
+    // .change()를 커밋하면 그 자체가 Prisma @updatedAt으로 이 행의 updatedAt을 이미 한 번
+    // 앞당긴다 — 그 새 값을 반영하지 않으면 같은 요청 안에서 스스로 CAS 충돌을 내게 된다
+    // (Copilot 리뷰 지적, 실제 결함: 출전 인원과 다른 필드를 한 요청에 같이 보내면 매번
+    // TOURNAMENT_VERSION_CONFLICT가 났을 것).
+    let casBaseline = existing.updatedAt;
 
     // 출전 인원/교체 정책 변경은 다른 필드들과 별도 트랜잭션으로 처리한다 —
     // TournamentCompetitionConfig.change()가 자기 CAS(expectedVersion)와 미완료 픽스처
@@ -533,14 +618,35 @@ export class TournamentsAdminService {
         if (changeResult.confirmationRequired) {
           throw new ConflictException({
             code: 'TOURNAMENT_LINEUP_SIZE_LOCKED',
-            message: '이미 기록된 경기 결과가 있어 출전 인원을 변경할 수 없어요.',
+            // 사유도 사실에 맞춘다 — 이 게이트는 완료된 픽스처뿐 아니라 **기록된 순위**나
+            // **이미 시작된 경기**만 있어도 걸린다(TournamentCompetitionConfig.change 의
+            // requiresRecalculation). "기록된 경기 결과가 있어"로만 안내하면, 결과가 하나도
+            // 없는데 거부당한 운영자는 무엇을 지워야 풀리는지 알 수 없다.
+            message: `이미 진행된 경기나 기록된 결과가 있어 ${lockedFieldLabel}을 변경할 수 없어요. ${LINEUP_LOCK_ESCAPE_HINT}`,
           });
         }
+        // confirmationRequired가 아니면 change()가 실제로 커밋된 것이다 — 그 트랜잭션이
+        // 남긴 새 updatedAt을 이후 CAS 기준으로 삼는다.
+        casBaseline = new Date(changeResult.expectedVersion);
       }
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const tournament = await tx.v1Tournament.update({ where: { id: tournamentId }, data });
+    await this.prisma.$transaction(async (tx) => {
+      // 원자적 CAS 시행부 — where절의 updatedAt이 그 사이 이미 바뀌었으면 count가 0이라
+      // "쓴 줄 없음"으로 걸린다. 이게 X03(관리자 두 명 동시 편집 시 나중 저장이 CAS 충돌
+      // 경고 없이 앞선 저장을 조용히 덮어쓰던 결함)의 근본 수정이다. updateMany는 갱신된
+      // 행을 돌려주지 않으므로, 감사 로그의 afterJson.title은 이번에 보낸 값(data.title)이
+      // 있으면 그 값을, 없으면(제목을 안 바꿨으면) 기존 값을 그대로 쓴다 — 재조회 불필요.
+      const changed = await tx.v1Tournament.updateMany({
+        where: { id: tournamentId, updatedAt: casBaseline },
+        data,
+      });
+      if (changed.count !== 1) {
+        throw new ConflictException({
+          code: 'TOURNAMENT_VERSION_CONFLICT',
+          message: '대회 정보가 다른 곳에서 이미 수정됐어요. 새로고침 후 다시 시도해 주세요.',
+        });
+      }
       await this.adminContext.logAdminAction(
         admin,
         {
@@ -548,19 +654,18 @@ export class TournamentsAdminService {
           targetType: 'tournament',
           targetId: tournamentId,
           beforeJson: { title: existing.title },
-          afterJson: { title: tournament.title },
+          afterJson: { title: data.title ?? existing.title },
         },
         tx,
       );
-      return tournament;
     });
 
-    return this.get(user, updated.id);
+    return this.get(user, tournamentId);
   }
 
   async changeStatus(user: V1AuthUser, tournamentId: string, dto: ChangeTournamentStatusDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const existing = await this.prisma.v1Tournament.findFirst({
+    const existing = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!existing) {
@@ -618,30 +723,53 @@ export class TournamentsAdminService {
   }
 
   /**
-   * 대회가 종료되는 순간, 후기를 쓸 수 있는 사람에게만 후기 요청 알림을 보낸다.
+   * 대회가 종료되는 순간, 후기를 쓸 수 있는 사람에게 후기 요청 알림을 보낸다.
    *
-   * 수신자 조건은 대회 후기 작성 권한과 정확히 같아야 한다(tournament-reviews.service.ts
-   * eligibleTeamWhere) — 참가 확정(confirmed) 팀의 active owner/manager. 넓게 보내면 열어봐야
-   * 쓸 수 없는 알림이 되고, 좁게 보내면 정작 쓸 사람이 못 받는다.
+   * 수신자는 참가 확정(confirmed) 팀의 **활성 멤버 전원**이다 — 대회 후기 권한
+   * (`eligibleTeamWhere`, owner/manager)보다 넓지만 그게 맞다. 후기는 세 종류이고
+   * 팀원(member)도 **상대 선수 후기**를 쓸 수 있어서, 역할로 좁히면 정작 쓸 사람이
+   * 못 받는다. 역할별 경계는 아래 인라인 주석의 표를 참고.
    *
-   * 발송 실패가 상태 전이를 되돌리면 안 되므로 트랜잭션 밖에서, fire-and-forget 계열로 호출한다.
+   * "열어봐야 쓸 수 없는 알림"은 수신자를 좁혀서가 아니라 **도착지**로 푼다 — 이 알림이
+   * 보내는 `/tournaments/:id/awards` 에 팀원용 진입점(`PendingReviewsCard`)이 함께 붙어
+   * 있다. 그게 빠지면 팀원에게 막다른 길이 된다(2026-08-20 그 상태를 고쳤다).
+   *
+   * 발송 실패가 상태 전이를 되돌리면 안 되므로 트랜잭션 밖에서 **best-effort** 로 호출한다
+   * (호출부에서 await + try/catch — 실패는 삼키되 응답 전에 끝낸다). 진짜 fire-and-forget
+   * 으로 떼어내지 않는 이유는, 요청 수명이 끝난 뒤 알림이 조용히 유실되는 것보다 관리자
+   * 응답을 쿼리 한 번만큼 늦추는 편이 낫기 때문이다.
    */
   private async requestTournamentReviews(tournamentId: string) {
     const registrations = await this.prisma.v1TournamentRegistration.findMany({
       where: {
         tournamentId,
         status: 'confirmed',
+        // 확정된 참가 팀의 **활성 멤버 전원**에게 보낸다 — 역할로 좁히지 않는 것이 맞다.
+        //
+        // 후기는 세 종류이고 역할별로 쓸 수 있는 것이 다르다(2026-08-20 오너 확인):
+        //   팀원(member)         상대 선수 후기
+        //   팀장·운영진(owner/manager)  상대 선수 + 상대 팀 + 대회 후기
+        //
+        // 즉 **팀원에게도 쓸 것이 있으므로** 알림 대상에서 빼면 안 된다. 대회 후기가
+        // `eligibleTeamWhere` 로 팀장·운영진에 한정되는 것은 격차가 아니라 설계다
+        // (`tournament-fixture-reviews.service.ts` 의 `canReviewOpponentTeam` 이 같은
+        //  경계를 상대 팀 후기에 적용한다).
+        //
+        // 다만 이 알림이 보내는 `/tournaments/:id/awards` 는 **대회 후기** 화면이라,
+        // 팀원이 자기가 쓸 수 있는 상대 선수 후기로 가는 길이 그 화면에 없었다. 그래서
+        // 같은 변경에서 그 화면에 `PendingReviewsCard` 진입점을 붙였다 — 알림이 막다른
+        // 길로 끝나지 않게 하는 쪽이 수신자를 좁히는 것보다 맞다.
         team: {
           status: 'active',
           deletedAt: null,
-          memberships: { some: { status: 'active', role: { in: ['owner', 'manager'] } } },
+          memberships: { some: { status: 'active' } },
         },
       },
       select: {
         team: {
           select: {
             memberships: {
-              where: { status: 'active', role: { in: ['owner', 'manager'] } },
+              where: { status: 'active' },
               select: { userId: true },
             },
           },
@@ -667,7 +795,7 @@ export class TournamentsAdminService {
    */
   async publishBracket(user: V1AuthUser, tournamentId: string, scheduledAt?: Date) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const existing = await this.prisma.v1Tournament.findFirst({
+    const existing = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
     });
     if (!existing) {
@@ -698,7 +826,7 @@ export class TournamentsAdminService {
       });
 
       if (transition.count === 0) {
-        const current = await tx.v1Tournament.findUnique({
+        const current = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
           where: { id: tournamentId },
           select: { bracketPublishedAt: true, deletedAt: true },
         });
@@ -774,7 +902,7 @@ export class TournamentsAdminService {
 
       if (transition.count === 0) {
         // 예약을 거는 사이 다른 관리자가 즉시 공개했거나, 기존 예약 시각이 지나 공개된 상태.
-        const current = await tx.v1Tournament.findUnique({
+        const current = await findTournamentOnSurface(tx, TOURNAMENT_KINDS, {
           where: { id: tournamentId },
           select: { bracketPublishedAt: true, deletedAt: true },
         });
@@ -814,7 +942,7 @@ export class TournamentsAdminService {
    */
   async unpublishBracket(user: V1AuthUser, tournamentId: string) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const existing = await this.prisma.v1Tournament.findFirst({
+    const existing = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: { bracketPublishedAt: true, bracketPublishScheduledAt: true },
     });
@@ -1087,6 +1215,8 @@ export class TournamentsAdminService {
       bankName: row.bankName,
       bankAccount: row.bankAccount,
       bankHolder: row.bankHolder,
+      yellowAccumulationLimit: row.yellowAccumulationLimit,
+      redCardSuspensionMatches: row.redCardSuspensionMatches,
       rulesText: row.rulesText,
       refundPolicyText: row.refundPolicyText,
       prizePool: row.prizePool,

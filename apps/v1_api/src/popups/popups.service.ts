@@ -1,12 +1,26 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PopupTargetScreen } from './popup-screen';
+
+type ActivePopup = {
+  popupId: string;
+  title: string;
+  body: string;
+  content: Prisma.JsonValue | null;
+  contentVersion: number;
+  targetScreens: string[];
+  targetPaths: string[];
+  linkUrl: string | null;
+  linkLabel: string | null;
+  publishedAt: Date | null;
+};
 
 @Injectable()
 export class PopupsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findActive(screen: PopupTargetScreen, path?: string) {
+  async findActive(screen: PopupTargetScreen, path?: string): Promise<ActivePopup | null> {
     const now = new Date();
     const activeWindow = {
       status: 'published' as const,

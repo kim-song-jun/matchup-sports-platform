@@ -1,0 +1,508 @@
+import {
+  ConflictException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { V1AuthUser } from '../auth/v1-auth-user';
+import { NotificationsService, type NotificationEventType } from '../notifications/notifications.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { archiveEndedContactRooms } from './contact-room-archive';
+import {
+  CreateContactBlockDto,
+  CreateTeamContactDto,
+  DeclineTeamContactDto,
+  UpdateContactPolicyDto,
+} from './dto/team-contact.dto';
+
+/** 한 팀이 24시간 동안 보낼 수 있는 컨택 수. 확정값 — 스펙 §2. */
+const DAILY_SEND_LIMIT = 10;
+/** 일일 한도 초과 응답이 클라이언트에 알려주는 재시도 대기(초). 24시간 rolling window 기준. */
+const RETRY_AFTER_SECONDS = 24 * 60 * 60;
+/** 무응답 컨택이 만료되기까지의 일수. 확정값 — 스펙 §6. */
+const EXPIRY_DAYS = 7;
+
+/**
+ * 응답(수락/거절/철회)이 방에 남기는 시스템 메시지 본문 — 스펙 §3.4.
+ * `V1ChatSystemEventType` 은 joined|left 뿐이고 컬럼이 nullable이라 enum 을 늘리지 않고
+ * `systemEventType: null` + 이 본문 그대로를 쓴다.
+ */
+const CONTACT_SYSTEM_MESSAGE: Record<'accepted' | 'declined' | 'withdrawn', string> = {
+  accepted: '컨택을 수락했어요',
+  declined: '컨택을 거절했어요',
+  withdrawn: '컨택을 철회했어요',
+};
+
+// 이 레포는 공용 에러 헬퍼를 두지 않고 파일마다 로컬로 중복 정의한다
+// (chat/matches/team-matches/teams 4개 서비스가 각각 같은 함수를 갖고 있다).
+function stateConflict(message: string, code = 'STATE_CONFLICT', details?: unknown) {
+  return new ConflictException({ code, message, details });
+}
+
+@Injectable()
+export class TeamContactsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
+
+  /**
+   * team-matches.service.ts 의 emitNotificationToTeamManagers 와 같은 패턴이다.
+   * emitToManyDeferred 는 수신자 해석을 지연시키고 에러를 삼키므로,
+   * 알림 실패가 컨택 생성/수락 자체를 되돌리지 않는다.
+   */
+  private notifyTeamManagers(teamId: string, type: NotificationEventType, targetId: string | null) {
+    this.notifications.emitToManyDeferred(
+      async () => {
+        const rows = await this.prisma.v1TeamMembership.findMany({
+          where: { teamId, status: 'active', role: { in: ['owner', 'manager'] } },
+          select: { userId: true },
+        });
+        return rows.map((row) => row.userId);
+      },
+      type,
+      targetId,
+      undefined,
+    );
+  }
+
+  async create(user: V1AuthUser, toTeamId: string, dto: CreateTeamContactDto) {
+    await this.assertCanManageTeam(user.id, dto.fromTeamId);
+
+    if (dto.fromTeamId === toTeamId) {
+      throw stateConflict('같은 팀에는 컨택을 보낼 수 없어요.', 'TEAM_CONTACT_SELF_NOT_ALLOWED');
+    }
+
+    // advisory lock 트랜잭션 **앞**에서 부른다 — 이 검사는 팀쌍 경합과 무관해서
+    // 락 안에서 부르면 락 유지 시간만 늘어난다.
+    await this.assertRecipientAccepting(dto.fromTeamId, toTeamId);
+
+    const expiresAt = new Date(Date.now() + EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      // 락 키의 팀 id 를 정렬한다. A→B 와 B→A 가 같은 락을 잡아야 양방향 중복 검사가
+      // 실제로 상호배제된다 — 정렬하지 않으면 두 방향이 서로 다른 락을 잡고 동시 통과한다.
+      const [left, right] = [dto.fromTeamId, toTeamId].sort();
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`team-contact:${left}:${right}`}, 0))`;
+
+      const now = new Date();
+      const directionOr = [
+        { fromTeamId: dto.fromTeamId, toTeamId },
+        { fromTeamId: toTeamId, toTeamId: dto.fromTeamId },
+      ];
+
+      // 이 팀쌍의 만료된 대기 건을 먼저 정리한다. advisory lock 안이라 경합이 없다.
+      // 이걸 안 하면 DB 는 requested 인데 화면은 expired 인 상태가 영구히 남아,
+      // Phase 2·3 이나 어드민 쿼리가 status 를 곧이곧대로 읽었을 때 틀린 답을 얻는다.
+      await tx.v1TeamContact.updateMany({
+        where: { status: 'requested', expiresAt: { lt: now }, OR: directionOr },
+        data: { status: 'expired' },
+      });
+      await archiveEndedContactRooms(tx, { OR: directionOr });
+
+      // 활성 = 수락된 것(만료 개념 없음) 또는 아직 만료 전인 대기 건.
+      // 만료 시각이 지난 requested 는 화면에 expired 로 보이므로(그리고 위에서 이미 정리됐으므로)
+      // 활성으로 치지 않는다 — 그래야 같은 팀쌍의 재발송이 영구히 막히지 않는다.
+      const active = await tx.v1TeamContact.findFirst({
+        where: {
+          AND: [
+            { OR: directionOr },
+            { OR: [{ status: 'accepted' }, { status: 'requested', expiresAt: { gt: now } }] },
+          ],
+        },
+        select: { id: true, status: true, chatRoom: { select: { id: true } } },
+      });
+      if (active) {
+        throw stateConflict(
+          '이미 이 팀과 진행 중인 컨택이 있어요.',
+          'TEAM_CONTACT_ALREADY_ACTIVE',
+          { existingContactId: active.id, existingStatus: active.status, existingChatRoomId: active.chatRoom?.id ?? null },
+        );
+      }
+
+      const sentToday = await tx.v1TeamContact.count({
+        where: { fromTeamId: dto.fromTeamId, createdAt: { gte: since } },
+      });
+      if (sentToday >= DAILY_SEND_LIMIT) {
+        // 레이트 리밋은 상태 충돌이 아니다 — 스펙 §8(a) 가 429 를 요구하고 프론트도 그렇게 가정한다.
+        // 실제 Retry-After 헤더는 서비스에서 던지는 예외로는 붙일 수 없어 details 로 내려보낸다.
+        throw new HttpException(
+          {
+            code: 'TEAM_CONTACT_DAILY_LIMIT_EXCEEDED',
+            message: '오늘 보낼 수 있는 컨택을 모두 사용했어요. 내일 다시 시도해 주세요.',
+            details: { retryAfterSeconds: RETRY_AFTER_SECONDS },
+          },
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      const contact = await tx.v1TeamContact.create({
+        data: { fromTeamId: dto.fromTeamId, toTeamId, requestedByUserId: user.id, message: dto.message, expiresAt },
+      });
+      // 컨택 = 채팅방. 요청 시점에 방을 열고 양 팀 운영진 전원을 참가자로 넣는다(스펙 §3.2).
+      // visibleFromAt 을 now 로 두어 "들어왔습니다" 시스템 메시지 없이 첫 메시지가 바로 보이고,
+      // 수신자에게 미읽음 1 로 잡힌다.
+      const room = await tx.v1ChatRoom.create({ data: { teamContactId: contact.id, status: 'active' } });
+      const operatorIds = await this.operatorUserIds(tx, [dto.fromTeamId, toTeamId]);
+      await tx.v1ChatRoomParticipant.createMany({
+        data: operatorIds.map((userId) => ({ chatRoomId: room.id, userId, status: 'active', visibleFromAt: now })),
+        skipDuplicates: true,
+      });
+      const firstMessage = await tx.v1ChatMessage.create({
+        data: { chatRoomId: room.id, senderUserId: user.id, body: dto.message, status: 'sent', messageType: 'text', sentAt: now },
+      });
+      await tx.v1ChatRoom.update({ where: { id: room.id }, data: { lastMessageAt: firstMessage.sentAt } });
+      return { ...contact, chatRoomId: room.id, route: `/chat/${room.id}` };
+    });
+    // 트랜잭션 밖에서 쏜다 — 트랜잭션 안에서 쏘면 이후 커밋 실패로 롤백돼도 알림은 이미 나간 뒤다.
+    // roomId 로 보낸다 — 딥링크가 /chat/{roomId} 라 알림 클릭이 바로 채팅방으로 가야 한다.
+    this.notifyTeamManagers(created.toTeamId, 'team_contact_received', created.chatRoomId);
+    return created;
+  }
+
+  /** 양 팀 owner/manager 활성 userId 중복 제거. 컨택 채팅방 참가자로 넣을 대상. */
+  private async operatorUserIds(tx: Prisma.TransactionClient, teamIds: string[]) {
+    const rows = await tx.v1TeamMembership.findMany({
+      where: { teamId: { in: teamIds }, status: 'active', role: { in: ['owner', 'manager'] } },
+      select: { userId: true },
+    });
+    return Array.from(new Set(rows.map((row) => row.userId)));
+  }
+
+  async accept(user: V1AuthUser, contactId: string) {
+    return this.respond(user, contactId, 'toTeamId', 'accepted');
+  }
+
+  async decline(user: V1AuthUser, contactId: string, dto: DeclineTeamContactDto) {
+    return this.respond(user, contactId, 'toTeamId', 'declined', dto.reason ?? null);
+  }
+
+  async withdraw(user: V1AuthUser, contactId: string) {
+    return this.respond(user, contactId, 'fromTeamId', 'withdrawn');
+  }
+
+  private async respond(
+    user: V1AuthUser,
+    contactId: string,
+    actorSide: 'fromTeamId' | 'toTeamId',
+    nextStatus: 'accepted' | 'declined' | 'withdrawn',
+    declineReason: string | null = null,
+  ) {
+    const contact = await this.prisma.v1TeamContact.findUnique({ where: { id: contactId } });
+    if (!contact) {
+      throw new NotFoundException({ code: 'TEAM_CONTACT_NOT_FOUND', message: '컨택을 찾을 수 없어요.' });
+    }
+    await this.assertCanManageTeam(user.id, contact[actorSide]);
+
+    const status = await this.settleExpiry(contact);
+
+    // 멱등: 이미 목표 상태면 아무것도 쓰지 않고 그대로 돌려준다
+    if (status === nextStatus) {
+      const chatRoomId = await this.findContactRoomId(contactId);
+      return { contact, alreadyProcessed: true, chatRoomId };
+    }
+    if (status !== 'requested') {
+      throw stateConflict(
+        '이미 처리된 컨택이에요.',
+        'TEAM_CONTACT_STATE_CONFLICT',
+        { currentStatus: status },
+      );
+    }
+
+    // updateMany + 응답 시스템 메시지(스펙 §3.4) + room.lastMessageAt 갱신을 하나의
+    // 트랜잭션으로 묶는다 — 상태 전이와 메시지 기록이 따로 커밋되면 "수락은 됐는데
+    // 시스템 메시지는 없는" 반쪽짜리 결과가 남을 수 있다.
+    const { count, chatRoomId } = await this.prisma.$transaction(async (tx) => {
+      const updateResult = await tx.v1TeamContact.updateMany({
+        where: { id: contactId, status: 'requested' },
+        data: {
+          status: nextStatus,
+          respondedByUserId: user.id,
+          respondedAt: new Date(),
+          declineReason,
+        },
+      });
+      if (updateResult.count === 0) {
+        return { count: 0, chatRoomId: null as string | null };
+      }
+
+      // 방이 없는 레거시 행(백필 이전 데이터) 방어 — 있으면 항상 있어야 정상이다.
+      const room = await tx.v1ChatRoom.findUnique({
+        where: { teamContactId: contactId },
+        select: { id: true },
+      });
+      if (room) {
+        const message = await tx.v1ChatMessage.create({
+          data: {
+            chatRoomId: room.id,
+            senderUserId: user.id,
+            body: CONTACT_SYSTEM_MESSAGE[nextStatus],
+            status: 'sent',
+            messageType: 'system',
+            systemEventType: null,
+            sentAt: new Date(),
+          },
+        });
+        // 거절·철회된 컨택 방은 목록에서 치운다("종료된 컨택 보기" 로만 조회, 딥링크는 계속 열림).
+        // 수락은 대화가 시작되는 시점이라 그대로 active 다.
+        await tx.v1ChatRoom.update({
+          where: { id: room.id },
+          data: { lastMessageAt: message.sentAt, ...(nextStatus === 'accepted' ? {} : { status: 'archived' }) },
+        });
+      }
+      return { count: updateResult.count, chatRoomId: room?.id ?? null };
+    });
+
+    if (count === 0) {
+      // 우리가 requested 를 읽은 뒤 누군가 먼저 처리했다.
+      // 최신 상태를 다시 읽어 멱등(같은 결과)과 충돌(다른 결과)을 가른다.
+      const current = await this.prisma.v1TeamContact.findUnique({ where: { id: contactId } });
+      if (!current) {
+        throw new NotFoundException({ code: 'TEAM_CONTACT_NOT_FOUND', message: '컨택을 찾을 수 없어요.' });
+      }
+      if (current.status === nextStatus) {
+        const raceChatRoomId = await this.findContactRoomId(contactId);
+        return { contact: current, alreadyProcessed: true, chatRoomId: raceChatRoomId };
+      }
+      throw stateConflict('이미 처리된 컨택이에요.', 'TEAM_CONTACT_STATE_CONFLICT', {
+        currentStatus: current.status,
+      });
+    }
+
+    const updated = await this.prisma.v1TeamContact.findUniqueOrThrow({ where: { id: contactId } });
+    if (nextStatus === 'accepted' || nextStatus === 'declined') {
+      // 응답 결과는 '보낸 팀' 이 알아야 한다. 철회는 상대가 아직 안 봤으므로 알리지 않는다.
+      // roomId 로 보낸다 — 딥링크가 /chat/{roomId} 라 알림 클릭이 바로 채팅방으로 가야 한다
+      // (create() 의 team_contact_received 와 같은 이유). 백필 뒤엔 방 없는 컨택이 없지만,
+      // 혹시 없으면 contactId 로 폴백하지 않는다 — /chat/{contactId} 는 깨진 링크다
+      // (PR #977 Copilot 지적). targetId 를 비워 링크 없는 알림으로 보낸다.
+      this.notifyTeamManagers(
+        contact.fromTeamId,
+        nextStatus === 'accepted' ? 'team_contact_accepted' : 'team_contact_declined',
+        chatRoomId,
+      );
+    }
+    return { contact: updated, alreadyProcessed: false, chatRoomId };
+  }
+
+  /** 컨택의 채팅방 id 조회. 백필 이전 레거시 행은 방이 없을 수 있어 null 을 허용한다. */
+  private async findContactRoomId(contactId: string): Promise<string | null> {
+    const room = await this.prisma.v1ChatRoom.findUnique({
+      where: { teamContactId: contactId },
+      select: { id: true },
+    });
+    return room?.id ?? null;
+  }
+
+  /**
+   * 만료를 읽기 시점에 반영한다. 이 레포에는 cron 인프라(@nestjs/schedule)가 없어
+   * 배치로 돌릴 수 없다 — team-matches 의 getApiStatus() 와 같은 lazy-flip 방식이다.
+   * 판정과 DB 정리를 한 곳에 모아, 목록 조회와 상태 전이가 서로 다른 답을 내지 않게 한다.
+   */
+  private async settleExpiry(contact: { id: string; status: string; expiresAt: Date }) {
+    if (contact.status !== 'requested' || contact.expiresAt > new Date()) {
+      return contact.status;
+    }
+    // status 를 where 에 넣어 동시에 수락된 건을 덮어쓰지 않게 한다
+    await this.prisma.v1TeamContact.updateMany({
+      where: { id: contact.id, status: 'requested', expiresAt: { lt: new Date() } },
+      data: { status: 'expired' },
+    });
+    await archiveEndedContactRooms(this.prisma, { id: contact.id });
+    return 'expired';
+  }
+
+  // team-matches.service.ts 의 동명 private 메서드와 같은 패턴이다.
+  // 이 레포에는 공유 권한 서비스가 없고 각 서비스가 자기 파일 안에서 중복 구현한다.
+  private async assertCanManageTeam(userId: string, teamId: string) {
+    const membership = await this.prisma.v1TeamMembership.findFirst({
+      where: {
+        teamId,
+        userId,
+        status: 'active',
+        role: { in: ['owner', 'manager'] },
+        team: { status: 'active', deletedAt: null },
+      },
+      select: { id: true },
+    });
+    if (!membership) {
+      throw new ForbiddenException({
+        code: 'PERMISSION_DENIED',
+        message: '팀장 또는 운영진만 할 수 있어요.',
+      });
+    }
+    return membership;
+  }
+
+  /**
+   * 받는 팀이 지금 컨택을 받는 상태인지 본다. 세 가지 거부 사유(차단 / closed /
+   * recruiting_only 인데 모집 중 아님)를 **하나의 응답으로 통일**한다 — 응답이 갈리면
+   * 발신자가 "우리가 차단당했구나" 를 역추론할 수 있다(스펙 §8(b)).
+   */
+  private async assertRecipientAccepting(fromTeamId: string, toTeamId: string) {
+    const notAccepting = () =>
+      new ForbiddenException({
+        code: 'TEAM_CONTACT_NOT_ACCEPTING',
+        message: '이 팀은 지금 컨택을 받지 않고 있어요.',
+      });
+
+    // 리뷰 라운드 1 (I1): 세 조회(차단 / 팀 정책 / host 모집 매치)를 **항상 병렬**로
+    // 돌린다. 순차 실행이면 사유별 DB 왕복 횟수가 다르다 — 차단=1, closed=2,
+    // recruiting_only=3. 응답 본문(코드·메시지)을 통일해도 발신자가 응답 지연시간으로
+    // "우리가 차단당했구나"를 역추론할 수 있는 타이밍 부수 채널이 남는다(스펙 §8(b)).
+    // 항상 3건을 동시에 조회하면 왕복 횟수가 사유와 무관하게 일정해지고, 최악 경로
+    // (원래 3왕복이던 recruiting_only)는 오히려 빨라진다. 컨택 생성은 팀당 하루 10건
+    // 한도라 추가 조회 비용은 무시할 수 있다. 판정 우선순위(차단 → 팀 실재 → closed →
+    // recruiting_only)는 조회를 병렬화해도 그대로 유지한다 — 조회 시점과 판정 순서는 별개다.
+    const [block, team, recruiting] = await Promise.all([
+      // 양방향: 상대가 나를 차단했거나, 내가 상대를 차단했거나.
+      this.prisma.v1TeamContactBlock.findFirst({
+        where: {
+          OR: [
+            { teamId: toTeamId, blockedTeamId: fromTeamId },
+            { teamId: fromTeamId, blockedTeamId: toTeamId },
+          ],
+        },
+        select: { id: true },
+      }),
+      // status/deletedAt 을 함께 건다 — 같은 파일의 assertCanManageTeam 이
+      // 쓰는 필터와 맞춘다. 걸지 않으면 소프트 삭제된 팀도 contactPolicy 가 open 인 한 컨택을
+      // 계속 받아 고아 row 가 생긴다. (unique 아닌 조건이 붙으므로 findFirst 다.)
+      this.prisma.v1Team.findFirst({
+        where: { id: toTeamId, status: 'active', deletedAt: null },
+        select: { contactPolicy: true },
+      }),
+      // '모집 중' = 이 팀이 host 인 recruiting 팀매치가 하나라도 있음 (스펙 §2 확정 결정 5).
+      // 캐시 컬럼을 두지 않는다 — 두면 공고 생성·마감 시 무효화 책임이 새로 생긴다.
+      // policy 가 recruiting_only 가 아니어도 항상 조회한다(위 타이밍 노트 참고).
+      this.prisma.v1TeamMatch.findFirst({
+        where: { hostTeamId: toTeamId, status: 'recruiting' },
+        select: { id: true },
+      }),
+    ]);
+
+    if (block) throw notAccepting();
+    if (!team) {
+      throw new NotFoundException({ code: 'TEAM_NOT_FOUND', message: '팀을 찾을 수 없어요.' });
+    }
+    if (team.contactPolicy === 'closed') throw notAccepting();
+    if (team.contactPolicy === 'recruiting_only' && !recruiting) throw notAccepting();
+  }
+
+  async createBlock(user: V1AuthUser, teamId: string, dto: CreateContactBlockDto) {
+    await this.assertCanManageTeam(user.id, teamId);
+    if (dto.blockedTeamId === teamId) {
+      throw stateConflict('자기 팀은 차단할 수 없어요.', 'TEAM_CONTACT_SELF_BLOCK_NOT_ALLOWED');
+    }
+    // 리뷰 라운드 1 (I2): 없는 팀 id 를 차단 대상으로 보내면 create() 시점에 FK 위반
+    // (P2003)으로 raw 500 이 났다. 팀 실재 여부는 공개 정보라 여기서 404 를 줘도 새는
+    // 정보가 없다 — assertRecipientAccepting 이 쓰는 것과 같은 코드·문구를 재사용한다.
+    const targetTeam = await this.prisma.v1Team.findFirst({
+      where: { id: dto.blockedTeamId, status: 'active', deletedAt: null },
+      select: { id: true },
+    });
+    if (!targetTeam) {
+      throw new NotFoundException({ code: 'TEAM_NOT_FOUND', message: '팀을 찾을 수 없어요.' });
+    }
+
+    const existing = await this.prisma.v1TeamContactBlock.findFirst({
+      where: { teamId, blockedTeamId: dto.blockedTeamId },
+      select: { id: true },
+    });
+    if (existing) return { block: existing, alreadyBlocked: true };
+
+    try {
+      const block = await this.prisma.v1TeamContactBlock.create({
+        data: {
+          teamId,
+          blockedTeamId: dto.blockedTeamId,
+          createdByUserId: user.id,
+          reason: dto.reason ?? null,
+        },
+      });
+      return { block, alreadyBlocked: false };
+    } catch (error) {
+      // 리뷰 라운드 1 (C1): findFirst 로 사전 확인해도 findFirst 와 create() 사이에
+      // 틈이 있다 — 동시 요청(더블클릭·재시도) 두 개가 그 틈을 지나가면 두 번째 create()
+      // 가 @@unique([teamId, blockedTeamId]) 제약(P2002)에 걸린다. 이 저장소엔 전역
+      // P2002 예외 필터가 없어(12곳 전부 서비스 로컬 try/catch) 잡지 않으면 raw 500 +
+      // 영어 메시지가 나간다. 차단은 멱등이 자연스러운 결과이므로 던지지 않고 다시
+      // 조회해 findFirst 경로와 완전히 같은 응답으로 수렴시킨다(패턴 출처:
+      // teams.service.ts 의 changeMembershipJersey).
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const raced = await this.prisma.v1TeamContactBlock.findFirst({
+          where: { teamId, blockedTeamId: dto.blockedTeamId },
+          select: { id: true },
+        });
+        return { block: raced, alreadyBlocked: true };
+      }
+      throw error;
+    }
+  }
+
+  async listBlocks(user: V1AuthUser, teamId: string) {
+    await this.assertCanManageTeam(user.id, teamId);
+    const items = await this.prisma.v1TeamContactBlock.findMany({
+      where: { teamId },
+      orderBy: { createdAt: 'desc' },
+      include: { blockedTeam: { select: { id: true, name: true } } },
+    });
+    return { items };
+  }
+
+  async removeBlock(user: V1AuthUser, teamId: string, blockedTeamId: string) {
+    await this.assertCanManageTeam(user.id, teamId);
+    const result = await this.prisma.v1TeamContactBlock.deleteMany({ where: { teamId, blockedTeamId } });
+    // 멱등: 이미 없으면 그냥 removed:false. 없는 차단을 지우는 건 오류가 아니다.
+    return { removed: result.count > 0 };
+  }
+
+  async updateContactPolicy(user: V1AuthUser, teamId: string, dto: UpdateContactPolicyDto) {
+    await this.assertCanManageTeam(user.id, teamId);
+    const team = await this.prisma.v1Team.update({
+      where: { id: teamId },
+      data: { contactPolicy: dto.contactPolicy },
+      select: { id: true, contactPolicy: true },
+    });
+    return team;
+  }
+
+  /**
+   * 마이 메뉴·팀 관리 메뉴 배지용 요약("팀 컨택의 채팅 흡수" §4). 호출자가 owner/manager 인
+   * 활성 팀 전체의 **대기 중 받은 컨택** 수를 팀별로 센다. 컨택함 목록·상세 API 가 사라지면서
+   * 만료 lazy-flip 의 읽기 경로 담당도 이 메서드가 이어받는다(create/respond 와 함께 세 곳).
+   */
+  async summary(user: V1AuthUser) {
+    const teams = await this.prisma.v1TeamMembership.findMany({
+      where: {
+        userId: user.id,
+        status: 'active',
+        role: { in: ['owner', 'manager'] },
+        team: { status: 'active', deletedAt: null },
+      },
+      select: { teamId: true },
+    });
+    const teamIds = teams.map((row) => row.teamId);
+    if (teamIds.length === 0) return { pendingInbound: 0, byTeam: [] };
+
+    await this.prisma.v1TeamContact.updateMany({
+      where: { toTeamId: { in: teamIds }, status: 'requested', expiresAt: { lt: new Date() } },
+      data: { status: 'expired' },
+    });
+    await archiveEndedContactRooms(this.prisma, { toTeamId: { in: teamIds } });
+    const groups = await this.prisma.v1TeamContact.groupBy({
+      by: ['toTeamId'],
+      where: { toTeamId: { in: teamIds }, status: 'requested' },
+      _count: { _all: true },
+    });
+    const byTeam = teamIds.map((teamId) => ({
+      teamId,
+      pendingInbound: groups.find((group) => group.toTeamId === teamId)?._count._all ?? 0,
+    }));
+    return { pendingInbound: byTeam.reduce((sum, row) => sum + row.pendingInbound, 0), byTeam };
+  }
+}

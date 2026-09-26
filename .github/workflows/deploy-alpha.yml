@@ -4,6 +4,42 @@ on:
   push:
     branches: [dev]
   workflow_dispatch:
+    inputs:
+      # StageB entry points. stageBFinal continues automatically through
+      # final-runtime activation and promotion once the runner commits M11
+      # (deploy/deploy-alpha-stage-b.sh). stageBResume is intentionally
+      # absent — retrying a failed activation is a documented manual
+      # procedure (docs/ops/task168-stage-b-runbook.md), not a scripted
+      # entry point; stageBRecover's own R-A/R-B judgments already refuse to
+      # touch a release once migration-stage.json exists.
+      task168_stage:
+        description: >-
+          Task 168 stage. final (default) is the push-equivalent path;
+          the StageB values are dispatch-only and gated below.
+        required: false
+        type: choice
+        options:
+          - final
+          - stageBFinal
+          - stageBRecover
+        default: final
+      # Optional: the StageA release this StageB dispatch cuts over from. Empty
+      # means "the same commit as this dispatch", the expected case (StageB is
+      # dispatched against the SHA that a prior push already deployed as StageA).
+      task168_predecessor_release_sha:
+        description: "StageA predecessor release SHA for stageBFinal (default: this commit)"
+        required: false
+        type: string
+        default: ""
+      # U11: no default is assumed. StageB dispatch is refused without this.
+      task168_stage_b_timeout_seconds:
+        description: >-
+          Required for stageBFinal/stageBRecover only: the SSM RunShellScript
+          executionTimeout in seconds (U11 — no assumed default; size it from
+          the manual runbook procedure's measured worst-case duration).
+        required: false
+        type: string
+        default: ""
 
 permissions:
   actions: read
@@ -31,6 +67,45 @@ jobs:
           set -Eeuo pipefail
           [[ "${RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]]
           echo "sha=${RELEASE_SHA}" >> "${GITHUB_OUTPUT}"
+
+      # Resolves the stage for every step below. A push event never carries
+      # workflow_dispatch inputs, so GITHUB_EVENT_NAME pins push to
+      # final regardless of what a stale UI default might show —
+      # this is the "push never reaches StageB" guarantee (T1 completion #1).
+      - name: Resolve Task 168 stage
+        id: task168
+        env:
+          STAGE_INPUT: ${{ inputs.task168_stage }}
+          TIMEOUT_INPUT: ${{ inputs.task168_stage_b_timeout_seconds }}
+        run: |
+          set -Eeuo pipefail
+          stage="${STAGE_INPUT:-final}"
+          if [[ "${GITHUB_EVENT_NAME}" != workflow_dispatch ]]; then
+            stage="final"
+          fi
+          case "${stage}" in
+            final|stageBFinal|stageBRecover) ;;
+            *)
+              echo "Unknown task168_stage: '${stage}'" >&2
+              exit 1
+              ;;
+          esac
+          step_timeout_minutes=25
+          if [[ "${stage}" != final ]]; then
+            if [[ -z "${TIMEOUT_INPUT:-}" || ! "${TIMEOUT_INPUT}" =~ ^[0-9]+$ ]]; then
+              echo "task168_stage_b_timeout_seconds is required for ${stage} (U11 has no assumed default)" >&2
+              exit 1
+            fi
+            # executionTimeout + 10 minutes (PR-A2 SSM timeout item): the polling
+            # loop and this step's own timeout must both outlive the SSM document's
+            # own executionTimeout, or a slow-but-successful host run reports as a
+            # step timeout instead of the UNKNOWN_HOST_MAY_BE_RUNNING classification
+            # deploy-alpha-via-ssm.sh is responsible for.
+            step_timeout_minutes=$(( (TIMEOUT_INPUT + 59) / 60 + 10 ))
+          fi
+          echo "stage=${stage}" >> "${GITHUB_OUTPUT}"
+          echo "timeoutSeconds=${TIMEOUT_INPUT:-}" >> "${GITHUB_OUTPUT}"
+          echo "stepTimeoutMinutes=${step_timeout_minutes}" >> "${GITHUB_OUTPUT}"
 
       - name: Wait for matching CI success
         timeout-minutes: 35
@@ -117,15 +192,24 @@ jobs:
         run: |
           set -Eeuo pipefail
           imageTag="sha-${RELEASE_SHA}"
+          toolTag="task168-${RELEASE_SHA}"
           api_exists=false
           web_exists=false
+          tool_exists=false
           aws ecr describe-images --repository-name "${API_REPOSITORY}" \
             --image-ids "imageTag=${imageTag}" >/dev/null 2>&1 && api_exists=true
           aws ecr describe-images --repository-name "${WEB_REPOSITORY}" \
             --image-ids "imageTag=${imageTag}" >/dev/null 2>&1 && web_exists=true
+          aws ecr describe-images --repository-name "${API_REPOSITORY}" \
+            --image-ids "imageTag=${toolTag}" >/dev/null 2>&1 && tool_exists=true
           echo "imageTag=${imageTag}" >> "${GITHUB_OUTPUT}"
+          echo "toolTag=${toolTag}" >> "${GITHUB_OUTPUT}"
           echo "api_exists=${api_exists}" >> "${GITHUB_OUTPUT}"
           echo "web_exists=${web_exists}" >> "${GITHUB_OUTPUT}"
+          echo "tool_exists=${tool_exists}" >> "${GITHUB_OUTPUT}"
+
+      - name: Bind Task 168 final-policy manifest inputs
+        run: bash scripts/release/prepare-task168-final-steady-inputs.sh
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
@@ -136,10 +220,28 @@ jobs:
         with:
           context: .
           file: deploy/Dockerfile.v1-api
+          # Explicit target — Dockerfile.v1-api now has a StageB stage (runtime-task168-final)
+          # in front of this one. Without this, adding that stage would silently retarget
+          # every untargeted build (this one and prod's) to the newest stage in the file.
+          target: runtime
           push: true
           tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.API_REPOSITORY }}:${{ steps.images.outputs.imageTag }}
           cache-from: type=gha,scope=alpha-v1-api
           cache-to: type=gha,mode=max,scope=alpha-v1-api
+          provenance: false
+          sbom: false
+
+      - name: Build and push immutable Task 168 cutover tool
+        if: steps.images.outputs.tool_exists != 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          file: deploy/Dockerfile.v1-api
+          target: task168-cutover-tool
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.API_REPOSITORY }}:${{ steps.images.outputs.toolTag }}
+          cache-from: type=gha,scope=alpha-v1-task168-cutover
+          cache-to: type=gha,mode=max,scope=alpha-v1-task168-cutover
           provenance: false
           sbom: false
 
@@ -171,6 +273,209 @@ jobs:
           IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
         run: bash scripts/release/check-alpha-image-scans.sh
 
+      # ── Task 168 StageB (dispatch-only) ─────────────────────────────────────
+      # Every step in this block is gated on stageBFinal and is a no-op — not
+      # merely skipped-looking, but structurally unreachable — on the push
+      # trigger and on final/stageBRecover dispatches (T1
+      # completion #1/#2). stageBRecover needs none of these: it only diagnoses
+      # and recovers already-staged host state (docs/ops/task168-stage-b-runbook.md)
+      # and is wired directly into the SSM step below.
+      - name: Resolve Task168 StageB final image tag
+        id: stageb-images
+        if: steps.task168.outputs.stage == 'stageBFinal'
+        env:
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          set -Eeuo pipefail
+          # task168-final-<sha> — never sha-<sha> (D-2: that tag is already claimed
+          # by the StageA image the push deploy for this same commit already built,
+          # and reusing it would make "Resolve immutable image tags" above report
+          # api_exists=true and skip building the StageB client entirely).
+          finalImageTag="task168-final-${RELEASE_SHA}"
+          final_exists=false
+          aws ecr describe-images --repository-name "${API_REPOSITORY}" \
+            --image-ids "imageTag=${finalImageTag}" >/dev/null 2>&1 && final_exists=true
+          echo "finalImageTag=${finalImageTag}" >> "${GITHUB_OUTPUT}"
+          echo "final_exists=${final_exists}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build and push Task168 StageB final API image
+        if: steps.task168.outputs.stage == 'stageBFinal' && steps.stageb-images.outputs.final_exists != 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          file: deploy/Dockerfile.v1-api
+          target: runtime-task168-final
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.API_REPOSITORY }}:${{ steps.stageb-images.outputs.finalImageTag }}
+          cache-from: type=gha,scope=alpha-v1-api-task168-final
+          cache-to: type=gha,mode=max,scope=alpha-v1-api-task168-final
+          provenance: false
+          sbom: false
+
+      - name: Prepare Task168 StageB final source inputs
+        id: stageb-inputs
+        if: steps.task168.outputs.stage == 'stageBFinal'
+        env:
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          set -Eeuo pipefail
+          preparedDir="$(mktemp -d)/task168-final-inputs"
+          bash scripts/release/prepare-task168-final-stage-inputs.sh \
+            --source-dir . \
+            --source-commit "${RELEASE_SHA}" \
+            --final-schema deploy/task168-final-drop/schema.prisma \
+            --m11 deploy/task168-final-drop/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql \
+            --output-dir "${preparedDir}"
+          echo "preparedDir=${preparedDir}" >> "${GITHUB_OUTPUT}"
+
+      # Namespaced key (D-2): releases/task168-stage-b/<sha>.tar.gz — never the
+      # StageA key (releases/<sha>.tar.gz), which the push deploy for this same
+      # commit has already claimed. Reuses an existing upload by content hash so
+      # re-dispatching the same SHA does not re-upload.
+      - name: Package and upload Task168 StageB source
+        id: stageb-source
+        if: steps.task168.outputs.stage == 'stageBFinal'
+        env:
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          PREPARED_DIR: ${{ steps.stageb-inputs.outputs.preparedDir }}
+          DEPLOY_BUCKET: ${{ vars.ALPHA_DEPLOY_BUCKET }}
+          EXPECTED_BUCKET_OWNER: ${{ steps.target.outputs.account_id }}
+        run: |
+          set -Eeuo pipefail
+          work="$(mktemp -d)"
+          archive="${work}/task168-stage-b-${RELEASE_SHA}.tar.gz"
+          bash scripts/release/package-task168-final-source.sh \
+            --source-dir . \
+            --source-commit "${RELEASE_SHA}" \
+            --prepared-dir "${PREPARED_DIR}" \
+            --final-schema deploy/task168-final-drop/schema.prisma \
+            --m11 deploy/task168-final-drop/migrations/20260911090000_retire_tournament_fixture_tables/migration.sql \
+            --output-archive "${archive}"
+          archiveSha256="$(sha256sum "${archive}" | awk '{print $1}')"
+          key="releases/task168-stage-b/${RELEASE_SHA}.tar.gz"
+          if versionId="$(aws s3api head-object --bucket "${DEPLOY_BUCKET}" --key "${key}" \
+            --expected-bucket-owner "${EXPECTED_BUCKET_OWNER}" --query VersionId --output text 2>/dev/null)"; then
+            stored="$(aws s3api get-object --bucket "${DEPLOY_BUCKET}" --key "${key}" --version-id "${versionId}" \
+              --expected-bucket-owner "${EXPECTED_BUCKET_OWNER}" "${work}/stored.tar.gz" >/dev/null && \
+              sha256sum "${work}/stored.tar.gz" | awk '{print $1}')"
+            [[ "${stored}" == "${archiveSha256}" ]] ||
+              { echo "Stored StageB source ${key} has a different content hash" >&2; exit 1; }
+          else
+            versionId="$(aws s3api put-object --bucket "${DEPLOY_BUCKET}" --key "${key}" --body "${archive}" \
+              --if-none-match '*' --expected-bucket-owner "${EXPECTED_BUCKET_OWNER}" --query VersionId --output text)"
+          fi
+          echo "sourceVersionId=${versionId}" >> "${GITHUB_OUTPUT}"
+          echo "sourceSha256=${archiveSha256}" >> "${GITHUB_OUTPUT}"
+          # The packager also writes a sidecar attestation at
+          # "${archive}.attestation.json" (its own fixed, script-computed
+          # path) -- this pipeline does not currently read or upload it. The
+          # manifest's rehearsal binding is a user-directed waiver
+          # (TASK168_REHEARSAL_* below), not this attestation.
+
+      # The StageA predecessor's transition receipt and the live DB identity are
+      # generated/known only on the Alpha host — GH Actions has no other path to
+      # them. This mirrors deploy.yml's "Resolve internal API origin" (an SSM
+      # RunShellScript read, no runtime mutation) rather than inventing a new
+      # transport. Least-verified step in this file: it has never been exercised
+      # against real Alpha infra (this session does not touch AWS/SSM/Alpha).
+      - name: Resolve Task168 StageA predecessor transition
+        id: stageb-predecessor
+        if: steps.task168.outputs.stage == 'stageBFinal'
+        env:
+          INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
+          PREDECESSOR_SHA: ${{ inputs.task168_predecessor_release_sha != '' && inputs.task168_predecessor_release_sha || steps.release.outputs.sha }}
+        run: |
+          set -Eeuo pipefail
+          [[ "${PREDECESSOR_SHA}" =~ ^[0-9a-f]{40}$ ]] ||
+            { echo "task168_predecessor_release_sha must be a full commit SHA" >&2; exit 1; }
+          # Ship this checkout's own script bytes as the SSM command payload,
+          # base64-encoded so no quoting/escaping of its content is needed —
+          # the live host tree is whatever a PRIOR StageA push deployed, which
+          # may predate this script's existence, so a path reference on the
+          # host is not reliable here.
+          script_b64="$(base64 < scripts/release/read-task168-stage-a-predecessor.sh | tr -d '\n')"
+          remote_command="echo ${script_b64} | base64 -d | bash -s -- ${PREDECESSOR_SHA}"
+          # JSON, never the `commands=[...]` shorthand: the shorthand parser
+          # rewrites backslash escapes, so the trailing \n that `jq -Rsc` emits
+          # arrived on the host as a literal "n" glued to the last argument.
+          # That corrupted the 40-char SHA and every dispatch died on the
+          # script's own usage (rc 64). Every other SSM caller in this repo
+          # already builds parameters this way.
+          params="$(jq -nc --arg c "${remote_command}" '{commands:[$c]}')"
+          cmd_id="$(aws ssm send-command --instance-ids "${INSTANCE_ID}" \
+            --document-name AWS-RunShellScript \
+            --comment "Teameet Task168 StageB predecessor read ${PREDECESSOR_SHA}" \
+            --parameters "${params}" \
+            --query 'Command.CommandId' --output text)"
+          for _ in $(seq 1 30); do
+            status="$(aws ssm get-command-invocation --command-id "${cmd_id}" \
+              --instance-id "${INSTANCE_ID}" --query Status --output text 2>/dev/null || true)"
+            [[ "${status}" == "InProgress" || "${status}" == "Pending" || -z "${status}" ]] || break
+            sleep 3
+          done
+          if [[ "${status:-}" != "Success" ]]; then
+            echo "Could not read the StageA predecessor transition (status=${status:-unknown})" >&2
+            # Without this the host's own reason never leaves the host, and the
+            # step reports only that something failed.
+            # No 2>/dev/null: if this fetch itself fails (auth, throttling), that
+            # error is the diagnostic. `|| true` keeps it from changing the exit.
+            aws ssm get-command-invocation --command-id "${cmd_id}" --instance-id "${INSTANCE_ID}" \
+              --query 'StandardErrorContent' --output text 2>&1 | head -20 >&2 || true
+            exit 1
+          fi
+          result="$(aws ssm get-command-invocation --command-id "${cmd_id}" \
+            --instance-id "${INSTANCE_ID}" --query StandardOutputContent --output text)"
+          jq -e 'has("path") and has("sha256") and has("apiImage") and has("databaseIdentity") and has("resolvedMigrationAttemptsSha256")' <<< "${result}" >/dev/null ||
+            { echo "Predecessor read did not return the expected fields" >&2; exit 1; }
+          echo "releaseSha=${PREDECESSOR_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "transitionPath=$(jq -r .path <<< "${result}")" >> "${GITHUB_OUTPUT}"
+          echo "transitionSha256=$(jq -r .sha256 <<< "${result}")" >> "${GITHUB_OUTPUT}"
+          echo "apiImage=$(jq -r .apiImage <<< "${result}")" >> "${GITHUB_OUTPUT}"
+          echo "databaseIdentity=$(jq -r .databaseIdentity <<< "${result}")" >> "${GITHUB_OUTPUT}"
+          echo "resolvedMigrationAttemptsSha256=$(jq -r .resolvedMigrationAttemptsSha256 <<< "${result}")" >> "${GITHUB_OUTPUT}"
+
+      - name: Create or reuse Task168 StageB release manifest
+        id: stageb-manifest
+        if: steps.task168.outputs.stage == 'stageBFinal'
+        env:
+          TASK168_STAGE: stageBFinal
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          RELEASE_VERSION: ${{ steps.version.outputs.prerelease }}
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          DEPLOY_BUCKET: ${{ vars.ALPHA_DEPLOY_BUCKET }}
+          EXPECTED_BUCKET_OWNER: ${{ steps.target.outputs.account_id }}
+          SOURCE_VERSION_ID: ${{ steps.stageb-source.outputs.sourceVersionId }}
+          SOURCE_SHA256: ${{ steps.stageb-source.outputs.sourceSha256 }}
+          IMAGE_TAG: ${{ steps.stageb-images.outputs.finalImageTag }}
+          # Web is unchanged by the Prisma schema — reuse StageA's build rather
+          # than rebuild it. cutoverTool likewise reuses StageA's already-built
+          # image: the runner validates the manifest's cutoverTool field for
+          # shape only and never actually invokes it in StageB
+          # (deploy/task168-stage-b-migrate.sh extracts TOOL_IMAGE but never
+          # runs it), so there is nothing StageB-specific to build here.
+          WEB_IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
+          TOOL_IMAGE_TAG: ${{ steps.images.outputs.toolTag }}
+          TASK168_PREDECESSOR_RELEASE_SHA: ${{ steps.stageb-predecessor.outputs.releaseSha }}
+          TASK168_PREDECESSOR_TRANSITION_PATH: ${{ steps.stageb-predecessor.outputs.transitionPath }}
+          TASK168_PREDECESSOR_TRANSITION_SHA256: ${{ steps.stageb-predecessor.outputs.transitionSha256 }}
+          TASK168_PREDECESSOR_API_IMAGE: ${{ steps.stageb-predecessor.outputs.apiImage }}
+          TASK168_PREDECESSOR_DATABASE_IDENTITY: ${{ steps.stageb-predecessor.outputs.databaseIdentity }}
+          TASK168_RESOLVED_MIGRATION_ATTEMPTS_SHA256: ${{ steps.stageb-predecessor.outputs.resolvedMigrationAttemptsSha256 }}
+          # The StageA build of this same release: what the push deploy that
+          # preceded this dispatch installed, and what the runner requires to
+          # be serving the database when StageB quiesces it.
+          TASK168_EXPECTED_RUNNING_API_IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
+          # No isolated T5 rehearsal is wired into this pipeline. Per direct
+          # user instruction (2026-09-14): Alpha is a development environment,
+          # so M11 runs with this waiver instead of a rehearsal receipt. The
+          # runner (deploy/task168-stage-b-migrate.sh) refuses to proceed
+          # unless database.task168.rehearsal.mode is exactly "waived", and
+          # copies this same waiver into the MIGRATION_COMMITTED receipt.
+          TASK168_REHEARSAL_MODE: waived
+          TASK168_REHEARSAL_REASON: "user-directed Alpha run without isolated rehearsal"
+          TASK168_REHEARSAL_DECIDED_AT: "2026-09-14"
+        run: bash scripts/release/create-alpha-release-manifest.sh
+
       - name: Create or reuse immutable release manifest
         id: manifest
         env:
@@ -183,6 +488,7 @@ jobs:
           SOURCE_SHA256: ${{ steps.source.outputs.sourceSha256 }}
           IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
           PREVIOUS_SHA: ${{ steps.rollback-base.outputs.previousSha }}
+          PREVIOUS_STAGE: ${{ steps.rollback-base.outputs.previousStage }}
           MIGRATION_BASE_SHA: ${{ steps.rollback-base.outputs.migrationBaseSha }}
         run: bash scripts/release/create-alpha-release-manifest.sh
 
@@ -193,20 +499,84 @@ jobs:
           SECRET_SLACK_INQUIRY_WEBHOOK_URL: ${{ secrets.SLACK_INQUIRY_WEBHOOK_URL }}
         run: bash scripts/release/sync-alpha-inquiry-slack-env.sh
 
-      - name: Deploy through AWS Systems Manager
-        timeout-minutes: 25
+      - name: Sync FCM service-account runtime env
         env:
+          INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
+          AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
+        run: bash scripts/release/sync-alpha-firebase-env.sh
+
+      # Skipped until the four APNs secrets are registered, rather than failing the deploy.
+      # A push-less alpha is a working alpha; a blocked deploy is not. The step reports which
+      # names are missing so the gap is visible in the run rather than only in a silent
+      # "iOS push disabled" line in the API's startup log.
+      - name: Sync APNs runtime env
+        env:
+          INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
+          AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
+          SECRET_APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+          SECRET_APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+          SECRET_APNS_BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+          SECRET_APNS_PRIVATE_KEY: ${{ secrets.APNS_PRIVATE_KEY }}
+        run: |
+          missing=()
+          for name in SECRET_APNS_KEY_ID SECRET_APNS_TEAM_ID SECRET_APNS_BUNDLE_ID SECRET_APNS_PRIVATE_KEY; do
+            [ -n "${!name:-}" ] || missing+=("${name#SECRET_}")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::warning::APNs secrets are not set, so the host's APNs env was not updated — missing: ${missing[*]}"
+            exit 0
+          fi
+          # Never fails the deploy. Push configuration is a side task here, and the first
+          # version of this step proved the point by blocking an alpha release over the
+          # shape of one secret. A warning is loud enough: the run summary carries it, and
+          # the symptom on the server side is push staying disabled, not a broken alpha.
+          bash scripts/release/sync-alpha-apns-env.sh \
+            || echo "::warning::APNs env sync did not complete; the host's APNs env may be unchanged from before"
+
+      # Same policy as APNs: skipped with a warning until the secrets exist, never blocks a deploy.
+      # The team id is the APNs one (same Apple team); the key is a separate Sign in with Apple key.
+      - name: Sync Sign in with Apple runtime env
+        env:
+          INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
+          AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
+          SECRET_APPLE_SIGN_IN_KEY_ID: ${{ secrets.APPLE_SIGN_IN_KEY_ID }}
+          SECRET_APPLE_SIGN_IN_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+          SECRET_APPLE_SIGN_IN_PRIVATE_KEY: ${{ secrets.APPLE_SIGN_IN_PRIVATE_KEY }}
+          SECRET_APPLE_SIGN_IN_TOKEN_ENCRYPTION_KEY: ${{ secrets.APPLE_SIGN_IN_TOKEN_ENCRYPTION_KEY }}
+        run: |
+          missing=()
+          for name in SECRET_APPLE_SIGN_IN_KEY_ID SECRET_APPLE_SIGN_IN_TEAM_ID SECRET_APPLE_SIGN_IN_PRIVATE_KEY SECRET_APPLE_SIGN_IN_TOKEN_ENCRYPTION_KEY; do
+            [ -n "${!name:-}" ] || missing+=("${name#SECRET_}")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::warning::Sign in with Apple secrets are not set, so Apple token revoke stays disabled on alpha — missing: ${missing[*]}"
+            exit 0
+          fi
+          bash scripts/release/sync-alpha-apple-sign-in-env.sh \
+            || echo "::warning::Sign in with Apple env sync did not complete; the host's env may be unchanged from before"
+
+      - name: Deploy through AWS Systems Manager
+        timeout-minutes: ${{ fromJSON(steps.task168.outputs.stepTimeoutMinutes) }}
+        env:
+          TASK168_STAGE: ${{ steps.task168.outputs.stage }}
+          TASK168_STAGE_B_TIMEOUT_SECONDS: ${{ steps.task168.outputs.timeoutSeconds }}
           RELEASE_SHA: ${{ steps.release.outputs.sha }}
           RELEASE_VERSION: ${{ steps.version.outputs.prerelease }}
           DEPLOY_BUCKET: ${{ vars.ALPHA_DEPLOY_BUCKET }}
           EXPECTED_BUCKET_OWNER: ${{ steps.target.outputs.account_id }}
           INSTANCE_ID: ${{ vars.ALPHA_EC2_INSTANCE_ID }}
+          # final-policy params — the push path.
           SOURCE_VERSION_ID: ${{ steps.source.outputs.sourceVersionId }}
           SOURCE_SHA256: ${{ steps.source.outputs.sourceSha256 }}
           MANIFEST_VERSION_ID: ${{ steps.manifest.outputs.manifestVersionId }}
           MANIFEST_SHA256: ${{ steps.manifest.outputs.manifestSha256 }}
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           AWS_REGION: ${{ vars.ALPHA_AWS_REGION }}
+          # StageB params — unused (empty) on the final path.
+          STAGE_B_SOURCE_VERSION_ID: ${{ steps.stageb-source.outputs.sourceVersionId }}
+          STAGE_B_SOURCE_SHA256: ${{ steps.stageb-source.outputs.sourceSha256 }}
+          STAGE_B_MANIFEST_VERSION_ID: ${{ steps.stageb-manifest.outputs.manifestVersionId }}
+          STAGE_B_MANIFEST_SHA256: ${{ steps.stageb-manifest.outputs.manifestSha256 }}
         run: bash scripts/release/deploy-alpha-via-ssm.sh
 
       - name: Verify public alpha release identity

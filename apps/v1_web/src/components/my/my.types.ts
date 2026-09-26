@@ -1,4 +1,10 @@
 export type MyUser = {
+  /**
+   * 공개 프로필(`/users/:id`) 진입에 쓴다. 로딩·에러 중에는 아직 모르므로 `null` 이고,
+   * 그때는 진입점을 렌더하지 않는다 — 링크를 먼저 그려 두고 눌렀을 때 깨지는 것보다
+   * 안 보이는 편이 낫다.
+   */
+  userId: string | null;
   name: string;
   handle: string;
   region: string;
@@ -19,11 +25,22 @@ export type MyMenuItem = {
   sub: string;
   href: string;
   icon: string;
+  /** 라벨 옆 숫자 배지(예: 답장을 기다리는 컨택 수). 0 이거나 없으면 그리지 않는다. */
+  badge?: number;
+  /** 배지의 스크린리더 문구. badge 를 넣는 쪽이 의미를 함께 넣는다. */
+  badgeLabel?: string;
+  /** 라벨 옆 상태 표시(예: 본인인증 완료). 숫자 배지와 달리 할 일이 아니라 상태라 회색으로 그린다. */
+  tag?: { label: string; icon: string };
 };
 
 export type MyMenuSection = {
   title: string;
   items: MyMenuItem[];
+  /**
+   * 모바일에서 카드 바로 아래로 끌어올릴 섹션. 한 화면에 하나만 켠다 --
+   * 여럿이면 DOM 순서대로 붙어 결국 아무것도 앞당겨지지 않는다.
+   */
+  primary?: boolean;
 };
 
 export type MyHomeViewModel = {
@@ -35,6 +52,11 @@ export type MyHomeViewModel = {
    * false 일 때만 인증 요청 카드를 띄운다.
    */
   phoneVerified?: boolean;
+  /**
+   * 카드가 설 자리. 카드 내용보다 한 홉 먼저 도착하므로, 그 사이 높이를 잡아 두는 데 쓴다.
+   * undefined = 아직 모름(또는 옛 서버) → 예약하지 않는다.
+   */
+  playerCardSlot?: { hidden: boolean; shape: 'rect' | 'shield' };
 };
 
 export type MyMatchStatus = 'pending' | 'approved' | 'recruiting' | 'ended';
@@ -47,19 +69,23 @@ export type MyMatch = {
   statusLabel: string;
   note: string;
   href: string;
+  manageHref: string;
   reviewHref?: string;
 };
 
 export type MyMatchesViewModel = {
+  hasNext?: boolean;
+  loadMorePending?: boolean;
+  loadMoreError?: boolean;
+  onLoadMore?: () => void;
   mode: 'joined' | 'created';
-  title: string;
   summary: Array<{ label: string; value: number; unit: string }>;
   matches: MyMatch[];
-  apiNotice?: {
-    title: string;
-    body: string;
-    tone: 'info' | 'warning';
-  };
+  /** 조회 중. 스켈레톤을 그리고 빈 상태는 띄우지 않는다. */
+  loading: boolean;
+  /** 조회 실패. ErrorState + 재시도를 그린다(예전엔 알림 카드뿐이라 다시 부를 길이 없었다). */
+  error: boolean;
+  onRetry: () => void;
 };
 
 export type MyTeamRole = 'owner' | 'manager' | 'admin' | 'member';
@@ -85,33 +111,7 @@ export type MyTeamsViewModel = {
   summary: Array<{ label: string; value: number | string; unit?: string }>;
 };
 
-export type MyTeamDetailViewModel = {
-  team: MyTeam;
-  actions: MyMenuItem[];
-  recentMatches: MyMatch[];
-  chatHref?: string;
-};
 
-export type MyMember = {
-  /** membershipId(멤버) 또는 applicationId(가입 요청) — React list key에 사용 */
-  id: string;
-  name: string;
-  role: string;
-  meta: string;
-  status: string;
-  actions?: Array<{ label: string; tone?: 'danger'; onSelect: () => void }>;
-  actionPending?: boolean;
-  locked?: boolean;
-};
-
-export type MyTeamMembersViewModel = {
-  teamName: string;
-  activeTab: 'members' | 'requests';
-  tabs: Array<{ key: 'members' | 'requests'; label: string; count: number; onSelect: () => void }>;
-  summary: Array<{ label: string; value: number; unit: string }>;
-  members: MyMember[];
-  requests: MyMember[];
-};
 
 export type ProfileEditViewModel = {
   user: MyUser;

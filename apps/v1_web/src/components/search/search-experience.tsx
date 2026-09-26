@@ -1,13 +1,17 @@
 'use client';
 
-import { Search, X, ChevronLeft, Clock, AlertCircle } from 'lucide-react';
+import { Search, X, ChevronLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useV1Matches, useV1RecentSearches, useV1RecordSearch, useV1TeamMatches, useV1Teams } from '@/hooks/use-v1-api';
+import { useV1LeagueMatches, useV1Matches, useV1RecentSearches, useV1RecordSearch, useV1TeamMatches, useV1Teams } from '@/hooks/use-v1-api';
 import type { V1Match, V1Team, V1TeamMatch } from '@/types/api';
-import { AppChrome } from '@/components/v1-ui/shell';
+import type { V1PublicLeagueListItem } from '@/types/league-match';
+import { formatTournamentDateRangeShort } from '@/lib/date-utils';
 import { trackEvent } from '@/lib/analytics';
+import { EmptyState, ErrorState } from '@/components/v1-ui/primitives';
+import { AUTH_NOTICE_STAGE } from '@/components/auth/auth-page';
+import { withFromPath } from '@/lib/session-storage';
 
 type SearchState = 'results' | 'new' | 'empty' | 'error' | 'stale';
 
@@ -15,25 +19,11 @@ type SearchExperienceProps = {
   state?: SearchState;
 };
 
-const quickFilters = [
-  ['오늘 참여 가능', '오늘 매치만 기준'],
-  ['마감임박', '24시간 이내'],
-  ['초보 환영', '레벨 필터 적용'],
-  ['팀매치 포함', '팀매치 결과 함께 보기'],
-];
-
-const baseResults = [
-  { type: '매치', title: '성수 저녁 풋살', meta: '성수 풋살파크 · 오늘 20:00 · 8/10명', href: '/matches/sample' },
-  { type: '팀매치', title: '마포 풋살 팀매치', meta: '마포 실내체육관 · 토요일 · 상대팀 모집 중', href: '/team-matches/sample' },
-  { type: '팀', title: '성수 러너스 FC', meta: '풋살 · 성동구 · 신입 환영', href: '/teams/sample' },
-];
-
 export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
   const router = useRouter();
   const initialQuery = getInitialQuery(state);
   const [query, setQuery] = useState(initialQuery);
   const [submittedQuery, setSubmittedQuery] = useState(initialQuery);
-  const [selectedQuickFilter, setSelectedQuickFilter] = useState<string | null>(null);
   const shouldSearch = state === 'results' && submittedQuery.trim().length > 0;
   const filters = useMemo(() => ({ query: submittedQuery.trim(), limit: 5, sort: 'recommended' }), [submittedQuery]);
   const recentSearches = useV1RecentSearches();
@@ -41,16 +31,35 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
   const matchesQuery = useV1Matches(filters, { enabled: shouldSearch });
   const teamMatchesQuery = useV1TeamMatches(filters, { enabled: shouldSearch });
   const teamsQuery = useV1Teams(filters, { enabled: shouldSearch });
+  // 리그: GET /league-matches 는 매치/팀매치/팀과 달리 서버 쪽 텍스트 query 필터가 없다
+  // (ListLeagueMatchesQueryDto — sportId/teamId/regionId/state/cursor/limit 뿐, query 없음).
+  // 이 감사 수정은 프론트엔드 표면(홈·검색·sitemap)만 배정돼 있어 백엔드 DTO 확장은
+  // 범위 밖이다 — 대신 최근 순으로 상위 limit개를 받아 클라이언트에서 제목/시리즈명을
+  // substring 매칭한다. 리그 수가 늘어나면 서버 쪽 query 필터가 필요해지므로, 그때는
+  // 이 client-side 필터를 걷어내고 서버 필터로 옮겨야 한다(임시 조치임을 명시).
+  const leagueMatchesQuery = useV1LeagueMatches({ limit: 30 }, { enabled: shouldSearch });
+  const normalizedQuery = submittedQuery.trim().toLowerCase();
+  const leagueResults = useMemo(() => {
+    if (!shouldSearch || !normalizedQuery) return [];
+    return (leagueMatchesQuery.data?.items ?? []).filter(
+      (item) =>
+        item.title.toLowerCase().includes(normalizedQuery) ||
+        (item.seriesTitle?.toLowerCase().includes(normalizedQuery) ?? false),
+    );
+  }, [leagueMatchesQuery.data?.items, normalizedQuery, shouldSearch]);
+  // 상세에서 돌아왔을 때 같은 결과를 다시 보도록 검색어를 출처에 담는다(getInitialQuery 가 q 를 읽는다).
+  const resultFrom = `/search?q=${encodeURIComponent(submittedQuery.trim())}`;
   const apiResults = useMemo(() => {
     if (!shouldSearch) return [];
     return [
-      ...(matchesQuery.data?.items ?? []).map(toMatchResult),
-      ...(teamMatchesQuery.data?.items ?? []).map(toTeamMatchResult),
-      ...(teamsQuery.data?.items ?? []).map(toTeamResult),
+      ...(matchesQuery.data?.items ?? []).map((item) => toMatchResult(item, resultFrom)),
+      ...(teamMatchesQuery.data?.items ?? []).map((item) => toTeamMatchResult(item, resultFrom)),
+      ...(teamsQuery.data?.items ?? []).map((item) => toTeamResult(item, resultFrom)),
+      ...leagueResults.map((item) => toLeagueResult(item, resultFrom)),
     ];
-  }, [matchesQuery.data?.items, shouldSearch, teamMatchesQuery.data?.items, teamsQuery.data?.items]);
-  const loading = shouldSearch && (matchesQuery.isLoading || teamMatchesQuery.isLoading || teamsQuery.isLoading);
-  const errored = shouldSearch && (matchesQuery.isError || teamMatchesQuery.isError || teamsQuery.isError);
+  }, [leagueResults, matchesQuery.data?.items, resultFrom, shouldSearch, teamMatchesQuery.data?.items, teamsQuery.data?.items]);
+  const loading = shouldSearch && (matchesQuery.isLoading || teamMatchesQuery.isLoading || teamsQuery.isLoading || leagueMatchesQuery.isLoading);
+  const errored = shouldSearch && (matchesQuery.isError || teamMatchesQuery.isError || teamsQuery.isError || leagueMatchesQuery.isError);
 
   const viewState = useMemo<SearchState>(() => {
     if (state !== 'results') {
@@ -69,12 +78,13 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
     setSubmittedQuery(next);
   }, [state]);
 
-  // 통합 검색(매치/팀매치/팀)이 실제로 완료된 시점에만 1회 기록한다 — 같은 검색어로
+  // 통합 검색(매치/팀매치/팀/리그)이 실제로 완료된 시점에만 1회 기록한다 — 같은 검색어로
   // 로딩 상태가 재렌더링되는 동안 중복 발화되지 않도록 마지막으로 기록한 검색어를 ref로 추적.
   const trackedSearchRef = useRef<string | null>(null);
   const matchResultCount = matchesQuery.data?.items?.length ?? 0;
   const teamMatchResultCount = teamMatchesQuery.data?.items?.length ?? 0;
   const teamResultCount = teamsQuery.data?.items?.length ?? 0;
+  const leagueResultCount = leagueResults.length;
   useEffect(() => {
     if (!shouldSearch || loading || errored) return;
     const trimmedQuery = submittedQuery.trim();
@@ -84,22 +94,25 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
     // 정보를 검색어로 입력할 수 있으므로(제약 없는 open text), 원문 대신 길이만 전송한다.
     //
     // domain: 설계 문서(docs/superpowers/specs/2026-07-18-logging-ga-analytics-design.md)의
-    // domain enum(match|team|tournament)은 이 통합검색 구현과 어긋난다 — 이 화면은
-    // tournament를 조회하지 않고 대신 match/teamMatch/team 3개 도메인을 항상 동시에
-    // 조회한다. 리터럴 'all'은 어떤 도메인이 실제로 결과를 낳았는지 알 수 없어
+    // domain enum(match|team_match|team, tournament는 제외 명시)은 이제 이 통합검색 구현과
+    // 다시 어긋난다 — 그룹 C 리그 발견성 감사(Task 153 Wave 3)로 league 도메인이 추가됐다.
+    // 이 화면은 tournament는 여전히 조회하지 않고 match/teamMatch/team/league 4개 도메인을
+    // 항상 동시에 조회한다. 리터럴 'all'은 어떤 도메인이 실제로 결과를 낳았는지 알 수 없어
     // 세그먼트 분석이 불가능하므로, 실제로 결과가 있었던 도메인만 콤마로 join해
     // 기록한다(전부 0건이면 빈 문자열 — "빈 검색" 세그먼트로 식별 가능).
+    // 문서(2026-07-18-logging-ga-analytics-design.md)도 이 커밋에서 domain enum에 league를 반영했다.
     const respondingDomains = [
       matchResultCount > 0 ? 'match' : null,
       teamMatchResultCount > 0 ? 'team_match' : null,
       teamResultCount > 0 ? 'team' : null,
+      leagueResultCount > 0 ? 'league' : null,
     ].filter((domain): domain is string => domain !== null);
     trackEvent('search', {
       queryLength: trimmedQuery.length,
       resultCount: apiResults.length,
       domain: respondingDomains.join(','),
     });
-  }, [apiResults.length, errored, loading, matchResultCount, shouldSearch, submittedQuery, teamMatchResultCount, teamResultCount]);
+  }, [apiResults.length, errored, leagueResultCount, loading, matchResultCount, shouldSearch, submittedQuery, teamMatchResultCount, teamResultCount]);
 
   function goBack() {
     if (window.history.length > 1) {
@@ -118,7 +131,7 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
       return;
     }
     router.replace(`/search?q=${encodeURIComponent(nextQuery)}`);
-    recordSearch.mutate({ query: nextQuery, filters: selectedQuickFilter ? { quickFilter: selectedQuickFilter } : undefined });
+    recordSearch.mutate({ query: nextQuery });
   }
 
   function clear() {
@@ -128,40 +141,33 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
   }
 
   function useChip(value: string) {
-    setSelectedQuickFilter(null);
     setQuery(value);
     setSubmittedQuery(value);
     router.replace(`/search?q=${encodeURIComponent(value)}`);
     recordSearch.mutate({ query: value, filters: { source: 'recent' } });
   }
 
-  function toggleQuickFilter(value: string) {
-    setSelectedQuickFilter(value);
-    setQuery(value);
-    setSubmittedQuery(value);
-    router.replace(`/search?q=${encodeURIComponent(value)}`);
-    recordSearch.mutate({ query: value, filters: { quickFilter: value } });
+  function retry() {
+    void Promise.all([matchesQuery.refetch(), teamMatchesQuery.refetch(), teamsQuery.refetch(), leagueMatchesQuery.refetch()]);
   }
 
-  const results = state === 'results' ? apiResults : baseResults;
+  // 결과는 API 에서 온 것만 그린다. 예전엔 /search/new 가 코드에 박힌 카드 3장(죽은 /…/sample
+  // 링크)을 그렸다(2026-09-04 감사 결함) — 가짜 데이터는 어떤 상태에서도 렌더하지 않는다.
+  const results = apiResults;
   const hasEmptyApiResults = shouldSearch && !loading && !errored && apiResults.length === 0;
   const effectiveViewState = viewState === 'results' && hasEmptyApiResults ? 'empty' : viewState;
-  const effectiveShowStateMessage = effectiveViewState === 'empty' || effectiveViewState === 'error' || effectiveViewState === 'stale';
 
   return (
-    <AppChrome
-      title="검색"
-      topBar={false}
-      showSearch={false}
-      showNotifications={false}
-      bottomNav={true}
-    >
-    <div className="tm-search-frame" style={{ width: 'min(100%, var(--v1-app-chrome-frame-width))', height: '100%', minHeight: 0, margin: '0 auto', background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
-      <form className="tm-search-form-bar" onSubmit={submit} style={{ minHeight: 'var(--v1-shell-topbar-height)', padding: '8px 10px 8px 8px', borderBottom: '1px solid var(--grey100)', display: 'flex', alignItems: 'center', gap: 1, background: 'var(--bg)', flexShrink: 0 }}>
-        <button type="button" aria-label="뒤로가기" onClick={goBack} className="tm-search-back-btn tm-hide-desktop" style={{ width: 30, minWidth: 30, height: 40, border: 0, background: 'transparent', borderRadius: 12, display: 'grid', placeItems: 'center', color: 'var(--text-strong)', padding: 0 }}>
+    <div className="tm-search-frame tm-content-enter" style={{ width: 'min(100%, var(--v1-app-chrome-frame-width))', height: '100%', minHeight: 0, margin: '0 auto', background: 'var(--bg)', fontFamily: 'var(--font)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+      {/* 이 화면엔 헤딩이 하나도 없어 스크린리더의 헤딩 이동으로 잡히지 않았다(2026-09-07 실측).
+          검색은 입력창이 곧 주인공이라 보이는 제목을 넣으면 입력이 아래로 밀린다 —
+          /tournaments 와 같이 sr-only 로 준다(세로 비용 0). */}
+      <h1 className="sr-only">검색</h1>
+      <form className="tm-search-form-bar" onSubmit={submit} style={{ minHeight: 'var(--v1-shell-topbar-height)', padding: '8px 12px 8px 8px', borderBottom: '1px solid var(--grey100)', display: 'flex', alignItems: 'center', gap: 1, background: 'var(--bg)', flexShrink: 0 }}>
+        <button type="button" aria-label="뒤로가기" onClick={goBack} className="tm-search-back-btn tm-hide-desktop tm-tap-44" style={{ width: 30, minWidth: 30, height: 40, border: 0, background: 'transparent', borderRadius: 'var(--radius-control)', display: 'grid', placeItems: 'center', color: 'var(--text-strong)', padding: 0 }}>
           <ChevronLeft size={20} />
         </button>
-        <div className="tm-search-input-wrap" style={{ flex: 1, minHeight: 44, borderRadius: 14, background: 'var(--grey100)', border: viewState === 'error' ? '1px solid var(--red500)' : query ? '1px solid var(--blue500)' : '1px solid transparent', display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px 0 14px', minWidth: 0 }}>
+        <div className="tm-search-input-wrap" style={{ flex: 1, minHeight: 44, borderRadius: 'var(--radius-field)', background: 'var(--grey100)', border: viewState === 'error' ? '1px solid var(--red500)' : query ? '1px solid var(--blue500)' : '1px solid transparent', display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px 0 16px', minWidth: 0 }}>
           <input
             aria-label="검색어"
             value={query}
@@ -172,25 +178,29 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
             autoFocus
           />
           {query ? (
-            <button type="button" aria-label="검색어 지우기" onClick={clear} style={{ width: 30, minWidth: 30, height: 30, border: 0, background: 'transparent', display: 'grid', placeItems: 'center', padding: 0 }}>
-              <span style={{ width: 20, height: 20, borderRadius: 999, background: 'var(--grey400)', color: 'var(--static-white)', display: 'grid', placeItems: 'center' }}>
+            <button type="button" aria-label="검색어 지우기" onClick={clear} className="tm-tap-44" style={{ width: 30, minWidth: 30, height: 30, border: 0, background: 'transparent', display: 'grid', placeItems: 'center', padding: 0 }}>
+              <span style={{ width: 20, height: 20, borderRadius: 'var(--radius-pill)', background: 'var(--grey400)', color: 'var(--static-white)', display: 'grid', placeItems: 'center' }}>
                 <X size={13} />
               </span>
             </button>
           ) : null}
-          <button type="submit" aria-label="검색" style={{ width: 34, minWidth: 34, height: 34, border: 0, background: 'transparent', borderRadius: 11, display: 'grid', placeItems: 'center', color: viewState === 'error' ? 'var(--red500)' : 'var(--blue500)', padding: 0 }}>
+          <button type="submit" aria-label="검색" className="tm-tap-44" style={{ width: 34, minWidth: 34, height: 34, border: 0, background: 'transparent', borderRadius: 11, display: 'grid', placeItems: 'center', color: viewState === 'error' ? 'var(--red500)' : 'var(--blue500)', padding: 0 }}>
             <Search size={19} />
           </button>
         </div>
       </form>
 
-      <div className="tm-search-body" style={{ flex: 1, overflow: 'auto', padding: '18px var(--v1-shell-page-x) calc(22px + var(--v1-shell-safe-bottom))' }}>
+      <div className="tm-search-body" style={{ flex: 1, overflow: 'auto', padding: '20px var(--v1-shell-page-x) calc(24px + var(--v1-shell-safe-bottom))' }}>
         <div className="tm-search-panel">
           <div className="tm-search-panel-col">
             <div className="tm-text-label">최근 검색</div>
-            <div className="tm-search-recent-chips" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-              {(recentSearches.data?.items ?? []).map((item, index) => (
-                <button key={item.id} type="button" onClick={() => useChip(item.query)} className={`tm-chip ${index === 0 ? 'tm-chip-active' : ''}`}>
+            <div className="tm-search-recent-chips" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+              {/* 최근 검색어 칩엔 "선택된" 상태가 없다 — 눌러서 그 검색어로 재검색할 뿐,
+                  다른 칩과 구분되는 활성 상태를 유지하지 않는다. index===0 이라는 이유만으로
+                  tm-chip-active(앱 전역에서 "선택된 필터"를 뜻하는 클래스)를 주면 실제로는
+                  아무것도 선택되지 않았는데 첫 칩만 선택된 것처럼 보인다. */}
+              {(recentSearches.data?.items ?? []).map((item) => (
+                <button key={item.id} type="button" onClick={() => useChip(item.query)} className="tm-chip">
                   {item.query}
                 </button>
               ))}
@@ -202,62 +212,60 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
               ) : null}
             </div>
 
-            <div className="tm-text-label" style={{ marginTop: 20 }}>빠른 조건</div>
-            <div className="tm-search-quick-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
-              {quickFilters.map(([title, sub]) => {
-                const selected = selectedQuickFilter === title;
-                return (
-                  <button key={title} type="button" onClick={() => toggleQuickFilter(title)} className="tm-card tm-card-interactive" aria-pressed={selected} style={{ textAlign: 'left', padding: 14, border: 0, background: selected ? 'var(--blue50)' : 'var(--bg)' }}>
-                    <div className="tm-text-label" style={{ color: selected ? 'var(--blue700)' : 'var(--text-strong)' }}>{title}</div>
-                    <div className="tm-text-micro" style={{ marginTop: 4, color: 'var(--text-caption)' }}>{sub}</div>
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
           <div className="tm-search-results-col">
-            <div style={{ height: 1, background: 'var(--grey100)', margin: '20px 0 18px' }} className="tm-hide-desktop" />
+            <div style={{ height: 1, background: 'var(--grey100)', margin: '20px 0 20px' }} className="tm-hide-desktop" />
             <div className="tm-search-results-header">
               <div className="tm-text-label">검색 결과</div>
               {submittedQuery ? (
                 <div className="tm-text-caption" style={{ marginTop: 2 }}>
-                  {submittedQuery} · 매치/팀매치/팀 통합 조회
+                  {submittedQuery} · 매치/팀매치/팀/정규 리그 통합 조회
                 </div>
               ) : null}
             </div>
 
             {effectiveViewState === 'results' ? (
-              <div className="tm-search-results-list" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+              <div className="tm-search-results-list" style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
                 {results.map((item) => (
-                  <button key={item.title} type="button" onClick={() => router.push(item.href)} className="tm-card tm-card-interactive tm-search-result-card" style={{ width: '100%', textAlign: 'left', border: 0, background: 'var(--bg)', padding: 14 }}>
+                  <button key={item.title} type="button" onClick={() => router.push(item.href)} className="tm-card tm-card-interactive tm-search-result-card" style={{ width: '100%', textAlign: 'left', border: 0, background: 'var(--bg)', padding: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span className="tm-badge tm-badge-blue tm-badge-sm">{item.type}</span>
                       <div className="tm-text-body-lg">{item.title}</div>
                     </div>
-                    <div className="tm-text-caption" style={{ marginTop: 6 }}>{item.meta}</div>
+                    <div className="tm-text-caption" style={{ marginTop: 8 }}>{item.meta}</div>
                   </button>
                 ))}
               </div>
             ) : null}
 
+            {/* 상태 화면은 전부 공용 EmptyState/ErrorState — 예전의 회색 사각 아이콘 + 한 줄 문구(다음 행동 없음)를
+                그래픽 → 타이틀 → 다음 행동 순서로 통일한다. 나침반은 인증 안내와 같은 자산("다른 길이 있다"). */}
             {effectiveViewState === 'new' ? (
-              <div className="tm-search-state-msg" style={{ marginTop: 42, textAlign: 'center', color: 'var(--text-muted)' }}>
-                <div style={{ width: 48, height: 48, borderRadius: 16, background: 'var(--grey50)', display: 'grid', placeItems: 'center', margin: '0 auto 14px', color: 'var(--grey500)' }}>
-                  <Search size={22} />
-                </div>
-                <div className="tm-text-body-lg">검색어를 입력하거나 조건을 선택해 주세요</div>
-                <div className="tm-text-caption" style={{ marginTop: 6 }}>최근 검색과 빠른 조건은 검색 전에도 그대로 있어요.</div>
-              </div>
+              <EmptyState
+                illustration={{ name: AUTH_NOTICE_STAGE.illustration }}
+                title="무엇을 찾고 있나요?"
+                sub="매치·팀매치·팀·정규 리그를 검색어 하나로 한 번에 찾아요."
+              />
             ) : null}
 
-            {effectiveShowStateMessage ? (
-              <div className="tm-search-state-msg" style={{ marginTop: 42, textAlign: 'center', color: 'var(--text-muted)' }}>
-                <div style={{ width: 48, height: 48, borderRadius: 16, background: 'var(--grey50)', display: 'grid', placeItems: 'center', margin: '0 auto 14px', color: effectiveViewState === 'error' ? 'var(--red500)' : 'var(--grey500)' }}>
-                  {effectiveViewState === 'stale' ? <Clock size={22} /> : effectiveViewState === 'error' ? <AlertCircle size={22} /> : <Search size={22} />}
-                </div>
-                <div className="tm-text-body-lg">{effectiveViewState === 'stale' ? '최신 결과를 불러오는 중이에요.' : effectiveViewState === 'error' ? '검색 결과를 불러오지 못했어요.' : '검색 결과가 없어요.'}</div>
-                <div className="tm-text-caption" style={{ marginTop: 6 }}>검색어와 조건은 그대로 남아 있어요.</div>
+            {effectiveViewState === 'empty' ? (
+              <EmptyState
+                illustration={{ name: AUTH_NOTICE_STAGE.illustration }}
+                title="조건에 맞는 결과가 없어요"
+                sub="검색어를 바꾸거나 전체 매치를 둘러보면 다른 경기가 보여요."
+                cta="전체 매치 둘러보기"
+                onCta={() => router.push('/matches')}
+              />
+            ) : null}
+
+            {effectiveViewState === 'error' ? (
+              <ErrorState title="검색 결과를 불러오지 못했어요" message="검색어와 조건은 그대로 남아 있어요. 다시 불러올 수 있어요." onRetry={retry} retryLabel="다시 불러오기" />
+            ) : null}
+
+            {effectiveViewState === 'stale' ? (
+              <div className="tm-text-caption tm-search-state-loading" role="status" style={{ marginTop: 24, textAlign: 'center', color: 'var(--text-caption)' }}>
+                최신 결과를 불러오는 중이에요
               </div>
             ) : null}
           </div>
@@ -265,12 +273,11 @@ export function SearchExperience({ state = 'results' }: SearchExperienceProps) {
       </div>
 
       {effectiveViewState === 'error' ? (
-        <div className="tm-search-error-toast" style={{ position: 'absolute', left: 'var(--v1-shell-page-x)', right: 'var(--v1-shell-page-x)', bottom: 'calc(22px + var(--v1-shell-safe-bottom))', minHeight: 48, borderRadius: 14, background: 'var(--scrim-dark-94)', color: 'var(--static-white)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 14px', fontSize: 13, fontWeight: 700 }}>
+        <div className="tm-native-toast-card tm-search-error-toast" style={{ position: 'absolute', left: 'var(--v1-shell-page-x)', right: 'var(--v1-shell-page-x)', bottom: 'calc(22px + var(--v1-shell-safe-bottom))', minHeight: 48, borderRadius: 'var(--radius-field)', background: 'var(--scrim-dark-94)', color: 'var(--static-white)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 16px', fontSize: 13, fontWeight: 700 }}>
           검색 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.
         </div>
       ) : null}
     </div>
-    </AppChrome>
   );
 }
 
@@ -280,30 +287,43 @@ function getInitialQuery(state: SearchState) {
   return new URLSearchParams(window.location.search).get('q') ?? '';
 }
 
-function toMatchResult(item: V1Match) {
+function toMatchResult(item: V1Match, from: string) {
   return {
     type: '매치',
     title: item.title,
     meta: [item.sport?.name ?? item.sportName, item.place?.name ?? item.placeName, formatDateTime(item.startsAt), item.capacityText].filter(Boolean).join(' · '),
-    href: `/matches/${item.matchId ?? item.id}`,
+    // 뒤로가기가 검색 결과로 돌아오도록 출처를 함께 넘긴다(각 상세 화면이 `?from=`을 읽는다).
+    href: withFromPath(`/matches/${item.matchId ?? item.id}`, from),
   };
 }
 
-function toTeamMatchResult(item: V1TeamMatch) {
+function toTeamMatchResult(item: V1TeamMatch, from: string) {
   return {
     type: '팀매치',
     title: item.title,
     meta: [item.sport?.name ?? item.sportName, item.hostTeam?.name ?? item.hostTeamName, item.place?.name ?? item.placeName, formatDateTime(item.startsAt)].filter(Boolean).join(' · '),
-    href: `/team-matches/${item.teamMatchId ?? item.id}`,
+    href: withFromPath(`/team-matches/${item.teamMatchId ?? item.id}`, from),
   };
 }
 
-function toTeamResult(item: V1Team) {
+function toLeagueResult(item: V1PublicLeagueListItem, from: string) {
+  const dateLabel = formatTournamentDateRangeShort(item.startsOn, item.endsOn);
+  return {
+    type: '정규 리그',
+    title: item.title,
+    meta: [item.sport.name, item.region.name, item.tierLabel, dateLabel ?? '일정 미정', `${item.teamCount}팀 참가`]
+      .filter(Boolean)
+      .join(' · '),
+    href: withFromPath(`/league-matches/${item.leagueId}`, from),
+  };
+}
+
+function toTeamResult(item: V1Team, from: string) {
   return {
     type: '팀',
     title: item.name,
     meta: [item.sport?.name ?? item.sportName, item.region?.name ?? item.regionName, `${item.memberCount}명`, item.joinPolicy === 'approval_required' ? '신입 환영' : '모집 마감'].filter(Boolean).join(' · '),
-    href: `/teams/${item.teamId ?? item.id}`,
+    href: withFromPath(`/teams/${item.teamId ?? item.id}`, from),
   };
 }
 

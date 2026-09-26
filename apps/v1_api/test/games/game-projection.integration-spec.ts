@@ -238,11 +238,11 @@ describe('Task 9 game projection real-database contract', () => {
         FROM pg_class AS relation
         INNER JOIN pg_namespace AS relation_namespace ON relation_namespace.oid = relation.relnamespace
         WHERE relation_namespace.nspname = current_schema()
-          AND relation.relname = 'v1_tournament_fixture_advancement_edges'
+          AND relation.relname = 'v1_tournament_match_advancement_edges'
       `;
 
       expect(catalog).toEqual([
-        { tableName: 'v1_tournament_fixture_advancement_edges', relationKind: 'r' },
+        { tableName: 'v1_tournament_match_advancement_edges', relationKind: 'r' },
       ]);
 
       const constraints = await prisma.$queryRaw<Array<{ constraintName: string; constraintType: string }>>`
@@ -251,16 +251,16 @@ describe('Task 9 game projection real-database contract', () => {
         INNER JOIN pg_class AS relation ON relation.oid = constraint_row.conrelid
         INNER JOIN pg_namespace AS relation_namespace ON relation_namespace.oid = relation.relnamespace
         WHERE relation_namespace.nspname = current_schema()
-          AND relation.relname = 'v1_tournament_fixture_advancement_edges'
+          AND relation.relname = 'v1_tournament_match_advancement_edges'
         ORDER BY constraint_row.conname ASC
       `;
       const constraintNames = new Set(constraints.map(({ constraintName }) => constraintName));
 
       expect({
-        sourceOutcomeUnique: constraintNames.has('v1_fixture_advancement_source_outcome_key'),
-        targetSideUnique: constraintNames.has('v1_fixture_advancement_target_side_key'),
-        sourceFixtureForeignKey: constraintNames.has('v1_fixture_advancement_source_fk'),
-        targetFixtureForeignKey: constraintNames.has('v1_fixture_advancement_target_fk'),
+        sourceOutcomeUnique: constraintNames.has('v1_match_advancement_source_outcome_key'),
+        targetSideUnique: constraintNames.has('v1_match_advancement_target_side_key'),
+        sourceFixtureForeignKey: constraintNames.has('v1_match_advancement_source_fk'),
+        targetFixtureForeignKey: constraintNames.has('v1_match_advancement_target_fk'),
       }).toEqual({
         sourceOutcomeUnique: true,
         targetSideUnique: true,
@@ -570,12 +570,12 @@ describe('Task 9 game projection real-database contract', () => {
       ]);
       const afterDuplicates = await bracketProjectionSnapshot();
 
-      await prisma.v1TournamentFixture.update({
-        where: { id: ids.targetFixture },
+      await prisma.v1TournamentMatchDetails.update({
+        where: { teamMatchId: ids.targetFixture },
         data: { homeRegistrationId: ids.opponentRegistration, awayRegistrationId: null },
       });
-      await prisma.v1TournamentFixture.update({
-        where: { id: ids.loserTargetFixture },
+      await prisma.v1TournamentMatchDetails.update({
+        where: { teamMatchId: ids.loserTargetFixture },
         data: { homeRegistrationId: null, awayRegistrationId: null },
       });
       const beforeConflictProjection = await projectionTransactionSnapshot(ids.tournamentRevision);
@@ -1080,6 +1080,7 @@ describe('Task 9 game projection real-database contract', () => {
       let cleanupApp: (() => Promise<void>) | undefined;
       try {
         ({ app, cleanup: cleanupApp } = await createV1IntegrationApp());
+        await ensureRequiredSignupTerm();
         const termsService = app.get(ManagedTermsRuntimeService);
         const requiredDocumentIds = (await termsService.currentSignupTerms()).items
           .filter((item) => item.requirement === 'required')
@@ -1207,12 +1208,35 @@ describe('Task 9 game projection real-database contract', () => {
     it('[RED-AC6] global platform_ops queue lists, details, acknowledges, resolves, and audits due escalations across tournaments', async () => {
       await cleanupR7EscalationArtifacts();
       const primary = await createAc6EscalationFixture(ids.tournamentGame, 'global-primary');
+      const otherTournamentMatchId = randomUUID();
       const otherTournamentGameId = randomUUID();
+      await prisma.v1TeamMatch.create({
+        data: {
+          id: otherTournamentMatchId,
+          tournamentId: ids.otherTournament,
+          hostTeamId: ids.hostTeam,
+          approvedApplicantTeamId: ids.opponentTeam,
+          createdByUserId: ids.hostUser,
+          sportId: ids.sport,
+          regionId: ids.region,
+          title: 'Task 9 AC6 secondary tournament match',
+          status: 'completed',
+          competitionConfigVersionId: ids.config,
+        },
+      });
+      await prisma.v1TournamentMatchDetails.create({
+        data: {
+          teamMatchId: otherTournamentMatchId,
+          tournamentId: ids.otherTournament,
+          round: 'final',
+          fixtureNumber: 99,
+        },
+      });
       await prisma.v1Game.create({
         data: {
           id: otherTournamentGameId,
-          sourceType: 'TOURNAMENT_FIXTURE',
-          tournamentFixtureId: ids.otherTournamentFixture,
+          sourceType: 'TEAM_MATCH',
+          teamMatchId: otherTournamentMatchId,
           state: 'ENDED',
           version: 0,
           competitionConfigVersionId: ids.config,
@@ -1588,50 +1612,99 @@ async function createFixture(): Promise<void> {
       },
     ],
   });
-  await prisma.v1TournamentFixture.createMany({
+  await prisma.v1TeamMatch.createMany({
     data: [
       {
         id: ids.sourceFixture,
         tournamentId: ids.tournament,
-        round: 'semi_final',
-        fixtureNumber: 1,
-        homeRegistrationId: ids.hostRegistration,
-        awayRegistrationId: ids.opponentRegistration,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+        createdByUserId: ids.hostUser,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: 'Task 9 source match',
         status: 'completed',
+        startAt: new Date('2026-08-01T00:00:00.000Z'),
         competitionConfigVersionId: ids.config,
       },
       {
         id: ids.targetFixture,
         tournamentId: ids.tournament,
-        round: 'final',
-        fixtureNumber: 2,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+        createdByUserId: ids.hostUser,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: 'Task 9 target match',
+        status: 'matched',
+        startAt: new Date('2026-08-02T00:00:00.000Z'),
         competitionConfigVersionId: ids.config,
       },
       {
         id: ids.loserTargetFixture,
         tournamentId: ids.tournament,
-        round: 'placement',
-        fixtureNumber: 3,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+        createdByUserId: ids.hostUser,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: 'Task 9 loser target match',
+        status: 'matched',
+        startAt: new Date('2026-08-03T00:00:00.000Z'),
         competitionConfigVersionId: ids.config,
       },
       {
         id: ids.otherTournamentFixture,
         tournamentId: ids.otherTournament,
-        round: 'final',
-        fixtureNumber: 1,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+        createdByUserId: ids.hostUser,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: 'Task 9 other tournament match',
+        status: 'matched',
+        startAt: new Date('2026-08-04T00:00:00.000Z'),
         competitionConfigVersionId: ids.config,
       },
+    ],
+  });
+  await prisma.v1TournamentMatchDetails.createMany({
+    data: [
+      { teamMatchId: ids.sourceFixture, tournamentId: ids.tournament, round: 'semi_final', fixtureNumber: 1, homeRegistrationId: ids.hostRegistration, awayRegistrationId: ids.opponentRegistration },
+      { teamMatchId: ids.targetFixture, tournamentId: ids.tournament, round: 'final', fixtureNumber: 2 },
+      { teamMatchId: ids.loserTargetFixture, tournamentId: ids.tournament, round: 'placement', fixtureNumber: 3 },
+      { teamMatchId: ids.otherTournamentFixture, tournamentId: ids.otherTournament, round: 'final', fixtureNumber: 1 },
     ],
   });
   await prisma.v1Game.create({
     data: {
       id: ids.tournamentGame,
-      sourceType: 'TOURNAMENT_FIXTURE',
-      tournamentFixtureId: ids.sourceFixture,
+      sourceType: 'TEAM_MATCH',
+      teamMatchId: ids.sourceFixture,
       state: 'ENDED',
       version: 0,
       competitionConfigVersionId: ids.config,
     },
+  });
+  const bracketTargetGames = [ids.targetFixture, ids.loserTargetFixture, ids.otherTournamentFixture].map((teamMatchId) => ({
+    id: randomUUID(),
+    teamMatchId,
+  }));
+  await prisma.v1Game.createMany({
+    data: bracketTargetGames.map(({ id, teamMatchId }) => ({
+      id,
+      sourceType: 'TEAM_MATCH' as const,
+      teamMatchId,
+      state: 'SCHEDULED' as const,
+      version: 0,
+      competitionConfigVersionId: ids.config,
+    })),
+  });
+  await prisma.v1GameSide.createMany({
+    data: bracketTargetGames.flatMap(({ id: gameId }) => [
+      { id: randomUUID(), gameId, sideKey: 'HOME' as const, teamId: ids.hostTeam, displayNameSnapshot: 'Task 9 target home' },
+      { id: randomUUID(), gameId, sideKey: 'AWAY' as const, teamId: ids.opponentTeam, displayNameSnapshot: 'Task 9 target away' },
+    ]),
   });
   await prisma.v1GameVisibilityPolicy.create({
     data: { gameId: ids.tournamentGame, mode: 'OFFICIAL_ONLY' },
@@ -2578,7 +2651,36 @@ async function createAc6EscalationFixture(
   return { revisionId, reminderId, escalationId };
 }
 
+async function ensureRequiredSignupTerm(): Promise<void> {
+  const code = `${prefix}:signup-policy`;
+  const existing = await prisma.v1ManagedTermsPolicy.findUnique({ where: { code }, select: { id: true } });
+  if (existing !== null) return;
+  const policyId = randomUUID();
+  const documentId = randomUUID();
+  await prisma.v1ManagedTermsPolicy.create({
+    data: { id: policyId, code, name: 'Task 9 signup policy', isActive: true },
+  });
+  await prisma.v1ManagedTermsDocument.create({
+    data: {
+      id: documentId,
+      policyId,
+      version: '1.1',
+      title: 'Task 9 required signup terms',
+      subtitle: 'Task 9 integration terms',
+      content: 'Task 9 integration terms content',
+      contentHash: `${prefix}:signup-document`,
+      status: 'published',
+      effectiveAt: new Date('2026-01-01T00:00:00.000Z'),
+      publishedAt: new Date('2026-01-01T00:00:00.000Z'),
+    },
+  });
+  await prisma.v1ManagedTermsPlacement.create({
+    data: { id: randomUUID(), policyId, context: 'signup', requirement: 'required', displayOrder: 0, isActive: true },
+  });
+}
+
 async function acceptAc6SignupTerms(app: INestApplication, userIds: readonly string[]): Promise<void> {
+  await ensureRequiredSignupTerm();
   const termsService = app.get(ManagedTermsRuntimeService);
   const documentIds = (await termsService.currentSignupTerms()).items
     .filter((item) => item.requirement === 'required')
@@ -2722,11 +2824,11 @@ async function assertR7FixturePreconditions(requiredDocumentIds: readonly string
           select: {
             id: true,
             sourceType: true,
-            tournamentFixture: {
+            teamMatch: {
               select: {
                 id: true,
                 tournamentId: true,
-                tournament: { select: { id: true } },
+                tournamentDetails: { select: { teamMatchId: true, tournamentId: true } },
               },
             },
           },
@@ -2773,11 +2875,11 @@ async function assertR7FixturePreconditions(requiredDocumentIds: readonly string
     gameId: ids.tournamentGame,
     game: {
       id: ids.tournamentGame,
-      sourceType: 'TOURNAMENT_FIXTURE',
-      tournamentFixture: {
+      sourceType: 'TEAM_MATCH',
+      teamMatch: {
         id: ids.sourceFixture,
         tournamentId: ids.tournament,
-        tournament: { id: ids.tournament },
+        tournamentDetails: { teamMatchId: ids.sourceFixture, tournamentId: ids.tournament },
       },
     },
   });
@@ -2890,11 +2992,11 @@ async function futureFactCount(table: FutureFactTable, revisionId: string): Prom
 }
 
 async function bracketEdgeCount(sourceFixtureId: string): Promise<number> {
-  if (!(await futureTableExists('v1_tournament_fixture_advancement_edges'))) return 0;
+  if (!(await futureTableExists('v1_tournament_match_advancement_edges'))) return 0;
   const rows = await prisma.$queryRaw<Array<{ count: bigint }>>`
     SELECT COUNT(*)::bigint AS count
-    FROM v1_tournament_fixture_advancement_edges
-    WHERE source_fixture_id = ${sourceFixtureId}
+    FROM v1_tournament_match_advancement_edges
+    WHERE source_team_match_id = ${sourceFixtureId}
   `;
   return Number(rows[0]?.count ?? 0n);
 }
@@ -2903,13 +3005,13 @@ async function bracketProjectionSnapshot(): Promise<{
   winnerTarget: { homeRegistrationId: string | null; awayRegistrationId: string | null };
   loserTarget: { homeRegistrationId: string | null; awayRegistrationId: string | null };
 }> {
-  const fixtures = await prisma.v1TournamentFixture.findMany({
-    where: { id: { in: [ids.targetFixture, ids.loserTargetFixture] } },
-    orderBy: { id: 'asc' },
-    select: { id: true, homeRegistrationId: true, awayRegistrationId: true },
+  const fixtures = await prisma.v1TournamentMatchDetails.findMany({
+    where: { teamMatchId: { in: [ids.targetFixture, ids.loserTargetFixture] } },
+    orderBy: { teamMatchId: 'asc' },
+    select: { teamMatchId: true, homeRegistrationId: true, awayRegistrationId: true },
   });
-  const winnerTarget = fixtures.find(({ id }) => id === ids.targetFixture);
-  const loserTarget = fixtures.find(({ id }) => id === ids.loserTargetFixture);
+  const winnerTarget = fixtures.find(({ teamMatchId }) => teamMatchId === ids.targetFixture);
+  const loserTarget = fixtures.find(({ teamMatchId }) => teamMatchId === ids.loserTargetFixture);
   if (!winnerTarget || !loserTarget) {
     throw new Error('Task 9 Lane 3 target fixtures are required');
   }
@@ -2937,12 +3039,12 @@ async function insertBracketEdges(edges: readonly BracketEdgeInput[]): Promise<v
   await prisma.$transaction(async (tx) => {
     for (const edge of edges) {
       await tx.$executeRaw`
-        INSERT INTO v1_tournament_fixture_advancement_edges (
+        INSERT INTO v1_tournament_match_advancement_edges (
           id,
           tournament_id,
-          source_fixture_id,
+          source_team_match_id,
           source_outcome,
-          target_fixture_id,
+          target_team_match_id,
           target_side,
           created_at
         ) VALUES (

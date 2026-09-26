@@ -7,6 +7,8 @@
  * 값도 안전한 한글 fallback으로 떨어지게 한다. 새 상태값 추가 시 여기만 갱신한다.
  */
 
+import type { V1InquiryReportReason } from '@/types/api';
+
 /**
  * 팀 가입 신청 상태 — **관리자(검토자) 관점** 라벨.
  *
@@ -93,3 +95,32 @@ const ONBOARDING_STEP_LABEL: Record<string, string> = {
 export function onboardingStepLabel(step: string): string {
   return ONBOARDING_STEP_LABEL[step] ?? '종목 선택';
 }
+
+/**
+ * 문의 신고 사유(`V1InquiryReportReason`) — `category: 'report'` 문의에만 실린다.
+ * 신고 작성 화면(community/team-contact-status-card.tsx)과 어드민 문의 목록/상세가 공유하는 단일 소스다.
+ * 백엔드 순서(`admin.service.ts`의 `INQUIRY_REPORT_REASONS`)와 값을 그대로 맞춘다.
+ */
+export const INQUIRY_REPORT_REASON_OPTIONS: { value: V1InquiryReportReason; label: string }[] = [
+  { value: 'spam', label: '스팸·광고' },
+  { value: 'harassment', label: '괴롭힘·욕설' },
+  { value: 'impersonation', label: '사칭·허위 팀' },
+  { value: 'inappropriate', label: '부적절한 내용' },
+  { value: 'other', label: '기타' },
+];
+
+const INQUIRY_REPORT_REASON_LABEL: Record<V1InquiryReportReason, string> = INQUIRY_REPORT_REASON_OPTIONS.reduce(
+  (acc, option) => ({ ...acc, [option.value]: option.label }),
+  {} as Record<V1InquiryReportReason, string>,
+);
+
+export function inquiryReportReasonLabel(reason: V1InquiryReportReason): string {
+  return INQUIRY_REPORT_REASON_LABEL[reason];
+}
+
+/** 친선 팀매치 공동 기록 상태와 변경 이력. */
+const phaseLabel: Record<string, string> = { scheduled: '경기 시작 전', live: '진행 중', official: '경기 종료 · 결과 확정', cancelled: '취소된 경기', legacy: '기존 경기 결과', managed: '운영자 기록 경기' };
+const actionLabel: Record<string, string> = { add: '득점 등록', edit: '득점 수정', delete: '득점 삭제', undo: '변경 되돌리기', confirm: '경기 종료 확인', reopen: '종료 확인 취소', submatch_add: '서브매치 추가', submatch_edit: '서브매치 이름 수정', submatch_delete: '서브매치 삭제' };
+
+export function sharedRecordPhaseLabel(phase: string): string { return phaseLabel[phase] ?? "경기 기록"; }
+export function sharedRecordActionLabel(action: string): string { return actionLabel[action] ?? "기록 변경"; }

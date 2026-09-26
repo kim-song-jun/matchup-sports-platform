@@ -1,10 +1,28 @@
+import {
+  LEAGUE_ROSTER_AUTOCONFIRM_TYPE,
+  LEAGUE_ROSTER_REMINDER_TYPE,
+  LeagueRosterAutoConfirmService,
+  LeagueRosterReminderService,
+} from './league-roster/league-roster-autoconfirm.service';
 import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
+import { TOURNAMENT_CUTOVER_SHARED_LOCK } from '../common/tournament-cutover-lock';
 import { GameResultOfficialProjectionService } from '../game-operations/game-result-official-projection.service';
 import { GameResultVoidProjectionService } from '../game-operations/game-result-void-projection.service';
 import { GameResultSubmittedEscalationService } from './result-escalation/game-result-submitted-escalation.service';
+import {
+  LEAGUE_RESULT_ENTRY_REMINDER_TYPE,
+  LeagueResultEntryReminderService,
+} from './league-reminders/league-result-entry-reminder.service';
+import {
+  IDENTITY_LINK_EXPIRY_TYPE,
+  IdentityLinkExpiryService,
+} from './identity-link/identity-link-expiry.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { WebPushService } from '../notifications/web-push.service';
+import { VideoUploadCleanupService } from './video-upload-cleanup.service';
+import { VIDEO_UPLOAD_CLEANUP_TYPE } from '../games/video-url-lock';
 
 export const GAME_OPERATION_RETRY_DELAYS_MS = [1_000, 5_000, 30_000, 120_000, 600_000] as const;
 export const GAME_OPERATION_LEASE_MS = 30_000;
@@ -26,6 +44,15 @@ export type GameOperationClaim = {
   version: number;
   leaseOwner: string;
   leaseUntil: Date;
+  /**
+   * 커밋 뒤에 실행할 부수효과를 담는 자리 (2026-08-26). 핸들러는 트랜잭션 **안에서**
+   * 돌기 때문에, 롤백할 수 없는 외부 발송(웹 푸시 등)을 거기서 바로 하면 트랜잭션이
+   * 뒤집혔을 때 "일어나지 않은 일"의 알림이 나간다. 여기 담아 두면 워커가 커밋 성공
+   * 직후에만 실행한다. 워커가 매 클레임마다 빈 배열로 채우므로 핸들러는 그냥 push 하면
+   * 된다(직접 클레임을 만들어 핸들러를 부르는 유닛 스펙에서는 없을 수 있다 —
+   * 그 경우 호출부가 즉시 실행으로 폴백한다).
+   */
+  afterCommit?: Array<() => void | Promise<void>>;
 };
 
 export type GameOperationHandler = (
@@ -60,12 +87,20 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() transactionTimeoutMs?: number,
+    // 리그 감사 그룹 A / R1: team_match_completed 알림의 Web Push best-effort 발송용.
+    // ScheduleReminderService(main.ts)가 WebPushService를 받는 것과 같은 이유로 optional이다 —
+    // 이 worktree/모듈 밖에서 `new V1GameOperationsWorkerService(prisma)` 형태로 직접 생성하는
+    // 기존 통합테스트 호출부가 다수 있어(예: test/tournaments/*.integration-spec.ts) 인자 없이도
+    // 계속 동작해야 한다. 실제 워커(v1-game-operations-worker.module.ts)에서는
+    // WorkerNotificationsModule이 내보내는 WebPushService가 DI로 자동 주입된다.
+    @Optional() private readonly webPush?: WebPushService,
+    @Optional() private readonly videoUploadCleanup?: VideoUploadCleanupService,
   ) {
     this.transactionTimeoutMs = transactionTimeoutMs ?? GAME_OPERATION_TRANSACTION_TIMEOUT_MS;
     if (this.transactionTimeoutMs <= 0 || this.transactionTimeoutMs >= GAME_OPERATION_SHUTDOWN_MS) {
       throw new Error('Worker transaction timeout must be positive and shorter than shutdown grace');
     }
-    const officialProjection = new GameResultOfficialProjectionService();
+    const officialProjection = new GameResultOfficialProjectionService(this.webPush);
     this.registerHandler('GAME_RESULT_OFFICIAL', officialProjection.handler);
     const voidProjection = new GameResultVoidProjectionService();
     this.registerHandler('GAME_RESULT_VOIDED', voidProjection.handler);
@@ -73,28 +108,40 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     this.registerHandler('GAME_RESULT_SUBMITTED', submittedEscalation.handler);
     this.registerHandler('GAME_RESULT_REVIEW_REMINDER', submittedEscalation.reminderHandler);
     this.registerHandler('GAME_RESULT_REVIEW_ESCALATION', submittedEscalation.escalationHandler);
-    // reject/request_supplement close their own review SLA synchronously in
-    // the API command (TournamentResultReviewService.closeReviewSla, Task
-    // 22); the durable audit handler here only needs to make the outbox's
-    // own business key idempotently durable, exactly like the CAS/flag
-    // audit trail.
-    this.registerDurableAuditHandler('GAME_RESULT_REJECTED');
-    this.registerDurableAuditHandler('GAME_RESULT_SUPPLEMENT_REQUESTED');
-    // GAME_RESULT_CHANGE_REQUESTED (GamesService.decideResultRevision's
-    // TEAM_MATCH change-request branch, games.service.ts) is the same kind
-    // of terminal review decision as REJECTED/SUPPLEMENT_REQUESTED above,
-    // and needed the identical durable-audit treatment — outbox-handler
-    // cleanup task found it writing but never claimed (retrying 6x then
-    // POISONED). Unlike REJECTED/SUPPLEMENT_REQUESTED, this branch does NOT
-    // yet synchronously close its own v1_result_escalations row the way
-    // TournamentResultReviewService.closeReviewSla() does; that's a
-    // pre-existing gap in the TEAM_MATCH review-decision flow, not something
-    // this handler causes or fixes — the async GAME_RESULT_REVIEW_REMINDER/
-    // ESCALATION handlers already guard on `revision.state !== 'SUBMITTED'`
-    // so no duplicate/incorrect notification can fire once a decision lands,
-    // it just leaves the escalation row's `status` sitting PENDING instead
-    // of flipping to CLOSED. Left out of this task's scope deliberately.
+    // 사용자 확정: 리그 대진의 경기 시작 +24시간에도 결과 미입력(not_entered)이면
+    // active admin(owner/ops, support 제외) 전원에게 1회 알림. 스케줄은
+    // league-match-admin.service.ts의 generateFixtures/regenerateFixtures(대진 생성)와
+    // updateFixture(시작 시각 변경)가 건다 — league-result-entry-reminder.service.ts 참고.
+    const leagueResultEntryReminder = new LeagueResultEntryReminderService();
+    this.registerHandler(LEAGUE_RESULT_ENTRY_REMINDER_TYPE, leagueResultEntryReminder.handler);
+    // D10(Task 164 BE-4b) — 시즌 시작 자동 명단 확정과 그 24h 전 리마인더.
+    // **기본은 꺼짐**이다: 핸들러가 `DISABLE_LEAGUE_ROSTER_AUTOCONFIRM_CRON !== 'false'`
+    // 이면 즉시 return 한다. 등록 자체는 항상 해 둔다 — 안 하면 예약된 잡이 핸들러 없이
+    // 6회 재시도 후 POISONED 로 가고, 켜는 순간 그 행들이 이미 죽어 있다.
+    const leagueRosterAutoConfirm = new LeagueRosterAutoConfirmService();
+    const leagueRosterReminder = new LeagueRosterReminderService();
+    this.registerHandler(LEAGUE_ROSTER_AUTOCONFIRM_TYPE, leagueRosterAutoConfirm.handler);
+    this.registerHandler(LEAGUE_ROSTER_REMINDER_TYPE, leagueRosterReminder.handler);
+    // 신원 연결 요청은 24시간 뒤 만료된다 — 예전에는 다음 attest 시도 때에야 기록되는
+    // lazy 처리라 아무도 손대지 않으면 신청자가 결말을 알 수 없었다. 신청 시각 +24h 에
+    // 만료를 확정하고 신청자에게 통보한다(identity-link-expiry.service.ts).
+    const identityLinkExpiry = new IdentityLinkExpiryService(this.webPush);
+    this.registerHandler(IDENTITY_LINK_EXPIRY_TYPE, identityLinkExpiry.handler);
+    // Task 166: `GAME_RESULT_REJECTED`·`GAME_RESULT_SUPPLEMENT_REQUESTED` 핸들러를
+    // 없앴다 — 그 두 결정(어드민이 팀에게 되돌려 보내는 왕복)이 사라졌으므로 그 이름의
+    // 아웃박스 이벤트가 더는 만들어지지 않는다.
+    //
+    // `GAME_RESULT_CHANGE_REQUESTED`(GamesService.decideResultRevision 의 TEAM_MATCH
+    // 재작성 허용 분기)는 남는다. 이 핸들러는 아웃박스의 업무 키를 멱등하게 durable 하게
+    // 만드는 일만 한다 — 예전에 이게 없어 쓰이기만 하고 claim 되지 않아 6회 재시도 후
+    // POISONED 로 갔다. 이 분기는 `closeReviewSla()` 처럼 자기 escalation 행을 동기적으로
+    // 닫지는 않는데, 비동기 REVIEW_REMINDER/ESCALATION 핸들러가 이미
+    // `revision.state !== 'SUBMITTED'` 를 가드하므로 잘못된 알림은 나가지 않고 escalation
+    // 행의 status 만 PENDING 으로 남는다(의도적으로 이 태스크 범위 밖).
     this.registerDurableAuditHandler('GAME_RESULT_CHANGE_REQUESTED');
+    if (this.videoUploadCleanup) {
+      this.registerHandler(VIDEO_UPLOAD_CLEANUP_TYPE, this.videoUploadCleanup.handler);
+    }
   }
 
   /** Read-only registration introspection for tests — no DB access. */
@@ -192,6 +239,11 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     if (!this.acceptingClaims || this.handlers.size === 0) return null;
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const maintenanceLock = await tx.$queryRaw<Array<{ acquired: boolean }>>(TOURNAMENT_CUTOVER_SHARED_LOCK);
+      if (maintenanceLock[0]?.acquired !== true) {
+        return { recovered: 0, row: null };
+      }
+
       const recovered = await tx.$executeRaw`
         WITH expired AS (
           SELECT id, version
@@ -374,6 +426,8 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
     heartbeatTimer.unref();
 
     const work = async () => {
+      // 커밋 뒤 부수효과 수집함 — 핸들러가 여기에 담고, 아래에서 커밋이 확정된 뒤에만 실행한다.
+      claim.afterCommit = [];
       try {
         await this.prisma.$transaction(async (tx) => {
           const locked = await this.lockClaim(tx, claim);
@@ -391,6 +445,23 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
         });
         claim.version += 1;
         this.completionCount += 1;
+        // 커밋이 확정된 뒤에만 외부 발송을 한다. 롤백된 트랜잭션의 알림이 나가는 것을
+        // 막는 유일한 지점이라, 실패해도 잡 결과에는 영향을 주지 않는다.
+        for (const effect of claim.afterCommit ?? []) {
+          const warn = (effectError: unknown) =>
+            this.logger.warn(
+              `after-commit effect failed for outbox job ${claim.id}: ${this.boundedError(effectError)}`,
+            );
+          try {
+            // 비동기 부수효과도 허용한다 — 잡을 붙잡지 않도록 await 하지 않지만,
+            // rejection 을 그냥 두면 unhandled rejection 이 되므로 catch 를 붙인다
+            // (Copilot 리뷰).
+            const outcome = effect();
+            if (outcome instanceof Promise) void outcome.catch(warn);
+          } catch (effectError: unknown) {
+            warn(effectError);
+          }
+        }
       } catch (error: unknown) {
         await this.fail(claim, error);
       } finally {
@@ -466,12 +537,20 @@ export class V1GameOperationsWorkerService implements OnModuleDestroy {
 
   async getHealth() {
     const queue = await this.getQueueCounts();
+    // 새 잡을 받아 처리할 수 있는지만 보는 판정 — POISONED 잡 존재와 무관하다. 녹아웃
+    // 무승부처럼 알려진 정상 경로로 잡 1건이 POISONED 되면(knockout-penalties.ts:150
+    // 참고) status 는 아래처럼 영구히 'degraded' 로 남는데, 그걸 프로덕션 배포
+    // 헬스체크(deploy/docker-compose.prod.yml)가 그대로 게이트로 삼으면 그 배포는
+    // 물론 실패한 배포를 되돌리는 restore_active_release() 의 롤백까지 같은 이유로
+    // 영구 차단된다(2026-08-27, C-poisoned-outbox-deploy-gate). POISONED 존재는 여전히
+    // 운영 알람 대상이므로 status/queue 필드에는 그대로 남기되, 배포 게이트는 이 필드만
+    // 보게 분리한다.
+    const deploymentStatus = this.handlers.size === 0 ? 'not_ready' : 'healthy';
     return {
       status: queue.poisoned > 0 || this.poisonCount > 0
         ? 'degraded'
-        : this.handlers.size === 0
-          ? 'not_ready'
-          : 'healthy',
+        : deploymentStatus,
+      deploymentStatus,
       acceptingClaims: this.acceptingClaims,
       activeHandlers: this.active.size,
       registeredHandlers: this.handlers.size,

@@ -1,19 +1,23 @@
 'use client';
 
+import { PreferredPositionPicker } from './preferred-position-picker';
+import { ProfilePhotoCropper } from './profile-photo-cropper';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AppChrome } from '@/components/v1-ui/shell';
+import { useShellOverride } from '@/components/v1-ui/shell-override';
+import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, InfoCircleIcon } from '@/components/v1-ui/icons';
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
-import { Check } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import { useTheme } from '@/components/providers/theme-provider';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
 import { cssUrl } from '@/lib/assets';
 import { extractErrorMessage } from '@/lib/error-message';
-import { clearStoredV1Session } from '@/lib/session-storage';
+import { clearStoredV1Session, withFromPath } from '@/lib/session-storage';
+import { isTeamOperatorRole } from '@/lib/team-role';
 import type { ThemePreference } from '@/lib/theme';
 import { myJoinApplicationStatusLabel, teamJoinApplicationStatusLabel, teamMemberStatusLabel } from '@/lib/v1-status-labels';
 import {
@@ -26,7 +30,6 @@ import {
   useV1DeclineTeamInvitation,
   useV1MyActivitySummary,
   useV1MyTeams,
-  useV1MyTeamMatches,
   useV1MyTournamentStaffAssignments,
   useV1MasterRegions,
   useV1MasterSports,
@@ -42,7 +45,10 @@ import {
   useV1Settings,
   useV1TeamDetail,
   useV1TeamJoinApplications,
+  useV1TeamContactSummary,
   useV1TeamMembers,
+  useV1Tournament,
+  useV1PlayerCardHidden,
   useV1TournamentRealNameVisibility,
   useV1UploadImages,
   useV1UpdateMyPreferences,
@@ -50,6 +56,9 @@ import {
   useV1UpdateProfile,
   useV1UpdateRecordConsent,
   useV1UpdateSettings,
+  useV1UpdatePlayerCardHidden,
+  useV1PlayerCardShape,
+  useV1UpdatePlayerCardShape,
   useV1UpdateTournamentRealNameVisibility,
   useV1WithdrawalRequest,
   useV1WithdrawMyJoinApplication,
@@ -58,20 +67,22 @@ import { usePendingIds } from '@/hooks/use-pending-ids';
 import { formatMonthDay, formatTournamentDateTimeLong } from '@/lib/date-utils';
 import { V1ApiError } from '@/lib/api-client';
 import { toDistrictRegionOptions } from '@/lib/v1-regions';
-import type { V1MyActivitySummary, V1MyJoinApplication, V1MyTeam, V1MyTeamMatch, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import type { V1MyActivitySummary, V1MyJoinApplication, V1MyTeam, V1Profile, V1ReceivedInvitation, V1Region, V1Settings, V1Sport, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
 import {
   MyHomePageView,
   MyInvitationsPageView,
   MyJoinApplicationsPageView,
   SettingsPageView,
-  MyTeamDetailPageView,
-  MyTeamMembersPageView,
   MyTeamsPageView,
 } from './my-page';
 import { ErrorState } from '@/components/v1-ui/primitives';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
-import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinApplicationsViewModel, MyMember, MyTeam, MyTeamDetailViewModel, MyTeamMembersViewModel, MyTeamsViewModel } from './my.types';
+import type { MyHomeViewModel, MyInvitationItem, MyJoinApplicationItem, MyJoinApplicationsViewModel, MyTeam, MyTeamsViewModel } from './my.types';
 import { myHomeModel, settingsModel } from './my.view-model';
+import { RECORD_CONSENT_POLICY_HASH } from '@/lib/record-consent';
+import { isNativePushAvailable, requestNativePush } from '@/lib/native-push';
+import { WithdrawalErrorCard } from './withdrawal-error-card';
+import { WITHDRAWAL_GRACE_NOTICE } from './withdrawal-guidance';
 
 type ProfileEditErrors = Partial<Record<'realName' | 'nickname' | 'email' | 'phone' | 'birthDate' | 'gender' | 'profileImage' | 'form', string>>;
 type DuplicateCheckState = {
@@ -105,6 +116,11 @@ export function MyHomePageClient() {
   // 대부분의 사용자는 스태프가 아니다 — "대회 운영" 메뉴는 유효한 배정이 있을 때만 노출해야
   // 하므로(스코프 밖 사용자에게 안 보여야 함) 항상 조회는 하되, 프로필 로딩 후에만 호출한다.
   const staffAssignments = useV1MyTournamentStaffAssignments({ enabled: Boolean(profile.data) });
+  // "채팅" 메뉴 배지 — 내가 운영하는 팀들이 아직 답하지 않은 컨택 수.
+  // 운영 팀이 하나도 없으면 대기 컨택이 있을 수 없다 — 요청 자체를 하지 않는다.
+  const contactSummary = useV1TeamContactSummary({
+    enabled: Boolean(profile.data) && (teams.data?.items ?? []).some((team) => team.role === 'owner' || team.role === 'manager'),
+  });
 
   const model = useMemo(() => {
     if (!profile.data) {
@@ -113,6 +129,7 @@ export function MyHomePageClient() {
         ...myHomeModel,
         user: {
           ...myHomeModel.user,
+          userId: null,
           name: '—',
           handle: '—',
           region: '—',
@@ -128,21 +145,21 @@ export function MyHomePageClient() {
     }
     return toMyHomeModel(
       profile.data,
-      teams.data?.items ?? [],
       notificationUnreadCount(notifications.data) > 0,
       activitySummary.data,
       hasPendingReview(pendingReviews.data),
       phoneVerified,
       staffAssignments.data?.items.length ?? 0,
+      contactSummary.data?.pendingInbound ?? 0,
     );
   }, [
     profile.data,
-    teams.data,
     notifications.data,
     activitySummary.data,
     pendingReviews.data,
     phoneVerified,
     staffAssignments.data,
+    contactSummary.data,
   ]);
 
   if (profile.isError) {
@@ -154,6 +171,12 @@ export function MyHomePageClient() {
 
 export function MyTeamsPageClient() {
   const query = useV1MyTeams();
+
+  // 로딩 중: 데이터가 아직 없는데 KPI 0/0/0 + "소속 팀이 없어요" 빈 상태를 그대로 그리면
+  // 실제로 소속 팀이 없는 것처럼 보인다 — 스켈레톤으로 로딩 중임을 명시한다.
+  if (query.isPending) {
+    return <PageSkeleton variant="list" />;
+  }
 
   // 에러 상태: mock 폴백 없이 에러를 명시적으로 표시한다.
   if (query.isError) {
@@ -186,7 +209,7 @@ export function MyInvitationsPageClient() {
     accept.mutate({ invitationId }, {
       onSuccess: (result) => {
         if (result.teamId) {
-          router.push(`/teams/${result.teamId}`);
+          router.push(withFromPath(`/teams/${result.teamId}`, '/my/invitations'));
         } else {
           void query.refetch();
         }
@@ -271,103 +294,7 @@ export function MyJoinApplicationsPageClient() {
   );
 }
 
-export function MyTeamDetailPageClient({ teamId }: { teamId: string }) {
-  const query = useV1TeamDetail(teamId);
-  const teamMatches = useV1MyTeamMatches({ limit: 20 });
 
-  // 에러 상태: mock 폴백 없이 에러를 명시적으로 표시한다.
-  if (query.isError) {
-    return <ErrorState message="팀 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void query.refetch()} />;
-  }
-
-  // 로딩 중: data 부재 시 스켈레톤 대신 빈 모델을 사용 (MyTeamDetailPageView 내부 레이아웃 보존)
-  const team = query.data;
-  if (!team) {
-    return <MyTeamDetailPageView model={{ team: { id: teamId, name: '불러오는 중…', logo: '…', sport: '', region: '', role: 'member', roleLabel: '', members: 0, manner: '-', next: '', description: '' }, actions: [], recentMatches: [] }} />;
-  }
-
-  const viewerRole = team.viewer.role;
-  // #10: owner/manager에게만 운영 메뉴(멤버 관리, 팀 설정) 노출. viewer.role은 V1TeamDetail에 실제 존재함.
-  const canManage = isTeamOperatorRole(viewerRole);
-  const actions: MyTeamDetailViewModel['actions'] = [
-    { label: '팀매치 내역', sub: '최근 경기와 결과를 확인해요', href: '/team-matches', icon: 'ClipboardList' },
-    ...(canManage
-      ? [
-          { label: '멤버 관리', sub: '초대와 가입 신청을 검토해요', href: `/teams/${team.teamId}/members`, icon: 'Users' },
-          // #16: 공개 edit 페이지로 가되 from=my로 취소·저장 후 /teams/[id] 복귀 유도
-          { label: '팀 설정', sub: '소개, 조건, 공개 범위를 수정해요', href: `/teams/${team.teamId}/edit?from=my`, icon: 'Settings' },
-        ]
-      : []),
-  ];
-
-  const model: MyTeamDetailViewModel = {
-    team: toTeamDetailModel(team),
-    actions,
-    recentMatches: (teamMatches.data?.items ?? []).filter((match) => match.teamId === team.teamId).slice(0, 3).map(toMyTeamMatch),
-    chatHref: '/chat',
-  };
-
-  return <MyTeamDetailPageView model={model} />;
-}
-
-export function MyTeamMembersPageClient({ teamId }: { teamId: string }) {
-  const [activeTab, setActiveTab] = useState<MyTeamMembersViewModel['activeTab']>('members');
-  const team = useV1TeamDetail(teamId);
-  const canViewMembers = Boolean(team.data?.canViewMembers);
-  const members = useV1TeamMembers(teamId, { limit: 50 }, { enabled: canViewMembers });
-  const canReviewApplications = isTeamOperatorRole(team.data?.viewer.role);
-  const applications = useV1TeamJoinApplications(teamId, { status: 'requested', limit: 50 }, { enabled: canReviewApplications });
-  const changeRole = useV1ChangeTeamMembershipRole(teamId);
-  const removeMember = useV1RemoveTeamMembership(teamId);
-  const approveApplication = useV1ApproveTeamJoinApplication(teamId);
-  const rejectApplication = useV1RejectTeamJoinApplication(teamId);
-  const { confirm, ConfirmModal } = useConfirm();
-  const items = members.data?.items ?? [];
-  const requests = applications.data?.items ?? [];
-  const actionPending = changeRole.isPending || removeMember.isPending || approveApplication.isPending || rejectApplication.isPending;
-  const viewerRole = team.data?.viewer.role;
-  const canManageMembers = isTeamOperatorRole(viewerRole);
-  const canDelegateOwner = viewerRole === 'owner';
-  const model = {
-    teamName: team.data?.name ?? '팀',
-    activeTab,
-    tabs: [
-      { key: 'members' as const, label: '멤버', count: members.data?.summary.memberCount ?? items.length, onSelect: () => setActiveTab('members') },
-      { key: 'requests' as const, label: '가입 신청', count: requests.length, onSelect: () => setActiveTab('requests') },
-    ],
-    summary: [
-      { label: '전체', value: members.data?.summary.memberCount ?? items.length, unit: '명' },
-      { label: '운영진', value: members.data ? members.data.summary.ownerCount + members.data.summary.managerCount : 0, unit: '명' },
-      { label: '요청', value: requests.length, unit: '명' },
-    ],
-    members: items.map((member) =>
-      toMyMember(member, {
-        actionPending,
-        canManageMembers,
-        canDelegateOwner,
-        promote: () => confirmAction(confirm, { title: '운영진 지정', message: `${member.displayName}님을 운영진으로 지정할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'manager' })),
-        delegateOwner: () => confirmAction(confirm, { title: '팀장 위임', message: `${member.displayName}님에게 팀장을 위임할까요? 위임 후 현재 팀장은 운영진이 돼요.`, tone: 'danger' }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'owner' })),
-        demote: () => confirmAction(confirm, { title: '멤버 강등', message: `${member.displayName}님을 멤버로 강등할까요?` }, () => changeRole.mutate({ membershipId: member.membershipId, role: 'member' })),
-        remove: () => confirmAction(confirm, { title: '멤버 내보내기', message: `${member.displayName}님을 팀에서 내보낼까요?`, tone: 'danger' }, () => removeMember.mutate({ membershipId: member.membershipId, reason: 'removed_from_v1_web_my_member_page' })),
-      }),
-    ),
-    requests: requests.map((application) =>
-      toMyJoinRequest(application, {
-        actionPending,
-        approve: () => confirmAction(confirm, { title: '가입 신청 승인', message: `${application.applicant.displayName}님의 가입 신청을 승인할까요?`, confirmLabel: '승인' }, () => approveApplication.mutate({ applicationId: application.applicationId, note: null })),
-        reject: () => confirmAction(confirm, { title: '가입 신청 거절', message: `${application.applicant.displayName}님의 가입 신청을 거절할까요?`, confirmLabel: '거절', tone: 'danger' }, () => rejectApplication.mutate({ applicationId: application.applicationId, reason: 'rejected_from_v1_web_my_member_page' })),
-      }),
-    ),
-  };
-
-  return (
-    <>
-      {/* 확인 모달 — window.confirm 대체 */}
-      {ConfirmModal}
-      <MyTeamMembersPageView model={model} backHref={`/teams/${teamId}`} />
-    </>
-  );
-}
 
 export function ProfileEditPageClient() {
   const router = useRouter();
@@ -384,11 +311,14 @@ export function ProfileEditPageClient() {
   const checkNickname = useV1CheckNickname();
   const [realName, setRealName] = useState('');
   const [nickname, setNickname] = useState('');
+  const [bio, setBio] = useState('');
   const [email, setEmail] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [birthDateDigits, setBirthDateDigits] = useState('');
   const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [profileImageUrl, setProfileImageUrl] = useState('');
+  /** 방금 고른 원본 -- 크롭 모달이 열려 있는 동안만 값이 있다. 업로드는 크롭 확인 뒤에 한다. */
+  const [cropSource, setCropSource] = useState<File | null>(null);
   const [profileImageName, setProfileImageName] = useState('');
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<ProfileEditErrors>({});
@@ -408,6 +338,7 @@ export function ProfileEditPageClient() {
     if (!profile.data) return;
     setRealName(profile.data.profile.realName ?? '');
     setNickname(profile.data.profile.nickname ?? '');
+    setBio(profile.data.profile.bio ?? '');
     setEmail(profile.data.email ?? '');
     setPhoneDigits(profile.data.phone ?? '');
     setBirthDateDigits(profile.data.profile.birthDate ?? '');
@@ -422,24 +353,25 @@ export function ProfileEditPageClient() {
     setInlineVerifiedPhone(null);
   }, [profile.data]);
 
+  // loading/error 상태에선 테이블 기본값(desktopHead:true)을 쓰고, success 분기만 자기
+  // `.tm-desktop-page-head`를 직접 그려 제너릭 데스크톱 헤더를 꺼야 한다(§1.9 표 R3,
+  // my-api-clients.tsx:613 참조). Hooks 규칙 때문에 이 호출 자체는 조건부 return보다 위,
+  // 매 렌더 항상 실행한다 — 값만 success 여부로 갈린다(undefined면 테이블 기본값이 그대로
+  // 살아남는다, team-schedules-page.tsx의 동일 패턴 참조).
+  useShellOverride({ desktopHead: profile.isPending || profile.isError || !profile.data ? undefined : false });
+
   if (profile.isPending) {
-    return (
-      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my" desktopHead>
-        <PageSkeleton variant="detail" />
-      </AppChrome>
-    );
+    return <PageSkeleton variant="detail" />;
   }
 
   if (profile.isError || !profile.data) {
     return (
-      <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my" desktopHead>
-        <div className="tm-my-shell">
-          <ErrorState
-            message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
-            onRetry={() => void profile.refetch()}
-          />
-        </div>
-      </AppChrome>
+      <div className="tm-my-shell">
+        <ErrorState
+          message="프로필 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+          onRetry={() => void profile.refetch()}
+        />
+      </div>
     );
   }
 
@@ -522,23 +454,27 @@ export function ProfileEditPageClient() {
     });
   };
 
-  const selectProfileImage = async (event: ChangeEvent<HTMLInputElement>) => {
+  const selectProfileImage = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     setFieldErrors((current) => ({ ...current, profileImage: undefined, form: undefined }));
+    // 같은 파일을 다시 고를 수 있게 비운다 -- 크롭을 취소했다가 같은 사진을 다시 고르면
+    // change 이벤트가 안 나는 문제가 있다.
+    event.target.value = '';
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
       setFieldErrors((current) => ({ ...current, profileImage: '이미지 파일만 선택할 수 있어요.' }));
-      event.target.value = '';
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      setFieldErrors((current) => ({ ...current, profileImage: '프로필 사진은 2MB 이하 이미지만 선택해 주세요.' }));
-      event.target.value = '';
-      return;
-    }
+    // 용량으로 거부하지 않는다(2026-08-25 사용자 확정). 바로 올리지 않고 **크롭 모달**을
+    // 먼저 띄운다(사용자 선택 A안, 2026-09-02) -- 선수 카드가 사진의 얼굴 위치를 모르는
+    // 문제는 입력을 얼굴 중심 정사각으로 정규화하는 것이 유일한 근본 해결이다.
+    // 크롭 결과(768² WebP/JPEG)는 2MB 를 훨씬 밑돌아 업로드 훅의 재압축을 타지 않는다.
+    setCropSource(file);
+  };
 
+  const uploadCroppedProfileImage = async (file: File) => {
     setUploadingProfileImage(true);
     try {
       const result = await uploadImages.mutateAsync([file]);
@@ -547,13 +483,14 @@ export function ProfileEditPageClient() {
         throw new Error('업로드 응답에 이미지 URL이 없어요.');
       }
       setProfileImageUrl(nextUrl);
-      setProfileImageName(file.name);
+      setProfileImageName(cropSource?.name ?? file.name);
+      setCropSource(null);
     } catch (err) {
+      setCropSource(null);
       setFieldErrors((current) => ({
         ...current,
         profileImage: err instanceof Error ? err.message : '이미지를 업로드하지 못했어요. 다시 선택해 주세요.',
       }));
-      event.target.value = '';
     } finally {
       setUploadingProfileImage(false);
     }
@@ -613,6 +550,7 @@ export function ProfileEditPageClient() {
       await update.mutateAsync({
         realName: realName.trim() || null,
         nickname: normalizedNickname,
+        bio: bio.trim() || null,
         email: normalizedEmail || null,
         profileImageUrl: profileImageUrl || null,
         phone: phoneDigits || null,
@@ -640,13 +578,13 @@ export function ProfileEditPageClient() {
   };
 
   return (
-    <AppChrome title="프로필 수정" activeTab="my" bottomNav={false} backHref="/my">
-      <form className="tm-create-shell tm-profile-edit-shell tm-my-profile-edit-desktop" id="v1-profile-edit-form" onSubmit={submit}>
+    <>
+      <form className="tm-create-shell tm-profile-edit-shell tm-my-profile-edit-desktop tm-content-enter" id="v1-profile-edit-form" onSubmit={submit}>
         {/* Desktop page head */}
         <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+          <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
+          </AppBackLink>
           <h1 className="tm-text-heading">프로필 수정</h1>
         </div>
         <section className="tm-my-profile-head">
@@ -656,7 +594,7 @@ export function ProfileEditPageClient() {
           <div>
             <div className="tm-text-body-lg">프로필 사진</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>매치 목록과 신청서에 함께 보여요.</div>
-            <div className="tm-auth-profile-upload-body" style={{ marginTop: 10 }}>
+            <div className="tm-auth-profile-upload-body" style={{ marginTop: 12 }}>
               <label className="tm-btn tm-btn-md tm-btn-neutral">
                 {uploadingProfileImage ? '올리는 중' : profileImageUrl ? '사진 변경' : '사진 선택'}
                 <input className="sr-only" type="file" accept="image/*" onChange={selectProfileImage} disabled={uploadingProfileImage} />
@@ -666,11 +604,19 @@ export function ProfileEditPageClient() {
                   제거
                 </button>
               ) : null}
-              <span className="tm-text-caption">{profileImageName || '이미지 1장, 2MB 이하'}</span>
+              <span className="tm-text-caption">{profileImageName || '이미지 1장 — 얼굴 위치를 맞춘 뒤 올려요'}</span>
             </div>
-            {fieldErrors.profileImage ? <div className="tm-text-caption tm-auth-field-helper-error" style={{ marginTop: 6 }}>{fieldErrors.profileImage}</div> : null}
+            {fieldErrors.profileImage ? <div className="tm-text-caption tm-auth-field-helper-error" style={{ marginTop: 8 }}>{fieldErrors.profileImage}</div> : null}
           </div>
         </section>
+        {cropSource ? (
+          <ProfilePhotoCropper
+            source={cropSource}
+            pending={uploadingProfileImage}
+            onCancel={() => setCropSource(null)}
+            onCropped={uploadCroppedProfileImage}
+          />
+        ) : null}
         <label className="tm-create-field">
           <span className="tm-text-label">이름 <em className="tm-auth-optional">(선택)</em></span>
           <input
@@ -683,6 +629,26 @@ export function ProfileEditPageClient() {
           />
           {fieldErrors.realName ? <span id="profile-realName-error" role="alert" className="tm-text-caption tm-auth-field-helper-error">{fieldErrors.realName}</span> : null}
         </label>
+        {/* 한 줄 소개 (Task 154 P1) -- 컬럼은 오래전부터 있었지만 저장 경로가 없어
+            프로덕션 245개 프로필 중 값이 들어간 게 1건뿐이었다. 300자 상한은 공개
+            프로필에서 카드 한 장에 접힘 없이 들어가는 분량 기준. */}
+        <div className="tm-create-field">
+          <label className="tm-text-label" htmlFor="v1-profile-bio">한 줄 소개</label>
+          <textarea
+            id="v1-profile-bio"
+            className="tm-input"
+            value={bio}
+            onChange={(event) => setBio(event.target.value)}
+            maxLength={300}
+            rows={3}
+            placeholder="어떤 선수인지 소개해 주세요"
+            style={{ resize: 'vertical', minHeight: 76 }}
+            aria-describedby="v1-profile-bio-counter"
+          />
+          <span id="v1-profile-bio-counter" className="tm-text-caption">
+            공개 프로필에 표시돼요 · {bio.length}/300
+          </span>
+        </div>
         <div className="tm-create-field">
           <label className="tm-text-label" htmlFor="v1-profile-nickname">닉네임</label>
           <span className="tm-auth-field-with-action">
@@ -843,9 +809,11 @@ export function ProfileEditPageClient() {
           ) : null}
         </div>
 
-        <Card pad={14} style={{ marginTop: 14, background: fieldErrors.form ? 'var(--red50)' : 'var(--blue50)' }}>
+        {/* 지면에 색을 까므로 그 위 보조 텍스트를 함께 올린다(globals.css .tm-on-tint).
+            blue50 에서 4.11:1, red50 에서 4.02:1 로 둘 다 기준 아래였다. */}
+        <Card pad={16} className="tm-on-tint" style={{ marginTop: 16, background: fieldErrors.form ? 'var(--red50)' : 'var(--blue50)' }}>
           <div className="tm-text-label">{fieldErrors.form ?? '프로필 정보만 저장돼요.'}</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>종목·난이도·활동 지역은 '운동 정보'에서 따로 관리할 수 있어요.</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>종목·난이도·활동 지역은 '운동 정보'에서 따로 관리할 수 있어요.</div>
         </Card>
       </form>
       {/*
@@ -864,7 +832,7 @@ export function ProfileEditPageClient() {
           <div className="tm-text-micro tm-auth-fixed-reason">변경한 닉네임과 이메일은 중복 확인 후 저장할 수 있어요.</div>
         ) : null}
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -876,7 +844,15 @@ export function SportsSettingsPageClient() {
   const updatePreferences = useV1UpdateMyPreferences();
   const sports = sportsQuery.data ?? [];
   const regionGroups = useMemo(() => toSettingsRegionGroups(regionsQuery.data ?? []), [regionsQuery.data]);
-  const [selectedSports, setSelectedSports] = useState<Array<{ sportId: string; levelId: string | null }>>([]);
+  const [selectedSports, setSelectedSports] = useState<
+    Array<{
+      sportId: string;
+      levelId: string | null;
+      // [D14] 종목별 선호 포지션(주/부). 둘 다 null 이 정상 상태다 -- 강제하지 않는다.
+      preferredPosition: string | null;
+      secondaryPreferredPosition: string | null;
+    }>
+  >([]);
   const [selectedRegionIds, setSelectedRegionIds] = useState<[string, string]>(['', '']);
   const [selectedRegionGroupIds, setSelectedRegionGroupIds] = useState<[string, string]>(['', '']);
   const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
@@ -884,7 +860,14 @@ export function SportsSettingsPageClient() {
 
   useEffect(() => {
     if (!profile.data || hydratedUserId === profile.data.userId) return;
-    setSelectedSports((profile.data.sports ?? []).map((sport) => ({ sportId: sport.sportId, levelId: sport.levelId })));
+    setSelectedSports(
+      (profile.data.sports ?? []).map((sport) => ({
+        sportId: sport.sportId,
+        levelId: sport.levelId,
+        preferredPosition: sport.preferredPosition ?? null,
+        secondaryPreferredPosition: sport.secondaryPreferredPosition ?? null,
+      })),
+    );
     const profileRegions = profile.data.regions ?? [];
     const primaryRegion = profileRegions.find((region) => region.primary) ?? profileRegions[0];
     const secondaryRegion = profileRegions.find((region) => region.regionId !== primaryRegion?.regionId);
@@ -907,12 +890,24 @@ export function SportsSettingsPageClient() {
   const toggleSport = (sportId: string) => {
     setSelectedSports((current) => {
       const exists = current.some((sport) => sport.sportId === sportId);
-      return exists ? current.filter((sport) => sport.sportId !== sportId) : [...current, { sportId, levelId: null }];
+      return exists
+        ? current.filter((sport) => sport.sportId !== sportId)
+        : [...current, { sportId, levelId: null, preferredPosition: null, secondaryPreferredPosition: null }];
     });
   };
 
   const setSportLevel = (sportId: string, levelId: string) => {
     setSelectedSports((current) => current.map((sport) => (sport.sportId === sportId ? { ...sport, levelId } : sport)));
+  };
+
+  const setSportPositions = (sportId: string, next: { primary: string | null; secondary: string | null }) => {
+    setSelectedSports((current) =>
+      current.map((sport) =>
+        sport.sportId === sportId
+          ? { ...sport, preferredPosition: next.primary, secondaryPreferredPosition: next.secondary }
+          : sport,
+      ),
+    );
   };
 
   const missingLevels = selectedSports.some((sport) => !sport.levelId);
@@ -958,18 +953,18 @@ export function SportsSettingsPageClient() {
   };
 
   return (
-    <AppChrome title="운동 정보" activeTab="my" bottomNav={false} backHref="/my">
-      <form className="tm-create-shell tm-profile-edit-shell tm-my-sports-desktop" id="v1-sports-settings-form" onSubmit={submit}>
+    <>
+      <form className="tm-create-shell tm-profile-edit-shell tm-my-sports-desktop tm-content-enter" id="v1-sports-settings-form" onSubmit={submit}>
         <div className="tm-desktop-page-head tm-show-desktop">
-          <Link className="tm-desktop-back" href="/my" aria-label="마이페이지로 돌아가기">
+          <AppBackLink className="tm-desktop-back" fallbackHref={"/my"}>
             <ChevronLeftIcon size={22} strokeWidth={2.5} />
-          </Link>
+          </AppBackLink>
           <h1 className="tm-text-heading">운동 정보</h1>
         </div>
         <Card pad={16}>
           <div className="tm-text-body-lg">운동 종목</div>
           <div className="tm-text-caption" style={{ marginTop: 4 }}>매치 추천과 모집 조건에 쓸 종목을 선택해 주세요.</div>
-          <div className="tm-auth-sport-grid" style={{ marginTop: 14 }}>
+          <div className="tm-auth-sport-grid" style={{ marginTop: 16 }}>
             {sports.map((sport) => {
               const selected = selectedSports.some((item) => item.sportId === sport.id);
               return (
@@ -992,11 +987,48 @@ export function SportsSettingsPageClient() {
           <Card pad={16}>
             <div className="tm-text-body-lg">난이도</div>
             <div className="tm-text-caption" style={{ marginTop: 4 }}>선택한 종목마다 현재 실력에 가까운 난이도를 선택해 주세요.</div>
-            <div className="tm-auth-stack" style={{ marginTop: 14 }}>
-              {selectedSports.map(({ sportId, levelId }) => {
+            <div className="tm-auth-stack" style={{ marginTop: 16 }}>
+              {selectedSports.map(({ sportId, levelId, preferredPosition, secondaryPreferredPosition }) => {
                 const sport = sports.find((candidate) => candidate.id === sportId);
                 if (!sport) return null;
-                return <SportLevelPicker key={sportId} levelId={levelId} onSelect={(nextLevelId) => setSportLevel(sportId, nextLevelId)} sport={sport} />;
+                // [D14] 그 종목의 자리 목록은 **서버가 준다**(프리셋이 단일 출처).
+                // 목록이 비면 포지션 개념이 없는 종목(러닝·수영)이라 피커가 스스로
+                // 아무것도 렌더하지 않는다 -- 빈 코트를 보여주지 않는다.
+                // [D14] **선택지는 마스터에서 읽는다.** 예전엔 저장된 프로필에서 읽었는데,
+                // 방금 고른 종목은 아직 저장 전이라 목록이 비어 **포지션 UI 가 아예 안 떴다**
+                // (alpha 실측에서 드러났다 -- 정적으로는 연결이 전부 맞아 보인다).
+                //
+                // 원칙: **"무엇을 고를 수 있는가"는 마스터 / "무엇을 골랐는가"는 프로필.**
+                const positionOptions = sport.positionOptions ?? [];
+                const positionFormations = sport.positionFormations ?? [];
+                return (
+                  <div key={sportId}>
+                    <SportLevelPicker levelId={levelId} onSelect={(nextLevelId) => setSportLevel(sportId, nextLevelId)} sport={sport} />
+                    {positionOptions.length > 0 ? (
+                      <div style={{ marginTop: 20 }}>
+                        {/* 이 종목 한정으로 등장하는 [D14] 위젯이 바로 위 "난이도" 섹션의 하위
+                            요소처럼 보였다 — 자체 제목이 없어 사용자가 난이도 선택 UI의 일부로
+                            오인했다(실사고). 이 선택이 실제로 무엇에 쓰이는지(전 대회·리그 자동
+                            적용, 기록·선수 카드 반영)도 위젯 자체 캡션(조작법만 설명)엔 없어 여기서
+                            보강한다. */}
+                        <div className="tm-text-body-lg">선호 포지션</div>
+                        <div className="tm-text-caption" style={{ marginTop: 4 }}>
+                          선택하면 이 종목의 모든 대회·리그에 자동 적용돼요. 경기 기록과 선수 카드에도 반영돼요.
+                        </div>
+                        <div style={{ marginTop: 12 }}>
+                          <PreferredPositionPicker
+                            formations={positionFormations}
+                            onChange={(next) => setSportPositions(sportId, next)}
+                            options={positionOptions}
+                            primary={preferredPosition}
+                            secondary={secondaryPreferredPosition}
+                            sportName={sport.name}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                );
               })}
             </div>
           </Card>
@@ -1025,9 +1057,9 @@ export function SportsSettingsPageClient() {
           />
         </Card>
 
-        <Card pad={14} style={{ marginTop: 14, background: message?.includes('실패') || message?.includes('선택해') ? 'var(--red50)' : 'var(--blue50)' }}>
+        <Card pad={16} className="tm-on-tint" style={{ marginTop: 16, background: message?.includes('실패') || message?.includes('선택해') ? 'var(--red50)' : 'var(--blue50)' }}>
           <div className="tm-text-label">{message ?? '운동 정보만 별도로 저장돼요.'}</div>
-          <div className="tm-text-caption" style={{ marginTop: 5 }}>저장하면 종목 태그와 추천 기준에 바로 반영돼요.</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>저장하면 종목 태그와 추천 기준에 바로 반영돼요.</div>
         </Card>
       </form>
       <div className="tm-fixed-cta tm-my-sports-cta">
@@ -1035,7 +1067,7 @@ export function SportsSettingsPageClient() {
           {updatePreferences.isPending ? '저장 중' : '운동 정보 저장'}
         </button>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -1051,7 +1083,7 @@ function SportLevelPicker({
   return (
     <div className="tm-profile-level-panel">
       <div className="tm-text-label">{sport.name}</div>
-      <div className="tm-auth-chip-wrap" style={{ marginTop: 10 }}>
+      <div className="tm-auth-chip-wrap" style={{ marginTop: 12 }}>
         {sport.levels.map((level) => (
           <button className={`tm-chip ${levelId === level.id ? 'tm-chip-active' : ''}`} key={level.id} onClick={() => onSelect(level.id)} type="button" aria-pressed={levelId === level.id}>
             {level.name}
@@ -1082,7 +1114,7 @@ function SettingsRegionSlot({
   const selectedGroup = groups.find((group) => group.id === groupId) ?? null;
 
   return (
-    <div className="tm-create-field" style={{ marginTop: 14 }}>
+    <div className="tm-create-field" style={{ marginTop: 16 }}>
       <div className="tm-text-label">{label}</div>
       <div className="tm-create-two-col" style={{ marginTop: 8 }}>
         <label>
@@ -1281,26 +1313,26 @@ export function LocationSettingsPageClient() {
   };
 
   return (
-    <AppChrome title="위치 및 활동 지역" activeTab="my" bottomNav={false} backHref="/my/settings">
-      <div className="tm-my-shell">
+    <>
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-location-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">위치 및 활동 지역</h1>
           </div>
           <Card pad={16}>
             <div className="tm-text-label">현재 활동 지역</div>
-            <div className="tm-text-heading" style={{ marginTop: 6 }}>{profile.data?.regionName ?? '지역 미설정'}</div>
-            <div className="tm-text-caption" style={{ marginTop: 6 }}>
+            <div className="tm-text-heading" style={{ marginTop: 8 }}>{profile.data?.regionName ?? '지역 미설정'}</div>
+            <div className="tm-text-caption" style={{ marginTop: 8 }}>
               매치·팀매치·팀 추천의 기준 지역으로 사용돼요.
             </div>
           </Card>
 
           <Card pad={16}>
             <div className="tm-text-body-lg">현재 위치로 찾기</div>
-            <div className="tm-text-caption" style={{ marginTop: 5 }}>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>
               버튼을 누르면 현재 좌표를 지역 확인 목적으로 팀밋 서버와 카카오에 1회 전송해요.
               좌표 자체는 저장하지 않아요.
             </div>
@@ -1324,9 +1356,9 @@ export function LocationSettingsPageClient() {
             </select>
           </label>
 
-          <Card pad={14} style={{ background: status === 'denied' || status === 'unsupported' || status === 'unmatched' ? 'var(--red50)' : 'var(--blue50)' }}>
+          <Card pad={16} className="tm-on-tint" style={{ background: status === 'denied' || status === 'unsupported' || status === 'unmatched' ? 'var(--red50)' : 'var(--blue50)' }}>
             <div className="tm-text-label">{matchedLabel ?? '지역을 선택해 주세요'}</div>
-            <div className="tm-text-caption" style={{ marginTop: 5 }}>{message}</div>
+            <div className="tm-text-caption" style={{ marginTop: 4 }}>{message}</div>
           </Card>
         </div>
       </div>
@@ -1335,7 +1367,7 @@ export function LocationSettingsPageClient() {
           {updateRegion.isPending ? '저장 중' : '활동 지역 저장'}
         </button>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
@@ -1343,28 +1375,50 @@ export function NotificationSettingsPageClient() {
   const settings = useV1Settings();
   const update = useV1UpdateSettings();
   const pushRegistration = useV1PushRegistration();
+  const [toggleError, setToggleError] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const [recoveredNativeSubscription, setRecoveredNativeSubscription] = useState<boolean | null>(null);
+  const nativePushAvailable = isNativePushAvailable();
+
+  // loading/error 상태에선 테이블 기본값(desktopHead:true)을 쓰고, success 분기만 자기
+  // `.tm-desktop-page-head`를 직접 그려 제너릭 데스크톱 헤더를 꺼야 한다(§1.9 표 R3,
+  // my-api-clients.tsx:1479 참조). Hooks 규칙 때문에 이 호출 자체는 조건부 return보다 위,
+  // 매 렌더 항상 실행한다.
+  useShellOverride({ desktopHead: settings.isError || settings.isLoading || !settings.data ? undefined : false });
 
   // #12: 설정 로드 실패 시 에러 상태를 명시적으로 표시한다.
   if (settings.isError) {
     return (
-      <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
-        <div className="tm-my-shell">
-          <ErrorState message="알림 설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void settings.refetch()} />
-        </div>
-      </AppChrome>
+      <div className="tm-my-shell">
+        <ErrorState message="알림 설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void settings.refetch()} />
+      </div>
+    );
+  }
+
+  // (원래 이 자리에 동일 조건의 loading 분기가 중복 정의돼 있었다 — 첫 분기가 이미 처리하므로
+  // 두 번째는 도달 불가능한 dead code였다. AppChrome 제거 작업으로 이 블록을 다시 쓰는
+  // 김에 함께 정리한다, 전역 지침 1.)
+  if (settings.isLoading || !settings.data) {
+    return (
+      <div className="tm-my-shell">
+        <p className="sr-only" role="status">알림 설정을 불러오는 중이에요.</p>
+        <PageSkeleton variant="list" />
+      </div>
     );
   }
 
   const notifications = settings.data?.notifications;
-  const [toggleError, setToggleError] = useState(false);
-  // 브라우저 알림 켜기 실패(권한 차단·서버 VAPID 미설정·SW 등록 실패)를 사용자에게 알린다.
-  // 이전에는 subscribe()가 false를 반환해도 토글이 OFF로 남기만 해 원인을 알 수 없었다.
-  const [pushError, setPushError] = useState<string | null>(null);
+  const deviceSubscribed = recoveredNativeSubscription ?? pushRegistration.isSubscribed;
+  const pushBlocked = pushRegistration.permission === 'denied' && !deviceSubscribed;
 
   const togglePush = async () => {
     setPushError(null);
-    if (pushRegistration.isSubscribed) {
-      await pushRegistration.unsubscribe();
+    setRecoveredNativeSubscription(null);
+    if (deviceSubscribed) {
+      const unsubscribed = await pushRegistration.unsubscribe();
+      if (!unsubscribed) {
+        setPushError('푸시 알림 해제를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.');
+      }
       return;
     }
     const subscribed = await pushRegistration.subscribe();
@@ -1374,25 +1428,44 @@ export function NotificationSettingsPageClient() {
       const denied = typeof Notification !== 'undefined' && Notification.permission === 'denied';
       setPushError(
         denied
-          ? '브라우저에서 알림이 차단돼 있어요. 브라우저 설정에서 이 사이트의 알림을 허용한 뒤 다시 시도해 주세요.'
-          : '지금은 브라우저 알림을 켤 수 없어요. 잠시 후 다시 시도해 주세요.',
+          ? '기기 또는 브라우저에서 알림이 차단돼 있어요. 알림 설정에서 허용한 뒤 다시 시도해 주세요.'
+          : '지금은 푸시 알림을 켤 수 없어요. 잠시 후 다시 시도해 주세요.',
       );
     }
   };
+  const openNativeNotificationSettings = async () => {
+    setPushError(null);
+    try {
+      const result = await requestNativePush('open-notification-settings');
+      setRecoveredNativeSubscription(result.subscribed);
+      if (!result.subscribed) {
+        setPushError('휴대폰 설정에서 Teameet 알림을 허용한 뒤 다시 시도해 주세요.');
+      }
+    } catch {
+      setPushError('기기 알림 설정을 열지 못했어요. 휴대폰 설정에서 Teameet 알림을 직접 허용해 주세요.');
+    }
+  };
   const items = [
-    { key: 'matchEnabled', label: '매치 승인 알림', sub: '참가 승인, 거절, 대기 상태가 바뀔 때' },
-    { key: 'teamEnabled', label: '팀 가입 신청', sub: '내가 운영하는 팀에 신청이 들어올 때' },
-    { key: 'teamMatchEnabled', label: '팀매치 알림', sub: '팀매치 신청, 승인, 매칭 상태가 바뀔 때' },
-    { key: 'chatEnabled', label: '채팅 메시지', sub: '참여 중인 매치와 팀 채팅 새 메시지' },
-    { key: 'noticeEnabled', label: '공지 알림', sub: '서비스 운영 공지와 필수 안내' },
-    { key: 'marketingEnabled', label: '마케팅 소식', sub: '새 기능과 이벤트 안내' },
+    {
+      key: 'games',
+      keys: ['matchEnabled', 'teamMatchEnabled', 'activityEnabled'],
+      label: '경기·대회',
+      sub: '개인 경기, 팀매치, 대회 일정과 결과',
+    },
+    { key: 'teams', keys: ['teamEnabled'], label: '팀 활동', sub: '가입 신청과 팀 운영 소식' },
+    { key: 'chat', keys: ['chatEnabled'], label: '채팅', sub: '참여 중인 경기와 팀의 새 메시지' },
+    { key: 'notices', keys: ['noticeEnabled'], label: '서비스 공지', sub: '서비스 운영 공지와 필수 안내' },
   ] as const;
 
-  const toggle = (key: keyof V1Settings['notifications']) => {
+  const toggle = (keys: readonly (keyof V1Settings['notifications'])[]) => {
     if (!notifications) return;
+    const enabled = keys.every((key) => notifications[key]);
+    const nextNotifications = Object.fromEntries(keys.map((key) => [key, !enabled])) as Partial<
+      V1Settings['notifications']
+    >;
     setToggleError(false);
     update.mutate(
-      { notifications: { [key]: !notifications[key] } },
+      { notifications: nextNotifications },
       {
         onError: () => {
           setToggleError(true);
@@ -1403,56 +1476,58 @@ export function NotificationSettingsPageClient() {
   };
 
   return (
-    <AppChrome title="알림 설정" activeTab="my" bottomNav={false} backHref="/my/settings">
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">알림 설정</h1>
           </div>
           {pushRegistration.permission !== 'unsupported' ? (
             <div className="tm-card" style={{ padding: 0, marginBottom: 8 }}>
               {(() => {
-                const blocked = pushRegistration.permission === 'denied' && !pushRegistration.isSubscribed;
+                const blocked = pushBlocked;
                 // 켜는 중에는 토글을 미리 ON 위치로 옮긴다 — 권한 팝업·서비스워커
                 // 활성화·서버 저장까지 수 초가 걸려서, 그동안 토글이 그대로면 눌리지
                 // 않은 줄 알고 다시 누르게 된다. 다만 '켜짐'이라고 단정하지는 않고
                 // 라벨로 진행 중임을 밝힌다 — 실패하면 되돌아간다.
-                const showAsOn = pushRegistration.isSubscribed || pushRegistration.isPending;
+                const recovering = blocked && nativePushAvailable;
+                const showAsOn = deviceSubscribed || pushRegistration.isPending;
                 return (
                   <button
                     className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
-                    onClick={() => void togglePush()}
+                    onClick={() => void (recovering ? openNativeNotificationSettings() : togglePush())}
                     type="button"
-                    role="switch"
-                    aria-checked={pushRegistration.isSubscribed}
+                    role={recovering ? undefined : 'switch'}
+                    aria-checked={recovering ? undefined : deviceSubscribed}
                     aria-busy={pushRegistration.isPending}
-                    aria-label="브라우저 알림 받기"
-                    disabled={blocked || pushRegistration.isPending}
+                    aria-label={recovering ? '휴대폰 알림 켜기' : '푸시 알림 받기'}
+                    disabled={(blocked && !nativePushAvailable) || pushRegistration.isPending}
                     style={{
                       width: '100%',
                       background: 'none',
                       border: 'none',
                       textAlign: 'left',
-                      cursor: blocked ? 'not-allowed' : pushRegistration.isPending ? 'progress' : 'pointer',
-                      opacity: blocked ? 0.5 : 1,
+                      cursor: blocked && !nativePushAvailable ? 'not-allowed' : pushRegistration.isPending ? 'progress' : 'pointer',
+                      opacity: blocked && !nativePushAvailable ? 0.5 : 1,
                     }}
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="tm-text-body">브라우저 알림 받기</div>
+                      <div className="tm-text-body">푸시 알림 받기</div>
                       <div className="tm-text-caption" style={{ marginTop: 3 }} role="status">
                         {/* 상태별로 다른 문장을 쓴다 — 꺼져 있는데 "받아요"라고 하면 켜진 것으로 읽힌다.
-                            웹 푸시 구독은 브라우저·기기 단위라 그 사실도 켜졌을 때 알려준다. */}
+                            푸시 등록은 기기 단위라 그 사실도 켜졌을 때 알려준다. */}
                         {pushRegistration.isPending
                           ? pushRegistration.isSubscribed
                             ? '끄는 중이에요…'
-                            : '켜는 중이에요… 브라우저가 물어보면 허용해 주세요'
-                          : blocked
-                            ? '브라우저 설정에서 이 사이트의 알림을 허용해 주세요'
-                            : pushRegistration.isSubscribed
-                              ? '지금 이 브라우저에서 받고 있어요. 다른 기기에서는 따로 켜야 해요'
+                            : '켜는 중이에요… 알림 권한을 물어보면 허용해 주세요'
+                          : recovering
+                            ? '눌러서 휴대폰 설정을 열고 Teameet 알림을 허용해 주세요'
+                            : blocked
+                              ? '브라우저 설정에서 알림을 허용해 주세요'
+                            : deviceSubscribed
+                              ? '지금 이 기기에서 받고 있어요. 다른 기기에서는 따로 켜야 해요'
                               : '켜면 앱을 닫아도 새 소식을 받을 수 있어요'}
                       </div>
                     </div>
@@ -1461,7 +1536,7 @@ export function NotificationSettingsPageClient() {
                       style={{ minWidth: 24, textAlign: 'right', color: showAsOn ? 'var(--blue700)' : 'var(--text-caption)' }}
                       aria-hidden="true"
                     >
-                      {pushRegistration.isPending ? '···' : pushRegistration.isSubscribed ? 'ON' : 'OFF'}
+                      {pushRegistration.isPending ? '···' : deviceSubscribed ? 'ON' : 'OFF'}
                     </span>
                     <span className={`tm-toggle ${showAsOn ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
                   </button>
@@ -1470,62 +1545,61 @@ export function NotificationSettingsPageClient() {
             </div>
           ) : null}
           {pushError ? (
-            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>브라우저 알림을 켜지 못했어요</div>
+            <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>푸시 알림을 켜지 못했어요</div>
               <div className="tm-text-caption" style={{ marginTop: 4 }} role="status">{pushError}</div>
             </Card>
           ) : null}
-          <Card pad={14} style={{ marginBottom: 8 }}>
-            <div className="tm-text-label">받을 알림 고르기</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+          <section style={{ marginTop: 16 }}>
+            <div className="tm-my-section-label">받을 알림</div>
+            {toggleError ? (
+              <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+                <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+              </Card>
+            ) : null}
+            {/* 저장 필드를 사용자가 이해하는 4개 발송 축으로 묶는다. */}
+            <div className="tm-card" style={{ padding: 0 }}>
+              {items.map((setting) => {
+                const enabled = Boolean(notifications && setting.keys.every((key) => notifications[key]));
+                return (
+                  <button
+                    key={setting.key}
+                    className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+                    onClick={() => toggle(setting.keys)}
+                    type="button"
+                    disabled={!notifications || update.isPending}
+                    role="switch"
+                    aria-checked={enabled}
+                    aria-label={setting.label}
+                    style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="tm-text-body">{setting.label}</div>
+                      <div className="tm-text-caption" style={{ marginTop: 3 }}>{setting.sub}</div>
+                    </div>
+                    <span
+                      className="tm-text-caption"
+                      style={{ minWidth: 24, textAlign: 'right', color: enabled ? 'var(--blue500)' : 'var(--text-caption)' }}
+                      aria-hidden="true"
+                    >
+                      {enabled ? 'ON' : 'OFF'}
+                    </span>
+                    <span className={`tm-toggle ${enabled ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+                  </button>
+                );
+              })}
+            </div>
+            <div className="tm-text-caption tm-my-settings-footnote">
               {/* 위 푸시 토글과의 관계를 명시한다 — 예전에는 두 영역이 무관해 보여서,
                   푸시를 켜지 않은 사용자가 왜 폰으로 알림이 안 오는지 알 수 없었다. */}
-              {pushRegistration.isSubscribed
-                ? '여기서 끈 종류는 알림함과 브라우저 알림 모두에서 빠져요.'
-                : '지금은 앱 안 알림함에서만 볼 수 있어요. 위에서 브라우저 알림을 켜면 같은 종류를 폰으로도 받아요.'}
+              {deviceSubscribed
+                ? '여기서 끈 종류는 알림함과 푸시 알림 모두에서 빠져요.'
+                : '지금은 앱 안 알림함에서만 볼 수 있어요. 위에서 푸시 알림을 켜면 같은 종류를 폰으로도 받아요.'}
             </div>
-          </Card>
-          {toggleError ? (
-            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
-            </Card>
-          ) : null}
-          {/* 6개 개별 카드 → 단일 Card 내 .tm-my-menu-row 행 — 시각 단위 절감, 마이홈 메뉴 패턴 일치 */}
-          <div className="tm-card" style={{ padding: 0 }}>
-            {items.map((setting) => {
-              const enabled = Boolean(notifications?.[setting.key]);
-              return (
-                <button
-                  key={setting.key}
-                  className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
-                  onClick={() => toggle(setting.key)}
-                  type="button"
-                  disabled={!notifications || update.isPending}
-                  role="switch"
-                  aria-checked={enabled}
-                  aria-label={setting.label}
-                  style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="tm-text-body">{setting.label}</div>
-                    <div className="tm-text-caption" style={{ marginTop: 3 }}>{setting.sub}</div>
-                  </div>
-                  <span
-                    className="tm-text-caption"
-                    style={{ minWidth: 24, textAlign: 'right', color: enabled ? 'var(--blue500)' : 'var(--text-caption)' }}
-                    aria-hidden="true"
-                  >
-                    {enabled ? 'ON' : 'OFF'}
-                  </span>
-                  <span className={`tm-toggle ${enabled ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
-                </button>
-              );
-            })}
-          </div>
+          </section>
         </div>
       </div>
-    </AppChrome>
   );
 }
 
@@ -1533,7 +1607,40 @@ export function NotificationSettingsPageClient() {
 // 지금은 v1 최초 버전이라 상수 하나로 고정한다 — 서버는 이 값을 그대로
 // V1UserRecordConsent.policyHash에 저장할 뿐 검증하지 않는다(신뢰 경계는 프론트가 아니라
 // "무엇에 동의했는지" 감사 로그 목적).
-const RECORD_CONSENT_POLICY_HASH = 'v1-public-record-consent-1';
+// 정책 해시는 홈 넛지 배너(Task 154 P0-3)와 공유한다 -- 두 곳이 다른 값을 보내면
+// 같은 동의가 서로 다른 문구에 동의한 것으로 기록된다.
+
+/**
+ * 알림에서 온 사람에게만 뜨는 맥락 배너 (Task 154 P0-6, 사용자 선택 A안).
+ *
+ * 이 설정 화면은 원래 맥락 없는 토글이다. 대회 명단에 올라 알림을 받고 들어온 사람에게
+ * "왜 지금 이걸 보고 있는지" 를 설명해 주지 않으면 그냥 나가버린다 -- 그래서 알림
+ * 딥링크가 실어 보낸 대회를 여기서 이름으로 되돌려 준다.
+ *
+ * 설정 메뉴로 직접 들어온 사람에게는 아무것도 렌더하지 않는다(파라미터가 없다).
+ * 대회 조회가 실패하거나 아직 로딩 중이면 이름 없이 "대회 명단" 으로만 말한다 --
+ * 배너가 사라졌다 나타나면 그 아래 토글 위치가 흔들려 오탭을 유발한다.
+ */
+function RecordConsentTournamentContext() {
+  const params = useSearchParams();
+  // 알림을 거쳐 오면 `from` 이 notifications 로 바뀌므로 대회 맥락은 tournamentId 로 판단한다.
+  const tournamentId = params.get('tournamentId') ?? '';
+  const fromTournament = Boolean(tournamentId);
+  const tournament = useV1Tournament(fromTournament ? tournamentId : '');
+  if (!fromTournament) return null;
+  const title = tournament.data?.title;
+  return (
+    <Card pad={16} style={{ marginBottom: 8, background: 'var(--blue-soft)' }}>
+      <div className="tm-text-label" style={{ color: 'var(--blue700)' }}>
+        {title ? `"${title}" 명단에 올랐어요` : '대회 명단에 올랐어요'}
+      </div>
+      <div className="tm-text-caption" style={{ marginTop: 4, color: 'var(--blue700)' }}>
+        공개를 켜면 이 대회 기록이 프로필에 표시돼요. 켜지 않으면 나에게만 보여요.
+      </div>
+    </Card>
+  );
+}
+
 
 export function RecordConsentSettingsPageClient() {
   const consent = useV1RecordConsent();
@@ -1542,11 +1649,9 @@ export function RecordConsentSettingsPageClient() {
 
   if (consent.isError) {
     return (
-      <AppChrome title="경기 기록 공개" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
-        <div className="tm-my-shell">
-          <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void consent.refetch()} />
-        </div>
-      </AppChrome>
+      <div className="tm-my-shell">
+        <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void consent.refetch()} />
+      </div>
     );
   }
 
@@ -1560,61 +1665,66 @@ export function RecordConsentSettingsPageClient() {
   };
 
   return (
-    <AppChrome title="경기 기록 공개" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref="/my/settings">
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">경기 기록 공개</h1>
           </div>
-          <Card pad={14} style={{ marginBottom: 8 }}>
-            <div className="tm-text-label">공개 프로필에 경기 기록 표시</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>
-              팀 라인업에 내 계정으로 연결된 경기가 공개 활동 기록(/users/내ID/records)에 나타나요.
-              {/* 과거 경기까지 소급 공개된다는 게 이 기능의 핵심 조건 — 켜기 전에 반드시
-                  알아야 한다(사용자 명시 결정: "모두 그냥 다 보이게"). */}
+          <RecordConsentTournamentContext />
+          <section>
+            <div className="tm-my-section-label">공개</div>
+            {toggleError ? (
+              <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+                <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+              </Card>
+            ) : null}
+            <div className="tm-card" style={{ padding: 0 }}>
+              <button
+                className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+                onClick={toggle}
+                type="button"
+                disabled={consent.isLoading || update.isPending}
+                role="switch"
+                aria-checked={granted}
+                aria-label="경기 기록 공개"
+                style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="tm-text-body">경기 기록 공개</div>
+                  <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                    {update.isPending
+                      ? '저장하는 중이에요…'
+                      : granted
+                        ? '지금 공개돼 있어요. 끄면 새 경기부터 다시 비공개예요.'
+                        : '지금은 비공개예요.'}
+                  </div>
+                </div>
+                <span
+                  className="tm-text-caption"
+                  style={{ minWidth: 24, textAlign: 'right', color: granted ? 'var(--blue500)' : 'var(--text-caption)' }}
+                  aria-hidden="true"
+                >
+                  {granted ? 'ON' : 'OFF'}
+                </span>
+                <span className={`tm-toggle ${granted ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+              </button>
+            </div>
+            {/* 이 각주는 **무엇이** 공개되는지만 답한다. "왜 지금 이 화면인지"는 위 대회
+                맥락 배너가, "지금 켜져 있는지"는 위 토글 서브텍스트가 각각 맡는다 --
+                셋이 같은 말을 반복하면(실측: 알림에서 들어온 화면에 "켜면 공개돼요"가
+                세 번 나왔다) 정작 무엇이 공개되는지는 아무도 말해주지 않는다. */}
+            <div className="tm-text-caption tm-my-settings-footnote">
+              내 프로필의 활동 기록에 출전 경기, 득점, 경고·퇴장, MVP 가 표시돼요.
+              팀 라인업에 내 계정으로 연결된 경기만 해당돼요.
+              {/* 소급 공개는 켜기 전에 반드시 알아야 하는 조건(사용자 명시 결정)이라
+                  여기 둔다 -- 토글 서브텍스트는 현재 상태만 말한다. */}
               {' '}켜면 지금까지 참가한 경기 기록도 함께 공개돼요.
             </div>
-          </Card>
-          {toggleError ? (
-            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
-            </Card>
-          ) : null}
-          <div className="tm-card" style={{ padding: 0 }}>
-            <button
-              className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
-              onClick={toggle}
-              type="button"
-              disabled={consent.isLoading || update.isPending}
-              role="switch"
-              aria-checked={granted}
-              aria-label="경기 기록 공개"
-              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="tm-text-body">경기 기록 공개</div>
-                <div className="tm-text-caption" style={{ marginTop: 3 }}>
-                  {update.isPending
-                    ? '저장하는 중이에요…'
-                    : granted
-                      ? '지금 공개돼 있어요. 끄면 새 경기부터 다시 비공개예요.'
-                      : '지금은 비공개예요. 켜면 과거 경기까지 함께 공개돼요.'}
-                </div>
-              </div>
-              <span
-                className="tm-text-caption"
-                style={{ minWidth: 24, textAlign: 'right', color: granted ? 'var(--blue500)' : 'var(--text-caption)' }}
-                aria-hidden="true"
-              >
-                {granted ? 'ON' : 'OFF'}
-              </span>
-              <span className={`tm-toggle ${granted ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
-            </button>
-          </div>
+          </section>
           {granted && consent.data?.effectiveAt ? (
             <div className="tm-text-caption" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
               {formatTournamentDateTimeLong(consent.data.effectiveAt)}부터 공개하고 있어요.
@@ -1622,7 +1732,6 @@ export function RecordConsentSettingsPageClient() {
           ) : null}
         </div>
       </div>
-    </AppChrome>
   );
 }
 
@@ -1641,22 +1750,6 @@ export function RecordConsentSettingsPageClient() {
  * 자체는 여전히 유효하지만, 신청 화면의 선택 동의 체크박스가 이 화면 밖에서 이 값을 켜는
  * 두 번째 진입점이 됐다 -- 이 화면은 "언제든 끌 수 있는" 유일한 진입점 역할은 그대로 유지.
  *
- * 기존 사용자 안내 배너 (범위 밖, 계획만) -- 조사 결과: 이 저장소에는 이미 "한 번 노출되는
- * 조건부 넛지 카드" 패턴이 있다. `components/home/home-client.tsx`의 `pushNudge`/
- * `phoneVerifyNudge`가 예시 -- 서버/클라이언트 조건(권한 미허용, 미인증)으로 표시 여부를
- * 계산하고, `PushNudgeBanner`/`PhoneVerifyBanner`(`components/home/home-page.tsx`)로
- * 렌더링하며, `lib/session-storage.ts`의 `V1_PUSH_NUDGE_DISMISSED_KEY` 같은
- * sessionStorage 키로 닫기 상태를 기록한다. 범용 배너 프리미티브는
- * `components/v1-ui/primitives.tsx`의 `AlertBanner`(tone: error|info|warning).
- * 이 토글을 위한 안내라면: (a) 홈 화면에 `TournamentRealNameNudgeBanner`를 추가해
- * `V1UserProfile.tournamentRealNameVisible === false`이고 아직 안내를 본 적 없는
- * 사용자에게만 노출 -- 단 `pushNudge`처럼 세션마다 리셋되는 sessionStorage는 "한 번만"
- * 요구사항에 안 맞으므로(로그인마다 다시 뜸) 영구 dismiss는 서버 플래그(예:
- * `V1UserProfile`에 `tournamentRealNameNudgeDismissedAt` 컬럼 추가, 스키마 변경 필요) 또는
- * localStorage(기기 단위라 완벽하진 않지만 스키마 변경 없이 가능)로 가야 한다. (b) 배너
- * CTA는 이 페이지(`/my/settings/tournament-real-name`)로 링크. 실제 구현은 이번 작업
- * 범위 밖 -- 스키마 변경(서버 dismiss 플래그가 필요하다면) 여부를 먼저 사용자에게 확인하고
- * 착수해야 한다.
  */
 export function TournamentRealNameVisibilitySettingsPageClient() {
   const visibility = useV1TournamentRealNameVisibility();
@@ -1665,11 +1758,9 @@ export function TournamentRealNameVisibilitySettingsPageClient() {
 
   if (visibility.isError) {
     return (
-      <AppChrome title="대회 기록 실명 표시" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
-        <div className="tm-my-shell">
-          <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void visibility.refetch()} />
-        </div>
-      </AppChrome>
+      <div className="tm-my-shell">
+        <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void visibility.refetch()} />
+      </div>
     );
   }
 
@@ -1680,63 +1771,347 @@ export function TournamentRealNameVisibilitySettingsPageClient() {
   };
 
   return (
-    <AppChrome title="대회 기록 실명 표시" activeTab="my" bottomNav={false} backHref="/my/settings" desktopHead>
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">대회 기록 실명 표시</h1>
           </div>
-          <Card pad={14} style={{ marginBottom: 8 }}>
-            <div className="tm-text-label">대회 경기 기록에 실명 표시</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>
-              대회 라인업·득점자·MVP에 붙는 이름이에요. 끄면 닉네임으로 표시되고, 대회
-              신청할 때마다 다시 묻지 않아요 — 여기서 한 번 켜면 계속 적용되고, 언제든
-              다시 끌 수 있어요.
+          <section>
+            <div className="tm-my-section-label">공개</div>
+            {toggleError ? (
+              <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+                <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+              </Card>
+            ) : null}
+            <div className="tm-card" style={{ padding: 0 }}>
+              <button
+                className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+                onClick={toggle}
+                type="button"
+                disabled={visibility.isLoading || update.isPending}
+                role="switch"
+                aria-checked={visible}
+                aria-label="대회 기록 실명 표시"
+                style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="tm-text-body">대회 기록 실명 표시</div>
+                  <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                    {update.isPending
+                      ? '저장하는 중이에요…'
+                      : visible
+                        ? '지금 실명으로 표시돼요. 끄면 닉네임으로 바뀌어요.'
+                        : '지금은 닉네임으로 표시돼요. 켜면 실명으로 바뀌어요.'}
+                  </div>
+                </div>
+                <span
+                  className="tm-text-caption"
+                  style={{ minWidth: 24, textAlign: 'right', color: visible ? 'var(--blue500)' : 'var(--text-caption)' }}
+                  aria-hidden="true"
+                >
+                  {visible ? 'ON' : 'OFF'}
+                </span>
+                <span className={`tm-toggle ${visible ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+              </button>
             </div>
-          </Card>
-          {toggleError ? (
-            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
-            </Card>
-          ) : null}
-          <div className="tm-card" style={{ padding: 0 }}>
+            {/* "끄면 닉네임으로 표시"는 위 토글 서브텍스트가 이미 상태로 말한다(alpha 감사,
+                2026-09-26) -- 여기서는 범위(어디에 붙는 이름인지)와 제약(언제 다시 안 묻는지)만. */}
+            <div className="tm-text-caption tm-my-settings-footnote">
+              대회 라인업·득점자·MVP에 붙는 이름이에요. 대회 신청할 때마다 다시 묻지
+              않아요 — 여기서 한 번 켜면 계속 적용되고, 언제든 다시 끌 수 있어요.
+            </div>
+          </section>
+        </div>
+      </div>
+  );
+}
+
+/**
+ * 선수 카드 숨김 설정 (Task 155).
+ *
+ * 카드는 게임화된 물건이라 거부감을 느끼는 사용자가 있다. 컬럼(`playerCardHidden`)은
+ * 그 탈출구로 만들었는데 **쓰는 경로가 없어 켤 수가 없었다** -- 이 화면이 그것을 연다.
+ *
+ * 켜면 마이페이지·공개 프로필·공유 화면에서 카드가 모두 사라진다(서버가 `playerCard: null`).
+ * 활동 기록과 프로필 자체는 그대로 남는다 -- 카드만 끄는 것이지 프로필을 숨기는 게 아니다.
+ */
+export function PlayerCardHiddenSettingsPageClient() {
+  const state = useV1PlayerCardHidden();
+  const update = useV1UpdatePlayerCardHidden();
+  const [toggleError, setToggleError] = useState(false);
+
+  if (state.isError) {
+    return (
+      <div className="tm-my-shell">
+        <ErrorState message="설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." onRetry={() => void state.refetch()} />
+      </div>
+    );
+  }
+
+  const hidden = Boolean(state.data?.hidden);
+  const toggle = () => {
+    setToggleError(false);
+    update.mutate({ hidden: !hidden }, { onError: () => setToggleError(true) });
+  };
+
+  return (
+      <div className="tm-my-shell tm-content-enter">
+        <div className="tm-my-settings-desktop">
+          <div className="tm-desktop-page-head tm-show-desktop">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
+              <ChevronLeftIcon size={22} strokeWidth={2.5} />
+            </AppBackLink>
+            <h1 className="tm-text-heading">선수 카드</h1>
+          </div>
+          <section>
+            <div className="tm-my-section-label">공개</div>
+            {toggleError ? (
+              <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+                <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+              </Card>
+            ) : null}
+            <div className="tm-card" style={{ padding: 0 }}>
+              <button
+                className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
+                onClick={toggle}
+                type="button"
+                disabled={state.isLoading || update.isPending}
+                role="switch"
+                aria-checked={hidden}
+                aria-label="선수 카드 숨기기"
+                style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="tm-text-body">선수 카드 숨기기</div>
+                  <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                    {update.isPending
+                      ? '저장하는 중이에요…'
+                      : hidden
+                        ? '지금은 카드가 보이지 않아요. 끄면 다시 보여요.'
+                        : '지금은 카드가 보여요. 켜면 어디에도 표시되지 않아요.'}
+                  </div>
+                </div>
+                <span
+                  className="tm-text-caption"
+                  style={{ minWidth: 24, textAlign: 'right', color: hidden ? 'var(--blue500)' : 'var(--text-caption)' }}
+                  aria-hidden="true"
+                >
+                  {hidden ? 'ON' : 'OFF'}
+                </span>
+                <span className={`tm-toggle ${hidden ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
+              </button>
+            </div>
+            {/* "숨기면 안 보인다"는 위 토글 서브텍스트가 이미 상태로 말한다(alpha 감사,
+                2026-09-26) -- 여기서는 그 범위(어디에 적용되는지)와 안심(뭐가 남는지)만 말한다. */}
+            <div className="tm-text-caption tm-my-settings-footnote">
+              경기 기록으로 만든 카드예요. 마이페이지·공개 프로필·공유 화면 세 곳에 함께
+              적용돼요. 활동 기록과 프로필은 그대로 남아요 — 카드만 끄는 거예요.
+            </div>
+          </section>
+
+          <PlayerCardShapePicker />
+          <PlayerCardPhotoAdjust />
+        </div>
+      </div>
+  );
+}
+
+/**
+ * 카드 사진 위치 맞추기 (사용자 선택 A안 후속, 2026-09-02).
+ *
+ * 크롭은 업로드 입구(프로필 수정)에서 하지만, **이미 올려 둔 사진**은 그 입구를 다시
+ * 지나지 않는다 -- 그 사용자에게는 카드가 계속 엉뚱하게 잘린 채다. 여기서 같은 크롭
+ * 모달을 기존 사진으로 열고, 잘라낸 파일을 올린 뒤 프로필의 사진 URL 만 바꾼다.
+ * 프로필 수정 폼 전체를 다시 거치게 하지 않는 이유: 사진 하나 고치자고 닉네임 중복
+ * 확인·성별 필수 같은 폼 게이트를 다시 통과시키면 "저장이 안 된다"로 읽힌다.
+ */
+function PlayerCardPhotoAdjust() {
+  const profile = useV1Profile();
+  const uploadImages = useV1UploadImages();
+  const update = useV1UpdateProfile();
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const current = profile.data?.profile.profileImageUrl ?? null;
+  const pending = uploadImages.isPending || update.isPending;
+
+  const save = async (file: File) => {
+    const data = profile.data;
+    if (!data) return;
+    setError(null);
+    // 서버 저장 API 는 성별이 필수다. 아직 성별을 고르지 않은(legacy) 계정에서 사진만 바꾸자고
+    // 임의의 값을 채워 보내면 개인정보를 조용히 바꾸는 셈이다 -- 프로필 수정으로 안내하고 멈춘다.
+    if (data.profile.gender !== 'male' && data.profile.gender !== 'female') {
+      setError('프로필 수정에서 성별을 먼저 골라 주세요. 그 다음 사진 위치를 맞출 수 있어요.');
+      setOpen(false);
+      return;
+    }
+    try {
+      const uploaded = await uploadImages.mutateAsync([file]);
+      const nextUrl = uploaded.urls[0];
+      if (!nextUrl) throw new Error('업로드 응답에 이미지 URL이 없어요.');
+      // PATCH /me/profile 은 보내지 않은 필드를 null 로 덮는다(서버 실측 2026-09-02) --
+      // 사진만 바꾸더라도 나머지는 지금 값을 그대로 실어 보내야 한다.
+      await update.mutateAsync({
+        realName: data.profile.realName ?? null,
+        nickname: data.profile.nickname ?? '',
+        email: data.email ?? null,
+        profileImageUrl: nextUrl,
+        phone: data.phone ?? null,
+        // 서버는 8자리 숫자만 받는다 -- 시드로 들어간 옛 계정은 '1995-01-01' 형태가 남아 있다.
+        birthDate: data.profile.birthDate ? data.profile.birthDate.replace(/\D/g, '') || null : null,
+        gender: data.profile.gender,
+      });
+      setOpen(false);
+    } catch (err) {
+      setError(extractErrorMessage(err, '사진을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'));
+      setOpen(false);
+    }
+  };
+
+  return (
+    <section style={{ marginTop: 16 }}>
+      <div className="tm-my-section-label">사진</div>
+      {error ? (
+        <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+          <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>{error}</div>
+        </Card>
+      ) : null}
+      <div className="tm-card" style={{ padding: 0 }}>
+        {current ? (
+          <button
+            className="tm-my-menu-row tm-pressable"
+            type="button"
+            disabled={profile.isLoading || pending}
+            onClick={() => {
+              setError(null);
+              setOpen(true);
+            }}
+            style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="tm-text-body">사진 위치 맞추기</div>
+              <div className="tm-text-caption" style={{ marginTop: 3 }}>
+                {pending ? '저장하는 중이에요…' : '지금 사진에서 카드에 넣을 부분을 다시 골라요'}
+              </div>
+            </div>
+            <ChevronRightIcon size={18} strokeWidth={2.2} aria-hidden="true" />
+          </button>
+        ) : (
+          <Link className="tm-my-menu-row tm-pressable" href="/my/profile/edit">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="tm-text-body">사진 올리기</div>
+              <div className="tm-text-caption" style={{ marginTop: 3 }}>프로필 수정에서 사진을 올리면 카드에 들어가요</div>
+            </div>
+            <ChevronRightIcon size={18} strokeWidth={2.2} aria-hidden="true" />
+          </Link>
+        )}
+      </div>
+      <div className="tm-text-caption tm-my-settings-footnote">
+        카드에는 사진의 위쪽 가운데가 들어가요. 얼굴이 어긋나 보이면 위치를 다시 맞출 수 있어요.
+      </div>
+      {open && current ? (
+        <ProfilePhotoCropper
+          source={current}
+          title="카드 사진 위치 맞추기"
+          pending={pending}
+          onCancel={() => setOpen(false)}
+          onCropped={save}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * 카드 모양 선택 (코스메틱 업적).
+ *
+ * 별도 화면을 만들지 않고 카드 설정 안에 둔다 -- 카드에 관한 설정이 두 곳으로 갈리면
+ * 사용자가 "카드 숨기기"와 "카드 모양"을 다른 기능으로 오해한다.
+ *
+ * 잠긴 모양도 **목록에서 지우지 않고 자물쇠로 보여준다.** 안 보이면 존재를 모르고,
+ * 존재를 몰라야 할 이유가 없다 -- 오히려 다음 목표가 되는 게 이 기능의 목적이다.
+ */
+function PlayerCardShapePicker() {
+  const state = useV1PlayerCardShape();
+  const update = useV1UpdatePlayerCardShape();
+  const [saveError, setSaveError] = useState(false);
+
+  const shape = state.data?.shape ?? 'rect';
+  const unlocked = state.data?.unlocked ?? ['rect'];
+  const reviewCount = state.data?.reviewCount ?? 0;
+  const required = state.data?.requiredForShield ?? 10;
+
+  const options: { key: 'rect' | 'shield'; label: string; sub: string }[] = [
+    { key: 'rect', label: '네모', sub: '기본 카드예요' },
+    {
+      key: 'shield',
+      label: '방패',
+      sub: unlocked.includes('shield')
+        ? '업적으로 열린 모양이에요'
+        : `후기 ${required}개를 받으면 열려요 (지금 ${reviewCount}개)`,
+    },
+  ];
+
+  return (
+    <section style={{ marginTop: 16 }}>
+      <div className="tm-my-section-label">모양</div>
+      {saveError ? (
+        <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+          <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+          <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요.</div>
+        </Card>
+      ) : null}
+      <div className="tm-card" style={{ padding: 0 }}>
+        {options.map((opt) => {
+          const locked = !unlocked.includes(opt.key);
+          const selected = shape === opt.key;
+          return (
             <button
-              className="tm-my-menu-row tm-pressable tm-noti-toggle-row"
-              onClick={toggle}
+              key={opt.key}
+              className="tm-my-menu-row tm-pressable"
               type="button"
-              disabled={visibility.isLoading || update.isPending}
-              role="switch"
-              aria-checked={visible}
-              aria-label="대회 기록 실명 표시"
-              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+              disabled={locked || state.isLoading || update.isPending}
+              aria-pressed={selected}
+              aria-label={`카드 모양 ${opt.label}${locked ? ' (잠김)' : ''}`}
+              onClick={() => {
+                setSaveError(false);
+                update.mutate({ shape: opt.key }, { onError: () => setSaveError(true) });
+              }}
+              style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: locked ? 'default' : 'pointer' }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="tm-text-body">대회 기록 실명 표시</div>
-                <div className="tm-text-caption" style={{ marginTop: 3 }}>
-                  {update.isPending
-                    ? '저장하는 중이에요…'
-                    : visible
-                      ? '지금 실명으로 표시돼요. 끄면 닉네임으로 바뀌어요.'
-                      : '지금은 닉네임으로 표시돼요. 켜면 실명으로 바뀌어요.'}
+                <div className="tm-text-body" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {/* 아이콘만으로 잠김을 전달하지 않는다 — 옆에 "잠김" 텍스트를 병행한다
+                      (teams-page.tsx의 <Lock/>비공개 배지와 같은 관례). 버튼 aria-label에
+                      이미 "(잠김)"이 있어 스크린리더에는 중복이지만 그쪽은 aria-hidden으로
+                      가려 두 번 읽히지 않는다. */}
+                  {locked ? <Lock size={13} aria-hidden="true" style={{ flexShrink: 0 }} /> : null}
+                  {locked ? '잠김 · ' : ''}{opt.label}
                 </div>
+                <div className="tm-text-caption" style={{ marginTop: 3 }}>{opt.sub}</div>
               </div>
               <span
                 className="tm-text-caption"
-                style={{ minWidth: 24, textAlign: 'right', color: visible ? 'var(--blue500)' : 'var(--text-caption)' }}
+                style={{ minWidth: 24, textAlign: 'right', color: selected ? 'var(--blue500)' : 'var(--text-caption)' }}
                 aria-hidden="true"
               >
-                {visible ? 'ON' : 'OFF'}
+                {selected ? '선택됨' : ''}
               </span>
-              <span className={`tm-toggle ${visible ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
             </button>
-          </div>
-        </div>
+          );
+        })}
       </div>
-    </AppChrome>
+      <div className="tm-text-caption tm-my-settings-footnote">
+        모양은 꾸미기예요 — 능력치나 등급은 바뀌지 않아요.
+      </div>
+    </section>
   );
 }
 
@@ -1750,64 +2125,62 @@ export function ThemeSettingsPageClient() {
   const { preference, setPreference, isSaving, saveError } = useTheme();
 
   return (
-    <AppChrome title="화면 테마" activeTab="my" bottomNav={false} backHref="/my/settings">
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-settings-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">화면 테마</h1>
           </div>
-          <Card pad={14} style={{ marginBottom: 8 }}>
-            <div className="tm-text-label">화면 밝기 고르기</div>
-            <div className="tm-text-caption" style={{ marginTop: 4 }}>
+          <section>
+            <div className="tm-my-section-label">화면 밝기</div>
+            {saveError ? (
+              <Card pad={16} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
+                <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
+                <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요. 이 화면에서는 그대로 적용돼요.</div>
+              </Card>
+            ) : null}
+            <div className="tm-card" style={{ padding: 0 }} role="radiogroup" aria-label="화면 테마 선택">
+              {THEME_OPTIONS.map((option) => {
+                const selected = preference === option.key;
+                return (
+                  <button
+                    key={option.key}
+                    className="tm-my-menu-row tm-pressable"
+                    onClick={() => setPreference(option.key)}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    // 저장 중엔 다른 옵션도 함께 막는다 — 선택된 행만 막으면 저장 대기 중에
+                    // 다른 옵션을 눌러 PATCH 두 개가 동시에 날아갈 수 있고, 응답이 뒤바뀌어
+                    // 도착하면 서버에 최종 저장되는 값이 마지막 클릭과 달라질 수 있다.
+                    disabled={isSaving}
+                    style={{
+                      width: '100%',
+                      border: 'none',
+                      cursor: isSaving ? 'default' : 'pointer',
+                      textAlign: 'left',
+                      background: selected ? 'var(--tint-blue)' : 'none',
+                      opacity: isSaving && !selected ? 0.6 : 1,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="tm-text-body" style={{ color: selected ? 'var(--blue700)' : undefined }}>{option.label}</div>
+                      <div className="tm-text-caption" style={{ marginTop: 3 }}>{option.sub}</div>
+                    </div>
+                    {/* 컬러만으로 선택 상태를 전달하지 않도록 체크 아이콘 + 배경색을 함께 사용 */}
+                    {selected ? <Check size={18} strokeWidth={2.5} color="var(--blue500)" aria-hidden="true" /> : null}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="tm-text-caption tm-my-settings-footnote">
               기본값은 라이트예요. 로그인하면 이 기기뿐 아니라 다른 기기에서도 같은 설정으로 보여요.
             </div>
-          </Card>
-          {saveError ? (
-            <Card pad={14} className="tm-auth-soft-card-warning" style={{ marginBottom: 8 }}>
-              <div className="tm-text-label" style={{ color: 'var(--orange700)' }}>저장하지 못했어요</div>
-              <div className="tm-text-caption" style={{ marginTop: 4 }}>잠시 후 다시 시도해 주세요. 이 화면에서는 그대로 적용돼요.</div>
-            </Card>
-          ) : null}
-          <div className="tm-card" style={{ padding: 0 }} role="radiogroup" aria-label="화면 테마 선택">
-            {THEME_OPTIONS.map((option) => {
-              const selected = preference === option.key;
-              return (
-                <button
-                  key={option.key}
-                  className="tm-my-menu-row tm-pressable"
-                  onClick={() => setPreference(option.key)}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  // 저장 중엔 다른 옵션도 함께 막는다 — 선택된 행만 막으면 저장 대기 중에
-                  // 다른 옵션을 눌러 PATCH 두 개가 동시에 날아갈 수 있고, 응답이 뒤바뀌어
-                  // 도착하면 서버에 최종 저장되는 값이 마지막 클릭과 달라질 수 있다.
-                  disabled={isSaving}
-                  style={{
-                    width: '100%',
-                    border: 'none',
-                    cursor: isSaving ? 'default' : 'pointer',
-                    textAlign: 'left',
-                    background: selected ? 'var(--tint-blue)' : 'none',
-                    opacity: isSaving && !selected ? 0.6 : 1,
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="tm-text-body" style={{ color: selected ? 'var(--blue700)' : undefined }}>{option.label}</div>
-                    <div className="tm-text-caption" style={{ marginTop: 3 }}>{option.sub}</div>
-                  </div>
-                  {/* 컬러만으로 선택 상태를 전달하지 않도록 체크 아이콘 + 배경색을 함께 사용 */}
-                  {selected ? <Check size={18} strokeWidth={2.5} color="var(--blue500)" aria-hidden="true" /> : null}
-                </button>
-              );
-            })}
-          </div>
+          </section>
         </div>
       </div>
-    </AppChrome>
   );
 }
 
@@ -1818,7 +2191,6 @@ export function WithdrawalPageClient() {
   const [infoOpen, setInfoOpen] = useState(false);
   // #4: 비가역 작업이므로 confirm 모달로 이중 확인한다.
   const { confirm, ConfirmModal } = useConfirm();
-
   const handleWithdraw = () => {
     confirm({
       title: '탈퇴 요청',
@@ -1841,14 +2213,14 @@ export function WithdrawalPageClient() {
   };
 
   return (
-    <AppChrome title="회원 탈퇴" activeTab="my" bottomNav={false} backHref="/my/settings">
+    <>
       {ConfirmModal}
-      <div className="tm-my-shell">
+      <div className="tm-my-shell tm-content-enter">
         <div className="tm-my-withdrawal-desktop">
           <div className="tm-desktop-page-head tm-show-desktop">
-            <Link className="tm-desktop-back" href="/my/settings" aria-label="설정으로 돌아가기">
+            <AppBackLink className="tm-desktop-back" fallbackHref={"/my/settings"}>
               <ChevronLeftIcon size={22} strokeWidth={2.5} />
-            </Link>
+            </AppBackLink>
             <h1 className="tm-text-heading">회원 탈퇴</h1>
           </div>
           <section className="tm-danger-panel">
@@ -1858,7 +2230,8 @@ export function WithdrawalPageClient() {
               </span>
               <div className="tm-text-heading">탈퇴 전 확인해 주세요</div>
             </div>
-            <p className="tm-text-body" style={{ margin: '10px 0 0', lineHeight: 1.6 }}>진행 중인 매치가 있거나 팀 운영 권한(팀장·운영진)을 갖고 있으면 탈퇴가 제한돼요.</p>
+            <p className="tm-text-body" style={{ margin: '12px 0 0', lineHeight: 1.6 }}>진행 중인 매치가 있거나 팀 운영 권한(팀장·운영진)을 갖고 있으면 탈퇴가 제한돼요.</p>
+            <p className="tm-text-body" style={{ margin: '8px 0 0', lineHeight: 1.6 }}>{WITHDRAWAL_GRACE_NOTICE}</p>
           </section>
           <Card pad={16}>
             <button
@@ -1883,8 +2256,12 @@ export function WithdrawalPageClient() {
                   <div className="tm-text-caption">탈퇴 신청 후 계정 확인 절차가 진행돼요</div>
                 </div>
                 <div>
+                  <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>알림 중지</div>
+                  <div className="tm-text-caption">요청 접수와 동시에 이 계정의 푸시 등록을 해제해요</div>
+                </div>
+                <div>
                   <div className="tm-text-label" style={{ color: 'var(--text-strong)' }}>보관 데이터</div>
-                  <div className="tm-text-caption">법령에 따른 보관 기간이 지나면 삭제돼요</div>
+                  <div className="tm-text-caption">완료 경기·결제·분쟁 기록은 정해진 목적과 기간에 한해 보관돼요</div>
                 </div>
               </div>
             ) : null}
@@ -1893,13 +2270,7 @@ export function WithdrawalPageClient() {
             <span className="tm-text-label">탈퇴 사유</span>
             <textarea className="tm-input tm-create-input-multiline" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} placeholder="선택 입력" />
           </label>
-          {withdrawal.isError ? (
-            <Card pad={14} className="tm-auth-soft-card-error">
-              <div className="tm-text-label">
-                {extractErrorMessage(withdrawal.error, '탈퇴 요청에 실패했어요')}
-              </div>
-            </Card>
-          ) : null}
+          {withdrawal.isError ? <WithdrawalErrorCard error={withdrawal.error} /> : null}
         </div>
       </div>
       <div className="tm-fixed-cta tm-my-withdrawal-cta">
@@ -1912,38 +2283,56 @@ export function WithdrawalPageClient() {
           {withdrawal.isPending ? '요청 중' : '탈퇴 요청'}
         </button>
       </div>
-    </AppChrome>
+    </>
   );
 }
 
 function toMyHomeModel(
   profile: V1Profile,
-  teams: V1MyTeam[],
   hasNewNotification: boolean,
   activitySummary?: V1MyActivitySummary,
   hasPendingReviews?: boolean,
   phoneVerified?: boolean,
   staffTournamentCount = 0,
+  pendingContactCount = 0,
 ): MyHomeViewModel {
   const nickname = profile.profile.nickname?.trim() || profile.profile.displayName;
   const totalMannerScore = activitySummary?.totals.mannerScore ?? profile.reputation.mannerScore;
   const activityCount = activitySummary?.totals.activityCount ?? '—';
   const monthlyMatchCount = activitySummary?.monthly.matchCount ?? '—';
-  const sections = myHomeModel.sections.map((section) => ({ ...section, items: [...section.items] }));
+  // 항목 객체까지 복사한다 — 얕은 복사면 아래 badge 쓰기가 모듈 싱글턴(my.view-model)을 오염시켜
+  // 배지가 영영 안 지워지고 로딩 셸·다른 계정에도 새어 나간다(최종 리뷰 Critical 1).
+  const sections = myHomeModel.sections.map((section) => ({ ...section, items: section.items.map((item) => ({ ...item })) }));
   // F3: 마이페이지에서 내 활동 기록(/users/:id/records)으로 가는 동선이 아예 없었다 —
   // 정적 myHomeModel엔 내 userId를 미리 넣을 수 없어 여기서 프로필 응답으로 동적으로 붙인다.
   const myActivitySection = sections.find((section) => section.title === '내 활동');
-  if (myActivitySection && !myActivitySection.items.some((item) => item.href === `/users/${profile.userId}/records`)) {
+  // 뒤로가기가 마이페이지로 돌아오도록 출처를 함께 넘긴다(teams-client.tsx의 팀 상세
+  // profileHref와 동일 패턴 — user-records-page-client.tsx가 `?from=`을 읽는다).
+  const activityRecordsHref = withFromPath(`/users/${profile.userId}/records`, '/my');
+  if (myActivitySection && !myActivitySection.items.some((item) => item.href === activityRecordsHref)) {
     myActivitySection.items.push({
       label: '내 활동 기록',
       sub: '팀 라인업에 연결된 경기 기록을 확인해요',
-      href: `/users/${profile.userId}/records`,
+      href: activityRecordsHref,
       icon: 'Award',
     });
   }
-  const communitySection = sections.find((section) => section.title === '커뮤니티');
-  if (communitySection && !communitySection.items.some((item) => item.href === '/my/reviews')) {
-    communitySection.items.push({
+  // 카드 아래 프로필 박스를 없애며(2026-09-26 B안) 로그인 방식·본인인증은 계정 설정 행이 말한다.
+  const loginMethod = formatLoginProvider(profile.authProvider);
+  const accountItem = sections.find((section) => section.title === '설정·문의')?.items.find((item) => item.href === '/my/settings');
+  if (accountItem) {
+    if (loginMethod) accountItem.sub = `${loginMethod} · ${accountItem.sub}`;
+    accountItem.tag = phoneVerified === true ? { label: '본인인증 완료', icon: 'ShieldCheck' } : undefined;
+  }
+  const inboxSection = sections.find((section) => section.title === '받은 소식');
+  const chatItem = inboxSection?.items.find((item) => item.href === '/chat');
+  if (chatItem) {
+    chatItem.badge = pendingContactCount > 0 ? pendingContactCount : undefined;
+    chatItem.badgeLabel = pendingContactCount > 0 ? `답장을 기다리는 컨택 ${pendingContactCount}건` : undefined;
+  }
+  if (inboxSection && !inboxSection.items.some((item) => item.href === '/my/reviews')) {
+    // '보낸 가입 신청'(결과 대기) 앞에 둔다 -- 배지가 붙을 수 있는 항목끼리 위로 모은다.
+    inboxSection.items.splice(2, 0, {
       label: '리뷰',
       sub: hasPendingReviews ? '작성할 리뷰가 있어요' : '작성한 리뷰와 받은 리뷰를 확인해요',
       href: '/my/reviews',
@@ -1951,8 +2340,8 @@ function toMyHomeModel(
     });
   }
   // 스태프가 아닌 대부분의 사용자에게는 이 섹션 자체가 없어야 한다 — 유효한(만료·해제되지
-  // 않은) 배정이 하나라도 있을 때만 추가한다. "내 활동" 바로 다음에 둬서, 지금 처리해야
-  // 하는 운영 업무가 있다는 신호가 눈에 잘 띄게 한다.
+  // 않은) 배정이 하나라도 있을 때만 추가한다. "받은 소식" 바로 다음(index 1)에 둬서, 지금
+  // 처리해야 하는 운영 업무가 있다는 신호가 눈에 잘 띄게 한다.
   if (staffTournamentCount > 0 && !sections.some((section) => section.title === '대회 운영')) {
     sections.splice(1, 0, {
       title: '대회 운영',
@@ -1966,48 +2355,42 @@ function toMyHomeModel(
       ],
     });
   }
-  if (!sections.some((section) => section.title === '문의')) {
-    sections.push({
-      title: '문의',
-      items: [
-        {
-          label: '문의하기',
-          sub: '계정, 매치, 대회, 결제 문제를 운영팀에 남겨요',
-          href: '/my/inquiries',
-          icon: 'Mail',
-        },
-      ],
-    });
-  }
-
   return {
     ...myHomeModel,
     hasNewNotification,
     phoneVerified,
+    playerCardSlot: profile.playerCardSlot,
     sections,
     user: {
       ...myHomeModel.user,
+      userId: profile.userId,
       name: nickname,
       handle: `@${nickname}`,
       region: profile.regionName ?? '지역 미정',
       genderLabel: formatGender(profile.profile.gender),
       initials: initials(nickname),
       profileImageUrl: profile.profile.profileImageUrl ?? null,
-      loginMethod: formatLoginProvider(profile.authProvider) ?? undefined,
+      loginMethod: loginMethod ?? undefined,
       loginMethodProvider: profile.authProvider,
       intro: '',
       sports: (profile.sports ?? []).map((sport) =>
         sport.levelName ? `${sport.sportName} ${sport.levelName}` : sport.sportName,
       ),
       stats: [
-        { label: '활동', value: activityCount, unit: activitySummary ? '회' : undefined },
-        { label: '소속 팀', value: activitySummary?.totals.teamCount ?? teams.length, unit: '팀' },
-        { label: '매너 점수', value: formatScore(totalMannerScore) },
+        { label: '전체 활동', value: activityCount, unit: activitySummary ? '회' : undefined },
+        // teamCount 는 activitySummary 응답의 필수(non-optional) 필드라 activitySummary 가
+        // 로딩됐다면 항상 채워져 있다 — 이전엔 activitySummary 로딩 중일 때 아직 못 채운
+        // teams(초기값 [])의 length(=0)로 폴백해서, 실제로 팀이 여러 개인 사용자에게도
+        // 로딩 중 잠깐(또는 이 쿼리가 느릴 때 계속) "소속 팀: 0팀"으로 보이는 결함이 있었다.
+        { label: '소속 팀', value: activitySummary ? activitySummary.totals.teamCount : '—', unit: activitySummary ? '팀' : undefined },
+        // 만점을 함께 적는다 -- 선수 카드의 MAN 은 같은 후기를 100점으로 환산해 보여주므로,
+        // 척도가 없으면 "94 인데 4.7" 두 숫자가 다른 사실처럼 읽힌다.
+        { label: '매너 점수', value: formatScore(totalMannerScore), unit: typeof totalMannerScore === 'number' ? '/5' : undefined },
       ],
       // '매너 점수'는 상단 활동 요약(stats)에만 표시. monthly는 경기 수·승률만 — 이중 표기 해소.
       monthly: [
         { label: '이번 달 경기', value: monthlyMatchCount, unit: activitySummary ? '경기' : undefined },
-        { label: '승률', value: formatWinRate(activitySummary?.monthly.winRate) },
+        { label: '이번 달 승률', value: formatWinRate(activitySummary?.monthly.winRate) },
       ],
     },
   };
@@ -2049,63 +2432,7 @@ function toTeamDetailModel(team: V1TeamDetail): MyTeam {
   };
 }
 
-function toMyMember(
-  member: V1TeamMember,
-  actions?: {
-    actionPending: boolean;
-    canManageMembers: boolean;
-    canDelegateOwner: boolean;
-    promote: () => void;
-    delegateOwner: () => void;
-    demote: () => void;
-    remove: () => void;
-  },
-): MyMember {
-  const itemActions: NonNullable<MyMember['actions']> = [];
-  if (actions?.canManageMembers && member.canChangeRole && member.role === 'member') {
-    itemActions.push({ label: '운영진 지정', onSelect: actions.promote });
-  }
-  if (actions?.canDelegateOwner && member.canChangeRole && member.role === 'manager') {
-    itemActions.push({ label: '팀장 지정', onSelect: actions.delegateOwner });
-    itemActions.push({ label: '멤버 강등', onSelect: actions.demote });
-  }
-  if (actions?.canManageMembers && member.canRemove && member.role !== 'owner') {
-    itemActions.push({ label: '내보내기', tone: 'danger', onSelect: actions.remove });
-  }
 
-  return {
-    id: member.membershipId,
-    name: member.displayName,
-    role: roleLabel(member.role),
-    meta: `${formatGender(member.gender)} · ${new Date(member.joinedAt).toLocaleDateString('ko-KR')}`,
-    status: teamMemberStatusLabel(member.status),
-    locked: member.role === 'owner',
-    actions: itemActions,
-    actionPending: actions?.actionPending,
-  };
-}
-
-function toMyJoinRequest(
-  application: V1TeamJoinApplication,
-  actions: {
-    actionPending: boolean;
-    approve: () => void;
-    reject: () => void;
-  },
-): MyMember {
-  return {
-    id: application.applicationId,
-    name: application.applicant.displayName,
-    role: '가입 신청',
-    meta: application.message ?? new Date(application.createdAt).toLocaleDateString('ko-KR'),
-    status: teamJoinApplicationStatusLabel(application.status),
-    actions: [
-      { label: '승인', onSelect: actions.approve },
-      { label: '거절', tone: 'danger', onSelect: actions.reject },
-    ],
-    actionPending: actions.actionPending,
-  };
-}
 
 /**
  * confirmAction — useConfirm()의 confirm 함수를 받아 모달 확인 후 action을 실행한다.
@@ -2119,19 +2446,6 @@ function confirmAction(
   confirm(opts).then((ok) => {
     if (ok) action();
   });
-}
-
-function toMyTeamMatch(match: V1MyTeamMatch): MyTeamDetailViewModel['recentMatches'][number] {
-  const status = match.status === 'completed' || match.status === 'expired' || match.status === 'cancelled' ? 'ended' : match.relation === 'requested' ? 'pending' : match.relation === 'approved' ? 'approved' : 'recruiting';
-  return {
-    id: match.teamMatchId,
-    title: match.title,
-    meta: `${new Date(match.startsAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} · ${match.sportName}`,
-    status,
-    statusLabel: status === 'pending' ? '승인 대기' : status === 'approved' ? '승인 완료' : status === 'ended' ? '종료' : '모집 중',
-    note: match.teamName ? `${match.teamName} 관련 팀매치예요.` : '내 팀 관련 팀매치예요.',
-    href: match.detailRoute,
-  };
 }
 
 function toMyInvitationItem(invitation: V1ReceivedInvitation, actionPending: boolean): MyInvitationItem {
@@ -2221,11 +2535,6 @@ function roleLabel(role: string) {
   if (role === 'member') return '멤버';
   return '비회원';
 }
-
-function isTeamOperatorRole(role?: string | null) {
-  return role === 'owner' || role === 'manager' || role === 'admin';
-}
-
 
 function hasTrustValue(value: string) {
   return value === 'verified' || value === 'estimated';

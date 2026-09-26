@@ -2,10 +2,14 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Providers } from './providers';
 import { JsonLd } from '@/components/seo/json-ld';
+import { PageTransitionController } from '@/components/v1-ui/page-transition-controller';
 import { ReleaseVersionWatcher } from '@/components/v1-ui/release-version-watcher';
 import { RouteProgressBar } from '@/components/v1-ui/route-progress';
+import { ScrollRestoration } from '@/components/v1-ui/scroll-restoration';
+import { NavigationHistoryTracker } from '@/components/v1-ui/navigation-history-tracker';
+import { StaticCacheBootstrap } from '@/components/v1-ui/static-cache-bootstrap';
 import { publicAssetPath } from '@/lib/assets';
-import { getSiteOrigin } from '@/lib/seo';
+import { buildSiteVerification, getSiteOrigin, SITE_FEED_ALTERNATE_TYPES } from '@/lib/seo';
 import { buildSiteIdentityLd } from '@/lib/structured-data';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 import './globals.css';
@@ -18,9 +22,11 @@ export const metadata: Metadata = {
     default: 'Teameet',
     template: '%s | Teameet',
   },
-  description: '같이 뛸 사람을 한 번에 — AI 기반 멀티스포츠 소셜 매칭 플랫폼',
+  description: '같이 뛸 사람을 한 번에 — 축구·풋살·러닝·수영 매치·팀·대회 플랫폼',
   category: 'sports',
   formatDetection: { email: false, address: false, telephone: false },
+  alternates: { types: SITE_FEED_ALTERNATE_TYPES },
+  verification: buildSiteVerification(),
   icons: {
     icon: [
       { url: publicAssetPath('/favicon.png'), type: 'image/png', sizes: '32x32' },
@@ -55,8 +61,12 @@ export default function RootLayout({
         <JsonLd data={buildSiteIdentityLd()} />
       </head>
       <body>
+        <NavigationHistoryTracker />
         <RouteProgressBar />
+        <PageTransitionController />
         <ReleaseVersionWatcher />
+        <ScrollRestoration />
+        <StaticCacheBootstrap />
         <Providers>{children}</Providers>
       </body>
     </html>

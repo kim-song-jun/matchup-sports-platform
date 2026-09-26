@@ -1,33 +1,41 @@
 'use client';
 
 import Link from 'next/link';
-import { Star, ImagePlus, X, Trophy, Medal } from 'lucide-react';
-import { AppChrome } from '@/components/v1-ui/shell';
-import { Card, ErrorState } from '@/components/v1-ui/primitives';
-import { useRef, useState } from 'react';
+import Image from 'next/image';
+import { createPortal } from 'react-dom';
+import { Star, ImagePlus, X, Trophy, Medal, ChevronRight } from 'lucide-react';
+import { Card, EmptyState, ErrorState } from '@/components/v1-ui/primitives';
+import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
+import { useEffect, useRef, useState } from 'react';
 import {
   useV1Tournament,
   useV1TournamentParticipantCheck,
-  useV1Reviews,
   useV1MyTournamentReview,
   useV1SubmitTournamentReview,
   useV1UploadImages,
+  useV1LeagueMatchPlayerRecords,
 } from '@/hooks/use-v1-api';
-import { hasStoredV1Session } from '@/lib/session-storage';
-import { trackEvent } from '@/lib/analytics';
+import { usePublicTournamentPlayerRecords } from '@/components/public-game-records/use-public-game-records';
+import { ProfileAvatar } from '@/components/users/public-profile-client';
+import { TournamentPlayerRecordsSections } from '@/components/public-game-records/player-records-sections';
 import { extractErrorMessage } from '@/lib/error-message';
-import { V1ApiError } from '@/lib/api-client';
+import { hasStoredV1Session, withFromPath } from '@/lib/session-storage';
+import { trackEvent } from '@/lib/analytics';
+import { V1ApiError, v1Get } from '@/lib/api-client';
 import { TournamentFlowNav } from '@/components/tournaments/tournament-flow-nav';
-import { TournamentFixtureReviewEntrySection } from '@/components/tournaments/tournament-venue-retention-sections';
 import { formatEntryFee } from '@/lib/date-utils';
 import { parsePrizeRows, isPrizeAmountValue, formatPrizeRowValue } from '@/lib/prize-breakdown';
 import { PrizeRankIcon } from '@/components/tournaments/prize-rank-icon';
+import { PendingReviewsCard } from '@/components/tournaments/pending-review-card';
 import { publicAssetPath } from '@/lib/assets';
 import { TournamentAwardIcon } from '@/components/tournaments/tournament-award-icon';
+import { isLeagueCompetition } from '@/lib/competition-kind';
+import { useCurrentHref } from '@/components/v1-ui/use-current-href';
 
 const REVIEW_PHOTO_MAX = 3;
 const REVIEW_EMBED_CAP = 3;
 import type {
+  V1LeagueOverallStandingsResponse,
   V1TournamentDetail,
   V1TournamentFixture,
   V1TournamentFixtureResult,
@@ -54,11 +62,25 @@ export function getTopThree(tournament: V1TournamentDetail): Array<{ pos: number
     .filter((s, i, arr) => arr.findIndex((x) => x.registrationId === s.registrationId) === i)
     .sort((a, b) => a.position - b.position);
 
-  if (allStandings.length >= 3 && tournament.format === 'league') {
-    return [1, 2, 3].map((pos) => {
-      const s = allStandings[pos - 1];
-      return { pos, name: s?.teamName ?? '미정' };
-    });
+  if (allStandings.length >= 3 && isLeagueCompetition(tournament)) {
+    // `standing.position`은 조 단위 순위다(각 조마다 1부터 다시 매겨짐,
+    // `tournament-group-standings.ts`의 `recalculateAndUpsertGroupStandings`). 조가
+    // 2개 이상인 리그에서 조 구분 없이 병합해 정렬하면 [A1,A2,…,B1,B2,…]가 아니라
+    // position 값 기준(1,1,2,2,…)으로 뒤섞여, 서로 맞붙은 적 없는 A조 1위·B조 1위를
+    // "우승·준우승"으로 잘못 확정한다. 이 함수는 group 로우 데이터만 받는 순수함수라
+    // 통합 순위(승점/득실차/페어플레이 5단계 tie-break, `calculateCompetitionStandings`)를
+    // 여기서 다시 계산할 수 없다 — 정본은 `GET /tournaments/:id/standings/overall`
+    // 하나뿐이다(대진표 탭 `LeagueStandingsSection`이 이미 그걸 쓴다). 그래서 다조
+    // 리그는 여기서 답을 만들어내지 않고 빈 배열로 접는다(fail-closed) — 호출부
+    // (`AwardsPageContent`)가 `useMultiGroupLeagueTopThree`로 그 API를 별도 조회해
+    // override한다. 조가 1개면 조 position이 곧 통합 순위이므로 그대로 정확하다.
+    if (tournament.groups.length <= 1) {
+      return [1, 2, 3].map((pos) => {
+        const s = allStandings[pos - 1];
+        return { pos, name: s?.teamName ?? '미정' };
+      });
+    }
+    return [];
   }
 
   // knockout: final + third_place 픽스처에서 추출
@@ -86,6 +108,63 @@ export function getTopThree(tournament: V1TournamentDetail): Array<{ pos: number
   return result;
 }
 
+/**
+ * 다조(2개 이상) 리그 · 정규 리그 단일 시즌(거울 행) 전용 top3 override.
+ *
+ * `getTopThree`는 두 경우 다 답을 못 낸다 — 다조는 (조 구분 없이 병합하면 우승팀을
+ * 잘못 확정하므로) fail-closed로 빈 배열, 거울 행(`kind==='regular_league'`)은
+ * `tournament.groups`·`tournament.fixtures`가 항상 []라 팀 수와 무관하게 항상 빈
+ * 배열이다(실사용자 발견, 2026-09-16 — 시상 페이지가 이 override를 안 태워 완결된
+ * 단일 시즌 리그에서도 시상대가 계속 빈 채로 남아 있었다). 통합 순위 정본
+ * (`GET /tournaments/:id/standings/overall` — 대진표 탭 `LeagueStandingsSection`과
+ * 동일 엔드포인트)을 여기서 별도 조회해 그 자리를 채운다.
+ *
+ * 이 파일은 도메인 훅 배정 파일(`hooks/use-v1-api.ts`)이 아니라서 `LeagueStandingsSection`
+ * (tournament-detail-client.tsx)과 같은 이유로 `v1Get`을 인라인 `useEffect`로 호출한다
+ * (react-query가 아니다 — 이 화면도 QueryClientProvider 없이 단독 렌더되는 테스트가
+ * 있으므로 동일 제약을 따른다).
+ *
+ * `enabled=false`(단일 조 대회·미완료·knockout 등 `getTopThree`가 이미 정확한 답을 내는
+ * 경우)면 요청하지 않고 `null`을 유지한다 — 호출부가 `null`이면 `getTopThree` 결과를
+ * 그대로 쓰고, `top3: []`(로딩 실패 포함)이면 시상대를 비워 보여준다(틀린 우승팀을
+ * 보여주는 것보다 안전).
+ *
+ * `championCount`는 1위 동점 처리 기준을 전부 소진하고도 안 갈려 공동 우승으로 처리된
+ * 팀 수다(`resolveLeagueChampions`, 2 이상 = 공동 우승). 결과 페이지(`results-page-client.tsx`)
+ * 의 `useLeagueOverallFinalRanking`과 같은 계약.
+ */
+function useMultiGroupLeagueTopThree(
+  tournamentId: string,
+  enabled: boolean,
+): { top3: Array<{ pos: number; name: string }>; championCount: number } | null {
+  const [result, setResult] = useState<{ top3: Array<{ pos: number; name: string }>; championCount: number } | null>(null);
+
+  useEffect(() => {
+    if (!enabled) {
+      setResult(null);
+      return;
+    }
+    let cancelled = false;
+    v1Get<V1LeagueOverallStandingsResponse>(`/tournaments/${tournamentId}/standings/overall`)
+      .then((data) => {
+        if (cancelled) return;
+        const ranked = data.standings
+          .filter((s): s is typeof s & { position: number } => s.position !== null && s.position <= 3)
+          .sort((a, b) => a.position - b.position)
+          .map((s) => ({ pos: s.position, name: s.teamName }));
+        setResult({ top3: ranked, championCount: Math.max(data.champions.length, 1) });
+      })
+      .catch(() => {
+        if (!cancelled) setResult({ top3: [], championCount: 1 });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tournamentId, enabled]);
+
+  return result;
+}
+
 /* ── 시상대 (podium) ── */
 function AwardsPodium({
   top3,
@@ -94,18 +173,31 @@ function AwardsPodium({
 }) {
   if (top3.length === 0) return null;
 
+  // 1위는 동점 처리 기준(승점·골득실·다득점·상대전적·최소실점)을 전부 소진해도 안 갈리면
+  // 공동 우승으로 2개 이상 들어올 수 있다 — `top3.find`로 하나만 집으면 나머지 팀이
+  // 조용히 사라진다(실사용자 발견, 2026-09-16의 시상대판). 시상대 구조(3슬롯)는 새로
+  // 짜지 않고, 금메달 한 슬롯에 이름을 모아 담백하게 보여준다(결과 페이지 "B안"과 동일).
+  const champions = top3.filter((t) => t.pos === 1);
+  const isCoChampion = champions.length > 1;
   // 2위(왼) / 1위(중) / 3위(오) 배치
   const podiumOrder = [2, 1, 3];
-  const podiumSlots = podiumOrder.map((pos) => top3.find((t) => t.pos === pos) ?? null);
-  const champion = top3.find((t) => t.pos === 1)?.name;
+  const podiumSlots = podiumOrder.map((pos) =>
+    pos === 1
+      ? (champions.length > 0 ? { pos: 1, name: champions.map((c) => c.name).join(' · ') } : null)
+      : top3.find((t) => t.pos === pos) ?? null,
+  );
   // 3위 → 2위 → 1위 순으로 차오르는 등장 딜레이(챔피언 공개에 살짝 뜸을 둠)
   const REVEAL_DELAY_MS: Record<number, number> = { 3: 0, 2: 140, 1: 300 };
 
   return (
     <div>
-      {champion ? (
+      {isCoChampion ? (
         <p className="tm-awards-podium-caption">
-          <strong>{champion}</strong>, 우승을 축하드려요! 🎉
+          <strong>{champions.map((c) => c.name).join(' · ')}</strong>, 공동 우승이에요.
+        </p>
+      ) : champions[0] ? (
+        <p className="tm-awards-podium-caption">
+          <strong>{champions[0].name}</strong>, 우승을 축하드려요! 🎉
         </p>
       ) : null}
       <div className="tm-awards-podium" aria-label="최종 시상대">
@@ -137,7 +229,7 @@ function AwardsPodium({
                   lineHeight: 1,
                   textShadow: '0 1px 3px rgba(0,0,0,0.2)',
                   background: 'var(--scrim-dark-72)',
-                  borderRadius: 999,
+                  borderRadius: 'var(--radius-pill)',
                   padding: pos === 1 ? '4px 12px' : '3px 9px',
                 }}
               >
@@ -168,16 +260,21 @@ function PrizeSection({
 
   const rows = tournament.prizeBreakdown ? parsePrizeRows(tournament.prizeBreakdown) : [];
   const safeTop3 = Array.isArray(top3) ? top3 : [];
-  const teamByPos = Object.fromEntries(safeTop3.map((t) => [t.pos, t.name]));
+  // 공동 우승이면 여러 팀이 같은 pos(=1)를 공유한다 — Object.fromEntries는 마지막 값만
+  // 남기고 나머지를 조용히 버리므로, 이름을 모아서 같은 자리에 함께 담는다.
+  const teamByPos: Record<number, string> = {};
+  for (const t of safeTop3) {
+    teamByPos[t.pos] = teamByPos[t.pos] ? `${teamByPos[t.pos]} · ${t.name}` : t.name;
+  }
 
   return (
     <section className="tm-prize-section" style={{ marginBottom: 20 }}>
       <h3 className="tm-hub-section-title">상금 · 시상</h3>
-      <div className="tm-prize-card" style={{ background: 'var(--card-surface)', borderRadius: 14, border: '1px solid var(--grey150)', overflow: 'hidden' }}>
+      <div className="tm-prize-card" style={{ background: 'var(--card-surface)', borderRadius: 'var(--radius-field)', border: '1px solid var(--grey150)', overflow: 'hidden' }}>
         {/* 총 상금 헤더 */}
         {tournament.prizePool !== null && tournament.prizePool > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', padding: '14px 16px', background: 'var(--blue50)', borderBottom: '1px solid var(--grey100)' }}>
-            <span style={{ display: 'inline-flex', marginRight: 10 }} aria-hidden="true">
+          <div style={{ display: 'flex', alignItems: 'center', padding: '16px 16px', background: 'var(--blue50)', borderBottom: '1px solid var(--grey100)' }}>
+            <span style={{ display: 'inline-flex', marginRight: 12 }} aria-hidden="true">
               <Trophy size={20} className="tm-medal-gold" strokeWidth={2} />
             </span>
             <span style={{ flex: 1, fontSize: 14, fontWeight: 700, color: 'var(--text-strong)' }}>총 상금</span>
@@ -191,8 +288,8 @@ function PrizeSection({
           const teamName = posNum ? teamByPos[Number(posNum)] : undefined;
           const isAmount = isPrizeAmountValue(row.amount);
           return (
-            <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '13px 16px', borderTop: idx > 0 || tournament.prizePool ? '1px solid var(--grey100)' : 'none' }}>
-              <span style={{ display: 'inline-flex', marginRight: 10, flexShrink: 0 }} aria-hidden="true">
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderTop: idx > 0 || tournament.prizePool ? '1px solid var(--grey100)' : 'none' }}>
+              <span style={{ display: 'inline-flex', marginRight: 12, flexShrink: 0 }} aria-hidden="true">
                 <PrizeRankIcon label={row.label} />
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -205,7 +302,7 @@ function PrizeSection({
                 isAmount ? (
                   <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-strong)', letterSpacing: '-0.01em', flexShrink: 0 }}>{formatPrizeRowValue(row.amount)}</span>
                 ) : (
-                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-caption)', flexShrink: 0, marginLeft: 10, textAlign: 'right', maxWidth: '55%' }}>{row.amount}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-caption)', flexShrink: 0, marginLeft: 12, textAlign: 'right', maxWidth: '55%' }}>{row.amount}</span>
                 )
               )}
             </div>
@@ -224,14 +321,52 @@ function PrizeSection({
     </section>
   );
 }
+/**
+ * 회고 STATS-1 — 수상 페이지의 개인 득점·도움 랭킹. 리그 수상 페이지가 순위
+ * 데이터를 함께 보여주는 패턴의 대회판이며, 어워드(수상자)가 "왜 그 사람인지"를
+ * 옆에서 뒷받침한다. 기록이 없으면 EmptyState(emptyBehavior=empty-state).
+ */
+function PlayerRecordsSection({ tournamentId, isRegularLeague }: { tournamentId: string; isRegularLeague: boolean }) {
+  // 프로필에서 뒤로가면 이 시상 화면(받은 출처 포함)으로 돌아온다.
+  const currentHref = useCurrentHref();
+  const tournamentRecords = usePublicTournamentPlayerRecords(tournamentId, { enabled: !isRegularLeague });
+  const leagueRecords = useV1LeagueMatchPlayerRecords(isRegularLeague ? tournamentId : '');
+  const records = isRegularLeague ? leagueRecords : tournamentRecords;
+  // 뒤로가기가 이 어워드 화면으로 돌아오도록 출처를 함께 넘긴다(public-profile-client.tsx가 `?from=`을 읽는다).
+  // 일반 대회 행의 profileHref는 서버가 bare `/users/:id`로 준다 — 두 분기 모두 여기서 붙인다.
+  const profileHref = (userId: string) =>
+    withFromPath(`/users/${userId}`, currentHref);
+  const withProfileHref = <T extends { userId: string }>(rows: readonly T[] | undefined) =>
+    rows?.map((row) => ({ ...row, profileHref: profileHref(row.userId) }));
+  const goals = isRegularLeague
+    ? withProfileHref(leagueRecords.data?.goals ?? [])
+    : withProfileHref(tournamentRecords.data?.goals);
+  const assists = isRegularLeague
+    ? withProfileHref(leagueRecords.data?.assists ?? [])
+    : withProfileHref(tournamentRecords.data?.assists);
+  return (
+    <TournamentPlayerRecordsSections
+      goals={goals}
+      assists={assists}
+      isLoading={records.isLoading}
+      isError={records.isError}
+      errorMessage={extractErrorMessage(records.error, '기록을 불러오지 못했어요.')}
+      onRetry={() => void records.refetch()}
+      emptyBehavior="empty-state"
+    />
+  );
+}
+
 function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetail }) {
+  // 프로필에서 뒤로가면 이 시상 화면(받은 출처 포함)으로 돌아온다.
+  const currentHref = useCurrentHref();
   const awards = tournament.awards ?? [];
 
   if (awards.length === 0) {
     return (
       <section style={{ marginBottom: 20 }}>
         <h3 className="tm-hub-section-title">개인 어워드</h3>
-        <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
+        <Card pad={20} className="tm-on-tint" style={{ background: 'var(--grey50)', textAlign: 'center' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true">
             <Star size={28} fill="var(--orange500)" stroke="var(--orange500)" strokeWidth={1.4} />
           </div>
@@ -247,34 +382,74 @@ function IndividualAwardsSection({ tournament }: { tournament: V1TournamentDetai
     <section style={{ marginBottom: 20 }}>
       <h3 className="tm-hub-section-title">개인 어워드</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {awards.map((award) => (
-          <div key={award.id} className="tm-award-card" style={{
+        {awards.map((award) => {
+          // M-A 감사: 바로 위 개인 기록 섹션은 이미 같은 화면에서 /users/:id 링크를
+          // 공개한다 — recipientUserId가 있을 때만(탈퇴 계정 제외, presenter가 걸러줌)
+          // 같은 방식으로 아바타+링크를 붙인다. 없으면 기존 아이콘·일반 텍스트 그대로.
+          const profileHref = award.recipientUserId
+            ? withFromPath(`/users/${award.recipientUserId}`, currentHref)
+            : null;
+          const content = (
+            <>
+              {profileHref ? (
+                <ProfileAvatar
+                  imageUrl={award.recipientProfileImageUrl}
+                  initials={Array.from(award.recipientName || '?')[0] ?? '?'}
+                  size={36}
+                />
+              ) : (
+                <span style={{ display: 'inline-flex', flexShrink: 0 }} aria-hidden="true">
+                  <TournamentAwardIcon iconKey={award.iconKey} awardType={award.awardType} />
+                </span>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {/* [R-T2] flex:1/minWidth:0 컬럼 — 고정폭 아님, 12로 상향. */}
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 2 }}>
+                  {award.awardLabel}
+                </div>
+                <div style={{
+                  fontSize: 15, fontWeight: 800,
+                  color: profileHref ? 'var(--blue700)' : 'var(--text-strong)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {award.recipientName}
+                </div>
+                {award.teamName && (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>{award.teamName}</div>
+                )}
+              </div>
+              {award.note && (
+                // [R-T2] maxWidth:80이지만 overflow/ellipsis 미설정이라 넘치면 줄바꿈으로
+                // 흡수된다(잘림 없음) — 12로 상향.
+                <div style={{ fontSize: 12, color: 'var(--text-caption)', flexShrink: 0, maxWidth: 80, textAlign: 'right' }}>{award.note}</div>
+              )}
+              {profileHref && (
+                <ChevronRight size={16} style={{ color: 'var(--grey500)', flexShrink: 0 }} aria-hidden="true" />
+              )}
+            </>
+          );
+          const cardStyle: React.CSSProperties = {
             alignItems: 'center', gap: 12,
             padding: '12px 16px', background: 'var(--surface)',
             borderRadius: 10, border: '1px solid var(--grey150)',
-          }}>
-            <span style={{ display: 'inline-flex', flexShrink: 0 }} aria-hidden="true">
-              <TournamentAwardIcon iconKey={award.iconKey} awardType={award.awardType} />
-            </span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {/* [R-T2] flex:1/minWidth:0 컬럼 — 고정폭 아님, 12로 상향. */}
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 2 }}>
-                {award.awardLabel}
-              </div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {award.recipientName}
-              </div>
-              {award.teamName && (
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>{award.teamName}</div>
-              )}
+            textDecoration: 'none',
+          };
+          return profileHref ? (
+            <Link
+              key={award.id}
+              href={profileHref}
+              className="tm-award-card"
+              style={cardStyle}
+              aria-label={`${award.awardLabel} 수상자 ${award.recipientName} 프로필 보기`}
+            >
+              {content}
+            </Link>
+          ) : (
+            <div key={award.id} className="tm-award-card" style={cardStyle}>
+              {content}
             </div>
-            {award.note && (
-              // [R-T2] maxWidth:80이지만 overflow/ellipsis 미설정이라 넘치면 줄바꿈으로
-              // 흡수된다(잘림 없음) — 12로 상향.
-              <div style={{ fontSize: 12, color: 'var(--text-caption)', flexShrink: 0, maxWidth: 80, textAlign: 'right' }}>{award.note}</div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -300,7 +475,7 @@ function StarRating({ value, onChange }: { value: number; onChange?: (v: number)
       {[1, 2, 3, 4, 5].map((n) => (
         <button
           key={n} type="button"
-          style={{ display: 'inline-flex', background: 'none', border: 'none', padding: '2px', cursor: onChange ? 'pointer' : 'default', lineHeight: 1 }}
+          style={{ display: 'inline-flex', width: 44, height: 44, alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', padding: 0, cursor: onChange ? 'pointer' : 'default', lineHeight: 1 }}
           onClick={() => onChange?.(n)}
           aria-label={`${n}점`}
         >
@@ -325,7 +500,12 @@ function parseTeamSelectionOptions(error: unknown): { teamId: string; teamName: 
   return teams.length > 0 ? teams : null;
 }
 
-function ReviewFormModal({
+/**
+ * 대회 후기 작성 폼(바텀시트). 시상 화면의 후기 섹션과 후기 전용 목록 페이지
+ * (`/tournaments/:id/reviews`)가 **같은 폼**을 띄운다 — 후기 진입점이 둘로 갈리면서
+ * 폼이 복제되면 팀 선택 재제출·사진 업로드 같은 예외 처리가 곧장 두 벌로 갈라진다.
+ */
+export function ReviewFormModal({
   tournamentId, onClose,
 }: { tournamentId: string; onClose: () => void }) {
   const [rating, setRating] = useState(5);
@@ -340,6 +520,19 @@ function ReviewFormModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { mutate, isPending } = useV1SubmitTournamentReview(tournamentId);
   const uploadImages = useV1UploadImages();
+
+  // focus 저장·복원(WCAG 2.4.3) / 첫 컨트롤 포커스 / ESC 닫기 / Tab focus trap /
+  // 배경 스크롤 잠금 — 공용 훅. 이 컴포넌트는 조건부 마운트형(부모의 `{showForm && ...}`)
+  // 이라 open은 항상 true고, 언마운트가 곧 "닫힘"이다 — 훅 자체가 cleanup 기반이라 이
+  // 패턴을 지원한다(훅 주석의 LogDetailModal 선례). 제출 중(isPending)에는 ESC·backdrop
+  // 닫기를 잠가 입력을 잃지 않게 한다 — 대회 도메인 형제 모달(my-registration-client.tsx
+  // CancelModal 등)과 동일 규약. (감사 evidence: 이 폼만 ESC·focus trap·포커스 복원·
+  // 스크롤 잠금이 전부 없어 프로젝트 모달 a11y 기준에서 어긋나 있었다.)
+  const { dialogRef, onBackdropClick } = useModalA11y({
+    open: true,
+    onClose,
+    pending: isPending,
+  });
 
   const handlePickPhotos = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -389,23 +582,32 @@ function ReviewFormModal({
     );
   };
 
-  return (
-    <div role="dialog" aria-modal="true" aria-label="리뷰 작성" style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
+  if (typeof document === 'undefined') return null;
+
+  return createPortal((
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 'var(--z-top)',
       background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-    }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{
-        width: '100%', maxWidth: 480, background: 'var(--background)',
-        borderRadius: '16px 16px 0 0', padding: '24px 20px',
-        paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
-      }}>
+    }} onClick={onBackdropClick}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="리뷰 작성"
+        style={{
+          width: '100%', maxWidth: 480, background: 'var(--background)',
+          borderRadius: 'var(--radius-container) var(--radius-container) 0 0', padding: '24px 20px',
+          maxHeight: 'calc(100dvh - var(--v1-shell-safe-bottom))', overflowY: 'auto',
+          paddingBottom: 'max(24px, calc(16px + var(--v1-shell-safe-bottom)))',
+        }}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-strong)' }}>대회 후기 작성</h3>
-          <button type="button" onClick={onClose} style={{ display: 'inline-flex', background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--text-muted)' }} aria-label="닫기"><X size={20} /></button>
+          <h3 className="tm-text-body-lg" style={{ margin: 0 }}>대회 후기 작성</h3>
+          <button type="button" onClick={onClose} disabled={isPending} style={{ display: 'inline-flex', width: 44, height: 44, alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'none', border: 'none', padding: 0, cursor: isPending ? 'default' : 'pointer', color: 'var(--text-muted)', opacity: isPending ? 0.55 : 1 }} aria-label="닫기"><X size={20} /></button>
         </div>
 
         <div style={{ marginBottom: 16, textAlign: 'center' }}>
-          <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--text-caption)' }}>대회는 어떠셨나요?</p>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-caption)' }}>대회는 어떠셨나요?</p>
           <StarRating value={rating} onChange={setRating} />
         </div>
 
@@ -434,7 +636,7 @@ function ReviewFormModal({
                     htmlFor={`review-team-${team.teamId}`}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      width: '100%', minHeight: 44, padding: '10px 14px', borderRadius: 10,
+                      width: '100%', minHeight: 44, padding: '12px 16px', borderRadius: 10,
                       border: isSelected ? '1.5px solid var(--blue500)' : '1px solid var(--grey200)',
                       background: isSelected ? 'var(--blue50)' : 'var(--surface)',
                       color: 'var(--text-strong)', fontSize: 13, fontWeight: isSelected ? 700 : 500,
@@ -465,7 +667,7 @@ function ReviewFormModal({
           maxLength={500}
           rows={4}
           style={{
-            width: '100%', padding: '12px', borderRadius: 8,
+            width: '100%', padding: '12px', borderRadius: 'var(--radius-chip)',
             border: '1px solid var(--grey200)', fontSize: 13, lineHeight: 1.6,
             color: 'var(--text-strong)', background: 'var(--surface)',
             resize: 'none', boxSizing: 'border-box',
@@ -479,13 +681,13 @@ function ReviewFormModal({
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {photoUrls.map((url) => (
               <div key={url} style={{ position: 'relative', width: 64, height: 64, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
-                <img src={publicAssetPath(url)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <Image src={publicAssetPath(url)} alt="" loading="lazy" width={64} height={64} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 <button
                   type="button"
                   onClick={() => setPhotoUrls((prev) => prev.filter((u) => u !== url))}
                   aria-label="사진 삭제"
                   style={{
-                    position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: '50%',
+                    position: 'absolute', top: 2, right: 2, width: 18, height: 18, borderRadius: 'var(--radius-circle)',
                     background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0,
                   }}
@@ -523,7 +725,7 @@ function ReviewFormModal({
             style={{ display: 'none' }}
           />
           {/* [R-T2] 고정폭 없는 에러 문구 — 12로 상향. */}
-          {photoError && <p style={{ color: 'var(--red700)', fontSize: 12, marginTop: 6 }}>{photoError}</p>}
+          {photoError && <p style={{ color: 'var(--red700)', fontSize: 12, marginTop: 8 }}>{photoError}</p>}
         </div>
 
         {genericError && <p style={{ color: 'var(--red700)', fontSize: 12, marginBottom: 12 }}>리뷰 작성 중 오류가 발생했어요. 다시 시도해주세요.</p>}
@@ -531,14 +733,13 @@ function ReviewFormModal({
         <button
           type="button" onClick={handleSubmit}
           disabled={isPending || rating === 0 || (!!teamOptions && !selectedTeamId)}
-          className="tm-btn tm-btn-primary"
-          style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: 14, fontWeight: 700 }}
+          className="tm-btn tm-btn-lg tm-btn-primary tm-btn-block"
         >
           {isPending ? '저장 중...' : teamOptions ? '선택한 팀으로 등록' : '후기 등록'}
         </button>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 /* ── 후기 카드 (임베드 목록 · 전체보기 페이지 공용) ── */
@@ -552,14 +753,7 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
       <div className="tm-review-card-header">
         <div className="tm-review-card-avatar" aria-hidden="true">{letter}</div>
         <div>
-          {/* 팀명만 보이면 "어떤 사람이 남겼는지"를 알 수 없다 — 팀장·운영진이 팀을 대표해 쓰는
-              후기라 둘 다 필요하다(어드민 화면은 이미 둘 다 보여준다). */}
-          <div className="tm-review-card-author">
-            {review.teamName ?? review.authorNickname}
-            {review.teamName && review.authorNickname ? (
-              <span className="tm-review-card-author-sub"> · {review.authorNickname}</span>
-            ) : null}
-          </div>
+          <div className="tm-review-card-author">{review.teamName ?? review.authorNickname}</div>
           <div className="tm-review-card-date">{date}</div>
         </div>
         <div className="tm-review-card-stars" aria-label={`별점 ${review.rating}점`}>
@@ -570,10 +764,10 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
       </div>
       {review.comment && <p className="tm-review-card-body">{review.comment}</p>}
       {photoUrls.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
           {photoUrls.map((url) => (
-            <a key={url} href={publicAssetPath(url)} target="_blank" rel="noreferrer" style={{ display: 'block', width: 72, height: 72, borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
-              <img src={publicAssetPath(url)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <a key={url} href={publicAssetPath(url)} target="_blank" rel="noreferrer" style={{ display: 'block', width: 72, height: 72, borderRadius: 'var(--radius-chip)', overflow: 'hidden', flexShrink: 0 }}>
+              <Image src={publicAssetPath(url)} alt="" loading="lazy" width={72} height={72} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </a>
           ))}
         </div>
@@ -582,47 +776,38 @@ export function ReviewCard({ review }: { review: V1TournamentReview }) {
   );
 }
 
-/* ── 리뷰 섹션 (실제 데이터 + 권한 gate) ── */
 /**
- * 이 대회의 경기별 후기 진입 — 예전엔 대회 상세에 있었다. 대회 상세에 후기 입구가 두 개
- * ("대회 후기" 행 + "리뷰할 수 있는 경기" 섹션)라 어디로 가야 하는지 헷갈려서, 후기는 이
- * 화면 하나로 모았다. 대회 후기(대회 자체)와 경기별 후기(상대팀·상대 선수)를 같이 본다.
+ * 후기를 쓸 수 있는지 판정하는 단 하나의 자리. 시상 화면의 후기 섹션과 후기 전용
+ * 목록 페이지가 이 훅을 공유한다 — 권한 규칙(대회 종료 + 참가 확정 팀의 팀장·운영진 +
+ * 미작성)이 화면마다 따로 적히면, 한쪽만 고쳐져 "여기선 쓸 수 있는데 저기선 안 되는"
+ * 상태가 조용히 생긴다.
+ *
+ * `isParticipant`/`alreadyReviewed`는 버튼뿐 아니라 **빈 상태 안내 문구**를 고르는 데도
+ * 쓰이므로(왜 못 쓰는지를 상태별로 안내한다) 판정 결과를 통째로 돌려준다.
  */
-function FixtureReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
+export function useTournamentReviewWriteGate(tournamentId: string, status: V1TournamentDetail['status']) {
   const hasSession = hasStoredV1Session();
-  const hasCompletedFixture = tournament.fixtures.some(
-    (fixture) => fixture.status === 'completed' && fixture.result !== null,
-  );
-  const query = useV1Reviews(
-    { tab: 'pending', tournamentId: tournament.id, limit: 50 },
-    { enabled: hasSession && hasCompletedFixture },
-  );
-  if (!hasSession || !hasCompletedFixture) return null;
+  const isCompleted = status === 'completed';
 
-  const state = query.isError
-    ? { status: 'error' as const, items: [], onRetry: () => void query.refetch() }
-    : query.isPending || query.isFetching
-      ? { status: 'loading' as const, items: [] }
-      : { status: 'ready' as const, items: query.data?.items ?? [] };
-
-  return (
-    <div style={{ marginBottom: 20 }}>
-      <TournamentFixtureReviewEntrySection fixtures={tournament.fixtures} state={state} />
-    </div>
-  );
-}
-
-function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
-  const [showForm, setShowForm] = useState(false);
-  const hasSession = hasStoredV1Session();
-  const isCompleted = tournament.status === 'completed';
-
-  const { data: participantData } = useV1TournamentParticipantCheck(tournament.id, hasSession && isCompleted);
-  const { data: myReview } = useV1MyTournamentReview(tournament.id, hasSession && isCompleted);
+  const { data: participantData } = useV1TournamentParticipantCheck(tournamentId, hasSession && isCompleted);
+  const { data: myReview } = useV1MyTournamentReview(tournamentId, hasSession && isCompleted);
 
   const isParticipant = participantData?.isParticipant ?? false;
   const alreadyReviewed = !!myReview;
-  const canWrite = isCompleted && isParticipant && !alreadyReviewed;
+  return {
+    hasSession,
+    isCompleted,
+    isParticipant,
+    alreadyReviewed,
+    canWrite: isCompleted && isParticipant && !alreadyReviewed,
+  };
+}
+
+/* ── 리뷰 섹션 (실제 데이터 + 권한 gate) ── */
+function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
+  const [showForm, setShowForm] = useState(false);
+  const { hasSession, isCompleted, isParticipant, alreadyReviewed, canWrite } =
+    useTournamentReviewWriteGate(tournament.id, tournament.status);
 
   const reviews = tournament.reviews ?? [];
 
@@ -631,18 +816,31 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
       {showForm && (
         <ReviewFormModal tournamentId={tournament.id} onClose={() => setShowForm(false)} />
       )}
+      {/* 대회 완료 알림(`tournament_completed_review_request`)은 참가 확정 팀의 **활성 멤버
+          전원**에게 가고 이 화면으로 보낸다. 그런데 이 섹션의 대회 후기는 설계상 팀장·운영진
+          전용(`eligibleTeamWhere`)이라, 팀원은 여기까지 와서 "쓸 수 없다"는 안내만 보고
+          끝났다 — 정작 팀원이 쓸 수 있는 **상대 선수 후기** 진입점은 홈·마이페이지에만
+          있었다(2026-08-20 확인).
+
+          이 카드가 그 간극을 메운다. 남은 후기가 0건이면 스스로 아무것도 그리지 않으므로
+          쓸 것이 없는 사용자에게는 화면이 그대로다. */}
+      <PendingReviewsCard />
       <section style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h3 className="tm-hub-section-title" style={{ margin: 0 }}>참가팀 후기</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {reviews.length > 0 && (
-              <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>{reviews.length}개</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* 배지는 잘리지 않은 전체 후기 개수(reviewsTotalCount)를 쓴다 —
+                reviews 배열 자체는 서버가 take:30으로 자르므로, 31건째부터
+                array.length는 `/tournaments/:id/reviews` 전용 목록의 total과
+                어긋나게 된다(감사 evidence). */}
+            {tournament.reviewsTotalCount > 0 && (
+              <span style={{ fontSize: 12, color: 'var(--text-caption)' }}>{tournament.reviewsTotalCount}개</span>
             )}
             {canWrite && (
               <button
                 type="button"
                 className="tm-btn tm-btn-sm tm-btn-secondary"
-                style={{ padding: '5px 12px', fontSize: 12 }}
+                style={{ padding: '4px 12px', fontSize: 12 }}
                 onClick={() => setShowForm(true)}
               >
                 + 후기 쓰기
@@ -658,23 +856,31 @@ function ReviewsSection({ tournament }: { tournament: V1TournamentDetail }) {
         </div>
 
         {reviews.length === 0 ? (
-          <Card pad={20} style={{ background: 'var(--grey50)', textAlign: 'center' }}>
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
-              {/* 왜 후기를 쓸 수 없는지(또는 어떻게 쓰는지)를 상태별로 안내한다 */}
-              {/* 실제 권한은 참가 확정 팀의 owner(팀장) + manager(운영진)다
-                  — tournaments/tournament-reviews.service.ts eligibleTeamWhere 참조.
-                  "팀 대표만"이라고 안내하면 운영진이 자기는 못 쓴다고 오해한다. */}
-              {isCompleted && isParticipant && !alreadyReviewed
-                ? '첫 번째 후기를 남겨보세요!'
-                : isCompleted && !hasSession
-                  ? '아직 등록된 후기가 없어요. 로그인하면 참가팀의 팀장·운영진은 후기를 작성할 수 있어요.'
-                  : isCompleted && hasSession && !isParticipant
-                    ? '아직 등록된 후기가 없어요. 후기는 대회에 참가한 팀의 팀장·운영진만 작성할 수 있어요.'
-                    : '아직 등록된 후기가 없어요.'}
-            </p>
+          <Card pad={20} className="tm-on-tint" style={{ background: 'var(--grey50)', textAlign: 'center' }}>
+            {/* 왜 후기를 쓸 수 없는지(또는 어떻게 쓰는지)를 상태별로 안내한다.
+                실제 권한은 참가 확정 팀의 owner(팀장) + manager(운영진)다
+                — tournaments/tournament-reviews.service.ts eligibleTeamWhere 참조.
+                "팀 대표만"이라고 안내하면 운영진이 자기는 못 쓴다고 오해한다. */}
+            <EmptyState
+              illustration={{ name: 'journey-done' }}
+              title="아직 등록된 후기가 없어요"
+              sub={
+                isCompleted && isParticipant && !alreadyReviewed
+                  ? '첫 번째 후기를 남겨보세요!'
+                  : isCompleted && !hasSession
+                    ? '로그인하면 참가팀의 팀장·운영진은 후기를 작성할 수 있어요.'
+                    : isCompleted && hasSession && !isParticipant
+                      ? // 팀원(member)도 여기까지 온다 — 대회 완료 알림이 모든 활성 멤버에게
+                        // 가기 때문이다. 대회 후기는 설계상 팀장·운영진 전용이 맞지만, 팀원에게도
+                        // **쓸 수 있는 후기가 따로 있다**(상대 선수 후기). 그 사실을 함께 알려
+                        // 알림이 막다른 길로 끝나지 않게 한다 — 진입 카드는 이 섹션 위에 있다.
+                        '대회 후기는 참가팀의 팀장·운영진이 작성해요. 팀원은 맞붙은 상대 선수에 대한 후기를 남길 수 있어요.'
+                      : '참가팀의 후기가 등록되면 여기에서 볼 수 있어요.'
+              }
+            />
           </Card>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {reviews.slice(0, REVIEW_EMBED_CAP).map((review) => (
               <ReviewCard key={review.id} review={review} />
             ))}
@@ -741,21 +947,16 @@ function RetentionSection({ tournamentId }: { tournamentId: string }) {
 
 /* ── 아직 종료 전 안내 ── */
 function NotCompletedNotice({ status }: { status: string }) {
-  const msg =
+  const { title, sub } =
     status === 'open'
-      ? '대회가 시작되지 않았어요. 종료 후 시상 결과를 확인할 수 있어요.'
+      ? { title: '대회가 시작되지 않았어요', sub: '종료 후 시상 결과를 확인할 수 있어요.' }
       : status === 'in_progress'
-      ? '대회가 진행 중이에요. 종료 후 시상 결과가 공개돼요.'
-      : '시상 결과를 준비 중이에요.';
+      ? { title: '대회가 진행 중이에요', sub: '종료 후 시상 결과가 공개돼요.' }
+      : { title: '시상 결과를 준비 중이에요', sub: '잠시 후 다시 확인해 주세요.' };
 
   return (
     <Card pad={24} style={{ textAlign: 'center', margin: '0 0 20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }} aria-hidden="true">
-        <Medal size={32} className="tm-medal-gold" strokeWidth={1.8} />
-      </div>
-      <p style={{ margin: 0, fontSize: 13, color: 'var(--text-caption)', lineHeight: 1.6 }}>
-        {msg}
-      </p>
+      <EmptyState illustration={{ name: 'journey-done' }} title={title} sub={sub} />
     </Card>
   );
 }
@@ -765,7 +966,23 @@ function NotCompletedNotice({ status }: { status: string }) {
  * (좌: 시상 결과·상금 / 우: 개인 어워드·후기) — 모바일은 클래스가 no-op이라 기존 스택 유지. */
 function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
   const isCompleted = tournament.status === 'completed';
-  const top3 = isCompleted ? getTopThree(tournament) : [];
+  const isMultiGroupLeague = isLeagueCompetition(tournament) && tournament.groups.length > 1;
+  // 정규 리그 단일 시즌(거울 행)도 다조와 같은 이유로 getTopThree가 답을 못 낸다 —
+  // groups·fixtures가 항상 []이기 때문이다(위 useMultiGroupLeagueTopThree 주석 참조).
+  const isLeagueMirror = tournament.kind === 'regular_league';
+  const needsOverallStandings = isMultiGroupLeague || isLeagueMirror;
+  const overall = useMultiGroupLeagueTopThree(tournament.id, isCompleted && needsOverallStandings);
+  // 동점 처리 기준을 전부 소진하고도 1위가 안 갈리면(공동 우승) 순차 순위 대신 그 자리를
+  // 나눠 가진 팀 전부를 "1위"로 함께 표기한다 — 결과 페이지와 같은 이유(실사용자 발견,
+  // 2026-09-16)의 시상대판.
+  const championCount = needsOverallStandings ? (overall?.championCount ?? 1) : 1;
+  const isCoChampion = championCount > 1;
+  // 다조·거울 리그는 getTopThree가 fail-closed로 []을 낸다 — 통합 순위 override(overall)가
+  // 도착하기 전(null)에도 틀린 우승팀 대신 빈 시상대를 보여준다(로딩 중 깜빡임보다 안전).
+  const rawTop3 = isCompleted ? (needsOverallStandings ? (overall?.top3 ?? []) : getTopThree(tournament)) : [];
+  const top3 = isCoChampion
+    ? rawTop3.map((row) => (row.pos <= championCount ? { ...row, pos: 1 } : row))
+    : rawTop3;
   const showPrizeColumn = isCompleted && hasPrizeData(tournament);
 
   return (
@@ -774,8 +991,12 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
       {!isCompleted && (
         <div style={{ padding: '20px 20px 0' }}>
           <NotCompletedNotice status={tournament.status} />
-          {/* 진행 중에도 상금 정보는 표시 */}
-          {tournament.prizeSummary && <PrizeSection tournament={tournament} top3={top3} />}
+          {/* 진행 중에도 상금 정보는 표시 — hasPrizeData()는 prizeSummary(자유 문구) 뿐 아니라
+              prizePool·prizeBreakdown도 인정한다(완료 분기의 showPrizeColumn과 동일 판정).
+              여기만 prizeSummary 존재만 봤다면, 운영자가 prizePool+prizeBreakdown만 채우고
+              prizeSummary를 비운 흔한 조합에서 대회가 completed로 바뀌기 전까지 총 상금·
+              순위별 배분이 화면에 전혀 안 보이는 모순이 생긴다(감사 evidence). */}
+          {hasPrizeData(tournament) && <PrizeSection tournament={tournament} top3={top3} />}
         </div>
       )}
 
@@ -802,8 +1023,10 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
             {/* 개인 어워드 */}
             <IndividualAwardsSection tournament={tournament} />
 
+            {/* 개인 기록 랭킹 (STATS-1) */}
+            <PlayerRecordsSection tournamentId={tournament.id} isRegularLeague={tournament.kind === 'regular_league'} />
+
             {/* 참가팀 후기 */}
-            <FixtureReviewsSection tournament={tournament} />
             <ReviewsSection tournament={tournament} />
           </div>
         </div>
@@ -813,7 +1036,7 @@ function AwardsPageContent({ tournament }: { tournament: V1TournamentDetail }) {
         /* 상금 정보가 없는 대회는 2열 그리드 대신 전체 폭 단일 컬럼으로 — 빈 좌측 트랙이 생기지 않도록 */
         <div className="tm-tourn-hero-full" style={{ padding: '0 20px' }}>
           <IndividualAwardsSection tournament={tournament} />
-          <FixtureReviewsSection tournament={tournament} />
+          <PlayerRecordsSection tournamentId={tournament.id} isRegularLeague={tournament.kind === 'regular_league'} />
             <ReviewsSection tournament={tournament} />
         </div>
       )}
@@ -839,8 +1062,8 @@ function AwardsPageSkeleton() {
   return (
     <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="tm-skeleton" style={{ height: 56, borderRadius: 10 }} />
-      <div className="tm-skeleton" style={{ height: 180, borderRadius: 12 }} />
-      <div className="tm-skeleton" style={{ height: 120, borderRadius: 12 }} />
+      <div className="tm-skeleton" style={{ height: 180, borderRadius: 'var(--radius-control)' }} />
+      <div className="tm-skeleton" style={{ height: 120, borderRadius: 'var(--radius-control)' }} />
     </div>
   );
 }
@@ -850,32 +1073,17 @@ export function AwardsPageClient({ tournamentId }: { tournamentId: string }) {
   const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
 
   if (isLoading) {
-    return (
-      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} activeTab="tournaments" desktopHead>
-        <AwardsPageSkeleton />
-      </AppChrome>
-    );
+    return <AwardsPageSkeleton />;
   }
 
   if (isError || !data) {
     const msg = extractErrorMessage(error, '대회 정보를 불러오지 못했어요.');
     return (
-      <AppChrome title="시상·리뷰" backHref={`/tournaments/${tournamentId}/results`} activeTab="tournaments" desktopHead>
-        <div style={{ padding: '40px 20px' }}>
-          <ErrorState message={msg} onRetry={() => void refetch()} />
-        </div>
-      </AppChrome>
+      <div style={{ padding: '40px 20px' }}>
+        <ErrorState message={msg} onRetry={() => void refetch()} />
+      </div>
     );
   }
 
-  return (
-    <AppChrome
-      title="시상·리뷰"
-      backHref={`/tournaments/${tournamentId}/results`}
-      activeTab="tournaments"
-      desktopHead
-    >
-      <AwardsPageContent tournament={data} />
-    </AppChrome>
-  );
+  return <AwardsPageContent tournament={data} />;
 }

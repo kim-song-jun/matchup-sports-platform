@@ -1,18 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  V1_PUSH_NUDGE_DISMISSED_KEY,
   V1_SESSION_HINT_KEY,
   V1_USER_EMAIL_KEY,
   V1_USER_ID_KEY,
   clearStoredV1Session,
-  dismissPushNudge,
   getTournamentOpsOrigin,
   hasStoredV1Session,
   sanitizeRedirectPath,
+  withFromPath,
   saveStoredV1Session,
   saveTournamentOpsOrigin,
   shouldProbeV1Session,
-  shouldShowPushNudge,
+  V1_RECORD_CONSENT_NUDGE_SEEN_KEY,
+  dismissRecordConsentNudge,
+  markRecordConsentNudgeSeen,
+  shouldShowRecordConsentNudge,
 } from './session-storage';
 
 afterEach(() => {
@@ -32,6 +34,52 @@ describe('sanitizeRedirectPath', () => {
 
   it('rejects protocol-relative redirects', () => {
     expect(sanitizeRedirectPath('//example.com')).toBeNull();
+  });
+
+  // alpha 실측으로 재현한 우회: `/\evil.com` 은 예전 검사(`//` 로 시작하지 않고
+  // `://` 를 담지 않음)를 전부 통과했는데, WHATWG URL 파서는 http(s) 에서 역슬래시를
+  // 슬래시와 똑같이 취급하므로 결국 `//evil.com` 과 같은 곳으로 해석된다.
+  // 로그인 직후 브라우저가 실제로 외부 origin 으로 떠나는 것을 확인했다.
+  it('rejects backslash-disguised absolute redirects', () => {
+    expect(sanitizeRedirectPath('/\\example.com')).toBeNull();
+    expect(sanitizeRedirectPath('/\\/example.com')).toBeNull();
+    expect(sanitizeRedirectPath('/\\\\example.com')).toBeNull();
+  });
+
+  // 위 셋과 `//example.com` 이 **같은 곳으로 해석된다**는 것이 이 규칙의 근거다 --
+  // 하나만 막고 나머지를 두면 막았다고 착각하게 된다.
+  it('treats every off-site form as the same thing', () => {
+    const base = 'https://teameet.example';
+    for (const form of ['//example.com', '/\\example.com', '/\\/example.com']) {
+      expect(new URL(form, base).origin).toBe('https://example.com');
+      expect(sanitizeRedirectPath(form)).toBeNull();
+    }
+  });
+
+  // 입력은 사이트 안이지만 정규화 결과가 `//evil.com` 이 되는 dot-segment 형태.
+  // 돌려준 값을 브라우저가 다시 해석하면 외부 origin 으로 떠난다.
+  it('rejects dot-segment forms that normalize into a protocol-relative path', () => {
+    for (const form of ['/..//example.com', '/.//example.com', '/%2e%2e//example.com', '/a/../..//example.com', '/./\\example.com']) {
+      expect(sanitizeRedirectPath(form)).toBeNull();
+    }
+    expect(sanitizeRedirectPath('/teams/../my')).toBe('/my');
+  });
+
+  // 원본 문자열을 돌려주면 호출부가 그 문자열을 다시 파싱하므로, 내가 검증한 것과
+  // 실제로 쓰이는 것이 두 번의 파싱으로 갈릴 여지가 남는다. 정규화된 경로를 돌려줘
+  // 그 틈 자체를 없앤다.
+  it('returns the value it actually validated, not the raw input', () => {
+    // 같은 곳을 가리키지만 표기가 다른 입력 — 돌려주는 값은 파서가 정규화한 하나다.
+    expect(sanitizeRedirectPath('/teams/./abc')).toBe('/teams/abc');
+    expect(sanitizeRedirectPath('/teams/x/../abc')).toBe('/teams/abc');
+    // 통과한 값을 다시 해석해도 같은 곳이어야 한다(재파싱 안정성).
+    const once = sanitizeRedirectPath('/my?tab=teams#top');
+    expect(once).not.toBeNull();
+    expect(sanitizeRedirectPath(once)).toBe(once);
+  });
+
+  it('still keeps ordinary in-site paths with query and hash', () => {
+    expect(sanitizeRedirectPath('/teams/abc/schedules?tab=all#top')).toBe('/teams/abc/schedules?tab=all#top');
   });
 });
 
@@ -65,28 +113,6 @@ describe('production session hint', () => {
   });
 });
 
-describe('push nudge visibility', () => {
-  it('shows the nudge by default', () => {
-    expect(shouldShowPushNudge()).toBe(true);
-  });
-
-  it('hides the nudge for the rest of the session after it is dismissed', () => {
-    dismissPushNudge();
-
-    expect(window.sessionStorage.getItem(V1_PUSH_NUDGE_DISMISSED_KEY)).toBe('true');
-    expect(shouldShowPushNudge()).toBe(false);
-  });
-
-  it('resets the dismissal on every fresh login, so a re-login shows the nudge again', () => {
-    dismissPushNudge();
-    expect(shouldShowPushNudge()).toBe(false);
-
-    saveStoredV1Session({ userId: 'user-1', userEmail: 'user@example.com' });
-
-    expect(shouldShowPushNudge()).toBe(true);
-  });
-});
-
 describe('tournament-ops 진입 출처 (T6-2)', () => {
   it('기록한 적 없으면 home을 기본값으로 반환한다', () => {
     expect(getTournamentOpsOrigin('t-1')).toBe('home');
@@ -100,5 +126,119 @@ describe('tournament-ops 진입 출처 (T6-2)', () => {
   it('대회 id별로 독립적으로 기록된다', () => {
     saveTournamentOpsOrigin('t-1', 'admin');
     expect(getTournamentOpsOrigin('t-2')).toBe('home');
+  });
+});
+
+/**
+ * 기록 공개 넛지는 "계정 수명 전체에서 총 2회" 라는 사용자 결정(②)을 지켜야 한다.
+ * 푸시 넛지(sessionStorage, 로그인마다 1회)와 저장소가 다른 이유가 여기 있다 --
+ * 세션 단위로 세면 로그아웃할 때마다 다시 2회가 살아나 사실상 무한 노출이 된다.
+ */
+describe('recordConsentNudge 노출 횟수', () => {
+  it('처음에는 보여준다', () => {
+    expect(shouldShowRecordConsentNudge()).toBe(true);
+  });
+
+  it('2회까지만 보여주고 3회째부터 멈춘다', () => {
+    markRecordConsentNudgeSeen();
+    expect(shouldShowRecordConsentNudge()).toBe(true);
+    markRecordConsentNudgeSeen();
+    expect(shouldShowRecordConsentNudge()).toBe(false);
+    markRecordConsentNudgeSeen();
+    expect(shouldShowRecordConsentNudge()).toBe(false);
+  });
+
+  it('사용자가 닫으면 남은 횟수와 무관하게 끝난다', () => {
+    dismissRecordConsentNudge();
+    expect(shouldShowRecordConsentNudge()).toBe(false);
+  });
+
+  it('세션이 끝나도(=sessionStorage 비워져도) 횟수가 남는다', () => {
+    markRecordConsentNudgeSeen();
+    markRecordConsentNudgeSeen();
+    window.sessionStorage.clear();
+    expect(shouldShowRecordConsentNudge()).toBe(false);
+  });
+
+  it('저장된 값이 깨져 있으면 보여주지 않는다 (무한 노출 방지)', () => {
+    // 손으로 편집했거나 옛 버전이 남긴 값. 파싱 실패를 "0회" 로 읽으면 영원히 뜬다.
+    window.localStorage.setItem(V1_RECORD_CONSENT_NUDGE_SEEN_KEY, 'nope');
+    expect(shouldShowRecordConsentNudge()).toBe(false);
+  });
+
+  it('음수가 들어 있어도 보여주지 않는다', () => {
+    window.localStorage.setItem(V1_RECORD_CONSENT_NUDGE_SEEN_KEY, '-5');
+    expect(shouldShowRecordConsentNudge()).toBe(false);
+  });
+});
+
+describe('withFromPath', () => {
+  it('출처가 없으면 경로를 그대로 둔다', () => {
+    expect(withFromPath('/teams/t1/members', null)).toBe('/teams/t1/members');
+  });
+
+  it('기존 쿼리 뒤에 이어 붙이고 hash 는 맨 뒤에 남긴다', () => {
+    expect(withFromPath('/search?q=a', '/my')).toBe('/search?q=a&from=%2Fmy');
+    expect(withFromPath('/teams/t1#members', '/my')).toBe('/teams/t1?from=%2Fmy#members');
+  });
+
+  // 받은 출처까지 담긴 URL 을 다시 출처로 넘겨도, 받는 쪽이 한 단계씩 원래 값으로 되돌릴 수 있어야 한다.
+  it('중첩된 출처가 sanitizeRedirectPath 를 거쳐 한 단계씩 복원된다', () => {
+    const detail = withFromPath('/teams/t1', '/my/teams');
+    const members = withFromPath('/teams/t1/members', detail);
+    const received = sanitizeRedirectPath(new URLSearchParams(members.split('?')[1]).get('from'));
+    expect(received).toBe(detail);
+    expect(sanitizeRedirectPath(new URLSearchParams(received!.split('?')[1]).get('from'))).toBe('/my/teams');
+  });
+});
+
+describe('withFromPath 체인 상한', () => {
+  // 팀 → 리그 → 팀으로 돌아오면 새로 감싸지 않고 처음 팀 방문 URL(원래 출처 포함)을 쓴다.
+  it('이미 지나온 화면으로 가면 그때의 URL 로 접는다', () => {
+    const team = withFromPath('/teams/t1', '/my/teams');
+    const league = withFromPath('/league-matches/l1', team);
+    expect(withFromPath('/teams/t1', league)).toBe(team);
+  });
+
+  // 중첩 from 은 URL 을 직접 고쳐 넣을 수 있다 — 렌더가 터지거나 표식·외부 주소가 경로로 섞이면 안 된다.
+  it('조작된 중첩 출처는 그 단계에서 끊고 예외를 내지 않는다', () => {
+    const crafted = `/teams/t1?from=${encodeURIComponent('http://[')}`;
+    expect(() => withFromPath('/users/u1', crafted)).not.toThrow();
+    expect(withFromPath('/users/u1', crafted)).toBe('/users/u1?from=%2Fteams%2Ft1');
+    expect(withFromPath('/users/u1', '/teams/t1?from=tournament')).toBe('/users/u1?from=%2Fteams%2Ft1');
+    expect(withFromPath('/users/u1', `/teams/t1?from=${encodeURIComponent('//evil.example')}`)).toBe('/users/u1?from=%2Fteams%2Ft1');
+    expect(withFromPath('/users/u1', 'https://evil.example')).toBe('/users/u1');
+    // 대상 경로가 URL 로 읽히지 않아도 렌더를 깨지 않고 그대로 돌려준다.
+    expect(() => withFromPath('http://[', '/my')).not.toThrow();
+    expect(withFromPath('http://[', '/my')).toBe('http://[');
+  });
+
+  it('체인을 줄여 다시 엮어도 각 단계의 hash 는 남는다', () => {
+    let href = '/home#rail';
+    for (let index = 0; index < 8; index += 1) href = withFromPath(`/teams/t${index}`, index === 0 ? href : `${href}#s${index}`);
+    expect(decodeURIComponent(href)).toContain('#s');
+  });
+
+  it('서로 다른 화면을 계속 거쳐도 체인 깊이가 상한을 넘지 않는다', () => {
+    let href = '/home';
+    for (let index = 0; index < 20; index += 1) href = withFromPath(`/teams/t${index}`, href);
+    let depth = 0;
+    let cursor: string | null = href;
+    while (cursor) {
+      depth += 1;
+      cursor = new URL(cursor, 'https://x.invalid').searchParams.get('from');
+    }
+    expect(depth).toBeLessThanOrEqual(6);
+    expect(href.length).toBeLessThan(600);
+  });
+});
+
+describe('sanitizeRedirectPath', () => {
+  it('경로는 그대로, 외부 주소·경로가 아닌 표식은 버린다', () => {
+    expect(sanitizeRedirectPath('notifications')).toBeNull();
+    expect(sanitizeRedirectPath('/my/teams')).toBe('/my/teams');
+    expect(sanitizeRedirectPath('tournament')).toBeNull();
+    expect(sanitizeRedirectPath('//evil.example')).toBeNull();
+    expect(sanitizeRedirectPath(null)).toBeNull();
   });
 });

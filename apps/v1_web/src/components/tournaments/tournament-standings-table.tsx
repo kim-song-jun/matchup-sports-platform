@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { Fragment, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { Card } from '@/components/v1-ui/primitives';
+import { Card, EmptyState } from '@/components/v1-ui/primitives';
 import { TeamAvatar } from '@/components/v1-ui/team-avatar';
+import { withFromPath } from '@/lib/session-storage';
 
 /**
  * §순위표 지표 통일 — 같은 대회 `/bracket` 화면의 두 탭(순위·대진표 탭의
@@ -72,7 +73,11 @@ function StandingRankBadge({ pos, advance, unranked }: { pos: number; advance: n
 
 function GoalDiff({ gf, ga }: { gf: number; ga: number }) {
   const diff = gf - ga;
-  const color = diff > 0 ? 'var(--blue500)' : diff < 0 ? 'var(--red, #ff4d4f)' : 'var(--text-muted)';
+  // --blue500/--red500 는 흰 카드 위에서 WCAG AA(4.5:1) 미달(3.71~3.72:1, 진출
+  // 하이라이트 행의 --blue50 배경 위에서는 3.31:1까지 떨어진다) — auth-page.tsx
+  // 선례와 동일하게 --blue700/--red700 로 교체한다(다크 모드는 :root.dark 블록이
+  // 이미 두 토큰을 밝게 재정의해 둬서 별도 분기 없이 함께 해결된다).
+  const color = diff > 0 ? 'var(--blue700)' : diff < 0 ? 'var(--red700)' : 'var(--text-muted)';
   return (
     <span style={{ color, fontWeight: diff !== 0 ? 700 : 400 }}>
       {diff > 0 ? '+' : ''}{diff}
@@ -100,12 +105,15 @@ export function TournamentStandingsTable({
   ariaLabel,
   emptyMessage = '순위 집계 전이에요',
   renderDetail,
+  fromHref,
 }: {
   rows: readonly TournamentStandingsRow[];
   advance: number | null;
   ariaLabel: string;
   emptyMessage?: string;
   renderDetail?: (row: TournamentStandingsRow) => ReactNode;
+  /** 팀 전적(`/records`) 링크의 뒤로가기 출처 — 없으면 기존처럼 쿼리 없는 링크. */
+  fromHref?: string | null;
 }) {
   const sorted = [...rows].sort((a, b) => a.position - b.position);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
@@ -224,7 +232,7 @@ export function TournamentStandingsTable({
                             />
                           </button>
                         ) : (
-                          <Link href={`/teams/${row.teamId}/records`} className="tm-pressable" style={cellStyle}>
+                          <Link href={withFromPath(`/teams/${row.teamId}/records`, fromHref)} className="tm-pressable" style={cellStyle}>
                             {teamCell}
                           </Link>
                         )}
@@ -257,8 +265,8 @@ export function TournamentStandingsTable({
               })
             ) : (
               <tr>
-                <td colSpan={COLUMN_COUNT} style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-caption)', fontSize: 13 }}>
-                  {emptyMessage}
+                <td colSpan={COLUMN_COUNT} style={{ padding: 0 }}>
+                  <EmptyState title={emptyMessage} sub="경기 결과가 등록되면 순위가 매겨져요." />
                 </td>
               </tr>
             )}
@@ -270,7 +278,7 @@ export function TournamentStandingsTable({
       {unranked ? (
         <div
           style={{
-            padding: '10px 12px',
+            padding: '12px 12px',
             borderTop: '1px solid var(--grey100)',
             fontSize: 12,
             color: 'var(--text-caption)',

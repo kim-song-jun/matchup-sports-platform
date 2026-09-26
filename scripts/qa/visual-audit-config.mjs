@@ -198,7 +198,7 @@ const ROUTE_STATES = {
   '/tournaments': ['default', 'scrolled', 'hover-primary-cta', 'hover-card-first'],
   '/profile': ['default', 'scrolled', 'hover-primary-cta', 'tab-switch'],
   '/settings': ['default', 'scrolled'],
-  '/settings/notifications': ['default', 'scrolled'],
+  '/my/settings/notifications': ['default', 'scrolled'],
   '/notifications': ['default', 'scrolled'],
   '/chat': ['default', 'scrolled', 'hover-card-first'],
   '/reviews': ['default', 'scrolled'],

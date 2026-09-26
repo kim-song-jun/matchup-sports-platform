@@ -1,4 +1,4 @@
-import { VideosPageClient } from './videos-page-client';
+import { VideosPageClient } from '@/components/tournament-live/videos-page-client';
 
 export default async function TournamentOpsVideosPage({
   params,

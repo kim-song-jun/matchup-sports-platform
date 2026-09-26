@@ -5,9 +5,14 @@ import type {
   SerializedGameVisibility,
 } from '../games.types';
 
+/**
+ * D-06 킬스위치 강등의 **방어적 사본**이다. 유일한 호출자(`GamesService#getVisibility`)가
+ * 이미 `effectivePublicVisibilityMode` 로 해석한 모드를 넘기므로 지금은 발동하지 않는다 —
+ * 해석 안 된 원시 모드를 넘기는 호출자가 생기면 그때 다시 동작한다.
+ */
 function effectiveMode(policy: GameVisibilityPolicyInput): PublicGameVisibilityMode {
   if (policy.mode === 'live' && !policy.publicLiveEnabled) {
-    return 'status_only';
+    return 'official_only';
   }
   return policy.mode;
 }

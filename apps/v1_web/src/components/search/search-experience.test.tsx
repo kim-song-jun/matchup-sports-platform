@@ -1,5 +1,4 @@
-import { render, waitFor } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SearchExperience } from './search-experience';
 
@@ -21,24 +20,21 @@ vi.mock('@/lib/analytics', () => ({
   trackEvent: analytics.trackEvent,
 }));
 
-// AppChrome(desktop nav, bottom nav, notification bell)은 검색 계측과 무관한 무거운
-// 셸이라 children만 통과시키는 얇은 대역으로 대체한다 — 실제 검증 대상은 SearchExperience 로직.
-vi.mock('@/components/v1-ui/shell', () => ({
-  AppChrome: ({ children }: { children: ReactNode }) => <>{children}</>,
-}));
-
 const apiMocks = vi.hoisted(() => ({
   matches: { items: [{ id: 'match-1', title: '성수 저녁 풋살' }] } as { items: unknown[] },
   teamMatches: { items: [] } as { items: unknown[] },
   teams: { items: [] } as { items: unknown[] },
+  leagues: { items: [] } as { items: unknown[] },
+  recentSearches: { items: [] } as { items: unknown[] },
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
-  useV1RecentSearches: () => ({ data: { items: [] }, isLoading: false }),
+  useV1RecentSearches: () => ({ data: apiMocks.recentSearches, isLoading: false }),
   useV1RecordSearch: () => ({ mutate: vi.fn() }),
   useV1Matches: () => ({ data: apiMocks.matches, isLoading: false, isError: false }),
   useV1TeamMatches: () => ({ data: apiMocks.teamMatches, isLoading: false, isError: false }),
   useV1Teams: () => ({ data: apiMocks.teams, isLoading: false, isError: false }),
+  useV1LeagueMatches: () => ({ data: apiMocks.leagues, isLoading: false, isError: false }),
 }));
 
 describe('SearchExperience GA events', () => {
@@ -48,6 +44,8 @@ describe('SearchExperience GA events', () => {
     apiMocks.matches = { items: [{ id: 'match-1', title: '성수 저녁 풋살' }] };
     apiMocks.teamMatches = { items: [] };
     apiMocks.teams = { items: [] };
+    apiMocks.leagues = { items: [] };
+    apiMocks.recentSearches = { items: [] };
   });
 
   it('tracks a search event with the query length (not raw text) and the domain that actually returned results', async () => {
@@ -85,10 +83,11 @@ describe('SearchExperience GA events', () => {
   });
 
   it('reports an empty domain string when no domain returns results', async () => {
-    // Given: all three domains are empty
+    // Given: all four domains are empty
     apiMocks.matches = { items: [] };
     apiMocks.teamMatches = { items: [] };
     apiMocks.teams = { items: [] };
+    apiMocks.leagues = { items: [] };
 
     // When
     render(<SearchExperience state="results" />);
@@ -97,5 +96,120 @@ describe('SearchExperience GA events', () => {
     await waitFor(() =>
       expect(analytics.trackEvent).toHaveBeenCalledWith('search', { queryLength: 6, resultCount: 0, domain: '' }),
     );
+  });
+
+  // 감사 결함 재현: '/league-matches' 는 매치/팀매치/팀과 함께 조회되지 않아서 리그명을
+  // 그대로 검색해도 0건이었다(그룹 C, Task 153 Wave 3). GET /league-matches 에는 서버
+  // 텍스트 query 필터가 없어(ListLeagueMatchesQueryDto) search-experience.tsx 가 클라이언트
+  // 에서 제목/시리즈명을 substring 매칭한다 — 그 매칭이 실제로 리그를 domain에 반영하는지,
+  // 그리고 무관한 제목의 리그는 걸러내는지를 검증한다.
+  it('includes leagues whose title matches the query in results and the league domain', async () => {
+    // Given: only the league domain has a matching item ('Futsal' 대소문자 무시 substring),
+    // 무관한 리그('배드민턴 챔피언십')는 매칭돼선 안 된다.
+    apiMocks.matches = { items: [] };
+    apiMocks.teamMatches = { items: [] };
+    apiMocks.teams = { items: [] };
+    apiMocks.leagues = {
+      items: [
+        {
+          leagueId: 'league-1',
+          title: '성수 Futsal 리그',
+          state: 'active',
+          startsOn: '2026-09-01T00:00:00.000Z',
+          endsOn: '2026-11-30T00:00:00.000Z',
+          sport: { sportId: 's1', code: 'futsal', name: '풋살' },
+          region: { regionId: 'r1', name: '성동구' },
+          seriesId: null,
+          tier: null,
+          tierLabel: null,
+          seasonNo: null,
+          seriesTitle: null,
+          teamCount: 8,
+        },
+        {
+          leagueId: 'league-2',
+          title: '배드민턴 챔피언십',
+          state: 'active',
+          startsOn: '2026-09-01T00:00:00.000Z',
+          endsOn: '2026-11-30T00:00:00.000Z',
+          sport: { sportId: 's2', code: 'badminton', name: '배드민턴' },
+          region: { regionId: 'r1', name: '성동구' },
+          seriesId: null,
+          tier: null,
+          tierLabel: null,
+          seasonNo: null,
+          seriesTitle: null,
+          teamCount: 4,
+        },
+      ],
+    };
+
+    // When
+    render(<SearchExperience state="results" />);
+
+    // Then — 매칭된 리그 1건만 domain에 반영되고, 무관한 리그는 세지 않는다.
+    await waitFor(() =>
+      expect(analytics.trackEvent).toHaveBeenCalledWith('search', { queryLength: 6, resultCount: 1, domain: 'league' }),
+    );
+  });
+
+  // 상세에서 뒤로가기로 돌아왔을 때 빈 검색 화면이 아니라 같은 결과가 떠야 한다.
+  it('결과를 누르면 검색어를 담은 출처로 상세에 간다', async () => {
+    apiMocks.teams = { items: [{ id: 'team-1', name: '성수 FC' }] };
+    render(<SearchExperience state="results" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /성수 저녁 풋살/ }));
+    fireEvent.click(screen.getByRole('button', { name: /성수 FC/ }));
+
+    expect(router.push).toHaveBeenCalledWith('/matches/match-1?from=%2Fsearch%3Fq%3Dfutsal');
+    expect(router.push).toHaveBeenCalledWith('/teams/team-1?from=%2Fsearch%3Fq%3Dfutsal');
+  });
+
+  it('리그·팀매치 결과도 검색어를 담은 출처로 상세에 간다', async () => {
+    apiMocks.matches = { items: [] };
+    apiMocks.teamMatches = {
+      items: [{ id: 'tm-1', teamMatchId: 'tm-1', title: '성수 친선매치', sportName: '풋살', hostTeamName: '성수 FC', placeName: '성수 풋살장', startsAt: '2026-09-01T10:00:00.000Z' }],
+    };
+    apiMocks.leagues = {
+      items: [
+        {
+          leagueId: 'league-1', title: '성수 Futsal 리그', state: 'active',
+          startsOn: '2026-09-01T00:00:00.000Z', endsOn: '2026-11-30T00:00:00.000Z',
+          sport: { sportId: 's1', code: 'futsal', name: '풋살' }, region: { regionId: 'r1', name: '성동구' },
+          seriesId: null, tier: null, tierLabel: null, seasonNo: null, seriesTitle: null, teamCount: 8,
+        },
+      ],
+    };
+    render(<SearchExperience state="results" />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /성수 친선매치/ }));
+    fireEvent.click(screen.getByRole('button', { name: /성수 Futsal 리그/ }));
+
+    expect(router.push).toHaveBeenCalledWith('/team-matches/tm-1?from=%2Fsearch%3Fq%3Dfutsal');
+    expect(router.push).toHaveBeenCalledWith('/league-matches/league-1?from=%2Fsearch%3Fq%3Dfutsal');
+  });
+});
+
+// 2026-09-07 alpha 실측: 이 화면엔 헤딩이 하나도 없어 스크린리더의 헤딩 이동으로 잡히지
+// 않았다. 검색창이 주인공이라 보이는 제목을 넣으면 입력이 밀리므로 sr-only 로 준다 —
+// 지우면 다시 헤딩 0개가 되므로 여기에 박제한다.
+describe('SearchExperience 접근성', () => {
+  it('화면에 보이지 않아도 페이지 제목 heading 을 제공한다', () => {
+    render(<SearchExperience state="results" />);
+    expect(screen.getByRole('heading', { name: '검색', level: 1 })).toBeInTheDocument();
+  });
+});
+
+// 2026-09-26 alpha 감사 — 최근 검색어 칩엔 "선택된" 상태가 없는데, index===0 이라는 이유만으로
+// 첫 칩이 항상 tm-chip-active(앱 전역 "선택된 필터" 스타일)로 렌더돼 실제로 선택된 것처럼 보였다.
+describe('SearchExperience 최근 검색어 칩', () => {
+  it('어떤 칩도 tm-chip-active 를 갖지 않는다(선택 상태가 없다)', () => {
+    apiMocks.recentSearches = { items: [{ id: 'r1', query: 'E2E' }, { id: 'r2', query: '풋살' }] };
+    render(<SearchExperience state="results" />);
+
+    const e2eChip = screen.getByRole('button', { name: 'E2E' });
+    const futsalChip = screen.getByRole('button', { name: '풋살' });
+    expect(e2eChip.className).not.toMatch(/tm-chip-active/);
+    expect(futsalChip.className).not.toMatch(/tm-chip-active/);
   });
 });

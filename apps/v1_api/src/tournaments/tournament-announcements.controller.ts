@@ -24,6 +24,20 @@ export class TournamentAnnouncementsController {
     return this.announcementsService.listByTournament(user, tournamentId);
   }
 
+  /** GET /tournaments/:tournamentId/announcements/me
+   * 신청자 본인이 볼 수 있는 공개 상세용 공지 목록 — audience='public' 공지 + 본인의
+   * 신청 상태가 대상에 해당하는 targeted 공지(confirmed_only/waitlist/all_registered).
+   * 로그인만 하면 누구나 호출 가능하고, 신청 이력이 없으면 public 공지만 돌아온다
+   * (참가팀만 볼 수 있는 targeted 공지를 관리자 라우트 없이 노출하지 않기 위함).
+   */
+  @Get('tournaments/:tournamentId/announcements/me')
+  listForMe(
+    @CurrentUser() user: V1AuthUser,
+    @Param('tournamentId') tournamentId: string,
+  ) {
+    return this.announcementsService.listForParticipant(user, tournamentId);
+  }
+
   /** POST /admin/tournaments/:tournamentId/announcements */
   @Post('admin/tournaments/:tournamentId/announcements')
   create(

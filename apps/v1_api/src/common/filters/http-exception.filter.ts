@@ -2,6 +2,12 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Request, Response } from 'express';
 import { ErrorLogService } from '../../error-logs/error-log.service';
+import {
+  PRISMA_AVAILABILITY_CODE,
+  PRISMA_AVAILABILITY_MESSAGE,
+  PRISMA_AVAILABILITY_RETRY_AFTER_SECONDS,
+  isPrismaAvailabilityError,
+} from '../prisma-availability-error';
 
 type V1Request = Request & { id?: string; v1User?: { id: string } };
 
@@ -39,9 +45,25 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const request = ctx.getRequest<V1Request>();
     const response = ctx.getResponse<Response>();
 
-    const status =
-      exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
-    const message = exception instanceof HttpException ? exception.getResponse() : 'Internal server error';
+    // 커넥션 풀 포화·트랜잭션 시작 실패처럼 "요청은 멀쩡한데 지금 감당이 안 되는" 실패는
+    // 500 INTERNAL_ERROR 로 나가면 안 된다 — 운영자가 장애와 혼잡을 구분할 수 없고,
+    // 클라이언트도 재시도해도 되는지 알 수 없다. 어떤 도메인도 "풀이 없다"에 의미를 붙일
+    // 수 없으므로 여기서 한 번만 번역한다(alpha 실측: 승강 확정 동시 6건이 전부 코드 없는
+    // 500 이었다). 반대로 행 경합(40001·P2034 등)은 도메인마다 뜻이 달라 각 서비스가
+    // 409 로 번역한다 — games/command-concurrency-error.ts 참고.
+    const isAvailabilityFailure =
+      !(exception instanceof HttpException) && isPrismaAvailabilityError(exception);
+
+    const status = isAvailabilityFailure
+      ? HttpStatus.SERVICE_UNAVAILABLE
+      : exception instanceof HttpException
+        ? exception.getStatus()
+        : HttpStatus.INTERNAL_SERVER_ERROR;
+    const message = isAvailabilityFailure
+      ? PRISMA_AVAILABILITY_MESSAGE
+      : exception instanceof HttpException
+        ? exception.getResponse()
+        : 'Internal server error';
 
     const messageObj =
       typeof message === 'object' && message !== null ? (message as Record<string, unknown>) : null;
@@ -55,7 +77,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       typeof contentType === 'string' && contentType.toLowerCase().includes('multipart/form-data');
     const isUncodedPayloadTooLarge =
       !rawCode && status === HttpStatus.PAYLOAD_TOO_LARGE && isMultipartRequest;
-    const code = rawCode ?? (isUncodedPayloadTooLarge ? PAYLOAD_TOO_LARGE_CODE : undefined);
+    const code = isAvailabilityFailure
+      ? PRISMA_AVAILABILITY_CODE
+      : (rawCode ?? (isUncodedPayloadTooLarge ? PAYLOAD_TOO_LARGE_CODE : undefined));
 
     const logContext = {
       requestId: request.id,
@@ -67,10 +91,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
     };
 
     const isServerError = status >= HttpStatus.INTERNAL_SERVER_ERROR;
+    // 503 은 코드 결함이 아니라 혼잡이라 error 로 올리면 알람이 오탐으로 울린다.
+    // 다만 어느 트랜잭션이 못 열렸는지는 남아야 하므로 스택은 그대로 기록한다.
+    const shouldLogAsError = isServerError && !isAvailabilityFailure;
     const rawStack = isServerError ? (exception instanceof Error ? exception.stack : String(exception)) : undefined;
     const truncatedStack = rawStack?.slice(0, MAX_LOGGED_STACK_LENGTH);
 
-    if (isServerError) {
+    if (shouldLogAsError) {
       this.logger.error(
         { ...logContext, stack: truncatedStack },
         `Unhandled exception at ${logContext.method} ${logContext.route}`,
@@ -131,6 +158,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       });
     } catch (err) {
       this.logger.warn({ err }, 'Failed to record server error log');
+    }
+
+    // 503 은 "언제 다시 오라"가 없으면 클라이언트가 즉시 재시도해 혼잡을 키운다.
+    if (isAvailabilityFailure) {
+      response.setHeader('Retry-After', String(PRISMA_AVAILABILITY_RETRY_AFTER_SECONDS));
     }
 
     response.status(status).json(responseBody);

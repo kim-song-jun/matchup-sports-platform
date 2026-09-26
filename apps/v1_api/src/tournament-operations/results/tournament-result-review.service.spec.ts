@@ -40,6 +40,7 @@ const ids = {
   game: '7c1d0000-0000-4000-8000-000000000010',
   fixture: '7c1d0000-0000-4000-8000-000000000011',
   tournament: '7c1d0000-0000-4000-8000-000000000012',
+  field: '7c1d0000-0000-4000-8000-000000000013',
   homeSide: '7c1d0000-0000-4000-8000-000000000020',
   awaySide: '7c1d0000-0000-4000-8000-000000000021',
   homePlayer: '7c1d0000-0000-4000-8000-000000000030',
@@ -67,11 +68,15 @@ type CreatedRevision = {
   goalEvents: unknown;
   missingScorer: boolean;
   eventsHash: string;
+  outcomeReason: unknown;
+  outcomeNote: unknown;
 };
 
 type CreatedParticipant = { participantId: string; sideId: string; goals: number };
 
 type HarnessOptions = {
+  /** 경기장 미정이면 권한 리소스에 fieldId 키 자체를 보내지 않는다. */
+  readonly fieldId?: string | null;
   /** 'group' = 조별리그, 'semi' = 결선. 승부차기 가드의 단일 판정 기준. */
   readonly phase?: 'group' | 'semi';
   /** 다음 라운드로 가는 진출 엣지가 있는가. */
@@ -89,23 +94,38 @@ type HarnessOptions = {
    * 정당하게 만들어진 경기의 정정을 막지 않기 위해).
    */
   readonly baseParticipantCount?: number;
-  /** base 리비전의 state. 재제출(supersede) 레인은 REJECTED base를 요구한다. */
+  /** base 리비전의 state. 재제출(supersede) 레인은 **SUBMITTED** base 를 요구한다
+   * (Task 166 — 되돌려 보내는 왕복이 사라져 어드민이 그 자리에서 고친다). */
   readonly baseState?: V1GameResultRevisionState;
+  /**
+   * base 리비전의 몰수·중단 표식. 정정·재제출·무효 세 레인 모두 base에서
+   * 새 리비전으로 그대로 승계해야 한다 — 안 하면 기본값 NORMAL로 떨어져
+   * 몰수로 끝난 경기가 정정 한 번에 정상 종료로 둔갑한다.
+   */
+  readonly baseOutcomeReason?: string;
+  readonly baseOutcomeNote?: string | null;
   /**
    * away 진영 GOAL 이벤트를 하나 더 둔다(= 이벤트 스트림이 1-1). 재제출 레인은
    * `validateGameResultInvariants`의 score↔이벤트 교차검증을 함께 통과해야
    * 하므로, 1-1 무승부 재제출을 검증하려면 이벤트도 1-1이어야 한다.
    */
   readonly awayGoalEvent?: boolean;
+  /** Use the canonical TEAM_MATCH source and Details bracket metadata. */
+  readonly canonical?: boolean;
+  /** Use the regular-league TEAM_MATCH shape (no Details bracket row). */
+  readonly canonicalLeague?: boolean;
 };
 
 type Harness = {
   readonly service: TournamentResultReviewService;
   readonly createdRevisions: CreatedRevision[];
   readonly createdParticipants: CreatedParticipant[];
+  readonly staffAccessInputs: Array<{ resource: Record<string, string> }>;
   readonly correct: (changes: Record<string, unknown>) => Promise<unknown>;
   /** 재제출 레인. 정정과 같은 가드를 통과해야 한다. */
   readonly supersede: (body: Record<string, unknown>) => Promise<unknown>;
+  /** 무효(void) 레인. */
+  readonly voidRevision: () => Promise<unknown>;
 };
 
 /** 이 경기의 정상 참가자 두 명 — 정상 정정 본문의 기본값. */
@@ -132,9 +152,15 @@ function createHarness(options: HarnessOptions = {}): Harness {
   const phase = options.phase ?? 'group';
   const hasAdvancementEdge = options.hasAdvancementEdge ?? false;
   const goalHasScorer = options.goalHasScorer ?? true;
+  // Result-review resolves canonical TEAM_MATCH games only. The explicit
+  // non-canonical source case below exercises the typed rejection, while the
+  // default fixture matches the production contract.
+  const canonical = options.canonical ?? true;
+  const canonicalLeague = options.canonicalLeague ?? false;
 
   const createdRevisions: CreatedRevision[] = [];
   const createdParticipants: CreatedParticipant[] = [];
+  const staffAccessInputs: Array<{ resource: Record<string, string> }> = [];
 
   const advancementEdges = hasAdvancementEdge
     ? [{ id: ids.edge, sourceFixtureId: ids.fixture, targetFixtureId: ids.edge, sourceOutcome: 'WINNER' }]
@@ -143,13 +169,6 @@ function createHarness(options: HarnessOptions = {}): Harness {
   // `readKnockoutFixtureFacts`는 phase와 진출 엣지 수를 **한 번의 findUnique**로
   // 읽는다(잠금 보유 시간 때문에 왕복을 늘리지 않는다). 그래서 이 더블은 같은
   // 행에 `_count.advancementSources`를 함께 실어야 한다.
-  const fixtureRow = {
-    id: ids.fixture,
-    tournamentId: ids.tournament,
-    group: { phase },
-    _count: { advancementSources: advancementEdges.length },
-  };
-
   const baseRevisionRow = {
     id: ids.baseRevision,
     gameId: ids.game,
@@ -159,6 +178,8 @@ function createHarness(options: HarnessOptions = {}): Harness {
     goalEvents: null,
     eventsHash: 'b'.repeat(64),
     mvpParticipantId: null,
+    outcomeReason: options.baseOutcomeReason ?? 'NORMAL',
+    outcomeNote: options.baseOutcomeNote ?? null,
   };
 
   const noop = async () => [] as unknown[];
@@ -170,8 +191,14 @@ function createHarness(options: HarnessOptions = {}): Harness {
     v1Game: {
       findUnique: async () => ({
         id: ids.game,
-        sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
-        tournamentFixtureId: ids.fixture,
+        // Historical corrupt rows can still be read from an archive, but the
+        // retired Prisma enum member is intentionally absent from the runtime
+        // client. Keep this negative case as a raw source value without
+        // reintroducing the removed enum dependency.
+        sourceType: canonical
+          ? V1GameSourceType.TEAM_MATCH
+          : ('TOURNAMENT_FIXTURE' as unknown as V1GameSourceType),
+        teamMatchId: canonical ? ids.fixture : null,
         state: 'ENDED',
         version: GAME_VERSION,
         currentOfficialRevisionId: ids.baseRevision,
@@ -179,12 +206,24 @@ function createHarness(options: HarnessOptions = {}): Harness {
       }),
       update: async () => ({ state: 'ENDED', version: GAME_VERSION + 1 }),
     },
-    v1TournamentFixture: {
-      findUnique: async () => fixtureRow,
-      findFirst: async () => fixtureRow,
+    v1TeamMatch: {
+      findUnique: async () => canonical
+        ? {
+            id: ids.fixture,
+            tournamentId: ids.tournament,
+            leagueId: canonicalLeague ? ids.tournament : null,
+            fieldId: options.fieldId === undefined ? ids.field : options.fieldId,
+            tournament: { kind: canonicalLeague ? 'regular_league' : 'regular_tournament' },
+            tournamentDetails: canonicalLeague
+              ? null
+              : { teamMatchId: ids.fixture, tournamentId: ids.tournament },
+          }
+        : null,
     },
-    v1TournamentFixtureAdvancementEdge: {
-      findMany: async () => advancementEdges,
+    v1TournamentMatchDetails: {
+      findUnique: async () => canonical && !canonicalLeague
+        ? { group: { phase }, _count: { advancementSources: advancementEdges.length } }
+        : null,
     },
     v1IdempotencyRecord: {
       findUnique: async () => null,
@@ -199,11 +238,15 @@ function createHarness(options: HarnessOptions = {}): Harness {
         const created: CreatedRevision = {
           id: `draft-${createdRevisions.length + 1}`,
           revision: args.data.revision as number,
-          state: V1GameResultRevisionState.DRAFT,
+          // void()는 data.state를 명시적으로 VOID로 실어 보낸다 — 그 값을
+          // 존중해야 한다. 나머지 레인은 (스키마 기본값과 같은) DRAFT다.
+          state: (args.data.state as V1GameResultRevisionState | undefined) ?? V1GameResultRevisionState.DRAFT,
           score: args.data.score,
           goalEvents: args.data.goalEvents,
           missingScorer: args.data.missingScorer as boolean,
           eventsHash: args.data.eventsHash as string,
+          outcomeReason: args.data.outcomeReason,
+          outcomeNote: args.data.outcomeNote,
         };
         createdRevisions.push(created);
         return created;
@@ -282,12 +325,15 @@ function createHarness(options: HarnessOptions = {}): Harness {
   } as unknown as PrismaService;
 
   const staffAccess = {
-    assertAccess: async () => ({
-      role: 'platform_ops' as const,
-      authorizationSubject: `platform_ops:${ids.user}@1`,
-      assignmentId: null,
-      assignmentVersion: null,
-    }),
+    assertAccess: async (input: { resource: Record<string, string> }) => {
+      staffAccessInputs.push(input);
+      return {
+        role: 'platform_ops' as const,
+        authorizationSubject: `platform_ops:${ids.user}@1`,
+        assignmentId: null,
+        assignmentVersion: null,
+      };
+    },
   } as unknown as TournamentStaffAccessService;
 
   const auditWriter = { create: async () => ({}) } as unknown as OperationAuditWriterService;
@@ -326,7 +372,17 @@ function createHarness(options: HarnessOptions = {}): Harness {
     } as never);
   };
 
-  return { service, createdRevisions, createdParticipants, correct, supersede };
+  const voidRevision = () => {
+    attempt += 1;
+    const commandId = `void-guard-${attempt}`;
+    return service.voidResultRevision(authUser, ids.game, ids.baseRevision, commandId, {
+      expectedVersion: GAME_VERSION,
+      clientCommandId: commandId,
+      reason: '오심으로 무효 처리',
+    } as never);
+  };
+
+  return { service, createdRevisions, createdParticipants, staffAccessInputs, correct, supersede, voidRevision };
 }
 
 async function captureFailure(operation: () => Promise<unknown>): Promise<unknown> {
@@ -365,6 +421,30 @@ describe('createResultCorrection — 정상 정정(하네스 건전성 증거)',
     ]);
   });
 
+  it('결과 명령 권한 검사에 픽스처의 실제 필드 범위를 전달한다', async () => {
+    const harness = createHarness();
+
+    await harness.correct({});
+
+    expect(harness.staffAccessInputs[0]?.resource).toEqual({
+      tournamentId: ids.tournament,
+      fixtureId: ids.fixture,
+      fieldId: ids.field,
+    });
+  });
+
+  it('경기장이 미정이면 엄격한 권한 파서에 fieldId 키를 보내지 않는다', async () => {
+    const harness = createHarness({ fieldId: null });
+
+    await harness.correct({});
+
+    expect(harness.staffAccessInputs[0]?.resource).toEqual({
+      tournamentId: ids.tournament,
+      fixtureId: ids.fixture,
+    });
+    expect(harness.staffAccessInputs[0]?.resource).not.toHaveProperty('fieldId');
+  });
+
   it('중복 participantId는 이미 거부된다(기존 가드가 실제로 도달한다는 증거)', async () => {
     const harness = createHarness();
 
@@ -374,6 +454,19 @@ describe('createResultCorrection — 정상 정정(하네스 건전성 증거)',
 
     expectHttp(error, 422, 'PARTICIPANT_INVALID');
     expect(harness.createdRevisions).toHaveLength(0);
+  });
+});
+
+describe('canonical source boundary', () => {
+  it('rejects a legacy tournament-fixture Game before authorization or mutation', async () => {
+    const harness = createHarness({ canonical: false });
+
+    const rejected = await captureFailure(() => harness.correct({}));
+
+    expectHttp(rejected, 404, 'GAME_NOT_FOUND');
+    expect(harness.staffAccessInputs).toHaveLength(0);
+    expect(harness.createdRevisions).toHaveLength(0);
+    expect(harness.createdParticipants).toHaveLength(0);
   });
 });
 
@@ -492,6 +585,95 @@ describe('2-E: missingScorer는 이벤트에서 계산되어야 한다', () => {
     const harness = createHarness({ goalHasScorer: true });
 
     await harness.correct({});
+
+    expect(harness.createdRevisions[0].missingScorer).toBe(false);
+  });
+});
+
+/**
+ * finding #67. 위 2-E는 `changes.goalEvents`를 실어 보내지 않는 `correct({})`만
+ * 쓴다 — 그래서 서비스가 `resultInvariantInput`(정본) 분기를 타고, 정정 폼이 실제로
+ * 항상 보내는 `assertGoalTimelineConsistent` 분기(goalEvents !== undefined일 때)는
+ * 한 번도 실행되지 않았다. 그 분기는 무득점자 골을 만나면 `continue`만 하고
+ * `missingScorer`를 대입한 적이 없어 **항상 false를 반환**했다 — 정정을 한 번이라도
+ * 거치면 득점자 미상 경고가 조용히 사라지는 실제 버그다. 여기서는 `goalEvents`를
+ * 명시적으로 실어 보내 그 분기를 직접 타격한다.
+ */
+describe('finding #67: goalEvents를 실어 보내는 정정·재제출도 missingScorer를 계산해야 한다', () => {
+  it('정정(correct)이 무득점자 GOAL을 anonymous 표식과 함께 보내면 missingScorer가 true다', async () => {
+    const harness = createHarness();
+
+    await harness.correct({
+      actualParticipants: [
+        { ...validParticipants[0], goals: 0 },
+        { ...validParticipants[1], goals: 0 },
+      ],
+      goalEvents: [
+        {
+          id: 'anonymous-goal-1',
+          sideId: ids.homeSide,
+          anonymous: true,
+          minute: 10,
+          period: 1,
+          ownGoal: false,
+        },
+      ],
+    });
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].missingScorer).toBe(true);
+  });
+
+  it('재제출(supersede)이 무득점자 GOAL을 anonymous 표식과 함께 보내도 missingScorer가 true다', async () => {
+    // supersede 는 SUBMITTED base 에서만 허용된다(위 '재제출 레인' describe 와 동일 전제).
+    const harness = createHarness({ baseState: V1GameResultRevisionState.SUBMITTED });
+
+    await harness.supersede({
+      actualParticipants: [
+        { ...validParticipants[0], goals: 0 },
+        { ...validParticipants[1], goals: 0 },
+      ],
+      goalEvents: [
+        {
+          id: 'anonymous-goal-1',
+          sideId: ids.homeSide,
+          anonymous: true,
+          minute: 10,
+          period: 1,
+          ownGoal: false,
+        },
+      ],
+    });
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].missingScorer).toBe(true);
+  });
+
+  /**
+   * 짝. 자책골(ownGoal)은 정본(`resultInvariantInput`)도 애초에 missingScorer
+   * 판정에서 제외하는 타입이라(`event.type === GOAL`만 본다) 무득점자여도
+   * false로 남아야 한다 — 위 "명시적인 익명 자책골" 테스트가 이미 이 축을
+   * 덮지만, `ownGoal: false`와 대조되는 짝으로 여기 다시 남겨 회귀를 좁힌다.
+   */
+  it('무득점자 자책골(ownGoal)은 anonymous 표식이 있으면 missingScorer가 false로 남는다', async () => {
+    const harness = createHarness();
+
+    await harness.correct({
+      actualParticipants: [
+        { ...validParticipants[0], goals: 0 },
+        { ...validParticipants[1], goals: 0 },
+      ],
+      goalEvents: [
+        {
+          id: 'anonymous-own-goal-2',
+          sideId: ids.homeSide,
+          anonymous: true,
+          minute: 10,
+          period: 1,
+          ownGoal: true,
+        },
+      ],
+    });
 
     expect(harness.createdRevisions[0].missingScorer).toBe(false);
   });
@@ -709,6 +891,41 @@ describe('2-C: 결선 경기 정정은 브래킷을 해결할 수 있어야 한�
     expectHttp(error, 409, 'TOURNAMENT_PENALTY_NOT_ALLOWED');
     expect(harness.createdRevisions).toHaveLength(0);
   });
+
+  it('canonical TEAM_MATCH 결선도 Details의 phase/진출 엣지로 무승부 승부차기를 요구한다', async () => {
+    const harness = createHarness({ canonical: true, phase: 'semi', hasAdvancementEdge: true });
+
+    const error = await captureFailure(() => harness.correct({ score: { home: 1, away: 1 } }));
+
+    expectHttp(error, 409, 'TOURNAMENT_PENALTY_REQUIRED');
+    expect(harness.createdRevisions).toHaveLength(0);
+  });
+
+  it('canonical regular-league TEAM_MATCH에는 승부차기를 허용하지 않는다', async () => {
+    const harness = createHarness({ canonical: true, canonicalLeague: true });
+
+    const error = await captureFailure(() =>
+      harness.correct({ score: { home: 1, away: 1, penalties: { home: 5, away: 4 } } }),
+    );
+
+    expectHttp(error, 409, 'TOURNAMENT_PENALTY_NOT_ALLOWED');
+    expect(harness.createdRevisions).toHaveLength(0);
+  });
+
+  it('canonical TEAM_MATCH 결선은 유효한 승부차기 정정을 저장한다', async () => {
+    const harness = createHarness({ canonical: true, phase: 'semi', hasAdvancementEdge: true });
+
+    await harness.correct({
+      score: { home: 1, away: 1, penalties: { home: 5, away: 4, takenHome: 5, takenAway: 5 } },
+    });
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].score).toEqual({
+      home: 1,
+      away: 1,
+      penalties: { home: 5, away: 4, takenHome: 5, takenAway: 5 },
+    });
+  });
 });
 
 /**
@@ -866,10 +1083,10 @@ describe('2-C 역방향: 승부차기로 결정된 결선 경기의 정정이 �
  * (`game-invariants.ts`) 같은 결함이 그대로 남는다.
  */
 describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', () => {
-  const rejectedBase = { baseState: V1GameResultRevisionState.REJECTED } as const;
+  const submittedBase = { baseState: V1GameResultRevisionState.SUBMITTED } as const;
 
   it('정상 재제출은 SUBMITTED 리비전과 참가자 행을 만든다(하네스 건전성 증거)', async () => {
-    const harness = createHarness(rejectedBase);
+    const harness = createHarness(submittedBase);
 
     await harness.supersede({});
 
@@ -894,7 +1111,7 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
    * `public-user-records.service.ts`가 그것을 직접 읽는다.
    */
   it('2-F: 정상 참가자 옆에 남의 경기 participantId를 끼워 넣으면 422 PARTICIPANT_INVALID', async () => {
-    const harness = createHarness(rejectedBase);
+    const harness = createHarness(submittedBase);
 
     const error = await captureFailure(() =>
       harness.supersede({
@@ -911,7 +1128,7 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
   });
 
   it('2-B: base에 개인기록이 있었으면 빈 actualParticipants 재제출을 422로 거부한다', async () => {
-    const harness = createHarness(rejectedBase);
+    const harness = createHarness(submittedBase);
 
     const error = await captureFailure(() => harness.supersede({ actualParticipants: [] }));
 
@@ -920,7 +1137,7 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
   });
 
   it('2-C: 결선 무승부를 승부차기 없이 재제출하면 409 TOURNAMENT_PENALTY_REQUIRED', async () => {
-    const harness = createHarness({ ...rejectedBase, phase: 'semi', hasAdvancementEdge: true });
+    const harness = createHarness({ ...submittedBase, phase: 'semi', hasAdvancementEdge: true });
 
     const error = await captureFailure(() => harness.supersede({ score: { home: 1, away: 1 } }));
 
@@ -929,7 +1146,7 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
   });
 
   it('2-G: 재제출 penalties가 null이면 422 TOURNAMENT_PENALTY_INVALID', async () => {
-    const harness = createHarness({ ...rejectedBase, phase: 'semi' });
+    const harness = createHarness({ ...submittedBase, phase: 'semi' });
 
     const error = await captureFailure(() =>
       harness.supersede({ score: { home: 1, away: 1, penalties: null } }),
@@ -947,7 +1164,7 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
    * 스트림은 home 1골뿐이므로 아래 0-0은 두 검증 모두를 위반한다.
    */
   it('승부차기 가드가 이벤트 교차검증보다 먼저 걸린다', async () => {
-    const harness = createHarness({ ...rejectedBase, phase: 'semi', hasAdvancementEdge: true });
+    const harness = createHarness({ ...submittedBase, phase: 'semi', hasAdvancementEdge: true });
 
     const error = await captureFailure(() => harness.supersede({ score: { home: 0, away: 0 } }));
 
@@ -956,7 +1173,7 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
 
   it('base의 승부차기를 승계해 결선 재제출도 통과한다', async () => {
     const harness = createHarness({
-      ...rejectedBase,
+      ...submittedBase,
       phase: 'semi',
       hasAdvancementEdge: true,
       baseScore: { home: 1, away: 1, penalties: { home: 5, away: 4 } },
@@ -976,5 +1193,108 @@ describe('재제출(supersede) 레인도 같은 가드를 통과해야 한다', 
       away: 1,
       penalties: { home: 5, away: 4 },
     });
+  });
+});
+
+/**
+ * 감사 지적: 정정·재제출·무효가 만드는 새 리비전이 몰수·중단 표식
+ * (outcomeReason/outcomeNote)을 base에서 승계하지 않으면, 몰수로 끝난 경기가
+ * 정정 한 번에(또는 재제출/재입력 한 번에) 정상 종료(NORMAL)로 조용히
+ * 둔갑한다. 세 create() 호출 전부를 개별로 잠근다 — 한 곳만 고치고 나머지를
+ * 놓치는 재발을 막기 위해서다.
+ */
+describe('몰수·중단 표식(outcomeReason/outcomeNote) 승계', () => {
+  const forfeitBase = {
+    baseOutcomeReason: 'FORFEIT',
+    baseOutcomeNote: '상대팀 미출전',
+  } as const;
+
+  it('정정(correct)은 base의 몰수 표식을 새 리비전에 그대로 승계한다', async () => {
+    const harness = createHarness(forfeitBase);
+
+    await harness.correct({});
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].outcomeReason).toBe('FORFEIT');
+    expect(harness.createdRevisions[0].outcomeNote).toBe('상대팀 미출전');
+  });
+
+  it('정정에 outcome 을 실으면 base 승계 대신 그 값이 들어간다 (Task 165 BE-3)', async () => {
+    // BE-3 가 리그 전용 결과 입력을 지우면 **몰수를 새로 지정할 길이 여기뿐**이다.
+    // 승계만 하면 정상 종료로 끝난 경기를 몰수로 고칠 수 없다.
+    const harness = createHarness();
+
+    await harness.correct({ outcome: { reason: 'FORFEIT', note: '상대팀 미출전' } });
+
+    expect(harness.createdRevisions[0].outcomeReason).toBe('FORFEIT');
+    expect(harness.createdRevisions[0].outcomeNote).toBe('상대팀 미출전');
+  });
+
+  it('몰수·중단에 사유가 비면 422 — 조용히 null 로 접지 않는다 (Copilot 리뷰)', async () => {
+    // 이 저장소는 몰수·중단에 **사유를 필수**로 한다 — "나중에 왜 그 점수인지 설명할 수
+    // 있는 유일한 기록" 이라서다(GamesService.extractEndOutcome). 공백을 null 로 접으면
+    // 그 규칙을 이 경로만 우회한다. `extractEndOutcome` 을 그대로 지나므로 코드도 같다.
+    const harness = createHarness();
+
+    await expect(
+      harness.correct({ outcome: { reason: 'ABANDONED', note: '   ' } }),
+    ).rejects.toMatchObject({ response: { code: 'GAME_OUTCOME_NOTE_REQUIRED' } });
+    expect(harness.createdRevisions).toHaveLength(0);
+  });
+
+  it('사유 없는 몰수도 같은 422 다 — note 미전송', async () => {
+    const harness = createHarness();
+
+    await expect(harness.correct({ outcome: { reason: 'FORFEIT' } })).rejects.toMatchObject({
+      response: { code: 'GAME_OUTCOME_NOTE_REQUIRED' },
+    });
+  });
+
+  it('outcome 이 null 이면 500 이 아니라 승계다 — @IsOptional 은 null 을 막지 않는다', async () => {
+    const harness = createHarness(forfeitBase);
+
+    await harness.correct({ outcome: null });
+
+    expect(harness.createdRevisions[0].outcomeReason).toBe('FORFEIT');
+    expect(harness.createdRevisions[0].outcomeNote).toBe('상대팀 미출전');
+  });
+
+  it('NORMAL 은 사유가 없어도 된다 — 필수는 몰수·중단에만 걸린다', async () => {
+    const harness = createHarness(forfeitBase);
+
+    await harness.correct({ outcome: { reason: 'NORMAL' } });
+
+    expect(harness.createdRevisions[0].outcomeReason).toBe('NORMAL');
+    expect(harness.createdRevisions[0].outcomeNote).toBeNull();
+  });
+
+  it('정정 base가 정상 종료(NORMAL)면 그대로 NORMAL을 승계한다(짝 증거 — 하드코딩된 상수를 리턴하는 거짓 초록 방지)', async () => {
+    const harness = createHarness();
+
+    await harness.correct({});
+
+    expect(harness.createdRevisions[0].outcomeReason).toBe('NORMAL');
+    expect(harness.createdRevisions[0].outcomeNote).toBeNull();
+  });
+
+  it('재제출(supersede)은 SUBMITTED base의 몰수 표식을 새 리비전에 그대로 승계한다', async () => {
+    const harness = createHarness({ ...forfeitBase, baseState: V1GameResultRevisionState.SUBMITTED });
+
+    await harness.supersede({});
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].outcomeReason).toBe('FORFEIT');
+    expect(harness.createdRevisions[0].outcomeNote).toBe('상대팀 미출전');
+  });
+
+  it('무효(void)는 OFFICIAL base의 몰수 표식을 VOID 리비전에 그대로 승계한다', async () => {
+    const harness = createHarness(forfeitBase);
+
+    await harness.voidRevision();
+
+    expect(harness.createdRevisions).toHaveLength(1);
+    expect(harness.createdRevisions[0].state).toBe(V1GameResultRevisionState.VOID);
+    expect(harness.createdRevisions[0].outcomeReason).toBe('FORFEIT');
+    expect(harness.createdRevisions[0].outcomeNote).toBe('상대팀 미출전');
   });
 });

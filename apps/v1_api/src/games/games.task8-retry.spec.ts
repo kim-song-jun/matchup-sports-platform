@@ -128,9 +128,8 @@ async function createTask8RetryService() {
     }>,
     game: {
       id: 'task8-retry-game',
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
-      teamMatchId: null,
-      tournamentFixtureId: '80000000-0000-4000-8000-000000000002',
+      sourceType: V1GameSourceType.TEAM_MATCH,
+      teamMatchId: '80000000-0000-4000-8000-000000000002',
       state: V1GameState.LIVE,
       version: 0,
       lastSequence: 0,
@@ -157,20 +156,16 @@ async function createTask8RetryService() {
         if (select.teamMatch !== undefined) {
           return {
             sourceType: state.game.sourceType,
-            teamMatch: null,
-            tournamentFixture: {
-              id: '80000000-0000-4000-8000-000000000002',
-              tournamentId: '80000000-0000-4000-8000-000000000001',
+            teamMatch: {
+              id: state.game.teamMatchId,
+              tournamentId: null,
+              leagueId: null,
+              deletedAt: null,
               fieldId: null,
-            },
-          };
-        }
-        if (select.tournamentFixture !== undefined) {
-          return {
-            tournamentFixture: {
-              id: '80000000-0000-4000-8000-000000000002',
-              tournamentId: '80000000-0000-4000-8000-000000000001',
-              fieldId: null,
+              status: 'matched',
+              tournament: null,
+              league: null,
+              tournamentDetails: null,
             },
           };
         }
@@ -180,6 +175,23 @@ async function createTask8RetryService() {
         state.game.lastSequence = data.lastSequence;
         state.game.version += data.version.increment;
         return { ...state.game };
+      },
+    },
+    v1TeamMatch: {
+      async findUnique() {
+        return {
+          id: state.game.teamMatchId,
+          tournamentId: null,
+          leagueId: null,
+          deletedAt: null,
+          fieldId: null,
+          status: 'matched',
+          hostTeamId: 'task8-team',
+          approvedApplicantTeamId: 'task8-away-team',
+          tournament: null,
+          league: null,
+          tournamentDetails: null,
+        };
       },
     },
     v1GameEvent: {

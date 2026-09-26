@@ -99,7 +99,7 @@ function staffAssignment(
     version: number;
     expiresAt: Date | null;
     revokedAt: Date | null;
-    fixtureScopes: readonly { fixtureId: string }[];
+    fixtureScopes: readonly { teamMatchId: string }[];
   }> = {},
 ) {
   const scoped = role === 'FIELD_OPERATOR';
@@ -112,7 +112,7 @@ function staffAssignment(
     createdAt: new Date('2026-08-01T11:00:00.000Z'),
     expiresAt: null,
     revokedAt: null,
-    fixtureScopes: scoped ? [{ fixtureId: IDS.fixture }] : [],
+    fixtureScopes: scoped ? [{ teamMatchId: IDS.fixture }] : [],
     ...overrides,
   };
 }
@@ -212,7 +212,7 @@ describe('Tournament staff auth core', () => {
           v1User: { id: IDS.user },
           params: {
             tournamentId: assignment.tournamentId,
-            fixtureId: assignment.fixtureScopes[0].fixtureId,
+            fixtureId: assignment.fixtureScopes[0].teamMatchId,
             fieldId: assignment.fieldId,
           },
           header: () => undefined,

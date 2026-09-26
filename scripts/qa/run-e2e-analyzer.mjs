@@ -31,7 +31,8 @@ const RESULT_SCHEMA_PATH = path.join(REPO_ROOT, 'scripts', 'qa', 'e2e-analyzer-r
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 const IGNORED_BASENAMES = new Set(['.DS_Store', '.watch-state.json', 'manifest.log']);
 const QUEUE_STATUSES = ['pending', 'running', 'completed', 'failed', 'staged'];
-const DEFAULT_MODEL = 'gpt-5.4';
+// Code edits (agent-all) go to the implementation model, analysis-only runs to the review model.
+const DEFAULT_MODEL_BY_MODE = { 'agent-all': 'gpt-5.6-luna', 'analyze-only': 'gpt-5.6-sol' };
 const DEFAULT_REASONING_EFFORT = 'high';
 const DEFAULT_POLL_SECONDS = 120;
 const DEFAULT_MAX_DISPATCH = 1;
@@ -62,7 +63,7 @@ Options:
   --incomplete-window-seconds <n>  Recent-change window for incomplete dispatch (default: 300)
   --auto-commit                    Commit successful UI fixes per feature set
   --commit-label <label>           Commit label token (default: codex)
-  --model <name>                   Codex model (default: gpt-5.4)
+  --model <name>                   Codex model (default: gpt-5.6-luna for agent-all, gpt-5.6-sol for analyze-only)
   --reasoning-effort <level>       Codex reasoning effort (default: high)
   --codex-timeout-seconds <n>      Kill hanging codex exec runs after N seconds (default: 900)
   --poll-seconds <n>               Watch loop interval (default: 120)
@@ -642,10 +643,10 @@ function buildCodexPrompt(set, reportDir, taskPath, options) {
 작업 문서: ${taskPath}
 리포트 디렉토리: ${reportDir}
 
-반드시 수행:
+수행할 일:
 1. ${taskPath}를 실행 계약으로 따른다.
 2. 첨부된 이미지를 하나도 빠짐없이 모두 분석한다.
-3. 이미지 분석은 서브에이전트를 사용해 병렬로 수행한다.
+3. 이미지는 서브에이전트로 나눠 병렬로 분석한다 — 셋당 최대 16장이라 한 컨텍스트에 모두 담으면 뒤쪽 이미지를 대충 보게 된다.
 4. DESIGN.md, .impeccable.md, AGENTS.md, 관련 코드/문서를 필요한 만큼 읽고 판단한다.
 5. per-image findings와 cross-cutting root cause를 정리한다.
 6. ${modeLine}
@@ -654,18 +655,6 @@ function buildCodexPrompt(set, reportDir, taskPath, options) {
    - ${findingsPath}
    - ${remediationPath}
 8. 코드 변경이 있으면 repo-relative 경로 목록을 \`changed_files\`에 넣는다.
-9. 최종 응답은 JSON schema를 만족해야 한다.
-
-JSON 응답 규칙:
-- status: completed | blocked | no-action
-- set_id: ${set.setId}
-- images_analyzed: 실제 분석한 이미지 개수
-- issues_found: actionable issue 개수
-- agent_all_ran: true/false
-- changed_files: 코드/문서 변경 파일의 repo-relative 경로 배열 (없으면 [])
-- report_path: ${analysisPath}
-- remediation_path: ${remediationPath}
-- notes: 짧은 요약
 `;
 }
 
@@ -1100,7 +1089,7 @@ function parseArgs(argv) {
     incompleteWindowSeconds: DEFAULT_INCOMPLETE_WINDOW_SECONDS,
     autoCommit: false,
     commitLabel: DEFAULT_COMMIT_LABEL,
-    model: DEFAULT_MODEL,
+    model: null,
     reasoningEffort: DEFAULT_REASONING_EFFORT,
     codexTimeoutSeconds: DEFAULT_CODEX_TIMEOUT_SECONDS,
     pollSeconds: DEFAULT_POLL_SECONDS,
@@ -1147,6 +1136,7 @@ function parseArgs(argv) {
   if (!['agent-all', 'analyze-only'].includes(options.codexMode)) {
     throw new Error(`Unsupported codex mode: ${options.codexMode}`);
   }
+  options.model ??= DEFAULT_MODEL_BY_MODE[options.codexMode];
   if (options.expectedViewports.length === 0) {
     throw new Error('expected viewport list must not be empty');
   }

@@ -1,3 +1,4 @@
+import { teamMatchDateErrors } from '@/lib/team-match-dates';
 import { labelToLevelCode } from '@/lib/v1-levels';
 import type { V1TeamMatchMutationPayload } from '@/types/api';
 import type { TeamMatchCreateStep, TeamMatchCreateViewModel } from './team-matches.types';
@@ -28,6 +29,7 @@ export type TeamMatchValidationContext = {
   sportId: string;
   regionId: string;
   draft: TeamMatchDraft;
+  existingDeadlineAt?: string | null;
 };
 
 const defaultGenderRule = '성별 무관';
@@ -57,34 +59,45 @@ const RULES: Array<{
   { field: 'venue', label: '장소를 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.venue.trim()) },
   { field: 'date', label: '날짜를 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.date) },
   { field: 'startTime', label: '시작 시간을 입력해 주세요', step: 'place-time', isSatisfied: (ctx) => Boolean(ctx.draft.startTime) },
+  // 마감일·마감시간은 "둘 다 비움(마감 없음)" 또는 "둘 다 채움" 두 상태만 유효하다.
+  // 한쪽만 채우면 parseDeadlineAt이 null을 반환해 deadlineAt=null(마감 없음)로 조용히
+  // 저장되는데, 호스트는 방금 고른 날짜/시간이 반영됐다고 믿는다 — 결측 필드로 명시 안내한다.
+  // (개인 매치 쪽 matches.validation.ts 와 같은 규칙 — 같은 결함이 양쪽에 있었다.)
   {
-    field: 'startTime',
-    label: '시작 시간은 지금 이후로 설정해 주세요',
+    field: 'deadlineDate',
+    label: '신청 마감일도 입력해 주세요',
     step: 'place-time',
-    isSatisfied: (ctx) => {
-      const startsAt = parseStartsAt(ctx.draft);
-      // 날짜·시작 시간이 아예 비어 있으면 위 규칙이 이미 잡는다 — 여기서는 값이 있을 때만 판단.
-      if (!startsAt) return true;
-      return startsAt > new Date();
-    },
+    isSatisfied: (ctx) => !(ctx.draft.deadlineTime && !ctx.draft.deadlineDate),
   },
   {
     field: 'deadlineTime',
-    label: '신청 마감은 시작 시간보다 빨라야 해요',
+    label: '신청 마감시간도 입력해 주세요',
     step: 'place-time',
-    isSatisfied: (ctx) => {
-      const deadlineAt = parseDeadlineAt(ctx.draft);
-      // 마감을 아예 설정하지 않으면 "경기 시작 전까지" 상시 접수로 통과.
-      if (!deadlineAt) return true;
-      const startsAt = parseStartsAt(ctx.draft);
-      if (!startsAt) return true;
-      return deadlineAt < startsAt;
-    },
+    isSatisfied: (ctx) => !(ctx.draft.deadlineDate && !ctx.draft.deadlineTime),
+  },
+  {
+    field: 'endTime', label: '종료 시간도 입력해 주세요', step: 'place-time',
+    isSatisfied: (ctx) => !ctx.draft.endDate || Boolean(ctx.draft.endTime),
   },
 ];
 
 export function getTeamMatchMissingFields(ctx: TeamMatchValidationContext): TeamMatchMissingField[] {
-  return RULES.filter((rule) => !rule.isSatisfied(ctx)).map(({ field, label, step }) => ({ field, label, step }));
+  const missing: TeamMatchMissingField[] = RULES.filter((rule) => !rule.isSatisfied(ctx)).map(({ field, label, step }) => ({ field, label, step }));
+  const d = ctx.draft;
+  if (d.date && d.startTime && !parseStartsAt(d)) {
+    missing.push({ field: 'date', label: '날짜를 확인해 주세요', step: 'place-time' });
+  }
+  const errors = teamMatchDateErrors({
+    startsAt: d.date && d.startTime ? `${d.date}T${d.startTime}:00` : '',
+    endsAt: d.endTime ? `${d.endDate || d.date}T${d.endTime}:00` : null,
+    deadlineAt: d.deadlineDate && d.deadlineTime ? `${d.deadlineDate}T${d.deadlineTime}:00` : null,
+    existingDeadlineAt: ctx.existingDeadlineAt,
+  });
+  const fields = { startsAt: 'startTime', endsAt: 'endTime', deadlineAt: 'deadlineTime' } as const;
+  for (const key of Object.keys(fields) as Array<keyof typeof fields>) {
+    if (errors[key]) missing.push({ field: fields[key], label: errors[key], step: 'place-time' });
+  }
+  return missing;
 }
 
 /** RULES에서 특정 필드의 (첫) label/step을 찾는다 — 결측 필드 안내 문구를 한 곳에서만 관리. */
@@ -122,8 +135,8 @@ export type TeamMatchPayloadResult =
   | { payload: V1TeamMatchMutationPayload; missingFields?: undefined }
   | { payload?: undefined; missingFields: TeamMatchMissingField[] };
 
-export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: string, sportId: string, regionId: string): TeamMatchPayloadResult {
-  const ctx: TeamMatchValidationContext = { hostTeamId, sportId, regionId, draft };
+export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: string, sportId: string, regionId: string, existingDeadlineAt?: string | null): TeamMatchPayloadResult {
+  const ctx: TeamMatchValidationContext = { hostTeamId, sportId, regionId, draft, existingDeadlineAt };
   const missingFields = getTeamMatchMissingFields(ctx);
   if (missingFields.length > 0) return { missingFields };
 
@@ -134,7 +147,7 @@ export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: s
     // 단언 후 크래시 대신 결측 필드로 되돌려 상위 UI가 그 스텝으로 안내하게 한다.
     return { missingFields: [missingFieldFor('date'), missingFieldFor('startTime')] };
   }
-  const endsAt = draft.endTime ? new Date(`${draft.date}T${draft.endTime}:00`) : null;
+  const endsAt = draft.endTime ? new Date(`${draft.endDate || draft.date}T${draft.endTime}:00`) : null;
   const deadlineAt = parseDeadlineAt(draft);
 
   return {
@@ -145,7 +158,7 @@ export function buildTeamMatchPayloadResult(draft: TeamMatchDraft, hostTeamId: s
       title: draft.title.trim(),
       description: draft.description.trim() || null,
       startsAt: startsAt.toISOString(),
-      endsAt: endsAt && endsAt > startsAt ? endsAt.toISOString() : null,
+      endsAt: endsAt?.toISOString() ?? null,
       deadlineAt: deadlineAt?.toISOString() ?? null,
       imageUrl: draft.imageUrl.trim() || null,
       manualPlaceName: draft.venue.trim(),

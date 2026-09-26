@@ -67,11 +67,14 @@ async function bootstrap(): Promise<void> {
   // 스캔이 필요한데, 두 번째 스케줄러를 들이지 않고 이 워커의 outbox 루프를 그대로
   // 재사용한다 — 스캔 한 번이 끝날 때 다음 스캔을 outbox 행으로 예약하는 방식이다.
   const lineupTodos = app.get(LineupTodoService);
-  const lineupReminders = new LineupReminderService(lineupTodos, webPush);
+  const prisma = app.get(PrismaService);
+  // 2026-08-27 감사 45: prisma를 LineupReminderService에 넘겨, scanHandler가 "다음 스캔
+  // 예약"을 스캔 자체와 분리된 독립 트랜잭션으로 먼저 커밋할 수 있게 한다 — 스캔이
+  // 실패해도 예약 체인이 함께 롤백되지 않는다(자세한 이유는 그 서비스의 docblock 참조).
+  const lineupReminders = new LineupReminderService(lineupTodos, prisma, webPush);
   worker.registerHandler(LINEUP_REMINDER_SCAN_TYPE, lineupReminders.scanHandler);
   // 체인의 첫 고리. 이미 예약돼 있으면 슬롯 키가 같아 무시되므로, 워커를 몇 번 재시작해도
   // 스캔이 늘어나지 않는다. 반대로 어떤 이유로 체인이 끊겼더라도 다음 배포 때 되살아난다.
-  const prisma = app.get(PrismaService);
   await prisma.$transaction((tx) => scheduleNextScan(tx, new Date()));
 
   app.setGlobalPrefix('api/v1');

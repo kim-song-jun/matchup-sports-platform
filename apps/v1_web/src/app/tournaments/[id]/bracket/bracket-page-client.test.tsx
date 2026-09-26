@@ -1,8 +1,26 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderBracketPage, renderBracketStandingsTab } from './bracket-test-utils';
 import type { V1TournamentDetail, V1TournamentFixture, V1TournamentGroup } from '@/types/api';
+
+// 순위표 링크의 출처는 현재 URL(받은 from 포함)이다 — 기본은 출처 없음으로 고정하고,
+// from 을 검증하는 테스트만 setMockSearchParams 로 override 한다.
+const { getMockSearchParams, setMockSearchParams } = vi.hoisted(() => {
+  let params = new URLSearchParams();
+  return {
+    getMockSearchParams: () => params,
+    setMockSearchParams: (next: URLSearchParams) => {
+      params = next;
+    },
+  };
+});
+
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/navigation')>()),
+  usePathname: () => '/tournaments/tour-1/bracket',
+  useSearchParams: () => getMockSearchParams(),
+}));
 
 /**
  * 조별/리그 순위표에서 팀명을 누르면 **그 자리에서** 그 팀의 경기 상세가 펼쳐져야
@@ -11,6 +29,7 @@ import type { V1TournamentDetail, V1TournamentFixture, V1TournamentGroup } from 
  */
 function makeTournament(overrides: Partial<V1TournamentDetail> & Pick<V1TournamentDetail, 'id' | 'status' | 'format'>): V1TournamentDetail {
   return {
+    kind: 'regular_tournament',
     sportId: 'sport-futsal',
     sport: { code: 'futsal', name: '풋살' },
     title: '테스트 대회',
@@ -58,17 +77,20 @@ function makeTournament(overrides: Partial<V1TournamentDetail> & Pick<V1Tourname
     promoListPriority: 0,
     campaignSlug: null,
     rulesText: null,
+    yellowAccumulationLimit: null,
+    redCardSuspensionMatches: null,
     refundPolicyText: null,
     confirmedCount: 0,
     participantTeams: [],
     pendingPaymentCount: 0,
     groups: [],
     fixtures: [],
+    leagueFixtures: [],
     announcements: [],
     sponsors: [],
     reviews: [],
+    reviewsTotalCount: 0,
     awards: [],
-    popup: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -96,6 +118,7 @@ function makeFixture(
     legNumber: 1,
     scheduledAt: null,
     venue: null,
+    liveStatus: 'scheduled',
     homeRegistrationId: null,
     homeTeamId: 'team-home',
     homeTeamName: '홈팀',
@@ -259,7 +282,11 @@ describe('BracketPageContent — 순위표 팀 링크', () => {
     renderBracketStandingsTab(tournament);
 
     const link = screen.getByRole('link', { name: /성수 FC/ });
-    expect(link).toHaveAttribute('href', '/teams/team-42/records');
+    // 뒤로가기가 이 대진표 화면으로 돌아오도록 ?from=이 함께 실린다.
+    expect(link).toHaveAttribute(
+      'href',
+      `/teams/team-42/records?from=${encodeURIComponent('/tournaments/tour-1/bracket')}`,
+    );
   });
 
   it('조별리그 포맷: 조별 순위표의 팀명을 누르면 /teams/:teamId/records 로 이동한다', () => {
@@ -646,5 +673,259 @@ describe('BracketPageContent — 결선 라운드 수에 따른 칼럼 배분 �
     );
 
     expect(container.querySelector('.tm-bracket-page-grid-slim-bracket')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 오너 지적(2026-08-18) — 순위표도 대진표도 아직 없는 대회의 "순위 · 대진표" 탭이,
+ * 왼쪽 절반을 빈 채로 넓게 잡고 오른쪽에 빈 상태만 치우쳐 붙어 있었다. 2열 폭 배분을
+ * **두 칼럼이 다 있는지 따지지 않고** 항상 걸었기 때문이다. 칼럼이 하나뿐이면 그리드를
+ * 1열로 접어 그 칼럼이 폭을 온전히 쓰게 한다.
+ */
+describe('BracketPageContent — 한쪽 칼럼만 있을 때는 2열로 펴지 않는다', () => {
+  it('조별 순위가 아직 없으면 빈 순위 칼럼을 만들지 않고 1열로 접는다', () => {
+    const { container } = renderBracketStandingsTab(
+      makeTournament({
+        id: 'tour-no-standings',
+        status: 'in_progress',
+        format: 'group_knockout',
+        // 조 편성 자체가 아직 없는 상태 = 좌측에 그릴 게 없다. (조가 하나라도 있으면
+        // 순위 행이 없어도 `toGroupStandingsRows` 가 편성 팀을 0값 기준선으로 내주므로
+        // 좌측이 비지 않는다 — #374. alpha 실측 케이스가 바로 이 "조 0개" 쪽이었다.)
+        groups: [],
+        fixtures: [],
+      }),
+    );
+
+    const grid = container.querySelector('.tm-bracket-page-grid');
+    expect(grid).toBeInTheDocument();
+    // 2열 배분 클래스가 하나도 붙지 않아야 한다 — 붙으면 빈 칼럼이 폭을 가져간다.
+    expect(grid).not.toHaveClass('tm-tourn-sub-grid-6040');
+    expect(grid).not.toHaveClass('tm-tourn-sub-grid-2col');
+    expect(grid).not.toHaveClass('tm-bracket-page-grid-empty');
+    // 칼럼 자체도 하나뿐이어야 한다(빈 div 를 남기지 않는다).
+    expect(container.querySelectorAll('.tm-tourn-sub-col')).toHaveLength(1);
+    expect(screen.getByText('대진표가 아직 공개되지 않았어요')).toBeInTheDocument();
+  });
+
+  it('리그 포맷은 대진표 칼럼이 없으므로 순위표만 1열로 놓는다', () => {
+    const { container } = renderBracketStandingsTab(
+      makeTournament({
+        id: 'tour-league',
+        status: 'in_progress',
+        format: 'league',
+        groups: [],
+        fixtures: [],
+      }),
+    );
+
+    const grid = container.querySelector('.tm-bracket-page-grid');
+    expect(grid).not.toHaveClass('tm-tourn-sub-grid-2col');
+    expect(container.querySelectorAll('.tm-tourn-sub-col')).toHaveLength(1);
+  });
+});
+
+
+/**
+ * 통합 거울 행(정규 리그 시즌)이 이 화면에 도착했을 때.
+ *
+ * **`format: 'group_knockout'` 인 것이 이 describe 의 전부다.** 백필·dual-write 가 `format` 을
+ * 안 채워 스키마 기본값이 남는 것이 거울 행의 실제 모양이고, 그래서 `format` 만 보는 코드는
+ * 리그에서 ① 리그 순위를 안 그리고 ② 없는 대진표 칼럼을 그리고 ③ "조별리그 + 토너먼트"라고
+ * 적었다.
+ *
+ * `format: 'league'` 로 픽스처를 만들면 `isLeagueCompetition` 의 `||` 앞쪽이 참이라 `kind` 를
+ * 안 탄다 — `|| kind === 'regular_league'` 를 지워도 통과하는 vacuous 테스트가 된다.
+ */
+describe('BracketPageContent — 정규 리그 거울 행(format=group_knockout, kind=regular_league)', () => {
+  function mirrorLeague(): V1TournamentDetail {
+    return makeTournament({
+      id: 'league-1',
+      status: 'in_progress',
+      format: 'group_knockout',
+      kind: 'regular_league',
+      groups: [
+        makeGroup({
+          id: 'group-1',
+          phase: 'league',
+          standings: [
+            {
+              registrationId: 'reg-1',
+              teamId: 'team-42',
+              teamName: '성수 FC',
+              teamLogoUrl: null,
+              position: 1,
+              points: 9,
+              wins: 3,
+              draws: 0,
+              losses: 0,
+              goalsFor: 10,
+              goalsAgainst: 2,
+              recalculatedAt: null,
+            },
+          ],
+        }),
+      ],
+    });
+  }
+
+  it('진행 방식 배지를 "리그 방식"으로 적는다 — format 을 그대로 읽으면 "조별리그 + 토너먼트"가 된다', () => {
+    const { container } = renderBracketPage(mirrorLeague());
+
+    // 단계 표시기에도 "리그 방식" 칸이 있어 getByText 는 2건을 문다 — 헤더 배지로 좁힌다.
+    expect(container.querySelector('.tm-bracket-page-format')).toHaveTextContent('리그 방식');
+    expect(screen.queryByText('조별리그 + 토너먼트')).not.toBeInTheDocument();
+  });
+
+  it('리그 순위를 그리고, 조별 순위는 그리지 않는다', () => {
+    renderBracketStandingsTab(mirrorLeague());
+
+    expect(screen.getByRole('heading', { name: '리그 순위' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '조별 순위' })).not.toBeInTheDocument();
+  });
+
+  // 이 화면이 리그에서 가장 크게 틀어지는 자리 — hasBracketColumn 이 format 만 보면
+  // group_knockout 에서 참이 되어 **빈 토너먼트 대진 칼럼**이 생긴다.
+  it('토너먼트 대진 칼럼을 만들지 않는다', () => {
+    renderBracketStandingsTab(mirrorLeague());
+
+    expect(screen.queryByRole('heading', { name: '토너먼트 대진' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * 탭 이름을 여기서 직접 단언한다 — `renderBracketStandingsTab` 헬퍼가 종류별 이름을
+   * 알아서 고르므로, 헬퍼에만 의존하면 라벨이 바뀌어도 아무 테스트도 안 깨진다.
+   */
+  it('순위 탭을 "리그 순위" 로 부른다 — 리그엔 대진표가 없다', () => {
+    renderBracketPage(mirrorLeague());
+
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['경기 일정', '리그 순위']);
+  });
+
+  /**
+   * **alpha 실측으로 잡힌 결함(2026-09-01).** `/schedule` 은 리그 순위를 정상으로 주는데
+   * 이 탭만 "순위 집계 전이에요" 를 그렸다 — 거울 행에는 대회 축 `groups` 가 **하나도 없어서**
+   * 상세에서 파생하던 `allLeagueRows` 가 항상 빈 배열이었기 때문이다.
+   *
+   * 서버는 맞았고 **화면이 다른 소스를 보고 있었다.** 그래서 소스만 갈랐다.
+   *
+   * 아래 두 테스트가 짝이다 — 앞은 *"주면 그린다"*, 뒤는 *"안 주면 못 그린다"*.
+   * 뒤가 없으면 이 테스트는 **원래 통과했을 수도 있는지** 알 수 없다.
+   */
+  const leagueSchedule = () => ({
+    tournamentId: 'league-1',
+    tournamentTitle: '테스트 리그',
+    bracketPublished: true,
+    items: [],
+    unscheduled: [],
+    standings: [
+      {
+        groupId: 'league-1',
+        groupName: '리그 순위',
+        teamId: 'team-42',
+        teamName: '성수 FC',
+        teamLogoUrl: null,
+        position: 1,
+        points: 9,
+        wins: 3,
+        draws: 0,
+        losses: 0,
+        goalsFor: 10,
+        goalsAgainst: 2,
+      },
+    ],
+    nextCursor: null,
+  });
+
+  it('순위 탭이 /schedule 의 리그 순위를 그린다 — 상세의 groups 는 리그에서 늘 비어 있다', () => {
+    renderBracketStandingsTab(mirrorLeague(), leagueSchedule() as never);
+
+    expect(screen.getByText('성수 FC')).toBeInTheDocument();
+    expect(screen.queryByText('순위 집계 전이에요')).not.toBeInTheDocument();
+  });
+
+  it('대조군: 그 응답이 없으면 여전히 못 그린다 — 위 테스트가 소스 전환을 실제로 재고 있다', () => {
+    renderBracketStandingsTab(mirrorLeague());
+
+    expect(screen.queryByText('성수 FC')).not.toBeInTheDocument();
+  });
+
+  /**
+   * **못 불러온 것을 "없다" 로 말하면 안 된다.** 순위를 `/schedule` 에 의존하게 만들면서
+   * 그 쿼리의 로딩·에러를 안 가르면, 빈 배열이 그대로 *"순위 집계 전이에요"* 로 읽힌다 —
+   * 이 PR 이 고치려던 바로 그 증상이 원인만 바뀌어 되살아난다. 에러일 때 특히 나쁘다:
+   * 사용자가 다시 시도할 이유를 못 찾는다.
+   *
+   * 이 테스트 환경은 네트워크를 안 태우므로 캐시를 안 넣으면 쿼리가 **에러**로 정착한다.
+   */
+  it('순위를 못 불러왔으면 "없다" 가 아니라 못 불러왔다고 말한다', async () => {
+    renderBracketStandingsTab(mirrorLeague());
+
+    expect(await screen.findByText('순위를 불러오지 못했어요.')).toBeInTheDocument();
+    // 거짓 빈 상태를 함께 막는다 — 둘 다 안 떠야 고쳐진 것이다.
+    expect(screen.queryByText('순위 집계 전이에요')).not.toBeInTheDocument();
+    expect(screen.queryByText('경기 일정이 아직 없어요.')).not.toBeInTheDocument();
+  });
+
+  /**
+   * 사용자 확정값은 *"tierLabel(1부/2부)을 쓰고 없으면 '리그 순위'"* 인데 이 화면은
+   * `'리그 순위'` 를 박아 두고 있었다 — **alpha 실측 55/88건이 티어 리그**이고 그 전부에서
+   * `'1부'`·`'2부'` 가 안 보였다. 같은 리그가 `/schedule` 에선 보이고 여기선 안 보였다.
+   */
+  it('티어가 있으면 순위 제목이 "2부" 다 — 사용자 확정값을 이 화면에도 적용한다', async () => {
+    const tiered = { ...leagueSchedule(), standings: [{ ...leagueSchedule().standings[0], groupName: '2부' }] };
+    renderBracketStandingsTab(mirrorLeague(), tiered as never);
+
+    expect(await screen.findByRole('heading', { name: '2부' })).toBeInTheDocument();
+  });
+
+  it('대조군: 티어가 없으면 "리그 순위" 그대로', async () => {
+    renderBracketStandingsTab(mirrorLeague(), leagueSchedule() as never);
+
+    expect(await screen.findByRole('heading', { name: '리그 순위' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '2부' })).not.toBeInTheDocument();
+  });
+
+  it('안내 문구에서 조별리그·결선을 말하지 않는다', () => {
+    renderBracketPage(mirrorLeague());
+
+    expect(screen.getByText('경기 일정과 순위를 확인하세요.')).toBeInTheDocument();
+  });
+});
+
+// 대회 상세로 되돌아가는 in-page 링크(flownav 이전 pill · 빈 대진표 CTA)는
+// 이 화면이 받은 from 을 그대로 실어야 한다.
+describe('BracketPageContent — 대회 상세로 돌아가는 링크는 받은 from 을 싣는다', () => {
+  afterEach(() => {
+    setMockSearchParams(new URLSearchParams());
+  });
+
+  function emptyBracketTournament(): V1TournamentDetail {
+    return makeTournament({
+      id: 'tour-1',
+      status: 'in_progress',
+      format: 'group_knockout',
+      groups: [],
+      fixtures: [],
+    });
+  }
+
+  it('from 이 상세 페이지의 자기 URL이면 그대로 붙는다', () => {
+    const detailWithFrom = `/tournaments/tour-1?from=${encodeURIComponent('/home')}`;
+    setMockSearchParams(new URLSearchParams({ from: detailWithFrom }));
+
+    renderBracketStandingsTab(emptyBracketTournament());
+
+    const expectedHref = `/tournaments/tour-1?from=${encodeURIComponent('/home')}`;
+    expect(screen.getByRole('link', { name: '대회 정보 보기' })).toHaveAttribute('href', expectedHref);
+    expect(screen.getByRole('link', { name: '대회 정보로 이동' })).toHaveAttribute('href', expectedHref);
+  });
+
+  it('대조군: from 이 없으면 상세 경로만 쓴다', () => {
+    renderBracketStandingsTab(emptyBracketTournament());
+
+    expect(screen.getByRole('link', { name: '대회 정보 보기' })).toHaveAttribute('href', '/tournaments/tour-1');
+    expect(screen.getByRole('link', { name: '대회 정보로 이동' })).toHaveAttribute('href', '/tournaments/tour-1');
   });
 });

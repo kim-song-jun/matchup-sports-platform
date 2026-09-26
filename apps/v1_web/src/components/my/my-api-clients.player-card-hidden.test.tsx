@@ -1,0 +1,186 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { PlayerCardHiddenSettingsPageClient } from './my-api-clients';
+
+/**
+ * 선수 카드 숨김 설정 (Task 155).
+ *
+ * 이 화면이 없을 때 컬럼(`playerCardHidden`)은 **읽히기만 하고 켤 수 없었다.**
+ * 게임화에 거부감이 있는 사용자를 위한 탈출구가 목적인데 잠글 방법이 없으면 탈출구가
+ * 아니다. 그래서 여기서 거는 것은 "토글이 실제로 서버에 반대값을 보내는가"와
+ * "화면이 지금 상태를 정직하게 말하는가" 두 가지다.
+ */
+
+// AppChrome 이 next/navigation 을 쓴다 -- theme 설정 테스트와 같은 패턴.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+const stateMock = vi.fn();
+const mutateMock = vi.fn();
+const updateMock = vi.fn();
+const shapeStateMock = vi.fn();
+const shapeUpdateMock = vi.fn();
+const shapeMutate = vi.fn();
+
+vi.mock('@/hooks/use-v1-api', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>('@/hooks/use-v1-api');
+  return {
+    ...actual,
+    useV1PlayerCardHidden: () => stateMock(),
+    useV1UpdatePlayerCardHidden: () => updateMock(),
+    useV1PlayerCardShape: () => shapeStateMock(),
+    useV1UpdatePlayerCardShape: () => shapeUpdateMock(),
+  };
+});
+
+// 이 화면은 react-query 훅을 쓰므로 Provider 없이는 렌더 자체가 안 된다.
+function renderWithClient(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
+
+beforeEach(() => {
+  mutateMock.mockReset();
+  shapeMutate.mockReset();
+  updateMock.mockReturnValue({ mutate: mutateMock, isPending: false });
+  shapeUpdateMock.mockReturnValue({ mutate: shapeMutate, isPending: false });
+  shapeStateMock.mockReturnValue({
+    data: { shape: 'rect', unlocked: ['rect'], reviewCount: 3, requiredForShield: 10 },
+    isLoading: false, isError: false,
+  });
+});
+
+describe('선수 카드 숨김 설정', () => {
+  it('꺼져 있으면 지금 보인다고 말하고, 누르면 숨김을 켠다', async () => {
+    stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
+
+    renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+
+    const toggle = screen.getByRole('switch', { name: '선수 카드 숨기기' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByText(/지금은 카드가 보여요/)).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    // 반대값을 보내야 한다 -- 같은 값을 보내면 아무 일도 일어나지 않는다.
+    await waitFor(() => expect(mutateMock).toHaveBeenCalledWith({ hidden: true }, expect.anything()));
+  });
+
+  it('켜져 있으면 지금 숨겨졌다고 말하고, 누르면 다시 보이게 한다', async () => {
+    stateMock.mockReturnValue({ data: { hidden: true }, isLoading: false, isError: false });
+
+    renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+
+    const toggle = screen.getByRole('switch', { name: '선수 카드 숨기기' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText(/지금은 카드가 보이지 않아요/)).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    await waitFor(() => expect(mutateMock).toHaveBeenCalledWith({ hidden: false }, expect.anything()));
+  });
+
+  it('카드만 끄는 것이지 프로필을 숨기는 게 아니라는 것을 화면에 적는다', () => {
+    stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
+
+    renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+
+    // 이 문장이 없으면 "프로필이 통째로 숨겨진다"로 오해하고 켜지 못한다.
+    expect(screen.getByText(/활동 기록과 프로필은 그대로 남아요/)).toBeInTheDocument();
+  });
+
+  it('각주는 행 설명이 이미 말한 상태를 반복하지 않고 범위·안심만 더한다 (alpha 감사, 2026-09-26)', () => {
+    // before: 토글 서브텍스트 "켜면 어디에도 표시되지 않아요"와 각주 "숨기면 ... 카드가
+    // 보이지 않아요"가 같은 뜻(숨기면 안 보임)을 두 번 말했다. 각주는 이제 어디에 적용되는지
+    // (범위)만 말하고, 상태 문장은 반복하지 않는다.
+    stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
+
+    renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+
+    expect(screen.getByText(/켜면 어디에도 표시되지 않아요/)).toBeInTheDocument();
+    expect(screen.getByText(/마이페이지·공개 프로필·공유 화면/)).toBeInTheDocument();
+    // [\s\S]* — JSX 멀티라인 텍스트가 실제 개행 문자를 담을 가능성까지 대비한다.
+    // `.`는 기본적으로 개행을 매칭하지 않아, 그 경우 이 부정 단언이 실제로는 아무것도
+    // 검증하지 못한 채 항상 통과할 수 있다(Copilot 리뷰).
+    expect(screen.queryByText(/숨기면[\s\S]*카드가 보이지 않아요/)).not.toBeInTheDocument();
+  });
+
+  it('저장에 실패하면 조용히 넘어가지 않고 화면에 말한다', async () => {
+    stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
+    mutateMock.mockImplementation((_body, options) => options?.onError?.(new Error('boom')));
+
+    renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+    fireEvent.click(screen.getByRole('switch', { name: '선수 카드 숨기기' }));
+
+    expect(await screen.findByText('저장하지 못했어요')).toBeInTheDocument();
+  });
+
+  it('조회 자체가 실패하면 재시도를 준다', () => {
+    const refetch = vi.fn();
+    stateMock.mockReturnValue({ data: undefined, isLoading: false, isError: true, refetch });
+
+    renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+
+    expect(screen.getByText(/설정을 불러오지 못했어요/)).toBeInTheDocument();
+  });
+
+  describe('카드 모양 (업적 코스메틱)', () => {
+    it('잠긴 모양은 지우지 않고 자물쇠와 남은 개수를 보여준다', () => {
+      stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
+
+      renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+
+      // 목록에서 지워버리면 존재를 모른다 -- 다음 목표가 되는 게 이 기능의 목적이다.
+      const shield = screen.getByRole('button', { name: '카드 모양 방패 (잠김)' });
+      expect(shield).toBeDisabled();
+      expect(screen.getByText(/후기 10개를 받으면 열려요 \(지금 3개\)/)).toBeInTheDocument();
+      // 2026-09-26 alpha 감사: 잠금 이모지(🔒) 대신 aria-hidden 아이콘 + "잠김" 텍스트를 쓴다
+      // — 아이콘만으로 정보를 전달하지 않는다(teams-page.tsx의 <Lock/>비공개 배지와 같은 관례).
+      expect(shield.textContent).not.toContain('🔒');
+      expect(shield.textContent).toContain('잠김');
+      expect(shield.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    });
+
+    it('열려 있으면 눌러서 바꿀 수 있다', async () => {
+      stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
+      shapeStateMock.mockReturnValue({
+        data: { shape: 'rect', unlocked: ['rect', 'shield'], reviewCount: 12, requiredForShield: 10 },
+        isLoading: false, isError: false,
+      });
+
+      renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+      fireEvent.click(screen.getByRole('button', { name: '카드 모양 방패' }));
+
+      await waitFor(() => expect(shapeMutate).toHaveBeenCalledWith({ shape: 'shield' }, expect.anything()));
+    });
+
+    it('모양은 꾸미기일 뿐이라는 것을 화면에 적는다', () => {
+      stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
+
+      renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+
+      expect(screen.getByText(/능력치나 등급은 바뀌지 않아요/)).toBeInTheDocument();
+    });
+  });
+
+  it('설명 전용 카드 없이 분류 라벨(공개·모양·사진) + 조작 카드 하나씩 + 각주로 보여준다 (P1 C안)', () => {
+    stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
+
+    const { container } = renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+
+    // 예전엔 "선수 카드 숨기기"가 설명 카드 제목과 토글 제목으로 2번 나왔다 --
+    // 이제 행 제목은 하나, 그 위 분류 라벨은 다른 낱말("공개")이라 반복이 없다.
+    expect(screen.getAllByText('선수 카드 숨기기')).toHaveLength(1);
+    expect(screen.getByText('공개')).toBeInTheDocument();
+    expect(screen.getByText('모양')).toBeInTheDocument();
+    expect(screen.getByText('사진')).toBeInTheDocument();
+    // 숨김·모양·사진 세 섹션이 각각 조작 카드 하나씩(설명 전용 카드는 없다).
+    expect(container.querySelectorAll('.tm-card').length).toBe(3);
+  });
+});

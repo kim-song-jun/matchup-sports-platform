@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   Prisma,
+  V1IdentityLinkAction,
   V1MatchParticipantStatus,
   V1PostEventReviewSourceType,
   V1PostEventReviewTargetType,
@@ -21,9 +22,11 @@ import { SubmitReviewDto } from './dto/submit-review.dto';
 import { formatReviewWindow, reviewWindowClosed } from './review-deadline';
 import { ReviewPolicySettingsService } from './review-policy-settings.service';
 import { isReviewRevealed, reviewRevealScope } from './review-visibility';
+import { aggregatePersonalMetricScores, REVIEW_METRICS, type MetricScoreRow } from './review-metric-aggregation';
 import { average, revealGroupKey, trustStateForReviewCount } from './team-trust-aggregation';
 import { TournamentFixtureReviewsService } from './tournament-fixture-reviews.service';
 import { AdminContextService } from '../common/admin-context.service';
+import { pickReviewHighlight } from './review-highlight';
 import { HidePostEventReviewDto } from './dto/moderate-review.dto';
 import { recalculateTournamentUserReputation } from './tournament-fixture-review-reputation';
 import { recalculateTournamentFixtureTeamTrust } from './tournament-fixture-review-trust';
@@ -52,6 +55,12 @@ const PERSONAL_REPUTATION_SOURCES: V1PostEventReviewSourceType[] = ['match', 'te
 type SourceType = 'match' | 'team_match' | 'tournament_fixture';
 type TargetType = 'user' | 'team';
 type RevealScopeCandidate = { sourceType: V1PostEventReviewSourceType; sourceId: string; sourceGroupId: string | null };
+type TeamMatchRosterParticipant = {
+  id: string;
+  sideId: string;
+  userId: string | null;
+  displayNameSnapshot: string;
+};
 type PrismaTx = Omit<
   PrismaService,
   '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends' | 'onModuleInit' | 'onModuleDestroy'
@@ -129,13 +138,25 @@ export class ReviewsService {
   /** 후기 한 건이 기여하던 집계만 골라 다시 계산한다. 소스·대상 조합마다 쌓이는 컬럼이 다르다. */
   private async recalculateForReview(
     tx: PrismaTx,
-    review: { sourceType: V1PostEventReviewSourceType; targetType: V1PostEventReviewTargetType; targetUserId: string | null; targetTeamId: string | null },
+    review: {
+      sourceType: V1PostEventReviewSourceType;
+      targetType: V1PostEventReviewTargetType;
+      targetUserId: string | null;
+      targetTeamId: string | null;
+      reviewerUserId: string;
+    },
   ) {
     if (review.targetType === 'user' && review.targetUserId) {
       if (review.sourceType === 'tournament_fixture') {
         await recalculateTournamentUserReputation(tx, review.targetUserId);
       } else {
         await this.recalculateUserReputation(tx, review.targetUserId);
+        // reveal(상호 공개)은 이 리뷰와 "짝"이 되는 반대 방향 리뷰의 존재 여부로도 결정된다
+        // (isReviewRevealed). 이 리뷰를 숨기거나 복구하면 작성자(reviewerUserId)가 같은
+        // 소스에서 "받은" 다른 리뷰의 reveal 여부도 함께 달라질 수 있으므로 작성자 본인의
+        // 캐시도 같이 다시 계산한다 — 안 그러면 숨김 처리 이후에도 작성자 화면엔 이미 사라진
+        // 리뷰가 계속 반영된 평판이 남는다(finding: 리뷰 대상만 재계산하는 반쪽 갱신).
+        await this.recalculateUserReputation(tx, review.reviewerUserId);
       }
       return;
     }
@@ -248,8 +269,24 @@ export class ReviewsService {
     };
   }
 
+  /**
+   * 팀 상세 화면이 쓰는 **공개** 요약 — 특정 팀이 받은 후기를 집계한다. 로그인 없이도
+   * 볼 수 있어야 하므로 사용자 기준 필터(`participatingTeamIds`)가 아니라 팀 id 를 직접 건다.
+   *
+   * 공개라고 해서 게이트를 느슨하게 두지 않는다: 아래 `summarizeTargetReviews` 를 그대로
+   * 지나므로 **상호평가 공개 규칙(`isReviewRevealed`)이 동일하게 적용된다** — 상대가 아직
+   * 안 썼고 유예 시간도 안 지난 후기는 여기서도 보이지 않는다. 이 경로만 따로 집계했다면
+   * 그 규칙을 우회하는 구멍이 됐을 것이다.
+   */
+  async publicTeamSummary(teamId: string, query?: { period?: string }) {
+    return this.summarizeTargetReviews(
+      { targetTeamId: teamId, targetType: 'team' as const },
+      'team',
+      query?.period,
+    );
+  }
+
   async receivedSummary(user: V1AuthUser, query: { targetType: 'user' | 'team'; period?: string }) {
-    const now = new Date();
     const targetFilter = query.targetType === 'team'
       ? { targetTeamId: { in: await this.participatingTeamIds(user.id) }, targetType: 'team' as const }
       // 개인 대상 요약은 매너 점수와 같은 소스만 센다(PERSONAL_REPUTATION_SOURCES) — 두 곳이
@@ -258,15 +295,30 @@ export class ReviewsService {
       // 대회 개인 후기는 계속 제외한다: V1UserReputationSummary의 tournament_* 컬럼으로 따로
       // 집계되고, 한 대회에서 상대 로스터 전원에게 수십 건이 들어와 평균이 급변하기 때문이다.
       : { targetUserId: user.id, targetType: 'user' as const, sourceType: { in: PERSONAL_REPUTATION_SOURCES } };
+    return this.summarizeTargetReviews(targetFilter, query.targetType, query.period, user.id);
+  }
 
+  /**
+   * 요약 집계의 단 하나의 구현. "누구의 요약인가"(대상 필터)만 호출부가 정하고, 공개 규칙과
+   * 종목·태그 집계는 전부 여기 있다 — 공개 경로와 내 화면 경로가 각자 집계하면 같은 팀의
+   * 같은 후기가 화면마다 다르게 세어진다.
+   */
+  private async summarizeTargetReviews(
+    targetFilter: Record<string, unknown>,
+    targetType: 'user' | 'team',
+    period?: string,
+    /** 개인 대상일 때 역방향 후기를 찾는 기준 사용자. 팀 대상에는 필요 없다. */
+    reverseUserId?: string,
+  ) {
+    const now = new Date();
     const candidates = await this.prisma.v1PostEventReview.findMany({
       where: { status: 'submitted', sportId: { not: null }, ...targetFilter },
       select: { sourceType: true, sourceId: true, sourceGroupId: true, reviewerUserId: true, reviewerTeamId: true, targetUserId: true, targetTeamId: true, rating: true, sportId: true, submittedAt: true, tags: { select: { tagCode: true, labelSnapshot: true } } },
     });
 
-    const reverseReviews = query.targetType === 'team'
+    const reverseReviews = targetType === 'team'
       ? await this.reverseTeamReviews(candidates)
-      : await this.reverseUserReviews(user.id, candidates);
+      : await this.reverseUserReviews(reverseUserId ?? '', candidates);
 
     const revealed = candidates.filter((review) =>
       isReviewRevealed(
@@ -274,8 +326,8 @@ export class ReviewsService {
           // 짝을 맞추는 단위는 경기가 아니라 reviewRevealScope() — 대회 후기는 중복 방지 스코프가
           // 대회 단위라, 서로 다른 경기에서 평가한 짝이 픽스처 기준으로는 절대 맞지 않는다.
           sourceId: reviewRevealScope(review),
-          reviewerUserId: query.targetType === 'team' ? review.reviewerTeamId ?? '' : review.reviewerUserId,
-          targetUserId: query.targetType === 'team' ? review.targetTeamId : review.targetUserId,
+          reviewerUserId: targetType === 'team' ? review.reviewerTeamId ?? '' : review.reviewerUserId,
+          targetUserId: targetType === 'team' ? review.targetTeamId : review.targetUserId,
           submittedAt: review.submittedAt,
         },
         reverseReviews,
@@ -283,14 +335,19 @@ export class ReviewsService {
       ),
     );
 
-    const availableMonths = [...new Set(revealed.map((review) => review.submittedAt.toISOString().slice(0, 7)))].sort().reverse();
-    const filtered = query.period
-      ? revealed.filter((review) => review.submittedAt.toISOString().slice(0, 7) === query.period)
-      : revealed;
+    // 팀 대상은 "팀당 1표"라 reviewerTeamId 가 없는 행은 어느 팀의 표인지 정할 수 없어
+    // 평점에서 빠진다(정본 집계도 같은 이유로 제외한다). 그런데 월 선택지를 revealed
+    // 전체에서 뽑으면, 그런 행만 있는 달이 목록에 남아 고르는 순간 평점이 빈 화면이
+    // 된다 -- 평점을 내는 모집단과 월 목록의 모집단을 같게 맞춘다.
+    const scoped = targetType === 'team' ? revealed.filter((review) => review.reviewerTeamId !== null) : revealed;
+    const availableMonths = [...new Set(scoped.map((review) => review.submittedAt.toISOString().slice(0, 7)))].sort().reverse();
+    const filtered = period
+      ? scoped.filter((review) => review.submittedAt.toISOString().slice(0, 7) === period)
+      : scoped;
 
     // 프론트의 종목 배지·색상은 v1Sport.code 로 매핑한다(SPORT_ACCENT_MAP). sportId(UUID)만
     // 내려주면 어떤 종목이든 "기타"로 떨어지므로 코드를 함께 실어 보낸다.
-    const bySport = summarizeBySport(filtered);
+    const bySport = summarizeBySport(filtered, targetType);
     const sports = bySport.length
       ? await this.prisma.v1Sport.findMany({
           where: { id: { in: bySport.map((entry) => entry.sportId) } },
@@ -301,6 +358,9 @@ export class ReviewsService {
     return {
       bySport: bySport.map((entry) => ({ ...entry, sportCode: codeById.get(entry.sportId) ?? null })),
       availableMonths,
+      highlight: pickReviewHighlight(filtered, (review) =>
+        targetType === 'team' ? review.reviewerTeamId : review.reviewerUserId,
+      ),
     };
   }
 
@@ -442,6 +502,9 @@ export class ReviewsService {
               { approvedApplicantTeamId: { in: teamIds } },
             ],
           },
+          // Tournament-owned canonical matches are served by the dedicated
+          // tournament review service. Equal-owner league rows remain here.
+          { OR: [{ tournamentId: null }, { leagueId: { not: null } }] },
         ],
       },
       orderBy: [{ completedAt: 'desc' }, { startAt: 'desc' }],
@@ -467,16 +530,19 @@ export class ReviewsService {
     return teamMatches
       .flatMap((match) => {
         if (!match.approvedApplicantTeamId) return [];
+        assertTeamReviewTeams(match);
+        const completedAt = match.completedAt ?? match.startAt;
+        if (completedAt === null) throw conflict('TEAM_MATCH_NOT_READY', 'Completed team match has no review date');
         // 양 팀 모두의 멤버면 두 방향이 각각 별도의 후기 항목이 된다.
         return resolveReviewerTeamIds(teamIds, match.hostTeamId, match.approvedApplicantTeamId).map((reviewerTeamId) => {
           const isHost = reviewerTeamId === match.hostTeamId;
           const targetTeam = isHost ? match.approvedApplicantTeam : match.hostTeam;
-          const key = teamReviewKey(match.id, targetTeam?.id ?? '');
+          const key = teamReviewKey(match.id, targetTeam.id);
           const role = roleByTeamId.get(reviewerTeamId);
           // 팀 후기는 팀장·운영진만 — 목록의 남은 개수도 실제로 쓸 수 있는 대상만 세야
           // "1건 남음"을 눌렀는데 쓸 게 없는 화면이 나오지 않는다.
           const canReviewTeam = role ? canReviewOpponentTeam(role) : false;
-          const rosterUserIds = (rostersBySource.get(match.id)?.get(targetTeam?.id ?? '') ?? [])
+          const rosterUserIds = (rostersBySource.get(match.id)?.get(targetTeam.id) ?? [])
             .filter((userId) => userId !== user.id);
           const reviewedUserIds = reviewKeys.users.get(match.id) ?? new Set<string>();
           const teamReviewed = reviewKeys.teams.has(key);
@@ -488,16 +554,16 @@ export class ReviewsService {
             sourceType: 'team_match' as const,
             sourceId: match.id,
             title: match.title,
-            completedAt: toIso(match.completedAt ?? match.startAt),
+            completedAt: toIso(completedAt),
             // 목록 배지가 작성 화면과 어긋나지 않도록 실제 대표 대상 종류를 따른다.
             targetType: canReviewTeam ? ('team' as const) : ('user' as const),
             targetCount,
             reviewedCount,
             remainingCount: Math.max(targetCount - reviewedCount, 0),
-            reviewerTeam: { teamId: reviewerTeamId, name: isHost ? match.hostTeam.name : match.approvedApplicantTeam?.name ?? '' },
-            targetTeam: targetTeam ? { teamId: targetTeam.id, name: targetTeam.name } : null,
+            reviewerTeam: { teamId: reviewerTeamId, name: isHost ? match.hostTeam.name : match.approvedApplicantTeam.name },
+            targetTeam: { teamId: targetTeam.id, name: targetTeam.name },
             state: reviewedCount >= targetCount ? 'done' : 'ready',
-            completedAtSort: (match.completedAt ?? match.startAt).getTime(),
+            completedAtSort: completedAt.getTime(),
           };
         });
       })
@@ -576,8 +642,8 @@ export class ReviewsService {
    * 제출 경로가 역할을 다시 조회하지 않도록 하기 위한 것 — 같은 판정을 두 번 하면 그 사이에
    * 멤버십이 바뀌었을 때 화면과 저장 결과가 어긋난다.
    */
-  private async teamMatchSourceContext(user: V1AuthUser, sourceId: string) {
-    const teamMatch = await this.prisma.v1TeamMatch.findUnique({
+  private async teamMatchSourceContext(user: V1AuthUser, sourceId: string, db: PrismaService | PrismaTx = this.prisma) {
+    const teamMatch = await db.v1TeamMatch.findUnique({
       where: { id: sourceId },
       select: {
         id: true,
@@ -586,35 +652,49 @@ export class ReviewsService {
         completedAt: true,
         startAt: true,
         sportId: true,
+        tournamentId: true,
+        leagueId: true,
+        deletedAt: true,
+        tournamentDetails: { select: { teamMatchId: true, tournamentId: true } },
         hostTeamId: true,
         approvedApplicantTeamId: true,
         hostTeam: { select: teamSelect() },
         approvedApplicantTeam: { select: teamSelect() },
+        // 무효(VOID) 판정에 필요한 최소 필드. 결과 무효화는 V1TeamMatch 를 건드리지 않고
+        // 게임의 공식 리비전만 VOID 로 바꾼다(games.service.ts voidTeamMatchResult).
+        game: { select: { currentOfficialRevision: { select: { state: true } } } },
       },
     });
     if (!teamMatch) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
+    if (teamMatch.deletedAt) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
+    if (teamMatch.tournamentId && teamMatch.leagueId === null) {
+      throw conflict('TOURNAMENT_REVIEW_SOURCE_REQUIRED', 'Tournament matches use the tournament review source');
+    }
     if (!isCompleted(teamMatch)) throw conflict('SOURCE_NOT_COMPLETED', 'Review source is not completed');
-    // team_match 앵커는 completedAt(games.service.ts 결과 확정 시 채워짐) — 정정 승인으로 앵커가
-    // 갱신되면 이 판정도 매 요청마다 다시 계산되므로 마감이 함께 연장된다(저장하지 않는다).
-    // 기간은 어드민 설정(V1ReviewPolicySettings, 기본 168시간=7일)에서 읽는다.
+    if (isResultVoided(teamMatch.game)) {
+      throw conflict('SOURCE_RESULT_VOIDED', '결과가 무효 처리된 경기예요. 평가를 남길 수 없어요.');
+    }
+    // team_match 앵커는 completedAt(games.service.ts 결과 확정 시 채워짐, 스펙 §6.1) — 정정 승인 시
+    // 앵커가 갱신되면 이 판정도 매 요청마다 다시 계산되므로 마감이 함께 연장된다(D-6, 저장 안 함).
+    const reviewAt = teamMatch.completedAt ?? teamMatch.startAt;
+    if (reviewAt === null) throw conflict('TEAM_MATCH_NOT_READY', 'Completed team match has no review date');
     const windowHours = await this.reviewPolicySettings.getWindowHours();
-    if (reviewWindowClosed(teamMatch.completedAt, new Date(), windowHours)) {
+    if (reviewWindowClosed(reviewAt, new Date(), windowHours)) {
       throw gone('REVIEW_WINDOW_CLOSED', `평가 가능 기간(${formatReviewWindow(windowHours)})이 지났어요.`);
     }
-    if (!teamMatch.approvedApplicantTeamId || !teamMatch.approvedApplicantTeam) {
-      throw conflict('TEAM_MATCH_NOT_READY', 'Team match does not have an approved opponent');
-    }
+    assertTeamReviewTeams(teamMatch);
+    const { hostTeam, approvedApplicantTeam } = teamMatch;
 
     // 양 팀 모두의 멤버면 두 방향 모두 대상이 된다 — 어느 팀 입장인지는 target 마다 실어 보낸다.
-    const reviewerTeams = await this.resolveReviewerTeams(user.id, teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId);
+    const reviewerTeams = await this.resolveReviewerTeams(user.id, teamMatch.hostTeamId, teamMatch.approvedApplicantTeamId, db);
     const opponentOf = (reviewerTeamId: string) =>
-      reviewerTeamId === teamMatch.hostTeamId ? teamMatch.approvedApplicantTeam! : teamMatch.hostTeam;
+      reviewerTeamId === teamMatch.hostTeamId ? approvedApplicantTeam : hostTeam;
     const opponentTeamIds = reviewerTeams.map((team) => opponentOf(team.teamId).id);
-    const rosterByTeamId = await this.teamMatchOpponentRosters(teamMatch.id, opponentTeamIds);
+    const rosterByTeamId = await this.teamMatchOpponentRosters(teamMatch.id, opponentTeamIds, db);
     const rosterUserIds = [...rosterByTeamId.values()].flat().map((player) => player.userId);
 
     // 기존 후기 조회도 사람 기준 — 팀 기준으로 조회하면 같은 팀 다른 사람의 후기를 "내 후기"로 잘못 잠근다.
-    const existingReviews = await this.prisma.v1PostEventReview.findMany({
+    const existingReviews = await db.v1PostEventReview.findMany({
       where: {
         reviewerUserId: user.id,
         sourceType: 'team_match',
@@ -634,7 +714,7 @@ export class ReviewsService {
     );
 
     const payload = {
-      source: sourceSummary('team_match', teamMatch.id, teamMatch.title, teamMatch.completedAt ?? teamMatch.startAt),
+      source: sourceSummary('team_match', teamMatch.id, teamMatch.title, reviewAt),
       sportId: teamMatch.sportId,
       // 겸직이면 단일 값으로 좁힐 수 없으므로 null — 소비자는 target.reviewerTeam 을 봐야 한다.
       reviewerTeam: reviewerTeams.length === 1 ? reviewerTeams[0] : null,
@@ -681,19 +761,53 @@ export class ReviewsService {
   }
 
   /**
+   * 사이드(side)별 최신 라인업 id. 라인업 저장은 매번 새 revision 행 + 새 참가자 행을 만들 뿐
+   * 이전 revision의 참가자 행을 지우지 않는다(team-match-lineup.service.ts에 delete/deleteMany가
+   * 0건) — 그래서 "그 경기에 실제로 뛴 명단"을 구하려면 gameId/sideId만으로는 부족하고 반드시
+   * 최신 revision 하나로 좁혀야 한다. team-match-lineup.service.ts의 private latestLineup()과
+   * 같은 규칙(revision desc, 상태 무관)을 그대로 따른다 — 두 곳이 서로 다른 "최신"의 정의를
+   * 갖게 되는 걸 막기 위해 규칙을 일치시켰다.
+   */
+  private async latestLineupIdsBySideId(sideIds: string[], db: PrismaService | PrismaTx = this.prisma): Promise<Map<string, string>> {
+    if (!sideIds.length) return new Map();
+    const lineups = await db.v1GameLineup.findMany({
+      where: { sideId: { in: sideIds }, invalidatedAt: null },
+      select: { id: true, sideId: true },
+      orderBy: { revision: 'desc' },
+    });
+    const latestBySideId = new Map<string, string>();
+    for (const lineup of lineups) {
+      if (!latestBySideId.has(lineup.sideId)) latestBySideId.set(lineup.sideId, lineup.id);
+    }
+    return latestBySideId;
+  }
+
+  /**
    * 팀 매치에서 "그 경기에 실제로 뛴 상대 선수" 명단.
    *
    * 근거는 제출된 라인업 하나뿐이다 — V1Game.teamMatchId 로 연결된 경기의, 상대 팀 사이드에 속한
-   * V1GameParticipant 중 userId 가 채워진 행(연동 팀원)만 센다. 게스트(userId=null)는 플랫폼 계정이
-   * 없어 평가 대상이 될 수 없고, 라인업을 제출하지 않은 팀 매치는 명단 자체가 없으므로 선수 후기도
-   * 없다(팀 후기만 남는다). 팀 멤버십 전원으로 대체하지 않는 이유: 그 경기에 안 뛴 사람까지
-   * 평가 대상이 되어 "상대했던 팀원"이라는 전제가 깨진다.
+   * "최신 revision 라인업"에 딸린 V1GameParticipant를 읽고, 현재 identity link로 실제 계정을
+   * 해석할 수 있는 행(연동 팀원)만 센다. TeamMatch의 참가자 userId 컬럼은 null이어도 정상이다.
+   * gameId/sideId만으로 조회하면 지워지지 않는 옛 revision의 참가자까지 섞여 최종 명단에서
+   * 빠진 선수가 계속 평가 대상으로 남는다(finding: 라인업을 rev1→rev2로 다시 저장해 선수를
+   * 뺐는데도 rev1 참가자가 그대로 남아 리뷰를 받음) — 그래서 latestLineupIdsBySideId()로 먼저
+   * "지금 유효한" 라인업만 골라낸 뒤 그 lineupId로만 조회한다. 현재 identity link가 없는
+   * 실제 게스트는 플랫폼 계정이 없어 평가 대상이 될 수 없고, 라인업을 제출하지 않은 팀 매치는
+   * 명단 자체가 없으므로 선수 후기도 없다(팀 후기만 남는다). 팀 멤버십 전원으로 대체하지 않는 이유: 그 경기에 안 뛴
+   * 사람까지 평가 대상이 되어 "상대했던 팀원"이라는 전제가 깨진다. TeamMatch의
+   * `userId=null` 자체는 게스트라는 결론이 아니므로, 현재 identity link가 있으면 그
+   * 연결된 계정을 대상으로 포함한다. 과거 link event만 있고 current link가 없는 행은
+   * revoked/expired일 수 있어 제외한다.
    */
-  private async teamMatchOpponentRosters(teamMatchId: string, opponentTeamIds: string[]) {
+  private async teamMatchOpponentRosters(
+    teamMatchId: string,
+    opponentTeamIds: string[],
+    db: PrismaService | PrismaTx = this.prisma,
+  ) {
     const rosterByTeamId = new Map<string, Array<{ userId: string; name: string; imageUrl: string | null }>>();
     if (!opponentTeamIds.length) return rosterByTeamId;
 
-    const game = await this.prisma.v1Game.findUnique({
+    const game = await db.v1Game.findUnique({
       where: { teamMatchId },
       select: { id: true, sides: { select: { id: true, teamId: true } } },
     });
@@ -707,14 +821,19 @@ export class ReviewsService {
     const sideIds = [...sideIdsByTeamId.values()].flat();
     if (!sideIds.length) return rosterByTeamId;
 
-    const participants = await this.prisma.v1GameParticipant.findMany({
-      where: { gameId: game.id, sideId: { in: sideIds }, userId: { not: null } },
-      select: { sideId: true, userId: true, displayNameSnapshot: true },
+    const latestLineupIdBySideId = await this.latestLineupIdsBySideId(sideIds, db);
+    const latestLineupIds = [...latestLineupIdBySideId.values()];
+    if (!latestLineupIds.length) return rosterByTeamId;
+
+    const participants = await db.v1GameParticipant.findMany({
+      where: { lineupId: { in: latestLineupIds } },
+      select: { id: true, sideId: true, userId: true, displayNameSnapshot: true },
     });
+    const resolvedParticipants = await this.resolveTeamMatchParticipantUsers(participants, db);
     // V1GameParticipant.userId 는 FK 가 아니라 nullable 컬럼이라(스키마 주석 참조) relation include 가
     // 불가능하다 — 프로필은 id 로 따로 모아 온다.
-    const profiles = await this.prisma.v1User.findMany({
-      where: { id: { in: [...new Set(participants.map((participant) => participant.userId!))] } },
+    const profiles = await db.v1User.findMany({
+      where: { id: { in: [...new Set(resolvedParticipants.map((participant) => participant.userId))] } },
       select: { id: true, profile: { select: { nickname: true, profileImageUrl: true } } },
     });
     const profileById = new Map(profiles.map((profile) => [profile.id, profile.profile]));
@@ -722,9 +841,10 @@ export class ReviewsService {
     for (const [teamId, teamSideIds] of sideIdsByTeamId) {
       const seen = new Set<string>();
       const roster: Array<{ userId: string; name: string; imageUrl: string | null }> = [];
-      for (const participant of participants) {
-        if (!participant.userId || !teamSideIds.includes(participant.sideId)) continue;
-        // 라인업 개정(revision)이 여러 벌 남아 있으면 같은 사람이 여러 번 잡힌다.
+      for (const participant of resolvedParticipants) {
+        if (!teamSideIds.includes(participant.sideId)) continue;
+        // 최신 라인업으로 이미 좁혔지만, 한 사람이 같은 라인업에 중복 등록되는 입력 오류까지
+        // 대비해 dedup은 유지한다.
         if (seen.has(participant.userId)) continue;
         seen.add(participant.userId);
         const profile = profileById.get(participant.userId);
@@ -759,10 +879,16 @@ export class ReviewsService {
           rating: dto.rating,
           sportId: source.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
+          ...metricScoreCreate(dto),
         },
         include: reviewInclude(),
       });
       await this.recalculateUserReputation(tx, targetUserId);
+      // 이 제출이 "상대가 먼저 남겨둔 리뷰"의 reveal 짝을 완성시키는 이벤트일 수 있다 —
+      // 그 경우 나(user.id)를 target으로 하는 리뷰가 방금 공개로 바뀌므로 내 캐시도 같이
+      // 다시 계산해야 한다. target만 갱신하면 "받은 리뷰는 정확히 뜨는데 선수 카드 해금은
+      // 영영 안 열리는" 결함이 난다(리뷰어 본인 캐시가 재계산되는 경로가 없었음).
+      await this.recalculateUserReputation(tx, user.id);
       return created;
     }).catch(async (error: unknown) => {
       if (!isUniqueConstraintError(error)) throw error;
@@ -782,21 +908,34 @@ export class ReviewsService {
     if (existing) return { review: existing, alreadySubmitted: true };
 
     const review = await this.prisma.$transaction(async (tx) => {
+      await this.lockTeamMatchGame(tx, dto.sourceId);
+      const { payload: lockedSource } = await this.teamMatchSourceContext(user, dto.sourceId, tx);
+      const lockedTarget = lockedSource.targets.find((item) => item.targetType === 'user' && item.targetUserId === targetUserId);
+      if (!lockedTarget) throw forbidden('TARGET_NOT_REVIEWABLE', 'Target user is not reviewable for this source');
+      const lockedExisting = await tx.v1PostEventReview.findFirst({
+        where: { reviewerUserId: user.id, sourceType: 'team_match', sourceId: dto.sourceId, targetUserId },
+        include: reviewInclude(),
+      });
+      if (lockedExisting) return markExistingReviewResult(lockedExisting);
       const created = await tx.v1PostEventReview.create({
         data: {
           reviewerUserId: user.id,
-          reviewerTeamId: target.reviewerTeam.teamId,
+          reviewerTeamId: lockedTarget.reviewerTeam.teamId,
           sourceType: 'team_match',
           sourceId: dto.sourceId,
           targetType: 'user',
           targetUserId,
           rating: dto.rating,
-          sportId: source.sportId,
+          sportId: lockedSource.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
+          ...metricScoreCreate(dto),
         },
         include: reviewInclude(),
       });
       await this.recalculateUserReputation(tx, targetUserId);
+      // submitPersonalReview와 동일한 이유 — 이 제출이 상대가 먼저 남긴 리뷰의 reveal 짝을
+      // 완성시킬 수 있으므로 리뷰어 본인(user.id) 캐시도 함께 재계산한다.
+      await this.recalculateUserReputation(tx, user.id);
       return created;
     }).catch(async (error: unknown) => {
       if (!isUniqueConstraintError(error)) throw error;
@@ -836,18 +975,29 @@ export class ReviewsService {
     const existing = target.review;
     if (existing) return { review: existing, alreadySubmitted: true };
 
-    const reviewerTeamId = target.reviewerTeam.teamId;
     const review = await this.prisma.$transaction(async (tx) => {
+      // Team reviews preserve the historical completed-TeamMatch contract even
+      // when no Game/lineup exists. In that case the TeamMatch row itself is the
+      // serialization boundary; player reviews still require a canonical Game.
+      await this.lockTeamMatchGame(tx, dto.sourceId, false);
+      const { payload: lockedSource } = await this.teamMatchSourceContext(user, dto.sourceId, tx);
+      const lockedTarget = lockedSource.targets.find((item) => item.targetType === 'team' && item.targetTeamId === targetTeamId);
+      if (!lockedTarget) throw forbidden('TARGET_NOT_REVIEWABLE', 'Target team is not reviewable for this source');
+      const lockedExisting = await tx.v1PostEventReview.findFirst({
+        where: { reviewerUserId: user.id, sourceType: 'team_match', sourceId: dto.sourceId, targetTeamId },
+        include: reviewInclude(),
+      });
+      if (lockedExisting) return markExistingReviewResult(lockedExisting);
       const created = await tx.v1PostEventReview.create({
         data: {
           reviewerUserId: user.id,
-          reviewerTeamId,
+          reviewerTeamId: lockedTarget.reviewerTeam.teamId,
           sourceType: 'team_match',
           sourceId: dto.sourceId,
           targetType: 'team',
           targetTeamId,
           rating: dto.rating,
-          sportId: source.sportId,
+          sportId: lockedSource.sportId,
           tags: { create: tagCodes.map((tagCode) => ({ tagCode, labelSnapshot: REVIEW_TAGS[tagCode] })) },
         },
         include: reviewInclude(),
@@ -860,6 +1010,23 @@ export class ReviewsService {
     });
 
     return { review: this.toReviewDetail(review), alreadySubmitted: isExistingReviewResult(review) };
+  }
+
+  /**
+   * Identity links and lineups are changed under the Game row lock. Review submission
+   * must take the same lock before re-reading the source, otherwise a revoke or lineup
+   * replacement can race a permission check and leave a review for a stale identity.
+   */
+  private async lockTeamMatchGame(tx: PrismaTx, teamMatchId: string, requireGame = true) {
+    const game = await tx.v1Game.findUnique({ where: { teamMatchId }, select: { id: true } });
+    if (game) {
+      await tx.$queryRaw`SELECT id FROM v1_games WHERE id = ${game.id} FOR UPDATE`;
+      return;
+    }
+    if (requireGame) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
+    const teamMatch = await tx.v1TeamMatch.findUnique({ where: { id: teamMatchId }, select: { id: true } });
+    if (!teamMatch) throw notFound('SOURCE_NOT_FOUND', 'Review source was not found');
+    await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id = ${teamMatch.id} FOR UPDATE`;
   }
 
   private async findExistingPersonalReview(reviewerUserId: string, sourceId: string, targetUserId: string) {
@@ -923,8 +1090,9 @@ export class ReviewsService {
     userId: string,
     hostTeamId: string,
     approvedApplicantTeamId: string,
+    db: PrismaService | PrismaTx = this.prisma,
   ): Promise<Array<{ teamId: string; name: string; role: V1TeamMembershipRole }>> {
-    const memberships = await this.prisma.v1TeamMembership.findMany({
+    const memberships = await db.v1TeamMembership.findMany({
       where: {
         userId,
         status: 'active',
@@ -984,7 +1152,11 @@ export class ReviewsService {
     return { teams, users };
   }
 
-  /** 여러 팀 매치의 상대팀 로스터를 한 번에 — 목록 화면이 매치마다 왕복하지 않도록 배치 조회한다. */
+  /**
+   * 여러 팀 매치의 상대팀 로스터를 한 번에 — 목록 화면이 매치마다 왕복하지 않도록 배치 조회한다.
+   * teamMatchOpponentRosters()와 동일한 이유로 최신 revision 라인업으로만 좁힌다 — 안 그러면
+   * "남은 리뷰 N명" 카운트가 지워지지 않는 옛 라인업 참가자만큼 부풀려진다.
+   */
   private async teamMatchRostersBySource(teamMatchIds: string[]) {
     const empty = new Map<string, Map<string, string[]>>();
     if (!teamMatchIds.length) return empty;
@@ -995,10 +1167,17 @@ export class ReviewsService {
     });
     if (!games.length) return empty;
 
-    const participants = await this.prisma.v1GameParticipant.findMany({
-      where: { gameId: { in: games.map((game) => game.id) }, userId: { not: null } },
-      select: { gameId: true, sideId: true, userId: true },
-    });
+    const sideIds = games.flatMap((game) => game.sides.map((side) => side.id));
+    const latestLineupIdBySideId = await this.latestLineupIdsBySideId(sideIds);
+    const latestLineupIds = [...latestLineupIdBySideId.values()];
+
+    const participants = latestLineupIds.length
+      ? await this.prisma.v1GameParticipant.findMany({
+          where: { lineupId: { in: latestLineupIds } },
+          select: { id: true, gameId: true, sideId: true, userId: true, displayNameSnapshot: true },
+        })
+      : [];
+    const resolvedParticipants = await this.resolveTeamMatchParticipantUsers(participants);
 
     for (const game of games) {
       if (!game.teamMatchId) continue;
@@ -1007,9 +1186,9 @@ export class ReviewsService {
         if (!side.teamId) continue;
         const userIds = [
           ...new Set(
-            participants
+            resolvedParticipants
               .filter((participant) => participant.gameId === game.id && participant.sideId === side.id)
-              .map((participant) => participant.userId!)
+              .map((participant) => participant.userId)
           ),
         ];
         byTeamId.set(side.teamId, [...(byTeamId.get(side.teamId) ?? []), ...userIds]);
@@ -1017,6 +1196,48 @@ export class ReviewsService {
       empty.set(game.teamMatchId, byTeamId);
     }
     return empty;
+  }
+
+  /**
+   * TeamMatch roster identity is authoritative in the current-link table. A
+   * participant row may legitimately keep `userId=null` after a REQUESTED →
+   * ATTESTED identity flow. Conversely, falling back to that snapshot when a
+   * current link disappeared could resurrect a REVOKED/EXPIRED identity.
+   *
+   * A persisted participant.userId is retained for rows whose history contains
+   * only a request/rejection/expiry. Those actions do not establish a terminal
+   * identity assignment. ATTESTED and REVOKED are terminal lifecycle actions:
+   * without a current link, either one suppresses the snapshot so a revoked
+   * identity can never be resurrected.
+   */
+  private async resolveTeamMatchParticipantUsers<T extends TeamMatchRosterParticipant>(
+    participants: readonly T[],
+    db: PrismaService | PrismaTx = this.prisma,
+  ): Promise<Array<Omit<T, 'userId'> & { userId: string }>> {
+    if (participants.length === 0) return [];
+    const participantIds = participants.map((participant) => participant.id);
+    const [currentLinks, identityEvents] = await Promise.all([
+      db.v1ParticipantIdentityLinkCurrent.findMany({
+        where: { participantId: { in: participantIds } },
+        select: { participantId: true, userId: true },
+      }),
+      db.v1ParticipantIdentityLinkEvent.findMany({
+        where: { participantId: { in: participantIds } },
+        select: { participantId: true, action: true },
+      }),
+    ]);
+    const currentUserByParticipantId = new Map(currentLinks.map((link) => [link.participantId, link.userId]));
+    const hasTerminalIdentityHistory = new Set(
+      identityEvents
+        .filter((event) => event.action === V1IdentityLinkAction.ATTESTED || event.action === V1IdentityLinkAction.REVOKED)
+        .map((event) => event.participantId),
+    );
+    return participants.flatMap((participant) => {
+      const linkedUserId = currentUserByParticipantId.get(participant.id);
+      if (linkedUserId !== undefined) return [{ ...participant, userId: linkedUserId }];
+      if (hasTerminalIdentityHistory.has(participant.id) || participant.userId === null) return [];
+      return [{ ...participant, userId: participant.userId }];
+    });
   }
 
   /**
@@ -1036,7 +1257,7 @@ export class ReviewsService {
       // 모순이 있었다. 대회 개인 후기(tournament_fixture)는 여전히 제외한다 — 한 대회에서
       // 상대 로스터 전원에게 수십 건이 들어와 점수가 급변하므로 tournament_* 컬럼에 따로 쌓는다.
       where: { targetUserId, targetType: 'user', status: 'submitted', sourceType: { in: PERSONAL_REPUTATION_SOURCES } },
-      select: { sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
+      select: { id: true, sourceId: true, reviewerUserId: true, targetUserId: true, rating: true, submittedAt: true },
     });
     const reverseReviews = candidates.length
       ? await tx.v1PostEventReview.findMany({
@@ -1048,10 +1269,28 @@ export class ReviewsService {
     const reviewCount = revealed.length;
     const avgRating = reviewCount ? revealed.reduce((sum, review) => sum + review.rating, 0) / reviewCount : null;
 
+    // 4항목 채점 집계 -- rating 과 같은 reveal 규칙, 표본은 "4항목이 달린 후기"만.
+    // 이 집계가 선수 카드의 SKI/MAN/PUN 값과 해금 카운트(후기 3 / 방패 10)의 원천이다.
+    const revealedIds = new Set(revealed.map((review) => review.id));
+    const metricRows = revealedIds.size
+      ? await tx.v1PostEventReviewMetricScore.findMany({
+          where: { reviewId: { in: [...revealedIds] } },
+          select: { reviewId: true, metric: true, score: true },
+        })
+      : [];
+    const metricAggregate = aggregatePersonalMetricScores(revealedIds, metricRows as MetricScoreRow[]);
+    const metricData = {
+      metricReviewCount: metricAggregate.metricReviewCount,
+      metricSkillScore: decimalScore(metricAggregate.skill),
+      metricMannerScore: decimalScore(metricAggregate.manner),
+      metricPunctualityScore: decimalScore(metricAggregate.punctuality),
+      metricSafetyScore: decimalScore(metricAggregate.safety),
+    };
+
     await tx.v1UserReputationSummary.upsert({
       where: { userId: targetUserId },
-      update: reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반'),
-      create: { userId: targetUserId, ...reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반') },
+      update: { ...reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반'), ...metricData },
+      create: { userId: targetUserId, ...reputationData(reviewCount, avgRating, '완료 경기 리뷰 기반'), ...metricData },
     });
   }
 
@@ -1076,7 +1315,10 @@ export class ReviewsService {
       tx.v1TeamMatch.count({
         where: {
           OR: [{ hostTeamId: targetTeamId }, { approvedApplicantTeamId: targetTeamId }],
-          AND: [{ OR: [{ status: 'completed' }, { completedAt: { not: null } }] }],
+          AND: [
+            { OR: [{ status: 'completed' }, { completedAt: { not: null } }] },
+            { OR: [{ tournamentId: null }, { leagueId: { not: null } }] },
+          ],
         },
       }),
     ]);
@@ -1159,6 +1401,11 @@ export class ReviewsService {
     if (dto.sourceType === 'match' && (dto.targetType !== 'user' || !dto.targetUserId || dto.targetTeamId)) {
       throw badRequest('INVALID_MATCH_REVIEW_TARGET', 'Match reviews require targetType=user and targetUserId only');
     }
+    // 4항목 채점은 사람에게만 -- 팀에 "시간약속" 점수를 주는 것은 의미가 없고,
+    // 조용히 버리면 클라이언트는 저장된 줄 안다(무시 대신 명시적 거부).
+    if (dto.metricScores && dto.targetType !== 'user') {
+      throw badRequest('METRIC_SCORES_USER_ONLY', 'metricScores is only allowed for user targets');
+    }
     // team_match도 대회 경기와 같은 두 대상을 받는다. 개인 대상 명단의 근거는 그 경기에 제출된
     // 라인업(V1GameParticipant.userId)이다 — 팀 매치 라인업은 연동 팀원의 userId를 그대로 저장하고
     // (team-matches/team-match-lineup.service.ts resolveEntry) 게스트만 null로 남긴다. 예전 주석은
@@ -1228,11 +1475,6 @@ export class ReviewsService {
       state: 'done' as const,
       reviewerTeam: review.reviewerTeam ? { teamId: review.reviewerTeam.id, name: review.reviewerTeam.name } : null,
       targetTeam: review.targetTeam ? { teamId: review.targetTeam.id, name: review.targetTeam.name } : null,
-      // 한 경기에서 여러 사람에게 쓴 리뷰는 sourceId 가 같아서, 대상자를 안 실으면 목록에서
-      // 서로 구분되지 않는다("누구에게 쓴 건지" 알 수 없음). targetUser 는 이미 조인돼 있다.
-      targetUser: review.targetUser
-        ? { userId: review.targetUser.id, nickname: review.targetUser.profile?.nickname ?? '참가자' }
-        : null,
     };
   }
 }
@@ -1241,6 +1483,23 @@ type ReviewWithIncludes = Prisma.V1PostEventReviewGetPayload<{
   include: ReturnType<typeof reviewInclude>;
 }>;
 type ExistingReviewWithIncludes = ReviewWithIncludes & { __alreadySubmitted: true };
+
+function assertTeamReviewTeams<T extends {
+  hostTeamId: string | null;
+  approvedApplicantTeamId: string | null;
+  hostTeam: { id: string; name: string } | null;
+  approvedApplicantTeam: { id: string; name: string } | null;
+}>(match: T): asserts match is T & {
+  hostTeamId: string;
+  approvedApplicantTeamId: string;
+  hostTeam: NonNullable<T['hostTeam']>;
+  approvedApplicantTeam: NonNullable<T['approvedApplicantTeam']>;
+} {
+  if (!match.hostTeamId || !match.approvedApplicantTeamId || !match.hostTeam || !match.approvedApplicantTeam ||
+      match.hostTeam.id !== match.hostTeamId || match.approvedApplicantTeam.id !== match.approvedApplicantTeamId) {
+    throw conflict('TEAM_MATCH_NOT_READY', 'Team review requires both assigned teams');
+  }
+}
 
 function markExistingReviewResult(review: ReviewWithIncludes): ExistingReviewWithIncludes {
   return Object.assign(review, { __alreadySubmitted: true as const });
@@ -1296,8 +1555,39 @@ function isCompleted(source: { status: string; completedAt: Date | null }) {
   return source.status === 'completed' || Boolean(source.completedAt);
 }
 
+/**
+ * 결과가 무효(VOID)로 뒤집혔는가.
+ *
+ * 무효화는 `V1TeamMatch.status`/`completedAt` 을 건드리지 않고 게임의 공식 리비전만
+ * VOID 로 바꾼다(games.service.ts voidTeamMatchResult, 호출부는 리그 이의 처리). 그래서
+ * status/completedAt 만 보는 `isCompleted` 로는 무효 경기와 정상 완료 경기를 구별할 수
+ * 없었고, 없던 일이 된 경기에 계속 평가를 남길 수 있었다.
+ *
+ * 대회 픽스처 경로는 같은 판정을 `officialResultTimestamp`(리비전 state === 'OFFICIAL')
+ * 로 이미 하고 있다 — team_match 경로에만 그 대응 검사가 빠져 있었다.
+ *
+ * 리비전 자체가 없으면(게임 연결 전 또는 리비전 체계 이전 데이터) 무효가 아니다 --
+ * 여기서 막으면 옛 경기의 평가가 통째로 닫힌다.
+ */
+function isResultVoided(game: { currentOfficialRevision: { state: string } | null } | null | undefined) {
+  const revision = game?.currentOfficialRevision;
+  if (!revision) return false;
+  return revision.state !== 'OFFICIAL';
+}
+
 function uniqueTagCodes(tagCodes: string[]): ReviewTagCode[] {
   return [...new Set(tagCodes)].filter((tagCode): tagCode is ReviewTagCode => tagCode in REVIEW_TAGS);
+}
+
+/** 4항목 채점을 후기 행에 nested create 로 싣는다. 없으면 legacy 후기 그대로. */
+function metricScoreCreate(dto: SubmitReviewDto) {
+  if (!dto.metricScores) return {};
+  const { skill, manner, punctuality, safety } = dto.metricScores;
+  const byMetric = { SKILL: skill, MANNER: manner, PUNCTUALITY: punctuality, SAFETY: safety } as const;
+  return {
+    scoringVersion: 'four_metric' as const,
+    metricScores: { create: REVIEW_METRICS.map((metric) => ({ metric, score: byMetric[metric] })) },
+  };
 }
 
 function reputationData(reviewCount: number, avgRating: number | null, sourceLabel: string) {
@@ -1385,15 +1675,55 @@ function gone(code: string, message: string) {
   return new GoneException({ code, message });
 }
 
+const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+
+/**
+ * 종목별 평점 집계.
+ *
+ * **팀 대상은 "팀당 1표"다.** 2026-08-18 정책 변경으로 상대 팀 평가는 참가팀 멤버가
+ * 각자 1건씩 남길 수 있게 됐다 — 그대로 개별 후기를 산술평균하면 활동 인원이 많은 팀의
+ * 목소리가 그만큼 커진다(15명 팀의 15표 vs 3명 팀의 3표). 그래서 평가한 팀별로 먼저
+ * 평균을 낸 뒤 그 평균들의 평균을 쓴다.
+ *
+ * 이 규칙은 이 저장소의 정본 집계(team-trust-aggregation.ts, recalculateTeamTrust,
+ * tournament-fixture-review-trust.ts)가 이미 같은 근거로 구현하고 있다 -- 이 함수만
+ * 빠져 있어서, 같은 팀의 신뢰 배지와 종목별 평점이 서로 다른 원칙의 다른 숫자를
+ * 보여주고 있었다.
+ *
+ * `ratingCount` 도 정본과 맞춰 **평가에 참여한 팀 수**다(건수가 아니다). 이 값은 화면에서
+ * 종목 간 가중평균의 가중치로도 쓰이므로, 평균이 팀 기준이면 가중치도 팀 기준이어야
+ * 둘이 어긋나지 않는다.
+ *
+ * 태그 비율은 그대로 **후기 건수** 기준이다 -- "이 태그를 붙인 후기가 몇 %인가"라서
+ * 팀 단위로 환산할 대상이 아니다.
+ */
 function summarizeBySport(
-  reviews: Array<{ sportId: string | null; rating: number; tags: Array<{ tagCode: string; labelSnapshot: string }> }>,
+  reviews: Array<{
+    sportId: string | null;
+    rating: number;
+    reviewerTeamId?: string | null;
+    tags: Array<{ tagCode: string; labelSnapshot: string }>;
+  }>,
+  targetType: 'user' | 'team',
 ) {
-  type SportBucket = { ratings: number[]; tagCounts: Map<string, { label: string; count: number }> };
+  type SportBucket = {
+    ratings: number[];
+    ratingsByReviewerTeam: Map<string, number[]>;
+    tagCounts: Map<string, { label: string; count: number }>;
+  };
   const bySport = new Map<string, SportBucket>();
   for (const review of reviews) {
     if (!review.sportId) continue;
-    const bucket: SportBucket = bySport.get(review.sportId) ?? { ratings: [], tagCounts: new Map() };
+    const bucket: SportBucket =
+      bySport.get(review.sportId) ?? { ratings: [], ratingsByReviewerTeam: new Map(), tagCounts: new Map() };
     bucket.ratings.push(review.rating);
+    // 정본과 동일: reviewerTeamId 가 없는 행은 묶지 않는다 -- 컬럼이 nullable 이라
+    // null 을 한 그룹으로 두면 "이름 없는 한 팀"이 생겨 표가 왜곡된다.
+    if (review.reviewerTeamId) {
+      const teamRatings = bucket.ratingsByReviewerTeam.get(review.reviewerTeamId) ?? [];
+      teamRatings.push(review.rating);
+      bucket.ratingsByReviewerTeam.set(review.reviewerTeamId, teamRatings);
+    }
     for (const tag of review.tags) {
       const current = bucket.tagCounts.get(tag.tagCode) ?? { label: tag.labelSnapshot, count: 0 };
       current.count += 1;
@@ -1402,15 +1732,19 @@ function summarizeBySport(
     bySport.set(review.sportId, bucket);
   }
 
-  return [...bySport.entries()].map(([sportId, bucket]) => ({
-    sportId,
-    ratingAvg: bucket.ratings.length ? Number((bucket.ratings.reduce((sum, value) => sum + value, 0) / bucket.ratings.length).toFixed(2)) : null,
-    ratingCount: bucket.ratings.length,
-    tagRates: [...bucket.tagCounts.entries()].map(([tagCode, { label, count }]) => ({
-      tagCode,
-      label,
-      rate: Number((count / bucket.ratings.length).toFixed(2)),
-      count,
-    })),
-  }));
+  return [...bySport.entries()].map(([sportId, bucket]) => {
+    const teamAverages = [...bucket.ratingsByReviewerTeam.values()].map(mean);
+    const scores = targetType === 'team' ? teamAverages : bucket.ratings;
+    return {
+      sportId,
+      ratingAvg: scores.length ? Number(mean(scores).toFixed(2)) : null,
+      ratingCount: scores.length,
+      tagRates: [...bucket.tagCounts.entries()].map(([tagCode, { label, count }]) => ({
+        tagCode,
+        label,
+        rate: Number((count / bucket.ratings.length).toFixed(2)),
+        count,
+      })),
+    };
+  });
 }

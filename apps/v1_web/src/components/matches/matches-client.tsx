@@ -7,6 +7,7 @@ import {
   useV1Match,
   useV1MatchApplicationEligibility,
   useV1Matches,
+  useV1MasterRegions,
   useV1MasterSports,
   useV1RecentSearches,
   useV1RecordSearch,
@@ -15,14 +16,37 @@ import {
 } from '@/hooks/use-v1-api';
 import { trackEvent } from '@/lib/analytics';
 import { chatRoomHref } from '@/lib/chat-route';
+import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
 import { toDetailMode } from './matches.mode';
-import { MatchDetailPageView, MatchListPageView, MatchStatePageView } from './matches-page';
+import { MatchDetailPageSkeleton, MatchDetailPageView, MatchListPageView, MatchStatePageView } from './matches-page';
 import type { MatchCardModel, MatchDetailViewModel, MatchListViewModel } from './matches.types';
 import { applyLabel, getMatchDetailViewModel, getMatchListViewModel, getMatchStateViewModel } from './matches.view-model';
+import {
+  actionLabel,
+  buildMatchHref,
+  buildSportSummary,
+  countToday,
+  formatDeadline,
+  formatDeadlineDetail,
+  getCapacity,
+  getStatus,
+  getViewerState,
+  statusToCardStatus,
+  sortMatchesByAvailability,
+  toMatchCard,
+} from './matches.card-model';
+import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
+import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 
-const FIXED_MATCH_SPORT_NAMES = ['축구', '풋살', '러닝', '수영'] as const;
+
+/** 이 개수 이하로 결과가 남으면 "희소" 로 보고 인접 매치 레일을 붙인다(디자인 검수 W-3).
+ *  3 이상은 DESIGN.md §15 의 "한 화면에 3-5개 카드" 를 이미 만족하므로 채울 이유가 없다. */
+const SPARSE_RESULT_MAX = 2;
+/** 인접 레일에 넣는 최대 카드 수. 가로 스크롤이라 더 넣어도 되지만, 검색 결과보다
+ *  추천이 커 보이면 주객이 바뀐다. */
+const NEARBY_RAIL_MAX = 4;
 
 export function MatchListPageClient() {
   const router = useRouter();
@@ -32,6 +56,7 @@ export function MatchListPageClient() {
   const selectedView = toMatchView(searchParams.get('view'));
   const selectedGenderRule = toGenderRuleFilter(searchParams.get('genderRule'));
   const selectedLevels = toLevelCodes(searchParams.get('levelCodes') ?? searchParams.get('levels'));
+  const selectedRegionId = searchParams.get('regionId') ?? undefined;
   const filterOpen = searchParams.get('filter') === '1';
   const initialQuery = searchParams.get('q') ?? '';
   const [searchValue, setSearchValue] = useState(initialQuery);
@@ -41,39 +66,96 @@ export function MatchListPageClient() {
     setSearchValue(initialQuery);
     setSubmittedQuery(initialQuery);
   }, [initialQuery]);
-  const allMatches = useV1Matches();
-  const activeFilterCount = countMatchFilters(selectedSort, selectedGenderRule, selectedLevels);
+  const activeFilterCount = countMatchFilters(selectedSort, selectedGenderRule, selectedLevels, selectedRegionId);
   const matchFilters = useMemo(() => {
-    const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'latest' | 'deadline'; view?: 'card' | 'compact'; genderRule?: string; levelCodes?: string } = {};
+    const filters: { sportId?: string; query?: string; sort?: 'recommended' | 'latest' | 'deadline'; view?: 'card' | 'compact'; genderRule?: string; levelCodes?: string; regionId?: string } = {};
     if (selectedSportId) filters.sportId = selectedSportId;
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
     if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
+    if (selectedRegionId) filters.regionId = selectedRegionId;
     if (submittedQuery.trim()) filters.query = submittedQuery.trim();
     if (selectedSort) filters.sort = selectedSort;
     if (selectedView !== 'card') filters.view = selectedView;
     return Object.keys(filters).length ? filters : undefined;
-  }, [selectedGenderRule, selectedLevels, selectedSportId, selectedSort, selectedView, submittedQuery]);
+  }, [selectedGenderRule, selectedLevels, selectedRegionId, selectedSportId, selectedSort, selectedView, submittedQuery]);
+  // 서버는 20건씩 커서 페이지네이션으로 자르는데(matches.service.ts list()) 예전엔 이 화면이
+  // 단발 useQuery로 첫 페이지만 받아 21번째 매치부터는 볼 방법이 아예 없었다(감사 결함).
+  // 대회 목록(tournaments/page.tsx)과 같은 "더 보기" 누적 방식 — 다만 그 화면 수준의
+  // 데스크톱 페이지 번호 분기까지는 아직 이 화면 규모에 근거가 없다.
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [accumulated, setAccumulated] = useState<V1Match[]>([]);
+  // 필터가 바뀌면(종목·성별·레벨·검색·정렬·보기) 새 조건의 1페이지부터 다시 쌓는다.
+  // useEffect가 아니라 렌더 중에 직접 되감는다("prop이 바뀔 때 state 조정" — React 공식
+  // 패턴): useEffect로 하면 effect가 도는 다음 렌더까지 "새 필터 + 이전 cursor"가 합쳐진
+  // 요청이 한 번 나간다 — 그 cursor는 이전 필터 기준 토큰이라 새 필터에서는 무효하고,
+  // 서버가 그 조합을 어떻게 처리할지도 검증된 바 없다. 렌더 중 set을 호출하면 이 렌더의
+  // 출력은 버려지고 즉시 다시 렌더되므로 그 중간 상태가 화면에도, 요청에도 나타나지 않는다.
+  const matchFiltersKey = matchFilters ? JSON.stringify(matchFilters) : '';
+  const [pagedFiltersKey, setPagedFiltersKey] = useState(matchFiltersKey);
+  if (pagedFiltersKey !== matchFiltersKey) {
+    setPagedFiltersKey(matchFiltersKey);
+    setCursor(undefined);
+    setAccumulated([]);
+  }
+  const allMatchesFilters = useMemo(() => (!matchFilters && cursor ? { cursor } : undefined), [matchFilters, cursor]);
+  const filteredMatchesFilters = useMemo(
+    () => (matchFilters ? (cursor ? { ...matchFilters, cursor } : matchFilters) : undefined),
+    [matchFilters, cursor],
+  );
+  const allMatches = useV1Matches(allMatchesFilters);
   const countFilters = useMemo(() => {
-    const filters: { query?: string; genderRule?: string; levelCodes?: string } = {};
+    const filters: { query?: string; genderRule?: string; levelCodes?: string; regionId?: string } = {};
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
     if (selectedLevels.length) filters.levelCodes = selectedLevels.join(',');
+    if (selectedRegionId) filters.regionId = selectedRegionId;
     if (submittedQuery.trim()) filters.query = submittedQuery.trim();
     return Object.keys(filters).length ? filters : undefined;
-  }, [selectedGenderRule, selectedLevels, submittedQuery]);
-  const filteredMatches = useV1Matches(matchFilters, { enabled: Boolean(matchFilters) });
+  }, [selectedGenderRule, selectedLevels, selectedRegionId, submittedQuery]);
+  const filteredMatches = useV1Matches(filteredMatchesFilters, { enabled: Boolean(matchFilters) });
   const countMatches = useV1Matches(countFilters, { enabled: Boolean(countFilters) });
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
   const sports = useV1MasterSports();
+  const regions = useV1MasterRegions();
   const query = matchFilters ? filteredMatches : allMatches;
 
-  if (query.isError) return <MatchStatePageView model={getMatchStateViewModel('error')} />;
+  if (query.isError) return <MatchStatePageView model={{ ...getMatchStateViewModel('error'), retry: () => void query.refetch() }} />;
 
   const base = getMatchListViewModel();
-  const items = query.data?.items;
+  const pageItems = query.data?.items;
+  // 누적: cursor가 있으면(2페이지 이상) 직전까지 쌓아둔 목록 뒤에 새 페이지를 이어 붙인다 —
+  // id 기준 중복 제거는 in-flight 재요청(포커스 재검증 등)이 겹쳐 와도 카드가 두 번 그려지지
+  // 않게 하기 위함.
+  const items: V1Match[] | undefined = pageItems === undefined
+    ? undefined
+    : cursor
+      ? [...accumulated, ...pageItems.filter((item) => !accumulated.some((prev) => (prev.matchId ?? prev.id) === (item.matchId ?? item.id)))]
+      : pageItems;
   const orderedItems = items ? sortMatchesByAvailability(items) : undefined;
   const visibleItems = filterMatchesByLevels(orderedItems, selectedLevels);
   const countItems = filterMatchesByLevels((countFilters ? countMatches.data?.items ?? allMatches.data?.items : allMatches.data?.items) ?? items, selectedLevels);
+  const hasNext = query.data?.pageInfo?.hasNext ?? false;
+  // 희소 결과(1~2건) 아래를 채우는 인접 매치 — 디자인 검수 W-3, B안.
+  // 새 요청을 만들지 않는다: allMatches 는 필터가 걸려 있든 아니든 이미 돌고 있고
+  // (countItems 가 같은 데이터를 쓴다) 그 무필터 목록에서 지금 보여준 것만 빼면 된다.
+  // 필터가 없을 때는 allMatches 가 곧 결과라 차집합이 비고, 레일은 그리지 않는다 —
+  // "다른 매치가 정말 없다" 는 뜻이므로 그게 맞는 동작이다.
+  const shownIds = new Set((visibleItems ?? []).map((item) => item.matchId ?? item.id));
+  const nearbyItems =
+    visibleItems && visibleItems.length > 0 && visibleItems.length <= SPARSE_RESULT_MAX
+      ? sortMatchesByAvailability(
+          (allMatches.data?.items ?? []).filter(
+            (item) =>
+              !shownIds.has(item.matchId ?? item.id) &&
+              statusToCardStatus(getStatus(item)) === 'open',
+          ),
+        ).slice(0, NEARBY_RAIL_MAX)
+      : [];
+  const handleLoadMore = () => {
+    if (!query.data?.pageInfo?.nextCursor || query.isFetching) return;
+    setAccumulated(orderedItems ?? []);
+    setCursor(query.data.pageInfo.nextCursor);
+  };
   const searchModel: NonNullable<MatchListViewModel['search']> = {
     value: searchValue,
     placeholder: '지역, 시간, 매치명 검색',
@@ -97,8 +179,9 @@ export function MatchListPageClient() {
         filterCount: activeFilterCount,
         search: searchModel,
         filterHref: buildMatchHref(searchParams, { filter: '1' }),
-        filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
+        filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], filterOpen),
         matches: visibleItems.map((item, index) => toMatchCard(item, base.matches[index] ?? base.matches[0])),
+        nearbyMatches: nearbyItems.map((item, index) => toMatchCard(item, base.matches[index] ?? base.matches[0])),
         sports: buildSportSummary(searchParams, countItems, base, selectedSportId, sports.data),
         summary: {
           ...base.summary,
@@ -106,6 +189,9 @@ export function MatchListPageClient() {
           today: countToday(visibleItems),
           urgent: visibleItems.filter((item) => statusToCardStatus(getStatus(item)) === 'open').length,
         },
+        hasNext,
+        onLoadMore: handleLoadMore,
+        loadMorePending: query.isFetching,
       }
     : {
         ...base,
@@ -113,7 +199,7 @@ export function MatchListPageClient() {
         filterCount: activeFilterCount,
         search: searchModel,
         filterHref: buildMatchHref(searchParams, { filter: '1' }),
-        filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, filterOpen),
+        filterSheet: buildMatchFilterSheet(searchParams, selectedSort, selectedView, selectedGenderRule, selectedLevels, selectedRegionId, regions.data ?? [], filterOpen),
         matches: [],
         sports: buildSportSummary(searchParams, countItems, base, selectedSportId, sports.data),
         summary: {
@@ -122,6 +208,9 @@ export function MatchListPageClient() {
           today: 0,
           urgent: 0,
         },
+        // team-matches-client.tsx #5와 동일 — 로딩 중임을 명시해 EmptyState 대신 스켈레톤을
+        // 그리게 한다(로딩 중을 "조건에 맞는 매치 0개"로 오인시키지 않는다).
+        isLoading: query.isLoading,
       };
 
   return <MatchListPageView model={model} />;
@@ -149,24 +238,30 @@ export function MatchListPageClient() {
   }
 }
 
-export function MatchDetailPageClient({ matchId }: { matchId: string }) {
+/**
+ * `seed` 는 서버 컴포넌트(app/matches/[id]/page.tsx)가 존재 확인·메타데이터를 위해
+ * 이미 받아 둔 공개 매치 응답이다. 그동안 이 값을 버리고 클라이언트가 같은 매치를
+ * 처음부터 다시 받았기 때문에, 딥링크·푸시·새로고침으로 들어오면 첫 화면이 비어 있었다.
+ * 추가 요청 없이 그 결과를 그대로 첫 표시값으로 쓴다(비인증 응답이라 뷰어 상태는 없고,
+ * `revalidate: 300` 캐시라 최대 5분 오래된 값일 수 있어 행동은 잠근 채 표시만 한다).
+ */
+export function MatchDetailPageClient({ matchId, seed }: { matchId: string; seed?: V1Match | null }) {
   const router = useRouter();
-  const query = useV1Match(matchId);
+  // topBar:false라 셸 뒤로가기가 없다 — 페이지가 직접 그리는 모바일·데스크톱 링크(matches-page.tsx)
+  // 둘 다 이 값을 쓴다. public-profile-client.tsx와 같은 `?from=` 패턴.
+  const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
+  const query = useV1Match(matchId, { seed });
   const eligibility = useV1MatchApplicationEligibility(matchId, { enabled: Boolean(query.data) });
   const viewerState = query.data ? getViewerState(query.data, eligibility.data?.viewerState) : 'none';
   const applyMatch = useV1ApplyMatch(matchId);
+  const [applyDialogOpen, setApplyDialogOpen] = useState(false);
+  const [applyMessage, setApplyMessage] = useState('');
+  const [applyError, setApplyError] = useState<string | null>(null);
   const withdrawMatch = useV1WithdrawMatchApplication(matchId, eligibility.data?.applicationId ?? query.data?.viewer?.applicationId);
   const resolveChatRoom = useV1ResolveChatRoom();
-  const autoResolvedChatRef = useRef<string | null>(null);
   const matchViewTrackedRef = useRef<string | null>(null);
   const fallback = getMatchDetailViewModel();
   const matchSportType = query.data ? query.data.sport?.name ?? query.data.sportName : undefined;
-
-  useEffect(() => {
-    if (!query.data || !canOpenMatchChat(viewerState) || autoResolvedChatRef.current === matchId) return;
-    autoResolvedChatRef.current = matchId;
-    resolveChatRoom.mutate({ targetType: 'match', targetId: matchId });
-  }, [matchId, query.data, resolveChatRoom, viewerState]);
 
   useEffect(() => {
     if (!query.data || matchViewTrackedRef.current === matchId) return;
@@ -175,108 +270,162 @@ export function MatchDetailPageClient({ matchId }: { matchId: string }) {
   }, [matchId, query.data, matchSportType]);
 
   if (query.isError) {
-    return <MatchStatePageView model={getMatchStateViewModel('error')} />;
+    return <MatchStatePageView model={{ ...getMatchStateViewModel('error'), retry: () => void query.refetch(), backHref: fromPath ?? undefined }} />;
   }
 
-  const model: MatchDetailViewModel = query.data
-    ? {
-        ...fallback,
-        match: {
-          // `...fallback.match` 스프레드를 걷어냈다 — 아래에서 모든 칸을 실제 값으로 채우므로
-          // 목업이 남을 자리가 없다. 특히 address 는 폴백이 걸리면 **다른 매치의 실제 주소**
-          // ('서울 양천구 안양천로 939')를 진짜 주소처럼 보여줬다.
-          ...toMatchCard(query.data, fallback.match),
-          description: query.data.description ?? query.data.descriptionPreview ?? '',
-          address: query.data.place?.addressText ?? query.data.placeName ?? '',
-          rules: query.data.rulesText ? [query.data.rulesText] : [],
-          editHref: viewerState === 'host' ? `/matches/${matchId}/edit` : undefined,
-          applicationsHref: viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,
-          participants: toParticipants(
-            query.data,
-            fallback.match.participants,
-            viewerState === 'host' ? `/matches/${matchId}/applications` : undefined,
-          ),
-        },
-        mode: toDetailMode(viewerState, getStatus(query.data)),
-        reviewAction: buildMatchReviewAction(matchId, viewerState, getStatus(query.data)),
-        applyLabel: applyLabel(viewerState, getStatus(query.data), eligibility.data?.eligible, eligibility.data?.message),
-        applyPending: applyMatch.isPending || withdrawMatch.isPending,
-        statusLabel: statusLabel(viewerState, getStatus(query.data)),
-        chatLabel: chatLabel(viewerState),
-        chatPending: resolveChatRoom.isPending,
-        onChat: canOpenMatchChat(viewerState)
-          ? () => resolveChatRoom.mutate(
-              { targetType: 'match', targetId: matchId },
-              { onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)) },
-            )
-          : undefined,
-        onShare: () => shareMatch(query.data),
-        onApply: getApplyAction({
-          viewerState,
-          eligible: eligibility.data?.eligible,
-          applicationId: eligibility.data?.applicationId ?? query.data.viewer?.applicationId,
-          apply: () =>
-            applyMatch.mutateAsync({ message: null }).then((result) => {
-              trackEvent('match_join_complete', { matchId, sportType: matchSportType ?? '' });
-              return result;
-            }),
-          withdraw: () =>
-            withdrawMatch.mutateAsync({ reason: 'applicant_withdrawn_from_v1_web' }).then((result) => {
-              trackEvent('match_leave', { matchId });
-              return result;
-            }),
+  // 데이터가 오기 전에는 하드코딩 목업(`fallback`)을 화면 전체로 렌더하지 않는다 —
+  // 목업 제목·주소·참가자가 실제 값처럼 보여 사용자가 잘못 읽던 결함이었다.
+  // `fallback` 은 아래에서 필드 단위 기본값으로만 쓴다.
+  if (!query.data) {
+    return <MatchDetailPageSkeleton />;
+  }
+
+  // 목록 캐시에서 승계한 표시용 데이터로 그리는 중. 제목·장소·날짜는 진짜지만 뷰어
+  // 상태·참가자는 아직 없다 — 이 동안 상태 라벨과 행동 버튼을 잠가, 이미 신청한 매치에
+  // "참가 신청"이 뜨는 식의 잘못된 안내를 막는다.
+  const seeding = query.isPlaceholderData;
+  // 하위 화면(수정/신청자 관리)에서 다시 뒤로가면 이 상세로, 그 뒤엔 원래 출처로 이어지도록
+  // 이 상세 페이지 자신의 URL(자기 ?from= 포함)을 다음 from으로 싣는다. fromPath가 없으면
+  // undefined — 기존 하위 링크(?from= 없음)를 그대로 유지한다.
+  const selfHref = fromPath ? withFromPath(`/matches/${matchId}`, fromPath) : undefined;
+
+  const model: MatchDetailViewModel = {
+    ...fallback,
+    match: {
+      // `...fallback.match` 스프레드를 걷어냈다 — 확장 필드까지 전부 아래에서 채우므로
+      // 목업이 남을 자리가 없다(남아 있으면 새 필드를 추가할 때 조용히 다시 샌다).
+      ...toMatchCard(query.data, fallback.match),
+      // fallback.match.description/address는 로딩 스켈레톤(fallback 전체를 그대로 보여주는
+      // 케이스)에서만 써야 하는 하드코딩 목업이다 — 실제 매치가 로드된 뒤 API가 값을 안 주면
+      // ''로 둔다(team-matches-client.tsx의 동일 패턴과 통일). 렌더 쪽(matches-page.tsx)이
+      // falsy면 이미 섹션·sub를 숨긴다(설명은 InfoRow 미사용, 주소는 InfoRow의 sub
+      // optional 처리, 규칙은 `.length` 가드) — 상세 주소를 비워 만든 매치에 목업 주소
+      // '서울 양천구 안양천로 939'가 실제 주소처럼 뜨던 결함(2026-08-27 감사
+      // M-A-personal-match-state)을 막는다.
+      description: query.data.description ?? query.data.descriptionPreview ?? '',
+      address: query.data.place?.addressText ?? query.data.placeName ?? '',
+      // API가 규칙을 안 주면 빈 배열 — 목업 규칙('풋살화 착용' 등)을 남의 매치에
+      // 붙이지 않는다. 렌더 쪽(matches-page.tsx)이 `.length` 로 섹션을 숨긴다.
+      rules: query.data.rulesText ? [query.data.rulesText] : [],
+      editHref: viewerState === 'host' ? withFromPath(`/matches/${matchId}/edit`, selfHref) : undefined,
+      applicationsHref: viewerState === 'host' ? withFromPath(`/matches/${matchId}/applications`, selfHref) : undefined,
+      lifecycleStatus: getStatus(query.data),
+      participants: toParticipants(
+        query.data,
+        viewerState === 'host' ? withFromPath(`/matches/${matchId}/applications`, selfHref) : undefined,
+      ),
+    },
+    mode: toDetailMode(viewerState, getStatus(query.data)),
+    backHref: fromPath ?? '/matches',
+    completed: getStatus(query.data) === 'completed',
+    canComplete: !seeding && query.data.canComplete === true,
+    withdrawApplicationId: !seeding && query.data.canWithdraw ? query.data.viewer?.applicationId : null,
+    reviewAction: buildMatchReviewAction(matchId, viewerState, getStatus(query.data), query.data.viewer?.participantStatus),
+    applyLabel: seeding ? '불러오는 중' : applyLabel(viewerState, getStatus(query.data), eligibility.data?.eligible, eligibility.data?.message),
+    // seeding 을 여기 넣지 않는다 — 렌더 쪽이 applyPending 을 '처리 중'(= 내 신청을
+    // 처리하는 중)으로 읽어 applyLabel 을 덮어쓴다. 잠금은 onApply 를 비우는 것으로
+    // 충분하고(canRunAction=false → disabled), 라벨은 '불러오는 중'이 남는다.
+    applyPending: applyMatch.isPending || withdrawMatch.isPending,
+    statusLabel: seeding ? undefined : statusLabel(viewerState, getStatus(query.data), query.data.viewer?.participantStatus),
+    chatLabel: chatLabel(viewerState),
+    chatPending: resolveChatRoom.isPending,
+    onChat: !seeding && canOpenMatchChat(viewerState)
+      ? () => resolveChatRoom.mutate(
+          { targetType: 'match', targetId: matchId },
+          { onSuccess: (room) => router.push(chatRoomHref(room.roomId, room.route)) },
+        )
+      : undefined,
+    onShare: () => shareMatch(query.data),
+    onApply: seeding ? undefined : getApplyAction({
+      viewerState,
+      eligible: eligibility.data?.eligible,
+      applicationId: eligibility.data?.applicationId ?? query.data.viewer?.applicationId,
+      apply: async () => {
+        setApplyError(null);
+        setApplyDialogOpen(true);
+        return null;
+      },
+      withdraw: () =>
+        withdrawMatch.mutateAsync({ reason: 'applicant_withdrawn_from_v1_web' }).then((result) => {
+          trackEvent('match_leave', { matchId });
+          return result;
         }),
-      }
-    : fallback;
-
-  return <MatchDetailPageView model={model} />;
-}
-
-// 직접 유닛 커버리지를 붙이려고 export 한다(team-matches 의 toTeamMatch 와 같은 관행).
-export function toMatchCard(match: V1Match, fallback: MatchCardModel): MatchCardModel {
-  const capacity = getCapacity(match);
-  const status = statusToCardStatus(getStatus(match), getViewerState(match));
-
-  // 화면 골격용 목업(matches.view-model.ts)을 **사실 값의 폴백으로 쓰지 않는다.** 예전에는
-  // 레벨·성별·지역·호스트가 비면 목업의 '초보-중수'·'성별 무관'·'목동'·'김정민'이 그대로
-  // 실제 매치 카드에 붙어, 있지도 않은 조건과 **실존하지 않는 사람 이름**을 보여줬다.
-  // 모르는 값은 지어내지 않고 "모른다"고 말한다 — 문자열 모양(비어 있지 않음)은 그대로라
-  // 렌더 쪽 가정을 깨지 않는다. 라벨은 이 저장소가 이미 쓰는 표현을 그대로 재사용한다
-  // (teams-client.tsx 의 '레벨 미설정' · '지역 미정', API 의 '호스트').
-  // image 는 예외다 — 사진 자리표시자는 사실 주장이 아니라 장식이고, 팀매치 카드도 같은
-  // 로컬 이미지를 폴백으로 쓰는 것이 의도된 동작이다(전용 테스트가 고정하고 있다).
-  return {
-    id: match.matchId ?? match.id ?? fallback.id,
-    title: match.title,
-    sport: match.sport?.name ?? match.sportName,
-    venue: match.place?.name ?? match.placeName,
-    region: match.region?.name ?? match.regionName ?? '지역 미정',
-    date: formatDate(match.startsAt),
-    time: formatTime(match.startsAt),
-    endTime: match.endsAt ? formatTime(match.endsAt) : undefined,
-    current: capacity.current,
-    capacity: capacity.capacity,
-    level: match.levelLabel ?? '레벨 미설정',
-    gender: match.genderRule ?? '성별 미설정',
-    host: match.host?.displayName ?? '호스트',
-    image: match.imageUrl ?? fallback.image,
-    status,
-    deadline: formatDeadline(match.deadlineAt, status),
-    deadlineDetail: formatDeadlineDetail(match.deadlineAt, status),
-    actionLabel: actionLabel(status),
+    }),
   };
+
+  return (
+    <>
+      <MatchDetailPageView model={model} />
+      <MatchApplyDialog
+        open={applyDialogOpen}
+        message={applyMessage}
+        error={applyError}
+        pending={applyMatch.isPending}
+        onMessageChange={setApplyMessage}
+        onClose={() => {
+          if (!applyMatch.isPending) setApplyDialogOpen(false);
+        }}
+        onSubmit={() => {
+          setApplyError(null);
+          applyMatch.mutate(
+            { message: applyMessage.trim() || null },
+            {
+              onSuccess: () => {
+                trackEvent('match_join_complete', { matchId, sportType: matchSportType ?? '' });
+                setApplyDialogOpen(false);
+                setApplyMessage('');
+              },
+              onError: () => setApplyError('신청을 보내지 못했어요. 잠시 후 다시 시도해 주세요.'),
+            },
+          );
+        }}
+      />
+    </>
+  );
 }
 
-function toParticipants(
-  match: V1Match,
-  fallback: MatchDetailViewModel['match']['participants'],
-  manageHref?: string,
-) {
+function MatchApplyDialog({ open, message, error, pending, onMessageChange, onClose, onSubmit }: {
+  open: boolean;
+  message: string;
+  error: string | null;
+  pending: boolean;
+  onMessageChange: (value: string) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  useOverlayHistory({ open, onClose, locked: pending });
+  useTopmostEscape({ open, onEscape: onClose, disabled: pending });
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center" style={{ background: 'rgba(25,31,40,0.45)' }} onClick={(event) => { if (event.target === event.currentTarget && !pending) onClose(); }}>
+      <div role="dialog" aria-modal="true" aria-labelledby="match-apply-title" className="w-full max-w-[420px] rounded-2xl" style={{ background: 'var(--surface, #fff)', padding: 24 }}>
+        <h2 id="match-apply-title" className="tm-text-subhead" style={{ margin: 0 }}>참가 신청</h2>
+        <p className="tm-text-body" style={{ marginTop: 8, color: 'var(--text-muted)' }}>호스트가 신청자와 메시지를 확인한 뒤 참가를 승인해요.</p>
+        <label className="tm-create-field" style={{ marginTop: 18 }}>
+          <span className="tm-text-label">호스트에게 남길 메시지 <span className="tm-text-caption">(선택)</span></span>
+          <textarea className="tm-input tm-create-input-multiline" value={message} maxLength={500} placeholder="경험이나 전달할 내용을 적어 주세요." onChange={(event) => onMessageChange(event.target.value)} autoFocus />
+          <span className="tm-text-caption" style={{ textAlign: 'right' }}>{message.length}/500</span>
+        </label>
+        {error ? <p className="tm-text-caption" role="alert" style={{ color: 'var(--danger)', marginTop: 8 }}>{error}</p> : null}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 20 }}>
+          <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled={pending} onClick={onClose}>닫기</button>
+          <button className="tm-btn tm-btn-lg tm-btn-primary" type="button" disabled={pending} onClick={onSubmit}>{pending ? '신청 중…' : '신청 보내기'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function toParticipants(match: V1Match, manageHref?: string) {
   if (!match.participantsPreview?.length) {
     return [{
-      name: match.host?.displayName ?? fallback[0]?.name ?? '호스트',
+      // 목업 참가자('김정민' 등)를 호스트 이름 자리에 쓰지 않는다 — 실제 매치의
+      // 호스트가 다른 사람 이름으로 보이던 결함이었다.
+      name: match.host?.displayName ?? '호스트',
       meta: '호스트',
-      status: '승인완료',
+      status: getStatus(match) === 'completed' ? '참여 완료' : '승인 완료',
       href: manageHref,
     }];
   }
@@ -284,33 +433,11 @@ function toParticipants(
   return match.participantsPreview.filter((participant) => participant.role === 'host').map((participant) => ({
     name: participant.displayName,
     meta: '매치 만든 사람',
-    status: participant.status === 'confirmed' ? '승인완료' : participant.status,
+    status: participant.status === 'completed' ? '참여 완료' : participant.status === 'confirmed' ? '승인 완료' : participant.status,
     href: manageHref,
   }));
 }
 
-function buildSportSummary(params: URLSearchParams, items: V1Match[], fallback: MatchListViewModel, selectedSportId?: string, masterSports?: V1Sport[]) {
-  const counts = new Map<string, number>();
-  items.forEach((item) => {
-    const name = item.sport?.name ?? item.sportName ?? '기타';
-    counts.set(name, (counts.get(name) ?? 0) + 1);
-  });
-
-  const fixedSports = FIXED_MATCH_SPORT_NAMES.map((name) => {
-    const sport = masterSports?.find((item) => item.name === name);
-    return {
-      label: name,
-      count: counts.get(name) ?? 0,
-      active: sport?.id === selectedSportId,
-      href: sport?.id ? buildMatchHref(params, { sportId: sport.id, filter: null }) : buildMatchHref(params, { sportId: null, filter: null }),
-    };
-  });
-
-  return [
-    { label: fallback.sports[0]?.label ?? '전체', count: items.length, active: !selectedSportId, href: buildMatchHref(params, { sportId: null, filter: null }) },
-    ...fixedSports,
-  ];
-}
 
 function buildMatchFilterSheet(
   params: URLSearchParams,
@@ -318,6 +445,8 @@ function buildMatchFilterSheet(
   view: NonNullable<MatchListViewModel['filterSheet']>['view'],
   genderRule: NonNullable<MatchListViewModel['filterSheet']>['genderRule'],
   levels: NonNullable<MatchListViewModel['filterSheet']>['levels'],
+  regionId: string | undefined,
+  regions: ReadonlyArray<{ id: string; name: string; parentId: string | null }>,
   open: boolean,
 ): NonNullable<MatchListViewModel['filterSheet']> {
   const sortOptions: NonNullable<MatchListViewModel['filterSheet']>['sortOptions'] = [
@@ -336,31 +465,37 @@ function buildMatchFilterSheet(
     href: buildMatchHref(params, { levelCodes: toggleLevelCode(levels, code), levels: null, filter: '1' }),
     active: levels.includes(code),
   }));
+  // 시/도(레벨1)만 칩으로 보여준다 — 구/군까지 펼치면 100개 넘게 쏟아진다. 선택한 시/도의
+  // 하위 구/군은 서버가 관계 필터로 함께 담는다(matches.service.ts list()).
+  const regionOptions: NonNullable<MatchListViewModel['filterSheet']>['regionOptions'] = [
+    { label: '전체', value: 'all', href: buildMatchHref(params, { regionId: null, filter: '1' }), active: !regionId },
+    ...regions
+      .filter((region) => region.parentId === null)
+      .map((region) => ({
+        label: region.name,
+        value: region.id,
+        href: buildMatchHref(params, { regionId: regionId === region.id ? null : region.id, filter: '1' }),
+        active: regionId === region.id,
+      })),
+  ];
 
   return {
     open,
     closeHref: buildMatchHref(params, { filter: null }),
-    resetHref: buildMatchHref(params, { sort: null, view: null, genderRule: null, levelCodes: null, levels: null, filter: '1' }),
+    resetHref: buildMatchHref(params, { sort: null, view: null, genderRule: null, levelCodes: null, levels: null, regionId: null, filter: '1' }),
     applyHref: buildMatchHref(params, { filter: null }),
     sort,
     view,
     genderRule,
     levels,
+    regionId: regionId ?? '',
     sortOptions,
     genderOptions,
     levelOptions,
+    regionOptions,
   };
 }
 
-function buildMatchHref(params: URLSearchParams, overrides: Record<string, string | null>) {
-  const next = new URLSearchParams(params.toString());
-  Object.entries(overrides).forEach(([key, value]) => {
-    if (value === null || value === '') next.delete(key);
-    else next.set(key, value);
-  });
-  const queryString = next.toString();
-  return queryString ? `/matches?${queryString}` : '/matches';
-}
 
 function toMatchSort(value: string | null): '' | 'recommended' | 'deadline' | 'latest' {
   if (value === 'recommended' || value === 'deadline' || value === 'latest') return value;
@@ -381,63 +516,15 @@ function filterMatchesByLevels(matches: V1Match[] | undefined, levels: NonNullab
   return matches.filter((match) => levelRangeMatches(levels, match.minLevel?.code, match.maxLevel?.code, match.levelLabel));
 }
 
-export function sortMatchesByAvailability(matches: V1Match[]): V1Match[] {
-  return matches
-    .map((match, index) => ({ match, index }))
-    .sort((left, right) => {
-      const rank = (match: V1Match) => statusToCardStatus(getStatus(match)) === 'open' ? 0 : 1;
-      return rank(left.match) - rank(right.match) || left.index - right.index;
-    })
-    .map(({ match }) => match);
-}
-
 function countMatchFilters(
   sort: '' | 'recommended' | 'deadline' | 'latest',
   genderRule: '' | '성별 무관' | '남' | '여',
   levels: NonNullable<MatchListViewModel['filterSheet']>['levels'],
+  regionId: string | undefined,
 ) {
-  return Number(Boolean(sort)) + Number(Boolean(genderRule)) + levels.length;
+  return Number(Boolean(sort)) + Number(Boolean(genderRule)) + levels.length + Number(Boolean(regionId));
 }
 
-function countToday(items: V1Match[]) {
-  const today = new Date();
-  return items.filter((item) => {
-    const date = new Date(item.startsAt);
-    return (
-      date.getFullYear() === today.getFullYear() &&
-      date.getMonth() === today.getMonth() &&
-      date.getDate() === today.getDate()
-    );
-  }).length;
-}
-
-function getCapacity(match: V1Match) {
-  if (typeof match.participantCount === 'number' && typeof match.capacity === 'number') {
-    return { current: match.participantCount, capacity: match.capacity };
-  }
-
-  const [current, capacity] = match.capacityText?.match(/\d+/g)?.map(Number) ?? [];
-  // 인원을 못 읽으면 0 으로 둔다. 목업(18/22명)으로 메우면 실제 매치에 **다른 매치의 인원**이
-  // 붙어, 자리가 남았는지 없는지를 잘못 알려준다.
-  return {
-    current: current ?? 0,
-    capacity: capacity ?? match.capacity ?? 0,
-  };
-}
-
-function getStatus(match: V1Match): V1MatchApiStatus {
-  const base = (match.displayState as V1MatchApiStatus | undefined) ?? (match.status as V1MatchApiStatus);
-  // 마감 UX 선행: deadlineAt < now 면 모집 종료로 표시
-  if (base === 'recruiting' || base === 'open') {
-    const dl = match.deadlineAt ? new Date(match.deadlineAt) : null;
-    if (dl && !Number.isNaN(dl.getTime()) && dl.getTime() < Date.now()) return 'closed';
-  }
-  return base;
-}
-
-function getViewerState(match: V1Match, preflight?: Exclude<V1ViewerState, 'guest'>): V1ViewerState {
-  return preflight ?? match.viewer?.state ?? match.viewerState ?? 'none';
-}
 
 /**
  * 매치가 끝난 뒤 후기 작성 화면으로 가는 진입점. 실제로 평가할 대상이 있는지(같이 뛴 다른
@@ -448,21 +535,22 @@ function buildMatchReviewAction(
   matchId: string,
   viewerState: V1ViewerState,
   status: V1MatchApiStatus,
+  participantStatus?: 'active' | 'completed' | 'no_show' | 'cancelled' | 'removed' | null,
 ): MatchDetailViewModel['reviewAction'] {
   if (status !== 'completed') return null;
-  if (viewerState !== 'host' && viewerState !== 'approved') return null;
+  if (participantStatus === 'no_show') return null;
+  if (viewerState !== 'host' && viewerState !== 'approved' && viewerState !== 'participant') return null;
   return { label: '후기 남기기', href: `/my/reviews/match/${matchId}` };
 }
 
-function statusToCardStatus(status: V1MatchApiStatus, viewerState: V1ViewerState = 'none'): MatchCardModel['status'] {
-  if (viewerState === 'host') return 'mine';
-  if (viewerState === 'requested') return 'pending';
-  if (viewerState === 'approved' || viewerState === 'participant') return 'approved';
-  if (status === 'closed' || status === 'cancelled' || status === 'completed' || status === 'expired' || status === 'full') return 'full';
-  return 'open';
-}
 
-function statusLabel(viewerState: V1ViewerState, status: V1MatchApiStatus) {
+function statusLabel(
+  viewerState: V1ViewerState,
+  status: V1MatchApiStatus,
+  participantStatus?: 'active' | 'completed' | 'no_show' | 'cancelled' | 'removed' | null,
+) {
+  if (status === 'completed' && participantStatus === 'no_show') return '불참 기록';
+  if (status === 'completed' && (viewerState === 'host' || viewerState === 'approved' || viewerState === 'participant')) return '참여 완료';
   if (viewerState === 'host') return '내가 만든 매치';
   if (viewerState === 'requested') return '승인 대기';
   if (viewerState === 'approved' || viewerState === 'participant') return '승인 완료';
@@ -478,42 +566,6 @@ function canOpenMatchChat(viewerState: V1ViewerState) {
   return viewerState === 'host' || viewerState === 'approved' || viewerState === 'participant';
 }
 
-function actionLabel(status: MatchCardModel['status']) {
-  if (status === 'pending') return '승인 대기';
-  if (status === 'approved') return '승인 완료';
-  if (status === 'full') return '신청 마감';
-  if (status === 'mine') return '내 매치';
-  return '참가 신청';
-}
-
-function formatDeadline(value: string | null | undefined, status: MatchCardModel['status']) {
-  if (status === 'pending') return '승인 대기';
-  if (status === 'approved') return '승인 완료';
-  if (status === 'full') return '신청 마감';
-  if (status === 'mine') return '내 매치';
-  if (!value) return '신청 가능';
-
-  const deadline = new Date(value);
-  if (Number.isNaN(deadline.getTime())) return '신청 가능';
-  const diffMs = deadline.getTime() - Date.now();
-  if (diffMs <= 0) return '신청 마감';
-  const diffHours = Math.ceil(diffMs / 3_600_000);
-  if (diffHours < 24) return `마감 ${diffHours}시간 전`;
-  const diffDays = Math.ceil(diffHours / 24);
-  return `마감 ${diffDays}일 전`;
-}
-
-function formatDeadlineDetail(value: string | null | undefined, status: MatchCardModel['status']) {
-  if (status === 'pending') return '승인 대기';
-  if (status === 'approved') return '승인 완료';
-  if (status === 'full') return '신청 마감';
-  if (status === 'mine') return '내 매치';
-  if (!value) return '경기 시작 전까지';
-
-  const deadline = new Date(value);
-  if (Number.isNaN(deadline.getTime())) return '경기 시작 전까지';
-  return `${formatDate(value)} ${formatTime(value)}`;
-}
 
 async function shareMatch(match: V1Match): Promise<string | null> {
   const title = match.title;
@@ -561,16 +613,4 @@ function getApplyAction({
   if (viewerState === 'requested' && applicationId) return withdraw;
   if (eligible) return apply;
   return undefined;
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
-}
-
-function formatTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 }

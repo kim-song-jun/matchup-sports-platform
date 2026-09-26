@@ -26,7 +26,7 @@ export class TournamentCampaignsPublicController {
   }
 
   @Get(':slug')
-  getPublished(@Param('slug') slug: string) {
+  getPublished(@Param('slug') slug: string): ReturnType<TournamentCampaignReadService['getPublished']> {
     return this.campaignReadService.getPublished(slug);
   }
 }
@@ -37,12 +37,12 @@ export class TournamentCampaignsAdminController {
   constructor(private readonly campaignAdminService: TournamentCampaignAdminService) {}
 
   @Get(':tournamentId/campaign/preview')
-  preview(@CurrentUser() user: V1AuthUser, @Param('tournamentId') tournamentId: string) {
+  preview(@CurrentUser() user: V1AuthUser, @Param('tournamentId') tournamentId: string): ReturnType<TournamentCampaignAdminService['preview']> {
     return this.campaignAdminService.preview(user, tournamentId);
   }
 
   @Get(':tournamentId/campaign')
-  get(@CurrentUser() user: V1AuthUser, @Param('tournamentId') tournamentId: string) {
+  get(@CurrentUser() user: V1AuthUser, @Param('tournamentId') tournamentId: string): ReturnType<TournamentCampaignAdminService['get']> {
     return this.campaignAdminService.get(user, tournamentId);
   }
 
@@ -51,7 +51,7 @@ export class TournamentCampaignsAdminController {
     @CurrentUser() user: V1AuthUser,
     @Param('tournamentId') tournamentId: string,
     @Body() dto: CreateTournamentCampaignDto,
-  ) {
+  ): ReturnType<TournamentCampaignAdminService['create']> {
     return this.campaignAdminService.create(user, tournamentId, dto);
   }
 
@@ -60,7 +60,7 @@ export class TournamentCampaignsAdminController {
     @CurrentUser() user: V1AuthUser,
     @Param('tournamentId') tournamentId: string,
     @Body() dto: UpdateTournamentCampaignDto,
-  ) {
+  ): ReturnType<TournamentCampaignAdminService['update']> {
     return this.campaignAdminService.update(user, tournamentId, dto);
   }
 
@@ -69,7 +69,7 @@ export class TournamentCampaignsAdminController {
     @CurrentUser() user: V1AuthUser,
     @Param('tournamentId') tournamentId: string,
     @Body() dto: ChangeTournamentCampaignStatusDto,
-  ) {
+  ): ReturnType<TournamentCampaignAdminService['changeStatus']> {
     return this.campaignAdminService.changeStatus(user, tournamentId, dto);
   }
 }

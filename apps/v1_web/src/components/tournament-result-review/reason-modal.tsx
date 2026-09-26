@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
+import { useOverlayHistory } from '@/components/v1-ui/use-overlay-history';
+import { useTopmostEscape } from '@/components/v1-ui/use-topmost-escape';
 
 export type ReasonModalTone = 'default' | 'danger';
 
@@ -66,14 +68,8 @@ export function ReasonModal({
     previousFocusRef.current = null;
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCancel();
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open, onCancel]);
+  useOverlayHistory({ open, onClose: onCancel });
+  useTopmostEscape({ open, onEscape: onCancel });
 
   useEffect(() => {
     if (!open) return;
@@ -131,13 +127,13 @@ export function ReasonModal({
         onClick={(event) => event.stopPropagation()}
       >
         <div style={{ padding: '28px 24px 20px' }}>
-          <p id={titleId} className="tm-text-body-lg" style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 10 }}>
+          <p id={titleId} className="tm-text-body-lg" style={{ color: 'var(--text-strong)', fontWeight: 700, marginBottom: 12 }}>
             {title}
           </p>
           <p id={messageId} className="tm-text-label" style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
             {message}
           </p>
-          <div style={{ marginTop: 18 }}>
+          <div style={{ marginTop: 20 }}>
             <label htmlFor={reasonId} className="tm-text-label" style={{ display: 'block', color: 'var(--text-strong)', fontWeight: 600, marginBottom: 8 }}>
               {reasonLabel}
             </label>
@@ -153,7 +149,7 @@ export function ReasonModal({
             />
           </div>
           {errorMessage ? (
-            <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 10 }}>
+            <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 12 }}>
               {errorMessage}
             </p>
           ) : null}

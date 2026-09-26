@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BracketScheduleTab } from './bracket-page-client';
 
@@ -7,6 +7,15 @@ const myFixturesMock = vi.fn();
 
 vi.mock('@/components/public-game-records/use-public-game-records', () => ({
   usePublicTournamentSchedule: (...args: unknown[]) => scheduleMock(...args),
+  // 선수 기록 섹션이 `/schedule` 에서 이 탭으로 옮겨왔다. 이 스펙의 관심사는 아니라
+  // 빈 상태로 둔다(`emptyBehavior="hide"` 라 아무것도 그리지 않는다).
+  usePublicTournamentPlayerRecords: () => ({
+    data: undefined,
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
 }));
 
 vi.mock('@/hooks/use-v1-api', () => ({
@@ -81,13 +90,18 @@ describe('BracketScheduleTab — 내 팀 경기와 라인업 권한', () => {
     });
   });
 
-  it('bracket 일정 탭에서 내 팀 경기를 강조하고 라인업으로 바로 연결한다', () => {
-    render(<BracketScheduleTab tournamentId="tour-1" />);
+  it('bracket 일정 탭에서 내 팀 경기를 강조하되, 대회엔 라인업 상태를 붙이지 않는다', () => {
+    const { container } = render(<BracketScheduleTab tournamentId="tour-1" />);
 
-    expect(screen.getByText('라인업 미작성')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '라인업 짜기' })).toHaveAttribute(
-      'href',
-      '/tournaments/tour-1/matches/fixture-1/lineup',
-    );
+    // [P1-d] 라인업 링크 단언은 뺐다(경기별 라인업 화면 제거). **강조 계약은 남긴다** --
+    // 이 탭에서 내 팀 경기가 눈에 띄어야 한다는 것은 링크와 별개의 계약이다.
+    // 강조는 행 카드가 `tm-schedule-card-mine` 을 다는 것으로 확인한다 — 이 픽스처의
+    // 팀 이름이 하필 '우리 팀'이라 문구로 찾으면 뱃지인지 팀 이름인지 갈리지 않는다.
+    const myCard = container.querySelector('.tm-schedule-card-mine');
+    expect(myCard).not.toBeNull();
+    expect(screen.queryByRole('link', { name: '라인업 짜기' })).not.toBeInTheDocument();
+    // 대회 축엔 라인업 제출 단계가 없다 — 여기 뱃지가 뜨면 팀장에게 할 수 없는 일을
+    // 안 했다고 말하는 것이고, 끝난 경기 위에도 남았다(alpha 실측).
+    expect(within(myCard as HTMLElement).queryByText('라인업 미작성')).not.toBeInTheDocument();
   });
 });

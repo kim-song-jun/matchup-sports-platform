@@ -1,0 +1,51 @@
+{
+  "checkedAt": "2026-09-18T17:25:51.298Z",
+  "runtime": {
+    "webBase": "http://localhost:13013",
+    "apiBase": "http://localhost:18121/api/v1",
+    "database": "isolated teameet-task149-flow PostgreSQL volume",
+    "browser": "Google Chrome headed"
+  },
+  "entity": {
+    "teamMatchId": "6e886e62-16ba-4102-bf1a-37d739b50030",
+    "title": "실제 팀 신청 QA 1789752280447",
+    "status": "recruiting",
+    "platformManaged": true
+  },
+  "applicant": {
+    "teamId": "00000000-0000-4000-8000-000000000102",
+    "teamName": "송파 풋살 모임",
+    "applicationId": "369c7ff6-361d-4a17-943d-a6b0b68e5616",
+    "status": "requested"
+  },
+  "assertions": {
+    "adminCreateStatus": 201,
+    "publicListContainsCreatedId": true,
+    "browserApplicationStatus": 201,
+    "adminApplicationCount": 1
+  },
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "name": "tablet",
+      "width": 834,
+      "height": 1112
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "telemetry": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "requestFailures": [],
+    "apiErrors": [],
+    "ignoredNextPrefetchAborts": 40
+  }
+}

@@ -19,6 +19,15 @@ export const inquiryRelatedTypes = [
   'registration',
   'payment',
   'user',
+  'team_contact',
+] as const;
+
+export const inquiryReportReasons = [
+  'spam',
+  'harassment',
+  'impersonation',
+  'inappropriate',
+  'other',
 ] as const;
 
 export class InquiriesQueryDto {
@@ -59,4 +68,8 @@ export class CreateInquiryDto {
   @IsString()
   @MaxLength(80)
   relatedId?: string;
+
+  @IsOptional()
+  @IsIn(inquiryReportReasons)
+  reportReason?: (typeof inquiryReportReasons)[number];
 }

@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import type { GameOperationHandler } from '../v1-game-operations-worker.service';
+import type { GameOperationClaim, GameOperationHandler } from '../v1-game-operations-worker.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { WebPushService } from '../../notifications/web-push.service';
 
@@ -122,7 +122,7 @@ export class ScheduleReminderService {
     const recipients = await this.activeTeamMemberIds(tx, schedule.teamId);
     if (recipients.length === 0) return;
 
-    await this.deliverDurableReminder(tx, claim.id, recipients, {
+    await this.deliverDurableReminder(tx, claim, recipients, {
       targetId: `${schedule.teamId}:${schedule.id}`,
       deepLink: `/teams/${schedule.teamId}/schedules/${schedule.id}`,
       ...RSVP_REMINDER_COPY,
@@ -154,7 +154,7 @@ export class ScheduleReminderService {
     const recipients = await this.activeTeamMemberIds(tx, recruitment.teamId);
     if (recipients.length === 0) return;
 
-    await this.deliverDurableReminder(tx, claim.id, recipients, {
+    await this.deliverDurableReminder(tx, claim, recipients, {
       targetId: `${recruitment.teamId}:${recruitment.scheduleId}`,
       deepLink: `/teams/${recruitment.teamId}/schedules/${recruitment.scheduleId}`,
       ...GUEST_RECRUITMENT_CLOSE_REMINDER_COPY,
@@ -180,7 +180,7 @@ export class ScheduleReminderService {
     const recipients = await this.activeManagerIds(tx, payload.teamId);
     if (recipients.length === 0) return;
 
-    await this.deliverDurableReminder(tx, claim.id, recipients, {
+    await this.deliverDurableReminder(tx, claim, recipients, {
       targetId: `${payload.teamId}:${payload.scheduleId}`,
       deepLink: `/teams/${payload.teamId}/schedules/${payload.scheduleId}`,
       title: GUEST_APPLICATION_RECEIVED_TITLE,
@@ -224,10 +224,23 @@ export class ScheduleReminderService {
    * UNIQUE` table) would still be needed to make an individual failed push retryable — that
    * requires a migration and is out of scope here (HARD CONSTRAINTS forbid schema changes); see
    * the Task 12 review response for that residual, explicitly-scoped gap.
+   *
+   * **afterCommit boundary (2026-08-27 audit 41/44):** step 3's Web Push used to fire directly
+   * inside `tx`'s scope, same as the other three notification sites this audit flagged. That is
+   * exactly the "genuinely fixable" bug the P0-3 note above already diagnoses — a *duplicate*
+   * push on retry — but it has a second, sharper failure mode: if anything AFTER this call
+   * throws (the caller handler keeps running after `deliverDurableReminder` returns, and the
+   * worker's own `completeWith` CAS can still fail), the whole `$transaction` this call is
+   * nested in rolls back — the just-created V1Notification rows disappear, but the push already
+   * left the process and cannot be recalled. The fix moves the send into `claim.afterCommit`
+   * (the pattern `identity-link-expiry.service.ts` established) so it only actually fires once
+   * the worker's transaction has durably committed. `claim` replaces the old bare `outboxId`
+   * string parameter — `businessKeyFor` below reads `claim.id`, which is the same value
+   * `outboxId` always was.
    */
   private async deliverDurableReminder(
     tx: Prisma.TransactionClient,
-    outboxId: string,
+    claim: GameOperationClaim,
     recipients: string[],
     event: ReminderEvent,
   ): Promise<void> {
@@ -239,7 +252,7 @@ export class ScheduleReminderService {
     const enabledRecipients = recipients.filter((userId) => teamEnabledByUser.get(userId) !== false);
     if (enabledRecipients.length === 0) return;
 
-    const businessKeyFor = (userId: string): string => `${outboxId}:${userId}`;
+    const businessKeyFor = (userId: string): string => `${claim.id}:${userId}`;
     const alreadyDelivered = await tx.v1Notification.findMany({
       where: { businessKey: { in: enabledRecipients.map(businessKeyFor) } },
       select: { businessKey: true },
@@ -262,12 +275,21 @@ export class ScheduleReminderService {
     const newlyDeliveredRecipients = enabledRecipients.filter((userId) => !alreadyDeliveredKeys.has(businessKeyFor(userId)));
 
     for (const userId of newlyDeliveredRecipients) {
-      void this.webPush
-        ?.sendToUser(userId, { title: event.title, body: event.body, url: event.deepLink })
-        .catch(() => {
-          // Best-effort only, and structurally unreachable before the createMany above has
-          // resolved — a push failure must never undo or retry the already-durable notification.
-        });
+      const send = () =>
+        void this.webPush
+          ?.sendToUser(userId, { title: event.title, body: event.body, url: event.deepLink })
+          .catch(() => {
+            // Best-effort only, and structurally unreachable before the createMany above has
+            // resolved — a push failure must never undo or retry the already-durable notification.
+          });
+      // Only fires once the worker's transaction actually commits (see docblock above). Handlers
+      // that call this directly with a hand-built claim missing `afterCommit` (unit specs) fall
+      // back to sending immediately, preserving those specs' existing assertions.
+      if (claim.afterCommit === undefined) {
+        send();
+      } else {
+        claim.afterCommit.push(send);
+      }
     }
   }
 

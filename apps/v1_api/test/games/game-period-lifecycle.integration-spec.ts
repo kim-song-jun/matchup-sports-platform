@@ -26,6 +26,8 @@ const ids = {
   opponentTeam: '65000000-0000-4000-8000-000000000021',
   tournament: '65000000-0000-4000-8000-000000000030',
   fixture: '65000000-0000-4000-8000-000000000040',
+  homeRegistration: '65000000-0000-4000-8000-000000000041',
+  awayRegistration: '65000000-0000-4000-8000-000000000042',
 } as const;
 
 const prisma = new PrismaService();
@@ -111,13 +113,35 @@ describe('T1-0 period lifecycle — start/next_period/end drive V1GamePeriod, no
     await prisma.v1Tournament.create({
       data: { id: ids.tournament, sportId: ids.sport, title: 'T1-0 tournament', competitionConfigVersionId: configId },
     });
-    await prisma.v1TournamentFixture.create({
+    await prisma.v1TournamentRegistration.createMany({
+      data: [
+        { id: ids.homeRegistration, tournamentId: ids.tournament, teamId: ids.hostTeam, appliedByUserId: ids.director, status: 'confirmed' },
+        { id: ids.awayRegistration, tournamentId: ids.tournament, teamId: ids.opponentTeam, appliedByUserId: ids.director, status: 'confirmed' },
+      ],
+    });
+    await prisma.v1TeamMatch.create({
       data: {
         id: ids.fixture,
         tournamentId: ids.tournament,
+        hostTeamId: ids.hostTeam,
+        approvedApplicantTeamId: ids.opponentTeam,
+        createdByUserId: ids.director,
+        sportId: ids.sport,
+        regionId: ids.region,
+        title: 'T1-0 canonical match',
+        status: 'matched',
+        startAt: new Date('2026-09-12T00:00:00.000Z'),
+        competitionConfigVersionId: configId,
+      },
+    });
+    await prisma.v1TournamentMatchDetails.create({
+      data: {
+        teamMatchId: ids.fixture,
+        tournamentId: ids.tournament,
         round: 'group',
         fixtureNumber: 1,
-        competitionConfigVersionId: configId,
+        homeRegistrationId: ids.homeRegistration,
+        awayRegistrationId: ids.awayRegistration,
       },
     });
     await prisma.v1TournamentStaffAssignment.create({
@@ -130,7 +154,7 @@ describe('T1-0 period lifecycle — start/next_period/end drive V1GamePeriod, no
     });
 
     const input: GameSourceCreationInput = {
-      sourceType: V1GameSourceType.TOURNAMENT_FIXTURE,
+      sourceType: V1GameSourceType.TEAM_MATCH,
       sourceId: ids.fixture,
       competitionConfigVersionId: configId,
       sides: [

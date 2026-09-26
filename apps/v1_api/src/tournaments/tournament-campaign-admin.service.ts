@@ -24,6 +24,7 @@ import {
 } from './tournament-campaign-record';
 import { TournamentCampaignReadService } from './tournament-campaign-read.service';
 import { TournamentCampaignStatusService } from './tournament-campaign-status.service';
+import { findTournamentOnSurface, TOURNAMENT_KINDS } from './tournament-surface-lookup';
 
 @Injectable()
 export class TournamentCampaignAdminService {
@@ -46,7 +47,7 @@ export class TournamentCampaignAdminService {
 
   async create(user: V1AuthUser, tournamentId: string, dto: CreateTournamentCampaignDto) {
     const admin = await this.adminContext.getMutationAdmin(user.id);
-    const tournament = await this.prisma.v1Tournament.findFirst({
+    const tournament = await findTournamentOnSurface(this.prisma, TOURNAMENT_KINDS, {
       where: { id: tournamentId, deletedAt: null },
       select: { id: true, status: true },
     });

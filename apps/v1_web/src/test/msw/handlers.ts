@@ -1,4 +1,5 @@
 import { http, HttpResponse } from 'msw';
+import type { SharedRecord } from '@/hooks/use-team-match-record';
 import {
   getSignupProfileIssue,
   SIGNUP_PROFILE_ERROR_MESSAGES,
@@ -55,17 +56,24 @@ import {
   v1ReviewsReceivedFixture,
   v1ReviewsWrittenFixture,
   v1ReviewSubmitFixture,
+  v1ReportedTeamsFixture,
+  v1ReportedTeamsWindowDays,
   v1ReviewTeamMatchSourceFixture,
   v1SettingsFixture,
   v1SportsFixture,
   v1TeamMatchesFixture,
   v1TeamsFixture,
   v1UserFixture,
+  getReportedTeamIdForInquiry,
   toAdminInquiryDetail,
   toAdminInquiryRow,
 } from './fixtures';
 
 const api = '*/api/v1';
+
+// `/admin/inquiries/:inquiryId/block-reported-team` 멱등 상태 — 같은 문의를 두 번 차단해도
+// 두 번째부터는 alreadyBlocked: true 로 200 이 온다(에러 아님, admin.service.ts 실측).
+const blockedInquiryIds = new Set<string>();
 
 type RegisterField = SignupProfileField | 'nickname' | 'email' | 'password' | 'requiredTermsAccepted';
 
@@ -213,6 +221,7 @@ let v1ScheduleFixture = {
   state: 'SCHEDULED' as 'SCHEDULED' | 'CANCELLED' | 'COMPLETED',
   version: 1,
   teamMatchId: null as string | null,
+  linkedMatch: null as { teamMatchId: string; tournamentId: string | null; leagueId: string | null } | null,
   matchConfirmed: null as boolean | null,
   cancelReason: null as string | null,
   cancelledAt: null as string | null,
@@ -271,6 +280,7 @@ function scheduleSummary() {
     state: v1ScheduleFixture.state,
     version: v1ScheduleFixture.version,
     teamMatchId: v1ScheduleFixture.teamMatchId,
+    linkedMatch: v1ScheduleFixture.linkedMatch,
     matchConfirmed: v1ScheduleFixture.matchConfirmed,
     goingCount: v1ScheduleAttendanceCounts.going,
     waitlistedCount: v1ScheduleAttendanceCounts.waitlisted,
@@ -334,7 +344,7 @@ let v1GameFixture = {
     { id: 'side-away-1', gameId: 'game-1', sideKey: 'AWAY' as const, teamId: 'team-2', displayNameSnapshot: '마포 FC' },
   ],
   periods: [] as unknown[],
-  lineups: [] as { id: string; gameId: string; sideId: string; revision: number; state: string; version: number; submittedAt: string | null; supersedesId: string | null }[],
+  lineups: [] as { id: string; gameId: string; sideId: string; revision: number; state: string; version: number; submittedAt: string | null; supersedesId: string | null; invalidatedAt: string | null }[],
   actorRole: 'team_owner',
 };
 
@@ -352,8 +362,8 @@ let v1TeamMatchLineupFixture: V1TeamMatchLineup = {
   formation: '2-2',
   publicLineupAt: null,
   starters: [
-    { id: 'participant-1', displayName: '김도윤', jerseyNumber: 7, position: 'FW', goalkeeper: false, positionX: 30, positionY: 60 },
-    { id: 'participant-2', displayName: '박서준', jerseyNumber: 1, position: 'GK', goalkeeper: true, positionX: 50, positionY: 6 },
+    { id: 'participant-1', userId: 'user-1', displayName: '김도윤', jerseyNumber: 7, position: 'FW', goalkeeper: false, positionX: 30, positionY: 60 },
+    { id: 'participant-2', userId: 'user-2', displayName: '박서준', jerseyNumber: 1, position: 'GK', goalkeeper: true, positionX: 50, positionY: 6 },
   ],
   bench: [{ id: 'participant-3', displayName: '이하늘', jerseyNumber: 11 }],
 };
@@ -373,6 +383,7 @@ let v1TournamentOperationsBoardItems: V1TournamentOperationsBoardItem[] = [
     awayRegistrationId: 'registration-2',
     scheduledAt: '2026-05-25T09:00:00.000Z',
     currentScore: null,
+    currentRevisionState: null,
     warnings: [],
     version: 1,
     revisionId: null,
@@ -467,6 +478,7 @@ export const v1MswHandlers = [
     const inquiry: V1Inquiry = {
       inquiryId: `inquiry-${v1InquiriesFixture.items.length + 1}`,
       category: body.category as V1Inquiry['category'],
+      reportReason: null,
       title: body.title,
       body: body.body,
       contact: body.contact ?? null,
@@ -566,6 +578,7 @@ export const v1MswHandlers = [
       roomType: room.roomType,
       status: room.status,
       title: room.title,
+      teamContact: room.teamContact,
       linkedTarget: room.linkedTarget,
       me: {
         participantId: 'chat-participant-1',
@@ -770,16 +783,34 @@ export const v1MswHandlers = [
     const params = new URL(request.url).searchParams;
     const status = params.get('status');
     const category = params.get('category');
+    const reportReason = params.get('reportReason');
+    const reportedTeamId = params.get('reportedTeamId');
     const q = params.get('q')?.trim().toLowerCase();
+    // reportedTeamId 는 칩이 없는 딥링크 필터라 자기 facet이 없다 — searched 단계에서 걸러
+    // 아래 세 facet(status/category/reportReason) 모두가 이미 걸러진 집합을 이어받게 한다
+    // (admin.service.ts의 statusFacetWhere/categoryFacetWhere/reportReasonFacetWhere 미러).
     const searched = v1InquiriesFixture.items.map(toAdminInquiryRow).filter((inquiry) => {
       if (q && !`${inquiry.title} ${inquiry.requesterName ?? ''} ${inquiry.requesterEmail ?? ''}`.toLowerCase().includes(q)) return false;
+      if (reportedTeamId && getReportedTeamIdForInquiry(inquiry.inquiryId) !== reportedTeamId) return false;
       return true;
     });
+    // 각 facet 은 "자기 자신을 뺀 나머지 필터" 로 집계한다 — admin.service.ts의 실제 규칙을
+    // 그대로 미러링한다(사유 하나를 골라도 다른 사유 칩 건수는 그대로 보여야 한다).
     const statusSource = searched.filter((inquiry) => {
+      if (category && inquiry.category !== category) return false;
+      if (reportReason && inquiry.reportReason !== reportReason) return false;
+      return true;
+    });
+    const categorySource = searched.filter((inquiry) => {
+      if (status && inquiry.status !== status) return false;
+      if (reportReason && inquiry.reportReason !== reportReason) return false;
+      return true;
+    });
+    const reportReasonSource = searched.filter((inquiry) => {
+      if (status && inquiry.status !== status) return false;
       if (category && inquiry.category !== category) return false;
       return true;
     });
-    const categorySource = searched.filter((inquiry) => !status || inquiry.status === status);
     const rows = statusSource.filter((inquiry) => !status || inquiry.status === status);
     return ok({
       ...page(rows),
@@ -787,12 +818,38 @@ export const v1MswHandlers = [
         total: statusSource.length,
         byStatus: countFacet(statusSource, ['received', 'reviewing', 'answered', 'closed'], (inquiry) => inquiry.status),
         byCategory: countFacet(categorySource, ['account', 'match', 'team', 'tournament', 'payment_refund', 'report', 'other'], (inquiry) => inquiry.category),
+        byReportReason: countFacet(reportReasonSource, ['spam', 'harassment', 'impersonation', 'inappropriate', 'other'], (inquiry) => inquiry.reportReason ?? ''),
       },
     });
   }),
   http.get(`${api}/admin/inquiries/:inquiryId`, ({ params }) => {
     const inquiry = v1InquiriesFixture.items.find((item) => item.inquiryId === params.inquiryId) ?? v1InquiriesFixture.items[0];
     return ok(toAdminInquiryDetail(inquiry));
+  }),
+  http.get(`${api}/admin/reports/teams`, ({ request }) => {
+    const limitParam = new URL(request.url).searchParams.get('limit');
+    const limit = limitParam ? Math.min(Math.max(Number(limitParam), 1), 50) : 20;
+    return ok({ items: v1ReportedTeamsFixture.slice(0, limit), windowDays: v1ReportedTeamsWindowDays });
+  }),
+  http.post(`${api}/admin/inquiries/:inquiryId/block-reported-team`, ({ params }) => {
+    const inquiryId = params.inquiryId as string;
+    const reportedTeamId = getReportedTeamIdForInquiry(inquiryId);
+    if (!reportedTeamId) {
+      return HttpResponse.json(
+        {
+          status: 'error',
+          statusCode: 409,
+          code: 'REPORT_TARGET_UNKNOWN',
+          message: '신고 대상 팀을 알 수 없어 차단할 수 없어요.',
+          timestamp: '2026-05-18T00:00:00.000Z',
+        },
+        { status: 409 },
+      );
+    }
+    // 멱등 — 두 번째 클릭도 에러가 아니라 200 + alreadyBlocked: true 여야 한다(admin.service.ts 실측, P2002 흡수).
+    const alreadyBlocked = blockedInquiryIds.has(inquiryId);
+    blockedInquiryIds.add(inquiryId);
+    return ok({ blocked: true, alreadyBlocked, teamId: 'team-1', blockedTeamId: reportedTeamId });
   }),
   http.post(`${api}/admin/inquiries/:inquiryId/replies`, async ({ params, request }) => {
     const body = await request.json() as { body: string };
@@ -1047,6 +1104,23 @@ export const v1MswHandlers = [
     nextCursor: null,
   })),
 
+  // The stock mock lineup is a draft: do not simulate successful shared writes.
+  // Interactive shared-record tests override these handlers with their own contract fixtures.
+  http.get(`${api}/team-matches/:teamMatchId/record`, ({ params }) => {
+    const match = v1TeamMatchesFixture.find((item) => item.id === params.teamMatchId);
+    if (!match || params.teamMatchId !== 'team-match-1') return HttpResponse.json({ message: '경기를 찾을 수 없어요.' }, { status: 404 });
+    return ok({
+      teamMatchId: match.id, title: match.title, startsAt: match.startsAt ?? null,
+      phase: v1GameResultRevisions.length ? 'legacy' : 'scheduled', version: 0,
+      serverTime: new Date().toISOString(), canEdit: false, participant: false, ownSideId: null,
+      sides: v1GameFixture.sides.map((side) => ({ id: side.id, key: side.sideKey, name: side.displayNameSnapshot, score: null })),
+      participants: [], subMatches: [], goals: [], history: [], confirmations: [], officialAt: null,
+    } satisfies SharedRecord);
+  }),
+  http.post(`${api}/team-matches/:teamMatchId/record`, () => HttpResponse.json({
+    code: 'RECORD_PARTICIPANT_REQUIRED', message: '양 팀의 제출된 라인업 참가자만 기록할 수 있어요.',
+  }, { status: 403 })),
+
   // ── Task 17: games / result revisions / team-match lineup ─────────────────
   http.get(`${api}/games/:gameId`, () => ok(v1GameFixture)),
   http.get(`${api}/games/:gameId/result-revisions`, () => ok(v1GameResultRevisions)),
@@ -1072,6 +1146,8 @@ export const v1MswHandlers = [
       missingScorer: false,
       mvpParticipantId: body.mvpParticipantId ?? null,
       reason: body.reason ?? null,
+      outcomeReason: 'NORMAL',
+      outcomeNote: null,
       createdByActorType: 'USER',
       createdByUserId: 'user-1',
       createdBySystemActor: null,
@@ -1161,8 +1237,24 @@ export const v1MswHandlers = [
       revision: v1TeamMatchLineupFixture.revision + 1,
       version: v1TeamMatchLineupFixture.version + 1,
       formation: body.formation ?? null,
-      starters: body.starters.map((participant, index) => ({
-        id: participant.userId ?? `guest-participant-${index + 1}`,
+      // 서버(`rosterOf`)와 **같은 규칙**: `participants` 가 **비어 있지 않을 때만** 그것이
+      // 명단이고, 그 밖에는 옛 `starters`+`bench` 를 합친다. `??` 로 쓰면 빈 배열에서
+      // 갈린다 — 서버는 `length > 0` 을 보므로 `participants: []` 를 받으면 레거시 두
+      // 배열로 넘어가는데, mock 만 빈 명단을 만들어 화면 테스트가 서버와 다른 것을 본다.
+      // 응답은 아직 `starters`/`bench` 모양이라 전원을 `starters` 에 싣고 `bench` 는
+      // 비운다(#978 이후의 실제 서버 동작).
+      starters: (body.participants?.length
+        ? body.participants
+        : [...(body.starters ?? []), ...(body.bench ?? [])]
+      ).map((participant, index) => ({
+        // **`id` 는 `V1GameParticipant.id` 이고 `userId` 와 별개다.** 예전 mock 은 여기에
+        // `userId` 를 그대로 넣어, `participantId` 를 `userId` 로 잘못 다루는 코드가
+        // 있어도 테스트가 통과했다(결과 입력 폼의 골·카드 귀속이 그 값을 쓴다).
+        // 두 값이 절대 같지 않도록 접두어를 붙여 갈라 둔다.
+        id: `participant-${index + 1}`,
+        // 서버와 같다: 저장 요청이 실어 보낸 사람 연결을 응답이 그대로 되돌려준다.
+        // 게스트는 계정이 없으므로 null.
+        userId: participant.userId ?? null,
         displayName: participant.displayName ?? '이름 미확인',
         jerseyNumber: participant.jerseyNumber ?? null,
         position: participant.position ?? null,
@@ -1170,11 +1262,7 @@ export const v1MswHandlers = [
         positionX: participant.positionX ?? null,
         positionY: participant.positionY ?? null,
       })),
-      bench: body.bench.map((participant, index) => ({
-        id: participant.userId ?? `guest-bench-${index + 1}`,
-        displayName: participant.displayName ?? '이름 미확인',
-        jerseyNumber: participant.jerseyNumber ?? null,
-      })),
+      bench: [],
     };
     return ok({
       teamMatchId: v1TeamMatchLineupFixture.teamMatchId,

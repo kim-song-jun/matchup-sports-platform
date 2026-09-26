@@ -510,23 +510,44 @@ async function seedFixture() {
         },
       ],
     });
-    await tx.v1TournamentFixture.createMany({
+    // V1TournamentFixture is intentionally @@ignore in the canonical Prisma
+    // schema. Keep fixture UUIDs as stable scenario identifiers while storing
+    // the canonical TeamMatch + Details pair.
+    await tx.v1TeamMatch.createMany({
       data: [
         {
           id: FIXTURE.fixtureA,
-          tournamentId: FIXTURE.tournamentA,
-          round: 'Task 9 CI A',
-          fixtureNumber: 1,
+          sportId: FIXTURE.sport,
+          title: 'Task 9 CI Tournament A fixture',
           status: 'completed',
+          tournamentId: FIXTURE.tournamentA,
           competitionConfigVersionId: FIXTURE.config,
         },
         {
           id: FIXTURE.fixtureB,
+          sportId: FIXTURE.sport,
+          title: 'Task 9 CI Tournament B fixture',
+          status: 'completed',
+          tournamentId: FIXTURE.tournamentB,
+          competitionConfigVersionId: FIXTURE.config,
+        },
+      ],
+    });
+    await tx.v1TournamentMatchDetails.createMany({
+      data: [
+        {
+          teamMatchId: FIXTURE.fixtureA,
+          tournamentId: FIXTURE.tournamentA,
+          round: 'Task 9 CI A',
+          fixtureNumber: 1,
+          legNumber: 1,
+        },
+        {
+          teamMatchId: FIXTURE.fixtureB,
           tournamentId: FIXTURE.tournamentB,
           round: 'Task 9 CI B',
           fixtureNumber: 1,
-          status: 'completed',
-          competitionConfigVersionId: FIXTURE.config,
+          legNumber: 1,
         },
       ],
     });
@@ -543,15 +564,15 @@ async function seedFixture() {
       data: [
         {
           id: FIXTURE.gameA,
-          sourceType: 'TOURNAMENT_FIXTURE',
-          tournamentFixtureId: FIXTURE.fixtureA,
+          sourceType: 'TEAM_MATCH',
+          teamMatchId: FIXTURE.fixtureA,
           state: 'ENDED',
           competitionConfigVersionId: FIXTURE.config,
         },
         {
           id: FIXTURE.gameB,
-          sourceType: 'TOURNAMENT_FIXTURE',
-          tournamentFixtureId: FIXTURE.fixtureB,
+          sourceType: 'TEAM_MATCH',
+          teamMatchId: FIXTURE.fixtureB,
           state: 'ENDED',
           competitionConfigVersionId: FIXTURE.config,
         },

@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { Card } from '@/components/v1-ui/primitives';
 import { MatchVideos } from '@/components/tournaments/match-videos';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
+import { withFromPath } from '@/lib/session-storage';
+import { matchOutcomeReasonLabel, toDisplayableOutcomeReason } from '@/lib/match-outcome';
 import { AbnormalClockBadge } from './abnormal-clock-badge';
 import { LiveBadge } from './live-badge';
 import {
-  eventPresentation,
   fixtureStatusLabel,
+  eventPresentation,
   formatClock,
   formatScoreline,
   isClockAbnormal,
@@ -20,41 +22,127 @@ import {
 import { PenaltyScoreline } from './penalty-scoreline';
 import type { PublicLineupSlot, PublicMatchDetail, PublicMatchEvent } from './types';
 
+/**
+ * 선수 이름을 프로필로 잇는다. **열어도 되는지는 서버가 이미 판단해서** `profileHref` 로
+ * 내려주므로(없으면 `null`) 여기서 동의·계정 유무를 다시 따지지 않는다 — 화면 세 곳이
+ * 각자 판단하면 언젠가 갈린다.
+ *
+ * 링크가 없을 때 굳이 span 으로 감싸지 않고 이름을 그대로 돌려주는 이유: 대부분의
+ * 참가자가 그 경우이고, 의미 없는 래퍼가 한 겹 늘면 기존 레이아웃(폭·정렬)이 미묘하게
+ * 달라진다.
+ */
+function ProfileLink({ href, children }: { href: string | null; children: React.ReactNode }) {
+  if (href === null) return <>{children}</>;
+  return (
+    <Link href={href} style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+      {children}
+    </Link>
+  );
+}
+
 function sideLabel(side: PublicMatchDetail['home']): string {
-  return side?.teamName ?? '미정';
+  if (side?.teamName) return side.teamName;
+  return side?.registrationId ? '참가팀 비공개' : '미정';
+}
+
+/**
+ * 스코어보드의 팀 이름. **선수 이름은 프로필로 눌리는데 팀 이름은 아무 데도 못 갔다** —
+ * 관전자가 이 경기에서 팀으로 가는 유일한 자리인데 막혀 있었다(alpha 실측).
+ *
+ * 모집 마감 전에는 서버가 신원을 가려 `teamId` 가 없다. 그때는 `ProfileLink` 와 같은
+ * 규칙으로 평문이 된다 — 없는 팀 페이지로 보내지 않는다.
+ */
+function SideName({ side, from }: { side: PublicMatchDetail['home']; from?: string }) {
+  const label = sideLabel(side);
+  // `teamId` 만 보면 **`'미정'` 이라는 글자가 팀 페이지로 링크된다** — 두 필드가 각각
+  // nullable 이라 id 는 있고 이름만 가려진 조합이 나올 수 있다. 이름이 없으면 링크도 없다.
+  if (!side?.teamId || !side.teamName) return <>{label}</>;
+  return (
+    <Link
+      href={from ? withFromPath(`/teams/${encodeURIComponent(side.teamId)}`, from) : `/teams/${encodeURIComponent(side.teamId)}`}
+      style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}
+    >
+      {label}
+    </Link>
+  );
 }
 
 /** `void`/`corrected` states need a visible badge so a stale-looking score is never mistaken for the live truth. */
 function ResultStateBadge({ state }: { state: PublicMatchDetail['resultState'] }) {
   if (state === 'pending' || state === 'official') return null;
-  const tone = state === 'void' ? 'var(--red500)' : 'var(--blue500)';
+  const tone = state === 'void' ? 'var(--red700)' : 'var(--blue700)';
   const bg = state === 'void' ? 'var(--red50)' : 'var(--blue50)';
   return (
-    <span
-      role="status"
-      style={{ fontSize: 12, fontWeight: 700, color: tone, background: bg, borderRadius: 8, padding: '3px 8px' }}
-    >
+    // live region 을 쓰지 않는다 — 이 배지는 렌더 후 변하지 않는 정적 텍스트라, role="status"
+    // 를 붙이면 스크린리더가 상태 변경으로 오인해 공지한다. 같은 파일의 몰수·중단 배지와
+    // 같은 이유이고, `LiveBadge`(경기 시계)처럼 값이 실제로 바뀌는 곳에만 쓴다.
+    <span style={{ fontSize: 12, fontWeight: 700, color: tone, background: bg, borderRadius: 'var(--radius-chip)', padding: '3px 8px' }}>
       {resultStateLabel(state)}
     </span>
+  );
+}
+
+/**
+ * 몰수·중단으로 끝난 경기의 표기. 이게 없으면 몰수 0:0 과 실제 0:0 무승부가 관전자
+ * 화면에서 **완전히 같아 보인다** — 회고에서 지적된 "왜 그 점수인지 기록 어디에도 없다"가
+ * 서버에 사유를 저장해 두고도 그대로 남는 상태다. 운영자가 종료 다이얼로그에서 "사유는
+ * 공개 경기 기록에 함께 남는다"는 안내를 읽고 사유를 적으므로, 여기서 보이지 않으면
+ * 그 안내 자체가 거짓이 된다.
+ *
+ * 컬러만으로 구분하지 않는다(WCAG) — 사유 라벨 텍스트가 항상 함께 나온다.
+ */
+function MatchOutcomeNotice({ outcome }: { outcome: PublicMatchDetail['outcome'] }) {
+  const reason = toDisplayableOutcomeReason(outcome?.reason);
+  if (outcome === null || reason === null) return null;
+  const note = outcome.note?.trim() ?? '';
+  return (
+    // live region 을 쓰지 않는 이유는 일정 카드의 같은 배지와 동일하다 — 정적 텍스트다.
+    <div
+      style={{
+        marginTop: 12,
+        padding: '8px 12px',
+        borderRadius: 10,
+        background: 'var(--orange50)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        textAlign: 'center',
+      }}
+    >
+      {/* --orange500 텍스트는 이 틴트 배경 위에서 1.97:1 로 WCAG AA 미달이다 —
+          --orange700(5.42:1)이 그 결함을 막으려 도입된 토큰이다. */}
+      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--orange700)' }}>
+        {matchOutcomeReasonLabel(reason)}으로 종료된 경기예요
+      </span>
+      {/* 사유가 비어 있으면 빈 줄을 남기지 않는다. 서버가 사유 없는 몰수를 422 로 막지만
+          그 규칙이 생기기 전에 종료된 과거 경기는 사유가 없을 수 있다. */}
+      {note.length > 0 ? (
+        <span style={{ fontSize: 12, color: 'var(--text-body)', wordBreak: 'keep-all' }}>{note}</span>
+      ) : null}
+    </div>
   );
 }
 
 function LineupColumn({ title, slots }: { title: string; slots: readonly PublicLineupSlot[] }) {
   return (
     <div style={{ flex: 1 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 6 }}>{title}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 8 }}>{title}</div>
       {slots.length === 0 ? (
         <div style={{ fontSize: 12, color: 'var(--text-caption)' }}>명단이 아직 없어요</div>
       ) : (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {slots.map((slot) => (
-            <li key={slot.participantId} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+            <li key={slot.participantId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
               {slot.jerseyNumber !== null ? (
                 <span className="tab-num" style={{ color: 'var(--text-caption)', width: 20 }}>{slot.jerseyNumber}</span>
               ) : null}
-              <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{presentParticipantName(slot.displayName)}</span>
-              {/* [R-T2] 고정폭 없는 인라인 텍스트 — 12로 상향. */}
-              {slot.position ? <span style={{ color: 'var(--text-caption)', fontSize: 12 }}>{slot.position}</span> : null}
+              <span style={{ color: 'var(--text-strong)', fontWeight: 600 }}>
+                <ProfileLink href={slot.profileHref}>{presentParticipantName(slot.displayName)}</ProfileLink>
+              </span>
+              {/* [P1-d] 포지션 표시를 걷어냈다 — 공개 응답에서 `position` 이 빠졌다(D4:
+                  관중에게는 등번호와 이름만). 포지션은 팀이 짜 넣은 전술 정보라 전술보드
+                  안에 머문다. 이 자리에 다시 무언가를 넣는다면 **선수 본인이 선언한 선호
+                  포지션**(D14)이어야 한다 — 공개를 전제로 본인이 정한 값이라 성격이 다르다. */}
             </li>
           ))}
         </ul>
@@ -80,7 +168,9 @@ function EventRow({ event }: { event: PublicMatchEvent }) {
         <span className="tab-num" style={{ color: 'var(--text-caption)', fontSize: 12 }}>{event.jerseyNumber}</span>
       ) : null}
       <span style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-strong)' }}>
-        {presentGameEventParticipantName(event.type, event.participantName)}
+        <ProfileLink href={event.profileHref}>
+          {presentGameEventParticipantName(event.type, event.participantName)}
+        </ProfileLink>
       </span>
     </span>
   );
@@ -99,10 +189,10 @@ function EventRow({ event }: { event: PublicMatchEvent }) {
              관전자에게는 원정 열에 홈 선수 이름이 뜬 일반 골로만 보였다). */
           <span
             style={{
-              fontSize: 10,
+              fontSize: 'var(--font-size-micro)',
               lineHeight: 1.4,
               padding: '0 4px',
-              borderRadius: 4,
+              borderRadius: 'var(--radius-tight)',
               fontWeight: 700,
               // 실제 팔레트 토큰을 쓴다 — `--danger-*` 는 이 코드베이스에 없어서
               // 하드코딩 fallback 이 항상 적용되고 있었다(다크모드도 따라오지 않는다).
@@ -162,7 +252,7 @@ function EventsSection({
   const periodNumbers = Array.from(byPeriod.keys()).sort((a, b) => a - b);
 
   return (
-    <div role="list" aria-label="경기 기록" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div role="list" aria-label="득점·카드" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {periodNumbers.map((period) => {
         const headingId = `match-events-period-${period}`;
         return (
@@ -173,7 +263,7 @@ function EventsSection({
             >
               {periodLabel(period)}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {byPeriod.get(period)!.map((event, index) => (
                 <EventRow key={`${event.type}-${event.sideId}-${period}-${index}`} event={event} />
               ))}
@@ -189,7 +279,7 @@ function EventsSection({
           >
             기타
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {unknownPeriodEvents.map((event, index) => (
               <EventRow key={`${event.type}-${event.sideId}-unknown-${index}`} event={event} />
             ))}
@@ -200,16 +290,16 @@ function EventsSection({
   );
 }
 
-function HistorySection({ history }: { history: PublicMatchDetail['history'] }) {
+function HistorySection({ history, isStatusOnly }: { history: PublicMatchDetail['history']; isStatusOnly: boolean }) {
   if (history.length === 0) return null;
   return (
     <section>
-      <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>결과 변경 이력</h3>
+      <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>결과 변경 이력</h3>
       <Card pad={0}>
         {history.map((revision, index) => (
           <div
             key={revision.revision}
-            style={{ padding: '10px 16px', borderTop: index > 0 ? '1px solid var(--grey100)' : 'none' }}
+            style={{ padding: '12px 16px', borderTop: index > 0 ? '1px solid var(--grey100)' : 'none' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-strong)' }}>
@@ -220,7 +310,7 @@ function HistorySection({ history }: { history: PublicMatchDetail['history'] }) 
                 {revision.officialAt ? formatTournamentDateTimeLong(revision.officialAt) : ''}
               </span>
             </div>
-            {revision.reason ? (
+            {revision.reason && !isStatusOnly ? (
               <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-caption)' }}>{revision.reason}</p>
             ) : null}
           </div>
@@ -230,7 +320,7 @@ function HistorySection({ history }: { history: PublicMatchDetail['history'] }) 
   );
 }
 
-export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
+export function MatchDetailContent({ data, from }: { data: PublicMatchDetail; from?: string }) {
   const isStatusOnly = data.visibilityMode === 'status_only';
   return (
     <div style={{ padding: '16px 20px 40px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -245,7 +335,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
         <Card pad={16}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ flex: 1, textAlign: 'right', fontSize: 16, fontWeight: 700, color: 'var(--text-strong)' }}>
-              {sideLabel(data.home)}
+              <SideName side={data.home} from={from} />
             </span>
             <span
               className="tab-num"
@@ -263,19 +353,36 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
               {formatScoreline(data.score, data.scoreStatus)}
             </span>
             <span style={{ flex: 1, textAlign: 'left', fontSize: 16, fontWeight: 700, color: 'var(--text-strong)' }}>
-              {sideLabel(data.away)}
+              <SideName side={data.away} from={from} />
             </span>
           </div>
           {/* 스코어 아래 보조 표기 — 승부차기가 없으면 렌더 없음. */}
-          <PenaltyScoreline score={data.score} scoreStatus={data.scoreStatus} fontSize={12} />
+          <PenaltyScoreline score={data.score} scoreStatus={data.scoreStatus} fontSize="var(--font-size-caption)" />
+          {data.visibilityMode === 'official_only' && data.resultState === 'pending' ? (
+            <p
+              style={{
+                margin: '8px auto 0',
+                maxWidth: '28rem',
+                fontSize: 'var(--font-size-body-sm)',
+                color: 'var(--text-caption)',
+                textAlign: 'center',
+                wordBreak: 'keep-all',
+              }}
+            >
+              공식 결과가 확정되면 점수와 기록이 공개돼요.
+            </p>
+          ) : null}
+          {/* 몰수·중단 표기는 스코어 바로 아래에 둔다 — 점수를 읽은 다음 눈이 가는 자리이자,
+              "이 점수가 정상 경기 결과가 아니다"를 점수와 떼어놓지 않는 유일한 위치다. */}
+          <MatchOutcomeNotice outcome={data.outcome} />
           <div
             style={{
               display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
               flexWrap: 'wrap',
-              gap: 6,
-              marginTop: 10,
+              gap: 8,
+              marginTop: 12,
               fontSize: 12,
               color: 'var(--text-caption)',
             }}
@@ -294,8 +401,18 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
             </p>
           ) : null}
           {isStatusOnly ? (
-            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-caption)', textAlign: 'center' }}>
-              이 경기는 진행 상태와 확정 기록만 공개돼요.
+            <p
+              style={{
+                margin: '8px auto 0',
+                maxWidth: '28rem',
+                fontSize: 12,
+                color: 'var(--text-caption)',
+                textAlign: 'center',
+                wordBreak: 'keep-all',
+                textWrap: 'balance',
+              }}
+            >
+              이 경기는 진행 상태만 공개돼요. 점수와 선수 기록은 공개되지 않아요.
             </p>
           ) : null}
         </Card>
@@ -305,7 +422,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
         <Card pad={16}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-caption)', marginBottom: 4 }}>MVP</div>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-strong)' }}>
-            {presentParticipantName(data.mvp.displayName)}
+            <ProfileLink href={data.mvp.profileHref}>{presentParticipantName(data.mvp.displayName)}</ProfileLink>
           </div>
         </Card>
       ) : null}
@@ -317,7 +434,7 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
           자체를 통째로 생략한다. */}
       {data.lineup ? (
         <section>
-          <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>라인업</h3>
+          <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>라인업</h3>
           <Card pad={16}>
             <div style={{ display: 'flex', gap: 20 }}>
               <LineupColumn title={sideLabel(data.home)} slots={data.lineup.home} />
@@ -327,8 +444,10 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
         </section>
       ) : null}
 
+      {/* [P2] 페이지 제목이 이미 "경기 기록"이다 — 섹션 제목은 실제 내용(골·자책골·
+          카드, eventPresentation 참고)을 그대로 말한다. */}
       <section>
-        <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>경기 기록</h3>
+        <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>득점·카드</h3>
         <Card pad={16}>
           <EventsSection events={data.events} isStatusOnly={isStatusOnly} />
         </Card>
@@ -336,18 +455,22 @@ export function MatchDetailContent({ data }: { data: PublicMatchDetail }) {
 
       {data.videos.length > 0 ? (
         <section>
-          <h3 className="tm-hub-section-title" style={{ marginBottom: 10 }}>경기 영상</h3>
+          <h3 className="tm-hub-section-title" style={{ marginBottom: 12 }}>경기 영상</h3>
           <Card pad={16}>
             <MatchVideos videos={[...data.videos]} matchLabel={`${sideLabel(data.home)} vs ${sideLabel(data.away)}`} />
           </Card>
         </section>
       ) : null}
 
-      <HistorySection history={data.history} />
+      <HistorySection history={data.history} isStatusOnly={isStatusOnly} />
 
       {data.nextMatch ? (
         <Link
-          href={`/tournaments/${data.tournamentId}/matches/${data.nextMatch.fixtureId}`}
+          href={
+            from
+              ? withFromPath(`/tournaments/${data.tournamentId}/matches/${data.nextMatch.fixtureId}`, from)
+              : `/tournaments/${data.tournamentId}/matches/${data.nextMatch.fixtureId}`
+          }
           className="tm-pressable"
           style={{ textDecoration: 'none' }}
         >

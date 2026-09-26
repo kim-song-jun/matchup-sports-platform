@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
 import { clearV1IdentityCache, v1Keys } from './query-keys';
+import { PERSIST_STORAGE_KEY } from './query-persist';
 
 describe('clearV1IdentityCache', () => {
+  it('removes the persisted RQ snapshot from localStorage so a previous account cannot be restored on next launch', () => {
+    const queryClient = new QueryClient();
+    window.localStorage.setItem(PERSIST_STORAGE_KEY, JSON.stringify({ clientState: {} }));
+
+    clearV1IdentityCache(queryClient);
+
+    expect(window.localStorage.getItem(PERSIST_STORAGE_KEY)).toBeNull();
+  });
+
   it('removes all v1-scoped cached queries so a new identity never sees a previous identity data', () => {
     const queryClient = new QueryClient();
 

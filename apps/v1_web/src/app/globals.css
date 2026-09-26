@@ -299,6 +299,13 @@
   --v1-shell-wide-topbar-right-x: 14px;
   --v1-shell-scroll-bottom-pad: 12px;
   --v1-shell-cta-bottom-pad: 22px;
+  /* FAB 자체 지름·나사 간격 — .tm-floating-fab 위치 계산과 아래 --v1-shell-fab-clear-pad(스크롤
+     영역이 FAB를 피해 확보하는 여백)가 이 두 값을 공유한다. 한쪽만 바꾸면 다시 겹친다. */
+  --v1-shell-fab-size: 56px;
+  --v1-shell-fab-gap: 18px;
+  /* 스크롤 콘텐츠 마지막 줄 ~ FAB 사이 여백. FAB 몸통(gap+size) 위에 기존 --v1-shell-scroll-bottom-pad
+     와 같은 간격(--spacing-3)을 얹는다 — floatingSlot 있는 화면 전용, .tm-scroll-area 에서만 쓴다. */
+  --v1-shell-fab-clear-pad: calc(var(--v1-shell-fab-gap) + var(--v1-shell-fab-size) + var(--spacing-3));
   /* Native Android publishes its measured navigation-bar inset here. The nav surface can then paint
      edge-to-edge while only controls consume the safe area. Browser/PWA clients keep using env(). */
   --teameet-native-safe-bottom: 0px;
@@ -3326,9 +3333,9 @@ label.tm-btn:focus-within {
   /* Keep mobile FABs above the complete navigation hit area. Android's edge-to-edge shell adds its
      measured system-navigation inset to the web bottom nav, so the old fixed 92px offset overlapped
      the bar on three-button devices. Preserve the original 18px visual gap above the 74px nav. */
-  bottom: calc(var(--v1-shell-bottom-nav-height) + var(--v1-shell-safe-bottom) + 18px);
-  width: 56px;
-  height: 56px;
+  bottom: calc(var(--v1-shell-bottom-nav-height) + var(--v1-shell-safe-bottom) + var(--v1-shell-fab-gap));
+  width: var(--v1-shell-fab-size);
+  height: var(--v1-shell-fab-size);
   border-radius: var(--radius-pill);
   background: var(--blue500);
   color: var(--static-white);

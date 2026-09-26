@@ -36,4 +36,9 @@ describe('목록/사이트맵 라우트는 빌드 타임 정적 프리렌더 대
     const mod = await import('./llms.txt/route');
     expect(mod.revalidate).toBe(0);
   });
+
+  it('llms-full.txt/route.ts: revalidate === 0', async () => {
+    const mod = await import('./llms-full.txt/route');
+    expect(mod.revalidate).toBe(0);
+  });
 });

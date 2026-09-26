@@ -9,14 +9,18 @@ import { LandingV2Story } from '@/components/landing/v2/landing-v2-story';
 import { LandingV2CtaBanner, LandingV2Trust } from '@/components/landing/v2/landing-v2-trust';
 
 /* A안(/landing)과 내용이 겹치는 비교용 안이라 색인하지 않고 정본을 /landing 으로 둔다.
+   og:url 은 이 페이지로 둔다 — 같으면 메신저 미리보기 캐시가 A안과 서로의 제목을 덮는다.
    sitemap·llms.txt 에도 넣지 않는다. */
+const base = buildPublicMetadata({
+  title: '운동보다 준비가 더 힘들었다면',
+  description:
+    '인원 모으기·대진표·점수 기록·전적 정리까지, 생활체육 경기 준비를 매치·팀·대회 한 흐름으로 이어 주는 Teameet이에요.',
+  path: '/landing/v2',
+});
+
 export const metadata: Metadata = {
-  ...buildPublicMetadata({
-    title: '운동보다 준비가 더 힘들었다면',
-    description:
-      '인원 모으기·대진표·점수 기록·전적 정리까지, 생활체육 경기 준비를 매치·팀·대회 한 흐름으로 이어 주는 Teameet이에요.',
-    path: '/landing',
-  }),
+  ...base,
+  alternates: { canonical: '/landing' },
   robots: { index: false, follow: true },
 };
 

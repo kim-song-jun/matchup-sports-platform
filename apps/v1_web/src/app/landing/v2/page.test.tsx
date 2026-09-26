@@ -36,6 +36,8 @@ describe('LandingV2Page', () => {
   it('검색에 따로 잡히지 않고 정본을 A안(/landing)으로 가리킨다', () => {
     expect(metadata.robots).toEqual({ index: false, follow: true });
     expect(metadata.alternates?.canonical).toBe('/landing');
+    // 미리보기 캐시가 A안과 섞이지 않게 og:url 은 자기 주소
+    expect(metadata.openGraph?.url).toBe('/landing/v2');
   });
 
   it('공감 → 해결 → 신뢰 → 종목 → 이용 방법 순서로 섹션이 서고, 키워드 다음은 제목이다', () => {

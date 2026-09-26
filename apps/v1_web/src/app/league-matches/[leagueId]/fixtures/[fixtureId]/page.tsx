@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
 import LeagueFixtureDetailClient from './league-fixture-detail-client';
 import { JsonLd } from '@/components/seo/json-ld';
 import { formatTournamentDateTimeLong } from '@/lib/date-utils';
@@ -42,6 +43,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function LeagueFixturePage({ params }: Props) {
   const { leagueId, fixtureId } = await params;
   const fixture = await loadPublic<V1TeamMatch>(fixtureApiPath(fixtureId));
+  // 이 경로는 proxy.ts matcher 밖이라 없는 경기의 HTTP 404 를 여기서 낸다(조회 실패는 404 가 아니다).
+  if (fixture.ok && !fixture.data) notFound();
   const detail = fixture.ok ? fixture.data : null;
   // LD 는 주소가 아니라 경기가 실제로 속한 리그로 잇는다 — 리그가 아닌 경기면 리그 연결을 만들지 않는다.
   const league = detail?.league ?? null;

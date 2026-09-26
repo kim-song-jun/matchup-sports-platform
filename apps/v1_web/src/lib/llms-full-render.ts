@@ -191,7 +191,7 @@ export function renderLlmsFull(s: LlmsFullSnapshot, now = new Date()): string {
     '> 찾고 참여하고, 경기 결과와 기록을 남기는 한국의 멀티스포츠 플랫폼이에요.',
     '',
     `이 문서는 ${absoluteSiteUrl('/llms.txt')} 의 확장판이에요. 아래 목록은 공개 API 에서 방금 만든 것이고`,
-    `(생성 시각 ${formatTournamentDateTimeLong(now.toISOString())} KST), 최대 5분 캐시돼요.`,
+    `(생성 시각 ${formatTournamentDateTimeLong(now.toISOString())} KST). 캐시 때문에 실제보다 최대 15분 늦을 수 있어요.`,
     '',
     ...PARTICIPATION_GUIDE,
     ...section('대회', tournamentRows, '지금 공개된 대회가 없어요.'),

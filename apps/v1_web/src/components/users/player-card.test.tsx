@@ -83,16 +83,21 @@ describe('선수 카드', () => {
   it('등급이 실력이 아니라 출전 수라는 것을 화면에 적는다', () => {
     renderCard(card({ tier: 'bronze', appearances: 2 }));
 
-    expect(document.querySelector('.tm-player-card-sub')).toHaveTextContent('브론즈 등급 · 경기 수로 올라가요');
+    expect(document.querySelector('.tm-player-card-sub')).toHaveTextContent('브론즈 등급');
+    // "경기 수로 올라가요"는 카드 아래 진행 박스 숫자·뒷면 묶음 머리와 같은 말이라
+    // 빠졌다(P4 B안) -- 한 정보는 한 자리에서만 말한다.
+    expect(document.querySelector('.tm-player-card-sub')).not.toHaveTextContent('경기 수로 올라가요');
     // 티어 한글 이름은 카드 아래 요약 줄과 뒷면 성향 태그 양쪽에 나온다.
     expect(screen.getAllByText(/브론즈/).length).toBeGreaterThan(0);
   });
 
-  it('다음에 무엇을 하면 열리는지 한 가지만 안내한다 (본인)', () => {
+  it('진행 박스는 능력치 개수만 숫자로 보여준다 (본인)', () => {
     renderCard(card(), true);
 
-    expect(screen.getByText('후기 3개를 더 받으면 열려요')).toBeInTheDocument();
-    expect(screen.getByText('3 / 6 열림')).toBeInTheDocument();
+    expect(screen.getByText('능력치 3 / 6 열림')).toBeInTheDocument();
+    // 이전엔 힌트 문장이 진행 박스에도 있었다 -- 뒷면 묶음 머리·앞면 "다음 목표"와
+    // 같은 말을 또 하지 않도록 숫자만 남긴다.
+    expect(screen.queryByText('후기 3개를 더 받으면 열려요')).not.toBeInTheDocument();
   });
 
   it('남이 보는 카드에는 진행도·해금 안내를 그리지 않는다', () => {
@@ -100,8 +105,7 @@ describe('선수 카드', () => {
     // 잠긴 이유가 궁금한 사람에게는 뒷면(산식·잠금 사유)이 말한다.
     renderCard(card(), false);
 
-    expect(screen.queryByText('후기 3개를 더 받으면 열려요')).not.toBeInTheDocument();
-    expect(screen.queryByText('3 / 6 열림')).not.toBeInTheDocument();
+    expect(screen.queryByText('능력치 3 / 6 열림')).not.toBeInTheDocument();
     // 뒤집기·공유 같은 중립 요소는 남에게도 남는다.
     expect(screen.getByRole('button', { name: /카드 뒤집기/ })).toBeInTheDocument();
   });
@@ -240,7 +244,9 @@ describe('선수 카드', () => {
       true,
     );
 
-    expect(screen.getByText('첫 경기 명단에 오르면 기록이 쌓이기 시작해요')).toBeInTheDocument();
+    // 골·도움·엔트리 세 줄이 전부 같은 조건이라 뒷면 묶음 머리 하나로 합쳐진다
+    // (P4 B안) -- getAllByText 로 "정확히 1번"까지 못박는다. 반복이 다시 생기면 깨진다.
+    expect(screen.getAllByText('첫 경기 명단에 오르면 열려요')).toHaveLength(1);
     // **잠금 문구만** 본다. 카드에는 무관한 "많이 뛸수록 올라가요"(티어 툴팁) 같은
     // 표현이 따로 있어서, 화면 전체에서 /뛰/ 를 금지하면 그것까지 잡는다.
     expect(screen.queryByText(/경기 더/)).not.toBeInTheDocument();
@@ -273,6 +279,29 @@ describe('선수 카드', () => {
     expect(screen.getByRole('button', { name: /앞면 보기/ })).toBeInTheDocument();
   });
 
+  it('뒷면 잠긴 능력치는 같은 조건끼리 묶여 조건 문구가 한 번만 보인다 (P4 B안)', () => {
+    // 기본 fixture 는 SKI·MAN·PUN 셋 다 "후기 3개를 받으면 열려요" 로 잠겨 있다 --
+    // 예전엔 세 줄에 그대로 반복됐다.
+    renderCard(card());
+
+    expect(screen.getAllByText('후기 3개를 받으면 열려요')).toHaveLength(1);
+    // 지표 이름(실력·매너·시간약속)은 묶음 안 각 행에 그대로 남는다.
+    expect(screen.getByText('실력')).toBeInTheDocument();
+    expect(screen.getByText('매너')).toBeInTheDocument();
+    expect(screen.getByText('시간약속')).toBeInTheDocument();
+  });
+
+  it('뒷면 성향 칩은 가운데 정렬 줄바꿈 컨테이너에 담긴다 (P4 B안 -- 외톨이 칩 방지)', () => {
+    // 2열 그리드였을 땐 칩이 홀수 개면 마지막 칩이 혼자 남았다. 이 클래스가
+    // globals.css 에서 grid 대신 flex-wrap + justify-content:center 를 쓴다 --
+    // 여기서는 클래스가 그대로인지만 확인하고, 실제 줄바꿈은 라이브 스크린샷으로 본다.
+    const { container } = renderCard(card());
+
+    const tags = container.querySelector('.tm-pcard-back-tags');
+    expect(tags).not.toBeNull();
+    expect(tags?.querySelectorAll('.tm-pcard-tag').length).toBeGreaterThan(0);
+  });
+
   describe('기록 공개 유도', () => {
     const needsConsent = card({
       stats: [
@@ -290,7 +319,6 @@ describe('선수 카드', () => {
     it('본인이 보면 공개 설정으로 데려간다 -- 이게 이 기능의 목적이다', () => {
       renderCard(needsConsent, true);
 
-      expect(screen.getByText('기록 공개를 켜면 골·도움·엔트리가 한 번에 열려요')).toBeInTheDocument();
       expect(screen.getByRole('link', { name: '기록 공개하고 3개 열기' })).toHaveAttribute(
         'href',
         '/my/settings/record-consent',
@@ -301,9 +329,12 @@ describe('선수 카드', () => {
       renderCard(needsConsent, false);
 
       expect(screen.queryByRole('link', { name: '기록 공개하고 3개 열기' })).not.toBeInTheDocument();
-      expect(screen.queryByText('기록 공개를 켜면 골·도움·엔트리가 한 번에 열려요')).not.toBeInTheDocument();
+      expect(screen.queryByText(/열림/)).not.toBeInTheDocument();
       // 왜 잠겼는지는 뒷면이 남에게도 말한다 -- 카드가 왜 비었는지 오해하지 않게.
-      expect(screen.getByText(/골 · 기록 공개를 켜면 열려요/)).toBeInTheDocument();
+      // 골·도움·엔트리가 같은 조건(기록 공개)이라 묶음 머리 하나로 합쳐지고,
+      // 각 행은 지표 이름만 남는다(P4 B안).
+      expect(screen.getByText('기록 공개를 켜면 열려요')).toBeInTheDocument();
+      expect(screen.getByText('골')).toBeInTheDocument();
     });
   });
 });

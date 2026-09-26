@@ -95,18 +95,6 @@ function nextGoalText(card: V1PlayerCard): string | null {
   return `후기 ${reason.remaining}개 받기`;
 }
 
-function unlockHint(card: V1PlayerCard): string | null {
-  if (card.nextUnlock === null) return null;
-  const { reason } = card.nextUnlock;
-  if (reason.type === 'consent') return '기록 공개를 켜면 골·도움·엔트리가 한 번에 열려요';
-  if (reason.type === 'appearances') {
-    // 아직 한 경기도 안 뛴 사람에게 "1경기 더" 는 틀린 말이다 -- 더 뛸 앞선 경기가 없다.
-    if (card.appearances === 0) return '첫 경기 명단에 오르면 기록이 쌓이기 시작해요';
-    return `${reason.remaining}경기 명단에 더 오르면 열려요`;
-  }
-  return `후기 ${reason.remaining}개를 더 받으면 열려요`;
-}
-
 /**
  * 티어 엠블럼 -- 롤 랭크 배지처럼 **모양 자체가** 등급을 말한다.
  * 방패(브론즈) → 날개(실버) → 왕관 밴드(골드) → 광휘 든 육각(레전드·스페셜).
@@ -216,6 +204,35 @@ function personaTags(card: V1PlayerCard): { text: string; accent: boolean }[] {
   return [...base, ...top];
 }
 
+type BackRowItem =
+  | { readonly kind: 'stat'; readonly stat: V1PlayerCardStat }
+  | { readonly kind: 'group'; readonly reasonText: string; readonly stats: V1PlayerCardStat[] };
+
+/**
+ * 뒷면 능력치 6줄을 해제 조건별로 묶는다(사용자 선택 B안, 2026-09-26). `card.stats` 는
+ * 항상 SHO·PAS·APP·SKI·MAN·PUN 고정 순서로 오고, 서버 락 함수(`player-card.ts`)가 조건을
+ * 3개 단위로 주므로 같은 문구는 실제로 항상 연달아 나온다 -- 그 연속 구간만 하나로 접으면
+ * 순서를 바꾸지 않고도 반복이 사라진다.
+ */
+function backRowItems(card: V1PlayerCard): BackRowItem[] {
+  const items: BackRowItem[] = [];
+  for (const s of card.stats) {
+    const locked = !s.unlocked || s.value === null;
+    if (!locked || !s.lockedBy) {
+      items.push({ kind: 'stat', stat: s });
+      continue;
+    }
+    const reasonText = lockReasonText(s.lockedBy, card.appearances);
+    const last = items[items.length - 1];
+    if (last?.kind === 'group' && last.reasonText === reasonText) {
+      last.stats.push(s);
+    } else {
+      items.push({ kind: 'group', reasonText, stats: [s] });
+    }
+  }
+  return items;
+}
+
 function backSummary(card: V1PlayerCard): ReactNode {
   const pos = card.position ? POSITION_LABEL[card.position] : '선수';
   if (card.appearances === 0) return <>아직 첫 경기를 기다리는 선수예요.</>;
@@ -277,7 +294,6 @@ export function PlayerCard({
    */
   readonly belowCardSlot?: ReactNode;
 }) {
-  const hint = unlockHint(card);
   const initial = displayName.trim().charAt(0) || '?';
   const needsConsent = card.nextUnlock?.reason.type === 'consent';
   const { left, right } = splitStats(card.stats);
@@ -496,19 +512,32 @@ export function PlayerCard({
 
       <div className="tm-pcard-back-sec">능력치</div>
       <div className="tm-pcard-back-rows">
-        {card.stats.map((stat) => {
-          const meta = STAT_BACK[stat.code];
-          const Icon = meta.icon;
-          const locked = !stat.unlocked || stat.value === null;
+        {backRowItems(card).map((item) => {
+          if (item.kind === 'stat') {
+            const meta = STAT_BACK[item.stat.code];
+            const Icon = meta.icon;
+            return (
+              <div key={item.stat.code} className="tm-pcard-brow">
+                <Icon aria-hidden="true" />
+                <b>{item.stat.value}</b>
+                <span>{meta.source}</span>
+              </div>
+            );
+          }
+          // 묶음 머리에서 조건 문구를 한 번만 말한다 -- 각 행은 아이콘 + 지표 이름만 남는다.
           return (
-            <div key={stat.code} className="tm-pcard-brow">
-              <Icon aria-hidden="true" />
-              <b data-locked={locked ? 'true' : undefined}>{locked ? '—' : stat.value}</b>
-              <span>
-                {locked && stat.lockedBy
-                  ? `${stat.label} · ${lockReasonText(stat.lockedBy, card.appearances)}`
-                  : meta.source}
-              </span>
+            <div key={`${item.stats[0].code}-group`} className="tm-pcard-brow-group">
+              <div className="tm-pcard-brow-group-head">{item.reasonText}</div>
+              {item.stats.map((s) => {
+                const Icon = STAT_BACK[s.code].icon;
+                return (
+                  <div key={s.code} className="tm-pcard-brow">
+                    <Icon aria-hidden="true" />
+                    <b data-locked="true">—</b>
+                    <span>{s.label}</span>
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -596,24 +625,25 @@ export function PlayerCard({
 
         {/* 경기 수는 여기서 말하지 않는다 -- 바로 위 카드 얼굴이 이미 말했고(tm-pcard-meta),
             마이페이지에서는 활동 요약까지 같은 숫자를 또 센다. 카드가 0경기(여정 면)면
-            얼굴에도 없지만, 그 면의 문장이 "아직 기록이 없다"를 이미 말한다. */}
+            얼굴에도 없지만, 그 면의 문장이 "아직 기록이 없다"를 이미 말한다.
+            "경기 수로 올라가요"도 뺐다 -- 바로 아래 진행 박스 숫자·뒷면 묶음 머리가 같은 말이다. */}
         {/* 등급의 의미를 같은 줄에서 못 박는다 — 없으면 브론즈가 "실력 하위"로 읽힌다. */}
         <div className="tm-player-card-sub">
           {card.position ? POSITION_LABEL[card.position] : '포지션 미정'}
           {' · '}
-          {TIER_LABEL[card.tier]} 등급 · 경기 수로 올라가요
+          {TIER_LABEL[card.tier]} 등급
         </div>
 
         {/* 진행도·해금 안내는 카드 주인에게 하는 말이다 -- 남의 프로필에서 보이면
-            소음이고, 잠긴 이유가 궁금한 사람은 뒷면이 말해 준다. */}
-        {isOwner && hint ? (
+            소음이고, 잠긴 이유가 궁금한 사람은 뒷면이 말해 준다. 안내 문장은 뒷면 묶음
+            머리·앞면 "다음 목표"가 이미 하므로 여기는 숫자만 남긴다(P4 B안). */}
+        {isOwner && card.nextUnlock !== null ? (
           <div className="tm-player-card-progress">
-            <div className="tm-player-card-progress-text">{hint}</div>
             <div className="tm-player-card-progress-bar" aria-hidden="true">
               <i style={{ width: `${Math.round((card.unlockedCount / card.stats.length) * 100)}%` }} />
             </div>
             <div className="tm-player-card-progress-count">
-              {card.unlockedCount} / {card.stats.length} 열림
+              능력치 {card.unlockedCount} / {card.stats.length} 열림
             </div>
           </div>
         ) : null}

@@ -152,4 +152,19 @@ describe('선수 카드 숨김 설정', () => {
       expect(screen.getByText(/능력치나 등급은 바뀌지 않아요/)).toBeInTheDocument();
     });
   });
+
+  it('설명 전용 카드 없이 분류 라벨(공개·모양·사진) + 조작 카드 하나씩 + 각주로 보여준다 (P1 C안)', () => {
+    stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
+
+    const { container } = renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+
+    // 예전엔 "선수 카드 숨기기"가 설명 카드 제목과 토글 제목으로 2번 나왔다 --
+    // 이제 행 제목은 하나, 그 위 분류 라벨은 다른 낱말("공개")이라 반복이 없다.
+    expect(screen.getAllByText('선수 카드 숨기기')).toHaveLength(1);
+    expect(screen.getByText('공개')).toBeInTheDocument();
+    expect(screen.getByText('모양')).toBeInTheDocument();
+    expect(screen.getByText('사진')).toBeInTheDocument();
+    // 숨김·모양·사진 세 섹션이 각각 조작 카드 하나씩(설명 전용 카드는 없다).
+    expect(container.querySelectorAll('.tm-card').length).toBe(3);
+  });
 });

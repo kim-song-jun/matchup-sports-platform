@@ -229,7 +229,7 @@ function buildMatchEventBase(match: V1Match, path: string): JsonLdNode | null {
 }
 
 /** 팀 상세의 SportsTeam 과 같은 `@id` 로 이어 붙인다 — 팀 엔티티가 둘로 쪼개지지 않게. */
-function teamReference(teamId: string | undefined, name: string | undefined): JsonLdNode | null {
+export function teamReference(teamId: string | null | undefined, name: string | null | undefined): JsonLdNode | null {
   const teamName = name?.trim();
   if (!teamName) return null;
   if (!teamId) return { '@type': 'SportsTeam', name: teamName };
@@ -253,9 +253,15 @@ export function buildMatchEventLd(match: V1Match, id: string): JsonLdNode | null
  * 플랫폼 모집(`platformManaged`)의 hostTeam 은 HOME 사이드로 배정된 팀일 뿐 주최자가 아니다 —
  * 화면도 "플랫폼 주관"으로 표시하므로 organizer 는 조직이다.
  */
-export function buildTeamMatchEventLd(teamMatch: V1TeamMatch, id: string): JsonLdNode | null {
-  const node = buildMatchEventBase(teamMatch, `/team-matches/${id}`);
+export function buildTeamMatchEventLd(
+  teamMatch: V1TeamMatch,
+  id: string,
+  // 리그 대진은 `/league-matches/:leagueId/fixtures/:id` 가 canonical 이라 경로와 상위 리그를 받는다.
+  options: { readonly path?: string; readonly superEventPath?: string } = {},
+): JsonLdNode | null {
+  const node = buildMatchEventBase(teamMatch, options.path ?? `/team-matches/${id}`);
   if (!node) return null;
+  if (options.superEventPath) node.superEvent = { '@id': `${absoluteSiteUrl(options.superEventPath)}#event` };
   const host = teamReference(teamMatch.hostTeam?.teamId ?? teamMatch.hostTeamId, teamMatch.hostTeam?.name ?? teamMatch.hostTeamName);
   if (host) node.homeTeam = host;
   if (teamMatch.platformManaged) node.organizer = { '@id': organizationId() };

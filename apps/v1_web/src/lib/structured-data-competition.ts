@@ -1,6 +1,6 @@
-import type { PublicMatchDetail, PublicSideSummary } from '@/components/public-game-records/types';
+import type { PublicMatchDetail } from '@/components/public-game-records/types';
 import { absoluteSiteUrl } from '@/lib/seo';
-import { organizationId, type JsonLdNode } from '@/lib/structured-data';
+import { organizationId, teamReference, type JsonLdNode } from '@/lib/structured-data';
 import type { V1LeagueStandingsResponse, V1PublicLeagueDetail } from '@/types/league-match';
 
 /**
@@ -8,16 +8,6 @@ import type { V1LeagueStandingsResponse, V1PublicLeagueDetail } from '@/types/le
  * 엔티티는 전역 `@id` 로 연결. 팀은 팀 상세의 `…/teams/:id#team`, 대회는 대회 상세의
  * `…/tournaments/:id#event` 와 같은 `@id` 를 써서 검색엔진·LLM 이 같은 실체로 잇게 한다.
  */
-
-function teamRef(teamId: string | null | undefined, name: string): JsonLdNode {
-  if (!teamId) return { '@type': 'SportsTeam', name };
-  const url = absoluteSiteUrl(`/teams/${teamId}`);
-  return { '@type': 'SportsTeam', '@id': `${url}#team`, name, url };
-}
-
-function sideRef(side: PublicSideSummary | null): JsonLdNode | null {
-  return side?.teamName ? teamRef(side.teamId, side.teamName) : null;
-}
 
 export function buildLeagueEventLd(
   league: V1PublicLeagueDetail,
@@ -39,8 +29,8 @@ export function buildLeagueEventLd(
   };
   // 순위표에 이름이 보이는 팀만 참가 팀으로 싣는다(대진 없는 준비 중 리그는 순위표가 비어 있다).
   const competitors = (standings?.standings ?? [])
-    .filter((row) => row.teamName)
-    .map((row) => teamRef(row.teamId, row.teamName));
+    .map((row) => teamReference(row.teamId, row.teamName))
+    .filter((ref): ref is JsonLdNode => ref !== null);
   if (competitors.length > 0) node.competitor = competitors;
   return node;
 }
@@ -78,8 +68,8 @@ export function buildFixtureEventLd(match: PublicMatchDetail): JsonLdNode | null
     superEvent: { '@id': `${tournamentUrl}#event` },
   };
 
-  const home = sideRef(match.home);
-  const away = sideRef(match.away);
+  const home = teamReference(match.home?.teamId, match.home?.teamName);
+  const away = teamReference(match.away?.teamId, match.away?.teamName);
   if (home) node.homeTeam = home;
   if (away) node.awayTeam = away;
 

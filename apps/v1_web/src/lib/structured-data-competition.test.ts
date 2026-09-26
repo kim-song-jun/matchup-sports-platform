@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { PublicMatchDetail } from '@/components/public-game-records/types';
-import { buildSportsEventLd, buildSportsTeamLd } from '@/lib/structured-data';
+import { buildSportsEventLd, buildSportsTeamLd, buildTeamMatchEventLd } from '@/lib/structured-data';
 import { buildFixtureEventLd, buildLeagueEventLd } from '@/lib/structured-data-competition';
-import type { V1TeamDetail, V1TournamentDetail } from '@/types/api';
+import type { V1TeamDetail, V1TeamMatch, V1TournamentDetail } from '@/types/api';
 import type { V1LeagueStandingsResponse, V1PublicLeagueDetail } from '@/types/league-match';
 
 const league = {
@@ -58,5 +58,20 @@ describe('buildFixtureEventLd', () => {
   it('일정 미정 경기는 LD 를 내지 않고, 취소 경기는 취소 상태로 적는다', () => {
     expect(buildFixtureEventLd(fixture({ scheduledAt: null }))).toBeNull();
     expect(buildFixtureEventLd(fixture({ status: 'cancelled' }))?.eventStatus).toBe('https://schema.org/EventCancelled');
+  });
+});
+
+describe('리그 대진 LD (buildTeamMatchEventLd + path 옵션)', () => {
+  it('리그 경기 주소를 @id 로 쓰고, 상위 리그 LD 의 @id 에 잇는다', () => {
+    const teamMatch = {
+      teamMatchId: 'f9', title: '1주차', sportName: '풋살', startsAt: '2026-09-20T01:00:00.000Z',
+      placeName: '송파 풋살파크', status: 'matched', hostTeam: { teamId: 'team-a', name: '송파 유나이티드' },
+    } as unknown as V1TeamMatch;
+
+    const ld = buildTeamMatchEventLd(teamMatch, 'f9', { path: '/league-matches/lg1/fixtures/f9', superEventPath: '/league-matches/lg1' });
+
+    expect(ld?.['@id']).toBe('https://teameet.co.kr/league-matches/lg1/fixtures/f9#event');
+    expect(ld?.superEvent).toEqual({ '@id': buildLeagueEventLd(league, null)['@id'] });
+    expect(buildTeamMatchEventLd(teamMatch, 'f9')?.['@id']).toBe('https://teameet.co.kr/team-matches/f9#event');
   });
 });

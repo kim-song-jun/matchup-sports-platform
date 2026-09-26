@@ -97,9 +97,13 @@ describe('tournament campaign proxy', () => {
 
     const missing = await proxy(detailRequest(`/league-matches/${missingId}`));
     const existing = await proxy(detailRequest(`/league-matches/${existingId}`));
+    // 공개 리그 API 가 ParseUUIDPipe 로 비-UUID 를 거절하므로 그런 주소엔 보여줄 리그가 없다.
+    const slug = await proxy(detailRequest('/league-matches/league-1'));
 
     expect(missing.status).toBe(404);
     expect(existing.status).toBe(200);
+    expect(slug.status).toBe(404);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenCalledWith(
       `http://localhost:8121/api/v1/league-matches/${missingId}`,
       { cache: 'no-store', headers: { accept: 'application/json' } },

@@ -24,12 +24,13 @@ async function load<T>(path: string): Promise<Loaded<T>> {
   }
 }
 
+// 웹 경로와 API 경로가 같은 모양이라 canonical·breadcrumb·조회가 한 값을 쓴다.
 const leaguePath = (leagueId: string) => `/league-matches/${encodeURIComponent(leagueId)}`;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { leagueId } = await params;
-  const league = await load<V1PublicLeagueDetail>(leaguePath(leagueId));
-  const path = `/league-matches/${leagueId}`;
+  const path = leaguePath(leagueId);
+  const league = await load<V1PublicLeagueDetail>(path);
   if (!league.ok) {
     return buildPublicMetadata({ title: '정규 리그', description: '정규 리그 순위표와 경기 일정·결과를 확인해 보세요.', path });
   }
@@ -63,7 +64,7 @@ export default async function LeagueMatchPage({ params }: Props) {
             data={buildBreadcrumbLd([
               { name: '대회', path: '/tournaments' },
               { name: '정규 리그', path: '/tournaments?kind=league' },
-              { name: detail.title, path: `/league-matches/${leagueId}` },
+              { name: detail.title, path: leaguePath(leagueId) },
             ])}
           />
         </>

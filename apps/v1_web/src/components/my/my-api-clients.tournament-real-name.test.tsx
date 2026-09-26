@@ -52,6 +52,20 @@ describe('TournamentRealNameVisibilitySettingsPageClient', () => {
     expect(screen.getByText(/지금은 닉네임으로 표시돼요/)).toBeInTheDocument();
   });
 
+  it('각주는 행 설명이 이미 말한 상태를 반복하지 않고 범위·제약만 더한다 (alpha 감사, 2026-09-26)', () => {
+    // before: 토글 서브텍스트 "지금은 닉네임으로 표시돼요"와 각주 "끄면 닉네임으로 표시되고"가
+    // 다른 낱말로 같은 뜻을 반복했다. 각주는 이제 어디에 붙는 이름인지(범위)·언제 다시 안
+    // 묻는지(제약)만 말하고, 상태 문장은 반복하지 않는다.
+    hooks.visibility.mockReturnValue({ data: { visible: false }, isLoading: false, isError: false, refetch: vi.fn() });
+    hooks.updateVisibility.mockReturnValue({ mutate: vi.fn(), isPending: false });
+
+    renderWithClient(<TournamentRealNameVisibilitySettingsPageClient />);
+
+    expect(screen.getByText(/지금은 닉네임으로 표시돼요/)).toBeInTheDocument();
+    expect(screen.getByText(/대회 라인업·득점자·MVP/)).toBeInTheDocument();
+    expect(screen.queryByText(/끄면 닉네임으로 표시되고/)).not.toBeInTheDocument();
+  });
+
   it('토글을 누르면 visible:true만 보낸다 (policyHash 없음)', async () => {
     hooks.visibility.mockReturnValue({ data: { visible: false }, isLoading: false, isError: false, refetch: vi.fn() });
     const mutate = vi.fn();

@@ -1818,10 +1818,11 @@ export function TournamentRealNameVisibilitySettingsPageClient() {
                 <span className={`tm-toggle ${visible ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
               </button>
             </div>
+            {/* "끄면 닉네임으로 표시"는 위 토글 서브텍스트가 이미 상태로 말한다(alpha 감사,
+                2026-09-26) -- 여기서는 범위(어디에 붙는 이름인지)와 제약(언제 다시 안 묻는지)만. */}
             <div className="tm-text-caption tm-my-settings-footnote">
-              대회 라인업·득점자·MVP에 붙는 이름이에요. 끄면 닉네임으로 표시되고, 대회
-              신청할 때마다 다시 묻지 않아요 — 여기서 한 번 켜면 계속 적용되고, 언제든
-              다시 끌 수 있어요.
+              대회 라인업·득점자·MVP에 붙는 이름이에요. 대회 신청할 때마다 다시 묻지
+              않아요 — 여기서 한 번 켜면 계속 적용되고, 언제든 다시 끌 수 있어요.
             </div>
           </section>
         </div>
@@ -1905,9 +1906,11 @@ export function PlayerCardHiddenSettingsPageClient() {
                 <span className={`tm-toggle ${hidden ? 'tm-toggle-on' : ''}`} aria-hidden="true" />
               </button>
             </div>
+            {/* "숨기면 안 보인다"는 위 토글 서브텍스트가 이미 상태로 말한다(alpha 감사,
+                2026-09-26) -- 여기서는 그 범위(어디에 적용되는지)와 안심(뭐가 남는지)만 말한다. */}
             <div className="tm-text-caption tm-my-settings-footnote">
-              경기 기록으로 만든 카드예요. 숨기면 마이페이지·공개 프로필·공유 화면에서
-              카드가 보이지 않아요. 활동 기록과 프로필은 그대로 남아요 — 카드만 끄는 거예요.
+              경기 기록으로 만든 카드예요. 마이페이지·공개 프로필·공유 화면 세 곳에 함께
+              적용돼요. 활동 기록과 프로필은 그대로 남아요 — 카드만 끄는 거예요.
             </div>
           </section>
 

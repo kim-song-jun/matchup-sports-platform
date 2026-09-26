@@ -95,6 +95,22 @@ describe('선수 카드 숨김 설정', () => {
     expect(screen.getByText(/활동 기록과 프로필은 그대로 남아요/)).toBeInTheDocument();
   });
 
+  it('각주는 행 설명이 이미 말한 상태를 반복하지 않고 범위·안심만 더한다 (alpha 감사, 2026-09-26)', () => {
+    // before: 토글 서브텍스트 "켜면 어디에도 표시되지 않아요"와 각주 "숨기면 ... 카드가
+    // 보이지 않아요"가 같은 뜻(숨기면 안 보임)을 두 번 말했다. 각주는 이제 어디에 적용되는지
+    // (범위)만 말하고, 상태 문장은 반복하지 않는다.
+    stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
+
+    renderWithClient(<PlayerCardHiddenSettingsPageClient />);
+
+    expect(screen.getByText(/켜면 어디에도 표시되지 않아요/)).toBeInTheDocument();
+    expect(screen.getByText(/마이페이지·공개 프로필·공유 화면/)).toBeInTheDocument();
+    // [\s\S]* — JSX 멀티라인 텍스트가 실제 개행 문자를 담을 가능성까지 대비한다.
+    // `.`는 기본적으로 개행을 매칭하지 않아, 그 경우 이 부정 단언이 실제로는 아무것도
+    // 검증하지 못한 채 항상 통과할 수 있다(Copilot 리뷰).
+    expect(screen.queryByText(/숨기면[\s\S]*카드가 보이지 않아요/)).not.toBeInTheDocument();
+  });
+
   it('저장에 실패하면 조용히 넘어가지 않고 화면에 말한다', async () => {
     stateMock.mockReturnValue({ data: { hidden: false }, isLoading: false, isError: false });
     mutateMock.mockImplementation((_body, options) => options?.onError?.(new Error('boom')));

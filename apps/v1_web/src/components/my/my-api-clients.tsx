@@ -10,7 +10,7 @@ import { AppBackLink } from '@/components/v1-ui/app-back-link';
 import { AlertTriangleIcon, ChevronLeftIcon, ChevronRightIcon, InfoCircleIcon } from '@/components/v1-ui/icons';
 import { Card, DatePickerTextInput, ListItem } from '@/components/v1-ui/primitives';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
-import { Check } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 import { PhoneVerificationCard } from '@/components/auth/phone-verification/phone-verification-card';
 import { useTheme } from '@/components/providers/theme-provider';
 import { useV1PushRegistration } from '@/hooks/use-v1-push-registration';
@@ -2095,8 +2095,13 @@ function PlayerCardShapePicker() {
               style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: locked ? 'default' : 'pointer' }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="tm-text-body">
-                  {locked ? '🔒 ' : ''}{opt.label}
+                <div className="tm-text-body" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {/* 아이콘만으로 잠김을 전달하지 않는다 — 옆에 "잠김" 텍스트를 병행한다
+                      (teams-page.tsx의 <Lock/>비공개 배지와 같은 관례). 버튼 aria-label에
+                      이미 "(잠김)"이 있어 스크린리더에는 중복이지만 그쪽은 aria-hidden으로
+                      가려 두 번 읽히지 않는다. */}
+                  {locked ? <Lock size={13} aria-hidden="true" style={{ flexShrink: 0 }} /> : null}
+                  {locked ? '잠김 · ' : ''}{opt.label}
                 </div>
                 <div className="tm-text-caption" style={{ marginTop: 3 }}>{opt.sub}</div>
               </div>

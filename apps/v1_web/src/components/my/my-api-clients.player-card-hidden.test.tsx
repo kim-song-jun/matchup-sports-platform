@@ -124,6 +124,11 @@ describe('선수 카드 숨김 설정', () => {
       const shield = screen.getByRole('button', { name: '카드 모양 방패 (잠김)' });
       expect(shield).toBeDisabled();
       expect(screen.getByText(/후기 10개를 받으면 열려요 \(지금 3개\)/)).toBeInTheDocument();
+      // 2026-09-26 alpha 감사: 잠금 이모지(🔒) 대신 aria-hidden 아이콘 + "잠김" 텍스트를 쓴다
+      // — 아이콘만으로 정보를 전달하지 않는다(teams-page.tsx의 <Lock/>비공개 배지와 같은 관례).
+      expect(shield.textContent).not.toContain('🔒');
+      expect(shield.textContent).toContain('잠김');
+      expect(shield.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
     });
 
     it('열려 있으면 눌러서 바꿀 수 있다', async () => {

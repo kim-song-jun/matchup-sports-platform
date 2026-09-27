@@ -199,6 +199,27 @@ describe('LandingV4Tour 고정 폰(1024+·높이 700+)', () => {
     expect(ty(pinScreens(container)[1])).toBe('');
   });
 
+  it('addEventListener 가 없는 MediaQueryList(Safari < 14)에서도 폭 변화를 따라 고정을 켜고 끈다', () => {
+    let wide = false;
+    const listeners = new Set<() => void>();
+    window.matchMedia = ((query: string) => ({
+      get matches() { return query === TOUR_PIN_QUERY ? wide : false; },
+      media: query,
+      addListener: (fn: () => void) => listeners.add(fn),
+      removeListener: (fn: () => void) => listeners.delete(fn),
+    })) as unknown as typeof window.matchMedia;
+    const { container, unmount } = renderVisibleTour();
+    const tour = container.querySelector<HTMLElement>('.tm-landing-v4-tour')!;
+    expect(tour.dataset.pin).toBeUndefined();
+
+    wide = true;
+    act(() => listeners.forEach((fn) => fn()));
+    expect(tour.dataset.pin).toBe('on');
+
+    unmount();
+    expect(listeners.size).toBe(0);
+  });
+
   it('1024 미만이거나 창 높이 700 미만이면 고정하지 않는다', () => {
     setMedia({ wide: false, reduce: false });
     const { container } = renderVisibleTour();

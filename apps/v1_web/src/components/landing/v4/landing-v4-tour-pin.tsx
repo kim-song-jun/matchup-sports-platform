@@ -37,10 +37,20 @@ export function sheetPose(progress: number, index: number): { ty: number; sc: nu
   };
 }
 
+// Safari < 14 의 MediaQueryList 에는 addListener/removeListener 만 있다.
+type LegacyMediaQueryList = MediaQueryList & {
+  addListener?: (listener: () => void) => void;
+  removeListener?: (listener: () => void) => void;
+};
+
 function onMediaChange(query: MediaQueryList, listener: () => void): () => void {
-  if (typeof query.addEventListener !== 'function') return () => {};
-  query.addEventListener('change', listener);
-  return () => query.removeEventListener('change', listener);
+  if (typeof query.addEventListener === 'function') {
+    query.addEventListener('change', listener);
+    return () => query.removeEventListener('change', listener);
+  }
+  const legacy = query as LegacyMediaQueryList;
+  legacy.addListener?.(listener);
+  return () => legacy.removeListener?.(listener);
 }
 
 /**

@@ -13,9 +13,16 @@
 ## 2. 디자인 토큰 — 하드코딩 색/사이즈 금지
 - 색: `var(--blue500)` 등 토큰. 하드코딩 hex/rgba 금지(정당한 OAuth 브랜드색은 명명 토큰화).
   알파 오버레이/스크림도 `--scrim`·`--overlay-text` 류 토큰으로(값 동일하게 정의 후 var() 참조).
-- 폰트: `globals.css` @theme의 `--font-size-*` 토큰. `text-[Npx]`/`font-size:Npx` 임의값 금지.
+- 폰트: `globals.css` `:root`의 `--font-size-*` 토큰(치수 토큰은 `tokens.css` `@theme` — `DESIGN.md` §1). `text-[Npx]`/`font-size:Npx` 임의값 금지.
 - 컴포넌트 CSS가 참조하는 토큰은 반드시 `:root`에 정의(미정의 var는 런타임 silent fail — WS1 사고).
-- light-only: `dark:` variant 금지.
+- 다크모드(2026-08-10 도입, `bb9600797`): 사용자가 라이트/다크/시스템을 고른다. 기본값은 light이고 OS 설정을 자동으로
+  따르지 않는다(`lib/theme.ts`, 서버 enum `V1ThemePreference`). `components/providers/theme-provider.tsx`가
+  `<html>`에 `.dark` 클래스를 토글한다.
+  - 컴포넌트 CSS(`tm-*` 등)는 색 토큰을 쓰면 `globals.css`의 `:root.dark` 재정의로 따라온다. 필요한 보정만
+    `:root.dark .tm-…` 셀렉터로 추가한다.
+  - Tailwind 유틸리티는 `dark:` variant를 쓴다 — `@custom-variant dark`가 같은 `.dark` 클래스를 기준으로 한다.
+  - `@media (prefers-color-scheme: dark)`를 직접 쓰지 않는다 — 수동 토글과 상태가 어긋난다.
+  - 하드코딩 색·Tailwind `gray-*` 원시값은 다크에서 대비가 깨진다. 다크를 지원하는 화면은 양쪽 모두 4.5:1.
 
 ## 3. 접근성(a11y) — WCAG 2.1 AA + 프로젝트 44px
 - 인터랙티브 요소 **min 44×44px**(`.tm-chip`/버튼 등). 키보드 `focus-visible` ring(blue500 2px).

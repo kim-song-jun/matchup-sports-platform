@@ -81,16 +81,23 @@ run_case "push event forces stage=none even if STAGE_INPUT says stageA" \
 # ── the injection guard itself ──────────────────────────────────────────
 run_case "evidence with an embedded newline (forged stage= line) is rejected" \
   workflow_dispatch stageA "$(printf 'legit\nstage=stageB-forged')" \
-  reject "" "" "printable characters"
+  reject "" "" "control characters"
 run_case "evidence with a tab (control character) is rejected" \
   workflow_dispatch stageA "$(printf 'tab\there')" \
-  reject "" "" "printable characters"
-run_case "evidence over 500 characters is rejected" \
-  workflow_dispatch stageA "$(printf 'a%.0s' $(seq 1 501))" \
-  reject "" "" "at most 500 characters"
-run_case "evidence at exactly 500 characters is accepted" \
-  workflow_dispatch stageA "$(printf 'a%.0s' $(seq 1 500))" \
-  pass stageA "$(printf 'a%.0s' $(seq 1 500))"
+  reject "" "" "control characters"
+# Fix round 2, Minor 1: CR gets its own case -- LF and CR are both rejected
+# by [[:cntrl:]], but a prior regex-based check could plausibly have
+# caught one and not the other (e.g. a hand-rolled [\n] class that forgot
+# \r), so this is a distinct assertion, not a duplicate of the LF case.
+run_case "evidence with a carriage return is rejected" \
+  workflow_dispatch stageA "$(printf 'legit\rstage=stageB-forged')" \
+  reject "" "" "control characters"
+run_case "evidence over 1500 bytes is rejected" \
+  workflow_dispatch stageA "$(printf 'a%.0s' $(seq 1 1501))" \
+  reject "" "" "at most 1500 bytes"
+run_case "evidence at exactly 1500 bytes is accepted" \
+  workflow_dispatch stageA "$(printf 'a%.0s' $(seq 1 1500))" \
+  pass stageA "$(printf 'a%.0s' $(seq 1 1500))"
 
 # ── required-ness and stage validation (pre-existing behavior, still
 #    covered so a future refactor can't silently drop them) ─────────────

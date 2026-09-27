@@ -43,7 +43,7 @@ export function LandingV4Live({ data }: { data: LandingV4Data }) {
     <section id="live" className="tm-landing-section" aria-labelledby="live-heading">
       <div className="tm-landing-section-inner">
         <div className="tm-landing-section-header" data-align="center" data-reveal>
-          <p className="tm-landing-section-kw">지금</p>
+          <p className="tm-landing-section-kw">현황</p>
           <h2 id="live-heading" className="tm-landing-section-title">지금 열려 있어요</h2>
           <p className="tm-landing-section-sub">로그인 없이 볼 수 있는 실제 대회와 경기예요.</p>
         </div>

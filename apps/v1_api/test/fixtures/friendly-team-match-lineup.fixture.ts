@@ -20,15 +20,33 @@ export async function submitFriendlyTeamMatchLineups(prisma: PrismaClient, gameI
     select: { id: true, sideKey: true },
   });
   for (const side of sides) {
-    const existing = await prisma.v1GameLineup.findFirst({
+    let lineup = await prisma.v1GameLineup.findFirst({
       where: { gameId, sideId: side.id, invalidatedAt: null },
       orderBy: { revision: 'desc' },
     });
-    const lineup =
-      existing ??
-      (await prisma.v1GameLineup.create({
-        data: { gameId, sideId: side.id, revision: 1, state: 'SUBMITTED', submittedAt: new Date() },
-      }));
+    const alreadySubmitted = lineup !== null;
+    if (lineup === null) {
+      // Copilot review finding (PR #1315): `(gameId, sideId, revision)` is
+      // unique, so a hardcoded `revision: 1` collides whenever the side's
+      // only lineup rows are invalidated (revision 1 exists but
+      // invalidatedAt is set, so the query above returns null). Look at
+      // ALL lineups for the side (invalidated included) and continue from
+      // the true max revision instead.
+      const latestAny = await prisma.v1GameLineup.findFirst({
+        where: { gameId, sideId: side.id },
+        orderBy: { revision: 'desc' },
+        select: { revision: true },
+      });
+      lineup = await prisma.v1GameLineup.create({
+        data: {
+          gameId,
+          sideId: side.id,
+          revision: (latestAny?.revision ?? 0) + 1,
+          state: 'SUBMITTED',
+          submittedAt: new Date(),
+        },
+      });
+    }
     const participantCount = await prisma.v1GameParticipant.count({
       where: { gameId, sideId: side.id, lineupId: lineup.id },
     });
@@ -42,7 +60,7 @@ export async function submitFriendlyTeamMatchLineups(prisma: PrismaClient, gameI
         },
       });
     }
-    if (existing) {
+    if (alreadySubmitted) {
       await prisma.v1GameLineup.update({
         where: { id: lineup.id },
         data: { state: 'SUBMITTED', submittedAt: new Date() },

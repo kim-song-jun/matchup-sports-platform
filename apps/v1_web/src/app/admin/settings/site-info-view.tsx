@@ -6,18 +6,24 @@ import { AdminInlineError, AdminToasts, useAdminToast } from '@/components/admin
 import { useAdminCanWrite } from '@/hooks/use-admin-can-write';
 import { useV1AdminSiteInfo, useV1UpdateSiteInfo } from '@/hooks/use-v1-api';
 import { extractErrorMessage } from '@/lib/error-message';
-import { SITE_INFO_DEFAULTS } from '@/lib/public-site/site-info';
+import {
+  formatGuestInquiryRetention,
+  GUEST_INQUIRY_RETENTION_DAYS_RANGE,
+  SITE_INFO_DEFAULTS,
+} from '@/lib/public-site/site-info';
 import { validationFieldMessages } from '@/lib/validation-details';
 import type { V1AdminSiteInfo, V1SiteInfoField, V1UpdateSiteInfoPayload } from '@/types/api';
 
-type Draft = Record<V1SiteInfoField, string>;
-type FieldErrors = Partial<Record<V1SiteInfoField, string>>;
+type FormField = V1SiteInfoField | 'guestInquiryRetentionDays';
+type Draft = Record<FormField, string>;
+type FieldErrors = Partial<Record<FormField, string>>;
 
 type FieldSpec = {
-  key: V1SiteInfoField;
+  key: FormField;
   label: string;
-  maxLength: number;
-  type?: 'text' | 'email';
+  /** 텍스트 칸만 — 숫자 칸은 min/max 로 제한한다. */
+  maxLength?: number;
+  type?: 'text' | 'email' | 'number';
   placeholder?: string;
   hint?: string;
 };
@@ -36,13 +42,23 @@ const FIELDS: readonly FieldSpec[] = [
     type: 'email',
     hint: `문의 페이지·푸터에 보이는 주소예요. 비워 두면 기본값(${SITE_INFO_DEFAULTS.contactEmail})을 보여 줘요.`,
   },
-  {
-    key: 'guestInquiryRetention',
-    label: '비회원 문의 보관 기간',
-    maxLength: 100,
-    hint: '문의 페이지 폼의 개인정보 수집·이용 동의에 그대로 보여요. 비워서 저장하면 기본 문구로 돌아가요. 기간이 지난 문의를 자동으로 지우는 기능은 아직 없어요.',
-  },
+  { key: 'guestInquiryRetentionDays', label: '비회원 문의 보관 기간(일)', type: 'number' },
 ];
+
+const { min: RETENTION_MIN, max: RETENTION_MAX } = GUEST_INQUIRY_RETENTION_DAYS_RANGE;
+
+function parseRetentionDays(value: string): number | null {
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const days = Number(trimmed);
+  return days >= RETENTION_MIN && days <= RETENTION_MAX ? days : null;
+}
+
+function retentionHint(value: string): string {
+  const days = parseRetentionDays(value);
+  const notice = days === null ? '' : `문의 페이지 동의 안내에 "${formatGuestInquiryRetention(days)}"로 보여요. `;
+  return `${notice}늘려도 이미 받은 문의는 제출 때 안내한 기간이 지나면 파기 대상이에요. 자동으로 지우지 않아요 — 기간이 지난 비회원 문의는 문의 관리 화면에서 직접 파기해요.`;
+}
 
 const BUSINESS_NUMBER_PATTERN = /^\d{3}-\d{2}-\d{5}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -55,8 +71,7 @@ function toDraft(settings: V1AdminSiteInfo | undefined): Draft {
     address: settings?.address ?? '',
     mailOrderSalesNumber: settings?.mailOrderSalesNumber ?? '',
     contactEmail: settings?.contactEmail ?? '',
-    // 기본 문구로 읽는 중이면 칸을 비워 둔다 — 채워 두면 저장할 때 기본 문구가 저장값으로 굳는다.
-    guestInquiryRetention: settings && !settings.guestInquiryRetentionIsDefault ? settings.guestInquiryRetention : '',
+    guestInquiryRetentionDays: settings ? String(settings.guestInquiryRetentionDays) : '',
   };
 }
 
@@ -68,10 +83,13 @@ function validate(draft: Draft): FieldErrors {
   }
   const email = draft.contactEmail.trim();
   if (email && !EMAIL_PATTERN.test(email)) errors.contactEmail = '이메일 형식이 올바르지 않아요.';
+  if (parseRetentionDays(draft.guestInquiryRetentionDays) === null) {
+    errors.guestInquiryRetentionDays = `보관 기간은 ${RETENTION_MIN}~${RETENTION_MAX}일 사이의 정수로 입력해 주세요.`;
+  }
   return errors;
 }
 
-const fieldId = (key: V1SiteInfoField) => `site-info-${key}`;
+const fieldId = (key: FormField) => `site-info-${key}`;
 
 /**
  * 사업자 정보 설정. 연동 설정 탭과 같은 카드·저장 흐름이고, 공개 정보라 입력칸에 현재 값을 채워 둔다.
@@ -90,7 +108,7 @@ export function SiteInfoView() {
   }, [settings]);
 
   // 저장 중에는 입력칸이 잠겨 있어 초점을 줄 수 없다 — 잠금이 풀린 뒤 옮긴다.
-  const [focusTarget, setFocusTarget] = useState<V1SiteInfoField | null>(null);
+  const [focusTarget, setFocusTarget] = useState<FormField | null>(null);
   useEffect(() => {
     if (!focusTarget || updateSettings.isPending) return;
     document.getElementById(fieldId(focusTarget))?.focus();
@@ -112,7 +130,9 @@ export function SiteInfoView() {
     const baseline = toDraft(settings);
     const payload: V1UpdateSiteInfoPayload = {};
     for (const { key } of FIELDS) {
-      if (draft[key].trim() !== baseline[key].trim()) payload[key] = draft[key].trim();
+      if (draft[key].trim() === baseline[key].trim()) continue;
+      if (key === 'guestInquiryRetentionDays') payload.guestInquiryRetentionDays = Number(draft[key].trim());
+      else payload[key] = draft[key].trim();
     }
     if (!Object.keys(payload).length) {
       showToast('바뀐 항목이 없어요.', 'error');
@@ -125,7 +145,7 @@ export function SiteInfoView() {
         const serverErrors: FieldErrors = {};
         for (const [field, messages] of Object.entries(validationFieldMessages(err))) {
           if (FIELDS.some((spec) => spec.key === field)) {
-            serverErrors[field as V1SiteInfoField] = messages[0] ?? '입력값을 확인해 주세요.';
+            serverErrors[field as FormField] = messages[0] ?? '입력값을 확인해 주세요.';
           }
         }
         setErrors(serverErrors);
@@ -155,10 +175,9 @@ export function SiteInfoView() {
             {FIELDS.map((field) => {
               const id = fieldId(field.key);
               const fieldError = errors[field.key];
-              const describedBy = [field.hint ? `${id}-hint` : '', fieldError ? `${id}-error` : ''].filter(Boolean).join(' ');
-              const placeholder = field.key === 'guestInquiryRetention' && settings?.guestInquiryRetentionIsDefault
-                ? `기본값: ${settings.guestInquiryRetention}`
-                : field.placeholder;
+              const hint = field.key === 'guestInquiryRetentionDays' ? retentionHint(draft[field.key]) : field.hint;
+              const describedBy = [hint ? `${id}-hint` : '', fieldError ? `${id}-error` : ''].filter(Boolean).join(' ');
+              const isNumber = field.type === 'number';
               return (
                 <div key={field.key} className="flex flex-col gap-2">
                   <label htmlFor={id} className="text-[length:var(--font-size-label)] font-semibold text-[var(--text-body)]">
@@ -174,16 +193,20 @@ export function SiteInfoView() {
                       if (errors[field.key]) setErrors((prev) => ({ ...prev, [field.key]: undefined }));
                     }}
                     maxLength={field.maxLength}
+                    min={isNumber ? RETENTION_MIN : undefined}
+                    max={isNumber ? RETENTION_MAX : undefined}
+                    step={isNumber ? 1 : undefined}
+                    inputMode={isNumber ? 'numeric' : undefined}
                     // 지원 역할은 이 칸으로만 값을 읽는다 — disabled 의 저대비 대신 읽기 전용으로 둔다.
                     readOnly={!canWrite}
                     disabled={locked}
-                    placeholder={isPending ? '불러오는 중...' : placeholder}
+                    placeholder={isPending ? '불러오는 중...' : field.placeholder}
                     aria-invalid={fieldError ? true : undefined}
                     aria-describedby={describedBy || undefined}
                     className="h-[44px] rounded-xl border border-[var(--border)] px-3 text-[length:var(--font-size-body-sm)] text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 aria-[invalid=true]:border-[var(--red500)] read-only:bg-[var(--surface-soft)] disabled:bg-[var(--surface-soft)] disabled:text-[var(--text-muted)]"
                   />
-                  {field.hint ? (
-                    <span id={`${id}-hint`} className="text-[length:var(--font-size-micro)] text-[var(--text-muted)]">{field.hint}</span>
+                  {hint ? (
+                    <span id={`${id}-hint`} className="text-[length:var(--font-size-micro)] text-[var(--text-muted)]">{hint}</span>
                   ) : null}
                   {fieldError ? (
                     <span id={`${id}-error`} className="text-[length:var(--font-size-micro)] font-semibold text-[var(--red700)]">

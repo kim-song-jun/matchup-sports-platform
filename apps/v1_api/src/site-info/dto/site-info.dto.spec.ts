@@ -18,7 +18,7 @@ describe('UpdateSiteInfoDto', () => {
         address: '서울',
         mailOrderSalesNumber: '제2026-서울-0000호',
         contactEmail: 'help@example.com',
-        guestInquiryRetention: '문의 처리 완료 후 1년',
+        guestInquiryRetentionDays: 365,
       }),
     ).toEqual([]);
     expect(await errorsFor({})).toEqual([]);
@@ -48,10 +48,17 @@ describe('UpdateSiteInfoDto', () => {
     ['representativeName', 51],
     ['address', 201],
     ['mailOrderSalesNumber', 51],
-    ['guestInquiryRetention', 101],
   ])('rejects %s longer than its limit', async (field, length) => {
     expect(await errorsFor({ [field]: 'a'.repeat(length) })).toEqual([field]);
     expect(await errorsFor({ [field]: 'a'.repeat(length - 1) })).toEqual([]);
+  });
+
+  it.each([0, 3651, 1.5, null, 'abc'])('rejects retention days %p', async (value) => {
+    expect(await errorsFor({ guestInquiryRetentionDays: value })).toEqual(['guestInquiryRetentionDays']);
+  });
+
+  it.each([1, 3650])('accepts retention days at the %i boundary', async (value) => {
+    expect(await errorsFor({ guestInquiryRetentionDays: value })).toEqual([]);
   });
 
   it('rejects non-string values', async () => {

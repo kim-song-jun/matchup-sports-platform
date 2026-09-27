@@ -19,7 +19,7 @@ vi.mock('@/lib/session-storage', () => ({ hasStoredV1Session: () => session.sign
 const SITE_INFO = {
   companyName: '가상 회사',
   contactEmail: 'help@example.com',
-  guestInquiryRetention: '문의 처리 완료 후 1년',
+  guestInquiryRetentionDays: 365,
 };
 
 function stubSiteInfo(response: Response) {

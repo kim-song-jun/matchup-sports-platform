@@ -11,10 +11,12 @@ import { AdminService } from './admin.service';
 import { UploadsModule } from '../uploads/uploads.module';
 import { AdminTermsController } from './admin-terms.controller';
 import { AdminTermsService } from './admin-terms.service';
+import { GuestInquiryPurgeController } from './guest-inquiry-purge.controller';
+import { GuestInquiryPurgeService } from './guest-inquiry-purge.service';
 
 @Module({
   imports: [AdminContextModule, NotificationsModule, RealtimeModule, UploadsModule],
-  controllers: [AdminController, AdminMonitoringController, AdminOpsController, AdminTermsController],
-  providers: [AdminService, AdminOpsService, AdminTermsService, V1AuthGuard],
+  controllers: [AdminController, AdminMonitoringController, AdminOpsController, AdminTermsController, GuestInquiryPurgeController],
+  providers: [AdminService, AdminOpsService, AdminTermsService, GuestInquiryPurgeService, V1AuthGuard],
 })
 export class AdminModule {}

@@ -536,7 +536,8 @@ export const gameSchemaSourceManifest = {
   // 20260927090000_v1_site_info_settings, and additive V1InquiryCategory values
   // tournament_hosting/partnership, backed by 20260927100000_v1_inquiry_public_categories.
   // No game model changed.
-  schema: '94269921fd1b382e599ba341f0b7ebdacbab858d009db2eb2ae946fad0be3068',
+  // 2026-09-27: guestInquiryRetentionDays Int + nullable V1Inquiry.guestRetentionDays/purgedAt/purgedByAdminUserId, in the same two migrations.
+  schema: 'a253cc251952aa69690f275ce2ef6bdf72d7c6cdede9b5ce631f181735599dab',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

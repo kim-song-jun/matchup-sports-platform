@@ -10,7 +10,10 @@ import { createHash } from 'node:crypto';
 import type { Prisma, V1Inquiry as V1InquiryRecord } from '@prisma/client';
 import { V1AuthUser } from '../auth/v1-auth-user';
 import { PrismaService } from '../prisma/prisma.service';
-import { readGuestInquiryRetention } from '../site-info/site-info-settings.service';
+import {
+  formatGuestInquiryRetention,
+  readGuestInquiryRetentionDays,
+} from '../site-info/site-info-settings.service';
 import { CreateInquiryDto, InquiriesQueryDto } from './dto/inquiries.dto';
 import {
   CreatePublicInquiryDto,
@@ -163,13 +166,14 @@ export class InquiriesService {
     }
 
     // 보관 기간은 어드민이 바꿀 수 있어, 제출 시점 값을 함께 남겨야 무엇에 동의했는지 남는다.
-    const retention = await readGuestInquiryRetention(this.prisma);
+    const retentionDays = await readGuestInquiryRetentionDays(this.prisma);
+    const retention = formatGuestInquiryRetention(retentionDays);
     const header = [
       organization && `단체명: ${organization}`,
       `담당자: ${name}`,
       dto.sportType && `종목: ${PUBLIC_SPORT_LABELS[dto.sportType]}`,
       dto.expectedSchedule && `희망 시기: ${singleLine(dto.expectedSchedule)}`,
-      `개인정보 수집·이용 동의: 동의함 (보관 기간: ${singleLine(retention)})`,
+      `개인정보 수집·이용 동의: 동의함 (보관 기간: ${retention})`,
     ].filter(Boolean);
 
     await this.createWithSlackOutbox(
@@ -177,6 +181,7 @@ export class InquiriesService {
         userId: null,
         guestEmail: email,
         guestPhone: null,
+        guestRetentionDays: retentionDays,
         category: dto.category,
         title: `${PUBLIC_CATEGORY_TITLES[dto.category]} · ${organization || name}`.slice(0, 80),
         body: `${header.join('\n')}${PUBLIC_MESSAGE_SEPARATOR}${message}`,

@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsOptional, IsString, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { IsEmail, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 /** 형식 검증은 값이 있을 때만 — 빈 문자열·null 은 "지우기" 요청이다(IsOptional 필드와 같은 취급). */
@@ -47,9 +47,10 @@ export class UpdateSiteInfoDto {
   @IsEmail({}, { message: '이메일 형식이 올바르지 않아요.' })
   contactEmail?: string;
 
-  @IsOptional()
-  @Transform(trim)
-  @IsString()
-  @MaxLength(100, { message: '문의 보관 기간 안내는 100자를 넘을 수 없어요.' })
-  guestInquiryRetention?: string;
+  // 지울 수 없는 값이라 null 은 "지우기" 가 아니라 형식 오류다.
+  @ValidateIf((_: object, value: unknown) => value !== undefined)
+  @IsInt({ message: '보관 기간은 일 단위 정수로 입력해주세요.' })
+  @Min(1, { message: '보관 기간은 1일 이상이어야 해요.' })
+  @Max(3650, { message: '보관 기간은 3650일(10년)을 넘을 수 없어요.' })
+  guestInquiryRetentionDays?: number;
 }

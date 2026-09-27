@@ -2528,6 +2528,35 @@ export type V1AdminInquiryRow = {
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
+  /** 비회원 문의 개인정보를 파기한 시각. 값이 있으면 연락처는 비었고 제목·본문·답변은 고정 문구다. */
+  purgedAt: string | null;
+};
+
+/** GET /admin/guest-inquiries/purge-candidates 한 행 — 개인정보(연락처·제목·본문)는 싣지 않는다. */
+export type V1GuestInquiryPurgeCandidate = {
+  inquiryId: string;
+  category: V1InquiryCategory;
+  completedAt: string;
+  retentionExpiredAt: string;
+};
+
+export type V1GuestInquiryPurgeCandidates = {
+  retentionDays: number;
+  /** 파기 대상 전체 건수. `items` 는 완료가 오래된 순으로 최대 200건이다. */
+  total: number;
+  items: V1GuestInquiryPurgeCandidate[];
+};
+
+/** POST /admin/guest-inquiries/purge 바디 — `all` 은 서버가 지금 계산한 대상 전체. */
+export type V1PurgeGuestInquiriesPayload =
+  | { scope: 'all' }
+  | { scope: 'selected'; inquiryIds: string[] };
+
+export type V1PurgeGuestInquiriesResult = {
+  purgedCount: number;
+  /** 고른 id 중 대상 조건을 통과하지 못해(이미 파기·기간 미도래 등) 건너뛴 수. */
+  skippedCount: number;
+  inquiryIds: string[];
 };
 
 export type V1AdminInquiryReply = V1InquiryReply & {
@@ -4371,9 +4400,8 @@ export type V1AdminSiteInfo = {
   address: string | null;
   mailOrderSalesNumber: string | null;
   contactEmail: string | null;
-  /** 저장값이 없으면 서버 기본 문구가 채워진다(`guestInquiryRetentionIsDefault` 로 구분). */
-  guestInquiryRetention: string;
-  guestInquiryRetentionIsDefault: boolean;
+  /** 비회원 문의 개인정보 보관 일수(처리 완료 시점부터, 1~3650). 행이 없으면 서버 기본값 365. */
+  guestInquiryRetentionDays: number;
   updatedByAdminUserId: string | null;
   updatedAt: string | null;
 };
@@ -4384,11 +4412,10 @@ export type V1SiteInfoField =
   | 'businessRegistrationNumber'
   | 'address'
   | 'mailOrderSalesNumber'
-  | 'contactEmail'
-  | 'guestInquiryRetention';
+  | 'contactEmail';
 
-/** PUT /admin/site-info 바디 — 필드 없음=유지, ""=지우기, 값=저장(서버가 앞뒤 공백 제거). */
-export type V1UpdateSiteInfoPayload = Partial<Record<V1SiteInfoField, string>>;
+/** PUT /admin/site-info 바디 — 필드 없음=유지, ""=지우기, 값=저장(서버가 앞뒤 공백 제거). 보관 일수는 지울 수 없다. */
+export type V1UpdateSiteInfoPayload = Partial<Record<V1SiteInfoField, string>> & { guestInquiryRetentionDays?: number };
 
 /** POST /public/inquiries 바디 — 비회원 대회 개설·제휴 문의. `website` 는 숨긴 honeypot 칸 값 그대로다. */
 export type V1PublicInquiryPayload = {

@@ -12,8 +12,7 @@ const SAVED: V1AdminSiteInfo = {
   address: null,
   mailOrderSalesNumber: null,
   contactEmail: 'help@example.com',
-  guestInquiryRetention: '문의 처리 완료 후 1년',
-  guestInquiryRetentionIsDefault: true,
+  guestInquiryRetentionDays: 365,
   updatedByAdminUserId: null,
   updatedAt: null,
 };
@@ -68,8 +67,6 @@ describe('SiteInfoView (/admin/settings?tab=site-info)', () => {
   it('저장은 바뀐 칸만 PUT /admin/site-info 로 보내고, 비운 칸은 빈 문자열(지우기)로 보낸다', async () => {
     const user = renderView();
     await ready();
-    expect(screen.getByLabelText('비회원 문의 보관 기간')).toHaveValue('');
-    expect(screen.getByLabelText('비회원 문의 보관 기간')).toHaveAttribute('placeholder', '기본값: 문의 처리 완료 후 1년');
 
     await user.type(screen.getByLabelText('사업장 주소'), '  가상시 가상로 1 ');
     await user.clear(screen.getByLabelText('대표자'));
@@ -78,6 +75,40 @@ describe('SiteInfoView (/admin/settings?tab=site-info)', () => {
     await waitFor(() => expect(putCalls).toHaveLength(1));
     expect(putCalls[0]).toEqual({ address: '가상시 가상로 1', representativeName: '' });
     expect(await screen.findByText('사업자 정보를 저장했어요.')).toBeInTheDocument();
+  });
+
+  it('보관 기간은 일수(숫자)로 보내고, 공개 고지 문구를 미리 보여 주며 수동 파기를 안내한다', async () => {
+    const user = renderView();
+    await ready();
+    const days = screen.getByLabelText('비회원 문의 보관 기간(일)');
+    expect(days).toHaveValue(365);
+    expect(days).toHaveAccessibleDescription(/"문의 처리 완료 후 1년"로 보여요/);
+    expect(days).toHaveAccessibleDescription(/늘려도 이미 받은 문의는 제출 때 안내한 기간이 지나면 파기 대상이에요/);
+    expect(days).toHaveAccessibleDescription(/문의 관리 화면에서 직접 파기해요/);
+
+    await user.clear(days);
+    await user.type(days, '730');
+    expect(days).toHaveAccessibleDescription(/"문의 처리 완료 후 2년"로 보여요/);
+    await user.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() => expect(putCalls).toHaveLength(1));
+    expect(putCalls[0]).toEqual({ guestInquiryRetentionDays: 730 });
+  });
+
+  it.each(['0', '3651'])('보관 기간 %s 일은 보내지 않고 칸 아래에 범위를 알려 준다', async (value) => {
+    const user = renderView();
+    await ready();
+    const days = screen.getByLabelText('비회원 문의 보관 기간(일)');
+    await user.clear(days);
+    await user.type(days, value);
+    await user.click(screen.getByRole('button', { name: '저장' }));
+
+    expect(days).toHaveFocus();
+    expect(days).toHaveAttribute('aria-invalid', 'true');
+    expect(document.getElementById('site-info-guestInquiryRetentionDays-error')).toHaveTextContent(
+      '보관 기간은 1~3650일 사이의 정수로 입력해 주세요.',
+    );
+    expect(putCalls).toHaveLength(0);
   });
 
   it('바뀐 칸이 없으면 보내지 않는다', async () => {

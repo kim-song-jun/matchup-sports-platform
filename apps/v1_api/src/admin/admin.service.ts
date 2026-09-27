@@ -2017,6 +2017,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         createdAt: true,
         updatedAt: true,
         closedAt: true,
+        purgedAt: true,
         userId: true,
         guestEmail: true,
         guestPhone: true,
@@ -2103,6 +2104,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         reportedTeam: { select: { id: true, name: true, status: true } },
         status: true,
         closedAt: true,
+        purgedAt: true,
         createdAt: true,
         updatedAt: true,
         user: { select: { email: true, profile: { select: { nickname: true, displayName: true } } } },
@@ -2285,15 +2287,19 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const asked = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.v1Inquiry.findUnique({ where: { id: inquiryId } });
       if (!existing) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Inquiry was not found' });
+      if (existing.purgedAt) throw inquiryPurgedError();
 
       await tx.v1InquiryReply.create({
         data: { inquiryId, adminUserId: admin.id, body },
       });
 
-      const updated = await tx.v1Inquiry.update({
-        where: { id: inquiryId },
+      // 조회 뒤에 커밋된 파기는 이 조건에서 0건이 되어 방금 쓴 답변까지 롤백된다.
+      const { count } = await tx.v1Inquiry.updateMany({
+        where: { id: inquiryId, purgedAt: null },
         data: { status: 'answered', closedAt: null },
       });
+      if (count === 0) throw inquiryPurgedError();
+      const updated = { status: 'answered' as const };
 
       await this.writeAdminStatusLogs(
         admin,
@@ -2336,12 +2342,23 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.v1InquiryReply.findUnique({ where: { id: replyId } });
+      const existing = await tx.v1InquiryReply.findUnique({
+        where: { id: replyId },
+        include: { inquiry: { select: { purgedAt: true } } },
+      });
       if (!existing || existing.inquiryId !== inquiryId) {
         throw new NotFoundException({ code: 'NOT_FOUND', message: 'Reply was not found' });
       }
+      if (existing.inquiry.purgedAt) throw inquiryPurgedError();
 
-      await tx.v1InquiryReply.update({ where: { id: replyId }, data: { body } });
+      // updatedAt 조건: 조회 뒤에 파기(또는 다른 수정)가 답변을 덮었으면 0건이 되어 그 위에 되쓰지 않는다.
+      const { count } = await tx.v1InquiryReply.updateMany({
+        where: { id: replyId, updatedAt: existing.updatedAt },
+        data: { body },
+      });
+      if (count === 0) {
+        throw new ConflictException({ code: 'INQUIRY_REPLY_CHANGED', message: '답변이 그사이 바뀌었어요. 새로고침한 뒤 다시 시도해 주세요.' });
+      }
 
       await tx.v1AdminActionLog.create({
         data: {
@@ -2363,6 +2380,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     const admin = await this.getMutationAdmin(user.id);
     const existing = await this.prisma.v1Inquiry.findUnique({ where: { id: inquiryId } });
     if (!existing) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Inquiry was not found' });
+    if (existing.purgedAt) throw inquiryPurgedError();
 
     const result = await this.prisma.$transaction(async (tx) => {
       const row = await tx.v1Inquiry.update({
@@ -3173,6 +3191,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     createdAt: Date;
     updatedAt: Date;
     closedAt: Date | null;
+    purgedAt: Date | null;
     user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null } | null;
     _count: { replies: number };
   }) {
@@ -3194,6 +3213,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       closedAt: row.closedAt,
+      purgedAt: row.purgedAt,
     };
   }
 
@@ -3211,6 +3231,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
     reportReason: string | null;
     status: string;
     closedAt: Date | null;
+    purgedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
     user: { email: string | null; profile: { nickname: string | null; displayName: string | null } | null } | null;
@@ -3248,6 +3269,7 @@ export class AdminService implements OnModuleInit, OnModuleDestroy {
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
         closedAt: row.closedAt,
+        purgedAt: row.purgedAt,
         user: row.user,
         _count: { replies: row.replies.length },
       }),
@@ -3327,6 +3349,11 @@ function buildDeletedNickname(userId: string) {
  * 문의 답변 알림 본문에 넣을 답변 미리보기. 알림 본문은 인앱 목록·상세 시트와
  * 웹 푸시 payload에 그대로 실리므로, 줄바꿈을 공백으로 접고 길이를 제한한다.
  */
+/** 파기한 문의에 답변·상태를 새로 쓰면 그 내용은 다시 파기할 경로가 없다. */
+function inquiryPurgedError() {
+  return new ConflictException({ code: 'INQUIRY_PURGED', message: '개인정보를 파기한 문의라 답변이나 상태를 바꿀 수 없어요.' });
+}
+
 const INQUIRY_REPLY_PREVIEW_LIMIT = 160;
 
 function previewInquiryReply(body: string): string {

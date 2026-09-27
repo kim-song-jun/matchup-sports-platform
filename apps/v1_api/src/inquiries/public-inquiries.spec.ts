@@ -78,11 +78,13 @@ describe('InquiriesService.createPublic', () => {
     }
   });
 
-  it('records the retention text the admin has set at submission time', async () => {
-    prisma.v1SiteInfoSettings.findUnique.mockResolvedValue({ guestInquiryRetention: '  문의 처리 완료 후 6개월 ' });
+  it('records the retention period the admin has set at submission time', async () => {
+    prisma.v1SiteInfoSettings.findUnique.mockResolvedValue({ guestInquiryRetentionDays: 180 });
     await service.createPublic(dto(), undefined);
-    const body: string = prisma.v1Inquiry.create.mock.calls[0][0].data.body;
-    expect(body).toContain('개인정보 수집·이용 동의: 동의함 (보관 기간: 문의 처리 완료 후 6개월)');
+    const data = prisma.v1Inquiry.create.mock.calls[0][0].data;
+    expect(data.body).toContain('개인정보 수집·이용 동의: 동의함 (보관 기간: 문의 처리 완료 후 180일)');
+    // 파기 판정이 읽는 값 — 뒤에 설정을 늘려도 이 문의는 180일을 넘겨 보관하지 않는다.
+    expect(data.guestRetentionDays).toBe(180);
   });
 
   it('never writes the raw client IP to the discard log', async () => {

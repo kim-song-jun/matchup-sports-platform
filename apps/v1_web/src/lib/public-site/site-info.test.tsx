@@ -6,6 +6,7 @@ import {
   SITE_INFO_TIMEOUT_MS,
   businessInfoRows,
   fetchPublicSiteInfo,
+  formatGuestInquiryRetention,
   normalizeSiteInfo,
 } from './site-info';
 
@@ -87,7 +88,7 @@ describe('fetchPublicSiteInfo', () => {
 
   it('성공 응답은 envelope 의 data 를 읽고, 경로는 /public/site-info 다', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ status: 'success', data: { address: '가상시 가상로 1', guestInquiryRetention: '문의 처리 완료 후 1년' } }), {
+      new Response(JSON.stringify({ status: 'success', data: { address: '가상시 가상로 1', guestInquiryRetentionDays: 365 } }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       }),
@@ -98,5 +99,30 @@ describe('fetchPublicSiteInfo', () => {
     expect(info.address).toBe('가상시 가상로 1');
     expect(info.guestInquiryRetention).toBe('문의 처리 완료 후 1년');
     expect(info.companyName).toBe(SITE_INFO_DEFAULTS.companyName);
+  });
+});
+
+// API site-info-settings.service.spec.ts 가 같은 표로 formatGuestInquiryRetention 을 고정한다 — 둘 중 하나만 바꾸면 한쪽이 red.
+describe('formatGuestInquiryRetention', () => {
+  it.each([
+    [365, '문의 처리 완료 후 1년'],
+    [730, '문의 처리 완료 후 2년'],
+    [3650, '문의 처리 완료 후 10년'],
+    [1, '문의 처리 완료 후 1일'],
+    [180, '문의 처리 완료 후 180일'],
+    [366, '문의 처리 완료 후 366일'],
+  ])('%i일 → %s', (days, text) => {
+    expect(formatGuestInquiryRetention(days)).toBe(text);
+  });
+});
+
+describe('normalizeSiteInfo 보관 기간', () => {
+  // 기간을 지어내지 않는다 — 받을 수 없는 값이면 null 이고, 문의 폼은 이메일 안내로 대신한다.
+  it.each([undefined, 0, 3651, 1.5, '365'])('일수가 %p 이면 null', (value) => {
+    expect(normalizeSiteInfo({ guestInquiryRetentionDays: value }).guestInquiryRetention).toBeNull();
+  });
+
+  it('유효한 일수는 고지 문구로 바꾼다', () => {
+    expect(normalizeSiteInfo({ guestInquiryRetentionDays: 90 }).guestInquiryRetention).toBe('문의 처리 완료 후 90일');
   });
 });

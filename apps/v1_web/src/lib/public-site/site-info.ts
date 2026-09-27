@@ -8,9 +8,25 @@ export type PublicSiteInfo = {
   readonly address: string | null;
   readonly mailOrderSalesNumber: string | null;
   readonly contactEmail: string;
-  /** 비회원 문의 개인정보 보관 기간 문구(예: "문의 처리 완료 후 1년"). */
+  /** 비회원 문의 개인정보 보관 기간 문구(예: "문의 처리 완료 후 1년"). API 가 일수를 주지 않으면 null. */
   readonly guestInquiryRetention: string | null;
 };
+
+/**
+ * 보관 기간 고지 문구. API `formatGuestInquiryRetention`(site-info-settings.service.ts)과 같은 규칙이어야 한다 —
+ * 폼이 고지한 문구와 제출 기록에 남는 문구가 달라지면 무엇에 동의했는지 흐려진다.
+ */
+export function formatGuestInquiryRetention(days: number): string {
+  return `문의 처리 완료 후 ${days % 365 === 0 ? `${days / 365}년` : `${days}일`}`;
+}
+
+export const GUEST_INQUIRY_RETENTION_DAYS_RANGE = { min: 1, max: 3650 } as const;
+
+function retentionText(value: unknown): string | null {
+  const { min, max } = GUEST_INQUIRY_RETENTION_DAYS_RANGE;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) return null;
+  return formatGuestInquiryRetention(value);
+}
 
 /**
  * 약관·개인정보처리방침 본문에 이미 공개된 값만 둔다. 사업자등록번호·주소 같은 값은 저장소에 없으므로
@@ -35,7 +51,7 @@ export function normalizeSiteInfo(raw: Readonly<Record<string, unknown>> | null)
     address: clean(raw?.address),
     mailOrderSalesNumber: clean(raw?.mailOrderSalesNumber),
     contactEmail: clean(raw?.contactEmail) ?? SITE_INFO_DEFAULTS.contactEmail,
-    guestInquiryRetention: clean(raw?.guestInquiryRetention),
+    guestInquiryRetention: retentionText(raw?.guestInquiryRetentionDays),
   };
 }
 

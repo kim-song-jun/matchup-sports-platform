@@ -255,6 +255,9 @@ import type {
   V1UpdateReviewPolicySettingsPayload,
   V1AdminSiteInfo,
   V1UpdateSiteInfoPayload,
+  V1GuestInquiryPurgeCandidates,
+  V1PurgeGuestInquiriesPayload,
+  V1PurgeGuestInquiriesResult,
   V1PublicKakaoMapsKeyResponse,
   V1TournamentOperationsBoardFilters,
   V1TournamentOperationsBoardPage,
@@ -3142,6 +3145,27 @@ export function useV1ChangeAdminInquiryStatus(inquiryId: string) {
       queryClient.invalidateQueries({ queryKey: v1Keys.adminInquiry(inquiryId) });
       queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'inquiries'] });
       queryClient.invalidateQueries({ queryKey: v1Keys.inquiry(inquiryId) });
+    },
+  });
+}
+
+/** 보관 기간이 지난 비회원 문의 — 개수·id·분류·완료일·만료일만 온다(개인정보 없음). */
+export function useV1AdminGuestInquiryPurgeCandidates() {
+  return useQuery({
+    queryKey: v1Keys.adminGuestInquiryPurgeCandidates(),
+    queryFn: () => v1Get<V1GuestInquiryPurgeCandidates>('/admin/guest-inquiries/purge-candidates'),
+  });
+}
+
+/** 비회원 문의 개인정보 파기 (ops·owner). 서버가 대상 조건을 다시 검사해 조건 밖 id 는 건너뛴다. */
+export function useV1PurgeGuestInquiries() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: V1PurgeGuestInquiriesPayload) =>
+      v1Post<V1PurgeGuestInquiriesResult>('/admin/guest-inquiries/purge', body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: v1Keys.adminGuestInquiryPurgeCandidates() });
+      queryClient.invalidateQueries({ queryKey: [...v1Keys.all, 'admin', 'inquiries'] });
     },
   });
 }

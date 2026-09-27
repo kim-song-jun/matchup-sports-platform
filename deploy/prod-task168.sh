@@ -22,6 +22,16 @@
 # PROD_SOURCE_DIR, PROD_MANIFEST_FILE, and a pre-defined `compose` array
 # (Ruling R3 -- migration itself never goes through compose, only the quiesce
 # step below does).
+#
+# Fix round 1 note (errexit does not protect a function's own body): a bash
+# function or `(...)` subshell invoked as `f args || handler` has its ENTIRE
+# body's `set -e` disabled -- POSIX/bash exempt a compound command used as
+# the left side of an AND/OR list from ErrExit, and that exemption extends
+# through everything it runs, including a subshell that explicitly
+# re-declares `set -Eeuo pipefail` at its own top. Verified empirically in
+# this session. Since every call site in this file uses exactly that
+# `|| return 1` shape, every function below explicitly `||`-checks its own
+# risky commands rather than trusting the caller's errexit.
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/prod-task168-common.sh"
 
@@ -51,11 +61,28 @@ _manifest_migration_sha() {
   jq -er --arg n "$1" '.database.task168.migrations[] | select(.name==$n) | .sha256' "${PROD_MANIFEST_FILE}"
 }
 
+_task168_names_csv() {
+  local name parts=()
+  for name in "$@"; do parts+=("'${name}'"); done
+  local IFS=,
+  echo "${parts[*]}"
+}
+# 9 names: M1(7) + M8 + M10 -- expected ledger right after the "pre" migrate
+# phase, before the cutover tool and before M9.
+_task168_pre_csv() { _task168_names_csv "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M10}"; }
+# 10 names: M1(7) + M8 + M9 + M10 -- everything Stage A ever applies (never
+# M11). Used both for the state-table's single scoped ledger read (whose
+# content decides "9 rows present" vs "10 rows present" vs "reject") and for
+# Stage B's own precondition read.
+_task168_pre_m11_csv() { _task168_names_csv "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}"; }
+# 11 names: the full set including M11 -- Stage B's post-migrate read.
+_task168_all_csv() { _task168_names_csv "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}" "${PROD_TASK168_M11}"; }
+
 # Ruling R2's manifest shape. Independent of whatever builds/validates the
 # manifest upstream (Task 4/5) -- this runner never trusts an unchecked shape.
 _assert_manifest_schema() {
   local stage name
-  stage="$(jq -r '.database.task168.stage // empty' "${PROD_MANIFEST_FILE}" 2>/dev/null)"
+  stage="$(jq -r '.database.task168.stage // empty' "${PROD_MANIFEST_FILE}" 2>/dev/null)" || return 1
   [[ "${stage}" == stageA || "${stage}" == stageB ]] || {
     echo "[prod-task168] manifest database.task168.stage must be stageA or stageB" >&2
     return 1
@@ -102,22 +129,67 @@ _rows_equal() {
   [[ "${actual}" == "${joined}" ]]
 }
 
-_task168_pre_m11_names_csv() {
-  local name parts=()
-  for name in "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}"; do
-    parts+=("'${name}'")
-  done
-  local IFS=,
-  echo "${parts[*]}"
+# Critical 1 (real prod_pristine check found 122 unrelated ledger rows): a
+# scoped IN-list comparison alone cannot see a MISSING or stuck migration
+# among everything that came before M1 -- it would simply not appear in the
+# scoped read. Compares the count of RESOLVED pre-M1 migrations (applied OR
+# cleanly rolled back -- both are normal, healthy history; a real prod
+# snapshot checked in this session had 2 legitimately rolled-back pre-M1
+# rows, which a naive "applied-only" comparison would have wrongly flagged)
+# against the count of pre-M1 migration folders the release source actually
+# ships, and separately demands zero truly-stuck-or-self-contradictory rows.
+_pre_m1_source_names() {
+  find "${PROD_SOURCE_DIR}/apps/v1_api/prisma/migrations" -mindepth 1 -maxdepth 1 -type d -exec basename '{}' \; 2>/dev/null |
+    LC_ALL=C sort | awk -v m1="${PROD_TASK168_M1[0]}" '$0 < m1'
+}
+
+# Returns 0 (clean), 1 (a real violation was found -- the caller should
+# treat this as "reject", not an error), or 2 (a genuine query/setup failure,
+# e.g. the DB is unreachable -- the caller must propagate this as a hard
+# failure, never as "reject"). Collapsing 1 and 2 into a single nonzero code
+# would make a real DB outage look identical to a safe, expected rejection.
+_assert_pre_m1_migrations_applied() {
+  local expected_count resolved_count anomalous_count
+  expected_count="$(_pre_m1_source_names | grep -c '.')" || expected_count=0
+  [[ "${expected_count}" -gt 0 ]] || {
+    echo "[prod-task168] no pre-M1 migrations found under PROD_SOURCE_DIR -- cannot validate the ledger baseline" >&2
+    return 2
+  }
+  # Anomalous: still-pending/failed (no finished_at, no rollback either) OR
+  # self-contradictory (both finished AND rolled back, which should never
+  # happen). A cleanly rolled-back row (finished_at NULL, rolled_back_at SET)
+  # is normal Prisma history, not an anomaly.
+  anomalous_count="$(prod_dbq "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name < '${PROD_TASK168_M1[0]}' AND ((finished_at IS NULL AND rolled_back_at IS NULL) OR (finished_at IS NOT NULL AND rolled_back_at IS NOT NULL))")" || return 2
+  if [[ "${anomalous_count}" != 0 ]]; then
+    echo "[prod-task168] pre-M1 migration ledger has ${anomalous_count} stuck or self-contradictory row(s)" >&2
+    return 1
+  fi
+  resolved_count="$(prod_dbq "SELECT count(DISTINCT migration_name) FROM \"_prisma_migrations\" WHERE migration_name < '${PROD_TASK168_M1[0]}' AND ((finished_at IS NOT NULL AND rolled_back_at IS NULL) OR (finished_at IS NULL AND rolled_back_at IS NOT NULL))")" || return 2
+  if [[ "${resolved_count}" != "${expected_count}" ]]; then
+    echo "[prod-task168] pre-M1 ledger has ${resolved_count} resolved migration(s) but source ships ${expected_count} pre-M1 migrations" >&2
+    return 1
+  fi
+  return 0
 }
 
 # Any row for our migration names that is not (finished, not rolled back) --
 # an in-progress/failed attempt, or a resolved rollback -- means the ledger
 # is not one of the 5 recognized states; reject rather than guess. M11 is
-# checked separately: Stage A must never see it applied.
+# checked separately: Stage A must never see it applied. Same 0/1/2 contract
+# as _assert_pre_m1_migrations_applied, for the same reason.
 _assert_stage_a_ledger_clean() {
-  local bad m11_present
-  bad="$(prod_dbq "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name IN ($(_task168_pre_m11_names_csv)) AND NOT (finished_at IS NOT NULL AND rolled_back_at IS NULL)")" || return 2
+  local pre_m1_rc bad m11_present
+  # Not a bare `_assert_pre_m1_migrations_applied || return 2` -- that would
+  # collapse its own 1-vs-2 distinction back into one code. The `&&`/`||`
+  # list is the "checked" context that keeps this call's own errexit exempt
+  # without losing which of the two failure codes it returned.
+  _assert_pre_m1_migrations_applied && pre_m1_rc=0 || pre_m1_rc=$?
+  case "${pre_m1_rc}" in
+    0) ;;
+    1) return 1 ;;
+    *) return 2 ;;
+  esac
+  bad="$(prod_dbq "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name IN ($(_task168_pre_m11_csv)) AND NOT (finished_at IS NOT NULL AND rolled_back_at IS NULL)")" || return 2
   m11_present="$(prod_dbq "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name = '${PROD_TASK168_M11}'")" || return 2
   [[ "${bad}" == 0 && "${m11_present}" == 0 ]]
 }
@@ -137,7 +209,7 @@ task168_stage_a_state() {
     1) echo reject; return 0 ;;
     *) return 1 ;;
   esac
-  rows="$(prod_ledger_rows)" || return 1
+  rows="$(prod_ledger_rows "$(_task168_pre_m11_csv)")" || return 1
   seals="$(prod_count_cutover_seals)" || return 1
   if [[ -z "${rows}" ]]; then
     if [[ "${seals}" == '0|0|0' ]]; then echo fresh; else echo reject; fi
@@ -172,16 +244,51 @@ _stage_a_assert_receipt() {
   }
 }
 
-_stage_a_quiesce() {
-  local release_sha="$1" api_image="$2" db_id="$3" quiesce_receipt="$4" content
-  "${compose[@]}" stop v1_api v1_game_operations_worker
-  [[ -z "$("${compose[@]}" ps -q v1_api)" && -z "$("${compose[@]}" ps -q v1_game_operations_worker)" ]] || {
+# Returns 0 when `path` already holds a receipt bound to this exact
+# release/database/api-image with a terminal status -- lets a retry of the
+# SAME release skip re-doing (and thus re-writing) a step a prior attempt
+# already finished, instead of being permanently blocked by
+# prod_write_receipt's byte-identical-content requirement (a fresh write
+# always carries a new timestamp field, so a naive retry can never match).
+_receipt_reusable() {
+  local path="$1" kind="$2" release_sha="$3" db_id="$4" api_image="$5"
+  [[ -s "${path}" ]] || return 1
+  jq -e --arg kind "${kind}" --arg release "${release_sha}" --arg db "${db_id}" --arg api "${api_image}" \
+    '.schemaVersion==1 and .kind==$kind and (.status=="COMPLETED" or .status=="ENTERED" or .status=="MIGRATION_COMMITTED") and .releaseSha==$release and .databaseIdentity==$db and .apiImage==$api' \
+    "${path}" >/dev/null 2>&1
+}
+
+_stage_a_assert_quiesced() {
+  local api_running worker_running
+  # Captured separately, not `[[ -z "$(cmd)" ]]` -- a failing `ps -q` prints
+  # nothing to stdout, and `[[ ]]` only looks at that string, never the
+  # substituted command's own exit status. Two failing `ps` calls would read
+  # as "both empty" = "quiesced", which is exactly backwards.
+  api_running="$("${compose[@]}" ps -q v1_api)" || {
+    echo "[prod-task168] compose ps v1_api failed" >&2
+    return 1
+  }
+  worker_running="$("${compose[@]}" ps -q v1_game_operations_worker)" || {
+    echo "[prod-task168] compose ps v1_game_operations_worker failed" >&2
+    return 1
+  }
+  [[ -z "${api_running}" && -z "${worker_running}" ]] || {
     echo "[prod-task168] writers did not quiesce" >&2
     return 1
   }
+}
+
+_stage_a_quiesce() {
+  local release_sha="$1" api_image="$2" db_id="$3" quiesce_receipt="$4" content
+  "${compose[@]}" stop v1_api v1_game_operations_worker || {
+    echo "[prod-task168] compose stop failed" >&2
+    return 1
+  }
+  _stage_a_assert_quiesced || return 1
+  _receipt_reusable "${quiesce_receipt}" quiesce "${release_sha}" "${db_id}" "${api_image}" && return 0
   content="$(jq -nc --arg release "${release_sha}" --arg api "${api_image}" --arg db "${db_id}" \
     --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    '{schemaVersion:1,kind:"quiesce",status:"COMPLETED",releaseSha:$release,apiImage:$api,databaseIdentity:$db,services:["v1_api","v1_game_operations_worker"],completedAt:$at}')"
+    '{schemaVersion:1,kind:"quiesce",status:"COMPLETED",releaseSha:$release,apiImage:$api,databaseIdentity:$db,services:["v1_api","v1_game_operations_worker"],completedAt:$at}')" || return 1
   prod_write_receipt "${quiesce_receipt}" "${content}"
 }
 
@@ -192,16 +299,25 @@ _stage_a_quiesce() {
 # uses via `compose exec ... pg_dump | gzip > file`).
 _stage_a_backup() {
   local release_sha="$1" api_image="$2" db_id="$3" backup_file="$4" backup_receipt="$5"
-  local network content
+  local network content existing_sha
+  if _receipt_reusable "${backup_receipt}" backup "${release_sha}" "${db_id}" "${api_image}" && [[ -s "${backup_file}" ]]; then
+    existing_sha="$(jq -er '.backupSha256' "${backup_receipt}" 2>/dev/null)" || existing_sha=''
+    if [[ -n "${existing_sha}" && "$(_sha256_file "${backup_file}")" == "${existing_sha}" ]]; then
+      echo "[prod-task168] reusing existing backup for this release" >&2
+      return 0
+    fi
+  fi
   network="$(prod_task168_assert_network)" || return 1
   _prod_task168_docker_argv
   "${_PROD_TASK168_DOCKER_ARGV[@]}" run --rm --network "${network}" \
-    --env-file <(printf 'DATABASE_URL=%s\n' "${PROD_TASK168_DATABASE_URL}") \
-    postgres:16-alpine sh -c 'exec pg_dump "$DATABASE_URL" -Fc' > "${backup_file}" || {
+    --env-file /dev/stdin \
+    postgres:16-alpine sh -c 'exec pg_dump "$DATABASE_URL" -Fc' \
+    < <(printf 'DATABASE_URL=%s\n' "${PROD_TASK168_DATABASE_URL}") \
+    > "${backup_file}" || {
     echo "[prod-task168] pg_dump failed" >&2
     return 1
   }
-  chmod 600 "${backup_file}"
+  chmod 600 "${backup_file}" || return 1
   [[ -s "${backup_file}" ]] || {
     echo "[prod-task168] backup file is empty" >&2
     return 1
@@ -216,7 +332,7 @@ _stage_a_backup() {
     --arg path "${backup_file}" --arg sha "$(_sha256_file "${backup_file}")" \
     --argjson bytes "$(wc -c < "${backup_file}" | tr -d ' ')" \
     --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    '{schemaVersion:1,kind:"backup",status:"COMPLETED",releaseSha:$release,apiImage:$api,databaseIdentity:$db,backupPath:$path,backupSha256:$sha,backupBytes:$bytes,completedAt:$at}')"
+    '{schemaVersion:1,kind:"backup",status:"COMPLETED",releaseSha:$release,apiImage:$api,databaseIdentity:$db,backupPath:$path,backupSha256:$sha,backupBytes:$bytes,completedAt:$at}')" || return 1
   prod_write_receipt "${backup_receipt}" "${content}"
 }
 
@@ -227,17 +343,22 @@ _stage_a_backup() {
 # service (Ruling R3), so a test can substitute a local image. `--user`
 # matches the temp dir's own host owner so the container can read/write it
 # regardless of the image's declared default user.
+#
+# Every step is `|| exit 1`-checked (see the file header on why this
+# subshell's own `set -e` does not protect it): `copy_migration` bakes the
+# check into its one definition instead of repeating `|| exit 1` at every
+# call site.
 _stage_a_run_migrations() {
   local phase="$1" api_image="$2"
   (
     set -Eeuo pipefail
     local tmp owner network name
-    tmp="$(mktemp -d)"
+    tmp="$(mktemp -d)" || exit 1
     trap 'rm -rf "${tmp}"' EXIT
-    mkdir -p "${tmp}/migrations"
-    cp "${PROD_SOURCE_DIR}/apps/v1_api/prisma/migrations/migration_lock.toml" "${tmp}/migrations/"
-    cp "${PROD_SOURCE_DIR}/apps/v1_api/prisma/schema.prisma" "${tmp}/schema.prisma"
-    copy_migration() { cp -R "${PROD_SOURCE_DIR}/apps/v1_api/prisma/migrations/$1" "${tmp}/migrations/$1"; }
+    mkdir -p "${tmp}/migrations" || exit 1
+    cp "${PROD_SOURCE_DIR}/apps/v1_api/prisma/migrations/migration_lock.toml" "${tmp}/migrations/" || exit 1
+    cp "${PROD_SOURCE_DIR}/apps/v1_api/prisma/schema.prisma" "${tmp}/schema.prisma" || exit 1
+    copy_migration() { cp -R "${PROD_SOURCE_DIR}/apps/v1_api/prisma/migrations/$1" "${tmp}/migrations/$1" || exit 1; }
     while IFS= read -r name; do
       [[ "${name}" < "${PROD_TASK168_M1[0]}" ]] && copy_migration "${name}"
     done < <(find "${PROD_SOURCE_DIR}/apps/v1_api/prisma/migrations" -mindepth 1 -maxdepth 1 -type d -exec basename '{}' \; | LC_ALL=C sort)
@@ -247,21 +368,23 @@ _stage_a_run_migrations() {
       post) copy_migration "${PROD_TASK168_M8}"; copy_migration "${PROD_TASK168_M9}"; copy_migration "${PROD_TASK168_M10}" ;;
       *) echo "[prod-task168] unknown migration phase: ${phase}" >&2; exit 1 ;;
     esac
-    owner="$(_stat_owner "${tmp}")"
-    network="$(prod_task168_assert_network)"
+    owner="$(_stat_owner "${tmp}")" || exit 1
+    network="$(prod_task168_assert_network)" || exit 1
     _prod_task168_docker_argv
     "${_PROD_TASK168_DOCKER_ARGV[@]}" run --rm --network "${network}" --user "${owner}" \
-      --env-file <(printf 'DATABASE_URL=%s\n' "${PROD_TASK168_DATABASE_URL}") \
+      --env-file /dev/stdin \
       -v "${tmp}:/tmp/task168" \
-      "${api_image}" sh -c 'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy --schema /tmp/task168/schema.prisma'
+      "${api_image}" sh -c 'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy --schema /tmp/task168/schema.prisma' \
+      < <(printf 'DATABASE_URL=%s\n' "${PROD_TASK168_DATABASE_URL}") || exit 1
   )
 }
 
-# Exit code 0: report is authoritative, must be COMPLETED with zero legacy
-# links. Nonzero: the seals themselves (not the tool's exit code) are the
-# authoritative signal -- if they already read 5|5|3 the cutover committed
-# before whatever made the tool exit nonzero, and Stage A must resume from
-# there rather than refuse a genuinely-committed database.
+# Exit code 0: report is authoritative, must exist and be a clean COMPLETED
+# result -- "exit 0 but wrote no report" is treated as a failure, not a
+# silent pass. Nonzero: the seals themselves (not the tool's exit code) are
+# the authoritative signal -- if they already read 5|5|3 the cutover
+# committed before whatever made the tool exit nonzero, and Stage A must
+# resume from there rather than refuse a genuinely-committed database.
 _stage_a_run_cutover_tool() {
   local tool_image="$1" report_file="$2"
   [[ ! -e "${report_file}" ]] || {
@@ -270,22 +393,25 @@ _stage_a_run_cutover_tool() {
   }
   local network owner tool_rc
   network="$(prod_task168_assert_network)" || return 1
-  owner="$(_stat_owner "$(dirname "${report_file}")")"
+  owner="$(_stat_owner "$(dirname "${report_file}")")" || return 1
   _prod_task168_docker_argv
   set +e
   "${_PROD_TASK168_DOCKER_ARGV[@]}" run --rm --network "${network}" --user "${owner}" \
-    --env-file <(printf 'DATABASE_URL=%s\n' "${PROD_TASK168_DATABASE_URL}") \
+    --env-file /dev/stdin \
     -v "$(dirname "${report_file}"):/work" \
-    "${tool_image}" --report "/work/$(basename "${report_file}")"
+    "${tool_image}" --report "/work/$(basename "${report_file}")" \
+    < <(printf 'DATABASE_URL=%s\n' "${PROD_TASK168_DATABASE_URL}")
   tool_rc=$?
   set -e
   if [[ "${tool_rc}" -eq 0 ]]; then
-    if [[ -s "${report_file}" ]]; then
-      jq -e '.status=="COMPLETED" and .result.verification.remainingLegacyGameLinks==0 and .result.verification.remainingLegacyStaffScopes==0 and .result.verification.remainingLegacyAuditScopes==0' "${report_file}" >/dev/null || {
-        echo "[prod-task168] cutover tool exited 0 but its report is not a clean COMPLETED result" >&2
-        return 1
-      }
-    fi
+    [[ -s "${report_file}" ]] || {
+      echo "[prod-task168] cutover tool exited 0 but wrote no report file" >&2
+      return 1
+    }
+    jq -e '.status=="COMPLETED" and .result.verification.remainingLegacyGameLinks==0 and .result.verification.remainingLegacyStaffScopes==0 and .result.verification.remainingLegacyAuditScopes==0' "${report_file}" >/dev/null || {
+      echo "[prod-task168] cutover tool exited 0 but its report is not a clean COMPLETED result" >&2
+      return 1
+    }
     return 0
   fi
   local seals
@@ -301,7 +427,11 @@ _stage_a_run_cutover_tool() {
 _stage_a_write_transition() {
   local release_sha="$1" api_image="$2" tool_image="$3" db_id="$4" quiesce_receipt="$5" backup_receipt="$6" backup_file="$7" report_file="$8" transition_receipt="$9"
   local migrations_json content
-  migrations_json="$(jq -c '.database.task168.migrations' "${PROD_MANIFEST_FILE}")"
+  [[ -s "${report_file}" ]] || {
+    echo "[prod-task168] cannot write transition receipt: cutover report is missing" >&2
+    return 1
+  }
+  migrations_json="$(jq -c '.database.task168.migrations' "${PROD_MANIFEST_FILE}")" || return 1
   content="$(jq -nc \
     --arg releaseSha "${release_sha}" \
     --arg apiImage "${api_image}" \
@@ -315,11 +445,9 @@ _stage_a_write_transition() {
     --arg backupPath "${backup_file}" \
     --arg backupSha256 "$(prod_receipt_sha "${backup_file}")" \
     --arg reportPath "${report_file}" \
+    --arg cutoverReportSha256 "$(prod_receipt_sha "${report_file}")" \
     --arg completedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    '{schemaVersion:1,kind:"transition",status:"COMPLETED",stage:"stageA",releaseSha:$releaseSha,apiImage:$apiImage,toolImage:$toolImage,databaseIdentity:$databaseIdentity,migrations:$migrations,quiesceReceipt:$quiesceReceipt,quiesceReceiptSha256:$quiesceReceiptSha256,backupReceipt:$backupReceipt,backupReceiptSha256:$backupReceiptSha256,backupPath:$backupPath,backupSha256:$backupSha256,cutoverReport:$reportPath,completedAt:$completedAt}')"
-  if [[ -s "${report_file}" ]]; then
-    content="$(jq -c --arg s "$(prod_receipt_sha "${report_file}")" '. + {cutoverReportSha256:$s}' <<< "${content}")"
-  fi
+    '{schemaVersion:1,kind:"transition",status:"COMPLETED",stage:"stageA",releaseSha:$releaseSha,apiImage:$apiImage,toolImage:$toolImage,databaseIdentity:$databaseIdentity,migrations:$migrations,quiesceReceipt:$quiesceReceipt,quiesceReceiptSha256:$quiesceReceiptSha256,backupReceipt:$backupReceipt,backupReceiptSha256:$backupReceiptSha256,backupPath:$backupPath,backupSha256:$backupSha256,cutoverReport:$reportPath,cutoverReportSha256:$cutoverReportSha256,completedAt:$completedAt}')" || return 1
   prod_write_receipt "${transition_receipt}" "${content}"
 }
 
@@ -333,10 +461,11 @@ _stage_a_verify_transition_receipt() {
     echo "[prod-task168] transition receipt does not match this database identity" >&2
     return 1
   }
-  local quiesce_path backup_receipt_path backup_file_path
-  quiesce_path="$(jq -er '.quiesceReceipt' "${transition_receipt}")"
-  backup_receipt_path="$(jq -er '.backupReceipt' "${transition_receipt}")"
-  backup_file_path="$(jq -er '.backupPath' "${transition_receipt}")"
+  local quiesce_path backup_receipt_path backup_file_path report_path
+  quiesce_path="$(jq -er '.quiesceReceipt' "${transition_receipt}")" || return 1
+  backup_receipt_path="$(jq -er '.backupReceipt' "${transition_receipt}")" || return 1
+  backup_file_path="$(jq -er '.backupPath' "${transition_receipt}")" || return 1
+  report_path="$(jq -er '.cutoverReport' "${transition_receipt}")" || return 1
   [[ "$(prod_receipt_sha "${quiesce_path}")" == "$(jq -er '.quiesceReceiptSha256' "${transition_receipt}")" ]] || {
     echo "[prod-task168] transition quiesce evidence changed" >&2
     return 1
@@ -347,6 +476,10 @@ _stage_a_verify_transition_receipt() {
   }
   [[ -s "${backup_file_path}" && "$(prod_receipt_sha "${backup_file_path}")" == "$(jq -er '.backupSha256' "${transition_receipt}")" ]] || {
     echo "[prod-task168] transition backup file evidence changed" >&2
+    return 1
+  }
+  [[ -s "${report_path}" && "$(prod_receipt_sha "${report_path}")" == "$(jq -er '.cutoverReportSha256' "${transition_receipt}")" ]] || {
+    echo "[prod-task168] transition cutover report evidence changed" >&2
     return 1
   }
 }
@@ -370,7 +503,7 @@ task168_stage_a() {
     path="$(_migration_sql_path "${name}")"
     expected="$(_manifest_migration_sha "${name}")" || return 1
     [[ -f "${path}" ]] || { echo "[prod-task168] missing migration source: ${name}" >&2; return 1; }
-    actual="$(_sha256_file "${path}")"
+    actual="$(_sha256_file "${path}")" || return 1
     [[ "${actual}" == "${expected}" ]] || { echo "[prod-task168] raw migration checksum mismatch: ${name}" >&2; return 1; }
   done
   # Stage A must never carry the M11 folder -- that is Stage B's exclusive step.
@@ -413,7 +546,7 @@ task168_stage_a() {
       ;;
   esac
 
-  install -d -m 700 "${state_dir}" "${report_dir}"
+  install -d -m 700 "${state_dir}" "${report_dir}" || return 1
 
   case "${state}" in
     fresh)
@@ -421,7 +554,7 @@ task168_stage_a() {
       _stage_a_backup "${release_sha}" "${api_image}" "${db_id}" "${backup_file}" "${backup_receipt}" || return 1
       _stage_a_run_migrations pre "${api_image}" || return 1
       local pre_rows
-      pre_rows="$(prod_ledger_rows)" || return 1
+      pre_rows="$(prod_ledger_rows "$(_task168_pre_m11_csv)")" || return 1
       _rows_equal "${pre_rows}" "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M10}" ||
         { echo "[prod-task168] pre-cutover ledger does not match the expected M1..M8,M10 set" >&2; return 1; }
       _stage_a_run_cutover_tool "${tool_image}" "${report_file}" || return 1
@@ -430,21 +563,33 @@ task168_stage_a() {
       _stage_a_assert_receipt "${quiesce_receipt}" quiesce "${release_sha}" "${db_id}" "${api_image}" || return 1
       _stage_a_assert_receipt "${backup_receipt}" backup "${release_sha}" "${db_id}" "${api_image}" || return 1
       [[ -s "${backup_file}" ]] || { echo "[prod-task168] precutover resume is missing the backup file" >&2; return 1; }
+      # Re-quiesce unconditionally on resume too (alpha task168-stage-a-migrate.sh:202) --
+      # nothing guarantees the writers are still down between attempts.
+      "${compose[@]}" stop v1_api v1_game_operations_worker || { echo "[prod-task168] compose stop failed" >&2; return 1; }
+      _stage_a_assert_quiesced || return 1
       _stage_a_run_cutover_tool "${tool_image}" "${report_file}" || return 1
       ;;
     committed)
       _stage_a_assert_receipt "${quiesce_receipt}" quiesce "${release_sha}" "${db_id}" "${api_image}" || return 1
       _stage_a_assert_receipt "${backup_receipt}" backup "${release_sha}" "${db_id}" "${api_image}" || return 1
       [[ -s "${backup_file}" ]] || { echo "[prod-task168] committed resume is missing the backup file" >&2; return 1; }
+      "${compose[@]}" stop v1_api v1_game_operations_worker || { echo "[prod-task168] compose stop failed" >&2; return 1; }
+      _stage_a_assert_quiesced || return 1
       # Seals already read 5|5|3 (that is what makes this "committed") -- the
       # cutover tool already ran successfully in a prior attempt. Re-running
-      # it here is exactly what Review Focus #1 forbids.
+      # it here is exactly what Review Focus #1 forbids. Its report evidence
+      # must still exist and show zero legacy links, though.
+      [[ -s "${report_file}" ]] || { echo "[prod-task168] committed resume is missing the cutover report" >&2; return 1; }
+      jq -e '.result.verification.remainingLegacyGameLinks==0 and .result.verification.remainingLegacyStaffScopes==0 and .result.verification.remainingLegacyAuditScopes==0' "${report_file}" >/dev/null || {
+        echo "[prod-task168] committed resume's cutover report does not show zero legacy links" >&2
+        return 1
+      }
       ;;
   esac
 
   _stage_a_run_migrations post "${api_image}" || return 1
   local final_rows
-  final_rows="$(prod_ledger_rows)" || return 1
+  final_rows="$(prod_ledger_rows "$(_task168_pre_m11_csv)")" || return 1
   _rows_equal "${final_rows}" "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}" ||
     { echo "[prod-task168] post-M9 ledger does not match the expected M1..M10 set" >&2; return 1; }
   prod_assert_cutover_seals || return 1
@@ -475,10 +620,11 @@ _stage_b_find_transition_receipt() {
 }
 
 _stage_b_assert_transition_bindings() {
-  local receipt="$1" quiesce_path backup_receipt_path backup_file_path
+  local receipt="$1" quiesce_path backup_receipt_path backup_file_path report_path
   quiesce_path="$(jq -er '.quiesceReceipt' "${receipt}")" || return 1
   backup_receipt_path="$(jq -er '.backupReceipt' "${receipt}")" || return 1
   backup_file_path="$(jq -er '.backupPath' "${receipt}")" || return 1
+  report_path="$(jq -er '.cutoverReport' "${receipt}")" || return 1
   [[ "$(prod_receipt_sha "${quiesce_path}")" == "$(jq -er '.quiesceReceiptSha256' "${receipt}")" ]] || {
     echo "[prod-task168] transition quiesce evidence changed" >&2
     return 1
@@ -489,6 +635,10 @@ _stage_b_assert_transition_bindings() {
   }
   [[ -s "${backup_file_path}" && "$(prod_receipt_sha "${backup_file_path}")" == "$(jq -er '.backupSha256' "${receipt}")" ]] || {
     echo "[prod-task168] transition backup file evidence changed" >&2
+    return 1
+  }
+  [[ -s "${report_path}" && "$(prod_receipt_sha "${report_path}")" == "$(jq -er '.cutoverReportSha256' "${receipt}")" ]] || {
+    echo "[prod-task168] transition cutover report evidence changed" >&2
     return 1
   }
 }
@@ -502,7 +652,8 @@ task168_stage_b() {
     return 1
   }
 
-  local api_image db_id
+  local release_sha api_image db_id
+  release_sha="$(_manifest_field '.release.sha')" || return 1
   api_image="$(_manifest_field '.images.api.uri')" || return 1
   db_id="$(prod_db_identity)" || return 1
 
@@ -512,56 +663,95 @@ task168_stage_b() {
     return 1
   }
   _stage_b_assert_transition_bindings "${transition_receipt}" || return 1
-  prod_assert_cutover_seals || return 1
-  local ledger_rows
-  ledger_rows="$(prod_ledger_rows)" || return 1
-  _rows_equal "${ledger_rows}" "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}" ||
-    { echo "[prod-task168] Stage B refuses: prod ledger is not exactly the Stage A M1..M10 set" >&2; return 1; }
 
-  local state_dir m11_path m11_sha
-  state_dir="$(dirname "${transition_receipt}")"
-  m11_path="$(_migration_sql_path "${PROD_TASK168_M11}")"
-  [[ -f "${m11_path}" ]] || { echo "[prod-task168] M11 migration source is missing" >&2; return 1; }
-  m11_sha="$(_sha256_file "${m11_path}")"
-  [[ "${m11_sha}" == "${PROD_TASK168_M11_PINNED_SHA256}" ]] || {
-    echo "[prod-task168] M11 source checksum does not match the pinned value" >&2
+  # The transition receipt must be for THIS candidate release and carry the
+  # same migration checksums this manifest pins -- otherwise Stage B could
+  # apply M11 against a DB whose Stage A evidence belongs to a different
+  # release or a tampered checksum set.
+  jq -e --arg r "${release_sha}" '.releaseSha==$r' "${transition_receipt}" >/dev/null || {
+    echo "[prod-task168] Stage B refuses: transition receipt's releaseSha does not match this manifest" >&2
+    return 1
+  }
+  local transition_migrations manifest_migrations
+  transition_migrations="$(jq -Sc '.migrations | sort_by(.name)' "${transition_receipt}")" || return 1
+  manifest_migrations="$(jq -Sc '.database.task168.migrations | sort_by(.name)' "${PROD_MANIFEST_FILE}")" || return 1
+  [[ "${transition_migrations}" == "${manifest_migrations}" ]] || {
+    echo "[prod-task168] Stage B refuses: manifest migration checksums do not match the Stage A transition receipt" >&2
     return 1
   }
 
-  local entry_content
-  entry_content="$(jq -nc --arg db "${db_id}" --arg sha "${m11_sha}" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    '{schemaVersion:1,kind:"m11Entry",status:"ENTERED",databaseIdentity:$db,migrationSha256:$sha,enteredAt:$at}')"
-  prod_write_receipt "${state_dir}/m11-entry.json" "${entry_content}" || return 1
+  local state_dir migration_stage_receipt network
+  state_dir="$(dirname "${transition_receipt}")"
+  migration_stage_receipt="${state_dir}/migration-stage.json"
 
-  # Unlike Stage A's crafted subset, Stage B trusts the real release source
-  # tree as packaged (it already carries every migration up to and including
-  # M11 in order) -- mounted read-only, since the container must never write
-  # into the immutable release source.
-  local network
+  if _receipt_reusable "${migration_stage_receipt}" migrationStage "${release_sha}" "${db_id}" "${api_image}"; then
+    # M11 was already committed in a prior Stage B attempt (only the backfill
+    # step failed after it) -- never re-run `prisma migrate deploy` against
+    # an already-migrated DB. Re-verify the ledger independently (never trust
+    # the receipt alone for something this destructive) before resuming
+    # straight into the backfill.
+    prod_assert_cutover_seals || return 1
+    local resumed_rows
+    resumed_rows="$(prod_ledger_rows "$(_task168_all_csv)")" || return 1
+    _rows_equal "${resumed_rows}" "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}" "${PROD_TASK168_M11}" ||
+      { echo "[prod-task168] Stage B resume refuses: ledger no longer shows the committed M11 set" >&2; return 1; }
+  else
+    _assert_pre_m1_migrations_applied || return 1
+    prod_assert_cutover_seals || return 1
+    local ledger_rows
+    ledger_rows="$(prod_ledger_rows "$(_task168_pre_m11_csv)")" || return 1
+    _rows_equal "${ledger_rows}" "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}" ||
+      { echo "[prod-task168] Stage B refuses: prod ledger is not exactly the Stage A M1..M10 set" >&2; return 1; }
+
+    local m11_path m11_sha
+    m11_path="$(_migration_sql_path "${PROD_TASK168_M11}")"
+    [[ -f "${m11_path}" ]] || { echo "[prod-task168] M11 migration source is missing" >&2; return 1; }
+    m11_sha="$(_sha256_file "${m11_path}")" || return 1
+    [[ "${m11_sha}" == "${PROD_TASK168_M11_PINNED_SHA256}" ]] || {
+      echo "[prod-task168] M11 source checksum does not match the pinned value" >&2
+      return 1
+    }
+
+    if ! _receipt_reusable "${state_dir}/m11-entry.json" m11Entry "${release_sha}" "${db_id}" "${api_image}"; then
+      local entry_content
+      entry_content="$(jq -nc --arg release "${release_sha}" --arg api "${api_image}" --arg db "${db_id}" --arg sha "${m11_sha}" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '{schemaVersion:1,kind:"m11Entry",status:"ENTERED",releaseSha:$release,apiImage:$api,databaseIdentity:$db,migrationSha256:$sha,enteredAt:$at}')" || return 1
+      prod_write_receipt "${state_dir}/m11-entry.json" "${entry_content}" || return 1
+    fi
+
+    # Unlike Stage A's crafted subset, Stage B trusts the real release source
+    # tree as packaged (it already carries every migration up to and
+    # including M11 in order) -- mounted read-only, since the container must
+    # never write into the immutable release source.
+    network="$(prod_task168_assert_network)" || return 1
+    _prod_task168_docker_argv
+    "${_PROD_TASK168_DOCKER_ARGV[@]}" run --rm --network "${network}" \
+      --env-file /dev/stdin \
+      -v "${PROD_SOURCE_DIR}/apps/v1_api/prisma:/tmp/task168-prisma:ro" \
+      "${api_image}" sh -c 'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy --schema /tmp/task168-prisma/schema.prisma' \
+      < <(printf 'DATABASE_URL=%s\n' "${PROD_TASK168_DATABASE_URL}") || {
+      echo "[prod-task168] M11 prisma migrate deploy failed" >&2
+      return 1
+    }
+
+    local final_rows applied_count
+    final_rows="$(prod_ledger_rows "$(_task168_all_csv)")" || return 1
+    _rows_equal "${final_rows}" "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}" "${PROD_TASK168_M11}" ||
+      { echo "[prod-task168] post-M11 ledger does not match the expected full set" >&2; return 1; }
+    applied_count="$(grep -c '.' <<< "${final_rows}")" || return 1
+
+    local stage_content
+    stage_content="$(jq -nc --arg release "${release_sha}" --arg api "${api_image}" --arg db "${db_id}" --argjson applied "${applied_count}" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      '{schemaVersion:1,kind:"migrationStage",status:"MIGRATION_COMMITTED",releaseSha:$release,apiImage:$api,databaseIdentity:$db,appliedCount:$applied,completedAt:$at}')" || return 1
+    prod_write_receipt "${migration_stage_receipt}" "${stage_content}" || return 1
+  fi
+
   network="$(prod_task168_assert_network)" || return 1
   _prod_task168_docker_argv
   "${_PROD_TASK168_DOCKER_ARGV[@]}" run --rm --network "${network}" \
-    --env-file <(printf 'DATABASE_URL=%s\n' "${PROD_TASK168_DATABASE_URL}") \
-    -v "${PROD_SOURCE_DIR}/apps/v1_api/prisma:/tmp/task168-prisma:ro" \
-    "${api_image}" sh -c 'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy --schema /tmp/task168-prisma/schema.prisma' || {
-    echo "[prod-task168] M11 prisma migrate deploy failed" >&2
-    return 1
-  }
-
-  local final_rows applied_count
-  final_rows="$(prod_ledger_rows)" || return 1
-  _rows_equal "${final_rows}" "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}" "${PROD_TASK168_M11}" ||
-    { echo "[prod-task168] post-M11 ledger does not match the expected full set" >&2; return 1; }
-  applied_count="$(grep -c '.' <<< "${final_rows}")"
-
-  local stage_content
-  stage_content="$(jq -nc --arg db "${db_id}" --argjson applied "${applied_count}" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    '{schemaVersion:1,kind:"migrationStage",status:"MIGRATION_COMMITTED",databaseIdentity:$db,appliedCount:$applied,completedAt:$at}')"
-  prod_write_receipt "${state_dir}/migration-stage.json" "${stage_content}" || return 1
-
-  "${_PROD_TASK168_DOCKER_ARGV[@]}" run --rm --network "${network}" \
-    --env-file <(printf 'DATABASE_URL=%s\n' "${PROD_TASK168_DATABASE_URL}") \
-    "${api_image}" sh -c 'cd /app/apps/v1_api && node dist/src/tournaments/migration/tournament-award-recipient-backfill.cli.js' || {
+    --env-file /dev/stdin \
+    "${api_image}" sh -c 'cd /app/apps/v1_api && node dist/src/tournaments/migration/tournament-award-recipient-backfill.cli.js' \
+    < <(printf 'DATABASE_URL=%s\n' "${PROD_TASK168_DATABASE_URL}") || {
     echo "[prod-task168] tournament award recipient backfill failed" >&2
     return 1
   }
@@ -570,9 +760,12 @@ task168_stage_b() {
 }
 
 # Runs after deploy-prod.sh's own health check passes, before it promotes the
-# candidate manifest. Public read surface only (no auth): tournament list,
-# every tournament's detail, and every v1_tournament_match_details row's
-# public match detail. A non-200 anywhere is a release-blocking failure.
+# candidate manifest. Public read surface only (no auth): the full
+# cursor-paginated tournament list, every tournament's detail, and every
+# v1_tournament_match_details row's public match detail. A non-200 anywhere
+# is a release-blocking failure (a private/draft tournament's legitimate
+# 403/404 is not distinguished from a real regression here -- Task 6's
+# real-data run is expected to confirm whether that distinction is needed).
 task168_verify() {
   local base_url="${PROD_TASK168_VERIFY_BASE_URL:-http://127.0.0.1:8121/api/v1}"
   local db_id state_dir
@@ -584,15 +777,48 @@ task168_verify() {
   }
   state_dir="$(dirname "${transition_receipt}")"
 
-  local failures=0 checked=0 list_response
-  list_response="$(curl -fsS --connect-timeout 3 --max-time 10 "${base_url}/tournaments")" || {
-    echo "[prod-task168] tournament list request failed" >&2
-    failures=$((failures + 1))
-  }
+  local failures=0 checked=0
+  local tournament_ids=() cursor='' has_next=true page_count=0
 
-  local tournament_ids=()
-  if [[ -n "${list_response:-}" ]]; then
-    mapfile -t tournament_ids < <(jq -r '.data.items[]?.id // empty' <<< "${list_response}" 2>/dev/null)
+  # This repo's list responses carry their cursor inside `data.pageInfo`
+  # (`{nextCursor,hasNext}`), never a top-level `data.nextCursor` -- walk it
+  # to exhaustion instead of reading only the first page.
+  while [[ "${has_next}" == true ]]; do
+    page_count=$((page_count + 1))
+    if [[ "${page_count}" -gt 500 ]]; then
+      echo "[prod-task168] tournament list pagination exceeded 500 pages -- refusing to loop further" >&2
+      failures=$((failures + 1))
+      break
+    fi
+    local url="${base_url}/tournaments" page_response page_ids encoded_cursor
+    if [[ -n "${cursor}" ]]; then
+      encoded_cursor="$(jq -rn --arg c "${cursor}" '$c|@uri')" || { failures=$((failures + 1)); break; }
+      url="${url}?cursor=${encoded_cursor}"
+    fi
+    page_response="$(curl -fsS --connect-timeout 3 --max-time 10 "${url}")" || {
+      echo "[prod-task168] tournament list request failed (page ${page_count})" >&2
+      failures=$((failures + 1))
+      break
+    }
+    jq -e '.data.items | type == "array"' <<< "${page_response}" >/dev/null 2>&1 || {
+      echo "[prod-task168] tournament list response has an unexpected shape (page ${page_count})" >&2
+      failures=$((failures + 1))
+      break
+    }
+    mapfile -t page_ids < <(jq -r '.data.items[].id' <<< "${page_response}")
+    tournament_ids+=("${page_ids[@]}")
+    has_next="$(jq -r '.data.pageInfo.hasNext // false' <<< "${page_response}")" || { failures=$((failures + 1)); break; }
+    cursor="$(jq -r '.data.pageInfo.nextCursor // empty' <<< "${page_response}")" || { failures=$((failures + 1)); break; }
+    if [[ "${has_next}" == true && -z "${cursor}" ]]; then
+      echo "[prod-task168] tournament list says hasNext=true but returned no cursor -- stopping" >&2
+      failures=$((failures + 1))
+      break
+    fi
+  done
+
+  if [[ "${#tournament_ids[@]}" -eq 0 ]]; then
+    echo "[prod-task168] tournament list returned zero ids after full pagination" >&2
+    failures=$((failures + 1))
   fi
 
   local tid code
@@ -616,15 +842,15 @@ task168_verify() {
   [[ "${failures}" -eq 0 ]] || status='FAILED'
   local content tmp
   content="$(jq -nc --arg db "${db_id}" --arg status "${status}" --argjson checked "${checked}" --argjson failures "${failures}" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    '{schemaVersion:1,kind:"runtimeVerification",status:$status,databaseIdentity:$db,checkedCount:$checked,failureCount:$failures,completedAt:$at}')"
+    '{schemaVersion:1,kind:"runtimeVerification",status:$status,databaseIdentity:$db,checkedCount:$checked,failureCount:$failures,completedAt:$at}')" || return 1
   # Overwrites on every run (unlike prod_write_receipt's idempotent-content
   # contract) -- a retry after a real fix is expected to produce different
   # content for the exact same release.
-  install -d -m 700 "${state_dir}"
-  tmp="$(mktemp "${state_dir}/.receipt.XXXXXX")"
-  printf '%s' "${content}" > "${tmp}"
-  chmod 600 "${tmp}"
-  mv "${tmp}" "${state_dir}/runtime-verification.json"
+  install -d -m 700 "${state_dir}" || return 1
+  tmp="$(mktemp "${state_dir}/.receipt.XXXXXX")" || return 1
+  printf '%s' "${content}" > "${tmp}" || return 1
+  chmod 600 "${tmp}" || return 1
+  mv "${tmp}" "${state_dir}/runtime-verification.json" || return 1
 
   [[ "${failures}" -eq 0 ]]
 }

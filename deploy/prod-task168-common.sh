@@ -48,9 +48,20 @@ prod_dbq() {
   : "${PROD_TASK168_DATABASE_URL:?PROD_TASK168_DATABASE_URL is required}"
   _prod_task168_docker_argv
   stderr_file="$(mktemp)"
+  # --env-file /dev/stdin (not `--env-file <(...)`) -- `sudo` by default closes
+  # every fd numbered 3 and above (closefrom()) before exec'ing the target
+  # program, which would silently sever a higher-numbered process-substitution
+  # fd like /dev/fd/63 before docker ever reads it. fd 0 (stdin) is never part
+  # of that closefrom range, so redirecting the whole command's stdin from the
+  # process substitution survives `sudo docker ...` the same as a plain
+  # `docker ...` call. Verified against the real docker CLI locally (`docker
+  # run --env-file /dev/stdin ... < <(printf ...)` prints the expected env
+  # var); NOT verified end-to-end through an actual `sudo` invocation in this
+  # sandbox (no passwordless sudo here to test with).
   output="$("${_PROD_TASK168_DOCKER_ARGV[@]}" run --rm --network "${PROD_TASK168_DB_NETWORK}" \
-    --env-file <(printf 'DATABASE_URL=%s\n' "${PROD_TASK168_DATABASE_URL}") \
+    --env-file /dev/stdin \
     postgres:16-alpine sh -c 'exec psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -At -c "$1"' sh "${sql}" \
+    < <(printf 'DATABASE_URL=%s\n' "${PROD_TASK168_DATABASE_URL}") \
     2>"${stderr_file}")" && rc=0 || rc=$?
   if [[ "${rc}" -ne 0 ]]; then
     echo "[prod-task168] prod_dbq failed:" >&2
@@ -99,8 +110,17 @@ prod_db_identity() {
   printf '%s|%s' "${basic}" "${hostport}" | sha256sum | awk '{print $1}'
 }
 
+# $1 (optional): a SQL IN-list fragment, e.g. "'name1','name2'" -- when given,
+# scopes the ledger read to exactly those migration names. Without it, this
+# returns the FULL prod ledger (100+ unrelated rows in real prod), which is
+# never what an exact-set comparison against a handful of Task168 migration
+# names wants -- Critical 1 (real prod_pristine copy: 122 total rows,
+# `_rows_equal` against an unscoped read can never match). Every task168
+# caller in prod-task168.sh must pass the scoped name-list.
 prod_ledger_rows() {
-  prod_dbq "SELECT migration_name || '|' || COALESCE(checksum,'') FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name"
+  local names_csv="${1:-}" where='finished_at IS NOT NULL AND rolled_back_at IS NULL'
+  [[ -z "${names_csv}" ]] || where="${where} AND migration_name IN (${names_csv})"
+  prod_dbq "SELECT migration_name || '|' || COALESCE(checksum,'') FROM \"_prisma_migrations\" WHERE ${where} ORDER BY migration_name"
 }
 
 # Same catalog query as alpha's assert_actual_cutover_seals
@@ -131,21 +151,30 @@ prod_assert_cutover_seals() {
 # 0600. Idempotent: a re-run that finds an existing receipt passes only when
 # the new content is byte-identical -- a retry must never silently overwrite
 # evidence written by a different run.
+#
+# Every step here is explicitly `||`-checked rather than relying on the
+# caller's `set -e`: a bash function invoked as `f args || handler` has its
+# OWN errexit disabled for its entire body (POSIX/bash: a compound command
+# used as the left side of an AND/OR list is exempt from ErrExit, and that
+# exemption extends through everything the command runs, not just its own
+# exit status) -- verified empirically in this session. Since every caller of
+# this function uses exactly that `|| return 1` shape, a bare `install -d`/
+# `mktemp`/`mv` here would have its failure silently swallowed.
 prod_write_receipt() {
   local path="$1" content="$2" existing tmp
-  install -d -m 700 "$(dirname "${path}")"
+  install -d -m 700 "$(dirname "${path}")" || return 1
   if [[ -e "${path}" ]]; then
-    existing="$(cat "${path}")"
+    existing="$(cat "${path}")" || return 1
     [[ "${existing}" == "${content}" ]] || {
       echo "[prod-task168] receipt already exists with different content: ${path}" >&2
       return 1
     }
     return 0
   fi
-  tmp="$(mktemp "$(dirname "${path}")/.receipt.XXXXXX")"
-  printf '%s' "${content}" > "${tmp}"
-  chmod 600 "${tmp}"
-  mv "${tmp}" "${path}"
+  tmp="$(mktemp "$(dirname "${path}")/.receipt.XXXXXX")" || return 1
+  printf '%s' "${content}" > "${tmp}" || return 1
+  chmod 600 "${tmp}" || return 1
+  mv "${tmp}" "${path}" || return 1
 }
 
 prod_receipt_sha() {

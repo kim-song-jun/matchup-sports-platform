@@ -2,7 +2,7 @@
 
 import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { Suspense, type ReactNode, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { PendingSocialSignupGate } from '@/components/auth/pending-social-signup-gate';
 import { PhoneVerificationRequiredModal } from '@/components/auth/phone-verification/phone-verification-required-modal';
 import { ClientErrorListener } from '@/components/providers/client-error-listener';
@@ -63,11 +63,7 @@ export function Providers({ children }: { children: ReactNode }) {
         <NativeAppSurface />
         <ClientErrorListener />
         <NotificationSocketBridge />
-        {getGaMeasurementId() && (
-          <Suspense fallback={null}>
-            <GoogleAnalytics />
-          </Suspense>
-        )}
+        {getGaMeasurementId() && <GoogleAnalytics />}
         <PendingSocialSignupGate>
           <AppShellFrame>{children}</AppShellFrame>
           <GlobalPopup />

@@ -13,6 +13,8 @@ function queuedCommands(): unknown[][] {
   return (window.dataLayer ?? []).map((entry) => Array.from(entry as ArrayLike<unknown>));
 }
 
+const indexOfCommand = (name: string) => queuedCommands().findIndex((c) => c[0] === name);
+
 beforeEach(() => {
   delete window.gtag;
   delete window.dataLayer;
@@ -35,67 +37,83 @@ describe('getGaMeasurementId', () => {
   });
 });
 
-describe('trackPageview', () => {
+describe('trackRoute', () => {
   it('does nothing when the measurement id is unset', async () => {
-    const { trackPageview } = await loadAnalytics('');
-    trackPageview('/home');
+    const { trackRoute } = await loadAnalytics('');
+    trackRoute('/home');
     expect(window.dataLayer).toBeUndefined();
   });
 
-  it('queues the landing page_view before gtag.js has loaded, after js and config', async () => {
-    const { trackPageview } = await loadAnalytics('G-TEST123');
+  it('lets gtag.js send the landing page_view itself', async () => {
+    const { trackRoute } = await loadAnalytics('G-TEST123');
 
-    trackPageview('/tournaments/t1?utm_source=ig&utm_medium=paid');
+    trackRoute('/tournaments/t1');
 
-    const commands = queuedCommands();
-    expect(commands.map((c) => c[0])).toEqual(['js', 'config', 'event']);
-    expect(commands[1]).toEqual(['config', 'G-TEST123', { send_page_view: false }]);
-    expect(commands[2][1]).toBe('page_view');
-    expect(commands[2][2]).toMatchObject({
-      page_location: 'http://localhost:3000/tournaments/t1?utm_source=ig&utm_medium=paid',
-    });
+    const config = queuedCommands().find((c) => c[0] === 'config');
+    // A config with send_page_view:false is what dropped every landing page.
+    expect(config).toEqual(['config', 'G-TEST123']);
+    expect(queuedCommands().some((c) => c[0] === 'event' && c[1] === 'page_view')).toBe(false);
   });
 
   it('queues arguments objects, which is the only shape gtag.js replays', async () => {
-    const { trackPageview } = await loadAnalytics('G-TEST123');
-    trackPageview('/home');
+    const { trackRoute } = await loadAnalytics('G-TEST123');
+    trackRoute('/home');
+    expect(window.dataLayer?.length).toBeGreaterThan(0);
     for (const entry of window.dataLayer ?? []) {
       expect(Object.prototype.toString.call(entry)).toBe('[object Arguments]');
     }
   });
 
-  it('initializes once across navigations', async () => {
-    const { trackPageview } = await loadAnalytics('G-TEST123');
-    trackPageview('/home');
-    trackPageview('/teams');
+  it('configures once across navigations', async () => {
+    const { trackRoute } = await loadAnalytics('G-TEST123');
+    trackRoute('/home');
+    trackRoute('/teams');
     expect(queuedCommands().filter((c) => c[0] === 'config')).toHaveLength(1);
-    expect(queuedCommands().filter((c) => c[1] === 'page_view')).toHaveLength(2);
   });
 
-  it('marks the page session internal from the first console route onward', async () => {
-    const { trackPageview } = await loadAnalytics('G-TEST123');
+  it('sets the in-app browser before config so the landing hit carries it', async () => {
+    vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 389.0.0.49.87',
+    );
+    const { trackRoute } = await loadAnalytics('G-TEST123');
 
-    trackPageview('/home');
-    trackPageview('/admin/users');
-    trackPageview('/tournaments');
+    trackRoute('/tournaments/t1');
 
-    const commands = queuedCommands();
-    const setIndex = commands.findIndex((c) => c[0] === 'set');
-    const pageViews = commands.flatMap((c, i) => (c[1] === 'page_view' ? [i] : []));
-    expect(commands[setIndex]).toEqual(['set', { traffic_type: 'internal' }]);
-    expect(pageViews[0]).toBeLessThan(setIndex);
-    expect(pageViews[1]).toBeGreaterThan(setIndex);
-    expect(commands.filter((c) => c[0] === 'set')).toHaveLength(1);
+    const setIndex = queuedCommands().findIndex((c) => c[0] === 'set' && 'in_app_browser' in (c[1] as object));
+    expect(queuedCommands()[setIndex]).toEqual(['set', { in_app_browser: 'instagram' }]);
+    expect(setIndex).toBeLessThan(indexOfCommand('config'));
+    vi.restoreAllMocks();
   });
 
-  it('treats /tournament-ops as internal but not look-alike public paths', async () => {
-    const { trackPageview } = await loadAnalytics('G-TEST123');
-    trackPageview('/administration-guide');
-    trackPageview('/tournaments/t1');
-    expect(queuedCommands().some((c) => c[0] === 'set')).toBe(false);
+  it('tags a session that lands on a console route as internal from its first hit', async () => {
+    window.history.replaceState(null, '', '/admin/users');
+    const { trackRoute } = await loadAnalytics('G-TEST123');
 
-    trackPageview('/tournament-ops/tournaments/t1/operations');
-    expect(queuedCommands().some((c) => c[0] === 'set')).toBe(true);
+    trackRoute('/admin/users');
+
+    const internal = queuedCommands().findIndex((c) => c[0] === 'set' && 'traffic_type' in (c[1] as object));
+    expect(queuedCommands()[internal]).toEqual(['set', { traffic_type: 'internal' }]);
+    expect(internal).toBeLessThan(indexOfCommand('config'));
+    expect(queuedCommands().filter((c) => c[0] === 'set' && 'traffic_type' in (c[1] as object))).toHaveLength(1);
+  });
+
+  it('tags the rest of the page session once it navigates into a console route', async () => {
+    window.history.replaceState(null, '', '/home');
+    const { trackRoute } = await loadAnalytics('G-TEST123');
+
+    trackRoute('/home');
+    const hasInternal = () => queuedCommands().some((c) => c[0] === 'set' && 'traffic_type' in (c[1] as object));
+    expect(hasInternal()).toBe(false);
+
+    trackRoute('/tournament-ops/tournaments/t1/operations');
+    expect(hasInternal()).toBe(true);
+  });
+
+  it('does not treat look-alike public paths as console routes', async () => {
+    const { trackRoute } = await loadAnalytics('G-TEST123');
+    trackRoute('/administration-guide');
+    trackRoute('/tournaments/t1');
+    expect(queuedCommands().some((c) => c[0] === 'set' && 'traffic_type' in (c[1] as object))).toBe(false);
   });
 });
 
@@ -106,12 +124,12 @@ describe('trackEvent', () => {
     expect(window.dataLayer).toBeUndefined();
   });
 
-  it('queues the event after init even if it fires before any page_view', async () => {
+  it('queues the event after config even if it fires before any route effect', async () => {
     const { trackEvent } = await loadAnalytics('G-TEST123');
     trackEvent('tournament_view', { tournamentId: 't1' });
-    const commands = queuedCommands();
-    expect(commands.map((c) => c[0])).toEqual(['js', 'config', 'event']);
-    expect(commands[2]).toEqual(['event', 'tournament_view', { tournamentId: 't1' }]);
+    const eventIndex = queuedCommands().findIndex((c) => c[0] === 'event');
+    expect(queuedCommands()[eventIndex]).toEqual(['event', 'tournament_view', { tournamentId: 't1' }]);
+    expect(indexOfCommand('config')).toBeLessThan(eventIndex);
   });
 
   it('forwards to an already loaded gtag', async () => {
@@ -149,9 +167,8 @@ describe('detectInAppBrowser', () => {
       'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1',
       'none',
     ],
-  ])('classifies %s', (ua, expected) => {
-    return loadAnalytics('G-TEST123').then(({ detectInAppBrowser }) => {
-      expect(detectInAppBrowser(ua)).toBe(expected);
-    });
+  ])('classifies %s', async (ua, expected) => {
+    const { detectInAppBrowser } = await loadAnalytics('G-TEST123');
+    expect(detectInAppBrowser(ua)).toBe(expected);
   });
 });

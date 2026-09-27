@@ -39,6 +39,15 @@ function markInternalIfConsole(path: string): void {
   window.gtag!('set', { traffic_type: 'internal' });
 }
 
+// The history listener sends a page_view as soon as a link pushes a console route, before
+// any route effect runs. A capture-phase click runs earlier still, so tag it there.
+function markInternalOnConsoleLinkClick(event: MouseEvent): void {
+  const anchor = (event.target as Element | null)?.closest?.('a[href]');
+  if (!anchor) return;
+  const url = new URL(anchor.getAttribute('href')!, window.location.href);
+  if (url.origin === window.location.origin) markInternalIfConsole(url.pathname);
+}
+
 /**
  * Page views come from GA enhanced measurement: the landing page from `config`, later
  * routes from its browser-history listener. Do not pass `send_page_view: false` or send
@@ -59,6 +68,7 @@ function ensureGtag(measurementId: string): void {
   window.gtag('set', { in_app_browser: detectInAppBrowser(window.navigator.userAgent) });
   markInternalIfConsole(window.location.pathname);
   window.gtag('config', measurementId);
+  document.addEventListener('click', markInternalOnConsoleLinkClick, { capture: true });
   initializedId = measurementId;
 }
 

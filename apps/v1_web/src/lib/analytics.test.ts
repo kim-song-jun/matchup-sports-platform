@@ -109,6 +109,39 @@ describe('trackRoute', () => {
     expect(hasInternal()).toBe(true);
   });
 
+  it('tags the session when a console link is clicked, before the history page_view fires', async () => {
+    window.history.replaceState(null, '', '/home');
+    const { trackRoute } = await loadAnalytics('G-TEST123');
+    trackRoute('/home');
+    const link = document.createElement('a');
+    link.href = '/admin/users';
+    link.addEventListener('click', (event) => event.preventDefault());
+    document.body.append(link);
+
+    link.click();
+
+    expect(queuedCommands()).toContainEqual(['set', { traffic_type: 'internal' }]);
+    link.remove();
+  });
+
+  it('ignores clicks on public and off-site links', async () => {
+    window.history.replaceState(null, '', '/home');
+    const { trackRoute } = await loadAnalytics('G-TEST123');
+    trackRoute('/home');
+    const links = ['/tournaments/t1', 'https://example.com/admin'].map((href) => {
+      const a = document.createElement('a');
+      a.href = href;
+      a.addEventListener('click', (event) => event.preventDefault());
+      document.body.append(a);
+      return a;
+    });
+
+    links.forEach((a) => a.click());
+
+    expect(queuedCommands().some((c) => c[0] === 'set' && 'traffic_type' in (c[1] as object))).toBe(false);
+    links.forEach((a) => a.remove());
+  });
+
   it('does not treat look-alike public paths as console routes', async () => {
     const { trackRoute } = await loadAnalytics('G-TEST123');
     trackRoute('/administration-guide');

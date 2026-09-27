@@ -5539,19 +5539,25 @@ export function useV1RegenerateLeagueFixtures(leagueId: string) {
 }
 
 
-export function useV1LeagueMatch(leagueId: string) {
+export function useV1LeagueMatch(leagueId: string, options?: { seed?: V1PublicLeagueDetail | null }) {
   return useQuery({
     queryKey: v1Keys.leagueMatch(leagueId),
     queryFn: () => v1Get<V1PublicLeagueDetail>(`/league-matches/${leagueId}`),
     enabled: Boolean(leagueId),
+    // 리그 상세 page 가 서버에서 받은 공개 응답 — 순위표·일정이 서버 HTML 에 들어가게 첫 값으로 쓴다.
+    placeholderData: options?.seed ?? undefined,
   });
 }
 
-export function useV1LeagueMatchStandings(leagueId: string) {
+export function useV1LeagueMatchStandings(
+  leagueId: string,
+  options?: { seed?: V1LeagueStandingsResponse | null },
+) {
   return useQuery({
     queryKey: v1Keys.leagueMatchStandings(leagueId),
     queryFn: () => v1Get<V1LeagueStandingsResponse>(`/league-matches/${leagueId}/standings`),
     enabled: Boolean(leagueId),
+    placeholderData: options?.seed ?? undefined,
   });
 }
 

@@ -56,10 +56,6 @@ redis_data/
 # Prisma (migrations tracked — required for production deploy)
 v1_before_team_chat_migration.sql
 
-# Capacitor
-apps/web/ios/
-apps/web/android/
-
 # iOS native shell (apps/v1_ios) — project.yml is the source of truth, the
 # Xcode project and the version xcconfig are generated build outputs.
 apps/v1_ios/*.xcodeproj/
@@ -79,8 +75,6 @@ coverage/
 infra/load/tokens.txt
 
 # E2E screenshot binaries and transient queue state
-e2e/scenarios/screenshots/
-e2e/scenarios/queue/
 screenshots/scenarios/**/*.png
 screenshots/scenarios/**/*.jpg
 screenshots/scenarios/**/*.jpeg

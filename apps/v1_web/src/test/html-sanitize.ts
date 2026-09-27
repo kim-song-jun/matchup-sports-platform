@@ -1,14 +1,6 @@
 /**
- * Test-only helpers for reading server-rendered HTML strings in *-first-html.test.tsx /
- * *-page-seed.test.tsx suites: stripping <script> blocks before asserting on visible body
- * markup, and pulling out the JSON-LD payload those scripts carry.
- *
- * Six of these test files used to duplicate `html.replace(/<script[\s\S]*?<\/script>/g, '')`.
- * CodeQL flagged that regex on two counts: it only matches lowercase `<script>` (an attacker
- * payload spelled `<SCRIPT>` survives), and even case-matched input isn't fully sanitized by a
- * single non-global-safe pass. A real HTML parser (via a `<template>` element, which jsdom
- * gives us in this test environment) doesn't have either problem — it finds `<script>`
- * elements the same way a browser does, regardless of case or malformed nesting.
+ * Test-only readers for server-rendered HTML strings. Parse with a `<template>` element (jsdom)
+ * instead of regexes: regex tag stripping misses `<SCRIPT>` and nested/malformed markup (CodeQL).
  */
 
 function parseIntoTemplate(html: string): HTMLTemplateElement {

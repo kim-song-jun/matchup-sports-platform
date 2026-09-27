@@ -119,7 +119,9 @@ async function shellHtml(route: string, page: ListPage): Promise<string> {
 }
 
 function h1Texts(html: string): string[] {
-  return [...stripScriptTags(html).matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => m[1].replace(/<[^>]+>/g, ''));
+  const template = document.createElement('template');
+  template.innerHTML = stripScriptTags(html);
+  return [...template.content.querySelectorAll('h1')].map((h1) => h1.textContent ?? '');
 }
 
 /** JSON-LD 는 따로 본다 — 본문 검사가 스크립트 안의 값으로 통과하면 안 된다. */

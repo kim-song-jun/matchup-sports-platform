@@ -421,7 +421,7 @@ pnpm test:e2e:v1                       # Playwright — e2e/v1.config.ts (v1 스
      잡는다): `lsof -nP -iTCP -sTCP:LISTEN | grep -E ':(301[3-9]|302[0-9]|812[0-9]|822[0-9])'`
 8. **v1 기능 PR엔 `.changeset/*.md`가 필요하다.** `apps/v1_api/`·`apps/v1_web/`·`deploy/`·
    `.github/workflows/`·`scripts/release/`·루트 매니페스트 변경이 대상이고, `.md`·테스트·fixtures·
-   `docs/`·`scripts/qa/`·`scripts/docs/`는 제외다(`scripts/release/check-changeset-policy.mjs`).
+   `docs/`·`e2e/`·`.github/tasks/`·`scripts/qa/`·`scripts/docs/`는 제외다(`scripts/release/check-changeset-policy.mjs`).
    빠지면 dev-push CI가 실패하고 alpha 배포가 막힌다.
 9. **PR 제목·본문은 한국어로 작성한다.**
 

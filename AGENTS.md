@@ -28,7 +28,7 @@ Scope: **entire repository**. 이 파일은 Codex용 프로젝트 엔트리이�
 - Scoped Open Design source: 사용자가 명시적으로 요청·고정한 Open Design 복구 작업에 한해 사용자가 제공한 Open Design export를 읽기 전용 시각 레퍼런스로 쓸 수 있다. 그것만으로 v1 route/API 계약이 없는 화면이 유효한 런타임 경로가 되지는 않는다.
 - Codex project rules: `.codex/*`
 
-옛 v0 앱(`apps/api`·`apps/web`)과 그 전용 도구는 저장소에서 제거한다(PR #1313, 제거 직전 스냅샷은 태그 `legacy-v0-final`). Legacy code, deprecated code, old API design, old DB design, old Prisma schema/migration/seed, old mock data, old screen design은 참조하지 않는다. 같은 기능이 legacy에 있어도 v1 판단 근거로 사용하지 않는다.
+레거시 v0 앱(`apps/api`·`apps/web`)과 그 전용 도구는 제거됐다 — 제거 직전 스냅샷은 태그 `legacy-v0-final`. Legacy code, deprecated code, old API design, old DB design, old Prisma schema/migration/seed, old mock data, old screen design은 참조하지 않는다. 같은 기능이 legacy에 있어도 v1 판단 근거로 사용하지 않는다.
 
 `.codex/*`는 Codex용 세부 규칙이다. `CLAUDE.md`와 충돌하면 `CLAUDE.md`를 따르고 그 충돌을 사용자에게 보고한다.
 

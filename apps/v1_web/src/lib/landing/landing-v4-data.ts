@@ -67,13 +67,16 @@ export async function fetchLandingV4Data(): Promise<LandingV4Data> {
  * MAX_PAGES 를 넘으면 hasNext 를 남겨 "N개 이상"으로 표기한다. 중간 페이지를 못 받으면 받은 데까지 쓰고 hasNext 로 표시한다. */
 const MAX_PAGES = 4;
 
-/** 여러 페이지를 이어 붙인 목록. CursorPage 의 최상위 nextCursor 는 서버가 채우지 않으므로 pageInfo 만 믿는다. */
-export type MergedPage<T> = { items: T[]; nextCursor: null; pageInfo: PageInfo };
+/** 여러 페이지를 이어 붙인 목록. 서버는 최상위 nextCursor 를 채우지 않아 읽을 땐 pageInfo 를 믿고, 돌려줄 땐 둘을 같게 둔다. */
+export type MergedPage<T> = { items: T[]; nextCursor: string | null; pageInfo: PageInfo };
 
 export async function fetchAllPages<T>(path: string, label: string): Promise<MergedPage<T> | null> {
   const items: T[] = [];
   let cursor: string | null = null;
-  const merged = (hasNext: boolean): MergedPage<T> => ({ items, nextCursor: null, pageInfo: { nextCursor: hasNext ? cursor : null, hasNext } });
+  const merged = (hasNext: boolean): MergedPage<T> => {
+    const nextCursor = hasNext ? cursor : null;
+    return { items, nextCursor, pageInfo: { nextCursor, hasNext } };
+  };
   for (let pageIndex = 0; pageIndex < MAX_PAGES; pageIndex += 1) {
     const query = new URLSearchParams({ limit: String(LIST_LIMIT) });
     if (cursor) query.set('cursor', cursor);

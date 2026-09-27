@@ -99,7 +99,19 @@ Actions → `deploy.yml` → "Run workflow" → 아래 입력으로 수동 실�
 6. `transition.json` 영수증 기록.
 
 **Stage A 는 API·워커를 다시 올리지 않는다** — 의도된 동작이다(중간에 옛 버전을 다시 띄우지
-않고 Stage B 로 바로 이어간다는 C2 결정). 이 시점에 API 는 계속 꺼진 상태다.
+않고 Stage B 로 바로 이어간다는 C2 결정). 이 시점에 API 는 계속 꺼진 상태다. 그래서:
+
+- 워크플로의 `Health check` 스텝은 Stage A 에서 **건너뛴다**(`task168Stage != 'stageA'`) — API 가
+  꺼진 채라 돌려 봐야 12회 재시도 끝에 실패하고 같은 `deploy-production` 큐의 Stage B 만
+  그만큼 기다리게 된다. Stage A 성공 판정은 `Run deploy-prod.sh` 스텝 성공 + 아래 5번의 로그 줄이다.
+- Stage A 는 nginx 공개 헤더(`X-Teameet-Release/Commit`) 파일을 **쓰지 않는다** — 승격되지 않는
+  SHA 가 A~B 사이 nginx 재시작으로 공개 헤더에 실리면 Stage B 빌드의
+  `resolve-prod-rollback-base.sh` 가 "퍼블릭 SHA 불일치"로 거부하기 때문이다.
+- **A~B 사이 재부팅·docker 재시작 주의**: `v1_api`·`v1_game_operations_worker` 는
+  `restart: always` 라 호스트 재부팅이나 docker 데몬 재시작이 옛 API·워커를 다시 띄운다.
+  Stage B 는 진입할 때마다 두 서비스를 다시 멈추고 멈췄는지 확인한 뒤에만 DB 에 손대므로
+  (정지 실패면 migrate 없이 거부) 사고로 이어지지는 않지만, 그 사이 옛 API 가 쓰기를 받았을 수
+  있다 — 재부팅이 있었다면 Stage B 전에 사용자에게 보고한다.
 
 ### 5. Stage A 확인
 
@@ -123,16 +135,23 @@ Actions → `deploy.yml` → "Run workflow" → 아래 입력으로 수동 실�
 승인하면 `task168_stage_b` 가 다음을 한다:
 
 1. Stage A 의 `transition.json` 영수증을 찾아 바인딩(release/DB/이미지 일치) 검증.
-2. M11(레거시 테이블 5개를 실제로 `DROP` 하는 마이그레이션) 적용 — **여기서부터 되돌리기
-   불가**(아래 "복구" 절).
-3. 시상자(award recipient) 백필 CLI 실행.
-4. `migration-stage.json` 영수증 기록 — 이 시점부터 `deploy-prod.sh` 의 **일반 배포 흐름과
-   합류**한다: 새 이미지로 API·웹·워커 컨테이너를 다시 올리고(`compose up -d`), nginx 를
-   force-recreate 하고, 헬스체크를 통과할 때까지 기다린다 — **여기서 API 오류 화면 구간이
-   끝난다.**
-5. 헬스체크 통과 후 `task168_verify` 실행 — 인증 없는 공개 API 로 대회 목록 전체 페이지네이션
-   + 각 대회 상세 + 각 경기 상세를 호출해 전부 200 인지 확인(`runtime-verification.json` 기록).
-6. 전부 통과하면 이 릴리스가 "active"로 승격된다(`promote_candidate_manifest`).
+2. API·워커를 **다시** 정지하고 정지됐는지 확인(재부팅 등으로 다시 떴을 수 있다). 정지 실패면
+   migrate 없이 거부.
+3. `prisma migrate deploy` 한 번으로 M11(레거시 테이블 5개를 실제로 `DROP`) **과 그 뒤의
+   migration 전부**를 적용 — **여기서부터 되돌리기 불가**(아래 "복구" 절).
+4. 원장 **전체** 검사 — 미해결(실패·진행 중) 행 0 이고 소스의 모든 migration 이 적용됐을 때만
+   통과. 하나라도 어긋나면 영수증 없이 거부한다(그대로 두면 다음 일반 배포가 P3009 로 막힌다).
+5. `migration-stage.json` 영수증 기록 → 시상자(award recipient) 백필 CLI 실행.
+6. 이 시점부터 `deploy-prod.sh` 의 **일반 배포 흐름과 합류**한다: 새 이미지로 API·웹·워커를
+   다시 올리고(`compose up -d`), nginx 를 force-recreate 하고, 헬스체크를 기다린다 — **여기서
+   API 오류 화면 구간이 끝난다.**
+7. `task168_verify` — DB 행이 아니라 **공개 API 가 스스로 노출하는 것**만 검증한다: 공개 대회
+   목록(끝 페이지까지) → 각 대회 상세 200 → 그 대회 공개 일정(`/tournaments/:id/schedule`,
+   끝 페이지까지)이 내보내는 경기마다 상세 200. 준비 중·대진 비공개 대회는 API 가 경기를
+   내보내지 않으므로 검사 대상이 아니다. 공개 경기가 **0건이면 실패**다(리허설한 prod 덤프에
+   공개 대회 2개·공개 경기 32건이 있었다). 결과는 `runtime-verification.json`
+   (`tournamentCount`·`publicMatchCount` 포함).
+8. 전부 통과하면 이 릴리스가 "active"로 승격된다(`promote_candidate_manifest`).
 
 ### 8. Stage B 확인
 
@@ -157,8 +176,10 @@ Actions 변수/시크릿 이름이나 `.env` 키 이름으로만 가리킨다 �
   대신 부록 B 의 "M11 이후" 쿼리를 쓴다.
 - **공개 API 응답으로 판정**: `task168_verify` 가 이미 하는 것과 같은 방식 — 커맨드 응답이
   아니라 `GET /api/v1/tournaments`(비인증) 로 대회 목록 전체를 페이지네이션해 각 `id` 에 대해
-  `GET /api/v1/tournaments/:id` 가 200 인지 직접 찍어 본다. 이번 리허설 기준으로는 대회 경기
-  상세 32건이 전부 200 이어야 한다(레거시 fixture 32건이 canonical 로 변환된 수).
+  `GET /api/v1/tournaments/:id`, 그 대회의 `GET /api/v1/tournaments/:id/schedule` 이 내보내는
+  경기마다 `GET /api/v1/tournaments/:id/matches/:fixtureId` 가 200 인지 직접 찍어 본다. 이번
+  리허설 기준으로는 공개 경기 32건이 전부 200 이어야 한다(레거시 fixture 32건이 canonical 로
+  변환된 수).
 - **핵심 테이블 행 수 불변**: 전환 전후 `v1_games`·`v1_team_matches` 등 핵심 테이블의
   행 수를 비교한다 — Stage B 리허설 기준 `v1_team_matches` 는 `+32`(레거시 fixture 가
   canonical 로 변환된 만큼 늘어나는 것이 정상, canonicalGameCount 증가), 그 외 사용자 데이터
@@ -174,17 +195,17 @@ Actions 변수/시크릿 이름이나 `.env` 키 이름으로만 가리킨다 �
 | dispatch 입력 검증 (build-images, DB 미접촉) | `task168_rehearsal_evidence is required for stageA` / `must not contain control characters` / `Unknown task168_stage` | 아무 것도 안 바뀜 | 예 | 입력값 고쳐서 재dispatch. |
 | deploy-prod.sh 시작 직후 | `Task168 ${stage} requires an existing active release (had_active=false)` | 아무 것도 안 바뀜(첫 배포 이전 상태에서만 발생, 지금 prod 는 `state.json` 이 있어 실무에서는 안 나올 가능성이 높다) | 해당 없음 | 이 에러가 나오면 `state.json` 자체가 없다는 뜻 — Stage A/B 이전에 먼저 일반 배포로 `state.json` 을 만들어야 한다. 이 문서 범위 밖의 별도 판단이 필요하니 진행 전 사용자에게 보고. |
 | Stage A 시작, 원장/seal 상태 판정 | `Stage A refuses: prod ledger/seal state is not a recognized Stage A state` | API·워커 정지 안 됨(quiesce 이전에 거부) | 아니오 | 자동 복구 대상이 아니다. DB 원장을 부록 B 쿼리로 직접 읽어 어떤 상태인지(다른 브랜치의 마이그레이션이 섞였는지 등) 사람이 판단한다. |
-| Stage A quiesce | `compose stop failed` / `writers did not quiesce` | API·워커가 일부만 내려갔을 수 있음 | 예 | 컨테이너 상태를 확인하고 Stage A 재dispatch(재-quiesce는 매 시도마다 무조건 다시 함). |
+| Stage A/B quiesce(정지 확인) | `compose stop failed` / `writers did not quiesce` | API·워커가 일부만 내려갔을 수 있음. DB 는 이 시도에서 아직 안 건드림 | 예 | 컨테이너 상태를 확인하고 같은 Stage 재dispatch(매 진입마다 다시 정지·확인한다). |
 | Stage A backup | `pg_dump failed` / `backup file is empty` / `backup archive failed pg_restore --list verification` | quiesce 는 끝났고 API 는 내려간 채, 백업은 없음 | 예 | 디스크 여유·DB 접속을 확인하고 Stage A 재dispatch — `_receipt_reusable` 가 quiesce 영수증은 재사용하고 backup 부터 다시 시도한다. |
-| Stage A 사전 마이그레이션 | `pre-cutover ledger does not match the expected M1..M8,M10 set` | quiesce+backup 완료, 마이그레이션 일부만 적용 | 예 | Stage A 재dispatch — `state` 판정이 `precutover` 로 잡혀 재-quiesce 후 전환 도구부터 이어간다. |
+| Stage A 사전·사후 마이그레이션(`prisma migrate deploy`) | prisma 오류 출력(`migrate deploy` 실패) / `pre-cutover ledger does not match the expected M1..M8,M10 set` | M1~M10 중 일부만 적용됐거나 실패 행(`finished_at IS NULL`)이 남았을 수 있음. API 는 내려간 채 | **아니오 — 수동 개입 + 사용자 승인** | 재dispatch 해도 러너가 거부한다(실패 행이 있으면 `stuck or self-contradictory`, M1~M10 부분 적용이면 `not a recognized Stage A state`). ① 부록 B 1)로 미해결 행과 M1~M10 적용 상태를 조회 ② 실패한 migration 과 원인(로그의 prisma 오류) 식별 ③ 그 migration 이 부분 적용되지 않았음을 확인한 뒤 `prisma migrate resolve --rolled-back <이름>` 을 할지, 러너 백업(층 1)으로 복원할지는 **사용자 승인 후** 실행 ④ 원장이 인식되는 상태로 돌아온 뒤 Stage A 재dispatch. |
 | Stage A 전환 도구(cutover tool) | `cutover tool failed (exit N) and no seals are present -- refusing` | seal 이 안 걸림(`0\|0\|0`), 실패한 리포트는 다음 재시도에서 자동 보관(archive) 됨 | 예 | Stage A 재dispatch. seal 이 이미 `5\|5\|3` 이면 코드 스스로 "seals are already committed -- continuing" 으로 통과시키므로 중복 실행 걱정은 없다. |
-| Stage A 사후 마이그레이션/최종 확인 | `post-M9 ledger does not match the expected M1..M10 set` / `cutover seals or zero-legacy-link counts are not exact` | 전환 도구는 성공, seal 확인만 실패 | 예 | Stage A 재dispatch — `committed` 상태로 재진입해 사후 마이그레이션부터 이어간다. |
+| Stage A 최종 확인 | `post-M9 ledger does not match the expected M1..M10 set` / `cutover seals or zero-legacy-link counts are not exact` | 전환 도구는 성공(seal `5\|5\|3`), 확인만 실패 | 실패 행이 없을 때만 예 | 부록 B 1)로 미해결 행이 0인지 먼저 확인한다. 0이면 Stage A 재dispatch — `committed` 상태로 재진입해 사후 마이그레이션부터 이어간다. 실패 행이 있으면 위 행과 같은 수동 절차(사용자 승인). |
 | Stage A 전체 실패(ERR trap) | `Candidate failed during Task168 stageA -- refusing to restart the previous release's images against a possibly partially migrated database` | `activation-stage.json`(stage=stageA) 기록, **API·워커는 계속 내려간 채로 유지**(옛 버전도 새 버전도 안 뜸) | 예(위 개별 단계 항목 참고) | 위 표에서 실제 실패 지점을 찾아 원인 조치 후 Stage A 재dispatch. 옛 버전으로 자동 복구되지 않는다는 점이 일반 배포와 다르다 — DB 가 부분적으로 바뀌었을 수 있는 상태에서 옛 코드를 올리는 것 자체가 위험하기 때문(의도된 설계). |
 | Stage B 시작, 영수증 조회 | `no unique Stage A transition receipt for this database` / `transition receipt's releaseSha does not match this manifest` / `manifest migration checksums do not match the Stage A transition receipt` | 아무 것도 안 바뀜 | 아니오(그 상태로는) | Stage A 를 같은 커밋으로 다시 완료했는지, Stage B 를 **다른 커밋**으로 잘못 dispatch 하지 않았는지 확인. 원인 없이 재시도하지 않는다. |
 | Stage B 사전 이름셋 확인 | `Stage B refuses: prod ledger is not exactly the Stage A M1..M10 set` | 아무 것도 안 바뀜 | 아니오 | Stage A~B 사이에 다른 배포가 끼어들어 원장이 바뀌었을 가능성 — 사람이 원장을 직접 읽고 판단(아래 "금지 사항" 위반이 있었는지부터 확인). |
-| Stage B M11 마이그레이션 자체 | `M11 prisma migrate deploy failed` | seal 은 아직 `5\|5\|3`(M11 이전 상태), M11 자체는 트랜잭션이라 실패하면 스키마는 안 바뀜 — 단 `m11-entry.json`(status `ENTERED`)은 이미 기록돼 있어 다음 시도가 "이번 실행이 넣은 항목"임을 증명할 수 있음 | 예 | 에러 원인(디스크·락 등) 해결 후 Stage B 재dispatch — 같은 release/db/image 조합이면 `m11-entry.json` 을 재사용하고 마이그레이션만 다시 시도한다. |
+| Stage B 마이그레이션(M11 과 그 뒤 migration 전부) | `Stage B prisma migrate deploy failed (M11 or a migration after it)` / `Stage B refuses: the migration ledger is not fully applied` | 어느 migration 이 실패했는지는 원장을 봐야 안다. M11 자체가 실패했으면 스키마는 그대로(seal `5\|5\|3`). **M11 은 커밋되고 그 뒤 migration 이 실패했으면 레거시 테이블은 이미 DROP 됨(되돌릴 수 없음)** 이고 실패 행이 남아 Prisma 가 P3009 상태 — 다음 일반 배포도 막힌다. `migration-stage.json` 은 쓰이지 않는다 | **아니오 — 수동 개입 + 사용자 승인** | 실패 행이 남은 채 재dispatch 하면 러너가 거부한다(`stuck or self-contradictory` 또는 P3009). ① 부록 B 1)·2)로 미해결 행과 M11 상태 조회 ② 실패한 migration 과 원인 식별 ③ 부분 적용이 없음을 확인한 뒤 `prisma migrate resolve --rolled-back <이름>`(또는 PITR 복원) 여부를 **사용자 승인 후** 실행 ④ Stage B 재dispatch — `m11-entry.json` 이 이번 실행의 M11 임을 증명하면 멱등 `migrate deploy` 를 다시 돌려 남은 migration 을 적용하고, 원장 전체 검사를 통과해야만 영수증을 쓴다. |
 | Stage B 활성화(컨테이너 재기동~헬스체크) | `wait_for_prod_health_contract` 계열 실패(로그에 `Health contract failed`) | **M11 은 이미 커밋됨**(되돌릴 수 없음), 새 컨테이너가 못 뜨거나 헬스체크 미통과 | 예 | Stage B 재dispatch — `migration-stage.json` 이 있으므로 마이그레이션은 건너뛰고 컨테이너 기동부터 재시도한다. 옛 버전으로 자동 복구되지 않는다(위와 같은 이유). |
-| Stage B verify(공개 API 검증) | 로그에 `tournament detail non-200` / `fixture detail non-200` 등, `task168_verify` 가 0 이 아님 | **컨테이너는 이미 새 버전으로 떠서 정상 서비스 중**(헬스체크는 통과한 뒤라서), 다만 이 릴리스는 아직 "active"로 승격되지 않음(`state.json` 은 옛 릴리스를 가리킨 채) | 예 | 실패한 대회/경기 ID 를 로그에서 찾아 원인 조사. 원인을 못 찾아도 서비스 자체는 떠 있으니 급하지 않다 — Stage B 재dispatch 하면 `migration-stage.json` 재사용으로 마이그레이션은 건너뛰고 verify 부터 재실행한다. |
+| Stage B verify(공개 API 검증) | 로그에 `tournament detail non-200` / `match detail non-200` / `zero public matches` / `request failed` 등, `task168_verify` 가 0 이 아님 | **컨테이너는 이미 새 버전으로 떠서 정상 서비스 중**(헬스체크는 통과한 뒤라서), 다만 이 릴리스는 아직 "active"로 승격되지 않음(`state.json` 은 옛 릴리스를 가리킨 채). `runtime-verification.json` 에 status=FAILED 로 남는다 | 예 | 실패한 대회/경기 ID 를 로그에서 찾아 원인 조사. `zero public matches` 는 공개 대회·경기가 실제로 없어졌는지(운영 판단)부터 확인. Stage B 재dispatch 하면 `migration-stage.json` 재사용으로 마이그레이션은 건너뛰고 verify 부터 재실행한다. |
 | 전체 공통 | `Another prod deployment is active` | `flock` 이 잡혀 있음 — 다른 배포가 진행 중이거나 이전 실행이 비정상 종료해 락이 안 풀렸을 수 있음 | 상황에 따라 다름 | 진짜 동시 배포가 있는지부터 확인(GitHub Actions 실행 목록). 없다면 EC2 호스트에서 락 파일 상태를 사람이 직접 확인 — 함부로 지우지 않는다. |
 
 ## 복구 (PITR·백업 복원)
@@ -275,6 +296,9 @@ M11 이 이미 원장에 적용된 뒤에는 `assert_task168_m11_restore_target_
   유일한 복구 경로이고, 실패 지점별로 세밀하게 재개하는 것이 아니라 `migration-stage.json`
   유무로만 "마이그레이션을 건너뛸지"를 판단한다 — 실패 대응표 이상의 세밀한 자동 복구는
   없다.
+- **Stage B 이후 일반 배포 실패의 자동 복구는 DB 조회 성공에 의존한다.** 복원 대상 가드
+  (`assert_task168_m11_restore_target_safe`)가 원장을 읽어야 옛 릴리스로의 자동 복구를 허용하므로,
+  DB 장애가 배포 실패의 원인이면 자동 복구도 거부된다(fail-closed) — 그때는 수동 개입이다.
 - **verify 실패는 승격을 막을 뿐 서비스를 막지는 않는다.** 위 실패 대응표에 적은 대로,
   verify 가 실패해도 새 버전 컨테이너는 이미 떠서 정상 응답 중이다 — 다만 `state.json`
   의 "active" 포인터가 갱신되지 않은 채로 남으므로, 이 상태에서 또 다른 배포를 진행하면
@@ -322,17 +346,27 @@ aws ssm send-command --instance-ids <PROD_EC2_INSTANCE_ID> --document-name AWS-R
   --cli-input-json file://<json>   # Parameters.commands 안에서 아래 스크립트를 실행
 ```
 
-EC2 안에서 실행할 내용(반드시 `SET default_transaction_read_only = on` 을 먼저 건다):
+EC2 안에서 실행할 내용. 러너·가드와 **같은 방식**으로 DB 에 붙는다 — API 컨테이너가 떠 있을
+필요가 없고(A~B 구간에도 동작), DB 가 외부 RDS 여도 되며, `DATABASE_URL`(비밀번호 포함)이
+어떤 명령줄 인자에도 실리지 않는다. `<PROD_LIVE_DIR>`·`<PROD_RELEASE_STATE_FILE>` 는
+`deploy/prod-release-common.sh` 의 같은 이름 변수 값을 가리키는 자리표시자다.
 
 ```bash
-API=$(sudo docker ps -q -f name=teameet_v1_api | head -1)
-URL=$(sudo docker exec "$API" printenv DATABASE_URL)
-sudo docker exec -i -e PGURL="$URL" teameet_v1_postgres sh -c 'psql "$PGURL" -f -' <<'SQL'
+set -Eeuo pipefail
+# compose 가 v1_api 서비스를 해석하려면 이미지 변수가 필요하다 — 현재 active 매니페스트 값을 쓴다.
+export V1_API_IMAGE="$(sudo jq -er '.active.images.api.uri' <PROD_RELEASE_STATE_FILE>)"
+export V1_WEB_IMAGE="$(sudo jq -er '.active.images.web.uri' <PROD_RELEASE_STATE_FILE>)"
+compose=(sudo --preserve-env=V1_API_IMAGE,V1_WEB_IMAGE docker compose --project-name deploy
+  -f <PROD_LIVE_DIR>/deploy/docker-compose.prod.yml --env-file <PROD_LIVE_DIR>/deploy/.env)
+URL="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')"
+[[ -n "${URL}" ]]
+SQL_FILE="$(mktemp)"
+cat > "${SQL_FILE}" <<'SQL'
 SET default_transaction_read_only = on;
 
--- 1) 원장에 미해결(진행 중이거나 실패한) 행이 있는지 — 0이어야 정상
-SELECT count(*) FROM "_prisma_migrations"
-WHERE finished_at IS NULL AND rolled_back_at IS NULL;
+-- 1) 원장에 미해결(진행 중이거나 실패한) 행 — 0행이어야 정상. 있으면 그 이름이 실패한 migration
+SELECT migration_name, started_at, left(logs, 300) AS logs FROM "_prisma_migrations"
+WHERE finished_at IS NULL AND rolled_back_at IS NULL ORDER BY started_at;
 
 -- 2) M11 이 정확한 체크섬으로 완료 상태인지(Stage B 완료 후)
 SELECT checksum, finished_at, rolled_back_at FROM "_prisma_migrations"
@@ -361,6 +395,12 @@ SELECT
 SELECT count(*) FROM v1_team_matches;
 SELECT count(*) FROM v1_games;
 SQL
+# --env-file /dev/stdin: `--env-file <(...)` 는 sudo 가 fd 를 닫아 prod 호스트에서 실패한다.
+sudo docker run --rm --network deploy_default --env-file /dev/stdin \
+  -v "${SQL_FILE}:/queries.sql:ro" postgres:16-alpine \
+  sh -c 'exec psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /queries.sql' \
+  < <(printf 'DATABASE_URL=%s\n' "${URL}")
+rm -f "${SQL_FILE}"
 ```
 
 숫자 3·4번의 정확한 기대값은 위 SQL 주석에 이미 적혀 있다 — 다르면 "실패 대응표"의 해당
@@ -372,7 +412,11 @@ SQL
 
 ```bash
 curl -fsS https://teameet.co.kr/api/v1/health | jq -e '.data.checks.db == true'
-curl -fsS https://teameet.co.kr/api/v1/tournaments | jq '.data.pageInfo'
+curl -fsS 'https://teameet.co.kr/api/v1/tournaments?limit=50' | jq '.data.pageInfo'
 # 위에서 얻은 각 대회 id 에 대해:
 curl -o /dev/null -sw '%{http_code}\n' https://teameet.co.kr/api/v1/tournaments/<id>
+curl -fsS 'https://teameet.co.kr/api/v1/tournaments/<id>/schedule?limit=100' |
+  jq -r '.data.items[].fixtureId, .data.unscheduled[].fixtureId, .data.nextCursor'
+# 각 fixtureId 에 대해:
+curl -o /dev/null -sw '%{http_code}\n' https://teameet.co.kr/api/v1/tournaments/<id>/matches/<fixtureId>
 ```

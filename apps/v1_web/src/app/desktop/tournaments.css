@@ -31,8 +31,12 @@
  *   Desktop ≥1024: position sticky, top 88px (64px nav + 24px breathing).
  *
  * .tm-tournament-bleed
- *   A child of any tournament grid that must span the full width (e.g. the bracket).
+ *   A child of any tournament grid that must span the full width.
  *   Mobile: normal flow. Desktop ≥1024: grid-column 1 / -1.
+ *
+ * .tm-tournament-detail-bracket
+ *   Detail-page bracket constrained to the left content column. The bracket component
+ *   owns its horizontal overflow, so it never overlaps the sticky information rail.
  *
  * .tm-tournament-form-grid
  *   Apply and My pages: 2-column grid, content left + summary/CTA right.
@@ -129,8 +133,6 @@
 
 @media (min-width: 1024px) {
   .tm-tournament-rail {
-    position: sticky;
-    top: 88px;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: var(--radius-container);
@@ -153,7 +155,8 @@
 
 @media (min-width: 1024px) {
   .tm-tournament-detail-aside {
-    position: static;
+    position: sticky;
+    top: 88px; /* 64px desktop nav + 24px breathing */
     margin-top: 0;
     padding: 0;
     gap: 20px;
@@ -170,6 +173,21 @@
   }
 
   .tm-tournament-bleed > .tm-match-detail-body {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+/* 상세 화면의 대진표는 오른쪽 고정 정보 열을 침범하지 않는다. TournamentBracket의
+   overflowX:auto가 이 열 안에서만 동작하므로 넓은 대진은 내부 좌우 스크롤로 확인한다. */
+@media (min-width: 1024px) {
+  .tm-tournament-detail-bracket {
+    grid-column: 1;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .tm-tournament-detail-bracket > .tm-match-detail-body {
     min-width: 0;
     max-width: 100%;
   }

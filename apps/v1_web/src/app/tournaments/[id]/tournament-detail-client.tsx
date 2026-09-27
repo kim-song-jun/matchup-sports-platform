@@ -1928,7 +1928,7 @@ function FormatLeftSections({ tournament }: { tournament: V1TournamentDetail }) 
   );
 }
 
-/* ── BracketSection — spans full width via .tm-tournament-bleed on desktop ── */
+/* ── BracketSection — desktop에서는 왼쪽 상세 열 안에서 자체 가로 스크롤 ── */
 function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
   const { format, fixtures, groups } = tournament;
   const { knockoutFixtures, hasKnockoutFixtures, hasAnyFixtures } =
@@ -1942,7 +1942,7 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
   if (format === 'knockout') {
     if (!hasAnyFixtures) return null;
     return (
-      <div className="tm-tournament-bleed">
+      <div className="tm-tournament-detail-bracket">
         <div className="tm-match-detail-body">
           <section aria-labelledby="bracket-heading" style={{ marginTop: 24 }}>
             <div id="bracket-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>
@@ -1963,7 +1963,7 @@ function BracketSection({ tournament }: { tournament: V1TournamentDetail }) {
   if (!hasKnockoutFixtures) return null;
 
   return (
-    <div className="tm-tournament-bleed">
+    <div className="tm-tournament-detail-bracket">
       <div className="tm-match-detail-body">
         <section aria-labelledby="bracket-heading" style={{ marginTop: 24 }}>
           <div id="bracket-heading" className="tm-text-body-lg" style={{ marginBottom: 8 }}>

@@ -137,7 +137,7 @@ export function MatchListPageView({ model }: { model: MatchListViewModel }) {
           />
         )}
         {/* 서버는 20건씩 커서로 자르는데(matches.service.ts) 예전엔 여기서 더 볼 방법이
-            없었다(감사 결함) — tournaments/page.tsx 와 같은 "더 보기" 누적 패턴. */}
+            없었다(감사 결함) — tournaments/tournaments-list-client.tsx 와 같은 "더 보기" 누적 패턴. */}
         {!model.isLoading && model.hasNext ? (
           <button
             type="button"

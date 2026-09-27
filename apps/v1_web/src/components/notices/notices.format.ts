@@ -36,5 +36,5 @@ export function toNotice(notice: V1Notice): NoticeModel {
 function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
+  return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', timeZone: 'Asia/Seoul' });
 }

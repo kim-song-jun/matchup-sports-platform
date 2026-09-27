@@ -1,11 +1,11 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { V1TournamentListItem } from '@/types/api';
-import TournamentsPage from './page';
+import { TournamentsListPageClient as TournamentsPage } from './tournaments-list-client';
 
 // motion-audit 그룹3(F1 subtab) — CompetitionKindSegment 는 kind='tab' 으로 정확히 분류돼
 // route-progress.tsx 가 진행바를 켜지 않는다. useV1Tournaments 는 placeholderData:
-// keepPreviousData 라 재요청 동안 isLoading 이 계속 false 로 유지되므로(카드 유지·스크롤
+// keepPreviousData 라 재요청 동안 isPending 이 계속 false 로 유지되므로(카드 유지·스크롤
 // 보존 목적) TournamentSkeletonList 도 안 뜬다. 그 사이 유일한 로딩 신호가 이 그리드의
 // aria-busy/opacity 다 — isFetching 이 꺼지면 신호도 사라져야 한다.
 function buildItem(overrides: Partial<V1TournamentListItem> = {}): V1TournamentListItem {
@@ -62,15 +62,15 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
 }));
 vi.mock('@/hooks/use-v1-api', () => ({
-  useV1AllTournaments: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
+  useV1AllTournaments: () => ({ data: [], isPending: false, isError: false, refetch: vi.fn() }),
   useV1Tournaments: () => ({
     data: {
       items: [buildItem()],
       pageInfo: { hasNext: false, totalPages: 1, total: 1, page: 1, nextCursor: null },
     },
-    // keepPreviousData 설계: 재요청 중에도 isLoading 은 false 로 유지된다 — 그래서
+    // keepPreviousData 설계: 재요청 중에도 isPending 은 false 로 유지된다 — 그래서
     // TournamentSkeletonList 가 아니라 isFetching 하나로만 로딩을 신호해야 한다.
-    isLoading: false,
+    isPending: false,
     isError: false,
     error: null,
     isFetching,

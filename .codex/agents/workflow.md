@@ -6,7 +6,7 @@
 - canonical QA policy: `.codex/qa-rules.md`
 - compatibility prompt entry: `.claude/agents/prompts.md`
 - task docs: `.github/tasks/{NN}-{slug}.md`
-- Playwright runbook: `docs/PLAYWRIGHT_E2E_RUNBOOK.md`
+- Playwright runbook: `docs/guides/playwright-e2e-runbook.md` (v1 E2E: `pnpm test:e2e:v1`)
 
 ## Commands
 
@@ -72,7 +72,7 @@
 5. live runtime contract가 바뀌면 실제 dev port에서 확인할 것
 6. concurrent local Playwright runner는 shared `make dev`가 아니라 isolated compose targets로만 검증할 것
 7. shared dev stack과 isolated web runtime 모두 stack-local `.next` volume을 유지해 Next dev artifact cross-talk를 막을 것
-8. feature screenshot-set analysis는 `scripts/qa/run-e2e-analyzer.mjs`로 수행하고, interrupted job recovery는 `ultraplan/runs/e2e-analyzer*` 디스크 큐 기준으로 재개할 것
+8. 화면 검증은 로컬 next 서버가 아니라 alpha에서 수행할 것 — 절차는 `CLAUDE.md` "Alpha 실측 검증"과 `scripts/README-alpha-verify.md`
 9. UI/design/admin surface changes require Playwright screenshot evidence, before/after screenshot evidence when visible layout changed, console/network checks, and layout rebalance across relevant breakpoints; tests pass is not completion.
 10. Shared dirty tree work must avoid `git add -A`; when a commit is explicitly requested, use `git commit -- <pathspec>` and verify diff scope with `git show --stat` and `git show --name-only`.
 11. Run the narrowest changed-contract test once. Before any automated test/typecheck/build/lint, inspect host CPU/load, memory/swap, Node/browser counts, Docker, and target-service health. Heavy validation runs only once immediately before commit, serially with minimum workers; CI owns repeated repository-wide validation.

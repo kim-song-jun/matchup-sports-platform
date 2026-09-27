@@ -1,6 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 import { PublicFaqList } from '@/components/public-site';
-import { FAQ_ITEMS } from '@/lib/public-content/faq';
+import { faqsByIds } from '@/lib/public-content/faq';
 import { LandingCtaLink } from '../landing-cta-link';
 
 /* 회원가입 없이 둘러보기 · 참가비·결제 · (팀 없이는 안 되고 팀장/매니저가 신청하는) 대회 참가 흐름 —
@@ -8,7 +8,7 @@ import { LandingCtaLink } from '../landing-cta-link';
 const FAQ_IDS = ['browse-without-account', 'entry-fee-payment', 'join-a-competition'] as const;
 
 export function LandingV4Faq() {
-  const items = FAQ_IDS.map((id) => FAQ_ITEMS.find((item) => item.id === id)).filter((item) => item !== undefined);
+  const items = faqsByIds(FAQ_IDS);
 
   return (
     <section id="faq" className="tm-landing-section" aria-labelledby="faq-heading">

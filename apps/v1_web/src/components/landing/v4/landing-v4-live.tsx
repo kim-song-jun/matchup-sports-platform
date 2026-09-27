@@ -49,7 +49,7 @@ export function LandingV4Live({ data }: { data: LandingV4Data }) {
         </div>
         {data.live.length > 0 ? (
           <ul className="tm-landing-v4-live-grid">
-            {data.live.map((card) => (card.kind === 'tournament' ? <TournamentCard key={card.id} card={card} /> : <TeamMatchCard key={card.id} card={card} />))}
+            {data.live.map((card) => (card.kind === 'tournament' ? <TournamentCard key={`tournament-${card.id}`} card={card} /> : <TeamMatchCard key={`team-match-${card.id}`} card={card} />))}
           </ul>
         ) : (
           <p className="tm-landing-v4-live-empty">

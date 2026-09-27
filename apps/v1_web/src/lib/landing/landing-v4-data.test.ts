@@ -75,6 +75,13 @@ describe('summarizeLandingData', () => {
     expect(data.live.map((c) => c.id)).toEqual(['sooner', 'later']);
   });
 
+  it('다음 페이지가 있어도 이번 페이지에 모집 중이 0개면 "0개 이상"이 아니라 "0개"다', () => {
+    const none = summarizeLandingData(null, tournamentPage([tournament({ status: 'completed' })], true), null, NOW);
+    expect(formatLandingCount(none.counts.tournamentsOpen)).toBe('0개');
+    const some = summarizeLandingData(null, tournamentPage([tournament({ status: 'open' })], true), null, NOW);
+    expect(formatLandingCount(some.counts.tournamentsOpen)).toBe('1개 이상');
+  });
+
   it('pageInfo.hasNext 가 있으면 more:true 로 "N개 이상" 표기를 만든다', () => {
     const data = summarizeLandingData(
       cursorPage([teamMatch({})], true),

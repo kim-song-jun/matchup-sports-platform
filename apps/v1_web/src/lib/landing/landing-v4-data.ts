@@ -70,8 +70,12 @@ export function formatLandingCount(count: LandingCount): string | null {
 
 /* 대회 목록 뱃지(getTournamentStatusConfig)의 "마감"과 다르게 "모집 마감"을 쓴다 — 이 섹션은
  * 목록 카드가 아니라 짧은 홍보 문구라 배지 라벨을 그대로 재사용하면 뜻이 덜 분명하다. */
-const TOURNAMENT_STATUS_PRIORITY: Readonly<Record<string, number>> = { in_progress: 0, open: 1, closed: 2 };
-const TOURNAMENT_STATUS_LABEL: Readonly<Record<string, string>> = { in_progress: '진행 중', open: '모집 중', closed: '모집 마감' };
+const TOURNAMENT_STATUS_PRIORITY = { in_progress: 0, open: 1, closed: 2 } as const satisfies Record<LandingTournamentLiveStatus, number>;
+const TOURNAMENT_STATUS_LABEL = { in_progress: '진행 중', open: '모집 중', closed: '모집 마감' } as const satisfies Record<LandingTournamentLiveStatus, string>;
+
+function isLiveStatus(status: string): status is LandingTournamentLiveStatus {
+  return Object.hasOwn(TOURNAMENT_STATUS_PRIORITY, status);
+}
 
 export function summarizeLandingData(
   teamMatchesPage: CursorPage<V1TeamMatch> | null,
@@ -101,7 +105,7 @@ export function summarizeLandingData(
       tournaments: toCount(tournamentsPage, tournaments.length),
       // 이 페이지(최대 50건) 안의 모집 중 개수다. hasNext 는 "더 있을 수도" 라는 신호를
       // 그대로 물려받는다(다음 페이지에 모집 중이 더 있을 수 있다는 뜻으로만 쓴다).
-      tournamentsOpen: tournamentsPage ? { value: openCount, more: tournamentsPage.pageInfo.hasNext } : null,
+      tournamentsOpen: tournamentsPage ? { value: openCount, more: openCount > 0 && tournamentsPage.pageInfo.hasNext } : null,
       teams: toCount(teamsPage, teams.length),
     },
     bySport,
@@ -117,17 +121,17 @@ function toCount(page: { pageInfo?: { hasNext: boolean } } | null, length: numbe
 
 function liveTournaments(items: readonly V1TournamentListItem[]): LandingLiveTournament[] {
   return items
-    .filter((item) => item.promoHomeEnabled && Object.hasOwn(TOURNAMENT_STATUS_PRIORITY, item.status))
+    .flatMap((item) => (item.promoHomeEnabled && isLiveStatus(item.status) ? [{ item, status: item.status }] : []))
     .sort((a, b) =>
-      TOURNAMENT_STATUS_PRIORITY[a.status] - TOURNAMENT_STATUS_PRIORITY[b.status] || a.promoHomePriority - b.promoHomePriority,
+      TOURNAMENT_STATUS_PRIORITY[a.status] - TOURNAMENT_STATUS_PRIORITY[b.status] || a.item.promoHomePriority - b.item.promoHomePriority,
     )
     .slice(0, 2)
-    .map((item) => ({
+    .map(({ item, status }) => ({
       kind: 'tournament' as const,
       id: item.id,
       title: item.title,
-      status: item.status as LandingTournamentLiveStatus,
-      statusLabel: TOURNAMENT_STATUS_LABEL[item.status],
+      status,
+      statusLabel: TOURNAMENT_STATUS_LABEL[status],
       dateText: item.promoHomeDateText ?? formatTournamentDateMedium(item.scheduledAt),
       location: item.promoHomeLocationText,
       teamsText: item.promoHomeTeamsText,

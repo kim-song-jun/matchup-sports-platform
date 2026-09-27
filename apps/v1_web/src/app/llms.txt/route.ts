@@ -65,6 +65,7 @@ export async function GET(): Promise<Response> {
     '- 인용 시 표기: Teameet (teameet.co.kr) — 개별 대회를 인용할 때는 해당 대회 페이지 URL을 함께 표기해 주세요',
     '- 크롤링 정책: /robots.txt (학습·검색 색인·실시간 열람 모두 허용, 비공개 경로만 차단)',
     `- 전체 페이지 목록: ${absoluteSiteUrl('/sitemap.xml')}`,
+    `- 전체 안내서(참여 방법과 지금 열린 대회·리그·매치·팀·구장 목록): ${absoluteSiteUrl('/llms-full.txt')}`,
     '',
     '## 인용할 때 주의',
     '',

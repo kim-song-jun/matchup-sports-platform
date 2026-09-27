@@ -89,6 +89,27 @@ describe('tournament campaign proxy', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('sets a missing league detail to a real 404 and keeps an existing one as 200', async () => {
+    const missingId = '00000000-0000-4000-8000-ffffffffffff';
+    const existingId = '525bd67a-e54b-41ad-a9bb-31415b882ced';
+    const fetchMock = vi.fn(async (url: string) => new Response(null, { status: url.endsWith(missingId) ? 404 : 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const missing = await proxy(detailRequest(`/league-matches/${missingId}`));
+    const existing = await proxy(detailRequest(`/league-matches/${existingId}`));
+    // 공개 리그 API 가 ParseUUIDPipe 로 비-UUID 를 거절하므로 그런 주소엔 보여줄 리그가 없다.
+    const slug = await proxy(detailRequest('/league-matches/league-1'));
+
+    expect(missing.status).toBe(404);
+    expect(existing.status).toBe(200);
+    expect(slug.status).toBe(404);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://localhost:8121/api/v1/league-matches/${missingId}`,
+      { cache: 'no-store', headers: { accept: 'application/json' } },
+    );
+  });
+
   it('does not turn the notices RSS feed into a 404 just because it sits under /notices/:id', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
@@ -140,6 +161,7 @@ describe('tournament campaign proxy', () => {
       '/tournaments/:id/reviews',
       '/tournaments/campaigns/:slug',
       '/notices/:id',
+      '/league-matches/:id',
     ]);
   });
 });

@@ -296,7 +296,7 @@ matchup-sports-platform/
 └── pnpm-workspace.yaml
 ```
 
-옛 v0 앱(`apps/api`·`apps/web`)은 저장소에서 제거해요(PR #1313). 필요하면 태그 `legacy-v0-final`에서 볼 수 있어요.
+레거시 v0 앱(`apps/api`·`apps/web`)은 제거됐어요. 필요하면 태그 `legacy-v0-final`에서 볼 수 있어요.
 
 ---
 

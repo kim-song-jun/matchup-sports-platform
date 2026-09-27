@@ -111,7 +111,21 @@ describe('friendly match shared score sheet (real DB)', () => {
     await records.mutate(actor, f.match.id, cmd('edit', 1, { goalId: added.goals[0].id, sideId: f.sides[0].id, participantId: f.participants[0].id }));
     await expect(records.mutate(actor, f.match.id, cmd('undo', 2, { changeId: added.history[0].id }))).rejects.toMatchObject({ status: 409 });
   });
-  it('a superseded submitted lineup does not grant rights when newest revision is draft', async () => {
+  it('a superseded submitted lineup does not grant rights to a participant the new roster excludes', async () => {
+    const f = await createSharedRecordFixture(prisma);
+    // Replace HOME's lineup with a new SUBMITTED revision (readiness gate
+    // stays satisfied) whose roster does NOT include f.userIds[1] -- proving
+    // the stale-actor 403 check, not the Task 106 readiness gate.
+    const replacement = await prisma.v1GameLineup.create({
+      data: { gameId: f.game.id, sideId: f.sides[0].id, revision: 2, state: 'SUBMITTED', submittedAt: new Date() },
+    });
+    await prisma.v1GameParticipant.create({
+      data: { gameId: f.game.id, sideId: f.sides[0].id, lineupId: replacement.id, displayNameSnapshot: '교체 선수' },
+    });
+    expect((await records.read(user(f.userIds[1]), f.match.id)).canEdit).toBe(false);
+    await expect(records.mutate(user(f.userIds[1]), f.match.id, cmd('confirm', 0))).rejects.toMatchObject({ status: 403 });
+  });
+  it('[Task 106] a side whose newest lineup is an unsubmitted draft blocks mutation with 409 ROSTER_INCOMPLETE', async () => {
     const f = await createSharedRecordFixture(prisma);
     await prisma.v1GameLineup.create({ data: { gameId: f.game.id, sideId: f.sides[0].id, revision: 2, state: 'DRAFT' } });
     const view = await records.read(user(f.userIds[1]), f.match.id);

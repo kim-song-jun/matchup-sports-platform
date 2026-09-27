@@ -214,34 +214,6 @@ test-v1: ## Run v1 backend + frontend tests
 	@pnpm --filter v1_api test
 	@pnpm --filter v1_web test
 
-.PHONY: autoqa
-autoqa: ## Run repo-local autoqa operator (background unavailable -> foreground fallback)
-	@node scripts/qa/run-autoqa.mjs $(AUTOQA_ARGS)
-
-.PHONY: autoqa-status
-autoqa-status: ## Print current autoqa status cursor summary
-	@node scripts/qa/run-autoqa.mjs status
-
-.PHONY: autoqa-scenarios
-autoqa-scenarios: ## Refresh autoqa scenario docs + scope-freeze from oracle
-	@node scripts/qa/run-autoqa-scenarios.mjs all
-
-.PHONY: autoqa-cycle
-autoqa-cycle: ## Run foreground autoqa cycle across oracle scenarios
-	@node scripts/qa/run-autoqa-cycle.mjs cycle all $(AUTOQA_ARGS)
-
-.PHONY: autoqa-cron
-autoqa-cron: ## Generate cron-friendly autoqa wrapper and crontab example
-	@node scripts/qa/run-autoqa.mjs cron
-
-.PHONY: autoqa-cron-install
-autoqa-cron-install: ## Install managed host cron entry for repo-local autoqa
-	@node scripts/qa/run-autoqa.mjs cron install $(AUTOQA_ARGS)
-
-.PHONY: autoqa-cron-status
-autoqa-cron-status: ## Print managed host cron status for repo-local autoqa
-	@node scripts/qa/run-autoqa.mjs cron status $(AUTOQA_ARGS)
-
 .PHONY: qa-visual-audit-manifest
 qa-visual-audit-manifest: ## Generate visual audit manifest (set RUN/BATCH/FAMILY/LIMIT)
 	@node scripts/qa/run-visual-audit.mjs manifest \

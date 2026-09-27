@@ -6304,10 +6304,10 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
   transform: translateX(-50%);
   z-index: 42;
   padding: 12px 16px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: rgba(25, 31, 40, 0.94);
   color: var(--static-white);
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-dropdown);
   font-size: var(--font-size-label);
   font-weight: 700;
   text-align: center;

@@ -1,8 +1,10 @@
 import type { PrismaClient } from '@prisma/client';
 
 /**
- * Friendly team-match results require a SUBMITTED/LOCKED latest lineup with at least one
- * participant on every team side (Task 106, ROSTER_INCOMPLETE). Fixture setup only:
+ * Friendly team-match results require, on every team side, a SUBMITTED/LOCKED lineup with at
+ * least one participant (Task 106, ROSTER_INCOMPLETE). The result gate reads each side's latest
+ * *submitted* lineup and ignores newer DRAFT revisions; only the shared-record gate treats a newer
+ * DRAFT as not ready. Fixture setup only:
  * a DRAFT latest lineup (createFromSourceInTransaction leaves revision 1 DRAFT) is promoted
  * in place, SUBMITTED/LOCKED ones are kept, and a participant is added only when the
  * lineup has none, so seeded participants stay as-is.

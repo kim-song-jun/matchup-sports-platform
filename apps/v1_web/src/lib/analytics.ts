@@ -66,7 +66,8 @@ function ensureGtag(measurementId: string): void {
     };
   }
   window.gtag('js', new Date());
-  window.gtag('set', { in_app_browser: detectInAppBrowser(window.navigator.userAgent) });
+  // A user property, not a plain `set` key: gtag.js drops custom keys given to `set`.
+  window.gtag('set', 'user_properties', { in_app_browser: detectInAppBrowser(window.navigator.userAgent) });
   markInternalIfConsole(window.location.pathname);
   window.gtag('config', measurementId);
   document.addEventListener('click', markInternalOnConsoleLinkClick, { capture: true });

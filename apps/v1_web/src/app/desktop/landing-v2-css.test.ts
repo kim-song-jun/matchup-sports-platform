@@ -80,3 +80,17 @@ describe('landing-v2.css 예전엔/이제는 면 가리기', () => {
     expect(hide?.selector).toContain("[data-view='before'] [data-face='after']");
   });
 });
+
+describe('landing-v2.css 히어로 에셋 층', () => {
+  it('에셋이 폰 목업보다 앞에 놓인다(뒤면 768 에서 폰이 에셋 절반을 가린다)', () => {
+    const z = (selector: string) =>
+      rules(CSS)
+        .filter((r) => r.selector === selector)
+        .map((r) => /z-index:\s*(-?\d+)/.exec(r.body)?.[1])
+        .filter((v): v is string => v !== undefined)
+        .map(Number);
+    const [illust] = z('.tm-landing-v2-stage-illust');
+    const [device] = z('.tm-landing-v2-stage-device');
+    expect(illust).toBeGreaterThan(device);
+  });
+});

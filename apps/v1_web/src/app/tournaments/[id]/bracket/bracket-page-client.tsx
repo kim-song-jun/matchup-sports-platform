@@ -574,9 +574,9 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
               같은 말을 두 번 하는 자리라 삭제했다. 안내 문단은 좁은 폭에서 숨긴다
               (globals.css의 .tm-bracket-page-intro p) — 390px에서 이 인트로 블록이
               스크롤 영역의 22%(159px)를 먹어 정작 경기가 2~3개밖에 안 보였다. */}
-          {/* 셸이 이미 데스크톱 헤드에 "순위·브래킷" 제목을 그린다(tournaments-core.ts
-              desktopHead:true) — 여기 h1을 그대로 두면 데스크톱에서 h1이 중복된다.
-              대회 실제 제목은 여기서만 나오는 정보라 h2로 낮춰 유지한다. */}
+          {/* 셸 제목("순위·브래킷")은 pageOwnsHeading 으로 h1 이 아니다. 문서 제목은 대회 이름을 담은
+              sr-only h1 이 맡고, 보이는 대회 제목은 기존 스타일(h2)을 그대로 쓴다. */}
+          <h1 className="sr-only">{tournament.title} 순위·대진표</h1>
           <h2>{tournament.title}</h2>
           {/* 리그엔 조별리그도 결선도 없다 — format 으로만 쓰면 거울 행에 이 문장이 그대로 뜬다. */}
           <p>
@@ -620,10 +620,12 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
       {/* flex:1 — 위 minHeight:'100%'+flex column과 짝을 이뤄 탭 콘텐츠가 남는 세로
           공간을 채우고, 아래 flownav가 marginTop:'auto'로 항상 바닥에 붙게 한다. */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-      {activeTab === 'schedule' ? (
-        // §일정 탭 가로 밀도 — 데스크탑에서 카드가 콘텐츠 폭(1440에서 998px)까지 그대로
-        // 늘어나는데 안의 팀명·점수는 중앙 정렬 고정이라 좌우로 각각 300px 가까이 비었다.
-        // 읽기 좋은 폭으로 묶어 가운데 세운다(제약은 globals.css, ≥1024에서만 적용).
+      {/* 두 탭 패널을 모두 그리고 닫힌 쪽만 숨긴다 — 순위·대진은 서버가 이미 받은 데이터로 그려지므로
+          첫 HTML 에 실려 검색엔진·AI 가 읽는다. 사용자가 탭으로 여는 표준 탭 콘텐츠라 숨긴 텍스트가 아니다. */}
+      <div role="tabpanel" aria-label="경기 일정" hidden={activeTab !== 'schedule'} style={{ display: activeTab === 'schedule' ? 'flex' : 'none', flexDirection: 'column', flex: 1 }}>
+        {/* §일정 탭 가로 밀도 — 데스크탑에서 카드가 콘텐츠 폭(1440에서 998px)까지 그대로
+            늘어나는데 안의 팀명·점수는 중앙 정렬 고정이라 좌우로 각각 300px 가까이 비었다.
+            읽기 좋은 폭으로 묶어 가운데 세운다(제약은 globals.css, ≥1024에서만 적용). */}
         <div className="tm-bracket-schedule-pane">
           {/* ⚠️ `kind` 로만 판정한다 — `isLeagueCompetition` 은 `format === 'league'` 인
               리그 방식 대회도 true 라(alpha 62건 중 7건) 그 대회들의 어휘까지 바꾼다. */}
@@ -632,11 +634,10 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
             isRegularLeague={isRegularLeague}
           />
         </div>
-      ) : (
-        <>
-          {/* 2열 그리드: 좌=순위표 / 우=대진표 (데스크탑) — 탭 전환용 조건 안이지만
-              활성 탭일 때만 그리드를 그린다. 아래 흐름 네비게이터(§FlowNav)는 탭과
-              무관한 페이지 레벨 이동이라 이 분기 밖(항상)으로 옮겼다. */}
+      </div>
+      <div role="tabpanel" aria-label={isRegularLeague ? '리그 순위' : '순위 · 대진표'} hidden={activeTab !== 'standings'} style={{ display: activeTab === 'standings' ? 'flex' : 'none', flexDirection: 'column', flex: 1 }}>
+          {/* 2열 그리드: 좌=순위표 / 우=대진표 (데스크탑). 아래 흐름 네비게이터(§FlowNav)는 탭과
+              무관한 페이지 레벨 이동이라 패널 밖(항상)에 둔다. */}
           <div
             className={[
               'tm-tourn-sub-grid',
@@ -724,8 +725,7 @@ export function BracketPageContent({ tournament }: { tournament: V1TournamentDet
               </div>
             )}
           </div>
-        </>
-      )}
+      </div>
       </div>
 
       {/* 이전/다음 흐름 네비게이터 — 탭과 무관하게 항상 노출(페이지 레벨 이동).

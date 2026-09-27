@@ -82,7 +82,7 @@
 - Isolated stack path:
   - concurrent local runner가 필요하면 `make e2e-isolated-up RUN=<id>` / `make test-e2e-isolated RUN=<id>` / `make test-e2e-isolated-spec RUN=<id> SPEC=<path> [PROJECT="Desktop Chrome"] [GREP="..."]` / `make e2e-isolated-down RUN=<id>`를 사용한다.
   - isolated helper가 run별 compose project, web/api port, auth dir, docker-postgres runtime을 직접 관리한다. shared `localhost:3013/8121` preflight를 재사용하지 않는다.
-  - 상세 절차, 병렬 실행 패턴, 트러블슈팅은 `docs/PLAYWRIGHT_E2E_RUNBOOK.md`를 기준 문서로 사용한다.
+  - 상세 절차, 병렬 실행 패턴, 트러블슈팅은 `docs/guides/playwright-e2e-runbook.md`를 기준 문서로 사용한다.
 - E2E preflight 정책:
   - 기본: strict fail-fast (`global-setup`에서 API/Web/dev-login/docker-postgres 실패 시 즉시 종료)
   - 예외: 런타임 디버깅 목적일 때만 `E2E_ALLOW_OFFLINE=1`로 완화 실행한다. 단, 이 모드는 full suite 보장용이 아니라 page/debug 용도다.

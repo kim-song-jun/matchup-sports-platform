@@ -1,5 +1,5 @@
 > 친선 팀매치의 현재 전체 화면 흐름, 화면별 입출력, 공식 기록 반영 규칙과 모바일/데스크톱
-> 스크린샷 32개는 [`friendly-team-match-screen-flow.md`](../qa-screenshots/friendly-team-match-screen-flow.md)를 참고한다.
+> 스크린샷 32개는 [`friendly-team-match-screen-flow.md`](./friendly-team-match-screen-flow.md)를 참고한다.
 
 # Team Match Flow Scenarios
 

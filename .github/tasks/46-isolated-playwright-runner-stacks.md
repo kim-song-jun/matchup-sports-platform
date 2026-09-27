@@ -107,7 +107,7 @@ Priority: P0
 ## Validation Notes
 
 - canonical usage/runbook doc
-  - `docs/PLAYWRIGHT_E2E_RUNBOOK.md`
+  - `docs/guides/playwright-e2e-runbook.md`
 - `node scripts/qa/run-e2e-isolated.mjs env NotifSmoke`
   - upper-case `RUN` 입력이 `notifsmoke` compose project preview로 정규화되는 것을 확인
 - explicit same-port claim smoke

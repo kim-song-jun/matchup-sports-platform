@@ -1,6 +1,6 @@
 # Task 53 — Visual Audit Operations One Pager
 
-> Active operations task. Use this as the condensed execution contract for screenshot capture runs. The detailed master coverage contract lives in `.github/tasks/54-unified-visual-audit-coverage-master.md`. Runtime details remain in `docs/PLAYWRIGHT_E2E_RUNBOOK.md`. Task 50 remains infrastructure history only.
+> Active operations task. Use this as the condensed execution contract for screenshot capture runs. The detailed master coverage contract lives in `.github/tasks/54-unified-visual-audit-coverage-master.md`. Runtime details remain in `docs/guides/playwright-e2e-runbook.md`. Task 50 remains infrastructure history only.
 
 Owner: qa/ui/frontend
 Date drafted: 2026-04-12

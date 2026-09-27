@@ -559,7 +559,7 @@ docs/DESIGN_SYSTEM_REFERENCE.md  ← THIS FILE: current state, evidence, gap ana
 .github/tasks/52-...          ← Active remediation execution contract
 .github/tasks/54-...          ← Visual audit coverage contract
 .github/tasks/53-...          ← Operator one-pager for screenshot runs
-docs/PLAYWRIGHT_E2E_RUNBOOK.md ← Runtime commands for captures
+docs/guides/playwright-e2e-runbook.md ← Runtime commands for captures
 ```
 
 When starting any design work:

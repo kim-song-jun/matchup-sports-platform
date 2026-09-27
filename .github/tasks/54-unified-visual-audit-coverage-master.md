@@ -1,6 +1,6 @@
 # Task 54 — Unified Visual Audit Coverage Master
 
-> Active master contract. This file unifies route inventory, interaction matrix, component catalog capture, asset inventory, execution order, and artifact expectations. Runtime commands remain in `docs/PLAYWRIGHT_E2E_RUNBOOK.md`. Condensed operator steps remain in `.github/tasks/53-visual-audit-operations-one-pager.md`. Task 50 remains implementation history only.
+> Active master contract. This file unifies route inventory, interaction matrix, component catalog capture, asset inventory, execution order, and artifact expectations. Runtime commands remain in `docs/guides/playwright-e2e-runbook.md`. Condensed operator steps remain in `.github/tasks/53-visual-audit-operations-one-pager.md`. Task 50 remains implementation history only.
 
 Owner: project-director -> tech-planner -> qa/ui/frontend  
 Date drafted: 2026-04-12  
@@ -38,7 +38,7 @@ Baseline commit: `9ba813a25a349f4d60a1b5412ed8c90a455beb68` (`2026-04-06 14:27:1
   - visual coverage와 capture completeness의 master contract
 - `.github/tasks/53-visual-audit-operations-one-pager.md`
   - 실행자용 1페이지 운영 문서
-- `docs/PLAYWRIGHT_E2E_RUNBOOK.md`
+- `docs/guides/playwright-e2e-runbook.md`
   - 실제 명령, 플래그, artifact, troubleshooting
 - `.github/tasks/50-playwright-mcp-visual-audit-matrix.md`
   - runner 구축과 hardening의 역사 문서
@@ -48,7 +48,7 @@ Baseline commit: `9ba813a25a349f4d60a1b5412ed8c90a455beb68` (`2026-04-06 14:27:1
 1. `DESIGN.md`
 2. Task 54
 3. Task 53
-4. `docs/PLAYWRIGHT_E2E_RUNBOOK.md`
+4. `docs/guides/playwright-e2e-runbook.md`
 5. Task 50
 
 ## 3. Target Outcome

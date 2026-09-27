@@ -34,7 +34,7 @@
 
 ### 데스크탑 (1280px 이상)
 
-![대시보드 데스크탑](visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/dashboard_desktop.png)
+![대시보드 데스크탑](../visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/dashboard_desktop.png)
 
 | 영역 | 설명 |
 |------|------|
@@ -45,7 +45,7 @@
 
 ### 모바일 (390px)
 
-![대시보드 모바일](visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/dashboard_mobile.png)
+![대시보드 모바일](../visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/dashboard_mobile.png)
 
 | 영역 | 설명 |
 |------|------|
@@ -59,7 +59,7 @@
 
 **경로**: `/admin`
 
-![홈 데스크탑](visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/dashboard_desktop.png)
+![홈 데스크탑](../visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/dashboard_desktop.png)
 
 ### KPI 카드 (4개)
 
@@ -91,7 +91,7 @@
 
 **경로**: `/admin/matches`
 
-![매치 관리 데스크탑](visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/matches_desktop.png)
+![매치 관리 데스크탑](../visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/matches_desktop.png)
 
 ### KPI 카드 (4개)
 
@@ -127,7 +127,7 @@
 
 **경로**: `/admin/team-matches`
 
-![팀매치 데스크탑](visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/team-matches_desktop.png)
+![팀매치 데스크탑](../visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/team-matches_desktop.png)
 
 팀 대 팀 경기를 관리합니다. 내 팀이 호스트이거나 상대방으로 신청한 팀매치가 모두 표시됩니다.
 
@@ -162,7 +162,7 @@
 
 **경로**: `/admin/teams`
 
-![팀 운영 데스크탑](visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/teams_desktop.png)
+![팀 운영 데스크탑](../visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/teams_desktop.png)
 
 소속 팀과 가입 신청을 관리합니다.
 
@@ -202,7 +202,7 @@
 
 **경로**: `/admin/reviews`
 
-![리뷰 데스크탑](visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/reviews_desktop.png)
+![리뷰 데스크탑](../visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/reviews_desktop.png)
 
 매치 후 리뷰를 작성하고 받은 리뷰를 확인합니다.
 
@@ -237,7 +237,7 @@
 
 **경로**: `/admin/notifications`
 
-![알림 데스크탑](visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/notifications_desktop.png)
+![알림 데스크탑](../visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/notifications_desktop.png)
 
 서비스 알림을 한눈에 확인합니다.
 
@@ -263,7 +263,7 @@
 
 **경로**: `/admin/audit`
 
-![활동 내역 데스크탑](visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/audit_desktop.png)
+![활동 내역 데스크탑](../visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/audit_desktop.png)
 
 나의 모든 매치·팀 참여 기록을 한곳에서 봅니다.
 
@@ -292,7 +292,7 @@
 
 ## 10. 모바일 사용 팁
 
-![모바일 활동 내역](visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/audit_mobile.png)
+![모바일 활동 내역](../visual-qa/admin-redesign-v2/final-2026-06-08T14-06-51/audit_mobile.png)
 
 - **상단 탭 바를 좌우로 스와이프**해 7개 메뉴를 이동할 수 있습니다
 - KPI 카드는 모바일에서 **2열 그리드**로 배치되어 한눈에 파악됩니다

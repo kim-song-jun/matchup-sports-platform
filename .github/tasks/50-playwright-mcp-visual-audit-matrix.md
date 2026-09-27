@@ -36,7 +36,7 @@ Implemented files:
 - `apps/web/src/components/layout/mobile-glass-header.tsx`
 - `package.json`
 - `Makefile`
-- `docs/PLAYWRIGHT_E2E_RUNBOOK.md`
+- `docs/guides/playwright-e2e-runbook.md`
 - `AGENTS.md`
 
 What changed:
@@ -282,7 +282,7 @@ Current caveats:
 
 - route inventory: `apps/web/src/app/**/page.tsx`
 - scenario hub: `docs/scenarios/index.md`
-- Playwright runtime contract: `docs/PLAYWRIGHT_E2E_RUNBOOK.md`
+- Playwright runtime contract: `docs/guides/playwright-e2e-runbook.md`
 - isolated runner background: `.github/tasks/46-isolated-playwright-runner-stacks.md`
 - design baseline: commit `9ba813a`
 - design rules: `.impeccable.md`, `AGENTS.md`

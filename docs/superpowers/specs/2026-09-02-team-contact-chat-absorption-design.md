@@ -199,7 +199,7 @@ teamContact: {
   `app/my/team-contacts/[contactId]/page.tsx` → `useV1ResolveChatRoom({ team_contact, contactId })` 성공 시
   `router.replace(route)`, 실패 시 `ErrorState`. `loading.tsx` 두 개는 삭제. route-chrome 의 두 패턴은
   리다이렉트 중 잠깐 보이는 셸이므로 제목만 "채팅으로 이동 중" 으로 바꾼다.
-- 매뉴얼 `docs/team-contact-message-guide.md` §4 를 채팅 기준으로 고쳐 쓴다. 스크린샷 링크는 alpha 갤러리
+- 매뉴얼 `docs/guides/team-contact-message-guide.md` §4 를 채팅 기준으로 고쳐 쓴다. 스크린샷 링크는 alpha 갤러리
   게시 뒤 교체한다.
 
 ## 8. 테스트

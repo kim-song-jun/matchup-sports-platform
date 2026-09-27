@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { MatchDetailPageClient } from '@/components/matches/matches-client';
 import { JsonLd } from '@/components/seo/json-ld';
-import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, metadataDescription } from '@/lib/seo';
+import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, matchDescriptionFallback, metadataDescription } from '@/lib/seo';
 import { buildMatchEventLd } from '@/lib/structured-data';
 import type { V1Match } from '@/types/api';
 
@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     title: match.title,
     description: metadataDescription(
       match.description,
-      `${match.sportName} · ${match.placeName}에서 열리는 개인 매치 정보를 확인해 보세요.`,
+      matchDescriptionFallback('개인 매치', match.sport?.name ?? match.sportName, match.place?.name ?? match.placeName),
     ),
     path: `/matches/${id}`,
     image: match.imageUrl,

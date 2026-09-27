@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { JsonLd } from '@/components/seo/json-ld';
 import { TeamMatchDetailPageClient } from '@/components/team-matches/team-matches-client';
-import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, metadataDescription } from '@/lib/seo';
+import { buildNoIndexMetadata, buildPublicMetadata, fetchPublicV1, matchDescriptionFallback, metadataDescription } from '@/lib/seo';
 import { buildTeamMatchEventLd } from '@/lib/structured-data';
 import type { V1TeamMatch } from '@/types/api';
 
@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     title: teamMatch.title,
     description: metadataDescription(
       teamMatch.description,
-      `${teamMatch.sportName} · ${teamMatch.placeName}에서 열리는 팀매치 정보를 확인해 보세요.`,
+      matchDescriptionFallback('팀매치', teamMatch.sport?.name ?? teamMatch.sportName, teamMatch.place?.name ?? teamMatch.placeName),
     ),
     path: `/team-matches/${id}`,
     image: teamMatch.imageUrl,

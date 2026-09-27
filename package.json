@@ -28,10 +28,7 @@
     "test:e2e:v1": "pnpm exec playwright test --config=e2e/v1.config.ts",
     "test:all": "pnpm run v1:test && pnpm run test:e2e:v1",
     "qa:visual:audit:manifest": "node scripts/qa/run-visual-audit.mjs manifest",
-    "qa:visual:audit:capture": "node scripts/qa/run-visual-audit.mjs capture",
-    "qa:e2e:analyzer": "node scripts/qa/run-e2e-analyzer.mjs",
-    "qa:e2e:analyzer:tick": "node scripts/qa/run-e2e-analyzer.mjs tick",
-    "qa:e2e:analyzer:watch": "node scripts/qa/run-e2e-analyzer.mjs watch"
+    "qa:visual:audit:capture": "node scripts/qa/run-visual-audit.mjs capture"
   },
   "packageManager": "pnpm@9.15.4",
   "engines": {

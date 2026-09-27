@@ -79,5 +79,4 @@ screenshots/scenarios/**/*.png
 screenshots/scenarios/**/*.jpg
 screenshots/scenarios/**/*.jpeg
 screenshots/scenarios/**/*.webp
-ultraplan/runs/e2e-analyzer*/
 .claude/worktrees/

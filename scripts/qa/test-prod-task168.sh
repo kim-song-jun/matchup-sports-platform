@@ -415,7 +415,9 @@ test_pre_m1_name_set_subset_allows_missing() {
 test_pre_m1_name_set_subset_allows_missing
 
 test_pre_m1_name_set_foreign_rejects() {
-  printf '%s\n%s\n' "${PRE_M1_NAME}" '20250101000000_a_different_branch_migration' > "${TEST_ROOT}/pre-m1-msg-foreign.txt"
+  # C-sorted ascending (Fix round 3 now enforces this via sort -c) -- the
+  # foreign name sorts before PRE_M1_NAME.
+  printf '%s\n%s\n' '20250101000000_a_different_branch_migration' "${PRE_M1_NAME}" > "${TEST_ROOT}/pre-m1-msg-foreign.txt"
   export FAKE_PRE_M1_APPLIED_FILE="${TEST_ROOT}/pre-m1-msg-foreign.txt"
   run_case false '_assert_pre_m1_name_set subset'
   export FAKE_PRE_M1_APPLIED_FILE="${PRE_M1_APPLIED_DEFAULT_FILE}"
@@ -439,6 +441,47 @@ test_pre_m1_name_set_exact_missing_rejects() {
   fi
 }
 test_pre_m1_name_set_exact_missing_rejects
+
+# Fix round 3 Important (reviewer-found): a `comm` failure on misordered
+# input must propagate as a refusal, never get swallowed into a false "0
+# differences" by `"$(comm ... | grep -c '.')" || x=0` (pipefail reports the
+# RIGHTMOST command's status, so a failing comm feeding a grep that still
+# runs can hide the comm failure entirely).
+test_pre_m1_name_set_detects_unsorted_input() {
+  # A real prod ledger row order under this fake would be produced by the
+  # mocked SQL_EVAL directly from this file's content -- simulating what a
+  # server collation mismatch (or any other reason the ledger's claimed
+  # ORDER BY doesn't match C order) would look like: two names printed in
+  # descending, not ascending, order.
+  printf '%s\n%s\n' "${PRE_M1_NAME}" '20250101000000_before_pre_m1_name' > "${TEST_ROOT}/pre-m1-unsorted.txt"
+  export FAKE_PRE_M1_APPLIED_FILE="${TEST_ROOT}/pre-m1-unsorted.txt"
+  run_case false '_assert_pre_m1_name_set subset'
+  export FAKE_PRE_M1_APPLIED_FILE="${PRE_M1_APPLIED_DEFAULT_FILE}"
+  if [[ "${CASE_RC}" -eq 2 ]] && assert_msg "${CASE_OUTPUT}" 'not C-sorted'; then
+    ok "_assert_pre_m1_name_set: misordered applied_names is detected via sort -c and refused (rc=2), never silently swallowed to 0"
+  else
+    bad "pre-m1-name-set-detects-unsorted-input: rc=${CASE_RC} output=${CASE_OUTPUT}"
+  fi
+}
+test_pre_m1_name_set_detects_unsorted_input
+
+# _pre_m1_comm_count must judge names by strict C/byte order (underscore
+# 0x5F sorts BEFORE lowercase letters 0x61-0x7A) regardless of what a
+# locale-aware collation (e.g. en_US.utf8, which commonly treats punctuation
+# as a lower-priority/ignorable comparison level) would have produced --
+# exercised directly with a hand-crafted, deliberately tricky name pair.
+test_pre_m1_comm_count_underscore_letter_pair() {
+  run_case false '
+a="$(printf "%s\n" "x_a" "xa")"
+b="$(printf "%s\n" "x_a" "xa" "xb")"
+_pre_m1_comm_count -13 "$a" "$b"'
+  if [[ "${CASE_RC}" -eq 0 && "$(tail -n1 <<< "${CASE_OUTPUT}")" == 1 ]]; then
+    ok "_pre_m1_comm_count: correctly judges an underscore-vs-letter name pair (x_a < xa in C/byte order) -- only xb is unique to the second list"
+  else
+    bad "pre-m1-comm-count-underscore-letter-pair: expected count=1, got rc=${CASE_RC} output='${CASE_OUTPUT}'"
+  fi
+}
+test_pre_m1_comm_count_underscore_letter_pair
 
 test_state "fresh"                 "${LEDGER_EMPTY}"     '0|0|0|0|0|0' fresh
 test_state "precutover"            "${LEDGER_M1_M8_M10}" '0|0|0|0|0|0' precutover
@@ -612,7 +655,10 @@ test_cutover_tool_retry_after_failed_report() {
   local report_dir="${TEST_ROOT}/tool-retry-report"
   install -d -m 700 "${report_dir}"
   local report_file="${report_dir}/cutover-report.json"
-  jq -n '{status:"FAILED",reason:"preflight blocked"}' > "${report_file}"
+  # Fix round 3 Minor: matches the tool's real contract (alpha
+  # assert_preflight_failed_report) -- top-level `status` is always
+  # "FAILED", PREFLIGHT_BLOCKED is nested under `.error.code`.
+  jq -n '{status:"FAILED",error:{name:"TournamentTeamMatchFullCutoverError",code:"PREFLIGHT_BLOCKED"},preflightReport:{status:"BLOCKED"}}' > "${report_file}"
   printf '0|0|0|0|0|0' > "${TEST_ROOT}/seals-tool-retry.txt"
   export FAKE_SEALS_FILE="${TEST_ROOT}/seals-tool-retry.txt"
   export TOOL_RC=0
@@ -664,12 +710,35 @@ test_cutover_tool_refuses_unrecognized_status() {
   local tool_calls
   tool_calls="$(grep -c 'TOOL_CALLED' "${CALL_LOG}" || true)"
   if [[ "${CASE_RC}" -ne 0 && "${tool_calls}" == 0 ]] && assert_msg "${CASE_OUTPUT}" 'cutover report already exists'; then
-    ok "cutover-tool-unrecognized-guard: an existing report with a status other than FAILED/PREFLIGHT_BLOCKED refuses rather than guessing"
+    ok "cutover-tool-unrecognized-guard: an existing report with a status other than FAILED refuses rather than guessing"
   else
     bad "cutover-tool-unrecognized-guard: rc=${CASE_RC} tool_calls=${tool_calls} output=${CASE_OUTPUT}"
   fi
 }
 test_cutover_tool_refuses_unrecognized_status
+
+# Fix round 3 Minor: PREFLIGHT_BLOCKED is never a top-level `.status` value
+# the tool emits (only nested under `.error.code`) -- a report whose
+# top-level status is literally the string "PREFLIGHT_BLOCKED" (the old,
+# wrong assumption this fix removes) must NOT be treated as retriable.
+test_cutover_tool_top_level_preflight_blocked_status_refuses() {
+  local report_dir="${TEST_ROOT}/tool-toplevel-preflight-report"
+  install -d -m 700 "${report_dir}"
+  local report_file="${report_dir}/cutover-report.json"
+  jq -n '{status:"PREFLIGHT_BLOCKED"}' > "${report_file}"
+  printf '0|0|0|0|0|0' > "${TEST_ROOT}/seals-tool-toplevel-preflight.txt"
+  export FAKE_SEALS_FILE="${TEST_ROOT}/seals-tool-toplevel-preflight.txt"
+  export CALL_LOG="${TEST_ROOT}/calls-tool-toplevel-preflight.log"; : > "${CALL_LOG}"
+  run_case false "_stage_a_run_cutover_tool '${TOOL_IMAGE}' '${report_file}'"
+  local tool_calls
+  tool_calls="$(grep -c 'TOOL_CALLED' "${CALL_LOG}" || true)"
+  if [[ "${CASE_RC}" -ne 0 && "${tool_calls}" == 0 ]] && assert_msg "${CASE_OUTPUT}" 'cutover report already exists'; then
+    ok "cutover-tool-top-level-preflight-blocked-status: a top-level status literally named PREFLIGHT_BLOCKED is unrecognized (contract says .status is always FAILED) and is refused, not retried"
+  else
+    bad "cutover-tool-top-level-preflight-blocked-status: rc=${CASE_RC} tool_calls=${tool_calls} output=${CASE_OUTPUT}"
+  fi
+}
+test_cutover_tool_top_level_preflight_blocked_status_refuses
 
 test_committed_resume_no_tool() {
   local sd="${TEST_ROOT}/state-committed/release-sha-a"
@@ -931,12 +1000,50 @@ export FAKE_PRE_M1_APPLIED_FILE="${PRE_M1_APPLIED_DEFAULT_FILE}"
 # migration-stage.json receipt) is invisible to the 10-name scoped read and
 # wrongly passes as "exactly the Stage A M1..M10 set", re-running
 # `prisma migrate deploy` a second time against an already-migrated DB.
+# Fix round 3 item 1 restructured this into its own dedicated branch (an
+# 11-row ledger is no longer just "not the M1..M10 set" -- it is checked
+# against m11-entry.json to tell a legitimate resume apart from an
+# out-of-band M11), so the expected message changed accordingly; this
+# specific scenario (no m11-entry.json at all) still hard-refuses, just with
+# a more specific message.
 export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/stateb-m11noreceipt"
 seed_stage_b_transition "${PROD_TASK168_STATE_ROOT}/release-sha-b" "${STAGE_B_DB_ID}" false
 printf '%s' "${LEDGER_ALL11}" > "${TEST_ROOT}/ledger-b-m11noreceipt.txt"
 export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b-m11noreceipt.txt"
-run_stage_b_reject_case "m11-applied-no-receipt" "not exactly the Stage A M1..M10 set"
+run_stage_b_reject_case "m11-applied-no-receipt" "no matching m11-entry.json"
 export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b.txt"
+
+# Fix round 3 item 1 (F5 residual): M11's own `prisma migrate deploy` can
+# succeed and then the ledger re-read or migration-stage.json write can
+# still fail. On retry, migration-stage.json is still missing, but a valid
+# m11-entry.json (bound to this exact release/db/api) proves THIS Stage B
+# run applied M11 -- must resume straight to writing migration-stage.json
+# and continuing to backfill, never re-running `prisma migrate deploy`.
+test_stage_b_resume_after_m11_migrate_success_receipt_missing() {
+  export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/stateb-m11-receipt-missing"
+  local sd="${PROD_TASK168_STATE_ROOT}/release-sha-b"
+  seed_stage_b_transition "${sd}" "${STAGE_B_DB_ID}" false
+  jq -nc --arg release release-sha-b --arg api "${API_IMAGE_STAGE_B}" --arg db "${STAGE_B_DB_ID}" --arg sha "${PROD_TASK168_M11_PINNED_SHA256}" \
+    '{schemaVersion:1,kind:"m11Entry",status:"ENTERED",releaseSha:$release,apiImage:$api,databaseIdentity:$db,migrationSha256:$sha,enteredAt:"2026-01-01T00:00:00Z"}' \
+    > "${sd}/m11-entry.json"
+  chmod 600 "${sd}/m11-entry.json"
+  printf '%s' "${LEDGER_ALL11}" > "${TEST_ROOT}/ledger-b-m11-receipt-missing.txt"
+  printf '5|5|3|0|0|0' > "${TEST_ROOT}/seals-b-m11-receipt-missing.txt"
+  export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b-m11-receipt-missing.txt" FAKE_SEALS_FILE="${TEST_ROOT}/seals-b-m11-receipt-missing.txt"
+  export CALL_LOG="${TEST_ROOT}/calls-b-m11-receipt-missing.log"; : > "${CALL_LOG}"
+  run_case false 'task168_stage_b'
+  local migrate_calls backfill_calls stage_receipt
+  migrate_calls="$(grep -c 'MIGRATE_DEPLOY_STAGE_B' "${CALL_LOG}" || true)"
+  backfill_calls="$(grep -c 'BACKFILL_CALLED' "${CALL_LOG}" || true)"
+  stage_receipt="${sd}/migration-stage.json"
+  if [[ "${CASE_RC}" -eq 0 && "${migrate_calls}" == 0 && "${backfill_calls}" == 1 && -s "${stage_receipt}" ]] &&
+     jq -e '.status=="MIGRATION_COMMITTED"' "${stage_receipt}" >/dev/null 2>&1; then
+    ok "stage-b-resume-m11-receipt-missing (Fix round 3 item 1): M11 already applied + valid m11-entry.json -> resumes straight to migration-stage.json + backfill, migrate NOT re-invoked"
+  else
+    bad "stage-b-resume-m11-receipt-missing: rc=${CASE_RC} migrate_calls=${migrate_calls} backfill_calls=${backfill_calls} output=${CASE_OUTPUT}"
+  fi
+}
+test_stage_b_resume_after_m11_migrate_success_receipt_missing
 
 test_stage_b_success() {
   export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/stateb-success"

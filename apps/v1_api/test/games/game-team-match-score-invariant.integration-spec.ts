@@ -8,6 +8,7 @@ import type {
   GameCommandContext,
   GameSourceCreationInput,
 } from '../../src/games/games.types';
+import { submitFriendlyTeamMatchLineups } from '../fixtures/friendly-team-match-lineup.fixture';
 
 // Task 17: resolveActor (games.service.ts, TEAM_MATCH branch) unconditionally
 // forbids `event_append` / `event_reverse` for a TEAM_MATCH game, so a
@@ -163,6 +164,10 @@ describe('Task 17 team-match score invariant (event-vs-score exemption)', () => 
       ),
     );
     gameId = created.gameId;
+    // Task 106 gate: both sides already have participants via input.participants
+    // above, but createFromSourceInTransaction leaves their lineups DRAFT.
+    // Flip to SUBMITTED so createResultRevision below doesn't 409 ROSTER_INCOMPLETE.
+    await submitFriendlyTeamMatchLineups(prisma, gameId);
   });
 
   afterAll(async () => {

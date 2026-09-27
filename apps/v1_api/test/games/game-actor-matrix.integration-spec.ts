@@ -14,6 +14,7 @@ import type {
   GameSourceCreationInput,
 } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { submitFriendlyTeamMatchLineups } from '../fixtures/friendly-team-match-lineup.fixture';
 
 const ids = {
   platformOps: '77000000-0000-4000-8000-000000000001',
@@ -491,6 +492,11 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
         ),
       )
     ).gameId;
+    // Task 106 gate: teamInput above carries no participants, so this
+    // friendly team-match game's per-side lineups start out DRAFT/empty.
+    // Back-fill a participant and flip both to SUBMITTED so the
+    // createResultRevision call below doesn't trip 409 ROSTER_INCOMPLETE.
+    await submitFriendlyTeamMatchLineups(prisma, teamGameId);
   });
 
   afterAll(async () => {

@@ -115,7 +115,12 @@ describe('friendly match shared score sheet (real DB)', () => {
     const f = await createSharedRecordFixture(prisma);
     await prisma.v1GameLineup.create({ data: { gameId: f.game.id, sideId: f.sides[0].id, revision: 2, state: 'DRAFT' } });
     expect((await records.read(user(f.userIds[1]), f.match.id)).canEdit).toBe(false);
-    await expect(records.mutate(user(f.userIds[1]), f.match.id, cmd('confirm', 0))).rejects.toMatchObject({ status: 403 });
+    // Task 106: lineupReadiness() now runs before actor resolution in mutate(),
+    // so a side whose newest lineup is DRAFT (not yet re-submitted) is rejected
+    // as 409 ROSTER_INCOMPLETE before the stale-participant 403 check is ever
+    // reached — canEdit above still proves the same underlying fact (this side
+    // isn't currently editable).
+    await expect(records.mutate(user(f.userIds[1]), f.match.id, cmd('confirm', 0))).rejects.toMatchObject({ status: 409, response: expect.objectContaining({ code: 'ROSTER_INCOMPLETE' }) });
   });
   it('cancelled and existing result games cannot be edited through the shared endpoint', async () => {
     const f = await createSharedRecordFixture(prisma);

@@ -15,6 +15,7 @@ import type {
   GameCommandContext,
   GameSourceCreationInput,
 } from '../../src/games/games.types';
+import { submitFriendlyTeamMatchLineups } from '../fixtures/friendly-team-match-lineup.fixture';
 
 const ids = {
   hostUser: '61000000-0000-4000-8000-000000000001',
@@ -584,6 +585,11 @@ describe('Task 6 L1 game lifecycle', () => {
         ),
       )
     ).gameId;
+    // Task 106 gate: input above carries no participants, so this friendly
+    // team-match game's per-side lineups start out DRAFT/empty. Back-fill a
+    // participant and flip both to SUBMITTED so the createResultRevision
+    // calls later in this file don't trip 409 ROSTER_INCOMPLETE.
+    await submitFriendlyTeamMatchLineups(prisma, teamGameId);
 
     // D-20/B6 (this PR) narrowed the TEAM_MATCH generic-command gate to block only
     // 'end' -- start/pause/resume/next-period now fall through to the tournament

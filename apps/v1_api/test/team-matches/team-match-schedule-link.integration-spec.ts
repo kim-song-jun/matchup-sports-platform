@@ -8,6 +8,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { TeamSchedulesService } from '../../src/team-schedules/team-schedules.service';
 import type { MutateTeamMatchDto, UpdateTeamMatchDto } from '../../src/team-matches/dto/mutate-team-match.dto';
 import { TeamMatchesService } from '../../src/team-matches/team-matches.service';
+import { submitFriendlyTeamMatchLineups } from '../fixtures/friendly-team-match-lineup.fixture';
 
 // 레인 schedule — 매치 ↔ 팀일정 연동. team-matches.service.ts의 create()/approveApplication()/
 // cancel()/update()가 team-schedules.service.ts의 평문 함수(createTeamMatchScheduleInTx/
@@ -234,6 +235,12 @@ describe('레인 schedule — 매치 ↔ 팀일정 연동 (TeamMatch 생명주�
       },
     });
     await teamMatches.approveApplication(authUser(ids.hostUser), application.id, {});
+
+    // Task 106 gate: this friendly team match's game was created without any
+    // lineup submission flow, so both sides' lineups start out DRAFT/empty.
+    // Back-fill a participant and flip both to SUBMITTED so the result
+    // revision below doesn't 409 ROSTER_INCOMPLETE.
+    await submitFriendlyTeamMatchLineups(prisma, created.gameId);
 
     const draft = await games.createResultRevision(authUser(ids.hostUser), created.gameId, 'schedule-link-result-draft', {
       expectedVersion: 0,

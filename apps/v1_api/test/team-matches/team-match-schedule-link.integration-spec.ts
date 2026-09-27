@@ -5,6 +5,7 @@ import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { GamesService } from '../../src/games/games.service';
 import { NotificationsService } from '../../src/notifications/notifications.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
 import { TeamSchedulesService } from '../../src/team-schedules/team-schedules.service';
 import type { MutateTeamMatchDto, UpdateTeamMatchDto } from '../../src/team-matches/dto/mutate-team-match.dto';
 import { TeamMatchesService } from '../../src/team-matches/team-matches.service';
@@ -234,6 +235,7 @@ describe('레인 schedule — 매치 ↔ 팀일정 연동 (TeamMatch 생명주�
       },
     });
     await teamMatches.approveApplication(authUser(ids.hostUser), application.id, {});
+    await submitFriendlyTeamMatchLineups(prisma, created.gameId);
 
     const draft = await games.createResultRevision(authUser(ids.hostUser), created.gameId, 'schedule-link-result-draft', {
       expectedVersion: 0,

@@ -88,7 +88,7 @@ export function LandingV4Doors({ data }: { data: LandingV4Data }) {
     <section id="doors" className="tm-landing-section" aria-labelledby="doors-heading">
       <div className="tm-landing-section-inner">
         <div className="tm-landing-section-header" data-align="center" data-reveal>
-          <p className="tm-landing-section-kw">문 3개</p>
+          <p className="tm-landing-section-kw">둘러보기</p>
           <h2 id="doors-heading" className="tm-landing-section-title">무엇을 하러 오셨나요</h2>
           <p className="tm-landing-section-sub">매치·대회·팀, 필요한 곳부터 둘러보세요.</p>
         </div>

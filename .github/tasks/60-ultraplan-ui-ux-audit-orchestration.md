@@ -13,7 +13,7 @@ Priority: P0
 
 - 이 작업은 "처음부터 디자인 시스템을 새로 만드는 프로젝트"가 아니라, 이미 있는 audit/remediation/capture 인프라를 하나의 운영 프로그램으로 묶는 작업으로 정의한다.
 - 현재 기준점은 이미 존재한다.
-  - `docs/DESIGN_SYSTEM_REFERENCE.md`: current design-system state, compliance 약 `55%`
+  - `docs/archive/v0-reports/DESIGN_SYSTEM_REFERENCE.md`: current design-system state, compliance 약 `55%`
   - `.github/tasks/54-unified-visual-audit-coverage-master.md`: `92` canonical route, `9` viewport, interaction/component/asset coverage contract
   - `.github/tasks/58-design-system-audit.md`: current remediation contract
   - `scripts/qa/run-visual-audit.mjs`: manifest/capture runner

@@ -20,8 +20,8 @@ Priority: P1
 ## Evidence
 
 - `.github/tasks/19-admin-dto-and-image-upload.md`
-- `docs/plans/2026-04-09-comprehensive-improvement-plan.md`
-- `docs/plans/2026-04-08-next-feature-backlog.md`
+- `docs/archive/v0-plans/2026-04-09-comprehensive-improvement-plan.md`
+- `docs/archive/v0-plans/2026-04-08-next-feature-backlog.md`
 - `apps/api/src/uploads/**`
 
 ## Owned Write Scope

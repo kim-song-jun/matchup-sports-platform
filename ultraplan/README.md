@@ -7,7 +7,7 @@
 ## Canonical Sources
 
 - 디자인 규칙: [DESIGN.md](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/DESIGN.md)
-- 현재 상태: [docs/DESIGN_SYSTEM_REFERENCE.md](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/docs/DESIGN_SYSTEM_REFERENCE.md)
+- 현재 상태: [docs/archive/v0-reports/DESIGN_SYSTEM_REFERENCE.md](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/docs/archive/v0-reports/DESIGN_SYSTEM_REFERENCE.md)
 - visual coverage master: [.github/tasks/54-unified-visual-audit-coverage-master.md](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/.github/tasks/54-unified-visual-audit-coverage-master.md)
 - remediation master: [.github/tasks/58-design-system-audit.md](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/.github/tasks/58-design-system-audit.md)
 - orchestration task: [.github/tasks/60-ultraplan-ui-ux-audit-orchestration.md](/Users/kimsungjun/Documents/05_기타프로젝트_EtcProjects/sub-project/sports-platform/.github/tasks/60-ultraplan-ui-ux-audit-orchestration.md)

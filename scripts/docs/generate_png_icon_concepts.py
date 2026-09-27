@@ -10,7 +10,7 @@ SIZE = 1024
 SCALE = 2
 CANVAS = SIZE * SCALE
 RADIUS = 224 * SCALE
-OUT_DIR = Path("docs/reference/app-icons-v3")
+OUT_DIR = Path("docs/archive/reference/app-icons-v3")
 THUMB_DIR = OUT_DIR / "png-192"
 CONTACT_SHEET = OUT_DIR / "contact-sheet.png"
 

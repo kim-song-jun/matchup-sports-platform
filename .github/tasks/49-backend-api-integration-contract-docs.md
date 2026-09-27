@@ -61,7 +61,7 @@ Priority: P0
 ### Planning / execution docs
 
 - `.github/tasks/49-backend-api-integration-contract-docs.md`
-- `docs/plans/2026-04-11-backend-api-contract-docs-plan.md`
+- `docs/archive/v0-plans/2026-04-11-backend-api-contract-docs-plan.md`
 
 ## Required Document Content
 
@@ -253,7 +253,7 @@ Priority: P0
 ### Files Updated
 
 - `.github/tasks/49-backend-api-integration-contract-docs.md`
-- `docs/plans/2026-04-11-backend-api-contract-docs-plan.md`
+- `docs/archive/v0-plans/2026-04-11-backend-api-contract-docs-plan.md`
 - `docs/api/README.md`
 - `docs/api/global-contract.md`
 - `docs/api/auth-and-session.md`
@@ -278,7 +278,7 @@ Priority: P0
 
 ### Validation Result
 
-- `git diff --check -- docs/api .github/tasks/49-backend-api-integration-contract-docs.md docs/plans/2026-04-11-backend-api-contract-docs-plan.md AGENTS.md`
+- `git diff --check -- docs/api .github/tasks/49-backend-api-integration-contract-docs.md docs/archive/v0-plans/2026-04-11-backend-api-contract-docs-plan.md AGENTS.md`
 - 도메인 문서 템플릿 체크 스크립트: `14/14`
 - endpoint prefix coverage grep: 누락 없음
 

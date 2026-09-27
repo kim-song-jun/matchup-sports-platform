@@ -1,6 +1,6 @@
 # Task 55 — Design System Remediation Waves
 
-> Active execution task. Implements the 6-wave remediation plan from `docs/DESIGN_SYSTEM_REFERENCE.md` Section 8. Rules source: `DESIGN.md`. Evidence source: `docs/DESIGN_SYSTEM_REFERENCE.md`.
+> Active execution task. Implements the 6-wave remediation plan from `docs/archive/v0-reports/DESIGN_SYSTEM_REFERENCE.md` Section 8. Rules source: `DESIGN.md`. Evidence source: `docs/archive/v0-reports/DESIGN_SYSTEM_REFERENCE.md`.
 
 Owner: frontend-ui-dev + frontend-review
 Date drafted: 2026-04-12
@@ -9,7 +9,7 @@ Priority: P0
 
 ## Context
 
-`docs/DESIGN_SYSTEM_REFERENCE.md` audit (2026-04-12) found overall design system compliance at ~55%. Key violations:
+`docs/archive/v0-reports/DESIGN_SYSTEM_REFERENCE.md` audit (2026-04-12) found overall design system compliance at ~55%. Key violations:
 - Shadow compliance: 40% (shadow-lg 29x, shadow-xl 14x)
 - Border compliance: 30% (border-2 in 20 files, 52 occurrences)
 - Card reuse: 6% (138 inline vs 8 component)

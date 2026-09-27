@@ -109,10 +109,10 @@ Canonical entry: `.github/tasks/122-alpha-profile-tournament-persona-e2e.md`, `.
 - [x] production 공통 migration 37개의 checksum은 현재 저장소와 37/37 일치한다. fresh snapshot의 production-only 3개(chat room polish, profile real name, chat membership backfill)는 최신 main 통합 전까지 로컬 DB에 그대로 보존하며, nullable/defaulted 컬럼이라 local seed와 현 dev runtime을 막지 않는다. 최종 schema diff는 최신 main 통합 뒤 닫는다.
 - [x] 이벤트 seed는 검증된 종목별 local 실사 mock을 ignored `apps/v1_api/uploads/dev-events/`에 복사하고 `/uploads/dev-events/*`로 사용한다. production upload 파일이나 원격 이미지는 가져오지 않는다.
 - [x] 대회 신청 시작·최종 제출·취소 요청·취소 철회에 same-tick 연속 클릭을 막는 동기 ref lock을 추가했다. `isPending` 반영 전 두 요청이 나갈 수 있던 경계를 닫았고 실제 network request count 검증은 복원 후 수행한다.
-- [x] 기획자 전달용 진행 문서 `docs/plans/2026-07-16-event-hub-user-scenario-qa-report.md`를 만들고 DB 기준·실사용 시나리오·스크린샷 인덱스를 누적하기 시작했다.
+- [x] 기획자 전달용 진행 문서 `docs/archive/v0-plans/2026-07-16-event-hub-user-scenario-qa-report.md`를 만들고 DB 기준·실사용 시나리오·스크린샷 인덱스를 누적하기 시작했다.
 - [x] 현재 dev DB custom-format backup 검증 → production read-only stream dump 검증 → 기존 dev DB 교체 복원 → local-only `prisma migrate deploy`를 완료했다. production에는 `pg_dump` 외 쓰기가 없었고 rollback backup은 최종 검증 전까지 mode 0600 임시 보관한다.
 - [x] 혼성부·남자부 실제 대회 데이터에 캠페인 2건을 로컬에 넣었다. opt-in 부재 시 mutation 전 거부, 1차 `created=2`, 2차 `created=0/updated=2`, SQL의 campaign/distinct slug 각 2를 확인했다.
-- [x] `/events` 목록·풋살 필터·상세·뒤로가기 query 복원·신청 경계와 로딩/애니메이션/이중 submit을 실제 사용자 속도로 검증했다. 22개 PNG, 단일 mutation request count, exact DB cleanup, 기획자 전달 문서를 `docs/plans/2026-07-16-event-hub-user-scenario-qa-report.md`에 기록했다.
+- [x] `/events` 목록·풋살 필터·상세·뒤로가기 query 복원·신청 경계와 로딩/애니메이션/이중 submit을 실제 사용자 속도로 검증했다. 22개 PNG, 단일 mutation request count, exact DB cleanup, 기획자 전달 문서를 `docs/archive/v0-plans/2026-07-16-event-hub-user-scenario-qa-report.md`에 기록했다.
 
 ### Historical blocker / current residual
 

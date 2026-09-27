@@ -390,7 +390,7 @@ TeamMeet은 금융 앱이 아니다. 사용자가 첫 3초에 읽어야 할 것�
 - `DESIGN.md`: 규칙 정의
 - `.impeccable.md`: 브랜드/미감 요약
 - `.github/tasks/52-current-design-drift-audit-and-remediation-plan.md`: 현재 디자인 개선 실행 계약
-- `docs/DESIGN_CONSISTENCY_REPORT.md`: audit snapshot
-- `docs/PROJECT_OVERVIEW.md`: 제품 소개용 요약
+- `docs/archive/v0-reports/DESIGN_CONSISTENCY_REPORT.md`: audit snapshot
+- `docs/archive/v0-reports/PROJECT_OVERVIEW.md`: 제품 소개용 요약
 - `.github/tasks/45-design-system-consolidation.md`: design system rollout history
-- 기타 `.github/tasks/*`, `docs/plans/*`: historical reference only
+- 기타 `.github/tasks/*`, `docs/archive/v0-plans/*`: historical reference only

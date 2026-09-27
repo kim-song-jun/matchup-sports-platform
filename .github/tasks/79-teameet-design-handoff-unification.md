@@ -33,12 +33,12 @@ The current handoff bundle already contains wide coverage, but quality is mixed.
 
 ### Completed in this turn
 
-- [x] verified the handoff archive was imported under `docs/reference/handoff-2026-04-25/sports-platform/`
+- [x] verified the handoff archive was imported under `docs/archive/reference/handoff-2026-04-25/sports-platform/`
 - [x] verified archive/import parity (`31` files vs `31` files)
 - [x] re-read intent from `sports-platform/chats/chat1.md`
 - [x] inspected `Teameet Design.html`, `tokens.jsx`, `signatures.jsx`, and `screens-refresh1/2/3.jsx`
-- [x] created `docs/reference/handoff-2026-04-25/INDEX.md`
-- [x] created `docs/reference/handoff-2026-04-25/SECTION_UNIFICATION_MATRIX.md`
+- [x] created `docs/archive/reference/handoff-2026-04-25/INDEX.md`
+- [x] created `docs/archive/reference/handoff-2026-04-25/SECTION_UNIFICATION_MATRIX.md`
 - [x] refreshed `ANALYSIS.md` / `SYSTEM_CANDIDATE.md` direction for this handoff pack
 - [x] linked the handoff pack from `docs/DESIGN_DOCUMENT_MAP.md`
 - [x] started direct prototype rework inside `project/Teameet Design.html`
@@ -51,7 +51,7 @@ The current handoff bundle already contains wide coverage, but quality is mixed.
   - source = actual `apps/web` implementation
   - prototype = `Teameet Design.html` and its `lib/*.jsx`
 - [x] inventoried current source page routes (`101`) and prototype coverage
-- [x] added `docs/reference/handoff-2026-04-25/SOURCE_PROTOTYPE_PARITY.md`
+- [x] added `docs/archive/reference/handoff-2026-04-25/SOURCE_PROTOTYPE_PARITY.md`
 - [x] unified prototype bottom navigation around five canonical tabs (`home`, `matches`, `lessons`, `marketplace`, `my`)
 - [x] added prototype section `00i · 글로벌 셸` for bottom nav, global menu, and dark mode
 - [x] added prototype section `25 · Source ↔ Prototype Parity` for missing source-backed functions
@@ -76,11 +76,11 @@ The current handoff bundle already contains wide coverage, but quality is mixed.
 - [x] updated the prototype cache key to `fix10`
 - [x] ran a full rendered prototype QA pass across all `163` artboards for `fix11`
 - [x] normalized common Toss palette raw colors into prototype design tokens and added static/alpha tokens
-- [x] created `docs/reference/handoff-2026-04-25/prototype-system/` as the dedicated hub for module map, common flows, interactions/states, color system, and QA report
+- [x] created `docs/archive/reference/handoff-2026-04-25/prototype-system/` as the dedicated hub for module map, common flows, interactions/states, color system, and QA report
 - [x] updated prototype cache key to `fix11`
 - [x] added implementation-ready case matrix boards to every functional module (`01~18`)
 - [x] added common state, edge-case, interaction, and handoff readiness atlas boards to `19 · 공통 플로우 · 인터랙션`
-- [x] created `docs/reference/handoff-2026-04-25/prototype-system/CASE_COVERAGE_MATRIX.md`
+- [x] created `docs/archive/reference/handoff-2026-04-25/prototype-system/CASE_COVERAGE_MATRIX.md`
 - [x] browser-validated and QA-validated `fix12` with `185` rendered artboards, `18` module case matrix boards, and `4` common coverage boards
 - [x] created page-by-page readiness audit for missing edge/interaction/animation/responsive/dark/copy-fit coverage
 - [x] started sequential page hardening with `01 · 인증 · 온보딩`
@@ -211,12 +211,12 @@ The current handoff bundle already contains wide coverage, but quality is mixed.
 
 1. `DESIGN.md`
 2. `.impeccable.md`
-3. `docs/reference/handoff-2026-04-25/INDEX.md`
-4. `docs/reference/handoff-2026-04-25/ANALYSIS.md`
-5. `docs/reference/handoff-2026-04-25/SYSTEM_CANDIDATE.md`
-6. `docs/reference/handoff-2026-04-25/SECTION_UNIFICATION_MATRIX.md`
-7. `docs/reference/handoff-2026-04-25/SOURCE_PROTOTYPE_PARITY.md`
-8. `docs/reference/handoff-2026-04-25/sports-platform/project/Teameet Design.html`
+3. `docs/archive/reference/handoff-2026-04-25/INDEX.md`
+4. `docs/archive/reference/handoff-2026-04-25/ANALYSIS.md`
+5. `docs/archive/reference/handoff-2026-04-25/SYSTEM_CANDIDATE.md`
+6. `docs/archive/reference/handoff-2026-04-25/SECTION_UNIFICATION_MATRIX.md`
+7. `docs/archive/reference/handoff-2026-04-25/SOURCE_PROTOTYPE_PARITY.md`
+8. `docs/archive/reference/handoff-2026-04-25/sports-platform/project/Teameet Design.html`
 
 ## Goal
 
@@ -761,6 +761,6 @@ Create one coherent TeamMeet design system where:
 
 ## Owned Files For Current Turn
 
-- `docs/reference/handoff-2026-04-25/**`
+- `docs/archive/reference/handoff-2026-04-25/**`
 - `docs/DESIGN_DOCUMENT_MAP.md`
 - `.github/tasks/79-teameet-design-handoff-unification.md`

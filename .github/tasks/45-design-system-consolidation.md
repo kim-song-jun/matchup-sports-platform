@@ -14,7 +14,7 @@ Priority: P1
 - `DESIGN.md`를 추가해 shadow / border / layout / glass 규칙을 한 문서에 통합
 - `docs/DESIGN_DOCUMENT_MAP.md`를 추가해 active vs historical 문서 탐색 허브를 고정
 - `.impeccable.md`는 brand memo 중심의 compatibility entry로 축소
-- `CLAUDE.md`, `AGENTS.md`, `docs/PROJECT_OVERVIEW.md`, `docs/DESIGN_CONSISTENCY_REPORT.md`가 모두 `DESIGN.md`를 우선 참조하도록 동기화
+- `CLAUDE.md`, `AGENTS.md`, `docs/archive/v0-reports/PROJECT_OVERVIEW.md`, `docs/archive/v0-reports/DESIGN_CONSISTENCY_REPORT.md`가 모두 `DESIGN.md`를 우선 참조하도록 동기화
 - 과거 audit/task 문서는 규칙 정의가 아니라 evidence/history 역할로 재정의
 
 ## Execution Report — 2026-04-11

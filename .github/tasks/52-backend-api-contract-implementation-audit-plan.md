@@ -48,8 +48,8 @@ Task 49에서 `docs/api/**`를 frontend integration의 canonical contract로 정
 ## Deliverables
 
 - `.github/tasks/52-backend-api-contract-implementation-audit-plan.md`
-- `docs/plans/2026-04-11-backend-api-implementation-audit-remediation-plan.md`
-- `docs/plans/2026-04-11-backend-api-contract-consistency-matrix.md`
+- `docs/archive/v0-plans/2026-04-11-backend-api-implementation-audit-remediation-plan.md`
+- `docs/archive/v0-plans/2026-04-11-backend-api-contract-consistency-matrix.md`
 
 ## User Scenarios
 
@@ -156,14 +156,14 @@ Task 49에서 `docs/api/**`를 frontend integration의 canonical contract로 정
 ### Files Updated
 
 - `.github/tasks/52-backend-api-contract-implementation-audit-plan.md`
-- `docs/plans/2026-04-11-backend-api-implementation-audit-remediation-plan.md`
-- `docs/plans/2026-04-11-backend-api-contract-consistency-matrix.md`
+- `docs/archive/v0-plans/2026-04-11-backend-api-implementation-audit-remediation-plan.md`
+- `docs/archive/v0-plans/2026-04-11-backend-api-contract-consistency-matrix.md`
 
 ### Validation
 
 - backend/controller/service/doc spot-check
 - `rg` 기반 cross-cutting pattern inventory (`pagination`, `raw body`, `OptionalJwtAuthGuard`, `AdminGuard`, `parseInt`, `nextCursor`)
-- `git diff --check -- .github/tasks/52-backend-api-contract-implementation-audit-plan.md docs/plans/2026-04-11-backend-api-implementation-audit-remediation-plan.md docs/plans/2026-04-11-backend-api-contract-consistency-matrix.md`
+- `git diff --check -- .github/tasks/52-backend-api-contract-implementation-audit-plan.md docs/archive/v0-plans/2026-04-11-backend-api-implementation-audit-remediation-plan.md docs/archive/v0-plans/2026-04-11-backend-api-contract-consistency-matrix.md`
 
 ### Follow-up
 

@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..', '..');
 const htmlPath = path.join(
   repoRoot,
-  'docs/reference/handoff-2026-04-25/sports-platform/project/Teameet Design.html'
+  'docs/archive/reference/handoff-2026-04-25/sports-platform/project/Teameet Design.html'
 );
 const mapPath = path.join(repoRoot, 'output/playwright/teameet-canonical-id-map.json');
 

@@ -140,4 +140,4 @@ Status: Proposed (partially superseded by tasks 33-40)
 
 ## Deliverable
 
-- detailed execution plan: `docs/plans/2026-04-10-web-audit-remediation-plan.md`
+- detailed execution plan: `docs/archive/v0-plans/2026-04-10-web-audit-remediation-plan.md`

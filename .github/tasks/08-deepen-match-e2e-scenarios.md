@@ -6,7 +6,7 @@ Status: in_progress
 Related:
 - `docs/scenarios/03-match-flows.md`
 - `docs/scenarios/index.md`
-- `docs/plans/2026-04-07-qa-remediation-plan.md`
+- `docs/archive/v0-plans/2026-04-07-qa-remediation-plan.md`
 
 ## Scope
 

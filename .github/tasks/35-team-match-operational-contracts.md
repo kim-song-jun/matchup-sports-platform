@@ -23,8 +23,8 @@ Priority: P0
 - `apps/web/src/app/(main)/team-matches/[id]/score/page.tsx`
 - `apps/web/src/app/(main)/team-matches/[id]/evaluate/page.tsx`
 - `docs/scenarios/05-team-match-flows.md`
-- `docs/TEAM_MATCHING_SPEC.md`
-- `docs/plans/2026-04-10-web-audit-remediation-plan.md`
+- `docs/archive/v0-reports/TEAM_MATCHING_SPEC.md`
+- `docs/archive/v0-plans/2026-04-10-web-audit-remediation-plan.md`
 
 ## Owned Write Scope
 

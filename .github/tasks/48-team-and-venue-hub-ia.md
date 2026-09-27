@@ -44,7 +44,7 @@ Priority: P1
 - `apps/web/src/app/(main)/teams/[id]/matches/page.tsx`
 - `apps/web/src/app/(main)/teams/[id]/mercenary/page.tsx`
 - `apps/web/src/app/(main)/venues/[id]/page.tsx`
-- `docs/PAGE_FEATURES.md`
+- `docs/archive/v0-reports/PAGE_FEATURES.md`
 
 ## Core Requirements
 

@@ -24,7 +24,7 @@ Priority: P0
 - `apps/web/src/app/(main)/my/lesson-tickets/page.tsx`
 - `apps/web/src/app/(main)/venues/[id]/page.tsx`
 - `.github/tasks/32-web-audit-and-remediation.md`
-- `docs/plans/2026-04-10-web-audit-remediation-plan.md`
+- `docs/archive/v0-plans/2026-04-10-web-audit-remediation-plan.md`
 
 ## Owned Write Scope
 

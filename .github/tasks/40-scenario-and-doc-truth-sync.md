@@ -30,18 +30,18 @@ Priority: P0
 - `docs/scenarios/08-marketplace-and-lessons.md`
 - `docs/scenarios/09-payment-review-badge.md`
 - `docs/scenarios/10-profile-settings-admin.md`
-- `docs/IMPLEMENTATION_STATUS.md`
-- `docs/PAGE_FEATURES.md`
-- `docs/WORK_SUMMARY.md`
+- `docs/archive/v0-reports/IMPLEMENTATION_STATUS.md`
+- `docs/archive/v0-reports/PAGE_FEATURES.md`
+- `docs/archive/v0-reports/WORK_SUMMARY.md`
 - `.github/tasks/26-qa-backlog-followups.md`
 - `.github/tasks/32-web-audit-and-remediation.md`
 
 ## Owned Write Scope
 
 - `docs/scenarios/**`
-- `docs/IMPLEMENTATION_STATUS.md`
-- `docs/PAGE_FEATURES.md`
-- `docs/WORK_SUMMARY.md`
+- `docs/archive/v0-reports/IMPLEMENTATION_STATUS.md`
+- `docs/archive/v0-reports/PAGE_FEATURES.md`
+- `docs/archive/v0-reports/WORK_SUMMARY.md`
 - `.github/tasks/26-qa-backlog-followups.md`
 - `.github/tasks/32-web-audit-and-remediation.md`
 
@@ -83,9 +83,9 @@ Priority: P0
 - `docs/scenarios/08-marketplace-and-lessons.md`
 - `docs/scenarios/09-payment-review-badge.md`
 - `docs/scenarios/10-profile-settings-admin.md`
-- `docs/IMPLEMENTATION_STATUS.md`
-- `docs/PAGE_FEATURES.md`
-- `docs/WORK_SUMMARY.md`
+- `docs/archive/v0-reports/IMPLEMENTATION_STATUS.md`
+- `docs/archive/v0-reports/PAGE_FEATURES.md`
+- `docs/archive/v0-reports/WORK_SUMMARY.md`
 - `.github/tasks/26-qa-backlog-followups.md`
 - `.github/tasks/32-web-audit-and-remediation.md`
 
@@ -100,7 +100,7 @@ Priority: P0
 - grep sanity check
   - stale 핵심 표현(`PATCH /matches/:id 미구현`, `/mercenary/[id] 미존재`)은 task/doc truth source에서 제거 또는 재분류됨
 - formatting check
-  - `git diff --check -- docs/scenarios/index.md docs/scenarios/03-match-flows.md docs/scenarios/06-mercenary-flows.md docs/scenarios/08-marketplace-and-lessons.md docs/scenarios/09-payment-review-badge.md docs/scenarios/10-profile-settings-admin.md docs/IMPLEMENTATION_STATUS.md docs/PAGE_FEATURES.md docs/WORK_SUMMARY.md .github/tasks/26-qa-backlog-followups.md .github/tasks/32-web-audit-and-remediation.md`
+  - `git diff --check -- docs/scenarios/index.md docs/scenarios/03-match-flows.md docs/scenarios/06-mercenary-flows.md docs/scenarios/08-marketplace-and-lessons.md docs/scenarios/09-payment-review-badge.md docs/scenarios/10-profile-settings-admin.md docs/archive/v0-reports/IMPLEMENTATION_STATUS.md docs/archive/v0-reports/PAGE_FEATURES.md docs/archive/v0-reports/WORK_SUMMARY.md .github/tasks/26-qa-backlog-followups.md .github/tasks/32-web-audit-and-remediation.md`
   - passed
 
 ### Acceptance Criteria Check

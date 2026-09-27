@@ -54,7 +54,7 @@ sports-platform/
 
 ## 3. 디자인 시스템
 
-Canonical source of truth: [`DESIGN.md`](../DESIGN.md)
+Canonical source of truth: [`DESIGN.md`](../../../DESIGN.md)
 
 - **문서 안내**: `docs/DESIGN_DOCUMENT_MAP.md`
 - **브랜드 성격**: 활발 · 스마트 · 친근
@@ -72,46 +72,46 @@ Canonical source of truth: [`DESIGN.md`](../DESIGN.md)
 히어로(스크롤 애니메이션) + 통계 카운트업 + 공감 섹션 + AI 매칭 히어로 카드 + 3단계 가이드 + 종목 그리드 + 사용자 후기 + CTA.
 
 **데스크탑:**
-![랜딩 - 데스크탑](screenshots/v4_intro/landing_desktop.png)
+![랜딩 - 데스크탑](../../screenshots/v4_intro/landing_desktop.png)
 
 **모바일:**
-![랜딩 - 모바일](screenshots/v4_intro/landing_mobile.png)
+![랜딩 - 모바일](../../screenshots/v4_intro/landing_mobile.png)
 
 ### 4.2 이용 가이드 (`/guide`)
 6단계 상세 튜토리얼 (회원가입→프로필→탐색→참가→경기→성장) + 팀 매칭 이용법 + 용병/장터 이용법.
 
 **데스크탑:**
-![가이드 - 데스크탑](screenshots/v4_intro/guide_desktop.png)
+![가이드 - 데스크탑](../../screenshots/v4_intro/guide_desktop.png)
 
 **모바일:**
-![가이드 - 모바일](screenshots/v4_intro/guide_mobile.png)
+![가이드 - 모바일](../../screenshots/v4_intro/guide_mobile.png)
 
 ### 4.3 요금 안내 (`/pricing`)
 무료/프로(9,900원)/팀(19,900원) 3단 요금제 + 매치 참가비 구조(5,000~30,000원, 수수료 10%) + 요금 FAQ 아코디언.
 
 **데스크탑:**
-![요금 - 데스크탑](screenshots/v4_intro/pricing_desktop.png)
+![요금 - 데스크탑](../../screenshots/v4_intro/pricing_desktop.png)
 
 **모바일:**
-![요금 - 모바일](screenshots/v4_intro/pricing_mobile.png)
+![요금 - 모바일](../../screenshots/v4_intro/pricing_mobile.png)
 
 ### 4.4 FAQ (`/faq`)
 18개 질문 아코디언 + 카테고리 필터(전체/서비스/매칭/결제/계정). expand/collapse 애니메이션.
 
 **데스크탑:**
-![FAQ - 데스크탑](screenshots/v4_intro/faq_desktop.png)
+![FAQ - 데스크탑](../../screenshots/v4_intro/faq_desktop.png)
 
 **모바일:**
-![FAQ - 모바일](screenshots/v4_intro/faq_mobile.png)
+![FAQ - 모바일](../../screenshots/v4_intro/faq_mobile.png)
 
 ### 4.5 소개 (`/about`)
 비전/미션 + 문제 인식 + 접근법 + 숫자로 보는 Teameet + 가치관 + 팀 소개.
 
 **데스크탑:**
-![소개 - 데스크탑](screenshots/v4_intro/about_desktop.png)
+![소개 - 데스크탑](../../screenshots/v4_intro/about_desktop.png)
 
 **모바일:**
-![소개 - 모바일](screenshots/v4_intro/about_mobile.png)
+![소개 - 모바일](../../screenshots/v4_intro/about_mobile.png)
 
 ### 소개 페이지 공통 요소
 - **LandingNav**: GNB (이용 가이드/요금/FAQ/소개) + 모바일 햄버거 메뉴 + 현재 페이지 하이라이트
@@ -128,65 +128,65 @@ Canonical source of truth: [`DESIGN.md`](../DESIGN.md)
 ### 5.1 로그인
 카카오/네이버/애플 소셜 로그인 + 개발용 빠른 로그인.
 
-![로그인 - 데스크탑](screenshots/v4_intro/login_desktop.png)
+![로그인 - 데스크탑](../../screenshots/v4_intro/login_desktop.png)
 
 ### 5.2 홈
 종목 선택 칩 + 프로모션 배너 캐러셀 + 오늘·내일 매치 + 전체 매치 리스트 + 빠른 메뉴.
 
-![홈 - 데스크탑](screenshots/v4_intro/home_desktop.png)
-![홈 - 모바일](screenshots/v4_intro/home_mobile.png)
+![홈 - 데스크탑](../../screenshots/v4_intro/home_desktop.png)
+![홈 - 모바일](../../screenshots/v4_intro/home_mobile.png)
 
 ### 5.3 매치 찾기
 검색 + 종목 필터 + 날짜/정렬 상세 필터 + 매치 카드 리스트. shimmer 스켈레톤 로딩.
 
-![매치 - 데스크탑](screenshots/v4_intro/matches_desktop.png)
-![매치 - 모바일](screenshots/v4_intro/matches_mobile.png)
+![매치 - 데스크탑](../../screenshots/v4_intro/matches_desktop.png)
+![매치 - 모바일](../../screenshots/v4_intro/matches_mobile.png)
 
 ### 5.4 팀 매칭
 S~D 등급 팀 매칭 모집글 리스트 + 종목/등급/날짜 필터.
 
-![팀 매칭 - 데스크탑](screenshots/v4_intro/team_matches_desktop.png)
+![팀 매칭 - 데스크탑](../../screenshots/v4_intro/team_matches_desktop.png)
 
 ### 5.5 팀·클럽
 동호회/팀 목록. 팀 정보 + 모집 상태 + 연락하기. 설명 line-clamp.
 
-![팀 - 데스크탑](screenshots/v4_intro/teams_desktop.png)
+![팀 - 데스크탑](../../screenshots/v4_intro/teams_desktop.png)
 
 ### 5.6 강좌
 그룹 레슨 / 연습 경기 / 자유 연습 필터 + 강좌 카드 + 진행 바.
 
-![강좌](screenshots/v4_intro/lessons_desktop.png)
+![강좌](../../screenshots/v4_intro/lessons_desktop.png)
 
 ### 5.7 장터
 스포츠 용품 중고거래/대여. 카테고리 필터 + 상품 카드 (가격, 상태, 조회/좋아요).
 
-![장터](screenshots/v4_intro/marketplace_desktop.png)
+![장터](../../screenshots/v4_intro/marketplace_desktop.png)
 
 ### 5.8 시설 찾기
 지역/종목 이중 필터 + 시설 카드 (평점, 가격, 주소, 지원 종목).
 
-![시설](screenshots/v4_intro/venues_desktop.png)
+![시설](../../screenshots/v4_intro/venues_desktop.png)
 
 ### 5.9 용병
 용병 모집/지원 게시판. 포지션/레벨/참가비/매너점수 정보.
 
-![용병](screenshots/v4_intro/mercenary_desktop.png)
+![용병](../../screenshots/v4_intro/mercenary_desktop.png)
 
 ### 5.10 뱃지
 내 뱃지 / 전체 뱃지 탭. 획득 상태 + 진행도 표시.
 
-![뱃지](screenshots/v4_intro/badges_desktop.png)
+![뱃지](../../screenshots/v4_intro/badges_desktop.png)
 
 ### 5.11 프로필
 유저 정보 + 종목별 ELO/레벨/전적 + 활동 통계 + 다가오는 일정 + 메뉴.
 
-![프로필 - 데스크탑](screenshots/v4_intro/profile_desktop.png)
-![프로필 - 모바일](screenshots/v4_intro/profile_mobile.png)
+![프로필 - 데스크탑](../../screenshots/v4_intro/profile_desktop.png)
+![프로필 - 모바일](../../screenshots/v4_intro/profile_mobile.png)
 
 ### 5.12 설정
 테마(라이트/다크/시스템) + 알림 + 계정 관리 + 약관.
 
-![설정](screenshots/v4_intro/settings_desktop.png)
+![설정](../../screenshots/v4_intro/settings_desktop.png)
 
 ---
 
@@ -197,23 +197,23 @@ S~D 등급 팀 매칭 모집글 리스트 + 종목/등급/날짜 필터.
 ### 6.1 대시보드
 총 사용자/매치/결제 통계 + 최근 매치/결제 리스트.
 
-![어드민 대시보드](screenshots/v3_20260325/19_admin_dashboard_desktop.png)
+![어드민 대시보드](../../screenshots/v3_20260325/19_admin_dashboard_desktop.png)
 
 ### 6.2 분쟁 관리
 사용자 신고/분쟁 접수 + 처리 상태 관리.
 
-![분쟁 관리](screenshots/v3_20260325/20_admin_disputes_desktop.png)
+![분쟁 관리](../../screenshots/v3_20260325/20_admin_disputes_desktop.png)
 
 ### 6.3 통계
 종목별/기간별 매치/사용자/결제 분석.
 
-![통계](screenshots/v3_20260325/21_admin_statistics_desktop.png)
+![통계](../../screenshots/v3_20260325/21_admin_statistics_desktop.png)
 
 ### 6.4 결제/정산
 결제 기록 + 정산 관리.
 
-![결제 관리](screenshots/v3_20260325/22_admin_payments_desktop.png)
-![정산 관리](screenshots/v3_20260325/23_admin_settlements_desktop.png)
+![결제 관리](../../screenshots/v3_20260325/22_admin_payments_desktop.png)
+![정산 관리](../../screenshots/v3_20260325/23_admin_settlements_desktop.png)
 
 ---
 

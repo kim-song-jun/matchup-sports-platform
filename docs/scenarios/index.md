@@ -65,8 +65,8 @@
 
 ## Canonical Documents
 
-- 상세 초안: [real-flow plan](./../plans/2026-04-07-real-flow-qa-scenarios.md)
-- 기술 계획 보고서: [tech-planner remediation report](./../plans/2026-04-07-tech-planner-qa-remediation-report.md)
+- 상세 초안: [real-flow plan](./../archive/v0-plans/2026-04-07-real-flow-qa-scenarios.md)
+- 기술 계획 보고서: [tech-planner remediation report](./../archive/v0-plans/2026-04-07-tech-planner-qa-remediation-report.md)
 - 실제 실행 허브: 이 문서
 
 ## Preflight

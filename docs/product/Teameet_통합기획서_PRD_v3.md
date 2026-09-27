@@ -785,62 +785,62 @@ GPS 위치 확인        → 구장 반경 500m 이내 확인
 
 | 화면 | 스크린샷 |
 |------|----------|
-| 로그인 (데스크탑) | ![로그인 화면](screenshots/01_login_desktop.png) |
-| 홈 (데스크탑) | ![홈 화면](screenshots/02_home_desktop.png) |
-| 홈 (모바일) | ![홈 모바일](screenshots/02_home_mobile.png) |
+| 로그인 (데스크탑) | ![로그인 화면](../screenshots/01_login_desktop.png) |
+| 홈 (데스크탑) | ![홈 화면](../screenshots/02_home_desktop.png) |
+| 홈 (모바일) | ![홈 모바일](../screenshots/02_home_mobile.png) |
 
 ### 9-2. 매치/팀 매칭
 
 | 화면 | 스크린샷 |
 |------|----------|
-| 매치 찾기 (데스크탑) | ![매치 찾기](screenshots/03_matches_desktop.png) |
-| 매치 찾기 (모바일) | ![매치 모바일](screenshots/03_matches_mobile.png) |
-| 매치 만들기 (데스크탑) | ![매치 만들기](screenshots/04_match_create_desktop.png) |
-| 팀 매칭 목록 (데스크탑) | ![팀 매칭](screenshots/05_team_matches_desktop.png) |
-| 팀 매칭 (모바일) | ![팀 매칭 모바일](screenshots/05_team_matches_mobile.png) |
-| 팀 매칭 모집글 작성 | ![모집글 작성](screenshots/06_team_match_create_desktop.png) |
+| 매치 찾기 (데스크탑) | ![매치 찾기](../screenshots/03_matches_desktop.png) |
+| 매치 찾기 (모바일) | ![매치 모바일](../screenshots/03_matches_mobile.png) |
+| 매치 만들기 (데스크탑) | ![매치 만들기](../screenshots/04_match_create_desktop.png) |
+| 팀 매칭 목록 (데스크탑) | ![팀 매칭](../screenshots/05_team_matches_desktop.png) |
+| 팀 매칭 (모바일) | ![팀 매칭 모바일](../screenshots/05_team_matches_mobile.png) |
+| 팀 매칭 모집글 작성 | ![모집글 작성](../screenshots/06_team_match_create_desktop.png) |
 
 ### 9-3. 팀/강좌/장터
 
 | 화면 | 스크린샷 |
 |------|----------|
-| 팀 목록 (데스크탑) | ![팀 목록](screenshots/07_teams_desktop.png) |
-| 강좌 목록 (데스크탑) | ![강좌](screenshots/08_lessons_desktop.png) |
-| 장터 (데스크탑) | ![장터](screenshots/09_marketplace_desktop.png) |
-| 시설 목록 (데스크탑) | ![시설](screenshots/10_venues_desktop.png) |
+| 팀 목록 (데스크탑) | ![팀 목록](../screenshots/07_teams_desktop.png) |
+| 강좌 목록 (데스크탑) | ![강좌](../screenshots/08_lessons_desktop.png) |
+| 장터 (데스크탑) | ![장터](../screenshots/09_marketplace_desktop.png) |
+| 시설 목록 (데스크탑) | ![시설](../screenshots/10_venues_desktop.png) |
 
 ### 9-4. 채팅/용병/뱃지
 
 | 화면 | 스크린샷 |
 |------|----------|
-| 채팅 (데스크탑) | ![채팅](screenshots/11_chat_desktop.png) |
-| 채팅 (모바일) | ![채팅 모바일](screenshots/11_chat_mobile.png) |
-| 용병 모집 (데스크탑) | ![용병](screenshots/12_mercenary_desktop.png) |
-| 뱃지 시스템 (데스크탑) | ![뱃지](screenshots/13_badges_desktop.png) |
+| 채팅 (데스크탑) | ![채팅](../screenshots/11_chat_desktop.png) |
+| 채팅 (모바일) | ![채팅 모바일](../screenshots/11_chat_mobile.png) |
+| 용병 모집 (데스크탑) | ![용병](../screenshots/12_mercenary_desktop.png) |
+| 뱃지 시스템 (데스크탑) | ![뱃지](../screenshots/13_badges_desktop.png) |
 
 ### 9-5. 결제/프로필
 
 | 화면 | 스크린샷 |
 |------|----------|
-| 결제 내역 (데스크탑) | ![결제](screenshots/14_payments_desktop.png) |
-| 프로필 (데스크탑) | ![프로필](screenshots/15_profile_desktop.png) |
-| 프로필 (모바일) | ![프로필 모바일](screenshots/15_profile_mobile.png) |
-| 설정 (데스크탑) | ![설정](screenshots/16_settings_desktop.png) |
+| 결제 내역 (데스크탑) | ![결제](../screenshots/14_payments_desktop.png) |
+| 프로필 (데스크탑) | ![프로필](../screenshots/15_profile_desktop.png) |
+| 프로필 (모바일) | ![프로필 모바일](../screenshots/15_profile_mobile.png) |
+| 설정 (데스크탑) | ![설정](../screenshots/16_settings_desktop.png) |
 
 ### 9-6. 내 콘텐츠 관리
 
 | 화면 | 스크린샷 |
 |------|----------|
-| 내 매치 (데스크탑) | ![내 매치](screenshots/17_my_matches_desktop.png) |
-| 내 팀 (데스크탑) | ![내 팀](screenshots/18_my_teams_desktop.png) |
+| 내 매치 (데스크탑) | ![내 매치](../screenshots/17_my_matches_desktop.png) |
+| 내 팀 (데스크탑) | ![내 팀](../screenshots/18_my_teams_desktop.png) |
 
 ### 9-7. Admin
 
 | 화면 | 스크린샷 |
 |------|----------|
-| 관리자 대시보드 | ![Admin 대시보드](screenshots/19_admin_dashboard_desktop.png) |
-| 분쟁 관리 | ![분쟁 관리](screenshots/20_admin_disputes_desktop.png) |
-| 통계 | ![통계](screenshots/21_admin_statistics_desktop.png) |
+| 관리자 대시보드 | ![Admin 대시보드](../screenshots/19_admin_dashboard_desktop.png) |
+| 분쟁 관리 | ![분쟁 관리](../screenshots/20_admin_disputes_desktop.png) |
+| 통계 | ![통계](../screenshots/21_admin_statistics_desktop.png) |
 
 ---
 

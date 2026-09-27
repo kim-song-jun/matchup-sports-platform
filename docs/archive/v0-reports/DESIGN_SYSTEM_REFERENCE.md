@@ -5,8 +5,8 @@
 Audit date: 2026-04-12
 Baseline commit: `9ba813a25a349f4d60a1b5412ed8c90a455beb68`
 Rule source: `DESIGN.md`
-Execution contract: `.github/tasks/52-current-design-drift-audit-and-remediation-plan.md`
-Coverage contract: `.github/tasks/54-unified-visual-audit-coverage-master.md`
+Execution contract: `.github/tasks/archive/52-current-design-drift-audit-and-remediation-plan.md`
+Coverage contract: `.github/tasks/archive/54-unified-visual-audit-coverage-master.md`
 
 ## 1. Compliance Summary
 
@@ -436,7 +436,7 @@ Note: 1,505+ PNG artifacts exist across 111 test runs in `output/playwright/visu
 
 ## 7. Screenshot-Backed Findings (from existing artifacts)
 
-Source: `.github/tasks/52-current-design-drift-audit-and-remediation-plan.md:107-378`
+Source: `.github/tasks/archive/52-current-design-drift-audit-and-remediation-plan.md:107-378`
 
 ### 7.1 Public Surface (batch-1, evidence available)
 

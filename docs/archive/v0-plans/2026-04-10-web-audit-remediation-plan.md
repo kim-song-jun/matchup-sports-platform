@@ -1,6 +1,6 @@
 # Teameet Web Audit Remediation Plan
 
-> Historical audit/planning note. Canonical design rules live in `DESIGN.md`, document navigation lives in `docs/DESIGN_DOCUMENT_MAP.md`, and current design remediation execution lives in `.github/tasks/52-current-design-drift-audit-and-remediation-plan.md`.
+> Historical audit/planning note. Canonical design rules live in `DESIGN.md`, document navigation lives in `docs/DESIGN_DOCUMENT_MAP.md`, and current design remediation execution lives in `.github/tasks/archive/52-current-design-drift-audit-and-remediation-plan.md`.
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
@@ -29,7 +29,7 @@
 ### Task 1: Lock The Audit Baseline
 
 **Files:**
-- Modify: `.github/tasks/32-web-audit-and-remediation.md`
+- Modify: `.github/tasks/archive/32-web-audit-and-remediation.md`
 - Modify: `docs/archive/v0-plans/2026-04-10-web-audit-remediation-plan.md`
 - Test: `git status --short`
 - Test: `pnpm --filter web exec tsc --noEmit`
@@ -57,7 +57,7 @@ Expected: 이후 라운드에서 “무엇이 얼마나 줄었는가”를 비�
 
 **Step 5: Commit docs-only baseline**
 
-Run: `git add .github/tasks/32-web-audit-and-remediation.md docs/archive/v0-plans/2026-04-10-web-audit-remediation-plan.md && git commit -m "docs: add web audit remediation plan"`
+Run: `git add .github/tasks/archive/32-web-audit-and-remediation.md docs/archive/v0-plans/2026-04-10-web-audit-remediation-plan.md && git commit -m "docs: add web audit remediation plan"`
 Expected: 구현 전 기준선이 별도 커밋으로 남는다.
 
 ### Task 2: Freeze A Single Brand Source Of Truth
@@ -263,7 +263,7 @@ Expected: admin mock surface 제거가 독립 라운드로 남는다.
 - Modify: `docs/archive/v0-reports/PROJECT_OVERVIEW.md`
 - Modify: `docs/archive/v0-reports/WORK_SUMMARY.md`
 - Modify: relevant scenario docs under `docs/scenarios/`
-- Modify: `.github/tasks/32-web-audit-and-remediation.md`
+- Modify: `.github/tasks/archive/32-web-audit-and-remediation.md`
 
 **Step 1: Update scenario statuses**
 

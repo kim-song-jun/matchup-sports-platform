@@ -20,7 +20,7 @@ Status: Implemented on 2026-04-11. Scope expanded to deploy checksum gate, empty
 ### Task 1: Canonical task and script surface
 
 **Files:**
-- Create: `.github/tasks/47-dev-mock-data-seed-and-public-assets.md`
+- Create: `.github/tasks/archive/47-dev-mock-data-seed-and-public-assets.md`
 - Create: `docs/archive/v0-plans/2026-04-11-dev-mock-data-seed-and-public-assets.md`
 - Modify: `apps/api/package.json`
 - Modify: `Makefile`
@@ -53,7 +53,7 @@ Expected: script boots and prints mock sync summary
 **Step 5: Commit**
 
 ```bash
-git add .github/tasks/47-dev-mock-data-seed-and-public-assets.md docs/archive/v0-plans/2026-04-11-dev-mock-data-seed-and-public-assets.md apps/api/package.json Makefile
+git add .github/tasks/archive/47-dev-mock-data-seed-and-public-assets.md docs/archive/v0-plans/2026-04-11-dev-mock-data-seed-and-public-assets.md apps/api/package.json Makefile
 git commit -m "feat: add dev mock seed command"
 ```
 

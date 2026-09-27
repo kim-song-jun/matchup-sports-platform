@@ -22,7 +22,7 @@
    - 실제 token truth
 7. `.github/tasks/79-teameet-design-handoff-unification.md`
    - handoff prototype parity, future service prototype, topic grouping 작업의 active execution contract
-8. `.github/tasks/52-current-design-drift-audit-and-remediation-plan.md`
+8. `.github/tasks/archive/52-current-design-drift-audit-and-remediation-plan.md`
    - 현재 코드베이스 디자인 개선의 active execution contract
 
 ## 2. Current Active Documents
@@ -47,9 +47,9 @@
   - `fix26` 기준 개발 핸드오프 보드와 전체 prototype QA 결과
 - `.github/tasks/79-teameet-design-handoff-unification.md`
   - uploaded handoff bundle 기반 `00 -> 01~24` 통합 재정비 execution contract
-- `.github/tasks/52-current-design-drift-audit-and-remediation-plan.md`
+- `.github/tasks/archive/52-current-design-drift-audit-and-remediation-plan.md`
   - current design remediation work contract
-- `.github/tasks/54-unified-visual-audit-coverage-master.md`
+- `.github/tasks/archive/54-unified-visual-audit-coverage-master.md`
   - unified visual coverage, interaction, component, and asset capture contract
 - `docs/archive/v0-reports/DESIGN_CONSISTENCY_REPORT.md`
   - audit snapshot and point-in-time findings summary
@@ -58,19 +58,19 @@
 
 ## 3. Historical Task Documents
 
-- `.github/tasks/29-ux-design-audit.md`
+- `.github/tasks/archive/29-ux-design-audit.md`
   - initial design/UX audit record
-- `.github/tasks/33-brand-and-public-shell-alignment.md`
+- `.github/tasks/archive/33-brand-and-public-shell-alignment.md`
   - public shell and brand alignment rollout history
 - `.github/tasks/39-mobile-glass-chrome-system.md`
   - reopened mobile chrome redesign planning history
-- `.github/tasks/40-mobile-glass-chrome-system.md`
+- `.github/tasks/archive/40-mobile-glass-chrome-system.md`
   - restrained mobile chrome implementation history
-- `.github/tasks/41-mobile-glass-chrome-system.md`
+- `.github/tasks/archive/41-mobile-glass-chrome-system.md`
   - mobile glass chrome implementation history
-- `.github/tasks/45-design-system-consolidation.md`
+- `.github/tasks/archive/45-design-system-consolidation.md`
   - design system consolidation rollout history
-- `.github/tasks/50-playwright-mcp-visual-audit-matrix.md`
+- `.github/tasks/archive/50-playwright-mcp-visual-audit-matrix.md`
   - visual audit infrastructure history
 
 이 문서들은 모두 유지 가치가 있지만, 새로운 디자인 규칙의 source of truth는 아니다.

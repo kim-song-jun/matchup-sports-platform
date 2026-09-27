@@ -10,7 +10,7 @@
 - Playwright dependency drift
 - brittle auth/UI selectors
 
-기준 파일은 `docker-compose.yml`, `deploy/Dockerfile.dev`, `Makefile`, `e2e/global-setup.ts`, `e2e/global-teardown.ts`, `e2e/playwright.config.ts`, `e2e/fixtures/sessions.ts`, `e2e/tests/home.spec.ts`, `e2e/tests/chat-realtime.spec.ts`, `apps/api/src/main.ts`, `docs/scenarios/index.md`, `.github/tasks/06-fix-make-dev-runtime.md`다.
+기준 파일은 `docker-compose.yml`, `deploy/Dockerfile.dev`, `Makefile`, `e2e/global-setup.ts`, `e2e/global-teardown.ts`, `e2e/playwright.config.ts`, `e2e/fixtures/sessions.ts`, `e2e/tests/home.spec.ts`, `e2e/tests/chat-realtime.spec.ts`, `apps/api/src/main.ts`, `docs/scenarios/index.md`, `.github/tasks/archive/06-fix-make-dev-runtime.md`다.
 
 ## 1) Architecture Impact
 
@@ -75,7 +75,7 @@
 
 ### Phase 0. Runtime Source Of Truth 고정
 
-먼저 dev topology를 문서와 스크립트에서 하나로 맞춘다. 이 단계에서 `docker-compose.yml`, `deploy/Dockerfile.dev`, `Makefile`, `.github/tasks/06-fix-make-dev-runtime.md`, `docs/scenarios/index.md`가 같은 사실을 말하게 해야 한다.
+먼저 dev topology를 문서와 스크립트에서 하나로 맞춘다. 이 단계에서 `docker-compose.yml`, `deploy/Dockerfile.dev`, `Makefile`, `.github/tasks/archive/06-fix-make-dev-runtime.md`, `docs/scenarios/index.md`가 같은 사실을 말하게 해야 한다.
 
 목표:
 
@@ -182,7 +182,7 @@ runtime이 안정된 뒤 바로 API health를 복구한다. 이 단계는 단순
 - `deploy/Dockerfile.dev`
 - `Makefile`
 - `scripts/docker/bootstrap-workspace.sh` 신규 가능
-- `.github/tasks/06-fix-make-dev-runtime.md`
+- `.github/tasks/archive/06-fix-make-dev-runtime.md`
 
 ### E2E Harness
 

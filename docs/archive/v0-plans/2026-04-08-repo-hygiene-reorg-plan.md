@@ -53,7 +53,7 @@
 
 1. Record which root paths are `canonical`, `move`, `ignore`, or `delete-later`.
 2. Search the repo for references before moving anything.
-3. Keep a mapping table in `.github/tasks/09-repo-hygiene-reorg.md`.
+3. Keep a mapping table in `.github/tasks/archive/09-repo-hygiene-reorg.md`.
 
 **Commands:**
 
@@ -195,7 +195,7 @@ git status --short
 - Modify: `.gitignore`
 - Modify: `README.md`
 - Modify: `AGENTS.md`
-- Modify: `.github/tasks/09-repo-hygiene-reorg.md`
+- Modify: `.github/tasks/archive/09-repo-hygiene-reorg.md`
 
 **Steps:**
 
@@ -209,7 +209,7 @@ git status --short
 ```bash
 git rm -r --cached playwright-report test-results .playwright-mcp .pnpm-store tmp
 git status --short
-rg -n "scripts/qa|scripts/docs|docs/reference|docs/screenshots" README.md AGENTS.md .github/tasks/09-repo-hygiene-reorg.md
+rg -n "scripts/qa|scripts/docs|docs/reference|docs/screenshots" README.md AGENTS.md .github/tasks/archive/09-repo-hygiene-reorg.md
 ```
 
 **Expected outcome:**

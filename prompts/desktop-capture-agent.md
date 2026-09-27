@@ -131,10 +131,10 @@ Read these files for detailed step-by-step instructions:
 | Phase | File | Scenarios |
 |-------|------|-----------|
 | A | `.github/tasks/61a-scenarios-public-auth.md` | S01-S05 |
-| B | `.github/tasks/61b-scenarios-match-team.md` | S06-S20 |
+| B | `.github/tasks/archive/61b-scenarios-match-team.md` | S06-S20 |
 | C | `.github/tasks/61c-scenarios-lesson-market-mercenary-venue.md` | S21-S31 |
-| D | `.github/tasks/61d-scenarios-profile-settings-chat-payment.md` | S32-S48 |
-| E | `.github/tasks/61e-scenarios-admin-navigation.md` | S49-S67 |
+| D | `.github/tasks/archive/61d-scenarios-profile-settings-chat-payment.md` | S32-S48 |
+| E | `.github/tasks/archive/61e-scenarios-admin-navigation.md` | S49-S67 |
 
 ## Auth Setup
 

@@ -32,13 +32,13 @@
   - `docs/scenarios/index.md`
   - `docs/scenarios/01-auth-and-session.md` ~ `10-profile-settings-admin.md`
 - 기존 task/backlog
-  - `.github/tasks/21-auth-gate-and-nonlogin-ux.md`
-  - `.github/tasks/23-team-match-application-visibility.md`
-  - `.github/tasks/24-team-match-creation-and-apply-permission.md`
-  - `.github/tasks/26-qa-backlog-followups.md`
-  - `.github/tasks/29-ux-design-audit.md`
-  - `.github/tasks/31-team-membership-tdd-rollout.md`
-  - `.github/tasks/32-web-audit-and-remediation.md`
+  - `.github/tasks/archive/21-auth-gate-and-nonlogin-ux.md`
+  - `.github/tasks/archive/23-team-match-application-visibility.md`
+  - `.github/tasks/archive/24-team-match-creation-and-apply-permission.md`
+  - `.github/tasks/archive/26-qa-backlog-followups.md`
+  - `.github/tasks/archive/29-ux-design-audit.md`
+  - `.github/tasks/archive/31-team-membership-tdd-rollout.md`
+  - `.github/tasks/archive/32-web-audit-and-remediation.md`
 - 코드 사실원천
   - `apps/web/src/app/**/page.tsx`
   - `apps/api/src/**`
@@ -64,7 +64,7 @@
 ### 3. Biggest documentation drift
 
 - `docs/scenarios/03-match-flows.md`는 아직 `PATCH /matches/:id` 미구현을 전제로 적혀 있다.
-- `.github/tasks/26-qa-backlog-followups.md`의 `C1`은 현재 코드에 이미 존재하는 `/mercenary/[id]/page.tsx`와 충돌한다.
+- `.github/tasks/archive/26-qa-backlog-followups.md`의 `C1`은 현재 코드에 이미 존재하는 `/mercenary/[id]/page.tsx`와 충돌한다.
 - `docs/archive/v0-reports/IMPLEMENTATION_STATUS.md`, `docs/archive/v0-reports/PAGE_FEATURES.md`, scenario 허브는 “구현됨”, “검증됨”, “부분 구현”의 기준이 서로 다르다.
 - `docs/archive/v0-plans/2026-04-10-web-audit-remediation-plan.md`가 제시한 후속 범위 중 일부는 아직 task로 분해되지 않았고, 일부는 기존 task와 중복된다.
 

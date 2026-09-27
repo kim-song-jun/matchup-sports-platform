@@ -361,7 +361,7 @@ E2E_REQUIRE_ADMIN_PROMOTION=1 pnpm exec playwright test --config=e2e/playwright.
 
 - [README.md](../../README.md)
 - [AGENTS.md](../../AGENTS.md)
-- [.github/tasks/54-unified-visual-audit-coverage-master.md](../../.github/tasks/54-unified-visual-audit-coverage-master.md)
+- [.github/tasks/archive/54-unified-visual-audit-coverage-master.md](../../.github/tasks/archive/54-unified-visual-audit-coverage-master.md)
 - [.github/tasks/53-visual-audit-operations-one-pager.md](../../.github/tasks/53-visual-audit-operations-one-pager.md)
 - [docs/scenarios/index.md](../scenarios/index.md)
-- [.github/tasks/46-isolated-playwright-runner-stacks.md](../../.github/tasks/46-isolated-playwright-runner-stacks.md)
+- [.github/tasks/archive/46-isolated-playwright-runner-stacks.md](../../.github/tasks/archive/46-isolated-playwright-runner-stacks.md)

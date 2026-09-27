@@ -1,6 +1,6 @@
 # Task 58 — Design System Consistency Audit & Remediation
 
-> Supersedes `.github/tasks/52-current-design-drift-audit-and-remediation-plan.md` (status: Planned -> Superseded by 58).
+> Supersedes `.github/tasks/archive/52-current-design-drift-audit-and-remediation-plan.md` (status: Planned -> Superseded by 58).
 > Continues from `.github/tasks/55-design-system-remediation-waves.md` (status: Completed — Wave 0-5 done).
 > Canonical rules: `DESIGN.md`. Document navigation: `docs/DESIGN_DOCUMENT_MAP.md`.
 

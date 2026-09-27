@@ -293,9 +293,9 @@ LOC 는 테스트 포함. 기존 파일 수정 (`AdminModule`, `admin/layout.tsx
 
 ## References
 
-- Task 70 완료 리포트: `.github/tasks/70-completion-report.md` (판매자/재무 대시보드 Deferred 항목)
-- Task 73 완료 리포트: `.github/tasks/73-completion-report.md` (idempotency precondition)
-- Task 74 완료 리포트: `.github/tasks/74-completion-report.md` (C9 메트릭 기반)
+- Task 70 완료 리포트: `.github/tasks/archive/70-completion-report.md` (판매자/재무 대시보드 Deferred 항목)
+- Task 73 완료 리포트: `.github/tasks/archive/73-completion-report.md` (idempotency precondition)
+- Task 74 완료 리포트: `.github/tasks/archive/74-completion-report.md` (C9 메트릭 기반)
 - Roadmap: `.github/tasks/next-session-plan-72-onward.md` (Task 76 outline L77-L84)
 - 기존 admin layout: `apps/web/src/app/admin/layout.tsx`
 - 기존 admin summary: `apps/api/src/admin/admin.service.ts` `getDashboardStats()` (중복 피하고 ops 전용으로 분리)

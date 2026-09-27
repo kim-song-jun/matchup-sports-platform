@@ -1,6 +1,6 @@
 # Task 60 — Ultraplan UI/UX Audit Orchestration
 
-> Planning/orchestration task. This task does not replace existing source-of-truth documents. Visual coverage truth remains in `.github/tasks/54-unified-visual-audit-coverage-master.md`, and design-system remediation truth remains in `.github/tasks/58-design-system-audit.md`.
+> Planning/orchestration task. This task does not replace existing source-of-truth documents. Visual coverage truth remains in `.github/tasks/archive/54-unified-visual-audit-coverage-master.md`, and design-system remediation truth remains in `.github/tasks/58-design-system-audit.md`.
 
 Owner: project-director + tech-planner -> qa/ui/frontend/design/docs
 Date drafted: 2026-04-12
@@ -14,7 +14,7 @@ Priority: P0
 - 이 작업은 "처음부터 디자인 시스템을 새로 만드는 프로젝트"가 아니라, 이미 있는 audit/remediation/capture 인프라를 하나의 운영 프로그램으로 묶는 작업으로 정의한다.
 - 현재 기준점은 이미 존재한다.
   - `docs/archive/v0-reports/DESIGN_SYSTEM_REFERENCE.md`: current design-system state, compliance 약 `55%`
-  - `.github/tasks/54-unified-visual-audit-coverage-master.md`: `92` canonical route, `9` viewport, interaction/component/asset coverage contract
+  - `.github/tasks/archive/54-unified-visual-audit-coverage-master.md`: `92` canonical route, `9` viewport, interaction/component/asset coverage contract
   - `.github/tasks/58-design-system-audit.md`: current remediation contract
   - `scripts/qa/run-visual-audit.mjs`: manifest/capture runner
 - 가장 큰 리스크는 세 가지다.

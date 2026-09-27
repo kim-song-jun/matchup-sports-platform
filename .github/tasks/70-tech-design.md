@@ -1,7 +1,7 @@
 # Task 70 — Marketplace Payment Lifecycle (Tech Design)
 
 **Owner**: tech-planner
-**Sibling**: `.github/tasks/70-marketplace-payment-lifecycle.md` (project-director, product scope)
+**Sibling**: `.github/tasks/archive/70-marketplace-payment-lifecycle.md` (project-director, product scope)
 **Status**: Draft v1 (parallel with director)
 **Branch hint**: `feat/task-70-marketplace-payment-lifecycle`
 

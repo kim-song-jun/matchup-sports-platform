@@ -62,8 +62,8 @@ For every covered ID:
 
 - `pnpm --filter v1_api test -- auth.controller.spec.ts onboarding.controller.spec.ts`
 - `pnpm --filter v1_web test -- src/components/auth`
-- `pnpm exec playwright test e2e/tests/auth-session-matrix.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line`
-- `pnpm exec playwright test e2e/tests/auth-session-matrix.spec.ts --config=e2e/playwright.config.ts --project='Mobile Chrome' --workers=1 --reporter=line`
+- `pnpm exec playwright test e2e/tests/auth-session-matrix.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line` (레거시·삭제됨 — legacy-v0-final)
+- `pnpm exec playwright test e2e/tests/auth-session-matrix.spec.ts --config=e2e/playwright.config.ts --project='Mobile Chrome' --workers=1 --reporter=line` (레거시·삭제됨 — legacy-v0-final)
 
 ## Execution Environment
 

@@ -42,8 +42,8 @@ Both specs assert DOM/route presence (render + CTA visibility) against seeded fi
 
 ## Scenario Checklist
 
-- [x] TEAM-001 팀 생성 후 owner 관점 반영 (`e2e/tests/team-owner-flow.spec.ts`)
-- [x] TEAM-002 owner/manager 권한 차등 (`e2e/tests/team-manager-membership.spec.ts`)
+- [x] TEAM-001 팀 생성 후 owner 관점 반영 (`e2e/tests/team-owner-flow.spec.ts`) (레거시·삭제됨 — legacy-v0-final)
+- [x] TEAM-002 owner/manager 권한 차등 (`e2e/tests/team-manager-membership.spec.ts`) (레거시·삭제됨 — legacy-v0-final)
 - [x] TEAM-003 팀 상세 이미지 슬롯 제거와 주요 멤버 공개 범위 표시 (`visual/manual + follow-up automation`)
 - [x] TEAM-004 일반 멤버 self-leave와 내 팀 동기화
 - [x] TEAM-005 owner role change / remove member 반영 (`TEAM-005-A/B` pass, `TEAM-005-C` planned)

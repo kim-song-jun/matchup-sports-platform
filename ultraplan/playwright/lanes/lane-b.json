@@ -1,8 +1,0 @@
-{
-  "id": "B",
-  "name": "ultra-b",
-  "batchOrder": ["batch-3-detail-pages", "batch-4-create-edit-forms"],
-  "priority": "highest",
-  "runnerLabel": "ultra-b-<band>",
-  "description": "Detail and form capture lane."
-}

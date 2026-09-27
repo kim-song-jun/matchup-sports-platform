@@ -1,12 +1,10 @@
 # Teameet — Makefile
 # Monorepo: pnpm workspaces + Turborepo
-# Backend: NestJS (apps/api, port 8111) | Frontend: Next.js (apps/web, port 3003)
-# DB: PostgreSQL (internal Docker network) | Cache: Redis (internal Docker network)
+# Backend: NestJS (apps/v1_api, port 8121) | Frontend: Next.js (apps/v1_web, port 3013)
+# DB: PostgreSQL (internal Docker network)
 
 SHELL := /bin/bash
 ROOT_DIR := $(shell pwd)
-API_DIR  := $(ROOT_DIR)/apps/api
-WEB_DIR  := $(ROOT_DIR)/apps/web
 V1_API_DIR := $(ROOT_DIR)/apps/v1_api
 V1_WEB_DIR := $(ROOT_DIR)/apps/v1_web
 DEPLOY_DIR := $(ROOT_DIR)/deploy
@@ -39,9 +37,8 @@ init: ## First-time setup: deps + .env + docker + migrate + seed
 	@echo "╚════════════════════════════════════════════╝"
 	@echo ""
 	@echo "Next steps:"
-	@echo "  make dev          # Start full dev stack (docker)"
-	@echo "  make dev-local    # Start api + web locally (host)"
-	@echo "  make db-studio    # Open Prisma Studio"
+	@echo "  make dev-v1       # Start v1 dev stack (docker)"
+	@echo "  make v1-db-studio # Open v1 Prisma Studio"
 	@echo "  make help         # See all available targets"
 	@echo ""
 
@@ -72,7 +69,7 @@ _init-env:
 	fi
 	@if ! grep -q "^VAPID_PUBLIC_KEY=..*" "$(ENV_FILE)" 2>/dev/null; then \
 		echo "  ▸ Generating VAPID keys..."; \
-		cd $(API_DIR) && node -e "\
+		cd $(V1_API_DIR) && node -e "\
 			const wp = require('web-push'); \
 			const k = wp.generateVAPIDKeys(); \
 			console.log('VAPID_PUBLIC_KEY=' + k.publicKey); \
@@ -92,7 +89,7 @@ _init-deps:
 	@echo "  ✓ Dependencies installed"
 	@if ! grep -q "^VAPID_PUBLIC_KEY=..*" "$(ENV_FILE)" 2>/dev/null; then \
 		echo "  ▸ Generating VAPID keys (retry after install)..."; \
-		cd $(API_DIR) && node -e "\
+		cd $(V1_API_DIR) && node -e "\
 			const wp = require('web-push'); \
 			const k = wp.generateVAPIDKeys(); \
 			console.log('VAPID_PUBLIC_KEY=' + k.publicKey); \
@@ -104,40 +101,33 @@ _init-deps:
 .PHONY: _init-docker
 _init-docker:
 	@echo ""
-	@echo "▸ Starting Docker infrastructure (postgres + redis)..."
-	@$(DOCKER_DEV) up -d postgres redis
-	@echo "  ▸ Waiting for postgres health..."
+	@echo "▸ Starting Docker infrastructure (v1_postgres)..."
+	@$(DOCKER_DEV) up -d v1_postgres
+	@echo "  ▸ Waiting for v1_postgres health..."
 	@for i in 1 2 3 4 5 6 7 8 9 10 11 12; do \
-		if $(DOCKER_DEV) exec -T postgres pg_isready -U teameet_user -d teameet_dev >/dev/null 2>&1; then \
-			echo "  ✓ postgres is ready"; break; \
+		if $(DOCKER_DEV) exec -T v1_postgres pg_isready -U teameet_v1_user -d teameet_v1_dev >/dev/null 2>&1; then \
+			echo "  ✓ v1_postgres is ready"; break; \
 		fi; \
-		if [ "$$i" = "12" ]; then echo "  ✗ postgres failed to start"; exit 1; fi; \
+		if [ "$$i" = "12" ]; then echo "  ✗ v1_postgres failed to start"; exit 1; fi; \
 		sleep 2; \
-	done
-	@for i in 1 2 3 4 5; do \
-		if $(DOCKER_DEV) exec -T redis redis-cli ping >/dev/null 2>&1; then \
-			echo "  ✓ redis is ready"; break; \
-		fi; \
-		if [ "$$i" = "5" ]; then echo "  ✗ redis failed to start"; exit 1; fi; \
-		sleep 1; \
 	done
 
 .PHONY: _init-db
 _init-db:
 	@echo ""
-	@echo "▸ Initializing database (via api container, internal network)..."
-	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:generate" >/dev/null 2>&1 && echo "  ✓ Prisma client generated"
-	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm exec prisma migrate deploy" 2>&1 \
+	@echo "▸ Initializing database (via v1_api container, internal network)..."
+	@$(DOCKER_DEV) run --rm v1_api sh -c "cd /app/apps/v1_api && pnpm db:generate" >/dev/null 2>&1 && echo "  ✓ Prisma client generated"
+	@$(DOCKER_DEV) run --rm v1_api sh -c "cd /app/apps/v1_api && pnpm exec prisma migrate deploy" 2>&1 \
 		| grep -E "(Applying|migration|already|No pending|All migrations)" | sed 's/^/    /' || true
 	@echo "  ✓ Migrations applied"
-	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:seed" 2>&1 | tail -15 | sed 's/^/    /' || true
+	@$(DOCKER_DEV) run --rm v1_api sh -c "cd /app/apps/v1_api && pnpm db:seed" 2>&1 | tail -15 | sed 's/^/    /' || true
 	@echo "  ✓ Seed data inserted"
 
 .PHONY: dev-local
-dev-local: ## Start api + web locally on host (assumes infra is up)
-	@if ! $(DOCKER_DEV) ps --services --filter "status=running" | grep -q postgres; then \
+dev-local: ## Start v1 apps locally on host (assumes infra is up)
+	@if ! $(DOCKER_DEV) ps --services --filter "status=running" | grep -q v1_postgres; then \
 		echo "Starting docker infrastructure first..."; \
-		$(DOCKER_DEV) up -d postgres redis; \
+		$(DOCKER_DEV) up -d v1_postgres; \
 		sleep 3; \
 	fi
 	@pnpm dev
@@ -155,18 +145,10 @@ dev-docker: up ## Alias for detached Docker dev startup
 up: ## Start full dev environment in Docker Compose (detached)
 	@echo "Starting full Docker development stack..."
 	@$(DOCKER_DEV) up -d --build
-	@echo "Waiting for postgres to be ready..."
-	@$(DOCKER_DEV) exec -T postgres sh -c \
-		'until pg_isready -U teameet_user -d teameet_dev; do sleep 1; done' 2>/dev/null || true
+	@echo "Waiting for v1_postgres to be ready..."
+	@$(DOCKER_DEV) exec -T v1_postgres sh -c \
+		'until pg_isready -U teameet_v1_user -d teameet_v1_dev; do sleep 1; done' 2>/dev/null || true
 	@echo "Docker development stack is up."
-
-.PHONY: dev-api
-dev-api: ## Start API container only (with Docker dependencies)
-	@$(DOCKER_DEV) up --build api
-
-.PHONY: dev-web
-dev-web: ## Start Web container only (with Docker dependencies)
-	@$(DOCKER_DEV) up --build deps web
 
 .PHONY: dev-v1
 dev-v1: ## Start v1 dev stack only (v1_postgres + v1_api + v1_web)
@@ -194,54 +176,6 @@ down: ## Stop and remove Docker development containers
 	@$(DOCKER_DEV) down
 
 # ─── Database ─────────────────────────────────────────────────────────────────
-
-.PHONY: db-migrate
-db-migrate: ## Run prisma migrate dev inside the api container
-	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:migrate"
-
-.PHONY: db-push
-db-push: ## Run prisma db push inside the api container
-	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:push"
-
-.PHONY: db-bootstrap-deploy
-db-bootstrap-deploy: ## Run deploy DB bootstrap logic (empty DB fallback + migrate deploy)
-	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:bootstrap:deploy"
-
-.PHONY: db-seed
-db-seed: ## Insert seed data inside the api container
-	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:generate && pnpm db:seed"
-
-.PHONY: db-seed-mocks
-db-seed-mocks: ## Insert or refresh canonical mock data without wiping unrelated records
-	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:generate && pnpm db:seed:mocks"
-
-.PHONY: db-seed-mocks-deploy
-db-seed-mocks-deploy: ## Run checksum-gated mock sync as deploy would
-	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:generate && pnpm db:seed:mocks:deploy"
-
-.PHONY: db-seed-images
-db-seed-images: ## Fill or refresh DB-backed image data without wiping records
-	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm db:generate && pnpm db:seed:images"
-
-.PHONY: db-seed-all
-db-seed-all: ## Seed everything: base data + mocks (admin/settlements/reports/22 users) + images
-	@echo "==> Seeding base data..."
-	@$(MAKE) db-seed
-	@echo "==> Seeding mock catalog (admin, settlements, reports, 22 users, 212 chat msgs, etc.)..."
-	@$(MAKE) db-seed-mocks
-	@echo "==> Seeding images..."
-	@$(MAKE) db-seed-images
-	@echo "✓ All seed data loaded."
-
-.PHONY: db-studio
-db-studio: ## Open Prisma Studio (exposes port 5555 only while running)
-	@echo "Prisma Studio will be available at http://localhost:5555"
-	@$(DOCKER_DEV) run --rm -p 127.0.0.1:5555:5555 api \
-		sh -c "cd /app/apps/api && pnpm exec prisma studio --browser none --hostname 0.0.0.0 --port 5555"
-
-.PHONY: db-shell
-db-shell: ## Open psql shell inside postgres container
-	@$(DOCKER_DEV) exec postgres psql -U teameet_user -d teameet_dev
 
 .PHONY: v1-db-migrate
 v1-db-migrate: ## Run prisma migrate dev inside the v1_api container
@@ -273,125 +207,12 @@ v1-db-studio: ## Open v1 Prisma Studio (exposes port 5556 only while running)
 v1-db-shell: ## Open psql shell inside v1_postgres container
 	@$(DOCKER_DEV) exec v1_postgres psql -U teameet_v1_user -d teameet_v1_dev
 
-.PHONY: redis-shell
-redis-shell: ## Open redis-cli inside redis container
-	@$(DOCKER_DEV) exec redis redis-cli
-
-.PHONY: db-reset
-db-reset: ## DESTRUCTIVE: reset DB, re-migrate, re-seed everything (base + mocks + images)
-	@echo "WARNING: This will wipe the dev database!"
-	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ] || exit 1
-	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm exec prisma migrate reset --force"
-	@$(MAKE) db-seed-all
-
 # ─── Testing ──────────────────────────────────────────────────────────────────
-
-.PHONY: test
-test: ## Run all tests (backend + frontend)
-	@pnpm --filter api test
-	@pnpm --filter web test
 
 .PHONY: test-v1
 test-v1: ## Run v1 backend + frontend tests
 	@pnpm --filter v1_api test
 	@pnpm --filter v1_web test
-
-.PHONY: autoqa
-autoqa: ## Run repo-local autoqa operator (background unavailable -> foreground fallback)
-	@node scripts/qa/run-autoqa.mjs $(AUTOQA_ARGS)
-
-.PHONY: autoqa-status
-autoqa-status: ## Print current autoqa status cursor summary
-	@node scripts/qa/run-autoqa.mjs status
-
-.PHONY: autoqa-scenarios
-autoqa-scenarios: ## Refresh autoqa scenario docs + scope-freeze from oracle
-	@node scripts/qa/run-autoqa-scenarios.mjs all
-
-.PHONY: autoqa-cycle
-autoqa-cycle: ## Run foreground autoqa cycle across oracle scenarios
-	@node scripts/qa/run-autoqa-cycle.mjs cycle all $(AUTOQA_ARGS)
-
-.PHONY: autoqa-cron
-autoqa-cron: ## Generate cron-friendly autoqa wrapper and crontab example
-	@node scripts/qa/run-autoqa.mjs cron
-
-.PHONY: autoqa-cron-install
-autoqa-cron-install: ## Install managed host cron entry for repo-local autoqa
-	@node scripts/qa/run-autoqa.mjs cron install $(AUTOQA_ARGS)
-
-.PHONY: autoqa-cron-status
-autoqa-cron-status: ## Print managed host cron status for repo-local autoqa
-	@node scripts/qa/run-autoqa.mjs cron status $(AUTOQA_ARGS)
-
-.PHONY: test-api
-test-api: ## Backend unit tests only
-	@pnpm --filter api test
-
-.PHONY: test-web
-test-web: ## Frontend tests only (Vitest)
-	@pnpm --filter web test
-
-.PHONY: test-integration
-test-integration: ## Backend integration tests (runs in api container, needs db)
-	@$(DOCKER_DEV) run --rm api sh -c "cd /app/apps/api && pnpm test:integration"
-
-.PHONY: test-e2e
-test-e2e: ## Playwright E2E tests (assumes `make dev` is running)
-	@npx playwright test
-
-.PHONY: qa-visual-audit-manifest
-qa-visual-audit-manifest: ## Generate visual audit manifest (set RUN/BATCH/FAMILY/LIMIT)
-	@node scripts/qa/run-visual-audit.mjs manifest \
-		$(if $(RUN),--run-id $(RUN),) \
-		$(if $(BATCH),--batch '$(BATCH)',) \
-		$(if $(FAMILY),--family '$(FAMILY)',) \
-		$(if $(ROUTE),--route '$(ROUTE)',) \
-		$(if $(LIMIT),--limit $(LIMIT),) \
-		$(EXTRA)
-
-.PHONY: qa-visual-audit-capture
-qa-visual-audit-capture: ## Capture visual audit screenshots (set RUN/BATCH/FAMILY/VIEWPORTS/STATES/LIMIT/HEADED=1)
-	@node scripts/qa/run-visual-audit.mjs capture \
-		$(if $(RUN),--run-id $(RUN),) \
-		$(if $(BATCH),--batch '$(BATCH)',) \
-		$(if $(FAMILY),--family '$(FAMILY)',) \
-		$(if $(ROUTE),--route '$(ROUTE)',) \
-		$(if $(VIEWPORTS),--viewports '$(VIEWPORTS)',) \
-		$(if $(STATES),--states '$(STATES)',) \
-		$(if $(LIMIT),--limit $(LIMIT),) \
-		$(if $(HEADED),--headed,) \
-		$(if $(INCLUDE_BLOCKED),--include-blocked,) \
-		$(EXTRA)
-
-.PHONY: qa-visual-audit-rerun
-qa-visual-audit-rerun: ## Re-run blocked routes for an existing RUN (set RUN plus optional FAMILY/ROUTE/VIEWPORTS/STATES/LIMIT)
-	@node scripts/qa/run-visual-audit.mjs capture \
-		--run-id $(RUN) \
-		--batch batch-8-rerun \
-		$(if $(FAMILY),--family '$(FAMILY)',) \
-		$(if $(ROUTE),--route '$(ROUTE)',) \
-		$(if $(VIEWPORTS),--viewports '$(VIEWPORTS)',) \
-		$(if $(STATES),--states '$(STATES)',) \
-		$(if $(LIMIT),--limit $(LIMIT),) \
-		$(if $(HEADED),--headed,) \
-		$(EXTRA)
-
-.PHONY: e2e-isolated-up
-e2e-isolated-up: ## Start an isolated Playwright runtime (set RUN=<id>)
-	@node scripts/qa/run-e2e-isolated.mjs up $(or $(RUN),r1)
-
-.PHONY: test-e2e-isolated
-test-e2e-isolated: ## Run the full Playwright suite against an isolated runtime (set RUN=<id>)
-	@node scripts/qa/run-e2e-isolated.mjs run $(or $(RUN),r1)
-
-.PHONY: test-e2e-isolated-spec
-test-e2e-isolated-spec: ## Run one isolated spec (set RUN=<id> SPEC=<path> [PROJECT='Desktop Chrome'] [GREP='pattern'])
-	@node scripts/qa/run-e2e-isolated.mjs run $(or $(RUN),r1) -- $(SPEC) $(if $(PROJECT),"--project=$(PROJECT)",) $(if $(GREP),"--grep=$(GREP)",)
-
-.PHONY: e2e-isolated-down
-e2e-isolated-down: ## Stop an isolated Playwright runtime (set RUN=<id>)
-	@node scripts/qa/run-e2e-isolated.mjs down $(or $(RUN),r1)
 
 .PHONY: test-load
 test-load: ## k6 load test (requires k6 installed)
@@ -414,11 +235,11 @@ lint: ## Lint all packages
 	@pnpm lint
 
 .PHONY: typecheck
-typecheck: ## TypeScript type check (api + web)
-	@echo "Type-checking api..."
-	@cd $(API_DIR) && npx tsc --noEmit
-	@echo "Type-checking web..."
-	@cd $(ROOT_DIR)/apps/web && npx tsc --noEmit
+typecheck: ## TypeScript type check (v1_api + v1_web)
+	@echo "Type-checking v1_api..."
+	@cd $(V1_API_DIR) && npx tsc --noEmit
+	@echo "Type-checking v1_web..."
+	@cd $(V1_WEB_DIR) && npx tsc --noEmit
 	@echo "All type checks passed."
 
 .PHONY: clean
@@ -429,14 +250,6 @@ clean: ## Clean all build artifacts
 	@echo "Clean complete."
 
 # ─── Deploy ───────────────────────────────────────────────────────────────────
-
-.PHONY: deploy-build
-deploy-build: ## Build production Docker images
-	@echo "Building teameet-api image..."
-	@docker build -f $(DEPLOY_DIR)/Dockerfile.api -t teameet-api:latest $(ROOT_DIR)
-	@echo "Building teameet-web image..."
-	@docker build -f $(DEPLOY_DIR)/Dockerfile.web -t teameet-web:latest $(ROOT_DIR)
-	@echo "Images built successfully."
 
 .PHONY: deploy-up
 deploy-up: ## Start production containers
@@ -460,10 +273,10 @@ vapid-keys: ## Generate new VAPID keys for Web Push
 
 .PHONY: clear
 clear: ## Find and kill processes blocking Teameet dev ports (interactive y/N)
-	@printf "\n▸ Checking Teameet dev ports (3003, 8111, 5555)...\n"
+	@printf "\n▸ Checking Teameet dev ports (3013, 8121, 5556)...\n"
 	@command -v lsof >/dev/null 2>&1 || { printf "  ✗ lsof not found\n"; exit 1; }
 	@found=0; docker_detected=0; \
-	for port in 3003 8111 5555; do \
+	for port in 3013 8121 5556; do \
 		pids=$$(lsof -ti :$$port -sTCP:LISTEN 2>/dev/null); \
 		if [ -z "$$pids" ]; then \
 			printf "  \033[32m✓\033[0m Port %-5s free\n" "$$port"; \

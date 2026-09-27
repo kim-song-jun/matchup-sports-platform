@@ -56,10 +56,6 @@ redis_data/
 # Prisma (migrations tracked — required for production deploy)
 v1_before_team_chat_migration.sql
 
-# Capacitor
-apps/web/ios/
-apps/web/android/
-
 # iOS native shell (apps/v1_ios) — project.yml is the source of truth, the
 # Xcode project and the version xcconfig are generated build outputs.
 apps/v1_ios/*.xcodeproj/
@@ -79,28 +75,11 @@ coverage/
 infra/load/tokens.txt
 
 # E2E screenshot binaries and transient queue state
-e2e/scenarios/screenshots/
-e2e/scenarios/queue/
-ultraplan/runs/e2e-analyzer*/
 .claude/worktrees/
 
-# Ad-hoc capture/QA output dirs (recurring stale-artifact cleanup, 2026-09-27) —
-# capture scripts keep re-creating these; do not track new dumps by default.
-# Rooted with a leading "/" on purpose: an unanchored "screenshots/" matches
-# that name at ANY depth (docs/screenshots/, apps/v1_web/public/screenshots/,
-# tests/ui-scenarios/screenshots/ would all have been caught too — verified,
-# see Fix round 1 in pr2-report.md). Root-anchoring keeps this to exactly the
-# top-level dirs we actually emptied.
-# tests/ui-scenarios/screenshots/ is deliberately NOT listed here: it's read as
-# input by scripts/qa/run-e2e-analyzer.mjs, not just written to.
+# Capture/QA output dirs. Rooted on purpose: an unanchored "screenshots/"
+# would also hide docs/screenshots/ and apps/v1_web/public/screenshots/.
 /screenshots/
 /.screenshots/
 /docs/visual-qa/*
 !/docs/visual-qa/manual-v2/
-
-# autoqa runtime artifacts
-.autoqa/runs/
-.autoqa/cookies/
-.autoqa/cron/*.log
-.autoqa/cron/autoqa.installed.crontab
-.autoqa/.lock.nnn

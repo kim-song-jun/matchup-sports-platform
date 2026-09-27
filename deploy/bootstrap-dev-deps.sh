@@ -19,12 +19,6 @@ sync_dir() {
 echo "[deps] syncing root node_modules"
 sync_dir /opt/deps/node_modules /app/node_modules
 
-echo "[deps] syncing api node_modules"
-sync_dir /opt/deps/apps/api/node_modules /app/apps/api/node_modules
-
-echo "[deps] syncing web node_modules"
-sync_dir /opt/deps/apps/web/node_modules /app/apps/web/node_modules
-
 echo "[deps] syncing v1_api node_modules"
 sync_dir /opt/deps/apps/v1_api/node_modules /app/apps/v1_api/node_modules
 

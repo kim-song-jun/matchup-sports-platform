@@ -11,6 +11,7 @@ import {
   V1GameOperationsWorkerService,
 } from '../../src/jobs/v1-game-operations-worker.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { FOOTBALL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config';
 import { createV1IntegrationApp } from '../integration/integration-app';
@@ -1869,6 +1870,7 @@ async function createFixture(): Promise<void> {
       displayNameSnapshot: 'Task 9 Lane 4 Player',
     },
   });
+  await submitFriendlyTeamMatchLineups(prisma, ids.lane4Game);
   await prisma.v1GameResultRevision.create({
     data: {
       id: ids.lane4Revision,

@@ -9,7 +9,7 @@ import { chromium } from 'playwright';
 const PROJECT_ROOT = process.cwd();
 const LIB_DIR = path.join(
   PROJECT_ROOT,
-  'docs/reference/handoff-2026-04-25/sports-platform/project/lib'
+  'docs/archive/reference/handoff-2026-04-25/sports-platform/project/lib'
 );
 const FIX_VERSION = process.env.PROTOTYPE_FIX || 'fix27';
 const URL = `http://127.0.0.1:8765/Teameet%20Design.html?v=20260425-${FIX_VERSION}`;

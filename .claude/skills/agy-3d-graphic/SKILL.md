@@ -120,7 +120,7 @@ description: Use when a Teameet screen needs an illustration or 3D graphic — l
 2. **`auth-notice` · `journey-done` 은 "큰 자리"가 아니다.** 둘 다 160px(≤360px 136px)로
    그려진다 — 이 스킬이 정한 삼각 기준선 176px 아래다. 그래서 둘로 끝내는 게 맞다.
 
-교훈: **자산을 다시 만들기 전에 그 자산이 실제로 몇 px 로 그려지는지 CSS 에서 확인한다(이 저장소엔 `globals.css` 가 둘이다 — 배포되는 것은 `apps/v1_web/src/app/globals.css` 이고 `apps/web/` 쪽은 배포되지 않는다. 인용할 때 경로를 붙인다).**
+교훈: **자산을 다시 만들기 전에 그 자산이 실제로 몇 px 로 그려지는지 CSS 에서 확인한다(`globals.css` 는 `apps/v1_web/src/app/globals.css` 하나뿐이다 — 레거시 `apps/web/` 은 PR #1313 으로 삭제됐다. 인용할 때 경로를 붙인다).**
 "큰 자리 전용"은 파일 이름이나 용도 이름으로 정할 수 없다 — `apps/v1_web/src/app/globals.css` 의
 `.tm-auth-illustration` · `.tm-empty-illustration` 의 `width` 를 읽어야 알 수 있다. **그리고 클래스 하나의 `width` 로
 끝나지 않는다** — 같은 클래스를 감싸는 파생 선택자가 크기를 덮어쓴다. `git grep -n

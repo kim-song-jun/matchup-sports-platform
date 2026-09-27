@@ -8,7 +8,7 @@ Canonical status: not canonical
 Implementation status: reference only
 Primary plan: docs/reference/handoff-sm-new-direction-plan.md
 Pack path: docs/reference/handoff-sm-new-direction/
-Source pack: docs/reference/handoff-2026-04-25/
+Source pack: docs/archive/reference/handoff-2026-04-25/
 ```
 
 이 문서는 `handoff-sm-new-direction` 관련 문서를 읽는 작업자가 바로 현재

@@ -1,6 +1,23 @@
-# Teameet - AI 기반 멀티스포츠 소셜 매칭 플랫폼
+# Teameet (팀밋)
 
-풋살/농구/아이스하키/배드민턴 등 생활체육 종목의 개인 및 팀을 AI로 최적 매칭하는 플랫폼.
+축구·풋살·러닝·수영 생활체육의 팀과 선수를 매칭하고, 축구·풋살 아마추어 대회를 열어 경기 결과·기록을
+남기는 멀티스포츠 플랫폼이다(서비스 소개 원문: `apps/v1_web/src/app/llms.txt/route.ts`).
+
+## 작업 범위 — v1 전용
+
+이 저장소에서 유효한 코드는 v1 네 앱뿐이다.
+
+| 앱 | 경로 | 역할 |
+|---|---|---|
+| Web | `apps/v1_web` | Next.js App Router 웹(사용자·운영 콘솔·어드민 전부) |
+| API | `apps/v1_api` | NestJS 백엔드 + Prisma(`apps/v1_api/prisma`) |
+| Android | `apps/v1_android` | 배포된 웹을 로드하는 네이티브 셸(FCM·권한·딥링크) |
+| iOS | `apps/v1_ios` | 같은 역할의 iOS 셸. Xcode 프로젝트는 생성물이고 정의는 `project.yml` |
+
+- 레거시 v0 앱(`apps/api`·`apps/web`)과 그것만 겨냥하던 도구는 제거됐다. 제거 직전 스냅샷은 git 태그
+  **`legacy-v0-final`** 에 있다(`git show legacy-v0-final:<경로>`). **v1 판단의 근거로 쓰지 않는다** —
+  같은 기능이 옛 앱에 있어도 옛 API·DB·목데이터·화면 설계는 참조하지 않는다.
+- 이 규칙은 `AGENTS.md`의 "V1 Scope Override"와 같은 내용이다(아래 "코드 컨벤션 > Codex 미러").
 
 ## Git 브랜치 정책 (Critical — 2026-07-31 실측 기준 정정)
 
@@ -31,28 +48,33 @@
   dev 내용을 main 기준에 맞춰 되돌리지 않는다.
 - **`main`에는 classic branch protection은 없지만 ruleset이 걸려 있다**(2026-08-09 실측 정정).
   `branches/main/protection`은 여전히 `404 Branch not protected`라 "보호 없음"으로 오해하기 쉬운데,
-  **repository ruleset "Copilot review for default branch"(id 15258451, enforcement=active)가
-  default 브랜치에 `deletion`·`non_fast_forward`·`copilot_code_review` 세 가지를 강제한다.**
-  즉 main으로의 force-push와 브랜치 삭제는 실제로 막힌다 — 2026-07-31 #231 사고 때 되돌리기
-  force-push가 `non_fast_forward`로 거부돼 `git revert`로 우회해야 했던 것이 이 ruleset 때문이다.
-  일반 fast-forward push 자체는 막지 않으므로 PR 없는 직접 push는 여전히 가능하고 그대로
-  프로덕션 배포로 이어진다. **확인 명령**: `gh api repos/<owner>/<repo>/rulesets` (classic
-  protection API만 보면 실상을 놓친다).
+  **repository ruleset "Copilot review for default branch"(id 15258451, enforcement=active)가 default 브랜치에
+  `deletion`·`non_fast_forward`·`copilot_code_review` 세 가지를 강제한다.** 즉 main으로의 force-push와
+  브랜치 삭제는 실제로 막힌다 — 2026-07-31 #231 사고 때 되돌리기 force-push가 `non_fast_forward`로
+  거부돼 `git revert`로 우회해야 했던 것이 이 ruleset 때문이다. 일반 fast-forward push 자체는 막지
+  않으므로 PR 없는 직접 push는 여전히 가능하고 그대로 프로덕션 배포로 이어진다.
+  **확인 명령**: `gh api repos/<owner>/<repo>/rulesets` (classic protection API만 보면 실상을 놓친다).
 - **머지·push 전에 항상 `baseRefName`(대상 브랜치)을 확인한다.** 2026-08-09에 dev용 PR을
   `mergeable`/CI만 보고 머지했다가 **base가 main이라 프로덕션 브랜치에 머지된 사고**가 있었다
   (`gh pr merge`는 PR에 설정된 base로 머지하지, 내가 의도한 곳으로 머지하지 않는다). 머지 직전
   `gh pr view <N> --json baseRefName`으로 `dev`임을 확인하고, 아니면 `gh pr edit <N> --base dev`로
   먼저 재타깃한다. main은 위 ruleset 때문에 force-push 롤백이 안 되므로 이 사고는 `git revert`로만
   수습 가능하다 — 사전 확인이 유일한 값싼 방어다.
-- **worktree는 항상 최신 `dev`를 fetch한 직후에 만든다.** 새 작업(기능/수정)을 시작할 때 `git worktree add <path> -b <branch> origin/dev` 직전에 반드시 `git fetch origin dev`를 먼저 실행해서 base를 최신으로 맞춘다 — 캐시된(오래된) ref에서 분기하면 나중에 `dev`와의 diff가 불필요하게 커지고, changeset 정책 체크 등 CI 게이트가 실제로는 이미 해결된 옛 상태를 기준으로 오판할 수 있다. dev push = 자동 실배포이므로, 오래된 base에서 분기해 뒤늦게 머지하면 검증 시점과 실제 배포 시점의 코드가 어긋날 위험도 커진다.
-  - **로컬 `dev` 브랜치를 직접 체크아웃해서 base로 쓰지 않는다.** git은 같은 브랜치를 두 worktree에 동시 체크아웃할 수 없다 — 이 저장소는 여러 세션이 각자 `.claude/worktrees/*`를 쓰는 공유 환경이라, 로컬 `dev`가 이미 다른 worktree(예: `dev-verify`류)에 uncommitted 상태로 체크아웃돼 있을 수 있다. 그 worktree를 임의로 건드리거나(pull/checkout/reset) 새 작업의 base로 재사용하지 말 것 — 대신 매번 `git fetch origin dev` 후 **원격 ref `origin/dev`**를 base로 분기한다(로컬 `dev` 브랜치 자체는 만들지 않는다). 이렇게 하면 항상 최신이면서도 다른 세션과 절대 충돌하지 않는다.
+- **worktree는 항상 최신 `dev`를 fetch한 직후에 만든다.** `git worktree add <path> -b <branch> origin/dev`
+  직전에 반드시 `git fetch origin dev`를 실행한다 — 캐시된 ref에서 분기하면 `dev`와의 diff가
+  불필요하게 커지고 changeset 정책 체크 등 CI 게이트가 옛 상태를 기준으로 오판할 수 있다. dev push =
+  자동 실배포이므로 오래된 base에서 분기해 뒤늦게 머지하면 검증 시점과 배포 시점의 코드도 어긋난다.
+  - **로컬 `dev` 브랜치를 직접 체크아웃해서 base로 쓰지 않는다.** git은 같은 브랜치를 두 worktree에
+    동시 체크아웃할 수 없고, 이 저장소는 여러 세션이 각자 `.claude/worktrees/*`를 쓰는 공유 환경이라
+    로컬 `dev`가 이미 다른 worktree에 uncommitted 상태로 물려 있을 수 있다. 그 worktree를 건드리거나
+    (pull/checkout/reset) base로 재사용하지 말고, 매번 `git fetch origin dev` 후 **원격 ref
+    `origin/dev`**에서 분기한다.
 - **착수 전에는 `fetch`, 머지 후에는 로컬 `dev` 동기화 — 양쪽 다 예외 없다** (2026-08-23 사용자 지시).
-  - **착수 전 (pull first)**: worktree를 만들기 전이든 메인 트리에서 코드를 읽기 전이든, 어떤 작업이라도
-    시작 전에 먼저 `git fetch origin dev`로 원격을 당겨온다. 캐시된 ref나 뒤처진 로컬 브랜치를 현행으로
-    착각하면 이미 고쳐진 것을 다시 고치거나 살아 있는 기능을 dead code로 오진한다(실사례 2건).
+  - **착수 전 (pull first)**: 어떤 작업이라도 시작 전에 `git fetch origin dev`로 원격을 당겨온다.
+    뒤처진 ref를 현행으로 착각하면 이미 고쳐진 것을 다시 고치거나 살아 있는 기능을 dead code로
+    오진한다(실사례 2건).
   - **머지 후 (sync back)**: PR이 `origin/dev`에 머지되면 **그 즉시** 메인 작업트리
-    (`/Users/sungjun/Dev/projects/matchup-sports-platform`)의 로컬 `dev`를 따라잡힌다. 머지 하나당 한 번,
-    나중에 몰아서 하지 않는다:
+    (`/Users/sungjun/Dev/projects/matchup-sports-platform`)의 로컬 `dev`를 따라잡힌다. 머지 하나당 한 번:
     ```bash
     cd /Users/sungjun/Dev/projects/matchup-sports-platform
     git fetch origin dev -q && git merge --ff-only origin/dev
@@ -61,233 +83,172 @@
     코드를 보므로, 뒤처진 트리는 곧 사용자가 옛 코드를 보는 것이다.
   - **반드시 `--ff-only`.** `git pull`(머지 커밋 생성)·rebase·`reset`은 쓰지 않는다 — 공유 트리라 다른
     세션 작업을 건드린다. `--ff-only`는 위험하면 실패하고 멈추므로 미커밋 변경을 보존한다.
-  - **FF가 거부되면 지우지 말고 백업 후 진행한다.** 원인은 대개 미커밋/untracked 파일이 upstream
-    커밋본과 겹치는 경우다. `git status --porcelain`과 `git diff --name-only HEAD origin/dev`의
-    **교집합**으로 충돌 파일만 특정하고(나머지 미커밋 변경은 손대지 않는다), 스크래치패드에 디렉터리
-    구조를 유지해 복사한 뒤 원복·FF 하고 **백업 경로를 사용자에게 알린다.** 타 세션의 미커밋 변경을
-    되돌려야 하면 그 전에 사용자 승인을 받는다(위 "공유 작업트리 git 안전" 규칙).
+  - **FF가 거부되면 지우지 말고 백업 후 진행한다.** `git status --porcelain`과
+    `git diff --name-only HEAD origin/dev`의 **교집합**으로 충돌 파일만 특정하고(나머지 미커밋 변경은
+    손대지 않는다), 디렉터리 구조를 유지해 백업한 뒤 원복·FF 하고 **백업 경로를 사용자에게 알린다.**
+    타 세션의 미커밋 변경을 되돌려야 하면 그 전에 사용자 승인을 받는다.
 
 ## DB 마이그레이션 규율 (Critical — 2026-07-12 프로덕션 장애 재발 방지)
 
-- **스키마 변경은 반드시 migration 파일 동반.** `prisma db push`로만 dev에 반영하고 migration을 빠뜨리면 prod `migrate deploy`가 깨진다 (실사례: 리뷰 테이블 migration 누락 → 배포 중단·서비스 장애).
-- **CI가 강제한다**: test job의 "V1 migration replay + drift gate"가 ① 빈 DB에 마이그레이션 전체 체인 재생 ② `schema.prisma` 드리프트 0을 검증 — 어느 쪽이 깨져도 CI red.
-- 수동 SQL로 dev에 먼저 적용한 경우: 같은 내용을 **idempotent migration**(IF NOT EXISTS/가드)으로 작성하고 dev에는 `prisma migrate resolve --applied`로 박제한다.
+- **스키마 변경은 반드시 migration 파일 동반.** `prisma db push`로만 dev에 반영하고 migration을
+  빠뜨리면 prod `migrate deploy`가 깨진다(실사례: 리뷰 테이블 migration 누락 → 배포 중단·서비스 장애).
+  스키마·마이그레이션 위치: `apps/v1_api/prisma/schema.prisma`, `apps/v1_api/prisma/migrations/`.
+- **CI가 강제한다**: `deploy.yml`의 "V1 migration replay + drift gate" 스텝이 ① 빈 DB에 마이그레이션
+  전체 체인 재생 ② `schema.prisma` 드리프트 0을 검증한다 — 어느 쪽이 깨져도 CI red. 같은 파일의
+  "Expand-contract migration gate (PR)"도 파괴적 변경을 검사한다.
+- 수동 SQL로 dev에 먼저 적용한 경우: 같은 내용을 **idempotent migration**(IF NOT EXISTS/가드)으로
+  작성하고 dev에는 `prisma migrate resolve --applied`로 박제한다.
 
 ## Core Engineering Principles
 
-이 프로젝트의 모든 변경에는 아래 7개 원칙이 엄격히 적용됩니다.
+이 프로젝트의 모든 변경에는 아래 7개 원칙이 엄격히 적용된다.
 
 1. **Resolve Tech Debt — Never Defer** (기술 부채는 즉시 해결)
    - 작업 범위 안의 TODO, hack, workaround, 임시 해결책은 같은 변경에서 고친다. 별도 티켓 이연 금지.
-   - 리뷰어는 범위 내 미해결 기술 부채를 **Critical**로 표시 (Warning 아님).
-   - 증명된 패턴: in-memory mock → Prisma 전환, `Record<string, unknown>` → DTO 전환 (Phase 1-5 참조).
-
+   - 리뷰어는 범위 내 미해결 기술 부채를 **Critical**로 표시(Warning 아님).
+   - 증명된 패턴: in-memory mock → Prisma 전환, `Record<string, unknown>` → 전용 DTO 전환.
 2. **Design System Consistency** (디자인 시스템 일관성)
-   - 우선순위: `DESIGN.md` > `.impeccable.md` > CSS 토큰(`globals.css` @theme) > `tailwind.config.*` > 코드 추론
-   - 문서 탐색은 `docs/DESIGN_DOCUMENT_MAP.md`를 사용하되, 이는 navigation only이며 규칙 정의 문서가 아니다.
-   - 이 프로젝트는 **utility-first (Tailwind CSS v4)** 클래스 네이밍을 사용한다.
-   - **토큰 우선**: 하드코딩 컬러/간격/폰트 금지. `text-2xs~text-6xl`, `sportCardAccent[sportType]`, `bg-blue-500` 사용.
-   - **컴포넌트 재사용**: 인라인 마크업 전에 `components/ui/`의 `EmptyState`, `ErrorState`, `Modal`, `Toast`, `ChatBubble` 존재 여부 확인.
-   - **시각 절제**: 과한 shadow, 과한 border, content-first glass 사용 금지. 기본값은 Toss-like clean layout의 solid-first rhythm이다.
-
+   - 우선순위는 `DESIGN.md` §1 "Source Of Truth Order"를 따른다: `DESIGN.md` > `.impeccable.md` >
+     `apps/v1_web/src/app/tokens.css`(치수 토큰) · `apps/v1_web/src/app/globals.css` `:root`(색·타입 토큰)
+     > `apps/v1_web/src/components/v1-ui/`의 공유 프리미티브 > 코드 추론.
+   - 문서 탐색은 `docs/DESIGN_DOCUMENT_MAP.md`(navigation only, 규칙 정의 문서가 아님).
+   - **토큰 우선**: 하드코딩 색·간격·폰트 금지. v1 구체 규칙은 `docs/guides/v1-coding-patterns.md` §2.
+   - **컴포넌트 재사용**: 인라인 마크업 전에 `components/v1-ui/`(`primitives.tsx`의 `EmptyState`·
+     `ErrorState`·`Card`·`AlertBanner`, `confirm-modal.tsx`, `bottom-sheet.tsx` 등)를 먼저 확인한다.
+   - **시각 절제**: 과한 shadow, 과한 border, content-first glass 금지. 기본값은 Toss-like clean
+     layout의 solid-first rhythm이다.
 3. **Security Always** (보안은 항상)
-   - 태스크 종류 무관하게 모든 변경은 보안 관점에서 검토.
-   - 체크: 하드코딩 시크릿 없음 / 시스템 경계 입력 검증 / 신규 엔드포인트 auth·authz / SQL injection / XSS / CSRF / 신규 의존성 CVE.
-   - 백엔드: `JwtAuthGuard` + `AdminGuard` + `TeamMembershipService.assertRole` 다층 방어.
-   - 프론트엔드: `dangerouslySetInnerHTML` 최소화, 사용자 입력 HTML 이스케이프, 시크릿을 프론트엔드에 두지 않음.
-
+   - 태스크 종류 무관하게 모든 변경은 보안 관점에서 검토한다.
+   - 체크: 하드코딩 시크릿 없음 / 시스템 경계 입력 검증 / 신규 엔드포인트 auth·authz / SQL injection /
+     XSS / CSRF / 신규 의존성 CVE.
+   - 백엔드: 인증 가드(`V1AuthGuard`) + 어드민 컨텍스트(`AdminContextService.getActiveAdmin`) + 서비스
+     계층 소유권·역할 검증의 다층 방어. 라우트 가드만 믿지 않는다.
+   - 프론트엔드: `dangerouslySetInnerHTML` 최소화, 사용자 입력 HTML 이스케이프, 시크릿을 프론트엔드에
+     두지 않는다.
 4. **Mock Data Discipline** (목 데이터 규율)
-   - 현재 프로젝트에 전용 mock 디렉토리 없음. 테스트 mock은 `apps/api/src/**/*.spec.ts`와 `apps/web/src/**/*.test.{ts,tsx}` 파일 내부에 inline으로 작성됨.
-   - **규칙**: Prisma 모델 / DTO / API 타입 변경 시, 영향받는 inline mock도 같은 커밋에서 업데이트한다.
-   - Schema ↔ mock 드리프트는 리뷰어가 **Critical**로 표시.
-   - **Future**: 전용 `__mocks__/` 또는 `fixtures/` 디렉토리 도입 시 이 섹션 업데이트.
-
+   - mock/fixture 위치: `apps/v1_api/test/fixtures/`, `apps/v1_api/prisma/`(시드),
+     `apps/v1_web/src/test/msw/`, `apps/v1_web/public/mock/`, 각 `*.spec.ts`·`*.test.tsx`의 inline mock.
+   - **규칙**: Prisma 모델 / DTO / API 타입 변경 시 영향받는 mock·fixture·MSW 핸들러도 같은 커밋에서
+     업데이트한다. Schema ↔ mock 드리프트는 리뷰어가 **Critical**로 표시.
 5. **No Ambiguous Skipping** (모호함을 조용히 지나치지 않기)
    - 요구사항이 모호하거나 충돌하면 **추측하고 진행하지 않는다**.
    - 컴파일만 되는 "가장 쉬운 경로"를 선택하지 않는다.
-   - 원본 요청의 모든 조건이 설계 → 구현 → 검증 전 단계에 살아있어야 한다.
+   - 원본 요청의 모든 조건이 설계 → 구현 → 검증 전 단계에 살아 있어야 한다.
    - 조용히 드롭된 요구사항은 리뷰어가 **Critical**로 표시.
-
 6. **Ambiguity → Re-enter Planning** (모호함은 기획 재진입)
-   - 빌더가 모호함을 만나면: 작업 중단 → 오케스트레이터에 `BLOCKED: {질문}` 보고 → `project-director` + `tech-planner` 재호출 → 기획팀이 task 문서 업데이트 → 빌더에게 재핸드오프.
-   - 이 루프는 실패가 아니라 **올바른 경로**다.
-   - 같은 모호함이 3회 이상 에스컬레이션되면 오케스트레이터가 사용자에게 직접 질문.
-
+   - 빌더가 모호함을 만나면: 작업 중단 → 오케스트레이터에 `BLOCKED: {질문}` 보고 →
+     `project-director` + `tech-planner` 재호출 → 기획팀이 task 문서 업데이트 → 빌더에게 재핸드오프.
+   - 이 루프는 실패가 아니라 **올바른 경로**다. 같은 모호함이 3회 이상 에스컬레이션되면
+     오케스트레이터가 사용자에게 직접 질문한다.
 7. **Structured Task Documents** (구조화된 태스크 문서)
-   - 기획팀은 `.github/tasks/{N}-{task-name}.md` 위치에 태스크 문서를 작성한다.
-   - **필수 섹션**: Context / Goal / Original Conditions (체크박스) / User Scenarios / Test Scenarios (happy/edge/error/mock updates) / Parallel Work Breakdown (Backend ⟂ Frontend ⟂ Infra + 순차) / Acceptance Criteria / Tech Debt Resolved / Security Notes / Risks & Dependencies / Ambiguity Log.
-   - 상세 템플릿: `.claude/agents/prompts.md.legacy`의 "Task Document Format" 섹션 참조.
-   - 현재 레포 관행: `.github/tasks/`에 `qa-feedback-execution-plan.md`, `qa-followup-detailed.md`, `qa-followup-tech-design.md`, `qa-followup-completion-report.md` 존재.
+   - 기획팀은 `.github/tasks/{N}-{task-name}.md`에 태스크 문서를 작성한다. 규칙(번호·Status 표기·
+     archive 기준)과 **필수 섹션 템플릿**은 `.github/tasks/README.md`에 있다.
+   - 필수 섹션: Context / Goal / Original Conditions (체크박스) / User Scenarios / Test Scenarios
+     (happy/edge/error/mock updates) / Parallel Work Breakdown (Backend ⟂ Frontend ⟂ Infra + 순차) /
+     Acceptance Criteria / Tech Debt Resolved / Security Notes / Risks & Dependencies / Ambiguity Log.
+   - 완료된 태스크는 `.github/tasks/archive/`로 옮긴다(판정 규칙은 같은 README).
 
-## 프로젝트 구조
+## Repo Map
 
 ```
 apps/
-  web/              → Next.js 16 프론트엔드 (App Router)
-    src/
-      app/          → 페이지 라우트
-        (auth)/     → 로그인 등 인증 페이지
-        (main)/     → 인증 후 메인 페이지 (home, matches, marketplace 등)
-        admin/      → 관리자 대시보드
-        landing/    → 랜딩 페이지
-      components/   → 공유 컴포넌트 (ui/, chat/, match/, venue/, landing/ 등)
-      hooks/        → 커스텀 훅
-      lib/          → 유틸리티 (utils.ts, api.ts, constants.ts 등)
-      stores/       → Zustand 상태 관리
-      i18n/         → next-intl 국제화
-      types/        → TypeScript 타입 정의
-  api/              → NestJS 백엔드
-    src/
-      auth/         → JWT + OAuth 인증 (카카오/네이버/애플)
-      matches/      → 개인 매칭 (매칭 엔진 포함)
-      team-matches/ → 팀 매칭 시스템
-      teams/        → 팀/클럽 관리
-      mercenary/    → 용병 시스템
-      marketplace/  → 장터 (중고거래/대여/공동구매)
-      lessons/      → 강좌/레슨
-      chat/         → 채팅
-      payments/     → 결제 (토스페이먼츠)
-      settlements/  → 정산 관리
-      reviews/      → 리뷰/평가
-      venues/       → 구장 정보
-      badges/       → 뱃지 시스템
-      notifications/→ 알림
-      disputes/     → 분쟁 처리
-      admin/        → 관리자 API
-      realtime/     → Socket.IO 게이트웨이
-      prisma/       → Prisma 서비스
-      common/       → 데코레이터, 필터, 가드, 인터셉터
-    prisma/
-      schema.prisma → DB 스키마
-      seed.ts       → 시드 데이터
-e2e/                → Playwright E2E 테스트
-deploy/             → Docker/프로덕션 설정
-infra/
-  load/             → k6 부하 테스트 하네스 (realtime-load.js, README.md)
+  v1_web/                 → Next.js 16 App Router 웹 (포트 3013)
+    src/app/              → 라우트. 공개·사용자 화면은 최상위 폴더(home, matches, team-matches, teams,
+                            tournaments, league-matches, chat, my, …), 어드민은 admin/, 대회 운영 콘솔은
+                            tournament-ops/. globals.css(색·타입 토큰) · tokens.css(치수 토큰)
+    src/components/       → 도메인별 컴포넌트 + v1-ui/(공유 셸·프리미티브)
+    src/hooks/            → use-v1-api.ts(서버 상태 훅 모음), use-v1-game-operations*.ts 등
+    src/lib/              → api-client.ts, error-message.ts, v1-status-labels.ts, date-utils.ts 등
+    src/types/            → API 타입(api.ts 등)
+    src/test/msw/         → Vitest용 MSW 핸들러
+    public/mock/          → 로컬 mock 이미지
+  v1_api/                 → NestJS 11 백엔드 (포트 8121, prefix /api/v1)
+    src/<domain>/         → 도메인 모듈(auth, teams, team-matches, matches, tournaments,
+                            tournament-operations, games, game-operations, league-matches, chat,
+                            notifications, admin, realtime, …)
+    src/common/           → 필터·인터셉터·가드·감사·로깅
+    prisma/               → schema.prisma · migrations/ · 시드
+    test/                 → 통합 스펙(*.integration-spec.ts) · fixtures/ · helpers/
+  v1_android/ v1_ios/     → 네이티브 셸
+e2e/                      → v1 Playwright(v1.config.ts · v1-tests/)
+deploy/                   → Dockerfile.v1-api · Dockerfile.v1-web · docker-compose.{prod,alpha}.yml · nginx
+scripts/                  → release/(배포·버전 계약) · qa/(가드레일 검사·QA 보조) · alpha 검증·캡처 스크립트
+docs/                     → docs/README.md 가 폴더별 목적과 정본 문서 표를 가진다
+.github/                  → workflows/ · tasks/
+.claude/ .codex/          → 에이전트 정의(Claude / Codex)
+infra/load/               → k6 부하 테스트 하네스
 ```
 
-## 기술 스택
+## 기술 스택 (v1 실사용 기준)
 
-### 프론트엔드
-- **프레임워크**: Next.js 16 (App Router, React 19.2)
-- **스타일링**: Tailwind CSS v4 + PostCSS
-- **UI 유틸**: clsx + class-variance-authority + tailwind-merge
-- **상태 관리**: Zustand 5
-- **서버 상태**: TanStack React Query 5
-- **HTTP**: Axios
-- **아이콘**: Lucide React
-- **국제화**: next-intl
-- **모바일**: Capacitor 6 (iOS/Android 래핑)
-- **테스트**: Vitest + jsdom + Testing Library
+- **Web**: Next.js 16 (App Router, `next dev --webpack`) · React 19.2 · Tailwind CSS v4 + PostCSS ·
+  TanStack React Query 5(+ persist) · Axios · clsx + class-variance-authority + tailwind-merge ·
+  Lucide React · Socket.IO client · TipTap(리치 텍스트) · Vitest + jsdom + Testing Library + MSW
+- **API**: NestJS 11 · TypeScript · Prisma 6 + PostgreSQL 16 · class-validator + class-transformer ·
+  Swagger(`/docs`) · Socket.IO(`@nestjs/websockets`) · `@nestjs/throttler` · nestjs-pino ·
+  web-push(VAPID) + APNs + FCM · AWS SES · Jest 30 + ts-jest + Supertest
+- **Infra**: pnpm workspaces + Turborepo · Docker Compose · GitHub Actions · Changesets(버전·CHANGELOG)
+- v1_web 의존성에 `zustand`가 있지만 import 0건이다 — 클라이언트 상태 관리 기준으로 삼지 않는다.
 
-### 백엔드
-- **프레임워크**: NestJS 11.1 + TypeScript
-- **DB**: PostgreSQL 16 (Prisma 6 ORM)
-- **캐시**: Redis 7 (ioredis)
-- **인증**: JWT (passport-jwt) + OAuth (카카오/네이버/애플)
-- **API 문서**: Swagger (@nestjs/swagger 11.2)
-- **실시간**: Socket.IO (@nestjs/websockets)
-- **유효성 검증**: class-validator + class-transformer
-- **테스트**: Jest 30 + ts-jest + Supertest
+## 포트
 
-### 인프라
-- **모노레포**: pnpm workspaces + Turborepo
-- **컨테이너**: Docker Compose (개발), Dockerfile (프로덕션)
-- **CI/CD**: GitHub Actions
-- **배포**: Docker (deploy/Dockerfile.api, deploy/Dockerfile.web)
+| 서비스 | dev (`docker-compose.yml` / 직접 실행) | prod·alpha (`deploy/docker-compose.prod.yml`, alpha는 `docker-compose.alpha.yml` 오버레이) |
+|---|---|---|
+| v1_web | 3013 (`apps/v1_web/package.json` dev 스크립트) | 3013 (`127.0.0.1` 바인딩, nginx 뒷단) |
+| v1_api | 8121 (`API_PORT \|\| 8121`, `apps/v1_api/src/main.ts`) | 8121 (`127.0.0.1` 바인딩, nginx 뒷단) |
+| game-operations worker | — | `WORKER_PORT` 기본 8122 |
+| v1_postgres | 컨테이너 내부 5432만(호스트 노출 없음) | 컨테이너 내부 |
 
-### 포트 맵
+- 웹은 `/api/:path*`·`/uploads/:path*`를 API로 rewrite한다(`apps/v1_web/next.config.ts`,
+  dev `http://localhost:8121` / prod `http://v1_api:8121`).
 
-**Dev 환경** (로컬 + `docker-compose.yml`)
-| 서비스 | 포트 | 용도 |
-|--------|------|------|
-| Next.js | 3003 | 프론트엔드 개발 서버 |
-| NestJS | **8111** | 백엔드 API 서버 (dev) |
-| PostgreSQL | 5433 | 데이터베이스 (호스트 노출) |
-| Redis | 6380 | 캐시/세션 (호스트 노출) |
-
-**Prod 환경** (`deploy/docker-compose.prod.yml`)
-| 서비스 | 포트 | 비고 |
-|--------|------|------|
-| Next.js | 3000 | Nginx 리버스 프록시 뒷단 (`deploy/Dockerfile.web` EXPOSE 3000) |
-| NestJS | **8100** | Nginx 리버스 프록시 뒷단 (`deploy/Dockerfile.api` EXPOSE 8100) |
-| PostgreSQL | 5432 | 컨테이너 내부만 |
-| Redis | 6379 | 컨테이너 내부만 |
-
-> **주의**: dev 와 prod 의 API 포트(8111 vs 8100) · Web 포트(3003 vs 3000) 가 다릅니다. 주요 설정 위치: `apps/api/src/config/configuration.ts` (`API_PORT || 8111`), `apps/web/next.config.ts` (`http://localhost:8111` dev / `http://api:8100` prod), `docker-compose.yml` (dev), `deploy/docker-compose.prod.yml` (prod).
-
-> **로컬 dev 서버는 항상 web·api 각 1개 쌍만 유지한다.** 여러 worktree/에이전트가 검증 목적으로 임시 서버(`pnpm --filter v1_web dev`, `pnpm --filter v1_api dev` 등)를 추가로 띄우기 쉬운데, 검증이 끝나면 즉시 종료해야 한다 — 방치하면 포트가 계속 늘어나고(예: 위 포트 맵과 별개인 v1 스택 기준 — web 3013 외 3014/3016/3020/3021, api 8121 외 8122/8123/8221 등) 어떤 프로세스가 실제로 쓰이는지 혼선이 생긴다. 새로 서버를 띄우기 전에 `lsof -nP -iTCP -sTCP:LISTEN | grep -E ':(3003|3013|301[4-9]|302[0-9]|8100|8111|812[0-9]|822[0-9])'`로(단순 `grep node`는 VS Code·다른 프로젝트의 무관한 Node 프로세스까지 잡혀 잘못된 PID를 kill할 위험이 있다 — 이 프로젝트의 기본 포트뿐 아니라 앞서 예시로 든 드리프트 포트 대역까지 포함해 필터링한다) 기존에 이 프로젝트용으로 떠 있는 프로세스(PID 포함)가 있는지 먼저 확인하고, 있으면 그걸 재사용한다. 부득이하게 별도 포트로 임시 서버를 띄웠다면(예: PR 검증용 격리 worktree), 검증이 끝나는 즉시 위 `lsof` 결과의 PID로 `kill <PID>`해서 정리한다.
-
-## 개발 명령어
+## 개발·검증 명령
 
 ```bash
-pnpm dev              # 전체 개발 서버 (프론트 3003 + 백엔드 8111)
-pnpm build            # 전체 빌드
-pnpm lint             # 전체 린트
-pnpm db:push          # Prisma 스키마 DB 반영
-pnpm db:migrate       # Prisma 마이그레이션
-pnpm db:studio        # Prisma Studio (DB 브라우저)
-pnpm db:seed          # 시드 데이터 삽입
-docker compose up -d  # PostgreSQL + Redis 실행
+pnpm --filter v1_api dev          # API (8121)
+pnpm --filter v1_web dev          # Web (3013) — 검증 목적으로는 띄우지 않는다(아래 "운영 워크플로" 7)
+pnpm --filter v1_web lint         # tsc --noEmit + scripts/v1-pattern-check.mjs
+pnpm --filter v1_api lint         # tsc --noEmit + scripts/v1-surface-check.mjs
+pnpm --filter v1_web build
+pnpm v1:db:generate | v1:db:migrate | v1:db:push | v1:db:studio | v1:db:seed
 ```
-
-## 테스트
 
 ```bash
-cd apps/web && pnpm test              # 프론트엔드 (Vitest, jsdom) — 19 suites
-cd apps/api && pnpm test              # 백엔드 unit (Jest) — 22 suites
-cd apps/api && pnpm test:integration  # 백엔드 통합 (Supertest, --runInBand) — 4 suites
-cd e2e && npx playwright test         # E2E (Mobile Chrome + Desktop Chrome) — 14 specs
-pnpm test:all                         # 전체 (unit + integration + E2E)
+pnpm --filter v1_web test              # Vitest(jsdom) — src/**/*.test.{ts,tsx}. 반드시 apps/v1_web 기준으로 실행
+pnpm --filter v1_api test              # Jest unit — src/**/*.spec.ts
+pnpm --filter v1_api test:integration  # Jest integration(--runInBand) — test/**/*.integration-spec.ts, DB 필요
+pnpm v1:test                           # 위 v1_api unit + v1_web test
+pnpm test:e2e:v1                       # Playwright — e2e/v1.config.ts (v1 스택 가동 전제)
 ```
 
-- 프론트엔드 테스트: `apps/web/src/**/*.test.{ts,tsx}`
-- 백엔드 unit 테스트: `apps/api/src/**/*.spec.ts`
-- 백엔드 통합 테스트: `apps/api/test/integration/*.e2e-spec.ts`
-- E2E 테스트: `e2e/tests/`
-
-### 테스트 인프라 (격리형)
-
-**DB 격리**: 매 suite `beforeAll/beforeEach`에서 `truncateAll(prisma)` → fixture 주입, `afterAll`에서 정리.
-- 헬퍼: `apps/api/test/helpers/db-cleanup.ts` — TRUNCATE RESTART IDENTITY CASCADE
-- 토큰: `apps/api/test/helpers/auth-token.ts` — unit용 `signTestJwt()`, 통합용 `devLoginToken()`
-- 앱 부트스트랩: `apps/api/test/helpers/nest-app.ts` — `createTestApp()` (main.ts 글로벌 설정 미러링)
-
-**Fixture 팩토리**: `apps/api/test/fixtures/`
-- `personas.ts` — 8개 테스트 페르소나 (sinaro/teamOwner/teamManager/teamMember/mercenaryHost/admin/instructor/seller)
-- `teams.ts`, `matches.ts`, `team-matches.ts`, `mercenary.ts`, `marketplace.ts`, `payments.ts`, `lessons.ts`
-- `disputes.ts` — `createDispute`, `createDisputeEvent` (Task 70 추가)
-- `payouts.ts` — `createPayout`, `createPayoutBatch` (Task 70 추가)
-
-**프론트엔드 모킹**: MSW (`apps/web/src/test/msw/`) — 네트워크 레이어 모킹. `vitest.setup.ts`에서 lifecycle 관리.
-
-**E2E**: `e2e/global-setup.ts` — 페르소나 dev-login + storageState 저장 + 시드 데이터. `e2e/global-teardown.ts` — Prisma로 E2E 사용자 cleanup.
+- 통합 스펙은 `DATABASE_URL`이 있는 환경(CI)에서만 돈다. 가시성·권한·기본값 변경의 통합 red를
+  "낡은 테스트"로 읽지 않는다.
+- 통합 테스트 fixture: `apps/v1_api/test/fixtures/`, 헬퍼: `apps/v1_api/test/helpers/`.
+- 프론트 네트워크 모킹: MSW(`apps/v1_web/src/test/msw/`), lifecycle은 `apps/v1_web/vitest.setup.ts`.
+- 부하 테스트: `infra/load/`(k6).
+- `.env*`는 읽거나 출력하지 않는다. 파괴적 시드·리셋은 사용자가 명시할 때만.
 
 ## 아키텍처
 
-### 인증 플로우
-- JWT 기반 인증 (access + refresh token)
-- OAuth: 카카오/네이버/애플 소셜 로그인
-- 개발 환경 전용 `dev-login` 엔드포인트 (프로덕션 차단)
-- `JwtAuthGuard` + `@CurrentUser()` 데코레이터
-- 관리자: `AdminGuard` (UserRole.admin 체크) — `/admin/*` 13개 엔드포인트 모두 적용됨
-- mutation 핸들러는 `@CurrentUser()` 로 userId 추출 후 서비스 계층에서 ownership 검증
+### 인증
+- 세션은 `teameet_v1_session` httpOnly 쿠키 하나(`v1.<payload>.<HMAC>`, 서명만 하는 stateless 토큰 —
+  저장 테이블 없음). 발급은 로그인·소셜(카카오/애플 등) API. 해석: `apps/v1_api/src/auth/v1-session.ts`.
+- **개발 전용 헤더 인증**: `NODE_ENV !== 'production'`일 때만 `x-v1-user-id`/`x-v1-user-email` 헤더를
+  신원으로 받는다(웹은 localStorage `teameet.v1.userId`/`teameet.v1.userEmail`을 헤더로 보낸다).
+  alpha·prod는 production 모드라 **401**이다.
+- 가드: `V1AuthGuard`(필수) · `OptionalV1AuthGuard` · `TournamentStaffGuard` · `CreatorProfileGuard`.
+  어드민은 `AdminContextService.getActiveAdmin()`이 `V1AdminUser`(role `owner|ops|support`, active)를 요구한다.
 
-### API 응답 형식
-- 모든 응답: `{ status, data, timestamp }` (TransformInterceptor)
-- 에러: `HttpExceptionFilter` → 에러 코드 `DOMAIN_CODE` 형태
-- 페이지네이션: Cursor 기반
-
-### 핵심 도메인
-- **개인 매칭**: 종목별 매치 생성 → 참가 신청 → 결제 → 팀 편성 → 경기 → 리뷰
-- **팀 매칭**: 팀 생성 → 경기 공고 → 상대팀 신청 → 2단계 상호확인 → 도착인증 → 경기 → 상호평가
-- **용병 시스템**: 팀 경기에 개인 용병 참가 (Prisma 기반, 더 이상 in-memory mock 없음)
-- **장터**: 중고 장비 판매/대여/공동구매 + 에스크로 결제 — Toss 일반 결제 + in-house 에스크로 원장. `MarketplaceOrder` 상태 머신(`pending → paid → shipped → delivered → completed | auto_released`), 에스크로 자동 해제 cron (10분 주기, `DISABLE_MARKETPLACE_CRON=true` 비활성화), 분쟁 도메인(`Dispute` + `DisputeEvent` Prisma 모델, in-memory mock 완전 제거), 정산 payout 배치 워크플로우(admin 수동 배치 → mark-paid), 커미션 10% 단일 상수(`MARKETPLACE_COMMISSION_RATE`, `apps/api/src/common/constants/commission.ts`)
-- **강좌**: 그룹레슨/연습경기/자유연습/클리닉 + 티켓(1회권/다회권/기간권) + 출석 관리
-- **팀 신뢰 점수**: 6항목 상호평가 → TeamTrustScore 누적
-- **채팅**: Prisma `ChatRoom`/`ChatMessage`/`ChatParticipant` 모델로 영속화. cursor 기반 페이지네이션, `teamMatchId` 연동, get-or-create. in-memory stub 완전 제거. `ChatService`가 persist → broadcast 단일 경로 (REST + WS 공통)
-- **팀 자동 구성 (Task 71)**: ELO snake-draft 기반 균등 팀 배정 — `TeamBalancingService`가 `UserSportProfile.eloRating`을 ELO 내림차순 정렬 후 snake-draft (A-B-B-A-A-B-... 또는 A-B-C-C-B-A-... 다팀 snake)로 배분. Preview API로 dry-run 확인 후 확정 시 `$transaction`으로 원자 교체. Cold-start(`UserSportProfile` 없음) 참가자는 eloRating=1000 fallback. 알고리즘 설계 문서: `docs/design/task-71-team-balancing.md`
-- **팀 자동 구성 v2 hardening (Task 72)**: preview→compose 간 **participant churn 감지** 추가. `computeParticipantHash()`(SHA-256 of sorted userIds, `apps/api/src/matches/matches.service.ts`)가 preview 응답에 `participantHash` 필드를 포함하고, compose 호출 시 stale hash 감지 → **409 `PARTICIPANTS_CHANGED`**. 프론트는 자동 재-preview + "참가자가 변경되어 다시 계산했어요" 토스트. Preview 엔드포인트에 **호스트 단위 rate limit** 적용(`@Throttle limit=20/60s`, `HostThrottlerGuard`가 `req.user.id`로 트래킹, 초과 시 429 + `Retry-After`). Modal은 `previewHistory` FIFO cap=2로 직전 preview 비교·재사용 지원. 기존 팀 배정이 있는 매치의 재확정은 `ConfirmReplaceModal`(alertdialog role)로 명시적 "교체" 확인. 4팀 그리드는 `sm:grid-cols-2 xl:grid-cols-3` responsive.
+### API 응답·에러·페이지네이션
+- prefix `/api/v1`. 성공 응답은 `TransformInterceptor`가 `{ status: 'success', data, timestamp }`로 감싼다.
+- 에러는 `HttpExceptionFilter`가 `{ statusCode, code, message, … }`로 정규화한다. `code`는
+  `DOMAIN_CODE` 형태(`PERMISSION_DENIED`, `LINEUP_DEADLINE_PASSED` …), 없으면 `INTERNAL_ERROR`.
+- `ValidationPipe`는 `whitelist + forbidNonWhitelisted + transform`이다 — 웹 폼의 UI 전용 필드를
+  그대로 보내면 400. submit 시 DTO 호환 payload로 정리한다.
+- 목록은 cursor 기반이 기본이고 어드민 표는 page도 받는다. 다음 커서는 응답의 `pageInfo.nextCursor`에
+  있다(`apps/v1_api/src/common/pagination/page-args.ts`).
+- API 계약 문서: `docs/api/README.md`(색인). 엔드포인트 목록을 이 파일에 복제하지 않는다 —
+  컨트롤러·DTO가 진실이고, 계약이 바뀌면 `docs/api/` 해당 문서를 같은 변경에서 고친다.
 
 ### 대회 · 리그 · 매치 — 정본 (2026-09-02 사용자 확정)
 
@@ -297,230 +258,45 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 명단 = 출전자(선후발 없음, 롤링 종목은 교체 기록 없음) · 결과는 "결과 보내기 → 어드민 확인" 한 단계(이의 없음) ·
 팀 전적 전체/대회/리그/친선 + 개인 기록. 바꾸려면 그 문서의 결정 이력 표에 먼저 적는다.
 
-### 팀 역할 기반 권한 (Phase 1-5 추가)
+### 팀 역할 기반 권한
 
-팀 멤버는 `TeamMembership` 모델로 관리되며, 역할 계층은 `owner > manager > member`.
+`V1TeamMembership.role`은 `owner > manager > member`(`apps/v1_api/src/teams/teams.service.ts`).
 
-| 역할 | 멤버 초대 | 역할 변경 | 멤버 추방 | 팀 삭제 |
-|------|-----------|-----------|-----------|---------|
-| owner | O | O | O | O |
-| manager | O | O (member만) | O (member만) | X |
-| member | X | X | X | X |
-
-- `TeamMembershipService.assertRole(teamId, userId, 'manager')` 로 권한 검증
-- 팀 생성 시 시더/백필 SQL이 owner 멤버십 자동 생성
-- 관련 모델: `TeamMembership`, enums `TeamRole` / `TeamMembershipStatus`
-- **팀 가입 신청 수락·거부** (Task 69 추가): manager+ 는 초대(invitation) 외에 **외부 가입 신청(application)도 수락·거부**할 수 있다. `GET/PATCH /teams/:id/applications` 엔드포인트 사용. reject 후 status는 `left`(재신청 가능)로 처리하며 `removed`(영구 차단)는 사용하지 않는다.
-
-## API 엔드포인트
-
-### 인증 (`/auth`)
-`POST register` | `POST login` | `POST dev-login` | `POST kakao/naver/apple` | `POST refresh` | `GET me` | `DELETE withdraw`
-
-### 사용자 (`/users`)
-`GET me` | `PATCH me` | `GET me/matches` | `GET :id`
-
-### 매치 (`/matches`)
-`GET /` | `GET recommended` | `POST /` | `GET :id` | `PATCH :id` | `POST :id/cancel` [idempotent] | `POST :id/close` [idempotent] | `POST :id/join` | `DELETE :id/leave` | `POST :id/teams` | `POST :id/complete` [idempotent]
-
-**팀 자동 구성** (Task 71 추가, Task 72에서 hardening):
-`POST :id/teams/preview` (호스트 전용, 팀 자동 구성 dry-run preview — body: `ComposeTeamsDto { strategy?, teamCount?, seed?, participantHash? }`, response: `PreviewTeamsResponseDto { teams, metrics: { maxEloGap, variance, stdDev, teamAvgElos, coldStartCount }, seed, participantHash }`. DB 변경 없음. **Task 72**: 응답에 `participantHash`(SHA-256 hex 64-char) 포함, `@Throttle limit=20/60s` + `HostThrottlerGuard`(req.user.id 트래킹) 적용. 초과 시 429 + `Retry-After: 60`)
-`POST :id/teams` — Task 71로 확장: `ComposeTeamsDto` body 수락, ELO snake-draft(`TeamBalancingService`) 경유, `$transaction` 원자 교체. body 없는 기존 클라이언트는 `autoBalance` 플래그 기반 default 동작 유지 (back-compat). **Task 72**: optional `participantHash` 수락 — preview 시점 hash와 현재 참가자 해시 불일치 시 **409 `PARTICIPANTS_CHANGED`** 반환(프론트에서 자동 재-preview). hash 미전달 시 legacy client로 간주하여 stale check skip.
-
-### 팀 (`/teams`)
-`GET /` | `GET me` (소유 팀 목록, JwtAuthGuard) | `GET :id` | `POST /` | `PATCH :id` | `DELETE :id` | `POST :id/apply`
-
-**팀 멤버 관리** (Phase 1-5 추가):
-`GET :id/members` | `POST :id/members` | `PATCH :id/members/:userId` | `DELETE :id/members/:userId` | `POST :id/leave`
-
-**소유권 이전**:
-`POST :id/transfer-ownership` (owner 전용, `TransferOwnershipDto` — `toUserId`, `demoteTo: 'manager'|'member'`)
-
-**팀 신청** (Task 27 추가):
-`POST :id/apply` (JwtAuthGuard, 비멤버 대상, idempotent — 중복 신청 시 409)
-
-**팀 신청 관리** (Task 69 추가, **Task 73에서 멱등**):
-`GET :id/applications` (manager+ 전용, pending 신청자 목록, 각 행에 nickname/profileImageUrl/mannerScore 포함) | `PATCH :id/applications/:userId/accept` [idempotent] (manager+, pending→active, memberCount +1, 신청자에게 `team_application_accepted` 알림. 이미 active면 `alreadyProcessed: true` 반환, 트랜잭션/알림 skip) | `PATCH :id/applications/:userId/reject` [idempotent] (manager+, pending→left, 신청자에게 `team_application_rejected` 알림. 이미 left면 `alreadyProcessed: true` 반환)
-
-**팀 전용 하위 페이지** (Task 22 추가, 프론트엔드):
-- `/teams/:id/matches` — 해당 팀이 host 또는 applicant로 참여한 팀 매칭 목록 (`GET /team-matches?teamId=`)
-- `/teams/:id/mercenary` — 해당 팀의 용병 모집글 목록 (`GET /mercenary?teamId=`)
-
-### 팀 매치 (`/team-matches`)
-`GET /` (쿼리: `teamId` — 호스트 또는 신청자로 참여한 팀의 매칭 필터) | `GET :id` | `POST /` | `POST :id/apply` | `PATCH :id/applications/:appId/approve` | `PATCH :id/applications/:appId/reject` | `POST :id/check-in` | `POST :id/result` | `POST :id/evaluate` | `GET :id/referee-schedule`
-
-**신청 조회** (Phase 1-5 추가):
-`GET :id/applications` (호스트 뷰) | `GET me/applications` (신청자 본인 뷰)
-
-### 장터 (`/marketplace`)
-`GET listings` | `POST listings` | `GET listings/:id` | `POST listings/:id/order`
-
-**주문 상태 전환** (Task 70 추가):
-`GET orders/me` (buyer 전용, cursor 페이지네이션) | `GET orders/:id` (buyer 또는 seller) | `POST orders/:id/ship` (seller 전용, `ShipOrderDto { carrier?, trackingNumber? }`) | `POST orders/:id/deliver` (seller 전용) | `POST orders/:id/confirm-receipt` (buyer 전용, `completed` 전환 + SettlementRecord 생성) | `POST orders/:id/dispute` (buyer 전용, `escrow_held | shipped | delivered` 상태에서만, `FileDisputeDto { type, description, attachmentUrls? }`)
-
-**어드민 주문 강제 해제** (Task 70 추가):
-`POST /admin/orders/:id/force-release` (AdminGuard, `{ note: string }` — cron과 동일 서비스 메서드, 운영 재처리 + 통합테스트 결정론용)
-
-### 분쟁 (`/disputes`)
-**구매자·판매자 뷰** (Task 70 추가 — 기존 `/admin/disputes` 완전 재작성):
-`GET me` (query `?role=buyer|seller|all`, cursor 페이지네이션) | `GET :id` (participant 또는 admin) | `POST :id/respond` (seller 전용, state=filed일 때, `RespondDisputeDto`) | `POST :id/messages` (buyer/seller participant, `DisputeMessageDto`) | `POST :id/withdraw` (buyer 전용, filed/seller_responded 상태에서만)
-
-**어드민 분쟁 관리** (Task 70 재작성 — 기존 `POST /` + `PATCH :id/status` 제거):
-`GET /admin/disputes` (status / targetType / cursor 필터) | `GET /admin/disputes/:id` (Dispute + events[] + order/teamMatch snapshot) | `POST /admin/disputes/:id/review` (→ `admin_reviewing`) | `PATCH /admin/disputes/:id/resolve` (`ResolveDisputeDto { action: refund|release|dismiss, note }` — refund 시 Toss cancel 연동, release 시 SettlementRecord 생성)
-
-### 정산 (`/admin/payouts`)
-**(Task 70 신규 — 기존 `/admin/settlements` 에 payout 배치 계층 추가)**
-`GET /admin/payouts` (status / recipientId / batchId / cursor 필터) | `GET /admin/payouts/eligible` (배치 대상 released settlements, recipient별 집계) | `POST /admin/payouts/batch` (`CreateBatchDto { recipientIds?, cutoffDate? }` — 서버에서 금액 계산, client 금액 신뢰 안 함) | `PATCH /admin/payouts/:id/mark-paid` (`{ externalRef?, note? }` — payout `paid`, 수령자 `payout_paid` 알림) | `PATCH /admin/payouts/:id/mark-failed` (`{ reason }` — settlements `payoutId=null` 복원, 재대기열)
-
-**실패 payout 재시도** (Task 76 추가):
-`POST /admin/payouts/:id/retry` [AdminGuard, `@HttpCode(200)`] (status=failed guard로 race-safe `updateMany`, 연결 settlements `payoutId=null` 복원, `Payout.status=cancelled` 기록. 이미 `paid`인 경우 409 `PAYOUT_NOT_RETRIABLE`)
-
-### 운영 대시보드 (`/admin/ops`)
-**(Task 76 신규 — `AdminOpsModule`)**
-`GET /admin/ops/summary` [AdminGuard, `@Throttle 120/60s`] — `{ matchesInProgress, paymentsPending, disputesOpen, settlementsPending, payoutsFailed, pushFailures5m }` 6개 KPI `Promise.all` 병렬 집계. `AdminOpsSummaryDto` (Swagger `ApiProperty`, plain interface)
-`GET /admin/ops/recent-push-failures?limit=20` [AdminGuard] — `WebPushFailureLog` 테이블 기반. PII 제거: endpoint 마지막 6자 + userId sha256 8자
-`POST /admin/ops/push-failures/ack` [AdminGuard] — `acknowledgedAt` 타임스탬프 기록, 알람 재트리거 방지
-
-### 결제 (`/payments`)
-`POST prepare` (PreparePaymentDto) | `POST confirm` (ConfirmPaymentDto) | `POST :id/refund` (RefundPaymentDto) | `GET me` | `POST webhook`
-
-### 업로드 (`/uploads`)
-`POST /` (멀티파트, 최대 5개 10MB, jpeg/png/webp/gif) | `GET :id` | `DELETE :id`
-
-### 채팅 (`/chat`)
-`GET rooms` (cursor on lastMessageAt) | `GET rooms/:id` (cursor on message createdAt) | `POST rooms` (with optional teamMatchId) | `POST rooms/:id/messages` | `PATCH rooms/:id/read` | `GET unread-count`
-
-### 구장 (`/venues`)
-`GET /` | `GET :id` | `GET :id/schedule` | `POST :id/reviews`
-
-### 관리자 (`/admin`)
-`GET stats/users/matches/lessons/teams/venues/payments` | `POST lessons/teams/venues` | `PATCH matches/:id/status` | `PATCH lessons/:id/status` | `PATCH venues/:id`
-
-### 정산 (`/admin/settlements`)
-`GET /` | `GET summary` | `PATCH :id/process` (status 컬럼: `pending | held | processing | completed | failed | refunded` — Task 70에서 `held`/`refunded` 추가)
-
-### 용병 (`/mercenary`)
-`GET /` (모든 11 종목 필터링 지원, Task 27 수정) | `POST /` | `GET :id` (Task 27 추가, detail page 지원) | `POST :id/apply`
-
-**신청 관리** (Phase 1-5 추가):
-`GET me/applications` (신청자 본인 뷰) | `PATCH :id/applications/:appId/accept|reject` (호스트 뷰) | `DELETE :id/applications/me` (신청 취소)
-
-**모집글 종료** (Task 69 추가, **Task 73에서 멱등**):
-`POST :id/close` [idempotent] (작성자 또는 팀 manager+, filled 외 수동 종료, pending/accepted 신청자에게 `mercenary_closed` 알림. 이미 closed면 `alreadyClosed: true` 반환) | `POST :id/cancel` [idempotent] (작성자 전용, 전체 신청자에게 `mercenary_cancelled` 알림. 이미 cancelled/closed면 `alreadyCancelled: true` 반환)
-
-### 알림 (`/notifications`)
-`GET /` | `PATCH :id/read` | `POST push-subscribe` [idempotent] (body `{endpoint, keys}`, endpoint 기준 upsert — 중복 구독 시 동일 row에 keys 갱신, `@Throttle 10/60s`) | `DELETE push-unsubscribe` (body `{endpoint}`) | `GET vapid-public-key` (`@Throttle 30/60s`)
-
-**알림 선호도** (Task 74 신규):
-`GET /notifications/preferences` (JwtAuthGuard, row 없으면 default all-enabled 반환) | `PATCH /notifications/preferences` (`UpdateNotificationPreferencesDto` — 8개 boolean 필드: `teamApplication`, `matchCompleted`, `eloChanged`, `chatMessage`, `mercenaryPost`, `teamMatch`, `payment`, `system`. `@IsBoolean()` 검증 필수)
-
-### 리뷰 (`/reviews`) — Task 73에서 멱등
-`POST /` [idempotent] (body `{ matchId, targetId, skillRating, mannerRating, comment? }`. 200 + flattened review + `alreadySubmitted: boolean`. `(matchId, authorId, targetId)` unique constraint — 중복 시 기존 리뷰 반환 + `alreadySubmitted: true` + 알림/ELO/매너 업데이트 skip) | `GET pending`
-
-### 기타
-`GET /health` — 헬스체크
+- 팀 관리(초대·가입 신청 처리·팀 매치 생성 등)는 owner·manager.
+- manager는 **member의 역할만** 바꾸고 **member만** 내보낼 수 있다. owner는 이 API로 바꾸거나 내보낼 수 없다.
+- owner 위임은 **manager에게만** 가능하고, 위임하면 기존 owner는 manager가 된다. manager는 팀당 최대 5명.
+- 권한 판정은 서비스 계층(`getManagementActor` 등)에서 한다. 컨트롤러에서 직접 DB 조회로 권한을 검사하지 않는다.
 
 ## 백엔드 개발 규칙
 
-### NestJS 패턴
-- 모듈 구조: `*.module.ts` + `*.controller.ts` + `*.service.ts`
-- DTO: `class-validator` 데코레이터 사용, `class-transformer` 변환
-- 가드: `JwtAuthGuard` (인증), `AdminGuard` (관리자 권한)
-- 인터셉터: `TransformInterceptor` (응답 래핑)
-- 필터: `HttpExceptionFilter` (에러 표준화)
-- Prisma: `PrismaService` 주입, 트랜잭션은 `$transaction()` 사용
-- `passwordHash` 필드는 API 응답에서 반드시 제거
-- **팀 mutation 엔드포인트**: `TeamMembershipService.assertRole(teamId, userId, 'manager')` 로 권한 검증 필수. 직접 DB 조회로 권한 검사하지 않음
-- **실시간(RealtimeGateway)**: JWT 핸드셰이크 인증, `emitToUser(userId, event, payload)` 헬퍼로 사용자 알림 전송
-- **WebPushService**: `VAPID_PUBLIC_KEY/PRIVATE_KEY/SUBJECT` 없을 시 `enabled=false`로 graceful disable. `sendToUser()` no-op + warn log. 알림 create 흐름은 푸시 실패와 무관하게 성공해야 함 (fire-and-forget). Firebase 미사용 — `web-push` 패키지 + VAPID로 EC2에서 직접 발송.
-- **ChatService**: 채팅 persist + broadcast 단일 경로 — REST `postMessage`와 WS `chat:message` 모두 `ChatService`를 통과. Gateway에서 직접 broadcast 금지. 참가자 검증(`assertParticipant`)은 REST + WS 양쪽에서 필수.
-- **중첩 DTO 패턴**: JSON 필드에 `Record<string, unknown>` 사용 금지. 전용 DTO 클래스 정의 후 `@ValidateNested() @Type(() => XxxDto)` 적용
-- **숫자 기본값**: `filter.limit || 20` 대신 `filter.limit ?? 20` — `||`는 0을 falsy로 처리하므로 nullish coalescing 사용
-
-### API 컨벤션
-- 경로: `/api/v1/*` (NestJS globalPrefix)
-- Swagger: `@nestjs/swagger` 데코레이터로 API 문서화
-- 에러 코드: `MATCH_NOT_FOUND`, `PAYMENT_FAILED` 등 `DOMAIN_CODE` 형태
+- 모듈 구조: `*.module.ts` + `*.controller.ts` + `*.service.ts` + `dto/`. Prisma는 `PrismaService` 주입,
+  트랜잭션은 `$transaction()`.
+- DTO는 `class-validator`/`class-transformer`. **중첩 JSON 필드에 `Record<string, unknown>` 금지** —
+  전용 DTO 클래스 + `@ValidateNested() @Type(() => XxxDto)`.
+- **숫자 기본값은 `??`**: `limit || 20`은 0을 falsy로 처리한다.
+- 비밀번호 해시 등 민감 필드는 응답에서 제거한다. 로그 마스킹은 `src/common/logging/`.
+- 실시간: `RealtimeGateway`(Socket.IO) — 사용자 알림은 `emitToUser(userId, event, payload)`, 경기 운영은
+  `game.*` 메시지. 채팅 전송은 `ChatService.sendMessage`가 참가자 검증 → persist → `chat:message` emit
+  순서로 처리한다(단일 경로 — 게이트웨이에서 직접 broadcast하지 않는다).
+- 대회 단건 조회는 `prisma.v1Tournament.findUnique/findFirst`를 직접 부르지 말고
+  `src/tournaments/tournament-surface-lookup.ts`의 헬퍼를 쓴다(`lint:surface` 래칫이 강제).
+- 푸시: `WebPushService`는 VAPID 키가 없으면 비활성(경고 로그)으로 동작하고, 알림 생성은 푸시 실패와
+  무관하게 성공해야 한다(fire-and-forget). 네이티브는 APNs·FCM 서비스가 따로 있다.
+- 에러 코드: `DOMAIN_CODE` 형태.
 
 ## 프론트엔드 개발 규칙
 
-### Next.js App Router
-- Route Groups: `(auth)` 인증 페이지, `(main)` 메인 앱, `admin/` 관리자
-- Parallel Routes: `{auth}`, `{main}` 레이아웃
-- `@` alias → `src/` 디렉토리
-- API 프록시: `next.config.ts` rewrites → `localhost:8111`
-
-### 컴포넌트 개발 규칙 (React 19.2)
-- `React.forwardRef` 사용 금지 — `ref`를 Props 인터페이스에 직접 포함
-- 패턴: `interface FooProps { ref?: React.Ref<HTMLFooElement>; ... }`
-- 적용 대상: `components/ui/button.tsx`, `input.tsx`, `select.tsx`, `textarea.tsx` 및 신규 UI 컴포넌트 전체
-
-### 상태 관리
-- 서버 상태: TanStack React Query (캐싱, 재요청)
-- 클라이언트 상태: Zustand stores (`stores/` 디렉토리)
-- 로컬 포맷터 정의 금지 — 반드시 `lib/utils.ts` 유틸 사용
-
-### 주요 커스텀 훅 (`hooks/use-api.ts` → `hooks/api/<domain>.ts` 도메인별 분리, `hooks/use-api.ts` 는 re-export barrel)
-- `useMyTeams()` — 로그인 유저 소속 팀 목록 (`GET /teams/me`). 백엔드 `TeamMembership[]` 응답을 `{ id, name, role, sportType, description, city, district, memberCount, level, isRecruiting, logoUrl, joinedAt }[]` 평탄화 형태로 정규화하여 반환. 팀 선택 UI·팀 매칭 생성 시 사용
-- `useMyTeamMatchApplications()` — 신청자 본인이 보낸 팀 매칭 신청 목록 (`GET /team-matches/me/applications`). `/my/team-match-applications` 페이지에서 사용
-- `useRequireAuth()` — 비로그인 접근 시 로그인 페이지로 redirect. **인증이 필요한 모든 페이지에 반드시 적용** (`/(main)/my/*`, `/(main)/profile`, `/(main)/matches/new`, `/(main)/lessons/new`, `/(main)/reviews`, `/teams/new`, `/team-matches/new`, `/mercenary/new` 등)
-- `useChatUnreadTotal()` — 전체 미읽음 메시지 수 (`GET /chat/unread-count`), 하단 내비게이션 뱃지에 사용
-- `useChatRoomSocket()` — Socket.IO `chat:message` 이벤트 구독, React Query 캐시 invalidate
-- `useNotificationSocket()` — `notification:new` 이벤트 구독, 인앱 알림 상태 반영
-- `usePushRegistration()` — Web Push 구독 (`POST /notifications/push-subscribe`), VAPID 기반, `sw-push.js` 서비스 워커 + Capacitor 분기 처리
-- `useNotificationPreferences()` — 알림 선호도 조회 (`GET /notifications/preferences`). row 없는 신규 사용자는 default all-enabled 반환. Task 74 추가
-- `useUpdateNotificationPreferences()` — 알림 선호도 저장 mutation (`PATCH /notifications/preferences`). `['notification-preferences']` invalidate. 8개 boolean 필드 `(teamApplicationEnabled, matchCompletedEnabled, eloChangedEnabled, chatMessageEnabled, mercenaryPostEnabled, teamMatchEnabled, paymentEnabled, systemEnabled)`. Task 74 추가
-- `useTeamApplications(teamId)` — 팀 가입 신청자 목록 (`GET /teams/:id/applications`), manager+ 전제. 각 항목에 nickname/profileImageUrl/mannerScore 포함 (Task 69 추가)
-- `useAcceptTeamApplication()` — 신청 수락 mutation (`PATCH /teams/:id/applications/:userId/accept`), `['team-applications', teamId]` + `['team-members', teamId]` invalidate (Task 69 추가)
-- `useRejectTeamApplication()` — 신청 거부 mutation (`PATCH /teams/:id/applications/:userId/reject`), 동일 invalidate (Task 69 추가)
-- `useUserPublicProfile(userId)` — 공개 프로필 조회 (`GET /users/:id`), PII 제외 필드만 반환 (Task 69 추가)
-- `useStartDirectChat()` — 1:1 채팅방 생성 mutation (`POST /chat/rooms` type=direct), 생성 후 `/chat/:roomId` redirect (Task 69 추가)
-- `useCloseMercenaryPost()` — 용병 모집글 종료 mutation (`POST /mercenary/:id/close`) (Task 69 추가)
-- `useCancelMercenaryPost()` — 용병 모집글 취소 mutation (`POST /mercenary/:id/cancel`) (Task 69 추가)
-- `usePreviewTeams(matchId)` — 팀 자동 구성 preview (dry-run) (`POST /matches/:id/teams/preview`), 호스트 전용. 응답: `{ teams, metrics: { maxEloGap, variance, stdDev, teamAvgElos, coldStartCount }, seed, participantHash }` (Task 71 추가, **Task 72**: `participantHash` 필드 추가로 stale preview 감지 지원). 429 수신 시 `retryAfterSeconds` 상태 노출 + info 토스트 표시(Track C에서 재추첨 버튼 60초 disable)
-- `useComposeTeams(matchId, options?)` — 팀 배정 확정 (`POST /matches/:id/teams`), 성공 시 `['match', matchId]` + `['match-participants', matchId]` invalidate (Task 71 추가, **Task 72**: `options.onParticipantsChanged` 콜백 — 서버가 409 `PARTICIPANTS_CHANGED` 반환 시 stale hash 제거 후 호출자에게 재-preview 지시. info 토스트 "참가자가 변경되어 다시 계산했어요" 자동 표시)
-- `useMyOrders(params?)` — buyer 주문 목록 (`GET /marketplace/orders/me`, cursor 페이지네이션) (Task 70 추가)
-- `useOrder(id)` — 주문 상세 (`GET /marketplace/orders/:id`, buyer 또는 seller) (Task 70 추가)
-- `useShipOrder()` — 판매자 배송 시작 mutation (`POST /marketplace/orders/:id/ship`) (Task 70 추가)
-- `useDeliverOrder()` — 판매자 배송 완료 mutation (`POST /marketplace/orders/:id/deliver`) (Task 70 추가)
-- `useConfirmReceipt()` — 구매자 수령 확인 mutation (`POST /marketplace/orders/:id/confirm-receipt`), `['order', id]` + `['my-orders']` invalidate (Task 70 추가)
-- `useFileDispute()` — 분쟁 신청 mutation (`POST /marketplace/orders/:id/dispute`) (Task 70 추가)
-- `useMyDisputes(role?)` — 내 분쟁 목록 (`GET /disputes/me?role=buyer|seller|all`) (Task 70 추가)
-- `useDispute(id)` — 분쟁 상세 (`GET /disputes/:id`) (Task 70 추가)
-- `useSellerRespond()` — 판매자 분쟁 답변 mutation (`POST /disputes/:id/respond`) (Task 70 추가)
-- `useAddDisputeMessage()` — 분쟁 메시지 추가 mutation (`POST /disputes/:id/messages`) (Task 70 추가)
-- `useWithdrawDispute()` — 분쟁 철회 mutation (`POST /disputes/:id/withdraw`) (Task 70 추가)
-- `useAdminDisputes(params?)` — 어드민 분쟁 목록 (`GET /admin/disputes`) — Task 70에서 실제 Prisma 데이터로 재연결 (in-memory mock 제거) (Task 70 업데이트)
-- `useAdminDispute(id)` — 어드민 분쟁 상세 (`GET /admin/disputes/:id`) (Task 70 추가)
-- `useReviewDispute()` — 어드민 검토 시작 mutation (`POST /admin/disputes/:id/review`) (Task 70 추가)
-- `useResolveDispute()` — 어드민 분쟁 해결 mutation (`PATCH /admin/disputes/:id/resolve`). `['admin-dispute', id]` + `['admin-disputes']` + `['admin-ops-summary']` invalidate (Task 70 추가, **Task 76**: `['admin-ops-summary']` invalidate 추가)
-- `useForceReleaseOrder()` — 어드민 에스크로 강제 해제 mutation (`POST /admin/orders/:id/force-release`) (Task 70 추가)
-- `useAdminPayouts(params?)` — 어드민 payout 목록 (`GET /admin/payouts`, status/recipientId/batchId 필터) (Task 70 추가)
-- `useAdminEligibleSettlements()` — 배치 가능 settlement 목록 (`GET /admin/payouts/eligible`) (Task 70 추가)
-- `useCreatePayoutBatch()` — payout 배치 생성 mutation (`POST /admin/payouts/batch`) (Task 70 추가)
-- `useMarkPayoutPaid()` — payout paid 처리 mutation (`PATCH /admin/payouts/:id/mark-paid`). `['admin-payouts']` + `['admin-ops-summary']` invalidate (Task 70 추가, **Task 76**: `['admin-ops-summary']` invalidate 추가)
-- `useMarkPayoutFailed()` — payout failed 처리 mutation (`PATCH /admin/payouts/:id/mark-failed`). `['admin-payouts']` + `['admin-ops-summary']` invalidate (Task 70 추가, **Task 76**: `['admin-ops-summary']` invalidate 추가)
-- `useAdminOpsSummary()` — ops KPI 조회 (`GET /admin/ops/summary`). `refetchInterval: 30_000`. 6개 지표: `matchesInProgress`, `paymentsPending`, `disputesOpen`, `settlementsPending`, `payoutsFailed`, `pushFailures5m` (Task 76 추가)
-- `useRecentPushFailures(limit?)` — 최근 푸시 실패 목록 (`GET /admin/ops/recent-push-failures?limit=20`). PII 마스킹 적용 (Task 76 추가)
-- `useAckPushFailures()` — 실패 알람 확인 mutation (`POST /admin/ops/push-failures/ack`). `['admin-ops-summary']` + `['recent-push-failures']` invalidate (Task 76 추가)
-- `useRetryPayout()` — 실패 payout 재시도 mutation (`POST /admin/payouts/:id/retry`). `['admin-payouts']` + `['admin-ops-summary']` invalidate. 409 `PAYOUT_NOT_RETRIABLE` 시 에러 toast (Task 76 추가)
-
-### 에러 처리 규칙
-- **에러 메시지**: `catch (err)` 블록에서 직접 타입 단언 금지. `extractErrorMessage(err, 'fallback 메시지')` (`@/lib/utils`) 사용
-- **에러 메시지 어조**: fallback 메시지는 반드시 **해요체** (`~했어요`, `~해주세요`). 합니다체 금지
-- **SportType 타입**: `lib/constants.ts`의 `SportType` + `SPORT_TYPES` 사용. `@prisma/client` 직접 import 금지 (프론트엔드에서)
-
-### 유틸 함수 (lib/utils.ts)
-- `extractErrorMessage(err, fallback)` — catch 블록 에러 메시지 추출 (타입 단언 대신 반드시 사용)
-- `formatCurrency(n)` — 금액 (0 → '무료', 그 외 'N원')
-- `formatAmount(n)` — 결제 금액 (항상 'N원', 0도 '0원')
-- `formatDate(dateStr)` / `formatMatchDate` — M/D (요일)
-- `formatFullDate(dateStr)` — YYYY년 M월 D일 (요일)
-- `formatDateDot(dateStr)` — YYYY.M.D (요일)
-- `formatDateCompact(dateStr)` — YYYY.MM.DD
-- `formatDateShort(dateStr)` — M월 D일
-- `formatDateTime(dateStr)` — YYYY년 M월 D일 HH:MM
-- `getTimeBadge(dateStr)` — 날짜 뱃지 (오늘/내일/이번 주)
+- v1 구체 규칙의 정본: **`docs/guides/v1-coding-patterns.md`**(상태 라벨 단일 소스, 토큰, a11y, 해요체,
+  컴포넌트, 데이터 상태, 테스트, 관측성). `pnpm --filter v1_web lint`의 `v1-pattern-check.mjs`가 일부를 강제한다.
+- `@` alias → `apps/v1_web/src/`. 라우트 그룹 없이 최상위 폴더가 곧 경로다.
+- 서버 상태는 TanStack React Query(`hooks/use-v1-api.ts`, 쿼리 키 `lib/query-keys.ts`). 훅·컴포넌트·유틸
+  목록은 이 문서에 복제하지 않는다 — 코드가 진실이다.
+- `React.forwardRef` 금지(v1_web 사용 0건) — `ref`를 Props에 직접 포함한다(React 19).
+- 에러 메시지: `catch` 블록에서 타입 단언 금지. `extractErrorMessage(err, '해요체 fallback')`
+  (`lib/error-message.ts`). fallback·UI 문구는 **해요체**.
+- 상태 enum을 삼항으로 직접 한글화하지 않는다 — `lib/v1-status-labels.ts`·`lib/admin-labels.ts` 경유.
+- 날짜 포맷은 `lib/date-utils.ts`·`lib/kst-calendar.ts` 등 기존 유틸을 쓰고 화면마다 새로 정의하지 않는다.
+- 한국어 사용자 대상이므로 UI 텍스트는 한국어.
 
 ## 디자인 원칙
 
@@ -540,8 +316,8 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
   (390 에서 화면당 4장 이상 · 미디어 크기는 결정 기여도에 비례 · 필터가 결과를 가리지 않기).
   `landing-rhythm` 의 반대편이다 — 이해시키는 화면인지 비교시키는 화면인지 먼저 가른다.
 - **`agy-3d-graphic`** — 화면에 들어가는 3D 그래픽을 `agy`(alias `ag`) CLI 로 만들 때의 절차.
-  메시지→상징 오브젝트→style lock 프롬프트→`scripts/postprocess.py` 검증·webp·매니페스트→
-  `EmptyState illustration` 배치. 이 절차 밖에서 만든 이미지는 `public/illustrations/` 에 넣지 않는다.
+  메시지→상징 오브젝트→style lock 프롬프트→`.claude/skills/agy-3d-graphic/scripts/postprocess.py` 검증·webp·매니페스트→
+  `EmptyState illustration` 배치. 이 절차 밖에서 만든 이미지는 `apps/v1_web/public/illustrations/`에 넣지 않는다.
 
 ### UI 착수 규칙 — A·B·C 3안 브레인스토밍 필수 (2026-08-23 사용자 지시)
 
@@ -557,49 +333,28 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 - **각 안에 장점·단점을 모두 적는다.** "단점 없음"은 금지 — 트레이드오프가 실재하는지
   먼저 검토하고, 있으면 정직하게 쓴다.
 - **목업은 production fidelity.** low-fi 와이어프레임 금지 — 이 저장소의 실제 디자인
-  시스템(아래 토큰·컴포넌트, 다크모드, 44px 터치, WCAG AA)을 그대로 적용해 만든다.
-  기존 컴포넌트(`EmptyState`·`Modal`·`Toast` 등) 재사용 여부를 각 안에 명시한다.
+  시스템(토큰·`components/v1-ui/` 컴포넌트, 다크모드, 44px 터치, WCAG AA)을 그대로 적용해 만든다.
+  기존 컴포넌트(`EmptyState`·`ConfirmModal`·`BottomSheet` 등) 재사용 여부를 각 안에 명시한다.
 - **제시 순서**: ① 3안 비교표(축·장단점·작업규모) → ② `AskUserQuestion` 으로 선택받기.
   선택 전에 구현을 시작하지 않는다.
 - **태스크 문서에 반영**: `.github/tasks/{N}-*.md` 의 UI 항목은 "구현" 앞에
   "3안 제시 → 선택" 단계가 선행한다는 것을 Acceptance Criteria 에 남긴다.
 
-### 디자인 시스템
-- **컬러**: 블루(#3182F6) 단일 액센트, Pretendard 폰트, 라이트+다크 모드
-- **타입 스케일**: `globals.css` @theme 블록에 `--font-size-2xs`(10px) ~ `--font-size-6xl`(56px) 12단계. `text-[Npx]` 대신 토큰 사용
-- **종목 컬러**: `lib/constants.ts`의 `sportCardAccent` — 11종목별 tint/badge/dot 클래스
-- **종목 아이콘**: `components/icons/sport-icons.tsx`의 `SportIconMap` — 11종목 SVG
-- **모션**: `globals.css`에 fade-in/slide-up/scale-in/badge-pulse, `prefers-reduced-motion` 대응
-- **내비게이션**: 모바일 하단 플로팅 pill 바, 활성 탭 blue-500 액센트
-- **레이아웃 재질**: 본문은 solid-first, glass는 navbar/header/overlay/button/panel chrome에서만 허용
-  - **CSS 클래스 관리**: `globals.css`의 glass 패턴:
-    - `.glass-mobile-header` (gradient: 0.88-0.72) — navbar/header 용
-    - `.glass-mobile-nav` / `.floating-bottom-nav` (solid: light 0.82 / dark 0.72) — 하단 모바일 nav 전용, header와 별도 관리
-- **스타일 절제**: shadow는 hairline-depth 중심, border는 subtle full-border 중심으로 사용
-
-### 공유 UI 컴포넌트
-- `components/ui/empty-state.tsx` — 빈 상태 (인라인 빈 상태 대신 반드시 사용)
-- `components/ui/error-state.tsx` — 에러 + 재시도
-- `components/ui/modal.tsx` — 모달 (ESC, backdrop, focus trap, aria-modal)
-- `components/ui/toast.tsx` — 토스트 알림
-- `components/chat/chat-bubble.tsx` — 채팅 버블 시스템 (반드시 사용)
-- `components/teams/transfer-ownership-modal.tsx` — 소유권 이전 확인 모달 (owner 전용, `components/ui/modal.tsx` 기반)
-- `components/user/user-card.tsx` — 재사용 가능 사용자 신원 카드 (avatar + nickname + sport profile + manner score + CTA slots). applicant row / mercenary applicant / team-match opponent에서 동일 컴포넌트 사용. 44x44 터치 타겟 + `aria-label` 내장 (Task 69 추가)
-- `components/marketplace/confirm-receipt-button.tsx` — 구매자 수령 확인 CTA. T-7d 카운트다운 + 상태 aware (Task 70 추가)
-- `components/marketplace/file-dispute-modal.tsx` — 분쟁 신청 모달 (`components/ui/modal.tsx` 기반, `FileDisputeDto` 폼) (Task 70 추가)
-- `components/marketplace/seller-actions.tsx` — 판매자용 ship/deliver 액션 버튼 그룹, 주문 상태에 따라 노출 CTA 전환 (Task 70 추가)
-- `components/dispute/dispute-message-thread.tsx` — 분쟁 메시지 스레드 (`components/chat/chat-bubble.tsx` 재사용, actorRole별 정렬) (Task 70 추가)
-- `components/dispute/dispute-resolve-modal.tsx` — 어드민 분쟁 해결 모달 (action: refund | release | dismiss, note 입력, `components/ui/modal.tsx` 기반) (Task 70 추가)
-- `components/admin/payout-batch-builder.tsx` — 어드민 payout 배치 생성 UI (eligible settlement 선택 → batch 생성 → mark-paid 흐름) (Task 70 추가)
-- `components/admin/kpi-card.tsx` — 운영 KPI 단일 카드 (숫자 + 레이블 + deep-link). 다크모드 + 44px 터치 + `aria-label` 내장. 숫자 0은 `EmptyState` 대체 없이 0 그대로 표시 (Task 76 추가)
-- `components/admin/push-failure-table.tsx` — 최근 웹 푸시 실패 목록 테이블 (PII 마스킹: endpoint 6자 + userId hash 8자). ack 버튼 포함 (Task 76 추가)
-- `components/admin/weekly-payout-bars.tsx` — 최근 4주 payout 합계 CSS 막대 차트 (Tailwind `bg-blue-500` + `h-[40px]` 인라인 bar + 숫자 병기, chart 라이브러리 추가 없음). 0건 주에 `h-[2px]` 최솟값 처리 (Task 76 추가)
-- `lib/dispute-labels.ts` — 분쟁 status/type 레이블 단일 소스. 어드민 목록·상세·필터 전체에서 공유 (Task 70 추가)
-- `components/match/auto-balance-modal.tsx` — 팀 자동 구성 모달 (preview → 재추첨 → 확정). **Task 72**에서 `previewHistory`(FIFO cap=2) 비교 토글, 재추첨 rate-limit 카운트다운 disable, aria-live dedup 공지 추가
-- `components/match/confirm-replace-modal.tsx` — 기존 팀 배정이 있는 매치 재확정 경고 alertdialog. current teams 요약 + "교체"/"취소" CTA (Task 72 추가)
+### 디자인 시스템 (값의 정본은 `DESIGN.md`와 토큰 파일)
+- **컬러**: 블루(`--blue500` #3182F6) 단일 액센트, Pretendard 폰트.
+- **토큰 파일**: 색·타입은 `apps/v1_web/src/app/globals.css` `:root`(타입 스케일
+  `--font-size-micro`(11px) ~ `--font-size-heading`(24px) 8단계), 치수(radius·spacing·shadow·
+  control size·easing·breakpoint)는 `apps/v1_web/src/app/tokens.css` `@theme`. `text-[Npx]` 임의값 대신 토큰.
+- **종목**: 컬러 `lib/v1-sport-accent.ts`, 아이콘 `components/v1-ui/sport-glyph.tsx`.
+- **다크모드**: `<html>`의 `.dark` 클래스 토글(`components/providers/theme-provider.tsx`, 저장 키 `tm-theme`).
+  기본값은 항상 light이고 OS 설정을 자동으로 따르지 않는다(사용자가 'system'을 고를 때만).
+- **레이아웃 재질**: 본문은 solid-first, glass는 navbar/header/overlay/button/panel chrome에서만
+  (`DESIGN.md` §4.4 "glass as chrome, solid as content").
+- **스타일 절제**: shadow는 hairline-depth 중심, border는 subtle full-border 중심.
 
 ### 프론트엔드 품질 기준
-- **Open Redirect 방지**: `/login?redirect=...` 파라미터는 반드시 `sanitizeRedirect()` (`apps/web/src/app/(auth)/login/page.tsx`)를 통과시켜 **상대 경로만** 허용한다. 절대 URL, `javascript:`, `//host/` 형태는 모두 차단하고 `/home`으로 fallback.
+- **Open Redirect 방지**: `redirect`/`from` 같은 되돌아갈 경로 파라미터는 `sanitizeRedirectPath()`
+  (`apps/v1_web/src/lib/session-storage.ts`)를 통과시켜 **같은 origin의 상대 경로만** 허용한다.
 - **접근성 기준**: **WCAG 2.1 AA** 준수 (토스·당근마켓 동급). 컬러 대비 4.5:1, 키보드 접근성, 스크린리더 대응, `prefers-reduced-motion` 필수.
   - **의도적 예외는 `docs/design/a11y-decisions.md` 에 모아 둔다.** 감사·리뷰·정적 분석이
     접근성 위반을 지적하면 **먼저 그 문서를 확인**한다 — 거기 근거와 함께 적혀 있으면 그 지적은
@@ -608,39 +363,70 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
     9~11.5px(전용 디자인 언어) · 간격 1~3px 광학 보정.
   - **새로 "안 고치기로" 결정하면 그 문서에 추가한다.** 커밋 메시지에만 적으면 다음 사람이
     같은 지적을 다시 하고 같은 논의를 반복한다.
-- **컬러만으로 정보 전달 금지**: 종목·상태·알림 등 의미 있는 구분은 반드시 **컬러 + 아이콘/텍스트/패턴**을 병행. 예: recruiting = 파란 점 + "모집중" 텍스트. 색맹 시뮬레이션 대응.
-- **다크모드**: 모든 `bg-white` → `dark:bg-gray-800`, `text-gray-900` → `dark:text-white`. 라이트/다크 전환 시 4.5:1 대비 유지. 누락은 Critical.
-- **터치 타겟**: 인터랙티브 요소 최소 44x44px (`min-h-[44px]`)
-- **접근성 요소**: 아이콘 버튼 `aria-label`, 장식 `aria-hidden="true"`, 모달 `role="dialog"` + `aria-modal="true"` + ESC 핸들러 + focus trap
-- **포커스 링**: 키보드 포커스 시 `blue-500` outline + 2px offset. 컬러에만 의존하지 않는 시각적 피드백.
-- **성능**: `transition-all` 금지 → `transition-colors`/`transition-transform`, scaleX() 프로그레스
-- **폼**: `<label htmlFor>` + `<input id>` 연결 필수, placeholder만으로 라벨 대체 금지
+- **컬러만으로 정보 전달 금지**: 종목·상태·알림 등 의미 있는 구분은 반드시 **컬러 + 아이콘/텍스트/패턴**을 병행. 예: recruiting = 파란 점 + "모집중" 텍스트.
+- **다크모드**: 다크를 지원하는 화면은 라이트/다크 양쪽에서 4.5:1 대비를 유지한다. 누락은 Critical.
+- **터치 타겟**: 인터랙티브 요소 최소 44x44px.
+- **접근성 요소**: 아이콘 버튼 `aria-label`, 장식 `aria-hidden="true"`, 모달 `role="dialog"` + `aria-modal="true"` + ESC 핸들러 + focus trap(`components/v1-ui/use-modal-a11y.ts`). 정적 하드코딩 id 대신 `useId()`.
+- **포커스 링**: 키보드 포커스 시 `blue500` outline + 2px offset.
+- **성능**: `transition-all` 금지 → `transition-colors`/`transition-transform`.
+- **폼**: `<label htmlFor>` + `<input id>` 연결 필수, placeholder만으로 라벨 대체 금지.
 
 ## 코드 컨벤션
 
-- Git 컨벤션, 코드 품질, 응답 구조: 글로벌 `~/.claude/CLAUDE.md` 참조
-- **Codex 미러**: 이 문서와 전역 지침의 핵심 운영 규칙은 `AGENTS.md`의 "공통 운영 규칙
-  (Codex ↔ Claude 공유)" 절에도 요약돼 있다(Codex는 `~/.claude/CLAUDE.md`와 Claude 메모리를
-  읽지 못하기 때문). **정본은 이 문서다.** 브랜치 정책·git 안전·DB 마이그레이션·PR 워크플로 등
-  양쪽에 있는 규칙을 바꿀 때는 `AGENTS.md`도 같은 변경에서 함께 고친다 — 과거 캡처 스크립트
-  경로 컨벤션이 두 문서에서 갈려 리뷰어가 반복 지적한 전례가 있다.
-- 한국어 사용자 대상이므로 UI 텍스트는 한국어
-- 에러 코드: `DOMAIN_CODE` 형태 (e.g., MATCH_NOT_FOUND)
+- Git 컨벤션, 코드 품질, 응답 구조: 글로벌 `~/.claude/CLAUDE.md` 참조.
+- **Codex 미러**: 이 문서의 핵심 운영 규칙은 `AGENTS.md`("V1 Scope Override" + "공통 운영 규칙
+  (Codex ↔ Claude 공유)")에도 요약돼 있다(Codex는 `~/.claude/CLAUDE.md`와 Claude 메모리를 읽지 못한다).
+  **정본은 이 문서다.** 브랜치 정책·git 안전·DB 마이그레이션·PR 워크플로 등 양쪽에 있는 규칙을 바꿀
+  때는 `AGENTS.md`도 같은 변경에서 함께 고친다 — 캡처 스크립트 경로 컨벤션이 두 문서에서 갈려
+  리뷰어가 반복 지적한 전례가 있다.
+- 에러 코드: `DOMAIN_CODE` 형태 (e.g., `PERMISSION_DENIED`).
+- 루트에 ad hoc 스크립트·개인 메모를 두지 않는다. QA 보조 도구는 `scripts/qa/`, alpha 검증·캡처는
+  `scripts/`(목록: `scripts/README-alpha-verify.md`).
 
 ## 운영 워크플로 — PR · Copilot 리뷰 · 시각 검증
 
-> PR을 올리고 → Copilot 리뷰를 clean까지 돌리고 → 라이브 스크린샷으로 검증해 PR에 올리는 전 과정.
 > **상세 런북(명령어·상수·전체 절차)**: `docs/ops/pr-review-visual-workflow.md` (반드시 이 절차를 따른다)
 
-핵심 규칙 (런북 요약):
-
-1. **커밋은 내 파일만 pathspec** + 직후 `git show --stat HEAD` 검증. 완료 보고 전 게이트 = `tsc 0` + 테스트 + (시각 변경이면) **라이브 스크린샷**.
-2. **Copilot 리뷰 루프**: 요청은 `gh pr edit <N> --add-reviewer copilot-pull-request-reviewer` (REST `requested_reviewers`는 422). 도착은 비동기 ~3–8분 → 폴링(리뷰 수 증가). 각 finding은 **적대적 검증으로 real만 수정**(Copilot도 틀림, 예: RQ `partialMatchKey` 빈 객체 부분일치). 스레드는 GraphQL `addPullRequestReviewThreadReply` + `resolveReviewThread`로 답변·resolve. **`generated no new comments`(clean) 나올 때까지 반복.**
-3. **300-파일 한도**: 변경 파일 300개 초과 시 Copilot 리뷰 거부. 커밋된 스크린샷 PNG가 원인이면 **트리에서 `git rm`** — 갤러리 코멘트는 **SHA 고정 raw URL**(`raw.githubusercontent.com/<owner>/<repo>/<SHA>/...`)이라 그대로 렌더된다.
-4. **시각 검증/스크린샷 — UI 변경 PR은 예외 없이 필수**: 화면 마크업·레이아웃·스타일이 조금이라도 바뀐 PR은 **반드시** 📱mobile 390 / 📲tablet 768 / 🖥desktop 1440 3폭 스크린샷 갤러리를 PR 코멘트로 첨부한다 — "커밋만 하고 스크린샷은 생략"은 완료가 아니다(로직/백엔드 전용 PR은 대상 아님). v1 스택 기동(DB `teameet_v1_pg`:5432 + `apps/v1_api`:8121 + web:3013) 후 **헤더 dev 인증**(localStorage `teameet.v1.userId`/`userEmail` → `x-v1-user-*` 헤더)으로 Playwright 캡처. **캡처 스크립트는 `scripts/` 내부**(`/tmp`는 모듈 해석 실패). 갤러리는 페이지별 **📱mobile 390 / 📲tablet 768 / 🖥desktop 1440** 3열 + raw URL 200 확인 후 코멘트 게시. PR을 이미 올린 뒤 UI 변경을 뒤늦게 인지했다면 그 PR에 갤러리 코멘트를 추가로 게시해 채운다.
-5. **전체 검수/피드백**은 built-in `Workflow`(ultracode) 8차원 적대 검증으로(= evidence-producing; `/agent-all`은 본 레포 Phase 0 전제 미충족). 모델 배정은 글로벌 규칙 11(결정=opus/fable, 실행=sonnet).
-6. **CI flake**(Postgres `40P01 deadlock` 등)는 내 변경과 무관함 확인 후 `gh run rerun <id> --failed`. 머지 준비 = `MERGEABLE/CLEAN` + 미해결 스레드 0 + CI pass.
-7. **런타임·환경 의존 동작은 로컬 포렌식에 매몰되지 말고 alpha 배포로 검증한다(Critical — 2026-08-09 실사고).** SSR 상태코드·스트리밍·프로덕션 렌더처럼 **환경에 따라 달라지는 동작**을 진단할 때, 로컬 `next start`/`next build` 반복 실험에 세션을 통째로 태우지 말 것. dev 머지 = 즉시 alpha 실배포이므로 **fix 후보를 dev에 머지해 alpha에서 직접 재측정**하는 것이 이 레포의 검증 루프이자 ground truth다. 실사고: schedule 라우트의 not-found HTTP 200 결함을 로컬에서 파다가 (a) `next start` 좀비 서버가 옛 빌드를 서빙해 거짓 결론을 냈고(`kill $SRV`가 래퍼만 죽이고 next-server 자식이 포트 점유 → 이후 측정이 stale 빌드를 때림), (b) 병렬 세션의 `next dev` 와 겹쳐 결과가 뒤엉켰다 — 몇 시간·수십 빌드를 태우고도 못 고쳤다. **불가피하게 로컬 prod 렌더로 검증해야 하면**: `next start` 대신 `node .next/standalone/apps/v1_web/server.js`(alpha 실런타임)를 쓰고, 매 측정마다 fresh 포트 + `lsof -tnP -iTCP:<port>` 로 실제 리스너 PID 를 확인해 그 PID 로 종료하며, 측정 전 좀비 next-server 를 전수 확인한다. 그래도 **1순위는 alpha 배포-측정**이다.
+1. **커밋은 내 파일만 pathspec** + 직후 `git show --stat HEAD` 검증. 완료 보고 전 게이트 = `tsc 0` +
+   영향받는 테스트 + (시각 변경이면) 아래 4번의 alpha 화면 검증.
+2. **Copilot 리뷰 루프**: 요청은 `gh pr edit <N> --add-reviewer copilot-pull-request-reviewer`
+   (REST `requested_reviewers`는 422). 도착은 비동기 ~3–8분 → 폴링(리뷰 수 증가). 각 finding은
+   **적대적 검증으로 real만 수정**(Copilot도 틀림, 예: RQ `partialMatchKey` 빈 객체 부분일치). 스레드는
+   GraphQL `addPullRequestReviewThreadReply` + `resolveReviewThread`로 답변·resolve.
+   **`generated no new comments`(clean) 나올 때까지 반복.**
+3. **300-파일 한도**: 변경 파일 300개 초과 시 Copilot 리뷰 거부. 커밋된 스크린샷 PNG가 원인이면
+   **트리에서 `git rm`** — 갤러리 코멘트는 **SHA 고정 raw URL**
+   (`raw.githubusercontent.com/<owner>/<repo>/<SHA>/...`)이라 그대로 렌더된다.
+4. **UI 변경 PR은 예외 없이 3폭 갤러리 필수 — 머지 후 alpha에서 찍어 그 PR에 게시한다.**
+   화면 마크업·레이아웃·스타일이 조금이라도 바뀐 PR은 📱mobile 390 / 📲tablet 768 / 🖥desktop 1440
+   스크린샷 갤러리를 PR 코멘트로 첨부한다(로직/백엔드 전용 PR은 대상 아님). 로컬 next 서버로
+   렌더하지 않으므로(7번) 순서는 **머지 → alpha 배포 확인(아래 "Alpha 실측 검증" 2) → 캡처 → 같은 PR에
+   갤러리 코멘트 사후 게시**다. PR 본문에 "갤러리를 머지 후에 채우는 이유"를 남긴다.
+   - 머지 전에는 코드로 안전성을 확인한다(로딩·에러·빈 목록에서 렌더가 깨지지 않는지 등).
+   - 브라우저 검증·QA의 기본 도구는 **`ego-browser` 스킬**이다 — alpha에 실제 로그인해 사용자 흐름을
+     클릭으로 밟고 단계별 스크린샷·판정을 남긴다. API 실측은 보조 근거이고 PASS 판정은 화면으로 한다.
+     여러 장을 반복 캡처하는 스크립트는 `scripts/` 내부에 둔다(`/tmp`는 모듈 해석 실패).
+   - 갤러리는 페이지별 3열 + raw URL 200 확인 후 게시. PR을 올린 뒤 UI 변경을 뒤늦게 인지했다면
+     그 PR에 갤러리 코멘트를 추가로 게시해 채운다.
+5. **전체 검수/피드백**은 built-in `Workflow` 적대 검증으로 한다. 모델 배정은 전역 `~/.claude/CLAUDE.md`
+   규칙 11.
+6. **CI flake**(Postgres `40P01 deadlock` 등)는 내 변경과 무관함 확인 후 `gh run rerun <id> --failed`.
+   머지 준비 = `MERGEABLE/CLEAN` + 미해결 스레드 0 + CI pass.
+7. **런타임·화면 동작은 로컬 next 서버가 아니라 alpha 배포로 검증한다(Critical — 2026-08-09 실사고).**
+   `next dev`/`next start`/`next build` 반복·standalone 기동으로 검증하지 않는다. dev 머지 = 즉시 alpha
+   실배포이므로 **fix 후보를 dev에 머지해 alpha에서 직접 재측정**하는 것이 이 레포의 검증 루프이자
+   ground truth다. 실사고: schedule 라우트의 not-found HTTP 200 결함을 로컬에서 파다가 (a) `next start`
+   좀비 서버(`kill $SRV`가 래퍼만 죽이고 next-server 자식이 포트 점유)가 옛 빌드를 서빙해 거짓 결론을
+   냈고, (b) 병렬 세션의 `next dev`와 겹쳐 결과가 뒤엉켰다 — 몇 시간·수십 빌드를 태우고도 못 고쳤다.
+   - 4번(UI 갤러리)과 7번(런타임 진단)은 같은 원칙의 두 적용이다 — 둘 다 alpha에서 본다.
+   - API만 로컬에서 띄워야 하는 경우(예: 통합 테스트용 DB)에도 검증이 끝나면 **내가 띄운 프로세스를
+     내가 종료**한다. 새로 띄우기 전 기존 리스너를 먼저 확인한다(단순 `grep node`는 무관한 프로세스를
+     잡는다): `lsof -nP -iTCP -sTCP:LISTEN | grep -E ':(301[3-9]|302[0-9]|812[0-9]|822[0-9])'`
+8. **v1 기능 PR엔 `.changeset/*.md`가 필요하다.** `apps/v1_api/`·`apps/v1_web/`·`deploy/`·
+   `.github/workflows/`·`scripts/release/`·루트 매니페스트 변경이 대상이고, `.md`·테스트·fixtures·
+   `docs/`·`e2e/`·`.github/tasks/`·`scripts/qa/`·`scripts/docs/`는 제외다(`scripts/release/check-changeset-policy.mjs`).
+   빠지면 dev-push CI가 실패하고 alpha 배포가 막힌다.
+9. **PR 제목·본문은 한국어로 작성한다.**
 
 ## Alpha 실측 검증 (E2E 테스트 절차)
 
@@ -648,7 +434,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 
 ### 1. 자격증명 — 저장소에 절대 적지 않는다
 
-**이 저장소는 PUBLIC이다.** 계정·비밀번호·세션 토큰을 `CLAUDE.md`·`AGENTS.md`·`scripts/`·PR
+**이 저장소는 PUBLIC이다.** 계정·비밀번호·세션 토큰·프로덕션 식별자를 `CLAUDE.md`·`AGENTS.md`·`scripts/`·PR
 코멘트 어디에도 적지 말 것. alpha E2E 계정 목록과 공통 비밀번호는 **저장소 밖의 비공개
 프로젝트 메모리**(`~/.claude/projects/<이 저장소>/memory/alpha-e2e-test-accounts.md`)에 있다.
 계정 종류: 플랫폼 관리자(`adminRole=ops`) / 대회 스태프 / A·B팀 팀장 / 선수 10명(양 팀 소속) /
@@ -656,7 +442,7 @@ pnpm test:all                         # 전체 (unit + integration + E2E)
 
 세션은 `teameet_v1_session` **쿠키 하나**이고 `v1.<payload>.<HMAC>` 형태로 **서명만 해서**
 발급된다 — 저장 테이블이 없으므로 **DB에서 뽑을 수 없다.** alpha는 프로덕션 모드라
-**헤더 dev 인증(`x-v1-user-*`)이 401**이다(로컬 검증과 다른 점). `login` API가 유일한 발급 경로다.
+**헤더 dev 인증(`x-v1-user-*`)이 401**이다. `login` API가 유일한 발급 경로다.
 
 ```bash
 curl -sS -D- -o/dev/null https://alpha.teameet.co.kr/api/v1/auth/login \
@@ -686,8 +472,7 @@ git merge-base --is-ancestor <내 머지 커밋> <배포 SHA> && echo "포함됨
 ### 3. 라이브 경기 상태는 운영 API로 직접 만든다
 
 alpha에는 `status === 'live'` 경기가 보통 없다(전부 `ended`). 라이브 전용 UI(경기 시계,
-하프타임 배지, 라이브 스코어, 콘솔 재연결)는 "재현 불가"로 접지 말고 운영자 경로를 그대로
-밟는다. 재사용 하네스: `scripts/verify-alpha-period-break.mjs`.
+하프타임 배지, 라이브 스코어, 콘솔 재연결)는 "재현 불가"로 접지 말고 운영자 경로를 그대로 밟는다.
 
 ```
 라인업 저장·제출 → start → end-period(하프타임) → start-period(후반) → end-period → end
@@ -713,7 +498,7 @@ computed 값(색·폰트크기·정렬)을 직접 읽는다.
 ### 5. 캡처 시 주의
 
 - 라이브 경기가 있는 페이지는 10초 주기 폴링이라 Playwright `waitUntil: 'networkidle'`이
-  **절대 끝나지 않는다**(60초 타임아웃) → `domcontentloaded` + 명시적 `waitForTimeout`.
+  **절대 끝나지 않는다**(60초 타임아웃) → `domcontentloaded` + 명시적 대기.
 - 캡처 스크립트는 **`scripts/` 내부**에 둔다(`/tmp`는 모듈 해석 실패).
 - 갤러리는 페이지별 📱390 / 📲768 / 🖥1440 3열 + raw URL 200 확인 후 PR 코멘트 게시.
 
@@ -731,32 +516,13 @@ alpha는 배포마다 QA 시드가 다시 돈다. 시드의 `deleteMany`는 **�
 
 ## Agent Team 운영
 
-글로벌 `~/.claude/CLAUDE.md`의 Agent Team 운영 섹션 참조.
-프로젝트별 에이전트 프롬프트: `.claude/agents/` 디렉토리 (개별 파일, 19 에이전트)
+- 프로젝트 에이전트 정의: `.claude/agents/*.md`(frontmatter `name:`이 있는 19개) — 팀 구성은
+  `.claude/agents/team-config.md`, 파이프라인은 `.claude/agents/workflow.md`. Codex 쪽 정본은 `.codex/agents/`.
+- 오케스트레이션·모델 배정은 전역 `~/.claude/CLAUDE.md` 규칙 11("모델 배정과 병렬 오케스트레이션")을 따른다.
 
-## 구현 문서 위치
+## 알려진 제약 (v1)
 
-구현 상세 문서는 별도 저장소. 주요 참조:
-- 01_ARCHITECTURE: 시스템 아키텍처
-- 02_DATABASE: DB 스키마 (Prisma 스키마로 변환 완료)
-- 03_API_SPEC: API 엔드포인트
-- 04_AI_MATCHING: 매칭 알고리즘
-- 06_ICE_SPORTS: 빙상 스포츠 모듈
-- 07_MARKETPLACE: 장터
-- 08_PAYMENT: 결제 시스템
-
-## Known Blockers
-
-1. ~~**VAPID 키 미생성**~~ **Resolved in Task 74** — `WebPushService` 실제 `webpush.sendNotification()` 연결 완료. VAPID 3종 환경변수 주입 경로(`.env.example`, `configuration.ts`, `deploy/docker-compose.prod.yml`, GitHub Actions secrets) 정비 완료. 키 생성·갱신·롤백 절차: `docs/ops/vapid-setup.md` 참조.
-   - **운영자 수동 필요**: GitHub Actions secrets(`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`) 실제 등록 — `docs/ops/vapid-setup.md` 1단계 참조.
-   - **Capacitor iOS APNs** 네이티브 통합은 Apple Developer 계정 확정 후 **Task 75에서 활성화 예정**. Android는 VAPID 공유 경로(ChromeWebView) 재사용으로 추가 작업 없음.
-
-2. **마켓플레이스 cron**: `DISABLE_MARKETPLACE_CRON` 환경변수가 설정되지 않으면 cron이 10분 주기로 자동 실행됨. 테스트 환경에서는 `DISABLE_MARKETPLACE_CRON=true` 로 비활성화 필요 (신규, Task 70 추가).
-
-3. **운영 알람 Slack webhook 미등록** (Task 76 추가): `WebPushAlertService`는 `OPS_ALERT_WEBHOOK_URL` 없을 시 logger-only fallback으로 안전하게 동작하므로 배포는 가능. 실제 Slack 알람 수신을 위해서는 아래 수동 작업 필요:
-   - Slack 워크스페이스에서 "Incoming Webhooks" App 생성 → 채널 지정 → URL 복사
-   - GitHub Actions secrets에 `OPS_ALERT_WEBHOOK_URL` 등록
-   - Staging/Prod 채널 분리 권장 (R8: 환경 혼선 방지)
-   - 테스트 환경에서는 `DISABLE_OPS_ALERT_CRON=true` 로 비활성화 가능 (Task 70 cron 선례 재사용)
-
-4. **`WebPushFailureLog` 보관 기간 무제한** (Task 76 추가): 현재 별도 cleanup cron 없음. 장기 운영 시 테이블 row 증가 가능. 30일 이상 cleanup cron은 별도 후속 task에서 처리 예정.
+1. **Web Push는 VAPID 키가 있어야 켜진다.** `WebPushService`는 키가 없으면 비활성(경고 로그)으로 동작하고
+   알림 생성은 계속 성공한다. 키 생성·갱신·롤백: `docs/ops/vapid-setup.md`.
+2. **`V1WebPushFailureLog` 보관 기간 무제한.** 행을 지우는 cleanup이 없다(쓰기는 `web-push.service.ts`,
+   조회·확인 처리는 `admin/admin-ops.service.ts`뿐). 장기 운영 시 행이 계속 늘어난다.

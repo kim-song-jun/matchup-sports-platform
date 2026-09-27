@@ -1,15 +1,17 @@
 # Pagination, Filtering, Sorting Contract
 
+> **v0 기준 서술 — v1 확인 필요.** 이 문서의 엔드포인트·에러 코드·상세 계약은 레거시 `apps/api`/`apps/web` 시절에 작성됐다. 파일 경로는 v1(`apps/v1_api`/`apps/v1_web`)로 갱신했지만, 계약 내용 자체가 v1 실제 동작과 일치하는지는 이번 변경에서 검증하지 않았다(2026-09-27, docs/api 레거시 분리 작업).
+
 이 문서는 프론트엔드에서 목록 API를 붙일 때 가장 많이 발생하는 드리프트를 막기 위한 규칙 문서다.
 
 ## Source Of Truth Priority
 
-1. `apps/api/src/**/*controller.ts`
-2. `apps/api/src/**/dto/*.ts`
-3. `apps/api/src/**/*.service.ts`
-4. `apps/api/src/**/*.spec.ts` + `apps/api/test/integration/*.e2e-spec.ts`
-5. `apps/web/src/hooks/use-api.ts`
-6. `apps/web/src/types/api.ts`
+1. `apps/v1_api/src/**/*.controller.ts`
+2. `apps/v1_api/src/**/dto/*.ts`
+3. `apps/v1_api/src/**/*.service.ts`
+4. `apps/v1_api/src/**/*.spec.ts` + `apps/v1_api/test/**/*.integration-spec.ts`
+5. `apps/v1_web/src/hooks/use-v1-api.ts`
+6. `apps/v1_web/src/types/api.ts`
 7. Swagger (`/docs`)는 보조 참조
 
 ## 공통 규칙
@@ -81,13 +83,13 @@
 
 ## Source References
 
-- `apps/api/src/lessons/lessons.controller.ts`
-- `apps/api/src/marketplace/marketplace.controller.ts`
-- `apps/api/src/mercenary/mercenary.controller.ts`
-- `apps/api/src/chat/chat.controller.ts`
-- `apps/api/src/notifications/notifications.controller.ts`
-- `apps/api/src/lessons/lessons.service.ts`
-- `apps/api/src/marketplace/marketplace.service.ts`
-- `apps/api/src/mercenary/mercenary.service.ts`
-- `apps/api/src/chat/chat.service.ts`
-- `apps/web/src/hooks/use-api.ts`
+- `apps/v1_api/src/chat/chat.controller.ts`
+- `apps/v1_api/src/notifications/notifications.controller.ts`
+- `apps/v1_api/src/matches/matches.controller.ts`
+- `apps/v1_api/src/tournaments/tournaments-read.controller.ts`
+- `apps/v1_api/src/chat/chat.service.ts`
+- `apps/v1_web/src/hooks/use-v1-api.ts`
+
+> `lessons`/`marketplace`/`mercenary` 컨트롤러·서비스 예시는 삭제했다 — 해당 도메인은
+> v1(`apps/v1_api/src`)에 존재하지 않는다(v0 전용 비즈니스 도메인). 대신 v1에 실재하는
+> `matches`/`tournaments`로 예시를 교체했다.

@@ -38,8 +38,8 @@ This PR runs after the domain execution PRs have landed or reached a stable QA p
 
 ## Validation Commands
 
-- `pnpm exec playwright test e2e/tests/auth-session-matrix.spec.ts e2e/tests/team-owner-flow.spec.ts e2e/tests/team-manager-membership.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line`
-- `pnpm exec playwright test e2e/tests/chat-realtime.spec.ts e2e/tests/notification-center.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line`
+- `pnpm exec playwright test e2e/tests/auth-session-matrix.spec.ts e2e/tests/team-owner-flow.spec.ts e2e/tests/team-manager-membership.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line` (레거시·삭제됨 — legacy-v0-final)
+- `pnpm exec playwright test e2e/tests/chat-realtime.spec.ts e2e/tests/notification-center.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line` (레거시·삭제됨 — legacy-v0-final)
 - Tournament route/API smoke commands should be selected from the final `TOURN-*` PR result.
 
 ## Execution Context

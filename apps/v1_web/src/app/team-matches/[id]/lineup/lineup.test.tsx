@@ -304,6 +304,7 @@ describe('lineup.view-model', () => {
     expect(describeLineupPhase('DRAFT', true).editable).toBe(false);
     expect(describeLineupPhase('SUBMITTED', false).editable).toBe(true);
     expect(describeLineupPhase('LOCKED', false).editable).toBe(false);
+    expect(describeLineupPhase('LOCKED', true, true)).toMatchObject({ editable: true, label: '경기 중 · 수정 가능' });
   });
 
   it('resolves which team is "mine" for this match from host/opponent + my memberships', () => {
@@ -463,6 +464,32 @@ describe('TeamMatchLineupPageClient', () => {
 
     expect(screen.queryByText('상대팀 참석명단 정정 요청')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '정정 요청 보내기' })).not.toBeInTheDocument();
+  });
+
+  it('경기 기록이 있는 진행 중 참석명단은 재확인 후 저장한다', async () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup({
+        gameState: 'LIVE',
+        hasRecordedEvents: true,
+        state: 'LOCKED',
+        starters: [{ id: 'p-live', userId: 'user-1', displayName: '홍길동', jerseyNumber: 7, position: null, goalkeeper: false, positionX: null, positionY: null }],
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: hoisted.refetchLineup,
+    });
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /골키퍼로 지정/ }));
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    expect(screen.getByRole('dialog', { name: '참석명단을 수정할까요?' })).toBeInTheDocument();
+    expect(hoisted.saveMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '확인하고 수정' }));
+    expect(hoisted.saveMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: expect.objectContaining({ confirmRecordedDataRisk: true }) }),
+      expect.any(Object),
+    );
   });
 
   /**

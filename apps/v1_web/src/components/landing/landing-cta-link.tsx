@@ -10,6 +10,7 @@ export type LandingCtaId =
   | 'nav_signup'
   | 'hero_signup'
   | 'hero_browse_matches'
+  | 'hero_browse_team_matches'
   | 'role_find_match'
   | 'role_browse_teams'
   | 'role_view_tournaments'
@@ -17,10 +18,21 @@ export type LandingCtaId =
   | 'story_view_tournaments'
   | 'story_view_live'
   | 'story_browse_teams'
+  | 'door_browse_team_matches'
+  | 'door_browse_tournaments'
+  | 'door_browse_teams'
+  | 'door_players_guide'
+  | 'door_organizers_guide'
+  | 'door_teams_guide'
+  | 'live_open_tournament'
+  | 'live_open_team_match'
+  | 'live_empty_contact'
+  | 'faq_view_all'
   | 'bottom_signup'
   | 'bottom_browse_tournaments'
   | 'mobile_bar_signup'
-  | 'mobile_bar_browse_matches';
+  | 'mobile_bar_browse_matches'
+  | 'mobile_bar_browse_team_matches';
 
 /** 같은 자리의 CTA 를 안끼리 비교하려고 cta 는 공유하고 variant 로 가른다. 없으면 기존 A안(/landing). */
 export type LandingVariant = 'v2';

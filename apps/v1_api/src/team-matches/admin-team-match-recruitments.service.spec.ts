@@ -156,7 +156,7 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       data: expect.objectContaining({ deadlineAt: null }),
     });
   });
-  it('approves the first application without creating a game or schedules', async () => {
+  it('reserves the first approved application as HOME without creating a game or schedules', async () => {
     await expect(service.approveApplication(adminUser, 'team-match-1', homeApplicationId, approveDto)).resolves.toEqual(expect.objectContaining({
       teamMatchId: 'team-match-1',
       applicationId: homeApplicationId,
@@ -164,16 +164,37 @@ describe('AdminTeamMatchRecruitmentsService', () => {
       gameId: null,
       teamMatchStatus: 'recruiting',
       approvedCount: 1,
+      homeTeamId: 'team-home',
       replayed: false,
     }));
     expect(games.createFromSourceInTransaction).not.toHaveBeenCalled();
-    expect(prisma.v1TeamMatch.update).not.toHaveBeenCalled();
+    expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith({
+      where: { id: 'team-match-1' },
+      data: { hostTeamId: 'team-home' },
+    });
     expect(prisma.v1TeamSchedule.create).not.toHaveBeenCalled();
     expect(adminContext.logAdminAction).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ action: 'team_match.application.approve', targetId: homeApplicationId }),
       prisma,
     );
+  });
+
+  it('repairs a legacy first approval that did not persist the HOME team', async () => {
+    prisma.v1TeamMatch.findFirst.mockResolvedValueOnce({
+      ...await prisma.v1TeamMatch.findFirst(),
+      applications: [application(homeApplicationId, 'team-home', '홈 FC', 'approved')],
+    });
+
+    await expect(service.approveApplication(adminUser, 'team-match-1', homeApplicationId, approveDto)).resolves.toEqual(expect.objectContaining({
+      approvedCount: 1,
+      homeTeamId: 'team-home',
+      replayed: true,
+    }));
+    expect(prisma.v1TeamMatch.update).toHaveBeenCalledWith({
+      where: { id: 'team-match-1' },
+      data: { hostTeamId: 'team-home' },
+    });
   });
 
   it('approves the second application and then creates the game and both schedules', async () => {

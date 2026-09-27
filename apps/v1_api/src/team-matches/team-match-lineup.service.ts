@@ -6,7 +6,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { Prisma, V1ConsentState, V1GameLineupState, type V1GameLineup, type V1TeamMatchStatus } from '@prisma/client';
+import { Prisma, V1ConsentState, V1GameLineupState, V1GameState, type V1GameLineup, type V1TeamMatchStatus } from '@prisma/client';
 import type { V1AuthUser } from '../auth/v1-auth-user';
 import { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import { canonicalGameCommandPayloadHash, createRosterAssertedIdentityLink } from '../games/games.service';
@@ -72,6 +72,7 @@ function rosterOf(dto: SaveTeamMatchLineupDto): TeamMatchLineupParticipantDto[] 
 interface TeamMatchLineupContext {
   gameId: string;
   gameCompetitionConfigVersionId: string;
+  gameState: V1GameState;
   teamMatchId: string;
   status: V1TeamMatchStatus;
   startAt: Date;
@@ -125,6 +126,8 @@ export class TeamMatchLineupService {
       });
       return {
         ...(await this.serializeLineup(tx, context, lineup, visibility?.lineupAt ?? null)),
+        gameState: context.gameState,
+        hasRecordedEvents: (await tx.v1GameEvent.count({ where: { gameId: context.gameId } })) > 0,
         lineupConfig: parseLineupConfigForResponse(config?.lineup ?? null),
         eligibleMembers: await this.loadEligibleMembers(tx, context),
       };
@@ -153,18 +156,16 @@ export class TeamMatchLineupService {
         },
         async () => {
           assertLineupMutationAllowed(context);
-          if (Date.now() >= context.startAt.getTime()) {
+          const liveEditAllowed = context.gameState === V1GameState.LIVE || context.gameState === V1GameState.PAUSED;
+          if (Date.now() >= context.startAt.getTime() && !liveEditAllowed) {
             throw new ConflictException({
               code: 'LINEUP_DEADLINE_PASSED',
               message: '경기 시작 이후에는 참석명단을 직접 수정할 수 없어요. 상대팀에 정정을 요청해 주세요.',
             });
           }
-          const previous = await this.lazyLock(
-            tx,
-            await this.latestLineup(tx, context.gameId, context.ownSideId),
-            context.startAt,
-          );
-          if (previous?.state === V1GameLineupState.LOCKED) {
+          const latest = await this.latestLineup(tx, context.gameId, context.ownSideId);
+          const previous = liveEditAllowed ? latest : await this.lazyLock(tx, latest, context.startAt);
+          if (previous?.state === V1GameLineupState.LOCKED && !liveEditAllowed) {
             throw new ConflictException({
               code: 'LINEUP_LOCKED_FOR_DIRECT_EDIT',
               message: '경기가 시작된 후에는 참석명단을 수정할 수 없어요.',
@@ -182,6 +183,16 @@ export class TeamMatchLineupService {
               code: 'VERSION_CONFLICT',
               message: '참석명단이 그새 변경됐어요. 새로고침 후 다시 시도해 주세요.',
               details: { expectedVersion: dto.expectedVersion, currentVersion: previous?.revision ?? 0 },
+            });
+          }
+
+          if (
+            (await tx.v1GameEvent.count({ where: { gameId: context.gameId } })) > 0 &&
+            dto.confirmRecordedDataRisk !== true
+          ) {
+            throw new ConflictException({
+              code: 'LINEUP_RECORDED_DATA_CONFIRMATION_REQUIRED',
+              message: '이미 경기 기록이 있어 참석명단 수정 시 선수 기록이 보이지 않을 수 있어요. 확인 후 다시 저장해 주세요.',
             });
           }
 
@@ -295,17 +306,15 @@ export class TeamMatchLineupService {
         },
         async () => {
           assertLineupMutationAllowed(context);
-          if (Date.now() >= context.startAt.getTime()) {
+          const liveEditAllowed = context.gameState === V1GameState.LIVE || context.gameState === V1GameState.PAUSED;
+          if (Date.now() >= context.startAt.getTime() && !liveEditAllowed) {
             throw new ConflictException({
               code: 'LINEUP_DEADLINE_PASSED',
               message: '경기 시작 이후에는 참석명단을 제출할 수 없어요.',
             });
           }
-          const lineup = await this.lazyLock(
-            tx,
-            await this.latestLineup(tx, context.gameId, context.ownSideId),
-            context.startAt,
-          );
+          const latest = await this.latestLineup(tx, context.gameId, context.ownSideId);
+          const lineup = liveEditAllowed ? latest : await this.lazyLock(tx, latest, context.startAt);
           if (lineup === null) {
             throw new NotFoundException({
               code: 'LINEUP_DRAFT_NOT_FOUND',
@@ -652,7 +661,7 @@ export class TeamMatchLineupService {
     }
     const game = await tx.v1Game.findUnique({
       where: { teamMatchId },
-      select: { id: true, competitionConfigVersionId: true },
+      select: { id: true, state: true, competitionConfigVersionId: true },
     });
     if (game === null) {
       throw new ConflictException({
@@ -685,6 +694,7 @@ export class TeamMatchLineupService {
     if (membership.teamId === teamMatch.hostTeamId) {
       return {
         gameId: game.id,
+        gameState: game.state,
         gameCompetitionConfigVersionId: game.competitionConfigVersionId,
         teamMatchId,
         status: teamMatch.status,
@@ -699,6 +709,7 @@ export class TeamMatchLineupService {
     }
     return {
       gameId: game.id,
+      gameState: game.state,
       gameCompetitionConfigVersionId: game.competitionConfigVersionId,
       teamMatchId,
       status: teamMatch.status,

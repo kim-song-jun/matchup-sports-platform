@@ -82,9 +82,8 @@
 18. **Runtime image fallback is mandatory** — 사용자-facing 이미지가 원격 URL을 받으면 로컬 mock으로 degrade
 19. **Deploy-safe data sync must be idempotent** — 운영 배포는 destructive seed 대신 idempotent backfill
 20. **URL-synced filter UIs must merge against pending local state** — stale searchParams 재사용 금지
-21. **Live runtime contract must be verified on the real port** — DTO/query 변경은 v1 API `localhost:8121` 응답 재확인
-22. **Concurrent Playwright runners use isolated compose only** — shared `make dev` stack은 single active runner 계약 유지
-23. **Isolated web runtimes need per-stack `.next` storage** — host-shared `.next`는 Next dev artifact cross-talk를 만들어 `/landing` 500과 module-not-found를 유발
+21. **Live runtime contract must be verified against a real API** — DTO/query 변경은 통합 스펙(`pnpm --filter v1_api test:integration`, CI) 또는 머지 후 alpha 응답으로 재확인
+22. **Browser verification runs on alpha, not a local next server** — `ego-browser`로 alpha에 로그인해 확인하고, UI 갤러리는 머지 후 alpha에서 캡처해 PR에 게시 (`CLAUDE.md` 운영 워크플로 4·7)
 
 ---
 
@@ -168,9 +167,9 @@ Builder 작업 재개
 - v1 frontend dev: `pnpm --filter v1_web dev`, default URL `http://localhost:3013`
 - v1 backend dev: `pnpm --filter v1_api dev`, default URL `http://localhost:8121/api/v1`
 - legacy app paths are not valid implementation references unless explicitly requested
-- Playwright canonical runbook: `docs/PLAYWRIGHT_E2E_RUNBOOK.md`
+- Playwright canonical runbook: `docs/guides/playwright-e2e-runbook.md` (v1 E2E: `pnpm test:e2e:v1`, `e2e/v1.config.ts`)
 - Nest validation: strict (`whitelist + forbidNonWhitelisted`)
-- feature screenshot-set analysis/retry loops use `scripts/qa/run-e2e-analyzer.mjs`; resume from `ultraplan/runs/e2e-analyzer*` queue state instead of relying on ephemeral loop memory
+- alpha verification procedure and scripts: `CLAUDE.md` "Alpha 실측 검증", `scripts/README-alpha-verify.md`
 
 ---
 
@@ -182,7 +181,7 @@ Builder 작업 재개
 | Frontend unit | `pnpm --filter v1_web test` |
 | Backend unit | `pnpm --filter v1_api test` |
 | Backend integration | `pnpm --filter v1_api test:integration` |
-| E2E | confirm v1 route/data coverage before running repository Playwright config |
+| E2E | `pnpm test:e2e:v1` (`e2e/v1.config.ts`, v1 stack must be running) |
 | Isolated E2E up | `make e2e-isolated-up RUN=<id>` |
 | Isolated E2E full suite | `make test-e2e-isolated RUN=<id>` |
 | Isolated E2E targeted spec | `make test-e2e-isolated-spec RUN=<id> SPEC=<path> [PROJECT="Desktop Chrome"] [GREP="..."]` |
@@ -197,7 +196,7 @@ Review is not complete if a change touches schema, DTOs, API responses, or seede
 - `apps/v1_api/test/fixtures/`
 - `apps/v1_web/src/test/msw/`
 - `apps/v1_web/public/mock/`
-- `e2e/fixtures/`
+- `apps/v1_api/prisma/` seeds
 - Affected inline mocks in `*.spec.ts` / `*.test.tsx`
 
 ---

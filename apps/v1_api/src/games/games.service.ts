@@ -4060,6 +4060,7 @@ export class GamesService {
       },
       async (tx, game, context) => {
         await this.assertTeamMatchMatched(tx, game.teamMatchId);
+        if (isFriendlyTeamMatch) await this.assertFriendlyTeamMatchLineupsReady(tx, gameId);
         // 친선 팀매치는 양 팀이 서로 다른 화면에서 명단을 관리하지만 결과 초안은
         // 호스트만 만든다. 클라이언트가 자기 팀 선수만 보내더라도 상대팀의 출전·승패
         // 기록이 사라지지 않도록, 사이드별 최신 유효 명단을 결과 참가자에 합친다.
@@ -4174,6 +4175,8 @@ export class GamesService {
         message: 'Tournament result submission is owned by the end command',
       });
     }
+    const isFriendlyTeamMatch =
+      (await this.resolveTeamMatchCompetitionContext(this.prisma, source.teamMatchId)) === null;
     return this.withCommand(
       {
         gameId,
@@ -4192,6 +4195,7 @@ export class GamesService {
           });
         }
         await this.assertTeamMatchMatched(tx, game.teamMatchId);
+        if (isFriendlyTeamMatch) await this.assertFriendlyTeamMatchLineupsReady(tx, gameId);
         this.assertLifecycle(
           game.sourceType,
           'TEAM_RESULT_SUBMISSION',
@@ -6880,6 +6884,31 @@ export class GamesService {
       participantCandidates,
       lineups,
     );
+  }
+
+  private async assertFriendlyTeamMatchLineupsReady(tx: Transaction, gameId: string): Promise<void> {
+    const [sides, lineups] = await Promise.all([
+      tx.v1GameSide.findMany({ where: { gameId, teamId: { not: null } }, select: { id: true } }),
+      tx.v1GameLineup.findMany({
+        where: { gameId, invalidatedAt: null, state: { in: [V1GameLineupState.SUBMITTED, V1GameLineupState.LOCKED] } },
+        orderBy: { revision: 'desc' },
+        select: { id: true, sideId: true },
+      }),
+    ]);
+    const latestBySide = new Map<string, string>();
+    for (const lineup of lineups) if (!latestBySide.has(lineup.sideId)) latestBySide.set(lineup.sideId, lineup.id);
+    const participantSides = new Set(
+      (await tx.v1GameParticipant.findMany({
+        where: { gameId, lineupId: { in: [...latestBySide.values()] } },
+        select: { sideId: true },
+      })).map((participant) => participant.sideId),
+    );
+    if (sides.length < 2 || sides.some((side) => !participantSides.has(side.id))) {
+      throw new ConflictException({
+        code: 'ROSTER_INCOMPLETE',
+        message: '양 팀의 참석명단이 모두 제출되어야 경기 결과를 입력할 수 있어요.',
+      });
+    }
   }
 
   private async nextGameRevisionNumber(tx: Transaction, gameId: string): Promise<number> {

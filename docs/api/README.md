@@ -24,17 +24,16 @@ This directory is the single indexed contract tree for `apps/v1_api` and `apps/v
 - [Game realtime](./domains/game-realtime.md)
 - [Game migration and cutover](./domains/game-migration.md)
 - [Public records](./domains/public-records.md)
-- [Venues](./domains/venues.md)
-- [Lessons](./domains/lessons.md)
-- [Marketplace](./domains/marketplace.md)
-- [Payments](./domains/payments.md)
-- [Mercenary](./domains/mercenary.md)
 - [Chat](./domains/chat.md)
 - [Notifications](./domains/notifications.md)
 - [Admin and operations](./domains/admin-and-ops.md)
 - [Supporting domains](./domains/supporting-domains.md)
 
 Each domain appears exactly once in this index. The superseded versioned tree is retained only for migration traceability and is not canonical or indexed here.
+
+**Removed 2026-09-27 (v0-only, no `apps/v1_api` module — PR #1313 deleted the legacy apps that
+implemented them):** Venues, Lessons, Marketplace, Payments, Mercenary. Their v0 contract docs are
+kept for historical reference under `docs/archive/v0-api/domains/`, not indexed here.
 
 ## Cross-cutting references
 

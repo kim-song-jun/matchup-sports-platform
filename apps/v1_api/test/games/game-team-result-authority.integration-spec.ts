@@ -8,6 +8,7 @@ import { OperationAuditWriterService } from '../../src/common/audit/operation-au
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
+import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
 import type {
   GameActorScope,
   GameCommandContext,
@@ -31,6 +32,7 @@ const ids = {
   unmatchedMatch: '64000000-0000-4000-8000-000000000031',
   completionMatch: '64000000-0000-4000-8000-000000000032',
   correctionMatch: '64000000-0000-4000-8000-000000000033',
+  rosterGateMatch: '64000000-0000-4000-8000-000000000034',
 } as const;
 
 // The v1_pin_sport_competition_config trigger (apps/v1_api/prisma/migrations/
@@ -124,6 +126,7 @@ async function createTeamMatchGame(
       context(actor, `task16-source-create-${teamMatchId}`, input),
     ),
   );
+  if (matchedOpponent) await submitFriendlyTeamMatchLineups(prisma, created.gameId);
   return created.gameId;
 }
 
@@ -483,5 +486,46 @@ describe('Task 16 team result draft/submit authority and completion', () => {
     const gameAfterApproval = await prisma.v1Game.findUniqueOrThrow({ where: { id: gameId } });
     expect(gameAfterApproval.currentOfficialRevisionId).toBe(correctedDraft.revisionId);
     expect(gameAfterApproval.state).toBe(V1GameState.ENDED);
+  });
+
+  it('[Task 106] blocks a friendly result draft with 409 ROSTER_INCOMPLETE while either side lacks a submitted lineup, then allows it once both are ready', async () => {
+    // createTeamMatchGame already submits both sides via the shared fixture
+    // helper — revert AWAY back to DRAFT here to simulate "opponent hasn't
+    // submitted their lineup yet", the exact precondition this gate guards.
+    const gameId = await createTeamMatchGame(ids.rosterGateMatch, true, configId);
+    const awaySide = await prisma.v1GameSide.findFirstOrThrow({
+      where: { gameId, sideKey: V1GameSideKey.AWAY },
+    });
+    await prisma.v1GameLineup.updateMany({
+      where: { gameId, sideId: awaySide.id },
+      data: { state: 'DRAFT', submittedAt: null },
+    });
+
+    const blocked = await captureFailure(() =>
+      service.createResultRevision(authUser(ids.hostUser), gameId, 'roster-gate-blocked', {
+        expectedVersion: 0,
+        clientCommandId: 'roster-gate-blocked',
+        score: { home: 0, away: 0 },
+        actualParticipants: [],
+        eventsHash: 'roster-gate-blocked-events',
+      }),
+    );
+    expectHttpCode(blocked, 409, 'ROSTER_INCOMPLETE');
+    expect(await prisma.v1GameResultRevision.count({ where: { gameId } })).toBe(0);
+
+    await prisma.v1GameLineup.updateMany({
+      where: { gameId, sideId: awaySide.id },
+      data: { state: 'SUBMITTED', submittedAt: new Date() },
+    });
+
+    const allowed = await service.createResultRevision(authUser(ids.hostUser), gameId, 'roster-gate-allowed', {
+      expectedVersion: 0,
+      clientCommandId: 'roster-gate-allowed',
+      score: { home: 0, away: 0 },
+      actualParticipants: [],
+      eventsHash: 'roster-gate-allowed-events',
+    });
+    expect(allowed.revisionState).toBe('DRAFT');
+    expect(await prisma.v1GameResultRevision.count({ where: { gameId } })).toBe(1);
   });
 });

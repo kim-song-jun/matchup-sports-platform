@@ -20,14 +20,14 @@ Backend work must start by checking:
 
 - Canonical frontend app: `apps/v1_web`
 - Framework: Next.js App Router
-- Design source: `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`
+- Design source of truth: `DESIGN.md` (priority in its §1); visual reference: `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`
 
 Frontend work must start by checking:
 
 1. Existing v1 route/page structure
 2. Existing v1 components/hooks/types
-3. The Teameet Design HTML
-4. Existing design tokens and shared UI patterns
+3. `DESIGN.md` and `docs/guides/v1-coding-patterns.md` (then the Teameet Design HTML for layout intent)
+4. Existing design tokens (`tokens.css`, `globals.css`) and shared UI patterns (`components/v1-ui/`)
 
 ## Android
 

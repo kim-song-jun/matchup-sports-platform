@@ -12,12 +12,9 @@ tmp
 output
 docs
 e2e
-tests
 screenshots
 scripts
 prompts
-ultraplan
-.autoqa
 .claude
 .codex
 .lazyweb

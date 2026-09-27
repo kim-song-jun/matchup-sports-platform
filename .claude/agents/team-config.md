@@ -7,8 +7,8 @@
 |-------|-------|-------|
 | `backend-api-dev` | API / HTTP | Controllers, DTOs, guards, interceptors, filters, modules |
 | `backend-data-dev` | Persistence | Services, Prisma schema/migrations, seed, fixtures, queries |
-| `frontend-ui-dev` | UI & design | Pages, components, styling, design tokens, forms, i18n |
-| `frontend-data-dev` | Data & state | Hooks, stores, types, API client, MSW handlers, providers |
+| `frontend-ui-dev` | UI & design | Pages, components, styling, design tokens, forms |
+| `frontend-data-dev` | Data & state | Hooks, types, API client, sockets, MSW handlers, providers |
 | `infra-devops-dev` | DevOps | Docker, Compose, deploy scripts, Makefile, CI/CD, healthchecks |
 | `infra-security-dev` | Security | Secrets policy, auth config, CORS/CSP, rate limiting, CVE audit |
 
@@ -76,12 +76,14 @@
 ## Workspace Separation (Parallel Safety)
 
 ### Ownership matrix
+Paths are relative to `apps/v1_api/src` (backend) and `apps/v1_web/src` (frontend).
+
 | Agent | Owned files | Do NOT touch |
 |-------|------------|--------------|
 | backend-api-dev | `*.controller.ts`, `*.dto.ts`, `*.module.ts`, `*.guard.ts` | `*.service.ts`, `prisma/**`, fixtures |
 | backend-data-dev | `*.service.ts`, `*.spec.ts`, `prisma/**`, `test/fixtures/**` | `*.controller.ts`, `*.dto.ts` |
-| frontend-ui-dev | `app/**/*.tsx`, `components/**`, `globals.css`, `messages/` | `hooks/**`, `stores/**`, `types/**`, `msw/**` |
-| frontend-data-dev | `hooks/**`, `stores/**`, `types/**`, `lib/api.ts`, `msw/**` | `app/**/page.tsx`, `components/**` |
+| frontend-ui-dev | `app/**/*.tsx`, `components/**`, `globals.css`, `tokens.css` | `hooks/**`, `types/**`, `test/msw/**` |
+| frontend-data-dev | `hooks/**`, `types/**`, `lib/api-client.ts`, `lib/query-keys.ts`, `test/msw/**`, `app/providers.tsx` | `app/**/page.tsx`, `components/**` |
 | infra-devops-dev | `docker-compose*`, `deploy/`, `Makefile`, `.github/workflows/` | `.env*` policy, auth config |
 | infra-security-dev | `.env*` policy, auth config, CORS/CSP | `docker-compose*`, `deploy/`, `Makefile` |
 

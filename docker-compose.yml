@@ -13,16 +13,6 @@ x-app-base: &app-base
       volume:
         nocopy: true
     - type: volume
-      source: api_node_modules_v5
-      target: /app/apps/api/node_modules
-      volume:
-        nocopy: true
-    - type: volume
-      source: web_node_modules_v5
-      target: /app/apps/web/node_modules
-      volume:
-        nocopy: true
-    - type: volume
       source: v1_api_node_modules_v1
       target: /app/apps/v1_api/node_modules
       volume:
@@ -40,36 +30,6 @@ services:
     <<: *app-base
     command: sh /app/deploy/bootstrap-dev-deps.sh
 
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: teameet_user
-      POSTGRES_PASSWORD: teameet_password
-      POSTGRES_DB: teameet_dev
-    # Internal Docker network only.
-    expose:
-      - "5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U teameet_user -d teameet_dev"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    # Internal Docker network only.
-    expose:
-      - "6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   v1_postgres:
     image: postgres:16-alpine
     environment:
@@ -85,90 +45,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  api:
-    <<: *app-base
-    command: sh -c "cd /app/apps/api && pnpm db:generate && pnpm dev"
-    environment:
-      TZ: Asia/Seoul
-      DATABASE_URL: postgresql://teameet_user:teameet_password@postgres:5432/teameet_dev
-      REDIS_URL: redis://redis:6379/0
-      JWT_SECRET: dev-secret
-      API_PORT: 8111
-      AUTH_HASH_DRIVER: bcryptjs
-      NODE_ENV: development
-      CHOKIDAR_USEPOLLING: "true"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      deps:
-        condition: service_completed_successfully
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "node -e \"fetch('http://127.0.0.1:8111/api/v1/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))\"",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-    ports:
-      - "8111:8111"
-
-  web:
-    <<: *app-base
-    command: pnpm --filter web dev
-    volumes:
-      - type: bind
-        source: .
-        target: /app
-      - type: volume
-        source: root_node_modules_v5
-        target: /app/node_modules
-        volume:
-          nocopy: true
-      - type: volume
-        source: api_node_modules_v5
-        target: /app/apps/api/node_modules
-        volume:
-          nocopy: true
-      - type: volume
-        source: web_node_modules_v5
-        target: /app/apps/web/node_modules
-        volume:
-          nocopy: true
-      - type: volume
-        source: v1_api_node_modules_v1
-        target: /app/apps/v1_api/node_modules
-        volume:
-          nocopy: true
-      - type: volume
-        source: v1_web_node_modules_v1
-        target: /app/apps/v1_web/node_modules
-        volume:
-          nocopy: true
-      - type: volume
-        source: web_next_dir_v1
-        target: /app/apps/web/.next
-        volume:
-          nocopy: true
-    environment:
-      TZ: Asia/Seoul
-      NODE_ENV: development
-      NEXT_PUBLIC_API_URL: /api/v1
-      INTERNAL_API_ORIGIN: http://api:8111
-      NEXT_PUBLIC_WS_URL: http://localhost:8111
-      WATCHPACK_POLLING: "true"
-    depends_on:
-      api:
-        condition: service_healthy
-      deps:
-        condition: service_completed_successfully
-    ports:
-      - "3003:3003"
 
   v1_api:
     <<: *app-base
@@ -214,16 +90,6 @@ services:
         volume:
           nocopy: true
       - type: volume
-        source: api_node_modules_v5
-        target: /app/apps/api/node_modules
-        volume:
-          nocopy: true
-      - type: volume
-        source: web_node_modules_v5
-        target: /app/apps/web/node_modules
-        volume:
-          nocopy: true
-      - type: volume
         source: v1_api_node_modules_v1
         target: /app/apps/v1_api/node_modules
         volume:
@@ -256,13 +122,8 @@ services:
       - "3013:3013"
 
 volumes:
-  postgres_data:
   v1_postgres_data:
-  redis_data:
   root_node_modules_v5:
-  api_node_modules_v5:
-  web_node_modules_v5:
   v1_api_node_modules_v1:
   v1_web_node_modules_v1:
-  web_next_dir_v1:
   v1_web_next_dir_v1:

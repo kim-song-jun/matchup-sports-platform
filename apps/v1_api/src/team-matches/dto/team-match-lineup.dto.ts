@@ -71,6 +71,10 @@ export class SaveTeamMatchLineupDto {
   @Min(0)
   expectedVersion!: number;
 
+  @IsOptional()
+  @IsBoolean()
+  confirmRecordedDataRisk?: boolean;
+
   // Task 15 blocker-2가 막았던 `formation` — V1GameLineup.formation 마이그레이션이
   // 추가돼 이제 저장·응답 모두 반영된다.
   @IsOptional()

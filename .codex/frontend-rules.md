@@ -6,29 +6,30 @@ Frontend work must use only `apps/v1_web`.
 
 1. Check the existing route/page structure in `apps/v1_web`.
 2. Check existing components, hooks, types, and state patterns.
-3. Read the Teameet Design HTML for the relevant screen or pattern. If the task explicitly pins an Open Design recovery/remake source, also read that pinned Open Design reference as a read-only visual target.
+3. Read `DESIGN.md` (rules; priority in its §1) and `docs/guides/v1-coding-patterns.md`, then the Teameet Design HTML as a visual reference for the relevant screen. If the task explicitly pins an Open Design recovery/remake source, also read that pinned reference as a read-only visual target.
 4. Reuse existing v1 components before creating new components.
 5. Implement with the smallest v1-scoped change.
 
 ## Design Contract
 
-- The first design source of truth is `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`.
+- The design source of truth is `DESIGN.md`; its §1 order is `DESIGN.md` > `.impeccable.md` > `apps/v1_web/src/app/tokens.css` / `globals.css` tokens > `components/v1-ui/` primitives.
+- `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html` is a visual reference for layout intent, not a rule source; `DESIGN.md` wins on conflict.
 - Explicitly pinned Open Design recovery/remake references may override visual structure for that scoped task only; they do not authorize fake routes, fake API states, or external export mutation.
 - Do not use old design files or legacy screens as references.
-- Do not create arbitrary UI that is not supported by the design HTML or existing v1 patterns.
+- Do not create arbitrary UI that is not supported by `DESIGN.md`, the design HTML, or existing v1 patterns. New or changed screens need A·B·C options + a user choice first (`CLAUDE.md` "UI 착수 규칙").
 - Keep components reusable and avoid duplicate one-off UI.
 
 ## Validation
 
 - Run `pnpm --filter v1_web test` for changed frontend behavior when tests exist.
 - Run `pnpm --filter v1_web build` or a type check when contract or route structure changes.
-- For visual behavior, compare against the Teameet Design HTML.
+- For visual behavior, check against `DESIGN.md` rules and tokens, using the Teameet Design HTML for layout intent.
 - For scoped Open Design recovery/remake work, compare against the pinned Open Design reference and verify v1 route/API honesty.
 
 ## Visual And Functional QA Gate
 
 - Apply `.codex/qa-rules.md` before final response. For frontend work, tests pass is not completion when the user-visible UI, responsive shell, admin surface, navigation, or route behavior changed.
-- Capture Playwright screenshot evidence for affected desktop, tablet, and mobile viewports. For visible layout changes, include before/after screenshot evidence; if no baseline exists, record that explicitly.
+- Capture screenshot evidence on alpha (`ego-browser`, not a local next server) for affected desktop, tablet, and mobile viewports (1440 / 768 / 390). For visible layout changes, include before/after screenshot evidence; if no baseline exists, record that explicitly.
 - Check console/network output while exercising the changed flow. A route that looks correct but logs failed API calls, hydration errors, or blocked navigation is not complete.
 - No useless fallback: do not mask API, auth, payment/refund/approval, image, or route failures with fake local success. Show the real error path.
 - No fake tests: do not rely on selector-only or mocked-render tests that can pass while the route/API/action is broken. Prefer RED -> GREEN evidence for changed contracts.

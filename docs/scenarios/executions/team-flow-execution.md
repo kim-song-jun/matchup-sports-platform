@@ -64,15 +64,15 @@ For every covered ID:
 
 - `pnpm --filter v1_api test -- teams.controller.spec.ts`
 - `pnpm --filter v1_web test -- src/components/teams`
-- `pnpm exec playwright test e2e/tests/team-owner-flow.spec.ts e2e/tests/team-manager-membership.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line`
-- `pnpm exec playwright test e2e/tests/teams.spec.ts --config=e2e/playwright.config.ts --project='Mobile Chrome' --workers=1 --reporter=line`
+- `pnpm exec playwright test e2e/tests/team-owner-flow.spec.ts e2e/tests/team-manager-membership.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line` (레거시·삭제됨 — legacy-v0-final)
+- `pnpm exec playwright test e2e/tests/teams.spec.ts --config=e2e/playwright.config.ts --project='Mobile Chrome' --workers=1 --reporter=line` (레거시·삭제됨 — legacy-v0-final)
 
 ## Result Log
 
 검증 방법:
 - API: `curl http://localhost:8121/api/v1/...` — v1 API 직접 호출 (포트 8121, `x-v1-user-email` 헤더 인증)
 - Unit: `apps/v1_api/src/teams/teams.controller.spec.ts` — 14/14 PASS
-- E2E: `e2e/tests/team-owner-flow.spec.ts`, `e2e/tests/team-manager-membership.spec.ts`
+- E2E: `e2e/tests/team-owner-flow.spec.ts`, `e2e/tests/team-manager-membership.spec.ts` (레거시·삭제됨 — legacy-v0-final)
 
 | ID | Mobile | Desktop | Result | Evidence | Notes |
 |---|---|---|---|---|---|

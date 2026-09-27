@@ -447,4 +447,4 @@
 
 ## 참고: 피그마 직접 열람 불가 고지
 
-이 rubric은 피그마 파일을 직접 열람하지 못하는 환경 제약으로 인해, **공개 아티클·문서로 대체**하여 작성되었다. 참조 소스: `toss.tech/article/toss-design-system` (토스 기술 블로그, 2024), `DESIGN.md`/`.impeccable.md`/`docs/v1-coding-patterns.md` (v1 프로젝트 내 기존 설계 문서), `apps/v1_web/src/app/globals.css` (실제 구현 토큰). 토스의 내부 Figma 라이브러리나 비공개 디자인 스펙과 상이할 수 있으며, 공개 자료에서 관찰 가능한 패턴 기반으로 합리적으로 재구성하였다.
+이 rubric은 피그마 파일을 직접 열람하지 못하는 환경 제약으로 인해, **공개 아티클·문서로 대체**하여 작성되었다. 참조 소스: `toss.tech/article/toss-design-system` (토스 기술 블로그, 2024), `DESIGN.md`/`.impeccable.md`/`docs/guides/v1-coding-patterns.md` (v1 프로젝트 내 기존 설계 문서), `apps/v1_web/src/app/globals.css` (실제 구현 토큰). 토스의 내부 Figma 라이브러리나 비공개 디자인 스펙과 상이할 수 있으며, 공개 자료에서 관찰 가능한 패턴 기반으로 합리적으로 재구성하였다.

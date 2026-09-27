@@ -1624,6 +1624,8 @@ export type V1TeamMatchLineup = {
   // 새 행으로 supersede되므로 row 자체의 `version`과는 별개다 — team-match-lineup.service.ts 참조.
   revision: number;
   state: V1TeamMatchLineupState;
+  gameState?: 'SCHEDULED' | 'LIVE' | 'PAUSED' | 'ENDED' | 'CANCELLED';
+  hasRecordedEvents?: boolean;
   version: number;
   // 포메이션 프리셋 라벨("4-4-2" 등), null이면 자유 배치.
   formation: string | null;
@@ -1658,6 +1660,7 @@ export type V1TeamMatchLineupParticipantInput = {
 // 추가돼 이제 저장·응답 모두 반영된다.
 export type V1TeamMatchLineupSavePayload = {
   expectedVersion: number;
+  confirmRecordedDataRisk?: boolean;
   /**
    * 전술보드가 정한 배치. 라인업 화면은 **편집하지 않고 그대로 되돌려 보낸다**(정본 §3 —
    * 포지션·좌표는 팀 내부 도구의 몫). 빼고 보내면 저장 한 번에 배치가 지워진다.

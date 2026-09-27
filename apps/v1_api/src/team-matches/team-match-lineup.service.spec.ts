@@ -15,7 +15,7 @@
  * (linkId, action))를 위반하면 던진다. 그래야 "여러 번 저장해도 안 터진다"는 멱등
  * 주장이 실제로 검증된다(제약을 안 거는 가짜는 아무것도 증명하지 못한다).
  */
-import { Prisma, V1ConsentState, V1GameLineupState } from '@prisma/client';
+import { Prisma, V1ConsentState, V1GameLineupState, V1GameState } from '@prisma/client';
 import type { OperationAuditWriterService } from '../common/audit/operation-audit-writer.service';
 import {
   isParticipantPubliclyEligible,
@@ -48,7 +48,7 @@ interface FakeState {
   userConsents: Array<{ userId: string; state: V1ConsentState }>;
 }
 
-function createFake(options: { managerTeamId?: string; approvedApplicantTeamId?: string | null } = {}) {
+function createFake(options: { managerTeamId?: string; approvedApplicantTeamId?: string | null; gameState?: V1GameState; recordedEventCount?: number; startAt?: Date } = {}) {
   /** 이 팀장이 어느 팀 소속인가. 홈이면 own=HOME, 원정이면 own=AWAY 로 갈린다.
    *  테스트 도중 바꿀 수 있게 객체로 들고 있는다 — "홈팀이 정정을 요청하고 원정팀이
    *  다시 저장한다"는 실제 흐름은 서로 다른 팀의 권한을 차례로 태워야 재현된다. */
@@ -72,12 +72,16 @@ function createFake(options: { managerTeamId?: string; approvedApplicantTeamId?:
         hostTeamId: 'team-home',
         approvedApplicantTeamId:
           options.approvedApplicantTeamId === undefined ? 'team-away' : options.approvedApplicantTeamId,
+        status: 'matched',
         // 마감(startAt) 이전이어야 저장이 허용된다.
-        startAt: new Date(Date.now() + 60 * 60 * 1000),
+        startAt: options.startAt ?? new Date(Date.now() + 60 * 60 * 1000),
       }),
     },
     v1Game: {
-      findUnique: async () => ({ id: 'game-1', competitionConfigVersionId: 'config-1' }),
+      findUnique: async () => ({ id: 'game-1', state: options.gameState ?? V1GameState.SCHEDULED, competitionConfigVersionId: 'config-1' }),
+    },
+    v1GameEvent: {
+      count: async () => options.recordedEventCount ?? 0,
     },
     v1GameSide: {
       findMany: async () => [
@@ -289,6 +293,29 @@ function lineupDto(expectedVersion: number) {
 }
 
 describe('TeamMatchLineupService.saveLineup — 신원 연결', () => {
+  it('진행 중인 팀매치는 킥오프 이후에도 참석명단을 저장한다', async () => {
+    const { prisma } = createFake({
+      gameState: V1GameState.LIVE,
+      startAt: new Date(Date.now() - 60 * 60 * 1000),
+    });
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(service.saveLineup(manager, 'team-match-1', 'live-save', lineupDto(0))).resolves.toMatchObject({ revision: 1 });
+  });
+
+  it('경기 기록이 있으면 위험 확인 없이 참석명단을 저장하지 않는다', async () => {
+    const { prisma } = createFake({ gameState: V1GameState.LIVE, recordedEventCount: 1 });
+    const service = new TeamMatchLineupService(prisma, audit);
+
+    await expect(service.saveLineup(manager, 'team-match-1', 'risk-blocked', lineupDto(0))).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'LINEUP_RECORDED_DATA_CONFIRMATION_REQUIRED' }),
+    });
+    await expect(service.saveLineup(manager, 'team-match-1', 'risk-confirmed', {
+      ...lineupDto(0),
+      confirmRecordedDataRisk: true,
+    })).resolves.toMatchObject({ revision: 1 });
+  });
+
   it('userId 가 실린 참가자마다 연결을 만들고, 게스트에는 만들지 않는다', async () => {
     const { state, prisma } = createFake();
     const service = new TeamMatchLineupService(prisma, audit);

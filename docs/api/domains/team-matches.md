@@ -37,6 +37,13 @@
   기존 `/result`, `/result/approval`도 신규 친선 경기에서는 공동 기록을 연다.
 - 신규 테이블: `V1TeamMatchRecord`, `V1TeamMatchRecordChange`; migration `20260921160000_v1_team_match_shared_record`.
 
+### 진행 중 참석명단 수정
+
+- `GET /team-matches/:id/lineup`은 `gameState`와 `hasRecordedEvents`를 반환한다.
+- Game이 `LIVE` 또는 `PAUSED`이면 킥오프 이후나 기존 라인업이 `LOCKED`여도 팀 owner/manager가 참석명단을 새 리비전으로 저장하고 다시 제출할 수 있다. 종료·취소된 경기는 계속 차단한다.
+- 경기 이벤트가 하나라도 있으면 `PUT /team-matches/:id/lineup`은 `confirmRecordedDataRisk=true`를 요구한다. 없으면 `409 LINEUP_RECORDED_DATA_CONFIRMATION_REQUIRED`를 반환한다.
+- Web은 저장 전에 득점 등 선수 기록이 화면에서 사라질 수 있음을 알리고 사용자의 명시적 재확인을 받은 요청에만 확인값을 포함한다.
+
 
 
 ## Task 168 Phase 3 canonical source addendum (candidate)

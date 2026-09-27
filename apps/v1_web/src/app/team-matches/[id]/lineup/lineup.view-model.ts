@@ -436,7 +436,15 @@ export function extractConflictCurrentVersion(details: unknown): number | null {
 export function describeLineupPhase(
   state: V1TeamMatchLineupState,
   deadlinePassed: boolean,
+  liveEditAllowed = false,
 ): { label: string; editable: boolean; helperText: string } {
+  if (liveEditAllowed) {
+    return {
+      label: '경기 중 · 수정 가능',
+      editable: true,
+      helperText: '경기 진행 중에도 참석명단을 수정할 수 있어요.',
+    };
+  }
   if (state === 'LOCKED') {
     return { label: '잠김', editable: false, helperText: '경기가 시작되어 참석명단이 잠겼어요.' };
   }

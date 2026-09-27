@@ -8,6 +8,7 @@ import { OperationAuditWriterService } from '../../src/common/audit/operation-au
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
+import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
 import type {
   GameActorScope,
   GameCommandContext,
@@ -124,6 +125,7 @@ async function createTeamMatchGame(
       context(actor, `task16-source-create-${teamMatchId}`, input),
     ),
   );
+  if (matchedOpponent) await submitFriendlyTeamMatchLineups(prisma, created.gameId);
   return created.gameId;
 }
 

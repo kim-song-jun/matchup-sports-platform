@@ -6,7 +6,7 @@
 import { fetchSeoSeed } from '@/lib/seo-list';
 import { getStatus } from '@/components/team-matches/team-matches.card-model';
 import { formatCardDate, formatCardTime, formatTournamentDateMedium } from '@/lib/date-utils';
-import type { CursorPage, V1Team, V1TeamMatch, V1TournamentListItem, V1TournamentListPage } from '@/types/api';
+import type { CursorPage, PageInfo, V1Team, V1TeamMatch, V1TournamentListItem, V1TournamentListPage } from '@/types/api';
 
 const LIST_LIMIT = 50;
 
@@ -56,11 +56,34 @@ export type LandingV4Data = {
 
 export async function fetchLandingV4Data(): Promise<LandingV4Data> {
   const [teamMatches, tournaments, teams] = await Promise.all([
-    fetchSeoSeed<CursorPage<V1TeamMatch>>(`/team-matches?limit=${LIST_LIMIT}`, 'landing-v4 team-matches'),
-    fetchSeoSeed<V1TournamentListPage>(`/tournaments?limit=${LIST_LIMIT}`, 'landing-v4 tournaments'),
-    fetchSeoSeed<CursorPage<V1Team>>(`/teams?limit=${LIST_LIMIT}`, 'landing-v4 teams'),
+    fetchAllPages<V1TeamMatch>('/team-matches', 'landing-v4 team-matches'),
+    fetchAllPages<V1TournamentListItem>('/tournaments', 'landing-v4 tournaments'),
+    fetchAllPages<V1Team>('/teams', 'landing-v4 teams'),
   ]);
   return summarizeLandingData(teamMatches, tournaments, teams, new Date());
+}
+
+/* 종목별 수치는 전체를 세야 맞다 — 첫 페이지만 세면 종목 비율이 틀린다(alpha 팀 85개 중 50개만 세던 결함).
+ * MAX_PAGES 를 넘으면 hasNext 를 남겨 "N개 이상"으로 표기한다. 중간 페이지를 못 받으면 받은 데까지 쓰고 hasNext 로 표시한다. */
+const MAX_PAGES = 4;
+
+/** 여러 페이지를 이어 붙인 목록. CursorPage 의 최상위 nextCursor 는 서버가 채우지 않으므로 pageInfo 만 믿는다. */
+export type MergedPage<T> = { items: T[]; nextCursor: null; pageInfo: PageInfo };
+
+export async function fetchAllPages<T>(path: string, label: string): Promise<MergedPage<T> | null> {
+  const items: T[] = [];
+  let cursor: string | null = null;
+  const merged = (hasNext: boolean): MergedPage<T> => ({ items, nextCursor: null, pageInfo: { nextCursor: hasNext ? cursor : null, hasNext } });
+  for (let pageIndex = 0; pageIndex < MAX_PAGES; pageIndex += 1) {
+    const query = new URLSearchParams({ limit: String(LIST_LIMIT) });
+    if (cursor) query.set('cursor', cursor);
+    const page = await fetchSeoSeed<CursorPage<T>>(`${path}?${query.toString()}`, label);
+    if (!page) return pageIndex === 0 ? null : merged(true);
+    items.push(...page.items);
+    cursor = page.pageInfo?.nextCursor ?? null;
+    if (!page.pageInfo?.hasNext || !cursor) return merged(false);
+  }
+  return merged(true);
 }
 
 export function formatLandingCount(count: LandingCount): string | null {

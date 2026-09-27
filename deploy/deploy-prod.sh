@@ -209,7 +209,7 @@ restore_legacy_runtime() {
 # 단계 모드 실패는 옛 이미지 복원 대신 실패한 단계만 기록한다. 재시도마다 덮어쓴다.
 write_task168_activation_stage_failure() {
   local stage="$1" state_dir content tmp
-  state_dir="${PROD_RELEASE_STATE_DIR}/task168/${PROD_SHA}"
+  state_dir="${PROD_TASK168_STATE_ROOT}/${PROD_SHA}"
   content="$(jq -nc --arg stage "${stage}" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     '{schemaVersion:1,kind:"activationStage",stage:$stage,failedAt:$at}')" || return 1
   install -d -m 700 "${state_dir}" || return 1
@@ -326,7 +326,7 @@ if [[ "${task168_stage}" == stageA ]]; then
   prod_task168_main stageA
   # Stage A 는 승격하지 않는다. 검토된 매니페스트는 기록용으로만 남긴다. API·워커는
   # Stage B 가 올릴 때까지 내려간 채다(C2).
-  task168_state_dir="${PROD_RELEASE_STATE_DIR}/task168/${PROD_SHA}"
+  task168_state_dir="${PROD_TASK168_STATE_ROOT}/${PROD_SHA}"
   install -d -m 700 "${task168_state_dir}"
   install -m 600 "${PROD_MANIFEST_FILE}" "${task168_state_dir}/manifest.json"
   rm -f "${PROD_CANDIDATE_MANIFEST}"

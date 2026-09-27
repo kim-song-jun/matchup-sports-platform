@@ -55,6 +55,7 @@ run_case() {
     printf 'restore_legacy_runtime() { echo called >> %q; return 1; }\n' "${restore_legacy_log}"
     printf 'PROD_SHA=%q\n' "3333333333333333333333333333333333333333"
     printf 'PROD_RELEASE_STATE_DIR=%q\n' "${scenario_dir}/state"
+    printf 'source %q\n' "${ROOT_DIR}/deploy/prod-task168-common.sh"
     printf 'task168_stage=%q\n' "${stage}"
     printf 'runtime_mutated=%q\n' "${runtime_mutated}"
     printf 'had_active=%q\n' "${had_active}"

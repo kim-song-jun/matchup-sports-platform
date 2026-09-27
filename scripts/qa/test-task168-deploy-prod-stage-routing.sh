@@ -89,6 +89,7 @@ task168_stage="${stage}"
 PROD_MANIFEST_FILE="${manifest_file}"
 PROD_SHA="3333333333333333333333333333333333333333"
 PROD_RELEASE_STATE_DIR="${scenario_dir}/state"
+source "${ROOT_DIR}/deploy/prod-task168-common.sh"
 PROD_RELEASE_STATE_FILE="${scenario_dir}/state/nonexistent-state.json"
 PROD_CANDIDATE_MANIFEST="${scenario_dir}/state/candidate.json"
 had_active=false

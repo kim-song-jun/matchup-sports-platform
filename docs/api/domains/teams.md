@@ -142,8 +142,9 @@ CAUTION:
 
 ### PATCH /team-memberships/:membershipId/role
 
-- owner 전용, body `{ role: "manager" | "member" }`
-- manager 인원 제한은 서비스 로직(5명)이 강제한다. owner는 이 API로 바꾸지 않는다.
+- body `{ role: "owner" | "manager" | "member" }`. 대상은 active 멤버십이어야 하고, 이미 같은 역할이면 변경 없이 그대로 반환한다.
+- `role: "owner"` = **소유권 위임**: 현재 owner 만 호출할 수 있고 대상은 manager 여야 한다(아니면 409 `OWNER_DELEGATION_TARGET_MUST_BE_MANAGER`). 한 트랜잭션에서 현재 owner 가 manager 로 내려가고 대상이 owner 가 되며 `team.ownerUserId` 도 바뀐다. 동시 위임은 409 `CONCURRENT_UPDATE`.
+- manager 는 팀당 5명까지(`MANAGER_LIMIT_EXCEEDED`).
 
 ### POST /team-memberships/:membershipId/remove
 

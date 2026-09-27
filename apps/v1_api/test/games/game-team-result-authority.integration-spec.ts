@@ -8,12 +8,12 @@ import { OperationAuditWriterService } from '../../src/common/audit/operation-au
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
+import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
 import type {
   GameActorScope,
   GameCommandContext,
   GameSourceCreationInput,
 } from '../../src/games/games.types';
-import { submitFriendlyTeamMatchLineups } from '../fixtures/friendly-team-match-lineup.fixture';
 
 // Task 16: host-only draft/submit authority, the matched-opponent precondition that replaces
 // the removed `/team-matches/:teamMatchId/complete` shortcut, and the atomic TeamMatch
@@ -126,12 +126,7 @@ async function createTeamMatchGame(
       context(actor, `task16-source-create-${teamMatchId}`, input),
     ),
   );
-  // Task 106 gate: input above carries no participants, so this friendly
-  // team-match game's per-side lineups start out DRAFT/empty. Back-fill a
-  // participant and flip both to SUBMITTED so createResultRevision below
-  // doesn't 409 ROSTER_INCOMPLETE (the unmatched-opponent side is skipped
-  // automatically since it has no teamId).
-  await submitFriendlyTeamMatchLineups(prisma, created.gameId);
+  if (matchedOpponent) await submitFriendlyTeamMatchLineups(prisma, created.gameId);
   return created.gameId;
 }
 

@@ -11,6 +11,7 @@ import {
   V1GameOperationsWorkerService,
 } from '../../src/jobs/v1-game-operations-worker.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
 import { ManagedTermsRuntimeService } from '../../src/terms/managed-terms-runtime.service';
 import { FOOTBALL_V1_CONFIG } from '../../src/tournaments/competition-config/competition-config';
 import { createV1IntegrationApp } from '../integration/integration-app';
@@ -78,8 +79,6 @@ const ids = {
   lane4Participant: '79000000-0000-4000-8000-00000000006b',
   lane4DirectorAssignment: '79000000-0000-4000-8000-00000000006c',
   lane4SubmittedReplay: '79000000-0000-4000-8000-00000000006d',
-  lane4AwayLineup: '79000000-0000-4000-8000-00000000006e',
-  lane4AwayParticipant: '79000000-0000-4000-8000-00000000006f',
 } as const;
 
 class DiagnosticGameOperationsWorker extends V1GameOperationsWorkerService {
@@ -1871,29 +1870,7 @@ async function createFixture(): Promise<void> {
       displayNameSnapshot: 'Task 9 Lane 4 Player',
     },
   });
-  // Task 106 (assertFriendlyTeamMatchLineupsReady) requires a submitted
-  // lineup with a participant on BOTH sides of a friendly team match before
-  // createResultRevision/submitResultRevision succeed. This fixture only had
-  // a HOME lineup above; back-fill the AWAY side the same way (LOCKED, one
-  // participant) so it counts as ready too.
-  await prisma.v1GameLineup.create({
-    data: {
-      id: ids.lane4AwayLineup,
-      gameId: ids.lane4Game,
-      sideId: ids.lane4AwaySide,
-      revision: 1,
-      state: 'LOCKED',
-    },
-  });
-  await prisma.v1GameParticipant.create({
-    data: {
-      id: ids.lane4AwayParticipant,
-      gameId: ids.lane4Game,
-      sideId: ids.lane4AwaySide,
-      lineupId: ids.lane4AwayLineup,
-      displayNameSnapshot: 'Task 9 Lane 4 Opponent Player',
-    },
-  });
+  await submitFriendlyTeamMatchLineups(prisma, ids.lane4Game);
   await prisma.v1GameResultRevision.create({
     data: {
       id: ids.lane4Revision,

@@ -2,13 +2,13 @@ import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
 import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
 import type {
   GameActorScope,
   GameCommandContext,
   GameSourceCreationInput,
 } from '../../src/games/games.types';
-import { submitFriendlyTeamMatchLineups } from '../fixtures/friendly-team-match-lineup.fixture';
 
 // Task 17: resolveActor (games.service.ts, TEAM_MATCH branch) unconditionally
 // forbids `event_append` / `event_reverse` for a TEAM_MATCH game, so a
@@ -164,9 +164,6 @@ describe('Task 17 team-match score invariant (event-vs-score exemption)', () => 
       ),
     );
     gameId = created.gameId;
-    // Task 106 gate: both sides already have participants via input.participants
-    // above, but createFromSourceInTransaction leaves their lineups DRAFT.
-    // Flip to SUBMITTED so createResultRevision below doesn't 409 ROSTER_INCOMPLETE.
     await submitFriendlyTeamMatchLineups(prisma, gameId);
   });
 

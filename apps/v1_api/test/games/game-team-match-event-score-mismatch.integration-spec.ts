@@ -9,7 +9,7 @@ import type {
   GameSourceCreationInput,
 } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { submitFriendlyTeamMatchLineups } from '../fixtures/friendly-team-match-lineup.fixture';
+import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
 
 // Task T1-1 follow-up: game-team-match-score-invariant.integration-spec.ts
 // proves the TEAM_MATCH-with-zero-events exemption in game-invariants.ts
@@ -166,9 +166,6 @@ describe('Task T1-1 team-match SCORE_EVENT_MISMATCH once real events exist', () 
       service.createFromSourceInTransaction(tx, input, context(actor, 't1-1-mismatch-source-create', input)),
     );
     gameId = created.gameId;
-    // Task 106 gate: both sides already have participants via input.participants
-    // above, but createFromSourceInTransaction leaves their lineups DRAFT.
-    // Flip to SUBMITTED so createResultRevision below doesn't 409 ROSTER_INCOMPLETE.
     await submitFriendlyTeamMatchLineups(prisma, gameId);
     hostSideId = (await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: V1GameSideKey.HOME } })).id;
     awaySideId = (await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: V1GameSideKey.AWAY } })).id;

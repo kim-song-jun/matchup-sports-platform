@@ -22,6 +22,8 @@ export const TOURNAMENTS_CORE_ROUTES: RouteChromeEntry[] = [
     pattern: '/tournaments/:id',
     chrome: {
       title: '대회 상세',
+      // 본문이 대회 이름으로 h1 을 그린다 — 셸 제목까지 h1 이면 검색엔진이 "대회 상세"를 대표 제목으로 읽는다.
+      pageOwnsHeading: true,
       activeTab: 'tournaments',
       bottomNav: false,
       backHref: '/tournaments',
@@ -34,6 +36,7 @@ export const TOURNAMENTS_CORE_ROUTES: RouteChromeEntry[] = [
     pattern: '/tournaments/:id/bracket',
     chrome: {
       title: '순위·브래킷',
+      pageOwnsHeading: true,
       activeTab: 'tournaments',
       backHref: (p) => `/tournaments/${p.id}`,
       desktopHead: true,
@@ -45,6 +48,7 @@ export const TOURNAMENTS_CORE_ROUTES: RouteChromeEntry[] = [
     pattern: '/tournaments/:id/results',
     chrome: {
       title: '최종결과',
+      pageOwnsHeading: true,
       activeTab: 'tournaments',
       backHref: (p) => `/tournaments/${p.id}/bracket`,
       desktopHead: true,
@@ -56,6 +60,7 @@ export const TOURNAMENTS_CORE_ROUTES: RouteChromeEntry[] = [
     pattern: '/tournaments/:id/awards',
     chrome: {
       title: '시상·리뷰',
+      pageOwnsHeading: true,
       activeTab: 'tournaments',
       backHref: (p) => `/tournaments/${p.id}/results`,
       desktopHead: true,

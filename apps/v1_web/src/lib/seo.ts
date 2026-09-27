@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
-import type { ApiEnvelope } from '@/types/api';
+import { competitionFormatLabel } from '@/lib/competition-kind';
+import { formatEntryFee, formatTournamentDateMedium, formatTournamentDateRangeMedium } from '@/lib/date-utils';
+import type { ApiEnvelope, V1TournamentDetail, V1TournamentStatus } from '@/types/api';
 
 const DEFAULT_SITE_ORIGIN = 'https://teameet.co.kr';
 /**
@@ -155,6 +157,57 @@ export function metadataDescription(value: string | null | undefined, fallback: 
   const normalized = value?.replace(/\s+/g, ' ').trim();
   if (!normalized || normalized.length < MIN_DESCRIPTION_LENGTH) return fallback;
   return normalized.length > 155 ? `${normalized.slice(0, 152).trimEnd()}…` : normalized;
+}
+
+const TOURNAMENT_STATUS_PHRASE: Partial<Record<V1TournamentStatus, string>> = {
+  closed: '신청 마감',
+  in_progress: '진행 중',
+  completed: '대회 종료',
+  cancelled: '대회 취소',
+};
+
+/**
+ * 대회 검색 설명문. 주최자 소개는 이모지 한 줄("⚽️ 5대5 풋살 ⚽️")인 경우가 많아 검색 결과·AI 요약이
+ * 일정도 장소도 모른다 — 사람이 대회를 고를 때 묻는 사실(언제·어디·방식·참가비·자리)을 앞에 둔다.
+ */
+export function buildTournamentDescription(
+  tournament: Pick<
+    V1TournamentDetail,
+    | 'sport'
+    | 'format'
+    | 'kind'
+    | 'status'
+    | 'scheduledAt'
+    | 'scheduledEndAt'
+    | 'venue'
+    | 'entryFee'
+    | 'teamCount'
+    | 'confirmedCount'
+    | 'registrationDeadlineAt'
+    | 'prizeSummary'
+    | 'promoListSubtitle'
+  >,
+): string {
+  const facts = [
+    formatTournamentDateRangeMedium(tournament.scheduledAt, tournament.scheduledEndAt),
+    tournament.venue?.trim() || null,
+    `${tournament.sport.name} ${competitionFormatLabel(tournament)}`,
+    `참가비 ${formatEntryFee(tournament.entryFee)}`,
+  ];
+  if (tournament.status === 'open') {
+    if (tournament.teamCount) facts.push(`${tournament.teamCount}팀 중 ${tournament.confirmedCount}팀 확정`);
+    const deadline = formatTournamentDateMedium(tournament.registrationDeadlineAt);
+    if (deadline) facts.push(`신청 마감 ${deadline}`);
+  } else {
+    facts.push(TOURNAMENT_STATUS_PHRASE[tournament.status] ?? null);
+  }
+  facts.push(tournament.prizeSummary?.trim() || null);
+  const factLine = facts.filter(Boolean).join(' · ');
+  const organizerLine = tournament.promoListSubtitle?.replace(/\s+/g, ' ').trim();
+  return metadataDescription(
+    organizerLine && organizerLine.length >= MIN_DESCRIPTION_LENGTH ? `${factLine} — ${organizerLine}` : factLine,
+    `${tournament.sport.name} 대회의 일정, 참가 조건과 경기 정보를 확인해 보세요.`,
+  );
 }
 
 export async function fetchPublicV1<T>(path: string): Promise<T | null> {

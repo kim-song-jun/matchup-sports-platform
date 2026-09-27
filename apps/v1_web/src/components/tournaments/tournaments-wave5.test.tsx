@@ -143,11 +143,14 @@ describe('셸 크롬 — 데스크톱 헤드 + 중복 h1 제거', () => {
     expect(resolveRouteChrome('/tournaments')?.chrome.desktopHead).toBe(true);
   });
 
-  it('순위·브래킷 화면은 자체 h1을 그리지 않는다 — 셸 데스크톱 헤드가 이미 그린다', () => {
+  it('순위·브래킷 화면은 대회 이름으로 h1 을 하나만 갖고, 셸은 제목을 h1 로 그리지 않는다', () => {
+    expect(resolveRouteChrome('/tournaments/tour-h1/bracket')?.chrome.pageOwnsHeading).toBe(true);
     const tournament = makeTournament({ id: 'tour-h1', status: 'open', format: 'knockout' });
     const { container } = renderBracketStandingsTab(tournament);
 
-    expect(container.querySelectorAll('h1')).toHaveLength(0);
+    const h1s = container.querySelectorAll('h1');
+    expect(h1s).toHaveLength(1);
+    expect(h1s[0]).toHaveTextContent('테스트 대회 순위·대진표');
     expect(screen.getByRole('heading', { level: 2, name: '테스트 대회' })).toBeInTheDocument();
   });
 

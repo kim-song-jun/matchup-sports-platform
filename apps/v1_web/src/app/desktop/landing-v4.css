@@ -1,0 +1,874 @@
+/* ── 랜딩 v4 (/landing/v4) ──
+ * landing.css(.tm-landing·.lpm-*) 위에 얹는다. 새 규칙은 전부 tm-landing-v4-* 접두사다.
+ * 움직임은 transform·opacity 만 쓰고, 모션 감소 설정이면 최종 상태로 보인다. */
+
+/* 히어로: 카피 | [폰 | 옆 칸]. 일러스트는 옆 칸에만 있어 폰과 겹칠 수 없다. */
+.tm-landing-v4-hero-grid {
+  display: grid;
+  gap: 36px;
+}
+
+.tm-landing-v4-hero-aside {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.tm-landing-v4-eyebrow-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-circle);
+  background: var(--green500);
+}
+
+.tm-landing-v4-line {
+  display: block;
+}
+
+/* 단어 마스크: 아래로 내려간 글자를 잘라 두었다가 올린다. 여백은 받침·쉼표가 잘리지 않게 둔다. */
+.tm-landing-v4-word {
+  display: inline-block;
+  overflow: clip;
+  vertical-align: top;
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
+}
+
+.tm-landing-v4-word > span {
+  display: inline-block;
+}
+
+/* 데모 무대 */
+.tm-landing-v4-stage {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.tm-landing-v4-stage-phone {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.tm-landing-v4-demo-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  margin: 0;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--grey400);
+  background: var(--card-surface);
+  font-size: var(--font-size-label);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.tm-landing-v4-demo-tag svg {
+  color: var(--blue500);
+}
+
+/* 폰 축소율 320/375 ≈ 0.85 — 폰 안 56px 누름 영역이 화면에서 약 48px 이 된다. */
+.tm-landing-v4-device {
+  --dw: 320;
+  --dh: 640;
+}
+
+/* 안쪽 스크롤을 두지 않는다 — 휠·세로 스와이프가 폰에 먹히지 않고 페이지로 간다. */
+.tm-landing-v4-screens {
+  touch-action: pan-y;
+}
+
+.tm-landing-v4-toast {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 96px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--radius-container);
+  background: var(--scrim-dark-94);
+  color: var(--static-white);
+  font-size: var(--font-size-body-sm);
+  font-weight: 700;
+  line-height: 1.4;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(12px);
+  pointer-events: none;
+  transition: opacity var(--duration-base) var(--ease-standard), transform var(--duration-slow) var(--ease-spring), visibility 0s linear var(--duration-slow);
+}
+
+.tm-landing-v4-toast[data-show='true'] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0s;
+}
+
+.tm-landing-v4-toast small {
+  display: block;
+  font-size: var(--font-size-caption);
+  font-weight: 500;
+  color: var(--overlay-white-72);
+}
+
+.tm-landing-v4-toast svg {
+  flex: none;
+  color: var(--green500);
+}
+
+.tm-landing-v4-stage-side {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding-top: 40px;
+}
+
+.tm-landing-v4-illust {
+  width: 100%;
+  max-width: 176px;
+  height: auto;
+  justify-self: center;
+}
+
+.tm-landing-v4-float {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 8px;
+  border-radius: var(--radius-container);
+  border: 1px solid var(--border);
+  background: var(--card-surface);
+  box-shadow: var(--shadow-card);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-strong);
+}
+
+.tm-landing-v4-float b {
+  font-variant-numeric: tabular-nums;
+}
+
+.tm-landing-v4-float small {
+  display: block;
+  font-size: var(--font-size-caption);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.tm-landing-v4-float-ic {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-control);
+  background: var(--red50);
+  color: var(--red700);
+}
+
+/* 해 볼 것 — 폰 밖의 44px 바로가기 */
+.tm-landing-v4-try {
+  display: grid;
+  gap: 8px;
+}
+
+.tm-landing-v4-try-title {
+  margin: 0;
+  font-size: var(--font-size-label);
+  font-weight: 800;
+  color: var(--text-muted);
+}
+
+.tm-landing-v4-try-btn {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card-surface);
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-strong);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+
+.tm-landing-v4-try-btn[data-done='true'] {
+  border-color: var(--blue500);
+}
+
+.tm-landing-v4-try-btn svg {
+  flex: none;
+  color: var(--blue500);
+}
+
+.tm-landing-v4-try-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin: 0 4px;
+  border-radius: var(--radius-circle);
+  background: var(--blue500);
+}
+
+@media (hover: hover) {
+  .tm-landing-v4-try-btn:hover {
+    border-color: var(--blue500);
+    background: var(--blue50);
+  }
+}
+
+/* 폰 안 버튼 공통 — 모양은 앱 그대로 두고 누르는 영역만 ::after 로 56px(화면에서 약 48px) */
+/* :where 로 특이도 0 — .lpm-chip·.lpm-tab 같은 앱 조각의 글꼴·테두리가 이 초기화에 지지 않게 한다. */
+:where(.tm-landing-v4-hit, .tm-landing-v4-tab, .tm-landing-v4-seg > button, .tm-landing-v4-bk-team, .tm-landing-v4-goal, .tm-landing-v4-reset, .tm-landing-v4-flip) {
+  position: relative;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* .lpm-chips 는 overflow:hidden 이라 위아래로 넘친 ::after 를 자른다 — 세로 여백을 안쪽에 둬 누름 영역을 살린다. */
+.tm-landing-v4-device .lpm-chips {
+  padding-block: 12px;
+  margin-block: -12px;
+}
+
+.tm-landing-v4-hit::after,
+.tm-landing-v4-reset::after,
+.tm-landing-v4-seg > button::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, 56px);
+  height: max(100%, 56px);
+  transform: translate(-50%, -50%);
+}
+
+.tm-landing-v4-device :focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+.tm-landing-v4-tab:active .lpm-tab-ic {
+  transform: scale(0.9);
+}
+
+.tm-landing-v4-cover {
+  width: 100%;
+  text-align: left;
+}
+
+.tm-landing-v4-bar-fill {
+  transform: scaleX(var(--tm-landing-v4-fill, 0));
+  transition: transform var(--duration-slower) var(--ease-out);
+}
+
+.tm-landing-v4-mcard-foot {
+  align-items: center;
+}
+
+.tm-landing-v4-num {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--blue700);
+}
+
+.tm-landing-v4-apply {
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius-pill);
+  background: var(--blue500);
+  font-size: var(--font-size-body-sm);
+  font-weight: 700;
+  color: var(--static-white);
+  transition: background-color var(--duration-base) var(--ease-standard), transform var(--duration-instant) var(--ease-standard);
+}
+
+.tm-landing-v4-apply[aria-pressed='true'] {
+  background: var(--grey100);
+  color: var(--text-strong);
+}
+
+.tm-landing-v4-apply:active {
+  transform: scale(0.96);
+}
+
+.tm-landing-v4-empty {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 20px 0;
+  text-align: center;
+}
+
+.tm-landing-v4-empty img {
+  width: 120px;
+  height: auto;
+}
+
+.tm-landing-v4-empty b {
+  font-size: var(--font-size-body-lg);
+  color: var(--text-strong);
+}
+
+.tm-landing-v4-empty span {
+  font-size: var(--font-size-label);
+  color: var(--text-muted);
+}
+
+.tm-landing-v4-record-tab {
+  flex: 1;
+  min-height: 48px;
+  font-weight: 700;
+  color: var(--grey600);
+  transition: color var(--duration-base) var(--ease-standard);
+}
+
+.tm-landing-v4-record-tab[data-on='true'] {
+  color: var(--text-strong);
+  box-shadow: inset 0 -2px 0 var(--text-strong);
+}
+
+.tm-landing-v4-wdl-bar {
+  display: grid;
+}
+
+.tm-landing-v4-wdl-bar i[data-part] {
+  flex: none;
+}
+
+/* 대회 화면(대진표·라이브) */
+.tm-landing-v4-seg > button {
+  height: 40px;
+  border-radius: var(--radius-control);
+  font-weight: 700;
+  color: var(--grey600);
+}
+
+.tm-landing-v4-seg > button[data-on='true'] {
+  background: var(--bg);
+  color: var(--text-strong);
+  box-shadow: var(--shadow-card);
+}
+
+.tm-landing-v4-sub {
+  display: grid;
+  gap: 12px;
+}
+
+.tm-landing-v4-sub[hidden] {
+  display: none;
+}
+
+.tm-landing-v4-bk {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr);
+  row-gap: 12px;
+}
+
+.tm-landing-v4-bk-cap {
+  font-size: var(--font-size-caption);
+  font-weight: 800;
+  color: var(--text-muted);
+}
+
+.tm-landing-v4-bk-match {
+  display: grid;
+  gap: 4px;
+}
+
+.tm-landing-v4-bk-team {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card-surface);
+  font-size: var(--font-size-body-sm);
+  font-weight: 700;
+  color: var(--text-muted);
+  text-align: left;
+  transition: border-color var(--duration-base) var(--ease-standard), background-color var(--duration-base) var(--ease-standard), transform var(--duration-instant) var(--ease-standard);
+}
+
+.tm-landing-v4-bk-team:active {
+  transform: scale(0.97);
+}
+
+.tm-landing-v4-bk-team[aria-pressed='true'] {
+  border-color: var(--blue500);
+  background: var(--blue50);
+  color: var(--text-strong);
+}
+
+.tm-landing-v4-bk-win {
+  display: none;
+  font-size: var(--font-size-caption);
+  font-weight: 800;
+  color: var(--blue700);
+}
+
+.tm-landing-v4-bk-team[aria-pressed='true'] .tm-landing-v4-bk-win {
+  display: inline;
+}
+
+/* 결승 칸은 아직 안 고른 상태라도 올라온 팀 이름이 읽혀야 한다 */
+.tm-landing-v4-bk-slot {
+  align-self: center;
+  color: var(--text-strong);
+}
+
+.tm-landing-v4-bk-link {
+  align-self: center;
+  height: 2px;
+  background: var(--blue500);
+}
+
+.tm-landing-v4-bk-champ {
+  grid-column: 1 / -1;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-control);
+  border: 1px dashed var(--grey400);
+  font-weight: 800;
+  color: var(--text-muted);
+}
+
+.tm-landing-v4-bk-champ[data-done='true'] {
+  border: 1px solid var(--blue500);
+  background: var(--blue50);
+  color: var(--blue700);
+}
+
+.tm-landing-v4-goal-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tm-landing-v4-goal {
+  min-height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card-surface);
+  font-size: var(--font-size-body-sm);
+  font-weight: 800;
+  color: var(--text-strong);
+  transition: transform var(--duration-instant) var(--ease-standard);
+}
+
+.tm-landing-v4-goal:active {
+  transform: scale(0.95);
+}
+
+.tm-landing-v4-goal i {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-circle);
+  background: var(--blue500);
+}
+
+.tm-landing-v4-goal[data-side='b'] i {
+  background: var(--orange500);
+}
+
+.tm-landing-v4-reset {
+  min-height: 44px;
+  margin-top: 4px;
+  padding: 0 12px;
+  font-size: var(--font-size-label);
+  font-weight: 700;
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* 선수 카드 뒤집기 */
+.tm-landing-v4-flip {
+  display: block;
+  width: 252px;
+  margin: 4px auto 0;
+  text-align: left;
+  perspective: 1200px;
+}
+
+.tm-landing-v4-flip-inner {
+  position: relative;
+  display: block;
+  transform-style: preserve-3d;
+  transition: transform 700ms var(--ease-out);
+}
+
+.tm-landing-v4-flip[aria-pressed='true'] .tm-landing-v4-flip-inner {
+  transform: rotateY(180deg);
+}
+
+.tm-landing .tm-landing-v4-flip-face {
+  margin: 0;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.tm-landing-v4-flip-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+}
+
+/* 버튼 안이라 span 으로 그린 카드 조각을 블록으로 되돌린다 */
+.tm-landing-v4-flip .lpm-pcard-face,
+.tm-landing-v4-flip .lpm-pcard-name,
+.tm-landing-v4-flip .lpm-pcard-team,
+.tm-landing-v4-flip .lpm-pcard-tier {
+  display: block;
+}
+
+.tm-landing-v4-flip-back .lpm-pcard-face {
+  height: 100%;
+}
+
+/* 광택 반복은 끈다 — 상시 모션은 LIVE 점멸 하나만 남긴다 */
+.tm-landing .tm-landing-v4-device .lpm-pcard-face::after {
+  animation: none;
+}
+
+.tm-landing-v4-card-back {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+  font-size: var(--font-size-body-sm);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.tm-landing-v4-card-back > span {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.tm-landing-v4-card-back svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.tm-landing-v4-flip-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--font-size-label);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+/* 반응형·모션 */
+@keyframes tmLandingV4Word {
+  from { transform: translate3d(0, 110%, 0); }
+  to { transform: none; }
+}
+
+/* 첫 로드 1회 연출 + 누른 결과 피드백. 스크립트가 없거나 모션 감소면 최종 상태 그대로다. */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  .tm-landing-v4-word > span {
+    animation: tmLandingV4Word 820ms var(--ease-out) both;
+    animation-delay: calc(80ms + var(--tm-landing-v4-w, 0) * 70ms);
+  }
+  .tm-landing-v4-device {
+    animation: tmLandingDeviceIn 700ms var(--ease-out) 120ms both;
+  }
+  .tm-landing-v4-bump[data-bump='true'] {
+    display: inline-block;
+    animation: tmLandingBump 520ms var(--ease-spring);
+  }
+  .tm-landing-v4-event-new {
+    animation: tmLandingRowIn 420ms var(--ease-out) both;
+  }
+  .tm-landing-v4-wdl {
+    animation: tmLandingRise 320ms var(--ease-out) both;
+  }
+  .tm-landing-v4-bk-slot,
+  .tm-landing-v4-bk-champ[data-done='true'] {
+    animation: tmLandingPop 420ms var(--ease-spring) both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-landing-v4-stage *,
+  .tm-landing-v4-stage *::before,
+  .tm-landing-v4-stage *::after {
+    transition-duration: 1ms !important;
+  }
+}
+
+/* 스크립트가 없으면 눌러도 반응하지 않으므로 "눌러 보세요" 류 안내를 숨긴다 */
+@media (scripting: none) {
+  .tm-landing-v4-demo-tag,
+  .tm-landing-v4-try {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .tm-landing-v4-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tm-landing-v4-stage-side {
+    grid-template-columns: 80px minmax(0, 1fr);
+    align-items: center;
+    column-gap: 12px;
+    padding-top: 0;
+  }
+  .tm-landing-v4-illust {
+    max-width: 80px;
+  }
+  .tm-landing-v4-float {
+    display: none;
+  }
+  .tm-landing-v4-try {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tm-landing-v4-try-title {
+    grid-column: 1 / -1;
+  }
+}
+
+/* landing.css 는 768–1023 에서 좁은 옆 칸 때문에 사실 스트립을 행으로 쌓지만, v4 는 그 폭에서 한 칸이라 세 칸으로 되돌린다. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tm-landing-v4-hero-aside .tm-landing-hero-facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .tm-landing-v4-hero-aside .tm-landing-fact {
+    flex-direction: column;
+    justify-content: center;
+    align-items: stretch;
+    gap: 2px;
+    padding: 12px 8px;
+    text-align: center;
+  }
+  .tm-landing-v4-hero-aside .tm-landing-fact + .tm-landing-fact {
+    border-top: 0;
+    border-left: 1px solid var(--border);
+  }
+}
+
+/* 폰 폭 + 테두리 16px 이 좌우 여백 20px 안에 들어오게 단계적으로 줄인다(0.8 이상이면 누름 영역 44px 유지). */
+@media (max-width: 375px) {
+  .tm-landing-v4-device {
+    --dw: 300;
+    --dh: 600;
+  }
+}
+
+@media (max-width: 355px) {
+  .tm-landing-v4-device {
+    --dw: 264;
+    --dh: 528;
+  }
+}
+
+@media (min-width: 1024px) {
+  .tm-landing-v4-hero-grid {
+    grid-template-columns: minmax(0, 1fr) 540px;
+    align-items: center;
+    gap: 40px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .tm-landing-v4-hero-grid {
+    grid-template-columns: minmax(0, 1fr) 560px;
+    gap: 48px;
+  }
+}
+
+/* ── 제품 투어 ──
+ * 행은 v3 투어 규칙(.tm-landing-v3-tour-*)을 그대로 받는다. 고정 폰은 훅이 frame[data-pin="on"] 을 달 때만 보이고,
+ * 그때 행 화면을 숨겨 같은 화면이 두 번 읽히지 않는다. sticky 는 1024+·높이 700+ 미디어 안에서만 쓴다
+ * (landing-v4-tour-pin.tsx 의 TOUR_PIN_QUERY 와 같아야 한다). 폰 안에는 스크롤러를 두지 않는다 — 휠을 삼킨다. */
+.tm-landing-v4-tour-pin {
+  display: none;
+}
+
+@media (min-width: 1024px) and (min-height: 700px) {
+  .tm-landing-v4-tour[data-pin='on'] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 440px;
+    column-gap: 80px;
+  }
+  .tm-landing-v4-tour[data-pin='on'] .tm-landing-v4-tour-rows {
+    grid-column: 1;
+    grid-row: 1;
+    gap: 0;
+  }
+  .tm-landing-v4-tour[data-pin='on'] .tm-landing-v3-tour-row {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 76vh;
+    padding: 24px 0;
+  }
+  .tm-landing-v4-tour[data-pin='on'] .tm-landing-v4-tour-shot {
+    display: none;
+  }
+  .tm-landing-v4-tour[data-pin='on'] .tm-landing-v4-tour-pin {
+    display: flex;
+    justify-content: center;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    position: sticky;
+    top: max(84px, calc(50vh - 306px));
+    padding: 28px 0;
+    border-radius: var(--radius-hero);
+    background: var(--tint-blue);
+  }
+  .tm-landing-v4-tour-pin .tm-landing-device {
+    --dw: 272;
+    --dh: 540;
+  }
+  .tm-landing-v4-tour-pin .lpm-screens {
+    overflow: hidden;
+  }
+  /* 화면 위치는 훅이 넣는 --tm-landing-v4-ty·sc·op 만 따른다. 전환 시간은 스크롤 사이 끊김과 "가까운 화면으로 맞춤"을 메운다. */
+  .tm-landing-v4-tour[data-pin='on'] .tm-landing-v4-tour-pin .lpm-screen {
+    background: var(--bg);
+    opacity: var(--tm-landing-v4-op, 0);
+    transform: translate3d(0, var(--tm-landing-v4-ty, 100%), 0) scale(var(--tm-landing-v4-sc, 1));
+    transform-origin: 50% 0;
+    box-shadow: var(--shadow-card);
+    transition: opacity var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out);
+  }
+  .tm-landing-v4-tour[data-still='true'] .tm-landing-v4-tour-pin .lpm-screen {
+    transition: none;
+  }
+  /* 고정 폰은 반복 모션 구역(data-loop)이 아니다 — 대진 승자선은 그려진 상태로 둔다 */
+  .tm-landing[data-motion='on'] .tm-landing-v4-tour-pin .lpm-bracket .win {
+    stroke-dashoffset: 0;
+    transition: none;
+  }
+}
+
+@media (min-width: 1024px) and (min-height: 820px) {
+  .tm-landing-v4-tour[data-pin='on'] .tm-landing-v4-tour-pin {
+    top: max(84px, calc(50vh - 342px));
+  }
+  .tm-landing-v4-tour-pin .tm-landing-device {
+    --dw: 300;
+    --dh: 612;
+  }
+}
+
+@media (min-width: 1440px) {
+  .tm-landing-v4-tour[data-pin='on'] {
+    grid-template-columns: minmax(0, 1fr) 480px;
+  }
+}
+
+/* 행 화면 드로잉: 스크롤 타임라인이 있으면 들어오는 동안 폰이 올라선다(view()). 없으면 landing.css 의 1회 등장을 그대로 쓴다.
+ * --tm-landing-v4-k 초깃값이 1 이라 스크립트·모션이 없거나 멈추기면 완성 상태다. */
+@property --tm-landing-v4-k {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+
+@keyframes tmLandingV4Draw {
+  from { --tm-landing-v4-k: 0; }
+  to { --tm-landing-v4-k: 1; }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .tm-landing[data-motion='on'] .tm-landing-v4-tour-shot[data-reveal] {
+      transition: none;
+      animation: tmLandingV4Draw linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 90%;
+    }
+    .tm-landing[data-motion='on'] .tm-landing-v4-tour-shot[data-reveal]:not(.is-in) {
+      opacity: 1;
+      transform: none;
+    }
+    .tm-landing[data-motion='on'] .tm-landing-v4-tour-shot > .tm-landing-device {
+      opacity: clamp(0, calc(var(--tm-landing-v4-k, 1) * 2), 1);
+      transform: translate3d(0, calc((1 - var(--tm-landing-v4-k, 1)) * 48px), 0) scale(calc(0.94 + var(--tm-landing-v4-k, 1) * 0.06));
+    }
+    .tm-landing[data-paused='true'] .tm-landing-v4-tour-shot[data-reveal] {
+      animation: none;
+    }
+  }
+}
+
+/* ── 벤토 막대·결과 흐름 · 이용 방법 진행선: 스크롤에 비례해 그려진다(view()) ──
+ * 루트가 .tm-landing-v4 일 때만 건다(v1·v3 불변). view() 가 없으면 landing.css 의 1회 전환(.is-in)이 폴백이고,
+ * 멈추기면 애니메이션을 떼어 --tm-landing-v4-k 초깃값 1(완성 상태)로 둔다. --tm-landing-v4-n 은 항목 순번(0부터)이다. */
+.tm-landing-v4 :is(.tm-landing-rate, .tm-landing-flow, .tm-landing-steps) > li:nth-child(2) { --tm-landing-v4-n: 1; }
+.tm-landing-v4 :is(.tm-landing-rate, .tm-landing-flow, .tm-landing-steps) > li:nth-child(3) { --tm-landing-v4-n: 2; }
+.tm-landing-v4 :is(.tm-landing-rate, .tm-landing-flow, .tm-landing-steps) > li:nth-child(4) { --tm-landing-v4-n: 3; }
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .tm-landing.tm-landing-v4[data-motion='on'] :is(.tm-landing-bento-card, .tm-landing-steps)[data-reveal] {
+      animation: tmLandingV4Draw linear both;
+      animation-timeline: view();
+      animation-range: entry 20% cover 40%;
+    }
+    .tm-landing.tm-landing-v4[data-motion='on'] .tm-landing-bento-card .tm-landing-rate .tm-landing-rate-track i {
+      transition: none;
+      transform: scaleX(clamp(0, calc(var(--tm-landing-v4-k, 1) * 1.6 - var(--tm-landing-v4-n, 0) * 0.15), 1));
+    }
+    .tm-landing.tm-landing-v4[data-motion='on'] .tm-landing-bento-card .tm-landing-flow li {
+      --tm-landing-v4-s: clamp(0, calc(var(--tm-landing-v4-k, 1) * 2 - var(--tm-landing-v4-n, 0) * 0.35), 1);
+    }
+    .tm-landing.tm-landing-v4[data-motion='on'] .tm-landing-bento-card .tm-landing-flow .tm-landing-flow-node {
+      background: var(--blue500);
+      transition: none;
+      opacity: calc(0.25 + var(--tm-landing-v4-s, 1) * 0.75);
+      transform: scale(calc(0.7 + var(--tm-landing-v4-s, 1) * 0.3));
+    }
+    .tm-landing.tm-landing-v4[data-motion='on'] .tm-landing-bento-card .tm-landing-flow li + li::before {
+      transform-origin: 50% 0;
+      transform: scaleY(var(--tm-landing-v4-s, 1));
+    }
+    .tm-landing.tm-landing-v4[data-motion='on'] .tm-landing-steps[data-reveal]::after {
+      transition: none;
+      transform: scaleY(var(--tm-landing-v4-k, 1));
+    }
+    .tm-landing.tm-landing-v4[data-paused='true'] :is(.tm-landing-bento-card, .tm-landing-steps)[data-reveal] {
+      animation: none;
+    }
+  }
+}

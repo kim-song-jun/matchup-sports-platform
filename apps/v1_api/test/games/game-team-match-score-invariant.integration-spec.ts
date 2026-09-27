@@ -2,6 +2,7 @@ import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
 import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
 import type {
   GameActorScope,
@@ -163,6 +164,7 @@ describe('Task 17 team-match score invariant (event-vs-score exemption)', () => 
       ),
     );
     gameId = created.gameId;
+    await submitFriendlyTeamMatchLineups(prisma, gameId);
   });
 
   afterAll(async () => {

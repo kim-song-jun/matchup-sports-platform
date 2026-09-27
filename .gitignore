@@ -75,8 +75,11 @@ coverage/
 infra/load/tokens.txt
 
 # E2E screenshot binaries and transient queue state
-screenshots/scenarios/**/*.png
-screenshots/scenarios/**/*.jpg
-screenshots/scenarios/**/*.jpeg
-screenshots/scenarios/**/*.webp
 .claude/worktrees/
+
+# Capture/QA output dirs. Rooted on purpose: an unanchored "screenshots/"
+# would also hide docs/screenshots/ and apps/v1_web/public/screenshots/.
+/screenshots/
+/.screenshots/
+/docs/visual-qa/*
+!/docs/visual-qa/manual-v2/

@@ -253,6 +253,12 @@ export class AdminTeamMatchRecruitmentsService {
       }
       const approvedApplications = teamMatch.applications.filter((application) => application.status === 'approved');
       if (targetApplication.status === 'approved' && approvedApplications.length === 1) {
+        if (teamMatch.hostTeamId === null) {
+          await tx.v1TeamMatch.update({
+            where: { id: teamMatch.id },
+            data: { hostTeamId: targetApplication.applicantTeam.id },
+          });
+        }
         return {
           applicationId,
           applicantTeamId: targetApplication.applicantTeam.id,
@@ -261,7 +267,7 @@ export class AdminTeamMatchRecruitmentsService {
           gameId: null,
           teamMatchStatus: 'recruiting' as const,
           approvedCount: 1 as const,
-          homeTeamId: null,
+          homeTeamId: targetApplication.applicantTeam.id,
           awayTeamId: null,
           replayed: true,
           rejectedTeamIds: [] as string[],
@@ -294,6 +300,10 @@ export class AdminTeamMatchRecruitmentsService {
             message: '신청 상태가 변경됐어요. 신청 목록을 새로고침한 뒤 다시 확인해 주세요.',
           });
         }
+        await tx.v1TeamMatch.update({
+          where: { id: teamMatch.id },
+          data: { hostTeamId: targetTeam.id },
+        });
         await this.adminContext.logAdminAction(
           admin,
           {
@@ -315,7 +325,7 @@ export class AdminTeamMatchRecruitmentsService {
           gameId: null,
           teamMatchStatus: 'recruiting' as const,
           approvedCount: 1 as const,
-          homeTeamId: null,
+          homeTeamId: targetTeam.id,
           awayTeamId: null,
           replayed: false,
           rejectedTeamIds: [] as string[],

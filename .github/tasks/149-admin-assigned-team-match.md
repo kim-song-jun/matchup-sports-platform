@@ -23,6 +23,7 @@ Status: in_progress
 - [x] Admin detail exposes the saved representative image and level alongside the existing format/style/gender/uniform/cost fields.
 - [x] Platform-managed provenance is persisted independently of `hostTeamId` and remains visible after home/away assignment.
 - [x] Admins approve applicant teams one at a time; the first approval stays recruiting and the second approval finalizes the match.
+- [x] The first approved team is persisted as HOME immediately, so the public hero changes from `모집 중 vs 모집 중` to `HOME 팀명 vs 모집 중` before the second approval.
 - [x] The admin list exposes a visible application-management action as soon as one requested application exists.
 - [x] HOME/AWAY assignment never promotes either participant team into the platform recruitment operator; platform HOME viewers receive no `host_team` state or recruitment-management CTA.
 - [x] Owner/ops admins can reject an individual requested application with a required reason, audit log, and applicant-team notification.
@@ -38,7 +39,7 @@ Status: in_progress
   Then the application is stored as `requested` without requiring a host team.
 - Given at least two valid requested applications
   When the admin approves the first application and later approves the second
-  Then the first response remains `recruiting`, the second makes the team match `matched`, remaining applications are rejected, and the detail route is returned.
+  Then the first response remains `recruiting` while the approved HOME team is publicly visible, the second makes the team match `matched`, remaining applications are rejected, and the detail route is returned.
 - Given the same application twice, a cross-sport/inactive team, or a support admin
   When finalization is attempted
   Then the API rejects the request without partial writes.
@@ -83,6 +84,8 @@ Status: in_progress
 - The administrator does not designate teams at creation. Teams apply first, and the administrator selects two requested applications later.
 
 ## Progress Snapshot
+
+- 2026-09-27: Fixed the first-approval projection gap reported on alpha. The approval transaction now persists the first approved applicant as `hostTeamId`, a data migration backfills existing single-approved platform recruitments, and public list/detail can render `HOME 팀명 vs 모집 중` immediately.
 
 - 2026-09-24: Added the missing explicit rejection action and a platform-recruitment edit route. Rejection requires a reason and preserves the recruiting aggregate; editing is limited to admin-managed standalone matches in `recruiting` state and uses optimistic concurrency.
 

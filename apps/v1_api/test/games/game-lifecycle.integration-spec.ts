@@ -8,6 +8,7 @@ import {
 } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { GamesService, canonicalGameCommandPayloadHash } from '../../src/games/games.service';
 import type {
@@ -584,6 +585,7 @@ describe('Task 6 L1 game lifecycle', () => {
         ),
       )
     ).gameId;
+    await submitFriendlyTeamMatchLineups(prisma, teamGameId);
 
     // D-20/B6 (this PR) narrowed the TEAM_MATCH generic-command gate to block only
     // 'end' -- start/pause/resume/next-period now fall through to the tournament

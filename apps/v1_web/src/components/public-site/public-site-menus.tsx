@@ -188,7 +188,7 @@ export function PublicSiteMobileMenu({ currentPath, primary, groups }: {
             {resolvedGroups.map((group, index) => {
               const labelId = groups ? `${panelId}-group-${index}` : `${panelId}-audience`;
               return (
-                <li key={group.label}>
+                <li key={`${index}-${group.label}`}>
                   <p className="tm-ps-menu-group-label" id={labelId}>{group.label}</p>
                   <ul className="tm-ps-menu-sublist" aria-labelledby={labelId}>
                     {group.links.map((link) => (

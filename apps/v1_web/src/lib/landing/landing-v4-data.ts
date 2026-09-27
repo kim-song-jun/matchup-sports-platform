@@ -117,7 +117,7 @@ function toCount(page: { pageInfo?: { hasNext: boolean } } | null, length: numbe
 
 function liveTournaments(items: readonly V1TournamentListItem[]): LandingLiveTournament[] {
   return items
-    .filter((item) => item.promoHomeEnabled && item.status in TOURNAMENT_STATUS_PRIORITY)
+    .filter((item) => item.promoHomeEnabled && Object.hasOwn(TOURNAMENT_STATUS_PRIORITY, item.status))
     .sort((a, b) =>
       TOURNAMENT_STATUS_PRIORITY[a.status] - TOURNAMENT_STATUS_PRIORITY[b.status] || a.promoHomePriority - b.promoHomePriority,
     )

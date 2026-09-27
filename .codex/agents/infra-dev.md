@@ -12,18 +12,19 @@
 - `infra/**`
 
 ## Must Keep True
-- V1 dev ports: `web=3013`, `api=8121`.
-- Prod ports: `web=3000`, `api=8100`.
+- Ports: `web=3013`, `api=8121`, game-operations worker `8122` (dev and prod; prod binds to `127.0.0.1` behind nginx).
 - `web` startup remains gated on API health.
+- Prod applies migrations with `prisma migrate deploy` once inside `deploy/deploy-prod.sh`.
 - Production automation must prefer idempotent backfill over destructive full seed.
 - `.env*` contents are never read or committed.
-- EC2 / Amazon Linux flows consider both `docker compose` and standalone `docker-compose`.
-- Production deploy preflight must catch only truly required env before container startup. Toss payment secrets stay optional, and GitHub repo secrets must converge EC2 `deploy/.env` without leaving stale host values behind.
+- alpha and prod hosts differ (e.g. compose plugin availability) — scripts must work on both.
+- Production deploy preflight must catch only truly required env before container startup; prod secrets flow GitHub Secrets → Parameter Store → host `.env` without leaving stale host values behind.
+- `deploy.yml` changes must pass `pnpm qa:production-deploy-security` and `pnpm qa:v1-db-guardrails`.
 - V1 frontend internal routing must resolve to the configured v1 API origin, not a legacy dev fallback.
 
 ## Validation
 - Relevant workflow or compose sanity checks
-- `pnpm build` when infra change can affect build or runtime boot
+- Guardrail/contract checks for touched deploy scripts (see `deploy.yml` Gates job)
 - Manual review of deploy/runtime assumptions
 
 ## Report

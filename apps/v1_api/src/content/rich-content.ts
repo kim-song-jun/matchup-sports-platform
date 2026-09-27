@@ -78,13 +78,8 @@ export function normalizeRichContent(input: unknown, legacyBody?: string | null)
   };
 }
 
-// `/[ \t]+\n/g` is backtracking-unsafe on uncontrolled input: when a long run of '\t'/' ' is
-// not followed by '\n' (e.g. one mismatching trailing character), the engine retries the
-// quantifier from every offset in that run, making the replace O(n^2). An end-anchored regex
-// (`/[ \t]+$/`) has the same problem for the same reason — anchoring only the finish, not the
-// start, still lets the search retry from every offset. Walking backward from the real end of
-// each line with a plain index loop removes the same trailing space/tab run in O(line length)
-// with no retrying, so the whole document stays O(n).
+// `/[ \t]+\n/g` (and `/[ \t]+$/`) retries from every offset of a long space/tab run that is not
+// followed by '\n' -- O(n^2) on uncontrolled input. An index walk from each line's end is O(n).
 function stripTrailingSpacesAndTabs(line: string): string {
   let end = line.length;
   while (end > 0 && (line.charCodeAt(end - 1) === 32 /* ' ' */ || line.charCodeAt(end - 1) === 9) /* '\t' */) {

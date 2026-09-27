@@ -241,7 +241,7 @@ pnpm test:e2e:v1                       # Playwright — e2e/v1.config.ts (v1 스
 
 ### API 응답·에러·페이지네이션
 - prefix `/api/v1`. 성공 응답은 `TransformInterceptor`가 `{ status: 'success', data, timestamp }`로 감싼다.
-- 에러는 `HttpExceptionFilter`가 `{ statusCode, code, message, … }`로 정규화한다. `code`는
+- 에러는 `AllExceptionsFilter`(`apps/v1_api/src/common/filters/http-exception.filter.ts`)가 `{ status, statusCode, code, message, details, requestId, timestamp }`로 정규화한다. `code`는
   `DOMAIN_CODE` 형태(`PERMISSION_DENIED`, `LINEUP_DEADLINE_PASSED` …), 없으면 `INTERNAL_ERROR`.
 - `ValidationPipe`는 `whitelist + forbidNonWhitelisted + transform`이다 — 웹 폼의 UI 전용 필드를
   그대로 보내면 400. submit 시 DTO 호환 payload로 정리한다.

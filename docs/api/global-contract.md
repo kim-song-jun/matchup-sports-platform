@@ -88,6 +88,7 @@ surface. What follows applies to every v1 endpoint, not only that surface.
     "code": "VALIDATION_ERROR",
     "message": "입력값을 다시 확인해 주세요.",
     "details": [{ "field": "title", "messages": ["title should not be empty"] }],
+    "requestId": 42,
     "timestamp": "2026-05-18T00:00:00.000Z"
   }
   ```
@@ -104,7 +105,7 @@ the API — unknown body/query fields can produce `400`.
 
 Production authentication uses the signed `teameet_v1_session` HttpOnly cookie issued by successful
 email registration/login and Kakao/Apple authentication responses (see [Auth](./domains/auth.md)).
-The cookie is `Secure` in production, `SameSite=Lax`, scoped to `/api/v1`, and expires after seven
+The cookie is `Secure` in production, `SameSite=Lax`, scoped to path `/` (the Socket.IO handshake at `/socket.io` needs it too), and expires after seven
 days. Guards validate its HMAC signature and expiry, then reload the current account status before
 installing `request.v1User`.
 

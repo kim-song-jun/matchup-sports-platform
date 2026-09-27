@@ -192,7 +192,7 @@ Active task가 불명확하면 새 작업을 시작하기 전에 관련 task doc
 - 백엔드는 NestJS 모듈 경계를 유지한다. 새 기능은 `*.module.ts`, `*.controller.ts`, `*.service.ts`, `dto/` 구조를 우선한다.
 - API 기본 규칙:
   - prefix는 `/api/v1`
-  - 응답은 `TransformInterceptor` 기준 `{ status: 'success', data, timestamp }`, 에러는 `HttpExceptionFilter` 기준 `{ statusCode, code, message }`
+  - 응답은 `TransformInterceptor` 기준 `{ status: 'success', data, timestamp }`, 에러는 `AllExceptionsFilter` 기준 `{ status, statusCode, code, message, details, requestId, timestamp }`
   - 입력 검증은 DTO + `class-validator`. `ValidationPipe`는 `whitelist + forbidNonWhitelisted`로 동작한다 — 프론트 form state에 UI 전용 필드가 있으면 API submit 시 DTO 호환 payload로 정리해서 보내야 한다.
   - 목록은 cursor pagination을 기본값으로 본다. 다음 커서는 `pageInfo.nextCursor`.
   - 프론트 통합용 API 문서는 Swagger만 단독 source of truth로 쓰지 않는다. v1 `controller` + DTO + service status gate + integration test + `apps/v1_web`의 관련 hooks/types를 함께 교차검증하고, auth/permission/error/pagination/multipart/idempotency/mock-vs-real gotcha를 명시해야 한다.

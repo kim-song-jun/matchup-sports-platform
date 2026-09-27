@@ -18,8 +18,8 @@
    - 실제 `apps/web` 구현 기능을 prototype에 반영할 때의 coverage map
 5. `docs/archive/reference/handoff-2026-04-25/prototype-system/README.md`
    - rendered prototype의 module map, common flow, state/interaction, Tailwind token, QA 문서 허브
-6. `apps/web/src/app/globals.css`
-   - 실제 token truth
+6. `apps/v1_web/src/app/tokens.css`(치수 토큰) · `apps/v1_web/src/app/globals.css`(색·타입 토큰)
+   - 실제 token truth (2026-09-07 DESIGN.md 정정과 일치 — `apps/web`은 레거시)
 7. `.github/tasks/79-teameet-design-handoff-unification.md`
    - handoff prototype parity, future service prototype, topic grouping 작업의 active execution contract
 8. `.github/tasks/archive/52-current-design-drift-audit-and-remediation-plan.md`

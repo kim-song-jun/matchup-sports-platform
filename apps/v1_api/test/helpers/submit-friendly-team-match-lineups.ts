@@ -17,8 +17,17 @@ export async function submitFriendlyTeamMatchLineups(prisma: PrismaClient, gameI
       orderBy: { revision: 'desc' },
     });
     if (lineup === null) {
+      // Copilot review finding (PR #1315): `(gameId, sideId, revision)` is unique, so a
+      // hardcoded `revision: 1` collides whenever the side's only lineup rows are invalidated
+      // (revision 1 exists but invalidatedAt is set, so the query above returns null). Continue
+      // from the side's true max revision -- invalidated rows included -- instead.
+      const latestAny = await prisma.v1GameLineup.findFirst({
+        where: { gameId, sideId: side.id },
+        orderBy: { revision: 'desc' },
+        select: { revision: true },
+      });
       lineup = await prisma.v1GameLineup.create({
-        data: { gameId, sideId: side.id, revision: 1, state: 'SUBMITTED', submittedAt: new Date() },
+        data: { gameId, sideId: side.id, revision: (latestAny?.revision ?? 0) + 1, state: 'SUBMITTED', submittedAt: new Date() },
       });
     } else if (lineup.state === 'DRAFT') {
       lineup = await prisma.v1GameLineup.update({

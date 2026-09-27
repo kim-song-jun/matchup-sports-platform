@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { submitFriendlyTeamMatchLineups } from './friendly-team-match-lineup.fixture';
+import { submitFriendlyTeamMatchLineups } from './submit-friendly-team-match-lineups';
 
 // PR #1315 Copilot finding (verified real): the helper used to hardcode
 // `revision: 1` whenever a side had no *valid* (invalidatedAt: null) lineup,
@@ -10,7 +10,7 @@ import { submitFriendlyTeamMatchLineups } from './friendly-team-match-lineup.fix
 // continue from the side's true max revision (invalidated rows included).
 const prisma = new PrismaService();
 
-describe('submitFriendlyTeamMatchLineups (fixture helper)', () => {
+describe('submitFriendlyTeamMatchLineups (test helper)', () => {
   beforeAll(async () => {
     if (!process.env.DATABASE_URL) {
       throw new Error('DATABASE_URL is required for this integration verification');

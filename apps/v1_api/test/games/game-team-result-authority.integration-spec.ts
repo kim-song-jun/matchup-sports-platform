@@ -18,7 +18,7 @@ import type {
 // Task 16: host-only draft/submit authority, the matched-opponent precondition that replaces
 // the removed `/team-matches/:teamMatchId/complete` shortcut, and the atomic TeamMatch
 // completion side effect that keeps review eligibility (reviews.service.ts) working now that
-// that shortcut is gone. See docs/api/domains/games.md and docs/api/v1/domains/team-matches.md
+// that shortcut is gone. See docs/api/domains/games.md and docs/api/domains/team-matches.md
 // for the frozen contract notes this spec proves.
 
 const ids = {

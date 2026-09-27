@@ -49,12 +49,15 @@
 {
   "importantEnabled": true,
   "activityEnabled": true,
+  "chatEnabled": true,
   "marketingEnabled": false,
   "updatedAt": "2026-09-11T00:00:00.000Z"
 }
 ```
 
 GET도 row가 없으면 기본값으로 실제 row를 생성한다. PATCH는 위 boolean 필드 중 전달한 값만 upsert한다.
+`chatEnabled=false`는 채팅 알림센터 row, `notification:new` 뱃지 이벤트, 채팅 푸시 발송을 억제한다.
+사용자가 방 안에 있는 동안의 실시간 `chat:message` 이벤트 자체는 억제하지 않는다.
 
 ### POST `/notifications/push-subscribe`
 
@@ -118,6 +121,22 @@ iOS 예시:
 - 로그아웃은 인증 쿠키를 제거하기 전에 이 요청을 완료해야 한다.
 - Android는 로그아웃 때 서버 row만 revoke하고 로컬 opt-in/FCM 토큰은 유지한다. 다음 로그인 뒤 같은 installation과 토큰을 새 사용자에게 재등록한다.
 - 명시적 opt-out 또는 권한 철회 때는 서버 revoke와 로컬 FCM 토큰 삭제를 함께 수행한다.
+
+## Navigation Contract
+
+알림 카드를 탭하면 바로 이동하지 않고 상세 시트를 연다 — 카드 탭은 읽음 처리만 하고, 실제 navigation은
+시트의 CTA에서만 일어난다. 이렇게 하면 읽음 mutation·목록 invalidate·route 이동이 서로 경쟁하지 않고,
+두 줄로 잘리는 카드 대신 시트에 전체 본문을 보여줄 자리가 생긴다. 웹 클라이언트는 `/` 하나로 시작하는
+동일 origin 상대 경로만 받아들인다 — 절대 URL, protocol-relative URL, 백슬래시 경로, path가 아닌 scheme은
+모두 라우터로 넘기지 않고 `/notifications`로 대체한다.
+
+모든 알림은 인앱 DB row다. 같은 emit 경로가 독립적으로 브라우저 Web Push·Android FCM·iOS APNs로
+fan-out되며, 한 채널의 개별 발송 실패는 알림 row 자체나 다른 채널 발송을 취소하지 않는다.
+
+`targetType` 값은 `match`, `team`, `team_match`, `chat`, `notice`, `system`, `tournament`, `inquiry`다.
+1:1 문의에 어드민이 답변하면 문의한 회원에게 `inquiry_answered`(targetType `inquiry`, 딥링크
+`/my/inquiries/:inquiryId`)를 emit한다 — 게스트 문의는 계정이 없으므로 연락처로 대신 응답한다. 이
+이벤트는 `activityEnabled`가 아니라 `importantEnabled`로 게이팅된다.
 
 ## Delivery Architecture
 

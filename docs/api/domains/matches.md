@@ -6,8 +6,12 @@
 |---|---|---|---|
 | GET | `/matches` | No | 목록 조회 |
 | GET | `/home/recommendations` | No | 신청 가능한 추천 매치 |
-| POST | `/matches` | Yes | 생성 |
+| GET | `/me/matches` | Yes | 내가 참가/생성한 매치 목록(`MyMatchesController`, `mode=joined\|created`) |
+| GET | `/me/recent-venues` | Yes | 최근 사용 장소 목록(생성 폼 자동완성용) |
+| POST | `/matches` | Yes | 생성 (`CreatorProfileGuard` — 프로필 미완성 시 `422 PROFILE_COMPLETION_REQUIRED`) |
+| GET | `/matches/:id/edit` | Yes(host) | 수정 폼 프리필용 상세(호스트 전용) |
 | GET | `/matches/:id` | No | 상세 |
+| GET | `/matches/:id/application-eligibility` | Yes | 신청 가능 여부(`DEADLINE_PASSED`\|`EXPIRED`\|`NOT_RECRUITING`\|`BLOCKED_USER`) |
 | PATCH | `/matches/:id` | Yes | 수정 |
 | POST | `/matches/:id/cancel` | Yes | 취소 (host) |
 | POST | `/matches/:id/close` | Yes | 모집 마감 (host) |

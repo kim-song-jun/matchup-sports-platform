@@ -54,21 +54,32 @@
 
 ## Endpoint Matrix
 
+`team-matches.controller.ts`에는 `check-in`, `result`, `evaluate`, `referee-schedule` 라우트가 없다
+— 이 문서의 옛 판은 v0 시절 계약을 그대로 옮겨 실제로 존재하지 않는 라우트를 설명하고 있었다.
+아래는 컨트롤러를 기준으로 다시 확인한 목록이다.
+
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/team-matches` | No | 모집글 목록 |
-| GET | `/team-matches/me/applications` | Yes | 내가 신청한 팀매칭 목록 |
-| GET | `/team-matches/:id` | No | 모집글 상세 |
-| POST | `/team-matches` | Yes | 모집글 생성 |
-| PATCH | `/team-matches/:id` | Yes | 모집글 수정 또는 취소 |
-| GET | `/team-matches/:id/applications` | Yes | 신청 목록 조회 (호스트 team manager+) |
-| POST | `/team-matches/:id/applications` | Yes | 다른 팀이 모집글에 신청 |
-| PATCH | `/team-matches/:id/applications/:appId/approve` | Yes | 신청 승인 |
-| PATCH | `/team-matches/:id/applications/:appId/reject` | Yes | 신청 거절 |
-| POST | `/team-matches/:id/check-in` | Yes | 도착 인증 |
-| POST | `/team-matches/:id/result` | Yes | 결과 입력 |
-| POST | `/team-matches/:id/evaluate` | Yes | 상대 팀 평가 |
-| GET | `/team-matches/:id/referee-schedule` | Yes | 심판 배정 조회 |
+| GET | `/team-matches` | Optional | 모집글 목록 |
+| POST | `/team-matches` | Yes(host team owner/manager) | 모집글 생성 |
+| GET | `/team-matches/:teamMatchId/edit` | Yes(host team owner/manager) | 수정 폼 프리필 |
+| GET | `/team-matches/:teamMatchId` | Optional | 모집글 상세 |
+| GET | `/team-matches/:teamMatchId/application-eligibility` | Yes | `teamId?` 기준 신청 가능 여부 |
+| PATCH | `/team-matches/:teamMatchId` | Yes(host team owner/manager) | 모집글 수정 |
+| POST | `/team-matches/:teamMatchId/close` | Yes(host team owner/manager) | 모집 마감(대기 신청 `expired`) |
+| POST | `/team-matches/:teamMatchId/reopen` | Yes(host team owner/manager) | 마감 취소(시작 전만) |
+| POST | `/team-matches/:teamMatchId/cancel` | Yes(host team owner/manager) | 취소 |
+| POST | `/team-matches/:teamMatchId/applications` | Yes(신청 팀 owner/manager) | 신청(`{ applicantTeamId, message? }`) |
+| GET | `/team-matches/:teamMatchId/applications` | Yes(host team owner/manager) | 신청 목록 |
+| POST | `/team-match-applications/:applicationId/withdraw` | Yes(신청 팀 owner/manager) | 신청 철회 |
+| POST | `/team-match-applications/:applicationId/approve` | Yes(host team owner/manager) | 신청 승인(경기 확정) |
+| POST | `/team-match-applications/:applicationId/reject` | Yes(host team owner/manager) | 신청 거절 |
+| GET | `/me/team-matches` | Yes | 내 팀매치 워크리스트(`scope?`, `teamId?`, `status?`) |
+| GET | `/team-matches/:teamMatchId/lineup` | Yes | 참석명단 조회 |
+| PUT | `/team-matches/:teamMatchId/lineup` | Yes | 참석명단 draft 저장 |
+| POST | `/team-matches/:teamMatchId/lineup/submit` | Yes | 참석명단 제출 |
+| POST | `/team-matches/:teamMatchId/lineup/change-request` | Yes | 상대측 라인업 변경 요청 |
+| GET | `/teams/:teamId/recent-venues` | Yes | 최근 사용 장소(생성 폼 자동완성) |
 | POST | `/admin/team-matches` | Admin owner/ops | 플랫폼 팀매치 모집 생성 |
 | POST | `/admin/team-matches/:id/applications/:applicationId/approve` | Admin owner/ops | 신청 팀을 한 팀씩 승인하고 두 번째 승인에서 경기 확정 |
 | POST | `/admin/team-matches/:id/applications/:applicationId/reject` | Admin owner/ops | 대기 신청을 사유와 함께 거절 |
@@ -130,7 +141,7 @@ Rules:
 - 두 번째 승인과 Game HOME/AWAY side, 양 팀 schedule, application/team-match 상태 로그, admin action log를 한 트랜잭션에서 생성한다.
 - 성공 응답은 `applicationId`, `applicantTeamId`, `applicationStatus`, `teamMatchId`, `teamMatchStatus`, `approvedCount`, nullable `gameId`/`homeTeamId`/`awayTeamId`, `detailRoute`, `replayed`를 포함한다.
 
-## GET /team-matches
+## GET /team-matches (TeamMatchesQueryDto)
 
 Query:
 
@@ -140,9 +151,11 @@ Query:
 | `query` | string | No | title/description/place/team 검색 |
 | `genderRule` | string | No | `성별 무관`, `남`, `여` |
 | `levelCodes` | comma string | No | `beginner,novice,intermediate,advanced` 중 다중 선택 |
+| `regionId` | uuid | No | — |
 | `status` | recruiting/closed/matched/cancelled/completed/expired | No | 기본 recruiting |
 | `teamId` | uuid | No | host 또는 applicant team 기준 |
 | `sort` | recommended/latest/starts_at/deadline | No | 기본 latest |
+| `view` | card/compact | No | — |
 | `cursor` | string | No | cursor pagination |
 | `limit` | int(1~50) | No | default 20 |
 
@@ -191,130 +204,69 @@ Rules:
 - `imageUrl`은 선택 사항이다. web create/edit는 `/uploads`가 반환한 루트 상대 URL만 저장하고, 미선택 상태를 `null`로 보낸다.
 - `deadlineAt`은 선택 사항이며 새로 설정할 때 현재보다 이후이고 `startsAt`보다 빨라야 한다. 수정 시에는 저장된 기존 마감 시각을 그대로 유지할 수 있다. `v1_team_matches.deadline_at`에 저장되고 목록·상세·수정 응답에 동일하게 반환된다.
 
-## PATCH /team-matches/:id
+## PATCH /team-matches/:teamMatchId (UpdateTeamMatchDto)
 
-Body: `UpdateTeamMatchDto`
+- 요청자는 host team `manager+`(owner/manager), `version: string` 필수
+- `title`, `description`, `imageUrl`, `startsAt`, `endsAt`, `deadlineAt`, `manualPlaceName`,
+  `addressText`, `costNote`, `rulesText`, `genderRule`, `minLevelCode`, `maxLevelCode` 등 모집글
+  필드를 부분 수정한다.
+- `403`: host team 권한 없음 / `404`: team-match 없음 / `409`: 현재 상태에서 수정 불가(버전 충돌 포함)
 
-Supported behaviors:
+## POST /team-matches/:teamMatchId/close · /reopen
 
-### 1. 모집글 수정
+- host team owner/manager 전용, body `{ reason?: string | null }`
+- `close`는 팀매치를 `closed`로 바꾸고 새 신청을 거절하며 대기 중이던 신청을 `expired`로 정리한다.
+- `reopen`은 `startAt` 이전의 `closed` 팀매치만 되돌린다. 만료된 신청은 자동 복구되지 않는다.
 
-- 모집글 성격의 필드만 부분 수정 가능
-- 요청자는 host team `manager+`
-- match status가 `recruiting`일 때만 수정 가능
+## POST /team-matches/:teamMatchId/applications
 
-대표 수정 필드:
-
-- `title`, `description`
-- `imageUrl` (업로드 URL 또는 제거 시 `null`)
-- `startsAt`, `endsAt`, `deadlineAt`
-- `manualPlaceName`, `addressText`
-- `costNote`, `rulesText`, `genderRule`
-- `minLevelCode`, `maxLevelCode`
-
-### 2. 모집글 취소
-
-- body는 `{ "status": "cancelled" }`
-- 요청자는 host team `manager+`
-- `recruiting`, `scheduled` 상태에서만 취소 가능
-- `checking_in`, `in_progress`, `completed` 이후는 취소 불가
-
-Errors:
-
-- `403`: host team 권한 없음
-- `404`: team-match 없음
-- `409`: 현재 상태에서는 수정/취소 불가
-
-## POST /team-matches/:id/apply
-
-Body: `ApplyTeamMatchDto`
-
-| Field | Type | Required |
-|---|---|---|
-| `applicantTeamId` | uuid | Yes |
-| `message` | string | No |
-| `confirmedInfo` | boolean | No |
-| `confirmedLevel` | boolean | No |
-| `proPlayerCheck` | boolean | No |
-| `mercenaryCheck` | boolean | No |
+Body: `{ applicantTeamId: uuid; message?: string | null }`
 
 Rules:
 
-- match status가 `recruiting`이어야 한다
-- applicant team에 대해 요청자는 `manager+`
-
-Errors:
-
+- 신청 팀은 사용자가 아니라 팀이며, 요청자는 신청 팀의 `manager+`여야 한다.
+- host team은 자기 자신에게 신청할 수 없다.
+- `deadlineAt`이 지나면 신청 가능 여부 응답이 `NOT_RECRUITING`이고 대기 신청도 더 이상 승인할 수 없다.
 - `409`: 같은 팀이 같은 모집글에 중복 신청
 
-## Approve / Reject
+## Approve / Reject / Withdraw
 
-### PATCH /team-matches/:id/applications/:appId/approve
+### POST /team-match-applications/:applicationId/approve
 
-- host team `manager+`만 가능
-- match status가 `recruiting`이어야 한다
-- 승인 시
-  - 해당 신청은 `approved`
-  - match status는 `scheduled`
-  - `guestTeamId` 확정
-  - 나머지 pending 신청은 자동 `rejected`
-  - team-match chat room 생성
+- host team owner/manager 전용
+- 팀매치 행을 잠그고 다시 읽은 뒤 아직 `requested`인 신청만 조건부로 `approved`로, 팀매치를
+  `matched`로 바꾼다 — 동시 승인 요청이 두 팀을 승인하는 일은 없다.
+- 남은 `requested` 신청은 같은 트랜잭션에서 자동 `rejected`로 전환되고 각각 상태변경 로그와
+  신청 팀 관리자 알림이 남는다.
+- `matched`는 매치 단위 상태일 뿐, 조회하는 팀이 승인됐다는 증명이 아니다 — `viewer.state =
+  approved`인 경우에만 승인 UI/채팅 권한을 준다.
 
-### PATCH /team-matches/:id/applications/:appId/reject
+### POST /team-match-applications/:applicationId/reject
 
-- host team `manager+`만 가능
-- 해당 신청만 `rejected`
+- host team owner/manager 전용, 해당 신청만 `rejected`로 전환한다.
 
-## POST /team-matches/:id/check-in
+### POST /team-match-applications/:applicationId/withdraw
 
-Body:
+- 신청 팀 owner/manager 전용, `requested` 신청만 철회할 수 있다.
+- withdraw/reject/재신청은 모두 기대 상태 기반 전이를 쓰므로 동시에 끝난 종료 상태를 덮어쓰거나
+  이중 성공으로 잘못 보고하지 않는다.
 
-| Field | Type | Required |
-|---|---|---|
-| `teamId` | uuid | Yes |
-| `lat` | number | No |
-| `lng` | number | No |
-| `photoUrl` | string | No |
+## 완료(complete) — Task 16에서 제거됨
 
-Rules:
+이 도메인에는 독립된 "완료" mutation이 없다. `matched` 팀매치는 host team owner/manager가 검증된
+결과 revision을 제출하는 부수효과로만 `completed`가 된다 — [Games](./games.md)의
+`POST /api/v1/games/:gameId/result-revisions/:revisionId/submit` 참조. 그 라우트가 같은 트랜잭션
+안에서 `completedAt`을 설정하고 Game을 종료하며 후기 화면을 연다. 상대 팀은
+`.../decision`으로 제출된 결과를 승인하거나 정정을 요청한다.
 
-- status는 `scheduled`, `checking_in`, `in_progress` 중 하나
-- host 또는 guest team만 가능
-- 해당 team `member+`
-- 같은 team 중복 check-in 불가
-- venue 좌표가 있으면 200m geo-fence 검사
+`GET /team-matches/:teamMatchId`는 `gameId`(1:1 `V1Game.id`)를 포함한다 — 클라이언트가
+`/games/:gameId/result-revisions*`를 호출하는 데 필요한 유일한 경로다. `GET
+/team-matches/:teamMatchId/lineup`의 참가자 항목도 실제 `V1GameParticipant.id`를 포함해 호스트가
+결과 초안에서 자기 팀 로스터의 특정 참가자에게 득점/카드를 귀속시킬 수 있다.
 
-## POST /team-matches/:id/result
-
-- 참가 team `manager+`만 가능
-- status는 `scheduled`, `checking_in`, `in_progress` 중 하나
-- `guestTeamId`가 확정된 경기만 가능
-
-Body:
-
-| Field | Type | Required |
-|---|---|---|
-| `scoreHome` | object (`Q1..Qn`) | Yes |
-| `scoreAway` | object (`Q1..Qn`) | Yes |
-| `resultHome` | `win/draw/lose` | Yes |
-| `resultAway` | `win/draw/lose` | Yes |
-
-Validation:
-
-- quarter 수와 점수 map 길이 일치
-- 점수와 승/무/패 결과 일치
-
-Success:
-
-- match status -> `completed`
-- badge 지급 트리거
-
-## POST /team-matches/:id/evaluate
-
-- match status가 `completed`일 때만 가능
-- evaluator team `member+`
-- evaluator / evaluated가 같은 team이면 불가
-- evaluator team 기준 중복 평가 불가
+체크인·쿼터별 점수 입력·상대 평가·심판 배정 API는 이 도메인에 존재하지 않는다 — 예전 v0 계약의
+잔재였다. 경기 결과·평가는 [Games](./games.md)와 리뷰 도메인의 result-revision/decision 흐름을
+따른다.
 
 ## Team-match lineup
 
@@ -328,7 +280,7 @@ Success:
 
 ## Frontend Mapping Notes
 
-- user-facing status vocabulary는 `recruiting`, `scheduled`, `checking_in`, `in_progress`, `completed`, `cancelled` 기준으로 맞춘다
+- `V1TeamMatchStatus`는 `recruiting`, `closed`, `matched`, `cancelled`, `completed`, `archived`뿐이다 — `scheduled`/`checking_in`/`in_progress`는 v0 계약의 잔재이며 이 컬럼에 존재하지 않는다.
 - `/my/team-matches`, `/teams/:id/matches`는 history 조회 시 다중 `status` query를 명시적으로 넘겨야 한다
 - edit/cancel UI는 `PATCH /team-matches/:id`를 사용한다
 - 목록 필터 URL은 `levelCodes`를 canonical source로 사용한다. legacy `levels` query는 읽기 호환만 유지한다.

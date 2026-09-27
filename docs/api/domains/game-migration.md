@@ -103,7 +103,7 @@ If visible, deferred surfaces must say that the function is not active in v1. Th
 
 Cutover review happens only after:
 
-- `docs/api/v1/**` is published;
+- `docs/api/**` v1 contract is published;
 - v1 frontend contract hooks and MSW exist;
 - core routes are bound to real v1 API data;
 - integration/state-machine tests cover stateful domains;

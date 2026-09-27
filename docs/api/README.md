@@ -2,6 +2,10 @@
 
 This directory is the single indexed contract tree for `apps/v1_api` and `apps/v1_web`. Swagger is reference material; the controller, DTO, service gates, integration tests, frontend hooks/types, and these canonical contracts must agree.
 
+For every domain document here, the actual `apps/v1_api/src/**` controller/DTO/service is the
+source of truth — a contract doc that disagrees with the running code is wrong and should be fixed
+in the same change that discovers the drift.
+
 ## Read order
 
 1. [Global contract](./global-contract.md)
@@ -26,14 +30,28 @@ This directory is the single indexed contract tree for `apps/v1_api` and `apps/v
 - [Public records](./domains/public-records.md)
 - [Chat](./domains/chat.md)
 - [Notifications](./domains/notifications.md)
+- [Home, search, notices, popups, master data](./domains/home-notices-master.md)
 - [Admin and operations](./domains/admin-and-ops.md)
 - [Supporting domains](./domains/supporting-domains.md)
 
-Each domain appears exactly once in this index. The superseded versioned tree is retained only for migration traceability and is not canonical or indexed here.
+Each domain appears exactly once in this index.
 
 **Removed 2026-09-27 (v0-only, no `apps/v1_api` module — PR #1313 deleted the legacy apps that
 implemented them):** Venues, Lessons, Marketplace, Payments, Mercenary. Their v0 contract docs are
 kept for historical reference under `docs/archive/v0-api/domains/`, not indexed here.
+
+## Canonical sources for the frozen SM New reference (auth/onboarding, terms, games/tournament-ops)
+
+- Frozen reference checklist: `docs/reference/sm-new-api-v1-contract-checklist.md`
+- State machines: `docs/reference/sm-new-state-machines.md`
+- Permissions: `docs/reference/sm-new-permission-matrix.md`
+- DB design: `docs/reference/sm-new-db-v1-implementation-design.md`
+- Scenario matrix: `docs/scenarios/12-v1-sm-new-e2e-scenarios.md`
+- Runtime evidence: `apps/v1_api/src/**` — the frozen reference checklist used `/api/v1/sm-new`
+  while the implemented Nest app uses `/api/v1`; the implementation prefix wins for runtime and
+  frontend hook work. Terms, OAuth callback, email login, and signup differ from the frozen
+  checklist in places where the implementation has since diverged (superseded, not simply pending —
+  see [Auth](./domains/auth.md#pending-from-frozen-contract)).
 
 ## Cross-cutting references
 

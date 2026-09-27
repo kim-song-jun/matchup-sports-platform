@@ -64,7 +64,9 @@ export function normalizeRichContent(input: unknown, legacyBody?: string | null)
   const document = normalizeEditorDefaults(candidate as RichContentDocument);
   const state = { nodeCount: 0, imageCount: 0, textLength: 0, textParts: [] as string[], assetRefs: new Map<string, string>() };
   validateNode(document, state, true);
-  const plainText = state.textParts.join('').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  const plainText = collapseTrailingSpacesAndTabsBeforeNewlines(state.textParts.join(''))
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
   if (!plainText) throw invalidContent('본문 내용을 입력해 주세요.');
   if (state.textLength > MAX_TEXT_LENGTH) throw invalidContent('본문 텍스트는 10,000자까지 입력할 수 있어요.');
   if (state.imageCount > MAX_IMAGES) throw invalidContent('본문 이미지는 최대 10개까지 사용할 수 있어요.');
@@ -74,6 +76,29 @@ export function normalizeRichContent(input: unknown, legacyBody?: string | null)
     plainText,
     assets: [...state.assetRefs].map(([assetId, url]) => ({ assetId, url })),
   };
+}
+
+// `/[ \t]+\n/g` is backtracking-unsafe on uncontrolled input: when a long run of '\t'/' ' is
+// not followed by '\n' (e.g. one mismatching trailing character), the engine retries the
+// quantifier from every offset in that run, making the replace O(n^2). An end-anchored regex
+// (`/[ \t]+$/`) has the same problem for the same reason — anchoring only the finish, not the
+// start, still lets the search retry from every offset. Walking backward from the real end of
+// each line with a plain index loop removes the same trailing space/tab run in O(line length)
+// with no retrying, so the whole document stays O(n).
+function stripTrailingSpacesAndTabs(line: string): string {
+  let end = line.length;
+  while (end > 0 && (line.charCodeAt(end - 1) === 32 /* ' ' */ || line.charCodeAt(end - 1) === 9) /* '\t' */) {
+    end -= 1;
+  }
+  return end === line.length ? line : line.slice(0, end);
+}
+
+function collapseTrailingSpacesAndTabsBeforeNewlines(text: string): string {
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length - 1; i += 1) {
+    lines[i] = stripTrailingSpacesAndTabs(lines[i]);
+  }
+  return lines.join('\n');
 }
 
 function validateNode(

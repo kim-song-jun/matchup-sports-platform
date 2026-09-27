@@ -9,6 +9,7 @@ import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicMatchDetail } from '@/components/public-game-records/types';
 import type { V1TournamentDetail } from '@/types/api';
+import { stripScriptTags } from '@/test/html-sanitize';
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
@@ -87,7 +88,7 @@ async function serverHtml(node: Promise<ReactNode>): Promise<string> {
     <QueryClientProvider client={client}><IsRestoringProvider value>{await node}</IsRestoringProvider></QueryClientProvider>,
   );
   // JSON-LD 안의 값으로 본문 검사가 통과하면 안 된다.
-  return html.replace(/<script[\s\S]*?<\/script>/g, '');
+  return stripScriptTags(html);
 }
 
 describe('대회 상세 첫 HTML', () => {

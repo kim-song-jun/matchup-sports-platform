@@ -5,6 +5,7 @@
 import { IsRestoringProvider, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { stripScriptTags } from '@/test/html-sanitize';
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
@@ -62,9 +63,9 @@ describe('리그 상세 첫 HTML', () => {
     const node = await LeagueMatchPage({ params: Promise.resolve({ leagueId: 'lg-1' }) });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     // 실제 앱은 PersistQueryClientProvider 라 서버·첫 렌더에서 isRestoring=true 다.
-    const html = renderToString(
+    const html = stripScriptTags(renderToString(
       <QueryClientProvider client={client}><IsRestoringProvider value>{node}</IsRestoringProvider></QueryClientProvider>,
-    ).replace(/<script[\s\S]*?<\/script>/g, '');
+    ));
 
     expect(html).toContain('송파 풋살 리그 1시즌');
     expect(html).toContain('송파 유나이티드');

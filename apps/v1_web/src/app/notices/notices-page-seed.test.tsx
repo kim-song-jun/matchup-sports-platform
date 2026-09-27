@@ -4,6 +4,7 @@
 import { IsRestoringProvider, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { parseJsonLd, stripScriptTags } from '@/test/html-sanitize';
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
@@ -23,7 +24,7 @@ async function serverHtml(): Promise<string> {
   );
 }
 
-const markup = (html: string) => html.replace(/<script[\s\S]*?<\/script>/g, '');
+const markup = stripScriptTags;
 
 describe('/notices 서버 렌더', () => {
   afterEach(() => {
@@ -47,7 +48,7 @@ describe('/notices 서버 렌더', () => {
     expect(markup(html)).toContain('href="/notices/n-1"');
     // 서버(UTC 컨테이너)와 브라우저(KST)가 같은 날짜를 그려야 하이드레이션이 어긋나지 않는다.
     expect(markup(html)).toContain('9월 21일');
-    const ld = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/)?.[1] ?? '{}');
+    const ld = parseJsonLd<{ itemListElement: unknown[] }>(html) ?? { itemListElement: [] };
     expect(ld.itemListElement).toEqual([
       expect.objectContaining({ name: '9월 정기 점검 안내', url: expect.stringMatching(/\/notices\/n-1$/) }),
     ]);

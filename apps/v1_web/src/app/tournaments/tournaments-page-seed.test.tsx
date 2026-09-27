@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1TournamentListItem } from '@/types/api';
+import { parseJsonLd, stripScriptTags } from '@/test/html-sanitize';
 
 const searchParamsState = vi.hoisted(() => ({ value: new URLSearchParams() }));
 vi.mock('next/navigation', () => ({
@@ -55,15 +56,11 @@ async function serverHtml(query = ''): Promise<string> {
 }
 
 /** JSON-LD 는 따로 본다 — 목록 본문 검사가 스크립트 안의 이름으로 통과하면 안 된다. */
-function markup(html: string): string {
-  return html.replace(/<script[\s\S]*?<\/script>/g, '');
-}
+const markup = stripScriptTags;
 
 function itemListNames(html: string): string[] {
-  const match = html.match(/<script type="application\/ld\+json">(.*?)<\/script>/);
-  if (!match) return [];
-  const data = JSON.parse(match[1]) as { itemListElement: Array<{ name: string }> };
-  return data.itemListElement.map((entry) => entry.name);
+  const data = parseJsonLd<{ itemListElement: Array<{ name: string }> }>(html);
+  return data?.itemListElement.map((entry) => entry.name) ?? [];
 }
 
 describe('/tournaments 서버 렌더', () => {

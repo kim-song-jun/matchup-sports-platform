@@ -41,6 +41,7 @@ export function AppShellFrame({ children }: { children: ReactNode }) {
       desktopHead={override.desktopHead ?? chrome.desktopHead}
       centerTitle={chrome.centerTitle}
       titleAsHeading={chrome.titleAsHeading}
+      pageOwnsHeading={chrome.pageOwnsHeading}
       floatingSlot={override.floatingSlot}
       topbarActions={override.topbarActions}
       hasNewNotification={override.hasNewNotification ?? false}

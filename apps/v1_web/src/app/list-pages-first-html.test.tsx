@@ -10,15 +10,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1Match, V1Sport, V1Team, V1TeamMatch } from '@/types/api';
 
 const searchParamsState = vi.hoisted(() => ({ value: new URLSearchParams() }));
+const pathnameState = vi.hoisted(() => ({ value: '/' }));
 vi.mock('next/navigation', () => ({
   useSearchParams: () => searchParamsState.value,
-  usePathname: () => '/',
+  usePathname: () => pathnameState.value,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(), back: vi.fn() }),
 }));
 
+import { AppShellFrame } from '@/components/v1-ui/app-shell-frame';
+import EventsLoading from './events/loading';
+import EventsPage from './events/page';
+import MatchesLoading from './matches/loading';
 import MatchesPage from './matches/page';
+import NoticesLoading from './notices/loading';
+import NoticesPage from './notices/page';
+import TeamMatchesLoading from './team-matches/loading';
 import TeamMatchesPage from './team-matches/page';
+import TeamsLoading from './teams/loading';
 import TeamsPage from './teams/page';
+import TournamentsLoading from './tournaments/loading';
+import TournamentsPage from './tournaments/page';
 
 const FUTSAL = { id: 'sport-futsal-uuid', code: 'futsal', name: '풋살', levels: [] } as unknown as V1Sport;
 
@@ -70,6 +81,9 @@ function healthyApi(path: string): Response {
   if (path === '/matches') return envelope(pageOf([CLOSED_MATCH, MATCH]));
   if (path === '/team-matches') return envelope(pageOf([TEAM_MATCH]));
   if (path === '/teams?limit=20') return envelope(pageOf([TEAM]));
+  if (path.startsWith('/tournaments/campaigns?')) return envelope(pageOf([]));
+  if (path.startsWith('/tournaments?')) return envelope(pageOf([]));
+  if (path === '/notices') return envelope({ notices: [] });
   return new Response('unexpected', { status: 500 });
 }
 
@@ -84,6 +98,27 @@ async function serverHtml(page: ListPage, query = ''): Promise<string> {
   return renderToString(
     <QueryClientProvider client={client}><IsRestoringProvider value>{node}</IsRestoringProvider></QueryClientProvider>,
   );
+}
+
+/** 셸까지 포함한 첫 HTML — 셸의 데스크톱 제목도 크롤러가 받는 h1 이다. */
+async function shellHtml(route: string, page: ListPage): Promise<string> {
+  pathnameState.value = route;
+  searchParamsState.value = new URLSearchParams();
+  const node = await page({ searchParams: Promise.resolve({}) });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  try {
+    return renderToString(
+      <QueryClientProvider client={client}>
+        <IsRestoringProvider value><AppShellFrame>{node}</AppShellFrame></IsRestoringProvider>
+      </QueryClientProvider>,
+    );
+  } finally {
+    pathnameState.value = '/';
+  }
+}
+
+function h1Texts(html: string): string[] {
+  return [...markup(html).matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => m[1].replace(/<[^>]+>/g, ''));
 }
 
 /** JSON-LD 는 따로 본다 — 본문 검사가 스크립트 안의 값으로 통과하면 안 된다. */
@@ -176,6 +211,33 @@ describe('공개 목록 첫 HTML — seed 성공', () => {
   it('/matches 는 필터가 걸려도 전체 목록 쿼리용 seed 를 받는다', async () => {
     await serverHtml(MatchesPage, 'regionId=region-1');
     expect(requested).toContain('/matches');
+  });
+});
+
+describe('공개 목록 첫 HTML — 페이지 제목 h1', () => {
+  beforeEach(() => stubApi(healthyApi));
+
+  it.each([
+    ['/matches', MatchesPage as ListPage],
+    ['/team-matches', TeamMatchesPage as ListPage],
+    ['/teams', TeamsPage as ListPage],
+    ['/tournaments', TournamentsPage as ListPage],
+    ['/events', EventsPage as ListPage],
+    ['/notices', NoticesPage as ListPage],
+  ])('%s 는 셸을 포함한 HTML 에 h1 이 정확히 하나다', async (route, page) => {
+    expect(h1Texts(await shellHtml(route, page))).toHaveLength(1);
+  });
+
+  // loading.tsx 는 Next 가 페이지를 감싸는 Suspense 의 fallback 이다 — 스트림에 실제 내용과 함께 실린다.
+  it.each([
+    ['/matches', MatchesLoading],
+    ['/team-matches', TeamMatchesLoading],
+    ['/teams', TeamsLoading],
+    ['/tournaments', TournamentsLoading],
+    ['/events', EventsLoading],
+    ['/notices', NoticesLoading],
+  ])('%s 의 로딩 fallback 은 제목 없는 스켈레톤이다', (_route, Loading) => {
+    expect(h1Texts(renderToString(<Loading />))).toEqual([]);
   });
 });
 

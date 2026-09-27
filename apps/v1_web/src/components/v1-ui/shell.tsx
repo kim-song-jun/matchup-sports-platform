@@ -76,6 +76,8 @@ type AppChromeProps = {
   backHref?: string;
   centerTitle?: boolean;
   titleAsHeading?: boolean;
+  /** route-chrome `pageOwnsHeading` 참조 — 셸은 제목을 h1 로 그리지 않는다. */
+  pageOwnsHeading?: boolean;
 };
 
 /**
@@ -118,6 +120,7 @@ function AppChromeInner({
   backHref,
   centerTitle = false,
   titleAsHeading = false,
+  pageOwnsHeading = false,
 }: AppChromeProps) {
   const frameClassName = [
     'tm-app-frame',
@@ -142,7 +145,7 @@ function AppChromeInner({
                 <ChevronLeftIcon size={22} strokeWidth={2.2} />
               </AppBackLink>
             ) : null}
-            {titleAsHeading ? (
+            {titleAsHeading && !pageOwnsHeading ? (
               <h1 className="tm-text-body-lg tm-topbar-heading" style={{ color: 'var(--text-strong)' }}>{title}</h1>
             ) : (
               <div className="tm-text-body-lg tm-topbar-heading" style={{ color: 'var(--text-strong)' }}>{title}</div>
@@ -190,7 +193,11 @@ function AppChromeInner({
                 <ChevronLeftIcon size={22} strokeWidth={2.2} />
               </AppBackLink>
             ) : null}
-            <h1 className="tm-text-heading">{title}</h1>
+            {pageOwnsHeading ? (
+              <div className="tm-text-heading">{title}</div>
+            ) : (
+              <h1 className="tm-text-heading">{title}</h1>
+            )}
           </div>
         ) : null}
         {children}

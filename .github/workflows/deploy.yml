@@ -6,6 +6,27 @@ on:
   pull_request:
     branches: [main, dev]
   workflow_dispatch:
+    inputs:
+      # Task 175 T5: prod Task168 Stage A/B transition entry point. A push
+      # event never carries workflow_dispatch inputs, so the "Resolve Task168
+      # stage" step below pins push to none regardless of what a stale UI
+      # default might show -- push must never reach Stage A/B.
+      task168_stage:
+        description: >-
+          Task 168 prod stage. none (default) is the ordinary push-equivalent
+          deploy path.
+        required: false
+        type: choice
+        options:
+          - none
+          - stageA
+          - stageB
+        default: none
+      task168_rehearsal_evidence:
+        description: "Required for stageA/stageB: a pointer to this stage's local rehearsal record"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -316,6 +337,54 @@ jobs:
       - name: Task168 prod guard contract tests
         run: bash scripts/qa/test-task168-prod-guard.sh
 
+      # Task 175 T5 (Ruling R12): CI wiring for the Task168 prod Stage A/B
+      # transition tests written in T1-4. All fake-shimmed (docker/psql on
+      # PATH), no real Docker or Postgres needed -- same convention as the
+      # two steps immediately above. A test that exists but is never wired
+      # into a workflow is the same as no test.
+      - name: Task168 prod stage-transition runner tests
+        run: bash scripts/qa/test-prod-task168.sh
+
+      - name: Task168 prod manifest schema validation tests
+        run: bash scripts/qa/test-task168-prod-manifest-validation.sh
+
+      - name: Task168 prod Stage A migration scope tests
+        run: bash scripts/qa/test-task168-stage-a-migration-scope.sh
+
+      - name: Task168 deploy-prod stage routing tests
+        run: bash scripts/qa/test-task168-deploy-prod-stage-routing.sh
+
+      - name: Task168 deploy-prod failure-path tests
+        run: bash scripts/qa/test-task168-deploy-prod-failure-paths.sh
+
+      - name: Task168 deploy-prod stage-failure (no old-image restart) tests
+        run: bash scripts/qa/test-task168-deploy-prod-stage-failure.sh
+
+      - name: Task168 deploy-prod had-active guard tests
+        run: bash scripts/qa/test-task168-deploy-prod-had-active-guard.sh
+
+      - name: Task168 deploy-prod Stage A release-metadata tests
+        run: bash scripts/qa/test-task168-deploy-prod-stage-a-metadata.sh
+
+      - name: Task168 prod rollback guard tests
+        run: bash scripts/qa/test-task168-prod-rollback-guard.sh
+
+      - name: Task168 restore-active-release guard tests
+        run: bash scripts/qa/test-task168-restore-active-release-guard.sh
+
+      - name: Deploy/scripts no env-file process-substitution regression tests
+        run: bash scripts/qa/test-deploy-no-env-file-process-substitution.sh
+
+      - name: Prod release manifest generator tests (Task168 none/stageA/stageB)
+        run: bash scripts/qa/test-create-prod-release-manifest.sh
+
+      # Fix round 1, Important 1: a workflow_dispatch string input can carry
+      # a raw newline, which would forge an extra key=value line in
+      # GITHUB_OUTPUT (last line for a key wins). This locks the
+      # extracted resolver's format check.
+      - name: Task168 stage resolver injection-guard tests
+        run: bash scripts/qa/test-resolve-task168-stage.sh
+
       # expand-contract 게이트를 **머지 전에** 돌린다.
       #
       # 2026-08-20 사고: 이 검사가 `deploy` job 에만 있었고 그 job 은 PR 에서 skip 된다.
@@ -493,6 +562,22 @@ jobs:
           PGDATABASE: v1_migrate_check
         run: bash scripts/qa/test-task168-final-steady-real-db.sh
 
+      # Task 175 Task 6 fix round 1 (M-5): a cheap subset of the prod-task168.sh
+      # real-DB proof, riding the same fully-migrated v1_migrate_check DB the
+      # step above already built. No image build -- just the runner's own
+      # legacy-retirement invariant SQL against a real, current-schema
+      # Postgres. The full Stage A -> Stage B proof
+      # (scripts/qa/test-prod-task168-real-db.sh) stays local-only; see
+      # .superpowers/sdd/175-prod-task168-transition/task-6-report.md for why.
+      - name: Task168 legacy-retirement invariant real-Postgres check
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: teameet_test
+          PGPASSWORD: teameet_test
+          PGDATABASE: v1_migrate_check
+        run: bash scripts/qa/test-task168-legacy-retirement-real-db.sh
+
       - name: V1 API unit tests
         run: pnpm --filter v1_api test
 
@@ -582,6 +667,7 @@ jobs:
       sourceSha256: ${{ steps.source.outputs.sourceSha256 }}
       sourceVersionId: ${{ steps.source.outputs.sourceVersionId }}
       releaseVersion: ${{ steps.version.outputs.stable }}
+      task168Stage: ${{ steps.task168.outputs.stage }}
 
     steps:
       # fetch-depth: 0 필수 — "Resolve rollback compatibility base" 스텝이 호출하는
@@ -591,6 +677,22 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
+
+      # Resolves the Task168 stage for every step below. Values are read
+      # through env (never interpolated into the run body) so a
+      # workflow_dispatch string input can't inject shell. github.event_name
+      # is checked instead of trusting the input, since a push event carries
+      # no workflow_dispatch inputs at all but a stale UI default could still
+      # show one -- this is what guarantees push always deploys as `none`.
+      # Logic lives in a standalone script (not inline here) so its
+      # newline-injection guard on the evidence input has its own unit test
+      # -- see scripts/qa/test-resolve-task168-stage.sh.
+      - name: Resolve Task168 stage
+        id: task168
+        env:
+          STAGE_INPUT: ${{ inputs.task168_stage }}
+          EVIDENCE_INPUT: ${{ inputs.task168_rehearsal_evidence }}
+        run: bash scripts/release/resolve-task168-stage.sh
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
@@ -624,15 +726,23 @@ jobs:
         run: |
           set -Eeuo pipefail
           imageTag="sha-${RELEASE_SHA}"
+          # Same ECR repository as the API image (Task 175 T5 -- no new
+          # repository), a different tag so IMMUTABLE tag rules don't clash.
+          toolTag="task168-cutover-${RELEASE_SHA}"
           api_exists=false
           web_exists=false
+          tool_exists=false
           aws ecr describe-images --repository-name teameet-prod-v1-api \
             --image-ids "imageTag=${imageTag}" >/dev/null 2>&1 && api_exists=true
           aws ecr describe-images --repository-name teameet-prod-v1-web \
             --image-ids "imageTag=${imageTag}" >/dev/null 2>&1 && web_exists=true
+          aws ecr describe-images --repository-name teameet-prod-v1-api \
+            --image-ids "imageTag=${toolTag}" >/dev/null 2>&1 && tool_exists=true
           echo "imageTag=${imageTag}" >> "${GITHUB_OUTPUT}"
+          echo "toolTag=${toolTag}" >> "${GITHUB_OUTPUT}"
           echo "api_exists=${api_exists}" >> "${GITHUB_OUTPUT}"
           echo "web_exists=${web_exists}" >> "${GITHUB_OUTPUT}"
+          echo "tool_exists=${tool_exists}" >> "${GITHUB_OUTPUT}"
 
       # 이 릴리스의 stable SemVer 를 계산한다. prod 는 alpha 와 달리 prerelease 접미사가
       # 없다(§2-4) — Gates job 의 "Validate planned SemVer" 스텝과 같은 스크립트를 쓰되
@@ -668,6 +778,39 @@ jobs:
           cache-to: type=gha,mode=max,scope=prod-v1-api
           provenance: false
           sbom: false
+
+      # Task 175 T5: only stageA needs the cutover tool -- ordinary deploys
+      # (task168_stage=none) and stageB (which reuses stageA's already-built
+      # image, per Ruling R2/deploy/prod-task168.sh) never build it.
+      - name: Build and push immutable Task 168 cutover tool
+        if: steps.task168.outputs.stage == 'stageA' && steps.images.outputs.tool_exists != 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          file: deploy/Dockerfile.v1-api
+          target: task168-cutover-tool
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/teameet-prod-v1-api:${{ steps.images.outputs.toolTag }}
+          cache-from: type=gha,scope=prod-v1-task168-cutover
+          cache-to: type=gha,mode=max,scope=prod-v1-task168-cutover
+          provenance: false
+          sbom: false
+
+      # Resolved from ECR (not the build step's own `digest` output) so a
+      # skipped rebuild (tool_exists already true, e.g. a re-dispatched Stage
+      # A after an earlier failure) still yields the real digest instead of
+      # an empty string -- same pattern create-prod-release-manifest.sh
+      # already uses for the api/web digests below.
+      - name: Resolve Task168 cutover tool digest
+        id: cutover-tool
+        if: steps.task168.outputs.stage == 'stageA'
+        env:
+          TOOL_TAG: ${{ steps.images.outputs.toolTag }}
+        run: |
+          set -Eeuo pipefail
+          digest="$(aws ecr describe-images --repository-name teameet-prod-v1-api \
+            --image-ids "imageTag=${TOOL_TAG}" --query 'imageDetails[0].imageDigest' --output text)"
+          echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
 
       # 웹 이미지 빌드 인자 하나(INTERNAL_API_ORIGIN)만 EC2 .env 에서 읽는다. 승인 전
       # 단계라 .env 를 쓰지는 않는다 — 값만 조회한다.
@@ -726,6 +869,9 @@ jobs:
       - name: Gate ECR critical findings
         env:
           IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
+          # Empty on non-stageA runs: check-prod-image-scans.sh only adds the
+          # extra cutover-tool scan when this is non-empty.
+          TASK168_CUTOVER_IMAGE_TAG: ${{ steps.task168.outputs.stage == 'stageA' && steps.images.outputs.toolTag || '' }}
         run: bash scripts/release/check-prod-image-scans.sh
 
       # D2: S3 중계 없이 러너가 저장소를 EC2 의 고정 스테이징 경로로 직접 rsync 한다.
@@ -779,6 +925,9 @@ jobs:
           IMAGE_TAG: ${{ steps.images.outputs.imageTag }}
           PREVIOUS_SHA: ${{ steps.rollback-base.outputs.previousSha }}
           MIGRATION_BASE_SHA: ${{ steps.rollback-base.outputs.migrationBaseSha }}
+          TASK168_STAGE: ${{ steps.task168.outputs.stage }}
+          TASK168_CUTOVER_DIGEST: ${{ steps.cutover-tool.outputs.digest }}
+          TASK168_REHEARSAL_EVIDENCE: ${{ steps.task168.outputs.evidence }}
         run: bash scripts/release/create-prod-release-manifest.sh
 
       - name: Upload release manifest to S3
@@ -936,7 +1085,10 @@ jobs:
       # deploy-prod.sh 는 EC2 안에서 이미 wait_for_prod_health_contract 로 로컬 헬스를
       # 확인한 뒤에만 성공 리턴한다. 여기서는 "EC2 로컬은 성공했지만 네트워크 경로 문제로
       # 퍼블릭엔 아직 안 나온" 케이스를 잡기 위해 러너에서 한 번 더 확인한다(요구사항 5).
+      # Stage A ends with the API deliberately stopped until Stage B (C2), so
+      # this check could only fail and hold the deploy-production queue.
       - name: Health check
+        if: needs.build-images.outputs.task168Stage != 'stageA'
         env:
           INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
           RELEASE_VERSION: ${{ needs.build-images.outputs.releaseVersion }}

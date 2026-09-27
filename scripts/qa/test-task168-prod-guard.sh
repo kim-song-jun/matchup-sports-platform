@@ -136,7 +136,15 @@ case "\$*" in
   *'network ls --filter name=^deploy_default\$ --format {{.Name}}'*)
     [[ "\${NETWORK_OK:-true}" == true ]] && printf 'deploy_default\n'
     ;;
-  *'--env-file'*'postgres:16-alpine sh -c'*)
+  *'--env-file /dev/stdin'*'postgres:16-alpine sh -c'*)
+    # Ruling R13 (fix round 3): the real invocation now redirects the WHOLE
+    # command's stdin from a process substitution (`< <(printf ...)`) into
+    # --env-file /dev/stdin -- real docker opens and reads that fd itself,
+    # which is how the process substitution's writer end gets unblocked.
+    # This fake must do the same or the write hangs (same reasoning as
+    # deploy/prod-task168-common.sh's prod_dbq() fake in
+    # scripts/qa/test-prod-task168.sh).
+    cat >/dev/null
     if [[ "\${PSQL_SHOULD_FAIL:-false}" == true ]]; then
       echo "fake docker: injected psql failure" >&2
       exit 1
@@ -232,8 +240,12 @@ elif [[ "$(migrate_deploy_count)" != 0 ]]; then
   echo "(i) FAILED: prisma migrate deploy was called despite the guard refusing" >&2
   cat "${CALL_LOG}" >&2
   failures=$((failures + 1))
+elif [[ "${SEGMENT_OUTPUT}" != *"docs/ops/prod-task168-transition-runbook.md"* ]]; then
+  echo "(i) FAILED: refusal message does not point at the transition runbook" >&2
+  echo "${SEGMENT_OUTPUT}" >&2
+  failures=$((failures + 1))
 else
-  echo "[(i)] OK: guard refused (M11 in source, not applied in prod), migrate deploy call count 0"
+  echo "[(i)] OK: guard refused (M11 in source, not applied in prod), migrate deploy call count 0, runbook path in the message"
 fi
 
 # ── (ii) M11 in source AND already applied in prod with the matching
@@ -293,8 +305,12 @@ elif grep -qE 'network ls|psql' "${CALL_LOG}"; then
   echo "(iv) FAILED: the pin check is supposed to fail BEFORE any DB/network call, but it touched docker network/psql:" >&2
   cat "${CALL_LOG}" >&2
   failures=$((failures + 1))
+elif [[ "${SEGMENT_OUTPUT}" != *"docs/ops/prod-task168-transition-runbook.md"* ]]; then
+  echo "(iv) FAILED: refusal message does not point at the transition runbook" >&2
+  echo "${SEGMENT_OUTPUT}" >&2
+  failures=$((failures + 1))
 else
-  echo "[(iv)] OK: guard refused (M11 source checksum does not match the pinned value) before touching docker network/psql, migrate deploy call count 0"
+  echo "[(iv)] OK: guard refused (M11 source checksum does not match the pinned value) before touching docker network/psql, migrate deploy call count 0, runbook path in the message"
 fi
 
 if [[ "${failures}" -ne 0 ]]; then
@@ -312,6 +328,12 @@ mut_dir="${TEST_ROOT}/mut-invert-dir"
 mkdir -p "${mut_dir}"
 ln -s "${ROOT_DIR}/deploy/prod-source-common.sh" "${mut_dir}/prod-source-common.sh"
 ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${mut_dir}/prod-manifest-common.sh"
+# Fix round 3, Minor (state-root unification): prod-release-common.sh now
+# also sources prod-task168-common.sh as its sibling -- every scratch dir a
+# mutation runs a modified prod-release-common.sh copy from needs this
+# symlink too, or the source line itself fails before the mutated code is
+# ever reached.
+ln -s "${ROOT_DIR}/deploy/prod-task168-common.sh" "${mut_dir}/prod-task168-common.sh"
 scratch_invert="${mut_dir}/prod-release-common.sh"
 python3 - "${PROD_RELEASE_COMMON}" "${scratch_invert}" <<'PYEOF'
 import sys
@@ -399,16 +421,24 @@ scratch_and_removed="${TEST_ROOT}/mut-and-clause-removed-dir"
 mkdir -p "${scratch_and_removed}"
 ln -s "${ROOT_DIR}/deploy/prod-source-common.sh" "${scratch_and_removed}/prod-source-common.sh"
 ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${scratch_and_removed}/prod-manifest-common.sh"
+ln -s "${ROOT_DIR}/deploy/prod-task168-common.sh" "${scratch_and_removed}/prod-task168-common.sh"
 scratch_and_removed_common="${scratch_and_removed}/prod-release-common.sh"
 python3 - "${PROD_RELEASE_COMMON}" "${scratch_and_removed_common}" <<'PYEOF'
 import sys
 src_path, out_path = sys.argv[1], sys.argv[2]
 src = open(src_path, encoding='utf-8').read()
-old = " AND finished_at IS NOT NULL AND rolled_back_at IS NULL"
+# Task 175 fix round 2: assert_task168_m11_restore_target_safe() (added for
+# Important 3, then rewritten for Ruling R11) now runs a SECOND, legitimately
+# near-identical ledger query with the same trailing clause -- the bare
+# clause text alone is no longer unique in this file, so the anchor must
+# include enough of the SELECT itself (checksum vs count(*)) to pin down
+# assert_task168_m11_guard's own query specifically.
+old = "SELECT checksum FROM \\\"_prisma_migrations\\\" WHERE migration_name = '${m11_name}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL"
+new = "SELECT checksum FROM \\\"_prisma_migrations\\\" WHERE migration_name = '${m11_name}'"
 count = src.count(old)
 if count != 1:
     raise SystemExit(f'expected exactly 1 occurrence, found {count}')
-open(out_path, 'w', encoding='utf-8').write(src.replace(old, '', 1))
+open(out_path, 'w', encoding='utf-8').write(src.replace(old, new, 1))
 PYEOF
 export PROD_RELEASE_COMMON_FOR_RUN="${scratch_and_removed_common}"
 write_fixture "${FIXTURE_UNFINISHED_SAME_CHECKSUM}"
@@ -432,6 +462,7 @@ scratch_failopen="${TEST_ROOT}/mut-fail-open-dir"
 mkdir -p "${scratch_failopen}"
 ln -s "${ROOT_DIR}/deploy/prod-source-common.sh" "${scratch_failopen}/prod-source-common.sh"
 ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${scratch_failopen}/prod-manifest-common.sh"
+ln -s "${ROOT_DIR}/deploy/prod-task168-common.sh" "${scratch_failopen}/prod-task168-common.sh"
 scratch_failopen_common="${scratch_failopen}/prod-release-common.sh"
 python3 - "${PROD_RELEASE_COMMON}" "${scratch_failopen_common}" <<'PYEOF'
 import sys
@@ -443,7 +474,7 @@ old = '''  if [[ "${query_rc}" -ne 0 ]]; then
     # `return 1` below, but surfacing the actual psql/docker error here
     # means an operator sees WHY (network unreachable, auth failure, ...)
     # instead of a diagnosis that reads identically to "M11 truly missing".
-    echo "[prod-deploy] Task168 M11 guard: could not query prod's migration ledger. Refusing to run prisma migrate deploy." >&2
+    echo "[prod-deploy] Task168 M11 guard: could not query prod's migration ledger. Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     cat "${psql_stderr}" >&2
     rm -f "${psql_stderr}"
     return 1
@@ -478,13 +509,14 @@ scratch_pin_removed="${TEST_ROOT}/mut-pin-removed-dir"
 mkdir -p "${scratch_pin_removed}"
 ln -s "${ROOT_DIR}/deploy/prod-source-common.sh" "${scratch_pin_removed}/prod-source-common.sh"
 ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${scratch_pin_removed}/prod-manifest-common.sh"
+ln -s "${ROOT_DIR}/deploy/prod-task168-common.sh" "${scratch_pin_removed}/prod-task168-common.sh"
 scratch_pin_removed_common="${scratch_pin_removed}/prod-release-common.sh"
 python3 - "${PROD_RELEASE_COMMON}" "${scratch_pin_removed_common}" <<'PYEOF'
 import sys
 src_path, out_path = sys.argv[1], sys.argv[2]
 src = open(src_path, encoding='utf-8').read()
 old = '''  if [[ "${m11_source_sha}" != "${m11_pinned_sha}" ]]; then
-    echo "[prod-deploy] Task168 M11 guard: candidate source's M11 checksum (${m11_source_sha}) does not match the pinned value (${m11_pinned_sha}). Refusing to run prisma migrate deploy." >&2
+    echo "[prod-deploy] Task168 M11 guard: candidate source's M11 checksum (${m11_source_sha}) does not match the pinned value (${m11_pinned_sha}). Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     return 1
   fi
 '''

@@ -81,6 +81,9 @@ PROD_FAILED_RELEASE_DIR="${PROD_FAILED_RELEASE_DIR:-${PROD_RELEASE_STATE_DIR}/fa
 PROD_LEGACY_STATE_FILE="${PROD_LEGACY_STATE_FILE:-${PROD_HOME_DIR}/.teameet-prod-release}"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/prod-source-common.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/prod-manifest-common.sh"
+# Shares PROD_TASK168_STATE_ROOT (and its default) with the Task168 runner so
+# the restore/rollback guard reads the receipts Stage A/B actually wrote.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/prod-task168-common.sh"
 
 write_candidate_manifest() {
   local manifest_file="$1"
@@ -242,6 +245,69 @@ wait_for_prod_health_contract() {
   done
 }
 
+# Task168 M11 restore/rollback-target guard (rollback-prod.sh and
+# restore_active_release()). Refuses only when all three hold:
+#   1. a Stage A transition receipt exists (else: no DB round-trip at all);
+#   2. the ledger shows M11 finished -- before the DROP any target is safe
+#      under expand-contract;
+#   3. the target release's stored source predates M11, or is not retained
+#      (fail closed). A target whose source carries M11 was built for the
+#      post-cutover schema.
+# Uses `compose run v1_api`, so V1_API_IMAGE must already be loaded.
+# Does not call assert_task168_m11_guard: test-task168-prod-guard.sh mutates
+# that function's exact text, so keep the two query sites separate.
+assert_task168_m11_restore_target_safe() {
+  local target_sha="$1"
+  local m11_name=20260911090000_retire_tournament_fixture_tables
+  local receipts=()
+  shopt -s nullglob
+  receipts=("${PROD_TASK168_STATE_ROOT}"/*/transition.json)
+  shopt -u nullglob
+  [[ "${#receipts[@]}" -gt 0 ]] || return 0
+
+  local database_url network query_rc m11_finished_count psql_stderr
+  database_url="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')" || {
+    echo "[prod-release] Task168 restore-target guard: could not read the candidate API's DATABASE_URL (compose run failed) -- cannot verify the M11 ledger. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+    return 1
+  }
+  if [[ -z "${database_url}" ]]; then
+    echo "[prod-release] Task168 restore-target guard: candidate API's DATABASE_URL is unavailable -- cannot verify the M11 ledger, refusing rather than guessing. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+    return 1
+  fi
+  network="$(sudo docker network ls --filter name='^deploy_default$' --format '{{.Name}}')"
+  if [[ "${network}" != deploy_default ]]; then
+    echo "[prod-release] Task168 restore-target guard: compose DB network unavailable -- cannot verify the M11 ledger. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+    return 1
+  fi
+  psql_stderr="$(mktemp)"
+  # `--env-file /dev/stdin`: sudo closes a process-substitution fd (R13).
+  m11_finished_count="$(sudo docker run --rm --network "${network}" \
+    --env-file /dev/stdin \
+    postgres:16-alpine sh -c 'exec psql "$DATABASE_URL" -At -c "$1"' sh \
+    "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name = '${m11_name}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL" \
+    < <(printf 'DATABASE_URL=%s\n' "${database_url}") \
+    2>"${psql_stderr}")" && query_rc=0 || query_rc=$?
+  if [[ "${query_rc}" -ne 0 ]]; then
+    echo "[prod-release] Task168 restore-target guard: could not query the migration ledger -- refusing rather than treating an unreadable ledger as \"M11 not applied\". See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+    cat "${psql_stderr}" >&2
+    rm -f "${psql_stderr}"
+    return 1
+  fi
+  rm -f "${psql_stderr}"
+  if [[ "${m11_finished_count}" != 0 ]]; then
+    local target_source_dir="${PROD_SOURCE_RELEASES_DIR}/${target_sha}"
+    if [[ ! -d "${target_source_dir}" ]]; then
+      echo "[prod-release] Refusing: the migration ledger shows M11 already applied, but ${target_sha}'s stored source is no longer retained (pruned, or never captured) -- cannot verify it is safe to restore/roll back to. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+      return 1
+    fi
+    if [[ ! -d "${target_source_dir}/apps/v1_api/prisma/migrations/${m11_name}" ]]; then
+      echo "[prod-release] Refusing: the migration ledger shows M11 already applied, so restoring/rolling back to ${target_sha} (whose own stored source predates the M11 migration) would run application code from before the M11 cutover against a database that no longer has the retired tables. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+      return 1
+    fi
+  fi
+  echo "[prod-release] Task168 restore-target guard: ${target_sha} is safe to restore/roll back to"
+}
+
 restore_active_release() {
   local active_tmp
   local active_sha
@@ -252,6 +318,7 @@ restore_active_release() {
   active_checksum="$(jq -er '.activeManifestSha256' "${PROD_RELEASE_STATE_FILE}")" || return 1
   validate_stored_prod_manifest "${active_tmp}" "${PROD_ECR_REGISTRY}" "${active_checksum}" || return 1
   active_sha="$(jq -er '.release.sha' "${active_tmp}")" || return 1
+  assert_task168_m11_restore_target_safe "${active_sha}" || return 1
   activate_prod_release_source "${active_sha}" || return 1
   load_prod_release_manifest "${active_tmp}" || return 1
   pull_release_images || return 1
@@ -294,24 +361,25 @@ assert_task168_m11_guard() {
   # tampered checksum (e.g. a prior guard-bypassed deploy), would pass the
   # source-vs-ledger check even though neither side is the real migration.
   if [[ "${m11_source_sha}" != "${m11_pinned_sha}" ]]; then
-    echo "[prod-deploy] Task168 M11 guard: candidate source's M11 checksum (${m11_source_sha}) does not match the pinned value (${m11_pinned_sha}). Refusing to run prisma migrate deploy." >&2
+    echo "[prod-deploy] Task168 M11 guard: candidate source's M11 checksum (${m11_source_sha}) does not match the pinned value (${m11_pinned_sha}). Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     return 1
   fi
-  database_url="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')" || return 1
+  database_url="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')" || {
+    echo "[prod-deploy] Task168 M11 guard: could not read the candidate API's DATABASE_URL (compose run failed). Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+    return 1
+  }
   if [[ -z "${database_url}" ]]; then
-    echo "[prod-deploy] Task168 M11 guard: candidate API's DATABASE_URL is unavailable" >&2
+    echo "[prod-deploy] Task168 M11 guard: candidate API's DATABASE_URL is unavailable. Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     return 1
   fi
   network="$(sudo docker network ls --filter name='^deploy_default$' --format '{{.Name}}')"
   if [[ "${network}" != deploy_default ]]; then
-    echo "[prod-deploy] Task168 M11 guard: compose DB network unavailable" >&2
+    echo "[prod-deploy] Task168 M11 guard: compose DB network unavailable. Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     return 1
   fi
   # DATABASE_URL (password included) must never appear as a `docker run`
   # argv element -- that argv is visible to any other user on the host via
-  # `ps`. --env-file with a process-substitution fd exposes only the fd path
-  # (/dev/fd/N) in argv; the value itself is read by docker directly from
-  # the fd, never passed on a command line.
+  # `ps`. `--env-file /dev/stdin`, not `<(...)`: sudo closes fds >= 3 (R13).
   psql_stderr="$(mktemp)"
   # `&& query_rc=0 || query_rc=$?` (not a bare trailing `$?`) is deliberate:
   # under `set -e`, `var="$(failing_cmd)"` on its own aborts the whole script
@@ -320,9 +388,10 @@ assert_task168_m11_guard() {
   # exit. Wrapping it in an && / || list is the standard way to catch a
   # command substitution's exit status without triggering errexit.
   m11_ledger_checksum="$(sudo docker run --rm --network "${network}" \
-    --env-file <(printf 'DATABASE_URL=%s\n' "${database_url}") \
+    --env-file /dev/stdin \
     postgres:16-alpine sh -c 'exec psql "$DATABASE_URL" -At -c "$1"' sh \
     "SELECT checksum FROM \"_prisma_migrations\" WHERE migration_name = '${m11_name}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL" \
+    < <(printf 'DATABASE_URL=%s\n' "${database_url}") \
     2>"${psql_stderr}")" && query_rc=0 || query_rc=$?
   if [[ "${query_rc}" -ne 0 ]]; then
     # Fail closed on a query/connection error instead of silently treating it
@@ -330,14 +399,14 @@ assert_task168_m11_guard() {
     # `return 1` below, but surfacing the actual psql/docker error here
     # means an operator sees WHY (network unreachable, auth failure, ...)
     # instead of a diagnosis that reads identically to "M11 truly missing".
-    echo "[prod-deploy] Task168 M11 guard: could not query prod's migration ledger. Refusing to run prisma migrate deploy." >&2
+    echo "[prod-deploy] Task168 M11 guard: could not query prod's migration ledger. Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     cat "${psql_stderr}" >&2
     rm -f "${psql_stderr}"
     return 1
   fi
   rm -f "${psql_stderr}"
   if [[ "${m11_ledger_checksum}" != "${m11_source_sha}" ]]; then
-    echo "[prod-deploy] Task168 M11 guard: candidate source includes the retirement migration (checksum ${m11_source_sha}) but prod's ledger does not show it as an applied row. Refusing to run prisma migrate deploy." >&2
+    echo "[prod-deploy] Task168 M11 guard: candidate source includes the retirement migration (checksum ${m11_source_sha}) but prod's ledger does not show it as an applied row. Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     return 1
   fi
   echo "[prod-deploy] Task168 M11 guard: prod ledger already shows M11 applied (checksum ${m11_ledger_checksum})"

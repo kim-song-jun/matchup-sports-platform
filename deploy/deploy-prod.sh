@@ -48,6 +48,8 @@ for required_path in \
   "${PROD_SOURCE_DIR}/deploy/prod-release-common.sh" \
   "${PROD_SOURCE_DIR}/deploy/prod-manifest-common.sh" \
   "${PROD_SOURCE_DIR}/deploy/prod-source-common.sh" \
+  "${PROD_SOURCE_DIR}/deploy/prod-task168.sh" \
+  "${PROD_SOURCE_DIR}/deploy/prod-task168-common.sh" \
   "${PROD_SOURCE_DIR}/deploy/rollback-prod.sh" \
   "${PROD_MANIFEST_FILE}"; do
   if [[ ! -f "${required_path}" ]]; then
@@ -57,18 +59,41 @@ for required_path in \
 done
 
 source "${PROD_SOURCE_DIR}/deploy/prod-release-common.sh"
+# exec 가 아니라 source 한다 — 러너가 아래 `compose` 배열을 그대로 써야 하는데 배열은
+# 프로세스 경계를 못 넘는다.
+source "${PROD_SOURCE_DIR}/deploy/prod-task168.sh"
 validate_prod_release_manifest \
   "${PROD_MANIFEST_FILE}" \
   "${PROD_SHA}" \
   "${PROD_RELEASE_VERSION}" \
   "${PROD_MANIFEST_SHA256}" \
-  "${PROD_ECR_REGISTRY}"
+  "${PROD_ECR_REGISTRY}" \
+  "${PROD_SOURCE_DIR}"
 load_prod_release_manifest "${PROD_MANIFEST_FILE}"
+
+# database.task168.stage 가 활성화 경로를 고른다. 없으면(일반 배포) 기존 M11 가드·migrate
+# 흐름 그대로다 — test-task168-prod-guard.sh 가 그 구간을 내용 앵커로 잘라 쓰므로 그 줄들을
+# 옮기거나 들여쓰지 않는다. 값 검증은 validate_prod_release_manifest 가 먼저 한다.
+task168_stage="$(jq -r '.database.task168.stage // empty' "${PROD_MANIFEST_FILE}")"
+case "${task168_stage}" in
+  ''|stageA|stageB) ;;
+  *)
+    echo "[prod-deploy] Unknown database.task168.stage: ${task168_stage}" >&2
+    exit 1
+    ;;
+esac
 
 had_active=false
 if [[ -f "${PROD_RELEASE_STATE_FILE}" ]]; then
   had_active=true
 fi
+
+# Ruling R10: 단계 실패 복구는 기존 active 릴리스를 전제로 한다 — 첫 배포와 겹치면 바로 멈춘다.
+if [[ -n "${task168_stage}" && "${had_active}" == false ]]; then
+  echo "[prod-deploy] Task168 ${task168_stage} requires an existing active release (had_active=false) -- refusing. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+  exit 1
+fi
+
 runtime_mutated=false
 source_activated=false
 legacy_api_image=''
@@ -181,11 +206,31 @@ restore_legacy_runtime() {
     http://127.0.0.1:8121/api/v1/health | jq -e '.data.checks.db == true' >/dev/null || return 1
 }
 
+# 단계 모드 실패는 옛 이미지 복원 대신 실패한 단계만 기록한다. 재시도마다 덮어쓴다.
+write_task168_activation_stage_failure() {
+  local stage="$1" state_dir content tmp
+  state_dir="${PROD_TASK168_STATE_ROOT}/${PROD_SHA}"
+  content="$(jq -nc --arg stage "${stage}" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{schemaVersion:1,kind:"activationStage",stage:$stage,failedAt:$at}')" || return 1
+  install -d -m 700 "${state_dir}" || return 1
+  tmp="$(mktemp "${state_dir}/.activation-stage.XXXXXX")" || return 1
+  printf '%s' "${content}" > "${tmp}" || return 1
+  chmod 600 "${tmp}" || return 1
+  mv "${tmp}" "${state_dir}/activation-stage.json" || return 1
+}
+
 restore_on_failure() {
   local status="$?"
   trap - ERR
   archive_failed_candidate
-  if [[ "${runtime_mutated}" == true && "${had_active}" == true ]]; then
+  if [[ -n "${task168_stage}" ]]; then
+    # DB 가 부분 전환됐을 수 있다(A 의 cutover 커밋, B 의 M11). 그 DB 에 옛 릴리스 이미지를
+    # 다시 띄우지 않는다 — 복구는 런북의 수동 판단이다.
+    echo "[prod-deploy] Candidate failed during Task168 ${task168_stage} -- refusing to restart the previous release's images against a possibly partially migrated database" >&2
+    write_task168_activation_stage_failure "${task168_stage}" ||
+      echo "[prod-deploy] WARNING: could not record the Task168 activation-stage failure receipt" >&2
+    echo "[prod-deploy] See docs/ops/prod-task168-transition-runbook.md for manual recovery steps" >&2
+  elif [[ "${runtime_mutated}" == true && "${had_active}" == true ]]; then
     echo "[prod-deploy] Candidate failed; restoring active release" >&2
     if ! restore_active_release; then
       echo "[prod-deploy] CRITICAL: active release restore failed" >&2
@@ -238,7 +283,11 @@ if [[ "${had_active}" == false ]]; then
   legacy_metadata_backup="$(mktemp)"
   cp "${PROD_RUNTIME_METADATA_FILE}" "${legacy_metadata_backup}"
 fi
-write_release_metadata "${PROD_MANIFEST_FILE}"
+# Stage A 는 승격하지 않는다 — 여기서 쓰면 B 전에 nginx 가 재시작될 때 승격 안 된 SHA 가
+# 공개 헤더에 실려 Stage B 빌드의 resolve-prod-rollback-base.sh 가 거부한다.
+if [[ "${task168_stage}" != stageA ]]; then
+  write_release_metadata "${PROD_MANIFEST_FILE}"
+fi
 # DB 가 인스턴스 밖(RDS)에 있으면 로컬 컨테이너를 띄우고 그것의 준비 상태를 기다리는 것은
 # 의미가 없다 — 앱이 접속하는 대상이 아니기 때문이다. V1_DB_HOST 가 기본값(v1_postgres)일
 # 때만 로컬 경로를 탄다. 전환 후에도 컨테이너와 볼륨은 남겨 두지만(롤백 창), 기동과 대기는
@@ -261,6 +310,32 @@ else
   echo "[prod-deploy] 외부 DB(${V1_DB_HOST}) 사용 — 로컬 v1_postgres 기동을 건너뜁니다"
 fi
 
+if [[ "${task168_stage}" == stageA || "${task168_stage}" == stageB ]]; then
+  # Ruling R1: 러너는 DB URL 을 이 변수로만 받는다(argv 금지). 획득 경로는
+  # assert_task168_m11_guard 와 같다.
+  task168_database_url="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')"
+  [[ -n "${task168_database_url}" ]] || {
+    echo "[prod-deploy] Task168 ${task168_stage}: candidate API's DATABASE_URL is unavailable" >&2
+    false
+  }
+  # export 하지 않는다 — 러너는 이 셸에 source 됐으므로 보이고, 이후 자식 프로세스에 노출할 이유가 없다.
+  PROD_TASK168_DATABASE_URL="${task168_database_url}"
+fi
+
+if [[ "${task168_stage}" == stageA ]]; then
+  prod_task168_main stageA
+  # Stage A 는 승격하지 않는다. 검토된 매니페스트는 기록용으로만 남긴다. API·워커는
+  # Stage B 가 올릴 때까지 내려간 채다(C2).
+  task168_state_dir="${PROD_TASK168_STATE_ROOT}/${PROD_SHA}"
+  install -d -m 700 "${task168_state_dir}"
+  install -m 600 "${PROD_MANIFEST_FILE}" "${task168_state_dir}/manifest.json"
+  rm -f "${PROD_CANDIDATE_MANIFEST}"
+  trap - ERR
+  echo "[prod-deploy] Task168 Stage A complete for ${PROD_SHA} — candidate manifest kept at ${task168_state_dir}/manifest.json, not promoted. Deploy the Stage B manifest next."
+  exit 0
+elif [[ "${task168_stage}" == stageB ]]; then
+  prod_task168_main stageB
+else
 assert_task168_m11_guard "${PROD_SOURCE_DIR}"
 
 # D7: prisma migrate deploy 는 이 스크립트 안에서 정확히 1회만 실행한다(구 restart-containers.sh
@@ -270,6 +345,7 @@ assert_task168_m11_guard "${PROD_SOURCE_DIR}"
   'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy'
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && node dist/src/tournaments/migration/tournament-award-recipient-backfill.cli.js'
+fi
 
 # restart-containers.sh 의 업로드 백업/복원 왕복을 그대로 흡수한다(D 표에 없던 prod 전용
 # 안전장치 — alpha 에는 없지만 기존 prod 배포가 볼륨 마운트에도 불구하고 방어적으로 이
@@ -316,6 +392,11 @@ rm -rf "${v1_uploads_backup_dir}" 2>/dev/null || true
 "${compose[@]}" up -d --force-recreate --no-deps nginx
 wait_for_prod_health_contract
 assert_running_release_digests
+
+if [[ "${task168_stage}" == stageB ]]; then
+  # 승격 전, 떠 있는 새 릴리스의 공개 API 를 검증한다.
+  prod_task168_main verify
+fi
 
 # restart-containers.sh 의 수동 재시드 escape hatch 를 그대로 흡수한다. 기본은 off — CI
 # 워크플로는 이 변수를 설정하지 않으므로 정상 배포 경로에는 영향이 없다. 운영자가 EC2 에

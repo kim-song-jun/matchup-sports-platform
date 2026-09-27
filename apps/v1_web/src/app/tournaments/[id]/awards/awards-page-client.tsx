@@ -1069,10 +1069,17 @@ function AwardsPageSkeleton() {
 }
 
 /* ── 진입점 ── */
-export function AwardsPageClient({ tournamentId }: { tournamentId: string }) {
-  const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
+export function AwardsPageClient({
+  tournamentId,
+  seed,
+}: {
+  tournamentId: string;
+  seed?: V1TournamentDetail | null;
+}) {
+  const { data, isPending, isError, error, refetch } = useV1Tournament(tournamentId, { seed });
 
-  if (isLoading) {
+  // isPending — 서버 렌더에서 isLoading 은 false 라 오류 분기로 떨어진다(대회 상세와 같다).
+  if (isPending) {
     return <AwardsPageSkeleton />;
   }
 

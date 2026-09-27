@@ -502,13 +502,19 @@ function BracketEntryCtaButton({ tournament }: { tournament: V1TournamentDetail 
 
 /* ── Entry point ── */
 
-export function TournamentDetailPageClient({ tournamentId }: { tournamentId: string }) {
+export function TournamentDetailPageClient({
+  tournamentId,
+  seed,
+}: {
+  tournamentId: string;
+  seed?: V1TournamentDetail | null;
+}) {
   // 뒤로가기 자체는 AppBackLink가 `?from=`을 직접 읽는다 — fromPath는 하위 화면(apply·
   // bracket 등) 링크에 실어 보낼 체인 출처(chainFrom)를 만드는 데만 쓴다.
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   const chainFrom = fromPath ? withFromPath(`/tournaments/${tournamentId}`, fromPath) : null;
   const [hasSessionHint, setHasSessionHint] = useState(false);
-  const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId);
+  const { data, isPending, isError, error, refetch } = useV1Tournament(tournamentId, { seed });
   const { data: myRegistrations = [] } = useV1MyRegistrations(tournamentId, {
     enabled: hasSessionHint,
   });
@@ -549,7 +555,9 @@ export function TournamentDetailPageClient({ tournamentId }: { tournamentId: str
       : {},
   );
 
-  if (isLoading) {
+  // isLoading 이 아니라 isPending — 서버 렌더에서는 fetch 가 없어 isLoading 이 false 로 남아
+  // 오류 분기로 떨어지고, 크롤러와 첫 화면이 "불러오지 못했어요"를 받는다.
+  if (isPending) {
     return <TournamentDetailSkeleton />;
   }
 

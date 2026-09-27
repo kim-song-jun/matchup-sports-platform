@@ -758,16 +758,23 @@ function BracketPageSkeleton() {
 }
 
 /* ── 진입점 ── */
-export function BracketPageClient({ tournamentId }: { tournamentId: string }) {
+export function BracketPageClient({
+  tournamentId,
+  seed,
+}: {
+  tournamentId: string;
+  seed?: V1TournamentDetail | null;
+}) {
   // §B-9 — 이 화면(순위·대진표)은 useV1Tournament를 쓰는데 그 훅은 기본적으로
   // 폴링하지 않는다. use-public-game-records.ts의 공개 일정 폴링(LIVE 픽스처가 있을
   // 때만 8초)과 같은 부하 모델을 이 훅에도 opt-in으로 적용했다(hooks/use-v1-api.ts
   // 참고) — "순위 · 대진표" 탭(useV1Tournament 소비)도 "경기 일정" 탭
   // (usePublicTournamentSchedule, 자체적으로 이미 이 규칙을 따름)과 동일하게 LIVE
   // 경기가 있을 때만 갱신된다.
-  const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId, { livePolling: true });
+  const { data, isPending, isError, error, refetch } = useV1Tournament(tournamentId, { livePolling: true, seed });
 
-  if (isLoading) {
+  // isPending — 서버 렌더에서 isLoading 은 false 라 오류 분기로 떨어진다(대회 상세와 같다).
+  if (isPending) {
     return <BracketPageSkeleton />;
   }
 

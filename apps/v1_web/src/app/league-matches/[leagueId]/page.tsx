@@ -54,7 +54,11 @@ export default async function LeagueMatchPage({ params }: Props) {
           />
         </>
       ) : null}
-      <LeagueMatchStandingsClient leagueId={leagueId} />
+      {/* 이미 받은 응답을 첫 값으로 넘긴다 — 순위표·일정이 서버 HTML 에 들어가 크롤러가 읽는다. */}
+      <LeagueMatchStandingsClient
+        leagueId={leagueId}
+        seed={{ league: detail, standings: standings.ok ? standings.data : null }}
+      />
     </>
   );
 }

@@ -14,7 +14,7 @@
 | Android | `apps/v1_android` | 배포된 웹을 로드하는 네이티브 셸(FCM·권한·딥링크) |
 | iOS | `apps/v1_ios` | 같은 역할의 iOS 셸. Xcode 프로젝트는 생성물이고 정의는 `project.yml` |
 
-- 옛 v0 앱(`apps/api`·`apps/web`)과 그것만 겨냥하던 도구는 저장소에서 제거한다(PR #1313). 제거 직전 스냅샷은 git 태그
+- 레거시 v0 앱(`apps/api`·`apps/web`)과 그것만 겨냥하던 도구는 제거됐다. 제거 직전 스냅샷은 git 태그
   **`legacy-v0-final`** 에 있다(`git show legacy-v0-final:<경로>`). **v1 판단의 근거로 쓰지 않는다** —
   같은 기능이 옛 앱에 있어도 옛 API·DB·목데이터·화면 설계는 참조하지 않는다.
 - 이 규칙은 `AGENTS.md`의 "V1 Scope Override"와 같은 내용이다(아래 "코드 컨벤션 > Codex 미러").

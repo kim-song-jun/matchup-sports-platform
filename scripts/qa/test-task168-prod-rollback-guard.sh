@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
-# Task 175 Task 4, Review Focus 4: deploy/rollback-prod.sh must refuse a
-# rollback whenever (a) a Task168 Stage A transition receipt exists anywhere
-# in this environment's task168 state AND (b) the rollback target's own
-# stored source tree does not carry the M11 (tournament-fixture retirement)
-# migration -- and must proceed past that guard, unchanged, in every other
-# case (no receipt at all; receipt present but the target DOES ship M11).
+# Task 175 Task 4, Review Focus 4 (fix round 1) + Ruling R11 (fix round 2):
+# deploy/rollback-prod.sh must refuse a rollback whenever (a) a Task168
+# Stage A transition receipt exists anywhere in this environment's task168
+# state AND (b) the migration LEDGER shows M11 as a finished, non-rolled-
+# back row -- and must proceed past that guard, unchanged, in every other
+# case (no receipt at all -- ledger never even queried; receipt present but
+# the ledger does not show M11 applied yet; ledger query itself fails ->
+# fail-closed).
+#
+# Fix round 2: dropped checking the rollback TARGET's own stored source tree
+# for an M11 folder -- see assert_task168_m11_restore_target_safe()'s own
+# doc comment (deploy/prod-release-common.sh) for why that signal was wrong
+# under C2 (virtually every release's source carries M11 once it is merged
+# into dev, regardless of what has actually been applied to this database).
 #
 # Runs the real deploy/rollback-prod.sh (same convention as
 # scripts/qa/test-prod-rollback-guards.sh) with sudo/aws/docker/flock faked
@@ -14,17 +22,15 @@
 #
 # `aws ecr get-login-password` and `resolve_compose_binary`'s own `docker
 # compose version` probe both run UNCONDITIONALLY, well BEFORE the M11 guard
-# -- they cannot serve as an "did we get past the guard" marker (an earlier
-# draft of this test wrongly assumed they ran after it). The marker instead
-# is the `docker ... compose ... config` call `assert_compose_variables_
+# -- they cannot serve as an "did we get past the guard" marker. The marker
+# instead is the `docker compose ... config` call `assert_compose_variables_
 # resolve()` makes, which happens only AFTER the guard (inside the
-# `rollback_started=true` / ERR-trap-armed section). A rejected run never
-# reaches it; an allowed run does. The marker is a FILE, not captured
-# output -- assert_compose_variables_resolve() redirects that call's own
-# stderr to a tempfile and rm -f's it on the success path, so anything
-# written to stdout/stderr there is silently discarded (verified empirically
-# in this session: an echo-based marker never appeared in the captured
-# output even on an allowed run). This test only asserts the marker file's
+# `rollback_started=true` / ERR-trap-armed section). The marker is a FILE,
+# not captured output -- assert_compose_variables_resolve() redirects that
+# call's own stderr to a tempfile and rm -f's it on the success path, so
+# anything written to stdout/stderr there is silently discarded (verified
+# empirically: an echo-based marker never appeared in the captured output
+# even on an allowed run). This test only asserts the marker file's
 # presence/absence -- it does not need (and does not attempt) to complete an
 # actual rollback.
 
@@ -34,7 +40,6 @@ readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 readonly SCRIPT="${ROOT_DIR}/deploy/rollback-prod.sh"
 [[ -f "${SCRIPT}" ]] || { echo "deploy/rollback-prod.sh is missing" >&2; exit 1; }
 
-readonly M11_NAME=20260911090000_retire_tournament_fixture_tables
 readonly ACTIVE_SHA=1111111111111111111111111111111111111111
 readonly PREVIOUS_SHA=2222222222222222222222222222222222222222
 readonly REGISTRY=851725525576.dkr.ecr.ap-northeast-2.amazonaws.com
@@ -66,27 +71,67 @@ cat > "${mock_bin}/aws" <<'FAKE'
 echo fake-ecr-password
 exit 0
 FAKE
-cat > "${mock_bin}/docker" <<FAKE
+chmod +x "${mock_bin}/sudo" "${mock_bin}/flock" "${mock_bin}/aws"
+
+ledger_calls_log="${TEST_ROOT}/ledger-calls.log"
+
+# $1: fake finished-M11-count the ledger psql query reports ("0" or "1"+).
+# $2: "fail" makes that same docker run (the psql query) exit nonzero
+#     instead, simulating an unreadable ledger.
+# Dispatches on docker's OWN first arg: `compose` for everything routed
+# through the `compose` array (DB-URL fetch, resolve_compose_binary's probe,
+# assert_compose_variables_resolve's post-guard `config` call), vs `network`/
+# `run`/`login` for the guard's OWN bare `sudo docker ...` calls.
+write_fake_docker() {
+  local m11_count="$1" should_fail="$2"
+  cat > "${mock_bin}/docker" <<FAKE
 #!/bin/sh
-case "\$*" in
-  'compose version') exit 0 ;;
-  'login --username AWS --password-stdin ${REGISTRY}') cat >/dev/null; exit 0 ;;
-  'compose --project-name deploy'*' config')
-    # assert_compose_variables_resolve() (deploy/prod-release-common.sh)
-    # redirects this call's OWN stderr to a tempfile and only ever prints or
-    # keeps it when an "variable is not set" warning is found in it --
-    # otherwise it rm -f's that tempfile on the success path. A plain echo
-    # here would be silently discarded along with it, so the marker is a
-    # file instead: it survives regardless of what the caller does with
-    # this process's stdout/stderr.
-    : "\${GUARD_MARKER_FILE:?}"
-    echo reached >> "\${GUARD_MARKER_FILE}"
+case "\$1" in
+  login)
+    cat >/dev/null
     exit 0
     ;;
-  *) echo "unexpected docker invocation in this guard test: \$*" >&2; exit 92 ;;
+  network)
+    printf 'network\n' >> "${ledger_calls_log}"
+    echo deploy_default
+    exit 0
+    ;;
+  run)
+    printf 'run\n' >> "${ledger_calls_log}"
+    if [ "${should_fail}" = fail ]; then
+      echo "fake psql failure injected by test" >&2
+      exit 1
+    fi
+    echo "${m11_count}"
+    exit 0
+    ;;
+  compose)
+    shift
+    case "\$*" in
+      version) exit 0 ;;
+      *'run --rm --no-deps -T v1_api sh -c printf "%s" "\$DATABASE_URL"')
+        echo fake-db-url
+        exit 0
+        ;;
+      *' config')
+        : "\${GUARD_MARKER_FILE:?}"
+        echo reached >> "\${GUARD_MARKER_FILE}"
+        exit 0
+        ;;
+      *)
+        echo "unexpected docker compose invocation: \$*" >&2
+        exit 93
+        ;;
+    esac
+    ;;
+  *)
+    echo "unexpected docker invocation: \$*" >&2
+    exit 92
+    ;;
 esac
 FAKE
-chmod +x "${mock_bin}/sudo" "${mock_bin}/flock" "${mock_bin}/docker" "${mock_bin}/aws"
+  chmod +x "${mock_bin}/docker"
+}
 
 make_manifest() {
   local sha="$1" output="$2"
@@ -106,11 +151,11 @@ make_manifest() {
 
 # Builds a fresh HOME with: .env, docker-compose.prod.yml stub, a state.json
 # whose active manifest declares rollbackCompatibleWith = PREVIOUS_SHA (so the
-# compatibility + stale-active checks both pass), and PROD_SOURCE_RELEASES_DIR
-# entries for both releases -- with or without the previous release's M11
-# migration folder, and with or without a task168 transition receipt.
+# compatibility + stale-active checks both pass), and (optionally) a task168
+# transition receipt. No per-release source-tree fixture is needed any more
+# (fix round 2 dropped that signal).
 setup_env() {
-  local home="$1" with_receipt="$2" previous_has_m11="$3"
+  local home="$1" with_receipt="$2"
   local live="${home}/teameet"
   mkdir -p "${live}/deploy"
   cp "${ROOT_DIR}/deploy/prod-release-common.sh" "${ROOT_DIR}/deploy/prod-source-common.sh" \
@@ -136,15 +181,9 @@ setup_env() {
       previous:$previous[0], previousManifestSha256:$previousChecksum}' \
     > "${state_dir}/state.json"
 
-  # Both releases' own immutable stored source trees -- required for
-  # validate_stored_prod_manifest's own optional source_dir comparison to be
-  # harmless (neither manifest carries database.task168, so it is a no-op),
-  # and for the M11 guard itself to have something to check on the previous
-  # release's side.
-  mkdir -p "${state_dir}/sources/${ACTIVE_SHA}" "${state_dir}/sources/${PREVIOUS_SHA}/apps/v1_api/prisma/migrations"
-  if [[ "${previous_has_m11}" == true ]]; then
-    mkdir -p "${state_dir}/sources/${PREVIOUS_SHA}/apps/v1_api/prisma/migrations/${M11_NAME}"
-  fi
+  # Neither manifest carries database.task168, so validate_stored_prod_manifest's
+  # optional source_dir comparison is a no-op even with these dirs empty.
+  mkdir -p "${state_dir}/sources/${ACTIVE_SHA}" "${state_dir}/sources/${PREVIOUS_SHA}"
 
   if [[ "${with_receipt}" == true ]]; then
     install -d -m 700 "${state_dir}/task168/${ACTIVE_SHA}"
@@ -180,42 +219,68 @@ failures=0
 ok() { echo "OK: $1"; }
 bad() { echo "FAILED: $1" >&2; failures=$((failures + 1)); }
 
-# ── (1) receipt exists + previous source has NO M11 folder -> reject ───────
+# ── (1) receipt exists + ledger M11 NOT applied -> guard passes through ────
+write_fake_docker 0 no
+: > "${ledger_calls_log}"
 home1="${TEST_ROOT}/home1"; mkdir -p "${home1}"
-state1="$(setup_env "${home1}" true false)"
+state1="$(setup_env "${home1}" true)"
 marker1="${TEST_ROOT}/marker1"
 out1="$(run_rollback "${home1}" "${state1}" "${marker1}")" && rc1=0 || rc1=$?
-if [[ "${rc1}" -ne 0 && "${out1}" == *"Refusing"*"predates the M11 migration"* ]]; then
-  ok "receipt present + previous lacks M11 -> rollback refused (rc=${rc1})"
-else
-  bad "receipt present + previous lacks M11 -> expected refusal, got rc=${rc1}: ${out1}"
-fi
 if guard_was_passed "${marker1}"; then
-  bad "rejection case reached the post-guard docker compose config call -- the guard did not actually stop the script before any side effect"
+  ok "receipt present + ledger M11 not applied -> guard passes (reached past the guard)"
+else
+  bad "receipt present + ledger M11 not applied -> expected the guard to pass through, got rc=${rc1}: ${out1}"
 fi
 
-# ── (2) receipt exists + previous source DOES have M11 -> guard does not
-#        block (execution proceeds past the guard into the real machinery) ─
+# ── (2) receipt exists + ledger M11 applied -> refused ─────────────────────
+write_fake_docker 1 no
+: > "${ledger_calls_log}"
 home2="${TEST_ROOT}/home2"; mkdir -p "${home2}"
-state2="$(setup_env "${home2}" true true)"
+state2="$(setup_env "${home2}" true)"
 marker2="${TEST_ROOT}/marker2"
 out2="$(run_rollback "${home2}" "${state2}" "${marker2}")" && rc2=0 || rc2=$?
-if guard_was_passed "${marker2}"; then
-  ok "receipt present + previous ships M11 -> guard does not block (reached past the guard)"
+if [[ "${rc2}" -ne 0 && "${out2}" == *"Refusing"*"M11 already applied"* ]]; then
+  ok "receipt present + ledger M11 applied -> rollback refused (rc=${rc2})"
 else
-  bad "receipt present + previous ships M11 -> expected the guard to pass through, got rc=${rc2}: ${out2}"
+  bad "receipt present + ledger M11 applied -> expected refusal, got rc=${rc2}: ${out2}"
+fi
+if guard_was_passed "${marker2}"; then
+  bad "M11-applied case reached the post-guard docker compose config call -- the guard did not stop it in time"
 fi
 
-# ── (3) no transition receipt anywhere -> guard is a no-op regardless of
-#        the previous release's M11 folder (ordinary, non-Task168 rollback) ─
+# ── (3) receipt exists + ledger query itself fails -> refused, fail-closed ─
+write_fake_docker 0 fail
+: > "${ledger_calls_log}"
 home3="${TEST_ROOT}/home3"; mkdir -p "${home3}"
-state3="$(setup_env "${home3}" false false)"
+state3="$(setup_env "${home3}" true)"
 marker3="${TEST_ROOT}/marker3"
 out3="$(run_rollback "${home3}" "${state3}" "${marker3}")" && rc3=0 || rc3=$?
-if guard_was_passed "${marker3}"; then
-  ok "no transition receipt anywhere -> guard is a no-op (reached past the guard) regardless of M11 folder"
+if [[ "${rc3}" -ne 0 && "${out3}" == *"could not query the migration ledger"* ]]; then
+  ok "receipt present + ledger query fails -> refused fail-closed (rc=${rc3}), reason asserted"
 else
-  bad "no transition receipt anywhere -> expected the guard to pass through, got rc=${rc3}: ${out3}"
+  bad "receipt present + ledger query fails -> expected a fail-closed refusal with a diagnosable reason, got rc=${rc3}: ${out3}"
+fi
+if guard_was_passed "${marker3}"; then
+  bad "query-failure case reached the post-guard docker compose config call -- fail-closed did not hold"
+fi
+
+# ── (4) no transition receipt anywhere -> guard is a no-op, ledger never
+#        queried (would refuse if queried -- proves the short-circuit) ─────
+write_fake_docker 1 no
+: > "${ledger_calls_log}"
+home4="${TEST_ROOT}/home4"; mkdir -p "${home4}"
+state4="$(setup_env "${home4}" false)"
+marker4="${TEST_ROOT}/marker4"
+out4="$(run_rollback "${home4}" "${state4}" "${marker4}")" && rc4=0 || rc4=$?
+if guard_was_passed "${marker4}"; then
+  ok "no transition receipt anywhere -> guard is a no-op (reached past the guard)"
+else
+  bad "no transition receipt anywhere -> expected the guard to pass through, got rc=${rc4}: ${out4}"
+fi
+if [[ -s "${ledger_calls_log}" ]]; then
+  bad "no transition receipt anywhere -> the ledger was queried anyway (should short-circuit before any DB round-trip): $(cat "${ledger_calls_log}")"
+else
+  ok "no transition receipt anywhere -> the ledger was never queried"
 fi
 
 if [[ "${failures}" -ne 0 ]]; then

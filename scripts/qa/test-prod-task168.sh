@@ -155,6 +155,18 @@ case "$*" in
     printf 'MIGRATE_DEPLOY_CRAFTED\n' >> "${CALL_LOG}"
     [[ "${MIGRATE_CRAFTED_SHOULD_FAIL:-false}" != true ]] || { echo "fake docker: injected migrate failure" >&2; exit 1; }
     hostdir="${volumes[0]:-}"
+    # Fix round 2, item 4 (real-condition runner test): records the crafted
+    # migration tree's own directory listing BEFORE _stage_a_run_migrations's
+    # own `trap ... EXIT` deletes it -- optional, a no-op unless a test sets
+    # TEMP_TREE_LISTING_DIR. Reuses the same M9-presence check already used
+    # below to name it pre- vs post-migrate (post has M9 copied in, pre does
+    # not).
+    if [[ -n "${TEMP_TREE_LISTING_DIR:-}" && -n "${hostdir}" ]]; then
+      phase_name=pre
+      [[ ! -d "${hostdir}/migrations/${M9_NAME:-__no_m9__}" ]] || phase_name=post
+      find "${hostdir}/migrations" -mindepth 1 -maxdepth 1 -type d -exec basename '{}' \; |
+        LC_ALL=C sort > "${TEMP_TREE_LISTING_DIR}/${phase_name}-listing.txt"
+    fi
     if [[ -n "${hostdir}" && -d "${hostdir}/migrations/${M9_NAME:-__no_m9__}" ]]; then
       [[ -z "${FAKE_LEDGER_AFTER_POST_FILE:-}" ]] || cp "${FAKE_LEDGER_AFTER_POST_FILE}" "${FAKE_LEDGER_FILE}"
     else
@@ -913,6 +925,61 @@ test_stage_a_fresh_success() {
   fi
 }
 test_stage_a_fresh_success
+export PROD_SOURCE_DIR="${SOURCE_A_DIR}"
+
+test_stage_a_fresh_success_with_m11_in_source() {
+  # Fix round 2, item 4 (real-condition runner test): under C2, PROD_SOURCE_DIR
+  # always carries M11 (and whatever comes after it) during Stage A too, not
+  # just Stage B -- proves the full task168_stage_a() run still reaches
+  # transition.json with such a source (Ruling R9), and that the crafted
+  # migration tree _stage_a_run_migrations() builds (and the ledger it ends
+  # up asserting) still never include M11 or anything after it, regardless
+  # of what PROD_SOURCE_DIR itself contains.
+  local source_dir="${TEST_ROOT}/source-a-with-m11"
+  build_fixture_source "${source_dir}" "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}" "${PROD_TASK168_M11}"
+  local post_m11_name='20261231000000_a_migration_after_m11'
+  install -d "${source_dir}/apps/v1_api/prisma/migrations/${post_m11_name}"
+  echo '-- decoy after M11' > "${source_dir}/apps/v1_api/prisma/migrations/${post_m11_name}/migration.sql"
+
+  export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/state-fresh-success-m11-source"
+  export PROD_SOURCE_DIR="${source_dir}"
+  printf '%s' "${LEDGER_EMPTY}" > "${TEST_ROOT}/ledger-fresh-success-m11.txt"
+  printf '0|0|0|0|0|0' > "${TEST_ROOT}/seals-fresh-success-m11.txt"
+  export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-fresh-success-m11.txt" FAKE_SEALS_FILE="${TEST_ROOT}/seals-fresh-success-m11.txt"
+  export FAKE_LEDGER_AFTER_PRE_FILE="${LEDGER_M1_M8_M10_FILE}"
+  export FAKE_LEDGER_AFTER_POST_FILE="${LEDGER_FULL10_FILE}"
+  export FAKE_SEALS_AFTER_TOOL_FILE="${SEALS_COMMITTED_FILE}"
+  export FAKE_TOOL_REPORT_FILE="${TOOL_REPORT_COMPLETED}"
+  export TOOL_RC=0
+  local listing_dir="${TEST_ROOT}/temp-tree-listing-m11"
+  install -d "${listing_dir}"
+  export TEMP_TREE_LISTING_DIR="${listing_dir}"
+  export CALL_LOG="${TEST_ROOT}/calls-fresh-success-m11.log"; : > "${CALL_LOG}"
+  run_case true 'task168_stage_a'
+  unset FAKE_LEDGER_AFTER_PRE_FILE FAKE_LEDGER_AFTER_POST_FILE FAKE_SEALS_AFTER_TOOL_FILE FAKE_TOOL_REPORT_FILE TOOL_RC TEMP_TREE_LISTING_DIR
+  local transition="${TEST_ROOT}/state-fresh-success-m11-source/release-sha-a/transition.json"
+  if [[ "${CASE_RC}" -eq 0 && -s "${transition}" ]] &&
+     jq -e '.status=="COMPLETED" and .kind=="transition"' "${transition}" >/dev/null 2>&1; then
+    ok "stage-a-fresh-success-with-m11-in-source: full green run reached transition.json even though PROD_SOURCE_DIR carries M11 (Ruling R9)"
+  else
+    bad "stage-a-fresh-success-with-m11-in-source: rc=${CASE_RC} output=${CASE_OUTPUT}"
+  fi
+
+  local listing_file m11_found=0
+  for listing_file in "${listing_dir}"/*-listing.txt; do
+    [[ -f "${listing_file}" ]] || continue
+    if grep -qE "^(${PROD_TASK168_M11}|${post_m11_name})\$" "${listing_file}"; then
+      m11_found=1
+      echo "  offending listing (${listing_file}): $(cat "${listing_file}")" >&2
+    fi
+  done
+  if [[ "${m11_found}" -eq 0 && -f "${listing_dir}/pre-listing.txt" && -f "${listing_dir}/post-listing.txt" ]]; then
+    ok "stage-a-fresh-success-with-m11-in-source: the crafted migration tree (pre AND post phases) never copied M11 or the post-M11 decoy, and the post-migrate ledger it asserts still excludes M11"
+  else
+    bad "stage-a-fresh-success-with-m11-in-source: M11/post-M11 leaked into the crafted migration tree, or a phase listing is missing (dir: $(ls "${listing_dir}" 2>/dev/null))"
+  fi
+}
+test_stage_a_fresh_success_with_m11_in_source
 export PROD_SOURCE_DIR="${SOURCE_A_DIR}"
 
 # ═══════════════════════ Task 3: Stage B ═══════════════════════════════════

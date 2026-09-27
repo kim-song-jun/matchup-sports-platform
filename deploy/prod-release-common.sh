@@ -244,29 +244,76 @@ wait_for_prod_health_contract() {
 
 # Task168 M11 restore/rollback-target guard, shared by rollback-prod.sh and
 # restore_active_release()'s automatic recovery path (Task 175 Task 4 fix
-# round 1, Important 3). If Stage B runs M11's `prisma migrate deploy` and
-# then fails at verify/health BEFORE promoting, `active` in state.json is
-# STILL the pre-M11 release even though the database itself now has M11
-# applied. A LATER, unrelated ordinary deploy that fails at its own health
-# check would otherwise have restore_active_release() redeploy that stale
-# pre-M11-aware active release's images against the now-post-M11 database --
-# exactly the same hazard rollback-prod.sh already guards against for an
-# explicit rollback target. Any Stage A transition receipt anywhere in this
-# environment's task168 state means an M11 cutover has been attempted here;
-# a target release with no retained stored source (pruned, or never
-# captured) fails closed rather than being treated as "presumably fine".
+# round 1, Important 3; ledger-based re-check per fix round 2, Ruling R11).
+#
+# Fix round 2 (Ruling R11): the first version gated on transition.json's mere
+# EXISTENCE, then checked whether the TARGET release's own stored source
+# folder carried M11. Both signals are wrong under C2 (Stage A and Stage B
+# share the same dev source tree): transition.json is written by Stage A
+# alone, long before Stage B ever runs M11's migrate, and once M1-M11 are
+# merged into dev EVERY subsequently-built release's source carries the M11
+# folder regardless of what has actually been applied to THIS database --
+# neither signal reflects the one fact that actually matters, which is
+# whether M11 has been APPLIED to the database Stage A/B are running
+# against. That produced a real false rejection: in the window after Stage A
+# completes (transition.json exists) but before Stage B's own M11 migrate
+# runs, this guard would refuse a completely unrelated ordinary deploy's
+# automatic recovery, even though the database only has M1-M10 (expand-only,
+# additive) applied and the migrationPolicy=expand-contract contract makes
+# restoring/rolling back to an older, M11-unaware release perfectly safe at
+# that point.
+#
+# The transition.json existence check is now only a cheap short-circuit
+# (skip the DB round-trip entirely when Task168 has never touched this
+# environment) -- the actual verdict is the migration ledger itself: M11
+# present as a finished, non-rolled-back row means the DROP already
+# happened, and ANY release (old or new) is refused as a restore/rollback
+# target; ledger read failure fails closed (refuse + a diagnosable reason),
+# never silently treated as "not applied".
+#
+# Duplicates (rather than calls) assert_task168_m11_guard's own DB-URL/
+# network/psql pattern -- a shared low-level helper would also require
+# updating that function's extensively mutation-tested call sites
+# (scripts/qa/test-task168-prod-guard.sh's 7 mutations pin its literal
+# source text), which is out of proportion for this fix.
 assert_task168_m11_restore_target_safe() {
   local target_sha="$1"
+  local m11_name=20260911090000_retire_tournament_fixture_tables
+  local state_root="${PROD_TASK168_STATE_ROOT:-${PROD_RELEASE_STATE_DIR}/task168}"
   local receipts=()
   shopt -s nullglob
-  receipts=("${PROD_RELEASE_STATE_DIR}/task168"/*/transition.json)
+  receipts=("${state_root}"/*/transition.json)
   shopt -u nullglob
   [[ "${#receipts[@]}" -gt 0 ]] || return 0
-  local target_m11_dir="${PROD_SOURCE_RELEASES_DIR}/${target_sha}/apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables"
-  [[ -d "${target_m11_dir}" ]] || {
-    echo "[prod-release] Refusing: a Task168 Stage A transition receipt exists but the restore/rollback target ${target_sha}'s stored source predates the M11 migration. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+
+  local database_url network query_rc m11_finished_count psql_stderr
+  database_url="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')" || return 1
+  if [[ -z "${database_url}" ]]; then
+    echo "[prod-release] Task168 restore-target guard: candidate API's DATABASE_URL is unavailable -- cannot verify the M11 ledger, refusing rather than guessing. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     return 1
-  }
+  fi
+  network="$(sudo docker network ls --filter name='^deploy_default$' --format '{{.Name}}')"
+  if [[ "${network}" != deploy_default ]]; then
+    echo "[prod-release] Task168 restore-target guard: compose DB network unavailable -- cannot verify the M11 ledger. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+    return 1
+  fi
+  psql_stderr="$(mktemp)"
+  m11_finished_count="$(sudo docker run --rm --network "${network}" \
+    --env-file <(printf 'DATABASE_URL=%s\n' "${database_url}") \
+    postgres:16-alpine sh -c 'exec psql "$DATABASE_URL" -At -c "$1"' sh \
+    "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name = '${m11_name}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL" \
+    2>"${psql_stderr}")" && query_rc=0 || query_rc=$?
+  if [[ "${query_rc}" -ne 0 ]]; then
+    echo "[prod-release] Task168 restore-target guard: could not query the migration ledger -- refusing rather than treating an unreadable ledger as \"M11 not applied\". See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+    cat "${psql_stderr}" >&2
+    rm -f "${psql_stderr}"
+    return 1
+  fi
+  rm -f "${psql_stderr}"
+  if [[ "${m11_finished_count}" != 0 ]]; then
+    echo "[prod-release] Refusing: the migration ledger shows M11 already applied, so restoring/rolling back to ${target_sha} would run application code from before the M11 cutover against a database that no longer has the retired tables. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+    return 1
+  fi
 }
 
 restore_active_release() {

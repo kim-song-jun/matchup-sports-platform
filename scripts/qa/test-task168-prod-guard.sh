@@ -412,11 +412,18 @@ python3 - "${PROD_RELEASE_COMMON}" "${scratch_and_removed_common}" <<'PYEOF'
 import sys
 src_path, out_path = sys.argv[1], sys.argv[2]
 src = open(src_path, encoding='utf-8').read()
-old = " AND finished_at IS NOT NULL AND rolled_back_at IS NULL"
+# Task 175 fix round 2: assert_task168_m11_restore_target_safe() (added for
+# Important 3, then rewritten for Ruling R11) now runs a SECOND, legitimately
+# near-identical ledger query with the same trailing clause -- the bare
+# clause text alone is no longer unique in this file, so the anchor must
+# include enough of the SELECT itself (checksum vs count(*)) to pin down
+# assert_task168_m11_guard's own query specifically.
+old = "SELECT checksum FROM \\\"_prisma_migrations\\\" WHERE migration_name = '${m11_name}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL"
+new = "SELECT checksum FROM \\\"_prisma_migrations\\\" WHERE migration_name = '${m11_name}'"
 count = src.count(old)
 if count != 1:
     raise SystemExit(f'expected exactly 1 occurrence, found {count}')
-open(out_path, 'w', encoding='utf-8').write(src.replace(old, '', 1))
+open(out_path, 'w', encoding='utf-8').write(src.replace(old, new, 1))
 PYEOF
 export PROD_RELEASE_COMMON_FOR_RUN="${scratch_and_removed_common}"
 write_fixture "${FIXTURE_UNFINISHED_SAME_CHECKSUM}"

@@ -35,6 +35,22 @@ const TOURNAMENT = {
   updatedAt: '2026-09-01T00:00:00.000Z',
 } as unknown as V1TournamentDetail;
 
+// 조별 순위는 상세 응답(groups)에 이미 있다 — 기본 탭이 "경기 일정"이어도 첫 HTML 에 실려야 한다.
+const GROUP_TOURNAMENT = {
+  ...(TOURNAMENT as unknown as Record<string, unknown>),
+  id: 't-2',
+  format: 'group_knockout',
+  groups: [
+    {
+      id: 'g-a', name: 'A조', phase: 'group', sortOrder: 1, advanceCount: 2, groupTeams: [],
+      standings: [
+        { registrationId: 'r-1', teamId: 'team-a', teamName: '송파 유나이티드', teamLogoUrl: null, position: 1, points: 6, wins: 2, draws: 0, losses: 0, goalsFor: 5, goalsAgainst: 1, recalculatedAt: null },
+        { registrationId: 'r-2', teamId: 'team-b', teamName: '한강 로버스', teamLogoUrl: null, position: 2, points: 3, wins: 1, draws: 0, losses: 1, goalsFor: 3, goalsAgainst: 3, recalculatedAt: null },
+      ],
+    },
+  ],
+} as unknown as V1TournamentDetail;
+
 const MATCH = {
   tournamentId: 't-1', tournamentTitle: '가을 송파 풋살컵', fixtureId: 'f-1', round: '결승', fixtureNumber: 1,
   legNumber: 1, groupId: null, groupName: null, scheduledAt: '2026-10-10T05:00:00.000Z', venue: '송파 풋살파크',
@@ -54,6 +70,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL) => {
     const path = String(input).replace(/^.*\/api\/v1/, '');
     if (path === '/tournaments/t-1') return envelope(TOURNAMENT);
+    if (path === '/tournaments/t-2') return envelope(GROUP_TOURNAMENT);
     if (path === '/tournaments/t-1/matches/f-1') return envelope(MATCH);
     return new Response('unexpected', { status: 500 });
   }));
@@ -93,6 +110,13 @@ describe('대회 상세 첫 HTML', () => {
     const html = await serverHtml(Page({ params: Promise.resolve({ id: 't-1' }) }));
     expect(html).not.toContain('불러오지 못했어요');
     expect(html).toContain('가을 송파 풋살컵');
+  });
+
+  it('대진표는 기본 탭이 경기 일정이어도 조별 순위를 서버 HTML 에 담는다', async () => {
+    const html = await serverHtml(BracketPage({ params: Promise.resolve({ id: 't-2' }) }));
+    expect(html).toContain('A조');
+    expect(html).toContain('송파 유나이티드');
+    expect(html).toContain('한강 로버스');
   });
 
   it('경기 상세는 두 팀 이름을 서버 HTML 에 그린다', async () => {

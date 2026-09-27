@@ -114,8 +114,14 @@ describe('friendly match shared score sheet (real DB)', () => {
   it('a superseded submitted lineup does not grant rights when newest revision is draft', async () => {
     const f = await createSharedRecordFixture(prisma);
     await prisma.v1GameLineup.create({ data: { gameId: f.game.id, sideId: f.sides[0].id, revision: 2, state: 'DRAFT' } });
-    expect((await records.read(user(f.userIds[1]), f.match.id)).canEdit).toBe(false);
-    await expect(records.mutate(user(f.userIds[1]), f.match.id, cmd('confirm', 0))).rejects.toMatchObject({ status: 403 });
+    const view = await records.read(user(f.userIds[1]), f.match.id);
+    expect(view).toMatchObject({ canEdit: false, participant: false, lineupReady: false });
+    expect(view.missingSides.map((side) => side.sideId)).toEqual([f.sides[0].id]);
+    // Task 106: an incomplete roster is rejected before the participant check.
+    await expect(records.mutate(user(f.userIds[1]), f.match.id, cmd('confirm', 0))).rejects.toMatchObject({
+      status: 409, response: { code: 'ROSTER_INCOMPLETE' },
+    });
+    expect(await prisma.v1TeamMatchRecord.count({ where: { gameId: f.game.id } })).toBe(0);
   });
   it('cancelled and existing result games cannot be edited through the shared endpoint', async () => {
     const f = await createSharedRecordFixture(prisma);

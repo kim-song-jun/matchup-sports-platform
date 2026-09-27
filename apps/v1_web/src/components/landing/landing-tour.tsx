@@ -4,7 +4,7 @@ import { LandingDevice, LandingScreen, type LandingTabKey } from './landing-devi
 import { MatchScreenBody, TeamScreenBody } from './landing-app-screens';
 import { BracketScreenBody, CardScreenBody, LiveScreenBody } from './landing-competition-screens';
 
-type TourStep = {
+export type TourStep = {
   kind: 'match' | 'team' | 'bracket' | 'live' | 'card';
   tab: LandingTabKey;
   label: string;
@@ -15,7 +15,7 @@ type TourStep = {
   Screen: () => ReactNode;
 };
 
-const STEPS: readonly TourStep[] = [
+export const TOUR_STEPS: readonly TourStep[] = [
   {
     kind: 'match', tab: 'match', label: '매치 찾기',
     title: ['내 동네, 내 종목 매치를', '바로 찾아요'],
@@ -58,9 +58,9 @@ const STEPS: readonly TourStep[] = [
   },
 ];
 
-const EXAMPLE_NOTE = '화면 속 팀·점수·능력치는 모두 예시예요.';
+export const TOUR_EXAMPLE_NOTE = '화면 속 팀·점수·능력치는 모두 예시예요.';
 
-function StepCopy({ step, index }: { step: TourStep; index: number }) {
+export function TourStepCopy({ step, index }: { step: TourStep; index: number }) {
   return (
     <>
       <p className="tm-landing-tour-num"><b>{String(index + 1).padStart(2, '0')}</b>{step.label}</p>
@@ -75,13 +75,25 @@ function StepCopy({ step, index }: { step: TourStep; index: number }) {
   );
 }
 
-function StepDevice({ step }: { step: TourStep }) {
+export function TourStepDevice({ step }: { step: TourStep }) {
   return (
-    <LandingDevice size="mini" activeTab={step.tab} label={`${step.screenLabel}. ${EXAMPLE_NOTE}`}>
+    <LandingDevice size="mini" activeTab={step.tab} label={`${step.screenLabel}. ${TOUR_EXAMPLE_NOTE}`}>
       <LandingScreen kind={step.kind} tabKey={step.tab} on>
         <step.Screen />
       </LandingScreen>
     </LandingDevice>
+  );
+}
+
+export function TourHeader() {
+  return (
+    <div className="tm-landing-section-header" data-reveal>
+      <p className="tm-landing-section-kw">기능</p>
+      <h2 id="tour-heading" className="tm-landing-section-title">말보다 화면으로<br />보여 드릴게요</h2>
+      <p className="tm-landing-section-sub">
+        매치를 찾는 순간부터 기록이 남는 순간까지, 팀밋 화면 구성 그대로 옮겼어요. {TOUR_EXAMPLE_NOTE}
+      </p>
+    </div>
   );
 }
 
@@ -96,13 +108,7 @@ export function LandingTour({ layout = 'sticky' }: { layout?: 'sticky' | 'rows' 
   return (
     <section id="tour" className="tm-landing-section" aria-labelledby="tour-heading">
       <div className="tm-landing-section-inner">
-        <div className="tm-landing-section-header" data-reveal>
-          <p className="tm-landing-section-kw">기능</p>
-          <h2 id="tour-heading" className="tm-landing-section-title">말보다 화면으로<br />보여 드릴게요</h2>
-          <p className="tm-landing-section-sub">
-            매치를 찾는 순간부터 기록이 남는 순간까지, 팀밋 화면 구성 그대로 옮겼어요. {EXAMPLE_NOTE}
-          </p>
-        </div>
+        <TourHeader />
         {layout === 'rows' ? <TourRows /> : <TourSticky />}
       </div>
     </section>
@@ -112,13 +118,13 @@ export function LandingTour({ layout = 'sticky' }: { layout?: 'sticky' | 'rows' 
 function TourRows() {
   return (
     <ol className="tm-landing-v3-tour">
-      {STEPS.map((step, i) => (
+      {TOUR_STEPS.map((step, i) => (
         <li key={step.kind} className="tm-landing-v3-tour-row">
           <div className="tm-landing-v3-tour-copy">
-            <StepCopy step={step} index={i} />
+            <TourStepCopy step={step} index={i} />
           </div>
           <div className="tm-landing-v3-tour-shot" data-loop="off" data-reveal>
-            <StepDevice step={step} />
+            <TourStepDevice step={step} />
           </div>
         </li>
       ))}
@@ -130,23 +136,23 @@ function TourSticky() {
   return (
     <div className="tm-landing-tour" data-tour>
       <div className="tm-landing-tour-stage" data-tour-stage data-loop="off">
-        <LandingDevice size="stage" activeTab="match" label={`팀밋 앱 화면 예시. 왼쪽 설명을 읽는 순서대로 매치 목록, 팀, 대진표, 라이브 스코어, 선수 카드 화면으로 바뀌어요. ${EXAMPLE_NOTE}`}>
-          {STEPS.map(({ kind, tab, Screen }, i) => (
+        <LandingDevice size="stage" activeTab="match" label={`팀밋 앱 화면 예시. 왼쪽 설명을 읽는 순서대로 매치 목록, 팀, 대진표, 라이브 스코어, 선수 카드 화면으로 바뀌어요. ${TOUR_EXAMPLE_NOTE}`}>
+          {TOUR_STEPS.map(({ kind, tab, Screen }, i) => (
             <LandingScreen key={kind} kind={kind} tabKey={tab} on={i === 0}>
               <Screen />
             </LandingScreen>
           ))}
         </LandingDevice>
         <ol className="tm-landing-tour-dots" aria-hidden="true">
-          {STEPS.map(({ kind }, i) => <li key={kind} data-tour-dot data-on={i === 0} />)}
+          {TOUR_STEPS.map(({ kind }, i) => <li key={kind} data-tour-dot data-on={i === 0} />)}
         </ol>
       </div>
       <ol className="tm-landing-tour-steps">
-        {STEPS.map((step, i) => (
+        {TOUR_STEPS.map((step, i) => (
           <li key={step.kind} className="tm-landing-tour-step" data-tour-step data-on={i === 0}>
-            <StepCopy step={step} index={i} />
+            <TourStepCopy step={step} index={i} />
             <div className="tm-landing-tour-mini" data-loop="off" data-reveal>
-              <StepDevice step={step} />
+              <TourStepDevice step={step} />
             </div>
           </li>
         ))}

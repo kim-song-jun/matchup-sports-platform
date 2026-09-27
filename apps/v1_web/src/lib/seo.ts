@@ -123,6 +123,23 @@ export function teamDescriptionFallback(
   return `${teamName} 팀을 만나보세요.`;
 }
 
+/**
+ * 매치·팀매치 상세의 메타 설명 폴백. 상세 응답은 종목·장소를 `sport.name`·`place.name` 에 담아
+ * 평평한 `sportName`·`placeName` 이 비어 있을 수 있다 — 있는 조각만 조합한다.
+ */
+export function matchDescriptionFallback(
+  kind: '개인 매치' | '팀매치',
+  sportName?: string | null,
+  placeName?: string | null,
+): string {
+  const sport = sportName?.trim();
+  const place = placeName?.trim();
+  if (sport && place) return `${sport} · ${place}에서 열리는 ${kind} 정보를 확인해 보세요.`;
+  if (place) return `${place}에서 열리는 ${kind} 정보를 확인해 보세요.`;
+  if (sport) return `${sport} ${kind} 정보를 확인해 보세요.`;
+  return `${kind} 정보를 확인해 보세요.`;
+}
+
 export function buildNoIndexMetadata(title: string, description?: string): Metadata {
   return {
     title,

@@ -16,7 +16,7 @@ Only these implementation sources are valid:
 - Design rules: `DESIGN.md` (priority order in its §1); visual reference: `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`
 - Scoped Open Design: when the user explicitly pins an Open Design recovery/remake task, the user-provided Open Design export is a read-only visual reference for that task only.
 
-The legacy v0 apps (`apps/api`, `apps/web`) are removed (PR #1313, snapshot tag `legacy-v0-final`). Do not use legacy code, legacy DB/Prisma schemas, legacy mock data, or `docs/archive/` material as references unless the user explicitly asks for legacy cleanup or migration work. If an agent file here still contradicts `CLAUDE.md`, `CLAUDE.md` wins — fix the agent file in the same change.
+The legacy v0 apps (`apps/api`, `apps/web`) have been removed — their last state is in the git tag `legacy-v0-final`. Do not use legacy code, legacy DB/Prisma schemas, legacy mock data, or `docs/archive/` material as references unless the user explicitly asks for legacy cleanup or migration work. If an agent file here still contradicts `CLAUDE.md`, `CLAUDE.md` wins — fix the agent file in the same change.
 
 ## Compatibility QA Gate
 

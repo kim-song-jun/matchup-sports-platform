@@ -176,6 +176,8 @@ describe('BracketPageContent — 기본 탭', () => {
     expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
     expect(tabs[1]).toHaveAttribute('aria-selected', 'false');
     expect(screen.queryByRole('table', { name: 'A조 순위표' })).not.toBeInTheDocument();
+    // 서버 HTML 에는 실리지만(detail-first-html.test.tsx), 하이드레이션 뒤엔 닫힌 순위 패널을 내린다.
+    expect(screen.queryByRole('table', { name: 'A조 순위표', hidden: true })).not.toBeInTheDocument();
   });
 });
 

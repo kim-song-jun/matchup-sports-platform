@@ -363,6 +363,9 @@ jobs:
       - name: Task168 deploy-prod had-active guard tests
         run: bash scripts/qa/test-task168-deploy-prod-had-active-guard.sh
 
+      - name: Task168 deploy-prod Stage A release-metadata tests
+        run: bash scripts/qa/test-task168-deploy-prod-stage-a-metadata.sh
+
       - name: Task168 prod rollback guard tests
         run: bash scripts/qa/test-task168-prod-rollback-guard.sh
 
@@ -664,6 +667,7 @@ jobs:
       sourceSha256: ${{ steps.source.outputs.sourceSha256 }}
       sourceVersionId: ${{ steps.source.outputs.sourceVersionId }}
       releaseVersion: ${{ steps.version.outputs.stable }}
+      task168Stage: ${{ steps.task168.outputs.stage }}
 
     steps:
       # fetch-depth: 0 필수 — "Resolve rollback compatibility base" 스텝이 호출하는
@@ -1081,7 +1085,10 @@ jobs:
       # deploy-prod.sh 는 EC2 안에서 이미 wait_for_prod_health_contract 로 로컬 헬스를
       # 확인한 뒤에만 성공 리턴한다. 여기서는 "EC2 로컬은 성공했지만 네트워크 경로 문제로
       # 퍼블릭엔 아직 안 나온" 케이스를 잡기 위해 러너에서 한 번 더 확인한다(요구사항 5).
+      # Stage A ends with the API deliberately stopped until Stage B (C2), so
+      # this check could only fail and hold the deploy-production queue.
       - name: Health check
+        if: needs.build-images.outputs.task168Stage != 'stageA'
         env:
           INSTANCE_ID: ${{ vars.PROD_EC2_INSTANCE_ID }}
           RELEASE_VERSION: ${{ needs.build-images.outputs.releaseVersion }}

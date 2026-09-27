@@ -59,10 +59,8 @@ for required_path in \
 done
 
 source "${PROD_SOURCE_DIR}/deploy/prod-release-common.sh"
-# Sourced (not exec'd) so its `compose`-array-based functions share this
-# script's own `compose` (defined below) and env vars -- see
-# deploy/prod-task168.sh's own header comment (arrays cannot cross a
-# subprocess boundary).
+# exec 가 아니라 source 한다 — 러너가 아래 `compose` 배열을 그대로 써야 하는데 배열은
+# 프로세스 경계를 못 넘는다.
 source "${PROD_SOURCE_DIR}/deploy/prod-task168.sh"
 validate_prod_release_manifest \
   "${PROD_MANIFEST_FILE}" \
@@ -73,13 +71,9 @@ validate_prod_release_manifest \
   "${PROD_SOURCE_DIR}"
 load_prod_release_manifest "${PROD_MANIFEST_FILE}"
 
-# `database.task168.stage` selects which activation path this deploy takes.
-# Absent (regular deploy) keeps the pre-Task168 M11-guard/migrate/compose-up
-# flow byte-for-byte -- scripts/qa/test-task168-prod-guard.sh extracts that
-# exact segment by content anchor, so its lines below must not move or gain
-# indentation. validate_prod_release_manifest already rejects any other
-# stage value when database.task168 is present; this is a defense-in-depth
-# re-check, not the primary gate.
+# database.task168.stage 가 활성화 경로를 고른다. 없으면(일반 배포) 기존 M11 가드·migrate
+# 흐름 그대로다 — test-task168-prod-guard.sh 가 그 구간을 내용 앵커로 잘라 쓰므로 그 줄들을
+# 옮기거나 들여쓰지 않는다. 값 검증은 validate_prod_release_manifest 가 먼저 한다.
 task168_stage="$(jq -r '.database.task168.stage // empty' "${PROD_MANIFEST_FILE}")"
 case "${task168_stage}" in
   ''|stageA|stageB) ;;
@@ -94,13 +88,7 @@ if [[ -f "${PROD_RELEASE_STATE_FILE}" ]]; then
   had_active=true
 fi
 
-# Ruling R10: prod already has an active release (state.json exists) as of
-# this writing, so had_active=false is not the realistic path here -- but a
-# staged (stageA/stageB) run combined with the first-ever legacy-conversion
-# deploy (no immutable state yet) is an untested, unsupported combination
-# (the ERR trap's staged-failure branch below assumes an existing active
-# release to eventually recover from). Fail fast rather than silently
-# behaving like an ordinary first deploy.
+# Ruling R10: 단계 실패 복구는 기존 active 릴리스를 전제로 한다 — 첫 배포와 겹치면 바로 멈춘다.
 if [[ -n "${task168_stage}" && "${had_active}" == false ]]; then
   echo "[prod-deploy] Task168 ${task168_stage} requires an existing active release (had_active=false) -- refusing. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
   exit 1
@@ -218,11 +206,7 @@ restore_legacy_runtime() {
     http://127.0.0.1:8121/api/v1/health | jq -e '.data.checks.db == true' >/dev/null || return 1
 }
 
-# A staged (stageA/stageB) failure records which stage failed instead of
-# restoring the previous release's images -- see restore_on_failure() below
-# for why a restore is refused in staged mode. Overwrites on retry (a second
-# failed attempt should get a fresh timestamp, unlike prod_write_receipt's
-# idempotent-content contract).
+# 단계 모드 실패는 옛 이미지 복원 대신 실패한 단계만 기록한다. 재시도마다 덮어쓴다.
 write_task168_activation_stage_failure() {
   local stage="$1" state_dir content tmp
   state_dir="${PROD_RELEASE_STATE_DIR}/task168/${PROD_SHA}"
@@ -240,14 +224,8 @@ restore_on_failure() {
   trap - ERR
   archive_failed_candidate
   if [[ -n "${task168_stage}" ]]; then
-    # A staged transition can leave the database partially migrated (Stage A
-    # may have already committed the cutover tool's writes; Stage B may have
-    # already run M11's `prisma migrate deploy`). Restarting the PREVIOUS
-    # release's application images against that database is exactly what
-    # Review Focus #3 forbids -- the old code does not know about the
-    # in-progress/committed schema change. Refuse to restart anything and
-    # leave the candidate's images/API stopped; recovery is a manual runbook
-    # decision (resume the same stage, or a DBA-verified rollback).
+    # DB 가 부분 전환됐을 수 있다(A 의 cutover 커밋, B 의 M11). 그 DB 에 옛 릴리스 이미지를
+    # 다시 띄우지 않는다 — 복구는 런북의 수동 판단이다.
     echo "[prod-deploy] Candidate failed during Task168 ${task168_stage} -- refusing to restart the previous release's images against a possibly partially migrated database" >&2
     write_task168_activation_stage_failure "${task168_stage}" ||
       echo "[prod-deploy] WARNING: could not record the Task168 activation-stage failure receipt" >&2
@@ -305,7 +283,11 @@ if [[ "${had_active}" == false ]]; then
   legacy_metadata_backup="$(mktemp)"
   cp "${PROD_RUNTIME_METADATA_FILE}" "${legacy_metadata_backup}"
 fi
-write_release_metadata "${PROD_MANIFEST_FILE}"
+# Stage A 는 승격하지 않는다 — 여기서 쓰면 B 전에 nginx 가 재시작될 때 승격 안 된 SHA 가
+# 공개 헤더에 실려 Stage B 빌드의 resolve-prod-rollback-base.sh 가 거부한다.
+if [[ "${task168_stage}" != stageA ]]; then
+  write_release_metadata "${PROD_MANIFEST_FILE}"
+fi
 # DB 가 인스턴스 밖(RDS)에 있으면 로컬 컨테이너를 띄우고 그것의 준비 상태를 기다리는 것은
 # 의미가 없다 — 앱이 접속하는 대상이 아니기 때문이다. V1_DB_HOST 가 기본값(v1_postgres)일
 # 때만 로컬 경로를 탄다. 전환 후에도 컨테이너와 볼륨은 남겨 두지만(롤백 창), 기동과 대기는
@@ -329,28 +311,21 @@ else
 fi
 
 if [[ "${task168_stage}" == stageA || "${task168_stage}" == stageB ]]; then
-  # Ruling R1: the runner takes the DB URL only via this env var (never
-  # argv). Reuse the exact acquisition path assert_task168_m11_guard already
-  # proved safe -- a throwaway `compose run` reads the candidate API's own
-  # DATABASE_URL, never the shell environment or a log line.
+  # Ruling R1: 러너는 DB URL 을 이 변수로만 받는다(argv 금지). 획득 경로는
+  # assert_task168_m11_guard 와 같다.
   task168_database_url="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')"
   [[ -n "${task168_database_url}" ]] || {
     echo "[prod-deploy] Task168 ${task168_stage}: candidate API's DATABASE_URL is unavailable" >&2
     false
   }
-  # Not exported: prod-task168.sh's functions are `source`d into this same
-  # shell (never a separate process), so a plain variable is already
-  # visible to them (subshells fork this process's image regardless of
-  # export). Exporting it would only widen exposure to any child process
-  # spawned later in this script for no benefit.
+  # export 하지 않는다 — 러너는 이 셸에 source 됐으므로 보이고, 이후 자식 프로세스에 노출할 이유가 없다.
   PROD_TASK168_DATABASE_URL="${task168_database_url}"
 fi
 
 if [[ "${task168_stage}" == stageA ]]; then
   prod_task168_main stageA
-  # Stage A never promotes -- it only proves the candidate database is
-  # ready for the M11 cutover. Keep the reviewed candidate manifest for the
-  # record under this release's own task168 state directory instead.
+  # Stage A 는 승격하지 않는다. 검토된 매니페스트는 기록용으로만 남긴다. API·워커는
+  # Stage B 가 올릴 때까지 내려간 채다(C2).
   task168_state_dir="${PROD_RELEASE_STATE_DIR}/task168/${PROD_SHA}"
   install -d -m 700 "${task168_state_dir}"
   install -m 600 "${PROD_MANIFEST_FILE}" "${task168_state_dir}/manifest.json"
@@ -419,9 +394,7 @@ wait_for_prod_health_contract
 assert_running_release_digests
 
 if [[ "${task168_stage}" == stageB ]]; then
-  # Public-surface verification against the now-live release, before this
-  # Stage B manifest is promoted -- see task168_verify()'s own doc comment
-  # for exactly what it checks.
+  # 승격 전, 떠 있는 새 릴리스의 공개 API 를 검증한다.
   prod_task168_main verify
 fi
 

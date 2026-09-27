@@ -266,11 +266,11 @@ Priority: P0
 - `docs/api/domains/matches.md`
 - `docs/api/domains/teams.md`
 - `docs/api/domains/team-matches.md`
-- `docs/api/domains/venues.md`
-- `docs/api/domains/lessons.md`
-- `docs/api/domains/marketplace.md`
-- `docs/api/domains/payments.md`
-- `docs/api/domains/mercenary.md`
+- `docs/archive/v0-api/domains/venues.md`
+- `docs/archive/v0-api/domains/lessons.md`
+- `docs/archive/v0-api/domains/marketplace.md`
+- `docs/archive/v0-api/domains/payments.md`
+- `docs/archive/v0-api/domains/mercenary.md`
 - `docs/api/domains/chat.md`
 - `docs/api/domains/notifications.md`
 - `docs/api/domains/admin-and-ops.md`

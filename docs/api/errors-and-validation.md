@@ -1,5 +1,7 @@
 # Errors And Validation
 
+> **v0 기준 서술 — v1 확인 필요.** 이 문서의 엔드포인트·에러 코드·상세 계약은 레거시 `apps/api`/`apps/web` 시절에 작성됐다. 파일 경로는 v1(`apps/v1_api`/`apps/v1_web`)로 갱신했지만, 계약 내용 자체가 v1 실제 동작과 일치하는지는 이번 변경에서 검증하지 않았다(2026-09-27, docs/api 레거시 분리 작업).
+
 ## 공통 에러 형태
 
 ```json
@@ -98,10 +100,10 @@ object 형태 예시:
 
 ## Source References
 
-- `apps/api/src/common/filters/http-exception.filter.ts`
-- `apps/api/src/main.ts`
-- `apps/api/src/auth/auth.service.ts`
-- `apps/api/src/matches/matches.service.ts`
-- `apps/api/src/teams/teams.service.ts`
-- `apps/api/src/team-matches/team-matches.service.ts`
-- `apps/web/src/lib/api.ts`
+- `apps/v1_api/src/common/filters/http-exception.filter.ts`
+- `apps/v1_api/src/main.ts`
+- `apps/v1_api/src/auth/auth.service.ts`
+- `apps/v1_api/src/matches/matches.service.ts`
+- `apps/v1_api/src/teams/teams.service.ts`
+- `apps/v1_api/src/team-matches/team-matches.service.ts`
+- `apps/v1_web/src/lib/api-client.ts`

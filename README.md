@@ -387,7 +387,9 @@ pnpm v1:test                            # v1_api unit + v1_web test
 pnpm test:e2e:v1                        # Playwright (e2e/v1.config.ts, v1 스택 가동 전제)
 ```
 
-Playwright 운영 절차: [`docs/guides/playwright-e2e-runbook.md`](docs/guides/playwright-e2e-runbook.md)
+과거 레거시(v0) Playwright 운영 절차 기록:
+[`docs/archive/v0-reports/playwright-e2e-runbook.md`](docs/archive/v0-reports/playwright-e2e-runbook.md)
+(PR #1313로 그 스택 자체가 삭제됐다 — 현재 절차는 위 `pnpm test:e2e:v1` 한 줄이 전부다).
 
 ---
 

@@ -473,7 +473,9 @@ it('컨택 방이 declined 면 "종료된 컨택이에요" 로 잠긴다', ...)
 - Rewrite: `apps/v1_web/src/app/my/team-contacts/page.tsx` → `redirect('/chat?category=team_contact')` (next/navigation 서버 redirect)
 - Rewrite: `apps/v1_web/src/app/my/team-contacts/[contactId]/page.tsx` → 클라이언트 컴포넌트 `TeamContactRedirectClient({ contactId })` (신규 `components/community/team-contact-redirect-client.tsx`): mount 시 `useV1ResolveChatRoom().mutate({ targetType:'team_contact', targetId })` → `router.replace(route)`; 실패 시 `ErrorState` + "채팅 목록으로" 링크.
 - Modify: `apps/v1_web/src/lib/route-chrome/fragments/my-secondary.ts:35-42` 제목 "채팅으로 이동 중"
-- Modify: `docs/guides/team-contact-message-guide.md` §4 (채팅 기준), `docs/api/v1/domains/chat-notifications.md:8,15` (`team_contact` 추가), `scripts/README-alpha-verify.md` 에서 캡처 스크립트 항목 제거
+- Modify: `docs/guides/team-contact-message-guide.md` §4 (채팅 기준), `docs/api/domains/chat.md`
+  "Linked rooms and resolve" 절(`team_contact` 추가 — 2026-09-28 docs/api/v1 병합에서 이미 반영됨),
+  `scripts/README-alpha-verify.md` 에서 캡처 스크립트 항목 제거
 - Create: `.changeset/team-contact-chat-absorption.md`
 - Test: `apps/v1_web/src/components/community/team-contact-redirect-client.test.tsx`
 

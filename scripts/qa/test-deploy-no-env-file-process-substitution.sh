@@ -1,24 +1,10 @@
 #!/usr/bin/env bash
-# Task 175 Task 4 fix round 3, Ruling R13 (SSM-verified against prod's real
-# sudo 1.9.15p5): `sudo docker run --env-file <(...)` fails on the real prod
-# host with "open /dev/fd/N: no such file or directory" -- sudo's own
-# closefrom() drops the process-substitution fd before docker ever reads it.
-# `--env-file /dev/stdin` with the WHOLE command's stdin redirected from the
-# process substitution instead survives sudo (fd 0 is never in the
-# closefrom range) -- deploy/prod-task168-common.sh's prod_dbq() already
-# established this pattern; deploy/prod-release-common.sh's
-# assert_task168_m11_guard() and assert_task168_m11_restore_target_safe()
-# were fixed to match in this same round (the former blocked EVERY prod
-# promotion carrying M11 until this fix).
-#
-# Regression guard: no file under deploy/ or scripts/ may reintroduce the
-# broken `--env-file <(...)` pattern, regardless of whether `sudo` appears on
-# the exact same physical line (the real code commonly splits `sudo docker
-# run ... \` and `--env-file <(...)` across two lines) -- `--env-file <(` on
-# its own is an unambiguous signal in this repo, since compose's own
-# --env-file usage always takes a plain file path, never a process
-# substitution. scripts/ is included (not just deploy/) because Task 175 T5
-# adds shell that also shells out to `docker run --env-file`.
+# Ruling R13 (SSM-measured on prod's sudo 1.9.15p5): `sudo docker run
+# --env-file <(...)` fails there ("open /dev/fd/N: no such file") because
+# sudo closes fds >= 3; `--env-file /dev/stdin < <(...)` survives. No file
+# under deploy/ or scripts/ may use a process substitution as --env-file, in
+# either the `--env-file <(` or the `--env-file=<(` spelling, whether or not
+# `sudo` is on the same physical line.
 
 set -Eeuo pipefail
 
@@ -39,7 +25,7 @@ bad() { echo "FAILED: $1" >&2; failures=$((failures + 1)); }
 # just its absence-reporting.
 scan_env_file_violations() {
   local dir="$1"
-  grep -rn -- '--env-file[[:space:]]*<(' "${dir}/deploy" "${dir}/scripts" 2>/dev/null |
+  grep -rnE -- '--env-file([[:space:]]*|=)<\(' "${dir}/deploy" "${dir}/scripts" 2>/dev/null |
     grep -v -F "${SELF}" |
     awk '{
       line = $0
@@ -72,13 +58,25 @@ FIXTURE
 cat > "${fixture_root}/scripts/fixture-violation.sh" <<'FIXTURE'
 docker run --rm --env-file <(printf 'FOO=bar') myimage
 FIXTURE
+cat > "${fixture_root}/scripts/fixture-equals-violation.sh" <<'FIXTURE'
+docker run --rm --env-file=<(printf 'FOO=bar') myimage
+FIXTURE
+cat > "${fixture_root}/deploy/fixture-allowed.sh" <<'FIXTURE'
+docker run --rm --env-file /dev/stdin myimage < <(printf 'FOO=bar')
+FIXTURE
 fixture_matches="$(scan_env_file_violations "${fixture_root}")"
 if [[ -n "${fixture_matches}" ]] &&
   grep -q 'deploy/fixture-violation\.sh' <<<"${fixture_matches}" &&
-  grep -q 'scripts/fixture-violation\.sh' <<<"${fixture_matches}"; then
-  ok "positive control: injected '--env-file <(' fixtures under BOTH deploy/ and scripts/ are detected"
+  grep -q 'scripts/fixture-violation\.sh' <<<"${fixture_matches}" &&
+  grep -q 'scripts/fixture-equals-violation\.sh' <<<"${fixture_matches}"; then
+  ok "positive control: injected '--env-file <(' and '--env-file=<(' fixtures under BOTH deploy/ and scripts/ are detected"
 else
-  bad "positive control: expected matches under both deploy/fixture-violation.sh and scripts/fixture-violation.sh, got: ${fixture_matches}"
+  bad "positive control: expected matches for all three violation fixtures, got: ${fixture_matches}"
+fi
+if grep -q 'fixture-allowed\.sh' <<<"${fixture_matches}"; then
+  bad "negative control: the allowed '--env-file /dev/stdin < <(...)' pattern was flagged"
+else
+  ok "negative control: '--env-file /dev/stdin < <(...)' is not flagged"
 fi
 
 # Positive control: the CORRECT replacement pattern must still be present

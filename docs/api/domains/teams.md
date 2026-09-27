@@ -17,7 +17,7 @@
 | GET | `/teams/:teamId/join-applications` | Yes(owner/manager) | 가입 신청 목록 |
 | GET | `/me/join-applications` | Yes | 내가 보낸 가입 신청 목록 |
 | GET | `/me/teams` | Yes | 내가 속한 팀(멤버십 포함) |
-| PATCH | `/team-memberships/:membershipId/role` | Yes(owner) | 역할 변경 |
+| PATCH | `/team-memberships/:membershipId/role` | Yes(owner/manager) | 역할 변경·소유권 위임 |
 | PATCH | `/team-memberships/:membershipId/jersey` | Yes(본인) | 등번호 변경(`jerseyNumber: number \| null`, 생략은 400) |
 | POST | `/team-memberships/:membershipId/remove` | Yes(owner/manager) | 멤버 제거 |
 | POST | `/team-join-applications/:applicationId/withdraw` | Yes(신청자) | 가입 신청 철회 |
@@ -144,6 +144,7 @@ CAUTION:
 
 - body `{ role: "owner" | "manager" | "member" }`. 대상은 active 멤버십이어야 하고, 이미 같은 역할이면 변경 없이 그대로 반환한다.
 - `role: "owner"` = **소유권 위임**: 현재 owner 만 호출할 수 있고 대상은 manager 여야 한다(아니면 409 `OWNER_DELEGATION_TARGET_MUST_BE_MANAGER`). 한 트랜잭션에서 현재 owner 가 manager 로 내려가고 대상이 owner 가 되며 `team.ownerUserId` 도 바뀐다. 동시 위임은 409 `CONCURRENT_UPDATE`.
+- 위임이 아닌 변경은 owner 또는 manager 가 한다. manager 는 **member 대상만** 바꿀 수 있고(아니면 403), 기존 owner 의 역할은 이 API 로 바꿀 수 없다(409).
 - manager 는 팀당 5명까지(`MANAGER_LIMIT_EXCEEDED`).
 
 ### POST /team-memberships/:membershipId/remove

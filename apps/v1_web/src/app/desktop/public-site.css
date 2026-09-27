@@ -206,6 +206,21 @@ html:has(.tm-ps) {
   padding-left: 24px;
 }
 
+/* 랜딩 v4 GNB(<1024): 매치·대회·팀 큰 행 — 라벨 + 한 줄 설명 */
+.tm-ps-menu-link-primary {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 56px;
+  padding: 8px 12px;
+}
+
+.tm-ps-menu-primary-desc {
+  font-size: var(--font-size-caption);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
 .tm-ps-menu-login {
   margin-top: 8px;
   padding-top: 8px;

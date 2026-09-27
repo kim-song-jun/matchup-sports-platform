@@ -1,14 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { LandingCtaLink, type LandingVariant } from './landing-cta-link';
+import { LandingCtaLink, type LandingCtaId, type LandingVariant } from './landing-cta-link';
+
+type BrowseCta = { href: string; label: string; cta: LandingCtaId };
+
+const DEFAULT_BROWSE: BrowseCta = { href: '/matches', label: '매치 보기', cta: 'mobile_bar_browse_matches' };
 
 /**
  * 모바일(<768) 하단 고정 CTA 바. 히어로 CTA 나 마지막 CTA 배너·푸터가 화면에 있으면
  * 같은 버튼이 두 번 보이고 푸터 링크를 가리므로 그때는 숨긴다(`[data-mobile-cta-hide]`).
  * 페이지에 하단 내비가 없어 DESIGN.md 14절의 "내비와 겹침" 문제는 생기지 않는다.
  */
-export function LandingMobileCta({ variant }: { variant?: LandingVariant } = {}) {
+export function LandingMobileCta({ variant, browse = DEFAULT_BROWSE }: { variant?: LandingVariant; browse?: BrowseCta } = {}) {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -29,8 +33,8 @@ export function LandingMobileCta({ variant }: { variant?: LandingVariant } = {})
 
   return (
     <div className="tm-landing-mobile-cta" data-show={show} inert={!show}>
-      <LandingCtaLink className="tm-btn tm-btn-lg tm-btn-neutral" href="/matches" cta="mobile_bar_browse_matches" variant={variant}>
-        매치 보기
+      <LandingCtaLink className="tm-btn tm-btn-lg tm-btn-neutral" href={browse.href} cta={browse.cta} variant={variant}>
+        {browse.label}
       </LandingCtaLink>
       <LandingCtaLink className="tm-btn tm-btn-lg tm-btn-primary" href="/login" cta="mobile_bar_signup" variant={variant}>
         무료로 시작하기

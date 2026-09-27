@@ -81,15 +81,8 @@ PROD_FAILED_RELEASE_DIR="${PROD_FAILED_RELEASE_DIR:-${PROD_RELEASE_STATE_DIR}/fa
 PROD_LEGACY_STATE_FILE="${PROD_LEGACY_STATE_FILE:-${PROD_HOME_DIR}/.teameet-prod-release}"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/prod-source-common.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/prod-manifest-common.sh"
-# Fix round 3, Minor: PROD_TASK168_STATE_ROOT used to be independently
-# defaulted here AND in prod-task168-common.sh (Stage A's own state root) --
-# overriding it for one side silently left the other pointed at the
-# hardcoded default. Sourcing the runner's own common file gives both
-# rollback-prod.sh and restore_active_release() the SAME variable (and the
-# SAME default expression) that deploy/prod-task168.sh's Stage A/B actually
-# write receipts under; harmless to source here even though deploy-prod.sh
-# also sources it via prod-task168.sh (plain assignments and function
-# definitions only, no `readonly`, so re-sourcing is idempotent).
+# Shares PROD_TASK168_STATE_ROOT (and its default) with the Task168 runner so
+# the restore/rollback guard reads the receipts Stage A/B actually wrote.
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/prod-task168-common.sh"
 
 write_candidate_manifest() {
@@ -252,46 +245,15 @@ wait_for_prod_health_contract() {
   done
 }
 
-# Task168 M11 restore/rollback-target guard, shared by rollback-prod.sh and
-# restore_active_release()'s automatic recovery path (Task 175 Task 4 fix
-# round 1, Important 3; ledger-based re-check per fix round 2, Ruling R11;
-# target-source re-check restored per fix round 3, Critical H1).
-#
-# Fix round 2 (Ruling R11): the first version gated on transition.json's mere
-# EXISTENCE, then checked whether the TARGET release's own stored source
-# folder carried M11 -- and ONLY that, dropping the ledger entirely. That
-# signal alone is wrong under C2 (Stage A and Stage B share the same dev
-# source tree): transition.json is written by Stage A alone, long before
-# Stage B ever runs M11's migrate, and once M1-M11 are merged into dev EVERY
-# subsequently-built release's source carries the M11 folder regardless of
-# what has actually been applied to THIS database. Round 2 replaced it with
-# a ledger-only check, which fixed the false rejection but (fix round 3,
-# Critical H1) went too far the other way: dropping the target-source check
-# ENTIRELY meant that once M11 really is applied, EVERY restore/rollback
-# target was refused forever -- including the very release that ran Stage
-# B's own M11 migrate (whose own source obviously already has M11) and any
-# later release built after it.
-#
-# The condition is now the conjunction of THREE checks, all of which must
-# hold for a refusal:
-#   1. a Task168 Stage A transition receipt exists anywhere in this
-#      environment's state (cheap short-circuit: skip the DB round-trip
-#      entirely when Task168 has never touched this environment);
-#   2. the migration ledger shows M11 as a finished, non-rolled-back row
-#      (the DROP already happened -- before this, restoring/rolling back to
-#      ANY release, however old, is safe under the expand-contract policy);
-#   3. the TARGET release's own stored source predates M11 (its application
-#      code was never built to handle the post-cutover schema -- if the
-#      target's own source already carries M11, it is exactly as safe to run
-#      against a post-cutover database as the release that applied M11 was).
-# A target release with no retained stored source at all (pruned, or never
-# captured) fails closed at check 3 rather than being treated as safe.
-#
-# Duplicates (rather than calls) assert_task168_m11_guard's own DB-URL/
-# network/psql pattern -- a shared low-level helper would also require
-# updating that function's extensively mutation-tested call sites
-# (scripts/qa/test-task168-prod-guard.sh's 7 mutations pin its literal
-# source text), which is out of proportion for this fix.
+# Task168 M11 restore/rollback-target guard (rollback-prod.sh and
+# restore_active_release()). Refuses only when all three hold:
+#   1. a Stage A transition receipt exists (else: no DB round-trip at all);
+#   2. the ledger shows M11 finished -- before the DROP any target is safe
+#      under expand-contract;
+#   3. the target release's stored source predates M11, or is not retained
+#      (fail closed). A target whose source carries M11 was built for the
+#      post-cutover schema.
+# Uses `compose run v1_api`, so V1_API_IMAGE must already be loaded.
 assert_task168_m11_restore_target_safe() {
   local target_sha="$1"
   local m11_name=20260911090000_retire_tournament_fixture_tables
@@ -316,13 +278,7 @@ assert_task168_m11_restore_target_safe() {
     return 1
   fi
   psql_stderr="$(mktemp)"
-  # Ruling R13 (fix round 3, SSM-verified against prod's real sudo 1.9.15p5):
-  # `--env-file <(...)` fails there with "open /dev/fd/N: no such file or
-  # directory" -- sudo's closefrom() drops the process-substitution fd
-  # before docker ever reads it. `--env-file /dev/stdin` with the WHOLE
-  # command's stdin redirected from the process substitution instead
-  # survives sudo (fd 0 is never in the closefrom range) -- the exact
-  # pattern deploy/prod-task168-common.sh's prod_dbq() already uses.
+  # `--env-file /dev/stdin`: sudo closes a process-substitution fd (R13).
   m11_finished_count="$(sudo docker run --rm --network "${network}" \
     --env-file /dev/stdin \
     postgres:16-alpine sh -c 'exec psql "$DATABASE_URL" -At -c "$1"' sh \
@@ -346,9 +302,6 @@ assert_task168_m11_restore_target_safe() {
       echo "[prod-release] Refusing: the migration ledger shows M11 already applied, so restoring/rolling back to ${target_sha} (whose own stored source predates the M11 migration) would run application code from before the M11 cutover against a database that no longer has the retired tables. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
       return 1
     fi
-    # target_sha's own source already carries M11 -- it was built to handle
-    # the post-cutover schema, so it is safe even though the ledger shows
-    # M11 applied.
   fi
   echo "[prod-release] Task168 restore-target guard: ${target_sha} is safe to restore/roll back to"
 }
@@ -424,14 +377,7 @@ assert_task168_m11_guard() {
   fi
   # DATABASE_URL (password included) must never appear as a `docker run`
   # argv element -- that argv is visible to any other user on the host via
-  # `ps`. Ruling R13 (fix round 3, SSM-verified against prod's real sudo
-  # 1.9.15p5): `--env-file <(...)` (a process-substitution fd) fails there
-  # with "open /dev/fd/N: no such file or directory" -- sudo's closefrom()
-  # drops that fd before docker ever reads it. `--env-file /dev/stdin` with
-  # the WHOLE command's stdin redirected from the process substitution
-  # instead survives sudo (fd 0 is never in the closefrom range) -- the same
-  # pattern deploy/prod-task168-common.sh's prod_dbq() already uses. Either
-  # way, the value itself is never passed on the command line.
+  # `ps`. `--env-file /dev/stdin`, not `<(...)`: sudo closes fds >= 3 (R13).
   psql_stderr="$(mktemp)"
   # `&& query_rc=0 || query_rc=$?` (not a bare trailing `$?`) is deliberate:
   # under `set -e`, `var="$(failing_cmd)"` on its own aborts the whole script

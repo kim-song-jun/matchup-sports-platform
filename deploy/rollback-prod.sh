@@ -91,10 +91,13 @@ if [[ "${active_sha}" != "${PROD_EXPECTED_ACTIVE_SHA}" ]]; then
   exit 1
 fi
 
-# Task168 M11 rollback guard -- shared with restore_active_release()'s own
-# automatic recovery path (deploy/prod-release-common.sh), since the same
-# hazard applies to both: an M11-migrated database restored/rolled back to a
-# release whose stored source predates M11 (fix round 1, Important 3).
+# 롤백 대상 매니페스트를 먼저 로드한다 — V1_*_IMAGE 는 여기서 export 되므로 그 전에
+# compose 를 부르면 이미지 변수가 비어 실패한다. 아직 아무것도 바꾸지 않았으므로 ERR
+# 복구 trap 을 걸기 전에 둔다. 롤백에서 빈 비밀키로 되살아나는 것도 여기서 막는다.
+load_prod_release_manifest "${PREVIOUS_MANIFEST}"
+assert_compose_variables_resolve "${compose[@]}"
+# Task168: M11 이 적용된 DB 를 M11 이전 소스의 릴리스로 되돌리지 않는다
+# (restore_active_release() 와 같은 가드). `compose run v1_api` 를 쓰므로 로드 뒤에 둔다.
 assert_task168_m11_restore_target_safe "${previous_sha}" || exit 1
 
 rollback_started=true
@@ -111,10 +114,6 @@ restore_current_on_failure() {
 }
 trap 'restore_current_on_failure' ERR
 
-load_prod_release_manifest "${PREVIOUS_MANIFEST}"
-# 매니페스트 로드 뒤에 검사한다 — V1_*_IMAGE 는 여기서 export 되므로 그 전에 부르면
-# 이미지 변수까지 미설정으로 잡힌다. 롤백에서 빈 비밀키로 되살아나는 것도 똑같이 막아야 한다.
-assert_compose_variables_resolve "${compose[@]}"
 pull_release_images
 activate_prod_release_source "${previous_sha}"
 write_release_metadata "${PREVIOUS_MANIFEST}"

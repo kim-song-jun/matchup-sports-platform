@@ -1,40 +1,15 @@
 #!/usr/bin/env bash
-# Task 175 Task 4, Review Focus 4 (fix round 1) + Ruling R11 (fix round 2) +
-# Critical H1 (fix round 3): deploy/rollback-prod.sh must refuse a rollback
-# whenever ALL THREE hold: (a) a Task168 Stage A transition receipt exists
-# anywhere in this environment's task168 state, (b) the migration LEDGER
-# shows M11 as a finished, non-rolled-back row, AND (c) the rollback
-# TARGET's (PREVIOUS_SHA's) own stored source tree predates M11 -- and must
-# proceed past that guard in every other case (no receipt at all -- ledger
-# never even queried; ledger does not show M11 applied yet; ledger query
-# itself fails -> fail-closed; target's source already carries M11).
+# deploy/rollback-prod.sh must refuse a rollback when ALL THREE hold: (a) a
+# Task168 Stage A transition receipt exists, (b) the ledger shows M11 as a
+# finished row, (c) the rollback TARGET's stored source predates M11 -- and
+# must get past the guard otherwise (no receipt: ledger never queried; M11
+# not applied; target source carries M11). A failing ledger query refuses.
 #
-# Fix round 2 dropped condition (c) entirely (ledger-only), which fixed a
-# false rejection but (fix round 3, Critical H1) then refused EVERY
-# restore/rollback target forever once M11 really was applied, including
-# the very release that ran Stage B. See
-# assert_task168_m11_restore_target_safe()'s own doc comment
-# (deploy/prod-release-common.sh) for the full history.
-#
-# Runs the real deploy/rollback-prod.sh (same convention as
-# scripts/qa/test-prod-rollback-guards.sh) with sudo/aws/docker/flock faked
-# and a full valid active+previous manifest pair in state.json -- real enough
-# to reach the M11 guard (past validate_stored_prod_manifest, the
-# rollbackCompatibleWith check, and the stale-active check).
-#
-# `aws ecr get-login-password` and `resolve_compose_binary`'s own `docker
-# compose version` probe both run UNCONDITIONALLY, well BEFORE the M11 guard
-# -- they cannot serve as an "did we get past the guard" marker. The marker
-# instead is the `docker compose ... config` call `assert_compose_variables_
-# resolve()` makes, which happens only AFTER the guard (inside the
-# `rollback_started=true` / ERR-trap-armed section). The marker is a FILE,
-# not captured output -- assert_compose_variables_resolve() redirects that
-# call's own stderr to a tempfile and rm -f's it on the success path, so
-# anything written to stdout/stderr there is silently discarded (verified
-# empirically: an echo-based marker never appeared in the captured output
-# even on an allowed run). This test only asserts the marker file's
-# presence/absence -- it does not need (and does not attempt) to complete an
-# actual rollback.
+# Runs the real rollback-prod.sh with sudo/aws/docker/flock faked. The
+# "got past the guard" marker is a FILE written by the first image pull
+# (pull_release_images runs right after the guard). The fake compose refuses
+# `run v1_api` while V1_API_IMAGE is empty, as real compose does -- that
+# pins the guard after load_prod_release_manifest.
 
 set -Eeuo pipefail
 
@@ -82,7 +57,7 @@ ledger_calls_log="${TEST_ROOT}/ledger-calls.log"
 #     instead, simulating an unreadable ledger.
 # Dispatches on docker's OWN first arg: `compose` for everything routed
 # through the `compose` array (DB-URL fetch, resolve_compose_binary's probe,
-# assert_compose_variables_resolve's post-guard `config` call), vs `network`/
+# assert_compose_variables_resolve's `config` call), vs `network`/
 # `run`/`login` for the guard's OWN bare `sudo docker ...` calls.
 write_fake_docker() {
   local m11_count="$1" should_fail="$2"
@@ -91,6 +66,11 @@ write_fake_docker() {
 case "\$1" in
   login)
     cat >/dev/null
+    exit 0
+    ;;
+  pull)
+    : "\${GUARD_MARKER_FILE:?}"
+    echo reached >> "\${GUARD_MARKER_FILE}"
     exit 0
     ;;
   network)
@@ -112,14 +92,12 @@ case "\$1" in
     case "\$*" in
       version) exit 0 ;;
       *'run --rm --no-deps -T v1_api sh -c printf "%s" "\$DATABASE_URL"')
+        # Real compose cannot resolve the v1_api service without its image.
+        [ -n "\${V1_API_IMAGE:-}" ] || { echo "fake compose: V1_API_IMAGE is empty" >&2; exit 94; }
         echo fake-db-url
         exit 0
         ;;
-      *' config')
-        : "\${GUARD_MARKER_FILE:?}"
-        echo reached >> "\${GUARD_MARKER_FILE}"
-        exit 0
-        ;;
+      *' config') exit 0 ;;
       *)
         echo "unexpected docker compose invocation: \$*" >&2
         exit 93
@@ -262,7 +240,7 @@ else
   bad "receipt + ledger M11 applied + rollback target source not retained -> expected refusal, got rc=${rc2a}: ${out2a}"
 fi
 if guard_was_passed "${marker2a}"; then
-  bad "target-source-missing case reached the post-guard docker compose config call"
+  bad "target-source-missing case reached the post-guard image pull"
 fi
 
 # ── (2b) receipt + ledger M11 applied + rollback target's source EXISTS but
@@ -279,7 +257,7 @@ else
   bad "receipt + ledger M11 applied + rollback target source predates M11 -> expected refusal, got rc=${rc2b}: ${out2b}"
 fi
 if guard_was_passed "${marker2b}"; then
-  bad "target-source-predates-M11 case reached the post-guard docker compose config call"
+  bad "target-source-predates-M11 case reached the post-guard image pull"
 fi
 
 # ── (2c) receipt + ledger M11 applied + rollback target's source ALREADY
@@ -310,7 +288,7 @@ else
   bad "receipt present + ledger query fails -> expected a fail-closed refusal with a diagnosable reason, got rc=${rc3}: ${out3}"
 fi
 if guard_was_passed "${marker3}"; then
-  bad "query-failure case reached the post-guard docker compose config call -- fail-closed did not hold"
+  bad "query-failure case reached the post-guard image pull -- fail-closed did not hold"
 fi
 
 # ── (4) no transition receipt anywhere -> guard is a no-op, ledger never

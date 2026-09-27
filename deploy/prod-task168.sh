@@ -818,10 +818,20 @@ task168_stage_b() {
   if _receipt_reusable "${migration_stage_receipt}" migrationStage "${release_sha}" "${db_id}" "${api_image}"; then
     # M11 was already committed in a prior Stage B attempt (only the backfill
     # step failed after it) -- never re-run `prisma migrate deploy` against
-    # an already-migrated DB. Re-verify the ledger independently (never trust
-    # the receipt alone for something this destructive) before resuming
-    # straight into the backfill.
-    prod_assert_cutover_seals || return 1
+    # an already-migrated DB. Re-verify independently (never trust the
+    # receipt alone for something this destructive) before resuming straight
+    # into the backfill.
+    #
+    # Fix round 4 (Task 6 real-DB finding, load-bearing): this branch is
+    # ALWAYS post-M11 by construction (migration-stage.json only ever gets
+    # written after M11 succeeds), so the physical invariant to re-verify is
+    # "M11's own retirement DDL is intact" (prod_assert_legacy_tables_retired),
+    # never prod_assert_cutover_seals -- that query casts to the 5 legacy
+    # tables M11 physically DROPs and hard-crashes with "relation ... does
+    # not exist" on every real post-M11 database (reproduced live by Task 6's
+    # real-DB test; the shim tests never caught it because they fake the
+    # seal query's result instead of running it against real tables).
+    prod_assert_legacy_tables_retired || return 1
     local resumed_rows
     resumed_rows="$(prod_ledger_rows "$(_task168_all_csv)")" || return 1
     _rows_equal "${resumed_rows}" "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}" "${PROD_TASK168_M11}" ||
@@ -831,7 +841,6 @@ task168_stage_b() {
     # its chance to catch up every pre-M1 migration source ships, so nothing
     # should be missing (fix round 2, item 2).
     _assert_pre_m1_name_set exact || return 1
-    prod_assert_cutover_seals || return 1
     # Declared here (covering BOTH branches below), not inside the `if` that
     # first assigns them -- this function is `source`d into deploy-prod.sh's
     # own shell, so a `local` that only executes on the `if` path leaves the
@@ -846,7 +855,8 @@ task168_stage_b() {
     # would run `prisma migrate deploy` a second time against an
     # already-migrated DB. Reading all 11 names means an already-applied M11
     # shows up as an extra row and correctly fails the 10-name `_rows_equal`
-    # below instead.
+    # below instead. Read BEFORE any seal check (fix round 4) -- which seal
+    # invariant is even safe to query depends on whether M11 has already run.
     ledger_rows="$(prod_ledger_rows "$(_task168_all_csv)")" || return 1
 
     if _rows_equal "${ledger_rows}" "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}" "${PROD_TASK168_M11}"; then
@@ -858,10 +868,13 @@ task168_stage_b() {
       # showing all 11 rows would otherwise hard-refuse forever. Resume
       # straight to writing the receipt -- but ONLY with independent
       # evidence THIS Stage B run (not an out-of-band change) is what
-      # applied M11: a valid m11-entry.json bound to this exact
-      # release/database/image (seals are already re-verified as 5|5|3
-      # above, before this ledger read). Any other reason the ledger might
-      # show all 11 rows (no matching m11-entry.json) still hard-refuses.
+      # applied M11: M11's own retirement DDL is intact (fix round 4 --
+      # NEVER prod_assert_cutover_seals here either, for the same reason as
+      # the resume branch above: M11 has already run by this point in this
+      # branch) plus a valid m11-entry.json bound to this exact
+      # release/database/image. Any other reason the ledger might show all
+      # 11 rows (no matching m11-entry.json) still hard-refuses.
+      prod_assert_legacy_tables_retired || return 1
       if ! _receipt_reusable "${state_dir}/m11-entry.json" m11Entry "${release_sha}" "${db_id}" "${api_image}"; then
         echo "[prod-task168] Stage B refuses: ledger already shows the full M1..M11 set but there is no matching m11-entry.json for this release/database (M11 applied out-of-band?)" >&2
         return 1
@@ -874,6 +887,10 @@ task168_stage_b() {
     else
       _rows_equal "${ledger_rows}" "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}" ||
         { echo "[prod-task168] Stage B refuses: prod ledger is not exactly the Stage A M1..M10 set" >&2; return 1; }
+      # M11 has not run yet in this branch -- prod_assert_cutover_seals is
+      # the correct (and only safe) pre-M11 invariant here: it reverifies
+      # Stage A really committed the cutover before we dare run M11's DDL.
+      prod_assert_cutover_seals || return 1
 
       local m11_path m11_sha
       m11_path="$(_migration_sql_path "${PROD_TASK168_M11}")"

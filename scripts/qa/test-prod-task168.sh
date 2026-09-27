@@ -57,6 +57,12 @@ elif 'NOT (finished_at IS NOT NULL AND rolled_back_at IS NULL)' in sql:
     print(os.environ.get('FAKE_BAD_COUNT', '0'), end='')
 elif sql.strip().startswith('SELECT count(*) FROM "_prisma_migrations" WHERE migration_name = \''):
     print(os.environ.get('FAKE_M11_PRESENT', '0'), end='')
+elif 'to_regclass' in sql:
+    # Fix round 4: _prod_task168_legacy_retirement_query() also contains
+    # 'pg_trigger' (the link-trigger subquery), so this branch MUST be
+    # checked first -- 'to_regclass' only appears in the new post-M11 query,
+    # never in the old 6-value seal query.
+    print(readfile(os.environ.get('FAKE_RETIREMENT_FILE'), '0|0'), end='')
 elif 'pg_trigger' in sql:
     print(readfile(os.environ.get('FAKE_SEALS_FILE'), '0|0|0|0|0|0'), end='')
 elif 'ORDER BY migration_name' in sql:
@@ -1095,8 +1101,15 @@ test_stage_b_resume_after_m11_migrate_success_receipt_missing() {
     > "${sd}/m11-entry.json"
   chmod 600 "${sd}/m11-entry.json"
   printf '%s' "${LEDGER_ALL11}" > "${TEST_ROOT}/ledger-b-m11-receipt-missing.txt"
+  # Fix round 4: this branch is post-M11 (ledger already shows all 11 rows),
+  # so it now checks prod_assert_legacy_tables_retired, not
+  # prod_assert_cutover_seals -- FAKE_RETIREMENT_FILE (0|0 = tables and link
+  # triggers both gone) is what actually gates it now; FAKE_SEALS_FILE is
+  # left at a realistic committed value only for documentation, it is not
+  # consulted by this code path.
+  printf '0|0' > "${TEST_ROOT}/retirement-b-m11-receipt-missing.txt"
   printf '5|5|3|0|0|0' > "${TEST_ROOT}/seals-b-m11-receipt-missing.txt"
-  export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b-m11-receipt-missing.txt" FAKE_SEALS_FILE="${TEST_ROOT}/seals-b-m11-receipt-missing.txt"
+  export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b-m11-receipt-missing.txt" FAKE_SEALS_FILE="${TEST_ROOT}/seals-b-m11-receipt-missing.txt" FAKE_RETIREMENT_FILE="${TEST_ROOT}/retirement-b-m11-receipt-missing.txt"
   export CALL_LOG="${TEST_ROOT}/calls-b-m11-receipt-missing.log"; : > "${CALL_LOG}"
   run_case false 'task168_stage_b'
   local migrate_calls backfill_calls stage_receipt
@@ -1144,8 +1157,13 @@ test_stage_b_resume_after_m11() {
     > "${sd}/migration-stage.json"
   chmod 600 "${sd}/migration-stage.json"
   printf '%s' "${LEDGER_ALL11}" > "${TEST_ROOT}/ledger-b-resume.txt"
+  # Fix round 4: this branch (migration-stage.json already reusable) is
+  # ALWAYS post-M11 -- it now checks prod_assert_legacy_tables_retired, not
+  # prod_assert_cutover_seals, which would hard-crash against a real
+  # post-M11 database (Task 6 real-DB finding).
+  printf '0|0' > "${TEST_ROOT}/retirement-b-resume.txt"
   printf '5|5|3|0|0|0' > "${TEST_ROOT}/seals-b-resume.txt"
-  export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b-resume.txt" FAKE_SEALS_FILE="${TEST_ROOT}/seals-b-resume.txt"
+  export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b-resume.txt" FAKE_SEALS_FILE="${TEST_ROOT}/seals-b-resume.txt" FAKE_RETIREMENT_FILE="${TEST_ROOT}/retirement-b-resume.txt"
   export CALL_LOG="${TEST_ROOT}/calls-b-resume.log"; : > "${CALL_LOG}"
   run_case false 'task168_stage_b'
   local migrate_calls backfill_calls
@@ -1158,6 +1176,36 @@ test_stage_b_resume_after_m11() {
   fi
 }
 test_stage_b_resume_after_m11
+
+# Fix round 4 (Task 6 real-DB finding "발견 1", load-bearing): proves the
+# resume branch actually GATES on prod_assert_legacy_tables_retired now,
+# not just that it happens to pass -- a non-"0|0" result (legacy tables or
+# link triggers still present, an impossible-but-must-not-crash state this
+# runner should still refuse rather than assume) must refuse before ever
+# touching the ledger or the backfill CLI.
+test_stage_b_resume_refuses_when_retirement_invariant_fails() {
+  export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/stateb-resume-retirement-bad"
+  local sd="${PROD_TASK168_STATE_ROOT}/release-sha-b"
+  seed_stage_b_transition "${sd}" "${STAGE_B_DB_ID}" false
+  jq -nc --arg release release-sha-b --arg api "${API_IMAGE_STAGE_B}" --arg db "${STAGE_B_DB_ID}" --argjson applied 11 \
+    '{schemaVersion:1,kind:"migrationStage",status:"MIGRATION_COMMITTED",releaseSha:$release,apiImage:$api,databaseIdentity:$db,appliedCount:$applied,completedAt:"2026-01-01T00:00:00Z"}' \
+    > "${sd}/migration-stage.json"
+  chmod 600 "${sd}/migration-stage.json"
+  printf '%s' "${LEDGER_ALL11}" > "${TEST_ROOT}/ledger-b-resume-retirement-bad.txt"
+  printf '1|1' > "${TEST_ROOT}/retirement-b-resume-bad.txt"
+  export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b-resume-retirement-bad.txt" FAKE_RETIREMENT_FILE="${TEST_ROOT}/retirement-b-resume-bad.txt"
+  export CALL_LOG="${TEST_ROOT}/calls-b-resume-retirement-bad.log"; : > "${CALL_LOG}"
+  run_case false 'task168_stage_b'
+  local migrate_calls backfill_calls
+  migrate_calls="$(grep -c 'MIGRATE_DEPLOY_STAGE_B' "${CALL_LOG}" || true)"
+  backfill_calls="$(grep -c 'BACKFILL_CALLED' "${CALL_LOG}" || true)"
+  if [[ "${CASE_RC}" -ne 0 && "${migrate_calls}" == 0 && "${backfill_calls}" == 0 ]] && assert_msg "${CASE_OUTPUT}" 'post-M11 retirement invariant not intact'; then
+    ok "stage-b-resume-refuses-when-retirement-invariant-fails: a non-0|0 legacy-retirement result refuses before ever reaching backfill"
+  else
+    bad "stage-b-resume-refuses-when-retirement-invariant-fails: rc=${CASE_RC} migrate_calls=${migrate_calls} backfill_calls=${backfill_calls} output=${CASE_OUTPUT}"
+  fi
+}
+test_stage_b_resume_refuses_when_retirement_invariant_fails
 
 # ═══════════════════════ Task 3: verify() (Important 8) ════════════════════
 

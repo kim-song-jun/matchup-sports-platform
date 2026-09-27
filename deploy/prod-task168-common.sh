@@ -148,6 +148,42 @@ prod_assert_cutover_seals() {
   }
 }
 
+# Fix round 4 (Task 6 real-DB finding "발견 1", load-bearing): M11
+# (apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables)
+# physically DROPs all 5 legacy fixture tables AND the 3
+# v1_000_tournament_fixture_retired_link triggers -- confirmed by reading
+# that migration.sql directly. `_prod_task168_seal_query()`'s regclass casts
+# to those 5 tables, and its legacy-link subqueries against the
+# tournament_fixture_id/fixture_id columns M11 also drops, both hard-fail
+# with "relation/column does not exist" once M11 has run (Postgres validates
+# every referenced relation/column at parse time, not just the ones a WHERE
+# clause happens to reach at runtime) -- reproduced live against a real M11'd
+# database, not just inferred from the migration source.
+#
+# `v1_games`/`v1_tournament_staff_fixture_scopes`/`v1_operation_audits`
+# themselves are never dropped (only the trigger + one column on each), so a
+# regclass cast to THOSE three is always parse-safe regardless of whether
+# M11 has run. `to_regclass()` on a legacy table name is likewise always
+# parse-safe (it takes a plain string, not an identifier reference) and
+# returns NULL instead of erroring when the relation is gone.
+#
+# This is the post-M11 equivalent of prod_assert_cutover_seals: the 5 legacy
+# tables must all be gone, and the 3 link triggers must all be gone too
+# (M11 explicitly DROPs them) -- both trivially true right after a real M11
+# run and never re-derivable through the pre-M11 seal query once it has.
+_prod_task168_legacy_retirement_query() {
+  echo "SELECT (SELECT count(*) FROM (VALUES ('v1_tournament_fixtures'),('v1_tournament_fixture_results'),('v1_tournament_fixture_goals'),('v1_tournament_fixture_videos'),('v1_tournament_fixture_advancement_edges')) AS legacy(name) WHERE to_regclass(legacy.name) IS NOT NULL)::text || '|' || (SELECT count(*) FROM pg_trigger t WHERE t.tgname='v1_000_tournament_fixture_retired_link' AND t.tgenabled='A' AND t.tgtype::int=23 AND NOT t.tgisinternal AND t.tgrelid IN ('v1_games'::regclass,'v1_tournament_staff_fixture_scopes'::regclass,'v1_operation_audits'::regclass))::text"
+}
+
+prod_assert_legacy_tables_retired() {
+  local result
+  result="$(prod_dbq "$(_prod_task168_legacy_retirement_query)")" || return 1
+  [[ "${result}" == '0|0' ]] || {
+    echo "[prod-task168] post-M11 retirement invariant not intact (legacy_tables_remaining|link_triggers_remaining = ${result}, expected 0|0)" >&2
+    return 1
+  }
+}
+
 # 0600. Idempotent: a re-run that finds an existing receipt passes only when
 # the new content is byte-identical -- a retry must never silently overwrite
 # evidence written by a different run.

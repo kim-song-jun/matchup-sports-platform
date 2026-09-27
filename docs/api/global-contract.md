@@ -129,7 +129,8 @@ defaults.
 ## Common Error Codes
 
 Observed service/guard codes outside the frozen command surface: `UNAUTHENTICATED`,
-`PERMISSION_DENIED`, `SIGNUP_INCOMPLETE`, `PROFILE_COMPLETION_REQUIRED`, `VALIDATION_FAILED`,
+`PERMISSION_DENIED`, `SIGNUP_INCOMPLETE`, `PROFILE_COMPLETION_REQUIRED`, `VALIDATION_ERROR` (DTO shape,
+from `ValidationPipe`), `VALIDATION_FAILED` (service-level business rules),
 `NOT_FOUND`, `NOT_FOUND_OR_ARCHIVED`, `ALREADY_PROCESSED`, `INTERNAL_ERROR`. State-changing callers
 must handle stale or duplicate action responses as either `ALREADY_PROCESSED` or a domain-specific
 validation/permission error.

@@ -25,7 +25,12 @@ import { LEAGUE_STATE_META } from '@/lib/league-state-meta';
 import { formatTieBreakRule } from '@/lib/league-tie-break-labels';
 import { formatTournamentDateTimeShort } from '@/lib/date-utils';
 import { fixtureResultLabel, fixtureStatusMeta, isUpcomingFixture, type TeamLookupEntry } from '@/lib/league-fixture-meta';
-import type { V1LeagueChampionTeam, V1LeagueFixture } from '@/types/league-match';
+import type {
+  V1LeagueChampionTeam,
+  V1LeagueFixture,
+  V1LeagueStandingsResponse,
+  V1PublicLeagueDetail,
+} from '@/types/league-match';
 import { leagueRecordEmptySub } from './league-record-empty-copy';
 
 /**
@@ -561,12 +566,18 @@ function LeagueRegistrationCta({
   );
 }
 
-export default function LeagueMatchStandingsClient({ leagueId }: { leagueId: string }) {
+export default function LeagueMatchStandingsClient({
+  leagueId,
+  seed,
+}: {
+  leagueId: string;
+  seed?: { league: V1PublicLeagueDetail | null; standings: V1LeagueStandingsResponse | null };
+}) {
   const fromPath = sanitizeRedirectPath(useSearchParams().get('from'));
   // 팀 이름 링크의 뒤로가기 출처 — 이 화면 자기 자신(상위에서 받은 from까지 포함해서 이어 붙인다).
   const selfHref = withFromPath(`/league-matches/${leagueId}`, fromPath);
-  const seriesQuery = useV1LeagueMatch(leagueId);
-  const standingsQuery = useV1LeagueMatchStandings(leagueId);
+  const seriesQuery = useV1LeagueMatch(leagueId, { seed: seed?.league });
+  const standingsQuery = useV1LeagueMatchStandings(leagueId, { seed: seed?.standings });
   const recordsQuery = useV1LeagueMatchPlayerRecords(leagueId);
   const series = seriesQuery.data;
   const standings = standingsQuery.data;

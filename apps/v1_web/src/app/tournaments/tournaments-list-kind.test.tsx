@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import TournamentsPage from './page';
+import { TournamentsListPageClient as TournamentsPage } from './tournaments-list-client';
 
 /**
  * 통합 목록의 유형 축(`?kind=`)이 **주소에서 서버까지 실제로 이어지는가**를 잠근다.
@@ -18,7 +18,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1Tournaments: (...args: unknown[]) => tournamentsMock(...args),
-  useV1AllTournaments: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
+  useV1AllTournaments: () => ({ data: [], isPending: false, isError: false, refetch: vi.fn() }),
   useV1MasterSports: () => ({ data: [] }),
 }));
 
@@ -26,7 +26,7 @@ beforeEach(() => {
   tournamentsMock.mockReset();
   tournamentsMock.mockReturnValue({
     data: { items: [], pageInfo: { hasNext: false, nextCursor: null, totalCount: 0 } },
-    isLoading: false,
+    isPending: false,
     isError: false,
     isFetching: false,
     refetch: vi.fn(),

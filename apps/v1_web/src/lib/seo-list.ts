@@ -1,34 +1,22 @@
 import { fetchPublicV1 } from '@/lib/seo';
-import type { CursorPage, V1MasterSportsResponse, V1Sport } from '@/types/api';
-
-/** 크롤러에게 내보낼 첫 페이지 크기 — 서버 기본 페이지(20건)와 같게 둔다. */
-export const SEO_LIST_PAGE_SIZE = 20;
+import type { V1MasterSportsResponse, V1Sport } from '@/types/api';
 
 /**
- * 목록 화면의 **서버 프리렌더용 첫 페이지**를 가져온다.
+ * 클라이언트 목록 쿼리의 placeholder 로 넘길 응답. `path` 는 클라이언트 훅이 보내는 요청과
+ * **같은 쿼리**여야 한다 — 다르면 서버 첫 화면과 하이드레이션 후 목록이 어긋난다.
  *
- * 실패해도 던지지 않는다. 이 데이터의 용도는 크롤러가 읽을 첫 화면을 채우는 것이고,
- * 사용자 화면은 하이드레이션 후 클라이언트가 다시 가져온다 — 업스트림이 잠깐 흔들렸다고
- * 목록 페이지 전체를 500 으로 만들면 얻는 것 없이 사용자만 잃는다. 대신 조용히 삼키지 않고
- * 서버 로그에 남겨 "크롤러에게 빈 목록이 나간" 사실이 추적되게 한다.
+ * 실패해도 던지지 않는다 — 업스트림이 흔들렸다고 목록 페이지 전체를 500 으로 만들지 않는다.
+ * 실패하면 빈 목록이 아니라 `null` 이다. 빈 목록을 seed 로 넘기면 클라이언트가 실제 응답이
+ * 올 때까지 "대회가 없어요" 빈 상태를 사실처럼 그린다 — seed 없음이면 기존 로딩 경로를 탄다.
  */
-export async function fetchSeoListPage<T>(path: string, label: string): Promise<T[]> {
-  return (await fetchSeoCursorPage<T>(path, label)).items;
-}
-
-export async function fetchSeoCursorPage<T>(path: string, label: string): Promise<CursorPage<T>> {
+export async function fetchSeoSeed<T>(path: string, label: string): Promise<T | null> {
   try {
-    const query = new URLSearchParams({ limit: String(SEO_LIST_PAGE_SIZE) });
-    const page = await fetchPublicV1<CursorPage<T>>(`${path}?${query.toString()}`);
-    return page
-      ? {
-          ...page,
-          nextCursor: page.nextCursor ?? page.pageInfo?.nextCursor ?? null,
-        }
-      : { items: [], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false, total: 0 } };
+    const data = await fetchPublicV1<T>(path);
+    if (data === null) console.error(`[seo] ${label} 목록 서버 프리렌더 404 — 클라이언트 로딩으로 넘긴다`);
+    return data;
   } catch (error) {
-    console.error(`[seo] ${label} 목록 서버 프리렌더 실패 — 크롤러에 빈 목록이 나간다`, error);
-    return { items: [], nextCursor: null, pageInfo: { nextCursor: null, hasNext: false, total: 0 } };
+    console.error(`[seo] ${label} 목록 서버 프리렌더 실패 — 클라이언트 로딩으로 넘긴다`, error);
+    return null;
   }
 }
 

@@ -42,7 +42,8 @@ import { useShellOverride } from '@/components/v1-ui/shell-override';
 import { teamSharePath } from '@/lib/team-share-route';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import { teamJoinApplicationStatusLabel } from '@/lib/v1-status-labels';
-import type { CursorPage, V1Sport, V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import type { V1Team, V1TeamDetail, V1TeamJoinApplication, V1TeamMember } from '@/types/api';
+import { TEAM_LIST_PAGE_SIZE, type CursorListSeed } from '@/lib/public-list-seed';
 import { useConfirm } from '@/components/v1-ui/confirm-modal';
 import { JerseyNumberDialog } from './jersey-number-dialog';
 import { INVITE_MESSAGE_MAX_LENGTH, TeamDetailPageSkeleton, TeamDetailPageView, TeamListPageView, TeamMembersPageView, TeamStatePageView } from './teams-page';
@@ -58,7 +59,7 @@ import {
   toTeam,
 } from './teams.card-model';
 
-export function TeamListPageClient({ seed }: { seed?: { page: CursorPage<V1Team>; sports: V1Sport[] } } = {}) {
+export function TeamListPageClient({ seed }: { readonly seed?: CursorListSeed<V1Team> } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedSportId = searchParams.get('sportId') ?? undefined;
@@ -90,7 +91,7 @@ export function TeamListPageClient({ seed }: { seed?: { page: CursorPage<V1Team>
     if (selectedSort === 'recommended') filters.sort = 'recommended';
     return Object.keys(filters).length ? filters : undefined;
   }, [selectedGenderRule, selectedLevels, selectedRegionId, selectedSort, selectedSportId, submittedQuery]);
-  const listFilters = useMemo(() => ({ ...(teamFilters ?? {}), limit: 20 }), [teamFilters]);
+  const listFilters = useMemo(() => ({ ...(teamFilters ?? {}), limit: TEAM_LIST_PAGE_SIZE }), [teamFilters]);
   // /teams가 서버(SEO 프리렌더)에서 이미 받아 둔 무필터 목록을 첫 표시값으로 쓴다 — 필터가
   // 걸려 있으면 그 목록이 이 화면과 다른 결과를 뜻하므로 seed를 넘기지 않는다(기존 로딩
   // 스켈레톤 그대로 유지).
@@ -120,7 +121,8 @@ export function TeamListPageClient({ seed }: { seed?: { page: CursorPage<V1Team>
   if (query.isError) return <TeamStatePageView model={getTeamStateViewModel('error')} />;
   const firstPage = query.data?.pages[0];
   const total = firstPage?.pageInfo?.total ?? visibleItems.length;
-  const isListLoading = query.isLoading && !items;
+  // isLoading 은 서버·하이드레이션 첫 렌더(persist 복원 중)에 false 라 데이터 없음(isPending)으로 판정한다.
+  const isListLoading = query.isPending;
   const searchModel: NonNullable<TeamListViewModel['search']> = {
     value: searchValue,
     placeholder: base.placeholder,

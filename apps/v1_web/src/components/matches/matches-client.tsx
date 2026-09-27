@@ -19,6 +19,7 @@ import { chatRoomHref } from '@/lib/chat-route';
 import { sanitizeRedirectPath, withFromPath } from '@/lib/session-storage';
 import { V1_LEVELS, levelRangeMatches, toLevelCodes, toggleLevelCode } from '@/lib/v1-levels';
 import type { V1Match, V1MatchApiStatus, V1Sport, V1ViewerState } from '@/types/api';
+import type { CursorListSeed } from '@/lib/public-list-seed';
 import { toDetailMode } from './matches.mode';
 import { MatchDetailPageSkeleton, MatchDetailPageView, MatchListPageView, MatchStatePageView } from './matches-page';
 import type { MatchCardModel, MatchDetailViewModel, MatchListViewModel } from './matches.types';
@@ -48,7 +49,7 @@ const SPARSE_RESULT_MAX = 2;
  *  추천이 커 보이면 주객이 바뀐다. */
 const NEARBY_RAIL_MAX = 4;
 
-export function MatchListPageClient() {
+export function MatchListPageClient({ seed }: { readonly seed?: CursorListSeed<V1Match> } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedSportId = searchParams.get('sportId') ?? undefined;
@@ -80,7 +81,7 @@ export function MatchListPageClient() {
   }, [selectedGenderRule, selectedLevels, selectedRegionId, selectedSportId, selectedSort, selectedView, submittedQuery]);
   // 서버는 20건씩 커서 페이지네이션으로 자르는데(matches.service.ts list()) 예전엔 이 화면이
   // 단발 useQuery로 첫 페이지만 받아 21번째 매치부터는 볼 방법이 아예 없었다(감사 결함).
-  // 대회 목록(tournaments/page.tsx)과 같은 "더 보기" 누적 방식 — 다만 그 화면 수준의
+  // 대회 목록(tournaments/tournaments-list-client.tsx)과 같은 "더 보기" 누적 방식 — 다만 그 화면 수준의
   // 데스크톱 페이지 번호 분기까지는 아직 이 화면 규모에 근거가 없다.
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [accumulated, setAccumulated] = useState<V1Match[]>([]);
@@ -102,7 +103,8 @@ export function MatchListPageClient() {
     () => (matchFilters ? (cursor ? { ...matchFilters, cursor } : matchFilters) : undefined),
     [matchFilters, cursor],
   );
-  const allMatches = useV1Matches(allMatchesFilters);
+  // seed 는 무필터 첫 페이지라 allMatches 의 cursor 없는 키에만 맞는다(필터가 걸려도 이 키는 무필터다).
+  const allMatches = useV1Matches(allMatchesFilters, { seed: allMatchesFilters ? undefined : seed?.page });
   const countFilters = useMemo(() => {
     const filters: { query?: string; genderRule?: string; levelCodes?: string; regionId?: string } = {};
     if (selectedGenderRule) filters.genderRule = selectedGenderRule;
@@ -115,7 +117,7 @@ export function MatchListPageClient() {
   const countMatches = useV1Matches(countFilters, { enabled: Boolean(countFilters) });
   const recentSearches = useV1RecentSearches();
   const recordSearch = useV1RecordSearch();
-  const sports = useV1MasterSports();
+  const sports = useV1MasterSports({ seed: seed?.sports });
   const regions = useV1MasterRegions();
   const query = matchFilters ? filteredMatches : allMatches;
 
@@ -209,8 +211,9 @@ export function MatchListPageClient() {
           urgent: 0,
         },
         // team-matches-client.tsx #5와 동일 — 로딩 중임을 명시해 EmptyState 대신 스켈레톤을
-        // 그리게 한다(로딩 중을 "조건에 맞는 매치 0개"로 오인시키지 않는다).
-        isLoading: query.isLoading,
+        // 그리게 한다(로딩 중을 "조건에 맞는 매치 0개"로 오인시키지 않는다). isLoading 이 아니라 isPending —
+        // 서버·하이드레이션 첫 렌더는 persist 복원 중이라 fetchStatus 'idle' 이고 isLoading 이 false 다.
+        isLoading: query.isPending,
       };
 
   return <MatchListPageView model={model} />;

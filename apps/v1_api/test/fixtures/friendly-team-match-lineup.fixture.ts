@@ -24,14 +24,10 @@ export async function submitFriendlyTeamMatchLineups(prisma: PrismaClient, gameI
       where: { gameId, sideId: side.id, invalidatedAt: null },
       orderBy: { revision: 'desc' },
     });
-    const alreadySubmitted = lineup !== null;
+    const existingDraft = lineup?.state === 'DRAFT';
     if (lineup === null) {
-      // Copilot review finding (PR #1315): `(gameId, sideId, revision)` is
-      // unique, so a hardcoded `revision: 1` collides whenever the side's
-      // only lineup rows are invalidated (revision 1 exists but
-      // invalidatedAt is set, so the query above returns null). Look at
-      // ALL lineups for the side (invalidated included) and continue from
-      // the true max revision instead.
+      // (gameId, sideId, revision) is unique and invalidated rows still hold
+      // their revision, so continue from the max over all of the side's rows.
       const latestAny = await prisma.v1GameLineup.findFirst({
         where: { gameId, sideId: side.id },
         orderBy: { revision: 'desc' },
@@ -60,7 +56,8 @@ export async function submitFriendlyTeamMatchLineups(prisma: PrismaClient, gameI
         },
       });
     }
-    if (alreadySubmitted) {
+    // Only a DRAFT needs flipping; LOCKED/SUBMITTED already satisfy the gate.
+    if (existingDraft) {
       await prisma.v1GameLineup.update({
         where: { id: lineup.id },
         data: { state: 'SUBMITTED', submittedAt: new Date() },

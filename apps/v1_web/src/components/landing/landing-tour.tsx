@@ -60,12 +60,39 @@ const STEPS: readonly TourStep[] = [
 
 const EXAMPLE_NOTE = '화면 속 팀·점수·능력치는 모두 예시예요.';
 
+function StepCopy({ step, index }: { step: TourStep; index: number }) {
+  return (
+    <>
+      <p className="tm-landing-tour-num"><b>{String(index + 1).padStart(2, '0')}</b>{step.label}</p>
+      <h3 className="tm-landing-tour-title">{step.title[0]}<br />{step.title[1]}</h3>
+      <p className="tm-landing-tour-body">{step.body}</p>
+      <ul className="tm-landing-tour-points">
+        {step.points.map((point) => (
+          <li key={point}><Check size={18} aria-hidden="true" />{point}</li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+function StepDevice({ step }: { step: TourStep }) {
+  return (
+    <LandingDevice size="mini" activeTab={step.tab} label={`${step.screenLabel}. ${EXAMPLE_NOTE}`}>
+      <LandingScreen kind={step.kind} tabKey={step.tab} on>
+        <step.Screen />
+      </LandingScreen>
+    </LandingDevice>
+  );
+}
+
 /**
- * 제품 투어. 768 이상(창 높이 600 이상)은 오른쪽 sticky 폰이 읽는 스텝에 맞춰 바뀌고(컨트롤러가 동기화),
- * 모바일은 sticky 를 끄고 스텝마다 인라인 미니 화면을 둔다 — 390 에서 sticky 폰이 화면 절반을
- * 차지하면 설명을 읽을 자리가 없다.
+ * 제품 투어. layout="sticky"(A안): 768 이상(창 높이 600 이상)은 오른쪽 sticky 폰이 읽는 스텝에 맞춰
+ * 바뀌고(컨트롤러가 동기화), 모바일은 sticky 를 끄고 스텝마다 인라인 미니 화면을 둔다 — 390 에서
+ * sticky 폰이 화면 절반을 차지하면 설명을 읽을 자리가 없다.
+ * layout="rows"(v3): 모든 폭에서 스텝마다 설명과 전용 화면을 한 행에 둔다. data-tour 를 달지 않아
+ * 컨트롤러의 스텝 동기화가 걸리지 않는다.
  */
-export function LandingTour() {
+export function LandingTour({ layout = 'sticky' }: { layout?: 'sticky' | 'rows' }) {
   return (
     <section id="tour" className="tm-landing-section" aria-labelledby="tour-heading">
       <div className="tm-landing-section-inner">
@@ -76,42 +103,54 @@ export function LandingTour() {
             매치를 찾는 순간부터 기록이 남는 순간까지, 팀밋 화면 구성 그대로 옮겼어요. {EXAMPLE_NOTE}
           </p>
         </div>
-        <div className="tm-landing-tour" data-tour>
-          <div className="tm-landing-tour-stage" data-tour-stage data-loop="off">
-            <LandingDevice size="stage" activeTab="match" label={`팀밋 앱 화면 예시. 왼쪽 설명을 읽는 순서대로 매치 목록, 팀, 대진표, 라이브 스코어, 선수 카드 화면으로 바뀌어요. ${EXAMPLE_NOTE}`}>
-              {STEPS.map(({ kind, tab, Screen }, i) => (
-                <LandingScreen key={kind} kind={kind} tabKey={tab} on={i === 0}>
-                  <Screen />
-                </LandingScreen>
-              ))}
-            </LandingDevice>
-            <ol className="tm-landing-tour-dots" aria-hidden="true">
-              {STEPS.map(({ kind }, i) => <li key={kind} data-tour-dot data-on={i === 0} />)}
-            </ol>
-          </div>
-          <ol className="tm-landing-tour-steps">
-            {STEPS.map((step, i) => (
-              <li key={step.kind} className="tm-landing-tour-step" data-tour-step data-on={i === 0}>
-                <p className="tm-landing-tour-num"><b>{String(i + 1).padStart(2, '0')}</b>{step.label}</p>
-                <h3 className="tm-landing-tour-title">{step.title[0]}<br />{step.title[1]}</h3>
-                <p className="tm-landing-tour-body">{step.body}</p>
-                <ul className="tm-landing-tour-points">
-                  {step.points.map((point) => (
-                    <li key={point}><Check size={18} aria-hidden="true" />{point}</li>
-                  ))}
-                </ul>
-                <div className="tm-landing-tour-mini" data-loop="off" data-reveal>
-                  <LandingDevice size="mini" activeTab={step.tab} label={`${step.screenLabel}. ${EXAMPLE_NOTE}`}>
-                    <LandingScreen kind={step.kind} tabKey={step.tab} on>
-                      <step.Screen />
-                    </LandingScreen>
-                  </LandingDevice>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </div>
+        {layout === 'rows' ? <TourRows /> : <TourSticky />}
       </div>
     </section>
+  );
+}
+
+function TourRows() {
+  return (
+    <ol className="tm-landing-v3-tour">
+      {STEPS.map((step, i) => (
+        <li key={step.kind} className="tm-landing-v3-tour-row">
+          <div className="tm-landing-v3-tour-copy">
+            <StepCopy step={step} index={i} />
+          </div>
+          <div className="tm-landing-v3-tour-shot" data-loop="off" data-reveal>
+            <StepDevice step={step} />
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function TourSticky() {
+  return (
+    <div className="tm-landing-tour" data-tour>
+      <div className="tm-landing-tour-stage" data-tour-stage data-loop="off">
+        <LandingDevice size="stage" activeTab="match" label={`팀밋 앱 화면 예시. 왼쪽 설명을 읽는 순서대로 매치 목록, 팀, 대진표, 라이브 스코어, 선수 카드 화면으로 바뀌어요. ${EXAMPLE_NOTE}`}>
+          {STEPS.map(({ kind, tab, Screen }, i) => (
+            <LandingScreen key={kind} kind={kind} tabKey={tab} on={i === 0}>
+              <Screen />
+            </LandingScreen>
+          ))}
+        </LandingDevice>
+        <ol className="tm-landing-tour-dots" aria-hidden="true">
+          {STEPS.map(({ kind }, i) => <li key={kind} data-tour-dot data-on={i === 0} />)}
+        </ol>
+      </div>
+      <ol className="tm-landing-tour-steps">
+        {STEPS.map((step, i) => (
+          <li key={step.kind} className="tm-landing-tour-step" data-tour-step data-on={i === 0}>
+            <StepCopy step={step} index={i} />
+            <div className="tm-landing-tour-mini" data-loop="off" data-reveal>
+              <StepDevice step={step} />
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }

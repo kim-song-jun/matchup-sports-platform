@@ -114,15 +114,22 @@ make_manifest() {
     }' > "${output}"
 }
 
+# $6 (optional, reject cases only): a substring that must appear in stderr --
+# Minor 3 requires a schema rejection to give a one-line, diagnosable reason
+# (not just a silent nonzero exit).
 check() {
-  local label="$1" expect="$2" manifest="$3" source_dir="${4:-}" checksum err_file
+  local label="$1" expect="$2" manifest="$3" source_dir="${4:-}" expect_message="${5:-}" checksum err_file
   checksum="$(sha256sum "${manifest}" | awk '{print $1}')"
   err_file="${TEST_ROOT}/.check-err"
   if validate_prod_release_manifest "${manifest}" "${SHA}" "1.2.3" "${checksum}" "${REGISTRY}" "${source_dir}" 2>"${err_file}"; then
     if [[ "${expect}" == pass ]]; then ok "${label}"; else bad "${label} -- expected rejection, was accepted"; fi
   else
-    if [[ "${expect}" == reject ]]; then ok "${label}"; else
+    if [[ "${expect}" != reject ]]; then
       bad "${label} -- expected acceptance, was rejected: $(cat "${err_file}")"
+    elif [[ -n "${expect_message}" && "$(cat "${err_file}")" != *"${expect_message}"* ]]; then
+      bad "${label} -- rejected as expected, but stderr did not contain '${expect_message}': $(cat "${err_file}")"
+    else
+      ok "${label}"
     fi
   fi
 }
@@ -146,48 +153,48 @@ check "well-formed stageA manifest (with cutoverTool) passes" pass "${m_stagea}"
 # ── stageA missing cutoverTool -- must be rejected ──────────────────────────
 m_stagea_notool="${TEST_ROOT}/stagea-notool.json"
 make_manifest "${m_stagea_notool}" "$(task168_migrations_json)" stageA false
-check "stageA without images.cutoverTool is rejected" reject "${m_stagea_notool}"
+check "stageA without images.cutoverTool is rejected" reject "${m_stagea_notool}" '' "database.task168 schema invalid"
 
 # ── invalid stage value ─────────────────────────────────────────────────────
 m_badstage="${TEST_ROOT}/badstage.json"
 make_manifest "${m_badstage}" "$(task168_migrations_json)" stageC false
-check "database.task168.stage outside {stageA,stageB} is rejected" reject "${m_badstage}"
+check "database.task168.stage outside {stageA,stageB} is rejected" reject "${m_badstage}" '' "database.task168 schema invalid"
 
 # ── wrong migration count (10 instead of 11) ────────────────────────────────
 m_shortlist="${TEST_ROOT}/shortlist.json"
 make_manifest "${m_shortlist}" "$(task168_migrations_json | jq -c '.[:-1]')" stageB false
-check "database.task168.migrations with only 10 entries is rejected" reject "${m_shortlist}"
+check "database.task168.migrations with only 10 entries is rejected" reject "${m_shortlist}" '' "database.task168 schema invalid"
 
 # ── foreign migration name -- same length/order, one name swapped for a
 #    non-pinned value, isolating this from the separate ordering test below ─
 m_foreign="${TEST_ROOT}/foreign.json"
 make_manifest "${m_foreign}" "$(task168_migrations_json | jq -c '.[0].name = "20260101000000_not_a_real_migration"')" stageB false
-check "database.task168.migrations with a non-pinned name is rejected" reject "${m_foreign}"
+check "database.task168.migrations with a non-pinned name is rejected" reject "${m_foreign}" '' "database.task168 schema invalid"
 
 # ── out-of-order names (same 11 names, not ascending) ───────────────────────
 m_unordered="${TEST_ROOT}/unordered.json"
 make_manifest "${m_unordered}" "$(task168_migrations_json | jq -c '[.[1],.[0]] + .[2:]')" stageB false
-check "database.task168.migrations out of ascending order is rejected" reject "${m_unordered}"
+check "database.task168.migrations out of ascending order is rejected" reject "${m_unordered}" '' "database.task168 schema invalid"
 
 # ── malformed sha256 (not 64 lowercase hex) ─────────────────────────────────
 m_badsha="${TEST_ROOT}/badsha.json"
 make_manifest "${m_badsha}" "$(task168_migrations_json | jq -c '.[0].sha256 = "not-a-checksum"')" stageB false
-check "a non-hex64 migrations[].sha256 is rejected" reject "${m_badsha}"
+check "a non-hex64 migrations[].sha256 is rejected" reject "${m_badsha}" '' "database.task168 schema invalid"
 
 # ── empty rehearsal.evidence ─────────────────────────────────────────────────
 m_noevidence="${TEST_ROOT}/noevidence.json"
 jq '.database.task168.rehearsal.evidence = ""' "${m_stageb}" > "${m_noevidence}"
-check "empty database.task168.rehearsal.evidence is rejected" reject "${m_noevidence}"
+check "empty database.task168.rehearsal.evidence is rejected" reject "${m_noevidence}" '' "database.task168 schema invalid"
 
 # ── stageA cutoverTool digest malformed ─────────────────────────────────────
 m_badtool="${TEST_ROOT}/badtool.json"
 jq '.images.cutoverTool.digest = "sha256:bad"' "${m_stagea}" > "${m_badtool}"
-check "stageA images.cutoverTool.digest not hex64 is rejected" reject "${m_badtool}"
+check "stageA images.cutoverTool.digest not hex64 is rejected" reject "${m_badtool}" '' "database.task168 schema invalid"
 
 # ── stageA cutoverTool in the wrong ECR repository ──────────────────────────
 m_wrongrepo="${TEST_ROOT}/wrongrepo.json"
 jq --arg d "${TOOL_DIGEST}" '.images.cutoverTool.repository = "851725525576.dkr.ecr.ap-northeast-2.amazonaws.com/some-other-repo" | .images.cutoverTool.uri = ("851725525576.dkr.ecr.ap-northeast-2.amazonaws.com/some-other-repo@" + $d)' "${m_stagea}" > "${m_wrongrepo}"
-check "stageA cutoverTool outside teameet-prod-v1-api is rejected" reject "${m_wrongrepo}"
+check "stageA cutoverTool outside teameet-prod-v1-api is rejected" reject "${m_wrongrepo}" '' "database.task168 schema invalid"
 
 # ── migrations[] vs source tree (only checked when a source_dir is given) ──
 m_realmatch="${TEST_ROOT}/realmatch.json"
@@ -198,6 +205,19 @@ m_realmismatch="${TEST_ROOT}/realmismatch.json"
 make_manifest "${m_realmismatch}" "$(real_task168_migrations_json "$(printf 'f%.0s' {1..64})")" stageB false
 check "a tampered M11 checksum vs the real source tree is rejected when source_dir is given" reject "${m_realmismatch}" "${SOURCE_DIR}"
 check "the SAME tampered manifest passes when no source_dir is given (disk comparison skipped)" pass "${m_realmismatch}"
+
+# ── Critical 1 (Ruling R9): a stageA manifest whose source_dir is the real
+#    repo (which DOES ship M11, per C2's single-source-tree design) must
+#    pass -- M11's mere presence in a Stage A candidate's source is no
+#    longer a rejection reason. A tampered M11 checksum in that same
+#    stageA context must still be rejected.
+m_realmatch_stagea="${TEST_ROOT}/realmatch-stagea.json"
+make_manifest "${m_realmatch_stagea}" "$(real_task168_migrations_json)" stageA true
+check "stageA: migrations[] matching the real source tree (M11 present) passes with source_dir given" pass "${m_realmatch_stagea}" "${SOURCE_DIR}"
+
+m_realmismatch_stagea="${TEST_ROOT}/realmismatch-stagea.json"
+make_manifest "${m_realmismatch_stagea}" "$(real_task168_migrations_json "$(printf 'f%.0s' {1..64})")" stageA true
+check "stageA: a tampered M11 checksum vs the real source tree is rejected when source_dir is given" reject "${m_realmismatch_stagea}" "${SOURCE_DIR}"
 
 if [[ "${failures}" -ne 0 ]]; then
   echo "[task168-prod-manifest-validation] FAILED: ${failures} case(s)" >&2

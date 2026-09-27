@@ -50,13 +50,10 @@ validate_prod_release_manifest() {
     return 1
   fi
 
-  task168_names_json="$(printf '%s\n' "${PROD_TASK168_MIGRATION_NAMES[@]}" | jq -R . | jq -sc .)" || return 1
-
   jq -e \
     --arg sha "${expected_sha}" \
     --arg version "${expected_version}" \
     --arg registry "${expected_registry}" \
-    --argjson task168Names "${task168_names_json}" \
     '
       .schemaVersion == 1 and
       .environment == "production" and
@@ -75,25 +72,40 @@ validate_prod_release_manifest() {
       (.images.api.digest | test("^sha256:[0-9a-f]{64}$")) and
       (.images.web.digest | test("^sha256:[0-9a-f]{64}$")) and
       .images.api.uri == (.images.api.repository + "@" + .images.api.digest) and
-      .images.web.uri == (.images.web.repository + "@" + .images.web.digest) and
+      .images.web.uri == (.images.web.repository + "@" + .images.web.digest)
+    ' "${manifest_file}" >/dev/null || {
+    echo "[prod-release] Manifest schema invalid" >&2
+    return 1
+  }
+
+  # Own jq -e call (not folded into the check above) so a task168 schema
+  # violation gets its own diagnosable message instead of the same silent
+  # "Manifest schema invalid" the unrelated release/source/images fields
+  # share.
+  task168_names_json="$(printf '%s\n' "${PROD_TASK168_MIGRATION_NAMES[@]}" | jq -R . | jq -sc .)" || return 1
+  jq -e \
+    --arg registry "${expected_registry}" \
+    --argjson task168Names "${task168_names_json}" \
+    '
+      (.database.task168 == null) or
       (
-        (.database.task168 == null) or
+        (.database.task168.stage == "stageA" or .database.task168.stage == "stageB") and
+        (.database.task168.migrations | type == "array") and
+        ((.database.task168.migrations | map(.name)) == $task168Names) and
+        (.database.task168.migrations | all(.sha256 | test("^[0-9a-f]{64}$"))) and
+        (.database.task168.rehearsal.evidence | type == "string" and length > 0) and
         (
-          (.database.task168.stage == "stageA" or .database.task168.stage == "stageB") and
-          (.database.task168.migrations | type == "array") and
-          ((.database.task168.migrations | map(.name)) == $task168Names) and
-          (.database.task168.migrations | all(.sha256 | test("^[0-9a-f]{64}$"))) and
-          ((.database.task168.rehearsal.evidence // "") | length > 0) and
-          (
-            if .database.task168.stage == "stageA" then
-              .images.cutoverTool.repository == ($registry + "/teameet-prod-v1-api") and
-              (.images.cutoverTool.digest | test("^sha256:[0-9a-f]{64}$")) and
-              .images.cutoverTool.uri == (.images.cutoverTool.repository + "@" + .images.cutoverTool.digest)
-            else true end
-          )
+          if .database.task168.stage == "stageA" then
+            .images.cutoverTool.repository == ($registry + "/teameet-prod-v1-api") and
+            (.images.cutoverTool.digest | test("^sha256:[0-9a-f]{64}$")) and
+            .images.cutoverTool.uri == (.images.cutoverTool.repository + "@" + .images.cutoverTool.digest)
+          else true end
         )
       )
-    ' "${manifest_file}" >/dev/null || return 1
+    ' "${manifest_file}" >/dev/null || {
+    echo "[prod-release] database.task168 schema invalid" >&2
+    return 1
+  }
 
   if [[ -n "${source_dir}" ]] && jq -e '.database.task168 != null' "${manifest_file}" >/dev/null 2>&1; then
     local name manifest_sha actual_sha migration_path

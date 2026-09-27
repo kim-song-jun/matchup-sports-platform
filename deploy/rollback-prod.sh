@@ -91,23 +91,11 @@ if [[ "${active_sha}" != "${PROD_EXPECTED_ACTIVE_SHA}" ]]; then
   exit 1
 fi
 
-# Task168 M11 rollback guard. Any Stage A transition receipt anywhere in
-# this environment's task168 state means an M11 cutover has been attempted
-# here -- rolling back to a release whose OWN stored source tree predates
-# M11 would run application code that still expects the retired
-# tournament-fixture tables against a database that no longer has them.
-# Fails closed: a previous release with no retained stored source (pruned,
-# or never captured) is refused, not treated as "presumably fine".
-shopt -s nullglob
-task168_transition_receipts=("${PROD_RELEASE_STATE_DIR}/task168"/*/transition.json)
-shopt -u nullglob
-if [[ "${#task168_transition_receipts[@]}" -gt 0 ]]; then
-  previous_m11_dir="${PROD_SOURCE_RELEASES_DIR}/${previous_sha}/apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables"
-  if [[ ! -d "${previous_m11_dir}" ]]; then
-    echo "[prod-rollback] Refusing: a Task168 Stage A transition receipt exists but the rollback target ${previous_sha}'s stored source predates the M11 migration" >&2
-    exit 1
-  fi
-fi
+# Task168 M11 rollback guard -- shared with restore_active_release()'s own
+# automatic recovery path (deploy/prod-release-common.sh), since the same
+# hazard applies to both: an M11-migrated database restored/rolled back to a
+# release whose stored source predates M11 (fix round 1, Important 3).
+assert_task168_m11_restore_target_safe "${previous_sha}" || exit 1
 
 rollback_started=true
 restore_current_on_failure() {

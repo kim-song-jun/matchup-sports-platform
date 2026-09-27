@@ -93,6 +93,19 @@ had_active=false
 if [[ -f "${PROD_RELEASE_STATE_FILE}" ]]; then
   had_active=true
 fi
+
+# Ruling R10: prod already has an active release (state.json exists) as of
+# this writing, so had_active=false is not the realistic path here -- but a
+# staged (stageA/stageB) run combined with the first-ever legacy-conversion
+# deploy (no immutable state yet) is an untested, unsupported combination
+# (the ERR trap's staged-failure branch below assumes an existing active
+# release to eventually recover from). Fail fast rather than silently
+# behaving like an ordinary first deploy.
+if [[ -n "${task168_stage}" && "${had_active}" == false ]]; then
+  echo "[prod-deploy] Task168 ${task168_stage} requires an existing active release (had_active=false) -- refusing. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+  exit 1
+fi
+
 runtime_mutated=false
 source_activated=false
 legacy_api_image=''
@@ -325,7 +338,12 @@ if [[ "${task168_stage}" == stageA || "${task168_stage}" == stageB ]]; then
     echo "[prod-deploy] Task168 ${task168_stage}: candidate API's DATABASE_URL is unavailable" >&2
     false
   }
-  export PROD_TASK168_DATABASE_URL="${task168_database_url}"
+  # Not exported: prod-task168.sh's functions are `source`d into this same
+  # shell (never a separate process), so a plain variable is already
+  # visible to them (subshells fork this process's image regardless of
+  # export). Exporting it would only widen exposure to any child process
+  # spawned later in this script for no benefit.
+  PROD_TASK168_DATABASE_URL="${task168_database_url}"
 fi
 
 if [[ "${task168_stage}" == stageA ]]; then

@@ -232,8 +232,12 @@ elif [[ "$(migrate_deploy_count)" != 0 ]]; then
   echo "(i) FAILED: prisma migrate deploy was called despite the guard refusing" >&2
   cat "${CALL_LOG}" >&2
   failures=$((failures + 1))
+elif [[ "${SEGMENT_OUTPUT}" != *"docs/ops/prod-task168-transition-runbook.md"* ]]; then
+  echo "(i) FAILED: refusal message does not point at the transition runbook" >&2
+  echo "${SEGMENT_OUTPUT}" >&2
+  failures=$((failures + 1))
 else
-  echo "[(i)] OK: guard refused (M11 in source, not applied in prod), migrate deploy call count 0"
+  echo "[(i)] OK: guard refused (M11 in source, not applied in prod), migrate deploy call count 0, runbook path in the message"
 fi
 
 # ── (ii) M11 in source AND already applied in prod with the matching
@@ -293,8 +297,12 @@ elif grep -qE 'network ls|psql' "${CALL_LOG}"; then
   echo "(iv) FAILED: the pin check is supposed to fail BEFORE any DB/network call, but it touched docker network/psql:" >&2
   cat "${CALL_LOG}" >&2
   failures=$((failures + 1))
+elif [[ "${SEGMENT_OUTPUT}" != *"docs/ops/prod-task168-transition-runbook.md"* ]]; then
+  echo "(iv) FAILED: refusal message does not point at the transition runbook" >&2
+  echo "${SEGMENT_OUTPUT}" >&2
+  failures=$((failures + 1))
 else
-  echo "[(iv)] OK: guard refused (M11 source checksum does not match the pinned value) before touching docker network/psql, migrate deploy call count 0"
+  echo "[(iv)] OK: guard refused (M11 source checksum does not match the pinned value) before touching docker network/psql, migrate deploy call count 0, runbook path in the message"
 fi
 
 if [[ "${failures}" -ne 0 ]]; then
@@ -443,7 +451,7 @@ old = '''  if [[ "${query_rc}" -ne 0 ]]; then
     # `return 1` below, but surfacing the actual psql/docker error here
     # means an operator sees WHY (network unreachable, auth failure, ...)
     # instead of a diagnosis that reads identically to "M11 truly missing".
-    echo "[prod-deploy] Task168 M11 guard: could not query prod's migration ledger. Refusing to run prisma migrate deploy." >&2
+    echo "[prod-deploy] Task168 M11 guard: could not query prod's migration ledger. Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     cat "${psql_stderr}" >&2
     rm -f "${psql_stderr}"
     return 1
@@ -484,7 +492,7 @@ import sys
 src_path, out_path = sys.argv[1], sys.argv[2]
 src = open(src_path, encoding='utf-8').read()
 old = '''  if [[ "${m11_source_sha}" != "${m11_pinned_sha}" ]]; then
-    echo "[prod-deploy] Task168 M11 guard: candidate source's M11 checksum (${m11_source_sha}) does not match the pinned value (${m11_pinned_sha}). Refusing to run prisma migrate deploy." >&2
+    echo "[prod-deploy] Task168 M11 guard: candidate source's M11 checksum (${m11_source_sha}) does not match the pinned value (${m11_pinned_sha}). Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     return 1
   fi
 '''

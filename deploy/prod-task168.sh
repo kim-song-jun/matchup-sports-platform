@@ -633,11 +633,15 @@ task168_stage_a() {
     actual="$(_sha256_file "${path}")" || return 1
     [[ "${actual}" == "${expected}" ]] || { echo "[prod-task168] raw migration checksum mismatch: ${name}" >&2; return 1; }
   done
-  # Stage A must never carry the M11 folder -- that is Stage B's exclusive step.
-  [[ ! -e "$(_migration_sql_path "${PROD_TASK168_M11}")" ]] || {
-    echo "[prod-task168] Stage A source must not include M11 (${PROD_TASK168_M11})" >&2
-    return 1
-  }
+  # Ruling R9 (fix round 1): C2 runs Stage A and Stage B off the SAME dev
+  # source tree, so PROD_SOURCE_DIR legitimately carries the M11 folder
+  # during Stage A too -- rejecting on its mere presence (the alpha-derived
+  # assumption this runner used to make) would refuse every real Stage A
+  # run. The real safety invariant lives in _stage_a_run_migrations()
+  # instead: its throwaway migration tree is built name-by-name (pre-M1 +
+  # M1 + M8/M10 or M8/M9/M10) and never calls copy_migration for M11, so
+  # Stage A's own `prisma migrate deploy` physically cannot see it
+  # regardless of what PROD_SOURCE_DIR contains.
 
   local release_sha api_image tool_image db_id state_dir report_dir state
   release_sha="$(_manifest_field '.release.sha')" || return 1

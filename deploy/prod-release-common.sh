@@ -242,6 +242,33 @@ wait_for_prod_health_contract() {
   done
 }
 
+# Task168 M11 restore/rollback-target guard, shared by rollback-prod.sh and
+# restore_active_release()'s automatic recovery path (Task 175 Task 4 fix
+# round 1, Important 3). If Stage B runs M11's `prisma migrate deploy` and
+# then fails at verify/health BEFORE promoting, `active` in state.json is
+# STILL the pre-M11 release even though the database itself now has M11
+# applied. A LATER, unrelated ordinary deploy that fails at its own health
+# check would otherwise have restore_active_release() redeploy that stale
+# pre-M11-aware active release's images against the now-post-M11 database --
+# exactly the same hazard rollback-prod.sh already guards against for an
+# explicit rollback target. Any Stage A transition receipt anywhere in this
+# environment's task168 state means an M11 cutover has been attempted here;
+# a target release with no retained stored source (pruned, or never
+# captured) fails closed rather than being treated as "presumably fine".
+assert_task168_m11_restore_target_safe() {
+  local target_sha="$1"
+  local receipts=()
+  shopt -s nullglob
+  receipts=("${PROD_RELEASE_STATE_DIR}/task168"/*/transition.json)
+  shopt -u nullglob
+  [[ "${#receipts[@]}" -gt 0 ]] || return 0
+  local target_m11_dir="${PROD_SOURCE_RELEASES_DIR}/${target_sha}/apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables"
+  [[ -d "${target_m11_dir}" ]] || {
+    echo "[prod-release] Refusing: a Task168 Stage A transition receipt exists but the restore/rollback target ${target_sha}'s stored source predates the M11 migration. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+    return 1
+  }
+}
+
 restore_active_release() {
   local active_tmp
   local active_sha
@@ -252,6 +279,7 @@ restore_active_release() {
   active_checksum="$(jq -er '.activeManifestSha256' "${PROD_RELEASE_STATE_FILE}")" || return 1
   validate_stored_prod_manifest "${active_tmp}" "${PROD_ECR_REGISTRY}" "${active_checksum}" || return 1
   active_sha="$(jq -er '.release.sha' "${active_tmp}")" || return 1
+  assert_task168_m11_restore_target_safe "${active_sha}" || return 1
   activate_prod_release_source "${active_sha}" || return 1
   load_prod_release_manifest "${active_tmp}" || return 1
   pull_release_images || return 1
@@ -294,7 +322,7 @@ assert_task168_m11_guard() {
   # tampered checksum (e.g. a prior guard-bypassed deploy), would pass the
   # source-vs-ledger check even though neither side is the real migration.
   if [[ "${m11_source_sha}" != "${m11_pinned_sha}" ]]; then
-    echo "[prod-deploy] Task168 M11 guard: candidate source's M11 checksum (${m11_source_sha}) does not match the pinned value (${m11_pinned_sha}). Refusing to run prisma migrate deploy." >&2
+    echo "[prod-deploy] Task168 M11 guard: candidate source's M11 checksum (${m11_source_sha}) does not match the pinned value (${m11_pinned_sha}). Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     return 1
   fi
   database_url="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')" || return 1
@@ -330,14 +358,14 @@ assert_task168_m11_guard() {
     # `return 1` below, but surfacing the actual psql/docker error here
     # means an operator sees WHY (network unreachable, auth failure, ...)
     # instead of a diagnosis that reads identically to "M11 truly missing".
-    echo "[prod-deploy] Task168 M11 guard: could not query prod's migration ledger. Refusing to run prisma migrate deploy." >&2
+    echo "[prod-deploy] Task168 M11 guard: could not query prod's migration ledger. Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     cat "${psql_stderr}" >&2
     rm -f "${psql_stderr}"
     return 1
   fi
   rm -f "${psql_stderr}"
   if [[ "${m11_ledger_checksum}" != "${m11_source_sha}" ]]; then
-    echo "[prod-deploy] Task168 M11 guard: candidate source includes the retirement migration (checksum ${m11_source_sha}) but prod's ledger does not show it as an applied row. Refusing to run prisma migrate deploy." >&2
+    echo "[prod-deploy] Task168 M11 guard: candidate source includes the retirement migration (checksum ${m11_source_sha}) but prod's ledger does not show it as an applied row. Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     return 1
   fi
   echo "[prod-deploy] Task168 M11 guard: prod ledger already shows M11 applied (checksum ${m11_ledger_checksum})"

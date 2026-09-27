@@ -1,0 +1,56 @@
+[
+  {
+    "viewportName": "mobile",
+    "kind": "admin",
+    "createdId": "08f715e8-9ef9-47f2-be2b-d47d3067bdfe",
+    "url": "http://127.0.0.1:3149/team-matches/08f715e8-9ef9-47f2-be2b-d47d3067bdfe",
+    "errors": [],
+    "failures": [],
+    "overflow": false
+  },
+  {
+    "viewportName": "mobile",
+    "kind": "regular",
+    "createdId": "0d6cc49c-1f7c-46f2-a5ca-649d8b268627",
+    "url": "http://127.0.0.1:3149/team-matches/0d6cc49c-1f7c-46f2-a5ca-649d8b268627/edit",
+    "errors": [],
+    "failures": [],
+    "overflow": false
+  },
+  {
+    "viewportName": "tablet",
+    "kind": "admin",
+    "createdId": "6ca0d794-f393-4e7a-90e0-a3b1e73d2a6f",
+    "url": "http://127.0.0.1:3149/team-matches/6ca0d794-f393-4e7a-90e0-a3b1e73d2a6f",
+    "errors": [],
+    "failures": [],
+    "overflow": false
+  },
+  {
+    "viewportName": "tablet",
+    "kind": "regular",
+    "createdId": "a42a9c51-5750-4538-bd71-2eb2cfad309c",
+    "url": "http://127.0.0.1:3149/team-matches/a42a9c51-5750-4538-bd71-2eb2cfad309c/edit",
+    "errors": [],
+    "failures": [],
+    "overflow": false
+  },
+  {
+    "viewportName": "desktop",
+    "kind": "admin",
+    "createdId": "46c57889-792a-4aad-8282-8ed8f5a7b6c1",
+    "url": "http://127.0.0.1:3149/team-matches/46c57889-792a-4aad-8282-8ed8f5a7b6c1",
+    "errors": [],
+    "failures": [],
+    "overflow": false
+  },
+  {
+    "viewportName": "desktop",
+    "kind": "regular",
+    "createdId": "0086fffe-d8d5-4e84-b8ef-a60e45fed908",
+    "url": "http://127.0.0.1:3149/team-matches/0086fffe-d8d5-4e84-b8ef-a60e45fed908/edit",
+    "errors": [],
+    "failures": [],
+    "overflow": false
+  }
+]

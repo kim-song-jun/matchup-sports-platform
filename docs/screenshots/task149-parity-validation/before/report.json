@@ -1,0 +1,50 @@
+[
+  {
+    "viewportName": "mobile",
+    "kind": "admin",
+    "url": "http://127.0.0.1:3149/admin/team-matches/new",
+    "errors": [],
+    "failures": [],
+    "overflow": false
+  },
+  {
+    "viewportName": "mobile",
+    "kind": "regular",
+    "url": "http://127.0.0.1:3149/team-matches/new/place-time",
+    "errors": [],
+    "failures": [],
+    "overflow": false
+  },
+  {
+    "viewportName": "tablet",
+    "kind": "admin",
+    "url": "http://127.0.0.1:3149/admin/team-matches/new",
+    "errors": [],
+    "failures": [],
+    "overflow": false
+  },
+  {
+    "viewportName": "tablet",
+    "kind": "regular",
+    "url": "http://127.0.0.1:3149/team-matches/new/place-time",
+    "errors": [],
+    "failures": [],
+    "overflow": false
+  },
+  {
+    "viewportName": "desktop",
+    "kind": "admin",
+    "url": "http://127.0.0.1:3149/admin/team-matches/new",
+    "errors": [],
+    "failures": [],
+    "overflow": false
+  },
+  {
+    "viewportName": "desktop",
+    "kind": "regular",
+    "url": "http://127.0.0.1:3149/team-matches/new/place-time",
+    "errors": [],
+    "failures": [],
+    "overflow": false
+  }
+]

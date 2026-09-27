@@ -60,7 +60,7 @@ export default async function TournamentMatchPage({
           { name: `${match.home?.teamName ?? '미정'} vs ${match.away?.teamName ?? '미정'}`, path: `/tournaments/${id}/matches/${fixtureId}` },
         ])}
       />
-      <MatchPageClient tournamentId={id} fixtureId={fixtureId} />
+      <MatchPageClient tournamentId={id} fixtureId={fixtureId} seed={match} />
     </>
   );
 }

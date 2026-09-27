@@ -3767,12 +3767,18 @@ const V1_TOURNAMENT_LIVE_POLL_INTERVAL_MS = PUBLIC_LIVE_POLL_INTERVAL_MS;
  * `/tournaments/:id/bracket`(진행 중 대회의 순위·대진표 실시간 갱신이 실제로 필요한
  * 유일한 소비처)만 명시적으로 켠다.
  */
-export function useV1Tournament(id: string, options?: { livePolling?: boolean }) {
+export function useV1Tournament(
+  id: string,
+  options?: { livePolling?: boolean; seed?: V1TournamentDetail | null },
+) {
   const livePolling = options?.livePolling ?? false;
   return useQuery({
     queryKey: v1Keys.tournament(id),
     queryFn: () => v1Get<V1TournamentDetail>(`/tournaments/${id}`),
     enabled: !!id,
+    // 서버 page 가 이미 받은 공개 응답을 첫 화면(서버 HTML 포함)에 쓴다. 뷰어별 필드가 없는
+    // 응답이라 그대로 써도 되고, 클라이언트는 곧바로 다시 받아 교체한다.
+    placeholderData: options?.seed ?? undefined,
     refetchInterval: livePolling
       ? (query: { state: { data?: V1TournamentDetail } }) => {
           // `f.status`(원본 컬럼)가 아니라 `f.liveStatus`(V1Game.state 파생)를 본다.

@@ -22,6 +22,12 @@ export type RouteChromeConfig = {
   desktopHead?: boolean;
   centerTitle?: boolean;
   titleAsHeading?: boolean;
+  /**
+   * 페이지가 모든 폭에서 스크린리더에 읽히는 자기 h1 을 그린다(sr-only 포함) — 셸은 제목을 h1 로 그리지 않는다(모양은 같다).
+   * 셸의 desktop head 는 1024px 미만에서 display:none 이라, 제목을 셸에만 두면 모바일
+   * 스크린리더에 h1 이 없다. 둘 다 h1 이면 크롤러가 받는 HTML 에 h1 이 두 개가 된다.
+   */
+  pageOwnsHeading?: boolean;
 };
 
 export type RouteChromeEntry = { pattern: string; chrome: RouteChromeConfig };

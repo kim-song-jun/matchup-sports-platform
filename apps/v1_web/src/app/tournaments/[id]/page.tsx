@@ -41,7 +41,7 @@ export default async function TournamentDetailPage({ params }: { params: Promise
           { name: tournament.title, path: `/tournaments/${id}` },
         ])}
       />
-      <TournamentDetailPageClient tournamentId={id} />
+      <TournamentDetailPageClient tournamentId={id} seed={tournament} />
     </>
   );
 }

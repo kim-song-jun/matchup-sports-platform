@@ -41,6 +41,28 @@ function primeValidOAuthState() {
   searchParamsValue = new URLSearchParams({ code: 'auth-code', state: 'state-123' });
 }
 
+describe('KakaoCallbackClient address bar', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+  });
+
+  it('removes the OAuth code and state from the URL before analytics can read it', async () => {
+    // Given the kauth redirect landed with the one-time code in the address bar
+    window.history.replaceState(null, '', '/callback/kakao?code=auth-code&state=state-123');
+    primeValidOAuthState();
+    api.v1Post.mockResolvedValue({ session: { userId: 'u1', userEmail: null }, next: { route: '/home' } });
+
+    // When
+    render(<KakaoCallbackClient />);
+
+    // Then the exchange still gets the code, but the address bar no longer carries it
+    await waitFor(() => expect(api.v1Post).toHaveBeenCalledWith('/auth/kakao', expect.objectContaining({ code: 'auth-code' })));
+    expect(window.location.pathname).toBe('/callback/kakao');
+    expect(window.location.search).toBe('');
+  });
+});
+
 describe('KakaoCallbackClient GA events', () => {
   beforeEach(() => {
     vi.clearAllMocks();

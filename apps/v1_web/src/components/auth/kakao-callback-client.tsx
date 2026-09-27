@@ -45,6 +45,10 @@ export function KakaoCallbackClient() {
 
     const code = searchParams.get('code');
     const providerError = searchParams.get('error');
+    const returnedState = searchParams.get('state');
+    // Analytics reports document.location with every hit, so the OAuth code and state
+    // must leave the address bar before gtag.js loads and reads it.
+    window.history.replaceState(window.history.state, '', window.location.pathname);
 
     if (providerError || !code) {
       trackEvent('login_failed', { method: 'kakao', reason: providerError || 'missing_code' });
@@ -52,7 +56,6 @@ export function KakaoCallbackClient() {
       return;
     }
 
-    const returnedState = searchParams.get('state');
     const storedState = getStoredKakaoOAuthState();
 
     if (!returnedState || !storedState || returnedState !== storedState) {

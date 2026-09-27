@@ -86,12 +86,17 @@ ultraplan/runs/e2e-analyzer*/
 
 # Ad-hoc capture/QA output dirs (recurring stale-artifact cleanup, 2026-09-27) —
 # capture scripts keep re-creating these; do not track new dumps by default.
+# Rooted with a leading "/" on purpose: an unanchored "screenshots/" matches
+# that name at ANY depth (docs/screenshots/, apps/v1_web/public/screenshots/,
+# tests/ui-scenarios/screenshots/ would all have been caught too — verified,
+# see Fix round 1 in pr2-report.md). Root-anchoring keeps this to exactly the
+# top-level dirs we actually emptied.
 # tests/ui-scenarios/screenshots/ is deliberately NOT listed here: it's read as
 # input by scripts/qa/run-e2e-analyzer.mjs, not just written to.
-screenshots/
-.screenshots/
-docs/visual-qa/*
-!docs/visual-qa/manual-v2
+/screenshots/
+/.screenshots/
+/docs/visual-qa/*
+!/docs/visual-qa/manual-v2/
 
 # autoqa runtime artifacts
 .autoqa/runs/

@@ -93,11 +93,17 @@ export function usePublicTournamentSchedule(
  * fixture/tournament all surface as the same 404 here (`react-query`
  * `isError`); the caller must not attempt to distinguish them.
  */
-export function usePublicMatch(tournamentId: string, fixtureId: string) {
+export function usePublicMatch(
+  tournamentId: string,
+  fixtureId: string,
+  options?: { seed?: PublicMatchDetail | null },
+) {
   return useQuery({
     queryKey: publicGameRecordsKeys.match(tournamentId, fixtureId),
     queryFn: () => v1Get<PublicMatchDetail>(`/tournaments/${tournamentId}/matches/${fixtureId}`),
     enabled: Boolean(tournamentId) && Boolean(fixtureId),
+    // 서버 page 가 404 판정용으로 이미 받은 공개 응답 — 첫 화면(서버 HTML 포함)에 쓴다.
+    placeholderData: options?.seed ?? undefined,
     retry: false,
     refetchInterval: (query) => (query.state.data?.status === 'live' ? LIVE_POLL_INTERVAL_MS : false),
   });

@@ -22,6 +22,8 @@ export default async function TournamentResultsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  if (!await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(id)}`)) notFound();
-  return <ResultsPageClient tournamentId={id} />;
+  const tournament = await fetchPublicV1<V1TournamentDetail>(`/tournaments/${encodeURIComponent(id)}`);
+  if (!tournament) notFound();
+  // 404 판정에 받은 응답을 첫 화면으로 넘긴다 — 크롤러가 받는 서버 HTML 에 실제 내용이 들어간다.
+  return <ResultsPageClient tournamentId={id} seed={tournament} />;
 }

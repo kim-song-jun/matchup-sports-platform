@@ -8,6 +8,7 @@ import { AttestRequestsSection } from '@/components/public-game-records/attest-r
 import { ClaimMyRecordSection } from '@/components/public-game-records/claim-my-record';
 import { TournamentInquirySection } from '@/components/tournaments/tournament-inquiry-section';
 import { useCurrentHref } from '@/components/v1-ui/use-current-href';
+import type { PublicMatchDetail } from '@/components/public-game-records/types';
 
 function MatchSkeleton() {
   return (
@@ -20,12 +21,21 @@ function MatchSkeleton() {
 
 /** 공개 경기 기록 화면. 히든/존재하지 않는 픽스처를 같은 404로 처리하는 계약을
  * 부모 page.tsx 의 notFound() 가 지고, public-game-records.test.tsx 가 고정한다. */
-export function MatchPageClient({ tournamentId, fixtureId }: { tournamentId: string; fixtureId: string }) {
-  const { data, isLoading, isError, error, refetch } = usePublicMatch(tournamentId, fixtureId);
+export function MatchPageClient({
+  tournamentId,
+  fixtureId,
+  seed,
+}: {
+  tournamentId: string;
+  fixtureId: string;
+  seed?: PublicMatchDetail | null;
+}) {
+  const { data, isPending, isError, error, refetch } = usePublicMatch(tournamentId, fixtureId, { seed });
   // 경기 기록의 팀·다음 경기 링크가 이 화면(받은 출처 포함)으로 돌아오게 한다.
   const currentHref = useCurrentHref();
 
-  if (isLoading) {
+  // isPending — 서버 렌더에서 isLoading 은 false 라 오류 분기로 떨어진다(대회 상세와 같다).
+  if (isPending) {
     return (
               <MatchSkeleton />
       );

@@ -360,7 +360,7 @@ export function BracketScheduleTab({
   // schedule-page-client.tsx와 동일한 데이터 배선(usePublicTournamentSchedule 페이지
   // 합치기 + 로딩/에러 분기) — AppChrome 래핑만 없는 얇은 버전이라 별도 훅으로
   // 추출하지 않았다(두 곳뿐이라 공용 추상화를 새로 만드는 게 오히려 과설계).
-  const { data, isLoading, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
+  const { data, isPending, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
     usePublicTournamentSchedule(tournamentId);
   // `/schedule`의 권한 기능도 통합 허브인 `/bracket`에서 동일하게 제공한다. 공개 일정
   // 조회와 분리된 인증 전용 요청이라 비로그인·비참가자는 빈 상태로 끝나고, 참가팀
@@ -369,7 +369,8 @@ export function BracketScheduleTab({
   // 리그는 조회조차 하지 않는다 — 위 섹션 주석 참조.
   const playerRecords = usePublicTournamentPlayerRecords(tournamentId, { enabled: !isRegularLeague });
 
-  if (isLoading) {
+  // isPending — 서버 렌더에서 isLoading 은 false 라 아래 오류 분기로 떨어진다(대회 상세와 같다).
+  if (isPending) {
     return (
       <div style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div className="tm-skeleton" style={{ height: 120, borderRadius: 'var(--radius-control)' }} />
@@ -758,16 +759,23 @@ function BracketPageSkeleton() {
 }
 
 /* ── 진입점 ── */
-export function BracketPageClient({ tournamentId }: { tournamentId: string }) {
+export function BracketPageClient({
+  tournamentId,
+  seed,
+}: {
+  tournamentId: string;
+  seed?: V1TournamentDetail | null;
+}) {
   // §B-9 — 이 화면(순위·대진표)은 useV1Tournament를 쓰는데 그 훅은 기본적으로
   // 폴링하지 않는다. use-public-game-records.ts의 공개 일정 폴링(LIVE 픽스처가 있을
   // 때만 8초)과 같은 부하 모델을 이 훅에도 opt-in으로 적용했다(hooks/use-v1-api.ts
   // 참고) — "순위 · 대진표" 탭(useV1Tournament 소비)도 "경기 일정" 탭
   // (usePublicTournamentSchedule, 자체적으로 이미 이 규칙을 따름)과 동일하게 LIVE
   // 경기가 있을 때만 갱신된다.
-  const { data, isLoading, isError, error, refetch } = useV1Tournament(tournamentId, { livePolling: true });
+  const { data, isPending, isError, error, refetch } = useV1Tournament(tournamentId, { livePolling: true, seed });
 
-  if (isLoading) {
+  // isPending — 서버 렌더에서 isLoading 은 false 라 오류 분기로 떨어진다(대회 상세와 같다).
+  if (isPending) {
     return <BracketPageSkeleton />;
   }
 

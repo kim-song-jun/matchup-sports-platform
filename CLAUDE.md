@@ -16,6 +16,9 @@
 | `dev` push | `deploy-alpha.yml` | **alpha.teameet.co.kr** | 없음 (즉시 실배포) |
 | `main` push | `deploy.yml`의 `build-images` + `deploy` job | **teameet.co.kr (프로덕션)** | `environment: production` |
 
+- **프로덕션 DB 전환(Task168 Stage A/B)처럼 승격 뒤 추가 절차가 필요한 배포는
+  `docs/ops/prod-task168-transition-runbook.md` 를 따른다** — `deploy.yml`/`deploy-prod.sh` 의
+  실패 메시지가 이 문서를 직접 가리킨다.
 - **모든 작업은 `dev`에서 시작한다.** 작업 브랜치·PR의 base는 항상 `dev`. 기능의 "완료" = dev 머지.
 - **`dev → main` 승격은 사용자만 한다.** 에이전트는 `gh pr merge`·`git push origin dev:main` 등
   **어떤 방식으로도 직접 실행하지 않는다.** 승격이 필요해 보이면 사용자에게 알리고 멈춘다.

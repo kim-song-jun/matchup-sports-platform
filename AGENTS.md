@@ -359,6 +359,8 @@ The sections below fill project-specific gaps while preserving curated content a
   - `dev` push → `deploy-alpha.yml` → **alpha.teameet.co.kr**, 승인 게이트 없음.
   - `main` push → `deploy.yml`의 `build-images` + `deploy` job → **teameet.co.kr(프로덕션)**,
     `environment: production` 승인 게이트 있음. 2026-07-27까지 6회 성공한 살아 있는 경로다.
+- **승격 뒤 추가 절차가 필요한 배포(Task168 Stage A/B DB 전환 등)는
+  `docs/ops/prod-task168-transition-runbook.md` 참고** — 실패 메시지가 이 문서를 직접 가리킨다.
 - **모든 작업은 `dev`에서만.** 작업 브랜치·PR의 base는 항상 `dev`. 기능의 "완료" = dev 머지.
 - **`dev` → `main` 승격은 사용자만 한다.** 에이전트는 `git push`/`gh pr merge`/
   `gh pr create --base main` 어느 방식으로도 **직접 실행하지 않는다** — 필요해 보이면 사용자에게

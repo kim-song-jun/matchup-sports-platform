@@ -133,8 +133,12 @@ function nullableString(value: unknown, field: string): string | null {
   return value.trim();
 }
 
+function isInquiryCategory(value: string): value is V1InquiryCategory {
+  return Object.hasOwn(CATEGORY_LABELS, value);
+}
+
 function buildSlackMessage(payload: InquirySlackNotificationPayload, adminUrl: string) {
-  const category = CATEGORY_LABELS[payload.category as V1InquiryCategory] ?? payload.category;
+  const category = isInquiryCategory(payload.category) ? CATEGORY_LABELS[payload.category] : payload.category;
   const related = payload.relatedType && payload.relatedId
     ? `${payload.relatedType} / ${payload.relatedId}`
     : '없음';

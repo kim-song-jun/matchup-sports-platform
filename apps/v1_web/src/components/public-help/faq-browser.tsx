@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { PublicFaqList, PublicResultCount } from '@/components/public-site';
 import type { FaqCategory, FaqCategoryId, FaqItem } from '@/lib/public-content/faq';
 import { faqCategorySectionId } from '@/lib/public-site/help-search';
+import { locationHashId } from '@/lib/public-site/location-hash';
 
 type Filter = 'all' | FaqCategoryId;
 
@@ -30,7 +31,7 @@ export function FaqBrowser({
   // 필터로 가려진 질문을 딥링크(#id)로 가리키면 전체로 되돌려 그 질문이 보이게 한다.
   useEffect(() => {
     const revealHashTarget = () => {
-      const id = decodeURIComponent(window.location.hash.slice(1));
+      const id = locationHashId(window.location.hash);
       if (!id) return;
       const target = document.getElementById(id);
       if (target?.closest('[hidden]')) setFilter('all');

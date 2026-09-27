@@ -4,6 +4,7 @@
 import { IsRestoringProvider, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { parseJsonLd, stripScriptTags } from '@/test/html-sanitize';
 
 const searchParamsState = vi.hoisted(() => ({ value: new URLSearchParams() }));
 vi.mock('next/navigation', () => ({
@@ -48,7 +49,7 @@ async function serverHtml(query = ''): Promise<string> {
   );
 }
 
-const markup = (html: string) => html.replace(/<script[\s\S]*?<\/script>/g, '');
+const markup = stripScriptTags;
 
 describe('/events 서버 렌더', () => {
   afterEach(() => {
@@ -64,8 +65,8 @@ describe('/events 서버 렌더', () => {
 
     expect(markup(html)).toContain('여름 풋살 컵');
     expect(markup(html)).toContain('/tournaments/campaigns/summer-cup');
-    const ld = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/)?.[1] ?? '{}');
-    expect(ld.itemListElement.map((entry: { name: string }) => entry.name)).toEqual(['여름 풋살 컵']);
+    const ld = parseJsonLd<{ itemListElement: Array<{ name: string }> }>(html) ?? { itemListElement: [] };
+    expect(ld.itemListElement.map((entry) => entry.name)).toEqual(['여름 풋살 컵']);
   });
 
   it('API 가 실패하면 "등록된 이벤트가 없어요" 대신 로딩 스켈레톤으로 넘긴다', async () => {

@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { V1Match, V1Sport, V1Team, V1TeamMatch } from '@/types/api';
+import { parseJsonLd, stripScriptTags } from '@/test/html-sanitize';
 
 const searchParamsState = vi.hoisted(() => ({ value: new URLSearchParams() }));
 const pathnameState = vi.hoisted(() => ({ value: '/' }));
@@ -118,18 +119,14 @@ async function shellHtml(route: string, page: ListPage): Promise<string> {
 }
 
 function h1Texts(html: string): string[] {
-  return [...markup(html).matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => m[1].replace(/<[^>]+>/g, ''));
+  return [...stripScriptTags(html).matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)].map((m) => m[1].replace(/<[^>]+>/g, ''));
 }
 
 /** JSON-LD 는 따로 본다 — 본문 검사가 스크립트 안의 값으로 통과하면 안 된다. */
-function markup(html: string): string {
-  return html.replace(/<script[\s\S]*?<\/script>/g, '');
-}
+const markup = stripScriptTags;
 
 function itemList(html: string): Array<{ name: string; url: string }> | null {
-  const match = html.match(/<script type="application\/ld\+json">(.*?)<\/script>/);
-  if (!match) return null;
-  return (JSON.parse(match[1]) as { itemListElement: Array<{ name: string; url: string }> }).itemListElement;
+  return parseJsonLd<{ itemListElement: Array<{ name: string; url: string }> }>(html)?.itemListElement ?? null;
 }
 
 /** 카드가 그린 상세 링크를 화면 순서대로. */

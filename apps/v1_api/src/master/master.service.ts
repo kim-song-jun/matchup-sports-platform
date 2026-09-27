@@ -199,16 +199,15 @@ export class MasterService {
   }
 }
 
-function normalizeRegionName(value?: string | null) {
+// Kakao 의 region_1depth_name(예: '서울특별시'·'경기도'·'제주특별자치도')을 v1_regions.level=1
+// 의 짧은 이름('서울'·'경기'·'제주')과 맞춘다. 접미사 하나만 지워도 두 지역 모두 이미 짧은
+// 이름이 되므로 별도 특수 케이스가 필요 없다.
+export function normalizeRegionName(value?: string | null) {
   if (!value) return null;
-  return value
-    .trim()
-    .replace(/특별시$|광역시$|특별자치시$|특별자치도$|자치도$|도$/u, '')
-    .replace(/^서울$/u, '서울')
-    .replace(/^경기$/u, '경기');
+  return value.trim().replace(/특별시$|광역시$|특별자치시$|특별자치도$|자치도$|도$/u, '');
 }
 
-function normalizeDistrictName(value?: string | null) {
+export function normalizeDistrictName(value?: string | null) {
   const trimmed = value?.trim();
   if (!trimmed) return null;
   const cityPart = trimmed.split(/\s+/u)[0];

@@ -26,9 +26,7 @@
     "v1:db:cleanup:demo": "pnpm --filter v1_api db:cleanup:demo",
     "v1:test": "pnpm --filter v1_api test && pnpm --filter v1_web test",
     "test:e2e:v1": "pnpm exec playwright test --config=e2e/v1.config.ts",
-    "test:all": "pnpm run v1:test && pnpm run test:e2e:v1",
-    "qa:visual:audit:manifest": "node scripts/qa/run-visual-audit.mjs manifest",
-    "qa:visual:audit:capture": "node scripts/qa/run-visual-audit.mjs capture"
+    "test:all": "pnpm run v1:test && pnpm run test:e2e:v1"
   },
   "packageManager": "pnpm@9.15.4",
   "engines": {

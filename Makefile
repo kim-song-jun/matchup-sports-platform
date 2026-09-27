@@ -214,43 +214,6 @@ test-v1: ## Run v1 backend + frontend tests
 	@pnpm --filter v1_api test
 	@pnpm --filter v1_web test
 
-.PHONY: qa-visual-audit-manifest
-qa-visual-audit-manifest: ## Generate visual audit manifest (set RUN/BATCH/FAMILY/LIMIT)
-	@node scripts/qa/run-visual-audit.mjs manifest \
-		$(if $(RUN),--run-id $(RUN),) \
-		$(if $(BATCH),--batch '$(BATCH)',) \
-		$(if $(FAMILY),--family '$(FAMILY)',) \
-		$(if $(ROUTE),--route '$(ROUTE)',) \
-		$(if $(LIMIT),--limit $(LIMIT),) \
-		$(EXTRA)
-
-.PHONY: qa-visual-audit-capture
-qa-visual-audit-capture: ## Capture visual audit screenshots (set RUN/BATCH/FAMILY/VIEWPORTS/STATES/LIMIT/HEADED=1)
-	@node scripts/qa/run-visual-audit.mjs capture \
-		$(if $(RUN),--run-id $(RUN),) \
-		$(if $(BATCH),--batch '$(BATCH)',) \
-		$(if $(FAMILY),--family '$(FAMILY)',) \
-		$(if $(ROUTE),--route '$(ROUTE)',) \
-		$(if $(VIEWPORTS),--viewports '$(VIEWPORTS)',) \
-		$(if $(STATES),--states '$(STATES)',) \
-		$(if $(LIMIT),--limit $(LIMIT),) \
-		$(if $(HEADED),--headed,) \
-		$(if $(INCLUDE_BLOCKED),--include-blocked,) \
-		$(EXTRA)
-
-.PHONY: qa-visual-audit-rerun
-qa-visual-audit-rerun: ## Re-run blocked routes for an existing RUN (set RUN plus optional FAMILY/ROUTE/VIEWPORTS/STATES/LIMIT)
-	@node scripts/qa/run-visual-audit.mjs capture \
-		--run-id $(RUN) \
-		--batch batch-8-rerun \
-		$(if $(FAMILY),--family '$(FAMILY)',) \
-		$(if $(ROUTE),--route '$(ROUTE)',) \
-		$(if $(VIEWPORTS),--viewports '$(VIEWPORTS)',) \
-		$(if $(STATES),--states '$(STATES)',) \
-		$(if $(LIMIT),--limit $(LIMIT),) \
-		$(if $(HEADED),--headed,) \
-		$(EXTRA)
-
 .PHONY: test-load
 test-load: ## k6 load test (requires k6 installed)
 	@if ! command -v k6 &> /dev/null; then \

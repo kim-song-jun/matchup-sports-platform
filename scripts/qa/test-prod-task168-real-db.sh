@@ -355,6 +355,7 @@ else
 fi
 
 echo "--- Stage B: real M11 migrate deploy (and everything after M11 in the current tree) + real backfill CLI ---"
+compose_lines_before_b="$(wc -l < "${COMPOSE_LOG}" | tr -d ' ')"
 if run_stage_a_dispatch "${manifest_b}" stageB >"${TEST_ROOT}/stageb.log" 2>&1; then
   ok "Stage B dispatcher: completed (M11 migrate -> migration-stage.json -> backfill CLI)"
 else
@@ -368,13 +369,20 @@ else
   bad "migration-stage.json missing or malformed: $(cat "${stage_receipt}" 2>&1)"
 fi
 
+stage_b_compose="$(tail -n "+$((compose_lines_before_b + 1))" "${COMPOSE_LOG}")"
+if grep -q 'stop v1_api v1_game_operations_worker' <<< "${stage_b_compose}" && grep -q 'ps -q v1_game_operations_worker' <<< "${stage_b_compose}"; then
+  ok "Stage B: re-stopped the writers and checked they are down (compose stop + ps) on entry"
+else
+  bad "Stage B: expected compose stop + ps during the Stage B run, compose log: ${stage_b_compose}"
+fi
+
 echo "--- unresolved (genuinely stuck/self-contradictory) ledger rows must be 0 after Stage B ---"
 # Not "NOT (finished AND not-rolled-back)" -- that naive form also counts a
 # CLEANLY rolled-back row (finished_at NULL, rolled_back_at SET) as
 # "unresolved", which is normal Prisma history, not a defect (the rehearsal
 # against a real prod_pristine copy has exactly 2 such rows, both resolved
 # long ago -- see task-6-report.md). This matches the runner's own
-# _assert_pre_m1_name_set anomalous-row definition: still-pending (neither
+# _assert_ledger_name_set anomalous-row definition: still-pending (neither
 # finished nor rolled back) OR self-contradictory (both set).
 unresolved="$("${REAL_DOCKER}" exec promo_test_pg psql -U postgres -d "${SCRATCH_DB}" -At -c \
   "SELECT count(*) FROM _prisma_migrations WHERE (finished_at IS NULL AND rolled_back_at IS NULL) OR (finished_at IS NOT NULL AND rolled_back_at IS NOT NULL)")"
@@ -428,7 +436,7 @@ after_stage_sha="$(sha256sum "${stage_receipt}" | awk '{print $1}')"
   ok "I2 (M-1): migration-stage.json sha256 unchanged across the rerun (receipt not rewritten)" ||
   bad "I2 (M-1): migration-stage.json sha256 changed across the rerun (${before_stage_sha} -> ${after_stage_sha})"
 
-echo "--- M-2: delete migration-stage.json, rerun Stage B a 3rd time -> exercises the SIBLING resume branch (prod-task168.sh:877, ledger already full M1..M11 but receipt missing, confirmed via m11-entry.json instead) ---"
+echo "--- M-2: delete migration-stage.json, rerun Stage B a 3rd time -> the m11-entry.json resume branch (ledger already full M1..M11, receipt missing; idempotent migrate re-run) ---"
 rm -f "${stage_receipt}"
 if run_stage_a_dispatch "${manifest_b}" stageB >"${TEST_ROOT}/stageb-rerun2.log" 2>&1; then
   ok "Stage B rerun after deleting migration-stage.json: resumed via m11-entry.json (rc=0)"
@@ -445,6 +453,45 @@ if jq -e '.schemaVersion==1 and .kind=="migrationStage" and .status=="MIGRATION_
   ok "M-2: migration-stage.json rewritten fresh by the m11-entry.json resume branch, still a valid MIGRATION_COMMITTED receipt"
 else
   bad "M-2: migration-stage.json missing or malformed after the m11-entry.json resume: $(cat "${stage_receipt}" 2>&1)"
+fi
+
+echo "--- I2 (final review): a failed row for a migration AFTER M11 must stop Stage B before any receipt/backfill ---"
+post_m11_name="$(find "${ROOT_DIR}/apps/v1_api/prisma/migrations" -mindepth 1 -maxdepth 1 -type d -exec basename '{}' \; | LC_ALL=C sort | tail -1)"
+[[ "${post_m11_name}" > "${M11}" ]] || { echo "fixture setup: the current tree has no migration after M11" >&2; exit 1; }
+inject_failed_row() {
+  "${REAL_DOCKER}" exec promo_test_pg psql -U postgres -d "${SCRATCH_DB}" -v ON_ERROR_STOP=1 -At -c \
+    "INSERT INTO _prisma_migrations (id, checksum, migration_name, started_at, applied_steps_count, logs) VALUES ('task175-final-fix-failed-row', 'x', '${post_m11_name}', now(), 0, 'injected by test')" >/dev/null
+}
+remove_failed_row() {
+  "${REAL_DOCKER}" exec promo_test_pg psql -U postgres -d "${SCRATCH_DB}" -v ON_ERROR_STOP=1 -At -c \
+    "DELETE FROM _prisma_migrations WHERE id = 'task175-final-fix-failed-row'" >/dev/null
+}
+backfill_ran() { grep -q 'tournament award recipient backfill failed\|Stage B migration commit complete' "$1"; }
+
+inject_failed_row
+if run_stage_a_dispatch "${manifest_b}" stageB >"${TEST_ROOT}/stageb-failed-row.log" 2>&1; then
+  bad "I2: Stage B with a failed post-M11 row and migration-stage.json present was ACCEPTED"
+elif grep -q 'stuck or self-contradictory' "${TEST_ROOT}/stageb-failed-row.log" && ! backfill_ran "${TEST_ROOT}/stageb-failed-row.log"; then
+  ok "I2: failed post-M11 row + migration-stage.json -> refused before the backfill (full-ledger gate)"
+else
+  bad "I2: refused but not by the full-ledger gate: $(cat "${TEST_ROOT}/stageb-failed-row.log")"
+fi
+
+rm -f "${stage_receipt}"
+if run_stage_a_dispatch "${manifest_b}" stageB >"${TEST_ROOT}/stageb-p3009.log" 2>&1; then
+  bad "I2: Stage B resume with a failed post-M11 row was ACCEPTED"
+elif grep -q 'M11 or a migration after it' "${TEST_ROOT}/stageb-p3009.log" && [[ ! -e "${stage_receipt}" ]] && ! backfill_ran "${TEST_ROOT}/stageb-p3009.log"; then
+  ok "I2: m11-entry.json resume with a failed post-M11 row -> real prisma migrate deploy refuses (P3009), no receipt written"
+else
+  bad "I2: resume with a failed row: unexpected result: $(cat "${TEST_ROOT}/stageb-p3009.log")"
+fi
+
+remove_failed_row
+if run_stage_a_dispatch "${manifest_b}" stageB >"${TEST_ROOT}/stageb-after-resolve.log" 2>&1 &&
+   jq -e '.status=="MIGRATION_COMMITTED"' "${stage_receipt}" >/dev/null 2>&1; then
+  ok "I2: after the failed row is resolved, the same Stage B re-dispatch completes and writes the receipt"
+else
+  bad "I2: Stage B after resolving the failed row did not complete: $(tail -5 "${TEST_ROOT}/stageb-after-resolve.log")"
 fi
 
 echo

@@ -53,6 +53,11 @@ elif "migration_name < '" in sql and 'DISTINCT migration_name' in sql:
     print(readfile(os.environ.get('FAKE_PRE_M1_APPLIED_FILE'), ''), end='')
 elif "migration_name < '" in sql:
     print(os.environ.get('FAKE_PRE_M1_ANOMALOUS', '0'), end='')
+elif 'DISTINCT migration_name' in sql:
+    # Full-ledger scope (no pre-M1 bound): Stage B's post-migrate check.
+    print(readfile(os.environ.get('FAKE_ALL_APPLIED_FILE'), ''), end='')
+elif 'finished_at IS NOT NULL AND rolled_back_at IS NOT NULL' in sql:
+    print(os.environ.get('FAKE_ALL_ANOMALOUS', '0'), end='')
 elif 'NOT (finished_at IS NOT NULL AND rolled_back_at IS NULL)' in sql:
     print(os.environ.get('FAKE_BAD_COUNT', '0'), end='')
 elif sql.strip().startswith('SELECT count(*) FROM "_prisma_migrations" WHERE migration_name = \''):
@@ -67,8 +72,6 @@ elif 'pg_trigger' in sql:
     print(readfile(os.environ.get('FAKE_SEALS_FILE'), '0|0|0|0|0|0'), end='')
 elif 'ORDER BY migration_name' in sql:
     print(readfile(os.environ.get('FAKE_LEDGER_FILE'), ''), end='')
-elif "tournament_id || '|' || team_match_id" in sql:
-    print(os.environ.get('FAKE_MATCH_ROWS', ''), end='')
 else:
     sys.stderr.write('SQL_EVAL: unrecognized query: ' + sql + '\n')
     sys.exit(1)
@@ -80,31 +83,53 @@ import json, os, re, sys
 
 argv = sys.argv[1:]
 url = argv[-1]
-
-if '-w' in argv:
-    code = os.environ.get('FAKE_DETAIL_CODE', '200')
-    if '/matches/' in url:
-        code = os.environ.get('FAKE_MATCH_DETAIL_CODE', code)
-    print(code, end='')
-    sys.exit(0)
-
+path = url.split('?', 1)[0]
 m = re.search(r'cursor=([^&]*)', url)
 cursor = m.group(1) if m else ''
-pages_path = os.environ.get('FAKE_LIST_PAGES_FILE')
-pages = json.load(open(pages_path)) if pages_path and os.path.exists(pages_path) else []
+
+def load(env):
+    p = os.environ.get(env)
+    return json.load(open(p)) if p and os.path.exists(p) else None
+
+def wrap(data):
+    print(json.dumps({"status": "success", "data": data, "timestamp": "2026-01-01T00:00:00Z"}), end='')
+
+match = re.search(r'/tournaments/([^/]+)/matches/([^/]+)$', path)
+if '-w' in argv:
+    if match and match.group(2) == os.environ.get('FAKE_MATCH_CONNECT_FAIL', ''):
+        print('000', end='')
+        sys.exit(7)
+    if match:
+        codes = load('FAKE_MATCH_CODES_FILE') or {}
+        print(codes.get(match.group(2), '200'), end='')
+    else:
+        print(os.environ.get('FAKE_DETAIL_CODE', '200'), end='')
+    sys.exit(0)
+
+schedule = re.search(r'/tournaments/([^/]+)/schedule$', path)
+if schedule:
+    pages = (load('FAKE_SCHEDULE_FILE') or {}).get(schedule.group(1), [])
+    page = next((p for p in pages if p.get('cursor', '') == cursor), None)
+    if page is None:
+        sys.stderr.write('fake curl: no schedule fixture for ' + schedule.group(1) + ' cursor=' + repr(cursor) + '\n')
+        sys.exit(22)
+    if page.get('malformed'):
+        wrap({"whatever": True})
+        sys.exit(0)
+    wrap({"items": [{"fixtureId": f} for f in page.get('items', [])],
+          "unscheduled": [{"fixtureId": f} for f in page.get('unscheduled', [])],
+          "nextCursor": page.get('nextCursor')})
+    sys.exit(0)
+
+pages = load('FAKE_LIST_PAGES_FILE') or []
 page = next((p for p in pages if p.get('cursor', '') == cursor), None)
 if page is None:
     sys.stderr.write('fake curl: no page fixture for cursor=' + repr(cursor) + '\n')
     sys.exit(1)
 if page.get('malformed'):
-    print(json.dumps({"status": "success", "data": {"whatever": True}, "timestamp": "2026-01-01T00:00:00Z"}), end='')
+    wrap({"whatever": True})
     sys.exit(0)
-body = {
-    "status": "success",
-    "data": {"items": page.get('items', []), "pageInfo": {"hasNext": page.get('hasNext', False), "nextCursor": page.get('nextCursor')}},
-    "timestamp": "2026-01-01T00:00:00Z",
-}
-print(json.dumps(body), end='')
+wrap({"items": page.get('items', []), "pageInfo": {"hasNext": page.get('hasNext', False), "nextCursor": page.get('nextCursor')}})
 PYEOF
 
 cat > "${mock_bin}/docker" <<'DOCKEREOF'
@@ -188,6 +213,11 @@ case "$*" in
     printf 'BACKFILL_CALLED\n' >> "${CALL_LOG}"
     [[ "${BACKFILL_SHOULD_FAIL:-false}" != true ]] || { echo "fake docker: injected backfill failure" >&2; exit 1; }
     ;;
+  *"run --rm --entrypoint cat ${TOOL_IMAGE:-__no_tool__} /opt/task168/tool-attestation.json"*)
+    printf 'TOOL_ATTESTATION_READ\n' >> "${CALL_LOG}"
+    default_attestation='{"schemaVersion":1,"archiveSha256":"829cbb214afc26c417947c864fd477647498003e06915ca20b4d2f8b44b80c4b","generatedClient":true}'
+    printf '%s' "${FAKE_TOOL_ATTESTATION:-${default_attestation}}"
+    ;;
   *"${TOOL_IMAGE:-__no_tool__} --report"*)
     printf 'TOOL_CALLED\n' >> "${CALL_LOG}"
     reportdir="${volumes[0]:-}"
@@ -228,12 +258,16 @@ export PROD_TASK168_DOCKER=docker
 compose_mock() {
   printf 'compose %s\n' "$*" >> "${CALL_LOG}"
   case "$*" in
-    'stop v1_api v1_game_operations_worker') return 0 ;;
+    'stop v1_api v1_game_operations_worker')
+      [[ "${COMPOSE_STOP_SHOULD_FAIL:-false}" != true ]] || { echo "compose_mock: injected stop failure" >&2; return 1; }
+      return 0
+      ;;
     'ps -q v1_api'|'ps -q v1_game_operations_worker')
       if [[ "${COMPOSE_PS_SHOULD_FAIL:-false}" == true ]]; then
         echo "compose_mock: injected ps failure" >&2
         return 1
       fi
+      [[ "${COMPOSE_PS_RUNNING:-false}" != true ]] || echo 'still-running-container-id'
       return 0
       ;;
     *) echo "compose_mock: unrecognized invocation: $*" >&2; return 1 ;;
@@ -345,7 +379,7 @@ MANIFEST_B="${TEST_ROOT}/manifest-stageB.json"
 write_manifest "${MANIFEST_B}" stageB release-sha-b "${API_IMAGE_STAGE_B}" false
 
 # Critical 1: every fixture source ships exactly one pre-M1 migration (a
-# realistic baseline: real prod ships ~115) so `_assert_pre_m1_name_set` has
+# realistic baseline: real prod ships ~115) so `_assert_ledger_name_set` has
 # something to compare against by default; dedicated tests below override
 # FAKE_PRE_M1_APPLIED_FILE to prove the subset/exact modes actually work.
 PRE_M1_NAME='20260101000000_pre_existing_migration'
@@ -417,15 +451,15 @@ test_state() {
   fi
 }
 
-# Fix round 2 (load-bearing): `_assert_pre_m1_name_set` at the unit level,
+# Fix round 2 (load-bearing): `_assert_ledger_name_set` at the unit level,
 # decoupled from the rest of the state machine, with explicit messages.
 test_pre_m1_name_set_subset_allows_missing() {
   : > "${TEST_ROOT}/pre-m1-msg-subset-ok.txt"
   export FAKE_PRE_M1_APPLIED_FILE="${TEST_ROOT}/pre-m1-msg-subset-ok.txt"
-  run_case false '_assert_pre_m1_name_set subset'
+  run_case false '_assert_ledger_name_set subset pre_m1'
   export FAKE_PRE_M1_APPLIED_FILE="${PRE_M1_APPLIED_DEFAULT_FILE}"
   if [[ "${CASE_RC}" -eq 0 ]]; then
-    ok "_assert_pre_m1_name_set(subset): zero pre-M1 migrations applied yet is fine -- Stage A's \"pre\" migrate phase catches up the rest"
+    ok "_assert_ledger_name_set(subset): zero pre-M1 migrations applied yet is fine -- Stage A's \"pre\" migrate phase catches up the rest"
   else
     bad "pre-m1-name-set-subset-allows-missing: rc=${CASE_RC} output=${CASE_OUTPUT}"
   fi
@@ -437,10 +471,10 @@ test_pre_m1_name_set_foreign_rejects() {
   # foreign name sorts before PRE_M1_NAME.
   printf '%s\n%s\n' '20250101000000_a_different_branch_migration' "${PRE_M1_NAME}" > "${TEST_ROOT}/pre-m1-msg-foreign.txt"
   export FAKE_PRE_M1_APPLIED_FILE="${TEST_ROOT}/pre-m1-msg-foreign.txt"
-  run_case false '_assert_pre_m1_name_set subset'
+  run_case false '_assert_ledger_name_set subset pre_m1'
   export FAKE_PRE_M1_APPLIED_FILE="${PRE_M1_APPLIED_DEFAULT_FILE}"
   if [[ "${CASE_RC}" -eq 1 ]] && assert_msg "${CASE_OUTPUT}" 'PROD_SOURCE_DIR does not ship'; then
-    ok "_assert_pre_m1_name_set(subset): an applied name PROD_SOURCE_DIR does not ship (different branch) is rejected"
+    ok "_assert_ledger_name_set(subset): an applied name PROD_SOURCE_DIR does not ship (different branch) is rejected"
   else
     bad "pre-m1-name-set-foreign-rejects: rc=${CASE_RC} output=${CASE_OUTPUT}"
   fi
@@ -450,10 +484,10 @@ test_pre_m1_name_set_foreign_rejects
 test_pre_m1_name_set_exact_missing_rejects() {
   : > "${TEST_ROOT}/pre-m1-msg-missing.txt"
   export FAKE_PRE_M1_APPLIED_FILE="${TEST_ROOT}/pre-m1-msg-missing.txt"
-  run_case false '_assert_pre_m1_name_set exact'
+  run_case false '_assert_ledger_name_set exact pre_m1'
   export FAKE_PRE_M1_APPLIED_FILE="${PRE_M1_APPLIED_DEFAULT_FILE}"
   if [[ "${CASE_RC}" -eq 1 ]] && assert_msg "${CASE_OUTPUT}" 'Stage B requires all of them applied'; then
-    ok "_assert_pre_m1_name_set(exact): a source pre-M1 migration missing from the ledger is rejected (Stage B mode)"
+    ok "_assert_ledger_name_set(exact): a source pre-M1 migration missing from the ledger is rejected (Stage B mode)"
   else
     bad "pre-m1-name-set-exact-missing-rejects: rc=${CASE_RC} output=${CASE_OUTPUT}"
   fi
@@ -473,33 +507,33 @@ test_pre_m1_name_set_detects_unsorted_input() {
   # descending, not ascending, order.
   printf '%s\n%s\n' "${PRE_M1_NAME}" '20250101000000_before_pre_m1_name' > "${TEST_ROOT}/pre-m1-unsorted.txt"
   export FAKE_PRE_M1_APPLIED_FILE="${TEST_ROOT}/pre-m1-unsorted.txt"
-  run_case false '_assert_pre_m1_name_set subset'
+  run_case false '_assert_ledger_name_set subset pre_m1'
   export FAKE_PRE_M1_APPLIED_FILE="${PRE_M1_APPLIED_DEFAULT_FILE}"
   if [[ "${CASE_RC}" -eq 2 ]] && assert_msg "${CASE_OUTPUT}" 'not C-sorted'; then
-    ok "_assert_pre_m1_name_set: misordered applied_names is detected via sort -c and refused (rc=2), never silently swallowed to 0"
+    ok "_assert_ledger_name_set: misordered applied_names is detected via sort -c and refused (rc=2), never silently swallowed to 0"
   else
     bad "pre-m1-name-set-detects-unsorted-input: rc=${CASE_RC} output=${CASE_OUTPUT}"
   fi
 }
 test_pre_m1_name_set_detects_unsorted_input
 
-# _pre_m1_comm_count must judge names by strict C/byte order (underscore
+# _name_set_comm_count must judge names by strict C/byte order (underscore
 # 0x5F sorts BEFORE lowercase letters 0x61-0x7A) regardless of what a
 # locale-aware collation (e.g. en_US.utf8, which commonly treats punctuation
 # as a lower-priority/ignorable comparison level) would have produced --
 # exercised directly with a hand-crafted, deliberately tricky name pair.
-test_pre_m1_comm_count_underscore_letter_pair() {
+test_name_set_comm_count_underscore_letter_pair() {
   run_case false '
 a="$(printf "%s\n" "x_a" "xa")"
 b="$(printf "%s\n" "x_a" "xa" "xb")"
-_pre_m1_comm_count -13 "$a" "$b"'
+_name_set_comm_count -13 "$a" "$b"'
   if [[ "${CASE_RC}" -eq 0 && "$(tail -n1 <<< "${CASE_OUTPUT}")" == 1 ]]; then
-    ok "_pre_m1_comm_count: correctly judges an underscore-vs-letter name pair (x_a < xa in C/byte order) -- only xb is unique to the second list"
+    ok "_name_set_comm_count: correctly judges an underscore-vs-letter name pair (x_a < xa in C/byte order) -- only xb is unique to the second list"
   else
     bad "pre-m1-comm-count-underscore-letter-pair: expected count=1, got rc=${CASE_RC} output='${CASE_OUTPUT}'"
   fi
 }
-test_pre_m1_comm_count_underscore_letter_pair
+test_name_set_comm_count_underscore_letter_pair
 
 test_state "fresh"                 "${LEDGER_EMPTY}"     '0|0|0|0|0|0' fresh
 test_state "precutover"            "${LEDGER_M1_M8_M10}" '0|0|0|0|0|0' precutover
@@ -528,7 +562,7 @@ export FAKE_PRE_M1_ANOMALOUS=0
 # ships one, PRE_M1_NAME) must resolve to "fresh", not "reject". The old
 # exact-count design blocked this scenario forever; the unit-level tests
 # above cover the function directly, this proves the full state machine
-# wiring (_assert_stage_a_ledger_clean -> _assert_pre_m1_name_set subset).
+# wiring (_assert_stage_a_ledger_clean -> _assert_ledger_name_set subset).
 : > "${TEST_ROOT}/pre-m1-state-subset-missing.txt"
 export FAKE_PRE_M1_APPLIED_FILE="${TEST_ROOT}/pre-m1-state-subset-missing.txt"
 test_state "accept-pre-m1-subset-missing" "${LEDGER_EMPTY}" '0|0|0|0|0|0' fresh
@@ -664,6 +698,31 @@ test_tool_exit0_no_report_fails() {
   fi
 }
 test_tool_exit0_no_report_fails
+
+# M2: the cutover tool image must carry the pinned archive's attestation.
+test_tool_attestation_mismatch_refuses() {
+  local desc="$1" attestation="$2"
+  local sd="${TEST_ROOT}/state-tool-attest-${desc}/release-sha-a"
+  export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/state-tool-attest-${desc}"
+  seed_stage_a_receipts "${sd}" "${STAGE_A_DB_ID}"
+  printf '%s' "${LEDGER_M1_M8_M10}" > "${TEST_ROOT}/ledger-tool-attest.txt"
+  printf '0|0|0|0|0|0' > "${TEST_ROOT}/seals-tool-attest.txt"
+  export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-tool-attest.txt" FAKE_SEALS_FILE="${TEST_ROOT}/seals-tool-attest.txt"
+  export FAKE_TOOL_ATTESTATION="${attestation}"
+  export CALL_LOG="${TEST_ROOT}/calls-tool-attest-${desc}.log"; : > "${CALL_LOG}"
+  run_case true 'task168_stage_a'
+  unset FAKE_TOOL_ATTESTATION
+  local tool_calls attest_reads
+  tool_calls="$(grep -c 'TOOL_CALLED' "${CALL_LOG}" || true)"
+  attest_reads="$(grep -c 'TOOL_ATTESTATION_READ' "${CALL_LOG}" || true)"
+  if [[ "${CASE_RC}" -ne 0 && "${tool_calls}" == 0 && "${attest_reads}" == 1 ]] && assert_msg "${CASE_OUTPUT}" 'cutover tool attestation'; then
+    ok "tool-attestation(${desc}): refused before the cutover tool ran, message asserted"
+  else
+    bad "tool-attestation(${desc}): rc=${CASE_RC} tool_calls=${tool_calls} attest_reads=${attest_reads} output=${CASE_OUTPUT}"
+  fi
+}
+test_tool_attestation_mismatch_refuses wrong-archive '{"schemaVersion":1,"archiveSha256":"0000000000000000000000000000000000000000000000000000000000000000","generatedClient":true}'
+test_tool_attestation_mismatch_refuses not-json 'no attestation here'
 
 # Fix round 2 item 1 (I4 unresolved): the tool writes a report even when it
 # fails preflight, so a bare "report already exists" guard blocks every
@@ -995,6 +1054,25 @@ export API_IMAGE="${API_IMAGE_STAGE_B}"
 export PROD_SOURCE_DIR="${SOURCE_B_DIR}"
 STAGE_B_DB_ID="$(printf '%s' "${FAKE_IDENTITY_FULL}" | sha256sum | awk '{print $1}')"
 
+# Full-ledger applied names (the post-migrate check reads the whole ledger,
+# not just the 11 task168 names).
+source_names_file() {
+  find "$1/apps/v1_api/prisma/migrations" -mindepth 1 -maxdepth 1 -type d -exec basename '{}' \; | LC_ALL=C sort > "$2"
+}
+ALL_APPLIED_B_FILE="${TEST_ROOT}/all-applied-source-b.txt"
+source_names_file "${SOURCE_B_DIR}" "${ALL_APPLIED_B_FILE}"
+export FAKE_ALL_APPLIED_FILE="${ALL_APPLIED_B_FILE}" FAKE_ALL_ANOMALOUS=0
+
+# Mirrors the real release: migrations exist after M11 and the same
+# `prisma migrate deploy` applies them.
+POST_M11_NAME='20260920000000_post_m11_fixture'
+SOURCE_B_POST_DIR="${TEST_ROOT}/source-b-post"
+build_fixture_source "${SOURCE_B_POST_DIR}" "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}" "${PROD_TASK168_M11}"
+install -d "${SOURCE_B_POST_DIR}/apps/v1_api/prisma/migrations/${POST_M11_NAME}"
+echo '-- post-M11' > "${SOURCE_B_POST_DIR}/apps/v1_api/prisma/migrations/${POST_M11_NAME}/migration.sql"
+ALL_APPLIED_POST_FILE="${TEST_ROOT}/all-applied-source-b-post.txt"
+source_names_file "${SOURCE_B_POST_DIR}" "${ALL_APPLIED_POST_FILE}"
+
 seed_stage_b_transition() {
   local sd="$1" transition_db_id="$2" tamper_receipt="${3:-false}" release_sha_field="${4:-release-sha-b}"
   install -d -m 700 "${sd}/report"
@@ -1021,7 +1099,7 @@ seed_stage_b_transition() {
 run_stage_b_reject_case() {
   local desc="$1" expected_msg="$2"
   export CALL_LOG="${TEST_ROOT}/calls-b-${desc}.log"; : > "${CALL_LOG}"
-  run_case false 'task168_stage_b'
+  run_case true 'task168_stage_b'
   local migrate_calls
   migrate_calls="$(grep -c 'MIGRATE_DEPLOY_STAGE_B' "${CALL_LOG}" || true)"
   if [[ "${CASE_RC}" -ne 0 && "${migrate_calls}" == 0 ]] && assert_msg "${CASE_OUTPUT}" "${expected_msg}"; then
@@ -1086,12 +1164,10 @@ export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b-m11noreceipt.txt"
 run_stage_b_reject_case "m11-applied-no-receipt" "no matching m11-entry.json"
 export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b.txt"
 
-# Fix round 3 item 1 (F5 residual): M11's own `prisma migrate deploy` can
-# succeed and then the ledger re-read or migration-stage.json write can
-# still fail. On retry, migration-stage.json is still missing, but a valid
-# m11-entry.json (bound to this exact release/db/api) proves THIS Stage B
-# run applied M11 -- must resume straight to writing migration-stage.json
-# and continuing to backfill, never re-running `prisma migrate deploy`.
+# M11 applied but migration-stage.json missing (a later migration failed or
+# the run died before the receipt): a valid m11-entry.json lets Stage B
+# re-run the idempotent migrate deploy, pass the full-ledger gate, write the
+# receipt and continue to the backfill.
 test_stage_b_resume_after_m11_migrate_success_receipt_missing() {
   export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/stateb-m11-receipt-missing"
   local sd="${PROD_TASK168_STATE_ROOT}/release-sha-b"
@@ -1111,14 +1187,14 @@ test_stage_b_resume_after_m11_migrate_success_receipt_missing() {
   printf '5|5|3|0|0|0' > "${TEST_ROOT}/seals-b-m11-receipt-missing.txt"
   export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b-m11-receipt-missing.txt" FAKE_SEALS_FILE="${TEST_ROOT}/seals-b-m11-receipt-missing.txt" FAKE_RETIREMENT_FILE="${TEST_ROOT}/retirement-b-m11-receipt-missing.txt"
   export CALL_LOG="${TEST_ROOT}/calls-b-m11-receipt-missing.log"; : > "${CALL_LOG}"
-  run_case false 'task168_stage_b'
+  run_case true 'task168_stage_b'
   local migrate_calls backfill_calls stage_receipt
   migrate_calls="$(grep -c 'MIGRATE_DEPLOY_STAGE_B' "${CALL_LOG}" || true)"
   backfill_calls="$(grep -c 'BACKFILL_CALLED' "${CALL_LOG}" || true)"
   stage_receipt="${sd}/migration-stage.json"
-  if [[ "${CASE_RC}" -eq 0 && "${migrate_calls}" == 0 && "${backfill_calls}" == 1 && -s "${stage_receipt}" ]] &&
+  if [[ "${CASE_RC}" -eq 0 && "${migrate_calls}" == 1 && "${backfill_calls}" == 1 && -s "${stage_receipt}" ]] &&
      jq -e '.status=="MIGRATION_COMMITTED"' "${stage_receipt}" >/dev/null 2>&1; then
-    ok "stage-b-resume-m11-receipt-missing (Fix round 3 item 1): M11 already applied + valid m11-entry.json -> resumes straight to migration-stage.json + backfill, migrate NOT re-invoked"
+    ok "stage-b-resume-m11-receipt-missing: M11 already applied + valid m11-entry.json -> idempotent migrate re-run, full-ledger gate, receipt, backfill"
   else
     bad "stage-b-resume-m11-receipt-missing: rc=${CASE_RC} migrate_calls=${migrate_calls} backfill_calls=${backfill_calls} output=${CASE_OUTPUT}"
   fi
@@ -1133,7 +1209,7 @@ test_stage_b_success() {
   export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b-success.txt" FAKE_SEALS_FILE="${TEST_ROOT}/seals-b-success.txt"
   export FAKE_LEDGER_AFTER_M11_FILE="${LEDGER_ALL11_FILE}"
   export CALL_LOG="${TEST_ROOT}/calls-b-success.log"; : > "${CALL_LOG}"
-  run_case false 'task168_stage_b'
+  run_case true 'task168_stage_b'
   unset FAKE_LEDGER_AFTER_M11_FILE
   local migrate_calls backfill_calls stage_receipt
   migrate_calls="$(grep -c 'MIGRATE_DEPLOY_STAGE_B' "${CALL_LOG}" || true)"
@@ -1165,7 +1241,7 @@ test_stage_b_resume_after_m11() {
   printf '5|5|3|0|0|0' > "${TEST_ROOT}/seals-b-resume.txt"
   export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b-resume.txt" FAKE_SEALS_FILE="${TEST_ROOT}/seals-b-resume.txt" FAKE_RETIREMENT_FILE="${TEST_ROOT}/retirement-b-resume.txt"
   export CALL_LOG="${TEST_ROOT}/calls-b-resume.log"; : > "${CALL_LOG}"
-  run_case false 'task168_stage_b'
+  run_case true 'task168_stage_b'
   local migrate_calls backfill_calls
   migrate_calls="$(grep -c 'MIGRATE_DEPLOY_STAGE_B' "${CALL_LOG}" || true)"
   backfill_calls="$(grep -c 'BACKFILL_CALLED' "${CALL_LOG}" || true)"
@@ -1195,7 +1271,7 @@ test_stage_b_resume_refuses_when_retirement_invariant_fails() {
   printf '1|1' > "${TEST_ROOT}/retirement-b-resume-bad.txt"
   export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b-resume-retirement-bad.txt" FAKE_RETIREMENT_FILE="${TEST_ROOT}/retirement-b-resume-bad.txt"
   export CALL_LOG="${TEST_ROOT}/calls-b-resume-retirement-bad.log"; : > "${CALL_LOG}"
-  run_case false 'task168_stage_b'
+  run_case true 'task168_stage_b'
   local migrate_calls backfill_calls
   migrate_calls="$(grep -c 'MIGRATE_DEPLOY_STAGE_B' "${CALL_LOG}" || true)"
   backfill_calls="$(grep -c 'BACKFILL_CALLED' "${CALL_LOG}" || true)"
@@ -1207,67 +1283,253 @@ test_stage_b_resume_refuses_when_retirement_invariant_fails() {
 }
 test_stage_b_resume_refuses_when_retirement_invariant_fails
 
-# ═══════════════════════ Task 3: verify() (Important 8) ════════════════════
+# ── I1: Stage B re-stops the writers on every entry path ──────────────────
+first_line_of() { awk -v p="$1" 'index($0, p) { print NR; exit }' "${CALL_LOG}"; }
 
-FAKE_MATCH_ROWS_EMPTY_FILE_UNUSED=1
-export FAKE_MATCH_ROWS=''
-
-test_verify_success_paginates() {
-  export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/verify-success"
-  seed_stage_b_transition "${PROD_TASK168_STATE_ROOT}/release-sha-b" "${STAGE_B_DB_ID}" false
-  local pages="${TEST_ROOT}/verify-pages-success.json"
-  jq -n '[
-    {cursor:"", items:[{id:"t1"},{id:"t2"}], hasNext:true, nextCursor:"t2"},
-    {cursor:"t2", items:[{id:"t3"}], hasNext:false, nextCursor:null}
-  ]' > "${pages}"
-  export FAKE_LIST_PAGES_FILE="${pages}" FAKE_DETAIL_CODE=200
-  export CALL_LOG="${TEST_ROOT}/calls-verify-success.log"; : > "${CALL_LOG}"
-  run_case false 'task168_verify'
-  unset FAKE_LIST_PAGES_FILE FAKE_DETAIL_CODE
-  local receipt="${PROD_TASK168_STATE_ROOT}/release-sha-b/runtime-verification.json"
-  local list_calls
-  list_calls="$(grep -cE "curl .*'\?cursor=|curl .*tournaments\"$|curl .*tournaments'" "${CALL_LOG}" 2>/dev/null || true)"
-  if [[ "${CASE_RC}" -eq 0 && -s "${receipt}" ]] && jq -e '.status=="COMPLETED" and .checkedCount==3' "${receipt}" >/dev/null 2>&1; then
-    ok "verify: paginates through pageInfo.nextCursor to completion, checks all 3 ids, writes COMPLETED"
+# $1 desc, $2 "fresh"|"resume" -- seeds either a pre-M11 ledger (M11 still to
+# run) or a MIGRATION_COMMITTED resume, then checks stop+ps precede the first
+# DB-mutating step (M11 migrate or, on resume, the backfill).
+test_stage_b_stops_writers_first() {
+  local desc="$1" kind="$2" sd
+  export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/stateb-stop-${desc}"
+  sd="${PROD_TASK168_STATE_ROOT}/release-sha-b"
+  seed_stage_b_transition "${sd}" "${STAGE_B_DB_ID}" false
+  printf '5|5|3|0|0|0' > "${TEST_ROOT}/seals-stop-${desc}.txt"
+  printf '0|0' > "${TEST_ROOT}/retirement-stop-${desc}.txt"
+  export FAKE_SEALS_FILE="${TEST_ROOT}/seals-stop-${desc}.txt" FAKE_RETIREMENT_FILE="${TEST_ROOT}/retirement-stop-${desc}.txt"
+  local mutate_marker
+  if [[ "${kind}" == fresh ]]; then
+    printf '%s' "${LEDGER_FULL10}" > "${TEST_ROOT}/ledger-stop-${desc}.txt"
+    export FAKE_LEDGER_AFTER_M11_FILE="${LEDGER_ALL11_FILE}"
+    mutate_marker='MIGRATE_DEPLOY_STAGE_B'
   else
-    bad "verify-success: rc=${CASE_RC} output=${CASE_OUTPUT} receipt=$(cat "${receipt}" 2>/dev/null)"
+    printf '%s' "${LEDGER_ALL11}" > "${TEST_ROOT}/ledger-stop-${desc}.txt"
+    jq -nc --arg api "${API_IMAGE_STAGE_B}" --arg db "${STAGE_B_DB_ID}" \
+      '{schemaVersion:1,kind:"migrationStage",status:"MIGRATION_COMMITTED",releaseSha:"release-sha-b",apiImage:$api,databaseIdentity:$db,appliedCount:11,completedAt:"2026-01-01T00:00:00Z"}' \
+      > "${sd}/migration-stage.json"
+    chmod 600 "${sd}/migration-stage.json"
+    mutate_marker='BACKFILL_CALLED'
+  fi
+  export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-stop-${desc}.txt"
+  export CALL_LOG="${TEST_ROOT}/calls-b-stop-${desc}.log"; : > "${CALL_LOG}"
+  run_case true 'task168_stage_b'
+  unset FAKE_LEDGER_AFTER_M11_FILE
+  local stop_at ps_at mutate_at
+  stop_at="$(first_line_of 'compose stop v1_api v1_game_operations_worker')"
+  ps_at="$(first_line_of 'compose ps -q v1_game_operations_worker')"
+  mutate_at="$(first_line_of "${mutate_marker}")"
+  if [[ "${CASE_RC}" -eq 0 && -n "${stop_at}" && -n "${ps_at}" && -n "${mutate_at}" && "${stop_at}" -lt "${ps_at}" && "${ps_at}" -lt "${mutate_at}" ]]; then
+    ok "stage-b-stops-writers(${desc}): compose stop + quiesce check precede ${mutate_marker}"
+  else
+    bad "stage-b-stops-writers(${desc}): rc=${CASE_RC} stop=${stop_at} ps=${ps_at} ${mutate_marker}=${mutate_at} output=${CASE_OUTPUT}"
   fi
 }
-test_verify_success_paginates
+test_stage_b_stops_writers_first fresh fresh
+test_stage_b_stops_writers_first resume resume
 
-test_verify_zero_ids_fails() {
-  export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/verify-zero"
+# $1 desc, $2 env var to inject, $3 expected message
+test_stage_b_refuses_when_writers_not_stopped() {
+  local desc="$1" inject="$2" expected="$3"
+  export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/stateb-nostop-${desc}"
   seed_stage_b_transition "${PROD_TASK168_STATE_ROOT}/release-sha-b" "${STAGE_B_DB_ID}" false
-  local pages="${TEST_ROOT}/verify-pages-zero.json"
-  jq -n '[{cursor:"", items:[], hasNext:false, nextCursor:null}]' > "${pages}"
-  export FAKE_LIST_PAGES_FILE="${pages}"
-  export CALL_LOG="${TEST_ROOT}/calls-verify-zero.log"; : > "${CALL_LOG}"
-  run_case false 'task168_verify'
-  unset FAKE_LIST_PAGES_FILE
-  if [[ "${CASE_RC}" -ne 0 ]] && assert_msg "${CASE_OUTPUT}" 'zero ids after full pagination'; then
-    ok "verify: zero ids after full pagination is a hard failure"
+  printf '%s' "${LEDGER_FULL10}" > "${TEST_ROOT}/ledger-nostop-${desc}.txt"
+  printf '5|5|3|0|0|0' > "${TEST_ROOT}/seals-nostop-${desc}.txt"
+  export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-nostop-${desc}.txt" FAKE_SEALS_FILE="${TEST_ROOT}/seals-nostop-${desc}.txt"
+  export "${inject}=true"
+  run_stage_b_reject_case "writers-${desc}" "${expected}"
+  unset "${inject}"
+  if grep -q 'BACKFILL_CALLED' "${CALL_LOG}"; then bad "stage-b-writers-${desc}: backfill ran despite the refusal"; fi
+}
+test_stage_b_refuses_when_writers_not_stopped still-running COMPOSE_PS_RUNNING 'writers did not quiesce'
+test_stage_b_refuses_when_writers_not_stopped stop-fails COMPOSE_STOP_SHOULD_FAIL 'compose stop failed'
+
+# ── I2: the whole ledger (not just the 11 task168 names) must be clean before
+# any Stage B receipt is written or the backfill runs ────────────────────────
+# $1 desc, $2 branch (first|entry-resume|stage-resume), $3 applied file,
+# $4 anomalous count, $5 expected message
+test_stage_b_full_ledger_gate() {
+  local desc="$1" branch="$2" applied_file="$3" anomalous="$4" expected="$5" sd
+  export PROD_SOURCE_DIR="${SOURCE_B_POST_DIR}"
+  export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/stateb-full-${desc}"
+  sd="${PROD_TASK168_STATE_ROOT}/release-sha-b"
+  seed_stage_b_transition "${sd}" "${STAGE_B_DB_ID}" false
+  printf '5|5|3|0|0|0' > "${TEST_ROOT}/seals-full-${desc}.txt"
+  printf '0|0' > "${TEST_ROOT}/retirement-full-${desc}.txt"
+  export FAKE_SEALS_FILE="${TEST_ROOT}/seals-full-${desc}.txt" FAKE_RETIREMENT_FILE="${TEST_ROOT}/retirement-full-${desc}.txt"
+  export FAKE_ALL_APPLIED_FILE="${applied_file}" FAKE_ALL_ANOMALOUS="${anomalous}"
+  local receipt_existed=false
+  case "${branch}" in
+    first)
+      printf '%s' "${LEDGER_FULL10}" > "${TEST_ROOT}/ledger-full-${desc}.txt"
+      export FAKE_LEDGER_AFTER_M11_FILE="${LEDGER_ALL11_FILE}"
+      ;;
+    entry-resume|stage-resume)
+      printf '%s' "${LEDGER_ALL11}" > "${TEST_ROOT}/ledger-full-${desc}.txt"
+      jq -nc --arg api "${API_IMAGE_STAGE_B}" --arg db "${STAGE_B_DB_ID}" --arg sha "${PROD_TASK168_M11_PINNED_SHA256}" \
+        '{schemaVersion:1,kind:"m11Entry",status:"ENTERED",releaseSha:"release-sha-b",apiImage:$api,databaseIdentity:$db,migrationSha256:$sha,enteredAt:"2026-01-01T00:00:00Z"}' \
+        > "${sd}/m11-entry.json"
+      if [[ "${branch}" == stage-resume ]]; then
+        jq -nc --arg api "${API_IMAGE_STAGE_B}" --arg db "${STAGE_B_DB_ID}" \
+          '{schemaVersion:1,kind:"migrationStage",status:"MIGRATION_COMMITTED",releaseSha:"release-sha-b",apiImage:$api,databaseIdentity:$db,appliedCount:11,completedAt:"2026-01-01T00:00:00Z"}' \
+          > "${sd}/migration-stage.json"
+        receipt_existed=true
+      fi
+      ;;
+  esac
+  export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-full-${desc}.txt"
+  export CALL_LOG="${TEST_ROOT}/calls-b-full-${desc}.log"; : > "${CALL_LOG}"
+  run_case true 'task168_stage_b'
+  unset FAKE_LEDGER_AFTER_M11_FILE
+  export PROD_SOURCE_DIR="${SOURCE_B_DIR}" FAKE_ALL_APPLIED_FILE="${ALL_APPLIED_B_FILE}" FAKE_ALL_ANOMALOUS=0
+  local backfill_calls receipt_ok=true
+  backfill_calls="$(grep -c 'BACKFILL_CALLED' "${CALL_LOG}" || true)"
+  [[ "${receipt_existed}" == true || ! -e "${sd}/migration-stage.json" ]] || receipt_ok=false
+  if [[ "${CASE_RC}" -ne 0 && "${backfill_calls}" == 0 && "${receipt_ok}" == true ]] && assert_msg "${CASE_OUTPUT}" "${expected}"; then
+    ok "stage-b-full-ledger(${desc}): refused before any receipt/backfill, message asserted"
   else
-    bad "verify-zero-ids: rc=${CASE_RC} output=${CASE_OUTPUT}"
+    bad "stage-b-full-ledger(${desc}): rc=${CASE_RC} backfill=${backfill_calls} receipt_ok=${receipt_ok} output=${CASE_OUTPUT}"
   fi
 }
-test_verify_zero_ids_fails
+ALL_APPLIED_POST_MISSING_FILE="${TEST_ROOT}/all-applied-post-missing.txt"
+grep -v -F "${POST_M11_NAME}" "${ALL_APPLIED_POST_FILE}" > "${ALL_APPLIED_POST_MISSING_FILE}"
+test_stage_b_full_ledger_gate first-post-missing first "${ALL_APPLIED_POST_MISSING_FILE}" 0 'Stage B requires all of them applied'
+test_stage_b_full_ledger_gate entry-resume-failed-row entry-resume "${ALL_APPLIED_POST_MISSING_FILE}" 1 'stuck or self-contradictory'
+test_stage_b_full_ledger_gate entry-resume-post-missing entry-resume "${ALL_APPLIED_POST_MISSING_FILE}" 0 'Stage B requires all of them applied'
+test_stage_b_full_ledger_gate stage-resume-failed-row stage-resume "${ALL_APPLIED_POST_FILE}" 1 'stuck or self-contradictory'
+# The resume's migrate re-run hits Prisma P3009 on a failed row left in place.
+export MIGRATE_STAGE_B_SHOULD_FAIL=true
+test_stage_b_full_ledger_gate entry-resume-p3009 entry-resume "${ALL_APPLIED_POST_MISSING_FILE}" 1 'M11 or a migration after it'
+unset MIGRATE_STAGE_B_SHOULD_FAIL
 
-test_verify_shape_mismatch_fails() {
-  export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/verify-shape"
+test_stage_b_migrate_failure_message() {
+  export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/stateb-migrate-fail"
   seed_stage_b_transition "${PROD_TASK168_STATE_ROOT}/release-sha-b" "${STAGE_B_DB_ID}" false
-  local pages="${TEST_ROOT}/verify-pages-shape.json"
-  jq -n '[{cursor:"", malformed:true, hasNext:false}]' > "${pages}"
-  export FAKE_LIST_PAGES_FILE="${pages}"
-  export CALL_LOG="${TEST_ROOT}/calls-verify-shape.log"; : > "${CALL_LOG}"
-  run_case false 'task168_verify'
-  unset FAKE_LIST_PAGES_FILE
-  if [[ "${CASE_RC}" -ne 0 ]] && assert_msg "${CASE_OUTPUT}" 'unexpected shape'; then
-    ok "verify: a response missing data.items (unexpected shape) is a hard failure"
+  printf '%s' "${LEDGER_FULL10}" > "${TEST_ROOT}/ledger-migrate-fail.txt"
+  printf '5|5|3|0|0|0' > "${TEST_ROOT}/seals-migrate-fail.txt"
+  export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-migrate-fail.txt" FAKE_SEALS_FILE="${TEST_ROOT}/seals-migrate-fail.txt"
+  export MIGRATE_STAGE_B_SHOULD_FAIL=true
+  export CALL_LOG="${TEST_ROOT}/calls-b-migrate-fail.log"; : > "${CALL_LOG}"
+  run_case true 'task168_stage_b'
+  unset MIGRATE_STAGE_B_SHOULD_FAIL
+  if [[ "${CASE_RC}" -ne 0 && ! -e "${PROD_TASK168_STATE_ROOT}/release-sha-b/migration-stage.json" ]] &&
+     assert_msg "${CASE_OUTPUT}" 'M11 or a migration after it'; then
+    ok "stage-b-migrate-failure: no receipt, message names M11 or a later migration"
   else
-    bad "verify-shape-mismatch: rc=${CASE_RC} output=${CASE_OUTPUT}"
+    bad "stage-b-migrate-failure: rc=${CASE_RC} output=${CASE_OUTPUT}"
   fi
 }
-test_verify_shape_mismatch_fails
+test_stage_b_migrate_failure_message
+
+# ═══════════════════════ verify(): public API surface only ════════════════
+
+# $1 desc; list/schedule/match-code fixtures come from the caller's exports.
+# Sets VERIFY_RECEIPT.
+run_verify_case() {
+  local desc="$1"
+  export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/verify-${desc}"
+  seed_stage_b_transition "${PROD_TASK168_STATE_ROOT}/release-sha-b" "${STAGE_B_DB_ID}" false
+  export CALL_LOG="${TEST_ROOT}/calls-verify-${desc}.log"; : > "${CALL_LOG}"
+  run_case false 'task168_verify'
+  VERIFY_RECEIPT="${PROD_TASK168_STATE_ROOT}/release-sha-b/runtime-verification.json"
+}
+
+# t1: public, two schedule pages + one unscheduled match. t2: bracket not
+# published (the API exposes no matches for it). t3 exists only on list page 2.
+VERIFY_LIST="${TEST_ROOT}/verify-list.json"
+jq -n '[
+  {cursor:"", items:[{id:"t1"},{id:"t2"}], hasNext:true, nextCursor:"t2"},
+  {cursor:"t2", items:[{id:"t3"}], hasNext:false, nextCursor:null}
+]' > "${VERIFY_LIST}"
+VERIFY_SCHEDULE="${TEST_ROOT}/verify-schedule.json"
+jq -n '{
+  t1: [
+    {cursor:"", items:["m1","m2"], unscheduled:["m9"], nextCursor:"c2"},
+    {cursor:"c2", items:["m3"], unscheduled:["m9"], nextCursor:null}
+  ],
+  t2: [{cursor:"", items:[], unscheduled:[], nextCursor:null}],
+  t3: [{cursor:"", items:["m4"], unscheduled:[], nextCursor:null}]
+}' > "${VERIFY_SCHEDULE}"
+# A match the public API never lists (e.g. a draft tournament's) would 404.
+VERIFY_CODES_PRIVATE="${TEST_ROOT}/verify-codes-private.json"
+jq -n '{"private-match":"404"}' > "${VERIFY_CODES_PRIVATE}"
+export FAKE_LIST_PAGES_FILE="${VERIFY_LIST}" FAKE_SCHEDULE_FILE="${VERIFY_SCHEDULE}" FAKE_MATCH_CODES_FILE="${VERIFY_CODES_PRIVATE}"
+
+run_verify_case success
+if [[ "${CASE_RC}" -eq 0 ]] &&
+   jq -e '.status=="COMPLETED" and .tournamentCount==3 and .publicMatchCount==5 and .failureCount==0' "${VERIFY_RECEIPT}" >/dev/null 2>&1 &&
+   ! grep -q 'private-match' "${CALL_LOG}" &&
+   [[ "$(grep -c '/matches/m9' "${CALL_LOG}")" == 1 ]]; then
+  ok "verify: walks list + schedule pages, checks each exposed match once (5), never probes a match the API does not expose"
+else
+  bad "verify-success: rc=${CASE_RC} output=${CASE_OUTPUT} receipt=$(cat "${VERIFY_RECEIPT}" 2>/dev/null)"
+fi
+
+VERIFY_CODES_404="${TEST_ROOT}/verify-codes-404.json"
+jq -n '{"m3":"404"}' > "${VERIFY_CODES_404}"
+export FAKE_MATCH_CODES_FILE="${VERIFY_CODES_404}"
+run_verify_case public-404
+if [[ "${CASE_RC}" -ne 0 ]] && assert_msg "${CASE_OUTPUT}" 'match detail non-200 (404, curl exit 0)' &&
+   jq -e '.status=="FAILED" and .failureCount==1' "${VERIFY_RECEIPT}" >/dev/null 2>&1; then
+  ok "verify: a publicly listed match whose detail is 404 fails and records FAILED"
+else
+  bad "verify-public-404: rc=${CASE_RC} output=${CASE_OUTPUT} receipt=$(cat "${VERIFY_RECEIPT}" 2>/dev/null)"
+fi
+export FAKE_MATCH_CODES_FILE="${VERIFY_CODES_PRIVATE}"
+
+export FAKE_MATCH_CONNECT_FAIL=m1
+run_verify_case connect-fail
+unset FAKE_MATCH_CONNECT_FAIL
+if [[ "${CASE_RC}" -ne 0 ]] && assert_msg "${CASE_OUTPUT}" 'curl exit 7' &&
+   jq -e '.status=="FAILED" and .failureCount==1' "${VERIFY_RECEIPT}" >/dev/null 2>&1; then
+  ok "verify: a curl connection failure is counted, and runtime-verification.json is still written"
+else
+  bad "verify-connect-fail: rc=${CASE_RC} output=${CASE_OUTPUT} receipt=$(cat "${VERIFY_RECEIPT}" 2>/dev/null)"
+fi
+
+VERIFY_SCHEDULE_EMPTY="${TEST_ROOT}/verify-schedule-empty.json"
+jq -n '{t1:[{cursor:"",items:[],unscheduled:[],nextCursor:null}], t2:[{cursor:"",items:[],unscheduled:[],nextCursor:null}], t3:[{cursor:"",items:[],unscheduled:[],nextCursor:null}]}' > "${VERIFY_SCHEDULE_EMPTY}"
+export FAKE_SCHEDULE_FILE="${VERIFY_SCHEDULE_EMPTY}"
+run_verify_case zero-matches
+if [[ "${CASE_RC}" -ne 0 ]] && assert_msg "${CASE_OUTPUT}" 'zero public matches' &&
+   jq -e '.status=="FAILED" and .publicMatchCount==0' "${VERIFY_RECEIPT}" >/dev/null 2>&1; then
+  ok "verify: zero public matches across every public tournament is a failure"
+else
+  bad "verify-zero-matches: rc=${CASE_RC} output=${CASE_OUTPUT} receipt=$(cat "${VERIFY_RECEIPT}" 2>/dev/null)"
+fi
+
+VERIFY_SCHEDULE_BAD="${TEST_ROOT}/verify-schedule-bad.json"
+jq '.t2 = [{cursor:"", malformed:true}]' "${VERIFY_SCHEDULE}" > "${VERIFY_SCHEDULE_BAD}"
+export FAKE_SCHEDULE_FILE="${VERIFY_SCHEDULE_BAD}"
+run_verify_case schedule-shape
+if [[ "${CASE_RC}" -ne 0 ]] && assert_msg "${CASE_OUTPUT}" 'unexpected shape' &&
+   jq -e '.status=="FAILED"' "${VERIFY_RECEIPT}" >/dev/null 2>&1; then
+  ok "verify: a schedule response without items/unscheduled arrays fails"
+else
+  bad "verify-schedule-shape: rc=${CASE_RC} output=${CASE_OUTPUT}"
+fi
+export FAKE_SCHEDULE_FILE="${VERIFY_SCHEDULE}"
+
+VERIFY_LIST_ZERO="${TEST_ROOT}/verify-list-zero.json"
+jq -n '[{cursor:"", items:[], hasNext:false, nextCursor:null}]' > "${VERIFY_LIST_ZERO}"
+export FAKE_LIST_PAGES_FILE="${VERIFY_LIST_ZERO}"
+run_verify_case zero-tournaments
+if [[ "${CASE_RC}" -ne 0 ]] && assert_msg "${CASE_OUTPUT}" 'zero public tournaments'; then
+  ok "verify: zero public tournaments after full pagination is a failure"
+else
+  bad "verify-zero-tournaments: rc=${CASE_RC} output=${CASE_OUTPUT}"
+fi
+
+VERIFY_LIST_BAD="${TEST_ROOT}/verify-list-bad.json"
+jq -n '[{cursor:"", malformed:true}]' > "${VERIFY_LIST_BAD}"
+export FAKE_LIST_PAGES_FILE="${VERIFY_LIST_BAD}"
+run_verify_case list-shape
+if [[ "${CASE_RC}" -ne 0 ]] && assert_msg "${CASE_OUTPUT}" 'unexpected shape' &&
+   jq -e '.status=="FAILED"' "${VERIFY_RECEIPT}" >/dev/null 2>&1; then
+  ok "verify: a list response missing data.items fails and still writes the receipt"
+else
+  bad "verify-list-shape: rc=${CASE_RC} output=${CASE_OUTPUT}"
+fi
+unset FAKE_LIST_PAGES_FILE FAKE_SCHEDULE_FILE FAKE_MATCH_CODES_FILE
 
 # ═══════════════════════════════════════════════════════════════════════════
 

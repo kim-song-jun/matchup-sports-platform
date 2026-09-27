@@ -74,7 +74,7 @@ describe('team match description line breaks', () => {
 
     renderPage(<TeamMatchDetailPageView model={model} />);
 
-    expect(screen.getByText('첫 번째 안내\n두 번째 안내')).toHaveStyle({ whiteSpace: 'pre-wrap' });
+    expect(screen.getByText(/첫 번째 안내\s+두 번째 안내/)).toHaveStyle({ whiteSpace: 'pre-wrap' });
   });
 
   it('preserves line breaks on the confirmation page', () => {
@@ -83,7 +83,7 @@ describe('team match description line breaks', () => {
 
     renderPage(<TeamMatchCreatePageView model={model} />);
 
-    expect(screen.getByText('첫 번째 안내\n두 번째 안내')).toHaveStyle({ whiteSpace: 'pre-wrap' });
+    expect(screen.getByText(/첫 번째 안내\s+두 번째 안내/)).toHaveStyle({ whiteSpace: 'pre-wrap' });
   });
 });
 

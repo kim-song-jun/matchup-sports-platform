@@ -14,6 +14,7 @@ import type {
   GameSourceCreationInput,
 } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { submitFriendlyTeamMatchLineups } from '../helpers/submit-friendly-team-match-lineups';
 
 const ids = {
   platformOps: '77000000-0000-4000-8000-000000000001',
@@ -491,6 +492,7 @@ describe('Task 7 six-persona Game actor matrix characterization PIN', () => {
         ),
       )
     ).gameId;
+    await submitFriendlyTeamMatchLineups(prisma, teamGameId);
   });
 
   afterAll(async () => {

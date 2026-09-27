@@ -102,6 +102,7 @@ export const v1Keys = {
   adminInquiries: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'inquiries', filters ?? {}] as const,
   adminInquiry: (id: string) => [...v1Keys.all, 'admin', 'inquiries', id] as const,
   adminInquiriesPendingCount: () => [...v1Keys.all, 'admin', 'inquiries', 'pending-count'] as const,
+  adminGuestInquiryPurgeCandidates: () => [...v1Keys.all, 'admin', 'guest-inquiries', 'purge-candidates'] as const,
   adminReportedTeams: (limit?: number) => [...v1Keys.all, 'admin', 'reported-teams', limit ?? null] as const,
   adminTeamMatches: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'team-matches', filters ?? {}] as const,
   adminStatusChangeLogs: (filters?: Record<string, unknown>) => [...v1Keys.all, 'admin', 'status-change-logs', filters ?? {}] as const,
@@ -174,6 +175,7 @@ export const v1Keys = {
   myJoinApplications: () => [...v1Keys.all, 'me', 'join-applications'] as const,
   adminIntegrationSettings: () => [...v1Keys.all, 'admin', 'integration-settings'] as const,
   adminReviewPolicySettings: () => [...v1Keys.all, 'admin', 'review-policy-settings'] as const,
+  adminSiteInfo: () => [...v1Keys.all, 'admin', 'site-info'] as const,
   publicKakaoMapsKey: () => [...v1Keys.all, 'public', 'kakao-maps-key'] as const,
   // Task 21: live tournament operations console (fixture lineup + event backfill).
   // `game`은 위쪽에 이미 선언돼 있어 여기서 다시 정의하지 않는다 — 양쪽 브랜치가

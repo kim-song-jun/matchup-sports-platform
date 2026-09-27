@@ -321,6 +321,8 @@ enum V1InquiryCategory {
   payment_refund
   report
   other
+  tournament_hosting
+  partnership
 }
 
 enum V1InquiryReportReason {
@@ -2351,22 +2353,28 @@ model V1StatusChangeLog {
 }
 
 model V1Inquiry {
-  id             String                 @id @default(uuid())
-  userId         String?                @map("user_id")
-  guestEmail     String?                @map("guest_email")
-  guestPhone     String?                @map("guest_phone")
-  category       V1InquiryCategory
-  title          String
-  body           String
-  contact        String?
-  relatedType    V1InquiryRelatedType?  @map("related_type")
-  relatedId      String?                @map("related_id")
-  reportReason   V1InquiryReportReason? @map("report_reason")
-  reportedTeamId String?                @map("reported_team_id")
-  status         V1InquiryStatus        @default(received)
-  closedAt       DateTime?              @map("closed_at")
-  createdAt      DateTime               @default(now()) @map("created_at")
-  updatedAt      DateTime               @updatedAt @map("updated_at")
+  id                  String                 @id @default(uuid())
+  userId              String?                @map("user_id")
+  guestEmail          String?                @map("guest_email")
+  guestPhone          String?                @map("guest_phone")
+  category            V1InquiryCategory
+  title               String
+  body                String
+  contact             String?
+  relatedType         V1InquiryRelatedType?  @map("related_type")
+  relatedId           String?                @map("related_id")
+  reportReason        V1InquiryReportReason? @map("report_reason")
+  reportedTeamId      String?                @map("reported_team_id")
+  status              V1InquiryStatus        @default(received)
+  closedAt            DateTime?              @map("closed_at")
+  /// 비회원이 제출 때 동의한 보관 일수. 파기 판정은 이 값과 현재 설정 중 짧은 쪽을 쓴다(null = 이 컬럼 이전 행).
+  guestRetentionDays  Int?                   @map("guest_retention_days")
+  /// 비회원 문의 개인정보 파기 시각. 값이 있으면 연락처·제목·본문·답변이 고정 문구로 바뀐 행이다.
+  purgedAt            DateTime?              @map("purged_at")
+  // 감사 추적용 참조 문자열 — FK 관계는 두지 않는다(V1SiteInfoSettings.updatedByAdminUserId 와 같은 규칙).
+  purgedByAdminUserId String?                @map("purged_by_admin_user_id")
+  createdAt           DateTime               @default(now()) @map("created_at")
+  updatedAt           DateTime               @updatedAt @map("updated_at")
 
   user         V1User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
   reportedTeam V1Team?          @relation("V1InquiryReportedTeam", fields: [reportedTeamId], references: [id], onDelete: SetNull)
@@ -3067,6 +3075,24 @@ model V1ReviewPolicySettings {
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   @@map("v1_review_policy_settings")
+}
+
+/// 공개 페이지 푸터·문의 폼에 노출하는 사업자 정보. 어드민이 런타임에 편집한다.
+model V1SiteInfoSettings {
+  id                         String   @id @default("singleton")
+  companyName                String?  @map("company_name")
+  representativeName         String?  @map("representative_name")
+  businessRegistrationNumber String?  @map("business_registration_number")
+  address                    String?
+  mailOrderSalesNumber       String?  @map("mail_order_sales_number")
+  contactEmail               String?  @map("contact_email")
+  /// 비회원 문의 개인정보 보관 일수(처리 완료 시점부터). DTO 가 1~3650 으로 제한한다.
+  guestInquiryRetentionDays  Int      @default(365) @map("guest_inquiry_retention_days")
+  // 감사 추적용 참조 문자열 — FK 관계는 두지 않는다(V1IntegrationSettings와 같은 규칙).
+  updatedByAdminUserId       String?  @map("updated_by_admin_user_id")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+
+  @@map("v1_site_info_settings")
 }
 
 model V1Game {

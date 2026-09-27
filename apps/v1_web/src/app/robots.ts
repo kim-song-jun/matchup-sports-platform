@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { ROBOTS_NAMED_USER_AGENTS } from '@/lib/crawler-agents';
 import { absoluteSiteUrl, getSiteOrigin, NOTICES_FEED_PATH } from '@/lib/seo';
+import { PUBLIC_SITE_ALLOW_PATHS } from '@/lib/public-site/routes';
 
 /**
  * 공개 크롤 대상 경로. 로그인·개인 데이터·운영 화면은 아래 DISALLOWED_PATHS로 차단한다.
@@ -14,6 +15,7 @@ const ALLOWED_PATHS = [
   '/league-matches',
   '/events',
   '/notices',
+  ...PUBLIC_SITE_ALLOW_PATHS,
 ];
 
 const DISALLOWED_PATHS = [

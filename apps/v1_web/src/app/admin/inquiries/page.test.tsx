@@ -17,6 +17,10 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/hooks/use-v1-api', () => ({
   useV1AdminInquiries: (filters?: AdminListFilters) => inquiriesMock(filters),
+  // 파기 패널은 guest-inquiry-purge-panel.test.tsx 가 다룬다 — 여기선 대상 0건(패널 숨김).
+  useV1AdminGuestInquiryPurgeCandidates: () => ({ data: { retentionDays: 365, total: 0, items: [] }, isError: false }),
+  useV1PurgeGuestInquiries: () => ({ mutate: vi.fn(), isPending: false }),
+  useV1AdminMe: () => ({ data: undefined }),
 }));
 
 const reportRow: V1AdminInquiryRow = {
@@ -37,6 +41,7 @@ const reportRow: V1AdminInquiryRow = {
   createdAt: '2026-08-01T00:00:00.000Z',
   updatedAt: '2026-08-01T00:00:00.000Z',
   closedAt: null,
+  purgedAt: null,
 };
 
 function mockInquiriesData() {

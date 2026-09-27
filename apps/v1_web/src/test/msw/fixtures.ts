@@ -204,6 +204,7 @@ export function toAdminInquiryRow(inquiry: V1Inquiry): V1AdminInquiryRow {
     createdAt: inquiry.createdAt,
     updatedAt: inquiry.updatedAt,
     closedAt: inquiry.closedAt,
+    purgedAt: null,
   };
 }
 

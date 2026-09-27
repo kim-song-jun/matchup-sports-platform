@@ -46,6 +46,13 @@ describe('robots', () => {
     }
   });
 
+  it('공개 도움말·이용 대상·문의 경로를 모든 user-agent 에 연다', () => {
+    for (const rule of rules()) {
+      const allow = Array.isArray(rule.allow) ? rule.allow : [rule.allow ?? ''];
+      expect(allow).toEqual(expect.arrayContaining(['/help', '/faq', '/for/', '/contact']));
+    }
+  });
+
   it('sitemap 과 host 를 절대 URL 로 알린다', () => {
     const result = robots();
     expect(result.sitemap).toEqual([

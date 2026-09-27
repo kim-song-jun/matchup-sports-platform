@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import { absoluteSiteUrl, fetchPublicV1 } from '@/lib/seo';
+import { PUBLIC_SITE_ROUTES } from '@/lib/public-site/routes';
 import type {
   CursorPage,
   V1Match,
@@ -44,6 +45,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: route.priority,
     changeFrequency: route.changeFrequency,
   }));
+  // 도움말·이용 대상·문의 페이지는 콘텐츠 모듈이 경로와 갱신일을 가진다(가이드는 편마다).
+  const publicSiteEntries = PUBLIC_SITE_ROUTES.map((route) =>
+    sitemapEntry(route.path, route.sitemapPriority, 'monthly', route.lastModified),
+  );
 
   const results = await Promise.allSettled([
     fetchCursorItems<V1Match>('/matches'),
@@ -62,6 +67,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [
     ...staticEntries,
+    ...publicSiteEntries,
     ...matches.flatMap((item) => {
       const id = item.matchId ?? item.id;
       return id ? [sitemapEntry(`/matches/${id}`, 0.7, 'daily')] : [];

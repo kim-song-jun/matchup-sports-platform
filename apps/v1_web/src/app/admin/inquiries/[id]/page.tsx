@@ -42,6 +42,8 @@ const CATEGORY_LABEL: Record<V1InquiryCategory, string> = {
   payment_refund: '결제/환불',
   report: '신고',
   other: '기타',
+  tournament_hosting: '대회 개설',
+  partnership: '제휴',
 };
 
 const STATUS_OPTIONS: Array<{ value: V1InquiryStatus; label: string }> = [
@@ -417,6 +419,10 @@ export default function AdminInquiryDetailPage() {
     );
   }
 
+  // 파기한 문의에 새로 쓴 답변은 다시 파기할 경로가 없다 — 서버도 409 INQUIRY_PURGED 로 막는다.
+  const purged = Boolean(inquiry.purgedAt);
+  const canEditInquiry = canWrite && !purged;
+
   return (
     <>
       <AdminPageHeader
@@ -468,6 +474,12 @@ export default function AdminInquiryDetailPage() {
               <AdminStatusPill status={inquiry.status} label={STATUS_LABEL[inquiry.status]} />
             </div>
 
+            {inquiry.purgedAt ? (
+              <p className="tm-on-tint mt-4 rounded-xl border border-[var(--tint-orange-border)] bg-[var(--tint-orange)] px-4 py-3 text-[length:var(--font-size-body-sm)] font-semibold text-[var(--orange700)]">
+                보관 기간이 지나 {formatAdminDateTime(inquiry.purgedAt)}에 개인정보를 파기한 문의예요. 연락처·제목·본문·답변은 되살릴 수 없어요.
+              </p>
+            ) : null}
+
             <div className="mt-5 whitespace-pre-wrap break-words rounded-xl bg-[var(--surface-soft)] px-4 py-3 text-sm leading-relaxed text-[var(--text-body)]">
               {inquiry.body}
             </div>
@@ -500,7 +512,7 @@ export default function AdminInquiryDetailPage() {
                             {formatAdminDateTime(reply.createdAt)}
                             {wasReplyEdited(reply) ? ' (수정됨)' : ''}
                           </time>
-                          {canWrite && !isEditing ? (
+                          {canEditInquiry && !isEditing ? (
                             <button
                               type="button"
                               onClick={() => startEditReply(reply.replyId, reply.body)}
@@ -576,18 +588,18 @@ export default function AdminInquiryDetailPage() {
                 onChange={(event) => setReplyBody(event.target.value)}
                 rows={8}
                 maxLength={2000}
-                disabled={!canWrite || replyMutation.isPending}
+                disabled={!canEditInquiry || replyMutation.isPending}
                 className="resize-y rounded-xl border border-[var(--border)] px-3 py-3 text-sm leading-relaxed text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
                 placeholder="답변 내용"
               />
-              {!canWrite ? (
+              {!canEditInquiry ? (
                 <p className="tm-on-tint rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-xs text-[var(--text-muted)]">
-                  지원 권한은 조회만 가능해요.
+                  {purged ? '개인정보를 파기한 문의라 답변이나 상태를 바꿀 수 없어요.' : '지원 권한은 조회만 가능해요.'}
                 </p>
               ) : null}
               <button
                 type="submit"
-                disabled={!canWrite || replyMutation.isPending}
+                disabled={!canEditInquiry || replyMutation.isPending}
                 className="inline-flex h-[44px] items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-gray-300 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"
               >
                 <Send size={16} aria-hidden="true" />
@@ -602,7 +614,7 @@ export default function AdminInquiryDetailPage() {
               <select
                 value={status}
                 onChange={(event) => setStatus(event.target.value as V1InquiryStatus)}
-                disabled={!canWrite || statusMutation.isPending}
+                disabled={!canEditInquiry || statusMutation.isPending}
                 className="h-[44px] rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 text-sm text-[var(--text-strong)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-gray-50 disabled:text-gray-400"
               >
                 {STATUS_OPTIONS.map((option) => (
@@ -613,7 +625,7 @@ export default function AdminInquiryDetailPage() {
               </select>
               <button
                 type="submit"
-                disabled={!canWrite || statusMutation.isPending}
+                disabled={!canEditInquiry || statusMutation.isPending}
                 // 부모 <section> 이 이미 --card-surface 라 select/button 도 같은 토큰이면
                 // 카드 안에 묻혀 경계가 안 보인다 — 전수검수에서 발견, --surface-soft 로 구분.
                 className="inline-flex h-[44px] items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 text-sm font-semibold text-[var(--text-body)] transition-colors hover:bg-[var(--border)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-blue-500 focus-visible:outline-offset-2"

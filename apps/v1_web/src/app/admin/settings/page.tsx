@@ -5,12 +5,14 @@ import { Suspense, useEffect, useState } from 'react';
 import { AdminPageHeader } from '@/components/admin';
 import { IntegrationsView } from './integrations-view';
 import { ReviewPolicyView } from './reviews-view';
+import { SiteInfoView } from './site-info-view';
 
-type TabKey = 'integrations' | 'reviews';
+type TabKey = 'integrations' | 'reviews' | 'site-info';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'integrations', label: '연동' },
   { key: 'reviews', label: '후기 정책' },
+  { key: 'site-info', label: '사업자 정보' },
 ];
 
 const DESCRIPTIONS: Record<TabKey, string> = {
@@ -18,7 +20,19 @@ const DESCRIPTIONS: Record<TabKey, string> = {
     '카카오맵 API 키를 등록하면 대회 상세의 현장 안내에 실제 지도와 내비게이션 길찾기가 표시돼요. 등록하지 않아도 기존 네이버 지도 검색 링크는 그대로 동작해요.',
   reviews:
     '경기 결과가 확정된 뒤 참가자가 상대팀·상대 선수 후기를 쓸 수 있는 기간이에요. 대회 경기와 팀 매치 모두에 함께 적용돼요.',
+  'site-info':
+    '공개 소개 페이지의 푸터 사업자 정보와 문의 페이지의 연락처·비회원 문의 보관 기간이에요.',
 };
+
+const TAB_BODIES: Record<TabKey, () => React.JSX.Element> = {
+  integrations: IntegrationsView,
+  reviews: ReviewPolicyView,
+  'site-info': SiteInfoView,
+};
+
+function tabFromQuery(value: string | null): TabKey {
+  return TABS.some((tab) => tab.key === value) ? (value as TabKey) : 'integrations';
+}
 
 // useSearchParams 는 Suspense 경계를 요구한다(Next.js App Router).
 export default function AdminSettingsHubPage() {
@@ -30,8 +44,8 @@ export default function AdminSettingsHubPage() {
 }
 
 /**
- * 설정 허브 — 연동 설정·후기 정책 두 소형 화면을 한 입구로 합친다(A안 사용자 확정,
- * 2026-08-25). 탭 본문은 기존 폼을 그대로 이식했고 구 URL 2개는 리다이렉트로 남는다.
+ * 설정 허브 — 소형 설정 화면(연동·후기 정책·사업자 정보)을 한 입구로 합친다(A안 사용자 확정,
+ * 2026-08-25). 하위 URL(/admin/settings/<탭>)은 리다이렉트로 남는다.
  * 문법은 모니터링·리그 허브와 동일(탭 + ?tab= 딥링크 + URL 재동기화).
  */
 function SettingsHub() {
@@ -39,19 +53,19 @@ function SettingsHub() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const [activeTab, setActiveTab] = useState<TabKey>(() =>
-    searchParams.get('tab') === 'reviews' ? 'reviews' : 'integrations',
-  );
+  const [activeTab, setActiveTab] = useState<TabKey>(() => tabFromQuery(searchParams.get('tab')));
   // 뒤로가기/앞으로가기·외부 내비게이션으로 URL 만 바뀐 경우에도 탭을 따라가게 한다 —
   // 클릭은 setActiveTab 이 즉시 처리하므로 이 effect 는 재동기화 전용이다.
   useEffect(() => {
-    setActiveTab(searchParams.get('tab') === 'reviews' ? 'reviews' : 'integrations');
+    setActiveTab(tabFromQuery(searchParams.get('tab')));
   }, [searchParams]);
 
   function handleTabChange(tab: TabKey) {
     setActiveTab(tab);
-    router.replace(tab === 'reviews' ? `${pathname}?tab=reviews` : pathname, { scroll: false });
+    router.replace(tab === 'integrations' ? pathname : `${pathname}?tab=${tab}`, { scroll: false });
   }
+
+  const ActiveBody = TAB_BODIES[activeTab];
 
   return (
     <>
@@ -95,7 +109,7 @@ function SettingsHub() {
         role="tabpanel"
         aria-labelledby={`settings-tab-${activeTab}`}
       >
-        {activeTab === 'integrations' ? <IntegrationsView /> : <ReviewPolicyView />}
+        <ActiveBody />
       </div>
     </>
   );

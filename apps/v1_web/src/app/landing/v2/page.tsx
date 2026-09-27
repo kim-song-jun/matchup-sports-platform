@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { buildPublicMetadata } from '@/lib/seo';
-import { LandingSports, LandingHow, LandingFooter } from '@/components/landing/landing-sections';
+import { fetchPublicSiteInfo } from '@/lib/public-site/site-info';
+import { PublicSiteFooter } from '@/components/public-site';
+import { LandingSports, LandingHow } from '@/components/landing/landing-sections';
 import { LandingMobileCta } from '@/components/landing/landing-mobile-cta';
 import { LandingV2Root } from '@/components/landing/v2/landing-v2-root';
 import { LandingV2Hero, LandingV2Nav } from '@/components/landing/v2/landing-v2-hero';
@@ -26,7 +28,8 @@ export const metadata: Metadata = {
 
 /* 기(공감 히어로) → 승(불편 넷) → 전(반전 띠·해결 챕터·신뢰) → 결(종목·이용 방법·CTA).
    섹션은 서버 컴포넌트라 설명이 HTML 에 그대로 실리고, 클라이언트 섬은 CTA 계측·토글·모션 배선뿐이다. */
-export default function LandingV2Page() {
+export default async function LandingV2Page() {
+  const siteInfo = await fetchPublicSiteInfo();
   return (
     <LandingV2Root>
       <LandingV2Nav />
@@ -40,7 +43,10 @@ export default function LandingV2Page() {
         <LandingHow />
         <LandingV2CtaBanner />
       </main>
-      <LandingFooter />
+      {/* A안(/landing)·공개 페이지와 같은 푸터 — 사업자 정보는 어드민 설정에서 온다 */}
+      <div data-mobile-cta-hide>
+        <PublicSiteFooter siteInfo={siteInfo} />
+      </div>
       <LandingMobileCta variant="v2" />
     </LandingV2Root>
   );

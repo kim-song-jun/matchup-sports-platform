@@ -1,0 +1,534 @@
+/*
+ * 도움말 트랙(/faq, /help, /help/guides/*, /help/glossary). 셸·섹션·FAQ 아코디언은 public-site.css 것을 쓰고
+ * 여기에는 검색·주제 칩·가이드 카드·가이드 본문·용어집만 둔다. 모바일 기본 → 768 → 1024 순.
+ */
+
+/* ── 검색(허브) ── */
+.tm-help-search {
+  max-width: 640px;
+}
+
+.tm-help-search-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: var(--font-size-body-sm);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.tm-help-search-field {
+  position: relative;
+}
+
+.tm-help-search-input {
+  padding-right: 52px;
+}
+
+.tm-help-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+.tm-help-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: var(--radius-circle);
+  background: transparent;
+  font-size: var(--font-size-subhead);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.tm-help-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tm-help-suggest-label {
+  margin-right: 4px;
+  font-size: var(--font-size-label);
+  color: var(--text-muted);
+}
+
+.tm-help-search-status {
+  margin: 16px 0 8px;
+}
+
+.tm-help-search-status:empty {
+  margin: 0;
+}
+
+.tm-help-results {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-help-result {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 12px;
+  min-height: 56px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card-surface);
+  transition: border-color var(--duration-fast) ease;
+}
+
+.tm-help-result-kind {
+  grid-row: span 2;
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--blue50);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  color: var(--blue700);
+}
+
+.tm-help-result-title {
+  font-size: var(--font-size-body);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.tm-help-result-context {
+  font-size: var(--font-size-label);
+  color: var(--text-muted);
+}
+
+.tm-help-search-empty {
+  margin: 0;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.7;
+  color: var(--text);
+}
+
+/* ── 주제 칩(허브) · 주제 필터(/faq): 좁은 화면에서는 가로로 넘긴다 ── */
+.tm-help-topics {
+  margin-top: 24px;
+}
+
+.tm-help-topics ul,
+.tm-help-filter {
+  display: flex;
+  gap: 8px;
+  margin: 0 -20px;
+  padding: 4px 20px;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: none;
+}
+
+.tm-help-topics ul::-webkit-scrollbar,
+.tm-help-filter::-webkit-scrollbar {
+  display: none;
+}
+
+.tm-help-topics li,
+.tm-help-filter .tm-chip {
+  flex-shrink: 0;
+}
+
+/* ── /faq 주제 묶음 ── */
+.tm-help-faq {
+  margin-top: 24px;
+}
+
+.tm-help-filter {
+  margin-bottom: 16px;
+}
+
+.tm-help-group + .tm-help-group {
+  margin-top: 40px;
+}
+
+.tm-help-group-title {
+  margin: 0;
+  font-size: var(--font-size-heading);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-help-group-desc {
+  margin: 4px 0 12px;
+  font-size: var(--font-size-body-sm);
+  color: var(--text-muted);
+}
+
+.tm-help-cta-wrap {
+  padding-bottom: 48px;
+}
+
+/* ── 가이드 카드: 제목 링크를 카드 전체로 넓힌다 ── */
+.tm-help-guides {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-help-guide-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card-surface);
+  transition: border-color var(--duration-fast) ease;
+}
+
+.tm-help-guide-card:focus-within {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+.tm-help-guide-link:focus-visible {
+  outline: none;
+}
+
+.tm-help-guide-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.tm-help-guide-who {
+  margin: 0;
+  font-size: var(--font-size-label);
+  font-weight: 700;
+  color: var(--blue700);
+}
+
+.tm-help-guide-title {
+  margin: 0;
+  font-size: var(--font-size-body-lg);
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--text-strong);
+}
+
+.tm-help-guide-summary {
+  margin: 0;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.tm-help-guide-more {
+  margin: auto 0 0;
+  padding-top: 4px;
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* ── 질문 링크 목록(인기·관련 질문) ── */
+.tm-help-qlinks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+
+.tm-help-qlinks li {
+  border-bottom: 1px solid var(--border);
+}
+
+.tm-help-qlink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 52px;
+  padding: 12px 0;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.tm-help-qlink::after {
+  content: '→';
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.tm-help-more-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 24px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ── 문의 안내 ── */
+.tm-help-cta {
+  padding: 24px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card-surface);
+}
+
+.tm-help-cta-title {
+  margin: 0;
+  font-size: var(--font-size-heading);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-help-cta-body {
+  margin: 8px 0 16px;
+  max-width: 40em;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.tm-help-cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ── 가이드 본문 ── */
+.tm-help-article {
+  max-width: 760px;
+}
+
+.tm-help-answer {
+  margin: 0;
+  padding: 16px 20px;
+  border-left: 4px solid var(--blue500);
+  border-radius: var(--radius-control);
+  background: var(--blue50);
+  font-size: var(--font-size-body-lg);
+  font-weight: 600;
+  line-height: 1.6;
+  color: var(--text-strong);
+}
+
+.tm-help-meta {
+  margin: 16px 0 0;
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.tm-help-h2 {
+  margin: 48px 0 16px;
+  font-size: var(--font-size-heading);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+/* 단계 번호는 CSS 카운터 — 스크린리더는 <ol> 순서로 읽는다 */
+.tm-help-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: tm-help-step;
+}
+
+.tm-help-step {
+  position: relative;
+  padding: 0 0 24px 48px;
+  counter-increment: tm-help-step;
+}
+
+.tm-help-step::before {
+  content: counter(tm-help-step);
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-circle);
+  border: 1.5px solid var(--blue500);
+  background: var(--card-surface);
+  font-size: var(--font-size-body-sm);
+  font-weight: 800;
+  color: var(--blue700);
+}
+
+.tm-help-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 40px;
+  bottom: 8px;
+  left: 16px;
+  border-left: 2px solid var(--border);
+}
+
+.tm-help-step-title {
+  margin: 4px 0 8px;
+  font-size: var(--font-size-body-lg);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-help-step-body,
+.tm-help-note p {
+  margin: 0;
+  font-size: var(--font-size-body);
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.tm-help-note {
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-soft);
+}
+
+.tm-help-note + .tm-help-note {
+  margin-top: 12px;
+}
+
+.tm-help-note-title {
+  margin: 0 0 8px;
+  font-size: var(--font-size-body);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-help-note p + p {
+  margin-top: 4px;
+}
+
+/* ── 용어집 ── */
+.tm-help-toc ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-help-toc-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--font-size-body-sm);
+  font-weight: 600;
+  color: var(--blue700);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tm-help-terms {
+  display: grid;
+  gap: 0;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+
+.tm-help-term {
+  padding: 24px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tm-help-term-name {
+  margin: 0;
+  font-size: var(--font-size-heading);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-help-term-alias {
+  margin: 4px 0 0;
+  font-size: var(--font-size-label);
+  color: var(--text-muted);
+}
+
+.tm-help-term-def {
+  margin: 12px 0 0;
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  line-height: 1.7;
+  color: var(--text-strong);
+}
+
+.tm-help-term-detail {
+  margin: 8px 0 0;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.tm-help-term .tm-help-qlinks {
+  margin-top: 12px;
+}
+
+@media (hover: hover) {
+  .tm-help-result:hover,
+  .tm-help-guide-card:hover {
+    border-color: var(--border-strong);
+  }
+
+  .tm-help-qlink:hover {
+    color: var(--blue700);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-help-result,
+  .tm-help-guide-card {
+    transition: none;
+  }
+}
+
+/* ─── 태블릿 (768+) ─── */
+@media (min-width: 768px) {
+  .tm-help-topics ul,
+  .tm-help-filter {
+    flex-wrap: wrap;
+    margin-inline: 0;
+    padding: 4px 0;
+    overflow: visible;
+  }
+
+  .tm-help-guides {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .tm-help-cta {
+    padding: 32px;
+  }
+
+  .tm-help-cta-wrap {
+    padding-bottom: 72px;
+  }
+}
+
+/* ─── 데스크톱 (1024+) ─── */
+@media (min-width: 1024px) {
+  .tm-help-cta-wrap {
+    padding-bottom: 96px;
+  }
+}

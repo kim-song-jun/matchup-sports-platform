@@ -1,0 +1,615 @@
+/*
+ * 공개 소개·도움말 페이지(/faq, /contact, /for/*, /help/*) 공용 셸. 랜딩처럼 앱 셸 밖 독립 페이지라
+ * 모바일 기본 스타일까지 이 파일에 두고 768 → 1024 → 1440 순으로 덧씌운다.
+ * 테마 토글 버튼(.tm-landing-icon-btn)은 랜딩 컴포넌트를 그대로 쓰므로 스타일도 landing.css 것을 쓴다.
+ */
+
+.tm-ps {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  word-break: keep-all;
+  overflow-x: clip;
+}
+
+.tm-ps :focus-visible {
+  outline: 2px solid var(--blue500);
+  outline-offset: 2px;
+}
+
+html:has(.tm-ps) {
+  scroll-padding-top: 76px;
+}
+
+.tm-ps-skip-link {
+  position: absolute;
+  left: 16px;
+  top: -64px;
+  z-index: var(--z-top);
+  padding: 12px 16px;
+  border-radius: var(--radius-control);
+  background: var(--static-ink);
+  color: var(--static-white);
+  font-weight: 700;
+}
+
+.tm-ps-skip-link:focus {
+  top: 8px;
+}
+
+.tm-ps-main:focus {
+  outline: none;
+}
+
+.tm-ps-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* ── 헤더 ── */
+.tm-ps-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-layer);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  -webkit-backdrop-filter: saturate(1.6) blur(12px);
+  backdrop-filter: saturate(1.6) blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+
+.tm-ps-header-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 60px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 12px 0 20px;
+}
+
+.tm-ps-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-right: auto;
+  font-size: var(--font-size-body-lg);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.tm-ps-nav {
+  display: none;
+}
+
+.tm-ps-nav-list,
+.tm-ps-menu-list,
+.tm-ps-menu-sublist,
+.tm-ps-dropdown-panel {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-ps-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-chip);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-body-sm);
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) ease, color var(--duration-fast) ease;
+}
+
+/* 현재 위치는 색 + 배경 두 신호로 */
+.tm-ps-nav-link[aria-current='page'],
+.tm-ps-nav-link[data-current='true'],
+.tm-ps-menu-link[aria-current='page'] {
+  background: var(--blue50);
+  color: var(--blue700);
+}
+
+.tm-ps-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tm-ps-login {
+  display: none;
+}
+
+/* ── 이용 대상 드롭다운(1024+) ── */
+.tm-ps-dropdown {
+  position: relative;
+}
+
+.tm-ps-dropdown-chevron {
+  transition: transform var(--duration-fast) ease;
+}
+
+.tm-ps-dropdown-trigger[aria-expanded='true'] .tm-ps-dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+.tm-ps-dropdown-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 176px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--surface);
+  box-shadow: var(--shadow-dropdown);
+}
+
+.tm-ps-dropdown-panel[hidden],
+.tm-ps-mobile-panel[hidden] {
+  display: none;
+}
+
+.tm-ps-menu-link {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--radius-control);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  color: var(--text-strong);
+  transition: background-color var(--duration-fast) ease;
+}
+
+/* ── 전체 메뉴(<1024) ── */
+.tm-ps-mobile-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: calc(100dvh - 60px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  box-shadow: var(--shadow-dropdown);
+}
+
+.tm-ps-menu-list {
+  display: grid;
+  gap: 4px;
+}
+
+.tm-ps-menu-group-label {
+  margin: 8px 0 4px;
+  padding: 0 12px;
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.tm-ps-menu-sublist .tm-ps-menu-link {
+  padding-left: 24px;
+}
+
+.tm-ps-menu-login {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── 이동 경로 ── */
+.tm-ps-breadcrumb ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+  padding: 16px 0 0;
+  list-style: none;
+  font-size: var(--font-size-label);
+  color: var(--text-muted);
+}
+
+.tm-ps-breadcrumb li + li::before {
+  content: '/';
+  margin: 0 8px;
+  color: var(--text-caption);
+}
+
+.tm-ps-breadcrumb a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tm-ps-breadcrumb [aria-current='page'] {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+/* ── 섹션 모듈(landing-rhythm): 키워드 → 제목 → 본문 ── */
+.tm-ps-section {
+  padding: 48px 0;
+}
+
+.tm-ps-section[data-tone='muted'] {
+  background: var(--surface-soft);
+  /* --grey600 보조 글자는 이 지면에서 4.19:1 로 AA 미달 — .tm-on-tint 와 같은 방법(globals.css) */
+  --text-caption: var(--grey700);
+  --text-muted: var(--grey700);
+}
+
+.tm-ps-section-header {
+  margin-bottom: 24px;
+}
+
+.tm-ps-kw {
+  margin: 0 0 12px;
+  font-size: var(--font-size-body-sm);
+  font-weight: 700;
+  color: var(--blue700);
+}
+
+/* 타입 스케일 상한(heading 24px)을 넘는 디스플레이 크기는 랜딩과 같은 값을 쓴다 */
+.tm-ps-title,
+.tm-ps-title-page {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.3;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-strong);
+  text-wrap: balance;
+}
+
+.tm-ps-title-page {
+  font-size: 32px;
+  line-height: 1.24;
+}
+
+.tm-ps-lead {
+  margin: 12px 0 0;
+  max-width: 36em;
+  font-size: var(--font-size-body);
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.tm-ps-updated {
+  margin: 12px 0 0;
+  font-size: var(--font-size-label);
+  color: var(--text-muted);
+}
+
+.tm-ps-count {
+  margin: 0 0 12px;
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.tm-ps-text-link,
+.tm-ps-footer-inline-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+  color: var(--blue700);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ── 정직 고지 ── */
+.tm-ps-honest {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-container);
+  background: var(--card-surface);
+}
+
+.tm-ps-honest-title {
+  margin: 0 0 12px;
+  font-size: var(--font-size-body-lg);
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.tm-ps-honest-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-ps-honest-list li {
+  display: grid;
+  gap: 4px;
+  padding-left: 16px;
+  border-left: 2px solid var(--border-strong);
+  font-size: var(--font-size-body-sm);
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.tm-ps-honest-list strong {
+  color: var(--text-strong);
+}
+
+/* ── FAQ 아코디언 ── */
+.tm-ps-faq {
+  border-top: 1px solid var(--border);
+}
+
+.tm-ps-faq-item {
+  border-bottom: 1px solid var(--border);
+}
+
+.tm-ps-faq-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 56px;
+  padding: 12px 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.tm-ps-faq-summary::-webkit-details-marker {
+  display: none;
+}
+
+/* 펼침 표시는 +/− 글자(색 아닌 모양)로 */
+.tm-ps-faq-summary::after {
+  content: '+';
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+  font-size: var(--font-size-subhead);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.tm-ps-faq-item[open] > .tm-ps-faq-summary::after {
+  content: '−';
+}
+
+.tm-ps-faq-question {
+  margin: 0;
+  font-size: var(--font-size-body);
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--text-strong);
+}
+
+.tm-ps-faq-answer {
+  padding: 0 0 20px;
+  font-size: var(--font-size-body-sm);
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.tm-ps-faq-answer p {
+  margin: 0 0 8px;
+}
+
+.tm-ps-faq-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ── 표(환불 기준·역할 권한 등) ── */
+.tm-ps-table-wrap {
+  margin: 12px 0;
+  overflow-x: auto;
+}
+
+.tm-ps-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-body-sm);
+}
+
+.tm-ps-table caption {
+  padding-bottom: 8px;
+  text-align: left;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.tm-ps-table th,
+.tm-ps-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.tm-ps-table thead th {
+  font-size: var(--font-size-label);
+  color: var(--text-muted);
+}
+
+.tm-ps-table tbody th {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+/* ── 푸터(랜딩 푸터와 같은 잉크 바탕) ── */
+.tm-ps-footer {
+  padding: 40px 0 calc(40px + var(--v1-shell-safe-bottom));
+  background: var(--static-ink);
+  font-size: var(--font-size-label);
+  color: var(--overlay-white-72);
+}
+
+.tm-ps-footer-top {
+  display: grid;
+  gap: 24px;
+}
+
+.tm-ps-footer-brand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tm-ps-footer-name {
+  font-size: var(--font-size-body);
+  font-weight: 800;
+  color: var(--static-white);
+}
+
+.tm-ps-footer-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px 16px;
+}
+
+.tm-ps-footer-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tm-ps-footer-group-title {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: var(--static-white);
+}
+
+.tm-ps-footer-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--overlay-white-85);
+  transition: color var(--duration-fast) ease;
+}
+
+.tm-ps-business {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 24px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--overlay-white-18);
+}
+
+.tm-ps-business-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tm-ps-business dt {
+  color: var(--overlay-white-66);
+}
+
+.tm-ps-business dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--overlay-white-85);
+  /* 어드민이 넣는 긴 무공백 값(이메일 등)이 잘리지 않게 */
+  overflow-wrap: anywhere;
+}
+
+.tm-ps-footer .tm-ps-footer-inline-link {
+  color: var(--overlay-white-85);
+}
+
+.tm-ps-footer-copy {
+  margin: 12px 0 0;
+  font-size: var(--font-size-caption);
+  color: var(--overlay-white-66);
+}
+
+@media (hover: hover) {
+  .tm-ps-nav-link:not([aria-current='page']):not([data-current='true']):hover,
+  .tm-ps-menu-link:not([aria-current='page']):hover {
+    background: var(--grey100);
+    color: var(--text-strong);
+  }
+
+  .tm-ps-footer-link:hover,
+  .tm-ps-footer .tm-ps-footer-inline-link:hover {
+    color: var(--static-white);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-ps-nav-link,
+  .tm-ps-menu-link,
+  .tm-ps-footer-link,
+  .tm-ps-dropdown-chevron {
+    transition: none;
+  }
+}
+
+/* ─── 태블릿 (768+) ─── */
+@media (min-width: 768px) {
+  .tm-ps-header-inner { padding: 0 24px 0 32px; }
+  .tm-ps-container { padding: 0 32px; }
+  .tm-ps-login { display: inline-flex; }
+
+  .tm-ps-section { padding: 72px 0; }
+  .tm-ps-kw { font-size: var(--font-size-body); }
+  .tm-ps-title { font-size: 36px; }
+  .tm-ps-title-page { font-size: 40px; }
+  .tm-ps-lead { font-size: var(--font-size-body-lg); }
+  .tm-ps-faq-question { font-size: var(--font-size-body-lg); }
+  .tm-ps-faq-answer { font-size: var(--font-size-body); }
+
+  .tm-ps-footer-groups { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* ─── 데스크톱 (1024+) ─── */
+@media (min-width: 1024px) {
+  .tm-ps-header-inner { height: 64px; }
+  .tm-ps-brand { margin-right: 24px; }
+  .tm-ps-nav { display: block; margin-right: auto; }
+  .tm-ps-nav-list { display: flex; align-items: center; gap: 4px; }
+  .tm-ps-mobile-menu { display: none; }
+
+  .tm-ps-section { padding: 96px 0; }
+  .tm-ps-title { font-size: 42px; line-height: 1.24; }
+  .tm-ps-title-page { font-size: 48px; line-height: 1.18; }
+
+  .tm-ps-footer-top {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 48px;
+  }
+}
+
+/* ─── 와이드 (1440+) ─── */
+@media (min-width: 1440px) {
+  .tm-ps-header-inner,
+  .tm-ps-container { padding: 0 40px; }
+  .tm-ps-title { font-size: 46px; }
+  .tm-ps-title-page { font-size: 52px; }
+}

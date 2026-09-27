@@ -75,7 +75,8 @@ html:has(.tm-landing) {
   white-space: nowrap;
 }
 
-.tm-landing-nav-links {
+.tm-landing-nav-links,
+.tm-landing-nav-site {
   display: none;
 }
 
@@ -2029,62 +2030,6 @@ html:has(.tm-landing) {
   justify-content: center;
 }
 
-.tm-landing-footer {
-  /* 안전영역만큼 더 비운다 — 모바일 CTA 바가 사라지는 전환 구간에 마지막 줄을 가리지 않게 */
-  padding: 32px 0 calc(40px + var(--v1-shell-safe-bottom));
-  border-top: 1px solid var(--overlay-white-08);
-  background: var(--static-ink);
-  font-size: var(--font-size-label);
-  color: var(--overlay-white-72);
-}
-
-.tm-landing-footer-inner {
-  display: grid;
-  gap: 16px;
-}
-
-.tm-landing-footer-brand {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.tm-landing-footer-name {
-  font-size: var(--font-size-body);
-  font-weight: 800;
-  color: var(--static-white);
-}
-
-.tm-landing-footer-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 4px;
-  margin-left: -8px;
-}
-
-.tm-landing-footer-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 8px;
-  border-radius: var(--radius-chip);
-  color: var(--overlay-white-85);
-  transition: color var(--duration-fast) ease;
-}
-
-@media (hover: hover) {
-  .tm-landing-footer-link:hover {
-    color: var(--static-white);
-  }
-}
-
-.tm-landing-footer-copy {
-  margin: 12px 0 0;
-  font-size: var(--font-size-caption);
-  color: var(--overlay-white-66);
-}
-
 /* ── 모바일 하단 고정 CTA 바(<768). 히어로 CTA·마지막 배너·푸터가 보이면 숨는다 ── */
 .tm-landing-mobile-cta {
   position: fixed;
@@ -2343,15 +2288,6 @@ html:has(.tm-landing) {
   .tm-landing-cta-banner { padding: 96px 0; }
   .tm-landing-cta-heading { font-size: 36px; }
 
-  .tm-landing-footer { padding-bottom: 48px; }
-  .tm-landing-footer-inner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 24px;
-  }
-  .tm-landing-footer-links { justify-content: flex-end; margin-left: 0; }
-
   .tm-landing-mobile-cta { display: none; }
 }
 
@@ -2406,7 +2342,16 @@ html:has(.tm-landing) {
 /* ─── 데스크톱 (1024+) ─── */
 @media (min-width: 1024px) {
   .tm-landing-nav-inner { height: 64px; }
-  .tm-landing-nav-links { display: flex; gap: 4px; margin-right: auto; }
+  .tm-landing-nav-links { display: flex; gap: 4px; }
+  /* 페이지 안 앵커와 다른 페이지로 가는 링크를 세로 선으로 가른다 */
+  .tm-landing-nav-site {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0 auto 0 4px;
+    padding-left: 8px;
+    border-left: 1px solid var(--border);
+  }
   .tm-landing-brand { margin-right: 24px; }
 
   .tm-landing-section { padding: 120px 0; }

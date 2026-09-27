@@ -1,6 +1,12 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, Check, Zap } from 'lucide-react';
+import {
+  PUBLIC_NAV_CONTACT,
+  PUBLIC_NAV_HELP,
+  PublicSiteAudienceMenu,
+  PublicSiteMobileMenu,
+} from '@/components/public-site';
 import { BrandMark } from '@/components/v1-ui/brand-logo';
 import { LandingCtaLink } from './landing-cta-link';
 import { LandingDevice, LandingScreen } from './landing-device';
@@ -13,6 +19,8 @@ const NAV_LINKS = [
   { href: '#sports', label: '종목' },
   { href: '#how', label: '이용 방법' },
 ] as const;
+
+const LANDING_PATH = '/landing';
 
 export function LandingNav() {
   return (
@@ -27,6 +35,12 @@ export function LandingNav() {
             <a key={link.href} className="tm-landing-nav-link" href={link.href}>{link.label}</a>
           ))}
         </nav>
+        <nav className="tm-landing-nav-site" aria-label="주요 메뉴">
+          <PublicSiteAudienceMenu currentPath={LANDING_PATH} />
+          {[PUBLIC_NAV_HELP, PUBLIC_NAV_CONTACT].map((link) => (
+            <Link key={link.href} className="tm-landing-nav-link" href={link.href}>{link.label}</Link>
+          ))}
+        </nav>
         <div className="tm-landing-nav-ctas">
           <LandingMotionToggle />
           <LandingThemeToggle />
@@ -37,6 +51,7 @@ export function LandingNav() {
           <LandingCtaLink className="tm-btn tm-btn-sm tm-btn-neutral tm-landing-nav-signup" href="/login" cta="nav_signup">
             시작하기
           </LandingCtaLink>
+          <PublicSiteMobileMenu currentPath={LANDING_PATH} />
         </div>
       </div>
       <span className="tm-landing-progress" aria-hidden="true" />

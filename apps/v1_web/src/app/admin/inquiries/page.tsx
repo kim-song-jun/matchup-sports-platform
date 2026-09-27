@@ -25,6 +25,7 @@ import type {
   V1InquiryStatus,
 } from '@/types/api';
 import { pickAllowedParam } from '../pick-allowed-param';
+import { GuestInquiryPurgePanel } from './guest-inquiry-purge-panel';
 
 const STATUS_OPTIONS = [
   { value: '', label: '전체' },
@@ -43,6 +44,8 @@ const CATEGORY_OPTIONS: Array<{ value: '' | V1InquiryCategory; label: string }> 
   { value: 'payment_refund', label: '결제/환불' },
   { value: 'report', label: '신고' },
   { value: 'other', label: '기타' },
+  { value: 'tournament_hosting', label: '대회 개설' },
+  { value: 'partnership', label: '제휴' },
 ];
 
 const STATUS_LABEL: Record<V1InquiryStatus, string> = {
@@ -60,6 +63,8 @@ const CATEGORY_LABEL: Record<V1InquiryCategory, string> = {
   payment_refund: '결제/환불',
   report: '신고',
   other: '기타',
+  tournament_hosting: '대회 개설',
+  partnership: '제휴',
 };
 
 // 신고 사유는 분류가 'report'일 때만 의미가 있다 — 다른 분류에서는 항상 null이라 보여줄 게 없다.
@@ -220,6 +225,8 @@ function AdminInquiriesPageContent() {
       />
 
       <div className="tm-content-enter flex flex-col gap-4">
+        <GuestInquiryPurgePanel categoryLabel={CATEGORY_LABEL} showToast={showToast} />
+
         {/* 신고 누적 팀 목록(#657 딥링크)에서 넘어온 팀 필터 — 보이지 않는 필터가 목록을
             좁히면 "왜 결과가 없지?"가 된다. 걸려 있는 동안은 항상 표시하고 해제 수단을 준다. */}
         {activeReportedTeamId ? (

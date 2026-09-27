@@ -1,10 +1,12 @@
 import {
   ArgumentsHost,
+  BadRequestException,
   HttpException,
   HttpStatus,
   InternalServerErrorException,
   PayloadTooLargeException,
 } from '@nestjs/common';
+import { OmitErrorLogBodyMiddleware } from '../logging/omit-error-log-body';
 import { AllExceptionsFilter } from './http-exception.filter';
 
 function buildHost(request: Record<string, unknown>) {
@@ -202,6 +204,19 @@ describe('AllExceptionsFilter', () => {
         route: '/api/v1/matches/1/join',
       }),
     );
+  });
+
+  it('drops the request body from the error log on a route marked by OmitErrorLogBodyMiddleware', () => {
+    const body = { name: '담당자', email: 'host@example.test', consent: false };
+    const marked = { id: 'req-9', method: 'POST', originalUrl: '/api/v1/public/inquiries', body };
+    new OmitErrorLogBodyMiddleware().use(marked as never, {} as never, () => undefined);
+    filter.catch(new BadRequestException(['consent must be equal to true']), buildHost(marked).host);
+
+    const unmarked = { id: 'req-10', method: 'POST', originalUrl: '/api/v1/inquiries', body };
+    filter.catch(new BadRequestException(['consent must be equal to true']), buildHost(unmarked).host);
+
+    expect(errorLogService.record.mock.calls[0][0].requestBody).toBeNull();
+    expect(errorLogService.record.mock.calls[1][0].requestBody).toEqual(body);
   });
 
   // ValidationPipe 는 message 를 문자열 배열로 준다. 이걸 'HTTP 400' 으로 뭉개면 같은

@@ -532,7 +532,12 @@ export const gameSchemaSourceManifest = {
   // The historical game-operations migration is unchanged; migration replay has no schema drift.
   // 2026-09-26: additive nullable V1AuthIdentity.providerRefreshTokenCiphertext (Apple token
   // revoke), backed by 20260926090000_v1_auth_identity_apple_refresh_token. No game model changed.
-  schema: '46e4129e4e03b1d74a07bcd7411427b5826114fa2c97ee232db0d9fd8ee207a9',
+  // 2026-09-27: additive V1SiteInfoSettings singleton table (public business info), backed by
+  // 20260927090000_v1_site_info_settings, and additive V1InquiryCategory values
+  // tournament_hosting/partnership, backed by 20260927100000_v1_inquiry_public_categories.
+  // No game model changed.
+  // 2026-09-27: guestInquiryRetentionDays Int + nullable V1Inquiry.guestRetentionDays/purgedAt/purgedByAdminUserId, in the same two migrations.
+  schema: 'a253cc251952aa69690f275ce2ef6bdf72d7c6cdede9b5ce631f181735599dab',
   migration: '6bd7fae42e9ee7debff71d26f7252d220ad2c12ae6f14745d103fc7fa61e8f64',
 } as const;
 

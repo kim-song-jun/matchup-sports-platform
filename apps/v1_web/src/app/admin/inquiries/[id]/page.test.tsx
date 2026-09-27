@@ -54,6 +54,7 @@ function detailWithReportedTeam(overrides: Partial<V1AdminInquiryDetail> = {}): 
     createdAt: '2026-08-01T00:00:00.000Z',
     updatedAt: '2026-08-01T00:00:00.000Z',
     closedAt: null,
+    purgedAt: null,
     body: '이 팀이 스팸을 보내요.',
     contact: null,
     replies: [],
@@ -88,6 +89,32 @@ describe('AdminInquiryDetailPage — 신고 대상 팀 롤업/조치', () => {
     statusMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
     blockMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
     suspendMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
+  });
+
+  it('파기된 비회원 문의는 파기 시각과 함께 파기 표시를 보인다', () => {
+    mockInquiryDetail({
+      userId: null,
+      isGuest: true,
+      category: 'tournament_hosting',
+      reportReason: null,
+      reportedTeam: null,
+      title: '[보관 기간이 지나 파기된 문의]',
+      body: '[보관 기간이 지나 파기된 문의]',
+      purgedAt: '2027-10-01T01:00:00.000Z',
+    });
+    render(<AdminInquiryDetailPage />);
+    expect(screen.getByText(/에 개인정보를 파기한 문의예요\. 연락처·제목·본문·답변은 되살릴 수 없어요\./)).toBeInTheDocument();
+    // 쓰기 권한이 있어도 답변·상태를 바꾸지 못한다(서버 409 INQUIRY_PURGED 와 같은 규칙).
+    expect(screen.getByRole('button', { name: /답변 등록/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '상태 변경' })).toBeDisabled();
+    expect(screen.getByText('개인정보를 파기한 문의라 답변이나 상태를 바꿀 수 없어요.')).toBeInTheDocument();
+  });
+
+  it('파기되지 않은 문의에는 파기 표시가 없고 쓰기 권한자는 답변할 수 있다', () => {
+    mockInquiryDetail();
+    render(<AdminInquiryDetailPage />);
+    expect(screen.queryByText(/개인정보를 파기한 문의예요/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /답변 등록/ })).toBeEnabled();
   });
 
   it('신고 상세에 대상 팀의 누적 요약이 보인다', () => {

@@ -2,6 +2,7 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Request, Response } from 'express';
 import { ErrorLogService } from '../../error-logs/error-log.service';
+import { shouldOmitErrorLogBody } from '../logging/omit-error-log-body';
 import {
   PRISMA_AVAILABILITY_CODE,
   PRISMA_AVAILABILITY_MESSAGE,
@@ -150,7 +151,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         route: logContext.route,
         message: responseMessage,
         stack: truncatedStack ?? null,
-        requestBody: request.body,
+        requestBody: shouldOmitErrorLogBody(request) ? null : request.body,
         requestHeaders: request.headers,
         responseBody,
         userId: request.v1User?.id ?? null,

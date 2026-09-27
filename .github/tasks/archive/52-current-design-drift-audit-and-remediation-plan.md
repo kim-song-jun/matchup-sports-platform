@@ -1,6 +1,6 @@
 # Task 52 — Current Design Drift Audit And Remediation Plan
 
-> **Superseded by `.github/tasks/58-design-system-audit.md`** (2026-04-12). This file remains as evidence/history. The Evidence Snapshot section below is referenced by Task 58.
+> **Superseded by `.github/tasks/archive/58-design-system-audit.md`** (2026-04-12). This file remains as evidence/history. The Evidence Snapshot section below is referenced by Task 58.
 
 Owner: project-director -> frontend-dev -> frontend-review -> design/qa/docs
 Date drafted: 2026-04-11

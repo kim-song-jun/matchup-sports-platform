@@ -12,7 +12,7 @@ Offer ten bundled team-logo presets while preserving custom image uploads and th
 
 ## Owned Files
 
-- `.github/tasks/125-v1-team-logo-presets.md`
+- `.github/tasks/archive/125-v1-team-logo-presets.md`
 - `apps/v1_web/public/images/team-logos/**`
 - `apps/v1_web/src/lib/team-logo-presets.ts`
 - `apps/v1_web/src/components/teams/teams-form-client.tsx`

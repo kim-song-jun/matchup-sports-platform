@@ -175,7 +175,7 @@ Use this section to identify exactly what can be reverted if a step changes the 
 
 | Step | Files | Rollback Strategy |
 | --- | --- | --- |
-| Documentation setup | `.github/tasks/88-v1-responsive-shell-hardening.md` | Revert this task doc only if the work is abandoned. |
+| Documentation setup | `.github/tasks/archive/88-v1-responsive-shell-hardening.md` | Revert this task doc only if the work is abandoned. |
 | Shell tokens | `apps/v1_web/src/app/globals.css`, `apps/v1_web/src/components/v1-ui/shell.tsx` | Revert CSS token block and class references from the same commit/diff chunk. |
 | `AppChrome` shell update | `apps/v1_web/src/app/globals.css` | Revert `--v1-app-chrome-frame-width` and `.tm-app-frame` / `.tm-fixed-cta` / filter layer width references together. |
 | Search shell alignment | `apps/v1_web/src/components/search/search-experience.tsx` | Revert search inline token references to the prior fixed values. |

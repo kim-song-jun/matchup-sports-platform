@@ -6,7 +6,7 @@
 ## 0. Read This First
 
 - 디자인 규칙을 읽거나 바꿔야 한다면 항상 `DESIGN.md`부터 본다.
-- 현재 코드베이스 디자인 개선 작업을 실행하려면 `DESIGN.md` 다음에 `.github/tasks/58-design-system-audit.md`를 본다. (이전 Task 52는 58에 의해 superseded)
+- 현재 코드베이스 디자인 개선 작업을 실행하려면 `DESIGN.md` 다음에 `.github/tasks/archive/58-design-system-audit.md`를 본다. (이전 Task 52는 58에 의해 superseded)
 - 과거 task, report, plan 문서는 evidence/history/reference일 뿐이고, 새로운 규칙 정의 문서가 아니다.
 - 문서 읽는 순서와 active/historical 구분은 `docs/DESIGN_DOCUMENT_MAP.md`를 따른다.
 

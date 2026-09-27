@@ -92,7 +92,7 @@
 ## References
 
 - Task 문서: `.github/tasks/archive/70-marketplace-payment-lifecycle.md`
-- Tech design: `.github/tasks/70-tech-design.md`
+- Tech design: `.github/tasks/archive/70-tech-design.md`
 - Migration: `apps/api/prisma/migrations/20260418070000_marketplace_payment_lifecycle/migration.sql`
 - 커미션 상수: `apps/api/src/common/constants/commission.ts`
 - Cron: `apps/api/src/marketplace/marketplace.cron.ts`

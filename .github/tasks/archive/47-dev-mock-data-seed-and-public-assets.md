@@ -27,7 +27,7 @@ Priority: P1
 - `apps/web/public/mock/**`
 - `apps/web/src/lib/sport-image.ts`
 - `.github/tasks/archive/07-refresh-mock-visual-assets.md`
-- `.github/tasks/12-diversify-image-data-and-deploy-sync.md`
+- `.github/tasks/archive/12-diversify-image-data-and-deploy-sync.md`
 
 ## Owned Write Scope
 

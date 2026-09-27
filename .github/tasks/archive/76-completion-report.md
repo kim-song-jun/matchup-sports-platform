@@ -161,7 +161,7 @@ Design + QA round: Critical 0 / Warning 7 — 전량 fix commit `003d986` 에서
 
 ## References
 
-- Task doc: `.github/tasks/76-operational-observability-admin-polish.md`
+- Task doc: `.github/tasks/archive/76-operational-observability-admin-polish.md`
 - Prior report: `.github/tasks/archive/74-completion-report.md` (C9 메트릭 기반)
 - Prior report: `.github/tasks/archive/73-completion-report.md` (idempotency precondition)
 - Commits (3): `c5b449f` build → `33a0076` review fix → `003d986` design+QA fix

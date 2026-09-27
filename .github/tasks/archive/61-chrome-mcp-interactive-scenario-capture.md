@@ -75,9 +75,9 @@ Detailed step-by-step scenarios are in separate files per part:
 
 | Part | File | Scenarios | Steps | Coverage |
 |------|------|-----------|-------|----------|
-| **A** | [`61a-scenarios-public-auth.md`](../61a-scenarios-public-auth.md) | S01–S05 | ~173 | Landing, Login/Register, Onboarding, Info Pages, OAuth Callbacks |
+| **A** | [`61a-scenarios-public-auth.md`](61a-scenarios-public-auth.md) | S01–S05 | ~173 | Landing, Login/Register, Onboarding, Info Pages, OAuth Callbacks |
 | **B** | [`61b-scenarios-match-team.md`](61b-scenarios-match-team.md) | S06–S20 | ~220 | Home Feed, Match Discovery/Detail/Create/Edit, Teams, Team Members, Team Matches, Score/Evaluate/Arrival |
-| **C** | [`61c-scenarios-lesson-market-mercenary-venue.md`](../61c-scenarios-lesson-market-mercenary-venue.md) | S21–S31 | ~268 | Lessons, Marketplace, Mercenary, Venues (each: discovery + detail + create/edit) |
+| **C** | [`61c-scenarios-lesson-market-mercenary-venue.md`](61c-scenarios-lesson-market-mercenary-venue.md) | S21–S31 | ~268 | Lessons, Marketplace, Mercenary, Venues (each: discovery + detail + create/edit) |
 | **D** | [`61d-scenarios-profile-settings-chat-payment.md`](61d-scenarios-profile-settings-chat-payment.md) | S32–S48 | ~250 | Profile, Settings, Chat, Notifications, Payments/Checkout/Refund, Reviews, Badges, Feed, User Profile, All My Pages |
 | **E** | [`61e-scenarios-admin-navigation.md`](61e-scenarios-admin-navigation.md) | S49–S67 | ~550 | Bottom Nav, Sidebar, Glass Header, Admin (Dashboard/Users/Matches/Lessons/Tickets/Teams/TeamMatches/Venues/Mercenary/Reviews/Payments/Settlements/Disputes/Statistics), Dark Mode Cross-Cutting, Empty/Error/Loading States, Form Validations, Auth Guards |
 

@@ -45,7 +45,7 @@ Related task: [79-team-match-management-history-contracts.md](/D:/dev/projects/m
 ## Files Created In This Planning Pass
 
 - `.github/tasks/79-team-match-management-history-contracts.md`
-- `.github/tasks/79-team-match-management-history-contracts-summary.md`
+- `.github/tasks/archive/79-team-match-management-history-contracts-summary.md`
 
 ## Files Modified In This Planning Pass
 

@@ -33,7 +33,7 @@
 3. 신규 페이지 A/B/C가 선택되면 해당 v1 계약부터 skeleton-first로 진행한다.
 4. 호스트가 안정되고 Lazyweb/GPT Pro가 복구되면 profile 실제 375/768/1280 QA, save/double-submit/reduced-motion, 권한 bundle insane-review, 기획자 전달 evidence를 닫는다.
 
-Canonical entry: `.github/tasks/122-alpha-profile-tournament-persona-e2e.md`, `.github/tasks/124-alpha-immutable-ecr-deploy.md`, `.github/tasks/125-upload-asset-reference-lifecycle.md`, `docs/scenarios/index.md`.
+Canonical entry: `.github/tasks/122-alpha-profile-tournament-persona-e2e.md`, `.github/tasks/archive/124-alpha-immutable-ecr-deploy.md`, `.github/tasks/archive/125-upload-asset-reference-lifecycle.md`, `docs/scenarios/index.md`.
 
 ## 2026-07-19 재개 스냅샷 (현재 기준)
 

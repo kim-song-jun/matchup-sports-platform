@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> 스펙 문서: `.github/tasks/117-v1-review-anonymized-aggregates.md` (Context/Goal/Ambiguity Log 참고)
+> 스펙 문서: `.github/tasks/archive/117-v1-review-anonymized-aggregates.md` (Context/Goal/Ambiguity Log 참고)
 
 **Goal:** 개인매치·팀매치 상호평가 리뷰(`V1PostEventReview`)를 대상자에게 개별(누가 몇 점을 줬는지) 노출 없이, 종목별 × 기간별(전체/월 선택) 집계 수치로만 보여주고, 상대와 상호 제출되거나 72시간이 지나야 그 리뷰가 집계에 반영되도록 만든다.
 

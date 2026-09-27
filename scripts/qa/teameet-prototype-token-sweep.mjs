@@ -7,7 +7,7 @@ import path from 'node:path';
 
 const LIB_DIR = path.join(
   process.cwd(),
-  'docs/reference/handoff-2026-04-25/sports-platform/project/lib'
+  'docs/archive/reference/handoff-2026-04-25/sports-platform/project/lib'
 );
 
 // hex → token map. Lower-case keys; matched case-insensitive.

@@ -91,6 +91,30 @@
 - **추가(web Vitest+MSW)**: login/email·matches/new·tournaments/apply page.test.
 - Playwright v1 하네스는 **6/23 이후로 descope**(결정#4).
 
+### 페르소나 정의 (17명 — Discovery 산출, `.new.md` 스냅샷에서 흡수)
+
+> Discovery 워크플로 산출. 각 페르소나 flow를 mobile 390 / tablet 768 / desktop 1440 × (app+admin)으로 전수 감사한다. 모든 라우트가 최소 1개 페르소나에 커버됨. 아래 §"페르소나 비주얼 감사" 절의 P01~P17 코드가 가리키는 정의.
+
+| ID | 페르소나 | 핵심 flow (라우트 체인) |
+|----|----------|------------------------|
+| P01 | 첫 방문자(이메일 가입) | `/`→landing→login→signup→terms→signup/complete→onboarding/{sport,level,region,confirm}→home |
+| P02 | 소셜 로그인(카카오) | login→callback/kakao→[성공:signup/social→onboarding…→home]\|[auth/{account-conflict,missing-email,provider-denied,blocked}] |
+| P03 | 개인매치 참가자 | home→matches→filter→matches\|empty\|error→matches/[id](신청)→joined→my/matches/joined |
+| P04 | 개인매치 호스트 | matches/new→sport→place-time→confirm→complete→[id]→[id]/applications→[id]/edit→my/matches/created |
+| P05 | 팀 창립자 | home→teams→search\|filter→search/empty\|error→teams/new→teams/[id]→my/teams |
+| P06 | 팀 owner/manager | my/teams→[id]→[id]/members(초대·역할·퇴출)→teams/[id]/members→teams/[id]/edit→my/teams/members |
+| P07 | 팀 일반 멤버 | home→teams→search→teams/[id](가입신청)→my→my/teams→my/teams/[id]→teams/[id]/members |
+| P08 | 팀매치 주최자 | team-matches/new→team→sport→place-time→info→condition→confirm→complete→[id]→[id]/edit→filter\|empty\|error |
+| P09 | 검색우선 탐색자 | home→search/new→search\|stale\|empty\|error→team-matches→filter→team-matches/[id](신청) |
+| P10 | 대회 참가자 | home→tournaments→tournaments/[id](대진표·규정)→[id]/apply→[id]/my |
+| P11 | 대회 팀주장(로스터) | tournaments/[id]→apply→my→registrations/[rid]→registrations/[rid]/roster(명단 제출) |
+| P12 | 경기후 리뷰어 | my→my/reviews?tab=pending→my/reviews/[sourceType]/[sourceId](작성)→?tab=written→received |
+| P13 | 채팅·알림 | home→notifications→notifications/read→chat→chat/[id]→home(badge) |
+| P14 | 설정·계정(탈퇴) | my→profile/edit→settings→{sports,location,notifications,legal}→auth/password-reset→settings/withdrawal |
+| P15 | 재방문(재개+이메일) | `/`(미완→resume)→onboarding/resume→…→home \| login→login/email→home→matches/[id]→matches/participants |
+| P16 | 플랫폼 Admin | admin(KPI)→users(상태변경+reason)→matches→team-matches→teams→audit(2탭·필터) |
+| P17 | 대회 Admin | admin→tournaments→tournaments/new→tournaments/[id](대진표·라운드·상태)→admins(권한) |
+
 ### 페르소나 비주얼 감사 (WS11, WS1~5 적용 후)
 3티어 ~112샷, 헤더 dev-auth + 스택 기동(:5432/:8121/:3013).
 - **Tier 1**(mobile 390+desktop 1440): P01 신규방문(10), P03 매치참가(4), P04 매치호스트(7), P10 대회참가(5), P16 admin(9) — ~70샷

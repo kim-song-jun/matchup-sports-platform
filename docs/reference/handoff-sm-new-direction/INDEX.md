@@ -3,7 +3,7 @@
 ## Purpose
 
 This folder is a candidate reference pack forked from
-`docs/reference/handoff-2026-04-25/`.
+`docs/archive/reference/handoff-2026-04-25/`.
 
 It preserves the existing handoff bundle, prototype system documents, QA records,
 mock assets, and design-system evidence while reframing the service priority for
@@ -15,7 +15,7 @@ the next planning direction.
 Decision status: candidate
 Canonical status: not canonical
 Implementation status: reference only
-Fork source: docs/reference/handoff-2026-04-25/
+Fork source: docs/archive/reference/handoff-2026-04-25/
 ```
 
 ## Current Priority Override

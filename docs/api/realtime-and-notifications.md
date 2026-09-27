@@ -1,16 +1,20 @@
 # Realtime And Notifications Contract
 
+> **v0 기준 서술 — v1 확인 필요.** 이 문서의 엔드포인트·에러 코드·상세 계약은 레거시 `apps/api`/`apps/web` 시절에 작성됐다. 파일 경로는 v1(`apps/v1_api`/`apps/v1_web`)로 갱신했지만, 계약 내용 자체가 v1 실제 동작과 일치하는지는 이번 변경에서 검증하지 않았다(2026-09-27, docs/api 레거시 분리 작업).
+
 이 문서는 Socket.IO 실시간 이벤트와 REST 알림 API를 함께 사용할 때의 프론트 통합 계약을 정의한다.
 
 ## Source Of Truth Priority
 
-1. `apps/api/src/realtime/realtime.gateway.ts`
-2. `apps/api/src/notifications/notifications.controller.ts`
-3. `apps/api/src/notifications/notifications.service.ts`
-4. `apps/api/src/notifications/notification-presentation.ts`
-5. `apps/web/src/hooks/use-realtime.ts`
-6. `apps/web/src/lib/realtime-client.ts`
-7. `apps/web/src/hooks/use-api.ts`
+1. `apps/v1_api/src/realtime/realtime.gateway.ts`
+2. `apps/v1_api/src/notifications/notifications.controller.ts`
+3. `apps/v1_api/src/notifications/notifications.service.ts`
+4. `apps/v1_api/src/notifications/realtime-notifier.port.ts` (v1엔 별도
+   `notification-presentation.ts`가 없다 — 가장 가까운 발신 포트로 대체)
+5. `apps/v1_web/src/hooks/use-v1-realtime-socket.ts`
+6. `apps/v1_web/src/hooks/use-v1-realtime-socket.ts` (v1엔 별도 `realtime-client.ts`가
+   없다 — 소켓 클라이언트 로직이 이 훅에 있다)
+7. `apps/v1_web/src/hooks/use-v1-api.ts`
 
 ## 연결 계약
 
@@ -98,9 +102,8 @@
 
 ## Source References
 
-- `apps/api/src/realtime/realtime.gateway.ts`
-- `apps/api/src/chat/chat.service.ts`
-- `apps/api/src/notifications/notifications.service.ts`
-- `apps/api/src/notifications/notification-presentation.ts`
-- `apps/web/src/hooks/use-realtime.ts`
-- `apps/web/src/lib/realtime-client.ts`
+- `apps/v1_api/src/realtime/realtime.gateway.ts`
+- `apps/v1_api/src/chat/chat.service.ts`
+- `apps/v1_api/src/notifications/notifications.service.ts`
+- `apps/v1_api/src/notifications/realtime-notifier.port.ts`
+- `apps/v1_web/src/hooks/use-v1-realtime-socket.ts`

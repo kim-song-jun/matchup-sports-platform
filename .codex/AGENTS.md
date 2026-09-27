@@ -11,7 +11,7 @@ Before starting analysis, implementation, refactoring, DB design, Prisma work, A
 3. Read `.codex/qa-rules.md`.
 4. Read the relevant `.codex/*.md` rule files.
 5. Read the relevant files inside `apps/v1_api`, `apps/v1_web`, and `apps/v1_android` for Android work.
-6. For UI or design work, read `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`.
+6. For UI or design work, read `DESIGN.md` (design rules; priority in its §1) and `docs/guides/v1-coding-patterns.md`, then `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html` as a visual reference.
 
 Do not assume architecture, API structure, database structure, Prisma schema, frontend patterns, or design conventions before the `.codex` review is complete.
 
@@ -22,11 +22,14 @@ Only these sources are valid for project analysis and implementation:
 - Backend: `apps/v1_api`
 - Frontend: `apps/v1_web`
 - Android: `apps/v1_android`
-- Design source of truth: `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`
-- Scoped Open Design source: when the user explicitly pins an Open Design recovery/remake task, `docs/reference/open-design/**` and the user-provided Open Design export may be used as read-only visual references for that task only. Design-only Open Design pages do not become valid runtime routes without a v1 route/API contract.
+- iOS: `apps/v1_ios`
+- Design source of truth: `DESIGN.md` (priority in its §1). Visual reference: `docs/reference/handoff-sm-new-direction/sports-platform/project/Teameet Design.html`
+- Scoped Open Design source: when the user explicitly pins an Open Design recovery/remake task, the user-provided Open Design export may be used as read-only visual references for that task only. Design-only Open Design pages do not become valid runtime routes without a v1 route/API contract.
 - Codex project rules: `.codex/*`
 
 ## Legacy Ban
+
+The legacy v0 apps (`apps/api`, `apps/web`) have been removed; their last state is kept only in the git tag `legacy-v0-final`.
 
 Do not use legacy code, deprecated code, old API designs, old DB designs, old Prisma schemas, old migrations, old seeds, old mock data, or old screen designs as references.
 
@@ -34,11 +37,11 @@ If a similar feature exists outside `apps/v1_api`, `apps/v1_web`, or `apps/v1_an
 
 ## Conflict Order
 
-If instructions conflict, follow this order:
+If instructions conflict, follow this order (the repository canonical guide is `CLAUDE.md`; report any conflict you find):
 
-1. `.codex/AGENTS.md`
-2. `.codex/*.md`
-3. `AGENTS.md`
+1. `CLAUDE.md`
+2. `AGENTS.md`
+3. `.codex/AGENTS.md` and `.codex/*.md`
 4. v1 implementation evidence in `apps/v1_api`, `apps/v1_web`, and `apps/v1_android`
 5. Runtime configuration and package scripts
 
@@ -49,7 +52,7 @@ Legacy implementations never outrank v1 sources.
 `.codex/qa-rules.md` is the canonical policy for completion, review, manual QA, and `.ulw` work loops.
 
 - No useless fallback and No fake tests: do not hide runtime failure behind mock success, silent success, or selector-only tests.
-- Visual verification before completion: for UI/design/responsive/admin surface work, tests pass is not completion; capture Playwright screenshot evidence, before/after screenshot evidence, and console/network checks.
+- Visual verification before completion: for UI/design/responsive/admin surface work, tests pass is not completion; capture before/after screenshot evidence on alpha (`ego-browser`, not a local next server) and console/network checks.
 - Layout rebalance and No left accent rail: after visible UI removal or rearrangement, rebalance spacing and breakpoints; avoid decorative rails, purple/tint/dashed/glow decoration, and use semantic color only.
 - No scope retreat: for all-routes/all-pages/comprehensive QA, define the total scope and report processed M/N.
 - Tech-Debt Grep and Committed-tree verification: grep touched paths for new debt markers and verify diff scope, untracked import risk, `git diff --check`, and committed-tree readiness.

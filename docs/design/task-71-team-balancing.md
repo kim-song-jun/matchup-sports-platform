@@ -428,5 +428,5 @@ body가 없는 경우 기존 동작 유지 (back-compat).
 ---
 
 *알고리즘 구현: `apps/api/src/matches/team-balancing.service.ts`*
-*태스크 문서: `.github/tasks/71-ai-team-balancing.md`*
-*완료 리포트: `.github/tasks/71-completion-report.md`*
+*태스크 문서: `.github/tasks/archive/71-ai-team-balancing.md`*
+*완료 리포트: `.github/tasks/archive/71-completion-report.md`*

@@ -12,7 +12,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..', '..');
 const htmlPath = path.join(
   repoRoot,
-  'docs/reference/handoff-2026-04-25/sports-platform/project/Teameet Design.html'
+  'docs/archive/reference/handoff-2026-04-25/sports-platform/project/Teameet Design.html'
 );
 const outDir = path.join(repoRoot, 'output/playwright');
 fs.mkdirSync(outDir, { recursive: true });

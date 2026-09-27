@@ -1,13 +1,15 @@
 # Domain Contract — Auth
 
+> **v0 기준 서술 — v1 확인 필요.** 이 문서의 엔드포인트·에러 코드·상세 계약은 레거시 `apps/api`/`apps/web` 시절에 작성됐다. 파일 경로는 v1(`apps/v1_api`/`apps/v1_web`)로 갱신했지만, 계약 내용 자체가 v1 실제 동작과 일치하는지는 이번 변경에서 검증하지 않았다(2026-09-27, docs/api 레거시 분리 작업).
+
 ## Source Of Truth Priority
 
-1. `apps/api/src/auth/auth.controller.ts`
-2. `apps/api/src/auth/dto/auth.dto.ts`
-3. `apps/api/src/auth/auth.service.ts`
-4. `apps/api/test/integration/auth.e2e-spec.ts`
-5. `apps/web/src/lib/api.ts`
-6. `apps/web/src/hooks/use-api.ts`
+1. `apps/v1_api/src/auth/auth.controller.ts`
+2. `apps/v1_api/src/auth/dto/` (여러 DTO로 분리됨 — `login.dto.ts`, `register.dto.ts` 등)
+3. `apps/v1_api/src/auth/auth.service.ts`
+4. `apps/v1_api/src/auth/auth.controller.spec.ts` + `auth.service.spec.ts`
+5. `apps/v1_web/src/lib/api-client.ts`
+6. `apps/v1_web/src/hooks/use-v1-api.ts`
 
 ## Endpoint Matrix
 
@@ -172,7 +174,7 @@ Kakao 응답의 `is_email_valid`와 `is_email_verified`가 모두 true가 아닐
 ```
 
 - 프론트 구현 규칙:
-  - `apps/web/src/lib/api.ts` interceptor가 자동 호출한다.
+  - `apps/v1_web/src/lib/api-client.ts` interceptor가 자동 호출한다.
   - 화면 훅에서 직접 refresh endpoint를 호출하는 새 경로를 만들지 않는다.
   - refresh 실패 시 interceptor가 auth store를 비우고 `/login`으로 이동한다.
 

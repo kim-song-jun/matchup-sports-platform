@@ -60,7 +60,7 @@ For every covered ID:
 
 - `pnpm --filter v1_api test -- chat.controller.spec.ts notifications.controller.spec.ts`
 - `pnpm --filter v1_web test -- src/components/community`
-- `pnpm exec playwright test e2e/tests/chat-realtime.spec.ts e2e/tests/notification-center.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line`
+- `pnpm exec playwright test e2e/tests/chat-realtime.spec.ts e2e/tests/notification-center.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line` (레거시·삭제됨 — legacy-v0-final)
 
 ## Result Log
 
@@ -85,7 +85,7 @@ For every covered ID:
 
 ### E2E 실행 결과
 
-E2E 테스트 전체 (`e2e/tests/chat-realtime.spec.ts`, `e2e/tests/notification-center.spec.ts`) **BLOCKED**.
+E2E 테스트 전체 (`e2e/tests/chat-realtime.spec.ts`, `e2e/tests/notification-center.spec.ts`) **BLOCKED**. (레거시·삭제됨 — legacy-v0-final)
 
 원인: `e2e/global-setup.ts`가 `POST /api/v1/auth/dev-login`을 호출하나 해당 엔드포인트가 v1_api에 미등록 (404). `E2E_ALLOW_OFFLINE=1` 우회 시도 시에도 8개 페르소나 모두 dev-login 실패로 persona bootstrap 중단.
 

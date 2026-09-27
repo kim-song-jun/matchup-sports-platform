@@ -59,7 +59,7 @@ For every covered ID:
 
 - `pnpm --filter v1_api test -- profile.controller.spec.ts reviews.controller.spec.ts notifications.controller.spec.ts`
 - `pnpm --filter v1_web test -- src/components/my src/components/reviews`
-- `pnpm exec playwright test e2e/tests/admin-dashboard.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line`
+- `pnpm exec playwright test e2e/tests/admin-dashboard.spec.ts --config=e2e/playwright.config.ts --project='Desktop Chrome' --workers=1 --reporter=line` (레거시·삭제됨 — legacy-v0-final)
 
 ## Result Log
 

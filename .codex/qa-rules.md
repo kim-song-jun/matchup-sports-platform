@@ -24,7 +24,7 @@ Manual UI and click QA driven through Playwright MCP must use a visible headed b
 
 ## Visual verification before completion (Visual Verification Before Completion)
 
-For UI, layout, responsive, design-system, or route-shell changes, tests pass is not completion. Completion requires browser-based manual QA with Playwright screenshot evidence, console/network inspection, and a written verdict for the changed route or component. Docs-only policy updates can skip screenshots, but must still prove the policy is searchable and enforced by a contract test.
+For UI, layout, responsive, design-system, or route-shell changes, tests pass is not completion. Completion requires browser-based manual QA on alpha (the `ego-browser` skill by default — not a local next server; if Playwright is used it must be a headed session) with screenshot evidence, console/network inspection, and a written verdict for the changed route or component. Docs-only policy updates can skip screenshots, but must still prove the policy is searchable and enforced by a contract test.
 
 ## Before/after screenshot evidence (Before/After Screenshot Evidence)
 

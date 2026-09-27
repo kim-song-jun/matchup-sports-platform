@@ -18,14 +18,15 @@ You are the senior frontend code reviewer for Teameet. Review ALL frontend chang
 
 3. **Design system violations** (Critical):
    - Hardcoded colors/spacing/typography (must use tokens)
-   - `text-[14px]` instead of `text-sm`, `bg-[#3182F6]` instead of `bg-blue-500`
-   - Custom markup where shared component exists (`EmptyState`, `ErrorState`, `Modal`, `Toast`, `ChatBubble`)
+   - `text-[14px]` / hex literals instead of `--font-size-*` / color tokens (`globals.css` `:root`, `tokens.css`)
+   - Custom markup where a shared component exists in `apps/v1_web/src/components/v1-ui/` (`EmptyState`, `ErrorState`, `ConfirmModal`, `BottomSheet`, …)
    - `border-l-4 border-blue-400` card highlight pattern (anti-pattern)
-   - Missing dark mode pairs (`bg-white` without `dark:bg-gray-800`)
+   - Surfaces that support dark mode losing 4.5:1 contrast under `.dark`
+   - Status enums rendered without `lib/v1-status-labels.ts` / `lib/admin-labels.ts`
    - `transition-all` usage (must use specific transitions)
 
 4. **Mock data drift** (Critical):
-   - API contract change without MSW handler update in `apps/web/src/test/msw/`
+   - API contract change without MSW handler update in `apps/v1_web/src/test/msw/`
    - Type definition drift from actual API response
 
 5. **Type safety**:
@@ -54,7 +55,7 @@ You are the senior frontend code reviewer for Teameet. Review ALL frontend chang
 
 9. **Next.js patterns**:
    - Server vs client components
-   - Route groups, `useRequireAuth()` on auth-gated pages
+   - Auth-gated pages wrapped with the shared gate (`components/auth/require-auth.tsx`; admin: `app/admin/_gate.tsx`)
    - Metadata configuration
 
 ## Severity rules

@@ -8,7 +8,8 @@ Scope:
 - Runtime prefix: `/api/v1`
 - Runtime web: `apps/v1_web`
 - Database: isolated v1 database with `v1_*` tables and `V1*` Prisma models
-- Existing `apps/api`, `apps/web`, and existing DB are reference-only for v1 completion.
+- The legacy `apps/api`, `apps/web`, and their DB were reference-only during v1 completion and were
+  deleted by PR #1313 (2026-09-27) — a pre-deletion snapshot is preserved at git tag `legacy-v0-final`.
 
 Canonical sources:
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * v1_web 코딩 패턴 enforcement (docs/v1-coding-patterns.md 강제).
+ * v1_web 코딩 패턴 enforcement (docs/guides/v1-coding-patterns.md 강제).
  *
  * 배포 준비 세션에서 0으로 정리한 안티패턴의 **회귀를 차단**한다. CI/lint에서 실행해
  * 위반 시 비-0 종료. 패턴은 문서뿐 아니라 이 검사로 "기본 개발방식에 녹아" 강제된다.
@@ -496,7 +496,7 @@ checkLiteralBaseline({
 if (violations.length) {
   console.error(`\n✗ v1 패턴 검사 실패 — ${violations.length}건:\n`);
   for (const v of [...new Set(violations)]) console.error('  ' + v);
-  console.error('\n참고: docs/v1-coding-patterns.md\n');
+  console.error('\n참고: docs/guides/v1-coding-patterns.md\n');
   process.exit(1);
 }
 console.log(

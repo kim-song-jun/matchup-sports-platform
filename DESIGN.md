@@ -6,7 +6,7 @@
 ## 0. Read This First
 
 - 디자인 규칙을 읽거나 바꿔야 한다면 항상 `DESIGN.md`부터 본다.
-- 현재 코드베이스 디자인 개선 작업을 실행하려면 `DESIGN.md` 다음에 `.github/tasks/58-design-system-audit.md`를 본다. (이전 Task 52는 58에 의해 superseded)
+- 현재 코드베이스 디자인 개선 작업을 실행하려면 `DESIGN.md` 다음에 `.github/tasks/archive/58-design-system-audit.md`를 본다. (이전 Task 52는 58에 의해 superseded)
 - 과거 task, report, plan 문서는 evidence/history/reference일 뿐이고, 새로운 규칙 정의 문서가 아니다.
 - 문서 읽는 순서와 active/historical 구분은 `docs/DESIGN_DOCUMENT_MAP.md`를 따른다.
 
@@ -389,8 +389,8 @@ TeamMeet은 금융 앱이 아니다. 사용자가 첫 3초에 읽어야 할 것�
 - `docs/DESIGN_DOCUMENT_MAP.md`: 읽는 순서와 active vs historical navigation hub
 - `DESIGN.md`: 규칙 정의
 - `.impeccable.md`: 브랜드/미감 요약
-- `.github/tasks/52-current-design-drift-audit-and-remediation-plan.md`: 현재 디자인 개선 실행 계약
-- `docs/DESIGN_CONSISTENCY_REPORT.md`: audit snapshot
-- `docs/PROJECT_OVERVIEW.md`: 제품 소개용 요약
-- `.github/tasks/45-design-system-consolidation.md`: design system rollout history
-- 기타 `.github/tasks/*`, `docs/plans/*`: historical reference only
+- `.github/tasks/archive/52-current-design-drift-audit-and-remediation-plan.md`: 현재 디자인 개선 실행 계약
+- `docs/archive/v0-reports/DESIGN_CONSISTENCY_REPORT.md`: audit snapshot
+- `docs/archive/v0-reports/PROJECT_OVERVIEW.md`: 제품 소개용 요약
+- `.github/tasks/archive/45-design-system-consolidation.md`: design system rollout history
+- 기타 `.github/tasks/*`, `docs/archive/v0-plans/*`: historical reference only

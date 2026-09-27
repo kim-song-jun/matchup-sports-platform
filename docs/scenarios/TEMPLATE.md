@@ -43,7 +43,7 @@
 
 | Case ID | Type | Intent | Layer | Status | Automation |
 |---------|------|--------|-------|--------|------------|
-| `SCENARIO-ID-A` | Happy | 핵심 성공 플로우 | Playwright | Planned | `e2e/tests/...` |
+| `SCENARIO-ID-A` | Happy | 핵심 성공 플로우 | Playwright | Planned | `e2e/v1-tests/...`(config `e2e/v1.config.ts`, `pnpm test:e2e:v1`) |
 | `SCENARIO-ID-B` | Negative | 권한/검증 실패 | Playwright / unit | Planned | `...` |
 
 ### Multi-Context Check

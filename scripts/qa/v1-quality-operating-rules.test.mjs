@@ -66,7 +66,7 @@ test('frontend and design rules require visual evidence beyond green tests', asy
 
   assertContainsEvery(text, [
     'tests pass is not completion',
-    'Playwright screenshot',
+    'ego-browser',
     'before/after',
     'layout rebalance',
     'no left accent rail',

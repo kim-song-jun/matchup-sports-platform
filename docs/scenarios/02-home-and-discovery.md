@@ -73,10 +73,10 @@
 ## Notes
 
 - 이 파일은 탐색 계열 smoke test 기준이다. 필터 정확도 심화 검증은 매치/팀/장터 문서에서 이어진다.
-- 2026-04-07: `e2e/tests/home.spec.ts` Desktop Chrome 기준 통과. 다만 `HOME-002` 전용 새로고침 일관성 spec은 아직 분리하지 않았다.
+- 2026-04-07: `e2e/tests/home.spec.ts` Desktop Chrome 기준 통과. 다만 `HOME-002` 전용 새로고침 일관성 spec은 아직 분리하지 않았다. (레거시·삭제됨 — legacy-v0-final)
 - 2026-04-07: 같은 `home.spec.ts`가 Mobile Chrome 기준도 `14/14` 통과했다. 홈 종목 칩 테스트는 모바일 숨김 중복 DOM을 피하도록 `button:visible` 스코프로 보정했다.
 - 2026-04-08: 홈 매치/장터 카드의 fallback 이미지는 `/mock/photoreal/` 로컬 자산으로 재검증했다.
-- 2026-04-08: `/home -> /matches?sport=futsal` deep link와 discovery query-state reload persistence는 `e2e/tests/match-join-flow.spec.ts` smoke(`Desktop Chrome 3/3`)로 검증했다.
-- 2026-04-08: `e2e/tests/match-join-flow.spec.ts`에 discovery subset을 추가해 `/home -> /matches?sport=futsal`, advanced filter URL sync, reload persistence를 Desktop Chrome `3/3`로 검증했다.
-- 2026-04-08: dedicated `e2e/tests/match-discovery.spec.ts`로 `/home -> /matches?sport=futsal`, query-based filter persistence, quick filter clear flow를 Desktop Chrome `3/3`로 재검증했다.
+- 2026-04-08: `/home -> /matches?sport=futsal` deep link와 discovery query-state reload persistence는 `e2e/tests/match-join-flow.spec.ts` smoke(`Desktop Chrome 3/3`)로 검증했다. (레거시·삭제됨 — legacy-v0-final)
+- 2026-04-08: `e2e/tests/match-join-flow.spec.ts`에 discovery subset을 추가해 `/home -> /matches?sport=futsal`, advanced filter URL sync, reload persistence를 Desktop Chrome `3/3`로 검증했다. (레거시·삭제됨 — legacy-v0-final)
+- 2026-04-08: dedicated `e2e/tests/match-discovery.spec.ts`로 `/home -> /matches?sport=futsal`, query-based filter persistence, quick filter clear flow를 Desktop Chrome `3/3`로 재검증했다. (레거시·삭제됨 — legacy-v0-final)
 - 2026-04-08: discovery live rerun 중 dev compose `api` watch가 stale contract를 남기는 현상을 확인했다. 이후 `curl`로 query contract를 먼저 확인하고 transpile-only api runtime으로 browser rerun을 마쳤다.

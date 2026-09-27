@@ -375,6 +375,13 @@ jobs:
       - name: Prod release manifest generator tests (Task168 none/stageA/stageB)
         run: bash scripts/qa/test-create-prod-release-manifest.sh
 
+      # Fix round 1, Important 1: a workflow_dispatch string input can carry
+      # a raw newline, which would forge an extra key=value line in
+      # GITHUB_OUTPUT (last line for a key wins). This locks the
+      # extracted resolver's format check.
+      - name: Task168 stage resolver injection-guard tests
+        run: bash scripts/qa/test-resolve-task168-stage.sh
+
       # expand-contract 게이트를 **머지 전에** 돌린다.
       #
       # 2026-08-20 사고: 이 검사가 `deploy` job 에만 있었고 그 job 은 PR 에서 skip 된다.
@@ -657,30 +664,15 @@ jobs:
       # is checked instead of trusting the input, since a push event carries
       # no workflow_dispatch inputs at all but a stale UI default could still
       # show one -- this is what guarantees push always deploys as `none`.
+      # Logic lives in a standalone script (not inline here) so its
+      # newline-injection guard on the evidence input has its own unit test
+      # -- see scripts/qa/test-resolve-task168-stage.sh.
       - name: Resolve Task168 stage
         id: task168
         env:
           STAGE_INPUT: ${{ inputs.task168_stage }}
           EVIDENCE_INPUT: ${{ inputs.task168_rehearsal_evidence }}
-        run: |
-          set -Eeuo pipefail
-          stage="${STAGE_INPUT:-none}"
-          if [[ "${GITHUB_EVENT_NAME}" != workflow_dispatch ]]; then
-            stage="none"
-          fi
-          case "${stage}" in
-            none|stageA|stageB) ;;
-            *)
-              echo "Unknown task168_stage: '${stage}'" >&2
-              exit 1
-              ;;
-          esac
-          if [[ "${stage}" != none && -z "${EVIDENCE_INPUT}" ]]; then
-            echo "task168_rehearsal_evidence is required for ${stage}" >&2
-            exit 1
-          fi
-          echo "stage=${stage}" >> "${GITHUB_OUTPUT}"
-          echo "evidence=${EVIDENCE_INPUT:-}" >> "${GITHUB_OUTPUT}"
+        run: bash scripts/release/resolve-task168-stage.sh
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6

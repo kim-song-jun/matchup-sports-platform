@@ -7,6 +7,12 @@ set -Eeuo pipefail
 # manifest 재사용" 케이스 자체가 없다 — validate_existing_manifest() 는 이식하지 않는다.
 # 매 실행이 항상 신규 생성이다.
 
+# Fix round 1, Minor 3: resolved from this script's own location, not cwd --
+# the CI step invokes this from the repo root so it worked there by
+# coincidence, but a caller running it from any other directory (or a test)
+# would silently hash the wrong (or a nonexistent) migration.sql.
+readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
 for name in RELEASE_SHA RELEASE_VERSION REGISTRY SOURCE_SHA256 IMAGE_TAG PREVIOUS_SHA; do
   [[ -n "${!name:-}" ]] || { echo "${name} is required" >&2; exit 1; }
 done
@@ -57,7 +63,7 @@ if [[ "${task168_stage}" != none ]]; then
 
   migrations_json="$(
     for name in "${TASK168_MIGRATION_NAMES[@]}"; do
-      migration_path="apps/v1_api/prisma/migrations/${name}/migration.sql"
+      migration_path="${ROOT_DIR}/apps/v1_api/prisma/migrations/${name}/migration.sql"
       [[ -f "${migration_path}" ]] || {
         echo "Task168 migration source is missing: ${migration_path}" >&2
         exit 1

@@ -127,24 +127,27 @@ check_stage "stageA" "stageA" "local rehearsal log 2026-09-27" "${TOOL_DIGEST}" 
 check_stage "stageB" "stageB" "local rehearsal log 2026-09-27" "" "stageB" false
 
 # ── negative controls: the generator must refuse, not silently ship a
-#    manifest missing a field the validator (or the runner) requires ────────
-if run_generator stageA "" "${TOOL_DIGEST}" >/dev/null 2>"${TEST_ROOT}/stderr"; then
-  bad "stageA without TASK168_REHEARSAL_EVIDENCE was accepted (must be required)"
-else
-  ok "stageA without TASK168_REHEARSAL_EVIDENCE is rejected"
-fi
+#    manifest missing a field the validator (or the runner) requires. Each
+#    also asserts the stderr message, not just the nonzero exit -- a
+#    generator that dies for the WRONG reason (e.g. a typo elsewhere) would
+#    still pass an exit-code-only check. ─────────────────────────────────
+check_rejects() {
+  local label="$1" stage="$2" evidence="$3" digest="$4" expect_message="$5"
+  if run_generator "${stage}" "${evidence}" "${digest}" >/dev/null 2>"${TEST_ROOT}/stderr"; then
+    bad "${label} -- was accepted (must be rejected)"
+  elif [[ "$(cat "${TEST_ROOT}/stderr")" != *"${expect_message}"* ]]; then
+    bad "${label} -- rejected, but stderr did not contain '${expect_message}': $(cat "${TEST_ROOT}/stderr")"
+  else
+    ok "${label}"
+  fi
+}
 
-if run_generator stageA "local rehearsal log 2026-09-27" "" >/dev/null 2>"${TEST_ROOT}/stderr"; then
-  bad "stageA without TASK168_CUTOVER_DIGEST was accepted (must be required)"
-else
-  ok "stageA without TASK168_CUTOVER_DIGEST is rejected"
-fi
-
-if run_generator bogusStage "local rehearsal log 2026-09-27" "${TOOL_DIGEST}" >/dev/null 2>"${TEST_ROOT}/stderr"; then
-  bad "an unknown TASK168_STAGE value was accepted"
-else
-  ok "an unknown TASK168_STAGE value is rejected"
-fi
+check_rejects "stageA without TASK168_REHEARSAL_EVIDENCE is rejected" \
+  stageA "" "${TOOL_DIGEST}" "TASK168_REHEARSAL_EVIDENCE is required"
+check_rejects "stageA without TASK168_CUTOVER_DIGEST is rejected" \
+  stageA "local rehearsal log 2026-09-27" "" "TASK168_CUTOVER_DIGEST is required"
+check_rejects "an unknown TASK168_STAGE value is rejected" \
+  bogusStage "local rehearsal log 2026-09-27" "${TOOL_DIGEST}" "Unknown TASK168_STAGE"
 
 if [[ "${failures}" -ne 0 ]]; then
   echo "[create-prod-release-manifest] FAILED: ${failures} case(s)" >&2

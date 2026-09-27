@@ -60,18 +60,25 @@ fi
 # Positive control: a checker that never flags anything (e.g. a typo'd path,
 # an always-empty grep) would pass the assertion above vacuously. Prove the
 # SAME scan function actually catches the violation by injecting it into a
-# throwaway fixture tree.
+# throwaway fixture tree -- under BOTH scanned roots, since scan_env_file_
+# violations() greps two separate directory args and a bug could easily
+# drop one of them (e.g. a typo'd path) without the other masking it.
 fixture_root="$(mktemp -d)"
 trap 'rm -rf "${fixture_root}"' EXIT
 mkdir -p "${fixture_root}/deploy" "${fixture_root}/scripts"
 cat > "${fixture_root}/deploy/fixture-violation.sh" <<'FIXTURE'
 docker run --rm --env-file <(printf 'FOO=bar') myimage
 FIXTURE
+cat > "${fixture_root}/scripts/fixture-violation.sh" <<'FIXTURE'
+docker run --rm --env-file <(printf 'FOO=bar') myimage
+FIXTURE
 fixture_matches="$(scan_env_file_violations "${fixture_root}")"
-if [[ -n "${fixture_matches}" ]]; then
-  ok "positive control: an injected '--env-file <(' fixture is detected by the same scan"
+if [[ -n "${fixture_matches}" ]] &&
+  grep -q 'deploy/fixture-violation\.sh' <<<"${fixture_matches}" &&
+  grep -q 'scripts/fixture-violation\.sh' <<<"${fixture_matches}"; then
+  ok "positive control: injected '--env-file <(' fixtures under BOTH deploy/ and scripts/ are detected"
 else
-  bad "positive control: the scan did not flag an injected '--env-file <(' fixture -- the checker itself is broken"
+  bad "positive control: expected matches under both deploy/fixture-violation.sh and scripts/fixture-violation.sh, got: ${fixture_matches}"
 fi
 
 # Positive control: the CORRECT replacement pattern must still be present

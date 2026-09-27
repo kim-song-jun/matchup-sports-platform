@@ -67,9 +67,6 @@ _task168_names_csv() {
   local IFS=,
   echo "${parts[*]}"
 }
-# 9 names: M1(7) + M8 + M10 -- expected ledger right after the "pre" migrate
-# phase, before the cutover tool and before M9.
-_task168_pre_csv() { _task168_names_csv "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M10}"; }
 # 10 names: M1(7) + M8 + M9 + M10 -- everything Stage A ever applies (never
 # M11). Used both for the state-table's single scoped ledger read (whose
 # content decides "9 rows present" vs "10 rows present" vs "reject") and for
@@ -130,43 +127,64 @@ _rows_equal() {
 }
 
 # Critical 1 (real prod_pristine check found 122 unrelated ledger rows): a
-# scoped IN-list comparison alone cannot see a MISSING or stuck migration
+# scoped IN-list comparison alone cannot see a MISSING or foreign migration
 # among everything that came before M1 -- it would simply not appear in the
-# scoped read. Compares the count of RESOLVED pre-M1 migrations (applied OR
-# cleanly rolled back -- both are normal, healthy history; a real prod
-# snapshot checked in this session had 2 legitimately rolled-back pre-M1
-# rows, which a naive "applied-only" comparison would have wrongly flagged)
-# against the count of pre-M1 migration folders the release source actually
-# ships, and separately demands zero truly-stuck-or-self-contradictory rows.
+# scoped read.
 _pre_m1_source_names() {
   find "${PROD_SOURCE_DIR}/apps/v1_api/prisma/migrations" -mindepth 1 -maxdepth 1 -type d -exec basename '{}' \; 2>/dev/null |
     LC_ALL=C sort | awk -v m1="${PROD_TASK168_M1[0]}" '$0 < m1'
 }
 
+# Fix round 2 (load-bearing): the earlier version compared COUNTS of
+# "resolved" (applied OR cleanly-rolled-back) pre-M1 rows against the count
+# of pre-M1 source folders, and required an exact match. Both were wrong for
+# a real prod database that legitimately lags dev between releases (real
+# prod_pristine: 157 source pre-M1 folders, only 123 applied) -- that design
+# blocks Stage A forever. Counts also let two completely different name sets
+# cancel out to the same number, and folded a rolled-back-and-never-reapplied
+# row in as if it satisfied "this migration is present", which it does not
+# (its effect is not in the schema).
+#
+# $1: "subset" (Stage A -- the ledger's applied pre-M1 names may lag behind
+# what source ships; the "pre" migrate phase below catches the rest up, so
+# only a FOREIGN name -- applied but not shipped by this source, i.e. from a
+# different branch -- is a violation) or "exact" (Stage B -- by the time
+# Stage B runs, Stage A's own "pre" phase already had its chance to apply
+# every pre-M1 migration source ships, so nothing should be missing either).
+#
 # Returns 0 (clean), 1 (a real violation was found -- the caller should
 # treat this as "reject", not an error), or 2 (a genuine query/setup failure,
 # e.g. the DB is unreachable -- the caller must propagate this as a hard
 # failure, never as "reject"). Collapsing 1 and 2 into a single nonzero code
 # would make a real DB outage look identical to a safe, expected rejection.
-_assert_pre_m1_migrations_applied() {
-  local expected_count resolved_count anomalous_count
-  expected_count="$(_pre_m1_source_names | grep -c '.')" || expected_count=0
-  [[ "${expected_count}" -gt 0 ]] || {
+_assert_pre_m1_name_set() {
+  local mode="$1" source_names applied_names anomalous foreign missing
+  source_names="$(_pre_m1_source_names)"
+  [[ -n "${source_names}" ]] || {
     echo "[prod-task168] no pre-M1 migrations found under PROD_SOURCE_DIR -- cannot validate the ledger baseline" >&2
     return 2
   }
   # Anomalous: still-pending/failed (no finished_at, no rollback either) OR
   # self-contradictory (both finished AND rolled back, which should never
   # happen). A cleanly rolled-back row (finished_at NULL, rolled_back_at SET)
-  # is normal Prisma history, not an anomaly.
-  anomalous_count="$(prod_dbq "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name < '${PROD_TASK168_M1[0]}' AND ((finished_at IS NULL AND rolled_back_at IS NULL) OR (finished_at IS NOT NULL AND rolled_back_at IS NOT NULL))")" || return 2
-  if [[ "${anomalous_count}" != 0 ]]; then
-    echo "[prod-task168] pre-M1 migration ledger has ${anomalous_count} stuck or self-contradictory row(s)" >&2
+  # is normal Prisma history, not an anomaly, and is handled below by simply
+  # never counting it toward "applied".
+  anomalous="$(prod_dbq "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name < '${PROD_TASK168_M1[0]}' AND ((finished_at IS NULL AND rolled_back_at IS NULL) OR (finished_at IS NOT NULL AND rolled_back_at IS NOT NULL))")" || return 2
+  if [[ "${anomalous}" != 0 ]]; then
+    echo "[prod-task168] pre-M1 migration ledger has ${anomalous} stuck or self-contradictory row(s)" >&2
     return 1
   fi
-  resolved_count="$(prod_dbq "SELECT count(DISTINCT migration_name) FROM \"_prisma_migrations\" WHERE migration_name < '${PROD_TASK168_M1[0]}' AND ((finished_at IS NOT NULL AND rolled_back_at IS NULL) OR (finished_at IS NULL AND rolled_back_at IS NOT NULL))")" || return 2
-  if [[ "${resolved_count}" != "${expected_count}" ]]; then
-    echo "[prod-task168] pre-M1 ledger has ${resolved_count} resolved migration(s) but source ships ${expected_count} pre-M1 migrations" >&2
+  applied_names="$(prod_dbq "SELECT DISTINCT migration_name FROM \"_prisma_migrations\" WHERE migration_name < '${PROD_TASK168_M1[0]}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name")" || return 2
+  foreign=0
+  [[ -z "${applied_names}" ]] || foreign="$(comm -23 <(printf '%s\n' "${applied_names}") <(printf '%s\n' "${source_names}") | grep -c '.')" || foreign=0
+  if [[ "${foreign}" != 0 ]]; then
+    echo "[prod-task168] pre-M1 ledger has ${foreign} applied migration name(s) PROD_SOURCE_DIR does not ship (a different branch's migration?)" >&2
+    return 1
+  fi
+  [[ "${mode}" == exact ]] || return 0
+  missing="$(comm -13 <(printf '%s\n' "${applied_names}") <(printf '%s\n' "${source_names}") | grep -c '.')" || missing=0
+  if [[ "${missing}" != 0 ]]; then
+    echo "[prod-task168] pre-M1 ledger is missing ${missing} migration(s) PROD_SOURCE_DIR ships -- Stage B requires all of them applied" >&2
     return 1
   fi
   return 0
@@ -176,14 +194,18 @@ _assert_pre_m1_migrations_applied() {
 # an in-progress/failed attempt, or a resolved rollback -- means the ledger
 # is not one of the 5 recognized states; reject rather than guess. M11 is
 # checked separately: Stage A must never see it applied. Same 0/1/2 contract
-# as _assert_pre_m1_migrations_applied, for the same reason.
+# as _assert_pre_m1_name_set, for the same reason.
 _assert_stage_a_ledger_clean() {
   local pre_m1_rc bad m11_present
-  # Not a bare `_assert_pre_m1_migrations_applied || return 2` -- that would
+  # Not a bare `_assert_pre_m1_name_set subset || return 2` -- that would
   # collapse its own 1-vs-2 distinction back into one code. The `&&`/`||`
   # list is the "checked" context that keeps this call's own errexit exempt
-  # without losing which of the two failure codes it returned.
-  _assert_pre_m1_migrations_applied && pre_m1_rc=0 || pre_m1_rc=$?
+  # without losing which of the two failure codes it returned. "subset": a
+  # real prod database legitimately lags dev between releases (34-migration
+  # gap observed against prod_pristine), so Stage A only requires that
+  # whatever IS applied is legitimate, not that everything is already there
+  # -- the "pre" migrate phase below catches the rest up.
+  _assert_pre_m1_name_set subset && pre_m1_rc=0 || pre_m1_rc=$?
   case "${pre_m1_rc}" in
     0) ;;
     1) return 1 ;;
@@ -387,10 +409,31 @@ _stage_a_run_migrations() {
 # resume from there rather than refuse a genuinely-committed database.
 _stage_a_run_cutover_tool() {
   local tool_image="$1" report_file="$2"
-  [[ ! -e "${report_file}" ]] || {
-    echo "[prod-task168] cutover report already exists: ${report_file}" >&2
-    return 1
-  }
+  if [[ -e "${report_file}" ]]; then
+    # Fix round 2 (I4): the tool writes a report even when it fails preflight
+    # -- a report existing must not by itself block every future retry of
+    # the same release forever. Only a report from a run that never sealed
+    # anything (seals still 0|0|0) and whose own status says it failed is
+    # safe to archive and retry; a report sitting next to seals that already
+    # read 5|5|3 (committed) or an unrecognized status must still refuse,
+    # since the cutover tool itself must never run twice against a database
+    # it already (or ambiguously might have) committed.
+    local seals prior_status
+    seals="$(prod_count_cutover_seals)" || return 1
+    prior_status="$(jq -r '.status // empty' "${report_file}" 2>/dev/null)" || prior_status=''
+    if [[ "${seals}" == '0|0|0' && ( "${prior_status}" == FAILED || "${prior_status}" == PREFLIGHT_BLOCKED ) ]]; then
+      local archived
+      archived="${report_file%.json}.failed-$(date -u +%s).json"
+      mv "${report_file}" "${archived}" || {
+        echo "[prod-task168] could not archive the prior failed cutover report: ${report_file}" >&2
+        return 1
+      }
+      echo "[prod-task168] archived prior ${prior_status} cutover report to ${archived} (seals still 0|0|0) -- retrying" >&2
+    else
+      echo "[prod-task168] cutover report already exists: ${report_file} (status=${prior_status:-<unreadable>}, seals=${seals})" >&2
+      return 1
+    fi
+  fi
   local network owner tool_rc
   network="$(prod_task168_assert_network)" || return 1
   owner="$(_stat_owner "$(dirname "${report_file}")")" || return 1
@@ -580,8 +623,8 @@ task168_stage_a() {
       # it here is exactly what Review Focus #1 forbids. Its report evidence
       # must still exist and show zero legacy links, though.
       [[ -s "${report_file}" ]] || { echo "[prod-task168] committed resume is missing the cutover report" >&2; return 1; }
-      jq -e '.result.verification.remainingLegacyGameLinks==0 and .result.verification.remainingLegacyStaffScopes==0 and .result.verification.remainingLegacyAuditScopes==0' "${report_file}" >/dev/null || {
-        echo "[prod-task168] committed resume's cutover report does not show zero legacy links" >&2
+      jq -e '(.status=="COMPLETED" or .status=="COMPLETED_WITH_GATE_RELEASE_ERROR") and .result.verification.remainingLegacyGameLinks==0 and .result.verification.remainingLegacyStaffScopes==0 and .result.verification.remainingLegacyAuditScopes==0' "${report_file}" >/dev/null || {
+        echo "[prod-task168] committed resume's cutover report is not a recognized completed status with zero legacy links" >&2
         return 1
       }
       ;;
@@ -696,10 +739,22 @@ task168_stage_b() {
     _rows_equal "${resumed_rows}" "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}" "${PROD_TASK168_M11}" ||
       { echo "[prod-task168] Stage B resume refuses: ledger no longer shows the committed M11 set" >&2; return 1; }
   else
-    _assert_pre_m1_migrations_applied || return 1
+    # "exact": by Stage B time, Stage A's own "pre" migrate phase already had
+    # its chance to catch up every pre-M1 migration source ships, so nothing
+    # should be missing (fix round 2, item 2).
+    _assert_pre_m1_name_set exact || return 1
     prod_assert_cutover_seals || return 1
     local ledger_rows
-    ledger_rows="$(prod_ledger_rows "$(_task168_pre_m11_csv)")" || return 1
+    # Scoped to all 11 names (including M11), not just the 10 pre-M11 ones --
+    # fix round 2 Minor 6: reading only the pre-M11 scope makes an M11 that
+    # is already applied (with no valid migration-stage.json receipt, e.g.
+    # because it was applied out-of-band) invisible to this check, so it
+    # would wrongly pass as "exactly the Stage A M1..M10 set" and this branch
+    # would run `prisma migrate deploy` a second time against an
+    # already-migrated DB. Reading all 11 names means an already-applied M11
+    # shows up as an extra row and correctly fails the 10-name `_rows_equal`
+    # below instead.
+    ledger_rows="$(prod_ledger_rows "$(_task168_all_csv)")" || return 1
     _rows_equal "${ledger_rows}" "${PROD_TASK168_M1[@]}" "${PROD_TASK168_M8}" "${PROD_TASK168_M9}" "${PROD_TASK168_M10}" ||
       { echo "[prod-task168] Stage B refuses: prod ledger is not exactly the Stage A M1..M10 set" >&2; return 1; }
 

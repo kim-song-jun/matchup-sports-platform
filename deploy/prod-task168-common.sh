@@ -110,17 +110,17 @@ prod_db_identity() {
   printf '%s|%s' "${basic}" "${hostport}" | sha256sum | awk '{print $1}'
 }
 
-# $1 (optional): a SQL IN-list fragment, e.g. "'name1','name2'" -- when given,
-# scopes the ledger read to exactly those migration names. Without it, this
-# returns the FULL prod ledger (100+ unrelated rows in real prod), which is
-# never what an exact-set comparison against a handful of Task168 migration
-# names wants -- Critical 1 (real prod_pristine copy: 122 total rows,
-# `_rows_equal` against an unscoped read can never match). Every task168
-# caller in prod-task168.sh must pass the scoped name-list.
+# $1 (required): a SQL IN-list fragment, e.g. "'name1','name2'" -- scopes the
+# ledger read to exactly those migration names. A caller with no scope to
+# pass is a caller with a bug: the FULL prod ledger (100+ unrelated rows in
+# real prod) is never what any Task168 comparison wants -- Critical 1 (real
+# prod_pristine copy: 122 total rows, `_rows_equal` against an unscoped read
+# can never match). Fix round 2 Minor 4: the earlier optional/unscoped mode
+# had no callers and was a footgun for future ones, so it is gone -- every
+# task168 caller in prod-task168.sh must pass a scoped name-list.
 prod_ledger_rows() {
-  local names_csv="${1:-}" where='finished_at IS NOT NULL AND rolled_back_at IS NULL'
-  [[ -z "${names_csv}" ]] || where="${where} AND migration_name IN (${names_csv})"
-  prod_dbq "SELECT migration_name || '|' || COALESCE(checksum,'') FROM \"_prisma_migrations\" WHERE ${where} ORDER BY migration_name"
+  local names_csv="${1:?names_csv is required}"
+  prod_dbq "SELECT migration_name || '|' || COALESCE(checksum,'') FROM \"_prisma_migrations\" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL AND migration_name IN (${names_csv}) ORDER BY migration_name"
 }
 
 # Same catalog query as alpha's assert_actual_cutover_seals

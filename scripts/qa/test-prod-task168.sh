@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Real tests for deploy/prod-task168-common.sh and deploy/prod-task168.sh
-# (Task 175 Task 1-3, Fix round 1): the production Task168 Stage A/B
+# (Task 175 Task 1-3, Fix rounds 1-2): the production Task168 Stage A/B
 # transition runner.
 #
 # Same docker-shim convention as scripts/qa/test-task168-prod-guard.sh: fakes
@@ -48,7 +48,9 @@ if 'pg_control_system' in sql:
 elif sql.strip() == "SELECT current_database() || '|' || current_user":
     print(os.environ.get('FAKE_IDENTITY_BASIC', ''), end='')
 elif "migration_name < '" in sql and 'DISTINCT migration_name' in sql:
-    print(os.environ.get('FAKE_PRE_M1_RESOLVED', '1'), end='')
+    # Fix round 2: this is now a NAME-LIST query (applied pre-M1 migration
+    # names), not a count -- read from a file like the other row-shaped fakes.
+    print(readfile(os.environ.get('FAKE_PRE_M1_APPLIED_FILE'), ''), end='')
 elif "migration_name < '" in sql:
     print(os.environ.get('FAKE_PRE_M1_ANOMALOUS', '0'), end='')
 elif 'NOT (finished_at IS NOT NULL AND rolled_back_at IS NULL)' in sql:
@@ -274,6 +276,13 @@ else
   bad "prod_write_receipt: unexpected result: ${CASE_OUTPUT}"
 fi
 
+run_case false 'prod_ledger_rows'
+if [[ "${CASE_RC}" -ne 0 ]] && assert_msg "${CASE_OUTPUT}" 'names_csv is required'; then
+  ok "prod_ledger_rows: refuses without a scoped name-list argument (Minor 4 -- the unscoped default mode is gone)"
+else
+  bad "prod_ledger_rows-no-scope: rc=${CASE_RC} output=${CASE_OUTPUT}"
+fi
+
 export FAKE_IDENTITY_FULL_SHOULD_FAIL=true
 export FAKE_IDENTITY_BASIC='proddb|produser'
 run_case false 'prod_db_identity'
@@ -318,10 +327,12 @@ MANIFEST_B="${TEST_ROOT}/manifest-stageB.json"
 write_manifest "${MANIFEST_B}" stageB release-sha-b "${API_IMAGE_STAGE_B}" false
 
 # Critical 1: every fixture source ships exactly one pre-M1 migration (a
-# realistic baseline: real prod ships ~115) so `_assert_pre_m1_migrations_applied`
-# has something to compare against by default; a dedicated test below
-# overrides FAKE_PRE_M1_* to prove the guard actually rejects a bad baseline.
+# realistic baseline: real prod ships ~115) so `_assert_pre_m1_name_set` has
+# something to compare against by default; dedicated tests below override
+# FAKE_PRE_M1_APPLIED_FILE to prove the subset/exact modes actually work.
 PRE_M1_NAME='20260101000000_pre_existing_migration'
+PRE_M1_APPLIED_DEFAULT_FILE="${TEST_ROOT}/pre-m1-applied-default.txt"
+printf '%s\n' "${PRE_M1_NAME}" > "${PRE_M1_APPLIED_DEFAULT_FILE}"
 build_fixture_source() {
   local dest="$1"; shift
   install -d "${dest}/apps/v1_api/prisma/migrations/${PRE_M1_NAME}"
@@ -357,7 +368,7 @@ SEALS_COMMITTED_FILE="${TEST_ROOT}/fixture-seals-committed.txt"; printf '5|5|3|0
 TOOL_REPORT_COMPLETED="${TEST_ROOT}/fixture-tool-report.json"
 jq -n '{status:"COMPLETED",result:{verification:{remainingLegacyGameLinks:0,remainingLegacyStaffScopes:0,remainingLegacyAuditScopes:0}}}' > "${TOOL_REPORT_COMPLETED}"
 
-export FAKE_PRE_M1_RESOLVED=1
+export FAKE_PRE_M1_APPLIED_FILE="${PRE_M1_APPLIED_DEFAULT_FILE}"
 export FAKE_PRE_M1_ANOMALOUS=0
 export FAKE_BAD_COUNT=0
 export FAKE_M11_PRESENT=0
@@ -388,6 +399,47 @@ test_state() {
   fi
 }
 
+# Fix round 2 (load-bearing): `_assert_pre_m1_name_set` at the unit level,
+# decoupled from the rest of the state machine, with explicit messages.
+test_pre_m1_name_set_subset_allows_missing() {
+  : > "${TEST_ROOT}/pre-m1-msg-subset-ok.txt"
+  export FAKE_PRE_M1_APPLIED_FILE="${TEST_ROOT}/pre-m1-msg-subset-ok.txt"
+  run_case false '_assert_pre_m1_name_set subset'
+  export FAKE_PRE_M1_APPLIED_FILE="${PRE_M1_APPLIED_DEFAULT_FILE}"
+  if [[ "${CASE_RC}" -eq 0 ]]; then
+    ok "_assert_pre_m1_name_set(subset): zero pre-M1 migrations applied yet is fine -- Stage A's \"pre\" migrate phase catches up the rest"
+  else
+    bad "pre-m1-name-set-subset-allows-missing: rc=${CASE_RC} output=${CASE_OUTPUT}"
+  fi
+}
+test_pre_m1_name_set_subset_allows_missing
+
+test_pre_m1_name_set_foreign_rejects() {
+  printf '%s\n%s\n' "${PRE_M1_NAME}" '20250101000000_a_different_branch_migration' > "${TEST_ROOT}/pre-m1-msg-foreign.txt"
+  export FAKE_PRE_M1_APPLIED_FILE="${TEST_ROOT}/pre-m1-msg-foreign.txt"
+  run_case false '_assert_pre_m1_name_set subset'
+  export FAKE_PRE_M1_APPLIED_FILE="${PRE_M1_APPLIED_DEFAULT_FILE}"
+  if [[ "${CASE_RC}" -eq 1 ]] && assert_msg "${CASE_OUTPUT}" 'PROD_SOURCE_DIR does not ship'; then
+    ok "_assert_pre_m1_name_set(subset): an applied name PROD_SOURCE_DIR does not ship (different branch) is rejected"
+  else
+    bad "pre-m1-name-set-foreign-rejects: rc=${CASE_RC} output=${CASE_OUTPUT}"
+  fi
+}
+test_pre_m1_name_set_foreign_rejects
+
+test_pre_m1_name_set_exact_missing_rejects() {
+  : > "${TEST_ROOT}/pre-m1-msg-missing.txt"
+  export FAKE_PRE_M1_APPLIED_FILE="${TEST_ROOT}/pre-m1-msg-missing.txt"
+  run_case false '_assert_pre_m1_name_set exact'
+  export FAKE_PRE_M1_APPLIED_FILE="${PRE_M1_APPLIED_DEFAULT_FILE}"
+  if [[ "${CASE_RC}" -eq 1 ]] && assert_msg "${CASE_OUTPUT}" 'Stage B requires all of them applied'; then
+    ok "_assert_pre_m1_name_set(exact): a source pre-M1 migration missing from the ledger is rejected (Stage B mode)"
+  else
+    bad "pre-m1-name-set-exact-missing-rejects: rc=${CASE_RC} output=${CASE_OUTPUT}"
+  fi
+}
+test_pre_m1_name_set_exact_missing_rejects
+
 test_state "fresh"                 "${LEDGER_EMPTY}"     '0|0|0|0|0|0' fresh
 test_state "precutover"            "${LEDGER_M1_M8_M10}" '0|0|0|0|0|0' precutover
 test_state "committed"             "${LEDGER_M1_M8_M10}" '5|5|3|0|0|0' committed
@@ -401,17 +453,25 @@ export FAKE_M11_PRESENT=1
 test_state "reject-m11-already-applied" "${LEDGER_FULL10}" '5|5|3|0|0|0' reject
 export FAKE_M11_PRESENT=0
 
-# Critical 1: a scoped comparison alone cannot see a missing/stuck migration
-# from BEFORE M1 -- prove the new baseline check actually rejects. (A
-# legitimately rolled-back pre-M1 row is NOT an anomaly -- real prod_pristine
-# has 2 of them -- so this test specifically injects a STUCK row: neither
-# finished nor rolled back.)
+# Critical 1: a scoped comparison alone cannot see a stuck migration from
+# BEFORE M1 -- prove the baseline check actually rejects. (A legitimately
+# rolled-back pre-M1 row is NOT an anomaly -- real prod_pristine has 2 of
+# them -- so this test specifically injects a STUCK row: neither finished
+# nor rolled back.)
 export FAKE_PRE_M1_ANOMALOUS=1
 test_state "reject-pre-m1-stuck" "${LEDGER_EMPTY}" '0|0|0|0|0|0' reject
 export FAKE_PRE_M1_ANOMALOUS=0
-export FAKE_PRE_M1_RESOLVED=0
-test_state "reject-pre-m1-missing" "${LEDGER_EMPTY}" '0|0|0|0|0|0' reject
-export FAKE_PRE_M1_RESOLVED=1
+
+# Fix round 2 (load-bearing, end-to-end): a real prod database legitimately
+# lags dev between releases -- zero pre-M1 migrations applied yet (source
+# ships one, PRE_M1_NAME) must resolve to "fresh", not "reject". The old
+# exact-count design blocked this scenario forever; the unit-level tests
+# above cover the function directly, this proves the full state machine
+# wiring (_assert_stage_a_ledger_clean -> _assert_pre_m1_name_set subset).
+: > "${TEST_ROOT}/pre-m1-state-subset-missing.txt"
+export FAKE_PRE_M1_APPLIED_FILE="${TEST_ROOT}/pre-m1-state-subset-missing.txt"
+test_state "accept-pre-m1-subset-missing" "${LEDGER_EMPTY}" '0|0|0|0|0|0' fresh
+export FAKE_PRE_M1_APPLIED_FILE="${PRE_M1_APPLIED_DEFAULT_FILE}"
 
 # ══════════════ Real DB check (Critical 1's explicit requirement) ══════════
 # Confirms task168_stage_a_state resolves to "fresh" against an ACTUAL PG16
@@ -425,29 +485,17 @@ real_db_check() {
     echo "SKIP: real-DB check (promo_test_pg container not running)"
     return 0
   fi
-  local scratch_db="agent_task175_fixround1_$$"
+  local scratch_db="agent_task175_fixround2_$$"
   "${REAL_DOCKER}" exec promo_test_pg psql -U postgres -At -c "CREATE DATABASE ${scratch_db} TEMPLATE prod_pristine" >/dev/null 2>&1 || {
     echo "SKIP: real-DB check (could not create scratch db from prod_pristine)"
     return 0
   }
-  # Build a synthetic PROD_SOURCE_DIR containing exactly the pre-M1 migration
-  # folders THIS prod_pristine snapshot's own ledger resolved (applied or
-  # cleanly rolled back). The current worktree's migrations folder has ~32
-  # MORE pre-M1 entries than this snapshot (prod legitimately lags dev
-  # between releases -- that gap is not what Critical 1's check exists to
-  # catch), so comparing against the full current tree would fail for a
-  # reason unrelated to this runner's own correctness.
-  local resolved_names real_source
-  resolved_names="$("${REAL_DOCKER}" exec promo_test_pg psql -U postgres -d "${scratch_db}" -At -c \
-    "SELECT DISTINCT migration_name FROM \"_prisma_migrations\" WHERE migration_name < '${PROD_TASK168_M1[0]}' AND ((finished_at IS NOT NULL AND rolled_back_at IS NULL) OR (finished_at IS NULL AND rolled_back_at IS NOT NULL)) ORDER BY migration_name")"
-  real_source="${TEST_ROOT}/real-db-source"
-  install -d "${real_source}/apps/v1_api/prisma/migrations"
-  local mname
-  while IFS= read -r mname; do
-    [[ -n "${mname}" && -d "${ROOT_DIR}/apps/v1_api/prisma/migrations/${mname}" ]] || continue
-    cp -R "${ROOT_DIR}/apps/v1_api/prisma/migrations/${mname}" "${real_source}/apps/v1_api/prisma/migrations/${mname}"
-  done <<< "${resolved_names}"
-  echo "--- real DB check: task168_stage_a_state against a fresh prod_pristine copy (${scratch_db}, $(wc -l <<< "${resolved_names}" | tr -d ' ') pre-M1 migrations) ---"
+  # Fix round 2 (item 2's explicit requirement): PROD_SOURCE_DIR is the
+  # ACTUAL current tree's real migrations directory, not a synthetic tree
+  # built from the DB's own resolved names -- proves the new subset check
+  # tolerates the real ~34-migration gap between this stale snapshot and the
+  # current tree, rather than proving something true only by construction.
+  echo "--- real DB check: task168_stage_a_state against a fresh prod_pristine copy (${scratch_db}), PROD_SOURCE_DIR = ${ROOT_DIR} (the current tree) ---"
   # promo_test_pg is on the default "bridge" network (there is no
   # "deploy_default" network on this host), which does not do container-name
   # DNS resolution -- reach it by its bridge IP on its INTERNAL port (5432,
@@ -455,13 +503,19 @@ real_db_check() {
   local pg_ip real_out real_rc
   pg_ip="$("${REAL_DOCKER}" inspect promo_test_pg --format '{{.NetworkSettings.Networks.bridge.IPAddress}}')"
   real_out="$(PROD_TASK168_DATABASE_URL="postgresql://postgres:promo@${pg_ip}:5432/${scratch_db}" \
-    PROD_TASK168_DOCKER="${REAL_DOCKER}" PROD_TASK168_DB_NETWORK=bridge PROD_SOURCE_DIR="${real_source}" \
+    PROD_TASK168_DOCKER="${REAL_DOCKER}" PROD_TASK168_DB_NETWORK=bridge PROD_SOURCE_DIR="${ROOT_DIR}" \
     bash -c 'source '"${RUNNER_SH}"' && task168_stage_a_state' 2>&1)"
   real_rc=$?
   echo "task168_stage_a_state output: ${real_out} (rc=${real_rc})"
-  "${REAL_DOCKER}" exec promo_test_pg psql -U postgres -At -c "DROP DATABASE IF EXISTS ${scratch_db}" >/dev/null 2>&1 || true
+  # Cleanup failure must be surfaced, not swallowed by `|| true` (fix round 2
+  # explicit instruction) -- captured via the errexit-safe &&/|| pattern so a
+  # failed drop is counted as a real test failure instead of aborting the
+  # rest of the suite or vanishing silently.
+  local drop_rc
+  "${REAL_DOCKER}" exec promo_test_pg psql -U postgres -At -c "DROP DATABASE IF EXISTS ${scratch_db}" >/dev/null 2>&1 && drop_rc=0 || drop_rc=$?
+  [[ "${drop_rc}" -eq 0 ]] || bad "real-DB: cleanup failed to drop scratch db ${scratch_db} (rc=${drop_rc}) -- manual cleanup needed"
   if [[ "${real_rc}" -eq 0 && "$(tail -n1 <<< "${real_out}")" == fresh ]]; then
-    ok "real-DB: task168_stage_a_state == fresh against a genuine prod_pristine copy"
+    ok "real-DB: task168_stage_a_state == fresh against a genuine prod_pristine copy using the CURRENT tree's real pre-M1 migrations"
   else
     bad "real-DB: expected fresh rc0 against prod_pristine copy, got rc=${real_rc} output='${real_out}'"
   fi
@@ -550,6 +604,73 @@ test_tool_exit0_no_report_fails() {
 }
 test_tool_exit0_no_report_fails
 
+# Fix round 2 item 1 (I4 unresolved): the tool writes a report even when it
+# fails preflight, so a bare "report already exists" guard blocks every
+# future retry of the same release forever. Exercises _stage_a_run_cutover_tool
+# directly (unit-level, decoupled from the rest of the state machine).
+test_cutover_tool_retry_after_failed_report() {
+  local report_dir="${TEST_ROOT}/tool-retry-report"
+  install -d -m 700 "${report_dir}"
+  local report_file="${report_dir}/cutover-report.json"
+  jq -n '{status:"FAILED",reason:"preflight blocked"}' > "${report_file}"
+  printf '0|0|0|0|0|0' > "${TEST_ROOT}/seals-tool-retry.txt"
+  export FAKE_SEALS_FILE="${TEST_ROOT}/seals-tool-retry.txt"
+  export TOOL_RC=0
+  export FAKE_TOOL_REPORT_FILE="${TOOL_REPORT_COMPLETED}"
+  export CALL_LOG="${TEST_ROOT}/calls-tool-retry.log"; : > "${CALL_LOG}"
+  run_case false "_stage_a_run_cutover_tool '${TOOL_IMAGE}' '${report_file}'"
+  unset TOOL_RC FAKE_TOOL_REPORT_FILE
+  local tool_calls archived_count
+  tool_calls="$(grep -c 'TOOL_CALLED' "${CALL_LOG}" || true)"
+  archived_count="$(find "${report_dir}" -maxdepth 1 -name 'cutover-report.failed-*.json' | grep -c '.' || true)"
+  if [[ "${CASE_RC}" -eq 0 && "${tool_calls}" == 1 && "${archived_count}" == 1 ]] &&
+     jq -e '.status=="COMPLETED"' "${report_file}" >/dev/null 2>&1 &&
+     jq -e '.status=="FAILED"' "${report_dir}"/cutover-report.failed-*.json >/dev/null 2>&1; then
+    ok "cutover-tool-retry (I4): an existing FAILED report with seals still 0|0|0 is archived, tool retried, new report written"
+  else
+    bad "cutover-tool-retry: rc=${CASE_RC} tool_calls=${tool_calls} archived=${archived_count} output=${CASE_OUTPUT}"
+  fi
+}
+test_cutover_tool_retry_after_failed_report
+
+test_cutover_tool_refuses_when_committed() {
+  local report_dir="${TEST_ROOT}/tool-committed-report"
+  install -d -m 700 "${report_dir}"
+  local report_file="${report_dir}/cutover-report.json"
+  jq -n '{status:"FAILED"}' > "${report_file}"
+  printf '5|5|3|0|0|0' > "${TEST_ROOT}/seals-tool-committed.txt"
+  export FAKE_SEALS_FILE="${TEST_ROOT}/seals-tool-committed.txt"
+  export CALL_LOG="${TEST_ROOT}/calls-tool-committed-guard.log"; : > "${CALL_LOG}"
+  run_case false "_stage_a_run_cutover_tool '${TOOL_IMAGE}' '${report_file}'"
+  local tool_calls
+  tool_calls="$(grep -c 'TOOL_CALLED' "${CALL_LOG}" || true)"
+  if [[ "${CASE_RC}" -ne 0 && "${tool_calls}" == 0 ]] && assert_msg "${CASE_OUTPUT}" 'cutover report already exists'; then
+    ok "cutover-tool-committed-guard: an existing report is refused when seals already read 5|5|3, even though its own status says FAILED"
+  else
+    bad "cutover-tool-committed-guard: rc=${CASE_RC} tool_calls=${tool_calls} output=${CASE_OUTPUT}"
+  fi
+}
+test_cutover_tool_refuses_when_committed
+
+test_cutover_tool_refuses_unrecognized_status() {
+  local report_dir="${TEST_ROOT}/tool-unrecognized-report"
+  install -d -m 700 "${report_dir}"
+  local report_file="${report_dir}/cutover-report.json"
+  jq -n '{status:"RUNNING"}' > "${report_file}"
+  printf '0|0|0|0|0|0' > "${TEST_ROOT}/seals-tool-unrecognized.txt"
+  export FAKE_SEALS_FILE="${TEST_ROOT}/seals-tool-unrecognized.txt"
+  export CALL_LOG="${TEST_ROOT}/calls-tool-unrecognized-guard.log"; : > "${CALL_LOG}"
+  run_case false "_stage_a_run_cutover_tool '${TOOL_IMAGE}' '${report_file}'"
+  local tool_calls
+  tool_calls="$(grep -c 'TOOL_CALLED' "${CALL_LOG}" || true)"
+  if [[ "${CASE_RC}" -ne 0 && "${tool_calls}" == 0 ]] && assert_msg "${CASE_OUTPUT}" 'cutover report already exists'; then
+    ok "cutover-tool-unrecognized-guard: an existing report with a status other than FAILED/PREFLIGHT_BLOCKED refuses rather than guessing"
+  else
+    bad "cutover-tool-unrecognized-guard: rc=${CASE_RC} tool_calls=${tool_calls} output=${CASE_OUTPUT}"
+  fi
+}
+test_cutover_tool_refuses_unrecognized_status
+
 test_committed_resume_no_tool() {
   local sd="${TEST_ROOT}/state-committed/release-sha-a"
   export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/state-committed"
@@ -573,6 +694,52 @@ test_committed_resume_no_tool() {
   fi
 }
 test_committed_resume_no_tool
+
+# Fix round 2 item 4 (Minor 5): committed-resume must check the cutover
+# report's own `.status`, not just its zero-legacy-links numbers -- a report
+# that shows zero legacy links but never actually reached a completed status
+# must still be refused.
+test_committed_resume_rejects_bad_status() {
+  local sd="${TEST_ROOT}/state-committed-badstatus/release-sha-a"
+  export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/state-committed-badstatus"
+  seed_stage_a_receipts "${sd}" "${STAGE_A_DB_ID}"
+  jq -n '{status:"FAILED",result:{verification:{remainingLegacyGameLinks:0,remainingLegacyStaffScopes:0,remainingLegacyAuditScopes:0}}}' \
+    > "${sd}/report/cutover-report.json"
+  printf '%s' "${LEDGER_M1_M8_M10}" > "${TEST_ROOT}/ledger-committed-badstatus.txt"
+  printf '5|5|3|0|0|0' > "${TEST_ROOT}/seals-committed-badstatus.txt"
+  export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-committed-badstatus.txt" FAKE_SEALS_FILE="${TEST_ROOT}/seals-committed-badstatus.txt"
+  export CALL_LOG="${TEST_ROOT}/calls-committed-badstatus.log"; : > "${CALL_LOG}"
+  run_case true 'task168_stage_a'
+  local migrate_calls
+  migrate_calls="$(grep -c 'MIGRATE_DEPLOY_CRAFTED' "${CALL_LOG}" || true)"
+  if [[ "${CASE_RC}" -ne 0 && "${migrate_calls}" == 0 ]] && assert_msg "${CASE_OUTPUT}" 'not a recognized completed status'; then
+    ok "committed-resume (Minor 5): a report with zero legacy links but status=FAILED (never COMPLETED) is refused, not silently accepted"
+  else
+    bad "committed-resume-bad-status: rc=${CASE_RC} migrate_calls=${migrate_calls} output=${CASE_OUTPUT}"
+  fi
+}
+test_committed_resume_rejects_bad_status
+
+test_committed_resume_accepts_gate_release_error() {
+  local sd="${TEST_ROOT}/state-committed-gaterelerr/release-sha-a"
+  export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/state-committed-gaterelerr"
+  seed_stage_a_receipts "${sd}" "${STAGE_A_DB_ID}"
+  jq -n '{status:"COMPLETED_WITH_GATE_RELEASE_ERROR",result:{verification:{remainingLegacyGameLinks:0,remainingLegacyStaffScopes:0,remainingLegacyAuditScopes:0}}}' \
+    > "${sd}/report/cutover-report.json"
+  printf '%s' "${LEDGER_M1_M8_M10}" > "${TEST_ROOT}/ledger-committed-gaterelerr.txt"
+  printf '5|5|3|0|0|0' > "${TEST_ROOT}/seals-committed-gaterelerr.txt"
+  export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-committed-gaterelerr.txt" FAKE_SEALS_FILE="${TEST_ROOT}/seals-committed-gaterelerr.txt"
+  export FAKE_LEDGER_AFTER_POST_FILE="${LEDGER_FULL10_FILE}"
+  export CALL_LOG="${TEST_ROOT}/calls-committed-gaterelerr.log"; : > "${CALL_LOG}"
+  run_case true 'task168_stage_a'
+  unset FAKE_LEDGER_AFTER_POST_FILE
+  if [[ "${CASE_RC}" -eq 0 ]]; then
+    ok "committed-resume (Minor 5): COMPLETED_WITH_GATE_RELEASE_ERROR is also accepted as a recognized completed status"
+  else
+    bad "committed-resume-gate-release-error: rc=${CASE_RC} output=${CASE_OUTPUT}"
+  fi
+}
+test_committed_resume_accepts_gate_release_error
 
 # Important 4: a same-release retry after a transient backup failure must not
 # be permanently blocked by prod_write_receipt's byte-identical requirement
@@ -747,6 +914,29 @@ printf -- '-- tampered\nSELECT 1;\n' > "${SOURCE_B_TAMPERED_DIR}/apps/v1_api/pri
 export PROD_SOURCE_DIR="${SOURCE_B_TAMPERED_DIR}"
 run_stage_b_reject_case "m11-hash-mismatch" "M11 source checksum does not match the pinned value"
 export PROD_SOURCE_DIR="${SOURCE_B_DIR}"
+
+# Fix round 2 item 2: Stage B's "else" branch now runs the pre-M1 check in
+# "exact" mode -- a pre-M1 migration SOURCE_B_DIR ships but the ledger has
+# never applied must refuse Stage B outright (unlike Stage A's subset mode).
+export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/stateb-premissing"
+seed_stage_b_transition "${PROD_TASK168_STATE_ROOT}/release-sha-b" "${STAGE_B_DB_ID}" false
+: > "${TEST_ROOT}/pre-m1-applied-empty-for-b.txt"
+export FAKE_PRE_M1_APPLIED_FILE="${TEST_ROOT}/pre-m1-applied-empty-for-b.txt"
+run_stage_b_reject_case "pre-m1-incomplete" "Stage B requires all of them applied"
+export FAKE_PRE_M1_APPLIED_FILE="${PRE_M1_APPLIED_DEFAULT_FILE}"
+
+# Fix round 2 item 5 (Minor 6): the "else" branch's own ledger read must be
+# scoped to all 11 names (including M11), not just the 10 pre-M11 ones --
+# otherwise an M11 that is already applied out-of-band (no valid
+# migration-stage.json receipt) is invisible to the 10-name scoped read and
+# wrongly passes as "exactly the Stage A M1..M10 set", re-running
+# `prisma migrate deploy` a second time against an already-migrated DB.
+export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/stateb-m11noreceipt"
+seed_stage_b_transition "${PROD_TASK168_STATE_ROOT}/release-sha-b" "${STAGE_B_DB_ID}" false
+printf '%s' "${LEDGER_ALL11}" > "${TEST_ROOT}/ledger-b-m11noreceipt.txt"
+export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b-m11noreceipt.txt"
+run_stage_b_reject_case "m11-applied-no-receipt" "not exactly the Stage A M1..M10 set"
+export FAKE_LEDGER_FILE="${TEST_ROOT}/ledger-b.txt"
 
 test_stage_b_success() {
   export PROD_TASK168_STATE_ROOT="${TEST_ROOT}/stateb-success"

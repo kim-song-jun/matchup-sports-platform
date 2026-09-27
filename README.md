@@ -19,7 +19,7 @@ The selected Alpha rollout first promotes and verifies a canonical intermediate 
 ![pnpm](https://img.shields.io/badge/pnpm-monorepo-F69220?style=flat-square&logo=pnpm&logoColor=white)
 ![Tests](https://img.shields.io/badge/tests-125_passed-brightgreen?style=flat-square)
 
-풋살·농구·배드민턴·아이스하키 등 11개 생활체육 종목의 개인 매치와 팀 매칭을 지원하는 모바일 중심 소셜 플랫폼입니다. 레슨 수강권 거래, 스포츠 용품 장터, 실시간 채팅, 토스페이먼츠 결제를 통합 제공합니다.
+팀밋(Teameet)은 축구·풋살·러닝·수영 생활체육의 개인 매치와 팀을 찾고, 아마추어 대회·정규 리그 신청부터 라이브 스코어와 경기 기록까지 한 흐름으로 이어 주는 서비스예요. 서비스 주소: https://teameet.co.kr
 
 ---
 
@@ -30,6 +30,8 @@ The selected Alpha rollout first promotes and verifies a canonical intermediate 
 ---
 
 ## Features
+
+> 아래 기능 목록은 이전 세대 앱(`apps/web`) 기준이에요. 지금 서비스(`apps/v1_web`·`apps/v1_api`)의 기능과 공개 정보는 https://teameet.co.kr 과 https://teameet.co.kr/llms.txt 에서 확인할 수 있어요.
 
 ### 매칭
 

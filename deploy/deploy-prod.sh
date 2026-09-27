@@ -48,6 +48,8 @@ for required_path in \
   "${PROD_SOURCE_DIR}/deploy/prod-release-common.sh" \
   "${PROD_SOURCE_DIR}/deploy/prod-manifest-common.sh" \
   "${PROD_SOURCE_DIR}/deploy/prod-source-common.sh" \
+  "${PROD_SOURCE_DIR}/deploy/prod-task168.sh" \
+  "${PROD_SOURCE_DIR}/deploy/prod-task168-common.sh" \
   "${PROD_SOURCE_DIR}/deploy/rollback-prod.sh" \
   "${PROD_MANIFEST_FILE}"; do
   if [[ ! -f "${required_path}" ]]; then
@@ -57,13 +59,35 @@ for required_path in \
 done
 
 source "${PROD_SOURCE_DIR}/deploy/prod-release-common.sh"
+# Sourced (not exec'd) so its `compose`-array-based functions share this
+# script's own `compose` (defined below) and env vars -- see
+# deploy/prod-task168.sh's own header comment (arrays cannot cross a
+# subprocess boundary).
+source "${PROD_SOURCE_DIR}/deploy/prod-task168.sh"
 validate_prod_release_manifest \
   "${PROD_MANIFEST_FILE}" \
   "${PROD_SHA}" \
   "${PROD_RELEASE_VERSION}" \
   "${PROD_MANIFEST_SHA256}" \
-  "${PROD_ECR_REGISTRY}"
+  "${PROD_ECR_REGISTRY}" \
+  "${PROD_SOURCE_DIR}"
 load_prod_release_manifest "${PROD_MANIFEST_FILE}"
+
+# `database.task168.stage` selects which activation path this deploy takes.
+# Absent (regular deploy) keeps the pre-Task168 M11-guard/migrate/compose-up
+# flow byte-for-byte -- scripts/qa/test-task168-prod-guard.sh extracts that
+# exact segment by content anchor, so its lines below must not move or gain
+# indentation. validate_prod_release_manifest already rejects any other
+# stage value when database.task168 is present; this is a defense-in-depth
+# re-check, not the primary gate.
+task168_stage="$(jq -r '.database.task168.stage // empty' "${PROD_MANIFEST_FILE}")"
+case "${task168_stage}" in
+  ''|stageA|stageB) ;;
+  *)
+    echo "[prod-deploy] Unknown database.task168.stage: ${task168_stage}" >&2
+    exit 1
+    ;;
+esac
 
 had_active=false
 if [[ -f "${PROD_RELEASE_STATE_FILE}" ]]; then
@@ -181,11 +205,41 @@ restore_legacy_runtime() {
     http://127.0.0.1:8121/api/v1/health | jq -e '.data.checks.db == true' >/dev/null || return 1
 }
 
+# A staged (stageA/stageB) failure records which stage failed instead of
+# restoring the previous release's images -- see restore_on_failure() below
+# for why a restore is refused in staged mode. Overwrites on retry (a second
+# failed attempt should get a fresh timestamp, unlike prod_write_receipt's
+# idempotent-content contract).
+write_task168_activation_stage_failure() {
+  local stage="$1" state_dir content tmp
+  state_dir="${PROD_RELEASE_STATE_DIR}/task168/${PROD_SHA}"
+  content="$(jq -nc --arg stage "${stage}" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{schemaVersion:1,kind:"activationStage",stage:$stage,failedAt:$at}')" || return 1
+  install -d -m 700 "${state_dir}" || return 1
+  tmp="$(mktemp "${state_dir}/.activation-stage.XXXXXX")" || return 1
+  printf '%s' "${content}" > "${tmp}" || return 1
+  chmod 600 "${tmp}" || return 1
+  mv "${tmp}" "${state_dir}/activation-stage.json" || return 1
+}
+
 restore_on_failure() {
   local status="$?"
   trap - ERR
   archive_failed_candidate
-  if [[ "${runtime_mutated}" == true && "${had_active}" == true ]]; then
+  if [[ -n "${task168_stage}" ]]; then
+    # A staged transition can leave the database partially migrated (Stage A
+    # may have already committed the cutover tool's writes; Stage B may have
+    # already run M11's `prisma migrate deploy`). Restarting the PREVIOUS
+    # release's application images against that database is exactly what
+    # Review Focus #3 forbids -- the old code does not know about the
+    # in-progress/committed schema change. Refuse to restart anything and
+    # leave the candidate's images/API stopped; recovery is a manual runbook
+    # decision (resume the same stage, or a DBA-verified rollback).
+    echo "[prod-deploy] Candidate failed during Task168 ${task168_stage} -- refusing to restart the previous release's images against a possibly partially migrated database" >&2
+    write_task168_activation_stage_failure "${task168_stage}" ||
+      echo "[prod-deploy] WARNING: could not record the Task168 activation-stage failure receipt" >&2
+    echo "[prod-deploy] See docs/ops/prod-task168-transition-runbook.md for manual recovery steps" >&2
+  elif [[ "${runtime_mutated}" == true && "${had_active}" == true ]]; then
     echo "[prod-deploy] Candidate failed; restoring active release" >&2
     if ! restore_active_release; then
       echo "[prod-deploy] CRITICAL: active release restore failed" >&2
@@ -261,6 +315,34 @@ else
   echo "[prod-deploy] 외부 DB(${V1_DB_HOST}) 사용 — 로컬 v1_postgres 기동을 건너뜁니다"
 fi
 
+if [[ "${task168_stage}" == stageA || "${task168_stage}" == stageB ]]; then
+  # Ruling R1: the runner takes the DB URL only via this env var (never
+  # argv). Reuse the exact acquisition path assert_task168_m11_guard already
+  # proved safe -- a throwaway `compose run` reads the candidate API's own
+  # DATABASE_URL, never the shell environment or a log line.
+  task168_database_url="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')"
+  [[ -n "${task168_database_url}" ]] || {
+    echo "[prod-deploy] Task168 ${task168_stage}: candidate API's DATABASE_URL is unavailable" >&2
+    false
+  }
+  export PROD_TASK168_DATABASE_URL="${task168_database_url}"
+fi
+
+if [[ "${task168_stage}" == stageA ]]; then
+  prod_task168_main stageA
+  # Stage A never promotes -- it only proves the candidate database is
+  # ready for the M11 cutover. Keep the reviewed candidate manifest for the
+  # record under this release's own task168 state directory instead.
+  task168_state_dir="${PROD_RELEASE_STATE_DIR}/task168/${PROD_SHA}"
+  install -d -m 700 "${task168_state_dir}"
+  install -m 600 "${PROD_MANIFEST_FILE}" "${task168_state_dir}/manifest.json"
+  rm -f "${PROD_CANDIDATE_MANIFEST}"
+  trap - ERR
+  echo "[prod-deploy] Task168 Stage A complete for ${PROD_SHA} — candidate manifest kept at ${task168_state_dir}/manifest.json, not promoted. Deploy the Stage B manifest next."
+  exit 0
+elif [[ "${task168_stage}" == stageB ]]; then
+  prod_task168_main stageB
+else
 assert_task168_m11_guard "${PROD_SOURCE_DIR}"
 
 # D7: prisma migrate deploy 는 이 스크립트 안에서 정확히 1회만 실행한다(구 restart-containers.sh
@@ -270,6 +352,7 @@ assert_task168_m11_guard "${PROD_SOURCE_DIR}"
   'cd /app/apps/v1_api && ./node_modules/.bin/prisma migrate deploy'
 "${compose[@]}" run --rm --no-deps -T v1_api sh -c \
   'cd /app/apps/v1_api && node dist/src/tournaments/migration/tournament-award-recipient-backfill.cli.js'
+fi
 
 # restart-containers.sh 의 업로드 백업/복원 왕복을 그대로 흡수한다(D 표에 없던 prod 전용
 # 안전장치 — alpha 에는 없지만 기존 prod 배포가 볼륨 마운트에도 불구하고 방어적으로 이
@@ -316,6 +399,13 @@ rm -rf "${v1_uploads_backup_dir}" 2>/dev/null || true
 "${compose[@]}" up -d --force-recreate --no-deps nginx
 wait_for_prod_health_contract
 assert_running_release_digests
+
+if [[ "${task168_stage}" == stageB ]]; then
+  # Public-surface verification against the now-live release, before this
+  # Stage B manifest is promoted -- see task168_verify()'s own doc comment
+  # for exactly what it checks.
+  prod_task168_main verify
+fi
 
 # restart-containers.sh 의 수동 재시드 escape hatch 를 그대로 흡수한다. 기본은 off — CI
 # 워크플로는 이 변수를 설정하지 않으므로 정상 배포 경로에는 영향이 없다. 운영자가 EC2 에

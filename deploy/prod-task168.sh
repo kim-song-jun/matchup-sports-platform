@@ -828,7 +828,12 @@ task168_stage_b() {
     # should be missing (fix round 2, item 2).
     _assert_pre_m1_name_set exact || return 1
     prod_assert_cutover_seals || return 1
-    local ledger_rows
+    # Declared here (covering BOTH branches below), not inside the `if` that
+    # first assigns them -- this function is `source`d into deploy-prod.sh's
+    # own shell, so a `local` that only executes on the `if` path leaves the
+    # `else` path's bare assignment (same names) creating real GLOBAL
+    # variables when that path runs instead (carried over from Task 1-3).
+    local ledger_rows applied_count stage_content
     # Scoped to all 11 names (including M11), not just the 10 pre-M11 ones --
     # fix round 2 Minor 6: reading only the pre-M11 scope makes an M11 that
     # is already applied (with no valid migration-stage.json receipt, e.g.
@@ -858,7 +863,6 @@ task168_stage_b() {
         return 1
       fi
       echo "[prod-task168] M11 already applied and m11-entry.json confirms this Stage B run -- resuming to write migration-stage.json" >&2
-      local applied_count stage_content
       applied_count="$(grep -c '.' <<< "${ledger_rows}")" || return 1
       stage_content="$(jq -nc --arg release "${release_sha}" --arg api "${api_image}" --arg db "${db_id}" --argjson applied "${applied_count}" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         '{schemaVersion:1,kind:"migrationStage",status:"MIGRATION_COMMITTED",releaseSha:$release,apiImage:$api,databaseIdentity:$db,appliedCount:$applied,completedAt:$at}')" || return 1

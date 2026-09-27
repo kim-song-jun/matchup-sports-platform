@@ -24,7 +24,7 @@ export function TeamRecordsPageClient({ teamId }: { teamId: string }) {
   // '전체 시즌' 은 로컬 전용 값(undefined)이다 -- 서버 `season` 쿼리 자체를 생략해
   // 팀 전체 기간을 요청한다(U2의 '전체' 탭과 동일한 계약).
   const [activeSeason, setActiveSeason] = useState<string | undefined>(undefined);
-  const { data, isLoading, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
+  const { data, isPending, isError, error, refetch, hasNextPage, isFetchingNextPage, fetchNextPage } =
     usePublicTeamRecords(teamId, activeSeason, activeType === 'all' ? undefined : activeType);
 
   const firstPage = data?.pages[0];
@@ -38,7 +38,8 @@ export function TeamRecordsPageClient({ teamId }: { teamId: string }) {
     ...(firstPage?.teamName ? { title: `${firstPage.teamName} 전적` } : {}),
   });
 
-  if (isLoading) {
+  // isPending — 서버 렌더에서 isLoading 은 false 라 아래 오류 분기로 떨어진다(대회 상세와 같다).
+  if (isPending) {
     return <RecordsSkeleton />;
   }
 

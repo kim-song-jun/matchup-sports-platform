@@ -19,6 +19,8 @@ vi.mock('next/navigation', () => ({
 
 import TournamentDetailPage from './page';
 import ResultsPage from './results/page';
+import BracketPage from './bracket/page';
+import AwardsPage from './awards/page';
 import TournamentMatchPage from './matches/[fixtureId]/page';
 
 const TOURNAMENT = {
@@ -80,6 +82,15 @@ describe('대회 상세 첫 HTML', () => {
 
   it('결과 화면도 오류 화면을 서버 HTML 에 넣지 않는다', async () => {
     const html = await serverHtml(ResultsPage({ params: Promise.resolve({ id: 't-1' }) }));
+    expect(html).not.toContain('불러오지 못했어요');
+    expect(html).toContain('가을 송파 풋살컵');
+  });
+
+  it.each([
+    ['대진표', BracketPage],
+    ['시상', AwardsPage],
+  ])('%s 화면도 오류 화면을 서버 HTML 에 넣지 않는다', async (_label, Page) => {
+    const html = await serverHtml(Page({ params: Promise.resolve({ id: 't-1' }) }));
     expect(html).not.toContain('불러오지 못했어요');
     expect(html).toContain('가을 송파 풋살컵');
   });

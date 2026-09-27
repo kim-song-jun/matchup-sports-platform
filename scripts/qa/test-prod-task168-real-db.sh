@@ -17,24 +17,22 @@
 # sessions already run for other Task168 real-DB checks (see
 # scripts/qa/test-prod-task168.sh's own real_db_check()). Never touches
 # `prod_pristine` -- only ever CREATEs/DROPs its own disposable database.
+# Set REQUIRE_REAL_DB=1 to turn the SKIP guards into a hard failure instead
+# (CI-style "this must actually run" mode).
 #
-# KNOWN, REPRODUCED DEFECT (not a bug in this test -- see task-6-report.md):
-# task168_stage_b()'s "M11 already committed, resume into backfill" branch
-# (deploy/prod-task168.sh, the `if _receipt_reusable ... migrationStage`
-# branch) calls prod_assert_cutover_seals() to re-verify the cutover before
-# resuming. That query's WHERE clause references the retired legacy tables
-# (v1_tournament_fixtures et al.) by name via `::regclass` -- which is
-# EXACTLY what M11 (the migration Stage B itself just applied) drops. Once a
-# real M11 has really run, ANY second invocation of task168_stage_b() -- the
-# resume path the function's own comment describes as its purpose -- hits a
-# hard Postgres error (`relation "v1_tournament_fixtures" does not exist`)
-# instead of resuming. Every prior real-DB check in Task 1-3/4 exercised this
-# branch only via a fake docker/SQL evaluator that never actually drops a
-# table, so it could not surface this. This file's own rerun-idempotency
-# check (scenario I2 below) reproduces it and is EXPECTED to keep failing
-# until deploy/prod-task168.sh gets a fix round for this -- this file does
-# not patch deploy/prod-task168.sh itself (out of this task's edit scope;
-# that file is already-reviewed code).
+# Contract this file proves for task168_stage_b()'s two resume branches
+# (deploy/prod-task168.sh): once M11 has genuinely run, re-verifying the
+# cutover uses prod_assert_legacy_tables_retired() (the post-M11 invariant --
+# the 5 retired legacy tables and their 3 link triggers are gone), never
+# prod_assert_cutover_seals() (the pre-M11 invariant, which casts to those
+# same 5 tables and would hard-fail once M11 has dropped them). Scenario I2
+# below calls task168_stage_b() a second time after a real M11 has already
+# committed and asserts it resumes cleanly -- no migrate re-invocation, no
+# ledger/receipt drift (fix round 1, M-1). Scenario M-2 goes one step
+# further: it deletes migration-stage.json and reruns Stage B a THIRD time to
+# exercise the sibling resume branch (prod-task168.sh:877, "ledger already
+# shows the full M1..M11 set but the receipt is missing -- confirm via
+# m11-entry.json instead").
 set -Eeuo pipefail
 
 readonly ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -47,10 +45,18 @@ bad() { echo "FAILED: $1" >&2; failures=$((failures + 1)); }
 
 REAL_DOCKER="$(command -v docker || true)"
 if [[ -z "${REAL_DOCKER}" ]] || ! "${REAL_DOCKER}" ps >/dev/null 2>&1; then
+  if [[ "${REQUIRE_REAL_DB:-}" == 1 ]]; then
+    echo "FAILED: REQUIRE_REAL_DB=1 but docker is not reachable in this environment" >&2
+    exit 1
+  fi
   echo "SKIP: test-prod-task168-real-db (docker not reachable in this environment) -- this is a SKIP, not a pass; the pipeline this file proves is unverified in this environment"
   exit 0
 fi
 if ! "${REAL_DOCKER}" exec promo_test_pg psql -U postgres -At -c 'SELECT 1' >/dev/null 2>&1; then
+  if [[ "${REQUIRE_REAL_DB:-}" == 1 ]]; then
+    echo "FAILED: REQUIRE_REAL_DB=1 but the promo_test_pg sidecar container is not running" >&2
+    exit 1
+  fi
   echo "SKIP: test-prod-task168-real-db (promo_test_pg sidecar container not running) -- this is a SKIP, not a pass"
   exit 0
 fi
@@ -83,6 +89,7 @@ echo "--- creating scratch database ${SCRATCH_DB} (never prod_pristine) ---"
 "${REAL_DOCKER}" exec promo_test_pg psql -U postgres -At -c "DROP DATABASE IF EXISTS ${SCRATCH_DB}" >/dev/null 2>&1 || true
 "${REAL_DOCKER}" exec promo_test_pg psql -U postgres -At -c "CREATE DATABASE ${SCRATCH_DB}"
 PG_IP="$("${REAL_DOCKER}" inspect promo_test_pg --format '{{.NetworkSettings.Networks.bridge.IPAddress}}')"
+[[ -n "${PG_IP}" ]] || { echo "fixture setup: could not resolve promo_test_pg's bridge IP -- refusing to build a DATABASE_URL with an empty host" >&2; exit 1; }
 DATABASE_URL="postgresql://postgres:promo@${PG_IP}:5432/${SCRATCH_DB}"
 
 # Named M1_NAMES, not PROD_TASK168_M1 -- the runner itself declares a
@@ -302,20 +309,17 @@ else
   bad "fixture setup: legacy fixture seed failed (rc=${seed_rc})"
 fi
 
-echo "--- real cutover tool (converts the seeded legacy fixture into a canonical game) ---"
-report_dir="${TEST_ROOT}/state/task168/${RELEASE_SHA_A}/report"
-mkdir -p "${report_dir}"
-"${REAL_DOCKER}" run --rm --network bridge --user "$(id -u):$(id -g)" \
-  --env-file /dev/stdin -v "${report_dir}:/work" "${TOOL_IMAGE}" --report /work/cutover-report.json \
-  < <(printf 'DATABASE_URL=%s\n' "${DATABASE_URL}") >"${TEST_ROOT}/tool.log" 2>&1 && tool_rc=0 || tool_rc=$?
-if [[ "${tool_rc}" -eq 0 ]] && jq -e '.status=="COMPLETED" and .result.verification.remainingLegacyGameLinks==0 and .result.verification.remainingLegacyStaffScopes==0 and .result.verification.remainingLegacyAuditScopes==0 and .result.verification.fixtureCount>=1' "${report_dir}/cutover-report.json" >/dev/null 2>&1; then
-  ok "cutover tool: real run against the seeded legacy fixture -> COMPLETED, zero remaining legacy links, fixtureCount=$(jq '.result.verification.fixtureCount' "${report_dir}/cutover-report.json")"
-else
-  cat "${TEST_ROOT}/tool.log" >&2
-  bad "cutover tool run did not produce a clean COMPLETED report (rc=${tool_rc})"
-fi
-
-echo "--- Stage A dispatcher: resumes from 'committed' (real seals 5|5|3), real M9 post-migrate, real transition.json ---"
+echo "--- Stage A dispatcher: judges 'precutover' (quiesce/backup receipts exist, ledger matches, seals still 0|0|0) and runs its OWN _stage_a_run_cutover_tool() for real ---"
+# Fix round 1, Important 1: this used to run the cutover tool via a standalone
+# `docker run ... ${TOOL_IMAGE}` call BEFORE calling the dispatcher -- which
+# meant _stage_a_run_cutover_tool() itself (the --network/--user/report-mount
+# wiring, its rc==0 report-verification branch, its rc!=0 seal-based
+# fallback) never actually ran against a real database in this file. Now the
+# dispatcher is the ONLY thing that invokes the tool: with quiesce.json/
+# backup.json already on disk (run_stage_a_prelude above) and the ledger
+# matching the precutover set with seals still 0|0|0, task168_stage_a_state()
+# judges "precutover", and task168_stage_a()'s precutover branch re-quiesces
+# then calls _stage_a_run_cutover_tool() itself.
 run_stage_a_dispatch() (
   set -Eeuo pipefail
   PROD_TASK168_DATABASE_URL="${DATABASE_URL}"
@@ -330,10 +334,18 @@ run_stage_a_dispatch() (
   prod_task168_main "${2}"
 )
 if run_stage_a_dispatch "${manifest_a}" stageA >"${TEST_ROOT}/stagea.log" 2>&1; then
-  ok "Stage A dispatcher: completed (committed -> post-migrate -> transition.json)"
+  ok "Stage A dispatcher: completed (precutover -> runner's own cutover tool call -> post-migrate -> transition.json)"
 else
   cat "${TEST_ROOT}/stagea.log" >&2
   bad "Stage A dispatcher failed"
+fi
+# The report the RUNNER wrote via its own _stage_a_run_cutover_tool() --
+# never a report this test wrote itself.
+report_path="${TEST_ROOT}/state/task168/${RELEASE_SHA_A}/report/cutover-report.json"
+if jq -e '.status=="COMPLETED" and .result.verification.remainingLegacyGameLinks==0 and .result.verification.remainingLegacyStaffScopes==0 and .result.verification.remainingLegacyAuditScopes==0 and .result.verification.fixtureCount>=1' "${report_path}" >/dev/null 2>&1; then
+  ok "cutover tool (invoked by the runner's own _stage_a_run_cutover_tool()): COMPLETED, zero remaining legacy links, fixtureCount=$(jq '.result.verification.fixtureCount' "${report_path}" 2>/dev/null)"
+else
+  bad "the runner's own cutover-report.json is missing or not a clean COMPLETED result: $(cat "${report_path}" 2>&1)"
 fi
 transition_path="${TEST_ROOT}/state/task168/${RELEASE_SHA_A}/transition.json"
 if jq -e '.schemaVersion==1 and .kind=="transition" and .status=="COMPLETED" and .stage=="stageA" and (.cutoverReportSha256|length==64)' "${transition_path}" >/dev/null 2>&1; then
@@ -386,28 +398,58 @@ else
   fi
 fi
 
-echo "--- I2 (KNOWN, REPRODUCED DEFECT -- see this file's header + task-6-report.md): Stage B rerun after success ---"
-# task168_stage_b()'s own resume branch exists specifically to let a SECOND
-# call succeed (its comment: "M11 was already committed in a prior Stage B
-# attempt ... resuming into the backfill"). Against a real Postgres where
-# M11's DROP TABLE has actually run, this assertion currently FAILS -- that
-# failure is the correct, honest signal (rule: a test that would not fail on
-# a real bug is not a real test). Do not silently invert this to "expects
-# failure": that would hide a genuine defect in already-reviewed code that
-# this task is not authorized to patch (deploy/prod-task168.sh is out of
-# scope for this file). Whoever fixes prod_assert_cutover_seals()/
-# _prod_task168_seal_query() to tolerate the retired tables already being
-# gone should see this assertion start passing and can then drop this
-# comment block.
+echo "--- I2: Stage B rerun after success is idempotent (post-M11 invariant: prod_assert_legacy_tables_retired) ---"
+# task168_stage_b()'s "migration-stage.json already committed" resume branch
+# calls prod_assert_legacy_tables_retired() (not prod_assert_cutover_seals())
+# precisely because this branch is always post-M11 by construction -- fix
+# round 4 (deploy/prod-task168.sh commit 96fb1d167). Assert not just rc==0
+# but that NOTHING changed: no migrate re-invocation (ledger's full
+# name|finished_at snapshot identical before/after -- Prisma never re-stamps
+# an already-applied row, so this is strong evidence the migrate CLI was
+# never even invoked, not just that it would have been a no-op) and
+# migration-stage.json byte-identical (fix round 1, M-1).
+ledger_snapshot() {
+  "${REAL_DOCKER}" exec promo_test_pg psql -U postgres -d "${SCRATCH_DB}" -At -c \
+    "SELECT migration_name || '|' || finished_at FROM _prisma_migrations ORDER BY migration_name"
+}
+before_ledger="$(ledger_snapshot)"
+before_stage_sha="$(sha256sum "${stage_receipt}" | awk '{print $1}')"
 if run_stage_a_dispatch "${manifest_b}" stageB >"${TEST_ROOT}/stageb-rerun.log" 2>&1; then
-  ok "Stage B rerun after success: idempotent (defect appears fixed -- update this file's header comment)"
+  ok "Stage B rerun after success: idempotent (rc=0)"
 else
-  bad "Stage B rerun after success crashed (KNOWN DEFECT, see file header): $(tail -3 "${TEST_ROOT}/stageb-rerun.log")"
+  bad "Stage B rerun after success failed: $(tail -3 "${TEST_ROOT}/stageb-rerun.log")"
+fi
+after_ledger="$(ledger_snapshot)"
+after_stage_sha="$(sha256sum "${stage_receipt}" | awk '{print $1}')"
+[[ "${before_ledger}" == "${after_ledger}" ]] &&
+  ok "I2 (M-1): ledger snapshot (migration_name|finished_at, all rows) byte-identical before/after -- migrate deploy was never re-invoked" ||
+  bad "I2 (M-1): ledger snapshot changed across the rerun -- something re-touched the migration history"
+[[ "${before_stage_sha}" == "${after_stage_sha}" ]] &&
+  ok "I2 (M-1): migration-stage.json sha256 unchanged across the rerun (receipt not rewritten)" ||
+  bad "I2 (M-1): migration-stage.json sha256 changed across the rerun (${before_stage_sha} -> ${after_stage_sha})"
+
+echo "--- M-2: delete migration-stage.json, rerun Stage B a 3rd time -> exercises the SIBLING resume branch (prod-task168.sh:877, ledger already full M1..M11 but receipt missing, confirmed via m11-entry.json instead) ---"
+rm -f "${stage_receipt}"
+if run_stage_a_dispatch "${manifest_b}" stageB >"${TEST_ROOT}/stageb-rerun2.log" 2>&1; then
+  ok "Stage B rerun after deleting migration-stage.json: resumed via m11-entry.json (rc=0)"
+else
+  cat "${TEST_ROOT}/stageb-rerun2.log" >&2
+  bad "Stage B rerun after deleting migration-stage.json failed"
+fi
+if grep -q 'm11-entry.json confirms this Stage B run' "${TEST_ROOT}/stageb-rerun2.log"; then
+  ok "M-2: the runner's own log confirms it took the m11-entry.json resume branch, not a fresh M11 migrate"
+else
+  bad "M-2: expected the m11-entry.json resume branch's own log line, got: $(cat "${TEST_ROOT}/stageb-rerun2.log")"
+fi
+if jq -e '.schemaVersion==1 and .kind=="migrationStage" and .status=="MIGRATION_COMMITTED" and .appliedCount==11' "${stage_receipt}" >/dev/null 2>&1; then
+  ok "M-2: migration-stage.json rewritten fresh by the m11-entry.json resume branch, still a valid MIGRATION_COMMITTED receipt"
+else
+  bad "M-2: migration-stage.json missing or malformed after the m11-entry.json resume: $(cat "${stage_receipt}" 2>&1)"
 fi
 
 echo
 echo "=== summary: ${failures} failing assertion(s) ==="
 if [[ "${failures}" -gt 0 ]]; then
-  echo "[test-prod-task168-real-db] ${failures} assertion(s) failed -- see task-6-report.md for the known Stage B resume defect this was designed to catch" >&2
+  echo "[test-prod-task168-real-db] ${failures} assertion(s) failed -- see task-6-report.md" >&2
 fi
 exit "${failures}"

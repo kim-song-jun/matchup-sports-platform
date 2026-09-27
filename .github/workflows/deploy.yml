@@ -559,6 +559,22 @@ jobs:
           PGDATABASE: v1_migrate_check
         run: bash scripts/qa/test-task168-final-steady-real-db.sh
 
+      # Task 175 Task 6 fix round 1 (M-5): a cheap subset of the prod-task168.sh
+      # real-DB proof, riding the same fully-migrated v1_migrate_check DB the
+      # step above already built. No image build -- just the runner's own
+      # legacy-retirement invariant SQL against a real, current-schema
+      # Postgres. The full Stage A -> Stage B proof
+      # (scripts/qa/test-prod-task168-real-db.sh) stays local-only; see
+      # .superpowers/sdd/175-prod-task168-transition/task-6-report.md for why.
+      - name: Task168 legacy-retirement invariant real-Postgres check
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: teameet_test
+          PGPASSWORD: teameet_test
+          PGDATABASE: v1_migrate_check
+        run: bash scripts/qa/test-task168-legacy-retirement-real-db.sh
+
       - name: V1 API unit tests
         run: pnpm --filter v1_api test
 

@@ -5,7 +5,7 @@
 - 뷰포트: 390×844, 768×1024, 1440×900
 - 결과: 27개 화면 상태, 81장
 - 자동 수집 오류: console/pageerror/HTTP 5xx 0건
-- 상세 실행 증거: [manifest.json](./manifest.json)
+- 상세 실행 증거: `manifest.json`(캡처 당시 생성되지 않았거나 유실 — 이 디렉터리에는 스크린샷과 이 README만 남아 있다)
 
 | # | 화면/상태 | Mobile | Tablet | Desktop |
 |---:|---|---|---|---|

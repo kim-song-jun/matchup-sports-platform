@@ -64,3 +64,79 @@ Review and compensation effects are exact:
 - Event reversal appends exactly one event whose unique non-null `reversesEventId` points to the target and whose business key is `game:<gameId>:event:<reversalSequence>`; a target may be reversed once. Any replacement is a separate append and therefore receives a separate sequence/ack.
 
 <!-- API_CONTRACT_SECTION_END:Frozen REST and idempotency contract -->
+
+## Runtime And General Conventions
+
+The section above is the frozen cross-domain contract for the games/tournament-operations command
+surface. What follows applies to every v1 endpoint, not only that surface.
+
+- Local API origin: `http://localhost:8121`; prefix `/api/v1`; Swagger at `http://localhost:8121/docs`.
+- JSON content type: `application/json`. CORS has credentials enabled; the production origin comes
+  from `FRONTEND_URL`.
+- All successful responses are wrapped by `TransformInterceptor`:
+
+  ```json
+  { "status": "success", "data": {}, "timestamp": "2026-05-18T00:00:00.000Z" }
+  ```
+
+- All exceptions are wrapped by `AllExceptionsFilter`:
+
+  ```json
+  {
+    "status": "error",
+    "statusCode": 400,
+    "code": "VALIDATION_ERROR",
+    "message": "입력값을 다시 확인해 주세요.",
+    "details": [{ "field": "title", "messages": ["title should not be empty"] }],
+    "requestId": 42,
+    "timestamp": "2026-05-18T00:00:00.000Z"
+  }
+  ```
+
+  If an exception does not provide `code`, the filter emits `INTERNAL_ERROR`.
+
+## Validation
+
+Global `ValidationPipe` settings: `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true`,
+`enableImplicitConversion: true`. Frontend submit payloads must remove UI-only fields before calling
+the API — unknown body/query fields can produce `400`.
+
+## Authentication
+
+Production authentication uses the signed `teameet_v1_session` HttpOnly cookie issued by successful
+email registration/login and Kakao/Apple authentication responses (see [Auth](./domains/auth.md)).
+The cookie is `Secure` in production, `SameSite=Lax`, scoped to path `/` (the Socket.IO handshake at `/socket.io` needs it too), and expires after seven
+days. Guards validate its HMAC signature and expiry, then reload the current account status before
+installing `request.v1User`.
+
+Temporary persona headers (`x-v1-user-id`, `x-v1-user-email`) remain development/test-only.
+Production Web does not send these identity headers, nginx strips them, and both guards ignore them
+even if supplied. `V1AuthGuard` requires a valid signed session in production. `OptionalV1AuthGuard`
+allows guests and hydrates a user only when a valid signed session is present.
+
+Common auth errors: `401 UNAUTHENTICATED`, `403 PERMISSION_DENIED`, `403 SIGNUP_INCOMPLETE` for
+authenticated social sessions that still require terms or profile completion, `422
+PROFILE_COMPLETION_REQUIRED` for the creator-profile gate (see [Users](./domains/users.md)).
+
+## Pagination (Outside The Frozen Command Surface)
+
+Cursor-list DTOs use `cursor?: string`, `limit?: number`; list limits are usually `1..50`, except
+chat messages which allow `1..100`. List responses are cursor-based result objects — frontend code
+must not assume offset pagination. See
+[Pagination, filtering, and sorting](./pagination-filtering-and-sorting.md) for domain-specific
+defaults.
+
+## Common Error Codes
+
+Observed service/guard codes outside the frozen command surface: `UNAUTHENTICATED`,
+`PERMISSION_DENIED`, `SIGNUP_INCOMPLETE`, `PROFILE_COMPLETION_REQUIRED`, `VALIDATION_ERROR` (DTO shape,
+from `ValidationPipe`), `VALIDATION_FAILED` (service-level business rules),
+`NOT_FOUND`, `NOT_FOUND_OR_ARCHIVED`, `ALREADY_PROCESSED`, `INTERNAL_ERROR`. State-changing callers
+must handle stale or duplicate action responses as either `ALREADY_PROCESSED` or a domain-specific
+validation/permission error.
+
+## Deferred Boundaries
+
+V1 intentionally has no payment, refund, dispute, support ticket, DM, file attachment, venue
+operator, lesson, marketplace, or tournament success API outside the games/result flow documented
+above. UI must not simulate successful transactions or support outcomes for these surfaces.

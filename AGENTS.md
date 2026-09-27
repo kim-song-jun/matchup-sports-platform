@@ -192,11 +192,11 @@ Active task가 불명확하면 새 작업을 시작하기 전에 관련 task doc
 - 백엔드는 NestJS 모듈 경계를 유지한다. 새 기능은 `*.module.ts`, `*.controller.ts`, `*.service.ts`, `dto/` 구조를 우선한다.
 - API 기본 규칙:
   - prefix는 `/api/v1`
-  - 응답은 `TransformInterceptor` 기준 `{ status: 'success', data, timestamp }`, 에러는 `HttpExceptionFilter` 기준 `{ statusCode, code, message }`
+  - 응답은 `TransformInterceptor` 기준 `{ status: 'success', data, timestamp }`, 에러는 `AllExceptionsFilter` 기준 `{ status, statusCode, code, message, details, requestId, timestamp }`
   - 입력 검증은 DTO + `class-validator`. `ValidationPipe`는 `whitelist + forbidNonWhitelisted`로 동작한다 — 프론트 form state에 UI 전용 필드가 있으면 API submit 시 DTO 호환 payload로 정리해서 보내야 한다.
   - 목록은 cursor pagination을 기본값으로 본다. 다음 커서는 `pageInfo.nextCursor`.
   - 프론트 통합용 API 문서는 Swagger만 단독 source of truth로 쓰지 않는다. v1 `controller` + DTO + service status gate + integration test + `apps/v1_web`의 관련 hooks/types를 함께 교차검증하고, auth/permission/error/pagination/multipart/idempotency/mock-vs-real gotcha를 명시해야 한다.
-  - controller/DTO/service 계약이 바뀌면 `docs/api/`(README + global-contract + `domains/*.md`)를 **같은 변경**에서 sync한다. 일부 도메인은 `docs/api/v1/domains/*.md`가 더 상세하다 — 두 트리의 통합은 별도 과제이므로, 고치는 도메인의 현행 문서가 어느 쪽인지 확인하고 그 문서를 고친다.
+  - controller/DTO/service 계약이 바뀌면 `docs/api/`(README + global-contract + `domains/*.md`)를 **같은 변경**에서 sync한다(2026-09-28: 옛 `docs/api/v1/` 초안 트리는 `docs/api/`로 완전히 병합·삭제됐다 — 이제 도메인마다 정본은 하나뿐이다).
 - 권한 검증은 라우트 가드와 서비스 계층을 함께 본다. `V1AuthGuard`, `AdminContextService.getActiveAdmin`, 팀 서비스의 역할 검증(owner/manager/member)을 우회하는 경로를 만들지 않는다.
 - 디자인 소스 우선순위: `DESIGN.md` §1(`DESIGN.md` > `.impeccable.md` > `apps/v1_web/src/app/tokens.css`·`globals.css` 토큰 > `components/v1-ui/` 공유 컴포넌트). 시각 레퍼런스는 `Teameet Design.html`, 명시적으로 고정된 Open Design 복구 작업에서는 사용자가 제공한 export.
 - shadow는 깊이감 보조 수단으로만 사용한다. content card에서 deep shadow, stacked shadow, glow shadow를 기본 스타일로 쓰지 않는다.

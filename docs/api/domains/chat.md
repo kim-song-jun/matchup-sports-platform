@@ -19,6 +19,37 @@ V1 session authentication and current room entitlement are required. Development
 | GET | `/chat/blocked-users` | own blocks only; `{ items: [{ userId, displayName }] }` |
 | DELETE | `/chat/blocked-users/:userId` | removes caller's block only; idempotent `{ blocked: false }` |
 
+## Linked rooms and resolve
+
+`resolve` targets are `match`, `team`, `team_match`, or `team_contact`, checked against domain
+membership. A `team_contact` room is created when a team contact is sent — both teams' owner/manager
+become participants and the request text is the first message; list/detail items carry a
+`teamContact` block (`contactId`, display `status`, `expiresAt`, `declineReason`, `mySide`,
+`fromTeam`, `toTeam`), and sending a message returns `409 TEAM_CONTACT_NOT_ACCEPTED` until the
+contact is accepted. Match, team match, and team detail entry resolves the linked room for eligible
+users so chat participation is repaired automatically. Team chat is created automatically when a
+team is created, and owner/member participants are activated from confirmed team membership — join
+approval or invitation acceptance immediately starts the member's team-chat visibility and creates
+the joined system notice in the same transaction. For personal matches, both the host and an
+approved participant can resolve and enter the linked room; completing the match moves participant
+rows from `active` to `completed` but preserves that room entitlement, while withdrawing before
+kickoff moves them to `cancelled` and drops current match-chat entitlement. The web chat list does
+not expose leaving a linked room; users can only mute/unmute per-room app chat notifications.
+
+## Room entry and read state
+
+- `v1_chat_room_participants.visible_from_at` is the participant visibility boundary; `GET
+  /chat/rooms/:roomId/messages` returns only messages at or after it, and `PATCH
+  /chat/rooms/:roomId/me` rejects `lastReadMessageId` values outside that visible window.
+- Newly created or reactivated team-chat participants set `visible_from_at` at confirmed membership
+  activation; match/team-match participants start with `visible_from_at = null` and the first room
+  detail/message entry sets it and creates the joined system message.
+- Team-membership activation creates one system message (`messageType = "system"`,
+  `systemEventType = "joined"`); existing active-member repair does not duplicate it.
+- Message rows include `messageType`, `systemEventType`, and `unreadCount`. `unreadCount` is
+  computed per text message from active participants whose visibility boundary includes that
+  message and whose `lastReadMessageId` is older or empty; system messages always return `0`.
+
 ## Reporting and blocking
 
 - Report reasons: `spam`, `harassment`, `impersonation`, `inappropriate`, `other`; detail max 500.

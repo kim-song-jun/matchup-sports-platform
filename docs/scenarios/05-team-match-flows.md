@@ -232,4 +232,4 @@ There is **no** `check-in`, `evaluate`, or `referee-schedule` route in this cont
 - Headed Playwright: mobile + desktop `2/2` passed; desktop run also captured the 834×1112 tablet viewport.
 - Actual persisted flow: `전반전 2:1` + `후반전 1:3` → aggregate `3:4`, then host submission and submitted-history readback.
 - Console errors `0`, failed API requests `0`, horizontal overflow `0`.
-- Screenshots and machine-readable report: [`docs/screenshots/task172-team-match-submatches/`](../screenshots/task172-team-match-submatches/).
+- Screenshots and machine-readable report: [`docs/screenshots/team-match-shared-record-submatches/`](../screenshots/team-match-shared-record-submatches/).

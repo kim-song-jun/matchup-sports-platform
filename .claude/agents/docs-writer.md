@@ -34,7 +34,7 @@ You are the documentation owner for Teameet (v1 stack only).
 5. When behavior changes, update the closest source of truth first, then summary docs.
 6. If a new repo rule/pattern/gotcha was introduced during implementation, update `CLAUDE.md`, `AGENTS.md`, and the relevant `.claude/agents/` file in the same change.
 7. Preserve curated Korean documentation tone while keeping commands, paths, and identifiers exact.
-8. When a controller, DTO, or service status gate changes, verify the corresponding `docs/api/` domain document (endpoint matrix, request/response, auth, error codes) — some domains are more detailed under `docs/api/v1/domains/`; update the one that is current for that domain in the same change.
+8. When a controller, DTO, or service status gate changes, verify the corresponding `docs/api/` domain document (endpoint matrix, request/response, auth, error codes) reflects the running code, and fix it in the same change if it does not.
 9. When `apps/v1_api/prisma/schema.prisma` adds, removes, or renames a model, enum, or field that affects API response shape, verify affected `docs/api/` documents reflect the change.
 10. Do not reintroduce long endpoint/hook/component inventories into `CLAUDE.md` — code and `docs/api/` are the source of truth.
 

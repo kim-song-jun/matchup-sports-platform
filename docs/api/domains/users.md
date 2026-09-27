@@ -30,6 +30,15 @@
 ### `GET /me/profile`
 
 현재 사용자의 계정, 프로필, 종목 선호, 지역, 평판 snapshot을 반환한다. deleted 계정은 조회 대상이 아니며, mutable profile API는 active 계정만 허용한다.
+응답에는 로그인 방식 메타데이터도 포함된다: `authProvider`, `authProviders`, `hasPassword`. 클라이언트는
+`hasPassword`로 이메일/비밀번호 계정 컨트롤 노출 여부를 판단해야 한다(카카오 전용 계정은 비밀번호가 없다).
+
+## Creator Profile Gate
+
+`POST /matches`, `POST /teams`, `POST /team-matches`는 프로필에 비어있지 않은 `realName`, 저장된
+`phone`, `male`/`female` `gender`가 모두 있어야 한다. 하나라도 없으면 `422
+PROFILE_COMPLETION_REQUIRED`와 `details.missingFields`, `details.next.route = "/my/profile/edit"`를
+반환한다. 신청·초대·채팅·리뷰·문의·프로필 수정·기존 엔티티 관리 엔드포인트는 이 게이트를 쓰지 않는다.
 
 ### `PATCH /me/profile`
 
@@ -55,8 +64,14 @@
 
 - `GET /me/activity-summary`는 `totals: { activityCount, teamCount, mannerScore }`와 `monthly: { matchCount, mannerScore, winRate }`를 반환한다.
 - `GET /users/:userId/public-profile`은 optional auth이며 active/non-deleted 사용자만 반환한다.
-- 공개 응답은 `userId`, `displayName`, `nickname`, `profileImageUrl`, `reputation`, `activitySummary`만 포함한다. email, phone, birthDate, gender, realName은 공개하지 않는다.
+- 공개 응답은 `userId`, `displayName`, `nickname`, `profileImageUrl`, `reputation`, `activitySummary`만 포함한다. email, phone, birthDate, gender, realName은 공개하지 않는다. `displayName`은 공개 닉네임에서만 파생되며 `realName`에서 파생되지 않는다.
+- `reputation`은 `mannerScore`, `reviewCount`, `trustState`에 더해 `highlight`(`tagCode`, `label`, `rate`
+  0-1, `reviewCount`)를 포함한다. `highlight`는 `mannerScore`와 같은 리뷰 중 가장 많이 공개된 태그이며,
+  서로 다른 리뷰어 3명 미만이면 `null`이다(2명 이하 평가로 비율을 단정하지 않기 위함). `GET
+  /teams/:teamId/reviews`도 팀에 대해 같은 `highlight`를 반환한다.
 - 공개 `activitySummary`는 누적 match/team/review 수와 이번 달 match/team join/review 수를 구분한다.
+- 사용자가 선택하는 프로필 공개 범위 설정은 v1 계약에 없다 — 클라이언트는 공개 프로필 데이터를
+  "필드 단위로 공개 안전"하다고 취급해야지, 사용자가 고른 공개 상태로 취급하면 안 된다.
 
 ## 설정·선호
 

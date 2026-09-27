@@ -67,6 +67,26 @@ describe('team match pending chat guidance', () => {
   });
 });
 
+describe('team match description line breaks', () => {
+  it('preserves line breaks on the detail page', () => {
+    const model = getTeamMatchDetailViewModel();
+    model.match.description = '첫 번째 안내\n두 번째 안내';
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    expect(screen.getByText('첫 번째 안내\n두 번째 안내')).toHaveStyle({ whiteSpace: 'pre-wrap' });
+  });
+
+  it('preserves line breaks on the confirmation page', () => {
+    const model = getTeamMatchCreateViewModel('confirm');
+    model.draft.description = '첫 번째 안내\n두 번째 안내';
+
+    renderPage(<TeamMatchCreatePageView model={model} />);
+
+    expect(screen.getByText('첫 번째 안내\n두 번째 안내')).toHaveStyle({ whiteSpace: 'pre-wrap' });
+  });
+});
+
 describe('team match detail — recordEntry 렌더 순서', () => {
   // recordEntry가 히어로(.tm-team-vs-hero, 뒤로가기 포함) 앞으로 되돌아가면 모바일에서
   // 뒤로가기보다 진행 상황 카드가 먼저 보인다 — DOM 순서를 직접 비교해 그 회귀를 잡는다.

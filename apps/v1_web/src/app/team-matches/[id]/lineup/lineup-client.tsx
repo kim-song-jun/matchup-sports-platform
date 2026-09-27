@@ -9,10 +9,8 @@ import {
 } from '@/components/lineup/lineup-source';
 import { PageSkeleton } from '@/components/v1-ui/page-skeleton';
 import { PlusIcon } from '@/components/v1-ui/icons';
-import { useModalA11y } from '@/components/v1-ui/use-modal-a11y';
 import {
   useV1MyTeams,
-  useV1RequestTeamMatchLineupChange,
   useV1SaveTeamMatchLineup,
   useV1SubmitTeamMatchLineup,
   useV1TeamMatch,
@@ -116,7 +114,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   const [conflict, setConflict] = useState(false);
   const saveMutation = useV1SaveTeamMatchLineup(teamMatchId);
   const submitMutation = useV1SubmitTeamMatchLineup(teamMatchId);
-  const changeRequestMutation = useV1RequestTeamMatchLineupChange(teamMatchId);
   const [lastSubmittedRevision, setLastSubmittedRevision] = useState<number | null>(null);
 
   const kickoffAt = teamMatchQuery.data?.startsAt;
@@ -260,21 +257,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
   }
 
   const [guestName, setGuestName] = useState('');
-  const [changeRequestOpen, setChangeRequestOpen] = useState(false);
-  const [changeRequestReason, setChangeRequestReason] = useState('');
-  const [changeRequestError, setChangeRequestError] = useState<string | null>(null);
-
-  // 접근성(ESC 닫기·포커스 저장/복원·Tab 포커스트랩·body 스크롤 잠금·backdrop 클릭 닫기)은
-  // 공용 훅 useModalA11y 로 위임 — 조건부 마운트형(changeRequestOpen ? … : null)이라
-  // open 은 실제 state 를 그대로 넘긴다.
-  const {
-    dialogRef: changeRequestDialogRef,
-    initialFocusRef: changeRequestReasonRef,
-    onBackdropClick: onChangeRequestBackdropClick,
-  } = useModalA11y<HTMLTextAreaElement, HTMLElement>({
-    open: changeRequestOpen,
-    onClose: () => setChangeRequestOpen(false),
-  });
 
   // insane review(P1-3, 2026-08 GPT Pro): "제외" 버튼은 실제로는 완전 삭제(moveEntry의
   // 선발↔후보 이동과 다르다) — 등번호·GK 지정·피치 좌표가 전부 소실되고, 재수화된 뒤라면
@@ -315,39 +297,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
       pendingRemovalTimerRef.current = null;
     }
     setPendingRemoval(null);
-  }
-
-  function submitChangeRequest() {
-    const reason = changeRequestReason.trim();
-    if (reason.length === 0) {
-      setChangeRequestError('사유를 입력해 주세요.');
-      return;
-    }
-    setChangeRequestError(null);
-    const attempt = (expectedVersion: number) =>
-      changeRequestMutation.mutate(
-        { idempotencyKey: randomUuid(), expectedVersion, reason },
-        {
-          onSuccess: () => {
-            setChangeRequestOpen(false);
-            setChangeRequestReason('');
-          },
-          onError: (error) => {
-            if (error instanceof V1ApiError && error.code === 'VERSION_CONFLICT' && expectedVersion === 0) {
-              const currentVersion = extractConflictCurrentVersion(error.details);
-              if (currentVersion !== null) {
-                attempt(currentVersion);
-                return;
-              }
-            }
-            setChangeRequestError(extractErrorMessage(error, '정정 요청을 보내지 못했어요.'));
-          },
-        },
-      );
-    // 상대팀 사이드를 조회하는 API가 없어 현재 revision을 미리 알 방법이 없다 — 0으로 첫
-    // 시도를 보내고, 409로 돌아오는 details.currentVersion으로 정확한 값을 얻어 한 번 더
-    // 시도한다(위 백엔드 수정으로 details가 실제로 전달된다).
-    attempt(0);
   }
 
   if (teamMatchQuery.isLoading || lineupQuery.isLoading || myTeamsQuery.isLoading) {
@@ -849,18 +798,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
         ) : null}
         </div>
 
-        <section aria-labelledby="lineup-change-request-heading" style={{ marginBottom: 16 }}>
-          <SectionTitle id="lineup-change-request-heading" title="상대팀 참석명단 정정 요청" />
-          <Card pad={16} style={{ marginTop: 8 }}>
-            <p className="tm-text-caption" style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 12 }}>
-              상대팀이 제출한 참석명단에 문제가 있다면 재작성을 요청할 수 있어요. 상대팀 참석명단 내용은 직접 볼 수 없고, 사유만 남겨 다시 작성해 달라고 요청하는 기능이에요.
-            </p>
-            <button type="button" className="tm-btn tm-btn-sm tm-btn-outline" onClick={() => setChangeRequestOpen(true)}>
-              정정 요청 보내기
-            </button>
-          </Card>
-        </section>
-
         {validationErrors.length > 0 && editable ? (
           <div style={{ marginBottom: 96 }}>
             <AlertBanner tone="warning" message={validationErrors.join(' ')} />
@@ -914,57 +851,6 @@ export function TeamMatchLineupPageClient({ teamMatchId }: { teamMatchId: string
                     : '참석명단 제출하기'}
             </button>
           </div>
-        </div>
-      ) : null}
-
-      {changeRequestOpen ? (
-        <div
-          role="presentation"
-          onClick={onChangeRequestBackdropClick}
-          style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', background: 'var(--scrim-dark-32)', padding: 20 }}
-        >
-          <section
-            ref={changeRequestDialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="lineup-change-request-dialog-title"
-            onClick={(event) => event.stopPropagation()}
-            style={{ width: 'min(100%, 420px)', borderRadius: 18, background: 'var(--bg)', boxShadow: 'var(--shadow-modal)', padding: 20 }}
-          >
-            <h2 id="lineup-change-request-dialog-title" className="tm-text-subhead" style={{ margin: 0 }}>
-              상대팀에 정정을 요청할까요?
-            </h2>
-            <label htmlFor="lineup-change-request-reason" className="tm-text-caption" style={{ display: 'block', margin: '12px 0 8px', color: 'var(--text-muted)' }}>
-              사유
-            </label>
-            <textarea
-              ref={changeRequestReasonRef}
-              id="lineup-change-request-reason"
-              className="tm-input"
-              rows={3}
-              value={changeRequestReason}
-              onChange={(event) => setChangeRequestReason(event.target.value)}
-              placeholder="예: 등번호가 중복된 것 같아요"
-            />
-            {changeRequestError ? (
-              <p role="alert" className="tm-text-caption" style={{ color: 'var(--red700)', marginTop: 8 }}>
-                {changeRequestError}
-              </p>
-            ) : null}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 8, marginTop: 16 }}>
-              <button type="button" className="tm-btn tm-btn-md tm-btn-neutral" onClick={() => setChangeRequestOpen(false)}>
-                취소
-              </button>
-              <button
-                type="button"
-                className="tm-btn tm-btn-md tm-btn-primary"
-                disabled={changeRequestMutation.isPending}
-                onClick={submitChangeRequest}
-              >
-                {changeRequestMutation.isPending ? '보내는 중…' : '요청 보내기'}
-              </button>
-            </div>
-          </section>
         </div>
       ) : null}
 

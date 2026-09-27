@@ -373,7 +373,6 @@ const hoisted = vi.hoisted(() => ({
   useV1TeamMembersMock: vi.fn(),
   saveMutate: vi.fn(),
   submitMutate: vi.fn(),
-  changeRequestMutate: vi.fn(),
   refetchLineup: vi.fn(),
 }));
 
@@ -396,7 +395,6 @@ vi.mock('@/hooks/use-v1-api', () => ({
   useV1UpdateLineupPreset: () => ({ mutateAsync: async () => undefined, isPending: false }),
   useV1SaveTeamMatchLineup: () => ({ mutate: hoisted.saveMutate, isPending: false }),
   useV1SubmitTeamMatchLineup: () => ({ mutate: hoisted.submitMutate, isPending: false }),
-  useV1RequestTeamMatchLineupChange: () => ({ mutate: hoisted.changeRequestMutate, isPending: false }),
   // AppChrome 헤더/데스크톱 nav의 알림 벨이 호출한다 — 라인업 화면과 무관하지만 모듈 전체를
   // 모킹하는 이상 실제로 렌더되는 하위 트리가 쓰는 훅도 채워줘야 한다.
   useV1NotificationUnreadSummary: () => ({ data: undefined }),
@@ -451,6 +449,20 @@ describe('TeamMatchLineupPageClient', () => {
       isLoading: false,
     });
     hoisted.refetchLineup.mockResolvedValue({ data: baseLineup() });
+  });
+
+  it('상대팀 참석명단 정정 요청 영역을 노출하지 않는다', () => {
+    hoisted.useV1TeamMatchLineupMock.mockReturnValue({
+      data: baseLineup(),
+      isLoading: false,
+      isError: false,
+      refetch: hoisted.refetchLineup,
+    });
+
+    render(<TeamMatchLineupPageClient teamMatchId="tm-1" />);
+
+    expect(screen.queryByText('상대팀 참석명단 정정 요청')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '정정 요청 보내기' })).not.toBeInTheDocument();
   });
 
   /**

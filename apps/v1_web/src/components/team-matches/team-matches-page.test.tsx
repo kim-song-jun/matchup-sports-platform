@@ -53,6 +53,20 @@ describe('team match images', () => {
   });
 });
 
+describe('team match pending chat guidance', () => {
+  it('shows guidance after click without rendering persistent helper copy', () => {
+    const model = getTeamMatchDetailViewModel('pending');
+    model.chatLabel = '승인 후 채팅';
+
+    renderPage(<TeamMatchDetailPageView model={model} />);
+
+    const chatButtons = screen.getAllByRole('button', { name: '승인 후 채팅' });
+    expect(screen.queryByText('승인 완료 후 이용할 수 있어요')).not.toBeInTheDocument();
+    fireEvent.click(chatButtons[0]);
+    expect(screen.getByRole('alert')).toHaveTextContent('승인 완료 후 이용할 수 있어요');
+  });
+});
+
 describe('team match detail — recordEntry 렌더 순서', () => {
   // recordEntry가 히어로(.tm-team-vs-hero, 뒤로가기 포함) 앞으로 되돌아가면 모바일에서
   // 뒤로가기보다 진행 상황 카드가 먼저 보인다 — DOM 순서를 직접 비교해 그 회귀를 잡는다.

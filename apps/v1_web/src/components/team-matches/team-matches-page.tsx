@@ -262,6 +262,12 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
   const showChat = mode === 'approved' || mode === 'mine' || mode === 'pending' || Boolean(model.onChat);
   const timeRange = match.endTime ? `${match.time}-${match.endTime}` : match.time;
   const [heroMessage, setHeroMessage] = useState('');
+  const [chatNoticeVisible, setChatNoticeVisible] = useState(false);
+  const chatNoticeTimerRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (chatNoticeTimerRef.current) window.clearTimeout(chatNoticeTimerRef.current);
+  }, []);
 
   const heroActionBusyRef = useRef(false);
   const runHeroAction = (
@@ -301,16 +307,28 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
     runHeroAction(action.onClick, `${action.label} 처리를 완료했어요.`);
   };
 
-  /* Chat button — rendered only when showChat is true (approved/mine/pending).
-   * disabled + notice when chatEnabled is false (pending, not yet approved). */
+  const handleChatClick = () => {
+    if (chatEnabled) {
+      model.onChat?.();
+      return;
+    }
+    setChatNoticeVisible(true);
+    if (chatNoticeTimerRef.current) window.clearTimeout(chatNoticeTimerRef.current);
+    chatNoticeTimerRef.current = window.setTimeout(() => setChatNoticeVisible(false), 2200);
+  };
+
+  /* Chat button — pending keeps disabled styling but remains clickable for guidance. */
   const chatButton = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <button className="tm-btn tm-btn-lg tm-btn-neutral" type="button" disabled={!chatEnabled || model.chatPending} onClick={model.onChat}>
+      <button
+        className={`tm-btn tm-btn-lg tm-btn-neutral${chatEnabled ? '' : ' tm-btn-disabled'}`}
+        type="button"
+        disabled={model.chatPending}
+        aria-disabled={!chatEnabled || model.chatPending}
+        onClick={handleChatClick}
+      >
         {model.chatPending ? '연결 중' : model.chatLabel ?? '채팅'}
       </button>
-      {!chatEnabled ? (
-        <div className="tm-text-micro" style={{ textAlign: 'center', color: 'var(--text-caption)' }}>승인 완료 후 이용할 수 있어요</div>
-      ) : null}
       {model.chatError ? (
         <div className="tm-text-micro" role="alert" style={{ textAlign: 'center', color: 'var(--red700)' }}>{model.chatError}</div>
       ) : null}
@@ -748,6 +766,11 @@ export function TeamMatchDetailPageView({ model, recordEntry }: { model: TeamMat
           {ctaButtons}
         </div>
       </div>
+      {chatNoticeVisible ? (
+        <div className="tm-team-match-chat-notice" role="alert" aria-live="assertive">
+          승인 완료 후 이용할 수 있어요
+        </div>
+      ) : null}
       {ConfirmModal}
     </>
   );

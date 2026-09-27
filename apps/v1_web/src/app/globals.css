@@ -6295,6 +6295,24 @@ html[data-teameet-native-keyboard="open"] .tm-modal-panel {
 }
 
 /* ── 전역 라우트 진행 바 (components/v1-ui/route-progress.tsx) ───────────── */
+.tm-team-match-chat-notice {
+  position: fixed;
+  left: 50%;
+  bottom: calc(126px + var(--v1-shell-safe-bottom));
+  width: max-content;
+  max-width: calc(100vw - 40px);
+  transform: translateX(-50%);
+  z-index: 42;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(25, 31, 40, 0.94);
+  color: var(--static-white);
+  box-shadow: var(--shadow-2);
+  font-size: var(--font-size-label);
+  font-weight: 700;
+  text-align: center;
+}
+
 .tm-route-progress {
   position: fixed;
   top: 0;

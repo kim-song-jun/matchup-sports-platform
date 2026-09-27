@@ -36,6 +36,15 @@ const PHASE_LABEL: Record<string, string> = {
   third_place: '3·4위전',
 };
 
+function getFixturePhase(round: string): keyof typeof PHASE_ORDER | null {
+  const normalized = round.trim().toLowerCase();
+
+  if (normalized.includes('third_place') || normalized.includes('3·4위전') || normalized.includes('3-4위전')) return 'third_place';
+  if (normalized === 'final' || normalized === '결승') return 'final';
+  if (normalized === 'semi' || normalized === 'semifinal' || normalized === '4강') return 'semi';
+  return null;
+}
+
 function getRoundLabel(key: string): string {
   return PHASE_LABEL[key] ?? key;
 }
@@ -50,8 +59,12 @@ export function groupFixturesByRound(
   for (const fixture of fixtures) {
     let key: string;
     let sortIndex: number;
+    const fixturePhase = getFixturePhase(fixture.round);
 
-    if (fixture.groupId !== null) {
+    if (fixturePhase) {
+      key = fixturePhase;
+      sortIndex = PHASE_ORDER[fixturePhase];
+    } else if (fixture.groupId !== null) {
       const group = groupById.get(fixture.groupId);
       if (group) {
         key = group.phase;

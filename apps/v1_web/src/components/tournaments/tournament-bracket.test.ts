@@ -67,6 +67,23 @@ describe('groupFixturesByRound', () => {
     expect(rounds[1].fixtures.map((f) => f.id)).toEqual(['f3']);
   });
 
+  it('uses fixture rounds when final and third-place fixtures share the semi group', () => {
+    const sharedSemiGroup = makeGroup({ id: 'g-semi', phase: 'semi' });
+    const fixtures = [
+      makeFixture({ id: 'semi-1', fixtureNumber: 7, groupId: 'g-semi', round: '4강' }),
+      makeFixture({ id: 'semi-2', fixtureNumber: 8, groupId: 'g-semi', round: '4강' }),
+      makeFixture({ id: 'final', fixtureNumber: 9, groupId: 'g-semi', round: '결승' }),
+      makeFixture({ id: 'third', fixtureNumber: 10, groupId: 'g-semi', round: '3·4위전' }),
+    ];
+
+    const rounds = groupFixturesByRound(fixtures, [sharedSemiGroup]);
+
+    expect(rounds.map((round) => round.key)).toEqual(['semi', 'final', 'third_place']);
+    expect(rounds[0].fixtures.map((fixture) => fixture.id)).toEqual(['semi-1', 'semi-2']);
+    expect(rounds[1].fixtures.map((fixture) => fixture.id)).toEqual(['final']);
+    expect(rounds[2].fixtures.map((fixture) => fixture.id)).toEqual(['third']);
+  });
+
   it('sorts rounds by PHASE_ORDER: semi(0) < final(1) < third_place(2)', () => {
     const groupThird = makeGroup({ id: 'g-third', phase: 'third_place' });
     const groupSemi = makeGroup({ id: 'g-semi', phase: 'semi' });

@@ -254,6 +254,8 @@ wait_for_prod_health_contract() {
 #      (fail closed). A target whose source carries M11 was built for the
 #      post-cutover schema.
 # Uses `compose run v1_api`, so V1_API_IMAGE must already be loaded.
+# Does not call assert_task168_m11_guard: test-task168-prod-guard.sh mutates
+# that function's exact text, so keep the two query sites separate.
 assert_task168_m11_restore_target_safe() {
   local target_sha="$1"
   local m11_name=20260911090000_retire_tournament_fixture_tables

@@ -1,5 +1,7 @@
 # Task 175 — 프로덕션 Task168 전환 (alpha 방식 이식, C2)
 
+Status: Implemented — 승격(dev→main)과 Stage A/B 실행은 사용자 결정 대기. 런북 `docs/ops/prod-task168-transition-runbook.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development. 체크박스로 진행을 추적한다.
 
 **Goal:** dev→main 승격 후 프로덕션 DB 를 Task168 최종 스키마로 옮기는 Stage A / Stage B 두 번의 배포 경로를 만든다.

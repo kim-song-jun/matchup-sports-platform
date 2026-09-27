@@ -40,6 +40,9 @@ alpha(`alpha.teameet.co.kr`)에서는 끝났고, 이 문서는 그 다음 단계
       (아래 "복구" 절 참고), 그것과 별개로 AWS 콘솔에서 RDS 인스턴스의 수동 스냅샷을 한 번 더
       떠 둔다. 배포 파이프라인의 IAM role 에는 RDS 스냅샷 권한이 없어 자동화돼 있지 않다 —
       사람이 콘솔에서 직접 눌러야 한다.
+- [ ] **공개 대회 경기가 있는지 확인한다.** Stage B 의 verify 는 공개 API 가 노출하는 경기가
+      0건이면 실패하고, M11 이후라 코드 변경 없이는 우회할 수 없다. 전환 직전에 공개 대회·
+      공개 대진표가 최소 하나 있는지 사이트에서 확인한다(리허설 덤프 기준 공개 경기 32건).
 - [ ] **PITR 보존 기간을 확인한다.** RDS 콘솔의 인스턴스 상세 → "백업" 탭에서 자동 백업
       보존 기간(2026-09-27 확인 시점 7일)을 확인한다. 짧아졌다면 복구 가능 시간창도
       그만큼 좁아진다는 뜻이니 전환 일정을 다시 검토한다.
@@ -354,8 +357,9 @@ EC2 안에서 실행할 내용. 러너·가드와 **같은 방식**으로 DB 에
 ```bash
 set -Eeuo pipefail
 # compose 가 v1_api 서비스를 해석하려면 이미지 변수가 필요하다 — 현재 active 매니페스트 값을 쓴다.
-export V1_API_IMAGE="$(sudo jq -er '.active.images.api.uri' <PROD_RELEASE_STATE_FILE>)"
-export V1_WEB_IMAGE="$(sudo jq -er '.active.images.web.uri' <PROD_RELEASE_STATE_FILE>)"
+V1_API_IMAGE="$(sudo jq -er '.active.images.api.uri' <PROD_RELEASE_STATE_FILE>)"
+V1_WEB_IMAGE="$(sudo jq -er '.active.images.web.uri' <PROD_RELEASE_STATE_FILE>)"
+export V1_API_IMAGE V1_WEB_IMAGE
 compose=(sudo --preserve-env=V1_API_IMAGE,V1_WEB_IMAGE docker compose --project-name deploy
   -f <PROD_LIVE_DIR>/deploy/docker-compose.prod.yml --env-file <PROD_LIVE_DIR>/deploy/.env)
 URL="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')"

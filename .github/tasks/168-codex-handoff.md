@@ -4,10 +4,10 @@
 
 ## 먼저 읽을 문서
 
-1. [Task 168 — 전체 진행 정본](.github/tasks/168-competition-phase3-full-flow-verification.md): 최상단 최신 판정·재개 커서부터 읽는다. Phase 3 구현, PR/Alpha 배포, 실패 원인, 후보 파일, 실제 검증과 미완 항목이 모여 있다. 아래쪽의 과거 '진행 중' 문구보다 최신 기록을 우선한다.
-2. [시나리오 허브](docs/scenarios/index.md): 관리자·팀장·팀원·첫 사용자·경기 운영자의 사용자 흐름과 QA 문서 연결. **2026-09-15 M11 마이그레이션+alpha 데이터 전체 재생성 이전 상태를 기준으로 한 옛 "41/42" 기록이라 그 자체로는 최신이 아니다** — 최신 판정은 Task 168 문서를 우선한다.
-3. [Task 165 — 피리어드·인라인 결과 정정](.github/tasks/165-ops-console-league-inline-correction-periods.md), [Task 166 — 결과·기록 흐름](.github/tasks/166-result-flow-simplify-dispute-removal-records.md): 계약 참고용, 오늘 세션에서 변경 없음.
-4. [저장소 지침](AGENTS.md), [.codex 진입 규칙](.codex/AGENTS.md), [QA 규칙](.codex/qa-rules.md), [프론트엔드 규칙](.codex/frontend-rules.md), [디자인 규칙](.codex/design-rules.md): 작업 전 확인.
+1. [Task 168 — 전체 진행 정본](168-competition-phase3-full-flow-verification.md): 최상단 최신 판정·재개 커서부터 읽는다. Phase 3 구현, PR/Alpha 배포, 실패 원인, 후보 파일, 실제 검증과 미완 항목이 모여 있다. 아래쪽의 과거 '진행 중' 문구보다 최신 기록을 우선한다.
+2. [시나리오 허브](../../docs/scenarios/index.md): 관리자·팀장·팀원·첫 사용자·경기 운영자의 사용자 흐름과 QA 문서 연결. **2026-09-15 M11 마이그레이션+alpha 데이터 전체 재생성 이전 상태를 기준으로 한 옛 "41/42" 기록이라 그 자체로는 최신이 아니다** — 최신 판정은 Task 168 문서를 우선한다.
+3. [Task 165 — 피리어드·인라인 결과 정정](165-ops-console-league-inline-correction-periods.md), [Task 166 — 결과·기록 흐름](166-result-flow-simplify-dispute-removal-records.md): 계약 참고용, 오늘 세션에서 변경 없음.
+4. [저장소 지침](../../AGENTS.md), [.codex 진입 규칙](../../.codex/AGENTS.md), [QA 규칙](../../.codex/qa-rules.md), [프론트엔드 규칙](../../.codex/frontend-rules.md), [디자인 규칙](../../.codex/design-rules.md): 작업 전 확인.
 
 ## 현재 확인한 상태 — 2026-09-15 세션 완료분
 
@@ -29,7 +29,7 @@
 
 ## 다음 세션에 바로 줄 지시
 
-> readme_codex.md와 Task 168 최신 판정을 읽고 시작해줘. 42흐름 재검증은 2026-09-15에 사용자 확정으로 완료됐다 — 다시 재검증하지 마. 열려 있는 항목은 이 세 가지뿐이다.
+> `.github/tasks/168-codex-handoff.md`(옛 루트 `readme_codex.md`)와 Task 168 최신 판정을 읽고 시작해줘. 42흐름 재검증은 2026-09-15에 사용자 확정으로 완료됐다 — 다시 재검증하지 마. 열려 있는 항목은 이 세 가지뿐이다.
 > 1. **S-L 대진 교체(reconcile-in-place) 실경로 검증**: 코드 diff로는 안전 확인됐지만 alpha 실클릭은 사용자 지시로 보류 중이다. 사용자가 요청하면 alpha의 유일한 리그(21경기)를 대상으로 진행하되, 그 전에 반드시 alpha 데이터 쓰기 승인을 별도로 받아라.
 > 2. **벤치마크 P0③(GTM 플레이북)**: 사용자가 "나중에 별도로" 하자고 명시적으로 보류했다. 사용자가 다시 꺼내기 전까지 자율로 시작하지 마라.
 > 3. **#735 프로덕션 승격 PR**: 여전히 사용자 전용, 머지 금지. 본문 경고가 오늘 머지된 PR #1209/#1210/#1212를 반영하는지 확인하고 필요하면 갱신만 해라(머지는 하지 마라).

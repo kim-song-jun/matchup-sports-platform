@@ -3,10 +3,10 @@
 - 파일명: `{N}-{task-name}.md`. 번호는 순차 부여되지만 유일하지 않을 수 있다(예: `22-*.md`가 두 개 —
   같은 번호를 먼저 소진한 뒤 뒤늦게 다른 문서가 재사용한 사례). 새 태스크는 `ls .github/tasks/ | grep
   -oE '^[0-9]+' | sort -n | tail -1`로 최신 번호를 확인하고 그다음 번호를 쓴다.
-- 필수 섹션 템플릿: 루트 `CLAUDE.md`의 "Structured Task Documents" 원칙 7 참조
-  (Context / Goal / Original Conditions / User Scenarios / Test Scenarios / Parallel Work
+- 필수 섹션(Context / Goal / Original Conditions / User Scenarios / Test Scenarios / Parallel Work
   Breakdown / Acceptance Criteria / Tech Debt Resolved / Security Notes / Risks & Dependencies /
-  Ambiguity Log).
+  Ambiguity Log)은 아래 "태스크 문서 템플릿"을 쓴다. 원칙은 루트 `CLAUDE.md` Core Engineering
+  Principles 7.
 - **Status 표기**: 문서 상단에 `Status: <값>` 한 줄을 남긴다(`Done`/`Completed`/`Merged`/`완료`
   계열이면 완료로 판정됨). 표기가 없거나 모호하면(진행 중·계획·검증 대기 등) 최상위에 남는다 —
   archive 판정은 파일명이 아니라 이 줄을 기준으로 한다.
@@ -45,3 +45,87 @@
   `81-sm-new-direction-0502-freeze.md`(docs/reference 인용), `77-test-infra-upgrade.md`,
   `78-next-to-react-migration-proposal.md`.
 - 전체 목록·근거는 PR-3a 보고서의 "Follow-up 1" 절 분류표를 참조.
+
+## 태스크 문서 템플릿
+
+`project-director` + `tech-planner`가 태스크를 시작할 때 `.github/tasks/{N}-{task-name}.md`에 아래 구조로
+작성한다. 빌더는 이 문서 없이 비자명한 변경을 시작하지 않는다. (옛 에이전트 프롬프트 파일의
+"Task Document Format"을 v1 경로로 옮긴 것)
+
+```markdown
+# Task {N}: {title}
+
+Status: Planning | In Progress | Review | Done
+**Owner**: Planning team → {빌더}
+**Created**: {YYYY-MM-DD}
+
+## Context
+이 태스크가 존재하는 이유. 비즈니스 문제 또는 기술적 필요.
+
+## Goal
+"Done"의 정의를 한 문장으로.
+
+## Original Conditions (must all be satisfied)
+- [ ] 조건 1 (원본 요청에서 가능하면 verbatim)
+- [ ] 조건 2
+(빌더는 이 전부를 충족해야 한다. 중간에 모호해지면 에스컬레이션.)
+
+## User Scenarios
+### Scenario 1: {이름}
+As a {유저 유형}, I want to {액션} so that {결과}.
+
+Steps:
+1. ...
+
+Expected result: ...
+
+## Test Scenarios
+### Happy path
+- [ ] 케이스 1
+### Edge cases
+- [ ] 엣지 케이스 1
+### Error paths
+- [ ] 에러 케이스 1
+### Mock data updates needed
+- [ ] `apps/v1_api/src/.../*.spec.ts`·`apps/v1_api/test/fixtures/` 의 mock을 schema 변경에 맞춰 업데이트
+- [ ] `apps/v1_web/src/.../*.test.tsx`·`apps/v1_web/src/test/msw/` 의 API response mock 업데이트
+
+## Parallel Work Breakdown
+### Backend (Frontend/Infra와 병렬 가능)
+- [ ] Step 1 — {상세}
+### Frontend (Backend와 병렬 가능)
+- [ ] Step 1 — {상세}  ← UI 변경이면 "A·B·C 3안 제시 → 사용자 선택"이 구현보다 먼저
+### Infra (Backend/Frontend와 병렬 가능)
+- [ ] Step 1 — {상세}
+### Sequential (병렬 작업 이후에 실행)
+- [ ] 통합 단계 (backend + frontend 완료 필요)
+- [ ] 머지 후 alpha 실측 검증
+
+## Acceptance Criteria
+- [ ] Original conditions 전부 충족
+- [ ] User scenarios 전부 통과
+- [ ] Test scenarios 전부 green
+- [ ] 범위 내 tech debt 해결됨 (새로운 부채 0)
+- [ ] Security 리뷰 통과 (아래 노트 참조)
+- [ ] Mock data 업데이트 완료, schema와 sync (스키마 변경이면 migration 포함)
+- [ ] 디자인 시스템 준수 (token, component, naming)
+- [ ] Code review: Critical=0, Warning=0
+
+## Tech Debt Resolved
+- {이 태스크가 정리한 부채 항목들}
+
+## Security Notes
+- 고려한 위협: ...
+- 완화책: ...
+
+## Risks & Dependencies
+- 외부 블로커: ...
+- 선행 태스크: ...
+
+## Ambiguity Log
+빌더가 에스컬레이션할 때마다 아래 표를 업데이트.
+
+| Date | Raised by | Question | Resolution |
+|------|-----------|----------|------------|
+| ...  | backend-data-dev | ... | ... |
+```

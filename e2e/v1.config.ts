@@ -1,8 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * v1 consumer 앱(apps/v1_web, :3013) 전용 E2E 설정.
- * 기존 playwright.config.ts(구 앱 :3003)와 독립 — 페르소나별 user flow 테스트를 담는다.
+ * v1 consumer 앱(apps/v1_web, :3013) 전용 E2E 설정 — 페르소나별 user flow 테스트를 담는다.
  *
  * 전제: v1 스택이 이미 가동 중(web:3013 + api:8121 + pg). webServer 미기동(reuseExisting).
  * 인증: v1 dev-auth는 localStorage `teameet.v1.userEmail`(+옵션 userId)을 x-v1-user-* 헤더로

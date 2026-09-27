@@ -81,6 +81,16 @@ PROD_FAILED_RELEASE_DIR="${PROD_FAILED_RELEASE_DIR:-${PROD_RELEASE_STATE_DIR}/fa
 PROD_LEGACY_STATE_FILE="${PROD_LEGACY_STATE_FILE:-${PROD_HOME_DIR}/.teameet-prod-release}"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/prod-source-common.sh"
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/prod-manifest-common.sh"
+# Fix round 3, Minor: PROD_TASK168_STATE_ROOT used to be independently
+# defaulted here AND in prod-task168-common.sh (Stage A's own state root) --
+# overriding it for one side silently left the other pointed at the
+# hardcoded default. Sourcing the runner's own common file gives both
+# rollback-prod.sh and restore_active_release() the SAME variable (and the
+# SAME default expression) that deploy/prod-task168.sh's Stage A/B actually
+# write receipts under; harmless to source here even though deploy-prod.sh
+# also sources it via prod-task168.sh (plain assignments and function
+# definitions only, no `readonly`, so re-sourcing is idempotent).
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/prod-task168-common.sh"
 
 write_candidate_manifest() {
   local manifest_file="$1"
@@ -244,32 +254,38 @@ wait_for_prod_health_contract() {
 
 # Task168 M11 restore/rollback-target guard, shared by rollback-prod.sh and
 # restore_active_release()'s automatic recovery path (Task 175 Task 4 fix
-# round 1, Important 3; ledger-based re-check per fix round 2, Ruling R11).
+# round 1, Important 3; ledger-based re-check per fix round 2, Ruling R11;
+# target-source re-check restored per fix round 3, Critical H1).
 #
 # Fix round 2 (Ruling R11): the first version gated on transition.json's mere
 # EXISTENCE, then checked whether the TARGET release's own stored source
-# folder carried M11. Both signals are wrong under C2 (Stage A and Stage B
-# share the same dev source tree): transition.json is written by Stage A
-# alone, long before Stage B ever runs M11's migrate, and once M1-M11 are
-# merged into dev EVERY subsequently-built release's source carries the M11
-# folder regardless of what has actually been applied to THIS database --
-# neither signal reflects the one fact that actually matters, which is
-# whether M11 has been APPLIED to the database Stage A/B are running
-# against. That produced a real false rejection: in the window after Stage A
-# completes (transition.json exists) but before Stage B's own M11 migrate
-# runs, this guard would refuse a completely unrelated ordinary deploy's
-# automatic recovery, even though the database only has M1-M10 (expand-only,
-# additive) applied and the migrationPolicy=expand-contract contract makes
-# restoring/rolling back to an older, M11-unaware release perfectly safe at
-# that point.
+# folder carried M11 -- and ONLY that, dropping the ledger entirely. That
+# signal alone is wrong under C2 (Stage A and Stage B share the same dev
+# source tree): transition.json is written by Stage A alone, long before
+# Stage B ever runs M11's migrate, and once M1-M11 are merged into dev EVERY
+# subsequently-built release's source carries the M11 folder regardless of
+# what has actually been applied to THIS database. Round 2 replaced it with
+# a ledger-only check, which fixed the false rejection but (fix round 3,
+# Critical H1) went too far the other way: dropping the target-source check
+# ENTIRELY meant that once M11 really is applied, EVERY restore/rollback
+# target was refused forever -- including the very release that ran Stage
+# B's own M11 migrate (whose own source obviously already has M11) and any
+# later release built after it.
 #
-# The transition.json existence check is now only a cheap short-circuit
-# (skip the DB round-trip entirely when Task168 has never touched this
-# environment) -- the actual verdict is the migration ledger itself: M11
-# present as a finished, non-rolled-back row means the DROP already
-# happened, and ANY release (old or new) is refused as a restore/rollback
-# target; ledger read failure fails closed (refuse + a diagnosable reason),
-# never silently treated as "not applied".
+# The condition is now the conjunction of THREE checks, all of which must
+# hold for a refusal:
+#   1. a Task168 Stage A transition receipt exists anywhere in this
+#      environment's state (cheap short-circuit: skip the DB round-trip
+#      entirely when Task168 has never touched this environment);
+#   2. the migration ledger shows M11 as a finished, non-rolled-back row
+#      (the DROP already happened -- before this, restoring/rolling back to
+#      ANY release, however old, is safe under the expand-contract policy);
+#   3. the TARGET release's own stored source predates M11 (its application
+#      code was never built to handle the post-cutover schema -- if the
+#      target's own source already carries M11, it is exactly as safe to run
+#      against a post-cutover database as the release that applied M11 was).
+# A target release with no retained stored source at all (pruned, or never
+# captured) fails closed at check 3 rather than being treated as safe.
 #
 # Duplicates (rather than calls) assert_task168_m11_guard's own DB-URL/
 # network/psql pattern -- a shared low-level helper would also require
@@ -279,15 +295,17 @@ wait_for_prod_health_contract() {
 assert_task168_m11_restore_target_safe() {
   local target_sha="$1"
   local m11_name=20260911090000_retire_tournament_fixture_tables
-  local state_root="${PROD_TASK168_STATE_ROOT:-${PROD_RELEASE_STATE_DIR}/task168}"
   local receipts=()
   shopt -s nullglob
-  receipts=("${state_root}"/*/transition.json)
+  receipts=("${PROD_TASK168_STATE_ROOT}"/*/transition.json)
   shopt -u nullglob
   [[ "${#receipts[@]}" -gt 0 ]] || return 0
 
   local database_url network query_rc m11_finished_count psql_stderr
-  database_url="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')" || return 1
+  database_url="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')" || {
+    echo "[prod-release] Task168 restore-target guard: could not read the candidate API's DATABASE_URL (compose run failed) -- cannot verify the M11 ledger. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+    return 1
+  }
   if [[ -z "${database_url}" ]]; then
     echo "[prod-release] Task168 restore-target guard: candidate API's DATABASE_URL is unavailable -- cannot verify the M11 ledger, refusing rather than guessing. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     return 1
@@ -298,10 +316,18 @@ assert_task168_m11_restore_target_safe() {
     return 1
   fi
   psql_stderr="$(mktemp)"
+  # Ruling R13 (fix round 3, SSM-verified against prod's real sudo 1.9.15p5):
+  # `--env-file <(...)` fails there with "open /dev/fd/N: no such file or
+  # directory" -- sudo's closefrom() drops the process-substitution fd
+  # before docker ever reads it. `--env-file /dev/stdin` with the WHOLE
+  # command's stdin redirected from the process substitution instead
+  # survives sudo (fd 0 is never in the closefrom range) -- the exact
+  # pattern deploy/prod-task168-common.sh's prod_dbq() already uses.
   m11_finished_count="$(sudo docker run --rm --network "${network}" \
-    --env-file <(printf 'DATABASE_URL=%s\n' "${database_url}") \
+    --env-file /dev/stdin \
     postgres:16-alpine sh -c 'exec psql "$DATABASE_URL" -At -c "$1"' sh \
     "SELECT count(*) FROM \"_prisma_migrations\" WHERE migration_name = '${m11_name}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL" \
+    < <(printf 'DATABASE_URL=%s\n' "${database_url}") \
     2>"${psql_stderr}")" && query_rc=0 || query_rc=$?
   if [[ "${query_rc}" -ne 0 ]]; then
     echo "[prod-release] Task168 restore-target guard: could not query the migration ledger -- refusing rather than treating an unreadable ledger as \"M11 not applied\". See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
@@ -311,9 +337,20 @@ assert_task168_m11_restore_target_safe() {
   fi
   rm -f "${psql_stderr}"
   if [[ "${m11_finished_count}" != 0 ]]; then
-    echo "[prod-release] Refusing: the migration ledger shows M11 already applied, so restoring/rolling back to ${target_sha} would run application code from before the M11 cutover against a database that no longer has the retired tables. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
-    return 1
+    local target_source_dir="${PROD_SOURCE_RELEASES_DIR}/${target_sha}"
+    if [[ ! -d "${target_source_dir}" ]]; then
+      echo "[prod-release] Refusing: the migration ledger shows M11 already applied, but ${target_sha}'s stored source is no longer retained (pruned, or never captured) -- cannot verify it is safe to restore/roll back to. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+      return 1
+    fi
+    if [[ ! -d "${target_source_dir}/apps/v1_api/prisma/migrations/${m11_name}" ]]; then
+      echo "[prod-release] Refusing: the migration ledger shows M11 already applied, so restoring/rolling back to ${target_sha} (whose own stored source predates the M11 migration) would run application code from before the M11 cutover against a database that no longer has the retired tables. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+      return 1
+    fi
+    # target_sha's own source already carries M11 -- it was built to handle
+    # the post-cutover schema, so it is safe even though the ledger shows
+    # M11 applied.
   fi
+  echo "[prod-release] Task168 restore-target guard: ${target_sha} is safe to restore/roll back to"
 }
 
 restore_active_release() {
@@ -372,21 +409,29 @@ assert_task168_m11_guard() {
     echo "[prod-deploy] Task168 M11 guard: candidate source's M11 checksum (${m11_source_sha}) does not match the pinned value (${m11_pinned_sha}). Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     return 1
   fi
-  database_url="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')" || return 1
+  database_url="$("${compose[@]}" run --rm --no-deps -T v1_api sh -c 'printf "%s" "$DATABASE_URL"')" || {
+    echo "[prod-deploy] Task168 M11 guard: could not read the candidate API's DATABASE_URL (compose run failed). Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
+    return 1
+  }
   if [[ -z "${database_url}" ]]; then
-    echo "[prod-deploy] Task168 M11 guard: candidate API's DATABASE_URL is unavailable" >&2
+    echo "[prod-deploy] Task168 M11 guard: candidate API's DATABASE_URL is unavailable. Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     return 1
   fi
   network="$(sudo docker network ls --filter name='^deploy_default$' --format '{{.Name}}')"
   if [[ "${network}" != deploy_default ]]; then
-    echo "[prod-deploy] Task168 M11 guard: compose DB network unavailable" >&2
+    echo "[prod-deploy] Task168 M11 guard: compose DB network unavailable. Refusing to run prisma migrate deploy. See docs/ops/prod-task168-transition-runbook.md for manual recovery steps." >&2
     return 1
   fi
   # DATABASE_URL (password included) must never appear as a `docker run`
   # argv element -- that argv is visible to any other user on the host via
-  # `ps`. --env-file with a process-substitution fd exposes only the fd path
-  # (/dev/fd/N) in argv; the value itself is read by docker directly from
-  # the fd, never passed on a command line.
+  # `ps`. Ruling R13 (fix round 3, SSM-verified against prod's real sudo
+  # 1.9.15p5): `--env-file <(...)` (a process-substitution fd) fails there
+  # with "open /dev/fd/N: no such file or directory" -- sudo's closefrom()
+  # drops that fd before docker ever reads it. `--env-file /dev/stdin` with
+  # the WHOLE command's stdin redirected from the process substitution
+  # instead survives sudo (fd 0 is never in the closefrom range) -- the same
+  # pattern deploy/prod-task168-common.sh's prod_dbq() already uses. Either
+  # way, the value itself is never passed on the command line.
   psql_stderr="$(mktemp)"
   # `&& query_rc=0 || query_rc=$?` (not a bare trailing `$?`) is deliberate:
   # under `set -e`, `var="$(failing_cmd)"` on its own aborts the whole script
@@ -395,9 +440,10 @@ assert_task168_m11_guard() {
   # exit. Wrapping it in an && / || list is the standard way to catch a
   # command substitution's exit status without triggering errexit.
   m11_ledger_checksum="$(sudo docker run --rm --network "${network}" \
-    --env-file <(printf 'DATABASE_URL=%s\n' "${database_url}") \
+    --env-file /dev/stdin \
     postgres:16-alpine sh -c 'exec psql "$DATABASE_URL" -At -c "$1"' sh \
     "SELECT checksum FROM \"_prisma_migrations\" WHERE migration_name = '${m11_name}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL" \
+    < <(printf 'DATABASE_URL=%s\n' "${database_url}") \
     2>"${psql_stderr}")" && query_rc=0 || query_rc=$?
   if [[ "${query_rc}" -ne 0 ]]; then
     # Fail closed on a query/connection error instead of silently treating it

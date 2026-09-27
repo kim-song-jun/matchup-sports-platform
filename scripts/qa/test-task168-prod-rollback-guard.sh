@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
-# Task 175 Task 4, Review Focus 4 (fix round 1) + Ruling R11 (fix round 2):
-# deploy/rollback-prod.sh must refuse a rollback whenever (a) a Task168
-# Stage A transition receipt exists anywhere in this environment's task168
-# state AND (b) the migration LEDGER shows M11 as a finished, non-rolled-
-# back row -- and must proceed past that guard, unchanged, in every other
-# case (no receipt at all -- ledger never even queried; receipt present but
-# the ledger does not show M11 applied yet; ledger query itself fails ->
-# fail-closed).
+# Task 175 Task 4, Review Focus 4 (fix round 1) + Ruling R11 (fix round 2) +
+# Critical H1 (fix round 3): deploy/rollback-prod.sh must refuse a rollback
+# whenever ALL THREE hold: (a) a Task168 Stage A transition receipt exists
+# anywhere in this environment's task168 state, (b) the migration LEDGER
+# shows M11 as a finished, non-rolled-back row, AND (c) the rollback
+# TARGET's (PREVIOUS_SHA's) own stored source tree predates M11 -- and must
+# proceed past that guard in every other case (no receipt at all -- ledger
+# never even queried; ledger does not show M11 applied yet; ledger query
+# itself fails -> fail-closed; target's source already carries M11).
 #
-# Fix round 2: dropped checking the rollback TARGET's own stored source tree
-# for an M11 folder -- see assert_task168_m11_restore_target_safe()'s own
-# doc comment (deploy/prod-release-common.sh) for why that signal was wrong
-# under C2 (virtually every release's source carries M11 once it is merged
-# into dev, regardless of what has actually been applied to this database).
+# Fix round 2 dropped condition (c) entirely (ledger-only), which fixed a
+# false rejection but (fix round 3, Critical H1) then refused EVERY
+# restore/rollback target forever once M11 really was applied, including
+# the very release that ran Stage B. See
+# assert_task168_m11_restore_target_safe()'s own doc comment
+# (deploy/prod-release-common.sh) for the full history.
 #
 # Runs the real deploy/rollback-prod.sh (same convention as
 # scripts/qa/test-prod-rollback-guards.sh) with sudo/aws/docker/flock faked
@@ -152,14 +154,18 @@ make_manifest() {
 # Builds a fresh HOME with: .env, docker-compose.prod.yml stub, a state.json
 # whose active manifest declares rollbackCompatibleWith = PREVIOUS_SHA (so the
 # compatibility + stale-active checks both pass), and (optionally) a task168
-# transition receipt. No per-release source-tree fixture is needed any more
-# (fix round 2 dropped that signal).
+# transition receipt. PREVIOUS_TARGET_SOURCE (none|no-m11|has-m11, default
+# none) controls the rollback TARGET's (PREVIOUS_SHA's) own stored source
+# tree -- fix round 3, Critical H1: condition (3) of the guard, restored.
 setup_env() {
-  local home="$1" with_receipt="$2"
+  local home="$1" with_receipt="$2" previous_target_source="${3:-none}"
   local live="${home}/teameet"
   mkdir -p "${live}/deploy"
+  # prod-task168-common.sh is a sibling prod-release-common.sh now sources
+  # too (fix round 3, state-root unification) -- must be copied alongside or
+  # that source line fails before rollback-prod.sh's own logic ever runs.
   cp "${ROOT_DIR}/deploy/prod-release-common.sh" "${ROOT_DIR}/deploy/prod-source-common.sh" \
-    "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${live}/deploy/"
+    "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${ROOT_DIR}/deploy/prod-task168-common.sh" "${live}/deploy/"
   printf 'FOO=bar\n' > "${live}/deploy/.env"
   printf 'services: {}\n' > "${live}/deploy/docker-compose.prod.yml"
 
@@ -182,8 +188,18 @@ setup_env() {
     > "${state_dir}/state.json"
 
   # Neither manifest carries database.task168, so validate_stored_prod_manifest's
-  # optional source_dir comparison is a no-op even with these dirs empty.
-  mkdir -p "${state_dir}/sources/${ACTIVE_SHA}" "${state_dir}/sources/${PREVIOUS_SHA}"
+  # optional source_dir comparison is a no-op regardless of what these hold.
+  mkdir -p "${state_dir}/sources/${ACTIVE_SHA}"
+  case "${previous_target_source}" in
+    none) : ;; # ${state_dir}/sources/${PREVIOUS_SHA} is simply never created
+    no-m11)
+      install -d -m 700 "${state_dir}/sources/${PREVIOUS_SHA}/apps/v1_api/prisma/migrations"
+      ;;
+    has-m11)
+      install -d -m 700 "${state_dir}/sources/${PREVIOUS_SHA}/apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables"
+      ;;
+    *) echo "setup_env: unknown previous_target_source '${previous_target_source}'" >&2; exit 1 ;;
+  esac
 
   if [[ "${with_receipt}" == true ]]; then
     install -d -m 700 "${state_dir}/task168/${ACTIVE_SHA}"
@@ -232,20 +248,53 @@ else
   bad "receipt present + ledger M11 not applied -> expected the guard to pass through, got rc=${rc1}: ${out1}"
 fi
 
-# ── (2) receipt exists + ledger M11 applied -> refused ─────────────────────
+# ── (2a) receipt + ledger M11 applied + rollback target's source never
+#         captured/pruned -> refused (fail-closed, cannot verify) ──────────
 write_fake_docker 1 no
 : > "${ledger_calls_log}"
-home2="${TEST_ROOT}/home2"; mkdir -p "${home2}"
-state2="$(setup_env "${home2}" true)"
-marker2="${TEST_ROOT}/marker2"
-out2="$(run_rollback "${home2}" "${state2}" "${marker2}")" && rc2=0 || rc2=$?
-if [[ "${rc2}" -ne 0 && "${out2}" == *"Refusing"*"M11 already applied"* ]]; then
-  ok "receipt present + ledger M11 applied -> rollback refused (rc=${rc2})"
+home2a="${TEST_ROOT}/home2a"; mkdir -p "${home2a}"
+state2a="$(setup_env "${home2a}" true none)"
+marker2a="${TEST_ROOT}/marker2a"
+out2a="$(run_rollback "${home2a}" "${state2a}" "${marker2a}")" && rc2a=0 || rc2a=$?
+if [[ "${rc2a}" -ne 0 && "${out2a}" == *"M11 already applied"*"no longer retained"* ]]; then
+  ok "receipt + ledger M11 applied + rollback target source not retained -> refused fail-closed"
 else
-  bad "receipt present + ledger M11 applied -> expected refusal, got rc=${rc2}: ${out2}"
+  bad "receipt + ledger M11 applied + rollback target source not retained -> expected refusal, got rc=${rc2a}: ${out2a}"
 fi
-if guard_was_passed "${marker2}"; then
-  bad "M11-applied case reached the post-guard docker compose config call -- the guard did not stop it in time"
+if guard_was_passed "${marker2a}"; then
+  bad "target-source-missing case reached the post-guard docker compose config call"
+fi
+
+# ── (2b) receipt + ledger M11 applied + rollback target's source EXISTS but
+#         predates M11 -> refused (Critical H1's condition 3, restored) ────
+write_fake_docker 1 no
+: > "${ledger_calls_log}"
+home2b="${TEST_ROOT}/home2b"; mkdir -p "${home2b}"
+state2b="$(setup_env "${home2b}" true no-m11)"
+marker2b="${TEST_ROOT}/marker2b"
+out2b="$(run_rollback "${home2b}" "${state2b}" "${marker2b}")" && rc2b=0 || rc2b=$?
+if [[ "${rc2b}" -ne 0 && "${out2b}" == *"M11 already applied"*"predates the M11 migration"* ]]; then
+  ok "receipt + ledger M11 applied + rollback target source predates M11 -> refused"
+else
+  bad "receipt + ledger M11 applied + rollback target source predates M11 -> expected refusal, got rc=${rc2b}: ${out2b}"
+fi
+if guard_was_passed "${marker2b}"; then
+  bad "target-source-predates-M11 case reached the post-guard docker compose config call"
+fi
+
+# ── (2c) receipt + ledger M11 applied + rollback target's source ALREADY
+#         carries M11 -- Critical H1: this must now PASS (round 2 wrongly
+#         refused it, having dropped this check entirely) ──────────────────
+write_fake_docker 1 no
+: > "${ledger_calls_log}"
+home2c="${TEST_ROOT}/home2c"; mkdir -p "${home2c}"
+state2c="$(setup_env "${home2c}" true has-m11)"
+marker2c="${TEST_ROOT}/marker2c"
+out2c="$(run_rollback "${home2c}" "${state2c}" "${marker2c}")" && rc2c=0 || rc2c=$?
+if guard_was_passed "${marker2c}"; then
+  ok "receipt + ledger M11 applied + rollback target source already carries M11 -> guard does not block (reached past the guard)"
+else
+  bad "receipt + ledger M11 applied + rollback target source already carries M11 -> expected the guard to pass through, got rc=${rc2c}: ${out2c}"
 fi
 
 # ── (3) receipt exists + ledger query itself fails -> refused, fail-closed ─

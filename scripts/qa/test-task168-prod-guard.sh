@@ -136,7 +136,15 @@ case "\$*" in
   *'network ls --filter name=^deploy_default\$ --format {{.Name}}'*)
     [[ "\${NETWORK_OK:-true}" == true ]] && printf 'deploy_default\n'
     ;;
-  *'--env-file'*'postgres:16-alpine sh -c'*)
+  *'--env-file /dev/stdin'*'postgres:16-alpine sh -c'*)
+    # Ruling R13 (fix round 3): the real invocation now redirects the WHOLE
+    # command's stdin from a process substitution (`< <(printf ...)`) into
+    # --env-file /dev/stdin -- real docker opens and reads that fd itself,
+    # which is how the process substitution's writer end gets unblocked.
+    # This fake must do the same or the write hangs (same reasoning as
+    # deploy/prod-task168-common.sh's prod_dbq() fake in
+    # scripts/qa/test-prod-task168.sh).
+    cat >/dev/null
     if [[ "\${PSQL_SHOULD_FAIL:-false}" == true ]]; then
       echo "fake docker: injected psql failure" >&2
       exit 1
@@ -320,6 +328,12 @@ mut_dir="${TEST_ROOT}/mut-invert-dir"
 mkdir -p "${mut_dir}"
 ln -s "${ROOT_DIR}/deploy/prod-source-common.sh" "${mut_dir}/prod-source-common.sh"
 ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${mut_dir}/prod-manifest-common.sh"
+# Fix round 3, Minor (state-root unification): prod-release-common.sh now
+# also sources prod-task168-common.sh as its sibling -- every scratch dir a
+# mutation runs a modified prod-release-common.sh copy from needs this
+# symlink too, or the source line itself fails before the mutated code is
+# ever reached.
+ln -s "${ROOT_DIR}/deploy/prod-task168-common.sh" "${mut_dir}/prod-task168-common.sh"
 scratch_invert="${mut_dir}/prod-release-common.sh"
 python3 - "${PROD_RELEASE_COMMON}" "${scratch_invert}" <<'PYEOF'
 import sys
@@ -407,6 +421,7 @@ scratch_and_removed="${TEST_ROOT}/mut-and-clause-removed-dir"
 mkdir -p "${scratch_and_removed}"
 ln -s "${ROOT_DIR}/deploy/prod-source-common.sh" "${scratch_and_removed}/prod-source-common.sh"
 ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${scratch_and_removed}/prod-manifest-common.sh"
+ln -s "${ROOT_DIR}/deploy/prod-task168-common.sh" "${scratch_and_removed}/prod-task168-common.sh"
 scratch_and_removed_common="${scratch_and_removed}/prod-release-common.sh"
 python3 - "${PROD_RELEASE_COMMON}" "${scratch_and_removed_common}" <<'PYEOF'
 import sys
@@ -447,6 +462,7 @@ scratch_failopen="${TEST_ROOT}/mut-fail-open-dir"
 mkdir -p "${scratch_failopen}"
 ln -s "${ROOT_DIR}/deploy/prod-source-common.sh" "${scratch_failopen}/prod-source-common.sh"
 ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${scratch_failopen}/prod-manifest-common.sh"
+ln -s "${ROOT_DIR}/deploy/prod-task168-common.sh" "${scratch_failopen}/prod-task168-common.sh"
 scratch_failopen_common="${scratch_failopen}/prod-release-common.sh"
 python3 - "${PROD_RELEASE_COMMON}" "${scratch_failopen_common}" <<'PYEOF'
 import sys
@@ -493,6 +509,7 @@ scratch_pin_removed="${TEST_ROOT}/mut-pin-removed-dir"
 mkdir -p "${scratch_pin_removed}"
 ln -s "${ROOT_DIR}/deploy/prod-source-common.sh" "${scratch_pin_removed}/prod-source-common.sh"
 ln -s "${ROOT_DIR}/deploy/prod-manifest-common.sh" "${scratch_pin_removed}/prod-manifest-common.sh"
+ln -s "${ROOT_DIR}/deploy/prod-task168-common.sh" "${scratch_pin_removed}/prod-task168-common.sh"
 scratch_pin_removed_common="${scratch_pin_removed}/prod-release-common.sh"
 python3 - "${PROD_RELEASE_COMMON}" "${scratch_pin_removed_common}" <<'PYEOF'
 import sys

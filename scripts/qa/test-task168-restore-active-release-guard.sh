@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Task 175 Task 4 fix round 2, Ruling R11: assert_task168_m11_restore_target_safe()
-# (deploy/prod-release-common.sh) must gate on the ACTUAL migration ledger
-# (M11 finished, not rolled back), not on transition.json's mere existence
-# combined with the target release's own stored-source folder -- see the
-# function's own doc comment for why fix round 1's version produced a real
-# false rejection (Stage A done, Stage B's M11 migrate not run yet).
+# Task 175 Task 4 fix round 2 (Ruling R11) + fix round 3 (Critical H1):
+# assert_task168_m11_restore_target_safe() (deploy/prod-release-common.sh)
+# refuses a restore/rollback only when ALL THREE hold: a transition receipt
+# exists, the migration ledger shows M11 finished, AND the restore TARGET's
+# own stored source predates M11. Round 1's transition.json-existence +
+# target-source-only check produced a real false rejection (Stage A done,
+# Stage B's M11 migrate not run yet); round 2's ledger-only replacement then
+# refused EVERY target forever once M11 really was applied. See the
+# function's own doc comment for the full history.
 #
 # Calls the real restore_active_release() directly against a real state.json
 # + stored manifest (same fixture shape as
@@ -85,10 +88,14 @@ failures=0
 ok() { echo "OK: $1"; }
 bad() { echo "FAILED: $1" >&2; failures=$((failures + 1)); }
 
-# setup_state HOME WITH_RECEIPT -> prints state_dir. Note: no per-release
-# source-tree fixture anymore -- fix round 2 dropped that signal entirely.
+# setup_state HOME WITH_RECEIPT [TARGET_SOURCE=none|no-m11|has-m11] -> prints
+# state_dir. TARGET_SOURCE controls ACTIVE_SHA's own stored source tree
+# (fix round 3, Critical H1: condition (3) of the guard) -- "none" (default)
+# means the release's stored source was never captured/was pruned, "no-m11"
+# means it exists but predates the M11 migration, "has-m11" means it already
+# carries M11 (built to handle the post-cutover schema).
 setup_state() {
-  local home="$1" with_receipt="$2" state_dir active_m active_checksum
+  local home="$1" with_receipt="$2" target_source="${3:-none}" state_dir active_m active_checksum
   state_dir="${home}/.teameet-prod-releases"
   install -d -m 700 "${state_dir}"
   active_m="${state_dir}/.active-fixture.json"
@@ -97,6 +104,17 @@ setup_state() {
   jq -n --slurpfile active "${active_m}" --arg activeChecksum "${active_checksum}" \
     '{schemaVersion:1, active:$active[0], activeManifestSha256:$activeChecksum, previous:null, previousManifestSha256:null}' \
     > "${state_dir}/state.json"
+
+  case "${target_source}" in
+    none) : ;; # ${state_dir}/sources/${ACTIVE_SHA} is simply never created
+    no-m11)
+      install -d -m 700 "${state_dir}/sources/${ACTIVE_SHA}/apps/v1_api/prisma/migrations"
+      ;;
+    has-m11)
+      install -d -m 700 "${state_dir}/sources/${ACTIVE_SHA}/apps/v1_api/prisma/migrations/20260911090000_retire_tournament_fixture_tables"
+      ;;
+    *) echo "setup_state: unknown target_source '${target_source}'" >&2; exit 1 ;;
+  esac
 
   if [[ "${with_receipt}" == true ]]; then
     install -d -m 700 "${state_dir}/task168/9999999999999999999999999999999999999999"
@@ -136,21 +154,47 @@ else
   bad "receipt present + ledger M11 not applied -> expected the guard to pass through, it did not"
 fi
 
-# ── (2) receipt exists + ledger shows M11 applied -> refused ───────────────
+# ── (2a) receipt + ledger M11 applied + target source never captured/pruned
+#         -> refused (fail-closed, cannot verify) ──────────────────────────
 write_fake_docker 1 no
 : > "${reached_activate_log}"; : > "${ledger_calls_log}"
-home2="${TEST_ROOT}/home2"; mkdir -p "${home2}"
-state2="$(setup_state "${home2}" true)"
-out2="$(run_restore "${state2}")" && rc2=0 || rc2=$?
-if [[ "${rc2}" -ne 0 && "${out2}" == *"Refusing"*"M11 already applied"* ]]; then
-  ok "receipt present + ledger M11 applied -> restore_active_release refused (rc=${rc2})"
+home2a="${TEST_ROOT}/home2a"; mkdir -p "${home2a}"
+state2a="$(setup_state "${home2a}" true none)"
+out2a="$(run_restore "${state2a}")" && rc2a=0 || rc2a=$?
+if [[ "${rc2a}" -ne 0 && "${out2a}" == *"M11 already applied"*"no longer retained"* ]]; then
+  ok "receipt + ledger M11 applied + target source not retained -> refused fail-closed"
 else
-  bad "receipt present + ledger M11 applied -> expected refusal, got rc=${rc2}: ${out2}"
+  bad "receipt + ledger M11 applied + target source not retained -> expected refusal, got rc=${rc2a}: ${out2a}"
 fi
 if [[ -s "${reached_activate_log}" ]]; then
-  bad "M11-applied case reached activate_prod_release_source -- the guard did not stop it in time: $(cat "${reached_activate_log}")"
+  bad "target-source-missing case reached activate_prod_release_source"
+fi
+
+# ── (2b) receipt + ledger M11 applied + target source EXISTS but predates
+#         M11 -> refused (Critical H1's condition 3, restored) ─────────────
+: > "${reached_activate_log}"; : > "${ledger_calls_log}"
+home2b="${TEST_ROOT}/home2b"; mkdir -p "${home2b}"
+state2b="$(setup_state "${home2b}" true no-m11)"
+out2b="$(run_restore "${state2b}")" && rc2b=0 || rc2b=$?
+if [[ "${rc2b}" -ne 0 && "${out2b}" == *"M11 already applied"*"predates the M11 migration"* ]]; then
+  ok "receipt + ledger M11 applied + target source predates M11 -> refused"
 else
-  ok "M11-applied case never reached activate_prod_release_source"
+  bad "receipt + ledger M11 applied + target source predates M11 -> expected refusal, got rc=${rc2b}: ${out2b}"
+fi
+if [[ -s "${reached_activate_log}" ]]; then
+  bad "target-source-predates-M11 case reached activate_prod_release_source"
+fi
+
+# ── (2c) receipt + ledger M11 applied + target source ALREADY carries M11 --
+#         Critical H1: this must now PASS (round 2 wrongly refused it) ─────
+: > "${reached_activate_log}"; : > "${ledger_calls_log}"
+home2c="${TEST_ROOT}/home2c"; mkdir -p "${home2c}"
+state2c="$(setup_state "${home2c}" true has-m11)"
+run_restore "${state2c}" >/dev/null 2>&1 || true
+if grep -q "called with ${ACTIVE_SHA}" "${reached_activate_log}" 2>/dev/null; then
+  ok "receipt + ledger M11 applied + target source already carries M11 -> guard passes (reached activate_prod_release_source)"
+else
+  bad "receipt + ledger M11 applied + target source already carries M11 -> expected the guard to pass through, it did not"
 fi
 
 # ── (3) receipt exists + ledger query itself fails -> refused, fail-closed ─

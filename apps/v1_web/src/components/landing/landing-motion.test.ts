@@ -179,6 +179,35 @@ describe('startLandingMotion — 정리', () => {
   });
 });
 
+describe('startLandingMotion — settleQuery(v3 의 768 이상)', () => {
+  const SETTLE = '(min-width: 768px)';
+  const run = (wide: boolean) => {
+    const raf = vi.fn(() => 1);
+    vi.stubGlobal('requestAnimationFrame', raf);
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === SETTLE ? wide : false,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    const root = mount('<div data-loop="off" id="mini"><div data-screen="card"><b data-count="78">78</b></div></div>');
+    startLandingMotion(root, { settleQuery: SETTLE });
+    fire(root.querySelector('#mini')!, true);
+    return { raf, stat: root.querySelector('[data-count]')! };
+  };
+
+  it('조건이 맞는 폭에서는 보여도 능력치를 세지 않고 최종값 그대로 둔다', () => {
+    const { raf, stat } = run(true);
+    expect(raf).not.toHaveBeenCalled();
+    expect(stat.textContent).toBe('78');
+  });
+
+  it('조건이 안 맞는 폭(모바일)에서는 A안처럼 카운트업한다', () => {
+    const { raf } = run(false);
+    expect(raf).toHaveBeenCalled();
+  });
+});
+
 describe('startLandingMotion — 투어 동기화(sticky 폰이 보일 때)', () => {
   const html = `
     <div data-tour>

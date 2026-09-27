@@ -20,12 +20,18 @@ function formatClock(seconds: number): string {
   return `${mm}:${ss}`;
 }
 
-export function startLandingMotion(root: HTMLElement): () => void {
+export type LandingMotionOptions = {
+  /** 이 미디어 조건에서는 스크롤로 켜지는 장면 효과(능력치 카운트업)를 건너뛰고 최종값을 그대로 둔다. */
+  settleQuery?: string;
+};
+
+export function startLandingMotion(root: HTMLElement, options: LandingMotionOptions = {}): () => void {
   if (typeof IntersectionObserver === 'undefined' || typeof window.matchMedia !== 'function') {
     return () => {};
   }
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const stageQuery = window.matchMedia(TOUR_STAGE_QUERY);
+  const settleQuery = options.settleQuery ? window.matchMedia(options.settleQuery) : null;
   const cleanups: Array<() => void> = [];
 
   /* 0. 능력치 카운트업 — 같은 숫자를 다시 세면 이전 루프를 끊고, 정리 때는 최종값으로 둔다 */
@@ -143,7 +149,7 @@ export function startLandingMotion(root: HTMLElement): () => void {
       const el = entry.target as HTMLElement;
       el.dataset.loop = entry.isIntersecting ? 'on' : 'off';
       const card = el.querySelector<HTMLElement>('[data-screen="card"]');
-      if (entry.isIntersecting && !reduce && card && el !== stage && el.dataset.counted !== 'true') {
+      if (entry.isIntersecting && !reduce && !settleQuery?.matches && card && el !== stage && el.dataset.counted !== 'true') {
         el.dataset.counted = 'true';
         countUp(card);
       }

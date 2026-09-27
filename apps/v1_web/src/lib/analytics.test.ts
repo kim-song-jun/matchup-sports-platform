@@ -14,6 +14,8 @@ function queuedCommands(): unknown[][] {
 }
 
 const indexOfCommand = (name: string) => queuedCommands().findIndex((c) => c[0] === name);
+const isInternalSet = (c: unknown[]) =>
+  c[0] === 'set' && typeof c[1] === 'object' && c[1] !== null && 'traffic_type' in c[1];
 
 beforeEach(() => {
   delete window.gtag;
@@ -71,7 +73,7 @@ describe('trackRoute', () => {
     expect(queuedCommands().filter((c) => c[0] === 'config')).toHaveLength(1);
   });
 
-  it('sets the in-app browser before config so the landing hit carries it', async () => {
+  it('sets the in-app browser as a user property before config so the landing hit carries it', async () => {
     vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(
       'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 389.0.0.49.87',
     );
@@ -79,8 +81,8 @@ describe('trackRoute', () => {
 
     trackRoute('/tournaments/t1');
 
-    const setIndex = queuedCommands().findIndex((c) => c[0] === 'set' && 'in_app_browser' in (c[1] as object));
-    expect(queuedCommands()[setIndex]).toEqual(['set', { in_app_browser: 'instagram' }]);
+    const setIndex = queuedCommands().findIndex((c) => c[0] === 'set' && c[1] === 'user_properties');
+    expect(queuedCommands()[setIndex]).toEqual(['set', 'user_properties', { in_app_browser: 'instagram' }]);
     expect(setIndex).toBeLessThan(indexOfCommand('config'));
     vi.restoreAllMocks();
   });
@@ -91,10 +93,10 @@ describe('trackRoute', () => {
 
     trackRoute('/admin/users');
 
-    const internal = queuedCommands().findIndex((c) => c[0] === 'set' && 'traffic_type' in (c[1] as object));
+    const internal = queuedCommands().findIndex(isInternalSet);
     expect(queuedCommands()[internal]).toEqual(['set', { traffic_type: 'internal' }]);
     expect(internal).toBeLessThan(indexOfCommand('config'));
-    expect(queuedCommands().filter((c) => c[0] === 'set' && 'traffic_type' in (c[1] as object))).toHaveLength(1);
+    expect(queuedCommands().filter(isInternalSet)).toHaveLength(1);
   });
 
   it('tags the rest of the page session once it navigates into a console route', async () => {
@@ -102,7 +104,7 @@ describe('trackRoute', () => {
     const { trackRoute } = await loadAnalytics('G-TEST123');
 
     trackRoute('/home');
-    const hasInternal = () => queuedCommands().some((c) => c[0] === 'set' && 'traffic_type' in (c[1] as object));
+    const hasInternal = () => queuedCommands().some(isInternalSet);
     expect(hasInternal()).toBe(false);
 
     trackRoute('/tournament-ops/tournaments/t1/operations');
@@ -138,7 +140,7 @@ describe('trackRoute', () => {
 
     links.forEach((a) => a.click());
 
-    expect(queuedCommands().some((c) => c[0] === 'set' && 'traffic_type' in (c[1] as object))).toBe(false);
+    expect(queuedCommands().some(isInternalSet)).toBe(false);
     links.forEach((a) => a.remove());
   });
 
@@ -146,7 +148,7 @@ describe('trackRoute', () => {
     const { trackRoute } = await loadAnalytics('G-TEST123');
     trackRoute('/administration-guide');
     trackRoute('/tournaments/t1');
-    expect(queuedCommands().some((c) => c[0] === 'set' && 'traffic_type' in (c[1] as object))).toBe(false);
+    expect(queuedCommands().some(isInternalSet)).toBe(false);
   });
 });
 

@@ -85,9 +85,9 @@ surface. What follows applies to every v1 endpoint, not only that surface.
   {
     "status": "error",
     "statusCode": 400,
-    "code": "VALIDATION_FAILED",
-    "message": "Invalid request",
-    "details": null,
+    "code": "VALIDATION_ERROR",
+    "message": "입력값을 다시 확인해 주세요.",
+    "details": [{ "field": "title", "messages": ["title should not be empty"] }],
     "timestamp": "2026-05-18T00:00:00.000Z"
   }
   ```

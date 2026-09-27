@@ -282,7 +282,7 @@ Rules:
 
 - `V1TeamMatchStatus`는 `recruiting`, `closed`, `matched`, `cancelled`, `completed`, `archived`뿐이다 — `scheduled`/`checking_in`/`in_progress`는 v0 계약의 잔재이며 이 컬럼에 존재하지 않는다.
 - `/my/team-matches`, `/teams/:id/matches`는 history 조회 시 다중 `status` query를 명시적으로 넘겨야 한다
-- edit/cancel UI는 `PATCH /team-matches/:id`를 사용한다
+- 수정 UI는 `PATCH /team-matches/:teamMatchId`, 취소는 `POST /team-matches/:teamMatchId/cancel`을 사용한다
 - 목록 필터 URL은 `levelCodes`를 canonical source로 사용한다. legacy `levels` query는 읽기 호환만 유지한다.
 - 레벨 표시 텍스트는 `formatNote`가 아니라 `minSportLevelId`, `maxSportLevelId` FK에서 계산한 `levelLabel`을 사용한다.
 

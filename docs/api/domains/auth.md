@@ -37,7 +37,7 @@
 | `POST` | `/api/v1/auth/recovery/email/confirm` | none | `{ email, code }` | `{ verified, proofToken }` |
 | `POST` | `/api/v1/auth/recovery/email/reset-password` | none | `{ email, proofToken, newPassword }` | `{ ok: true }` |
 
-Account deletion is not on this controller — see `POST /api/v1/profile/me/withdrawal-request`
+Account deletion is not on this controller — see `POST /api/v1/me/withdrawal-request`
 in [Users](./users.md).
 
 ## Session Model

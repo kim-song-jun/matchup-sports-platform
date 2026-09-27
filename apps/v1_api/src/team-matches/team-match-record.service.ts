@@ -51,6 +51,24 @@ export class TeamMatchRecordService {
     return game.participants.filter((p) => latest.get(p.sideId) === p.lineupId && game.sides.some((s) => s.id === p.sideId));
   }
 
+  private lineupReadiness(game: Loaded) {
+    const roster = this.roster(game);
+    const missingSides = game.sides
+      .filter((side) => side.teamId !== null && !roster.some((participant) => participant.sideId === side.id))
+      .map((side) => ({ sideId: side.id, sideKey: side.sideKey, teamName: side.displayNameSnapshot }));
+    return { lineupReady: missingSides.length === 0, missingSides };
+  }
+
+  private async viewerSideId(tx: Tx, game: Loaded, user: V1AuthUser | null, actorSideId: string | null) {
+    if (actorSideId || !user || user.accountStatus !== 'active') return actorSideId;
+    const teamIds = game.sides.flatMap((side) => side.teamId ? [side.teamId] : []);
+    const membership = await tx.v1TeamMembership.findFirst({
+      where: { userId: user.id, teamId: { in: teamIds }, status: 'active', role: { in: ['owner', 'manager'] } },
+      select: { teamId: true },
+    });
+    return game.sides.find((side) => side.teamId === membership?.teamId)?.id ?? null;
+  }
+
   private async participantViews(tx: Tx, game: Loaded) {
     const roster = this.roster(game);
     const links = await tx.v1ParticipantIdentityLinkCurrent.findMany({
@@ -118,6 +136,8 @@ export class TeamMatchRecordService {
 
   private async view(tx: Tx, game: Loaded, user: V1AuthUser | null) {
     const actor = await this.actor(tx, game, user);
+    const ownSideId = await this.viewerSideId(tx, game, user, actor?.sideId ?? null);
+    const readiness = this.lineupReadiness(game);
     const phase = this.phase(game);
     const record = game.sharedRecord;
     const goals = this.goals(game);
@@ -131,7 +151,8 @@ export class TeamMatchRecordService {
     return {
       teamMatchId: game.teamMatchId, title: game.teamMatch!.title, startsAt: game.teamMatch!.startAt,
       phase, version: record?.version ?? 0, serverTime: new Date().toISOString(),
-      canEdit: !!actor && phase === 'live', participant: !!actor, ownSideId: actor?.sideId ?? null,
+      canEdit: !!actor && phase === 'live' && readiness.lineupReady, participant: !!actor, ownSideId,
+      ...readiness,
       sides: game.sides.map((s) => ({ id: s.id, key: s.sideKey, name: s.displayNameSnapshot, score: showScore ? goals.filter((g) => g.sideId === s.id).length : null })),
       subMatches: subMatches.map((subMatch) => ({ ...subMatch, scores: game.sides.map((side) => ({ sideId: side.id, score: showScore ? goals.filter((goal) => goal.subMatchId === subMatch.id && goal.sideId === side.id).length : null })) })),
       participants,
@@ -147,6 +168,9 @@ export class TeamMatchRecordService {
       await tx.$queryRaw`SELECT id FROM v1_games WHERE team_match_id = ${teamMatchId} FOR UPDATE`;
       await tx.$queryRaw`SELECT id FROM v1_team_matches WHERE id = ${teamMatchId} FOR UPDATE`;
       const game = await this.load(tx, teamMatchId);
+      if (!this.lineupReadiness(game).lineupReady) {
+        throw conflict('ROSTER_INCOMPLETE', '양 팀의 참석명단이 모두 제출되어야 경기 결과를 입력할 수 있어요.');
+      }
       const actor = await this.actor(tx, game, user);
       if (!actor || user.accountStatus !== 'active') throw new ForbiddenException({ code: 'RECORD_PARTICIPANT_REQUIRED', message: '양 팀의 제출된 라인업 참가자만 기록할 수 있어요.' });
       const payloadHash = canonicalGameCommandPayloadHash(dto);

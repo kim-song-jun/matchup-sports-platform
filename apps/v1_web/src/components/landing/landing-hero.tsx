@@ -90,16 +90,18 @@ export function LandingHero() {
         {/* aside 의 첫 자식 = 그래픽, 둘째 = 사실 스트립(page.test.tsx 순서 계약) */}
         <div className="tm-landing-hero-aside">
           <div className="tm-landing-hero-graphic">
-            <Image
-              className="tm-landing-hero-illust"
-              src="/illustrations/landing-hero-640.webp"
-              alt=""
-              aria-hidden="true"
-              width={640}
-              height={640}
-              sizes="(min-width: 1024px) 200px, 150px"
-              priority
-            />
+            {/* 바깥 = 위치·반복 모션, 안쪽 = 첫 등장(두 animation 이 한 요소에서 서로 덮지 않게) */}
+            <span className="tm-landing-hero-illust" aria-hidden="true">
+              <Image
+                className="tm-landing-hero-illust-img"
+                src="/illustrations/landing-hero-640.webp"
+                alt=""
+                width={640}
+                height={640}
+                sizes="(min-width: 1024px) 176px, 120px"
+                priority
+              />
+            </span>
             <div className="tm-landing-float" data-pos="a" aria-hidden="true">
               <div className="tm-landing-float-card">
                 <span className="tm-landing-float-ic" data-tone="green"><Check size={16} /></span>

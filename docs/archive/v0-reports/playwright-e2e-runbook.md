@@ -1,5 +1,13 @@
 # Playwright E2E Runbook
 
+> **레거시(삭제됨 — legacy-v0-final).** 이 문서는 레거시 `apps/web`(포트 3003/8111) 전용 Playwright
+> 스택(`e2e/tests/`, `e2e/playwright.config.ts`, `make test-e2e`/`make e2e-isolated-*`,
+> `scripts/qa/run-e2e-isolated.mjs`, `qa-visual-audit-*` Makefile 타깃)을 다룬다. 이 스택은 PR
+> #1313(레거시 v0 앱 제거)으로 전부 삭제됐다 — Makefile 타깃·스크립트·`e2e/tests/`·
+> `e2e/playwright.config.ts` 어느 것도 지금 존재하지 않는다. **현재 v1 E2E는 `pnpm test:e2e:v1`
+> (`e2e/v1.config.ts`, 테스트는 `e2e/v1-tests/`, baseURL `http://localhost:3013`)이다** — 절차가
+> 이 문서와 다르므로 현재 실행 방법으로 참조하지 말 것. 역사적 참고용으로만 보관한다.
+
 이 문서는 Teameet 저장소의 Playwright 실행 계약과 병렬 실행 방법의 canonical runbook이다.
 
 ## 목적
@@ -359,9 +367,9 @@ E2E_REQUIRE_ADMIN_PROMOTION=1 pnpm exec playwright test --config=e2e/playwright.
 
 ## References
 
-- [README.md](../../README.md)
-- [AGENTS.md](../../AGENTS.md)
-- [.github/tasks/archive/54-unified-visual-audit-coverage-master.md](../../.github/tasks/archive/54-unified-visual-audit-coverage-master.md)
-- [.github/tasks/53-visual-audit-operations-one-pager.md](../../.github/tasks/53-visual-audit-operations-one-pager.md)
-- [docs/scenarios/index.md](../scenarios/index.md)
-- [.github/tasks/archive/46-isolated-playwright-runner-stacks.md](../../.github/tasks/archive/46-isolated-playwright-runner-stacks.md)
+- [README.md](../../../README.md)
+- [AGENTS.md](../../../AGENTS.md)
+- [.github/tasks/archive/54-unified-visual-audit-coverage-master.md](../../../.github/tasks/archive/54-unified-visual-audit-coverage-master.md)
+- [.github/tasks/53-visual-audit-operations-one-pager.md](../../../.github/tasks/53-visual-audit-operations-one-pager.md)
+- [docs/scenarios/index.md](../../scenarios/index.md)
+- [.github/tasks/archive/46-isolated-playwright-runner-stacks.md](../../../.github/tasks/archive/46-isolated-playwright-runner-stacks.md)

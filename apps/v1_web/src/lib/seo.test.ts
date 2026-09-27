@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import sitemap from '@/app/sitemap';
 import { metadata as eventsMetadata } from '@/app/events/layout';
-import { absoluteSiteUrl, getSiteOrigin, teamDescriptionFallback } from './seo';
+import { absoluteSiteUrl, getSiteOrigin, metadataDescription, teamDescriptionFallback } from './seo';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -103,5 +103,22 @@ describe('teamDescriptionFallback', () => {
 
   it('공백만 있는 값은 없는 것으로 본다', () => {
     expect(teamDescriptionFallback('강남 FC', '  ', ' \n ')).toBe('강남 FC 팀을 만나보세요.');
+  });
+});
+
+describe('metadataDescription', () => {
+  const fallback = '풋살 · 송파 풋살파크에서 열리는 팀매치 정보를 확인해 보세요.';
+
+  it('검색 설명으로 쓸 수 없는 짧은 입력은 기본 문구로 바꾼다', () => {
+    expect(metadataDescription('dfd', fallback)).toBe(fallback);
+    expect(metadataDescription('   ', fallback)).toBe(fallback);
+    expect(metadataDescription(null, fallback)).toBe(fallback);
+  });
+
+  it('충분한 길이의 입력은 공백을 접어 그대로 쓰고, 155자를 넘으면 자른다', () => {
+    expect(metadataDescription('매주 토요일 오전 송파에서\n풋살하는 팀이에요', fallback)).toBe('매주 토요일 오전 송파에서 풋살하는 팀이에요');
+    const long = metadataDescription('가'.repeat(200), fallback);
+    expect(long).toHaveLength(153);
+    expect(long.endsWith('…')).toBe(true);
   });
 });

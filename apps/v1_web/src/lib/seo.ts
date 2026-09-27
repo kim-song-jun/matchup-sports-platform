@@ -131,9 +131,12 @@ export function buildNoIndexMetadata(title: string, description?: string): Metad
   };
 }
 
+// 이보다 짧은 사용자 입력("dfd"·"ㅇㅇ")은 검색 결과·AI 요약에 쓸 설명이 못 된다 — 종목·장소가 든 기본 문구가 낫다.
+const MIN_DESCRIPTION_LENGTH = 15;
+
 export function metadataDescription(value: string | null | undefined, fallback: string): string {
   const normalized = value?.replace(/\s+/g, ' ').trim();
-  if (!normalized) return fallback;
+  if (!normalized || normalized.length < MIN_DESCRIPTION_LENGTH) return fallback;
   return normalized.length > 155 ? `${normalized.slice(0, 152).trimEnd()}…` : normalized;
 }
 

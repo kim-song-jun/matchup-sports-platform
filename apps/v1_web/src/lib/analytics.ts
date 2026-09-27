@@ -42,10 +42,11 @@ function markInternalIfConsole(path: string): void {
 // The history listener sends a page_view as soon as a link pushes a console route, before
 // any route effect runs. A capture-phase click runs earlier still, so tag it there.
 function markInternalOnConsoleLinkClick(event: MouseEvent): void {
+  // The anchor's own origin/pathname are already resolved by the browser and never throw.
   const anchor = (event.target as Element | null)?.closest?.('a[href]');
-  if (!anchor) return;
-  const url = new URL(anchor.getAttribute('href')!, window.location.href);
-  if (url.origin === window.location.origin) markInternalIfConsole(url.pathname);
+  if (anchor instanceof HTMLAnchorElement && anchor.origin === window.location.origin) {
+    markInternalIfConsole(anchor.pathname);
+  }
 }
 
 /**

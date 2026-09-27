@@ -128,7 +128,7 @@ describe('trackRoute', () => {
     window.history.replaceState(null, '', '/home');
     const { trackRoute } = await loadAnalytics('G-TEST123');
     trackRoute('/home');
-    const links = ['/tournaments/t1', 'https://example.com/admin'].map((href) => {
+    const links = ['/tournaments/t1', 'https://example.com/admin', 'http://%'].map((href) => {
       const a = document.createElement('a');
       a.href = href;
       a.addEventListener('click', (event) => event.preventDefault());

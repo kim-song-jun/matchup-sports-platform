@@ -3,15 +3,16 @@ import { buildPublicMetadata } from '@/lib/seo';
 import { fetchPublicSiteInfo } from '@/lib/public-site/site-info';
 import { PublicSiteFooter } from '@/components/public-site';
 import { LandingRoot } from '@/components/landing/landing-root';
-import { LandingCtaBanner, LandingHow } from '@/components/landing/landing-sections';
 import { LandingMobileCta } from '@/components/landing/landing-mobile-cta';
-import { fetchLandingV4Data } from '@/lib/landing/landing-v4-data';
+import { fetchLandingV4Data, formatLandingCount, sportChips } from '@/lib/landing/landing-v4-data';
 import { LandingV4Nav } from '@/components/landing/v4/landing-v4-nav';
 import { LandingV4Hero } from '@/components/landing/v4/landing-v4-hero';
-import { LandingV4Doors } from '@/components/landing/v4/landing-v4-doors';
-import { LandingV4Live } from '@/components/landing/v4/landing-v4-live';
-import { LandingV4Sports } from '@/components/landing/v4/landing-v4-sports';
+import { LandingV4Stage } from '@/components/landing/v4/landing-v4-stage';
+import { LandingV4Now } from '@/components/landing/v4/landing-v4-now';
+import { LandingV4Bento } from '@/components/landing/v4/landing-v4-bento';
+import { LandingV4Steps } from '@/components/landing/v4/landing-v4-steps';
 import { LandingV4Faq } from '@/components/landing/v4/landing-v4-faq';
+import { LandingV4Cta } from '@/components/landing/v4/landing-v4-cta';
 
 /* v3 와 같은 이유로 색인하지 않고 정본은 /landing 으로 둔다. */
 const base = buildPublicMetadata({
@@ -31,21 +32,26 @@ export const metadata: Metadata = {
 // fetchPublicV1 자체는 next:{revalidate:300} 을 쓰므로 API 부하는 5분 캐시로 그대로 유지된다.
 export const revalidate = 0;
 
-/* 구성: GNB → 히어로 → 문 3개 → 지금 열려 있어요(실데이터) → 시작 3단계(A안 재사용) →
- * 종목(실데이터) → 자주 묻는 질문 3개 → CTA 배너 → 푸터 → 모바일 하단 바. */
+/* 구성: GNB → 히어로(데모) → 고정 무대(실데이터 ①②) → 지금 팀밋에서(실데이터, 유일한 강조) →
+ * 경기 전후 벤토 → 3단계 → 자주 묻는 질문 → 펼쳐지는 CTA → 푸터 → 모바일 하단 바. */
 export default async function LandingV4Page() {
   const [siteInfo, data] = await Promise.all([fetchPublicSiteInfo(), fetchLandingV4Data()]);
+  const sports = sportChips(data.bySport, 'teamMatches').chips.map((chip) => chip.name);
   return (
     <LandingRoot variant="v4">
       <LandingV4Nav />
       <main>
         <LandingV4Hero />
-        <LandingV4Doors data={data} />
-        <LandingV4Live data={data} />
-        <LandingHow />
-        <LandingV4Sports data={data} />
+        <LandingV4Stage
+          matches={data.teamMatches}
+          countText={formatLandingCount(data.counts.teamMatches)}
+          sportsText={sports.length > 0 ? sports.join(' · ') : null}
+        />
+        <LandingV4Now data={data} />
+        <LandingV4Bento />
+        <LandingV4Steps />
         <LandingV4Faq />
-        <LandingCtaBanner />
+        <LandingV4Cta />
       </main>
       <div data-mobile-cta-hide>
         <PublicSiteFooter siteInfo={siteInfo} />

@@ -168,14 +168,18 @@ describe('summarizeLandingData', () => {
     expect([byId.a.formatLabel, byId.b.formatLabel, byId.c.formatLabel]).toEqual(['토너먼트', '리그 방식', '조별리그 + 토너먼트']);
   });
 
-  it('정원 칸은 정원이 있는 모집 중 대회에만 있다(리그·진행 중은 null)', () => {
+  it('정원 칸은 모집 중 대회에만 있고, 리그 판정은 format 이 아니라 kind 로 한다', () => {
     const open = tournament({ id: 'open', status: 'open', promoHomeEnabled: true, teamCount: 4, confirmedCount: 1, format: 'knockout', kind: null });
-    const league = tournament({ id: 'league', status: 'open', promoHomeEnabled: true, teamCount: 8, confirmedCount: 2, format: 'league', kind: null });
-    const live = tournament({ id: 'live', status: 'in_progress', promoHomeEnabled: true, teamCount: 4, confirmedCount: 4, format: 'knockout', kind: null });
-    const byId = Object.fromEntries(summarizeLandingData(null, tournamentPage([open, league, live]), null, NOW).tournaments.map((t) => [t.id, t]));
+    // format='league' 인 리그 방식 대회는 진짜 대회라 정원이 있다 — 정원을 잃으면 안 된다
+    const leagueFormat = tournament({ id: 'leagueFormat', status: 'open', promoHomeEnabled: true, teamCount: 8, confirmedCount: 2, format: 'league', kind: 'regular_tournament' });
+    const mirror = tournament({ id: 'mirror', status: 'open', promoHomeEnabled: true, teamCount: 8, confirmedCount: 0, format: 'group_knockout', kind: 'regular_league' });
+    const byId = Object.fromEntries(summarizeLandingData(null, tournamentPage([open, leagueFormat, mirror]), null, NOW).tournaments.map((t) => [t.id, t]));
     expect(byId.open.slots).toEqual({ confirmed: 1, total: 4 });
-    expect(byId.league.slots).toBeNull();
-    expect(byId.live.slots).toBeNull();
+    expect(byId.leagueFormat.slots).toEqual({ confirmed: 2, total: 8 });
+    expect(byId.mirror.slots).toBeNull();
+
+    const live = tournament({ id: 'live', status: 'in_progress', promoHomeEnabled: true, teamCount: 4, confirmedCount: 4, format: 'knockout', kind: null });
+    expect(summarizeLandingData(null, tournamentPage([live]), null, NOW).tournaments[0].slots).toBeNull();
   });
 });
 

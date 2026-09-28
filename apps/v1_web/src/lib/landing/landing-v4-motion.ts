@@ -47,10 +47,16 @@ function rangeOffset(kind: RangeKind, percent: number, height: number, viewport:
   return start + ((end - start) * percent) / 100;
 }
 
+const parsedRanges = new Map<string, [RangeKind, number, RangeKind, number]>();
+
 function parseRange(range: string): [RangeKind, number, RangeKind, number] {
+  const cached = parsedRanges.get(range);
+  if (cached) return cached;
   const m = /^(cover|entry|contain) (\d+(?:\.\d+)?)% (cover|entry|contain) (\d+(?:\.\d+)?)%$/.exec(range.trim());
   if (!m) throw new Error(`지원하지 않는 animation-range 예요: ${range}`);
-  return [m[1] as RangeKind, Number(m[2]), m[3] as RangeKind, Number(m[4])];
+  const parsed: [RangeKind, number, RangeKind, number] = [m[1] as RangeKind, Number(m[2]), m[3] as RangeKind, Number(m[4])];
+  parsedRanges.set(range, parsed);
+  return parsed;
 }
 
 /**

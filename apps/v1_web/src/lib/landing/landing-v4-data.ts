@@ -6,7 +6,7 @@
 import { fetchSeoSeed } from '@/lib/seo-list';
 import { getStatus } from '@/components/team-matches/team-matches.card-model';
 import { formatCardDate, formatCardTime, formatTournamentDateMedium } from '@/lib/date-utils';
-import { competitionFormatLabel, isLeagueCompetition } from '@/lib/competition-kind';
+import { competitionFormatLabel } from '@/lib/competition-kind';
 import type { CursorPage, PageInfo, V1Team, V1TeamMatch, V1TournamentListItem, V1TournamentListPage } from '@/types/api';
 
 const LIST_LIMIT = 50;
@@ -181,8 +181,9 @@ function liveTournaments(items: readonly V1TournamentListItem[]): LandingLiveTou
       prizeText: item.promoHomePrizeText,
       imageUrl: item.promoHomeImageUrl ?? item.coverImageUrl ?? null,
       formatLabel: competitionFormatLabel(item),
+      // 정원 유무는 kind 로만 가른다 — format='league' 인 리그 방식 대회는 진짜 정원이 있다(competition-kind.ts).
       slots:
-        status === 'open' && !isLeagueCompetition(item) && typeof item.teamCount === 'number' && item.teamCount > 0
+        status === 'open' && item.kind !== 'regular_league' && typeof item.teamCount === 'number' && item.teamCount > 0
           ? { confirmed: Math.min(item.confirmedCount, item.teamCount), total: item.teamCount }
           : null,
       href: `/tournaments/${item.id}`,

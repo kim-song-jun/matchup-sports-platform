@@ -119,8 +119,9 @@ export function LandingV4Stage({ matches, countText, sportsText }: StageProps) {
     const top = section.getBoundingClientRect().top;
     const progress = stageProgress(top, scrollRange(section, sticky));
     // 무대에 닿기 전엔 첫 장면 연출을 아껴 두었다가 닿는 순간 재생한다
-    if (top <= window.innerHeight * 0.4) setArmed(true);
-    setScene(sceneFromProgress(progress));
+    if (top <= window.innerHeight * 0.4) setArmed((prev) => prev || true);
+    const next = sceneFromProgress(progress);
+    setScene((prev) => (prev === next ? prev : next));
     railRef.current?.querySelectorAll<HTMLElement>('[data-rail-bar]').forEach((bar, k) => {
       bar.style.setProperty('--tm-landing-v4-f', railFill(progress, k).toFixed(4));
     });

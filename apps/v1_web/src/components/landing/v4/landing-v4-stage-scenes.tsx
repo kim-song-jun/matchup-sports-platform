@@ -78,7 +78,7 @@ export function SceneFind({ matches, countText, example }: { matches: readonly L
         ))}
         {countText ? (
           <p className="lpm-cap tm-landing-v4-rise" style={delay(120 + shown.length * 120)}>
-            <b className="tm-landing-v4-accent-text">{countText}</b> 중 {shown.length}개를 보고 있어요
+            지금 열린 팀 매치 <b className="tm-landing-v4-accent-text">{countText}</b>
           </p>
         ) : null}
       </div>
@@ -107,7 +107,7 @@ export function SceneApply({ match, example }: { match: LandingLiveTeamMatch; ex
       </div>
       <div className="tm-landing-v4-apply-toast">
         <Check size={20} />
-        <span>신청했어요<small>체험용 예시라 실제로 신청되지 않아요</small></span>
+        <span>신청했어요<small>화면 예시라 실제로 신청되지 않아요</small></span>
       </div>
       <div className="tm-landing-v4-apply-cta">
         <span className="tm-landing-v4-apply-tap" />

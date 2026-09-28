@@ -108,7 +108,9 @@ export function LandingV4Stage({ matches, countText, sportsText }: StageProps) {
 
   const example = matches.length === 0;
   const cards = example ? EXAMPLE_TEAM_MATCHES : matches;
-  const scenes = buildScenes(countText, sportsText);
+  // 예시 카드일 땐 실데이터 수치를 섞지 않는다 — 무대 전체가 '예시' 한 가지 말투여야 한다
+  const shownCount = example ? null : countText;
+  const scenes = buildScenes(shownCount, example ? null : sportsText);
 
   const scrollRange = (section: HTMLElement, sticky: HTMLElement) => section.offsetHeight - sticky.offsetHeight;
 
@@ -139,7 +141,7 @@ export function LandingV4Stage({ matches, countText, sportsText }: StageProps) {
 
   const stateOf = (i: number) => (i === scene ? 'active' : i < scene ? 'past' : 'next');
   const screen = (i: number) =>
-    i === 0 ? <SceneFind matches={cards} countText={countText} example={example} />
+    i === 0 ? <SceneFind matches={cards} countText={shownCount} example={example} />
     : i === 1 ? <SceneApply match={cards[0]} example={example} />
     : i === 2 ? <SceneRoster />
     : i === 3 ? <SceneLive />

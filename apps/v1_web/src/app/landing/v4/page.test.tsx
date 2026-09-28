@@ -193,6 +193,15 @@ describe('LandingV4Page', () => {
     expect(stage.textContent).not.toContain('지금 올라온 팀 매치');
   });
 
+  it('예정된 실경기가 없어 예시 카드를 쓰면, 수치가 있어도 무대에 실데이터 문구를 섞지 않는다', async () => {
+    landingData.fetchLandingV4Data.mockResolvedValue({ ...FIXTURE, teamMatches: [] });
+    const { container } = await renderPage(LandingV4Page);
+    const stage = container.querySelector('#stage') as HTMLElement;
+    expect(stage.textContent).toContain('FC 한강 vs 성수 러너스');
+    expect(stage.textContent).not.toContain('지금 올라온 팀 매치');
+    expect(stage.textContent).not.toContain('지금 열린 팀 매치');
+  });
+
   it('움직임을 멈추면 무대가 세로 나열로 돌아가고, 켜면 장면 탭이 생긴다 — 두 경우 모두 5장면 문구가 있다', async () => {
     const { container } = await renderPage(LandingV4Page);
     const stage = container.querySelector('#stage') as HTMLElement;

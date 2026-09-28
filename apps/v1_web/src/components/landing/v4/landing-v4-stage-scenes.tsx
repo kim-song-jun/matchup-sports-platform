@@ -90,7 +90,7 @@ export function SceneApply({ match, example }: { match: LandingLiveTeamMatch; ex
   const tag = matchTag(match);
   return (
     <>
-      <div className="lpm-appbar"><ChevronLeft size={24} /><span className="lpm-appbar-title">팀 매치</span>{example ? <ExampleTag /> : null}</div>
+      <div className="lpm-appbar"><ChevronLeft size={24} aria-hidden="true" /><span className="lpm-appbar-title">팀 매치</span>{example ? <ExampleTag /> : null}</div>
       <div className="lpm-body">
         <div className="tm-landing-v4-apply-hero">
           <Image src="/illustrations/sport-futsal-hero-320.webp" alt="" width={320} height={320} sizes="160px" />
@@ -100,9 +100,9 @@ export function SceneApply({ match, example }: { match: LandingLiveTeamMatch; ex
           <b className="lpm-h">{match.hostName} vs {match.opponentName}</b>
         </div>
         <ul className="tm-landing-v4-apply-info">
-          <li><Clock size={16} />{match.dateTimeText}</li>
-          {(match.place ?? match.region) ? <li><MapPin size={16} />{match.place ?? match.region}</li> : null}
-          <li><Users size={16} />{tag.label}</li>
+          <li><Clock size={16} aria-hidden="true" />{match.dateTimeText}</li>
+          {(match.place ?? match.region) ? <li><MapPin size={16} aria-hidden="true" />{match.place ?? match.region}</li> : null}
+          <li><Users size={16} aria-hidden="true" />{tag.label}</li>
         </ul>
       </div>
       <div className="tm-landing-v4-apply-toast">

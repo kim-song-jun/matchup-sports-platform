@@ -4,6 +4,7 @@ import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/games.service';
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PublicUserRecordsService } from '../../src/games/public-records/public-user-records.service';
+import { syncGameSideRoster } from '../../src/games/roster/game-roster-sync';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 /**
@@ -12,12 +13,12 @@ import { PrismaService } from '../../src/prisma/prisma.service';
  * 증명하는 스펙. 개별 조각(라인업 자동 연결은
  * game-lineup-roster-identity-link.integration-spec.ts, 사용자 단위 동의
  * 판정은 public-user-records-assist-foul.integration-spec.ts)은 이미 각자
- * 검증돼 있지만, 그 둘이 실제로 이어붙는지 -- 매니저가 라인업에 저장한
+ * 검증돼 있지만, 그 둘이 실제로 이어붙는지 -- 참가 명단에서 계산된 경기 명단의
  * userId가 자동 연결을 만들고, 그 연결된 사용자가 나중에 동의하면 "이미 끝난
  * 과거 경기"까지 즉시 보이고, 개별로 다시 숨기면 다시 사라지는지 -- 는 어느
  * 기존 스펙도 하나의 흐름으로 잇지 않았다.
  *
- * 흐름: `games.saveLineup`(userId 포함, ROSTER_ASSERTED 자동 연결) ->
+ * 흐름: `syncGameSideRoster`(참가 명단 → 경기 명단, ROSTER_ASSERTED 자동 연결) ->
  * 결과 확정(officialAt + game.currentOfficialRevisionId -- 실제 command
  * 엔진으로 SCHEDULED->LIVE->ENDED를 다 돌리는 대신, 같은 최종 상태를
  * public-user-records-assist-foul.integration-spec.ts와 동일한 방식으로
@@ -76,7 +77,6 @@ describe('End-to-end: lineup roster link -> official result -> user-consent-gate
       where: { name: 'futsal-v1', status: 'ACTIVE' },
       orderBy: { version: 'desc' },
     });
-    const minPlayers = (config.lineup as { minPlayers: number }).minPlayers;
 
     await prisma.v1User.createMany({
       data: [ids.platformOps, ids.targetUser].map((id, index) => ({
@@ -102,8 +102,6 @@ describe('End-to-end: lineup roster link -> official result -> user-consent-gate
         { id: ids.awayTeam, ownerUserId: ids.platformOps, sportId: ids.sport, regionId: ids.region, name: 'Records E2E Away' },
       ],
     });
-    // targetUser는 호스트 팀의 active 멤버여야 saveLineup의 roster 검증을
-    // 통과한다 (LINEUP_USER_NOT_TEAM_MEMBER 게이트).
     await prisma.v1TeamMembership.create({
       data: { teamId: ids.hostTeam, userId: ids.targetUser, role: 'member', status: 'active' },
     });
@@ -161,25 +159,13 @@ describe('End-to-end: lineup roster link -> official result -> user-consent-gate
       await prisma.v1GameSide.findFirstOrThrow({ where: { gameId, sideKey: V1GameSideKey.HOME } })
     ).id;
 
-    // 1) 라인업 저장 -- targetUser를 로스터에 지정한다. saveLineup이 같은
-    // 트랜잭션에서 ROSTER_ASSERTED 연결을 자동 생성한다(별도 연결 요청/승인
-    // 없이 -- 이게 이번 작업이 메운 공백이다).
-    const guests = Array.from({ length: Math.max(minPlayers - 1, 0) }, (_, index) => ({
-      displayNameSnapshot: `Records E2E guest ${index + 1}`,
-      jerseyNumber: 50 + index,
-      started: true,
-    }));
-    const saved = await games.saveLineup(authUser(ids.platformOps), gameId, homeSideId, 'records-e2e-lineup', {
-      expectedVersion: 1,
-      clientCommandId: 'records-e2e-lineup',
-      participants: [
-        { displayNameSnapshot: 'Records E2E Player', jerseyNumber: 10, position: 'GOLEIRO', started: true, userId: ids.targetUser },
-        ...guests,
-      ],
-    });
+    // 1) 경기 명단 동기화 -- 참가 명단의 targetUser 가 경기 참가자가 되고, 같은 트랜잭션에서
+    // ROSTER_ASSERTED 연결이 생긴다(별도 연결 요청/승인 없이).
+    expect(await prisma.$transaction((tx) => syncGameSideRoster(tx, { gameId, sideId: homeSideId }))).toBe(true);
     participantId = (
       await prisma.v1GameParticipant.findFirstOrThrow({
-        where: { lineupId: saved.lineupId, displayNameSnapshot: 'Records E2E Player' },
+        where: { gameId, sideId: homeSideId, userId: ids.targetUser },
+        orderBy: { createdAt: 'desc' },
       })
     ).id;
     expect(

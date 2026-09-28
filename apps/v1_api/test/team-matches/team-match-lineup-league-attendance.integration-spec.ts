@@ -10,6 +10,9 @@ import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup
 /**
  * 팀매치 참석명단 저장에는 리그·친선 구분 없이 **참석 응답 게이트를 걸지 않는다.**
  *
+ * Task 176 이후 리그 대진은 이 경로로 명단을 저장하지 않는다(409, 경기 명단 조정으로 대체) —
+ * 아래 결함 설명은 친선 계약과 리그 조회(eligibleMembers)에만 남는다.
+ *
  * ## 무엇이 결함이었나
  *
  * 리그 대진은 운영자가 일괄 생성하고(`league-fixture-creation.ts`), 그때 양 팀에
@@ -247,34 +250,22 @@ describe('팀매치 참석명단 — 팀장·운영진 직접 등록', () => {
     await prisma.$disconnect();
   });
 
-  it('리그 대진은 참석 응답이 NOT_GOING 인 팀원도 저장되고, 참가자 행에 userId 가 실린다', async () => {
-    const saved = await service.saveLineup(
-      authUser(ids.hostOwner),
-      ids.leagueMatch,
-      'league-lineup-attendance-save',
-      {
-        expectedVersion: await currentVersion(ids.leagueMatch),
+  it('리그 대진은 팀장이 전체 명단을 저장할 수 없다 — 409 ROSTER_MANAGED_BY_ADJUSTMENTS, 새 리비전 없음 (Task 176)', async () => {
+    const version = await currentVersion(ids.leagueMatch);
+
+    const rejected = await captureFailure(() =>
+      service.saveLineup(authUser(ids.hostOwner), ids.leagueMatch, 'league-lineup-attendance-save', {
+        expectedVersion: version,
         starters: [
           { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
           { userId: ids.hostP2, jerseyNumber: 2 },
-          // 일정에는 NOT_GOING이지만 활성 팀원이므로 직접 등록할 수 있다.
           { userId: ids.hostNotAttending, jerseyNumber: 3 },
         ],
         bench: [],
-      },
+      }),
     );
-
-    const participants = await prisma.v1GameParticipant.findMany({
-      where: { lineupId: saved.lineupId },
-      orderBy: { jerseyNumber: 'asc' },
-      select: { userId: true, jerseyNumber: true },
-    });
-    // 저장된 것으로 끝이 아니다 — **사람이 실려야** 개인 기록·징계가 그를 찾는다.
-    expect(participants).toEqual([
-      { userId: ids.hostOwner, jerseyNumber: 1 },
-      { userId: ids.hostP2, jerseyNumber: 2 },
-      { userId: ids.hostNotAttending, jerseyNumber: 3 },
-    ]);
+    expectHttpCode(rejected, 409, 'ROSTER_MANAGED_BY_ADJUSTMENTS');
+    expect(await currentVersion(ids.leagueMatch)).toBe(version);
   });
 
   it('친선 매치도 참석 응답 없이 활성 팀원을 직접 저장한다', async () => {
@@ -300,25 +291,6 @@ describe('팀매치 참석명단 — 팀장·운영진 직접 등록', () => {
       select: { userId: true },
     });
     expect(participant).toEqual({ userId: ids.hostNotAttending });
-  });
-
-  it('리그 대진에서도 팀 소속이 아닌 사용자는 여전히 거부된다 (자격 판정 전체를 끈 것이 아니다)', async () => {
-    const version = await currentVersion(ids.leagueMatch);
-
-    const rejected = await captureFailure(() =>
-      service.saveLineup(authUser(ids.hostOwner), ids.leagueMatch, 'league-lineup-stranger', {
-        expectedVersion: version,
-        starters: [
-          { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
-          { userId: ids.hostP2, jerseyNumber: 2 },
-          { userId: ids.stranger, jerseyNumber: 3 },
-        ],
-        bench: [],
-      }),
-    );
-    expectHttpCode(rejected, 422, 'LINEUP_PARTICIPANT_INELIGIBLE');
-    // 거부된 시도가 새 리비전을 남기면 안 된다.
-    expect(await currentVersion(ids.leagueMatch)).toBe(version);
   });
 
   it('eligibleMembers는 리그와 친선 모두 활성 팀원을 직접 등록 가능하게 반환한다', async () => {

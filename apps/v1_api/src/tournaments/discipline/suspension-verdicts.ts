@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { ALL_COMPETITION_KINDS, findTournamentOnSurface } from '../tournament-surface-lookup';
 import {
@@ -195,43 +194,4 @@ export async function readSuspensionVerdicts(
     verdicts.set(userId, evaluateSuspension({ rules, played, upcomingGameOrder }));
   }
   return verdicts;
-}
-
-/**
- * 이 라인업에 출전정지 선수가 있으면 400 `DISCIPLINE_SUSPENDED` 로 막는다.
- *
- * **명단 = 출전자**이므로 갈래가 없다(정본 §3). 예전 이름과 주석은 "선발만 막고 후보는
- * 막지 않는다"고 적고 있었는데, 그 벤치 개념 자체가 폐기됐다 — `started` 로 좁히던
- * 조건도 함께 걷어냈다(쓰기 경로 7곳이 전부 `true` 라 결과는 같고, 남겨 두면 `started`
- * 가 다시 의미를 갖는 날 이 가드가 조용히 죽는다).
- *
- * 규정이 꺼진 대회·리그면 `readSuspensionVerdicts` 가 조회 없이 빈 맵을 돌려주므로 여기서도
- * 즉시 통과한다.
- */
-export async function assertNoSuspendedParticipants(
-  tx: Tx,
-  input: SuspensionVerdictInput & { readonly lineupId: string },
-): Promise<void> {
-  const verdicts = await readSuspensionVerdicts(tx, input);
-  if (verdicts.size === 0) return; // 규정 미적용이거나 누적 카드가 아직 없다.
-
-  const participants = await tx.v1GameParticipant.findMany({
-    where: { lineupId: input.lineupId },
-    select: { userId: true, displayNameSnapshot: true },
-  });
-  const blocked = participants
-    .map((participant) => {
-      const verdict = participant.userId === null ? undefined : verdicts.get(participant.userId);
-      return verdict?.suspended === true
-        ? { name: participant.displayNameSnapshot, reason: verdict.reason }
-        : null;
-    })
-    .filter((entry): entry is { name: string; reason: string | null } => entry !== null);
-  if (blocked.length === 0) return;
-
-  throw new BadRequestException({
-    code: 'DISCIPLINE_SUSPENDED',
-    message: `${blocked.map((entry) => entry.name).join(', ')} 선수는 출전정지 상태예요. 명단에서 빼고 다시 제출해 주세요.`,
-    details: { blocked },
-  });
 }

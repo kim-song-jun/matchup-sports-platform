@@ -39,6 +39,7 @@
 
 ### 진행 중 참석명단 수정
 
+- **Task 176**: 대회·리그 경기(`leagueId` 또는 `tournamentId` 가 있는 팀매치)는 `PUT .../lineup`·`POST .../lineup/submit`·`POST .../lineup/change-request` 가 모두 `409 ROSTER_MANAGED_BY_ADJUSTMENTS` 다(진행 중 포함). 경기 명단은 참가 명단에서 계산되고 빠지는 선수는 경기 명단 조정 API 로 뺀다. 아래 규칙은 친선에만 적용된다.
 - `GET /team-matches/:id/lineup`은 `gameState`와 `hasRecordedEvents`를 반환한다.
 - Game이 `LIVE` 또는 `PAUSED`이면 킥오프 이후나 기존 라인업이 `LOCKED`여도 팀 owner/manager가 참석명단을 새 리비전으로 저장하고 다시 제출할 수 있다. 종료·취소된 경기는 계속 차단한다.
 - 경기 이벤트가 하나라도 있으면 `PUT /team-matches/:id/lineup`은 `confirmRecordedDataRisk=true`를 요구한다. 없으면 `409 LINEUP_RECORDED_DATA_CONFIRMATION_REQUIRED`를 반환한다.

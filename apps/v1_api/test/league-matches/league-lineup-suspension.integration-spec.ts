@@ -3,12 +3,12 @@ import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { AdminContextService } from '../../src/common/admin-context.service';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
+import { loadGameRoster } from '../../src/games/roster/game-roster-loader';
 import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/games.service';
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { LeagueMatchAdminService } from '../../src/league-matches/league-match-admin.service';
 import type { NotificationsService } from '../../src/notifications/notifications.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup.service';
 
 /**
  * 정규 리그에도 출전정지 규정이 걸린다 — **옵트인이고, 리그 축으로 판정한다.**
@@ -23,9 +23,10 @@ import { TeamMatchLineupService } from '../../src/team-matches/team-match-lineup
  *
  * ## 이 스펙이 재는 것
  *
- * - 규정을 켠 리그: 앞 경기에서 레드카드를 받은 선수를 다음 경기 명단으로 제출하면 막힌다.
- * - 규정을 끈 리그: **똑같은 상황에서 그대로 통과한다**(옵트인 전제). 이 대조가 없으면
- *   "리그는 무조건 막는다" 와 구분되지 않는다.
+ * - 규정을 켠 리그: 앞 경기에서 레드카드를 받은 선수가 다음 경기 명단 계산에서 빠진다
+ *   (Task 176 — 예전의 제출 가드 400 대신 계산이 뺀다).
+ * - 규정을 끈 리그: **똑같은 상황에서 그대로 출전한다**(옵트인 전제). 이 대조가 없으면
+ *   "리그는 무조건 뺀다" 와 구분되지 않는다.
  * - 규정 수정은 첫 경기가 시작되면 잠긴다(소급 적용 방지).
  *
  * ## 결과 리비전은 SUBMITTED 다 — 공식 확정본이 아니다
@@ -77,7 +78,6 @@ const ids = {
 
 const prisma = new PrismaService();
 const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
-const lineups = new TeamMatchLineupService(prisma, new OperationAuditWriterService());
 
 function makeAdminService() {
   return new LeagueMatchAdminService(
@@ -463,145 +463,55 @@ describe('정규 리그 출전정지 — 옵트인 규정이 리그 축으로 �
     });
   }
 
-  async function saveNextLineup(teamMatchId: string, idempotencyKey: string) {
-    const view = await lineups.getLineup(authUser(ids.hostOwner), teamMatchId);
-    return lineups.saveLineup(authUser(ids.hostOwner), teamMatchId, idempotencyKey, {
-      expectedVersion: view.version,
-      starters: [
-        { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
-        { userId: ids.clean, jerseyNumber: 2 },
-        { userId: ids.suspended, jerseyNumber: 3 },
-      ],
-      bench: [],
+  /** 그 경기 홈 사이드의 계산된 경기 명단(Task 176 — 정지 선수는 계산이 뺀다). */
+  async function homeRoster(teamMatchId: string) {
+    const game = await prisma.v1Game.findUniqueOrThrow({
+      where: { teamMatchId },
+      select: { id: true, sides: { select: { id: true, sideKey: true } } },
     });
+    const homeSide = game.sides.find((side) => side.sideKey === V1GameSideKey.HOME)!;
+    const loaded = await prisma.$transaction((tx) => loadGameRoster(tx, { gameId: game.id, sideId: homeSide.id }));
+    if (loaded === null) throw new Error(`roster not computable for ${teamMatchId}`);
+    return {
+      participants: loaded.computation.participants.map((entry) => entry.userId).sort(),
+      suspended: loaded.computation.suspended.map((row) => row.entry.userId),
+    };
   }
 
-  it('규정을 켠 리그: 앞 경기 레드카드 선수를 다음 경기 명단으로 제출하면 400 DISCIPLINE_SUSPENDED 로 막힌다', async () => {
-    const saved = await saveNextLineup(ids.strictNext, 'league-suspension-strict-save');
+  const everyone = [ids.hostOwner, ids.suspended, ids.clean].sort();
+  const withoutSuspended = [ids.hostOwner, ids.clean].sort();
 
-    const rejected = await captureFailure(() =>
-      lineups.submitLineup(authUser(ids.hostOwner), ids.strictNext, 'league-suspension-strict-submit', {
-        expectedVersion: saved.revision,
-      }),
-    );
-    expectHttpCode(rejected, 400, 'DISCIPLINE_SUSPENDED');
-    // 누구 때문인지 화면이 말해 줘야 한다 — 이름 없이 막으면 팀장은 고칠 수가 없다.
-    expect((rejected as HttpException).getResponse()).toEqual(
-      expect.objectContaining({ details: { blocked: [expect.objectContaining({ name: expect.any(String) })] } }),
-    );
-
-    // 막힌 제출이 상태를 바꾸면 안 된다 — 초안 그대로여야 다시 고쳐 낼 수 있다.
-    const after = await lineups.getLineup(authUser(ids.hostOwner), ids.strictNext);
-    expect(after.state).toBe('DRAFT');
+  it('규정을 켠 리그: 앞 경기 레드카드 선수는 다음 경기 명단에서 빠진다', async () => {
+    expect(await homeRoster(ids.strictNext)).toEqual({ participants: withoutSuspended, suspended: [ids.suspended] });
   });
 
-  it('규정을 끈 리그: 똑같은 상황에서 그대로 제출된다 (옵트인)', async () => {
-    const saved = await saveNextLineup(ids.openNext, 'league-suspension-open-save');
-
-    const submitted = await lineups.submitLineup(
-      authUser(ids.hostOwner),
-      ids.openNext,
-      'league-suspension-open-submit',
-      { expectedVersion: saved.revision },
-    );
-    expect(submitted.state).toBe('SUBMITTED');
+  it('규정을 끈 리그: 똑같은 상황에서 그대로 출전한다 (옵트인)', async () => {
+    expect(await homeRoster(ids.openNext)).toEqual({ participants: everyone, suspended: [] });
   });
 
   /**
-   * **아직 치르지 않은 경기의 카드는 세지 않는다.**
-   *
-   * 결과 정정 때문에 나중 경기의 카드가 먼저 들어오는 경우가 실제로 있다. 정지 판정의
-   * 기준틀은 "몇 번째 경기인가" 이므로, 리그 축 정렬(`leagueFixtureListOrder()` --
-   * `startAt` → `id`)이 흐트러지면 미래의 카드가 과거로 둔갑해 **아무 잘못 없는 선수가
-   * 막힌다.**
-   *
-   * 이 케이스가 따로 있는 이유: 다른 케이스들은 "가드가 안 돌았다"·"폴백이 없다"·"정렬이
-   * 뒤집혔다" 가 **전부 같은 테스트 하나**만 red 로 만들어 원인을 못 가른다. 여기는
-   * **정렬이 뒤집힐 때만** red 가 되므로 신호가 갈린다.
+   * **아직 치르지 않은 경기의 카드는 세지 않는다.** 결과 정정으로 나중 경기의 카드가 먼저 들어오는
+   * 경우가 있다 — 경기 순서가 뒤집히면 미래의 카드가 과거로 둔갑해 잘못 없는 선수가 빠진다.
    */
-  it('나중 경기의 카드는 앞선 경기 제출을 막지 않는다 (리그 축 정렬)', async () => {
-    const view = await lineups.getLineup(authUser(ids.hostOwner), ids.futureCardEarly);
-    const saved = await lineups.saveLineup(authUser(ids.hostOwner), ids.futureCardEarly, 'league-suspension-order-save', {
-      expectedVersion: view.version,
-      starters: [
-        { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
-        { userId: ids.clean, jerseyNumber: 2 },
-        { userId: ids.suspended, jerseyNumber: 3 },
-      ],
-      bench: [],
-    });
+  it('나중 경기의 카드는 앞선 경기 명단에 영향을 주지 않는다 (리그 축 정렬)', async () => {
+    expect(await homeRoster(ids.futureCardEarly)).toEqual({ participants: everyone, suspended: [] });
+  });
 
-    const submitted = await lineups.submitLineup(
-      authUser(ids.hostOwner),
-      ids.futureCardEarly,
-      'league-suspension-order-submit',
-      { expectedVersion: saved.revision },
-    );
-    expect(submitted.state).toBe('SUBMITTED');
+  /** 공식 확정본의 카드도 센다 — SUBMITTED 폴백과 독립인 두 번째 신호다. */
+  it('공식 확정본의 카드도 다음 경기 명단에서 뺀다', async () => {
+    expect(await homeRoster(ids.officialNext)).toEqual({ participants: withoutSuspended, suspended: [ids.suspended] });
   });
 
   /**
-   * 카드가 **공식 확정본**에 있어도 걸린다.
-   *
-   * 이 케이스는 `SUBMITTED` 폴백과 **독립적**이다 — 폴백을 지워도 공식본은 그대로 세므로
-   * 여기는 green 으로 남는다. 그래서 "가드가 안 돌았다"(둘 다 red)와 "폴백이 없다"(제출본
-   * 케이스만 red)를 가르는 두 번째 신호가 된다.
+   * **경고 누적은 여러 경기에 걸쳐 세는 값이다.** 아래 두 케이스는 데이터가 같고 한도만 다르다 —
+   * 하나만 두면 "경고가 하나라도 있으면 뺀다" 와 구분되지 않는다.
    */
-  it('공식 확정본의 카드도 다음 경기 제출을 막는다', async () => {
-    const view = await lineups.getLineup(authUser(ids.hostOwner), ids.officialNext);
-    const saved = await lineups.saveLineup(authUser(ids.hostOwner), ids.officialNext, 'league-suspension-official-save', {
-      expectedVersion: view.version,
-      starters: [
-        { userId: ids.hostOwner, jerseyNumber: 1, goalkeeper: true },
-        { userId: ids.clean, jerseyNumber: 2 },
-        { userId: ids.suspended, jerseyNumber: 3 },
-      ],
-      bench: [],
-    });
-
-    const rejected = await captureFailure(() =>
-      lineups.submitLineup(authUser(ids.hostOwner), ids.officialNext, 'league-suspension-official-submit', {
-        expectedVersion: saved.revision,
-      }),
-    );
-    expectHttpCode(rejected, 400, 'DISCIPLINE_SUSPENDED');
+  it('한도 2인 리그: 앞 두 경기 경고 1장씩이면 다음 경기에서 빠진다', async () => {
+    expect(await homeRoster(ids.yellowHitNext)).toEqual({ participants: withoutSuspended, suspended: [ids.suspended] });
   });
 
-  /**
-   * **경고 누적은 여러 경기에 걸쳐 세는 값이다.** 레드카드는 한 경기의 한 장으로 끝나지만
-   * 이쪽은 앞선 경기들을 합산해야 하고, 그 합산이 **DB 를 거쳐** 맞는지는 여기서만 잰다
-   * (순수 함수 스펙은 자기가 만든 배열을 셀 뿐이다).
-   *
-   * 아래 두 케이스는 **데이터가 완전히 같고 한도만 다르다** — 그래야 갈리는 것이 누적
-   * 수라는 게 증명된다. 하나만 두면 "경고가 하나라도 있으면 막는다" 와 구분되지 않는다.
-   */
-  it('한도 2인 리그: 앞 두 경기 경고 1장씩이면 다음 경기 제출이 막힌다', async () => {
-    const saved = await saveNextLineup(ids.yellowHitNext, 'league-yellow-hit-save');
-
-    const rejected = await captureFailure(() =>
-      lineups.submitLineup(authUser(ids.hostOwner), ids.yellowHitNext, 'league-yellow-hit-submit', {
-        expectedVersion: saved.revision,
-      }),
-    );
-    expectHttpCode(rejected, 400, 'DISCIPLINE_SUSPENDED');
-    expect((rejected as HttpException).getResponse()).toEqual(
-      expect.objectContaining({ details: { blocked: [expect.objectContaining({ name: expect.any(String) })] } }),
-    );
-
-    const after = await lineups.getLineup(authUser(ids.hostOwner), ids.yellowHitNext);
-    expect(after.state).toBe('DRAFT');
-  });
-
-  it('한도 3인 리그: 같은 경고 2장으로는 막히지 않는다', async () => {
-    const saved = await saveNextLineup(ids.yellowUnderNext, 'league-yellow-under-save');
-
-    const submitted = await lineups.submitLineup(
-      authUser(ids.hostOwner),
-      ids.yellowUnderNext,
-      'league-yellow-under-submit',
-      { expectedVersion: saved.revision },
-    );
-    expect(submitted.state).toBe('SUBMITTED');
+  it('한도 3인 리그: 같은 경고 2장으로는 빠지지 않는다', async () => {
+    expect(await homeRoster(ids.yellowUnderNext)).toEqual({ participants: everyone, suspended: [] });
   });
 
   it('규정 수정은 첫 경기가 시작되면 잠긴다 — 시작 전에는 저장되고 상세에 그대로 보인다', async () => {

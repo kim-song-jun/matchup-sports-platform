@@ -1,30 +1,17 @@
-import { HttpException } from '@nestjs/common';
 import { V1GameSideKey, V1GameSourceType } from '@prisma/client';
 import { OperationAuditWriterService } from '../../src/common/audit/operation-audit-writer.service';
 import { GameTakeoverService } from '../../src/games/game-takeover.service';
 import { canonicalGameCommandPayloadHash, GamesService } from '../../src/games/games.service';
+import { loadGameRoster } from '../../src/games/roster/game-roster-loader';
 import type { GameCommandContext, GameSourceCreationInput } from '../../src/games/games.types';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 /**
- * 대회 축 출전정지 가드 — `GamesService.submitLineup` 이 `DISCIPLINE_SUSPENDED` 로 막는다.
+ * 대회 축 출전정지 — 규정이 있는 대회에서 앞 경기 레드카드 선수는 다음 경기 명단 계산에서 빠진다
+ * (Task 176, 예전에는 `GamesService.submitLineup` 의 400 가드였다).
  *
- * **이 스펙이 없던 동안 그 코드를 단언하는 테스트가 저장소 전체에 0건이었다.**
- * (`card-suspension.spec.ts` 는 순수 규칙만 보고 DB·가드를 지나지 않는다.) 그래서 규칙을
- * 축에서 떼어내는 리팩터가 들어올 때마다 "행동이 보존됐다" 를 **코드 대조로만** 말할 수
- * 있었다. 이 스펙이 그 자리를 실행으로 바꾼다.
- *
- * ## 왜 통합인가
- *
- * 판정이 성립하려면 **네 테이블의 관계**가 필요하다 — 대회의 규정 컬럼 · 픽스처의 일정
- * 순서 · 앞 경기 결과 리비전의 카드 · 그 카드가 붙은 참가자의 `userId`. mock 으로 만들면
- * 그 관계를 내가 지어내는 것이라 아무것도 증명하지 못한다.
- *
- * ## 왜 takeover 토큰이 없어도 되나
- *
- * 인계 토큰은 **참가팀의 사전 명단 제출에는 요구되지 않는다** — takeover 는 "현장 기기가
- * 이 경기를 배타적으로 장악 중" 이라는 라이브 운영 개념이라 경기 전 로스터 준비와 무관하다
- * (`submitLineup` 의 그 자리 주석). 그래서 팀장 신원으로 부르면 그 관문을 지나지 않는다.
+ * 판정이 성립하려면 **네 테이블의 관계**가 필요하다 — 대회의 규정 컬럼 · 경기 순서 · 앞 경기
+ * 결과 리비전의 카드 · 그 카드가 붙은 참가자의 `userId`. mock 으로는 그 관계를 지어내게 된다.
  */
 
 const ids = {
@@ -53,30 +40,7 @@ const ids = {
 const prisma = new PrismaService();
 const games = new GamesService(prisma, new OperationAuditWriterService(), new GameTakeoverService());
 
-const authUser = (id: string) => ({
-  id,
-  email: `${id}@example.test`,
-  accountStatus: 'active' as const,
-  onboardingStatus: 'completed' as const,
-});
-
-async function captureFailure(operation: () => Promise<unknown>) {
-  try {
-    await operation();
-  } catch (error) {
-    return error;
-  }
-  throw new Error('Expected operation to fail');
-}
-
-function expectHttpCode(error: unknown, status: number, code: string) {
-  expect(error).toBeInstanceOf(HttpException);
-  const exception = error as HttpException;
-  expect(exception.getStatus()).toBe(status);
-  expect(exception.getResponse()).toEqual(expect.objectContaining({ code }));
-}
-
-describe('대회 축 출전정지 — 라인업 제출이 DISCIPLINE_SUSPENDED 로 막힌다', () => {
+describe('대회 축 출전정지 — 다음 경기 명단 계산에서 빠진다', () => {
   let configId: string;
 
   beforeAll(async () => {
@@ -179,6 +143,13 @@ describe('대회 축 출전정지 — 라인업 제출이 DISCIPLINE_SUSPENDED �
         },
       ],
     });
+    await prisma.v1TournamentPlayer.createMany({
+      data: [ids.hostOwner, ids.suspended, ids.clean].map((userId) => ({
+        registrationId: input.hostRegistrationId,
+        userId,
+        realName: '참가 선수',
+      })),
+    });
     // 일정 순서가 정지 판정의 기준틀이다 — 앞 경기가 먼저 와야 그 카드가 "이미 치른
     // 경기" 로 잡힌다. 대회 경기는 canonical TeamMatch + Details가 정본이다.
     await prisma.v1TeamMatch.createMany({
@@ -253,7 +224,6 @@ describe('대회 축 출전정지 — 라인업 제출이 DISCIPLINE_SUSPENDED �
     }
 
     await seedRedCardResult(input.pastFixtureId);
-    await seedDraftRoster(input.nextFixtureId);
   }
 
   /** 앞 경기에 "레드카드 1장" 제출본을 심는다. */
@@ -298,18 +268,6 @@ describe('대회 축 출전정지 — 라인업 제출이 DISCIPLINE_SUSPENDED �
     });
   }
 
-  /** 다음 경기의 홈 라인업 초안에 정지 대상 선수를 넣어 둔다. */
-  async function seedDraftRoster(fixtureId: string) {
-    const { game, homeSide, homeLineup } = await loadGame(fixtureId);
-    await prisma.v1GameParticipant.createMany({
-      data: [
-        { gameId: game.id, sideId: homeSide.id, lineupId: homeLineup.id, userId: ids.hostOwner, displayNameSnapshot: '팀장', jerseyNumber: 1, started: true },
-        { gameId: game.id, sideId: homeSide.id, lineupId: homeLineup.id, userId: ids.clean, displayNameSnapshot: '멀쩡한 선수', jerseyNumber: 2, started: true },
-        { gameId: game.id, sideId: homeSide.id, lineupId: homeLineup.id, userId: ids.suspended, displayNameSnapshot: '퇴장 선수', jerseyNumber: 3, started: true },
-      ],
-    });
-  }
-
   async function loadGame(fixtureId: string) {
     const game = await prisma.v1Game.findFirstOrThrow({
       where: { teamMatchId: fixtureId },
@@ -324,37 +282,28 @@ describe('대회 축 출전정지 — 라인업 제출이 DISCIPLINE_SUSPENDED �
     return { game, homeSide, homeLineup };
   }
 
-  async function submitHomeLineup(fixtureId: string, commandId: string) {
-    const { game, homeLineup } = await loadGame(fixtureId);
-    return games.submitLineup(authUser(ids.hostOwner), game.id, homeLineup.id, commandId, {
-      expectedVersion: homeLineup.revision,
-      clientCommandId: commandId,
-    });
+  /** 다음 경기 홈 사이드의 계산된 경기 명단(Task 176 — 정지 선수는 계산이 뺀다). */
+  async function homeRoster(fixtureId: string) {
+    const { game, homeSide } = await loadGame(fixtureId);
+    const loaded = await prisma.$transaction((tx) => loadGameRoster(tx, { gameId: game.id, sideId: homeSide.id }));
+    if (loaded === null) throw new Error(`roster not computable for ${fixtureId}`);
+    return {
+      participants: loaded.computation.participants.map((entry) => entry.userId).sort(),
+      suspended: loaded.computation.suspended.map((row) => row.entry.userId),
+    };
   }
 
-  it('규정을 켠 대회: 앞 경기 레드카드 선수가 낀 명단은 400 DISCIPLINE_SUSPENDED 로 막힌다', async () => {
-    const rejected = await captureFailure(() =>
-      submitHomeLineup(ids.strictNextFixture, 'tournament-suspension-strict-submit'),
-    );
-    expectHttpCode(rejected, 400, 'DISCIPLINE_SUSPENDED');
-    // 누구 때문인지 화면이 말해 줘야 한다 — 이름 없이 막으면 팀장은 고칠 수가 없다.
-    expect((rejected as HttpException).getResponse()).toEqual(
-      expect.objectContaining({ details: { blocked: [expect.objectContaining({ name: '퇴장 선수' })] } }),
-    );
-
-    // 막힌 제출이 상태를 바꾸면 안 된다 — 초안 그대로여야 다시 고쳐 낼 수 있다.
-    const { homeLineup } = await loadGame(ids.strictNextFixture);
-    expect(homeLineup).toBeDefined();
-    const row = await prisma.v1GameLineup.findUniqueOrThrow({ where: { id: homeLineup.id } });
-    expect(row.state).toBe('DRAFT');
+  it('규정을 켠 대회: 앞 경기 레드카드 선수는 다음 경기 명단에서 빠진다', async () => {
+    expect(await homeRoster(ids.strictNextFixture)).toEqual({
+      participants: [ids.hostOwner, ids.clean].sort(),
+      suspended: [ids.suspended],
+    });
   });
 
-  it('규정을 끈 대회: 똑같은 상황에서 그대로 제출된다 (옵트인)', async () => {
-    const submitted = await submitHomeLineup(ids.openNextFixture, 'tournament-suspension-open-submit');
-    // `state` 는 **게임 상태**(SCHEDULED)다 — 명단 상태는 `lineupState` 다. 둘을 헷갈리면
-    // 라인업이 제출되지 않았는데도 통과하는 단언이 된다.
-    expect(submitted).toEqual(
-      expect.objectContaining({ lineupState: 'SUBMITTED', lineupRevision: 1, replayed: false }),
-    );
+  it('규정을 끈 대회: 똑같은 상황에서 그대로 출전한다 (옵트인)', async () => {
+    expect(await homeRoster(ids.openNextFixture)).toEqual({
+      participants: [ids.hostOwner, ids.suspended, ids.clean].sort(),
+      suspended: [],
+    });
   });
 });

@@ -477,19 +477,18 @@ alpha에는 `status === 'live'` 경기가 보통 없다(전부 `ended`). 라이�
 하프타임 배지, 라이브 스코어, 콘솔 재연결)는 "재현 불가"로 접지 말고 운영자 경로를 그대로 밟는다.
 
 ```
-라인업 저장·제출 → start → end-period(하프타임) → start-period(후반) → end-period → end
+start → end-period(하프타임) → start-period(후반) → end-period → end
 ```
 
-실측으로 확인된 계약 4개(하나라도 어기면 400/409/422):
+대회·리그 경기 명단은 참가 명단에서 계산된 제출본이라 라인업 단계가 없다(Task 176 — 라인업 저장·제출
+API 는 409 `ROSTER_MANAGED_BY_ADJUSTMENTS`, 빠질 선수는 `/games/:gameId/sides/:sideId/roster-adjustments`).
+
+실측으로 확인된 계약 2개(하나라도 어기면 409/422):
 1. **takeover 토큰은 REST로 못 받는다.** `TOURNAMENT_FIXTURE` 게임의 모든 커맨드에 필수인데
    발급 경로는 Socket.IO `/game-operations` 의 `game.takeover.request` 하나뿐이다
    (`socket.io-client` + `extraHeaders: { cookie }` + `auth: { clientInstanceId,
    authorizationSubjectVersion: 0 }`).
 2. **`Idempotency-Key` 헤더 = body의 `clientCommandId`.** 다르면 422 `COMMAND_IDEMPOTENCY_KEY_MISMATCH`.
-3. **라인업 참가자에 `started: boolean` 필수.** 빼면 400인데 `details.messages`가 빈 배열로 와서
-   원인이 안 보인다. `participantId`는 optional이라 `displayNameSnapshot`만으로 구성 가능(풋살 `minPlayers: 3`).
-4. **라인업 수정은 `state === 'SCHEDULED'` 동안만.** 이후 409 `LINEUP_DEADLINE_PASSED` — 이미 시작된
-   경기를 재사용할 땐 라인업 단계를 건너뛴다.
 
 ### 4. 판정은 공개 API를 ground truth로
 

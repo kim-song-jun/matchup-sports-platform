@@ -13,8 +13,6 @@ import { canonicalGameCommandPayloadHash, createRosterAssertedIdentityLink } fro
 import { PrismaService } from '../prisma/prisma.service';
 import { parseLineupCatalog, parseLineupConfigForResponse } from '../tournaments/competition-config/competition-config.parse';
 import { findRejectedLineupPosition, rejectedLineupPositionMessage } from '../games/core/lineup-position';
-import { assertNoSuspendedParticipants } from '../tournaments/discipline/suspension-verdicts';
-import { loadTeamCompetitionGameOrder } from '../tournaments/discipline/team-game-order';
 import {
   carryRevokedConsent,
   latestConsentSnapshotByLinkId,
@@ -78,14 +76,21 @@ interface TeamMatchLineupContext {
   opponentSideId: string;
   opponentTeamId: string | null;
   role: 'team_owner' | 'team_manager';
-  /**
-   * 정규 리그의 대진이면 그 리그(`V1Tournament(kind='regular_league')`)의 id, 친선이면
-   * `null`. 이 저장소가 이미 쓰는 리그/친선 판별자와 같은 값이다
-   * (`team-record-category.ts`).
-   *
-   * 출전정지 집계는 이 id로 해당 리그의 규정과 경기 목록을 읽는다.
-   */
-  leagueId: string | null;
+  /** 대회·리그 경기(`leagueId` 또는 `tournamentId`). 친선만 false. */
+  isCompetition: boolean;
+}
+
+/**
+ * 대회·리그 경기 명단은 참가 명단에서 계산되고 팀장의 뜻은 조정 기록으로만 들어간다(Task 176).
+ * 여기서 전체 명단을 쓰면 동기화가 그 리비전을 팀장 저장본으로 보고 멈추므로 쓰기를 모두 막는다.
+ */
+function assertFriendlyLineupRoute(context: TeamMatchLineupContext): void {
+  if (!context.isCompetition) return;
+  throw new ConflictException({
+    code: 'ROSTER_MANAGED_BY_ADJUSTMENTS',
+    message: '대회·리그 경기 명단은 참가 명단에서 정해져요. 빠지는 선수는 경기 명단 조정에서 빼 주세요.',
+    details: { gameId: context.gameId, sideId: context.ownSideId },
+  });
 }
 
 function assertLineupMutationAllowed(context: TeamMatchLineupContext): void {
@@ -142,6 +147,7 @@ export class TeamMatchLineupService {
       // idempotent replay — mirroring GamesService.withCommand, which
       // resolves the actor before consulting the idempotency record.
       const context = await this.loadContext(tx, teamMatchId, user.id);
+      assertFriendlyLineupRoute(context);
       return this.withIdempotency(
         tx,
         {
@@ -219,8 +225,7 @@ export class TeamMatchLineupService {
           // 않는데, 신원 연결(V1ParticipantIdentityLinkCurrent)의 키가 바로 그 participantId
           // 다. 저장 후 다시 조회해 이름으로 짝지으면 동명이인에서 **엉뚱한 사람에게 기록이
           // 붙는다** — 이 도메인에서 가장 큰 사고라 id 를 직접 받는 쪽을 택했다. 라인업 한
-          // 건은 20명 안팎이라 왕복 비용도 문제되지 않으며, 대회 라인업의 범용 경로
-          // (GamesService.saveLineup)도 같은 이유로 이미 개별 create 를 쓴다.
+          // 건은 20명 안팎이라 왕복 비용도 문제되지 않는다.
           for (const entry of entries) {
             const created = await tx.v1GameParticipant.create({
               data: {
@@ -292,6 +297,7 @@ export class TeamMatchLineupService {
   ) {
     return this.serializable(async (tx) => {
       const context = await this.loadContext(tx, teamMatchId, user.id);
+      assertFriendlyLineupRoute(context);
       return this.withIdempotency(
         tx,
         {
@@ -331,25 +337,6 @@ export class TeamMatchLineupService {
               details: { expectedVersion: dto.expectedVersion, currentVersion: lineup.revision },
             });
           }
-          // **출전정지 가드는 제출에만 건다** — 대회도 같다(`GamesService.submitLineup`).
-          // 초안(`saveLineup`)에서 막으면 명단을 짜는 도중에 계속 튕겨 작성 자체가 안 된다.
-          //
-          // 리그가 아니면(친선) `leagueId` 가 null 이라 호출조차 하지 않는다. 리그여도
-          // 규정(`yellowAccumulationLimit`·`redCardSuspensionMatches`)이 꺼져 있으면 공유
-          // 함수가 조회 없이 통과시킨다 — **옵트인**이다.
-          if (context.leagueId !== null) {
-            await assertNoSuspendedParticipants(tx, {
-              competitionId: context.leagueId,
-              orderedGames: await loadTeamCompetitionGameOrder(tx, {
-                competitionId: context.leagueId,
-                isLeague: true,
-                teamId: context.ownTeamId,
-              }),
-              upcomingKey: context.teamMatchId,
-              lineupId: lineup.id,
-            });
-          }
-
           const submitted = await tx.v1GameLineup.update({
             where: { id: lineup.id },
             data: {
@@ -386,6 +373,7 @@ export class TeamMatchLineupService {
   ) {
     return this.serializable(async (tx) => {
       const context = await this.loadContext(tx, teamMatchId, user.id);
+      assertFriendlyLineupRoute(context);
       return this.withIdempotency(
         tx,
         {
@@ -638,6 +626,7 @@ export class TeamMatchLineupService {
         status: true,
         startAt: true,
         leagueId: true,
+        tournamentId: true,
       },
     });
     if (teamMatch === null) {
@@ -684,6 +673,7 @@ export class TeamMatchLineupService {
       });
     }
     const role = membership.role === 'owner' ? ('team_owner' as const) : ('team_manager' as const);
+    const isCompetition = teamMatch.leagueId !== null || teamMatch.tournamentId !== null;
     if (membership.teamId === teamMatch.hostTeamId) {
       return {
         gameId: game.id,
@@ -697,7 +687,7 @@ export class TeamMatchLineupService {
         opponentSideId: awaySide.id,
         opponentTeamId: teamMatch.approvedApplicantTeamId,
         role,
-        leagueId: teamMatch.leagueId,
+        isCompetition,
       };
     }
     return {
@@ -712,7 +702,7 @@ export class TeamMatchLineupService {
       opponentSideId: hostSide.id,
       opponentTeamId: teamMatch.hostTeamId,
       role,
-      leagueId: teamMatch.leagueId,
+      isCompetition,
     };
   }
 

@@ -1,5 +1,13 @@
 # v1_api
 
+## 1.0.2
+
+### Patch Changes
+
+- 81ae2d2: 개인매치 주최자의 빈 채팅방 생성을 막고 승인 참가자와의 채팅 권한을 보완하며, 모바일 하단 액션을 두 개의 주요 버튼과 별도 수정 링크로 정리합니다.
+- 2a60f87: dev→main 승격을 수동 GitHub Actions 워크플로 하나(`promote-main.yml`, "Promote to main")로 자동화합니다. alpha 검증(커밋·prereleaseVersion 일치) 후 미소비 changeset이 있으면 버전을 올려 dev에 커밋·push하고, 승격 게이트를 미리 확인한 뒤 dev→main PR을 열 링크를 job summary에 남깁니다(Actions의 PR 생성이 저장소 설정상 막혀 있어 PR 자체는 사람이 엽니다). 이 자동화가 늘 "GitHub Actions is not permitted to create or approve pull requests"로 실패하던 옛 `release-main.yml`을 대체합니다.
+- 69efd27: 팀매치 상세에서 상대팀이 아직 확정되지 않은 경우 생성팀과 관리자 승인 홈팀 모두 동일하게 모집 중 상태를 표시합니다.
+
 ## 1.0.1
 
 ### Patch Changes
